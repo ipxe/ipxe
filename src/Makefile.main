@@ -302,11 +302,6 @@ $(FILO)/main/version.h: FORCE
 FORCE:
 
 
-# Utilities
-
-$(BIN)/lzhuf:	util/lzhuf.c
-	$(HOST_CC) -O2 -DENCODE -DDECODE -DMAIN -DVERBOSE -o $@ $<
-
 # Roms file
 # Builds almost silently because this rule is triggered for just about
 # every modification to sources.
