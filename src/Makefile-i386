@@ -1,0 +1,18 @@
+ARCH:=i386
+MAKEDEPS:=
+
+include arch/$(ARCH)/Config
+include Config
+
+CC=		i386-linux-gcc
+AS=		i386-linux-as
+LD=		i386-linux-ld
+SIZE=		i386-linux-size
+AR=		i386-linux-ar
+RANLIB=		i386-linux-ranlib
+OBJCOPY=	i386-linux-objcopy
+
+MAKEDEPS+=Makefile-i386
+BIN=bin-i386
+
+include Makefile.main

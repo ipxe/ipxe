@@ -1,0 +1,307 @@
+
+	Instructions for use of the 3C90X driver for EtherBoot
+
+		Original 3C905B support by:
+			Greg Beeley (Greg.Beeley@LightSys.org),
+			LightSys Technology Services, Inc.
+			February 11, 1999
+
+		Updates for 3C90X family by:
+			Steve Smith (steve.smith@juno.com)
+			October 1, 1999
+
+		Minor documentation updates by
+			Greg Beeley (Greg.Beeley@LightSys.org)
+			March 29, 2000
+
+-------------------------------------------------------------------------------
+
+I   OVERVIEW
+
+    The 3c90X series ethernet cards are a group of high-performance busmaster
+    DMA cards from 3Com.  This particular driver supports both the 3c90x and
+    the 3c90xB revision cards.  3C90xC family support has been tested to some
+    degree but not extensively.
+
+    Here's the licensing information:
+
+    This program Copyright (C) 1999 LightSys Technology Services, Inc.
+    Portions Copyright (C) 1999 Steve Smith.
+
+    This program may be re-distributed in source or binary form, modified,
+    sold, or copied for any purpose, provided that the above copyright message
+    and this text are included with all source copies or derivative works, and
+    provided that the above copyright message and this text are included in the
+    documentation of any binary-only distributions.  This program is
+    distributed WITHOUT ANY WARRANTY, without even the warranty of FITNESS FOR
+    A PARTICULAR PURPOSE or MERCHANTABILITY.  Please read the associated
+    documentation "3c90x.txt" before compiling and using this driver.
+
+
+II  FLASH PROMS
+
+    The 3c90xB cards, according to the 3Com documentation, only accept the
+    following flash memory chips:
+
+	Atmel AT29C512 (64 kilobyte)
+	Atmel AT29C010 (128 kilobyte)
+
+    The 3c90x cards, according to the 3Com documentation, accept the
+    following flash memory chips capacities:
+
+	64  kb (8 kB)
+	128 kb (16 kB)
+	256 kb (32 kB) and
+	512 kb (64 kB)
+
+    Atmel AT29C512 (64 kilobyte) chips are specifically listed for both
+    adapters, but flashing on the 3c905b cards would only be supported
+    through the Atmel parts.  Any device, of the supported size, should
+    be supported when programmed by a dedicated PROM programmer (e.g.
+    not the card).
+
+    To use this driver in such a PROM, visit Atmel's web site and download
+    their .PDF file containing a list of their distributors.  Contact the
+    distributors for pricing information.  The prices are quite reasonable
+    (about $3 US each for the 64 kB part), and are comparable to what one would
+    expect for similarly sized standard EPROMs.  And, the flash chips are much
+    easier to work with, as they don't need to be UV-erased to be reprogrammed.
+    The 3C905B card actually provides a method to program the flash memory
+    while it is resident on board the card itself; if someone would like to
+    write a small DOS program to do the programming, I can provide the
+    information about the registers and so forth.
+
+    A utility program, 3c90xutil, is provided with Etherboot in the 'contrib'
+    directory that allows for the on-board flashing of the ROM while Linux
+    is running.  The program has been successfully used under Linux, but I
+    have heard problem reports of its use under FreeBSD.  Anyone willing to
+    make it work under FreeBSD is more than welcome to do so!
+
+    You also have the option of using EPROM chips - the 3C905B-TX-NM has been
+    successfully tested with 27C256 (32kB) and 27C512 (64kB) chips with a
+    specified access time of 100ns and faster.
+
+
+III GENERAL USE
+
+    Normally, the basic procedure for using this driver is as follows:
+
+	1.  Run the 3c90xcfg program on the driver diskette to enable the
+	boot PROM and set it to 64k or 128k, as appropriate.
+	2.  Build the appropriate 3c90x.fd0 or 3c90x.fd0 floppy image with
+	possibly the value CFG_3C90X_XCVR defined to the transceiver type that
+	you want to use (i.e., 10/100 rj45, AUI, coax, MII).
+	3.  Run the floppy image on the PC to be network booted, to get
+	it configured, and to verify that it will boot properly.
+	4.  Build the 3c90x.rom or 3c90x.lzrom PROM image and program
+	it into the flash or EPROM memory chip.
+	5.  Put the PROM in the ethernet card, boot and enable 'boot from
+	network first' in the system BIOS, save and reboot.
+
+    Here are some issues to be aware of:
+
+	1.  If you experience crashes or different behaviour when using the
+	boot PROM, add the setting CFG_3C90X_BOOTROM_FIX and go through the
+	steps 2-5 above.  This works around a bug in some 3c905B cards (see
+	below), but has some side-effects which may not be desirable.
+        Please note that you have to boot off a floppy (not PROM!) once for
+        this fix to take effect.
+	2.  The possible need to manually set the CFG_3C90X_XCVR value to
+	configure the transceiver type.  Values are listed below.
+	3.  The possible need to define CFG_3C90X_PRESERVE_XCVR for use in
+	operating systems that don't intelligently determine the
+	transceiver type.
+
+    Some things that are on the 'To-Do' list, perhaps for me, but perhaps
+    for any other volunteers out there:
+
+	1.  Extend the driver to fully implement the auto-select
+	algorithm if the card has multiple media ports.
+	2.  Fix any bugs in the code <grin>....
+	3.  Extend the driver to support the 3c905c revision cards
+	"officially".  Right now, the support has been primarily empirical
+	and not based on 3c905C documentation.
+
+    Now for the details....
+
+    This driver has been tested on roughly 300 systems.  The main two
+    configuration issues to contend with are:
+
+	1.  Ensure that PCI Busmastering is enabled for the adapter (configured
+	in the CMOS setup)
+	2.  Some systems don't work properly with the adapter when plug and
+	play OS is enabled; I always set it to "No" or "Disabled" -- this makes
+	it easier and really doesn't adversely affect anything.
+
+    Roughly 95% of the systems worked when configured properly.  A few
+    have issues with booting locally once the boot PROM has been installed
+    (this number has been less than 2%).  Other configuration issues that
+    to check:
+
+	1.  Newer BIOS's actually work correctly with the network boot order.
+	Set the network adapter first.  Most older BIOS's automatically go to
+	the network boot PROM first.
+	2.  For systems where the adapter was already installed and is just
+	having the PROM installed, try setting the "reset configuration data"
+	to yes in the CMOS setup if the BIOS isn't seen at first.  If your BIOS
+	doesn't have this option, remove the card, start the system, shut down,
+	install the card and restart (or switch to a different PCI slot).
+	3.  Make sure the CMOS security settings aren't preventing a boot.
+
+    The 3c905B cards have a significant 'bug' that relates to the flash prom:
+    unless the card is set internally to the MII transceiver, it will only
+    read the first 8k of the PROM image.  Don't ask why -- it seems really
+    obscure, but it has to do with the way they mux'd the address lines
+    from the PCI bus to the ROM.  Unfortunately, most of us are not using
+    MII transceivers, and even the .lzrom image ends up being just a little
+    bit larger than 8k.  Note that the workaround for this is disabled by
+    default, because the Windows NT 4.0 driver does not like it (no packets
+    are transmitted).
+
+    So, the solution that I've used is to internally set the card's nvram
+    configuration to use MII when it boots.  The 3c905b driver does this
+    automatically.  This way, the 16k prom image can be loaded into memory,
+    and then the 3c905b driver can set the temporary configuration of the
+    card to an appropriate value, either configurable by the user or chosen
+    by the driver.
+
+    To enable the 3c905B bugfix, which is necessary for these cards when 
+    booting from the Flash ROM, define -DCFG_3C90X_BOOTROM_FIX when building,
+    create a floppy image and boot it once.
+    Thereafter, the card should accept the larger prom image.
+
+    The driver should choose an appropriate transceiver on the card.  However,
+    if it doesn't on your card or if you need to, for instance, set your
+    card to 10mbps when connected to an unmanaged 10/100 hub, you can specify
+    which transceiver you want to use.  To do this, build the 3c905b.fd0
+    image with -DCFG_3C90X_XCVR=x, where 'x' is one of the following
+    values:
+
+	0	10Base-T
+	1	10mbps AUI
+	3	10Base-2 (thinnet/coax)
+	4	100Base-TX
+	5	100Base-FX
+	6	MII
+	8	Auto-negotiation 10Base-T / 100Base-TX (usually the default)
+	9	MII External MAC Mode
+	255	Allow driver to choose an 'appropriate' media port.
+
+    Then proceed from step 2 in the above 'general use' instructions.  The
+    .rom image can be built with CFG_3C90X_XCVR set to a value, but you
+    normally don't want to do this, since it is easier to change the
+    transceiver type by rebuilding a new floppy, changing the BIOS to floppy
+    boot, booting, and then changing the BIOS back to network boot.  If
+    CFG_3C90X_XCVR is not set in a particular build, it just uses the
+    current configuration (either its 'best guess' or whatever the stored
+    CFG_3C90X_XCVR value was from the last time it was set).
+
+    [[ Note for the more technically inclined:  The CFG_3C90X_XCVR value is
+    programmed into a register in the card's NVRAM that was reserved for
+    LanWorks PROM images to use.  When the driver boots, the card comes
+    up in MII mode, and the driver checks the LanWorks register to find
+    out if the user specified a transceiver type.  If it finds that
+    information, it uses that, otherwise it picks a transceiver that the
+    card has based on the 3c905b's MediaOptions register.  This driver isn't
+    quite smart enough to always determine which media port is actually
+    _connected_; maybe someone else would like to take on that task (it
+    actually involves sending a self-directed packet and seeing if it
+    comes back.  IF it does, that port is connected). ]]
+
+    Another issue to keep in mind is that it is possible that some OS'es
+    might not be happy with the way I've handled the PROM-image hack with
+    setting MII mode on bootup.  Linux 2.0.35 does not have this problem.
+    Behavior of other systems may vary.  The 3com documentation specifically
+    says that, at least with the card that I have, the device driver in the
+    OS should auto-select the media port, so other drivers should work fine
+    with this 'hack'.  However, if yours doesn't seem to, you can try defining
+    CFG_3C90X_PRESERVE_XCVR when building to cause Etherboot to keep the
+    working setting (that allowed the bootp/tftp process) across the eth_reset
+    operation.
+
+
+IV  FOR DEVELOPERS....
+
+    If you would like to fix/extend/etc. this driver, feel free to do so; just
+    be sure you can test the modified version on the 3c905B-TX cards that the
+    driver was originally designed for.  This section of this document gives
+    some information that might be relevant to a programmer.
+
+    A.  Main Entry Point
+
+	a3c90x_probe is the main entry point for this driver.  It is referred
+	to in an array in 'config.c'.
+
+    B.  Other Important Functions
+
+	The functions a3c90x_transmit, a3c90x_poll, a3c90x_reset, and
+	a3c90x_disable are static functions that EtherBoot finds out about
+	as a  result of a3c90x_probe setting entries in the nic structure
+	for them.  The EtherBoot framework does not use interrupts.  It is
+	polled.  All transmit and receive operations are initiated by the
+	etherboot framework, not by an interrupt or by the driver.
+
+    C.  Internal Functions
+
+	The following functions are internal to the driver:
+
+	a3c90x_internal_IssueCommand - sends a command to the 3c905b card.
+	a3c90x_internal_SetWindow - shifts between one of eight register
+	windows onboard the 3c90x.  The bottom 16 bytes of the card's
+	I/O space are multiplexed among 128 bytes, only 16 of which are
+	visible at any one time.  This SetWindow function selects one of
+	the eight sets.
+	a3c90x_internal_ReadEeprom - reads a word (16 bits) from the
+	card's onboard nvram.  This is NOT the BIOS boot rom.  This is
+	where the card stores such things as its hardware address.
+	a3c90x_internal_WriteEeprom - writes a word (16 bits) to the
+	card's nvram, and recomputes the eeprom checksum.
+	a3c90x_internal_WriteEepromWord - writes a word (16 bits) to the
+	card's nvram.  Used by the above routine.
+	a3c90x_internal_WriteEepromWord - writes a word (16 bits) to the
+	card's nvram.  Used by the above routine.
+
+    D.  Globals
+
+	All global variables are inside a global structure named INF_3C90X.
+	So, wherever you see that structure referenced, you know the variable
+	is a global.  Just keeps things a little neater.
+
+    E.  Enumerations
+
+	There are quite a few enumerated type definitions for registers and
+	so forth, many for registers that I didn't even touch in the driver.
+	Register types start with 'reg', window numbers (for SetWindow)
+	start with 'win', and commands (for IssueCommand) start with 'cmd'.
+	Register offsets also include an indication in the name as to the
+	size of the register (_b = byte, _w = word, _l = long), and which
+	window the register is in, if it is windowed (0-7).
+
+    F.  Why the 'a3c90x' name?
+
+	I had to come up with a letter at the beginning of all of the
+	identifiers, since 3com so conveniently had their name start with a
+	number.  Another driver used 't' (for 'three'?); I chose 'a' for
+	no reason at all.
+
+Addendum by Jorge L. deLyra <delyra@latt.if.usp.br>, 22Nov2000 re
+working around the 3C905 hardware bug mentioned above:
+
+Use this floppy to fix any 3COM model 3C905B PCI 10/100 Ethernet cards
+that fail to load and run the boot program the first time around. If
+they have a "Lucent" rather than a "Broadcom" chipset these cards have
+a configuration bug that causes a hang when trying to load the boot
+program from the PROM, if you try to use them right out of the box.
+
+The boot program in this floppy is the file named 3c905b-tpo100.rom
+from Etherboot version 4.6.10, compiled with the bugfix parameter
+
+			CFG_3C90X_BOOTROM_FIX
+
+You have to take the chip off the card and boot the system once using
+this floppy. Once loaded from the floppy, the boot program will access
+the card and change some setting in it, correcting the problem. After
+that you may use either this boot program or the normal one, compiled
+without this bugfix parameter, to boot the machine from the PROM chip.
+
+[Any recent Etherboot version should do, not just 4.6.10 - Ed.]

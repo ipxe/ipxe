@@ -1,0 +1,18 @@
+ARCH:=ia64
+MAKEDEPS:=
+
+include arch/$(ARCH)/Config
+include Config
+
+CC=		ia64-linux-gcc
+AS=		ia64-linux-as
+LD=		ia64-linux-ld
+SIZE=		ia64-linux-size
+AR=		ia64-linux-ar
+RANLIB=		ia64-linux-ranlib
+OBJCOPY=	ia64-linux-objcopy
+
+MAKEDEPS+=Makefile-ia64
+BIN=bin-ia64
+
+include Makefile.main

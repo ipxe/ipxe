@@ -1,0 +1,450 @@
+#
+# Config for Etherboot/32
+#
+# Do not delete the tag OptionDescription and /OptionDescription
+# It is used to automatically generate the documentation.
+#
+# @OptionDescription@
+#	User interaction options:
+#
+#	-DASK_BOOT=n
+#			Ask "Boot from (N)etwork ... or (Q)uit? " 
+#			at startup, timeout after n seconds (0 = no timeout).
+#			If unset or negative, don't ask and boot immediately
+#			using the default.
+#	-DBOOT_FIRST
+#	-DBOOT_SECOND
+#	-DBOOT_THIRD
+#			On timeout or Return key from previous
+#			question, selects the order to try to boot from
+#			various devices.
+#			(alternatives: BOOT_NIC, BOOT_DISK,
+#			 BOOT_FLOPPY, BOOT_NOTHING)
+#			See etherboot.h for prompt and answer strings.
+#			BOOT_DISK and BOOT_FLOPPY work only where a driver
+#			exists, e.g. in LinuxBIOS.
+#			They have no effect on PCBIOS.
+#	-DBOOT_INDEX	The device to boot from 0 == any device.
+#			1 == The first nic found.
+#			2 == The second nic found
+#			...
+#			BOOT_INDEX only applies to the BOOT_FIRST.  BOOT_SECOND 
+#			and BOOT_THIRD search through all of the boot devices.
+#	-DBAR_PROGRESS
+#			Use rotating bar instead of sequential dots
+#			to indicate an IP packet transmitted.
+#
+#	Boot order options:
+#
+#	-DBOOT_CLASS_FIRST
+#	-DBOOT_CLASS_SECOND
+#	-DBOOT_CLASS_THIRD
+#			Select the priority of the boot classes
+#			Valid values are:
+#				BOOT_NIC
+#				BOOT_DISK
+#				BOOT_FLOPPY
+#	BOOT_DISK and BOOT_FLOPPY work only where a driver exists,
+#	e.g. in LinuxBIOS.  They have no effect on PCBIOS.
+#
+#	Boot autoconfiguration protocol options:
+#
+#	-DALTERNATE_DHCP_PORTS_1067_1068
+#			Use ports 1067 and 1068 for DHCP instead of 67 and 68.
+#			As these ports are non-standard, you need to configure
+#			your DHCP server to use them. This option gets around
+#			existing DHCP servers which cannot be touched, for
+#			one reason or another, at the cost of non-standard
+#			boot images.
+#	-DNO_DHCP_SUPPORT
+#			Use BOOTP instead of DHCP.
+#	-DRARP_NOT_BOOTP
+#			Use RARP instead of BOOTP/DHCP.
+#	-DREQUIRE_VCI_ETHERBOOT
+#			Require an encapsulated Vendor Class Identifier
+#			of "Etherboot" in the DHCP reply
+#			Requires DHCP support.
+#	-DDHCP_CLIENT_ID=\"Identifier\"
+#	-DDHCP_CLIENT_ID_LEN=<Client ID length in octets>
+#	-DDHCP_CLIENT_ID_TYPE=<Client ID type>
+#			Specify a RFC2132 Client Identifier option, length and type.
+#			Requires DHCP support.
+#	-DDHCP_USER_CLASS=\"UserClass\"
+#	-DDHCP_USER_CLASS_LEN=<User Class length in octets>
+# 			Specify a RFC3004 User Class option and length. Use this
+#			option to set a UC (or multiple UCs) rather than munge the
+#			client Vendor Class ID.
+#			Requires DHCP support.
+#	-DALLOW_ONLY_ENCAPSULATED
+#			Ignore Etherboot-specific options that are not within
+#			the Etherboot encapsulated options field.  This option
+#			should be enabled unless you have a legacy DHCP server
+#			configuration from the bad old days before the use of
+#			encapsulated Etherboot options.
+#	-DDEFAULT_BOOTFILE=\"default_bootfile_name\"
+#			Define a default bootfile for the case where your DHCP
+#			server does not provide the information.  Example:
+#			  -DDEFAULT_BOOTFILE="tftp:///tftpboot/kernel"
+#			If you do not specify this option, then DHCP offers that
+#			do not specify bootfiles will be ignored.
+#
+#	NIC tuning parameters:
+#
+#	-DALLMULTI
+#			Turns on multicast reception in the NICs.
+#
+#	Boot tuning parameters:
+#
+#	-DCONGESTED
+#			Turns on packet retransmission.	 Use it on a
+#			congested network, where the normal operation
+#			can't boot the image.
+#	-DBACKOFF_LIMIT
+#			Sets the maximum RFC951 backoff exponent to n.
+#			Do not set this unreasonably low, because on networks
+#			with many machines they can saturate the link
+#			(the delay corresponding to the exponent is a random
+#			time in the range 0..3.5*2^n seconds).	Use 5 for a
+#			VERY small network (max. 2 minutes delay), 7 for a
+#			medium sized network (max. 7.5 minutes delay) or 10
+#			for a really huge network with many clients, frequent
+#			congestions (max. 1  hour delay).  On average the
+#			delay time will be half the maximum value.  If in
+#			doubt about the consequences, use a larger value.
+#			Also keep in mind that the number of retransmissions
+#			is not changed by this setting, so the default of 20
+#			may no longer be appropriate.  You might need to set
+#			MAX_ARP_RETRIES, MAX_BOOTP_RETRIES, MAX_TFTP_RETRIES
+#			and MAX_RPC_RETRIES to a larger value.
+#	-DTIMEOUT=n
+#			Use with care!! See above.
+#			Sets the base of RFC2131 sleep interval to n.
+#			This can be used with -DBACKOFF_LIMIT=0 to get a small
+#			and constant (predictable) retry interval for embedded
+#			devices. This is to achieve short boot delays if both
+#			the DHCP Server and the embedded device will be powered
+#			on the same time. Otherwise if the DHCP server is ready
+#			the client could sleep the next exponentially timeout,
+#			e.g. 70 seconds or more. This is not what you want.
+#			n should be a multiple of TICKS_PER_SEC (18).
+#
+#	Boot device options:
+#
+#	-DTRY_FLOPPY_FIRST
+#			If > 0, tries that many times to read the boot
+#			sector from a floppy drive before booting from
+#			ROM. If successful, does a local boot.
+#			It assumes the floppy is bootable.
+#	-DEXIT_IF_NO_OFFER
+#			If no IP offer is obtained, exit and
+#			let the BIOS continue.
+#			The accessibility of the TFTP server has no effect,
+#			so configure your DHCP/BOOTP server properly.
+#			You should probably reduce MAX_BOOTP_RETRIES
+#			to a small number like 3.
+#
+#	Boot image options:
+#
+#	-DTAGGED_IMAGE
+#			Add tagged image kernel boot support (recommended).
+#	-DAOUT_IMAGE
+#			Add a.out kernel boot support (generic).
+#	-DELF_IMAGE
+#			Add generic ELF kernel boot support (recommended).
+#	-DEL64F_IMAGE
+#			Add generic ELF64 kernel boot support (useful for > 4GB disks).
+#	-DWINCE_IMAGE
+#			Add the ability to boot WINCE.... now only sis630 OK!
+#	-DPXE_IMAGE
+#			Add the ability to boot PXE NBPs.  Requires
+#			PXE_EXPORT.  Currently not supported on
+#			anything other than i386
+#	-DFREEBSD_PXEEMU
+#			Add the ability to boot PXE images... only FreeBSD supported
+#	-DIMAGE_MULTIBOOT
+#			Add Multiboot image support (currently only
+#			for ELF images).
+#			Without this, generic ELF support is selected.
+#	-DIMAGE_FREEBSD
+#			Add FreeBSD image loading support (requires at least
+#			-DAOUT_IMAGE and/or -DELF_IMAGE).
+#	-DFREEBSD_KERNEL_ENV
+#			Pass in FreeBSD kernel environment
+#	-DAOUT_LYNX_KDI
+#			Add Lynx a.out KDI support
+#	-DMULTICAST_LEVEL1
+#			Support for sending multicast packets
+#	-DMULTICAST_LEVEL2
+#			Support for receiving multicast packets
+#	-DDNS_RESOLVER
+#			Support for resolving hostnames in bootfile name (experimental)
+#	-DDOWNLOAD_PROTO_TFTP
+#			If defined, includes TFTP support (recommended).
+#	-DDOWNLOAD_PROTO_NFS
+#			If defined, includes NFS support.
+#	-DDEFAULT_PROTO_NFS
+#			If defined, makes NFS the default protocol instead
+#			of TFTP. Requires DOWNLOAD_PROTO_NFS.
+#	-DDOWNLOAD_PROTO_SLAM
+#			If defined, includes Scalable Local Area Multicast
+#			support.
+#	-DDOWNLOAD_PROTO_TFTM
+#			If defined, includes TFTP Multicast mode support.
+#	-DDOWNLOAD_PROTO_HTTP
+#			If defined, includes HTTP support.
+#
+#	Console options:
+#
+#	-DCONSOLE_FIRMWARE
+#			Set for firmware/BIOS provided (default if nothing else is set).
+#			Normally this is shows up on your CRT.
+#	-DCONSOLE_SERIAL
+#			Set for serial console.
+#	-DCONSOLE_DUAL
+#			Both of the above
+#	-DCONSOLE_DIRECT_VGA
+#			Set for direct VGA console (only for x86).
+#	-DCOMCONSOLE
+#			Set port, e.g. 0x3F8.
+#	-DCONSPEED
+#			Set speed, e.g. 57600.
+#	-DCOMPARM
+#			Set Line Control Register value for data bits, stop
+#			bits and parity. See a National Semiconditor 8250/
+#			16450/16550 data sheet for bit meanings.
+#			If undefined, defaults to 0x03 = 8N1.
+#	-DCOMPRESERVE
+#			Ignore COMSPEED and COMPARAM and instead preserve
+#			the com port parameters from the previous user
+#			of the com port.  Examples of previous user are a BIOS
+#			that implements console redirection, lilo and LinuxBIOS.
+#			This makes it trivial to keep the serial port
+#			speed setting in sync between multiple users.
+#			You set the speed in the first user and the
+#			rest follow along.
+#
+#	Interface export options:
+#
+#	-DPXE_EXPORT
+#			Export a PXE API interface.  This is work in
+#			progress.  Note that you won't be able to load
+#			PXE NBPs unless you also use -DPXE_IMAGE.
+#	-DPXE_STRICT
+#			Strict(er) compliance with the PXE
+#			specification as published by Intel.  This may
+#                       or may not be a good thing depending on your
+#			view of the spec...
+#	-DPXE_DHCP_STRICT
+#			Strict compliance of the DHCP request packets
+#			with the PXE specification as published by
+#			Intel.  This may or may not be a good thing
+#			depending on your view of whether requesting
+#			vendor options which don't actually exist is
+#			pointless or not. You probably want this
+#			option if you intend to use Windows RIS or
+#			similar.
+#
+#	Obscure options you probably don't need to touch:
+#
+#	-DPOWERSAVE
+#			Halt the processor when waiting for keyboard input
+#			which saves power while waiting for user interaction.
+#			Good for compute clusters and VMware emulation.
+#			But may not work for all CPUs.
+#	-DBUILD_SERIAL
+#			Include an auto-incrementing build number in
+#			the Etherboot welcome message.  Useful when
+#			developing, to be sure that the file you
+#			compiled is the one you're currently testing.
+#	-DBUILD_ID
+#			Include a build ID string in the Etherboot
+#			welcome message.  Useful when developing, if
+#			you have multiple builds with different
+#			configurations and want to check you're
+#			running the one you think you are.  Requires
+#			-DBUILD_SERIAL.
+#
+#	BUS options:
+#	
+#	-DCONFIG_PCI
+#			Include support for devices using the pci bus.
+#	-DCONFIG_ISA
+#			Include support for devices using isa bus.
+#	-DCONFIG_PCMCIA
+#			Include support for PCMCIA in general *development*
+# @/OptionDescription@
+
+# These default settings compile Etherboot with a small number of options.
+# You may wish to enable more of the features if the size of your ROM allows.
+
+
+# Select which buses etherboot should support
+CFLAGS+=	-DCONFIG_PCI -DCONFIG_ISA
+# CFLAGS+=	-DCONFIG_PCMCIA
+
+# For prompting and default on timeout
+CFLAGS+=	-DASK_BOOT=3 -DBOOT_FIRST=BOOT_NIC
+# If you would like to attempt to boot from other devices as well as the network.
+# CFLAGS+=	-DBOOT_SECOND=BOOT_FLOPPY
+# CFLAGS+=	-DBOOT_THIRD=BOOT_DISK
+# CFLAGS+=	-DBOOT_INDEX=0
+
+# If you prefer the old style rotating bar progress display
+# CFLAGS+=	-DBAR_PROGRESS
+
+# Show size indicator
+# CFLAGS+=	-DSIZEINDICATOR
+
+# Enabling this creates non-standard images which use ports 1067 and 1068
+# for DHCP/BOOTP
+# CFLAGS+=	-DALTERNATE_DHCP_PORTS_1067_1068
+
+# Enabling this makes the boot ROM require a Vendor Class Identifier
+# of "Etherboot" in the Vendor Encapsulated Options
+# This can be used to reject replies from servers other than the one
+# we want to give out addresses to us, but it will prevent Etherboot
+# from getting an IP lease until you have configured DHCPD correctly
+# CFLAGS+=	-DREQUIRE_VCI_ETHERBOOT
+
+# EXPERIMENTAL! Set DHCP_CLIENT_ID to create a Client Identifier (DHCP
+# option 61, see RFC2132 section 9.14) when Etherboot sends the DHCP
+# DISCOVER and REQUEST packets.  This ID must UNIQUELY identify each
+# client on your local network.  Set DHCP_CLIENT_ID_TYPE to the
+# appropriate hardware type as described in RFC2132 / RFC1700; this
+# almost certainly means using '1' if the Client ID is an Ethernet MAC
+# address and '0' otherwise. Set DHCP_CLIENT_ID_LEN to the length of
+# the Client ID in octets (this is not a null terminated C string, do
+# NOT add 1 for a terminator and do NOT add an extra 1 for the
+# hardware type octet).  Note that to identify your client using the
+# normal default MAC address of your NIC, you do NOT need to set this
+# option, as the MAC address is automatically used in the
+# hwtype/chaddr field; note also that this field only sets the DHCP
+# option: it does NOT change the MAC address used by the client.
+
+# CFLAGS+=	-DDHCP_CLIENT_ID="'C','L','I','E','N','T','0','0','1'" \
+#		-DDHCP_CLIENT_ID_LEN=9 -DDHCP_CLIENT_ID_TYPE=0
+
+# CFLAGS+=	-DDHCP_CLIENT_ID="0xDE,0xAD,0xBE,0xEF,0xDE,0xAD" \
+#		-DDHCP_CLIENT_ID_LEN=6 -DDHCP_CLIENT_ID_TYPE=1
+
+# EXPERIMENTAL! Set DHCP_USER_CLASS to create a User Class option (see
+# RFC3004) when Etherboot sends the DHCP DISCOVER and REQUEST packets.
+# This can be used for classification of clients, typically so that a
+# DHCP server can send an appropriately tailored reply.  Normally, a
+# string identifies a class of to which this client instance belongs
+# which is useful in your network, such as a department ('FINANCE' or
+# 'MARKETING') or hardware type ('THINCLIENT' or 'KIOSK').  Set
+# DHCP_USER_CLASS_LEN to the length of DHCP_USER_CLASS in octets.
+# This is NOT a null terminated C string, do NOT add 1 for a
+# terminator.  RFC3004 advises how to lay out multiple User Class
+# options by using an octet for the length of each string, as in this
+# example.  It is, of course, up to the server to parse this.
+
+# CFLAGS+=	-DDHCP_USER_CLASS="'T','E','S','T','C','L','A','S','S'"	\
+#		-DDHCP_USER_CLASS_LEN=9
+
+# CFLAGS+=	-DDHCP_USER_CLASS="5,'A','L','P','H','A',4,'B','E','T','A'" \
+#		-DDHCP_USER_CLASS_LEN=11
+
+# for btext console support
+# CFLAGS+=	-DCONSOLE_BTEXT 
+# for direct PC kbd support 
+# CFLAGS+=	-DCONSOLE_PC_KBD
+# Set to enable FILO support
+# for FILO support it will make main call pci_init
+# INCLUDE_FILO=y
+ifdef	INCLUDE_FILO
+CFLAGS+=	-DCONFIG_FILO
+endif
+
+# Enabling this causes Etherboot to ignore Etherboot-specific options
+# that are not within an Etherboot encapsulated options field.
+# This option should be enabled unless you have a legacy DHCP server
+# configuration from the bad old days before the use of
+# encapsulated Etherboot options.
+CFLAGS+=	-DALLOW_ONLY_ENCAPSULATED
+
+# Disable DHCP support
+# CFLAGS+=	-DNO_DHCP_SUPPORT
+
+# Specify a default bootfile to be used if the DHCP server does not
+# provide the information.  If you do not specify this option, then
+# DHCP offers that do not contain bootfiles will be ignored.
+# CFLAGS+=	-DDEFAULT_BOOTFILE=\"tftp:///tftpboot/kernel\"
+
+# Limit the delay on packet loss/congestion to a more bearable value. See
+# description above.  If unset, do not limit the delay between resend.
+CFLAGS+=	-DBACKOFF_LIMIT=7 -DCONGESTED
+
+# More optional features
+# CFLAGS+=	-DTRY_FLOPPY_FIRST=4
+# CFLAGS+=	-DEXIT_IF_NO_OFFER
+
+# For a serial console, which can run in parallel with FIRMWARE console
+# CFLAGS+=	-DCONSOLE_DUAL -DCOMCONSOLE=0x3F8 -DCONSPEED=9600
+
+# Enable tagged image, generic ELF, Multiboot ELF
+# or FreeBSD ELF/a.out boot image support
+CFLAGS+=	-DTAGGED_IMAGE -DELF_IMAGE
+# CFLAGS+=	-DAOUT_IMAGE -DIMAGE_MULTIBOOT -DIMAGE_FREEBSD
+# CFLAGS+=	-DAOUT_IMAGE -DAOUT_LYNX_KDI
+# CFLAGS+=	-DCOFF_IMAGE 
+# CFLAGS+=	-DRAW_IMAGE
+
+# Download files via TFTP
+CFLAGS+=	-DDOWNLOAD_PROTO_TFTP
+# Change download protocol to NFS, default is TFTP
+# CFLAGS+=	-DDOWNLOAD_PROTO_NFS
+# Change download protocol to HTTP, default is TFTP
+# CFLAGS+=	-DDOWNLOAD_PROTO_HTTP
+# Change default protocol to NFS
+# CFLAGS+=	-DDEFAULT_PROTO_NFS
+# Support to resolve hostnames in boot filename
+# CFLAGS+=	-DDNS_RESOLVER
+
+# Multicast Support
+# CFLAGS+=	-DALLMULTI -DMULTICAST_LEVEL1 -DMULTICAST_LEVEL2 -DDOWNLOAD_PROTO_TFTM
+
+# Etherboot as a PXE network protocol ROM
+CFLAGS+=	-DPXE_IMAGE -DPXE_EXPORT
+# Etherboot stricter as a PXE network protocol ROM
+# CFLAGS+=	-DPXE_DHCP_STRICT
+
+# Support for PXE emulation. Works only with FreeBSD to load the kernel
+# via pxeboot, use only with DOWNLOAD_PROTO_NFS
+# CFLAGS+=	-DFREEBSD_PXEEMU
+
+# Include an auto-incrementing build serial number and optional build
+# ID string
+# CFLAGS+=	-DBUILD_SERIAL
+# CFLAGS+=	-DBUILD_SERIAL -DBUILD_ID=\"testing\"
+
+# Do not relocate
+# core/relocate.c should really be moved to an arch specific directory
+# but this is here for archs that don't support relocation
+# CFLAGS+=	-DNORELOCATE
+
+# you should normally not need to change these
+HOST_CC=	gcc
+CPP=		gcc -E -Wp,-Wall
+RM=		rm -f
+TOUCH=		touch
+PERL=		/usr/bin/perl
+CC=		gcc
+AS=		as
+LD=		ld
+SIZE=		size
+AR=		ar
+RANLIB=		ranlib
+OBJCOPY=	objcopy
+
+CFLAGS+=	-Os -ffreestanding
+CFLAGS+=	-Wall -W -Wno-format
+CFLAGS+=	$(EXTRA_CFLAGS)
+ASFLAGS+=	$(EXTRA_ASFLAGS)
+LDFLAGS+=	$(EXTRA_LDFLAGS)
+# For debugging
+# LDFLAGS+=	-Map $@.map
+
+# Location to place generated binaries, and files
+BIN=bin

@@ -1,0 +1,131 @@
+# Config for i386 Etherboot
+#
+# Do not delete the tag OptionDescription and /OptionDescription
+# It is used to automatically generate the documentation.
+#
+# @OptionDescrition@
+#
+#	BIOS interface options:
+#
+#	-DPCBIOS
+#			Compile in support for the normal pcbios
+#	-DLINUXBIOS
+#			Compile in support for LinuxBIOS
+#	-DBBS_BUT_NOT_PNP_COMPLIANT
+#			Some BIOSes claim to be PNP but they don't conform
+#			to the BBS spec which specifies that ES:DI must
+#			point to the string $PnP on entry. This option
+#			works around those. This option must be added to
+#			LCONFIG.
+#	-DNO_DELAYED_INT
+#			Take control as soon as BIOS detects the ROM.
+#			Normally hooks onto INT18H or INT19H. Use only if you
+#			have a very non-conformant BIOS as it bypasses
+#			BIOS initialisation of devices. This only works for
+#			legacy ROMs, i.e. PCI_PNP_HEADER not defined.
+#			This option was formerly called NOINT19H.
+#	-DBOOT_INT18H
+#			Etherboot normally hooks onto INT19H for legacy ROMs.
+#			You can choose to hook onto INT18H (BASIC interpreter
+#			entry point) instead. This entry point is used when
+#			all boot devices have been exhausted. This option must
+#			be added to LCONFIG.
+#	-DCONFIG_PCI_DIRECT
+#			Define this for PCI BIOSes that do not implement
+#			BIOS32 or not correctly. Normally not needed.
+#			Only works for BIOSes of a certain era.
+#	-DCONFIG_TSC_CURRTICKS
+#			Uses the processor time stamp counter instead of reading
+#			the BIOS time counter.  This allows Etherboot to work
+#			even without a BIOS.  This only works on late model
+#			486s and above.
+#	-DCONFIG_NO_TIMER2
+#			Some systems do not have timer2 implemented.
+#			If you have a RTC this will allow you to roughly calibrate
+#			it using outb instructions.
+#	-DIBM_L40
+#			This option uses the 0x92 method of controlling
+#			A20 instead of the traditional method of using the
+#			keyboard controller. An explanation of A20 is here:
+#			http://www.win.tue.nl/~aeb/linux/kbd/A20.html
+#			This occurs on MCA, EISA and some embedded boards,
+#			and sometimes with the Fast Gate A20 option on some
+#			BIOSes.
+#			Enable this only if you are sure of what you are doing.
+#
+#	Extended cpu options
+
+#	-DCONFIG_X86_64	
+#			Compile in support for booting x86_64 64bit binaries.
+#
+#	PXE loader options:
+#
+#	-DPXELOADER_KEEP_ALL
+#			Prevent PXE loader (prefix) from unloading the
+#			PXE stack.  You will want to use this if, for
+#			example, you are booting via PXE-on-floppy.
+#			You may want to use it under certain
+#			circumstances when using the Etherboot UNDI
+#			driver; these are complex and best practice is
+#			not yet established.
+#			
+#	Obscure options you probably don't need to touch:
+#
+#	-DIGNORE_E820_MAP
+#			Ignore the memory map returned by the E820 BIOS
+#			call.  May be necessary on some buggy BIOSes.
+#	-DT503_AUI
+#			Use AUI by default on 3c503 cards.
+#	-DFLATTEN_REAL_MODE
+# 			Use 4GB segment limits when calling out to or
+#			returning to real-mode code.  This is necessary to
+#			work around some buggy code (e.g. OpenBSD's pxeboot)
+#			that uses flat real-mode without being sufficiently
+#			paranoid about the volatility of its segment limits.
+
+#
+# @/OptionDescription@
+
+# BIOS select don't change unless you know what you are doing
+CFLAGS+=	-DPCBIOS
+
+# Compile in k8/hammer support
+# CFLAGS+=	-DCONFIG_X86_64
+
+# Options to make a version of Etherboot that will work under linuxBIOS.
+# CFLAGS+=	-DLINUXBIOS -DCONFIG_TSC_CURRTICKS  -DCONSOLE_SERIAL -DCOMCONSOLE=0x3f8 -DCOMPRESERVE -DCONFIG_PCI_DIRECT -DELF_IMAGE 
+
+# These options affect the loader that is prepended to the Etherboot image
+# LCONFIG+=	-DBBS_BUT_NOT_PNP_COMPLIANT
+# LCONFIG+=	-DBOOT_INT18H
+
+# Produce code that will work inside the Bochs emulator.  The pnic
+# driver is probably the best one to try.
+# CFLAGS+=	-DCONFIG_PCI_DIRECT
+
+# Produce code that will work with OpenBSD's pxeboot
+# CFLAGS+=	-DFLATTEN_REAL_MODE
+
+CFLAGS+= -fstrength-reduce -fomit-frame-pointer -march=i386
+# Squeeze the code in as little space as possible.
+# gcc3 needs a different syntax to gcc2 if you want to avoid spurious warnings.
+GCC_VERSION	 = $(subst ., ,$(shell $(CC) -dumpversion))
+GCC_MAJORVERSION = $(firstword $(GCC_VERSION))
+ifeq ($(GCC_MAJORVERSION),2)
+CFLAGS+=	-malign-jumps=1 -malign-loops=1 -malign-functions=1
+else
+CFLAGS+=	-falign-jumps=1 -falign-loops=1 -falign-functions=1
+endif
+GCC_MINORVERSION = $(word 2, $(GCC_VERSION))
+ifneq ($(GCC_MINORVERSION),4)
+CFLAGS+=	-mcpu=i386
+endif
+
+LDFLAGS+=	-N
+
+ifeq "$(shell uname -s)" "FreeBSD"
+CFLAGS+=	-DIMAGE_FREEBSD -DELF_IMAGE -DAOUT_IMAGE
+endif
+
+# An alternate location for isolinux.bin can be set here
+# ISOLINUX_BIN=/path/to/isolinux.bin

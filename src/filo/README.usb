@@ -1,0 +1,15 @@
+It is from steven james's baremetal in linuxbios util.
+yhlu seperate common functions from uhci.c to usb.c and create ohci.c to support ohci.
+ohci.c mainly cames from kernel 2.4.22 dirvers/usb/host/usb-ohci.c.
+it includes several parts
+1. UHCI+OHCI--->USB: privide usb init and usb_control_msg and usb_bulk_msg interface
+2. USB_SCSI: bulk only device 
+3. USB_X interface to FILO
+
+other changes in Etherboot
+1. Add allot2 and forget2, it will produce the required aligned memory.
+
+todo:
+1. EHCI support
+
+yhlu 6/2/2004

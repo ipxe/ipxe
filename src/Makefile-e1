@@ -1,0 +1,18 @@
+ARCH:=e1
+MAKEDEPS:=
+
+include arch/$(ARCH)/Config
+include Config
+
+CC=		e1-coff-gcc
+AS=		e1-coff-as
+LD=		e1-coff-ld
+SIZE=	e1-coff-size
+AR=		e1-coff-ar
+RANLIB=	e1-coff-ranlib
+OBJCOPY=e1-coff-objcopy
+
+MAKEDEPS+=Makefile-e1
+BIN=bin-e1
+
+include Makefile.main

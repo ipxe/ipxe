@@ -1,0 +1,125 @@
+This is FILO, a bootloader which loads boot images from local filesystem,
+without help from legacy BIOS services.
+
+Expected usage is to flash it into the BIOS ROM together with LinuxBIOS.
+
+FEATURES
+
+    - Supported boot devices: IDE hard disk and CD-ROM, and system memory (ROM)
+    - Supported filesystems: ext2, fat, jfs, minix, reiserfs, xfs, and iso9660
+    - Supported image formats: ELF and [b]zImage (a.k.a. /vmlinuz)
+    - Supports boot disk image of El Torito bootable CD-ROM
+    - Supports loading image from raw device with user-specified offset
+    - Console on VGA + keyboard, serial port, or both
+    - Line editing with ^H, ^W and ^U keys to type arbitrary filename to boot
+    - Full support for the ELF Boot Proposal (where is it btw, Eric?)
+    - Auxiliary tool to compute checksum of ELF boot images
+    - Full 32-bit code, no BIOS calls
+
+REQUIREMENT
+
+    Only i386 PC architecture is currently supported.
+
+    x86-64 (AMD 64) machines in 32-bit mode should also work.
+    (It looks like LinuxBIOS uses 32-bit mode and Linux kernel does
+    the transition to 64-bit mode)
+
+    I'm using a VIA EPIA 5000 mini-ITX board, with a 2.5" IDE hard disk
+    and a 32x CD-RW, for testing, and Bochs and VMware for development.
+
+    Recent version of GNU toolchain is required to build.
+    I have tested with Debian/woody (gcc 2.95.4, binutils 2.12.90.0.1,
+    make 3.79.1) and Debian/sid (gcc 3.3.2, binutils 2.14.90.0.6,
+    make 3.80).
+
+INSTALL
+
+    First invocation of make creates the default Config file.
+	$ make
+    Edit this file as you like. It's fairly straightforward (I hope).
+	$ vi Config
+    Then running make again will build filo.elf, the ELF boot image of FILO.
+	$ make
+
+    Use filo.elf as your payload of LinuxBIOS, or a boot image for
+    Etherboot.
+
+    If you enable MULTIBOOT_IMAGE option in Config, you can
+    also boot filo.elf from GNU GRUB or other Multiboot bootloader.
+    This feature is intended for testing or development purpose.
+
+USING
+
+    When FILO starts, it displays "boot:" prompt.
+    At "boot:" prompt, type the name of your boot image, and optionally
+    the kernel parameter, in the form:
+	DEVICE:FILENAME[ PARAM]
+    for example:
+	boot: hda1:/vmlinuz root=/dev/hda1
+
+    Notation of DEVICE for IDE disk and CD-ROM is same as in Linux
+    (eg. hda1 means the first partition of master device on primary 
+    IDE channel).
+
+    FILENAME can be standard bzImage/zImage (vmlinuz) Linux kernels,
+    Linux-compatible images such as memtest.bin of Memtest86,
+    and any bootable ELF images, which include Linux kernel converted
+    by mkelfImage, Etherboot .elf and .zelf, Memtest86, FILO itself, etc.
+
+    If AUTOBOOT_FILE is set in Config, FILO tries to boot this file
+    first, and falls back to boot: prompt if it fails.
+
+    If AUTOBOOT_DELAY is also set, FILO waits for specified time in
+    seconds before booting AUTOBOOT_FILE. If <Esc> key is pressed
+    during this time period, automatic boot is canceled.
+    Pressing <Enter> key also cancels the delay, but in this case
+    AUTOBOOT_FILE is booted immediately.
+
+    Even if AUTOBOOT_DELAY is not set, automatic boot can be disabled
+    by pressing <Esc> key beforehand.
+
+    FILO can also load separate initrd images along with vmlinuz
+    kernels. (For ELF kernel, initrd images are embedded into the
+    ELF file and cannot be altered).
+    To do so, add "initrd=NAME" parameter to the kernel command line.
+    NAME uses the same notation as kernel image name.
+    (eg. boot: hda1:/vmlinuz initrd=hda1:/root.gz root=/dev/ram)
+
+    To boot an image in the BIOS flash (or whatever is mapped in the system
+    memory space), use the notation "mem@OFFSET[,LENGTH]", like:
+	boot: mem@0xfffe0000
+    In this example, it loads the boot image from the last 128KB of BIOS
+    flash.
+
+    The same notation can be used with IDE devices, eg:
+	boot: hda@512,697344 initrd=hda@1M,4M
+    In this case the 697344 bytes starting from second sector of IDE drive
+    is loaded as kernel, and 4M bytes of offset 1M bytes of the same disk
+    is loaded as initrd.
+    Note that when you load vmlinuz kernel or initrd this way,
+    you must specify the LENGTH parameter. You can omit it for ELF
+    images since they have segment length internally.
+    OFFSET and LENGTH parameters must be multiple of 512.
+
+BUG REPORTING
+
+    If you have problem with FILO, set DEBUG_ALL in Config and send its 
+    console output to me at <ts1@tsn.or.jp>.
+
+ACKNOWLEDGEMENTS
+
+    Filesystem code is taken from GNU GRUB and patches for it.
+    IDE driver is originally taken from Etherboot.
+    Steve Gehlbach wrote the original bzImage loader for FILO.
+
+    Besides, I have taken pieces of code and/or learned concepts
+    from various standalone programs, including GNU GRUB, Etherboot,
+    polled IDE patch by Adam Agnew, Memtest86, LinuxBIOS, and Linux.
+    I must say thanks to all the developers of these wonderful software,
+    especially to Eric Biederman for his great development work in this area.
+
+LICENSE
+
+    Copyright (C) 2003 by SONE Takeshi <ts1@tsn.or.jp> and others.
+    This program is licensed under the terms of GNU General Public License.
+    See the COPYING file for details.

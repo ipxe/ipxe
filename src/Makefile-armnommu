@@ -1,0 +1,18 @@
+ARCH:=armnommu
+MAKEDEPS:=
+
+include Config
+include arch/$(ARCH)/Config
+
+CC=		$(CROSS_COMPILE)gcc
+AS=		$(CROSS_COMPILE)as
+LD=		$(CROSS_COMPILE)ld
+SIZE=		$(CROSS_COMPILE)size
+AR=		$(CROSS_COMPILE)ar
+RANLIB=		$(CROSS_COMPILE)ranlib
+OBJCOPY=	$(CROSS_COMPILE)objcopy
+
+MAKEDEPS+=Makefile-armnommu
+BIN=bin
+
+include Makefile.main

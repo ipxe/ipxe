@@ -1,0 +1,22 @@
+# Config for ia64 Etherboot
+#
+# Do not delete the tag OptionDescription and /OptionDescription
+# It is used to automatically generate the documentation.
+#
+# @OptionDescrition@
+#
+#	BIOS interface options:
+#
+#	-DCONFIG_EFI
+#			Compile in support for EFI
+#
+# @/OptionDescription@
+
+CFLAGS+= -DCONSOLE_FIRMWARE
+CFLAGS+= -DCONFIG_EFI
+
+CFLAGS+=  -fpic -mconstant-gp -mauto-pic
+ASFLAGS+= -mconstant-gp -mauto-pic
+
+LDFLAGS+=	-static -shared -Bsymbolic --warn-multiple-gp --warn-common
+

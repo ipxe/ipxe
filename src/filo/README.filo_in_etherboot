@@ -1,0 +1,48 @@
+Moved from FILO into Etherboot, yhlu add boot from SATA disk and move usb boot framework 
+from Steven James baremetal in LinuxBIOS, also add the OHCI support.
+
+
+1. refer to README.filo
+	but don't need to use make config. 
+2. CFLAG added
+	CONSOLE_BTEXT --- for btext console support
+	CONSOLE_PC_KBD  --- for direct pc keyboard support
+	CONFIG_FILO	--- It will make main call pci_init
+3. to make:
+	make bin/filo.zelf
+    or 
+	make bin/tg3--filo.zelf
+
+   You can not use filo and ide_disk at the same time.
+
+Some input for boot:
+
+boot from BIOS ROM area 
+4G-128K
+mem@0xfffe0000
+4G-512K
+mem@0xfff80000
+
+boot from suse 
+hda2:/boot/vmlinuz initrd=/boot/initrd ro root=/dev/hda2 console=tty0 console=ttyS0,115200
+for suse install from CD
+hdc:/boot/loader/linux initrd=/boot/loader/initrd ramdisk_size=65536 splash=silent showopts console=tty0 console=ttyS0,115200
+
+boot from RH
+for RH install from CD
+hdc:/isolinux/vmlinuz initrd=/isolinux/initrd.img expert nofb acpi=off devfs=nomount ramdisk_size=65536 console=ttyS0,115200
+
+for serial ATA support (using port1 and port2 only)
+1) if your kernel think SATA as SCSI
+hde2:/boot/vmlinuz initrd=/boot/initrd ro root=/dev/sda2 console=tty0 console=ttyS0,115200
+2) if your kernel think SATA as normal IDE
+hde2:/boot/vmlinuz initrd=/boot/initrd ro root=/dev/hde2 console=tty0 console=ttyS0,115200
+
+for usb support
+uda1:/ram0_2.5_2.6.5_k8.2_mydisk7.elf
+
+
+Yinghai Lu      yhlu@tyan.com
+
+to do:
+	add menu to filo boot 
