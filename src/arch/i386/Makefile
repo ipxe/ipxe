@@ -19,7 +19,6 @@ START=	$(BIN)/start32.o $(BIN)/linuxbios.o \
 	$(BIN)/callbacks.o $(BIN)/pxe_callbacks.o
 
 SRCS+=	arch/i386/prefix/floppyprefix.S
-SRCS+=	arch/i386/prefix/unhuf.S
 SRCS+=	arch/i386/prefix/unnrv2b.S
 SRCS+=	arch/i386/firmware/pcbios/bios.c
 SRCS+=	arch/i386/firmware/pcbios/console.c
