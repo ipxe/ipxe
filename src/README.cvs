@@ -1,0 +1,65 @@
+Changes should be committed to the CVS HEAD only when they are in a
+working state.  The definition of "working" is somewhat liquid; a good
+guiding principle is that anyone checking out HEAD should receive a
+checkout of working software.
+
+When you want to work on changes that are likely to temporarily break
+large swathes of code, you should probably work on a private branch.
+Since CVS branching and merging is something of a black art, here are
+some simple step-by-step instructions for creating and using a branch.
+
+To create your private branch:
+
+  # Get most up-to-date tree before branching
+  cvs update
+  # Create a branch called "my-branch"
+  cvs tag -b my-branch
+  # Switch working copy to the "my-branch" branch
+  cvs update -r my-branch
+
+At this point you'll be on a branch called "my-branch".  Any changes
+you make will not affect people working on HEAD, or on other branches.
+
+Use name for your branch that is both descriptive and unique.
+Starting the branch name with your SourceForge username
+(e.g. "mcb30-realmode-redesign") is a good idea.
+
+When you want to merge the changes on your branch back into HEAD, do
+the following:
+
+  # Ensure there are no not-yet-checked-in modifications in your tree)
+  cvs -q update
+  # Tag the merge point in the "my-branch" branch
+  cvs tag -c my-branch-merge-1
+  # Switch working copy back to HEAD
+  cvs update -A
+  # Merge changes from the branch
+  cvs update -j my-branch
+  # Commit merged changes to HEAD
+  cvs commit
+
+If you then want to continue working further on the "my-branch" branch,
+do the following
+
+  # Switch working copy back to the "my-branch" branch
+  cvs update -r my-branch
+
+and then when you want to merge some more changes back to HEAD:
+
+  # Ensure there are no not-yet-checked-in modifications in your tree)
+  cvs -q update
+  # Tag the merge point in the "my-branch" branch
+  cvs tag -c my-branch-merge-2
+  # Switch working copy back to HEAD
+  cvs update -A
+  # Merge changes from the branch
+  cvs update -j my-branch-merge-1 -j my-branch
+  # Commit merged changes to HEAD
+  cvs commit
+
+Note that the format of the "merge changes from the branch" command has
+changed, because this time you need to only merge changes since the last
+merge point.
+
+When you have finished with your branch and merged all the changes
+back to HEAD, simply stop using the branch.
