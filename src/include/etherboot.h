@@ -31,11 +31,6 @@
 #define	TAGGED_IMAGE		/* choose at least one */
 #endif
 
-#undef CODE16
-#if defined(PCBIOS)
-#define	CODE16
-#endif
-
 #define K_ESC		'\033'
 #define K_EOF		'\04'  /* Ctrl-D */
 #define K_INTR		'\03'  /* Ctrl-C */
