@@ -179,10 +179,13 @@ $(BIN)/%.o:	arch/i386/firmware/pcbios/%.c $(MAKEDEPS)
 	$(CC) $(CFLAGS) -o $@ -c $<
 
 $(BIN)/%.o:	arch/i386/firmware/pcbios/%.S $(MAKEDEPS)
-	$(CPP) $(CFLAGS) -Ui386 -D ASSEMBLY $< | $(AS) $(ASFLAGS) -o $@
+	$(CPP) $(CFLAGS) -Ui386 -DASSEMBLY $< | $(AS) $(ASFLAGS) -o $@
 
 $(BIN)/%.o:	arch/i386/prefix/%.S $(MAKEDEPS)
-	$(CPP) $(CFLAGS) -Ui386 -D ASSEMBLY $< | $(AS) $(ASFLAGS) -o $@
+	$(CPP) $(CFLAGS) -Ui386 -DASSEMBLY $< | $(AS) $(ASFLAGS) -o $@
+
+$(BIN)/%16.o:	arch/i386/prefix/%.S $(MAKEDEPS)
+	$(CPP) $(CFLAGS) -Ui386 -DASSEMBLY -DCODE16 $< | $(AS) $(ASFLAGS) -o $@
 
 # general rule for 16bit .o, may be overridden
 $(BIN)/%.o:	$(BIN)/%.s
