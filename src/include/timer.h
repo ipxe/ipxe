@@ -53,7 +53,6 @@ extern void load_timer2(unsigned int ticks);
 extern inline int timer2_running(void);
 extern void waiton_timer2(unsigned int ticks);
 
-extern void setup_timers(void);
 extern void ndelay(unsigned int nsecs);
 extern void udelay(unsigned int usecs);
 extern void mdelay(unsigned int msecs);

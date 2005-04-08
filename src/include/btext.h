@@ -32,7 +32,7 @@ typedef struct boot_infos
     /* Some infos about the current MacOS display */
     u32       dispDeviceRect[4];       /* left,top,right,bottom */
     u32       dispDeviceDepth;         /* (8, 16 or 32) */
-    u8*       dispDeviceBase;          /* base address (physical) */
+    u32       dispDeviceBase;          /* base address (physical) */
     u32       dispDeviceRowBytes;      /* rowbytes (in bytes) */
     u32       dispDeviceColorsOffset;  /* Colormap (8 bits only) or 0 (*) */
 
@@ -56,21 +56,7 @@ typedef struct boot_infos
  * Benjamin Herrenschmidt <benh@kernel.crashing.org>
  */
 
-extern void btext_clearscreen(void);
-
 extern boot_infos_t disp_bi;
 extern u32 boot_text_mapped;
-
-void btext_setup_display(u32 width, u32 height, u32 depth, u32 pitch,
-			 unsigned long address);
-void map_boot_text(void);
-
-void btext_drawchar(char c);
-void btext_drawstring(const char *str);
-void btext_drawhex(u32 v);
-
-void btext_putc(int c);
-
-void btext_init(void);
 
 #endif /* _BTEXT_H */

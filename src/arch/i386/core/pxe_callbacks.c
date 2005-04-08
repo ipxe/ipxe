@@ -3,6 +3,31 @@
  * an NBP to the PXE stack and for starting an NBP from the PXE stack.
  */
 
+#warning "pxe_callbacks.c is temporarily broken"
+
+void xstartpxe ( void ) {
+}
+
+void install_pxe_stack ( void ) {
+}
+
+void remove_pxe_stack ( void ) {
+}
+
+void hook_pxe_stack ( void ) {
+}
+
+void unhook_pxe_stack ( void ) {
+}
+
+void pxe_in_call ( void ) {
+}
+
+void use_undi_ds_for_rm_stack ( void ) {
+}
+
+#if 0
+
 #ifdef PXE_EXPORT
 
 #include "etherboot.h"
@@ -362,3 +387,5 @@ __asm__ ( ".globl _pxe_stack_t_size" );
 __asm__ ( ".equ _pxe_stack_t_size, 0" );
 
 #endif /* PXE_EXPORT */
+
+#endif /* 0 */

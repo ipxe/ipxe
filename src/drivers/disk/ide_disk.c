@@ -759,7 +759,8 @@ static int ide_pci_probe(struct dev *dev, struct pci_device *pci)
 }
 #define PCI_DEVICE_ID_INTEL_82801CA_11	0x248b
 static struct pci_id ide_controllers[] = {
-{ PCI_VENDOR_ID_INTEL,       PCI_DEVICE_ID_INTEL_82801CA_11,    "PIIX4" },
+	PCI_ROM(0x0000, 0x0000, "ide_disk", "Generic IDE disk support"),
+/* { PCI_VENDOR_ID_INTEL,       PCI_DEVICE_ID_INTEL_82801CA_11,    "PIIX4" },*/
 #if 0  /* Currently I don't need any entries in this table so ignore it */
 { PCI_VENDOR_ID_INTEL,       PCI_DEVICE_ID_INTEL_82371FB_0,     "PIIX" },
 { PCI_VENDOR_ID_INTEL,       PCI_DEVICE_ID_INTEL_82371FB_1,     "PIIX" },

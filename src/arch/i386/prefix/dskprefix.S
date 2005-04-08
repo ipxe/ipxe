@@ -1,3 +1,5 @@
+#include "compiler.h"
+
 /* NOTE: this boot sector contains instructions that need at least an 80186.
  * Yes, as86 has a bug somewhere in the valid instruction set checks.
  *
@@ -115,7 +117,6 @@ got_sectors:
 
 /* ok, we've written the Loading... message, now we want to load the system */
 
-	pushw	%es			/* = ds */
 	movw	$SYSSEG, %ax
 	movw	%ax,%es			/* segment of SYSSEG<<4 */
 	pushw	%es
@@ -130,8 +131,6 @@ got_sectors:
 
 	call	print_nl
 	pop	%es			/* = SYSSEG */
-	pop	%es			/* balance push/pop es */
-sigok: 
 
 /* Restore original disk parameters */
 	movw	$0x78, %bx
@@ -142,20 +141,47 @@ sigok:
 	movw	%di,(%bx)
 	movw	%si,2(%bx)
 
-/* after that (everything loaded), we call to the .ROM file loaded. */
+	/* Everything now loaded.  %es = SYSSEG, so %es:0000 points to
+	 * start of loaded image.
+	 */
 
-	pushl	$0		/* No parameters to preserve for exit path */
-	pushw	$0		/* Use prefix exit path mechanism */
-	ljmp	$SYSSEG, $_start
+start_runtime:
 
-	.section ".text16", "ax", @progbits
-	.globl	prefix_exit
-prefix_exit:
-	xchgw	%bx, %bx
-	int	$0x19		/* should try to boot machine */
-	.globl	prefix_exit_end
-prefix_exit_end:
-	.previous
+#ifdef	COMPRESS
+	/* Decompress runtime image.  %es:0000 points to decompressed
+	 * image on exit.
+	 */
+	lcall	$SYSSEG, $decompress16
+#endif
+	
+	/* Set up internal environment.  Address of entry-point
+	 * function is returned in %es:di.
+	 */
+	pushw	%es		/* setup16 says %ds:0000 must point to image */
+	popw	%ds
+	movw	$setup16, %di
+	pushw	%cs
+	call	ljmp_to_es_di
+
+	/* Call initialisation routine.  Relocation may be done.  New
+	 * address of entry-point function is returned in %es:di.
+	 */
+	pushl	$arch_rm_initialise
+	pushw	%cs		/* == lcall %es:di */
+	call	ljmp_to_es_di
+	
+	/* Call to arch_rm_main.  Register INT19 as an exit path.  This
+	 * call will never return.
+	 */
+	movl	$exit_via_int19, %eax
+	pushl	$arch_rm_main
+	pushl	%eax		/* Dummy return address */
+
+	/* Do the equivalent of ljmp *%es:di */
+ljmp_to_es_di:	
+	pushw	%es
+	pushw	%di
+	lret
 
 /* This routine loads the system at address SYSSEG<<4, making sure no 64kB
  * boundaries are crossed. We try to load it as fast as possible, loading whole
@@ -164,7 +190,7 @@ prefix_exit_end:
  * in:	es - starting address segment (normally SYSSEG)
  */
 read_it: 
-	movw	$0,sread		/* read whole image incl boot sector */
+	movw	$1,sread		/* don't reload the prefix */
 	movw	%es,%ax
 	testw	$0x0fff, %ax
 die:	jne	die			/* es must be at 64kB boundary */

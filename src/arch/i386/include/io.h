@@ -1,22 +1,8 @@
 #ifndef	ETHERBOOT_IO_H
 #define ETHERBOOT_IO_H
 
-
-/* Amount of relocation etherboot is experiencing */
-extern unsigned long virt_offset;
-
-/* Don't require identity mapped physical memory,
- * osloader.c is the only valid user at the moment.
- */
-static inline unsigned long virt_to_phys(volatile const void *virt_addr)
-{
-	return ((unsigned long)virt_addr) + virt_offset;
-}
-
-static inline void *phys_to_virt(unsigned long phys_addr)
-{
-	return (void *)(phys_addr - virt_offset);
-}
+#include "compiler.h"
+#include "virtaddr.h"
 
 /* virt_to_bus converts an addresss inside of etherboot [_start, _end]
  * into a memory access cards can use.

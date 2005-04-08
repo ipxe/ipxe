@@ -10,6 +10,7 @@
 #include	"etherboot.h"
 #include	"timer.h"
 #include	"latch.h"
+#include	"init.h"
 
 void __load_timer2(unsigned int ticks)
 {
@@ -40,7 +41,7 @@ static int __timer2_running(void)
 }
 
 #if !defined(CONFIG_TSC_CURRTICKS)
-void setup_timers(void)
+static void setup_timers(void)
 {
 	return;
 }
@@ -126,7 +127,7 @@ bad_ctc:
 }
 
 static unsigned long clocks_per_tick;
-void setup_timers(void)
+static void setup_timers(void)
 {
 	if (!clocks_per_tick) {
 		clocks_per_tick = calibrate_tsc();
@@ -189,3 +190,5 @@ int timer2_running(void)
 }
 
 #endif /* RTC_CURRTICKS */
+
+INIT_FN ( INIT_TIMERS, setup_timers, NULL, NULL );

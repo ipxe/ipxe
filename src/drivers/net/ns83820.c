@@ -370,25 +370,6 @@ struct ring_desc {
 };
 #endif
 
-/* Define the TX Descriptor */
-static struct ring_desc tx_ring[NR_TX_DESC]
-    __attribute__ ((aligned(8)));
-
-/* Create a static buffer of size REAL_RX_BUF_SIZE for each
-TX Descriptor.  All descriptors point to a
-part of this buffer */
-static unsigned char txb[NR_TX_DESC * REAL_RX_BUF_SIZE];
-
-/* Define the TX Descriptor */
-static struct ring_desc rx_ring[NR_RX_DESC]
-    __attribute__ ((aligned(8)));
-
-/* Create a static buffer of size REAL_RX_BUF_SIZE for each
-RX Descriptor   All descriptors point to a
-part of this buffer */
-static unsigned char rxb[NR_RX_DESC * REAL_RX_BUF_SIZE]
-    __attribute__ ((aligned(8)));
-
 /* Private Storage for the NIC */
 struct ns83820_private {
 	u8 *base;
@@ -411,6 +392,25 @@ struct ns83820_private {
 
 } nsx;
 static struct ns83820_private *ns;
+
+/* Define the TX Descriptor */
+static struct ring_desc tx_ring[NR_TX_DESC]
+    __attribute__ ((aligned(8)));
+
+/* Create a static buffer of size REAL_RX_BUF_SIZE for each
+TX Descriptor.  All descriptors point to a
+part of this buffer */
+static unsigned char txb[NR_TX_DESC * REAL_RX_BUF_SIZE];
+
+/* Define the TX Descriptor */
+static struct ring_desc rx_ring[NR_RX_DESC]
+    __attribute__ ((aligned(8)));
+
+/* Create a static buffer of size REAL_RX_BUF_SIZE for each
+RX Descriptor   All descriptors point to a
+part of this buffer */
+static unsigned char rxb[NR_RX_DESC * REAL_RX_BUF_SIZE]
+    __attribute__ ((aligned(8)));
 
 static void phy_intr(struct nic *nic __unused)
 {

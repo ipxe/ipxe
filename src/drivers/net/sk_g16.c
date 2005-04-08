@@ -1187,3 +1187,4 @@ static struct isa_driver SK_driver __isa_driver = {
 	.probe   = SK_probe,
 	.ioaddrs = 0,
 };
+ISA_ROM("sk_g16","Schneider and Koch G16");

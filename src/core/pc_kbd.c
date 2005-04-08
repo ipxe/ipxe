@@ -9,8 +9,9 @@
  * 2004-04 moved by LYH From filo to Etherboot
  *		yhlu@tyan.com
  */
-#ifdef CONSOLE_PC_KBD
-#include "etherboot.h"
+
+#include "io.h"
+#include "console.h"
 
 static char key_map[][128] = {
     {
@@ -69,14 +70,14 @@ static int get_scancode(void)
     return scan;
 }
 
-int kbd_havekey(void)
+static int kbd_havekey(void)
 {
     if (!cur_scan)
 	cur_scan = get_scancode();
     return cur_scan != 0;
 }
 
-int kbd_ischar(void)
+static int kbd_ischar(void)
 {
     if (!kbd_havekey())
 	return 0;
@@ -87,7 +88,7 @@ int kbd_ischar(void)
     return 1;
 }
 
-int kbd_getc(void)
+static int kbd_getc(void)
 {
     int c;
 
@@ -105,4 +106,7 @@ int kbd_getc(void)
     cur_scan = 0;
     return c;
 }
-#endif
+
+static struct console_driver pc_kbd_console __console_driver = {
+	.getchar = kbd_getc,
+};

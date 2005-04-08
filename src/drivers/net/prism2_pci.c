@@ -18,7 +18,9 @@ $Id$
 #include "prism2.c"
 
 static struct pci_id prism2_pci_nics[] = {
-PCI_ROM(0x1260, 0x3873, "prism2_pci", "Harris Semiconductor Prism2.5 clone"),	/* Generic Prism2.5 PCI device */
+PCI_ROM(0x1260, 0x3873, "prism2_pci",	"Harris Semiconductor Prism2.5 clone"),
+PCI_ROM(0x1260, 0x3873, "hwp01170",	"ActionTec HWP01170"),
+PCI_ROM(0x1260, 0x3873, "dwl520",	"DLink DWL-520"),
 };
 
 static struct pci_driver prism2_pci_driver __pci_driver = {

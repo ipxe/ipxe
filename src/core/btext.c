@@ -1,5 +1,3 @@
-#ifdef CONSOLE_BTEXT
-#ifdef CONFIG_PCI
 /*
  * Procedures for drawing on the screen early on in the boot process.
  *
@@ -10,6 +8,8 @@
  */
 
 #include "etherboot.h"
+#include "console.h"
+#include "init.h"
 #include "pci.h"
 
 #ifdef CONFIG_FILO
@@ -35,6 +35,8 @@ static void draw_byte_32(unsigned char *bits, u32 *base, u32 rb);
 static void draw_byte_16(unsigned char *bits, u32 *base, u32 rb);
 #endif
 static void draw_byte_8(unsigned char *bits, u32 *base, u32 rb);
+
+static int pci_find_device_x(int vendorx, int devicex, int index, struct pci_device *dev);
 
 static u32 g_loc_X;
 static u32 g_loc_Y;
@@ -62,7 +64,7 @@ boot_infos_t disp_bi;
 /* This function will enable the early boot text when doing OF booting. This
  * way, xmon output should work too
  */
-void
+static void
 btext_setup_display(u32 width, u32 height, u32 depth, u32 pitch,
 		    unsigned long address)
 {
@@ -73,7 +75,7 @@ btext_setup_display(u32 width, u32 height, u32 depth, u32 pitch,
 	g_max_loc_X = width / 8;
 	g_max_loc_Y = height / 16;
 //	bi->logicalDisplayBase = (unsigned char *)address;
-	bi->dispDeviceBase = (unsigned char *)address;
+	bi->dispDeviceBase = address;
 	bi->dispDeviceRowBytes = pitch;
 	bi->dispDeviceDepth = depth;
 	bi->dispDeviceRect[0] = bi->dispDeviceRect[1] = 0;
@@ -93,7 +95,7 @@ btext_setup_display(u32 width, u32 height, u32 depth, u32 pitch,
  *    changes.
  */
 
-void 
+static void 
 map_boot_text(void)
 {
 	boot_infos_t *bi = &disp_bi;
@@ -113,18 +115,19 @@ static unsigned char * BTEXT
 calc_base(boot_infos_t *bi, u32 x, u32 y)
 {
 	unsigned char *base;
-#if 1
 	base = bi->logicalDisplayBase;
+#if 0
+	/* Ummm... which moron wrote this? */
 	if (base == 0)
-#endif
 		base = bi->dispDeviceBase;
+#endif
 	base += (x + bi->dispDeviceRect[0]) * (bi->dispDeviceDepth >> 3);
 	base += (y + bi->dispDeviceRect[1]) * bi->dispDeviceRowBytes;
 	return base;
 }
 
 
-void BTEXT btext_clearscreen(void)
+static void BTEXT btext_clearscreen(void)
 {
 	boot_infos_t* bi	= &disp_bi;
 	u32 *base	= (u32 *)calc_base(bi, 0, 0);
@@ -147,7 +150,7 @@ __inline__ void dcbst(const void* addr)
 	__asm__ __volatile__ ("dcbst 0,%0" :: "r" (addr));
 }
 
-void BTEXT btext_flushscreen(void)
+static void BTEXT btext_flushscreen(void)
 {
 	boot_infos_t* bi	= &disp_bi;
 	u32  *base	= (unsigned long *)calc_base(bi, 0, 0);
@@ -198,7 +201,7 @@ scrollscreen(void)
 }
 #endif /* ndef NO_SCROLL */
 
-void BTEXT btext_drawchar(char c)
+static void BTEXT btext_drawchar(char c)
 {
 	u32 cline = 0;
 
@@ -246,7 +249,7 @@ void BTEXT btext_drawchar(char c)
 #endif
 }
 #if 0
-void BTEXT
+static void BTEXT
 btext_drawstring(const char *c)
 {
 	if (!boot_text_mapped)
@@ -254,7 +257,7 @@ btext_drawstring(const char *c)
 	while (*c)
 		btext_drawchar(*c++);
 }
-void BTEXT
+static void BTEXT
 btext_drawhex(u32 v)
 {
 	static char hex_table[] = "0123456789abcdef";
@@ -394,7 +397,7 @@ draw_byte_8(unsigned char *font, u32 *base, u32 rb)
 #endif
 
 
-void btext_init(void)
+static void btext_init(void)
 {
 #if 0
 // for debug
@@ -402,14 +405,16 @@ void btext_init(void)
 #else
     uint32_t frame_buffer;//  0xfc000000
 
-    struct pci_device *dev = 0;
-
 #if USE_FILO_PCI_FIND==0
+    struct pci_device dev;
+
     pci_find_device_x(0x1002, 0x4752, 0, &dev);
     if(dev.vendor==0) return; // no fb
 
     frame_buffer = (uint32_t)dev.membase;
 #else
+    struct pci_device *dev = 0;
+
     pci_init();
     dev = pci_find_device(0x1002, 0x4752, -1, -1, 0);
     if(!dev) {
@@ -422,21 +427,21 @@ void btext_init(void)
 #endif
 
 	btext_setup_display(640, 480, 8, 640,frame_buffer);
-//	btext_clearscreen(); //move to main
-//	map_boot_text();  //move console_init
+	btext_clearscreen();
+	map_boot_text();
 }
-void btext_putc(int c)
+static void btext_putc(int c)
 {	
         btext_drawchar((unsigned char)c);
 }
-#if 0
-static struct console_driver btext_console __console = {
-        .init    = btext_init,
-        .tx_byte = btext_tx_byte,
-        .rx_byte = 0,
-        .tst_byte = 0,
+
+static struct console_driver btext_console __console_driver = {
+	.putchar = btext_putc,
+	.disabled = 1,
 };
-#endif
+
+INIT_FN ( INIT_CONSOLE, btext_init, NULL, NULL );
+
 #if USE_FILO_PCI_FIND==0
 int pci_find_device_x(int vendorx, int devicex, int index, struct pci_device *dev)
 {                       
@@ -445,7 +450,6 @@ int pci_find_device_x(int vendorx, int devicex, int index, struct pci_device *de
 #if 1
         unsigned char hdr_type = 0;
 #endif
-        uint32_t class; 
         uint16_t vendor, device;
         uint32_t l, membase;
 #if 0
@@ -5192,5 +5196,3 @@ static unsigned char vga_font[cmapsz] BTDATA = {
 	0x00, /* 00000000 */
 #endif
 };
-#endif
-#endif

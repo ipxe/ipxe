@@ -9,7 +9,6 @@
 #include "etherboot.h"
 #include "callbacks.h"
 #include "realmode.h"
-#include "segoff.h"
 #include <stdarg.h>
 
 /* Maximum amount of stack data that prefix may request to be passed

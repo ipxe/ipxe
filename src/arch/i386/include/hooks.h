@@ -1,9 +1,14 @@
-#ifndef ETHERBOOT_I386_HOOKS_H
-#define ETHERBOOT_I386_HOOKS_H
+#ifndef HOOKS_H
+#define HOOKS_H
 
-void arch_main(in_call_data_t *data, va_list params);
-void arch_on_exit(int status);
-#define arch_relocate_to(addr)
-void arch_relocated_from ( uint32_t old_addr );
+/* in hooks.o */
+extern void arch_initialise ( struct i386_all_regs *regs,
+			      void (*retaddr) (void) );
+extern void arch_main ( struct i386_all_regs *regs );
 
-#endif /* ETHERBOOT_I386_HOOKS_H */
+/* in hooks_rm.o */
+extern void arch_rm_initialise ( struct i386_all_regs *regs,
+				 void (*retaddr) (void) );
+extern void arch_rm_main ( struct i386_all_regs *regs );
+
+#endif /* HOOKS_H */

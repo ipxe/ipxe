@@ -542,3 +542,4 @@ static struct isa_driver smc9000_driver __isa_driver = {
 	.probe   = smc9000_probe,
 	.ioaddrs = 0,
 };
+ISA_ROM("smc9000","SMC9000");

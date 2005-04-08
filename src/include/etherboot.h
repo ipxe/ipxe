@@ -49,28 +49,6 @@
 #define DEFAULT_BOOTFILE	PXENFSROOTPATH "/boot/pxeboot"
 #endif
 
-/* Clean up console settings... mainly CONSOLE_FIRMWARE and CONSOLE_SERIAL are used
- * in the sources (except start.S and serial.S which cannot include
- * etherboot.h).  At least one of the CONSOLE_xxx has to be set, and
- * CONSOLE_DUAL sets both CONSOLE_CRT and CONSOLE_SERIAL.  If none is set,
- * CONSOLE_CRT is assumed.  */
-#ifdef CONSOLE_CRT
-#define CONSOLE_FIRMWARE
-#endif
-#ifdef	CONSOLE_DUAL
-#undef CONSOLE_FIRMWARE
-#define CONSOLE_FIRMWARE
-#undef CONSOLE_SERIAL
-#define CONSOLE_SERIAL
-#endif
-#if	defined(CONSOLE_FIRMWARE) && defined(CONSOLE_SERIAL)
-#undef CONSOLE_DUAL
-#define CONSOLE_DUAL
-#endif
-#if	!defined(CONSOLE_FIRMWARE) && !defined(CONSOLE_SERIAL)
-#define CONSOLE_FIRMWARE
-#endif
-
 #if	!defined(DOWNLOAD_PROTO_TFTP) && !defined(DOWNLOAD_PROTO_NFS) && !defined(DOWNLOAD_PROTO_SLAM) && !defined(DOWNLOAD_PROTO_TFTM) && !defined(DOWNLOAD_PROTO_DISK) && !defined(DOWNLOAD_PROTO_HTTP)
 #error No download protocol defined!
 #endif
@@ -204,7 +182,7 @@ External prototypes
 struct Elf_Bhdr;
 extern int in_call(in_call_data_t *data, uint32_t opcode, va_list params);
 extern void console_init(void); 
-extern int main(in_call_data_t *data, va_list params);
+extern int main();
 extern int loadkernel P((const char *fname));
 extern char as_main_program;
 /* nic.c */
@@ -287,26 +265,6 @@ extern unsigned long strtoul P((const char *p, const char **, int base));
 extern void printf P((const char *, ...));
 extern int sprintf P((char *, const char *, ...));
 extern int inet_aton P((const char *p, in_addr *i));
-#ifdef PCBIOS
-extern void gateA20_set P((void));
-#define gateA20_unset()
-#else
-#define gateA20_set()
-#define gateA20_unset()
-#endif
-extern void putchar P((int));
-extern int getchar P((void));
-extern int iskey P((void));
-
-/* pcbios.S */
-extern int console_getc P((void));
-extern void console_putc P((int));
-extern int console_ischar P((void));
-extern int getshift P((void));
-extern int int15 P((int));
-#ifdef	POWERSAVE
-extern void cpu_nap P((void));
-#endif	/* POWERSAVE */
 
 /* basemem.c */
 extern uint32_t get_free_base_memory ( void );
@@ -318,26 +276,6 @@ extern void free_unused_base_memory ( void );
 extern void forget_prefix_base_memory ( void );
 extern void forget_runtime_base_memory ( uint32_t old_addr );
 
-struct e820entry {
-	uint64_t addr;
-	uint64_t size;
-	uint32_t type;
-#define E820_RAM	1
-#define E820_RESERVED	2
-#define E820_ACPI	3 /* usable as RAM once ACPI tables have been read */
-#define E820_NVS	4
-} PACKED;
-#define E820ENTRY_SIZE 20
-#define E820MAX 32
-struct meminfo {
-	uint16_t basememsize;
-	uint16_t pad;
-	uint32_t memsize;
-	uint32_t map_count;
-	struct e820entry map[E820MAX];
-} PACKED;
-extern struct meminfo meminfo;
-extern void get_memsizes(void);
 extern unsigned long get_boot_order(unsigned long order, unsigned *index);
 #ifndef NORELOCATE
 extern void relocate(void);

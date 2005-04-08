@@ -1,6 +1,7 @@
 #ifndef	NORELOCATE
 
 #include "etherboot.h"
+#include "memsizes.h"
 
 /* by Eric Biederman */
 
@@ -93,10 +94,10 @@ void relocate(void)
 		printf("Relocating _text from: [%lx,%lx) to [%lx,%lx)\n",
 			old_addr, virt_to_phys(_end),
 			addr, eaddr);
-		arch_relocate_to(addr);
+		/* arch_relocate_to ( addr ) */
 		cleanup();
 		relocate_to(addr);
-		arch_relocated_from(old_addr);
+		/* arch_relocated_from ( addr ) */
 	}
 }
 

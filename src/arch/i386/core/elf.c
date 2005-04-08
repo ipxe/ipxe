@@ -1,5 +1,6 @@
 #include "etherboot.h"
 #include "elf.h"
+#include "memsizes.h"
 
 
 #define NAME "Etherboot"

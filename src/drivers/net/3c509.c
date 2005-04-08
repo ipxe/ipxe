@@ -653,6 +653,7 @@ static struct isa_driver t509_driver __isa_driver = {
 	.probe   = t509_probe,
 	.ioaddrs = 0,
 };
+ISA_ROM("3c509","3c509, ISA/EISA");
 #endif
 
 #ifdef INCLUDE_3C529
@@ -662,6 +663,7 @@ static struct isa_driver t529_driver __isa_driver = {
 	.probe   = t529_probe,
 	.ioaddrs = 0,
 };
+ISA_ROM("3c529","3c529 == MCA 3c509");
 #endif
 
 /*

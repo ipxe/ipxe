@@ -2,6 +2,7 @@
 #include "stdint.h"
 #include "string.h"
 #include "bits/cpu.h"
+#include "init.h"
 
 
 /* Standard macro to see if a specific flag is changeable */
@@ -83,4 +84,7 @@ void cpu_setup(void)
 {
 	identify_cpu(&cpu_info);
 }
+
+INIT_FN ( INIT_CPU, cpu_setup, NULL, NULL );
+
 #endif /* CONFIG_X86_64 */

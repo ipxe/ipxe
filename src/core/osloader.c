@@ -30,6 +30,22 @@ Modifications: Ken Yap (for Etherboot/16)
  */
 
 #include "etherboot.h"
+#include "memsizes.h"
+
+#ifdef KEEP_IT_REAL
+
+#warning "All download mechanisms are broken under KEEP_IT_REAL"
+
+os_download_t probe_image(unsigned char *data, unsigned int len) {
+	return 0;
+}
+
+int load_block(unsigned char *data, unsigned int block, unsigned int len, int eof) {
+	return 1;
+}
+
+#else /* KEEP_IT_REAL */
+
 
 struct os_entry_regs os_regs;
 
@@ -128,7 +144,7 @@ static void done(int do_cleanup)
 	 */
 	if ( do_cleanup ) {
 		cleanup();
-		arch_on_exit(0);
+		/* arch_on_exit(0); */
 	}
 }
 
@@ -261,6 +277,7 @@ PROBE_IMAGE - Detect image file type
 os_download_t probe_image(unsigned char *data, unsigned int len)
 {
 	os_download_t os_download = 0;
+
 #ifdef AOUT_IMAGE
 	if (!os_download) os_download = aout_probe(data, len);
 #endif
@@ -286,6 +303,7 @@ os_download_t probe_image(unsigned char *data, unsigned int len)
 #ifdef RAW_IMAGE
 	if (!os_download) os_download = raw_probe(data, len);
 #endif
+
 	return os_download;
 }
 
@@ -363,3 +381,4 @@ int load_block(unsigned char *data, unsigned int block, unsigned int len, int eo
  * End:
  */
 
+#endif /* KEEP_IT_REAL */

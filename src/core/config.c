@@ -7,6 +7,7 @@
 
 #include	"etherboot.h"
 #include	"nic.h"
+#include	"console.h"
 #ifdef BUILD_SERIAL
 #include	".buildserial.h"
 #define xstr(s) str(s)
@@ -104,6 +105,9 @@ void print_config(void)
 		"DNS "
 #endif
 		"\n");
+#ifdef KEEP_IT_REAL
+	printf( "Keeping It Real [EXPERIMENTAL]\n" );
+#endif
 }
 
 static const char *driver_name[] = {
@@ -159,3 +163,48 @@ void disable(struct dev *dev)
 		dev->disable = 0;
 	}
 }
+
+
+/*
+ * Drag in all requested console types
+ *
+ * At least one of the CONSOLE_xxx has to be set.  CONSOLE_DUAL sets
+ * both CONSOLE_FIRMWARE and CONSOLE_SERIAL for legacy compatibility.
+ * If no CONSOLE_xxx is set, CONSOLE_FIRMWARE is assumed.
+ */
+
+#ifdef CONSOLE_CRT
+#define CONSOLE_FIRMWARE
+#endif
+
+#ifdef	CONSOLE_DUAL
+#undef CONSOLE_FIRMWARE
+#define CONSOLE_FIRMWARE
+#undef CONSOLE_SERIAL
+#define CONSOLE_SERIAL
+#endif
+
+#if	!defined(CONSOLE_FIRMWARE) && !defined(CONSOLE_SERIAL)
+#define CONSOLE_FIRMWARE
+#endif
+
+#ifdef CONSOLE_FIRMWARE
+REQUIRE_OBJECT ( bios_console );
+#endif
+
+#ifdef CONSOLE_SERIAL
+REQUIRE_OBJECT ( serial );
+#endif
+
+#ifdef CONSOLE_DIRECT_VGA
+REQUIRE_OBJECT ( video_subr );
+#endif
+
+#ifdef CONSOLE_BTEXT
+REQUIRE_OBJECT ( btext );
+#endif
+
+#ifdef CONSOLE_PC_KBD
+REQUIRE_OBJECT ( pc_kbd );
+#endif
+

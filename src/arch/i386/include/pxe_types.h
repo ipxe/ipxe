@@ -10,7 +10,7 @@
 
 /* SEGOFF16_t defined in separate header
  */
-#include "segoff.h"
+#include "realmode.h"
 typedef segoff_t I386_SEGOFF16_t;
 #define SEGOFF16_t I386_SEGOFF16_t
 

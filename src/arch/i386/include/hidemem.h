@@ -1,7 +1,7 @@
 #ifndef HIDEMEM_H
 #define HIDEMEM_H
 
-#include "segoff.h"
+#include "realmode.h"
 
 extern int install_e820mangler ( void *new_mangler );
 extern int hide_etherboot ( void );

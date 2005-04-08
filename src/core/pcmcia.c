@@ -1,5 +1,3 @@
-#ifdef CONFIG_PCMCIA
-
 /*
  *	pcmcia.c
  *
@@ -25,13 +23,13 @@
  *	at some point. If there's anything obvious or better, not-so-obvious,
  *	please contact me by e-mail: anselm (AT) hoffmeister (DOT) be   *THANKS*
  */
-#include "../include/pcmcia.h"
-#include "../include/i82365.h"
+#include "pcmcia.h"
+#include "i82365.h"
 #define CODE_STATUS "alpha"
 #define	CODE_VERSION "0.1.3"
-
-#include "../include/pcmcia-opts.h"
-#include "../include/pcmcia.h"
+#include "pcmcia-opts.h"
+#include "console.h"
+#include "init.h"
 
 int	sockets; /* AHTODO: Phase this out! */
 u_int	pccsocks;
@@ -55,7 +53,7 @@ void	sleepticks(int numticks ) {
 	return;
 }
 
-int	pcmcia_init_all(void) {
+static void pcmcia_init_all(void) {
 	u_int i, j, k, l, m, n, ui, configs = 0;
 	u_int multicard[8];
 	u_char	*uc, upc;
@@ -253,17 +251,15 @@ int	pcmcia_init_all(void) {
 		getchar();
 	}
 
-	return 0;
 }
 
-int	pcmcia_shutdown_all(void) {
+static void	pcmcia_shutdown_all(void) {
 	int i;
 	//if ( PDEBUG > 2 ) {printf("<press key to continue>\n" ); getchar(); }
 	for ( i = 0; i < pccsocks; ++i ) {
  		driver[pccsock[i].drivernum].f(SHUTDOWN,pccsock[i].internalid,0,0,0);
 	}
 	printf("Shutdown of PCMCIA subsystem completed");
-	return 0;
 }
 
-#endif /* CONFIG_PCMCIA */
+INIT_FN ( INIT_PCMCIA, pcmcia_init_all, NULL, pcmcia_shutdown_all );

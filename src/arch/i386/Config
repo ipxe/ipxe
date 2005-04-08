@@ -129,3 +129,8 @@ endif
 
 # An alternate location for isolinux.bin can be set here
 # ISOLINUX_BIN=/path/to/isolinux.bin
+
+# These seem to have some relevance to compiling on x86_64
+# EXTRA_CFLAGS=-m32
+# EXTRA_ASFLAGS=--32
+# EXTRA_LDFLAGS=-m elf_i386

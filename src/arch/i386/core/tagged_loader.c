@@ -1,5 +1,4 @@
 #include "realmode.h"
-#include "segoff.h"
 
 struct segheader
 {

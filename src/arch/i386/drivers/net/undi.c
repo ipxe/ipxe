@@ -1436,7 +1436,7 @@ static int undi_isa_probe ( struct dev *dev,
  * this list.
  */
 static struct pci_id undi_nics[] = {
-	/* PCI_ROM(0x0000, 0x0000, "undi", "UNDI adaptor"), */
+	PCI_ROM(0x0000, 0x0000, "undi", "UNDI driver support"),
 };
 
 static struct pci_driver undi_driver __pci_driver = {

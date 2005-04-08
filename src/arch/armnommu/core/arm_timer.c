@@ -9,7 +9,7 @@
 #include "timer.h"
 #include "latch.h"
 #include "hardware.h"
-
+#include "init.h"
 
 /* get timer returns the contents of the timer */
 static unsigned long get_timer(void)
@@ -29,7 +29,7 @@ static unsigned long configure_timer(void)
 
 static unsigned long clocks_per_tick = 1;
 
-void setup_timers(void)
+static void setup_timers(void)
 {
 	if (!clocks_per_tick) {
 		clocks_per_tick = configure_timer();
@@ -75,3 +75,5 @@ int timer2_running(void)
 {
 	return __timer_running();
 }
+
+INIT_FN ( INIT_TIMERS, setup_timers, NULL, NULL );

@@ -623,3 +623,4 @@ static struct isa_driver eepro_driver __isa_driver = {
 	.probe   = eepro_probe,
 	.ioaddrs = 0,
 };
+ISA_ROM("eepro","Intel Etherexpress Pro/10");

@@ -1230,17 +1230,11 @@ PXENV_EXIT_t pxenv_undi_loader ( undi_loader_t *loader ) {
 	 * this, but it's currently split interestingly between main()
 	 * and main_loop()...
 	 */
-	console_init();
-	cpu_setup();
-	setup_timers();
-	gateA20_set();
 	print_config();
 	get_memsizes();
 	cleanup();
 	relocate();
 	cleanup();
-	console_init();
-	init_heap();
 
 	/* We have relocated; the loader pointer is now invalid */
 	loader = phys_to_virt ( loader_phys );

@@ -812,3 +812,4 @@ static struct isa_driver t515_driver __isa_driver = {
 	.probe = t515_probe,
 	.ioaddrs = 0,
 };
+ISA_ROM("3c515","3c515, Fast EtherLink ISA");

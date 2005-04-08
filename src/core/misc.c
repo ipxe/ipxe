@@ -3,13 +3,7 @@ MISC Support Routines
 **************************************************************************/
 
 #include "etherboot.h"
-#ifdef CONSOLE_BTEXT
-#include <btext.h>
-#endif
-#ifdef CONSOLE_PC_KBD
-#include <pc_kbd.h>
-#endif
-
+#include "console.h"
 
 /**************************************************************************
 IPCHKSUM - Checksum IP Header
@@ -170,7 +164,6 @@ int inet_aton(const char *start, in_addr *i)
 	return p - start;
 }
 
-
 unsigned long strtoul(const char *p, const char **endp, int base)
 {
 	unsigned long ret = 0;
@@ -185,140 +178,6 @@ unsigned long strtoul(const char *p, const char **endp, int base)
 	
 }
 
-#define K_RDWR		0x60		/* keyboard data & cmds (read/write) */
-#define K_STATUS	0x64		/* keyboard status */
-#define K_CMD		0x64		/* keybd ctlr command (write-only) */
-
-#define K_OBUF_FUL	0x01		/* output buffer full */
-#define K_IBUF_FUL	0x02		/* input buffer full */
-
-#define KC_CMD_WIN	0xd0		/* read  output port */
-#define KC_CMD_WOUT	0xd1		/* write output port */
-#define KB_SET_A20	0xdf		/* enable A20,
-					   enable output buffer full interrupt
-					   enable data line
-					   disable clock line */
-#define KB_UNSET_A20	0xdd		/* enable A20,
-					   enable output buffer full interrupt
-					   enable data line
-					   disable clock line */
-
-enum { Disable_A20 = 0x2400, Enable_A20 = 0x2401, Query_A20_Status = 0x2402,
-	Query_A20_Support = 0x2403 };
-
-#if defined(PCBIOS) && !defined(IBM_L40)
-static void empty_8042(void)
-{
-	unsigned long time;
-	char st;
-
-	time = currticks() + TICKS_PER_SEC;	/* max wait of 1 second */
-	while ((((st = inb(K_CMD)) & K_OBUF_FUL) ||
-	       (st & K_IBUF_FUL)) &&
-	       currticks() < time)
-		inb(K_RDWR);
-}
-#endif	/* IBM_L40 */
-
-#if defined(PCBIOS)
-/*
- * Gate A20 for high memory
- */
-void gateA20_set(void)
-{
-#warning "gateA20_set should test to see if it is already set"
-	if (int15(Enable_A20) == 0) {
-		return;
-	}
-#ifdef	IBM_L40
-	outb(0x2, 0x92);
-#else	/* IBM_L40 */
-	empty_8042();
-	outb(KC_CMD_WOUT, K_CMD);
-	empty_8042();
-	outb(KB_SET_A20, K_RDWR);
-	empty_8042();
-#endif	/* IBM_L40 */
-}
-#endif
-
-
-int last_putchar; // From filo
-
-void
-putchar(int c)
-{
-	c &= 0xff;
-	last_putchar = c;
-
-	if (c == '\n')
-		putchar('\r');
-#ifdef	CONSOLE_FIRMWARE
-	console_putc(c);
-#endif
-#ifdef	CONSOLE_DIRECT_VGA
-	vga_putc(c);
-#endif
-#ifdef  CONSOLE_BTEXT
-        btext_putc(c);
-#endif
-#ifdef	CONSOLE_SERIAL
-	serial_putc(c);
-#endif
-}
-
-/**************************************************************************
-GETCHAR - Read the next character from input device WITHOUT ECHO
-**************************************************************************/
-int getchar(void)
-{
-	int c = 256;
-
-	do {
-#if defined(PCBIOS) && defined(POWERSAVE)
-		/* Doze for a while (until the next interrupt).  This works
-		 * fine, because the keyboard is interrupt-driven, and the
-		 * timer interrupt (approx. every 50msec) takes care of the
-		 * serial port, which is read by polling.  This reduces the
-		 * power dissipation of a modern CPU considerably, and also
-		 * makes Etherboot waiting for user interaction waste a lot
-		 * less CPU time in a VMware session.  */
-		cpu_nap();
-#endif	/* POWERSAVE */
-#ifdef	CONSOLE_FIRMWARE
-		if (console_ischar())
-			c = console_getc();
-#endif
-#ifdef	CONSOLE_SERIAL
-		if (serial_ischar())
-			c = serial_getc();
-#endif
-#ifdef CONSOLE_PC_KBD
-		if (kbd_ischar()) 
-			c = kbd_getc();
-#endif
-	} while (c==256);
-	if (c == '\r')
-		c = '\n';
-	return c;
-}
-
-int iskey(void)
-{
-#ifdef	CONSOLE_FIRMWARE
-	if (console_ischar())
-		return 1;
-#endif
-#ifdef	CONSOLE_SERIAL
-	if (serial_ischar())
-		return 1;
-#endif
-#ifdef CONSOLE_PC_KBD
-        if (kbd_ischar())
-		return 1;
-#endif
-	return 0;
-}
 
 #if DEBUG_UTILS
 

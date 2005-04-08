@@ -5,7 +5,6 @@
 #define PXE_CALLBACKS_H
 
 #include "etherboot.h"
-#include "segoff.h"
 #include "pxe.h"
 
 typedef struct {

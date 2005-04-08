@@ -2,6 +2,7 @@
 #include "timer.h"
 #include "sal.h"
 #include "pal.h"
+#include "init.h"
 
 static inline unsigned long get_cycles(void)
 {
@@ -39,7 +40,7 @@ static unsigned long calibrate_cycles(void)
 }
 
 static unsigned long clocks_per_tick;
-void setup_timers(void)
+static void setup_timers(void)
 {
 	if (!clocks_per_tick) {
 		clocks_per_tick = calibrate_cycles();
@@ -87,3 +88,5 @@ int timer2_running(void)
 {
 	return __timer_running();
 }
+
+INIT_FN ( INIT_TIMERS, setup_timers, NULL, NULL );

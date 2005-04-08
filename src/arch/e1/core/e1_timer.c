@@ -7,6 +7,7 @@
 #include "etherboot.h"
 #include "timer.h"
 #include "e132_xs_board.h"
+#include "init.h"
 
 /* get timer returns the contents of the timer */
 static inline unsigned long get_timer(void)
@@ -46,7 +47,7 @@ static unsigned long configure_timer(void)
 
 static unsigned long clocks_per_tick;
 
-void setup_timers(void)
+static void setup_timers(void)
 {
 	if (!clocks_per_tick) {
 		clocks_per_tick = configure_timer();
@@ -92,3 +93,5 @@ int timer2_running(void)
 {
 	return __timer_running();
 }
+
+INIT_FN ( INIT_TIMERS, setup_timers, NULL, NULL );

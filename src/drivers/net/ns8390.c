@@ -961,6 +961,7 @@ static struct isa_driver wd_driver __isa_driver = {
 	.probe   = wd_probe,
 	.ioaddrs = 0, 
 };
+ISA_ROM("wd","WD8003/8013, SMC8216/8416, SMC 83c790 (EtherEZ)");
 #endif
 
 #ifdef	INCLUDE_3C503
@@ -970,6 +971,7 @@ static struct isa_driver t503_driver __isa_driver = {
 	.probe   = t503_probe,
 	.ioaddrs = 0, 
 };
+ISA_ROM("3c503","3Com503, Etherlink II[/16]");
 #endif
 
 #ifdef	INCLUDE_NE
@@ -979,6 +981,7 @@ static struct isa_driver ne_driver __isa_driver = {
 	.probe   = ne_probe,
 	.ioaddrs = 0, 
 };
+ISA_ROM("ne","NE1000/2000 and clones");
 #endif
 
 #ifdef	INCLUDE_NS8390
@@ -1013,4 +1016,3 @@ static struct pci_driver nepci_driver __pci_driver = {
  *  c-basic-offset: 8
  * End:
  */
-

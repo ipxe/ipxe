@@ -8,7 +8,7 @@
 #define PIC8259_H
 
 /* For segoff_t */
-#include "segoff.h"
+#include "realmode.h"
 
 #define IRQ_PIC_CUTOFF (8)
 
@@ -90,7 +90,7 @@ void dump_irq_status ( void );
  * handler code, so we put prototypes and the size macro here.
  */
 extern void _trivial_irq_handler ( void );
-extern void _trivial_irq_handler_end ( void );
+extern char _trivial_irq_handler_size[];
 #define TRIVIAL_IRQ_HANDLER_SIZE FRAGMENT_SIZE(_trivial_irq_handler)
 
 #endif /* PIC8259_H */

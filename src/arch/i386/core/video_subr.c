@@ -5,10 +5,14 @@
  *
  */
 
-#ifdef CONSOLE_DIRECT_VGA
+#include "stddef.h"
+#include "string.h"
+#include "io.h"
+#include "console.h"
+#include "init.h"
+#include "vga.h"
 
-#include <etherboot.h>
-#include <vga.h>
+static struct console_driver vga_console;
 
 static char *vidmem;		/* The video buffer */
 static int video_line, video_col;
@@ -17,7 +21,7 @@ static int video_line, video_col;
 
 static void memsetw(void *s, int c, unsigned int n)
 {
-	int i;
+	unsigned int i;
 	u16 *ss = (u16 *) s;
 
 	for (i = 0; i < n; i++) {
@@ -25,7 +29,7 @@ static void memsetw(void *s, int c, unsigned int n)
 	}
 }
 
-void video_init(void)
+static void video_init(void)
 {
 	static int inited=0;
 
@@ -50,7 +54,7 @@ static void video_scroll(void)
 		vidmem[i] = ' ';
 }
 
-void vga_putc(unsigned char byte)
+static void vga_putc(int byte)
 {
 	if (byte == '\n') {
 		video_line++;
@@ -90,5 +94,9 @@ void vga_putc(unsigned char byte)
 	write_crtc((video_col + (video_line *COLS)) & 0x0ff, CRTC_CURSOR_LO);
 }
 
-#endif
+static struct console_driver vga_console __console_driver = {
+	.putchar = vga_putc,
+	.disabled = 1,
+};
 
+INIT_FN ( INIT_CONSOLE, video_init, NULL, NULL );

@@ -1,8 +1,12 @@
 #include "etherboot.h"
+#include "init.h"
+#include "memsizes.h"
 
 size_t heap_ptr, heap_top, heap_bot;
 
-void init_heap(void)
+#define _virt_start 0
+
+static void init_heap(void)
 {
 	size_t size;
 	size_t start, end;
@@ -79,6 +83,11 @@ void init_heap(void)
 		printf("init_heap: No heap found.\n");
 		exit(1);
 	}
+	heap_ptr = heap_bot;
+}
+
+static void reset_heap(void)
+{
 	heap_ptr = heap_bot;
 }
 
@@ -166,3 +175,5 @@ void forget2(void *ptr)
         }
         heap_ptr = addr;
 }
+
+INIT_FN ( INIT_HEAP, init_heap, reset_heap, NULL );

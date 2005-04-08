@@ -1,7 +1,3 @@
-#include "etherboot.h"
-#include "timer.h"
-#ifdef	CONSOLE_SERIAL
-
 /*
  * The serial port interface routines implement a simple polled i/o
  * interface to a standard serial port.  Due to the space restrictions
@@ -15,25 +11,27 @@
  * parity, 1 stop bit (8N1).  This can be changed in init_serial().
  */
 
-static int found = 0;
+#include "stddef.h"
+#include "console.h"
+#include "init.h"
+#include "io.h"
+#include "timer.h"
 
-#if defined(COMCONSOLE)
+/* Set default values if none specified */
+
+#ifndef COMCONSOLE
+#define COMCONSOLE ( 0x3f8 )
+#endif
+
+#ifndef CONSPEED
+#define CONSPEED ( 9600 )
+#endif
+
 #undef UART_BASE
 #define UART_BASE COMCONSOLE
-#endif
 
-#ifndef UART_BASE
-#error UART_BASE not defined
-#endif
-
-#if defined(CONSPEED)
 #undef UART_BAUD
 #define UART_BAUD CONSPEED
-#endif
-
-#ifndef UART_BAUD
-#define UART_BAUD 115200
-#endif
 
 #if ((115200%UART_BAUD) != 0)
 #error Bad ttys0 baud rate
@@ -83,18 +81,15 @@ static int found = 0;
 #define uart_writeb(val,addr) outb((val),(addr))
 #endif
 
+static struct console_driver serial_console;
+
 /*
  * void serial_putc(int ch);
  *	Write character `ch' to port UART_BASE.
  */
-void serial_putc(int ch)
-{
+static void serial_putc ( int ch ) {
 	int i;
 	int status;
-	if (!found) {
-		/* no serial interface */
-		return;
-	}
 	i = 1000; /* timeout */
 	while(--i > 0) {
 		status = uart_readb(UART_BASE + UART_LSR);
@@ -111,8 +106,7 @@ void serial_putc(int ch)
  * int serial_getc(void);
  *	Read a character from port UART_BASE.
  */
-int serial_getc(void)
-{
+static int serial_getc ( void ) {
 	int status;
 	int ch;
 	do {
@@ -131,11 +125,8 @@ int serial_getc(void)
  *       If there is a character in the input buffer of port UART_BASE,
  *       return nonzero; otherwise return 0.
  */
-int serial_ischar(void)
-{
+static int serial_ischar ( void ) {
 	int status;
-	if (!found)
-		return 0;
 	status = uart_readb(UART_BASE + UART_LSR);	/* line status reg; */
 	return status & 1;		/* rx char available */
 }
@@ -144,14 +135,9 @@ int serial_ischar(void)
  * int serial_init(void);
  *	Initialize port UART_BASE to speed CONSPEED, line settings 8N1.
  */
-int serial_init(void)
-{
-	int initialized = 0;
+static void serial_init ( void ) {
 	int status;
 	int divisor, lcs;
-
-	if (found)
-		return 1;
 
 	divisor = COMBRD;
 	lcs = UART_LCS;
@@ -207,10 +193,9 @@ int serial_init(void)
 		/* line status reg */
 		status = uart_readb(UART_BASE + UART_LSR);
 	} while(status & UART_LSR_DR);
-	initialized = 1;
+	serial_console.disabled = 0;
  out:
-	found = initialized;
-	return initialized;
+	return;
 }
 
 /*
@@ -218,10 +203,9 @@ int serial_init(void)
  *	Cleanup our use of the serial port, in particular flush the
  *	output buffer so we don't accidentially loose characters.
  */
-void serial_fini(void)
-{
+static void serial_fini ( void ) {
 	int i, status;
-	if (!found) {
+	if (serial_console.disabled) {
 		/* no serial interface */
 		return;
 	}
@@ -232,5 +216,15 @@ void serial_fini(void)
 	do {
 		status = uart_readb(UART_BASE + UART_LSR);
 	} while((--i > 0) && !(status & UART_LSR_TEMPT));
+	/* Don't mark it as disabled; it's still usable */
 }
-#endif
+
+static struct console_driver serial_console __console_driver = {
+	.putchar = serial_putc,
+	.getchar = serial_getc,
+	.iskey = serial_ischar,
+	.disabled = 1,
+};
+
+INIT_FN ( INIT_CONSOLE, serial_init, NULL, serial_fini );
+

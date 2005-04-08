@@ -792,3 +792,4 @@ static struct isa_driver depca_driver __isa_driver = {
 	.probe   = depca_probe,
 	.ioaddrs = 0,
 };
+ISA_ROM("depca","Digital DE100 and DE200");

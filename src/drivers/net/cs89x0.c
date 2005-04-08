@@ -711,6 +711,7 @@ static struct isa_driver cs89x0_driver __isa_driver = {
 	.probe   = cs89x0_probe,
 	.ioaddrs = 0,
 };
+ISA_ROM("cs89x0","Crystal Semiconductor CS89x0");
 
 /*
  * Local variables:
