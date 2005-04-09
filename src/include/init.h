@@ -33,12 +33,13 @@ struct init_fn {
 };
 
 /* Use double digits to avoid problems with "10" < "9" on alphabetic sort */
-#define INIT_CONSOLE	"00"
-#define	INIT_CPU	"01"
-#define	INIT_TIMERS	"02"
-#define	INIT_PCMCIA	"03"
-#define	INIT_MEMSIZES	"04"
-#define	INIT_HEAP	"05"
+#define INIT_LIBRM	"00"
+#define INIT_CONSOLE	"01"
+#define	INIT_CPU	"02"
+#define	INIT_TIMERS	"03"
+#define	INIT_PCMCIA	"04"
+#define	INIT_MEMSIZES	"05"
+#define	INIT_HEAP	"06"
 
 /* Macro for creating an initialisation function table entry */
 #define INIT_FN( init_order, init_func, reset_func, exit_func )		      \
