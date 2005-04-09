@@ -22,17 +22,6 @@
 #define fbms ( * ( ( uint16_t * ) phys_to_virt ( 0x413 ) ) )
 #define FBMS_MAX ( 640 )
 
-/* Structure that we use to represent a free block of base memory
- */
-#define FREE_BLOCK_MAGIC ( ('!'<<0) + ('F'<<8) + ('R'<<16) + ('E'<<24) )
-union free_base_memory_block {
-	struct {
-		uint32_t	magic;
-		uint16_t	size_kb;
-	};
-	char bytes[1024];
-};
-
 /* Local prototypes */
 static void free_unused_base_memory ( void );
 
@@ -188,12 +177,10 @@ static void free_unused_base_memory ( void ) {
 		      free_block->size_kb, ( fbms << 6 ),
 		      ( fbms + free_block->size_kb ) << 6 );
 		
-		/* Zero out freed block.  We do this in case
-		 * the block contained any structures that
-		 * might be located by scanning through
-		 * memory.
+		/* Do not zero out the freed block, because it might
+		 * be the one containing librm, in which case we're
+		 * going to have severe problems the next time we use
+		 * DBG() or, failing that, call get_memsizes().
 		 */
-		memset ( free_block, 0, free_block->size_kb << 10 );
-
 	}
 }
