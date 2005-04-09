@@ -2,13 +2,10 @@
 #include "stddef.h"
 #include "realmode.h"
 #include "init.h"
+#include "etherboot.h"
 #include "memsizes.h"
 
 #define CF ( 1 << 0 )
-
-#ifndef MEMSIZES_DEBUG 
-#define MEMSIZES_DEBUG 0
-#endif
 
 /* by Eric Biederman */
 
@@ -19,10 +16,18 @@ BASEMEMSIZE - Get size of the conventional (base) memory
 **************************************************************************/
 static unsigned short basememsize ( void ) {
 	uint16_t int12_basememsize, fbms_basememsize;
+	uint16_t basememsize;
 
 	/* There are two methods for retrieving the base memory size:
 	 * INT 12 and the BIOS FBMS counter at 40:13.  We read both
 	 * and use the smaller value, to be paranoid.
+	 * 
+	 * We then store the smaller value in the BIOS FBMS counter so
+	 * that other code (e.g. basemem.c) can rely on it and not
+	 * have to use INT 12.  This is especially important because
+	 * basemem.c functions can be called in a context in which
+	 * there is no real-mode stack (e.g. when trying to allocate
+	 * memory for a real-mode stack...)
 	 */
 
 	REAL_EXEC ( rm_basememsize,
@@ -34,8 +39,12 @@ static unsigned short basememsize ( void ) {
 
 	get_real ( fbms_basememsize, 0x40, 0x13 );
 
-	return ( int12_basememsize < fbms_basememsize ?
-		 int12_basememsize : fbms_basememsize );
+	basememsize = ( int12_basememsize < fbms_basememsize ?
+			int12_basememsize : fbms_basememsize );
+
+	put_real ( basememsize, 0x40, 0x13 );
+
+	return basememsize;
 }
 
 /**************************************************************************
@@ -204,7 +213,7 @@ void get_memsizes ( void ) {
 		}
 	}
 
-#if MEMSIZES_DEBUG
+#ifdef DEBUG_MEMSIZES
 	printf ( "basememsize %d\n", meminfo.basememsize );
 	printf ( "memsize %d\n",     meminfo.memsize );
 	printf ( "Memory regions(%d):\n", meminfo.map_count );
