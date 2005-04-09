@@ -265,16 +265,6 @@ extern void printf P((const char *, ...));
 extern int sprintf P((char *, const char *, ...));
 extern int inet_aton P((const char *p, in_addr *i));
 
-/* basemem.c */
-extern uint32_t get_free_base_memory ( void );
-extern void allot_real_mode_stack ( void );
-extern void forget_real_mode_stack ( void );
-extern void * allot_base_memory ( size_t );
-extern void forget_base_memory ( void*, size_t );
-extern void free_unused_base_memory ( void );
-extern void forget_prefix_base_memory ( void );
-extern void forget_runtime_base_memory ( uint32_t old_addr );
-
 extern unsigned long get_boot_order(unsigned long order, unsigned *index);
 extern void disk_init P((void));
 extern unsigned int pcbios_disk_read P((int drv,int c,int h,int s,char *buf));
@@ -322,9 +312,6 @@ struct Elf_Bhdr *prepare_boot_params(void *header);
 extern int elf_start(unsigned long machine, unsigned long entry, unsigned long params);
 extern unsigned long currticks P((void));
 extern void exit P((int status));
-extern void _stack;
-extern char _prefix_copy[512];
-extern uint32_t image_basemem;
 
 /* serial.c */
 extern int serial_getc P((void));
