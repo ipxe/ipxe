@@ -17,7 +17,6 @@
 #include "byteswap.h"
 #include "setjmp.h"
 #include "latch.h"
-#include "callbacks.h"
 
 /* within 1MB of 4GB is too close. 
  * MAX_ADDR is the maximum address we can easily do DMA to.
