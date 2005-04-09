@@ -287,7 +287,7 @@ EXPORT(real_to_prot):
 	pushl	%eax
 	
 	/* Restore protected-mode GDT */
-	lgdt	%ds:OFFSET(pm_gdt)
+	data32 lgdt	%ds:OFFSET(pm_gdt)
 
 	/* Switch to protected mode */
 	movl	%cr0, %eax
