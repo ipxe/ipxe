@@ -204,7 +204,6 @@ static int main_loop(int state)
 		static int firsttime = 1;
 		/* First time through */
 		if (firsttime) {
-			/* relocate(); */
 			cleanup();
 			firsttime = 0;
 		} 
