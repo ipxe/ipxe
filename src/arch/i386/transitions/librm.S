@@ -496,8 +496,10 @@ EXPORT(prot_call):
 	movl	$SIZEOF_REAL_MODE_REGS, %ecx
 	subl	%ecx, %esp
 	movl	%esp, %edi
+	pushl	%esi
 	cld
-	rep	movsb
+	rep movsb
+	popl	%edi		/* %edi = phys addr of RM copy of rm_regs */
 	
 	/* Switch to virtual addresses. */
 	call	1f
@@ -522,7 +524,18 @@ EXPORT(prot_call):
 
 	/* Switch to physical addresses, discard PM register store */
 	lcall	$VIRTUAL_CS, $_virt_to_phys
-	addl	$SIZEOF_REAL_MODE_REGS+4, %esp /* also discard lcall seg */
+	popl	%eax /* discard */
+
+	/* Copy rm_regs from PM stack to RM stack, and remove rm_regs
+	 * from PM stack.  (%edi still contains physical address of
+	 * rm_regs on RM stack from earlier, since C code preserves
+	 * %edi).
+	 */
+	movl	%esp, %esi
+	movl	$SIZEOF_REAL_MODE_REGS, %ecx
+	cld
+	rep movsb
+	movl	%esi, %esp	/* remove rm_regs from PM stack */
 
 	/* Switch to real mode */
 	call	prot_to_real
