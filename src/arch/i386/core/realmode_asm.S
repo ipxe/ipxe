@@ -4,7 +4,6 @@
  */
 
 #include "realmode.h"
-#include "callbacks.h"
 
 #if	1	/* CODE16 */
 	
