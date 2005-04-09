@@ -8,6 +8,9 @@
 /* Drag in local definitions */
 #include "librm.h"
 
+/* Drag in FREE_BASEMEM_HEADER_SIZE */
+#include "basemem.h"
+
 /****************************************************************************
  * This file defines librm: a block of code that is designed to reside
  * permanently in base memory and provide the interface between
@@ -129,6 +132,19 @@ _librm_start:
 	.equ _ ## sym, OFFSET(sym) ; \
 	sym
 
+/****************************************************************************
+ * Note that the first sizeof(struct free_base_memory_header) bytes of
+ * librm will get vapourised by free_base_memory().  Since we need
+ * librm to continue working even when this happens, we put some
+ * padding here.
+ *
+ * We must also ensure that the total size of librm is <1kB, otherwise
+ * free_base_memory() will stomp somewhere in the middle of us as
+ * well...
+ ****************************************************************************
+ */
+	.fill FREE_BASEMEM_HEADER_SIZE, 1, 0
+	
 /****************************************************************************
  * GDT for initial transition to protected mode
  *
