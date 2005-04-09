@@ -4,6 +4,8 @@
 #include "etherboot.h"
 #include "relocate.h"
 
+#ifndef KEEP_IT_REAL
+
 /* by Eric Biederman */
 
 /* On some platforms etherboot is compiled as a shared library, and we use
@@ -191,3 +193,5 @@ void relocate ( void ) {
 		 */
 	}
 }
+
+#endif /* ! KEEP_IT_REAL */
