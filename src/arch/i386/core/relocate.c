@@ -2,6 +2,7 @@
 #include "memsizes.h"
 #include "osdep.h"
 #include "etherboot.h"
+#include "relocate.h"
 
 /* by Eric Biederman */
 
@@ -182,5 +183,11 @@ void relocate ( void ) {
 		      addr, addr + _end - _text );
 
 		relocate_to ( addr );
+		/* Note that we cannot make real-mode calls
+		 * (e.g. printf) at this point, because the pointer
+		 * installed_librm uses a virtual address (in order
+		 * that it can have a valid initialiser) and so is
+		 * currently invalid.
+		 */
 	}
 }
