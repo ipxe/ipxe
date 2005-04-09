@@ -274,10 +274,12 @@ prefix_exit_end:
 	.previous
 
 	
-	
+
+/* UNDI loader needs to be rewritten to use new mechanism */
+#if 0
+		
 #ifdef 	PXE_EXPORT
 
-#include "callbacks.h"
 #define PXENV_UNDI_LOADER		0x104d
 
 	.section ".prefix"
@@ -331,7 +333,9 @@ UNDILoader:
 	call	deprelocate
 	lret	$2			/* Skip our PXE 'opcode' */
 #endif	/* PXE_EXPORT */
-		
+
+#endif /* 0 */
+			
 #ifdef DEBUG_ROMPREFIX
 	.section ".prefix"
 
