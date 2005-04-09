@@ -276,12 +276,6 @@ extern void forget_prefix_base_memory ( void );
 extern void forget_runtime_base_memory ( uint32_t old_addr );
 
 extern unsigned long get_boot_order(unsigned long order, unsigned *index);
-#ifndef NORELOCATE
-extern void relocate(void);
-extern void relocate_to(unsigned long phys_dest);
-#else
-#define relocate() do {} while(0)
-#endif
 extern void disk_init P((void));
 extern unsigned int pcbios_disk_read P((int drv,int c,int h,int s,char *buf));
 
