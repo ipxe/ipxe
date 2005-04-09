@@ -10,6 +10,16 @@ $Id$
 ***************************************************************************/
 
 /*
+ * NOTE TO SELF: basemem.c no longer zeroes freed base memory, because
+ * that behaviour is incompatible with librm.  Instead, we must make
+ * sure that the !PXE and PXENV+ structures are rendered unusable
+ * (e.g. by destroying the signature) when we shut down an underlying
+ * pixie.
+ *
+ */
+#warning "undi.c needs to destroy the !PXE signature when freeing a pixie"
+
+/*
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License as
  * published by the Free Software Foundation; either version 2, or (at
