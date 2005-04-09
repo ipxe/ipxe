@@ -180,7 +180,6 @@ External prototypes
 ***************************************************************************/
 /* main.c */
 struct Elf_Bhdr;
-extern int in_call(in_call_data_t *data, uint32_t opcode, va_list params);
 extern void console_init(void); 
 extern int main();
 extern int loadkernel P((const char *fname));
@@ -342,9 +341,6 @@ extern void serial_fini P((void));
 
 /* floppy.c */
 extern int bootdisk P((int dev,int part));
-
-/* pxe_callbacks.c */
-extern int pxe_in_call ( in_call_data_t *in_call_data, va_list params );
 
 /***************************************************************************
 External variables
