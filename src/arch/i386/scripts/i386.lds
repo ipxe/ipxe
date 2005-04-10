@@ -140,6 +140,8 @@ SECTIONS {
 	__data = .;
 	*(.data)
 	*(.data.*)
+
+	/* Various tables */
 	pci_drivers = .;
 	*(.drivers.pci)
 	pci_drivers_end = .;
@@ -149,6 +151,9 @@ SECTIONS {
 	console_drivers = .;
 	*(.drivers.console)
 	console_drivers_end = .;
+	post_reloc_fns = .;
+	*(SORT(.post_reloc_fns.*))
+	post_reloc_fns_end = .;
 	init_fns = .;
 	*(SORT(.init_fns.*))
 	init_fns_end = .;

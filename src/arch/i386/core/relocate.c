@@ -2,6 +2,7 @@
 #include "memsizes.h"
 #include "osdep.h"
 #include "etherboot.h"
+#include "init.h"
 #include "relocate.h"
 
 #ifndef KEEP_IT_REAL
@@ -38,6 +39,8 @@ extern char _max_align[];
 /* Linker symbols */
 extern char _text[];
 extern char _end[];
+extern struct post_reloc_fn post_reloc_fns[];
+extern struct post_reloc_fn post_reloc_fns_end[];
 
 #undef DBG
 #ifdef DEBUG_RELOCATE
@@ -46,9 +49,10 @@ extern char _end[];
 #define DBG(...)
 #endif
 
-void relocate ( void ) {
+static void relocate ( void ) {
 	unsigned long addr, eaddr, size;
 	unsigned i;
+	struct post_reloc_fn *post_reloc_fn;
 
 	/* Walk through the memory map and find the highest address
 	 * below 4GB that etherboot will fit into.  Ensure etherboot
@@ -186,12 +190,23 @@ void relocate ( void ) {
 
 		relocate_to ( addr );
 		/* Note that we cannot make real-mode calls
-		 * (e.g. printf) at this point, because the pointer
-		 * installed_librm uses a virtual address (in order
-		 * that it can have a valid initialiser) and so is
-		 * currently invalid.
+		 * (e.g. printf) at this point, because librm has just
+		 * been moved to high memory.
 		 */
+
+		/* Call any registered post-relocation functions.
+		 * librm has a post-relocation function to install a
+		 * new librm into base memory.
+		 */
+		for ( post_reloc_fn = post_reloc_fns;
+		      post_reloc_fn < post_reloc_fns_end ; post_reloc_fn++ ) {
+			if ( post_reloc_fn->post_reloc )
+				post_reloc_fn->post_reloc ();
+		}
+		
 	}
 }
+
+INIT_FN ( INIT_RELOCATE, relocate, NULL, NULL );
 
 #endif /* ! KEEP_IT_REAL */
