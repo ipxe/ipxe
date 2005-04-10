@@ -21,11 +21,6 @@ CFLAGS_setup16		= -DCODE16
 OBJS_unnrv2b		= unnrv2b unnrv2b16
 CFLAGS_unnrv2b16	= -DCODE16
 
-# hooks.c is used to generate hooks.o and hooks_rm.o
-#
-OBJS_hooks		= hooks hooks_rm
-CFLAGS_hooks_rm		= -DREALMODE
-
 # We need to undefine the default macro "i386" when compiling .S
 # files, otherwise ".arch i386" translates to ".arch 1"...
 #
