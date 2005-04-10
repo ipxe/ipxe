@@ -23,7 +23,6 @@
 
 /* Current location of librm in base memory */
 char *installed_librm = librm;
-static uint32_t installed_librm_phys;
 
 /* Whether or not we have base memory currently allocated for librm.
  * Note that we *can* have a working librm present in unallocated base
@@ -67,7 +66,8 @@ void remove_from_rm_stack ( void *data, size_t size ) {
  * Install librm to base memory
  *
  */
-static inline void install_librm ( char *addr ) {
+static void install_librm ( char *addr ) {
+	librm_base = virt_to_phys ( addr );
 	memcpy ( addr, librm, librm_size );
 	installed_librm = addr;
 }
@@ -79,21 +79,25 @@ static inline void install_librm ( char *addr ) {
  * copy.
  *
  */
-static inline void uninstall_librm ( void ) {
+static void uninstall_librm ( void ) {
 	memcpy ( librm, installed_librm, librm_size );
+	librm_base = 0;
 }
 
 /*
- * On entry, record the physical location of librm.  Do this so that
- * we can update installed_librm after relocation.
+ * If librm isn't installed (i.e. if we have librm, but weren't
+ * entered via it), then install librm and a real-mode stack to a
+ * fixed temporary location, just so that we can e.g. issue printf()
  *
- * Doing this is probably more efficient than making installed_librm
- * be a physical address, because of the number of times that
- * installed_librm gets referenced in the remainder of the code.
- *
+ * [ If we were entered via librm, then the real_to_prot call will
+ * have filled in librm_base. ]
  */
 static void librm_init ( void ) {
-	installed_librm_phys = virt_to_phys ( installed_librm );
+	if ( ! librm_base ) {
+		install_librm ( phys_to_virt ( 0x7c00 ) );
+		inst_rm_stack.segment = 0x7c0;
+		inst_rm_stack.offset = 0x1000;
+	}
 }
 
 /*
@@ -112,19 +116,17 @@ static void librm_exit ( void ) {
 }
 
 /*
- * On reset, we want to free up our old installed copy of librm, if
- * any, then allocate a new base memory block and install there.
+ * Reset gets called immediately after relocation.
  *
  */
 
 static void librm_reset ( void ) {
 	char *new_librm;
 
-	/* Point installed_librm back at last known physical location */
-	installed_librm = phys_to_virt ( installed_librm_phys );
-
-	/* Uninstall old librm */
-	uninstall_librm();
+	/* Point installed_librm back at last known physical location.
+	 * Do this in case we have just relocated and the virtual
+	 * address has therefore changed. */
+	installed_librm = phys_to_virt ( librm_base );
 
 	/* Free allocated base memory, if applicable */
 	librm_exit();

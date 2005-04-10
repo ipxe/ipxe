@@ -144,7 +144,17 @@ _librm_start:
  ****************************************************************************
  */
 	.fill FREE_BASEMEM_HEADER_SIZE, 1, 0
-	
+
+/****************************************************************************
+ * Record of the current physical location of the installed copy.
+ * Used by prot_call in order to return via the current installed copy
+ * even if Etherboot has been relocated during the protected-mode
+ * call.
+ ****************************************************************************
+ */
+EXPORT(librm_base):
+librm_base:	.long 0
+		
 /****************************************************************************
  * GDT for initial transition to protected mode
  *
@@ -266,6 +276,9 @@ EXPORT(real_to_prot):
 	xorl	%ebx, %ebx
 	movw	%cs, %bx
 	shll	$4, %ebx
+
+	/* Record physical base address of librm */
+	movl	%ebx, %ds:OFFSET(librm_base)
 		
 	/* Check base address of stored protected-mode GDT.  If it's
 	 * zero, set it up to use our internal GDT (with physical
@@ -360,6 +373,9 @@ EXPORT(prot_to_real):
 	popl	OFFSET(save_ebx)(%ebx)
 	movl	%eax, OFFSET(save_eax)(%ebx)
 
+	/* Record physical base address of librm */
+	movl	%ebx, OFFSET(librm_base)(%ebx)
+
 	/* Extract return address from the stack, convert to offset
 	 * within librm and save in save_retaddr
 	 */
@@ -445,21 +461,31 @@ p2r_ljmp:
  *
  * Call a specific C function in the protected-mode code.  The
  * prototype of the C function must be
- *   void function ( struct real_mode_regs *rm_regs,
- *		     void (*retaddr) (void) ); 
+ *   void function ( struct real_mode_regs *rm_regs ); 
  * rm_regs will point to a struct containing the real-mode registers
- * at entry to prot_call.  retaddr will point to the (virtual) return
- * address from "function".  This return address will point into
- * librm.  It is included so that "function" may, if desired, relocate
- * librm and return via the new copy.  It must not be directly called
- * as a function, i.e. you may not do "*retaddr()"; you must instead
- * do something like:
- *	*retaddr += ( new_librm_location - old_librm_location );
- *	return;
+ * at entry to prot_call.  
  *
  * All registers will be preserved across prot_call(), unless the C
  * function explicitly overwrites values in rm_regs.  Interrupt status
  * will also be preserved.  Gate A20 will be enabled.
+ *
+ * The protected-mode code may install librm to a new location.  If it
+ * does so, it must update librm_base in *this* copy of librm to point
+ * to the new physical location.  prot_call will then return via the
+ * newly installed copy.
+ *
+ * Note that when Etherboot performs its initial relocation, "*this*"
+ * copy in the above paragraph will refer to the "master" copy, since
+ * that is the initial installed copy.  Etherboot will return to
+ * prot_call using a virtual address, so will return to the master
+ * copy in high memory (rather than the original copy in base memory).
+ * The master copy in high memory will have the physical address of
+ * the newly installed copy in librm_base, since install_librm()
+ * writes it there.  Thus, Etherboot's initialise() function will
+ * return to the master copy of prot_call(), which will then jump to
+ * the installed copy.
+ *
+ * It works, trust me.
  *
  * Parameters:
  *   function : virtual address of protected-mode function to call
@@ -529,13 +555,9 @@ EXPORT(prot_call):
 	popl	%eax	/* discard */
 	popal
 
-	/* Push &rm_regs and &retaddr on the stack, and call function */
-	movl	%esp, %ebp
+	/* Push &rm_regs on the stack, and call function */
 	pushl	%esp
-	subl	$12, 0(%esp)
-	pushl	%ebp
 	call	*%ebx
-	popl	%eax /* discard */
 	popl	%eax /* discard */
 
 	/* Switch to physical addresses, discard PM register store */
@@ -553,6 +575,22 @@ EXPORT(prot_call):
 	rep movsb
 	movl	%esi, %esp	/* remove rm_regs from PM stack */
 
+	/* Obtain physical base address of installed copy of librm in
+	 * %ebx.  (It's possible that this *isn't* the physical base
+	 * address of the copy we're currently executing in, because
+	 * the protected-mode call could have moved librm.  If it does
+	 * so, it must update librm_base in our copy to reflect the
+	 * new location.
+	 */
+	call	1f
+1:	popl	%ebp
+	movl	OFFSET(librm_base-1b)(%ebp), %ebx
+	
+	/* Jump to running in installed copy of librm */
+	addl	$OFFSET(1f), %ebx
+	jmp	*%ebx
+1:	
+	
 	/* Switch to real mode */
 	call	prot_to_real
 	.code16
