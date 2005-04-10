@@ -2,11 +2,10 @@
 #include "stddef.h"
 #include "registers.h"
 #include "string.h"
-#include "hooks.h"
 #include "init.h"
 #include "main.h"
-#include "relocate.h"
 #include "etherboot.h"
+#include "hooks.h"
 
 /* Symbols defined by the linker */
 extern char _bss[], _ebss[];
@@ -19,15 +18,9 @@ extern char _bss[], _ebss[];
 
 /*
  * arch_initialise(): perform any required initialisation such as
- * setting up the console device and relocating to high memory.  Note
- * that if we relocate to high memory and the prefix is in base
- * memory, then we will need to install a copy of librm in base
- * memory.  librm's reset function takes care of this.
+ * setting up the console device and relocating to high memory.
  *
  */
-
-#include "librm.h"
-
 void arch_initialise ( struct i386_all_regs *regs __unused ) {
 	/* Zero the BSS */
 	memset ( _bss, 0, _ebss - _bss );
@@ -35,27 +28,6 @@ void arch_initialise ( struct i386_all_regs *regs __unused ) {
 	/* Call all registered initialisation functions.
 	 */
 	call_init_fns ();
-
-	/* Relocate to high memory.  (This is a no-op under
-	 * -DKEEP_IT_REAL.)
-	 */
-	relocate();
-
-	/* Call all registered reset functions.  Note that if librm is
-	 * included, it is the reset function that will install a
-	 * fresh copy of librm in base memory.  It follows from this
-	 * that (a) librm must be first in the reset list and (b) you
-	 * cannot call console output functions between relocate() and
-	 * call_reset_fns(), because real-mode calls will crash the
-	 * machine.
-	 */
-	call_reset_fns();
-
-	printf ( "init finished\n" );
-
-	regs->es = virt_to_phys ( installed_librm ) >> 4;
-
-	__asm__ ( "xchgw %bx, %bx" );
 }
 
 /*
