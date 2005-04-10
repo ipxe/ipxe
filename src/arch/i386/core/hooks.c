@@ -1,8 +1,4 @@
-#include "stdint.h"
-#include "stddef.h"
 #include "registers.h"
-#include "string.h"
-#include "init.h"
 #include "main.h"
 #include "etherboot.h"
 #include "hooks.h"
@@ -17,20 +13,6 @@ extern char _bss[], _ebss[];
  */
 
 /*
- * arch_initialise(): perform any required initialisation such as
- * setting up the console device and relocating to high memory.
- *
- */
-void arch_initialise ( struct i386_all_regs *regs __unused ) {
-	/* Zero the BSS */
-	memset ( _bss, 0, _ebss - _bss );
-
-	/* Call all registered initialisation functions.
-	 */
-	call_init_fns ();
-}
-
-/*
  * arch_main() : call main() and then exit via whatever exit mechanism
  * the prefix requested.
  *
@@ -43,9 +25,6 @@ void arch_main ( struct i386_all_regs *regs ) {
 
 	/* Call to main() */
 	regs->eax = main();
-
-	/* Call registered per-object exit functions */
-	call_exit_fns ();
 
 	if ( exit_path ) {
 		/* Prefix requested that we use a particular function

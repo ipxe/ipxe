@@ -126,16 +126,16 @@ INIT_FN ( INIT_LIBRM, librm_init, NULL, uninstall_librm );
 POST_RELOC_FN ( POST_RELOC_LIBRM, librm_post_reloc );
 
 /*
- * Wrapper for arch_initialise() when librm is being used.  We have to
+ * Wrapper for initialise() when librm is being used.  We have to
  * install a copy of librm to allocated base memory and return the
  * pointer to this new librm's entry point via es:di.
  *
  */
-void librm_arch_initialise ( struct i386_all_regs *regs ) {
+void initialise_via_librm ( struct i386_all_regs *regs ) {
 	char *new_librm;
 
 	/* Hand off to arch_initialise() */
-	arch_initialise ( regs );
+	initialise ( regs );
 
 	/* Uninstall current librm (i.e. the one that's part of the
 	 * original, pre-relocation Etherboot image).

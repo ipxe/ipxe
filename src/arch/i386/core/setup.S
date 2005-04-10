@@ -40,7 +40,7 @@
 #define RETURN_TO_EXTERNAL call kir_to_ext
 #define ENTRY_POINT kir_call
 #define ENTRY_POINT_REGISTER di	 
-#define INIT_FUNC arch_initialise
+#define INIT_FUNC initialise
 
 #else /* KEEP_IT_REAL */
 
@@ -53,7 +53,7 @@
 	.code16
 #define ENTRY_POINT _prot_call /* _prot_call = OFFSET ( prot_call ) in librm */
 #define ENTRY_POINT_REGISTER di	 
-#define INIT_FUNC librm_arch_initialise
+#define INIT_FUNC initialise_via_librm
 
 #endif /* KEEP_IT_REAL */
 	
@@ -78,7 +78,7 @@ setup16:
 #define RETURN_TO_EXTERNAL call int_to_ext
 #define ENTRY_POINT int_call
 #define ENTRY_POINT_REGISTER edi
-#define INIT_FUNC arch_initialise
+#define INIT_FUNC initialise
 		
 	.section ".text"
 	.code32
@@ -142,11 +142,11 @@ setup:
 	pop	%es
 	mov	$ENTRY_POINT, %ENTRY_POINT_REGISTER
 
-	/* Far call to arch_initialise via the entry-point function.
-	 * arch_initialise() (or the entry-point function itself) may
+	/* Far call to initialise via the entry-point function.
+	 * initialise() (or the entry-point function itself) may
 	 * update %es:[e]di to point to a new entry-point function for
 	 * subsequent calls.  librm will use this facility, since
-	 * arch_initialise() causes librm to be relocated.
+	 * initialise() causes librm to be relocated.
 	 */
 	pushl	$INIT_FUNC
 	push	%cs		/* lcall %es:[x]di == %cs:[x]di */
