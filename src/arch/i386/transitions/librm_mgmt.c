@@ -12,8 +12,9 @@
 #include "stdint.h"
 #include "stddef.h"
 #include "string.h"
-#include "init.h"
 #include "basemem.h"
+#include "relocate.h"
+#include "init.h"
 #include "librm.h"
 
 /*
@@ -78,10 +79,21 @@ static void install_librm ( char *addr ) {
  * preserving the values for rm_ss and rm_sp from the old installed
  * copy.
  *
+ * We deliberately leave the old copy intact and effectively installed
+ * (apart from being in unallocated memory) so that we can use it for
+ * any real-mode calls required when allocating memory for the new
+ * copy, or for the real-mode exit path.
  */
 static void uninstall_librm ( void ) {
+
+	/* Copy installed librm back to master copy */
 	memcpy ( librm, installed_librm, librm_size );
-	librm_base = 0;
+
+	/* Free but do not zero the base memory */
+	if ( allocated_librm ) {
+		free_base_memory ( installed_librm, librm_size );
+		allocated_librm = 0;
+	}
 }
 
 /*
@@ -101,48 +113,48 @@ static void librm_init ( void ) {
 }
 
 /*
- * On exit, we want to leave a copy of librm in *unallocated* base
- * memory.  It must be there so that we can exit via a 16-bit exit
- * path, but it must not be allocated because nothing will ever
- * deallocate it once we exit.
+ * librm_post_reloc gets called immediately after relocation.
  *
  */
-static void librm_exit ( void ) {
-	/* Free but do not zero the base memory */
-	if ( allocated_librm ) {
-		free_base_memory ( installed_librm, librm_size );
-		allocated_librm = 0;
-	}
+static void librm_post_reloc ( void ) {
+	/* Point installed_librm back at last known physical location.
+	 */
+	installed_librm = phys_to_virt ( librm_base );
 }
 
+INIT_FN ( INIT_LIBRM, librm_init, NULL, uninstall_librm );
+POST_RELOC_FN ( POST_RELOC_LIBRM, librm_post_reloc );
+
 /*
- * Reset gets called immediately after relocation.
+ * Wrapper for arch_initialise() when librm is being used.  We have to
+ * install a copy of librm to allocated base memory and return the
+ * pointer to this new librm's entry point via es:di.
  *
  */
-
-static void librm_reset ( void ) {
+void librm_arch_initialise ( struct i386_all_regs *regs ) {
 	char *new_librm;
 
-	/* Point installed_librm back at last known physical location.
-	 * Do this in case we have just relocated and the virtual
-	 * address has therefore changed. */
-	installed_librm = phys_to_virt ( librm_base );
+	/* Hand off to arch_initialise() */
+	arch_initialise ( regs );
 
-	/* Free allocated base memory, if applicable */
-	librm_exit();
+	/* Uninstall current librm (i.e. the one that's part of the
+	 * original, pre-relocation Etherboot image).
+	 */
+	uninstall_librm();
 
 	/* Allocate space for new librm */
 	new_librm = alloc_base_memory ( librm_size );
 	allocated_librm = 1;
-
+	
 	/* Install new librm */
 	install_librm ( new_librm );
+
+	/* Point es:di to new librm's entry point.  Fortunately, di is
+	 * already set up by setup16, so all we need to do is point
+	 * es:0000 to the start of the new librm.
+	 */
+	regs->es = librm_base >> 4;
 }
-
-INIT_FN ( INIT_LIBRM, librm_init, librm_reset, librm_exit );
-
-
-
 
 /*
  * Increment lock count of librm
