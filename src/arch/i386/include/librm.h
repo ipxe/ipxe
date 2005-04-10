@@ -40,6 +40,7 @@ extern void (*_real_to_prot[]) ( void );
 extern void (*_prot_to_real[]) ( void );
 extern void (*_prot_call[]) ( void );
 extern void (*_real_call[]) ( void );
+extern uint32_t _librm_base[];
 extern segoff_t _rm_stack[];
 extern uint32_t _pm_stack[];
 extern char _librm_ref_count[];
@@ -57,10 +58,14 @@ extern char _librm_ref_count[];
 #define inst_prot_to_real	LIBRM_FN ( prot_to_real )
 #define inst_prot_call		LIBRM_FN ( prot_call )
 #define inst_real_call		LIBRM_FN ( real_call )
+#define inst_librm_base		LIBRM_VAR ( librm_base )
 #define inst_rm_stack		LIBRM_VAR ( rm_stack )
 #define inst_pm_stack		LIBRM_VAR ( pm_stack )
 #define inst_librm_ref_count	LIBRM_VAR ( librm_ref_count )
 #define librm_size		LIBRM_CONSTANT ( librm_size )
+
+/* Symbols within local (uninstalled) copy of librm */
+extern uint32_t librm_base;
 
 /* Functions that librm expects to be able to link to.  Included here
  * so that the compiler will catch prototype mismatches.
