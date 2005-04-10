@@ -163,14 +163,7 @@ start_runtime:
 	pushw	%cs
 	call	ljmp_to_es_di
 
-	/* Call initialisation routine.  Relocation may be done.  New
-	 * address of entry-point function is returned in %es:di.
-	 */
-	pushl	$arch_rm_initialise
-	pushw	%cs		/* == lcall %es:di */
-	call	ljmp_to_es_di
-	
-	/* Call to arch_rm_main.  Register INT19 as an exit path.  This
+	/* Call to arch_main.  Register INT19 as an exit path.  This
 	 * call will never return.
 	 */
 	movl	$exit_via_int19, %eax
