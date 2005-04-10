@@ -167,7 +167,7 @@ start_runtime:
 	 * call will never return.
 	 */
 	movl	$exit_via_int19, %eax
-	pushl	$arch_rm_main
+	pushl	$arch_main
 	pushl	%eax		/* Dummy return address */
 
 	/* Do the equivalent of ljmp *%es:di */
