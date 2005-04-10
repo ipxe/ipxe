@@ -79,8 +79,10 @@ void * alloc_base_memory ( size_t size ) {
 	 */
 	memset ( ptr, 0, size_kb << 10 );
 
-	DBG ( "Allocated %d kB of base memory at [%hx:0000,%hx:0000)\n",
-	      size_kb, ( fbms << 6 ), ( ( fbms + size_kb ) << 6 ) );
+	DBG ( "Allocated %d kB of base memory at [%hx:0000,%hx:0000), "
+	      "%d kB now free\n", size_kb,
+	      ( virt_to_phys ( ptr ) >> 4 ),
+	      ( ( virt_to_phys ( ptr ) + ( size_kb << 10 ) ) >> 4 ), fbms );
 
 	/* Update our memory map */
 	get_memsizes();
@@ -113,9 +115,11 @@ void free_base_memory ( void *ptr, size_t size ) {
 		return; 
 	}
 
-	DBG ( "Trying to free %d bytes base memory at %hx:%hx\n", size,
+	DBG ( "Trying to free %d bytes base memory at %hx:%hx "
+	      "from %d kB free\n", size,
 	      ( virt_to_phys ( ptr - remainder ) >> 4 ),
-	      ( virt_to_phys ( ptr - remainder ) & 0xf ) + remainder );
+	      ( virt_to_phys ( ptr - remainder ) & 0xf ) + remainder,
+	      fbms );
 
 	/* Mark every kilobyte within this block as free.  This is
 	 * overkill for normal purposes, but helps when something has
@@ -142,8 +146,6 @@ void free_base_memory ( void *ptr, size_t size ) {
 
 	/* Update our memory map */
 	get_memsizes();
-
-	DBG ( "%d kB of base memory now free\n", fbms );
 }
 
 /* Do the actual freeing of memory.  This is split out from
@@ -173,9 +175,13 @@ static void free_unused_base_memory ( void ) {
 		/* Return memory to BIOS */
 		fbms += free_block->size_kb;
 
-		DBG ( "Freed %d kB of base memory at [%hx:0000,%hx:0000)\n",
-		      free_block->size_kb, ( fbms << 6 ),
-		      ( fbms + free_block->size_kb ) << 6 );
+		DBG ( "Freed %d kB of base memory at [%hx:0000,%hx:0000), "
+		      "%d kB now free\n",
+		      free_block->size_kb,
+		      ( virt_to_phys ( free_block ) >> 4 ),
+		      ( ( virt_to_phys ( free_block ) + 
+			  ( free_block->size_kb << 10 ) ) >> 4 ),
+		      fbms );
 		
 		/* Do not zero out the freed block, because it might
 		 * be the one containing librm, in which case we're
