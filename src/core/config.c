@@ -208,3 +208,10 @@ REQUIRE_OBJECT ( btext );
 REQUIRE_OBJECT ( pc_kbd );
 #endif
 
+/*
+ * Drag in relocate.o if required
+ */
+
+#ifndef NORELOCATE
+REQUIRE_OBJECT ( relocate );
+#endif
