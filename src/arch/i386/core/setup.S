@@ -84,8 +84,9 @@ setup:
 	
 #endif /* CODE16 */
 	
-	/* Preserve flags (including interrupt status) */
+	/* Preserve flags (including interrupt status) and registers */
 	pushfl
+	pushl	%ebp
 
 	/* Switch to (uninitialised) internal environment.  This will
 	 * preserve the external environment for when we call
@@ -100,15 +101,13 @@ setup:
 	 * after the code segment.
 	 */
 	pushw	%ax
-	pushw	%bx
 	movw	%cs, %ax
-	movw	%ds, %bx
-	cmpw	%ax, %bx
+	movw	%ds, %bp
+	cmpw	%ax, %bp
 	jne	1f
 	addw	$_text_load_size_pgh, %ax
 	movw	%ax, %ds
-1:	popw	%bx
-	popw	%ax
+1:	popw	%ax
 		
 	/* Switch to internal stack */
 	pushw	%ds
@@ -117,11 +116,11 @@ setup:
 
 #else /* CODE16 && KEEP_IT_REAL */
 
-	/* Work out where we're running */
+	/* Work out where we're running and switch to internal pmode
+	 * stack
+	 */
 	call	1f
 1:	popl	%ebp
-
-	/* Switch to internal pmode stack */
 	leal	(_estack-1b)(%ebp), %esp
 
 	/* Set up GDT for virtual addressing */
@@ -134,17 +133,26 @@ setup:
 	 */
 	RETURN_TO_EXTERNAL
 
-	/* Pass pointer to entry-point function back to prefix.  %es
-	 * may, by now, have been destroyed, so we re-initialise it
-	 * from %cs.
+	/* Set %es:[e]di to point to entry-point function.
 	 */
-	pushw	%cs
-	popw	%es
+	push	%cs
+	pop	%es
 	mov	$ENTRY_POINT, %ENTRY_POINT_REGISTER
+
+	/* Far call to arch_initialise via the entry-point function.
+	 * arch_initialise() (or the entry-point function itself) may
+	 * update %es:[e]di to point to a new entry-point function for
+	 * subsequent calls.  librm will use this facility, since
+	 * arch_initialise() causes librm to be relocated.
+	 */
+	pushl	$arch_initialise
+	push	%cs		/* lcall %es:[x]di == %cs:[x]di */
+	call	*%ENTRY_POINT_REGISTER
+	popl	%ebp /* discard */
 	
-	/* Restore flags (including interrupt status) */
+	/* Restore flags (including interrupt status) and return */
+	popl	%ebp
 	popfl
-	
 	lret
 
 /****************************************************************************
