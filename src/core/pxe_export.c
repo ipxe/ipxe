@@ -1230,11 +1230,13 @@ PXENV_EXIT_t pxenv_undi_loader ( undi_loader_t *loader ) {
 	 * this, but it's currently split interestingly between main()
 	 * and main_loop()...
 	 */
-	print_config();
-	get_memsizes();
-	cleanup();
-	relocate();
-	cleanup();
+
+
+	/* CHECKME: Our init functions have probably already been
+	   called by the ROM prefix's call to setup(), haven't
+	   they? */
+
+
 
 	/* We have relocated; the loader pointer is now invalid */
 	loader = phys_to_virt ( loader_phys );
