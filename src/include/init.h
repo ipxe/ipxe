@@ -37,14 +37,15 @@ struct init_fn {
 #define INIT_CONSOLE	"01"
 #define	INIT_CPU	"02"
 #define	INIT_TIMERS	"03"
-#define	INIT_PCMCIA	"04"
-#define	INIT_MEMSIZES	"05"
-#define	INIT_HEAP	"06"
+#define	INIT_MEMSIZES	"04"
+#define INIT_RELOCATE	"05"
+#define	INIT_PCMCIA	"05"
+#define	INIT_HEAP	"07"
 
 /* Macro for creating an initialisation function table entry */
 #define INIT_FN( init_order, init_func, reset_func, exit_func )		      \
-	static struct init_fn init_ ## init_func ## _ ## exit_func	      \
-	    __attribute__ ((used,__section__(".init_fns." init_order))) = {  \
+	static struct init_fn init_functions				      \
+	    __attribute__ ((used,__section__(".init_fns." init_order))) = {   \
 		.init = init_func,					      \
 		.reset = reset_func,					      \
 		.exit = exit_func,					      \
