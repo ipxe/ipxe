@@ -134,8 +134,8 @@ POST_RELOC_FN ( POST_RELOC_LIBRM, librm_post_reloc );
 void initialise_via_librm ( struct i386_all_regs *regs ) {
 	char *new_librm;
 
-	/* Hand off to arch_initialise() */
-	initialise ( regs );
+	/* Hand off to initialise() */
+	initialise ();
 
 	/* Uninstall current librm (i.e. the one that's part of the
 	 * original, pre-relocation Etherboot image).
