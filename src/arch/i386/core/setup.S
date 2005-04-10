@@ -39,6 +39,8 @@
 #define ENTER_FROM_EXTERNAL call ext_to_kir
 #define RETURN_TO_EXTERNAL call kir_to_ext
 #define ENTRY_POINT kir_call
+#define ENTRY_POINT_REGISTER di	 
+#define INIT_FUNC arch_initialise
 
 #else /* KEEP_IT_REAL */
 
@@ -50,11 +52,11 @@
 	call prot_to_real ; \
 	.code16
 #define ENTRY_POINT _prot_call /* _prot_call = OFFSET ( prot_call ) in librm */
+#define ENTRY_POINT_REGISTER di	 
+#define INIT_FUNC librm_arch_initialise
 
 #endif /* KEEP_IT_REAL */
 	
-#define ENTRY_POINT_REGISTER di
-	 
 	.section ".text16"
 	.code16
 	.globl setup16
@@ -76,7 +78,8 @@ setup16:
 #define RETURN_TO_EXTERNAL call int_to_ext
 #define ENTRY_POINT int_call
 #define ENTRY_POINT_REGISTER edi
-	
+#define INIT_FUNC arch_initialise
+		
 	.section ".text"
 	.code32
 	.globl setup
@@ -145,7 +148,7 @@ setup:
 	 * subsequent calls.  librm will use this facility, since
 	 * arch_initialise() causes librm to be relocated.
 	 */
-	pushl	$arch_initialise
+	pushl	$INIT_FUNC
 	push	%cs		/* lcall %es:[x]di == %cs:[x]di */
 	call	*%ENTRY_POINT_REGISTER
 	popl	%ebp /* discard */
