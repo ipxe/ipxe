@@ -8,6 +8,132 @@
 #define DBG(...)
 #endif
 
+static struct pci_device current;
+static char used_current;
+
+/*
+ * Fill in parameters (vendor & device ids, class, membase etc.) for a
+ * PCI device based on bus & devfn.
+ *
+ * Returns 1 if a device was found, 0 for no device present.
+ */
+static int fill_pci_device ( struct pci_device *pci ) {
+	uint32_t l;
+	int reg;
+	
+	/* Check to see if there's anything physically present.
+	 */
+	pci_read_config_dword ( pci, PCI_VENDOR_ID, &l );
+	/* some broken boards return 0 if a slot is empty: */
+	if ( ( l == 0xffffffff ) || ( l == 0x00000000 ) ) {
+		return 0;
+	}
+	pci->vendor = l & 0xffff;
+	pci->dev_id = ( l >> 16 ) & 0xffff;
+	
+	/* Check that we're not a duplicate function on a
+	 * non-multifunction device.
+	 */
+	if ( PCI_FUNC ( pci->devfn ) != 0 ) {
+		uint8_t header_type;
+		pci_read_config_byte ( pci, PCI_HEADER_TYPE, &header_type );
+		if ( ! ( header_type & 0x80 ) ) {
+			return 0;
+		}
+	}
+	
+	/* Get device class */
+	pci_read_config_dword ( pci, PCI_REVISION, &l );
+	pci->class = ( l >> 8 ) & 0xffffff;
+
+	/* Get the "membase" */
+	pci_read_config_dword ( pci, PCI_BASE_ADDRESS_1, &pci->membase );
+				
+	/* Get the "ioaddr" */
+	pci->ioaddr = 0;
+	for ( reg = PCI_BASE_ADDRESS_0; reg <= PCI_BASE_ADDRESS_5; reg += 4 ) {
+		pci_read_config_dword ( pci, reg, &pci->ioaddr );
+		if ( pci->ioaddr & PCI_BASE_ADDRESS_SPACE_IO ) {
+			pci->ioaddr &= PCI_BASE_ADDRESS_IO_MASK;
+			if ( pci->ioaddr ) {
+				break;
+			}
+		}
+		pci->ioaddr = 0;
+	}
+
+	/* Get the irq */
+	pci_read_config_byte ( pci, PCI_INTERRUPT_PIN, &pci->irq );
+	if ( pci->irq ) {
+		pci_read_config_byte ( pci, PCI_INTERRUPT_LINE, &pci->irq );
+	}
+
+	return 1;
+}
+
+/*
+ * Set PCI device to use.
+ *
+ * This routine can be called by e.g. the ROM prefix to specify that
+ * the first device to be tried should be the device on which the ROM
+ * was physically located.
+ *
+ */
+void set_pci_device ( uint8_t bus, uint8_t devfn ) {
+	current.bus = bus;
+	current.devfn = devfn;
+	used_current = 0;
+}
+
+/*
+ * Find a PCI device matching the specified driver
+ *
+ */
+struct pci_device * find_pci_device ( struct pci_driver *driver ) {
+	int i;
+
+	/* Iterate through all possible PCI bus:dev.fn combinations,
+	 * starting where we left off.
+	 */
+	for ( ; current.bus <= 0xff ; current.bus++ ) {
+		for ( ; current.devfn <= 0xff ; current.devfn++ ) {
+
+			/* If we've already used this device, skip it */
+			if ( used_current ) {
+				used_current = 0;
+				continue;
+			}
+
+			/* Fill in device parameters, if device present */
+			if ( ! fill_pci_device ( &current ) ) {
+				continue;
+			}
+
+			/* If driver has a class, and class matches, use it */
+			if ( driver->class && 
+			     ( driver->class == current.class ) ) {
+				current.name = driver->name;
+				used_current = 1;
+				return &current;
+			}
+
+			/* If any of driver's IDs match, use it */
+			for ( i = 0 ; i < driver->id_count; i++ ) {
+				struct pci_id *id = &driver->ids[i];
+
+				if ( ( current.vendor == id->vendor ) &&
+				     ( current.dev_id == id->dev_id ) ) {
+					current.name = id->name;
+					used_current = 1;
+					return &current;
+				}
+			}
+		}
+	}
+	/* No device found */
+	memset ( &current, 0, sizeof ( current ) );
+	return NULL;
+}
 
 /*
  * Set device to be a busmaster in case BIOS neglected to do so.  Also
