@@ -120,6 +120,14 @@ static void librm_post_reloc ( void ) {
 	/* Point installed_librm back at last known physical location.
 	 */
 	installed_librm = phys_to_virt ( librm_base );
+
+	/* Allocate base memory for librm and place a copy there */
+	if ( ! allocated_librm ) {
+		char *new_librm = alloc_base_memory ( librm_size );
+		uninstall_librm ();
+		install_librm ( new_librm );
+		allocated_librm = 1;
+	}
 }
 
 INIT_FN ( INIT_LIBRM, librm_init, NULL, uninstall_librm );
@@ -132,22 +140,8 @@ POST_RELOC_FN ( POST_RELOC_LIBRM, librm_post_reloc );
  *
  */
 void initialise_via_librm ( struct i386_all_regs *regs ) {
-	char *new_librm;
-
 	/* Hand off to initialise() */
 	initialise ();
-
-	/* Uninstall current librm (i.e. the one that's part of the
-	 * original, pre-relocation Etherboot image).
-	 */
-	uninstall_librm();
-
-	/* Allocate space for new librm */
-	new_librm = alloc_base_memory ( librm_size );
-	allocated_librm = 1;
-	
-	/* Install new librm */
-	install_librm ( new_librm );
 
 	/* Point es:di to new librm's entry point.  Fortunately, di is
 	 * already set up by setup16, so all we need to do is point
