@@ -458,8 +458,6 @@ CFLAGS+=	-DPXE_IMAGE -DPXE_EXPORT
 #	-DINCLUDE_3C509	- Include 3c509 support
 #
 # 3C90X options:
-#	-DINCLUDE_3C90X	- Include 3c90x support
-#
 #	Warning Warning Warning
 #	If you use any of the XCVR options below, please do not complain about
 #	the behaviour with Linux drivers to the kernel developers. You are
@@ -478,80 +476,27 @@ CFLAGS+=	-DPXE_IMAGE -DPXE_EXPORT
 #	See the documentation file 3c90x.txt for more details.
 #
 # CS89X0 (optional) options:
-#	-DINCLUDE_CS89X0- Include CS89x0 support
 #	-DCS_SCAN=list	- Probe for CS89x0 base address using list of
 #			  comma separated hex addresses; increasing the
 #			  address by one (0x300 -> 0x301) will force a
 #			  more aggressive probing algorithm. This might
 #			  be neccessary after a soft-reset of the NIC.
 #
-# LANCE options:
-#	-DINCLUDE_NE2100- Include NE2100 support
-#	-DINCLUDE_NI6510- Include NI6510 support
-#
-# SK_G16 options:
-#	-DINCLUDE_SK_G16- Include SK_G16 support
-#
-# I82586 options:
-#	-DINCLUDE_3C507	- Include 3c507 support
-#	-DINCLUDE_NI5210- Include NI5210 support
-#	-DINCLUDE_EXOS205-Include EXOS205 support
-#
 # SMC9000 options:
-#       -DINCLUDE_SMC9000   - Include SMC9000 driver
 #       -DSMC9000_SCAN=list - List of I/O addresses to probe
-#
-# TIARA (Fujitsu Etherstar) options:
-#	-DINCLUDE_TIARA	- Include Tiara support
-#
-# NI5010 options:
-#	-DINCLUDE_NI5010 - Include NI5010 support
-#
-# TULIP options:
-#	-DINCLUDE_TULIP	- Include Tulip support
-#
-# RTL8139 options:
-#	-DINCLUDE_RTL8139 - Include RTL8139 support
-#
-# SIS900 options:
-#	-DINCLUDE_SIS900 - Include SIS900 support
-#
-# NATSEMI options:
-#	-DINCLUDE_NATSEMI - Include NATSEMI support
-#
+
 
 CFLAGS_3c503	= -DINCLUDE_3C503 # -DT503_SHMEM
 MAKEROM_FLAGS_3c503=	-3
-CFLAGS_3c507	= -DINCLUDE_3C507
 CFLAGS_3c509	= -DINCLUDE_3C509
 CFLAGS_3c529	= -DINCLUDE_3C529
-CFLAGS_3c595	= -DINCLUDE_3C595
-CFLAGS_3c90x	= -DINCLUDE_3C90X
-CFLAGS_cs89x0	= -DINCLUDE_CS89X0
-CFLAGS_eepro	= -DINCLUDE_EEPRO
-CFLAGS_eepro100	= -DINCLUDE_EEPRO100
-CFLAGS_e1000	= -DINCLUDE_E1000
-CFLAGS_epic100	= -DINCLUDE_EPIC100
-CFLAGS_exos205	= -DINCLUDE_EXOS205
-CFLAGS_lance	= -DINCLUDE_LANCE		# Lance/PCI!
-CFLAGS_ne2100	= -DINCLUDE_NE2100
 CFLAGS_ne	= -DINCLUDE_NE -DNE_SCAN=0x300,0x280,0x320,0x340,0x380
 CFLAGS_ns8390	= -DINCLUDE_NS8390	# NE2000/PCI!
-CFLAGS_ni5010	= -DINCLUDE_NI5010
-CFLAGS_ni5210	= -DINCLUDE_NI5210
-CFLAGS_ni6510	= -DINCLUDE_NI6510
-CFLAGS_rtl8139	= -DINCLUDE_RTL8139
-CFLAGS_sk_g16	= -DINCLUDE_SK_G16
-CFLAGS_sis900   = -DINCLUDE_SIS900
-CFLAGS_natsemi  = -DINCLUDE_NATSEMI
-CFLAGS_smc9000  = -DINCLUDE_SMC9000
-CFLAGS_sundance	= -DINCLUDE_SUNDANCE
-CFLAGS_tlan	= -DINCLUDE_TLAN
-CFLAGS_tiara	= -DINCLUDE_TIARA
-CFLAGS_depca	= -DINCLUDE_DEPCA	
-# CFLAGS_depca	+= -DDEPCA_MODEL=DEPCA -DDEPCA_RAM_BASE=0xd0000
-CFLAGS_tulip	= -DINCLUDE_TULIP
-CFLAGS_otulip	= -DINCLUDE_OTULIP
-CFLAGS_via_rhine = -DINCLUDE_VIA_RHINE
 CFLAGS_wd	= -DINCLUDE_WD -DWD_DEFAULT_MEM=0xCC000
-CFLAGS_w89c840	= -DINCLUDE_W89C840
+
+
+
+
+
+# For bochs
+CFLAGS += -DCONFIG_PCI_DIRECT
