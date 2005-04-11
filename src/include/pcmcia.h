@@ -1,7 +1,8 @@
 //	pcmcia.h - Header file for PCMCIA support
 
-#ifndef INCLUDE_PCMCIA_H
-#define	INCLUDE_PCMCIA_H 1
+#ifndef PCMCIA_H
+#define	PCMCIA_H
+
 #include "etherboot.h"
 
 typedef unsigned char	u_char;
@@ -154,4 +155,4 @@ typedef struct cb_bridge_map {
 
 
 
-#endif
+#endif /* PCMCIA_H */
