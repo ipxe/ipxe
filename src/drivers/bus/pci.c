@@ -2,8 +2,6 @@
 #include "dev.h"
 #include "pci.h"
 
-#define DEBUG_PCI
-
 #undef DBG
 #ifdef DEBUG_PCI
 #define DBG(...) printf ( __VA_ARGS__ )
