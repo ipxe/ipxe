@@ -831,11 +831,7 @@ PCI_ROM(0x8086, 0x5201, "eepro100-5201", "Intel EtherExpress PRO/100 Intelligent
  * 2003/03/17 gbaum */
 
 
-static struct pci_driver eepro100_driver __pci_driver = {
-	.type      = NIC_DRIVER,
-	.name      = "EEPRO100",
-	.probe     = eepro100_probe,
-	.ids       = eepro100_nics,
-	.id_count  = sizeof(eepro100_nics)/sizeof(eepro100_nics[0]),
-	.class     = 0
-};
+static struct pci_driver eepro100_driver =
+	PCI_DRIVER ( "EEPRO100", eepro100_nics, PCI_NO_CLASS );
+
+BOOT_DRIVER ( "EEPRO100", eepro100_probe );

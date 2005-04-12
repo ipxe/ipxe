@@ -881,11 +881,7 @@ static struct pci_id sundance_nics[] = {
 	PCI_ROM(0x1186, 0x1002, "dfe530txs", "D-Link DFE530TXS (Sundance ST201 Alta)"),
 };
 
-static struct pci_driver sundance_driver __pci_driver = {
-	.type = NIC_DRIVER,
-	.name = "SUNDANCE/PCI",
-	.probe = sundance_probe,
-	.ids = sundance_nics,
-	.id_count = sizeof(sundance_nics) / sizeof(sundance_nics[0]),
-	.class = 0,
-};
+static struct pci_driver sundance_driver =
+	PCI_DRIVER ( "SUNDANCE/PCI", sundance_nics, PCI_NO_CLASS );
+
+BOOT_DRIVER ( "SUNDANCE/PCI", sundance_probe );

@@ -158,14 +158,10 @@ static struct pci_id skel_nics[] = {
 PCI_ROM(0x0000, 0x0000, "skel-pci", "Skeleton PCI Adaptor"),
 };
 
-static struct pci_driver skel_driver __pci_driver = {
-	.type     = NIC_DRIVER,
-	.name     = "SKELETON/PCI",
-	.probe    = skel_probe,
-	.ids      = skel_nics,
-	.id_count = sizeof(skel_nics)/sizeof(skel_nics[0]),
-	.class    = 0,
-};
+static struct pci_driver skel_driver =
+	PCI_DRIVER ( "SKELETON/PCI", skel_nics, PCI_NO_CLASS );
+
+BOOT_DRIVER ( "SKELETON/PCI", skel_probe );
 
 /**************************************************************************
 PROBE - Look for an adapter, this routine's visible to the outside

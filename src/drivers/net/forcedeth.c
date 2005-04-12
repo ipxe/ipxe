@@ -1029,11 +1029,7 @@ static struct pci_id forcedeth_nics[] = {
 	PCI_ROM(0x10de, 0x00D6, "nforce3", "nForce3 Ethernet Controller"),
 };
 
-static struct pci_driver forcedeth_driver __pci_driver = {
-	.type = NIC_DRIVER,
-	.name = "forcedeth",
-	.probe = forcedeth_probe,
-	.ids = forcedeth_nics,
-	.id_count = sizeof(forcedeth_nics) / sizeof(forcedeth_nics[0]),
-	.class = 0,
-};
+static struct pci_driver forcedeth_driver =
+	PCI_DRIVER ( "forcedeth", forcedeth_nics, PCI_NO_CLASS );
+
+BOOT_DRIVER ( "forcedeth", forcedeth_probe );

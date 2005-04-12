@@ -23,12 +23,8 @@ PCI_ROM(0x1260, 0x3873, "hwp01170",	"ActionTec HWP01170"),
 PCI_ROM(0x1260, 0x3873, "dwl520",	"DLink DWL-520"),
 };
 
-static struct pci_driver prism2_pci_driver __pci_driver = {
-	.type     = NIC_DRIVER,
-	.name     = "Prism2_PCI",
-	.probe    = prism2_pci_probe,
-	.ids      = prism2_pci_nics,
-	.id_count = sizeof(prism2_pci_nics)/sizeof(prism2_pci_nics[0]),
-	.class    = 0,
-};
+static struct pci_driver prism2_pci_driver =
+	PCI_DRIVER ( "Prism2_PCI", prism2_pci_nics, PCI_NO_CLASS );
+
+BOOT_DRIVER ( "Prism2_PCI", prism2_pci_probe );
 

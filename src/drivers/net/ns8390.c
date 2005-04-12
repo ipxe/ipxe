@@ -1000,14 +1000,10 @@ PCI_ROM(0x10bd, 0x0e34, "surecom-ne34", "Surecom NE34"),
 PCI_ROM(0x1106, 0x0926, "via86c926",    "Via 86c926"),
 };
 
-static struct pci_driver nepci_driver __pci_driver = {
-	.type     = NIC_DRIVER,
-	.name     = "NE2000/PCI",
-	.probe    = nepci_probe,
-	.ids      = nepci_nics,
-	.id_count = sizeof(nepci_nics)/sizeof(nepci_nics[0]),
-	.class    = 0,
-};
+static struct pci_driver nepci_driver =
+	PCI_DRIVER ( "NE2000/PCI", nepci_nics, PCI_NO_CLASS );
+
+BOOT_DRIVER ( "NE2000/PCI", nepci_probe );
 
 #endif /* INCLUDE_NS8390 */
 

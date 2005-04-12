@@ -1712,11 +1712,7 @@ static struct pci_id tlan_nics[] = {
 	PCI_ROM(0x0e11, 0xb012, "netelligent_10_t2", "Compaq Netelligent 10 T/2 PCI UTP/Coax"),
 };
 
-static struct pci_driver tlan_driver __pci_driver = {
-	.type = NIC_DRIVER,
-	.name = "TLAN/PCI",
-	.probe = tlan_probe,
-	.ids = tlan_nics,
-	.id_count = sizeof(tlan_nics) / sizeof(tlan_nics[0]),
-	.class = 0,
-};
+static struct pci_driver tlan_driver =
+	PCI_DRIVER ( "TLAN/PCI", tlan_nics, PCI_NO_CLASS );
+
+BOOT_DRIVER ( "TLAN/PCI", tlan_probe );

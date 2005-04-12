@@ -1220,11 +1220,7 @@ static struct pci_id dmfe_nics[] = {
 	PCI_ROM(0x1282, 0x9132, "dmfe9132", "Davicom 9132"),	/* Needs probably some fixing */
 };
 
-static struct pci_driver dmfe_driver __pci_driver = {
-	.type = NIC_DRIVER,
-	.name = "DMFE/PCI",
-	.probe = dmfe_probe,
-	.ids = dmfe_nics,
-	.id_count = sizeof(dmfe_nics) / sizeof(dmfe_nics[0]),
-	.class = 0,
-};
+static struct pci_driver dmfe_driver =
+	PCI_DRIVER ( "DMFE/PCI", dmfe_nics, PCI_NO_CLASS );
+
+BOOT_DRIVER ( "DMFE/PCI", dmfe_probe );

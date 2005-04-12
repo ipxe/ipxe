@@ -1254,11 +1254,7 @@ PCI_ROM(0x1039, 0x0900, "sis900",  "SIS900"),
 PCI_ROM(0x1039, 0x7016, "sis7016", "SIS7016"),
 };
 
-static struct pci_driver sis900_driver __pci_driver = {
-	.type     = NIC_DRIVER,
-	.name     = "SIS900",
-	.probe    = sis900_probe,
-	.ids      = sis900_nics,
-	.id_count = sizeof(sis900_nics)/sizeof(sis900_nics[0]),
-	.class    = 0,
-};
+static struct pci_driver sis900_driver =
+	PCI_DRIVER ( "SIS900", sis900_nics, PCI_NO_CLASS );
+
+BOOT_DRIVER ( "SIS900", sis900_probe );

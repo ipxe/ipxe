@@ -770,11 +770,7 @@ static struct pci_id natsemi_nics[] = {
 PCI_ROM(0x100b, 0x0020, "dp83815", "DP83815"),
 };
 
-static struct pci_driver natsemi_driver __pci_driver = {
-	.type     = NIC_DRIVER,
-	.name     = "NATSEMI",
-	.probe    = natsemi_probe,
-	.ids      = natsemi_nics,
-	.id_count = sizeof(natsemi_nics)/sizeof(natsemi_nics[0]),
-	.class    = 0,
-};
+static struct pci_driver natsemi_driver =
+	PCI_DRIVER ( "NATSEMI", natsemi_nics, PCI_NO_CLASS );
+
+BOOT_DRIVER ( "NATSEMI", natsemi_probe );

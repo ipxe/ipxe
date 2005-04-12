@@ -844,11 +844,7 @@ static struct pci_id r8169_nics[] = {
 	PCI_ROM(0x10ec, 0x8169, "r8169", "RealTek RTL8169 Gigabit Ethernet"),
 };
 
-static struct pci_driver r8169_driver __pci_driver = {
-	.type = NIC_DRIVER,
-	.name = "r8169/PCI",
-	.probe = r8169_probe,
-	.ids = r8169_nics,
-	.id_count = sizeof(r8169_nics) / sizeof(r8169_nics[0]),
-	.class = 0,
-};
+static struct pci_driver r8169_driver =
+	PCI_DRIVER ( "r8169/PCI", r8169_nics, PCI_NO_CLASS );
+
+BOOT_DRIVER ( "r8169/PCI", r8169_probe );

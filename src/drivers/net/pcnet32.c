@@ -994,11 +994,7 @@ static struct pci_id pcnet32_nics[] = {
 	PCI_ROM(0x1022, 0x2001, "amdhomepna", "AMD Lance/HomePNA"),
 };
 
-static struct pci_driver pcnet32_driver __pci_driver = {
-	.type = NIC_DRIVER,
-	.name = "PCNET32/PCI",
-	.probe = pcnet32_probe,
-	.ids = pcnet32_nics,
-	.id_count = sizeof(pcnet32_nics) / sizeof(pcnet32_nics[0]),
-	.class = 0,
-};
+static struct pci_driver pcnet32_driver =
+	PCI_DRIVER ( "PCNET32/PCI", pcnet32_nics, PCI_NO_CLASS );
+
+BOOT_DRIVER ( "PCNET32/PCI", pcnet32_probe );

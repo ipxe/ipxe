@@ -533,14 +533,10 @@ PCI_ROM(0x10b7, 0x7646, "3csoho100-tx-1",  "3CSOHO100-TX"),	/* Hurricane */
 PCI_ROM(0x10b7, 0x4500, "3c450-1",         "3Com450 HomePNA Tornado"),
 };
 
-static struct pci_driver t595_driver __pci_driver = {
-	.type     = NIC_DRIVER,
-	.name     = "3C595",
-	.probe    = t595_probe,
-	.ids      = t595_nics,
-	.id_count = sizeof(t595_nics)/sizeof(t595_nics[0]),
-	.class    = 0,
-};
+static struct pci_driver t595_driver =
+	PCI_DRIVER ( "3C595", t595_nics, PCI_NO_CLASS );
+
+BOOT_DRIVER ( "3C595", t595_probe );
 
 /*
  * Local variables:

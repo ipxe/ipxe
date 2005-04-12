@@ -1010,11 +1010,7 @@ static struct pci_id ns83820_nics[] = {
 	PCI_ROM(0x100b, 0x0022, "ns83820", "National Semiconductor 83820"),
 };
 
-static struct pci_driver ns83820_driver __pci_driver = {
-	.type = NIC_DRIVER,
-	.name = "NS83820/PCI",
-	.probe = ns83820_probe,
-	.ids = ns83820_nics,
-	.id_count = sizeof(ns83820_nics) / sizeof(ns83820_nics[0]),
-	.class = 0,
-};
+static struct pci_driver ns83820_driver =
+	PCI_DRIVER ( "NS83820/PCI", ns83820_nics, PCI_NO_CLASS );
+
+BOOT_DRIVER ( "NS83820/PCI", ns83820_probe );
