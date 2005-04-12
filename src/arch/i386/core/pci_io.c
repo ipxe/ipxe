@@ -165,6 +165,7 @@ static void find_pcibios16 ( void ) {
 	}
 
 	/* We have a PCI BIOS */
+	DBG ( "Found 16-bit PCI BIOS interface\n" );
 	have_pcibios = 1;
 	return;
 }
@@ -264,6 +265,8 @@ static unsigned long find_bios32_service ( struct bios32 * bios32,
 
 	switch ( return_code ) {
 	case BIOS32_SERVICE_PRESENT:
+		DBG ( "BIOS32 service %c%c%c%c present at %#x\n",
+		      PRINT_BIOS_SIG ( service ), ( address + entry ) );
 		return ( address + entry );
 	case BIOS32_SERVICE_NOT_PRESENT:
 		DBG ( "BIOS32 service %c%c%c%c : not present\n",
@@ -276,6 +279,10 @@ static unsigned long find_bios32_service ( struct bios32 * bios32,
 	}
 }
 
+/*
+ * Find the 32-bit PCI BIOS interface, if present.
+ *
+ */
 static void find_pcibios32 ( void ) {
 	struct bios32 *bios32;
 	uint32_t signature;
@@ -317,6 +324,7 @@ static void find_pcibios32 ( void ) {
 	}
 
 	/* We have a PCI BIOS */
+	DBG ( "Found 32-bit PCI BIOS interface at %#x\n", pcibios32_entry );
 	have_pcibios = 1;
 	return;
 }
