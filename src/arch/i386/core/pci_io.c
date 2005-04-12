@@ -10,279 +10,202 @@
 ** /usr/src/linux/include/linux/bios32.h
 ** /usr/src/linux/drivers/net/ne.c
 */
-#ifdef CONFIG_PCI
 #include "etherboot.h"
+#include "init.h"
 #include "pci.h"
+#include "pci_io.h"
+#ifdef KEEP_IT_REAL
+#include "realmode.h"
+#endif
 
-#ifdef	CONFIG_PCI_DIRECT
-#define  PCIBIOS_SUCCESSFUL                0x00
+#define DEBUG_PCI_IO
 
-#define DEBUG 0
+#undef DBG
+#ifdef DEBUG_PCI_IO
+#define DBG(...) printf ( __VA_ARGS__ )
+#else
+#define DBG(...)
+#endif
+
+/* Macros for direct PCI access */
+#define CONFIG_ADDRESS	0xcf8
+#define CONFIG_DATA	0xcfc
+#define CONFIG_CMD( pci, where ) \
+	( 0x80000000 | (pci->busdevfn << 8) | (where & ~3) )
+
+/* Signatures for PCI BIOS */
+#define BIOS_SIG(a,b,c,d)	( ( a<<0 ) + ( b<<8 ) + ( c<<16 ) + ( d<<24 ) )
+#define PRINT_BIOS_SIG(x)	( (x) & 0xff ), ( ( (x)>>8 ) & 0xff ), \
+				( ( (x)>>16 ) & 0xff ),( ( (x)>>24 ) & 0xff )
+#define BIOS32_SIGNATURE	BIOS_SIG ( '_', '3', '2', '_' )
+#define PCI_SIGNATURE		BIOS_SIG ( 'P', 'C', 'I', ' ' )
+#define PCI_SERVICE		BIOS_SIG ( '$', 'P', 'C', 'I' )
+
+/* BIOS32 structure as found in PCI BIOS ROM */
+struct bios32 {
+	unsigned long signature;	/* _32_ */
+	unsigned long entry;		/* 32 bit physical address */
+	unsigned char revision;		/* Revision level, 0 */
+	unsigned char length;		/* Length in paragraphs */
+	unsigned char checksum;		/* Should byte sum to zero */
+	unsigned char reserved[5];	/* Must be zero */
+};
+
+/* Values returned by BIOS32 service directory */
+#define BIOS32_SERVICE_PRESENT		0x00
+#define BIOS32_SERVICE_NOT_PRESENT	0x80
+#define CF ( 1 << 0 )
+
+/* PCI BIOS entry point */
+#ifndef KEEP_IT_REAL
+static unsigned long pcibios32_entry;
+#endif
+static int have_pcibios;
+
+/* Macro for calling a 32-bit entry point with flat physical
+ * addresses.  Use in a statement such as
+ * __asm__ ( FLAT_FAR_CALL_ESI,
+ *	     : <output registers>
+ *	     : "S" ( entry_point ), <other input registers> );
+ */
+#define FLAT_FAR_CALL_ESI "call _virt_to_phys\n\t" \
+			  "pushl %%cs\n\t" \
+			  "call *%%esi\n\t" \
+			  "cli\n\t" \
+			  "cld\n\t" \
+			  "call _phys_to_virt\n\t"
 
 /*
- * Functions for accessing PCI configuration space with type 1 accesses
+ * Functions for accessing PCI configuration space directly with type
+ * 1 accesses.
+ *
  */
 
-#define CONFIG_CMD(bus, device_fn, where)   (0x80000000 | (bus << 16) | (device_fn << 8) | (where & ~3))
-
-int pcibios_read_config_byte(unsigned int bus, unsigned int device_fn,
-			       unsigned int where, uint8_t *value)
-{
-    outl(CONFIG_CMD(bus,device_fn,where), 0xCF8);
-    *value = inb(0xCFC + (where&3));
-    return PCIBIOS_SUCCESSFUL;
+static inline int pcidirect_read_config_byte ( struct pci_device *pci,
+					       unsigned int where,
+					       uint8_t *value ) {
+    outl ( CONFIG_CMD ( pci, where ), CONFIG_ADDRESS );
+    *value = inb ( CONFIG_DATA + ( where & 3 ) );
+    return 0;
 }
 
-int pcibios_read_config_word (unsigned int bus,
-    unsigned int device_fn, unsigned int where, uint16_t *value)
-{
-    outl(CONFIG_CMD(bus,device_fn,where), 0xCF8);
-    *value = inw(0xCFC + (where&2));
-    return PCIBIOS_SUCCESSFUL;
+static inline int pcidirect_read_config_word ( struct pci_device *pci,
+					       unsigned int where,
+					       uint16_t *value ) {
+    outl ( CONFIG_CMD ( pci, where ), CONFIG_ADDRESS );
+    *value = inw ( CONFIG_DATA + ( where & 2 ) );
+    return 0;
 }
 
-int pcibios_read_config_dword (unsigned int bus, unsigned int device_fn,
-				 unsigned int where, uint32_t *value)
-{
-    outl(CONFIG_CMD(bus,device_fn,where), 0xCF8);
-    *value = inl(0xCFC);
-    return PCIBIOS_SUCCESSFUL;
+static inline int pcidirect_read_config_dword ( struct pci_device *pci,
+						unsigned int where,
+						uint32_t *value ) {
+    outl ( CONFIG_CMD ( pci, where ), CONFIG_ADDRESS );
+    *value = inl ( CONFIG_DATA );
+    return 0;
 }
 
-int pcibios_write_config_byte (unsigned int bus, unsigned int device_fn,
-				 unsigned int where, uint8_t value)
-{
-    outl(CONFIG_CMD(bus,device_fn,where), 0xCF8);
-    outb(value, 0xCFC + (where&3));
-    return PCIBIOS_SUCCESSFUL;
+static inline int pcidirect_write_config_byte ( struct pci_device *pci,
+						unsigned int where,
+						uint8_t value ) {
+    outl ( CONFIG_CMD ( pci, where ), CONFIG_ADDRESS );
+    outb ( value, CONFIG_DATA + ( where & 3 ) );
+    return 0;
 }
 
-int pcibios_write_config_word (unsigned int bus, unsigned int device_fn,
-				 unsigned int where, uint16_t value)
-{
-    outl(CONFIG_CMD(bus,device_fn,where), 0xCF8);
-    outw(value, 0xCFC + (where&2));
-    return PCIBIOS_SUCCESSFUL;
+static inline int pcidirect_write_config_word ( struct pci_device *pci,
+						unsigned int where,
+						uint16_t value ) {
+    outl ( CONFIG_CMD ( pci, where ), CONFIG_ADDRESS );
+    outw ( value, CONFIG_DATA + ( where & 2 ) );
+    return 0;
 }
 
-int pcibios_write_config_dword (unsigned int bus, unsigned int device_fn, unsigned int where, uint32_t value)
-{
-    outl(CONFIG_CMD(bus,device_fn,where), 0xCF8);
-    outl(value, 0xCFC);
-    return PCIBIOS_SUCCESSFUL;
+static inline int pcidirect_write_config_dword ( struct pci_device *pci,
+						 unsigned int where,
+						 uint32_t value ) {
+    outl ( CONFIG_CMD ( pci, where ), CONFIG_ADDRESS );
+    outl ( value, CONFIG_DATA );
+    return 0;
 }
 
-#undef CONFIG_CMD
-
-#else	 /* CONFIG_PCI_DIRECT  not defined */
-
-#if !defined(PCBIOS)
-#error "The pcibios can only be used when the PCBIOS support is compiled in"
-#endif
-
-/* Macro for calling the BIOS32 service.  This replaces the old
- * bios32_call function.  Use in a statement such as
- * __asm__ ( BIOS32_CALL,
- *	     : <output registers>
- *	     : "S" ( bios32_entry ), <other input registers> );
+/*
+ * Functions for accessing PCI configuration space directly via the
+ * PCI BIOS.
+ *
+ * Under -DKEEP_IT_REAL, we use INT 1A, otherwise we use the BIOS32
+ * interface.
  */
-#define BIOS32_CALL "call _virt_to_phys\n\t" \
-		    "pushl %%cs\n\t" \
-		    "call *%%esi\n\t" \
-		    "cli\n\t" \
-		    "cld\n\t" \
-		    "call _phys_to_virt\n\t"
 
-static unsigned long bios32_entry;
-static unsigned long pcibios_entry;
+#ifdef KEEP_IT_REAL
 
-static unsigned long bios32_service(unsigned long service)
-{
-	unsigned char return_code;	/* %al */
-	unsigned long address;		/* %ebx */
-	unsigned long length;		/* %ecx */
-	unsigned long entry;		/* %edx */
+static void find_pcibios16 ( void ) {
+	uint16_t present;
+	uint32_t signature;
+	uint16_t flags;
+	uint16_t revision;
 
-	__asm__(BIOS32_CALL
-		: "=a" (return_code),
-		  "=b" (address),
-		  "=c" (length),
-		  "=d" (entry)
-		: "0" (service),
-		  "1" (0),
-		  "S" (bios32_entry));
+	/* PCI BIOS installation check */
+	REAL_EXEC ( rm_pcibios_check,
+		    "int $0x1a\n\t"
+		    "pushfw\n\t"
+		    "popw %%cx\n\t",
+		    4,
+		    OUT_CONSTRAINTS ( "=a" ( present ), "=b" ( revision ),
+				      "=c" ( flags ), "=d" ( signature ) ),
+		    IN_CONSTRAINTS ( "a" ( ( PCIBIOS_PCI_FUNCTION_ID << 8 ) +
+					   PCIBIOS_PCI_BIOS_PRESENT ) ),
+		    CLOBBER ( "esi", "edi", "ebp" ) );
 
-	switch (return_code) {
-		case 0:
-			return address + entry;
-		case 0x80:	/* Not present */
-			printf("bios32_service(%d) : not present\n", service);
-			return 0;
-		default: /* Shouldn't happen */
-			printf("bios32_service(%d) : returned %#X????\n",
-				service, return_code);
-			return 0;
+	if ( ( flags & CF ) ||
+	     ( ( present >> 8 ) != 0 ) ||
+	     ( signature != PCI_SIGNATURE ) ) {
+		DBG ( "PCI BIOS installation check failed\n" );
+		return;
 	}
+
+	/* We have a PCI BIOS */
+	have_pcibios = 1;
+	return;
 }
 
-int pcibios_read_config_byte(unsigned int bus,
-        unsigned int device_fn, unsigned int where, uint8_t *value)
-{
-        unsigned long ret;
-        unsigned long bx = (bus << 8) | device_fn;
+INIT_FN ( INIT_PCIBIOS, find_pcibios16, NULL, NULL );
 
-        __asm__(BIOS32_CALL
-                "jc 1f\n\t"
-                "xor %%ah, %%ah\n"
-                "1:"
-                : "=c" (*value),
-                  "=a" (ret)
-                : "1" (PCIBIOS_READ_CONFIG_BYTE),
-                  "b" (bx),
-                  "D" ((long) where),
-                  "S" (pcibios_entry));
-        return (int) (ret & 0xff00) >> 8;
-}
+#define pcibios16_read_write( command, pci, where, value )		\
+	( {								\
+		uint32_t discard_b, discard_D;				\
+		uint16_t ret;						\
+									\
+		REAL_EXEC ( __FUNCTION__ ,			\
+			    "int $0x1a\n\t"				\
+			    "jc 1f\n\t"					\
+			    "xorl %%eax, %%eax\n\t"			\
+			    "\n1:\n\t",					\
+			    5,						\
+			    OUT_CONSTRAINTS ( "=a" ( ret ),		\
+					      "=b" ( discard_b ),	\
+					      "=c" ( value ),		\
+					      "=D" ( discard_D ) ),	\
+			    IN_CONSTRAINTS ( "a" ( command +		\
+				    ( PCIBIOS_PCI_FUNCTION_ID << 8 ) ),	\
+					     "b" ( pci->busdevfn ),	\
+					     "c" ( value ),		\
+			    		     "D" ( where ) ),		\
+			    CLOBBER ( "edx", "ebp" ) );			\
+									\
+		( ret >> 8 );						\
+	} )
+#define pcibios_read_write pcibios16_read_write
 
-int pcibios_read_config_word(unsigned int bus,
-        unsigned int device_fn, unsigned int where, uint16_t *value)
-{
-        unsigned long ret;
-        unsigned long bx = (bus << 8) | device_fn;
+#else /* KEEP_IT_REAL */
 
-        __asm__(BIOS32_CALL
-                "jc 1f\n\t"
-                "xor %%ah, %%ah\n"
-                "1:"
-                : "=c" (*value),
-                  "=a" (ret)
-                : "1" (PCIBIOS_READ_CONFIG_WORD),
-                  "b" (bx),
-                  "D" ((long) where),
-                  "S" (pcibios_entry));
-        return (int) (ret & 0xff00) >> 8;
-}
-
-int pcibios_read_config_dword(unsigned int bus,
-        unsigned int device_fn, unsigned int where, uint32_t *value)
-{
-        unsigned long ret;
-        unsigned long bx = (bus << 8) | device_fn;
-
-        __asm__(BIOS32_CALL
-                "jc 1f\n\t"
-                "xor %%ah, %%ah\n"
-                "1:"
-                : "=c" (*value),
-                  "=a" (ret)
-                : "1" (PCIBIOS_READ_CONFIG_DWORD),
-                  "b" (bx),
-                  "D" ((long) where),
-                  "S" (pcibios_entry));
-        return (int) (ret & 0xff00) >> 8;
-}
-
-int pcibios_write_config_byte (unsigned int bus,
-	unsigned int device_fn, unsigned int where, uint8_t value)
-{
-	unsigned long ret;
-	unsigned long bx = (bus << 8) | device_fn;
-
-	__asm__(BIOS32_CALL
-		"jc 1f\n\t"
-		"xor %%ah, %%ah\n"
-		"1:"
-		: "=a" (ret)
-		: "0" (PCIBIOS_WRITE_CONFIG_BYTE),
-		  "c" (value),
-		  "b" (bx),
-		  "D" ((long) where),
-		  "S" (pcibios_entry));
-	return (int) (ret & 0xff00) >> 8;
-}
-
-int pcibios_write_config_word (unsigned int bus,
-	unsigned int device_fn, unsigned int where, uint16_t value)
-{
-	unsigned long ret;
-	unsigned long bx = (bus << 8) | device_fn;
-
-	__asm__(BIOS32_CALL
-		"jc 1f\n\t"
-		"xor %%ah, %%ah\n"
-		"1:"
-		: "=a" (ret)
-		: "0" (PCIBIOS_WRITE_CONFIG_WORD),
-		  "c" (value),
-		  "b" (bx),
-		  "D" ((long) where),
-		  "S" (pcibios_entry));
-	return (int) (ret & 0xff00) >> 8;
-}
-
-int pcibios_write_config_dword (unsigned int bus,
-	unsigned int device_fn, unsigned int where, uint32_t value)
-{
-	unsigned long ret;
-	unsigned long bx = (bus << 8) | device_fn;
-
-	__asm__(BIOS32_CALL
-		"jc 1f\n\t"
-		"xor %%ah, %%ah\n"
-		"1:"
-		: "=a" (ret)
-		: "0" (PCIBIOS_WRITE_CONFIG_DWORD),
-		  "c" (value),
-		  "b" (bx),
-		  "D" ((long) where),
-		  "S" (pcibios_entry));
-	return (int) (ret & 0xff00) >> 8;
-}
-
-static void check_pcibios(void)
-{
-	unsigned long signature;
-	unsigned char present_status;
-	unsigned char major_revision;
-	unsigned char minor_revision;
-	int pack;
-
-	if ((pcibios_entry = bios32_service(PCI_SERVICE))) {
-		__asm__(BIOS32_CALL
-			"jc 1f\n\t"
-			"xor %%ah, %%ah\n"
-			"1:\tshl $8, %%eax\n\t"
-			"movw %%bx, %%ax"
-			: "=d" (signature),
-			  "=a" (pack)
-			: "1" (PCIBIOS_PCI_BIOS_PRESENT),
-			  "S" (pcibios_entry)
-			: "bx", "cx");
-
-		present_status = (pack >> 16) & 0xff;
-		major_revision = (pack >> 8) & 0xff;
-		minor_revision = pack & 0xff;
-		if (present_status || (signature != PCI_SIGNATURE)) {
-			printf("ERROR: BIOS32 says PCI BIOS, but no PCI "
-				"BIOS????\n");
-			pcibios_entry = 0;
-		}
-#if	DEBUG
-		if (pcibios_entry) {
-			printf ("pcibios_init : PCI BIOS revision %hhX.%hhX"
-				" entry at %#X\n", major_revision,
-				minor_revision, pcibios_entry);
-		}
-#endif
-	}
-}
-
-static void pcibios_init(void)
-{
-	union bios32 *check;
-	unsigned char sum;
-	int i, length;
-	bios32_entry = 0;
+/*
+ * Locate the BIOS32 service directory by scanning for a valid BIOS32
+ * structure
+ *
+ */
+static struct bios32 * find_bios32 ( void ) {
+	uint32_t address;
 
 	/*
 	 * Follow the standard procedure for locating the BIOS32 Service
@@ -290,63 +213,231 @@ static void pcibios_init(void)
 	 * 0xe0000 through 0xfffff for a valid BIOS32 structure.
 	 *
 	 */
+	for ( address = 0xe0000 ; address < 0xffff0 ; address += 16 ) {
+		struct bios32 * candidate = phys_to_virt ( address );
+		unsigned int length, i;
+		unsigned char sum;
 
-	for (check = phys_to_virt(0xe0000); (void *)check <= phys_to_virt(0xffff0); ++check) {
-		if (check->fields.signature != BIOS32_SIGNATURE)
+		if ( candidate->signature != BIOS32_SIGNATURE )
 			continue;
-		length = check->fields.length * 16;
-		if (!length)
+
+		length = candidate->length * 16;
+		if ( ! length )
 			continue;
-		sum = 0;
-		for (i = 0; i < length ; ++i)
-			sum += check->chars[i];
-		if (sum != 0)
+
+		for ( sum = 0, i = 0 ; i < length ; i++ )
+			sum += ( ( char * ) candidate ) [i];
+		if ( sum != 0 )
 			continue;
-		if (check->fields.revision != 0) {
-			printf("pcibios_init : unsupported revision %d at %#X, mail drew@colorado.edu\n",
-				check->fields.revision, check);
+
+		if ( candidate->revision != 0 ) {
+			DBG ( "unsupported BIOS32 revision %d at %#x\n",
+			      candidate->revision, address );
 			continue;
 		}
-#if	DEBUG
-		printf("pcibios_init : BIOS32 Service Directory "
-			"structure at %#X\n", check);
-#endif
-		if (!bios32_entry) {
-			if (check->fields.entry >= 0x100000) {
-				printf("pcibios_init: entry in high "
-					"memory, giving up\n");
-				return;
-			} else {
-				bios32_entry = check->fields.entry;
-#if	DEBUG
-				printf("pcibios_init : BIOS32 Service Directory"
-					" entry at %#X\n", bios32_entry);
-#endif
-			}
-		}
+
+		DBG ( "BIOS32 Service Directory structure at %#x\n", address );
+
+		return candidate;
 	}
-	if (bios32_entry)
-		check_pcibios();
-}
-#endif	/* CONFIG_PCI_DIRECT not defined*/
 
-unsigned long pcibios_bus_base(unsigned int bus __unused)
-{
+	return NULL;
+}
+
+/*
+ * Look up a service in the BIOS32 service directory
+ *
+ */
+static unsigned long find_bios32_service ( struct bios32 * bios32,
+					   unsigned long service ) {
+	uint8_t return_code;
+	uint32_t address;
+	uint32_t length;
+	uint32_t entry;
+	uint32_t discard;
+
+	__asm__ ( FLAT_FAR_CALL_ESI
+		  : "=a" ( return_code ), "=b" ( address ),
+		    "=c" ( length ), "=d" ( entry ), "=S" ( discard )
+		  : "a" ( service ), "b" ( 0 ), "S" ( bios32->entry )
+		  : "edi", "ebp" );
+
+	switch ( return_code ) {
+	case BIOS32_SERVICE_PRESENT:
+		return ( address + entry );
+	case BIOS32_SERVICE_NOT_PRESENT:
+		DBG ( "BIOS32 service %c%c%c%c : not present\n",
+		      PRINT_BIOS_SIG ( service ) );
+		return 0;
+	default: /* Shouldn't happen */
+		DBG ( "BIOS32 returned %#x for service %c%c%c%c!\n",
+		      return_code, PRINT_BIOS_SIG ( service ) );
+		return 0;
+	}
+}
+
+static void find_pcibios32 ( void ) {
+	struct bios32 *bios32;
+	uint32_t signature;
+	uint16_t present;
+	uint32_t flags;
+	uint16_t revision;
+	uint32_t discard;
+
+	/* Locate BIOS32 service directory */
+	bios32 = find_bios32 ();
+	if ( ! bios32 ) {
+		DBG ( "No BIOS32\n" );
+		return;
+	}
+
+	/* Locate PCI BIOS service */
+	pcibios32_entry = find_bios32_service ( bios32, PCI_SERVICE );
+	if ( ! pcibios32_entry ) {
+		DBG ( "No PCI BIOS\n" );
+		return;
+	}
+	
+	/* PCI BIOS installation check */
+	__asm__ ( FLAT_FAR_CALL_ESI
+		  "pushfl\n\t"
+		  "popl %%ecx\n\t"
+		  : "=a" ( present ), "=b" ( revision ), "=c" ( flags ),
+		    "=d" ( signature ), "=S" ( discard )
+		  : "a" ( ( PCIBIOS_PCI_FUNCTION_ID << 8 )
+			  + PCIBIOS_PCI_BIOS_PRESENT ),
+		    "S" ( pcibios32_entry )
+		  : "edi", "ebp" );
+
+	if ( ( flags & CF ) ||
+	     ( ( present >> 8 ) != 0 ) ||
+	     ( signature != PCI_SIGNATURE ) ) {
+		DBG ( "PCI BIOS installation check failed\n" );
+		return;
+	}
+
+	/* We have a PCI BIOS */
+	have_pcibios = 1;
+	return;
+}
+
+INIT_FN ( INIT_PCIBIOS, find_pcibios32, NULL, NULL );
+
+#define pcibios32_read_write( command, pci, where, value )		\
+	( {								\
+		uint32_t discard_b, discard_D, discard_S;		\
+		uint16_t ret;						\
+									\
+		__asm__ ( FLAT_FAR_CALL_ESI				\
+			  "jc 1f\n\t"					\
+			  "xorl %%eax, %%eax\n\t"			\
+			  "\n1:\n\t"					\
+			  : "=a" ( ret ), "=b" ( discard_b ),		\
+			    "=c" ( value ),				\
+			    "=S" ( discard_S ), "=D" ( discard_D )	\
+			  : "a" ( ( PCIBIOS_PCI_FUNCTION_ID << 8 )	\
+				  + command ),			       	\
+			    "b" ( pci->busdevfn ), "c" ( value ),	\
+			    "D" ( where ), "S" ( pcibios32_entry )	\
+			  : "edx", "ebp" );				\
+									\
+		( ret >> 8 );						\
+	} )
+#define pcibios_read_write pcibios32_read_write
+
+#endif /* KEEP_IT_REAL */
+
+static inline int pcibios_read_config_byte ( struct pci_device *pci,
+					     unsigned int where,
+					     uint8_t *value ) {
+	return pcibios_read_write ( PCIBIOS_READ_CONFIG_BYTE,
+				    pci, where, *value );
+}
+
+static inline int pcibios_read_config_word ( struct pci_device *pci,
+					     unsigned int where,
+					     uint16_t *value ) {
+	return pcibios_read_write ( PCIBIOS_READ_CONFIG_WORD,
+				    pci, where, *value );
+}
+
+static inline int pcibios_read_config_dword ( struct pci_device *pci,
+					      unsigned int where,
+					      uint32_t *value ) {
+	return pcibios_read_write ( PCIBIOS_READ_CONFIG_DWORD,
+				    pci, where, *value );
+}
+
+static inline int pcibios_write_config_byte ( struct pci_device *pci,
+					      unsigned int where,
+					      uint8_t value ) {
+	return pcibios_read_write ( PCIBIOS_WRITE_CONFIG_BYTE,
+				    pci, where, value );
+}
+
+static inline int pcibios_write_config_word ( struct pci_device *pci,
+					      unsigned int where,
+					      uint16_t value ) {
+	return pcibios_read_write ( PCIBIOS_WRITE_CONFIG_WORD,
+				    pci, where, value );
+}
+
+static inline int pcibios_write_config_dword ( struct pci_device *pci,
+					       unsigned int where,
+					       uint32_t value ) {
+	return pcibios_read_write ( PCIBIOS_WRITE_CONFIG_DWORD,
+				    pci, where, value );
+}
+
+/*
+ * Functions for accessing PCI configuration space via the PCI BIOS if
+ * present, otherwise directly via type 1 accesses.
+ *
+ */
+
+int pci_read_config_byte ( struct pci_device *pci, unsigned int where,
+			   uint8_t *value ) {
+	return have_pcibios ?
+		pcibios_read_config_byte ( pci, where, value ) :
+		pcidirect_read_config_byte ( pci, where, value );
+}
+		
+int pci_read_config_word ( struct pci_device *pci, unsigned int where,
+			   uint16_t *value ) {
+	return have_pcibios ?
+		pcibios_read_config_word ( pci, where, value ) :
+		pcidirect_read_config_word ( pci, where, value );
+}
+		
+int pci_read_config_dword ( struct pci_device *pci, unsigned int where,
+			    uint32_t *value ) {
+	return have_pcibios ?
+		pcibios_read_config_dword ( pci, where, value ) :
+		pcidirect_read_config_dword ( pci, where, value );
+}
+		
+int pci_write_config_byte ( struct pci_device *pci, unsigned int where,
+			    uint8_t value ) {
+	return have_pcibios ?
+		pcibios_write_config_byte ( pci, where, value ) :
+		pcidirect_write_config_byte ( pci, where, value );
+}
+		
+int pci_write_config_word ( struct pci_device *pci, unsigned int where,
+			    uint16_t value ) {
+	return have_pcibios ?
+		pcibios_write_config_word ( pci, where, value ) :
+		pcidirect_write_config_word ( pci, where, value );
+}
+		
+int pci_write_config_dword ( struct pci_device *pci, unsigned int where,
+			     uint32_t value ) {
+	return have_pcibios ?
+		pcibios_write_config_dword ( pci, where, value ) :
+		pcidirect_write_config_dword ( pci, where, value );
+}
+		
+unsigned long pci_bus_base ( struct pci_device *pci __unused ) {
 	/* architecturally this must be 0 */
 	return 0;
 }
-
-void find_pci(int type, struct pci_device *dev)
-{
-#ifndef	CONFIG_PCI_DIRECT
-	if (!pcibios_entry) {
-		pcibios_init();
-	}
-	if (!pcibios_entry) {
-		printf("pci_init: no BIOS32 detected\n");
-		return;
-	}
-#endif
-	return scan_pci_bus(type, dev);
-}
-#endif /* CONFIG_PCI */
