@@ -33,6 +33,7 @@ struct dev {
 
 struct dev_operations {
 	void ( *disable ) ( struct dev * );
+	void ( *print_info ) ( struct dev * );
 	int ( *load_configuration ) ( struct dev * );
 	int ( *load ) ( struct dev * );
 };
@@ -53,6 +54,9 @@ struct boot_driver {
 extern void print_drivers ( void );
 extern int probe ( struct dev *dev );
 extern void disable ( struct dev *dev );
+static inline void print_info ( struct dev *dev ) {
+	dev->dev_op->print_info ( dev );
+}
 static inline int load_configuration ( struct dev *dev ) {
 	return dev->dev_op->load_configuration ( dev );
 }
