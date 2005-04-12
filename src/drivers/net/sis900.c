@@ -307,9 +307,11 @@ static int sis635_get_mac_addr(struct pci_device * pci_dev __unused, struct nic 
  * Returns:   struct nic *:          pointer to NIC data structure
  */
 
-static int sis900_probe(struct dev *dev, struct pci_device *pci)
-{
-    struct nic *nic = (struct nic *)dev;
+static int sis900_probe ( struct dev *dev ) {
+
+    struct nic *nic = nic_device ( dev );
+
+    struct pci_device *pci = pci_device ( dev );
     int i;
     int found=0;
     int phy_addr;

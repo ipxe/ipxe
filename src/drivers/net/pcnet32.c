@@ -665,9 +665,11 @@ static void pcnet32_irq(struct nic *nic __unused, irq_action_t action __unused)
 PROBE - Look for an adapter, this routine's visible to the outside
 You should omit the last argument struct pci_device * for a non-PCI NIC
 ***************************************************************************/
-static int pcnet32_probe(struct dev *dev, struct pci_device *pci)
-{
-	struct nic *nic = (struct nic *) dev;
+static int pcnet32_probe ( struct dev *dev ) {
+
+	struct nic *nic = nic_device ( dev );
+
+	struct pci_device *pci = pci_device ( dev );
 	int i, media;
 	int fdx, mii, fset, dxsuflo, ltint;
 	int chip_version;

@@ -134,9 +134,11 @@ PROBE - Look for an adapter, this routine's visible to the outside
 
 #define board_found 1
 #define valid_link 0
-static int skel_probe(struct dev *dev, struct pci_device *pci)
-{
-	struct nic *nic = (struct nic *)dev;
+static int skel_probe ( struct dev *dev ) {
+
+	struct nic *nic = nic_device ( dev );
+
+	struct pci_device *pci = pci_device ( dev );
 
 	if (board_found && valid_link)
 	{

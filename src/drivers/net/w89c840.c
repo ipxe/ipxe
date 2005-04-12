@@ -609,9 +609,11 @@ static void w89c840_irq(struct nic *nic __unused, irq_action_t action __unused)
 /**************************************************************************
 w89c840_probe - Look for an adapter, this routine's visible to the outside
 ***************************************************************************/
-static int w89c840_probe(struct dev *dev, struct pci_device *p)
-{
-    struct nic *nic = (struct nic *)dev;
+static int w89c840_probe ( struct dev *dev ) {
+
+    struct nic *nic = nic_device ( dev );
+
+    struct pci_device *p = pci_device ( dev );
     u16 sum = 0;
     int i, j;
     unsigned short value;

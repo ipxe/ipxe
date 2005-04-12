@@ -663,9 +663,11 @@ static void mtd_disable(struct dev *dev)
 PROBE - Look for an adapter, this routine's visible to the outside
 ***************************************************************************/
 
-static int mtd_probe(struct dev *dev, struct pci_device *pci)
-{
-    struct nic *nic = (struct nic *)dev;
+static int mtd_probe ( struct dev *dev ) {
+
+    struct nic *nic = nic_device ( dev );
+
+    struct pci_device *pci = pci_device ( dev );
     int i;
 
     if (pci->ioaddr == 0)

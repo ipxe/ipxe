@@ -577,9 +577,11 @@ static void sundance_disable(struct dev *dev __unused)
 /**************************************************************************
 PROBE - Look for an adapter, this routine's visible to the outside
 ***************************************************************************/
-static int sundance_probe(struct dev *dev, struct pci_device *pci)
-{
-	struct nic *nic = (struct nic *) dev;
+static int sundance_probe ( struct dev *dev ) {
+
+	struct nic *nic = nic_device ( dev );
+
+	struct pci_device *pci = pci_device ( dev );
 	u8 ee_data[EEPROM_SIZE];
 	u16 mii_ctl;
 	int i;

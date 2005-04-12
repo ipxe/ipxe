@@ -925,9 +925,11 @@ PROBE - Look for an adapter, this routine's visible to the outside
 #define IORESOURCE_MEM 0x00000200
 #define board_found 1
 #define valid_link 0
-static int forcedeth_probe(struct dev *dev, struct pci_device *pci)
-{
-	struct nic *nic = (struct nic *) dev;
+static int forcedeth_probe ( struct dev *dev ) {
+
+	struct nic *nic = nic_device ( dev );
+
+	struct pci_device *pci = pci_device ( dev );
 	unsigned long addr;
 	int sz;
 	u8 *base;

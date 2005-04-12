@@ -240,9 +240,11 @@ static void natsemi_irq(struct nic *nic, irq_action_t action);
  */
 
 static int
-natsemi_probe(struct dev *dev, struct pci_device *pci)
-{
-    struct nic *nic = (struct nic *)dev;
+natsemi_probe ( struct dev *dev ) {
+
+    struct nic *nic = nic_device ( dev );
+
+    struct pci_device *pci = pci_device ( dev );
     int i;
     int prev_eedata;
     u32 tmp;

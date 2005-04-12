@@ -467,9 +467,11 @@ static void t595_irq(struct nic *nic __unused, irq_action_t action __unused)
 /**************************************************************************
 ETH_PROBE - Look for an adapter
 ***************************************************************************/
-static int t595_probe(struct dev *dev, struct pci_device *pci)
-{
-	struct nic *nic = (struct nic *)dev;
+static int t595_probe ( struct dev *dev ) {
+
+	struct nic *nic = nic_device ( dev );
+
+	struct pci_device *pci = pci_device ( dev );
 	int i;
 	unsigned short *p;
 

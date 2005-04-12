@@ -95,9 +95,11 @@ static unsigned char		tx_packet[PKT_BUF_SZ * TX_RING_SIZE];
 
 
     static int
-epic100_probe(struct dev *dev, struct pci_device *pci)
-{
-    struct nic *nic = (struct nic *)dev;
+epic100_probe ( struct dev *dev ) {
+
+    struct nic *nic = nic_device ( dev );
+
+    struct pci_device *pci = pci_device ( dev );
     int i;
     unsigned short* ap;
     unsigned int phy, phy_idx;

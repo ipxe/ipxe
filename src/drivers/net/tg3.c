@@ -3224,9 +3224,11 @@ static void tg3_irq(struct nic *nic __unused, irq_action_t action __unused)
 PROBE - Look for an adapter, this routine's visible to the outside
 You should omit the last argument struct pci_device * for a non-PCI NIC
 ***************************************************************************/
-static int tg3_probe(struct dev *dev, struct pci_device *pdev)
-{
-	struct nic *nic = (struct nic *)dev;
+static int tg3_probe ( struct dev *dev ) {
+
+	struct nic *nic = nic_device ( dev );
+
+	struct pci_device *pdev = pci_device ( dev );
 	struct tg3 *tp = &tg3;
 	unsigned long tg3reg_base, tg3reg_len;
 	int i, err, pm_cap;

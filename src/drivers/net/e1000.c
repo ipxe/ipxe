@@ -3580,9 +3580,11 @@ static void e1000_irq(struct nic *nic __unused, irq_action_t action)
 PROBE - Look for an adapter, this routine's visible to the outside
 You should omit the last argument struct pci_device * for a non-PCI NIC
 ***************************************************************************/
-static int e1000_probe(struct dev *dev, struct pci_device *p)
-{
-	struct nic *nic = (struct nic *)dev;
+static int e1000_probe ( struct dev *dev ) {
+
+	struct nic *nic = nic_device ( dev );
+
+	struct pci_device *p = pci_device ( dev );
 	unsigned long mmio_start, mmio_len;
 	int ret_val, i;
 

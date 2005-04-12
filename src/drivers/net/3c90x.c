@@ -688,9 +688,11 @@ static void a3c90x_irq(struct nic *nic __unused, irq_action_t action __unused)
  *** initialization.  If this routine is called, the pci functions did find the
  *** card.  We just have to init it here.
  ***/
-static int a3c90x_probe(struct dev *dev, struct pci_device *pci)
-{
-    struct nic *nic = (struct nic *)dev;
+static int a3c90x_probe ( struct dev *dev ) {
+
+    struct nic *nic = nic_device ( dev );
+
+    struct pci_device *pci = pci_device ( dev );
     int i, c;
     unsigned short eeprom[0x21];
     unsigned int cfg;
