@@ -22,11 +22,6 @@ Bochs Pseudo NIC driver for Etherboot
 /* PNIC API */
 #include "pnic_api.h"
 
-/* Private data structure */
-typedef struct {
-	uint16_t api_version;
-} pnic_priv_data_t;
-
 /* Function prototypes */
 static int pnic_api_check ( uint16_t api_version );
 
@@ -96,7 +91,6 @@ static uint16_t pnic_command ( struct nic *nic, uint16_t command,
 			       void *input, uint16_t input_length,
 			       void *output, uint16_t output_max_length,
 			       uint16_t *output_length ) {
-	pnic_priv_data_t *priv = (pnic_priv_data_t*)nic->priv_data;
 	uint16_t status = pnic_command_quiet ( nic, command,
 					       input, input_length,
 					       output, output_max_length,
@@ -104,7 +98,6 @@ static uint16_t pnic_command ( struct nic *nic, uint16_t command,
 	if ( status == PNIC_STATUS_OK ) return status;
 	printf ( "PNIC command %#hx (len %#hx) failed with status %#hx\n",
 		 command, input_length, status );
-	if ( priv->api_version ) pnic_api_check(priv->api_version);
 	return status;
 }
 
@@ -123,10 +116,17 @@ static int pnic_api_check ( uint16_t api_version ) {
 }
 
 /**************************************************************************
+CONNECT - connect adapter to the network
+***************************************************************************/
+static int pnic_connect ( struct nic *nic __unused ) {
+	/* Nothing to do */
+	return 1;
+}
+
+/**************************************************************************
 POLL - Wait for a frame
 ***************************************************************************/
-static int pnic_poll(struct nic *nic, int retrieve)
-{
+static int pnic_poll ( struct nic *nic, int retrieve ) {
 	uint16_t length;
 	uint16_t qlen;
 
@@ -153,13 +153,9 @@ static int pnic_poll(struct nic *nic, int retrieve)
 /**************************************************************************
 TRANSMIT - Transmit a frame
 ***************************************************************************/
-static void pnic_transmit(
-	struct nic *nic,
-	const char *dest,		/* Destination */
-	unsigned int type,		/* Type */
-	unsigned int size,		/* size */
-	const char *data)		/* Packet */
-{
+static void pnic_transmit ( struct nic *nic, const char *dest,
+			    unsigned int type, unsigned int size,
+			    const char *data ) {
 	unsigned int nstype = htons ( type );
 
 	if ( ( ETH_HLEN + size ) >= ETH_FRAME_LEN ) {
@@ -180,17 +176,14 @@ static void pnic_transmit(
 /**************************************************************************
 DISABLE - Turn off ethernet interface
 ***************************************************************************/
-static void pnic_disable(struct dev *dev)
-{
-	struct nic *nic = (struct nic *)dev;
+static void pnic_disable ( struct nic *nic ) {
 	pnic_command ( nic, PNIC_CMD_RESET, NULL, 0, NULL, 0, NULL );
 }
 
 /**************************************************************************
 IRQ - Handle card interrupt status
 ***************************************************************************/
-static void pnic_irq ( struct nic *nic, irq_action_t action )
-{
+static void pnic_irq ( struct nic *nic, irq_action_t action ) {
 	uint8_t enabled;
 
 	switch ( action ) {
@@ -208,60 +201,60 @@ static void pnic_irq ( struct nic *nic, irq_action_t action )
 }
 
 /**************************************************************************
+NIC operations table
+***************************************************************************/
+static struct nic_operations pnic_operations = {
+	.connect	= pnic_connect,
+	.poll		= pnic_poll,
+	.transmit	= pnic_transmit,
+	.irq		= pnic_irq,
+	.disable        = pnic_disable,
+};
+
+static struct pci_id pnic_nics[] = {
+/* genrules.pl doesn't let us use macros for PCI IDs...*/
+PCI_ROM ( 0xfefe, 0xefef, "pnic", "Bochs Pseudo NIC Adaptor" ),
+};
+
+static struct pci_driver pnic_driver =
+	PCI_DRIVER ( "PNIC", pnic_nics, PCI_NO_CLASS );
+
+/**************************************************************************
 PROBE - Look for an adapter, this routine's visible to the outside
 ***************************************************************************/
 
-static int pnic_probe(struct dev *dev, struct pci_device *pci)
-{
-	struct nic *nic = (struct nic *)dev;
-	static pnic_priv_data_t priv;
+static int pnic_probe ( struct dev *dev ) {
+	struct nic *nic = nic_device ( dev );
+	struct pci_device *pci = pci_device ( dev );
+	uint16_t api_version;
 	uint16_t status;
 
-	printf(" - ");
+	/* Scan PCI bus for a PNIC device */
+	if ( ! find_pci_device ( pci, &pnic_driver ) )
+		return 0;
 
-	/* Clear private data structure and chain it in */
-	memset ( &priv, 0, sizeof(priv) );
-	nic->priv_data = &priv;
-
-	/* Mask the bit that says "this is an io addr" */
-	nic->ioaddr = pci->ioaddr & ~3;
+	/* Retrieve relevant information about PCI device */
+	nic->ioaddr = pci->ioaddr;
 	nic->irqno = pci->irq;
-	/* Not sure what this does, but the rtl8139 driver does it */
-	adjust_pci_device(pci);
 
+	/* API version check */
 	status = pnic_command_quiet( nic, PNIC_CMD_API_VER, NULL, 0,
-				     &priv.api_version,
-				     sizeof(priv.api_version), NULL );
+				     &api_version,
+				     sizeof(api_version), NULL );
 	if ( status != PNIC_STATUS_OK ) {
 		printf ( "PNIC failed installation check, code %#hx\n",
 			 status );
 		return 0;
 	}
-	pnic_api_check(priv.api_version);
+	pnic_api_check(api_version);
+
+	/* Get MAC address */
 	status = pnic_command ( nic, PNIC_CMD_READ_MAC, NULL, 0,
 				nic->node_addr, ETH_ALEN, NULL );
-	printf ( "Detected Bochs Pseudo NIC MAC %! (API v%d.%d) at %#hx\n",
-		 nic->node_addr, priv.api_version>>8, priv.api_version&0xff,
-		 nic->ioaddr );
 
 	/* point to NIC specific routines */
-	dev->disable  = pnic_disable;
-	nic->poll     = pnic_poll;
-	nic->transmit = pnic_transmit;
-	nic->irq      = pnic_irq;
+	nic->nic_op	= &pnic_operations;
 	return 1;
 }
 
-static struct pci_id pnic_nics[] = {
-/* genrules.pl doesn't let us use macros for PCI IDs...*/
-PCI_ROM(0xfefe, 0xefef, "pnic", "Bochs Pseudo NIC Adaptor"),
-};
-
-static struct pci_driver pnic_driver __pci_driver = {
-	.type     = NIC_DRIVER,
-	.name     = "PNIC",
-	.probe    = pnic_probe,
-	.ids      = pnic_nics,
-	.id_count = sizeof(pnic_nics)/sizeof(pnic_nics[0]),
-	.class    = 0,
-};
+BOOT_DRIVER ( "PNIC", pnic_probe );
