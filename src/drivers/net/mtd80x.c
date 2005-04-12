@@ -1086,11 +1086,7 @@ static void getlinktype(struct nic *dev)
 }
 
 
-struct pci_driver mtd80x_driver __pci_driver ={
-        .type     = NIC_DRIVER,
-        .name     = "MTD80X",
-        .probe    = mtd_probe,
-        .ids      = mtd80x_nics,
-        .id_count = sizeof(mtd80x_nics)/sizeof(mtd80x_nics[0]),
-        .class    = 0,
-};
+static struct pci_driver mtd80x_driver =
+	PCI_DRIVER ( "MTD80X", mtd80x_nics, PCI_NO_CLASS );
+
+BOOT_DRIVER ( "MTD80X", mtd_probe );
