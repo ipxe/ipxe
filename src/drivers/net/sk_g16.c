@@ -476,8 +476,8 @@ const char *d,			/* Destination */
 unsigned int t,			/* Type */
 unsigned int s,			/* size */
 const char *p);			/* Packet */
-static void SK_disable(struct dev *dev);
-static int  SK_probe(struct dev *dev, unsigned short *probe_addrs);
+static void SK_disable(struct nic *nic);
+static int  SK_probe(struct dev *dev);
 
 /*
  * LANCE Functions

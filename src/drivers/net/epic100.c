@@ -49,7 +49,7 @@ struct epic_tx_desc {
 
 static void	epic100_open(void);
 static void	epic100_init_ring(void);
-static void	epic100_disable(struct dev *dev);
+static void	epic100_disable(struct nic *nic);
 static int	epic100_poll(struct nic *nic, int retrieve);
 static void	epic100_transmit(struct nic *nic, const char *destaddr,
 				 unsigned int type, unsigned int len, const char *data);

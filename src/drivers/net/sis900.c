@@ -125,7 +125,7 @@ static struct pci_driver sis_bridge_driver =
 
 /* Function Prototypes */
 
-static int sis900_probe(struct dev *dev, struct pci_device *pci);
+static int sis900_probe(struct dev *dev);
 
 static u16  sis900_read_eeprom(int location);
 static void sis900_mdio_reset(long mdio_addr);
@@ -148,7 +148,7 @@ static void sis900_transmit(struct nic *nic, const char *d,
                             unsigned int t, unsigned int s, const char *p);
 static int  sis900_poll(struct nic *nic, int retrieve);
 
-static void sis900_disable(struct dev *dev);
+static void sis900_disable(struct nic *nic);
 
 static void sis900_irq(struct nic *nic, irq_action_t action);
 

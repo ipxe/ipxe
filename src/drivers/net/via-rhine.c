@@ -685,7 +685,7 @@ static int ReadMII (int byMIIIndex, int);
 static void WriteMII (char, char, char, int);
 static void MIIDelay (void);
 static void rhine_init_ring (struct nic *dev);
-static void rhine_disable (struct dev *dev);
+static void rhine_disable (struct nic *nic);
 static void rhine_reset (struct nic *nic);
 static int rhine_poll (struct nic *nic, int retreive);
 static void rhine_transmit (struct nic *nic, const char *d, unsigned int t,

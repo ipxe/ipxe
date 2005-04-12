@@ -154,13 +154,13 @@ static int TxPtr;
 /*********************************************************************/
 static void whereami(const char *str);
 static int read_eeprom(unsigned long ioaddr, int location, int addr_len);
-static int davicom_probe(struct dev *dev, struct pci_device *pci);
+static int davicom_probe(struct dev *dev);
 static void davicom_init_chain(struct nic *nic);	/* Sten 10/9 */
 static void davicom_reset(struct nic *nic);
 static void davicom_transmit(struct nic *nic, const char *d, unsigned int t,
 			   unsigned int s, const char *p);
 static int davicom_poll(struct nic *nic, int retrieve);
-static void davicom_disable(struct dev *dev);
+static void davicom_disable(struct nic *nic);
 #ifdef	DAVICOM_DEBUG
 static void davicom_more(void);
 #endif /* DAVICOM_DEBUG */

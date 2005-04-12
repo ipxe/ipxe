@@ -210,7 +210,7 @@ static unsigned char rxb[NUM_RX_DESC * RX_BUF_SIZE] __attribute__ ((aligned(4)))
 
 /* Function Prototypes */
 
-static int natsemi_probe(struct dev *dev, struct pci_device *pci);
+static int natsemi_probe(struct dev *dev);
 static int eeprom_read(long addr, int location);
 static int mdio_read(int phy_id, int location);
 static void natsemi_init(struct nic *nic);
@@ -222,7 +222,7 @@ static void natsemi_set_rx_mode(struct nic *nic);
 static void natsemi_check_duplex(struct nic *nic);
 static void natsemi_transmit(struct nic *nic, const char *d, unsigned int t, unsigned int s, const char *p);
 static int  natsemi_poll(struct nic *nic, int retrieve);
-static void natsemi_disable(struct dev *dev);
+static void natsemi_disable(struct nic *nic);
 static void natsemi_irq(struct nic *nic, irq_action_t action);
 
 /* 

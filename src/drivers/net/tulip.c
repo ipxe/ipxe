@@ -486,13 +486,13 @@ static int mdio_read(struct nic *nic, int phy_id, int location);
 static void mdio_write(struct nic *nic, int phy_id, int location, int value);
 static int read_eeprom(unsigned long ioaddr, int location, int addr_len);
 static void parse_eeprom(struct nic *nic);
-static int tulip_probe(struct dev *dev, struct pci_device *pci);
+static int tulip_probe(struct dev *dev);
 static void tulip_init_ring(struct nic *nic);
 static void tulip_reset(struct nic *nic);
 static void tulip_transmit(struct nic *nic, const char *d, unsigned int t,
                            unsigned int s, const char *p);
 static int tulip_poll(struct nic *nic, int retrieve);
-static void tulip_disable(struct dev *dev);
+static void tulip_disable(struct nic *nic);
 static void nway_start(struct nic *nic);
 static void pnic_do_nway(struct nic *nic);
 static void select_media(struct nic *nic, int startup);
