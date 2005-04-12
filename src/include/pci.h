@@ -21,7 +21,13 @@
  * your option) any later version.
  */
 
+#include "stdint.h"
 #include "pci_ids.h"
+
+/*
+ * PCI constants
+ *
+ */
 
 #define PCI_COMMAND_IO			0x1	/* Enable response in I/O space */
 #define PCI_COMMAND_MEM			0x2	/* Enable response in mem space */
@@ -35,17 +41,6 @@
 #define  PCI_COMMAND_SERR	0x100	/* Enable SERR */
 #define  PCI_COMMAND_FAST_BACK	0x200	/* Enable back-to-back writes */
 
-#define PCIBIOS_PCI_FUNCTION_ID         0xb1XX
-#define PCIBIOS_PCI_BIOS_PRESENT        0xb101
-#define PCIBIOS_FIND_PCI_DEVICE         0xb102
-#define PCIBIOS_FIND_PCI_CLASS_CODE     0xb103
-#define PCIBIOS_GENERATE_SPECIAL_CYCLE  0xb106
-#define PCIBIOS_READ_CONFIG_BYTE        0xb108
-#define PCIBIOS_READ_CONFIG_WORD        0xb109
-#define PCIBIOS_READ_CONFIG_DWORD       0xb10a
-#define PCIBIOS_WRITE_CONFIG_BYTE       0xb10b
-#define PCIBIOS_WRITE_CONFIG_WORD       0xb10c
-#define PCIBIOS_WRITE_CONFIG_DWORD      0xb10d
 
 #define PCI_VENDOR_ID           0x00    /* 16 bits */
 #define PCI_DEVICE_ID           0x02    /* 16 bits */
@@ -238,125 +233,98 @@
 #define PCI_MSI_DATA_32		8	/* 16 bits of data for 32-bit devices */
 #define PCI_MSI_DATA_64		12	/* 16 bits of data for 64-bit devices */
 
-#define PCI_SLOT(devfn)		  ((devfn) >> 3)
-#define PCI_FUNC(devfn)           ((devfn) & 0x07)
-
-#define BIOS32_SIGNATURE        (('_' << 0) + ('3' << 8) + ('2' << 16) + ('_' << 24))
-
-/* PCI signature: "PCI " */
-#define PCI_SIGNATURE           (('P' << 0) + ('C' << 8) + ('I' << 16) + (' ' << 24))
-
-/* PCI service signature: "$PCI" */
-#define PCI_SERVICE             (('$' << 0) + ('P' << 8) + ('C' << 16) + ('I' << 24))
-
-union bios32 {
-	struct {
-		unsigned long signature;	/* _32_ */
-		unsigned long entry;		/* 32 bit physical address */
-		unsigned char revision;		/* Revision level, 0 */
-		unsigned char length;		/* Length in paragraphs should be 01 */
-		unsigned char checksum;		/* All bytes must add up to zero */
-		unsigned char reserved[5];	/* Must be zero */
-	} fields;
-	char chars[16];
-};
-
-struct pci_device;
-struct dev;
-typedef int (*pci_probe_t)(struct dev *, struct pci_device *);
-
+/*
+ * A physical PCI device
+ *
+ */
 struct pci_device {
-	uint32_t		class;
+	uint32_t		membase;	/* BAR 1 */
+	uint32_t		ioaddr;		/* first IO BAR */
 	uint16_t		vendor, dev_id;
-	const char		*name;
-	/* membase and ioaddr are silly and depricated */
-	unsigned int		membase;
-	unsigned int		ioaddr;
-	unsigned int		romaddr;
-	unsigned char		irq;
-	unsigned char		devfn;
-	unsigned char		bus;
-	unsigned char		use_specified;
-	const struct pci_driver	*driver;
+	uint16_t		class;
+	uint16_t		busdevfn;
+	uint8_t			revision;
+	uint8_t			irq;
 };
+#define PCI_BUS(busdevfn)	( ( (busdevfn) >> 8 ) & 0xff )
+#define PCI_DEV(busdevfn)	( ( (busdevfn) >> 3 ) & 0x1f )
+#define PCI_FUNC(busdevfn)      ( (busdevfn) & 0x07 )
 
-extern void scan_pci_bus(int type, struct pci_device *dev);
-extern void find_pci(int type, struct pci_device *dev);
-
-extern int pcibios_read_config_byte(unsigned int bus, unsigned int device_fn, unsigned int where, uint8_t *value);
-extern int pcibios_write_config_byte (unsigned int bus, unsigned int device_fn, unsigned int where, uint8_t value);
-extern int pcibios_read_config_word(unsigned int bus, unsigned int device_fn, unsigned int where, uint16_t *value);
-extern int pcibios_write_config_word (unsigned int bus, unsigned int device_fn, unsigned int where, uint16_t value);
-extern int pcibios_read_config_dword(unsigned int bus, unsigned int device_fn, unsigned int where, uint32_t *value);
-extern int pcibios_write_config_dword(unsigned int bus, unsigned int device_fn, unsigned int where, uint32_t value);
-extern unsigned long pcibios_bus_base(unsigned int bus);
-extern void adjust_pci_device(struct pci_device *p);
-
-
-static inline int 
-pci_read_config_byte(struct pci_device *dev, unsigned int where, uint8_t *value)
-{
-	return pcibios_read_config_byte(dev->bus, dev->devfn, where, value);
-}
-static inline int 
-pci_write_config_byte(struct pci_device *dev, unsigned int where, uint8_t value)
-{
-	return pcibios_write_config_byte(dev->bus, dev->devfn, where, value);
-}
-static inline int 
-pci_read_config_word(struct pci_device *dev, unsigned int where, uint16_t *value)
-{
-	return pcibios_read_config_word(dev->bus, dev->devfn, where, value);
-}
-static inline int 
-pci_write_config_word(struct pci_device *dev, unsigned int where, uint16_t value)
-{
-	return pcibios_write_config_word(dev->bus, dev->devfn, where, value);
-}
-static inline int 
-pci_read_config_dword(struct pci_device *dev, unsigned int where, uint32_t *value)
-{
-	return pcibios_read_config_dword(dev->bus, dev->devfn, where, value);
-}
-static inline int 
-pci_write_config_dword(struct pci_device *dev, unsigned int where, uint32_t value)
-{
-	return pcibios_write_config_dword(dev->bus, dev->devfn, where, value);
-}
-
-/* Helper functions to find the size of a pci bar */
-extern unsigned long pci_bar_start(struct pci_device *dev, unsigned int bar);
-extern unsigned long pci_bar_size(struct pci_device *dev, unsigned int bar);
-/* Helper function to find pci capabilities */
-extern int pci_find_capability(struct pci_device *dev, int cap);
+/*
+ * An individual PCI device identified by vendor and device IDs
+ *
+ */
 struct pci_id {
 	unsigned short vendor, dev_id;
 	const char *name;
 };
 
-struct dev;
-/* Most pci drivers will use this */
+/*
+ * PCI_ROM is used to build up entries in a struct pci_id array.  It
+ * is also parsed by parserom.pl to generate Makefile rules and files
+ * for rom-o-matic.
+ */
+#define PCI_ROM( rom_vendor, rom_dev_id, rom_name, rom_description ) {	\
+	.vendor = rom_vendor,						\
+	.dev_id = rom_dev_id,						\
+	.name = rom_name,						\
+}
+
+/*
+ * A PCI driver, with a device ID (struct pci_id) table and an
+ * optional class.
+ *
+ * Set the class to something other than PCI_NO_CLASS if the driver
+ * can handle an entire class of devices.
+ *
+ */
 struct pci_driver {
-	int type;
 	const char *name;
-	pci_probe_t probe;
 	struct pci_id *ids;
 	int id_count;
-
-/* On a few occasions the hardware is standardized enough that
- * we only need to know the class of the device and not the exact
- * type to drive the device correctly.  If this is the case
- * set a class value other than 0.
- */
-	unsigned short class;
+	uint16_t class;
 };
+#define PCI_NO_CLASS 0
 
-#define __pci_driver	__attribute__ ((used,__section__(".drivers.pci")))
-/* Defined by the linker... */
-extern const struct pci_driver pci_drivers[];
-extern const struct pci_driver pci_drivers_end[];
+/*
+ * Define a PCI driver.
+ *
+ */
+#define PCI_DRIVER( driver_name, pci_ids, pci_class ) {			\
+	.name = driver_name,						\
+	.ids = pci_ids,							\
+	.id_count = sizeof ( pci_ids ) / sizeof ( pci_ids[0] ),		\
+	.class = pci_class,						\
+}
 
-#define PCI_ROM(VENDOR_ID, DEVICE_ID, IMAGE, DESCRIPTION) \
-	{ VENDOR_ID, DEVICE_ID, IMAGE, }
+/*
+ * These are the functions we expect pci_io.c to provide.
+ *
+ */
+extern int pci_read_config_byte	( struct pci_device *dev, unsigned int where,
+				  uint8_t *value );
+extern int pci_write_config_byte ( struct pci_device *dev, unsigned int where,
+				   uint8_t value );
+extern int pci_read_config_word ( struct pci_device *dev, unsigned int where,
+				  uint16_t *value );
+extern int pci_write_config_word ( struct pci_device *dev, unsigned int where,
+				   uint16_t value );
+extern int pci_read_config_dword ( struct pci_device *dev, unsigned int where,
+				   uint32_t *value );
+extern int pci_write_config_dword ( struct pci_device *dev, unsigned int where,
+				    uint32_t value );
+extern unsigned long pci_bus_base ( struct pci_device *dev );
+
+/*
+ * Functions in pci.c
+ *
+ */
+extern void set_pci_device ( uint16_t busdevfn );
+extern struct pci_device * find_pci_device ( struct pci_driver *driver,
+					     struct dev *dev );
+extern unsigned long pci_bar_start ( struct pci_device *pci,
+				     unsigned int bar );
+extern unsigned long pci_bar_size ( struct pci_device *pci, unsigned int bar );
+extern int pci_find_capability ( struct pci_device *pci, int capability );
 
 #endif	/* PCI_H */
