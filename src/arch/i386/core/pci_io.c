@@ -18,8 +18,6 @@
 #include "realmode.h"
 #endif
 
-#define DEBUG_PCI_IO
-
 #undef DBG
 #ifdef DEBUG_PCI_IO
 #define DBG(...) printf ( __VA_ARGS__ )
