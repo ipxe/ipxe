@@ -87,7 +87,7 @@ static int fill_pci_device ( struct pci_device *pci ) {
  * Set device to be a busmaster in case BIOS neglected to do so.  Also
  * adjust PCI latency timer to a reasonable value, 32.
  */
-static void adjust_pci_device ( struct pci_device *pci ) {
+void adjust_pci_device ( struct pci_device *pci ) {
 	unsigned short	new_command, pci_command;
 	unsigned char	pci_latency;
 

@@ -325,6 +325,7 @@ extern unsigned long pci_bus_base ( struct pci_device *dev );
 extern struct pci_device * pci_device ( struct dev *dev );
 extern int find_pci_device ( struct pci_device *pci,
 			     struct pci_driver *driver );
+extern void adjust_pci_device ( struct pci_device *pci );
 extern unsigned long pci_bar_start ( struct pci_device *pci,
 				     unsigned int bar );
 extern unsigned long pci_bar_size ( struct pci_device *pci, unsigned int bar );
