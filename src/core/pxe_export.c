@@ -29,9 +29,9 @@
 #include "pxe.h"
 #include "pxe_export.h"
 #include "pxe_callbacks.h"
+#include "dev.h"
 #include "nic.h"
 #include "pci.h"
-#include "dev.h"
 #include "cpu.h"
 #include "timer.h"
 
@@ -121,10 +121,13 @@ pxe_stack_t *pxe_stack = NULL;
 int pxe_initialise_nic ( void ) {
 	if ( pxe_stack->state >= READY ) return 1;
 
-	/* Check if NIC is initialised.  nic.dev.disable is set to 0
+#warning "device probing mechanism has completely changed"
+#if 0
+
+	/* Check if NIC is initialised.  dev.disable is set to 0
 	 * when disable() is called, so we use this.
 	 */
-	if ( nic.dev.disable ) {
+	if ( dev.disable ) {
 		/* NIC may have been initialised independently
 		 * (e.g. when we set up the stack prior to calling the
 		 * NBP).
@@ -137,22 +140,26 @@ int pxe_initialise_nic ( void ) {
 	 * PROBE_AWAKE.  If one was specifed via PXENV_START_UNDI, try
 	 * that one first.  Otherwise, set PROBE_FIRST.
 	 */
-	if ( nic.dev.state.pci.dev.use_specified == 1 ) {
-		nic.dev.how_probe = PROBE_NEXT;
+
+	if ( dev.state.pci.dev.use_specified == 1 ) {
+		dev.how_probe = PROBE_NEXT;
 		DBG ( " initialising NIC specified via START_UNDI" );
-	} else if ( nic.dev.state.pci.dev.driver ) {
+	} else if ( dev.state.pci.dev.driver ) {
 		DBG ( " reinitialising NIC" );
-		nic.dev.how_probe = PROBE_AWAKE;
+		dev.how_probe = PROBE_AWAKE;
 	} else {
 		DBG ( " probing for any NIC" );
-		nic.dev.how_probe = PROBE_FIRST;
+		dev.how_probe = PROBE_FIRST;
 	}
-	
+
 	/* Call probe routine to bring up the NIC */
-	if ( eth_probe ( &nic.dev ) != PROBE_WORKED ) {
+	if ( eth_probe ( &dev ) != PROBE_WORKED ) {
 		DBG ( " failed" );
 		return 0;
 	}
+#endif
+	
+
 	pxe_stack->state = READY;
 	return 1;
 }
@@ -204,8 +211,6 @@ int ensure_pxe_state ( pxe_stack_state_t wanted ) {
  */
 PXENV_EXIT_t pxenv_start_undi ( t_PXENV_START_UNDI *start_undi ) {
 	unsigned char bus, devfn;
-	struct pci_probe_state *pci = &nic.dev.state.pci;
-	struct dev *dev = &nic.dev;
 
 	DBG ( "PXENV_START_UNDI" );
 	ENSURE_MIDWAY(start_undi);
@@ -220,6 +225,8 @@ PXENV_EXIT_t pxenv_start_undi ( t_PXENV_START_UNDI *start_undi ) {
 	bus = ( start_undi->ax >> 8 ) & 0xff;
 	devfn = start_undi->ax & 0xff;
 
+#warning "device probing mechanism has completely changed"
+#if 0
 	if ( ( pci->dev.driver == NULL ) ||
 	     ( pci->dev.bus != bus ) || ( pci->dev.devfn != devfn ) ) {
 		/* This is quite a bit of a hack and relies on
@@ -236,6 +243,7 @@ PXENV_EXIT_t pxenv_start_undi ( t_PXENV_START_UNDI *start_undi ) {
 		pci->dev.bus = bus;
 		pci->dev.devfn = devfn;
 	}
+#endif
 
 	start_undi->Status = PXENV_STATUS_SUCCESS;
 	return PXENV_EXIT_SUCCESS;
@@ -424,7 +432,7 @@ PXENV_EXIT_t pxenv_undi_set_station_address ( t_PXENV_UNDI_SET_STATION_ADDRESS
 	 * the current value anyway then return success, otherwise
 	 * return UNSUPPORTED.
 	 */
-	if ( memcmp ( nic.node_addr,
+	if ( memcmp ( nic->node_addr,
 		      &undi_set_station_address->StationAddress,
 		      ETH_ALEN ) == 0 ) {
 		undi_set_station_address->Status = PXENV_STATUS_SUCCESS;
@@ -456,8 +464,8 @@ PXENV_EXIT_t pxenv_undi_get_information ( t_PXENV_UNDI_GET_INFORMATION
 	DBG ( "PXENV_UNDI_GET_INFORMATION" );
 	ENSURE_READY ( undi_get_information );
 
-	undi_get_information->BaseIo = nic.ioaddr;
-	undi_get_information->IntNumber = nic.irqno;
+	undi_get_information->BaseIo = nic->ioaddr;
+	undi_get_information->IntNumber = nic->irqno;
 	/* Cheat: assume all cards can cope with this */
 	undi_get_information->MaxTranUnit = ETH_MAX_MTU;
 	/* Cheat: we only ever have Ethernet cards */
@@ -467,11 +475,12 @@ PXENV_EXIT_t pxenv_undi_get_information ( t_PXENV_UNDI_GET_INFORMATION
 	 * node address.  This is a valid assumption within Etherboot
 	 * at the time of writing.
 	 */
-	memcpy ( &undi_get_information->CurrentNodeAddress, nic.node_addr,
+	memcpy ( &undi_get_information->CurrentNodeAddress, nic->node_addr,
 		 ETH_ALEN );
-	memcpy ( &undi_get_information->PermNodeAddress, nic.node_addr,
+	memcpy ( &undi_get_information->PermNodeAddress, nic->node_addr,
 		 ETH_ALEN );
-	undi_get_information->ROMAddress = nic.rom_info->rom_segment;
+	undi_get_information->ROMAddress = 0;
+		/* nic->rom_info->rom_segment; */
 	/* We only provide the ability to receive or transmit a single
 	 * packet at a time.  This is a bootloader, not an OS.
 	 */
@@ -552,7 +561,10 @@ PXENV_EXIT_t pxenv_undi_get_mcast_address ( t_PXENV_UNDI_GET_MCAST_ADDRESS
  */
 PXENV_EXIT_t pxenv_undi_get_nic_type ( t_PXENV_UNDI_GET_NIC_TYPE
 				       *undi_get_nic_type ) {
-	struct dev *dev = &nic.dev;
+#warning "device probing mechanism has changed completely"
+
+#if 0
+	struct dev *dev = &dev;
 	
 	DBG ( "PXENV_UNDI_GET_NIC_TYPE" );
 	ENSURE_READY ( undi_get_nic_type );
@@ -594,6 +606,8 @@ PXENV_EXIT_t pxenv_undi_get_nic_type ( t_PXENV_UNDI_GET_NIC_TYPE
 	}
 	undi_get_nic_type->Status = PXENV_STATUS_SUCCESS;
 	return PXENV_EXIT_SUCCESS;
+
+#endif
 }
 
 /* PXENV_UNDI_GET_IFACE_INFO
@@ -622,7 +636,7 @@ PXENV_EXIT_t pxenv_undi_get_iface_info ( t_PXENV_UNDI_GET_IFACE_INFO
  * Status: working
  */
 PXENV_EXIT_t pxenv_undi_isr ( t_PXENV_UNDI_ISR *undi_isr ) {
-	media_header_t *media_header = (media_header_t*)nic.packet;
+	media_header_t *media_header = (media_header_t*)nic->packet;
 
 	DBG ( "PXENV_UNDI_ISR" );
 	/* We can't call ENSURE_READY, because this could be being
@@ -668,8 +682,8 @@ PXENV_EXIT_t pxenv_undi_isr ( t_PXENV_UNDI_ISR *undi_isr ) {
 		 */
 		DBG ( " PROCESS" );
 		if ( eth_poll ( 1 ) ) {
-			DBG ( " RECEIVE %d", nic.packetlen );
-			if ( nic.packetlen > sizeof(pxe_stack->packet) ) {
+			DBG ( " RECEIVE %d", nic->packetlen );
+			if ( nic->packetlen > sizeof(pxe_stack->packet) ) {
 				/* Should never happen */
 				undi_isr->FuncFlag = PXENV_UNDI_ISR_OUT_DONE;
 				undi_isr->Status =
@@ -677,10 +691,10 @@ PXENV_EXIT_t pxenv_undi_isr ( t_PXENV_UNDI_ISR *undi_isr ) {
 				return PXENV_EXIT_FAILURE;
 			}
 			undi_isr->FuncFlag = PXENV_UNDI_ISR_OUT_RECEIVE;
-			undi_isr->BufferLength = nic.packetlen;
-			undi_isr->FrameLength = nic.packetlen;
+			undi_isr->BufferLength = nic->packetlen;
+			undi_isr->FrameLength = nic->packetlen;
 			undi_isr->FrameHeaderLength = ETH_HLEN;
-			memcpy ( pxe_stack->packet, nic.packet, nic.packetlen);
+			memcpy ( pxe_stack->packet, nic->packet, nic->packetlen);
 			PTR_TO_SEGOFF16 ( pxe_stack->packet, undi_isr->Frame );
 			switch ( ntohs(media_header->nstype) ) {
 			case IP :	undi_isr->ProtType = P_IP;	break;
@@ -1011,7 +1025,7 @@ PXENV_EXIT_t pxenv_udp_read ( t_PXENV_UDP_READ *udp_read ) {
 PXENV_EXIT_t pxenv_udp_write ( t_PXENV_UDP_WRITE *udp_write ) {
 	uint16_t src_port;
 	uint16_t dst_port;
-	struct udppacket *packet = (struct udppacket *)nic.packet;
+	struct udppacket *packet = (struct udppacket *)nic->packet;
 	int packet_size;
 
 	DBG ( "PXENV_UDP_WRITE" );
