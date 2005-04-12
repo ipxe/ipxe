@@ -142,12 +142,9 @@ SECTIONS {
 	*(.data.*)
 
 	/* Various tables */
-	pci_drivers = .;
-	*(.drivers.pci)
-	pci_drivers_end = .;
-	isa_drivers = .;
-	*(.drivers.isa)
-	isa_drivers_end = .;
+	boot_drivers = .;
+	*(.boot_drivers)
+	boot_drivers_end = .;
 	console_drivers = .;
 	*(.drivers.console)
 	console_drivers_end = .;
