@@ -36,8 +36,6 @@ static void draw_byte_16(unsigned char *bits, u32 *base, u32 rb);
 #endif
 static void draw_byte_8(unsigned char *bits, u32 *base, u32 rb);
 
-static int pci_find_device_x(int vendorx, int devicex, int index, struct pci_device *dev);
-
 static u32 g_loc_X;
 static u32 g_loc_Y;
 static u32 g_max_loc_X;
@@ -408,7 +406,8 @@ static void btext_init(void)
 #if USE_FILO_PCI_FIND==0
     struct pci_device dev;
 
-    pci_find_device_x(0x1002, 0x4752, 0, &dev);
+    #warning "pci_find_device_x no longer exists; use find_pci_device instead"
+    /*    pci_find_device_x(0x1002, 0x4752, 0, &dev); */
     if(dev.vendor==0) return; // no fb
 
     frame_buffer = (uint32_t)dev.membase;
@@ -442,141 +441,7 @@ static struct console_driver btext_console __console_driver = {
 
 INIT_FN ( INIT_CONSOLE, btext_init, NULL, NULL );
 
-#if USE_FILO_PCI_FIND==0
-int pci_find_device_x(int vendorx, int devicex, int index, struct pci_device *dev)
-{                       
-        unsigned int first_bus, first_devfn;
-        unsigned int devfn, bus, buses;
-#if 1
-        unsigned char hdr_type = 0;
-#endif
-        uint16_t vendor, device;
-        uint32_t l, membase;
-#if 0
-	uint32_t ioaddr, romaddr;
-        int reg;
-#endif
 
-        first_bus    = 0;
-        first_devfn  = 0;
-#if 0
-	if(dev->vendor!=0){
-                first_bus    = dev->bus;
-                first_devfn  = dev->devfn;
-                /* Re read the header type on a restart */
-                pcibios_read_config_byte(first_bus, first_devfn & ~0x7,
-                        PCI_HEADER_TYPE, &hdr_type);
-                dev->bus     = 0;
-                dev->devfn   = 0;
-	}
-#endif
-
-        /* Scan all PCI buses, until we find our card.
-         * We could be smart only scan the required buses but that
-         * is error prone, and tricky.
-         * By scanning all possible pci buses in order we should find
-         * our card eventually. 
-         */
-        buses=256;
-        for (bus = first_bus; bus < buses; ++bus) {
-                for (devfn = first_devfn; devfn < 0xff; ++devfn) {
-#if 1
-                        if (PCI_FUNC (devfn) == 0)
-                                pcibios_read_config_byte(bus, devfn, PCI_HEADER_TYPE, &hdr_type);
-                        else if (!(hdr_type & 0x80))    /* not a multi-function device */
-                                continue;
-#endif
-                        pcibios_read_config_dword(bus, devfn, PCI_VENDOR_ID, &l);
-                        /* some broken boards return 0 if a slot is empty: */
-                        if (l == 0xffffffff || l == 0x00000000) {
-                                continue;
-                        }
-                        vendor = l & 0xffff;
-                        device = (l >> 16) & 0xffff;
-#if 0
-                        pcibios_read_config_dword(bus, devfn, PCI_REVISION, &l);
-                        class = (l >> 8) & 0xffffff;
-#endif
-
-#if  0
-                {
-                        int i;
-                        printf("%hhx:%hhx.%hhx [%hX/%hX]\n",
-                                bus, PCI_SLOT(devfn), PCI_FUNC(devfn),
-                                vendor, device);
-#if    0 
-                        for(i = 0; i < 256; i++) {
-                                unsigned char byte;
-                                if ((i & 0xf) == 0) {
-                                        printf("%hhx: ", i);
-                                }
-                                pcibios_read_config_byte(bus, devfn, i, &byte);
-                                printf("%hhx ", byte);
-                                if ((i & 0xf) == 0xf) {
-                                        printf("\n");
-                                }
-                        }
-#endif
-
-                }
-#endif
-			if(vendor != vendorx) continue;
-			
-			if(device != devicex) continue;
-
-			if(index !=0 ) {
-				index--;
-				continue;
-			}
-			
-				
-                        dev->devfn = devfn;
-                        dev->bus = bus;
-#if 0
-                        dev->class = class;
-#endif
-                        dev->vendor = vendor;
-                        dev->dev_id = device;
-
-#if 0
-                        /* Get the ROM base address */
-                        pcibios_read_config_dword(bus, devfn,
-                                PCI_ROM_ADDRESS, &romaddr);
-                        romaddr >>= 10;
-                        dev->romaddr = romaddr;
-#endif
-
-                        /* Get the ``membase'' */
-                        pcibios_read_config_dword(bus, devfn,
-                                PCI_BASE_ADDRESS_0, &membase);
-                        dev->membase = membase;
-#if 0
-                        /* Get the ``ioaddr'' */
-                        for (reg = PCI_BASE_ADDRESS_0; reg <= PCI_BASE_ADDRESS_5; reg += 4) {
-                                pcibios_read_config_dword(bus, devfn, reg, &ioaddr);
-                                if ((ioaddr & PCI_BASE_ADDRESS_IO_MASK) == 0 || (ioaddr & PCI_BASE_ADDRESS_SPACE_IO) == 0)
-                                        continue;
-
-
-                                /* Strip the I/O address out of the returned value */
-                                ioaddr &= PCI_BASE_ADDRESS_IO_MASK;
-
-                                /* Take the first one or the one that matches in boot ROM address */
-                                dev->ioaddr = ioaddr;
-                        }
-#endif
-#if 0
-                        printf("Found %s ROM address %#hx\n",
-                                dev->name, romaddr);
-#endif
-                        return 1;
-                }
-                first_devfn = 0;
-        }
-        first_bus = 0;
-	return 0;
-}
-#endif
 //come from linux/drivers/video/font-8x16.c
 /**********************************************/
 /*                                            */
