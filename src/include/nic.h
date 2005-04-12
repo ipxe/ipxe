@@ -79,4 +79,7 @@ static inline void eth_disable ( void ) {
 	nic->nic_op->disable ( nic );
 }
 
+/* dev.h needs declarations from nic.h */
+#include "dev.h"
+
 #endif	/* NIC_H */
