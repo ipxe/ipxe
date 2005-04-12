@@ -8,10 +8,6 @@
 #ifndef	NIC_H
 #define NIC_H
 
-/* to get global "dev" */
-struct dev;
-#include "main.h"
-
 typedef enum {
 	DISABLE = 0,
 	ENABLE,
@@ -46,6 +42,7 @@ struct nic_operations {
  * Function prototypes
  *
  */
+struct dev;
 extern struct nic * nic_device ( struct dev * dev );
 
 /*
@@ -81,5 +78,7 @@ static inline void eth_disable ( void ) {
 
 /* dev.h needs declarations from nic.h */
 #include "dev.h"
+/* to get global "dev" */
+#include "main.h"
 
 #endif	/* NIC_H */
