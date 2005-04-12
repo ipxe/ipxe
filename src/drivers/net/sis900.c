@@ -118,14 +118,10 @@ static struct pci_id   pci_isa_bridge_list[] = {
 		"SIS 85C503/5513 PCI to ISA bridge"},
 };
 
-static struct pci_driver sis_bridge_driver __pci_driver = {
-	.type     = BRIDGE_DRIVER,
-	.name     = "",
-	.probe    = 0,
-	.ids      = pci_isa_bridge_list,
-	.id_count = sizeof(pci_isa_bridge_list)/sizeof(pci_isa_bridge_list[0]),
-	.class    = 0,
-};
+
+
+static struct pci_driver sis_bridge_driver =
+	PCI_DRIVER ( "sis_bridge", pci_isa_bridge_list, PCI_NO_CLASS );
 
 /* Function Prototypes */
 
@@ -241,27 +237,22 @@ static int sis630e_get_mac_addr(struct pci_device * pci_dev __unused, struct nic
 {
 	u8 reg;
 	int i;
-	struct pci_device	p[1];
+	struct pci_device	isa_bridge;
 
 	/* find PCI to ISA bridge */
-	memset(p, 0, sizeof(p));
-	do {
-		find_pci(BRIDGE_DRIVER, p);
-	} while(p->driver && p->driver != &sis_bridge_driver);
-
-	/* error on failure */
-	if (!p->driver)
+	memset(&isa_bridge, 0, sizeof(isa_bridge));
+	if ( ! find_pci_device ( &isa_bridge, &sis_bridge_driver ) )
 	    return 0;
 
-	pcibios_read_config_byte(p->bus,p->devfn, 0x48, &reg);
-	pcibios_write_config_byte(p->bus,p->devfn, 0x48, reg | 0x40);
+	pci_read_config_byte(&isa_bridge, 0x48, &reg);
+	pci_write_config_byte(&isa_bridge, 0x48, reg | 0x40);
 
 	for (i = 0; i < ETH_ALEN; i++)
 	{
 		outb(0x09 + i, 0x70);
 		((u8 *)(nic->node_addr))[i] = inb(0x71);
 	}
-	pcibios_write_config_byte(p->bus,p->devfn, 0x48, reg & ~0x40);
+	pci_write_config_byte(&isa_bridge, 0x48, reg & ~0x40);
 
 	return 1;
 }
@@ -335,13 +326,13 @@ static int sis900_probe(struct dev *dev, struct pci_device *pci)
     dev_id  = pci->dev_id;
 
     /* wakeup chip */
-    pcibios_write_config_dword(pci->bus, pci->devfn, 0x40, 0x00000000);
+    pci_write_config_dword(pci, 0x40, 0x00000000);
 
     adjust_pci_device(pci);
 
     /* get MAC address */
     ret = 0;
-    pcibios_read_config_byte(pci->bus,pci->devfn, PCI_REVISION, &revision);
+    pci_read_config_byte(pci, PCI_REVISION, &revision);
     
     /* save for use later in sis900_reset() */
     pci_revision = revision; 
@@ -424,6 +415,8 @@ static int sis900_probe(struct dev *dev, struct pci_device *pci)
 
     return 1;
 }
+
+
 
 
 /* 
