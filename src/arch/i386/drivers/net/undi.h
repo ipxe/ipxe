@@ -167,7 +167,7 @@ typedef struct undi {
 	uint8_t opened;		/* pxenv_undi_open() has been called */
 	/* Parameters that we need to store for future reference
 	 */
-	struct pci_device	pci;
+	struct pci_device	*pci;
 	irq_t			irq;
 } undi_t;
 
