@@ -61,7 +61,6 @@ static undi_t undi = {
 	.started          = 0, 
 	.initialized      = 0, 
 	.opened           = 0,
-	.pci	          = { 0, 0, 0, NULL, 0, 0, 0, 0, 0, 0, 0, NULL },
 	.irq              = IRQ_NONE 
 };
 
@@ -302,7 +301,7 @@ static int hunt_rom ( void ) {
 	/* If we are not a PCI device, we cannot search for a ROM that
 	 * matches us (?)
 	 */
-	if ( ! undi.pci.vendor )
+	if ( ! undi.pci->vendor )
 		return 0;
 
 	printf ( "Hunting for ROMs..." );
@@ -327,11 +326,11 @@ static int hunt_rom ( void ) {
 			}
 			printf ( "PCI:%hx:%hx...", pcir_header->vendor_id,
 				 pcir_header->device_id );
-			if ( ( pcir_header->vendor_id != undi.pci.vendor ) ||
-			     ( pcir_header->device_id != undi.pci.dev_id ) ) {
+			if ( ( pcir_header->vendor_id != undi.pci->vendor ) ||
+			     ( pcir_header->device_id != undi.pci->dev_id ) ) {
 				printf ( "not me (%hx:%hx)\n...",
-					 undi.pci.vendor,
-					 undi.pci.dev_id );
+					 undi.pci->vendor,
+					 undi.pci->dev_id );
 				continue;
 			}
 			if ( undi.rom->pnp_off == 0 ) {
@@ -661,13 +660,13 @@ static void nontrivial_irq_debug ( irq_t irq ) {
 static int undi_loader ( void ) {
 	pxe_t *pxe = NULL;
 
-	if ( ! undi.pci.vendor ) {
+	if ( ! undi.pci->vendor ) {
 		printf ( "ERROR: attempted to call loader of an ISA ROM?\n" );
 		return 0;
 	}
 
 	/* AX contains PCI bus:devfn (PCI specification) */
-	undi.pxs->loader.ax = ( undi.pci.bus << 8 ) | undi.pci.devfn;
+	undi.pxs->loader.ax = ( undi.pci->busdevfn );
 	/* BX and DX set to 0xffff for non-ISAPnP devices
 	 * (BIOS boot specification)
 	 */
@@ -735,7 +734,7 @@ static int eb_pxenv_start_undi ( void ) {
 	int success = 0;
 
 	/* AX contains PCI bus:devfn (PCI specification) */
-	undi.pxs->start_undi.ax = ( undi.pci.bus << 8 ) | undi.pci.devfn;
+	undi.pxs->start_undi.ax = undi.pci->busdevfn;
 
 	/* BX and DX set to 0xffff for non-ISAPnP devices
 	 * (BIOS boot specification)
@@ -1331,7 +1330,7 @@ static void undi_transmit(
 /**************************************************************************
 DISABLE - Turn off ethernet interface
 ***************************************************************************/
-static void undi_disable ( struct dev *dev __unused ) {
+static void undi_disable ( struct nic *nic __unused ) {
 	undi_full_shutdown();
 	free_base_mem_data();
 }
@@ -1364,22 +1363,44 @@ static int hunt_pixies_and_undi_roms ( void ) {
 	return 0;
 }
 
+/* UNDI driver states that it is suitable for any PCI NIC (i.e. any
+ * PCI device of class PCI_CLASS_NETWORK_ETHERNET).  If there are any
+ * obscure UNDI NICs that have the incorrect PCI class, add them to
+ * this list.
+ */
+static struct pci_id undi_nics[] = {
+	PCI_ROM ( 0x0000, 0x0000, "undi", "UNDI driver support" ),
+};
+
+static struct pci_driver undi_driver =
+	PCI_DRIVER ( "UNDI", undi_nics, PCI_CLASS_NETWORK_ETHERNET );
+
+static struct nic_operations undi_operations = {
+	.connect = dummy_connect,
+	.poll = undi_poll,
+	.transmit = undi_transmit,
+	.irq = dummy_irq,
+	.disable = undi_disable,
+};
+
 /* The actual Etherboot probe routine.
  */
 
-static int undi_probe(struct dev *dev, struct pci_device *pci)
-{
-	struct nic *nic = (struct nic *)dev;
+static int undi_probe ( struct dev *dev ) {
+	struct nic *nic = nic_device ( dev );
+	struct pci_device *pci = pci_device ( dev );
 
 	/* Zero out global undi structure */
 	memset ( &undi, 0, sizeof(undi) );
 
+	/* Scan PCI bus for a suitable device */
+	if ( ! find_pci_device ( pci, &undi_driver ) )
+		return 0;
+
 	/* Store PCI parameters; we will need them to initialize the
 	 * UNDI driver later.  If not a PCI device, leave as 0.
 	 */
-	if ( pci ) {
-		memcpy ( &undi.pci, pci, sizeof(undi.pci) );
-	}
+	undi.pci = pci;
 
 	/* Find the BIOS' $PnP structure */
 	if ( ! hunt_pnp_bios() ) {
@@ -1425,44 +1446,14 @@ static int undi_probe(struct dev *dev, struct pci_device *pci)
 		printf ( "NDIS type %s interface at %d Mbps\n",
 			 undi.pxs->undi_get_iface_info.IfaceType,
 			 undi.pxs->undi_get_iface_info.LinkSpeed / 1000000 );
-		dev->disable  = undi_disable;
-		nic->poll     = undi_poll;
-		nic->transmit = undi_transmit;
+
+		nic->nic_op = &undi_operations;
 		return 1;
 	}
-	undi_disable ( dev ); /* To free base memory structures */
+	undi_disable ( nic ); /* To free base memory structures */
 	return 0;
 }
 
-static int undi_isa_probe ( struct dev *dev,
-			    unsigned short *probe_addrs __unused ) {
-	return undi_probe ( dev, NULL );
-}
-
-
-/* UNDI driver states that it is suitable for any PCI NIC (i.e. any
- * PCI device of class PCI_CLASS_NETWORK_ETHERNET).  If there are any
- * obscure UNDI NICs that have the incorrect PCI class, add them to
- * this list.
- */
-static struct pci_id undi_nics[] = {
-	PCI_ROM(0x0000, 0x0000, "undi", "UNDI driver support"),
-};
-
-static struct pci_driver undi_driver __pci_driver = {
-	.type     = NIC_DRIVER,
-	.name     = "UNDI",
-	.probe    = undi_probe,
-	.ids      = undi_nics,
- 	.id_count = sizeof(undi_nics)/sizeof(undi_nics[0]),
-	.class    = PCI_CLASS_NETWORK_ETHERNET,
-};
-
-static struct isa_driver undi_isa_driver __isa_driver = {
-	.type     = NIC_DRIVER,
-	.name     = "UNDI",
-	.probe    = undi_isa_probe,
-	.ioaddrs  = 0,
-};
+BOOT_DRIVER ( "UNDI", undi_probe );
 
 #endif /* PCBIOS */
