@@ -176,10 +176,10 @@ INIT_FN ( INIT_PCIBIOS, find_pcibios16, NULL, NULL );
 		uint32_t discard_b, discard_D;				\
 		uint16_t ret;						\
 									\
-		REAL_EXEC ( __FUNCTION__ ,			\
+		REAL_EXEC ( 999, /* need a local label */		\
 			    "int $0x1a\n\t"				\
 			    "jc 1f\n\t"					\
-			    "xorl %%eax, %%eax\n\t"			\
+			    "xorw %%ax, %%ax\n\t"			\
 			    "\n1:\n\t",					\
 			    5,						\
 			    OUT_CONSTRAINTS ( "=a" ( ret ),		\
@@ -191,7 +191,7 @@ INIT_FN ( INIT_PCIBIOS, find_pcibios16, NULL, NULL );
 					     "b" ( pci->busdevfn ),	\
 					     "c" ( value ),		\
 			    		     "D" ( where ) ),		\
-			    CLOBBER ( "edx", "ebp" ) );			\
+			    CLOBBER ( "edx", "esi", "ebp" ) );		\
 									\
 		( ret >> 8 );						\
 	} )
