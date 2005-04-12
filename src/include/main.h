@@ -3,8 +3,9 @@
 
 #include "dev.h"
 
-extern int main ( void );
-
 extern struct dev dev;
+
+extern int main ( void );
+extern void set_pci_device ( uint16_t busdevfn );
 
 #endif /* MAIN_H */

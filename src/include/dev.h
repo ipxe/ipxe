@@ -3,6 +3,7 @@
 
 #include "stdint.h"
 #include "nic.h"
+#include "pci.h"
 
 /* Need to check the packing of this struct if Etherboot is ported */
 struct dev_id {
@@ -17,9 +18,13 @@ struct dev_id {
 #define	DEV_ID_SIZE	8
 
 struct dev {
+	struct dev_operations *dev_op;
 	const char *name;
 	struct dev_id	devid;	/* device ID string (sent to DHCP server) */
-	struct dev_operations *dev_op;
+	/* All possible bus types */
+	union {
+		struct pci_device pci;
+	};
 	/* All possible device types */
 	union {
 		struct nic	nic;

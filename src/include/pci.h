@@ -237,7 +237,9 @@
  * A physical PCI device
  *
  */
+struct dev;
 struct pci_device {
+	struct dev *		dev;
 	uint32_t		membase;	/* BAR 1 */
 	uint32_t		ioaddr;		/* first IO BAR */
 	uint16_t		vendor, dev_id;
@@ -245,6 +247,7 @@ struct pci_device {
 	uint16_t		busdevfn;
 	uint8_t			revision;
 	uint8_t			irq;
+	uint8_t			already_tried;
 };
 #define PCI_BUS(busdevfn)	( ( (busdevfn) >> 8 ) & 0xff )
 #define PCI_DEV(busdevfn)	( ( (busdevfn) >> 3 ) & 0x1f )
@@ -319,9 +322,9 @@ extern unsigned long pci_bus_base ( struct pci_device *dev );
  * Functions in pci.c
  *
  */
-extern void set_pci_device ( uint16_t busdevfn );
-extern struct pci_device * find_pci_device ( struct pci_driver *driver,
-					     struct dev *dev );
+extern struct pci_device * pci_device ( struct dev *dev );
+extern int find_pci_device ( struct pci_device *pci,
+			     struct pci_driver *driver );
 extern unsigned long pci_bar_start ( struct pci_device *pci,
 				     unsigned int bar );
 extern unsigned long pci_bar_size ( struct pci_device *pci, unsigned int bar );

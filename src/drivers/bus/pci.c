@@ -11,9 +11,6 @@
 #define DBG(...)
 #endif
 
-static struct pci_device current;
-static char used_current;
-
 /*
  * Fill in parameters (vendor & device ids, class, membase etc.) for a
  * PCI device based on bus & devfn.
@@ -114,77 +111,76 @@ static void adjust_pci_device ( struct pci_device *pci ) {
 }
 
 /*
- * Set PCI device to use.
+ * Obtain a struct pci * from a struct dev *
  *
- * This routine can be called by e.g. the ROM prefix to specify that
- * the first device to be tried should be the device on which the ROM
- * was physically located.
- *
+ * If dev has not previously been used for a PCI device scan, blank
+ * out dev.pci
  */
-void set_pci_device ( uint16_t busdevfn ) {
-	current.busdevfn = busdevfn;
-	used_current = 0;
+struct pci_device * pci_device ( struct dev *dev ) {
+	struct pci_device *pci = &dev->pci;
+
+	if ( dev->devid.bus_type != PCI_BUS_TYPE ) {
+		memset ( pci, 0, sizeof ( *pci ) );
+	}
+	pci->dev = dev;
+	return pci;
 }
 
 /*
  * Find a PCI device matching the specified driver
  *
- * If "dev" is non-NULL, the struct dev will be filled in with any
- * relevant information.
- *
  */
-struct pci_device * find_pci_device ( struct pci_driver *driver,
-				      struct dev *dev ) {
+int find_pci_device ( struct pci_device *pci,
+		      struct pci_driver *driver ) {
 	int i;
 
 	/* Iterate through all possible PCI bus:dev.fn combinations,
 	 * starting where we left off.
 	 */
-	for ( ; current.busdevfn <= 0xffff ; current.busdevfn++ ) {
+	for ( ; pci->busdevfn <= 0xffff ; pci->busdevfn++ ) {
 		/* If we've already used this device, skip it */
-		if ( used_current ) {
-			used_current = 0;
+		if ( pci->already_tried ) {
+			pci->already_tried = 0;
 			continue;
 		}
 		
 		/* Fill in device parameters, if device present */
-		if ( ! fill_pci_device ( &current ) ) {
+		if ( ! fill_pci_device ( pci ) ) {
 			continue;
 		}
 		
 		/* Fix up PCI device */
-		adjust_pci_device ( &current );
+		adjust_pci_device ( pci );
 		
 		/* Fill in dev structure, if present */
-		if ( dev ) {
-			dev->name = driver->name;
-			dev->devid.vendor_id = current.vendor;
-			dev->devid.device_id = current.dev_id;
-			dev->devid.bus_type = PCI_BUS_TYPE;
+		if ( pci->dev ) {
+			pci->dev->name = driver->name;
+			pci->dev->devid.vendor_id = pci->vendor;
+			pci->dev->devid.device_id = pci->dev_id;
 		}
 
 		/* If driver has a class, and class matches, use it */
 		if ( driver->class && 
-		     ( driver->class == current.class ) ) {
+		     ( driver->class == pci->class ) ) {
 			DBG ( "Driver %s matches class %hx\n",
 			      driver->name, driver->class );
-			used_current = 1;
-			return &current;
+			pci->already_tried = 1;
+			return 1;
 		}
 		
 		/* If any of driver's IDs match, use it */
 		for ( i = 0 ; i < driver->id_count; i++ ) {
 			struct pci_id *id = &driver->ids[i];
 			
-			if ( ( current.vendor == id->vendor ) &&
-			     ( current.dev_id == id->dev_id ) ) {
+			if ( ( pci->vendor == id->vendor ) &&
+			     ( pci->dev_id == id->dev_id ) ) {
 				DBG ( "Device %s (driver %s) matches "
 				      "ID %hx:%hx\n", id->name, driver->name,
 				      id->vendor, id->dev_id );
-				if ( dev )
-					dev->name = id->name;
-				used_current = 1;
-				return &current;
+				if ( pci->dev )
+					pci->dev->name = id->name;
+				pci->already_tried = 1;
+				return 1;
 			}
 		}
 
@@ -192,8 +188,7 @@ struct pci_device * find_pci_device ( struct pci_driver *driver,
 	}
 
 	/* No device found */
-	memset ( &current, 0, sizeof ( current ) );
-	return NULL;
+	return 0;
 }
 
 /*
