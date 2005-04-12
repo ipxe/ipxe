@@ -41,6 +41,8 @@ int freebsd_howto = 0;
 char freebsd_kernel_env[FREEBSD_KERNEL_ENV_SIZE];
 #endif
 
+#if 0
+
 static inline unsigned long ask_boot(unsigned *index)
 {
 	unsigned long order = DEFAULT_BOOT_ORDER;
@@ -131,12 +133,18 @@ operations[] = {
 	{ &disk.dev, disk_probe, disk_load_configuration, disk_load },
 };
 
+#endif
+
+
 
 static int main_loop(int state);
 static int exit_ok;
 static int exit_status;
 static int initialized;
 
+
+/* Global instance of the current boot device */
+struct dev dev;
 
 /**************************************************************************
  * initialise() - perform any C-level initialisation
@@ -150,8 +158,7 @@ void initialise ( void ) {
 	/* Zero the BSS */
 	memset ( _bss, 0, _ebss - _bss );
 
-	/* Call all registered initialisation functions.
-	 */
+	/* Call all registered initialisation functions */
 	call_init_fns ();
 }
 
@@ -159,28 +166,34 @@ void initialise ( void ) {
 MAIN - Kick off routine
 **************************************************************************/
 int main ( void ) {
-	int state;
 
+	/* Print out configuration */
 	print_config();
-	cleanup();
 
-	/* -1:	timeout or ESC
-	   -2:	error return from loader
-	   -3:  finish the current run.
-	   0:	retry booting bootp and tftp
-	   1:   retry tftp with possibly modified bootp reply
-	   2:   retry bootp and tftp
-	   3:   retry probe bootp and tftp
-	   4:   start with the next device and retry from there...
-	   255: exit Etherboot
-	   256: retry after relocation
-	*/
-	state = setjmp(restart_etherboot);
-	exit_ok = 1;
-	for(;state != 255;) {
-		state = main_loop(state);
+	/*
+	 * Trivial main loop: we need to think about how we want to
+	 * prompt the user etc.
+	 *
+	 */
+	for ( ; ; disable ( &dev ), call_reset_fns() ) {
+	
+		/* Get next boot device */
+		if ( ! probe ( &dev ) ) {
+			/* Reached end of device list */
+			continue;
+		}
+		
+		/* Load configuration (e.g. DHCP) */
+		if ( ! load_configuration ( &dev ) ) {
+			/* DHCP failed */
+			continue;
+		}
+
+		/* Load image */
+		if ( ! load ( &dev ) )
+			/* Load failed */
+			continue;
 	}
-	/* arch_on_exit(exit_status) */
 
 	/* Call registered per-object exit functions */
 	call_exit_fns ();
@@ -195,6 +208,9 @@ void exit(int status)
 	exit_status = status;
 	longjmp(restart_etherboot, 255);
 }
+
+
+#if 0
 
 static int main_loop(int state)
 {
@@ -329,6 +345,9 @@ static int main_loop(int state)
 	}
 	return state;
 }
+
+
+#endif
 
 
 /**************************************************************************
