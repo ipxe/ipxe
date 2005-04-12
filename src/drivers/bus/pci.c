@@ -1,5 +1,8 @@
 #include "etherboot.h"
+#include "dev.h"
 #include "pci.h"
+
+#define DEBUG_PCI
 
 #undef DBG
 #ifdef DEBUG_PCI
@@ -34,17 +37,24 @@ static int fill_pci_device ( struct pci_device *pci ) {
 	/* Check that we're not a duplicate function on a
 	 * non-multifunction device.
 	 */
-	if ( PCI_FUNC ( pci->devfn ) != 0 ) {
+	if ( PCI_FUNC ( pci->busdevfn ) != 0 ) {
+		uint16_t save_busdevfn = pci->busdevfn;
 		uint8_t header_type;
+
+		pci->busdevfn &= ~PCI_FUNC ( 0xffff );
 		pci_read_config_byte ( pci, PCI_HEADER_TYPE, &header_type );
+		pci->busdevfn = save_busdevfn;
+
 		if ( ! ( header_type & 0x80 ) ) {
 			return 0;
 		}
 	}
 	
 	/* Get device class */
-	pci_read_config_dword ( pci, PCI_REVISION, &l );
-	pci->class = ( l >> 8 ) & 0xffffff;
+	pci_read_config_word ( pci, PCI_SUBCLASS_CODE, &pci->class );
+
+	/* Get revision */
+	pci_read_config_byte ( pci, PCI_REVISION, &pci->revision );
 
 	/* Get the "membase" */
 	pci_read_config_dword ( pci, PCI_BASE_ADDRESS_1, &pci->membase );
@@ -68,7 +78,39 @@ static int fill_pci_device ( struct pci_device *pci ) {
 		pci_read_config_byte ( pci, PCI_INTERRUPT_LINE, &pci->irq );
 	}
 
+	DBG ( "%hhx:%hhx.%d Class %hx: %hx:%hx (rev %hhx)\n",
+	      PCI_BUS ( pci->busdevfn ), PCI_DEV ( pci->busdevfn ),
+	      PCI_FUNC ( pci->busdevfn ), pci->class, pci->vendor, pci->dev_id,
+	      pci->revision );
+
 	return 1;
+}
+
+/*
+ * Set device to be a busmaster in case BIOS neglected to do so.  Also
+ * adjust PCI latency timer to a reasonable value, 32.
+ */
+static void adjust_pci_device ( struct pci_device *pci ) {
+	unsigned short	new_command, pci_command;
+	unsigned char	pci_latency;
+
+	pci_read_config_word ( pci, PCI_COMMAND, &pci_command );
+	new_command = pci_command | PCI_COMMAND_MASTER | PCI_COMMAND_IO;
+	if ( pci_command != new_command ) {
+		DBG ( "%hhx:%hhx.%d : PCI BIOS has not enabled this device! "
+		      "Updating PCI command %hX->%hX\n",
+		      PCI_BUS ( pci->busdevfn ), PCI_DEV ( pci->busdevfn ),
+		      PCI_FUNC ( pci->busdevfn ), pci_command, new_command );
+		pci_write_config_word ( pci, PCI_COMMAND, new_command );
+	}
+	pci_read_config_byte ( pci, PCI_LATENCY_TIMER, &pci_latency);
+	if ( pci_latency < 32 ) {
+		DBG ( "%hhx:%hhx.%d : PCI latency timer (CFLT) "
+		      "is unreasonably low at %d. Setting to 32 clocks.\n",
+		      PCI_BUS ( pci->busdevfn ), PCI_DEV ( pci->busdevfn ),
+		      PCI_FUNC ( pci->busdevfn ), pci_latency );
+		pci_write_config_byte ( pci, PCI_LATENCY_TIMER, 32);
+	}
 }
 
 /*
@@ -79,101 +121,96 @@ static int fill_pci_device ( struct pci_device *pci ) {
  * was physically located.
  *
  */
-void set_pci_device ( uint8_t bus, uint8_t devfn ) {
-	current.bus = bus;
-	current.devfn = devfn;
+void set_pci_device ( uint16_t busdevfn ) {
+	current.busdevfn = busdevfn;
 	used_current = 0;
 }
 
 /*
  * Find a PCI device matching the specified driver
  *
+ * If "dev" is non-NULL, the struct dev will be filled in with any
+ * relevant information.
+ *
  */
-struct pci_device * find_pci_device ( struct pci_driver *driver ) {
+struct pci_device * find_pci_device ( struct pci_driver *driver,
+				      struct dev *dev ) {
 	int i;
 
 	/* Iterate through all possible PCI bus:dev.fn combinations,
 	 * starting where we left off.
 	 */
-	for ( ; current.bus <= 0xff ; current.bus++ ) {
-		for ( ; current.devfn <= 0xff ; current.devfn++ ) {
+	for ( ; current.busdevfn <= 0xffff ; current.busdevfn++ ) {
+		/* If we've already used this device, skip it */
+		if ( used_current ) {
+			used_current = 0;
+			continue;
+		}
+		
+		/* Fill in device parameters, if device present */
+		if ( ! fill_pci_device ( &current ) ) {
+			continue;
+		}
+		
+		/* Fix up PCI device */
+		adjust_pci_device ( &current );
+		
+		/* Fill in dev structure, if present */
+		if ( dev ) {
+			dev->name = driver->name;
+			dev->devid.vendor_id = current.vendor;
+			dev->devid.device_id = current.dev_id;
+			dev->devid.bus_type = PCI_BUS_TYPE;
+		}
 
-			/* If we've already used this device, skip it */
-			if ( used_current ) {
-				used_current = 0;
-				continue;
-			}
-
-			/* Fill in device parameters, if device present */
-			if ( ! fill_pci_device ( &current ) ) {
-				continue;
-			}
-
-			/* If driver has a class, and class matches, use it */
-			if ( driver->class && 
-			     ( driver->class == current.class ) ) {
-				current.name = driver->name;
+		/* If driver has a class, and class matches, use it */
+		if ( driver->class && 
+		     ( driver->class == current.class ) ) {
+			DBG ( "Driver %s matches class %hx\n",
+			      driver->name, driver->class );
+			used_current = 1;
+			return &current;
+		}
+		
+		/* If any of driver's IDs match, use it */
+		for ( i = 0 ; i < driver->id_count; i++ ) {
+			struct pci_id *id = &driver->ids[i];
+			
+			if ( ( current.vendor == id->vendor ) &&
+			     ( current.dev_id == id->dev_id ) ) {
+				DBG ( "Device %s (driver %s) matches "
+				      "ID %hx:%hx\n", id->name, driver->name,
+				      id->vendor, id->dev_id );
+				if ( dev )
+					dev->name = id->name;
 				used_current = 1;
 				return &current;
 			}
-
-			/* If any of driver's IDs match, use it */
-			for ( i = 0 ; i < driver->id_count; i++ ) {
-				struct pci_id *id = &driver->ids[i];
-
-				if ( ( current.vendor == id->vendor ) &&
-				     ( current.dev_id == id->dev_id ) ) {
-					current.name = id->name;
-					used_current = 1;
-					return &current;
-				}
-			}
 		}
+
+		DBG ( "No match in driver %s\n", driver->name );
 	}
+
 	/* No device found */
 	memset ( &current, 0, sizeof ( current ) );
 	return NULL;
 }
 
 /*
- * Set device to be a busmaster in case BIOS neglected to do so.  Also
- * adjust PCI latency timer to a reasonable value, 32.
- */
-void adjust_pci_device ( struct pci_device *dev ) {
-	unsigned short	new_command, pci_command;
-	unsigned char	pci_latency;
-
-	pci_read_config_word ( dev, PCI_COMMAND, &pci_command );
-	new_command = pci_command | PCI_COMMAND_MASTER | PCI_COMMAND_IO;
-	if ( pci_command != new_command ) {
-		DBG ( "The PCI BIOS has not enabled this device!\n"
-		      "Updating PCI command %hX->%hX. bus %hhX dev_fn %hhX\n",
-		      pci_command, new_command, p->bus, p->devfn );
-		pci_write_config_word ( dev, PCI_COMMAND, new_command );
-	}
-	pci_read_config_byte ( dev, PCI_LATENCY_TIMER, &pci_latency);
-	if ( pci_latency < 32 ) {
-		DBG ( "PCI latency timer (CFLT) is unreasonably low at %d. "
-		      "Setting to 32 clocks.\n", pci_latency );
-		pci_write_config_byte ( dev, PCI_LATENCY_TIMER, 32);
-	}
-}
-
-/*
  * Find the start of a pci resource.
  */
-unsigned long pci_bar_start ( struct pci_device *dev, unsigned int index ) {
+unsigned long pci_bar_start ( struct pci_device *pci, unsigned int index ) {
 	uint32_t lo, hi;
 	unsigned long bar;
 
-	pci_read_config_dword ( dev, index, &lo );
+	pci_read_config_dword ( pci, index, &lo );
 	if ( lo & PCI_BASE_ADDRESS_SPACE_IO ) {
 		bar = lo & PCI_BASE_ADDRESS_IO_MASK;
 	} else {
 		bar = 0;
 		if ( ( lo & PCI_BASE_ADDRESS_MEM_TYPE_MASK ) ==
 		     PCI_BASE_ADDRESS_MEM_TYPE_64) {
-			pci_read_config_dword ( dev, index + 4, &hi );
+			pci_read_config_dword ( pci, index + 4, &hi );
 			if ( hi ) {
 #if ULONG_MAX > 0xffffffff
 					bar = hi;
@@ -186,22 +223,22 @@ unsigned long pci_bar_start ( struct pci_device *dev, unsigned int index ) {
 		}
 		bar |= lo & PCI_BASE_ADDRESS_MEM_MASK;
 	}
-	return bar + pcibios_bus_base ( dev->bus );
+	return bar + pci_bus_base ( pci );
 }
 
 /*
  * Find the size of a pci resource.
  */
-unsigned long pci_bar_size ( struct pci_device *dev, unsigned int bar ) {
+unsigned long pci_bar_size ( struct pci_device *pci, unsigned int bar ) {
 	uint32_t start, size;
 
 	/* Save the original bar */
-	pci_read_config_dword ( dev, bar, &start );
+	pci_read_config_dword ( pci, bar, &start );
 	/* Compute which bits can be set */
-	pci_write_config_dword ( dev, bar, ~0 );
-	pci_read_config_dword ( dev, bar, &size );
+	pci_write_config_dword ( pci, bar, ~0 );
+	pci_read_config_dword ( pci, bar, &size );
 	/* Restore the original size */
-	pci_write_config_dword ( dev, bar, start );
+	pci_write_config_dword ( pci, bar, start );
 	/* Find the significant bits */
 	if ( start & PCI_BASE_ADDRESS_SPACE_IO ) {
 		size &= PCI_BASE_ADDRESS_IO_MASK;
@@ -215,7 +252,7 @@ unsigned long pci_bar_size ( struct pci_device *dev, unsigned int bar ) {
 
 /**
  * pci_find_capability - query for devices' capabilities 
- * @dev: PCI device to query
+ * @pci: PCI device to query
  * @cap: capability code
  *
  * Tell if a device supports a given PCI capability.
@@ -235,36 +272,36 @@ unsigned long pci_bar_size ( struct pci_device *dev, unsigned int bar ) {
  *
  *  %PCI_CAP_ID_CHSWP        CompactPCI HotSwap 
  */
-int pci_find_capability ( struct pci_device *dev, int cap ) {
+int pci_find_capability ( struct pci_device *pci, int cap ) {
 	uint16_t status;
 	uint8_t pos, id;
 	uint8_t hdr_type;
 	int ttl = 48;
 
-	pci_read_config_word ( dev, PCI_STATUS, &status );
+	pci_read_config_word ( pci, PCI_STATUS, &status );
 	if ( ! ( status & PCI_STATUS_CAP_LIST ) )
 		return 0;
 
-	pci_read_config_byte ( dev, PCI_HEADER_TYPE, &hdr_type );
+	pci_read_config_byte ( pci, PCI_HEADER_TYPE, &hdr_type );
 	switch ( hdr_type & 0x7F ) {
 	case PCI_HEADER_TYPE_NORMAL:
 	case PCI_HEADER_TYPE_BRIDGE:
 	default:
-		pci_read_config_byte ( dev, PCI_CAPABILITY_LIST, &pos );
+		pci_read_config_byte ( pci, PCI_CAPABILITY_LIST, &pos );
 		break;
 	case PCI_HEADER_TYPE_CARDBUS:
-		pci_read_config_byte ( dev, PCI_CB_CAPABILITY_LIST, &pos );
+		pci_read_config_byte ( pci, PCI_CB_CAPABILITY_LIST, &pos );
 		break;
 	}
 	while ( ttl-- && pos >= 0x40 ) {
 		pos &= ~3;
-		pci_read_config_byte ( dev, pos + PCI_CAP_LIST_ID, &id );
+		pci_read_config_byte ( pci, pos + PCI_CAP_LIST_ID, &id );
 		DBG ( "Capability: %d\n", id );
 		if ( id == 0xff )
 			break;
 		if ( id == cap )
 			return pos;
-		pci_read_config_byte ( dev, pos + PCI_CAP_LIST_NEXT, &pos );
+		pci_read_config_byte ( pci, pos + PCI_CAP_LIST_NEXT, &pos );
 	}
 	return 0;
 }
