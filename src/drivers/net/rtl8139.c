@@ -511,9 +511,7 @@ static void rtl_irq(struct nic *nic, irq_action_t action)
 	}
 }
 
-static void rtl_disable(struct dev *dev)
-{
-	struct nic *nic = (struct nic *)dev;
+static void rtl_disable ( struct nic *nic ) {
 	/* merge reset and disable */
 	rtl_reset(nic);
 

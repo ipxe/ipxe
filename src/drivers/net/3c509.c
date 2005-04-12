@@ -379,9 +379,7 @@ static void __t509_disable(void)
 	outb(0xc0, EP_ID_PORT);
 }
 
-static void t509_disable(struct dev *dev)
-{
-	struct nic *nic = (struct nic *)dev;
+static void t509_disable ( struct nic *nic ) {
 	/* reset and disable merge */
 	t509_reset(nic);
 	__t509_disable();

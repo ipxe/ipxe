@@ -617,9 +617,7 @@ static int davicom_poll(struct nic *nic, int retrieve)
 /*********************************************************************/
 /* eth_disable - Disable the interface                               */
 /*********************************************************************/
-static void davicom_disable(struct dev *dev)
-{
-  struct nic *nic = (struct nic *)dev;
+static void davicom_disable ( struct nic *nic ) {
   whereami("davicom_disable\n");
 
   davicom_reset(nic);

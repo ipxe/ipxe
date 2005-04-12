@@ -566,8 +566,7 @@ static int eepro100_poll(struct nic *nic, int retrieve)
  *
  * returns:   void.
  */
-static void eepro100_disable(struct dev *dev __unused)
-{
+static void eepro100_disable ( struct nic *nic __unused ) {
 /* from eepro100_reset */
 	outl(0, ioaddr + SCBPort);
 /* from eepro100_disable */

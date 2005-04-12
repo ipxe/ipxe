@@ -1213,9 +1213,7 @@ sis900_poll(struct nic *nic, int retrieve)
  */
 
 static void
-sis900_disable(struct dev *dev)
-{
-    struct nic *nic = (struct nic *)dev;
+sis900_disable ( struct nic *nic ) {
     /* merge reset and disable */
     sis900_init(nic);
 

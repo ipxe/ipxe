@@ -3186,8 +3186,7 @@ static void tg3_transmit(struct nic *nic, const char *dst_addr,
 /**************************************************************************
 DISABLE - Turn off ethernet interface
 ***************************************************************************/
-static void tg3_disable(struct dev *dev __unused)
-{
+static void tg3_disable ( struct nic *nic __unused ) {
 	struct tg3 *tp = &tg3;
 	/* put the card in its initial state */
 	/* This function serves 3 purposes.

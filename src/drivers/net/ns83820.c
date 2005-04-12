@@ -756,8 +756,7 @@ static void ns83820_transmit(struct nic *nic, const char *d,	/* Destination */
 /**************************************************************************
 DISABLE - Turn off ethernet interface
 ***************************************************************************/
-static void ns83820_disable(struct dev *dev)
-{
+static void ns83820_disable ( struct nic *nic ) {
 	/* put the card in its initial state */
 	/* This function serves 3 purposes.
 	 * This disables DMA and interrupts so we don't receive

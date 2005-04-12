@@ -592,9 +592,7 @@ static void t515_transmit(struct nic *nic, const char *d,	/* Destination */
 /**************************************************************************
 DISABLE - Turn off ethernet interface
 ***************************************************************************/
-static void t515_disable(struct dev *dev)
-{
-	struct nic *nic = (struct nic *) dev;
+static void t515_disable ( struct nic *nic ) {
 
 	/* merge reset an disable */
 	t515_reset(nic);

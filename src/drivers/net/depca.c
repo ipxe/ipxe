@@ -648,9 +648,7 @@ static void depca_transmit(
 /**************************************************************************
 DISABLE - Turn off ethernet interface
 ***************************************************************************/
-static void depca_disable(struct dev *dev)
-{
-	struct nic *nic = (struct nic *)dev;
+static void depca_disable ( struct nic *nic ) {
 	/* reset and disable merge */
 	depca_reset(nic);
 

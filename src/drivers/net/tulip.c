@@ -1180,9 +1180,7 @@ static int tulip_poll(struct nic *nic, int retrieve)
 /*********************************************************************/
 /* eth_disable - Disable the interface                               */
 /*********************************************************************/
-static void tulip_disable(struct dev *dev)
-{
-    struct nic *nic = (struct nic *)dev;
+static void tulip_disable ( struct nic *nic ) {
 #ifdef TULIP_DEBUG_WHERE
     whereami("tulip_disable\n");
 #endif

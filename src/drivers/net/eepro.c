@@ -456,8 +456,7 @@ static void eepro_transmit(
 /**************************************************************************
 DISABLE - Turn off ethernet interface
 ***************************************************************************/
-static void eepro_disable(struct dev *dev __unused)
-{
+static void eepro_disable ( struct nic *nic __unused ) {
 	eepro_sw2bank0(ioaddr);	/* Switch to bank 0 */
 	/* Flush the Tx and disable Rx */
 	outb(STOP_RCV_CMD, ioaddr);

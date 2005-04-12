@@ -81,8 +81,7 @@ static void skel_transmit(
 /**************************************************************************
 DISABLE - Turn off ethernet interface
 ***************************************************************************/
-static void skel_disable(struct dev *dev)
-{
+static void skel_disable ( struct nic *nic ) {
 	/* put the card in its initial state */
 	/* This function serves 3 purposes.
 	 * This disables DMA and interrupts so we don't receive

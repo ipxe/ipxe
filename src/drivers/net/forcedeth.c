@@ -875,8 +875,7 @@ static void forcedeth_transmit(struct nic *nic, const char *d,	/* Destination */
 /**************************************************************************
 DISABLE - Turn off ethernet interface
 ***************************************************************************/
-static void forcedeth_disable(struct dev *dev __unused)
-{
+static void forcedeth_disable ( struct nic *nic __unused ) {
 	/* put the card in its initial state */
 	/* This function serves 3 purposes.
 	 * This disables DMA and interrupts so we don't receive

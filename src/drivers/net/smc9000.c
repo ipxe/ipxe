@@ -359,8 +359,7 @@ static int smc9000_poll(struct nic *nic, int retrieve)
    return 0;
 }
 
-static void smc9000_disable(struct dev *dev __unused)
-{
+static void smc9000_disable ( struct nic *nic __unused ) {
    if(!smc9000_base)
      return;
 

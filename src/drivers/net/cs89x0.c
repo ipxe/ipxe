@@ -438,9 +438,7 @@ static int cs89x0_poll(struct nic *nic, int retrieve)
 	return 1;
 }
 
-static void cs89x0_disable(struct dev *dev)
-{
-	struct nic *nic = (struct nic *)dev;
+static void cs89x0_disable ( struct nic *nic ) {
 	cs89x0_reset(nic);
 }
 

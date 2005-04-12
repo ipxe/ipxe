@@ -440,9 +440,7 @@ vxsetlink(void)
     GO_WINDOW(1); 
 }
 
-static void t595_disable(struct dev *dev)
-{
-	struct nic *nic = (struct nic *)dev;
+static void t595_disable ( struct nic *nic ) {
 	t595_reset(nic);
 
 	outw(STOP_TRANSCEIVER, BASE + VX_COMMAND);

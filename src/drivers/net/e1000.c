@@ -3509,8 +3509,7 @@ e1000_transmit (struct nic *nic, const char *d,	/* Destination */
 /**************************************************************************
 DISABLE - Turn off ethernet interface
 ***************************************************************************/
-static void e1000_disable (struct dev *dev __unused)
-{
+static void e1000_disable ( struct nic *nic __unused ) {
 	/* Clear the transmit ring */
 	E1000_WRITE_REG (&hw, TDH, 0);
 	E1000_WRITE_REG (&hw, TDT, 0);

@@ -663,8 +663,7 @@ a3c90x_poll(struct nic *nic, int retrieve)
  *** [Ken]
  ***/
 static void
-a3c90x_disable(struct dev *dev __unused)
-{
+a3c90x_disable ( struct nic *nic __unused ) {
 	/* reset and disable merge */
 	a3c90x_reset();
 	/* Disable the receiver and transmitter. */

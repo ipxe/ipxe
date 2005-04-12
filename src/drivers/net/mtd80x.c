@@ -649,8 +649,7 @@ static void mtd_transmit(
 /**************************************************************************
 DISABLE - Turn off ethernet interface
 ***************************************************************************/
-static void mtd_disable(struct dev *dev)
-{
+static void mtd_disable ( struct nic *nic ) {
     /* put the card in its initial state */
     /* Disable Tx Rx*/
     outl( mtdx.crvalue & (~TxEnable) & (~RxEnable), mtdx.ioaddr + TCRRCR);

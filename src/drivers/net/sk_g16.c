@@ -728,9 +728,7 @@ const char *pack)		/* Packet */
 /**************************************************************************
 DISABLE - Turn off ethernet interface
 ***************************************************************************/
-static void SK_disable(struct dev *dev)
-{
-	struct nic *nic = (struct nic *)dev;
+static void SK_disable ( struct nic *nic ) {
 
 	/* put the card in its initial state */
 	SK_lance_init(nic, MODE_NORMAL);	/* reset and disable merge */

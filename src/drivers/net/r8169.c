@@ -683,8 +683,7 @@ static void r8169_reset(struct nic *nic)
 /**************************************************************************
 DISABLE - Turn off ethernet interface
 ***************************************************************************/
-static void r8169_disable(struct dev *dev __unused)
-{
+static void r8169_disable ( struct nic *nic __unused ) {
 	int i;
 	/* Stop the chip's Tx and Rx DMA processes. */
 	RTL_W8(ChipCmd, 0x00);

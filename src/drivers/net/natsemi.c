@@ -728,9 +728,7 @@ natsemi_poll(struct nic *nic, int retrieve)
  */
 
 static void
-natsemi_disable(struct dev *dev)
-{
-    struct nic *nic = (struct nic *)dev;
+natsemi_disable ( struct nic *nic ) {
     /* merge reset and disable */
     natsemi_init(nic);
 

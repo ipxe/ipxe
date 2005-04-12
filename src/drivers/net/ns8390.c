@@ -583,9 +583,7 @@ static int ns8390_poll(struct nic *nic, int retrieve)
 /**************************************************************************
 NS8390_DISABLE - Turn off adapter
 **************************************************************************/
-static void ns8390_disable(struct dev *dev)
-{
-	struct nic *nic = (struct nic *)dev;
+static void ns8390_disable ( struct nic *nic ) {
 	/* reset and disable merge */
 	ns8390_reset(nic);
 }

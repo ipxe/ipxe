@@ -634,8 +634,7 @@ static void pcnet32_transmit(struct nic *nic __unused, const char *d,	/* Destina
 /**************************************************************************
 DISABLE - Turn off ethernet interface
 ***************************************************************************/
-static void pcnet32_disable(struct dev *dev __unused)
-{
+static void pcnet32_disable ( struct nic *nic __unused ) {
 	/* Stop the PCNET32 here -- it ocassionally polls memory if we don't */
 	lp->a.write_csr(ioaddr, 0, 0x0004);
 
