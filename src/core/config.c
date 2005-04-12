@@ -5,17 +5,16 @@
  * your option) any later version.
  */
 
-#include	"etherboot.h"
-#include	"nic.h"
-#include	"console.h"
+#include "etherboot.h"
+#include "dev.h"
+#include "console.h"
 #ifdef BUILD_SERIAL
-#include	".buildserial.h"
+#include ".buildserial.h"
 #define xstr(s) str(s)
 #define str(s) #s
 #endif
 
-void print_config(void)
-{
+void print_config ( void ) {
 	printf( "Etherboot " VERSION
 #ifdef BUILD_SERIAL
 		" [build " 
@@ -26,12 +25,7 @@ void print_config(void)
 #endif /* BUILD_SERIAL */
 		" (GPL) http://etherboot.org\n"
 		"Drivers: " );
-#ifdef CONFIG_PCI
-	pci_enumerate();
-#endif	
-#ifdef CONFIG_ISA
-	isa_enumerate();
-#endif	
+	print_drivers();
 	printf( "  Images: " 
 #ifdef	TAGGED_IMAGE
 		"NBI "
@@ -109,61 +103,6 @@ void print_config(void)
 	printf( "Keeping It Real [EXPERIMENTAL]\n" );
 #endif
 }
-
-static const char *driver_name[] = {
-	"nic", 
-	"disk", 
-	"floppy",
-};
-
-int probe(struct dev *dev)
-{
-	const char *type_name;
-	type_name = "";
-	if ((dev->type >= 0) && 
-		((unsigned)dev->type < sizeof(driver_name)/sizeof(driver_name[0]))) {
-		type_name = driver_name[dev->type];
-	}
-	if (dev->how_probe == PROBE_FIRST) {
-		dev->to_probe = PROBE_PCI;
-		memset(&dev->state, 0, sizeof(dev->state));
-	}
-	if (dev->to_probe == PROBE_PCI) {
-#ifdef	CONFIG_PCI
-		dev->how_probe = pci_probe(dev, type_name);
-#else
-		dev->how_probe = PROBE_FAILED;
-#endif
-		if (dev->how_probe == PROBE_FAILED) {
-			dev->to_probe = PROBE_ISA;
-		}
-	}
-	if (dev->to_probe == PROBE_ISA) {
-#ifdef	CONFIG_ISA
-		dev->how_probe = isa_probe(dev, type_name);
-#else
-		dev->how_probe = PROBE_FAILED;
-#endif
-		if (dev->how_probe == PROBE_FAILED) {
-			dev->to_probe = PROBE_NONE;
-		}
-	}
-	if ((dev->to_probe != PROBE_PCI) &&
-		(dev->to_probe != PROBE_ISA)) {
-		dev->how_probe = PROBE_FAILED;
-		
-	}
-	return dev->how_probe;
-}
-
-void disable(struct dev *dev)
-{
-	if (dev->disable) {
-		dev->disable(dev);
-		dev->disable = 0;
-	}
-}
-
 
 /*
  * Drag in all requested console types
