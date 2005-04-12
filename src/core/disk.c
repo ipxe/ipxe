@@ -1,6 +1,9 @@
 #include "etherboot.h"
 #include "disk.h"
 
+#warning "disk.c is currently broken"
+#if 0
+
 #undef disk_disable
 
 static int dummy(void *unused __unused)
@@ -281,3 +284,6 @@ void disk_disable(void)
 {
 	disable(&disk.dev);
 }
+
+
+#endif
