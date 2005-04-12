@@ -9,9 +9,6 @@ extern struct boot_driver boot_drivers_end[];
 /* Current attempted boot driver */
 static struct boot_driver *boot_driver = boot_drivers;
 
-/* Current boot device */
-struct dev dev;
-
 /* Print all drivers */
 void print_drivers ( void ) {
 	struct boot_driver *driver;
