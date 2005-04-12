@@ -183,6 +183,9 @@ int main ( void ) {
 			continue;
 		}
 		
+		/* Print device info */
+		print_info ( &dev );
+
 		/* Load configuration (e.g. DHCP) */
 		if ( ! load_configuration ( &dev ) ) {
 			/* DHCP failed */
