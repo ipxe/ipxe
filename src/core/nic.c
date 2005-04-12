@@ -257,9 +257,9 @@ static int nic_load_configuration(struct dev *dev __unused)
 #endif
 	if (!server_found) {
 		printf("No Server found\n");
-		longjmp(restart_etherboot, -1);
+		return 0;
 	}
-	return 0;
+	return 1;
 }
 
 
@@ -312,7 +312,7 @@ static int nic_load(struct dev *dev __unused)
 		printf("No filename\n");
 	}
 	interruptible_sleep(2);		/* lay off the server for a while */
-	longjmp(restart_etherboot, -1);
+	return 0;
 }
 
 
@@ -329,12 +329,19 @@ static void nic_disable ( struct dev *dev ) {
 	nic->nic_op->disable ( nic );
 }
 
+static void nic_print_info ( struct dev *dev ) {
+	struct nic *nic = &dev->nic;
+
+	printf ( "Found %s NIC (MAC %!)\n", dev->name, nic->node_addr );
+}
+
 /* 
  * Device operations tables
  *
  */
 static struct dev_operations nic_operations = {
 	.disable = nic_disable,
+	.print_info = nic_print_info,
 	.load_configuration = nic_load_configuration,
 	.load = nic_load,
 };
@@ -363,8 +370,13 @@ struct nic * nic_device ( struct dev *dev ) {
 
 
 
+int dummy_connect ( struct nic *nic ) {
+	return 1;
+}
 
-
+int dummy_irq ( struct nic *nic ) {
+	return 1;
+}
 
 /**************************************************************************
 DEFAULT_NETMASK - Return default netmask for IP address

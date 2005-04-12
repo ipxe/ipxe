@@ -44,6 +44,8 @@ struct nic_operations {
  */
 struct dev;
 extern struct nic * nic_device ( struct dev * dev );
+extern int dummy_connect ( struct nic *nic );
+extern int dummy_irq ( struct nic *nic );
 
 /*
  * Functions that implicitly operate on the current boot device
