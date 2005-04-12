@@ -177,6 +177,7 @@ static int skel_isa_probe(struct dev *dev, unsigned short *probe_addrs)
 		dev->disable  = skel_disable;
 		nic->poll     = skel_poll;
 		nic->transmit = skel_transmit;
+		nic->irq      = skel_irq;
 
 		/* Report the ISA pnp id of the board */
 		dev->devid.vendor_id = htons(GENERIC_ISAPNP_VENDOR);

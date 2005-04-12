@@ -946,9 +946,9 @@ static int pcnet32_probe ( struct dev *dev ) {
 			printf("\n");
 	}
 
+	dev->disable  = pcnet32_disable;
 	nic->poll     = pcnet32_poll;
 	nic->transmit = pcnet32_transmit;
-	dev->disable  = pcnet32_disable;
 	nic->irq      = pcnet32_irq;
 
 	return 1;

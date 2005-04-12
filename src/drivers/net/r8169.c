@@ -834,8 +834,8 @@ static int r8169_probe ( struct dev *dev ) {
 	dev->disable = r8169_disable;
 	nic->poll = r8169_poll;
 	nic->transmit = r8169_transmit;
-	nic->irqno = pci->irq;
 	nic->irq = r8169_irq;
+	nic->irqno = pci->irq;
 	nic->ioaddr = ioaddr;
 	return 1;
 

@@ -967,8 +967,8 @@ rhine_probe ( struct dev *dev ) {
     dev->disable  = rhine_disable;
     nic->poll     = rhine_poll;
     nic->transmit = rhine_transmit;
-    nic->irqno	  = pci->irq;
     nic->irq      = rhine_irq;
+    nic->irqno	  = pci->irq;
     nic->ioaddr   = tp->ioaddr;
 
 

@@ -738,8 +738,8 @@ static int sundance_probe ( struct dev *dev ) {
 	dev->disable = sundance_disable;
 	nic->poll = sundance_poll;
 	nic->transmit = sundance_transmit;
-	nic->irqno = pci->irq;
 	nic->irq = sundance_irq;
+	nic->irqno = pci->irq;
 	nic->ioaddr = BASE;
 
 	return 1;

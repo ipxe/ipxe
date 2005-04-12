@@ -766,6 +766,7 @@ static int mtd_probe ( struct dev *dev ) {
     dev->disable  = mtd_disable;
     nic->poll     = mtd_poll;
     nic->transmit = mtd_transmit;
+    nic->irq	  = dummy_irq;
     return 1;
 }
 
