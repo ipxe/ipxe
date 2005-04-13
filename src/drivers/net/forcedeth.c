@@ -918,6 +918,23 @@ static void forcedeth_irq(struct nic *nic __unused, irq_action_t action __unused
   }
 }
 
+static struct nic_operations forcedeth_operations = {
+	.connect	= dummy_connect,
+	.poll		= forcedeth_poll,
+	.transmit	= forcedeth_transmit,
+	.irq		= forcedeth_irq,
+	.disable	= forcedeth_disable,
+};
+
+static struct pci_id forcedeth_nics[] = {
+	PCI_ROM(0x10de, 0x01C3, "nforce", "nForce Ethernet Controller"),
+	PCI_ROM(0x10de, 0x0066, "nforce2", "nForce2 Ethernet Controller"),
+	PCI_ROM(0x10de, 0x00D6, "nforce3", "nForce3 Ethernet Controller"),
+};
+
+static struct pci_driver forcedeth_driver =
+	PCI_DRIVER ( "forcedeth", forcedeth_nics, PCI_NO_CLASS );
+
 /**************************************************************************
 PROBE - Look for an adapter, this routine's visible to the outside
 ***************************************************************************/
@@ -925,22 +942,23 @@ PROBE - Look for an adapter, this routine's visible to the outside
 #define board_found 1
 #define valid_link 0
 static int forcedeth_probe ( struct dev *dev ) {
-
 	struct nic *nic = nic_device ( dev );
-
 	struct pci_device *pci = pci_device ( dev );
 	unsigned long addr;
 	int sz;
 	u8 *base;
 
+	if ( ! find_pci_device ( pci, &forcedeth_driver ) )
+		return 0;
+
 	if (pci->ioaddr == 0)
 		return 0;
 
 	printf("forcedeth.c: Found %s, vendor=0x%hX, device=0x%hX\n",
-	       pci->name, pci->vendor, pci->dev_id);
+	       dev->name, pci->vendor, pci->dev_id);
 
 	nic->irqno  = 0;
-	nic->ioaddr = pci->ioaddr & ~3;
+	nic->ioaddr = pci->ioaddr;
 
 	/* point to private storage */
 	np = &npx;
@@ -988,7 +1006,7 @@ static int forcedeth_probe ( struct dev *dev ) {
 		get_random_bytes(&dev->dev_addr[3], 3);
 	}
 #endif
-	printf("%s: MAC Address %!, ", pci->name, nic->node_addr);
+	printf("%s: MAC Address %!, ", dev->name, nic->node_addr);
 
 	np->tx_flags =
 	    cpu_to_le16(NV_TX_LASTPACKET | NV_TX_LASTPACKET1 |
@@ -1015,26 +1033,10 @@ static int forcedeth_probe ( struct dev *dev ) {
 	forcedeth_reset(nic);
 //      if (board_found && valid_link)
 	/* point to NIC specific routines */
-static struct nic_operations forcedeth_operations;
-static struct nic_operations forcedeth_operations = {
-	.connect	= dummy_connect,
-	.poll		= forcedeth_poll,
-	.transmit	= forcedeth_transmit,
-	.irq		= forcedeth_irq,
-	.disable	= forcedeth_disable,
-};	nic->nic_op	= &forcedeth_operations;
+	nic->nic_op	= &forcedeth_operations;
 	return 1;
 //      }
 	/* else */
 }
-
-static struct pci_id forcedeth_nics[] = {
-	PCI_ROM(0x10de, 0x01C3, "nforce", "nForce Ethernet Controller"),
-	PCI_ROM(0x10de, 0x0066, "nforce2", "nForce2 Ethernet Controller"),
-	PCI_ROM(0x10de, 0x00D6, "nforce3", "nForce3 Ethernet Controller"),
-};
-
-static struct pci_driver forcedeth_driver =
-	PCI_DRIVER ( "forcedeth", forcedeth_nics, PCI_NO_CLASS );
 
 BOOT_DRIVER ( "forcedeth", forcedeth_probe );

@@ -8,6 +8,7 @@
 #include "pci.h"
 #include "nic.h"
 #include "timer.h"
+#include "console.h"
 #include "epic100.h"
 
 /* Condensed operations for readability */
@@ -59,6 +60,9 @@ static int	read_eeprom(int location);
 static int	mii_read(int phy_id, int location);
 static void     epic100_irq(struct nic *nic, irq_action_t action);
 
+static struct nic_operations epic100_operations;
+static struct pci_driver epic100_driver;
+
 static int	ioaddr;
 
 static int	command;
@@ -94,15 +98,16 @@ static unsigned char		tx_packet[PKT_BUF_SZ * TX_RING_SIZE];
 /***********************************************************************/
 
 
-    static int
+static int
 epic100_probe ( struct dev *dev ) {
-
     struct nic *nic = nic_device ( dev );
-
     struct pci_device *pci = pci_device ( dev );
     int i;
     unsigned short* ap;
     unsigned int phy, phy_idx;
+
+    if ( ! find_pci_device ( pci, &epic100_driver ) )
+	    return 0;
 
     if (pci->ioaddr == 0)
 	return 0;
@@ -202,14 +207,6 @@ epic100_probe ( struct dev *dev ) {
     }
 
     epic100_open();
-static struct nic_operations epic100_operations;
-static struct nic_operations epic100_operations = {
-	.connect	= dummy_connect,
-	.poll		= epic100_poll,
-	.transmit	= epic100_transmit,
-	.irq		= epic100_irq,
-	.disable	= epic100_disable,
-};
     nic->nic_op	= &epic100_operations;
 
     return 1;
@@ -509,6 +506,13 @@ mii_read(int phy_id, int location)
     return inw(mmdata);
 }
 
+static struct nic_operations epic100_operations = {
+	.connect	= dummy_connect,
+	.poll		= epic100_poll,
+	.transmit	= epic100_transmit,
+	.irq		= epic100_irq,
+	.disable	= epic100_disable,
+};
 
 static struct pci_id epic100_nics[] = {
 PCI_ROM(0x10b8, 0x0005, "epic100",    "SMC EtherPowerII"),		/* SMC 83c170 EPIC/100 */

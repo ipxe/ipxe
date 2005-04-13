@@ -85,6 +85,9 @@ typedef enum {
 #include "e1000_hw.h"
 
 /* NIC specific static variables go here */
+static struct nic_operations e1000_operations;
+static struct pci_driver e1000_driver;
+
 static struct e1000_hw hw;
 static char tx_pool[128 + 16];
 static char rx_pool[128 + 16];
@@ -3580,15 +3583,14 @@ PROBE - Look for an adapter, this routine's visible to the outside
 You should omit the last argument struct pci_device * for a non-PCI NIC
 ***************************************************************************/
 static int e1000_probe ( struct dev *dev ) {
-
 	struct nic *nic = nic_device ( dev );
-
 	struct pci_device *p = pci_device ( dev );
 	unsigned long mmio_start, mmio_len;
 	int ret_val, i;
 
-	if (p == 0)
+	if ( ! find_pci_device ( p, &e1000_driver ) )
 		return 0;
+
 	/* Initialize hw with default values */
 	memset(&hw, 0, sizeof(hw));
 	hw.pdev = p;
@@ -3663,17 +3665,18 @@ static int e1000_probe ( struct dev *dev ) {
 	init_descriptor();
 
 	/* point to NIC specific routines */
-static struct nic_operations e1000_operations;
+	nic->nic_op	= &e1000_operations;
+
+	return 1;
+}
+
 static struct nic_operations e1000_operations = {
 	.connect	= dummy_connect,
 	.poll		= e1000_poll,
 	.transmit	= e1000_transmit,
 	.irq		= e1000_irq,
 	.disable	= e1000_disable,
-};	nic->nic_op	= &e1000_operations;
-
-	return 1;
-}
+};
 
 static struct pci_id e1000_nics[] = {
 PCI_ROM(0x8086, 0x1000, "e1000-82542",               "Intel EtherExpressPro1000"),

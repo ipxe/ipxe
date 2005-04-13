@@ -153,6 +153,7 @@ enum chip_capability_flags {
     HAS_CHIP_XCVR,
 };
 
+#if 0 /* not used */
 static
 struct chip_info
 {
@@ -165,6 +166,7 @@ mtd80x_chips[] = {
                      {0x0891, HAS_MII_XCVR}
                  };
 static int chip_cnt = sizeof( mtd80x_chips ) / sizeof( struct chip_info );
+#endif
 
 /* Offsets to the Command and Status Registers. */
 enum mtd_offsets {
@@ -437,7 +439,6 @@ struct mtd_private
 static struct mtd_private mtdx;
 
 static int mdio_read(struct nic * , int phy_id, int location);
-static void mdio_write(struct nic * , int phy_id, int location, int value);
 static void getlinktype(struct nic * );
 static void getlinkstatus(struct nic * );
 static void set_rx_mode(struct nic *);
@@ -445,7 +446,7 @@ static void set_rx_mode(struct nic *);
 /**************************************************************************
  *  init_ring - setup the tx and rx descriptors
  *************************************************************************/
-static void init_ring(struct nic *nic)
+static void init_ring(struct nic *nic __unused)
 {
     int i;
 
@@ -534,7 +535,7 @@ static void mtd_reset(struct nic *nic)
 /**************************************************************************
 POLL - Wait for a frame
 ***************************************************************************/
-static int mtd_poll(struct nic *nic)
+static int mtd_poll(struct nic *nic, int retrieve)
 {
     s32 rx_status = mtdx.cur_rx->status;
     int retval = 0;
@@ -654,34 +655,46 @@ static void mtd_disable ( struct nic *nic ) {
     /* Disable Tx Rx*/
     outl( mtdx.crvalue & (~TxEnable) & (~RxEnable), mtdx.ioaddr + TCRRCR);
     /* Reset the chip to erase previous misconfiguration. */
-    mtd_reset((struct nic *) dev);
+    mtd_reset(nic);
     DBGPRNT(("DISABLE\n"));
 }
+
+static struct nic_operations mtd_operations = {
+	.connect	= dummy_connect,
+	.poll		= mtd_poll,
+	.transmit	= mtd_transmit,
+	.irq		= dummy_irq,
+	.disable	= mtd_disable,
+};
+
+static struct pci_id mtd80x_nics[] = {
+        PCI_ROM(0x1516, 0x0800, "MTD800", "Myson MTD800"),
+        PCI_ROM(0x1516, 0x0803, "MTD803", "Surecom EP-320X"),
+        PCI_ROM(0x1516, 0x0891, "MTD891", "Myson MTD891"),
+};
+
+static struct pci_driver mtd80x_driver =
+	PCI_DRIVER ( "MTD80X", mtd80x_nics, PCI_NO_CLASS );
 
 /**************************************************************************
 PROBE - Look for an adapter, this routine's visible to the outside
 ***************************************************************************/
 
 static int mtd_probe ( struct dev *dev ) {
-
     struct nic *nic = nic_device ( dev );
-
     struct pci_device *pci = pci_device ( dev );
     int i;
 
-    if (pci->ioaddr == 0)
-    {
-        return 0;
-    }
+    if ( ! find_pci_device ( pci, &mtd80x_driver ) )
+	    return 0;
 
-    printf(" - ");
+    if (pci->ioaddr == 0)
+	    return 0;
 
     /* Mask the bit that says "this is an io addr" */
-    mtdx.ioaddr = pci->ioaddr & ~3;
+    mtdx.ioaddr = pci->ioaddr;
 
-    adjust_pci_device(pci);
-
-    mtdx.nic_name = pci->name;
+    mtdx.nic_name = dev->name;
     mtdx.dev_id = pci->dev_id;
 
     /* read ethernet id */
@@ -763,26 +776,13 @@ static int mtd_probe ( struct dev *dev ) {
     mtd_reset( nic );
 
     /* point to NIC specific routines */
-static struct nic_operations mtd_operations;
-static struct nic_operations mtd_operations = {
-	.connect	= dummy_connect,
-	.poll		= mtd_poll,
-	.transmit	= mtd_transmit,
-	.irq		= dummy_irq,
-	.disable	= mtd_disable,
-};    nic->nic_op	= &mtd_operations;
+    nic->nic_op	= &mtd_operations;
     return 1;
 }
 
-static struct pci_id mtd80x_nics[] =
-    {
-        PCI_ROM(0x1516, 0x0800, "MTD800", "Myson MTD800"),
-        PCI_ROM(0x1516, 0x0803, "MTD803", "Surecom EP-320X"),
-        PCI_ROM(0x1516, 0x0891, "MTD891", "Myson MTD891"),
-    };
 
 /**************************************************************************/
-static void set_rx_mode(struct nic *nic)
+static void set_rx_mode(struct nic *nic __unused)
 {
     u32 mc_filter[2];                       /* Multicast hash filter */
     u32 rx_mode;
@@ -884,7 +884,7 @@ static u32 m80x_send_cmd_to_phy(long miiport, int opcode, int phyad, int regad)
     return miir;
 }
 
-static int mdio_read(struct nic *nic, int phyad, int regad)
+static int mdio_read(struct nic *nic __unused, int phyad, int regad)
 {
     long miiport = mtdx.ioaddr + MANAGEMENT;
     u32 miir;
@@ -922,7 +922,9 @@ static int mdio_read(struct nic *nic, int phyad, int regad)
     return data & 0xffff;
 }
 
-static void mdio_write(struct nic *nic, int phyad, int regad, int data)
+#if 0 /* not used */
+static void mdio_write(struct nic *nic __unused, int phyad, int regad,
+		       int data)
 {
     long miiport = mtdx.ioaddr + MANAGEMENT;
     u32 miir;
@@ -954,6 +956,7 @@ static void mdio_write(struct nic *nic, int phyad, int regad, int data)
 
     return;
 }
+#endif
 
 static void getlinkstatus(struct nic *nic)
 /* function: Routine will read MII Status Register to get link status.       */
@@ -1090,9 +1093,5 @@ static void getlinktype(struct nic *dev)
             mtdx.crvalue |= FD;
     }
 }
-
-
-static struct pci_driver mtd80x_driver =
-	PCI_DRIVER ( "MTD80X", mtd80x_nics, PCI_NO_CLASS );
 
 BOOT_DRIVER ( "MTD80X", mtd_probe );

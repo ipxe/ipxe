@@ -258,6 +258,9 @@ struct RxFD {               /* Receive frame descriptor. */
 	char packet[1518];
 };
 
+static struct nic_operations eepro100_operations;
+static struct pci_driver eepro100_driver;
+
 #define RXFD_COUNT 4
 static struct RxFD rxfds[RXFD_COUNT];
 static unsigned int rxfd = 0;
@@ -601,9 +604,7 @@ static void eepro100_disable ( struct nic *nic __unused ) {
  */
 
 static int eepro100_probe ( struct dev *dev ) {
-
 	struct nic *nic = nic_device ( dev );
-
 	struct pci_device *p = pci_device ( dev );
 	unsigned short sum = 0;
 	int i;
@@ -615,12 +616,13 @@ static int eepro100_probe ( struct dev *dev ) {
 	   be careful not to access beyond this array */
 	unsigned short eeprom[16];
 
+	if ( ! find_pci_device ( p, &eepro100_driver ) )
+		return 0;
+
 	if (p->ioaddr == 0)
 		return 0;
-	ioaddr = p->ioaddr & ~3; /* Mask the bit that says "this is an io addr" */
+	ioaddr = p->ioaddr;
 	nic->ioaddr = ioaddr;
-
-	adjust_pci_device(p);
 
 	/* Copy IRQ from PCI information */
 	nic->irqno = p->irq;
@@ -764,17 +766,9 @@ static int eepro100_probe ( struct dev *dev ) {
 	 */
 	if (!(mdio_read(eeprom[6] & 0x1f, 1) & (1 << 2))) {
 		printf("Valid link not established\n");
-		eepro100_disable(dev);
+		eepro100_disable(nic);
 		return 0;
 	}
-static struct nic_operations eepro100_operations;
-static struct nic_operations eepro100_operations = {
-	.connect	= dummy_connect,
-	.poll		= eepro100_poll,
-	.transmit	= eepro100_transmit,
-	.irq		= eepro100_irq,
-	.disable	= eepro100_disable,
-};
 	nic->nic_op	= &eepro100_operations;
 	return 1;
 }
@@ -798,6 +792,14 @@ void hd (void *where, int n)
 	}
 }
 #endif
+
+static struct nic_operations eepro100_operations = {
+	.connect	= dummy_connect,
+	.poll		= eepro100_poll,
+	.transmit	= eepro100_transmit,
+	.irq		= eepro100_irq,
+	.disable	= eepro100_disable,
+};
 
 static struct pci_id eepro100_nics[] = {
 PCI_ROM(0x8086, 0x1029, "id1029",        "Intel EtherExpressPro100 ID1029"),
