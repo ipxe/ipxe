@@ -98,9 +98,8 @@ int find_mca_device ( struct mca_device *mca, struct mca_driver *driver ) {
 				if ( mca->dev ) {
 					mca->dev->name = driver->name;
 					mca->dev->devid.vendor_id =
-						htons ( GENERIC_MCA_VENDOR );
-					mca->dev->devid.device_id =
-						htons ( id->id );
+						GENERIC_MCA_VENDOR;
+					mca->dev->devid.device_id = id->id;
 				}
 				mca->already_tried = 1;
 				return 1;
