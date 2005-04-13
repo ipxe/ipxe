@@ -604,14 +604,32 @@ static void w89c840_irq(struct nic *nic __unused, irq_action_t action __unused)
   }
 }
 
+static struct nic_operations w89c840_operations = {
+	.connect	= dummy_connect,
+	.poll		= w89c840_poll,
+	.transmit	= w89c840_transmit,
+	.irq		= w89c840_irq,
+	.disable	= w89c840_disable,
+};
+
+static struct pci_id w89c840_nics[] = {
+PCI_ROM(0x1050, 0x0840, "winbond840",     "Winbond W89C840F"),
+PCI_ROM(0x11f6, 0x2011, "compexrl100atx", "Compex RL100ATX"),
+};
+
+static struct pci_driver w89c840_driver =
+	PCI_DRIVER ( "W89C840F", w89c840_nics, PCI_NO_CLASS );
+
 /**************************************************************************
 w89c840_probe - Look for an adapter, this routine's visible to the outside
 ***************************************************************************/
 static int w89c840_probe ( struct dev *dev ) {
-
     struct nic *nic = nic_device ( dev );
-
     struct pci_device *p = pci_device ( dev );
+
+    if ( ! find_pci_device ( p, &w89c840_driver ) )
+	    return 0;
+
     u16 sum = 0;
     int i, j;
     unsigned short value;
@@ -698,14 +716,7 @@ static int w89c840_probe ( struct dev *dev ) {
     }
 
     /* point to NIC specific routines */
-static struct nic_operations w89c840_operations;
-static struct nic_operations w89c840_operations = {
-	.connect	= dummy_connect,
-	.poll		= w89c840_poll,
-	.transmit	= w89c840_transmit,
-	.irq		= w89c840_irq,
-	.disable	= w89c840_disable,
-};    nic->nic_op	= &w89c840_operations;
+    nic->nic_op	= &w89c840_operations;
 
     w89c840_reset(nic);
 
@@ -946,13 +957,5 @@ static void init_ring(void)
     return;
 }
 
-
-static struct pci_id w89c840_nics[] = {
-PCI_ROM(0x1050, 0x0840, "winbond840",     "Winbond W89C840F"),
-PCI_ROM(0x11f6, 0x2011, "compexrl100atx", "Compex RL100ATX"),
-};
-
-static struct pci_driver w89c840_driver =
-	PCI_DRIVER ( "W89C840F", w89c840_nics, PCI_NO_CLASS );
 
 BOOT_DRIVER ( "W89C840F", w89c840_probe );

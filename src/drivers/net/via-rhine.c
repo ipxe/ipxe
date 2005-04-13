@@ -950,27 +950,23 @@ void rhine_irq ( struct nic *nic, irq_action_t action ) {
         }
 }
 
+static struct nic_operations rhine_operations;
+static struct pci_driver rhine_driver;
+
 static int
 rhine_probe ( struct dev *dev ) {
-
     struct nic *nic = nic_device ( dev );
-
     struct pci_device *pci = pci_device ( dev );
     struct rhine_private *tp = (struct rhine_private *) nic->priv_data;
+
+    if ( ! find_pci_device ( pci, &rhine_driver ) )
+	    return 0;
+
     if (!pci->ioaddr)
 	return 0;
     rhine_probe1 (nic, pci, pci->ioaddr, pci->dev_id, -1);
 
-    adjust_pci_device(pci);
     rhine_reset (nic);
-static struct nic_operations rhine_operations;
-static struct nic_operations rhine_operations = {
-	.connect	= dummy_connect,
-	.poll		= rhine_poll,
-	.transmit	= rhine_transmit,
-	.irq		= rhine_irq,
-	.disable	= rhine_disable,
-};
     nic->nic_op	= &rhine_operations;
     nic->irqno	  = pci->irq;
     nic->ioaddr   = tp->ioaddr;
@@ -997,7 +993,7 @@ rhine_probe1 (struct nic *nic, struct pci_device *pci, int ioaddr, int chip_id, 
 {
     struct rhine_private *tp;
     static int did_version = 0;	/* Already printed version info. */
-    int i, ww;
+    unsigned int i, ww;
     unsigned int timeout;
     int FDXFlag;
     int byMIIvalue, LineSpeed, MIICRbak;
@@ -1409,6 +1405,14 @@ rhine_transmit (struct nic *nic,
     /*dev_kfree_skb(tp->tx_skbuff[entry], FREE_WRITE); */
     /*tp->tx_skbuff[entry] = 0; */
 }
+
+static struct nic_operations rhine_operations = {
+	.connect	= dummy_connect,
+	.poll		= rhine_poll,
+	.transmit	= rhine_transmit,
+	.irq		= rhine_irq,
+	.disable	= rhine_disable,
+};
 
 static struct pci_id rhine_nics[] = {
 PCI_ROM(0x1106, 0x3065, "dlink-530tx",     "VIA 6102"),
