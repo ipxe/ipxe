@@ -380,8 +380,8 @@ int dummy_connect ( struct nic *nic __unused ) {
 	return 1;
 }
 
-int dummy_irq ( struct nic *nic __unused, irq_action_t irq_action __unused ) {
-	return 1;
+void dummy_irq ( struct nic *nic __unused, irq_action_t irq_action __unused ) {
+	return;
 }
 
 /**************************************************************************
