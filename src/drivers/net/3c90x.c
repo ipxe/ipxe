@@ -42,6 +42,9 @@
 #include "pci.h"
 #include "timer.h"
 
+static struct nic_operations a3c90x_operations;
+static struct pci_driver a3c90x_driver;
+
 #define	XCVR_MAGIC	(0x5A00)
 /** any single transmission fails after 16 collisions or other errors
  ** this is the number of times to retry the transmission -- this should
@@ -688,9 +691,7 @@ static void a3c90x_irq(struct nic *nic __unused, irq_action_t action __unused)
  *** card.  We just have to init it here.
  ***/
 static int a3c90x_probe ( struct dev *dev ) {
-
     struct nic *nic = nic_device ( dev );
-
     struct pci_device *pci = pci_device ( dev );
     int i, c;
     unsigned short eeprom[0x21];
@@ -700,12 +701,13 @@ static int a3c90x_probe ( struct dev *dev ) {
     unsigned short linktype;
 #define	HWADDR_OFFSET	10
 
+    if ( ! find_pci_device ( pci, &a3c90x_driver ) )
+	    return 0;
+    
     if (pci->ioaddr == 0)
           return 0;
 
-    adjust_pci_device(pci);
-
-    nic->ioaddr = pci->ioaddr & ~3;
+    nic->ioaddr = pci->ioaddr;
     nic->irqno = 0;
 
     INF_3C90X.IOAddr = pci->ioaddr & ~3;
@@ -951,18 +953,17 @@ static int a3c90x_probe ( struct dev *dev ) {
                                  cmdAcknowledgeInterrupt, 0x661);
 
     /** Set our exported functions **/
-static struct nic_operations a3c90x_operations;
+    nic->nic_op	= &a3c90x_operations;
+    return 1;
+}
+
 static struct nic_operations a3c90x_operations = {
 	.connect	= dummy_connect,
 	.poll		= a3c90x_poll,
 	.transmit	= a3c90x_transmit,
 	.irq		= a3c90x_irq,
 	.disable	= a3c90x_disable,
-};    nic->nic_op	= &a3c90x_operations;
-
-    return 1;
-}
-
+};
 
 static struct pci_id a3c90x_nics[] = {
 /* Original 90x revisions: */

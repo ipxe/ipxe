@@ -129,6 +129,9 @@ struct rxdesc {
 /* Global Storage                                                    */
 /*********************************************************************/
 
+static struct nic_operations davicom_operations;
+static struct pci_driver davicom_driver;
+
 /* PCI Bus parameters */
 static unsigned short vendor, dev_id;
 static unsigned long ioaddr;
@@ -653,26 +656,27 @@ static void davicom_irq(struct nic *nic __unused, irq_action_t action __unused)
 /* eth_probe - Look for an adapter                                   */
 /*********************************************************************/
 static int davicom_probe ( struct dev *dev ) {
-
   struct nic *nic = nic_device ( dev );
-
   struct pci_device *pci = pci_device ( dev );
   unsigned int i;
 
   whereami("davicom_probe\n");
+
+  if ( ! find_pci_device ( pci, &davicom_driver ) )
+	  return 0;
 
   if (pci->ioaddr == 0)
     return 0;
 
   vendor  = pci->vendor;
   dev_id  = pci->dev_id;
-  ioaddr  = pci->ioaddr & ~3;
+  ioaddr  = pci->ioaddr;
 
   nic->irqno  = 0;
-  nic->ioaddr = pci->ioaddr & ~3;
+  nic->ioaddr = pci->ioaddr;
 
   /* wakeup chip */
-  pcibios_write_config_dword(pci->bus, pci->devfn, 0x40, 0x00000000);
+  pci_write_config_dword(pci, 0x40, 0x00000000);
 
   /* Stop the chip's Tx and Rx processes. */
   outl(inl(ioaddr + CSR6) & ~0x00002002, ioaddr + CSR6);
@@ -694,7 +698,10 @@ static int davicom_probe ( struct dev *dev ) {
 
   /* initialize device */
   davicom_reset(nic);
-static struct nic_operations davicom_operations;
+  nic->nic_op	= &davicom_operations;
+  return 1;
+}
+
 static struct nic_operations davicom_operations = {
 	.connect	= dummy_connect,
 	.poll		= davicom_poll,
@@ -702,10 +709,6 @@ static struct nic_operations davicom_operations = {
 	.irq		= davicom_irq,
 	.disable	= davicom_disable,
 };
-  nic->nic_op	= &davicom_operations;
-
-  return 1;
-}
 
 static struct pci_id davicom_nics[] = {
 PCI_ROM(0x1282, 0x9100, "davicom9100", "Davicom 9100"),

@@ -195,12 +195,13 @@ enum dmfe_CR6_bits {
 };
 
 /* Global variable declaration ----------------------------- */
-static int dmfe_debug;
+static struct nic_operations dmfe_operations;
+static struct pci_driver dmfe_driver;
+
 static unsigned char dmfe_media_mode = DMFE_AUTO;
 static u32 dmfe_cr6_user_set;
 
 /* For module input parameter */
-static int debug;
 static u8 chkmode = 1;
 static u8 HPNA_mode;		/* Default: Low Power/High Speed */
 static u8 HPNA_rx_cmd;		/* Default: Disable Rx remote command */
@@ -245,8 +246,6 @@ static u16 phy_read(unsigned long, u8, u8, u32);
 static void phy_write(unsigned long, u8, u8, u16, u32);
 static void phy_write_1bit(unsigned long, u32);
 static u16 phy_read_1bit(unsigned long);
-static u8 dmfe_sense_speed(struct nic *nic);
-static void dmfe_process_mode(struct nic *nic);
 static void dmfe_set_phyxcer(struct nic *nic);
 
 static void dmfe_parse_srom(struct nic *nic);
@@ -461,19 +460,20 @@ PROBE - Look for an adapter, this routine's visible to the outside
 #define board_found 1
 #define valid_link 0
 static int dmfe_probe ( struct dev *dev ) {
-
 	struct nic *nic = nic_device ( dev );
-
 	struct pci_device *pci = pci_device ( dev );
 	uint32_t dev_rev, pci_pmr;
 	int i;
+
+	if ( ! find_pci_device ( pci, &dmfe_driver ) )
+		return 0;
 
 	if (pci->ioaddr == 0)
 		return 0;
 
 	BASE = pci->ioaddr;
 	printf("dmfe.c: Found %s Vendor=0x%hX Device=0x%hX\n",
-	       pci->name, pci->vendor, pci->dev_id);
+	       dev->name, pci->vendor, pci->dev_id);
 
 	/* Read Chip revision */
 	pci_read_config_dword(pci, PCI_REVISION_ID, &dev_rev);
@@ -504,7 +504,7 @@ static int dmfe_probe ( struct dev *dev ) {
 		nic->node_addr[i] = db->srom[20 + i];
 
 	/* Print out some hardware info */
-	printf("%s: %! at ioaddr %hX\n", pci->name, nic->node_addr, BASE);
+	printf("%s: %! at ioaddr %hX\n", dev->name, nic->node_addr, BASE);
 
 	/* Set the card as PCI Bus Master */
 	adjust_pci_device(pci);
@@ -515,14 +515,7 @@ static int dmfe_probe ( struct dev *dev ) {
 	nic->ioaddr = pci->ioaddr;
 
 	/* point to NIC specific routines */
-static struct nic_operations dmfe_operations;
-static struct nic_operations dmfe_operations = {
-	.connect	= dummy_connect,
-	.poll		= dmfe_poll,
-	.transmit	= dmfe_transmit,
-	.irq		= dmfe_irq,
-	.disable	= dmfe_disable,
-};	nic->nic_op	= &dmfe_operations;
+	nic->nic_op	= &dmfe_operations;
 
 	return 1;
 }
@@ -551,7 +544,7 @@ static void dmfe_descriptor_init(struct nic *nic __unused, unsigned long ioaddr)
 		txd[i].tdes1 = cpu_to_le32(0x81000000);	/* IC, chain */
 		txd[i].tdes2 = cpu_to_le32(virt_to_bus(&txb[i]));
 		txd[i].tdes3 = cpu_to_le32(virt_to_bus(&txd[i + 1]));
-		txd[i].next_tx_desc = cpu_to_le32(&txd[i + 1]);	
+		txd[i].next_tx_desc = virt_to_le32desc(&txd[i + 1]);	
 	}
 	/* Mark the last entry as wrapping the ring */
 	txd[i - 1].tdes3 = virt_to_le32desc(&txd[0]);
@@ -565,7 +558,7 @@ static void dmfe_descriptor_init(struct nic *nic __unused, unsigned long ioaddr)
 		rxd[i].rdes2 =
 		    cpu_to_le32(virt_to_bus(&rxb[i * RX_ALLOC_SIZE]));
 		rxd[i].rdes3 = cpu_to_le32(virt_to_bus(&rxd[i + 1]));
-		rxd[i].next_rx_desc = cpu_to_le32(&rxd[i + 1]);
+		rxd[i].next_rx_desc = virt_to_le32desc(&rxd[i + 1]);
 	}
 	/* Mark the last entry as wrapping the ring */
 	rxd[i - 1].rdes3 = cpu_to_le32(virt_to_bus(&rxd[0]));
@@ -722,6 +715,7 @@ static u16 read_srom_word(long ioaddr, int offset)
  *	Auto sense the media mode
  */
 
+#if 0 /* not used */
 static u8 dmfe_sense_speed(struct nic *nic __unused)
 {
 	u8 ErrFlag = 0;
@@ -769,7 +763,7 @@ static u8 dmfe_sense_speed(struct nic *nic __unused)
 
 	return ErrFlag;
 }
-
+#endif
 
 /*
  *	Set 10/100 phyxcer capability
@@ -841,6 +835,7 @@ static void dmfe_set_phyxcer(struct nic *nic __unused)
  *			N-way force capability with SWITCH
  */
 
+#if 0 /* not used */
 static void dmfe_process_mode(struct nic *nic __unused)
 {
 	u16 phy_reg;
@@ -890,7 +885,7 @@ static void dmfe_process_mode(struct nic *nic __unused)
 		}
 	}
 }
-
+#endif
 
 /*
  *	Write a word to Phy register
@@ -1217,6 +1212,13 @@ static void dmfe_program_DM9802(struct nic *nic __unused)
 	phy_write(BASE, db->phy_addr, 25, phy_reg, db->chip_id);
 }
 
+static struct nic_operations dmfe_operations = {
+	.connect	= dummy_connect,
+	.poll		= dmfe_poll,
+	.transmit	= dmfe_transmit,
+	.irq		= dmfe_irq,
+	.disable	= dmfe_disable,
+};
 
 static struct pci_id dmfe_nics[] = {
 	PCI_ROM(0x1282, 0x9100, "dmfe9100", "Davicom 9100"),

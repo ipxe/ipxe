@@ -31,6 +31,9 @@
 #include "3c595.h"
 #include "timer.h"
 
+static struct nic_operations t595_operations;
+static struct pci_driver t595_driver;
+
 static unsigned short	eth_nic_base;
 static unsigned short	vx_connector, vx_connectors;
 
@@ -466,20 +469,20 @@ static void t595_irq(struct nic *nic __unused, irq_action_t action __unused)
 ETH_PROBE - Look for an adapter
 ***************************************************************************/
 static int t595_probe ( struct dev *dev ) {
-
 	struct nic *nic = nic_device ( dev );
-
 	struct pci_device *pci = pci_device ( dev );
 	int i;
 	unsigned short *p;
 
+	if ( ! find_pci_device ( pci, &t595_driver ) )
+		return 0;
+
 	if (pci->ioaddr == 0)
 		return 0;
-/*	eth_nic_base = probeaddrs[0] & ~3; */
 	eth_nic_base = pci->ioaddr;
 
 	nic->irqno  = 0;
-	nic->ioaddr = pci->ioaddr & ~3;
+	nic->ioaddr = pci->ioaddr;
 
 	GO_WINDOW(0);
 	outw(GLOBAL_RESET, BASE + VX_COMMAND);
@@ -508,17 +511,18 @@ static int t595_probe ( struct dev *dev ) {
 	printf("Ethernet address: %!\n", nic->node_addr);
 
 	t595_reset(nic);
-static struct nic_operations t595_operations;
+	nic->nic_op	= &t595_operations;
+	return 1;
+
+}
+
 static struct nic_operations t595_operations = {
 	.connect	= dummy_connect,
 	.poll		= t595_poll,
 	.transmit	= t595_transmit,
 	.irq		= t595_irq,
 	.disable	= t595_disable,
-};	nic->nic_op	= &t595_operations;
-	return 1;
-
-}
+};
 
 static struct pci_id t595_nics[] = {
 PCI_ROM(0x10b7, 0x5900, "3c590",           "3Com590"),		/* Vortex 10Mbps */
