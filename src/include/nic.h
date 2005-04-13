@@ -14,6 +14,11 @@ typedef enum {
 	FORCE
 } irq_action_t;
 
+typedef enum duplex {
+	HALF_DUPLEX = 1,
+	FULL_DUPLEX
+} duplex_t;
+
 /*
  *	Structure returned from eth_probe and passed to other driver
  *	functions.
@@ -26,6 +31,8 @@ struct nic {
 	unsigned int	packetlen;
 	unsigned int	ioaddr;
 	unsigned char	irqno;
+	unsigned int	mbps;
+	duplex_t	duplex;
 	void		*priv_data;	/* driver can hang private data here */
 };
 
