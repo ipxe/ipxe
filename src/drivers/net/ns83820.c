@@ -774,7 +774,7 @@ static void ns83820_disable ( struct nic *nic ) {
 
 	ns->up = 0;
 
-	ns83820_do_reset((struct nic *) dev, CR_RST);
+	ns83820_do_reset(nic, CR_RST);
 
 	ns->IMR_cache &=
 	    ~(ISR_RXOK | ISR_RXDESC | ISR_RXERR | ISR_RXEARLY |
@@ -804,6 +804,21 @@ static void ns83820_irq(struct nic *nic __unused, irq_action_t action __unused)
   }
 }
 
+static struct nic_operations ns83820_operations = {
+	.connect	= dummy_connect,
+	.poll		= ns83820_poll,
+	.transmit	= ns83820_transmit,
+	.irq		= ns83820_irq,
+	.disable	= ns83820_disable,
+};
+
+static struct pci_id ns83820_nics[] = {
+	PCI_ROM(0x100b, 0x0022, "ns83820", "National Semiconductor 83820"),
+};
+
+static struct pci_driver ns83820_driver =
+	PCI_DRIVER ( "NS83820/PCI", ns83820_nics, PCI_NO_CLASS );
+
 /**************************************************************************
 PROBE - Look for an adapter, this routine's visible to the outside
 ***************************************************************************/
@@ -811,19 +826,20 @@ PROBE - Look for an adapter, this routine's visible to the outside
 #define board_found 1
 #define valid_link 0
 static int ns83820_probe ( struct dev *dev ) {
-
 	struct nic *nic = nic_device ( dev );
-
 	struct pci_device *pci = pci_device ( dev );
 	int sz;
 	long addr;
 	int using_dac = 0;
 
+	if ( ! find_pci_device ( pci, &ns83820_driver ) )
+		return 0;
+
 	if (pci->ioaddr == 0)
 		return 0;
 
 	printf("ns83820.c: Found %s, vendor=0x%hX, device=0x%hX\n",
-	       pci->name, pci->vendor, pci->dev_id);
+	       dev->name, pci->vendor, pci->dev_id);
 
 	/* point to private storage */
 	ns = &nsx;
@@ -863,12 +879,12 @@ static int ns83820_probe ( struct dev *dev ) {
 	ns->CFG_cache = readl(ns->base + CFG);
 
 	if ((ns->CFG_cache & CFG_PCI64_DET)) {
-		printf("%s: detected 64 bit PCI data bus.\n", pci->name);
+		printf("%s: detected 64 bit PCI data bus.\n", dev->name);
 		/*dev->CFG_cache |= CFG_DATA64_EN; */
 		if (!(ns->CFG_cache & CFG_DATA64_EN))
 			printf
 			    ("%s: EEPROM did not enable 64 bit bus.  Disabled.\n",
-			     pci->name);
+			     dev->name);
 	} else
 		ns->CFG_cache &= ~(CFG_DATA64_EN);
 
@@ -1000,22 +1016,8 @@ static int ns83820_probe ( struct dev *dev ) {
 
 	ns83820_reset(nic);
 	/* point to NIC specific routines */
-static struct nic_operations ns83820_operations;
-static struct nic_operations ns83820_operations = {
-	.connect	= dummy_connect,
-	.poll		= ns83820_poll,
-	.transmit	= ns83820_transmit,
-	.irq		= ns83820_irq,
-	.disable	= ns83820_disable,
-};	nic->nic_op	= &ns83820_operations;
+	nic->nic_op	= &ns83820_operations;
 	return 1;
 }
-
-static struct pci_id ns83820_nics[] = {
-	PCI_ROM(0x100b, 0x0022, "ns83820", "National Semiconductor 83820"),
-};
-
-static struct pci_driver ns83820_driver =
-	PCI_DRIVER ( "NS83820/PCI", ns83820_nics, PCI_NO_CLASS );
 
 BOOT_DRIVER ( "NS83820/PCI", ns83820_probe );

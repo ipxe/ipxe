@@ -52,6 +52,9 @@
 
 /* Globals */
 
+static struct nic_operations sis900_operations;
+static struct pci_driver sis900_driver;
+
 static int sis900_debug = 0;
 
 static unsigned short vendor, dev_id;
@@ -308,9 +311,7 @@ static int sis635_get_mac_addr(struct pci_device * pci_dev __unused, struct nic 
  */
 
 static int sis900_probe ( struct dev *dev ) {
-
     struct nic *nic = nic_device ( dev );
-
     struct pci_device *pci = pci_device ( dev );
     int i;
     int found=0;
@@ -318,12 +319,15 @@ static int sis900_probe ( struct dev *dev ) {
     u8 revision;
     int ret;
 
+    if ( ! find_pci_device ( pci, &sis900_driver ) )
+	return 0;
+
     if (pci->ioaddr == 0)
         return 0;
 
     nic->irqno  = 0;
-    nic->ioaddr = pci->ioaddr & ~3;
-    ioaddr  = pci->ioaddr & ~3;
+    nic->ioaddr = pci->ioaddr;
+    ioaddr  = pci->ioaddr;
     vendor  = pci->vendor;
     dev_id  = pci->dev_id;
 
@@ -409,14 +413,6 @@ static int sis900_probe ( struct dev *dev ) {
 
     /* initialize device */
     sis900_init(nic);
-static struct nic_operations sis900_operations;
-static struct nic_operations sis900_operations = {
-	.connect	= dummy_connect,
-	.poll		= sis900_poll,
-	.transmit	= sis900_transmit,
-	.irq		= sis900_irq,
-	.disable	= sis900_disable,
-};
     nic->nic_op	= &sis900_operations;
 
     return 1;
@@ -1252,6 +1248,14 @@ sis900_irq(struct nic *nic __unused, irq_action_t action __unused)
     break;
   }
 }
+
+static struct nic_operations sis900_operations = {
+	.connect	= dummy_connect,
+	.poll		= sis900_poll,
+	.transmit	= sis900_transmit,
+	.irq		= sis900_irq,
+	.disable	= sis900_disable,
+};
 
 static struct pci_id sis900_nics[] = {
 PCI_ROM(0x1039, 0x0900, "sis900",  "SIS900"),

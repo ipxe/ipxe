@@ -62,6 +62,8 @@ typedef unsigned int u32;
 typedef signed int s32;
 
 static u32 ioaddr;		/* Globally used for the card's io address */
+static struct nic_operations pcnet32_operations;
+static struct pci_driver pcnet32_driver;
 
 #ifdef EDEBUG
 #define dprintf(x) printf x
@@ -665,9 +667,7 @@ PROBE - Look for an adapter, this routine's visible to the outside
 You should omit the last argument struct pci_device * for a non-PCI NIC
 ***************************************************************************/
 static int pcnet32_probe ( struct dev *dev ) {
-
 	struct nic *nic = nic_device ( dev );
-
 	struct pci_device *pci = pci_device ( dev );
 	int i, media;
 	int fdx, mii, fset, dxsuflo, ltint;
@@ -675,15 +675,18 @@ static int pcnet32_probe ( struct dev *dev ) {
 	char *chipname;
 	struct pcnet32_access *a = NULL;
 	u8 promaddr[6];
-
 	int shared = 1;
+
+	if ( ! find_pci_device ( pci, &pcnet32_driver ) )
+		return 0;
+
 	if (pci->ioaddr == 0)
 		return 0;
 
 	/* BASE is used throughout to address the card */
 	ioaddr = pci->ioaddr;
 	printf("pcnet32.c: Found %s, Vendor=0x%hX Device=0x%hX\n",
-	       pci->name, pci->vendor, pci->dev_id);
+	       dev->name, pci->vendor, pci->dev_id);
 
 	nic->irqno  = 0;
 	nic->ioaddr = pci->ioaddr & ~3;
@@ -801,7 +804,7 @@ static int pcnet32_probe ( struct dev *dev ) {
 		nic->node_addr[i] = promaddr[i];
 	}
 	/* Print out some hardware info */
-	printf("%s: %! at ioaddr %hX, ", pci->name, nic->node_addr,
+	printf("%s: %! at ioaddr %hX, ", dev->name, nic->node_addr,
 	       ioaddr);
 
 	/* Set to pci bus master */
@@ -945,14 +948,7 @@ static int pcnet32_probe ( struct dev *dev ) {
 		else
 			printf("\n");
 	}
-static struct nic_operations pcnet32_operations;
-static struct nic_operations pcnet32_operations = {
-	.connect	= dummy_connect,
-	.poll		= pcnet32_poll,
-	.transmit	= pcnet32_transmit,
-	.irq		= pcnet32_irq,
-	.disable	= pcnet32_disable,
-};
+
 	nic->nic_op	= &pcnet32_operations;
 
 	return 1;
@@ -992,6 +988,14 @@ static void mdio_write(struct nic *nic __unused, int phy_id, int reg_num,
 	lp->a.write_bcr(ioaddr, 33, phyaddr);
 }
 #endif
+
+static struct nic_operations pcnet32_operations = {
+	.connect	= dummy_connect,
+	.poll		= pcnet32_poll,
+	.transmit	= pcnet32_transmit,
+	.irq		= pcnet32_irq,
+	.disable	= pcnet32_disable,
+};
 
 static struct pci_id pcnet32_nics[] = {
 	PCI_ROM(0x1022, 0x2000, "lancepci", "AMD Lance/PCI"),

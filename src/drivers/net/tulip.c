@@ -1213,13 +1213,20 @@ static void tulip_irq(struct nic *nic __unused, irq_action_t action __unused)
   }
 }
 
+static struct nic_operations tulip_operations = {
+	.connect	= dummy_connect,
+	.poll		= tulip_poll,
+	.transmit	= tulip_transmit,
+	.irq		= tulip_irq,
+	.disable	= tulip_disable,
+};
+static struct pci_driver tulip_driver;
+
 /*********************************************************************/
 /* eth_probe - Look for an adapter                                   */
 /*********************************************************************/
 static int tulip_probe ( struct dev *dev ) {
-
     struct nic *nic = nic_device ( dev );
-
     struct pci_device *pci = pci_device ( dev );
     u32 i;
     u8  chip_rev;
@@ -1227,6 +1234,9 @@ static int tulip_probe ( struct dev *dev ) {
     unsigned short sum;
     int chip_idx;
     static unsigned char last_phys_addr[ETH_ALEN] = {0x00, 'L', 'i', 'n', 'u', 'x'};
+
+    if ( ! find_pci_device ( pci, &tulip_driver ) )
+	return 0;
 
     if (pci->ioaddr == 0)
         return 0;
@@ -1240,7 +1250,7 @@ static int tulip_probe ( struct dev *dev ) {
 
     tp->vendor_id  = pci->vendor;
     tp->dev_id     = pci->dev_id;
-    tp->nic_name   = pci->name;
+    tp->nic_name   = dev->name;
 
     tp->if_port = 0;
     tp->default_port = 0;
@@ -1301,7 +1311,7 @@ static int tulip_probe ( struct dev *dev ) {
     /* Bring the 21041/21143 out of sleep mode.
        Caution: Snooze mode does not work with some boards! */
     if (tp->flags & HAS_PWRDWN)
-        pcibios_write_config_dword(pci->bus, pci->devfn, 0x40, 0x00000000);
+        pci_write_config_dword(pci, 0x40, 0x00000000);
 
     if (inl(ioaddr + CSR5) == 0xFFFFFFFF) {
         printf("%s: The Tulip chip at %X is not functioning.\n",
@@ -1309,7 +1319,7 @@ static int tulip_probe ( struct dev *dev ) {
         return 0;
     }
    
-    pcibios_read_config_byte(pci->bus, pci->devfn, PCI_REVISION, &chip_rev);
+    pci_read_config_byte(pci, PCI_REVISION, &chip_rev);
 
     printf("%s: [chip: %s] rev %d at %hX\n", tp->nic_name,
            tulip_tbl[chip_idx].chip_name, chip_rev, ioaddr);
@@ -1422,14 +1432,6 @@ static int tulip_probe ( struct dev *dev ) {
 
     /* reset the device and make ready for tx and rx of packets */
     tulip_reset(nic);
-static struct nic_operations tulip_operations;
-static struct nic_operations tulip_operations = {
-	.connect	= dummy_connect,
-	.poll		= tulip_poll,
-	.transmit	= tulip_transmit,
-	.irq		= tulip_irq,
-	.disable	= tulip_disable,
-};
     nic->nic_op	= &tulip_operations;
 
     /* give the board a chance to reset before returning */

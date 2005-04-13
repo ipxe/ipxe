@@ -65,6 +65,8 @@
 #define dprintf(x)
 #endif
 
+static struct pci_driver tlan_driver;
+
 static void TLan_ResetLists(struct nic *nic __unused);
 static void TLan_ResetAdapter(struct nic *nic __unused);
 static void TLan_FinishReset(struct nic *nic __unused);
@@ -438,8 +440,9 @@ void TLan_FinishReset(struct nic *nic)
 				     "Full" : "Half"));
 				dprintf(("TLAN: Partner capability: "));
 				for (i = 5; i <= 10; i++)
-					if (partner & (1 << i))
+					if (partner & (1 << i)) {
 						dprintf(("%s", media[i - 5]));
+					}
 				dprintf(("\n"));
 			}
 
@@ -748,6 +751,14 @@ static void tlan_irq(struct nic *nic __unused, irq_action_t action __unused)
   }
 }
 
+static struct nic_operations tlan_operations = {
+	.connect	= dummy_connect,
+	.poll		= tlan_poll,
+	.transmit	= tlan_transmit,
+	.irq		= tlan_irq,
+	.disable	= tlan_disable,
+};
+
 static void TLan_SetMulticastList(struct nic *nic) {
 	int i;
 	u8 tmp;
@@ -771,28 +782,23 @@ PROBE - Look for an adapter, this routine's visible to the outside
 #define board_found 1
 #define valid_link 0
 static int tlan_probe ( struct dev *dev ) {
-
 	struct nic *nic = nic_device ( dev );
-
 	struct pci_device *pci = pci_device ( dev );
 	u16 data = 0;
 	int err;
 	int i;
 
+	if ( ! find_pci_device ( pci, &tlan_driver ) )
+		return 0;
+
 	if (pci->ioaddr == 0)
 		return 0;
 
 	nic->irqno  = 0;
-	nic->ioaddr = pci->ioaddr & ~3;
+	nic->ioaddr = pci->ioaddr;
 
 	BASE = pci->ioaddr;
 	
-	printf("tlan.c: Found %s, Vendor 0x%hX, Device 0x%hX\n", 
-		pci->name, pci->vendor, pci->dev_id);
-
-	/* Set nic as PCI bus master */
-	adjust_pci_device(pci);
-
 	/* Point to private storage */
 	priv = &TLanPrivateInfo;
 
@@ -810,7 +816,7 @@ static int tlan_probe ( struct dev *dev ) {
 
 	priv->vendor_id = pci->vendor;
 	priv->dev_id = pci->dev_id;
-	priv->nic_name = pci->name;
+	priv->nic_name = dev->name;
 	priv->eoc = 0;
 
 	err = 0;
@@ -821,11 +827,11 @@ static int tlan_probe ( struct dev *dev ) {
 				       (u8 *) & nic->node_addr[i]);
 	if (err) {
 		printf("TLAN: %s: Error reading MAC from eeprom: %d\n",
-		       pci->name, err);
+		       dev->name, err);
 	} else 
 		/* Print out some hardware info */
 		printf("%s: %! at ioaddr %hX, ", 
-			pci->name, nic->node_addr, pci->ioaddr);
+			dev->name, nic->node_addr, pci->ioaddr);
 
 	priv->tlanRev = TLan_DioRead8(BASE, TLAN_DEF_REVISION);
 	printf("revision: 0x%hX\n", priv->tlanRev);
@@ -844,14 +850,6 @@ static int tlan_probe ( struct dev *dev ) {
 /*	if (board_found && valid_link)
 	{*/
 	/* point to NIC specific routines */
-static struct nic_operations tlan_operations;
-static struct nic_operations tlan_operations = {
-	.connect	= dummy_connect,
-	.poll		= tlan_poll,
-	.transmit	= tlan_transmit,
-	.irq		= tlan_irq,
-	.disable	= tlan_disable,
-};
 	nic->nic_op	= &tlan_operations;
 	return 1;
 }

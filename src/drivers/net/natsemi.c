@@ -181,6 +181,9 @@ enum desc_status_bits {
 
 /* Globals */
 
+static struct nic_operations natsemi_operations;
+static struct pci_driver natsemi_driver;
+
 static int natsemi_debug = 1;			/* 1 normal messages, 0 quiet .. 7 verbose. */
 
 const char *nic_name;
@@ -248,31 +251,32 @@ natsemi_probe ( struct dev *dev ) {
     int i;
     int prev_eedata;
     u32 tmp;
+    
+    if ( ! find_pci_device ( pci, &natsemi_driver ) )
+	return 0;
 
     if (pci->ioaddr == 0)
         return 0;
 
-    adjust_pci_device(pci);
-
     /* initialize some commonly used globals */
 	
     nic->irqno  = 0;
-    nic->ioaddr = pci->ioaddr & ~3;
+    nic->ioaddr = pci->ioaddr;
 
-    ioaddr     = pci->ioaddr & ~3;
+    ioaddr     = pci->ioaddr;
     vendor     = pci->vendor;
     dev_id     = pci->dev_id;
-    nic_name   = pci->name;
+    nic_name   = dev->name;
 
     /* natsemi has a non-standard PM control register
      * in PCI config space.  Some boards apparently need
      * to be brought to D0 in this manner.
      */
-    pcibios_read_config_dword(pci->bus, pci->devfn, PCIPM, &tmp);
+    pci_read_config_dword(pci, PCIPM, &tmp);
     if (tmp & (0x03|0x100)) {
 	/* D0 state, disable PME assertion */
 	u32 newtmp = tmp & ~(0x03|0x100);
-	pcibios_write_config_dword(pci->bus, pci->devfn, PCIPM, newtmp);
+	pci_write_config_dword(pci, PCIPM, newtmp);
     }
 
     /* get MAC address */
@@ -316,14 +320,6 @@ natsemi_probe ( struct dev *dev ) {
 
     /* initialize device */
     natsemi_init(nic);
-static struct nic_operations natsemi_operations;
-static struct nic_operations natsemi_operations = {
-	.connect	= dummy_connect,
-	.poll		= natsemi_poll,
-	.transmit	= natsemi_transmit,
-	.irq		= natsemi_irq,
-	.disable	= natsemi_disable,
-};
     nic->nic_op	= &natsemi_operations;
 
     return 1;
@@ -769,6 +765,14 @@ natsemi_irq(struct nic *nic __unused, irq_action_t action __unused)
     break;
   }
 }
+
+static struct nic_operations natsemi_operations = {
+	.connect	= dummy_connect,
+	.poll		= natsemi_poll,
+	.transmit	= natsemi_transmit,
+	.irq		= natsemi_irq,
+	.disable	= natsemi_disable,
+};
 
 static struct pci_id natsemi_nics[] = {
 PCI_ROM(0x100b, 0x0020, "dp83815", "DP83815"),

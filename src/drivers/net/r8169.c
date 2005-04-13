@@ -702,6 +702,21 @@ static void r8169_disable ( struct nic *nic __unused ) {
 	}
 }
 
+static struct nic_operations r8169_operations = {
+	.connect	= dummy_connect,
+	.poll		= r8169_poll,
+	.transmit	= r8169_transmit,
+	.irq		= r8169_irq,
+	.disable	= r8169_disable,
+};
+
+static struct pci_id r8169_nics[] = {
+	PCI_ROM(0x10ec, 0x8169, "r8169", "RealTek RTL8169 Gigabit Ethernet"),
+};
+
+static struct pci_driver r8169_driver =
+	PCI_DRIVER ( "r8169/PCI", r8169_nics, PCI_NO_CLASS );
+
 /**************************************************************************
 PROBE - Look for an adapter, this routine's visible to the outside
 ***************************************************************************/
@@ -709,17 +724,18 @@ PROBE - Look for an adapter, this routine's visible to the outside
 #define board_found 1
 #define valid_link 0
 static int r8169_probe ( struct dev *dev ) {
-
 	struct nic *nic = nic_device ( dev );
-
 	struct pci_device *pci = pci_device ( dev );
 	static int board_idx = -1;
 	static int printed_version = 0;
 	int i, rc;
 	int option = -1, Cap10_100 = 0, Cap1000 = 0;
 
+	if ( ! find_pci_device ( pci, &r8169_driver ) )
+		return 0;
+
 	printf("r8169.c: Found %s, Vendor=%hX Device=%hX\n",
-	       pci->name, pci->vendor, pci->dev_id);
+	       dev->name, pci->vendor, pci->dev_id);
 
 	board_idx++;
 
@@ -737,7 +753,7 @@ static int r8169_probe ( struct dev *dev ) {
 	dprintf(("%s: Identified chip type is '%s'.\n", pci->name,
 		 rtl_chip_info[tpc->chipset].name));
 	/* Print out some hardware info */
-	printf("%s: %! at ioaddr %hX, ", pci->name, nic->node_addr,
+	printf("%s: %! at ioaddr %hX, ", dev->name, nic->node_addr,
 	       ioaddr);
 
 	/* if TBI is not endbled */
@@ -824,32 +840,18 @@ static int r8169_probe ( struct dev *dev ) {
 		udelay(100);
 		printf
 		    ("%s: 1000Mbps Full-duplex operation, TBI Link %s!\n",
-		     pci->name,
+		     dev->name,
 		     (RTL_R32(TBICSR) & TBILinkOK) ? "OK" : "Failed");
 
 	}
 
 	r8169_reset(nic);
 	/* point to NIC specific routines */
-static struct nic_operations r8169_operations;
-static struct nic_operations r8169_operations = {
-	.connect	= dummy_connect,
-	.poll		= r8169_poll,
-	.transmit	= r8169_transmit,
-	.irq		= r8169_irq,
-	.disable	= r8169_disable,
-};	nic->nic_op	= &r8169_operations;
+	nic->nic_op	= &r8169_operations;
 	nic->irqno = pci->irq;
 	nic->ioaddr = ioaddr;
 	return 1;
 
 }
-
-static struct pci_id r8169_nics[] = {
-	PCI_ROM(0x10ec, 0x8169, "r8169", "RealTek RTL8169 Gigabit Ethernet"),
-};
-
-static struct pci_driver r8169_driver =
-	PCI_DRIVER ( "r8169/PCI", r8169_nics, PCI_NO_CLASS );
 
 BOOT_DRIVER ( "r8169/PCI", r8169_probe );
