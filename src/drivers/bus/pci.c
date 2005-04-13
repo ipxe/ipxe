@@ -119,6 +119,7 @@ struct pci_device * pci_device ( struct dev *dev ) {
 
 	if ( dev->devid.bus_type != PCI_BUS_TYPE ) {
 		memset ( pci, 0, sizeof ( *pci ) );
+		dev->devid.bus_type = PCI_BUS_TYPE;
 	}
 	pci->dev = dev;
 	return pci;
@@ -153,8 +154,8 @@ int find_pci_device ( struct pci_device *pci,
 		/* Fill in dev structure, if present */
 		if ( pci->dev ) {
 			pci->dev->name = driver->name;
-			pci->dev->devid.vendor_id = pci->vendor;
-			pci->dev->devid.device_id = pci->dev_id;
+			pci->dev->devid.vendor_id = htons ( pci->vendor );
+			pci->dev->devid.device_id = htons ( pci->dev_id );
 		}
 
 		/* If driver has a class, and class matches, use it */
