@@ -236,9 +236,15 @@ struct nic *nic = &dev.nic;
 /*
  * Find out what our boot parameters are
  */
-static int nic_load_configuration(struct dev *dev __unused)
-{
+static int nic_load_configuration ( struct dev *dev ) {
+	struct nic *nic = &dev->nic;
 	int server_found;
+
+	if ( ! nic->nic_op->connect ( nic ) ) {
+		printf ( "No connection to network\n" );
+		return 0;
+	}
+
 	/* Find a server to get BOOTP reply from */
 #ifdef	RARP_NOT_BOOTP
 	printf("Searching for server (RARP)...");
