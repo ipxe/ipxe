@@ -380,17 +380,6 @@
 
 #define RX_BYTES_MASK			(unsigned short) (0x07ff)
 
- /* EISA support */
-#define EP_EISA_START			0x1000
-#define EP_EISA_W0			0x0c80
-
-#ifdef	INCLUDE_3C529
- /* MCA support */
-#define MCA_MOTHERBOARD_SETUP_REG	0x94
-#define MCA_ADAPTER_SETUP_REG		0x96
-#define MCA_MAX_SLOT_NR			8
-#define MCA_POS_REG(n)			(0x100+(n))
-#endif
 
 /*
  * Local variables:
