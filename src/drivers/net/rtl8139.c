@@ -180,29 +180,24 @@ static void rtl_transmit(struct nic *nic, const char *destaddr,
 static int rtl_poll(struct nic *nic, int retrieve);
 static void rtl_disable(struct nic *nic);
 static void rtl_irq(struct nic *nic, irq_action_t action);
-
+static struct nic_operations rtl_operations;
+static struct pci_driver rtl8139_driver;
 
 static int rtl8139_probe ( struct dev *dev ) {
-
 	struct nic *nic = nic_device ( dev );
-
 	struct pci_device *pci = pci_device ( dev );
 	int i;
 	int speed10, fullduplex;
 	int addr_len;
 	unsigned short *ap = (unsigned short*)nic->node_addr;
 
-	/* There are enough "RTL8139" strings on the console already, so
-	 * be brief and concentrate on the interesting pieces of info... */
-	printf(" - ");
+	/* Look for PCI device */
+	if ( ! find_pci_device ( pci, &rtl8139_driver ) )
+		return 0;
 
-	/* Mask the bit that says "this is an io addr" */
-	nic->ioaddr = pci->ioaddr & ~3;
-
-	/* Copy IRQ from PCI information */
+	/* Copy ioaddr and IRQ from PCI information */
+	nic->ioaddr = pci->ioaddr;
 	nic->irqno = pci->irq;
-
-	adjust_pci_device(pci);
 
 	/* Bring the chip out of low-power mode. */
 	outb(0x00, nic->ioaddr + Config1);
@@ -211,28 +206,14 @@ static int rtl8139_probe ( struct dev *dev ) {
 	for (i = 0; i < 3; i++)
 	  *ap++ = read_eeprom(nic,i + 7,addr_len);
 
-	speed10 = inb(nic->ioaddr + MediaStatus) & MSRSpeed10;
-	fullduplex = inw(nic->ioaddr + MII_BMCR) & BMCRDuplex;
-	printf("ioaddr %#hX, irq %d, addr %! %sMbps %s-duplex\n", nic->ioaddr,
-	       nic->irqno, nic->node_addr,  speed10 ? "10" : "100",
-	       fullduplex ? "full" : "half");
-
 	rtl_reset(nic);
 
-	if (inb(nic->ioaddr + MediaStatus) & MSRLinkFail) {
-		printf("Cable not connected or other link failure\n");
-		return(0);
-	}
-static struct nic_operations rtl_operations;
-static struct nic_operations rtl_operations = {
-	.connect	= dummy_connect,
-	.poll		= rtl_poll,
-	.transmit	= rtl_transmit,
-	.irq		= rtl_irq,
-	.disable	= rtl_disable,
-};
-	nic->nic_op	= &rtl_operations;
+	speed10 = inb(nic->ioaddr + MediaStatus) & MSRSpeed10;
+	nic->mbps = speed10 ? 10 : 100;
+	fullduplex = inw(nic->ioaddr + MII_BMCR) & BMCRDuplex;
+	nic->duplex = fullduplex ? FULL_DUPLEX : HALF_DUPLEX;
 
+	nic->nic_op	= &rtl_operations;
 	return 1;
 }
 
@@ -311,6 +292,14 @@ static void set_rx_mode(struct nic *nic) {
 
 	outl(mc_filter[0], nic->ioaddr + MAR0 + 0);
 	outl(mc_filter[1], nic->ioaddr + MAR0 + 4);
+}
+
+static int rtl_connect ( struct nic *nic ) {
+	if (inb(nic->ioaddr + MediaStatus) & MSRLinkFail) {
+		printf("Cable not connected or other link failure\n");
+		return 0;
+	}
+	return 1;
 }
 	
 static void rtl_reset(struct nic* nic)
@@ -527,6 +516,14 @@ static void rtl_disable ( struct nic *nic ) {
 	while ((inb(nic->ioaddr + ChipCmd) & CmdReset) != 0 && timer2_running())
 		/* wait */;
 }
+
+static struct nic_operations rtl_operations = {
+	.connect	= rtl_connect,
+	.poll		= rtl_poll,
+	.transmit	= rtl_transmit,
+	.irq		= rtl_irq,
+	.disable	= rtl_disable,
+};
 
 static struct pci_id rtl8139_nics[] = {
 PCI_ROM(0x10ec, 0x8129, "rtl8129",       "Realtek 8129"),
