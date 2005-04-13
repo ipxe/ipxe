@@ -4,6 +4,7 @@
 #include "stdint.h"
 #include "nic.h"
 #include "pci.h"
+#include "mca.h"
 
 /* Need to check the packing of this struct if Etherboot is ported */
 struct dev_id {
@@ -12,6 +13,7 @@ struct dev_id {
 	uint8_t		bus_type;
 #define	PCI_BUS_TYPE	1
 #define	ISA_BUS_TYPE	2
+#define MCA_BUS_TYPE	3
 } __attribute__ ((packed));
 
 /* Dont use sizeof, that will include the padding */
@@ -24,6 +26,7 @@ struct dev {
 	/* All possible bus types */
 	union {
 		struct pci_device pci;
+		struct mca_device mca;
 	};
 	/* All possible device types */
 	union {
