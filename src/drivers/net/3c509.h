@@ -54,12 +54,6 @@
 #endif
 
 /*
- * some macros to acces long named fields
- */
-#define IS_BASE (eth_nic_base)
-#define BASE	(eth_nic_base)
-
-/*
  * Commands to read/write EEPROM trough EEPROM command register (Window 0,
  * Offset 0xa)
  */
@@ -75,7 +69,7 @@
  * Some short functions, worth to let them be a macro
  */
 #define is_eeprom_busy(b) (inw((b)+EP_W0_EEPROM_COMMAND)&EEPROM_BUSY)
-#define GO_WINDOW(x)	outw(WINDOW_SELECT|(x), BASE+EP_COMMAND)
+#define GO_WINDOW(b,x)	outw(WINDOW_SELECT|(x), (b)+EP_COMMAND)
 
 /**************************************************************************
  *
