@@ -376,11 +376,11 @@ struct nic * nic_device ( struct dev *dev ) {
 
 
 
-int dummy_connect ( struct nic *nic ) {
+int dummy_connect ( struct nic *nic __unused ) {
 	return 1;
 }
 
-int dummy_irq ( struct nic *nic ) {
+int dummy_irq ( struct nic *nic __unused ) {
 	return 1;
 }
 
