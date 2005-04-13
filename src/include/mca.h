@@ -19,8 +19,8 @@
 #define MCA_POS_REG(n)			(0x100+(n))
 
 /* Is there a standard that would define this? */
-#include "isa.h"
-#define GENERIC_MCA_VENDOR ISAPNP_VENDOR ( 'M', 'C', 'A' )
+#include "isa_ids.h"
+#define GENERIC_MCA_VENDOR ISA_VENDOR ( 'M', 'C', 'A' )
 
 /*
  * A physical MCA device

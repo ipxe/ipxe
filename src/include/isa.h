@@ -1,13 +1,9 @@
 #ifndef	ISA_H
 #define ISA_H
 
+#include "isa_ids.h"
+
 struct dev;
-
-#define ISAPNP_VENDOR(a,b,c)	(((((a)-'A'+1)&0x3f)<<2)|\
-				((((b)-'A'+1)&0x18)>>3)|((((b)-'A'+1)&7)<<13)|\
-				((((c)-'A'+1)&0x1f)<<8))
-
-#define	GENERIC_ISAPNP_VENDOR	ISAPNP_VENDOR('P','N','P')
 
 struct isa_driver
 {
