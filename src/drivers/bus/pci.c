@@ -154,8 +154,8 @@ int find_pci_device ( struct pci_device *pci,
 		/* Fill in dev structure, if present */
 		if ( pci->dev ) {
 			pci->dev->name = driver->name;
-			pci->dev->devid.vendor_id = htons ( pci->vendor );
-			pci->dev->devid.device_id = htons ( pci->dev_id );
+			pci->dev->devid.vendor_id = pci->vendor;
+			pci->dev->devid.device_id = pci->dev_id;
 		}
 
 		/* If driver has a class, and class matches, use it */
