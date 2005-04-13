@@ -161,12 +161,6 @@ typedef struct wlan_80211hdr
  * Function prototypes
  */
 
-#if (WLAN_HOSTIF == WLAN_PLX)
-static int prism2_find_plx ( hfa384x_t *hw, struct pci_device *p );
-#elif (WLAN_HOSTIF == WLAN_PCI)
-static int prism2_find_pci ( hfa384x_t *hw, struct pci_device *p );
-#endif
-
 /*
  * Hardware-level hfa384x functions
  * These are based on the ones in hfa384x.h (which are ifdef'd out since __KERNEL__ is not defined).
@@ -747,32 +741,27 @@ static void prism2_irq(struct nic *nic __unused, irq_action_t action __unused)
 }
 
 /**************************************************************************
+Operations table
+***************************************************************************/
+static struct nic_operations prism2_operations = {
+	.connect	= dummy_connect,
+	.poll		= prism2_poll,
+	.transmit	= prism2_transmit,
+	.irq		= prism2_irq,
+	.disable	= prism2_disable,
+};
+
+/**************************************************************************
 PROBE - Look for an adapter, this routine's visible to the outside
 You should omit the last argument struct pci_device * for a non-PCI NIC
 ***************************************************************************/
-#if (WLAN_HOSTIF == WLAN_PLX)
-static int prism2_plx_probe(struct dev *dev, struct pci_device *p)
-#elif (WLAN_HOSTIF == WLAN_PCI)
-static int prism2_pci_probe(struct dev *dev, struct pci_device *p)
-#endif
-{
-  struct nic *nic = (struct nic *)dev;
-  hfa384x_t *hw = &hw_global;
+static int prism2_probe ( struct nic *nic, hfa384x_t *hw ) {
   int result;
   UINT16 tmp16 = 0;
   UINT16 infofid;
   hfa384x_InfFrame_t inf;
   char ssid[HFA384x_RID_CNFDESIREDSSID_LEN];
   int info_count = 0;
-
-  /* Find and intialise PLX Prism2 card */
-#if (WLAN_HOSTIF == WLAN_PLX)
-  if ( ! prism2_find_plx ( hw, p ) ) return 0;
-  nic->ioaddr = hw->iobase;
-#elif (WLAN_HOSTIF == WLAN_PCI)
-  if ( ! prism2_find_pci ( hw, p ) ) return 0;
-  nic->ioaddr = hw->membase;
-#endif
 
   nic->irqno  = 0;
 
@@ -856,96 +845,7 @@ static int prism2_pci_probe(struct dev *dev, struct pci_device *p)
   printf ( "Link connected (BSSID %! - MAC address %!)\n", hw->bssid, nic->node_addr );
   
   /* point to NIC specific routines */
-static struct nic_operations prism2_operations;
-static struct nic_operations prism2_operations = {
-	.connect	= dummy_connect,
-	.poll		= prism2_poll,
-	.transmit	= prism2_transmit,
-	.irq		= prism2_irq,
-	.disable	= prism2_disable,
-};  nic->nic_op	= &prism2_operations;
+  nic->nic_op	= &prism2_operations;
   return 1;
 }
-
-#if (WLAN_HOSTIF == WLAN_PLX)
-/*
- * Find PLX card.  Prints out information strings from PCMCIA CIS as visual
- * confirmation of presence of card.
- *
- * Arguments:
- *	hw		device structure to be filled in
- *      p               PCI device structure
- *
- * Returns:
- *      1               Success
- */
-static int prism2_find_plx ( hfa384x_t *hw, struct pci_device *p )
-{
-  int found = 0;
-  uint32_t plx_lcr  = 0; /* PLX9052 Local Configuration Register Base (I/O) */
-  uint32_t attr_mem = 0; /* Prism2 Attribute Memory Base */
-  uint32_t iobase   = 0; /* Prism2 I/O Base */
-  unsigned char *cis_tpl  = NULL;
-  unsigned char *cis_string;
-  
-  /* Obtain all memory and IO base addresses */
-  pcibios_read_config_dword( p->bus, p->devfn, PLX_LOCAL_CONFIG_REGISTER_BASE, &plx_lcr);
-  plx_lcr &= PCI_BASE_ADDRESS_IO_MASK;
-  pcibios_read_config_dword( p->bus, p->devfn, PRISM2_PLX_ATTR_MEM_BASE, &attr_mem);
-  pcibios_read_config_dword( p->bus, p->devfn, PRISM2_PLX_IO_BASE, &iobase);
-  iobase &= PCI_BASE_ADDRESS_IO_MASK;
-
-  /* Fill out hw structure */
-  hw->membase = attr_mem;
-  hw->iobase = iobase;
-  printf ( "PLX9052 has local config registers at %#hx\n", plx_lcr );
-  printf ( "Prism2 has attribute memory at %#x and I/O base at %#hx\n", attr_mem, iobase );
-
-  /* Search for CIS strings */
-  printf ( "Searching for PCMCIA card...\n" );
-  cis_tpl = bus_to_virt(attr_mem);
-  while ( *cis_tpl != CISTPL_END ) {
-    if ( *cis_tpl == CISTPL_VERS_1 ) {
-      /* CISTPL_VERS_1 contains some nice text strings */
-      printf ( "...found " );
-      found = 1;
-      cis_string = cis_tpl + CISTPL_VERS_1_STR_OFF;
-      while ( ! ( ( *cis_string == 0 ) && ( *(cis_string+CIS_STEP) == 0 ) ) ) {
-	printf ( "%c", *cis_string == 0 ? ' ' : *cis_string );
-	cis_string += CIS_STEP;
-      }
-      printf ( "\n" );
-    }
-    /* printf ( "CIS tuple type %#hhx, length %#hhx\n", *cis_tpl, *(cis_tpl+CISTPL_LEN_OFF) ); */
-    cis_tpl += CISTPL_HEADER_LEN + CIS_STEP * ( *(cis_tpl+CISTPL_LEN_OFF) );
-  }
-  if ( found == 0 ) {
-    printf ( "...nothing found\n" );
-  }
-  ((unsigned char *)bus_to_virt(attr_mem))[COR_OFFSET] = COR_VALUE; /* Write COR to enable PC card */
-  return found;
-}
-#endif /* WLAN_PLX */
-
-#if (WLAN_HOSTIF == WLAN_PCI)
-/*
- * Find PCI card.
- *
- * Arguments:
- *	hw		device structure to be filled in
- *      p               PCI device structure
- *
- * Returns:
- *      1               Success
- */
-static int prism2_find_pci ( hfa384x_t *hw, struct pci_device *p )
-{
-  uint32_t membase = 0; /* Prism2.5 Memory Base */
-  pcibios_read_config_dword( p->bus, p->devfn, PRISM2_PCI_MEM_BASE, &membase);
-  membase &= PCI_BASE_ADDRESS_MEM_MASK;
-  hw->membase = (uint32_t) phys_to_virt(membase);
-  printf ( "Prism2.5 has registers at %#x\n", hw->membase );
-  return 1;
-}
-#endif /* WLAN_PCI */
 

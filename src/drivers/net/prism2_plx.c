@@ -34,5 +34,78 @@ PCI_ROM(0x126c, 0x8030, "emobility",     "Nortel emobility"),
 static struct pci_driver prism2_plx_driver =
 	PCI_DRIVER ( "Prism2_PLX", prism2_plx_nics, PCI_NO_CLASS );
 
+/*
+ * Find PLX card.  Prints out information strings from PCMCIA CIS as visual
+ * confirmation of presence of card.
+ *
+ * Arguments:
+ *	hw		device structure to be filled in
+ *      p               PCI device structure
+ *
+ * Returns:
+ *      1               Success
+ */
+static int prism2_find_plx ( hfa384x_t *hw, struct pci_device *p )
+{
+  int found = 0;
+  uint32_t plx_lcr  = 0; /* PLX9052 Local Configuration Register Base (I/O) */
+  uint32_t attr_mem = 0; /* Prism2 Attribute Memory Base */
+  uint32_t iobase   = 0; /* Prism2 I/O Base */
+  unsigned char *cis_tpl  = NULL;
+  unsigned char *cis_string;
+  
+  /* Obtain all memory and IO base addresses */
+  pci_read_config_dword( p, PLX_LOCAL_CONFIG_REGISTER_BASE, &plx_lcr);
+  plx_lcr &= PCI_BASE_ADDRESS_IO_MASK;
+  pci_read_config_dword( p, PRISM2_PLX_ATTR_MEM_BASE, &attr_mem);
+  pci_read_config_dword( p, PRISM2_PLX_IO_BASE, &iobase);
+  iobase &= PCI_BASE_ADDRESS_IO_MASK;
+
+  /* Fill out hw structure */
+  hw->membase = attr_mem;
+  hw->iobase = iobase;
+  printf ( "PLX9052 has local config registers at %#hx\n", plx_lcr );
+  printf ( "Prism2 has attribute memory at %#x and I/O base at %#hx\n", attr_mem, iobase );
+
+  /* Search for CIS strings */
+  printf ( "Searching for PCMCIA card...\n" );
+  cis_tpl = bus_to_virt(attr_mem);
+  while ( *cis_tpl != CISTPL_END ) {
+    if ( *cis_tpl == CISTPL_VERS_1 ) {
+      /* CISTPL_VERS_1 contains some nice text strings */
+      printf ( "...found " );
+      found = 1;
+      cis_string = cis_tpl + CISTPL_VERS_1_STR_OFF;
+      while ( ! ( ( *cis_string == 0 ) && ( *(cis_string+CIS_STEP) == 0 ) ) ) {
+	printf ( "%c", *cis_string == 0 ? ' ' : *cis_string );
+	cis_string += CIS_STEP;
+      }
+      printf ( "\n" );
+    }
+    /* printf ( "CIS tuple type %#hhx, length %#hhx\n", *cis_tpl, *(cis_tpl+CISTPL_LEN_OFF) ); */
+    cis_tpl += CISTPL_HEADER_LEN + CIS_STEP * ( *(cis_tpl+CISTPL_LEN_OFF) );
+  }
+  if ( found == 0 ) {
+    printf ( "...nothing found\n" );
+  }
+  ((unsigned char *)bus_to_virt(attr_mem))[COR_OFFSET] = COR_VALUE; /* Write COR to enable PC card */
+  return found;
+}
+
+static int prism2_plx_probe ( struct dev *dev ) {
+  struct nic *nic = nic_device ( dev );
+  struct pci_device *pci = pci_device ( dev );
+  hfa384x_t *hw = &hw_global;
+
+  if ( ! find_pci_device ( pci, &prism2_plx_driver ) )
+	  return 0;
+
+  /* Find and intialise PLX Prism2 card */
+  if ( ! prism2_find_plx ( hw, pci ) ) return 0;
+  nic->ioaddr = hw->iobase;
+
+  return prism2_probe ( nic, hw );
+}
+
 BOOT_DRIVER ( "Prism2_PLX", prism2_plx_probe );
 
