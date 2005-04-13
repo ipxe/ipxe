@@ -2,9 +2,14 @@
 #define DEV_H
 
 #include "stdint.h"
-#include "nic.h"
+
+/* Bus types */
 #include "pci.h"
+#include "eisa.h"
 #include "mca.h"
+
+/* Device types */
+#include "nic.h"
 
 /* Need to check the packing of this struct if Etherboot is ported */
 struct dev_id {
@@ -13,7 +18,8 @@ struct dev_id {
 	uint8_t		bus_type;
 #define	PCI_BUS_TYPE	1
 #define	ISA_BUS_TYPE	2
-#define MCA_BUS_TYPE	3
+#define EISA_BUS_TYPE	3
+#define MCA_BUS_TYPE	4
 } __attribute__ ((packed));
 
 /* Dont use sizeof, that will include the padding */
@@ -25,8 +31,9 @@ struct dev {
 	struct dev_id	devid;	/* device ID string (sent to DHCP server) */
 	/* All possible bus types */
 	union {
-		struct pci_device pci;
-		struct mca_device mca;
+		struct pci_device	pci;
+		struct eisa_device	eisa;
+		struct mca_device	mca;
 	};
 	/* All possible device types */
 	union {
