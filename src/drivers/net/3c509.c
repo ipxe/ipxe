@@ -627,11 +627,15 @@ static int t509_probe(struct dev *dev, unsigned short *probe_addrs __unused)
 
 	nic->irqno    = 0;
 	nic->ioaddr   = eth_nic_base;
-
-	dev->disable  = t509_disable; 
-	nic->poll     = t509_poll;
-	nic->transmit = t509_transmit;
-	nic->irq      = t509_irq;
+static struct nic_operations t509_operations;
+static struct nic_operations t509_operations = {
+	.connect	= dummy_connect,
+	.poll		= t509_poll,
+	.transmit	= t509_transmit,
+	.irq		= t509_irq,
+	.disable	= t509_disable,
+};
+	nic->nic_op	= &t509_operations;
 
 	/* Based on PnP ISA map */
 	dev->devid.vendor_id = htons(GENERIC_ISAPNP_VENDOR);

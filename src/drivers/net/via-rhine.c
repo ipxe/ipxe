@@ -963,11 +963,15 @@ rhine_probe ( struct dev *dev ) {
 
     adjust_pci_device(pci);
     rhine_reset (nic);
-
-    dev->disable  = rhine_disable;
-    nic->poll     = rhine_poll;
-    nic->transmit = rhine_transmit;
-    nic->irq      = rhine_irq;
+static struct nic_operations rhine_operations;
+static struct nic_operations rhine_operations = {
+	.connect	= dummy_connect,
+	.poll		= rhine_poll,
+	.transmit	= rhine_transmit,
+	.irq		= rhine_irq,
+	.disable	= rhine_disable,
+};
+    nic->nic_op	= &rhine_operations;
     nic->irqno	  = pci->irq;
     nic->ioaddr   = tp->ioaddr;
 

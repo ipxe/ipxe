@@ -773,10 +773,14 @@ static int depca_probe(struct dev *dev, unsigned short *probe_addrs)
 
 	depca_reset(nic);
 	/* point to NIC specific routines */
-	dev->disable  = depca_disable;
-	nic->poll     = depca_poll;
-	nic->transmit = depca_transmit;
-	nic->irq      = depca_irq;
+static struct nic_operations depca_operations;
+static struct nic_operations depca_operations = {
+	.connect	= dummy_connect,
+	.poll		= depca_poll,
+	.transmit	= depca_transmit,
+	.irq		= depca_irq,
+	.disable	= depca_disable,
+};	nic->nic_op	= &depca_operations;
 
 	/* Based on PnP ISA map */
 	dev->devid.vendor_id = htons(GENERIC_ISAPNP_VENDOR);

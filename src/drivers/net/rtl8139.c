@@ -223,11 +223,15 @@ static int rtl8139_probe ( struct dev *dev ) {
 		printf("Cable not connected or other link failure\n");
 		return(0);
 	}
-
-	dev->disable  = rtl_disable;
-	nic->poll     = rtl_poll;
-	nic->transmit = rtl_transmit;
-	nic->irq      = rtl_irq;
+static struct nic_operations rtl_operations;
+static struct nic_operations rtl_operations = {
+	.connect	= dummy_connect,
+	.poll		= rtl_poll,
+	.transmit	= rtl_transmit,
+	.irq		= rtl_irq,
+	.disable	= rtl_disable,
+};
+	nic->nic_op	= &rtl_operations;
 
 	return 1;
 }

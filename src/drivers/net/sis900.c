@@ -409,11 +409,15 @@ static int sis900_probe ( struct dev *dev ) {
 
     /* initialize device */
     sis900_init(nic);
-
-    dev->disable  = sis900_disable;
-    nic->poll     = sis900_poll;
-    nic->transmit = sis900_transmit;
-    nic->irq      = sis900_irq;
+static struct nic_operations sis900_operations;
+static struct nic_operations sis900_operations = {
+	.connect	= dummy_connect,
+	.poll		= sis900_poll,
+	.transmit	= sis900_transmit,
+	.irq		= sis900_irq,
+	.disable	= sis900_disable,
+};
+    nic->nic_op	= &sis900_operations;
 
     return 1;
 }

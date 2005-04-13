@@ -514,11 +514,15 @@ static int smc9000_probe(struct dev *dev, unsigned short *probe_addrs)
       _outw( inw( smc9000_base + CONFIG ) | CFG_AUI_SELECT,
 	   smc9000_base + CONFIG );
    }
-
-   dev->disable  = smc9000_disable;
-   nic->poll     = smc9000_poll;
-   nic->transmit = smc9000_transmit;
-   nic->irq      = smc9000_irq;
+static struct nic_operations smc9000_operations;
+static struct nic_operations smc9000_operations = {
+	.connect	= dummy_connect,
+	.poll		= smc9000_poll,
+	.transmit	= smc9000_transmit,
+	.irq		= smc9000_irq,
+	.disable	= smc9000_disable,
+};
+   nic->nic_op	= &smc9000_operations;
 
    /* Based on PnP ISA map */
    dev->devid.vendor_id = htons(GENERIC_ISAPNP_VENDOR);

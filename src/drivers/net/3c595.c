@@ -508,10 +508,14 @@ static int t595_probe ( struct dev *dev ) {
 	printf("Ethernet address: %!\n", nic->node_addr);
 
 	t595_reset(nic);
-	dev->disable  = t595_disable;
-	nic->poll     = t595_poll;
-	nic->transmit = t595_transmit;
-	nic->irq      = t595_irq;
+static struct nic_operations t595_operations;
+static struct nic_operations t595_operations = {
+	.connect	= dummy_connect,
+	.poll		= t595_poll,
+	.transmit	= t595_transmit,
+	.irq		= t595_irq,
+	.disable	= t595_disable,
+};	nic->nic_op	= &t595_operations;
 	return 1;
 
 }

@@ -1422,11 +1422,15 @@ static int tulip_probe ( struct dev *dev ) {
 
     /* reset the device and make ready for tx and rx of packets */
     tulip_reset(nic);
-
-    dev->disable  = tulip_disable;
-    nic->poll     = tulip_poll;
-    nic->transmit = tulip_transmit;
-    nic->irq      = tulip_irq;
+static struct nic_operations tulip_operations;
+static struct nic_operations tulip_operations = {
+	.connect	= dummy_connect,
+	.poll		= tulip_poll,
+	.transmit	= tulip_transmit,
+	.irq		= tulip_irq,
+	.disable	= tulip_disable,
+};
+    nic->nic_op	= &tulip_operations;
 
     /* give the board a chance to reset before returning */
     tulip_wait(4*TICKS_PER_SEC);

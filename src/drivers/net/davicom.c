@@ -694,11 +694,15 @@ static int davicom_probe ( struct dev *dev ) {
 
   /* initialize device */
   davicom_reset(nic);
-
-  dev->disable  = davicom_disable;
-  nic->poll     = davicom_poll;
-  nic->transmit = davicom_transmit;
-  nic->irq      = davicom_irq;
+static struct nic_operations davicom_operations;
+static struct nic_operations davicom_operations = {
+	.connect	= dummy_connect,
+	.poll		= davicom_poll,
+	.transmit	= davicom_transmit,
+	.irq		= davicom_irq,
+	.disable	= davicom_disable,
+};
+  nic->nic_op	= &davicom_operations;
 
   return 1;
 }

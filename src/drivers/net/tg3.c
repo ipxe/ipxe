@@ -3340,11 +3340,15 @@ static int tg3_probe ( struct dev *dev ) {
 		printf("Valid link not established\n");
 		goto err_out_disable;
 	}
-
-	dev->disable  = tg3_disable;
-	nic->poll     = tg3_poll;
-	nic->transmit = tg3_transmit;
-	nic->irq      = tg3_irq;
+static struct nic_operations tg3_operations;
+static struct nic_operations tg3_operations = {
+	.connect	= dummy_connect,
+	.poll		= tg3_poll,
+	.transmit	= tg3_transmit,
+	.irq		= tg3_irq,
+	.disable	= tg3_disable,
+};
+	nic->nic_op	= &tg3_operations;
 
 	return 1;
 

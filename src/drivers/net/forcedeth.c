@@ -1015,10 +1015,14 @@ static int forcedeth_probe ( struct dev *dev ) {
 	forcedeth_reset(nic);
 //      if (board_found && valid_link)
 	/* point to NIC specific routines */
-	dev->disable = forcedeth_disable;
-	nic->poll = forcedeth_poll;
-	nic->transmit = forcedeth_transmit;
-	nic->irq    = forcedeth_irq;
+static struct nic_operations forcedeth_operations;
+static struct nic_operations forcedeth_operations = {
+	.connect	= dummy_connect,
+	.poll		= forcedeth_poll,
+	.transmit	= forcedeth_transmit,
+	.irq		= forcedeth_irq,
+	.disable	= forcedeth_disable,
+};	nic->nic_op	= &forcedeth_operations;
 	return 1;
 //      }
 	/* else */

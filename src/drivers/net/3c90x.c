@@ -951,10 +951,14 @@ static int a3c90x_probe ( struct dev *dev ) {
                                  cmdAcknowledgeInterrupt, 0x661);
 
     /** Set our exported functions **/
-    dev->disable  = a3c90x_disable;
-    nic->poll     = a3c90x_poll;
-    nic->transmit = a3c90x_transmit;
-    nic->irq      = a3c90x_irq;
+static struct nic_operations a3c90x_operations;
+static struct nic_operations a3c90x_operations = {
+	.connect	= dummy_connect,
+	.poll		= a3c90x_poll,
+	.transmit	= a3c90x_transmit,
+	.irq		= a3c90x_irq,
+	.disable	= a3c90x_disable,
+};    nic->nic_op	= &a3c90x_operations;
 
     return 1;
 }

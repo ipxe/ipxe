@@ -763,10 +763,14 @@ static int mtd_probe ( struct dev *dev ) {
     mtd_reset( nic );
 
     /* point to NIC specific routines */
-    dev->disable  = mtd_disable;
-    nic->poll     = mtd_poll;
-    nic->transmit = mtd_transmit;
-    nic->irq	  = dummy_irq;
+static struct nic_operations mtd_operations;
+static struct nic_operations mtd_operations = {
+	.connect	= dummy_connect,
+	.poll		= mtd_poll,
+	.transmit	= mtd_transmit,
+	.irq		= dummy_irq,
+	.disable	= mtd_disable,
+};    nic->nic_op	= &mtd_operations;
     return 1;
 }
 

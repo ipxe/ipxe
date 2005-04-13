@@ -782,10 +782,14 @@ static int SK_probe(struct dev *dev, unsigned short *probe_addrs)
 	        nic->ioaddr = ioaddr & ~3;
 		nic->irqno  = 0;
 		/* point to NIC specific routines */
-		dev->disable  = SK_disable;
-		nic->poll     = SK_poll;
-		nic->transmit = SK_transmit;
-		nic->irq      = SK_irq;
+static struct nic_operations SK_operations;
+static struct nic_operations SK_operations = {
+	.connect	= dummy_connect,
+	.poll		= SK_poll,
+	.transmit	= SK_transmit,
+	.irq		= SK_irq,
+	.disable	= SK_disable,
+};		nic->nic_op	= &SK_operations;
 		/* FIXME set dev->devid */
 		return 1;
 	}

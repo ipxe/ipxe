@@ -606,10 +606,14 @@ static int eepro_probe(struct dev *dev, unsigned short *probe_addrs)
 
 	eepro_reset(nic);
 	/* point to NIC specific routines */
-	dev->disable  = eepro_disable;
-	nic->poll     = eepro_poll;
-	nic->transmit = eepro_transmit;
-	nic->irq      = eepro_irq;
+static struct nic_operations eepro_operations;
+static struct nic_operations eepro_operations = {
+	.connect	= dummy_connect,
+	.poll		= eepro_poll,
+	.transmit	= eepro_transmit,
+	.irq		= eepro_irq,
+	.disable	= eepro_disable,
+};	nic->nic_op	= &eepro_operations;
 	/* Based on PnP ISA map */
 	dev->devid.vendor_id = htons(GENERIC_ISAPNP_VENDOR);
 	dev->devid.device_id = htons(0x828a);

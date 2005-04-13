@@ -945,11 +945,15 @@ static int pcnet32_probe ( struct dev *dev ) {
 		else
 			printf("\n");
 	}
-
-	dev->disable  = pcnet32_disable;
-	nic->poll     = pcnet32_poll;
-	nic->transmit = pcnet32_transmit;
-	nic->irq      = pcnet32_irq;
+static struct nic_operations pcnet32_operations;
+static struct nic_operations pcnet32_operations = {
+	.connect	= dummy_connect,
+	.poll		= pcnet32_poll,
+	.transmit	= pcnet32_transmit,
+	.irq		= pcnet32_irq,
+	.disable	= pcnet32_disable,
+};
+	nic->nic_op	= &pcnet32_operations;
 
 	return 1;
 }

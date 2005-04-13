@@ -145,10 +145,14 @@ static int skel_probe ( struct dev *dev ) {
 		nic->ioaddr = pci->ioaddr & ~3;
 		nic->irqno = pci->irq;
 		/* point to NIC specific routines */
-		dev->disable  = skel_disable;
-		nic->poll     = skel_poll;
-		nic->transmit = skel_transmit;
-		nic->irq      = skel_irq;
+static struct nic_operations skel_operations;
+static struct nic_operations skel_operations = {
+	.connect	= dummy_connect,
+	.poll		= skel_poll,
+	.transmit	= skel_transmit,
+	.irq		= skel_irq,
+	.disable	= skel_disable,
+};		nic->nic_op	= &skel_operations;
 		return 1;
 	}
 	/* else */
@@ -174,10 +178,14 @@ static int skel_isa_probe(struct dev *dev, unsigned short *probe_addrs)
 	if (board_found && valid_link)
 	{
 		/* point to NIC specific routines */
-		dev->disable  = skel_disable;
-		nic->poll     = skel_poll;
-		nic->transmit = skel_transmit;
-		nic->irq      = skel_irq;
+static struct nic_operations skel_operations;
+static struct nic_operations skel_operations = {
+	.connect	= dummy_connect,
+	.poll		= skel_poll,
+	.transmit	= skel_transmit,
+	.irq		= skel_irq,
+	.disable	= skel_disable,
+};		nic->nic_op	= &skel_operations;
 
 		/* Report the ISA pnp id of the board */
 		dev->devid.vendor_id = htons(GENERIC_ISAPNP_VENDOR);

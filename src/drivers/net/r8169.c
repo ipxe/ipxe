@@ -831,10 +831,14 @@ static int r8169_probe ( struct dev *dev ) {
 
 	r8169_reset(nic);
 	/* point to NIC specific routines */
-	dev->disable = r8169_disable;
-	nic->poll = r8169_poll;
-	nic->transmit = r8169_transmit;
-	nic->irq = r8169_irq;
+static struct nic_operations r8169_operations;
+static struct nic_operations r8169_operations = {
+	.connect	= dummy_connect,
+	.poll		= r8169_poll,
+	.transmit	= r8169_transmit,
+	.irq		= r8169_irq,
+	.disable	= r8169_disable,
+};	nic->nic_op	= &r8169_operations;
 	nic->irqno = pci->irq;
 	nic->ioaddr = ioaddr;
 	return 1;

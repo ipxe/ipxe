@@ -202,11 +202,15 @@ epic100_probe ( struct dev *dev ) {
     }
 
     epic100_open();
-
-    dev->disable  = epic100_disable;
-    nic->poll     = epic100_poll;
-    nic->transmit = epic100_transmit;
-    nic->irq      = epic100_irq;
+static struct nic_operations epic100_operations;
+static struct nic_operations epic100_operations = {
+	.connect	= dummy_connect,
+	.poll		= epic100_poll,
+	.transmit	= epic100_transmit,
+	.irq		= epic100_irq,
+	.disable	= epic100_disable,
+};
+    nic->nic_op	= &epic100_operations;
 
     return 1;
 }

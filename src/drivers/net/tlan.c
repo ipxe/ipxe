@@ -844,11 +844,15 @@ static int tlan_probe ( struct dev *dev ) {
 /*	if (board_found && valid_link)
 	{*/
 	/* point to NIC specific routines */
-
-	dev->disable = tlan_disable;
-	nic->poll = tlan_poll;
-	nic->transmit = tlan_transmit;
-	nic->irq    = tlan_irq;
+static struct nic_operations tlan_operations;
+static struct nic_operations tlan_operations = {
+	.connect	= dummy_connect,
+	.poll		= tlan_poll,
+	.transmit	= tlan_transmit,
+	.irq		= tlan_irq,
+	.disable	= tlan_disable,
+};
+	nic->nic_op	= &tlan_operations;
 	return 1;
 }
 

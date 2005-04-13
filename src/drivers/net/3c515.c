@@ -686,11 +686,15 @@ static int t515_probe(struct dev *dev,
 
 		nic->irqno    = 0;
 		nic->ioaddr   = BASE;
-
-		dev->disable = t515_disable;
-		nic->poll = t515_poll;
-		nic->transmit = t515_transmit;
-		nic->irq      = t515_irq;
+static struct nic_operations t515_operations;
+static struct nic_operations t515_operations = {
+	.connect	= dummy_connect,
+	.poll		= t515_poll,
+	.transmit	= t515_transmit,
+	.irq		= t515_irq,
+	.disable	= t515_disable,
+};
+		nic->nic_op	= &t515_operations;
 
 		/* Based on PnP ISA map */
 		dev->devid.vendor_id = htons(ISAPNP_VENDOR('T', 'C', 'M'));

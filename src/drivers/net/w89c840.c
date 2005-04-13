@@ -698,10 +698,14 @@ static int w89c840_probe ( struct dev *dev ) {
     }
 
     /* point to NIC specific routines */
-    dev->disable  = w89c840_disable;
-    nic->poll     = w89c840_poll;
-    nic->transmit = w89c840_transmit;
-    nic->irq      = w89c840_irq;
+static struct nic_operations w89c840_operations;
+static struct nic_operations w89c840_operations = {
+	.connect	= dummy_connect,
+	.poll		= w89c840_poll,
+	.transmit	= w89c840_transmit,
+	.irq		= w89c840_irq,
+	.disable	= w89c840_disable,
+};    nic->nic_op	= &w89c840_operations;
 
     w89c840_reset(nic);
 

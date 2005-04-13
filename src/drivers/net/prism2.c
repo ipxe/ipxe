@@ -856,10 +856,14 @@ static int prism2_pci_probe(struct dev *dev, struct pci_device *p)
   printf ( "Link connected (BSSID %! - MAC address %!)\n", hw->bssid, nic->node_addr );
   
   /* point to NIC specific routines */
-  dev->disable  = prism2_disable; 
-  nic->poll     = prism2_poll;
-  nic->transmit = prism2_transmit;
-  nic->irq      = prism2_irq;
+static struct nic_operations prism2_operations;
+static struct nic_operations prism2_operations = {
+	.connect	= dummy_connect,
+	.poll		= prism2_poll,
+	.transmit	= prism2_transmit,
+	.irq		= prism2_irq,
+	.disable	= prism2_disable,
+};  nic->nic_op	= &prism2_operations;
   return 1;
 }
 

@@ -1000,10 +1000,14 @@ static int ns83820_probe ( struct dev *dev ) {
 
 	ns83820_reset(nic);
 	/* point to NIC specific routines */
-	dev->disable  = ns83820_disable;
-	nic->poll     = ns83820_poll;
-	nic->transmit = ns83820_transmit;
-	nic->irq      = ns83820_irq;
+static struct nic_operations ns83820_operations;
+static struct nic_operations ns83820_operations = {
+	.connect	= dummy_connect,
+	.poll		= ns83820_poll,
+	.transmit	= ns83820_transmit,
+	.irq		= ns83820_irq,
+	.disable	= ns83820_disable,
+};	nic->nic_op	= &ns83820_operations;
 	return 1;
 }
 

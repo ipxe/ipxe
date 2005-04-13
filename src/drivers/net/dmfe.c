@@ -515,10 +515,14 @@ static int dmfe_probe ( struct dev *dev ) {
 	nic->ioaddr = pci->ioaddr;
 
 	/* point to NIC specific routines */
-	dev->disable = dmfe_disable;
-	nic->poll = dmfe_poll;
-	nic->transmit = dmfe_transmit;
-        nic->irq      = dmfe_irq;
+static struct nic_operations dmfe_operations;
+static struct nic_operations dmfe_operations = {
+	.connect	= dummy_connect,
+	.poll		= dmfe_poll,
+	.transmit	= dmfe_transmit,
+	.irq		= dmfe_irq,
+	.disable	= dmfe_disable,
+};	nic->nic_op	= &dmfe_operations;
 
 	return 1;
 }

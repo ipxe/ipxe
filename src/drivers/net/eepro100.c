@@ -767,11 +767,15 @@ static int eepro100_probe ( struct dev *dev ) {
 		eepro100_disable(dev);
 		return 0;
 	}
-
-	dev->disable  = eepro100_disable;
-	nic->poll     = eepro100_poll;
-	nic->transmit = eepro100_transmit;
-	nic->irq      = eepro100_irq;
+static struct nic_operations eepro100_operations;
+static struct nic_operations eepro100_operations = {
+	.connect	= dummy_connect,
+	.poll		= eepro100_poll,
+	.transmit	= eepro100_transmit,
+	.irq		= eepro100_irq,
+	.disable	= eepro100_disable,
+};
+	nic->nic_op	= &eepro100_operations;
 	return 1;
 }
 

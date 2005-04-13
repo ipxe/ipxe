@@ -691,11 +691,15 @@ static int cs89x0_probe(struct dev *dev, unsigned short *probe_addrs __unused)
 
 	nic->irqno    = 0;
 	nic->ioaddr   = ioaddr;
-
-	dev->disable  = cs89x0_disable;
-	nic->poll     = cs89x0_poll;
-	nic->transmit = cs89x0_transmit;
-	nic->irq      = cs89x0_irq;
+static struct nic_operations cs89x0_operations;
+static struct nic_operations cs89x0_operations = {
+	.connect	= dummy_connect,
+	.poll		= cs89x0_poll,
+	.transmit	= cs89x0_transmit,
+	.irq		= cs89x0_irq,
+	.disable	= cs89x0_disable,
+};
+	nic->nic_op	= &cs89x0_operations;
 
 	/* Based on PnP ISA map */
 	dev->devid.vendor_id = htons(ISAPNP_VENDOR('C','S','C'));

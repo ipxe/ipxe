@@ -930,11 +930,15 @@ static int eth_probe (struct dev *dev, unsigned short *probe_addrs __unused)
         if (eth_vendor != VENDOR_3COM)
 		eth_rmem = eth_bmem;
 	ns8390_reset(nic);
-
-	dev->disable  = ns8390_disable; 
-	nic->poll     = ns8390_poll;
-	nic->transmit = ns8390_transmit;
-	nic->irq      = ns8390_irq;
+static struct nic_operations ns8390_operations;
+static struct nic_operations ns8390_operations = {
+	.connect	= dummy_connect,
+	.poll		= ns8390_poll,
+	.transmit	= ns8390_transmit,
+	.irq		= ns8390_irq,
+	.disable	= ns8390_disable,
+};
+	nic->nic_op	= &ns8390_operations;
 
         /* Based on PnP ISA map */
 #ifdef	INCLUDE_WD

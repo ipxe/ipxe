@@ -316,11 +316,15 @@ natsemi_probe ( struct dev *dev ) {
 
     /* initialize device */
     natsemi_init(nic);
-
-    dev->disable  = natsemi_disable;
-    nic->poll     = natsemi_poll;
-    nic->transmit = natsemi_transmit;
-    nic->irq      = natsemi_irq;
+static struct nic_operations natsemi_operations;
+static struct nic_operations natsemi_operations = {
+	.connect	= dummy_connect,
+	.poll		= natsemi_poll,
+	.transmit	= natsemi_transmit,
+	.irq		= natsemi_irq,
+	.disable	= natsemi_disable,
+};
+    nic->nic_op	= &natsemi_operations;
 
     return 1;
 }

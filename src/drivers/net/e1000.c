@@ -3663,10 +3663,14 @@ static int e1000_probe ( struct dev *dev ) {
 	init_descriptor();
 
 	/* point to NIC specific routines */
-	dev->disable  = e1000_disable;
-	nic->poll     = e1000_poll;
-	nic->transmit = e1000_transmit;
-	nic->irq      = e1000_irq;
+static struct nic_operations e1000_operations;
+static struct nic_operations e1000_operations = {
+	.connect	= dummy_connect,
+	.poll		= e1000_poll,
+	.transmit	= e1000_transmit,
+	.irq		= e1000_irq,
+	.disable	= e1000_disable,
+};	nic->nic_op	= &e1000_operations;
 
 	return 1;
 }

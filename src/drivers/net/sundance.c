@@ -735,10 +735,14 @@ static int sundance_probe ( struct dev *dev ) {
 	       sdc->mii_if.full_duplex ? "Full" : "Half");
 
 	/* point to NIC specific routines */
-	dev->disable = sundance_disable;
-	nic->poll = sundance_poll;
-	nic->transmit = sundance_transmit;
-	nic->irq = sundance_irq;
+static struct nic_operations sundance_operations;
+static struct nic_operations sundance_operations = {
+	.connect	= dummy_connect,
+	.poll		= sundance_poll,
+	.transmit	= sundance_transmit,
+	.irq		= sundance_irq,
+	.disable	= sundance_disable,
+};	nic->nic_op	= &sundance_operations;
 	nic->irqno = pci->irq;
 	nic->ioaddr = BASE;
 
