@@ -53,7 +53,6 @@
 /* Globals */
 
 static struct nic_operations sis900_operations;
-static struct pci_driver sis900_driver;
 
 static int sis900_debug = 0;
 
@@ -128,7 +127,7 @@ static struct pci_driver sis_bridge_driver =
 
 /* Function Prototypes */
 
-static int sis900_probe(struct dev *dev);
+static int sis900_probe(struct dev *dev,struct pci_device *pci);
 
 static u16  sis900_read_eeprom(int location);
 static void sis900_mdio_reset(long mdio_addr);
@@ -310,17 +309,13 @@ static int sis635_get_mac_addr(struct pci_device * pci_dev __unused, struct nic 
  * Returns:   struct nic *:          pointer to NIC data structure
  */
 
-static int sis900_probe ( struct dev *dev ) {
+static int sis900_probe ( struct dev *dev, struct pci_device *pci ) {
     struct nic *nic = nic_device ( dev );
-    struct pci_device *pci = pci_device ( dev );
     int i;
     int found=0;
     int phy_addr;
     u8 revision;
     int ret;
-
-    if ( ! find_pci_device ( pci, &sis900_driver ) )
-	return 0;
 
     if (pci->ioaddr == 0)
         return 0;
@@ -1265,4 +1260,4 @@ PCI_ROM(0x1039, 0x7016, "sis7016", "SIS7016"),
 static struct pci_driver sis900_driver =
 	PCI_DRIVER ( "SIS900", sis900_nics, PCI_NO_CLASS );
 
-BOOT_DRIVER ( "SIS900", sis900_probe );
+BOOT_DRIVER ( "SIS900", find_pci_boot_device, sis900_driver, sis900_probe );
