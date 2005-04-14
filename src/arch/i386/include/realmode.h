@@ -4,7 +4,6 @@
 #ifndef ASSEMBLY
 
 #include "stdint.h"
-#include "compiler.h"
 #include "registers.h"
 #include "io.h"
 

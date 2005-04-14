@@ -2,7 +2,6 @@
 #define REGISTERS_H
 
 #include "stdint.h"
-#include "compiler.h"
 
 /* Basic 16-bit and 32-bit register types */
 typedef union {

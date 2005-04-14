@@ -5,7 +5,6 @@
 
 #include "stdint.h"
 #include "realmode.h"
-#include "compiler.h"
 
 #define BIOS_DATA_SEG 0x0040
 

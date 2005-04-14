@@ -1,7 +1,6 @@
 #ifndef	ETHERBOOT_IO_H
 #define ETHERBOOT_IO_H
 
-#include "compiler.h"
 #include "virtaddr.h"
 
 /* virt_to_bus converts an addresss inside of etherboot [_start, _end]

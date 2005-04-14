@@ -3,7 +3,6 @@
  * Body of routines taken from old pcbios.S
  */
 
-#include "compiler.h"
 #include "realmode.h"
 #include "console.h"
 

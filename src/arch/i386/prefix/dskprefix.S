@@ -1,5 +1,3 @@
-#include "compiler.h"
-
 /* NOTE: this boot sector contains instructions that need at least an 80186.
  * Yes, as86 has a bug somewhere in the valid instruction set checks.
  *
