@@ -3227,44 +3227,11 @@ static struct nic_operations tg3_operations = {
 	.disable	= tg3_disable,
 };
 
-
-static struct pci_id tg3_nics[] = {
-PCI_ROM(0x14e4, 0x1644, "tg3-5700",        "Broadcom Tigon 3 5700"),
-PCI_ROM(0x14e4, 0x1645, "tg3-5701",        "Broadcom Tigon 3 5701"),
-PCI_ROM(0x14e4, 0x1646, "tg3-5702",        "Broadcom Tigon 3 5702"),
-PCI_ROM(0x14e4, 0x1647, "tg3-5703",        "Broadcom Tigon 3 5703"),
-PCI_ROM(0x14e4, 0x1648, "tg3-5704",        "Broadcom Tigon 3 5704"),
-PCI_ROM(0x14e4, 0x164d, "tg3-5702FE",      "Broadcom Tigon 3 5702FE"),
-PCI_ROM(0x14e4, 0x1653, "tg3-5705",        "Broadcom Tigon 3 5705"),
-PCI_ROM(0x14e4, 0x1654, "tg3-5705_2",      "Broadcom Tigon 3 5705_2"),
-PCI_ROM(0x14e4, 0x165d, "tg3-5705M",       "Broadcom Tigon 3 5705M"),
-PCI_ROM(0x14e4, 0x165e, "tg3-5705M_2",     "Broadcom Tigon 3 5705M_2"),
-PCI_ROM(0x14e4, 0x1677, "tg3-5751",        "Broadcom Tigon 3 5751"),
-PCI_ROM(0x14e4, 0x1696, "tg3-5782",        "Broadcom Tigon 3 5782"),
-PCI_ROM(0x14e4, 0x169c, "tg3-5788",        "Broadcom Tigon 3 5788"),
-PCI_ROM(0x14e4, 0x16a6, "tg3-5702X",       "Broadcom Tigon 3 5702X"),
-PCI_ROM(0x14e4, 0x16a7, "tg3-5703X",       "Broadcom Tigon 3 5703X"),
-PCI_ROM(0x14e4, 0x16a8, "tg3-5704S",       "Broadcom Tigon 3 5704S"),
-PCI_ROM(0x14e4, 0x16c6, "tg3-5702A3",      "Broadcom Tigon 3 5702A3"),
-PCI_ROM(0x14e4, 0x16c7, "tg3-5703A3",      "Broadcom Tigon 3 5703A3"),
-PCI_ROM(0x14e4, 0x170d, "tg3-5901",        "Broadcom Tigon 3 5901"),
-PCI_ROM(0x14e4, 0x170e, "tg3-5901_2",      "Broadcom Tigon 3 5901_2"),
-PCI_ROM(0x1148, 0x4400, "tg3-9DXX",        "Syskonnect 9DXX"),
-PCI_ROM(0x1148, 0x4500, "tg3-9MXX",        "Syskonnect 9MXX"),
-PCI_ROM(0x173b, 0x03e8, "tg3-ac1000",      "Altima AC1000"),
-PCI_ROM(0x173b, 0x03e9, "tg3-ac1001",      "Altima AC1001"),
-PCI_ROM(0x173b, 0x03ea, "tg3-ac9100",      "Altima AC9100"),
-PCI_ROM(0x173b, 0x03eb, "tg3-ac1003",      "Altima AC1003"),
-};
-
-static struct pci_driver tg3_driver =
-	PCI_DRIVER ( "TG3", tg3_nics, PCI_NO_CLASS );
-
 /**************************************************************************
 PROBE - Look for an adapter, this routine's visible to the outside
 You should omit the last argument struct pci_device * for a non-PCI NIC
 ***************************************************************************/
-static int tg3_probe ( struct dev *dev, struct pci_device *pci ) {
+static int tg3_probe ( struct dev *dev, struct pci_device *pdev ) {
 	struct nic *nic = nic_device ( dev );
 	struct tg3 *tp = &tg3;
 	unsigned long tg3reg_base, tg3reg_len;
@@ -3385,5 +3352,38 @@ static int tg3_probe ( struct dev *dev, struct pci_device *pci ) {
 	tg3_disable(nic);
 	return 0;
 }
+
+
+static struct pci_id tg3_nics[] = {
+PCI_ROM(0x14e4, 0x1644, "tg3-5700",        "Broadcom Tigon 3 5700"),
+PCI_ROM(0x14e4, 0x1645, "tg3-5701",        "Broadcom Tigon 3 5701"),
+PCI_ROM(0x14e4, 0x1646, "tg3-5702",        "Broadcom Tigon 3 5702"),
+PCI_ROM(0x14e4, 0x1647, "tg3-5703",        "Broadcom Tigon 3 5703"),
+PCI_ROM(0x14e4, 0x1648, "tg3-5704",        "Broadcom Tigon 3 5704"),
+PCI_ROM(0x14e4, 0x164d, "tg3-5702FE",      "Broadcom Tigon 3 5702FE"),
+PCI_ROM(0x14e4, 0x1653, "tg3-5705",        "Broadcom Tigon 3 5705"),
+PCI_ROM(0x14e4, 0x1654, "tg3-5705_2",      "Broadcom Tigon 3 5705_2"),
+PCI_ROM(0x14e4, 0x165d, "tg3-5705M",       "Broadcom Tigon 3 5705M"),
+PCI_ROM(0x14e4, 0x165e, "tg3-5705M_2",     "Broadcom Tigon 3 5705M_2"),
+PCI_ROM(0x14e4, 0x1677, "tg3-5751",        "Broadcom Tigon 3 5751"),
+PCI_ROM(0x14e4, 0x1696, "tg3-5782",        "Broadcom Tigon 3 5782"),
+PCI_ROM(0x14e4, 0x169c, "tg3-5788",        "Broadcom Tigon 3 5788"),
+PCI_ROM(0x14e4, 0x16a6, "tg3-5702X",       "Broadcom Tigon 3 5702X"),
+PCI_ROM(0x14e4, 0x16a7, "tg3-5703X",       "Broadcom Tigon 3 5703X"),
+PCI_ROM(0x14e4, 0x16a8, "tg3-5704S",       "Broadcom Tigon 3 5704S"),
+PCI_ROM(0x14e4, 0x16c6, "tg3-5702A3",      "Broadcom Tigon 3 5702A3"),
+PCI_ROM(0x14e4, 0x16c7, "tg3-5703A3",      "Broadcom Tigon 3 5703A3"),
+PCI_ROM(0x14e4, 0x170d, "tg3-5901",        "Broadcom Tigon 3 5901"),
+PCI_ROM(0x14e4, 0x170e, "tg3-5901_2",      "Broadcom Tigon 3 5901_2"),
+PCI_ROM(0x1148, 0x4400, "tg3-9DXX",        "Syskonnect 9DXX"),
+PCI_ROM(0x1148, 0x4500, "tg3-9MXX",        "Syskonnect 9MXX"),
+PCI_ROM(0x173b, 0x03e8, "tg3-ac1000",      "Altima AC1000"),
+PCI_ROM(0x173b, 0x03e9, "tg3-ac1001",      "Altima AC1001"),
+PCI_ROM(0x173b, 0x03ea, "tg3-ac9100",      "Altima AC9100"),
+PCI_ROM(0x173b, 0x03eb, "tg3-ac1003",      "Altima AC1003"),
+};
+
+static struct pci_driver tg3_driver =
+	PCI_DRIVER ( "TG3", tg3_nics, PCI_NO_CLASS );
 
 BOOT_DRIVER ( "TG3", find_pci_boot_device, tg3_driver, tg3_probe );

@@ -486,7 +486,7 @@ static int mdio_read(struct nic *nic, int phy_id, int location);
 static void mdio_write(struct nic *nic, int phy_id, int location, int value);
 static int read_eeprom(unsigned long ioaddr, int location, int addr_len);
 static void parse_eeprom(struct nic *nic);
-static int tulip_probe(struct dev *dev);
+static int tulip_probe(struct dev *dev,struct pci_device *pci);
 static void tulip_init_ring(struct nic *nic);
 static void tulip_reset(struct nic *nic);
 static void tulip_transmit(struct nic *nic, const char *d, unsigned int t,
@@ -1220,12 +1220,11 @@ static struct nic_operations tulip_operations = {
 	.irq		= tulip_irq,
 	.disable	= tulip_disable,
 };
-static struct pci_driver tulip_driver;
 
 /*********************************************************************/
 /* eth_probe - Look for an adapter                                   */
 /*********************************************************************/
-static int tulip_probe ( struct dev *dev ) {
+static int tulip_probe ( struct dev *dev, struct pci_device *pci ) {
     struct nic *nic = nic_device ( dev );
     u32 i;
     u8  chip_rev;

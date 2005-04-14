@@ -157,7 +157,7 @@ static int TxPtr;
 /*********************************************************************/
 static void whereami(const char *str);
 static int read_eeprom(unsigned long ioaddr, int location, int addr_len);
-static int davicom_probe(struct dev *dev);
+static int davicom_probe(struct dev *dev,struct pci_device *pci);
 static void davicom_init_chain(struct nic *nic);	/* Sten 10/9 */
 static void davicom_reset(struct nic *nic);
 static void davicom_transmit(struct nic *nic, const char *d, unsigned int t,
@@ -178,7 +178,7 @@ static void davicom_media_chk(struct nic *);
 /*********************************************************************/
 /* Utility Routines                                                  */
 /*********************************************************************/
-static inline void whereami(const char *str, struct pci_device *pci)
+static inline void whereami(const char *str)
 {
   printf("%s\n", str);
   /* sleep(2); */
@@ -655,7 +655,7 @@ static void davicom_irq(struct nic *nic __unused, irq_action_t action __unused)
 /*********************************************************************/
 /* eth_probe - Look for an adapter                                   */
 /*********************************************************************/
-static int davicom_probe ( struct dev *dev ) {
+static int davicom_probe ( struct dev *dev, struct pci_device *pci ) {
   struct nic *nic = nic_device ( dev );
   unsigned int i;
 

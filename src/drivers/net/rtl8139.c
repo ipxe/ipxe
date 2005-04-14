@@ -172,7 +172,7 @@ static unsigned int cur_rx,cur_tx;
 static unsigned char tx_buffer[TX_BUF_SIZE] __attribute__((aligned(4)));
 static unsigned char rx_ring[RX_BUF_LEN+16] __attribute__((aligned(4)));
 
-static int rtl8139_probe(struct dev *dev);
+static int rtl8139_probe(struct dev *dev,struct pci_device *pci);
 static int read_eeprom(struct nic *nic, int location, int addr_len);
 static void rtl_reset(struct nic *nic);
 static void rtl_transmit(struct nic *nic, const char *destaddr,

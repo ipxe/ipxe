@@ -213,7 +213,7 @@ static unsigned char rxb[NUM_RX_DESC * RX_BUF_SIZE] __attribute__ ((aligned(4)))
 
 /* Function Prototypes */
 
-static int natsemi_probe(struct dev *dev);
+static int natsemi_probe(struct dev *dev,struct pci_device *pci);
 static int eeprom_read(long addr, int location);
 static int mdio_read(int phy_id, int location);
 static void natsemi_init(struct nic *nic);
