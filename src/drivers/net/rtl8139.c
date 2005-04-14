@@ -190,7 +190,6 @@ static int rtl8139_probe ( struct dev *dev, struct pci_device *pci ) {
 	int addr_len;
 	unsigned short *ap = (unsigned short*)nic->node_addr;
 
-	/* Look for PCI device */
 	if ( ! find_pci_device ( pci, &rtl8139_driver ) )
 		return 0;
 
