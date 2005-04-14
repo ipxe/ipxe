@@ -97,7 +97,7 @@ int find_isa_device ( struct isa_device *isa, struct isa_driver *driver ) {
 	return 0;
 
  found:
-	DBG ( "Found %s ISA device at address %hx\n", driver->name, ioaddr );
+	DBG ( "ISA found %s device at address %hx\n", driver->name, ioaddr );
 	isa->ioaddr = ioaddr;
 	isa->already_tried = 1;
 	return 1;
