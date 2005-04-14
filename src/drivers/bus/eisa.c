@@ -14,6 +14,14 @@
 #endif
 
 /*
+ * Ensure that there is sufficient space in the shared dev_bus
+ * structure for a struct pci_device.
+ *
+ */
+DEV_BUS( struct eisa_device, eisa_dev );
+static char eisa_magic[0]; /* guaranteed unique symbol */
+
+/*
  * Fill in parameters for an EISA device based on slot number
  *
  * Return 1 if device present, 0 otherwise
@@ -52,15 +60,14 @@ static int fill_eisa_device ( struct eisa_device *eisa ) {
  * Obtain a struct eisa * from a struct dev *
  *
  * If dev has not previously been used for an EISA device scan, blank
- * out dev.eisa
+ * out struct eisa
  */
 struct eisa_device * eisa_device ( struct dev *dev ) {
-	struct eisa_device *eisa = &dev->eisa;
+	struct eisa_device *eisa = dev->bus;;
 
-	if ( dev->devid.bus_type != EISA_BUS_TYPE ) {
+	if ( eisa->magic != eisa_magic ) {
 		memset ( eisa, 0, sizeof ( *eisa ) );
-		dev->devid.bus_type = EISA_BUS_TYPE;
-		eisa->slot = EISA_MIN_SLOT;
+		eisa->magic = eisa_magic;
 	}
 	eisa->dev = dev;
 	return eisa;
@@ -74,8 +81,13 @@ int find_eisa_device ( struct eisa_device *eisa, struct eisa_driver *driver ) {
 	unsigned int i;
 
 	/* Iterate through all possible EISA slots, starting where we
-	 * left off/
+	 * left off.  If eisa->slot is zero (which it will be if we
+	 * have a zeroed structure), start from slot EISA_MIN_SLOT,
+	 * since slot 0 doesn't exist.
 	 */
+	if ( ! eisa->slot ) {
+		eisa->slot = EISA_MIN_SLOT;
+	}
 	for ( ; eisa->slot <= EISA_MAX_SLOT ; eisa->slot++ ) {
 		/* If we've already used this device, skip it */
 		if ( eisa->already_tried ) {
@@ -101,6 +113,8 @@ int find_eisa_device ( struct eisa_device *eisa, struct eisa_driver *driver ) {
 						      eisa->prod_id ) );
 				if ( eisa->dev ) {
 					eisa->dev->name = driver->name;
+					eisa->dev->devid.bus_type
+						= ISA_BUS_TYPE;
 					eisa->dev->devid.vendor_id
 						= eisa->mfg_id;
 					eisa->dev->devid.device_id

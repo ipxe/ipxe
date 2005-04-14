@@ -3,11 +3,6 @@
 
 #include "stdint.h"
 
-/* Bus types */
-#include "pci.h"
-#include "eisa.h"
-#include "mca.h"
-
 /* Device types */
 #include "nic.h"
 
@@ -18,8 +13,7 @@ struct dev_id {
 	uint8_t		bus_type;
 #define	PCI_BUS_TYPE	1
 #define	ISA_BUS_TYPE	2
-#define EISA_BUS_TYPE	3
-#define MCA_BUS_TYPE	4
+#define MCA_BUS_TYPE	3
 } __attribute__ ((packed));
 
 /* Dont use sizeof, that will include the padding */
@@ -29,17 +23,24 @@ struct dev {
 	struct dev_operations *dev_op;
 	const char *name;
 	struct dev_id	devid;	/* device ID string (sent to DHCP server) */
-	/* All possible bus types */
-	union {
-		struct pci_device	pci;
-		struct eisa_device	eisa;
-		struct mca_device	mca;
-	};
+	/* Pointer to bus information for device.  Whatever sets up
+	 * the struct dev must make sure that this points to a buffer
+	 * large enough for the required struct <bus>_device.
+	 */
+	void *bus;
 	/* All possible device types */
 	union {
 		struct nic	nic;
 	};
 };
+
+/*
+ * Macro to help create a common symbol with enough space for any
+ * struct <bus>_device.
+ *
+ * Use as e.g. DEV_BUS(struct pci_device);
+ */
+#define DEV_BUS(datatype,symbol) datatype symbol __asm__ ( "_dev_bus" );
 
 struct dev_operations {
 	void ( *disable ) ( struct dev * );

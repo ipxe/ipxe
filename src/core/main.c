@@ -144,7 +144,10 @@ static int initialized;
 
 
 /* Global instance of the current boot device */
-struct dev dev;
+DEV_BUS(struct {}, dev_bus);
+struct dev dev = {
+	.bus = &dev_bus,
+};
 
 /**************************************************************************
  * initialise() - perform any C-level initialisation
@@ -210,24 +213,6 @@ void exit(int status)
 		;
 	exit_status = status;
 	longjmp(restart_etherboot, 255);
-}
-
-
-/*
- * Set PCI device to use.
- *
- * This routine can be called by e.g. the ROM prefix to specify that
- * the first device to be tried should be the device on which the ROM
- * was physically located.
- *
- * Note that this is deliberately in main.c rather than pci.c, because
- * this function should generalise to other bus types (e.g. ISAPnP),
- * and we don't want to end up dragging in pci.o unnecessarily.
- */
-void set_pci_device ( uint16_t busdevfn ) {
-	dev.devid.bus_type = PCI_BUS_TYPE;
-	dev.pci.busdevfn = busdevfn;
-	dev.pci.already_tried = 0;
 }
 
 

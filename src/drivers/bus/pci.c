@@ -10,6 +10,14 @@
 #endif
 
 /*
+ * Ensure that there is sufficient space in the shared dev_bus
+ * structure for a struct pci_device.
+ *
+ */
+DEV_BUS( struct pci_device, pci_dev );
+static char pci_magic[0]; /* guaranteed unique symbol */
+
+/*
  * Fill in parameters (vendor & device ids, class, membase etc.) for a
  * PCI device based on bus & devfn.
  *
@@ -112,17 +120,31 @@ void adjust_pci_device ( struct pci_device *pci ) {
  * Obtain a struct pci * from a struct dev *
  *
  * If dev has not previously been used for a PCI device scan, blank
- * out dev.pci
+ * out struct pci
  */
 struct pci_device * pci_device ( struct dev *dev ) {
-	struct pci_device *pci = &dev->pci;
+	struct pci_device *pci = dev->bus;
 
-	if ( dev->devid.bus_type != PCI_BUS_TYPE ) {
+	if ( pci->magic != pci_magic ) {
 		memset ( pci, 0, sizeof ( *pci ) );
-		dev->devid.bus_type = PCI_BUS_TYPE;
+		pci->magic = pci_magic;
 	}
 	pci->dev = dev;
 	return pci;
+}
+
+/*
+ * Set PCI device to use.
+ *
+ * This routine can be called by e.g. the ROM prefix to specify that
+ * the first device to be tried should be the device on which the ROM
+ * was physically located.
+ *
+ */
+void set_pci_device ( uint16_t busdevfn ) {
+	pci_dev.magic = pci_magic;
+	pci_dev.busdevfn = busdevfn;
+	pci_dev.already_tried = 0;
 }
 
 /*
@@ -154,6 +176,7 @@ int find_pci_device ( struct pci_device *pci,
 		/* Fill in dev structure, if present */
 		if ( pci->dev ) {
 			pci->dev->name = driver->name;
+			pci->dev->devid.bus_type = PCI_BUS_TYPE;
 			pci->dev->devid.vendor_id = pci->vendor;
 			pci->dev->devid.device_id = pci->dev_id;
 		}

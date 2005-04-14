@@ -27,6 +27,7 @@
  */
 struct dev;
 struct eisa_device {
+	char *magic; /* must be first */
 	struct dev *dev;
 	unsigned int slot;
 	uint16_t ioaddr;

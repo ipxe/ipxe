@@ -232,13 +232,13 @@
 #define PCI_MSI_ADDRESS_HI	8	/* Upper 32 bits (if PCI_MSI_FLAGS_64BIT set) */
 #define PCI_MSI_DATA_32		8	/* 16 bits of data for 32-bit devices */
 #define PCI_MSI_DATA_64		12	/* 16 bits of data for 64-bit devices */
-
 /*
  * A physical PCI device
  *
  */
 struct dev;
 struct pci_device {
+	char *			magic; /* must be first */
 	struct dev *		dev;
 	uint32_t		membase;	/* BAR 1 */
 	uint32_t		ioaddr;		/* first IO BAR */

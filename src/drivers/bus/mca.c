@@ -20,6 +20,14 @@
 #endif
 
 /*
+ * Ensure that there is sufficient space in the shared dev_bus
+ * structure for a struct pci_device.
+ *
+ */
+DEV_BUS( struct mca_device, mca_dev );
+static char mca_magic[0]; /* guaranteed unique symbol */
+
+/*
  * Fill in parameters for an MCA device based on slot number
  *
  */
@@ -53,14 +61,14 @@ static int fill_mca_device ( struct mca_device *mca ) {
  * Obtain a struct mca * from a struct dev *
  *
  * If dev has not previously been used for an MCA device scan, blank
- * out dev.mca
+ * out struct mca
  */
 struct mca_device * mca_device ( struct dev *dev ) {
-	struct mca_device *mca = &dev->mca;
+	struct mca_device *mca = dev->bus;
 
-	if ( dev->devid.bus_type != MCA_BUS_TYPE ) {
+	if ( mca->magic != mca_magic ) {
 		memset ( mca, 0, sizeof ( *mca ) );
-		dev->devid.bus_type = MCA_BUS_TYPE;
+		mca->magic = mca_magic;
 	}
 	mca->dev = dev;
 	return mca;
@@ -97,8 +105,10 @@ int find_mca_device ( struct mca_device *mca, struct mca_driver *driver ) {
 				      id->name, driver->name, id->id );
 				if ( mca->dev ) {
 					mca->dev->name = driver->name;
-					mca->dev->devid.vendor_id =
-						GENERIC_MCA_VENDOR;
+					mca->dev->devid.bus_type
+						= MCA_BUS_TYPE;
+					mca->dev->devid.vendor_id
+						= GENERIC_MCA_VENDOR;
 					mca->dev->devid.device_id = id->id;
 				}
 				mca->already_tried = 1;

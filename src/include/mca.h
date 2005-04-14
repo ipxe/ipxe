@@ -28,6 +28,7 @@
  */
 struct dev;
 struct mca_device {
+	char *magic; /* must be first */
 	struct dev *dev;
 	unsigned int slot;
 	unsigned char pos[8];
