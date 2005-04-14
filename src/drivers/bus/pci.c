@@ -1,5 +1,4 @@
 #include "etherboot.h"
-#include "dev.h"
 #include "pci.h"
 
 /*

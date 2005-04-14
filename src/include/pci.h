@@ -23,6 +23,7 @@
 
 #include "stdint.h"
 #include "pci_ids.h"
+#include "dev.h"
 
 /*
  * PCI constants

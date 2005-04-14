@@ -2,6 +2,7 @@
 #define EISA_H
 
 #include "isa_ids.h"
+#include "dev.h"
 
 /*
  * EISA constants

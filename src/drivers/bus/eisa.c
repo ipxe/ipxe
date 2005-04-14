@@ -1,5 +1,4 @@
 #include "etherboot.h"
-#include "dev.h"
 #include "io.h"
 #include "timer.h"
 #include "eisa.h"

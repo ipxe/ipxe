@@ -6,7 +6,6 @@
  */
 
 #include "etherboot.h"
-#include "dev.h"
 #include "io.h"
 #include "mca.h"
 
