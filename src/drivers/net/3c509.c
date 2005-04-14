@@ -34,7 +34,7 @@ struct t509_device {
  *
  */
 struct t509_driver {
-	char *name;
+	const char *name;
 };
 
 /*
