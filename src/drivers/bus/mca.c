@@ -49,31 +49,20 @@ static int fill_mca_device ( struct mca_device *mca ) {
 }
 
 /*
- * Obtain a struct mca * from a struct dev *
- *
- * If dev has not previously been used for an MCA device scan, blank
- * out struct mca
- */
-struct mca_device * mca_device ( struct dev *dev ) {
-	struct mca_device *mca = dev->bus;
-
-	if ( mca->magic != mca_magic ) {
-		memset ( mca, 0, sizeof ( *mca ) );
-		mca->magic = mca_magic;
-	}
-	mca->dev = dev;
-	return mca;
-}
-
-/*
  * Find an MCA device matching the specified driver
  *
  */
 int find_mca_device ( struct mca_device *mca, struct mca_driver *driver ) {
 	unsigned int i;
 
+	/* Initialise struct mca if it's the first time it's been used. */
+	if ( mca->magic != mca_magic ) {
+		memset ( mca, 0, sizeof ( *mca ) );
+		mca->magic = mca_magic;
+	}
+
 	/* Iterate through all possible MCA slots, starting where we
-	 * left off/
+	 * left off
 	 */
 	for ( ; mca->slot < MCA_MAX_SLOT_NR ; mca->slot++ ) {
 		/* If we've already used this device, skip it */
@@ -94,14 +83,7 @@ int find_mca_device ( struct mca_device *mca, struct mca_driver *driver ) {
 			if ( MCA_ID ( mca ) == id->id ) {
 				DBG ( "Device %s (driver %s) matches ID %hx\n",
 				      id->name, driver->name, id->id );
-				if ( mca->dev ) {
-					mca->dev->name = driver->name;
-					mca->dev->devid.bus_type
-						= MCA_BUS_TYPE;
-					mca->dev->devid.vendor_id
-						= GENERIC_MCA_VENDOR;
-					mca->dev->devid.device_id = id->id;
-				}
+				mca->name = id->name;
 				mca->already_tried = 1;
 				return 1;
 			}
@@ -111,4 +93,23 @@ int find_mca_device ( struct mca_device *mca, struct mca_driver *driver ) {
 	/* No device found */
 	mca->slot = 0;
 	return 0;
+}
+
+/*
+ * Find the next MCA device that can be used to boot using the
+ * specified driver.
+ *
+ */
+int find_mca_boot_device ( struct dev *dev, struct mca_driver *driver ) {
+	struct mca_device *mca = ( struct mca_device * )dev->bus;
+
+	if ( ! find_mca_device ( mca, driver ) )
+		return 0;
+
+	dev->name = mca->name;
+	dev->devid.bus_type = MCA_BUS_TYPE;
+	dev->devid.vendor_id = GENERIC_MCA_VENDOR;
+	dev->devid.device_id = MCA_ID ( mca );
+
+	return 1;
 }

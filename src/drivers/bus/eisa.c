@@ -48,37 +48,22 @@ static int fill_eisa_device ( struct eisa_device *eisa ) {
 }
 
 /*
- * Obtain a struct eisa * from a struct dev *
- *
- * If dev has not previously been used for an EISA device scan, blank
- * out struct eisa
- */
-struct eisa_device * eisa_device ( struct dev *dev ) {
-	struct eisa_device *eisa = dev->bus;;
-
-	if ( eisa->magic != eisa_magic ) {
-		memset ( eisa, 0, sizeof ( *eisa ) );
-		eisa->magic = eisa_magic;
-	}
-	eisa->dev = dev;
-	return eisa;
-}
-
-/*
  * Find an EISA device matching the specified driver
  *
  */
 int find_eisa_device ( struct eisa_device *eisa, struct eisa_driver *driver ) {
 	unsigned int i;
 
-	/* Iterate through all possible EISA slots, starting where we
-	 * left off.  If eisa->slot is zero (which it will be if we
-	 * have a zeroed structure), start from slot EISA_MIN_SLOT,
-	 * since slot 0 doesn't exist.
-	 */
-	if ( ! eisa->slot ) {
+	/* Initialise struct eisa if it's the first time it's been used. */
+	if ( eisa->magic != eisa_magic ) {
+		memset ( eisa, 0, sizeof ( *eisa ) );
+		eisa->magic = eisa_magic;
 		eisa->slot = EISA_MIN_SLOT;
 	}
+
+	/* Iterate through all possible EISA slots, starting where we
+	 * left off.
+	 */
 	for ( ; eisa->slot <= EISA_MAX_SLOT ; eisa->slot++ ) {
 		/* If we've already used this device, skip it */
 		if ( eisa->already_tried ) {
@@ -102,15 +87,7 @@ int find_eisa_device ( struct eisa_device *eisa, struct eisa_driver *driver ) {
 				      id->name, driver->name,
 				      isa_id_string ( eisa->mfg_id,
 						      eisa->prod_id ) );
-				if ( eisa->dev ) {
-					eisa->dev->name = driver->name;
-					eisa->dev->devid.bus_type
-						= ISA_BUS_TYPE;
-					eisa->dev->devid.vendor_id
-						= eisa->mfg_id;
-					eisa->dev->devid.device_id
-						= eisa->prod_id;
-				}
+				eisa->name = id->name;
 				eisa->already_tried = 1;
 				return 1;
 			}
@@ -120,6 +97,25 @@ int find_eisa_device ( struct eisa_device *eisa, struct eisa_driver *driver ) {
 	/* No device found */
 	eisa->slot = EISA_MIN_SLOT;
 	return 0;
+}
+
+/*
+ * Find the next EISA device that can be used to boot using the
+ * specified driver.
+ *
+ */
+int find_eisa_boot_device ( struct dev *dev, struct eisa_driver *driver ) {
+	struct eisa_device *eisa = ( struct eisa_device * )dev->bus;
+
+	if ( ! find_eisa_device ( eisa, driver ) )
+		return 0;
+
+	dev->name = eisa->name;
+	dev->devid.bus_type = ISA_BUS_TYPE;
+	dev->devid.vendor_id = eisa->mfg_id;
+	dev->devid.device_id = eisa->prod_id;
+
+	return 1;
 }
 
 /*

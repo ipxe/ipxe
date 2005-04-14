@@ -25,10 +25,9 @@
  * A physical EISA device
  *
  */
-struct dev;
 struct eisa_device {
 	char *magic; /* must be first */
-	struct dev *dev;
+	const char *name;
 	unsigned int slot;
 	uint16_t ioaddr;
 	uint16_t mfg_id;
@@ -69,9 +68,10 @@ struct eisa_driver {
  * Functions in eisa.c
  *
  */
-extern struct eisa_device * eisa_device ( struct dev *dev );
 extern int find_eisa_device ( struct eisa_device *eisa,
 			      struct eisa_driver *driver );
+extern int find_eisa_boot_device ( struct dev *dev,
+				   struct eisa_driver *driver );
 extern void enable_eisa_device ( struct eisa_device *eisa );
 
 #endif /* EISA_H */

@@ -110,23 +110,6 @@ void adjust_pci_device ( struct pci_device *pci ) {
 }
 
 /*
- * Obtain a struct pci * from a struct dev *
- *
- * If dev has not previously been used for a PCI device scan, blank
- * out struct pci
- */
-struct pci_device * pci_device ( struct dev *dev ) {
-	struct pci_device *pci = dev->bus;
-
-	if ( pci->magic != pci_magic ) {
-		memset ( pci, 0, sizeof ( *pci ) );
-		pci->magic = pci_magic;
-	}
-	pci->dev = dev;
-	return pci;
-}
-
-/*
  * Set PCI device to use.
  *
  * This routine can be called by e.g. the ROM prefix to specify that
@@ -148,6 +131,12 @@ int find_pci_device ( struct pci_device *pci,
 		      struct pci_driver *driver ) {
 	int i;
 
+	/* Initialise struct pci if it's the first time it's been used. */
+	if ( pci->magic != pci_magic ) {
+		memset ( pci, 0, sizeof ( *pci ) );
+		pci->magic = pci_magic;
+	}
+
 	/* Iterate through all possible PCI bus:dev.fn combinations,
 	 * starting where we left off.
 	 */
@@ -166,19 +155,12 @@ int find_pci_device ( struct pci_device *pci,
 		/* Fix up PCI device */
 		adjust_pci_device ( pci );
 		
-		/* Fill in dev structure, if present */
-		if ( pci->dev ) {
-			pci->dev->name = driver->name;
-			pci->dev->devid.bus_type = PCI_BUS_TYPE;
-			pci->dev->devid.vendor_id = pci->vendor;
-			pci->dev->devid.device_id = pci->dev_id;
-		}
-
 		/* If driver has a class, and class matches, use it */
 		if ( driver->class && 
 		     ( driver->class == pci->class ) ) {
 			DBG ( "Driver %s matches class %hx\n",
 			      driver->name, driver->class );
+			pci->name = driver->name;
 			pci->already_tried = 1;
 			return 1;
 		}
@@ -192,8 +174,7 @@ int find_pci_device ( struct pci_device *pci,
 				DBG ( "Device %s (driver %s) matches "
 				      "ID %hx:%hx\n", id->name, driver->name,
 				      id->vendor, id->dev_id );
-				if ( pci->dev )
-					pci->dev->name = id->name;
+				pci->name = id->name;
 				pci->already_tried = 1;
 				return 1;
 			}
@@ -204,6 +185,25 @@ int find_pci_device ( struct pci_device *pci,
 
 	/* No device found */
 	return 0;
+}
+
+/*
+ * Find the next PCI device that can be used to boot using the
+ * specified driver.
+ *
+ */
+int find_pci_boot_device ( struct dev *dev, struct pci_driver *driver ) {
+	struct pci_device *pci = ( struct pci_device * )dev->bus;
+
+	if ( ! find_pci_device ( pci, driver ) )
+		return 0;
+
+	dev->name = pci->name;
+	dev->devid.bus_type = PCI_BUS_TYPE;
+	dev->devid.vendor_id = pci->vendor;
+	dev->devid.device_id = pci->dev_id;
+
+	return 1;
 }
 
 /*

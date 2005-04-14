@@ -236,10 +236,9 @@
  * A physical PCI device
  *
  */
-struct dev;
 struct pci_device {
 	char *			magic; /* must be first */
-	struct dev *		dev;
+	const char *		name;
 	uint32_t		membase;	/* BAR 1 */
 	uint32_t		ioaddr;		/* first IO BAR */
 	uint16_t		vendor, dev_id;
@@ -322,9 +321,9 @@ extern unsigned long pci_bus_base ( struct pci_device *dev );
  * Functions in pci.c
  *
  */
-extern struct pci_device * pci_device ( struct dev *dev );
 extern int find_pci_device ( struct pci_device *pci,
 			     struct pci_driver *driver );
+extern int find_pci_boot_device ( struct dev *dev, struct pci_driver *driver );
 extern void adjust_pci_device ( struct pci_device *pci );
 extern unsigned long pci_bar_start ( struct pci_device *pci,
 				     unsigned int bar );

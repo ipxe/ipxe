@@ -26,10 +26,9 @@
  * A physical MCA device
  *
  */
-struct dev;
 struct mca_device {
 	char *magic; /* must be first */
-	struct dev *dev;
+	const char *name;
 	unsigned int slot;
 	unsigned char pos[8];
 	int already_tried;
@@ -69,8 +68,8 @@ struct mca_driver {
  * Functions in mca.c
  *
  */
-extern struct mca_device * mca_device ( struct dev *dev );
 extern int find_mca_device ( struct mca_device *mca,
 			     struct mca_driver *driver );
+extern int find_mca_boot_device ( struct dev *dev, struct mca_driver *driver );
 
 #endif
