@@ -29,8 +29,28 @@
 __asm__ ( ".globl\t" OBJECT_SYMBOL_STR );
 __asm__ ( ".equ\t" OBJECT_SYMBOL_STR ", 0" );
 
+/*
+ * Macro to allow objects to explicitly drag in other objects by
+ * object name.  Used by config.c.
+ *
+ */
 #define REQUIRE_OBJECT(object) \
 	__asm__ ( ".equ\tneed_" #object ", obj_" #object );
+
+/*
+ * If debug_OBJECT is set to a true value, the macro DBG(...) will
+ * expand to printf(...) when compiling OBJECT, and the symbol
+ * WITH_DEBUG_MESSAGES will be inserted into the object file.
+ *
+ */
+#define DEBUG_SYMBOL _H2 ( debug_, OBJECT )
+#if DEBUG_SYMBOL
+#define DBG(...) printf ( __VA_ARGS__ )
+#define DEBUG_SYMBOL_STR _XSTR ( DEBUG_SYMBOL )
+__asm__ ( ".equ\tWITH_DEBUG_MESSAGES, 0" );
+#else
+#define DBG(...)
+#endif
 
 #define PACKED __attribute__((packed))
 #define __unused __attribute__((unused))
