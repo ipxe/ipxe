@@ -623,9 +623,8 @@ static struct pci_driver w89c840_driver =
 /**************************************************************************
 w89c840_probe - Look for an adapter, this routine's visible to the outside
 ***************************************************************************/
-static int w89c840_probe ( struct dev *dev ) {
+static int w89c840_probe ( struct dev *dev, struct pci_device *pci ) {
     struct nic *nic = nic_device ( dev );
-    struct pci_device *p = pci_device ( dev );
 
     if ( ! find_pci_device ( p, &w89c840_driver ) )
 	    return 0;

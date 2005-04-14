@@ -459,9 +459,8 @@ PROBE - Look for an adapter, this routine's visible to the outside
 
 #define board_found 1
 #define valid_link 0
-static int dmfe_probe ( struct dev *dev ) {
+static int dmfe_probe ( struct dev *dev, struct pci_device *pci ) {
 	struct nic *nic = nic_device ( dev );
-	struct pci_device *pci = pci_device ( dev );
 	uint32_t dev_rev, pci_pmr;
 	int i;
 

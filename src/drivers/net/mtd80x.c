@@ -674,9 +674,8 @@ static struct pci_driver mtd80x_driver =
 PROBE - Look for an adapter, this routine's visible to the outside
 ***************************************************************************/
 
-static int mtd_probe ( struct dev *dev ) {
+static int mtd_probe ( struct dev *dev, struct pci_device *pci ) {
     struct nic *nic = nic_device ( dev );
-    struct pci_device *pci = pci_device ( dev );
     int i;
 
     if ( ! find_pci_device ( pci, &mtd80x_driver ) )

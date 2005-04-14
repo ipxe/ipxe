@@ -26,9 +26,8 @@ PCI_ROM(0x1260, 0x3873, "dwl520",	"DLink DWL-520"),
 static struct pci_driver prism2_pci_driver =
 	PCI_DRIVER ( "Prism2_PCI", prism2_pci_nics, PCI_NO_CLASS );
 
-static int prism2_pci_probe ( struct dev *dev ) {
+static int prism2_pci_probe ( struct dev *dev, struct pci_device *pci ) {
   struct nic *nic = nic_device ( dev );
-  struct pci_device *pci = pci_device ( dev );
   hfa384x_t *hw = &hw_global;
   uint32_t membase = 0; /* Prism2.5 Memory Base */
 

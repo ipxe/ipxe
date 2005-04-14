@@ -723,9 +723,8 @@ PROBE - Look for an adapter, this routine's visible to the outside
 
 #define board_found 1
 #define valid_link 0
-static int r8169_probe ( struct dev *dev ) {
+static int r8169_probe ( struct dev *dev, struct pci_device *pci ) {
 	struct nic *nic = nic_device ( dev );
-	struct pci_device *pci = pci_device ( dev );
 	static int board_idx = -1;
 	static int printed_version = 0;
 	int i, rc;

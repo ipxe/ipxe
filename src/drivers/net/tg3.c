@@ -3264,9 +3264,8 @@ static struct pci_driver tg3_driver =
 PROBE - Look for an adapter, this routine's visible to the outside
 You should omit the last argument struct pci_device * for a non-PCI NIC
 ***************************************************************************/
-static int tg3_probe ( struct dev *dev ) {
+static int tg3_probe ( struct dev *dev, struct pci_device *pci ) {
 	struct nic *nic = nic_device ( dev );
-	struct pci_device *pdev = pci_device ( dev );
 	struct tg3 *tp = &tg3;
 	unsigned long tg3reg_base, tg3reg_len;
 	int i, err, pm_cap;

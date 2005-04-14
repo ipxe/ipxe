@@ -516,7 +516,7 @@ static void tulip_more(void);
 /*********************************************************************/
 
 #ifdef TULIP_DEBUG_WHERE
-static void whereami (const char *str)
+static void whereami (const char *str, struct pci_device *pci)
 {
     printf("%s: %s\n", tp->nic_name, str);
     /* sleep(2); */
@@ -1227,7 +1227,6 @@ static struct pci_driver tulip_driver;
 /*********************************************************************/
 static int tulip_probe ( struct dev *dev ) {
     struct nic *nic = nic_device ( dev );
-    struct pci_device *pci = pci_device ( dev );
     u32 i;
     u8  chip_rev;
     u8 ee_data[EEPROM_SIZE];

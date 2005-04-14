@@ -603,9 +603,8 @@ static void eepro100_disable ( struct nic *nic __unused ) {
  *            leaves the 82557 initialized, and ready to recieve packets.
  */
 
-static int eepro100_probe ( struct dev *dev ) {
+static int eepro100_probe ( struct dev *dev, struct pci_device *pci ) {
 	struct nic *nic = nic_device ( dev );
-	struct pci_device *p = pci_device ( dev );
 	unsigned short sum = 0;
 	int i;
 	int read_cmd, ee_size;

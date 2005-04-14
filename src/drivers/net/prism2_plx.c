@@ -92,9 +92,8 @@ static int prism2_find_plx ( hfa384x_t *hw, struct pci_device *p )
   return found;
 }
 
-static int prism2_plx_probe ( struct dev *dev ) {
+static int prism2_plx_probe ( struct dev *dev, struct pci_device *pci ) {
   struct nic *nic = nic_device ( dev );
-  struct pci_device *pci = pci_device ( dev );
   hfa384x_t *hw = &hw_global;
 
   if ( ! find_pci_device ( pci, &prism2_plx_driver ) )

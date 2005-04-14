@@ -183,9 +183,8 @@ static void rtl_irq(struct nic *nic, irq_action_t action);
 static struct nic_operations rtl_operations;
 static struct pci_driver rtl8139_driver;
 
-static int rtl8139_probe ( struct dev *dev ) {
+static int rtl8139_probe ( struct dev *dev, struct pci_device *pci ) {
 	struct nic *nic = nic_device ( dev );
-	struct pci_device *pci = pci_device ( dev );
 	int i;
 	int speed10, fullduplex;
 	int addr_len;

@@ -583,9 +583,8 @@ static struct pci_driver sundance_driver;
 /**************************************************************************
 PROBE - Look for an adapter, this routine's visible to the outside
 ***************************************************************************/
-static int sundance_probe ( struct dev *dev ) {
+static int sundance_probe ( struct dev *dev, struct pci_device *pci ) {
 	struct nic *nic = nic_device ( dev );
-	struct pci_device *pci = pci_device ( dev );
 	u8 ee_data[EEPROM_SIZE];
 	u16 mii_ctl;
 	int i;
