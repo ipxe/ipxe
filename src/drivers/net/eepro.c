@@ -33,8 +33,6 @@ has 34 pins, the top row of 2 are not used.
 /* we use timer2 for microsecond waits */
 #include "timer.h"
 
-#undef	DEBUG		/* only after include files */
-
 /* Different 82595 chips */
 #define LAN595		0
 #define LAN595TX	1
@@ -287,7 +285,6 @@ static unsigned int	rx_start, tx_start;
 static int		tx_last;
 static unsigned	int	tx_end;
 static int		eepro = 0;
-static unsigned short	ioaddr = 0;
 static unsigned int	mem_start, mem_end = RCV_DEFAULT_RAM / 1024;
 
 /**************************************************************************
@@ -298,42 +295,40 @@ static void eepro_reset(struct nic *nic)
 	int		temp_reg, i;
 
 	/* put the card in its initial state */
-	eepro_sw2bank2(ioaddr);	/* be careful, bank2 now */
-	temp_reg = inb(ioaddr + eeprom_reg);
-#ifdef	DEBUG
-	printf("Stepping %d\n", temp_reg >> 5);
-#endif
+	eepro_sw2bank2(nic->ioaddr);	/* be careful, bank2 now */
+	temp_reg = inb(nic->ioaddr + eeprom_reg);
+	DBG("Stepping %d\n", temp_reg >> 5);
 	if (temp_reg & 0x10)	/* check the TurnOff Enable bit */
-		outb(temp_reg & 0xEF, ioaddr + eeprom_reg);
+		outb(temp_reg & 0xEF, nic->ioaddr + eeprom_reg);
 	for (i = 0; i < ETH_ALEN; i++)	/* fill the MAC address */
-		outb(nic->node_addr[i], ioaddr + I_ADD_REG0 + i);
-	temp_reg = inb(ioaddr + REG1);
+		outb(nic->node_addr[i], nic->ioaddr + I_ADD_REG0 + i);
+	temp_reg = inb(nic->ioaddr + REG1);
 	/* setup Transmit Chaining and discard bad RCV frames */
 	outb(temp_reg | XMT_Chain_Int | XMT_Chain_ErrStop
-		| RCV_Discard_BadFrame, ioaddr + REG1);
-	temp_reg = inb(ioaddr + REG2);		/* match broadcast */
-	outb(temp_reg | 0x14, ioaddr + REG2);
-	temp_reg = inb(ioaddr + REG3);
-	outb(temp_reg & 0x3F, ioaddr + REG3);	/* clear test mode */
+		| RCV_Discard_BadFrame, nic->ioaddr + REG1);
+	temp_reg = inb(nic->ioaddr + REG2);		/* match broadcast */
+	outb(temp_reg | 0x14, nic->ioaddr + REG2);
+	temp_reg = inb(nic->ioaddr + REG3);
+	outb(temp_reg & 0x3F, nic->ioaddr + REG3);	/* clear test mode */
 	/* set the receiving mode */
-	eepro_sw2bank1(ioaddr);	/* be careful, bank1 now */
+	eepro_sw2bank1(nic->ioaddr);	/* be careful, bank1 now */
 	/* initialise the RCV and XMT upper and lower limits */
-	outb(RCV_LOWER_LIMIT, ioaddr + RCV_LOWER_LIMIT_REG);
-	outb(RCV_UPPER_LIMIT, ioaddr + RCV_UPPER_LIMIT_REG);
-	outb(XMT_LOWER_LIMIT, ioaddr + xmt_lower_limit_reg);
-	outb(XMT_UPPER_LIMIT, ioaddr + xmt_upper_limit_reg);
-	eepro_sw2bank0(ioaddr);	/* Switch back to bank 0 */
-	eepro_clear_int(ioaddr);
+	outb(RCV_LOWER_LIMIT, nic->ioaddr + RCV_LOWER_LIMIT_REG);
+	outb(RCV_UPPER_LIMIT, nic->ioaddr + RCV_UPPER_LIMIT_REG);
+	outb(XMT_LOWER_LIMIT, nic->ioaddr + xmt_lower_limit_reg);
+	outb(XMT_UPPER_LIMIT, nic->ioaddr + xmt_upper_limit_reg);
+	eepro_sw2bank0(nic->ioaddr);	/* Switch back to bank 0 */
+	eepro_clear_int(nic->ioaddr);
 	/* Initialise RCV */
 	rx_start = (unsigned int)bus_to_virt(RCV_LOWER_LIMIT << 8);
-	outw(RCV_LOWER_LIMIT << 8, ioaddr + RCV_BAR);
-	outw(((RCV_UPPER_LIMIT << 8) | 0xFE), ioaddr + RCV_STOP);
+	outw(RCV_LOWER_LIMIT << 8, nic->ioaddr + RCV_BAR);
+	outw(((RCV_UPPER_LIMIT << 8) | 0xFE), nic->ioaddr + RCV_STOP);
 	/* Intialise XMT */
-	outw((XMT_LOWER_LIMIT << 8), ioaddr + xmt_bar);
-	eepro_sel_reset(ioaddr);
+	outw((XMT_LOWER_LIMIT << 8), nic->ioaddr + xmt_bar);
+	eepro_sel_reset(nic->ioaddr);
 	tx_start = tx_end = (unsigned int)bus_to_virt(XMT_LOWER_LIMIT << 8);
 	tx_last = 0;
-	eepro_en_rx(ioaddr);
+	eepro_en_rx(nic->ioaddr);
 }
 
 /**************************************************************************
@@ -348,12 +343,12 @@ static int eepro_poll(struct nic *nic, int retrieve)
 	/* nic->packet should contain data on return */
 	/* nic->packetlen should contain length of data */
 #if	0
-	if ((inb(ioaddr + STATUS_REG) & 0x40) == 0)
+	if ((inb(nic->ioaddr + STATUS_REG) & 0x40) == 0)
 		return (0);
-	outb(0x40, ioaddr + STATUS_REG);
+	outb(0x40, nic->ioaddr + STATUS_REG);
 #endif
-	outw(rcv_car, ioaddr + HOST_ADDRESS_REG);
-	rcv_event = inw(ioaddr + IO_PORT);
+	outw(rcv_car, nic->ioaddr + HOST_ADDRESS_REG);
+	rcv_event = inw(nic->ioaddr + IO_PORT);
 	if (rcv_event != RCV_DONE)
 		return (0);
 
@@ -362,19 +357,19 @@ static int eepro_poll(struct nic *nic, int retrieve)
 	   maybe there's another way. */
 	if ( ! retrieve ) return 1;
 
-	rcv_status = inw(ioaddr + IO_PORT);
-	rcv_next_frame = inw(ioaddr + IO_PORT);
-	rcv_size = inw(ioaddr + IO_PORT);
+	rcv_status = inw(nic->ioaddr + IO_PORT);
+	rcv_next_frame = inw(nic->ioaddr + IO_PORT);
+	rcv_size = inw(nic->ioaddr + IO_PORT);
 #if	0
 	printf("%hX %hX %d %hhX\n", rcv_status, rcv_next_frame, rcv_size,
-		inb(ioaddr + STATUS_REG));
+		inb(nic->ioaddr + STATUS_REG));
 #endif
 	if ((rcv_status & (RX_OK|RX_ERROR)) != RX_OK) {
 		printf("Receive error %hX\n", rcv_status);
 		return (0);
 	}
 	rcv_size &= 0x3FFF;
-	insw(ioaddr + IO_PORT, nic->packet, ((rcv_size + 3) >> 1));
+	insw(nic->ioaddr + IO_PORT, nic->packet, ((rcv_size + 3) >> 1));
 #if	0
 {
 	int i;
@@ -389,7 +384,7 @@ static int eepro_poll(struct nic *nic, int retrieve)
 	rx_start = (unsigned int)bus_to_virt(rcv_next_frame << 8);
 	if (rcv_car == 0)
 		rcv_car = ((RCV_UPPER_LIMIT << 8) | 0xff);
-	outw(rcv_car - 1, ioaddr + RCV_STOP);
+	outw(rcv_car - 1, nic->ioaddr + RCV_STOP);
 	return (1);
 }
 
@@ -420,20 +415,20 @@ static void eepro_transmit(
 		last = (XMT_LOWER_LIMIT << 8);
 		end = last + (((length + 3) >> 1) << 1) + XMT_HEADER;
 	}
-	outw(last, ioaddr + HOST_ADDRESS_REG);
-	outw(XMT_CMD, ioaddr + IO_PORT);
-	outw(0, ioaddr + IO_PORT);
-	outw(end, ioaddr + IO_PORT);
-	outw(length, ioaddr + IO_PORT);
-	outsw(ioaddr + IO_PORT, d, ETH_ALEN / 2);
-	outsw(ioaddr + IO_PORT, nic->node_addr, ETH_ALEN / 2);
+	outw(last, nic->ioaddr + HOST_ADDRESS_REG);
+	outw(XMT_CMD, nic->ioaddr + IO_PORT);
+	outw(0, nic->ioaddr + IO_PORT);
+	outw(end, nic->ioaddr + IO_PORT);
+	outw(length, nic->ioaddr + IO_PORT);
+	outsw(nic->ioaddr + IO_PORT, d, ETH_ALEN / 2);
+	outsw(nic->ioaddr + IO_PORT, nic->node_addr, ETH_ALEN / 2);
 	type = htons(t);
-	outsw(ioaddr + IO_PORT, &type, sizeof(type) / 2);
-	outsw(ioaddr + IO_PORT, p, (s + 3) >> 1);
+	outsw(nic->ioaddr + IO_PORT, &type, sizeof(type) / 2);
+	outsw(nic->ioaddr + IO_PORT, p, (s + 3) >> 1);
 	/* A dummy read to flush the DRAM write pipeline */
-	status = inw(ioaddr + IO_PORT);
-	outw(last, ioaddr + xmt_bar);
-	outb(XMT_CMD, ioaddr);
+	status = inw(nic->ioaddr + IO_PORT);
+	outw(last, nic->ioaddr + xmt_bar);
+	outb(XMT_CMD, nic->ioaddr);
 	tx_start = last;
 	tx_last = last;
 	tx_end = end;
@@ -441,29 +436,28 @@ static void eepro_transmit(
 	printf("%d %d\n", tx_start, tx_end);
 #endif
 	while (boguscount > 0) {
-		if (((status = inw(ioaddr + IO_PORT)) & TX_DONE_BIT) == 0) {
+		if (((status = inw(nic->ioaddr + IO_PORT)) & TX_DONE_BIT) == 0) {
 			udelay(40);
 			boguscount--;
 			continue;
 		}
-#if	DEBUG
-		if ((status & 0x2000) == 0)
-			printf("Transmit status %hX\n", status);
-#endif
+		if ((status & 0x2000) == 0) {
+			DBG("Transmit status %hX\n", status);
+		}
 	}
 }
 
 /**************************************************************************
 DISABLE - Turn off ethernet interface
 ***************************************************************************/
-static void eepro_disable ( struct nic *nic __unused ) {
-	eepro_sw2bank0(ioaddr);	/* Switch to bank 0 */
+static void eepro_disable ( struct nic *nic ) {
+	eepro_sw2bank0(nic->ioaddr);	/* Switch to bank 0 */
 	/* Flush the Tx and disable Rx */
-	outb(STOP_RCV_CMD, ioaddr);
+	outb(STOP_RCV_CMD, nic->ioaddr);
 	tx_start = tx_end = (unsigned int) (bus_to_virt(XMT_LOWER_LIMIT << 8));
 	tx_last = 0;
 	/* Reset the 82595 */
-	eepro_full_reset(ioaddr);
+	eepro_full_reset(nic->ioaddr);
 }
 
 /**************************************************************************
@@ -481,7 +475,7 @@ static void eepro_irq(struct nic *nic __unused, irq_action_t action __unused)
   }
 }
 
-static int read_eeprom(int location)
+static int read_eeprom(uint16_t ioaddr, int location)
 {
 	int		i;
 	unsigned short	retval = 0;
@@ -522,14 +516,8 @@ static int read_eeprom(int location)
 	return (retval);
 }
 
-static int eepro_probe1(struct nic *nic)
-{
-	int		i, id, counter, l_eepro = 0;
-	union {
-		unsigned char	caddr[ETH_ALEN];
-		unsigned short	saddr[ETH_ALEN/2];
-	} station_addr;
-	char		*name;
+static int eepro_probe1 ( uint16_t ioaddr ) {
+	int		id, counter;
 
 	id = inb(ioaddr + ID_REG);
 	if ((id & ID_REG_MASK) != ID_REG_SIG)
@@ -538,29 +526,55 @@ static int eepro_probe1(struct nic *nic)
 	if (((id = inb(ioaddr + ID_REG)) & R_ROBIN_BITS) != (counter + 0x40))
 		return (0);
 	/* yes the 82595 has been found */
-	station_addr.saddr[2] = read_eeprom(2);
-	if (station_addr.saddr[2] == 0x0000 || station_addr.saddr[2] == 0xFFFF) {
+	return (1);
+}
+
+static struct nic_operations eepro_operations = {
+	.connect	= dummy_connect,
+	.poll		= eepro_poll,
+	.transmit	= eepro_transmit,
+	.irq		= eepro_irq,
+	.disable	= eepro_disable,
+};
+
+/**************************************************************************
+PROBE - Look for an adapter, this routine's visible to the outside
+***************************************************************************/
+static int eepro_probe ( struct dev *dev, struct isa_device *isa ) {
+	struct nic *nic = nic_device ( dev );
+	int		i, l_eepro = 0;
+	union {
+		unsigned char	caddr[ETH_ALEN];
+		unsigned short	saddr[ETH_ALEN/2];
+	} station_addr;
+
+	nic->irqno  = 0;
+	nic->ioaddr = isa->ioaddr;
+
+	station_addr.saddr[2] = read_eeprom(nic->ioaddr,2);
+	if ( ( station_addr.saddr[2] == 0x0000 ) ||
+	     ( station_addr.saddr[2] == 0xFFFF ) ) {
 		l_eepro = 3;
 		eepro = LAN595FX_10ISA;
 		eeprom_reg= EEPROM_REG_10;
 		rcv_start = RCV_START_10;
 		xmt_lower_limit_reg = XMT_LOWER_LIMIT_REG_10;
 		xmt_upper_limit_reg = XMT_UPPER_LIMIT_REG_10;
-		station_addr.saddr[2] = read_eeprom(2);
+		station_addr.saddr[2] = read_eeprom(nic->ioaddr,2);
 	}
-	station_addr.saddr[1] = read_eeprom(3);
-	station_addr.saddr[0] = read_eeprom(4);
+	station_addr.saddr[1] = read_eeprom(nic->ioaddr,3);
+	station_addr.saddr[0] = read_eeprom(nic->ioaddr,4);
 	if (l_eepro)
-		name = "Intel EtherExpress 10 ISA";
-	else if (read_eeprom(7) == ee_FX_INT2IRQ) {
-		name = "Intel EtherExpress Pro/10+ ISA";
+		dev->name = "Intel EtherExpress 10 ISA";
+	else if (read_eeprom(nic->ioaddr,7) == ee_FX_INT2IRQ) {
+		dev->name = "Intel EtherExpress Pro/10+ ISA";
 		l_eepro = 2;
 	} else if (station_addr.saddr[0] == SA_ADDR1) {
-		name = "Intel EtherExpress Pro/10 ISA";
+		dev->name = "Intel EtherExpress Pro/10 ISA";
 		l_eepro = 1;
 	} else {
 		l_eepro = 0;
-		name = "Intel 82595-based LAN card";
+		dev->name = "Intel 82595-based LAN card";
 	}
 	station_addr.saddr[0] = swap16(station_addr.saddr[0]);
 	station_addr.saddr[1] = swap16(station_addr.saddr[1]);
@@ -568,7 +582,7 @@ static int eepro_probe1(struct nic *nic)
 	for (i = 0; i < ETH_ALEN; i++) {
 		nic->node_addr[i] = station_addr.caddr[i];
 	}
-	printf("\n%s ioaddr %#hX, addr %!", name, ioaddr, nic->node_addr);
+	DBG("%s ioaddr %#hX, addr %!", dev->name, nic->ioaddr, nic->node_addr);
 	mem_start = RCV_LOWER_LIMIT << 8;
 	if ((mem_end & 0x3F) < 3 || (mem_end & 0x3F) > 29)
 		mem_end = RCV_UPPER_LIMIT << 8;
@@ -577,53 +591,25 @@ static int eepro_probe1(struct nic *nic)
 		rcv_ram = mem_end - (RCV_LOWER_LIMIT << 8);
 	}
 	printf(", Rx mem %dK, if %s\n", (mem_end - mem_start) >> 10,
-		GetBit(read_eeprom(5), ee_BNC_TPE) ? "BNC" : "TP");
-	return (1);
-}
-
-/**************************************************************************
-PROBE - Look for an adapter, this routine's visible to the outside
-***************************************************************************/
-static int eepro_probe(struct dev *dev, unsigned short *probe_addrs)
-{
-	struct nic *nic = (struct nic *)dev;
-	unsigned short		*p;
-	/* same probe list as the Linux driver */
-	static unsigned short	ioaddrs[] = {
-		0x300, 0x210, 0x240, 0x280, 0x2C0, 0x200, 0x320, 0x340, 0x360, 0};
-
-	if (probe_addrs == 0 || probe_addrs[0] == 0)
-		probe_addrs = ioaddrs;
-	for (p = probe_addrs; (ioaddr = *p) != 0; p++) {
-		if (eepro_probe1(nic))
-			break;
-	}
-	if (*p == 0)
-		return (0);
-
-	nic->irqno  = 0;
-	nic->ioaddr = *p;
+		GetBit(read_eeprom(nic->ioaddr,5), ee_BNC_TPE) ? "BNC" : "TP");
 
 	eepro_reset(nic);
+
 	/* point to NIC specific routines */
-static struct nic_operations eepro_operations;
-static struct nic_operations eepro_operations = {
-	.connect	= dummy_connect,
-	.poll		= eepro_poll,
-	.transmit	= eepro_transmit,
-	.irq		= eepro_irq,
-	.disable	= eepro_disable,
-};	nic->nic_op	= &eepro_operations;
-	/* Based on PnP ISA map */
-	dev->devid.vendor_id = htons(GENERIC_ISAPNP_VENDOR);
-	dev->devid.device_id = htons(0x828a);
+	nic->nic_op	= &eepro_operations;
 	return 1;
 }
 
-static struct isa_driver eepro_driver __isa_driver = {
-	.type    = NIC_DRIVER,
-	.name    = "EEPRO",
-	.probe   = eepro_probe,
-	.ioaddrs = 0,
+static struct isa_probe_addr eepro_probe_addrs[] = {
+	{ 0x300 },
+	{ 0x210 }, { 0x240 }, { 0x280 }, { 0x2C0 }, { 0x200 },
+	{ 0x320 }, { 0x340 }, { 0x360 },
 };
-ISA_ROM("eepro","Intel Etherexpress Pro/10");
+
+static struct isa_driver eepro_driver =
+	ISA_DRIVER ( "eepro", eepro_probe_addrs, eepro_probe1,
+		     GENERIC_ISAPNP_VENDOR, 0x828a );
+
+BOOT_DRIVER ( "eepro", find_isa_boot_device, eepro_driver, eepro_probe );
+
+ISA_ROM ( "eepro", "Intel Etherexpress Pro/10" );
