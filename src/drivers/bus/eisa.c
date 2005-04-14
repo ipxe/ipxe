@@ -39,7 +39,7 @@ static int fill_eisa_device ( struct eisa_device *eisa ) {
 	eisa->prod_id = ( inb ( eisa->ioaddr + EISA_PROD_ID_LO ) << 8 )
 		+ inb ( eisa->ioaddr + EISA_PROD_ID_HI );
 
-	DBG ( "EISA slot %d (base %#hx) ID %hx:%hx (\"%s\")\n",
+	DBG ( "EISA found slot %d (base %#hx) ID %hx:%hx (\"%s\")\n",
 	      eisa->slot, eisa->ioaddr, eisa->mfg_id, eisa->prod_id,
 	      isa_id_string ( eisa->mfg_id, eisa->prod_id ) );
 

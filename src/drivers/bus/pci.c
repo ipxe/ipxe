@@ -73,7 +73,7 @@ static int fill_pci_device ( struct pci_device *pci ) {
 		pci_read_config_byte ( pci, PCI_INTERRUPT_LINE, &pci->irq );
 	}
 
-	DBG ( "%hhx:%hhx.%d Class %hx: %hx:%hx (rev %hhx)\n",
+	DBG ( "PCI found %hhx:%hhx.%d Class %hx: %hx:%hx (rev %hhx)\n",
 	      PCI_BUS ( pci->busdevfn ), PCI_DEV ( pci->busdevfn ),
 	      PCI_FUNC ( pci->busdevfn ), pci->class, pci->vendor, pci->dev_id,
 	      pci->revision );

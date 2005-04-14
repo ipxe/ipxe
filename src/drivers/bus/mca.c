@@ -39,7 +39,8 @@ static int fill_mca_device ( struct mca_device *mca ) {
 	/* Kill all setup modes */
 	outb_p ( 0, MCA_ADAPTER_SETUP_REG );
 
-	DBG ( "MCA slot %d id %hx (%hhx:%hhx:%hhx:%hhx:%hhx:%hhx:%hhx:%hhx)\n",
+	DBG ( "MCA found slot %d id %hx "
+	      "(POS %hhx:%hhx:%hhx:%hhx:%hhx:%hhx:%hhx:%hhx)\n",
 	      mca->slot, MCA_ID ( mca ),
 	      mca->pos[0], mca->pos[1], mca->pos[2], mca->pos[3],
 	      mca->pos[4], mca->pos[5], mca->pos[6], mca->pos[7] );

@@ -129,6 +129,7 @@ static inline int fill_t509_device ( struct t509_device *t509 ) {
 			DBG ( "No ID port available for contention select\n" );
 			return 0;
 		}
+		DBG ( "T509 scan using ID port at %hx\n", t509->id_port );
 	}
 
 	/* 
@@ -165,6 +166,9 @@ static inline int fill_t509_device ( struct t509_device *t509 ) {
 	t509->ioaddr = 0x200 + ( ( iobase & 0x1f ) << 4 );
 	outb ( ++t509->current_tag, t509->id_port ); /* tag */
 	outb ( ( 0xe0 | iobase ), t509->id_port ); /* activate */
+
+	DBG ( "T509 found at %hx (tagged as %hhx)\n", t509->ioaddr,
+	      t509->current_tag );
 
 	return 1;
 }
