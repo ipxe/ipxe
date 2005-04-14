@@ -144,7 +144,7 @@ static int initialized;
 
 
 /* Global instance of the current boot device */
-DEV_BUS(struct {}, dev_bus);
+DEV_BUS(struct bus_device, dev_bus);
 struct dev dev = {
 	.bus = &dev_bus,
 };
@@ -181,8 +181,17 @@ int main ( void ) {
 	for ( ; ; disable ( &dev ), call_reset_fns() ) {
 
 		/* Get next boot device */
-		if ( ! probe ( &dev ) ) {
+		if ( ! find_boot_device ( &dev ) ) {
 			/* Reached end of device list */
+			printf ( "No more boot devices\n" );
+			continue;
+		}
+
+		/* Probe boot device */
+		if ( ! probe ( &dev ) ) {
+			/* Device found on bus, but probe failed */
+			printf ( "Probe failed on %s, trying next device\n",
+				 dev.name );
 			continue;
 		}
 		
@@ -192,12 +201,14 @@ int main ( void ) {
 		/* Load configuration (e.g. DHCP) */
 		if ( ! load_configuration ( &dev ) ) {
 			/* DHCP failed */
+			printf ( "Could not configure device %s\n", dev.name );
 			continue;
 		}
 
 		/* Load image */
 		if ( ! load ( &dev ) )
 			/* Load failed */
+			printf ( "Could not boot from device %s\n", dev.name );
 			continue;
 	}
 

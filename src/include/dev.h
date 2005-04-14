@@ -23,11 +23,12 @@ struct dev {
 	struct dev_operations *dev_op;
 	const char *name;
 	struct dev_id	devid;	/* device ID string (sent to DHCP server) */
+	struct boot_driver *driver; /* driver being used for boot */
 	/* Pointer to bus information for device.  Whatever sets up
 	 * the struct dev must make sure that this points to a buffer
 	 * large enough for the required struct <bus>_device.
 	 */
-	void *bus;
+	struct bus_device *bus;
 	/* All possible device types */
 	union {
 		struct nic	nic;
@@ -49,20 +50,33 @@ struct dev_operations {
 	int ( *load ) ( struct dev * );
 };
 
+/*
+ * Table to describe a bootable device driver.  See comments in dev.c
+ * for an explanation.
+ *
+ */
+struct bus_device {};
+struct bus_driver {};
 struct boot_driver {
 	char *name;
-	int (*probe) ( struct dev * );
+	struct bus_device * ( *find_bus_boot_device ) ( struct dev *dev,
+						   struct bus_driver *driver );
+	struct bus_driver *bus_driver;
+	int ( *probe ) ( struct dev *dev, struct bus_device *bus_device );
 };
 
-#define BOOT_DRIVER( driver_name, probe_func )				      \
+#define BOOT_DRIVER( _name, _find_bus_boot_device, _bus_driver,	_probe )      \
 	static struct boot_driver boot_driver_ ## probe_func		      \
 	    __attribute__ ((used,__section__(".boot_drivers"))) = {	      \
-		.name = driver_name,					      \
-		.probe = probe_func,					      \
+		.name = _name,						      \
+		.find_bus_boot_device = ( void * ) _find_bus_boot_device,     \
+		.bus_driver = ( void * ) _bus_driver,			      \
+		.probe = ( void * ) _probe,				      \
 	};
 
 /* Functions in dev.c */
 extern void print_drivers ( void );
+extern int find_boot_device ( struct dev *dev );
 extern int probe ( struct dev *dev );
 extern void disable ( struct dev *dev );
 static inline void print_info ( struct dev *dev ) {
