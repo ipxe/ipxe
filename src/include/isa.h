@@ -46,7 +46,7 @@ struct isa_driver {
 #define ISA_DRIVER( _name, _probe_addrs, _probe_addr, _mfg_id, _prod_id ) { \
 	.name = _name,							    \
 	.probe_addrs = _probe_addrs,					    \
-	.addr_count = sizeof ( _probe_addrs ) / sizeof ( probe_addrs[0] ),  \
+	.addr_count = sizeof ( _probe_addrs ) / sizeof ( _probe_addrs[0] ), \
 	.probe_addr = _probe_addr,					    \
 	.mfg_id = _mfg_id,						    \
 	.prod_id = _prod_id,						    \
