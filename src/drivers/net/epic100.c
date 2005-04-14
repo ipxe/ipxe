@@ -105,9 +105,6 @@ epic100_probe ( struct dev *dev, struct pci_device *pci ) {
     unsigned short* ap;
     unsigned int phy, phy_idx;
 
-    if ( ! find_pci_device ( pci, &epic100_driver ) )
-	    return 0;
-
     if (pci->ioaddr == 0)
 	return 0;
 
@@ -521,4 +518,4 @@ PCI_ROM(0x10b8, 0x0006, "smc-83c175", "SMC EPIC/C 83c175"),
 static struct pci_driver epic100_driver =
 	PCI_DRIVER ( "EPIC100", epic100_nics, PCI_NO_CLASS );
 
-BOOT_DRIVER ( "EPIC100", epic100_probe );
+BOOT_DRIVER ( "EPIC100", find_pci_boot_device, epic100_driver, epic100_probe );

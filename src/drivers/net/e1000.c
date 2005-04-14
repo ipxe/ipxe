@@ -3587,9 +3587,6 @@ static int e1000_probe ( struct dev *dev, struct pci_device *pci ) {
 	unsigned long mmio_start, mmio_len;
 	int ret_val, i;
 
-	if ( ! find_pci_device ( p, &e1000_driver ) )
-		return 0;
-
 	/* Initialize hw with default values */
 	memset(&hw, 0, sizeof(hw));
 	hw.pdev = p;
@@ -3713,4 +3710,4 @@ PCI_ROM(0x8086, 0x107b, "e1000-82546gb-serdes",	     "Intel EtherExpressPro1000 
 static struct pci_driver e1000_driver =
 	PCI_DRIVER ( "E1000", e1000_nics, PCI_NO_CLASS );
 
-BOOT_DRIVER ( "E1000", e1000_probe );
+BOOT_DRIVER ( "E1000", find_pci_boot_device, e1000_driver, e1000_probe );

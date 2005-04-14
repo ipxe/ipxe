@@ -190,9 +190,6 @@ static int rtl8139_probe ( struct dev *dev, struct pci_device *pci ) {
 	int addr_len;
 	unsigned short *ap = (unsigned short*)nic->node_addr;
 
-	if ( ! find_pci_device ( pci, &rtl8139_driver ) )
-		return 0;
-
 	/* Copy ioaddr and IRQ from PCI information */
 	nic->ioaddr = pci->ioaddr;
 	nic->irqno = pci->irq;
@@ -543,4 +540,4 @@ PCI_ROM(0xffff, 0x8139, "clone-rtl8139", "Cloned 8139"),
 static struct pci_driver rtl8139_driver =
 	PCI_DRIVER ( "RTL8139", rtl8139_nics, PCI_NO_CLASS );
 
-BOOT_DRIVER ( "RTL8139", rtl8139_probe );
+BOOT_DRIVER ( "RTL8139", find_pci_boot_device, rtl8139_driver, rtl8139_probe );

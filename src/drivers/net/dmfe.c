@@ -464,9 +464,6 @@ static int dmfe_probe ( struct dev *dev, struct pci_device *pci ) {
 	uint32_t dev_rev, pci_pmr;
 	int i;
 
-	if ( ! find_pci_device ( pci, &dmfe_driver ) )
-		return 0;
-
 	if (pci->ioaddr == 0)
 		return 0;
 
@@ -1229,4 +1226,4 @@ static struct pci_id dmfe_nics[] = {
 static struct pci_driver dmfe_driver =
 	PCI_DRIVER ( "DMFE/PCI", dmfe_nics, PCI_NO_CLASS );
 
-BOOT_DRIVER ( "DMFE/PCI", dmfe_probe );
+BOOT_DRIVER ( "DMFE/PCI", find_pci_boot_device, dmfe_driver, dmfe_probe );

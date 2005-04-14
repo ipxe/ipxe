@@ -676,9 +676,6 @@ static int pcnet32_probe ( struct dev *dev, struct pci_device *pci ) {
 	u8 promaddr[6];
 	int shared = 1;
 
-	if ( ! find_pci_device ( pci, &pcnet32_driver ) )
-		return 0;
-
 	if (pci->ioaddr == 0)
 		return 0;
 
@@ -1005,4 +1002,4 @@ static struct pci_id pcnet32_nics[] = {
 static struct pci_driver pcnet32_driver =
 	PCI_DRIVER ( "PCNET32/PCI", pcnet32_nics, PCI_NO_CLASS );
 
-BOOT_DRIVER ( "PCNET32/PCI", pcnet32_probe );
+BOOT_DRIVER ( "PCNET32/PCI", find_pci_boot_device, pcnet32_driver, pcnet32_probe );

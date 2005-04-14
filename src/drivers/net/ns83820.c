@@ -831,9 +831,6 @@ static int ns83820_probe ( struct dev *dev, struct pci_device *pci ) {
 	long addr;
 	int using_dac = 0;
 
-	if ( ! find_pci_device ( pci, &ns83820_driver ) )
-		return 0;
-
 	if (pci->ioaddr == 0)
 		return 0;
 
@@ -1019,4 +1016,4 @@ static int ns83820_probe ( struct dev *dev, struct pci_device *pci ) {
 	return 1;
 }
 
-BOOT_DRIVER ( "NS83820/PCI", ns83820_probe );
+BOOT_DRIVER ( "NS83820/PCI", find_pci_boot_device, ns83820_driver, ns83820_probe );

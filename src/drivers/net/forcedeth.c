@@ -947,9 +947,6 @@ static int forcedeth_probe ( struct dev *dev, struct pci_device *pci ) {
 	int sz;
 	u8 *base;
 
-	if ( ! find_pci_device ( pci, &forcedeth_driver ) )
-		return 0;
-
 	if (pci->ioaddr == 0)
 		return 0;
 
@@ -1038,4 +1035,4 @@ static int forcedeth_probe ( struct dev *dev, struct pci_device *pci ) {
 	/* else */
 }
 
-BOOT_DRIVER ( "forcedeth", forcedeth_probe );
+BOOT_DRIVER ( "forcedeth", find_pci_boot_device, forcedeth_driver, forcedeth_probe );

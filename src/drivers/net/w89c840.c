@@ -626,9 +626,6 @@ w89c840_probe - Look for an adapter, this routine's visible to the outside
 static int w89c840_probe ( struct dev *dev, struct pci_device *pci ) {
     struct nic *nic = nic_device ( dev );
 
-    if ( ! find_pci_device ( p, &w89c840_driver ) )
-	    return 0;
-
     u16 sum = 0;
     int i, j;
     unsigned short value;
@@ -957,4 +954,4 @@ static void init_ring(void)
 }
 
 
-BOOT_DRIVER ( "W89C840F", w89c840_probe );
+BOOT_DRIVER ( "W89C840F", find_pci_boot_device, w89c840_driver, w89c840_probe );

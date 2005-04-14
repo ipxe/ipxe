@@ -96,9 +96,6 @@ static int prism2_plx_probe ( struct dev *dev, struct pci_device *pci ) {
   struct nic *nic = nic_device ( dev );
   hfa384x_t *hw = &hw_global;
 
-  if ( ! find_pci_device ( pci, &prism2_plx_driver ) )
-	  return 0;
-
   /* Find and intialise PLX Prism2 card */
   if ( ! prism2_find_plx ( hw, pci ) ) return 0;
   nic->ioaddr = hw->iobase;
@@ -106,5 +103,5 @@ static int prism2_plx_probe ( struct dev *dev, struct pci_device *pci ) {
   return prism2_probe ( nic, hw );
 }
 
-BOOT_DRIVER ( "Prism2_PLX", prism2_plx_probe );
+BOOT_DRIVER ( "Prism2_PLX", find_pci_boot_device, prism2_plx_driver, prism2_plx_probe );
 

@@ -661,9 +661,6 @@ static int davicom_probe ( struct dev *dev ) {
 
   whereami("davicom_probe\n");
 
-  if ( ! find_pci_device ( pci, &davicom_driver ) )
-	  return 0;
-
   if (pci->ioaddr == 0)
     return 0;
 
@@ -719,4 +716,4 @@ PCI_ROM(0x1282, 0x9132, "davicom9132", "Davicom 9132"),	/* Needs probably some f
 static struct pci_driver davicom_driver =
 	PCI_DRIVER ( "DAVICOM", davicom_nics, PCI_NO_CLASS );
 
-BOOT_DRIVER ( "DAVICOM", davicom_probe );
+BOOT_DRIVER ( "DAVICOM", find_pci_boot_device, davicom_driver, davicom_probe );

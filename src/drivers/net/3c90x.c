@@ -699,9 +699,6 @@ static int a3c90x_probe ( struct dev *dev, struct pci_device *pci ) {
     unsigned int mstat;
     unsigned short linktype;
 #define	HWADDR_OFFSET	10
-
-    if ( ! find_pci_device ( pci, &a3c90x_driver ) )
-	    return 0;
     
     if (pci->ioaddr == 0)
           return 0;
@@ -994,4 +991,4 @@ PCI_ROM(0x10b7, 0x1202, "3c982b",        "3Com982B"),
 static struct pci_driver a3c90x_driver =
 	PCI_DRIVER ( "3C90X", a3c90x_nics, PCI_NO_CLASS );
 
-BOOT_DRIVER ( "3C90X", a3c90x_probe );
+BOOT_DRIVER ( "3C90X", find_pci_boot_device, a3c90x_driver, a3c90x_probe );

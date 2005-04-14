@@ -615,9 +615,6 @@ static int eepro100_probe ( struct dev *dev, struct pci_device *pci ) {
 	   be careful not to access beyond this array */
 	unsigned short eeprom[16];
 
-	if ( ! find_pci_device ( p, &eepro100_driver ) )
-		return 0;
-
 	if (p->ioaddr == 0)
 		return 0;
 	ioaddr = p->ioaddr;
@@ -840,4 +837,4 @@ PCI_ROM(0x8086, 0x5201, "eepro100-5201", "Intel EtherExpress PRO/100 Intelligent
 static struct pci_driver eepro100_driver =
 	PCI_DRIVER ( "EEPRO100", eepro100_nics, PCI_NO_CLASS );
 
-BOOT_DRIVER ( "EEPRO100", eepro100_probe );
+BOOT_DRIVER ( "EEPRO100", find_pci_boot_device, eepro100_driver, eepro100_probe );

@@ -958,9 +958,6 @@ rhine_probe ( struct dev *dev, struct pci_device *pci ) {
     struct nic *nic = nic_device ( dev );
     struct rhine_private *tp = (struct rhine_private *) nic->priv_data;
 
-    if ( ! find_pci_device ( pci, &rhine_driver ) )
-	    return 0;
-
     if (!pci->ioaddr)
 	return 0;
     rhine_probe1 (nic, pci, pci->ioaddr, pci->dev_id, -1);
@@ -1424,6 +1421,6 @@ PCI_ROM(0x1106, 0x6100, "via-rhine-old",   "VIA 86C100A"),	/* Rhine-II */
 static struct pci_driver rhine_driver =
 	PCI_DRIVER ( "VIA 86C100", rhine_nics, PCI_NO_CLASS );
 
-BOOT_DRIVER ( "VIA 86C100", rhine_probe );
+BOOT_DRIVER ( "VIA 86C100", find_pci_boot_device, rhine_driver, rhine_probe );
 
 /* EOF via-rhine.c */

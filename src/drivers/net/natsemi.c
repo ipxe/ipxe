@@ -249,9 +249,6 @@ natsemi_probe ( struct dev *dev, struct pci_device *pci ) {
     int i;
     int prev_eedata;
     u32 tmp;
-    
-    if ( ! find_pci_device ( pci, &natsemi_driver ) )
-	return 0;
 
     if (pci->ioaddr == 0)
         return 0;
@@ -779,4 +776,4 @@ PCI_ROM(0x100b, 0x0020, "dp83815", "DP83815"),
 static struct pci_driver natsemi_driver =
 	PCI_DRIVER ( "NATSEMI", natsemi_nics, PCI_NO_CLASS );
 
-BOOT_DRIVER ( "NATSEMI", natsemi_probe );
+BOOT_DRIVER ( "NATSEMI", find_pci_boot_device, natsemi_driver, natsemi_probe );

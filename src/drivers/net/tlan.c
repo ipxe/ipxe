@@ -787,9 +787,6 @@ static int tlan_probe ( struct dev *dev, struct pci_device *pci ) {
 	int err;
 	int i;
 
-	if ( ! find_pci_device ( pci, &tlan_driver ) )
-		return 0;
-
 	if (pci->ioaddr == 0)
 		return 0;
 
@@ -1717,4 +1714,4 @@ static struct pci_id tlan_nics[] = {
 static struct pci_driver tlan_driver =
 	PCI_DRIVER ( "TLAN/PCI", tlan_nics, PCI_NO_CLASS );
 
-BOOT_DRIVER ( "TLAN/PCI", tlan_probe );
+BOOT_DRIVER ( "TLAN/PCI", find_pci_boot_device, tlan_driver, tlan_probe );

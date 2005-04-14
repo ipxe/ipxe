@@ -678,9 +678,6 @@ static int mtd_probe ( struct dev *dev, struct pci_device *pci ) {
     struct nic *nic = nic_device ( dev );
     int i;
 
-    if ( ! find_pci_device ( pci, &mtd80x_driver ) )
-	    return 0;
-
     if (pci->ioaddr == 0)
 	    return 0;
 
@@ -1087,4 +1084,4 @@ static void getlinktype(struct nic *dev)
     }
 }
 
-BOOT_DRIVER ( "MTD80X", mtd_probe );
+BOOT_DRIVER ( "MTD80X", find_pci_boot_device, mtd80x_driver, mtd_probe );

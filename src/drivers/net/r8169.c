@@ -730,9 +730,6 @@ static int r8169_probe ( struct dev *dev, struct pci_device *pci ) {
 	int i, rc;
 	int option = -1, Cap10_100 = 0, Cap1000 = 0;
 
-	if ( ! find_pci_device ( pci, &r8169_driver ) )
-		return 0;
-
 	printf("r8169.c: Found %s, Vendor=%hX Device=%hX\n",
 	       dev->name, pci->vendor, pci->dev_id);
 
@@ -853,4 +850,4 @@ static int r8169_probe ( struct dev *dev, struct pci_device *pci ) {
 
 }
 
-BOOT_DRIVER ( "r8169/PCI", r8169_probe );
+BOOT_DRIVER ( "r8169/PCI", find_pci_boot_device, r8169_driver, r8169_probe );

@@ -3270,9 +3270,6 @@ static int tg3_probe ( struct dev *dev, struct pci_device *pci ) {
 	unsigned long tg3reg_base, tg3reg_len;
 	int i, err, pm_cap;
 
-	if ( ! find_pci_device ( pdev, &tg3_driver ) )
-		return 0;
-
 	memset(tp, 0, sizeof(*tp));
 
 	nic->irqno  = 0;
@@ -3389,4 +3386,4 @@ static int tg3_probe ( struct dev *dev, struct pci_device *pci ) {
 	return 0;
 }
 
-BOOT_DRIVER ( "TG3", tg3_probe );
+BOOT_DRIVER ( "TG3", find_pci_boot_device, tg3_driver, tg3_probe );

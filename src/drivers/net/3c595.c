@@ -473,9 +473,6 @@ static int t595_probe ( struct dev *dev, struct pci_device *pci ) {
 	int i;
 	unsigned short *p;
 
-	if ( ! find_pci_device ( pci, &t595_driver ) )
-		return 0;
-
 	if (pci->ioaddr == 0)
 		return 0;
 	eth_nic_base = pci->ioaddr;
@@ -543,7 +540,7 @@ PCI_ROM(0x10b7, 0x4500, "3c450-1",         "3Com450 HomePNA Tornado"),
 static struct pci_driver t595_driver =
 	PCI_DRIVER ( "3C595", t595_nics, PCI_NO_CLASS );
 
-BOOT_DRIVER ( "3C595", t595_probe );
+BOOT_DRIVER ( "3C595", find_pci_boot_device, t595_driver, t595_probe );
 
 /*
  * Local variables:

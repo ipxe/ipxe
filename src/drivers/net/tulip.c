@@ -1234,9 +1234,6 @@ static int tulip_probe ( struct dev *dev ) {
     int chip_idx;
     static unsigned char last_phys_addr[ETH_ALEN] = {0x00, 'L', 'i', 'n', 'u', 'x'};
 
-    if ( ! find_pci_device ( pci, &tulip_driver ) )
-	return 0;
-
     if (pci->ioaddr == 0)
         return 0;
 
@@ -2080,4 +2077,4 @@ PCI_ROM(0x1737, 0xab09, "tulip-ab09",  "Tulip 0x1737 0xab09"),
 static struct pci_driver tulip_driver =
 	PCI_DRIVER ( "Tulip", tulip_nics, PCI_NO_CLASS );
 
-BOOT_DRIVER ( "Tulip", tulip_probe );
+BOOT_DRIVER ( "Tulip", find_pci_boot_device, tulip_driver, tulip_probe );

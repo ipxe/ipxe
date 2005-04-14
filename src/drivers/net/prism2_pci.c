@@ -31,9 +31,6 @@ static int prism2_pci_probe ( struct dev *dev, struct pci_device *pci ) {
   hfa384x_t *hw = &hw_global;
   uint32_t membase = 0; /* Prism2.5 Memory Base */
 
-  if ( ! find_pci_device ( pci, &prism2_pci_driver ) )
-	  return 0;
-
   pci_read_config_dword( pci, PRISM2_PCI_MEM_BASE, &membase);
   membase &= PCI_BASE_ADDRESS_MEM_MASK;
   hw->membase = (uint32_t) phys_to_virt(membase);
@@ -43,5 +40,5 @@ static int prism2_pci_probe ( struct dev *dev, struct pci_device *pci ) {
   return prism2_probe ( nic, hw );
 }   
 
-BOOT_DRIVER ( "Prism2_PCI", prism2_pci_probe );
+BOOT_DRIVER ( "Prism2_PCI", find_pci_boot_device, prism2_pci_driver, prism2_pci_probe );
 

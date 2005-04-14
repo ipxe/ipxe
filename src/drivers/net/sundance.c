@@ -590,9 +590,6 @@ static int sundance_probe ( struct dev *dev, struct pci_device *pci ) {
 	int i;
 	int speed;
 
-	if ( ! find_pci_device ( pci, &sundance_driver ) )
-		return 0;
-
 	if (pci->ioaddr == 0)
 		return 0;
 
@@ -889,4 +886,4 @@ static struct pci_id sundance_nics[] = {
 static struct pci_driver sundance_driver =
 	PCI_DRIVER ( "SUNDANCE/PCI", sundance_nics, PCI_NO_CLASS );
 
-BOOT_DRIVER ( "SUNDANCE/PCI", sundance_probe );
+BOOT_DRIVER ( "SUNDANCE/PCI", find_pci_boot_device, sundance_driver, sundance_probe );
