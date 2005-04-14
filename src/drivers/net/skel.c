@@ -127,6 +127,14 @@ static void skel_irq(struct nic *nic, irq_action_t action)
 	}
 }
 
+static struct nic_operations skel_operations = {
+	.connect	= dummy_connect,
+	.poll		= skel_poll,
+	.transmit	= skel_transmit,
+	.irq		= skel_irq,
+	.disable	= skel_disable,
+};
+
 /**************************************************************************
 PROBE - Look for an adapter, this routine's visible to the outside
 ***************************************************************************/
@@ -140,17 +148,10 @@ static int skel_probe ( struct dev *dev, struct pci_device *pci ) {
 	if (board_found && valid_link)
 	{
 		/* store NIC parameters */
-		nic->ioaddr = pci->ioaddr & ~3;
+		nic->ioaddr = pci->ioaddr;
 		nic->irqno = pci->irq;
 		/* point to NIC specific routines */
-static struct nic_operations skel_operations;
-static struct nic_operations skel_operations = {
-	.connect	= dummy_connect,
-	.poll		= skel_poll,
-	.transmit	= skel_transmit,
-	.irq		= skel_irq,
-	.disable	= skel_disable,
-};		nic->nic_op	= &skel_operations;
+		nic->nic_op	= &skel_operations;
 		return 1;
 	}
 	/* else */
@@ -164,7 +165,7 @@ PCI_ROM(0x0000, 0x0000, "skel-pci", "Skeleton PCI Adaptor"),
 static struct pci_driver skel_driver =
 	PCI_DRIVER ( "SKELETON/PCI", skel_nics, PCI_NO_CLASS );
 
-BOOT_DRIVER ( "SKELETON/PCI", skel_probe );
+BOOT_DRIVER ( "SKELETON/PCI", find_pci_boot_device, skel_driver, skel_probe );
 
 /**************************************************************************
 PROBE - Look for an adapter, this routine's visible to the outside
