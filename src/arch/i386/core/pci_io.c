@@ -18,13 +18,6 @@
 #include "realmode.h"
 #endif
 
-#undef DBG
-#ifdef DEBUG_PCI_IO
-#define DBG(...) printf ( __VA_ARGS__ )
-#else
-#define DBG(...)
-#endif
-
 /* Macros for direct PCI access */
 #define CONFIG_ADDRESS	0xcf8
 #define CONFIG_DATA	0xcfc

@@ -25,13 +25,6 @@
 /* Local prototypes */
 static void free_unused_base_memory ( void );
 
-#undef DBG
-#ifdef DEBUG_BASEMEM
-#define DBG(...) printf ( __VA_ARGS__ )
-#else
-#define DBG(...)
-#endif
-
 /*
  * Return amount of free base memory in bytes
  *

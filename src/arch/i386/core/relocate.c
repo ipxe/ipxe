@@ -42,13 +42,6 @@ extern char _end[];
 extern struct post_reloc_fn post_reloc_fns[];
 extern struct post_reloc_fn post_reloc_fns_end[];
 
-#undef DBG
-#ifdef DEBUG_RELOCATE
-#define DBG(...) printf ( __VA_ARGS__ )
-#else
-#define DBG(...)
-#endif
-
 static void relocate ( void ) {
 	unsigned long addr, eaddr, size;
 	unsigned i;

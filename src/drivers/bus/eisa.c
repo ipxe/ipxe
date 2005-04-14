@@ -4,15 +4,6 @@
 #include "timer.h"
 #include "eisa.h"
 
-#define DEBUG_EISA
-
-#undef DBG
-#ifdef DEBUG_EISA
-#define DBG(...) printf ( __VA_ARGS__ )
-#else
-#define DBG(...)
-#endif
-
 /*
  * Ensure that there is sufficient space in the shared dev_bus
  * structure for a struct pci_device.

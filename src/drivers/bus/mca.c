@@ -10,15 +10,6 @@
 #include "io.h"
 #include "mca.h"
 
-#define DEBUG_MCA
-
-#undef DBG
-#ifdef DEBUG_MCA
-#define DBG(...) printf ( __VA_ARGS__ )
-#else
-#define DBG(...)
-#endif
-
 /*
  * Ensure that there is sufficient space in the shared dev_bus
  * structure for a struct pci_device.

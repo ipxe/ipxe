@@ -35,6 +35,7 @@
 #include "cpu.h"
 #include "timer.h"
 
+#undef DBG
 #if TRACE_PXE
 #define DBG(...) printf ( __VA_ARGS__ )
 #else

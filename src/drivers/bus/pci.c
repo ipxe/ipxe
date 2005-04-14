@@ -2,13 +2,6 @@
 #include "dev.h"
 #include "pci.h"
 
-#undef DBG
-#ifdef DEBUG_PCI
-#define DBG(...) printf ( __VA_ARGS__ )
-#else
-#define DBG(...)
-#endif
-
 /*
  * Ensure that there is sufficient space in the shared dev_bus
  * structure for a struct pci_device.

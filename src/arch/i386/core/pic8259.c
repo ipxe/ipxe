@@ -8,12 +8,6 @@
 #include "pic8259.h"
 #include "realmode.h"
 
-#ifdef DEBUG_IRQ
-#define DBG(...) printf ( __VA_ARGS__ )
-#else
-#define DBG(...)
-#endif
-
 /* State of trivial IRQ handler */
 irq_t trivial_irq_installed_on = IRQ_NONE;
 static uint16_t trivial_irq_previous_trigger_count = 0;

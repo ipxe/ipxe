@@ -30,12 +30,6 @@
 /* to get the PCI support functions, if this is a PCI NIC */
 #include "pci.h"
 
-#if 0
-#define DBGPRNT( x ) printf x
-#else
-#define DBGPRNT( x )
-#endif
-
 typedef unsigned char u8;
 typedef signed char s8;
 typedef unsigned short u16;
@@ -518,10 +512,10 @@ static void mtd_reset(struct nic *nic)
     {
         char* texts[]={"half","full","10","100","1000"};
         getlinktype(nic);
-        DBGPRNT(("Link is OK : %s %s\n", texts[mtdx.duplexmode-1], texts[mtdx.line_speed+1] ));
+        DBG(("Link is OK : %s %s\n", texts[mtdx.duplexmode-1], texts[mtdx.line_speed+1] ));
     } else
     {
-        DBGPRNT(("No link!!!\n"));
+        DBG(("No link!!!\n"));
     }
 
     mtdx.crvalue |= /*TxEnable |*/ RxEnable | TxThreshold;
@@ -563,8 +557,8 @@ static int mtd_poll(struct nic *nic, int retrieve)
         /* Omit the four octet CRC from the length. */
         short pkt_len = ((rx_status & FLNGMASK) >> FLNGShift) - 4;
 
-        DBGPRNT(( "  netdev_rx() normal Rx pkt length %d"
-                  " status %x.\n", pkt_len, rx_status));
+        DBG(( "  netdev_rx() normal Rx pkt length %d"
+	      " status %x.\n", pkt_len, rx_status));
 
         nic->packetlen = pkt_len;
         memcpy(nic->packet, mtdx.cur_rx->skbuff, pkt_len);
@@ -630,7 +624,7 @@ static void mtd_transmit(
 
     tx_status = mtdx.tx_ring[0].status;
     if (currticks() >= to){
-        DBGPRNT(("TX Time Out"));
+        DBG(("TX Time Out"));
     } else if( tx_status & (CSL | LC | EC | UDF | HF)){
         printf("Transmit error: %s %s %s %s %s.\n",
                tx_status,
@@ -644,7 +638,7 @@ static void mtd_transmit(
     /*hex_dump( txb, size );*/
     /*pause();*/
 
-    DBGPRNT(("TRANSMIT\n"));
+    DBG(("TRANSMIT\n"));
 }
 
 /**************************************************************************
@@ -656,7 +650,7 @@ static void mtd_disable ( struct nic *nic ) {
     outl( mtdx.crvalue & (~TxEnable) & (~RxEnable), mtdx.ioaddr + TCRRCR);
     /* Reset the chip to erase previous misconfiguration. */
     mtd_reset(nic);
-    DBGPRNT(("DISABLE\n"));
+    DBG(("DISABLE\n"));
 }
 
 static struct nic_operations mtd_operations = {
@@ -708,7 +702,7 @@ static int mtd_probe ( struct dev *dev ) {
         return 0;
     }
 
-    DBGPRNT(("%s : ioaddr %#hX, addr %!\n",mtdx.nic_name, mtdx.ioaddr, nic->node_addr));
+    DBG(("%s : ioaddr %#hX, addr %!\n",mtdx.nic_name, mtdx.ioaddr, nic->node_addr));
 
     /* Reset the chip to erase previous misconfiguration. */
     outl(0x00000001, mtdx.ioaddr + BCR);
@@ -725,8 +719,8 @@ static int mtd_probe ( struct dev *dev ) {
             if (mii_status != 0xffff && mii_status != 0x0000) {
                 mtdx.phys[phy_idx] = phy;
 
-                DBGPRNT(("%s: MII PHY found at address %d, status "
-                         "0x%4.4x.\n", mtdx.nic_name, phy, mii_status));
+                DBG(("%s: MII PHY found at address %d, status "
+		     "0x%4.4x.\n", mtdx.nic_name, phy, mii_status));
                 /* get phy type */
                 {
                     unsigned int data;
@@ -759,10 +753,10 @@ static int mtd_probe ( struct dev *dev ) {
         /* get phy type */
         if (inl(mtdx.ioaddr + PHYIDENTIFIER) == MysonPHYID ) {
             mtdx.PHYType = MysonPHY;
-            DBGPRNT(("MysonPHY\n"));
+            DBG(("MysonPHY\n"));
         } else {
             mtdx.PHYType = OtherPHY;
-            DBGPRNT(("OtherPHY\n"));
+            DBG(("OtherPHY\n"));
         }
     }
 

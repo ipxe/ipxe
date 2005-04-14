@@ -207,6 +207,7 @@ static void shoot_targets ( firing_squad_lineup_t *lineup ) {
 /* Debug macros
  */
 
+#undef DBG
 #ifdef TRACE_UNDI
 #define DBG(...) printf ( __VA_ARGS__ )
 #else
