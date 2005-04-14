@@ -66,11 +66,11 @@ struct boot_driver {
 };
 
 #define BOOT_DRIVER( _name, _find_bus_boot_device, _bus_driver,	_probe )      \
-	static struct boot_driver boot_driver_ ## probe_func		      \
+	static struct boot_driver boot_ ## _bus_driver			      \
 	    __attribute__ ((used,__section__(".boot_drivers"))) = {	      \
 		.name = _name,						      \
 		.find_bus_boot_device = ( void * ) _find_bus_boot_device,     \
-		.bus_driver = ( void * ) _bus_driver,			      \
+		.bus_driver = ( void * ) &_bus_driver,			      \
 		.probe = ( void * ) _probe,				      \
 	};
 
