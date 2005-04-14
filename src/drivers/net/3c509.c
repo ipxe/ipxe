@@ -120,6 +120,17 @@ static inline int fill_t509_device ( struct t509_device *t509 ) {
 	int i;
 	uint16_t iobase;
 
+	/*
+	 * We need an ID port, if we don't already have one.
+	 *
+	 */
+	if ( ! t509->id_port ) {
+		if ( ! find_id_port ( t509 ) ) {
+			DBG ( "No ID port available for contention select\n" );
+			return 0;
+		}
+	}
+
 	/* 
 	 * If this is the start of the scan, clear all tag registers.
 	 * Otherwise, tell already-found NICs not to respond.
@@ -173,10 +184,6 @@ static inline int find_t509_device ( struct t509_device *t509,
 	if ( t509->magic != t509_magic ) {
 		memset ( t509, 0, sizeof ( *t509 ) );
 		t509->magic = t509_magic;
-		if ( ! find_id_port ( t509 ) ) {
-			DBG ( "No ID port available for contention select\n" );
-			return 0;
-		}
 	}
 
 	/* Find the next t509 device */
