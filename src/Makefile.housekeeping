@@ -46,6 +46,10 @@ CFLAGS	+= $(OLDGAS)
 oldgas :
 	@echo $(oldgas)
 
+# compiler.h is needed for our linking and debugging system
+#
+CFLAGS	+= -include compiler.h
+
 # SRCDIRS lists all directories containing source files.
 srcdirs :
 	@echo $(SRCDIRS)
@@ -365,6 +369,18 @@ TAGS : TAGS.$(ARCH)
 TAGS.$(ARCH) : 
 	ctags -e -R -f $@ $(foreach ARCH,$(OTHER_ARCHS),--exclude=arch/$(ARCH))
 CLEANUP	+= TAGS*
+
+# Force rebuild for any given target
+#
+$(BIN)/%.rebuild :
+	rm -f $(BIN)/$*
+	$(MAKE) $(MAKEFLAGS) $(BIN)/$*
+
+# Build a debugging version of an object
+#
+$(BIN)/%.o.dbg :
+	rm -f $(BIN)/$*.o
+	$(MAKE) $(MAKEFLAGS) EXTRA_CFLAGS+=-Ddebug_$* $(BIN)/$*.o
 
 # Clean-up
 #
