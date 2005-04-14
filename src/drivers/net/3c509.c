@@ -6,7 +6,6 @@
 
 #include "eisa.h"
 #include "isa.h"
-#include "dev.h"
 #include "io.h"
 #include "timer.h"
 #include "string.h"
@@ -25,7 +24,6 @@
  */
 struct t509_device {
 	char *magic; /* must be first */
-	struct dev *dev;
 	uint16_t id_port;
 	uint16_t ioaddr;
 	unsigned char current_tag;
@@ -123,16 +121,11 @@ static inline int fill_t509_device ( struct t509_device *t509 ) {
 	uint16_t iobase;
 
 	/* 
-	 * If this is the start of the scan, find an id_port and clear
-	 * all tag registers.  Otherwise, tell already-found NICs not
-	 * to respond.
+	 * If this is the start of the scan, clear all tag registers.
+	 * Otherwise, tell already-found NICs not to respond.
 	 *
 	 */
 	if ( t509->current_tag == 0 ) {
-		if ( ! find_id_port ( t509 ) ) {
-			DBG ( "No ID port available for contention select\n" );
-			return 0;
-		}
 		outb ( 0xd0, t509->id_port );
 	} else {
 		outb ( 0xd8, t509->id_port ) ;
@@ -166,42 +159,48 @@ static inline int fill_t509_device ( struct t509_device *t509 ) {
 }
 
 /*
- * Obtain a struct t509_device * from a struct dev *
- *
- * If dev has not previously been used for a PCI device scan, blank
- * out struct t509_device
- */
-static struct t509_device * t509_device ( struct dev *dev ) {
-	struct t509_device *t509 = dev->bus;
-
-	if ( t509->magic != t509_magic ) {
-		memset ( t509, 0, sizeof ( *t509 ) );
-		t509->magic = t509_magic;
-	}
-	t509->dev = dev;
-	return t509;
-}
-
-/*
  * Find a t509 device matching the specified driver.  ("Matching the
  * specified driver" is, in this case, a no-op, but we want to
  * preserve the common bus API).
  *
+ * Called only once, so inlined for efficiency.
+ *
  */
-static int find_t509_device ( struct t509_device *t509,
-				 struct t509_driver *driver ) {
+static inline int find_t509_device ( struct t509_device *t509,
+				     struct t509_driver *driver __unused ) {
+
+	/* Initialise struct t509 if it's the first time it's been used. */
+	if ( t509->magic != t509_magic ) {
+		memset ( t509, 0, sizeof ( *t509 ) );
+		t509->magic = t509_magic;
+		if ( ! find_id_port ( t509 ) ) {
+			DBG ( "No ID port available for contention select\n" );
+			return 0;
+		}
+	}
+
 	/* Find the next t509 device */
 	if ( ! fill_t509_device ( t509 ) )
 		return 0;
 	
-	/* Fill in dev structure, if present */
-	if ( t509->dev ) {
-		t509->dev->name = driver->name;
-		t509->dev->devid.bus_type = ISA_BUS_TYPE;
-		t509->dev->devid.vendor_id = MFG_ID;
-		t509->dev->devid.device_id = PROD_ID;
-	}
+	return 1;
+}
 
+/*
+ * Find the next T509 device that can be used to boot using the
+ * specified driver.
+ *
+ */
+int find_t509_boot_device ( struct dev *dev, struct t509_driver *driver ) {
+	struct t509_device *t509 = ( struct t509_device * )dev->bus;
+
+	if ( ! find_t509_device ( t509, driver ) )
+		return 0;
+
+	dev->name = driver->name;
+	dev->devid.bus_type = ISA_BUS_TYPE;
+	dev->devid.vendor_id = MFG_ID;
+	dev->devid.device_id = PROD_ID;
 	return 1;
 }
 
@@ -209,42 +208,28 @@ static int find_t509_device ( struct t509_device *t509,
  * The ISA probe function
  *
  */
-static struct t509_driver el3_t509_driver = { "3c509 (ISA)" };
-
-static int el3_t509_probe ( struct dev *dev ) {
+static int el3_t509_probe ( struct dev *dev, struct t509_device *t509 ) {
 	struct nic *nic = nic_device ( dev );
-	struct t509_device *t509 = t509_device ( dev );
-	
-	if ( ! find_t509_device ( t509, &el3_t509_driver ) )
-		return 0;
 	
 	nic->ioaddr = t509->ioaddr;
 	nic->irqno = 0;
-	printf ( "3C5x9 board on ISA at %#hx - ", nic->ioaddr );
+	printf ( "3c509 board on ISA at %#hx - ", nic->ioaddr );
 
 	/* Hand off to generic t5x9 probe routine */
 	return t5x9_probe ( nic, ISA_PROD_ID ( PROD_ID ), ISA_PROD_ID_MASK );
 }
 
-BOOT_DRIVER ( "3c509", el3_t509_probe );
+static struct t509_driver el3_t509_driver = { "3c509 (ISA)" };
+
+BOOT_DRIVER ( "3c509", find_t509_boot_device, el3_t509_driver,
+	      el3_t509_probe );
 
 /*
- * The 3c509 driver also supports EISA cards
+ * The EISA probe function
  *
  */
-static struct eisa_id el3_eisa_adapters[] = {
-	{ "3Com 3c509 EtherLink III (EISA)", MFG_ID, PROD_ID },
-};
-
-static struct eisa_driver el3_eisa_driver =
-	EISA_DRIVER ( "3c509 (EISA)", el3_eisa_adapters );
-
-static int el3_eisa_probe ( struct dev *dev ) {
+static int el3_eisa_probe ( struct dev *dev, struct eisa_device *eisa ) {
 	struct nic *nic = nic_device ( dev );
-	struct eisa_device *eisa = eisa_device ( dev );
-	
-	if ( ! find_eisa_device ( eisa, &el3_eisa_driver ) )
-		return 0;
 	
 	enable_eisa_device ( eisa );
 	nic->ioaddr = eisa->ioaddr;
@@ -255,7 +240,15 @@ static int el3_eisa_probe ( struct dev *dev ) {
 	return t5x9_probe ( nic, ISA_PROD_ID ( PROD_ID ), ISA_PROD_ID_MASK );
 }
 
-BOOT_DRIVER ( "3c509 (EISA)", el3_eisa_probe );
+static struct eisa_id el3_eisa_adapters[] = {
+	{ "3Com 3c509 EtherLink III (EISA)", MFG_ID, PROD_ID },
+};
+
+static struct eisa_driver el3_eisa_driver =
+	EISA_DRIVER ( "3c509 (EISA)", el3_eisa_adapters );
+
+BOOT_DRIVER ( "3c509 (EISA)", find_eisa_boot_device, el3_eisa_driver,
+	      el3_eisa_probe );
 
 /*
  * We currently build both ISA and EISA support into a single ROM

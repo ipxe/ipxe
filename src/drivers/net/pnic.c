@@ -211,27 +211,14 @@ static struct nic_operations pnic_operations = {
 	.disable        = pnic_disable,
 };
 
-static struct pci_id pnic_nics[] = {
-/* genrules.pl doesn't let us use macros for PCI IDs...*/
-PCI_ROM ( 0xfefe, 0xefef, "pnic", "Bochs Pseudo NIC Adaptor" ),
-};
-
-static struct pci_driver pnic_driver =
-	PCI_DRIVER ( "PNIC", pnic_nics, PCI_NO_CLASS );
-
 /**************************************************************************
 PROBE - Look for an adapter, this routine's visible to the outside
 ***************************************************************************/
 
-static int pnic_probe ( struct dev *dev ) {
+static int pnic_probe ( struct dev *dev, struct pci_device *pci ) {
 	struct nic *nic = nic_device ( dev );
-	struct pci_device *pci = pci_device ( dev );
 	uint16_t api_version;
 	uint16_t status;
-
-	/* Scan PCI bus for a PNIC device */
-	if ( ! find_pci_device ( pci, &pnic_driver ) )
-		return 0;
 
 	/* Retrieve relevant information about PCI device */
 	nic->ioaddr = pci->ioaddr;
@@ -257,4 +244,12 @@ static int pnic_probe ( struct dev *dev ) {
 	return 1;
 }
 
-BOOT_DRIVER ( "PNIC", pnic_probe );
+static struct pci_id pnic_nics[] = {
+/* genrules.pl doesn't let us use macros for PCI IDs...*/
+PCI_ROM ( 0xfefe, 0xefef, "pnic", "Bochs Pseudo NIC Adaptor" ),
+};
+
+static struct pci_driver pnic_driver =
+	PCI_DRIVER ( "PNIC", pnic_nics, PCI_NO_CLASS );
+
+BOOT_DRIVER ( "PNIC", find_pci_boot_device, pnic_driver, pnic_probe );

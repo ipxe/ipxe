@@ -5,7 +5,7 @@
 
 #include "etherboot.h"
 #include "mca.h"
-#include "isa.h"
+#include "isa.h" /* for ISA_ROM */
 #include "nic.h"
 #include "3c509.h"
 
@@ -44,6 +44,6 @@ static struct mca_id el3_mca_adapters[] = {
 static struct mca_driver t529_driver
 	= MCA_DRIVER ( "3c529", el3_mca_adapters );
 
-BOOT_DRIVER ( "3c529", find_mca_boot_device, &t529_driver, t529_probe );
+BOOT_DRIVER ( "3c529", find_mca_boot_device, t529_driver, t529_probe );
 
 ISA_ROM( "3c529", "3c529 == MCA 3c509" );
