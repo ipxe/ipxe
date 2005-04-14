@@ -35,8 +35,9 @@
  * Extract product ID and revision from combined product field
  *
  */
-#define ISA_PROD_ID(product)	( (product) & 0xf0ff )
-#define ISA_PROD_REV(product)	( ( (product) & 0x0f00 ) >> 8 )
+#define ISA_PROD_ID_MASK	( 0xf0ff )
+#define ISA_PROD_ID(product)	( (product) & ISA_PROD_ID_MASK )
+#define ISA_PROD_REV(product)	( ( (product) & ~ISA_PROD_ID_MASK ) >> 8 )
 
 /* Functions in isa_ids.c */
 extern char * isa_id_string ( uint16_t vendor, uint16_t product );
