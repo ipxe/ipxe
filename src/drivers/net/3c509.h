@@ -49,9 +49,9 @@
 #define MAX_EEPROMBUSY	1000
 #define EP_LAST_TAG	0xd7
 #define EP_MAX_BOARDS	16
-#ifndef	EP_ID_PORT
-#define EP_ID_PORT	0x100
-#endif
+#define EP_ID_PORT_START 0x110
+#define EP_ID_PORT_INC 0x10
+#define EP_ID_PORT_END 0x200
 
 /*
  * Commands to read/write EEPROM trough EEPROM command register (Window 0,
@@ -373,6 +373,12 @@
 #define UTP				0x4
 
 #define RX_BYTES_MASK			(unsigned short) (0x07ff)
+
+/*
+ * Function shared between 3c509.c and 3c529.c
+ */
+extern int t5x9_probe ( struct nic *nic,
+			uint16_t prod_id_check, uint16_t prod_id_mask );
 
 
 /*

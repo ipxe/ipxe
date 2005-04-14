@@ -1,354 +1,91 @@
-/**************************************************************************
-ETHERBOOT -  BOOTP/TFTP Bootstrap Program
+/*
+ * Split out into 3c509.c and 3c5x9.c, to make it possible to build a
+ * 3c529 module without including ISA, ISAPnP and EISA code.
+ *
+ */
 
-Author: Martin Renters.
-  Date: Mar 22 1995
-
- This code is based heavily on David Greenman's if_ed.c driver and
-  Andres Vega Garcia's if_ep.c driver.
-
- Copyright (C) 1993-1994, David Greenman, Martin Renters.
- Copyright (C) 1993-1995, Andres Vega Garcia.
- Copyright (C) 1995, Serge Babkin.
-  This software may be used, modified, copied, distributed, and sold, in
-  both source and binary form provided that the above copyright and these
-  terms are retained. Under no circumstances are the authors responsible for
-  the proper functioning of this software, nor do the authors assume any
-  responsibility for damages incurred with its use.
-
-3c509 support added by Serge Babkin (babkin@hq.icb.chel.su)
-
-$Id$
-
-***************************************************************************/
-
-/* #define EDEBUG */
-
-#include "etherboot.h"
-#include "nic.h"
+#include "eisa.h"
 #include "isa.h"
+#include "dev.h"
+#include "io.h"
 #include "timer.h"
+#include "string.h"
+#include "etherboot.h"
 #include "3c509.h"
 
-static unsigned short	eth_nic_base;
-static enum { none, bnc, utp } connector = none;	/* for 3C509 */
-
-#ifdef	INCLUDE_3C529
 /*
- * This table and several other pieces of the MCA support
- * code were shamelessly borrowed from the Linux kernel source.
- *
- * MCA support added by Adam Fritzler (mid@auk.cx)
+ * 3c509 cards have their own method of contention resolution; this
+ * effectively defines another bus type.
  *
  */
-struct el3_mca_adapters_struct {
-        const char *name;
-        int id;
+
+/*
+ * A physical t509 device
+ *
+ */
+struct t509_device {
+	char *magic; /* must be first */
+	struct dev *dev;
+	uint16_t id_port;
+	uint16_t ioaddr;
+	unsigned char current_tag;
 };
-static struct el3_mca_adapters_struct el3_mca_adapters[] = {
-        { "3Com 3c529 EtherLink III (10base2)", 0x627c },
-        { "3Com 3c529 EtherLink III (10baseT)", 0x627d },
-        { "3Com 3c529 EtherLink III (test mode)", 0x62db },
-        { "3Com 3c529 EtherLink III (TP or coax)", 0x62f6 },
-        { "3Com 3c529 EtherLink III (TP)", 0x62f7 },
-        { NULL, 0 },
+
+/*
+ * A t509 driver
+ *
+ */
+struct t509_driver {
+	char *name;
 };
-#endif
 
-/**************************************************************************
-ETH_RESET - Reset adapter
-***************************************************************************/
-static void t509_reset(struct nic *nic)
-{
-	int i;
+/*
+ * Ensure that there is sufficient space in the shared dev_bus
+ * structure for a struct pci_device.
+ *
+ */
+DEV_BUS( struct t509_device, t509_dev );
+static char t509_magic[0]; /* guaranteed unique symbol */
 
-	/***********************************************************
-			Reset 3Com 509 card
-	*************************************************************/
-
-	/* stop card */
-	outw(RX_DISABLE, BASE + EP_COMMAND);
-	outw(RX_DISCARD_TOP_PACK, BASE + EP_COMMAND);
-	while (inw(BASE + EP_STATUS) & S_COMMAND_IN_PROGRESS)
-		;
-	outw(TX_DISABLE, BASE + EP_COMMAND);
-	outw(STOP_TRANSCEIVER, BASE + EP_COMMAND);
-	udelay(1000);
-	outw(RX_RESET, BASE + EP_COMMAND);
-	outw(TX_RESET, BASE + EP_COMMAND);
-	outw(C_INTR_LATCH, BASE + EP_COMMAND);
-	outw(SET_RD_0_MASK, BASE + EP_COMMAND);
-	outw(SET_INTR_MASK, BASE + EP_COMMAND);
-	outw(SET_RX_FILTER, BASE + EP_COMMAND);
-
-	/*
-	* initialize card
-	*/
-	while (inw(BASE + EP_STATUS) & S_COMMAND_IN_PROGRESS)
-		;
-
-	GO_WINDOW(0);
-
-	/* Disable the card */
-	outw(0, BASE + EP_W0_CONFIG_CTRL);
-
-	/* Configure IRQ to none */
-	outw(SET_IRQ(0), BASE + EP_W0_RESOURCE_CFG);
-
-	/* Enable the card */
-	outw(ENABLE_DRQ_IRQ, BASE + EP_W0_CONFIG_CTRL);
-
-	GO_WINDOW(2);
-
-	/* Reload the ether_addr. */
-	for (i = 0; i < ETH_ALEN; i++)
-		outb(nic->node_addr[i], BASE + EP_W2_ADDR_0 + i);
-
-	outw(RX_RESET, BASE + EP_COMMAND);
-	outw(TX_RESET, BASE + EP_COMMAND);
-
-	/* Window 1 is operating window */
-	GO_WINDOW(1);
-	for (i = 0; i < 31; i++)
-		inb(BASE + EP_W1_TX_STATUS);
-
-	/* get rid of stray intr's */
-	outw(ACK_INTR | 0xff, BASE + EP_COMMAND);
-
-	outw(SET_RD_0_MASK | S_5_INTS, BASE + EP_COMMAND);
-
-	outw(SET_INTR_MASK, BASE + EP_COMMAND);
-
-	outw(SET_RX_FILTER | FIL_GROUP | FIL_INDIVIDUAL | FIL_BRDCST, BASE + EP_COMMAND);
-
-	/* configure BNC */
-	if (connector == bnc) {
-		outw(START_TRANSCEIVER, BASE + EP_COMMAND);
-		udelay(1000);
-	}
-	/* configure UTP */
-	else if (connector == utp) {
-		GO_WINDOW(4);
-		outw(ENABLE_UTP, BASE + EP_W4_MEDIA_TYPE);
-		sleep(2);	/* Give time for media to negotiate */
-		GO_WINDOW(1);
-	}
-
-	/* start transceiver and receiver */
-	outw(RX_ENABLE, BASE + EP_COMMAND);
-	outw(TX_ENABLE, BASE + EP_COMMAND);
-
-	/* set early threshold for minimal packet length */
-	outw(SET_RX_EARLY_THRESH | ETH_ZLEN, BASE + EP_COMMAND);
-	outw(SET_TX_START_THRESH | 16, BASE + EP_COMMAND);
-}
-
-/**************************************************************************
-ETH_TRANSMIT - Transmit a frame
-***************************************************************************/
-static char padmap[] = {
-	0, 3, 2, 1};
-
-static void t509_transmit(
-struct nic *nic,
-const char *d,			/* Destination */
-unsigned int t,			/* Type */
-unsigned int s,			/* size */
-const char *p)			/* Packet */
-{
-	register unsigned int len;
-	int pad;
-	int status;
-
-#ifdef	EDEBUG
-	printf("{l=%d,t=%hX}",s+ETH_HLEN,t);
-#endif
-
-	/* swap bytes of type */
-	t= htons(t);
-
-	len=s+ETH_HLEN; /* actual length of packet */
-	pad = padmap[len & 3];
-
-	/*
-	* The 3c509 automatically pads short packets to minimum ethernet length,
-	* but we drop packets that are too large. Perhaps we should truncate
-	* them instead?
-	*/
-	if (len + pad > ETH_FRAME_LEN) {
-		return;
-	}
-
-	/* drop acknowledgements */
-	while ((status=inb(BASE + EP_W1_TX_STATUS)) & TXS_COMPLETE ) {
-		if (status & (TXS_UNDERRUN|TXS_MAX_COLLISION|TXS_STATUS_OVERFLOW)) {
-			outw(TX_RESET, BASE + EP_COMMAND);
-			outw(TX_ENABLE, BASE + EP_COMMAND);
+/*
+ * Find a port that can be used for contention select
+ *
+ * Called only once, so inlined for efficiency.
+ *
+ */
+static inline int find_id_port ( struct t509_device *t509 ) {
+	for ( t509->id_port = EP_ID_PORT_START ;
+	      t509->id_port < EP_ID_PORT_END ;
+	      t509->id_port += EP_ID_PORT_INC ) {
+		outb ( 0x00, t509->id_port );
+		outb ( 0xff, t509->id_port );
+		if ( inb ( t509->id_port ) & 0x01 ) {
+			/* Found a suitable port */
+			return 1;
 		}
-		outb(0x0, BASE + EP_W1_TX_STATUS);
 	}
-
-	while (inw(BASE + EP_W1_FREE_TX) < (unsigned short)len + pad + 4)
-		; /* no room in FIFO */
-
-	outw(len, BASE + EP_W1_TX_PIO_WR_1);
-	outw(0x0, BASE + EP_W1_TX_PIO_WR_1);	/* Second dword meaningless */
-
-	/* write packet */
-	outsw(BASE + EP_W1_TX_PIO_WR_1, d, ETH_ALEN/2);
-	outsw(BASE + EP_W1_TX_PIO_WR_1, nic->node_addr, ETH_ALEN/2);
-	outw(t, BASE + EP_W1_TX_PIO_WR_1);
-	outsw(BASE + EP_W1_TX_PIO_WR_1, p, s / 2);
-	if (s & 1)
-		outb(*(p+s - 1), BASE + EP_W1_TX_PIO_WR_1);
-
-	while (pad--)
-		outb(0, BASE + EP_W1_TX_PIO_WR_1);	/* Padding */
-
-	/* wait for Tx complete */
-	while((inw(BASE + EP_STATUS) & S_COMMAND_IN_PROGRESS) != 0)
-		;
-}
-
-/**************************************************************************
-ETH_POLL - Wait for a frame
-***************************************************************************/
-static int t509_poll(struct nic *nic, int retrieve)
-{
-	/* common variables */
-	/* variables for 3C509 */
-	short status, cst;
-	register short rx_fifo;
-
-	cst=inw(BASE + EP_STATUS);
-
-#ifdef	EDEBUG
-	if(cst & 0x1FFF)
-		printf("-%hX-",cst);
-#endif
-
-	if( (cst & S_RX_COMPLETE)==0 ) {
-		/* acknowledge  everything */
-		outw(ACK_INTR| (cst & S_5_INTS), BASE + EP_COMMAND);
-		outw(C_INTR_LATCH, BASE + EP_COMMAND);
-
-		return 0;
-	}
-
-	status = inw(BASE + EP_W1_RX_STATUS);
-#ifdef	EDEBUG
-	printf("*%hX*",status);
-#endif
-
-	if (status & ERR_RX) {
-		outw(RX_DISCARD_TOP_PACK, BASE + EP_COMMAND);
-		return 0;
-	}
-
-	rx_fifo = status & RX_BYTES_MASK;
-	if (rx_fifo==0)
-		return 0;
-
-	if ( ! retrieve ) return 1;
-
-		/* read packet */
-#ifdef	EDEBUG
-	printf("[l=%d",rx_fifo);
-#endif
-	insw(BASE + EP_W1_RX_PIO_RD_1, nic->packet, rx_fifo / 2);
-	if(rx_fifo & 1)
-		nic->packet[rx_fifo-1]=inb(BASE + EP_W1_RX_PIO_RD_1);
-	nic->packetlen=rx_fifo;
-
-	while(1) {
-		status = inw(BASE + EP_W1_RX_STATUS);
-#ifdef	EDEBUG
-		printf("*%hX*",status);
-#endif
-		rx_fifo = status & RX_BYTES_MASK;
-		if(rx_fifo>0) {
-			insw(BASE + EP_W1_RX_PIO_RD_1, nic->packet+nic->packetlen, rx_fifo / 2);
-			if(rx_fifo & 1)
-				nic->packet[nic->packetlen+rx_fifo-1]=inb(BASE + EP_W1_RX_PIO_RD_1);
-			nic->packetlen+=rx_fifo;
-#ifdef	EDEBUG
-			printf("+%d",rx_fifo);
-#endif
-		}
-		if(( status & RX_INCOMPLETE )==0) {
-#ifdef	EDEBUG
-			printf("=%d",nic->packetlen);
-#endif
-			break;
-		}
-		udelay(1000);	/* if incomplete wait 1 ms */
-	}
-	/* acknowledge reception of packet */
-	outw(RX_DISCARD_TOP_PACK, BASE + EP_COMMAND);
-	while (inw(BASE + EP_STATUS) & S_COMMAND_IN_PROGRESS)
-		;
-#ifdef	EDEBUG
-{
-	unsigned short type = 0;	/* used by EDEBUG */
-	type = (nic->packet[12]<<8) | nic->packet[13];
-	if(nic->packet[0]+nic->packet[1]+nic->packet[2]+nic->packet[3]+nic->packet[4]+
-	    nic->packet[5] == 0xFF*ETH_ALEN)
-		printf(",t=%hX,b]",type);
-	else
-		printf(",t=%hX]",type);
-}
-#endif
-	return (1);
-}
-
-/*************************************************************************
-	3Com 509 - specific routines
-**************************************************************************/
-
-static int
-eeprom_rdy(void)
-{
-	int i;
-
-	for (i = 0; is_eeprom_busy(IS_BASE) && i < MAX_EEPROMBUSY; i++);
-	if (i >= MAX_EEPROMBUSY) {
-		/* printf("3c509: eeprom failed to come ready.\n"); */
-		/* memory in EPROM is tight */
-		/* printf("3c509: eeprom busy.\n"); */
-		return (0);
-	}
-	return (1);
+	/* No id port available */
+	return 0;
 }
 
 /*
- * get_e: gets a 16 bits word from the EEPROM. we must have set the window
- * before
+ * Send ID sequence to the ID port
+ *
+ * Called only once, so inlined for efficiency.
+ *
  */
-static int
-get_e(int offset)
-{
-	if (!eeprom_rdy())
-		return (0xffff);
-	outw(EEPROM_CMD_RD | offset, IS_BASE + EP_W0_EEPROM_COMMAND);
-	if (!eeprom_rdy())
-		return (0xffff);
-	return (inw(IS_BASE + EP_W0_EEPROM_DATA));
+static inline void send_id_sequence ( struct t509_device *t509 ) {
+	unsigned short lrs_state, i;
+
+	outb ( 0x00, t509->id_port );
+        outb ( 0x00, t509->id_port );
+	lrs_state = 0xff;
+        for ( i = 0; i < 255; i++ ) {
+                outb ( lrs_state, t509->id_port );
+                lrs_state <<= 1;
+                lrs_state = lrs_state & 0x100 ? lrs_state ^ 0xcf : lrs_state;
+        }
 }
-
-static int
-send_ID_sequence(int port)
-{
-	int cx, al;
-
-	for (al = 0xff, cx = 0; cx < 255; cx++) {
-		outb(al, port);
-		al <<= 1;
-		if (al & 0x100)
-			al ^= 0xcf;
-	}
-	return (1);
-}
-
 
 /*
  * We get eeprom data from the id_port given an offset into the eeprom.
@@ -362,314 +99,170 @@ send_ID_sequence(int port)
  * the AX register which is conveniently returned to us by inb().  Hence; we
  * read 16 times getting one bit of data with each read.
  */
-static int
-get_eeprom_data(int id_port, int offset)
-{
+static uint16_t id_read_eeprom ( struct t509_device *t509, int offset ) {
 	int i, data = 0;
-	outb(0x80 + offset, id_port);
+
+	outb ( 0x80 + offset, t509->id_port );
 	/* Do we really need this wait? Won't be noticeable anyway */
 	udelay(10000);
-	for (i = 0; i < 16; i++)
-		data = (data << 1) | (inw(id_port) & 1);
-	return (data);
+
+	for ( i = 0; i < 16; i++ ) {
+		data = ( data << 1 ) | ( inw ( t509->id_port ) & 1 );
+	}
+	return data;
 }
-
-static void __t509_disable(void)
-{
-	outb(0xc0, EP_ID_PORT);
-}
-
-static void t509_disable ( struct nic *nic ) {
-	/* reset and disable merge */
-	t509_reset(nic);
-	__t509_disable();
-}
-
-static void t509_irq(struct nic *nic __unused, irq_action_t action __unused)
-{
-  switch ( action ) {
-  case DISABLE :
-    break;
-  case ENABLE :
-    break;
-  case FORCE :
-    break;
-  }
-}
-
-/**************************************************************************
-ETH_PROBE - Look for an adapter
-***************************************************************************/
-#ifdef	INCLUDE_3C529
-static int t529_probe(struct dev *dev, unsigned short *probe_addrs __unused)
-#else
-static int t509_probe(struct dev *dev, unsigned short *probe_addrs __unused)
-#endif
-{
-	struct nic *nic = (struct nic *)dev;
-	/* common variables */
-	int i;
-	int failcount;
-
-#ifdef	INCLUDE_3C529
-	struct el3_mca_adapters_struct *mcafound = NULL;
-	int mca_pos4 = 0, mca_pos5 = 0, mca_irq = 0;
-#endif
-
-	__t509_disable();		/* in case board was active */
-
-	for (failcount = 0; failcount < 100; failcount++) {
-		int data, j, io_base, id_port;
-		unsigned short k;
-		int ep_current_tag;
-		short *p;
-#ifdef	INCLUDE_3C529
-		int curboard;
-#endif
-
-		id_port = EP_ID_PORT;
-		ep_current_tag = EP_LAST_TAG + 1;
-
-	/*********************************************************
-			Search for 3Com 509 card
-	***********************************************************/
-#ifdef	INCLUDE_3C529
-		/*
-		 * XXX: We should really check to make sure we have an MCA
-		 * bus controller before going ahead with this...
-		 *
-		 * For now, we avoid any hassle by making it a compile
-		 * time option.
-		 *
-		 */
-		/* printf("\nWarning: Assuming presence of MCA bus\n"); */
-
-                /* Make sure motherboard setup is off */
-                outb_p(0xff, MCA_MOTHERBOARD_SETUP_REG);
-
-		/* Cycle through slots */
-		for(curboard=0; curboard<MCA_MAX_SLOT_NR; curboard++) {
-			int boardid;
-			int curcard;
-
-			outb_p(0x8|(curboard&0xf), MCA_ADAPTER_SETUP_REG);
-
-			boardid = inb_p(MCA_POS_REG(0));
-			boardid += inb_p(MCA_POS_REG(1)) << 8;
-
-			curcard = 0;
-			while (el3_mca_adapters[curcard].name) {
-				if (el3_mca_adapters[curcard].id == boardid) {
-					mcafound = &el3_mca_adapters[curcard];
-
-					mca_pos4 = inb_p(MCA_POS_REG(4));
-					mca_pos5 = inb_p(MCA_POS_REG(5));
-
-					goto donewithdetect;
-				}
-				else
-					curcard++;
-			}
-
-		}
-	donewithdetect:
-		/* Kill all setup modes */
-		outb_p(0, MCA_ADAPTER_SETUP_REG);
-
-		if (mcafound) {
-			eth_nic_base = ((short)((mca_pos4&0xfc)|0x02)) << 8;
-			mca_irq = mca_pos5 & 0x0f;
-			ep_current_tag--;
-		}
-		else
-			/*printf("MCA Card not found\n")*/;
-#endif
-	/* Look for the EISA boards, leave them activated */
-	/* search for the first card, ignore all others */
-	for(j = 1; j < 16; j++) {
-		io_base = (j * EP_EISA_START) | EP_EISA_W0;
-		if (inw(io_base + EP_W0_MFG_ID) != MFG_ID)
-			continue;
-
-		/* we must have found 0x1f if the board is EISA configurated */
-		if ((inw(io_base + EP_W0_ADDRESS_CFG) & 0x1f) != 0x1f)
-			continue;
-
-		/* Reset and Enable the card */
-		outb(W0_P4_CMD_RESET_ADAPTER, io_base + EP_W0_CONFIG_CTRL);
-		udelay(1000); /* Must wait 800 µs, be conservative */
-		outb(W0_P4_CMD_ENABLE_ADAPTER, io_base + EP_W0_CONFIG_CTRL);
-
-		/*
-		 * Once activated, all the registers are mapped in the range
-		 * x000 - x00F, where x is the slot number.
-		 */
-		eth_nic_base = j * EP_EISA_START;
-		break;
-	}
-	ep_current_tag--;
-
-	/* Look for the ISA boards. Init and leave them actived */
-	/* search for the first card, ignore all others */
-	outb(0xc0, id_port);	/* Global reset */
-	udelay(1000);		/* wait 1 ms */
-	for (i = 0; i < EP_MAX_BOARDS; i++) {
-		outb(0, id_port);
-		outb(0, id_port);
-		send_ID_sequence(id_port);
-
-		data = get_eeprom_data(id_port, EEPROM_MFG_ID);
-		if (data != MFG_ID)
-			break;
-
-		/* resolve contention using the Ethernet address */
-		for (j = 0; j < 3; j++)
-			data = get_eeprom_data(id_port, j);
-
-		eth_nic_base =
-		    (get_eeprom_data(id_port, EEPROM_ADDR_CFG) & 0x1f) * 0x10 + 0x200;
-		outb(ep_current_tag, id_port);	/* tags board */
-		outb(ACTIVATE_ADAPTER_TO_CONFIG, id_port);
-		ep_current_tag--;
-		break;
-	}
-
-	if (i >= EP_MAX_BOARDS)
-		goto no3c509;
-
-	/*
-	* The iobase was found and MFG_ID was 0x6d50. PROD_ID should be
-	* 0x9[0-f]50
-	*/
-	GO_WINDOW(0);
-	k = get_e(EEPROM_PROD_ID);
-#ifdef	INCLUDE_3C529
-	/*
-	 * On MCA, the PROD_ID matches the MCA card ID (POS0+POS1)
-	 */
-	if (mcafound) {
-		if (mcafound->id != k) {
-			printf("MCA: PROD_ID in EEPROM does not match MCA card ID! (%hX != %hX)\n", k, mcafound->id);
-			goto no3c509;
-		}
-	} else { /* for ISA/EISA */
-		if ((k & 0xf0ff) != (PROD_ID & 0xf0ff))
-			goto no3c509;
-	}
-#else
-	if ((k & 0xf0ff) != (PROD_ID & 0xf0ff))
-		goto no3c509;
-#endif
-
-#ifdef	INCLUDE_3C529
-	if (mcafound) {
-		printf("%s board found on MCA at %#hx IRQ %d -",
-		       mcafound->name, eth_nic_base, mca_irq);
-	} else {
-#endif
-		if(eth_nic_base >= EP_EISA_START)
-			printf("3C5x9 board on EISA at %#hx - ",eth_nic_base);
-		else
-			printf("3C5x9 board on ISA at %#hx - ",eth_nic_base);
-#ifdef	INCLUDE_3C529
-	}
-#endif
-
-	/* test for presence of connectors */
-	i = inw(IS_BASE + EP_W0_CONFIG_CTRL);
-	j = (inw(IS_BASE + EP_W0_ADDRESS_CFG) >> 14) & 0x3;
-
-	switch(j) {
-		case 0:
-			if (i & IS_UTP) {
-				printf("10baseT\n");
-				connector = utp;
-				}
-			else {
-				printf("10baseT not present\n");
-				goto no3c509;
-				}
-			break;
-		case 1:
-			if (i & IS_AUI)
-				printf("10base5\n");
-			else {
-				printf("10base5 not present\n");
-				goto no3c509;
-				}
-			break;
-		case 3:
-			if (i & IS_BNC) {
-				printf("10base2\n");
-				connector = bnc;
-				}
-			else {
-				printf("10base2 not present\n");
-				goto no3c509;
-				}
-			break;
-		default:
-			printf("unknown connector\n");
-			goto no3c509;
-		}
-	/*
-	* Read the station address from the eeprom
-	*/
-	p = (unsigned short *) nic->node_addr;
-	for (i = 0; i < ETH_ALEN / 2; i++) {
-		GO_WINDOW(0);
-		p[i] = htons(get_e(i));
-		GO_WINDOW(2);
-		outw(ntohs(p[i]), BASE + EP_W2_ADDR_0 + (i * 2));
-	}
-	printf("Ethernet address: %!\n", nic->node_addr);
-	t509_reset(nic);
-
-	nic->irqno    = 0;
-	nic->ioaddr   = eth_nic_base;
-static struct nic_operations t509_operations;
-static struct nic_operations t509_operations = {
-	.connect	= dummy_connect,
-	.poll		= t509_poll,
-	.transmit	= t509_transmit,
-	.irq		= t509_irq,
-	.disable	= t509_disable,
-};
-	nic->nic_op	= &t509_operations;
-
-	/* Based on PnP ISA map */
-	dev->devid.vendor_id = htons(GENERIC_ISAPNP_VENDOR);
-	dev->devid.device_id = htons(0x80f7);
-	return 1;
-no3c509:
-	continue;
-	/* printf("(probe fail)"); */
-	}
-	return 0;
-}
-
-#ifdef INCLUDE_3C509
-static struct isa_driver t509_driver __isa_driver = {
-	.type    = NIC_DRIVER,
-	.name    = "3C509",
-	.probe   = t509_probe,
-	.ioaddrs = 0,
-};
-ISA_ROM("3c509","3c509, ISA/EISA");
-#endif
-
-#ifdef INCLUDE_3C529
-static struct isa_driver t529_driver __isa_driver = {
-	.type    = NIC_DRIVER,
-	.name    = "3C529",
-	.probe   = t529_probe,
-	.ioaddrs = 0,
-};
-ISA_ROM("3c529","3c529 == MCA 3c509");
-#endif
 
 /*
- * Local variables:
- *  c-basic-offset: 8
- * End:
+ * Find the next t509 device
+ *
+ * Called only once, so inlined for efficiency.
+ *
  */
+static inline int fill_t509_device ( struct t509_device *t509 ) {
+	int i;
+	uint16_t iobase;
+
+	/* 
+	 * If this is the start of the scan, find an id_port and clear
+	 * all tag registers.  Otherwise, tell already-found NICs not
+	 * to respond.
+	 *
+	 */
+	if ( t509->current_tag == 0 ) {
+		if ( ! find_id_port ( t509 ) ) {
+			DBG ( "No ID port available for contention select\n" );
+			return 0;
+		}
+		outb ( 0xd0, t509->id_port );
+	} else {
+		outb ( 0xd8, t509->id_port ) ;
+	}
+
+	/* Send the ID sequence */
+	send_id_sequence ( t509 );
+
+	/* Check the manufacturer ID */
+	if ( id_read_eeprom ( t509, EEPROM_MFG_ID ) != MFG_ID ) {
+		/* No more t509 devices */
+		return 0;
+	}
+
+	/* Do contention select by reading the MAC address */
+	for ( i = 0 ; i < 3 ; i++ ) {
+		id_read_eeprom ( t509, i );
+	}
+
+	/* By now, only one device will be left active.  Get its I/O
+	 * address, tag and activate the adaptor.  Tagging will
+	 * prevent it taking part in the next scan, enabling us to see
+	 * the next device.
+	 */
+	iobase = id_read_eeprom ( t509, EEPROM_ADDR_CFG );
+	t509->ioaddr = 0x200 + ( ( iobase & 0x1f ) << 4 );
+	outb ( ++t509->current_tag, t509->id_port ); /* tag */
+	outb ( ( 0xe0 | iobase ), t509->id_port ); /* activate */
+
+	return 1;
+}
+
+/*
+ * Obtain a struct t509_device * from a struct dev *
+ *
+ * If dev has not previously been used for a PCI device scan, blank
+ * out struct t509_device
+ */
+static struct t509_device * t509_device ( struct dev *dev ) {
+	struct t509_device *t509 = dev->bus;
+
+	if ( t509->magic != t509_magic ) {
+		memset ( t509, 0, sizeof ( *t509 ) );
+		t509->magic = t509_magic;
+	}
+	t509->dev = dev;
+	return t509;
+}
+
+/*
+ * Find a t509 device matching the specified driver.  ("Matching the
+ * specified driver" is, in this case, a no-op, but we want to
+ * preserve the common bus API).
+ *
+ */
+static int find_t509_device ( struct t509_device *t509,
+				 struct t509_driver *driver ) {
+	/* Find the next t509 device */
+	if ( ! fill_t509_device ( t509 ) )
+		return 0;
+	
+	/* Fill in dev structure, if present */
+	if ( t509->dev ) {
+		t509->dev->name = driver->name;
+		t509->dev->devid.bus_type = ISA_BUS_TYPE;
+		t509->dev->devid.vendor_id = MFG_ID;
+		t509->dev->devid.device_id = PROD_ID;
+	}
+
+	return 1;
+}
+
+/*
+ * The ISA probe function
+ *
+ */
+static struct t509_driver el3_t509_driver = { "3c509 (ISA)" };
+
+static int el3_t509_probe ( struct dev *dev ) {
+	struct nic *nic = nic_device ( dev );
+	struct t509_device *t509 = t509_device ( dev );
+	
+	if ( ! find_t509_device ( t509, &el3_t509_driver ) )
+		return 0;
+	
+	nic->ioaddr = t509->ioaddr;
+	nic->irqno = 0;
+	printf ( "3C5x9 board on ISA at %#hx - ", nic->ioaddr );
+
+	/* Hand off to generic t5x9 probe routine */
+	return t5x9_probe ( nic, ISA_PROD_ID ( PROD_ID ), ISA_PROD_ID_MASK );
+}
+
+BOOT_DRIVER ( "3c509", el3_t509_probe );
+
+/*
+ * The 3c509 driver also supports EISA cards
+ *
+ */
+static struct eisa_id el3_eisa_adapters[] = {
+	{ "3Com 3c509 EtherLink III (EISA)", MFG_ID, PROD_ID },
+};
+
+static struct eisa_driver el3_eisa_driver =
+	EISA_DRIVER ( "3c509 (EISA)", el3_eisa_adapters );
+
+static int el3_eisa_probe ( struct dev *dev ) {
+	struct nic *nic = nic_device ( dev );
+	struct eisa_device *eisa = eisa_device ( dev );
+	
+	if ( ! find_eisa_device ( eisa, &el3_eisa_driver ) )
+		return 0;
+	
+	enable_eisa_device ( eisa );
+	nic->ioaddr = eisa->ioaddr;
+	nic->irqno = 0;
+	printf ( "3C5x9 board on EISA at %#hx - ", nic->ioaddr );
+
+	/* Hand off to generic t5x9 probe routine */
+	return t5x9_probe ( nic, ISA_PROD_ID ( PROD_ID ), ISA_PROD_ID_MASK );
+}
+
+BOOT_DRIVER ( "3c509 (EISA)", el3_eisa_probe );
+
+/*
+ * We currently build both ISA and EISA support into a single ROM
+ * image, though there's no reason why this couldn't be split to
+ * reduce code size; just split this .c file into two in the obvious
+ * place.
+ *
+ */
+ISA_ROM ( "3c509","3c509, ISA/EISA" );
+
