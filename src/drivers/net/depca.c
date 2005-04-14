@@ -1,3 +1,5 @@
+#warning "depca.c almost certainly won't work"
+
 /* Not fixed for relocation yet. Probably won't work relocated above 16MB */
 #ifdef ALLMULTI
 #error multicast support is not yet implemented
@@ -235,22 +237,23 @@
 #include "etherboot.h"
 #include "nic.h"
 #include "isa.h"
+#include "console.h"
 
 /*
 ** I/O addresses. Note that the 2k buffer option is not supported in
 ** this driver.
 */
-#define DEPCA_NICSR ioaddr+0x00   /* Network interface CSR */
-#define DEPCA_RBI   ioaddr+0x02   /* RAM buffer index (2k buffer mode) */
-#define DEPCA_DATA  ioaddr+0x04   /* LANCE registers' data port */
-#define DEPCA_ADDR  ioaddr+0x06   /* LANCE registers' address port */
-#define DEPCA_HBASE ioaddr+0x08   /* EISA high memory base address reg. */
-#define DEPCA_PROM  ioaddr+0x0c   /* Ethernet address ROM data port */
-#define DEPCA_CNFG  ioaddr+0x0c   /* EISA Configuration port */
-#define DEPCA_RBSA  ioaddr+0x0e   /* RAM buffer starting address (2k buff.) */
+#define DEPCA_NICSR 0x00   /* Network interface CSR */
+#define DEPCA_RBI   0x02   /* RAM buffer index (2k buffer mode) */
+#define DEPCA_DATA  0x04   /* LANCE registers' data port */
+#define DEPCA_ADDR  0x06   /* LANCE registers' address port */
+#define DEPCA_HBASE 0x08   /* EISA high memory base address reg. */
+#define DEPCA_PROM  0x0c   /* Ethernet address ROM data port */
+#define DEPCA_CNFG  0x0c   /* EISA Configuration port */
+#define DEPCA_RBSA  0x0e   /* RAM buffer starting address (2k buff.) */
 
 /*
-** These are LANCE registers addressable through DEPCA_ADDR 
+** These are LANCE registers addressable through nic->ioaddr + DEPCA_ADDR 
 */
 #define CSR0       0
 #define CSR1       1
@@ -375,8 +378,6 @@
 /*
 ** ISA Bus defines
 */
-#define DEPCA_IO_PORTS	{0x300, 0x200, 0}
-
 #ifndef	DEPCA_MODEL
 #define	DEPCA_MODEL	DEPCA
 #endif
@@ -465,15 +466,14 @@ struct depca_private {
 
 static Address		mem_start = DEPCA_RAM_BASE;
 static Address		mem_len, offset;
-static unsigned short	ioaddr = 0;
 static struct depca_private	lp;
 
 /*
 ** Miscellaneous defines...
 */
-#define STOP_DEPCA \
-    outw(CSR0, DEPCA_ADDR);\
-    outw(STOP, DEPCA_DATA)
+#define STOP_DEPCA(ioaddr) \
+    outw(CSR0, ioaddr + DEPCA_ADDR);\
+    outw(STOP, ioaddr + DEPCA_DATA)
 
 /* Initialize the lance Rx and Tx descriptor rings. */
 static void depca_init_ring(struct nic *nic)
@@ -504,13 +504,13 @@ static void depca_init_ring(struct nic *nic)
 
 static void LoadCSRs(void)
 {
-	outw(CSR1, DEPCA_ADDR);	/* initialisation block address LSW */
-	outw((u16) (lp.sh_mem & LA_MASK), DEPCA_DATA);
-	outw(CSR2, DEPCA_ADDR);	/* initialisation block address MSW */
-	outw((u16) ((lp.sh_mem & LA_MASK) >> 16), DEPCA_DATA);
-	outw(CSR3, DEPCA_ADDR);	/* ALE control */
-	outw(ACON, DEPCA_DATA);
-	outw(CSR0, DEPCA_ADDR);	/* Point back to CSR0 */
+	outw(CSR1, nic->ioaddr + DEPCA_ADDR);	/* initialisation block address LSW */
+	outw((u16) (lp.sh_mem & LA_MASK), nic->ioaddr + DEPCA_DATA);
+	outw(CSR2, nic->ioaddr + DEPCA_ADDR);	/* initialisation block address MSW */
+	outw((u16) ((lp.sh_mem & LA_MASK) >> 16), nic->ioaddr + DEPCA_DATA);
+	outw(CSR3, nic->ioaddr + DEPCA_ADDR);	/* ALE control */
+	outw(ACON, nic->ioaddr + DEPCA_DATA);
+	outw(CSR0, nic->ioaddr + DEPCA_ADDR);	/* Point back to CSR0 */
 }
 
 static int InitRestartDepca(void)
@@ -519,14 +519,14 @@ static int InitRestartDepca(void)
 
 	/* Copy the shadow init_block to shared memory */
 	memcpy_toio((char *)lp.sh_mem, &lp.init_block, sizeof(struct depca_init));
-	outw(CSR0, DEPCA_ADDR);		/* point back to CSR0 */
-	outw(INIT, DEPCA_DATA);		/* initialise DEPCA */
+	outw(CSR0, nic->ioaddr + DEPCA_ADDR);		/* point back to CSR0 */
+	outw(INIT, nic->ioaddr + DEPCA_DATA);		/* initialise DEPCA */
 
-	for (i = 0; i < 100 && !(inw(DEPCA_DATA) & IDON); i++)
+	for (i = 0; i < 100 && !(inw(nic->ioaddr + DEPCA_DATA) & IDON); i++)
 		;
 	if (i < 100) {
 		/* clear IDON by writing a 1, and start LANCE */
-		outw(IDON | STRT, DEPCA_DATA);
+		outw(IDON | STRT, nic->ioaddr + DEPCA_DATA);
 	} else {
 		printf("DEPCA not initialised\n");
 		return (1);
@@ -542,11 +542,11 @@ static void depca_reset(struct nic *nic)
 	s16	nicsr;
 	int	i, j;
 
-	STOP_DEPCA;
-	nicsr = inb(DEPCA_NICSR);
+	STOP_DEPCA(nic->ioaddr);
+	nicsr = inb(nic->ioaddr + DEPCA_NICSR);
 	nicsr = ((nicsr & ~SHE & ~RBE & ~IEN) | IM);
-	outb(nicsr, DEPCA_NICSR);
-	if (inw(DEPCA_DATA) != STOP)
+	outb(nicsr, nic->ioaddr + DEPCA_NICSR);
+	if (inw(nic->ioaddr + DEPCA_DATA) != STOP)
 	{
 		printf("depca: Cannot stop NIC\n");
 		return;
@@ -652,7 +652,7 @@ static void depca_disable ( struct nic *nic ) {
 	/* reset and disable merge */
 	depca_reset(nic);
 
-	STOP_DEPCA;
+	STOP_DEPCA(nic->ioaddr);
 }
 
 /**************************************************************************
@@ -685,24 +685,32 @@ static void depca_irq(struct nic *nic __unused, irq_action_t action __unused)
 ** PROM address counter is correctly positioned at the start of the
 ** ethernet address for later read out.
 */
-static int depca_probe1(struct nic *nic)
-{
-	u8	data, nicsr;
+
+
+/*
+ * Ugly, ugly, ugly.  I can't quite make out where the split should be
+ * between probe1 and probe()...
+ *
+ */
+static u8 nicsr;
+
+
+static int depca_probe1 ( uint16_t ioaddr ) {
+	u8	data;
 	/* This is only correct for little endian machines, but then
 	   Etherboot doesn't work on anything but a PC */
 	u8	sig[] = { 0xFF, 0x00, 0x55, 0xAA, 0xFF, 0x00, 0x55, 0xAA };
 	int	i, j;
-	long	sum, chksum;
 
-	data = inb(DEPCA_PROM);		/* clear counter on DEPCA */
-	data = inb(DEPCA_PROM);		/* read data */
+	data = inb(ioaddr + DEPCA_PROM);		/* clear counter on DEPCA */
+	data = inb(ioaddr + DEPCA_PROM);		/* read data */
 	if (data == 0x8) {
-		nicsr = inb(DEPCA_NICSR);
+		nicsr = inb(ioaddr + DEPCA_NICSR);
 		nicsr |= AAC;
-		outb(nicsr, DEPCA_NICSR);
+		outb(nicsr, ioaddr + DEPCA_NICSR);
 	}
 	for (i = 0, j = 0; j < (int)sizeof(sig) && i < PROBE_LENGTH+((int)sizeof(sig))-1; ++i) {
-		data = inb(DEPCA_PROM);
+		data = inb(ioaddr + DEPCA_PROM);
 		if (data == sig[j])		/* track signature */
 			++j;
 		else
@@ -711,27 +719,50 @@ static int depca_probe1(struct nic *nic)
 	if (j != sizeof(sig))
 		return (0);
 	/* put the card in its initial state */
-	STOP_DEPCA;
-	nicsr = ((inb(DEPCA_NICSR) & ~SHE & ~RBE & ~IEN) | IM);
-	outb(nicsr, DEPCA_NICSR);
-	if (inw(DEPCA_DATA) != STOP)
+	STOP_DEPCA(ioaddr);
+	nicsr = ((inb(ioaddr + DEPCA_NICSR) & ~SHE & ~RBE & ~IEN) | IM);
+	outb(nicsr, ioaddr + DEPCA_NICSR);
+	if (inw(ioaddr + DEPCA_DATA) != STOP)
 		return (0);
 	memcpy((char *)mem_start, sig, sizeof(sig));
 	if (memcmp((char *)mem_start, sig, sizeof(sig)) != 0)
 		return (0);
+
+	return 1;
+}
+
+static struct nic_operations depca_operations = {
+	.connect	= dummy_connect,
+	.poll		= depca_poll,
+	.transmit	= depca_transmit,
+	.irq		= depca_irq,
+	.disable	= depca_disable,
+};
+
+/**************************************************************************
+PROBE - Look for an adapter, this routine's visible to the outside
+***************************************************************************/
+static int depca_probe ( struct dev *dev, struct isa_device *isa ) {
+	struct nic *nic = nic_device ( dev );
+	int	i, j;
+	long	sum, chksum;
+
+	nic->irqno    = 0;
+	nic->ioaddr   = isa->ioaddr;
+
 	for (i = 0, j = 0, sum = 0; j < 3; j++) {
 		sum <<= 1;
 		if (sum > 0xFFFF)
 			sum -= 0xFFFF;
-		sum += (u8)(nic->node_addr[i++] = inb(DEPCA_PROM));
-		sum += (u16)((nic->node_addr[i++] = inb(DEPCA_PROM)) << 8);
+		sum += (u8)(nic->node_addr[i++] = inb(nic->ioaddr + DEPCA_PROM));
+		sum += (u16)((nic->node_addr[i++] = inb(nic->ioaddr + DEPCA_PROM)) << 8);
 		if (sum > 0xFFFF)
 			sum -= 0xFFFF;
 	}
 	if (sum == 0xFFFF)
 		sum = 0;
-	chksum = (u8)inb(DEPCA_PROM);
-	chksum |= (u16)(inb(DEPCA_PROM) << 8);
+	chksum = (u8)inb(nic->ioaddr + DEPCA_PROM);
+	chksum |= (u16)(inb(nic->ioaddr + DEPCA_PROM) << 8);
 	mem_len = (adapter == DEPCA) ? (48 << 10) : (64 << 10);
 	offset = 0;
 	if (nicsr & BUF) {
@@ -740,58 +771,30 @@ static int depca_probe1(struct nic *nic)
 		mem_len -= (32 << 10);
 	}
 	if (adapter != DEPCA)	/* enable shadow RAM */
-		outb(nicsr |= SHE, DEPCA_NICSR);
+		outb(nicsr |= SHE, nic->ioaddr + DEPCA_NICSR);
 	printf("%s base %#hX, memory [%#hX-%#hX], addr %!",
-		adapter_name[adapter], ioaddr, mem_start, mem_start + mem_len,
-		nic->node_addr);
+	       adapter_name[adapter], nic->ioaddr, mem_start,
+	       mem_start + mem_len,
+	       nic->node_addr);
 	if (sum != chksum)
 		printf(" (bad checksum)");
 	putchar('\n');
-	return (1);
-}
-
-/**************************************************************************
-PROBE - Look for an adapter, this routine's visible to the outside
-***************************************************************************/
-static int depca_probe(struct dev *dev, unsigned short *probe_addrs)
-{
-	struct nic *nic = (struct nic *)dev;
-	static unsigned short	base[] = DEPCA_IO_PORTS;
-	int			i;
-
-	if (probe_addrs == 0 || probe_addrs[0] == 0)
-		probe_addrs = base;	/* Use defaults */
-	for (i = 0; (ioaddr = base[i]) != 0; ++i) {
-		if (depca_probe1(nic))
-			break;
-	}
-	if (ioaddr == 0)
-		return (0);
-
-	nic->irqno    = 0;
-	nic->ioaddr   = ioaddr & ~3;
 
 	depca_reset(nic);
-	/* point to NIC specific routines */
-static struct nic_operations depca_operations;
-static struct nic_operations depca_operations = {
-	.connect	= dummy_connect,
-	.poll		= depca_poll,
-	.transmit	= depca_transmit,
-	.irq		= depca_irq,
-	.disable	= depca_disable,
-};	nic->nic_op	= &depca_operations;
 
-	/* Based on PnP ISA map */
-	dev->devid.vendor_id = htons(GENERIC_ISAPNP_VENDOR);
-	dev->devid.device_id = htons(0x80f7);
+	/* point to NIC specific routines */
+	nic->nic_op	= &depca_operations;
 	return 1;
 }
 
-static struct isa_driver depca_driver __isa_driver = {
-	.type    = NIC_DRIVER,
-	.name    = "DEPCA",
-	.probe   = depca_probe,
-	.ioaddrs = 0,
+static struct isa_probe_addr depca_probe_addrs[] = {
+	{ 0x300 }, { 0x200 },
 };
-ISA_ROM("depca","Digital DE100 and DE200");
+
+static struct isa_driver depca_driver =
+	ISA_DRIVER ( "depca", depca_probe_addrs, depca_probe1,
+		     GENERIC_ISAPNP_VENDOR, 0x80f7 );
+
+BOOT_DRIVER ( "depce", find_isa_boot_device, depca_driver, depca_probe );
+
+ISA_ROM ( "depca", "Digital DE100 and DE200" );
