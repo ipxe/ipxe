@@ -55,7 +55,7 @@ struct boot_driver {
 };
 
 #define BOOT_DRIVER( driver_name, probe_func )				      \
-	static struct boot_driver boot_driver				      \
+	static struct boot_driver boot_driver_ ## probe_func		      \
 	    __attribute__ ((used,__section__(".boot_drivers"))) = {	      \
 		.name = driver_name,					      \
 		.probe = probe_func,					      \
