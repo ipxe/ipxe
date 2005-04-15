@@ -1,4 +1,3 @@
-#ifdef CONFIG_ISA
 /**************************************************************************
 *
 *    isapnp.c -- Etherboot isapnp support for the 3Com 3c515
@@ -24,159 +23,264 @@
 *
 *    REVISION HISTORY:
 *    ================
-*    Version 0.1 April 26, 2002 	TJL
-*    Version 0.2 01/08/2003		TJL Moved outside the 3c515.c driver file
+*    Version 0.1 April 26, 2002 TJL
+*    Version 0.2 01/08/2003	TJL Moved outside the 3c515.c driver file
 *    Version 0.3 Sept 23, 2003	timlegge Change delay to currticks
 *		
 *
-*    Indent Options: indent -kr -i8
+*    Generalised into an ISAPnP bus that can be used by more than just
+*    the 3c515 by Michael Brown <mbrown@fensystems.co.uk>
+*
 ***************************************************************************/
 
-/* to get some global routines like printf */
 #include "etherboot.h"
 #include "timer.h"
 #include "isapnp.h"
 
-static int pnp_card_csn = 0;
+/*
+ * We can have only one ISAPnP bus in a system.  Once the read port is
+ * known and all cards have been allocated CSNs, there's nothing to be
+ * gained by re-scanning for cards.
+ *
+ * However, we shouldn't make scanning the ISAPnP bus an INIT_FN(),
+ * because even ISAPnP probing can still screw up other devices on the
+ * ISA bus.  We therefore probe only when we are first asked to find
+ * an ISAPnP device.
+ *
+ */
+static uint16_t isapnp_read_port;
+static uint16_t isapnp_max_csn;
 
-void isapnp_wait(unsigned int nticks)
-{
-	unsigned int to = currticks() + nticks;
-	while (currticks() < to)
-		/* Wait */ ;
+static const char initdata[] = INITDATA;
+
+/*
+ * ISAPnP utility functions
+ *
+ */
+
+static inline void isapnp_write_address ( uint8_t address ) {
+	outb ( address, ISAPNP_ADDRESS );
 }
 
-/* The following code is the ISA PNP logic required to activate the 3c515 */
-/* PNP Defines */
-#define IDENT_LEN 9
-#define NUM_CARDS 128
+static inline void isapnp_write_data ( uint8_t data ) {
+	outb ( data, ISAPNP_WRITE_DATA );
+}
 
-/* PNP declares */
-static unsigned char serial_identifier[NUM_CARDS + 1][IDENT_LEN];
-static unsigned char isapnp_checksum_value;
-static char initdata[INIT_LENGTH] = INITDATA;
-int read_port = 0;
+static inline void isapnp_write_byte ( uint8_t address, uint8_t value ) {
+	isapnp_write_address ( address );
+	isapnp_write_data ( value );
+}
 
+static inline uint8_t isapnp_read_data ( void ) {
+	return inb ( isapnp_read_port );
+}
 
-/* PNP Prototypes */
-static int Isolate(void);
-static int do_isapnp_isolate(void);
-static int isapnp_build_device_list(void);
-static int isapnp_isolate_rdp_select(void);
-static int isapnp_next_rdp(void);
-static void isapnp_peek(unsigned char *data, int bytes);
-static void send_key(void);
-static unsigned char isapnp_checksum(unsigned char *data);
-int Config(int csn);
+static inline void isapnp_set_read_port ( void ) {
+	isapnp_write_byte ( ISAPNP_READPORT, isapnp_read_port >> 2 );
+}
 
-void config_pnp_device(void)
-{
-	/* PNP Configuration */
-	printf("Probing/Configuring ISAPNP devices\n");
-	if (!read_port) {
-		Isolate();
-		if (pnp_card_csn)
-			Config(pnp_card_csn);
+static inline void isapnp_serialisolation ( void ) {
+	isapnp_write_address ( ISAPNP_SERIALISOLATION );
+}
+
+static inline void isapnp_wait_for_key ( void ) {
+	isapnp_write_byte ( ISAPNP_CONFIGCONTROL, ISAPNP_CONFIG_WAIT_FOR_KEY );
+}
+
+static inline void isapnp_reset_csn ( void ) {
+	isapnp_write_byte ( ISAPNP_CONFIGCONTROL, ISAPNP_CONFIG_RESET_CSN );
+}
+
+static inline void isapnp_wake ( uint8_t csn ) {
+	isapnp_write_byte ( ISAPNP_WAKE, csn );
+}
+
+static inline void isapnp_write_csn ( uint8_t csn ) {
+	isapnp_write_byte ( ISAPNP_CARDSELECTNUMBER, csn );
+}
+
+/*
+ * The linear feedback shift register as described in Appendix B of
+ * the PnP ISA spec.  The hardware implementation uses eight D-type
+ * latches and two XOR gates.  I think this is probably the smallest
+ * possible implementation in software.  :)
+ *
+ */
+static inline uint8_t isapnp_lfsr_next ( uint8_t lfsr, int input_bit ) {
+	register uint8_t lfsr_next;
+
+	lfsr_next = lfsr >> 1;
+	lfsr_next |= ( ( ( lfsr ^ lfsr_next ) ^ input_bit ) ) << 7;
+	return lfsr_next;
+}
+
+/*
+ * Send the ISAPnP initiation key
+ *
+ */
+static void isapnp_send_key ( void ) {
+	unsigned int i;
+	uint8_t lfsr;
+
+	udelay ( 1000 );
+	isapnp_write_address ( 0x00 );
+	isapnp_write_address ( 0x00 );
+
+	lfsr = ISAPNP_LFSR_SEED;
+	for ( i = 0 ; i < 32 ; i-- ) {
+		isapnp_write_address ( lfsr );
+		lfsr = isapnp_lfsr_next ( lfsr, 0 );
 	}
 }
 
-/* Isolate all the PNP Boards on the ISA BUS */
-static int Isolate(void)
-{
-	int cards = 0;
-	if (read_port < 0x203 || read_port > 0x3ff) {
-		cards = do_isapnp_isolate();
-		if (cards < 0 || (read_port < 0x203 || read_port > 0x3ff)) {
-			printf("No Plug & Play device found\n");
-			return 0;
+/*
+ *  Compute ISAPnP identifier checksum
+ *
+ */
+static uint8_t isapnp_checksum ( union isapnp_identifier *identifier ) {
+	int i, j;
+	uint8_t lfsr;
+	uint8_t byte;
+
+	lfsr = ISAPNP_LFSR_SEED;
+	for ( i = 0 ; i < 8 ; i++ ) {
+		byte = identifier->bytes[i];
+		for ( j = 0 ; j < 8 ; j++ ) {
+			lfsr = isapnp_lfsr_next ( lfsr, byte );
+			byte >>= 1;
 		}
 	}
-	isapnp_build_device_list();
-#ifdef EDEBUG
-	printf("%d Plug & Play device found\n", cards);
-#endif
-	return 0;
+	return lfsr;
 }
 
-static int do_isapnp_isolate(void)
-{
-	unsigned char checksum = 0x6a;
-	unsigned char chksum = 0x00;
-	unsigned char bit = 0x00;
-	unsigned char c1, c2;
-	int csn = 0;
-	int i;
-	int iteration = 1;
+/*
+ * Try isolating ISAPnP cards at the current read port.  Return the
+ * number of ISAPnP cards found.
+ *
+ * The state diagram on page 18 (PDF page 24) of the PnP ISA spec
+ * gives the best overview of what happens here.
+ *
+ */
+static int isapnp_try_isolate ( void ) {
+	union isapnp_identifier identifier;
+	int i, j, seen55aa;
+	uint16_t data;
+	uint8_t byte;
 
-	read_port = 0x213;
-	if (isapnp_isolate_rdp_select() < 0)
-		return -1;
+	DBG ( "ISAPnP attempting isolation at read port %hx\n",
+	      isapnp_read_port );
 
-	while (1) {
-		for (i = 1; i <= 64; i++) {
-			c1 = READ_DATA;
-			isapnp_wait(1);
-			c2 = READ_DATA;
-			isapnp_wait(1);
-			if (c1 == 0x55) {
-				if (c2 == 0xAA) {
-					bit = 0x01;
+	/* Place all cards into the Sleep state, whatever state
+	 * they're currently in.
+	 */
+	isapnp_wait_for_key ();
+	isapnp_send_key ();
+
+	/* Reset all assigned CSNs */
+	isapnp_reset_csn ();
+	isapnp_max_csn = 0;
+	udelay ( 2000 );
+	
+	/* Place all cards into the Isolation state */
+	isapnp_wait_for_key ();
+	isapnp_send_key ();
+	isapnp_wake ( 0x00 );
+	
+	/* Set the read port */
+	isapnp_set_read_port ();
+	udelay ( 1000 );
+
+	while ( 1 ) {
+
+		/* All cards that do not have assigned CSNs are
+		 * currently in the Isolation state, each time we go
+		 * through this loop.
+		 */
+
+		/* Initiate serial isolation */
+		isapnp_serialisolation ();
+		udelay ( 1000 );
+
+		/* Read identifier serially via the ISAPnP read port. */
+		memset ( &identifier, 0, sizeof ( identifier ) );
+		seen55aa = 0;
+		for ( i = 0 ; i < 9 ; i++ ) {
+			byte = 0;
+			for ( j = 0 ; j < 8 ; j++ ) {
+				data = isapnp_read_data ();
+				udelay ( 1000 );
+				data = ( data << 8 ) | isapnp_read_data ();
+				udelay ( 1000 );
+				if ( data == 0x55aa ) {
+					byte |= 1;
 				}
+				byte <<= 1;
 			}
-			checksum =
-			    ((((checksum ^ (checksum >> 1)) & 0x01) ^ bit)
-			     << 7) | (checksum >> 1);
-			bit = 0x00;
-		}
-#ifdef EDEBUG
-		printf("Calc checksum %d", checksum);
-#endif
-		for (i = 65; i <= 72; i++) {
-			c1 = READ_DATA;
-			udelay(250);
-			c2 = READ_DATA;
-			udelay(250);
-			if (c1 == 0x55) {
-				if (c2 == 0xAA)
-					chksum |= (1 << (i - 65));
+			identifier.bytes[i] = byte;
+			if ( byte ) {
+				seen55aa = 1;
 			}
 		}
-#ifdef EDEBUG
-		printf("Actual checksum %d", chksum);
-#endif
-		if (checksum != 0x00 && checksum == chksum) {
-			csn++;
-			serial_identifier[csn][iteration] >>= 1;
-			serial_identifier[csn][iteration] |= bit;
-			CARDSELECTNUMBER;
-#ifdef EDEBUG
-			printf("Writing csn: %d", csn);
-#endif
-			WRITE_DATA(csn);
-			udelay(250);
-			iteration++;
-			/* Force all cards without a CSN into Isolation state */
-			Wake(0);
-			SetRdPort(read_port);
-			udelay(1000);
-			SERIALISOLATION;
-			udelay(1000);
-			goto __next;
-		}
-		if (iteration == 1) {
-			read_port += READ_ADDR_STEP;
-			if (isapnp_isolate_rdp_select() < 0)
-				return -1;
-		} else if (iteration > 1) {
+				
+		/* If we didn't see a valid ISAPnP device, stop here */
+		if ( ( ! seen55aa ) ||
+		     ( identifier.checksum != isapnp_checksum (&identifier) ) )
 			break;
-		}
-	      __next:
-		checksum = 0x6a;
-		chksum = 0x00;
-		bit = 0x00;
+
+		/* Give the device a CSN */
+		isapnp_max_csn++;
+		DBG ( "ISAPnP isolation found device "
+		      "%hhx:%hhx:%hhx:%hhx:%hhx:%hhx:%hhx:%hhx "
+		      "(checksum %hhx), assigning CSN %hhx\n",
+		      identifier.bytes[0], identifier.bytes[1],
+		      identifier.bytes[2], identifier.bytes[3],
+		      identifier.bytes[4], identifier.bytes[5],
+		      identifier.bytes[6], identifier.bytes[7],
+		      identifier.checksum, isapnp_max_csn );
+		
+		isapnp_write_csn ( isapnp_max_csn );
+		udelay ( 1000 );
+
+		/* Send this card back to Sleep and force all cards
+		 * without a CSN into Isolation state
+		 */
+		isapnp_wake ( 0x00 );
+		udelay ( 1000 );
 	}
-	return csn;
+
+	/* Place all cards in Wait for Key state */
+	isapnp_wait_for_key ();
+
+	/* Return number of cards found */
+	DBG ( "ISAPnP found %d devices at read port %hx\n", isapnp_read_port );
+	return isapnp_max_csn;
 }
+
+/*
+ * Isolate all ISAPnP cards, locating a valid read port in the process.
+ *
+ */
+static void isapnp_isolate ( void ) {
+	for ( isapnp_read_port = ISAPNP_READ_PORT_MIN ;
+	      isapnp_read_port <= ISAPNP_READ_PORT_MAX ;
+	      isapnp_read_port += ISAPNP_READ_PORT_STEP ) {
+		/* Avoid problematic locations such as the NE2000
+		 * probe space
+		 */
+		if ( ( isapnp_read_port >= 0x280 ) &&
+		     ( isapnp_read_port <= 0x380 ) )
+			continue;
+		
+		/* If we detect any ISAPnP cards at this location, stop */
+		if ( isapnp_try_isolate () )
+			return;
+	}
+}
+
+
+
+
+
 
 /*
  *  Build device list for all present ISA PnP devices.
@@ -277,20 +381,6 @@ int Config(int csn)
 	return 1;
 }
 
-static void send_key(void)
-{
-	int i;
-	/* Ask for access to the Wait for Key command - ConfigControl register */
-	CONFIGCONTROL;
-	/* Write the Wait for Key Command to the ConfigControl Register */
-	WRITE_DATA(CONFIG_WAIT_FOR_KEY);
-	/* As per doc. Two Write cycles of 0x00 required befor the Initialization key is sent */
-	ADDRESS(0);
-	ADDRESS(0);
-	/* 32 writes of the initiation key to the card */
-	for (i = 0; i < INIT_LENGTH; i++)
-		ADDRESS(initdata[i]);
-}
 
 static void isapnp_peek(unsigned char *data, int bytes)
 {
@@ -316,67 +406,111 @@ static void isapnp_peek(unsigned char *data, int bytes)
 	}
 }
 
+
+
+
 /*
- *  Compute ISA PnP checksum for first eight bytes.
+ * Ensure that there is sufficient space in the shared dev_bus
+ * structure for a struct isapnp_device.
+ *
  */
-static unsigned char isapnp_checksum(unsigned char *data)
-{
-	int i, j;
-	unsigned char checksum = 0x6a, bit, b;
+DEV_BUS( struct isapnp_device, isapnp_dev );
+static char isapnp_magic[0]; /* guaranteed unique symbol */
 
-	for (i = 0; i < 8; i++) {
-		b = data[i];
-		for (j = 0; j < 8; j++) {
-			bit = 0;
-			if (b & (1 << j))
-				bit = 1;
-			checksum =
-			    ((((checksum ^ (checksum >> 1)) & 0x01) ^ bit)
-			     << 7) | (checksum >> 1);
-		}
-	}
-	return checksum;
-}
-static int isapnp_next_rdp(void)
-{
-	int rdp = read_port;
-	while (rdp <= 0x3ff) {
-		/*
-		 *      We cannot use NE2000 probe spaces for ISAPnP or we
-		 *      will lock up machines.
-		 */
-		if ((rdp < 0x280 || rdp > 0x380)) {
-			read_port = rdp;
-			return 0;
-		}
-		rdp += READ_ADDR_STEP;
-	}
-	return -1;
-}
+/*
+ * Fill in parameters for an ISAPnP device based on CSN
+ *
+ * Return 1 if device present, 0 otherwise
+ *
+ */
+static int fill_isapnp_device ( struct isapnp_device *isapnp ) {
 
-static int isapnp_isolate_rdp_select(void)
-{
-	send_key();
-	/* Control: reset CSN and conditionally everything else too */
-	CONFIGCONTROL;
-	WRITE_DATA((CONFIG_RESET_CSN | CONFIG_WAIT_FOR_KEY));
-	mdelay(2);
-
-	send_key();
-	Wake(0);
-
-	if (isapnp_next_rdp() < 0) {
-		/* Ask for access to the Wait for Key command - ConfigControl register */
-		CONFIGCONTROL;
-		/* Write the Wait for Key Command to the ConfigControl Register */
-		WRITE_DATA(CONFIG_WAIT_FOR_KEY);
-		return -1;
+	/*
+	 * Ensure that all ISAPnP cards have CSNs allocated to them,
+	 * if we haven't already done so.
+	 *
+	 */
+	if ( ! isapnp_read_port ) {
+		isapnp_isolate();
 	}
 
-	SetRdPort(read_port);
-	udelay(1000);
-	SERIALISOLATION;
-	udelay(1000);
+	/* wake csn, read config, send card to sleep */
+
+	DBG ( "ISAPnP found CSN %hhx ID %hx:%hx (\"%s\")\n",
+	      isapnp->csn, isapnp->vendor_id, isapnp->prod_id,
+	      isa_id_string ( isapnp->vendor_id, isapnp->prod_id ) );
+
 	return 0;
 }
-#endif  /* CONFIG_ISA */
+
+/*
+ * Find an ISAPnP device matching the specified driver
+ *
+ */
+int find_isapnp_device ( struct isapnp_device *isapnp,
+			 struct isapnp_driver *driver ) {
+	unsigned int i;
+
+	/* Initialise struct isapnp if it's the first time it's been used. */
+	if ( isapnp->magic != isapnp_magic ) {
+		memset ( isapnp, 0, sizeof ( *isapnp ) );
+		isapnp->magic = isapnp_magic;
+		isapnp->csn = 1;
+	}
+
+	/* Iterate through all possible ISAPNP CSNs, starting where we
+	 * left off.
+	 */
+	for ( ; isapnp->csn <= isapnp_max_csn ; isapnp->csn++ ) {
+		/* If we've already used this device, skip it */
+		if ( isapnp->already_tried ) {
+			isapnp->already_tried = 0;
+			continue;
+		}
+
+		/* Fill in device parameters */
+		if ( ! fill_isapnp_device ( isapnp ) ) {
+			continue;
+		}
+
+		/* Compare against driver's ID list */
+		for ( i = 0 ; i < driver->id_count ; i++ ) {
+			struct isapnp_id *id = &driver->ids[i];
+			
+			if ( ( isapnp->vendor_id == id->vendor_id ) &&
+			     ( ISA_PROD_ID ( isapnp->prod_id ) ==
+			       ISA_PROD_ID ( id->prod_id ) ) ) {
+				DBG ( "Device %s (driver %s) matches ID %s\n",
+				      id->name, driver->name,
+				      isa_id_string ( isapnp->vendor_id,
+						      isapnp->prod_id ) );
+				isapnp->name = id->name;
+				isapnp->already_tried = 1;
+				return 1;
+			}
+		}
+	}
+
+	/* No device found */
+	isapnp->csn = 1;
+	return 0;
+}
+
+/*
+ * Find the next ISAPNP device that can be used to boot using the
+ * specified driver.
+ *
+ */
+int find_isapnp_boot_device ( struct dev *dev, struct isapnp_driver *driver ) {
+	struct isapnp_device *isapnp = ( struct isapnp_device * ) dev->bus;
+
+	if ( ! find_isapnp_device ( isapnp, driver ) )
+		return 0;
+
+	dev->name = isapnp->name;
+	dev->devid.bus_type = ISA_BUS_TYPE;
+	dev->devid.vendor_id = isapnp->vendor_id;
+	dev->devid.device_id = isapnp->prod_id;
+
+	return 1;
+}
