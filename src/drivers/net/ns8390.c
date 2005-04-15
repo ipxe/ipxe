@@ -25,6 +25,10 @@ SMC8416 PIO support added by Andrew Bettison (andrewb@zip.com.au) on 4/3/02
 
 **************************************************************************/
 
+#warning "ns8390.c is a horrendous mess and needs to be tidied up"
+#if 0
+
+
 #include "etherboot.h"
 #include "nic.h"
 #include "ns8390.h"
@@ -1014,3 +1018,6 @@ BOOT_DRIVER ( "NE2000/PCI", nepci_probe );
  *  c-basic-offset: 8
  * End:
  */
+
+
+#endif
