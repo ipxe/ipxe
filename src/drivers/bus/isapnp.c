@@ -351,14 +351,12 @@ static int isapnp_try_isolate ( void ) {
 
 		/* Give the device a CSN */
 		isapnp_max_csn++;
-		DBG ( "ISAPnP isolation found card "
-		      "%hhx:%hhx:%hhx:%hhx:%hhx:%hhx:%hhx:%hhx "
-		      "(checksum %hhx), assigning CSN %hhx\n",
-		      identifier.bytes[0], identifier.bytes[1],
-		      identifier.bytes[2], identifier.bytes[3],
-		      identifier.bytes[4], identifier.bytes[5],
-		      identifier.bytes[6], identifier.bytes[7],
-		      identifier.checksum, isapnp_max_csn );
+		DBG ( "ISAPnP isolation found card %hhx ID %hx:%hx (\"%s\") "
+		      "serial %x checksum %hhx, assigning CSN %hhx\n",
+		      identifier.vendor_id, identifier.prod_id,
+		      isa_id_string ( identifier.vendor_id,
+				      identifier.prod_id ),
+		      identifier.serial, identifier.checksum, isapnp_max_csn );
 		
 		isapnp_write_csn ( isapnp_max_csn );
 		isapnp_delay();
