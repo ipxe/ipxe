@@ -491,12 +491,12 @@ static struct isa_probe_addr smc9000_probe_addrs[] = {
 };
 
 static struct isa_driver smc9000_driver =
-ISA_DRIVER ( "SMC9000", smc9000_probe_addrs, smc9000_probe_addr,
-	     GENERIC_ISAPNP_VENDOR, 0x8228 );
+	ISA_DRIVER ( "SMC9000", smc9000_probe_addrs, smc9000_probe_addr,
+		     GENERIC_ISAPNP_VENDOR, 0x8228 );
 
 BOOT_DRIVER ( "SMC9000", find_isa_boot_device, smc9000_driver, smc9000_probe );
 
-ISA_ROM( "smc9000", "SMC9000" );
+ISA_ROM ( "smc9000", "SMC9000" );
 
 /*
  * Local variables:
