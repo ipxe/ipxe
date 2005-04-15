@@ -187,30 +187,140 @@ static struct nic_operations skel_operations = {
 static int skel_pci_probe ( struct dev *dev, struct pci_device *pci ) {
 	struct nic *nic = nic_device ( dev );
 
-	/* store NIC parameters */
 	nic->ioaddr = pci->ioaddr;
 	nic->irqno = pci->irq;
 
 	/* Test for physical presence of NIC */
 	/*
-	  if ( ! my_tests ) {
+	   if ( ! my_tests ) {
 	  	DBG ( "Could not find NIC: my explanation\n" );
 		return 0;
-	  }
+	   }
 	*/
 
 	/* point to NIC specific routines */
-	nic->nic_op	= &skel_operations;
+	nic->nic_op = &skel_operations;
 	return 1;
 }
 
 static struct pci_id skel_pci_nics[] = {
-PCI_ROM ( 0x0000, 0x0000, "skel-pci", "Skeleton PCI Adaptor" ),
+PCI_ROM ( 0x0000, 0x0000, "skel-pci", "Skeleton PCI Adapter" ),
 };
 
 static struct pci_driver skel_pci_driver =
-	PCI_DRIVER ( "SKELETON/PCI", skel_pci_nics, PCI_NO_CLASS );
+	PCI_DRIVER ( "SKEL/PCI", skel_pci_nics, PCI_NO_CLASS );
 
-BOOT_DRIVER ( "SKELETON/PCI", find_pci_boot_device,
+BOOT_DRIVER ( "SKEL/PCI", find_pci_boot_device,
 	      skel_pci_driver, skel_pci_probe );
+
+/**************************************************************************
+ * ISAPnP PROBE - Look for an adapter
+ **************************************************************************
+ */
+static int skel_eisa_probe ( struct dev *dev, struct eisa_device *eisa ) {
+	struct nic *nic = nic_device ( dev );
+
+	enable_eisa_device ( eisa );
+	nic->ioaddr = eisa->ioaddr;
+	nic->irqno = 0;
+
+	/* Test for physical presence of NIC */
+	/*
+	   if ( ! my_tests ) {
+	  	DBG ( "Could not find NIC: my explanation\n" );
+		return 0;
+	   }
+	*/
+
+	/* point to NIC specific routines */
+	nic->nic_op = &skel_operations;
+	return 1;
+}
+
+static struct eisa_id skel_eisa_nics[] = {
+	{ "Skeleton EISA Adapter", EISA_VENDOR('S','K','L'), 0x0000 },
+};
+
+static struct eisa_driver skel_eisa_driver =
+	EISA_DRIVER ( "SKEL/EISA", skel_eisa_nics );
+
+BOOT_DRIVER ( "SKEL/EISA", find_eisa_boot_device,
+	      skel_eisa_driver, skel_eisa_probe );
+
+ISA_ROM ( "skel-eisa", "Skeleton EISA Adapter" );
+
+/**************************************************************************
+ * ISAPnP PROBE - Look for an adapter
+ **************************************************************************
+ */
+static int skel_isapnp_probe ( struct dev *dev,
+			       struct isapnp_device *isapnp ) {
+	struct nic *nic = nic_device ( dev );
+
+	nic->ioaddr = isapnp->ioaddr;
+	nic->irqno = isapnp->irqno;
+
+	/* Test for physical presence of NIC */
+	/*
+	   if ( ! my_tests ) {
+	  	DBG ( "Could not find NIC: my explanation\n" );
+		return 0;
+	   }
+	*/
+
+	/* point to NIC specific routines */
+	nic->nic_op = &skel_operations;
+	return 1;
+}
+
+static struct isapnp_id skel_isapnp_nics[] = {
+	{ "Skeleton ISAPnP Adapter", ISAPNP_VENDOR('S','K','L'), 0x0000 },
+};
+
+static struct isapnp_driver skel_isapnp_driver =
+	ISAPNP_DRIVER ( "SKEL/ISAPnP", skel_isapnp_nics );
+
+BOOT_DRIVER ( "SKEL/ISAPnP", find_isapnp_boot_device,
+	      skel_isapnp_driver, skel_isapnp_probe );
+
+ISA_ROM ( "skel-isapnp", "Skeleton ISAPnP Adapter" );
+
+/**************************************************************************
+ * MCA PROBE - Look for an adapter
+ **************************************************************************
+ */
+static int skel_mca_probe ( struct dev *dev,
+			    struct mca_device *mca __unused ) {
+	struct nic *nic = nic_device ( dev );
+
+	/* MCA parameters are available in the mca->pos[] array */
+	/*
+	   nic->ioaddr = ( mca->pos[xxx] << 8 ) + mca->pos[yyy];
+	   nic->irqno = mca->pos[zzz] & 0x0f;
+	*/
+
+	/* Test for physical presence of NIC */
+	/*
+	   if ( ! my_tests ) {
+	  	DBG ( "Could not find NIC: my explanation\n" );
+		return 0;
+	   }
+	*/
+
+	/* point to NIC specific routines */
+	nic->nic_op = &skel_operations;
+	return 1;
+}
+
+static struct mca_id skel_mca_nics[] = {
+	{ "Skeleton MCA Adapter", 0x0000 },
+};
+
+static struct mca_driver skel_mca_driver =
+	MCA_DRIVER ( "SKEL/MCA", skel_mca_nics );
+
+BOOT_DRIVER ( "SKEL/MCA", find_mca_boot_device,
+	      skel_mca_driver, skel_mca_probe );
+
+ISA_ROM ( "skel-mca", "Skeleton MCA Adapter" );
 
