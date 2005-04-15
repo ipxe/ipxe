@@ -1364,18 +1364,6 @@ static int hunt_pixies_and_undi_roms ( void ) {
 	return 0;
 }
 
-/* UNDI driver states that it is suitable for any PCI NIC (i.e. any
- * PCI device of class PCI_CLASS_NETWORK_ETHERNET).  If there are any
- * obscure UNDI NICs that have the incorrect PCI class, add them to
- * this list.
- */
-static struct pci_id undi_nics[] = {
-	PCI_ROM ( 0x0000, 0x0000, "undi", "UNDI driver support" ),
-};
-
-static struct pci_driver undi_driver =
-	PCI_DRIVER ( "UNDI", undi_nics, PCI_CLASS_NETWORK_ETHERNET );
-
 static struct nic_operations undi_operations = {
 	.connect = dummy_connect,
 	.poll = undi_poll,
@@ -1387,16 +1375,11 @@ static struct nic_operations undi_operations = {
 /* The actual Etherboot probe routine.
  */
 
-static int undi_probe ( struct dev *dev ) {
+static int undi_probe ( struct dev *dev, struct pci_device *pci ) {
 	struct nic *nic = nic_device ( dev );
-	struct pci_device *pci = pci_device ( dev );
 
 	/* Zero out global undi structure */
 	memset ( &undi, 0, sizeof(undi) );
-
-	/* Scan PCI bus for a suitable device */
-	if ( ! find_pci_device ( pci, &undi_driver ) )
-		return 0;
 
 	/* Store PCI parameters; we will need them to initialize the
 	 * UNDI driver later.  If not a PCI device, leave as 0.
@@ -1455,6 +1438,18 @@ static int undi_probe ( struct dev *dev ) {
 	return 0;
 }
 
-BOOT_DRIVER ( "UNDI", undi_probe );
+/* UNDI driver states that it is suitable for any PCI NIC (i.e. any
+ * PCI device of class PCI_CLASS_NETWORK_ETHERNET).  If there are any
+ * obscure UNDI NICs that have the incorrect PCI class, add them to
+ * this list.
+ */
+static struct pci_id undi_nics[] = {
+	PCI_ROM ( 0x0000, 0x0000, "undi", "UNDI driver support" ),
+};
+
+static struct pci_driver undi_driver =
+	PCI_DRIVER ( "UNDI", undi_nics, PCI_CLASS_NETWORK_ETHERNET );
+
+BOOT_DRIVER ( "UNDI", find_pci_boot_device, undi_driver, undi_probe );
 
 #endif /* PCBIOS */
