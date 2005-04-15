@@ -133,11 +133,16 @@ static inline void isapnp_deactivate ( uint8_t logdev ) {
 	isapnp_write_byte ( ISAPNP_ACTIVATE, 0 );
 }
 
+static void isapnp_delay ( void ) {
+	udelay ( 1000 );
+}
+
 /*
  * The linear feedback shift register as described in Appendix B of
  * the PnP ISA spec.  The hardware implementation uses eight D-type
  * latches and two XOR gates.  I think this is probably the smallest
- * possible implementation in software.  :)
+ * possible implementation in software.  Six instructions when input_bit
+ * is a constant 0 (for isapnp_send_key).  :)
  *
  */
 static inline uint8_t isapnp_lfsr_next ( uint8_t lfsr, int input_bit ) {
@@ -156,12 +161,12 @@ static void isapnp_send_key ( void ) {
 	unsigned int i;
 	uint8_t lfsr;
 
-	udelay ( 1000 );
+	isapnp_delay();
 	isapnp_write_address ( 0x00 );
 	isapnp_write_address ( 0x00 );
 
 	lfsr = ISAPNP_LFSR_SEED;
-	for ( i = 0 ; i < 32 ; i-- ) {
+	for ( i = 0 ; i < 32 ; i++ ) {
 		isapnp_write_address ( lfsr );
 		lfsr = isapnp_lfsr_next ( lfsr, 0 );
 	}
@@ -200,7 +205,7 @@ static inline uint8_t isapnp_peek_byte ( void ) {
 			/* Byte ready - read it */
 			return isapnp_read_resourcedata();
 		}
-		udelay ( 100 );
+		isapnp_delay ();
 	}
 	/* Data never became ready - return 0xff */
 	return 0xff;
@@ -249,7 +254,8 @@ static int isapnp_try_isolate ( void ) {
 	/* Reset all assigned CSNs */
 	isapnp_reset_csn ();
 	isapnp_max_csn = 0;
-	udelay ( 2000 );
+	isapnp_delay();
+	isapnp_delay();
 	
 	/* Place all cards into the Isolation state */
 	isapnp_wait_for_key ();
@@ -258,7 +264,7 @@ static int isapnp_try_isolate ( void ) {
 	
 	/* Set the read port */
 	isapnp_set_read_port ();
-	udelay ( 1000 );
+	isapnp_delay();
 
 	while ( 1 ) {
 
@@ -269,7 +275,7 @@ static int isapnp_try_isolate ( void ) {
 
 		/* Initiate serial isolation */
 		isapnp_serialisolation ();
-		udelay ( 1000 );
+		isapnp_delay();
 
 		/* Read identifier serially via the ISAPnP read port. */
 		memset ( &identifier, 0, sizeof ( identifier ) );
@@ -278,9 +284,9 @@ static int isapnp_try_isolate ( void ) {
 			byte = 0;
 			for ( j = 0 ; j < 8 ; j++ ) {
 				data = isapnp_read_data ();
-				udelay ( 1000 );
+				isapnp_delay();
 				data = ( data << 8 ) | isapnp_read_data ();
-				udelay ( 1000 );
+				isapnp_delay();
 				if ( data == 0x55aa ) {
 					byte |= 1;
 				}
@@ -309,13 +315,13 @@ static int isapnp_try_isolate ( void ) {
 		      identifier.checksum, isapnp_max_csn );
 		
 		isapnp_write_csn ( isapnp_max_csn );
-		udelay ( 1000 );
+		isapnp_delay();
 
 		/* Send this card back to Sleep and force all cards
 		 * without a CSN into Isolation state
 		 */
 		isapnp_wake ( 0x00 );
-		udelay ( 1000 );
+		isapnp_delay();
 	}
 
 	/* Place all cards in Wait for Key state */
@@ -484,7 +490,7 @@ void activate_isapnp_device ( struct isapnp_device *isapnp,
 
 	/* Select the specified logical device */
 	isapnp_activate ( logdev );
-	udelay ( 1000 );
+	isapnp_delay();
 	
 	/* Return all cards to Wait for Key state */
 	isapnp_wait_for_key ();
@@ -503,7 +509,7 @@ void deactivate_isapnp_device ( struct isapnp_device *isapnp,
 
 	/* Select the specified logical device */
 	isapnp_deactivate ( logdev );
-	udelay ( 1000 );
+	isapnp_delay();
 	
 	/* Return all cards to Wait for Key state */
 	isapnp_wait_for_key ();
