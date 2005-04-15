@@ -177,6 +177,11 @@ static struct nic_operations skel_operations = {
  * example, most PCI devices will only need the PCI probing section;
  * ISAPnP, EISA, etc. can all be deleted.
  *
+ * Some devices will need custom bus logic.  The ISA 3c509 is a good
+ * example of this; it has a contention-resolution mechanism that is
+ * similar to ISAPnP, but not close enough to use the generic ISAPnP
+ * code.  Look at 3c509.c to see how it works.
+ *
  **************************************************************************
  */
 
@@ -323,4 +328,62 @@ BOOT_DRIVER ( "SKEL/MCA", find_mca_boot_device,
 	      skel_mca_driver, skel_mca_probe );
 
 ISA_ROM ( "skel-mca", "Skeleton MCA Adapter" );
+
+/**************************************************************************
+ * ISA PROBE - Look for an adapter
+ *
+ * The "classical" ISA probe is split into two stages: trying a list
+ * of I/O addresses to see if there's anything listening, and then
+ * using that I/O address to fill in the information in the nic
+ * structure.
+ *
+ * The list of probe addresses defined in skel_isa_probe_addrs[] will
+ * be passed to skel_isa_probe_addr().  If skel_isa_probe_addr()
+ * returns true, a struct isa_device will be created with isa->ioaddr
+ * set to the working I/O address, and skel_isa_probe() will be
+ * called.
+ *
+ * There is a standard mechanism for overriding the probe address list
+ * using ISA_PROBE_ADDRS.  Do not implement any custom code to
+ * override the probe address list.
+ *
+ **************************************************************************
+ */
+static int skel_isa_probe_addr ( uint16_t ioaddr __unused ) {
+	return 0;
+}
+
+static int skel_isa_probe ( struct dev *dev, struct isa_device *isa ) {
+	struct nic *nic = nic_device ( dev );
+
+	nic->ioaddr = isa->ioaddr;
+	nic->irqno = 0;
+
+	/* Test for physical presence of NIC */
+	/*
+	   if ( ! my_tests ) {
+	  	DBG ( "Could not find NIC: my explanation\n" );
+		return 0;
+	   }
+	*/
+
+	/* point to NIC specific routines */
+	nic->nic_op = &skel_operations;
+	return 1;
+}
+
+static struct isa_probe_addr skel_isa_probe_addrs[] = {
+	/*
+	   { 0x200 }, { 0x240 },
+	*/
+};
+
+static struct isa_driver skel_isa_driver =
+	ISA_DRIVER ( "SKEL/ISA", skel_isa_probe_addrs, skel_isa_probe_addr,
+		     ISA_VENDOR('S','K','L'), 0x0000 );
+
+BOOT_DRIVER ( "SKEL/ISA", find_isa_boot_device,
+	      skel_isa_driver, skel_isa_probe );
+
+ISA_ROM ( "skel-isa", "Skeleton ISA Adapter" );
 
