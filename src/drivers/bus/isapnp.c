@@ -372,7 +372,8 @@ static int isapnp_try_isolate ( void ) {
 	isapnp_wait_for_key ();
 
 	/* Return number of cards found */
-	DBG ( "ISAPnP found %d cards at read port %hx\n", isapnp_read_port );
+	DBG ( "ISAPnP found %d cards at read port %hx\n",
+	      isapnp_max_csn, isapnp_read_port );
 	return isapnp_max_csn;
 }
 
@@ -407,13 +408,6 @@ static int fill_isapnp_device ( struct isapnp_device *isapnp ) {
 	unsigned int i;
 	struct isapnp_logdevid logdevid;
 	
-	/* Ensure that all ISAPnP cards have CSNs allocated to them,
-	 * if we haven't already done so.
-	 */
-	if ( ! isapnp_read_port ) {
-		isapnp_isolate();
-	}
-
 	/* Wake the card */
 	isapnp_wait_for_key ();
 	isapnp_send_key ();
@@ -467,6 +461,13 @@ int find_isapnp_device ( struct isapnp_device *isapnp,
 		memset ( isapnp, 0, sizeof ( *isapnp ) );
 		isapnp->magic = isapnp_magic;
 		isapnp->csn = 1;
+	}
+
+	/* Ensure that all ISAPnP cards have CSNs allocated to them,
+	 * if we haven't already done so.
+	 */
+	if ( ! isapnp_read_port ) {
+		isapnp_isolate();
 	}
 
 	/* Iterate through all possible ISAPNP CSNs, starting where we
