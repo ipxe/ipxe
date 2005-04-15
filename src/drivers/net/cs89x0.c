@@ -69,13 +69,10 @@
 #include "etherboot.h"
 #include "nic.h"
 #include "isa.h"
+#include "console.h"
 #include "cs89x0.h"
 
-#ifndef EMBEDDED
 static unsigned short	eth_nic_base;
-#else
-static unsigned long	eth_nic_base;
-#endif
 static unsigned long    eth_mem_start;
 static unsigned short   eth_irqno;
 static unsigned short   eth_cs_type;	/* one of: CS8900, CS8920, CS8920M  */
@@ -454,244 +451,6 @@ static void cs89x0_irq(struct nic *nic __unused, irq_action_t action __unused)
   }
 }
 
-/**************************************************************************
-ETH_PROBE - Look for an adapter
-***************************************************************************/
-
-static int cs89x0_probe(struct dev *dev, unsigned short *probe_addrs __unused)
-{
-	struct nic *nic = (struct nic *)dev;
-	static const unsigned int netcard_portlist[] = {
-#ifdef	CS_SCAN
-		CS_SCAN,
-#else	/* use "conservative" default values for autoprobing */
-#ifndef EMBEDDED
-		0x300,0x320,0x340,0x200,0x220,0x240,
-		0x260,0x280,0x2a0,0x2c0,0x2e0,
-	/* if that did not work, then be more aggressive */
-		0x301,0x321,0x341,0x201,0x221,0x241,
-		0x261,0x281,0x2a1,0x2c1,0x2e1,
-#else
-		0x01000300,
-#endif
-#endif
-		0};
-
-	int      i, result = -1;
-	unsigned rev_type = 0, ioaddr, ioidx, isa_cnf, cs_revision;
-	unsigned short eeprom_buff[CHKSUM_LEN];
-
-
-	for (ioidx = 0; (ioaddr=netcard_portlist[ioidx++]) != 0; ) {
-		/* if they give us an odd I/O address, then do ONE write to
-		   the address port, to get it back to address zero, where we
-		   expect to find the EISA signature word. */
-		if (ioaddr & 1) {
-			ioaddr &= ~1;
-			if ((inw(ioaddr + ADD_PORT) & ADD_MASK) != ADD_SIG)
-				continue;
-			outw(PP_ChipID, ioaddr + ADD_PORT);
-		}
-
-		if (inw(ioaddr + DATA_PORT) != CHIP_EISA_ID_SIG)
-			continue;
-		eth_nic_base = ioaddr;
-
-		/* get the chip type */
-		rev_type = readreg(PRODUCT_ID_ADD);
-		eth_cs_type = rev_type &~ REVISON_BITS;
-		cs_revision = ((rev_type & REVISON_BITS) >> 8) + 'A';
-
-		printf("\ncs: cs89%c0%s rev %c, base %#hX",
-		       eth_cs_type==CS8900?'0':'2',
-		       eth_cs_type==CS8920M?"M":"",
-		       cs_revision,
-		       eth_nic_base);
-#ifndef EMBEDDED 
-		/* First check to see if an EEPROM is attached*/
-		if ((readreg(PP_SelfST) & EEPROM_PRESENT) == 0) {
-			printf("\ncs: no EEPROM...\n");
-			outw(PP_ChipID, eth_nic_base + ADD_PORT);
-			continue; }
-		else if (get_eeprom_data(START_EEPROM_DATA,CHKSUM_LEN,
-					 eeprom_buff) < 0) {
-			printf("\ncs: EEPROM read failed...\n");
-			outw(PP_ChipID, eth_nic_base + ADD_PORT);
-			continue; }
-		else if (get_eeprom_chksum(START_EEPROM_DATA,CHKSUM_LEN,
-					   eeprom_buff) < 0) {
-			printf("\ncs: EEPROM checksum bad...\n");
-			outw(PP_ChipID, eth_nic_base + ADD_PORT);
-			continue; }
-
-		/* get transmission control word but keep the
-		   autonegotiation bits */
-		eth_auto_neg_cnf = eeprom_buff[AUTO_NEG_CNF_OFFSET/2];
-		/* Store adapter configuration */
-		eth_adapter_cnf = eeprom_buff[ADAPTER_CNF_OFFSET/2];
-		/* Store ISA configuration */
-		isa_cnf = eeprom_buff[ISA_CNF_OFFSET/2];
-
-		/* store the initial memory base address */
-		eth_mem_start = eeprom_buff[PACKET_PAGE_OFFSET/2] << 8;
-
-		printf("%s%s%s, addr ",
-		       (eth_adapter_cnf & A_CNF_10B_T)?", RJ-45":"",
-		       (eth_adapter_cnf & A_CNF_AUI)?", AUI":"",
-		       (eth_adapter_cnf & A_CNF_10B_2)?", BNC":"");
-
-		/* If this is a CS8900 then no pnp soft */
-		if (eth_cs_type != CS8900 &&
-		    /* Check if the ISA IRQ has been set  */
-		    (i = readreg(PP_CS8920_ISAINT) & 0xff,
-		     (i != 0 && i < CS8920_NO_INTS)))
-			eth_irqno = i;
-		else {
-			i = isa_cnf & INT_NO_MASK;
-			if (eth_cs_type == CS8900) {
-				/* the table that follows is dependent
-				   upon how you wired up your cs8900
-				   in your system.  The table is the
-				   same as the cs8900 engineering demo
-				   board.  irq_map also depends on the
-				   contents of the table.  Also see
-				   write_irq, which is the reverse
-				   mapping of the table below. */
-				if (i < 4) i = "\012\013\014\005"[i];
-				else printf("\ncs: BUG: isa_config is %d\n", i); }
-			eth_irqno = i; }
-
-		/* Retrieve and print the ethernet address. */
-		for (i=0; i<ETH_ALEN; i++) {
-			nic->node_addr[i] = ((unsigned char *)eeprom_buff)[i];
-		}
-		printf("%!\n", nic->node_addr);
-#endif
-#ifdef EMBEDDED
-		/* Retrieve and print the ethernet address. */
-		{
-		unsigned char MAC_HW_ADDR[6]={MAC_HW_ADDR_DRV};
-		memcpy(nic->node_addr, MAC_HW_ADDR, 6);
-		}
-		printf("\n%!\n", nic->node_addr);
-
-	    eth_adapter_cnf = A_CNF_10B_T | A_CNF_MEDIA_10B_T;
-		eth_auto_neg_cnf = EE_AUTO_NEG_ENABLE | IMM_BIT;
-#endif
-#ifndef EMBEDDED 
-		/* Set the LineCTL quintuplet based on adapter
-		   configuration read from EEPROM */
-		if ((eth_adapter_cnf & A_CNF_EXTND_10B_2) &&
-		    (eth_adapter_cnf & A_CNF_LOW_RX_SQUELCH))
-			eth_linectl = LOW_RX_SQUELCH;
-		else
-			eth_linectl = 0;
-
-		/* check to make sure that they have the "right"
-		   hardware available */
-		switch(eth_adapter_cnf & A_CNF_MEDIA_TYPE) {
-		case A_CNF_MEDIA_10B_T: result = eth_adapter_cnf & A_CNF_10B_T;
-			break;
-		case A_CNF_MEDIA_AUI:   result = eth_adapter_cnf & A_CNF_AUI;
-			break;
-		case A_CNF_MEDIA_10B_2: result = eth_adapter_cnf & A_CNF_10B_2;
-			break;
-		default: result = eth_adapter_cnf & (A_CNF_10B_T | A_CNF_AUI |
-						     A_CNF_10B_2);
-		}
-		if (!result) {
-			printf("cs: EEPROM is configured for unavailable media\n");
-		error:
-			writereg(PP_LineCTL, readreg(PP_LineCTL) &
-				 ~(SERIAL_TX_ON | SERIAL_RX_ON));
-			outw(PP_ChipID, eth_nic_base + ADD_PORT);
-			continue;
-		}
-#endif
-		/* Initialize the card for probing of the attached media */
-		cs89x0_reset(nic);
-
-		/* set the hardware to the configured choice */
-		switch(eth_adapter_cnf & A_CNF_MEDIA_TYPE) {
-		case A_CNF_MEDIA_10B_T:
-			result = detect_tp();
-			if (!result) {
-				clrline();
-				printf("10Base-T (RJ-45%s",
-				       ") has no cable\n"); }
-			/* check "ignore missing media" bit */
-			if (eth_auto_neg_cnf & IMM_BIT)
-				/* Yes! I don't care if I see a link pulse */
-				result = A_CNF_MEDIA_10B_T;
-			break;
-		case A_CNF_MEDIA_AUI:
-			result = detect_aui(nic);
-			if (!result) {
-				clrline();
-				printf("10Base-5 (AUI%s",
-				       ") has no cable\n"); }
-			/* check "ignore missing media" bit */
-			if (eth_auto_neg_cnf & IMM_BIT)
-				/* Yes! I don't care if I see a carrrier */
-				result = A_CNF_MEDIA_AUI;
-			break;
-		case A_CNF_MEDIA_10B_2:
-			result = detect_bnc(nic);
-			if (!result) {
-				clrline();
-				printf("10Base-2 (BNC%s",
-				       ") has no cable\n"); }
-			/* check "ignore missing media" bit */
-			if (eth_auto_neg_cnf & IMM_BIT)
-				/* Yes! I don't care if I can xmit a packet */
-				result = A_CNF_MEDIA_10B_2;
-			break;
-		case A_CNF_MEDIA_AUTO:
-			writereg(PP_LineCTL, eth_linectl | AUTO_AUI_10BASET);
-			if (eth_adapter_cnf & A_CNF_10B_T)
-				if ((result = detect_tp()) != 0)
-					break;
-			if (eth_adapter_cnf & A_CNF_AUI)
-				if ((result = detect_aui(nic)) != 0)
-					break;
-			if (eth_adapter_cnf & A_CNF_10B_2)
-				if ((result = detect_bnc(nic)) != 0)
-					break;
-			clrline(); printf("no media detected\n");
-			goto error;
-		}
-		clrline();
-		switch(result) {
-		case 0:                 printf("no network cable attached to configured media\n");
-			goto error;
-		case A_CNF_MEDIA_10B_T: printf("using 10Base-T (RJ-45)\n");
-			break;
-		case A_CNF_MEDIA_AUI:   printf("using 10Base-5 (AUI)\n");
-			break;
-		case A_CNF_MEDIA_10B_2: printf("using 10Base-2 (BNC)\n");
-			break;
-		}
-
-		/* Turn on both receive and transmit operations */
-		writereg(PP_LineCTL, readreg(PP_LineCTL) | SERIAL_RX_ON |
-			 SERIAL_TX_ON);
-
-		break;
-#ifdef EMBEDDED
-		error:
-			writereg(PP_LineCTL, readreg(PP_LineCTL) &
-				 ~(SERIAL_TX_ON | SERIAL_RX_ON));
-			outw(PP_ChipID, eth_nic_base + ADD_PORT);
-			continue;
-#endif
-	}
-
-	if (ioaddr == 0)
-		return (0);
-
-	nic->irqno    = 0;
-	nic->ioaddr   = ioaddr;
-static struct nic_operations cs89x0_operations;
 static struct nic_operations cs89x0_operations = {
 	.connect	= dummy_connect,
 	.poll		= cs89x0_poll,
@@ -699,21 +458,251 @@ static struct nic_operations cs89x0_operations = {
 	.irq		= cs89x0_irq,
 	.disable	= cs89x0_disable,
 };
-	nic->nic_op	= &cs89x0_operations;
 
-	/* Based on PnP ISA map */
-	dev->devid.vendor_id = htons(ISAPNP_VENDOR('C','S','C'));
-	dev->devid.device_id = htons(0x0007);
+/**************************************************************************
+ETH_PROBE - Look for an adapter
+***************************************************************************/
+
+static int cs89x0_probe_addr ( uint16_t ioaddr ) {
+	/* if they give us an odd I/O address, then do ONE write to
+	   the address port, to get it back to address zero, where we
+	   expect to find the EISA signature word. */
+	if (ioaddr & 1) {
+		ioaddr &= ~1;
+		if ((inw(ioaddr + ADD_PORT) & ADD_MASK) != ADD_SIG)
+			return 0;
+		outw(PP_ChipID, ioaddr + ADD_PORT);
+	}
+	
+	if (inw(ioaddr + DATA_PORT) != CHIP_EISA_ID_SIG)
+		return 0;
+
 	return 1;
 }
 
-static struct isa_driver cs89x0_driver __isa_driver = {
-	.type    = NIC_DRIVER,
-	.name    = "CS89x0",
-	.probe   = cs89x0_probe,
-	.ioaddrs = 0,
+static int cs89x0_probe ( struct dev *dev, struct isa_device *isa ) {
+	struct nic *nic = nic_device ( dev );
+
+	int      i, result = -1;
+	unsigned rev_type = 0, isa_cnf, cs_revision;
+	unsigned short eeprom_buff[CHKSUM_LEN];
+
+	nic->ioaddr = ( isa->ioaddr & ~1 );
+	nic->irqno  = 0;
+
+	eth_nic_base = nic->ioaddr;
+
+	/* get the chip type */
+	rev_type = readreg(PRODUCT_ID_ADD);
+	eth_cs_type = rev_type &~ REVISON_BITS;
+	cs_revision = ((rev_type & REVISON_BITS) >> 8) + 'A';
+	
+	printf("\ncs: cs89%c0%s rev %c, base %#hX",
+	       eth_cs_type==CS8900?'0':'2',
+	       eth_cs_type==CS8920M?"M":"",
+	       cs_revision,
+	       eth_nic_base);
+#ifndef EMBEDDED 
+	/* First check to see if an EEPROM is attached*/
+	if ((readreg(PP_SelfST) & EEPROM_PRESENT) == 0) {
+		printf("\ncs: no EEPROM...\n");
+		outw(PP_ChipID, eth_nic_base + ADD_PORT);
+		return 0;
+	} else if (get_eeprom_data(START_EEPROM_DATA,CHKSUM_LEN,
+				   eeprom_buff) < 0) {
+		printf("\ncs: EEPROM read failed...\n");
+		outw(PP_ChipID, eth_nic_base + ADD_PORT);
+		return 0;
+	} else if (get_eeprom_chksum(START_EEPROM_DATA,CHKSUM_LEN,
+				     eeprom_buff) < 0) {
+		printf("\ncs: EEPROM checksum bad...\n");
+		outw(PP_ChipID, eth_nic_base + ADD_PORT);
+		return 0;
+	}
+
+	/* get transmission control word but keep the
+	   autonegotiation bits */
+	eth_auto_neg_cnf = eeprom_buff[AUTO_NEG_CNF_OFFSET/2];
+	/* Store adapter configuration */
+	eth_adapter_cnf = eeprom_buff[ADAPTER_CNF_OFFSET/2];
+	/* Store ISA configuration */
+	isa_cnf = eeprom_buff[ISA_CNF_OFFSET/2];
+	
+	/* store the initial memory base address */
+	eth_mem_start = eeprom_buff[PACKET_PAGE_OFFSET/2] << 8;
+	
+	printf("%s%s%s, addr ",
+	       (eth_adapter_cnf & A_CNF_10B_T)?", RJ-45":"",
+	       (eth_adapter_cnf & A_CNF_AUI)?", AUI":"",
+	       (eth_adapter_cnf & A_CNF_10B_2)?", BNC":"");
+	
+	/* If this is a CS8900 then no pnp soft */
+	if (eth_cs_type != CS8900 &&
+	    /* Check if the ISA IRQ has been set  */
+	    (i = readreg(PP_CS8920_ISAINT) & 0xff,
+	     (i != 0 && i < CS8920_NO_INTS)))
+		eth_irqno = i;
+	else {
+		i = isa_cnf & INT_NO_MASK;
+		if (eth_cs_type == CS8900) {
+			/* the table that follows is dependent
+			   upon how you wired up your cs8900
+			   in your system.  The table is the
+			   same as the cs8900 engineering demo
+			   board.  irq_map also depends on the
+			   contents of the table.  Also see
+			   write_irq, which is the reverse
+			   mapping of the table below. */
+			if (i < 4) i = "\012\013\014\005"[i];
+			else printf("\ncs: BUG: isa_config is %d\n", i); }
+		eth_irqno = i; }
+	
+	/* Retrieve and print the ethernet address. */
+	for (i=0; i<ETH_ALEN; i++) {
+		nic->node_addr[i] = ((unsigned char *)eeprom_buff)[i];
+	}
+	printf("%!\n", nic->node_addr);
+#endif
+#ifdef EMBEDDED
+	/* Retrieve and print the ethernet address. */
+	{
+		unsigned char MAC_HW_ADDR[6]={MAC_HW_ADDR_DRV};
+		memcpy(nic->node_addr, MAC_HW_ADDR, 6);
+	}
+	printf("\n%!\n", nic->node_addr);
+	
+	eth_adapter_cnf = A_CNF_10B_T | A_CNF_MEDIA_10B_T;
+	eth_auto_neg_cnf = EE_AUTO_NEG_ENABLE | IMM_BIT;
+#endif
+#ifndef EMBEDDED 
+	/* Set the LineCTL quintuplet based on adapter
+	   configuration read from EEPROM */
+	if ((eth_adapter_cnf & A_CNF_EXTND_10B_2) &&
+	    (eth_adapter_cnf & A_CNF_LOW_RX_SQUELCH))
+		eth_linectl = LOW_RX_SQUELCH;
+	else
+		eth_linectl = 0;
+	
+	/* check to make sure that they have the "right"
+	   hardware available */
+	switch(eth_adapter_cnf & A_CNF_MEDIA_TYPE) {
+	case A_CNF_MEDIA_10B_T: result = eth_adapter_cnf & A_CNF_10B_T;
+		break;
+	case A_CNF_MEDIA_AUI:   result = eth_adapter_cnf & A_CNF_AUI;
+		break;
+	case A_CNF_MEDIA_10B_2: result = eth_adapter_cnf & A_CNF_10B_2;
+		break;
+	default: result = eth_adapter_cnf & (A_CNF_10B_T | A_CNF_AUI |
+					     A_CNF_10B_2);
+	}
+	if (!result) {
+		printf("cs: EEPROM is configured for unavailable media\n");
+	error:
+		writereg(PP_LineCTL, readreg(PP_LineCTL) &
+			 ~(SERIAL_TX_ON | SERIAL_RX_ON));
+		outw(PP_ChipID, eth_nic_base + ADD_PORT);
+		return 0;
+	}
+#endif
+	/* Initialize the card for probing of the attached media */
+	cs89x0_reset(nic);
+	
+	/* set the hardware to the configured choice */
+	switch(eth_adapter_cnf & A_CNF_MEDIA_TYPE) {
+	case A_CNF_MEDIA_10B_T:
+		result = detect_tp();
+		if (!result) {
+			clrline();
+			printf("10Base-T (RJ-45%s",
+			       ") has no cable\n"); }
+		/* check "ignore missing media" bit */
+		if (eth_auto_neg_cnf & IMM_BIT)
+			/* Yes! I don't care if I see a link pulse */
+			result = A_CNF_MEDIA_10B_T;
+		break;
+	case A_CNF_MEDIA_AUI:
+		result = detect_aui(nic);
+		if (!result) {
+			clrline();
+			printf("10Base-5 (AUI%s",
+			       ") has no cable\n"); }
+		/* check "ignore missing media" bit */
+		if (eth_auto_neg_cnf & IMM_BIT)
+			/* Yes! I don't care if I see a carrrier */
+			result = A_CNF_MEDIA_AUI;
+		break;
+	case A_CNF_MEDIA_10B_2:
+		result = detect_bnc(nic);
+		if (!result) {
+			clrline();
+			printf("10Base-2 (BNC%s",
+			       ") has no cable\n"); }
+		/* check "ignore missing media" bit */
+		if (eth_auto_neg_cnf & IMM_BIT)
+			/* Yes! I don't care if I can xmit a packet */
+			result = A_CNF_MEDIA_10B_2;
+		break;
+	case A_CNF_MEDIA_AUTO:
+		writereg(PP_LineCTL, eth_linectl | AUTO_AUI_10BASET);
+		if (eth_adapter_cnf & A_CNF_10B_T)
+			if ((result = detect_tp()) != 0)
+				break;
+		if (eth_adapter_cnf & A_CNF_AUI)
+			if ((result = detect_aui(nic)) != 0)
+				break;
+		if (eth_adapter_cnf & A_CNF_10B_2)
+			if ((result = detect_bnc(nic)) != 0)
+				break;
+		clrline(); printf("no media detected\n");
+		goto error;
+	}
+	clrline();
+	switch(result) {
+	case 0:                 printf("no network cable attached to configured media\n");
+		goto error;
+	case A_CNF_MEDIA_10B_T: printf("using 10Base-T (RJ-45)\n");
+		break;
+	case A_CNF_MEDIA_AUI:   printf("using 10Base-5 (AUI)\n");
+		break;
+	case A_CNF_MEDIA_10B_2: printf("using 10Base-2 (BNC)\n");
+		break;
+	}
+	
+	/* Turn on both receive and transmit operations */
+	writereg(PP_LineCTL, readreg(PP_LineCTL) | SERIAL_RX_ON |
+		 SERIAL_TX_ON);
+	
+	return 0;
+#ifdef EMBEDDED
+ error:
+	writereg(PP_LineCTL, readreg(PP_LineCTL) &
+		 ~(SERIAL_TX_ON | SERIAL_RX_ON));
+	outw(PP_ChipID, eth_nic_base + ADD_PORT);
+	return 0;
+#endif
+
+	nic->nic_op   = &cs89x0_operations;
+	return 1;
+}
+	
+static struct isa_probe_addr cs89x0_probe_addrs[] = { 
+#ifndef EMBEDDED
+	/* use "conservative" default values for autoprobing */
+	{ 0x300 }, { 0x320 }, { 0x340 }, { 0x200 }, { 0x220 }, { 0x240 },
+	{ 0x260 }, { 0x280 }, { 0x2a0 }, { 0x2c0 }, { 0x2e0 },
+	/* if that did not work, then be more aggressive */
+	{ 0x301 }, { 0x321 }, { 0x341 }, { 0x201 }, { 0x221 }, { 0x241 },
+	{ 0x261 }, { 0x281 }, { 0x2a1 }, { 0x2c1 }, { 0x2e1 },
+#else
+	0x01000300,
+#endif
 };
-ISA_ROM("cs89x0","Crystal Semiconductor CS89x0");
+
+static struct isa_driver cs89x0_driver =
+	ISA_DRIVER ( "CS89x0", cs89x0_probe_addrs, cs89x0_probe_addr,
+		     ISAPNP_VENDOR('C','S','C'), 0x0007 );
+
+ISA_ROM ( "cs89x0", "Crystal Semiconductor CS89x0" );
 
 /*
  * Local variables:
