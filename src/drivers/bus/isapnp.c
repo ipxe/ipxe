@@ -517,6 +517,10 @@ void activate_isapnp_device ( struct isapnp_device *isapnp,
 	
 	/* Return all cards to Wait for Key state */
 	isapnp_wait_for_key ();
+
+	DBG ( "ISAPnP activated logical device %hhx on CSN %hhx "
+	      "with ioaddr %hx and IRQ %d\n",
+	      logdev, isapnp->csn, isapnp->ioaddr, isapnp->irqno );
 }
 
 /*
@@ -536,4 +540,7 @@ void deactivate_isapnp_device ( struct isapnp_device *isapnp,
 	
 	/* Return all cards to Wait for Key state */
 	isapnp_wait_for_key ();
+
+	DBG ( "ISAPnP deactivated logical device %hhx on CSN %hhx\n",
+	      logdev, isapnp->csn );
 }
