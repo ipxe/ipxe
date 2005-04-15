@@ -41,8 +41,8 @@ int find_boot_device ( struct dev *dev ) {
 		if (  boot_driver->find_bus_boot_device ( dev,
 						  boot_driver->bus_driver ) ) {
 			DBG ( "Found device %s (ID %hhx:%hx:%hx)\n",
-			      dev->name, dev->devid->bus_type,
-			      dev->devid->vendor_id, dev->devid->device_id );
+			      dev->name, dev->devid.bus_type,
+			      dev->devid.vendor_id, dev->devid.device_id );
 			return 1;
 		}
 	}
