@@ -66,6 +66,9 @@
 #define ISAPNP_LOGICALDEVICENUMBER	0x07
 #define ISAPNP_ACTIVATE			0x30
 #define ISAPNP_IORANGECHECK		0x31
+#define ISAPNP_IOBASE(n)		( 0x60 + ( (n) * 2 ) )
+#define ISAPNP_IRQNO(n)			( 0x70 + ( (n) * 2 ) )
+#define ISAPNP_IRQTYPE(n)		( 0x71 + ( (n) * 2 ) )
 
 /* Bits in the CONFIGCONTROL register */
 #define ISAPNP_CONFIG_RESET		( 1 << 0 )
@@ -143,6 +146,8 @@ struct isapnp_device {
 	unsigned char csn;
 	uint16_t vendor_id;
 	uint16_t prod_id;
+	uint16_t ioaddr;
+	uint8_t irqno;
 	int already_tried;
 };
 

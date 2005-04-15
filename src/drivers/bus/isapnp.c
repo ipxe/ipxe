@@ -87,6 +87,12 @@ static inline uint8_t isapnp_read_byte ( uint8_t address ) {
 	return isapnp_read_data ();
 }
 
+static inline uint16_t isapnp_read_word ( uint8_t address ) {
+	/* Yes, they're in big-endian order */
+	return ( ( isapnp_read_byte ( address ) << 8 )
+		 + isapnp_read_byte ( address + 1 ) );
+}
+
 static inline void isapnp_set_read_port ( void ) {
 	isapnp_write_byte ( ISAPNP_READPORT, isapnp_read_port >> 2 );
 }
@@ -131,6 +137,14 @@ static inline void isapnp_activate ( uint8_t logdev ) {
 static inline void isapnp_deactivate ( uint8_t logdev ) {
 	isapnp_logicaldevice ( logdev );
 	isapnp_write_byte ( ISAPNP_ACTIVATE, 0 );
+}
+
+static inline uint16_t isapnp_read_iobase ( unsigned int index ) {
+	return isapnp_read_word ( ISAPNP_IOBASE ( index ) );
+}
+
+static inline uint8_t isapnp_read_irqno ( unsigned int index ) {
+	return isapnp_read_byte ( ISAPNP_IRQNO ( index ) );
 }
 
 static void isapnp_delay ( void ) {
@@ -388,6 +402,13 @@ static int fill_isapnp_device ( struct isapnp_device *isapnp ) {
 	isapnp->vendor_id = identifier.vendor_id;
 	isapnp->prod_id = identifier.prod_id;
 
+	/* I/O addresses and IRQs are associated with logical devices,
+	 * not with cards.  They will be assigned when
+	 * activate_isapnp_device() is called.
+	 */
+	isapnp->ioaddr = 0;
+	isapnp->irqno = 0;
+
 	/* Return all cards to Wait for Key state */
 	isapnp_wait_for_key ();
 
@@ -471,7 +492,8 @@ int find_isapnp_boot_device ( struct dev *dev, struct isapnp_driver *driver ) {
 }
 
 /*
- * Activate a logical function on an ISAPnP device
+ * Activate a logical function on an ISAPnP device, and fill in the
+ * ioaddr and irqno fields in the isapnp struct.
  *
  * This routine simply activates the device in its current
  * configuration.  It does not attempt any kind of resource
@@ -488,6 +510,10 @@ void activate_isapnp_device ( struct isapnp_device *isapnp,
 	/* Select the specified logical device */
 	isapnp_activate ( logdev );
 	isapnp_delay();
+
+	/* Read the current ioaddr and irqno */
+	isapnp->ioaddr = isapnp_read_iobase ( 0 );
+	isapnp->irqno = isapnp_read_irqno ( 0 );
 	
 	/* Return all cards to Wait for Key state */
 	isapnp_wait_for_key ();
@@ -498,7 +524,7 @@ void activate_isapnp_device ( struct isapnp_device *isapnp,
  *
  */
 void deactivate_isapnp_device ( struct isapnp_device *isapnp,
-			      uint8_t logdev ) {
+				uint8_t logdev ) {
 	/* Wake the device */
 	isapnp_wait_for_key ();
 	isapnp_send_key ();
