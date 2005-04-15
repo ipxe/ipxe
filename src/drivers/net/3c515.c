@@ -44,17 +44,13 @@
 * *********************************************************/
 
 
-#define ISA_PNP
-/*#define EDEBUG1*/
-
 /* to get some global routines like printf */
 #include "etherboot.h"
 /* to get the interface to the body of the program */
 #include "nic.h"
-#include "isa.h"
+#include "isapnp.h"
+#include "isa.h" /* for ISA_ROM */
 #include "timer.h"
-
-#ifdef ISA_PNP
 
 static void t3c515_wait(unsigned int nticks)
 {
@@ -62,15 +58,13 @@ static void t3c515_wait(unsigned int nticks)
 	while (currticks() < to)
 		/* wait */ ;
 }
-#endif
+
 /* TJL definations */
 #define HZ      100
 #define u16 unsigned short
 #define u32 unsigned long
 #define s16 signed short
 #define s32 signed long
-static unsigned short eth_nic_base;
-#define BASE 	(eth_nic_base)
 static int if_port;
 struct corkscrew_private *vp;
 /* Brought directly from 3c515.c by Becker */
@@ -103,15 +97,10 @@ static int max_interrupt_work = 20;
 static int rx_nocopy, rx_copy, queued_packet;
 */
 
-#ifdef DRIVER_DEBUG
-static int corkscrew_debug = DRIVER_DEBUG;
-#else
-static int corkscrew_debug = 1;
-#endif
-
 #define CORKSCREW_ID 10
 
-#define EL3WINDOW(win_num) outw(SelectWindow + (win_num), ioaddr + EL3_CMD)
+#define EL3WINDOW(win_num) \
+	outw(SelectWindow + (win_num), nic->ioaddr + EL3_CMD)
 #define EL3_CMD 0x0e
 #define EL3_STATUS 0x0e
 #define RX_BYTES_MASK			(unsigned short) (0x07ff)
@@ -296,7 +285,7 @@ static int corkscrew_probe1(int ioaddr, int irq, int product_index,
 
 /* This driver uses 'options' to pass the media type, full-duplex flag, etc. */
 /* Note: this is the only limit on the number of cards supported!! */
-static int options[8] = { -1, -1, -1, -1, -1, -1, -1, -1, };
+static int options = -1;
 
 /* End Brought directly from 3c515.c by Becker */
 
@@ -305,21 +294,19 @@ RESET - Reset adapter
 ***************************************************************************/
 static void t515_reset(struct nic *nic)
 {
-	int ioaddr = BASE;
 	union wn3_config config;
 	int i;
 
 	/* Before initializing select the active media port. */
 	EL3WINDOW(3);
 	if (vp->full_duplex)
-		outb(0x20, ioaddr + Wn3_MAC_Ctrl);	/* Set the full-duplex bit. */
-	config.i = inl(ioaddr + Wn3_Config);
+		outb(0x20, nic->ioaddr + Wn3_MAC_Ctrl);	/* Set the full-duplex bit. */
+	config.i = inl(nic->ioaddr + Wn3_Config);
 
 	if (vp->media_override != 7) {
-		if (corkscrew_debug > 1)
-			printf("Media override to transceiver %d (%s).\n",
-			       vp->media_override,
-			       media_tbl[vp->media_override].name);
+		DBG ( "Media override to transceiver %d (%s).\n",
+		      vp->media_override,
+		      media_tbl[vp->media_override].name);
 		if_port = vp->media_override;
 	} else if (vp->autoselect) {
 		/* Find first available media type, starting with 100baseTx. */
@@ -327,66 +314,63 @@ static void t515_reset(struct nic *nic)
 		while (!(vp->available_media & media_tbl[if_port].mask))
 			if_port = media_tbl[if_port].next;
 
-		if (corkscrew_debug > 1)
-			printf("Initial media type %s.\n",
-			       media_tbl[if_port].name);
+		DBG ( "Initial media type %s.\n",
+		      media_tbl[if_port].name);
 	} else
 		if_port = vp->default_media;
 
 	config.u.xcvr = if_port;
-	outl(config.i, ioaddr + Wn3_Config);
+	outl(config.i, nic->ioaddr + Wn3_Config);
 
-	if (corkscrew_debug > 1) {
-		printf("corkscrew_open() InternalConfig 0x%hX.\n",
-		       config.i);
-	}
+	DBG ( "corkscrew_open() InternalConfig 0x%hX.\n",
+	      config.i);
 
-	outw(TxReset, ioaddr + EL3_CMD);
+	outw(TxReset, nic->ioaddr + EL3_CMD);
 	for (i = 20; i >= 0; i--)
-		if (!(inw(ioaddr + EL3_STATUS) & CmdInProgress))
+		if (!(inw(nic->ioaddr + EL3_STATUS) & CmdInProgress))
 			break;
 
-	outw(RxReset, ioaddr + EL3_CMD);
+	outw(RxReset, nic->ioaddr + EL3_CMD);
 	/* Wait a few ticks for the RxReset command to complete. */
 	for (i = 20; i >= 0; i--)
-		if (!(inw(ioaddr + EL3_STATUS) & CmdInProgress))
+		if (!(inw(nic->ioaddr + EL3_STATUS) & CmdInProgress))
 			break;
 
-	outw(SetStatusEnb | 0x00, ioaddr + EL3_CMD);
+	outw(SetStatusEnb | 0x00, nic->ioaddr + EL3_CMD);
 
-	if (corkscrew_debug > 1) {
+#ifdef debug_3c515
 		EL3WINDOW(4);
-		printf("FIXME: fix print for irq, not 9");
-		printf("corkscrew_open() irq %d media status 0x%hX.\n",
-		       9, inw(ioaddr + Wn4_Media));
-	}
+		DBG ( "FIXME: fix print for irq, not 9" );
+		DBG ( "corkscrew_open() irq %d media status 0x%hX.\n",
+		      9, inw(nic->ioaddr + Wn4_Media) );
+#endif
 
 	/* Set the station address and mask in window 2 each time opened. */
 	EL3WINDOW(2);
 	for (i = 0; i < 6; i++)
-		outb(nic->node_addr[i], ioaddr + i);
+		outb(nic->node_addr[i], nic->ioaddr + i);
 	for (; i < 12; i += 2)
-		outw(0, ioaddr + i);
+		outw(0, nic->ioaddr + i);
 
 	if (if_port == 3)
 		/* Start the thinnet transceiver. We should really wait 50ms... */
-		outw(StartCoax, ioaddr + EL3_CMD);
+		outw(StartCoax, nic->ioaddr + EL3_CMD);
 	EL3WINDOW(4);
-	outw((inw(ioaddr + Wn4_Media) & ~(Media_10TP | Media_SQE)) |
-	     media_tbl[if_port].media_bits, ioaddr + Wn4_Media);
+	outw((inw(nic->ioaddr + Wn4_Media) & ~(Media_10TP | Media_SQE)) |
+	     media_tbl[if_port].media_bits, nic->ioaddr + Wn4_Media);
 
 	/* Switch to the stats window, and clear all stats by reading. */
-/*	outw(StatsDisable, ioaddr + EL3_CMD);*/
+/*	outw(StatsDisable, nic->ioaddr + EL3_CMD);*/
 	EL3WINDOW(6);
 	for (i = 0; i < 10; i++)
-		inb(ioaddr + i);
-	inw(ioaddr + 10);
-	inw(ioaddr + 12);
+		inb(nic->ioaddr + i);
+	inw(nic->ioaddr + 10);
+	inw(nic->ioaddr + 12);
 	/* New: On the Vortex we must also clear the BadSSD counter. */
 	EL3WINDOW(4);
-	inb(ioaddr + 12);
+	inb(nic->ioaddr + 12);
 	/* ..and on the Boomerang we enable the extra statistics bits. */
-	outw(0x0040, ioaddr + Wn4_NetDiag);
+	outw(0x0040, nic->ioaddr + Wn4_NetDiag);
 
 	/* Switch to register set 7 for normal use. */
 	EL3WINDOW(7);
@@ -397,37 +381,36 @@ static void t515_reset(struct nic *nic)
 	if (vp->full_bus_master_rx) {	/* Boomerang bus master. */
 		printf("FIXME: Is this if necessary");
 		vp->cur_rx = vp->dirty_rx = 0;
-		if (corkscrew_debug > 2)
-			printf("   Filling in the Rx ring.\n");
+		DBG ( "   Filling in the Rx ring.\n" );
 		for (i = 0; i < RX_RING_SIZE; i++) {
 			printf("FIXME: Is this if necessary");
 		}
 	}
 	if (vp->full_bus_master_tx) {	/* Boomerang bus master Tx. */
 		vp->cur_tx = vp->dirty_tx = 0;
-		outb(PKT_BUF_SZ >> 8, ioaddr + TxFreeThreshold);	/* Room for a packet. */
+		outb(PKT_BUF_SZ >> 8, nic->ioaddr + TxFreeThreshold);	/* Room for a packet. */
 		/* Clear the Tx ring. */
 		for (i = 0; i < TX_RING_SIZE; i++)
 			vp->tx_skbuff[i] = 0;
-		outl(0, ioaddr + DownListPtr);
+		outl(0, nic->ioaddr + DownListPtr);
 	}
 	/* Set receiver mode: presumably accept b-case and phys addr only. */
 	outw(SetRxFilter | RxStation | RxMulticast | RxBroadcast | RxProm,
-	     ioaddr + EL3_CMD);
+	     nic->ioaddr + EL3_CMD);
 
-	outw(RxEnable, ioaddr + EL3_CMD);	/* Enable the receiver. */
-	outw(TxEnable, ioaddr + EL3_CMD);	/* Enable transmitter. */
+	outw(RxEnable, nic->ioaddr + EL3_CMD);	/* Enable the receiver. */
+	outw(TxEnable, nic->ioaddr + EL3_CMD);	/* Enable transmitter. */
 	/* Allow status bits to be seen. */
 	outw(SetStatusEnb | AdapterFailure | IntReq | StatsFull |
 	     (vp->full_bus_master_tx ? DownComplete : TxAvailable) |
 	     (vp->full_bus_master_rx ? UpComplete : RxComplete) |
-	     (vp->bus_master ? DMADone : 0), ioaddr + EL3_CMD);
+	     (vp->bus_master ? DMADone : 0), nic->ioaddr + EL3_CMD);
 	/* Ack all pending events, and set active indicator mask. */
 	outw(AckIntr | IntLatch | TxAvailable | RxEarly | IntReq,
-	     ioaddr + EL3_CMD);
+	     nic->ioaddr + EL3_CMD);
 	outw(SetIntrEnb | IntLatch | TxAvailable | RxComplete | StatsFull
 	     | (vp->bus_master ? DMADone : 0) | UpComplete | DownComplete,
-	     ioaddr + EL3_CMD);
+	     nic->ioaddr + EL3_CMD);
 
 }
 
@@ -439,23 +422,23 @@ static int t515_poll(struct nic *nic, int retrieve)
 	short status, cst;
 	register short rx_fifo;
 
-	cst = inw(BASE + EL3_STATUS);
+	cst = inw(nic->ioaddr + EL3_STATUS);
 
 	if ((cst & RxComplete) == 0) {
 		/* Ack all pending events, and set active indicator mask. */
 		outw(AckIntr | IntLatch | TxAvailable | RxEarly | IntReq,
-		     BASE + EL3_CMD);
+		     nic->ioaddr + EL3_CMD);
 		outw(SetIntrEnb | IntLatch | TxAvailable | RxComplete |
 		     StatsFull | (vp->
 				  bus_master ? DMADone : 0) | UpComplete |
-		     DownComplete, BASE + EL3_CMD);
+		     DownComplete, nic->ioaddr + EL3_CMD);
 		return 0;
 	}
-	status = inw(BASE + RxStatus);
+	status = inw(nic->ioaddr + RxStatus);
 
 	if (status & RxDError) {
 		printf("RxDError\n");
-		outw(RxDiscard, BASE + EL3_CMD);
+		outw(RxDiscard, nic->ioaddr + EL3_CMD);
 		return 0;
 	}
 
@@ -465,54 +448,46 @@ static int t515_poll(struct nic *nic, int retrieve)
 
 	if ( ! retrieve ) return 1;
 
-#ifdef EDEBUG
-	printf("[l=%d", rx_fifo);
-#endif
-	insw(BASE + RX_FIFO, nic->packet, rx_fifo / 2);
+	DBG ( "[l=%d", rx_fifo );
+	insw(nic->ioaddr + RX_FIFO, nic->packet, rx_fifo / 2);
 	if (rx_fifo & 1)
-		nic->packet[rx_fifo - 1] = inb(BASE + RX_FIFO);
+		nic->packet[rx_fifo - 1] = inb(nic->ioaddr + RX_FIFO);
 	nic->packetlen = rx_fifo;
 
 	while (1) {
-		status = inw(BASE + RxStatus);
-#ifdef EDEBUG
-		printf("0x%hX*", status);
-#endif
+		status = inw(nic->ioaddr + RxStatus);
+		DBG ( "0x%hX*", status );
 		rx_fifo = status & RX_BYTES_MASK;
 
 		if (rx_fifo > 0) {
-			insw(BASE + RX_FIFO, nic->packet + nic->packetlen,
+			insw(nic->ioaddr + RX_FIFO, nic->packet + nic->packetlen,
 			     rx_fifo / 2);
 			if (rx_fifo & 1)
 				nic->packet[nic->packetlen + rx_fifo - 1] =
-				    inb(BASE + RX_FIFO);
+				    inb(nic->ioaddr + RX_FIFO);
 			nic->packetlen += rx_fifo;
-#ifdef EDEBUG
-			printf("+%d", rx_fifo);
-#endif
+			DBG ( "+%d", rx_fifo );
 		}
 		if ((status & RxComplete) == 0) {
-#ifdef EDEBUG
-			printf("=%d", nic->packetlen);
-#endif
+			DBG ( "=%d", nic->packetlen );
 			break;
 		}
 		udelay(1000);
 	}
 
 	/* acknowledge reception of packet */
-	outw(RxDiscard, BASE + EL3_CMD);
-	while (inw(BASE + EL3_STATUS) & CmdInProgress);
-#ifdef EDEBUG
+	outw(RxDiscard, nic->ioaddr + EL3_CMD);
+	while (inw(nic->ioaddr + EL3_STATUS) & CmdInProgress);
+#ifdef debug_3c515
 	{
 		unsigned short type = 0;
 		type = (nic->packet[12] << 8) | nic->packet[13];
 		if (nic->packet[0] + nic->packet[1] + nic->packet[2] +
 		    nic->packet[3] + nic->packet[4] + nic->packet[5] ==
 		    0xFF * ETH_ALEN)
-			printf(",t=0x%hX,b]", type);
+			DBG ( ",t=0x%hX,b]", type );
 		else
-			printf(",t=0x%hX]", type);
+			DBG ( ",t=0x%hX]", type );
 	}
 #endif
 
@@ -537,9 +512,7 @@ static void t515_transmit(struct nic *nic, const char *d,	/* Destination */
 	int pad;
 	int status;
 
-#ifdef EDEBUG
-	printf("{l=%d,t=0x%hX}", s + ETH_HLEN, t);
-#endif
+	DBG ( "{l=%d,t=0x%hX}", s + ETH_HLEN, t );
 
 	/* swap bytes of type */
 	t = htons(t);
@@ -557,36 +530,36 @@ static void t515_transmit(struct nic *nic, const char *d,	/* Destination */
 		return;
 	}
 	/* drop acknowledgements */
-	while ((status = inb(BASE + TxStatus)) & TxComplete) {
+	while ((status = inb(nic->ioaddr + TxStatus)) & TxComplete) {
 		/*if(status & (TXS_UNDERRUN|0x88|TXS_STATUS_OVERFLOW)) { */
-		outw(TxReset, BASE + EL3_CMD);
-		outw(TxEnable, BASE + EL3_CMD);
+		outw(TxReset, nic->ioaddr + EL3_CMD);
+		outw(TxEnable, nic->ioaddr + EL3_CMD);
 /*		}                                                          */
 
-		outb(0x0, BASE + TxStatus);
+		outb(0x0, nic->ioaddr + TxStatus);
 	}
 
-	while (inw(BASE + TxFree) < len + pad + 4) {
+	while (inw(nic->ioaddr + TxFree) < len + pad + 4) {
 		/* no room in FIFO */
 	}
 
-	outw(len, BASE + TX_FIFO);
-	outw(0x0, BASE + TX_FIFO);	/* Second dword meaningless */
+	outw(len, nic->ioaddr + TX_FIFO);
+	outw(0x0, nic->ioaddr + TX_FIFO);	/* Second dword meaningless */
 
 	/* write packet */
-	outsw(BASE + TX_FIFO, d, ETH_ALEN / 2);
-	outsw(BASE + TX_FIFO, nic->node_addr, ETH_ALEN / 2);
-	outw(t, BASE + TX_FIFO);
-	outsw(BASE + TX_FIFO, p, s / 2);
+	outsw(nic->ioaddr + TX_FIFO, d, ETH_ALEN / 2);
+	outsw(nic->ioaddr + TX_FIFO, nic->node_addr, ETH_ALEN / 2);
+	outw(t, nic->ioaddr + TX_FIFO);
+	outsw(nic->ioaddr + TX_FIFO, p, s / 2);
 
 	if (s & 1)
-		outb(*(p + s - 1), BASE + TX_FIFO);
+		outb(*(p + s - 1), nic->ioaddr + TX_FIFO);
 
 	while (pad--)
-		outb(0, BASE + TX_FIFO);	/* Padding */
+		outb(0, nic->ioaddr + TX_FIFO);	/* Padding */
 
 	/* wait for Tx complete */
-	while ((inw(BASE + EL3_STATUS) & CmdInProgress) != 0);
+	while ((inw(nic->ioaddr + EL3_STATUS) & CmdInProgress) != 0);
 }
 
 /**************************************************************************
@@ -602,15 +575,15 @@ static void t515_disable ( struct nic *nic ) {
 	   have no way to determine if this works */
 
 	/* Disable the receiver and transmitter. */
-	outw(RxDisable, BASE + EL3_CMD);
-	outw(TxDisable, BASE + EL3_CMD);
+	outw(RxDisable, nic->ioaddr + EL3_CMD);
+	outw(TxDisable, nic->ioaddr + EL3_CMD);
 
 	if (if_port == XCVR_10base2)
 		/* Turn off thinnet power.  Green! */
-		outw(StopCoax, BASE + EL3_CMD);
+		outw(StopCoax, nic->ioaddr + EL3_CMD);
 
 
-	outw(SetIntrEnb | 0x0000, BASE + EL3_CMD);
+	outw(SetIntrEnb | 0x0000, nic->ioaddr + EL3_CMD);
 #ifdef ISA_PNP
 	/*Deactivate */
 /*    ACTIVATE;
@@ -632,61 +605,6 @@ static void t515_irq(struct nic *nic __unused, irq_action_t action __unused)
   }
 }
 
-/**************************************************************************
-PROBE - Look for an adapter, this routine's visible to the outside
-You should omit the last argument struct pci_device * for a non-PCI NIC
-***************************************************************************/
-void config_pnp_device(void);
-
-static int t515_probe(struct dev *dev,
-		      unsigned short *probe_addrs __unused)
-{
-	struct nic *nic = (struct nic *) dev;
-	/* Direct copy from Beckers 3c515.c removing any ISAPNP sections */
-	int cards_found = 0;
-	static int ioaddr;
-#ifdef ISA_PNP
-	config_pnp_device();
-#endif
-	/* Check all locations on the ISA bus -- evil! */
-	for (ioaddr = 0x100; ioaddr < 0x400; ioaddr += 0x20) {
-		int irq;
-
-		/* Check the resource configuration for a matching ioaddr. */
-		if ((inw(ioaddr + 0x2002) & 0x1f0) != (ioaddr & 0x1f0))
-			continue;
-		/* Verify by reading the device ID from the EEPROM. */
-		{
-			int timer;
-			outw(EEPROM_Read + 7, ioaddr + Wn0EepromCmd);
-			/* Pause for at least 162 us. for the read to take place. */
-			for (timer = 4; timer >= 0; timer--) {
-				t3c515_wait(1);
-				if ((inw(ioaddr + Wn0EepromCmd) & 0x0200)
-				    == 0)
-					break;
-			}
-			if (inw(ioaddr + Wn0EepromData) != 0x6d50)
-				continue;
-		}
-		printf
-		    ("3c515 Resource configuration register 0x%hX, DCR 0x%hX.\n",
-		     inl(ioaddr + 0x2002), inw(ioaddr + 0x2000));
-		irq = inw(ioaddr + 0x2002) & 15;
-		BASE = ioaddr;
-		corkscrew_found_device(BASE, irq, CORKSCREW_ID,
-				       options[cards_found], nic);
-		cards_found++;
-	}
-	if (corkscrew_debug)
-		printf("%d 3c515 cards found.\n", cards_found);
-
-	if (cards_found > 0) {
-		t515_reset(nic);
-
-		nic->irqno    = 0;
-		nic->ioaddr   = BASE;
-static struct nic_operations t515_operations;
 static struct nic_operations t515_operations = {
 	.connect	= dummy_connect,
 	.poll		= t515_poll,
@@ -694,15 +612,50 @@ static struct nic_operations t515_operations = {
 	.irq		= t515_irq,
 	.disable	= t515_disable,
 };
-		nic->nic_op	= &t515_operations;
 
-		/* Based on PnP ISA map */
-		dev->devid.vendor_id = htons(ISAPNP_VENDOR('T', 'C', 'M'));
-		dev->devid.device_id = htons(0x5051);
-		return 1;
-	} else
+/**************************************************************************
+PROBE - Look for an adapter, this routine's visible to the outside
+You should omit the last argument struct pci_device * for a non-PCI NIC
+***************************************************************************/
+static int t515_probe ( struct dev *dev, struct isapnp_device *isapnp ) {
+	struct nic *nic = nic_device ( dev );
+	/* Direct copy from Beckers 3c515.c removing any ISAPNP sections */
+
+	nic->ioaddr = isapnp->ioaddr;
+	nic->irqno = isapnp->irqno;
+	activate_isapnp_device ( isapnp, 1 );
+
+	/* Check the resource configuration for a matching ioaddr. */
+	if ((unsigned)(inw(nic->ioaddr + 0x2002) & 0x1f0)
+	    != (nic->ioaddr & 0x1f0)) {
+		DBG ( "3c515 ioaddr mismatch\n" );
 		return 0;
+	}
 
+	/* Verify by reading the device ID from the EEPROM. */
+	{
+		int timer;
+		outw(EEPROM_Read + 7, nic->ioaddr + Wn0EepromCmd);
+		/* Pause for at least 162 us. for the read to take place. */
+		for (timer = 4; timer >= 0; timer--) {
+			t3c515_wait(1);
+			if ((inw(nic->ioaddr + Wn0EepromCmd) & 0x0200) == 0)
+				break;
+		}
+		if (inw(nic->ioaddr + Wn0EepromData) != 0x6d50) {
+			DBG ( "3c515 read incorrect vendor ID from EEPROM" );
+			return 0;
+		}
+
+	}
+	DBG ( "3c515 Resource configuration register 0x%hX, DCR 0x%hX.\n",
+	      inl(nic->ioaddr + 0x2002), inw(nic->ioaddr + 0x2000) );
+	corkscrew_found_device(nic->ioaddr, nic->irqno, CORKSCREW_ID,
+			       options, nic);
+	
+	t515_reset(nic);	
+	nic->nic_op	= &t515_operations;
+	return 1;
 }
 
 static int
@@ -733,7 +686,6 @@ corkscrew_probe1(int ioaddr, int irq, int product_index __unused,
 {
 	unsigned int eeprom[0x40], checksum = 0;	/* EEPROM contents */
 	int i;
-	ioaddr = BASE;
 
 	printf("3Com %s at 0x%hX, ", vp->product_name, ioaddr);
 
@@ -750,9 +702,7 @@ corkscrew_probe1(int ioaddr, int irq, int product_index __unused,
 				break;
 		}
 		eeprom[i] = inw(ioaddr + Wn0EepromData);
-#ifdef EDEBUG1
-		printf("Value %d: %hX        ", i, eeprom[i]);
-#endif
+		DBG ( "Value %d: %hX        ", i, eeprom[i] );
 		checksum ^= eeprom[i];
 		if (i < 3)
 			phys_addr[i] = htons(eeprom[i]);
@@ -767,9 +717,9 @@ corkscrew_probe1(int ioaddr, int irq, int product_index __unused,
 	}
 	printf(", IRQ %d\n", irq);
 	/* Tell them about an invalid IRQ. */
-	if (corkscrew_debug && (irq <= 0 || irq > 15))
-		printf
-		    (" *** Warning: this IRQ is unlikely to work! ***\n");
+	if ( (irq <= 0 || irq > 15) ) {
+		DBG (" *** Warning: this IRQ is unlikely to work! ***\n" );
+	}
 
 	{
 		char *ram_split[] = { "5:3", "3:1", "1:1", "3:5" };
@@ -777,10 +727,9 @@ corkscrew_probe1(int ioaddr, int irq, int product_index __unused,
 		EL3WINDOW(3);
 		vp->available_media = inw(ioaddr + Wn3_Options);
 		config.i = inl(ioaddr + Wn3_Config);
-		if (corkscrew_debug > 1)
-			printf
-			    ("  Internal config register is %4.4x, transceivers 0x%hX.\n",
-			     config.i, inw(ioaddr + Wn3_Options));
+		DBG ( "  Internal config register is %4.4x, "
+		      "transceivers 0x%hX.\n",
+		      config.i, inw(ioaddr + Wn3_Options) );
 		printf
 		    ("  %dK %s-wide RAM %s Rx:Tx split, %s%s interface.\n",
 		     8 << config.u.ram_size,
@@ -808,10 +757,14 @@ corkscrew_probe1(int ioaddr, int irq, int product_index __unused,
 	return 0;
 }
 
-static struct isa_driver t515_driver __isa_driver = {
-	.type = NIC_DRIVER,
-	.name = "3C515",
-	.probe = t515_probe,
-	.ioaddrs = 0,
+static struct isapnp_id t515_adapters[] = {
+	{ "3c515 (ISAPnP)", ISAPNP_VENDOR('T','C','M'), 0x5051 },
 };
-ISA_ROM("3c515","3c515, Fast EtherLink ISA");
+
+static struct isapnp_driver t515_driver =
+	ISAPNP_DRIVER ( "3c515", t515_adapters );
+
+BOOT_DRIVER ( "3c515", find_isapnp_boot_device, t515_driver,
+	      t515_probe );
+
+ISA_ROM ( "3c515", "3c515 Fast EtherLink ISAPnP" );
