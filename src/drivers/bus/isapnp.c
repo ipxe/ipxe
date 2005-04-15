@@ -190,14 +190,14 @@ static void isapnp_send_key ( void ) {
  *  Compute ISAPnP identifier checksum
  *
  */
-static uint8_t isapnp_checksum ( union isapnp_identifier *identifier ) {
+static uint8_t isapnp_checksum ( struct isapnp_identifier *identifier ) {
 	int i, j;
 	uint8_t lfsr;
 	uint8_t byte;
 
 	lfsr = ISAPNP_LFSR_SEED;
 	for ( i = 0 ; i < 8 ; i++ ) {
-		byte = identifier->bytes[i];
+		byte = ( (char *) identifier )[i];
 		for ( j = 0 ; j < 8 ; j++ ) {
 			lfsr = isapnp_lfsr_next ( lfsr, byte );
 			byte >>= 1;
@@ -243,6 +243,38 @@ static void isapnp_peek ( uint8_t *buf, size_t bytes ) {
 }
 
 /*
+ * Scan through the resource data until we find a particular tag, and
+ * read its contents into a buffer.
+ *
+ * It is the caller's responsibility to ensure that buf is large
+ * enough to contain a tag of the requested size.
+ *
+ */
+static int isapnp_find_tag ( uint8_t wanted_tag, uint8_t *buf ) {
+	uint8_t tag;
+	uint16_t len;
+
+	do {
+		tag = isapnp_peek_byte();
+		if ( ISAPNP_IS_SMALL_TAG ( tag ) ) {
+			len = ISAPNP_SMALL_TAG_LEN ( tag );
+			tag = ISAPNP_SMALL_TAG_NAME ( tag );
+		} else {
+			len = isapnp_peek_byte() + ( isapnp_peek_byte() << 8 );
+			tag = ISAPNP_LARGE_TAG_NAME ( tag );
+		}
+		DBG ( "ISAPnP read tag %hhx len %hhx\n", tag, len );
+		if ( tag == wanted_tag ) {
+			isapnp_peek ( buf, len );
+			return 1;
+		} else {
+			isapnp_peek ( NULL, len );
+		}
+	} while ( tag != ISAPNP_TAG_END );
+	return 0;
+}
+
+/*
  * Try isolating ISAPnP cards at the current read port.  Return the
  * number of ISAPnP cards found.
  *
@@ -251,7 +283,7 @@ static void isapnp_peek ( uint8_t *buf, size_t bytes ) {
  *
  */
 static int isapnp_try_isolate ( void ) {
-	union isapnp_identifier identifier;
+	struct isapnp_identifier identifier;
 	int i, j, seen55aa;
 	uint16_t data;
 	uint8_t byte;
@@ -306,7 +338,7 @@ static int isapnp_try_isolate ( void ) {
 				}
 				byte <<= 1;
 			}
-			identifier.bytes[i] = byte;
+			( (char *) &identifier )[i] = byte;
 			if ( byte ) {
 				seen55aa = 1;
 			}
@@ -319,7 +351,7 @@ static int isapnp_try_isolate ( void ) {
 
 		/* Give the device a CSN */
 		isapnp_max_csn++;
-		DBG ( "ISAPnP isolation found device "
+		DBG ( "ISAPnP isolation found card "
 		      "%hhx:%hhx:%hhx:%hhx:%hhx:%hhx:%hhx:%hhx "
 		      "(checksum %hhx), assigning CSN %hhx\n",
 		      identifier.bytes[0], identifier.bytes[1],
@@ -342,7 +374,7 @@ static int isapnp_try_isolate ( void ) {
 	isapnp_wait_for_key ();
 
 	/* Return number of cards found */
-	DBG ( "ISAPnP found %d devices at read port %hx\n", isapnp_read_port );
+	DBG ( "ISAPnP found %d cards at read port %hx\n", isapnp_read_port );
 	return isapnp_max_csn;
 }
 
@@ -374,7 +406,8 @@ static void isapnp_isolate ( void ) {
  *
  */
 static int fill_isapnp_device ( struct isapnp_device *isapnp ) {
-	union isapnp_identifier identifier;
+	unsigned int i;
+	struct isapnp_logdevid logdevid;
 	
 	/* Ensure that all ISAPnP cards have CSNs allocated to them,
 	 * if we haven't already done so.
@@ -383,38 +416,42 @@ static int fill_isapnp_device ( struct isapnp_device *isapnp ) {
 		isapnp_isolate();
 	}
 
-	/* Wake the specified CSN */
+	/* Wake the card */
 	isapnp_wait_for_key ();
 	isapnp_send_key ();
 	isapnp_wake ( isapnp->csn );
 
-	/* Read the identifier.  Do *not* verify the checksum, because
-	 * the PnP ISA spec explicitly states in section 4.5 that the
-	 * checksum is invalid except when read via the serial
-	 * isolation protocol.  (This is presumably to allow for lazy
-	 * card designers who implement the checksum using the LFSR
-	 * only and can't be bothered to write the same value into the
-	 * EPROM).
-	 */
-	isapnp_peek ( identifier.bytes, sizeof ( identifier ) );
+	/* Skip past the card identifier */
+	isapnp_peek ( NULL, sizeof ( struct isapnp_identifier ) );
+
+	/* Find the Logical Device ID tag corresponding to this device */
+	for ( i = 0 ; i <= isapnp->logdev ; i++ ) {
+		if ( ! isapnp_find_tag ( ISAPNP_TAG_LOGDEVID,
+					 ( char * ) &logdevid ) ) {
+			/* No tag for this device */
+			return 0;
+		}
+	}
 
 	/* Read information from identifier structure */
-	isapnp->vendor_id = identifier.vendor_id;
-	isapnp->prod_id = identifier.prod_id;
+	isapnp->vendor_id = logdevid.vendor_id;
+	isapnp->prod_id = logdevid.prod_id;
 
-	/* I/O addresses and IRQs are associated with logical devices,
-	 * not with cards.  They will be assigned when
-	 * activate_isapnp_device() is called.
-	 */
-	isapnp->ioaddr = 0;
-	isapnp->irqno = 0;
+	/* Select the logical device */
+	isapnp_logicaldevice ( isapnp->logdev );
+
+	/* Read the current ioaddr and irqno */
+	isapnp->ioaddr = isapnp_read_iobase ( 0 );
+	isapnp->irqno = isapnp_read_irqno ( 0 );
 
 	/* Return all cards to Wait for Key state */
 	isapnp_wait_for_key ();
 
-	DBG ( "ISAPnP found CSN %hhx ID %hx:%hx (\"%s\")\n",
-	      isapnp->csn, isapnp->vendor_id, isapnp->prod_id,
-	      isa_id_string ( isapnp->vendor_id, isapnp->prod_id ) );
+	DBG ( "ISAPnP found device %hhx.%hhx ID %hx:%hx (\"%s\"), "
+	      "base %hx irq %d\n",
+	      isapnp->csn, isapnp->logdev, isapnp->vendor_id, isapnp->prod_id,
+	      isa_id_string ( isapnp->vendor_id, isapnp->prod_id ),
+	      isapnp->ioaddr, isapnp->irqno );
 
 	return 1;
 }
@@ -438,31 +475,40 @@ int find_isapnp_device ( struct isapnp_device *isapnp,
 	 * left off.
 	 */
 	for ( ; isapnp->csn <= isapnp_max_csn ; isapnp->csn++ ) {
-		/* If we've already used this device, skip it */
-		if ( isapnp->already_tried ) {
-			isapnp->already_tried = 0;
-			continue;
-		}
-
-		/* Fill in device parameters */
-		if ( ! fill_isapnp_device ( isapnp ) ) {
-			continue;
-		}
-
-		/* Compare against driver's ID list */
-		for ( i = 0 ; i < driver->id_count ; i++ ) {
-			struct isapnp_id *id = &driver->ids[i];
+		for ( ; isapnp->logdev <= 0xff ; isapnp->logdev++ ) {
+			/* If we've already used this device, skip it */
+			if ( isapnp->already_tried ) {
+				isapnp->already_tried = 0;
+				continue;
+			}
 			
-			if ( ( isapnp->vendor_id == id->vendor_id ) &&
-			     ( ISA_PROD_ID ( isapnp->prod_id ) ==
-			       ISA_PROD_ID ( id->prod_id ) ) ) {
-				DBG ( "Device %s (driver %s) matches ID %s\n",
-				      id->name, driver->name,
-				      isa_id_string ( isapnp->vendor_id,
-						      isapnp->prod_id ) );
-				isapnp->name = id->name;
-				isapnp->already_tried = 1;
-				return 1;
+			/* Fill in device parameters */
+			if ( ! fill_isapnp_device ( isapnp ) ) {
+				/* If fill_isapnp_device fails, assume
+				 * that we've reached the last logical
+				 * device on this card, and proceed to
+				 * the next card.
+				 */
+				isapnp->logdev = 0;
+				break;
+			}
+
+			/* Compare against driver's ID list */
+			for ( i = 0 ; i < driver->id_count ; i++ ) {
+				struct isapnp_id *id = &driver->ids[i];
+				
+				if ( ( isapnp->vendor_id == id->vendor_id ) &&
+				     ( ISA_PROD_ID ( isapnp->prod_id ) ==
+				       ISA_PROD_ID ( id->prod_id ) ) ) {
+					DBG ( "Device %s (driver %s) "
+					      "matches ID %s\n",
+					      id->name, driver->name,
+					      isa_id_string( isapnp->vendor_id,
+							   isapnp->prod_id ) );
+					isapnp->name = id->name;
+					isapnp->already_tried = 1;
+					return 1;
+				}
 			}
 		}
 	}
@@ -492,8 +538,7 @@ int find_isapnp_boot_device ( struct dev *dev, struct isapnp_driver *driver ) {
 }
 
 /*
- * Activate a logical function on an ISAPnP device, and fill in the
- * ioaddr and irqno fields in the isapnp struct.
+ * Activate or deactivate an ISAPnP device
  *
  * This routine simply activates the device in its current
  * configuration.  It does not attempt any kind of resource
@@ -501,46 +546,20 @@ int find_isapnp_boot_device ( struct dev *dev, struct isapnp_driver *driver ) {
  *
  */
 void activate_isapnp_device ( struct isapnp_device *isapnp,
-			      uint8_t logdev ) {
-	/* Wake the device */
+			      int activate ) {
+	/* Wake the card and select the logical device */
 	isapnp_wait_for_key ();
 	isapnp_send_key ();
 	isapnp_wake ( isapnp->csn );
+	isapnp_logicaldevice ( isapnp->logdev );
 
-	/* Select the specified logical device */
-	isapnp_activate ( logdev );
+	/* Activate/deactivate the logical device */
+	isapnp_activate ( activate );
 	isapnp_delay();
 
-	/* Read the current ioaddr and irqno */
-	isapnp->ioaddr = isapnp_read_iobase ( 0 );
-	isapnp->irqno = isapnp_read_irqno ( 0 );
-	
 	/* Return all cards to Wait for Key state */
 	isapnp_wait_for_key ();
 
-	DBG ( "ISAPnP activated logical device %hhx on CSN %hhx "
-	      "with ioaddr %hx and IRQ %d\n",
-	      logdev, isapnp->csn, isapnp->ioaddr, isapnp->irqno );
-}
-
-/*
- * Deactivate a logical function on an ISAPnP device
- *
- */
-void deactivate_isapnp_device ( struct isapnp_device *isapnp,
-				uint8_t logdev ) {
-	/* Wake the device */
-	isapnp_wait_for_key ();
-	isapnp_send_key ();
-	isapnp_wake ( isapnp->csn );
-
-	/* Select the specified logical device */
-	isapnp_deactivate ( logdev );
-	isapnp_delay();
-	
-	/* Return all cards to Wait for Key state */
-	isapnp_wait_for_key ();
-
-	DBG ( "ISAPnP deactivated logical device %hhx on CSN %hhx\n",
-	      logdev, isapnp->csn );
+	DBG ( "ISAPnP activated device %hhx.%hhx\n",
+	      isapnp->csn, isapnp->logdev );
 }

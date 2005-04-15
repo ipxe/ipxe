@@ -81,7 +81,10 @@
 /* The LFSR used for the initiation key and for checksumming */
 #define ISAPNP_LFSR_SEED		0x6a
 
-/* Short  Tags */
+/* Small tags */
+#define ISAPNP_IS_SMALL_TAG(tag)	( ! ( (tag) & 0x80 ) )
+#define ISAPNP_SMALL_TAG_NAME(tag)	( ( (tag) >> 3 ) & 0xf )
+#define ISAPNP_SMALL_TAG_LEN(tag)	( ( (tag) & 0x7 ) )
 #define ISAPNP_TAG_PNPVERNO		0x01
 #define ISAPNP_TAG_LOGDEVID		0x02
 #define ISAPNP_TAG_COMPATDEVID		0x03
@@ -97,7 +100,9 @@
 #define ISAPNP_TAG_RSVDSHORTD		0x0D
 #define ISAPNP_TAG_VENDORSHORT		0x0E
 #define ISAPNP_TAG_END			0x0F
-/* Long  Tags */
+/* Large tags */
+#define ISAPNP_IS_LARGE_TAG(tag)	( ( (tag) & 0x80 ) )
+#define ISAPNP_LARGE_TAG_NAME(tag)	( (tag) & 0x7f )
 #define ISAPNP_TAG_MEMRANGE		0x81
 #define ISAPNP_TAG_ANSISTR		0x82
 #define ISAPNP_TAG_UNICODESTR		0x83
