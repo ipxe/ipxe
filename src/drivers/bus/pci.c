@@ -101,7 +101,7 @@ void adjust_pci_device ( struct pci_device *pci ) {
 	pci_read_config_byte ( pci, PCI_LATENCY_TIMER, &pci_latency);
 	if ( pci_latency < 32 ) {
 		DBG ( "%hhx:%hhx.%d : PCI latency timer (CFLT) "
-		      "is unreasonably low at %d. Setting to 32 clocks.\n",
+		      "is unreasonably low at %d. Setting to 32.\n",
 		      PCI_BUS ( pci->busdevfn ), PCI_DEV ( pci->busdevfn ),
 		      PCI_FUNC ( pci->busdevfn ), pci_latency );
 		pci_write_config_byte ( pci, PCI_LATENCY_TIMER, 32);
