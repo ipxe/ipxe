@@ -127,7 +127,7 @@ union isapnp_identifier {
 	char bytes[9];
 	struct {
 		uint16_t vendor_id;
-		uint16_t product_id;
+		uint16_t prod_id;
 		uint32_t serial;
 		uint8_t checksum;
 	} __attribute__ (( packed ));
@@ -183,5 +183,9 @@ extern int find_isapnp_device ( struct isapnp_device *isapnp,
 				struct isapnp_driver *driver );
 extern int find_isapnp_boot_device ( struct dev *dev,
 				     struct isapnp_driver *driver );
+extern void activate_isapnp_device ( struct isapnp_device *isapnp,
+				     uint8_t logdev );
+extern void deactivate_isapnp_device ( struct isapnp_device *isapnp,
+				       uint8_t logdev );
 
 #endif /* ISAPNP_H */

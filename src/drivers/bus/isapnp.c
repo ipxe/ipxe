@@ -35,7 +35,16 @@
 
 #include "etherboot.h"
 #include "timer.h"
+#include "io.h"
 #include "isapnp.h"
+
+/*
+ * Ensure that there is sufficient space in the shared dev_bus
+ * structure for a struct isapnp_device.
+ *
+ */
+DEV_BUS( struct isapnp_device, isapnp_dev );
+static char isapnp_magic[0]; /* guaranteed unique symbol */
 
 /*
  * We can have only one ISAPnP bus in a system.  Once the read port is
@@ -51,8 +60,6 @@
 static uint16_t isapnp_read_port;
 static uint16_t isapnp_max_csn;
 
-static const char initdata[] = INITDATA;
-
 /*
  * ISAPnP utility functions
  *
@@ -66,13 +73,18 @@ static inline void isapnp_write_data ( uint8_t data ) {
 	outb ( data, ISAPNP_WRITE_DATA );
 }
 
+static inline uint8_t isapnp_read_data ( void ) {
+	return inb ( isapnp_read_port );
+}
+
 static inline void isapnp_write_byte ( uint8_t address, uint8_t value ) {
 	isapnp_write_address ( address );
 	isapnp_write_data ( value );
 }
 
-static inline uint8_t isapnp_read_data ( void ) {
-	return inb ( isapnp_read_port );
+static inline uint8_t isapnp_read_byte ( uint8_t address ) {
+	isapnp_write_address ( address );
+	return isapnp_read_data ();
 }
 
 static inline void isapnp_set_read_port ( void ) {
@@ -95,8 +107,30 @@ static inline void isapnp_wake ( uint8_t csn ) {
 	isapnp_write_byte ( ISAPNP_WAKE, csn );
 }
 
+static inline uint8_t isapnp_read_resourcedata ( void ) {
+	return isapnp_read_byte ( ISAPNP_RESOURCEDATA );
+}
+
+static inline uint8_t isapnp_read_status ( void ) {
+	return isapnp_read_byte ( ISAPNP_STATUS );
+}
+
 static inline void isapnp_write_csn ( uint8_t csn ) {
 	isapnp_write_byte ( ISAPNP_CARDSELECTNUMBER, csn );
+}
+
+static inline void isapnp_logicaldevice ( uint8_t logdev ) {
+	isapnp_write_byte ( ISAPNP_LOGICALDEVICENUMBER, logdev );
+}
+
+static inline void isapnp_activate ( uint8_t logdev ) {
+	isapnp_logicaldevice ( logdev );
+	isapnp_write_byte ( ISAPNP_ACTIVATE, 1 );
+}
+
+static inline void isapnp_deactivate ( uint8_t logdev ) {
+	isapnp_logicaldevice ( logdev );
+	isapnp_write_byte ( ISAPNP_ACTIVATE, 0 );
 }
 
 /*
@@ -151,6 +185,42 @@ static uint8_t isapnp_checksum ( union isapnp_identifier *identifier ) {
 		}
 	}
 	return lfsr;
+}
+
+/*
+ * Read a byte of resource data from the current location
+ *
+ */
+static inline uint8_t isapnp_peek_byte ( void ) {
+	int i;
+
+	/* Wait for data to be ready */
+	for ( i = 0 ; i < 20 ; i ++ ) {
+		if ( isapnp_read_status() & 0x01 ) {
+			/* Byte ready - read it */
+			return isapnp_read_resourcedata();
+		}
+		udelay ( 100 );
+	}
+	/* Data never became ready - return 0xff */
+	return 0xff;
+}
+
+/*
+ * Read n bytes of resource data from the current location.  If buf is
+ * NULL, discard data.
+ *
+ */
+static void isapnp_peek ( uint8_t *buf, size_t bytes ) {
+	unsigned int i;
+	uint8_t byte;
+
+	for ( i = 0 ; i < bytes ; i++) {
+		byte = isapnp_peek_byte();
+		if ( buf ) {
+			buf[i] = byte;
+		}
+	}
 }
 
 /*
@@ -277,146 +347,6 @@ static void isapnp_isolate ( void ) {
 	}
 }
 
-
-
-
-
-
-/*
- *  Build device list for all present ISA PnP devices.
- */
-static int isapnp_build_device_list(void)
-{
-	int csn, device, vendor, serial;
-	unsigned char header[9], checksum;
-	for (csn = 1; csn <= 10; csn++) {
-		Wake(csn);
-		isapnp_peek(header, 9);
-		checksum = isapnp_checksum(header);
-#ifdef EDEBUG
-		printf
-		    ("vendor: 0x%hX:0x%hX:0x%hX:0x%hX:0x%hX:0x%hX:0x%hX:0x%hX:0x%hX\n",
-		     header[0], header[1], header[2], header[3], header[4],
-		     header[5], header[6], header[7], header[8]);
-		printf("checksum = 0xhX\n", checksum);
-#endif
-		/* Don't be strict on the checksum, here !
-		   e.g. 'SCM SwapBox Plug and Play' has header[8]==0 (should be: b7) */
-		if (header[8] == 0);
-		else if (checksum == 0x00 || checksum != header[8])	/* not valid CSN */
-			continue;
-
-		vendor = (header[1] << 8) | header[0];
-		device = (header[3] << 8) | header[2];
-		serial =
-		    (header[7] << 24) | (header[6] << 16) | (header[5] <<
-							     8) |
-		    header[4];
-		if (vendor == 0x6D50)
-			if (device == 0x5150) {
-				printf
-				    ("\nFound 3Com 3c515 PNP Card!\n Vendor ID: 0x%hX, Device ID: 0x%hX, Serial Num: 0x%hX\n",
-				     vendor, device, serial);
-				pnp_card_csn = csn;
-			}
-		isapnp_checksum_value = 0x00;
-	}
-	return 0;
-}
-
-int Config(int csn)
-{
-#define TIMEOUT_PNP     100
-	unsigned char id[IDENT_LEN];
-	int i, x;
-	Wake(csn);
-	udelay(1000);
-	for (i = 0; i < IDENT_LEN; i++) {
-		for (x = 1; x < TIMEOUT_PNP; x++) {
-			if (STATUS & 1)
-				break;
-			udelay(1000);
-		}
-		id[i] = RESOURCEDATA;
-#ifdef EDEBUG
-		printf(" 0x%hX ", id[i]);
-#endif
-	}
-#ifdef EDEBUG
-	printf("Got The status bit\n");
-#endif
-	/*Set Logical Device Register active */
-	LOGICALDEVICENUMBER;
-	/* Specify the first logical device */
-	WRITE_DATA(0);
-
-
-	/* Apparently just activating the card is enough
-	   for Etherboot to detect it.  Why bother with the
-	   following code.  Left in place in case it is
-	   later required  */
-/*==========================================*/
-	/* set DMA */
-/*    ADDRESS(0x74 + 0);
-    WRITE_DATA(7); */
-
-	/*Set IRQ */
-/*    udelay(1000);
-    ADDRESS(0x70 + (0 << 1));
-    WRITE_DATA(9);
-    udelay(1000); */
-/*=============================================*/
-	/*Activate */
-	ACTIVATE;
-	WRITE_DATA(1);
-	udelay(250);
-	/* Ask for access to the Wait for Key command - ConfigControl register */
-	CONFIGCONTROL;
-	/* Write the Wait for Key Command to the ConfigControl Register */
-	WRITE_DATA(CONFIG_WAIT_FOR_KEY);
-	/* As per doc. Two Write cycles of 0x00 required befor the Initialization key is sent */
-	ADDRESS(0);
-	ADDRESS(0);
-
-	return 1;
-}
-
-
-static void isapnp_peek(unsigned char *data, int bytes)
-{
-	int i, j;
-	unsigned char d = 0;
-
-	for (i = 1; i <= bytes; i++) {
-		for (j = 0; j < 20; j++) {
-			d = STATUS;
-			if (d & 1)
-				break;
-			udelay(100);
-		}
-		if (!(d & 1)) {
-			if (data != NULL)
-				*data++ = 0xff;
-			continue;
-		}
-		d = RESOURCEDATA;	/* PRESDI */
-		isapnp_checksum_value += d;
-		if (data != NULL)
-			*data++ = d;
-	}
-}
-
-
-
-
-/*
- * Ensure that there is sufficient space in the shared dev_bus
- * structure for a struct isapnp_device.
- *
- */
-DEV_BUS( struct isapnp_device, isapnp_dev );
-static char isapnp_magic[0]; /* guaranteed unique symbol */
-
 /*
  * Fill in parameters for an ISAPnP device based on CSN
  *
@@ -424,23 +354,45 @@ static char isapnp_magic[0]; /* guaranteed unique symbol */
  *
  */
 static int fill_isapnp_device ( struct isapnp_device *isapnp ) {
-
-	/*
-	 * Ensure that all ISAPnP cards have CSNs allocated to them,
+	union isapnp_identifier identifier;
+	
+	/* Ensure that all ISAPnP cards have CSNs allocated to them,
 	 * if we haven't already done so.
-	 *
 	 */
 	if ( ! isapnp_read_port ) {
 		isapnp_isolate();
 	}
 
-	/* wake csn, read config, send card to sleep */
+	/* Wake the specified CSN */
+	isapnp_wait_for_key ();
+	isapnp_send_key ();
+	isapnp_wake ( isapnp->csn );
+
+	/* Read the identifier and verify the checksum.  Allow
+	 * checksum = 0 to cope with cards that just generate the
+	 * checksum using the LFSR during serial isolation.
+	 */
+	isapnp_peek ( identifier.bytes, sizeof ( identifier ) );
+	if ( ( identifier.checksum != 0 ) &&
+	     ( identifier.checksum != isapnp_checksum ( &identifier ) ) ) {
+		DBG ( "ISAPnP invalid checksum on CSN %hhx "
+		      "(is %hhx, should be %hhx)\n", isapnp->csn,
+		      identifier.checksum, isapnp_checksum ( &identifier ) );
+		return 0;
+	}
+
+	/* Read information from identifier structure */
+	isapnp->vendor_id = identifier.vendor_id;
+	isapnp->prod_id = identifier.prod_id;
+
+	/* Return all cards to Wait for Key state */
+	isapnp_wait_for_key ();
 
 	DBG ( "ISAPnP found CSN %hhx ID %hx:%hx (\"%s\")\n",
 	      isapnp->csn, isapnp->vendor_id, isapnp->prod_id,
 	      isa_id_string ( isapnp->vendor_id, isapnp->prod_id ) );
 
-	return 0;
+	return 1;
 }
 
 /*
@@ -513,4 +465,46 @@ int find_isapnp_boot_device ( struct dev *dev, struct isapnp_driver *driver ) {
 	dev->devid.device_id = isapnp->prod_id;
 
 	return 1;
+}
+
+/*
+ * Activate a logical function on an ISAPnP device
+ *
+ * This routine simply activates the device in its current
+ * configuration.  It does not attempt any kind of resource
+ * arbitration.
+ *
+ */
+void activate_isapnp_device ( struct isapnp_device *isapnp,
+			      uint8_t logdev ) {
+	/* Wake the device */
+	isapnp_wait_for_key ();
+	isapnp_send_key ();
+	isapnp_wake ( isapnp->csn );
+
+	/* Select the specified logical device */
+	isapnp_activate ( logdev );
+	udelay ( 1000 );
+	
+	/* Return all cards to Wait for Key state */
+	isapnp_wait_for_key ();
+}
+
+/*
+ * Deactivate a logical function on an ISAPnP device
+ *
+ */
+void deactivate_isapnp_device ( struct isapnp_device *isapnp,
+			      uint8_t logdev ) {
+	/* Wake the device */
+	isapnp_wait_for_key ();
+	isapnp_send_key ();
+	isapnp_wake ( isapnp->csn );
+
+	/* Select the specified logical device */
+	isapnp_deactivate ( logdev );
+	udelay ( 1000 );
+	
+	/* Return all cards to Wait for Key state */
+	isapnp_wait_for_key ();
 }
