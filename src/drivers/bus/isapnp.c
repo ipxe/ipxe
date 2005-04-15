@@ -374,18 +374,15 @@ static int fill_isapnp_device ( struct isapnp_device *isapnp ) {
 	isapnp_send_key ();
 	isapnp_wake ( isapnp->csn );
 
-	/* Read the identifier and verify the checksum.  Allow
-	 * checksum = 0 to cope with cards that just generate the
-	 * checksum using the LFSR during serial isolation.
+	/* Read the identifier.  Do *not* verify the checksum, because
+	 * the PnP ISA spec explicitly states in section 4.5 that the
+	 * checksum is invalid except when read via the serial
+	 * isolation protocol.  (This is presumably to allow for lazy
+	 * card designers who implement the checksum using the LFSR
+	 * only and can't be bothered to write the same value into the
+	 * EPROM).
 	 */
 	isapnp_peek ( identifier.bytes, sizeof ( identifier ) );
-	if ( ( identifier.checksum != 0 ) &&
-	     ( identifier.checksum != isapnp_checksum ( &identifier ) ) ) {
-		DBG ( "ISAPnP invalid checksum on CSN %hhx "
-		      "(is %hhx, should be %hhx)\n", isapnp->csn,
-		      identifier.checksum, isapnp_checksum ( &identifier ) );
-		return 0;
-	}
 
 	/* Read information from identifier structure */
 	isapnp->vendor_id = identifier.vendor_id;
