@@ -126,14 +126,21 @@
  * An ISAPnP serial identifier
  *
  */
-union isapnp_identifier {
-	char bytes[9];
-	struct {
-		uint16_t vendor_id;
-		uint16_t prod_id;
-		uint32_t serial;
-		uint8_t checksum;
-	} __attribute__ (( packed ));
+struct isapnp_identifier {
+	uint16_t vendor_id;
+	uint16_t prod_id;
+	uint32_t serial;
+	uint8_t checksum;
+} __attribute__ (( packed ));
+
+/*
+ * An ISAPnP logical device ID structure
+ *
+ */
+struct isapnp_logdevid {
+	uint16_t vendor_id;
+	uint16_t prod_id;
+	uint16_t flags;
 } __attribute__ (( packed ));
 
 /*
@@ -143,7 +150,8 @@ union isapnp_identifier {
 struct isapnp_device {
 	char *magic; /* must be first */
 	const char *name;
-	unsigned char csn;
+	uint8_t csn;
+	uint8_t logdev;
 	uint16_t vendor_id;
 	uint16_t prod_id;
 	uint16_t ioaddr;
@@ -189,8 +197,6 @@ extern int find_isapnp_device ( struct isapnp_device *isapnp,
 extern int find_isapnp_boot_device ( struct dev *dev,
 				     struct isapnp_driver *driver );
 extern void activate_isapnp_device ( struct isapnp_device *isapnp,
-				     uint8_t logdev );
-extern void deactivate_isapnp_device ( struct isapnp_device *isapnp,
-				       uint8_t logdev );
+				     int active );
 
 #endif /* ISAPNP_H */
