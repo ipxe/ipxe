@@ -79,48 +79,48 @@
 					  ISAPNP_CONFIG_RESET_CSN )
 
 /* The LFSR used for the initiation key and for checksumming */
-#define ISAPNP_LFSR_SEED	0x6a
+#define ISAPNP_LFSR_SEED		0x6a
 
 /* Short  Tags */
-#define PnPVerNo_TAG		0x01
-#define LogDevId_TAG		0x02
-#define CompatDevId_TAG		0x03
-#define IRQ_TAG			0x04
-#define DMA_TAG			0x05
-#define StartDep_TAG		0x06
-#define EndDep_TAG		0x07
-#define IOport_TAG		0x08
-#define FixedIO_TAG		0x09
-#define RsvdShortA_TAG		0x0A
-#define RsvdShortB_TAG		0x0B
-#define RsvdShortC_TAG		0x0C
-#define RsvdShortD_TAG		0x0D
-#define VendorShort_TAG		0x0E
-#define End_TAG			0x0F
+#define ISAPNP_TAG_PNPVERNO		0x01
+#define ISAPNP_TAG_LOGDEVID		0x02
+#define ISAPNP_TAG_COMPATDEVID		0x03
+#define ISAPNP_TAG_IRQ			0x04
+#define ISAPNP_TAG_DMA			0x05
+#define ISAPNP_TAG_STARTDEP		0x06
+#define ISAPNP_TAG_ENDDEP		0x07
+#define ISAPNP_TAG_IOPORT		0x08
+#define ISAPNP_TAG_FIXEDIO		0x09
+#define ISAPNP_TAG_RSVDSHORTA		0x0A
+#define ISAPNP_TAG_RSVDSHORTB		0x0B
+#define ISAPNP_TAG_RSVDSHORTC		0x0C
+#define ISAPNP_TAG_RSVDSHORTD		0x0D
+#define ISAPNP_TAG_VENDORSHORT		0x0E
+#define ISAPNP_TAG_END			0x0F
 /* Long  Tags */
-#define MemRange_TAG		0x81
-#define ANSIstr_TAG		0x82
-#define UNICODEstr_TAG		0x83
-#define VendorLong_TAG		0x84
-#define Mem32Range_TAG		0x85
-#define FixedMem32Range_TAG	0x86
-#define RsvdLong0_TAG		0xF0
-#define RsvdLong1_TAG		0xF1
-#define RsvdLong2_TAG		0xF2
-#define RsvdLong3_TAG		0xF3
-#define RsvdLong4_TAG		0xF4
-#define RsvdLong5_TAG		0xF5
-#define RsvdLong6_TAG		0xF6
-#define RsvdLong7_TAG		0xF7
-#define RsvdLong8_TAG		0xF8
-#define RsvdLong9_TAG		0xF9
-#define RsvdLongA_TAG		0xFA
-#define RsvdLongB_TAG		0xFB
-#define RsvdLongC_TAG		0xFC
-#define RsvdLongD_TAG		0xFD
-#define RsvdLongE_TAG		0xFE
-#define RsvdLongF_TAG		0xFF
-#define NewBoard_PSEUDOTAG	0x100
+#define ISAPNP_TAG_MEMRANGE		0x81
+#define ISAPNP_TAG_ANSISTR		0x82
+#define ISAPNP_TAG_UNICODESTR		0x83
+#define ISAPNP_TAG_VENDORLONG		0x84
+#define ISAPNP_TAG_MEM32RANGE		0x85
+#define ISAPNP_TAG_FIXEDMEM32RANGE	0x86
+#define ISAPNP_TAG_RSVDLONG0		0xF0
+#define ISAPNP_TAG_RSVDLONG1		0xF1
+#define ISAPNP_TAG_RSVDLONG2		0xF2
+#define ISAPNP_TAG_RSVDLONG3		0xF3
+#define ISAPNP_TAG_RSVDLONG4		0xF4
+#define ISAPNP_TAG_RSVDLONG5		0xF5
+#define ISAPNP_TAG_RSVDLONG6		0xF6
+#define ISAPNP_TAG_RSVDLONG7		0xF7
+#define ISAPNP_TAG_RSVDLONG8		0xF8
+#define ISAPNP_TAG_RSVDLONG9		0xF9
+#define ISAPNP_TAG_RSVDLONGA		0xFA
+#define ISAPNP_TAG_RSVDLONGB		0xFB
+#define ISAPNP_TAG_RSVDLONGC		0xFC
+#define ISAPNP_TAG_RSVDLONGD		0xFD
+#define ISAPNP_TAG_RSVDLONGE		0xFE
+#define ISAPNP_TAG_RSVDLONGF		0xFF
+#define ISAPNP_TAG_PSEUDO_NEWBOARD	0x100
 
 /*
  * An ISAPnP serial identifier
