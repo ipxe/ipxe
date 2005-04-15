@@ -184,6 +184,7 @@ int main ( void ) {
 		if ( ! find_boot_device ( &dev ) ) {
 			/* Reached end of device list */
 			printf ( "No more boot devices\n" );
+			sleep ( 2 );
 			continue;
 		}
 
