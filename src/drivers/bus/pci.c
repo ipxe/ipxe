@@ -180,9 +180,9 @@ int find_pci_device ( struct pci_device *pci,
 			}
 		}
 	} while ( ++pci->busdevfn );
-	DBG ( "PCI failed to find device matching driver %s\n", driver->name );
 
 	/* No device found */
+	DBG ( "PCI found no device matching driver %s\n", driver->name );
 	return 0;
 }
 

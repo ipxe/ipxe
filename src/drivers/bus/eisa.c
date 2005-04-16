@@ -63,6 +63,7 @@ int find_eisa_device ( struct eisa_device *eisa, struct eisa_driver *driver ) {
 	/* Iterate through all possible EISA slots, starting where we
 	 * left off.
 	 */
+	DBG ( "EISA searching for device matching driver %s\n", driver->name );
 	for ( ; eisa->slot <= EISA_MAX_SLOT ; eisa->slot++ ) {
 		/* If we've already used this device, skip it */
 		if ( eisa->already_tried ) {
@@ -82,10 +83,12 @@ int find_eisa_device ( struct eisa_device *eisa, struct eisa_driver *driver ) {
 			if ( ( eisa->mfg_id == id->mfg_id ) &&
 			     ( ISA_PROD_ID ( eisa->prod_id ) ==
 			       ISA_PROD_ID ( id->prod_id ) ) ) {
-				DBG ( "Device %s (driver %s) matches ID %s\n",
-				      id->name, driver->name,
+				DBG ( "EISA found ID %hx:%hx (\"%s\") "
+				      "(device %s) matching driver %s\n",
+				      eisa->mfg_id, eisa->prod_id,
 				      isa_id_string ( eisa->mfg_id,
-						      eisa->prod_id ) );
+						      eisa->prod_id ),
+				      id->name, driver->name );
 				eisa->name = id->name;
 				eisa->already_tried = 1;
 				return 1;
@@ -94,6 +97,7 @@ int find_eisa_device ( struct eisa_device *eisa, struct eisa_driver *driver ) {
 	}
 
 	/* No device found */
+	DBG ( "EISA found no device matching driver %s\n", driver->name );
 	eisa->slot = EISA_MIN_SLOT;
 	return 0;
 }
