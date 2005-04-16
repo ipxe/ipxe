@@ -395,9 +395,6 @@ static int isapnp_try_isolate ( void ) {
 	/* Return number of cards found */
 	DBG ( "ISAPnP found %d cards at read port %hx\n",
 	      isapnp_max_csn, isapnp_read_port );
-
-	getchar();
-
 	return isapnp_max_csn;
 }
 
