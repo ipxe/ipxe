@@ -73,7 +73,7 @@ static int fill_pci_device ( struct pci_device *pci ) {
 		pci_read_config_byte ( pci, PCI_INTERRUPT_LINE, &pci->irq );
 	}
 
-	DBG ( "PCI found %hhx:%hhx.%d Class %hx: %hx:%hx (rev %hhx)\n",
+	DBG ( "PCI found device %hhx:%hhx.%d Class %hx: %hx:%hx (rev %hhx)\n",
 	      PCI_BUS ( pci->busdevfn ), PCI_DEV ( pci->busdevfn ),
 	      PCI_FUNC ( pci->busdevfn ), pci->class, pci->vendor, pci->dev_id,
 	      pci->revision );
@@ -92,7 +92,7 @@ void adjust_pci_device ( struct pci_device *pci ) {
 	pci_read_config_word ( pci, PCI_COMMAND, &pci_command );
 	new_command = pci_command | PCI_COMMAND_MASTER | PCI_COMMAND_IO;
 	if ( pci_command != new_command ) {
-		DBG ( "%hhx:%hhx.%d : PCI BIOS has not enabled this device! "
+		DBG ( "PCI BIOS has not enabled device %hhx:%hhx.%d! "
 		      "Updating PCI command %hX->%hX\n",
 		      PCI_BUS ( pci->busdevfn ), PCI_DEV ( pci->busdevfn ),
 		      PCI_FUNC ( pci->busdevfn ), pci_command, new_command );
@@ -100,8 +100,8 @@ void adjust_pci_device ( struct pci_device *pci ) {
 	}
 	pci_read_config_byte ( pci, PCI_LATENCY_TIMER, &pci_latency);
 	if ( pci_latency < 32 ) {
-		DBG ( "%hhx:%hhx.%d : PCI latency timer (CFLT) "
-		      "is unreasonably low at %d. Setting to 32.\n",
+		DBG ( "PCI device %hhx:%hhx.%d latency timer is "
+		      "unreasonably low at %d. Setting to 32.\n",
 		      PCI_BUS ( pci->busdevfn ), PCI_DEV ( pci->busdevfn ),
 		      PCI_FUNC ( pci->busdevfn ), pci_latency );
 		pci_write_config_byte ( pci, PCI_LATENCY_TIMER, 32);
@@ -139,7 +139,8 @@ int find_pci_device ( struct pci_device *pci,
 	/* Iterate through all possible PCI bus:dev.fn combinations,
 	 * starting where we left off.
 	 */
-	for ( ; pci->busdevfn <= 0xffff ; pci->busdevfn++ ) {
+	DBG ( "PCI searching for device matching driver %s\n", driver->name );
+	do {
 		/* If we've already used this device, skip it */
 		if ( pci->already_tried ) {
 			pci->already_tried = 0;
@@ -157,8 +158,8 @@ int find_pci_device ( struct pci_device *pci,
 		/* If driver has a class, and class matches, use it */
 		if ( driver->class && 
 		     ( driver->class == pci->class ) ) {
-			DBG ( "Driver %s matches class %hx\n",
-			      driver->name, driver->class );
+			DBG ( "PCI found class %hx matching driver %s\n",
+			      driver->class, driver->name );
 			pci->name = driver->name;
 			pci->already_tried = 1;
 			return 1;
@@ -170,17 +171,16 @@ int find_pci_device ( struct pci_device *pci,
 			
 			if ( ( pci->vendor == id->vendor ) &&
 			     ( pci->dev_id == id->dev_id ) ) {
-				DBG ( "Device %s (driver %s) matches "
-				      "ID %hx:%hx\n", id->name, driver->name,
-				      id->vendor, id->dev_id );
+				DBG ( "PCI found ID %hx:%hx (device %s) "
+				      "matching driver %s\n", id->vendor,
+				      id->dev_id, id->name, driver->name );
 				pci->name = id->name;
 				pci->already_tried = 1;
 				return 1;
 			}
 		}
-
-		DBG ( "No match in driver %s\n", driver->name );
-	}
+	} while ( ++pci->busdevfn );
+	DBG ( "PCI failed to find device matching driver %s\n", driver->name );
 
 	/* No device found */
 	return 0;
