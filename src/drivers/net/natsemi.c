@@ -253,6 +253,8 @@ natsemi_probe ( struct dev *dev, struct pci_device *pci ) {
     if (pci->ioaddr == 0)
         return 0;
 
+    adjust_pci_device(pci);
+
     /* initialize some commonly used globals */
 	
     nic->irqno  = 0;

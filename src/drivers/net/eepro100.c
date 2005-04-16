@@ -620,6 +620,8 @@ static int eepro100_probe ( struct dev *dev, struct pci_device *p ) {
 	ioaddr = p->ioaddr;
 	nic->ioaddr = ioaddr;
 
+	adjust_pci_device(p);
+
 	/* Copy IRQ from PCI information */
 	nic->irqno = p->irq;
 

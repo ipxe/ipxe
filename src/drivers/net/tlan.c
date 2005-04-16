@@ -794,6 +794,9 @@ static int tlan_probe ( struct dev *dev, struct pci_device *pci ) {
 	nic->ioaddr = pci->ioaddr;
 
 	BASE = pci->ioaddr;
+
+	/* Set nic as PCI bus master */
+	adjust_pci_device(pci);
 	
 	/* Point to private storage */
 	priv = &TLanPrivateInfo;

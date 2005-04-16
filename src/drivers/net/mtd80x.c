@@ -684,6 +684,8 @@ static int mtd_probe ( struct dev *dev, struct pci_device *pci ) {
     /* Mask the bit that says "this is an io addr" */
     mtdx.ioaddr = pci->ioaddr;
 
+    adjust_pci_device(pci);
+
     mtdx.nic_name = dev->name;
     mtdx.dev_id = pci->dev_id;
 

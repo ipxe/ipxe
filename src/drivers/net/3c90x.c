@@ -703,6 +703,8 @@ static int a3c90x_probe ( struct dev *dev, struct pci_device *pci ) {
     if (pci->ioaddr == 0)
           return 0;
 
+    adjust_pci_device(pci);
+
     nic->ioaddr = pci->ioaddr;
     nic->irqno = 0;
 

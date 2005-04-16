@@ -3239,6 +3239,8 @@ static int tg3_probe ( struct dev *dev, struct pci_device *pdev ) {
 
 	memset(tp, 0, sizeof(*tp));
 
+	adjust_pci_device(pdev);
+
 	nic->irqno  = 0;
 	nic->ioaddr = pdev->ioaddr;
 
@@ -3342,7 +3344,6 @@ static int tg3_probe ( struct dev *dev, struct pci_device *pdev ) {
 	}
 
 	nic->nic_op	= &tg3_operations;
-
 	return 1;
 
  err_out_iounmap:

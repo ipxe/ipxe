@@ -185,9 +185,6 @@ int find_pci_device ( struct pci_device *pci,
 			continue;
 		}
 		
-		/* Fix up PCI device */
-		adjust_pci_device ( pci );
-		
 		/* If driver has a class, and class matches, use it */
 		if ( driver->class && 
 		     ( driver->class == pci->class ) ) {

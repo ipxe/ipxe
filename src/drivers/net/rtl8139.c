@@ -194,6 +194,8 @@ static int rtl8139_probe ( struct dev *dev, struct pci_device *pci ) {
 	nic->ioaddr = pci->ioaddr;
 	nic->irqno = pci->irq;
 
+	adjust_pci_device(pci);
+
 	/* Bring the chip out of low-power mode. */
 	outb(0x00, nic->ioaddr + Config1);
 

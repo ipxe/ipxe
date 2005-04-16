@@ -962,12 +962,11 @@ rhine_probe ( struct dev *dev, struct pci_device *pci ) {
 	return 0;
     rhine_probe1 (nic, pci, pci->ioaddr, pci->dev_id, -1);
 
+    adjust_pci_device ( pci );
     rhine_reset (nic);
     nic->nic_op	= &rhine_operations;
     nic->irqno	  = pci->irq;
     nic->ioaddr   = tp->ioaddr;
-
-
     return 1;
 }
 
