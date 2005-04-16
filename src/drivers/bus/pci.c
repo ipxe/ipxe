@@ -10,6 +10,13 @@ DEV_BUS( struct pci_device, pci_dev );
 static char pci_magic[0]; /* guaranteed unique symbol */
 
 /*
+ * pci_io.c may know how many buses we have, in which case it can
+ * overwrite this value.
+ *
+ */
+unsigned int pci_max_bus = 0xff;
+
+/*
  * Fill in parameters (vendor & device ids, class, membase etc.) for a
  * PCI device based on bus & devfn.
  *
@@ -18,6 +25,10 @@ static char pci_magic[0]; /* guaranteed unique symbol */
 static int fill_pci_device ( struct pci_device *pci ) {
 	uint32_t l;
 	int reg;
+
+	/* Check bus is within range */
+	if ( PCI_BUS ( pci->busdevfn ) > pci_max_bus )
+		return 0;
 	
 	/* Check to see if there's anything physically present.
 	 */

@@ -56,8 +56,10 @@ static int have_pcibios;
 /* Macro for calling a 32-bit entry point with flat physical
  * addresses.  Use in a statement such as
  * __asm__ ( FLAT_FAR_CALL_ESI,
- *	     : <output registers>
+ *	     : "=S" ( discard, or real output ), <other output registers>
  *	     : "S" ( entry_point ), <other input registers> );
+ * "=S" *must* be specified as an output, otherwise the compiler will
+ * assume that it remains unaltered.
  */
 #define FLAT_FAR_CALL_ESI "call _virt_to_phys\n\t" \
 			  "pushl %%cs\n\t" \
@@ -135,18 +137,20 @@ static void find_pcibios16 ( void ) {
 	uint32_t signature;
 	uint16_t flags;
 	uint16_t revision;
+	uint8_t max_bus;
 
 	/* PCI BIOS installation check */
 	REAL_EXEC ( rm_pcibios_check,
 		    "int $0x1a\n\t"
 		    "pushfw\n\t"
-		    "popw %%cx\n\t",
-		    4,
+		    "popw %%si\n\t",
+		    5,
 		    OUT_CONSTRAINTS ( "=a" ( present ), "=b" ( revision ),
-				      "=c" ( flags ), "=d" ( signature ) ),
+				      "=c" ( max_bus ), "=d" ( signature ),
+				      "=S" ( flags ) ),
 		    IN_CONSTRAINTS ( "a" ( ( PCIBIOS_PCI_FUNCTION_ID << 8 ) +
 					   PCIBIOS_PCI_BIOS_PRESENT ) ),
-		    CLOBBER ( "esi", "edi", "ebp" ) );
+		    CLOBBER ( "edi", "ebp" ) );
 
 	if ( ( flags & CF ) ||
 	     ( ( present >> 8 ) != 0 ) ||
@@ -156,8 +160,9 @@ static void find_pcibios16 ( void ) {
 	}
 
 	/* We have a PCI BIOS */
-	DBG ( "Found 16-bit PCI BIOS interface\n" );
+	DBG ( "Found 16-bit PCI BIOS interface with %d buses\n", max_bus + 1 );
 	have_pcibios = 1;
+	pci_max_bus = max_bus;
 	return;
 }
 
@@ -280,7 +285,7 @@ static void find_pcibios32 ( void ) {
 	uint16_t present;
 	uint32_t flags;
 	uint16_t revision;
-	uint32_t discard;
+	uint8_t max_bus;
 
 	/* Locate BIOS32 service directory */
 	bios32 = find_bios32 ();
@@ -299,9 +304,9 @@ static void find_pcibios32 ( void ) {
 	/* PCI BIOS installation check */
 	__asm__ ( FLAT_FAR_CALL_ESI
 		  "pushfl\n\t"
-		  "popl %%ecx\n\t"
-		  : "=a" ( present ), "=b" ( revision ), "=c" ( flags ),
-		    "=d" ( signature ), "=S" ( discard )
+		  "popl %%esi\n\t"
+		  : "=a" ( present ), "=b" ( revision ), "=c" ( max_bus ),
+		    "=d" ( signature ), "=S" ( flags )
 		  : "a" ( ( PCIBIOS_PCI_FUNCTION_ID << 8 )
 			  + PCIBIOS_PCI_BIOS_PRESENT ),
 		    "S" ( pcibios32_entry )
@@ -315,8 +320,10 @@ static void find_pcibios32 ( void ) {
 	}
 
 	/* We have a PCI BIOS */
-	DBG ( "Found 32-bit PCI BIOS interface at %#x\n", pcibios32_entry );
+	DBG ( "Found 32-bit PCI BIOS interface at %#x with %d bus(es)\n",
+	      pcibios32_entry, max_bus + 1 );
 	have_pcibios = 1;
+	pci_max_bus = max_bus;
 	return;
 }
 
@@ -435,7 +442,7 @@ int pci_write_config_dword ( struct pci_device *pci, unsigned int where,
 		pcibios_write_config_dword ( pci, where, value ) :
 		pcidirect_write_config_dword ( pci, where, value );
 }
-		
+
 unsigned long pci_bus_base ( struct pci_device *pci __unused ) {
 	/* architecturally this must be 0 */
 	return 0;

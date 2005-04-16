@@ -319,6 +319,13 @@ extern int pci_write_config_dword ( struct pci_device *dev, unsigned int where,
 extern unsigned long pci_bus_base ( struct pci_device *dev );
 
 /*
+ * pci_io.c is allowed to overwrite pci_max_bus if it knows what the
+ * highest bus in the system will be.
+ *
+ */
+extern unsigned int pci_max_bus;
+
+/*
  * Functions in pci.c
  *
  */
