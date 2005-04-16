@@ -473,6 +473,8 @@ int find_isapnp_device ( struct isapnp_device *isapnp,
 	/* Iterate through all possible ISAPNP CSNs, starting where we
 	 * left off.
 	 */
+	DBG ( "ISAPnP searching for device matching driver %s\n",
+	      driver->name );
 	for ( ; isapnp->csn <= isapnp_max_csn ; isapnp->csn++ ) {
 		for ( ; isapnp->logdev <= 0xff ; isapnp->logdev++ ) {
 			/* If we've already used this device, skip it */
@@ -499,11 +501,14 @@ int find_isapnp_device ( struct isapnp_device *isapnp,
 				if ( ( isapnp->vendor_id == id->vendor_id ) &&
 				     ( ISA_PROD_ID ( isapnp->prod_id ) ==
 				       ISA_PROD_ID ( id->prod_id ) ) ) {
-					DBG ( "Device %s (driver %s) "
-					      "matches ID %s\n",
-					      id->name, driver->name,
+					DBG ( "ISAPnP found ID %hx:%hx "
+					      "(\"%s\") (device %s) "
+					      "matching driver %s\n",
+					      isapnp->vendor_id,
+					      isapnp->prod_id,
 					      isa_id_string( isapnp->vendor_id,
-							   isapnp->prod_id ) );
+							     isapnp->prod_id ),
+					      id->name, driver->name );
 					isapnp->name = id->name;
 					isapnp->already_tried = 1;
 					return 1;
@@ -513,6 +518,7 @@ int find_isapnp_device ( struct isapnp_device *isapnp,
 	}
 
 	/* No device found */
+	DBG ( "ISAPnP found no device matching driver %s\n", driver->name );
 	isapnp->csn = 1;
 	return 0;
 }

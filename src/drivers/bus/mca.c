@@ -22,7 +22,7 @@ static char mca_magic[0]; /* guaranteed unique symbol */
  *
  */
 static int fill_mca_device ( struct mca_device *mca ) {
-	unsigned int i;
+	unsigned int i, seen_non_ff;
 
 	/* Make sure motherboard setup is off */
 	outb_p ( 0xff, MCA_MOTHERBOARD_SETUP_REG );
@@ -31,10 +31,19 @@ static int fill_mca_device ( struct mca_device *mca ) {
 	outb_p ( 0x8 | ( mca->slot & 0xf ), MCA_ADAPTER_SETUP_REG );
 
 	/* Read the POS registers */
+	seen_non_ff = 0;
 	for ( i = 0 ; i < ( sizeof ( mca->pos ) / sizeof ( mca->pos[0] ) ) ;
 	      i++ ) {
 		mca->pos[i] = inb_p ( MCA_POS_REG ( i ) );
+		if ( mca->pos[i] != 0xff )
+			seen_non_ff = 1;
 	}
+	
+	/* If all POS registers are 0xff, this means there's no device
+	 * present
+	 */
+	if ( ! seen_non_ff )
+		return 0;
 
 	/* Kill all setup modes */
 	outb_p ( 0, MCA_ADAPTER_SETUP_REG );
@@ -64,6 +73,7 @@ int find_mca_device ( struct mca_device *mca, struct mca_driver *driver ) {
 	/* Iterate through all possible MCA slots, starting where we
 	 * left off
 	 */
+	DBG ( "MCA searching for device matching driver %s\n", driver->name );
 	for ( ; mca->slot < MCA_MAX_SLOT_NR ; mca->slot++ ) {
 		/* If we've already used this device, skip it */
 		if ( mca->already_tried ) {
@@ -81,8 +91,9 @@ int find_mca_device ( struct mca_device *mca, struct mca_driver *driver ) {
 			struct mca_id *id = &driver->ids[i];
 
 			if ( MCA_ID ( mca ) == id->id ) {
-				DBG ( "Device %s (driver %s) matches ID %hx\n",
-				      id->name, driver->name, id->id );
+				DBG ( "MCA found ID %hx (device %s) "
+				      "matching driver %s\n",
+				      id->name, id->id, driver->name );
 				mca->name = id->name;
 				mca->already_tried = 1;
 				return 1;
@@ -91,6 +102,7 @@ int find_mca_device ( struct mca_device *mca, struct mca_driver *driver ) {
 	}
 
 	/* No device found */
+	DBG ( "MCA found no device matching driver %s\n", driver->name );
 	mca->slot = 0;
 	return 0;
 }

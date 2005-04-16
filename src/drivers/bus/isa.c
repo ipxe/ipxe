@@ -44,6 +44,7 @@ int find_isa_device ( struct isa_device *isa, struct isa_driver *driver ) {
 	/* Iterate through any ISA probe addresses specified by
 	 * config.c, starting where we left off.
 	 */
+	DBG ( "ISA searching for device matching driver %s\n", driver->name );
 	for ( i = isa->probe_idx ; i < isa_extra_probe_addr_count ; i++ ) {
 		/* If we've already used this device, skip it */
 		if ( isa->already_tried ) {
@@ -96,6 +97,7 @@ int find_isa_device ( struct isa_device *isa, struct isa_driver *driver ) {
 
  notfound:
 	/* No device found */
+	DBG ( "ISA found no device matching driver %s\n", driver->name );
 	isa->probe_idx = 0;
 	return 0;
 
