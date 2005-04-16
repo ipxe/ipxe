@@ -219,7 +219,7 @@ BOOT_DRIVER ( "SKEL/PCI", find_pci_boot_device,
 	      skel_pci_driver, skel_pci_probe );
 
 /**************************************************************************
- * ISAPnP PROBE - Look for an adapter
+ * EISA PROBE - Look for an adapter
  **************************************************************************
  */
 static int skel_eisa_probe ( struct dev *dev, struct eisa_device *eisa ) {
@@ -264,6 +264,7 @@ static int skel_isapnp_probe ( struct dev *dev,
 
 	nic->ioaddr = isapnp->ioaddr;
 	nic->irqno = isapnp->irqno;
+	activate_isapnp_device ( isapnp );
 
 	/* Test for physical presence of NIC */
 	/*
