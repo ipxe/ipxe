@@ -65,6 +65,16 @@ static uint16_t isapnp_max_csn;
  *
  */
 
+#define ISAPNP_CARD_ID_FMT "ID %hx:%hx (\"%s\") serial %x"
+#define ISAPNP_CARD_ID_DATA(identifier)					  \
+	(identifier)->vendor_id, (identifier)->prod_id,			  \
+	isa_id_string ( (identifier)->vendor_id, (identifier)->prod_id ), \
+	(identifier)->serial
+#define ISAPNP_DEV_ID_FMT "ID %hx:%hx (\"%s\")"
+#define ISAPNP_DEV_ID_DATA(isapnp)					  \
+	(isapnp)->vendor_id, (isapnp)->prod_id,				  \
+	isa_id_string ( (isapnp)->vendor_id, (isapnp)->prod_id )
+
 static inline void isapnp_write_address ( uint8_t address ) {
 	outb ( address, ISAPNP_ADDRESS );
 }
@@ -254,6 +264,7 @@ static int isapnp_find_tag ( uint8_t wanted_tag, uint8_t *buf ) {
 	uint8_t tag;
 	uint16_t len;
 
+	DBG ( "ISAPnP read tag" );
 	do {
 		tag = isapnp_peek_byte();
 		if ( ISAPNP_IS_SMALL_TAG ( tag ) ) {
@@ -263,14 +274,16 @@ static int isapnp_find_tag ( uint8_t wanted_tag, uint8_t *buf ) {
 			len = isapnp_peek_byte() + ( isapnp_peek_byte() << 8 );
 			tag = ISAPNP_LARGE_TAG_NAME ( tag );
 		}
-		DBG ( "ISAPnP read tag %hhx len %hhx\n", tag, len );
+		DBG ( " %hhx (%hhx)", tag, len );
 		if ( tag == wanted_tag ) {
 			isapnp_peek ( buf, len );
+			DBG ( "\n" );
 			return 1;
 		} else {
 			isapnp_peek ( NULL, len );
 		}
 	} while ( tag != ISAPNP_TAG_END );
+	DBG ( "\n" );
 	return 0;
 }
 
@@ -333,30 +346,38 @@ static int isapnp_try_isolate ( void ) {
 				isapnp_delay();
 				data = ( data << 8 ) | isapnp_read_data ();
 				isapnp_delay();
+				byte >>= 1;
 				if ( data == 0x55aa ) {
-					byte |= 1;
+					byte |= 0x80;
+					seen55aa = 1;
 				}
-				byte <<= 1;
 			}
 			( (char *) &identifier )[i] = byte;
-			if ( byte ) {
-				seen55aa = 1;
-			}
 		}
 				
-		/* If we didn't see a valid ISAPnP device, stop here */
-		if ( ( ! seen55aa ) ||
-		     ( identifier.checksum != isapnp_checksum (&identifier) ) )
+		/* If we didn't see any 55aa patterns, stop here */
+		if ( ! seen55aa ) {
+			DBG ( "ISAPnP saw %s signs of life\n",
+			      isapnp_max_csn ? "no futher" : "no" );
 			break;
+		}
+
+		/* If the checksum was invalid stop here */
+		if ( identifier.checksum != isapnp_checksum ( &identifier) ) {
+			DBG ( "ISAPnP found malformed card "
+			      ISAPNP_CARD_ID_FMT "\n  with checksum %hhx "
+			      "(should be %hhx), abandoning isolation\n",
+			      ISAPNP_CARD_ID_DATA ( &identifier ),
+			      identifier.checksum,
+			      isapnp_checksum ( &identifier) );
+			/* break; */
+		}
 
 		/* Give the device a CSN */
 		isapnp_max_csn++;
-		DBG ( "ISAPnP isolation found card %hhx ID %hx:%hx (\"%s\") "
-		      "serial %x checksum %hhx, assigning CSN %hhx\n",
-		      identifier.vendor_id, identifier.prod_id,
-		      isa_id_string ( identifier.vendor_id,
-				      identifier.prod_id ),
-		      identifier.serial, identifier.checksum, isapnp_max_csn );
+		DBG ( "ISAPnP found card " ISAPNP_CARD_ID_FMT
+		      ", assigning CSN %hhx\n",
+		      ISAPNP_CARD_ID_DATA ( &identifier ), isapnp_max_csn );
 		
 		isapnp_write_csn ( isapnp_max_csn );
 		isapnp_delay();
@@ -374,6 +395,9 @@ static int isapnp_try_isolate ( void ) {
 	/* Return number of cards found */
 	DBG ( "ISAPnP found %d cards at read port %hx\n",
 	      isapnp_max_csn, isapnp_read_port );
+
+	getchar();
+
 	return isapnp_max_csn;
 }
 
@@ -406,6 +430,7 @@ static void isapnp_isolate ( void ) {
  */
 static int fill_isapnp_device ( struct isapnp_device *isapnp ) {
 	unsigned int i;
+	struct isapnp_identifier identifier;
 	struct isapnp_logdevid logdevid;
 	
 	/* Wake the card */
@@ -413,19 +438,23 @@ static int fill_isapnp_device ( struct isapnp_device *isapnp ) {
 	isapnp_send_key ();
 	isapnp_wake ( isapnp->csn );
 
-	/* Skip past the card identifier */
-	isapnp_peek ( NULL, sizeof ( struct isapnp_identifier ) );
+	/* Read the card identifier */
+	isapnp_peek ( ( char * ) &identifier, sizeof ( identifier ) );
 
 	/* Find the Logical Device ID tag corresponding to this device */
 	for ( i = 0 ; i <= isapnp->logdev ; i++ ) {
 		if ( ! isapnp_find_tag ( ISAPNP_TAG_LOGDEVID,
 					 ( char * ) &logdevid ) ) {
 			/* No tag for this device */
+			DBG ( "ISAPnP found no device %hhx.%hhx on "
+			      "card " ISAPNP_CARD_ID_FMT "\n",
+			      isapnp->csn, isapnp->logdev,
+			      ISAPNP_CARD_ID_DATA ( &identifier ) );
 			return 0;
 		}
 	}
 
-	/* Read information from identifier structure */
+	/* Read information from logdevid structure */
 	isapnp->vendor_id = logdevid.vendor_id;
 	isapnp->prod_id = logdevid.prod_id;
 
@@ -439,11 +468,11 @@ static int fill_isapnp_device ( struct isapnp_device *isapnp ) {
 	/* Return all cards to Wait for Key state */
 	isapnp_wait_for_key ();
 
-	DBG ( "ISAPnP found device %hhx.%hhx ID %hx:%hx (\"%s\"), "
-	      "base %hx irq %d\n",
-	      isapnp->csn, isapnp->logdev, isapnp->vendor_id, isapnp->prod_id,
-	      isa_id_string ( isapnp->vendor_id, isapnp->prod_id ),
-	      isapnp->ioaddr, isapnp->irqno );
+	DBG ( "ISAPnP found device %hhx.%hhx " ISAPNP_DEV_ID_FMT
+	      ", base %hx irq %d\n", isapnp->csn, isapnp->logdev,
+	      ISAPNP_DEV_ID_DATA ( isapnp ), isapnp->ioaddr, isapnp->irqno );
+	DBG ( "  on card " ISAPNP_CARD_ID_FMT "\n",
+	      ISAPNP_CARD_ID_DATA ( &identifier ) );
 
 	return 1;
 }

@@ -102,7 +102,7 @@
 #define ISAPNP_TAG_END			0x0F
 /* Large tags */
 #define ISAPNP_IS_LARGE_TAG(tag)	( ( (tag) & 0x80 ) )
-#define ISAPNP_LARGE_TAG_NAME(tag)	( (tag) & 0x7f )
+#define ISAPNP_LARGE_TAG_NAME(tag)	(tag)
 #define ISAPNP_TAG_MEMRANGE		0x81
 #define ISAPNP_TAG_ANSISTR		0x82
 #define ISAPNP_TAG_UNICODESTR		0x83
