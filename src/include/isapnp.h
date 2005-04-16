@@ -53,7 +53,13 @@
 					 * comment.  0x203 probably
 					 * clashes with something. */
 #define ISAPNP_READ_PORT_MAX	0x3ff
-#define ISAPNP_READ_PORT_STEP	0x08	/* Can be any multiple of 4 */
+#define ISAPNP_READ_PORT_STEP	0x10	/* Can be any multiple of 4
+					 * according to the spec, but
+					 * since ISA I/O addresses are
+					 * allocated in blocks of 16,
+					 * it makes no sense to use
+					 * any value less than 16.
+					 */
 
 /* Registers */
 #define ISAPNP_READPORT			0x00
