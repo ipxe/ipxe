@@ -463,7 +463,7 @@ static struct nic_operations cs89x0_operations = {
 ETH_PROBE - Look for an adapter
 ***************************************************************************/
 
-static int cs89x0_probe_addr ( uint16_t ioaddr ) {
+static int cs89x0_probe_addr ( isa_probe_addr_t ioaddr ) {
 	/* if they give us an odd I/O address, then do ONE write to
 	   the address port, to get it back to address zero, where we
 	   expect to find the EISA signature word. */
@@ -685,14 +685,14 @@ static int cs89x0_probe ( struct dev *dev, struct isa_device *isa ) {
 	return 1;
 }
 	
-static struct isa_probe_addr cs89x0_probe_addrs[] = { 
+static isa_probe_addr_t cs89x0_probe_addrs[] = { 
 #ifndef EMBEDDED
 	/* use "conservative" default values for autoprobing */
-	{ 0x300 }, { 0x320 }, { 0x340 }, { 0x200 }, { 0x220 }, { 0x240 },
-	{ 0x260 }, { 0x280 }, { 0x2a0 }, { 0x2c0 }, { 0x2e0 },
+	0x300, 0x320, 0x340, 0x200, 0x220, 0x240,
+	0x260, 0x280, 0x2a0, 0x2c0, 0x2e0,
 	/* if that did not work, then be more aggressive */
-	{ 0x301 }, { 0x321 }, { 0x341 }, { 0x201 }, { 0x221 }, { 0x241 },
-	{ 0x261 }, { 0x281 }, { 0x2a1 }, { 0x2c1 }, { 0x2e1 },
+	0x301, 0x321, 0x341, 0x201, 0x221, 0x241,
+	0x261, 0x281, 0x2a1, 0x2c1, 0x2e1,
 #else
 	0x01000300,
 #endif

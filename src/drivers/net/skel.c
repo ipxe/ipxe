@@ -349,7 +349,7 @@ ISA_ROM ( "skel-mca", "Skeleton MCA Adapter" );
  *
  **************************************************************************
  */
-static int skel_isa_probe_addr ( uint16_t ioaddr __unused ) {
+static int skel_isa_probe_addr ( isa_probe_addr_t ioaddr __unused ) {
 	return 0;
 }
 
@@ -372,9 +372,9 @@ static int skel_isa_probe ( struct dev *dev, struct isa_device *isa ) {
 	return 1;
 }
 
-static struct isa_probe_addr skel_isa_probe_addrs[] = {
+static isa_probe_addr_t skel_isa_probe_addrs[] = {
 	/*
-	   { 0x200 }, { 0x240 },
+	   0x200, 0x240,
 	*/
 };
 

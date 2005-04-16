@@ -13,7 +13,10 @@
  * instead.  Some cards (e.g. the 3c509) implement a proprietary
  * ISAPnP-like mechanism.
  *
- * The ISA probe address list can be overridden by config.c; if 
+ * The ISA probe address list can be overridden by config.c; if the
+ * user specifies ISA_PROBE_ADDRS then that list will be used first.
+ * (If ISA_PROBE_ADDRS ends with a zero, the driver's own list will
+ * never be used).
  */
 
 /*
@@ -49,7 +52,7 @@ int find_isa_device ( struct isa_device *isa, struct isa_driver *driver ) {
 		}
 
 		/* Set I/O address */
-		ioaddr = isa_extra_probe_addrs[i].addr;
+		ioaddr = isa_extra_probe_addrs[i];
 
 		/* An I/O address of 0 in extra_probe_addrs list means
 		 * stop probing (i.e. don't continue to the
@@ -80,7 +83,7 @@ int find_isa_device ( struct isa_device *isa, struct isa_driver *driver ) {
 		}
 
 		/* Set I/O address */
-		ioaddr = driver->probe_addrs[i].addr;
+		ioaddr = driver->probe_addrs[i];
 
 		/* Use probe_addr method to see if there's a device
 		 * present at this address.

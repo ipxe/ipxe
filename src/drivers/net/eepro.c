@@ -516,7 +516,7 @@ static int read_eeprom(uint16_t ioaddr, int location)
 	return (retval);
 }
 
-static int eepro_probe1 ( uint16_t ioaddr ) {
+static int eepro_probe1 ( isa_probe_addr_t ioaddr ) {
 	int		id, counter;
 
 	id = inb(ioaddr + ID_REG);
@@ -600,10 +600,8 @@ static int eepro_probe ( struct dev *dev, struct isa_device *isa ) {
 	return 1;
 }
 
-static struct isa_probe_addr eepro_probe_addrs[] = {
-	{ 0x300 },
-	{ 0x210 }, { 0x240 }, { 0x280 }, { 0x2C0 }, { 0x200 },
-	{ 0x320 }, { 0x340 }, { 0x360 },
+static isa_probe_addr_t eepro_probe_addrs[] = {
+	0x300, 0x210, 0x240, 0x280, 0x2C0, 0x200, 0x320, 0x340, 0x360,
 };
 
 static struct isa_driver eepro_driver =

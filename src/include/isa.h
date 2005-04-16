@@ -19,9 +19,7 @@ struct isa_device {
  * An individual ISA device, identified by probe address
  *
  */
-struct isa_probe_addr {
-	uint16_t addr;
-} __attribute__ (( packed ));
+typedef uint16_t isa_probe_addr_t;
 
 /*
  * An ISA driver, with a probe address list and a probe_addr method.
@@ -32,9 +30,9 @@ struct isa_probe_addr {
  */
 struct isa_driver {
 	const char *name;
-	struct isa_probe_addr *probe_addrs;
+	isa_probe_addr_t *probe_addrs;
 	unsigned int addr_count;
-	int ( * probe_addr ) ( uint16_t addr );
+	int ( * probe_addr ) ( isa_probe_addr_t addr );
 	uint16_t mfg_id;
 	uint16_t prod_id;
 };
@@ -72,7 +70,7 @@ extern int find_isa_boot_device ( struct dev *dev,
  * config.c defines isa_extra_probe_addrs and isa_extra_probe_addr_count.
  *
  */
-extern struct isa_probe_addr isa_extra_probe_addrs[];
+extern isa_probe_addr_t isa_extra_probe_addrs[];
 extern unsigned int isa_extra_probe_addr_count;
 
 #endif /* ISA_H */

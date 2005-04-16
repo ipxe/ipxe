@@ -695,7 +695,7 @@ static void depca_irq(struct nic *nic __unused, irq_action_t action __unused)
 static u8 nicsr;
 
 
-static int depca_probe1 ( uint16_t ioaddr ) {
+static int depca_probe1 ( isa_probe_addr_t ioaddr ) {
 	u8	data;
 	/* This is only correct for little endian machines, but then
 	   Etherboot doesn't work on anything but a PC */
@@ -787,8 +787,8 @@ static int depca_probe ( struct dev *dev, struct isa_device *isa ) {
 	return 1;
 }
 
-static struct isa_probe_addr depca_probe_addrs[] = {
-	{ 0x300 }, { 0x200 },
+static isa_probe_addr_t depca_probe_addrs[] = {
+	0x300, 0x200,
 };
 
 static struct isa_driver depca_driver =

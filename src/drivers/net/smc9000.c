@@ -108,7 +108,7 @@ static void smc_reset(int ioaddr)
  *
  * ---------------------------------------------------------------------
  */
-static int smc9000_probe_addr( unsigned short ioaddr )
+static int smc9000_probe_addr( isa_probe_addr_t ioaddr )
 {
    word bank;
    word	revision_register;
@@ -483,11 +483,9 @@ static int smc9000_probe ( struct dev *dev, struct isa_device *isa ) {
  * change for a slightly different card, you can add it to the array.
  *
  */
-static struct isa_probe_addr smc9000_probe_addrs[] = {
-   { 0x200 }, { 0x220 }, { 0x240 }, { 0x260 },
-   { 0x280 }, { 0x2A0 }, { 0x2C0 }, { 0x2E0 },
-   { 0x300 }, { 0x320 }, { 0x340 }, { 0x360 },
-   { 0x380 }, { 0x3A0 }, { 0x3C0 }, { 0x3E0 },
+static isa_probe_addr_t smc9000_probe_addrs[] = {
+   0x200, 0x220, 0x240, 0x260, 0x280, 0x2A0, 0x2C0, 0x2E0,
+   0x300, 0x320, 0x340, 0x360, 0x380, 0x3A0, 0x3C0, 0x3E0,
 };
 
 static struct isa_driver smc9000_driver =
