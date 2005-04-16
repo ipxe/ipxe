@@ -31,8 +31,9 @@ static int fill_pci_device ( struct pci_device *pci ) {
 	int reg;
 
 	/* Check bus is within range */
-	if ( PCI_BUS ( pci->busdevfn ) > pci_max_bus )
+	if ( PCI_BUS ( pci->busdevfn ) > pci_max_bus ) {
 		return 0;
+	}
 
 	/* Check to see if we've cached the result that this is a
 	 * non-zero function on a non-existent card.  This is done to
