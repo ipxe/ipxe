@@ -23,18 +23,39 @@ unsigned int pci_max_bus = 0xff;
  * Returns 1 if a device was found, 0 for no device present.
  */
 static int fill_pci_device ( struct pci_device *pci ) {
+	static struct {
+		uint16_t devfn0;
+		int is_present;
+	} cache = { 0, 1 };
 	uint32_t l;
 	int reg;
 
 	/* Check bus is within range */
 	if ( PCI_BUS ( pci->busdevfn ) > pci_max_bus )
 		return 0;
+
+	/* Check to see if we've cached the result that this is a
+	 * non-zero function on a non-existent card.  This is done to
+	 * increase scan speed by a factor of 8.
+	 */
+	if ( ( PCI_FUNC ( pci->busdevfn ) != 0 ) &&
+	     ( PCI_FN0 ( pci->busdevfn ) == cache.devfn0 ) &&
+	     ( ! cache.is_present ) ) {
+		return 0;
+	}
 	
 	/* Check to see if there's anything physically present.
 	 */
 	pci_read_config_dword ( pci, PCI_VENDOR_ID, &l );
 	/* some broken boards return 0 if a slot is empty: */
 	if ( ( l == 0xffffffff ) || ( l == 0x00000000 ) ) {
+		if ( PCI_FUNC ( pci->busdevfn ) == 0 ) {
+			/* Don't look for subsequent functions if the
+			 * card itself is not present.
+			 */
+			cache.devfn0 = pci->busdevfn;
+			cache.is_present = 0;
+		}
 		return 0;
 	}
 	pci->vendor = l & 0xffff;
@@ -47,7 +68,7 @@ static int fill_pci_device ( struct pci_device *pci ) {
 		uint16_t save_busdevfn = pci->busdevfn;
 		uint8_t header_type;
 
-		pci->busdevfn &= ~PCI_FUNC ( 0xffff );
+		pci->busdevfn &= PCI_FN0 ( pci->busdevfn );
 		pci_read_config_byte ( pci, PCI_HEADER_TYPE, &header_type );
 		pci->busdevfn = save_busdevfn;
 

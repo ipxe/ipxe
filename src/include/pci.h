@@ -252,6 +252,7 @@ struct pci_device {
 #define PCI_BUS(busdevfn)	( ( (busdevfn) >> 8 ) & 0xff )
 #define PCI_DEV(busdevfn)	( ( (busdevfn) >> 3 ) & 0x1f )
 #define PCI_FUNC(busdevfn)      ( (busdevfn) & 0x07 )
+#define PCI_FN0(busdevfn)	( (busdevfn) & 0xfff8 )
 
 /*
  * An individual PCI device identified by vendor and device IDs
