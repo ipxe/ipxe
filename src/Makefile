@@ -96,12 +96,15 @@ LDFLAGS		+= $(EXTRA_LDFLAGS)
 CFLAGS_c	+= 
 CFLAGS_S 	+= -DASSEMBLY
 
+# Base object name of the current target
+#
+OBJECT		= $(firstword $(subst ., ,$(@F)))
+
 # CFLAGS for specific object files.  You can define
 # e.g. CFLAGS_rtl8139, and have those flags automatically used when
 # compiling bin/rtl8139.o.
 #
-OBJ_CFLAGS	= $(CFLAGS_$(basename $(@F))) \
-		  -DOBJECT=$(subst -,_,$(basename $(@F)))
+OBJ_CFLAGS	= $(CFLAGS_$(OBJECT)) -DOBJECT=$(subst -,_,$(OBJECT))
 $(BIN)/%.flags :
 	@echo $(OBJ_CFLAGS)
 
@@ -109,24 +112,27 @@ $(BIN)/%.flags :
 #
 COMPILE_c	= $(CC) $(CFLAGS) $(CFLAGS_c) $(OBJ_CFLAGS)
 RULE_c		= $(COMPILE_c) -c $< -o $@
-RULE_c_to_s	= $(COMPILE_c) -S -c $< -o $@ 
+RULE_c_to_dbg.o	= $(COMPILE_c) -DDEBUG_$(OBJECT) -c $< -o $@
 RULE_c_to_c	= $(COMPILE_c) -E -c $< > $@
+RULE_c_to_s	= $(COMPILE_c) -S -c $< -o $@ 
 
 PREPROCESS_S	= $(CPP) $(CFLAGS) $(CFLAGS_S) $(OBJ_CFLAGS)
 ASSEMBLE_S	= $(AS) $(ASFLAGS)
 RULE_S		= $(PREPROCESS_S) $< | $(ASSEMBLE_S) -o $@
 RULE_S_to_s	= $(PREPROCESS_S) $< > $@
 
-DEBUG_TARGETS	+= c s
+DEBUG_TARGETS	+= dbg.o c s
 
 # SRCDIRS lists all directories containing source files.
 #
-SRCDIRS		+= core drivers/net drivers/disk
+SRCDIRS		+= core drivers/bus drivers/net
+# drivers/disk
 
 # NON_AUTO_SRCS lists files that are excluded from the normal
 # automatic build system.
 #
 NON_AUTO_SRCS	+= core/elf_loader.c
+NON_AUTO_SRCS	+= drivers/net/prism2.c
 
 # Rules for finalising files.  TGT_MAKEROM_FLAGS is defined as part of
 # the automatic build system and varies by target; it includes the
