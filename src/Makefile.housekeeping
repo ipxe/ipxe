@@ -260,10 +260,10 @@ $(BIN)/%.info :
 # 
 # If it's a debugging version, force a link to take place by making
 # this target depend on a phony target, and mark the resulting files
-# as being older than BLIB, so that any subsequent images will do a
-# fresh link.  Otherwise, you won't get what you expect when you do
-# e.g. "make DEBUG=pci bin/pnic.dsk ; make bin/pnic.dsk ; make
-# DEBUG=pci bin/pnic.dsk"
+# as being older than BLIB (and prevent them from being deleted), so
+# that any subsequent images will do a fresh link.  Otherwise, you
+# won't get what you expect when you do e.g. "make DEBUG=pci
+# bin/pnic.dsk ; make bin/pnic.dsk ; make DEBUG=pci bin/pnic.dsk"
 #
 $(BIN)/%.tmp : $(BLIB) $(MAKEDEPS) $(LDSCRIPT) \
 	       $(DEBUG_OBJECTS) $(if $(DEBUG),force_relink)
@@ -271,6 +271,7 @@ $(BIN)/%.tmp : $(BLIB) $(MAKEDEPS) $(LDSCRIPT) \
 		$(DEBUG_OBJECTS) $(BLIB) -o $@ -Map $(BIN)/$*.tmp.map
 	$(if $(DEBUG_OBJECTS),$(TOUCH) -r $(BLIB) -B 2 $@ $(BIN)/$*.tmp.map)
 .PHONY : force_relink
+.SECONDARY :
 
 # Show a linker map for the specified target
 #
