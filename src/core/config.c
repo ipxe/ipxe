@@ -110,6 +110,7 @@ void print_config ( void ) {
  * At least one of the CONSOLE_xxx has to be set.  CONSOLE_DUAL sets
  * both CONSOLE_FIRMWARE and CONSOLE_SERIAL for legacy compatibility.
  * If no CONSOLE_xxx is set, CONSOLE_FIRMWARE is assumed.
+ *
  */
 
 #ifdef CONSOLE_CRT
@@ -149,8 +150,25 @@ REQUIRE_OBJECT ( pc_kbd );
 
 /*
  * Drag in relocate.o if required
+ *
  */
 
 #ifndef NORELOCATE
 REQUIRE_OBJECT ( relocate );
 #endif
+
+/*
+ * Allow ISA probe address list to be overridden
+ *
+ */
+#include "isa.h"
+#ifndef ISA_PROBE_ADDRS
+#define ISA_PROBE_ADDRS
+#endif
+
+isa_probe_addr_t isa_extra_probe_addrs[] = {
+	ISA_PROBE_ADDRS
+};
+
+unsigned int isa_extra_probe_addr_count
+      = sizeof ( isa_extra_probe_addrs ) / sizeof ( isa_extra_probe_addrs[0] );
