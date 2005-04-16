@@ -249,10 +249,10 @@ struct pci_device {
 	uint8_t			irq;
 	uint8_t			already_tried;
 };
-#define PCI_BUS(busdevfn)	( ( (busdevfn) >> 8 ) & 0xff )
-#define PCI_DEV(busdevfn)	( ( (busdevfn) >> 3 ) & 0x1f )
-#define PCI_FUNC(busdevfn)      ( (busdevfn) & 0x07 )
-#define PCI_FN0(busdevfn)	( (busdevfn) & 0xfff8 )
+#define PCI_BUS(busdevfn)	( ( uint8_t ) ( ( (busdevfn) >> 8 ) & 0xff ) )
+#define PCI_DEV(busdevfn)	( ( uint8_t ) ( ( (busdevfn) >> 3 ) & 0x1f ) )
+#define PCI_FUNC(busdevfn)      ( ( uint8_t ) ( (busdevfn) & 0x07 ) )
+#define PCI_FN0(busdevfn)	( ( uint16_t ) ( (busdevfn) & 0xfff8 ) )
 
 /*
  * An individual PCI device identified by vendor and device IDs
