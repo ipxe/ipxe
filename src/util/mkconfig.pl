@@ -1,11 +1,12 @@
 #!/usr/bin/perl -w
 
 use File::Spec::Functions qw ( :ALL );
+use File::stat;
 use strict;
 use warnings;
 
 my $cfgdir = "config";
-my $config_h = "config.h";
+my $config_h = shift || "config.h";
 
 # Read in a whole file
 #
@@ -36,6 +37,15 @@ sub delete_file {
   my $file = shift;
 
   unlink $file or die "Could not delete $file: $!\n";
+}
+
+# Get a file modification time
+#
+sub file_mtime {
+  my $file = shift;
+
+  my $stat = stat ( $file ) or die "Could not stat $file: $!\n";
+  return $stat->mtime;
 }
 
 # Read a directory listing (excluding the . and .. entries)
@@ -155,9 +165,24 @@ foreach my $file ( keys %$current ) {
   unlink catfile ( $cfgdir, $file ) unless exists $new->{$file};
 }
 
-# Write out any modified fragments
+# Write out any modified fragments, and find the oldest timestamp of
+# any unmodified fragments.
 #
+my $oldest = time ();
 foreach my $file ( keys %$new ) {
-  write_file ( catfile ( $cfgdir, $file ), $new->{$file} )
-      unless $current->{$file} && $new->{$file} eq $current->{$file};
+  if ( $current->{$file} && $new->{$file} eq $current->{$file} ) {
+    # Unmodified
+    my $time = file_mtime ( catfile ( $cfgdir, $file ) );
+    $oldest = $time if $time < $oldest;
+  } else {
+    write_file ( catfile ( $cfgdir, $file ), $new->{$file} );
+  }
+}
+
+# If we now have fragments that are older than config.h, set the
+# timestamp on config.h to match the oldest fragment, to prevent make
+# from always attempting to rebuild the fragments.
+#
+if ( $oldest < file_mtime ( $config_h ) ) {
+  utime time(), $oldest, $config_h or die "Could not touch $config_h: $!\n";
 }
