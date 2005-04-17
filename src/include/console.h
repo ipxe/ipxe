@@ -2,6 +2,7 @@
 #define CONSOLE_H
 
 #include "stdint.h"
+#include "vsprintf.h"
 
 /*
  * Consoles that cannot be used before their INIT_FN() has completed

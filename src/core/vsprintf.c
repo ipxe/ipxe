@@ -1,5 +1,8 @@
-#include "etherboot.h"
 #include <stdarg.h>
+#include "if_ether.h" /* for ETH_ALEN */
+#include "limits.h" /* for CHAR_BIT */
+#include "console.h"
+#include "vsprintf.h"
 
 #define LONG_SHIFT  ((int)((sizeof(unsigned long)*CHAR_BIT) - 4))
 #define INT_SHIFT   ((int)((sizeof(unsigned int)*CHAR_BIT) - 4))
