@@ -14,29 +14,31 @@
 
 static inline void copy_to_real_libkir ( uint16_t dest_seg, uint16_t dest_off,
 					 void *src, size_t n ) {
-	__asm__ ( "movw %4, %%es\n\t"
-		  "cld\n\t"
-		  "rep movsb\n\t"
-		  "pushw %%ds\n\t" /* restore %es */
-		  "popw %%es\n\t"
-		  : "=S" ( src ), "=D" ( dest_off ), "=c" ( n ) /* clobbered */
-		  : "S" ( src ), "r" ( dest_seg ), "D" ( dest_off ), "c" ( n )
-		  : "memory"
-		  );
+	__asm__ __volatile__ ( "movw %4, %%es\n\t"
+			       "cld\n\t"
+			       "rep movsb\n\t"
+			       "pushw %%ds\n\t" /* restore %es */
+			       "popw %%es\n\t"
+			       : "=S" ( src ), "=D" ( dest_off ),
+			         "=c" ( n ) /* clobbered */
+			       : "S" ( src ), "r" ( dest_seg ),
+			         "D" ( dest_off ), "c" ( n )
+			       : "memory" );
 }
 
 static inline void copy_from_real_libkir ( void *dest,
 					   uint16_t src_seg, uint16_t src_off,
 					   size_t n ) {
-	__asm__ ( "movw %%ax, %%ds\n\t"
-		  "cld\n\t"
-		  "rep movsb\n\t"
-		  "pushw %%es\n\t" /* restore %ds */
-		  "popw %%ds\n\t"
-		  : "=S" ( src_off ), "=D" ( dest ), "=c" ( n ) /* clobbered */
-		  : "a" ( src_seg ), "S" ( src_off ), "D" ( dest ), "c" ( n )
-		  : "memory"
-		  );
+	__asm__ __volatile__ ( "movw %%ax, %%ds\n\t"
+			       "cld\n\t"
+			       "rep movsb\n\t"
+			       "pushw %%es\n\t" /* restore %ds */
+			       "popw %%ds\n\t"
+			       : "=S" ( src_off ), "=D" ( dest ),
+			         "=c" ( n ) /* clobbered */
+			       : "a" ( src_seg ), "S" ( src_off ),
+			         "D" ( dest ), "c" ( n )
+			       : "memory" );
 }
 #define copy_to_real copy_to_real_libkir
 #define copy_from_real copy_from_real_libkir
@@ -121,6 +123,35 @@ static inline void copy_from_real_libkir ( void *dest,
 #define BASEMEM_PARAMETER_DONE_LIBKIR( param )
 #define BASEMEM_PARAMETER_INIT BASEMEM_PARAMETER_INIT_LIBKIR
 #define BASEMEM_PARAMETER_DONE BASEMEM_PARAMETER_DONE_LIBKIR
+
+/* REAL_FRAGMENT: Declare and define a real-mode code fragment in
+ * .text16.  We don't need this for REAL_EXEC, since we can just
+ * execute our real-mode code inline, but it's handy in case someone
+ * genuinely wants to create a block of code that can be copied to a
+ * specific location and then executed.
+ *
+ * Note that we put the code in the data segment, since otherwise we
+ * can't (easily) access it in order to copy it to its target
+ * location.  We should never be calling any REAL_FRAGMENT routines
+ * directly anyway.
+ */
+#define	REAL_FRAGMENT( name, asm_code_str )				\
+	extern void name ( void );					\
+	extern char name ## _size[];					\
+	__asm__ __volatile__ (						\
+		".section \".data.text16\"\n\t"				\
+		".code16\n\t"						\
+		".arch i386\n\t"					\
+		#name ":\n\t"						\
+		asm_code_str "\n\t"					\
+		"lret\n\t"						\
+		#name "_end:\n\t"					\
+		".equ " #name "_size, " #name "_end - " #name "\n\t"	\
+		".code16gcc\n\t"					\
+		".previous\n\t"						\
+		: :							\
+	)
+#define FRAGMENT_SIZE( fragment ) ( (size_t) fragment ## _size )
 
 /* REAL_CALL: call an external real-mode routine */
 #define OUT_CONSTRAINTS(...) __VA_ARGS__
