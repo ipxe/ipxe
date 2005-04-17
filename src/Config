@@ -204,24 +204,6 @@
 #			Both of the above
 #	-DCONSOLE_DIRECT_VGA
 #			Set for direct VGA console (only for x86).
-#	-DCOMCONSOLE
-#			Set port, e.g. 0x3F8.
-#	-DCONSPEED
-#			Set speed, e.g. 57600.
-#	-DCOMPARM
-#			Set Line Control Register value for data bits, stop
-#			bits and parity. See a National Semiconditor 8250/
-#			16450/16550 data sheet for bit meanings.
-#			If undefined, defaults to 0x03 = 8N1.
-#	-DCOMPRESERVE
-#			Ignore COMSPEED and COMPARAM and instead preserve
-#			the com port parameters from the previous user
-#			of the com port.  Examples of previous user are a BIOS
-#			that implements console redirection, lilo and LinuxBIOS.
-#			This makes it trivial to keep the serial port
-#			speed setting in sync between multiple users.
-#			You set the speed in the first user and the
-#			rest follow along.
 #
 #	Interface export options:
 #
@@ -380,9 +362,6 @@ CFLAGS+=	-DBACKOFF_LIMIT=7 -DCONGESTED
 # CFLAGS+=	-DTRY_FLOPPY_FIRST=4
 # CFLAGS+=	-DEXIT_IF_NO_OFFER
 
-# For a serial console, which can run in parallel with FIRMWARE console
-# CFLAGS+=	-DCONSOLE_DUAL -DCOMCONSOLE=0x3F8 -DCONSPEED=9600
-
 # Enable tagged image, generic ELF, Multiboot ELF
 # or FreeBSD ELF/a.out boot image support
 CFLAGS+=	-DTAGGED_IMAGE -DELF_IMAGE
@@ -482,7 +461,6 @@ CFLAGS+=	-DPXE_IMAGE -DPXE_EXPORT
 
 
 CFLAGS_3c503	= -DINCLUDE_3C503 # -DT503_SHMEM
-MAKEROM_FLAGS_3c503=	-3
 CFLAGS_ne	= -DINCLUDE_NE -DNE_SCAN=0x300,0x280,0x320,0x340,0x380
 CFLAGS_ns8390	= -DINCLUDE_NS8390	# NE2000/PCI!
 CFLAGS_wd	= -DINCLUDE_WD -DWD_DEFAULT_MEM=0xCC000
