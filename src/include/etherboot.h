@@ -143,6 +143,7 @@ enum {
 #include	"tftp.h"
 #include	"igmp.h"
 #include	"nfs.h"
+#include	"console.h"
 
 struct arptable_t {
 	in_addr ipaddr;
@@ -180,7 +181,6 @@ External prototypes
 ***************************************************************************/
 /* main.c */
 struct Elf_Bhdr;
-extern void console_init(void); 
 extern int main();
 extern int loadkernel P((const char *fname));
 extern char as_main_program;
@@ -261,8 +261,6 @@ extern void poll_interruptions P((void));
 extern int strcasecmp P((const char *a, const char *b));
 extern char *substr P((const char *a, const char *b));
 extern unsigned long strtoul P((const char *p, const char **, int base));
-extern void printf P((const char *, ...));
-extern int sprintf P((char *, const char *, ...));
 extern int inet_aton P((const char *p, in_addr *i));
 
 extern unsigned long get_boot_order(unsigned long order, unsigned *index);
