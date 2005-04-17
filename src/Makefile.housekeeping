@@ -50,6 +50,11 @@ oldgas :
 #
 CFLAGS	+= -include compiler.h
 
+# config/%.h files are generated from config.h using mkconfig.pl
+config/%.h : config.h
+	$(MKCONFIG) $<
+CLEANUP	+= config/*.h
+
 # SRCDIRS lists all directories containing source files.
 srcdirs :
 	@echo $(SRCDIRS)
@@ -104,8 +109,7 @@ endef
 define obj_template
 
 	@$(CPP) $(CFLAGS) $(CFLAGS_$(3)) $(CFLAGS_$(4)) \
-		-M $(1) -MT "$(4)_DEPS" -MG -MP | \
-		sed 's/$(4)_DEPS[[:space:]]*:/$(4)_DEPS =/' >> $(2)
+		-M $(1) -MT "$(4)_DEPS" -MG | tr : = >> $(2)
 	@echo -e '\n$$(BIN)/$(4).o : $(1) $$(MAKEDEPS) $$($(4)_DEPS)' \
 		 '\n\t$$(RULE_$(3))\n' \
 		 '\nBOBJS += $$(BIN)/$(4).o\n' \
