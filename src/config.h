@@ -2,13 +2,13 @@
  * This file defines the configuration for Etherboot.
  *
  * The build system splits this file into several individual header
- * files, so that changing one option doesn't necessitate a rebuild of
- * every single object.  For this reason, it is important to maintain
- * the strict formatting in this file.
+ * files of the form config/%.h, so that changing one option doesn't
+ * necessitate a rebuild of every single object.  For this reason, it
+ * is important to maintain the strict formatting in this file.
  *
  */
 
-/* BEGIN config_serial.h
+/* @BEGIN serial.h
  *
  * Serial port configuration
  *
@@ -32,5 +32,4 @@
 #define COMSTOP		1		/* Stop bits */
 #endif
 
-/* END config_serial.h */
-
+/* @END serial.h */
