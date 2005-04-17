@@ -33,7 +33,7 @@
 #endif
 
 #ifndef COMPARITY
-#define COMPARITY	N
+#define COMPARITY	0
 #endif
 
 #ifndef COMSTOP
