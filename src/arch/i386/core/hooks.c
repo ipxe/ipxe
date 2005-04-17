@@ -1,10 +1,6 @@
 #include "registers.h"
 #include "main.h"
-#include "etherboot.h"
 #include "hooks.h"
-
-/* Symbols defined by the linker */
-extern char _bss[], _ebss[];
 
 /*
  * This file provides the basic entry points from assembly code.  See
