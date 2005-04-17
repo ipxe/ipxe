@@ -48,13 +48,13 @@ sub file_mtime {
   return $stat->mtime;
 }
 
-# Read a directory listing (excluding the . and .. entries)
+# Read all the .h files in a directory
 #
 sub read_dir {
   my $dir = shift;
 
   opendir my $dh, $dir or die "Could not open directory $dir: $!\n";
-  my @entries = grep { ! /^(\.)+$/ } readdir $dh;
+  my @entries = grep { /\.h$/ } readdir $dh;
   closedir $dh;
   return @entries;
 }
