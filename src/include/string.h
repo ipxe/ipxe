@@ -14,6 +14,7 @@
 #ifndef ETHERBOOT_STRING_H
 #define ETHERBOOT_STRING_H
 
+#include "stddef.h"
 #include "bits/string.h"
 
 
