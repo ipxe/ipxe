@@ -337,6 +337,8 @@ int load_block(unsigned char *data, unsigned int block, unsigned int len, int eo
 		putchar('0' + (size/10)%10);
 		putchar('0' + (size/1)%10);
 	}
+#else
+	putchar ( '.' );
 #endif
 	if (block == 1)
 	{
