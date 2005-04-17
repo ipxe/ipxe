@@ -454,9 +454,6 @@ CFLAGS+=	-DPXE_IMAGE -DPXE_EXPORT
 #	The code will notify if it does a abort.
 #	SomniOne - somnione@gmx.net
 #
-# 3C509 option:
-#	-DINCLUDE_3C509	- Include 3c509 support
-#
 # 3C90X options:
 #	Warning Warning Warning
 #	If you use any of the XCVR options below, please do not complain about
@@ -476,20 +473,16 @@ CFLAGS+=	-DPXE_IMAGE -DPXE_EXPORT
 #	See the documentation file 3c90x.txt for more details.
 #
 # CS89X0 (optional) options:
-#	-DCS_SCAN=list	- Probe for CS89x0 base address using list of
+#	-DISA_PROBE_ADDRS=list	
+#			  Probe for CS89x0 base address using list of
 #			  comma separated hex addresses; increasing the
 #			  address by one (0x300 -> 0x301) will force a
 #			  more aggressive probing algorithm. This might
 #			  be neccessary after a soft-reset of the NIC.
-#
-# SMC9000 options:
-#       -DSMC9000_SCAN=list - List of I/O addresses to probe
 
 
 CFLAGS_3c503	= -DINCLUDE_3C503 # -DT503_SHMEM
 MAKEROM_FLAGS_3c503=	-3
-CFLAGS_3c509	= -DINCLUDE_3C509
-CFLAGS_3c529	= -DINCLUDE_3C529
 CFLAGS_ne	= -DINCLUDE_NE -DNE_SCAN=0x300,0x280,0x320,0x340,0x380
 CFLAGS_ns8390	= -DINCLUDE_NS8390	# NE2000/PCI!
 CFLAGS_wd	= -DINCLUDE_WD -DWD_DEFAULT_MEM=0xCC000
