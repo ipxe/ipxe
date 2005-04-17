@@ -40,7 +40,7 @@ static struct tagged_context
 
 static sector_t tagged_download(unsigned char *data, unsigned int len, int eof);
 void xstart16 (unsigned long execaddr, segoff_t location,
-	       void *bootp);
+	       struct bootpd_t *bootp);
 
 static inline os_download_t tagged_probe(unsigned char *data, unsigned int len)
 {
@@ -173,28 +173,29 @@ static sector_t tagged_download(unsigned char *data, unsigned int len, int eof)
 }
 
 void xstart16 (unsigned long execaddr, segoff_t location,
-	       void *bootp) {
-	struct {
-		segoff_t execaddr;
-		segoff_t location;
-		segoff_t bootp;
-	} PACKED in_stack;
+	       struct bootpd_t *bootp) {
+	uint16_t basemem_bootp;
+	int discard_D, discard_S, discard_b;
 
 	/* AFAICT, execaddr is actually already a segment:offset */
-	*((unsigned long *)&in_stack.execaddr) = execaddr;
-	in_stack.location = location;
-	in_stack.bootp.segment = SEGMENT(bootp);
-	in_stack.bootp.offset = OFFSET(bootp);
-
-	RM_FRAGMENT(rm_xstart16,
-		"popl %eax\n\t"	/* Calculated lcall */
-		"pushw %cs\n\t" 
-		"call 1f\n1:\tpopw %bp\n\t" 
-		"leaw (2f-1b)(%bp), %bx\n\t" 
-		"pushw %bx\n\t" 
-		"pushl %eax\n\t"
-		"lret\n2:\n\t"
-	);
-       
-	real_call ( rm_xstart16, &in_stack, NULL );
+	basemem_bootp = BASEMEM_PARAMETER_INIT ( *bootp );
+	REAL_EXEC ( rm_xstart16,
+		    "pushw %%ds\n\t"	/* far pointer to bootp data copy */
+		    "pushw %%bx\n\t"
+		    "pushl %%esi\n\t"	/* location */
+		    "pushw %%cs\n\t"	/* lcall execaddr */
+		    "call 1f\n\t"
+		    "jmp 2f\n\t"
+		    "\n1:\n\t"
+		    "pushl %%edi\n\t"
+		    "lret\n\t"
+		    "\n2:\n\t"
+		    "addw $8,%%sp\n\t",	/* pop location and bootp ptr */
+		    3,
+		    OUT_CONSTRAINTS ( "=D" ( discard_D ), "=S" ( discard_S ),
+				      "=b" ( discard_b ) ),
+		    IN_CONSTRAINTS ( "D" ( execaddr ), "S" ( location ),
+				     "b" ( basemem_bootp ) ),
+		    CLOBBER ( "eax", "ecx", "edx", "ebp" ) );
+	BASEMEM_PARAMETER_DONE ( *bootp );
 }
