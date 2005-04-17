@@ -73,6 +73,7 @@ RANLIB		?= $(CROSS_COMPILE)ranlib
 OBJCOPY		?= $(CROSS_COMPILE)objcopy
 PARSEROM	?= $(PERL) ./util/parserom.pl
 MAKEROM		?= $(PERL) ./util/makerom.pl
+MKCONFIG	?= $(PERL) ./util/mkconfig.pl
 NRV2B		?= ./util/nrv2b
 
 # Location to place generated files
@@ -84,7 +85,7 @@ BLIB	= $(BIN)/blib.a
 
 # Common flags
 #
-CFLAGS		+= -I include -I arch/$(ARCH)/include -DARCH=$(ARCH)
+CFLAGS		+= -I include -I arch/$(ARCH)/include -I . -DARCH=$(ARCH)
 CFLAGS		+= -Os -ffreestanding
 CFLAGS		+= -Wall -W -Wno-format
 CFLAGS		+= $(EXTRA_CFLAGS)
