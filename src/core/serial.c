@@ -16,22 +16,35 @@
 #include "init.h"
 #include "io.h"
 #include "timer.h"
+#include "config/serial.h"
 
 /* Set default values if none specified */
 
 #ifndef COMCONSOLE
-#define COMCONSOLE ( 0x3f8 )
+#define COMCONSOLE	0x3f8
 #endif
 
-#ifndef CONSPEED
-#define CONSPEED ( 9600 )
+#ifndef COMSPEED
+#define COMSPEED	9600
+#endif
+
+#ifndef COMDATA
+#define COMDATA		8
+#endif
+
+#ifndef COMPARITY
+#define COMPARITY	N
+#endif
+
+#ifndef COMSTOP
+#define COMSTOP		1
 #endif
 
 #undef UART_BASE
-#define UART_BASE COMCONSOLE
+#define UART_BASE ( COMCONSOLE )
 
 #undef UART_BAUD
-#define UART_BAUD CONSPEED
+#define UART_BAUD ( COMSPEED )
 
 #if ((115200%UART_BAUD) != 0)
 #error Bad ttys0 baud rate
@@ -40,12 +53,9 @@
 #define COMBRD (115200/UART_BAUD)
 
 /* Line Control Settings */
-#ifndef	COMPARM
-/* Set 8bit, 1 stop bit, no parity */
-#define	COMPARM	0x03
-#endif
-
-#define UART_LCS COMPARM
+#define UART_LCS ( ( ( (COMDATA) - 5 )	<< 0 ) | \
+		   ( ( (COMPARITY) )	<< 3 ) | \
+		   ( ( (COMSTOP) - 1 )	<< 2 ) )
 
 /* Data */
 #define UART_RBR 0x00
@@ -133,7 +143,7 @@ static int serial_ischar ( void ) {
 
 /*
  * int serial_init(void);
- *	Initialize port UART_BASE to speed CONSPEED, line settings 8N1.
+ *	Initialize port UART_BASE to speed COMSPEED, line settings 8N1.
  */
 static void serial_init ( void ) {
 	int status;
@@ -150,7 +160,7 @@ static void serial_init ( void ) {
 	uart_writeb(lcs, UART_BASE + UART_LCR);
 #endif
 
-	/* Set Baud Rate Divisor to CONSPEED, and test to see if the
+	/* Set Baud Rate Divisor to COMSPEED, and test to see if the
 	 * serial port appears to be present.
 	 */
 	uart_writeb(0x80 | lcs, UART_BASE + UART_LCR);

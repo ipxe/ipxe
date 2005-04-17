@@ -28,7 +28,7 @@
 #if ! COMPRESERVE
 #define COMSPEED	9600		/* Baud rate */
 #define COMDATA		8		/* Data bits */ 
-#define COMPARITY	N		/* Parity */
+#define COMPARITY	0		/* Parity: 0=None, 1=Odd, 2=Even */
 #define COMSTOP		1		/* Stop bits */
 #endif
 
