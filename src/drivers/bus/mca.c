@@ -5,7 +5,7 @@
  *
  */
 
-#include "etherboot.h"
+#include "string.h"
 #include "io.h"
 #include "mca.h"
 

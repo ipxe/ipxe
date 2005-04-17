@@ -33,7 +33,7 @@
 *
 ***************************************************************************/
 
-#include "etherboot.h"
+#include "string.h"
 #include "timer.h"
 #include "io.h"
 #include "isapnp.h"

@@ -1,4 +1,6 @@
-#include "etherboot.h"
+#include "stdint.h"
+#include "byteswap.h"
+#include "console.h"
 #include "isa_ids.h"
 
 /* 

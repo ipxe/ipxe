@@ -1,4 +1,4 @@
-#include "etherboot.h"
+#include "string.h"
 #include "io.h"
 #include "timer.h"
 #include "eisa.h"

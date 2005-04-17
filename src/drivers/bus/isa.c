@@ -1,4 +1,4 @@
-#include "etherboot.h"
+#include "string.h"
 #include "isa.h"
 
 /*
