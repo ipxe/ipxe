@@ -4,12 +4,11 @@
  *
  */
 
-#include "eisa.h"
 #include "isa.h"
 #include "io.h"
 #include "timer.h"
 #include "string.h"
-#include "etherboot.h"
+#include "console.h"
 #include "3c509.h"
 
 /*
@@ -235,38 +234,4 @@ static struct t509_driver el3_t509_driver = { "3c509 (ISA)" };
 BOOT_DRIVER ( "3c509", find_t509_boot_device, el3_t509_driver,
 	      el3_t509_probe );
 
-/*
- * The EISA probe function
- *
- */
-static int el3_eisa_probe ( struct dev *dev, struct eisa_device *eisa ) {
-	struct nic *nic = nic_device ( dev );
-	
-	enable_eisa_device ( eisa );
-	nic->ioaddr = eisa->ioaddr;
-	nic->irqno = 0;
-	printf ( "3C5x9 board on EISA at %#hx - ", nic->ioaddr );
-
-	/* Hand off to generic t5x9 probe routine */
-	return t5x9_probe ( nic, ISA_PROD_ID ( PROD_ID ), ISA_PROD_ID_MASK );
-}
-
-static struct eisa_id el3_eisa_adapters[] = {
-	{ "3Com 3c509 EtherLink III (EISA)", MFG_ID, PROD_ID },
-};
-
-static struct eisa_driver el3_eisa_driver =
-	EISA_DRIVER ( "3c509 (EISA)", el3_eisa_adapters );
-
-BOOT_DRIVER ( "3c509 (EISA)", find_eisa_boot_device, el3_eisa_driver,
-	      el3_eisa_probe );
-
-/*
- * We currently build both ISA and EISA support into a single ROM
- * image, though there's no reason why this couldn't be split to
- * reduce code size; just split this .c file into two in the obvious
- * place.
- *
- */
-ISA_ROM ( "3c509","3c509, ISA/EISA" );
-
+ISA_ROM ( "3c509","3c509" );
