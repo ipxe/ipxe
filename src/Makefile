@@ -138,8 +138,12 @@ NON_AUTO_SRCS	+= drivers/net/prism2.c
 # the automatic build system and varies by target; it includes the
 # "-p 0x1234,0x5678" string to set the PCI IDs.
 #
-FINALISE_rom = $(MAKEROM) $(MAKEROM_FLAGS) $(TGT_MAKEROM_FLAGS) \
-	       -i$(IDENT) $@
+FINALISE_rom	= $(MAKEROM) $(MAKEROM_FLAGS) $(TGT_MAKEROM_FLAGS) \
+		  -i$(IDENT) $@
+
+# Some ROMs require specific flags to be passed to makerom.pl
+#
+MAKEROM_FLAGS_3c503 = -3
 
 # Drag in architecture-specific Makefile
 #
