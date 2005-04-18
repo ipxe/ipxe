@@ -193,18 +193,6 @@
 #	-DDOWNLOAD_PROTO_HTTP
 #			If defined, includes HTTP support.
 #
-#	Console options:
-#
-#	-DCONSOLE_FIRMWARE
-#			Set for firmware/BIOS provided (default if nothing else is set).
-#			Normally this is shows up on your CRT.
-#	-DCONSOLE_SERIAL
-#			Set for serial console.
-#	-DCONSOLE_DUAL
-#			Both of the above
-#	-DCONSOLE_DIRECT_VGA
-#			Set for direct VGA console (only for x86).
-#
 #	Interface export options:
 #
 #	-DPXE_EXPORT
@@ -246,23 +234,11 @@
 #			running the one you think you are.  Requires
 #			-DBUILD_SERIAL.
 #
-#	BUS options:
-#	
-#	-DCONFIG_PCI
-#			Include support for devices using the pci bus.
-#	-DCONFIG_ISA
-#			Include support for devices using isa bus.
-#	-DCONFIG_PCMCIA
-#			Include support for PCMCIA in general *development*
 # @/OptionDescription@
 
 # These default settings compile Etherboot with a small number of options.
 # You may wish to enable more of the features if the size of your ROM allows.
 
-
-# Select which buses etherboot should support
-CFLAGS+=	-DCONFIG_PCI -DCONFIG_ISA
-# CFLAGS+=	-DCONFIG_PCMCIA
 
 # For prompting and default on timeout
 CFLAGS+=	-DASK_BOOT=3 -DBOOT_FIRST=BOOT_NIC

@@ -8,6 +8,23 @@
  *
  */
 
+/* @BEGIN general.h
+ *
+ * Console configuration
+ *
+ * These options specify the console types that Etherboot will use for
+ * interaction with the user.
+ *
+ */
+
+#define CONSOLE_FIRMWARE	1	/* Default BIOS console */
+#define CONSOLE_SERIAL		0	/* Serial port */
+#define CONSOLE_DIRECT_VGA	0	/* Direct access to VGA card */
+#define CONSOLE_BTEXT		0	/* Who knows what this does? */
+#define CONSOLE_PC_KBD		0	/* Direct access to PC keyboard */
+
+/* @END general.h */
+
 /* @BEGIN serial.h
  *
  * Serial port configuration
