@@ -694,7 +694,6 @@ static void ide_disable(struct dev *dev)
 	ide_software_reset(info->ctrl);
 }
 
-#ifdef CONFIG_PCI
 static int ide_pci_probe(struct dev *dev, struct pci_device *pci)
 {
 	struct disk *disk = (struct disk *)dev;
@@ -832,12 +831,11 @@ static struct pci_driver ide_driver __pci_driver = {
 	.id_count  = sizeof(ide_controllers)/sizeof(ide_controllers),
 	.class     = PCI_CLASS_STORAGE_IDE,
 };
-#endif
 
 /* The isa driver works but it causes disks to show up twice.
  * comment it out for now.
  */
-#if 0 && defined(CONFIG_ISA)
+#if 0
 static int ide_isa_probe(struct dev * dev, unsigned short *probe_addrs)
 {
 	struct disk *disk = (struct disk *)dev;
