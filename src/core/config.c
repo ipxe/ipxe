@@ -22,25 +22,19 @@
 
 #ifdef BUILD_SERIAL
 #include "config/.buildserial.h"
-#define BUILD_SERIAL_STR "#" XSTR(BUILD_SERIAL_NUM)
+#define BUILD_SERIAL_STR " #" XSTR(BUILD_SERIAL_NUM)
 #else
 #define BUILD_SERIAL_STR ""
 #endif
 
 #ifdef BUILD_ID
-#define BUILD_ID_STR BUILD_ID
+#define BUILD_ID_STR " " BUILD_ID
 #else
 #define BUILD_ID_STR ""
 #endif
 
-#if defined(BUILD_ID) && defined(BUILD_SERIAL)
-#define BUILD_SPACER " "
-#else
-#define BUILD_SPACER ""
-#endif
-
 #if defined(BUILD_ID) || defined(BUILD_SERIAL)
-#define BUILD_STRING " [build " BUILD_ID_STR BUILD_SPACER BUILD_SERIAL_STR "]"
+#define BUILD_STRING " [build" BUILD_ID_STR BUILD_SERIAL_STR "]"
 #else
 #define BUILD_STRING ""
 #endif
