@@ -3,10 +3,13 @@
 #
 # IMPORTANT!
 # 
-# This file is deprecated.  All options are gradually being migrated
-# to config.h.  Only options that affect the entire build
-# (e.g. overriding the $(CC) Makefile variable) should be placed in
-# here.
+# The use of this file to set options that affect only single object
+# files is deprecated, because changing anything in this file results
+# in a complete rebuild, which is slow.  All options are gradually
+# being migrated to config.h, which does not suffer from this problem.
+# 
+# Only options that affect the entire build (e.g. overriding the $(CC)
+# Makefile variable) should be placed in here.
 #
 ##############################################################################
 ##############################################################################
