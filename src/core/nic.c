@@ -916,11 +916,14 @@ static int bootp(void)
 	unsigned char *bp_vend;
 
 #ifndef	NO_DHCP_SUPPORT
-	dhcp_machine_info[4] = dev.devid.bus_type;
-	dhcp_machine_info[5] = dev.devid.vendor_id & 0xff;
-	dhcp_machine_info[6] = ((dev.devid.vendor_id) >> 8) & 0xff;
-	dhcp_machine_info[7] = dev.devid.device_id & 0xff;
-	dhcp_machine_info[8] = ((dev.devid.device_id) >> 8) & 0xff;
+	struct {
+		uint8_t bus_type;
+		uint16_t vendor_id;
+		uint16_t device_id;
+	} __attribute__((packed)) *dhcp_dev_id = (void*)&dhcp_machine_info[4];
+	dhcp_dev_id->bus_type = dev.devid.bus_type;
+	dhcp_dev_id->vendor_id = htons ( dev.devid.vendor_id );
+	dhcp_dev_id->device_id = htons ( dev.devid.device_id );
 #endif	/* NO_DHCP_SUPPORT */
 	memset(&ip, 0, sizeof(struct bootpip_t));
 	ip.bp.bp_op = BOOTP_REQUEST;
