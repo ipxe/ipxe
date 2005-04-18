@@ -80,9 +80,6 @@ NRV2B		?= ./util/nrv2b
 #
 BIN		?= bin
 
-# Library containing all compiled objects
-BLIB	= $(BIN)/blib.a
-
 # Common flags
 #
 CFLAGS		+= -I include -I arch/$(ARCH)/include -I . -DARCH=$(ARCH)
