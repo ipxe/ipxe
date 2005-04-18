@@ -1,4 +1,5 @@
 #include "string.h"
+#include "config/isa.h"
 #include "isa.h"
 
 /*
@@ -28,6 +29,19 @@ DEV_BUS( struct isa_device, isa_dev );
 static char isa_magic[0]; /* guaranteed unique symbol */
 
 /*
+ * User-supplied probe address list
+ *
+ */
+static isa_probe_addr_t isa_extra_probe_addrs[] = {
+	ISA_PROBE_ADDRS
+#if ISA_PROBE_ONLY
+	, 0
+#endif
+};
+#define isa_extra_probe_addr_count \
+     ( sizeof ( isa_extra_probe_addrs ) / sizeof ( isa_extra_probe_addrs[0] ) )
+
+/*
  * Find an ISA device matching the specified driver
  *
  */
@@ -41,8 +55,8 @@ int find_isa_device ( struct isa_device *isa, struct isa_driver *driver ) {
 		isa->magic = isa_magic;
 	}
 
-	/* Iterate through any ISA probe addresses specified by
-	 * config.c, starting where we left off.
+	/* Iterate through any ISA probe addresses specified by the
+	 * user, starting where we left off.
 	 */
 	DBG ( "ISA searching for device matching driver %s\n", driver->name );
 	for ( i = isa->probe_idx ; i < isa_extra_probe_addr_count ; i++ ) {
@@ -51,7 +65,7 @@ int find_isa_device ( struct isa_device *isa, struct isa_driver *driver ) {
 			isa->already_tried = 0;
 			continue;
 		}
-
+		
 		/* Set I/O address */
 		ioaddr = isa_extra_probe_addrs[i];
 

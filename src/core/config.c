@@ -8,6 +8,9 @@
 #include "etherboot.h"
 #include "dev.h"
 #include "console.h"
+
+#include "config/general.h"
+
 #ifdef BUILD_SERIAL
 #include ".buildserial.h"
 #define xstr(s) str(s)
@@ -107,44 +110,35 @@ void print_config ( void ) {
 /*
  * Drag in all requested console types
  *
- * At least one of the CONSOLE_xxx has to be set.  CONSOLE_DUAL sets
- * both CONSOLE_FIRMWARE and CONSOLE_SERIAL for legacy compatibility.
- * If no CONSOLE_xxx is set, CONSOLE_FIRMWARE is assumed.
+ * CONSOLE_DUAL sets both CONSOLE_FIRMWARE and CONSOLE_SERIAL for
+ * legacy compatibility.
  *
  */
 
-#ifdef CONSOLE_CRT
-#define CONSOLE_FIRMWARE
+#if	CONSOLE_DUAL
+#undef	CONSOLE_FIRMWARE
+#define	CONSOLE_FIRMWARE	1
+#undef	CONSOLE_SERIAL
+#define	CONSOLE_SERIAL		1
 #endif
 
-#ifdef	CONSOLE_DUAL
-#undef CONSOLE_FIRMWARE
-#define CONSOLE_FIRMWARE
-#undef CONSOLE_SERIAL
-#define CONSOLE_SERIAL
-#endif
-
-#if	!defined(CONSOLE_FIRMWARE) && !defined(CONSOLE_SERIAL)
-#define CONSOLE_FIRMWARE
-#endif
-
-#ifdef CONSOLE_FIRMWARE
+#if CONSOLE_FIRMWARE
 REQUIRE_OBJECT ( bios_console );
 #endif
 
-#ifdef CONSOLE_SERIAL
+#if CONSOLE_SERIAL
 REQUIRE_OBJECT ( serial );
 #endif
 
-#ifdef CONSOLE_DIRECT_VGA
+#if CONSOLE_DIRECT_VGA
 REQUIRE_OBJECT ( video_subr );
 #endif
 
-#ifdef CONSOLE_BTEXT
+#if CONSOLE_BTEXT
 REQUIRE_OBJECT ( btext );
 #endif
 
-#ifdef CONSOLE_PC_KBD
+#if CONSOLE_PC_KBD
 REQUIRE_OBJECT ( pc_kbd );
 #endif
 
@@ -153,22 +147,6 @@ REQUIRE_OBJECT ( pc_kbd );
  *
  */
 
-#ifndef NORELOCATE
+#if RELOCATE
 REQUIRE_OBJECT ( relocate );
 #endif
-
-/*
- * Allow ISA probe address list to be overridden
- *
- */
-#include "isa.h"
-#ifndef ISA_PROBE_ADDRS
-#define ISA_PROBE_ADDRS
-#endif
-
-isa_probe_addr_t isa_extra_probe_addrs[] = {
-	ISA_PROBE_ADDRS
-};
-
-unsigned int isa_extra_probe_addr_count
-      = sizeof ( isa_extra_probe_addrs ) / sizeof ( isa_extra_probe_addrs[0] );

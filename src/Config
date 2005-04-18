@@ -304,10 +304,6 @@ CFLAGS+=	-DASK_BOOT=3 -DBOOT_FIRST=BOOT_NIC
 # CFLAGS+=	-DDHCP_USER_CLASS="5,'A','L','P','H','A',4,'B','E','T','A'" \
 #		-DDHCP_USER_CLASS_LEN=11
 
-# for btext console support
-# CFLAGS+=	-DCONSOLE_BTEXT 
-# for direct PC kbd support 
-# CFLAGS+=	-DCONSOLE_PC_KBD
 # Set to enable FILO support
 # for FILO support it will make main call pci_init
 # INCLUDE_FILO=y
@@ -373,11 +369,6 @@ CFLAGS+=	-DPXE_IMAGE -DPXE_EXPORT
 # ID string
 # CFLAGS+=	-DBUILD_SERIAL
 # CFLAGS+=	-DBUILD_SERIAL -DBUILD_ID=\"testing\"
-
-# Do not relocate
-# core/relocate.c should really be moved to an arch specific directory
-# but this is here for archs that don't support relocation
-# CFLAGS+=	-DNORELOCATE
 
 
 

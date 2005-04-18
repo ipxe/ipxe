@@ -66,12 +66,5 @@ extern int find_isa_device ( struct isa_device *eisa,
 extern int find_isa_boot_device ( struct dev *dev,
 				  struct isa_driver *driver );
 
-/*
- * config.c defines isa_extra_probe_addrs and isa_extra_probe_addr_count.
- *
- */
-extern isa_probe_addr_t isa_extra_probe_addrs[];
-extern unsigned int isa_extra_probe_addr_count;
-
 #endif /* ISA_H */
 
