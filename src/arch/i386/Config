@@ -1,3 +1,20 @@
+##############################################################################
+##############################################################################
+#
+# IMPORTANT!
+# 
+# The use of this file to set options that affect only single object
+# files is deprecated, because changing anything in this file results
+# in a complete rebuild, which is slow.  All options are gradually
+# being migrated to config.h, which does not suffer from this problem.
+# 
+# Only options that affect the entire build (e.g. overriding the $(CC)
+# Makefile variable) should be placed in here.
+#
+##############################################################################
+##############################################################################
+
+
 # Config for i386 Etherboot
 #
 # Do not delete the tag OptionDescription and /OptionDescription
@@ -98,10 +115,6 @@ CFLAGS+=	-DPCBIOS
 # These options affect the loader that is prepended to the Etherboot image
 # LCONFIG+=	-DBBS_BUT_NOT_PNP_COMPLIANT
 # LCONFIG+=	-DBOOT_INT18H
-
-# Produce code that will work inside the Bochs emulator.  The pnic
-# driver is probably the best one to try.
-# CFLAGS+=	-DCONFIG_PCI_DIRECT
 
 # Produce code that will work with OpenBSD's pxeboot
 # CFLAGS+=	-DFLATTEN_REAL_MODE

@@ -1,5 +1,20 @@
+##############################################################################
+##############################################################################
+#
+# IMPORTANT!
+# 
+# This file is deprecated.  All options are gradually being migrated
+# to config.h.  Only options that affect the entire build
+# (e.g. overriding the $(CC) Makefile variable) should be placed in
+# here.
+#
+##############################################################################
+##############################################################################
+
+
 #
 # Config for Etherboot/32
+#
 #
 # Do not delete the tag OptionDescription and /OptionDescription
 # It is used to automatically generate the documentation.
