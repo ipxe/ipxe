@@ -2,10 +2,16 @@
 
 #define CF ( 1 << 0 )
 
-/**************************************************************************
-DISK_INIT - Initialize the disk system
-**************************************************************************/
-void disk_init ( void ) {
+struct disk_sector {
+	char data[512];
+};
+
+/*
+ * Reset the disk system using INT 13,0.  Forces both hard disks and
+ * floppy disks to seek back to track 0.
+ *
+ */
+static void disk_init ( void ) {
 	REAL_EXEC ( rm_disk_init,
 		    "sti\n\t"
 		    "xorw %%ax,%%ax\n\t"
@@ -19,38 +25,35 @@ void disk_init ( void ) {
 			      "ebp", "esi", "edi" ) );
 }
 
-/**************************************************************************
-DISK_READ - Read a sector from disk
-**************************************************************************/
-unsigned int pcbios_disk_read ( int drive, int cylinder, int head, int sector,
-				char *fixme_buf ) {
-	uint16_t ax, flags, discard_c, discard_d;
-	segoff_t buf = SEGOFF ( fixme_buf );
+/*
+ * Read a single sector from a disk using INT 13,2.
+ *
+ * Returns the BIOS status code (%ah) - 0 indicates success
+ *
+ */
+static unsigned int pcbios_disk_read ( int drive, int cylinder, int head,
+				       int sector, struct disk_sector *buf ) {
+	uint16_t basemem_buf, status, flags;
+	int discard_c, discard_d;
 
-	/* FIXME: buf should be passed in as a segoff_t rather than a
-	 * char *
-	 */
-
+	basemem_buf = BASEMEM_PARAMETER_INIT ( *buf );
 	REAL_EXEC ( rm_pcbios_disk_read,
 		    "sti\n\t"
-		    "pushl %%ebx\n\t"	   /* Convert %ebx to %es:bx */
-		    "popw %%bx\n\t"
-		    "popw %%es\n\t"
-		    "movb $0x02, %%ah\n\t" /* INT 13,2 - Read disk sector */
-		    "movb $0x01, %%al\n\t" /* Read one sector */
+		    "movw $0x0201, %%ax\n\t" /* Read a single sector */
 		    "int $0x13\n\t"
 		    "pushfw\n\t"
 		    "popw %%bx\n\t"
 		    "cli\n\t",
 		    4,
-		    OUT_CONSTRAINTS ( "=a" ( ax ), "=b" ( flags ),
+		    OUT_CONSTRAINTS ( "=a" ( status ), "=b" ( flags ),
 				      "=c" ( discard_c ), "=d" ( discard_d ) ),
 		    IN_CONSTRAINTS ( "c" ( ( ( cylinder & 0xff ) << 8 ) |
 					   ( ( cylinder >> 8 ) & 0x3 ) |
 					   sector ),
 				     "d" ( ( head << 8 ) | drive ),
-				     "b" ( buf ) ),
+				     "b" ( basemem_buf ) ),
 		    CLOBBER ( "ebp", "esi", "edi" ) );
+	BASEMEM_PARAMETER_DONE ( *buf );
 
-	return ( flags & CF ) ? ax : 0;
+	return ( flags & CF ) ? ( status >> 8 ) : 0;
 }
