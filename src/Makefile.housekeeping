@@ -258,10 +258,11 @@ $(BIN)/%.info :
 # changes.
 #
 BLIB_LIST	= $(BIN)/.blib.list
-.PHONY : always_check_blib_list
-$(BLIB_LIST) : always_check_blib_list
-	@[ "$(shell cat $@)" = "$(BLIB_OBJS)" ] || echo "$(BLIB_OBJS)" > $@
-.SECONDARY : $(BLIB_LIST)
+ifneq ($(shell cat $(BLIB_LIST)),$(BLIB_OBJS))
+$(shell echo "$(BLIB_OBJS)" > $(BLIB_LIST))
+endif
+
+$(BLIB_LIST) :
 
 # Library of all objects
 #
