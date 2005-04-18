@@ -29,7 +29,7 @@ static void free_unused_base_memory ( void );
  * Return amount of free base memory in bytes
  *
  */
-uint32_t get_free_base_memory ( void ) {
+unsigned int get_free_base_memory ( void ) {
 	return fbms << 10;
 }
 
@@ -39,7 +39,7 @@ uint32_t get_free_base_memory ( void ) {
  *
  */
 void * alloc_base_memory ( size_t size ) {
-	uint16_t size_kb = ( size + 1023 ) >> 10;
+	unsigned int size_kb = ( size + 1023 ) >> 10;
 	void *ptr;
 
 	DBG ( "Trying to allocate %d bytes of base memory from %d kB free\n",
@@ -99,8 +99,8 @@ void * alloc_base_memory ( size_t size ) {
  *
  */
 void free_base_memory ( void *ptr, size_t size ) {
-	uint16_t remainder = virt_to_phys ( ptr ) & 1023;
-	uint16_t size_kb = ( size + remainder + 1023 ) >> 10;
+	unsigned int remainder = virt_to_phys ( ptr ) & 1023;
+	unsigned int size_kb = ( size + remainder + 1023 ) >> 10;
 	union free_base_memory_block *free_block = 
 		( ( void * ) ( ptr - remainder ) );
 	

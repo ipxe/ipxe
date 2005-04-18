@@ -24,7 +24,7 @@ union free_base_memory_block {
 };
 
 /* Function prototypes */
-extern uint32_t get_free_base_memory ( void );
+extern unsigned int get_free_base_memory ( void );
 extern void * alloc_base_memory ( size_t size );
 extern void free_base_memory ( void *ptr, size_t size );
 
