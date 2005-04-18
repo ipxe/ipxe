@@ -17,11 +17,11 @@
  *
  */
 
-#define CONSOLE_FIRMWARE	1	/* Default BIOS console */
-#define CONSOLE_SERIAL		0	/* Serial port */
-#define CONSOLE_DIRECT_VGA	0	/* Direct access to VGA card */
-#define CONSOLE_BTEXT		0	/* Who knows what this does? */
-#define CONSOLE_PC_KBD		0	/* Direct access to PC keyboard */
+#define	CONSOLE_FIRMWARE	/* Default BIOS console */
+#undef	CONSOLE_SERIAL		/* Serial port */
+#undef	CONSOLE_DIRECT_VGA	/* Direct access to VGA card */
+#undef	CONSOLE_BTEXT		/* Who knows what this does? */
+#undef	CONSOLE_PC_KBD		/* Direct access to PC keyboard */
 
 /* @END general.h */
 
@@ -35,18 +35,49 @@
  *
  */
 
-#define COMCONSOLE	0x3f8		/* I/O port address */
+#define	COMCONSOLE	0x3f8		/* I/O port address */
 
 /* Keep settings from a previous user of the serial port (e.g. lilo or
  * LinuxBIOS), ignoring COMSPEED, COMDATA, COMPARITY and COMSTOP.
  */
-#define COMPRESERVE	0
+#undef	COMPRESERVE
 
-#if ! COMPRESERVE
-#define COMSPEED	9600		/* Baud rate */
-#define COMDATA		8		/* Data bits */ 
-#define COMPARITY	0		/* Parity: 0=None, 1=Odd, 2=Even */
-#define COMSTOP		1		/* Stop bits */
+#ifdef COMPRESERVE
+#define	COMSPEED	9600		/* Baud rate */
+#define	COMDATA		8		/* Data bits */ 
+#define	COMPARITY	0		/* Parity: 0=None, 1=Odd, 2=Even */
+#define	COMSTOP		1		/* Stop bits */
 #endif
 
 /* @END serial.h */
+
+/* @BEGIN isa.h
+ *
+ * ISA probe address configuration
+ *
+ * You can override the list of addresses that will be probed by any
+ * ISA drivers.
+ *
+ */
+#undef	ISA_PROBE_ADDRS		/* e.g. 0x200, 0x300 */
+#undef	ISA_PROBE_ONLY		/* Do not probe any other addresses */
+
+/* @END isa.h */
+
+/* @BEGIN general.h
+ *
+ * Obscure configuration options
+ *
+ * You probably don't need to touch these.
+ *
+ */
+
+#define	RELOCATE		/* Relocate to high memory */
+#undef	BUILD_SERIAL		/* Include an automatic build serial
+				 * number.  Add "bs" to the list of
+				 * make targets.  For example:
+				 * "make bin/rtl8139.dsk bs" */
+#undef	BUILD_ID		/* Include a custom build ID string,
+				 * e.g "test-foo" */
+
+/* @END general.h */

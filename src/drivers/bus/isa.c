@@ -32,11 +32,21 @@ static char isa_magic[0]; /* guaranteed unique symbol */
  * User-supplied probe address list
  *
  */
-static isa_probe_addr_t isa_extra_probe_addrs[] = {
-	ISA_PROBE_ADDRS
-#if ISA_PROBE_ONLY
-	, 0
+#ifdef ISA_PROBE_ADDRS
+#  ifdef ISA_PROBE_ONLY
+#    define			HAVE_ISA_PROBE_ADDRS	1
+#    define			ISA_PROBE_ADDR_LIST	ISA_PROBE_ADDRS, 0
+#  else
+#    define			HAVE_ISA_PROBE_ADDRS	1
+#    define			ISA_PROBE_ADDR_LIST	ISA_PROBE_ADDRS
+#  endif
+#else
+#  define			HAVE_ISA_PROBE_ADDRS	0
+#  define			ISA_PROBE_ADDR_LIST	
 #endif
+
+static isa_probe_addr_t isa_extra_probe_addrs[] = {
+	ISA_PROBE_ADDR_LIST
 };
 #define isa_extra_probe_addr_count \
      ( sizeof ( isa_extra_probe_addrs ) / sizeof ( isa_extra_probe_addrs[0] ) )

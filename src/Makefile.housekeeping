@@ -359,26 +359,24 @@ CLEANUP	+= $(NRV2B)
 # build targets to get a serial number printed at the end of the
 # build.  Enable -DBUILD_SERIAL in order to see it when the code runs.
 #
-BUILDSERIAL_H = include/.buildserial.h
+BUILDSERIAL_H		= config/.buildserial.h
+BUILDSERIAL_NOW		= config/.buildserial.now
+BUILDSERIAL_NEXT	= config/.buildserial.next
 
-$(BUILDSERIAL_H) :
-	@if [ ! -s $@ ]; then echo '#define BUILD_SERIAL_NUM 0' > $@; fi
-	@perl -pi -e 's/(BUILD_SERIAL_NUM)\s+(\d+)/"$${1} ".($${2}+1)/e' $@
+$(BUILDSERIAL_NOW) $(BUILDSERIAL_NEXT) :
+	echo 1 > $@
 
-bs : $(BUILDSERIAL_H)
-	@perl -n -e '/BUILD_SERIAL_NUM\s+(\d+)/ && ' \
-		-e 'print "Build serial number is $$1\n";' $<
+$(BUILDSERIAL_H) : $(BUILDSERIAL_NOW) $(BUILDSERIAL_NEXT)
+	echo '#define BUILD_SERIAL_NUM $(shell cat $<)' > $@
 
 ifeq ($(filter bs,$(MAKECMDGOALS)),bs)
-.PHONY : $(BUILDSERIAL_H)
+$(shell diff -q $(BUILDSERIAL_NOW) $(BUILDSERIAL_NEXT) > /dev/null || \
+	cp -f $(BUILDSERIAL_NEXT) $(BUILDSERIAL_NOW))
 endif
 
-# Ensure that include/.buildserial.h always exists, to solve the
-# problem of bootstrapping a BUILD_SERIAL-enabled build.
-#
-ifeq ($(wildcard $(BUILDSERIAL_H)),)
-$(shell $(TOUCH) $(BUILDSERIAL_H))
-endif
+bs : $(BUILDSERIAL_NOW)
+	@echo $$(( $(shell cat $<) + 1 )) > $(BUILDSERIAL_NEXT)
+	@echo "Build serial number is $(shell cat $<)"
 
 # List of available architectures
 #

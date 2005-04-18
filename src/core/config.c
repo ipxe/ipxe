@@ -11,21 +11,46 @@
 
 #include "config/general.h"
 
+/*
+ * Build ID string calculations
+ *
+ */
+#undef XSTR
+#undef STR
+#define XSTR(s) STR(s)
+#define STR(s) #s
+
 #ifdef BUILD_SERIAL
-#include ".buildserial.h"
-#define xstr(s) str(s)
-#define str(s) #s
+#include "config/.buildserial.h"
+#define BUILD_SERIAL_STR "#" XSTR(BUILD_SERIAL_NUM)
+#else
+#define BUILD_SERIAL_STR ""
 #endif
 
-void print_config ( void ) {
-	printf( "Etherboot " VERSION
-#ifdef BUILD_SERIAL
-		" [build " 
 #ifdef BUILD_ID
-		BUILD_ID " "
+#define BUILD_ID_STR BUILD_ID
+#else
+#define BUILD_ID_STR ""
 #endif
-		"#" xstr(BUILD_SERIAL_NUM) "]"
-#endif /* BUILD_SERIAL */
+
+#if defined(BUILD_ID) && defined(BUILD_SERIAL)
+#define BUILD_SPACER " "
+#else
+#define BUILD_SPACER ""
+#endif
+
+#if defined(BUILD_ID) || defined(BUILD_SERIAL)
+#define BUILD_STRING " [build " BUILD_ID_STR BUILD_SPACER BUILD_SERIAL_STR "]"
+#else
+#define BUILD_STRING ""
+#endif
+
+/*
+ * Print out configuration
+ *
+ */
+void print_config ( void ) {
+	printf( "Etherboot " VERSION BUILD_STRING
 		" (GPL) http://etherboot.org\n"
 		"Drivers: " );
 	print_drivers();
@@ -115,30 +140,30 @@ void print_config ( void ) {
  *
  */
 
-#if	CONSOLE_DUAL
+#ifdef	CONSOLE_DUAL
 #undef	CONSOLE_FIRMWARE
 #define	CONSOLE_FIRMWARE	1
 #undef	CONSOLE_SERIAL
 #define	CONSOLE_SERIAL		1
 #endif
 
-#if CONSOLE_FIRMWARE
+#ifdef CONSOLE_FIRMWARE
 REQUIRE_OBJECT ( bios_console );
 #endif
 
-#if CONSOLE_SERIAL
+#ifdef CONSOLE_SERIAL
 REQUIRE_OBJECT ( serial );
 #endif
 
-#if CONSOLE_DIRECT_VGA
+#ifdef CONSOLE_DIRECT_VGA
 REQUIRE_OBJECT ( video_subr );
 #endif
 
-#if CONSOLE_BTEXT
+#ifdef CONSOLE_BTEXT
 REQUIRE_OBJECT ( btext );
 #endif
 
-#if CONSOLE_PC_KBD
+#ifdef CONSOLE_PC_KBD
 REQUIRE_OBJECT ( pc_kbd );
 #endif
 
@@ -147,6 +172,6 @@ REQUIRE_OBJECT ( pc_kbd );
  *
  */
 
-#if RELOCATE
+#ifdef RELOCATE
 REQUIRE_OBJECT ( relocate );
 #endif

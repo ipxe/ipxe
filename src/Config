@@ -221,18 +221,6 @@
 #			which saves power while waiting for user interaction.
 #			Good for compute clusters and VMware emulation.
 #			But may not work for all CPUs.
-#	-DBUILD_SERIAL
-#			Include an auto-incrementing build number in
-#			the Etherboot welcome message.  Useful when
-#			developing, to be sure that the file you
-#			compiled is the one you're currently testing.
-#	-DBUILD_ID
-#			Include a build ID string in the Etherboot
-#			welcome message.  Useful when developing, if
-#			you have multiple builds with different
-#			configurations and want to check you're
-#			running the one you think you are.  Requires
-#			-DBUILD_SERIAL.
 #
 # @/OptionDescription@
 
@@ -364,12 +352,6 @@ CFLAGS+=	-DPXE_IMAGE -DPXE_EXPORT
 # Support for PXE emulation. Works only with FreeBSD to load the kernel
 # via pxeboot, use only with DOWNLOAD_PROTO_NFS
 # CFLAGS+=	-DFREEBSD_PXEEMU
-
-# Include an auto-incrementing build serial number and optional build
-# ID string
-# CFLAGS+=	-DBUILD_SERIAL
-# CFLAGS+=	-DBUILD_SERIAL -DBUILD_ID=\"testing\"
-
 
 
 
