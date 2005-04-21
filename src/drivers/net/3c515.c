@@ -565,7 +565,9 @@ static void t515_transmit(struct nic *nic, const char *d,	/* Destination */
 /**************************************************************************
 DISABLE - Turn off ethernet interface
 ***************************************************************************/
-static void t515_disable ( struct nic *nic ) {
+static void t515_disable ( struct nic *nic, struct isapnp_device *isapnp __unused ) {
+
+	nic_disable ( nic );
 
 	/* merge reset an disable */
 	t515_reset(nic);
@@ -610,16 +612,18 @@ static struct nic_operations t515_operations = {
 	.poll		= t515_poll,
 	.transmit	= t515_transmit,
 	.irq		= t515_irq,
-	.disable	= t515_disable,
+
 };
 
 /**************************************************************************
 PROBE - Look for an adapter, this routine's visible to the outside
 You should omit the last argument struct pci_device * for a non-PCI NIC
 ***************************************************************************/
-static int t515_probe ( struct dev *dev, struct isapnp_device *isapnp ) {
-	struct nic *nic = nic_device ( dev );
+static int t515_probe ( struct nic *nic, struct isapnp_device *isapnp ) {
+
 	/* Direct copy from Beckers 3c515.c removing any ISAPNP sections */
+
+	isapnp_fill_nic ( nic, isapnp );
 
 	nic->ioaddr = isapnp->ioaddr;
 	nic->irqno = isapnp->irqno;
@@ -762,9 +766,9 @@ static struct isapnp_id t515_adapters[] = {
 };
 
 static struct isapnp_driver t515_driver =
-	ISAPNP_DRIVER ( "3c515", t515_adapters );
+	ISAPNP_DRIVER ( t515_adapters );
 
-BOOT_DRIVER ( "3c515", find_isapnp_boot_device, t515_driver,
-	      t515_probe );
+DRIVER ( "3c515", nic_driver, isapnp_driver, t515_driver,
+	 t515_probe, t515_disable );
 
 ISA_ROM ( "3c515", "3c515 Fast EtherLink ISAPnP" );

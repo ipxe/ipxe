@@ -685,7 +685,7 @@ static int ReadMII (int byMIIIndex, int);
 static void WriteMII (char, char, char, int);
 static void MIIDelay (void);
 static void rhine_init_ring (struct nic *dev);
-static void rhine_disable (struct nic *nic);
+static void rhine_disable (struct nic *nic, struct pci_device *pci);
 static void rhine_reset (struct nic *nic);
 static int rhine_poll (struct nic *nic, int retreive);
 static void rhine_transmit (struct nic *nic, const char *d, unsigned int t,
@@ -954,8 +954,8 @@ static struct nic_operations rhine_operations;
 static struct pci_driver rhine_driver;
 
 static int
-rhine_probe ( struct dev *dev, struct pci_device *pci ) {
-    struct nic *nic = nic_device ( dev );
+rhine_probe ( struct nic *nic, struct pci_device *pci ) {
+
     struct rhine_private *tp = (struct rhine_private *) nic->priv_data;
 
     if (!pci->ioaddr)
@@ -965,6 +965,7 @@ rhine_probe ( struct dev *dev, struct pci_device *pci ) {
     adjust_pci_device ( pci );
     rhine_reset (nic);
     nic->nic_op	= &rhine_operations;
+    pci_fill_nic ( nic, pci );
     nic->irqno	  = pci->irq;
     nic->ioaddr   = tp->ioaddr;
     return 1;
@@ -1157,7 +1158,8 @@ rhine_probe1 (struct nic *nic, struct pci_device *pci, int ioaddr, int chip_id, 
 }
 
 static void 
-rhine_disable ( struct nic *nic ) {
+rhine_disable ( struct nic *nic, struct pci_device *pci __unused ) {
+    nic_disable ( nic );
     struct rhine_private *tp = (struct rhine_private *) nic->priv_data;
     int ioaddr = tp->ioaddr;
 
@@ -1406,7 +1408,7 @@ static struct nic_operations rhine_operations = {
 	.poll		= rhine_poll,
 	.transmit	= rhine_transmit,
 	.irq		= rhine_irq,
-	.disable	= rhine_disable,
+
 };
 
 static struct pci_id rhine_nics[] = {
@@ -1418,8 +1420,9 @@ PCI_ROM(0x1106, 0x6100, "via-rhine-old",   "VIA 86C100A"),	/* Rhine-II */
 };
 
 static struct pci_driver rhine_driver =
-	PCI_DRIVER ( "VIA 86C100", rhine_nics, PCI_NO_CLASS );
+	PCI_DRIVER ( rhine_nics, PCI_NO_CLASS );
 
-BOOT_DRIVER ( "VIA 86C100", find_pci_boot_device, rhine_driver, rhine_probe );
+DRIVER ( "VIA 86C100", nic_driver, pci_driver, rhine_driver,
+	 rhine_probe, rhine_disable );
 
 /* EOF via-rhine.c */

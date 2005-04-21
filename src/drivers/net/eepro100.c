@@ -603,8 +603,8 @@ static void eepro100_disable ( struct nic *nic __unused ) {
  *            leaves the 82557 initialized, and ready to recieve packets.
  */
 
-static int eepro100_probe ( struct dev *dev, struct pci_device *p ) {
-	struct nic *nic = nic_device ( dev );
+static int eepro100_probe ( struct nic *nic, struct pci_device *p ) {
+
 	unsigned short sum = 0;
 	int i;
 	int read_cmd, ee_size;
@@ -796,7 +796,7 @@ static struct nic_operations eepro100_operations = {
 	.poll		= eepro100_poll,
 	.transmit	= eepro100_transmit,
 	.irq		= eepro100_irq,
-	.disable	= eepro100_disable,
+
 };
 
 static struct pci_id eepro100_nics[] = {
@@ -837,6 +837,7 @@ PCI_ROM(0x8086, 0x5201, "eepro100-5201", "Intel EtherExpress PRO/100 Intelligent
 
 
 static struct pci_driver eepro100_driver =
-	PCI_DRIVER ( "EEPRO100", eepro100_nics, PCI_NO_CLASS );
+	PCI_DRIVER ( eepro100_nics, PCI_NO_CLASS );
 
-BOOT_DRIVER ( "EEPRO100", find_pci_boot_device, eepro100_driver, eepro100_probe );
+DRIVER ( "EEPRO100", nic_driver, pci_driver, eepro100_driver,
+	 eepro100_probe, eepro100_disable );

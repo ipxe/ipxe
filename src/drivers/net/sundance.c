@@ -576,15 +576,15 @@ static struct nic_operations sundance_operations = {
 	.poll		= sundance_poll,
 	.transmit	= sundance_transmit,
 	.irq		= sundance_irq,
-	.disable	= sundance_disable,
+
 };
 static struct pci_driver sundance_driver;
 
 /**************************************************************************
 PROBE - Look for an adapter, this routine's visible to the outside
 ***************************************************************************/
-static int sundance_probe ( struct dev *dev, struct pci_device *pci ) {
-	struct nic *nic = nic_device ( dev );
+static int sundance_probe ( struct nic *nic, struct pci_device *pci ) {
+
 	u8 ee_data[EEPROM_SIZE];
 	u16 mii_ctl;
 	int i;
@@ -740,6 +740,7 @@ static int sundance_probe ( struct dev *dev, struct pci_device *pci ) {
 
 	/* point to NIC specific routines */
 	nic->nic_op	= &sundance_operations;
+	pci_fill_nic ( nic, pci );
 	nic->irqno = pci->irq;
 	nic->ioaddr = BASE;
 
@@ -884,6 +885,7 @@ static struct pci_id sundance_nics[] = {
 };
 
 static struct pci_driver sundance_driver =
-	PCI_DRIVER ( "SUNDANCE/PCI", sundance_nics, PCI_NO_CLASS );
+	PCI_DRIVER ( sundance_nics, PCI_NO_CLASS );
 
-BOOT_DRIVER ( "SUNDANCE/PCI", find_pci_boot_device, sundance_driver, sundance_probe );
+DRIVER ( "SUNDANCE/PCI", nic_driver, pci_driver, sundance_driver,
+	 sundance_probe, sundance_disable );

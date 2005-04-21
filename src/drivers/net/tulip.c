@@ -486,13 +486,13 @@ static int mdio_read(struct nic *nic, int phy_id, int location);
 static void mdio_write(struct nic *nic, int phy_id, int location, int value);
 static int read_eeprom(unsigned long ioaddr, int location, int addr_len);
 static void parse_eeprom(struct nic *nic);
-static int tulip_probe(struct dev *dev,struct pci_device *pci);
+static int tulip_probe(struct nic *nic,struct pci_device *pci);
 static void tulip_init_ring(struct nic *nic);
 static void tulip_reset(struct nic *nic);
 static void tulip_transmit(struct nic *nic, const char *d, unsigned int t,
                            unsigned int s, const char *p);
 static int tulip_poll(struct nic *nic, int retrieve);
-static void tulip_disable(struct nic *nic);
+static void tulip_disable(struct nic *nic, struct pci_device *pci);
 static void nway_start(struct nic *nic);
 static void pnic_do_nway(struct nic *nic);
 static void select_media(struct nic *nic, int startup);
@@ -1180,7 +1180,8 @@ static int tulip_poll(struct nic *nic, int retrieve)
 /*********************************************************************/
 /* eth_disable - Disable the interface                               */
 /*********************************************************************/
-static void tulip_disable ( struct nic *nic ) {
+static void tulip_disable ( struct nic *nic, struct pci_device *pci __unused ) {
+nic_disable ( nic );
 #ifdef TULIP_DEBUG_WHERE
     whereami("tulip_disable\n");
 #endif
@@ -1218,14 +1219,14 @@ static struct nic_operations tulip_operations = {
 	.poll		= tulip_poll,
 	.transmit	= tulip_transmit,
 	.irq		= tulip_irq,
-	.disable	= tulip_disable,
+
 };
 
 /*********************************************************************/
 /* eth_probe - Look for an adapter                                   */
 /*********************************************************************/
-static int tulip_probe ( struct dev *dev, struct pci_device *pci ) {
-    struct nic *nic = nic_device ( dev );
+static int tulip_probe ( struct nic *nic, struct pci_device *pci ) {
+
     u32 i;
     u8  chip_rev;
     u8 ee_data[EEPROM_SIZE];
@@ -1237,6 +1238,7 @@ static int tulip_probe ( struct dev *dev, struct pci_device *pci ) {
         return 0;
 
     ioaddr         = pci->ioaddr;
+    pci_fill_nic ( nic, pci );
     nic->ioaddr    = pci->ioaddr & ~3;
     nic->irqno     = 0;
 
@@ -2074,6 +2076,7 @@ PCI_ROM(0x1737, 0xab09, "tulip-ab09",  "Tulip 0x1737 0xab09"),
 };
 
 static struct pci_driver tulip_driver =
-	PCI_DRIVER ( "Tulip", tulip_nics, PCI_NO_CLASS );
+	PCI_DRIVER ( tulip_nics, PCI_NO_CLASS );
 
-BOOT_DRIVER ( "Tulip", find_pci_boot_device, tulip_driver, tulip_probe );
+DRIVER ( "Tulip", nic_driver, pci_driver, tulip_driver,
+	 tulip_probe, tulip_disable );

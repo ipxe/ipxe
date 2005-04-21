@@ -157,13 +157,13 @@ static int TxPtr;
 /*********************************************************************/
 static void whereami(const char *str);
 static int read_eeprom(unsigned long ioaddr, int location, int addr_len);
-static int davicom_probe(struct dev *dev,struct pci_device *pci);
+static int davicom_probe(struct nic *nic,struct pci_device *pci);
 static void davicom_init_chain(struct nic *nic);	/* Sten 10/9 */
 static void davicom_reset(struct nic *nic);
 static void davicom_transmit(struct nic *nic, const char *d, unsigned int t,
 			   unsigned int s, const char *p);
 static int davicom_poll(struct nic *nic, int retrieve);
-static void davicom_disable(struct nic *nic);
+static void davicom_disable(struct nic *nic, struct pci_device *pci);
 #ifdef	DAVICOM_DEBUG
 static void davicom_more(void);
 #endif /* DAVICOM_DEBUG */
@@ -620,7 +620,8 @@ static int davicom_poll(struct nic *nic, int retrieve)
 /*********************************************************************/
 /* eth_disable - Disable the interface                               */
 /*********************************************************************/
-static void davicom_disable ( struct nic *nic ) {
+static void davicom_disable ( struct nic *nic, struct pci_device *pci __unused ) {
+  nic_disable ( nic );
   whereami("davicom_disable\n");
 
   davicom_reset(nic);
@@ -655,8 +656,8 @@ static void davicom_irq(struct nic *nic __unused, irq_action_t action __unused)
 /*********************************************************************/
 /* eth_probe - Look for an adapter                                   */
 /*********************************************************************/
-static int davicom_probe ( struct dev *dev, struct pci_device *pci ) {
-  struct nic *nic = nic_device ( dev );
+static int davicom_probe ( struct nic *nic, struct pci_device *pci ) {
+
   unsigned int i;
 
   whereami("davicom_probe\n");
@@ -669,6 +670,7 @@ static int davicom_probe ( struct dev *dev, struct pci_device *pci ) {
   ioaddr  = pci->ioaddr;
 
   nic->irqno  = 0;
+  pci_fill_nic ( nic, pci );
   nic->ioaddr = pci->ioaddr;
 
   /* wakeup chip */
@@ -703,7 +705,7 @@ static struct nic_operations davicom_operations = {
 	.poll		= davicom_poll,
 	.transmit	= davicom_transmit,
 	.irq		= davicom_irq,
-	.disable	= davicom_disable,
+
 };
 
 static struct pci_id davicom_nics[] = {
@@ -714,6 +716,7 @@ PCI_ROM(0x1282, 0x9132, "davicom9132", "Davicom 9132"),	/* Needs probably some f
 };
 
 static struct pci_driver davicom_driver =
-	PCI_DRIVER ( "DAVICOM", davicom_nics, PCI_NO_CLASS );
+	PCI_DRIVER ( davicom_nics, PCI_NO_CLASS );
 
-BOOT_DRIVER ( "DAVICOM", find_pci_boot_device, davicom_driver, davicom_probe );
+DRIVER ( "DAVICOM", nic_driver, pci_driver, davicom_driver,
+	 davicom_probe, davicom_disable );

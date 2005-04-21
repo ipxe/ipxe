@@ -644,7 +644,8 @@ static void mtd_transmit(
 /**************************************************************************
 DISABLE - Turn off ethernet interface
 ***************************************************************************/
-static void mtd_disable ( struct nic *nic ) {
+static void mtd_disable ( struct nic *nic, struct pci_device *pci __unused ) {
+    nic_disable ( nic );
     /* put the card in its initial state */
     /* Disable Tx Rx*/
     outl( mtdx.crvalue & (~TxEnable) & (~RxEnable), mtdx.ioaddr + TCRRCR);
@@ -658,7 +659,7 @@ static struct nic_operations mtd_operations = {
 	.poll		= mtd_poll,
 	.transmit	= mtd_transmit,
 	.irq		= dummy_irq,
-	.disable	= mtd_disable,
+
 };
 
 static struct pci_id mtd80x_nics[] = {
@@ -668,14 +669,14 @@ static struct pci_id mtd80x_nics[] = {
 };
 
 static struct pci_driver mtd80x_driver =
-	PCI_DRIVER ( "MTD80X", mtd80x_nics, PCI_NO_CLASS );
+	PCI_DRIVER ( mtd80x_nics, PCI_NO_CLASS );
 
 /**************************************************************************
 PROBE - Look for an adapter, this routine's visible to the outside
 ***************************************************************************/
 
-static int mtd_probe ( struct dev *dev, struct pci_device *pci ) {
-    struct nic *nic = nic_device ( dev );
+static int mtd_probe ( struct nic *nic, struct pci_device *pci ) {
+
     int i;
 
     if (pci->ioaddr == 0)
@@ -1086,4 +1087,5 @@ static void getlinktype(struct nic *dev)
     }
 }
 
-BOOT_DRIVER ( "MTD80X", find_pci_boot_device, mtd80x_driver, mtd_probe );
+DRIVER ( "MTD80X", nic_driver, pci_driver, mtd80x_driver,
+	 mtd_probe, mtd_disable );

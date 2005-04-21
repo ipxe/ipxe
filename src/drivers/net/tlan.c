@@ -756,7 +756,7 @@ static struct nic_operations tlan_operations = {
 	.poll		= tlan_poll,
 	.transmit	= tlan_transmit,
 	.irq		= tlan_irq,
-	.disable	= tlan_disable,
+
 };
 
 static void TLan_SetMulticastList(struct nic *nic) {
@@ -781,8 +781,8 @@ PROBE - Look for an adapter, this routine's visible to the outside
 
 #define board_found 1
 #define valid_link 0
-static int tlan_probe ( struct dev *dev, struct pci_device *pci ) {
-	struct nic *nic = nic_device ( dev );
+static int tlan_probe ( struct nic *nic, struct pci_device *pci ) {
+
 	u16 data = 0;
 	int err;
 	int i;
@@ -791,6 +791,7 @@ static int tlan_probe ( struct dev *dev, struct pci_device *pci ) {
 		return 0;
 
 	nic->irqno  = 0;
+	pci_fill_nic ( nic, pci );
 	nic->ioaddr = pci->ioaddr;
 
 	BASE = pci->ioaddr;
@@ -1715,6 +1716,7 @@ static struct pci_id tlan_nics[] = {
 };
 
 static struct pci_driver tlan_driver =
-	PCI_DRIVER ( "TLAN/PCI", tlan_nics, PCI_NO_CLASS );
+	PCI_DRIVER ( tlan_nics, PCI_NO_CLASS );
 
-BOOT_DRIVER ( "TLAN/PCI", find_pci_boot_device, tlan_driver, tlan_probe );
+DRIVER ( "TLAN/PCI", nic_driver, pci_driver, tlan_driver,
+	 tlan_probe, tlan_disable );

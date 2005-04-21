@@ -707,7 +707,7 @@ static struct nic_operations r8169_operations = {
 	.poll		= r8169_poll,
 	.transmit	= r8169_transmit,
 	.irq		= r8169_irq,
-	.disable	= r8169_disable,
+
 };
 
 static struct pci_id r8169_nics[] = {
@@ -715,7 +715,7 @@ static struct pci_id r8169_nics[] = {
 };
 
 static struct pci_driver r8169_driver =
-	PCI_DRIVER ( "r8169/PCI", r8169_nics, PCI_NO_CLASS );
+	PCI_DRIVER ( r8169_nics, PCI_NO_CLASS );
 
 /**************************************************************************
 PROBE - Look for an adapter, this routine's visible to the outside
@@ -723,8 +723,8 @@ PROBE - Look for an adapter, this routine's visible to the outside
 
 #define board_found 1
 #define valid_link 0
-static int r8169_probe ( struct dev *dev, struct pci_device *pci ) {
-	struct nic *nic = nic_device ( dev );
+static int r8169_probe ( struct nic *nic, struct pci_device *pci ) {
+
 	static int board_idx = -1;
 	static int printed_version = 0;
 	int i, rc;
@@ -844,10 +844,12 @@ static int r8169_probe ( struct dev *dev, struct pci_device *pci ) {
 	r8169_reset(nic);
 	/* point to NIC specific routines */
 	nic->nic_op	= &r8169_operations;
+	pci_fill_nic ( nic, pci );
 	nic->irqno = pci->irq;
 	nic->ioaddr = ioaddr;
 	return 1;
 
 }
 
-BOOT_DRIVER ( "r8169/PCI", find_pci_boot_device, r8169_driver, r8169_probe );
+DRIVER ( "r8169/PCI", nic_driver, pci_driver, r8169_driver,
+	 r8169_probe, r8169_disable );

@@ -648,7 +648,8 @@ static void depca_transmit(
 /**************************************************************************
 DISABLE - Turn off ethernet interface
 ***************************************************************************/
-static void depca_disable ( struct nic *nic ) {
+static void depca_disable ( struct nic *nic, struct isa_device *isa __unused ) {
+	nic_disable ( nic );
 	/* reset and disable merge */
 	depca_reset(nic);
 
@@ -736,18 +737,19 @@ static struct nic_operations depca_operations = {
 	.poll		= depca_poll,
 	.transmit	= depca_transmit,
 	.irq		= depca_irq,
-	.disable	= depca_disable,
+
 };
 
 /**************************************************************************
 PROBE - Look for an adapter, this routine's visible to the outside
 ***************************************************************************/
-static int depca_probe ( struct dev *dev, struct isa_device *isa ) {
-	struct nic *nic = nic_device ( dev );
+static int depca_probe ( struct nic *nic, struct isa_device *isa ) {
+
 	int	i, j;
 	long	sum, chksum;
 
 	nic->irqno    = 0;
+	isa_fill_nic ( nic, isa );
 	nic->ioaddr   = isa->ioaddr;
 
 	for (i = 0, j = 0, sum = 0; j < 3; j++) {
@@ -792,9 +794,10 @@ static isa_probe_addr_t depca_probe_addrs[] = {
 };
 
 static struct isa_driver depca_driver =
-	ISA_DRIVER ( "depca", depca_probe_addrs, depca_probe1,
+	ISA_DRIVER ( depca_probe_addrs, depca_probe1,
 		     GENERIC_ISAPNP_VENDOR, 0x80f7 );
 
-BOOT_DRIVER ( "depce", find_isa_boot_device, depca_driver, depca_probe );
+DRIVER ( "depce", nic_driver, isa_driver, depca_driver,
+	 depca_probe, depca_disable );
 
 ISA_ROM ( "depca", "Digital DE100 and DE200" );

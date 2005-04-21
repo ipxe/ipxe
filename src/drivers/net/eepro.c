@@ -450,7 +450,8 @@ static void eepro_transmit(
 /**************************************************************************
 DISABLE - Turn off ethernet interface
 ***************************************************************************/
-static void eepro_disable ( struct nic *nic ) {
+static void eepro_disable ( struct nic *nic, struct isa_device *isa __unused ) {
+	nic_disable ( nic );
 	eepro_sw2bank0(nic->ioaddr);	/* Switch to bank 0 */
 	/* Flush the Tx and disable Rx */
 	outb(STOP_RCV_CMD, nic->ioaddr);
@@ -534,14 +535,14 @@ static struct nic_operations eepro_operations = {
 	.poll		= eepro_poll,
 	.transmit	= eepro_transmit,
 	.irq		= eepro_irq,
-	.disable	= eepro_disable,
+
 };
 
 /**************************************************************************
 PROBE - Look for an adapter, this routine's visible to the outside
 ***************************************************************************/
-static int eepro_probe ( struct dev *dev, struct isa_device *isa ) {
-	struct nic *nic = nic_device ( dev );
+static int eepro_probe ( struct nic *nic, struct isa_device *isa ) {
+
 	int		i, l_eepro = 0;
 	union {
 		unsigned char	caddr[ETH_ALEN];
@@ -549,6 +550,7 @@ static int eepro_probe ( struct dev *dev, struct isa_device *isa ) {
 	} station_addr;
 
 	nic->irqno  = 0;
+	isa_fill_nic ( nic, isa );
 	nic->ioaddr = isa->ioaddr;
 
 	station_addr.saddr[2] = read_eeprom(nic->ioaddr,2);
@@ -605,9 +607,10 @@ static isa_probe_addr_t eepro_probe_addrs[] = {
 };
 
 static struct isa_driver eepro_driver =
-	ISA_DRIVER ( "eepro", eepro_probe_addrs, eepro_probe1,
+	ISA_DRIVER ( eepro_probe_addrs, eepro_probe1,
 		     GENERIC_ISAPNP_VENDOR, 0x828a );
 
-BOOT_DRIVER ( "eepro", find_isa_boot_device, eepro_driver, eepro_probe );
+DRIVER ( "eepro", nic_driver, isa_driver, eepro_driver,
+	 eepro_probe, eepro_disable );
 
 ISA_ROM ( "eepro", "Intel Etherexpress Pro/10" );

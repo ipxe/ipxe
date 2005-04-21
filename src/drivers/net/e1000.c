@@ -3582,8 +3582,8 @@ static void e1000_irq(struct nic *nic __unused, irq_action_t action)
 PROBE - Look for an adapter, this routine's visible to the outside
 You should omit the last argument struct pci_device * for a non-PCI NIC
 ***************************************************************************/
-static int e1000_probe ( struct dev *dev, struct pci_device *p ) {
-	struct nic *nic = nic_device ( dev );
+static int e1000_probe ( struct nic *nic, struct pci_device *p ) {
+
 	unsigned long mmio_start, mmio_len;
 	int ret_val, i;
 
@@ -3671,7 +3671,7 @@ static struct nic_operations e1000_operations = {
 	.poll		= e1000_poll,
 	.transmit	= e1000_transmit,
 	.irq		= e1000_irq,
-	.disable	= e1000_disable,
+
 };
 
 static struct pci_id e1000_nics[] = {
@@ -3708,6 +3708,7 @@ PCI_ROM(0x8086, 0x107b, "e1000-82546gb-serdes",	     "Intel EtherExpressPro1000 
 };
 
 static struct pci_driver e1000_driver =
-	PCI_DRIVER ( "E1000", e1000_nics, PCI_NO_CLASS );
+	PCI_DRIVER ( e1000_nics, PCI_NO_CLASS );
 
-BOOT_DRIVER ( "E1000", find_pci_boot_device, e1000_driver, e1000_probe );
+DRIVER ( "E1000", nic_driver, pci_driver, e1000_driver,
+	 e1000_probe, e1000_disable );

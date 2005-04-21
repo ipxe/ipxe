@@ -213,7 +213,7 @@ static unsigned char rxb[NUM_RX_DESC * RX_BUF_SIZE] __attribute__ ((aligned(4)))
 
 /* Function Prototypes */
 
-static int natsemi_probe(struct dev *dev,struct pci_device *pci);
+static int natsemi_probe(struct nic *nic,struct pci_device *pci);
 static int eeprom_read(long addr, int location);
 static int mdio_read(int phy_id, int location);
 static void natsemi_init(struct nic *nic);
@@ -225,7 +225,7 @@ static void natsemi_set_rx_mode(struct nic *nic);
 static void natsemi_check_duplex(struct nic *nic);
 static void natsemi_transmit(struct nic *nic, const char *d, unsigned int t, unsigned int s, const char *p);
 static int  natsemi_poll(struct nic *nic, int retrieve);
-static void natsemi_disable(struct nic *nic);
+static void natsemi_disable(struct nic *nic, struct pci_device *pci);
 static void natsemi_irq(struct nic *nic, irq_action_t action);
 
 /* 
@@ -243,9 +243,8 @@ static void natsemi_irq(struct nic *nic, irq_action_t action);
  */
 
 static int
-natsemi_probe ( struct dev *dev, struct pci_device *pci ) {
+natsemi_probe ( struct nic *nic, struct pci_device *pci ) {
 
-    struct nic *nic = nic_device ( dev );
     int i;
     int prev_eedata;
     u32 tmp;
@@ -258,6 +257,7 @@ natsemi_probe ( struct dev *dev, struct pci_device *pci ) {
     /* initialize some commonly used globals */
 	
     nic->irqno  = 0;
+    pci_fill_nic ( nic, pci );
     nic->ioaddr = pci->ioaddr;
 
     ioaddr     = pci->ioaddr;
@@ -725,7 +725,8 @@ natsemi_poll(struct nic *nic, int retrieve)
  */
 
 static void
-natsemi_disable ( struct nic *nic ) {
+natsemi_disable ( struct nic *nic, struct pci_device *pci __unused ) {
+    nic_disable ( nic );
     /* merge reset and disable */
     natsemi_init(nic);
 
@@ -768,7 +769,7 @@ static struct nic_operations natsemi_operations = {
 	.poll		= natsemi_poll,
 	.transmit	= natsemi_transmit,
 	.irq		= natsemi_irq,
-	.disable	= natsemi_disable,
+
 };
 
 static struct pci_id natsemi_nics[] = {
@@ -776,6 +777,7 @@ PCI_ROM(0x100b, 0x0020, "dp83815", "DP83815"),
 };
 
 static struct pci_driver natsemi_driver =
-	PCI_DRIVER ( "NATSEMI", natsemi_nics, PCI_NO_CLASS );
+	PCI_DRIVER ( natsemi_nics, PCI_NO_CLASS );
 
-BOOT_DRIVER ( "NATSEMI", find_pci_boot_device, natsemi_driver, natsemi_probe );
+DRIVER ( "NATSEMI", nic_driver, pci_driver, natsemi_driver,
+	 natsemi_probe, natsemi_disable );

@@ -3224,15 +3224,15 @@ static struct nic_operations tg3_operations = {
 	.poll		= tg3_poll,
 	.transmit	= tg3_transmit,
 	.irq		= tg3_irq,
-	.disable	= tg3_disable,
+
 };
 
 /**************************************************************************
 PROBE - Look for an adapter, this routine's visible to the outside
 You should omit the last argument struct pci_device * for a non-PCI NIC
 ***************************************************************************/
-static int tg3_probe ( struct dev *dev, struct pci_device *pdev ) {
-	struct nic *nic = nic_device ( dev );
+static int tg3_probe ( struct nic *nic, struct pci_device *pdev ) {
+
 	struct tg3 *tp = &tg3;
 	unsigned long tg3reg_base, tg3reg_len;
 	int i, err, pm_cap;
@@ -3385,6 +3385,7 @@ PCI_ROM(0x173b, 0x03eb, "tg3-ac1003",      "Altima AC1003"),
 };
 
 static struct pci_driver tg3_driver =
-	PCI_DRIVER ( "TG3", tg3_nics, PCI_NO_CLASS );
+	PCI_DRIVER ( tg3_nics, PCI_NO_CLASS );
 
-BOOT_DRIVER ( "TG3", find_pci_boot_device, tg3_driver, tg3_probe );
+DRIVER ( "TG3", nic_driver, pci_driver, tg3_driver,
+	 tg3_probe, tg3_disable );

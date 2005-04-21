@@ -459,8 +459,8 @@ PROBE - Look for an adapter, this routine's visible to the outside
 
 #define board_found 1
 #define valid_link 0
-static int dmfe_probe ( struct dev *dev, struct pci_device *pci ) {
-	struct nic *nic = nic_device ( dev );
+static int dmfe_probe ( struct nic *nic, struct pci_device *pci ) {
+
 	uint32_t dev_rev, pci_pmr;
 	int i;
 
@@ -508,6 +508,7 @@ static int dmfe_probe ( struct dev *dev, struct pci_device *pci ) {
 	dmfe_reset(nic);
 
 	nic->irqno  = 0;
+	pci_fill_nic ( nic, pci );
 	nic->ioaddr = pci->ioaddr;
 
 	/* point to NIC specific routines */
@@ -1213,7 +1214,7 @@ static struct nic_operations dmfe_operations = {
 	.poll		= dmfe_poll,
 	.transmit	= dmfe_transmit,
 	.irq		= dmfe_irq,
-	.disable	= dmfe_disable,
+
 };
 
 static struct pci_id dmfe_nics[] = {
@@ -1224,6 +1225,7 @@ static struct pci_id dmfe_nics[] = {
 };
 
 static struct pci_driver dmfe_driver =
-	PCI_DRIVER ( "DMFE/PCI", dmfe_nics, PCI_NO_CLASS );
+	PCI_DRIVER ( dmfe_nics, PCI_NO_CLASS );
 
-BOOT_DRIVER ( "DMFE/PCI", find_pci_boot_device, dmfe_driver, dmfe_probe );
+DRIVER ( "DMFE/PCI", nic_driver, pci_driver, dmfe_driver,
+	 dmfe_probe, dmfe_disable );

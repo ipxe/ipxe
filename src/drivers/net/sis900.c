@@ -123,11 +123,11 @@ static struct pci_id   pci_isa_bridge_list[] = {
 
 
 static struct pci_driver sis_bridge_driver =
-	PCI_DRIVER ( "sis_bridge", pci_isa_bridge_list, PCI_NO_CLASS );
+	PCI_DRIVER ( pci_isa_bridge_list, PCI_NO_CLASS );
 
 /* Function Prototypes */
 
-static int sis900_probe(struct dev *dev,struct pci_device *pci);
+static int sis900_probe(struct nic *nic,struct pci_device *pci);
 
 static u16  sis900_read_eeprom(int location);
 static void sis900_mdio_reset(long mdio_addr);
@@ -150,7 +150,7 @@ static void sis900_transmit(struct nic *nic, const char *d,
                             unsigned int t, unsigned int s, const char *p);
 static int  sis900_poll(struct nic *nic, int retrieve);
 
-static void sis900_disable(struct nic *nic);
+static void sis900_disable(struct nic *nic, struct pci_device *pci);
 
 static void sis900_irq(struct nic *nic, irq_action_t action);
 
@@ -309,8 +309,8 @@ static int sis635_get_mac_addr(struct pci_device * pci_dev __unused, struct nic 
  * Returns:   struct nic *:          pointer to NIC data structure
  */
 
-static int sis900_probe ( struct dev *dev, struct pci_device *pci ) {
-    struct nic *nic = nic_device ( dev );
+static int sis900_probe ( struct nic *nic, struct pci_device *pci ) {
+
     int i;
     int found=0;
     int phy_addr;
@@ -321,6 +321,7 @@ static int sis900_probe ( struct dev *dev, struct pci_device *pci ) {
         return 0;
 
     nic->irqno  = 0;
+    pci_fill_nic ( nic, pci );
     nic->ioaddr = pci->ioaddr;
     ioaddr  = pci->ioaddr;
     vendor  = pci->vendor;
@@ -1208,7 +1209,8 @@ sis900_poll(struct nic *nic, int retrieve)
  */
 
 static void
-sis900_disable ( struct nic *nic ) {
+sis900_disable ( struct nic *nic, struct pci_device *pci __unused ) {
+    nic_disable ( nic );
     /* merge reset and disable */
     sis900_init(nic);
 
@@ -1249,7 +1251,7 @@ static struct nic_operations sis900_operations = {
 	.poll		= sis900_poll,
 	.transmit	= sis900_transmit,
 	.irq		= sis900_irq,
-	.disable	= sis900_disable,
+
 };
 
 static struct pci_id sis900_nics[] = {
@@ -1260,4 +1262,5 @@ PCI_ROM(0x1039, 0x7016, "sis7016", "SIS7016"),
 static struct pci_driver sis900_driver =
 	PCI_DRIVER ( "SIS900", sis900_nics, PCI_NO_CLASS );
 
-BOOT_DRIVER ( "SIS900", find_pci_boot_device, sis900_driver, sis900_probe );
+DRIVER ( "SIS900", nic_driver, pci_driver, sis900_driver,
+	 sis900_probe, sis900_disable );

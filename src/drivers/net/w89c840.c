@@ -579,7 +579,8 @@ static void w89c840_transmit(
 /**************************************************************************
 w89c840_disable - Turn off ethernet interface
 ***************************************************************************/
-static void w89c840_disable ( struct nic *nic ) {
+static void w89c840_disable ( struct nic *nic, struct pci_device *pci __unused ) {
+    nic_disable ( nic );
     /* merge reset and disable */
     w89c840_reset(nic);
 
@@ -609,7 +610,7 @@ static struct nic_operations w89c840_operations = {
 	.poll		= w89c840_poll,
 	.transmit	= w89c840_transmit,
 	.irq		= w89c840_irq,
-	.disable	= w89c840_disable,
+
 };
 
 static struct pci_id w89c840_nics[] = {
@@ -618,13 +619,13 @@ PCI_ROM(0x11f6, 0x2011, "compexrl100atx", "Compex RL100ATX"),
 };
 
 static struct pci_driver w89c840_driver =
-	PCI_DRIVER ( "W89C840F", w89c840_nics, PCI_NO_CLASS );
+	PCI_DRIVER ( w89c840_nics, PCI_NO_CLASS );
 
 /**************************************************************************
 w89c840_probe - Look for an adapter, this routine's visible to the outside
 ***************************************************************************/
-static int w89c840_probe ( struct dev *dev, struct pci_device *p ) {
-    struct nic *nic = nic_device ( dev );
+static int w89c840_probe ( struct nic *nic, struct pci_device *p ) {
+
 
     u16 sum = 0;
     int i, j;
@@ -954,4 +955,5 @@ static void init_ring(void)
 }
 
 
-BOOT_DRIVER ( "W89C840F", find_pci_boot_device, w89c840_driver, w89c840_probe );
+DRIVER ( "W89C840F", nic_driver, pci_driver, w89c840_driver,
+	 w89c840_probe, w89c840_disable );

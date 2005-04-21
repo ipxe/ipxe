@@ -50,7 +50,7 @@ struct epic_tx_desc {
 
 static void	epic100_open(void);
 static void	epic100_init_ring(void);
-static void	epic100_disable(struct nic *nic);
+static void	epic100_disable(struct nic *nic, struct pci_device *pci);
 static int	epic100_poll(struct nic *nic, int retrieve);
 static void	epic100_transmit(struct nic *nic, const char *destaddr,
 				 unsigned int type, unsigned int len, const char *data);
@@ -99,8 +99,8 @@ static unsigned char		tx_packet[PKT_BUF_SZ * TX_RING_SIZE];
 
 
 static int
-epic100_probe ( struct dev *dev, struct pci_device *pci ) {
-    struct nic *nic = nic_device ( dev );
+epic100_probe ( struct nic *nic, struct pci_device *pci ) {
+
     int i;
     unsigned short* ap;
     unsigned int phy, phy_idx;
@@ -115,6 +115,7 @@ epic100_probe ( struct dev *dev, struct pci_device *pci ) {
 
     ioaddr = pci->ioaddr;
     nic->irqno  = 0;
+    pci_fill_nic ( nic, pci );
     nic->ioaddr = pci->ioaddr & ~3;
 
     /* compute all used static epic100 registers address */
@@ -507,7 +508,7 @@ static struct nic_operations epic100_operations = {
 	.poll		= epic100_poll,
 	.transmit	= epic100_transmit,
 	.irq		= epic100_irq,
-	.disable	= epic100_disable,
+
 };
 
 static struct pci_id epic100_nics[] = {
@@ -516,6 +517,7 @@ PCI_ROM(0x10b8, 0x0006, "smc-83c175", "SMC EPIC/C 83c175"),
 };
 
 static struct pci_driver epic100_driver =
-	PCI_DRIVER ( "EPIC100", epic100_nics, PCI_NO_CLASS );
+	PCI_DRIVER ( epic100_nics, PCI_NO_CLASS );
 
-BOOT_DRIVER ( "EPIC100", find_pci_boot_device, epic100_driver, epic100_probe );
+DRIVER ( "EPIC100", nic_driver, pci_driver, epic100_driver,
+	 epic100_probe, epic100_disable );

@@ -690,8 +690,8 @@ static void a3c90x_irq(struct nic *nic __unused, irq_action_t action __unused)
  *** initialization.  If this routine is called, the pci functions did find the
  *** card.  We just have to init it here.
  ***/
-static int a3c90x_probe ( struct dev *dev, struct pci_device *pci ) {
-    struct nic *nic = nic_device ( dev );
+static int a3c90x_probe ( struct nic *nic, struct pci_device *pci ) {
+
     int i, c;
     unsigned short eeprom[0x21];
     unsigned int cfg;
@@ -704,6 +704,8 @@ static int a3c90x_probe ( struct dev *dev, struct pci_device *pci ) {
           return 0;
 
     adjust_pci_device(pci);
+
+    pci_fill_nic ( nic, pci );
 
     nic->ioaddr = pci->ioaddr;
     nic->irqno = 0;
@@ -960,7 +962,7 @@ static struct nic_operations a3c90x_operations = {
 	.poll		= a3c90x_poll,
 	.transmit	= a3c90x_transmit,
 	.irq		= a3c90x_irq,
-	.disable	= a3c90x_disable,
+
 };
 
 static struct pci_id a3c90x_nics[] = {
@@ -991,6 +993,7 @@ PCI_ROM(0x10b7, 0x1202, "3c982b",        "3Com982B"),
 };
 
 static struct pci_driver a3c90x_driver =
-	PCI_DRIVER ( "3C90X", a3c90x_nics, PCI_NO_CLASS );
+	PCI_DRIVER ( a3c90x_nics, PCI_NO_CLASS );
 
-BOOT_DRIVER ( "3C90X", find_pci_boot_device, a3c90x_driver, a3c90x_probe );
+DRIVER ( "3C90X", nic_driver, pci_driver, a3c90x_driver,
+	 a3c90x_probe, a3c90x_disable );

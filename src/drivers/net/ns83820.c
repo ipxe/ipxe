@@ -756,7 +756,8 @@ static void ns83820_transmit(struct nic *nic, const char *d,	/* Destination */
 /**************************************************************************
 DISABLE - Turn off ethernet interface
 ***************************************************************************/
-static void ns83820_disable ( struct nic *nic ) {
+static void ns83820_disable ( struct nic *nic, struct pci_device *pci __unused ) {
+	nic_disable ( nic );
 	/* put the card in its initial state */
 	/* This function serves 3 purposes.
 	 * This disables DMA and interrupts so we don't receive
@@ -809,7 +810,7 @@ static struct nic_operations ns83820_operations = {
 	.poll		= ns83820_poll,
 	.transmit	= ns83820_transmit,
 	.irq		= ns83820_irq,
-	.disable	= ns83820_disable,
+
 };
 
 static struct pci_id ns83820_nics[] = {
@@ -817,7 +818,7 @@ static struct pci_id ns83820_nics[] = {
 };
 
 static struct pci_driver ns83820_driver =
-	PCI_DRIVER ( "NS83820/PCI", ns83820_nics, PCI_NO_CLASS );
+	PCI_DRIVER ( ns83820_nics, PCI_NO_CLASS );
 
 /**************************************************************************
 PROBE - Look for an adapter, this routine's visible to the outside
@@ -825,8 +826,8 @@ PROBE - Look for an adapter, this routine's visible to the outside
 
 #define board_found 1
 #define valid_link 0
-static int ns83820_probe ( struct dev *dev, struct pci_device *pci ) {
-	struct nic *nic = nic_device ( dev );
+static int ns83820_probe ( struct nic *nic, struct pci_device *pci ) {
+
 	int sz;
 	long addr;
 	int using_dac = 0;
@@ -852,6 +853,7 @@ static int ns83820_probe ( struct dev *dev, struct pci_device *pci ) {
 		return 0;
 
 	nic->irqno  = 0;
+	pci_fill_nic ( nic, pci );
 	nic->ioaddr = pci->ioaddr & ~3;
 
 	/* disable interrupts */
@@ -1016,4 +1018,5 @@ static int ns83820_probe ( struct dev *dev, struct pci_device *pci ) {
 	return 1;
 }
 
-BOOT_DRIVER ( "NS83820/PCI", find_pci_boot_device, ns83820_driver, ns83820_probe );
+DRIVER ( "NS83820/PCI", nic_driver, pci_driver, ns83820_driver,
+	 ns83820_probe, ns83820_disable );

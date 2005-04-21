@@ -172,25 +172,26 @@ static unsigned int cur_rx,cur_tx;
 static unsigned char tx_buffer[TX_BUF_SIZE] __attribute__((aligned(4)));
 static unsigned char rx_ring[RX_BUF_LEN+16] __attribute__((aligned(4)));
 
-static int rtl8139_probe(struct dev *dev,struct pci_device *pci);
+static int rtl8139_probe(struct nic *nic,struct pci_device *pci);
 static int read_eeprom(struct nic *nic, int location, int addr_len);
 static void rtl_reset(struct nic *nic);
 static void rtl_transmit(struct nic *nic, const char *destaddr,
 	unsigned int type, unsigned int len, const char *data);
 static int rtl_poll(struct nic *nic, int retrieve);
-static void rtl_disable(struct nic *nic);
+static void rtl_disable(struct nic *nic, struct pci_device *pci);
 static void rtl_irq(struct nic *nic, irq_action_t action);
 static struct nic_operations rtl_operations;
 static struct pci_driver rtl8139_driver;
 
-static int rtl8139_probe ( struct dev *dev, struct pci_device *pci ) {
-	struct nic *nic = nic_device ( dev );
+static int rtl8139_probe ( struct nic *nic, struct pci_device *pci ) {
+
 	int i;
 	int speed10, fullduplex;
 	int addr_len;
 	unsigned short *ap = (unsigned short*)nic->node_addr;
 
 	/* Copy ioaddr and IRQ from PCI information */
+	pci_fill_nic ( nic, pci );
 	nic->ioaddr = pci->ioaddr;
 	nic->irqno = pci->irq;
 
@@ -501,7 +502,8 @@ static void rtl_irq(struct nic *nic, irq_action_t action)
 	}
 }
 
-static void rtl_disable ( struct nic *nic ) {
+static void rtl_disable ( struct nic *nic, struct pci_device *pci __unused ) {
+	nic_disable ( nic );
 	/* merge reset and disable */
 	rtl_reset(nic);
 
@@ -519,7 +521,7 @@ static struct nic_operations rtl_operations = {
 	.poll		= rtl_poll,
 	.transmit	= rtl_transmit,
 	.irq		= rtl_irq,
-	.disable	= rtl_disable,
+
 };
 
 static struct pci_id rtl8139_nics[] = {
@@ -540,6 +542,7 @@ PCI_ROM(0xffff, 0x8139, "clone-rtl8139", "Cloned 8139"),
 };
 
 static struct pci_driver rtl8139_driver =
-	PCI_DRIVER ( "RTL8139", rtl8139_nics, PCI_NO_CLASS );
+	PCI_DRIVER ( rtl8139_nics, PCI_NO_CLASS );
 
-BOOT_DRIVER ( "RTL8139", find_pci_boot_device, rtl8139_driver, rtl8139_probe );
+DRIVER ( "RTL8139", nic_driver, pci_driver, rtl8139_driver,
+	 rtl8139_probe, rtl_disable );

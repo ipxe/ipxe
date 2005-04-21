@@ -163,7 +163,7 @@ static struct nic_operations skel_operations = {
 	.poll		= skel_poll,
 	.transmit	= skel_transmit,
 	.irq		= skel_irq,
-	.disable	= skel_disable,
+
 };
 
 /**************************************************************************
@@ -189,8 +189,11 @@ static struct nic_operations skel_operations = {
  * PCI PROBE - Look for an adapter
  **************************************************************************
  */
-static int skel_pci_probe ( struct dev *dev, struct pci_device *pci ) {
-	struct nic *nic = nic_device ( dev );
+static int skel_pci_probe ( struct nic *nic, struct pci_device *pci ) {
+
+
+	pci_fill_nic ( nic, pci );
+
 
 	nic->ioaddr = pci->ioaddr;
 	nic->irqno = pci->irq;
@@ -213,16 +216,16 @@ PCI_ROM ( 0x0000, 0x0000, "skel-pci", "Skeleton PCI Adapter" ),
 };
 
 static struct pci_driver skel_pci_driver =
-	PCI_DRIVER ( "SKEL/PCI", skel_pci_nics, PCI_NO_CLASS );
+	PCI_DRIVER ( skel_pci_nics, PCI_NO_CLASS );
 
-BOOT_DRIVER ( "SKEL/PCI", find_pci_boot_device,
-	      skel_pci_driver, skel_pci_probe );
+DRIVER ( "SKEL/PCI", nic_driver, pci_driver, skel_pci_driver,
+	 skel_pci_probe, skel_disable );
 
 /**************************************************************************
  * EISA PROBE - Look for an adapter
  **************************************************************************
  */
-static int skel_eisa_probe ( struct dev *dev, struct eisa_device *eisa ) {
+static int skel_eisa_probe ( struct nic *nic, struct eisa_device *eisa ) {
 	struct nic *nic = nic_device ( dev );
 
 	enable_eisa_device ( eisa );
@@ -258,7 +261,7 @@ ISA_ROM ( "skel-eisa", "Skeleton EISA Adapter" );
  * ISAPnP PROBE - Look for an adapter
  **************************************************************************
  */
-static int skel_isapnp_probe ( struct dev *dev,
+static int skel_isapnp_probe ( struct nic *nic,
 			       struct isapnp_device *isapnp ) {
 	struct nic *nic = nic_device ( dev );
 
@@ -295,7 +298,7 @@ ISA_ROM ( "skel-isapnp", "Skeleton ISAPnP Adapter" );
  * MCA PROBE - Look for an adapter
  **************************************************************************
  */
-static int skel_mca_probe ( struct dev *dev,
+static int skel_mca_probe ( struct nic *nic,
 			    struct mca_device *mca __unused ) {
 	struct nic *nic = nic_device ( dev );
 
@@ -354,7 +357,7 @@ static int skel_isa_probe_addr ( isa_probe_addr_t ioaddr __unused ) {
 	return 0;
 }
 
-static int skel_isa_probe ( struct dev *dev, struct isa_device *isa ) {
+static int skel_isa_probe ( struct nic *nic, struct isa_device *isa ) {
 	struct nic *nic = nic_device ( dev );
 
 	nic->ioaddr = isa->ioaddr;

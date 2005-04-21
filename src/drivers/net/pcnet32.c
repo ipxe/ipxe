@@ -666,8 +666,8 @@ static void pcnet32_irq(struct nic *nic __unused, irq_action_t action __unused)
 PROBE - Look for an adapter, this routine's visible to the outside
 You should omit the last argument struct pci_device * for a non-PCI NIC
 ***************************************************************************/
-static int pcnet32_probe ( struct dev *dev, struct pci_device *pci ) {
-	struct nic *nic = nic_device ( dev );
+static int pcnet32_probe ( struct nic *nic, struct pci_device *pci ) {
+
 	int i, media;
 	int fdx, mii, fset, dxsuflo, ltint;
 	int chip_version;
@@ -685,6 +685,7 @@ static int pcnet32_probe ( struct dev *dev, struct pci_device *pci ) {
 	       dev->name, pci->vendor, pci->dev_id);
 
 	nic->irqno  = 0;
+	pci_fill_nic ( nic, pci );
 	nic->ioaddr = pci->ioaddr & ~3;
 
 	/* reset the chip */
@@ -990,7 +991,7 @@ static struct nic_operations pcnet32_operations = {
 	.poll		= pcnet32_poll,
 	.transmit	= pcnet32_transmit,
 	.irq		= pcnet32_irq,
-	.disable	= pcnet32_disable,
+
 };
 
 static struct pci_id pcnet32_nics[] = {
@@ -1000,6 +1001,7 @@ static struct pci_id pcnet32_nics[] = {
 };
 
 static struct pci_driver pcnet32_driver =
-	PCI_DRIVER ( "PCNET32/PCI", pcnet32_nics, PCI_NO_CLASS );
+	PCI_DRIVER ( pcnet32_nics, PCI_NO_CLASS );
 
-BOOT_DRIVER ( "PCNET32/PCI", find_pci_boot_device, pcnet32_driver, pcnet32_probe );
+DRIVER ( "PCNET32/PCI", nic_driver, pci_driver, pcnet32_driver,
+	 pcnet32_probe, pcnet32_disable );

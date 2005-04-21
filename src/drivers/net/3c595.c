@@ -443,7 +443,8 @@ vxsetlink(void)
     GO_WINDOW(1); 
 }
 
-static void t595_disable ( struct nic *nic ) {
+static void t595_disable ( struct nic *nic, struct pci_device *pci __unused ) {
+	nic_disable ( nic );
 	t595_reset(nic);
 
 	outw(STOP_TRANSCEIVER, BASE + VX_COMMAND);
@@ -468,8 +469,8 @@ static void t595_irq(struct nic *nic __unused, irq_action_t action __unused)
 /**************************************************************************
 ETH_PROBE - Look for an adapter
 ***************************************************************************/
-static int t595_probe ( struct dev *dev, struct pci_device *pci ) {
-	struct nic *nic = nic_device ( dev );
+static int t595_probe ( struct nic *nic, struct pci_device *pci ) {
+
 	int i;
 	unsigned short *p;
 
@@ -478,6 +479,7 @@ static int t595_probe ( struct dev *dev, struct pci_device *pci ) {
 	eth_nic_base = pci->ioaddr;
 
 	nic->irqno  = 0;
+	pci_fill_nic ( nic, pci );
 	nic->ioaddr = pci->ioaddr;
 
 	GO_WINDOW(0);
@@ -517,7 +519,7 @@ static struct nic_operations t595_operations = {
 	.poll		= t595_poll,
 	.transmit	= t595_transmit,
 	.irq		= t595_irq,
-	.disable	= t595_disable,
+
 };
 
 static struct pci_id t595_nics[] = {
@@ -538,9 +540,10 @@ PCI_ROM(0x10b7, 0x4500, "3c450-1",         "3Com450 HomePNA Tornado"),
 };
 
 static struct pci_driver t595_driver =
-	PCI_DRIVER ( "3C595", t595_nics, PCI_NO_CLASS );
+	PCI_DRIVER ( t595_nics, PCI_NO_CLASS );
 
-BOOT_DRIVER ( "3C595", find_pci_boot_device, t595_driver, t595_probe );
+DRIVER ( "3C595", nic_driver, pci_driver, t595_driver,
+	 t595_probe, t595_disable );
 
 /*
  * Local variables:

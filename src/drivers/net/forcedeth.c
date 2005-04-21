@@ -923,7 +923,7 @@ static struct nic_operations forcedeth_operations = {
 	.poll		= forcedeth_poll,
 	.transmit	= forcedeth_transmit,
 	.irq		= forcedeth_irq,
-	.disable	= forcedeth_disable,
+
 };
 
 static struct pci_id forcedeth_nics[] = {
@@ -933,7 +933,7 @@ static struct pci_id forcedeth_nics[] = {
 };
 
 static struct pci_driver forcedeth_driver =
-	PCI_DRIVER ( "forcedeth", forcedeth_nics, PCI_NO_CLASS );
+	PCI_DRIVER ( forcedeth_nics, PCI_NO_CLASS );
 
 /**************************************************************************
 PROBE - Look for an adapter, this routine's visible to the outside
@@ -941,8 +941,8 @@ PROBE - Look for an adapter, this routine's visible to the outside
 #define IORESOURCE_MEM 0x00000200
 #define board_found 1
 #define valid_link 0
-static int forcedeth_probe ( struct dev *dev, struct pci_device *pci ) {
-	struct nic *nic = nic_device ( dev );
+static int forcedeth_probe ( struct nic *nic, struct pci_device *pci ) {
+
 	unsigned long addr;
 	int sz;
 	u8 *base;
@@ -954,6 +954,7 @@ static int forcedeth_probe ( struct dev *dev, struct pci_device *pci ) {
 	       dev->name, pci->vendor, pci->dev_id);
 
 	nic->irqno  = 0;
+	pci_fill_nic ( nic, pci );
 	nic->ioaddr = pci->ioaddr;
 
 	/* point to private storage */
@@ -1035,4 +1036,5 @@ static int forcedeth_probe ( struct dev *dev, struct pci_device *pci ) {
 	/* else */
 }
 
-BOOT_DRIVER ( "forcedeth", find_pci_boot_device, forcedeth_driver, forcedeth_probe );
+DRIVER ( "forcedeth", nic_driver, pci_driver, forcedeth_driver,
+	 forcedeth_probe, forcedeth_disable );

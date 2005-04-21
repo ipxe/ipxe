@@ -346,7 +346,8 @@ static int smc9000_poll(struct nic *nic, int retrieve)
    return 0;
 }
 
-static void smc9000_disable ( struct nic *nic ) {
+static void smc9000_disable ( struct nic *nic, struct isa_device *isa __unused ) {
+   nic_disable ( nic );
    smc_reset(nic->ioaddr);
 
    /* no more interrupts for me */
@@ -376,15 +377,15 @@ static struct nic_operations smc9000_operations = {
 	.poll		= smc9000_poll,
 	.transmit	= smc9000_transmit,
 	.irq		= smc9000_irq,
-	.disable	= smc9000_disable,
+
 };
 
 /**************************************************************************
  * ETH_PROBE - Look for an adapter
  ***************************************************************************/
 
-static int smc9000_probe ( struct dev *dev, struct isa_device *isa ) {
-   struct nic *nic = nic_device ( dev );
+static int smc9000_probe ( struct nic *nic, struct isa_device *isa ) {
+
    unsigned short   revision;
    int	            memory;
    int              media;
@@ -393,6 +394,7 @@ static int smc9000_probe ( struct dev *dev, struct isa_device *isa ) {
    int              i;
 
    nic->irqno  = 0;
+   isa_fill_nic ( nic, isa );
    nic->ioaddr = isa->ioaddr;
 
    /*
@@ -489,10 +491,11 @@ static isa_probe_addr_t smc9000_probe_addrs[] = {
 };
 
 static struct isa_driver smc9000_driver =
-	ISA_DRIVER ( "SMC9000", smc9000_probe_addrs, smc9000_probe_addr,
+	ISA_DRIVER ( smc9000_probe_addrs, smc9000_probe_addr,
 		     GENERIC_ISAPNP_VENDOR, 0x8228 );
 
-BOOT_DRIVER ( "SMC9000", find_isa_boot_device, smc9000_driver, smc9000_probe );
+DRIVER ( "SMC9000", nic_driver, isa_driver, smc9000_driver,
+	 smc9000_probe, smc9000_disable );
 
 ISA_ROM ( "smc9000", "SMC9000" );
 
