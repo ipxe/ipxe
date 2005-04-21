@@ -52,7 +52,7 @@ static unsigned char dhcp_machine_info[] = {
 	/* Our enclosing DHCP tag */
 	RFC1533_VENDOR_ETHERBOOT_ENCAP, 11,
 	/* Our boot device */
-	RFC1533_VENDOR_NIC_DEV_ID, 5, PCI_BUS_TYPE, 0, 0, 0, 0,
+	RFC1533_VENDOR_NIC_DEV_ID, 5, 0, 0, 0, 0, 0,
 	/* Our current architecture */
 	RFC1533_VENDOR_ARCH, 2, EM_CURRENT & 0xff, (EM_CURRENT >> 8) & 0xff,
 #ifdef EM_CURRENT_64
@@ -231,13 +231,10 @@ static int bootp(void);
 static unsigned short tcpudpchksum(struct iphdr *ip);
 
 
-struct nic *nic = &dev.nic;
-
 /*
  * Find out what our boot parameters are
  */
-static int nic_load_configuration ( struct dev *dev ) {
-	struct nic *nic = &dev->nic;
+static int nic_load_configuration ( struct nic *nic ) {
 	int server_found;
 
 	if ( ! nic->nic_op->connect ( nic ) ) {
@@ -321,35 +318,31 @@ static int nic_load(struct dev *dev __unused)
 	return 0;
 }
 
-
-static void nic_disable ( struct dev *dev ) {
-	struct nic *nic = &dev->nic;
-
+void nic_disable ( struct nic *nic __unused ) {
 #ifdef MULTICAST_LEVEL2
 	int i;
 	for(i = 0; i < MAX_IGMP; i++) {
 		leave_group(i);
 	}
 #endif
-	
-	nic->nic_op->disable ( nic );
 }
 
-static void nic_print_info ( struct dev *dev ) {
-	struct nic *nic = &dev->nic;
-
-	printf ( "Found %s NIC (MAC %!)\n", dev->name, nic->node_addr );
+static char * nic_describe ( struct type_dev *type_dev ) {
+	struct nic *nic = ( struct nic * ) type_dev;
+	static char nic_description[] = "MAC 00:00:00:00:00:00";
+	
+	sprintf ( nic_description + 4, "%!", nic->node_addr );
+	return nic_description;
 }
 
 /* 
  * Device operations tables
  *
  */
-static struct dev_operations nic_operations = {
-	.disable = nic_disable,
-	.print_info = nic_print_info,
-	.load_configuration = nic_load_configuration,
-	.load = nic_load,
+struct type_driver nic_driver = {
+	.name		= "NIC",
+	.type_dev	= ( struct type_dev * ) &nic,
+	.describe	= nic_describe,
 };
 
 /* Careful.  We need an aligned buffer to avoid problems on machines
@@ -360,19 +353,10 @@ static struct dev_operations nic_operations = {
  */
 static char	packet[ETH_FRAME_LEN + ETH_DATA_ALIGN] __aligned;
 
-/*
- * Set up a struct dev to operate as a NIC, return the struct nic *
- *
- */
-struct nic * nic_device ( struct dev *dev ) {
-	struct nic *nic = &dev->nic;
-
-	memset ( nic, 0, sizeof ( *nic ) );
-	nic->node_addr = arptable[ARP_CLIENT].node;
-	nic->packet = packet + ETH_DATA_ALIGN;
-	dev->dev_op = &nic_operations;
-	return nic;
-}
+struct nic nic = {
+	.node_addr = arptable[ARP_CLIENT].node,
+	.packet = packet + ETH_DATA_ALIGN,
+};
 
 
 
@@ -408,9 +392,9 @@ static int await_arp(int ival, void *ptr,
 	struct	arprequest *arpreply;
 	if (ptype != ETH_P_ARP)
 		return 0;
-	if (nic->packetlen < ETH_HLEN + sizeof(struct arprequest))
+	if (nic.packetlen < ETH_HLEN + sizeof(struct arprequest))
 		return 0;
-	arpreply = (struct arprequest *)&nic->packet[ETH_HLEN];
+	arpreply = (struct arprequest *)&nic.packet[ETH_HLEN];
 
 	if (arpreply->opcode != htons(ARP_REPLY)) 
 		return 0;
@@ -697,7 +681,7 @@ int tftp_block ( struct tftpreq_info_t *request, struct tftpblk_info_t *block )
 			continue; /* Back to waiting for packet */
 		}
 		/* Packet has been received */
-		rcvd = (struct tftp_t *)&nic->packet[ETH_HLEN];
+		rcvd = (struct tftp_t *)&nic.packet[ETH_HLEN];
 		recvlen = ntohs(rcvd->udp.len) - sizeof(struct udphdr)
 			- sizeof(rcvd->opcode);
 		rport = ntohs(rcvd->udp.src);
@@ -777,9 +761,9 @@ static int await_rarp(int ival, void *ptr,
 	struct arprequest *arpreply;
 	if (ptype != ETH_P_RARP)
 		return 0;
-	if (nic->packetlen < ETH_HLEN + sizeof(struct arprequest))
+	if (nic.packetlen < ETH_HLEN + sizeof(struct arprequest))
 		return 0;
-	arpreply = (struct arprequest *)&nic->packet[ETH_HLEN];
+	arpreply = (struct arprequest *)&nic.packet[ETH_HLEN];
 	if (arpreply->opcode != htons(RARP_REPLY))
 		return 0;
 	if ((arpreply->opcode == htons(RARP_REPLY)) &&
@@ -841,9 +825,9 @@ static int await_bootp(int ival __unused, void *ptr __unused,
 	if (!udp) {
 		return 0;
 	}
-	bootpreply = (struct bootp_t *)&nic->packet[ETH_HLEN + 
+	bootpreply = (struct bootp_t *)&nic.packet[ETH_HLEN + 
 		sizeof(struct iphdr) + sizeof(struct udphdr)];
-	if (nic->packetlen < ETH_HLEN + sizeof(struct iphdr) + 
+	if (nic.packetlen < ETH_HLEN + sizeof(struct iphdr) + 
 		sizeof(struct udphdr) + 
 #ifdef NO_DHCP_SUPPORT
 		sizeof(struct bootp_t)
@@ -916,14 +900,7 @@ static int bootp(void)
 	unsigned char *bp_vend;
 
 #ifndef	NO_DHCP_SUPPORT
-	struct {
-		uint8_t bus_type;
-		uint16_t vendor_id;
-		uint16_t device_id;
-	} __attribute__((packed)) *dhcp_dev_id = (void*)&dhcp_machine_info[4];
-	dhcp_dev_id->bus_type = dev.devid.bus_type;
-	dhcp_dev_id->vendor_id = htons ( dev.devid.vendor_id );
-	dhcp_dev_id->device_id = htons ( dev.devid.device_id );
+	* ( ( struct dhcp_dev_id * ) &dhcp_machine_info[4] ) = nic.dhcp_dev_id;
 #endif	/* NO_DHCP_SUPPORT */
 	memset(&ip, 0, sizeof(struct bootpip_t));
 	ip.bp.bp_op = BOOTP_REQUEST;
@@ -1089,11 +1066,11 @@ static void process_igmp(struct iphdr *ip, unsigned long now)
 	int i;
 	unsigned iplen;
 	if (!ip || (ip->protocol == IP_IGMP) ||
-		(nic->packetlen < sizeof(struct iphdr) + sizeof(struct igmp))) {
+		(nic.packetlen < sizeof(struct iphdr) + sizeof(struct igmp))) {
 		return;
 	}
 	iplen = (ip->verhdrlen & 0xf)*4;
-	igmp = (struct igmp *)&nic->packet[sizeof(struct iphdr)];
+	igmp = (struct igmp *)&nic.packet[sizeof(struct iphdr)];
 	if (ipchksum(igmp, ntohs(ip->len) - iplen) != 0)
 		return;
 	if ((igmp->type == IGMP_QUERY) && 
@@ -1300,7 +1277,7 @@ int tcp_transaction(unsigned long destip, unsigned int destsock, void *ptr,
 	       syn_ack = state == CLOSED || state == SYN_RCVD;
 	       consumed = ntohl(tcp->ack) - send_seq - syn_ack;
 	       if (consumed < 0 || consumed > can_send) {
-		       tcp_reset((struct iphdr *)&nic->packet[ETH_HLEN]);
+		       tcp_reset((struct iphdr *)&nic.packet[ETH_HLEN]);
 		       goto recv_data;
 	       }
 
@@ -1342,7 +1319,7 @@ int tcp_transaction(unsigned long destip, unsigned int destsock, void *ptr,
        }
 
  consume_data:
-       ip  = (struct iphdr *)&nic->packet[ETH_HLEN];
+       ip  = (struct iphdr *)&nic.packet[ETH_HLEN];
        header_size = sizeof(struct iphdr) + ((ntohs(tcp->ctrl)>>10)&0x3C);
        payload = ntohs(ip->len) - header_size;
        if (payload > 0 && state == ESTABLISHED) {
@@ -1351,7 +1328,7 @@ int tcp_transaction(unsigned long destip, unsigned int destsock, void *ptr,
 		       recv_seq += payload - old_bytes;
 		       if (state != FIN_WAIT_1 && state != FIN_WAIT_2 &&
 			   !recv(payload - old_bytes,
-				 &nic->packet[ETH_HLEN+header_size+old_bytes],
+				 &nic.packet[ETH_HLEN+header_size+old_bytes],
 				 ptr)) {
 			       goto close;
 		       }
@@ -1463,15 +1440,15 @@ int await_reply(reply_t reply, int ival, void *ptr, long timeout)
 		/* We have something! */
 
 		/* Find the Ethernet packet type */
-		if (nic->packetlen >= ETH_HLEN) {
-			ptype = ((unsigned short) nic->packet[12]) << 8
-				| ((unsigned short) nic->packet[13]);
+		if (nic.packetlen >= ETH_HLEN) {
+			ptype = ((unsigned short) nic.packet[12]) << 8
+				| ((unsigned short) nic.packet[13]);
 		} else continue; /* what else could we do with it? */
 		/* Verify an IP header */
 		ip = 0;
-		if ((ptype == ETH_P_IP) && (nic->packetlen >= ETH_HLEN + sizeof(struct iphdr))) {
+		if ((ptype == ETH_P_IP) && (nic.packetlen >= ETH_HLEN + sizeof(struct iphdr))) {
 			unsigned ipoptlen;
-			ip = (struct iphdr *)&nic->packet[ETH_HLEN];
+			ip = (struct iphdr *)&nic.packet[ETH_HLEN];
 			if ((ip->verhdrlen < 0x45) || (ip->verhdrlen > 0x4F)) 
 				continue;
 			iplen = (ip->verhdrlen & 0xf) * 4;
@@ -1493,17 +1470,17 @@ int await_reply(reply_t reply, int ival, void *ptr, long timeout)
 				/* Delete the ip options, to guarantee
 				 * good alignment, and make etherboot simpler.
 				 */
-				memmove(&nic->packet[ETH_HLEN + sizeof(struct iphdr)], 
-					&nic->packet[ETH_HLEN + iplen],
-					nic->packetlen - ipoptlen);
-				nic->packetlen -= ipoptlen;
+				memmove(&nic.packet[ETH_HLEN + sizeof(struct iphdr)], 
+					&nic.packet[ETH_HLEN + iplen],
+					nic.packetlen - ipoptlen);
+				nic.packetlen -= ipoptlen;
 			}
 		}
 		udp = 0;
 		if (ip && (ip->protocol == IP_UDP) && 
-			(nic->packetlen >= 
+			(nic.packetlen >= 
 			ETH_HLEN + sizeof(struct iphdr) + sizeof(struct udphdr))) {
-			udp = (struct udphdr *)&nic->packet[ETH_HLEN + sizeof(struct iphdr)];
+			udp = (struct udphdr *)&nic.packet[ETH_HLEN + sizeof(struct iphdr)];
 
 			/* Make certain we have a reasonable packet length */
 			if (ntohs(udp->len) > (ntohs(ip->len) - iplen))
@@ -1517,9 +1494,9 @@ int await_reply(reply_t reply, int ival, void *ptr, long timeout)
 		tcp = 0;
 #ifdef DOWNLOAD_PROTO_HTTP
 		if (ip && (ip->protocol == IP_TCP) &&
-		    (nic->packetlen >=
+		    (nic.packetlen >=
 		     ETH_HLEN + sizeof(struct iphdr) + sizeof(struct tcphdr))){
-			tcp = (struct tcphdr *)&nic->packet[ETH_HLEN +
+			tcp = (struct tcphdr *)&nic.packet[ETH_HLEN +
 							 sizeof(struct iphdr)];
 			/* Make certain we have a reasonable packet length */
 			if (((ntohs(tcp->ctrl) >> 10) & 0x3C) >
@@ -1541,11 +1518,11 @@ int await_reply(reply_t reply, int ival, void *ptr, long timeout)
 		 * action.  This allows us reply to arp, igmp, and lacp queries.
 		 */
 		if ((ptype == ETH_P_ARP) &&
-			(nic->packetlen >= ETH_HLEN + sizeof(struct arprequest))) {
+			(nic.packetlen >= ETH_HLEN + sizeof(struct arprequest))) {
 			struct	arprequest *arpreply;
 			unsigned long tmp;
 		
-			arpreply = (struct arprequest *)&nic->packet[ETH_HLEN];
+			arpreply = (struct arprequest *)&nic.packet[ETH_HLEN];
 			memcpy(&tmp, arpreply->tipaddr, sizeof(in_addr));
 			if ((arpreply->opcode == htons(ARP_REQUEST)) &&
 				(tmp == arptable[ARP_CLIENT].ipaddr.s_addr)) {

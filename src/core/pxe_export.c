@@ -169,7 +169,7 @@ int pxe_shutdown_nic ( void ) {
 	if ( pxe_stack->state <= MIDWAY ) return 1;
 
 	eth_irq ( DISABLE );
-	eth_disable();
+	disable ( &dev );
 	pxe_stack->state = MIDWAY;
 	return 1;
 }
@@ -433,7 +433,7 @@ PXENV_EXIT_t pxenv_undi_set_station_address ( t_PXENV_UNDI_SET_STATION_ADDRESS
 	 * the current value anyway then return success, otherwise
 	 * return UNSUPPORTED.
 	 */
-	if ( memcmp ( nic->node_addr,
+	if ( memcmp ( nic.node_addr,
 		      &undi_set_station_address->StationAddress,
 		      ETH_ALEN ) == 0 ) {
 		undi_set_station_address->Status = PXENV_STATUS_SUCCESS;
@@ -465,8 +465,8 @@ PXENV_EXIT_t pxenv_undi_get_information ( t_PXENV_UNDI_GET_INFORMATION
 	DBG ( "PXENV_UNDI_GET_INFORMATION" );
 	ENSURE_READY ( undi_get_information );
 
-	undi_get_information->BaseIo = nic->ioaddr;
-	undi_get_information->IntNumber = nic->irqno;
+	undi_get_information->BaseIo = nic.ioaddr;
+	undi_get_information->IntNumber = nic.irqno;
 	/* Cheat: assume all cards can cope with this */
 	undi_get_information->MaxTranUnit = ETH_MAX_MTU;
 	/* Cheat: we only ever have Ethernet cards */
@@ -476,12 +476,12 @@ PXENV_EXIT_t pxenv_undi_get_information ( t_PXENV_UNDI_GET_INFORMATION
 	 * node address.  This is a valid assumption within Etherboot
 	 * at the time of writing.
 	 */
-	memcpy ( &undi_get_information->CurrentNodeAddress, nic->node_addr,
+	memcpy ( &undi_get_information->CurrentNodeAddress, nic.node_addr,
 		 ETH_ALEN );
-	memcpy ( &undi_get_information->PermNodeAddress, nic->node_addr,
+	memcpy ( &undi_get_information->PermNodeAddress, nic.node_addr,
 		 ETH_ALEN );
 	undi_get_information->ROMAddress = 0;
-		/* nic->rom_info->rom_segment; */
+		/* nic.rom_info->rom_segment; */
 	/* We only provide the ability to receive or transmit a single
 	 * packet at a time.  This is a bootloader, not an OS.
 	 */
@@ -637,7 +637,7 @@ PXENV_EXIT_t pxenv_undi_get_iface_info ( t_PXENV_UNDI_GET_IFACE_INFO
  * Status: working
  */
 PXENV_EXIT_t pxenv_undi_isr ( t_PXENV_UNDI_ISR *undi_isr ) {
-	media_header_t *media_header = (media_header_t*)nic->packet;
+	media_header_t *media_header = (media_header_t*)nic.packet;
 
 	DBG ( "PXENV_UNDI_ISR" );
 	/* We can't call ENSURE_READY, because this could be being
@@ -683,8 +683,8 @@ PXENV_EXIT_t pxenv_undi_isr ( t_PXENV_UNDI_ISR *undi_isr ) {
 		 */
 		DBG ( " PROCESS" );
 		if ( eth_poll ( 1 ) ) {
-			DBG ( " RECEIVE %d", nic->packetlen );
-			if ( nic->packetlen > sizeof(pxe_stack->packet) ) {
+			DBG ( " RECEIVE %d", nic.packetlen );
+			if ( nic.packetlen > sizeof(pxe_stack->packet) ) {
 				/* Should never happen */
 				undi_isr->FuncFlag = PXENV_UNDI_ISR_OUT_DONE;
 				undi_isr->Status =
@@ -692,10 +692,10 @@ PXENV_EXIT_t pxenv_undi_isr ( t_PXENV_UNDI_ISR *undi_isr ) {
 				return PXENV_EXIT_FAILURE;
 			}
 			undi_isr->FuncFlag = PXENV_UNDI_ISR_OUT_RECEIVE;
-			undi_isr->BufferLength = nic->packetlen;
-			undi_isr->FrameLength = nic->packetlen;
+			undi_isr->BufferLength = nic.packetlen;
+			undi_isr->FrameLength = nic.packetlen;
 			undi_isr->FrameHeaderLength = ETH_HLEN;
-			memcpy ( pxe_stack->packet, nic->packet, nic->packetlen);
+			memcpy ( pxe_stack->packet, nic.packet, nic.packetlen);
 			PTR_TO_SEGOFF16 ( pxe_stack->packet, undi_isr->Frame );
 			switch ( ntohs(media_header->nstype) ) {
 			case IP :	undi_isr->ProtType = P_IP;	break;
@@ -1026,7 +1026,7 @@ PXENV_EXIT_t pxenv_udp_read ( t_PXENV_UDP_READ *udp_read ) {
 PXENV_EXIT_t pxenv_udp_write ( t_PXENV_UDP_WRITE *udp_write ) {
 	uint16_t src_port;
 	uint16_t dst_port;
-	struct udppacket *packet = (struct udppacket *)nic->packet;
+	struct udppacket *packet = (struct udppacket *)nic.packet;
 	int packet_size;
 
 	DBG ( "PXENV_UDP_WRITE" );

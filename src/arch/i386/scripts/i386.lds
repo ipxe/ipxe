@@ -142,9 +142,15 @@ SECTIONS {
 	*(.data.*)
 
 	/* Various tables */
-	boot_drivers = .;
-	*(.boot_drivers)
-	boot_drivers_end = .;
+	device_drivers = .;
+	*(.drivers.device)
+	device_drivers_end = .;
+	bus_drivers = .;
+	*(.drivers.bus)
+	bus_drivers_end = .;
+	type_drivers = .;
+	*(.drivers.type)
+	type_drivers_end = .;
 	console_drivers = .;
 	*(.drivers.console)
 	console_drivers_end = .;

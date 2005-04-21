@@ -8,6 +8,10 @@
 #ifndef	NIC_H
 #define NIC_H
 
+#include "dev.h"
+#include "byteswap.h"
+#include "dhcp.h"
+
 typedef enum {
 	DISABLE = 0,
 	ENABLE,
@@ -24,16 +28,17 @@ typedef enum duplex {
  *	functions.
  */
 struct nic {
-	struct nic_operations *nic_op;
-	int		flags;	/* driver specific flags */
-	unsigned char	*node_addr;
-	unsigned char	*packet;
-	unsigned int	packetlen;
-	unsigned int	ioaddr;
-	unsigned char	irqno;
-	unsigned int	mbps;
-	duplex_t	duplex;
-	void		*priv_data;	/* driver can hang private data here */
+	struct nic_operations	*nic_op;
+	int			flags;	/* driver specific flags */
+	unsigned char		*node_addr;
+	unsigned char		*packet;
+	unsigned int		packetlen;
+	unsigned int		ioaddr;
+	unsigned char		irqno;
+	unsigned int		mbps;
+	duplex_t		duplex;
+	struct dhcp_dev_id	dhcp_dev_id;
+	void			*priv_data;	/* driver private data */
 };
 
 struct nic_operations {
@@ -42,52 +47,43 @@ struct nic_operations {
 	void ( *transmit ) ( struct nic *, const char *,
 			     unsigned int, unsigned int, const char * );
 	void ( *irq ) ( struct nic *, irq_action_t );
-	void ( *disable ) ( struct nic * );
 };
+
+extern struct type_driver nic_driver;
 
 /*
  * Function prototypes
  *
  */
-struct dev;
-extern struct nic * nic_device ( struct dev * dev );
 extern int dummy_connect ( struct nic *nic );
 extern void dummy_irq ( struct nic *nic, irq_action_t irq_action );
+extern void nic_disable ( struct nic *nic );
 
 /*
  * Functions that implicitly operate on the current boot device
  *
- * "nic" always points to &dev.nic
  */
 
-extern struct nic *nic;
+extern struct nic nic;
 
 static inline int eth_connect ( void ) {
-	return nic->nic_op->connect ( nic );
+	return nic.nic_op->connect ( &nic );
 }
 
 static inline int eth_poll ( int retrieve ) {
-	return nic->nic_op->poll ( nic, retrieve );
+	return nic.nic_op->poll ( &nic, retrieve );
 }
 
 static inline void eth_transmit ( const char *dest, unsigned int type,
 				  unsigned int size, const void *packet ) {
-	nic->nic_op->transmit ( nic, dest, type, size, packet );
+	nic.nic_op->transmit ( &nic, dest, type, size, packet );
 }
 
 static inline void eth_irq ( irq_action_t action ) {
-	nic->nic_op->irq ( nic, action );
+	nic.nic_op->irq ( &nic, action );
 }
 
 /* Should be using disable() rather than eth_disable() */
-static inline void eth_disable ( void ) __attribute__ (( deprecated ));
-static inline void eth_disable ( void ) {
-	nic->nic_op->disable ( nic );
-}
-
-/* dev.h needs declarations from nic.h */
-#include "dev.h"
-/* to get global "dev" */
-#include "main.h"
+extern void eth_disable ( void ) __attribute__ (( deprecated ));
 
 #endif	/* NIC_H */

@@ -408,7 +408,7 @@ static void btext_init(void)
 
     #warning "pci_find_device_x no longer exists; use find_pci_device instead"
     /*    pci_find_device_x(0x1002, 0x4752, 0, &dev); */
-    if(dev.vendor==0) return; // no fb
+    if(dev.vendor_id==0) return; // no fb
 
     frame_buffer = (uint32_t)dev.membase;
 #else

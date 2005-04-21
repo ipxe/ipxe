@@ -143,12 +143,6 @@ static int exit_status;
 static int initialized;
 
 
-/* Global instance of the current boot device */
-DEV_BUS(struct bus_device, dev_bus);
-struct dev dev = {
-	.bus = &dev_bus,
-};
-
 /**************************************************************************
  * initialise() - perform any C-level initialisation
  *
@@ -169,6 +163,7 @@ void initialise ( void ) {
 MAIN - Kick off routine
 **************************************************************************/
 int main ( void ) {
+	int skip = 0;
 
 	/* Print out configuration */
 	print_config();
@@ -181,36 +176,34 @@ int main ( void ) {
 	for ( ; ; disable ( &dev ), call_reset_fns() ) {
 
 		/* Get next boot device */
-		if ( ! find_boot_device ( &dev ) ) {
+		if ( ! find_any_with_driver ( &dev, skip ) ) {
 			/* Reached end of device list */
 			printf ( "No more boot devices\n" );
+			skip = 0;
 			sleep ( 2 );
 			continue;
 		}
 
+		/* Skip this device the next time we encounter it */
+		skip = 1;
+
+		/* Print out what we're doing */
+		printf ( "Booting from %s %s at %s "
+			 "using the %s driver\n",
+			 dev.bus_driver->name ( &dev.bus_dev ),
+			 dev.type_driver->name,
+			 dev.bus_driver->describe ( &dev.bus_dev ),
+			 dev.device_driver->name );
+
 		/* Probe boot device */
 		if ( ! probe ( &dev ) ) {
 			/* Device found on bus, but probe failed */
-			printf ( "Probe failed on %s, trying next device\n",
-				 dev.name );
+			printf ( "...probe failed on %s\n" );
 			continue;
 		}
 		
-		/* Print device info */
-		print_info ( &dev );
-
-		/* Load configuration (e.g. DHCP) */
-		if ( ! load_configuration ( &dev ) ) {
-			/* DHCP failed */
-			printf ( "Could not configure device %s\n", dev.name );
-			continue;
-		}
-
-		/* Load image */
-		if ( ! load ( &dev ) )
-			/* Load failed */
-			printf ( "Could not boot from device %s\n", dev.name );
-			continue;
+		printf ( "%s: %s\n", dev.bus_driver->name ( &dev.bus_dev ),
+			 dev.type_driver->describe ( dev.type_dev ) );
 	}
 
 	/* Call registered per-object exit functions */
@@ -463,8 +456,7 @@ void cleanup(void)
 	nfs_umountall(ARP_SERVER);
 #endif
 	/* Stop receiving packets */
-	eth_disable();
-	disk_disable();
+	disable ( &dev );
 	initialized = 0;
 }
 

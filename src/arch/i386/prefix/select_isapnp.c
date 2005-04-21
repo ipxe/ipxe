@@ -1,3 +1,4 @@
+#include "dev.h"
 #include "isapnp.h"
 #include "registers.h"
 
@@ -16,5 +17,16 @@ void i386_select_isapnp_device ( struct i386_all_regs *regs ) {
 	 * address in %dx.
 	 *
 	 */
-	select_isapnp_device ( regs->dx, regs->bx );
+	union {
+		struct bus_loc bus_loc;
+		struct isapnp_loc isapnp_loc;
+	} u;
+
+	/* Set ISAPnP read port */
+	isapnp_set_read_port ( regs->dx );
+	
+	/* Select ISAPnP bus and specified CSN as first boot device */
+	memset ( &u, 0, sizeof ( u ) );
+	u.isapnp_loc.csn = regs->bx;
+	select_device ( &dev, &isapnp_driver, &u.bus_loc );
 }

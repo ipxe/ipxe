@@ -19,6 +19,8 @@
 
 #include "stdint.h"
 
+#define	ISA_BUS_TYPE	2
+
 /*
  * Construct a vendor ID from three ASCII characters
  *

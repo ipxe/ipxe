@@ -1,15 +1,8 @@
 #include "stdint.h"
 #include "string.h"
 #include "console.h"
+#include "nic.h"
 #include "pci.h"
-
-/*
- * Ensure that there is sufficient space in the shared dev_bus
- * structure for a struct pci_device.
- *
- */
-DEV_BUS( struct pci_device, pci_dev );
-static char pci_magic[0]; /* guaranteed unique symbol */
 
 /*
  * pci_io.c may know how many buses we have, in which case it can
@@ -19,12 +12,38 @@ static char pci_magic[0]; /* guaranteed unique symbol */
 unsigned int pci_max_bus = 0xff;
 
 /*
+ * Increment a bus_loc structure to the next possible PCI location.
+ * Leave the structure zeroed and return 0 if there are no more valid
+ * locations.
+ *
+ */
+static int pci_next_location ( struct bus_loc *bus_loc ) {
+	struct pci_loc *pci_loc = ( struct pci_loc * ) bus_loc;
+	
+	/*
+	 * Ensure that there is sufficient space in the shared bus
+	 * structures for a struct pci_loc and a struct
+	 * pci_dev, as mandated by bus.h.
+	 *
+	 */
+	BUS_LOC_CHECK ( struct pci_loc );
+	BUS_DEV_CHECK ( struct pci_device );
+
+	return ( ++pci_loc->busdevfn );
+}
+
+/*
  * Fill in parameters (vendor & device ids, class, membase etc.) for a
  * PCI device based on bus & devfn.
  *
  * Returns 1 if a device was found, 0 for no device present.
+ *
  */
-static int fill_pci_device ( struct pci_device *pci ) {
+static int pci_fill_device ( struct bus_dev *bus_dev,
+			     struct bus_loc *bus_loc ) {
+	struct pci_loc *pci_loc = ( struct pci_loc * ) bus_loc;
+	struct pci_device *pci = ( struct pci_device * ) bus_dev;
+	uint16_t busdevfn = pci_loc->busdevfn;
 	static struct {
 		uint16_t devfn0;
 		int is_present;
@@ -32,8 +51,12 @@ static int fill_pci_device ( struct pci_device *pci ) {
 	uint32_t l;
 	int reg;
 
+	/* Store busdevfn in struct pci_device and set default values */
+	pci->busdevfn = busdevfn;
+	pci->name = "?";
+
 	/* Check bus is within range */
-	if ( PCI_BUS ( pci->busdevfn ) > pci_max_bus ) {
+	if ( PCI_BUS ( busdevfn ) > pci_max_bus ) {
 		return 0;
 	}
 
@@ -41,8 +64,8 @@ static int fill_pci_device ( struct pci_device *pci ) {
 	 * non-zero function on a non-existent card.  This is done to
 	 * increase scan speed by a factor of 8.
 	 */
-	if ( ( PCI_FUNC ( pci->busdevfn ) != 0 ) &&
-	     ( PCI_FN0 ( pci->busdevfn ) == cache.devfn0 ) &&
+	if ( ( PCI_FUNC ( busdevfn ) != 0 ) &&
+	     ( PCI_FN0 ( busdevfn ) == cache.devfn0 ) &&
 	     ( ! cache.is_present ) ) {
 		return 0;
 	}
@@ -52,28 +75,27 @@ static int fill_pci_device ( struct pci_device *pci ) {
 	pci_read_config_dword ( pci, PCI_VENDOR_ID, &l );
 	/* some broken boards return 0 if a slot is empty: */
 	if ( ( l == 0xffffffff ) || ( l == 0x00000000 ) ) {
-		if ( PCI_FUNC ( pci->busdevfn ) == 0 ) {
+		if ( PCI_FUNC ( busdevfn ) == 0 ) {
 			/* Don't look for subsequent functions if the
 			 * card itself is not present.
 			 */
-			cache.devfn0 = pci->busdevfn;
+			cache.devfn0 = busdevfn;
 			cache.is_present = 0;
 		}
 		return 0;
 	}
-	pci->vendor = l & 0xffff;
-	pci->dev_id = ( l >> 16 ) & 0xffff;
+	pci->vendor_id = l & 0xffff;
+	pci->device_id = ( l >> 16 ) & 0xffff;
 	
 	/* Check that we're not a duplicate function on a
 	 * non-multifunction device.
 	 */
-	if ( PCI_FUNC ( pci->busdevfn ) != 0 ) {
-		uint16_t save_busdevfn = pci->busdevfn;
+	if ( PCI_FUNC ( busdevfn ) != 0 ) {
 		uint8_t header_type;
 
-		pci->busdevfn &= PCI_FN0 ( pci->busdevfn );
+		pci->busdevfn &= PCI_FN0 ( busdevfn );
 		pci_read_config_byte ( pci, PCI_HEADER_TYPE, &header_type );
-		pci->busdevfn = save_busdevfn;
+		pci->busdevfn = busdevfn;
 
 		if ( ! ( header_type & 0x80 ) ) {
 			return 0;
@@ -108,13 +130,86 @@ static int fill_pci_device ( struct pci_device *pci ) {
 		pci_read_config_byte ( pci, PCI_INTERRUPT_LINE, &pci->irq );
 	}
 
-	DBG ( "PCI found device %hhx:%hhx.%d Class %hx: %hx:%hx (rev %hhx)\n",
+	DBG ( "found device %hhx:%hhx.%d Class %hx: %hx:%hx (rev %hhx)\n",
 	      PCI_BUS ( pci->busdevfn ), PCI_DEV ( pci->busdevfn ),
-	      PCI_FUNC ( pci->busdevfn ), pci->class, pci->vendor, pci->dev_id,
-	      pci->revision );
+	      PCI_FUNC ( pci->busdevfn ), pci->class, pci->vendor_id,
+	      pci->device_id, pci->revision );
 
 	return 1;
 }
+
+/*
+ * Test whether or not a driver is capable of driving the device.
+ *
+ */
+static int pci_check_driver ( struct bus_dev *bus_dev,
+		       struct device_driver *device_driver ) {
+	struct pci_device *pci = ( struct pci_device * ) bus_dev;
+	struct pci_driver_info *pci_driver_info
+		= ( struct pci_driver_info * ) device_driver->bus_driver_info;
+	unsigned int i;
+
+	/* If driver has a class, and class matches, use it */
+	if ( pci_driver_info->class && 
+	     ( pci_driver_info->class == pci->class ) ) {
+		DBG ( "driver %s matches class %hx\n",
+		      device_driver->name, pci_driver_info->class );
+		pci->name = device_driver->name;
+		return 1;
+	}
+		
+	/* If any of driver's IDs match, use it */
+	for ( i = 0 ; i < pci_driver_info->id_count; i++ ) {
+		struct pci_id *id = &pci_driver_info->ids[i];
+		
+		if ( ( pci->vendor_id == id->vendor_id ) &&
+		     ( pci->device_id == id->device_id ) ) {
+			DBG ( "driver %s device %s matches ID %hx:%hx\n",
+			      device_driver->name, id->name,
+			      id->vendor_id, id->device_id );
+			pci->name = id->name;
+			return 1;
+		}
+	}
+
+	return 0;
+}
+
+/*
+ * Describe a PCI device
+ *
+ */
+static char * pci_describe ( struct bus_dev *bus_dev ) {
+	struct pci_device *pci = ( struct pci_device * ) bus_dev;
+	static char pci_description[] = "PCI 00:00.0";
+
+	sprintf ( pci_description + 4, "%hhx:%hhx.%d",
+		  PCI_BUS ( pci->busdevfn ), PCI_DEV ( pci->busdevfn ),
+		  PCI_FUNC ( pci->busdevfn ) );
+	return pci_description;
+}
+
+/*
+ * Name a PCI device
+ *
+ */
+static char * pci_name ( struct bus_dev *bus_dev ) {
+	struct pci_device *pci = ( struct pci_device * ) bus_dev;
+	
+	return pci->name;
+}
+
+/*
+ * PCI bus operations table
+ *
+ */
+struct bus_driver pci_driver __bus_driver = {
+	.next_location	= pci_next_location,
+	.fill_device	= pci_fill_device,
+	.check_driver	= pci_check_driver,
+	.describe	= pci_describe,
+	.name		= pci_name,
+};
 
 /*
  * Set device to be a busmaster in case BIOS neglected to do so.  Also
@@ -127,7 +222,7 @@ void adjust_pci_device ( struct pci_device *pci ) {
 	pci_read_config_word ( pci, PCI_COMMAND, &pci_command );
 	new_command = pci_command | PCI_COMMAND_MASTER | PCI_COMMAND_IO;
 	if ( pci_command != new_command ) {
-		DBG ( "PCI BIOS has not enabled device %hhx:%hhx.%d! "
+		DBG ( "BIOS has not enabled device %hhx:%hhx.%d! "
 		      "Updating PCI command %hX->%hX\n",
 		      PCI_BUS ( pci->busdevfn ), PCI_DEV ( pci->busdevfn ),
 		      PCI_FUNC ( pci->busdevfn ), pci_command, new_command );
@@ -135,106 +230,12 @@ void adjust_pci_device ( struct pci_device *pci ) {
 	}
 	pci_read_config_byte ( pci, PCI_LATENCY_TIMER, &pci_latency);
 	if ( pci_latency < 32 ) {
-		DBG ( "PCI device %hhx:%hhx.%d latency timer is "
+		DBG ( "device %hhx:%hhx.%d latency timer is "
 		      "unreasonably low at %d. Setting to 32.\n",
 		      PCI_BUS ( pci->busdevfn ), PCI_DEV ( pci->busdevfn ),
 		      PCI_FUNC ( pci->busdevfn ), pci_latency );
 		pci_write_config_byte ( pci, PCI_LATENCY_TIMER, 32);
 	}
-}
-
-/*
- * Set PCI device to use.
- *
- * This routine can be called by e.g. the ROM prefix to specify that
- * the first device to be tried should be the device on which the ROM
- * was physically located.
- *
- */
-void set_pci_device ( uint16_t busdevfn ) {
-	pci_dev.magic = pci_magic;
-	pci_dev.busdevfn = busdevfn;
-	pci_dev.already_tried = 0;
-}
-
-/*
- * Find a PCI device matching the specified driver
- *
- */
-int find_pci_device ( struct pci_device *pci,
-		      struct pci_driver *driver ) {
-	int i;
-
-	/* Initialise struct pci if it's the first time it's been used. */
-	if ( pci->magic != pci_magic ) {
-		memset ( pci, 0, sizeof ( *pci ) );
-		pci->magic = pci_magic;
-	}
-
-	/* Iterate through all possible PCI bus:dev.fn combinations,
-	 * starting where we left off.
-	 */
-	DBG ( "PCI searching for device matching driver %s\n", driver->name );
-	do {
-		/* If we've already used this device, skip it */
-		if ( pci->already_tried ) {
-			pci->already_tried = 0;
-			continue;
-		}
-		
-		/* Fill in device parameters, if device present */
-		if ( ! fill_pci_device ( pci ) ) {
-			continue;
-		}
-		
-		/* If driver has a class, and class matches, use it */
-		if ( driver->class && 
-		     ( driver->class == pci->class ) ) {
-			DBG ( "PCI found class %hx matching driver %s\n",
-			      driver->class, driver->name );
-			pci->name = driver->name;
-			pci->already_tried = 1;
-			return 1;
-		}
-		
-		/* If any of driver's IDs match, use it */
-		for ( i = 0 ; i < driver->id_count; i++ ) {
-			struct pci_id *id = &driver->ids[i];
-			
-			if ( ( pci->vendor == id->vendor ) &&
-			     ( pci->dev_id == id->dev_id ) ) {
-				DBG ( "PCI found ID %hx:%hx (device %s) "
-				      "matching driver %s\n", id->vendor,
-				      id->dev_id, id->name, driver->name );
-				pci->name = id->name;
-				pci->already_tried = 1;
-				return 1;
-			}
-		}
-	} while ( ++pci->busdevfn );
-
-	/* No device found */
-	DBG ( "PCI found no device matching driver %s\n", driver->name );
-	return 0;
-}
-
-/*
- * Find the next PCI device that can be used to boot using the
- * specified driver.
- *
- */
-int find_pci_boot_device ( struct dev *dev, struct pci_driver *driver ) {
-	struct pci_device *pci = ( struct pci_device * )dev->bus;
-
-	if ( ! find_pci_device ( pci, driver ) )
-		return 0;
-
-	dev->name = pci->name;
-	dev->devid.bus_type = PCI_BUS_TYPE;
-	dev->devid.vendor_id = pci->vendor;
-	dev->devid.device_id = pci->dev_id;
-
-	return 1;
 }
 
 /*
@@ -345,4 +346,20 @@ int pci_find_capability ( struct pci_device *pci, int cap ) {
 		pci_read_config_byte ( pci, pos + PCI_CAP_LIST_NEXT, &pos );
 	}
 	return 0;
+}
+
+/*
+ * Fill in a DHCP device ID structure
+ *
+ */
+void pci_fill_nic ( struct nic *nic, struct pci_device *pci ) {
+
+	/* Fill in ioaddr and irqno */
+	nic->ioaddr = pci->ioaddr;
+	nic->irqno = pci->irq;
+
+	/* Fill in DHCP device ID structure */
+	nic->dhcp_dev_id.bus_type = PCI_BUS_TYPE;
+	nic->dhcp_dev_id.vendor_id = htons ( pci->vendor_id );
+	nic->dhcp_dev_id.device_id = htons ( pci->device_id );
 }

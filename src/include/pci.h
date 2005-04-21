@@ -22,8 +22,10 @@
  */
 
 #include "stdint.h"
+#include "nic.h"
 #include "pci_ids.h"
-#include "dev.h"
+
+#define	PCI_BUS_TYPE	1
 
 /*
  * PCI constants
@@ -234,32 +236,44 @@
 #define PCI_MSI_DATA_32		8	/* 16 bits of data for 32-bit devices */
 #define PCI_MSI_DATA_64		12	/* 16 bits of data for 64-bit devices */
 /*
+ * A location on a PCI bus
+ *
+ */
+struct pci_loc {
+	uint16_t		busdevfn;
+};
+
+/*
  * A physical PCI device
  *
  */
 struct pci_device {
-	char *			magic; /* must be first */
-	const char *		name;
-	uint32_t		membase;	/* BAR 1 */
-	uint32_t		ioaddr;		/* first IO BAR */
-	uint16_t		vendor, dev_id;
-	uint16_t		class;
-	uint16_t		busdevfn;
-	uint8_t			revision;
-	uint8_t			irq;
-	uint8_t			already_tried;
-};
+	const char *	name;
+	uint32_t	membase;	/* BAR 1 */
+	uint32_t	ioaddr;		/* first IO BAR */
+	uint16_t	vendor_id, device_id;
+	uint16_t	class;
+	uint16_t	busdevfn;
+	uint8_t		revision;
+	uint8_t		irq;
+} __attribute__ (( packed ));
+
+/*
+ * Useful busdevfn calculations
+ *
+ */
 #define PCI_BUS(busdevfn)	( ( uint8_t ) ( ( (busdevfn) >> 8 ) & 0xff ) )
 #define PCI_DEV(busdevfn)	( ( uint8_t ) ( ( (busdevfn) >> 3 ) & 0x1f ) )
 #define PCI_FUNC(busdevfn)      ( ( uint8_t ) ( (busdevfn) & 0x07 ) )
 #define PCI_FN0(busdevfn)	( ( uint16_t ) ( (busdevfn) & 0xfff8 ) )
+#define PCI_MAX_BUSDEVFN	0xffff
 
 /*
  * An individual PCI device identified by vendor and device IDs
  *
  */
 struct pci_id {
-	unsigned short vendor, dev_id;
+	unsigned short vendor_id, device_id;
 	const char *name;
 };
 
@@ -268,24 +282,23 @@ struct pci_id {
  * is also parsed by parserom.pl to generate Makefile rules and files
  * for rom-o-matic.
  */
-#define PCI_ROM( rom_vendor, rom_dev_id, rom_name, rom_description ) {	\
-	.vendor = rom_vendor,						\
-	.dev_id = rom_dev_id,						\
-	.name = rom_name,						\
+#define PCI_ROM( _vendor_id, _device_id, _name, _description ) {	\
+	.vendor_id = _vendor_id,					\
+	.device_id = _device_id,					\
+	.name = _name,							\
 }
 
 /*
- * A PCI driver, with a device ID (struct pci_id) table and an
- * optional class.
+ * A PCI driver information table, with a device ID (struct pci_id)
+ * table and an optional class.
  *
  * Set the class to something other than PCI_NO_CLASS if the driver
  * can handle an entire class of devices.
  *
  */
-struct pci_driver {
-	const char *name;
+struct pci_driver_info {
 	struct pci_id *ids;
-	int id_count;
+	unsigned int id_count;
 	uint16_t class;
 };
 #define PCI_NO_CLASS 0
@@ -294,30 +307,30 @@ struct pci_driver {
  * Define a PCI driver.
  *
  */
-#define PCI_DRIVER( driver_name, pci_ids, pci_class ) {			\
-	.name = driver_name,						\
-	.ids = pci_ids,							\
-	.id_count = sizeof ( pci_ids ) / sizeof ( pci_ids[0] ),		\
-	.class = pci_class,						\
-}
+#define PCI_DRIVER( _info_name, _ids, _class )				\
+	static struct pci_driver_info _info_name = {			\
+		.ids = _ids,						\
+		.id_count = sizeof ( _ids ) / sizeof ( _ids[0] ),	\
+		.class = _class,					\
+	};
 
 /*
  * These are the functions we expect pci_io.c to provide.
  *
  */
-extern int pci_read_config_byte	( struct pci_device *dev, unsigned int where,
+extern int pci_read_config_byte	( struct pci_device *pci, unsigned int where,
 				  uint8_t *value );
-extern int pci_write_config_byte ( struct pci_device *dev, unsigned int where,
+extern int pci_write_config_byte ( struct pci_device *pci, unsigned int where,
 				   uint8_t value );
-extern int pci_read_config_word ( struct pci_device *dev, unsigned int where,
+extern int pci_read_config_word ( struct pci_device *pci, unsigned int where,
 				  uint16_t *value );
-extern int pci_write_config_word ( struct pci_device *dev, unsigned int where,
+extern int pci_write_config_word ( struct pci_device *pci, unsigned int where,
 				   uint16_t value );
-extern int pci_read_config_dword ( struct pci_device *dev, unsigned int where,
+extern int pci_read_config_dword ( struct pci_device *pci, unsigned int where,
 				   uint32_t *value );
-extern int pci_write_config_dword ( struct pci_device *dev, unsigned int where,
+extern int pci_write_config_dword ( struct pci_device *pci, unsigned int where,
 				    uint32_t value );
-extern unsigned long pci_bus_base ( struct pci_device *dev );
+extern unsigned long pci_bus_base ( struct pci_device *pci );
 
 /*
  * pci_io.c is allowed to overwrite pci_max_bus if it knows what the
@@ -330,13 +343,17 @@ extern unsigned int pci_max_bus;
  * Functions in pci.c
  *
  */
-extern int find_pci_device ( struct pci_device *pci,
-			     struct pci_driver *driver );
-extern int find_pci_boot_device ( struct dev *dev, struct pci_driver *driver );
 extern void adjust_pci_device ( struct pci_device *pci );
 extern unsigned long pci_bar_start ( struct pci_device *pci,
 				     unsigned int bar );
 extern unsigned long pci_bar_size ( struct pci_device *pci, unsigned int bar );
 extern int pci_find_capability ( struct pci_device *pci, int capability );
+extern void pci_fill_nic ( struct nic *nic, struct pci_device *pci );
+
+/*
+ * PCI bus global definition
+ *
+ */
+extern struct bus_driver pci_driver;
 
 #endif	/* PCI_H */

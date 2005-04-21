@@ -11,6 +11,8 @@
 #include "isa_ids.h"
 #include "dev.h"
 
+#define MCA_BUS_TYPE	3
+
 /*
  * MCA constants
  *
