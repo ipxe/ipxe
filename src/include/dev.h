@@ -201,10 +201,10 @@ struct device_driver {
 #define __device_driver \
 	__attribute__ (( used, __section__ ( ".drivers.device" ) ))
 
-#define DRIVER(_name,_name_string,_type_driver,_bus_driver,_bus_info,	      \
+#define DRIVER(_name,_type_driver,_bus_driver,_bus_info,	 	      \
 	       _probe,_disable) 		 			      \
-	static struct device_driver _name __device_driver = {		      \
-		.name = _name_string,					      \
+	static struct device_driver device_ ## _bus_info __device_driver = {  \
+		.name = _name,						      \
 		.type_driver = &_type_driver,				      \
 		.bus_driver = &_bus_driver,				      \
 		.bus_driver_info = ( struct bus_driver_info * ) &_bus_info,   \

@@ -307,12 +307,11 @@ struct pci_driver_info {
  * Define a PCI driver.
  *
  */
-#define PCI_DRIVER( _info_name, _ids, _class )				\
-	static struct pci_driver_info _info_name = {			\
+#define PCI_DRIVER( _ids, _class ) {					\
 		.ids = _ids,						\
 		.id_count = sizeof ( _ids ) / sizeof ( _ids[0] ),	\
 		.class = _class,					\
-	};
+	}
 
 /*
  * These are the functions we expect pci_io.c to provide.
