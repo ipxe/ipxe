@@ -176,7 +176,8 @@ static void pnic_transmit ( struct nic *nic, const char *dest,
 /**************************************************************************
 DISABLE - Turn off ethernet interface
 ***************************************************************************/
-static void pnic_disable ( struct nic *nic ) {
+static void pnic_disable ( struct nic *nic, struct pci_device *pci __unused ) {
+	nic_disable ( nic );
 	pnic_command ( nic, PNIC_CMD_RESET, NULL, 0, NULL, 0, NULL );
 }
 
@@ -208,21 +209,17 @@ static struct nic_operations pnic_operations = {
 	.poll		= pnic_poll,
 	.transmit	= pnic_transmit,
 	.irq		= pnic_irq,
-	.disable        = pnic_disable,
 };
 
 /**************************************************************************
 PROBE - Look for an adapter, this routine's visible to the outside
 ***************************************************************************/
-
-static int pnic_probe ( struct dev *dev, struct pci_device *pci ) {
-	struct nic *nic = nic_device ( dev );
+static int pnic_probe ( struct nic *nic, struct pci_device *pci ) {
 	uint16_t api_version;
 	uint16_t status;
 
 	/* Retrieve relevant information about PCI device */
-	nic->ioaddr = pci->ioaddr;
-	nic->irqno = pci->irq;
+	pci_fill_nic ( nic, pci );
 
 	/* API version check */
 	status = pnic_command_quiet( nic, PNIC_CMD_API_VER, NULL, 0,
@@ -249,7 +246,8 @@ static struct pci_id pnic_nics[] = {
 PCI_ROM ( 0xfefe, 0xefef, "pnic", "Bochs Pseudo NIC Adaptor" ),
 };
 
-static struct pci_driver pnic_driver =
-	PCI_DRIVER ( "PNIC", pnic_nics, PCI_NO_CLASS );
+static struct pci_driver_info pnic_driver =
+	PCI_DRIVER ( pnic_nics, PCI_NO_CLASS );
 
-BOOT_DRIVER ( "PNIC", find_pci_boot_device, pnic_driver, pnic_probe );
+DRIVER ( "PNIC", nic_driver, pci_driver, pnic_driver,
+	 pnic_probe, pnic_disable );
