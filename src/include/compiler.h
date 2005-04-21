@@ -46,7 +46,7 @@ __asm__ ( ".equ\t" OBJECT_SYMBOL_STR ", 0" );
 #define DEBUG_SYMBOL _H2 ( debug_, OBJECT )
 #if DEBUG_SYMBOL
 #include "console.h"
-#define DBG(...) printf ( __VA_ARGS__ )
+#define DBG(...) printf ( _XSTR ( OBJECT ) ": " __VA_ARGS__ )
 #define DEBUG_SYMBOL_STR _XSTR ( DEBUG_SYMBOL )
 __asm__ ( ".equ\tWITH_DEBUG_MESSAGES, 0" );
 #else
