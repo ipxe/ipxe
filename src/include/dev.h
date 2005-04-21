@@ -154,7 +154,7 @@ struct bus_driver {
 	int ( *check_driver ) ( struct bus_dev *bus_dev,
 				struct device_driver *device_driver );
 	char * ( *describe ) ( struct bus_dev *bus_dev );
-	char * ( *name ) ( struct bus_dev *bus_dev );
+	const char * ( *name ) ( struct bus_dev *bus_dev );
 };
 
 #define __bus_driver __attribute__ (( used, __section__ ( ".drivers.bus" ) ))

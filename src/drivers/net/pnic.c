@@ -246,7 +246,7 @@ static struct pci_id pnic_nics[] = {
 PCI_ROM ( 0xfefe, 0xefef, "pnic", "Bochs Pseudo NIC Adaptor" ),
 };
 
-static struct pci_driver_info pnic_driver =
+static struct pci_driver pnic_driver =
 	PCI_DRIVER ( pnic_nics, PCI_NO_CLASS );
 
 DRIVER ( "PNIC", nic_driver, pci_driver, pnic_driver,

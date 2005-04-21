@@ -296,7 +296,7 @@ struct pci_id {
  * can handle an entire class of devices.
  *
  */
-struct pci_driver_info {
+struct pci_driver {
 	struct pci_id *ids;
 	unsigned int id_count;
 	uint16_t class;

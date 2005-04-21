@@ -143,24 +143,24 @@ static int pci_fill_device ( struct bus_dev *bus_dev,
  *
  */
 static int pci_check_driver ( struct bus_dev *bus_dev,
-		       struct device_driver *device_driver ) {
+			      struct device_driver *device_driver ) {
 	struct pci_device *pci = ( struct pci_device * ) bus_dev;
-	struct pci_driver_info *pci_driver_info
-		= ( struct pci_driver_info * ) device_driver->bus_driver_info;
+	struct pci_driver *pci_driver
+		= ( struct pci_driver * ) device_driver->bus_driver_info;
 	unsigned int i;
 
 	/* If driver has a class, and class matches, use it */
-	if ( pci_driver_info->class && 
-	     ( pci_driver_info->class == pci->class ) ) {
+	if ( pci_driver->class && 
+	     ( pci_driver->class == pci->class ) ) {
 		DBG ( "driver %s matches class %hx\n",
-		      device_driver->name, pci_driver_info->class );
+		      device_driver->name, pci_driver->class );
 		pci->name = device_driver->name;
 		return 1;
 	}
 		
 	/* If any of driver's IDs match, use it */
-	for ( i = 0 ; i < pci_driver_info->id_count; i++ ) {
-		struct pci_id *id = &pci_driver_info->ids[i];
+	for ( i = 0 ; i < pci_driver->id_count; i++ ) {
+		struct pci_id *id = &pci_driver->ids[i];
 		
 		if ( ( pci->vendor_id == id->vendor_id ) &&
 		     ( pci->device_id == id->device_id ) ) {
@@ -193,7 +193,7 @@ static char * pci_describe ( struct bus_dev *bus_dev ) {
  * Name a PCI device
  *
  */
-static char * pci_name ( struct bus_dev *bus_dev ) {
+static const char * pci_name ( struct bus_dev *bus_dev ) {
 	struct pci_device *pci = ( struct pci_device * ) bus_dev;
 	
 	return pci->name;
