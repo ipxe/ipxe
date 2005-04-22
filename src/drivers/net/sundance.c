@@ -596,7 +596,7 @@ static int sundance_probe ( struct nic *nic, struct pci_device *pci ) {
 	/* BASE is used throughout to address the card */
 	BASE = pci->ioaddr;
 	printf(" sundance.c: Found %s Vendor=0x%hX Device=0x%hX\n",
-	       dev->name, pci->vendor, pci->dev_id);
+	       pci->name, pci->vendor_id, pci->device_id);
 
 	/* Get the MAC Address by reading the EEPROM */
 	for (i = 0; i < 3; i++) {
@@ -618,13 +618,13 @@ static int sundance_probe ( struct nic *nic, struct pci_device *pci ) {
 	/* point to private storage */
 	sdc = &sdx;
 
-	sdc->nic_name = dev->name;
+	sdc->nic_name = pci->name;
 	sdc->mtu = mtu;
 
 	pci_read_config_byte(pci, PCI_REVISION_ID, &sdc->pci_rev_id);
 	dprintf(("Device revision id: %hx\n", sdc->pci_rev_id));
 	/* Print out some hardware info */
-	printf("%s: %! at ioaddr %hX, ", dev->name, nic->node_addr, BASE);
+	printf("%s: %! at ioaddr %hX, ", pci->name, nic->node_addr, BASE);
 	sdc->mii_preamble_required = 0;
 	if (1) {
 		int phy, phy_idx = 0;

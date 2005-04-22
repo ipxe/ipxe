@@ -960,7 +960,7 @@ rhine_probe ( struct nic *nic, struct pci_device *pci ) {
 
     if (!pci->ioaddr)
 	return 0;
-    rhine_probe1 (nic, pci, pci->ioaddr, pci->dev_id, -1);
+    rhine_probe1 (nic, pci, pci->ioaddr, pci->device_id, -1);
 
     adjust_pci_device ( pci );
     rhine_reset (nic);

@@ -682,7 +682,7 @@ static int pcnet32_probe ( struct nic *nic, struct pci_device *pci ) {
 	/* BASE is used throughout to address the card */
 	ioaddr = pci->ioaddr;
 	printf("pcnet32.c: Found %s, Vendor=0x%hX Device=0x%hX\n",
-	       dev->name, pci->vendor, pci->dev_id);
+	       pci->name, pci->vendor_id, pci->device_id);
 
 	nic->irqno  = 0;
 	pci_fill_nic ( nic, pci );
@@ -801,7 +801,7 @@ static int pcnet32_probe ( struct nic *nic, struct pci_device *pci ) {
 		nic->node_addr[i] = promaddr[i];
 	}
 	/* Print out some hardware info */
-	printf("%s: %! at ioaddr %hX, ", dev->name, nic->node_addr,
+	printf("%s: %! at ioaddr %hX, ", pci->name, nic->node_addr,
 	       ioaddr);
 
 	/* Set to pci bus master */

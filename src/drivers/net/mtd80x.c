@@ -687,8 +687,8 @@ static int mtd_probe ( struct nic *nic, struct pci_device *pci ) {
 
     adjust_pci_device(pci);
 
-    mtdx.nic_name = dev->name;
-    mtdx.dev_id = pci->dev_id;
+    mtdx.nic_name = pci->name;
+    mtdx.dev_id = pci->device_id;
 
     /* read ethernet id */
     for (i = 0; i < 6; ++i)

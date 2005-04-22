@@ -2841,9 +2841,9 @@ static int tg3_get_invariants(struct tg3 *tp)
 	if (((GET_ASIC_REV(tp->pci_chip_rev_id) == ASIC_REV_5703) &&
 		    ((grc_misc_cfg == 0x8000) || (grc_misc_cfg == 0x4000))) ||
 		((GET_ASIC_REV(tp->pci_chip_rev_id) == ASIC_REV_5705) &&
-			(tp->pdev->vendor == PCI_VENDOR_ID_BROADCOM) &&
-			((tp->pdev->dev_id == PCI_DEVICE_ID_TIGON3_5901) ||
-				(tp->pdev->dev_id == PCI_DEVICE_ID_TIGON3_5901_2)))) {
+			(tp->pdev->vendor_id == PCI_VENDOR_ID_BROADCOM) &&
+			((tp->pdev->device_id == PCI_DEVICE_ID_TIGON3_5901) ||
+				(tp->pdev->device_id == PCI_DEVICE_ID_TIGON3_5901_2)))) {
 		tp->tg3_flags |= TG3_FLAG_10_100_ONLY;
 	}
 

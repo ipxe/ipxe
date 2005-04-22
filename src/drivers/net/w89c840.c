@@ -649,19 +649,20 @@ static int w89c840_probe ( struct nic *nic, struct pci_device *p ) {
 #define PCI_DEVICE_ID_COMPEX_RL100ATX   0x2011
 
     /* From Matt Hortman <mbhortman@acpthinclient.com> */
-    if (p->vendor == PCI_VENDOR_ID_WINBOND2
-        && p->dev_id == PCI_DEVICE_ID_WINBOND2_89C840) {
+    if (p->vendor_id == PCI_VENDOR_ID_WINBOND2
+        && p->device_id == PCI_DEVICE_ID_WINBOND2_89C840) {
 
         /* detected "Winbond W89c840 Fast Ethernet PCI NIC" */
 
-    } else if ( p->vendor == PCI_VENDOR_ID_COMPEX
-                && p->dev_id == PCI_DEVICE_ID_COMPEX_RL100ATX) {
+    } else if ( p->vendor_id == PCI_VENDOR_ID_COMPEX
+                && p->device_id == PCI_DEVICE_ID_COMPEX_RL100ATX) {
 
         /* detected "Compex RL100ATX Fast Ethernet PCI NIC" */
 
     } else {
         /* Gee, guess what? They missed again. */
-        printf("device ID : %X - is not a Compex RL100ATX NIC.\n", p->dev_id);
+        printf("device ID : %X - is not a Compex RL100ATX NIC.\n",
+	       p->device_id);
         return 0;
     }
 

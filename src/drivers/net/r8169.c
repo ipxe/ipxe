@@ -731,7 +731,7 @@ static int r8169_probe ( struct nic *nic, struct pci_device *pci ) {
 	int option = -1, Cap10_100 = 0, Cap1000 = 0;
 
 	printf("r8169.c: Found %s, Vendor=%hX Device=%hX\n",
-	       dev->name, pci->vendor, pci->dev_id);
+	       pci->name, pci->vendor_id, pci->device_id);
 
 	board_idx++;
 
@@ -749,7 +749,7 @@ static int r8169_probe ( struct nic *nic, struct pci_device *pci ) {
 	dprintf(("%s: Identified chip type is '%s'.\n", pci->name,
 		 rtl_chip_info[tpc->chipset].name));
 	/* Print out some hardware info */
-	printf("%s: %! at ioaddr %hX, ", dev->name, nic->node_addr,
+	printf("%s: %! at ioaddr %hX, ", pci->name, nic->node_addr,
 	       ioaddr);
 
 	/* if TBI is not endbled */
@@ -836,7 +836,7 @@ static int r8169_probe ( struct nic *nic, struct pci_device *pci ) {
 		udelay(100);
 		printf
 		    ("%s: 1000Mbps Full-duplex operation, TBI Link %s!\n",
-		     dev->name,
+		     pci->name,
 		     (RTL_R32(TBICSR) & TBILinkOK) ? "OK" : "Failed");
 
 	}

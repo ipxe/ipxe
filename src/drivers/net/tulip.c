@@ -1245,9 +1245,9 @@ static int tulip_probe ( struct nic *nic, struct pci_device *pci ) {
     /* point to private storage */
     tp = &tpx;
 
-    tp->vendor_id  = pci->vendor;
-    tp->dev_id     = pci->dev_id;
-    tp->nic_name   = dev->name;
+    tp->vendor_id  = pci->vendor_id;
+    tp->dev_id     = pci->device_id;
+    tp->nic_name   = pci->name;
 
     tp->if_port = 0;
     tp->default_port = 0;

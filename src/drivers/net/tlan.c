@@ -806,7 +806,7 @@ static int tlan_probe ( struct nic *nic, struct pci_device *pci ) {
 	i = 0;
 	chip_idx = -1;
 	while (tlan_pci_tbl[i].name) {
-		if ((((u32) pci->dev_id << 16) | pci->vendor) ==
+		if ((((u32) pci->device_id << 16) | pci->vendor_id) ==
 		    (tlan_pci_tbl[i].id.pci & 0xffffffff)) {
 			chip_idx = i;
 			break;
@@ -814,9 +814,9 @@ static int tlan_probe ( struct nic *nic, struct pci_device *pci ) {
 		i++;
 	}
 
-	priv->vendor_id = pci->vendor;
-	priv->dev_id = pci->dev_id;
-	priv->nic_name = dev->name;
+	priv->vendor_id = pci->vendor_id;
+	priv->dev_id = pci->device_id;
+	priv->nic_name = pci->name;
 	priv->eoc = 0;
 
 	err = 0;
@@ -827,11 +827,11 @@ static int tlan_probe ( struct nic *nic, struct pci_device *pci ) {
 				       (u8 *) & nic->node_addr[i]);
 	if (err) {
 		printf("TLAN: %s: Error reading MAC from eeprom: %d\n",
-		       dev->name, err);
+		       pci->name, err);
 	} else 
 		/* Print out some hardware info */
 		printf("%s: %! at ioaddr %hX, ", 
-			dev->name, nic->node_addr, pci->ioaddr);
+			pci->name, nic->node_addr, pci->ioaddr);
 
 	priv->tlanRev = TLan_DioRead8(BASE, TLAN_DEF_REVISION);
 	printf("revision: 0x%hX\n", priv->tlanRev);
