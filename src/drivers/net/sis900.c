@@ -120,10 +120,14 @@ static struct pci_id   pci_isa_bridge_list[] = {
 		"SIS 85C503/5513 PCI to ISA bridge"},
 };
 
-
-
-static struct pci_driver sis_bridge_driver =
+static struct pci_driver sis_bridge_pci_driver =
 	PCI_DRIVER ( pci_isa_bridge_list, PCI_NO_CLASS );
+
+static struct device_driver sis_bridge_driver = {
+    .name = "SIS ISA bridge",
+    .bus_driver = &pci_driver,
+    .bus_driver_info = ( struct bus_driver_info * ) &sis_bridge_pci_driver,
+};
 
 /* Function Prototypes */
 
@@ -239,22 +243,26 @@ static int sis630e_get_mac_addr(struct pci_device * pci_dev __unused, struct nic
 {
 	u8 reg;
 	int i;
-	struct pci_device	isa_bridge;
+	struct bus_loc bus_loc;
+	union {
+	    struct bus_dev bus_dev;
+	    struct pci_device isa_bridge;
+	} u;
 
 	/* find PCI to ISA bridge */
-	memset(&isa_bridge, 0, sizeof(isa_bridge));
-	if ( ! find_pci_device ( &isa_bridge, &sis_bridge_driver ) )
+	memset(&bus_loc, 0, sizeof(bus_loc));
+	if ( ! find_by_driver ( &bus_loc, &u.bus_dev, &sis_bridge_driver, 0 ) )
 	    return 0;
 
-	pci_read_config_byte(&isa_bridge, 0x48, &reg);
-	pci_write_config_byte(&isa_bridge, 0x48, reg | 0x40);
+	pci_read_config_byte(&u.isa_bridge, 0x48, &reg);
+	pci_write_config_byte(&u.isa_bridge, 0x48, reg | 0x40);
 
 	for (i = 0; i < ETH_ALEN; i++)
 	{
 		outb(0x09 + i, 0x70);
 		((u8 *)(nic->node_addr))[i] = inb(0x71);
 	}
-	pci_write_config_byte(&isa_bridge, 0x48, reg & ~0x40);
+	pci_write_config_byte(&u.isa_bridge, 0x48, reg & ~0x40);
 
 	return 1;
 }
@@ -324,8 +332,8 @@ static int sis900_probe ( struct nic *nic, struct pci_device *pci ) {
     pci_fill_nic ( nic, pci );
     nic->ioaddr = pci->ioaddr;
     ioaddr  = pci->ioaddr;
-    vendor  = pci->vendor;
-    dev_id  = pci->dev_id;
+    vendor  = pci->vendor_id;
+    dev_id  = pci->device_id;
 
     /* wakeup chip */
     pci_write_config_dword(pci, 0x40, 0x00000000);
@@ -1251,7 +1259,6 @@ static struct nic_operations sis900_operations = {
 	.poll		= sis900_poll,
 	.transmit	= sis900_transmit,
 	.irq		= sis900_irq,
-
 };
 
 static struct pci_id sis900_nics[] = {
@@ -1260,7 +1267,7 @@ PCI_ROM(0x1039, 0x7016, "sis7016", "SIS7016"),
 };
 
 static struct pci_driver sis900_driver =
-	PCI_DRIVER ( "SIS900", sis900_nics, PCI_NO_CLASS );
+	PCI_DRIVER ( sis900_nics, PCI_NO_CLASS );
 
 DRIVER ( "SIS900", nic_driver, pci_driver, sis900_driver,
 	 sis900_probe, sis900_disable );
