@@ -748,7 +748,6 @@ static struct nic_operations prism2_operations = {
 	.poll		= prism2_poll,
 	.transmit	= prism2_transmit,
 	.irq		= prism2_irq,
-	.disable	= prism2_disable,
 };
 
 /**************************************************************************

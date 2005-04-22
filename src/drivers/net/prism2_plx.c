@@ -14,25 +14,11 @@ $Id$
  * your option) any later version.
  */
 
+#include "pci.h"
+#include "nic.h"
+
 #define WLAN_HOSTIF WLAN_PLX
 #include "prism2.c"
-
-static struct pci_id prism2_plx_nics[] = {
-PCI_ROM(0x1385, 0x4100, "ma301",         "Netgear MA301"),
-PCI_ROM(0x10b7, 0x7770, "3c-airconnect", "3Com AirConnect"),
-PCI_ROM(0x111a, 0x1023, "ss1023",        "Siemens SpeedStream SS1023"),
-PCI_ROM(0x15e8, 0x0130, "correga",       "Correga"),
-PCI_ROM(0x1638, 0x1100, "smc2602w",      "SMC EZConnect SMC2602W"),	/* or Eumitcom PCI WL11000, Addtron AWA-100 */
-PCI_ROM(0x16ab, 0x1100, "gl24110p",      "Global Sun Tech GL24110P"),
-PCI_ROM(0x16ab, 0x1101, "16ab-1101",     "Unknown"),
-PCI_ROM(0x16ab, 0x1102, "wdt11",         "Linksys WDT11"),
-PCI_ROM(0x16ec, 0x3685, "usr2415",       "USR 2415"),
-PCI_ROM(0xec80, 0xec00, "f5d6000",       "Belkin F5D6000"),
-PCI_ROM(0x126c, 0x8030, "emobility",     "Nortel emobility"),
-};
-
-static struct pci_driver prism2_plx_driver =
-	PCI_DRIVER ( "Prism2_PLX", prism2_plx_nics, PCI_NO_CLASS );
 
 /*
  * Find PLX card.  Prints out information strings from PCMCIA CIS as visual
@@ -92,8 +78,7 @@ static int prism2_find_plx ( hfa384x_t *hw, struct pci_device *p )
   return found;
 }
 
-static int prism2_plx_probe ( struct dev *dev, struct pci_device *pci ) {
-  struct nic *nic = nic_device ( dev );
+static int prism2_plx_probe ( struct nic *nic, struct pci_device *pci ) {
   hfa384x_t *hw = &hw_global;
 
   /* Find and intialise PLX Prism2 card */
@@ -103,5 +88,29 @@ static int prism2_plx_probe ( struct dev *dev, struct pci_device *pci ) {
   return prism2_probe ( nic, hw );
 }
 
-BOOT_DRIVER ( "Prism2_PLX", find_pci_boot_device, prism2_plx_driver, prism2_plx_probe );
+static void prism2_plx_disable ( struct nic *nic,
+				 struct pci_device *pci __unused ) {
+  prism2_disable ( nic );
+}
+
+static struct pci_id prism2_plx_nics[] = {
+PCI_ROM(0x1385, 0x4100, "ma301",         "Netgear MA301"),
+PCI_ROM(0x10b7, 0x7770, "3c-airconnect", "3Com AirConnect"),
+PCI_ROM(0x111a, 0x1023, "ss1023",        "Siemens SpeedStream SS1023"),
+PCI_ROM(0x15e8, 0x0130, "correga",       "Correga"),
+PCI_ROM(0x1638, 0x1100, "smc2602w",      "SMC EZConnect SMC2602W"),	/* or Eumitcom PCI WL11000, Addtron AWA-100 */
+PCI_ROM(0x16ab, 0x1100, "gl24110p",      "Global Sun Tech GL24110P"),
+PCI_ROM(0x16ab, 0x1101, "16ab-1101",     "Unknown"),
+PCI_ROM(0x16ab, 0x1102, "wdt11",         "Linksys WDT11"),
+PCI_ROM(0x16ec, 0x3685, "usr2415",       "USR 2415"),
+PCI_ROM(0xec80, 0xec00, "f5d6000",       "Belkin F5D6000"),
+PCI_ROM(0x126c, 0x8030, "emobility",     "Nortel emobility"),
+};
+
+static struct pci_driver prism2_plx_driver =
+	PCI_DRIVER ( prism2_plx_nics, PCI_NO_CLASS );
+
+
+DRIVER ( "Prism2/PLX", nic_driver, pci_driver, prism2_plx_driver,
+	 prism2_plx_probe, prism2_plx_disable );
 
