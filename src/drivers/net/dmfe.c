@@ -469,7 +469,7 @@ static int dmfe_probe ( struct nic *nic, struct pci_device *pci ) {
 
 	BASE = pci->ioaddr;
 	printf("dmfe.c: Found %s Vendor=0x%hX Device=0x%hX\n",
-	       dev->name, pci->vendor, pci->dev_id);
+	       pci->name, pci->vendor_id, pci->device_id);
 
 	/* Read Chip revision */
 	pci_read_config_dword(pci, PCI_REVISION_ID, &dev_rev);
@@ -478,7 +478,7 @@ static int dmfe_probe ( struct nic *nic, struct pci_device *pci ) {
 	/* point to private storage */
 	db = &dfx;
 
-	db->chip_id = ((u32) pci->dev_id << 16) | pci->vendor;
+	db->chip_id = ((u32) pci->device_id << 16) | pci->vendor_id;
 	BASE = pci_bar_start(pci, PCI_BASE_ADDRESS_0);
 	db->chip_revision = dev_rev;
 
@@ -500,7 +500,7 @@ static int dmfe_probe ( struct nic *nic, struct pci_device *pci ) {
 		nic->node_addr[i] = db->srom[20 + i];
 
 	/* Print out some hardware info */
-	printf("%s: %! at ioaddr %hX\n", dev->name, nic->node_addr, BASE);
+	printf("%s: %! at ioaddr %hX\n", pci->name, nic->node_addr, BASE);
 
 	/* Set the card as PCI Bus Master */
 	adjust_pci_device(pci);
