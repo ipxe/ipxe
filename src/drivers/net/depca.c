@@ -502,7 +502,7 @@ static void depca_init_ring(struct nic *nic)
 	memset(lp.init_block.mcast_table, 0, sizeof(lp.init_block.mcast_table));
 }
 
-static void LoadCSRs(void)
+static inline void LoadCSRs(struct nic *nic)
 {
 	outw(CSR1, nic->ioaddr + DEPCA_ADDR);	/* initialisation block address LSW */
 	outw((u16) (lp.sh_mem & LA_MASK), nic->ioaddr + DEPCA_DATA);
@@ -513,7 +513,7 @@ static void LoadCSRs(void)
 	outw(CSR0, nic->ioaddr + DEPCA_ADDR);	/* Point back to CSR0 */
 }
 
-static int InitRestartDepca(void)
+static inline int InitRestartDepca(struct nic *nic)
 {
 	int		i;
 
@@ -582,8 +582,8 @@ static void depca_reset(struct nic *nic)
 
 	/* Load the initialisation block */
 	depca_init_ring(nic);
-	LoadCSRs();
-	InitRestartDepca();
+	LoadCSRs(nic);
+	InitRestartDepca(nic);
 }
 
 /**************************************************************************
