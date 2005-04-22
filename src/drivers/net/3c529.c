@@ -33,7 +33,7 @@ static int t529_probe ( struct nic *nic, struct mca_device *mca ) {
 	return t5x9_probe ( nic, MCA_ID ( mca ), 0xffff );
 }
 
-static int t529_disable ( struct nic *nic, struct mca_device *mca __unused ) {
+static void t529_disable ( struct nic *nic, struct mca_device *mca __unused ) {
 	t5x9_disable ( nic );
 }
 
