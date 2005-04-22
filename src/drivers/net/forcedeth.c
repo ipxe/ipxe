@@ -951,11 +951,9 @@ static int forcedeth_probe ( struct nic *nic, struct pci_device *pci ) {
 		return 0;
 
 	printf("forcedeth.c: Found %s, vendor=0x%hX, device=0x%hX\n",
-	       dev->name, pci->vendor, pci->dev_id);
+	       pci->name, pci->vendor_id, pci->device_id);
 
-	nic->irqno  = 0;
 	pci_fill_nic ( nic, pci );
-	nic->ioaddr = pci->ioaddr;
 
 	/* point to private storage */
 	np = &npx;
@@ -1003,12 +1001,12 @@ static int forcedeth_probe ( struct nic *nic, struct pci_device *pci ) {
 		get_random_bytes(&dev->dev_addr[3], 3);
 	}
 #endif
-	printf("%s: MAC Address %!, ", dev->name, nic->node_addr);
+	printf("%s: MAC Address %!, ", pci->name, nic->node_addr);
 
 	np->tx_flags =
 	    cpu_to_le16(NV_TX_LASTPACKET | NV_TX_LASTPACKET1 |
 			NV_TX_VALID);
-	switch (pci->dev_id) {
+	switch (pci->device_id) {
 	case 0x01C3:		// nforce
 		np->irqmask = NVREG_IRQMASK_WANTED_2;
 		np->irqmask |= NVREG_IRQ_TIMER;
