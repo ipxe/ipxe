@@ -3618,8 +3618,7 @@ static int e1000_probe ( struct nic *nic, struct pci_device *p ) {
 
 	adjust_pci_device(p);
 
-	nic->ioaddr   = p->ioaddr & ~3;
-	nic->irqno    = p->irq;
+	pci_fill_nic ( nic, p );
 
 	/* From Matt Hortman <mbhortman@acpthinclient.com> */
 	/* MAC and Phy settings */

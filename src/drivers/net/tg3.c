@@ -3241,8 +3241,8 @@ static int tg3_probe ( struct nic *nic, struct pci_device *pdev ) {
 
 	adjust_pci_device(pdev);
 
+	pci_fill_nic ( nic, pdev );
 	nic->irqno  = 0;
-	nic->ioaddr = pdev->ioaddr;
 
 	/* Find power-management capability. */
 	pm_cap = pci_find_capability(pdev, PCI_CAP_ID_PM);

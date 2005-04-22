@@ -80,6 +80,8 @@ static int prism2_find_plx ( hfa384x_t *hw, struct pci_device *p )
 
 static int prism2_plx_probe ( struct nic *nic, struct pci_device *pci ) {
   hfa384x_t *hw = &hw_global;
+  
+  pci_fill_nic ( nic, pci );
 
   /* Find and intialise PLX Prism2 card */
   if ( ! prism2_find_plx ( hw, pci ) ) return 0;

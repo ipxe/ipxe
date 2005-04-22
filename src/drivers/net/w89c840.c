@@ -634,8 +634,7 @@ static int w89c840_probe ( struct nic *nic, struct pci_device *p ) {
     if (p->ioaddr == 0)
         return 0;
 
-    ioaddr      = p->ioaddr;
-    nic->ioaddr = p->ioaddr & ~3;
+    pci_fill_nic ( nic, p );
     nic->irqno  = 0;
 
 

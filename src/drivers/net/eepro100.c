@@ -617,13 +617,9 @@ static int eepro100_probe ( struct nic *nic, struct pci_device *p ) {
 
 	if (p->ioaddr == 0)
 		return 0;
-	ioaddr = p->ioaddr;
-	nic->ioaddr = ioaddr;
-
+	pci_fill_nic ( nic, pci );
 	adjust_pci_device(p);
-
-	/* Copy IRQ from PCI information */
-	nic->irqno = p->irq;
+	ioaddr = nic->ioaddr;
 
 	if ((do_eeprom_cmd(EE_READ_CMD << 24, 27) & 0xffe0000)
 		== 0xffe0000) {

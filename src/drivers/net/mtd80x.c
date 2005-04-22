@@ -682,13 +682,12 @@ static int mtd_probe ( struct nic *nic, struct pci_device *pci ) {
     if (pci->ioaddr == 0)
 	    return 0;
 
-    /* Mask the bit that says "this is an io addr" */
-    mtdx.ioaddr = pci->ioaddr;
-
+    pci_fill_nic ( nic, pci );
     adjust_pci_device(pci);
 
     mtdx.nic_name = pci->name;
     mtdx.dev_id = pci->device_id;
+    mtdx.ioaddr = nic->ioaddr;
 
     /* read ethernet id */
     for (i = 0; i < 6; ++i)
