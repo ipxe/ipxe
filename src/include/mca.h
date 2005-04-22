@@ -76,7 +76,7 @@ struct mca_driver {
  * Functions in mca.c
  *
  */
-extern void fill_mca_nic ( struct nic *nic, struct mca_device *mca );
+extern void mca_fill_nic ( struct nic *nic, struct mca_device *mca );
 
 /*
  * MCA bus global definition

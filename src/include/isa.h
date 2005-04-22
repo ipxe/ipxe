@@ -71,7 +71,7 @@ struct isa_driver {
  * Functions in isa.c
  *
  */
-extern void fill_isa_nic ( struct nic *nic, struct isa_device *isa );
+extern void isa_fill_nic ( struct nic *nic, struct isa_device *isa );
 
 /*
  * ISA bus global definition

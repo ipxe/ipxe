@@ -76,7 +76,7 @@ struct eisa_driver {
  *
  */
 extern void eisa_device_enabled ( struct eisa_device *eisa, int enabled );
-extern void fill_eisa_nic ( struct nic *nic, struct eisa_device *eisa );
+extern void eisa_fill_nic ( struct nic *nic, struct eisa_device *eisa );
 
 static inline void enable_eisa_device ( struct eisa_device *eisa ) {
 	eisa_device_enabled ( eisa, 1 );
