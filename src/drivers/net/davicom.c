@@ -665,13 +665,11 @@ static int davicom_probe ( struct nic *nic, struct pci_device *pci ) {
   if (pci->ioaddr == 0)
     return 0;
 
-  vendor  = pci->vendor;
-  dev_id  = pci->dev_id;
+  vendor  = pci->vendor_id;
+  dev_id  = pci->device_id;
   ioaddr  = pci->ioaddr;
 
-  nic->irqno  = 0;
   pci_fill_nic ( nic, pci );
-  nic->ioaddr = pci->ioaddr;
 
   /* wakeup chip */
   pci_write_config_dword(pci, 0x40, 0x00000000);
