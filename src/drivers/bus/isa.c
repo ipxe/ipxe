@@ -100,8 +100,11 @@ int isa_check_driver ( struct bus_dev *bus_dev,
 	/* If ioaddr is zero, it means we're using a driver-specified
 	 * ioaddr
 	 */
-	if ( ! isa->ioaddr )
+	if ( ! isa->ioaddr ) {
+		if ( isa->driver_probe_idx >= driver->addr_count )
+			return 0;
 		isa->ioaddr = driver->probe_addrs[isa->driver_probe_idx];
+	}
 
 	/* Use probe_addr method to see if there's a device
 	 * present at this address.
