@@ -617,7 +617,7 @@ static int eepro100_probe ( struct nic *nic, struct pci_device *p ) {
 
 	if (p->ioaddr == 0)
 		return 0;
-	pci_fill_nic ( nic, pci );
+	pci_fill_nic ( nic, p );
 	adjust_pci_device(p);
 	ioaddr = nic->ioaddr;
 
