@@ -302,7 +302,7 @@ static int hunt_rom ( void ) {
 	/* If we are not a PCI device, we cannot search for a ROM that
 	 * matches us (?)
 	 */
-	if ( ! undi.pci->vendor )
+	if ( ! undi.pci->vendor_id )
 		return 0;
 
 	printf ( "Hunting for ROMs..." );
@@ -327,11 +327,11 @@ static int hunt_rom ( void ) {
 			}
 			printf ( "PCI:%hx:%hx...", pcir_header->vendor_id,
 				 pcir_header->device_id );
-			if ( ( pcir_header->vendor_id != undi.pci->vendor ) ||
-			     ( pcir_header->device_id != undi.pci->dev_id ) ) {
+			if ( (pcir_header->vendor_id != undi.pci->vendor_id) ||
+			     (pcir_header->device_id != undi.pci->device_id) ){
 				printf ( "not me (%hx:%hx)\n...",
-					 undi.pci->vendor,
-					 undi.pci->dev_id );
+					 undi.pci->vendor_id,
+					 undi.pci->device_id );
 				continue;
 			}
 			if ( undi.rom->pnp_off == 0 ) {
@@ -661,7 +661,7 @@ static void nontrivial_irq_debug ( irq_t irq ) {
 static int undi_loader ( void ) {
 	pxe_t *pxe = NULL;
 
-	if ( ! undi.pci->vendor ) {
+	if ( ! undi.pci->vendor_id ) {
 		printf ( "ERROR: attempted to call loader of an ISA ROM?\n" );
 		return 0;
 	}
@@ -1331,7 +1331,8 @@ static void undi_transmit(
 /**************************************************************************
 DISABLE - Turn off ethernet interface
 ***************************************************************************/
-static void undi_disable ( struct nic *nic __unused ) {
+static void undi_disable ( struct nic *nic __unused,
+			   struct pci_device *pci __unused ) {
 	undi_full_shutdown();
 	free_base_mem_data();
 }
@@ -1369,14 +1370,12 @@ static struct nic_operations undi_operations = {
 	.poll = undi_poll,
 	.transmit = undi_transmit,
 	.irq = dummy_irq,
-	.disable = undi_disable,
 };
 
 /* The actual Etherboot probe routine.
  */
 
-static int undi_probe ( struct dev *dev, struct pci_device *pci ) {
-	struct nic *nic = nic_device ( dev );
+static int undi_probe ( struct nic *nic, struct pci_device *pci ) {
 
 	/* Zero out global undi structure */
 	memset ( &undi, 0, sizeof(undi) );
@@ -1434,7 +1433,7 @@ static int undi_probe ( struct dev *dev, struct pci_device *pci ) {
 		nic->nic_op = &undi_operations;
 		return 1;
 	}
-	undi_disable ( nic ); /* To free base memory structures */
+	undi_disable ( nic, pci ); /* To free base memory structures */
 	return 0;
 }
 
@@ -1448,8 +1447,9 @@ static struct pci_id undi_nics[] = {
 };
 
 static struct pci_driver undi_driver =
-	PCI_DRIVER ( "UNDI", undi_nics, PCI_CLASS_NETWORK_ETHERNET );
+	PCI_DRIVER ( undi_nics, PCI_CLASS_NETWORK_ETHERNET );
 
-BOOT_DRIVER ( "UNDI", find_pci_boot_device, undi_driver, undi_probe );
+DRIVER ( "UNDI", nic_driver, pci_driver, undi_driver,
+	 undi_probe, undi_disable );
 
 #endif /* PCBIOS */
