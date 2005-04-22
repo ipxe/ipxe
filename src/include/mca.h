@@ -9,7 +9,7 @@
 #define MCA_H
 
 #include "isa_ids.h"
-#include "dev.h"
+#include "nic.h"
 
 #define MCA_BUS_TYPE	3
 
@@ -71,6 +71,12 @@ struct mca_driver {
 	.ids = _ids,						\
 	.id_count = sizeof ( _ids ) / sizeof ( _ids[0] ),	\
 }
+
+/*
+ * Functions in mca.c
+ *
+ */
+extern void fill_mca_nic ( struct nic *nic, struct mca_device *mca );
 
 /*
  * MCA bus global definition

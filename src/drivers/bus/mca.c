@@ -8,7 +8,6 @@
 #include "string.h"
 #include "io.h"
 #include "console.h"
-#include "nic.h"
 #include "mca.h"
 
 /*
@@ -145,7 +144,7 @@ struct bus_driver mca_driver __bus_driver = {
  * Fill in a nic structure
  *
  */
-void mca_fill_nic ( struct nic *nic, struct mca_device *mca ) {
+void fill_mca_nic ( struct nic *nic, struct mca_device *mca ) {
 
 	/* ioaddr and irqno must be read in a device-dependent way
 	 * from the POS registers
