@@ -555,7 +555,7 @@ static int isapnp_check_driver ( struct bus_dev *bus_dev,
 			      isapnp->prod_id,
 			      isa_id_string( isapnp->vendor_id,
 					     isapnp->prod_id ),
-			      id->name, driver->name );
+			      id->name, device_driver->name );
 			isapnp->name = id->name;
 			return 1;
 		}
@@ -622,7 +622,8 @@ void isapnp_device_activation ( struct isapnp_device *isapnp,
 	/* Return all cards to Wait for Key state */
 	isapnp_wait_for_key ();
 
-	DBG ( "ISAPnP activated device %hhx.%hhx\n",
+	DBG ( "ISAPnP %s device %hhx.%hhx\n",
+	      ( activation ? "activated" : "deactivated" ),
 	      isapnp->csn, isapnp->logdev );
 }
 

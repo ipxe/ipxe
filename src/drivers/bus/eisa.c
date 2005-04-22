@@ -171,4 +171,7 @@ void eisa_device_enabled ( struct eisa_device *eisa, int enabled ) {
 	outb ( enabled ? EISA_CMD_ENABLE : 0,
 	       eisa->ioaddr + EISA_GLOBAL_CONFIG );
 	udelay ( 1000 ); /* Must wait 800 */
+
+	DBG ( "EISA %s device %hhx\n", ( enabled ? "enabled" : "disabled" ),
+	      eisa->slot );
 }

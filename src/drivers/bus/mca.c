@@ -96,7 +96,7 @@ static int mca_check_driver ( struct bus_dev *bus_dev,
 		if ( MCA_ID ( mca ) == id->id ) {
 			DBG ( "MCA found ID %hx (device %s) "
 			      "matching driver %s\n",
-			      id->name, id->id, driver->name );
+			      id->name, id->id, device_driver->name );
 			mca->name = id->name;
 			return 1;
 		}
