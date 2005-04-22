@@ -47,11 +47,10 @@
 
 #define EEPROMSIZE	0x40
 #define MAX_EEPROMBUSY	1000
-#define EP_LAST_TAG	0xd7
-#define EP_MAX_BOARDS	16
-#define EP_ID_PORT_START 0x110
+#define EP_ID_PORT_START 0x110  /* avoid 0x100 to avoid conflict with SB16 */
 #define EP_ID_PORT_INC 0x10
 #define EP_ID_PORT_END 0x200
+#define EP_TAG_MAX		0x7 /* must be 2^n - 1 */
 
 /*
  * Commands to read/write EEPROM trough EEPROM command register (Window 0,
@@ -95,6 +94,11 @@
  * applicable.  They have been taken out the the "EtherLink III Parallel
  * Tasking EISA and ISA Technical Reference" "Beta Draft 10/30/92" manual
  * from 3com.
+ *
+ * Getting this document out of 3Com is almost impossible.  However,
+ * archived copies are available at
+ * http://www.osdever.net/cottontail/downloads/docs/3c5x9b.zip and
+ * several other places on the web (search for 3c5x9b.pdf).
  *
  **************************************************************************/
 
@@ -360,11 +364,9 @@
 #define RX_ERROR	0x4000
 #define RX_INCOMPLETE	0x8000
 
-
 /*
  * Misc defines for various things.
  */
-#define ACTIVATE_ADAPTER_TO_CONFIG	0xff /* to the id_port */
 #define MFG_ID				0x6d50 /* in EEPROM and W0 ADDR_CONFIG */
 #define PROD_ID				0x9150
 
