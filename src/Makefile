@@ -123,8 +123,10 @@ DEBUG_TARGETS	+= dbg.o c s
 
 # SRCDIRS lists all directories containing source files.
 #
-SRCDIRS		+= core drivers/bus drivers/net
-# drivers/disk
+SRCDIRS		+= core
+SRCDIRS		+= drivers/bus
+SRCDIRS		+= drivers/net
+#SRCDIRS		+= drivers/disk 
 
 # NON_AUTO_SRCS lists files that are excluded from the normal
 # automatic build system.
