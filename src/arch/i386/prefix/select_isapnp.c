@@ -23,7 +23,7 @@ void i386_select_isapnp_device ( struct i386_all_regs *regs ) {
 	} u;
 
 	/* Set ISAPnP read port */
-	isapnp_set_read_port ( regs->dx );
+	isapnp_read_port = regs->dx;
 	
 	/* Select ISAPnP bus and specified CSN as first boot device */
 	memset ( &u, 0, sizeof ( u ) );
