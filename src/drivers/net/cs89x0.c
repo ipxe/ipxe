@@ -435,10 +435,6 @@ static int cs89x0_poll(struct nic *nic, int retrieve)
 	return 1;
 }
 
-static void cs89x0_disable ( struct nic *nic ) {
-	cs89x0_reset(nic);
-}
-
 static void cs89x0_irq(struct nic *nic __unused, irq_action_t action __unused)
 {
   switch ( action ) {
@@ -456,7 +452,6 @@ static struct nic_operations cs89x0_operations = {
 	.poll		= cs89x0_poll,
 	.transmit	= cs89x0_transmit,
 	.irq		= cs89x0_irq,
-	.disable	= cs89x0_disable,
 };
 
 /**************************************************************************
@@ -480,15 +475,13 @@ static int cs89x0_probe_addr ( isa_probe_addr_t ioaddr ) {
 	return 1;
 }
 
-static int cs89x0_probe ( struct dev *dev, struct isa_device *isa ) {
-	struct nic *nic = nic_device ( dev );
-
+static int cs89x0_probe ( struct nic *nic, struct isa_device *isa ) {
 	int      i, result = -1;
 	unsigned rev_type = 0, isa_cnf, cs_revision;
 	unsigned short eeprom_buff[CHKSUM_LEN];
 
-	nic->ioaddr = ( isa->ioaddr & ~1 );
-	nic->irqno  = 0;
+	isa_fill_nic ( nic, isa );
+	nic->ioaddr &= ~1; /* LSB = 1 indicates a more aggressive probe */
 
 	eth_nic_base = nic->ioaddr;
 
@@ -684,6 +677,11 @@ static int cs89x0_probe ( struct dev *dev, struct isa_device *isa ) {
 	nic->nic_op   = &cs89x0_operations;
 	return 1;
 }
+
+static void cs89x0_disable ( struct nic *nic,
+			     struct isa_device *isa __unused ) {
+	cs89x0_reset(nic);
+}
 	
 static isa_probe_addr_t cs89x0_probe_addrs[] = { 
 #ifndef EMBEDDED
@@ -699,8 +697,11 @@ static isa_probe_addr_t cs89x0_probe_addrs[] = {
 };
 
 static struct isa_driver cs89x0_driver =
-	ISA_DRIVER ( "CS89x0", cs89x0_probe_addrs, cs89x0_probe_addr,
+	ISA_DRIVER ( cs89x0_probe_addrs, cs89x0_probe_addr,
 		     ISAPNP_VENDOR('C','S','C'), 0x0007 );
+
+DRIVER ( "cs89x0", nic_driver, isa_driver, cs89x0_driver,
+	 cs89x0_probe, cs89x0_disable );
 
 ISA_ROM ( "cs89x0", "Crystal Semiconductor CS89x0" );
 
