@@ -63,18 +63,18 @@ static inline int next_location ( struct bus_driver **bus_driver,
  */
 int find_any ( struct bus_driver **bus_driver, struct bus_loc *bus_loc,
 	       struct bus_dev *bus_dev, signed int skip ) {
-	DBG ( "searching for any device\n" );
+	DBG ( "DEV searching for any device\n" );
 	do {
 		if ( --skip >= 0 )
 			continue;
 		if ( ! (*bus_driver)->fill_device ( bus_dev, bus_loc ) )
 			continue;
-		DBG ( "found device %s\n",
+		DBG ( "DEV found device %s\n",
 		      (*bus_driver)->describe ( bus_dev ) );
 		return 1;
 	} while ( next_location ( bus_driver, bus_loc ) );
 
-	DBG ( "found no device\n" );
+	DBG ( "DEV found no device\n" );
 	return 0;
 }
 
@@ -87,7 +87,7 @@ int find_any ( struct bus_driver **bus_driver, struct bus_loc *bus_loc,
 int find_by_device ( struct device_driver **device_driver,
 		     struct bus_driver *bus_driver, struct bus_dev *bus_dev,
 		     signed int skip ) {
-	DBG ( "searching for a driver for device %s\n",
+	DBG ( "DEV searching for a driver for device %s\n",
 	      bus_driver->describe ( bus_dev ) );
 	do {
 		if ( --skip >= 0 )
@@ -96,12 +96,12 @@ int find_by_device ( struct device_driver **device_driver,
 			continue;
 		if ( ! bus_driver->check_driver ( bus_dev, *device_driver ))
 			continue;
-		DBG ( "found driver %s\n", (*device_driver)->name );
+		DBG ( "DEV found driver %s\n", (*device_driver)->name );
 		return 1;
 	} while ( ++(*device_driver) < device_drivers_end );
 	
 	/* Reset to first driver, return "not found" */
-	DBG ( "found no driver for device %s\n",
+	DBG ( "DEV found no driver for device %s\n",
 	      bus_driver->describe ( bus_dev ) );
 	*device_driver = device_drivers;
 	return 0;
@@ -118,7 +118,8 @@ int find_by_driver ( struct bus_loc *bus_loc, struct bus_dev *bus_dev,
 		     signed int skip ) {
 	struct bus_driver *bus_driver = device_driver->bus_driver;
 	
-	DBG ( "searching for a device for driver %s\n", device_driver->name );
+	DBG ( "DEV searching for a device for driver %s\n",
+	      device_driver->name );
 	do {
 		if ( --skip >= 0 )
 			continue;
@@ -126,11 +127,12 @@ int find_by_driver ( struct bus_loc *bus_loc, struct bus_dev *bus_dev,
 			continue;
 		if ( ! bus_driver->check_driver ( bus_dev, device_driver ) )
 			continue;
-		DBG ( "found device %s\n", bus_driver->describe ( bus_dev ) );
+		DBG ( "DEV found device %s\n",
+		      bus_driver->describe ( bus_dev ) );
 		return 1;
 	} while ( bus_driver->next_location ( bus_loc ) );
 
-	DBG ( "found no device for driver %s\n" );
+	DBG ( "DEV found no device for driver %s\n" );
 	return 0;
 }
 
