@@ -379,7 +379,7 @@
  */
 extern int t5x9_probe ( struct nic *nic,
 			uint16_t prod_id_check, uint16_t prod_id_mask );
-
+extern void t5x9_disable ( struct nic *nic );
 
 /*
  * Local variables:

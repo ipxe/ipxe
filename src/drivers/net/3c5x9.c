@@ -35,7 +35,7 @@ static enum { none, bnc, utp } connector = none;	/* for 3C509 */
 /**************************************************************************
 ETH_RESET - Reset adapter
 ***************************************************************************/
-static void t509_disable ( struct nic *nic ) {
+void t5x9_disable ( struct nic *nic ) {
 	/* stop card */
 	outw(RX_DISABLE, nic->ioaddr + EP_COMMAND);
 	outw(RX_DISCARD_TOP_PACK, nic->ioaddr + EP_COMMAND);
@@ -120,7 +120,7 @@ static void t509_enable ( struct nic *nic ) {
 }
 
 static void t509_reset ( struct nic *nic ) {
-	t509_disable ( nic );
+	t5x9_disable ( nic );
 	t509_enable ( nic );
 }    
 
@@ -332,7 +332,6 @@ struct nic_operations t509_operations = {
 	.poll		= t509_poll,
 	.transmit	= t509_transmit,
 	.irq		= t509_irq,
-	.disable	= t509_disable,
 };
 
 /**************************************************************************

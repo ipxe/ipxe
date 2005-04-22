@@ -565,7 +565,8 @@ static void t515_transmit(struct nic *nic, const char *d,	/* Destination */
 /**************************************************************************
 DISABLE - Turn off ethernet interface
 ***************************************************************************/
-static void t515_disable ( struct nic *nic, struct isapnp_device *isapnp __unused ) {
+static void t515_disable ( struct nic *nic,
+			   struct isapnp_device *isapnp ) {
 
 	nic_disable ( nic );
 
@@ -586,12 +587,8 @@ static void t515_disable ( struct nic *nic, struct isapnp_device *isapnp __unuse
 
 
 	outw(SetIntrEnb | 0x0000, nic->ioaddr + EL3_CMD);
-#ifdef ISA_PNP
-	/*Deactivate */
-/*    ACTIVATE;
-    WRITE_DATA(0);
-    */
-#endif
+
+	deactivate_isapnp_device ( isapnp );
 	return;
 }
 
@@ -627,7 +624,7 @@ static int t515_probe ( struct nic *nic, struct isapnp_device *isapnp ) {
 
 	nic->ioaddr = isapnp->ioaddr;
 	nic->irqno = isapnp->irqno;
-	activate_isapnp_device ( isapnp, 1 );
+	activate_isapnp_device ( isapnp );
 
 	/* Check the resource configuration for a matching ioaddr. */
 	if ((unsigned)(inw(nic->ioaddr + 0x2002) & 0x1f0)

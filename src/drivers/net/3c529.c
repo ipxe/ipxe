@@ -20,17 +20,21 @@
  *
  */
 
-static int t529_probe ( struct dev *dev, struct mca_device *mca ) {
-	struct nic *nic = nic_device ( dev );
+static int t529_probe ( struct nic *nic, struct mca_device *mca ) {
 
 	/* Retrieve NIC parameters from MCA device parameters */
+	mca_fill_nic ( nic, mca );
 	nic->ioaddr = ( ( mca->pos[4] & 0xfc ) | 0x02 ) << 8;
 	nic->irqno = mca->pos[5] & 0x0f;
-	printf ( "%s board found on MCA at %#hx IRQ %d -",
-		 dev->name, nic->ioaddr, nic->irqno );
+	printf ( "3c529 board found on MCA at %#hx IRQ %d -",
+		 nic->ioaddr, nic->irqno );
 
 	/* Hand off to generic t5x9 probe routine */
 	return t5x9_probe ( nic, MCA_ID ( mca ), 0xffff );
+}
+
+static int t529_disable ( struct nic *nic, struct mca_device *mca __unused ) {
+	t5x9_disable ( nic );
 }
 
 static struct mca_id el3_mca_adapters[] = {
@@ -42,8 +46,9 @@ static struct mca_id el3_mca_adapters[] = {
 };
 
 static struct mca_driver t529_driver
-	= MCA_DRIVER ( "3c529", el3_mca_adapters );
+	= MCA_DRIVER ( el3_mca_adapters );
 
-BOOT_DRIVER ( "3c529", find_mca_boot_device, t529_driver, t529_probe );
+DRIVER ( "3c529", nic_driver, mca_driver, t529_driver,
+	 t529_probe, t529_disable );
 
 ISA_ROM( "3c529", "3c529 == MCA 3c509" );
