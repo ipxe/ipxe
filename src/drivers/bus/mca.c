@@ -28,7 +28,7 @@ static int mca_next_location ( struct bus_loc *bus_loc ) {
 	BUS_LOC_CHECK ( struct mca_loc );
 	BUS_DEV_CHECK ( struct mca_device );
 
-	return ( ++mca_loc->slot & MCA_MAX_SLOT_NR );
+	return ( mca_loc->slot = ( ++mca_loc->slot & MCA_MAX_SLOT_NR ) );
 }
 
 /*

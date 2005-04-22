@@ -22,7 +22,7 @@ static int eisa_next_location ( struct bus_loc *bus_loc ) {
 	BUS_LOC_CHECK ( struct eisa_loc );
 	BUS_DEV_CHECK ( struct eisa_device );
 
-	return ( ++eisa_loc->slot & EISA_MAX_SLOT );
+	return ( eisa_loc->slot = ( ++eisa_loc->slot & EISA_MAX_SLOT ) );
 }
 
 /*
