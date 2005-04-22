@@ -209,9 +209,16 @@ struct isapnp_driver {
  * Functions in isapnp.c
  *
  */
-extern void activate_isapnp_device ( struct isapnp_device *isapnp,
-				     int active );
+extern void isapnp_device_activation ( struct isapnp_device *isapnp,
+				       int activation );
 extern void isapnp_fill_nic ( struct nic *nic, struct isapnp_device *isapnp );
+
+static inline void activate_isapnp_device ( struct isapnp_device *isapnp ) {
+	isapnp_device_activation ( isapnp, 1 );
+}
+static inline void deactivate_isapnp_device ( struct isapnp_device *isapnp ) {
+	isapnp_device_activation ( isapnp, 0 );
+}
 
 /*
  * ISAPnP bus global definition

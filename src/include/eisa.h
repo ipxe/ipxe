@@ -75,8 +75,15 @@ struct eisa_driver {
  * Functions in eisa.c
  *
  */
-extern void enable_eisa_device ( struct eisa_device *eisa );
+extern void eisa_device_enabled ( struct eisa_device *eisa, int enabled );
 extern void fill_eisa_nic ( struct nic *nic, struct eisa_device *eisa );
+
+static inline void enable_eisa_device ( struct eisa_device *eisa ) {
+	eisa_device_enabled ( eisa, 1 );
+}
+static inline void disable_eisa_device ( struct eisa_device *eisa ) {
+	eisa_device_enabled ( eisa, 0 );
+}
 
 /*
  * EISA bus global definition

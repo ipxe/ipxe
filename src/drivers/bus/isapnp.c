@@ -607,8 +607,8 @@ struct bus_driver isapnp_driver __bus_driver = {
  * arbitration.
  *
  */
-void activate_isapnp_device ( struct isapnp_device *isapnp,
-			      int activate ) {
+void isapnp_device_activation ( struct isapnp_device *isapnp,
+				int activation ) {
 	/* Wake the card and select the logical device */
 	isapnp_wait_for_key ();
 	isapnp_send_key ();
@@ -616,7 +616,7 @@ void activate_isapnp_device ( struct isapnp_device *isapnp,
 	isapnp_logicaldevice ( isapnp->logdev );
 
 	/* Activate/deactivate the logical device */
-	isapnp_activate ( activate );
+	isapnp_activate ( activation );
 	isapnp_delay();
 
 	/* Return all cards to Wait for Key state */

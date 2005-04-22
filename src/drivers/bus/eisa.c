@@ -155,10 +155,10 @@ void eisa_fill_nic ( struct nic *nic, struct eisa_device *eisa ) {
 }
 
 /*
- * Reset and enable an EISA device
+ * Reset and enable/disable an EISA device
  *
  */
-void enable_eisa_device ( struct eisa_device *eisa ) {
+void eisa_device_enabled ( struct eisa_device *eisa, int enabled ) {
 	/* Set reset line high for 1000 µs.  Spec says 500 µs, but
 	 * this doesn't work for all cards, so we are conservative.
 	 */
@@ -168,6 +168,7 @@ void enable_eisa_device ( struct eisa_device *eisa ) {
 	/* Set reset low and write a 1 to ENABLE.  Delay again, in
 	 * case the card takes a while to wake up.
 	 */
-	outb ( EISA_CMD_ENABLE, eisa->ioaddr + EISA_GLOBAL_CONFIG );
+	outb ( enabled ? EISA_CMD_ENABLE : 0,
+	       eisa->ioaddr + EISA_GLOBAL_CONFIG );
 	udelay ( 1000 ); /* Must wait 800 */
 }
