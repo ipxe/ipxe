@@ -45,7 +45,7 @@ static int pci_fill_device ( struct bus_dev *bus_dev,
 	struct pci_device *pci = ( struct pci_device * ) bus_dev;
 	uint16_t busdevfn = pci_loc->busdevfn;
 	static struct {
-		uint16_t devfn0;
+		uint16_t busdevfn0;
 		int is_present;
 	} cache = { 0, 1 };
 	uint32_t l;
@@ -65,7 +65,7 @@ static int pci_fill_device ( struct bus_dev *bus_dev,
 	 * increase scan speed by a factor of 8.
 	 */
 	if ( ( PCI_FUNC ( busdevfn ) != 0 ) &&
-	     ( PCI_FN0 ( busdevfn ) == cache.devfn0 ) &&
+	     ( PCI_FN0 ( busdevfn ) == cache.busdevfn0 ) &&
 	     ( ! cache.is_present ) ) {
 		return 0;
 	}
@@ -79,7 +79,7 @@ static int pci_fill_device ( struct bus_dev *bus_dev,
 			/* Don't look for subsequent functions if the
 			 * card itself is not present.
 			 */
-			cache.devfn0 = busdevfn;
+			cache.busdevfn0 = busdevfn;
 			cache.is_present = 0;
 		}
 		return 0;
@@ -130,7 +130,7 @@ static int pci_fill_device ( struct bus_dev *bus_dev,
 		pci_read_config_byte ( pci, PCI_INTERRUPT_LINE, &pci->irq );
 	}
 
-	DBG ( "found device %hhx:%hhx.%d Class %hx: %hx:%hx (rev %hhx)\n",
+	DBG ( "PCI found device %hhx:%hhx.%d Class %hx: %hx:%hx (rev %hhx)\n",
 	      PCI_BUS ( pci->busdevfn ), PCI_DEV ( pci->busdevfn ),
 	      PCI_FUNC ( pci->busdevfn ), pci->class, pci->vendor_id,
 	      pci->device_id, pci->revision );
@@ -152,7 +152,7 @@ static int pci_check_driver ( struct bus_dev *bus_dev,
 	/* If driver has a class, and class matches, use it */
 	if ( pci_driver->class && 
 	     ( pci_driver->class == pci->class ) ) {
-		DBG ( "driver %s matches class %hx\n",
+		DBG ( "PCI driver %s matches class %hx\n",
 		      device_driver->name, pci_driver->class );
 		pci->name = device_driver->name;
 		return 1;
@@ -164,7 +164,7 @@ static int pci_check_driver ( struct bus_dev *bus_dev,
 		
 		if ( ( pci->vendor_id == id->vendor_id ) &&
 		     ( pci->device_id == id->device_id ) ) {
-			DBG ( "driver %s device %s matches ID %hx:%hx\n",
+			DBG ( "PCI driver %s device %s matches ID %hx:%hx\n",
 			      device_driver->name, id->name,
 			      id->vendor_id, id->device_id );
 			pci->name = id->name;
@@ -222,7 +222,7 @@ void adjust_pci_device ( struct pci_device *pci ) {
 	pci_read_config_word ( pci, PCI_COMMAND, &pci_command );
 	new_command = pci_command | PCI_COMMAND_MASTER | PCI_COMMAND_IO;
 	if ( pci_command != new_command ) {
-		DBG ( "BIOS has not enabled device %hhx:%hhx.%d! "
+		DBG ( "PCI BIOS has not enabled device %hhx:%hhx.%d! "
 		      "Updating PCI command %hX->%hX\n",
 		      PCI_BUS ( pci->busdevfn ), PCI_DEV ( pci->busdevfn ),
 		      PCI_FUNC ( pci->busdevfn ), pci_command, new_command );
@@ -230,7 +230,7 @@ void adjust_pci_device ( struct pci_device *pci ) {
 	}
 	pci_read_config_byte ( pci, PCI_LATENCY_TIMER, &pci_latency);
 	if ( pci_latency < 32 ) {
-		DBG ( "device %hhx:%hhx.%d latency timer is "
+		DBG ( "PCI device %hhx:%hhx.%d latency timer is "
 		      "unreasonably low at %d. Setting to 32.\n",
 		      PCI_BUS ( pci->busdevfn ), PCI_DEV ( pci->busdevfn ),
 		      PCI_FUNC ( pci->busdevfn ), pci_latency );
@@ -338,7 +338,7 @@ int pci_find_capability ( struct pci_device *pci, int cap ) {
 	while ( ttl-- && pos >= 0x40 ) {
 		pos &= ~3;
 		pci_read_config_byte ( pci, pos + PCI_CAP_LIST_ID, &id );
-		DBG ( "Capability: %d\n", id );
+		DBG ( "PCI Capability: %d\n", id );
 		if ( id == 0xff )
 			break;
 		if ( id == cap )
@@ -349,7 +349,7 @@ int pci_find_capability ( struct pci_device *pci, int cap ) {
 }
 
 /*
- * Fill in a DHCP device ID structure
+ * Fill in a nic structure
  *
  */
 void pci_fill_nic ( struct nic *nic, struct pci_device *pci ) {

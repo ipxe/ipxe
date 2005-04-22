@@ -36,8 +36,9 @@
 #ifndef ISAPNP_H
 #define ISAPNP_H
 
+#include "stdint.h"
+#include "nic.h"
 #include "isa_ids.h"
-#include "dev.h"
 
 /*
  * ISAPnP constants
@@ -155,11 +156,19 @@ struct isapnp_logdevid {
 } __attribute__ (( packed ));
 
 /*
+ * A location on an ISAPnP bus
+ *
+ */
+struct isapnp_loc {
+	uint8_t csn;
+	uint8_t logdev;
+};
+
+/*
  * A physical ISAPnP device
  *
  */
 struct isapnp_device {
-	char *magic; /* must be first */
 	const char *name;
 	uint8_t csn;
 	uint8_t logdev;
@@ -167,7 +176,6 @@ struct isapnp_device {
 	uint16_t prod_id;
 	uint16_t ioaddr;
 	uint8_t irqno;
-	int already_tried;
 };
 
 /*
@@ -184,7 +192,6 @@ struct isapnp_id {
  *
  */
 struct isapnp_driver {
-	const char *name;
 	struct isapnp_id *ids;
 	unsigned int id_count;
 };
@@ -193,21 +200,29 @@ struct isapnp_driver {
  * Define an ISAPnP driver
  *
  */
-#define ISAPNP_DRIVER( driver_name, isapnp_ids ) {			\
-	.name = driver_name,						\
-	.ids = isapnp_ids,						\
-	.id_count = sizeof ( isapnp_ids ) / sizeof ( isapnp_ids[0] ),	\
+#define ISAPNP_DRIVER( _ids ) {					\
+	.ids = _ids,						\
+	.id_count = sizeof ( _ids ) / sizeof ( _ids[0] ),	\
 }
 
 /*
  * Functions in isapnp.c
  *
  */
-extern int find_isapnp_device ( struct isapnp_device *isapnp,
-				struct isapnp_driver *driver );
-extern int find_isapnp_boot_device ( struct dev *dev,
-				     struct isapnp_driver *driver );
 extern void activate_isapnp_device ( struct isapnp_device *isapnp,
 				     int active );
+extern void isapnp_fill_nic ( struct nic *nic, struct isapnp_device *isapnp );
+
+/*
+ * ISAPnP bus global definition
+ *
+ */
+extern struct bus_driver isapnp_driver;
+
+/*
+ * ISAPnP read port.  ROM prefix may be able to set this address.
+ *
+ */
+extern uint16_t isapnp_read_port;
 
 #endif /* ISAPNP_H */

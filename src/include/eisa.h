@@ -1,8 +1,9 @@
 #ifndef EISA_H
 #define EISA_H
 
+#include "stdint.h"
 #include "isa_ids.h"
-#include "dev.h"
+#include "nic.h"
 
 /*
  * EISA constants
@@ -10,7 +11,7 @@
  */
 
 #define EISA_MIN_SLOT (0x1)
-#define EISA_MAX_SLOT (0xf)
+#define EISA_MAX_SLOT (0xf)	/* Must be 2^n - 1 */
 #define EISA_SLOT_BASE( n ) ( 0x1000 * (n) )
 
 #define EISA_MFG_ID_HI ( 0xc80 )
@@ -23,17 +24,23 @@
 #define EISA_CMD_ENABLE ( 1 << 0 )
 
 /*
+ * A location on an EISA bus
+ *
+ */
+struct eisa_loc {
+	unsigned int slot;
+};
+
+/*
  * A physical EISA device
  *
  */
 struct eisa_device {
-	char *magic; /* must be first */
 	const char *name;
 	unsigned int slot;
 	uint16_t ioaddr;
 	uint16_t mfg_id;
 	uint16_t prod_id;
-	int already_tried;
 };
 
 /*
@@ -59,20 +66,22 @@ struct eisa_driver {
  * Define an EISA driver
  *
  */
-#define EISA_DRIVER( driver_name, eisa_ids ) {				\
-	.name = driver_name,						\
-	.ids = eisa_ids,						\
-	.id_count = sizeof ( eisa_ids ) / sizeof ( eisa_ids[0] ),	\
+#define EISA_DRIVER( _ids ) {					\
+	.ids = _ids,						\
+	.id_count = sizeof ( _ids ) / sizeof ( _ids[0] ),	\
 }
 
 /*
  * Functions in eisa.c
  *
  */
-extern int find_eisa_device ( struct eisa_device *eisa,
-			      struct eisa_driver *driver );
-extern int find_eisa_boot_device ( struct dev *dev,
-				   struct eisa_driver *driver );
 extern void enable_eisa_device ( struct eisa_device *eisa );
+extern void fill_eisa_nic ( struct nic *nic, struct eisa_device *eisa );
+
+/*
+ * EISA bus global definition
+ *
+ */
+extern struct bus_driver eisa_driver;
 
 #endif /* EISA_H */

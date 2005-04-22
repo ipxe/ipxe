@@ -7,22 +7,44 @@
 
 #include "string.h"
 #include "io.h"
+#include "console.h"
+#include "nic.h"
 #include "mca.h"
 
 /*
- * Ensure that there is sufficient space in the shared dev_bus
- * structure for a struct pci_device.
+ * Increment a bus_loc structure to the next possible MCA location.
+ * Leave the structure zeroed and return 0 if there are no more valid
+ * locations.
  *
  */
-DEV_BUS( struct mca_device, mca_dev );
-static char mca_magic[0]; /* guaranteed unique symbol */
+static int mca_next_location ( struct bus_loc *bus_loc ) {
+	struct mca_loc *mca_loc = ( struct mca_loc * ) bus_loc;
+	
+	/*
+	 * Ensure that there is sufficient space in the shared bus
+	 * structures for a struct mca_loc and a struct
+	 * mca_dev, as mandated by bus.h.
+	 *
+	 */
+	BUS_LOC_CHECK ( struct mca_loc );
+	BUS_DEV_CHECK ( struct mca_device );
+
+	return ( ++mca_loc->slot & MCA_MAX_SLOT_NR );
+}
 
 /*
  * Fill in parameters for an MCA device based on slot number
  *
  */
-static int fill_mca_device ( struct mca_device *mca ) {
+static int mca_fill_device ( struct bus_dev *bus_dev,
+			     struct bus_loc *bus_loc ) {
+	struct mca_loc *mca_loc = ( struct mca_loc * ) bus_loc;
+	struct mca_device *mca = ( struct mca_device * ) bus_dev;
 	unsigned int i, seen_non_ff;
+
+	/* Store slot in struct mca, set default values */
+	mca->slot = mca_loc->slot;
+	mca->name = "?";
 
 	/* Make sure motherboard setup is off */
 	outb_p ( 0xff, MCA_MOTHERBOARD_SETUP_REG );
@@ -58,70 +80,81 @@ static int fill_mca_device ( struct mca_device *mca ) {
 }
 
 /*
- * Find an MCA device matching the specified driver
+ * Test whether or not a driver is capable of driving the device.
  *
  */
-int find_mca_device ( struct mca_device *mca, struct mca_driver *driver ) {
+static int mca_check_driver ( struct bus_dev *bus_dev,
+			      struct device_driver *device_driver ) {
+	struct mca_device *mca = ( struct mca_device * ) bus_dev;
+	struct mca_driver *driver
+		= ( struct mca_driver * ) device_driver->bus_driver_info;
 	unsigned int i;
 
-	/* Initialise struct mca if it's the first time it's been used. */
-	if ( mca->magic != mca_magic ) {
-		memset ( mca, 0, sizeof ( *mca ) );
-		mca->magic = mca_magic;
-	}
-
-	/* Iterate through all possible MCA slots, starting where we
-	 * left off
-	 */
-	DBG ( "MCA searching for device matching driver %s\n", driver->name );
-	for ( ; mca->slot < MCA_MAX_SLOT_NR ; mca->slot++ ) {
-		/* If we've already used this device, skip it */
-		if ( mca->already_tried ) {
-			mca->already_tried = 0;
-			continue;
-		}
-
-		/* Fill in device parameters */
-		if ( ! fill_mca_device ( mca ) ) {
-			continue;
-		}
-
-		/* Compare against driver's ID list */
-		for ( i = 0 ; i < driver->id_count ; i++ ) {
-			struct mca_id *id = &driver->ids[i];
-
-			if ( MCA_ID ( mca ) == id->id ) {
-				DBG ( "MCA found ID %hx (device %s) "
-				      "matching driver %s\n",
-				      id->name, id->id, driver->name );
-				mca->name = id->name;
-				mca->already_tried = 1;
-				return 1;
-			}
+	/* Compare against driver's ID list */
+	for ( i = 0 ; i < driver->id_count ; i++ ) {
+		struct mca_id *id = &driver->ids[i];
+		
+		if ( MCA_ID ( mca ) == id->id ) {
+			DBG ( "MCA found ID %hx (device %s) "
+			      "matching driver %s\n",
+			      id->name, id->id, driver->name );
+			mca->name = id->name;
+			return 1;
 		}
 	}
 
 	/* No device found */
-	DBG ( "MCA found no device matching driver %s\n", driver->name );
-	mca->slot = 0;
 	return 0;
 }
 
 /*
- * Find the next MCA device that can be used to boot using the
- * specified driver.
+ * Describe an MCA device
  *
  */
-int find_mca_boot_device ( struct dev *dev, struct mca_driver *driver ) {
-	struct mca_device *mca = ( struct mca_device * )dev->bus;
+static char * mca_describe ( struct bus_dev *bus_dev ) {
+	struct mca_device *mca = ( struct mca_device * ) bus_dev;
+	static char mca_description[] = "MCA 00";
 
-	if ( ! find_mca_device ( mca, driver ) )
-		return 0;
+	sprintf ( mca_description + 4, "%hhx", mca->slot );
+	return mca_description;
+}
 
-	dev->name = mca->name;
-	dev->devid.bus_type = MCA_BUS_TYPE;
-	dev->devid.vendor_id = GENERIC_MCA_VENDOR;
-	dev->devid.device_id = MCA_ID ( mca );
+/*
+ * Name an MCA device
+ *
+ */
+static const char * mca_name ( struct bus_dev *bus_dev ) {
+	struct mca_device *mca = ( struct mca_device * ) bus_dev;
+	
+	return mca->name;
+}
 
-	return 1;
+/*
+ * MCA bus operations table
+ *
+ */
+struct bus_driver mca_driver __bus_driver = {
+	.next_location	= mca_next_location,
+	.fill_device	= mca_fill_device,
+	.check_driver	= mca_check_driver,
+	.describe	= mca_describe,
+	.name		= mca_name,
+};
+
+/*
+ * Fill in a nic structure
+ *
+ */
+void mca_fill_nic ( struct nic *nic, struct mca_device *mca ) {
+
+	/* ioaddr and irqno must be read in a device-dependent way
+	 * from the POS registers
+	 */
+	nic->ioaddr = 0;
+	nic->irqno = 0;
+
+	/* Fill in DHCP device ID structure */
+	nic->dhcp_dev_id.bus_type = MCA_BUS_TYPE;
+	nic->dhcp_dev_id.vendor_id = htons ( GENERIC_MCA_VENDOR );
+	nic->dhcp_dev_id.device_id = htons ( MCA_ID ( mca ) );
 }

@@ -1,18 +1,29 @@
 #ifndef	ISA_H
 #define ISA_H
 
+#include "stdint.h"
 #include "isa_ids.h"
-#include "dev.h"
+#include "nic.h"
+
+/*
+ * A location on an ISA bus
+ *
+ */
+struct isa_loc {
+	unsigned int probe_idx;
+};
+#define ISA_MAX_PROBE_IDX	255 /* Unlikely to ever be more than ~20 */
 
 /*
  * A physical ISA device
  *
  */
 struct isa_device {
-	char *magic; /* must be first */
-	unsigned int probe_idx;
+	const char *name;
+	unsigned int driver_probe_idx;
 	uint16_t ioaddr;
-	int already_tried;
+	uint16_t mfg_id;
+	uint16_t prod_id;
 };
 
 /*
@@ -41,8 +52,7 @@ struct isa_driver {
  * Define an ISA driver
  *
  */
-#define ISA_DRIVER( _name, _probe_addrs, _probe_addr, _mfg_id, _prod_id ) { \
-	.name = _name,							    \
+#define ISA_DRIVER( _probe_addrs, _probe_addr, _mfg_id, _prod_id ) {	    \
 	.probe_addrs = _probe_addrs,					    \
 	.addr_count = sizeof ( _probe_addrs ) / sizeof ( _probe_addrs[0] ), \
 	.probe_addr = _probe_addr,					    \
@@ -61,10 +71,13 @@ struct isa_driver {
  * Functions in isa.c
  *
  */
-extern int find_isa_device ( struct isa_device *eisa,
-			     struct isa_driver *driver );
-extern int find_isa_boot_device ( struct dev *dev,
-				  struct isa_driver *driver );
+extern void fill_isa_nic ( struct nic *nic, struct isa_device *isa );
+
+/*
+ * ISA bus global definition
+ *
+ */
+extern struct bus_driver isa_driver;
 
 #endif /* ISA_H */
 

@@ -36,15 +36,8 @@
 #include "string.h"
 #include "timer.h"
 #include "io.h"
+#include "console.h"
 #include "isapnp.h"
-
-/*
- * Ensure that there is sufficient space in the shared dev_bus
- * structure for a struct isapnp_device.
- *
- */
-DEV_BUS( struct isapnp_device, isapnp_dev );
-static char isapnp_magic[0]; /* guaranteed unique symbol */
 
 /*
  * We can have only one ISAPnP bus in a system.  Once the read port is
@@ -56,9 +49,14 @@ static char isapnp_magic[0]; /* guaranteed unique symbol */
  * ISA bus.  We therefore probe only when we are first asked to find
  * an ISAPnP device.
  *
+ * External code (e.g. the ISAPnP ROM prefix) may already know the
+ * read port address, in which case it can initialise this value.
+ * Note that setting the read port address will prevent further
+ * isolation from taking place; you should set the read port address
+ * only if you know that devices have already been allocated CSNs.
+ *
  */
-static uint16_t isapnp_read_port;
-static uint16_t isapnp_max_csn;
+uint16_t isapnp_read_port;
 
 /*
  * ISAPnP utility functions
@@ -297,7 +295,8 @@ static int isapnp_find_tag ( uint8_t wanted_tag, uint8_t *buf ) {
  */
 static int isapnp_try_isolate ( void ) {
 	struct isapnp_identifier identifier;
-	int i, j, seen55aa;
+	unsigned int i, j, seen55aa;
+	unsigned int csn = 0;
 	uint16_t data;
 	uint8_t byte;
 
@@ -312,7 +311,6 @@ static int isapnp_try_isolate ( void ) {
 
 	/* Reset all assigned CSNs */
 	isapnp_reset_csn ();
-	isapnp_max_csn = 0;
 	isapnp_delay();
 	isapnp_delay();
 	
@@ -358,7 +356,7 @@ static int isapnp_try_isolate ( void ) {
 		/* If we didn't see any 55aa patterns, stop here */
 		if ( ! seen55aa ) {
 			DBG ( "ISAPnP saw %s signs of life\n",
-			      isapnp_max_csn ? "no futher" : "no" );
+			      csn ? "no futher" : "no" );
 			break;
 		}
 
@@ -374,12 +372,12 @@ static int isapnp_try_isolate ( void ) {
 		}
 
 		/* Give the device a CSN */
-		isapnp_max_csn++;
+		csn++;
 		DBG ( "ISAPnP found card " ISAPNP_CARD_ID_FMT
 		      ", assigning CSN %hhx\n",
-		      ISAPNP_CARD_ID_DATA ( &identifier ), isapnp_max_csn );
+		      ISAPNP_CARD_ID_DATA ( &identifier ), csn );
 		
-		isapnp_write_csn ( isapnp_max_csn );
+		isapnp_write_csn ( csn );
 		isapnp_delay();
 
 		/* Send this card back to Sleep and force all cards
@@ -394,8 +392,8 @@ static int isapnp_try_isolate ( void ) {
 
 	/* Return number of cards found */
 	DBG ( "ISAPnP found %d cards at read port %hx\n",
-	      isapnp_max_csn, isapnp_read_port );
-	return isapnp_max_csn;
+	      csn, isapnp_read_port );
+	return csn;
 }
 
 /*
@@ -420,16 +418,64 @@ static void isapnp_isolate ( void ) {
 }
 
 /*
+ * Increment a bus_loc structure to the next possible ISAPnP location.
+ * Leave the structure zeroed and return 0 if there are no more valid
+ * locations.
+ *
+ */
+static int isapnp_next_location ( struct bus_loc *bus_loc ) {
+	struct isapnp_loc *isapnp_loc = ( struct isapnp_loc * ) bus_loc;
+	
+	/*
+	 * Ensure that there is sufficient space in the shared bus
+	 * structures for a struct isapnp_loc and a struct isapnp_dev,
+	 * as mandated by bus.h.
+	 *
+	 */
+	BUS_LOC_CHECK ( struct isapnp_loc );
+	BUS_DEV_CHECK ( struct isapnp_device );
+
+	return ( ++isapnp_loc->logdev ? 1 : ++isapnp_loc->csn );
+}
+
+/*
  * Fill in parameters for an ISAPnP device based on CSN
  *
  * Return 1 if device present, 0 otherwise
  *
  */
-static int fill_isapnp_device ( struct isapnp_device *isapnp ) {
+static int isapnp_fill_device ( struct bus_dev *bus_dev,
+				struct bus_loc *bus_loc ) {
+	struct isapnp_device *isapnp = ( struct isapnp_device * ) bus_dev;
+	struct isapnp_loc *isapnp_loc = ( struct isapnp_loc * ) bus_loc;
 	unsigned int i;
 	struct isapnp_identifier identifier;
 	struct isapnp_logdevid logdevid;
-	
+	static struct {
+		uint8_t csn;
+		uint8_t first_nonexistent_logdev;
+	} cache = { 0, 0 };
+
+	/* Copy CSN and logdev to isapnp_device, set default values */
+	isapnp->csn = isapnp_loc->csn;
+	isapnp->logdev = isapnp_loc->logdev;
+	isapnp->name = "?";
+
+	/* CSN 0 is never valid, but may be passed in */
+	if ( ! isapnp->csn )
+		return 0;
+
+	/* Check cache to see if we are already past the highest
+	 * logical device of this CSN
+	 */
+	if ( ( isapnp->csn == cache.csn ) &&
+	     ( isapnp->logdev >= cache.first_nonexistent_logdev ) )
+		return 0;
+
+	/* Perform isolation if it hasn't yet been done */
+	if ( ! isapnp_read_port )
+		isapnp_isolate();
+
 	/* Wake the card */
 	isapnp_wait_for_key ();
 	isapnp_send_key ();
@@ -437,6 +483,14 @@ static int fill_isapnp_device ( struct isapnp_device *isapnp ) {
 
 	/* Read the card identifier */
 	isapnp_peek ( ( char * ) &identifier, sizeof ( identifier ) );
+
+	/* Need to return 0 if no device exists at this CSN */
+	if ( identifier.vendor_id & 0x80 ) {
+		DBG ( "ISAPnP found no card %hhx\n", isapnp->csn );
+		cache.csn = isapnp->csn;
+		cache.first_nonexistent_logdev = 0;
+		return 0;
+	}
 
 	/* Find the Logical Device ID tag corresponding to this device */
 	for ( i = 0 ; i <= isapnp->logdev ; i++ ) {
@@ -447,6 +501,8 @@ static int fill_isapnp_device ( struct isapnp_device *isapnp ) {
 			      "card " ISAPNP_CARD_ID_FMT "\n",
 			      isapnp->csn, isapnp->logdev,
 			      ISAPNP_CARD_ID_DATA ( &identifier ) );
+			cache.csn = isapnp->csn;
+			cache.first_nonexistent_logdev = isapnp->logdev;
 			return 0;
 		}
 	}
@@ -475,98 +531,73 @@ static int fill_isapnp_device ( struct isapnp_device *isapnp ) {
 }
 
 /*
- * Find an ISAPnP device matching the specified driver
+ * Test whether or not a driver is capable of driving the device.
  *
  */
-int find_isapnp_device ( struct isapnp_device *isapnp,
-			 struct isapnp_driver *driver ) {
+static int isapnp_check_driver ( struct bus_dev *bus_dev,
+				 struct device_driver *device_driver ) {
+	struct isapnp_device *isapnp = ( struct isapnp_device * ) bus_dev;
+	struct isapnp_driver *driver
+		= ( struct isapnp_driver * ) device_driver->bus_driver_info;
 	unsigned int i;
 
-	/* Initialise struct isapnp if it's the first time it's been used. */
-	if ( isapnp->magic != isapnp_magic ) {
-		memset ( isapnp, 0, sizeof ( *isapnp ) );
-		isapnp->magic = isapnp_magic;
-		isapnp->csn = 1;
-	}
-
-	/* Ensure that all ISAPnP cards have CSNs allocated to them,
-	 * if we haven't already done so.
-	 */
-	if ( ! isapnp_read_port ) {
-		isapnp_isolate();
-	}
-
-	/* Iterate through all possible ISAPNP CSNs, starting where we
-	 * left off.
-	 */
-	DBG ( "ISAPnP searching for device matching driver %s\n",
-	      driver->name );
-	for ( ; isapnp->csn <= isapnp_max_csn ; isapnp->csn++ ) {
-		for ( ; isapnp->logdev <= 0xff ; isapnp->logdev++ ) {
-			/* If we've already used this device, skip it */
-			if ( isapnp->already_tried ) {
-				isapnp->already_tried = 0;
-				continue;
-			}
-			
-			/* Fill in device parameters */
-			if ( ! fill_isapnp_device ( isapnp ) ) {
-				/* If fill_isapnp_device fails, assume
-				 * that we've reached the last logical
-				 * device on this card, and proceed to
-				 * the next card.
-				 */
-				isapnp->logdev = 0;
-				break;
-			}
-
-			/* Compare against driver's ID list */
-			for ( i = 0 ; i < driver->id_count ; i++ ) {
-				struct isapnp_id *id = &driver->ids[i];
-				
-				if ( ( isapnp->vendor_id == id->vendor_id ) &&
-				     ( ISA_PROD_ID ( isapnp->prod_id ) ==
-				       ISA_PROD_ID ( id->prod_id ) ) ) {
-					DBG ( "ISAPnP found ID %hx:%hx "
-					      "(\"%s\") (device %s) "
-					      "matching driver %s\n",
-					      isapnp->vendor_id,
-					      isapnp->prod_id,
-					      isa_id_string( isapnp->vendor_id,
-							     isapnp->prod_id ),
-					      id->name, driver->name );
-					isapnp->name = id->name;
-					isapnp->already_tried = 1;
-					return 1;
-				}
-			}
+	/* Compare against driver's ID list */
+	for ( i = 0 ; i < driver->id_count ; i++ ) {
+		struct isapnp_id *id = &driver->ids[i];
+		
+		if ( ( isapnp->vendor_id == id->vendor_id ) &&
+		     ( ISA_PROD_ID ( isapnp->prod_id ) ==
+		       ISA_PROD_ID ( id->prod_id ) ) ) {
+			DBG ( "ISAPnP found ID %hx:%hx "
+			      "(\"%s\") (device %s) "
+			      "matching driver %s\n",
+			      isapnp->vendor_id,
+			      isapnp->prod_id,
+			      isa_id_string( isapnp->vendor_id,
+					     isapnp->prod_id ),
+			      id->name, driver->name );
+			isapnp->name = id->name;
+			return 1;
 		}
 	}
 
-	/* No device found */
-	DBG ( "ISAPnP found no device matching driver %s\n", driver->name );
-	isapnp->csn = 1;
 	return 0;
 }
 
 /*
- * Find the next ISAPNP device that can be used to boot using the
- * specified driver.
+ * Describe an ISAPnP device
  *
  */
-int find_isapnp_boot_device ( struct dev *dev, struct isapnp_driver *driver ) {
-	struct isapnp_device *isapnp = ( struct isapnp_device * ) dev->bus;
+static char * isapnp_describe ( struct bus_dev *bus_dev ) {
+	struct isapnp_device *isapnp = ( struct isapnp_device * ) bus_dev;
+	static char isapnp_description[] = "ISAPnP 00:00";
 
-	if ( ! find_isapnp_device ( isapnp, driver ) )
-		return 0;
-
-	dev->name = isapnp->name;
-	dev->devid.bus_type = ISA_BUS_TYPE;
-	dev->devid.vendor_id = isapnp->vendor_id;
-	dev->devid.device_id = isapnp->prod_id;
-
-	return 1;
+	sprintf ( isapnp_description + 7, "%hhx:%hhx",
+		  isapnp->csn, isapnp->logdev );
+	return isapnp_description;
 }
+
+/*
+ * Name an ISAPnP device
+ *
+ */
+static const char * isapnp_name ( struct bus_dev *bus_dev ) {
+	struct isapnp_device *isapnp = ( struct isapnp_device * ) bus_dev;
+	
+	return isapnp->name;
+}
+
+/*
+ * ISAPnP bus operations table
+ *
+ */
+struct bus_driver isapnp_driver __bus_driver = {
+	.next_location	= isapnp_next_location,
+	.fill_device	= isapnp_fill_device,
+	.check_driver	= isapnp_check_driver,
+	.describe	= isapnp_describe,
+	.name		= isapnp_name,
+};
 
 /*
  * Activate or deactivate an ISAPnP device
@@ -594,3 +625,20 @@ void activate_isapnp_device ( struct isapnp_device *isapnp,
 	DBG ( "ISAPnP activated device %hhx.%hhx\n",
 	      isapnp->csn, isapnp->logdev );
 }
+
+/*
+ * Fill in a nic structure
+ *
+ */
+void isapnp_fill_nic ( struct nic *nic, struct isapnp_device *isapnp ) {
+
+	/* Fill in ioaddr and irqno */
+	nic->ioaddr = isapnp->ioaddr;
+	nic->irqno = isapnp->irqno;
+
+	/* Fill in DHCP device ID structure */
+	nic->dhcp_dev_id.bus_type = ISA_BUS_TYPE;
+	nic->dhcp_dev_id.vendor_id = htons ( isapnp->vendor_id );
+	nic->dhcp_dev_id.device_id = htons ( isapnp->prod_id );
+}
+

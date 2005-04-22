@@ -1,4 +1,5 @@
 #include "string.h"
+#include "console.h"
 #include "config/isa.h"
 #include "isa.h"
 
@@ -14,139 +15,156 @@
  * instead.  Some cards (e.g. the 3c509) implement a proprietary
  * ISAPnP-like mechanism.
  *
- * The ISA probe address list can be overridden by config.c; if the
+ * The ISA probe address list can be overridden by config.h; if the
  * user specifies ISA_PROBE_ADDRS then that list will be used first.
  * (If ISA_PROBE_ADDRS ends with a zero, the driver's own list will
  * never be used).
  */
 
 /*
- * Ensure that there is sufficient space in the shared dev_bus
- * structure for a struct isa_device.
- *
- */
-DEV_BUS( struct isa_device, isa_dev );
-static char isa_magic[0]; /* guaranteed unique symbol */
-
-/*
  * User-supplied probe address list
  *
  */
-#ifdef ISA_PROBE_ADDRS
-#  ifdef ISA_PROBE_ONLY
-#    define			HAVE_ISA_PROBE_ADDRS	1
-#    define			ISA_PROBE_ADDR_LIST	ISA_PROBE_ADDRS, 0
-#  else
-#    define			HAVE_ISA_PROBE_ADDRS	1
-#    define			ISA_PROBE_ADDR_LIST	ISA_PROBE_ADDRS
-#  endif
-#else
-#  define			HAVE_ISA_PROBE_ADDRS	0
-#  define			ISA_PROBE_ADDR_LIST	
-#endif
-
 static isa_probe_addr_t isa_extra_probe_addrs[] = {
-	ISA_PROBE_ADDR_LIST
+#ifdef ISA_PROBE_ADDRS
+	ISA_PROBE_ADDRS
+#endif
 };
 #define isa_extra_probe_addr_count \
      ( sizeof ( isa_extra_probe_addrs ) / sizeof ( isa_extra_probe_addrs[0] ) )
 
+#ifdef ISA_PROBE_ONLY
+#  define		ISA_PROBE_IDX_LIMIT	isa_extra_probe_addr_count
+#else
+#  define		ISA_PROBE_IDX_LIMIT	( ISA_MAX_PROBE_IDX + 1 )
+#endif
+
 /*
- * Find an ISA device matching the specified driver
+ * Increment a bus_loc structure to the next possible ISA location.
+ * Leave the structure zeroed and return 0 if there are no more valid
+ * locations.
  *
  */
-int find_isa_device ( struct isa_device *isa, struct isa_driver *driver ) {
-	unsigned int i;
-	uint16_t ioaddr;
-
-	/* Initialise struct isa if it's the first time it's been used. */
-	if ( isa->magic != isa_magic ) {
-		memset ( isa, 0, sizeof ( *isa ) );
-		isa->magic = isa_magic;
-	}
-
-	/* Iterate through any ISA probe addresses specified by the
-	 * user, starting where we left off.
+static int isa_next_location ( struct bus_loc *bus_loc ) {
+	struct isa_loc *isa_loc = ( struct isa_loc * ) bus_loc;
+	
+	/*
+	 * Ensure that there is sufficient space in the shared bus
+	 * structures for a struct isa_loc and a struct
+	 * isa_dev, as mandated by bus.h.
+	 *
 	 */
-	DBG ( "ISA searching for device matching driver %s\n", driver->name );
-	for ( i = isa->probe_idx ; i < isa_extra_probe_addr_count ; i++ ) {
-		/* If we've already used this device, skip it */
-		if ( isa->already_tried ) {
-			isa->already_tried = 0;
-			continue;
-		}
-		
-		/* Set I/O address */
-		ioaddr = isa_extra_probe_addrs[i];
+	BUS_LOC_CHECK ( struct isa_loc );
+	BUS_DEV_CHECK ( struct isa_device );
 
-		/* An I/O address of 0 in extra_probe_addrs list means
-		 * stop probing (i.e. don't continue to the
-		 * driver-provided list)
-		 */
-		if ( ! ioaddr )
-			goto notfound;
+	return ( ( ++isa_loc->probe_idx < ISA_PROBE_IDX_LIMIT ) ?
+		 1 : ( isa_loc->probe_idx = 0 ) );
+}
 
-		/* Use probe_addr method to see if there's a device
-		 * present at this address.
-		 */
-		if ( driver->probe_addr ( ioaddr ) ) {
-			isa->probe_idx = i;
-			goto found;
-		}
+/*
+ * Fill in parameters (vendor & device ids, class, membase etc.) for
+ * an ISA device based on bus_loc.
+ *
+ * Returns 1 if a device was found, 0 for no device present.
+ *
+ */
+static int isa_fill_device ( struct bus_dev *bus_dev,
+			     struct bus_loc *bus_loc ) {
+	struct isa_loc *isa_loc = ( struct isa_loc * ) bus_loc;
+	struct isa_device *isa = ( struct isa_device * ) bus_dev;
+	signed int driver_probe_idx;
+
+	driver_probe_idx = isa_loc->probe_idx - isa_extra_probe_addr_count;
+	if ( driver_probe_idx < 0 ) {
+		isa->ioaddr = isa_extra_probe_addrs[isa_loc->probe_idx];
+	} else {
+		isa->ioaddr = 0;
+		isa->driver_probe_idx = driver_probe_idx;
 	}
-
-	/* Iterate through all ISA probe addresses provided by the
-	 * driver, starting where we left off.
-	 */
-	for ( i = isa->probe_idx - isa_extra_probe_addr_count ;
-	      i < driver->addr_count ; i++ ) {
-
-		/* If we've already used this device, skip it */
-		if ( isa->already_tried ) {
-			isa->already_tried = 0;
-			continue;
-		}
-
-		/* Set I/O address */
-		ioaddr = driver->probe_addrs[i];
-
-		/* Use probe_addr method to see if there's a device
-		 * present at this address.
-		 */
-		if ( driver->probe_addr ( ioaddr ) ) {
-			isa->probe_idx = i + isa_extra_probe_addr_count;
-			goto found;
-		}
-	}
-
- notfound:
-	/* No device found */
-	DBG ( "ISA found no device matching driver %s\n", driver->name );
-	isa->probe_idx = 0;
-	return 0;
-
- found:
-	DBG ( "ISA found %s device at address %hx\n", driver->name, ioaddr );
-	isa->ioaddr = ioaddr;
-	isa->already_tried = 1;
+	isa->mfg_id = isa->prod_id = 0;
+	isa->name = "?";
 	return 1;
 }
 
 /*
- * Find the next ISA device that can be used to boot using the
- * specified driver.
+ * Test whether or not a driver is capable of driving the specified
+ * device.
  *
  */
-int find_isa_boot_device ( struct dev *dev, struct isa_driver *driver ) {
-	struct isa_device *isa = ( struct isa_device * )dev->bus;
+int isa_check_driver ( struct bus_dev *bus_dev,
+		       struct device_driver *device_driver ) {
+	struct isa_device *isa = ( struct isa_device * ) bus_dev;
+	struct isa_driver *driver
+		= ( struct isa_driver * ) device_driver->bus_driver_info;
 
-	if ( ! find_isa_device ( isa, driver ) )
-		return 0;
+	/* If ioaddr is zero, it means we're using a driver-specified
+	 * ioaddr
+	 */
+	if ( ! isa->ioaddr )
+		isa->ioaddr = driver->probe_addrs[isa->driver_probe_idx];
 
-	dev->name = driver->name;
-	dev->devid.bus_type = ISA_BUS_TYPE;
-	dev->devid.vendor_id = driver->mfg_id;
-	dev->devid.device_id = driver->prod_id;
+	/* Use probe_addr method to see if there's a device
+	 * present at this address.
+	 */
+	if ( driver->probe_addr ( isa->ioaddr ) ) {
+		DBG ( "ISA found %s device at address %hx\n",
+		      driver->name, isa->ioaddr );
+		isa->name = driver->name;
+		isa->mfg_id = driver->mfg_id;
+		isa->prod_id = driver->prod_id;
+		return 1;
+	}
 
-	return 1;
+	/* No device found */
+	return 0;
+}
+
+/*
+ * Describe a ISA device
+ *
+ */
+static char * isa_describe ( struct bus_dev *bus_dev ) {
+	struct isa_device *isa = ( struct isa_device * ) bus_dev;
+	static char isa_description[] = "ISA 0000";
+
+	sprintf ( isa_description + 4, "%hx", isa->ioaddr );
+	return isa_description;
+}
+
+/*
+ * Name a ISA device
+ *
+ */
+static const char * isa_name ( struct bus_dev *bus_dev ) {
+	struct isa_device *isa = ( struct isa_device * ) bus_dev;
+	
+	return isa->name;
+}
+
+/*
+ * ISA bus operations table
+ *
+ */
+struct bus_driver isa_driver __bus_driver = {
+	.next_location	= isa_next_location,
+	.fill_device	= isa_fill_device,
+	.check_driver	= isa_check_driver,
+	.describe	= isa_describe,
+	.name		= isa_name,
+};
+
+/*
+ * Fill in a nic structure
+ *
+ */
+void isa_fill_nic ( struct nic *nic, struct isa_device *isa ) {
+
+	/* Fill in ioaddr and irqno */
+	nic->ioaddr = isa->ioaddr;
+	nic->irqno = 0;
+
+	/* Fill in DHCP device ID structure */
+	nic->dhcp_dev_id.bus_type = ISA_BUS_TYPE;
+	nic->dhcp_dev_id.vendor_id = htons ( isa->mfg_id );
+	nic->dhcp_dev_id.device_id = htons ( isa->prod_id );
 }

@@ -1,15 +1,29 @@
 #include "string.h"
 #include "io.h"
 #include "timer.h"
+#include "console.h"
 #include "eisa.h"
 
 /*
- * Ensure that there is sufficient space in the shared dev_bus
- * structure for a struct pci_device.
+ * Increment a bus_loc structure to the next possible EISA location.
+ * Leave the structure zeroed and return 0 if there are no more valid
+ * locations.
  *
  */
-DEV_BUS( struct eisa_device, eisa_dev );
-static char eisa_magic[0]; /* guaranteed unique symbol */
+static int eisa_next_location ( struct bus_loc *bus_loc ) {
+	struct eisa_loc *eisa_loc = ( struct eisa_loc * ) bus_loc;
+	
+	/*
+	 * Ensure that there is sufficient space in the shared bus
+	 * structures for a struct isa_loc and a struct
+	 * isa_dev, as mandated by bus.h.
+	 *
+	 */
+	BUS_LOC_CHECK ( struct eisa_loc );
+	BUS_DEV_CHECK ( struct eisa_device );
+
+	return ( ++eisa_loc->slot & EISA_MAX_SLOT );
+}
 
 /*
  * Fill in parameters for an EISA device based on slot number
@@ -17,8 +31,19 @@ static char eisa_magic[0]; /* guaranteed unique symbol */
  * Return 1 if device present, 0 otherwise
  *
  */
-static int fill_eisa_device ( struct eisa_device *eisa ) {
+static int eisa_fill_device  ( struct bus_dev *bus_dev,
+			       struct bus_loc *bus_loc ) {
+	struct eisa_loc *eisa_loc = ( struct eisa_loc * ) bus_loc;
+	struct eisa_device *eisa = ( struct eisa_device * ) bus_dev;
 	uint8_t present;
+
+	/* Copy slot number to struct eisa, set default values */
+	eisa->slot = eisa_loc->slot;
+	eisa->name = "?";
+
+	/* Slot 0 is never valid */
+	if ( ! eisa->slot )
+		return 0;
 
 	/* Set ioaddr */
 	eisa->ioaddr = EISA_SLOT_BASE ( eisa->slot );
@@ -39,7 +64,7 @@ static int fill_eisa_device ( struct eisa_device *eisa ) {
 	eisa->prod_id = ( inb ( eisa->ioaddr + EISA_PROD_ID_LO ) << 8 )
 		+ inb ( eisa->ioaddr + EISA_PROD_ID_HI );
 
-	DBG ( "EISA found slot %d (base %#hx) ID %hx:%hx (\"%s\")\n",
+	DBG ( "EISA found slot %hhx (base %#hx) ID %hx:%hx (\"%s\")\n",
 	      eisa->slot, eisa->ioaddr, eisa->mfg_id, eisa->prod_id,
 	      isa_id_string ( eisa->mfg_id, eisa->prod_id ) );
 
@@ -47,78 +72,86 @@ static int fill_eisa_device ( struct eisa_device *eisa ) {
 }
 
 /*
- * Find an EISA device matching the specified driver
+ * Test whether or not a driver is capable of driving the device.
  *
  */
-int find_eisa_device ( struct eisa_device *eisa, struct eisa_driver *driver ) {
+static int eisa_check_driver ( struct bus_dev *bus_dev,
+				 struct device_driver *device_driver ) {
+	struct eisa_device *eisa = ( struct eisa_device * ) bus_dev;
+	struct eisa_driver *driver
+		= ( struct eisa_driver * ) device_driver->bus_driver_info;
 	unsigned int i;
 
-	/* Initialise struct eisa if it's the first time it's been used. */
-	if ( eisa->magic != eisa_magic ) {
-		memset ( eisa, 0, sizeof ( *eisa ) );
-		eisa->magic = eisa_magic;
-		eisa->slot = EISA_MIN_SLOT;
-	}
-
-	/* Iterate through all possible EISA slots, starting where we
-	 * left off.
-	 */
-	DBG ( "EISA searching for device matching driver %s\n", driver->name );
-	for ( ; eisa->slot <= EISA_MAX_SLOT ; eisa->slot++ ) {
-		/* If we've already used this device, skip it */
-		if ( eisa->already_tried ) {
-			eisa->already_tried = 0;
-			continue;
-		}
-
-		/* Fill in device parameters */
-		if ( ! fill_eisa_device ( eisa ) ) {
-			continue;
-		}
-
-		/* Compare against driver's ID list */
-		for ( i = 0 ; i < driver->id_count ; i++ ) {
-			struct eisa_id *id = &driver->ids[i];
-			
-			if ( ( eisa->mfg_id == id->mfg_id ) &&
-			     ( ISA_PROD_ID ( eisa->prod_id ) ==
-			       ISA_PROD_ID ( id->prod_id ) ) ) {
-				DBG ( "EISA found ID %hx:%hx (\"%s\") "
-				      "(device %s) matching driver %s\n",
-				      eisa->mfg_id, eisa->prod_id,
-				      isa_id_string ( eisa->mfg_id,
-						      eisa->prod_id ),
-				      id->name, driver->name );
-				eisa->name = id->name;
-				eisa->already_tried = 1;
-				return 1;
-			}
+	/* Compare against driver's ID list */
+	for ( i = 0 ; i < driver->id_count ; i++ ) {
+		struct eisa_id *id = &driver->ids[i];
+		
+		if ( ( eisa->mfg_id == id->mfg_id ) &&
+		     ( ISA_PROD_ID ( eisa->prod_id ) ==
+		       ISA_PROD_ID ( id->prod_id ) ) ) {
+			DBG ( "EISA found ID %hx:%hx (\"%s\") "
+			      "(device %s) matching driver %s\n",
+			      eisa->mfg_id, eisa->prod_id,
+			      isa_id_string ( eisa->mfg_id,
+					      eisa->prod_id ),
+			      id->name, driver->name );
+			eisa->name = id->name;
+			return 1;
 		}
 	}
 
 	/* No device found */
-	DBG ( "EISA found no device matching driver %s\n", driver->name );
-	eisa->slot = EISA_MIN_SLOT;
 	return 0;
 }
 
 /*
- * Find the next EISA device that can be used to boot using the
- * specified driver.
+ * Describe an EISA device
  *
  */
-int find_eisa_boot_device ( struct dev *dev, struct eisa_driver *driver ) {
-	struct eisa_device *eisa = ( struct eisa_device * )dev->bus;
+static char * eisa_describe ( struct bus_dev *bus_dev ) {
+	struct eisa_device *eisa = ( struct eisa_device * ) bus_dev;
+	static char eisa_description[] = "EISA 00";
 
-	if ( ! find_eisa_device ( eisa, driver ) )
-		return 0;
+	sprintf ( eisa_description + 5, "%hhx", eisa->slot );
+	return eisa_description;
+}
 
-	dev->name = eisa->name;
-	dev->devid.bus_type = ISA_BUS_TYPE;
-	dev->devid.vendor_id = eisa->mfg_id;
-	dev->devid.device_id = eisa->prod_id;
+/*
+ * Name an EISA device
+ *
+ */
+static const char * eisa_name ( struct bus_dev *bus_dev ) {
+	struct eisa_device *eisa = ( struct eisa_device * ) bus_dev;
+	
+	return eisa->name;
+}
 
-	return 1;
+/*
+ * EISA bus operations table
+ *
+ */
+struct bus_driver eisa_driver __bus_driver = {
+	.next_location	= eisa_next_location,
+	.fill_device	= eisa_fill_device,
+	.check_driver	= eisa_check_driver,
+	.describe	= eisa_describe,
+	.name		= eisa_name,
+};
+
+/*
+ * Fill in a nic structure
+ *
+ */
+void eisa_fill_nic ( struct nic *nic, struct eisa_device *eisa ) {
+
+	/* Fill in ioaddr and irqno */
+	nic->ioaddr = eisa->ioaddr;
+	nic->irqno = 0;
+
+	/* Fill in DHCP device ID structure */
+	nic->dhcp_dev_id.bus_type = ISA_BUS_TYPE;
+	nic->dhcp_dev_id.vendor_id = htons ( eisa->mfg_id );
+	nic->dhcp_dev_id.device_id = htons ( eisa->prod_id );
 }
 
 /*
