@@ -105,23 +105,6 @@ static void skel_transmit ( struct nic *nic __unused,
 }
 
 /**************************************************************************
- * DISABLE - Turn off ethernet interface
- **************************************************************************
- */
-static void skel_disable ( struct nic *nic __unused ) {
-	/* put the card in its initial state */
-	/* This function serves 3 purposes.
-	 * This disables DMA and interrupts so we don't receive
-	 *  unexpected packets or interrupts from the card after
-	 *  etherboot has finished. 
-	 * This frees resources so etherboot may use
-	 *  this driver on another interface
-	 * This allows etherboot to reinitialize the interface
-	 *  if something is something goes wrong.
-	 */
-}
-
-/**************************************************************************
  * IRQ - handle interrupts
  **************************************************************************
 */
@@ -163,15 +146,15 @@ static struct nic_operations skel_operations = {
 	.poll		= skel_poll,
 	.transmit	= skel_transmit,
 	.irq		= skel_irq,
-
 };
 
 /**************************************************************************
  * PROBE - Look for an adapter
  *
- * You need to define a probe routine for each bus type that your
- * driver supports, together with tables that enable Etherboot to
- * identify that your driver should be used for a particular device.
+ * You need to define a probe routine and a disable routine for each
+ * bus type that your driver supports, together with tables that
+ * enable Etherboot to identify that your driver should be used for a
+ * particular device.
  *
  * Delete whichever of the following sections you don't need.  For
  * example, most PCI devices will only need the PCI probing section;
@@ -186,17 +169,12 @@ static struct nic_operations skel_operations = {
  */
 
 /**************************************************************************
- * PCI PROBE - Look for an adapter
+ * PCI PROBE and DISABLE
  **************************************************************************
  */
 static int skel_pci_probe ( struct nic *nic, struct pci_device *pci ) {
 
-
 	pci_fill_nic ( nic, pci );
-
-
-	nic->ioaddr = pci->ioaddr;
-	nic->irqno = pci->irq;
 
 	/* Test for physical presence of NIC */
 	/*
@@ -209,6 +187,13 @@ static int skel_pci_probe ( struct nic *nic, struct pci_device *pci ) {
 	/* point to NIC specific routines */
 	nic->nic_op = &skel_operations;
 	return 1;
+}
+
+static void skel_pci_disable ( struct nic *nic __unused,
+			       struct pci_device *pci __unused ) {
+	/* Reset the card to its initial state, disable DMA and
+	 * interrupts
+	 */
 }
 
 static struct pci_id skel_pci_nics[] = {
@@ -219,18 +204,17 @@ static struct pci_driver skel_pci_driver =
 	PCI_DRIVER ( skel_pci_nics, PCI_NO_CLASS );
 
 DRIVER ( "SKEL/PCI", nic_driver, pci_driver, skel_pci_driver,
-	 skel_pci_probe, skel_disable );
+	 skel_pci_probe, skel_pci_disable );
 
 /**************************************************************************
- * EISA PROBE - Look for an adapter
+ * EISA PROBE and DISABLE
  **************************************************************************
  */
 static int skel_eisa_probe ( struct nic *nic, struct eisa_device *eisa ) {
-	struct nic *nic = nic_device ( dev );
 
+	eisa_fill_nic ( nic, eisa );
 	enable_eisa_device ( eisa );
-	nic->ioaddr = eisa->ioaddr;
-	nic->irqno = 0;
+	nic->irqno = 0; /* No standard way to get irq from EISA cards */
 
 	/* Test for physical presence of NIC */
 	/*
@@ -243,6 +227,14 @@ static int skel_eisa_probe ( struct nic *nic, struct eisa_device *eisa ) {
 	/* point to NIC specific routines */
 	nic->nic_op = &skel_operations;
 	return 1;
+}
+
+static void skel_eisa_disable ( struct nic *nic __unused,
+				struct eisa_device *eisa ) {
+	/* Reset the card to its initial state, disable DMA and
+	 * interrupts
+	 */
+	disable_eisa_device ( eisa );
 }
 
 static struct eisa_id skel_eisa_nics[] = {
@@ -250,24 +242,22 @@ static struct eisa_id skel_eisa_nics[] = {
 };
 
 static struct eisa_driver skel_eisa_driver =
-	EISA_DRIVER ( "SKEL/EISA", skel_eisa_nics );
+	EISA_DRIVER ( skel_eisa_nics );
 
-BOOT_DRIVER ( "SKEL/EISA", find_eisa_boot_device,
-	      skel_eisa_driver, skel_eisa_probe );
+DRIVER ( "SKEL/EISA", nic_driver, eisa_driver, skel_eisa_driver,
+	 skel_eisa_probe, skel_eisa_disable );
 
 ISA_ROM ( "skel-eisa", "Skeleton EISA Adapter" );
 
 /**************************************************************************
- * ISAPnP PROBE - Look for an adapter
+ * ISAPnP PROBE and DISABLE
  **************************************************************************
  */
 static int skel_isapnp_probe ( struct nic *nic,
 			       struct isapnp_device *isapnp ) {
-	struct nic *nic = nic_device ( dev );
 
-	nic->ioaddr = isapnp->ioaddr;
-	nic->irqno = isapnp->irqno;
-	activate_isapnp_device ( isapnp, 1 );
+	isapnp_fill_nic ( nic, isapnp );
+	activate_isapnp_device ( isapnp );
 
 	/* Test for physical presence of NIC */
 	/*
@@ -282,25 +272,34 @@ static int skel_isapnp_probe ( struct nic *nic,
 	return 1;
 }
 
+static void skel_isapnp_disable ( struct nic *nic __unused,
+				  struct isapnp_device *isapnp ) {
+	/* Reset the card to its initial state, disable DMA and
+	 * interrupts
+	 */
+	deactivate_isapnp_device ( isapnp );
+}
+
 static struct isapnp_id skel_isapnp_nics[] = {
 	{ "Skeleton ISAPnP Adapter", ISAPNP_VENDOR('S','K','L'), 0x0000 },
 };
 
 static struct isapnp_driver skel_isapnp_driver =
-	ISAPNP_DRIVER ( "SKEL/ISAPnP", skel_isapnp_nics );
+	ISAPNP_DRIVER ( skel_isapnp_nics );
 
-BOOT_DRIVER ( "SKEL/ISAPnP", find_isapnp_boot_device,
-	      skel_isapnp_driver, skel_isapnp_probe );
+DRIVER ( "SKEL/ISAPnP", nic_driver, isapnp_driver, skel_isapnp_driver,
+	 skel_isapnp_probe, skel_isapnp_disable );
 
 ISA_ROM ( "skel-isapnp", "Skeleton ISAPnP Adapter" );
 
 /**************************************************************************
- * MCA PROBE - Look for an adapter
+ * MCA PROBE and DISABLE
  **************************************************************************
  */
 static int skel_mca_probe ( struct nic *nic,
-			    struct mca_device *mca __unused ) {
-	struct nic *nic = nic_device ( dev );
+			    struct mca_device *mca ) {
+
+	mca_fill_nic ( nic, mca );
 
 	/* MCA parameters are available in the mca->pos[] array */
 	/*
@@ -321,20 +320,27 @@ static int skel_mca_probe ( struct nic *nic,
 	return 1;
 }
 
+static void skel_mca_disable ( struct nic *nic __unused,
+			       struct mca_device *mca __unused ) {
+	/* Reset the card to its initial state, disable DMA and
+	 * interrupts
+	 */
+}
+
 static struct mca_id skel_mca_nics[] = {
 	{ "Skeleton MCA Adapter", 0x0000 },
 };
 
 static struct mca_driver skel_mca_driver =
-	MCA_DRIVER ( "SKEL/MCA", skel_mca_nics );
+	MCA_DRIVER ( skel_mca_nics );
 
-BOOT_DRIVER ( "SKEL/MCA", find_mca_boot_device,
-	      skel_mca_driver, skel_mca_probe );
+DRIVER ( "SKEL/MCA", nic_driver, mca_driver, skel_mca_driver,
+	 skel_mca_probe, skel_mca_disable );
 
 ISA_ROM ( "skel-mca", "Skeleton MCA Adapter" );
 
 /**************************************************************************
- * ISA PROBE - Look for an adapter
+ * ISA PROBE and DISABLE
  *
  * The "classical" ISA probe is split into two stages: trying a list
  * of I/O addresses to see if there's anything listening, and then
@@ -358,10 +364,9 @@ static int skel_isa_probe_addr ( isa_probe_addr_t ioaddr __unused ) {
 }
 
 static int skel_isa_probe ( struct nic *nic, struct isa_device *isa ) {
-	struct nic *nic = nic_device ( dev );
 
-	nic->ioaddr = isa->ioaddr;
-	nic->irqno = 0;
+	isa_fill_nic ( nic, isa );
+	nic->irqno = 0; /* No standard way to get IRQ for ISA */
 
 	/* Test for physical presence of NIC */
 	/*
@@ -376,6 +381,13 @@ static int skel_isa_probe ( struct nic *nic, struct isa_device *isa ) {
 	return 1;
 }
 
+static void skel_isa_disable ( struct nic *nic __unused,
+			      struct isa_device *isa __unused ) {
+	/* Reset the card to its initial state, disable DMA and
+	 * interrupts
+	 */
+}
+
 static isa_probe_addr_t skel_isa_probe_addrs[] = {
 	/*
 	   0x200, 0x240,
@@ -383,11 +395,11 @@ static isa_probe_addr_t skel_isa_probe_addrs[] = {
 };
 
 static struct isa_driver skel_isa_driver =
-	ISA_DRIVER ( "SKEL/ISA", skel_isa_probe_addrs, skel_isa_probe_addr,
+	ISA_DRIVER ( skel_isa_probe_addrs, skel_isa_probe_addr,
 		     ISA_VENDOR('S','K','L'), 0x0000 );
 
-BOOT_DRIVER ( "SKEL/ISA", find_isa_boot_device,
-	      skel_isa_driver, skel_isa_probe );
+DRIVER ( "SKEL/ISA", nic_driver, isa_driver, skel_isa_driver,
+	 skel_isa_probe, skel_isa_disable );
 
 ISA_ROM ( "skel-isa", "Skeleton ISA Adapter" );
 
