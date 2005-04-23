@@ -327,7 +327,7 @@ static int get_e ( uint16_t ioaddr, int offset ) {
 	return (inw(ioaddr + EP_W0_EEPROM_DATA));
 }
 
-struct nic_operations t509_operations = {
+static struct nic_operations t509_operations = {
 	.connect	= dummy_connect,
 	.poll		= t509_poll,
 	.transmit	= t509_transmit,

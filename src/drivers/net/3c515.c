@@ -66,7 +66,7 @@ static void t3c515_wait(unsigned int nticks)
 #define s16 signed short
 #define s32 signed long
 static int if_port;
-struct corkscrew_private *vp;
+static struct corkscrew_private *vp;
 /* Brought directly from 3c515.c by Becker */
 #define CORKSCREW 1
 

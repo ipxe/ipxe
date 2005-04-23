@@ -311,7 +311,7 @@ static const char * t509_name ( struct bus_dev *bus_dev __unused ) {
  * T509 bus operations table
  *
  */
-struct bus_driver t509_driver __bus_driver = {
+static struct bus_driver t509_driver __bus_driver = {
 	.next_location	= t509_next_location,
 	.fill_device	= t509_fill_device,
 	.check_driver	= t509_check_driver,
