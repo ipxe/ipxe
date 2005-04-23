@@ -43,7 +43,6 @@
 	.arch i386
 	.org 0
 	.section ".prefix", "ax", @progbits
-	.globl _prefix
 _prefix: 
 	.word 0xAA55			/* BIOS extension signature */
 size:	.byte 0				/* number of 512 byte blocks */
@@ -254,7 +253,6 @@ invoke:
 	
 
 	.section ".text16", "ax", @progbits
-	.globl	prefix_exit
 prefix_exit:
 	popw	%ax			/* padding */
 	popw	%ax			/* %ax = exit code */
@@ -269,7 +267,6 @@ prefix_exit:
 	int	$BOOT_INT		/* Try original vector */
 2:	/* Exit via int $0x18 */
 	int	$0x18			/* As per BIOS Boot Spec, next dev */
-	.globl	prefix_exit_end
 prefix_exit_end:
 	.previous
 

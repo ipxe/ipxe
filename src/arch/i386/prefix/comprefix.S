@@ -12,7 +12,6 @@
 	.code16
 	.arch i386
 	.section ".prefix", "ax", @progbits
-	.globl _prefix
 
 /* Cheat a little with the relocations: .COM files are loaded at 0x100 */
 _prefix:
@@ -34,11 +33,9 @@ _prefix:
 	lret
 
 	.section ".text16", "ax", @progbits
-	.globl	prefix_exit
 prefix_exit:
 	movw	$0x4c00,%ax		/* return to DOS */
 	int	$0x21			/* reach this on Quit */
-	.globl	prefix_exit_end
 prefix_exit_end:
 	.previous
 

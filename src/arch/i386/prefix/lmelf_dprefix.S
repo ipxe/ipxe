@@ -155,9 +155,7 @@ _gdt_end:
 
 	/* Dummy routines to satisfy the build */
 	.section ".text16", "ax", @progbits
-	.globl	prefix_exit
 prefix_exit:
 
-	.globl	prefix_exit_end
 prefix_exit_end:
 	.previous

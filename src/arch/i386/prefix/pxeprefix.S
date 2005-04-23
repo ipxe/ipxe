@@ -18,7 +18,6 @@
 	.arch i386
 	.org 0
 	.section ".prefix", "ax", @progbits
-	.globl _prefix
 /*****************************************************************************
  * Entry point:	set cs, ds, bp, print welcome message
  *****************************************************************************
@@ -237,7 +236,6 @@ run_etherboot:
 	jmp	_start			/* Run Etherboot */
 
 	.section ".text16", "ax", @progbits
-	.globl	prefix_exit
 prefix_exit:
 	pushw	%cs			/* Set %ds, %bp for access to text */
 	popw	%ds
@@ -273,7 +271,6 @@ print_exit_message:
 	int	$0x10
 	jmp	1b
 2:	ret
-	.globl	prefix_exit_end
 prefix_exit_end:
 	.previous
 

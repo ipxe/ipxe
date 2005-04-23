@@ -87,7 +87,6 @@
 	.arch i386
 	.org	0
 	.section ".prefix", "ax", @progbits
-	.globl	_prefix
 _prefix:
 
 /* 
@@ -572,10 +571,8 @@ bImage_gdt_48:
 	.long	bImage_gdt_48 - setup_code	# gdt base (filled in later)
 
 	.section ".text16", "ax", @progbits
-	.globl	prefix_exit
 prefix_exit:
 	int	$0x19		/* should try to boot machine */
-	.globl	prefix_exit_end
 prefix_exit_end:
 	.previous
 	

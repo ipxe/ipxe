@@ -8,7 +8,6 @@
 	.code16
 	.arch i386
 	.section	".prefix", "ax", @progbits
-	.globl	_prefix
 
 _prefix:
 	.byte	'M', 'Z'
@@ -29,11 +28,9 @@ _prefix:
 	.short	0				/* fill */
 
 	.section ".text16", "ax", @progbits
-	.globl	prefix_exit
 prefix_exit:
 	movw	$0x4c00,%ax		/* return to DOS */
 	int	$0x21			/* reach this on Quit */
-	.globl	prefix_exit_end
 prefix_exit_end:
 	.previous
 
