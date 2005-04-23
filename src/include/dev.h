@@ -105,10 +105,10 @@ struct bus_dev {
 	}
 
 #define BUS_LOC_CHECK(datatype)					      \
-	LINKER_ASSERT( ( sizeof (datatype) < sizeof (struct bus_loc) ),  \
+	LINKER_ASSERT( ( sizeof (datatype) <= sizeof (struct bus_loc) ),  \
 		       __BUS_LOC_SIZE_is_too_small__see_dev_h )
 #define BUS_DEV_CHECK(datatype)					      \
-	LINKER_ASSERT( ( sizeof (datatype) < sizeof (struct bus_dev) ),    \
+	LINKER_ASSERT( ( sizeof (datatype) <= sizeof (struct bus_dev) ),    \
 		       __BUS_DEV_SIZE_is_too_small__see_dev_h )
 
 /*
