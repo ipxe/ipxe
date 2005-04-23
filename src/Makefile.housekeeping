@@ -398,6 +398,15 @@ TAGS.$(ARCH) :
 	ctags -e -R -f $@ $(foreach ARCH,$(OTHER_ARCHS),--exclude=arch/$(ARCH))
 CLEANUP	+= TAGS*
 
+# Symbol table checks
+#
+SYMTAB	= $(BIN)/symtab
+$(SYMTAB) : $(BLIB)
+	$(NM) -o -g $< > $@
+
+symcheck : $(SYMTAB)
+	$(SYMCHECK) $<
+
 # Force rebuild for any given target
 #
 $(BIN)/%.rebuild :
