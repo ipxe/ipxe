@@ -39,7 +39,7 @@ while ( ( my $symbol, my $info ) = each %$symbols ) {
     $problems->{$_}->{nonexistent}->{$symbol} = 1 foreach @requires;
   } elsif ( @provides > 1 ) {
     # Symbol defined in multiple objects
-    $problems->{$_}->{multiples}->{$symbol} = 1 foreach @requires;
+    $problems->{$_}->{multiples}->{$symbol} = 1 foreach @provides;
   }
   if ( @requires == 0 ) {
     # Symbol not required
