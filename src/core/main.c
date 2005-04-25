@@ -190,9 +190,9 @@ int main ( void ) {
 		/* Print out what we're doing */
 		printf ( "Booting from %s %s at %s "
 			 "using the %s driver\n",
-			 dev.bus_driver->name ( &dev.bus_dev ),
+			 dev.bus_driver->name_device ( &dev.bus_dev ),
 			 dev.type_driver->name,
-			 dev.bus_driver->describe ( &dev.bus_dev ),
+			 dev.bus_driver->describe_device ( &dev.bus_dev ),
 			 dev.device_driver->name );
 
 		/* Probe boot device */
@@ -202,8 +202,9 @@ int main ( void ) {
 			continue;
 		}
 		
-		printf ( "%s: %s\n", dev.bus_driver->name ( &dev.bus_dev ),
-			 dev.type_driver->describe ( dev.type_dev ) );
+		printf ( "%s: %s\n",
+			 dev.bus_driver->name_device ( &dev.bus_dev ),
+			 dev.type_driver->describe_device ( dev.type_dev ) );
 	}
 
 	/* Call registered per-object exit functions */
