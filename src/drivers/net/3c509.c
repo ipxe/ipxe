@@ -291,7 +291,7 @@ static int t509_check_driver ( struct bus_dev *bus_dev __unused,
  * Describe a T509 device
  *
  */
-static char * t509_describe ( struct bus_dev *bus_dev ) {
+static char * t509_describe_device ( struct bus_dev *bus_dev ) {
 	struct t509_device *t509 = ( struct t509_device * ) bus_dev;
 	static char t509_description[] = "T509 00";
 
@@ -303,7 +303,7 @@ static char * t509_describe ( struct bus_dev *bus_dev ) {
  * Name a T509 device
  *
  */
-static const char * t509_name ( struct bus_dev *bus_dev __unused ) {
+static const char * t509_name_device ( struct bus_dev *bus_dev __unused ) {
 	return "T509";
 }
 
@@ -312,11 +312,12 @@ static const char * t509_name ( struct bus_dev *bus_dev __unused ) {
  *
  */
 static struct bus_driver t509_driver __bus_driver = {
-	.next_location	= t509_next_location,
-	.fill_device	= t509_fill_device,
-	.check_driver	= t509_check_driver,
-	.describe	= t509_describe,
-	.name		= t509_name,
+	.name			= "T509",
+	.next_location		= t509_next_location,
+	.fill_device		= t509_fill_device,
+	.check_driver		= t509_check_driver,
+	.describe_device	= t509_describe_device,
+	.name_device		= t509_name_device,
 };
 
 /*
