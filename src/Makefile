@@ -71,9 +71,11 @@ SIZE		?= $(CROSS_COMPILE)size
 AR		?= $(CROSS_COMPILE)ar
 RANLIB		?= $(CROSS_COMPILE)ranlib
 OBJCOPY		?= $(CROSS_COMPILE)objcopy
+NM		?= $(CROSS_COMPILE)nm
 PARSEROM	?= $(PERL) ./util/parserom.pl
 MAKEROM		?= $(PERL) ./util/makerom.pl
 MKCONFIG	?= $(PERL) ./util/mkconfig.pl
+SYMCHECK	?= $(PERL) ./util/symcheck.pl
 NRV2B		?= ./util/nrv2b
 
 # Location to place generated files
@@ -111,6 +113,7 @@ $(BIN)/%.flags :
 COMPILE_c	= $(CC) $(CFLAGS) $(CFLAGS_c) $(OBJ_CFLAGS)
 RULE_c		= $(COMPILE_c) -c $< -o $@
 RULE_c_to_dbg.o	= $(COMPILE_c) -Ddebug_$(OBJECT) -c $< -o $@
+RULE_c_to_dbg2.o = $(COMPILE_c) -Ddebug_$(OBJECT)=2 -c $< -o $@
 RULE_c_to_c	= $(COMPILE_c) -E -c $< > $@
 RULE_c_to_s	= $(COMPILE_c) -S -c $< -o $@ 
 
@@ -119,7 +122,7 @@ ASSEMBLE_S	= $(AS) $(ASFLAGS)
 RULE_S		= $(PREPROCESS_S) $< | $(ASSEMBLE_S) -o $@
 RULE_S_to_s	= $(PREPROCESS_S) $< > $@
 
-DEBUG_TARGETS	+= dbg.o c s
+DEBUG_TARGETS	+= dbg2.o dbg.o c s
 
 # SRCDIRS lists all directories containing source files.
 #

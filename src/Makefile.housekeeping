@@ -225,9 +225,13 @@ TGT_MAKEROM_FLAGS = $(strip $(MAKEROM_FLAGS_$(TGT_ROM_NAME)) \
 # the target.
 #
 COMMA		:= ,
-DEBUG_OBJS	= $(foreach D,$(subst $(COMMA), ,$(DEBUG)),$(BIN)/$(D).dbg.o)
-DEBUG_REPLACE_OBJS = $(foreach D,$(subst $(COMMA), ,$(DEBUG)),$(BIN)/$(D).o)
-BLIB_OBJS	= $(DEBUG_OBJS) $(filter-out $(DEBUG_REPLACE_OBJS),$(BOBJS))
+DEBUG_LIST	= $(subst $(COMMA), ,$(DEBUG))
+DEBUG_OBJ_BASE	= $(word 1,$(subst :, ,$(1))).dbg$(word 2,$(subst :, ,$(1)))
+DEBUG_OBJ	= $(BIN)/$(call DEBUG_OBJ_BASE,$(1)).o
+DEBUG_ORIG_OBJ	= $(BIN)/$(word 1,$(subst :, ,$(1))).o
+DEBUG_OBJS	= $(foreach D,$(DEBUG_LIST),$(call DEBUG_OBJ,$(D)))
+DEBUG_ORIG_OBJS	= $(foreach D,$(DEBUG_LIST),$(call DEBUG_ORIG_OBJ,$(D)))
+BLIB_OBJS	= $(DEBUG_OBJS) $(filter-out $(DEBUG_ORIG_OBJS),$(BOBJS))
 
 # Print out all derived information for a given target.
 #
@@ -251,7 +255,7 @@ $(BIN)/%.info :
 	@echo 'makerom target flags : $(TGT_MAKEROM_FLAGS)'
 	@echo
 	@echo 'Debugging objects    : $(DEBUG_OBJS)'
-	@echo 'Replaced objects     : $(DEBUG_REPLACE_OBJS)'
+	@echo 'Replaced objects     : $(DEBUG_ORIG_OBJS)'
 
 # List of objects included in the last build of blib.  This is needed
 # in order to correctly rebuild blib whenever the list of objects
