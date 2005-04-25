@@ -40,17 +40,30 @@ __asm__ ( ".equ\t" OBJECT_SYMBOL_STR ", 0" );
 /*
  * If debug_OBJECT is set to a true value, the macro DBG(...) will
  * expand to printf(...) when compiling OBJECT, and the symbol
- * WITH_DEBUG_MESSAGES will be inserted into the object file.
+ * DEBUG_LEVEL will be inserted into the object file.
  *
  */
 #define DEBUG_SYMBOL _H2 ( debug_, OBJECT )
+
 #if DEBUG_SYMBOL
 #include "console.h"
-#define DBG(...) printf ( __VA_ARGS__ )
 #define DEBUG_SYMBOL_STR _XSTR ( DEBUG_SYMBOL )
-__asm__ ( ".equ\tWITH_DEBUG_MESSAGES, 0" );
-#else
-#define DBG(...)
+__asm__ ( ".equ\tDEBUG_LEVEL, " DEBUG_SYMBOL_STR );
+#endif
+
+#define DBG_PRINT(...) printf ( __VA_ARGS__ )
+#define DBG_DISCARD(...)
+#define DBG  DBG_DISCARD
+#define DBG2 DBG_DISCARD
+
+#if DEBUG_SYMBOL >= 1
+#undef DBG
+#define DBG DBG_PRINT
+#endif
+
+#if DEBUG_SYMBOL >= 2
+#undef DBG2
+#define DBG2 DBG_PRINT
 #endif
 
 #define PACKED __attribute__((packed))
