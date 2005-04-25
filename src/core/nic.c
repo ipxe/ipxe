@@ -327,7 +327,7 @@ void nic_disable ( struct nic *nic __unused ) {
 #endif
 }
 
-static char * nic_describe ( struct type_dev *type_dev ) {
+static char * nic_describe_device ( struct type_dev *type_dev ) {
 	struct nic *nic = ( struct nic * ) type_dev;
 	static char nic_description[] = "MAC 00:00:00:00:00:00";
 	
@@ -340,9 +340,9 @@ static char * nic_describe ( struct type_dev *type_dev ) {
  *
  */
 struct type_driver nic_driver = {
-	.name		= "NIC",
-	.type_dev	= ( struct type_dev * ) &nic,
-	.describe	= nic_describe,
+	.name			= "NIC",
+	.type_dev		= ( struct type_dev * ) &nic,
+	.describe_device	= nic_describe_device,
 };
 
 /* Careful.  We need an aligned buffer to avoid problems on machines

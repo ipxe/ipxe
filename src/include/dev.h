@@ -179,7 +179,7 @@ struct type_dev;
 struct type_driver {
 	char *name;
 	struct type_dev *type_dev; /* single instance */
-	char * ( * describe ) ( struct type_dev *type_dev );
+	char * ( * describe_device ) ( struct type_dev *type_dev );
 };
 
 #define __type_driver __attribute__ (( used, __section__ ( ".drivers.type" ) ))
