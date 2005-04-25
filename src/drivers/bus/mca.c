@@ -110,7 +110,7 @@ static int mca_check_driver ( struct bus_dev *bus_dev,
  * Describe an MCA device
  *
  */
-static char * mca_describe ( struct bus_dev *bus_dev ) {
+static char * mca_describe_device ( struct bus_dev *bus_dev ) {
 	struct mca_device *mca = ( struct mca_device * ) bus_dev;
 	static char mca_description[] = "MCA 00";
 
@@ -122,7 +122,7 @@ static char * mca_describe ( struct bus_dev *bus_dev ) {
  * Name an MCA device
  *
  */
-static const char * mca_name ( struct bus_dev *bus_dev ) {
+static const char * mca_name_device ( struct bus_dev *bus_dev ) {
 	struct mca_device *mca = ( struct mca_device * ) bus_dev;
 	
 	return mca->name;
@@ -133,11 +133,12 @@ static const char * mca_name ( struct bus_dev *bus_dev ) {
  *
  */
 struct bus_driver mca_driver __bus_driver = {
-	.next_location	= mca_next_location,
-	.fill_device	= mca_fill_device,
-	.check_driver	= mca_check_driver,
-	.describe	= mca_describe,
-	.name		= mca_name,
+	.name			= "MCA",
+	.next_location		= mca_next_location,
+	.fill_device		= mca_fill_device,
+	.check_driver		= mca_check_driver,
+	.describe_device	= mca_describe_device,
+	.name_device		= mca_name_device,
 };
 
 /*

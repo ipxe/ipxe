@@ -126,7 +126,7 @@ int isa_check_driver ( struct bus_dev *bus_dev,
  * Describe a ISA device
  *
  */
-static char * isa_describe ( struct bus_dev *bus_dev ) {
+static char * isa_describe_device ( struct bus_dev *bus_dev ) {
 	struct isa_device *isa = ( struct isa_device * ) bus_dev;
 	static char isa_description[] = "ISA 0000";
 
@@ -138,7 +138,7 @@ static char * isa_describe ( struct bus_dev *bus_dev ) {
  * Name a ISA device
  *
  */
-static const char * isa_name ( struct bus_dev *bus_dev ) {
+static const char * isa_name_device ( struct bus_dev *bus_dev ) {
 	struct isa_device *isa = ( struct isa_device * ) bus_dev;
 	
 	return isa->name;
@@ -149,11 +149,12 @@ static const char * isa_name ( struct bus_dev *bus_dev ) {
  *
  */
 struct bus_driver isa_driver __bus_driver = {
-	.next_location	= isa_next_location,
-	.fill_device	= isa_fill_device,
-	.check_driver	= isa_check_driver,
-	.describe	= isa_describe,
-	.name		= isa_name,
+	.name			= "ISA",
+	.next_location		= isa_next_location,
+	.fill_device		= isa_fill_device,
+	.check_driver		= isa_check_driver,
+	.describe_device	= isa_describe_device,
+	.name_device		= isa_name_device,
 };
 
 /*

@@ -179,7 +179,7 @@ static int pci_check_driver ( struct bus_dev *bus_dev,
  * Describe a PCI device
  *
  */
-static char * pci_describe ( struct bus_dev *bus_dev ) {
+static char * pci_describe_device ( struct bus_dev *bus_dev ) {
 	struct pci_device *pci = ( struct pci_device * ) bus_dev;
 	static char pci_description[] = "PCI 00:00.0";
 
@@ -193,7 +193,7 @@ static char * pci_describe ( struct bus_dev *bus_dev ) {
  * Name a PCI device
  *
  */
-static const char * pci_name ( struct bus_dev *bus_dev ) {
+static const char * pci_name_device ( struct bus_dev *bus_dev ) {
 	struct pci_device *pci = ( struct pci_device * ) bus_dev;
 	
 	return pci->name;
@@ -204,11 +204,12 @@ static const char * pci_name ( struct bus_dev *bus_dev ) {
  *
  */
 struct bus_driver pci_driver __bus_driver = {
-	.next_location	= pci_next_location,
-	.fill_device	= pci_fill_device,
-	.check_driver	= pci_check_driver,
-	.describe	= pci_describe,
-	.name		= pci_name,
+	.name			= "PCI",
+	.next_location		= pci_next_location,
+	.fill_device		= pci_fill_device,
+	.check_driver		= pci_check_driver,
+	.describe_device	= pci_describe_device,
+	.name_device		= pci_name_device,
 };
 
 /*

@@ -108,7 +108,7 @@ static int eisa_check_driver ( struct bus_dev *bus_dev,
  * Describe an EISA device
  *
  */
-static char * eisa_describe ( struct bus_dev *bus_dev ) {
+static char * eisa_describe_device ( struct bus_dev *bus_dev ) {
 	struct eisa_device *eisa = ( struct eisa_device * ) bus_dev;
 	static char eisa_description[] = "EISA 00";
 
@@ -120,7 +120,7 @@ static char * eisa_describe ( struct bus_dev *bus_dev ) {
  * Name an EISA device
  *
  */
-static const char * eisa_name ( struct bus_dev *bus_dev ) {
+static const char * eisa_name_device ( struct bus_dev *bus_dev ) {
 	struct eisa_device *eisa = ( struct eisa_device * ) bus_dev;
 	
 	return eisa->name;
@@ -131,11 +131,12 @@ static const char * eisa_name ( struct bus_dev *bus_dev ) {
  *
  */
 struct bus_driver eisa_driver __bus_driver = {
-	.next_location	= eisa_next_location,
-	.fill_device	= eisa_fill_device,
-	.check_driver	= eisa_check_driver,
-	.describe	= eisa_describe,
-	.name		= eisa_name,
+	.name			= "EISA",
+	.next_location		= eisa_next_location,
+	.fill_device		= eisa_fill_device,
+	.check_driver		= eisa_check_driver,
+	.describe_device	= eisa_describe_device,
+	.name_device		= eisa_name_device,
 };
 
 /*

@@ -148,13 +148,14 @@ struct bus_dev {
  *
  */
 struct bus_driver {
+	const char *name;
 	int ( *next_location ) ( struct bus_loc *bus_loc );
 	int ( *fill_device ) ( struct bus_dev *bus_dev,
 			       struct bus_loc *bus_loc );
 	int ( *check_driver ) ( struct bus_dev *bus_dev,
 				struct device_driver *device_driver );
-	char * ( *describe ) ( struct bus_dev *bus_dev );
-	const char * ( *name ) ( struct bus_dev *bus_dev );
+	char * ( *describe_device ) ( struct bus_dev *bus_dev );
+	const char * ( *name_device ) ( struct bus_dev *bus_dev );
 };
 
 #define __bus_driver __attribute__ (( used, __section__ ( ".drivers.bus" ) ))

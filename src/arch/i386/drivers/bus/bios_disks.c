@@ -1,24 +1,17 @@
 #include "realmode.h"
-#include "isa_ids.h"
+#include "console.h"
+#include "disk.h"
 #include "bios_disks.h"
 
 #define CF ( 1 << 0 )
 #define BIOS_DISK_NONE 0
 
 /*
- * Ensure that there is sufficient space in the shared dev_bus
- * structure for a struct bios_disk_device.
- *
- */
-DEV_BUS( struct bios_disk_device, bios_disk_dev );
-static char bios_disk_magic[0]; /* guaranteed unique symbol */
-
-/*
  * Reset the disk system using INT 13,0.  Forces both hard disks and
  * floppy disks to seek back to track 0.
  *
  */
-void bios_disk_init ( void ) {
+static void bios_disk_init ( void ) {
 	REAL_EXEC ( rm_bios_disk_init,
 		    "sti\n\t"
 		    "xorw %%ax,%%ax\n\t"
@@ -36,45 +29,82 @@ void bios_disk_init ( void ) {
  * Read a single sector from a disk using INT 13,2.
  *
  * Returns the BIOS status code (%ah) - 0 indicates success.
+ * Automatically retries up to three times to allow time for floppy
+ * disks to spin up, calling bios_disk_init() after each failure.
  *
  */
-unsigned int bios_disk_read_once ( struct bios_disk_device *bios_disk,
-				   unsigned int cylinder,
-				   unsigned int head,
-				   unsigned int sector,
-				   struct bios_disk_sector *buf ) {
-	uint16_t basemem_buf, status, flags;
-	int discard_c, discard_d;
+static unsigned int bios_disk_read ( struct bios_disk_device *bios_disk,
+				     unsigned int cylinder,
+				     unsigned int head,
+				     unsigned int sector,
+				     struct bios_disk_sector *buf ) {
+	uint16_t basemem_buf, ax, flags;
+	unsigned int status, discard_c, discard_d;
+	int retry = 3;
 
 	basemem_buf = BASEMEM_PARAMETER_INIT ( *buf );
-	REAL_EXEC ( rm_bios_disk_read,
-		    "sti\n\t"
-		    "movw $0x0201, %%ax\n\t" /* Read a single sector */
-		    "int $0x13\n\t"
-		    "pushfw\n\t"
-		    "popw %%bx\n\t"
-		    "cli\n\t",
-		    4,
-		    OUT_CONSTRAINTS ( "=a" ( status ), "=b" ( flags ),
-				      "=c" ( discard_c ),
-				      "=d" ( discard_d ) ),
-		    IN_CONSTRAINTS ( "c" ( ( ( cylinder & 0xff ) << 8 ) |
-					   ( ( cylinder >> 8 ) & 0x3 ) |
-					   sector ),
-				     "d" ( ( head << 8 ) | bios_disk->drive ),
-				     "b" ( basemem_buf ) ),
-		    CLOBBER ( "ebp", "esi", "edi" ) );
+	do {
+		REAL_EXEC ( rm_bios_disk_read,
+			    "sti\n\t"
+			    "movw $0x0201, %%ax\n\t" /* Read a single sector */
+			    "int $0x13\n\t"
+			    "pushfw\n\t"
+			    "popw %%bx\n\t"
+			    "cli\n\t",
+			    4,
+			    OUT_CONSTRAINTS ( "=a" ( ax ), "=b" ( flags ),
+					      "=c" ( discard_c ),
+					      "=d" ( discard_d ) ),
+			    IN_CONSTRAINTS ( "c" ( ( (cylinder & 0xff) << 8 ) |
+						   ( (cylinder >> 8) & 0x3 ) |
+						   sector ),
+					     "d" ( ( head << 8 ) |
+						   bios_disk->drive ),
+					     "b" ( basemem_buf ) ),
+			    CLOBBER ( "ebp", "esi", "edi" ) );
+		status = ( flags & CF ) ? ( ax >> 8 ) : 0;
+	} while ( ( status != 0 ) && ( bios_disk_init(), retry-- ) );
 	BASEMEM_PARAMETER_DONE ( *buf );
 
-	return ( flags & CF ) ? ( status >> 8 ) : 0; 
+	return status;
+}
+
+/*
+ * Increment a bus_loc structure to the next possible BIOS disk
+ * location.  Leave the structure zeroed and return 0 if there are no
+ * more valid locations.
+ *
+ */
+static int bios_disk_next_location ( struct bus_loc *bus_loc ) {
+	struct bios_disk_loc *bios_disk_loc
+		= ( struct bios_disk_loc * ) bus_loc;
+	
+	/*
+	 * Ensure that there is sufficient space in the shared bus
+	 * structures for a struct bios_disk_loc and a struct
+	 * bios_disk_dev, as mandated by bus.h.
+	 *
+	 */
+	BUS_LOC_CHECK ( struct bios_disk_loc );
+	BUS_DEV_CHECK ( struct bios_disk_device );
+
+	return ( ++bios_disk_loc->drive );
 }
 
 /*
  * Fill in parameters for a BIOS disk device based on drive number
  *
  */
-static int fill_bios_disk_device ( struct bios_disk_device *bios_disk ) {
-	uint16_t type, flags;
+static int bios_disk_fill_device ( struct bus_dev *bus_dev,
+				   struct bus_loc *bus_loc ) {
+	struct bios_disk_loc *bios_disk_loc
+		= ( struct bios_disk_loc * ) bus_loc;
+	struct bios_disk_device *bios_disk
+		= ( struct bios_disk_device * ) bus_dev;
+	uint16_t flags;
+
+	/* Store drive in struct bios_disk_device */
+	bios_disk->drive = bios_disk_loc->drive;
        
 	REAL_EXEC ( rm_bios_disk_exists,
 		    "sti\n\t"
@@ -82,14 +112,15 @@ static int fill_bios_disk_device ( struct bios_disk_device *bios_disk ) {
 		    "int $0x13\n\t"
 		    "pushfw\n\t"
 		    "popw %%dx\n\t"
+		    "movb %%ah, %%al\n\t"
 		    "cli\n\t",
 		    2,
-		    OUT_CONSTRAINTS ( "=a" ( type ), "=d" ( flags ) ),
+		    OUT_CONSTRAINTS ( "=a" ( bios_disk->type ),
+				      "=d" ( flags ) ),
 		    IN_CONSTRAINTS ( "d" ( bios_disk->drive ) ),
 		    CLOBBER ( "ebx", "ecx", "esi", "edi", "ebp" ) );
 
-	if ( ( flags & CF ) ||
-	     ( ( type >> 8 ) == BIOS_DISK_NONE ) )
+	if ( ( flags & CF ) || ( bios_disk->type == BIOS_DISK_NONE ) )
 		return 0;
 
 	DBG ( "BIOS disk found valid drive %hhx\n", bios_disk->drive );
@@ -97,72 +128,72 @@ static int fill_bios_disk_device ( struct bios_disk_device *bios_disk ) {
 }
 
 /*
- * Find a BIOS disk device matching the specified driver
+ * Test whether or not a driver is capable of driving the device.
  *
  */
-int find_bios_disk_device ( struct bios_disk_device *bios_disk,
-			    struct bios_disk_driver *driver ) {
+static int bios_disk_check_driver ( struct bus_dev *bus_dev,
+				    struct device_driver *device_driver ) {
+	struct bios_disk_device *bios_disk
+		= ( struct bios_disk_device * ) bus_dev;
+	struct bios_disk_driver *driver
+		= ( struct bios_disk_driver * ) device_driver->bus_driver_info;
 
-	/* Initialise struct bios_disk if it's the first time it's been used.
-	 */
-	if ( bios_disk->magic != bios_disk_magic ) {
-		memset ( bios_disk, 0, sizeof ( *bios_disk ) );
-		bios_disk->magic = bios_disk_magic;
+	/* Compare against driver's valid ID range */
+	if ( ( bios_disk->drive >= driver->min_drive ) &&
+	     ( bios_disk->drive <= driver->max_drive ) ) {
+		driver->fill_drive_name ( bios_disk->name, bios_disk->drive );
+		DBG ( "BIOS disk found drive %hhx (\"%s\") "
+		      "matching driver %s\n",
+		      bios_disk->drive, bios_disk->name,
+		      driver->name );
+		return 1;
 	}
 
-	/* Iterate through all possible BIOS drives, starting where we
-	 * left off
-	 */
-	DBG ( "BIOS disk searching for device matching driver %s\n",
-	      driver->name );
-	do {
-		/* If we've already used this device, skip it */
-		if ( bios_disk->already_tried ) {
-			bios_disk->already_tried = 0;
-			continue;
-		}
-
-		/* Fill in device parameters */
-		if ( ! fill_bios_disk_device ( bios_disk ) ) {
-			continue;
-		}
-
-		/* Compare against driver's valid ID range */
-		if ( ( bios_disk->drive >= driver->min_drive ) &&
-		     ( bios_disk->drive <= driver->max_drive ) ) {
-			driver->fill_drive_name ( bios_disk->drive,
-						  bios_disk->name );
-			DBG ( "BIOS_DISK found drive %hhx (\"%s\") "
-			      "matching driver %s\n",
-			      bios_disk->drive, bios_disk->name,
-			      driver->name );
-			bios_disk->already_tried = 1;
-			return 1;
-		}
-	} while ( ++bios_disk->drive );
-
-	/* No device found */
-	DBG ( "BIOS disk found no device matching driver %s\n", driver->name );
 	return 0;
 }
 
 /*
- * Find the next MCA device that can be used to boot using the
- * specified driver.
+ * Describe a BIOS disk device
  *
  */
-int find_bios_disk_boot_device ( struct dev *dev,
-				 struct bios_disk_driver *driver ) {
+static char * bios_disk_describe_device ( struct bus_dev *bus_dev ) {
 	struct bios_disk_device *bios_disk
-		= ( struct bios_disk_device * ) dev->bus;
+		= ( struct bios_disk_device * ) bus_dev;
+	static char bios_disk_description[] = "BIOS disk 00";
 
-	if ( ! find_bios_disk_device ( bios_disk, driver ) )
-		return 0;
+	sprintf ( bios_disk_description + 10, "%hhx", bios_disk->drive );
+	return bios_disk_description;
+}
 
-	dev->name = bios_disk->name;
-	dev->devid.bus_type = ISA_BUS_TYPE;
-	dev->devid.vendor_id = ISA_VENDOR ( 'D', 'S', 'K' );
-	dev->devid.device_id = bios_disk->drive;
+/*
+ * Name a BIOS disk device
+ *
+ */
+static const char * bios_disk_name_device ( struct bus_dev *bus_dev ) {
+	struct bios_disk_device *bios_disk
+		= ( struct bios_disk_device * ) bus_dev;
+	
+	return bios_disk->name;
+}
 
-	return 1;
+/*
+ * BIOS disk bus operations table
+ *
+ */
+struct bus_driver bios_disk_driver __bus_driver = {
+	.name			= "BIOS DISK",
+	.next_location		= bios_disk_next_location,
+	.fill_device		= bios_disk_fill_device,
+	.check_driver		= bios_disk_check_driver,
+	.describe_device	= bios_disk_describe_device,
+	.name_device		= bios_disk_name_device,
+};
+
+/*
+ * Fill in a disk structure
+ *
+ */
+void bios_disk_fill_disk ( struct disk *disk __unused,
+			   struct bios_disk_device *bios_disk __unused ) {
+
 }

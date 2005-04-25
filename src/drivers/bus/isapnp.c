@@ -262,7 +262,7 @@ static int isapnp_find_tag ( uint8_t wanted_tag, uint8_t *buf ) {
 	uint8_t tag;
 	uint16_t len;
 
-	DBG ( "ISAPnP read tag" );
+	DBG2 ( "ISAPnP read tag" );
 	do {
 		tag = isapnp_peek_byte();
 		if ( ISAPNP_IS_SMALL_TAG ( tag ) ) {
@@ -272,22 +272,23 @@ static int isapnp_find_tag ( uint8_t wanted_tag, uint8_t *buf ) {
 			len = isapnp_peek_byte() + ( isapnp_peek_byte() << 8 );
 			tag = ISAPNP_LARGE_TAG_NAME ( tag );
 		}
-		DBG ( " %hhx (%hhx)", tag, len );
+		DBG2 ( " %hhx (%hhx)", tag, len );
 		if ( tag == wanted_tag ) {
 			isapnp_peek ( buf, len );
-			DBG ( "\n" );
+			DBG2 ( "\n" );
 			return 1;
 		} else {
 			isapnp_peek ( NULL, len );
 		}
 	} while ( tag != ISAPNP_TAG_END );
-	DBG ( "\n" );
+	DBG2 ( "\n" );
 	return 0;
 }
 
 /*
  * Try isolating ISAPnP cards at the current read port.  Return the
- * number of ISAPnP cards found.
+ * number of ISAPnP cards found.  <0 indicates "try a new read port",
+ * 0 indicates "definitely no cards".
  *
  * The state diagram on page 18 (PDF page 24) of the PnP ISA spec
  * gives the best overview of what happens here.
@@ -295,7 +296,8 @@ static int isapnp_find_tag ( uint8_t wanted_tag, uint8_t *buf ) {
  */
 static int isapnp_try_isolate ( void ) {
 	struct isapnp_identifier identifier;
-	unsigned int i, j, seen55aa;
+	unsigned int i, j;
+	unsigned int seen_55aa, seen_life;
 	unsigned int csn = 0;
 	uint16_t data;
 	uint8_t byte;
@@ -336,7 +338,7 @@ static int isapnp_try_isolate ( void ) {
 
 		/* Read identifier serially via the ISAPnP read port. */
 		memset ( &identifier, 0, sizeof ( identifier ) );
-		seen55aa = 0;
+		seen_55aa = seen_life = 0;
 		for ( i = 0 ; i < 9 ; i++ ) {
 			byte = 0;
 			for ( j = 0 ; j < 8 ; j++ ) {
@@ -345,18 +347,31 @@ static int isapnp_try_isolate ( void ) {
 				data = ( data << 8 ) | isapnp_read_data ();
 				isapnp_delay();
 				byte >>= 1;
-				if ( data == 0x55aa ) {
-					byte |= 0x80;
-					seen55aa = 1;
+				if (  data != 0xffff ) {
+					seen_life++;
+					if ( data == 0x55aa ) {
+						byte |= 0x80;
+						seen_55aa++;
+					}
 				}
 			}
 			( (char *) &identifier )[i] = byte;
 		}
-				
+
 		/* If we didn't see any 55aa patterns, stop here */
-		if ( ! seen55aa ) {
-			DBG ( "ISAPnP saw %s signs of life\n",
-			      csn ? "no futher" : "no" );
+		if ( ! seen_55aa ) {
+			if ( csn ) {
+				DBG ( "ISAPnP found no more cards\n" );
+			} else {
+				if ( seen_life ) {
+					DBG ( "ISAPnP saw life but no cards, "
+					      "trying new read port\n" );
+					csn = -1;
+				} else {
+					DBG ( "ISAPnP saw no signs of life, "
+					      "abandoning isolation\n" );
+				}
+			}
 			break;
 		}
 
@@ -364,11 +379,12 @@ static int isapnp_try_isolate ( void ) {
 		if ( identifier.checksum != isapnp_checksum ( &identifier) ) {
 			DBG ( "ISAPnP found malformed card "
 			      ISAPNP_CARD_ID_FMT "\n  with checksum %hhx "
-			      "(should be %hhx), abandoning isolation\n",
+			      "(should be %hhx), trying new read port\n",
 			      ISAPNP_CARD_ID_DATA ( &identifier ),
 			      identifier.checksum,
 			      isapnp_checksum ( &identifier) );
-			/* break; */
+			csn = -1;
+			break;
 		}
 
 		/* Give the device a CSN */
@@ -391,8 +407,10 @@ static int isapnp_try_isolate ( void ) {
 	isapnp_wait_for_key ();
 
 	/* Return number of cards found */
-	DBG ( "ISAPnP found %d cards at read port %hx\n",
-	      csn, isapnp_read_port );
+	if ( csn > 0 ) {
+		DBG ( "ISAPnP found %d cards at read port %hx\n",
+		      csn, isapnp_read_port );
+	}
 	return csn;
 }
 
@@ -412,7 +430,7 @@ static void isapnp_isolate ( void ) {
 			continue;
 		
 		/* If we detect any ISAPnP cards at this location, stop */
-		if ( isapnp_try_isolate () )
+		if ( isapnp_try_isolate () >= 0 )
 			return;
 	}
 }
@@ -486,7 +504,6 @@ static int isapnp_fill_device ( struct bus_dev *bus_dev,
 
 	/* Need to return 0 if no device exists at this CSN */
 	if ( identifier.vendor_id & 0x80 ) {
-		DBG ( "ISAPnP found no card %hhx\n", isapnp->csn );
 		cache.csn = isapnp->csn;
 		cache.first_nonexistent_logdev = 0;
 		return 0;
@@ -497,10 +514,11 @@ static int isapnp_fill_device ( struct bus_dev *bus_dev,
 		if ( ! isapnp_find_tag ( ISAPNP_TAG_LOGDEVID,
 					 ( char * ) &logdevid ) ) {
 			/* No tag for this device */
-			DBG ( "ISAPnP found no device %hhx.%hhx on "
-			      "card " ISAPNP_CARD_ID_FMT "\n",
-			      isapnp->csn, isapnp->logdev,
-			      ISAPNP_CARD_ID_DATA ( &identifier ) );
+			if ( isapnp->logdev == 0 ) {
+				DBG ( "ISAPnP found no device %hhx.0 on card "
+				      ISAPNP_CARD_ID_FMT "\n", isapnp->csn,
+				      ISAPNP_CARD_ID_DATA ( &identifier ) );
+			}
 			cache.csn = isapnp->csn;
 			cache.first_nonexistent_logdev = isapnp->logdev;
 			return 0;
@@ -548,11 +566,9 @@ static int isapnp_check_driver ( struct bus_dev *bus_dev,
 		if ( ( isapnp->vendor_id == id->vendor_id ) &&
 		     ( ISA_PROD_ID ( isapnp->prod_id ) ==
 		       ISA_PROD_ID ( id->prod_id ) ) ) {
-			DBG ( "ISAPnP found ID %hx:%hx "
-			      "(\"%s\") (device %s) "
+			DBG ( "ISAPnP found ID %hx:%hx (\"%s\") (device %s) "
 			      "matching driver %s\n",
-			      isapnp->vendor_id,
-			      isapnp->prod_id,
+			      isapnp->vendor_id, isapnp->prod_id,
 			      isa_id_string( isapnp->vendor_id,
 					     isapnp->prod_id ),
 			      id->name, device_driver->name );
@@ -568,7 +584,7 @@ static int isapnp_check_driver ( struct bus_dev *bus_dev,
  * Describe an ISAPnP device
  *
  */
-static char * isapnp_describe ( struct bus_dev *bus_dev ) {
+static char * isapnp_describe_device ( struct bus_dev *bus_dev ) {
 	struct isapnp_device *isapnp = ( struct isapnp_device * ) bus_dev;
 	static char isapnp_description[] = "ISAPnP 00:00";
 
@@ -581,7 +597,7 @@ static char * isapnp_describe ( struct bus_dev *bus_dev ) {
  * Name an ISAPnP device
  *
  */
-static const char * isapnp_name ( struct bus_dev *bus_dev ) {
+static const char * isapnp_name_device ( struct bus_dev *bus_dev ) {
 	struct isapnp_device *isapnp = ( struct isapnp_device * ) bus_dev;
 	
 	return isapnp->name;
@@ -592,11 +608,12 @@ static const char * isapnp_name ( struct bus_dev *bus_dev ) {
  *
  */
 struct bus_driver isapnp_driver __bus_driver = {
-	.next_location	= isapnp_next_location,
-	.fill_device	= isapnp_fill_device,
-	.check_driver	= isapnp_check_driver,
-	.describe	= isapnp_describe,
-	.name		= isapnp_name,
+	.name			= "ISAPnP",
+	.next_location		= isapnp_next_location,
+	.fill_device		= isapnp_fill_device,
+	.check_driver		= isapnp_check_driver,
+	.describe_device	= isapnp_describe_device,
+	.name_device		= isapnp_name_device,
 };
 
 /*
