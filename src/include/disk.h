@@ -1,6 +1,7 @@
 #ifndef DISK_H
 #define DISK_H
 
+#include "etherboot.h" /* for sector_t */
 #include "dev.h"
 
 /*
@@ -30,6 +31,9 @@ struct disk
 	int           direction;
 };
 
+struct disk_operations {
+};
+
 extern struct disk disk;
 extern int url_file(const char *name,
 	int (*fnc)(unsigned char *, unsigned int, unsigned int, int));
@@ -39,6 +43,7 @@ extern int disk_load_configuration(struct dev *dev);
 extern int disk_load(struct dev *dev);
 extern void disk_disable(void);
 
+extern struct type_driver disk_driver;
 
 #ifndef DOWNLOAD_PROTO_DISK
 #define disk_disable()	do { } while(0)
