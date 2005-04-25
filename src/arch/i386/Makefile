@@ -2,7 +2,9 @@
 #
 SRCDIRS		+= arch/i386/core arch/i386/transitions arch/i386/prefix
 SRCDIRS		+= arch/i386/firmware/pcbios arch/i386/firmware/linuxbios
-SRCDIRS		+= arch/i386/drivers/bus arch/i386/drivers/net
+SRCDIRS		+= arch/i386/drivers/bus
+SRCDIRS		+= arch/i386/drivers/net
+SRCDIRS		+= arch/i386/drivers/disk
 
 # The various xxx_loader.c files are #included into core/loader.c and
 # should not be compiled directly.
