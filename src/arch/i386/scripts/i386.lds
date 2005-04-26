@@ -145,6 +145,9 @@ SECTIONS {
 	device_drivers = .;
 	*(.drivers.device)
 	device_drivers_end = .;
+	isa_drivers = . ;
+	*(.drivers.isa)
+	isa_drivers_end = .;
 	bus_drivers = .;
 	*(.drivers.bus)
 	bus_drivers_end = .;

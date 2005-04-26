@@ -66,10 +66,11 @@ struct eisa_driver {
  * Define an EISA driver
  *
  */
-#define EISA_DRIVER( _ids ) {					\
-	.ids = _ids,						\
-	.id_count = sizeof ( _ids ) / sizeof ( _ids[0] ),	\
-}
+#define EISA_DRIVER( _name, _ids ) 					\
+	static struct eisa_driver _name = {				\
+		.ids = _ids,						\
+		.id_count = sizeof ( _ids ) / sizeof ( _ids[0] ),	\
+	}
 
 /*
  * Functions in eisa.c

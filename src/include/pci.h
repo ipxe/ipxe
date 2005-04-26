@@ -307,7 +307,8 @@ struct pci_driver {
  * Define a PCI driver.
  *
  */
-#define PCI_DRIVER( _ids, _class ) {					\
+#define PCI_DRIVER( _name, _ids, _class ) 				\
+	static struct pci_driver _name = {				\
 		.ids = _ids,						\
 		.id_count = sizeof ( _ids ) / sizeof ( _ids[0] ),	\
 		.class = _class,					\

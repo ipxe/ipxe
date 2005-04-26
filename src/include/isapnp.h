@@ -200,10 +200,11 @@ struct isapnp_driver {
  * Define an ISAPnP driver
  *
  */
-#define ISAPNP_DRIVER( _ids ) {					\
-	.ids = _ids,						\
-	.id_count = sizeof ( _ids ) / sizeof ( _ids[0] ),	\
-}
+#define ISAPNP_DRIVER( _name, _ids ) 					\
+	static struct isapnp_driver _name = {				\
+		.ids = _ids,						\
+		.id_count = sizeof ( _ids ) / sizeof ( _ids[0] ),	\
+	}
 
 /*
  * Functions in isapnp.c

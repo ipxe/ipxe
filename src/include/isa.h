@@ -9,10 +9,11 @@
  * A location on an ISA bus
  *
  */
+struct isa_driver;
 struct isa_loc {
+	unsigned int driver;
 	unsigned int probe_idx;
 };
-#define ISA_MAX_PROBE_IDX	255 /* Unlikely to ever be more than ~20 */
 
 /*
  * A physical ISA device
@@ -20,7 +21,7 @@ struct isa_loc {
  */
 struct isa_device {
 	const char *name;
-	unsigned int driver_probe_idx;
+	struct isa_driver *driver;
 	uint16_t ioaddr;
 	uint16_t mfg_id;
 	uint16_t prod_id;
@@ -47,12 +48,14 @@ struct isa_driver {
 	uint16_t mfg_id;
 	uint16_t prod_id;
 };
+#define __isa_driver __attribute__ (( section ( ".drivers.isa" ) ))
 
 /*
  * Define an ISA driver
  *
  */
-#define ISA_DRIVER( _probe_addrs, _probe_addr, _mfg_id, _prod_id ) {	    \
+#define ISA_DRIVER( _name, _probe_addrs, _probe_addr, _mfg_id, _prod_id )   \
+static struct isa_driver _name __isa_driver = {				    \
 	.probe_addrs = _probe_addrs,					    \
 	.addr_count = sizeof ( _probe_addrs ) / sizeof ( _probe_addrs[0] ), \
 	.probe_addr = _probe_addr,					    \

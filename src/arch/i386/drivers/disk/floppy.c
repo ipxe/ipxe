@@ -21,8 +21,7 @@ static void floppy_disable ( struct disk *disk,
 	
 }
 
-static struct bios_disk_driver floppy_driver =
-	BIOS_DISK_DRIVER ( fill_floppy_name, 0x00, 0x7f );
+BIOS_DISK_DRIVER ( floppy_driver, fill_floppy_name, 0x00, 0x7f );
 
 DRIVER ( "floppy", disk_driver, bios_disk_driver, floppy_driver,
 	 floppy_probe, floppy_disable );

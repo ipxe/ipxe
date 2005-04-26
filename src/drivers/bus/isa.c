@@ -17,8 +17,8 @@
  *
  * The ISA probe address list can be overridden by config.h; if the
  * user specifies ISA_PROBE_ADDRS then that list will be used first.
- * (If ISA_PROBE_ADDRS ends with a zero, the driver's own list will
- * never be used).
+ * (If ISA_PROBE_ONLY is defined, the driver's own list will never be
+ * used).
  */
 
 /*
@@ -34,20 +34,33 @@ static isa_probe_addr_t isa_extra_probe_addrs[] = {
      ( sizeof ( isa_extra_probe_addrs ) / sizeof ( isa_extra_probe_addrs[0] ) )
 
 #ifdef ISA_PROBE_ONLY
-#  define		ISA_PROBE_IDX_LIMIT	isa_extra_probe_addr_count
+#define ISA_PROBE_ADDR_COUNT(driver) ( isa_extra_probe_addr_count )
 #else
-#  define		ISA_PROBE_IDX_LIMIT	( ISA_MAX_PROBE_IDX + 1 )
+#define ISA_PROBE_ADDR_COUNT(driver) \
+	( isa_extra_probe_addr_count + (driver)->addr_count )
 #endif
+
+/*
+ * Symbols defined by linker
+ *
+ */
+extern struct isa_driver isa_drivers[];
+extern struct isa_driver isa_drivers_end[];
 
 /*
  * Increment a bus_loc structure to the next possible ISA location.
  * Leave the structure zeroed and return 0 if there are no more valid
  * locations.
  *
+ * There is no sensible concept of a device location on an ISA bus, so
+ * we use the probe address list for each ISA driver to define the
+ * list of ISA locations.
+ *
  */
 static int isa_next_location ( struct bus_loc *bus_loc ) {
 	struct isa_loc *isa_loc = ( struct isa_loc * ) bus_loc;
-	
+	struct isa_driver *driver;
+
 	/*
 	 * Ensure that there is sufficient space in the shared bus
 	 * structures for a struct isa_loc and a struct
@@ -57,8 +70,18 @@ static int isa_next_location ( struct bus_loc *bus_loc ) {
 	BUS_LOC_CHECK ( struct isa_loc );
 	BUS_DEV_CHECK ( struct isa_device );
 
-	return ( ( ++isa_loc->probe_idx < ISA_PROBE_IDX_LIMIT ) ?
-		 1 : ( isa_loc->probe_idx = 0 ) );
+	/* Move to next probe address within this driver */
+	driver = &isa_drivers[isa_loc->driver];
+	if ( ++isa_loc->probe_idx < ISA_PROBE_ADDR_COUNT ( driver ) )
+		return 1;
+
+	/* Move to next driver */
+	isa_loc->probe_idx = 0;
+	if ( ( ++isa_loc->driver, ++driver ) < isa_drivers_end )
+		return 1;
+
+	isa_loc->driver = 0;
+	return 0;
 }
 
 /*
@@ -73,17 +96,29 @@ static int isa_fill_device ( struct bus_dev *bus_dev,
 	struct isa_loc *isa_loc = ( struct isa_loc * ) bus_loc;
 	struct isa_device *isa = ( struct isa_device * ) bus_dev;
 	signed int driver_probe_idx;
-
+	
+	/* Fill in struct isa from struct isa_loc */
+	isa->driver = &isa_drivers[isa_loc->driver];
 	driver_probe_idx = isa_loc->probe_idx - isa_extra_probe_addr_count;
 	if ( driver_probe_idx < 0 ) {
 		isa->ioaddr = isa_extra_probe_addrs[isa_loc->probe_idx];
 	} else {
-		isa->ioaddr = 0;
-		isa->driver_probe_idx = driver_probe_idx;
+		isa->ioaddr = isa->driver->probe_addrs[driver_probe_idx];
 	}
-	isa->mfg_id = isa->prod_id = 0;
-	isa->name = "?";
-	return 1;
+
+	/* Call driver's probe_addr method to determine if a device is
+	 * physically present
+	 */
+	if ( isa->driver->probe_addr ( isa->ioaddr ) ) {
+		isa->name = isa->driver->name;
+		isa->mfg_id = isa->driver->mfg_id;
+		isa->prod_id = isa->driver->prod_id;
+		DBG ( "ISA found %s device at address %hx\n",
+		      isa->name, isa->ioaddr );
+		return 1;
+	}
+
+	return 0;
 }
 
 /*
@@ -97,29 +132,7 @@ int isa_check_driver ( struct bus_dev *bus_dev,
 	struct isa_driver *driver
 		= ( struct isa_driver * ) device_driver->bus_driver_info;
 
-	/* If ioaddr is zero, it means we're using a driver-specified
-	 * ioaddr
-	 */
-	if ( ! isa->ioaddr ) {
-		if ( isa->driver_probe_idx >= driver->addr_count )
-			return 0;
-		isa->ioaddr = driver->probe_addrs[isa->driver_probe_idx];
-	}
-
-	/* Use probe_addr method to see if there's a device
-	 * present at this address.
-	 */
-	if ( driver->probe_addr ( isa->ioaddr ) ) {
-		DBG ( "ISA found %s device at address %hx\n",
-		      driver->name, isa->ioaddr );
-		isa->name = driver->name;
-		isa->mfg_id = driver->mfg_id;
-		isa->prod_id = driver->prod_id;
-		return 1;
-	}
-
-	/* No device found */
-	return 0;
+	return ( driver == isa->driver );
 }
 
 /*
@@ -128,9 +141,10 @@ int isa_check_driver ( struct bus_dev *bus_dev,
  */
 static char * isa_describe_device ( struct bus_dev *bus_dev ) {
 	struct isa_device *isa = ( struct isa_device * ) bus_dev;
-	static char isa_description[] = "ISA 0000";
+	static char isa_description[] = "ISA 0000 (00)";
 
-	sprintf ( isa_description + 4, "%hx", isa->ioaddr );
+	sprintf ( isa_description + 4, "%hx (%hhx)", isa->ioaddr,
+		  isa->driver - isa_drivers );
 	return isa_description;
 }
 

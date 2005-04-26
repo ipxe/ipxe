@@ -47,11 +47,12 @@ struct bios_disk_driver {
  * Define a BIOS disk driver
  *
  */
-#define BIOS_DISK_DRIVER( _fill_drive_name, _min_drive, _max_drive ) {	      \
-	.fill_drive_name = _fill_drive_name,				      \
-	.min_drive = _min_drive,					      \
-	.max_drive = _max_drive,					      \
-}
+#define BIOS_DISK_DRIVER( _name, _fill_drive_name, _min_drive, _max_drive )   \
+	static struct bios_disk_driver _name = {			      \
+		.fill_drive_name = _fill_drive_name,			      \
+		.min_drive = _min_drive,				      \
+		.max_drive = _max_drive,				      \
+	}
 
 /*
  * Functions in bios_disks.c

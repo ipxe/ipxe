@@ -28,7 +28,7 @@ struct device_driver;
  * A physical device location on a bus.
  *
  */
-#define BUS_LOC_SIZE 4
+#define BUS_LOC_SIZE 8
 struct bus_loc {
 	char bytes[BUS_LOC_SIZE];
 };

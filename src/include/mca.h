@@ -67,10 +67,11 @@ struct mca_driver {
  * Define an MCA driver
  *
  */
-#define MCA_DRIVER( _ids ) {					\
-	.ids = _ids,						\
-	.id_count = sizeof ( _ids ) / sizeof ( _ids[0] ),	\
-}
+#define MCA_DRIVER( _name, _ids )					\
+	static struct mca_driver _name = {				\
+		.ids = _ids,						\
+		.id_count = sizeof ( _ids ) / sizeof ( _ids[0] ),	\
+	}
 
 /*
  * Functions in mca.c
