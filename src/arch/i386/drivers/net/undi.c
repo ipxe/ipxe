@@ -1446,8 +1446,7 @@ static struct pci_id undi_nics[] = {
 	PCI_ROM ( 0x0000, 0x0000, "undi", "UNDI driver support" ),
 };
 
-static struct pci_driver undi_driver =
-	PCI_DRIVER ( undi_nics, PCI_CLASS_NETWORK_ETHERNET );
+PCI_DRIVER ( undi_driver, undi_nics, PCI_CLASS_NETWORK_ETHERNET );
 
 DRIVER ( "UNDI", nic_driver, pci_driver, undi_driver,
 	 undi_probe, undi_disable );
