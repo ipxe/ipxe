@@ -182,7 +182,7 @@ External prototypes
 /* main.c */
 struct Elf_Bhdr;
 extern int main();
-extern int loadkernel P((const char *fname));
+extern int loadkernel P((const char *fname, int (*)(unsigned char *, unsigned int, unsigned int, int)));
 extern char as_main_program;
 /* nic.c */
 extern void rx_qdrain P((void));

@@ -180,6 +180,11 @@ struct type_driver {
 	char *name;
 	struct type_dev *type_dev; /* single instance */
 	char * ( * describe_device ) ( struct type_dev *type_dev );
+	int ( * configure ) ( struct type_dev *type_dev );
+	int ( * load ) ( struct type_dev *type_dev, 
+			 int ( * process ) ( unsigned char *data,
+					     unsigned int blocknum,
+					     unsigned int len, int eof ) );
 };
 
 #define __type_driver __attribute__ (( used, __section__ ( ".drivers.type" ) ))
@@ -265,6 +270,17 @@ static inline void select_device ( struct dev *dev,
 				   struct bus_loc *bus_loc ) {
 	dev->bus_driver = bus_driver;
 	memcpy ( &dev->bus_loc, bus_loc, sizeof ( dev->bus_loc ) );
+}
+/* Configure a device */
+static inline int configure ( struct dev *dev ) {
+	return dev->type_driver->configure ( dev->type_dev );
+}
+/* Boot from a device */
+static inline int load ( struct dev *dev,
+			 int ( * process ) ( unsigned char *data,
+					     unsigned int blocknum, 
+					     unsigned int len, int eof ) ) {
+	return dev->type_driver->load ( dev->type_dev, process );
 }
 
 /* Linker symbols for the various tables */

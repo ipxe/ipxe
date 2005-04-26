@@ -234,7 +234,8 @@ static unsigned short tcpudpchksum(struct iphdr *ip);
 /*
  * Find out what our boot parameters are
  */
-static int nic_load_configuration ( struct nic *nic ) {
+static int nic_configure ( struct type_dev *type_dev ) {
+	struct nic *nic = ( struct nic * ) type_dev;
 	int server_found;
 
 	if ( ! nic->nic_op->connect ( nic ) ) {
@@ -262,16 +263,7 @@ static int nic_load_configuration ( struct nic *nic ) {
 		printf("No Server found\n");
 		return 0;
 	}
-	return 1;
-}
 
-
-/**************************************************************************
-LOAD - Try to get booted
-**************************************************************************/
-static int nic_load(struct dev *dev __unused)
-{
-	const char	*kernel;
 	printf("\nMe: %@", arptable[ARP_CLIENT].ipaddr.s_addr );
 #ifndef NO_DHCP_SUPPORT
 	printf(", DHCP: %@", dhcp_server );
@@ -297,6 +289,19 @@ static int nic_load(struct dev *dev __unused)
 	printf("\n=>>"); getchar();
 #endif
 
+	return 1;
+}
+
+
+/**************************************************************************
+LOAD - Try to get booted
+**************************************************************************/
+static int nic_load ( struct type_dev *type_dev,
+		      int ( * process ) ( unsigned char *data,
+					  unsigned int blocknum,
+					  unsigned int size, int eof ) ) {
+	const char	*kernel;
+
 	/* Now use TFTP to load file */
 #ifdef	DOWNLOAD_PROTO_NFS
 	rpc_init();
@@ -309,7 +314,7 @@ static int nic_load(struct dev *dev __unused)
 #endif
 		: KERNEL_BUF;
 	if ( kernel ) {
-		loadkernel(kernel); /* We don't return except on error */
+		loadkernel(kernel,process); /* We don't return except on error */
 		printf("Unable to load file.\n");
 	} else {	
 		printf("No filename\n");
@@ -343,6 +348,8 @@ struct type_driver nic_driver = {
 	.name			= "NIC",
 	.type_dev		= ( struct type_dev * ) &nic,
 	.describe_device	= nic_describe_device,
+	.configure		= nic_configure,
+	.load			= nic_load,
 };
 
 /* Careful.  We need an aligned buffer to avoid problems on machines

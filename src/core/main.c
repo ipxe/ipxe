@@ -187,24 +187,36 @@ int main ( void ) {
 		/* Skip this device the next time we encounter it */
 		skip = 1;
 
-		/* Print out what we're doing */
-		printf ( "Booting from %s %s at %s "
-			 "using the %s driver\n",
+		/* Print out device information */
+		printf ( "%s (%s) %s at %s\n",
 			 dev.bus_driver->name_device ( &dev.bus_dev ),
+			 dev.device_driver->name,
 			 dev.type_driver->name,
-			 dev.bus_driver->describe_device ( &dev.bus_dev ),
-			 dev.device_driver->name );
+			 dev.bus_driver->describe_device ( &dev.bus_dev ) );
 
 		/* Probe boot device */
 		if ( ! probe ( &dev ) ) {
 			/* Device found on bus, but probe failed */
-			printf ( "...probe failed on %s\n" );
+			printf ( "...probe failed\n" );
 			continue;
 		}
-		
-		printf ( "%s: %s\n",
+
+		/* Print out device information */
+		printf ( "%s %s has %s\n",
 			 dev.bus_driver->name_device ( &dev.bus_dev ),
+			 dev.type_driver->name,
 			 dev.type_driver->describe_device ( dev.type_dev ) );
+
+		/* Configure boot device */
+		if ( ! configure ( &dev ) ) {
+			/* Configuration (e.g. DHCP) failed */
+			printf ( "...configuration failed\n" );
+			continue;
+		}
+
+		/* Boot from the device */
+		load ( &dev, load_block );
+
 	}
 
 	/* Call registered per-object exit functions */
@@ -391,8 +403,10 @@ static const struct proto protos[] = {
 #endif
 };
 
-int loadkernel(const char *fname)
-{
+int loadkernel ( const char *fname,
+		 int ( * load_block ) ( unsigned char *data,
+					unsigned int blocknum,
+					unsigned int len, int eof ) ) {
 	static const struct proto * const last_proto = 
 		&protos[sizeof(protos)/sizeof(protos[0])];
 	const struct proto *proto;
