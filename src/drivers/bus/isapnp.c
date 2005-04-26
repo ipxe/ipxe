@@ -59,6 +59,21 @@
 uint16_t isapnp_read_port;
 
 /*
+ * Highest assigned CSN.
+ *
+ * Note that *we* do not necessarily assign CSNs; it could be done by
+ * the PnP BIOS instead.  We therefore set this only when we first try
+ * to Wake[CSN] a device and find that there's nothing there.  Page 16
+ * (PDF page 22) of the ISAPnP spec states that "Valid Card Select
+ * Numbers for identified ISA cards range from 1 to 255 and must be
+ * assigned sequentially starting from 1", so we are (theoretically,
+ * at least) safe to assume that there are no ISAPnP cards at CSNs
+ * higher than the first unused CSN.
+ *
+ */
+static uint8_t isapnp_max_csn = 0xff;
+
+/*
  * ISAPnP utility functions
  *
  */
@@ -483,6 +498,10 @@ static int isapnp_fill_device ( struct bus_dev *bus_dev,
 	if ( ! isapnp->csn )
 		return 0;
 
+	/* Check to see if we are already past the maximum CSN */
+	if ( isapnp->csn > isapnp_max_csn )
+		return 0;
+
 	/* Check cache to see if we are already past the highest
 	 * logical device of this CSN
 	 */
@@ -504,8 +523,7 @@ static int isapnp_fill_device ( struct bus_dev *bus_dev,
 
 	/* Need to return 0 if no device exists at this CSN */
 	if ( identifier.vendor_id & 0x80 ) {
-		cache.csn = isapnp->csn;
-		cache.first_nonexistent_logdev = 0;
+		isapnp_max_csn = isapnp->csn - 1;
 		return 0;
 	}
 
