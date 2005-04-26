@@ -932,8 +932,7 @@ static struct pci_id forcedeth_nics[] = {
 	PCI_ROM(0x10de, 0x00D6, "nforce3", "nForce3 Ethernet Controller"),
 };
 
-static struct pci_driver forcedeth_driver =
-	PCI_DRIVER ( forcedeth_nics, PCI_NO_CLASS );
+PCI_DRIVER ( forcedeth_driver, forcedeth_nics, PCI_NO_CLASS );
 
 /**************************************************************************
 PROBE - Look for an adapter, this routine's visible to the outside

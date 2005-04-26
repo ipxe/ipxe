@@ -817,8 +817,7 @@ static struct pci_id ns83820_nics[] = {
 	PCI_ROM(0x100b, 0x0022, "ns83820", "National Semiconductor 83820"),
 };
 
-static struct pci_driver ns83820_driver =
-	PCI_DRIVER ( ns83820_nics, PCI_NO_CLASS );
+PCI_DRIVER ( ns83820_driver, ns83820_nics, PCI_NO_CLASS );
 
 /**************************************************************************
 PROBE - Look for an adapter, this routine's visible to the outside

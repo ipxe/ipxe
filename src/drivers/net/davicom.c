@@ -713,8 +713,7 @@ PCI_ROM(0x1282, 0x9009, "davicom9009", "Davicom 9009"),
 PCI_ROM(0x1282, 0x9132, "davicom9132", "Davicom 9132"),	/* Needs probably some fixing */
 };
 
-static struct pci_driver davicom_driver =
-	PCI_DRIVER ( davicom_nics, PCI_NO_CLASS );
+PCI_DRIVER ( davicom_driver, davicom_nics, PCI_NO_CLASS );
 
 DRIVER ( "DAVICOM", nic_driver, pci_driver, davicom_driver,
 	 davicom_probe, davicom_disable );

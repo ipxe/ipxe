@@ -490,8 +490,7 @@ static isa_probe_addr_t smc9000_probe_addrs[] = {
    0x300, 0x320, 0x340, 0x360, 0x380, 0x3A0, 0x3C0, 0x3E0,
 };
 
-static struct isa_driver smc9000_driver =
-	ISA_DRIVER ( smc9000_probe_addrs, smc9000_probe_addr,
+ISA_DRIVER ( smc9000_driver, smc9000_probe_addrs, smc9000_probe_addr,
 		     GENERIC_ISAPNP_VENDOR, 0x8228 );
 
 DRIVER ( "SMC9000", nic_driver, isa_driver, smc9000_driver,

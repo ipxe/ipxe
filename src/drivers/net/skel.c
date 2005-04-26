@@ -200,8 +200,7 @@ static struct pci_id skel_pci_nics[] = {
 PCI_ROM ( 0x0000, 0x0000, "skel-pci", "Skeleton PCI Adapter" ),
 };
 
-static struct pci_driver skel_pci_driver =
-	PCI_DRIVER ( skel_pci_nics, PCI_NO_CLASS );
+PCI_DRIVER ( skel_pci_driver, skel_pci_nics, PCI_NO_CLASS );
 
 DRIVER ( "SKEL/PCI", nic_driver, pci_driver, skel_pci_driver,
 	 skel_pci_probe, skel_pci_disable );
@@ -241,8 +240,7 @@ static struct eisa_id skel_eisa_nics[] = {
 	{ "Skeleton EISA Adapter", EISA_VENDOR('S','K','L'), 0x0000 },
 };
 
-static struct eisa_driver skel_eisa_driver =
-	EISA_DRIVER ( skel_eisa_nics );
+EISA_DRIVER ( skel_eisa_driver, skel_eisa_nics );
 
 DRIVER ( "SKEL/EISA", nic_driver, eisa_driver, skel_eisa_driver,
 	 skel_eisa_probe, skel_eisa_disable );
@@ -284,8 +282,7 @@ static struct isapnp_id skel_isapnp_nics[] = {
 	{ "Skeleton ISAPnP Adapter", ISAPNP_VENDOR('S','K','L'), 0x0000 },
 };
 
-static struct isapnp_driver skel_isapnp_driver =
-	ISAPNP_DRIVER ( skel_isapnp_nics );
+ISAPNP_DRIVER ( skel_isapnp_driver, skel_isapnp_nics );
 
 DRIVER ( "SKEL/ISAPnP", nic_driver, isapnp_driver, skel_isapnp_driver,
 	 skel_isapnp_probe, skel_isapnp_disable );
@@ -331,8 +328,7 @@ static struct mca_id skel_mca_nics[] = {
 	{ "Skeleton MCA Adapter", 0x0000 },
 };
 
-static struct mca_driver skel_mca_driver =
-	MCA_DRIVER ( skel_mca_nics );
+MCA_DRIVER ( skel_mca_driver, skel_mca_nics );
 
 DRIVER ( "SKEL/MCA", nic_driver, mca_driver, skel_mca_driver,
 	 skel_mca_probe, skel_mca_disable );
@@ -394,8 +390,7 @@ static isa_probe_addr_t skel_isa_probe_addrs[] = {
 	*/
 };
 
-static struct isa_driver skel_isa_driver =
-	ISA_DRIVER ( skel_isa_probe_addrs, skel_isa_probe_addr,
+ISA_DRIVER ( skel_isa_driver, skel_isa_probe_addrs, skel_isa_probe_addr,
 		     ISA_VENDOR('S','K','L'), 0x0000 );
 
 DRIVER ( "SKEL/ISA", nic_driver, isa_driver, skel_isa_driver,

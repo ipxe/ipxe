@@ -3706,8 +3706,7 @@ PCI_ROM(0x8086, 0x107a, "e1000-82546gb-fiber",	     "Intel EtherExpressPro1000 8
 PCI_ROM(0x8086, 0x107b, "e1000-82546gb-serdes",	     "Intel EtherExpressPro1000 82546GB SERDES"),
 };
 
-static struct pci_driver e1000_driver =
-	PCI_DRIVER ( e1000_nics, PCI_NO_CLASS );
+PCI_DRIVER ( e1000_driver, e1000_nics, PCI_NO_CLASS );
 
 DRIVER ( "E1000", nic_driver, pci_driver, e1000_driver,
 	 e1000_probe, e1000_disable );

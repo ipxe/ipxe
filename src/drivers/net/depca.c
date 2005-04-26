@@ -793,8 +793,7 @@ static isa_probe_addr_t depca_probe_addrs[] = {
 	0x300, 0x200,
 };
 
-static struct isa_driver depca_driver =
-	ISA_DRIVER ( depca_probe_addrs, depca_probe1,
+ISA_DRIVER ( depca_driver, depca_probe_addrs, depca_probe1,
 		     GENERIC_ISAPNP_VENDOR, 0x80f7 );
 
 DRIVER ( "depce", nic_driver, isa_driver, depca_driver,

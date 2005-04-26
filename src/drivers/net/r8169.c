@@ -714,8 +714,7 @@ static struct pci_id r8169_nics[] = {
 	PCI_ROM(0x10ec, 0x8169, "r8169", "RealTek RTL8169 Gigabit Ethernet"),
 };
 
-static struct pci_driver r8169_driver =
-	PCI_DRIVER ( r8169_nics, PCI_NO_CLASS );
+PCI_DRIVER ( r8169_driver, r8169_nics, PCI_NO_CLASS );
 
 /**************************************************************************
 PROBE - Look for an adapter, this routine's visible to the outside

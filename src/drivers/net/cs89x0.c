@@ -696,9 +696,8 @@ static isa_probe_addr_t cs89x0_probe_addrs[] = {
 #endif
 };
 
-static struct isa_driver cs89x0_driver =
-	ISA_DRIVER ( cs89x0_probe_addrs, cs89x0_probe_addr,
-		     ISAPNP_VENDOR('C','S','C'), 0x0007 );
+ISA_DRIVER ( cs89x0_driver, cs89x0_probe_addrs, cs89x0_probe_addr,
+	     ISAPNP_VENDOR('C','S','C'), 0x0007 );
 
 DRIVER ( "cs89x0", nic_driver, isa_driver, cs89x0_driver,
 	 cs89x0_probe, cs89x0_disable );

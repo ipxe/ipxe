@@ -584,7 +584,7 @@ static int eepro_probe ( struct nic *nic, struct isa_device *isa ) {
 	for (i = 0; i < ETH_ALEN; i++) {
 		nic->node_addr[i] = station_addr.caddr[i];
 	}
-	DBG("%s ioaddr %#hX, addr %!", dev->name, nic->ioaddr, nic->node_addr);
+	DBG("%s ioaddr %#hX, addr %!", isa->name, nic->ioaddr, nic->node_addr);
 	mem_start = RCV_LOWER_LIMIT << 8;
 	if ((mem_end & 0x3F) < 3 || (mem_end & 0x3F) > 29)
 		mem_end = RCV_UPPER_LIMIT << 8;
@@ -606,8 +606,7 @@ static isa_probe_addr_t eepro_probe_addrs[] = {
 	0x300, 0x210, 0x240, 0x280, 0x2C0, 0x200, 0x320, 0x340, 0x360,
 };
 
-static struct isa_driver eepro_driver =
-	ISA_DRIVER ( eepro_probe_addrs, eepro_probe1,
+ISA_DRIVER ( eepro_driver, eepro_probe_addrs, eepro_probe1,
 		     GENERIC_ISAPNP_VENDOR, 0x828a );
 
 DRIVER ( "eepro", nic_driver, isa_driver, eepro_driver,

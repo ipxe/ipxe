@@ -31,8 +31,7 @@ static struct eisa_id el3_eisa_adapters[] = {
 	{ "3Com 3c509 EtherLink III (EISA)", MFG_ID, PROD_ID },
 };
 
-static struct eisa_driver el3_eisa_driver =
-	EISA_DRIVER ( el3_eisa_adapters );
+EISA_DRIVER ( el3_eisa_driver, el3_eisa_adapters );
 
 DRIVER ( "3c509 (EISA)", nic_driver, eisa_driver, el3_eisa_driver,
 	 el3_eisa_probe, el3_eisa_disable );

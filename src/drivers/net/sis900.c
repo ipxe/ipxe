@@ -120,8 +120,7 @@ static struct pci_id   pci_isa_bridge_list[] = {
 		"SIS 85C503/5513 PCI to ISA bridge"},
 };
 
-static struct pci_driver sis_bridge_pci_driver =
-	PCI_DRIVER ( pci_isa_bridge_list, PCI_NO_CLASS );
+PCI_DRIVER ( sis_bridge_pci_driver, pci_isa_bridge_list, PCI_NO_CLASS );
 
 static struct device_driver sis_bridge_driver = {
     .name = "SIS ISA bridge",
@@ -1266,8 +1265,7 @@ PCI_ROM(0x1039, 0x0900, "sis900",  "SIS900"),
 PCI_ROM(0x1039, 0x7016, "sis7016", "SIS7016"),
 };
 
-static struct pci_driver sis900_driver =
-	PCI_DRIVER ( sis900_nics, PCI_NO_CLASS );
+PCI_DRIVER ( sis900_driver, sis900_nics, PCI_NO_CLASS );
 
 DRIVER ( "SIS900", nic_driver, pci_driver, sis900_driver,
 	 sis900_probe, sis900_disable );

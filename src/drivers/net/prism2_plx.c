@@ -109,8 +109,7 @@ PCI_ROM(0xec80, 0xec00, "f5d6000",       "Belkin F5D6000"),
 PCI_ROM(0x126c, 0x8030, "emobility",     "Nortel emobility"),
 };
 
-static struct pci_driver prism2_plx_driver =
-	PCI_DRIVER ( prism2_plx_nics, PCI_NO_CLASS );
+PCI_DRIVER ( prism2_plx_driver, prism2_plx_nics, PCI_NO_CLASS );
 
 
 DRIVER ( "Prism2/PLX", nic_driver, pci_driver, prism2_plx_driver,

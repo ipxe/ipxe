@@ -992,8 +992,7 @@ PCI_ROM(0x10b7, 0x1201, "3c982a",        "3Com982A"),
 PCI_ROM(0x10b7, 0x1202, "3c982b",        "3Com982B"),
 };
 
-static struct pci_driver a3c90x_driver =
-	PCI_DRIVER ( a3c90x_nics, PCI_NO_CLASS );
+PCI_DRIVER ( a3c90x_driver, a3c90x_nics, PCI_NO_CLASS );
 
 DRIVER ( "3C90X", nic_driver, pci_driver, a3c90x_driver,
 	 a3c90x_probe, a3c90x_disable );

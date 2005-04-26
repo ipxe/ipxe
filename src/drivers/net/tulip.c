@@ -2075,8 +2075,7 @@ PCI_ROM(0x1737, 0xab08, "tulip-1737-ab08","Tulip 0x1737 0xab08"),
 PCI_ROM(0x1737, 0xab09, "tulip-ab09",  "Tulip 0x1737 0xab09"),
 };
 
-static struct pci_driver tulip_driver =
-	PCI_DRIVER ( tulip_nics, PCI_NO_CLASS );
+PCI_DRIVER ( tulip_driver, tulip_nics, PCI_NO_CLASS );
 
 DRIVER ( "Tulip", nic_driver, pci_driver, tulip_driver,
 	 tulip_probe, tulip_disable );

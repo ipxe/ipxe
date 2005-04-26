@@ -3384,8 +3384,7 @@ PCI_ROM(0x173b, 0x03ea, "tg3-ac9100",      "Altima AC9100"),
 PCI_ROM(0x173b, 0x03eb, "tg3-ac1003",      "Altima AC1003"),
 };
 
-static struct pci_driver tg3_driver =
-	PCI_DRIVER ( tg3_nics, PCI_NO_CLASS );
+PCI_DRIVER ( tg3_driver, tg3_nics, PCI_NO_CLASS );
 
 DRIVER ( "TG3", nic_driver, pci_driver, tg3_driver,
 	 tg3_probe, tg3_disable );

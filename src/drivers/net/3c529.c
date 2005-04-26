@@ -45,8 +45,7 @@ static struct mca_id el3_mca_adapters[] = {
         { "3Com 3c529 EtherLink III (TP)", 0x62f7 },
 };
 
-static struct mca_driver t529_driver
-	= MCA_DRIVER ( el3_mca_adapters );
+MCA_DRIVER ( t529_driver, el3_mca_adapters );
 
 DRIVER ( "3c529", nic_driver, mca_driver, t529_driver,
 	 t529_probe, t529_disable );

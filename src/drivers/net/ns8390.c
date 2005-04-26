@@ -1006,8 +1006,7 @@ PCI_ROM(0x10bd, 0x0e34, "surecom-ne34", "Surecom NE34"),
 PCI_ROM(0x1106, 0x0926, "via86c926",    "Via 86c926"),
 };
 
-static struct pci_driver nepci_driver =
-	PCI_DRIVER ( "NE2000/PCI", nepci_nics, PCI_NO_CLASS );
+PCI_DRIVER ( nepci_driver, "NE2000/PCI", nepci_nics, PCI_NO_CLASS );
 
 BOOT_DRIVER ( "NE2000/PCI", nepci_probe );
 

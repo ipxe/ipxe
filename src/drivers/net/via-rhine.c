@@ -1419,8 +1419,7 @@ PCI_ROM(0x1106, 0x3053, "via6105m",        "VIA 6105M"),
 PCI_ROM(0x1106, 0x6100, "via-rhine-old",   "VIA 86C100A"),	/* Rhine-II */
 };
 
-static struct pci_driver rhine_driver =
-	PCI_DRIVER ( rhine_nics, PCI_NO_CLASS );
+PCI_DRIVER ( rhine_driver, rhine_nics, PCI_NO_CLASS );
 
 DRIVER ( "VIA 86C100", nic_driver, pci_driver, rhine_driver,
 	 rhine_probe, rhine_disable );

@@ -516,8 +516,7 @@ PCI_ROM(0x10b8, 0x0005, "epic100",    "SMC EtherPowerII"),		/* SMC 83c170 EPIC/1
 PCI_ROM(0x10b8, 0x0006, "smc-83c175", "SMC EPIC/C 83c175"),
 };
 
-static struct pci_driver epic100_driver =
-	PCI_DRIVER ( epic100_nics, PCI_NO_CLASS );
+PCI_DRIVER ( epic100_driver, epic100_nics, PCI_NO_CLASS );
 
 DRIVER ( "EPIC100", nic_driver, pci_driver, epic100_driver,
 	 epic100_probe, epic100_disable );

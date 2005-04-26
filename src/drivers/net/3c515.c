@@ -762,8 +762,7 @@ static struct isapnp_id t515_adapters[] = {
 	{ "3c515 (ISAPnP)", ISAPNP_VENDOR('T','C','M'), 0x5051 },
 };
 
-static struct isapnp_driver t515_driver =
-	ISAPNP_DRIVER ( t515_adapters );
+ISAPNP_DRIVER ( t515_driver, t515_adapters );
 
 DRIVER ( "3c515", nic_driver, isapnp_driver, t515_driver,
 	 t515_probe, t515_disable );

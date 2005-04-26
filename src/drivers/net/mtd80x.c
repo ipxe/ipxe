@@ -668,8 +668,7 @@ static struct pci_id mtd80x_nics[] = {
         PCI_ROM(0x1516, 0x0891, "MTD891", "Myson MTD891"),
 };
 
-static struct pci_driver mtd80x_driver =
-	PCI_DRIVER ( mtd80x_nics, PCI_NO_CLASS );
+PCI_DRIVER ( mtd80x_driver, mtd80x_nics, PCI_NO_CLASS );
 
 /**************************************************************************
 PROBE - Look for an adapter, this routine's visible to the outside

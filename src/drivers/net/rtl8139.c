@@ -541,8 +541,7 @@ PCI_ROM(0x14ea, 0xab07, "fnw3800tx",     "Planex FNW-3800-TX"),
 PCI_ROM(0xffff, 0x8139, "clone-rtl8139", "Cloned 8139"),
 };
 
-static struct pci_driver rtl8139_driver =
-	PCI_DRIVER ( rtl8139_nics, PCI_NO_CLASS );
+PCI_DRIVER ( rtl8139_driver, rtl8139_nics, PCI_NO_CLASS );
 
 DRIVER ( "RTL8139", nic_driver, pci_driver, rtl8139_driver,
 	 rtl8139_probe, rtl_disable );

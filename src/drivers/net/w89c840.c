@@ -618,8 +618,7 @@ PCI_ROM(0x1050, 0x0840, "winbond840",     "Winbond W89C840F"),
 PCI_ROM(0x11f6, 0x2011, "compexrl100atx", "Compex RL100ATX"),
 };
 
-static struct pci_driver w89c840_driver =
-	PCI_DRIVER ( w89c840_nics, PCI_NO_CLASS );
+PCI_DRIVER ( w89c840_driver, w89c840_nics, PCI_NO_CLASS );
 
 /**************************************************************************
 w89c840_probe - Look for an adapter, this routine's visible to the outside
