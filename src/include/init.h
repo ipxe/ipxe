@@ -1,6 +1,8 @@
 #ifndef INIT_H
 #define INIT_H
 
+#include "tables.h"
+
 /*
  * In order to avoid having objects dragged in just because main()
  * calls their initialisation function, we allow each object to
@@ -33,20 +35,20 @@ struct init_fn {
 };
 
 /* Use double digits to avoid problems with "10" < "9" on alphabetic sort */
-#define INIT_LIBRM	"00"
-#define INIT_CONSOLE	"01"
-#define	INIT_CPU	"02"
-#define	INIT_TIMERS	"03"
-#define INIT_PCIBIOS	"04"
-#define	INIT_MEMSIZES	"05"
-#define INIT_RELOCATE	"06"
-#define	INIT_PCMCIA	"07"
-#define	INIT_HEAP	"08"
+#define	INIT_LIBRM	01
+#define	INIT_CONSOLE	02
+#define	INIT_CPU	03
+#define	INIT_TIMERS	04
+#define	INIT_PCIBIOS	05
+#define	INIT_MEMSIZES	06
+#define	INIT_RELOCATE	07
+#define	INIT_PCMCIA	08
+#define	INIT_HEAP	09
 
 /* Macro for creating an initialisation function table entry */
 #define INIT_FN( init_order, init_func, reset_func, exit_func )		      \
 	static struct init_fn init_functions				      \
-	    __attribute__ ((used,__section__(".init_fns." init_order))) = {   \
+	    __attribute__ (( used, __table_section(init_fn,init_order) )) = { \
 		.init = init_func,					      \
 		.reset = reset_func,					      \
 		.exit = exit_func,					      \
