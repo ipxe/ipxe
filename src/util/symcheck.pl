@@ -21,11 +21,7 @@ while ( ( my $symbol, my $info ) = each %$symbols ) {
 }
 $symbols->{$_}->{provides}->{LINKER} = 1
     foreach qw ( _prefix _eprefix _decompress _edecompress _text
-		 _etext _data _edata _bss _ebss _end device_drivers
-		 device_drivers_end bus_drivers bus_drivers_end
-		 type_drivers type_drivers_end console_drivers
-		 console_drivers_end post_reloc_fns post_reloc_fns_end
-		 init_fns init_fns_end );
+		 _etext _data _edata _bss _ebss _end );
 
 # Check for multiply defined, never-defined and unused symbols
 #
