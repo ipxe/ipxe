@@ -3,6 +3,7 @@
 
 #include "stdint.h"
 #include "vsprintf.h"
+#include "tables.h"
 
 /*
  * Consoles that cannot be used before their INIT_FN() has completed
@@ -18,7 +19,7 @@ struct console_driver {
 };
 
 #define __console_driver \
-	__attribute__ (( used, __section__ ( ".drivers.console" ) ))
+	__attribute__ (( used, __table_section ( console, 01 ) ))
 
 /* Function prototypes */
 

@@ -18,8 +18,8 @@
  */
 #include "bios.h"
 
-extern struct console_driver console_drivers[];
-extern struct console_driver console_drivers_end[];
+static struct console_driver console_drivers[0] __table_start ( console );
+static struct console_driver console_drivers_end[0] __table_end ( console );
 
 /*****************************************************************************
  * putchar : write a single character to each console

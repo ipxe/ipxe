@@ -141,7 +141,10 @@ SECTIONS {
 	*(.data)
 	*(.data.*)
 
-	/* Various tables */
+	/* Various tables.  See include/tables.h for an explanation. */
+	*(SORT(.tbl.*))	
+
+
 	device_drivers = .;
 	*(.drivers.device)
 	device_drivers_end = .;
@@ -154,15 +157,9 @@ SECTIONS {
 	type_drivers = .;
 	*(.drivers.type)
 	type_drivers_end = .;
-	console_drivers = .;
-	*(.drivers.console)
-	console_drivers_end = .;
 	post_reloc_fns = .;
 	*(SORT(.post_reloc_fns.*))
 	post_reloc_fns_end = .;
-	init_fns = .;
-	*(SORT(.init_fns.*))
-	init_fns_end = .;
 
 	_progbits_end = .;
     }
