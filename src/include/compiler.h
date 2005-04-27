@@ -12,7 +12,8 @@
 #define _H1( x, y ) x ## y
 #undef _H2
 #define _H2( x, y ) _H1 ( x, y )
-#define OBJECT_SYMBOL _H2 ( obj_, OBJECT )
+#define PREFIX_OBJECT(prefix) _H2 ( prefix, OBJECT )
+#define OBJECT_SYMBOL PREFIX_OBJECT(obj_)
 #undef _STR
 #define _STR(s) #s
 #undef _XSTR
@@ -43,7 +44,7 @@ __asm__ ( ".equ\t" OBJECT_SYMBOL_STR ", 0" );
  * DEBUG_LEVEL will be inserted into the object file.
  *
  */
-#define DEBUG_SYMBOL _H2 ( debug_, OBJECT )
+#define DEBUG_SYMBOL PREFIX_OBJECT(debug_)
 
 #if DEBUG_SYMBOL
 #include "console.h"
