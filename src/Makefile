@@ -72,10 +72,12 @@ AR		?= $(CROSS_COMPILE)ar
 RANLIB		?= $(CROSS_COMPILE)ranlib
 OBJCOPY		?= $(CROSS_COMPILE)objcopy
 NM		?= $(CROSS_COMPILE)nm
+OBJDUMP		?= $(CROSS_COMPILE)objdump
 PARSEROM	?= $(PERL) ./util/parserom.pl
 MAKEROM		?= $(PERL) ./util/makerom.pl
 MKCONFIG	?= $(PERL) ./util/mkconfig.pl
 SYMCHECK	?= $(PERL) ./util/symcheck.pl
+SORTOBJDUMP	?= $(PERL) ./util/sortobjdump.pl
 NRV2B		?= ./util/nrv2b
 
 # Location to place generated files
