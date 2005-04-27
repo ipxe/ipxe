@@ -3,18 +3,17 @@
 #include "dev.h"
 
 /*
- * Each driver specifies a name, the bus-scanning function
- * (find_bus_boot_device) that it wants to use, a driver information
- * structure (bus_driver) containing e.g. device IDs to be passed to
- * find_bus_boot_device, and a probe function (probe) to be called
- * whenever a suitable device is found.
+ * Each bus driver defines several methods, which are described in
+ * dev.h.  This file provides a centralised, bus-independent mechanism
+ * for locating devices and drivers.
  *
- * The generic device-probing code knows nothing about particular bus
- * types; it simply passes the driver information structure
- * (bus_driver) to the bus-scanning function (find_bus_boot_device),
- * then passes the result of that function (if not NULL) to the probe
- * function (probe).
  */
+
+/* Linker symbols for the various tables */
+static struct bus_driver bus_drivers[0] __table_start ( bus_driver );
+static struct bus_driver bus_drivers_end[0] __table_end ( bus_driver );
+static struct device_driver device_drivers[0] __table_start ( device_driver );
+static struct device_driver device_drivers_end[0] __table_end (device_driver );
 
 /* Current attempted boot device */
 struct dev dev = {

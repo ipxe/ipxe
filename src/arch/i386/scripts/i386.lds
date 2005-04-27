@@ -145,18 +145,9 @@ SECTIONS {
 	*(SORT(.tbl.*))	
 
 
-	device_drivers = .;
-	*(.drivers.device)
-	device_drivers_end = .;
 	isa_drivers = . ;
 	*(.drivers.isa)
 	isa_drivers_end = .;
-	bus_drivers = .;
-	*(.drivers.bus)
-	bus_drivers_end = .;
-	type_drivers = .;
-	*(.drivers.type)
-	type_drivers_end = .;
 
 	_progbits_end = .;
     }

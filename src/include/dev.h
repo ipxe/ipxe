@@ -4,6 +4,7 @@
 #include "stdint.h"
 #include "string.h"
 #include "dhcp.h" /* for dhcp_dev_id */
+#include "tables.h"
 
 /*
  * Forward declarations
@@ -158,7 +159,7 @@ struct bus_driver {
 	const char * ( *name_device ) ( struct bus_dev *bus_dev );
 };
 
-#define __bus_driver __attribute__ (( used, __section__ ( ".drivers.bus" ) ))
+#define __bus_driver __attribute__ (( used, __table_section(bus_driver,01) ))
 
 /*
  * A structure fully describing the bus-independent parts of a
@@ -187,7 +188,7 @@ struct type_driver {
 					     unsigned int len, int eof ) );
 };
 
-#define __type_driver __attribute__ (( used, __section__ ( ".drivers.type" ) ))
+#define __type_driver __attribute__ (( used, __table_section(type_driver,01) ))
 
 /*
  * A driver for a device.
@@ -205,7 +206,7 @@ struct device_driver {
 };
 
 #define __device_driver \
-	__attribute__ (( used, __section__ ( ".drivers.device" ) ))
+	__attribute__ (( used, __table_section(device_driver,01) ))
 
 #define DRIVER(_name,_type_driver,_bus_driver,_bus_info,	 	      \
 	       _probe,_disable) 		 			      \
@@ -282,13 +283,5 @@ static inline int load ( struct dev *dev,
 					     unsigned int len, int eof ) ) {
 	return dev->type_driver->load ( dev->type_dev, process );
 }
-
-/* Linker symbols for the various tables */
-extern struct bus_driver bus_drivers[];
-extern struct bus_driver bus_drivers_end[];
-extern struct type_driver type_drivers[];
-extern struct type_driver type_drivers_end[];
-extern struct device_driver device_drivers[];
-extern struct device_driver device_drivers_end[];
 
 #endif /* DEV_H */
