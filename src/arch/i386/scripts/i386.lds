@@ -140,15 +140,7 @@ SECTIONS {
 	__data = .;
 	*(.data)
 	*(.data.*)
-
-	/* Various tables.  See include/tables.h for an explanation. */
-	*(SORT(.tbl.*))	
-
-
-	isa_drivers = . ;
-	*(.drivers.isa)
-	isa_drivers_end = .;
-
+	*(SORT(.tbl.*))		/* Various tables.  See include/tables.h */
 	_progbits_end = .;
     }
 

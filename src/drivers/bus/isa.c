@@ -44,8 +44,8 @@ static isa_probe_addr_t isa_extra_probe_addrs[] = {
  * Symbols defined by linker
  *
  */
-extern struct isa_driver isa_drivers[];
-extern struct isa_driver isa_drivers_end[];
+static struct isa_driver isa_drivers[0] __table_start ( isa_driver );
+static struct isa_driver isa_drivers_end[0] __table_end ( isa_driver );
 
 /*
  * Increment a bus_loc structure to the next possible ISA location.

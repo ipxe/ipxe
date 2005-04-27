@@ -48,14 +48,13 @@ struct isa_driver {
 	uint16_t mfg_id;
 	uint16_t prod_id;
 };
-#define __isa_driver __attribute__ (( section ( ".drivers.isa" ) ))
 
 /*
  * Define an ISA driver
  *
  */
 #define ISA_DRIVER( _name, _probe_addrs, _probe_addr, _mfg_id, _prod_id )   \
-static struct isa_driver _name __isa_driver = {				    \
+static struct isa_driver _name __table(isa_driver,01 ) = {		    \
 	.probe_addrs = _probe_addrs,					    \
 	.addr_count = sizeof ( _probe_addrs ) / sizeof ( _probe_addrs[0] ), \
 	.probe_addr = _probe_addr,					    \
