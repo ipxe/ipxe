@@ -4,6 +4,8 @@
 /* relocate() is conceptually impossible with KEEP_IT_REAL */
 #ifndef KEEP_IT_REAL
 
+#include "tables.h"
+
 /* An entry in the post-relocation function table */
 struct post_reloc_fn {
 	void ( *post_reloc ) ( void );
