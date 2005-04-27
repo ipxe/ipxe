@@ -39,8 +39,10 @@ extern char _max_align[];
 /* Linker symbols */
 extern char _text[];
 extern char _end[];
-extern struct post_reloc_fn post_reloc_fns[];
-extern struct post_reloc_fn post_reloc_fns_end[];
+
+/* Post-relocation function table */
+static struct post_reloc_fn post_reloc_fns[0] __table_start(post_reloc_fn);
+static struct post_reloc_fn post_reloc_fns_end[0] __table_end(post_reloc_fn);
 
 static void relocate ( void ) {
 	unsigned long addr, eaddr, size;

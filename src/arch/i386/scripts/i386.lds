@@ -157,9 +157,6 @@ SECTIONS {
 	type_drivers = .;
 	*(.drivers.type)
 	type_drivers_end = .;
-	post_reloc_fns = .;
-	*(SORT(.post_reloc_fns.*))
-	post_reloc_fns_end = .;
 
 	_progbits_end = .;
     }
