@@ -66,6 +66,16 @@
 
 /* @BEGIN general.h
  *
+ * Name resolution modules
+ *
+ */
+
+#define	DNS_RESOLVER		/* DNS resolver */
+
+/* @END general.h */
+
+/* @BEGIN general.h
+ *
  * Obscure configuration options
  *
  * You probably don't need to touch these.

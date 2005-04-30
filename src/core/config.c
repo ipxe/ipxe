@@ -169,3 +169,11 @@ REQUIRE_OBJECT ( pc_kbd );
 #ifdef RELOCATE
 REQUIRE_OBJECT ( relocate );
 #endif
+
+/*
+ * Drag in any required resolvers
+ *
+ */
+#ifdef DNS_RESOLVER
+REQUIRE_OBJECT ( dns_resolver );
+#endif
