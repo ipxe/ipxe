@@ -1,5 +1,8 @@
-#ifndef	_TFTP_H
-#define	_TFTP_H
+#ifndef	TFTP_H
+#define	TFTP_H
+
+#include "in.h"
+#include "nic.h"
 
 #define TFTP_PORT	69
 #define	TFTP_DEFAULTSIZE_PACKET	512
@@ -60,8 +63,8 @@ struct tftpreq_t {
 } PACKED;
 
 struct tftpreq_info_t {
+	struct sockaddr_in *server;
 	const char *name;
-	unsigned short port;
 	unsigned short blksize;
 } PACKED;
 
@@ -74,4 +77,17 @@ struct tftpblk_info_t {
 
 #define TFTP_MIN_PACKET	(sizeof(struct iphdr) + sizeof(struct udphdr) + 4)
 
-#endif	/* _TFTP_H */
+/*
+ * Functions in tftp.c.  Needed for pxe_export.c
+ *
+ */
+extern int tftp_block ( struct tftpreq_info_t *request,
+			struct tftpblk_info_t *block );
+extern int tftp ( char *url,
+		  struct sockaddr_in *server,
+		  char *file,
+		  int ( * process ) ( unsigned char *data,
+				      unsigned int blocknum,
+				      unsigned int len, int eof ) );
+
+#endif	/* TFTP_H */
