@@ -147,7 +147,7 @@ static inline const char * dns_skip_name ( const char *name ) {
  */
 static struct dns_rr_info * dns_find_rr ( struct dns_query *query,
 					  struct dns_header *reply ) {
-	int i;
+	int i, cmp;
 	const char *p = ( ( char * ) reply ) + sizeof ( struct dns_header );
 
 	/* Skip over the questions section */
@@ -157,10 +157,10 @@ static struct dns_rr_info * dns_find_rr ( struct dns_query *query,
 
 	/* Process the answers section */
 	for ( i = ntohs ( reply->ancount ) ; i > 0 ; i-- ) {
-		if ( dns_name_cmp ( query->payload, p, reply ) == 0 ) {
-			return ( ( struct dns_rr_info * ) p );
-		}
+		cmp = dns_name_cmp ( query->payload, p, reply );
 		p = dns_skip_name ( p );
+		if ( cmp == 0 )
+			return ( ( struct dns_rr_info * ) p );
 		p += ( sizeof ( struct dns_rr_info ) +
 		       ntohs ( ( ( struct dns_rr_info * ) p )->rdlength ) );
 	}
