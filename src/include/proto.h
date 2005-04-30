@@ -7,6 +7,7 @@ struct protocol {
 	char *name;
 	int ( * load ) ( char *url,
 			 struct sockaddr_in *server,
+			 char *file,
 			 int ( * process ) ( unsigned char *data,
 					     unsigned int blocknum,
 					     unsigned int len,
