@@ -16,6 +16,9 @@ Literature dealing with the network protocols:
 **************************************************************************/
 #include "etherboot.h"
 #include "console.h"
+#include "url.h"
+#include "proto.h"
+#include "resolv.h"
 #include "dev.h"
 #include "nic.h"
 #include "elf.h" /* FOR EM_CURRENT */
@@ -293,6 +296,62 @@ static int nic_configure ( struct type_dev *type_dev ) {
 }
 
 
+/*
+ * Download a file from the specified URL and process it with the
+ * specified function
+ *
+ */
+int download_url ( char *url,
+		   int ( * process ) ( unsigned char *data,
+				       unsigned int blocknum,
+				       unsigned int len, int eof ) ) {
+	struct url_info url_info;
+	struct protocol *proto;
+	struct sockaddr_in server;
+	
+	DBG ( "Loading %s\n", url );
+
+	/* Parse URL */
+	parse_url ( &url_info, url );
+	
+	/* Identify protocol */
+	proto = identify_protocol ( url_info.protocol );
+	if ( ! proto ) {
+		if ( url_info.protocol ) {
+			printf ( "Unknown protocol %s\n", url_info.protocol );
+		} else {
+			printf ( "No default protocols\n" );
+		}
+		goto error_out;
+	}
+
+	/* Resolve hostname */
+	server.sin_addr = arptable[ARP_SERVER].ipaddr;
+	if ( url_info.host ) {
+		if ( ! resolv ( &server.sin_addr, url_info.host ) ) {
+			printf ( "Cannot resolve host %s\n", url_info.host );
+			goto error_out;
+		}
+	}
+
+	/* Resolve port number */
+	server.sin_port = url_info.port ?
+		strtoul ( url_info.port, NULL, 10 ) : 0;
+
+	/* Restore URL */
+	unparse_url ( &url_info );
+
+	/* Call protocol's method to download the file */
+	return proto->load ( url, &server, process );
+
+ error_out:
+	unparse_url ( &url_info );
+	return 0;
+}
+
+
+
+
 /**************************************************************************
 LOAD - Try to get booted
 **************************************************************************/
@@ -300,7 +359,7 @@ static int nic_load ( struct type_dev *type_dev,
 		      int ( * process ) ( unsigned char *data,
 					  unsigned int blocknum,
 					  unsigned int size, int eof ) ) {
-	const char	*kernel;
+	char	*kernel;
 
 	/* Now use TFTP to load file */
 #ifdef	DOWNLOAD_PROTO_NFS
@@ -314,7 +373,7 @@ static int nic_load ( struct type_dev *type_dev,
 #endif
 		: KERNEL_BUF;
 	if ( kernel ) {
-		loadkernel(kernel,process); /* We don't return except on error */
+		download_url(kernel,process); /* We don't return except on error */
 		printf("Unable to load file.\n");
 	} else {	
 		printf("No filename\n");
@@ -1757,3 +1816,4 @@ long rfc1112_sleep_interval(long base, int exp)
 	return tmo;
 }
 #endif /* MULTICAST_LEVEL_2 */
+
