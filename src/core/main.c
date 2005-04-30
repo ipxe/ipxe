@@ -377,89 +377,17 @@ static int main_loop(int state)
 /**************************************************************************
 LOADKERNEL - Try to load kernel image
 **************************************************************************/
-struct proto {
-	char *name;
-	int (*load)(const char *name,
-		int (*fnc)(unsigned char *, unsigned int, unsigned int, int));
-};
+#if 0
+/* To be split out into individual files */
 static const struct proto protos[] = {
-#ifdef DOWNLOAD_PROTO_TFTM
 	{ "x-tftm", url_tftm },
-#endif
-#ifdef DOWNLOAD_PROTO_SLAM
 	{ "x-slam", url_slam },
-#endif
-#ifdef DOWNLOAD_PROTO_NFS
 	{ "nfs", nfs },
-#endif
-#ifdef DOWNLOAD_PROTO_DISK
 	{ "file", url_file },
-#endif
-#ifdef DOWNLOAD_PROTO_TFTP
 	{ "tftp", tftp },
-#endif
-#ifdef DOWNLOAD_PROTO_HTTP
         { "http", http },
-#endif
 };
-
-int loadkernel ( const char *fname,
-		 int ( * load_block ) ( unsigned char *data,
-					unsigned int blocknum,
-					unsigned int len, int eof ) ) {
-	static const struct proto * const last_proto = 
-		&protos[sizeof(protos)/sizeof(protos[0])];
-	const struct proto *proto;
-	in_addr ip;
-	int len;
-	const char *name;
-#ifdef	DNS_RESOLVER
-	const char *resolvt;
 #endif
-	ip.s_addr = arptable[ARP_SERVER].ipaddr.s_addr;
-	name = fname;
-	url_port = -1;
-	len = 0;
-	while(fname[len] && fname[len] != ':') {
-		len++;
-	}
-	for(proto = &protos[0]; proto < last_proto; proto++) {
-		if (memcmp(name, proto->name, len) == 0) {
-			break;
-		}
-	}
-	if ((proto < last_proto) && (memcmp(fname + len, "://", 3) == 0)) {
-		name += len + 3;
-		if (name[0] != '/') {
-#ifdef DNS_RESOLVER
-			resolvt = dns_resolver ( name );
-			if ( NULL != resolvt ) {
-				//printf ("Resolved host name [%s] to [%s]\n",
-				//	name, resolvt );
-				inet_aton(resolvt, &ip);
-				while ( ( '/' != name[0] ) && ( 0 != name[0]))
-					++name;
-			} else
-#endif	/* DNS_RESOLVER */
-			name += inet_aton(name, &ip);
-			if (name[0] == ':') {
-				name++;
-				url_port = strtoul(name, &name, 10);
-			}
-		}
-		if (name[0] == '/') {
-			arptable[ARP_SERVER].ipaddr.s_addr = ip.s_addr;
-			printf( "Loading %s ", fname );
-			return proto->load(name + 1, load_block);
-		}
-	}
-	printf("Loading %@:%s ", arptable[ARP_SERVER].ipaddr, fname);
-#ifdef	DEFAULT_PROTO_NFS
-	return nfs(fname, load_block);
-#else
-	return tftp(fname, load_block);
-#endif
-}
 
 
 /**************************************************************************
