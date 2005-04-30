@@ -129,6 +129,7 @@ DEBUG_TARGETS	+= dbg2.o dbg.o c s
 # SRCDIRS lists all directories containing source files.
 #
 SRCDIRS		+= core
+SRCDIRS		+= proto
 SRCDIRS		+= drivers/bus
 SRCDIRS		+= drivers/net
 #SRCDIRS		+= drivers/disk 
