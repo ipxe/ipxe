@@ -94,18 +94,14 @@ static const unsigned char dhcpdiscover[] = {
 #else
 #define DHCPDISCOVER_PARAMS_PXE 0
 #endif /* PXE_DHCP_STRICT */
-#ifdef  DNS_RESOLVER
 #define DHCPDISCOVER_PARAMS_DNS  1
-#else
-#define DHCPDISCOVER_PARAMS_DNS  0
-#endif /* DNS_RESOLVER */
 	( DHCPDISCOVER_PARAMS_BASE +
 	  DHCPDISCOVER_PARAMS_PXE+
 	  DHCPDISCOVER_PARAMS_DNS ),
 	RFC1533_NETMASK,
 	RFC1533_GATEWAY,
 	RFC1533_HOSTNAME,
-	RFC1533_VENDOR
+	RFC1533_VENDOR,
 #ifdef PXE_DHCP_STRICT
 	,RFC2132_VENDOR_CLASS_ID,
 	RFC1533_VENDOR_PXE_OPT128,
@@ -115,11 +111,9 @@ static const unsigned char dhcpdiscover[] = {
 	RFC1533_VENDOR_PXE_OPT132,
 	RFC1533_VENDOR_PXE_OPT133,
 	RFC1533_VENDOR_PXE_OPT134,
-	RFC1533_VENDOR_PXE_OPT135
+	RFC1533_VENDOR_PXE_OPT135,
 #endif /* PXE_DHCP_STRICT */
-#ifdef	DNS_RESOLVER
-	,RFC1533_DNS
-#endif
+	RFC1533_DNS
 };
 static const unsigned char dhcprequest [] = {
 	RFC2132_MSG_TYPE,1,DHCPREQUEST,
@@ -162,11 +156,7 @@ static const unsigned char dhcprequest [] = {
 #else
 #define DHCPREQUEST_PARAMS_FREEBSD 0
 #endif /* IMAGE_FREEBSD */
-#ifdef  DNS_RESOLVER
 #define DHCPREQUEST_PARAMS_DNS     1
-#else
-#define DHCPREQUEST_PARAMS_DNS     0
-#endif /* DNS_RESOLVER */
 	( DHCPREQUEST_PARAMS_BASE +
 	  DHCPREQUEST_PARAMS_PXE +
 	  DHCPREQUEST_PARAMS_VENDOR_PXE +
@@ -191,10 +181,8 @@ static const unsigned char dhcprequest [] = {
 	RFC1533_VENDOR_HOWTO,
 	RFC1533_VENDOR_KERNEL_ENV,
 #endif
-#ifdef	DNS_RESOLVER
 	/* 1 DNS option */
 	RFC1533_DNS,
-#endif
 #ifdef  PXE_DHCP_STRICT
 	RFC2132_VENDOR_CLASS_ID,
 	RFC1533_VENDOR_PXE_OPT128,
@@ -282,10 +270,8 @@ static int nic_configure ( struct type_dev *type_dev ) {
 			BOOTP_DATA_ADDR->bootp_reply.bp_giaddr.s_addr);
 	if (arptable[ARP_GATEWAY].ipaddr.s_addr)
 		printf(", Gateway %@", arptable[ARP_GATEWAY].ipaddr.s_addr);
-#ifdef	DNS_RESOLVER
 	if (arptable[ARP_NAMESERVER].ipaddr.s_addr)
 		printf(", Nameserver %@", arptable[ARP_NAMESERVER].ipaddr.s_addr);
-#endif
 	putchar('\n');
 
 #ifdef	MDEBUG
@@ -1599,13 +1585,11 @@ int decode_rfc1533(unsigned char *p, unsigned int block, unsigned int len, int e
 			}
 		}
 #endif
-#ifdef	DNS_RESOLVER
 		else if (NON_ENCAP_OPT c == RFC1533_DNS) {
 			// TODO: Copy the DNS IP somewhere reasonable
 			if (TAG_LEN(p) >= sizeof(in_addr))
 				memcpy(&arptable[ARP_NAMESERVER].ipaddr, p+2, sizeof(in_addr));
 		}
-#endif
 		else {
 #if 0
 			unsigned char *q;
