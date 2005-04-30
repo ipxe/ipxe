@@ -107,9 +107,7 @@
 
 enum {
 	ARP_CLIENT, ARP_SERVER, ARP_GATEWAY,
-#ifdef DNS_RESOLVER
 	ARP_NAMESERVER,
-#endif
 #ifdef PXE_EXPORT
 	ARP_PROXYDHCP,
 #endif
@@ -144,9 +142,10 @@ enum {
 #include	"igmp.h"
 #include	"nfs.h"
 #include	"console.h"
+#include	"stdlib.h"
 
 struct arptable_t {
-	in_addr ipaddr;
+	struct in_addr ipaddr;
 	uint8_t node[6];
 } PACKED;
 
@@ -182,7 +181,6 @@ External prototypes
 /* main.c */
 struct Elf_Bhdr;
 extern int main();
-extern int loadkernel P((const char *fname, int (*)(unsigned char *, unsigned int, unsigned int, int)));
 extern char as_main_program;
 /* nic.c */
 extern void rx_qdrain P((void));
@@ -260,8 +258,6 @@ extern void interruptible_sleep P((int secs));
 extern void poll_interruptions P((void));
 extern int strcasecmp P((const char *a, const char *b));
 extern char *substr P((const char *a, const char *b));
-extern unsigned long strtoul P((const char *p, const char **, int base));
-extern int inet_aton P((const char *p, in_addr *i));
 
 extern unsigned long get_boot_order(unsigned long order, unsigned *index);
 extern void disk_init P((void));
