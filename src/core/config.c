@@ -175,5 +175,5 @@ REQUIRE_OBJECT ( relocate );
  *
  */
 #ifdef DNS_RESOLVER
-REQUIRE_OBJECT ( dns_resolver );
+REQUIRE_OBJECT ( dns );
 #endif
