@@ -5,6 +5,7 @@
 #include "tables.h"
 
 struct resolver {
+	const char *name;
 	int ( * resolv ) ( struct in_addr *address, const char *name );
 };
 
