@@ -5,7 +5,8 @@
 
 struct protocol {
 	char *name;
-	int ( * load ) ( const char *name,
+	int ( * load ) ( char *url,
+			 struct sockaddr_in *server,
 			 int ( * process ) ( unsigned char *data,
 					     unsigned int blocknum,
 					     unsigned int len,
