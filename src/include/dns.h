@@ -64,7 +64,7 @@ struct dns_query {
 struct dns_rr_info {
 	uint16_t	type;
 	uint16_t	class;
-	uint16_t	ttl;
+	uint32_t	ttl;
 	uint16_t	rdlength;
 } __attribute__ (( packed ));
 
