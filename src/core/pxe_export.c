@@ -760,30 +760,30 @@ PXENV_EXIT_t pxenv_stop_undi ( t_PXENV_STOP_UNDI *stop_undi ) {
  * Status: working
  */
 PXENV_EXIT_t pxenv_tftp_open ( t_PXENV_TFTP_OPEN *tftp_open ) {
+	struct sockaddr_in tftp_server;
 	struct tftpreq_info_t request;
 	struct tftpblk_info_t block;
 
 	DBG ( "PXENV_TFTP_OPEN" );
 	ENSURE_READY ( tftp_open );
 
-	/* Change server address if different */
-	if ( tftp_open->ServerIPAddress && 
-	     tftp_open->ServerIPAddress!=arptable[ARP_SERVER].ipaddr.s_addr ) {
-		memset(arptable[ARP_SERVER].node, 0, ETH_ALEN ); /* kill arp */
-		arptable[ARP_SERVER].ipaddr.s_addr=tftp_open->ServerIPAddress;
-	}
-	/* Ignore gateway address; we can route properly */
-	/* Fill in request structure */
-	request.name = tftp_open->FileName;
-	request.port = ntohs(tftp_open->TFTPPort);
+	/* Set server address and port */
+	tftp_server.sin_addr.s_addr = tftp_open->ServerIPAddress
+		? tftp_open->ServerIPAddress
+		: arptable[ARP_SERVER].ipaddr.s_addr;
+	tftp_server.sin_port = ntohs ( tftp_open->TFTPPort );
 #ifdef WORK_AROUND_BPBATCH_BUG        
 	/* Force use of port 69; BpBatch tries to use port 4 for some         
 	* bizarre reason.         */        
-	request.port = TFTP_PORT;
+	tftp_server.sin_port = TFTP_PORT;
 #endif
+	/* Ignore gateway address; we can route properly */
+	/* Fill in request structure */
+	request.server = &tftp_server;
+	request.name = tftp_open->FileName;
 	request.blksize = tftp_open->PacketSize;
 	DBG ( " %@:%d/%s (%d)", tftp_open->ServerIPAddress,
-	      request.port, request.name, request.blksize );
+	      tftp_open->TFTPPort, request.name, request.blksize );
 	if ( !request.blksize ) request.blksize = TFTP_DEFAULTSIZE_PACKET;
 	/* Make request and get first packet */
 	if ( !tftp_block ( &request, &block ) ) {
@@ -853,7 +853,8 @@ PXENV_EXIT_t pxenv_tftp_read ( t_PXENV_TFTP_READ *tftp_read ) {
  * Status: working
  */
 
-int pxe_tftp_read_block ( unsigned char *data, unsigned int block __unused, unsigned int len, int eof ) {
+int pxe_tftp_read_block ( unsigned char *data, unsigned int block __unused,
+			  unsigned int len, int eof ) {
 	if ( pxe_stack->readfile.buffer ) {
 		if ( pxe_stack->readfile.offset + len >=
 		     pxe_stack->readfile.bufferlen ) return -1;
@@ -865,10 +866,12 @@ int pxe_tftp_read_block ( unsigned char *data, unsigned int block __unused, unsi
 }
 
 PXENV_EXIT_t pxenv_tftp_read_file ( t_PXENV_TFTP_READ_FILE *tftp_read_file ) {
+	struct sockaddr_in tftp_server;
 	int rc;
 
 	DBG ( "PXENV_TFTP_READ_FILE %s to [%x,%x)", tftp_read_file->FileName,
-	      tftp_read_file->Buffer, tftp_read_file->Buffer + tftp_read_file->BufferSize );
+	      tftp_read_file->Buffer,
+	      tftp_read_file->Buffer + tftp_read_file->BufferSize );
 	ENSURE_READY ( tftp_read_file );
 
 	/* inserted by Klaus Wittemeier */
@@ -877,11 +880,18 @@ PXENV_EXIT_t pxenv_tftp_read_file ( t_PXENV_TFTP_READ_FILE *tftp_read_file ) {
 	memcpy(KERNEL_BUF, tftp_read_file->FileName, sizeof(KERNEL_BUF));
 	/* end of insertion */
 
+	/* Set server address and port */
+	tftp_server.sin_addr.s_addr = tftp_read_file->ServerIPAddress
+		? tftp_read_file->ServerIPAddress
+		: arptable[ARP_SERVER].ipaddr.s_addr;
+	tftp_server.sin_port = ntohs ( tftp_read_file->TFTPSrvPort );
+
 	pxe_stack->readfile.buffer = phys_to_virt ( tftp_read_file->Buffer );
 	pxe_stack->readfile.bufferlen = tftp_read_file->BufferSize;
 	pxe_stack->readfile.offset = 0;
 
-	rc = tftp ( tftp_read_file->FileName, pxe_tftp_read_block );
+	rc = tftp ( NULL, &tftp_server, tftp_read_file->FileName,
+		    pxe_tftp_read_block );
 	if ( rc ) {
 		tftp_read_file->Status = PXENV_STATUS_FAILURE;
 		return PXENV_EXIT_FAILURE;
@@ -906,7 +916,7 @@ PXENV_EXIT_t pxenv_tftp_get_fsize ( t_PXENV_TFTP_GET_FSIZE *tftp_get_fsize ) {
 	pxe_stack->readfile.bufferlen = 0;
 	pxe_stack->readfile.offset = 0;
 
-	rc = tftp ( tftp_get_fsize->FileName, pxe_tftp_read_block );
+#warning "Rewrite pxenv_tftp_get_fsize, please"
 	if ( rc ) {
 		tftp_get_fsize->FileSize = 0;
 		tftp_get_fsize->Status = PXENV_STATUS_FAILURE;
