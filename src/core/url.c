@@ -8,7 +8,6 @@
  *
  *   [protocol://[host][:port]/]path/to/file
  *
- * We return true for success, 0 for failure (e.g. unknown protocol).
  * The URL string will be modified by having NULs inserted after
  * "protocol", "host" and "port".  The original URL can be
  * reconstructed by calling unparse_url.
@@ -16,6 +15,8 @@
  */
 void parse_url ( struct url_info *info, char *url ) {
 	char *p;
+
+	DBG ( "URL parsing \"%s\"\n", url );
 
 	/* Zero the structure */
 	memset ( info, 0, sizeof ( *info ) );
@@ -44,11 +45,15 @@ void parse_url ( struct url_info *info, char *url ) {
 			}
 		}
 		info->file = p;
+		DBG ( "URL protocol \"%s\" host \"%s\" port \"%s\" "
+		      "file \"%s\"\n", info->protocol, info->host,
+		      info->port ? info->port : "(NONE)", info->file );
 		return;
 	}
 
 	/* URL has no explicit protocol; is just a filename */
 	info->file = url;
+	DBG ( "URL file \"%s\"\n", info->file );
 }
 
 /*
@@ -63,9 +68,11 @@ char * unparse_url ( struct url_info *info ) {
 			info->port[-1] = ':';
 		}
 		info->host[-3] = ':';
+		DBG ( "URL reconstructed \"%s\"\n", info->protocol );
 		return info->protocol;
 	} else {
 		/* URL had no protocol; was just a filename */
+		DBG ( "URL reconstructed \"%s\"\n", info->file );
 		return info->file;
 	}
 }
