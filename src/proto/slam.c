@@ -532,5 +532,5 @@ static int url_slam ( char *url __unused,
 }
 
 static struct protocol slam_protocol __protocol = {
-	"slam", url_slam
+	"x-slam", url_slam
 };

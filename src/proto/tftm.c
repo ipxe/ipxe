@@ -482,5 +482,5 @@ static int opt_get_multicast(struct tftp_t *tr, unsigned short *len,
 }
 
 static struct protocol tftm_protocol __protocol = {
-	"tftm", url_tftm
+	"x-tftm", url_tftm
 };
