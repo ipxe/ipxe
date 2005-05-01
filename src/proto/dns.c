@@ -145,8 +145,8 @@ static inline const char * dns_skip_name ( const char *name ) {
  * query.  Returns a pointer to the RR, or NULL if no answer found.
  *
  */
-static struct dns_rr_info * dns_find_rr ( struct dns_query *query,
-					  struct dns_header *reply ) {
+struct dns_rr_info * dns_find_rr ( struct dns_query *query,
+				   struct dns_header *reply ) {
 	int i, cmp;
 	const char *p = ( ( char * ) reply ) + sizeof ( struct dns_header );
 
@@ -190,6 +190,23 @@ static inline char * dns_make_name ( char *dest, const char *name ) {
 	*length_byte = dest - length_byte - 1;
 	*(dest++) = '\0';
 	return dest;
+}
+
+/*
+ * Produce a printable version of a DNS name.  Used only for debugging.
+ *
+ */
+static inline char * dns_unmake_name ( char *name ) {
+	char *p;
+	unsigned int len;
+
+	p = name;
+	while ( ( len = *p ) ) {
+		*(p++) = '.';
+		p += len;
+	}
+	
+	return name + 1;
 }
 
 /*
@@ -281,10 +298,15 @@ static int dns_resolv ( struct in_addr *addr, const char *name ) {
 					( struct dns_rr_info_cname * ) rr_info;
 				char *cname = rr_info_cname->cname;
 
-				DBG ( "DNS found CNAME\n" );
 				query_info = ( void * )
 					dns_decompress_name ( query.payload,
 							      cname, reply );
+				DBG ( "DNS found CNAME %s\n",
+				      dns_unmake_name ( query.payload ) );
+				DBG ( "", /* Reconstruct name */
+				      dns_make_name ( query.payload,
+						      query.payload + 1 ) );
+				
 				query_info->qtype = htons ( DNS_TYPE_A );
 				query_info->qclass = htons ( DNS_CLASS_IN );
 

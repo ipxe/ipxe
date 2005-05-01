@@ -2,8 +2,9 @@
 #define DNS_RESOLVER_H
 
 #include "stdint.h"
-#include "nic.h"
 #include "in.h"
+#include "ip.h"
+#include "udp.h"
 
 /*
  * Constants
@@ -76,6 +77,16 @@ struct dns_rr_info_a {
 struct dns_rr_info_cname {
 	struct dns_rr_info;
 	char		cname[0];
-};
+} __attribute__ (( packed ));
+
+/*
+ * Functions in dns.c (used by nmb.c)
+ *
+ */
+extern struct dns_header * dns_query ( struct dns_query *query,
+				       unsigned int query_len, 
+				       struct sockaddr_in *nameserver );
+extern struct dns_rr_info * dns_find_rr ( struct dns_query *query,
+					  struct dns_header *reply );
 
 #endif /* DNS_RESOLVER_H */
