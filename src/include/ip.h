@@ -1,6 +1,10 @@
 #ifndef	_IP_H
 #define	_IP_H
 
+#include "stddef.h"
+#include "stdint.h"
+#include "in.h"
+
 struct iphdr {
 	uint8_t  verhdrlen;
 	uint8_t  service;
@@ -10,8 +14,8 @@ struct iphdr {
 	uint8_t  ttl;
 	uint8_t  protocol;
 	uint16_t chksum;
-	in_addr src;
-	in_addr dest;
+	struct in_addr src;
+	struct in_addr dest;
 } PACKED;
 
 #endif	/* _IP_H */
