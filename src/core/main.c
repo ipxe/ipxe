@@ -395,9 +395,6 @@ CLEANUP - shut down networking and console so that the OS may be called
 **************************************************************************/
 void cleanup(void)
 {
-#ifdef	DOWNLOAD_PROTO_NFS
-	nfs_umountall(ARP_SERVER);
-#endif
 	/* Stop receiving packets */
 	disable ( &dev );
 	initialized = 0;
