@@ -1,22 +1,10 @@
 #ifndef URL_H
 #define URL_H
 
-/*
- * Information parsed from a URL string.  "char *" pointers will point
- * to the start of the relevant portion of the original URL string,
- * which will have been modified by inserting terminating NULs at the
- * appropriate points.  Use unparse_url() if you want to get back the
- * original string.
- *
- */
-struct url_info {
-	char *protocol;
-	char *host;
-	char *port;
-	char *file;
-};
+#include "proto.h"
+#include "in.h"
 
-extern void parse_url ( struct url_info *info, char *url );
-extern char * unparse_url ( struct url_info *info );
+extern int parse_url ( char *url, struct protocol **proto,
+		       struct sockaddr_in *server, char **filename );
 
 #endif /* URL_H */

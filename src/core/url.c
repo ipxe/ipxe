@@ -1,42 +1,51 @@
 #include "string.h"
+#include "resolv.h"
+#include "etherboot.h" /* for arptable */
 #include "url.h"
 
 /*
- * Parse a URL string into its constituent parts.
+ * Parse a URL and deduce a struct protocol *, a struct sockaddr_in
+ * and a char *filename.
  *
  * We accept URLs of the form
  *
  *   [protocol://[host][:port]/]path/to/file
  *
- * The URL string will be modified by having NULs inserted after
- * "protocol", "host" and "port".  The original URL can be
- * reconstructed by calling unparse_url.
+ * Returns 1 for success, 0 for failure (e.g. unknown protocol).
  *
  */
-void parse_url ( struct url_info *info, char *url ) {
+int parse_url ( char *url, struct protocol **proto,
+		struct sockaddr_in *server, char **filename ) {
 	char *p;
+	char *protocol = NULL;
+	char *host = NULL;
+	char *port = NULL;
+	int rc = 0;
 
 	DBG ( "URL parsing \"%s\"\n", url );
 
-	/* Zero the structure */
-	memset ( info, 0, sizeof ( *info ) );
+	/* If no protocol is present, the whole URL will be a filename */
+	*filename = url;
 
-	/* Search for a protocol delimiter */
+	/* Search for a protocol delimiter.  If found, parse out the
+	 * host and port parts of the URL, inserting NULs to terminate
+	 * the different sections.
+	 */
 	for ( p = url ; *p ; p++ ) {
 		if ( memcmp ( p, "://", 3 ) != 0 )
 			continue;
 
 		/* URL has an explicit protocol */
-		info->protocol = url;
 		*p = '\0';
 		p += 3;
-		info->host = p;
+		protocol = url;
+		host = p;
 
-		/* Search for port or file delimiter */
+		/* Search for port and file delimiters */
 		for ( ; *p ; p++ ) {
 			if ( *p == ':' ) {
 				*p = '\0';
-				info->port = p + 1;
+				port = p + 1;
 				continue;
 			}
 			if ( *p == '/' ) {
@@ -44,35 +53,46 @@ void parse_url ( struct url_info *info, char *url ) {
 				break;
 			}
 		}
-		info->file = p;
-		DBG ( "URL protocol \"%s\" host \"%s\" port \"%s\" "
-		      "file \"%s\"\n", info->protocol, info->host,
-		      info->port ? info->port : "(NONE)", info->file );
-		return;
+		*filename = p;
+
+		break;
+	}
+	DBG ( "URL protocol \"%s\" host \"%s\" port \"%s\" file \"%s\"\n",
+	      protocol ? protocol : "(default)", host ? host : "(default)",
+	      port ? port : "(default)", *filename );
+
+	/* Identify the protocol */
+	*proto = identify_protocol ( protocol );
+	if ( ! *proto ) {
+		DBG ( "URL unknown protocol \"%s\"\n",
+		      protocol ? protocol : "(default)" );
+		goto out;
 	}
 
-	/* URL has no explicit protocol; is just a filename */
-	info->file = url;
-	DBG ( "URL file \"%s\"\n", info->file );
-}
-
-/*
- * Restore a parsed URL to its original pristine form.
- *
- */
-char * unparse_url ( struct url_info *info ) {
-	if ( info->protocol ) {
-		/* URL had a protocol: fill in the deleted separators */
-		info->file[-1] = '/';
-		if ( info->port ) {
-			info->port[-1] = ':';
+	/* Identify the host */
+	server->sin_addr = arptable[ARP_SERVER].ipaddr;
+	if ( host && host[0] ) {
+		if ( ! resolv ( &server->sin_addr, host ) ) {
+			DBG ( "URL unknown host \"%s\"\n", host );
+			goto out;
 		}
-		info->host[-3] = ':';
-		DBG ( "URL reconstructed \"%s\"\n", info->protocol );
-		return info->protocol;
-	} else {
-		/* URL had no protocol; was just a filename */
-		DBG ( "URL reconstructed \"%s\"\n", info->file );
-		return info->file;
 	}
+
+	/* Identify the port */
+	server->sin_port = (*proto)->default_port;
+	if ( port && port[0] ) {
+		server->sin_port = strtoul ( port, NULL, 10 );
+	}
+
+	rc = 1;
+
+ out:
+	/* Fill back in the original URL */
+	if ( protocol ) {
+		(*filename)[-1] = '/';
+		if ( port )
+			port[-1] = ':';
+		host[-3] = ':';
+	}
+	return rc;
 }
