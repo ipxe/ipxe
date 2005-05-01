@@ -1,6 +1,7 @@
-#ifdef	DOWNLOAD_PROTO_NFS
-
 #include "etherboot.h"
+#include "init.h"
+#include "proto.h"
+#include "in.h"
 #include "nic.h"
 
 /* NOTE: the NFS code is heavily inspired by the NetBSD netboot code (read:
@@ -24,22 +25,20 @@
 #define OPORT_SWEEP 200		/* make sure we don't leave secure range */
 
 static int oport = START_OPORT;
-static int mount_port = -1;
-static int nfs_port = -1;
-static int fs_mounted = 0;
+static struct sockaddr_in mount_server;
+static struct sockaddr_in nfs_server;
 static unsigned long rpc_id;
 
 /**************************************************************************
 RPC_INIT - set up the ID counter to something fairly random
 **************************************************************************/
-void rpc_init(void)
+static void rpc_init(void)
 {
 	unsigned long t;
 
 	t = currticks();
 	rpc_id = t ^ (t << 8) ^ (t << 16);
 }
-
 
 /**************************************************************************
 RPC_PRINTERROR - Print a low level RPC error message
@@ -50,9 +49,9 @@ static void rpc_printerror(struct rpc_t *rpc)
 	    rpc->u.reply.astatus) {
 		/* rpc_printerror() is called for any RPC related error,
 		 * suppress output if no low level RPC error happened.  */
-		printf("RPC error: (%d,%d,%d)\n", ntohl(rpc->u.reply.rstatus),
-			ntohl(rpc->u.reply.verifier),
-			ntohl(rpc->u.reply.astatus));
+		DBG("RPC error: (%d,%d,%d)\n", ntohl(rpc->u.reply.rstatus),
+		    ntohl(rpc->u.reply.verifier),
+		    ntohl(rpc->u.reply.astatus));
 	}
 }
 
@@ -60,7 +59,8 @@ static void rpc_printerror(struct rpc_t *rpc)
 AWAIT_RPC - Wait for an rpc packet
 **************************************************************************/
 static int await_rpc(int ival, void *ptr,
-	unsigned short ptype, struct iphdr *ip, struct udphdr *udp)
+		     unsigned short ptype __unused, struct iphdr *ip,
+		     struct udphdr *udp, struct tcphdr *tcp __unused)
 {
 	struct rpc_t *rpc;
 	if (!udp) 
@@ -82,7 +82,7 @@ static int await_rpc(int ival, void *ptr,
 /**************************************************************************
 RPC_LOOKUP - Lookup RPC Port numbers
 **************************************************************************/
-static int rpc_lookup(int addr, int prog, int ver, int sport)
+static int rpc_lookup(struct sockaddr_in *addr, int prog, int ver, int sport)
 {
 	struct rpc_t buf, *rpc;
 	unsigned long id;
@@ -103,9 +103,12 @@ static int rpc_lookup(int addr, int prog, int ver, int sport)
 	*p++ = htonl(ver);
 	*p++ = htonl(IP_UDP);
 	*p++ = 0;
+	if ( ! addr->sin_port ) {
+		addr->sin_port = SUNRPC_PORT;
+	}
 	for (retries = 0; retries < MAX_RPC_RETRIES; retries++) {
 		long timeout;
-		udp_transmit(arptable[addr].ipaddr.s_addr, sport, SUNRPC_PORT,
+		udp_transmit(addr->sin_addr.s_addr, sport, addr->sin_port,
 			(char *)p - (char *)&buf, &buf);
 		timeout = rfc2131_sleep_interval(TIMEOUT, retries);
 		if (await_reply(await_rpc, sport, &id, timeout)) {
@@ -113,13 +116,13 @@ static int rpc_lookup(int addr, int prog, int ver, int sport)
 			if (rpc->u.reply.rstatus || rpc->u.reply.verifier ||
 			    rpc->u.reply.astatus) {
 				rpc_printerror(rpc);
-				return -1;
+				return 0;
 			} else {
 				return ntohl(rpc->u.reply.data[0]);
 			}
 		}
 	}
-	return -1;
+	return 0;
 }
 
 /**************************************************************************
@@ -197,7 +200,7 @@ static void nfs_printerror(int err)
 /**************************************************************************
 NFS_MOUNT - Mount an NFS Filesystem
 **************************************************************************/
-static int nfs_mount(int server, int port, char *path, char *fh, int sport)
+static int nfs_mount(struct sockaddr_in *server, char *path, char *fh, int sport)
 {
 	struct rpc_t buf, *rpc;
 	unsigned long id;
@@ -221,7 +224,7 @@ static int nfs_mount(int server, int port, char *path, char *fh, int sport)
 	p += (pathlen + 3) / 4;
 	for (retries = 0; retries < MAX_RPC_RETRIES; retries++) {
 		long timeout;
-		udp_transmit(arptable[server].ipaddr.s_addr, sport, port,
+		udp_transmit(server->sin_addr.s_addr, sport, server->sin_port,
 			(char *)p - (char *)&buf, &buf);
 		timeout = rfc2131_sleep_interval(TIMEOUT, retries);
 		if (await_reply(await_rpc, sport, &id, timeout)) {
@@ -239,7 +242,6 @@ static int nfs_mount(int server, int port, char *path, char *fh, int sport)
 				}
 				return -ntohl(rpc->u.reply.data[0]);
 			} else {
-				fs_mounted = 1;
 				memcpy(fh, rpc->u.reply.data + 1, NFS_FHSIZE);
 				return 0;
 			}
@@ -251,21 +253,13 @@ static int nfs_mount(int server, int port, char *path, char *fh, int sport)
 /**************************************************************************
 NFS_UMOUNTALL - Unmount all our NFS Filesystems on the Server
 **************************************************************************/
-void nfs_umountall(int server)
+static void nfs_umountall(struct sockaddr_in *server)
 {
 	struct rpc_t buf, *rpc;
 	unsigned long id;
 	int retries;
 	long *p;
 
-	if (!arptable[server].ipaddr.s_addr) {
-		/* Haven't sent a single UDP packet to this server */
-		return;
-	}
-	if ((mount_port == -1) || (!fs_mounted)) {
-		/* Nothing mounted, nothing to umount */
-		return;
-	}
 	id = rpc_id++;
 	buf.u.call.id = htonl(id);
 	buf.u.call.type = htonl(MSG_CALL);
@@ -276,7 +270,7 @@ void nfs_umountall(int server)
 	p = rpc_add_credentials((long *)buf.u.call.data);
 	for (retries = 0; retries < MAX_RPC_RETRIES; retries++) {
 		long timeout = rfc2131_sleep_interval(TIMEOUT, retries);
-		udp_transmit(arptable[server].ipaddr.s_addr, oport, mount_port,
+		udp_transmit(server->sin_addr.s_addr, oport, server->sin_port,
 			(char *)p - (char *)&buf, &buf);
 		if (await_reply(await_rpc, oport, &id, timeout)) {
 			rpc = (struct rpc_t *)&nic.packet[ETH_HLEN];
@@ -284,11 +278,24 @@ void nfs_umountall(int server)
 			    rpc->u.reply.astatus) {
 				rpc_printerror(rpc);
 			}
-			fs_mounted = 0;
-			return;
+			break;
 		}
 	}
 }
+
+/**************************************************************************
+NFS_RESET - Reset the NFS subsystem
+**************************************************************************/
+static void nfs_reset ( void ) {
+	/* If we have a mount server, call nfs_umountall() */
+	if ( mount_server.sin_addr.s_addr ) {
+		nfs_umountall ( &mount_server );
+	}
+	/* Zero the data structures */
+	memset ( &mount_server, 0, sizeof ( mount_server ) );
+	memset ( &nfs_server, 0, sizeof ( nfs_server ) );
+}
+
 /***************************************************************************
  * NFS_READLINK (AH 2003-07-14)
  * This procedure is called when read of the first block fails -
@@ -296,8 +303,8 @@ void nfs_umountall(int server)
  * In case of successful readlink(), the dirname is manipulated,
  * so that inside the nfs() function a recursion can be done.
  **************************************************************************/
-static int nfs_readlink(int server, int port, char *fh, char *path, char *nfh,
-	int sport)
+static int nfs_readlink(struct sockaddr_in *server, char *fh __unused,
+			char *path, char *nfh, int sport)
 {
 	struct rpc_t buf, *rpc;
 	unsigned long id;
@@ -317,7 +324,7 @@ static int nfs_readlink(int server, int port, char *fh, char *path, char *nfh,
 	p += (NFS_FHSIZE / 4);
 	for (retries = 0; retries < MAX_RPC_RETRIES; retries++) {
 		long timeout = rfc2131_sleep_interval(TIMEOUT, retries);
-		udp_transmit(arptable[server].ipaddr.s_addr, sport, port,
+		udp_transmit(server->sin_addr.s_addr, sport, server->sin_port,
 			(char *)p - (char *)&buf, &buf);
 		if (await_reply(await_rpc, sport, &id, timeout)) {
 			rpc = (struct rpc_t *)&nic.packet[ETH_HLEN];
@@ -361,7 +368,7 @@ static int nfs_readlink(int server, int port, char *fh, char *path, char *nfh,
 /**************************************************************************
 NFS_LOOKUP - Lookup Pathname
 **************************************************************************/
-static int nfs_lookup(int server, int port, char *fh, char *path, char *nfh,
+static int nfs_lookup(struct sockaddr_in *server, char *fh, char *path, char *nfh,
 	int sport)
 {
 	struct rpc_t buf, *rpc;
@@ -388,7 +395,7 @@ static int nfs_lookup(int server, int port, char *fh, char *path, char *nfh,
 	p += (pathlen + 3) / 4;
 	for (retries = 0; retries < MAX_RPC_RETRIES; retries++) {
 		long timeout = rfc2131_sleep_interval(TIMEOUT, retries);
-		udp_transmit(arptable[server].ipaddr.s_addr, sport, port,
+		udp_transmit(server->sin_addr.s_addr, sport, server->sin_port,
 			(char *)p - (char *)&buf, &buf);
 		if (await_reply(await_rpc, sport, &id, timeout)) {
 			rpc = (struct rpc_t *)&nic.packet[ETH_HLEN];
@@ -416,7 +423,7 @@ static int nfs_lookup(int server, int port, char *fh, char *path, char *nfh,
 /**************************************************************************
 NFS_READ - Read File on NFS Server
 **************************************************************************/
-static int nfs_read(int server, int port, char *fh, int offset, int len,
+static int nfs_read(struct sockaddr_in *server, char *fh, int offset, int len,
 		    int sport)
 {
 	struct rpc_t buf, *rpc;
@@ -450,7 +457,7 @@ static int nfs_read(int server, int port, char *fh, int offset, int len,
 		if (tokens >= 2)
 			timeout = TICKS_PER_SEC/2;
 
-		udp_transmit(arptable[server].ipaddr.s_addr, sport, port,
+		udp_transmit(server->sin_addr.s_addr, sport, server->sin_port,
 			(char *)p - (char *)&buf, &buf);
 		if (await_reply(await_rpc, sport, &id, timeout)) {
 			if (tokens < 256)
@@ -480,8 +487,12 @@ static int nfs_read(int server, int port, char *fh, int offset, int len,
 /**************************************************************************
 NFS - Download extended BOOTP data, or kernel image from NFS server
 **************************************************************************/
-int nfs(const char *name, int (*fnc)(unsigned char *, unsigned int, unsigned int, int))
-{
+static int nfs ( char *url __unused,
+		 struct sockaddr_in *server,
+		 char *name,
+		 int ( * process ) ( unsigned char *data,
+				     unsigned int blocknum,
+				     unsigned int len, int eof ) ) {
 	static int recursion = 0;
 	int sport;
 	int err, namelen = strlen(name);
@@ -492,19 +503,33 @@ int nfs(const char *name, int (*fnc)(unsigned char *, unsigned int, unsigned int
 	int rlen, size, offs, len;
 	struct rpc_t *rpc;
 
-	rx_qdrain();
-
 	sport = oport++;
 	if (oport > START_OPORT+OPORT_SWEEP) {
 		oport = START_OPORT;
 	}
+
+	mount_server.sin_addr = nfs_server.sin_addr = server->sin_addr;
+	mount_server.sin_port = rpc_lookup(server, PROG_MOUNT, 1, sport);
+	if ( ! mount_server.sin_port ) {
+		DBG ( "Cannot get mount port from %!:%d\n",
+		      server->sin_addr.s_addr, server->sin_port );
+		return 0;
+	}
+	nfs_server.sin_port = rpc_lookup(server, PROG_NFS, 2, sport);
+	if ( ! mount_server.sin_port ) {
+		DBG ( "Cannot get nfs port from %!:%d\n",
+		      server->sin_addr.s_addr, server->sin_port );
+		return 0;
+	}
+
 	if ( name != dirname ) {
 		memcpy(dirname, name, namelen + 1);
 	}
 	recursion = 0;
 nfssymlink:
 	if ( recursion > NFS_MAXLINKDEPTH ) {
-		printf ( "\nRecursion: More than %d symlinks followed. Abort.\n", NFS_MAXLINKDEPTH );
+		DBG ( "\nRecursion: More than %d symlinks followed. Abort.\n",
+		      NFS_MAXLINKDEPTH );
 		return	0;
 	}
 	recursion++;
@@ -518,36 +543,24 @@ nfssymlink:
 		fname--;
 	}
 	if (fname < dirname) {
-		printf("can't parse file name %s\n", name);
+		DBG("can't parse file name %s\n", name);
 		return 0;
 	}
 
-	if (mount_port == -1) {
-		mount_port = rpc_lookup(ARP_SERVER, PROG_MOUNT, 1, sport);
-	}
-	if (nfs_port == -1) {
-		nfs_port = rpc_lookup(ARP_SERVER, PROG_NFS, 2, sport);
-	}
-	if (nfs_port == -1 || mount_port == -1) {
-		printf("can't get nfs/mount ports from portmapper\n");
-		return 0;
-	}
-
-
-	err = nfs_mount(ARP_SERVER, mount_port, dirname, dirfh, sport);
+	err = nfs_mount(&mount_server, dirname, dirfh, sport);
 	if (err) {
-		printf("mounting %s: ", dirname);
+		DBG("mounting %s: ", dirname);
 		nfs_printerror(err);
 		/* just to be sure... */
-		nfs_umountall(ARP_SERVER);
+		nfs_reset();
 		return 0;
 	}
 
-	err = nfs_lookup(ARP_SERVER, nfs_port, dirfh, fname, filefh, sport);
+	err = nfs_lookup(&nfs_server, dirfh, fname, filefh, sport);
 	if (err) {
-		printf("looking up %s: ", fname);
+		DBG("looking up %s: ", fname);
 		nfs_printerror(err);
-		nfs_umountall(ARP_SERVER);
+		nfs_reset();
 		return 0;
 	}
 
@@ -556,25 +569,25 @@ nfssymlink:
 	size = -1;	/* will be set properly with the first reply */
 	len = NFS_READ_SIZE;	/* first request is always full size */
 	do {
-		err = nfs_read(ARP_SERVER, nfs_port, filefh, offs, len, sport);
+		err = nfs_read(&nfs_server, filefh, offs, len, sport);
                 if ((err <= -NFSERR_ISDIR)&&(err >= -NFSERR_INVAL) && (offs == 0)) {
 			// An error occured. NFS servers tend to sending
 			// errors 21 / 22 when symlink instead of real file
 			// is requested. So check if it's a symlink!
-			block = nfs_readlink(ARP_SERVER, nfs_port, dirfh, dirname,
+			block = nfs_readlink(&nfs_server, dirfh, dirname,
 			                filefh, sport);
 			if ( 0 == block ) {
 				printf("\nLoading symlink:%s ..",dirname);
 				goto nfssymlink;
 			}
 			nfs_printerror(err);
-			nfs_umountall(ARP_SERVER);
+			nfs_reset();
 			return 0;
 		}
 		if (err) {
 			printf("reading at offset %d: ", offs);
 			nfs_printerror(err);
-			nfs_umountall(ARP_SERVER);
+			nfs_reset();
 			return 0;
 		}
 
@@ -589,10 +602,10 @@ nfssymlink:
 			rlen = len;	/* shouldn't happen...  */
 		}
 
-		err = fnc((char *)&rpc->u.reply.data[19], block, rlen,
+		err = process((char *)&rpc->u.reply.data[19], block, rlen,
 			(offs+rlen == size));
 		if (err <= 0) {
-			nfs_umountall(ARP_SERVER);
+			nfs_reset();
 			return err;
 		}
 
@@ -607,4 +620,8 @@ nfssymlink:
 	return 1;
 }
 
-#endif	/* DOWNLOAD_PROTO_NFS */
+INIT_FN ( INIT_RPC, rpc_init, nfs_reset, nfs_reset );
+
+static struct protocol nfs_protocol __protocol = {
+	"nfs", nfs
+};
