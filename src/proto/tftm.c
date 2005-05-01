@@ -35,24 +35,17 @@
 *    Indent Options: indent -kr -i8
 ***************************************************************************/
 
-#ifdef DOWNLOAD_PROTO_TFTM
 #include "etherboot.h"
+#include "proto.h"
 #include "nic.h"
 
-//#define TFTM_DEBUG
-#ifdef TFTM_DEBUG
-#define debug(x) printf x
-#else
-#define debug(x)
-#endif
 struct tftm_info {
-	in_addr server_ip;
-	in_addr multicast_ip;
-	in_addr local_ip;
-	uint16_t server_port;
-	uint16_t multicast_port;
-	uint16_t local_port;
-	int (*fnc) (unsigned char *, unsigned int, unsigned int, int);
+	struct sockaddr_in server;
+	struct sockaddr_in local;
+	struct sockaddr_in multicast;
+	int ( * process ) ( unsigned char *data,
+			    unsigned int blocknum,
+			    unsigned int len, int eof );
 	int sent_nack;
 	const char *name;	/* Filename */
 };
@@ -72,11 +65,12 @@ struct tftm_state {
 #define TFTM_MIN_PACKET 1024
 
 
-int opt_get_multicast(struct tftp_t *tr, unsigned short *len,
-		      unsigned long *filesize, struct tftm_info *info);
+static int opt_get_multicast(struct tftp_t *tr, unsigned short *len,
+			     unsigned long *filesize, struct tftm_info *info);
 
 static int await_tftm(int ival, void *ptr, unsigned short ptype __unused,
-		      struct iphdr *ip, struct udphdr *udp)
+		      struct iphdr *ip, struct udphdr *udp,
+		      struct tcphdr *tcp __unused)
 {
 	struct tftm_info *info = ptr;
 
@@ -94,8 +88,8 @@ static int await_tftm(int ival, void *ptr, unsigned short ptype __unused,
 	}
 
 	/* Also check for Multicast data being received */
-	if ((ip->dest.s_addr == info->multicast_ip.s_addr) &&
-	    (ntohs(udp->dest) == info->multicast_port) &&
+	if ((ip->dest.s_addr == info->multicast.sin_addr.s_addr) &&
+	    (ntohs(udp->dest) == info->multicast.sin_port) &&
 	    (nic.packetlen >= ETH_HLEN + sizeof(struct iphdr) +
 	     sizeof(struct udphdr))) {
 		return 1;	/* Multicast data received */
@@ -103,7 +97,7 @@ static int await_tftm(int ival, void *ptr, unsigned short ptype __unused,
 	return 0;
 }
 
-int proto_tftm(struct tftm_info *info)
+static int proto_tftm(struct tftm_info *info)
 {
 	int retry = 0;
 	static unsigned short iport = 2000;
@@ -129,8 +123,8 @@ int proto_tftm(struct tftm_info *info)
 		    "%s%coctet%cmulticast%c%cblksize%c%d%ctsize%c",
 		    info->name, 0, 0, 0, 0, 0, TFTM_MIN_PACKET, 0, 0) + 1;
 
-	if (!udp_transmit(arptable[ARP_SERVER].ipaddr.s_addr, ++iport,
-			  TFTM_PORT, len, &tp))
+	if (!udp_transmit(info->server.sin_addr.s_addr, ++iport,
+			  info->server.sin_port, len, &tp))
 		return (0);
 
 	/* loop to listen for packets and to receive the file */
@@ -148,17 +142,14 @@ int proto_tftm(struct tftm_info *info)
 		if (!await_reply(await_tftm, iport, info, timeout)) {
 			if (!block && retry++ < MAX_TFTP_RETRIES) {	/* maybe initial request was lost */
 				if (!udp_transmit
-				    (arptable[ARP_SERVER].ipaddr.s_addr,
-				     ++iport, TFTM_PORT, len, &tp))
+				    (info->server.sin_addr.s_addr, ++iport,
+				     info->server.sin_port, len, &tp))
 					return (0);
 				continue;
 			}
 #ifdef	CONGESTED
 			if (block && ((retry += TFTP_REXMT) < TFTP_TIMEOUT)) {	/* we resend our last ack */
-#ifdef	MDEBUG
-				printf("<REXMT>\n");
-#endif
-				debug(("Timed out receiving file"));
+				DBG("Timed out receiving file");
 				len =
 				    sizeof(tp.ip) + sizeof(tp.udp) +
 				    sizeof(tp.opcode) +
@@ -168,8 +159,9 @@ int proto_tftm(struct tftm_info *info)
 					    TFTM_MIN_PACKET, 0, 0) + 1;
 
 				udp_transmit
-				    (arptable[ARP_SERVER].ipaddr.s_addr,
-				     ++iport, TFTM_PORT, len, &tp);
+					(info->server.sin_addr.s_addr,
+					 ++iport, info->server.sin_port,
+					 len, &tp);
 					continue;
 			}
 #endif
@@ -209,9 +201,9 @@ int proto_tftm(struct tftm_info *info)
 				     */
 				    sprintf((char *) tp.u.err.errmsg,
 					    "RFC2090 error") + 1;
-				udp_transmit(arptable[ARP_SERVER].ipaddr.
-					     s_addr, iport,
-					     ntohs(tr->udp.src), len, &tp);
+				udp_transmit(info->server.sin_addr.s_addr,
+					     iport, ntohs(tr->udp.src),
+					     len, &tp);
 				block = tp.u.ack.block = 0;	/* this ensures, that */
 				/* the packet does not get */
 				/* processed as data! */
@@ -245,8 +237,7 @@ int proto_tftm(struct tftm_info *info)
 					}
 					/* If I'm running over multicast join the multicast group */
 					join_group(IGMP_SERVER,
-						   info->multicast_ip.
-						   s_addr);
+					      info->multicast.sin_addr.s_addr);
 				}
 				state.recvd_oack = 1;
 			}
@@ -353,7 +344,8 @@ int proto_tftm(struct tftm_info *info)
 		if (state.ismaster) {
 			tp.opcode = htons(TFTP_ACK);
 			oport = ntohs(tr->udp.src);
-			udp_transmit(arptable[ARP_SERVER].ipaddr.s_addr, iport, oport, TFTP_MIN_PACKET, &tp);	/* ack */
+			udp_transmit(info->server.sin_addr.s_addr, iport,
+				     oport, TFTP_MIN_PACKET, &tp); /* ack */
 		}
 		if (state.received_packets == state.total_packets) {
 			/* If the client is finished and not the master,
@@ -363,7 +355,9 @@ int proto_tftm(struct tftm_info *info)
 				/* Ack Last packet to end xfer */
 				tp.u.ack.block = htons(state.total_packets);
 				oport = ntohs(tr->udp.src);
-				udp_transmit(arptable[ARP_SERVER].ipaddr.s_addr, iport, oport, TFTP_MIN_PACKET, &tp);	/* ack */
+				udp_transmit(info->server.sin_addr.s_addr,
+					     iport, oport,
+					     TFTP_MIN_PACKET, &tp); /* ack */
 			}
 			/* We are done get out */
 			forget(state.bitmap);
@@ -382,26 +376,29 @@ int proto_tftm(struct tftm_info *info)
 	}
 	/* Leave the multicast group */
 	leave_group(IGMP_SERVER);
-	return info->fnc(state.image, 1, filesize, 1);
+	return info->process(state.image, 1, filesize, 1);
 }
 
-int url_tftm(const char *name,
-	     int (*fnc) (unsigned char *, unsigned int, unsigned int, int))
-{
+static int url_tftm ( char *url __unused,
+		      struct sockaddr_in *server,
+		      char *file,
+		      int ( * process ) ( unsigned char *data,
+					  unsigned int blocknum,
+					  unsigned int len, int eof ) ) {
 
 	int ret;
 	struct tftm_info info;
 
 	/* Set the defaults */
-	info.server_ip.s_addr = arptable[ARP_SERVER].ipaddr.s_addr;
-	info.server_port = TFTM_PORT;
-	info.local_ip.s_addr = arptable[ARP_CLIENT].ipaddr.s_addr;
-	info.local_port = TFTM_PORT;	/* Does not matter. So take tftm port too. */
-	info.multicast_ip.s_addr = info.local_ip.s_addr;
-	info.multicast_port = TFTM_PORT;
-	info.fnc = fnc;
+	info.server = *server;
+	if ( ! info.server.sin_port )
+		info.server.sin_port = TFTM_PORT;
+	info.local.sin_addr.s_addr = arptable[ARP_CLIENT].ipaddr.s_addr;
+	info.local.sin_port = TFTM_PORT; /* Does not matter. */
+	info.multicast = info.local;
+	info.process = process;
 	state.ismaster = 0;
-	info.name = name;
+	info.name = file;
 
 	state.block_size = 0;
 	state.total_bytes = 0;
@@ -411,13 +408,8 @@ int url_tftm(const char *name,
 	state.bitmap = 0;
 	state.recvd_oack = 0;
 
-	if (name[0] != '/') {
-		/* server ip given, so use it */
-		name += inet_aton(info.name, &info.server_ip);
-		/* No way to specify another port for now */
-	}
-	if (name[0] != '/') {
-		printf("Bad tftm-URI: [%s]\n", info.name);
+	if (file[0] != '/') {
+		printf("Bad tftm-URI: [%s]\n", file);
 		return 0;
 	}
 
@@ -429,8 +421,8 @@ int url_tftm(const char *name,
 /******************************
 * Parse the multicast options
 *******************************/
-int opt_get_multicast(struct tftp_t *tr, unsigned short *len,
-		      unsigned long *filesize, struct tftm_info *info)
+static int opt_get_multicast(struct tftp_t *tr, unsigned short *len,
+			     unsigned long *filesize, struct tftm_info *info)
 {
 	const char *p = tr->u.oack.data, *e = 0;
 	int i = 0;
@@ -444,8 +436,8 @@ int opt_get_multicast(struct tftp_t *tr, unsigned short *len,
 			p += 6;
 			if ((*filesize = strtoul(p, &p, 10)) > 0)
 				i |= 4;
-			debug(("\n"));
-			debug(("tsize=%d\n", *filesize));
+			DBG("\n");
+			DBG("tsize=%d\n", *filesize);
 			while (p < e && *p)
 				p++;
 			if (p < e)
@@ -460,7 +452,7 @@ int opt_get_multicast(struct tftp_t *tr, unsigned short *len,
 				     TFTM_MIN_PACKET);
 				return 0;
 			}
-			debug(("blksize=%d\n", state.block_size));
+			DBG("blksize=%d\n", state.block_size);
 			while (p < e && *p)
 				p++;
 			if (p < e)
@@ -468,16 +460,16 @@ int opt_get_multicast(struct tftp_t *tr, unsigned short *len,
 		} else if (!strncmp(p, "multicast", 10)) {
 			i |= 1;
 			p += 10;
-			debug(("multicast options: %s\n", p));
-			p += 1 + inet_aton(p, &info->multicast_ip);
-			debug(("multicast ip = %@\n", info->multicast_ip));
-			info->multicast_port = strtoul(p, &p, 10);
+			DBG("multicast options: %s\n", p);
+			p += 1 + inet_aton(p, &info->multicast.sin_addr);
+			DBG("multicast ip = %@\n", info->multicast_ip);
+			info->multicast.sin_port = strtoul(p, &p, 10);
 			++p;
-			debug(("multicast port = %d\n",
-			       info->multicast_port));
+			DBG("multicast port = %d\n",
+			    info->multicast.sin_port);
 			state.ismaster = (*p == '1' ? 1 : 0);
-			debug(("multicast ismaster = %d\n",
-			       state.ismaster));
+			DBG("multicast ismaster = %d\n",
+			       state.ismaster);
 			while (p < e && *p)
 				p++;
 			if (p < e)
@@ -488,4 +480,7 @@ int opt_get_multicast(struct tftp_t *tr, unsigned short *len,
 		return 0;
 	return i;
 }
-#endif				/* DOWNLOAD_PROTO_TFTP */
+
+static struct protocol tftm_protocol __protocol = {
+	"tftm", url_tftm
+};
