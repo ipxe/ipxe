@@ -1,5 +1,5 @@
-#ifdef DOWNLOAD_PROTO_SLAM
 #include "etherboot.h"
+#include "proto.h"
 #include "nic.h"
 
 #define SLAM_PORT 10000
@@ -101,13 +101,12 @@ static void init_slam_state(void)
 }
 
 struct slam_info {
-	in_addr server_ip;
-	in_addr multicast_ip;
-	in_addr local_ip;
-	uint16_t server_port;
-	uint16_t multicast_port;
-	uint16_t local_port;
-	int (*fnc)(unsigned char *, unsigned int, unsigned int, int);
+	struct sockaddr_in server;
+	struct sockaddr_in local;
+	struct sockaddr_in multicast;
+	int ( * process ) ( unsigned char *data,
+			    unsigned int blocknum,
+			    unsigned int len, int eof );
 	int sent_nack;
 };
 
@@ -115,7 +114,8 @@ struct slam_info {
 #define SLAM_REQUEST 1
 #define SLAM_DATA    2
 static int await_slam(int ival __unused, void *ptr,
-	unsigned short ptype __unused, struct iphdr *ip, struct udphdr *udp)
+		      unsigned short ptype __unused, struct iphdr *ip,
+		      struct udphdr *udp, struct tcphdr *tcp __unused)
 {
 	struct slam_info *info = ptr;
 	if (!udp) {
@@ -126,7 +126,7 @@ static int await_slam(int ival __unused, void *ptr,
 	 */
 	/* Check for a data request packet */
 	if ((ip->dest.s_addr == arptable[ARP_CLIENT].ipaddr.s_addr) &&
-		(ntohs(udp->dest) == info->local_port) && 
+		(ntohs(udp->dest) == info->local.sin_port) && 
 		(nic.packetlen >= 
 			ETH_HLEN + 
 			sizeof(struct iphdr) + 
@@ -135,8 +135,8 @@ static int await_slam(int ival __unused, void *ptr,
 		return SLAM_REQUEST;
 	}
 	/* Check for a multicast data packet */
-	if ((ip->dest.s_addr == info->multicast_ip.s_addr) &&
-		(ntohs(udp->dest) == info->multicast_port) &&
+	if ((ip->dest.s_addr == info->multicast.sin_addr.s_addr) &&
+		(ntohs(udp->dest) == info->multicast.sin_port) &&
 		(nic.packetlen >= 
 			ETH_HLEN + 
 			sizeof(struct iphdr) + 
@@ -203,7 +203,8 @@ static int slam_skip(unsigned char **ptr, unsigned char *end)
 	
 }
 
-static unsigned long slam_decode(unsigned char **ptr, unsigned char *end, int *err)
+static unsigned long slam_decode(unsigned char **ptr, unsigned char *end,
+				 int *err)
 {
 	unsigned long value;
 	unsigned bytes;
@@ -368,8 +369,8 @@ static void transmit_nack(unsigned char *ptr, struct slam_info *info)
 	/* Ensure the packet is null terminated */
 	*ptr++ = 0;
 	nack_len = ptr - (unsigned char *)&nack;
-	build_udp_hdr(info->server_ip.s_addr, 
-		info->local_port, info->server_port, 1, nack_len, &nack);
+	build_udp_hdr(info->server.sin_addr.s_addr, info->local.sin_port,
+		      info->server.sin_port, 1, nack_len, &nack);
 	ip_transmit(nack_len, &nack);
 #if defined(MDEBUG) && 0
 	printf("Sent NACK to %@ bytes: %d have:%ld/%ld\n", 
@@ -443,12 +444,12 @@ static int proto_slam(struct slam_info *info)
 	retry = -1;
 	rx_qdrain();
 	/* Arp for my server */
-	if (arptable[ARP_SERVER].ipaddr.s_addr != info->server_ip.s_addr) {
-		arptable[ARP_SERVER].ipaddr.s_addr = info->server_ip.s_addr;
+	if (arptable[ARP_SERVER].ipaddr.s_addr != info->server.sin_addr.s_addr) {
+		arptable[ARP_SERVER].ipaddr.s_addr = info->server.sin_addr.s_addr;
 		memset(arptable[ARP_SERVER].node, 0, ETH_ALEN);
 	}
 	/* If I'm running over multicast join the multicast group */
-	join_group(IGMP_SERVER, info->multicast_ip.s_addr);
+	join_group(IGMP_SERVER, info->multicast.sin_addr.s_addr);
 	for(;;) {
 		unsigned char *header;
 		unsigned char *data;
@@ -503,39 +504,33 @@ static int proto_slam(struct slam_info *info)
 	leave_group(IGMP_SERVER);
 	/* FIXME don't overwrite myself */
 	/* load file to correct location */
-	return info->fnc(state.image, 1, state.total_bytes, 1);
+	return info->process(state.image, 1, state.total_bytes, 1);
 }
 
-
-int url_slam(const char *name, int (*fnc)(unsigned char *, unsigned int, unsigned int, int))
-{
+static int url_slam ( char *url __unused,
+		      struct sockaddr_in *server,
+		      char *file,
+		      int ( * process ) ( unsigned char *data,
+					  unsigned int blocknum,
+					  unsigned int len, int eof ) ) {
 	struct slam_info info;
 	/* Set the defaults */
-	info.server_ip.s_addr    = arptable[ARP_SERVER].ipaddr.s_addr;
-	info.server_port         = SLAM_PORT;
-	info.multicast_ip.s_addr = htonl(SLAM_MULTICAST_IP);
-	info.multicast_port      = SLAM_MULTICAST_PORT;
-	info.local_ip.s_addr     = arptable[ARP_CLIENT].ipaddr.s_addr;
-	info.local_port          = SLAM_LOCAL_PORT;
-	info.fnc                 = fnc;
+	info.server = *server;
+	if ( ! info.server.sin_port )
+		info.server.sin_port = SLAM_PORT;
+	info.multicast.sin_addr.s_addr = htonl(SLAM_MULTICAST_IP);
+	info.multicast.sin_port      = SLAM_MULTICAST_PORT;
+	info.local.sin_addr.s_addr   = arptable[ARP_CLIENT].ipaddr.s_addr;
+	info.local.sin_port          = SLAM_LOCAL_PORT;
+	info.process                 = process;
 	info.sent_nack = 0;
-	/* Now parse the url */
-	if (url_port != -1) {
-		info.server_port = url_port;
-	}
-	if (name[0]) {
-		/* multicast ip */
-		name += inet_aton(name, &info.multicast_ip);
-		if (name[0] == ':') {
-			name++;
-			info.multicast_port = strtoul(name, &name, 10);
-		}
-	}
-	if (name[0]) {
+	if (file[0]) {
 		printf("\nBad url\n");
 		return 0;
 	}
 	return proto_slam(&info);
 }
 
-#endif /* DOWNLOAD_PROTO_SLAM */
+static struct protocol slam_protocol __protocol = {
+	"slam", url_slam
+};
