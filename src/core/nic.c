@@ -291,48 +291,20 @@ int download_url ( char *url,
 		   int ( * process ) ( unsigned char *data,
 				       unsigned int blocknum,
 				       unsigned int len, int eof ) ) {
-	struct url_info url_info;
 	struct protocol *proto;
 	struct sockaddr_in server;
+	char *filename;
 	
-	DBG ( "Loading %s\n", url );
+	printf ( "Loading %s\n", url );
 
 	/* Parse URL */
-	parse_url ( &url_info, url );
+	if ( ! parse_url ( url, &proto, &server, &filename ) ) {
+		DBG ( "Unusable URL %s\n", url );
+		return 0;
+	}
 	
-	/* Identify protocol */
-	proto = identify_protocol ( url_info.protocol );
-	if ( ! proto ) {
-		if ( url_info.protocol ) {
-			printf ( "Unknown protocol %s\n", url_info.protocol );
-		} else {
-			printf ( "No default protocols\n" );
-		}
-		goto error_out;
-	}
-
-	/* Resolve hostname */
-	server.sin_addr = arptable[ARP_SERVER].ipaddr;
-	if ( url_info.host ) {
-		if ( ! resolv ( &server.sin_addr, url_info.host ) ) {
-			printf ( "Cannot resolve host %s\n", url_info.host );
-			goto error_out;
-		}
-	}
-
-	/* Resolve port number */
-	server.sin_port = url_info.port ?
-		strtoul ( url_info.port, NULL, 10 ) : 0;
-
-	/* Restore URL */
-	unparse_url ( &url_info );
-
 	/* Call protocol's method to download the file */
-	return proto->load ( url, &server, url_info.file, process );
-
- error_out:
-	unparse_url ( &url_info );
-	return 0;
+	return proto->load ( url, &server, filename, process );
 }
 
 
