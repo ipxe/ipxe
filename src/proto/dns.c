@@ -249,6 +249,12 @@ static int dns_resolv ( struct in_addr *addr, const char *name ) {
 	unsigned int recursion = 0;
 	unsigned int id = 1;
 
+	/* Fail immediately if we have no name server */
+	if ( ! arptable[ARP_NAMESERVER].ipaddr.s_addr ) {
+		DBG ( "DNS has no nameserver\n" );
+		return 0;
+	}
+
 	DBG ( "DNS resolving %s\n", name );
 
 	/* Set up the query data */
