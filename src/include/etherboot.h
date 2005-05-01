@@ -207,29 +207,12 @@ extern uint16_t add_ipchksums P((unsigned long offset, uint16_t sum, uint16_t ne
 extern int32_t random P((void));
 extern long rfc2131_sleep_interval P((long base, int exp));
 extern long rfc1112_sleep_interval P((long base, int exp));
-#ifndef DOWNLOAD_PROTO_TFTP
-#define	tftp(fname, load_block) 0
-#endif
 extern void cleanup P((void));
-
-/* proto_slam.c */
-extern int url_slam P((const char *name, int (*fnc)(unsigned char *, unsigned int, unsigned int, int)));
-
-/* proto_tftm.c */
-extern int url_tftm P((const char *name, int (*fnc)(unsigned char *, unsigned int, unsigned int, int)));
 
 /* config.c */
 extern void print_config(void);
 
-/* isa_probe.c and pci_probe.c */
-struct dev;
-extern void isa_enumerate(void);
-extern int isa_probe(struct dev *, const char *);
-extern void pci_enumerate(void);
-extern int pci_probe(struct dev *, const char *);
-
 /* heap.c */
-extern void init_heap(void);
 extern void *allot(size_t size);
 void forget(void *ptr);
 extern void *allot2(size_t size, uint32_t mask);
