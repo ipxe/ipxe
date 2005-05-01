@@ -20,7 +20,6 @@ Literature dealing with the network protocols:
 #include "dev.h"
 #include "nic.h"
 #include "disk.h"
-#include "http.h"
 #include "timer.h"
 #include "cpu.h"
 #include "console.h"
