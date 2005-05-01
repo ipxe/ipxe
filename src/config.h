@@ -71,6 +71,7 @@
  */
 
 #define	DNS_RESOLVER		/* DNS resolver */
+#define NMB_RESOLVER		/* NMB resolver */
 
 /* @END general.h */
 

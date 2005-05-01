@@ -177,3 +177,7 @@ REQUIRE_OBJECT ( relocate );
 #ifdef DNS_RESOLVER
 REQUIRE_OBJECT ( dns );
 #endif
+
+#ifdef NMB_RESOLVER
+REQUIRE_OBJECT ( nmb );
+#endif
