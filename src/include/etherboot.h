@@ -212,11 +212,6 @@ extern long rfc1112_sleep_interval P((long base, int exp));
 #endif
 extern void cleanup P((void));
 
-/* nfs.c */
-extern void rpc_init(void);
-extern int nfs P((const char *name, int (*)(unsigned char *, unsigned int, unsigned int, int)));
-extern void nfs_umountall P((int));
-
 /* proto_slam.c */
 extern int url_slam P((const char *name, int (*fnc)(unsigned char *, unsigned int, unsigned int, int)));
 
