@@ -44,6 +44,7 @@ struct init_fn {
 #define	INIT_RELOCATE	07
 #define	INIT_PCMCIA	08
 #define	INIT_HEAP	09
+#define	INIT_RPC	10
 
 /* Macro for creating an initialisation function table entry */
 #define INIT_FN( init_order, init_func, reset_func, exit_func )		      \
