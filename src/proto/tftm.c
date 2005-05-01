@@ -391,8 +391,6 @@ static int url_tftm ( char *url __unused,
 
 	/* Set the defaults */
 	info.server = *server;
-	if ( ! info.server.sin_port )
-		info.server.sin_port = TFTM_PORT;
 	info.local.sin_addr.s_addr = arptable[ARP_CLIENT].ipaddr.s_addr;
 	info.local.sin_port = TFTM_PORT; /* Does not matter. */
 	info.multicast = info.local;
@@ -482,5 +480,7 @@ static int opt_get_multicast(struct tftp_t *tr, unsigned short *len,
 }
 
 static struct protocol tftm_protocol __protocol = {
-	"x-tftm", url_tftm
+	.name = "x-tftm",
+	.default_port = TFTM_PORT,
+	.load = url_tftm,
 };

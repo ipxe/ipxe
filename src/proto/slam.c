@@ -516,8 +516,6 @@ static int url_slam ( char *url __unused,
 	struct slam_info info;
 	/* Set the defaults */
 	info.server = *server;
-	if ( ! info.server.sin_port )
-		info.server.sin_port = SLAM_PORT;
 	info.multicast.sin_addr.s_addr = htonl(SLAM_MULTICAST_IP);
 	info.multicast.sin_port      = SLAM_MULTICAST_PORT;
 	info.local.sin_addr.s_addr   = arptable[ARP_CLIENT].ipaddr.s_addr;
@@ -532,5 +530,7 @@ static int url_slam ( char *url __unused,
 }
 
 static struct protocol slam_protocol __protocol = {
-	"x-slam", url_slam
+	.name = "x-slam",
+	.default_port = SLAM_PORT,
+	.load = url_slam,
 };

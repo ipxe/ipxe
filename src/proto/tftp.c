@@ -50,8 +50,6 @@ int tftp_block ( struct tftpreq_info_t *request,
 		blksize = TFTP_DEFAULTSIZE_PACKET;
 		lport++; /* Use new local port */
 		server = *(request->server);
-		if ( ! server.sin_port )
-			server.sin_port = TFTP_PORT;
 		if ( !udp_transmit(server.sin_addr.s_addr, lport,
 				   server.sin_port, xmitlen, &xmit) )
 			return (0);
@@ -170,5 +168,7 @@ int tftp ( char *url __unused,
 }
 
 struct protocol tftp_protocol __default_protocol = {
-	"tftp", tftp
+	.name = "tftp",
+	.default_port = TFTP_PORT,
+	.load = tftp,
 };

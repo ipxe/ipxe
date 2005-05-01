@@ -103,9 +103,6 @@ static int rpc_lookup(struct sockaddr_in *addr, int prog, int ver, int sport)
 	*p++ = htonl(ver);
 	*p++ = htonl(IP_UDP);
 	*p++ = 0;
-	if ( ! addr->sin_port ) {
-		addr->sin_port = SUNRPC_PORT;
-	}
 	for (retries = 0; retries < MAX_RPC_RETRIES; retries++) {
 		long timeout;
 		udp_transmit(addr->sin_addr.s_addr, sport, addr->sin_port,
@@ -623,5 +620,7 @@ nfssymlink:
 INIT_FN ( INIT_RPC, rpc_init, nfs_reset, nfs_reset );
 
 static struct protocol nfs_protocol __protocol = {
-	"nfs", nfs
+	.name = "nfs",
+	.default_port = SUNRPC_PORT,
+	.load = nfs,
 };
