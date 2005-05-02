@@ -16,7 +16,6 @@
 #include "pci.h"
 #include "timer.h"
 #include "string.h"
-#include "shared.h"
 #include "tg3.h"
 
 #define SUPPORT_COPPER_PHY  1

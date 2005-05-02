@@ -48,7 +48,6 @@
 #include "pci.h"
 #include "timer.h"
 #include "mii.h"
-#include "shared.h"
 
 #define drv_version "v1.12"
 #define drv_date "2004-03-21"
