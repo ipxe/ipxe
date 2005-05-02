@@ -18,4 +18,6 @@ struct iphdr {
 	struct in_addr dest;
 } PACKED;
 
+extern uint16_t tcpudpchksum(struct iphdr *ip);
+
 #endif	/* _IP_H */
