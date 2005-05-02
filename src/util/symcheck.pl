@@ -3,30 +3,62 @@
 use strict;
 use warnings;
 
-my $symbols = {};
+use constant WARNING_SIZE => 2048;
 
-# Scan output of "nm -o -g bin/blib.a" and build up symbol cross-ref table
+my $symtab = {};
+
+# Scan output of "nm -o -S bin/blib.a" and build up symbol table
 #
 while ( <> ) {
   chomp;
-  ( my $object, my $type, my $symbol ) = /^.*?:(.*?\.o):.*?\s(\S)\s(.*)$/;
-  my $category = $type eq 'U' ? "requires" : "provides";
-  $symbols->{$symbol}->{$category}->{$object} = 1;
+  ( my $object, undef, my $value, undef, my $size, my $type, my $symbol )
+      = /^.*?:(.*?\.o):((\S+)(\s+(\S+))?)?\s+(\S)\s+(\S+)$/;
+  $symtab->{$object}->{$symbol} = {
+    global	=> ( $type eq uc $type ),
+    type	=> ( $type ),
+    value	=> ( $value ? hex ( $value ) : 0 ),
+    size	=> ( $size ? hex ( $size ) : 0 ),
+  };
 }
 
 # Add symbols that we know will be generated or required by the linker
 #
-while ( ( my $symbol, my $info ) = each %$symbols ) {
-  $info->{requires}->{LINKER} = 1 if $symbol =~ /^obj_/;
+foreach my $object ( keys %$symtab ) {
+  my $obj_symbol = "obj_$object";
+  $obj_symbol =~ s/\.o$//;
+  $obj_symbol =~ s/\W/_/g;
+  $symtab->{LINKER}->{$obj_symbol} = {
+    global	=> 1,
+    type	=> 'U',
+    value	=> 0,
+    size	=> 0,
+  };
 }
-$symbols->{$_}->{provides}->{LINKER} = 1
-    foreach qw ( _prefix _eprefix _decompress _edecompress _text
-		 _etext _data _edata _bss _ebss _end );
+foreach my $link_sym qw ( _prefix _eprefix _decompress _edecompress _text
+			  _etext _data _edata _bss _ebss _end ) {
+  $symtab->{LINKER}->{$link_sym} = {
+    global	=> 1,
+    type       	=> 'A',
+    value	=> 0,
+    size	=> 0,
+  };
+}
 
-# Check for multiply defined, never-defined and unused symbols
+# Build up requires and provides tables for global symbols
+my $globals = {};
+while ( ( my $object, my $symbols ) = each %$symtab ) {
+  while ( ( my $symbol, my $info ) = each %$symbols ) {
+    if ( $info->{global} ) {
+      my $category = ( ( $info->{type} eq 'U' ? "requires" : "provides" ) );
+      $globals->{$symbol}->{$category}->{$object} = 1;
+    }
+  }
+}
+
+# Check for multiply defined, never-defined and unused global symbols
 #
 my $problems = {};
-while ( ( my $symbol, my $info ) = each %$symbols ) {
+while ( ( my $symbol, my $info ) = each %$globals ) {
   my @provides = keys %{$info->{provides}};
   my @requires = keys %{$info->{requires}};
 
@@ -58,7 +90,7 @@ foreach my $object ( sort keys %$problems ) {
   $errors += @nonexistent;
   foreach my $symbol ( @multiples ) {
     my @other_objects = sort grep { $_ ne $object }
-		        keys %{$symbols->{$symbol}->{provides}};
+		        keys %{$globals->{$symbol}->{provides}};
     print "ERR  $object provides symbol $symbol"
 	." (also provided by @other_objects)\n";
   }

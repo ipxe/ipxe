@@ -407,7 +407,7 @@ CLEANUP	+= TAGS*
 #
 SYMTAB	= $(BIN)/symtab
 $(SYMTAB) : $(BLIB)
-	$(NM) -o -g $< > $@
+	$(NM) -o -S $< > $@
 
 symcheck : $(SYMTAB)
 	$(SYMCHECK) $<
