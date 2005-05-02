@@ -66,12 +66,26 @@
 
 /* @BEGIN general.h
  *
+ * Download protocols
+ *
+ */
+
+#define	DOWNLOAD_PROTO_TFTP	/* Trivial File Transfer Protocol */
+#undef	DOWNLOAD_PROTO_NFS	/* Network File System */
+#undef	DOWNLOAD_PROTO_HTTP	/* Hypertext Transfer Protocol */
+#undef	DOWNLOAD_PROTO_TFTM	/* Multicast Trivial File Transfer Protocol */
+#undef	DOWNLOAD_PROTO_SLAM	/* Scalable Local Area Multicast */
+
+/* @END general.h */
+
+/* @BEGIN general.h
+ *
  * Name resolution modules
  *
  */
 
 #define	DNS_RESOLVER		/* DNS resolver */
-#define NMB_RESOLVER		/* NMB resolver */
+#undef	NMB_RESOLVER		/* NMB resolver */
 
 /* @END general.h */
 
