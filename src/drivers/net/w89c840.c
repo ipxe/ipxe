@@ -258,8 +258,10 @@ static struct winbond_private
 
 static int ioaddr;
 static unsigned short eeprom [0x40];
-static char        rx_packet[PKT_BUF_SZ * RX_RING_SIZE];
-static char        tx_packet[PKT_BUF_SZ * TX_RING_SIZE];
+struct {
+	char        rx_packet[PKT_BUF_SZ * RX_RING_SIZE];
+	char        tx_packet[PKT_BUF_SZ * TX_RING_SIZE];
+} w89c840_buf __shared;
 
 static int  eeprom_read(long ioaddr, int location);
 static int  mdio_read(int base_address, int phy_id, int location);
@@ -498,19 +500,20 @@ static void w89c840_transmit(
     /* Fill in our transmit buffer */
     entry = w840private.cur_tx % TX_RING_SIZE;
 
-    memcpy (tx_packet, d, ETH_ALEN);    /* dst */
-    memcpy (tx_packet + ETH_ALEN, nic->node_addr, ETH_ALEN);/* src */
+    memcpy (w89c840_buf.tx_packet, d, ETH_ALEN);    /* dst */
+    memcpy (w89c840_buf.tx_packet + ETH_ALEN, nic->node_addr, ETH_ALEN);/*src*/
 
-    *((char *) tx_packet + 12) = t >> 8;    /* type */
-    *((char *) tx_packet + 13) = t;
+    *((char *) w89c840_buf.tx_packet + 12) = t >> 8;    /* type */
+    *((char *) w89c840_buf.tx_packet + 13) = t;
 
-    memcpy (tx_packet + ETH_HLEN, p, s);
+    memcpy (w89c840_buf.tx_packet + ETH_HLEN, p, s);
     s += ETH_HLEN;
 
     while (s < ETH_ZLEN)
-    *((char *) tx_packet + ETH_HLEN + (s++)) = 0;
+    *((char *) w89c840_buf.tx_packet + ETH_HLEN + (s++)) = 0;
 
-    w840private.tx_ring[entry].buffer1 = virt_to_le32desc(tx_packet);
+    w840private.tx_ring[entry].buffer1
+	    = virt_to_le32desc(w89c840_buf.tx_packet);
 
     w840private.tx_ring[entry].length = (DescWholePkt | (u32) s);
     if (entry >= TX_RING_SIZE-1)         /* Wrap ring */
@@ -930,7 +933,7 @@ static void init_ring(void)
 
     /* Initial all Rx descriptors. Fill in the Rx buffers. */
 
-    p = &rx_packet[0];
+    p = &w89c840_buf.rx_packet[0];
 
     for (i = 0; i < RX_RING_SIZE; i++) {
         w840private.rx_ring[i].length = w840private.rx_buf_sz;
