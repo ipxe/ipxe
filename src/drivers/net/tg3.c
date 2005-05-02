@@ -16,6 +16,7 @@
 #include "pci.h"
 #include "timer.h"
 #include "string.h"
+#include "shared.h"
 #include "tg3.h"
 
 #define SUPPORT_COPPER_PHY  1
@@ -24,7 +25,7 @@
 #define SUPPORT_PARTNO_STR  1
 #define SUPPORT_PHY_STR     1
 
-struct tg3 tg3;
+static struct tg3 tg3;
 
 /* Dummy defines for error handling */
 #define EBUSY  1
@@ -55,15 +56,22 @@ struct tg3 tg3;
 
 #define RX_PKT_BUF_SZ		(1536 + 2 + 64)
 
+struct eth_frame {
+	uint8_t  dst_addr[ETH_ALEN];
+	uint8_t  src_addr[ETH_ALEN];
+	uint16_t type;
+	uint8_t  data [ETH_FRAME_LEN - ETH_HLEN];
+};
 
-static struct bss {
+struct bss {
 	struct tg3_rx_buffer_desc rx_std[TG3_RX_RING_SIZE];
 	struct tg3_rx_buffer_desc rx_rcb[TG3_RX_RCB_RING_SIZE];
 	struct tg3_tx_buffer_desc tx_ring[TG3_TX_RING_SIZE];
 	struct tg3_hw_status      hw_status;
 	struct tg3_hw_stats       hw_stats;
 	unsigned char             rx_bufs[TG3_DEF_RX_RING_PENDING][RX_PKT_BUF_SZ];
-} tg3_bss;
+	struct eth_frame	  tx_frame[2];
+} tg3_bss __shared;
 
 /**
  * pci_save_state - save the PCI configuration space of a device before suspending
@@ -3126,13 +3134,8 @@ static void tg3_set_txd(struct tg3 *tp, int entry,
 static void tg3_transmit(struct nic *nic, const char *dst_addr,
 	unsigned int type, unsigned int size, const char *packet)
 {
-	static struct eth_frame {
-		uint8_t  dst_addr[ETH_ALEN];
-		uint8_t  src_addr[ETH_ALEN];
-		uint16_t type;
-		uint8_t  data [ETH_FRAME_LEN - ETH_HLEN];
-	} frame[2];
 	static int frame_idx;
+	struct eth_frame *frame;
 	
 	/* send the packet to destination */
 	struct tg3_tx_buffer_desc *txd;
@@ -3160,11 +3163,12 @@ static void tg3_transmit(struct nic *nic, const char *dst_addr,
 	}
 	
 	/* Copy the packet to the our local buffer */
-	memcpy(&frame[frame_idx].dst_addr, dst_addr, ETH_ALEN);
-	memcpy(&frame[frame_idx].src_addr, nic->node_addr, ETH_ALEN);
+	frame = &tg3_bss.tx_frame[frame_idx];
+	memcpy(frame[frame_idx].dst_addr, dst_addr, ETH_ALEN);
+	memcpy(frame[frame_idx].src_addr, nic->node_addr, ETH_ALEN);
 	frame[frame_idx].type = htons(type);
-	memset(&frame[frame_idx].data, 0, sizeof(frame[frame_idx].data));
-	memcpy(&frame[frame_idx].data, packet, size);
+	memset(frame[frame_idx].data, 0, sizeof(frame[frame_idx].data));
+	memcpy(frame[frame_idx].data, packet, size);
 
 	/* Setup the ring buffer entry to transmit */
 	txd            = &tp->tx_ring[entry];

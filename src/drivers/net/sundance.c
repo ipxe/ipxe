@@ -48,6 +48,7 @@
 #include "pci.h"
 #include "timer.h"
 #include "mii.h"
+#include "shared.h"
 
 #define drv_version "v1.12"
 #define drv_date "2004-03-21"
@@ -248,16 +249,17 @@ enum desc_status_bits {
 /* Define the TX Descriptor */
 static struct netdev_desc tx_ring[TX_RING_SIZE];
 
-/* Create a static buffer of size PKT_BUF_SZ for each TX Descriptor.
-  All descriptors point to a part of this buffer */
-static unsigned char txb[PKT_BUF_SZ * TX_RING_SIZE];
-
 /* Define the RX Descriptor */
 static struct netdev_desc rx_ring[RX_RING_SIZE];
 
-/* Create a static buffer of size PKT_BUF_SZ for each RX Descriptor.
+/* Create a static buffer of size PKT_BUF_SZ for each RX and TX descriptor.
    All descriptors point to a part of this buffer */
-static unsigned char rxb[RX_RING_SIZE * PKT_BUF_SZ];
+struct {
+	unsigned char txb[PKT_BUF_SZ * TX_RING_SIZE];
+	unsigned char rxb[RX_RING_SIZE * PKT_BUF_SZ];
+} rx_tx_buf __shared;
+#define rxb rx_tx_buf.rxb
+#define txb rx_tx_buf.txb
 
 /* FIXME: Move BASE to the private structure */
 static u32 BASE;
@@ -273,7 +275,7 @@ enum chip_capability_flags { CanHaveMII = 1, KendinPktDropBug = 2, };
 #define PCI_IOTYPE (PCI_USES_MASTER | PCI_USES_IO  | PCI_ADDR0)
 
 #define MII_CNT		4
-struct sundance_private {
+static struct sundance_private {
 	const char *nic_name;
 	/* Frequently used values */
 
@@ -440,7 +442,7 @@ static void sundance_reset(struct nic *nic)
 /**************************************************************************
 IRQ - Wait for a frame
 ***************************************************************************/
-void sundance_irq ( struct nic *nic, irq_action_t action ) {
+static void sundance_irq ( struct nic *nic, irq_action_t action ) {
         unsigned int intr_status;
 
 	switch ( action ) {
