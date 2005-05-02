@@ -194,22 +194,6 @@
 #			Support for sending multicast packets
 #	-DMULTICAST_LEVEL2
 #			Support for receiving multicast packets
-#	-DDNS_RESOLVER
-#			Support for resolving hostnames in bootfile name (experimental)
-#	-DDOWNLOAD_PROTO_TFTP
-#			If defined, includes TFTP support (recommended).
-#	-DDOWNLOAD_PROTO_NFS
-#			If defined, includes NFS support.
-#	-DDEFAULT_PROTO_NFS
-#			If defined, makes NFS the default protocol instead
-#			of TFTP. Requires DOWNLOAD_PROTO_NFS.
-#	-DDOWNLOAD_PROTO_SLAM
-#			If defined, includes Scalable Local Area Multicast
-#			support.
-#	-DDOWNLOAD_PROTO_TFTM
-#			If defined, includes TFTP Multicast mode support.
-#	-DDOWNLOAD_PROTO_HTTP
-#			If defined, includes HTTP support.
 #
 #	Interface export options:
 #
@@ -348,19 +332,8 @@ CFLAGS+=	-DTAGGED_IMAGE -DELF_IMAGE
 # CFLAGS+=	-DCOFF_IMAGE 
 # CFLAGS+=	-DRAW_IMAGE
 
-# Download files via TFTP
-CFLAGS+=	-DDOWNLOAD_PROTO_TFTP
-# Change download protocol to NFS, default is TFTP
-# CFLAGS+=	-DDOWNLOAD_PROTO_NFS
-# Change download protocol to HTTP, default is TFTP
-# CFLAGS+=	-DDOWNLOAD_PROTO_HTTP
-# Change default protocol to NFS
-# CFLAGS+=	-DDEFAULT_PROTO_NFS
-# Support to resolve hostnames in boot filename
-# CFLAGS+=	-DDNS_RESOLVER
-
 # Multicast Support
-# CFLAGS+=	-DALLMULTI -DMULTICAST_LEVEL1 -DMULTICAST_LEVEL2 -DDOWNLOAD_PROTO_TFTM
+# CFLAGS+=	-DALLMULTI -DMULTICAST_LEVEL1 -DMULTICAST_LEVEL2
 
 # Etherboot as a PXE network protocol ROM
 CFLAGS+=	-DPXE_IMAGE -DPXE_EXPORT

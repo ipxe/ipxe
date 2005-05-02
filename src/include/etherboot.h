@@ -49,10 +49,6 @@
 #define DEFAULT_BOOTFILE	PXENFSROOTPATH "/boot/pxeboot"
 #endif
 
-#if	!defined(DOWNLOAD_PROTO_TFTP) && !defined(DOWNLOAD_PROTO_NFS) && !defined(DOWNLOAD_PROTO_SLAM) && !defined(DOWNLOAD_PROTO_TFTM) && !defined(DOWNLOAD_PROTO_DISK) && !defined(DOWNLOAD_PROTO_HTTP)
-#error No download protocol defined!
-#endif
-
 #ifndef	MAX_TFTP_RETRIES
 #define MAX_TFTP_RETRIES	20
 #endif

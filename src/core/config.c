@@ -171,6 +171,26 @@ REQUIRE_OBJECT ( relocate );
 #endif
 
 /*
+ * Drag in all requested protocols
+ *
+ */
+#ifdef DOWNLOAD_PROTO_TFTP
+REQUIRE_OBJECT ( tftp );
+#endif
+#ifdef DOWNLOAD_PROTO_NFS
+REQUIRE_OBJECT ( nfs );
+#endif
+#ifdef DOWNLOAD_PROTO_HTTP
+REQUIRE_OBJECT ( http );
+#endif
+#ifdef DOWNLOAD_PROTO_TFTM
+REQUIRE_OBJECT ( tftm );
+#endif
+#ifdef DOWNLOAD_PROTO_SLAM
+REQUIRE_OBJECT ( slam );
+#endif
+
+/*
  * Drag in any required resolvers
  *
  */
