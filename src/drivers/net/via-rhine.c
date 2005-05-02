@@ -546,6 +546,12 @@ struct rhine_rx_desc
 
 };
 
+struct {
+	char txbuf[TX_RING_SIZE * PKT_BUF_SZ + 32];
+	char rxbuf[RX_RING_SIZE * PKT_BUF_SZ + 32];
+	char txdesc[TX_RING_SIZE * sizeof (struct rhine_tx_desc) + 32];
+	char rxdesc[RX_RING_SIZE * sizeof (struct rhine_rx_desc) + 32];
+} rhine_buffers __shared;
 
 /* The I/O extent. */
 #define rhine_TOTAL_SIZE 0x80
@@ -1188,19 +1194,14 @@ rhine_reset (struct nic *nic)
     int rx_bufs_tmp, rx_bufs_tmp1;
     int tx_bufs_tmp, tx_bufs_tmp1;
 
-    static char buf1[TX_RING_SIZE * PKT_BUF_SZ + 32];
-    static char buf2[RX_RING_SIZE * PKT_BUF_SZ + 32];
-    static char desc1[TX_RING_SIZE * sizeof (struct rhine_tx_desc) + 32];
-    static char desc2[RX_RING_SIZE * sizeof (struct rhine_rx_desc) + 32];
-
     /* printf ("rhine_reset\n"); */
     /* Soft reset the chip. */
     /*outb(CmdReset, ioaddr + ChipCmd); */
 
-    tx_bufs_tmp = (int) buf1;
-    tx_ring_tmp = (int) desc1;
-    rx_bufs_tmp = (int) buf2;
-    rx_ring_tmp = (int) desc2;
+    tx_bufs_tmp = (int) rhine_buffers.txbuf;
+    tx_ring_tmp = (int) rhine_buffers.txdesc;
+    rx_bufs_tmp = (int) rhine_buffers.rxbuf;
+    rx_ring_tmp = (int) rhine_buffers.rxdesc;
 
     /* tune RD TD 32 byte alignment */
     rx_ring_tmp1 = (int) virt_to_bus ((char *) rx_ring_tmp);
