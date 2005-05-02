@@ -1,7 +1,7 @@
+#include "proto.h"
+#include "tcp.h"
+#include "url.h"
 #include "etherboot.h"
-#include "http.h"
-
-#ifdef DOWNLOAD_PROTO_HTTP
 
 /* The block size is currently chosen to be 512 bytes. This means, we can
    allocate the receive buffer on the stack, but it results in a noticeable
@@ -17,7 +17,9 @@
 SEND_TCP_CALLBACK - Send data using TCP
 **************************************************************************/
 struct send_recv_state {
-	int (*fnc)(unsigned char *data, int block, int len, int eof);
+	int ( * process ) ( unsigned char *data,
+			    unsigned int blocknum,
+			    unsigned int len, int eof );
 	char *send_buffer;
 	char *recv_buffer;
 	int send_length;
@@ -27,7 +29,7 @@ struct send_recv_state {
 	int bytes_received;
 	enum { RESULT_CODE, HEADER, DATA, ERROR, MOVED } recv_state;
 	int rc;
-	char location[MAX_URL+1];
+	char *url;
 };
 
 static int send_tcp_request(int length, void *buffer, void *ptr) {
@@ -56,16 +58,19 @@ static int recv_tcp_request(int length, const void *buffer, void *ptr) {
 				int rc = strtoul(ptr, &ptr, 10);
 				if (ptr >= (const char *)buffer + length) {
 					state->recv_state = ERROR;
+					DBG ( "HTTP got bad result code\n" );
 					return 0;
 				}
 				state->rc = rc;
 				state->recv_state = HEADER;
+				DBG ( "HTTP got result code %d\n", rc );
 				goto header;
 			}
 			++(const char *)buffer;
 			length--;
 		}
 		state->recv_state = ERROR;
+		DBG ( "HTTP got no result code\n" );
 		return 0;
 	}
 	if (state->recv_state == HEADER) {
@@ -73,13 +78,16 @@ static int recv_tcp_request(int length, const void *buffer, void *ptr) {
 			/* Check for HTTP redirect */
 			if (state->rc >= 300 && state->rc < 400 &&
 			    !memcmp(buffer, "Location: ", 10)) {
-				char *ptr = state->location;
-				int i;
-				memcpy(ptr, buffer + 10, MAX_URL);
-				for (i = 0; i < MAX_URL && *ptr > ' ';
-				     i++, ptr++);
-				*ptr = '\000';
+				char *p;
+				
+				state->url = p = ( char * ) buffer + 10;
+				while ( *p > ' ' ) {
+					p++;
+				}
+				*p = '\0';
 				state->recv_state = MOVED;
+				DBG ( "HTTP got redirect to %s\n",
+				      state->url );
 				return 1;
 			}
 			/* Find beginning of line */
@@ -99,6 +107,7 @@ static int recv_tcp_request(int length, const void *buffer, void *ptr) {
 	}
 	if (state->recv_state == DATA) {
 		state->bytes_received += length;
+		DBG2 ( "HTTP received %d bytes\n", length );
 		while (length > 0) {
 			int copy_length = BLOCKSIZE - state->recv_length;
 			if (copy_length > length)
@@ -106,9 +115,11 @@ static int recv_tcp_request(int length, const void *buffer, void *ptr) {
 			memcpy(state->recv_buffer + state->recv_length,
 			       buffer, copy_length);
 			if ((state->recv_length += copy_length) == BLOCKSIZE) {
-				if (!state->fnc(state->recv_buffer,
-						++state->block, BLOCKSIZE, 0))
-					return 0;
+				DBG2 ( "HTTP processing %d bytes\n",
+				      BLOCKSIZE );
+				if (!state->process(state->recv_buffer,
+						    ++state->block,
+						    BLOCKSIZE, 0))
 				state->recv_length = 0;
 			}
 			length -= copy_length;
@@ -121,86 +132,70 @@ static int recv_tcp_request(int length, const void *buffer, void *ptr) {
 /**************************************************************************
 HTTP_GET - Get data using HTTP
 **************************************************************************/
-int http(const char *url,
-		int (*fnc)(unsigned char *, unsigned int, unsigned int, int)) {
+static int http ( char *url,
+		  struct sockaddr_in *server __unused,
+		  char *file __unused,
+		  int ( * process ) ( unsigned char *data,
+				      unsigned int blocknum,
+				      unsigned int len, int eof ) ) {
+	struct protocol *proto;
+	struct sockaddr_in http_server = *server;
+	char *filename;
 	static const char GET[] = "GET /%s HTTP/1.0\r\n\r\n";
 	static char recv_buffer[BLOCKSIZE];
-	in_addr destip;
-	int port;
-	int length;
 	struct send_recv_state state;
+	int length;
 
-	state.fnc = fnc;
 	state.rc = -1;
 	state.block = 0;
 	state.recv_buffer = recv_buffer;
-	length = strlen(url);
-	if (length <= MAX_URL) {
-		memcpy(state.location, url, length+1);
-		destip = arptable[ARP_SERVER].ipaddr;
-		port = url_port;
-		if (port == -1)
-		  port = 80;
-		goto first_time;
+	state.url = url;
+	state.process = process;
+	while ( 1 ) {
+		length = strlen ( filename ) + strlen ( GET );
+		{
+			char send_buf[length];
 
-		do {
-			state.rc = -1;
-			state.block = 0;
-			url = state.location;
-			if (memcmp("http://", url, 7))
-				break;
-			url += 7;
-			length = inet_aton(url, &destip);
-			if (!length) {
-				/* As we do not have support for DNS, assume*/
-				/* that HTTP redirects always point to the */
-				/* same machine */
-				if (state.recv_state == MOVED) {
-					while (*url &&
-					*url != ':' && *url != '/') url++;
-				} else {
-					break;
-				}
-			}
-			if (*(url += length) == ':') {
-				port = strtoul(url, &url, 10);
-			} else {
-				port = 80;
-			}
-			if (!*url)
-				url = "/";
-			if (*url != '/')
-				break;
-			url++;
-
-		first_time:
-			length = strlen(url);
-			state.send_length = sizeof(GET) - 3 + length;
-			
-			{ char buf[state.send_length + 1];
-			sprintf(state.send_buffer = buf, GET, url);
+			sprintf ( send_buf, GET, filename );
+			state.send_buffer = send_buf;
+			state.send_length = strlen ( send_buf );
 			state.bytes_sent = 0;
 			
 			state.bytes_received = 0;
 			state.recv_state = RESULT_CODE;
 			
 			state.recv_length = 0;
-			tcp_transaction(destip.s_addr, 80, &state,
-					send_tcp_request, recv_tcp_request);
+			tcp_transaction ( server->sin_addr.s_addr,
+					  server->sin_port, &state,
+					  send_tcp_request, recv_tcp_request );
+		}
+
+		if ( state.recv_state == MOVED ) {
+			if ( ! parse_url ( state.url, &proto,
+					   &http_server, &filename ) ) {
+				printf ( "Invalid redirect URL %s\n",
+					 state.url );
+				return 0;
 			}
-		} while (state.recv_state == MOVED);
-	} else {
-		memcpy(state.location, url, MAX_URL);
-		state.location[MAX_URL] = '\000';
+			continue;
+		}
+		
+		break;
 	}
 
-	if (state.rc == 200) {
-		return fnc(recv_buffer, ++state.block, state.recv_length, 1);
+	if ( state.rc == 200 ) {
+		DBG2 ( "HTTP processing %d bytes\n", state.recv_length );
+		return process ( recv_buffer, ++state.block,
+				 state.recv_length, 1 );
 	} else {
-		printf("Failed to download %s (rc = %d)\n",
-		       state.location, state.rc);
+		printf ( "Failed to download %s (rc = %d)\n",
+			 state.url, state.rc );
 		return 0;
 	}
 }
 
-#endif /* DOWNLOAD_PROTO_HTTP */
+static struct protocol http_protocol __protocol = {
+	.name = "http",
+	.default_port = 80,
+	.load = http,
+};
