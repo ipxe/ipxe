@@ -71,7 +71,7 @@ typedef signed int s32;
 #define virt_to_le32desc(addr)  cpu_to_le32(virt_to_bus(addr))
 #define le32desc_to_virt(addr)  bus_to_virt(le32_to_cpu(addr))
 
-unsigned long BASE;
+static unsigned long BASE;
 /* NIC specific static variables go here */
 
 
@@ -290,24 +290,20 @@ struct ring_desc {
 };
 
 
-/* Define the TX Descriptor */
-static struct ring_desc tx_ring[TX_RING];
-
-/* Create a static buffer of size RX_BUF_SZ for each
-TX Descriptor.  All descriptors point to a
-part of this buffer */
-static unsigned char txb[TX_RING * RX_NIC_BUFSIZE];
-
-/* Define the TX Descriptor */
-static struct ring_desc rx_ring[RX_RING];
-
-/* Create a static buffer of size RX_BUF_SZ for each
-RX Descriptor   All descriptors point to a
-part of this buffer */
-static unsigned char rxb[RX_RING * RX_NIC_BUFSIZE];
+/* Define the TX and RX Descriptor and Buffers */
+struct {
+	struct ring_desc tx_ring[TX_RING];
+	unsigned char txb[TX_RING * RX_NIC_BUFSIZE];
+	struct ring_desc rx_ring[RX_RING];
+	unsigned char rxb[RX_RING * RX_NIC_BUFSIZE];
+} forcedeth_bufs __shared;
+#define tx_ring forcedeth_bufs.tx_ring
+#define rx_ring forcedeth_bufs.rx_ring
+#define txb forcedeth_bufs.txb
+#define rxb forcedeth_bufs.rxb
 
 /* Private Storage for the NIC */
-struct forcedeth_private {
+static struct forcedeth_private {
 	/* General data:
 	 * Locking: spin_lock(&np->lock); */
 	int in_shutdown;
@@ -322,19 +318,13 @@ struct forcedeth_private {
 	/* rx specific fields.
 	 * Locking: Within irq hander or disable_irq+spin_lock(&np->lock);
 	 */
-	struct ring_desc *rx_ring;
 	unsigned int cur_rx, refill_rx;
-	struct sk_buff *rx_skbuff[RX_RING];
-	u32 rx_dma[RX_RING];
 	unsigned int rx_buf_sz;
 
 	/*
 	 * tx specific fields.
 	 */
-	struct ring_desc *tx_ring;
 	unsigned int next_tx, nic_tx;
-	struct sk_buff *tx_skbuff[TX_RING];
-	u32 tx_dma[TX_RING];
 	u16 tx_flags;
 } npx;
 

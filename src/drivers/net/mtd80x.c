@@ -368,16 +368,14 @@ enum tx_desc_control_bits {
 #define LinkIsUp2 0x00040000
 
 /* Create a static buffer of size PKT_BUF_SZ for each
-TX Descriptor.  All descriptors point to a
+RX and TX Descriptor.  All descriptors point to a
 part of this buffer */
-static u8 txb[PKT_BUF_SZ * TX_RING_SIZE]
-__attribute__ ((aligned(8)));
-
-/* Create a static buffer of size PKT_BUF_SZ for each
-RX Descriptor   All descriptors point to a
-part of this buffer */
-static u8 rxb[PKT_BUF_SZ * RX_RING_SIZE]
-__attribute__ ((aligned(8)));
+struct {
+	u8 txb[PKT_BUF_SZ * TX_RING_SIZE] __attribute__ ((aligned(8)));
+	u8 rxb[PKT_BUF_SZ * RX_RING_SIZE] __attribute__ ((aligned(8)));
+} mtd80x_bufs __shared;
+#define txb mtd80x_bufs.txb
+#define rxb mtd80x_bufs.rxb
 
 /* The Tulip Rx and Tx buffer descriptors. */
 struct mtd_desc

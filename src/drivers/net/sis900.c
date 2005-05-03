@@ -64,10 +64,16 @@ static unsigned int cur_phy;
 
 static unsigned int cur_rx;
 
-static BufferDesc txd;
-static BufferDesc rxd[NUM_RX_DESC];
-static unsigned char txb[TX_BUF_SIZE];
-static unsigned char rxb[NUM_RX_DESC * RX_BUF_SIZE];
+struct {
+    BufferDesc txd;
+    BufferDesc rxd[NUM_RX_DESC];
+    unsigned char txb[TX_BUF_SIZE];
+    unsigned char rxb[NUM_RX_DESC * RX_BUF_SIZE];
+} sis900_bufs __shared;
+#define txd sis900_bufs.txd
+#define rxd sis900_bufs.rxd
+#define txb sis900_bufs.txb
+#define rxb sis900_bufs.rxb
 
 #if 0
 static struct mac_chip_info {

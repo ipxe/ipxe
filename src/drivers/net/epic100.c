@@ -86,12 +86,18 @@ static unsigned int	cur_rx, cur_tx;		/* The next free ring entry */
 static unsigned short	eeprom[64];
 #endif
 static signed char	phys[4];		/* MII device addresses. */
-static struct epic_rx_desc	rx_ring[RX_RING_SIZE]
+struct {
+	struct epic_rx_desc	rx_ring[RX_RING_SIZE]
 	__attribute__ ((aligned(4)));
-static struct epic_tx_desc	tx_ring[TX_RING_SIZE]
+	struct epic_tx_desc	tx_ring[TX_RING_SIZE]
 	__attribute__ ((aligned(4)));
-static unsigned char	 	rx_packet[PKT_BUF_SZ * RX_RING_SIZE];
-static unsigned char		tx_packet[PKT_BUF_SZ * TX_RING_SIZE];
+	unsigned char	 	rx_packet[PKT_BUF_SZ * RX_RING_SIZE];
+	unsigned char		tx_packet[PKT_BUF_SZ * TX_RING_SIZE];
+} epic100_bufs __shared;
+#define rx_ring epic100_bufs.rx_ring
+#define tx_ring epic100_bufs.tx_ring
+#define rx_packet epic100_bufs.rx_packet
+#define tx_packet epic100_bufs.tx_packet
 
 /***********************************************************************/
 /*                    Externally visible functions                     */

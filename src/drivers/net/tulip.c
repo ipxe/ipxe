@@ -400,12 +400,17 @@ static u32 ioaddr;
    longword divisable */
 
 #define TX_RING_SIZE	2
-static struct tulip_tx_desc tx_ring[TX_RING_SIZE] __attribute__ ((aligned(4)));
-static unsigned char txb[BUFLEN] __attribute__ ((aligned(4)));
-
 #define RX_RING_SIZE	4
-static struct tulip_rx_desc rx_ring[RX_RING_SIZE] __attribute__ ((aligned(4)));
-static unsigned char rxb[RX_RING_SIZE * BUFLEN] __attribute__ ((aligned(4)));
+struct {
+    struct tulip_tx_desc tx_ring[TX_RING_SIZE];
+    unsigned char txb[BUFLEN];
+    struct tulip_rx_desc rx_ring[RX_RING_SIZE];
+    unsigned char rxb[RX_RING_SIZE * BUFLEN];
+} tulip_buffers __shared __attribute__ ((aligned(4)));
+#define tx_ring tulip_buffers.tx_ring
+#define txb tulip_buffers.txb
+#define rx_ring tulip_buffers.rx_ring
+#define rxb tulip_buffers.rxb
 
 static struct tulip_private {
     int cur_rx;

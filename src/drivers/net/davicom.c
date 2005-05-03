@@ -141,13 +141,17 @@ static unsigned long ioaddr;
 
 /* transmit descriptor and buffer */
 #define NTXD 2
-static struct txdesc txd[NTXD] __attribute__ ((aligned(4)));
-static unsigned char txb[BUFLEN] __attribute__ ((aligned(4)));
-
-/* receive descriptor(s) and buffer(s) */
 #define NRXD 4
-static struct rxdesc rxd[NRXD] __attribute__ ((aligned(4)));
-static unsigned char rxb[NRXD * BUFLEN] __attribute__ ((aligned(4)));
+struct {
+	struct txdesc txd[NTXD] __attribute__ ((aligned(4)));
+	unsigned char txb[BUFLEN] __attribute__ ((aligned(4)));
+	struct rxdesc rxd[NRXD] __attribute__ ((aligned(4)));
+	unsigned char rxb[NRXD * BUFLEN] __attribute__ ((aligned(4)));
+} davicom_bufs __shared;
+#define txd davicom_bufs.txd
+#define txb davicom_bufs.txb
+#define rxd davicom_bufs.rxd
+#define rxb davicom_bufs.rxb
 static int rxd_tail;
 static int TxPtr;
 

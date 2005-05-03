@@ -182,20 +182,6 @@ static int full_duplex[MAX_UNITS];
 
 #define PCNET32_TOTAL_SIZE	0x20
 
-/* Buffers for the tx and Rx */
-
-/* Create a static buffer of size PKT_BUF_SZ for each
-TX Descriptor.  All descriptors point to a
-part of this buffer */
-static unsigned char txb[PKT_BUF_SZ * TX_RING_SIZE];
-//    __attribute__ ((aligned(16)));
-
-/* Create a static buffer of size PKT_BUF_SZ for each
-RX Descriptor   All descriptors point to a
-part of this buffer */
-static unsigned char rxb[RX_RING_SIZE * PKT_BUF_SZ];
-//    __attribute__ ((aligned(16)));
-
 /* The PCNET32 Rx and Tx ring descriptors. */
 struct pcnet32_rx_head {
 	u32 base;
@@ -235,14 +221,15 @@ struct pcnet32_access {
 	void (*reset) (unsigned long);
 };
 
-/* Define the TX Descriptor */
-static struct pcnet32_tx_head tx_ring[TX_RING_SIZE]
-    __attribute__ ((aligned(16)));
-
-
-/* Define the RX Descriptor */
-static struct pcnet32_rx_head rx_ring[RX_RING_SIZE]
-    __attribute__ ((aligned(16)));
+/* Define the TX and RX Descriptors and Rings */
+struct {
+	struct pcnet32_tx_head tx_ring[TX_RING_SIZE]
+	__attribute__ ((aligned(16)));
+	struct pcnet32_rx_head rx_ring[RX_RING_SIZE]
+	__attribute__ ((aligned(16)));
+	unsigned char txb[PKT_BUF_SZ * TX_RING_SIZE];
+	unsigned char rxb[RX_RING_SIZE * PKT_BUF_SZ];
+} pcnet32_bufs __shared;
 
 /* May need to be moved to mii.h */
 struct mii_if_info {
@@ -411,16 +398,17 @@ static int pcnet32_init_ring(struct nic *nic)
 	lp->cur_rx = lp->cur_tx = 0;
 
 	for (i = 0; i < RX_RING_SIZE; i++) {
-		rx_ring[i].base = (u32) virt_to_le32desc(&rxb[i]);
-		rx_ring[i].buf_length = le16_to_cpu(-PKT_BUF_SZ);
-		rx_ring[i].status = le16_to_cpu(0x8000);
+		pcnet32_bufs.rx_ring[i].base =
+			virt_to_le32desc(&pcnet32_bufs.rxb[i]);
+		pcnet32_bufs.rx_ring[i].buf_length = le16_to_cpu(-PKT_BUF_SZ);
+		pcnet32_bufs.rx_ring[i].status = le16_to_cpu(0x8000);
 	}
 
 	/* The Tx buffer address is filled in as needed, but we do need to clear
 	   the upper ownership bit. */
 	for (i = 0; i < TX_RING_SIZE; i++) {
-		tx_ring[i].base = 0;
-		tx_ring[i].status = 0;
+		pcnet32_bufs.tx_ring[i].base = 0;
+		pcnet32_bufs.tx_ring[i].status = 0;
 	}
 
 
@@ -428,8 +416,8 @@ static int pcnet32_init_ring(struct nic *nic)
 	    le16_to_cpu(TX_RING_LEN_BITS | RX_RING_LEN_BITS);
 	for (i = 0; i < 6; i++)
 		lp->init_block.phys_addr[i] = nic->node_addr[i];
-	lp->init_block.rx_ring = (u32) virt_to_le32desc(&rx_ring[0]);
-	lp->init_block.tx_ring = (u32) virt_to_le32desc(&tx_ring[0]);
+	lp->init_block.rx_ring = virt_to_le32desc(&pcnet32_bufs.rx_ring[0]);
+	lp->init_block.tx_ring = virt_to_le32desc(&pcnet32_bufs.tx_ring[0]);
 	return 0;
 }
 
@@ -547,11 +535,11 @@ static int pcnet32_poll(struct nic *nic __unused, int retrieve)
 	/* nic->packet should contain data on return */
 	/* nic->packetlen should contain length of data */
 
-	int status;
+	signed char status;
 	int entry;
 
 	entry = lp->cur_rx & RX_RING_MOD_MASK;
-	status = ((short) le16_to_cpu(rx_ring[entry].status) >> 8);
+	status = (le16_to_cpu(pcnet32_bufs.rx_ring[entry].status) >> 8);
 
 	if (status < 0)
 		return 0;
@@ -560,13 +548,16 @@ static int pcnet32_poll(struct nic *nic __unused, int retrieve)
 
 	if (status == 0x03) {
 		nic->packetlen =
-		    (le32_to_cpu(rx_ring[entry].msg_length) & 0xfff) - 4;
-		memcpy(nic->packet, &rxb[entry], nic->packetlen);
+			(le32_to_cpu(pcnet32_bufs.rx_ring[entry].msg_length)
+			 & 0xfff) - 4;
+		memcpy(nic->packet, &pcnet32_bufs.rxb[entry], nic->packetlen);
 
 		/* Andrew Boyd of QNX reports that some revs of the 79C765
 		 * clear the buffer length */
-		rx_ring[entry].buf_length = le16_to_cpu(-PKT_BUF_SZ);
-		rx_ring[entry].status |= le16_to_cpu(0x8000);	/* prime for next receive */
+		pcnet32_bufs.rx_ring[entry].buf_length
+			= le16_to_cpu(-PKT_BUF_SZ);
+		/* prime for next receive */
+		pcnet32_bufs.rx_ring[entry].status |= le16_to_cpu(0x8000);
 		/* Switch to the next Rx ring buffer */
 		lp->cur_rx++;
 
@@ -594,7 +585,7 @@ static void pcnet32_transmit(struct nic *nic __unused, const char *d,	/* Destina
 
 	status = 0x8300;
 	/* point to the current txb incase multiple tx_rings are used */
-	ptxb = txb + (lp->cur_tx * PKT_BUF_SZ);
+	ptxb = pcnet32_bufs.txb + (lp->cur_tx * PKT_BUF_SZ);
 
 	/* copy the packet to ring buffer */
 	memcpy(ptxb, d, ETH_ALEN);	/* dst */
@@ -607,12 +598,12 @@ static void pcnet32_transmit(struct nic *nic __unused, const char *d,	/* Destina
 	while (s < ETH_ZLEN)	/* pad to min length */
 		ptxb[s++] = '\0';
 
-	tx_ring[entry].length = le16_to_cpu(-s);
-	tx_ring[entry].misc = 0x00000000;
-	tx_ring[entry].base = (u32) virt_to_le32desc(ptxb);
+	pcnet32_bufs.tx_ring[entry].length = le16_to_cpu(-s);
+	pcnet32_bufs.tx_ring[entry].misc = 0x00000000;
+	pcnet32_bufs.tx_ring[entry].base = (u32) virt_to_le32desc(ptxb);
 
 	/* we set the top byte as the very last thing */
-	tx_ring[entry].status = le16_to_cpu(status);
+	pcnet32_bufs.tx_ring[entry].status = le16_to_cpu(status);
 
 
 	/* Trigger an immediate send poll */
@@ -622,14 +613,14 @@ static void pcnet32_transmit(struct nic *nic __unused, const char *d,	/* Destina
 	lp->cur_tx = 0;		/* (lp->cur_tx + 1); */
 	time = currticks() + TICKS_PER_SEC;	/* wait one second */
 	while (currticks() < time &&
-	       ((short) le16_to_cpu(tx_ring[entry].status) < 0));
+	       ((short) le16_to_cpu(pcnet32_bufs.tx_ring[entry].status) < 0));
 
-	if ((short) le16_to_cpu(tx_ring[entry].status) < 0)
+	if ((short) le16_to_cpu(pcnet32_bufs.tx_ring[entry].status) < 0)
 		printf("PCNET32 timed out on transmit\n");
 
 	/* Stop pointing at the current txb
 	 * otherwise the card continues to send the packet */
-	tx_ring[entry].base = 0;
+	pcnet32_bufs.tx_ring[entry].base = 0;
 
 }
 
@@ -882,8 +873,8 @@ static int pcnet32_probe ( struct nic *nic, struct pci_device *pci ) {
 		lp->init_block.phys_addr[i] = nic->node_addr[i];
 	lp->init_block.filter[0] = 0xffffffff;
 	lp->init_block.filter[1] = 0xffffffff;
-	lp->init_block.rx_ring = virt_to_bus(&rx_ring);
-	lp->init_block.tx_ring = virt_to_bus(&tx_ring);
+	lp->init_block.rx_ring = virt_to_bus(&pcnet32_bufs.rx_ring);
+	lp->init_block.tx_ring = virt_to_bus(&pcnet32_bufs.tx_ring);
 
 	/* switch pcnet32 to 32bit mode */
 	a->write_bcr(ioaddr, 20, 2);

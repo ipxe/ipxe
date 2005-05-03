@@ -205,11 +205,16 @@ static unsigned int tx_config;
    longword aligned 
 */
 
-static BufferDesc txd              __attribute__ ((aligned(4)));
-static BufferDesc rxd[NUM_RX_DESC] __attribute__ ((aligned(4)));
-
-static unsigned char txb[TX_BUF_SIZE] __attribute__ ((aligned(4)));
-static unsigned char rxb[NUM_RX_DESC * RX_BUF_SIZE] __attribute__ ((aligned(4)));
+struct {
+    BufferDesc txd              __attribute__ ((aligned(4)));
+    BufferDesc rxd[NUM_RX_DESC] __attribute__ ((aligned(4)));
+    unsigned char txb[TX_BUF_SIZE] __attribute__ ((aligned(4)));
+    unsigned char rxb[NUM_RX_DESC * RX_BUF_SIZE] __attribute__ ((aligned(4)));
+} natsemi_bufs __shared;
+#define txd natsemi_bufs.txd
+#define rxd natsemi_bufs.rxd
+#define txb natsemi_bufs.txb
+#define rxb natsemi_bufs.rxb
 
 /* Function Prototypes */
 

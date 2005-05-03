@@ -100,7 +100,7 @@ static void TLan_MiiSync(u16);
 static void TLan_MiiWriteReg(struct nic *nic __unused, u16, u16, u16);
 
 
-const char *media[] = {
+static const char *media[] = {
 	"10BaseT-HD ", "10BaseT-FD ", "100baseTx-HD ",
 	"100baseTx-FD", "100baseT4", 0
 };
@@ -187,21 +187,26 @@ struct TLanList {
 	} buffer[TLAN_BUFFERS_PER_LIST];
 };
 
-struct TLanList tx_ring[TLAN_NUM_TX_LISTS];
-static unsigned char txb[TLAN_MAX_FRAME_SIZE * TLAN_NUM_TX_LISTS];
-
-struct TLanList rx_ring[TLAN_NUM_RX_LISTS];
-static unsigned char rxb[TLAN_MAX_FRAME_SIZE * TLAN_NUM_RX_LISTS];
+struct {
+	struct TLanList tx_ring[TLAN_NUM_TX_LISTS];
+	unsigned char txb[TLAN_MAX_FRAME_SIZE * TLAN_NUM_TX_LISTS];
+	struct TLanList rx_ring[TLAN_NUM_RX_LISTS];
+	unsigned char rxb[TLAN_MAX_FRAME_SIZE * TLAN_NUM_RX_LISTS];
+} tlan_buffers __shared;
+#define tx_ring tlan_buffers.tx_ring
+#define txb tlan_buffers.txb
+#define rx_ring tlan_buffers.rx_ring
+#define rxb tlan_buffers.rxb
 
 typedef u8 TLanBuffer[TLAN_MAX_FRAME_SIZE];
 
-int chip_idx;
+static int chip_idx;
 
 /*****************************************************************
 * TLAN Private Information Structure
 *
 ****************************************************************/
-struct tlan_private {
+static struct tlan_private {
 	unsigned short vendor_id;	/* PCI Vendor code */
 	unsigned short dev_id;	/* PCI Device code */
 	const char *nic_name;
@@ -226,7 +231,7 @@ struct tlan_private {
 
 static struct tlan_private *priv;
 
-u32 BASE;
+static u32 BASE;
 
 /***************************************************************
 *	TLan_ResetLists
@@ -242,7 +247,7 @@ u32 BASE;
 *
 **************************************************************/
 
-void TLan_ResetLists(struct nic *nic __unused)
+static void TLan_ResetLists(struct nic *nic __unused)
 {
 
 	int i;

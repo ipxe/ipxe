@@ -393,7 +393,7 @@ typedef struct tlan_adapter_entry {
 
 /* Routines to access internal registers. */
 
-inline u8 TLan_DioRead8(u16 base_addr, u16 internal_addr)
+static inline u8 TLan_DioRead8(u16 base_addr, u16 internal_addr)
 {
 	outw(internal_addr, base_addr + TLAN_DIO_ADR);
 	return (inb((base_addr + TLAN_DIO_DATA) + (internal_addr & 0x3)));
@@ -403,7 +403,7 @@ inline u8 TLan_DioRead8(u16 base_addr, u16 internal_addr)
 
 
 
-inline u16 TLan_DioRead16(u16 base_addr, u16 internal_addr)
+static inline u16 TLan_DioRead16(u16 base_addr, u16 internal_addr)
 {
 	outw(internal_addr, base_addr + TLAN_DIO_ADR);
 	return (inw((base_addr + TLAN_DIO_DATA) + (internal_addr & 0x2)));
@@ -413,7 +413,7 @@ inline u16 TLan_DioRead16(u16 base_addr, u16 internal_addr)
 
 
 
-inline u32 TLan_DioRead32(u16 base_addr, u16 internal_addr)
+static inline u32 TLan_DioRead32(u16 base_addr, u16 internal_addr)
 {
 	outw(internal_addr, base_addr + TLAN_DIO_ADR);
 	return (inl(base_addr + TLAN_DIO_DATA));
@@ -423,7 +423,7 @@ inline u32 TLan_DioRead32(u16 base_addr, u16 internal_addr)
 
 
 
-inline void TLan_DioWrite8(u16 base_addr, u16 internal_addr, u8 data)
+static inline void TLan_DioWrite8(u16 base_addr, u16 internal_addr, u8 data)
 {
 	outw(internal_addr, base_addr + TLAN_DIO_ADR);
 	outb(data, base_addr + TLAN_DIO_DATA + (internal_addr & 0x3));
@@ -433,7 +433,7 @@ inline void TLan_DioWrite8(u16 base_addr, u16 internal_addr, u8 data)
 
 
 
-inline void TLan_DioWrite16(u16 base_addr, u16 internal_addr, u16 data)
+static inline void TLan_DioWrite16(u16 base_addr, u16 internal_addr, u16 data)
 {
 	outw(internal_addr, base_addr + TLAN_DIO_ADR);
 	outw(data, base_addr + TLAN_DIO_DATA + (internal_addr & 0x2));
@@ -443,7 +443,7 @@ inline void TLan_DioWrite16(u16 base_addr, u16 internal_addr, u16 data)
 
 
 
-inline void TLan_DioWrite32(u16 base_addr, u16 internal_addr, u32 data)
+static inline void TLan_DioWrite32(u16 base_addr, u16 internal_addr, u32 data)
 {
 	outw(internal_addr, base_addr + TLAN_DIO_ADR);
 	outl(data, base_addr + TLAN_DIO_DATA + (internal_addr & 0x2));
@@ -453,7 +453,7 @@ inline void TLan_DioWrite32(u16 base_addr, u16 internal_addr, u32 data)
 
 
 #if 0
-inline void TLan_ClearBit(u8 bit, u16 port)
+static inline void TLan_ClearBit(u8 bit, u16 port)
 {
 	outb_p(inb_p(port) & ~bit, port);
 }
@@ -461,7 +461,7 @@ inline void TLan_ClearBit(u8 bit, u16 port)
 
 
 
-inline int TLan_GetBit(u8 bit, u16 port)
+static inline int TLan_GetBit(u8 bit, u16 port)
 {
 	return ((int) (inb_p(port) & bit));
 }
@@ -469,7 +469,7 @@ inline int TLan_GetBit(u8 bit, u16 port)
 
 
 
-inline void TLan_SetBit(u8 bit, u16 port)
+static inline void TLan_SetBit(u8 bit, u16 port)
 {
 	outb_p(inb_p(port) | bit, port);
 }
@@ -482,7 +482,7 @@ inline void TLan_SetBit(u8 bit, u16 port)
 #ifdef I_LIKE_A_FAST_HASH_FUNCTION
 /* given 6 bytes, view them as 8 6-bit numbers and return the XOR of those */
 /* the code below is about seven times as fast as the original code */
-inline u32 TLan_HashFunc(u8 * a)
+static inline u32 TLan_HashFunc(u8 * a)
 {
 	u8 hash;
 
@@ -498,7 +498,7 @@ inline u32 TLan_HashFunc(u8 * a)
 
 #else				/* original code */
 
-inline u32 xor(u32 a, u32 b)
+static inline u32 xor(u32 a, u32 b)
 {
 	return ((a && !b) || (!a && b));
 }
@@ -506,7 +506,7 @@ inline u32 xor(u32 a, u32 b)
 #define XOR8( a, b, c, d, e, f, g, h )	xor( a, xor( b, xor( c, xor( d, xor( e, xor( f, xor( g, h ) ) ) ) ) ) )
 #define DA( a, bit )					( ( (u8) a[bit/8] ) & ( (u8) ( 1 << bit%8 ) ) )
 
-inline u32 TLan_HashFunc(u8 * a)
+static inline u32 TLan_HashFunc(u8 * a)
 {
 	u32 hash;
 

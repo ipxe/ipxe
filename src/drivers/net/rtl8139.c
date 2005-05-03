@@ -169,8 +169,12 @@ enum rx_mode_bits {
 static unsigned int cur_rx,cur_tx;
 
 /* The RTL8139 can only transmit from a contiguous, aligned memory block.  */
-static unsigned char tx_buffer[TX_BUF_SIZE] __attribute__((aligned(4)));
-static unsigned char rx_ring[RX_BUF_LEN+16] __attribute__((aligned(4)));
+struct {
+	unsigned char tx_buffer[TX_BUF_SIZE] __attribute__((aligned(4)));
+	unsigned char rx_ring[RX_BUF_LEN+16] __attribute__((aligned(4)));
+} rtl8139_bufs __shared;
+#define tx_buffer rtl8139_bufs.tx_buffer
+#define rx_ring rtl8139_bufs.rx_ring
 
 static int rtl8139_probe(struct nic *nic,struct pci_device *pci);
 static int read_eeprom(struct nic *nic, int location, int addr_len);

@@ -150,7 +150,7 @@ struct rx_desc {
 	 u32 /* struct rx_desc * */ next_rx_desc;
 } __attribute__ ((aligned(32)));
 
-struct dmfe_private {
+static struct dmfe_private {
 	u32 chip_id;		/* Chip vendor/Device ID */
 	u32 chip_revision;	/* Chip revision */
 	u32 cr0_data;
@@ -214,26 +214,21 @@ static u8 SF_mode;		/* Special Function: 1:VLAN, 2:RX Flow Control
 /**********************************************
 * Descriptor Ring and Buffer defination
 ***********************************************/
-/* Define the TX Descriptor */
-static struct tx_desc txd[TX_DESC_CNT]
-    __attribute__ ((aligned(32)));
-
-/* Create a static buffer of size PKT_BUF_SZ for each TX Descriptor.
-  All descriptors point to a part of this buffer */
-static unsigned char txb[TX_BUF_ALLOC * TX_DESC_CNT]
-    __attribute__ ((aligned(32)));
-
-/* Define the RX Descriptor */
-static struct rx_desc rxd[RX_DESC_CNT]
-__attribute__ ((aligned(32)));
-
-/* Create a static buffer of size PKT_BUF_SZ for each RX Descriptor.
-   All descriptors point to a part of this buffer */
-static unsigned char rxb[RX_ALLOC_SIZE * RX_DESC_CNT]
-__attribute__ ((aligned(32)));
+struct {
+	struct tx_desc txd[TX_DESC_CNT] __attribute__ ((aligned(32)));
+	unsigned char txb[TX_BUF_ALLOC * TX_DESC_CNT]
+	__attribute__ ((aligned(32)));
+	struct rx_desc rxd[RX_DESC_CNT] __attribute__ ((aligned(32)));
+	unsigned char rxb[RX_ALLOC_SIZE * RX_DESC_CNT]
+	__attribute__ ((aligned(32)));
+} dmfe_bufs __shared;
+#define txd dmfe_bufs.txd
+#define txb dmfe_bufs.txb
+#define rxd dmfe_bufs.rxd
+#define rxb dmfe_bufs.rxb
 
 /* NIC specific static variables go here */
-long int BASE;
+static long int BASE;
 
 static u16 read_srom_word(long ioaddr, int offset);
 static void dmfe_init_dm910x(struct nic *nic);

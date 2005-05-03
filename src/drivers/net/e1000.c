@@ -89,9 +89,12 @@ static struct nic_operations e1000_operations;
 static struct pci_driver e1000_driver;
 
 static struct e1000_hw hw;
-static char tx_pool[128 + 16];
-static char rx_pool[128 + 16];
-static char packet[2096];
+
+struct {
+	char tx_pool[128 + 16];
+	char rx_pool[128 + 16];
+	char packet[2096];
+} e1000_bufs __shared;
 
 static struct e1000_tx_desc *tx_base;
 static struct e1000_rx_desc *rx_base;
@@ -171,13 +174,13 @@ static void e1000_irq(struct nic *nic, irq_action_t action);
 
 #define E1000_WRITE_FLUSH(a) {uint32_t x; x = E1000_READ_REG(a, STATUS);}
 
-uint32_t
+static inline uint32_t
 e1000_io_read(struct e1000_hw *hw __unused, uint32_t port)
 {
         return inl(port);
 }
 
-void
+static inline void
 e1000_io_write(struct e1000_hw *hw __unused, uint32_t port, uint32_t value)
 {
         outl(value, port);
@@ -724,11 +727,10 @@ e1000_clear_vfta(struct e1000_hw *hw)
 * hw - Struct containing variables accessed by shared code
 * offset - offset to write to * value - value to write
 *****************************************************************************/
-void e1000_write_reg_io(struct e1000_hw *hw, uint32_t offset, uint32_t value){
-	uint32_t io_addr = hw->io_base;
-	uint32_t io_data = hw->io_base + 4;
-	e1000_io_write(hw, io_addr, offset);
-	e1000_io_write(hw, io_data, value);
+static inline void e1000_write_reg_io(struct e1000_hw *hw, uint32_t offset,
+				      uint32_t value){
+	e1000_io_write(hw, hw->io_base, offset);
+	e1000_io_write(hw, hw->io_base + 4, value);
 }
 
 /******************************************************************************
@@ -3362,7 +3364,7 @@ static void fill_rx (void)
 	rd = rx_base + rx_tail;
 	rx_tail = (rx_tail + 1) % 8;
 	memset (rd, 0, 16);
-	rd->buffer_addr = virt_to_bus(&packet);
+	rd->buffer_addr = virt_to_bus(&e1000_bufs.packet);
 	E1000_WRITE_REG (&hw, RDT, rx_tail);
 }
 
@@ -3371,7 +3373,7 @@ static void init_descriptor (void)
 	unsigned long ptr;
 	unsigned long tctl;
 
-	ptr = virt_to_phys(tx_pool);
+	ptr = virt_to_phys(e1000_bufs.tx_pool);
 	if (ptr & 0xf)
 		ptr = (ptr + 0x10) & (~0xf);
 
@@ -3409,7 +3411,7 @@ static void init_descriptor (void)
 	rx_tail = 0;
 	/* disable receive */
 	E1000_WRITE_REG (&hw, RCTL, 0);
-	ptr = virt_to_phys(rx_pool);
+	ptr = virt_to_phys(e1000_bufs.rx_pool);
 	if (ptr & 0xf)
 		ptr = (ptr + 0x10) & (~0xf);
 	rx_base = phys_to_virt(ptr);
@@ -3454,7 +3456,7 @@ e1000_poll (struct nic *nic, int retrieve)
 	if ( ! retrieve ) return 1;
 
 	//      printf("recv: packet %! -> %! len=%d \n", packet+6, packet,rd->Length);
-	memcpy (nic->packet, packet, rd->length);
+	memcpy (nic->packet, e1000_bufs.packet, rd->length);
 	nic->packetlen = rd->length;
 	fill_rx ();
 

@@ -262,7 +262,10 @@ static struct nic_operations eepro100_operations;
 static struct pci_driver eepro100_driver;
 
 #define RXFD_COUNT 4
-static struct RxFD rxfds[RXFD_COUNT];
+struct {
+	struct RxFD rxfds[RXFD_COUNT];
+} eepro100_bufs __shared;
+#define rxfds eepro100_bufs.rxfds
 static unsigned int rxfd = 0;
 
 static int congenb = 0;         /* Enable congestion control in the DP83840. */
