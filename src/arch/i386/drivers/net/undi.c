@@ -26,7 +26,7 @@ $Id$
  * your option) any later version.
  */
 
-#ifdef PCBIOS
+#if 0
 
 /* to get some global routines like printf */
 #include "etherboot.h"
