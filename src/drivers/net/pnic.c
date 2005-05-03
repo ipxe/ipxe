@@ -26,7 +26,7 @@ Bochs Pseudo NIC driver for Etherboot
 static int pnic_api_check ( uint16_t api_version );
 
 /* NIC specific static variables go here */
-static uint8_t tx_buffer[ETH_FRAME_LEN];
+static uint8_t tx_buffer[ETH_FRAME_LEN] __shared;
 
 /* 
  * Utility functions: issue a PNIC command, retrieve result.  Use
