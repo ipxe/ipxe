@@ -86,7 +86,7 @@ __asm__ ( ".equ\tDEBUG_LEVEL, " DEBUG_SYMBOL_STR );
  *
  */
 
-#define __shared __asm__ ( "_shared_bss" );
+#define __shared __asm__ ( "_shared_bss" )
 
 #endif /* ASSEMBLY */
 
