@@ -396,23 +396,7 @@ struct tulip_tx_desc {
 
 static u32 ioaddr;
 
-/* Note: transmit and receive buffers must be longword aligned and
-   longword divisable */
-
-#define TX_RING_SIZE	2
-#define RX_RING_SIZE	4
-struct {
-    struct tulip_tx_desc tx_ring[TX_RING_SIZE];
-    unsigned char txb[BUFLEN];
-    struct tulip_rx_desc rx_ring[RX_RING_SIZE];
-    unsigned char rxb[RX_RING_SIZE * BUFLEN];
-} tulip_buffers __shared __attribute__ ((aligned(4)));
-#define tx_ring tulip_buffers.tx_ring
-#define txb tulip_buffers.txb
-#define rx_ring tulip_buffers.rx_ring
-#define rxb tulip_buffers.rxb
-
-static struct tulip_private {
+struct tulip_private {
     int cur_rx;
     int chip_id;                        /* index into tulip_tbl[]  */
     int pci_id_idx;                     /* index into pci_id_tbl[] */
@@ -439,7 +423,24 @@ static struct tulip_private {
     signed char phys[4], mii_cnt;       /* MII device addresses. */
     int cur_index;                      /* Current media index. */
     int saved_if_port;
-} tpx;
+};
+
+/* Note: transmit and receive buffers must be longword aligned and
+   longword divisable */
+
+#define TX_RING_SIZE	2
+#define RX_RING_SIZE	4
+struct {
+    struct tulip_tx_desc tx_ring[TX_RING_SIZE];
+    unsigned char txb[BUFLEN];
+    struct tulip_rx_desc rx_ring[RX_RING_SIZE];
+    unsigned char rxb[RX_RING_SIZE * BUFLEN];
+    struct tulip_private tpx;
+} tulip_bss __shared __attribute__ ((aligned(4)));
+#define tx_ring tulip_bss.tx_ring
+#define txb tulip_bss.txb
+#define rx_ring tulip_bss.rx_ring
+#define rxb tulip_bss.rxb
 
 static struct tulip_private *tp;
 
@@ -1248,7 +1249,7 @@ static int tulip_probe ( struct nic *nic, struct pci_device *pci ) {
     nic->irqno     = 0;
 
     /* point to private storage */
-    tp = &tpx;
+    tp = &tulip_bss.tpx;
 
     tp->vendor_id  = pci->vendor_id;
     tp->dev_id     = pci->device_id;
