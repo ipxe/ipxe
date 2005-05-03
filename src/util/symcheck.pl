@@ -104,12 +104,13 @@ while ( ( my $symbol, my $info ) = each %$globals ) {
   }
 }
 
-# Check for excessively large local symbols
+# Check for excessively large local symbols.  Text and rodata symbols
+# are exempt from this check
 #
 while ( ( my $object, my $symbols ) = each %$symtab ) {
   while ( ( my $symbol, my $info ) = each %$symbols ) {
     if ( ( ! $info->{global} ) &&
-	 ( $info->{type} ne 't' ) &&
+	 ( ! ( $info->{type} =~ /^(t|r)$/ ) ) &&
 	 ( $info->{size} >= WARNING_SIZE ) ) {
       $problems->{$object}->{large}->{$symbol} = 1;
     }
