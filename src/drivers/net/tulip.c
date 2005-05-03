@@ -180,7 +180,7 @@ struct pci_id_info {
     int drv_flags;                              /* Driver use, intended as capability flags. */
 };
 
-static struct pci_id_info pci_id_tbl[] = {
+static const struct pci_id_info pci_id_tbl[] = {
     { "Digital DC21040 Tulip", { 0x00021011, 0xffffffff, 0, 0, 0, 0 },
       TULIP_IOTYPE, 0x80, DC21040 },
     { "Digital DC21041 Tulip", { 0x00141011, 0xffffffff, 0, 0, 0, 0 },

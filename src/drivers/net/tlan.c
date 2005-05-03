@@ -125,7 +125,7 @@ struct pci_id_info {
 	u16 addrOfs;		/* Address Offset */
 };
 
-static struct pci_id_info tlan_pci_tbl[] = {
+static const struct pci_id_info tlan_pci_tbl[] = {
 	{"Compaq Netelligent 10 T PCI UTP", NETEL10,
 	 {0xae340e11, 0xffffffff, 0, 0, 0, 0},
 	 TLAN_ADAPTER_ACTIVITY_LED, 0x83},
