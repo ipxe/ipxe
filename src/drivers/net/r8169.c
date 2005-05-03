@@ -282,34 +282,32 @@ struct RxDesc {
 	u32 buf_Haddr;
 };
 
-/* The descriptors for this card are required to be aligned on
-256 byte boundaries.  As the align attribute does not do more than
-16 bytes of alignment it requires some extra steps.  Add 256 to the 
-size of the array and the init_ring adjusts the alignment */
+/* The descriptors for this card are required to be aligned on 256
+ * byte boundaries.  As the align attribute does not do more than 16
+ * bytes of alignment it requires some extra steps.  Add 256 to the
+ * size of the array and the init_ring adjusts the alignment.
+ *
+ * UPDATE: This is no longer true; we can request arbitrary alignment.
+ */
 
-/* Define the TX Descriptor */
-static u8 tx_ring[NUM_TX_DESC * sizeof(struct TxDesc) + 256];
+/* Define the TX and RX Descriptors and Buffers */
+#define __align_256 __attribute__ (( aligned ( 256 ) ))
+struct {
+	struct TxDesc tx_ring[NUM_TX_DESC] __align_256;
+	unsigned char txb[NUM_TX_DESC * RX_BUF_SIZE];
+	struct RxDesc rx_ring[NUM_RX_DESC] __align_256;
+	unsigned char rxb[NUM_RX_DESC * RX_BUF_SIZE];
+} r8169_bufs __shared;
+#define tx_ring r8169_bufs.tx_ring
+#define rx_ring r8169_bufs.rx_ring
+#define txb r8169_bufs.txb
+#define rxb r8169_bufs.rxb
 
-/* Create a static buffer of size RX_BUF_SZ for each
-TX Descriptor.  All descriptors point to a
-part of this buffer */
-static unsigned char txb[NUM_TX_DESC * RX_BUF_SIZE];
-
-/* Define the RX Descriptor */
-static u8 rx_ring[NUM_RX_DESC * sizeof(struct TxDesc) + 256];
-
-/* Create a static buffer of size RX_BUF_SZ for each
-RX Descriptor   All descriptors point to a
-part of this buffer */
-static unsigned char rxb[NUM_RX_DESC * RX_BUF_SIZE];
-
-struct rtl8169_private {
+static struct rtl8169_private {
 	void *mmio_addr;	/* memory map physical address */
 	int chipset;
 	unsigned long cur_rx;	/* Index into the Rx descriptor buffer of next Rx pkt. */
 	unsigned long cur_tx;	/* Index into the Tx descriptor buffer of next Rx pkt. */
-	unsigned char *TxDescArrays;	/* Index of Tx Descriptor buffer */
-	unsigned char *RxDescArrays;	/* Index of Rx Descriptor buffer */
 	struct TxDesc *TxDescArray;	/* Index of 256-alignment Tx Descriptor buffer */
 	struct RxDesc *RxDescArray;	/* Index of 256-alignment Rx Descriptor buffer */
 	unsigned char *RxBufferRing[NUM_RX_DESC];	/* Index of Rx Buffer array */
@@ -324,7 +322,7 @@ static const u16 rtl8169_intr_mask =
 static const unsigned int rtl8169_rx_config =
     (RX_FIFO_THRESH << RxCfgFIFOShift) | (RX_DMA_BURST << RxCfgDMAShift);
 
-void mdio_write(int RegAddr, int value)
+static void mdio_write(int RegAddr, int value)
 {
 	int i;
 
@@ -341,7 +339,7 @@ void mdio_write(int RegAddr, int value)
 	}
 }
 
-int mdio_read(int RegAddr)
+static int mdio_read(int RegAddr)
 {
 	int i, value = -1;
 
@@ -416,7 +414,7 @@ static int rtl8169_init_board(struct pci_device *pdev)
 /**************************************************************************
 IRQ - Wait for a frame
 ***************************************************************************/
-void r8169_irq ( struct nic *nic __unused, irq_action_t action ) {
+static void r8169_irq ( struct nic *nic __unused, irq_action_t action ) {
 	int intr_status = 0;
 	int interested = RxUnderrun | RxOverflow | RxFIFOOver | RxErr | RxOK;
  
@@ -641,29 +639,9 @@ RESET - Finish setting up the ethernet interface
 static void r8169_reset(struct nic *nic)
 {
 	int i;
-	u8 diff;
-	u32 TxPhyAddr, RxPhyAddr;
 
-	tpc->TxDescArrays = tx_ring;
-	if (tpc->TxDescArrays == 0)
-		printf("Allot Error");
-	/* Tx Desscriptor needs 256 bytes alignment; */
-	TxPhyAddr = virt_to_bus(tpc->TxDescArrays);
-	diff = 256 - (TxPhyAddr - ((TxPhyAddr >> 8) << 8));
-	TxPhyAddr += diff;
-	tpc->TxDescArray = (struct TxDesc *) (tpc->TxDescArrays + diff);
-
-	tpc->RxDescArrays = rx_ring;
-	/* Rx Desscriptor needs 256 bytes alignment; */
-	RxPhyAddr = virt_to_bus(tpc->RxDescArrays);
-	diff = 256 - (RxPhyAddr - ((RxPhyAddr >> 8) << 8));
-	RxPhyAddr += diff;
-	tpc->RxDescArray = (struct RxDesc *) (tpc->RxDescArrays + diff);
-
-	if (tpc->TxDescArrays == NULL || tpc->RxDescArrays == NULL) {
-		printf("Allocate RxDescArray or TxDescArray failed\n");
-		return;
-	}
+	tpc->TxDescArray = tx_ring;
+	tpc->RxDescArray = rx_ring;
 
 	rtl8169_init_ring(nic);
 	rtl8169_hw_start(nic);
@@ -693,8 +671,6 @@ static void r8169_disable ( struct nic *nic __unused ) {
 
 	RTL_W32(RxMissed, 0);
 
-	tpc->TxDescArrays = NULL;
-	tpc->RxDescArrays = NULL;
 	tpc->TxDescArray = NULL;
 	tpc->RxDescArray = NULL;
 	for (i = 0; i < NUM_RX_DESC; i++) {
