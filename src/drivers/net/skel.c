@@ -21,10 +21,32 @@ Skeleton NIC driver for Etherboot
 #include "isapnp.h"
 #include "mca.h"
 
-/* NIC specific static variables go here.  Try to avoid using static
+/*
+ * NIC specific static variables go here.  Try to avoid using static
  * variables wherever possible.  In particular, the I/O address can
  * always be accessed via nic->ioaddr.
  */
+
+/*
+ * If you have large static variables (e.g. transmit and receive
+ * buffers), you should place them together in a single structure and
+ * mark the structure as "shared".  This enables this space to be
+ * shared between drivers in multi-driver images, which can easily
+ * reduce the runtime size by 50%.
+ *
+ */
+#define SKEL_RX_BUFS	1
+#define SKEL_TX_BUFS	1
+#define SKEL_RX_BUFSIZE	0
+#define SKEL_TX_BUFSIZE 0
+struct skel_rx_desc {};
+struct skel_tx_desc {};
+struct {
+	struct skel_rx_desc	rxd[SKEL_RX_BUFS];
+	unsigned char		rxb[SKEL_RX_BUFS][SKEL_RX_BUFSIZE];
+	struct skel_tx_desc	txd[SKEL_TX_BUFS];
+	unsigned char		txb[SKEL_TX_BUFS][SKEL_TX_BUFSIZE];
+} skel_bufs __shared;
 
 /*
  * Don't forget to remove "__unused" from all the function parameters!
@@ -46,6 +68,29 @@ static int skel_connect ( struct nic *nic __unused ) {
 	 *
 	 */
 	return 1;
+}
+
+/**************************************************************************
+ * TRANSMIT - Transmit a frame
+ **************************************************************************
+*/
+static void skel_transmit ( struct nic *nic __unused,
+			    const char *dest __unused,
+			    unsigned int type __unused,
+			    unsigned int size __unused,
+			    const char *packet __unused ) {
+	/* Transmit packet to dest MAC address.  You will need to
+	 * construct the link-layer header (dest MAC, source MAC,
+	 * type).
+	 */
+	/*
+	   unsigned int nstype = htons ( type );
+	   memcpy ( <tx_buffer>, dest, ETH_ALEN );
+	   memcpy ( <tx_buffer> + ETH_ALEN, nic->node_addr, ETH_ALEN );
+	   memcpy ( <tx_buffer> + 2 * ETH_ALEN, &nstype, 2 );
+	   memcpy ( <tx_buffer> + ETH_HLEN, data, size );
+	   <transmit_data> ( <tx_buffer>, size + ETH_HLEN );
+	 */
 }
 
 /**************************************************************************
@@ -79,29 +124,6 @@ static int skel_poll ( struct nic *nic __unused, int retrieve __unused ) {
 	*/
 
 	return 0;	/* Remove this line once this method is implemented */
-}
-
-/**************************************************************************
- * TRANSMIT - Transmit a frame
- **************************************************************************
-*/
-static void skel_transmit ( struct nic *nic __unused,
-			    const char *dest __unused,
-			    unsigned int type __unused,
-			    unsigned int size __unused,
-			    const char *packet __unused ) {
-	/* Transmit packet to dest MAC address.  You will need to
-	 * construct the link-layer header (dest MAC, source MAC,
-	 * type).
-	 */
-	/*
-	   unsigned int nstype = htons ( type );
-	   memcpy ( <tx_buffer>, dest, ETH_ALEN );
-	   memcpy ( <tx_buffer> + ETH_ALEN, nic->node_addr, ETH_ALEN );
-	   memcpy ( <tx_buffer> + 2 * ETH_ALEN, &nstype, 2 );
-	   memcpy ( <tx_buffer> + ETH_HLEN, data, size );
-	   <transmit_data> ( <tx_buffer>, size + ETH_HLEN );
-	 */
 }
 
 /**************************************************************************
@@ -143,8 +165,8 @@ static void skel_irq ( struct nic *nic __unused, irq_action_t action ) {
  */
 static struct nic_operations skel_operations = {
 	.connect	= skel_connect,
-	.poll		= skel_poll,
 	.transmit	= skel_transmit,
+	.poll		= skel_poll,
 	.irq		= skel_irq,
 };
 
