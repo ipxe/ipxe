@@ -3,7 +3,7 @@
 use strict;
 use warnings;
 
-use constant WARNING_SIZE => 2048;
+use constant WARNING_SIZE => 512;
 
 my $symtab = {};
 
