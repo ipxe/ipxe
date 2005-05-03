@@ -29,12 +29,12 @@
 static void scrollscreen(void);
 #endif
 
-static void draw_byte(unsigned char c, u32 locX, u32 locY);
+static void draw_byte(const unsigned char c, u32 locX, u32 locY);
 #if 0
-static void draw_byte_32(unsigned char *bits, u32 *base, u32 rb);
-static void draw_byte_16(unsigned char *bits, u32 *base, u32 rb);
+static void draw_byte_32(const unsigned char *bits, u32 *base, u32 rb);
+static void draw_byte_16(const unsigned char *bits, u32 *base, u32 rb);
 #endif
-static void draw_byte_8(unsigned char *bits, u32 *base, u32 rb);
+static void draw_byte_8(const unsigned char *bits, u32 *base, u32 rb);
 
 static u32 g_loc_X;
 static u32 g_loc_Y;
@@ -49,7 +49,7 @@ static u32 g_max_loc_Y;
 #define cmapsz  (16*96)
 #endif
 
-static unsigned char vga_font[cmapsz];
+static const unsigned char vga_font[cmapsz];
 
 u32 boot_text_mapped;
 
@@ -275,14 +275,14 @@ btext_drawhex(u32 v)
 #endif
 
 static void BTEXT
-draw_byte(unsigned char c, u32 locX, u32 locY)
+draw_byte(const unsigned char c, u32 locX, u32 locY)
 {
 	boot_infos_t* bi	= &disp_bi;
 	unsigned char *base	= calc_base(bi, locX << 3, locY << 4);
 #if CHAR_256==1
-        unsigned char *font     = &vga_font[(((u32)c)) * 16];
+        unsigned const char *font     = &vga_font[(((u32)c)) * 16];
 #else
-	unsigned char *font	= &vga_font[(((u32)c-0x20)) * 16];
+	unsigned const char *font	= &vga_font[(((u32)c-0x20)) * 16];
 #endif
 
 	u32 rb			= bi->dispDeviceRowBytes;
@@ -331,7 +331,7 @@ static const u32 expand_bits_16[4] BTDATA = {
 #endif
 #if 0
 static void BTEXT
-draw_byte_32(unsigned char *font, u32 *base, u32 rb)
+draw_byte_32(const unsigned char *font, u32 *base, u32 rb)
 {
 	u32 l, bits;
 	u32 fg = 0xFFFFFFFF;
@@ -353,7 +353,7 @@ draw_byte_32(unsigned char *font, u32 *base, u32 rb)
 }
 
 static void BTEXT
-draw_byte_16(unsigned char *font, u32 *base, u32 rb)
+draw_byte_16(const unsigned char *font, u32 *base, u32 rb)
 {
 	u32 l, bits;
 	u32 fg = 0xFFFFFFFF;
@@ -372,7 +372,7 @@ draw_byte_16(unsigned char *font, u32 *base, u32 rb)
 }
 #endif
 static void BTEXT
-draw_byte_8(unsigned char *font, u32 *base, u32 rb)
+draw_byte_8(const unsigned char *font, u32 *base, u32 rb)
 {
 	u32 l, bits;
 	u32 fg = 0x0F0F0F0F;
@@ -450,7 +450,7 @@ INIT_FN ( INIT_CONSOLE, btext_init, NULL, NULL );
 /**********************************************/
 
 
-static unsigned char vga_font[cmapsz] BTDATA = {
+static const unsigned char vga_font[cmapsz] BTDATA = {
 #if CHAR_256==1
 	/* 0 0x00 '^@' */
 	0x00, /* 00000000 */
