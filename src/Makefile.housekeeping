@@ -167,11 +167,15 @@ CLEANUP		+= $(BIN)/NIC
 # TGT_ROM_NAME : the ROM name (e.g. "dfe538")
 # TGT_MEDIA    : the media type (e.g. "rom")
 #
+DRIVERS_etherboot = $(DRIVERS)
+CARD_DRIVER	= $(firstword $(DRIVER_$(1)) $(1))
 TGT_ELEMENTS	= $(subst --, ,$(firstword $(subst ., ,$(notdir $@))))
 TGT_PREFIX	= $(word 2,$(subst ., ,$(notdir $@)))
-TGT_DRIVERS	= $(strip $(foreach TGT_ELEMENT,$(TGT_ELEMENTS), \
-		   $(firstword $(DRIVER_$(TGT_ELEMENT)) $(TGT_ELEMENT))))
 TGT_ROM_NAME	= $(firstword $(TGT_ELEMENTS))
+TGT_DRIVERS	= $(strip $(if $(DRIVERS_$(TGT_ROM_NAME)), \
+			       $(DRIVERS_$(TGT_ROM_NAME)), \
+			       $(foreach TGT_ELEMENT,$(TGT_ELEMENTS), \
+			         $(call CARD_DRIVER,$(TGT_ELEMENT))) ))
 TGT_MEDIA	= $(subst z,,$(TGT_PREFIX))
 
 # Look up ROM type and IDs for the current target
