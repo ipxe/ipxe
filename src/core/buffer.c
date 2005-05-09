@@ -32,15 +32,12 @@
  * Initialise a buffer
  *
  */
-void init_buffer ( struct buffer *buffer, physaddr_t start, size_t len ) {
-	buffer->start = start;
-	buffer->end = start + len;
-	buffer->fill = 0;
+void init_buffer ( struct buffer *buffer ) {
+	char tail = 1;
 
-	if ( len ) {
-		char tail = 1;
-		copy_to_phys ( start, &tail, sizeof ( tail ) );
-	}
+	buffer->fill = 0;
+	if ( buffer->end != buffer->start )
+		copy_to_phys ( buffer->start, &tail, sizeof ( tail ) );
 
 	DBG ( "BUFFER [%x,%x) initialised\n", buffer->start, buffer->end );
 }

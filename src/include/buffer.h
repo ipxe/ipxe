@@ -33,10 +33,12 @@ struct buffer_free_block {
 	physaddr_t	end;
 } __attribute__ (( packed ));
 
+/* This must be provided by the architecture-dependent load_buffer.c */
+extern struct buffer load_buffer;
+
 /* Functions in buffer.c */
 
-extern void init_buffer ( struct buffer *buffer, physaddr_t start,
-			  size_t len );
+extern void init_buffer ( struct buffer *buffer );
 extern int fill_buffer ( struct buffer *buffer, void *data,
 			 off_t offset, size_t len );
 
