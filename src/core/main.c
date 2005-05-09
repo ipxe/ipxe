@@ -162,7 +162,6 @@ void initialise ( void ) {
 MAIN - Kick off routine
 **************************************************************************/
 int main ( void ) {
-	struct buffer buffer;
 	int skip = 0;
 
 	/* Print out configuration */
@@ -215,15 +214,21 @@ int main ( void ) {
 		}
 
 		/* Load boot file from the device */
-		init_buffer ( &buffer, 0x7c00, 0x100 );
-		if ( ! load ( &dev, &buffer ) ) {
-			/* Load (e.g. TFTP failed) */
+		init_buffer ( &load_buffer );
+		if ( ! load ( &dev, &load_buffer ) ) {
+			/* Load (e.g. TFTP) failed */
 			printf ( "...load failed\n" );
 			continue;
 		}
 
-		printf ( "Loaded file of size %d\n", buffer.fill );
-
+		/* Boot the loaded image */
+		if ( ! boot_image ( &load_buffer ) ) {
+			/* Boot failed (e.g. invalid image) */
+			printf ( "...boot failed\n" );
+			continue;
+		}
+		
+		/* Image returned */
 	}
 
 	/* Call registered per-object exit functions */
