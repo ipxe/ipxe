@@ -15,6 +15,7 @@
 #ifndef ASSEMBLY
 
 #include "stdint.h"
+#include "string.h"
 
 #ifndef KEEP_IT_REAL
 
