@@ -18,6 +18,19 @@
  *		consider these trivial functions to be PD.
  */
 
+#define __HAVE_ARCH_MEMCPY
+static inline void * memcpy(void *dest, const void *src, size_t n)
+{
+int d0, d1, d2;
+__asm__ __volatile__ (
+	"cld\n\t"
+	"rep\n\t"
+	"movsb"
+	: "=&c" (d0), "=&S" (d1), "=&D" (d2)
+	:"0" (n), "1" (src), "2" (dest)
+	: "memory");
+return dest; 
+}
 
 #define __HAVE_ARCH_MEMMOVE
 static inline void * memmove(void * dest,const void * src, size_t n)
