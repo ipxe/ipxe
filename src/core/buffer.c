@@ -41,6 +41,8 @@ void init_buffer ( struct buffer *buffer, physaddr_t start, size_t len ) {
 		char tail = 1;
 		copy_to_phys ( start, &tail, sizeof ( tail ) );
 	}
+
+	DBG ( "BUFFER [%x,%x) initialised\n", buffer->start, buffer->end );
 }
 
 /*
@@ -56,6 +58,9 @@ static void split_free_block ( struct buffer_free_block *desc,
 	/* If split point is after end of block, do nothing */
 	if ( split >= desc->end )
 		return;
+
+	DBG ( "BUFFER splitting [%x,%x) into [%x,%x) and [%x,%x)\n",
+	      block, desc->end, block, split, split, desc->end );
 
 	/* Create descriptor for new free block */
 	copy_to_phys ( split, &desc->tail, sizeof ( desc->tail ) );
@@ -80,12 +85,17 @@ static inline void unfree_block ( struct buffer *buffer,
 	
 	/* If this is the first block, just update first_free */
 	if ( ! prev_block ) {
+		DBG ( "BUFFER marking [%x,%x) as used\n",
+		      buffer->first_free, desc->end );
 		buffer->first_free = desc->next_free;
 		return;
 	}
 
 	/* Get descriptor for previous block (which cannot be a tail block) */
 	copy_from_phys ( &prev_desc, prev_block, sizeof ( prev_desc ) );
+
+	DBG ( "BUFFER marking [%x,%x) as used\n",
+	      prev_desc.next_free, desc->end );
 
 	/* Modify descriptor for previous block and write it back */
 	prev_desc.next_free = desc->next_free;
@@ -114,6 +124,8 @@ off_t fill_buffer ( struct buffer *buffer, void *data,
 	/* Calculate start and end addresses of data */
 	data_start = buffer->start + offset;
 	data_end = data_start + len;
+	DBG ( "BUFFER [%x,%x) writing portion [%x,%x)\n",
+	      buffer->start, buffer->end, data_start, data_end );
 
 	/* Iterate through the buffer's free blocks */
 	prev_block = 0;
@@ -133,7 +145,7 @@ off_t fill_buffer ( struct buffer *buffer, void *data,
 		/* Block is now either completely contained by or
 		 * completely outside the data area
 		 */
-		if ( ( block >= data_start ) && ( block <= data_end ) ) {
+		if ( ( block >= data_start ) && ( block < data_end ) ) {
 			/* Block is within the data area */
 			unfree_block ( buffer, &desc, prev_block );
 			copy_to_phys ( block, data + ( block - data_start ),
@@ -146,6 +158,9 @@ off_t fill_buffer ( struct buffer *buffer, void *data,
 		/* Move to next free block */
 		block = desc.next_free;
 	}
+
+	DBG ( "BUFFER [%x,%x) full up to %x\n",
+	      buffer->start, buffer->end, buffer->first_free );
 
 	return ( buffer->first_free - buffer->start );
 }
