@@ -35,7 +35,7 @@
 void init_buffer ( struct buffer *buffer, physaddr_t start, size_t len ) {
 	buffer->start = start;
 	buffer->end = start + len;
-	buffer->first_free = start;
+	buffer->fill = 0;
 
 	if ( len ) {
 		char tail = 1;
@@ -59,7 +59,7 @@ static void split_free_block ( struct buffer_free_block *desc,
 	if ( split >= desc->end )
 		return;
 
-	DBG ( "BUFFER splitting [%x,%x) into [%x,%x) and [%x,%x)\n",
+	DBG ( "BUFFER splitting [%x,%x) -> [%x,%x) [%x,%x)\n",
 	      block, desc->end, block, split, split, desc->end );
 
 	/* Create descriptor for new free block */
@@ -83,11 +83,11 @@ static inline void unfree_block ( struct buffer *buffer,
 				  physaddr_t prev_block ) {
 	struct buffer_free_block prev_desc;
 	
-	/* If this is the first block, just update first_free */
+	/* If this is the first block, just update buffer->fill */
 	if ( ! prev_block ) {
 		DBG ( "BUFFER marking [%x,%x) as used\n",
-		      buffer->first_free, desc->end );
-		buffer->first_free = desc->next_free;
+		      buffer->start + buffer->fill, desc->end );
+		buffer->fill = desc->next_free - buffer->start;
 		return;
 	}
 
@@ -110,13 +110,10 @@ static inline void unfree_block ( struct buffer *buffer,
  * apart.  If this condition is not satisfied, data corruption will
  * occur.
  *
- * Returns the offset to the first gap in the buffer.  (When the
- * buffer is full, returns the offset to the byte past the end of the
- * buffer.)
- *
+ * Returns 1 for success, 0 for failure (e.g. buffer too small).
  */
-off_t fill_buffer ( struct buffer *buffer, void *data,
-		    off_t offset, size_t len ) {
+int fill_buffer ( struct buffer *buffer, void *data,
+		  off_t offset, size_t len ) {
 	struct buffer_free_block desc;
 	physaddr_t block, prev_block;
 	physaddr_t data_start, data_end;
@@ -127,9 +124,16 @@ off_t fill_buffer ( struct buffer *buffer, void *data,
 	DBG ( "BUFFER [%x,%x) writing portion [%x,%x)\n",
 	      buffer->start, buffer->end, data_start, data_end );
 
+	/* Check buffer bounds */
+	if ( data_end > buffer->end ) {
+		DBG ( "BUFFER [%x,%x) too small for data!\n",
+		      buffer->start, buffer->end );
+		return 0;
+	}
+
 	/* Iterate through the buffer's free blocks */
 	prev_block = 0;
-	block = buffer->first_free;
+	block = buffer->start + buffer->fill;
 	while ( block < buffer->end ) {
 		/* Read block descriptor */
 		desc.next_free = buffer->end;
@@ -160,7 +164,7 @@ off_t fill_buffer ( struct buffer *buffer, void *data,
 	}
 
 	DBG ( "BUFFER [%x,%x) full up to %x\n",
-	      buffer->start, buffer->end, buffer->first_free );
+	      buffer->start, buffer->end, buffer->start + buffer->fill );
 
-	return ( buffer->first_free - buffer->start );
+	return 1;
 }
