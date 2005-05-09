@@ -1,6 +1,7 @@
 #ifndef INIT_H
 #define INIT_H
 
+#include "stddef.h" /* for NULL */
 #include "tables.h"
 
 /*
@@ -42,9 +43,10 @@ struct init_fn {
 #define	INIT_PCIBIOS	05
 #define	INIT_MEMSIZES	06
 #define	INIT_RELOCATE	07
-#define	INIT_PCMCIA	08
-#define	INIT_HEAP	09
-#define	INIT_RPC	10
+#define	INIT_LOADBUF	08
+#define	INIT_PCMCIA	09
+#define	INIT_HEAP	10
+#define	INIT_RPC	11
 
 /* Macro for creating an initialisation function table entry */
 #define INIT_FN( init_order, init_func, reset_func, exit_func )		      \
