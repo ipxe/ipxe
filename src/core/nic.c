@@ -282,14 +282,10 @@ static int nic_configure ( struct type_dev *type_dev ) {
 
 
 /*
- * Download a file from the specified URL and process it with the
- * specified function
+ * Download a file from the specified URL into the specified buffer
  *
  */
-int download_url ( char *url,
-		   int ( * process ) ( unsigned char *data,
-				       unsigned int blocknum,
-				       unsigned int len, int eof ) ) {
+int download_url ( char *url, struct buffer *buffer ) {
 	struct protocol *proto;
 	struct sockaddr_in server;
 	char *filename;
@@ -303,7 +299,7 @@ int download_url ( char *url,
 	}
 	
 	/* Call protocol's method to download the file */
-	return proto->load ( url, &server, filename, process );
+	return proto->load ( url, &server, filename, buffer );
 }
 
 
@@ -312,10 +308,7 @@ int download_url ( char *url,
 /**************************************************************************
 LOAD - Try to get booted
 **************************************************************************/
-static int nic_load ( struct type_dev *type_dev,
-		      int ( * process ) ( unsigned char *data,
-					  unsigned int blocknum,
-					  unsigned int size, int eof ) ) {
+static int nic_load ( struct type_dev *type_dev, struct buffer *buffer ) {
 	char	*kernel;
 
 	/* Now use TFTP to load file */
@@ -327,12 +320,10 @@ static int nic_load ( struct type_dev *type_dev,
 #endif
 		: KERNEL_BUF;
 	if ( kernel ) {
-		download_url(kernel,process); /* We don't return except on error */
-		printf("Unable to load file.\n");
+		return download_url ( kernel, buffer );
 	} else {	
 		printf("No filename\n");
 	}
-	interruptible_sleep(2);		/* lay off the server for a while */
 	return 0;
 }
 

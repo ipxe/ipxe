@@ -162,6 +162,7 @@ void initialise ( void ) {
 MAIN - Kick off routine
 **************************************************************************/
 int main ( void ) {
+	struct buffer buffer;
 	int skip = 0;
 
 	/* Print out configuration */
@@ -213,8 +214,15 @@ int main ( void ) {
 			continue;
 		}
 
-		/* Boot from the device */
-		load ( &dev, load_block );
+		/* Load boot file from the device */
+		init_buffer ( &buffer, 0x7c00, 0x100 );
+		if ( ! load ( &dev, &buffer ) ) {
+			/* Load (e.g. TFTP failed) */
+			printf ( "...load failed\n" );
+			continue;
+		}
+
+		printf ( "Loaded file of size %d\n", buffer.fill );
 
 	}
 

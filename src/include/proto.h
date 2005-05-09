@@ -2,18 +2,14 @@
 #define PROTO_H
 
 #include "tables.h"
+#include "buffer.h"
 #include "in.h"
 
 struct protocol {
 	char *name;
 	in_port_t default_port;
-	int ( * load ) ( char *url,
-			 struct sockaddr_in *server,
-			 char *file,
-			 int ( * process ) ( unsigned char *data,
-					     unsigned int blocknum,
-					     unsigned int len,
-					     int eof ) );
+	int ( * load ) ( char *url, struct sockaddr_in *server, char *file,
+			 struct buffer *buffer );
 };
 
 /*

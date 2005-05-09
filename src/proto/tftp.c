@@ -144,12 +144,8 @@ int tftp_block ( struct tftpreq_info_t *request,
  * Download a file via TFTP
  *
  */
-int tftp ( char *url __unused,
-	   struct sockaddr_in *server,
-	   char *file,
-	   int ( * process ) ( unsigned char *data,
-			       unsigned int blocknum,
-			       unsigned int len, int eof ) ) {
+int tftp ( char *url __unused, struct sockaddr_in *server, char *file,
+	   struct buffer *buffer ) {
 	struct tftpreq_info_t request_data = {
 		.server = server,
 		.name = file,
@@ -157,14 +153,18 @@ int tftp ( char *url __unused,
 	};
 	struct tftpreq_info_t *request = &request_data;
 	struct tftpblk_info_t block;
-	int rc;
+	off_t offset = 0;
 
-	while ( tftp_block ( request, &block ) ) {
+	do {
+		if ( ! tftp_block ( request, &block ) )
+			return 0;
+		if ( ! fill_buffer ( buffer, block.data, offset, block.len ) )
+			return 0;
+		offset += block.len;
 		request = NULL; /* Send request only once */
-		rc = process ( block.data, block.block, block.len, block.eof );
-		if ( rc <= 0 ) return ( rc );
-	}
-	return 0;
+	} while ( ! block.eof );
+
+	return 1;
 }
 
 struct protocol tftp_protocol __default_protocol = {

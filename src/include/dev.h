@@ -3,6 +3,7 @@
 
 #include "stdint.h"
 #include "string.h"
+#include "buffer.h"
 #include "dhcp.h" /* for dhcp_dev_id */
 #include "tables.h"
 
@@ -182,10 +183,7 @@ struct type_driver {
 	struct type_dev *type_dev; /* single instance */
 	char * ( * describe_device ) ( struct type_dev *type_dev );
 	int ( * configure ) ( struct type_dev *type_dev );
-	int ( * load ) ( struct type_dev *type_dev, 
-			 int ( * process ) ( unsigned char *data,
-					     unsigned int blocknum,
-					     unsigned int len, int eof ) );
+	int ( * load ) ( struct type_dev *type_dev, struct buffer *buffer );
 };
 
 #define __type_driver __attribute__ (( used, __table_section(type_driver,01) ))
@@ -277,11 +275,8 @@ static inline int configure ( struct dev *dev ) {
 	return dev->type_driver->configure ( dev->type_dev );
 }
 /* Boot from a device */
-static inline int load ( struct dev *dev,
-			 int ( * process ) ( unsigned char *data,
-					     unsigned int blocknum, 
-					     unsigned int len, int eof ) ) {
-	return dev->type_driver->load ( dev->type_dev, process );
+static inline int load ( struct dev *dev, struct buffer *buffer ) {
+	return dev->type_driver->load ( dev->type_dev, buffer );
 }
 
 #endif /* DEV_H */

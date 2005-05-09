@@ -2,6 +2,7 @@
 #define	TFTP_H
 
 #include "in.h"
+#include "buffer.h"
 #include "nic.h"
 
 #define TFTP_PORT	69
@@ -83,11 +84,7 @@ struct tftpblk_info_t {
  */
 extern int tftp_block ( struct tftpreq_info_t *request,
 			struct tftpblk_info_t *block );
-extern int tftp ( char *url,
-		  struct sockaddr_in *server,
-		  char *file,
-		  int ( * process ) ( unsigned char *data,
-				      unsigned int blocknum,
-				      unsigned int len, int eof ) );
+extern int tftp ( char *url, struct sockaddr_in *server, char *file,
+		  struct buffer *buffer );
 
 #endif	/* TFTP_H */
