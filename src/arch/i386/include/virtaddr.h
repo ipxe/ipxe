@@ -45,6 +45,14 @@ static inline void * phys_to_virt ( unsigned long phys_addr ) {
 	return ( void * ) ( phys_addr - virt_offset );
 }
 
+static inline void copy_to_phys ( physaddr_t dest, void *src, size_t len ) {
+	memcpy ( phys_to_virt ( dest ), src, len );
+}
+
+static inline void copy_from_phys ( void *dest, physaddr_t src, size_t len ) {
+	memcpy ( dest, phys_to_virt ( src ), len );
+}
+
 #else /* KEEP_IT_REAL */
 
 /*
