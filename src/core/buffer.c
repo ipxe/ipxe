@@ -14,6 +14,13 @@
  * which assemble a file into a single contiguous block.  The whole
  * block is then passed to the image loader.
  *
+ *
+ * Note that the rather convoluted way of manipulating the buffer
+ * descriptors (using copy_{to,from}_phys rather than straightforward
+ * pointers) is needed to cope with operation as a PXE stack, when we
+ * may be running in real mode or 16-bit protected mode, and therefore
+ * cannot directly access arbitrary areas of memory.
+ *
  */
 
 #include "stddef.h"
