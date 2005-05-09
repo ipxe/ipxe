@@ -18,114 +18,127 @@
 
 #include "stddef.h"
 #include "string.h"
+#include "io.h"
 #include "buffer.h"
-
-/*
- * Split a free block at the specified address, to produce two
- * consecutive free blocks.  If the address is not within the free
- * block, do nothing and return success.  If one of the resulting free
- * blocks would be too small to contain the free block descriptor,
- * return failure.
- *
- */
-static int split_free_block ( struct buffer_free_block *block, void *split ) {
-	struct buffer_free_block *new_block = split;
-
-	if ( ( split <= ( void * ) block ) || ( split >= block->end ) ) {
-		/* Split is outside block; nothing to do */
-		return 1;
-	}
-	
-	if ( ( ( block + 1 ) > new_block ) ||
-	     ( ( ( void * ) ( new_block + 1 ) ) > block->end ) ) {
-		/* Split block would be too small; fail */
-		return 0;
-	}
-
-	/* Create new block, link into free list */
-	new_block->next		= block->next;
-	new_block->next->prev	= new_block;
-	new_block->prev		= block->prev;
-	new_block->end 		= block->end;
-	block->next		= new_block;
-	block->end		= new_block;
-	return 1;
-}
-
-/*
- * Remove a block from the free list.
- *
- * Note that this leaves block->next intact.
- *
- */
-static inline void unfree_block ( struct buffer_free_block *block ) {
-	block->prev->next = block->next;
-	block->next->prev = block->prev;
-}
-
-/*
- * Mark a stretch of memory within a buffer as allocated.
- *
- */
-static inline int mark_allocated ( struct buffer *buffer,
-				   void *start, void *end ) {
-	struct buffer_free_block *block = buffer->free_blocks.next;
-
-	while ( block != &buffer->free_blocks ) {
-		if ( ! ( split_free_block ( block, start ) &&
-			 split_free_block ( block, end ) ) ) {
-			/* Block split failure; fail */
-			return 0;
-		}
-		/* At this point, block can be entirely contained
-		 * within [start,end), but it can't overlap.
-		 */
-		if ( ( ( ( void * ) block ) >= start ) &&
-		     ( ( ( void * ) block ) < end ) ) {
-			unfree_block ( block );
-		}
-		block = block->next;
-	}
-
-	return 1;
-}
-
-/*
- * Place data into a buffer
- *
- */
-int fill_buffer ( struct buffer *buffer, void *data,
-		  off_t offset, size_t len ) {
-	void *start = buffer->start + offset;
-	void *end = start + len;
-
-	if ( ! mark_allocated ( buffer, start, end ) ) {
-		/* Allocation failure; fail */
-		return 0;
-	}
-	memcpy ( start, data, len );
-	return 1;
-}
 
 /*
  * Initialise a buffer
  *
  */
-static void init_buffer ( struct buffer *buffer, void *start, size_t len ) {
-	struct buffer_free_block *block;
-
-	block = start;
-	block->next = &buffer->free_blocks;
-	block->prev = &buffer->free_blocks;
-	block->end = start + len;
-
-	buffer->free_blocks.next = block;
-	buffer->free_blocks.prev = block;
+void init_buffer ( struct buffer *buffer, physaddr_t start, size_t len ) {
 	buffer->start = start;
 	buffer->end = start + len;
+	buffer->first_free = start;
+
+	if ( len ) {
+		char tail = 1;
+		copy_to_phys ( start, &tail, sizeof ( tail ) );
+	}
 }
 
 /*
- * Move a buffer
+ * Split a free block
  *
  */
+static void split_free_block ( struct buffer_free_block *desc,
+			       physaddr_t block, physaddr_t split ) {
+	/* If split point is before start of block, do nothing */
+	if ( split <= block )
+		return;
+
+	/* If split point is after end of block, do nothing */
+	if ( split >= desc->end )
+		return;
+
+	/* Create descriptor for new free block */
+	copy_to_phys ( split, &desc->tail, sizeof ( desc->tail ) );
+	if ( ! desc->tail )
+		copy_to_phys ( split, desc, sizeof ( *desc ) );
+
+	/* Update descriptor for old free block */
+	desc->tail = 0;
+	desc->next_free = split;
+	desc->end = split;
+	copy_to_phys ( block, desc, sizeof ( *desc ) );
+}
+
+/*
+ * Mark a free block as used
+ *
+ */
+static inline void unfree_block ( struct buffer *buffer,
+				  struct buffer_free_block *desc,
+				  physaddr_t prev_block ) {
+	struct buffer_free_block prev_desc;
+	
+	/* If this is the first block, just update first_free */
+	if ( ! prev_block ) {
+		buffer->first_free = desc->next_free;
+		return;
+	}
+
+	/* Get descriptor for previous block (which cannot be a tail block) */
+	copy_from_phys ( &prev_desc, prev_block, sizeof ( prev_desc ) );
+
+	/* Modify descriptor for previous block and write it back */
+	prev_desc.next_free = desc->next_free;
+	copy_to_phys ( prev_block, &prev_desc, sizeof ( prev_desc ) );
+}
+
+/*
+ * Write data into a buffer
+ *
+ * It is the caller's responsibility to ensure that the boundaries
+ * between data blocks are more than sizeof(struct buffer_free_block)
+ * apart.  If this condition is not satisfied, data corruption will
+ * occur.
+ *
+ * Returns the offset to the first gap in the buffer.  (When the
+ * buffer is full, returns the offset to the byte past the end of the
+ * buffer.)
+ *
+ */
+off_t fill_buffer ( struct buffer *buffer, void *data,
+		    off_t offset, size_t len ) {
+	struct buffer_free_block desc;
+	physaddr_t block, prev_block;
+	physaddr_t data_start, data_end;
+
+	/* Calculate start and end addresses of data */
+	data_start = buffer->start + offset;
+	data_end = data_start + len;
+
+	/* Iterate through the buffer's free blocks */
+	prev_block = 0;
+	block = buffer->first_free;
+	while ( block < buffer->end ) {
+		/* Read block descriptor */
+		desc.next_free = buffer->end;
+		desc.end = buffer->end;
+		copy_from_phys ( &desc.tail, block, sizeof ( desc.tail ) );
+		if ( ! desc.tail )
+			copy_from_phys ( &desc, block, sizeof ( desc ) );
+
+		/* Split block at data start and end markers */
+		split_free_block ( &desc, block, data_start );
+		split_free_block ( &desc, block, data_end );
+
+		/* Block is now either completely contained by or
+		 * completely outside the data area
+		 */
+		if ( ( block >= data_start ) && ( block <= data_end ) ) {
+			/* Block is within the data area */
+			unfree_block ( buffer, &desc, prev_block );
+			copy_to_phys ( block, data + ( block - data_start ),
+				       desc.end - block );
+		} else {
+			/* Block is outside the data area */
+			prev_block = block;
+		}
+
+		/* Move to next free block */
+		block = desc.next_free;
+	}
+
+	return ( buffer->first_free - buffer->start );
+}
