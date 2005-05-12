@@ -59,4 +59,24 @@ static inline void * erealloc ( void *ptr, size_t size, unsigned int align ) {
 	return emalloc ( size, align );
 }
 
+/*
+ * Legacy API calls
+ *
+ */
+static inline void * allot ( size_t size ) {
+	return emalloc ( size, sizeof ( void * ) );
+}
+
+static inline void forget ( void *ptr ) {
+	efree ( ptr );
+}
+
+static inline void * allot2 ( size_t size, uint32_t mask ) {
+	return emalloc ( size, mask + 1 );
+}
+
+static inline void forget2 ( void *ptr ) {
+	efree ( ptr );
+}
+
 #endif /* HEAP_H */
