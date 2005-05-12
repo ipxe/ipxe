@@ -1,6 +1,14 @@
 #include "etherboot.h"
 #include "init.h"
 #include "memsizes.h"
+#include "heap.h"
+
+#define ASSERT(...)
+
+struct heap_block {
+	size_t size;
+	char data[0];
+};
 
 size_t heap_ptr, heap_top, heap_bot;
 
@@ -86,94 +94,59 @@ static void init_heap(void)
 	heap_ptr = heap_bot;
 }
 
-static void reset_heap(void)
-{
+/*
+ * Allocate a block from the heap.
+ *
+ */
+void * emalloc ( size_t size, unsigned int align ) {
+	physaddr_t addr;
+	struct heap_block *block;
+	
+	ASSERT ( ! ( align & ( align - 1 ) ) );
+	
+	addr = ( ( ( heap_ptr - size ) & ~( align - 1 ) )
+		 - sizeof ( struct heap_block ) );
+	if ( addr < heap_top ) {
+		return NULL;
+	}
+
+	block = phys_to_virt ( addr );
+	block->size = ( heap_ptr - addr );
+	heap_ptr = addr;
+	return block->data;
+}
+
+/*
+ * Allocate all remaining space on the heap
+ *
+ */
+void * emalloc_all ( size_t *size ) {
+	*size = heap_ptr - heap_top - sizeof ( struct heap_block );
+	return emalloc ( *size, sizeof ( void * ) );
+}
+
+/*
+ * Free a heap block
+ *
+ */
+void efree ( void *ptr ) {
+	struct heap_block *block;
+
+	ASSERT ( ptr == ( heap_ptr + sizeof ( size_t ) ) );
+	
+	block = ( struct heap_block * )
+		( ptr - offsetof ( struct heap_block, data ) );
+	heap_ptr += block->size;
+
+	ASSERT ( heap_ptr <= heap_bot );
+}
+
+/*
+ * Free all allocated heap blocks
+ *
+ */
+void efree_all ( void ) {
 	heap_ptr = heap_bot;
 }
 
-void *allot(size_t size)
-{
-	void *ptr;
-	size_t *mark, addr;
-	/* Get an 16 byte aligned chunk of memory off of the heap 
-	 * An extra sizeof(size_t) bytes is allocated to track
-	 * the size of the object allocated on the heap.
-	 */
-	addr = (heap_ptr - (size + sizeof(size_t))) &  ~15;
-	if (addr < heap_top) {
-		ptr = 0;
-	} else {
-		mark = phys_to_virt(addr);
-		*mark = size;
-		heap_ptr = addr;
-		ptr = phys_to_virt(addr + sizeof(size_t));
-	}
-	return ptr;
-}
-
-//if mask = 0xf, it will be 16 byte aligned
-//if mask = 0xff, it will be 256 byte aligned
-//For DMA memory allocation, because it has more reqiurement on alignment
-void *allot2(size_t size, uint32_t mask)
-{
-        void *ptr;
-        size_t *mark, addr;
-	uint32_t *mark1;
-        
-	addr = ((heap_ptr - size ) &  ~mask) - sizeof(size_t) - sizeof(uint32_t);
-        if (addr < heap_top) {
-                ptr = 0;        
-        } else {        
-                mark = phys_to_virt(addr);
-                *mark = size;  
-		mark1 = phys_to_virt(addr+sizeof(size_t));
-		*mark1 = mask; 
-                heap_ptr = addr;
-                ptr = phys_to_virt(addr + sizeof(size_t) + sizeof(uint32_t));
-        }                       
-        return ptr;             
-}  
-
-void forget(void *ptr)
-{
-	size_t *mark, addr;
-	size_t size;
-
-	if (!ptr) {
-		return;
-	}
-	addr = virt_to_phys(ptr);
-	mark = phys_to_virt(addr - sizeof(size_t));
-	size = *mark;
-	addr += (size + 15) & ~15;
-	
-	if (addr > heap_bot) {
-		addr = heap_bot;
-	}
-	heap_ptr = addr;
-}
-
-void forget2(void *ptr)
-{
-        size_t *mark, addr;
-        size_t size;
-	uint32_t mask;
-	uint32_t *mark1;
-
-        if (!ptr) {
-                return;
-        }
-        addr = virt_to_phys(ptr);
-        mark = phys_to_virt(addr - sizeof(size_t) - sizeof(uint32_t));
-        size = *mark;
-	mark1 = phys_to_virt(addr - sizeof(uint32_t));
-	mask = *mark1;
-        addr += (size + mask) & ~mask;
-
-        if (addr > heap_bot) {
-                addr = heap_bot;
-        }
-        heap_ptr = addr;
-}
-
-INIT_FN ( INIT_HEAP, init_heap, reset_heap, NULL );
+INIT_FN ( INIT_HEAP, init_heap, efree_all, NULL );
