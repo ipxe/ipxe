@@ -13,14 +13,6 @@
 extern void * emalloc ( size_t size, unsigned int align );
 
 /*
- * Allocate a block, with no particular alignment requirements.
- *
- */
-static inline void * malloc ( size_t size ) {
-	return emalloc ( size, sizeof ( void * ) );
-}
-
-/*
  * Allocate all remaining space on the heap
  *
  */
@@ -36,10 +28,6 @@ extern void * emalloc_all ( size_t *size );
  */
 extern void efree ( void *ptr );
 
-static inline void free ( void *ptr ) {
-	efree ( ptr );
-}
-
 /*
  * Free all allocated blocks on the heap
  *
@@ -54,9 +42,22 @@ extern void efree_all ( void );
  * corruption will occur.
  *
  */
-static inline void * erealloc ( void *ptr, size_t size, unsigned int align ) {
+extern void * erealloc ( void *ptr, size_t size );
+
+/*
+ * Allocate, free, and resize blocks without caring about alignment
+ *
+ */
+static inline void * malloc ( size_t size ) {
+	return emalloc ( size, sizeof ( void * ) );
+}
+
+static inline void free ( void *ptr ) {
 	efree ( ptr );
-	return emalloc ( size, align );
+}
+
+static inline void * realloc ( void *ptr, size_t size ) {
+	return erealloc ( ptr, size );
 }
 
 /*

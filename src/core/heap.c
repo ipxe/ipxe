@@ -5,6 +5,7 @@
 
 struct heap_block {
 	size_t size;
+	unsigned int align;
 	char data[0];
 };
 
@@ -12,7 +13,7 @@ struct heap_block {
 extern char _text[];
 extern char _end[];
 
-static unsigned long heap_start, heap_end, heap_ptr;
+static physaddr_t heap_start, heap_end, heap_ptr;
 
 /*
  * Find the largest contiguous area of memory that I can use for the
@@ -21,8 +22,8 @@ static unsigned long heap_start, heap_end, heap_ptr;
  */
 static void init_heap ( void ) {
 	unsigned int i;
-	unsigned long eb_start, eb_end;
-	unsigned long size;
+	physaddr_t eb_start, eb_end;
+	physaddr_t size;
 
 	size = 0;
 	
@@ -31,8 +32,8 @@ static void init_heap ( void ) {
 	eb_end = virt_to_phys ( _end );
 
 	for ( i = 0 ; i < meminfo.map_count ; i++ ) {
-		unsigned long r_start, r_end, r_size;
-		unsigned long pre_eb, post_eb;
+		physaddr_t r_start, r_end, r_size;
+		physaddr_t pre_eb, post_eb;
 
 		/* Get start and end addresses of the region */
 		if ( meminfo.map[i].type != E820_RAM )
@@ -84,14 +85,19 @@ static void init_heap ( void ) {
  * Allocate a block from the heap.
  *
  */
+static inline physaddr_t block_alloc_addr ( physaddr_t heap_ptr,
+					    size_t size, unsigned int align ) {
+	return ( ( ( heap_ptr - size ) & ~( align - 1 ) )
+		 - sizeof ( struct heap_block ) );
+}
+
 void * emalloc ( size_t size, unsigned int align ) {
-	physaddr_t addr;
 	struct heap_block *block;
+	physaddr_t addr;
 	
 	ASSERT ( ( align & ( align - 1 ) ) == 0 );
-	
-	addr = ( ( ( heap_ptr - size ) & ~( align - 1 ) )
-		 - sizeof ( struct heap_block ) );
+
+	addr = block_alloc_addr ( heap_ptr, size, align );
 	if ( addr < heap_start ) {
 		DBG ( "HEAP no space for %x bytes (alignment %d) in [%x,%x)\n",
 		      size, align, heap_start, heap_ptr );
@@ -100,6 +106,7 @@ void * emalloc ( size_t size, unsigned int align ) {
 
 	block = phys_to_virt ( addr );
 	block->size = ( heap_ptr - addr );
+	block->align = align;
 	DBG ( "HEAP allocated %x bytes (alignment %d) at %x [%x,%x)\n",
 	      size, align, virt_to_phys ( block->data ), addr, heap_ptr );
 	heap_ptr = addr;
@@ -119,6 +126,10 @@ void * emalloc_all ( size_t *size ) {
  * Free a heap block
  *
  */
+static inline physaddr_t block_free_addr ( size_t size ) {
+	return heap_ptr + size;
+}
+
 void efree ( void *ptr ) {
 	struct heap_block *block;
 
@@ -126,7 +137,7 @@ void efree ( void *ptr ) {
 	
 	block = ( struct heap_block * )
 		( ptr - offsetof ( struct heap_block, data ) );
-	heap_ptr += block->size;
+	heap_ptr = block_free_addr ( block->size );
 
 	DBG ( "HEAP freed %x [%x,%x)\n", virt_to_phys ( ptr ),
 	      virt_to_phys ( block ), heap_ptr );
@@ -143,6 +154,54 @@ void efree_all ( void ) {
 	      heap_ptr, heap_end );
 
 	heap_ptr = heap_end;
+}
+
+/*
+ * Resize a heap block
+ *
+ */
+void * erealloc ( void *ptr, size_t size ) {
+	struct heap_block *old_block;
+	size_t old_size;
+	unsigned int old_align;
+	physaddr_t new_addr;
+	size_t move_size;
+	
+	/* Get descriptor of the old block */
+	old_block = ( struct heap_block * )
+		( ptr - offsetof ( struct heap_block, data ) );
+	old_size = old_block->size;
+	old_align = old_block->align;
+
+	/* Check that allocation is going to succeed */
+	new_addr = block_alloc_addr ( block_free_addr ( old_size ),
+				      size, old_align );
+	if ( new_addr < heap_start ) {
+		DBG ( "HEAP no space for %x bytes (alignment %d) in [%x,%x)\n",
+		      size, align, heap_start, block_free_addr ( old_size ) );
+		return NULL;
+	}
+
+	/* Free the old block */
+	efree ( ptr );
+
+	/* Move the data.  Do this *before* allocating the new block,
+	 * because the new block's descriptor may overwrite the old
+	 * block's data, if the new block is smaller than the old
+	 * block.
+	 */
+	move_size = size + sizeof ( struct heap_block );
+	if ( old_size < move_size )
+		move_size = old_size;
+	memmove ( phys_to_virt ( new_addr ), old_block, move_size );
+
+	/* Allocate the new block.  This must succeed, because we
+	 * already checked that there was sufficient space.
+	 */
+	ptr = emalloc ( size, old_align );
+	ASSERT ( ptr != NULL );
+
+	return ptr;
 }
 
 INIT_FN ( INIT_HEAP, init_heap, efree_all, NULL );
