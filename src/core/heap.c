@@ -76,6 +76,7 @@ static void init_heap ( void ) {
 	}
 
 	ASSERT ( size != 0 );
+	DBG ( "HEAP using region [%x,%x)\n", heap_start, heap_end );
 	heap_ptr = heap_end;
 }
 
@@ -92,11 +93,15 @@ void * emalloc ( size_t size, unsigned int align ) {
 	addr = ( ( ( heap_ptr - size ) & ~( align - 1 ) )
 		 - sizeof ( struct heap_block ) );
 	if ( addr < heap_start ) {
+		DBG ( "HEAP no space for %x bytes (alignment %d) in [%x,%x)\n",
+		      size, align, heap_start, heap_ptr );
 		return NULL;
 	}
 
 	block = phys_to_virt ( addr );
 	block->size = ( heap_ptr - addr );
+	DBG ( "HEAP allocated %x bytes (alignment %d) at %x [%x,%x)\n",
+	      size, align, virt_to_phys ( block->data ), addr, heap_ptr );
 	heap_ptr = addr;
 	return block->data;
 }
@@ -123,6 +128,9 @@ void efree ( void *ptr ) {
 		( ptr - offsetof ( struct heap_block, data ) );
 	heap_ptr += block->size;
 
+	DBG ( "HEAP freed %x [%x,%x)\n", virt_to_phys ( ptr ),
+	      virt_to_phys ( block ), heap_ptr );
+
 	ASSERT ( heap_ptr <= heap_end );
 }
 
@@ -131,6 +139,9 @@ void efree ( void *ptr ) {
  *
  */
 void efree_all ( void ) {
+	DBG ( "HEAP discarding allocated blocks in [%x,%x)\n",
+	      heap_ptr, heap_end );
+
 	heap_ptr = heap_end;
 }
 
