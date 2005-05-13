@@ -67,6 +67,23 @@ __asm__ ( ".equ\tDEBUG_LEVEL, " DEBUG_SYMBOL_STR );
 #define DBG2 DBG_PRINT
 #endif
 
+/*
+ * ASSERT() macros
+ *
+ */
+#define ASSERT(x)
+
+#if DEBUG_SYMBOL >= 1
+#undef ASSERT
+#define ASSERT(x) 							      \
+	do { 								      \
+		if ( ! (x) ) { 						      \
+			DBG ( "ASSERT(%s) failed at %s line %d [%s]\n", #x,   \
+			      __FILE__, __LINE__, __FUNCTION__ );	      \
+		} 							      \
+	} while (0)
+#endif
+
 #define PACKED __attribute__((packed))
 #define __unused __attribute__((unused))
 #define __used __attribute__((used))

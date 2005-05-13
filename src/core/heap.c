@@ -3,8 +3,6 @@
 #include "memsizes.h"
 #include "heap.h"
 
-#define ASSERT(...)
-
 struct heap_block {
 	size_t size;
 	char data[0];
@@ -102,7 +100,7 @@ void * emalloc ( size_t size, unsigned int align ) {
 	physaddr_t addr;
 	struct heap_block *block;
 	
-	ASSERT ( ! ( align & ( align - 1 ) ) );
+	ASSERT ( ( align & ( align - 1 ) ) == 0 );
 	
 	addr = ( ( ( heap_ptr - size ) & ~( align - 1 ) )
 		 - sizeof ( struct heap_block ) );
@@ -132,7 +130,7 @@ void * emalloc_all ( size_t *size ) {
 void efree ( void *ptr ) {
 	struct heap_block *block;
 
-	ASSERT ( ptr == ( heap_ptr + sizeof ( size_t ) ) );
+	ASSERT ( ptr == phys_to_virt ( heap_ptr + sizeof ( size_t ) ) );
 	
 	block = ( struct heap_block * )
 		( ptr - offsetof ( struct heap_block, data ) );
