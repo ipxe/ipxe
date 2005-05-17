@@ -17,15 +17,10 @@
 SEND_TCP_CALLBACK - Send data using TCP
 **************************************************************************/
 struct send_recv_state {
-	int ( * process ) ( unsigned char *data,
-			    unsigned int blocknum,
-			    unsigned int len, int eof );
+	struct buffer *recv_buffer;
 	char *send_buffer;
-	char *recv_buffer;
 	int send_length;
-	int recv_length;
 	int bytes_sent;
-	int block;
 	int bytes_received;
 	enum { RESULT_CODE, HEADER, DATA, ERROR, MOVED } recv_state;
 	int rc;
@@ -106,25 +101,11 @@ static int recv_tcp_request(int length, const void *buffer, void *ptr) {
 		}
 	}
 	if (state->recv_state == DATA) {
-		state->bytes_received += length;
 		DBG2 ( "HTTP received %d bytes\n", length );
-		while (length > 0) {
-			int copy_length = BLOCKSIZE - state->recv_length;
-			if (copy_length > length)
-				copy_length = length;
-			memcpy(state->recv_buffer + state->recv_length,
-			       buffer, copy_length);
-			if ((state->recv_length += copy_length) == BLOCKSIZE) {
-				DBG2 ( "HTTP processing %d bytes\n",
-				      BLOCKSIZE );
-				if (!state->process(state->recv_buffer,
-						    ++state->block,
-						    BLOCKSIZE, 0))
-				state->recv_length = 0;
-			}
-			length -= copy_length;
-			buffer += copy_length;
-		}
+		if ( ! fill_buffer ( state->recv_buffer, buffer,
+				     state->bytes_received, length ) )
+			return 0;
+		state->bytes_received += length;
 	}
 	return 1;
 }
@@ -132,25 +113,18 @@ static int recv_tcp_request(int length, const void *buffer, void *ptr) {
 /**************************************************************************
 HTTP_GET - Get data using HTTP
 **************************************************************************/
-static int http ( char *url,
-		  struct sockaddr_in *server __unused,
-		  char *file __unused,
-		  int ( * process ) ( unsigned char *data,
-				      unsigned int blocknum,
-				      unsigned int len, int eof ) ) {
+static int http ( char *url, struct sockaddr_in *server __unused,
+		  char *file __unused, struct buffer *buffer ) {
 	struct protocol *proto;
 	struct sockaddr_in http_server = *server;
 	char *filename;
 	static const char GET[] = "GET /%s HTTP/1.0\r\n\r\n";
-	static char recv_buffer[BLOCKSIZE];
 	struct send_recv_state state;
 	int length;
 
 	state.rc = -1;
-	state.block = 0;
-	state.recv_buffer = recv_buffer;
 	state.url = url;
-	state.process = process;
+	state.recv_buffer = buffer;
 	while ( 1 ) {
 		length = strlen ( filename ) + strlen ( GET );
 		{
@@ -164,7 +138,6 @@ static int http ( char *url,
 			state.bytes_received = 0;
 			state.recv_state = RESULT_CODE;
 			
-			state.recv_length = 0;
 			tcp_transaction ( server->sin_addr.s_addr,
 					  server->sin_port, &state,
 					  send_tcp_request, recv_tcp_request );
@@ -183,15 +156,13 @@ static int http ( char *url,
 		break;
 	}
 
-	if ( state.rc == 200 ) {
-		DBG2 ( "HTTP processing %d bytes\n", state.recv_length );
-		return process ( recv_buffer, ++state.block,
-				 state.recv_length, 1 );
-	} else {
+	if ( state.rc != 200 ) {
 		printf ( "Failed to download %s (rc = %d)\n",
 			 state.url, state.rc );
 		return 0;
 	}
+
+	return 1;
 }
 
 static struct protocol http_protocol __protocol = {
