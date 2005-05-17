@@ -35,6 +35,16 @@
 *    Indent Options: indent -kr -i8
 ***************************************************************************/
 
+/*
+ * IMPORTANT
+ *
+ * This file should be rewritten to avoid the use of a bitmap.  Our
+ * buffer routines can cope with being handed blocks in an arbitrary
+ * order, duplicate blocks, etc.  This code could be substantially
+ * simplified by taking advantage of these features.
+ *
+ */
+
 #include "etherboot.h"
 #include "proto.h"
 #include "nic.h"
@@ -43,9 +53,6 @@ struct tftm_info {
 	struct sockaddr_in server;
 	struct sockaddr_in local;
 	struct sockaddr_in multicast;
-	int ( * process ) ( unsigned char *data,
-			    unsigned int blocknum,
-			    unsigned int len, int eof );
 	int sent_nack;
 	const char *name;	/* Filename */
 };
@@ -56,6 +63,7 @@ struct tftm_state {
 	unsigned long total_packets;
 	char ismaster;
 	unsigned long received_packets;
+	struct buffer *buffer;
 	unsigned char *image;
 	unsigned char *bitmap;
 	char recvd_oack;
@@ -221,17 +229,11 @@ static int proto_tftm(struct tftm_info *info)
 					bitmap_len =
 					    (state.total_packets + 7) / 8;
 					if (!state.image) {
-						state.bitmap =
-						    allot(bitmap_len);
-						state.image =
-						    allot(filesize);
+						state.image = phys_to_virt ( state.buffer->start );
+						state.bitmap = state.image + filesize;
+						/* We don't yet use the buffer routines; fake it */
+						state.buffer->fill = filesize;
 
-						if ((unsigned long) state.
-						    image < 1024 * 1024) {
-							printf
-							    ("ALERT: tftp filesize to large for available memory\n");
-							return 0;
-						}
 						memset(state.bitmap, 0,
 						       bitmap_len);
 					}
@@ -360,7 +362,6 @@ static int proto_tftm(struct tftm_info *info)
 					     TFTP_MIN_PACKET, &tp); /* ack */
 			}
 			/* We are done get out */
-			forget(state.bitmap);
 			break;
 		}
 
@@ -376,15 +377,11 @@ static int proto_tftm(struct tftm_info *info)
 	}
 	/* Leave the multicast group */
 	leave_group(IGMP_SERVER);
-	return info->process(state.image, 1, filesize, 1);
+	return 1;
 }
 
-static int url_tftm ( char *url __unused,
-		      struct sockaddr_in *server,
-		      char *file,
-		      int ( * process ) ( unsigned char *data,
-					  unsigned int blocknum,
-					  unsigned int len, int eof ) ) {
+static int url_tftm ( char *url __unused, struct sockaddr_in *server,
+		      char *file, struct buffer *buffer ) {
 
 	int ret;
 	struct tftm_info info;
@@ -394,7 +391,6 @@ static int url_tftm ( char *url __unused,
 	info.local.sin_addr.s_addr = arptable[ARP_CLIENT].ipaddr.s_addr;
 	info.local.sin_port = TFTM_PORT; /* Does not matter. */
 	info.multicast = info.local;
-	info.process = process;
 	state.ismaster = 0;
 	info.name = file;
 
@@ -402,6 +398,7 @@ static int url_tftm ( char *url __unused,
 	state.total_bytes = 0;
 	state.total_packets = 0;
 	state.received_packets = 0;
+	state.buffer = buffer;
 	state.image = 0;
 	state.bitmap = 0;
 	state.recvd_oack = 0;

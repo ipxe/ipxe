@@ -2,6 +2,16 @@
 #include "proto.h"
 #include "nic.h"
 
+/*
+ * IMPORTANT
+ *
+ * This file should be rewritten to avoid the use of a bitmap.  Our
+ * buffer routines can cope with being handed blocks in an arbitrary
+ * order, duplicate blocks, etc.  This code could be substantially
+ * simplified by taking advantage of these features.
+ *
+ */
+
 #define SLAM_PORT 10000
 #define SLAM_MULTICAST_IP ((239<<24)|(255<<16)|(1<<8)|(1<<0))
 #define SLAM_MULTICAST_PORT 10000
@@ -82,6 +92,7 @@ struct slam_state {
 
 	unsigned long received_packets;
 
+	struct buffer *buffer;
 	unsigned char *image;
 	unsigned char *bitmap;
 } state;
@@ -104,10 +115,8 @@ struct slam_info {
 	struct sockaddr_in server;
 	struct sockaddr_in local;
 	struct sockaddr_in multicast;
-	int ( * process ) ( unsigned char *data,
-			    unsigned int blocknum,
-			    unsigned int len, int eof );
 	int sent_nack;
+	struct buffer *buffer;
 };
 
 #define SLAM_TIMEOUT 0
@@ -304,12 +313,11 @@ static unsigned char *reinit_slam_state(
 		printf("ALERT: slam blocksize to large\n");
 		return 0;
 	}
-	if (state.bitmap) {
-		forget(state.bitmap);
-	}
 	bitmap_len   = (state.total_packets + 1 + 7)/8;
-	state.bitmap = allot(bitmap_len);
-	state.image  = allot(total_bytes);
+	state.image  = phys_to_virt ( state.buffer->start );
+	/* We don't use the buffer routines properly yet; fake it */
+	state.buffer->fill = total_bytes;
+	state.bitmap = state.image + total_bytes;
 	if ((unsigned long)state.image < 1024*1024) {
 		printf("ALERT: slam filesize to large for available memory\n");
 		return 0;
@@ -440,6 +448,7 @@ static int proto_slam(struct slam_info *info)
 	long timeout;
 
 	init_slam_state();
+	state.buffer = info->buffer;
 
 	retry = -1;
 	rx_qdrain();
@@ -504,15 +513,11 @@ static int proto_slam(struct slam_info *info)
 	leave_group(IGMP_SERVER);
 	/* FIXME don't overwrite myself */
 	/* load file to correct location */
-	return info->process(state.image, 1, state.total_bytes, 1);
+	return 1;
 }
 
-static int url_slam ( char *url __unused,
-		      struct sockaddr_in *server,
-		      char *file,
-		      int ( * process ) ( unsigned char *data,
-					  unsigned int blocknum,
-					  unsigned int len, int eof ) ) {
+static int url_slam ( char *url __unused, struct sockaddr_in *server,
+		      char *file, struct buffer *buffer ) {
 	struct slam_info info;
 	/* Set the defaults */
 	info.server = *server;
@@ -520,7 +525,7 @@ static int url_slam ( char *url __unused,
 	info.multicast.sin_port      = SLAM_MULTICAST_PORT;
 	info.local.sin_addr.s_addr   = arptable[ARP_CLIENT].ipaddr.s_addr;
 	info.local.sin_port          = SLAM_LOCAL_PORT;
-	info.process                 = process;
+	info.buffer                  = buffer;
 	info.sent_nack = 0;
 	if (file[0]) {
 		printf("\nBad url\n");
