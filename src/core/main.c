@@ -24,6 +24,7 @@ Literature dealing with the network protocols:
 #include "cpu.h"
 #include "console.h"
 #include "init.h"
+#include "image.h"
 #include <stdarg.h>
 
 #ifdef CONFIG_FILO
@@ -162,6 +163,8 @@ void initialise ( void ) {
 MAIN - Kick off routine
 **************************************************************************/
 int main ( void ) {
+	struct image *image;
+	void *image_context;
 	int skip = 0;
 
 	/* Print out configuration */
@@ -214,21 +217,28 @@ int main ( void ) {
 		}
 
 		/* Load boot file from the device */
-		init_buffer ( &load_buffer );
-		if ( ! load ( &dev, &load_buffer ) ) {
+		if ( ! autoload ( &dev, &image, &image_context ) ) {
 			/* Load (e.g. TFTP) failed */
 			printf ( "...load failed\n" );
 			continue;
 		}
 
-		/* Boot the loaded image */
-		if ( ! boot_image ( &load_buffer ) ) {
-			/* Boot failed (e.g. invalid image) */
+		/* Print out image information */
+		printf ( "\nLoaded %s image\n", image->name );
+
+		/* Disable devices? */
+		cleanup();
+		/* arch_on_exit(0); */
+
+		/* Boot the image */
+		if ( ! image->boot ( image_context ) ) {
+			/* Boot failed */
 			printf ( "...boot failed\n" );
 			continue;
 		}
 		
 		/* Image returned */
+		printf ( "...image returned\n" );
 	}
 
 	/* Call registered per-object exit functions */
