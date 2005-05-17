@@ -484,19 +484,14 @@ static int nfs_read(struct sockaddr_in *server, char *fh, int offset, int len,
 /**************************************************************************
 NFS - Download extended BOOTP data, or kernel image from NFS server
 **************************************************************************/
-static int nfs ( char *url __unused,
-		 struct sockaddr_in *server,
-		 char *name,
-		 int ( * process ) ( unsigned char *data,
-				     unsigned int blocknum,
-				     unsigned int len, int eof ) ) {
+static int nfs ( char *url __unused, struct sockaddr_in *server,
+		 char *name, struct buffer *buffer ) {
 	static int recursion = 0;
 	int sport;
 	int err, namelen = strlen(name);
 	char dirname[300], *fname;
 	char dirfh[NFS_FHSIZE];		/* file handle of directory */
 	char filefh[NFS_FHSIZE];	/* file handle of kernel image */
-	unsigned int block;
 	int rlen, size, offs, len;
 	struct rpc_t *rpc;
 
@@ -562,7 +557,6 @@ nfssymlink:
 	}
 
 	offs = 0;
-	block = 1;	/* blocks are numbered starting from 1 */
 	size = -1;	/* will be set properly with the first reply */
 	len = NFS_READ_SIZE;	/* first request is always full size */
 	do {
@@ -571,9 +565,8 @@ nfssymlink:
 			// An error occured. NFS servers tend to sending
 			// errors 21 / 22 when symlink instead of real file
 			// is requested. So check if it's a symlink!
-			block = nfs_readlink(&nfs_server, dirfh, dirname,
-			                filefh, sport);
-			if ( 0 == block ) {
+			if ( nfs_readlink(&nfs_server, dirfh, dirname,
+					  filefh, sport) == 0 ) {
 				printf("\nLoading symlink:%s ..",dirname);
 				goto nfssymlink;
 			}
@@ -599,14 +592,12 @@ nfssymlink:
 			rlen = len;	/* shouldn't happen...  */
 		}
 
-		err = process((char *)&rpc->u.reply.data[19], block, rlen,
-			(offs+rlen == size));
-		if (err <= 0) {
+		if ( ! fill_buffer ( buffer, &rpc->u.reply.data[19],
+				     offs, rlen ) ) {
 			nfs_reset();
-			return err;
+			return 0;
 		}
 
-		block++;
 		offs += rlen;
 		/* last request is done with matching requested read size */
 		if (size-offs < NFS_READ_SIZE) {
