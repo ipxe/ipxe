@@ -109,7 +109,7 @@ static inline void unfree_block ( struct buffer *buffer,
  *
  * Returns 1 for success, 0 for failure (e.g. buffer too small).
  */
-int fill_buffer ( struct buffer *buffer, void *data,
+int fill_buffer ( struct buffer *buffer, const void *data,
 		  off_t offset, size_t len ) {
 	struct buffer_free_block desc;
 	physaddr_t block, prev_block;

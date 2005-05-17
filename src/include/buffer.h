@@ -39,7 +39,7 @@ extern struct buffer load_buffer;
 /* Functions in buffer.c */
 
 extern void init_buffer ( struct buffer *buffer );
-extern int fill_buffer ( struct buffer *buffer, void *data,
+extern int fill_buffer ( struct buffer *buffer, const void *data,
 			 off_t offset, size_t len );
 
 #endif /* BUFFER_H */
