@@ -54,6 +54,11 @@ static inline void copy_from_phys ( void *dest, physaddr_t src, size_t len ) {
 	memcpy ( dest, phys_to_virt ( src ), len );
 }
 
+static inline void copy_phys_to_phys ( physaddr_t dest, physaddr_t src,
+				       size_t len ) {
+	memcpy ( phys_to_virt ( dest ), phys_to_virt ( src ), len );
+}
+
 #else /* KEEP_IT_REAL */
 
 /*
