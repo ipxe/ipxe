@@ -2,6 +2,7 @@
 #
 SRCDIRS		+= arch/i386/core arch/i386/transitions arch/i386/prefix
 SRCDIRS		+= arch/i386/firmware/pcbios arch/i386/firmware/linuxbios
+SRCDIRS		+= arch/i386/image
 SRCDIRS		+= arch/i386/drivers/bus
 SRCDIRS		+= arch/i386/drivers/net
 SRCDIRS		+= arch/i386/drivers/disk
