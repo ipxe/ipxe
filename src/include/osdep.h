@@ -1,10 +1,6 @@
 #ifndef	ETHERBOOT_OSDEP_H
 #define ETHERBOOT_OSDEP_H
 
-#define __unused __attribute__((unused))
-#define __aligned __attribute__((aligned(16)))
-#define PACKED __attribute__((packed))
-
 /* Optimization barrier */
 /* The "volatile" is due to gcc bugs */
 #define barrier() __asm__ __volatile__("": : :"memory")

@@ -51,7 +51,7 @@ struct init_fn {
 /* Macro for creating an initialisation function table entry */
 #define INIT_FN( init_order, init_func, reset_func, exit_func )		      \
 	static struct init_fn PREFIX_OBJECT(init_fn__)			      \
-	    __attribute__ (( used, __table_section(init_fn,init_order) )) = { \
+	    __table ( init_fn, init_order ) = {				      \
 		.init = init_func,					      \
 		.reset = reset_func,					      \
 		.exit = exit_func,					      \

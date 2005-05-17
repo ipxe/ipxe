@@ -18,8 +18,7 @@ struct console_driver {
 	int ( *iskey ) ( void );
 };
 
-#define __console_driver \
-	__attribute__ (( used, __table_section ( console, 01 ) ))
+#define __console_driver __table ( console, 01 )
 
 /* Function prototypes */
 

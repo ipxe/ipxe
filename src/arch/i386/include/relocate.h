@@ -17,7 +17,7 @@ struct post_reloc_fn {
 /* Macro for creating a post-relocation function table entry */
 #define POST_RELOC_FN( order, post_reloc_func )				      \
 	static struct post_reloc_fn PREFIX_OBJECT(post_reloc_fn__)	      \
-	    __attribute__ (( used, __table_section(post_reloc_fn,order) )) = {\
+	    __table ( post_reloc_fn, order ) = {			      \
 		.post_reloc = post_reloc_func,				      \
 	};
 

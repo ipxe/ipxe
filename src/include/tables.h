@@ -49,8 +49,11 @@
 #define __table_section_start(table) __table_section(table,00)
 #define __table_section_end(table) __table_section(table,99)
 
-#define __table(table,idx) __attribute__ (( __table_section(table,idx) ))
-#define __table_start(table) __attribute__ (( __table_section_start(table) ))
-#define __table_end(table) __attribute__ (( __table_section_end(table) ))
+#define __table(table,idx) \
+	__attribute__ (( unused, __table_section(table,idx) ))
+#define __table_start(table) \
+	__attribute__ (( unused, __table_section_start(table) ))
+#define __table_end(table) \
+	__attribute__ (( unused, __table_section_end(table) ))
 
 #endif /* TABLES_H */

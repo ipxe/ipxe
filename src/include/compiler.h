@@ -84,9 +84,18 @@ __asm__ ( ".equ\tDEBUG_LEVEL, " DEBUG_SYMBOL_STR );
 	} while (0)
 #endif
 
-#define PACKED __attribute__((packed))
-#define __unused __attribute__((unused))
-#define __used __attribute__((used))
+/*
+ * Commonly-used attributes.
+ *
+ * Note that __used can be used only for functions.  If you have a
+ * static variable declaration that you want to force to be included,
+ * use __unused.
+ *
+ */
+#define PACKED __attribute__ (( packed ))
+#define __unused __attribute__ (( unused ))
+#define __used __attribute__ (( used ))
+#define __aligned __attribute__ (( aligned ( 16 ) ))
 
 /*
  * To save space in the binary when multiple-driver images are
