@@ -208,14 +208,6 @@ extern void cleanup P((void));
 /* config.c */
 extern void print_config(void);
 
-/* heap.c */
-extern void *allot(size_t size);
-void forget(void *ptr);
-extern void *allot2(size_t size, uint32_t mask);
-void forget2(void *ptr);
-/* Physical address of the heap */
-extern size_t heap_ptr, heap_top, heap_bot;
-
 /* osloader.c */
 /* Be careful with sector_t it is an unsigned long long on x86 */
 typedef uint64_t sector_t;
