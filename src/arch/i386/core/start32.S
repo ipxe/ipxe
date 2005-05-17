@@ -38,7 +38,11 @@
 	.text
 	.arch i386
 	.code32
-	
+
+	/* This is a struct os_entry_regs */
+	.globl os_regs
+os_regs:	.space 56
+		
 /**************************************************************************
 XSTART32 - Transfer control to the kernel just loaded
 **************************************************************************/
