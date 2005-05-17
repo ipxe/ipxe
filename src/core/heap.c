@@ -13,7 +13,7 @@ struct heap_block {
 extern char _text[];
 extern char _end[];
 
-static physaddr_t heap_start, heap_end, heap_ptr;
+static physaddr_t heap_start;
 
 /*
  * Find the largest contiguous area of memory that I can use for the

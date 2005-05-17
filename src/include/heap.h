@@ -80,4 +80,13 @@ static inline void forget2 ( void *ptr ) {
 	efree ( ptr );
 }
 
+/*
+ * Heap markers.  osloader.c and other code may wish to know the heap
+ * location, without necessarily wanting to drag in heap.o.  We
+ * therefore declare these as shared (i.e. common) symbols.
+ *
+ */
+physaddr_t heap_ptr __asm__ ( "_shared_heap_ptr" );
+physaddr_t heap_end __asm__ ( "_shared_heap_end" );
+
 #endif /* HEAP_H */
