@@ -1,0 +1,8 @@
+This simple utility has currently no correct error checking.
+If your environment space couldn't hold up the variables, the
+program breaks without an error message, so be sure to add a 
+line similar to the following to your config.sys:
+SHELL=A:\COMMAND.COM A:\ /P/E:2048
+
+The batch is a sample which shows how it could be used for those
+one not familar with batch files and environment variables.

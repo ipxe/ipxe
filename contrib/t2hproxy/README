@@ -1,0 +1,95 @@
+T2hproxy
+
+This is a TFTP to HTTP proxy. To the TFTP client it looks like a TFTP
+server. To the HTTP server it looks like a HTTP client. So you can store
+your boot files on the HTTP server. Or even create them with a CGI
+program. E.g. if you can get dhcpd to send a filename which has strings
+representing attributes of the client, as determined from the DHCP
+request, then you can get the CGI program to parse this and send the
+appropriate image, which might even be synthesised.
+
+There are two versions of the proxy, in Perl and in Java.
+
+1. The Perl version.
+
+This is the original quick Perl hack conceived in a moment of madness.
+:-) Perl is great for prototyping.
+
+To run it, you need Perl 5.8.0 or later and all the Perl modules listed
+at the top of the program installed. Edit and install the xinetd config
+file as /etc/xinetd.d/t2hproxy and restart xinetd. The prefix is the
+string that is prepended to all filenames to form the URL requested from
+the HTTP server. Remember you need the trailing / if the filenames don't
+start with /.
+
+This is only a proof-of concept. It has these drawbacks at the moment:
+
++ (I don't consider this a draback, but some may.) It's started from
+xinetd because xinetd handles all the socket listening, IP address
+checking, rate limiting, etc.
+
++ It has no cache. Use a proxy to do the caching (there's a --proxy
+option). This also takes care of fetching from outside a firewall.
+
++ It reads the entire HTTP content into memory before serving. Ideally
+it should stream it from the HTTP server to minimise memory usage. This
+is a serious drawback for booting lots of clients. Each instance of the
+server will consume an amount of memory equal to the size of image
+loaded.
+
++ If the HTTP server is at the end of a slow link there is a delay
+before the first data block is sent.  The client may timeout before
+then.  Another reason for streaming, as this allows the first block to
+be sent sooner.  A local cache primed with the images in advance may
+help. Using the blocksize option helps here because this causes the
+server to send the OACK to the client immediately before the data is
+fetched and this prevents it from starting up another connection.
+
++ The transfer size may not be obtainable from the HTTP headers in all
+cases, e.g. a CGI constructed image. This matters for clients that need
+the tsize extension, which is not supported at the moment.
+
+If I'm feeling masochistic I may write a Java version, which should take
+care of the multi-threading and streaming.
+
+2. The Java version
+
+The main problem with the Perl version is that it does not stream the
+HTTP input but sucks it all in at once. As mentioned, this causes a
+delay as well as requiring memory to hold the image. I could fix this by
+doing the polling on the HTTP socket myself instead of letting LWP do
+it, but that's for later. Java has streaming facilities as well as
+threading and is also somewhat portable.  So I decided to be masochistic
+and give it a go.  But boy is Java bureaucratic.
+
+You will need a Java 1.4 JRE, because I use the java.nio classes; and
+the commons-httpclient and commons-logging jars from the
+jakarta.apache.org project. As I understand it, there are several ways
+to get those jars on your classpath. One is to put it in the directory
+where your java extensions jars are kept, normally
+$JAVA_HOME/jre/lib/ext. But it may not be writable to you. Another is to
+set your $CLASSPATH variable to have those jars in the path. A third is
+to use the -cp option of the java interpreter, see the shell script
+runT2hproxy for details.
+
+All the source is in one Java file. build.xml is a "Makefile" for ant to
+compile and jar it. You should then edit runT2proxy.sh as required, then
+start it. As with the Perl version, the prefix is what's prepended to
+the filenames requested by the TFTP client, and the proxy is the
+host:port string for the proxy if you are using one. On *ix you will
+need root permission to listen on ports below 1024 (TFTP is at 69 UDP by
+default).
+
+Currently it logs to stderr, but you can change this by downloading and
+installing the log4j jar from jakarta.apache.org and instructing
+commons-logging to use that, with a command line property setting and a
+property file.  Destinations could be syslog, or a file, or an event
+logger, or...; it's supposedly very flexible.
+
+3. Licensing
+
+All this code is GPLed. For details read the file COPYING found in the
+Etherboot top directory since it currently bundled with Etherboot. I
+don't see the point of including COPYING in every directory.
+
+Ken Yap, October 2003

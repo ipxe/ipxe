@@ -1,0 +1,28 @@
+If you don't want to install development tools, and have access to the
+Web, you can get ROM images made on demand from http://rom-o-matic.net/
+
+The documentation tarballs should be extracted in the top directory (the
+one you are reading this INSTALL document from). A top directory called
+doc will be populated. This way the links from index.html will work
+properly.
+
+More likely if you are unfamiliar with Etherboot you should read the
+documentation starting with index.html if you have a Web browser, or
+doc/text/userman.txt (after installing the documentation tarball) if you
+just have a plain text terminal.
+
+Also read RELNOTES for any additional recent information.
+
+Don't forget to check out the contrib/ directory which contains much
+contributed software and documentation. Please contact the authors of
+those packages directly for queries.
+
+If you are booting FreeBSD, enable -DELF_IMAGE (and optionally
+-DAOUT_IMAGE) in Config. This should happen automatically now.
+
+The index.html file is the same as the one on the Etherboot home page at
+the time the distribution was made. Therefore some of the local file:/
+links from the Distribution section may not work.
+
+Etherboot was built using gcc 3.3.3 and binutils 2.15.91 from SuSE 9.2 but
+earlier 3.x versions will generally work.

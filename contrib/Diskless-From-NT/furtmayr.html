@@ -1,0 +1,82 @@
+<html>
+
+<head>
+<title>Free TFTP / Syslog / NFS Servers for Windows</title>
+</head>
+
+<body>
+
+<h3 align="center">Free TFTP / Syslog / NFS Servers for Windows</h3>
+<div align="center"><center>
+
+<address>
+  Stefan Furtmayr (<a href="mailto:sf@paf.net">sf@paf.net</a>) 
+</address>
+</center></div>
+
+<p>Feel free to send me your comments about these programs or some additions.</p>
+
+<p>Also have a look at the <a
+href="http://www.ltsp.org/contrib/diskless-windows-howto.htm">&quot;Diskless Windows
+Cookbook &quot;</a> in the <a href="http://www.ltsp.org/contrib/">LTSP Contrib Area</a>.</p>
+
+<p><small>From this list I have only used the W2K-TFTP once for a customer with the <a
+href="http://support.3com.com/infodeli/tools/nic/mba.htm">3Com MBA Utility Disk</a>, while
+it can be used as well with <a href="http://etherboot.sourceforge.net">Etherboot</a>
+tagged images for other NIC brands.</small><br>
+<small>The solution used a netbooted DOS with MS Client 3.0 to easily restore disk images
+with <a href="http://www.ghost.com/">Symantec Ghost</a> (see <a
+href="http://appdeploy.com/tools/imaging.shtml">appdeploy.com</a> for similar tools).</small><br>
+<small>Sure there are several possibilities to do this with Linux but for cloning NT4/W2K
+the NTFS support is rather experimental and automatically changing the SID is another
+issue.</small></p>
+
+<h4>TFTP Servers:</h4>
+
+<p>In Autumn 2000 i tested some different TFTP servers and found out that most of them do
+not install/run as a service, especially under W2K. 
+
+<ul>
+  <li>TFTP server included with Windows 2000 (remote installation services need to be
+    installed)<br>
+    The path for the images has to be specified via registry:<br>
+    Q232115 - Changing the Drive or Volume on Which Remote Installation Images Reside:<br>
+    <a href="http://support.microsoft.com/support/kb/articles/Q232/1/15.ASP">http://support.microsoft.com/support/kb/articles/Q232/1/15.ASP</a></li>
+  <li>3CDaemon version 2.0 revision 10. Freeware. Integrated TFTP/FTP/Syslog Daemon for
+    Windows 95/98/NT<br>
+    <a href="ftp://ftp.3com.com/pub/utilbin/win32/3cdv2r10.zip">ftp://ftp.3com.com/pub/utilbin/win32/3cdv2r10.zip</a><br>
+    - Windows 2000 Server: does not run as service!<br>
+    - Windows NT Server 4.0: not tested</li>
+  <li>The TFTP Server portion of 3CServer, altered to run as a system Service under Windows NT<br>
+    <a href="ftp://ftp.3com.com/pub/utilbin/win32/3CTftpSvc.zip">ftp://ftp.3com.com/pub/utilbin/win32/3CTftpSvc.zip</a><br>
+    - Windows 2000 Server: only working in debug mode, does not run as service!<br>
+    - Windows NT Server 4.0: not tested</li>
+  <li>Cisco TFTP Server v.1.1<br>
+    <a href="http://www.cisco.com/pcgi-bin/tablebuild.pl/tftp">http://www.cisco.com/pcgi-bin/tablebuild.pl/tftp</a><br>
+    Does not provide an option itself to install as service.</li>
+  <li><a href="http://solarwinds.net/Tools/Free_Tools/TFTP_Server/">http://solarwinds.net/Tools/Free_Tools/TFTP_Server/</a><br>
+    Does not provide an option itself to install as service.</li>
+</ul>
+
+<p><em>Untested:</em></p>
+
+<p>found on <a href="http://www.nonags.com/nonags/servd32.html">http://www.nonags.com/nonags/servd32.html</a><br>
+- <a href="http://www.klever.net/kin/pumpkin.html">http://www.klever.net/kin/pumpkin.html</a><br>
+- <a href="http://membres.tripod.fr/phjounin//P_tftpd32.htm">http://membres.tripod.fr/phjounin//P_tftpd32.htm</a></p>
+
+<h4>Syslog Servers:</h4>
+
+<ul>
+  <li>3Com Software Library - Utilities for 32 bit Windows<br>
+    <a href="http://support.3com.com/software/utilities_for_windows_32_bit.htm">http://support.3com.com/software/utilities_for_windows_32_bit.htm</a></li>
+  <li><a href="http://www.netal.com/download.htm#SL4NT03">http://www.netal.com/download.htm#SL4NT03</a>
+    (works as service) </li>
+</ul>
+
+<h4>NFS Servers:</h4>
+
+<ul>
+  <li>War NFS Daemon: <a href="http://www.jgaa.com">http://www.jgaa.com</a> (untested)</li>
+</ul>
+</body>
+</html>

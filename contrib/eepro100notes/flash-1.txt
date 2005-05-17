@@ -1,0 +1,73 @@
+Date: Tue, 18 May 1999 15:45:55 +0200 (MEST)
+From: Erik Starback <erik@math.uu.se>
+To: netboot@baghira.han.de
+Subject: Netboot with Intel EEPRO100+ Management
+Message-ID: <Pine.LNX.3.96.990518154313.3875A-100000@anarchy.math.uu.se>
+MIME-Version: 1.0
+Content-Type: TEXT/PLAIN; charset=iso-8859-1
+Content-Transfer-Encoding: 8BIT
+Sender: owner-netboot@baghira.han.de
+Precedence: bulk
+Reply-To: netboot@baghira.han.de
+X-Moderator: netboot-owner@baghira.han.de
+X-UIDL: 6ca8453c19c46d622813e9be8ada9517
+Status: O
+X-Status: 
+
+Hello!
+
+When Intel eepro100+ NIC disappeared from the market, I didn't know
+what to do. I didn't find any information if anyone has used the
+new eepro100+ Management Adapter to netboot linux. 
+
+I thought that the card should netboot with the same configuration as
+the old card when I read Donald Beckers comment:
+> The driver should "just work" with the '559. It's not supposed to be
+> substantially different than the '558. (I don't have a datasheet
+> or sample card to confirm this statement.)
+
+The problem was now only to put the netboot-program to the built in
+flash memory on the NIC. With the old card I used a flash memory (Intel
+N28F020 [N28010 didn't work])) and the program FUTIL.EXE from Intel to
+flash it. FUTIL did't recognize the memory on the management card
+and did not work therefore.
+
+I found the intel program FBOOT.EXE that was made to upgrade the built
+in Intel BOOT agent. I did: Boot dos from floppy, Run FBOOT (choose
+adapter), choose (u)pdate, choose Create restore image, rename the
+backup file (in my case 2743BE52.FLS [the eight last hex digits from
+the MAC address]), rename your netboot code (in my case netboot 0.8.1)
+to the backup files original name (in my case 2743BE52.FLS), run
+FBOOT, choose (r)estore.
+
+Voila!
+
+A shorter way (if you don't need the backup of the old Intel BOOT
+agent code) is of course: rename netboot file to [the eight last hex
+digits from the MAC address].FLS, run FBOOT, choose restore.
+ 
+Caution: I think it is possible to make a NIC unusable if you have
+made the netboot (or etherboot) file with "wrong" parameters. A couple
+of month ago I did a etherboot boot file and put it on an old
+EEPRO100+ card. It worked fine, but it was impossible to boot local
+with it. So I could not boot dos and with FUTIL or FBOOT erase the
+flash memory!  To erase the chip I had to take out the memory chip,
+boot dos and then put in the memory chip. This isn't possible when the
+memory chip is build in.
+
+Links:
+<http://support.intel.com/support/landesk/configmgr/LSA1_193.HTM>
+FUTIL.EXE  is a part of LSA1_193.ZIP
+
+<http://support.intel.com/support/etherexpress/pro100/100pboot.htm>
+FBOOT.EXE is a part of 100pboot.exe
+
+/Erik S
+
+-------------------------------------------------------------------------
+Erik Starbäck, System administrator    E-mail address:    erik@math.uu.se
+Uppsala University                     Telephone (o):     +46 18 4713277
+Department of Mathematics              Cellular phone:    +46 70 4250260
+P. O. Box 480                          Fax (o):           +46 18 4713201
+SE-751 06  UPPSALA                  
+Sweden                                

@@ -1,0 +1,9 @@
+# maclist - mac addresses for wakeonlan
+00:BA:BE:FA:CE:00 mainframe
+00:11:22:33:44:5A maschine1
+00:11:22:33:44:B5 maschine2
+00:11:22:33:44:5C maschine3
+0A:BB:CC:DD:EE:F9 macintosh
+1A:BB:CC:DD:E6:FF 
+3A:BB:CC:DD:EE:F5 testpc
+3A:BB:CC:DD:EE:F6 123.45.6.7

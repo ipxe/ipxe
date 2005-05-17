@@ -1,0 +1,23 @@
+The compression code as implemented in "lzhuf.c" was taken from a BBS
+program written by Joachim Schurig <jschurig@zedat.fu-berlin.de>. He
+states that the code can be used freely for programs that are covered
+by a "freeware" license. This probably includes both BSD style
+licenses and the GPL.
+
+The code in "loader.asm" is a reimplementation of the uncompressor. It
+has been written from scratch and is hereby placed under the
+conditions of the GNU General Public License (GPL). The algorithm is
+outlined in "algorithm.doc".
+
+Thus, there are no copyright problems with using this code, but there
+still might be difficulties with software patents. These patents are
+not legal in most parts of the world, but if you live in a country
+that honors software patents then you should verify that using these
+algorithms is legally permitted. Unless you are absolutely sure, that
+there are no legal obstacles, you should use the code for educational
+purposes only (this assumes that your educational institution is
+exempted from patent laws). The author cannot be held responsible for
+using the program code in violation of applicable local laws.
+
+If you are aware of patents that might affect the legality of using
+the code in some parts of the world, please let me know.

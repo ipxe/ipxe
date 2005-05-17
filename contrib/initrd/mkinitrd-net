@@ -1,0 +1,165 @@
+#!/bin/sh
+#
+# $Id$
+# initrd builder for network booting
+
+# Utility function to determine whether or not a filesystem is usable for
+# loopback mounts.  Lifted verbatim from Erik Troan's mkinitrd script.
+#
+is_good_fs() {
+    local parttype= tmpname=
+    local dir=$1
+    [[ -d $dir ]] || return 1
+    [[ -w $dir ]] || return 1
+    [[ $dir == */ ]] && dir=${dir%/}
+    parttype=$(awk "{if (\$2 == \""$dir"\") print \$3 }" /proc/mounts)
+ 
+    while tmpname=${dir%/*} && [[ -z $parttype ]];do
+        [[ -z $tmpname ]] && tmpname=/
+        parttype=$(awk "{if (\$2 == \""$tmpname"\") print \$3 }" /proc/mounts)
+        dir=$tmpname
+    done
+ 
+    case $parttype in
+        nfs|tmpfs) return 1;;
+        *) return 0;
+    esac
+}
+
+# Find a suitable temporary directory (i.e. not tmpfs or nfs)
+if is_good_fs $TMPDIR; then
+  tmpdir=$TMPDIR
+elif is_good_fs /tmp; then
+  tmpdir=/tmp
+elif is_good_fs /var/tmp; then
+  tmpdir=/var/tmp
+elif is_good_fs /root/tmp; then
+  tmpdir=/root/tmp
+else
+  echo "Cannot use a tmp directory" >&2
+  exit 1
+fi
+
+# Default settings (some can be overridden by command-line options)
+include_modules=include-modules
+initrd_skel=/usr/lib/mkinitrd-net/initrd-skel
+kernel_ver=`uname -r`
+use_sudo=y
+keep=n
+output_dir=/var/lib/tftpboot
+make_link=y
+quiet=
+
+# No need to use sudo if we are root
+if [ $UID -eq 0 ]; then
+  use_sudo=n
+fi
+
+USAGE="Usage: $0 [-k|--kernel <kernel_ver>] [-n|--nolink] [-q|--quiet] [-l|--local] [--nosudo] [--keep] [--help] module_list ..."
+
+# Parse command-line options
+while [ $# -gt 0 ]; do
+  case "$1" in
+    -l|--local)
+		shift
+		use_local=y ;;
+    -k|--kernel)
+		shift
+		kernel_ver=$1
+		shift ;;
+    --nosudo)   shift ; use_sudo=n ;;
+    --keep)     shift ; keep=y ;;
+    --n|--nolink)
+		shift ; make_link=n ;;
+    -q|--quiet) shift ; quiet=-q ;;
+    --help)	shift ; do_help=y ;;
+    --)		shift ; break ;;
+    -*)		echo "${0}: ${1}: invalid option" >&2
+		echo $USAGE >& 2
+		exit 2 ;;
+    *)		break ;;
+  esac
+done
+
+# Build list of requested modules
+modules="$*"
+requested_modules="$modules"
+modules="$modules nfs" # Always require nfs for nfs mount
+modules="$modules af_packet" # Always require af_packet for udhcpc
+
+# --help => Print help message
+if [ "$do_help" == "y" ]; then
+  echo $USAGE
+  echo "  -k, --kernel   Specify kernel version"
+  echo "  -n, --nolink   Do not create a matching symbolic link"
+  echo "  -l, --local    Run locally from CVS (for developers only)"
+  echo "  --nosudo       Do not use sudo (i.e. must run as root instead)"
+  echo "  --keep         Keep temporary files instead of deleting them"
+  exit 0;
+fi
+
+# --local => we are running directly from CVS, rather than
+# from an installed copy, so use local files and directories
+if [ "$use_local" == "y" ]; then
+  include_modules=./include-modules
+  initrd_skel=initrd-skel
+  output_dir=tftpboot
+fi
+
+# If use_sudo is set, check that sudo exists
+sudo=/usr/bin/sudo
+if [ "$use_sudo" == "y" ]; then
+  if [ ! -x $sudo ]; then
+    use_sudo=n
+    echo "WARNING: --nosudo not specified but $sudo not found"
+  fi
+fi
+if [ "$use_sudo" == "n" ]; then
+  sudo=
+fi
+
+# Create temporary working files
+initrd=`mktemp -d ${tmpdir}/initrd.XXXXXX`
+initrdimg=`mktemp ${tmpdir}/initrd.img.XXXXXX`
+initrdmnt=`mktemp -d ${tmpdir}/initrd.mnt.XXXXXX`
+
+# Copy skeleton into temporary area
+cp -a $initrd_skel/* $initrd/
+mkdir -p $initrd/lib/modules/$kernel_ver
+$include_modules $quiet -k $kernel_ver -d $initrd/lib/modules/$kernel_ver $modules > $initrd/bin/insert-modules || exit 1
+chmod 755 $initrd/bin/insert-modules
+
+# Create empty ext2fs image file
+dd if=/dev/zero bs=1k of=$initrdimg count=$((`du -sk $initrd | cut -f1` * 7 / 6)) 2> /dev/null
+/sbin/mke2fs -q -F $initrdimg 2> /dev/null
+
+# Mount image file, copy files on, create /dev entries, display free space, umount
+$sudo mount -o loop $initrdimg $initrdmnt
+cp -a $initrd/* $initrdmnt/
+$sudo mknod $initrdmnt/dev/console c 5 1
+$sudo mknod $initrdmnt/dev/null c 1 3
+$sudo mknod $initrdmnt/dev/ram b 1 1
+$sudo mknod $initrdmnt/dev/systty c 4 0
+for i in 1 2 3 4; do $sudo mknod $initrdmnt/dev/tty$i c 4 $i; done
+if [ "$quiet" == "n" ]; then
+  df -h $initrdmnt
+fi
+$sudo umount $initrdmnt
+
+# Create output file
+initrd_suffix=`echo $requested_modules | tr " " .`
+gzip -9 -n -c $initrdimg > $output_dir/initrd-$initrd_suffix.$kernel_ver.img
+
+# Create symlink
+if [ "$make_link" == "y" ]; then
+  link=$output_dir/initrd-$initrd_suffix.img
+  [ -L $link ] && rm -f $link
+  ln -s initrd-$initrd_suffix.$kernel_ver.img $link
+fi
+
+# Remove temporary files
+if [ "$keep" == "n" ]; then
+  rm -rf $initrd
+  rm -f $initrdimg
+  rmdir $initrdmnt
+fi

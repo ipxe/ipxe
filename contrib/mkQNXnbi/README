@@ -1,0 +1,36 @@
+mkQNXnbi is a quick hack to generate tagged images from QNX boot images.
+
+To boot a QNX client with Etherboot you have to consider the following:
+1. You MUST have another QNX box running in the network to provide the
+   root filesystem and the license info to the client. QNX cannot use
+   e.g. NFS for its root filesystem, as it needs to load a valid license
+   from a file on the root fs before being able to start TCP/IP. This
+   would lead to a chicken-and-egg problem.
+2. The Net task normally determines the size of its internal tables from
+   the actual number of licensed nodes. Since this information is not
+   available at boot time when booting from the network, you will have
+   to set the max. number of nodes as well as a valid netmap entry for
+   the node providing the root filesystem as an option to Net in the
+   build file.
+   See examples/ws.etherboot and fill in the <blanks>.
+3. The client does not need a TCP/IP license in order to boot.
+4. You can use the boot-server OS of your choice. If you choose to use
+   QNX as boot server, the server of course needs a TCP/IP run-time
+   license.  In this case you have the option of creating the boot image
+   on-the-fly and use the macro $(netmap) instead of a hard-coded MAC
+   address.
+   See examples/ws.etherboot.on-the-fly and fill in the <blanks>.
+   A template bootptab for the QNX bootp server is placed in the
+   examples directory.
+5. mkQNXnbi expects the QNX image to be supplied on stdin and generates
+   the tagged image to stdout. This can be overridden on the command line
+   using the options -i <input-file> and -o <output-file>.
+
+mkQNXnbi can be compiled using e.g. Linux/gcc or on QNX using Watcom C
+(or gcc, if you have it - see http://w3c.teaser.fr/~jcmichot/)
+
+Bug-reports to <al@alarsen.net>
+
+2002-01-25
+Anders Larsen
+<al@alarsen.net>

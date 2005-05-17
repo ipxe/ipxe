@@ -1,0 +1,149 @@
+Subject: Look Mom, no PROM burner! (eepro100b flashing instructions) :-)
+Date: Sun, 23 Jan 2000 01:53:08 -0500
+x-sender: mdc%thinguin.org@cdi.entity.com
+x-mailer: Claris Emailer 2.0v3, January 22, 1998
+From: Marty Connor <mdc@thinguin.org>
+To: "Netboot List" <netboot@baghira.han.de>
+Mime-Version: 1.0
+Content-Type: text/plain; charset="US-ASCII"
+Message-ID: <1263512144-341319205@entity.com>
+
+Continuing the Etherboot World Domination theme, I noticed that there was 
+a PCI ethernet card on my bookshelf that still contained the original 
+vendor's code in its flash memory.  The card virtually cried out to be 
+flashed with Etherboot 4.4.1. :-)
+
+After having figured out how to flash the 3C905C last week, and owing to 
+the fact that the temperature here in Cambridge, Massachusetts (USA) has 
+dropped well below freezing, I decided to explore the possibility of 
+flashing the Intel eepro100b that was sitting on my bookcase.
+
+After determining that it was unlikely that one could flash the chip in 
+user mode under linux like the 3C509C,  I turned to other options.  (the 
+reason is that the flash is memory mapped to a place that causes a core 
+dump if accessed.  i suppose one could to patch the kernel to flash the 
+card, or add a linux device driver, but... :-)  
+
+By the way, If you are ever looking for Linux utilities for Ethernet 
+cards, you may want to check out: 
+
+   http://cesdis.gsfc.nasa.gov/linux/diag/
+
+which is a treasure trove of tools for manipulating and testing Ethernet 
+cards, all with source, courtesy of Donald Becker.
+
+At this point, I felt it was time to make a virtual trip to the Intel 
+site (http://www.intel.com/), and search for utilities that might work 
+with the eepro100B.  I found two candidates:  FUTIL and FBOOT.  I 
+downloaded, decompressed, and transferred them to a DOS formatted floppy. 
+Next I determined (after a few tries) that F8 will let me get to DOS 
+instead of booting windows. (I tend to avoid Windows when I can).
+
+I first tried FUTIL.EXE.  No good.  It told me it didn't recognize the 
+flash on my eepro100B.  how unfortunate.  and I had such hopes :-)
+
+Next I tested FBOOT.EXE  (available at 
+http://support.intel.com/support/network/adapter/pro100/100PBOOT.htm)  
+This program did in fact recognize my eepro100b card.
+
+The thing about FBOOT however, is that it thinks it only can load certain 
+files.  I of course needed to load an Etherboot image.  It appeared to 
+have no option for doing that.  Things looked grim.
+
+Then I noticed that FBOOT was kind enough to do the following dialog:
+
+   Select Option (U)pdate or (R)estore: U
+
+I chose Update and it then offered to back up my flash rom for later 
+restore:
+
+   Create Restore Image (Y)es or (N)o: Y
+
+I chose "Y" and it proceeded to write a file of my flash memory, which 
+contained the Intel code.
+
+   Writing FLASH image to file... 100%
+
+It then erased the device:
+
+   Erasing FLASH Device... 100%
+
+and then programmed it with fresh code (stored inside the program, no 
+doubt):
+
+   Programming FLASH Device... 100%
+
+So now I had a backup of the Intel boot code in a file strangely called:
+
+   2794FC60.FLS
+
+Hmmmm, interesting name.  The MAC address of the card is 09902794FC60.  
+They just name the file with the last 4 octets of the MAC address and 
+.FLS.  The file is exactly 65536 bytes, which would make sense for a 64K 
+Flash Memory device.
+
+Then I got to thinking, I wonder how carefully the "restore" part of 
+FBOOT looks at what it is loading?  What if I took an Etherboot .rom 
+file, padded it with 48K of 0xFFs and named it 2794FC60.FLS.  What if I 
+then told FBOOT.EXE to "restore" that?
+
+Well, I guess by now, you know it worked :-) 
+
+The card came up with the delightful Etherboot banner, Did DHCP, tftp, 
+and started a kernel.
+
+The only unfortunate part is that you need to do this under DOS because 
+you seem to need to be in real mode to program the card.  Oh well, 
+sacrifices have to be made :-)
+
+So, in summary, to prepare Etherboot image for flashing into the Intel 
+EEPRO100B card with FBOOT, you need to first make an eepro100.rom file, 
+as usual.
+
+Then, see how large it is, with an "ls -l eepro100.rom". the answer will 
+probably be 16,384.  You need to pad it with hex FFs to make it 64K for 
+FBOOT.  I used the following two lines to create the flash image file.
+
+   $ perl -e 'print "\xFF" x 49152' > 48kpad.bin
+   $ cat eepro100.rom 48kpad.bin > 2794FC60.FLS
+
+Next write it to a DOS Floppy:
+
+   $ mount -t msdos /dev/fd0 /mnt/floppy
+   $ cp 2794FC60.FLS /mnt/floppy
+   $ umount /mnt/floppy
+
+Now you need to get to DOS.  You could actually use a bootable DOS floppy 
+with FBOOT.EXE and 2794FC60.FLS on it.  I started a Windows box and hit 
+F8 right before Windows started, and chose option 5, "Command Prompt 
+Only", which gives you DOS.  This program can't run in a DOS window under 
+Windows or anything like that.  You need to be in real DOS.
+
+Next it's time to run FBOOT.  It will detect your ethernet card(s), ask 
+you which one you want to program, and let you choose it from a menu.
+
+now the fun part:
+
+   Select Option (U)pdate or (R)estore: R
+   Erasing FLASH Device... 100%
+   Writing FLASH image from file... 100%
+
+Time to reboot and let Etherboot take over.
+
+So there you go, a way to make Intel EEPRO100Bs play nicely with 
+Etherboot.  Maybe we should put these instructions in the Etherboot 
+contrib directory so people who have eepro100b cards will be able to 
+avoid 3C905C envy :-)
+
+I hope this helps a few people out.
+
+Regards,
+
+Marty
+
+---
+   Name: Martin D. Connor
+US Mail: Entity Cyber, Inc.; P.O. Box 391827; Cambridge, MA 02139; USA
+  Voice: (617) 491-6935, Fax: (617) 491-7046 
+  Email: mdc@thinguin.org
+    Web: http://www.thinguin.org/

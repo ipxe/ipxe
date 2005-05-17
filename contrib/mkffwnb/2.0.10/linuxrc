@@ -1,0 +1,76 @@
+#!/bin/sh
+#
+# floppyfw initfile
+#
+# nicked from:
+# hal91's initfile (/linuxrc), the bootup script of the system
+#
+
+VERSION=2.1.6
+
+load_fsmod () {
+	case $1 in
+	/dev/hd*)
+		insmod ide-cd
+		insmod cdrom
+		;;
+	esac
+	case $2 in
+	vfat)
+		echo vfat support is builtin
+		;;
+	iso9660)
+		insmod isofs
+		;;
+	esac
+}
+
+#
+/bin/busybox echo "Booting floppyfw" 
+
+PATH="/bin:/sbin:/usr/bin:/usr/sbin"
+#PATH="/bin"
+TERM=linux
+ignoreeof=10
+no_exit_on_failed_exec=yes
+export PATH TERM ignoreeof
+umask 022
+
+/bin/busybox echo "mounting: proc"
+/bin/busybox mount -t proc /proc /proc
+
+/bin/busybox echo "Generating links. (Thanks to busybox.lineo.com)"
+/bin/busybox --install -s
+
+echo "Generated"
+
+# Modified by Gem, based on coyote distro, changes by Ken Yap
+ROOTDEV=`sed -e 's/$/ /' -e 's/.*root=\([^ ]*\) .*/\1/' -e 's/,/ /g' -e 's:/dev/nfs:/dev/fd0:' /proc/cmdline`
+set -- $ROOTDEV
+# Backward compatibility with a single device argument
+if [ $# -eq 1 ]
+then
+	set -- $1 vfat
+fi
+while [ "$1" -a "$2" ]
+do
+	echo "attempting to mount $1 ($2)"
+	load_fsmod $1 $2
+	if mount -t $2 $1 /mnt/tmp
+	then
+		echo "mounted $1 on /mnt/tmp"
+		break
+	fi
+	shift; shift
+done
+
+[ -f /mnt/tmp/floppyfw/floppyfw.ini ] && cat /mnt/tmp/floppyfw/floppyfw.ini \
+| tr -d '\015' >/floppyfw.ini
+
+[ -f /floppyfw.ini ] && chmod 777 /floppyfw.ini
+[ -f /floppyfw.ini ] && exec /floppyfw.ini
+
+echo
+echo "** floppyfw.ini failed.. starting a shell"
+echo
+exec sh

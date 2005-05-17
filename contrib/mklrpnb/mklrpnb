@@ -1,0 +1,45 @@
+#!/usr/bin/perl -w
+#
+# A program to make a netbootable image from a LRP firewall floppy
+# Tested on a Coyote Linux floppy
+#
+@cfg = `mtype a:syslinux.cfg`;
+unless (defined(@cfg)) {
+	print "Cannot find syslinux.cfg on floppy\n";
+	exit 1;
+}
+($append) = grep(/^append/, @cfg);	# find the append= line
+chomp($append);				# remove trailing newline
+$append =~ s/append=//;			# remove the append= at beginning
+@args = split(/ /, $append);		# split into arguments at whitespace
+($root) = grep(/^initrd=/, @args);	# find the initrd= argument
+$root =~ s/^initrd=//;			# remove the initrd= at beginning
+($lrp) = grep(/^LRP=/, @args);		# find the LRP= argument
+$lrp =~ s/^LRP=//;			# remove the LRP= at beginning
+@lrp = split(/,/, $lrp);		# split into filenames at ,
+unshift(@lrp, $root);			# prepend the root LRP filename
+$append = '';
+foreach $i (@args) {			# rebuild the append string
+	next if ($i =~ /^initrd=/);	# minus the unneeded parameters
+	next if ($i =~ /^LRP=/);
+	next if ($i =~ /^boot=/);
+	$append .= "$i ";
+}
+# print "$append\n";
+$tempdir = "/tmp/lrp$$";
+mkdir($tempdir, 0777) or die "$tempdir: $!\n";
+chdir($tempdir) or die "$tempdir: $!\n";
+foreach $i (@lrp) {
+	$i .= '.lrp' if $i !~ /\.lrp$/;
+	print "Unpacking $i\n";
+	system("mtype a:$i | tar zxvf -");
+}
+print "Repacking to /tmp/lrp.lrp\n";
+system("tar zcf /tmp/lrp.lrp *");
+chdir('/tmp') or die "/tmp: $!\n";
+system("rm -fr $tempdir");
+print "Extracting kernel image from floppy\n";
+system("mtype a:linux > /tmp/lrp.ker");
+print "Creating netboot image in /tmp/lrp.nb\n";
+system("mkelf-linux --append='$append' --output=/tmp/lrp.nb /tmp/lrp.ker /tmp/lrp.lrp");
+exit 0;

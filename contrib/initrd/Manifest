@@ -1,0 +1,15 @@
+initrd/ChangeLog
+initrd/Makefile
+initrd/Manifest
+initrd/README
+initrd/dhcpd.conf.etherboot.include
+initrd/include-modules
+initrd/linux-wlan.cfg
+initrd/linuxrc
+initrd/mkinitrd-net
+initrd/mkinitrd-net.spec
+initrd/mknbi-encap.patch
+initrd/mknbi-set
+initrd/mknbi-set.conf
+initrd/script.c.patch
+initrd/udhcpc-post

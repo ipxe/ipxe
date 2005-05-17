@@ -1,0 +1,69 @@
+This is a quick and dirty script to convert a floppyfw floppy
+(http://www.zelow.no/floppyfw/) to a tagged image for booting with
+Etherboot (http://etherboot.sourceforge.net/). The advantages of network
+booting include: it's much faster loading from the network than from a
+floppy disk, you can boot from any size floppy, and you are not limited
+to the maximum of 1.44 MB of the physical floppy. If you have enough RAM
+and use a virtual floppy to build the initial boot image, you can put as
+much on it as will fit the ramdisk.
+
+See further down under -nonet if you want to boot from HD or CDROM.
+
+This program requires mtools, tar, bzip2, loopback mount in the kernel,
+and root privileges to execute. Hope you have them.
+
+This script works for any of the releases for which a subdirectory of
+that name is provided, but it should not be too hard to make it work for
+other releases, all that is done here is to substitute some scripts for
+the distributed ones.
+
+First of all you should make the floppy work the way you want before
+converting it to a tagged image. This involves editing the various
+config files on the floppy. Instructions on this are distributed from
+the floppyfw web page mentioned above.
+
+Edit the $tftpdir assignment for the directory where you put your tagged
+images.  Edit the $libdir assignment and the use lib directive near the
+top if you decide to put this package somewhere other than
+/usr/local/lib/mkffwnb/. Adjust the instructions below as necessary.
+
+Copy everything to $libdir.
+
+	mkdir -p /usr/local/lib/mkffwnb/
+	cp -a . /usr/local/lib/mkffwnb/
+
+Make a link from /usr/local/lib/mkffwnb/mkffwnb.pl to
+/usr/local/bin/mkffwnb so that it's in your path.
+
+	ln -s /usr/local/lib/mkffwnb/mkffwnb.pl /usr/local/bin/mkffwnb
+
+Then run it as:
+
+	mkffwnb
+
+You can also provide a floppy drive as an argument, e.g.
+
+	mkffwnb x:
+
+where x: could be mapped to a disk file. This allows you to build an
+image without a real floppy drive. Remember that for virtual drives root
+must have the mapping for the drive in question in ~root/.mtoolsrc.
+
+You can use the option --localtime=/etc/localtime to specify that the
+file /etc/localtime is to be copied to /etc/localtime on the initrd.
+Instead of /etc/localtime, you can use any of the timezone files under
+/usr/share/zoneinfo/, it's just that /etc/localtime will usually be the
+correct one for your timezone.
+
+If you use the option -nonet, it leaves the intermediate files in
+$tempdir, /tmp/mkffwnb by default. This is useful if you want the
+vmlinuz and initrd.gz files for use with LILO or isolinux to boot from
+HD or CDROM. Actually you can also use these with a floppy, it loads
+faster if you fold all the scripts and modules into the initrd ahead
+of time.
+
+mkffwnb has to be run as root because it uses loopback mounts and also
+because the files inside the initrd are owned by root.
+
+Ken Yap
+2003-04-20

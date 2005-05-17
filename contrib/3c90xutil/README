@@ -1,0 +1,31 @@
+This utility was apparently writen by John Finlay and came to me
+via Richard Schroeder who got it from Greg Beeley. John, if you want
+to be credited with your full address or whatever in the Etherboot
+documentation, please contact me (Etherboot maintainer).
+
+1/18/2000 Marty Connor (mdc@thinguin.org) added code for the 3C905C
+with AT49BV512 Flash memory, and created cromutil and bromutil to
+differentiate the versions.  cromutil is for 3C905C and bromutil is
+for 3C905B.
+
+Be careful. You can easily erase your Flash memory using these
+utilities.  Make *sure* to back them up first using the "read"
+command. You must "erase" before using "prog" to program the chip with
+Etherboot code.  This code comes with NO WARRANTY, and you take sole
+responsibility and liability for whatever it does.  Read the
+"romutil.txt" file for more information on commands.
+
+That being said, if you are programming a 3C905C-TXM (for example)
+you would do something like this:
+
+    $ cd etherboot-x.x.x/contrib
+    $ tar -zxvf n3c905xutil.tar.gz
+    $ cd n3c905xutil
+    $ make
+    # replace 0x6600 with whatever the IO Addr for your card is!!!!
+    $ ./cromutil 0x6600 read > 905cbackup.bin
+    $ ./cromutil 0x6600 erase
+    $ ./cromutil 0x6600 prog < 3c90x.lzrom
+
+You should now have an Etherboot-enabled 3c905C-TXM.
+

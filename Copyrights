@@ -1,0 +1,20 @@
+Unless specifically noted, a file is under the GPL.  GPLed files are in
+general either from Linux or have been explicitly put under GPL by the
+authors.  A few files are inherited from FreeBSD netboot and therefore
+can be used under BSD or GPL.
+
+File				Copyright status
+
+core/misc.c			BSD
+drivers/net/3c509.c		BSD
+drivers/net/3c509.h		BSD
+drivers/net/3c595.c		BSD
+drivers/net/3c595.h		BSD
+drivers/net/3c90x.c		Open Source
+drivers/net/epic100.c		None
+drivers/net/epic100.h		None
+drivers/net/ns8390.c		BSD
+drivers/net/ns8390.h		BSD
+drivers/net/tulip.c		BSD
+arch/i386/include/bits/string.h	None
+util/lzhuf.c			Open Source

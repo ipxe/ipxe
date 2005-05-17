@@ -1,0 +1,40 @@
+Date:        11/9/2001 3:56 PM
+Received:    11/9/2001 4:05 PM
+From:        Steve Tilden, stilden@sicom-sys.com
+
+...
+
+2)  I have added conditional code to main.c from Etherboot 5.0.4 to add
+a new default boot option and I have included the modified main.c as an
+attachment to this message.
+
+As I received Etherboot 5.0.4, in the Config file, if you select
+ASK_BOOT with a non zero time-out option, then you also get to set
+ANS_DEFAULT = ANS_NETWORK or ANS_DEFAULT = ANS_LOCAL to determine what
+will happen if the operator does not respond to the prompt.   I have now
+added conditional code in main.c such that if you set ANS_DEFAULT =
+ANS_AUTO, the default answer will be set according to whether or not
+there is a hard disk in the system (as detected by the BIOS).  If a hard
+disk is present, then if the operator does nothing, the system will boot
+from it.  If a hard disk does not exist, then again if the operator does
+nothing, the system will boot via the network.  Either way, for our
+particular environment, the operator has to do nothing to get it to boot
+correctly.  Yet the operator can still override the default selection
+to, for example, allow a unit without a hard disk, to boot directly from
+a floppy rather than the network, or to allow a unit with a hard disk,
+to boot from the network.
+
+I don't know it the code I have added might be correct for a future
+production version of Etherboot, but I thought I'd send it to you and
+let you get it into the system if you feel it might be appropriate.
+
+Thanks,
+
+Steve Tilden
+Sicom Systems Inc.
+stilden@sicom-sys.com
+
+[Ed: On a compliant BIOS, it will actually boot the next device in the
+BIOS list if local is selected, either explicitly or by timeout, which
+may or may not be the hard disk, which is why it's less than general and
+not included in the distribution by default.]

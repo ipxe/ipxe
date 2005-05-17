@@ -1,0 +1,52 @@
+From: "Paolo Marini" <paolom@prisma-eng.it>
+Subject: Etherboot on bare metal
+Date: Tue, 10 Apr 2001 23:19:19 +0200
+Organization: Prisma Engineering srl
+
+Hi Ken,
+I have ported Etherboot on an embedded, biosless platform and would like
+to contribute the code.
+
+Essentially, the hardware I was running Etherboot is a Pentium based
+embedded system, with an Intel Chipset, *but* without serial, VGA,
+keyboard etc., only an 82559 Intel (custom) Ethernet controller (I debug
+it with the etheral Ethernet packet analyser and an emulator).
+
+What I did was:
+
+  a.. integrate the init.s file within the firmware, with GDT
+(re)initialisation (a simple and single entry point taking control of
+the boot process)
+  b.. provide some stupid BIOS stubs in order to let the OS boot and
+still belive that an INT10 call goes to the BIOS
+  c.. provide some basic functions to Etherboot, like timer (I used the
+Pentium TSC internal counter)
+  d.. hardwire in the code information about the RAM size
+The BIOS stubs are enough to boot Linux, pSOS and QNX with bootp. QNX is
+somewhat difficult to load, because the i82559 driver tries to find the
+component using the BIOS32 calls, so I had to patch it.
+
+what i I got from the original firmware is the PCI initialisation and
+resource (I/O, interrupts, memory) allocation.
+
+I send you what I changed, that is, the initialisation code and the
+misc.c file containing the timer, and the makefile (I don't remember
+exactly the options I used to compile all).
+
+Of course, it is only a good starting point for anyone wanting to
+implement a bootp client on a biosless platform; some integration work
+still needs to be done.
+
+Ciao
+Paolo
+
+And in a subsequent email:
+
+I worked with version 4.6.12, but the real modifications involve the
+init.S file, which I think is quite sstable between releases.  I forgot
+to say that my entry point (symbol _start in init.s) assumes the
+processor is already in protected mode.
+
+[The only difference between main.c and misc.c from those in Etherboot
+4.6.12 seems to be the deletion of eth_reset(). This may be of use to
+others trying to make these changes work on more recent releases. Ken]

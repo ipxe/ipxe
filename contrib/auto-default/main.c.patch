@@ -1,0 +1,55 @@
+--- main.c	Mon Nov  5 18:58:30 2001
++++ main.c.new	Thu Nov 15 01:45:12 2001
+@@ -149,21 +151,49 @@
+ static unsigned short ipchksum(unsigned short *ip, int len);
+ static unsigned short udpchksum(struct iphdr *packet);
+ 
++
++#if defined(ASK_BOOT) && ASK_BOOT > 0 && (ANS_DEFAULT == ANS_AUTO)
++/*
++ * Read Installed Hard Disk Count from BIOS memory at 0:0475
++ */
++static int hdsk_cnt(void)
++{
++	int retv;
++	__asm__ __volatile__(
++       "xorw %%ax,%%ax\n\t"
++       "movb 0x475,%%al\n"
++       : "=a" (retv)
++       : /* no inputs */
++       : "ax", "cc", "memory"
++	);
++	return(retv);
++}
++#endif /* ASK_BOOT && ANS_AUTO */
++
++
+ static inline void ask_boot(void)
+ {
+ #if defined(ASK_BOOT) && ASK_BOOT > 0
+ 	while(1) {
+-		int c;
++		int c, deflt;
+ 		unsigned long time;
++#if defined(ASK_BOOT) && ASK_BOOT > 0 && (ANS_DEFAULT == ANS_AUTO)
++		if (hdsk_cnt() != 0)
++			deflt = ANS_LOCAL;
++		else
++			deflt = ANS_NETWORK;
++#else
++		deflt = ANS_DEFAULT;
++#endif
+ 		printf(ASK_PROMPT);
+ 		for (time = currticks() + ASK_BOOT*TICKS_PER_SEC; !iskey(); )
+ 			if (currticks() > time) {
+-				c = ANS_DEFAULT;
++				c = deflt;
+ 				goto done;
+ 			}
+ 		c = getchar();
+ 		if ((c >= 'a') && (c <= 'z')) c &= 0x5F;
+-		if (c == '\n') c = ANS_DEFAULT;
++		if (c == '\n') c = deflt;
+ done:
+ 		if ((c >= ' ') && (c <= '~')) putchar(c);
+ 		putchar('\n');

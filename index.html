@@ -1,0 +1,254 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<html>
+<head>
+<meta name="generator" content=
+"HTML Tidy for Linux/x86 (vers 1st April 2002), see www.w3.org">
+<title>Welcome to EtherBoot.org</title>
+<meta http-equiv="Content-Type" content=
+"text/html; charset=iso-8859-1">
+<link rel=StyleSheet href="style.css" type="text/css"/>
+</head>
+<body>
+<table summary="welcome" width="95%" border="0" cellspacing="0"
+cellpadding="3" align="center">
+<tr bgcolor="#0F3161">
+<td width="278" bgcolor="#0F3161" valign="bottom">
+<h2 class="c1">Welcome to the</h2>
+</td>
+<td bgcolor="#0F3161">
+</td>
+<td></td>
+</tr>
+
+<tr>
+<td bgcolor="#BFCBD9">
+<div class="c2">EtherBoot Project</div>
+</td>
+<td align="middle">
+<div class="c2">
+<a href="http://osdir.com/Article198.phtml"><img src=
+"http://www.osdir.com/images/2003osdirwinnerbadge.gif" width=
+"125" height="65" border="0" alt="OSDir 2003 Winner Badge"></a>
+</div>
+</td>
+<td bgcolor="#BFCBD9">
+<div class="c4"><a href="index.html" class="c3"><img src=
+"doc/html/images/etherboot_logo.png" alt="Etherboot logo" width=
+"125" height="54" border="0"></a></div>
+</td>
+</tr>
+</table>
+
+<table summary="index" width="95%" border="0" cellspacing="0"
+cellpadding="0" align="center">
+<tr>
+<td bgcolor="#0F3161" width="165" height="56" valign="top">
+<table summary="index.html" width="100%" border="0" cellspacing=
+"10" cellpadding="0" align="right">
+<tr>
+<td height="45">
+<div class="c4"><a href="index.html" class=
+"c5"><b>Home</b></a></div>
+</td>
+</tr>
+
+<tr>
+<td height="45">
+<div class="c4"><a href="http://sourceforge.net/projects/etherboot" class=
+"c3">Sourceforge project home</a></div>
+</td>
+</tr>
+
+<tr>
+<td height="45">
+<div class="c4"><a href="http://developer.berlios.de/projects/etherboot" class=
+"c3">Berlios project mirror</a></div>
+</td>
+</tr>
+
+<tr>
+<td height="45">
+<div class="c4"><a href="http://sourceforge.net/news/?group_id=4233" class=
+"c3">News</a></div>
+</td>
+</tr>
+
+<tr>
+<td height="45">
+<div class="c4"><a href="doc/html/documentation.html" class=
+"c3">Documentation</a></div>
+</td>
+</tr>
+
+<tr>
+<td height="45">
+<div class="c4"><a href="http://wiki.etherboot.org" class=
+"c3">Wiki</a></div>
+</td>
+</tr>
+
+<tr>
+<td height="45">
+<div class="c4"><a href="http://rom-o-matic.net/" class=
+"c3">Make ROMs</a></div>
+</td>
+</tr>
+
+<tr>
+<td height="45">
+<div class="c4"><a href="http://sourceforge.net/project/showfiles.php?group_id=4233" class=
+"c3">Download source from Sourceforge</a></div>
+</td>
+</tr>
+
+<tr>
+<td height="45">
+<div class="c4"><a href="http://etherboot.berlios.de/dist/" class=
+"c3">Download source from Berlios (Germany)</a></div>
+</td>
+</tr>
+
+<tr>
+<td height="45">
+<div class="c4"><a href="doc/html/contributing.html" class=
+"c3">Volunteering</a></div>
+</td>
+</tr>
+
+<tr>
+<td height="45">
+<div class="c4"><a href="http://sourceforge.net/mail/?group_id=4233" class=
+"c3">Mailing Lists</a></div>
+</td>
+</tr>
+
+<tr>
+<td height="45">
+<div class="c4"><a href=
+"http://etherboot.sourceforge.net/relatedlinks.html" class=
+"c3">Related Links</a></div>
+</td>
+</tr>
+
+<tr>
+<td height="45">
+<div class="c4"><a href=
+"http://etherboot.sourceforge.net/clinks.html" class=
+"c3">Commercial Links</a></div>
+</td>
+</tr>
+</table>
+</td>
+<td width="700" height="56" bgcolor="#FFFFFF" valign="top" align=
+"left">
+<blockquote>
+<h2 class="c6">About EtherBoot</h2>
+
+<p class="c7">Etherboot is a software package for creating ROM
+images that can download code over an Ethernet network to be
+executed on an x86 computer. Many network adapters have a socket
+where a ROM chip can be installed. Etherboot is code that can be
+put in such a ROM. Etherboot is normally used for for booting PCs
+diskless. This is useful in various situations, for example:</p>
+
+<ul class="c11">
+<li>An X-terminal.</li>
+
+<li>Clusters of compute servers.</li>
+
+<li>Routers.</li>
+
+<li>Various kinds of remote servers, e.g. a tape drive server that
+can be accessed with the RMT protocol.</li>
+
+<li>Machines doing tasks in environments unfriendly to disks.</li>
+
+<li>A user platform where remote partitions are mounted over the
+network and you are willing to accept the lower speed compared to
+disk.</li>
+
+<li>Maintaining software for a cluster of equally configured
+workstations centrally.</li>
+</ul>
+
+<p class="c7">Etherboot can boot computers faster than from a disk
+because there are no delays in spinning up disks, etc. A moment's
+calculation will show that even with a 10Mbit Ethernet, sending a
+500kB kernel will take only a couple of seconds typically. With
+100Mbit Ethernet it gets even better.</p>
+
+<p class="c7">Compared to booting from solid-state devices, e.g.
+Flash disks, Etherboot has the advantage of centralising software
+adminstration, the tradeoff being the dependence on a server. This
+can be partly alleviated by providing redundant servers.</p>
+
+<p class="c7">Etherboot can work with RAM disks, NFS filesystems,
+or even local disks, if desired. It's a component technology and
+can be combined with other technologies to do things the way you
+want.</p>
+
+<p class="c7">Etherboot is usually used to load Linux, FreeBSD or
+DOS. However the protocol and boot file formats are general, so
+there is no reason why it could not be used to load arbitrary
+images to a PC, including other OSes.</p>
+
+<p class="c7">Etherboot is Open Source under the GNU General Public
+License Version 2 (GPL2).</p>
+
+<p class="c7">The components needed by Etherboot are</p>
+
+<ul class="c11">
+<li>A bootstrap loader, usually in an EPROM on a network card, or
+installed in the flash BIOS, but could be put anywhere in the
+address space the BIOS probes in. For testing this could be put on
+a floppy disk or a hard disk partition. Some configurations may
+even be always run from a floppy disk (e.g. temporary testing
+setups or pedagogic uses).</li>
+
+<li>A DHCP or bootp server, for returning an IP address and other
+information when sent a MAC (Ethernet card) address.</li>
+
+<li>A tftp server, for sending the kernel images and other files
+required in the boot process. Alternatively, Etherboot can boot
+from an NFS mount.</li>
+
+<li>A Linux or FreeBSD kernel.</li>
+
+<li>Optionally, a NFS server, for providing the disk partitions
+that will be mounted if Linux or FreeBSD is being booted.</li>
+
+<li>Optionally, a RAM disk contained in the loaded image. This can
+be the initial RAM disk if desired.</li>
+
+<li>Software tools for building the download image, and tools for
+debugging.</li>
+</ul>
+</blockquote>
+
+</td>
+<td width="12" height="56" bgcolor="#0F3161"></td>
+</tr>
+</table>
+
+<table summary="pad" width="95%" border="0" cellspacing="0"
+cellpadding="0" align="center">
+<tr>
+<td height="5" bgcolor="#BFCBD9">&nbsp;</td>
+</tr>
+</table>
+
+<table summary="sponsor" width="95%" border="0" cellspacing="3"
+cellpadding="0" align="center" bgcolor="#0F3161">
+<tr>
+<td valign="middle" width="81">
+<div class="c10">Hosted by</div>
+</td>
+<td valign="middle" width="610"><a href="http://sourceforge.net"><img src=
+"http://sourceforge.net/sflogo.php?group_id=4233&amp;type=1" width=
+"88" height="31" border="0" alt="SourceForge Logo"></a>
+</td>
+</tr>
+</table>
+</body>
+</html>
+

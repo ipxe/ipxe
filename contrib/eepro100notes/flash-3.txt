@@ -1,0 +1,57 @@
+Date: Sun, 23 Jan 2000 09:47:15 +0100 (MET)
+From: Erik Starbäck <erik@math.uu.se>
+To: Netboot List <netboot@baghira.han.de>
+Subject: Re: Look Mom, no PROM burner! (eepro100b flashing instructions) :-)
+In-Reply-To: <1263512144-341319205@entity.com>
+Message-ID: <Pine.LNX.3.96.1000123094505.28562A-100000@anarchy.math.uu.se>
+MIME-Version: 1.0
+Content-Type: TEXT/PLAIN; charset=iso-8859-1
+Content-Transfer-Encoding: 8BIT
+Sender: owner-netboot@baghira.han.de
+Precedence: bulk
+Reply-To: netboot@baghira.han.de
+X-Moderator: netboot-owner@baghira.han.de
+
+
+Hello!
+
+In <http://www.han.de/~gero/netboot/archive/msg01718.html> I wrote what I
+did know about futil and fboot then. It is about the same as Martys
+instructions, but I have a few comments now.
+
+> Then, see how large it is, with an "ls -l eepro100.rom". the answer will 
+> probably be 16,384.  You need to pad it with hex FFs to make it 64K for 
+> FBOOT.  I used the following two lines to create the flash image file.
+
+>   $ perl -e 'print "\xFF" x 49152' > 48kpad.bin
+>   $ cat eepro100.rom 48kpad.bin > 2794FC60.FLS
+
+It worked for me without any padding. When I burned a smaller image
+the program printed 50% instead of 100% and then it
+stopped. Everything worked anyway.
+
+
+I also did a brutal way of install etherboot or netboot on a
+EEPRO100+Mng without creating a file of type "2794FC60.FLS" for
+every card. It was necessary for me when I installed 70 clients...
+
+I chopped the binary file fboot.exe (my version was 99811 bytes, I
+don't remember the version name) in three parts:
+
+fboot1 30096 bytes
+fboot2 65536 bytes
+fboot3 4179  bytes
+
+Then you cat put them together again, but with a different part 2 and
+save it as fbootown.exe and execute it. It worked for me anyway. Of
+course you have to use padding to get a 64k part instead of fboot2.
+
+/Erik S
+
+-------------------------------------------------------------------------
+Erik Starbäck, System administrator    E-mail address:    erik@math.uu.se
+Uppsala University                     Telephone (o):     +46 18 4713277
+Department of Mathematics              Cellular phone:    +46 70 4250260
+P. O. Box 480                          Fax (o):           +46 18 4713201
+SE-751 06  UPPSALA                  
+Sweden                                

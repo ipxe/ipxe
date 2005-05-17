@@ -1,0 +1,83 @@
+<blockquote>
+<h2 class="c6">About EtherBoot</h2>
+
+<p class="c7">Etherboot is a software package for creating ROM
+images that can download code over an Ethernet network to be
+executed on an x86 computer. Many network adapters have a socket
+where a ROM chip can be installed. Etherboot is code that can be
+put in such a ROM. Etherboot is normally used for for booting PCs
+diskless. This is useful in various situations, for example:</p>
+
+<ul class="c11">
+<li>An X-terminal.</li>
+
+<li>Clusters of compute servers.</li>
+
+<li>Routers.</li>
+
+<li>Various kinds of remote servers, e.g. a tape drive server that
+can be accessed with the RMT protocol.</li>
+
+<li>Machines doing tasks in environments unfriendly to disks.</li>
+
+<li>A user platform where remote partitions are mounted over the
+network and you are willing to accept the lower speed compared to
+disk.</li>
+
+<li>Maintaining software for a cluster of equally configured
+workstations centrally.</li>
+</ul>
+
+<p class="c7">Etherboot can boot computers faster than from a disk
+because there are no delays in spinning up disks, etc. A moment's
+calculation will show that even with a 10Mbit Ethernet, sending a
+500kB kernel will take only a couple of seconds typically. With
+100Mbit Ethernet it gets even better.</p>
+
+<p class="c7">Compared to booting from solid-state devices, e.g.
+Flash disks, Etherboot has the advantage of centralising software
+adminstration, the tradeoff being the dependence on a server. This
+can be partly alleviated by providing redundant servers.</p>
+
+<p class="c7">Etherboot can work with RAM disks, NFS filesystems,
+or even local disks, if desired. It's a component technology and
+can be combined with other technologies to do things the way you
+want.</p>
+
+<p class="c7">Etherboot is usually used to load Linux, FreeBSD or
+DOS. However the protocol and boot file formats are general, so
+there is no reason why it could not be used to load arbitrary
+images to a PC, including other OSes.</p>
+
+<p class="c7">Etherboot is Open Source under the GNU General Public
+License Version 2 (GPL2).</p>
+
+<p class="c7">The components needed by Etherboot are</p>
+
+<ul class="c11">
+<li>A bootstrap loader, usually in an EPROM on a network card, or
+installed in the flash BIOS, but could be put anywhere in the
+address space the BIOS probes in. For testing this could be put on
+a floppy disk or a hard disk partition. Some configurations may
+even be always run from a floppy disk (e.g. temporary testing
+setups or pedagogic uses).</li>
+
+<li>A DHCP or bootp server, for returning an IP address and other
+information when sent a MAC (Ethernet card) address.</li>
+
+<li>A tftp server, for sending the kernel images and other files
+required in the boot process. Alternatively, Etherboot can boot
+from an NFS mount.</li>
+
+<li>A Linux or FreeBSD kernel.</li>
+
+<li>Optionally, a NFS server, for providing the disk partitions
+that will be mounted if Linux or FreeBSD is being booted.</li>
+
+<li>Optionally, a RAM disk contained in the loaded image. This can
+be the initial RAM disk if desired.</li>
+
+<li>Software tools for building the download image, and tools for
+debugging.</li>
+</ul>
+</blockquote>

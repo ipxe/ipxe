@@ -1,0 +1,11 @@
+--- script.c.orig	Tue Apr  2 23:49:33 2002
++++ script.c	Wed Jun  5 14:17:22 2002
+@@ -179,7 +179,7 @@
+ 	}
+ 	if (packet->siaddr) {
+ 		envp[j] = malloc(sizeof("siaddr=255.255.255.255"));
+-		sprintip(envp[j++], "siaddr=", (unsigned char *) &packet->yiaddr);
++		sprintip(envp[j++], "siaddr=", (unsigned char *) &packet->siaddr);
+ 	}
+ 	if (!(over & FILE_FIELD) && packet->file[0]) {
+ 		/* watch out for invalid packets */

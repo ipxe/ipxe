@@ -1,0 +1,37 @@
+README for mkinitrd-net
+
+mkinitrd-net enables you to use your distribution's stock kernel for
+diskless workstations, without having to compile in support for the
+relevant network card(s).  It creates an initial ramdisk image containing
+the required network-card kernel modules and bootstrap scripts to load the
+module, obtain an IP address via DHCP and mount the root filesystem via
+NFS.
+
+mkinitrd-net also generates a dhcpd.conf file fragment that can be used to
+automate the process of mapping NBI files to clients, based on the PCI IDs
+of their network cards.  Etherboot will send the PCI ID of the network
+card to the DHCP server in the etherboot-encapsulated-options field
+(Etherboot 5.0.7 and newer) and the DHCP server can use this to identify
+the correct NBI to point the client towards.
+
+The end result is that:
+
+a) You can avoid the hassle of compiling custom kernels for diskless
+   workstations.
+
+b) Diskless workstations will automatically download the correct
+   kernel+initrd.
+
+c) You have an easier life! :-)
+
+
+
+mkinitrd-net is Copyright Fen Systems Ltd. 2001.  mkinitrd-net itself is
+licensed under the GNU GPL.  It incorporates code from the uClibc,
+busybox, udhcpc and Etherboot projects, each of which has its own licence
+terms.  Standard disclaimers apply.
+
+The copy of mkinitrd-net in the Etherboot contribs is not the
+authoritative copy of mkinitrd-net; please do not make modifications to
+this copy.  Patches should be sent to Michael Brown
+<mbrown@fensystems.co.uk>.

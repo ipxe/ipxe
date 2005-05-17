@@ -1,0 +1,74 @@
+/* 
+
+  Quick and dirty program to make intel-hex from a binary.
+
+  Written by R.E.Wolff@BitWizard.nl
+  This file is in the public domain
+
+  Typing started:
+
+  Mon Jun 16 00:24:15 MET DST 1997
+
+  programming stopped:
+
+  Mon Jun 16 00:31:27 MET DST 1997
+
+  debugging finished (2 bugs found):
+  Mon Jun 16 00:32:52 MET DST 1997
+
+--------------------------------------------------------- 
+
+  Doc written in timeout. Everything else in this file was done while
+  the timer was running.
+
+  I promised "Mark Kopecki" that writing the bin-to-intel-hex
+  converter would cost less than 15 minutes, and that it would be more
+  trouble to find a converter on the net than to write the converter
+  myself.  I ended up spending over half an hour searching for
+  spec/converter/docs because of unreachable hosts on the internet. I
+  got a file with docs, after that it was 8 minutes.....
+
+--------------------------------------------------------- 
+
+*/
+
+
+#include <stdio.h>
+#include <unistd.h>
+
+/* Intel Hex format:
+   
+   ll aaaa tt dd....dd cc
+ 
+   ll = length
+   aaaa = address
+   tt = type
+   dd....dd = data
+   cc = checksum.
+*/
+
+
+int main (int argc, char **argv)
+{
+  unsigned char buf[32];
+  int addr = 0;
+  int n,i;
+
+  while ((n = read (0, buf+4, 16)) > 0) {
+    buf[0] = n;
+    buf[1] = addr >> 8;
+    buf[2] = addr & 0xff;
+    buf[3] = 0x00;
+    buf[4+n] = 0x00;
+
+    for (i=0;i<4+n;i++)
+      buf[4+n] -= buf[i];
+    printf (":");
+    for (i=0;i<= 4+n;i++)
+      printf ("%02x", buf[i]);
+    printf ("\n");
+    addr += n;
+  }
+  printf (":0000000001ff\n");
+  exit (0);
+}

@@ -1,0 +1,58 @@
+The  compressor achieves  an  average compression  rate of 60%  of the
+original size which is on par with "gzip". It seems that you cannot do
+much better for compressing  compiled  binaries.  This means that  the
+break even  point  for using compressed  images is   reached, once the
+uncompressed size approaches 1.5kB. We  can stuff more than 12kB  into
+an 8kB EPROM and more than 25kB into an 16kB EPROM.   As there is only
+32kB of RAM  for both the uncompressed  image  and its BSS  area, this
+means that 32kB EPROMs will hardly ever be required.
+
+The compression  algorithm uses a  4kB  ring buffer  for buffering the
+uncompressed data. Before   compression starts,  the  ring buffer   is
+filled  with spaces (ASCII  character  0x20).  The algorithm tries  to
+find repeated  input sequences of a  maximum length of  60 bytes.  All
+256 different input  bytes  plus the 58 (60   minus a threshold of  2)
+possible  repeat lengths form a set  of 314 symbols. These symbols are
+adaptively Huffman encoded.  The  algorithm starts out with a Huffmann
+tree  that  assigns equal code lengths    to each of  the  314 symbols
+(slightly favoring the repeat  symbols over symbols for regular  input
+characters), but  it will be changed whenever  the frequency of any of
+the symbols  changes. Frequency counts are  kept in 16bit  words until
+the total number of compressed codes totals 2^15.  Then, all frequency
+counts will be halfed (rounding to the bigger number).  For unrepeated
+characters (symbols 0..255) the Huffman code  is written to the output
+stream.  For repeated characters the  Huffmann code, which denotes the
+length of the repeated character sequence, is written out and then the
+index in the ring buffer is computed.   From this index, the algorithm
+computes  the offset   relative to  the current  index  into  the ring
+buffer. Thus,  for typical input data,  one would expect that short to
+medium range offsets are more frequent  than extremely short or medium
+range to long range offsets. Thus the  12bit (for a 4kB buffer) offset
+value  is statically Huffman encoded  using a precomputed Huffman tree
+that favors  those  offset  values    that  are deemed to   be    more
+frequent. The  Huffman encoded offset  is  written to the output  data
+stream,  directly  following the code  that   determines the length of
+repeated characters.
+
+This algorithm, as implemented in the  C example code, looks very good
+and  its operating parameters are   already well optimized. This  also
+explains   why  it achieves     compression ratios    comparable  with
+"gzip". Depending on the input data, it sometimes excells considerably
+beyond what "gzip -9" does, but this  phenomenon does not appear to be
+typical. There are some flaws with  the algorithm, such as the limited
+buffer  sizes, the  adaptive  Huffman tree  which takes  very  long to
+change, if    the input  characters  experience   a sudden   change in
+distribution, and the static Huffman   tree for encoding offsets  into
+the  buffer.   The slow  changes of   the  adaptive  Huffman  tree are
+partially counteracted by  artifically keeping  a 16bit precision  for
+the frequency counts, but  this does not  come into play until 32kB of
+compressed data is output, so  it does not  have any impact on our use
+for "etherboot", because  the BOOT Prom  does not support uncompressed
+data of more then 32kB (c.f. doc/spec.doc).
+
+Nonetheless,  these problems  do  not  seem  to affect  compression of
+compiled  programs very much.  Mixing  object code with English  text,
+would not work too  well though, and  the algorithm should be reset in
+between. Actually, we  might  gain a little  improvement, if  text and
+data   segments    were compressed  individually,    but   I have  not
+experimented with this option, yet.

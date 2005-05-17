@@ -1,0 +1,207 @@
+# dhcpd.conf include file for Etherboot
+#
+# Include this file from your /etc/dhcpd.conf
+# $Id$
+
+# Definition of Etherboot options
+# (taken from vendortags.html)
+
+# We use an encapsulated option space to avoid polluting the site-local DHCP option space
+#
+option space etherboot;
+option etherboot-encapsulated-options code 150 = encapsulate etherboot;
+
+# Definition of option codes within the etherboot-encapsulated-options space
+#
+option etherboot.extensions-path code 18 = string;
+option etherboot.magic		code 128 = string;
+option etherboot.kernel-cmdline	code 129 = string;
+option etherboot.menu-opts	code 160 = string;
+option etherboot.nic-dev-id	code 175 = string;
+option etherboot.menu-selection	code 176 = unsigned integer 8;
+option etherboot.motd-1		code 184 = string;
+option etherboot.motd-2		code 185 = string;
+option etherboot.motd-3		code 186 = string;
+option etherboot.motd-4		code 187 = string;
+option etherboot.motd-5		code 188 = string;
+option etherboot.motd-6		code 189 = string;
+option etherboot.motd-7		code 190 = string;
+option etherboot.motd-8		code 191 = string;
+option etherboot.image-1	code 192 = string;
+option etherboot.image-2	code 193 = string;
+option etherboot.image-3	code 194 = string;
+option etherboot.image-4	code 195 = string;
+option etherboot.image-5	code 196 = string;
+option etherboot.image-6	code 197 = string;
+option etherboot.image-7	code 198 = string;
+option etherboot.image-8	code 199 = string;
+option etherboot.image-9	code 200 = string;
+option etherboot.image-10	code 201 = string;
+option etherboot.image-11	code 202 = string;
+option etherboot.image-12	code 203 = string;
+option etherboot.image-13	code 204 = string;
+option etherboot.image-14	code 205 = string;
+option etherboot.image-15	code 206 = string;
+option etherboot.image-16	code 207 = string;
+option etherboot.kmod		code 254 = string;
+
+# Legacy support for Etherboot options as site-local options (i.e. non-encapsulated)
+# Note: options defined after the switch to encapsulated options should not be defined here
+#
+option legacy-etherboot-magic		code 128 = string;
+option legacy-etherboot-kernel-cmdline	code 129 = string;
+option legacy-etherboot-menu-opts	code 160 = string;
+option legacy-etherboot-menu-selection	code 176 = unsigned integer 8;
+option legacy-etherboot-motd-1		code 184 = string;
+option legacy-etherboot-motd-2		code 185 = string;
+option legacy-etherboot-motd-3		code 186 = string;
+option legacy-etherboot-motd-4		code 187 = string;
+option legacy-etherboot-motd-5		code 188 = string;
+option legacy-etherboot-motd-6		code 189 = string;
+option legacy-etherboot-motd-7		code 190 = string;
+option legacy-etherboot-motd-8		code 191 = string;
+option legacy-etherboot-image-1		code 192 = string;
+option legacy-etherboot-image-2		code 193 = string;
+option legacy-etherboot-image-3		code 194 = string;
+option legacy-etherboot-image-4		code 195 = string;
+option legacy-etherboot-image-5		code 196 = string;
+option legacy-etherboot-image-6		code 197 = string;
+option legacy-etherboot-image-7		code 198 = string;
+option legacy-etherboot-image-8		code 199 = string;
+option legacy-etherboot-image-9 	code 200 = string;
+option legacy-etherboot-image-10	code 201 = string;
+option legacy-etherboot-image-11	code 202 = string;
+option legacy-etherboot-image-12	code 203 = string;
+option legacy-etherboot-image-13	code 204 = string;
+option legacy-etherboot-image-14	code 205 = string;
+option legacy-etherboot-image-15	code 206 = string;
+option legacy-etherboot-image-16	code 207 = string;
+
+# Apply Etherboot options only for Etherboot clients
+#
+if substring ( option vendor-class-identifier, 0, 9 ) = "Etherboot" {
+
+  # We must specify this value for etherboot-magic, or Etherboot will
+  # ignore all other options.
+  #
+  option etherboot.magic E4:45:74:68:00:00;
+
+  # Bootfile name: derive from etherboot.kmod (calculated below)
+  # Use boot.nbi if no NIC_DEV_ID option present
+  # (i.e. if etherboot.kmod doesn't get set)
+  # Also pass filename back in filename field
+  #
+  option bootfile-name = pick-first-value ( concat ( "boot-",
+						     config-option etherboot.kmod,
+						     ".nbi" ),
+					    "boot.nbi" ) ;
+  filename = config-option bootfile-name;
+
+  # "Sensible" default values for some options
+
+  # Mount devfs (will probably be needed for a network-boot)
+  option etherboot.kernel-cmdline " devfs=mount";
+
+  # Info message (includes client IP address, MAC address, hardware ID string,
+  # server IP address and name of boot file)
+  option etherboot.motd-4 = concat ( "Using Etherboot to boot ",
+				     binary-to-ascii ( 10, 8, ".", leased-address ),
+				     " [",
+				     binary-to-ascii ( 16, 8, ":", suffix ( hardware, 6 ) ),
+				     "] [",
+				     pick-first-value ( option etherboot.nic-dev-id, "unknown card" ),
+				     "]", 0d:0a, "  from ",
+				     binary-to-ascii ( 10, 8, ".", option dhcp-server-identifier ),
+				     " with file ",
+				     config-option tftp-server-name,
+				     ":",
+				     config-option bootfile-name,
+				     " [",
+				     pick-first-value ( config-option etherboot.kmod, "unknown module" ),
+				     "]", 0d:0a );
+
+  # Legacy site-local option support
+  # If client does not include an etherboot-encapsulated-options field in its DHCPREQUEST, then
+  # it will not understand etherboot-encapsulated-options in the DHCPACK and so we must send
+  # back the options as site-local options (i.e. not encapsulated).
+  # Note: we need do this only for options that existed prior to the switch to encapsulation.
+  #
+  if not exists etherboot-encapsulated-options {
+    option legacy-etherboot-magic	= config-option etherboot.magic;
+    option legacy-etherboot-kernel-cmdline = config-option etherboot.kernel-cmdline;
+    option legacy-etherboot-menu-opts	= config-option etherboot.menu-opts;
+    option legacy-etherboot-menu-selection = config-option etherboot.menu-selection;
+    option legacy-etherboot-motd-1	= config-option etherboot.motd-1;
+    option legacy-etherboot-motd-2	= config-option etherboot.motd-2;
+    option legacy-etherboot-motd-3	= config-option etherboot.motd-3;
+    option legacy-etherboot-motd-4	= config-option etherboot.motd-4;
+    option legacy-etherboot-motd-5	= config-option etherboot.motd-5;
+    option legacy-etherboot-motd-6	= config-option etherboot.motd-6;
+    option legacy-etherboot-motd-7	= config-option etherboot.motd-7;
+    option legacy-etherboot-motd-8	= config-option etherboot.motd-8;
+    option legacy-etherboot-image-1	= config-option etherboot.image-1;
+    option legacy-etherboot-image-2	= config-option etherboot.image-2;
+    option legacy-etherboot-image-3	= config-option etherboot.image-3;
+    option legacy-etherboot-image-4	= config-option etherboot.image-4;
+    option legacy-etherboot-image-5	= config-option etherboot.image-5;
+    option legacy-etherboot-image-6	= config-option etherboot.image-6;
+    option legacy-etherboot-image-7	= config-option etherboot.image-7;
+    option legacy-etherboot-image-8	= config-option etherboot.image-8;
+    option legacy-etherboot-image-9	= config-option etherboot.image-9;
+    option legacy-etherboot-image-10	= config-option etherboot.image-10;
+    option legacy-etherboot-image-11	= config-option etherboot.image-11;
+    option legacy-etherboot-image-12	= config-option etherboot.image-12;
+    option legacy-etherboot-image-13	= config-option etherboot.image-13;
+    option legacy-etherboot-image-14	= config-option etherboot.image-14;
+    option legacy-etherboot-image-15	= config-option etherboot.image-15;
+    option legacy-etherboot-image-16	= config-option etherboot.image-16;
+  }
+}
+
+# Some options should be set for both Etherboot and the udhcpc client
+#
+if ( ( substring ( option vendor-class-identifier, 0, 9 ) = "Etherboot" ) 
+     or ( substring ( option vendor-class-identifier, 0, 5 ) = "udhcp" ) ) {
+
+  # TFTP server defaults to DHCP server and is specified in both
+  # next-server field and tftp-server-name option field
+  #
+  option tftp-server-name = binary-to-ascii ( 10, 8, ".", config-option dhcp-server-identifier );
+  server-name = config-option tftp-server-name;
+  next-server = config-option dhcp-server-identifier;
+
+  # Root path defaults to root of TFTP server
+  option root-path = concat ( config-option tftp-server-name, ":/" );
+
+  # A fallback hostname, generated from the IP address
+  option host-name = concat ( "client_", binary-to-ascii ( 10, 8, "_", leased-address ) );
+}
+
+# Force some items onto parameter request list for udhcp
+#
+if substring ( option vendor-class-identifier, 0, 5 ) = "udhcp" {
+  # Forcibly add root-path to list
+  option dhcp-parameter-request-list = concat ( option dhcp-parameter-request-list, 11 );
+}
+
+# Etherboot sends a string to identify the NIC in etherboot.nic-dev-id.
+# For PCI NICs, this string is of the form "PCI:vvvv:dddd" where vvvv is the 
+# vendor identifier and dddd the device identifier, in lower-case ASCII hex.
+# For ISA NICs, the format of the string is "ISA:..." where ... is not yet
+# decided upon.
+#
+# We use the identifier to select the NBI image that will be specified via
+# the "bootfile-name" option.
+#
+# PCI NICs - use PCI vendor and device IDs
+# Listed in file generated by mknbi-set
+#
+include "/etc/dhcpd.conf.etherboot-pcimap.include";
+
+# ISA NICs
+#
+if substring ( option vendor-class-identifier, 0, 9 ) = "Etherboot" {
+  if exists etherboot.nic-dev-id {
+
+  }
+}

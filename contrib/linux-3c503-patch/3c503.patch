@@ -1,0 +1,24 @@
+diff -Naur linux.orig/drivers/net/3c503.c linux/drivers/net/3c503.c
+--- linux.orig/drivers/net/3c503.c	Thu Feb 19 23:14:04 1998
++++ linux/drivers/net/3c503.c	Thu Feb 19 23:16:24 1998
+@@ -179,7 +179,8 @@
+        for both the old and new 3Com prefix */
+     outb(ECNTRL_SAPROM|ECNTRL_THIN, ioaddr + 0x406);
+     vendor_id = inb(ioaddr)*0x10000 + inb(ioaddr + 1)*0x100 + inb(ioaddr + 2);
+-    if ((vendor_id != OLD_3COM_ID) && (vendor_id != NEW_3COM_ID)) {
++    if ((vendor_id != OLD_3COM_ID) && (vendor_id != NEW_3COM_ID) &&
++    	(vendor_id != BULL_3COM_ID)) {
+ 	/* Restore the register we frobbed. */
+ 	outb(saved_406, ioaddr + 0x406);
+ 	return ENODEV;
+diff -Naur linux.orig/drivers/net/3c503.h linux/drivers/net/3c503.h
+--- linux.orig/drivers/net/3c503.h	Thu Feb 19 23:14:05 1998
++++ linux/drivers/net/3c503.h	Mon Feb 16 11:41:56 1998
+@@ -11,6 +11,7 @@
+ 
+ #define OLD_3COM_ID	0x02608c
+ #define NEW_3COM_ID	0x0020af
++#define BULL_3COM_ID	0x000062
+ 
+ /* Shared memory management parameters. NB: The 8 bit cards have only
+    one bank (MB1) which serves both Tx and Rx packet space. The 16bit

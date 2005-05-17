@@ -1,0 +1,63 @@
+#!/usr/bin/perl -w
+#
+# Retrieve modules required for an initrd image
+# $Id$
+
+unless ( @ARGV ) {
+  die "Syntax: $0 [ -d target_directory ] module_1 module_2 module_3\n"
+}
+
+# Parse command line arguments
+my @requested_modules = ();
+my $target_dir = "";
+my $kernel_ver;
+my $quiet;
+chomp ( my $current_kernel_ver = `uname -r` );
+while ( $_ = shift ) {
+  if    ( /-d/ ) { $target_dir = shift }
+  elsif ( /-k/ ) { $kernel_ver = shift }
+  elsif ( /-q/ ) { $quiet = 1 }
+  else           { push @requested_modules, $_ };
+}
+
+# Create target directory if required
+if ( $target_dir ) {
+  print STDERR "Target directory is $target_dir\n" unless $quiet;
+  system ( "mkdir -p $target_dir" );
+  chdir $target_dir;
+}
+
+# Use modprobe -nav to retrieve locations of modules and their dependencies
+print STDERR "Requested modules ". join (' ', @requested_modules)."\n" unless $quiet;
+my @modules_dups;
+foreach my $module ( @requested_modules ) {
+  my @module_list = map { /^\S+\s+(.*)$/ ; $1 } `/sbin/modprobe -nva $module`;
+  die "Cannot find any modules matching $module\n" unless @module_list;
+  push @modules_dups, @module_list;
+}
+
+# Remove duplicates from list
+my %module_basenames = ();
+my @modules = ();
+foreach my $module ( @modules_dups ) {
+  # Ugly hack : assume that dependencies are independent of kernel version
+  # This seems to be necessary because we can't run modprobe and specify
+  # an alternate modules.dep file; it refuses to understand lines of the 
+  # form "depfile=XXX" as documented in modules.conf(5)
+  $module =~ s/$current_kernel_ver/$kernel_ver/ if $kernel_ver;
+  push @modules, $module unless $module_basenames{$module};
+  ( my $basename ) = ( $module =~ /([^\/]+)\.o/ ); 
+  $module_basenames{$module} = $basename;
+}
+
+# Process module list
+print "#!/bin/sh\n";
+foreach my $module ( @modules ) {
+  my $basename = $module_basenames{$module};
+  # Report via stdout
+  print STDERR "Using module $basename from $module\n" unless $quiet;
+  # Copy uncompressed module to current directory
+  system ("gunzip -c $module > $basename.o");
+  # Print insmod line to stdout
+  print "insmod $basename\n";
+}

@@ -1,0 +1,29 @@
+# Description: tftp to http proxy
+# A sample config file for xinetd, edit and put in /etc/xinetd.d
+# then killall -HUP xinetd, or restart xinetd
+
+service t2hproxy
+{
+	type		= UNLISTED
+	id		= t2hproxy
+	socket_type	= dgram
+	protocol	= udp
+#
+#	The pathname to where you have installed it
+#
+	server		= /usr/local/sbin/t2hproxy.pl
+#
+#	If your filenames don't start with /, then the trailing
+#	slash is needed
+#
+	server_args	= --prefix http://localhost/
+#
+#	--proxy http://proxyhost:3128/ can also be appended
+#
+	log_type	= FILE /var/log/t2hproxy.log
+	user		= nobody
+	wait		= yes
+	instances	= 10
+	disable		= no
+	port		= 69
+}                                                                               

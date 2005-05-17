@@ -1,0 +1,121 @@
+Running Etherboot within Bochs
+==============================
+
+Michael Brown <mbrown@fensystems.co.uk>
+Based on an idea suggested by H. Peter Anvin <hpa@zytor.com>.
+
+$Id$
+
+Bochs is a program that simulates a complete Intel x86 computer,
+including hardware.  It can be used to test Etherboot.  There is a
+special pseudo NIC ("pnic") implemented in Bochs, with a corresponding
+driver in Etherboot.  (There is also an NE2000 ISA driver in Bochs,
+but it doesn't seem to quite work.)
+
+To get bochs running is fairly simple:
+
+1.  Get the bochs source code:
+    a)  cvs -d:pserver:anonymous:@cvs.sourceforge.net:/cvsroot/bochs login
+    b)  cvs -d:pserver:anonymous:@cvs.sourceforge.net:/cvsroot/bochs co bochs
+
+2.  Configure bochs with
+      ./configure --enable-all-optimisations --enable-pci \
+	 	 --enable-ne2000 --enable-pnic
+    Other potentially useful configure options:
+      --prefix=/usr
+          to force use of standard file locations
+      --enable-debugger
+          to enable the internal debugger
+
+3.  Build bochs:
+      make
+
+4.  Configure Etherboot with CONFIG_PCI_DIRECT: add the line
+      CFLAGS += -DCONFIG_PCI_DIRECT
+    to the end of src/arch/i386/Config.
+
+5.  Build bin/pnic.zrom:
+      make bin/pnic.zrom
+
+6.  Load the TUN/TAP kernel module:
+      modprobe tun
+    You should see the device /dev/net/tun is created automatically if
+    you're using devfs, otherwise you may have to create it by hand with:
+      mknod /dev/net/tun c 10 200
+
+7.  Grant yourself write access to /dev/net/tun:
+      su -c 'chown <your user id> /dev/net/tun'
+    The alternative to this is to run Bochs as root.  Don't do that.
+
+8.  Add the following fragment to /etc/dhcpd.conf:
+      subnet 10.254.254.0 netmask 255.255.255.252 {
+        range dynamic-bootp 10.254.254.1 10.254.254.1;
+      }
+    You will also need to add in any of your usual declarations for
+    Etherboot, e.g. 'filename "vmlinuz.ltsp";'.  Note that this setup
+    assumes that your DHCP server, TFTP server etc. all live on the
+    machine you are using for running Bochs.  If not, then you're on
+    your own.
+
+9.  Change back to this directory and run bochs from your Bochs source tree:
+      cd /path/to/Etherboot/contrib/bochs
+      /path/to/bochs/source/tree/bochs
+
+10. Select option 5 (Begin simulation).  You will be prompted for your
+    root password.  This is required in order to configure the tun1
+    network interface and to restart the DHCP server.
+
+11. You should see Bochs start up and attempt to boot from the network,
+    with a screen that looks like:
+
+VGA BIOS - Version 2.40
+Copyright (C) 1990-2000 Elpin Systems, Inc.
+All rights reserved.
+
+Licensed for use with bochs, courtesy of MandrakeSoft.
+
+For information on this or other VGA development products, contact
+Elpin Systems at: (800) 723-9038 or www.elpin.com
+
+Bochs BIOS, 1 cpu, $Revision$ $Date$
+
+
+Etherboot 5.3.6 (GPL) http://etherboot.org Tagged ELF for [PNIC]
+Relocating _text from: [00091020,0009fb50) to [01ef14d0,01f00000)
+Boot from (N)etwork or (Q)uit?
+
+Probing pci nic...
+[pnic] - Detected Bochs Pseudo NIC MAC FE:FD:00:00:00:01 (API v1.0) at 0xdc00
+Searching for server (DHCP)...
+..Me: 10.254.254.1, Server: 10.254.254.2
+Loading 10.254.254.2:/tftpboot/kernel
+
+
+
+
+Serial console
+==============
+
+You can use the program "serial-console" to obtain a virtual serial
+console for Etherboot running within Bochs.  Simply run
+"./serial-console" on a spare tty (e.g. a separate xterm window)
+before starting Bochs, and ensure that you have compiled Etherboot
+with appropriate settings such as
+  CFLAGS+=      -DCONSOLE_DUAL -DCOMCONSOLE=0x3F8 -DCONSPEED=9600
+
+There is a manual page for "serial-console"; use
+"man ./serial-console.1" to view it.
+
+
+
+TODO
+====
+
+Packet forwarding/masquerading - document what must be set up.
+
+Mention possibility of using RFB as the display device - in
+conjunction with the serial console, gives you a test facility that
+can be accessed remotely.
+
+Mention use of BOCHSBP instruction (xchgw %bx,%bx) to avoid need to
+calculate breakpoints.

@@ -1,0 +1,24 @@
+This code was written by Dave Ashley for NXTV, Inc. It is released under
+the terms of the GPL. The purpose is to let you write to the bootrom of
+the SMC9462TX card. The assumption is that you've stuck an AT29C512 in the
+socket. Note that the board has pins D5 + D6 reversed on the socket. Also
+the socket only supplies 3.3V to the rom. Good luck trying to locate a
+DIP programmable flash device that operates at 3.3V. What I do is to bend
+pin 32 back and solder a wire directly from the 5V side of the 3.3V regulator
+over to it. The dp83820's bootrom interface pins are all 5V logic tolerant.
+However mod your board at your own risk, no warranty or guarantees are implied
+or given!!! If you don't wire the 5V to the AT29C512, you can still read
+the rom contents (it operates ok at 3.3V evidently) but you can't write to it
+because the AT29C512 has a safety protection, it disables writes if the
+power supply voltage drops below 3.8V.
+
+See the comments at the top of the 2 C files for more information.
+
+The Makefile needs to be hacked to build for your system. If you can't
+figure it out you shouldn't be messing with this stuff anyway.
+
+-Dave Ashley
+Email address intentionally left out to avoid spam.
+http://www.xdr.com/dash
+
+Mon Mar  8 13:55:34 PST 2004

@@ -1,0 +1,36 @@
+I wrote the attached little util program to try out the basic approach
+and thought that you might find it useful as well as providing some
+simple testing. It isn't a final solution so the interface is rough. The
+program must be run as root on an Intel based machine.
+
+The key point is that the IO address needs to be entered - I grab it
+from the dmesg output:
+
+eth0: 3Com 3c905B Cyclone 100baseTx at 0xe400,  00:10:4b:d2:5e:0d, IRQ
+11
+
+or "cat /proc/pci" to find the "I/O at XXXXXX" for your 3Com Card.
+
+Some example commands are:
+
+romutil 0xe400 erase            - erases the ROM contents
+romutil 0xe400 protect            - enables the Software Data Protection
+on the ROM [3c905B only]
+romutil 0xe400 unprotect       - disables the Software Data Protection
+on the ROM [3c905B only]
+romutil 0xe400 id                    - displays the manufacturer and
+device IDs
+romutil 0xe400 read >file    - writes the contents of the ROM to stdout
+romutil 0xe400 prog <file    - writes the contents of the stdin into the
+ROM (<64k)
+
+I tried reading and writing the ROM while doing large ftp transfers and
+experienced no problems. I didn't spend much time worrying about the
+possible race conditions. My system has lots of resources (450MHx P2,
+128MB RAM) so it might not provide the best test candidate.
+
+Let me know what results you get if you try it out.
+
+Thanks
+
+John

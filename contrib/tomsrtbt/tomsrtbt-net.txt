@@ -1,0 +1,37 @@
+Notes on turning tomsrtbt El Torito into a Etherboot image:
+
+0. Tomsrtbt (http://www.toms.net/) is an all-purpose rescue and utility
+1-floppy Linux system. You can read all about it at the web site. These
+notes explain how to turn the El Torito version of it into a netbootable
+image for Etherboot.  Note that the .img file is not an ISO image, it is
+a 2.88M floppy emulation image for writing onto a CD-R(W) with mkisofs.
+It's actually a minix filesystem.  Inside it are the kernel bz2bzImage
+and initrd.bz2.
+
+1. First uncompress the .img:
+
+	bunzip2 tomsrtbt-2.0.103.ElTorito.288.img.bz2
+
+2. Mount the image using loopback. You probably need to be root to do
+this:
+
+	mount -o ro,loop tomsrtbt-2.0.103.ElTorito.288.img /media/floppy
+
+I've specified /media/floppy which is the floppy mount point for my
+system, but any convenient directory will do.
+
+3. Copy the kernel image and initrd off it:
+
+	cp -p /media/floppy/bz2bzImage /media/floppy/initrd.bz2 .
+
+4. Use mkelf-linux (or mknbi-linux) to make a netbootable image:
+
+mkelf-linux --append='root=100' bz2bzImage initrd.bz2 > tomsrtbt.nb
+
+root=100 means use /dev/ram0 (device 1,0) as the root device.
+
+5. That's it. Clean up by unmounting the .img:
+
+	umount /media/cdrom
+
+tomsrtbt.nb can now be loaded with Etherboot. Have fun.

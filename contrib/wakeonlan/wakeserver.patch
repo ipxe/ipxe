@@ -1,0 +1,179 @@
+To: etherboot-developers@lists.sourceforge.net
+X-face: #Qvg5o3u!)WoVDDi4-bFy`fl@""4^pm68%_,`puon{0Q6lQ-O,)3D.J.":A&^,#4O2vc8`?
+ 3^1lhBh=EQH,"Qq*e1vY":she&t^8:!&Fb32Ed:nM2Y<E9|i[+z20G?CO=E=-IWv;bL"=Y`+`q,ML6
+ ,!Me?==j&In1
+Mime-Version: 1.0
+Content-Type: multipart/mixed ;
+	boundary="==_Exmh_-19971541890"
+From: Tilmann Bubeck <bubeck@think-at-work.de>
+Message-Id: <20010219195622.C97A84ABD8@chaos.think-at-work.de>
+Subject: [Etherboot-developers] Wake-on-LAN patch
+Sender: etherboot-developers-admin@lists.sourceforge.net
+Errors-To: etherboot-developers-admin@lists.sourceforge.net
+X-BeenThere: etherboot-developers@lists.sourceforge.net
+X-Mailman-Version: 2.0
+Precedence: bulk
+List-Help: <mailto:etherboot-developers-request@lists.sourceforge.net?subject=help>
+List-Post: <mailto:etherboot-developers@lists.sourceforge.net>
+List-Subscribe: <http://lists.sourceforge.net/lists/listinfo/etherboot-developers>,
+	<mailto:etherboot-developers-request@lists.sourceforge.net?subject=subscribe>
+List-Id: Discussion list for Etherboot developers <etherboot-developers.lists.sourceforge.net>
+List-Unsubscribe: <http://lists.sourceforge.net/lists/listinfo/etherboot-developers>,
+	<mailto:etherboot-developers-request@lists.sourceforge.net?subject=unsubscribe>
+List-Archive: <http://lists.sourceforge.net/archives//etherboot-developers/>
+Date: Mon, 19 Feb 2001 20:56:22 +0100
+Status: RO
+Content-Length: 5351
+Lines: 152
+
+This is a multipart MIME message.
+
+--==_Exmh_-19971541890
+Content-Type: text/plain; charset=us-ascii
+
+
+Hello!
+
+please find enclosed a patch to optionally enable etherboot to start the 
+server it is booting from by sending a magic wake-on-lan packet to the 
+sleeping server first.
+
+This is very important for an etherboot-server, which is not running all the 
+time and is not easily accessible from the etherboot machine (e.g. because it 
+is installed in the basement of the house and one must climb several stairs to 
+switch the server on...)
+
+Are the authors of etherboot willing to accept this patch for inclusion? 
+Please note, that the wake-on-lan code is only compiled in, when setting 
+appropriate flags in src/Config.
+
+If you don't want to include the patch, should I change anything of the 
+implementation or do you dislike the idea at all?
+ 
+Thanks!
+   Till
+
++-------+--------------------------------------------------------------+
+|       | dr. tilmann bubeck               think@work it consulting    |
+|       |                                  professional services       |
+| think | cell.: +49 172 8842972           widmaierstrasse 58          |
+| @work | fax  : +49 711 7227734           70567 stuttgart             |
+|       | email: bubeck@think-at-work.de   http://www.think-at-work.de |
++-------+ -------------------------------------------------------------+
+
+
+--==_Exmh_-19971541890
+Content-Type: application/x-patch ; name="etherboot-4.7.17-wol.patch"
+Content-Description: etherboot-4.7.17-wol.patch
+Content-Disposition: attachment; filename="etherboot-4.7.17-wol.patch"
+
+diff -r -u etherboot-4.7.17/src/Config etherboot-4.7.17-wol/src/Config
+--- etherboot-4.7.17/src/Config	Sat Jan  6 16:25:23 2001
++++ etherboot-4.7.17-wol/src/Config	Mon Feb 19 20:28:00 2001
+@@ -113,6 +113,16 @@
+ #	-DINTERNAL_BOOTP_DATA
+ #			- define if the area 0x93C00-0x93FFF is not available
+ #			  for use for bootpd_data by the loader for some reason
++#	-DWAKEUP_SERVER 
++#                       - define this for sending a Wake-On-LAN (WOL) 
++#                         "Magic Packet" to a sleeping server, before trying 
++#                         a etherboot. Useful if your server is soft-off all
++#                         the time and must be switched on when booting a 
++#                         client. Define SERVER_MAC with the MAC address of the
++#                         server to wakeup. CAUTION! This MAC address is 
++#                         stored in the rom image. The rom is therefore not
++#                         generic anymore but tailored for a specific
++#                         server!
+ 
+ # These default settings compile Etherboot with a small number of options.
+ # You may wish to enable more of the features if the size of your ROM allows.
+@@ -142,6 +152,10 @@
+ 
+ # These flags affect the loader that is prepended to the Etherboot image
+ LCONFIG+=	-DMOVEROM
++
++# Include code for sending a Wake-On-LAN (WOL) "Magic Packet" to a sleeping
++# server, before trying a etherboot.
++CFLAGS32+=	-DWAKEUP_SERVER -DSERVER_MAC=0x00,0x01,0x02,0xDA,0xDF,0x77
+ 
+ # you should normally not need to change these
+ RM=		rm -f
+diff -r -u etherboot-4.7.17/src/main.c etherboot-4.7.17-wol/src/main.c
+--- etherboot-4.7.17/src/main.c	Fri Jan  5 12:45:29 2001
++++ etherboot-4.7.17-wol/src/main.c	Thu Feb  8 20:46:59 2001
+@@ -137,6 +137,7 @@
+  *	declarations, but in this case I like to see main() as the first
+  *	routine.
+  */
++static void wakeup_server(void) ;
+ static int bootp(void);
+ static int rarp(void);
+ static void load(void);
+@@ -217,6 +218,11 @@
+ 			rfc951_sleep(++card_retries);
+ 	}
+ #endif
++
++#ifdef WAKEUP_SERVER
++	wakeup_server();
++#endif
++
+ 	while (1) {
+ 		/* -1:	timeout or ESC
+ 		   -2:	error return from loader
+@@ -650,6 +656,46 @@
+ 	return (0);
+ }
+ #endif	/* DOWNLOAD_PROTO_TFTP */
++
++#ifdef WAKEUP_SERVER
++#ifndef SERVER_MAC 
++#error "Please define SERVER_MAC to the MAC address of the sleeping server"
++#endif
++
++/**************************************************************************
++WOL - Wake up a sleeping server by transmitting a Wake-On-LAN (WOL) "Magic
++      Packet", used for restarting machines that have been soft-powered-down
++      (ACPI D3-warm state). It currently generates the standard AMD Magic
++      Packet format.
++**************************************************************************/
++static void wakeup_server(void) 
++{
++	unsigned char data[100];
++	int i, len, retry;
++	char server_adr[] = { SERVER_MAC };
++	unsigned long time;
++
++	/* build "Magic Packet" */
++	len = 0;
++	data[len++] = 0xff;
++	data[len++] = 0xff;
++	data[len++] = 0xff;
++	data[len++] = 0xff;
++	data[len++] = 0xff;
++	data[len++] = 0xff;
++	for ( i = 0; i < 16; i++ ) {
++		memcpy(&data[len], server_adr, 6);
++		len += 6;
++	}
++
++	printf("Sending Wake-On-LAN (WOL) \"Magic Packet\" to server %b:%b:%b:%b:%b:%b...", 
++	       server_adr[0], server_adr[1], server_adr[2],
++	       server_adr[3], server_adr[4], server_adr[5]);
++	
++	eth_transmit(broadcast, 0x0842, len, data);
++	printf("done\n");
++}
++#endif
+ 
+ #ifdef	RARP_NOT_BOOTP
+ /**************************************************************************
+
+--==_Exmh_-19971541890--
+
+
+
+_______________________________________________
+Etherboot-developers mailing list
+Etherboot-developers@lists.sourceforge.net
+http://lists.sourceforge.net/lists/listinfo/etherboot-developers

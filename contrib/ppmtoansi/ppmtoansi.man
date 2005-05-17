@@ -1,0 +1,120 @@
+.TH PPMTOANSI 1 "January 12, 1997"
+.SH NAME
+ppmtoansi \- Graphics Conversion Program For Extended ANSI Escape Codes
+.SH SYNOPSIS
+.B ppmtoansi
+[
+.SM \-b
+r/g/b ] [
+.SM \-t
+r/g/b:idx] [
+.SM \-x
+<xoffset> ] [
+.SM \-y
+<yoffset> ] [
+<filename> ]
+.SH DESCRIPTION
+.I ppmtoansi
+converts input files in
+.IR ppm (5)
+format to escape sequences that are understood by
+.IR etherboot .
+This allows for displaying icons and logos on the BOOT-Prom's splash
+screen.
+.PP
+If no input file is specified, data is read from
+.IR standard
+.IR input .
+All output is send to 
+.IR standard
+.IR output ,
+error messages go to
+.IR standard
+.IR error .
+.I ppmtoansi
+tries to do some compression and minimizes the output filesize.
+.SH OPTIONS
+.TP
+.B \-b
+Specifies the
+.IR red ,
+.IR green , and
+.IR blue
+intensities for the background color. This information is
+used for providing a shape mask. All values are in the range from 0 to
+255.
+.TP
+.B \-t
+Allows for explicitly providing a translation between color values and
+color indices. The indices are in the range 0 to 7 and conform to the
+standard
+.IR ANSI
+.IR colorcodes .
+.RS
+.PP
+0 black       4 blue
+.PP
+1 red         5 magenta
+.PP
+2 green       6 cyan
+.PP
+3 yellow      7 white
+.PP
+If no translations apply,
+.IR ppmtoansi
+will automatically select the color that is closest.
+.RE
+.TP
+.B \-x
+Specify an X offset relative to the current text cursor position.
+.TP
+.B \-y
+Specify an Y offset relative to the current text cursor position.
+.SH FILE FORMAT
+.IR ppmtoansi
+uses these extensions to the standard
+.B ANSI escape
+.BR codes .
+.TP
+.B <esc>[a;b;c;d+<data>
+Draw pixel data.  Use one byte per pixel.  Colors are encoded as shown
+above.  In text mode, graphics is approximated by outputting suitable
+characters.  Parameters differ depending on the number of parameters
+passed:
+.RS
+.TP
+.B cnt
+.IR cnt
+data bytes follow. They will be drawn to the right of the last
+graphics position.
+.TP
+.B rle;col
+The next
+.IR rle
+pixels have the value
+.IR col .
+They will be drawn to the right of the last graphics position. No data
+bytes follow.
+.TP
+.B x;y;cnt
+.IR cnt
+data bytes follow. They will be drawn relative to the top left corner
+of the text cursor with an offset of
+.RI ( x / y ).
+.TP
+.B x;y;rle;col
+the next
+.IR rle
+pixels have the value
+.IR col .
+They will be drawn relative to the top left corner of the text cursor
+with an offset of
+.RI ( x / y ).
+No data bytes follow.
+.RE
+.TP
+.B <esc>[a;b;c;d\-<data>
+same as above, but pack pixels into three bits. The first pixel is
+stored in the three most significant bits of the first data byte.
+.SH "SEE ALSO"
+ppm(5), mknbi-linux(8), mknbi-dos(8).

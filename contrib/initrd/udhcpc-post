@@ -1,0 +1,25 @@
+#!/bin/sh
+# $Id$
+
+if [ "$1" = "deconfig" ]; then
+  ifconfig $interface 0.0.0.0 up
+else if [ "$1" = "bound" ] ; then
+    echo UDHCPC: I am $ip [$hostname], booting from $serverid
+    [ -n "$hostname" ] && echo $hostname > /proc/sys/kernel/hostname
+    [ -n "$broadcast" ] && BROADCAST="broadcast $broadcast"
+    [ -n "$subnet" ] && NETMASK="netmask $subnet" 
+    ifconfig $interface $ip $BROADCAST $NETMASK
+    route add default gw $router dev $interface
+    echo -n > /etc/resolv.conf
+    for i in $dns; do
+      echo nameserver $i >> /etc/resolv.conf
+    done
+    [ -n "$siaddr" ] || siaddr=$serverid
+    [ -n "$rootpath" ] || rootpath=$siaddr:/
+    echo Mounting root filesystem $rootpath at /sysroot
+    echo If this appears to hang, check that the server of $rootpath is able to
+    echo reverse-map my IP address $ip to obtain my hostname $hostname
+    mount -t nfs -o nolock,rsize=8192,wsize=8192 $rootpath /sysroot
+  fi
+fi
+

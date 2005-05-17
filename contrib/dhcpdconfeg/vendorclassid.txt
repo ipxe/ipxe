@@ -1,0 +1,140 @@
+From: Dax Kelson
+To: Etherboot users list
+Subject: [Etherboot-users] Example ISC DHCP v3 dhcpd.conf using conditional operations
+Date: Wed, 13 Jun 2001 20:22:21 -0600
+
+Hopefully someone will find this useful.  I spent a long time tracking
+down and figuring out all the pieces.  To the powers that be, feel free to
+stick this in contrib if you like it.
+
+Goal:  Use the vendor-class-identifier and ISC DHCP v3 "match" option to
+conditionally send proper options only when the DHCP discover/request from
+etherboot comes in.  We use static-MAC-to-IP mappings for classroom
+computers, and dynamic dhcp ranges for other clients (student laptops,
+etc).
+
+I used Etherboot 5.0.1 and the patch (required) in this email:
+
+http://www.geocrawler.com/lists/3/SourceForge/5299/0/5952625/
+
+Furture versions of Etherboot will likely already have this patch
+included.
+
+Dax Kelson
+Guru Labs
+
+######### Begin ISC DHCP v3 dhcpd.conf #############
+
+ddns-update-style ad-hoc;
+
+# Global default, can be overridden
+filename "/exports/kickstart/class1-rh7.1.ks";
+
+# Define options for Etherboot
+# There are more, these are just the ones I'm using
+option ebootmagic code 128 = string;
+option cmdline code 129 = string;
+option menudflts code 160 = string;
+option menuline1 code 192 = string;
+option menuline2 code 193 = string;
+option menuline3 code 194 = string;
+option menuline4 code 195 = string;
+option menuline5 code 196 = string;
+option menuline6 code 197 = string;
+option menuline7 code 198 = string;
+option menuline8 code 199 = string;
+option menuline9 code 200 = string;
+option menuline10 code 201 = string;
+option menuline11 code 202 = string;
+option menuline12 code 203 = string;
+option menuline13 code 204 = string;
+option menuline14 code 205 = string;
+option menuline15 code 206 = string;
+option menuline16 code 207 = string;
+option motdline1 code 184 = string;
+
+class "Etherboot" {
+    match if substring (option vendor-class-identifier, 0, 9) = "Etherboot";
+
+        option ebootmagic  = E4:45:74:68:00:00;
+
+# We don't use this here, because different menu items require
+# different cmdlines.  In our ".nbi" files we specify the cmdlines
+
+#        option cmdline  = "ks initrd=initrd.img lang= devfs=nomount";
+
+        option motdline1  = "Welcome to Guru Labs classroom";
+
+        option menudflts  = "timeout=30:default=192";
+
+        option menuline1  = "Boot from Hard Drive (Default):::/dev/hda:::";
+        option menuline2  = "Boot from Floppy:::/dev/fd0:::";
+        option menuline3  = "Boot from CDROM::::::";
+        option menuline4  = "Kickstart install Red Hat 7.1:::rh71-ks-etherboot.nbi:::";
+        option menuline5  = "Red Hat 7.1 network rescue:::rh71-rescue-etherboot.nbi:::";
+        option menuline6  = "Boot Win98SE startup floppy:::win98se-startupdisk.nbi:::";
+        option menuline7  = "Jumpstart install Solaris 8 (not working yet):::/dev/hda:::";
+        option menuline8  = "Install Windows 98 SE (not working yet):::/dev/hda:::";
+        option menuline9  = "Install Windows 2000 (not working yet):::/dev/hda:::";
+        option menuline10  = "Install FreeBSD 4.3 (not working yet):::/dev/hda:::";
+        option menuline11  = "Install OpenBSD 2.9 (not working yet):::/dev/hda:::";
+
+	# This is a hidden menu item, it should be password protected too
+        option menuline12  = "^[[3D^[[K^[[1A^M:::/dev/hda:::";
+
+# We are using the menu, with different bootfiles.  So we don't use this.
+# If you weren't using a menu, you could use this override the global
+# default "filename" setting.
+
+#        filename "rh71-ks-etherboot";
+
+# Use the following if etherboot compiled with -DREQUIRE_VCI_ETHERBOOT
+
+        option vendor-encapsulated-options 3c:09:45:74:68:65:72:62:6f:6f:74:ff;
+
+}
+
+subnet 10.100.0.0 netmask 255.255.255.0 {
+        authoritative;
+        option routers                  10.100.0.254;
+        option subnet-mask              255.255.255.0;
+        option domain-name              "example.com";
+        option domain-name-servers      10.100.0.254;
+        option time-offset              -7; # US/Mountain
+        option ntp-servers              10.100.0.254;
+        range dynamic-bootp 10.100.0.175 10.100.0.250;
+        default-lease-time 21600;
+        max-lease-time 43200;
+        option netbios-name-servers     10.100.0.254;
+        option netbios-node-type 2;
+        use-host-decl-names on;
+        next-server server1.example.com;
+
+}
+
+host station1 {
+        hardware ethernet 00:01:03:de:57:e2;
+        fixed-address 10.100.0.1;
+}
+host station2 {
+        hardware ethernet 00:01:03:de:57:e7;
+        fixed-address 10.100.0.2;
+}
+host station3 {
+        hardware ethernet 00:01:03:de:57:b4;
+        fixed-address 10.100.0.3;
+}
+host station4 {
+        hardware ethernet 00:01:03:de:57:38;
+        fixed-address 10.100.0.4;
+}
+host station5 {
+        hardware ethernet 00:01:03:de:58:3d;
+        fixed-address 10.100.0.5;
+}
+
+#
+# Etc, etc
+#
+
+############## End ISC DHCP v3 dhcpd.conf #############

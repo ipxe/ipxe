@@ -1,0 +1,7 @@
+As part of determining whether a 3c503 is present, the Linux driver
+examines the first 3 bytes of the ethernet address (the vendor ID)
+to see if it corresponds to a known 3Com vendor ID.
+
+The Bull discless 386 workstation I have (don't laugh) has an
+unknown vendor ID 0x000062. This trivial patch adds it to those
+known to the driver.

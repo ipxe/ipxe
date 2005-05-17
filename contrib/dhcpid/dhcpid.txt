@@ -1,0 +1,884 @@
+From daniel@insu.com Thu Apr 27 14:14:55 2000
+Sender: root@iNsu.COM
+Message-ID: <39075669.FAEB20F2@insu.com>
+Date: Wed, 26 Apr 2000 16:49:45 -0400
+From: Daniel Shane <daniel@insu.com>
+X-Mailer: Mozilla 4.72 [en] (X11; U; Linux 2.2.14-5.0 i686)
+X-Accept-Language: en
+MIME-Version: 1.0
+Subject: Re: New feature added to etherboot
+References: <20000425170804.6677127D8A@Goffman.iNsu.COM>
+Content-Type: multipart/mixed;
+ boundary="------------4734FDA0BF2F2FBDF8EB8DF6"
+
+This is a multi-part message in MIME format.
+--------------4734FDA0BF2F2FBDF8EB8DF6
+Content-Type: text/plain; charset=us-ascii
+Content-Transfer-Encoding: 7bit
+
+Ok, here is a diff for etherboot 4.6.0 that adds identifiers.
+
+To test this you need to use a class in the dhcpd.conf file and
+also send back a string in option 208.
+
+These identifiers prevent a client from booting from other DHCP
+servers when you have more than 1 in your network.
+
+In will also prevent any client, except the valid ones, to use this
+DHCP server.
+
+Here is a subset of my dhcpd.conf :
+
+option iNdiskless-state code 208 = text;
+
+class "iNdiskless-boot" {
+    match if substring(option iNdiskless-state,0,4) = "BOOT";
+}
+class "iNdiskless-setup" {
+    match if substring(option iNdiskless-state,0,5) = "SETUP";
+}           
+
+subnet 10.4.1.0 netmask 255.255.255.0 {
+pool {
+  allow members of "iNdiskless-boot";
+  deny unknown clients;
+  range 10.4.1.2 10.4.1.200;
+  next-server 10.4.1.1;
+
+# Identify ourselves to the etherboot/DHCP client
+  option iNdiskless-state       "BOOT"; 
+
+  host labo01 {
+       hardware ethernet 00:80:c8:ec:04:1b;
+     }
+  host labo02 {
+       hardware ethernet 00:4f:4c:04:45:d6;
+     }
+  host labo03 {
+       hardware ethernet 00:50:ba:c8:db:d6;
+  }
+}
+pool {
+  allow members of "iNdiskless-setup";
+  range 10.4.1.201 10.4.1.254;
+  option iNdiskless-state       "SETUP";
+
+# send another kernel to setup the diskless workstation
+  }
+}    
+
+Daniel Shane.
+--------------4734FDA0BF2F2FBDF8EB8DF6
+Content-Type: text/plain; charset=us-ascii;
+ name="main.c.diff"
+Content-Transfer-Encoding: 7bit
+Content-Disposition: inline;
+ filename="main.c.diff"
+
+--- etherboot-4.6.0/src/main.c	Tue Apr 25 08:30:01 2000
++++ etherboot-4.5.6-new/src/main.c	Wed Apr 26 16:17:09 2000
+@@ -42,6 +42,23 @@ char	*motd[RFC1533_VENDOR_NUMOFMOTD];
+ #ifdef	IMAGE_FREEBSD
+ int freebsd_howto = 0;
+ #endif
++
++#ifdef SERVER_IDENT 
++#ifdef DEFAULT_SERVER_IDENT
++char server_ident[9] = DEFAULT_SERVER_IDENT;
++#else
++char server_ident[9] = {};
++#endif   
++#endif
++
++#ifdef CLIENT_IDENT 
++#ifdef DEFAULT_CLIENT_IDENT
++char client_ident[9] = DEFAULT_CLIENT_IDENT;
++#else
++char client_ident[9] = {};
++#endif
++#endif
++
+ int     vendorext_isvalid;
+ char	config_buffer[TFTP_MAX_PACKET+1];	/* +1 for null byte */
+ unsigned long	netmask;
+@@ -63,61 +80,85 @@ char    rfc1533_cookie[5] = { RFC1533_CO
+ char    rfc1533_cookie[] = { RFC1533_COOKIE};
+ char    rfc1533_end[]={RFC1533_END };
+ static const char dhcpdiscover[]={
+-		RFC2132_MSG_TYPE,1,DHCPDISCOVER,
+-		RFC2132_MAX_SIZE,2,2,64,
+-		RFC2132_PARAM_LIST,4,RFC1533_NETMASK,RFC1533_GATEWAY,
+-		RFC1533_HOSTNAME,RFC1533_EXTENSIONPATH
+-	};
+-static const char dhcprequest []={
+-		RFC2132_MSG_TYPE,1,DHCPREQUEST,
+-		RFC2132_SRV_ID,4,0,0,0,0,
+-		RFC2132_REQ_ADDR,4,0,0,0,0,
+-		RFC2132_MAX_SIZE,2,2,64,
+-		/* request parameters */
+-		RFC2132_PARAM_LIST,
+-#ifdef	IMAGE_FREEBSD
+-		/* 4 standard + 4 vendortags + 8 motd + 16 menu items */
+-		4 + 4 + 8 + 16,
++	RFC2132_MSG_TYPE,1,DHCPDISCOVER,
++	RFC2132_MAX_SIZE,2,2,64,
++#ifdef CLIENT_IDENT 
++	RFC1533_VENDOR_CLIENT_IDENT,8,0,0,0,0,0,0,0,0,
++#endif
++	RFC2132_PARAM_LIST,
++#ifdef SERVER_IDENT 
++	5,
+ #else
+-		/* 4 standard + 3 vendortags + 8 motd + 16 menu items */
+-		4 + 3 + 8 + 16,
++	4,
+ #endif
+-		/* Standard parameters */
+-		RFC1533_NETMASK, RFC1533_GATEWAY,
+-		RFC1533_HOSTNAME, RFC1533_EXTENSIONPATH,
+-		/* Etherboot vendortags */
+-		RFC1533_VENDOR_MAGIC,
++#ifdef SERVER_IDENT 
++	RFC1533_VENDOR_SERVER_IDENT,   
++#endif
++	RFC1533_NETMASK,
++	RFC1533_GATEWAY,
++	RFC1533_HOSTNAME,
++	RFC1533_EXTENSIONPATH
++};
++static const char dhcprequest []={
++	RFC2132_MSG_TYPE,1,DHCPREQUEST,
++	RFC2132_SRV_ID,4,0,0,0,0,
++	RFC2132_REQ_ADDR,4,0,0,0,0,
++#ifdef CLIENT_IDENT 
++	RFC1533_VENDOR_CLIENT_IDENT,8,0,0,0,0,0,0,0,0,
++#endif
++	RFC2132_MAX_SIZE,2,2,64,
++	/* request parameters */
++	RFC2132_PARAM_LIST,
++	/* 4 standard + 3 vendortags + 8 motd + 16 menu items */
++	4 + 
++	3 + 
++#ifdef  IMAGE_FREEBSD
++	1 + /* One more vendortags for VENDOR_HOWTO */
++#endif
++#ifdef SERVER_IDENT 
++	1 + /* One more vendortags for VENDOR_SERVER_IDENT */
++#endif
++	8 + 
++	16,
++	/* Standard parameters */
++	RFC1533_NETMASK, RFC1533_GATEWAY,
++	RFC1533_HOSTNAME, RFC1533_EXTENSIONPATH,
++	/* Etherboot vendortags */
++	RFC1533_VENDOR_MAGIC,
+ #ifdef	IMAGE_FREEBSD
+-		RFC1533_VENDOR_HOWTO,
++	RFC1533_VENDOR_HOWTO,
+ #endif
+-		RFC1533_VENDOR_MNUOPTS, RFC1533_VENDOR_SELECTION,
+-		/* 8 MOTD entries */
+-		RFC1533_VENDOR_MOTD,
+-		RFC1533_VENDOR_MOTD+1,
+-		RFC1533_VENDOR_MOTD+2,
+-		RFC1533_VENDOR_MOTD+3,
+-		RFC1533_VENDOR_MOTD+4,
+-		RFC1533_VENDOR_MOTD+5,
+-		RFC1533_VENDOR_MOTD+6,
+-		RFC1533_VENDOR_MOTD+7,
+-		/* 16 image entries */
+-		RFC1533_VENDOR_IMG,
+-		RFC1533_VENDOR_IMG+1,
+-		RFC1533_VENDOR_IMG+2,
+-		RFC1533_VENDOR_IMG+3,
+-		RFC1533_VENDOR_IMG+4,
+-		RFC1533_VENDOR_IMG+5,
+-		RFC1533_VENDOR_IMG+6,
+-		RFC1533_VENDOR_IMG+7,
+-		RFC1533_VENDOR_IMG+8,
+-		RFC1533_VENDOR_IMG+9,
+-		RFC1533_VENDOR_IMG+10,
+-		RFC1533_VENDOR_IMG+11,
+-		RFC1533_VENDOR_IMG+12,
+-		RFC1533_VENDOR_IMG+13,
+-		RFC1533_VENDOR_IMG+14,
+-		RFC1533_VENDOR_IMG+15,
+-	};
++#ifdef SERVER_IDENT
++	RFC1533_VENDOR_SERVER_IDENT,
++#endif
++	RFC1533_VENDOR_MNUOPTS, RFC1533_VENDOR_SELECTION,
++	/* 8 MOTD entries */
++	RFC1533_VENDOR_MOTD,
++	RFC1533_VENDOR_MOTD+1,
++	RFC1533_VENDOR_MOTD+2,
++	RFC1533_VENDOR_MOTD+3,
++	RFC1533_VENDOR_MOTD+4,
++	RFC1533_VENDOR_MOTD+5,
++	RFC1533_VENDOR_MOTD+6,
++	RFC1533_VENDOR_MOTD+7,
++	/* 16 image entries */
++	RFC1533_VENDOR_IMG,
++	RFC1533_VENDOR_IMG+1,
++	RFC1533_VENDOR_IMG+2,
++	RFC1533_VENDOR_IMG+3,
++	RFC1533_VENDOR_IMG+4,
++	RFC1533_VENDOR_IMG+5,
++	RFC1533_VENDOR_IMG+6,
++	RFC1533_VENDOR_IMG+7,
++	RFC1533_VENDOR_IMG+8,
++	RFC1533_VENDOR_IMG+9,
++	RFC1533_VENDOR_IMG+10,
++	RFC1533_VENDOR_IMG+11,
++	RFC1533_VENDOR_IMG+12,
++	RFC1533_VENDOR_IMG+13,
++	RFC1533_VENDOR_IMG+14,
++	RFC1533_VENDOR_IMG+15,
++};
+ 
+ #endif	/* NO_DHCP_SUPPORT */
+ static const char broadcast[] = { 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF };
+@@ -176,6 +217,55 @@ done:
+ 			break;
+ 	}
+ #endif
++
++#ifdef SHIFTED_IDENT_INPUT
++	if (getshift() & 3)
++		{
++#endif
++	
++#ifdef  CLIENT_IDENT
++#   ifdef ASK_CLIENT_IDENT
++			{
++				char tmp_ident[9] = {};
++#      ifdef  DEFAULT_CLIENT_IDENT
++				printf("Enter the client identifier (8 char max.) default [%s] : ",client_ident);
++#      else
++				printf("Enter the client identifier (8 char max.) : ");
++#      endif
++				getstr(tmp_ident,8);
++				if (strlen(tmp_ident) != 0)
++					memcpy(client_ident,tmp_ident,8);
++				else
++					printf("%s",client_ident);
++				putchar('\n');
++			}
++#   endif
++#endif
++
++#ifdef  SERVER_IDENT
++#   ifdef ASK_SERVER_IDENT
++			{
++				char tmp_ident[9] = {};
++#      ifdef  DEFAULT_SERVER_IDENT
++				printf("Enter the server identifier (8 char max.) default [%s] : ",server_ident);
++#      else
++				printf("Enter the server identifier (8 char max.) : ");
++#      endif
++				getstr(tmp_ident,8);
++				if (strlen(tmp_ident) != 0)
++					memcpy(server_ident,tmp_ident,8);
++				else
++					printf("%s",server_ident);
++				putchar('\n');
++			}
++#   endif
++#endif
++
++#ifdef SHIFTED_IDENT_INPUT
++		}
++#endif
++
++	print_config();
+ #if	(TRY_FLOPPY_FIRST > 0) && defined(FLOPPY)
+ 	disk_init();
+ 	printf("Trying floppy");
+@@ -188,7 +278,7 @@ done:
+ 	}
+ 	printf("no floppy\n");
+ #endif	/* TRY_FLOPPY_FIRST && FLOPPY */
+-	print_config();
++        print_config();
+ 	gateA20_set();
+ #ifdef	EMERGENCYDISKBOOT
+ 	if (!eth_probe()) {
+@@ -663,6 +753,8 @@ BOOTP - Get my IP address and load infor
+ int bootp()
+ {
+ 	int retry;
++        int offset = 0;
++
+ #ifndef	NO_DHCP_SUPPORT
+ 	int retry1;
+ #endif	/* NO_DHCP_SUPPORT */
+@@ -680,11 +772,18 @@ int bootp()
+ 	bp.bp_xid = xid = starttime = currticks();
+ 	memcpy(bp.bp_hwaddr, arptable[ARP_CLIENT].node, ETHER_ADDR_SIZE);
+ #ifdef	NO_DHCP_SUPPORT
+-	memcpy(bp.bp_vend, rfc1533_cookie, 5); /* request RFC-style options */
++	memcpy(bp.bp_vend+offset, rfc1533_cookie, 5); /* request RFC-style options */
++	offset += sizeof rfc1533_cookie;
+ #else
+-	memcpy(bp.bp_vend, rfc1533_cookie, sizeof rfc1533_cookie); /* request RFC-style options */
+-	memcpy(bp.bp_vend+sizeof rfc1533_cookie, dhcpdiscover, sizeof dhcpdiscover);
+-	memcpy(bp.bp_vend+sizeof rfc1533_cookie +sizeof dhcpdiscover, rfc1533_end, sizeof rfc1533_end);
++	memcpy(bp.bp_vend+offset, rfc1533_cookie, sizeof rfc1533_cookie); /* request RFC-style options */
++	offset += sizeof rfc1533_cookie; 	
++	memcpy(bp.bp_vend+offset, dhcpdiscover, sizeof dhcpdiscover);
++	offset += sizeof dhcpdiscover;
++#ifdef CLIENT_IDENT 
++	memcpy(bp.bp_vend+13, client_ident, strlen(client_ident));
++#endif
++	memcpy(bp.bp_vend+offset, rfc1533_end, sizeof rfc1533_end);
++	offset += sizeof rfc1533_end;
+ #endif	/* NO_DHCP_SUPPORT */
+ 
+ 	for (retry = 0; retry < MAX_BOOTP_RETRIES; ) {
+@@ -715,19 +814,22 @@ int bootp()
+ #else
+ 		if (await_reply(AWAIT_BOOTP, 0, NULL, TIMEOUT)){
+ 			if (dhcp_reply==DHCPOFFER){
+-		dhcp_reply=0;
+-		memcpy(bp.bp_vend, rfc1533_cookie, sizeof rfc1533_cookie);
+-		memcpy(bp.bp_vend+sizeof rfc1533_cookie, dhcprequest, sizeof dhcprequest);
+-		memcpy(bp.bp_vend+sizeof rfc1533_cookie +sizeof dhcprequest, rfc1533_end, sizeof rfc1533_end);
+-		memcpy(bp.bp_vend+9, &dhcp_server, sizeof(in_addr));
+-		memcpy(bp.bp_vend+15, &dhcp_addr, sizeof(in_addr));
+-			for (retry1 = 0; retry1 < MAX_BOOTP_RETRIES;) {
+-			udp_transmit(IP_BROADCAST, 0, BOOTP_SERVER,
+-				sizeof(struct bootp_t), &bp);
+ 				dhcp_reply=0;
+-				if (await_reply(AWAIT_BOOTP, 0, NULL, TIMEOUT))
+-					if (dhcp_reply==DHCPACK)
+-						return(1);
++				memcpy(bp.bp_vend, rfc1533_cookie, sizeof rfc1533_cookie);
++				memcpy(bp.bp_vend+sizeof rfc1533_cookie, dhcprequest, sizeof dhcprequest);
++				memcpy(bp.bp_vend+sizeof rfc1533_cookie +sizeof dhcprequest, rfc1533_end, sizeof rfc1533_end);
++				memcpy(bp.bp_vend+9, &dhcp_server, sizeof(in_addr));
++				memcpy(bp.bp_vend+15, &dhcp_addr, sizeof(in_addr));
++#ifdef CLIENT_IDENT
++				memcpy(bp.bp_vend+21, client_ident, strlen(client_ident));
++#endif
++				for (retry1 = 0; retry1 < MAX_BOOTP_RETRIES;) {
++					udp_transmit(IP_BROADCAST, 0, BOOTP_SERVER,
++						     sizeof(struct bootp_t), &bp);
++					dhcp_reply=0;
++					if (await_reply(AWAIT_BOOTP, 0, NULL, TIMEOUT))
++						if (dhcp_reply==DHCPACK)
++							return(1);
+ 					rfc951_sleep(++retry1);
+ 				}
+ 			} else
+@@ -750,6 +852,7 @@ AWAIT_REPLY - Wait until we get a respon
+ **************************************************************************/
+ int await_reply(int type, int ival, void *ptr, int timeout)
+ {
++	int result;
+ 	unsigned long time;
+ 	struct	iphdr *ip;
+ 	struct	udphdr *udp;
+@@ -757,6 +860,7 @@ int await_reply(int type, int ival, void
+ 	struct	bootp_t *bootpreply;
+ 	struct	rpc_t *rpc;
+ 	unsigned short ptype;
++	unsigned int min_packetlen;
+ 
+ 	unsigned int protohdrlen = ETHER_HDR_SIZE + sizeof(struct iphdr) +
+ 				sizeof(struct udphdr);
+@@ -766,35 +870,35 @@ int await_reply(int type, int ival, void
+ 	 * needs a negligible amount of time.  */
+ 	for (;;) {
+ 		if (eth_poll()) {	/* We have something! */
+-					/* Check for ARP - No IP hdr */
++			/* Check for ARP - No IP hdr */
+ 			if (nic.packetlen >= ETHER_HDR_SIZE) {
+ 				ptype = ((unsigned short) nic.packet[12]) << 8
+ 					| ((unsigned short) nic.packet[13]);
+ 			} else continue; /* what else could we do with it? */
+ 			if ((nic.packetlen >= ETHER_HDR_SIZE +
+-				sizeof(struct arprequest)) &&
+-			   (ptype == ARP) ) {
++			     sizeof(struct arprequest)) &&
++			    (ptype == ARP) ) {
+ 				unsigned long tmp;
+-
++				
+ 				arpreply = (struct arprequest *)
+ 					&nic.packet[ETHER_HDR_SIZE];
+ 				if ((arpreply->opcode == ntohs(ARP_REPLY)) &&
+-				   !memcmp(arpreply->sipaddr, ptr, sizeof(in_addr)) &&
+-				   (type == AWAIT_ARP)) {
++				    !memcmp(arpreply->sipaddr, ptr, sizeof(in_addr)) &&
++				    (type == AWAIT_ARP)) {
+ 					memcpy(arptable[ival].node, arpreply->shwaddr, ETHER_ADDR_SIZE);
+ 					return(1);
+ 				}
+ 				memcpy(&tmp, arpreply->tipaddr, sizeof(in_addr));
+ 				if ((arpreply->opcode == ntohs(ARP_REQUEST)) &&
+-					(tmp == arptable[ARP_CLIENT].ipaddr.s_addr)) {
++				    (tmp == arptable[ARP_CLIENT].ipaddr.s_addr)) {
+ 					arpreply->opcode = htons(ARP_REPLY);
+ 					memcpy(arpreply->tipaddr, arpreply->sipaddr, sizeof(in_addr));
+ 					memcpy(arpreply->thwaddr, arpreply->shwaddr, ETHER_ADDR_SIZE);
+ 					memcpy(arpreply->sipaddr, &arptable[ARP_CLIENT].ipaddr, sizeof(in_addr));
+ 					memcpy(arpreply->shwaddr, arptable[ARP_CLIENT].node, ETHER_ADDR_SIZE);
+ 					eth_transmit(arpreply->thwaddr, ARP,
+-						sizeof(struct  arprequest),
+-						arpreply);
++						     sizeof(struct  arprequest),
++						     arpreply);
+ #ifdef	MDEBUG
+ 					memcpy(&tmp, arpreply->tipaddr, sizeof(in_addr));
+ 					printf("Sent ARP reply to: %I\n",tmp);
+@@ -802,20 +906,20 @@ int await_reply(int type, int ival, void
+ 				}
+ 				continue;
+ 			}
+-
++			
+ 			if (type == AWAIT_QDRAIN) {
+ 				continue;
+ 			}
+-
+-					/* Check for RARP - No IP hdr */
++			
++			/* Check for RARP - No IP hdr */
+ 			if ((type == AWAIT_RARP) &&
+-			   (nic.packetlen >= ETHER_HDR_SIZE +
+-				sizeof(struct arprequest)) &&
+-			   (ptype == RARP)) {
++			    (nic.packetlen >= ETHER_HDR_SIZE +
++			     sizeof(struct arprequest)) &&
++			    (ptype == RARP)) {
+ 				arpreply = (struct arprequest *)
+ 					&nic.packet[ETHER_HDR_SIZE];
+ 				if ((arpreply->opcode == ntohs(RARP_REPLY)) &&
+-				   !memcmp(arpreply->thwaddr, ptr, ETHER_ADDR_SIZE)) {
++				    !memcmp(arpreply->thwaddr, ptr, ETHER_ADDR_SIZE)) {
+ 					memcpy(arptable[ARP_SERVER].node, arpreply->shwaddr, ETHER_ADDR_SIZE);
+ 					memcpy(& arptable[ARP_SERVER].ipaddr, arpreply->sipaddr, sizeof(in_addr));
+ 					memcpy(& arptable[ARP_CLIENT].ipaddr, arpreply->tipaddr, sizeof(in_addr));
+@@ -823,64 +927,72 @@ int await_reply(int type, int ival, void
+ 				}
+ 				continue;
+ 			}
+-
+-					/* Anything else has IP header */
++			
++			/* Anything else has IP header */
+ 			if ((nic.packetlen < protohdrlen) ||
+-			   (ptype != IP) ) continue;
++			    (ptype != IP) ) continue;
+ 			ip = (struct iphdr *)&nic.packet[ETHER_HDR_SIZE];
+ 			if ((ip->verhdrlen != 0x45) ||
+-				ipchksum((unsigned short *)ip, sizeof(struct iphdr)) ||
+-				(ip->protocol != IP_UDP)) continue;
++			    ipchksum((unsigned short *)ip, sizeof(struct iphdr)) ||
++			    (ip->protocol != IP_UDP)) continue;
+ 			udp = (struct udphdr *)&nic.packet[ETHER_HDR_SIZE +
+-				sizeof(struct iphdr)];
+-
+-					/* BOOTP ? */
++							  sizeof(struct iphdr)];
++			
++			/* BOOTP ? */
+ 			bootpreply = (struct bootp_t *)&nic.packet[ETHER_HDR_SIZE];
+-			if ((type == AWAIT_BOOTP) &&
+-			   (nic.packetlen >= (ETHER_HDR_SIZE +
+-#ifdef	NO_DHCP_SUPPORT
+-			     sizeof(struct bootp_t))) &&
++#ifdef  NO_DHCP_SUPPORT
++			min_packetlen = ETHER_HDR_SIZE + sizeof(struct bootp_t);
+ #else
+-			     sizeof(struct bootp_t))-DHCP_OPT_LEN) &&
+-#endif	/* NO_DHCP_SUPPORT */
+-			   (ntohs(udp->dest) == BOOTP_CLIENT) &&
+-			   (bootpreply->bp_op == BOOTP_REPLY) &&
+-			   (bootpreply->bp_xid == xid)) {
+-				arptable[ARP_CLIENT].ipaddr.s_addr =
+-					bootpreply->bp_yiaddr.s_addr;
++			min_packetlen = ETHER_HDR_SIZE + sizeof(struct bootp_t) - DHCP_OPT_LEN;
++#endif
++			if (
++			    (type == AWAIT_BOOTP) &&
++			    (nic.packetlen >= min_packetlen) &&
++			    (ntohs(udp->dest) == BOOTP_CLIENT) &&
++			    (bootpreply->bp_op == BOOTP_REPLY) &&
++			    (bootpreply->bp_xid == xid)
++			    ) {
++				arptable[ARP_CLIENT].ipaddr.s_addr = bootpreply->bp_yiaddr.s_addr;
+ #ifndef	NO_DHCP_SUPPORT
+ 				dhcp_addr.s_addr = bootpreply->bp_yiaddr.s_addr;
+ #endif	/* NO_DHCP_SUPPORT */
+ 				netmask = default_netmask();
+-				arptable[ARP_SERVER].ipaddr.s_addr =
+-					bootpreply->bp_siaddr.s_addr;
++				arptable[ARP_SERVER].ipaddr.s_addr = bootpreply->bp_siaddr.s_addr;
+ 				memset(arptable[ARP_SERVER].node, 0, ETHER_ADDR_SIZE);  /* Kill arp */
+-				arptable[ARP_GATEWAY].ipaddr.s_addr =
+-					bootpreply->bp_giaddr.s_addr;
++				arptable[ARP_GATEWAY].ipaddr.s_addr = bootpreply->bp_giaddr.s_addr;
+ 				memset(arptable[ARP_GATEWAY].node, 0, ETHER_ADDR_SIZE);  /* Kill arp */
+ 				if (bootpreply->bp_file[0]) {
+ 					memcpy(kernel_buf, bootpreply->bp_file, 128);
+ 					kernel = kernel_buf;
+ 				}
+ 				memcpy((char *)BOOTP_DATA_ADDR, (char *)bootpreply, sizeof(struct bootpd_t));
+-				decode_rfc1533(BOOTP_DATA_ADDR->bootp_reply.bp_vend,
+-#ifdef	NO_DHCP_SUPPORT
+-					       0, BOOTP_VENDOR_LEN +
+-					       MAX_BOOTP_EXTLEN, 1);
+-#else
+-					       0, DHCP_OPT_LEN, 1);
+-#endif	/* NO_DHCP_SUPPORT */
+-				return(1);
++#ifdef  NO_DHCP_SUPPORT
++				if (decode_rfc1533(BOOTP_DATA_ADDR->bootp_reply.bp_vend,
++						   0, BOOTP_VENDOR_LEN +
++						   MAX_BOOTP_EXTLEN, 1)) {
++					return(1);
++				}
++				else {
++					continue;
++				}
++#else	
++				if (decode_rfc1533(BOOTP_DATA_ADDR->bootp_reply.bp_vend,
++						   0, DHCP_OPT_LEN, 1)) {
++					return(1);
++				}
++				else {
++					continue;
++				}
+ 			}
+-
++#endif	/* NO_DHCP_SUPPORT */
+ #ifdef	DOWNLOAD_PROTO_TFTP
+-					/* TFTP ? */
++			/* TFTP ? */
+ 			if ((type == AWAIT_TFTP) &&
+-				(ntohs(udp->dest) == ival)) return(1);
++			    (ntohs(udp->dest) == ival)) return(1);
+ #endif	/* DOWNLOAD_PROTO_TFTP */
+-
++			
+ #ifdef	DOWNLOAD_PROTO_NFS
+-					/* RPC ? */
++			/* RPC ? */
+ 			rpc = (struct rpc_t *)&nic.packet[ETHER_HDR_SIZE];
+ 			if ((type == AWAIT_RPC) &&
+ 			    (ntohs(udp->dest) == ival) &&
+@@ -889,19 +1001,19 @@ int await_reply(int type, int ival, void
+ 				return (1);
+ 			}
+ #endif	/* DOWNLOAD_PROTO_NFS */
+-
++			
+ 		} else {
+-			/* Check for abort key only if the Rx queue is empty -
+-			 * as long as we have something to process, don't
+-			 * assume that something failed.  It is unlikely that
+-			 * we have no processing time left between packets.  */
++				/* Check for abort key only if the Rx queue is empty -
++				 * as long as we have something to process, don't
++				 * assume that something failed.  It is unlikely that
++				 * we have no processing time left between packets.  */
+ 			if (iskey() && (getchar() == ESC))
+ #ifdef	EMERGENCYDISKBOOT
+ 				exit(0);
+ #else
+-				longjmp(jmp_bootmenu,1);
++			longjmp(jmp_bootmenu,1);
+ #endif
+-			/* Do the timeout after at least a full queue walk.  */
++				/* Do the timeout after at least a full queue walk.  */
+ 			if ((timeout == 0) || (currticks() > time)) {
+ 				break;
+ 			}
+@@ -914,13 +1026,15 @@ int await_reply(int type, int ival, void
+ DECODE_RFC1533 - Decodes RFC1533 header
+ **************************************************************************/
+ int decode_rfc1533(p, block, len, eof)
+-	register unsigned char *p;
+-	int block, len, eof;
++        register unsigned char *p;
++        int block, len, eof;  
+ {
+ 	static unsigned char *extdata = NULL, *extend = NULL;
+ 	unsigned char        *extpath = NULL;
+ 	unsigned char        *endp;
+-
++#ifdef SERVER_IDENT
++	char rcvd_server_ident[9] = {};
++#endif
+ 	if (block == 0) {
+ #ifdef	IMAGE_MENU
+ 		memset(imagelist, 0, sizeof(imagelist));
+@@ -1002,11 +1116,16 @@ int decode_rfc1533(p, block, len, eof)
+ 			}
+ #endif
+ #ifdef	MOTD
+-			else if (c >= RFC1533_VENDOR_MOTD &&
++                        else if (c >= RFC1533_VENDOR_MOTD &&
+ 				 c < RFC1533_VENDOR_MOTD +
+ 				 RFC1533_VENDOR_NUMOFMOTD)
+ 				motd[c - RFC1533_VENDOR_MOTD] = p;
+ #endif
++#ifdef SERVER_IDENT 
++			else if (c == RFC1533_VENDOR_SERVER_IDENT) {
++				memcpy(rcvd_server_ident,p+2,TAG_LEN(p));
++			}
++#endif
+ 			else {
+ #if	0
+ 				unsigned char *q;
+@@ -1018,6 +1137,30 @@ int decode_rfc1533(p, block, len, eof)
+ 			}
+ 			p += TAG_LEN(p) + 2;
+ 		}
++#if defined(SERVER_IDENT) && defined(DBG_IDENT)
++		if (strcasecmp(rcvd_server_ident,server_ident)) {
++			char ip[16];
++
++			inet_ntoa(dhcp_server,ip);
++			printf("[%s]: Option %d (%s), invalid response. Wanted (%s).\n",
++			       ip,
++			       RFC1533_VENDOR_SERVER_IDENT,
++			       rcvd_server_ident,
++			       server_ident);
++			strcpy(rcvd_server_ident,"");
++			return(0);
++		}
++	        else {
++			char ip[16];
++
++			inet_ntoa(dhcp_server,ip);
++			printf("[%s]: Option %d (%s), valid response.\n",
++			       ip,
++			       RFC1533_VENDOR_SERVER_IDENT,
++			       rcvd_server_ident);
++			strcpy(rcvd_server_ident,"");
++		}
++#endif
+ 		extdata = extend = endp;
+ 		if (block == 0 && extpath != NULL) {
+ 			char fname[64];
+@@ -1103,3 +1246,4 @@ void cleanup(void)
+  *  c-basic-offset: 8
+  * End:
+  */
++
+
+--------------4734FDA0BF2F2FBDF8EB8DF6
+Content-Type: text/plain; charset=us-ascii;
+ name="misc.c.diff"
+Content-Transfer-Encoding: 7bit
+Content-Disposition: inline;
+ filename="misc.c.diff"
+
+--- etherboot-4.6.0/src/misc.c	Tue Apr 25 08:30:25 2000
++++ etherboot-4.5.6-new/src/misc.c	Wed Apr 26 16:26:38 2000
+@@ -140,9 +140,11 @@ void printf(const char *fmt, ...)
+ 
+ #ifdef	IMAGE_MENU
+ /**************************************************************************
+-INET_ATON - Convert an ascii x.x.x.x to binary form
++INET_NTOA - Convert an ascii x.x.x.x to binary form
+ **************************************************************************/
+-int inet_aton(char *p, in_addr *i)
++int inet_aton(p, i)
++	char *p;
++	in_addr *i;
+ {
+ 	unsigned long ip = 0;
+ 	int val;
+@@ -165,7 +167,19 @@ int inet_aton(char *p, in_addr *i)
+ 
+ #endif	/* IMAGE_MENU */
+ 
+-int getdec(char **ptr)
++#if  defined(CLIENT_IDENT) || defined (SERVER_IDENT)
++/**************************************************************************
++INET_NTOA - Convert a binary form to an ascii x.x.x.x form
++**************************************************************************/
++char *inet_ntoa(in_addr i, char *p)
++{
++	sprintf(p,"%d.%d.%d.%d",i.s_addr>>24,i.s_addr<<8>>24,i.s_addr<<16>>24,i.s_addr<<24>>24);
++	return p;
++}
++#endif
++
++int getdec(ptr)
++	char **ptr;
+ {
+ 	char *p = *ptr;
+ 	int ret=0;
+@@ -308,6 +322,45 @@ iskey(void)
+ 	return 0;
+ }
+ #endif	/* ETHERBOOT32 */
++
++/**************************************************************************
++GETSTR - Read a string of size bytes from the keyboard 
++(without echoing the final return)
++**************************************************************************/
++void getstr(char *s, int size)
++{
++   int i=0;
++   char c;
++
++   while(1) {
++      c = getc();
++	  
++			    
++      if (c == 13)
++         {
++	   s[i]='\0';
++	   break;
++         }
++      else if ( 
++		((c >= 'a') && (c <='z')) ||  
++		((c >= 'A') && (c <='Z')) ||
++		((c >= '0') && (c <='9'))
++	      ) {
++                 if (i==8) {
++                     putchar(8);
++                     putchar(s[i-1]=c);
++                  }
++                  else
++                     putchar(s[i++]=c);      
++                }
++     else if ( c == 8 ) {   
++	   if (i != 0) {
++		   --i;
++		   s[i]='\0';
++		   putchar(8);
++		   putchar(32);
++		   putchar(8);
++	   }
++     }
++   }
++}
+ 
+ /*
+  * Local variables:
+
+--------------4734FDA0BF2F2FBDF8EB8DF6
+Content-Type: text/plain; charset=us-ascii;
+ name="Config.diff"
+Content-Transfer-Encoding: 7bit
+Content-Disposition: inline;
+ filename="Config.diff"
+
+--- etherboot-4.6.0/src/Config	Tue Apr 25 08:30:57 2000
++++ etherboot-4.5.6-new/src/Config	Wed Apr 26 15:55:57 2000
+@@ -59,6 +59,27 @@
+ #			  may no longer be appropriate.  You might need to set
+ #			  MAX_ARP_RETRIES, MAX_BOOTP_RETRIES, MAX_TFTP_RETRIES
+ #			  and MAX_RPC_RETRIES to a larger value.
++#	-DDEFAULT_CLIENT_IDENT
++#			  The default client identifier that is sent to the
++#			  DHCP server to identify itself. 
++#	-DDEFAULT_SERVER_IDENT
++#			  The expected response that the client will wait
++#			  for when a DHCP server responds to the the initial
++#			  client discovery.
++#	-DASK_CLIENT_IDENT
++#	-DASK_SERVER_IDENT
++#			  If these are set, the boot process will include
++#			  a question period where you can manualy specify
++#			  the client and/or server identifiers.
++#	-DSHIFTED_IDENT_INPUT
++#			  If this is set then the boot process will only
++#			  ask for the identifiers if one of the shift keys
++#			  is pressed. Else it will send the default identifiers
++#			  automatically
++#	-DDBG_IDENT
++#			  This will give show all the DHCP responses with
++#			  their identifiers.
++#			  
+ #
+ # Etherboot/32 only options:
+ #	-DAOUT_IMAGE	- Add a.out kernel boot support (generic)
+@@ -147,6 +168,14 @@ CFLAGS32+=	-DASK_BOOT=3 -DANS_DEFAULT=AN
+ 
+ # Change download protocol to NFS.  Only available for Etherboot/32 for now.
+ # CFLAGS32+=	-DDOWNLOAD_PROTO_NFS
++
++# If you have more than one DHCP server you might want to
++# enable these to be able to sort out which one you want to
++# respond to.  
++CFLAGS32+= -DDEFAULT_CLIENT_IDENT=\"BOOT\" -DDEFAULT_SERVER_IDENT=\"BOOT\"
++CFLAGS32+= -DASK_CLIENT_IDENT -DASK_SERVER_IDENT
++CFLAGS32+= -DSHIFTED_IDENT_INPUT
++CFLAGS32+= -DDBG_IDENT 
+ 
+ # These flags affect the loader that is prepended to the Etherboot image
+ LCONFIG+=	-DMOVEROM
+
+--------------4734FDA0BF2F2FBDF8EB8DF6
+Content-Type: text/plain; charset=us-ascii;
+ name="etherboot.h.diff"
+Content-Transfer-Encoding: 7bit
+Content-Disposition: inline;
+ filename="etherboot.h.diff"
+
+--- etherboot-4.6.0/src/etherboot.h	Tue Apr 25 08:30:55 2000
++++ etherboot-4.5.6-new/src/etherboot.h	Wed Apr 26 16:07:16 2000
+@@ -8,6 +8,14 @@ Author: Martin Renters
+ 
+ #include "osdep.h"
+ 
++#if (! defined(NO_DHCP_SUPPORT)) && (defined(ASK_CLIENT_IDENT) || defined(DEFAULT_CLIENT_IDENT))
++#   define CLIENT_IDENT
++#endif
++
++#if (! defined(NO_DHCP_SUPPORT)) && (defined(ASK_SERVER_IDENT) || defined(DEFAULT_SERVER_IDENT))
++#   define SERVER_IDENT
++#endif
++
+ /* These could be customised for different languages perhaps */
+ #define	ASK_PROMPT	"Boot from (N)etwork or from (L)ocal? "
+ #define	ANS_NETWORK	'N'
+@@ -224,6 +232,12 @@ Author: Martin Renters
+ #ifdef	IMAGE_FREEBSD
+ #define RFC1533_VENDOR_HOWTO    132
+ #endif
++#ifdef CLIENT_IDENT
++#define RFC1533_VENDOR_CLIENT_IDENT    208
++#endif
++#ifdef SERVER_IDENT
++#define RFC1533_VENDOR_SERVER_IDENT    208
++#endif
+ #define RFC1533_VENDOR_MNUOPTS	160
+ #define RFC1533_VENDOR_SELECTION 176
+ #define RFC1533_VENDOR_MOTD	184
+@@ -477,11 +491,13 @@ extern int getdec P((char **));
+ extern void printf P((const char *, ...));
+ extern char *sprintf P((char *, const char *, ...));
+ extern int inet_aton P((char *p, in_addr *i));
++extern char *inet_ntoa P((in_addr i, char *p));
+ extern void gateA20_set P((void));
+ extern void gateA20_unset P((void));
+ extern void putchar P((int));
+ extern int getchar P((void));
+ extern int iskey P((void));
++extern void getstr P((char *s, int size));
+ 
+ /* start*.S */
+ extern int getc P((void));
+@@ -528,8 +544,10 @@ extern int hostnamelen;
+ extern unsigned long netmask;
+ extern int jmp_bootmenu[10];
+ extern struct arptable_t arptable[MAX_ARP];
+-#ifdef	IMAGE_MENU
++#ifdef MOTD
+ extern char *motd[RFC1533_VENDOR_NUMOFMOTD];
++#endif
++#ifdef	IMAGE_MENU
+ extern int menutmo,menudefault;
+ extern unsigned char *defparams;
+ extern int defparams_max;
+
+--------------4734FDA0BF2F2FBDF8EB8DF6--
+

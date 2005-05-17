@@ -1,0 +1,19 @@
+<?xml version="1.0"?>
+<!--
+ Build file for T2hproxy
+-->
+<project name="T2hproxy" default="jar" basedir=".">
+  <target name="compile">
+    <javac fork="true" srcdir="." destdir="." />
+  </target>
+
+  <target name="jar" depends="compile">
+    <jar jarfile="T2hproxy.jar" basedir="."
+    includes="T2hproxy.class">
+      <manifest>
+        <attribute name="Main-Class" value="T2hproxy" />
+      </manifest>
+    </jar>
+  </target>
+</project>
+

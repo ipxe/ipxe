@@ -1,0 +1,22 @@
+# /boot/build/ws.etherboot.on-the-fly
+
+sys/boot
+$ boot -v
+
+sys/Proc32
+$ Proc32 -l $(lnode)
+
+sys/Slib32
+$ Slib32
+
+sys/Slib16
+$ Slib16
+
+/bin/Net
+$ Net -n <highest QNX node number in network> -m $(netmap)
+
+/bin/Net.<network driver>
+$ Net.<network driver>
+
+/bin/sinit
+$ sinit -r //$(bnode)/ TERM=<your terminal emulation {QNX|qansi}>

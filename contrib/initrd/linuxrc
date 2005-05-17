@@ -1,0 +1,76 @@
+#!/bin/sh
+# $Id$
+
+PATH=/sbin:/bin
+
+echo Busybox /linuxrc starting
+
+echo Mounting /proc filesystem
+mount -t proc none /proc
+
+echo=echo
+if grep '\bquiet\b' /proc/cmdline > /dev/null; then
+  echo=true
+  quiet=1
+fi
+
+$echo Creating root device
+mknod /dev/root b 1 0 2>/dev/null
+chmod 700 /dev/root
+echo 0x100 > /proc/sys/kernel/real-root-dev
+
+$echo Inserting modules
+if [ -z "$quiet" ]; then
+  /bin/insert-modules
+else
+  /bin/insert-modules >/dev/null
+fi
+
+$echo Bringing up loopback interface
+ifconfig lo 127.0.0.1 up
+route add -net 127.0.0.0 netmask 255.0.0.0 lo
+
+# Hack required for prism2 cards
+# It is not yet possible to use iwconfig to configure these cards,
+# so we need wlanctl.
+if ifconfig wlan0 down 2> /dev/null; then
+  $echo Setting up wireless link
+  wlanctl wlan0 lnxreq_ifstate ifstate=enable
+  wlanctl wlan0 lnxreq_autojoin ssid= authtype=opensystem
+fi
+
+$echo Obtaining IP address via DHCP
+$echo Trying to obtain IP address via wired link [eth0]
+if udhcpc -i eth0 -f -n -q -s /bin/udhcpc-post; then
+  $echo Successfully obtained IP address via wired link [eth0]
+else
+  $echo Failed to obtain IP address via wired link [eth0]
+  $echo Trying to obtain IP address via wireless link [wlan0]
+  udhcpc -i wlan0 -f -n -q -s /bin/udhcpc-post
+fi
+
+if [ -d /sysroot/initrd ]; then
+  $echo Unmounting /proc prior to pivot_root
+  umount /proc
+
+  $echo Pivoting root to /sysroot
+  pivot_root /sysroot /sysroot/initrd
+  cd /
+
+  $echo Remounting devfs at correct place
+  mount -t devfs none /dev
+
+  $echo Releasing locks on old devfs
+  exec 0</dev/null
+  exec 1>/dev/console
+  exec 2>/dev/console
+
+  $echo Unmounting old devfs
+  umount /initrd/dev
+else
+  # Failed to mount root: report error and hang
+  echo FATAL ERROR: Failed to mount root filesystem
+  echo Press Alt-SysRq-B or hit the reset switch to reboot
+  while : ; do sleep 6000 ; done
+fi
+

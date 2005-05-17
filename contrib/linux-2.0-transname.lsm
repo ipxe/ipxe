@@ -1,0 +1,93 @@
+Xref: news.nsw.CSIRO.AU comp.os.linux.announce:2827
+Path: news.nsw.CSIRO.AU!metro!metro!munnari.OZ.AU!news.ecn.uoknor.edu!news.wildstar.net!news.ececs.uc.edu!newsrelay.netins.net!newsfeed.dacom.co.kr!arclight.uoregon.edu!feed1.news.erols.com!howland.erols.net!newsfeed.internetmci.com!in3.uu.net!liw.clinet.fi!usenet
+From: schoebel@informatik.uni-stuttgart.de (Thomas Schoebel-Theuer)
+Newsgroups: comp.os.linux.announce
+Subject: linux-2.0.21-transname - Patch for easier pool administration
+Followup-To: comp.os.linux.misc
+Date: 30 Oct 1996 10:53:38 GMT
+Organization: Informatik, Uni Stuttgart, Germany
+Lines: 76
+Approved: linux-announce@news.ornl.gov (Lars Wirzenius)
+Message-ID: <pgpmoose.199610301253.4416@liw>
+NNTP-Posting-Host: liw
+X-Auth: PGPMoose V1.1 PGP comp.os.linux.announce
+	iQBVAwUBMnczrjiesvPHtqnBAQEO6gH/WRtFpTPyVtwi0cFVPZ1Xhn8cvfb6i3mk
+	LQY2kgpAPquP2TeXYWb5Ta3HxqK15pR1AgaEy5BmPS6+66ixZFvKRQ==
+	=hhea
+
+-----BEGIN PGP SIGNED MESSAGE-----
+
+linux-2.0.21-transname.patch enables diskless clients, X-terminals etc to
+mount the *root filesystem* of the server. This makes administration of
+large pools *a lot* easier.
+
+Currently different diskless clients must have their root "/" on different
+directories on the server, beause each client has _some_ different
+configuration files. However, most administration files (typically about 99%)
+have the same contents on the clients and on the server, but have to be
+(and maintained separately) just because of the 1% differences.
+
+This duplication causes very large efforts in practice, since at least
+the /etc directory has to be duplicated for every client. Even in /etc
+many files are identical, for example sendmail.cf, initrc scripts and
+others. Maintaining a large pool means to ensure coherence amoung the
+duplicates. Classical methods like symlinks are unconvenient
+for this task because they have to be valid in the view of mounted
+filesystems at the client, not at the server.
+
+linux-2.0-transname.patch overcomes this problem by allowing filenames
+to be context-dependend. For example, if you have a file "/etc/config"
+that should differ on the hosts "myserver" and "myclient", you just
+create two different files named "/etc/config#host=myserver#" and
+"/etc/config#host=myclient#". On host "myserver", the file
+"/etc/config#host=myserver#" will appear as if it were hardlinked to
+file "/etc/config" (without the #...=...# suffix). On host "myclient",
+the corresponding other file will appear as "/etc/config". So you
+can access the right file contents under the same name, depending
+on which host you are.
+
+As a result, you may use different contexts for e.g. /etc/fstab, but
+have one shared /etc/passwd for all pool machines. So you don't need
+yp or NYS any more.
+
+The kernel patch was developped for and is used at our Linux pool at the
+University of Stuttgart with good results. Maintainance of the pool is
+at a minimum, and adding new clients is a child's play. No worry with
+keeping up mail configurations, newly installed tools, changed /etc/services,
+/etc/shells, /etc/resolv.conf and many, many others. In contrast to a
+sophisticated symlink solution, adding a new file to the /etc directory
+is seen immediately by all clients. I never had less trouble with
+administration before.
+
+I just uploaded the patch to
+  ftp://ftp.lmh.ox.ac.uk
+         where it should appear in /pub/linux-kernel-patch-archive/
+and also to
+  ftp://sunsite.unc.edu/pub/Linux/Incoming/
+         where it should be moved to /pub/Linux/kernel/patches/misc/ soon.
+
+More details can be found in the README there, and also in the
+configure-help.
+
+Enjoy,
+
+- -- Thomas
+
+
+-----BEGIN PGP SIGNATURE-----
+Version: 2.6.3i
+Charset: noconv
+
+iQCVAwUBMnczhYQRll5MupLRAQHzuwP9HGYa4I3bZpt22Y3oQIwEKZGfvnaS5AaD
+fVG8wOQ/T7Nrant9JtTktsTVlxGVlYVnziRY4c0ew2qExapK9FqY/ItN0NJXy5aT
+a4eSkn86rp6Un7m90RK1xVY5AyVAq49Rdw2StGxr7uj+davnmg3Np+U0MiAILq91
+52jKGaR3fvc=
+=LSD6
+-----END PGP SIGNATURE-----
+
+-- 
+This article has been digitally signed by the moderator, using PGP.
+http://www.iki.fi/liw/lars-public-key.asc has PGP key for validating signature.
+Send submissions for comp.os.linux.announce to: linux-announce@news.ornl.gov
+PLEASE remember a short description of the software and the LOCATION.
+This group is archived at http://www.iki.fi/liw/linux/cola.html

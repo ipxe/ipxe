@@ -1,0 +1,28 @@
+This is a copy of the TFTP client as available from
+ftp://sunsite.unc.edu/pub/linux/system/Network/file-transfer; I
+modified the code, so that it understands RFC1782 and RFC1783
+extensions to the TFTP protocol.  This allows for negotating an
+extended transfer block size of up to 1432 bytes (as oppossed to the
+standard 512 bytes).  On busy networks, this will result in
+considerably improved throughput and less load on the network.
+
+For further information and for licensing conditions, please have a
+look at the header of the source files.
+
+Markus Gutschke <gutschk@math.uni-muenster.de>
+
+This is a copy of the TFTP server as available from
+ftp://sunsite.unc.edu/pub/linux/system/Network/file-transfer; I
+modified the code, so that it understands RFC1782 and RFC1783
+extensions to the TFTP protocol.  This allows for negotating an
+extended transfer block size of up to 1432 bytes (as oppossed to the
+standard 512 bytes).  On busy networks, this will result in
+considerably improved throughput and less load on the network.
+
+I also added two command line options for changing the root directory
+and for enabling debugging output.
+
+For further information and for licensing conditions, please have a
+look at the header of the source files.
+
+Markus Gutschke <gutschk@math.uni-muenster.de>
