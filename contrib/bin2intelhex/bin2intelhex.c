@@ -24,8 +24,8 @@
 /*
  * $Id$
  * $Log$
- * Revision 1.1  2005/05/17 16:45:06  mcb30
- * Initial revision
+ * Revision 1.1.1.1  2005/05/17 16:45:06  mcb30
+ * Import from Etherboot 5.4
  *
  * Revision 1.9  1997/12/14 05:14:54  install
  * - some documentation....

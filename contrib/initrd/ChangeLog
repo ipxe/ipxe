@@ -3,8 +3,8 @@ mkinitrd-net ChangeLog
 Last Modified: Fri Jul 26 23:08:28 2002
 
 $Log$
-Revision 1.1  2005/05/17 16:45:02  mcb30
-Initial revision
+Revision 1.1.1.1  2005/05/17 16:45:02  mcb30
+Import from Etherboot 5.4
 
 Revision 1.1  2002/11/06 06:31:06  ken_yap
 Contributed by Michael Brown.
