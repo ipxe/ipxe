@@ -163,29 +163,6 @@
 #
 #	Boot image options:
 #
-#	-DTAGGED_IMAGE
-#			Add tagged image kernel boot support (recommended).
-#	-DAOUT_IMAGE
-#			Add a.out kernel boot support (generic).
-#	-DELF_IMAGE
-#			Add generic ELF kernel boot support (recommended).
-#	-DEL64F_IMAGE
-#			Add generic ELF64 kernel boot support (useful for > 4GB disks).
-#	-DWINCE_IMAGE
-#			Add the ability to boot WINCE.... now only sis630 OK!
-#	-DPXE_IMAGE
-#			Add the ability to boot PXE NBPs.  Requires
-#			PXE_EXPORT.  Currently not supported on
-#			anything other than i386
-#	-DFREEBSD_PXEEMU
-#			Add the ability to boot PXE images... only FreeBSD supported
-#	-DIMAGE_MULTIBOOT
-#			Add Multiboot image support (currently only
-#			for ELF images).
-#			Without this, generic ELF support is selected.
-#	-DIMAGE_FREEBSD
-#			Add FreeBSD image loading support (requires at least
-#			-DAOUT_IMAGE and/or -DELF_IMAGE).
 #	-DFREEBSD_KERNEL_ENV
 #			Pass in FreeBSD kernel environment
 #	-DAOUT_LYNX_KDI
@@ -324,13 +301,6 @@ CFLAGS+=	-DBACKOFF_LIMIT=7 -DCONGESTED
 # CFLAGS+=	-DTRY_FLOPPY_FIRST=4
 # CFLAGS+=	-DEXIT_IF_NO_OFFER
 
-# Enable tagged image, generic ELF, Multiboot ELF
-# or FreeBSD ELF/a.out boot image support
-CFLAGS+=	-DTAGGED_IMAGE -DELF_IMAGE
-# CFLAGS+=	-DAOUT_IMAGE -DIMAGE_MULTIBOOT -DIMAGE_FREEBSD
-# CFLAGS+=	-DAOUT_IMAGE -DAOUT_LYNX_KDI
-# CFLAGS+=	-DCOFF_IMAGE 
-# CFLAGS+=	-DRAW_IMAGE
 
 # Multicast Support
 # CFLAGS+=	-DALLMULTI -DMULTICAST_LEVEL1 -DMULTICAST_LEVEL2

@@ -8,6 +8,7 @@
 #include "etherboot.h"
 #include "dev.h"
 #include "console.h"
+#include "image.h"
 
 #include "config/general.h"
 
@@ -48,42 +49,13 @@ void print_config ( void ) {
 		" (GPL) http://etherboot.org\n"
 		"Drivers: " );
 	print_drivers();
-	printf( "  Images: " 
-#ifdef	TAGGED_IMAGE
-		"NBI "
-#endif
-#ifdef	ELF64_IMAGE
-		"ELF64 "
-#endif
-#ifdef	ELF_IMAGE
-		"ELF "
-#endif
-#ifdef	COFF_IMAGE
-		"COFF "
-#endif
-#ifdef	IMAGE_FREEBSD
-		"FreeBSD "
-#endif
-#ifdef	IMAGE_MULTIBOOT
-		"Multiboot "
-#endif
-#ifdef	AOUT_IMAGE
-		"a.out "
-#endif
-#ifdef	WINCE_IMAGE
-		"WINCE "
-#endif
-#ifdef	PXE_IMAGE
-		"PXE "
-#endif
+	printf( "  Images: " );
+	print_images();
+
 #ifdef PXE_EXPORT /* All possible exports */
-		"  Exports: "
-#ifdef PXE_EXPORT
-		"PXE "
-#endif
+	printf ( "  Exports: PXE  " );
 #endif /* All possible exports */
-		"  "
-		);
+
 #if	(BOOTP_SERVER != 67) || (BOOTP_CLIENT != 68)
 	printf( "[DHCP ports %d and %d] ",
 		BOOTP_SERVER, BOOTP_CLIENT);
@@ -200,4 +172,36 @@ REQUIRE_OBJECT ( dns );
 
 #ifdef NMB_RESOLVER
 REQUIRE_OBJECT ( nmb );
+#endif
+
+/*
+ * Drag in all requested image formats
+ *
+ */
+#ifdef TAGGED_IMAGE
+REQUIRE_OBJECT ( nbi );
+#endif
+#ifdef ELF64_IMAGE
+REQUIRE_OBJECT ( elf64 );
+#endif
+#ifdef ELF_IMAGE
+REQUIRE_OBJECT ( elf );
+#endif
+#ifdef COFF_IMAGE
+REQUIRE_OBJECT ( coff );
+#endif
+#ifdef IMAGE_FREEBSD
+REQUIRE_OBJECT ( freebsd );
+#endif
+#ifdef	IMAGE_MULTIBOOT
+REQUIRE_OBJECT ( multiboot );
+#endif
+#ifdef	AOUT_IMAGE
+REQUIRE_OBJECT ( aout );
+#endif
+#ifdef	WINCE_IMAGE
+REQUIRE_OBJECT ( wince );
+#endif
+#ifdef	PXE_IMAGE
+REQUIRE_OBJECT ( pxe );
 #endif
