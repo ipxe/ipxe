@@ -160,6 +160,7 @@ int tftp ( char *url __unused, struct sockaddr_in *server, char *file,
 			return 0;
 		if ( ! fill_buffer ( buffer, block.data, offset, block.len ) )
 			return 0;
+		twiddle();
 		offset += block.len;
 		request = NULL; /* Send request only once */
 	} while ( ! block.eof );
