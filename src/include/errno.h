@@ -1,0 +1,138 @@
+#ifndef ERRNO_H
+#define ERRNO_H
+
+/*
+ * We define error codes that are a superset of those mentioned in the
+ * PXE specification.  Various error string tables may be compiled in
+ * if required; if not compiled in, strerror(errno) will produce the
+ * text "error 0x<errno>".
+ *
+ */
+
+/* PXE error codes are determined by the PXE specification */
+
+/* Generic errors */
+#define	PXENV_STATUS_SUCCESS				0x00
+#define	PXENV_STATUS_FAILURE				0x01
+#define	PXENV_STATUS_BAD_FUNC				0x02
+#define	PXENV_STATUS_UNSUPPORTED			0x03
+#define	PXENV_STATUS_KEEP_UNDI				0x04
+#define	PXENV_STATUS_KEEP_ALL				0x05
+#define	PXENV_STATUS_OUT_OF_RESOURCES			0x06
+
+/* ARP errors (0x10 to 0x1f) */
+#define	PXENV_STATUS_ARP_TIMEOUT			0x11
+
+/* Base-Code state errors */
+#define	PXENV_STATUS_UDP_CLOSED				0x18
+#define	PXENV_STATUS_UDP_OPEN				0x19
+#define	PXENV_STATUS_TFTP_CLOSED			0x1a
+#define	PXENV_STATUS_TFTP_OPEN				0x1b
+
+/* BIOS/system errors (0x20 to 0x2f) */
+#define	PXENV_STATUS_MCOPY_PROBLEM			0x20
+#define	PXENV_STATUS_BIS_INTEGRITY_FAILURE		0x21
+#define	PXENV_STATUS_BIS_VALIDATE_FAILURE		0x22
+#define	PXENV_STATUS_BIS_INIT_FAILURE			0x23
+#define	PXENV_STATUS_BIS_SHUTDOWN_FAILURE		0x24
+#define	PXENV_STATUS_BIS_GBOA_FAILURE			0x25
+#define	PXENV_STATUS_BIS_FREE_FAILURE			0x26
+#define	PXENV_STATUS_BIS_GSI_FAILURE			0x27
+#define	PXENV_STATUS_BIS_BAD_CKSUM			0x28
+
+/* TFTP/MTFTP errors (0x30 to 0x3f) */
+#define	PXENV_STATUS_TFTP_CANNOT_ARP_ADDRESS		0x30
+#define	PXENV_STATUS_TFTP_OPEN_TIMEOUT			0x32
+#define	PXENV_STATUS_TFTP_UNKNOWN_OPCODE		0x33
+#define	PXENV_STATUS_TFTP_READ_TIMEOUT			0x35
+#define	PXENV_STATUS_TFTP_ERROR_OPCODE			0x36
+#define	PXENV_STATUS_TFTP_CANNOT_OPEN_CONNECTION	0x38
+#define	PXENV_STATUS_TFTP_CANNOT_READ_FROM_CONNECTION	0x39
+#define	PXENV_STATUS_TFTP_TOO_MANY_PACKAGES		0x3a
+#define	PXENV_STATUS_TFTP_FILE_NOT_FOUND		0x3b
+#define	PXENV_STATUS_TFTP_ACCESS_VIOLATION		0x3c
+#define	PXENV_STATUS_TFTP_NO_MCAST_ADDRESS		0x3d
+#define	PXENV_STATUS_TFTP_NO_FILESIZE			0x3e
+#define	PXENV_STATUS_TFTP_INVALID_PACKET_SIZE		0x3f
+
+/* Reserved errors 0x40 to 0x4f) */
+
+/* DHCP/BOOTP errors (0x50 to 0x5f) */
+#define	PXENV_STATUS_DHCP_TIMEOUT			0x51
+#define	PXENV_STATUS_DHCP_NO_IP_ADDRESS			0x52
+#define	PXENV_STATUS_DHCP_NO_BOOTFILE_NAME		0x53
+#define	PXENV_STATUS_DHCP_BAD_IP_ADDRESS		0x54
+
+/* Driver errors (0x60 to 0x6f) */
+#define	PXENV_STATUS_UNDI_INVALID_FUNCTION		0x60
+#define	PXENV_STATUS_UNDI_MEDIATEST_FAILED		0x61
+#define	PXENV_STATUS_UNDI_CANNOT_INIT_NIC_FOR_MCAST	0x62
+#define	PXENV_STATUS_UNDI_CANNOT_INITIALIZE_NIC		0x63
+#define	PXENV_STATUS_UNDI_CANNOT_INITIALIZE_PHY		0x64
+#define	PXENV_STATUS_UNDI_CANNOT_READ_CONFIG_DATA	0x65
+#define	PXENV_STATUS_UNDI_CANNOT_READ_INIT_DATA		0x66
+#define	PXENV_STATUS_UNDI_BAD_MAC_ADDRESS		0x67
+#define	PXENV_STATUS_UNDI_BAD_EEPROM_CHECKSUM		0x68
+#define	PXENV_STATUS_UNDI_ERROR_SETTING_ISR		0x69
+#define	PXENV_STATUS_UNDI_INVALID_STATE			0x6a
+#define	PXENV_STATUS_UNDI_TRANSMIT_ERROR		0x6b
+#define	PXENV_STATUS_UNDI_INVALID_PARAMETER		0x6c
+
+/* ROM and NBP bootstrap errors (0x70 to 0x7f) */
+#define	PXENV_STATUS_BSTRAP_PROMPT_MENU			0x74
+#define	PXENV_STATUS_BSTRAP_MCAST_ADDR			0x76
+#define	PXENV_STATUS_BSTRAP_MISSING_LIST		0x77
+#define	PXENV_STATUS_BSTRAP_NO_RESPONSE			0x78
+#define	PXENV_STATUS_BSTRAP_FILE_TOO_BIG		0x79
+
+/* Environment NBP errors (0x80 to 0x8f) */
+
+/* Reserved errors (0x90 to 0x9f) */
+
+/* Miscellaneous errors (0xa0 to 0xaf) */
+#define	PXENV_STATUS_BINL_CANCELED_BY_KEYSTROKE		0xa0
+#define	PXENV_STATUS_BINL_NO_PXE_SERVER			0xa1
+#define	PXENV_STATUS_NOT_AVAILABLE_IN_PMODE		0xa2
+#define	PXENV_STATUS_NOT_AVAILABLE_IN_RMODE		0xa3
+
+/* BUSD errors (0xb0 to 0xbf) */
+#define	PXENV_STATUS_BUSD_DEVICE_NOT_SUPPORTED		0xb0
+
+/* Loader errors (0xc0 to 0xcf) */
+#define	PXENV_STATUS_LOADER_NO_FREE_BASE_MEMORY		0xc0
+#define	PXENV_STATUS_LOADER_NO_BC_ROMID			0xc1
+#define	PXENV_STATUS_LOADER_BAD_BC_ROMID		0xc2
+#define	PXENV_STATUS_LOADER_BAD_BC_RUNTIME_IMAGE	0xc3
+#define	PXENV_STATUS_LOADER_NO_UNDI_ROMID		0xc4
+#define	PXENV_STATUS_LOADER_BAD_UNDI_ROMID		0xc5
+#define	PXENV_STATUS_LOADER_BAD_UNDI_DRIVER_IMAGE	0xc6
+#define	PXENV_STATUS_LOADER_NO_PXE_STRUCT		0xc8
+#define	PXENV_STATUS_LOADER_NO_PXENV_STRUCT		0xc9
+#define	PXENV_STATUS_LOADER_UNDI_START			0xca
+#define	PXENV_STATUS_LOADER_BC_START			0xcb
+
+/*
+ * The range 0xd0 to 0xff is defined as "Vendor errors" by the PXE
+ * spec.  We place all our Etherboot-specific errors in this range.
+ * We also define some generic errors as aliases to the PXE errors.
+ *
+ */
+
+#define ENOMEM	PXENV_STATUS_OUT_OF_RESOURCES
+
+/* Data structures and declarations */
+
+#include "tables.h"
+
+extern int errno;
+
+extern const char * strerror ( int errno );
+
+struct errortab {
+	int errno;
+	const char *text;
+};
+
+#define __errortab __table(errortab,01)
+
+#endif /* ERRNO_H */

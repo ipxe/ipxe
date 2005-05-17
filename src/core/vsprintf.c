@@ -2,6 +2,7 @@
 #include "if_ether.h" /* for ETH_ALEN */
 #include "limits.h" /* for CHAR_BIT */
 #include "console.h"
+#include "errno.h"
 #include "vsprintf.h"
 
 #define LONG_SHIFT  ((int)((sizeof(unsigned long)*CHAR_BIT) - 4))
@@ -31,7 +32,8 @@ PRINTF and friends
 **************************************************************************/
 static int vsprintf(char *buf, const char *fmt, va_list args)
 {
-	char *p, *s;
+	const char *p;
+	char *s;
 	s = buf;
 	for ( ; *fmt != '\0'; ++fmt) {
 		if (*fmt != '%') {
@@ -49,8 +51,10 @@ static int vsprintf(char *buf, const char *fmt, va_list args)
 		if (*fmt == 's') {
 			for(p = va_arg(args, char *); *p != '\0'; p++) 
 				buf ? *s++ = *p : putchar(*p);
-		}
-		else {	/* Length of item is bounded */
+		} else if (*fmt == 'm') {
+			for(p = strerror(errno); *p != '\0'; p++)
+				buf ? *s++ = *p : putchar(*p);
+		} else {	/* Length of item is bounded */
 			char tmp[40], *q = tmp;
 			int alt = 0;
 			int shift = INT_SHIFT;
@@ -93,7 +97,7 @@ static int vsprintf(char *buf, const char *fmt, va_list args)
 					*q++ = "0123456789ABCDEF"[(h >> shift) & 0xF] | ncase;
 			}
 			else if (*fmt == 'd') {
-				char *r;
+				char *r, *t;
 				long i;
 				if (shift > INT_SHIFT) {
 					i = va_arg(args, long);
@@ -104,17 +108,17 @@ static int vsprintf(char *buf, const char *fmt, va_list args)
 					*q++ = '-';
 					i = -i;
 				}
-				p = q;		/* save beginning of digits */
+				t = q;		/* save beginning of digits */
 				do {
 					*q++ = '0' + (i % 10);
 					i /= 10;
 				} while (i);
 				/* reverse digits, stop in middle */
 				r = q;		/* don't alter q */
-				while (--r > p) {
+				while (--r > t) {
 					i = *r;
-					*r = *p;
-					*p++ = i;
+					*r = *t;
+					*t++ = i;
 				}
 			}
 			else if (*fmt == '@') {
@@ -129,7 +133,7 @@ static int vsprintf(char *buf, const char *fmt, va_list args)
 				--q;
 			}
 			else if (*fmt == '!') {
-				char *r;
+				const char *r;
 				p = va_arg(args, char *);
 				for (r = p + ETH_ALEN; p < r; ++p)
 					q += sprintf(q, "%hhX:", *p);
