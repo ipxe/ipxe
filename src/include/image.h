@@ -4,22 +4,23 @@
 #include "stdint.h"
 #include "io.h"
 #include "tables.h"
-
-#define IMAGE_HEADER_SIZE 512
-
-struct image_header {
-	char data[IMAGE_HEADER_SIZE];
-};
+#include "dev.h"
 
 struct image {
 	char *name;
-	int ( * probe ) ( struct image_header *header, off_t len );
-	int ( * boot ) ( physaddr_t start, off_t len );
+	int ( * probe ) ( physaddr_t data, off_t len, void **context );
+	int ( * load ) ( physaddr_t data, off_t len, void *context );
+	int ( * boot ) ( void *context );
 };
 
 #define __image_start		__table_start(image)
 #define __image			__table(image,01)
 #define __default_image		__table(image,02)
 #define __image_end		__table_end(image)
+
+/* Functions in image.c */
+
+extern void print_images ( void );
+extern int autoload ( struct dev *dev, struct image **image, void **context );
 
 #endif /* IMAGE_H */

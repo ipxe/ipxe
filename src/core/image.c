@@ -1,28 +1,33 @@
+#include "dev.h"
 #include "buffer.h"
+#include "load_buffer.h"
 #include "image.h"
 
-static struct image images_start[0] __image_start;
+static struct image images[0] __image_start;
 static struct image images_end[0] __image_end;
+
+/*
+ * Print all images
+ *
+ */
+void print_images ( void ) {
+	struct image *image;
+
+	for ( image = images ; image < images_end ; image++ ) {
+		printf ( "%s ", image->name );
+	}
+}
 
 /*
  * Identify the image format
  *
  */
-static struct image * identify_image ( struct buffer *buffer ) {
-	struct image_header header;
-	int header_len = sizeof ( header );
-	off_t len;
+static struct image * identify_image ( physaddr_t start, physaddr_t len,
+				       void **context ) {
 	struct image *image;
 	
-	/* Copy first (up to) 512 bytes of image to easily-accessible
-	 * buffer.
-	 */
-	len = buffer->fill;
-	copy_from_phys ( &header, buffer->start,
-			 len < header_len ? len : header_len );
-	
-	for ( image = images_start ; image < images_end ; image++ ) {
-		if ( image->probe ( &header, len ) )
+	for ( image = images ; image < images_end ; image++ ) {
+		if ( image->probe ( start, len, context ) )
 			return image;
 	}
 	
@@ -30,20 +35,48 @@ static struct image * identify_image ( struct buffer *buffer ) {
 }
 
 /*
- * Boot a loaded image
+ * Load an image into memory at a location determined by the image
+ * format
  *
  */
-int boot_image ( struct buffer *buffer ) {
-	struct image *image;
+int autoload ( struct dev *dev, struct image **image, void **context ) {
+	struct buffer buffer;
+	int rc = 0;
 
-	image = identify_image ( buffer );
-	if ( ! image ) {
-		DBG ( "IMAGE could not identify image format\n" );
-		return 0;
+	/* Prepare the load buffer */
+	if ( ! init_load_buffer ( &buffer ) ) {
+		DBG ( "IMAGE could not initialise load buffer\n" );
+		goto out;
 	}
 
-	DBG ( "IMAGE found %s image (length %d)\n",
-	      image->name, buffer->fill );
+	/* Load the image into the load buffer */
+	if ( ! load ( dev, &buffer ) ) {
+		DBG ( "IMAGE could not load image\n" );
+		goto out_free;
+	}
 
-	return image->boot ( buffer->start, buffer->fill );
+	/* Shrink the load buffer */
+	trim_load_buffer ( &buffer );
+
+	/* Identify the image type */
+	*image = identify_image ( buffer.start, buffer.fill, context );
+	if ( ! *image ) {
+		DBG ( "IMAGE could not identify image type\n" );
+		goto out_free;
+	}
+
+	/* Move the image into the target location */
+	if ( ! (*image)->load ( buffer.start, buffer.fill, *context ) ) {
+		DBG ( "IMAGE could not move to target location\n" );
+		goto out_free;
+	}
+
+	/* Return success */
+	rc = 1;
+
+ out_free:
+	/* Free the load buffer */
+	done_load_buffer ( &buffer );
+ out:
+	return rc;
 }
