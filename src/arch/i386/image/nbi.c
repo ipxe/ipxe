@@ -4,22 +4,44 @@
 #include "gateA20.h"
 #include "osloader.h"
 #include "etherboot.h"
+#include "errno.h"
 
-/* An NBI image header */
+/** @file
+ *
+ * NBI image format.
+ *
+ * The Net Boot Image format is defined by the "Draft Net Boot Image
+ * Proposal 0.3" by Jamie Honan, Gero Kuhlmann and Ken Yap.  It is now
+ * considered to be a legacy format, but it still included because a
+ * large amount of software (e.g. nymph, LTSP) makes use of NBI files.
+ *
+ * Etherboot does not implement the INT 78 callback interface
+ * described by the NBI specification.  For a callback interface on
+ * x86 architecture, use PXE.
+ *
+ */
+
+/**
+ * An NBI image header
+ *
+ * Note that the length field uses a peculiar encoding; use the
+ * NBI_LENGTH() macro to decode the actual header length.
+ *
+ */
 struct imgheader {
-	unsigned long magic;
+	unsigned long magic;		/**< Magic number (NBI_MAGIC) */
 	union {
-		unsigned char length;
-		unsigned long flags;
+		unsigned char length;	/**< Nibble-coded header length */
+		unsigned long flags;	/**< Image flags */
 	};
-	segoff_t location;
+	segoff_t location;		/**< 16-bit seg:off header location */
 	union {
-		segoff_t segoff;
-		unsigned long linear;
+		segoff_t segoff;	/**< 16-bit seg:off entry point */
+		unsigned long linear;	/**< 32-bit entry point */
 	} execaddr;
 } __attribute__ (( packed ));
 
-/* NBI magic number */
+/** NBI magic number */
 #define NBI_MAGIC 0x1B031336UL
 
 /* Interpretation of the "length" fields */
@@ -31,18 +53,24 @@ struct imgheader {
 #define	NBI_PROGRAM_RETURNS(flags)	( (flags) & ( 1 << 8 ) )
 #define	NBI_LINEAR_EXEC_ADDR(flags)	( (flags) & ( 1 << 31 ) )
 
-/* NBI header length */
+/** NBI header length */
 #define NBI_HEADER_LENGTH	512
 
-/* An NBI segment header */
+/**
+ * An NBI segment header
+ *
+ * Note that the length field uses a peculiar encoding; use the
+ * NBI_LENGTH() macro to decode the actual header length.
+ *
+ */
 struct segheader {
-	unsigned char length;
-	unsigned char vendortag;
+	unsigned char length;		/**< Nibble-coded header length */
+	unsigned char vendortag;	/**< Vendor-defined private tag */
 	unsigned char reserved;
-	unsigned char flags;
-	unsigned long loadaddr;
-	unsigned long imglength;
-	unsigned long memlength;
+	unsigned char flags;		/**< Segment flags */
+	unsigned long loadaddr;		/**< Load address */
+	unsigned long imglength;	/**< Segment length in NBI file */
+	unsigned long memlength;	/**< Segment length in memory */
 };
 
 /* Interpretation of the "flags" fields */
@@ -53,14 +81,24 @@ struct segheader {
 #define NBI_LOADADDR_BEFORE		0x03
 #define NBI_LAST_SEGHEADER(flags)	( (flags) & ( 1 << 2 ) )
 
-/* Info passed to NBI image */
+/** Info passed to NBI image */
 static struct ebinfo loaderinfo = {
 	VERSION_MAJOR, VERSION_MINOR,
 	0
 };
 
-/*
+/**
  * Determine whether or not this is a valid NBI image
+ *
+ * @v start		Address of the image
+ * @v len		Length of the image
+ * @v context		NBI image context
+ * @ret	True		Image is a valid NBI image
+ * @ret	False		Image is not a valid NBI image
+ * @err	EBADIMG		Image is not a valid NBI image
+ * 
+ * "context" is filled in with a context pointer suitable for passing to
+ * nbi_load() and nbi_boot().
  *
  */
 static int nbi_probe ( physaddr_t start, off_t len, void **context ) {
@@ -68,13 +106,16 @@ static int nbi_probe ( physaddr_t start, off_t len, void **context ) {
 
 	if ( (unsigned)len < sizeof ( imgheader ) ) {
 		DBG ( "NBI image too small\n" );
+		errno = EBADIMG;
 		return 0;
 	}
 
 	copy_from_phys ( &imgheader, start, sizeof ( imgheader ) );
 
-	if ( imgheader.magic != NBI_MAGIC )
+	if ( imgheader.magic != NBI_MAGIC ) {
+		errno = EBADIMG;
 		return 0;
+	}
 
 	/* Record image context */
 	DBG ( "NBI found valid image\n" );
@@ -82,8 +123,16 @@ static int nbi_probe ( physaddr_t start, off_t len, void **context ) {
 	return 1;
 }
 
-/*
+/**
  * Prepare a segment for an NBI image
+ *
+ * @v dest		Address of segment
+ * @v imglen		Length of initialised-data portion of the segment
+ * @v memlen		Total length of the segment
+ * @v src		Source for initialised data
+ * @ret True		Segment can be used
+ * @ret False		Segment cannot be used
+ * @err other		As returned by prep_segment()
  *
  */
 static int nbi_prepare_segment ( physaddr_t dest, off_t imglen, off_t memlen,
@@ -93,8 +142,14 @@ static int nbi_prepare_segment ( physaddr_t dest, off_t imglen, off_t memlen,
 	return prep_segment ( dest, dest + imglen, dest + memlen );
 }
 
-/*
+/**
  * Load a segment for an NBI image
+ *
+ * @v dest		Address of segment
+ * @v imglen		Length of initialised-data portion of the segment
+ * @v memlen		Total length of the segment
+ * @v src		Source for initialised data
+ * @ret True		Always
  *
  */
 static int nbi_load_segment ( physaddr_t dest, off_t imglen,
@@ -104,8 +159,17 @@ static int nbi_load_segment ( physaddr_t dest, off_t imglen,
 	return 1;
 }
 
-/*
+/**
  * Process segments of an NBI image
+ *
+ * @v start		Address of the image
+ * @v len		Length of the image
+ * @v imgheader		Image header information
+ * @v process		Function to call for each segment
+ * @ret True		All segments were processed successfully
+ * @ret False		An error occurred processing a segment
+ * @err EBADIMG		Image is not a valid NBI image
+ * @err other		As returned by the "process" function
  *
  */
 static int nbi_process_segments ( physaddr_t start, off_t len,
@@ -136,6 +200,7 @@ static int nbi_process_segments ( physaddr_t start, off_t len,
 		if ( sh.length == 0 ) {
 			/* Avoid infinite loop? */
 			DBG ( "NBI invalid segheader length 0\n" );
+			errno = EBADIMG;
 			return 0;
 		}
 		
@@ -159,8 +224,8 @@ static int nbi_process_segments ( physaddr_t start, off_t len,
 				- sh.loadaddr;
 			break;
 		default:
-			DBG ( "NBI can't count up to three\n" );
-			return 0;
+			/* Cannot be reached */
+			DBG ( "NBI can't count up to three!\n" );
 		}
 
 		/* Process this segment */
@@ -175,6 +240,7 @@ static int nbi_process_segments ( physaddr_t start, off_t len,
 		sh_off += NBI_LENGTH ( sh.length );
 		if ( sh_off >= NBI_HEADER_LENGTH ) {
 			DBG ( "NBI header overflow\n" );
+			errno = EBADIMG;
 			return 0;
 		}
 
@@ -183,22 +249,35 @@ static int nbi_process_segments ( physaddr_t start, off_t len,
 	if ( offset != len ) {
 		DBG ( "NBI length mismatch (file %d, metadata %d)\n",
 		      len, offset );
+		errno = EBADIMG;
 		return 0;
 	}
 
 	return 1;
 }
 
-/*
+/**
  * Load an NBI image into memory
+ *
+ * @v start		Address of image
+ * @v len		Length of image
+ * @v context		NBI context (as returned by nbi_probe())
+ * @ret True		Image loaded into memory
+ * @ret False		Image not loaded into memory
+ * @err EBADIMG		Image is not a valid NBI image
+ * @err other		As returned by nbi_process_segments()
+ * @err other		As returned by nbi_prepare_segment()
+ * @err other		As returned by nbi_load_segment()
  *
  */
 static int nbi_load ( physaddr_t start, off_t len, void *context ) {
 	struct imgheader *imgheader = context;
 
 	/* If we don't have enough data give up */
-	if ( len < NBI_HEADER_LENGTH )
+	if ( len < NBI_HEADER_LENGTH ) {
+		errno = EBADIMG;
 		return 0;
+	}
 	
 	DBG ( "NBI placing header at %hx:%hx\n",
 	      imgheader->location.segment, imgheader->location.offset );
@@ -220,8 +299,13 @@ static int nbi_load ( physaddr_t start, off_t len, void *context ) {
 	return 1;
 }
 
-/*
+/**
  * Boot a 16-bit NBI image
+ *
+ * @v imgheader		Image header information
+ * @ret Never		NBI program booted successfully
+ * @ret False		NBI program returned
+ * @err EIMGRET		NBI program returned
  *
  */
 static int nbi_boot16 ( struct imgheader *imgheader ) {
@@ -256,11 +340,22 @@ static int nbi_boot16 ( struct imgheader *imgheader ) {
 		    CLOBBER ( "eax", "ecx", "edx", "ebp" ) );
 	BASEMEM_PARAMETER_DONE ( bootp_data );
 	
+	errno = EIMGRET;
 	return 0;
 }
 
-/*
+/**
  * Boot a 32-bit NBI image
+ *
+ * @v imgheader		Image header information
+ * @ret False		NBI program should not have returned
+ * @ret other		As returned by NBI program
+ * @err EIMGRET		NBI program should not have returned
+ *
+ * To distinguish between the case of an NBI program returning false,
+ * and an NBI program that should not have returned, check errno.
+ * errno will be set to EIMGRET only if the NBI program should not
+ * have returned.
  *
  */
 static int nbi_boot32 ( struct imgheader *imgheader ) {
@@ -270,6 +365,7 @@ static int nbi_boot32 ( struct imgheader *imgheader ) {
 	      imgheader->execaddr.linear );
 
 	/* no gateA20_unset for PM call */
+	errno = ENOERR;
 	rc = xstart32 ( imgheader->execaddr.linear,
 			virt_to_phys ( &loaderinfo ),
 			( ( imgheader->location.segment << 4 ) +
@@ -278,14 +374,23 @@ static int nbi_boot32 ( struct imgheader *imgheader ) {
 	printf ( "Secondary program returned %d\n", rc );
 	if ( ! NBI_PROGRAM_RETURNS ( imgheader->flags ) ) {
 		/* We shouldn't have returned */
+		errno = EIMGRET;
 		rc = 0;
 	}
 
 	return rc;
 }
 
-/*
+/**
  * Boot a loaded NBI image
+ *
+ * @v context		NBI context (as returned by nbi_probe())
+ * @ret Never		NBI program booted successfully
+ * @ret False		NBI program should not have returned
+ * @ret other		As returned by NBI program
+ * @err EIMGRET		NBI program should not have returned
+ *
+ * See also nbi_boot16() and nbi_boot32().
  *
  */
 static int nbi_boot ( void *context ) {
@@ -298,6 +403,7 @@ static int nbi_boot ( void *context ) {
 	}
 }
 
+/** Declaration of the NBI image format */
 static struct image nbi_image __image = {
 	.name	= "NBI",
 	.probe	= nbi_probe,
