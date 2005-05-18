@@ -1,7 +1,17 @@
 #ifndef COMPILER_H
 #define COMPILER_H
 
-/* We export the symbol obj_OBJECT (OBJECT is defined on command-line)
+/*
+ * Doxygen can't cope with some of the more esoteric areas of C, so we
+ * make its life simpler.
+ *
+ */
+#ifdef DOXYGEN
+#define __attribute__(...)
+#endif
+
+/*
+ * We export the symbol obj_OBJECT (OBJECT is defined on command-line)
  * as a global symbol, so that the linker can drag in selected object
  * files from the library using -u obj_OBJECT.
  *
