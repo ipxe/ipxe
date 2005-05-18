@@ -1,11 +1,9 @@
 #ifndef ERRNO_H
 #define ERRNO_H
 
-/*
- * We define error codes that are a superset of those mentioned in the
- * PXE specification.  Various error string tables may be compiled in
- * if required; if not compiled in, strerror(errno) will produce the
- * text "error 0x<errno>".
+/** @file
+ *
+ * Error codes
  *
  */
 
