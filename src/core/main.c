@@ -31,6 +31,9 @@ Literature dealing with the network protocols:
 #include <lib.h>
 #endif
 
+/* Linker symbols */
+extern char _bss[], _ebss[];
+
 jmp_buf	restart_etherboot;
 int	url_port;		
 
@@ -199,7 +202,7 @@ int main ( void ) {
 		/* Probe boot device */
 		if ( ! probe ( &dev ) ) {
 			/* Device found on bus, but probe failed */
-			printf ( "...probe failed\n" );
+			printf ( "...probe failed: %m\n" );
 			continue;
 		}
 
@@ -212,14 +215,14 @@ int main ( void ) {
 		/* Configure boot device */
 		if ( ! configure ( &dev ) ) {
 			/* Configuration (e.g. DHCP) failed */
-			printf ( "...configuration failed\n" );
+			printf ( "...configuration failed: %m\n" );
 			continue;
 		}
 
 		/* Load boot file from the device */
 		if ( ! autoload ( &dev, &image, &image_context ) ) {
 			/* Load (e.g. TFTP) failed */
-			printf ( "...load failed\n" );
+			printf ( "...load failed: %m\n" );
 			continue;
 		}
 
@@ -233,7 +236,7 @@ int main ( void ) {
 		/* Boot the image */
 		if ( ! image->boot ( image_context ) ) {
 			/* Boot failed */
-			printf ( "...boot failed\n" );
+			printf ( "...boot failed: %m\n" );
 			continue;
 		}
 		
