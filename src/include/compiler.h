@@ -7,7 +7,7 @@
  *
  */
 #ifdef DOXYGEN
-#define __attribute__(...)
+#define __attribute__(x)
 #endif
 
 /*
