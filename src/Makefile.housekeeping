@@ -422,6 +422,28 @@ $(BIN)/%.rebuild :
 	rm -f $(BIN)/$*
 	$(MAKE) $(MAKEFLAGS) $(BIN)/$*
 
+# Documentation
+#
+$(BIN)/doxygen.cfg : doxygen.cfg $(MAKEDEPS)
+	$(PERL) -pe 's{\@SRCDIRS\@}{$(SRCDIRS)}; s{\@BIN\@}{$(BIN)};' $< > $@
+
+$(BIN)/doc : $(BIN)/doxygen.cfg
+	$(DOXYGEN) $<
+
+.PHONY : $(BIN)/doc
+
+VERYCLEANUP	+= $(BIN)/doc
+
+doc : $(BIN)/doc
+
+docview :
+	@[ -f $(BIN)/doc/html/index.html ] || $(MAKE) $(BIN)/doc
+	@if [ -n "$$BROWSER" ] ; then \
+		( $$BROWSER $(BIN)/doc/html/index.html & ) ; \
+	else \
+		echo "Documentation index in $(BIN)/doc/html/index.html" ; \
+	fi
+
 # Clean-up
 #
 clean :
