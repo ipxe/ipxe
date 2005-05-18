@@ -79,6 +79,7 @@ MKCONFIG	?= $(PERL) ./util/mkconfig.pl
 SYMCHECK	?= $(PERL) ./util/symcheck.pl
 SORTOBJDUMP	?= $(PERL) ./util/sortobjdump.pl
 NRV2B		?= ./util/nrv2b
+DOXYGEN		?= doxygen
 
 # Location to place generated files
 #
@@ -130,7 +131,7 @@ DEBUG_TARGETS	+= dbg2.o dbg.o c s
 #
 SRCDIRS		+= core
 SRCDIRS		+= proto
-SRCDIRS		+= image
+#SRCDIRS		+= image
 SRCDIRS		+= drivers/bus
 SRCDIRS		+= drivers/net
 #SRCDIRS		+= drivers/disk 
