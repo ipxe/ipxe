@@ -118,7 +118,12 @@
  *
  */
 
-#define ENOMEM	PXENV_STATUS_OUT_OF_RESOURCES
+#define ENOERR		0x00
+#define ENOMEM		PXENV_STATUS_OUT_OF_RESOURCES
+#define	EBADIMG		0xd0
+#define EIMGRET		0xd1
+#define ETIMEDOUT	0xd2
+#define EINVAL		0xd3
 
 /* Data structures and declarations */
 
