@@ -425,7 +425,10 @@ $(BIN)/%.rebuild :
 # Documentation
 #
 $(BIN)/doxygen.cfg : doxygen.cfg $(MAKEDEPS)
-	$(PERL) -pe 's{\@SRCDIRS\@}{$(SRCDIRS)}; s{\@BIN\@}{$(BIN)};' $< > $@
+	$(PERL) -pe 's{\@SRCDIRS\@}{$(SRCDIRS)}; ' \
+		-e  's{\@BIN\@}{$(BIN)}; ' \
+		-e  's{\@ARCH\@}{$(ARCH)}; ' \
+		$< > $@
 
 $(BIN)/doc : $(BIN)/doxygen.cfg
 	$(DOXYGEN) $<
