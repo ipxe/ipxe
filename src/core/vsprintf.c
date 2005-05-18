@@ -26,6 +26,7 @@ PRINTF and friends
 		%d	- decimal int
 		%c	- char
 		%s	- string
+		%m	- string representation of the most recent error
 		%@	- Internet address in ddd.ddd.ddd.ddd notation
 		%!	- Ethernet address in xx:xx:xx:xx:xx:xx notation
 	Note: width specification ignored
