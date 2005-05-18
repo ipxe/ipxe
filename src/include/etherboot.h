@@ -1,6 +1,26 @@
 #ifndef ETHERBOOT_H
 #define ETHERBOOT_H
 
+/*
+ * Standard includes that we always want
+ *
+ */
+
+#include "compiler.h"
+#include "stddef.h"
+#include "stdint.h"
+
+
+/*
+ * IMPORTANT!!!!!!!!!!!!!!
+ *
+ * Everything below this point is cruft left over from older versions
+ * of Etherboot.  Do not add *anything* below this point.  Things are
+ * gradually being moved to individual header files.
+ *
+ */
+
+
 #include <stdarg.h>
 #include "osdep.h"
 
@@ -205,9 +225,6 @@ extern long rfc2131_sleep_interval P((long base, int exp));
 extern long rfc1112_sleep_interval P((long base, int exp));
 extern void cleanup P((void));
 
-/* config.c */
-extern void print_config(void);
-
 /* osloader.c */
 /* Be careful with sector_t it is an unsigned long long on x86 */
 typedef uint64_t sector_t;
@@ -271,15 +288,6 @@ extern int elf_start(unsigned long machine, unsigned long entry, unsigned long p
 extern unsigned long currticks P((void));
 extern void exit P((int status));
 
-/* serial.c */
-extern int serial_getc P((void));
-extern void serial_putc P((int));
-extern int serial_ischar P((void));
-extern int serial_init P((void));
-extern void serial_fini P((void));
-
-/* floppy.c */
-extern int bootdisk P((int dev,int part));
 
 /***************************************************************************
 External variables
@@ -308,14 +316,6 @@ extern int freebsd_howto;
 #define FREEBSD_KERNEL_ENV_SIZE 256
 extern char freebsd_kernel_env[FREEBSD_KERNEL_ENV_SIZE];
 #endif
-
-/* bootmenu.c */
-
-/* osloader.c */
-
-/* created by linker */
-extern char _virt_start[], _text[], _etext[], _text16[], _etext16[];
-extern char _data[], _edata[], _bss[], _ebss[], _end[];
 
 
 /*
