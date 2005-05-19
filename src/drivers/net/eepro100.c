@@ -110,13 +110,6 @@
 
 static int ioaddr;
 
-typedef unsigned char  u8;
-typedef   signed char  s8;
-typedef unsigned short u16;
-typedef   signed short s16;
-typedef unsigned int   u32;
-typedef   signed int   s32;
-
 enum speedo_offsets {
   SCBStatus = 0, SCBCmd = 2,      /* Rx/Command Unit command and status. */
   SCBPointer = 4,                 /* General purpose pointer. */

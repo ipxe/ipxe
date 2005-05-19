@@ -74,6 +74,9 @@ void print_config ( void ) {
 #ifdef DOWNLOAD_PROTO_TFTP
 		"TFTP "
 #endif
+#ifdef  DOWNLOAD_PROTO_FSP
+		"FSP "
+#endif				
 #ifdef  DOWNLOAD_PROTO_NFS
 		"NFS "
 #endif

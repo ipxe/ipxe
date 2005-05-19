@@ -100,10 +100,7 @@ typedef struct {					// 0x00130000U
 
 typedef union {						// 0x00140000U
 	struct {	// write
-		volatile unsigned int TX1;		// 0x00000000U
-		volatile unsigned int TX2;		// 0x00000004U
-		volatile unsigned int TX3;		// 0x00000008U
-		volatile unsigned int TX4;		// 0x0000000CU
+		volatile unsigned int TX[4];		// 0x00000000-0x000CU
 		volatile unsigned int Baudrate;		// 0x00000010U
 		volatile unsigned int reserved1[0x3];
 		volatile unsigned int Config;		// 0x00000020U
@@ -113,10 +110,7 @@ typedef union {						// 0x00140000U
 	} w;		// write
 	
 	struct {	// read
-		volatile unsigned int RX1;		// 0x00000000U
-		volatile unsigned int RX2;		// 0x00000004U
-		volatile unsigned int RX3;		// 0x00000008U
-		volatile unsigned int RX4;		// 0x0000000CU
+		volatile unsigned int RX[4];		// 0x00000000-0x000CU
 		volatile unsigned int reserved1[0x4];
 		volatile unsigned int PRE_STATUS;	// 0x00000020U
 		volatile unsigned int STATUS;		// 0x00000024U
@@ -168,11 +162,8 @@ typedef struct {				// 0x0018_000U _=0,1,2,3
 	volatile unsigned int TMAC_DMA_DATA;	// 0x00000FF8U
 	volatile unsigned int TMAC_DMA_ADR;	// 0x00000FFCU
 } *P2001_ETH_regs_ptr;
-#define P2001_EU0 ((volatile P2001_ETH_regs_ptr) 0x00180000)
-#define P2001_EU1 ((volatile P2001_ETH_regs_ptr) 0x00181000)
-#define P2001_EU2 ((volatile P2001_ETH_regs_ptr) 0x00182000)
-#define P2001_EU3 ((volatile P2001_ETH_regs_ptr) 0x00183000)
-#define P2001_MU  P2001_EU0
+#define P2001_EU(x) ((volatile P2001_ETH_regs_ptr) ((unsigned int) 0x00180000UL+(0x1000UL*(x)))) /* x = 0..3 */
+#define P2001_MU  P2001_EU(0)
 
 #endif
 

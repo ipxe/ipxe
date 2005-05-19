@@ -17,6 +17,12 @@ CFLAGS+= -DRAWADDR=0x40100000
 # NIC Debug Outputs
 #CFLAGS+= -DDEBUG_NIC
 
+# Reduced Media Independent Interface
+# MAZBR LPEC2001: MII	(Intel LXT971ALE at 0..1)
+# Elmeg D@VOS   : RMII	(Altima AC104-QF at 4..7)
+# Telekom XI521 : RMII	(Altima AC104-QF at 4..7)
+#CFLAGS+= -DRMII
+
 # Fixed MAC address
 # p2001_eth has no flash and fixed mac address
 #CFLAGS+=	-DMAC_HW_ADDR_DRV="'H','Y','L','N','X','1'"

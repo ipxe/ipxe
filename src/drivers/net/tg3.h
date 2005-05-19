@@ -2156,7 +2156,7 @@ struct tg3 {
 	((X) == PHY_ID_BCM5400 || (X) == PHY_ID_BCM5401 || \
 	 (X) == PHY_ID_BCM5411 || (X) == PHY_ID_BCM5701 || \
 	 (X) == PHY_ID_BCM5703 || (X) == PHY_ID_BCM5704 || \
-	 (X) == PHY_ID_BCM5705 || (X) == PHY_ID_BCM5751 || \
+	 (X) == PHY_ID_BCM5705 || (X) == PHY_ID_BCM5750 || (X) == PHY_ID_BCM5751 || \
 	 (X) == PHY_ID_BCM8002 || (X) == PHY_ID_SERDES)
 
 	unsigned long			regs;

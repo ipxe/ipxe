@@ -48,6 +48,8 @@
 /*********************************************************************/
 
 /*
+  08 Feb 2005  Ramesh Chander chhabaramesh at yahoo.co.in added table entries
+               for SGThomson STE10/100A
   07 Sep 2003  timlegge	Multicast Support Added
   11 Apr 2001  mdc     [patch to etherboot 4.7.24]
      Major rewrite to include Linux tulip driver media detection
@@ -118,13 +120,6 @@ static int tulip_debug = 2;             /* 1 normal messages, 0 quiet .. 7 verbo
 
 #define TX_TIME_OUT       2*TICKS_PER_SEC
 
-typedef uint8_t    u8;
-typedef  int8_t    s8;
-typedef uint16_t   u16;
-typedef  int16_t   s16;
-typedef uint32_t   u32;
-typedef  int32_t   s32;
-
 /* helpful macros if on a big_endian machine for changing byte order.
    not strictly needed on Intel */
 #define get_unaligned(ptr) (*(ptr))
@@ -157,7 +152,7 @@ static const char * const medianame[32] = {
 enum tulip_chips {
     DC21040=0, DC21041=1, DC21140=2, DC21142=3, DC21143=3,
     LC82C168, MX98713, MX98715, MX98725, AX88141, AX88140, PNIC2, COMET,
-    COMPEX9881, I21145, XIRCOM
+    COMPEX9881, I21145, XIRCOM, SGThomson,	/*Ramesh Chander*/
 };
 
 enum pci_id_flags_bits {
@@ -233,6 +228,8 @@ static const struct pci_id_info pci_id_tbl[] = {
       TULIP_IOTYPE, 256, MX98715 },
     { "3Com 3cSOHO100B-TX (ADMtek Centuar)", { 0x930010b7, 0xffffffff, 0, 0, 0, 0 },
       TULIP_IOTYPE, TULIP_SIZE, COMET },
+    { "SG Thomson STE10/100A", { 0x2774104a, 0xffffffff, 0, 0, 0, 0 },
+      TULIP_IOTYPE, 256, COMET },	/*Ramesh Chander*/
     { 0, { 0, 0, 0, 0, 0, 0 }, 0, 0, 0 },
 };
 
@@ -268,6 +265,7 @@ static struct tulip_chip_table {
       | HAS_PWRDWN | HAS_NWAY },
     { "Xircom tulip work-alike", HAS_MII | HAS_MEDIA_TABLE | ALWAYS_CHECK_MII 
       | HAS_PWRDWN | HAS_NWAY },
+    { "SGThomson STE10/100A", HAS_MII | MC_HASH_ONLY },	/*Ramesh Chander*/   
     { 0, 0 },
 };
 
@@ -2068,7 +2066,7 @@ PCI_ROM(0x125b, 0x1400, "ax88140",     "ASIX AX88140"),
 PCI_ROM(0x11f6, 0x9881, "rl100tx",     "Compex RL100-TX"),
 PCI_ROM(0x115d, 0x0003, "xircomtulip", "Xircom Tulip"),
 PCI_ROM(0x104a, 0x0981, "tulip-0981",  "Tulip 0x104a 0x0981"),
-PCI_ROM(0x104a, 0x2774, "tulip-2774",  "Tulip 0x104a 0x2774"),
+PCI_ROM(0x104a, 0x2774, "SGThomson-STE10100A", "Tulip 0x104a 0x2774"),	/*Modified by Ramesh Chander*/
 PCI_ROM(0x1113, 0x9511, "tulip-9511",  "Tulip 0x1113 0x9511"),
 PCI_ROM(0x1186, 0x1561, "tulip-1561",  "Tulip 0x1186 0x1561"),
 PCI_ROM(0x1259, 0xa120, "tulip-a120",  "Tulip 0x1259 0xa120"),

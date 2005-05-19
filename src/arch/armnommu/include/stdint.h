@@ -20,4 +20,16 @@ typedef signed short       int16_t;
 typedef signed int         int32_t;
 typedef signed long long   int64_t;
 
+typedef signed char        s8;
+typedef unsigned char      u8;
+
+typedef signed short       s16;
+typedef unsigned short     u16;
+
+typedef signed long        s32;
+typedef unsigned int       u32;
+
+typedef signed long long   s64;
+typedef unsigned long long u64;
+
 #endif /* STDINT_H */

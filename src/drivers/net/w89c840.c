@@ -84,13 +84,6 @@
 
 static const char *w89c840_version = "driver Version 0.94 - December 12, 2003";
 
-typedef unsigned char  u8;
-typedef   signed char  s8;
-typedef unsigned short u16;
-typedef   signed short s16;
-typedef unsigned int   u32;
-typedef   signed int   s32;
-
 /* Linux support functions */
 #define virt_to_le32desc(addr)  virt_to_bus(addr)
 #define le32desc_to_virt(addr)  bus_to_virt(addr)

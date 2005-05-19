@@ -34,22 +34,10 @@
 * Indent Style: indent -kr -i8
 ***************************************************************************/
 
-/*
-#include <asm/io.h>
-#include <asm/types.h>
-#include <linux/netdevice.h>
-*/
-
-typedef unsigned char u8;
-typedef signed char s8;
-typedef unsigned short u16;
-typedef signed short s16;
-typedef unsigned int u32;
-typedef signed int s32;
-	/*****************************************************************
-	 * TLan Definitions
-	 *
-	 ****************************************************************/
+/*****************************************************************
+* TLan Definitions
+*
+****************************************************************/
 
 #define FALSE			0
 #define TRUE			1

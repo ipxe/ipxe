@@ -61,10 +61,6 @@ static void t3c515_wait(unsigned int nticks)
 
 /* TJL definations */
 #define HZ      100
-#define u16 unsigned short
-#define u32 unsigned long
-#define s16 signed short
-#define s32 signed long
 static int if_port;
 static struct corkscrew_private *vp;
 /* Brought directly from 3c515.c by Becker */

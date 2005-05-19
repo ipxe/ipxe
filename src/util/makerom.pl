@@ -157,7 +157,7 @@ sub makerom () {
 	# If PXE image, just fill the length field and write it out
 	if ($opts{'x'}) {
 		substr($rom, 2, 1) = chr((length($rom) + 511) / 512);
-		&writerom($ARGV[0], \$rom);
+		writerom($ARGV[0], \$rom);
 		return;
 	}
 	# Size specified with -s overrides value in 3rd byte in image
@@ -168,7 +168,7 @@ sub makerom () {
 			$romsize = ($filesize + 511) & ~511
 		}
 	} else {
-		$romsize = &getromsize(\$rom);
+		$romsize = getromsize(\$rom);
 		# 0 put there by *loader.S means makerom should pick the size
 		if ($romsize == 0) {
 			# Shrink romsize down to the smallest power of two that will do
@@ -190,14 +190,16 @@ sub makerom () {
 	}
 	substr($rom, 2, 1) = chr(($romsize / 512) % 256);
 	print "ROM size is $romsize\n" if $opts{'v'};
-	my $identoffset = &addident(\$rom);
-	&pcipnpheaders(\$rom, $identoffset);
-	&undiheaders(\$rom);
+	# set the product string only if we don't have one yet
+	my $pnp_hdr_offset = unpack('v', substr($rom, PNP_PTR_LOC, 2));
+	my $identoffset = substr($rom, $pnp_hdr_offset+PNP_DEVICE_OFF, 2) eq "\0\0" ? addident(\$rom) : undef;
+	pcipnpheaders(\$rom, $identoffset);
+	undiheaders(\$rom);
 	# 3c503 requires last two bytes to be 0x80
 	substr($rom, MINROMSIZE-2, 2) = "\x80\x80"
 		if ($opts{'3'} and $romsize == MINROMSIZE);
-	&checksum(\$rom);
-	&writerom($ARGV[0], \$rom);
+	checksum(\$rom);
+	writerom($ARGV[0], \$rom);
 }
 
 sub modrom () {
@@ -211,16 +213,16 @@ sub modrom () {
 	close(R);
 	defined($filesize) and $filesize >= 3 or die "Cannot get first 3 bytes of file\n";
 	print "$filesize bytes read\n" if $opts{'v'};
-	&pcipnpheaders(\$rom);
-	&undiheaders(\$rom);
-	&checksum(\$rom);
-	&writerom($ARGV[0], \$rom);
+	pcipnpheaders(\$rom, undef);
+	undiheaders(\$rom);
+	checksum(\$rom);
+	writerom($ARGV[0], \$rom);
 }
 
 # Main routine. See how we were called and behave accordingly
 if ($0 =~ m:modrom(\.pl)?$:) {
-	&modrom();
+	modrom();
 } else {
-	&makerom();
+	makerom();
 }
 exit(0);

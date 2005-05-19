@@ -52,13 +52,6 @@
 #define drv_version "v1.6"
 #define drv_date "03-27-2004"
 
-typedef unsigned char u8;
-typedef signed char s8;
-typedef unsigned short u16;
-typedef signed short s16;
-typedef unsigned int u32;
-typedef signed int s32;
-
 #define HZ 1000
 
 static u32 ioaddr;

@@ -51,13 +51,6 @@
 #define dprintf(x)
 #endif
 
-typedef unsigned char u8;
-typedef signed char s8;
-typedef unsigned short u16;
-typedef signed short s16;
-typedef unsigned int u32;
-typedef signed int s32;
-
 /* Condensed operations for readability. */
 #define virt_to_le32desc(addr)  cpu_to_le32(virt_to_bus(addr))
 #define le32desc_to_virt(addr)  bus_to_virt(le32_to_cpu(addr))

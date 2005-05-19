@@ -50,13 +50,6 @@
 
 #define TX_TIME_OUT       2*TICKS_PER_SEC
 
-typedef unsigned char  u8;
-typedef   signed char  s8;
-typedef unsigned short u16;
-typedef   signed short s16;
-typedef unsigned int   u32;
-typedef   signed int   s32;
-
 /* Register offsets for davicom device */
 enum davicom_offsets {
    CSR0=0,     CSR1=0x08,  CSR2=0x10,  CSR3=0x18,  CSR4=0x20,  CSR5=0x28,

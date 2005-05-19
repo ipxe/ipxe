@@ -1,10 +1,10 @@
 /**************************************************************************
-Etherboot -  BOOTP/TFTP Bootstrap Program
-P2001 NIC driver for Etherboot
-***************************************************************************/
+ * Etherboot -  BOOTP/TFTP Bootstrap Program
+ * P2001 NIC driver for Etherboot
+ **************************************************************************/
 
 /*
- *  Copyright (C) 2004 Tobias Lorenz
+ *  Copyright (C) 2005 Tobias Lorenz
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -19,7 +19,7 @@ P2001 NIC driver for Etherboot
 #include "isa.h"
 
 #include "hardware.h"
-#include "lxt971a.h"
+#include "mii.h"
 #include "timer.h"
 
 
@@ -31,25 +31,20 @@ static unsigned char MAC_HW_ADDR[6]={MAC_HW_ADDR_DRV};
 #define DMA_BUF_SIZE	2048	/* Buffer size */
 static DMA_DSC txd              __attribute__ ((__section__(".dma.desc")));
 static DMA_DSC rxd[NUM_RX_DESC] __attribute__ ((__section__(".dma.desc")));
-static unsigned char rxb[NUM_RX_DESC * DMA_BUF_SIZE] __attribute__ ((__section__(".dma.buffer")));
-static unsigned char txb[              DMA_BUF_SIZE] __attribute__ ((__section__(".dma.buffer")));
+static char rxb[NUM_RX_DESC * DMA_BUF_SIZE] __attribute__ ((__section__(".dma.buffer")));
+static char txb[              DMA_BUF_SIZE] __attribute__ ((__section__(".dma.buffer")));
 static unsigned int cur_rx;
 
 /* Device selectors */
 static unsigned int cur_channel;	// DMA channel    : 0..3
 static unsigned int cur_phy;		// PHY Address    : 0..31
 static P2001_ETH_regs_ptr EU;		// Ethernet Unit  : 0x0018_000 with _=0..3
-static P2001_ETH_regs_ptr MU;		// Management Unit: 0x00180000
 
-#define MDIO_MAXCOUNT 1000			/* mdio abort */
-static unsigned int mdio_error;			/* mdio error */
+/* mdio handling */
+static int          p2001_eth_mdio_read (int phy_id, int location);
+static void         p2001_eth_mdio_write(int phy_id, int location, int val);
 
-/* Function prototypes */
-static void         p2001_eth_mdio_init ();
-static void         p2001_eth_mdio_write(unsigned int phyadr, unsigned int regadr, unsigned int data);
-static unsigned int p2001_eth_mdio_read (unsigned int phyadr, unsigned int regadr);
-extern unsigned int p2001_eth_mdio_error;
-
+/* net_device functions */
 static int          p2001_eth_poll      (struct nic *nic, int retrieve);
 static void         p2001_eth_transmit  (struct nic *nic, const char *d,
 					unsigned int t, unsigned int s, const char *p);
@@ -60,103 +55,107 @@ static void         p2001_eth_init      ();
 static void         p2001_eth_disable   (struct dev *dev);
 
 static int          p2001_eth_check_link(unsigned int phy);
+static int          link;
+static void         p2001_eth_phyreset  ();
 static int          p2001_eth_probe     (struct dev *dev, unsigned short *probe_addrs __unused);
+
+/* Supported MII list */
+static struct mii_chip_info {
+	const char * name;
+	unsigned int physid;	// (MII_PHYSID2 << 16) | MII_PHYSID1
+} mii_chip_table[] = {
+	{ "Intel LXT971A",	0x78e20013 },
+	{ "Altima AC104-QF",	0x55410022 },
+	{NULL,0},
+};
+
 
 
 /**************************************************************************
-PHY MANAGEMENT UNIT - Read/write
-***************************************************************************/
-static void p2001_eth_mdio_init()
+ * PHY MANAGEMENT UNIT - Read/write
+ **************************************************************************/
+
+/**
+ *	mdio_read - read MII PHY register
+ *	@dev: the net device to read
+ *	@regadr: the phy register id to read
+ *
+ *	Read MII registers through MDIO and MDC
+ *	using MDIO management frame structure and protocol(defined by ISO/IEC).
+ */
+static int p2001_eth_mdio_read(int phy_id, int location)
 {
-	/* reset ethernet PHYs */
-	printf("Resetting PHYs...\n");
-
-	/* GPIO24/25: TX_ER2/TX_ER0 */
-	/* GPIO26/27: PHY_RESET/TX_ER1 */
-	P2001_GPIO->PIN_MUX |= 0x0018;
-	// 31-16: 0000 1111 0000 0000
-	P2001_GPIO->GPIO2_En |= 0x0400;
-
-	P2001_GPIO->GPIO2_Out |= 0x04000000;
-	P2001_GPIO->GPIO2_Out &= ~0x0400;
-	mdelay(500);
-	P2001_GPIO->GPIO2_Out |= 0x0400;
-
-	/* set management unit clock divisor */
-	// max. MDIO CLK = 2.048 MHz (EU.doc)
-	// max. MDIO CLK = 8.000 MHz (LXT971A)
-	// sysclk/(2*(n+1)) = MDIO CLK <= 2.048 MHz
-	// n >= sysclk/4.096 MHz - 1
-#if SYSCLK == 73728000
-	P2001_MU->MU_DIV = 17;	// 73.728 MHZ =17=> 2.020 MHz
-#else
-	//MU->MU_DIV = (SYSCLK/4.096)-1;
-#error "Please define a proper MDIO CLK divisor for that sysclk."
-#endif
-	asm("nop \n nop");
-}
-
-static void p2001_eth_mdio_write(unsigned int phyadr, unsigned int regadr, unsigned int data)
-{
-	static unsigned int count;
-	count = 0;
-
-	/* Warten bis Hardware inaktiv (MIU = "0") */
-	while ((MU->MU_CNTL & 0x8000) && (count < MDIO_MAXCOUNT))
-		count++;
-
-	/* Schreiben MU_DATA */
-	MU->MU_DATA = data;
-
-	/* Schreiben MU_CNTL */
-	MU->MU_CNTL = regadr + (phyadr<<5) + (1<<10);
-
-	/* Warten bis Hardware aktiv (MIU = "1") */
-	while (((MU->MU_CNTL & 0x8000) == 0) && (count < MDIO_MAXCOUNT))
-		count++;
-	//asm("nop \r\n nop");
-
-	/* Warten bis Hardware inaktiv (MIU = "0") */
-	while ((MU->MU_CNTL & 0x8000) && (count < MDIO_MAXCOUNT))
-		count++;
-
-	mdio_error = (count >= MDIO_MAXCOUNT);
-}
-
-static unsigned int p2001_eth_mdio_read(unsigned int phyadr, unsigned int regadr)
-{
-	static unsigned int count;
-	count = 0;
+	int result, boguscnt = 1000;
 
 	do {
 		/* Warten bis Hardware inaktiv (MIU = "0") */
-		while ((MU->MU_CNTL & 0x8000) && (count < MDIO_MAXCOUNT))
-			count++;
+		while (P2001_MU->MU_CNTL & 0x8000)
+			barrier();
 
 		/* Schreiben MU_CNTL */
-		MU->MU_CNTL = regadr + (phyadr<<5) + (2<<10);
+		P2001_MU->MU_CNTL = location + (phy_id<<5) + (2<<10);
 
 		/* Warten bis Hardware aktiv (MIU = "1") */
-		while (((MU->MU_CNTL & 0x8000) == 0) && (count < MDIO_MAXCOUNT))
-			count++;
+		while ((P2001_MU->MU_CNTL & 0x8000) == 0)
+			barrier();
 		//asm("nop \r\n nop");
 
 		/* Warten bis Hardware inaktiv (MIU = "0") */
-		while ((MU->MU_CNTL & 0x8000) && (count < MDIO_MAXCOUNT))
-			count++;
+		while (P2001_MU->MU_CNTL & 0x8000)
+			barrier();
 
 		/* Fehler, wenn MDIO Read Error (MRE = "1") */
-	} while ((MU->MU_CNTL & 0x4000) && (count < MDIO_MAXCOUNT));
+	} while ((P2001_MU->MU_CNTL & 0x4000) && (--boguscnt > 0));
 
 	/* Lesen MU_DATA */
-	mdio_error = (count >= MDIO_MAXCOUNT);
-	return MU->MU_DATA;
+	result = P2001_MU->MU_DATA;
+
+	if (boguscnt == 0)
+		return 0;
+	if ((result & 0xffff) == 0xffff)
+		return 0;
+
+	return result & 0xffff;
 }
 
 
+/**
+ *	mdio_write - write MII PHY register
+ *	@dev: the net device to write
+ *	@regadr: the phy register id to write
+ *	@value: the register value to write with
+ *
+ *	Write MII registers with @value through MDIO and MDC
+ *	using MDIO management frame structure and protocol(defined by ISO/IEC)
+ */
+static void p2001_eth_mdio_write(int phy_id, int location, int val)
+{
+	/* Warten bis Hardware inaktiv (MIU = "0") */
+	while (P2001_MU->MU_CNTL & 0x8000)
+		barrier();
+
+	/* Schreiben MU_DATA */
+	P2001_MU->MU_DATA = val;
+
+	/* Schreiben MU_CNTL */
+	P2001_MU->MU_CNTL = location + (phy_id<<5) + (1<<10);
+
+	/* Warten bis Hardware aktiv (MIU = "1") */
+	while ((P2001_MU->MU_CNTL & 0x8000) == 0)
+		barrier();
+	//asm("nop \r\n nop");
+
+	/* Warten bis Hardware inaktiv (MIU = "0") */
+	while (P2001_MU->MU_CNTL & 0x8000)
+		barrier();
+}
+
+
+
 /**************************************************************************
-POLL - Wait for a frame
-***************************************************************************/
+ * POLL - Wait for a frame
+ **************************************************************************/
+
 /* Function: p2001_eth_poll
  *
  * Description: checks for a received packet and returns it if found.
@@ -231,9 +230,11 @@ static int p2001_eth_poll(struct nic *nic, int retrieve)
 }
 
 
+
 /**************************************************************************
-TRANSMIT - Transmit a frame
-***************************************************************************/
+ * TRANSMIT - Transmit a frame
+ **************************************************************************/
+
 /* Function: p2001_eth_transmit
  *
  * Description: transmits a packet and waits for completion or timeout.
@@ -271,7 +272,7 @@ static void p2001_eth_transmit(
 	// TMAC_CNTL.ATP does the same
 
 #ifdef DEBUG_NIC
-	printf("p2001_eth_transmit: packet from %! to %! sent\n", txb+ETH_ALEN, txb);
+	printf("p2001_eth_transmit: packet from %! to %! sent (size: %d)\n", txb+ETH_ALEN, txb, s);
 #endif
 
 	/* configure descriptor */
@@ -281,12 +282,12 @@ static void p2001_eth_transmit(
 
 	/* restart the transmitter */
 	EU->TMAC_DMA_EN = 0x01;		/* set run bit */
-	while(EU->TMAC_DMA_EN & 0x01) ;	/* wait */
+	while(EU->TMAC_DMA_EN & 0x01);	/* wait */
 
 #ifdef DEBUG_NIC
 	/* check status */
 	status = EU->TMAC_DMA_STAT;
-	if (status & ~(0x40))
+	if (status & ~(0x40))	// not END
 		printf("p2001_eth_transmit: dma status=0x%hx\n", status);
 
 	printf("TMAC_MIB6..7: %d:%d\n", EU->TMAC_MIB6, EU->TMAC_MIB7);
@@ -294,9 +295,11 @@ static void p2001_eth_transmit(
 }
 
 
+
 /**************************************************************************
-IRQ - Enable, Disable or Force Interrupts
-***************************************************************************/
+ * IRQ - Enable, Disable or Force Interrupts
+ **************************************************************************/
+
 /* Function: p2001_eth_irq
  *
  * Description: Enable, Disable, or Force, interrupts
@@ -321,9 +324,11 @@ p2001_eth_irq(struct nic *nic __unused, irq_action_t action __unused)
 }
 
 
+
 /**************************************************************************
-INIT - Initialize device
-***************************************************************************/
+ * INIT - Initialize device
+ **************************************************************************/
+
 /* Function: p2001_init
  *
  * Description: resets the ethernet controller chip and various
@@ -334,6 +339,23 @@ INIT - Initialize device
 static void p2001_eth_init()
 {
 	static int i;
+
+	/* activate MII 3 */
+	if (cur_channel == 3)
+		P2001_GPIO->PIN_MUX |= (1<<8);	// MII_3_en = 1
+
+#ifdef RMII
+	/* RMII init sequence */
+	if (link & LPA_100) {
+		EU->CONF_RMII = (1<<2) | (1<<1);		// softres | 100Mbit
+		EU->CONF_RMII = (1<<2) | (1<<1) | (1<<0);	// softres | 100Mbit | RMII
+		EU->CONF_RMII = (1<<1) | (1<<0);		// 100 Mbit | RMII
+	} else {
+		EU->CONF_RMII = (1<<2);				// softres
+		EU->CONF_RMII = (1<<2) | (1<<0);		// softres | RMII
+		EU->CONF_RMII = (1<<0);				// RMII
+	}
+#endif
 
 	/* disable transceiver */
 //	EU->TMAC_DMA_EN = 0;		/* clear run bit */
@@ -353,7 +375,7 @@ static void p2001_eth_init()
 //	txd.stat = (1<<31) | (1<<30) | (1<<29);			// DSC0 OWN|START|END
 //	txd.cntl = cur_channel << 16;				// DSC1 CHANNEL
 //	txd.cntl |= DMA_BUF_SIZE;				// DSC1 LEN
-	txd.buf = &txb;						// DSC2 BUFFER
+	txd.buf = (char *)&txb;					// DSC2 BUFFER
 	txd.next = &txd;					// DSC3 NEXTDSC @self
 	EU->TMAC_DMA_DESC = &txd;
 
@@ -371,9 +393,12 @@ static void p2001_eth_init()
 	EU->RMAC_DMA_DESC = &rxd[0];
 
 	/* set transmitter mode */
-	EU->TMAC_CNTL = (1<<4) |	/* COI: Collision ignore */
-			//(1<<3) |	/* CSI: Carrier Sense ignore */
-			(1<<2);		/* ATP: Automatic Transmit Padding */
+	if (link & LPA_DUPLEX)
+		EU->TMAC_CNTL =	(1<<4) |	/* COI: Collision ignore */
+				(1<<3) |	/* CSI: Carrier Sense ignore */
+				(1<<2);		/* ATP: Automatic Transmit Padding */
+	else
+		EU->TMAC_CNTL =	(1<<2);		/* ATP: Automatic Transmit Padding */
 
 	/* set receive mode */
 	EU->RMAC_CNTL = (1<<3) |	/* BROAD: Broadcast packets */
@@ -384,9 +409,10 @@ static void p2001_eth_init()
 }
 
 
+
 /**************************************************************************
-DISABLE - Turn off ethernet interface
-***************************************************************************/
+ * DISABLE - Turn off ethernet interface
+ **************************************************************************/
 static void p2001_eth_disable(struct dev *dev __unused)
 {
 	/* put the card in its initial state */
@@ -408,40 +434,52 @@ static void p2001_eth_disable(struct dev *dev __unused)
 }
 
 
+
 /**************************************************************************
-LINK - Check for valid link
-***************************************************************************/
+ * LINK - Check for valid link
+ **************************************************************************/
 static int p2001_eth_check_link(unsigned int phy)
 {
 	static int status;
-	static unsigned int count;
-	count = 0;
+	static unsigned int i, physid;
+
+	/* print some information about out PHY */
+	physid = (p2001_eth_mdio_read(phy, MII_PHYSID2) << 16) |
+		  p2001_eth_mdio_read(phy, MII_PHYSID1);
+	printf("PHY %d, ID 0x%x ", phy, physid);
+	for (i = 0; mii_chip_table[i].physid; i++)
+		if (mii_chip_table[i].physid == physid) {
+			printf("(%s).\n", mii_chip_table[i].name);
+			break;
+		}
+	if (!mii_chip_table[i].physid)
+		printf("(unknown).\n");
 
 	/* Use 0x3300 for restarting NWay */
 	printf("Starting auto-negotiation... ");
-	p2001_eth_mdio_write(phy, Adr_LXT971A_Control, 0x3300);
-	if (mdio_error)
-		goto failed;
+	p2001_eth_mdio_write(phy, MII_BMCR, 0x3300);
 
-	/* Bits 1.5 and 17.7 are set to 1 once the Auto-Negotiation process to completed. */
+	/* Bit 1.5 is set once the Auto-Negotiation process is completed. */
+	i = 0;
 	do {
 		mdelay(500);
-		status = p2001_eth_mdio_read(phy, Adr_LXT971A_Status1);
-		if (mdio_error || (count++ > 6))	// 6*500ms = 3s timeout
+		status = p2001_eth_mdio_read(phy, MII_BMSR);
+		if (!status || (i++ > 6))	// 6*500ms = 3s timeout
 			goto failed;
-	} while (!(status & 0x20));
-	
-	/* Bits 1.2 and 17.10 are set to 1 once the link is established. */
-	if (p2001_eth_mdio_read(phy, Adr_LXT971A_Status1) & 0x04) {
-		/* Bits 17.14 and 17.9 can be used to determine the link operation conditions (speed and duplex). */
-		printf("Valid link, operating at: %sMb-%s\n",
-			(p2001_eth_mdio_read(phy, Adr_LXT971A_Status2) & 0x4000) ? "100" : "10",
-			(p2001_eth_mdio_read(phy, Adr_LXT971A_Status2) & 0x0200) ? "FD" : "HD");
-			return 1;
+	} while (!(status & BMSR_ANEGCOMPLETE));
+
+	/* Bits 1.2 is set once the link is established. */
+	if ((status = p2001_eth_mdio_read(phy, MII_BMSR)) & BMSR_LSTATUS) {
+		link = p2001_eth_mdio_read(phy, MII_ADVERTISE) &
+		       p2001_eth_mdio_read(phy, MII_LPA);
+		printf("  Valid link, operating at: %sMb-%s\n",
+			(link & LPA_100) ? "100" : "10",
+			(link & LPA_DUPLEX) ? "FD" : "HD");
+		return 1;
 	}
 
 failed:
-	if (mdio_error)
+	if (!status)
 		printf("Failed\n");
 	else
 		printf("No valid link\n");
@@ -449,49 +487,79 @@ failed:
 }
 
 
+
 /**************************************************************************
-PROBE - Look for an adapter, this routine's visible to the outside
-***************************************************************************/
+ * PHYRESET - hardware reset all MII PHYs
+ **************************************************************************/
+
+/**
+ *	p2001_eth_phyreset - hardware reset all MII PHYs
+ */
+static void p2001_eth_phyreset()
+{
+	/* GPIO24/25: TX_ER2/TX_ER0 */
+	/* GPIO26/27: PHY_RESET/TX_ER1 */
+	P2001_GPIO->PIN_MUX |= 0x0018;
+	// 31-16: 0000 1111 0000 0000
+	P2001_GPIO->GPIO2_En |= 0x0400;
+
+	P2001_GPIO->GPIO2_Out |= 0x04000000;
+	P2001_GPIO->GPIO2_Out &= ~0x0400;
+	mdelay(500);
+	P2001_GPIO->GPIO2_Out |= 0x0400;
+
+#ifdef RMII
+	/* RMII_clk_sel = 0xxb  no RMII (default) */
+	/* RMII_clk_sel = 100b	COL_0 */
+	/* RMII_clk_sel = 101b	COL_1 */
+	/* RMII_clk_sel = 110b	COL_2 */
+	/* RMII_clk_sel = 111b	COL_3 */
+	P2001_GPIO->PIN_MUX |= (4 << 13);
+#endif
+}
+
+
+
+/**************************************************************************
+ * PROBE - Look for an adapter, this routine's visible to the outside
+ **************************************************************************/
+
 static int p2001_eth_probe(struct dev *dev, unsigned short *probe_addrs __unused)
 {
 	struct nic *nic = (struct nic *)dev;
 	/* if probe_addrs is 0, then routine can use a hardwired default */
-	static int board_found;
-	static int valid_link;
 
 	/* reset phys and configure mdio clk */
-	p2001_eth_mdio_init();
+	printf("Resetting PHYs...\n");
+	p2001_eth_phyreset();
+
+	/* set management unit clock divisor */
+	// max. MDIO CLK = 2.048 MHz (EU.doc)
+	P2001_MU->MU_DIV = (SYSCLK/4096000)-1;	// 2.048 MHz
+	//asm("nop \n nop");
 
 	/* find the correct PHY/DMA/MAC combination */
-	MU = P2001_MU;	// MU for all PHYs is only in EU0
 	printf("Searching for P2001 NICs...\n");
+	cur_phy = -1;
 	for (cur_channel=0; cur_channel<4; cur_channel++) {
-		switch(cur_channel) {
-			case 0:
-				EU = P2001_EU0;
-				cur_phy = 0;
+		EU = P2001_EU(cur_channel);
+
+		/* find next phy */
+		while (++cur_phy < 16) {
+			//printf("phy detect %d\n", cur_phy);
+			if (p2001_eth_mdio_read(cur_phy, MII_BMSR) != 0)
 				break;
-			case 1:
-				EU = P2001_EU1;
-				cur_phy = 1;
-				break;
-			case 2:
-				EU = P2001_EU2;
-				cur_phy = 2;
-				break;
-			case 3:
-				EU = P2001_EU3;
-				cur_phy = 3;
-				break;
+		}
+		if (cur_phy == 16) {
+			printf("no more MII PHYs found\n");
+			break;
 		}
 
 		/* first a non destructive test for initial value RMAC_TLEN=1518 */
-		board_found = (EU->RMAC_TLEN == 1518);
-		if (board_found) {
+		if (EU->RMAC_TLEN == 1518) {
 			printf("Checking EU%d...\n", cur_channel);
 
-			valid_link = p2001_eth_check_link(cur_phy);
-			if (valid_link) {
+			if (p2001_eth_check_link(cur_phy)) {
 				/* initialize device */
 				p2001_eth_init(nic);
 
@@ -507,7 +575,6 @@ static int p2001_eth_probe(struct dev *dev, unsigned short *probe_addrs __unused
 
 				/* Report the ISA pnp id of the board */
 				dev->devid.vendor_id = htons(GENERIC_ISAPNP_VENDOR);
-				dev->devid.vendor_id = htons(0x1234);
 				return 1;
 			}
 		}

@@ -9,6 +9,7 @@
 /* 11-13-2003	timlegge	Fix Issue with NetGear GA302T 
  * 11-18-2003   ebiederm        Generalize NetGear Fix to what the code was supposed to be.
  * 01-06-2005   Alf (Frederic Olivie) Add Dell bcm 5751 (0x1677) support
+ * 04-15-2005   Martin Vogt Add Fujitsu Siemens Computer (FSC) 0x1734 bcm 5751 0x105d support
  */
 
 #include "etherboot.h"
@@ -2413,6 +2414,9 @@ static struct subsys_tbl_ent subsys_id_to_phy_id[] = {
 	{ PCI_VENDOR_ID_DELL, 0x0109, PHY_ID_BCM5411 }, /* MERLOT */
 	{ PCI_VENDOR_ID_DELL, 0x010a, PHY_ID_BCM5411 }, /* SLIM_MERLOT */
 	{ PCI_VENDOR_ID_DELL, 0x0179, PHY_ID_BCM5751 }, /* EtherXpress */
+	
+	/* Fujitsu Siemens Computer */
+	{ PCI_VENDOR_ID_FSC, 0x105d, PHY_ID_BCM5751 }, /* Futro C200 */	
 
 	/* Compaq boards. */
 	{ PCI_VENDOR_ID_COMPAQ, 0x007c, PHY_ID_BCM5701 }, /* BANSHEE */

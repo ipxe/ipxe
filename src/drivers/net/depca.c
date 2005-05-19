@@ -413,13 +413,6 @@ static char *adapter_name[] = {
 #define ALIGN8      ((u32)8 - 1)       /* 2 longword (quadword) align */
 #define ALIGN         ALIGN8              /* Keep the LANCE happy... */
 
-typedef	long		s32;
-typedef	unsigned long	u32;
-typedef	short		s16;
-typedef	unsigned short	u16;
-typedef	char		s8;
-typedef	unsigned char	u8;
-
 /*
 ** The DEPCA Rx and Tx ring descriptors. 
 */

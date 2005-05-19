@@ -363,13 +363,6 @@ enum sis630_revision_id {
 
 #define NUM_RX_DESC     4              /* Number of Rx descriptor registers. */
 
-typedef unsigned char  u8;
-typedef   signed char  s8;
-typedef unsigned short u16;
-typedef   signed short s16;
-typedef unsigned int   u32;
-typedef   signed int   s32;
-
 /* Time in ticks before concluding the transmitter is hung. */
 #define TX_TIMEOUT       (4*TICKS_PER_SEC)
 

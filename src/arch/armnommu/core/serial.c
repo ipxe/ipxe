@@ -17,7 +17,7 @@ void serial_putc(int ch)
 {
 	/* wait for room in the 32 byte tx FIFO */
 	while ((P2001_UART->r.STATUS & 0x3f) > /* 30 */ 0) ;
-	P2001_UART->w.TX1 = ch & 0xff;
+	P2001_UART->w.TX[0] = ch & 0xff;
 }
 
 /*
@@ -27,7 +27,7 @@ void serial_putc(int ch)
 int serial_getc(void)
 {
 	while (((P2001_UART->r.STATUS >> 6) & 0x3f) == 0) ;
-	return P2001_UART->r.RX1 & 0xff;
+	return P2001_UART->r.RX[0] & 0xff;
 }
 
 /*
