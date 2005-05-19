@@ -1,9 +1,62 @@
 #ifndef BUFFER_H
 #define BUFFER_H
 
-#include "stdint.h"
+#include "etherboot.h"
 
-/* @file */
+/** @file
+ *
+ * Buffers for loading files.
+ *
+ * This file provides routines for filling a buffer with data received
+ * piecemeal, where the size of the data is not necessarily known in
+ * advance.
+ *
+ * Some protocols do not provide a mechanism for us to know the size
+ * of the file before we happen to receive a particular block
+ * (e.g. the final block in an MTFTP transfer).  In addition, some
+ * protocols (all the multicast protocols plus any TCP-based protocol)
+ * can, in theory, provide the data in any order.
+ *
+ * Rather than requiring each protocol to implement its own equivalent
+ * of "dd" to arrange the data into well-sized pieces before handing
+ * off to the image loader, we provide these generic buffer functions
+ * which assemble a file into a single contiguous block.  The whole
+ * block is then passed to the image loader.
+ *
+ * Example usage:
+ *
+ * @code
+ *
+ *   struct buffer my_buffer;
+ *   void *data;
+ *   off_t offset;
+ *   size_t len;
+ *   
+ *   // We have an area of memory [buf_start,buf_end) into which we want
+ *   // to load a file, where buf_start and buf_end are physical addresses.
+ *   buffer->start = buf_start;
+ *   buffer->end = buf_end;
+ *   init_buffer ( &buffer );
+ *   ...
+ *   while ( get_file_block ( ... ) ) {
+ *     // Downloaded block is stored in [data,data+len), and represents 
+ *     // the portion of the file at offsets [offset,offset+len)
+ *     if ( ! fill_buffer ( &buffer, data, offset, len ) ) {
+ *       // An error occurred
+ *       return 0;
+ *     }
+ *     ...
+ *   }
+ *   ...
+ *   // The whole file is now present at [buf_start,buf_start+filesize),
+ *   // where buf_start is a physical address.  The struct buffer can simply
+ *   // be discarded; there is no done_buffer() call.
+ *
+ * @endcode
+ *
+ * For a description of the internal operation, see buffer.c.
+ *
+ */
 
 /**
  * A buffer
@@ -23,7 +76,7 @@ struct buffer {
 /**
  * A free block descriptor.
  *
- * See \ref buffer_int for a full description of the fields.
+ * See buffer.c for a full description of the fields.
  *
  */
 struct buffer_free_block {
