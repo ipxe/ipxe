@@ -10,27 +10,57 @@
 #define SHRT_SHIFT  ((int)((sizeof(unsigned short)*CHAR_BIT) - 4))
 #define CHAR_SHIFT  ((int)((sizeof(unsigned char)*CHAR_BIT) - 4))
 
-/**************************************************************************
-PRINTF and friends
+/** @file
+ *
+ * printf and friends.
+ *
+ * Etherboot's printf() functions understand the following format
+ * specifiers:
+ *
+ *	- Hexadecimal integers
+ *		- @c %[#]x	- 4 bytes int (8 hex digits, lower case)
+ *		- @c %[#]X	- 4 bytes int (8 hex digits, upper case)
+ *		- @c %[#]lx	- 8 bytes long (16 hex digits, lower case)
+ *		- @c %[#]lX	- 8 bytes long (16 hex digits, upper case)
+ *		- @c %[#]hx	- 2 bytes int (4 hex digits, lower case)
+ *		- @c %[#]hX	- 2 bytes int (4 hex digits, upper case)
+ *		- @c %[#]hhx	- 1 byte int (2 hex digits, lower case)
+ *		- @c %[#]hhX	- 1 byte int (2 hex digits, upper case)
+ *		.
+ *		If the optional # prefix is specified, the output will
+ *		be prefixed with 0x (or 0X).
+ *
+ *	- Other integers
+ *		- @c %d		- decimal int
+ *	.
+ *	Note that any width specification (e.g. the @c 02 in @c %02x)
+ *	will be accepted but ignored.
+ *
+ *	- Strings and characters
+ *		- @c %c		- char
+ *		- @c %s		- string
+ *		- @c %m		- error message text (i.e. strerror(errno))
+ *
+ *	- Etherboot-specific specifiers
+ *		- @c %@		- IP in ddd.ddd.ddd.ddd notation
+ *		- @c %!		- MAC address in xx:xx:xx:xx:xx:xx notation
+ *
+ */
 
-	Formats:
-		%[#]x	- 4 bytes int (8 hex digits, lower case)
-		%[#]X	- 4 bytes int (8 hex digits, upper case)
-		%[#]lx  - 8 bytes long (16 hex digits, lower case)
-		%[#]lX  - 8 bytes long (16 hex digits, upper case)
-		%[#]hx	- 2 bytes int (4 hex digits, lower case)
-		%[#]hX	- 2 bytes int (4 hex digits, upper case)
-		%[#]hhx	- 1 byte int (2 hex digits, lower case)
-		%[#]hhX	- 1 byte int (2 hex digits, upper case)
-			- optional # prefixes 0x or 0X
-		%d	- decimal int
-		%c	- char
-		%s	- string
-		%m	- string representation of the most recent error
-		%@	- Internet address in ddd.ddd.ddd.ddd notation
-		%!	- Ethernet address in xx:xx:xx:xx:xx:xx notation
-	Note: width specification ignored
-**************************************************************************/
+/**
+ * Write a formatted string to a buffer.
+ *
+ * @v buf		Buffer into which to write the string, or NULL
+ * @v fmt		Format string
+ * @v args		Arguments corresponding to the format string
+ * @ret len		Length of string written to buffer (if buf != NULL)
+ * @ret	0		(if buf == NULL)
+ * @err None
+ *
+ * If @c buf==NULL, then the string will be written to the console
+ * directly using putchar().
+ *
+ */
 static int vsprintf(char *buf, const char *fmt, va_list args)
 {
 	const char *p;
@@ -154,6 +184,20 @@ static int vsprintf(char *buf, const char *fmt, va_list args)
 	return (s - buf);
 }
 
+/**
+ * Write a formatted string to a buffer.
+ *
+ * @v buf		Buffer into which to write the string, or NULL
+ * @v fmt		Format string
+ * @v ...		Arguments corresponding to the format string
+ * @ret len		Length of string written to buffer (if buf != NULL)
+ * @ret	0		(if buf == NULL)
+ * @err None
+ *
+ * If @c buf==NULL, then the string will be written to the console
+ * directly using putchar().
+ *
+ */
 int sprintf(char *buf, const char *fmt, ...)
 {
 	va_list args;
@@ -164,6 +208,15 @@ int sprintf(char *buf, const char *fmt, ...)
 	return i;
 }
 
+/**
+ * Write a formatted string to the console.
+ *
+ * @v fmt		Format string
+ * @v ...		Arguments corresponding to the format string
+ * @ret	None
+ * @err None
+ *
+ */
 void printf(const char *fmt, ...)
 {
 	va_list args;

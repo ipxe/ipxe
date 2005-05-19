@@ -1,9 +1,16 @@
 #ifndef BOCHS_H
 #define BOCHS_H
 
-/*
- * This file defines "bochsbp", the magic breakpoint instruction that
- * is incredibly useful when debugging under bochs.
+/** @file
+ *
+ * bochs breakpoints
+ *
+ * This file defines @c bochsbp, the magic breakpoint instruction that
+ * is incredibly useful when debugging under bochs.  This file should
+ * never be included in production code.
+ *
+ * Use the pseudo-instruction @c bochsbp in assembly code, or the
+ * bochsbp() function in C code.
  *
  */
 
@@ -15,7 +22,7 @@
 
 #else /* ASSEMBLY */
 
-/* Breakpoint for when debugging under bochs */
+/** Breakpoint for when debugging under bochs */
 static inline void bochsbp ( void ) {
 	__asm__ __volatile__ ( "xchgw %bx, %bx" );
 }
