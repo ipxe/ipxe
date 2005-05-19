@@ -1,7 +1,8 @@
 #ifndef BUFFER_H
 #define BUFFER_H
 
-#include "etherboot.h"
+#include "compiler.h"
+#include "stdint.h"
 
 /** @file
  *
