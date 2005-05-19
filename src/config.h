@@ -91,6 +91,26 @@
 
 /* @BEGIN general.h
  *
+ * Image types
+ *
+ * Etherboot supports various image formats.  Select whichever ones
+ * you want to use.
+ *
+ */
+#define TAGGED_IMAGE		/* NBI image support */
+#undef	ELF64_IMAGE		/* ELF64 image support */
+#undef	ELF_IMAGE		/* ELF image support */
+#undef	COFF_IMAGE		/* COFF image support */
+#undef	IMAGE_FREEBSD		/* FreeBSD kernel image support */
+#undef	IMAGE_MULTIBOOT		/* MultiBoot image support */
+#undef	AOUT_IMAGE		/* a.out image support */
+#undef	WINCE_IMAGE		/* WinCE image support */
+#undef	PXE_IMAGE		/* PXE image support */
+
+/* @END general.h */ 
+
+/* @BEGIN general.h
+ *
  * Obscure configuration options
  *
  * You probably don't need to touch these.
