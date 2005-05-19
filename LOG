@@ -2861,3 +2861,10 @@ driver
 
 + Hermann Gausterer sent a patch to support additional Broadcom PHYs
 
++ Timothy Legge updated the forcedeth driver to the latest Linux version
+2.6.10 (untested and broken)
+
++ YhLu fixed the updated forcedeth driver so that it worked and confirmed 
+that it supports the Gigabit nVidia NICs
+
++ Timothy Legge fixed relocation issues with the eepro driver
