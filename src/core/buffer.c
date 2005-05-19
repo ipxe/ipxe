@@ -1,6 +1,10 @@
-/*
- * Routines for filling a buffer with data received piecemeal, where
- * the size of the data is not necessarily known in advance.
+/** @file
+ *
+ * Buffers for loading files.
+ *
+ * This file provides routines for filling a buffer with data received
+ * piecemeal, where the size of the data is not necessarily known in
+ * advance.
  *
  * Some protocols do not provide a mechanism for us to know the size
  * of the file before we happen to receive a particular block
@@ -14,6 +18,40 @@
  * which assemble a file into a single contiguous block.  The whole
  * block is then passed to the image loader.
  *
+ * Example usage:
+ *
+ * @code
+ *
+ *   struct buffer my_buffer;
+ *   void *data;
+ *   off_t offset;
+ *   size_t len;
+ *   
+ *   // We have an area of memory [buf_start,buf_end) into which we want
+ *   // to load a file, where buf_start and buf_end are physical addresses.
+ *   buffer->start = buf_start;
+ *   buffer->end = buf_end;
+ *   init_buffer ( &buffer );
+ *   ...
+ *   while ( get_file_block ( ... ) ) {
+ *     // Downloaded block is stored in [data,data+len), and represents 
+ *     // the portion of the file at offsets [offset,offset+len)
+ *     if ( ! fill_buffer ( &buffer, data, offset, len ) ) {
+ *       // An error occurred
+ *       return 0;
+ *     }
+ *     ...
+ *   }
+ *   ...
+ *   // The whole file is now present at [buf_start,buf_start+filesize),
+ *   // where buf_start is a physical address.  The struct buffer can simply
+ *   // be discarded; there is no done_buffer() call.
+ *
+ * @endcode
+ *
+ */
+
+/** @package Internals
  *
  * Note that the rather convoluted way of manipulating the buffer
  * descriptors (using copy_{to,from}_phys rather than straightforward
@@ -28,8 +66,16 @@
 #include "io.h"
 #include "buffer.h"
 
-/*
- * Initialise a buffer
+/**
+ * Initialise a buffer.
+ *
+ * @v buffer		The buffer to be initialised
+ * @ret None
+ * @err None
+ *
+ * Set @c buffer->start and @c buffer->end before calling init_buffer().
+ * init_buffer() will initialise the buffer to the state of being
+ * empty.
  *
  */
 void init_buffer ( struct buffer *buffer ) {
@@ -42,8 +88,27 @@ void init_buffer ( struct buffer *buffer ) {
 	DBG ( "BUFFER [%x,%x) initialised\n", buffer->start, buffer->end );
 }
 
-/*
- * Split a free block
+/**
+ * Split a free block.
+ *
+ * @v desc		A descriptor for the free block
+ * @v block		Start address of the block
+ * @v split		Address at which to split the block
+ * @ret None
+ * @err None
+ *
+ * Split a free block into two separate free blocks.  If the split
+ * point lies outside the block, no action is taken; this is not an
+ * error.
+ *
+ * @b NOTE: It is the reponsibility of the caller to ensure that there
+ * is enough room in each of the two portions for a free block
+ * descriptor (a @c struct @c buffer_free_block, except in the case of
+ * a tail block which requires only a one byte descriptor).  If the
+ * caller fails to do this, data corruption will occur.
+ *
+ * In practice, this means that the granularity at which blocks are
+ * split must be at least @c sizeof(struct @c buffer_free_block).
  *
  */
 static void split_free_block ( struct buffer_free_block *desc,
@@ -71,8 +136,16 @@ static void split_free_block ( struct buffer_free_block *desc,
 	copy_to_phys ( block, desc, sizeof ( *desc ) );
 }
 
-/*
- * Mark a free block as used
+/**
+ * Mark a free block as used.
+ *
+ * @v buffer		The buffer containing the block
+ * @v desc		A descriptor for the free block
+ * @v prev_block	Address of the previous block
+ * @ret None
+ * @err None
+ *
+ * Marks a free block as used, i.e. removes it from the free list.
  *
  */
 static inline void unfree_block ( struct buffer *buffer,
@@ -99,15 +172,42 @@ static inline void unfree_block ( struct buffer *buffer,
 	copy_to_phys ( prev_block, &prev_desc, sizeof ( prev_desc ) );
 }
 
-/*
- * Write data into a buffer
+/**
+ * Write data into a buffer.
  *
- * It is the caller's responsibility to ensure that the boundaries
- * between data blocks are more than sizeof(struct buffer_free_block)
- * apart.  If this condition is not satisfied, data corruption will
- * occur.
+ * @v buffer		The buffer into which to write the data
+ * @v data		The data to be written
+ * @v offset		Offset within the buffer at which to write the data
+ * @v len		Length of data to be written
+ * @ret True		Data was successfully written
+ * @ret False		Data was not written
+ * @err ENOMEM		Buffer is too small to contain the data
  *
- * Returns 1 for success, 0 for failure (e.g. buffer too small).
+ * Writes a block of data into the buffer.  The block need not be
+ * aligned to any particular boundary, or be of any particular size,
+ * and it may overlap blocks already in the buffer (i.e. duplicate
+ * calls to fill_buffer() are explicitly permitted).
+ *
+ * @c buffer->fill will be updated to indicate the fill level of the
+ * buffer, i.e. the offset to the first gap within the buffer.  If the
+ * filesize is known (e.g. as with the SLAM protocol), you can test
+ * for end-of-file by checking for @c buffer->fill==filesize.  If the
+ * filesize is not known, but there is a well-defined end-of-file test
+ * (e.g. as with the TFTP protocol), you can read @c buffer->fill to
+ * determine the final filesize.  If blocks are known to be delivered
+ * in a strictly sequential order with no packet loss or duplication,
+ * then you can pass in @c offset==buffer->fill.
+ *
+ * @b NOTE: It is the caller's responsibility to ensure that the
+ * boundaries between data blocks are more than @c sizeof(struct @c
+ * buffer_free_block) apart.  If this condition is not satisfied, data
+ * corruption will occur.  (See split_free_block() for details.)
+ *
+ * @att In practice this is not a problem.  Callers of fill_buffer()
+ * will be download protocols such as TFTP, and very few protocols
+ * have a block size smaller than @c sizeof(struct @c
+ * buffer_free_block).
+ *
  */
 int fill_buffer ( struct buffer *buffer, const void *data,
 		  off_t offset, size_t len ) {
@@ -125,6 +225,7 @@ int fill_buffer ( struct buffer *buffer, const void *data,
 	if ( data_end > buffer->end ) {
 		DBG ( "BUFFER [%x,%x) too small for data!\n",
 		      buffer->start, buffer->end );
+		errno = ENOMEM;
 		return 0;
 	}
 
