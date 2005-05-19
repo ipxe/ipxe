@@ -93,6 +93,7 @@
 #include "stddef.h"
 #include "string.h"
 #include "io.h"
+#include "errno.h"
 #include "buffer.h"
 
 /**
