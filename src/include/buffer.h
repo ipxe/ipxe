@@ -3,34 +3,33 @@
 
 #include "stdint.h"
 
-/*
- * "start" and "end" denote the real boundaries of the buffer.  "fill"
- * denotes the offset to the first free block in the buffer.  (If the
- * buffer is full, "fill" will equal ( end - start ) ).
+/* @file */
+
+/**
+ * A buffer
+ *
+ * @c start and @c end denote the real boundaries of the buffer, and
+ * are physical addresses.  @c fill denotes the offset to the first
+ * free block in the buffer.  (If the buffer is full, @c fill will
+ * equal @c end-start.)
  *
  */
 struct buffer {
-	physaddr_t	start;
-	physaddr_t	end;
-	off_t		fill;
+	physaddr_t	start;		/**< Start of buffer in memory */
+	physaddr_t	end;		/**< End of buffer in memory */
+	off_t		fill;		/**< Offset to first gap in buffer */
 };
 
-/*
- * Free blocks in the buffer start with a "tail byte".  If non-zero,
- * this byte indicates that the free block is the tail of the buffer,
- * i.e. occupies all the remaining space up to the end of the buffer.
- * When the tail byte is non-zero, it indicates that the remainder of
- * the descriptor (the struct buffer_free_block) follows the tail
- * byte.
+/**
+ * A free block descriptor.
  *
- * This scheme is necessary because we may end up with a tail that is
- * smaller than a struct buffer_free_block.
+ * See \ref buffer_int for a full description of the fields.
  *
  */
 struct buffer_free_block {
-	char		tail;
-	physaddr_t	next_free;
-	physaddr_t	end;
+	char		tail;		/**< Tail byte marker */
+	physaddr_t	next_free;	/**< Address of next free block */
+	physaddr_t	end;		/**< End of this block */
 } __attribute__ (( packed ));
 
 /* Functions in buffer.c */

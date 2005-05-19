@@ -49,15 +49,44 @@
  *
  * @endcode
  *
+ * For a description of the internal operation, see \ref buffer_int.
+ *
  */
 
-/** @package Internals
+/** @page buffer_int Buffer internals
  *
+ * A buffer consists of a single, contiguous area of memory, some of
+ * which is "filled" and the remainder of which is "free".  The
+ * "filled" and "free" spaces are not necessarily contiguous.
+ *
+ * When a buffer is initialised via init_buffer(), it consists of a
+ * single free space.  As data is added to the buffer via
+ * fill_buffer(), this free space decreases and can become fragmented.
+ *
+ * Each free block within a buffer starts with a "tail byte".  If the
+ * tail byte is non-zero, this indicates that the free block is the
+ * tail of the buffer, i.e. occupies all the remaining space up to the
+ * end of the buffer.  When the tail byte is non-zero, it indicates
+ * that a descriptor (a @c struct @c buffer_free_block) follows the
+ * tail byte.  The descriptor describes the size of the free block and
+ * the address of the next free block.
+ *
+ * We cannot simply always start a free block with a descriptor,
+ * because it is conceivable that we will, at some point, encounter a
+ * situation in which the final free block of a buffer is too small to
+ * contain a descriptor.  Consider a protocol with a blocksize of 512
+ * downloading a 1025-byte file into a 1025-byte buffer.  Suppose that
+ * the first two blocks are received; we have now filled 1024 of the
+ * 1025 bytes in the buffer, and our only free block consists of the
+ * 1025th byte.  Using a "tail byte" solves this problem.
+ *
+ * 
  * Note that the rather convoluted way of manipulating the buffer
  * descriptors (using copy_{to,from}_phys rather than straightforward
  * pointers) is needed to cope with operation as a PXE stack, when we
  * may be running in real mode or 16-bit protected mode, and therefore
- * cannot directly access arbitrary areas of memory.
+ * cannot directly access arbitrary areas of memory using simple
+ * pointers.
  *
  */
 
@@ -203,10 +232,9 @@ static inline void unfree_block ( struct buffer *buffer,
  * buffer_free_block) apart.  If this condition is not satisfied, data
  * corruption will occur.  (See split_free_block() for details.)
  *
- * @att In practice this is not a problem.  Callers of fill_buffer()
- * will be download protocols such as TFTP, and very few protocols
- * have a block size smaller than @c sizeof(struct @c
- * buffer_free_block).
+ * In practice this is not a problem.  Callers of fill_buffer() will
+ * be download protocols such as TFTP, and very few protocols have a
+ * block size smaller than @c sizeof(struct @c buffer_free_block).
  *
  */
 int fill_buffer ( struct buffer *buffer, const void *data,
