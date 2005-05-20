@@ -1,9 +1,25 @@
 #ifndef REGISTERS_H
 #define REGISTERS_H
 
+/** @file
+ *
+ * i386 registers.
+ *
+ * This file defines data structures that allow easy access to i386
+ * register dumps.
+ *
+ */
+
+#include "compiler.h" /* for doxygen */
 #include "stdint.h"
 
-/* Basic 16-bit and 32-bit register types */
+/**
+ * A 16-bit general register.
+ *
+ * This type encapsulates a 16-bit register such as %ax, %bx, %cx,
+ * %dx, %si, %di, %bp or %sp.
+ *
+ */
 typedef union {
 	struct {
 		union {
@@ -15,12 +31,33 @@ typedef union {
 	uint16_t word;
 } PACKED reg16_t;
 
+/**
+ * A 32-bit general register.
+ *
+ * This type encapsulates a 32-bit register such as %eax, %ebx, %ecx,
+ * %edx, %esi, %edi, %ebp or %esp.
+ *
+ */
 typedef union {
-	reg16_t;
+	struct {
+		union {
+			uint8_t l;
+			uint8_t byte;
+		};
+		uint8_t h;
+	} PACKED;
+	uint16_t word;
 	uint32_t dword;
 } PACKED reg32_t;
 
-/* As created by pushal / read by popal */
+/**
+ * A 32-bit general register dump.
+ *
+ * This is the data structure that is created on the stack by the @c
+ * pushal instruction, and can be read back using the @c popal
+ * instruction.
+ *
+ */
 struct i386_regs {
 	union {
 		uint16_t di;
@@ -72,7 +109,31 @@ struct i386_regs {
 	};
 } PACKED;
 
-/* Our pushal/popal equivalent for segment registers */
+/**
+ * A segment register dump.
+ *
+ * The i386 has no equivalent of the @c pushal or @c popal
+ * instructions for the segment registers.  We adopt the convention of
+ * always using the sequences
+ *
+ * @code
+ *
+ *   pushw %gs ; pushw %fs ; pushw %es ; pushw %ds ; pushw %ss ; pushw %cs
+ *
+ * @endcode
+ *
+ * and
+ *
+ * @code
+ *
+ *   addw $4, %sp ; popw %ds ; popw %es ; popw %fs ; popw %gs
+ *
+ * @endcode
+ *
+ * This is the data structure that is created and read back by these
+ * instruction sequences.
+ *
+ */
 struct i386_seg_regs {
 	uint16_t cs;
 	uint16_t ss;
@@ -82,11 +143,37 @@ struct i386_seg_regs {
 	uint16_t gs;
 } PACKED;
 
-/* All i386 registers, as passed in by prot_call or kir_call */
+/**
+ * A full register dump.
+ *
+ * This data structure is created by the instructions
+ *
+ * @code
+ *
+ *   pushfl
+ *   pushal
+ *   pushw %gs ; pushw %fs ; pushw %es ; pushw %ds ; pushw %ss ; pushw %cs
+ *
+ * @endcode
+ *
+ * and can be read back using the instructions
+ *
+ * @code
+ *
+ *   addw $4, %sp ; popw %ds ; popw %es ; popw %fs ; popw %gs
+ *   popal
+ *   popfl
+ *
+ * @endcode
+ *
+ * prot_call() and kir_call() create this data structure on the stack
+ * and pass in a pointer to this structure.
+ *
+ */
 struct i386_all_regs {
-	struct i386_seg_regs;
-	struct i386_regs;
-	uint32_t i386_flags;
+	struct i386_seg_regs segs;
+	struct i386_regs regs;
+	uint32_t flags;
 } PACKED;
 
 #endif /* REGISTERS_H */
