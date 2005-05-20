@@ -1,0 +1,200 @@
+/** @page build_sys Build system
+
+@section overview Overview
+
+Building an Etherboot image consists of two stages:
+
+  -# @ref compilation : Compiling all the source files into object files
+
+  -# @ref linking : Building a particular image from select object files
+
+Though this is a remarkably complex process, it is important to note
+that it all happens automatically.  Whatever state your build tree is
+in, you can always type, for example
+
+@code
+
+	make bin/rtl8139.dsk
+
+@endcode
+
+and know that you will get a floppy disk image with an RTL8139 driver
+built from the current sources.
+
+@section compilation Compilation
+
+@subsection comp_general Overview
+
+Each source file (a @c .c or a @c .S file) is compiled into a @c .o
+file in the @c bin/ directory.  Etherboot makes minimal use of
+conditional compilation (see @ref ifdef_harmful), and so you will find
+that all objects get built, even the objects that correspond to
+features that you are not intending to include in your image.  For
+example, all network card drivers will be compiled even if you are
+just building a ROM for a 3c509 card.  This is a deliberate design
+decision; please do @b not attempt to "fix" the build system to avoid
+doing this.
+
+Source files are defined to be any @c .c or @c .S files found in a
+directory listed in the Makefile variable #SRCDIRS.  You therefore do
+@b not need to edit the Makefile just because you have added a new
+source file (although you will need to edit the Makefile if you have
+added a new source directory).  To see a list of all source
+directories and source files that the build system currently knows
+about, you can use the commands
+
+@code
+
+	make srcdirs
+	make srcs
+
+@endcode
+
+Rules for compiling @c .c and @c .S files are defined in the Makefile
+variables #RULE_c and #RULE_S.  Makefile rules are automatically
+generated for each source file using these rules.  The generated rules
+can be found in the @c .d file corresponding to each source file;
+these are located in <tt>bin/deps/</tt>.  For example, the rules
+generated for <tt>drivers/net/rtl8139.c</tt> can be found in
+<tt>bin/deps/drivers/net/rtl8139.c.d</tt>.  These rules allow you to
+type, for example
+
+@code
+
+	make bin/rtl8139.o
+
+@endcode
+
+and have <tt>rtl8139.o</tt> be built from
+<tt>drivers/net/rtl8139.c</tt> using the generic rule #RULE_c for
+compiling @c .c files.
+
+You can see the full list of object files that will be built using
+
+@code
+
+	make bobjs
+
+@endcode
+
+@subsection comp_custom Customising compilation
+
+The Makefile rules for a particular object can be customised to a
+certain extent by defining the Makefile variable CFLAGS_@<object@>.
+For example, if you were to set
+
+@code
+
+	CFLAGS_rtl8139 = -DFOO
+
+@endcode
+
+then <tt>bin/rtl8139.o</tt> would be compiled with the additional
+flags <tt>-DFOO</tt>.  To see the flags that will be used when
+compiling a particular object, you can use e.g.
+
+@code
+
+	make bin/rtl8139.flags
+
+@endcode
+
+If you need more flexibility than the CFLAGS_@<object@> mechanism
+provides, then you can exclude source files from the automatic rule
+generation process by listing them in the Makefile variable
+#NON_AUTO_SRCS.  The command
+
+@code
+
+	make autosrcs
+
+@endcode
+
+will show you which files are currently part of the automatic rule
+generation process.
+
+@subsection comp_multiobj Multiple objects
+
+A single source file can be used to generate multiple object files.
+This is used, for example, to generate the decompressing and the
+non-decompressing prefixes from the same source files.
+
+By default, a single object will be built from each source file.  To
+override the list of objects for a source file, you can define the
+Makefile variable OBJS_@<object@>.  For example, the
+<tt>arch/i386/prefix/dskprefix.S</tt> source file is built into two
+objects, <tt>bin/dskprefix.o</tt> and <tt>zdskprefix.o</tt> by
+defining the Makefile variable
+
+@code
+
+	OBJS_dskprefix = dskprefix zdskprefix
+
+@endcode
+
+Since there would be little point in building two identical objects,
+customised compilation flags (see @ref comp_custom) are defined as
+
+@code
+
+	CFLAGS_zdskprefix = -DCOMPRESS
+
+@endcode
+
+Thus, <tt>arch/i386/prefix/dskprefix.S</tt> is built into @c
+dskprefix.o using the normal set of flags, and into @c zdskprefix.o
+using the normal set of flags plus <tt>-DCOMPRESS</tt>.
+
+@subsection comp_debug Special debugging targets
+
+In addition to the basic rules #RULE_c and #RULE_S for compiling
+source files into object files, there are various other rules that can
+be useful for debugging.
+
+@subsubsection comp_debug_c_to_c Preprocessed C
+
+You can see the results of preprocessing a @c .c file (including the
+per-object flags defined via CFLAGS_@<object@> if applicable) using
+e.g.
+
+@code
+
+	make bin/rtl8139.c
+
+@endcode
+
+and examining the resulting file (<tt>bin/rtl8139.c</tt> in this
+case).
+
+@subsubsection comp_debug_x_to_s Assembler
+
+You can see the results of assembling a @c .c file, or of
+preprocessing a @c .S file, using e.g.
+
+@code
+
+	make bin/rtl8139.s
+	make bin/zdskprefix.s
+
+@endcode
+
+@subsubsection comp_debug_dbg Debugging-enabled targets
+
+You can build targets with debug messages (DBG()) enabled using e.g.
+
+@code
+
+	make bin/rtl8139.dbg.o
+	make bin/rtl8139.dbg2.o
+
+@endcode
+
+You will probably not need to use these targets directly, since a
+mechanism exists to select debugging levels at link-time; see @ref
+link_debug.
+
+@section linking Linking
+
+@subsection link_debug Debugging-enabled builds
+
+*/
