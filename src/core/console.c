@@ -1,31 +1,24 @@
-/*
- * Central console switch.  Various console devices can be selected
- * via the build options CONSOLE_FIRMWARE, CONSOLE_SERIAL etc.
- * config.c picks up on these definitions and drags in the relevant
- * objects.  The linker compiles the console_drivers table for us; we
- * simply delegate to each console_driver that we find in the table.
- *
- * Doing it this way allows for changing CONSOLE_XXX without
- * rebuilding anything other than config.o.  This is extremely useful
- * for rom-o-matic.
- */
-
 #include "stddef.h"
 #include "console.h"
 
-/* FIXME: we need a cleaner way to pick up cpu_nap().  It makes a
- * real-mode call, and so we don't want to use it with LinuxBIOS.
- */
+/** @file */
+
 #include "bios.h"
 
 static struct console_driver console_drivers[0] __table_start ( console );
 static struct console_driver console_drivers_end[0] __table_end ( console );
 
-/*****************************************************************************
- * putchar : write a single character to each console
- *****************************************************************************
+/**
+ * Write a single character to each console device.
+ *
+ * @v character		Character to be written
+ * @ret None
+ * @err None
+ *
+ * The character is written out to all enabled console devices, using
+ * each device's console_driver::putchar() method.
+ *
  */
-
 void putchar ( int character ) {
 	struct console_driver *console;
 
@@ -40,10 +33,18 @@ void putchar ( int character ) {
 	}
 }
 
-/*****************************************************************************
- * has_input : check to see if any input is available on any console,
- * and return a pointer to the console device if so
- *****************************************************************************
+/**
+ * Check to see if any input is available on any console.
+ *
+ * @v None
+ * @ret console		Console device that has input available, if any.
+ * @ret NULL		No console device has input available.
+ * @err None
+ *
+ * All enabled console devices are checked once for available input
+ * using each device's console_driver::iskey() method.  The first
+ * console device that has available input will be returned, if any.
+ *
  */
 static struct console_driver * has_input ( void ) {
 	struct console_driver *console;
@@ -58,13 +59,30 @@ static struct console_driver * has_input ( void ) {
 	return NULL;
 }
 
-/*****************************************************************************
- * getchar : read a single character from any console
+/**
+ * Read a single character from any console.
  *
- * NOTE : this function does not echo the character, and it does block
- *****************************************************************************
+ * @v None
+ * @ret character	Character read from a console.
+ * @err None
+ *
+ * A character will be read from the first enabled console device that
+ * has input available using that console's console_driver::getchar()
+ * method.  If no console has input available to be read, this method
+ * will block.  To perform a non-blocking read, use something like
+ *
+ * @code
+ *
+ *   int key = iskey() ? getchar() : -1;
+ *
+ * @endcode
+ *
+ * The character read will not be echoed back to any console.
+ *
+ * @bug We need a cleaner way to pick up cpu_nap().  It makes a
+ * real-mode call, and so we don't want to use it with LinuxBIOS.
+ *
  */
-
 int getchar ( void ) {
 	struct console_driver *console;
 	int character = 256;
@@ -92,11 +110,20 @@ int getchar ( void ) {
 	return character;
 }
 
-/*****************************************************************************
- * iskey : check to see if any input is available on any console
- *****************************************************************************
+/** Check for available input on any console.
+ *
+ * @v None
+ * @ret True		Input is available on a console
+ * @ret False		Input is not available on any console
+ * @err None
+ *
+ * All enabled console devices are checked once for available input
+ * using each device's console_driver::iskey() method.  If any console
+ * device has input available, this call will return True.  If this
+ * call returns True, you can then safely call getchar() without
+ * blocking.
+ *
  */
-
 int iskey ( void ) {
 	return has_input() ? 1 : 0;
 }
