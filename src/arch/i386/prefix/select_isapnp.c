@@ -11,7 +11,7 @@
  * would cause linker symbol pollution.
  *
  */
-void i386_select_isapnp_device ( struct i386_all_regs *regs ) {
+void i386_select_isapnp_device ( struct i386_all_regs *ix86 ) {
 	/*
 	 * PnP BIOS passes card select number in %bx and read port
 	 * address in %dx.
@@ -23,10 +23,10 @@ void i386_select_isapnp_device ( struct i386_all_regs *regs ) {
 	} u;
 
 	/* Set ISAPnP read port */
-	isapnp_read_port = regs->dx;
+	isapnp_read_port = ix86->regs.dx;
 	
 	/* Select ISAPnP bus and specified CSN as first boot device */
 	memset ( &u, 0, sizeof ( u ) );
-	u.isapnp_loc.csn = regs->bx;
+	u.isapnp_loc.csn = ix86->regs.bx;
 	select_device ( &dev, &isapnp_driver, &u.bus_loc );
 }

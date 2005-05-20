@@ -135,12 +135,12 @@ kir_to_ext:
  *
  * Call a specific C function in the internal code.  The prototype of
  * the C function must be
- *   void function ( struct real_mode_regs *rm_regs ); 
- * rm_regs will point to a struct containing the real-mode registers
+ *   void function ( struct i386_all_resg *ix86 ); 
+ * ix86 will point to a struct containing the real-mode registers
  * at entry to kir_call.
  *
  * All registers will be preserved across kir_call(), unless the C
- * function explicitly overwrites values in rm_regs.  Interrupt status
+ * function explicitly overwrites values in ix86.  Interrupt status
  * will also be preserved.
  *
  * Parameters:
@@ -151,7 +151,7 @@ kir_to_ext:
  *	lcall	$UNDI_CS, $kir_call
  *	addw	$2, %sp
  * to call in to the C function
- *      void pxe_api_call ( struct real_mode_regs *rm_regs );
+ *      void pxe_api_call ( struct i386_all_regs *ix86 );
  ****************************************************************************
  */
 
@@ -190,7 +190,7 @@ kir_call:
 	pushl	%cs:ext_ds_and_es
 	pushl	%cs:ext_cs_and_ss
 
-	/* Push &rm_regs on stack and call function */
+	/* Push &ix86 on stack and call function */
 	pushl	%esp
 	data32 call *%cs:save_function
 	popl	%eax /* discard */

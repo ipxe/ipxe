@@ -106,11 +106,11 @@
 /* Size of various C data structures */
 #define SIZEOF_I386_SEG_REGS	12
 #define SIZEOF_I386_REGS	32
-#define SIZEOF_I386_ALL_REGS	( SIZEOF_I386_SEG_REGS + SIZEOF_I386_REGS )
+#define SIZEOF_REAL_MODE_REGS	( SIZEOF_I386_SEG_REGS + SIZEOF_I386_REGS )
 #define SIZEOF_I386_FLAGS	4
-#define SIZEOF_REAL_MODE_REGS   ( SIZEOF_I386_ALL_REGS + SIZEOF_I386_FLAGS )
+#define SIZEOF_I386_ALL_REGS	( SIZEOF_REAL_MODE_REGS + SIZEOF_I386_FLAGS )
 #define SIZEOF_SEGOFF_T		4
-#define SIZEOF_REAL_CALL_PARAMS ( SIZEOF_I386_ALL_REGS + 2 * SIZEOF_SEGOFF_T )
+#define SIZEOF_REAL_CALL_PARAMS ( SIZEOF_REAL_MODE_REGS + 2 * SIZEOF_SEGOFF_T )
 	
 	.text
 	.arch i386
@@ -461,12 +461,12 @@ p2r_ljmp:
  *
  * Call a specific C function in the protected-mode code.  The
  * prototype of the C function must be
- *   void function ( struct real_mode_regs *rm_regs ); 
- * rm_regs will point to a struct containing the real-mode registers
+ *   void function ( struct i386_all_regs *ix86 ); 
+ * ix86 will point to a struct containing the real-mode registers
  * at entry to prot_call.  
  *
  * All registers will be preserved across prot_call(), unless the C
- * function explicitly overwrites values in rm_regs.  Interrupt status
+ * function explicitly overwrites values in ix86.  Interrupt status
  * will also be preserved.  Gate A20 will be enabled.
  *
  * The protected-mode code may install librm to a new location.  If it
@@ -495,12 +495,12 @@ p2r_ljmp:
  *	lcall	$LIBRM_SEGMENT, $prot_call
  *	addw	$4, %sp
  * to call in to the C function
- *      void pxe_api_call ( struct real_mode_regs *rm_regs );
+ *      void pxe_api_call ( struct i386_all_regs *ix86 );
  ****************************************************************************
  */
 
-#define PC_OFFSET_RM_REGS ( 0 )
-#define PC_OFFSET_RETADDR ( PC_OFFSET_RM_REGS + SIZEOF_REAL_MODE_REGS )
+#define PC_OFFSET_IX86 ( 0 )
+#define PC_OFFSET_RETADDR ( PC_OFFSET_IX86 + SIZEOF_I386_ALL_REGS )
 #define PC_OFFSET_FUNCTION ( PC_OFFSET_RETADDR + 4 )
 	
 	.code16
@@ -534,14 +534,14 @@ EXPORT(prot_call):
 	call	real_to_prot
 	.code32
 
-	/* Copy rm_regs from RM stack to PM stack */
-	movl	$SIZEOF_REAL_MODE_REGS, %ecx
+	/* Copy ix86 from RM stack to PM stack */
+	movl	$SIZEOF_I386_ALL_REGS, %ecx
 	subl	%ecx, %esp
 	movl	%esp, %edi
 	pushl	%esi
 	cld
 	rep movsb
-	popl	%edi		/* %edi = phys addr of RM copy of rm_regs */
+	popl	%edi		/* %edi = phys addr of RM copy of ix86 */
 	
 	/* Switch to virtual addresses. */
 	call	1f
@@ -555,7 +555,7 @@ EXPORT(prot_call):
 	popl	%eax	/* discard */
 	popal
 
-	/* Push &rm_regs on the stack, and call function */
+	/* Push &ix86 on the stack, and call function */
 	pushl	%esp
 	call	*%ebx
 	popl	%eax /* discard */
@@ -564,16 +564,16 @@ EXPORT(prot_call):
 	lcall	$VIRTUAL_CS, $_virt_to_phys
 	popl	%eax /* discard */
 
-	/* Copy rm_regs from PM stack to RM stack, and remove rm_regs
+	/* Copy ix86 from PM stack to RM stack, and remove ix86
 	 * from PM stack.  (%edi still contains physical address of
-	 * rm_regs on RM stack from earlier, since C code preserves
+	 * ix86 on RM stack from earlier, since C code preserves
 	 * %edi).
 	 */
 	movl	%esp, %esi
-	movl	$SIZEOF_REAL_MODE_REGS, %ecx
+	movl	$SIZEOF_I386_ALL_REGS, %ecx
 	cld
 	rep movsb
-	movl	%esi, %esp	/* remove rm_regs from PM stack */
+	movl	%esi, %esp	/* remove ix86 from PM stack */
 
 	/* Obtain physical base address of installed copy of librm in
 	 * %ebx.  (It's possible that this *isn't* the physical base

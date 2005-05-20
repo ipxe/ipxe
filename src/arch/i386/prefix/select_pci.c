@@ -11,7 +11,7 @@
  * that would cause linker symbol pollution.
  *
  */
-void i386_select_pci_device ( struct i386_all_regs *regs ) {
+void i386_select_pci_device ( struct i386_all_regs *ix86 ) {
 	/*
 	 * PCI BIOS passes busdevfn in %ax
 	 *
@@ -23,6 +23,6 @@ void i386_select_pci_device ( struct i386_all_regs *regs ) {
 	
 	/* Select PCI bus and specified busdevfn as first boot device */
 	memset ( &u, 0, sizeof ( u ) );
-	u.pci_loc.busdevfn = regs->ax;
+	u.pci_loc.busdevfn = ix86->regs.ax;
 	select_device ( &dev, &pci_driver, &u.bus_loc );
 }

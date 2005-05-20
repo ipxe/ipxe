@@ -139,7 +139,7 @@ POST_RELOC_FN ( POST_RELOC_LIBRM, librm_post_reloc );
  * pointer to this new librm's entry point via es:di.
  *
  */
-void initialise_via_librm ( struct i386_all_regs *regs ) {
+void initialise_via_librm ( struct i386_all_regs *ix86 ) {
 	/* Hand off to initialise() */
 	initialise ();
 
@@ -147,7 +147,7 @@ void initialise_via_librm ( struct i386_all_regs *regs ) {
 	 * already set up by setup16, so all we need to do is point
 	 * es:0000 to the start of the new librm.
 	 */
-	regs->es = librm_base >> 4;
+	ix86->segs.es = librm_base >> 4;
 }
 
 /*

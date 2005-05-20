@@ -12,11 +12,6 @@
  *
  */
 
-/* All i386 registers, as passed in by prot_call or kir_call */
-struct real_mode_regs {
-	struct i386_all_regs;
-} PACKED;
-
 /* Segment:offset structure.  Note that the order within the structure
  * is offset:segment.
  */
