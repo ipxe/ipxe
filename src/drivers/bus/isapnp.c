@@ -52,8 +52,8 @@
  * an ISAPnP device.
  *
  * External code (e.g. the ISAPnP ROM prefix) may already know the
- * read port address, in which case it can store it in @c
- * isapnp_read_port.  Note that setting the read port address in this
+ * read port address, in which case it can store it in
+ * #isapnp_read_port.  Note that setting the read port address in this
  * way will prevent further isolation from taking place; you should
  * set the read port address only if you know that devices have
  * already been allocated CSNs.
@@ -332,7 +332,7 @@ static inline uint8_t isapnp_peek_byte ( void ) {
  * @ret None
  * @err None
  *
- * Resource data is read from the current location.  If @c buf is NULL,
+ * Resource data is read from the current location.  If #buf is NULL,
  * the data is discarded.
  *
  */
@@ -359,7 +359,7 @@ static void isapnp_peek ( uint8_t *buf, size_t bytes ) {
  *
  * Scan through the resource data until we find a particular tag, and
  * read its contents into a buffer.  It is the caller's responsibility
- * to ensure that @c buf is large enough to contain a tag of the
+ * to ensure that #buf is large enough to contain a tag of the
  * requested size.
  *
  */
@@ -544,15 +544,15 @@ static void isapnp_isolate ( void ) {
 }
 
 /**
- * Increment a @c bus_loc structure to the next possible ISAPnP
+ * Increment a #bus_loc structure to the next possible ISAPnP
  * location.
  *
  * @v bus_loc		Bus location
- * @ret True		@c bus_loc contains a valid ISAPnP location
+ * @ret True		#bus_loc contains a valid ISAPnP location
  * @ret False		There are no more valid ISAPnP locations
  * @err None
  *
- * If there are no more valid locations, the @c bus_loc structure will
+ * If there are no more valid locations, the #bus_loc structure will
  * be zeroed.
  *
  */

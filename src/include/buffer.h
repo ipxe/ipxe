@@ -1,7 +1,7 @@
 #ifndef BUFFER_H
 #define BUFFER_H
 
-#include "compiler.h"
+#include "compiler.h" /* for doxygen */
 #include "stdint.h"
 
 /** @file
@@ -62,10 +62,10 @@
 /**
  * A buffer
  *
- * @c start and @c end denote the real boundaries of the buffer, and
- * are physical addresses.  @c fill denotes the offset to the first
- * free block in the buffer.  (If the buffer is full, @c fill will
- * equal @c end-start.)
+ * #start and #end denote the real boundaries of the buffer, and are
+ * physical addresses.  #fill denotes the offset to the first free
+ * block in the buffer.  (If the buffer is full, #fill will equal
+ * #end-#start.)
  *
  */
 struct buffer {

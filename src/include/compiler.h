@@ -165,7 +165,7 @@ __asm__ ( ".equ\tDEBUG_LEVEL, " DEBUG_SYMBOL_STR );
 /** 
  * Declare a variable or data structure as unused.
  *
- * Note that using @c __unused on a static global variable (such as a
+ * Note that using #__unused on a static global variable (such as a
  * table structure as mentioned in tables.h) is necessary in order to
  * inhibit compiler warnings.
  *
@@ -176,8 +176,8 @@ __asm__ ( ".equ\tDEBUG_LEVEL, " DEBUG_SYMBOL_STR );
  * Declare a function as used.
  *
  * Necessary only if the function is called only from assembler code.
- * You cannot use this attribute for static global variables; use @c
- * __unused instead.
+ * You cannot use this attribute for static global variables; use
+ * #__unused instead.
  *
  */
 #define __used __attribute__ (( used ))

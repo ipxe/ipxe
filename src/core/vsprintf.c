@@ -22,7 +22,7 @@
  * @ret	0		(if buf == NULL)
  * @err None
  *
- * If @c buf==NULL, then the string will be written to the console
+ * If #buf==NULL, then the string will be written to the console
  * directly using putchar().
  *
  */
@@ -159,7 +159,7 @@ static int vsprintf(char *buf, const char *fmt, va_list args)
  * @ret	0		(if buf == NULL)
  * @err None
  *
- * If @c buf==NULL, then the string will be written to the console
+ * If #buf==NULL, then the string will be written to the console
  * directly using putchar().
  *
  */

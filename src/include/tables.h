@@ -164,6 +164,8 @@
  *
  */
 
+#include "compiler.h" /* for doxygen */
+
 #define __table_str(x) #x
 #define __table_section(table,idx) \
 	__section__ ( ".tbl." __table_str(table) "." __table_str(idx) )
