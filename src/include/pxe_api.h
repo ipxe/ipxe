@@ -320,6 +320,8 @@ extern PXENV_EXIT_t pxenv_tftp_get_fsize ( struct s_PXENV_TFTP_GET_FSIZE
 
 /** Parameter block for pxenv_udp_open() */
 struct s_PXENV_UDP_OPEN {
+	PXENV_STATUS_t	Status;		/**< PXE status code */
+	IP4_t		src_ip;		/**< IP address of this station */
 } PACKED;
 
 typedef struct s_PXENV_UDP_OPEN PXENV_UDP_OPEN_t;
@@ -340,6 +342,7 @@ extern PXENV_EXIT_t pxenv_udp_open ( struct s_PXENV_UDP_OPEN *udp_open );
 
 /** Parameter block for pxenv_udp_close() */
 struct s_PXENV_UDP_CLOSE {
+	PXENV_STATUS_t	Status;		/**< PXE status code */
 } PACKED;
 
 typedef struct s_PXENV_UDP_CLOSE PXENV_UDP_CLOSE_t;
@@ -360,6 +363,13 @@ extern PXENV_EXIT_t pxenv_udp_close ( struct s_PXENV_UDP_CLOSE *udp_close );
 
 /** Parameter block for pxenv_udp_write() */
 struct s_PXENV_UDP_WRITE {
+	PXENV_STATUS_t	Status;		/**< PXE status code */
+	IP4_t		ip;		/**< Destination IP address */
+	IP4_t		gw;		/**< Gateway IP address */
+	UDP_PORT_t	src_port;	/**< Source UDP port */
+	UDP_PORT_t	dst_port;	/**< Destination UDP port */
+	UINT16_t	buffer_size;	/**< UDP payload buffer size */
+	SEGOFF16_t	buffer;		/**< UDP payload buffer address */
 } PACKED;
 
 typedef struct s_PXENV_UDP_WRITE PXENV_UDP_WRITE_t;
@@ -380,6 +390,13 @@ extern PXENV_EXIT_t pxenv_udp_write ( struct s_PXENV_UDP_WRITE *udp_write );
 
 /** Parameter block for pxenv_udp_read() */
 struct s_PXENV_UDP_READ {
+	PXENV_STATUS_t	Status;		/**< PXE status code */
+	IP4_t		src_ip;		/**< Source IP address */
+	IP4_t		dest_ip;	/**< Destination IP address */
+	UDP_PORT_t	s_port;		/**< Source UDP port */
+	UDP_PORT_t	d_port;		/**< Destination UDP port */
+	UINT16_t	buffer_size;	/**< UDP payload buffer size */
+	SEGOFF16_t	buffer;		/**< UDP payload buffer address */
 } PACKED;
 
 typedef struct s_PXENV_UDP_READ PXENV_UDP_READ_t;
