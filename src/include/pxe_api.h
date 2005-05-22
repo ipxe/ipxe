@@ -77,10 +77,125 @@ struct s_PXENV_GET_CACHED_INFO {
 	UINT16_t PacketType;
 	UINT16_t BufferSize;			/**< Buffer size */
 	SEGOFF16_t Buffer;			/**< Buffer address */
-	UINT16_t BufferLimit			/**< Maximum buffer size */
+	UINT16_t BufferLimit;			/**< Maximum buffer size */
 } PACKED;
 
 typedef struct s_PXENV_GET_CACHED_INFO PXENV_GET_CACHED_INFO_t;
+
+#define BOOTP_REQ	1	/**< A BOOTP request packet */
+#define BOOTP_REP	2	/**< A BOOTP reply packet */
+
+#define HWTYPE_ETHER		1	/**< Ethernet (10Mb) */
+#define HWTYPE_EXP_ETHER	2	/**< Experimental Ethernet (3Mb) */
+#define HWTYPE_AX25		3	/**< Amateur Radio AX.25 */
+#define HWTYPE_TOKEN_RING	4	/**< Proteon ProNET Token Ring */
+#define HWTYPE_CHAOS		5	/**< Chaos */
+#define HWTYPE_IEEE		6	/**< IEEE 802 Networks */
+#define HWTYPE_ARCNET		7	/**< ARCNET */
+
+/** DHCP broadcast flag
+ *
+ * Request a broadcast response (DHCPOFFER or DHCPACK) from the DHCP
+ * server.
+ */
+#define BOOTP_BCAST	0x8000
+
+#define VM_RFC1048	0x63825363L	/**< DHCP magic cookie */
+
+/** Format of buffer filled in by pxenv_get_cached_info()
+ *
+ * This somewhat convoluted data structure simply describes the layout
+ * of a DHCP packet.  Refer to RFC2131 section 2 for a full
+ * description.
+ */
+struct bootph {
+	/** Message opcode.
+	 *
+	 * Valid values are #BOOTP_REQ and #BOOTP_REP.
+	 */
+	UINT8_t opcode;
+	/** NIC hardware type.
+	 *
+	 * Valid values are defined in RFC1010 ("Assigned numbers"),
+	 * and are #HWTYPE_ETHER, #HWTYPE_EXP_ETHER, #HWTYPE_AX25,
+	 * #HWTYPE_TOKEN_RING, #HWTYPE_CHAOS, #HWTYPE_IEEE and
+	 * #HWTYPE_ARCNET.
+	 */
+	UINT8_t Hardware;
+	UINT8_t Hardlen;		/**< MAC address length */
+	/** Gateway hops
+	 *
+	 * Zero in packets sent by the client.  May be non-zero in
+	 * replies from the DHCP server, if the reply comes via a DHCP
+	 * relay agent.
+	 */
+	UINT8_t Gatehops;
+	UINT32_t ident;			/**< DHCP transaction id (xid) */
+	/** Elapsed time
+	 *
+	 * Number of seconds since the client began the DHCP
+	 * transaction.
+	 */
+	UINT16_t seconds;
+	/** Flags
+	 *
+	 * This is the bitwise-OR of any of the following values:
+	 * #BOOTP_BCAST.
+	 */
+	UINT16_t Flags;
+	/** Client IP address
+	 *
+	 * Set only if the client already has an IP address.
+	 */
+	IP4_t cip;
+	/** Your IP address
+	 *
+	 * This is the IP address that the server assigns to the
+	 * client.
+	 */
+	IP4_t yip;
+	/** Server IP address
+	 *
+	 * This is the IP address of the BOOTP/DHCP server.
+	 */
+	IP4_t sip;
+	/** Gateway IP address
+	 *
+	 * This is the IP address of the BOOTP/DHCP relay agent, if
+	 * any.  It is @b not (necessarily) the address of the default
+	 * gateway for routing purposes.
+	 */
+	IP4_t gip;
+	MAC_ADDR_t CAddr;		/**< Client MAC address */
+	UINT8_t Sname[64];		/**< Server host name */
+	UINT8_t bootfile[128];		/**< Boot file name */
+	/** DHCP options
+	 *
+	 * Don't ask.  Just laugh.  Then burn a copy of the PXE
+	 * specification and send Intel an e-mail asking them if
+	 * they've figured out what a "union" does in C yet.
+	 */
+	union bootph_vendor {
+		UINT8_t d[BOOTP_DHCPVEND]; /**< DHCP options */
+		/** DHCP options */
+		struct bootph_vendor_v {
+			/** DHCP magic cookie
+			 *
+			 * Should have the value #VM_RFC1048.
+			 */
+			UINT8_t magic[4];
+			UINT32_t flags;	/**< BOOTP flags/opcodes */
+			/** "End of BOOTP vendor extensions"
+			 *
+			 * Abandon hope, all ye who consider the
+			 * purpose of this field.
+			 */
+			UINT8_t pad[56];
+		} v;
+	} vendor;
+} PACKED;
+
+typedef struct bootph BOOTPLAYER_t;
 
 extern PXENV_EXIT_t pxenv_get_cached_info ( struct s_PXENV_GET_CACHED_INFO
 					    *get_cached_info );
