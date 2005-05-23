@@ -117,7 +117,7 @@ typedef struct s_SEGDESC {
 	SEGSEL_t	segment_address;	/**< Segment selector */
 	ADDR32_t	physical_address;	/**< Segment base address */
 	OFF16_t		seg_size;		/**< Size of the segment */
-} PACKED __SEGDESC_t;
+} PACKED SEGDESC_t;
 
 /** @} */ /* pxe_types */
 

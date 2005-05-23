@@ -13,7 +13,6 @@
 
 #include "etherboot.h"
 #include "pxe_callbacks.h"
-#include "pxe_export.h"
 #include "pxe.h"
 
 unsigned long pxe_load_offset;

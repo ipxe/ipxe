@@ -3,6 +3,7 @@
 
 #include "pxe_types.h"
 #include "pxe_api.h"
+#include "etherboot.h"
 
 /* Union used for PXE API calls; we don't know the type of the
  * structure until we interpret the opcode.  Also, Status is available
@@ -14,7 +15,7 @@ union u_PXENV_ANY {
 	PXENV_STATUS_t				Status;
 	struct s_PXENV_UNLOAD_STACK		unload_stack;
 	struct s_PXENV_GET_CACHED_INFO		get_cached_info;
-	struct s_PXENV_RESTART_TFTP		restart_tftp;
+	struct s_PXENV_TFTP_READ_FILE		restart_tftp;
 	struct s_PXENV_START_UNDI		start_undi;
 	struct s_PXENV_STOP_UNDI		stop_undi;
 	struct s_PXENV_START_BASE		start_base;
@@ -31,7 +32,7 @@ union u_PXENV_ANY {
 	struct s_PXENV_UNDI_STARTUP		undi_startup;
 	struct s_PXENV_UNDI_CLEANUP		undi_cleanup;
 	struct s_PXENV_UNDI_INITIALIZE		undi_initialize;
-	struct s_PXENV_UNDI_RESET_ADAPTER	undi_reset_adapter;
+	struct s_PXENV_UNDI_RESET		undi_reset_adapter;
 	struct s_PXENV_UNDI_SHUTDOWN		undi_shutdown;
 	struct s_PXENV_UNDI_OPEN		undi_open;
 	struct s_PXENV_UNDI_CLOSE		undi_close;
@@ -62,16 +63,26 @@ typedef enum {
 	READY
 } pxe_stack_state_t;
 
+#define ENSURE_CAN_UNLOAD(structure) if ( ! ensure_pxe_state(CAN_UNLOAD) ) { \
+			structure->Status = PXENV_STATUS_UNDI_INVALID_STATE; \
+			return PXENV_EXIT_FAILURE; }
+#define ENSURE_MIDWAY(structure) if ( ! ensure_pxe_state(MIDWAY) ) { \
+			structure->Status = PXENV_STATUS_UNDI_INVALID_STATE; \
+			return PXENV_EXIT_FAILURE; }
+#define ENSURE_READY(structure) if ( ! ensure_pxe_state(READY) ) { \
+			structure->Status = PXENV_STATUS_UNDI_INVALID_STATE; \
+			return PXENV_EXIT_FAILURE; }
+
 /* Data structures installed as part of a PXE stack.  Architectures
  * will have extra information to append to the end of this.
  */
 #define PXE_TFTP_MAGIC_COOKIE ( ( 'P'<<24 ) | ( 'x'<<16 ) | ( 'T'<<8 ) | 'f' )
-typedef struct {
-	pxe_t		pxe	__attribute__ ((aligned(16)));
-	pxenv_t		pxenv	__attribute__ ((aligned(16)));
+typedef struct pxe_stack {
+	struct s_PXE		pxe	__attribute__ ((aligned(16)));
+	struct s_PXENV		pxenv	__attribute__ ((aligned(16)));
 	pxe_stack_state_t state;
 	union {
-		BOOTPLAYER	cached_info;
+		BOOTPLAYER_t	cached_info;
 		char		packet[ETH_FRAME_LEN];
 		struct {
 			uint32_t magic_cookie;
@@ -87,6 +98,10 @@ typedef struct {
 	};
 	struct {}	arch_data __attribute__ ((aligned(16)));
 } pxe_stack_t;
+
+extern int ensure_pxe_state ( pxe_stack_state_t wanted );
+
+extern pxe_stack_t *pxe_stack;
 
 extern PXENV_EXIT_t pxe_api_call ( int opcode, union u_PXENV_ANY *any );
 

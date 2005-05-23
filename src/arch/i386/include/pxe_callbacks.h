@@ -5,12 +5,12 @@
 #define PXE_CALLBACKS_H
 
 #include "etherboot.h"
-#include "pxe.h"
+#include "pxe_types.h"
 
 typedef struct {
-	segoff_t	orig_retaddr;
-	uint16_t	opcode;
-	segoff_t	segoff;
+	SEGOFF16_t	orig_retaddr;
+	UINT16_t	opcode;
+	SEGOFF16_t	segoff;
 } PACKED pxe_call_params_t;
 
 /*
@@ -22,7 +22,7 @@ typedef struct {
 
 /* Function prototypes
  */
-extern pxe_stack_t * install_pxe_stack ( void *base );
+extern struct pxe_stack * install_pxe_stack ( void *base );
 extern void use_undi_ds_for_rm_stack ( uint16_t ds );
 extern int hook_pxe_stack ( void );
 extern int unhook_pxe_stack ( void );

@@ -5,6 +5,8 @@
  */
 
 #include "pxe.h"
+#include "io.h"
+#include "string.h"
 
 /*
  * Copyright (C) 2004 Michael Brown <mbrown@fensystems.co.uk>.
@@ -25,13 +27,13 @@
  */
 
 /**
- * UDP OPEN (#PXENV_UDP_OPEN)
+ * UDP OPEN
  *
  * @v udp_open				Pointer to a struct s_PXENV_UDP_OPEN
  * @v s_PXENV_UDP_OPEN::src_ip		IP address of this station, or 0.0.0.0
- * @ret PXENV_EXIT_SUCCESS		Always
+ * @ret #PXENV_EXIT_SUCCESS		Always
  * @ret s_PXENV_UDP_OPEN::Status	PXE status code
- * @err PXENV_STATUS_UNDI_INVALID_STATE	NIC could not be initialised
+ * @err #PXENV_STATUS_UNDI_INVALID_STATE NIC could not be initialised
  *
  * Prepares the PXE stack for communication using pxenv_udp_write()
  * and pxenv_udp_read().  The IP address supplied in
@@ -49,11 +51,16 @@
  *   - you take the multiple connections into account when calling
  *     pxenv_udp_read().
  *
- * You can call pxenv_udp_open() in real mode, 16-bit protected mode
- * with a 16-bit stack segment, 16-bit protected mode with a 32-bit
- * stack segment, or V86 mode.  The pxe::StatusCallout field may be
- * zero even in protected mode.
+ * On x86, you can call pxenv_udp_open() in real mode, 16-bit
+ * protected mode with a 16-bit stack segment, 16-bit protected mode
+ * with a 32-bit stack segment, or V86 mode.  The pxe::StatusCallout
+ * field may be zero even in protected mode.
  * 
+ * @note The PXE specification states that you have only one UDP
+ * connection open at a time, and that you cannot have a UDP
+ * connection open simultaneously with a TFTP connection.  Etherboot
+ * does not enforce this unnecessary restriction.
+ *
  */
 PXENV_EXIT_t pxenv_udp_open ( struct s_PXENV_UDP_OPEN *udp_open ) {
 	DBG ( "PXENV_UDP_OPEN" );
@@ -71,10 +78,10 @@ PXENV_EXIT_t pxenv_udp_open ( struct s_PXENV_UDP_OPEN *udp_open ) {
 }
 
 /**
- * UDP CLOSE (#PXENV_UDP_CLOSE)
+ * UDP CLOSE
  *
  * @v udp_close				Pointer to a struct s_PXENV_UDP_CLOSE
- * @ret PXENV_EXIT_SUCCESS		Always
+ * @ret #PXENV_EXIT_SUCCESS		Always
  * @ret s_PXENV_UDP_CLOSE::Status	PXE status code
  * @err None
  *
@@ -89,6 +96,11 @@ PXENV_EXIT_t pxenv_udp_open ( struct s_PXENV_UDP_OPEN *udp_open ) {
  * stack segment, or V86 mode.  The pxe::StatusCallout field may be
  * zero even in protected mode.
  *
+ * @note The PXE specification states that you have only one UDP
+ * connection open at a time, and that you cannot have a UDP
+ * connection open simultaneously with a TFTP connection.  Etherboot
+ * does not enforce this unnecessary restriction.
+ *
  */
 PXENV_EXIT_t pxenv_udp_close ( struct s_PXENV_UDP_CLOSE *udp_close __unused ) {
 	DBG ( "PXENV_UDP_CLOSE" );
@@ -97,7 +109,7 @@ PXENV_EXIT_t pxenv_udp_close ( struct s_PXENV_UDP_CLOSE *udp_close __unused ) {
 }
 
 /**
- * UDP WRITE (#PXENV_UDP_WRITE)
+ * UDP WRITE
  *
  * @v udp_write				Pointer to a struct s_PXENV_UDP_WRITE
  * @v s_PXENV_UDP_WRITE::ip		Destination IP address
@@ -106,11 +118,11 @@ PXENV_EXIT_t pxenv_udp_close ( struct s_PXENV_UDP_CLOSE *udp_close __unused ) {
  * @v s_PXENV_UDP_WRITE::dst_port	Destination UDP port
  * @v s_PXENV_UDP_WRITE::buffer_size	Length of the UDP payload
  * @v s_PXENV_UDP_WRITE::buffer		Address of the UDP payload
- * @ret PXENV_EXIT_SUCCESS		Packet was transmitted successfully
- * @ret PXENV_EXIT_FAILURE		Packet could not be transmitter
+ * @ret #PXENV_EXIT_SUCCESS		Packet was transmitted successfully
+ * @ret #PXENV_EXIT_FAILURE		Packet could not be transmitter
  * @ret s_PXENV_UDP_WRITE::Status	PXE status code
- * @err PXENV_STATUS_UNDI_INVALID_STATE	NIC could not be initialised
- * @err PXENV_STATUS_OUT_OF_RESOURCES	Packet was too large to transmit
+ * @err #PXENV_STATUS_UNDI_INVALID_STATE NIC could not be initialised
+ * @err #PXENV_STATUS_OUT_OF_RESOURCES	Packet was too large to transmit
  * @err other				Any error from pxenv_undi_transmit()
  *
  * Transmits a single UDP packet.  A valid IP and UDP header will be
@@ -135,6 +147,11 @@ PXENV_EXIT_t pxenv_udp_close ( struct s_PXENV_UDP_CLOSE *udp_close __unused ) {
  * with a 16-bit stack segment, 16-bit protected mode with a 32-bit
  * stack segment, or V86 mode.  The pxe::StatusCallout field may be
  * zero even in protected mode.
+ *
+ * @note The PXE specification states that you have only one UDP
+ * connection open at a time, and that you cannot have a UDP
+ * connection open simultaneously with a TFTP connection.  Etherboot
+ * does not enforce this unnecessary restriction.
  *
  * @bug s_PXENV_UDP_WRITE::gw is ignored; the default routing table is
  * always used.
@@ -187,7 +204,7 @@ static int await_pxe_udp ( int ival __unused, void *ptr,
 			   unsigned short ptype __unused,
 			   struct iphdr *ip, struct udphdr *udp,
 			   struct tcphdr *tcp __unused ) {
-	t_PXENV_UDP_READ *udp_read = (t_PXENV_UDP_READ*)ptr;
+	struct s_PXENV_UDP_READ *udp_read = (struct s_PXENV_UDP_READ*)ptr;
 	uint16_t d_port;
 	size_t size;
 
@@ -237,24 +254,24 @@ static int await_pxe_udp ( int ival __unused, void *ptr,
 }
 
 /**
- * UDP READ (#PXENV_UDP_READ)
+ * UDP READ
  *
  * @v udp_read				Pointer to a struct s_PXENV_UDP_READ
  * @v s_PXENV_UDP_READ::dest_ip		Destination IP address, or 0.0.0.0
  * @v s_PXENV_UDP_READ::d_port		Destination UDP port, or 0
  * @v s_PXENV_UDP_READ::buffer_size	Size of the UDP payload buffer
  * @v s_PXENV_UDP_READ::buffer		Address of the UDP payload buffer
- * @ret PXENV_EXIT_SUCCESS		A packet has been received
- * @ret PXENV_EXIT_FAILURE		No packet has been received
+ * @ret #PXENV_EXIT_SUCCESS		A packet has been received
+ * @ret #PXENV_EXIT_FAILURE		No packet has been received
  * @ret s_PXENV_UDP_READ::Status	PXE status code
  * @ret s_PXENV_UDP_READ::src_ip	Source IP address
- * @ret s_PXEND_UDP_READ::dest_ip	Destination IP address
+ * @ret s_PXENV_UDP_READ::dest_ip	Destination IP address
  * @ret s_PXENV_UDP_READ::s_port	Source UDP port
  * @ret s_PXENV_UDP_READ::d_port	Destination UDP port
  * @ret s_PXENV_UDP_READ::buffer_size	Length of UDP payload
- * @err PXENV_STATUS_UNDI_INVALID_STATE	NIC could not be initialised
- * @err PXENV_STATUS_OUT_OF_RESOURCES	Buffer was too small for payload
- * @err PXENV_STATUS_FAILURE		No packet was ready to read
+ * @err #PXENV_STATUS_UNDI_INVALID_STATE NIC could not be initialised
+ * @err #PXENV_STATUS_OUT_OF_RESOURCES	Buffer was too small for payload
+ * @err #PXENV_STATUS_FAILURE		No packet was ready to read
  *
  * Receive a single UDP packet.  This is a non-blocking call; if no
  * packet is ready to read, the call will return instantly with
@@ -276,6 +293,11 @@ static int await_pxe_udp ( int ival __unused, void *ptr,
  * with a 16-bit stack segment, 16-bit protected mode with a 32-bit
  * stack segment, or V86 mode.  The pxe::StatusCallout field may be
  * zero even in protected mode.
+ *
+ * @note The PXE specification states that you have only one UDP
+ * connection open at a time, and that you cannot have a UDP
+ * connection open simultaneously with a TFTP connection.  Etherboot
+ * does not enforce this unnecessary restriction.
  *
  * @note The PXE specification (version 2.1) does not state that we
  * should fill in s_PXENV_UDP_READ::dest_ip and
