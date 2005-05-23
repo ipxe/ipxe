@@ -85,14 +85,6 @@ typedef struct s_PXENV_GET_CACHED_INFO PXENV_GET_CACHED_INFO_t;
 #define BOOTP_REQ	1	/**< A BOOTP request packet */
 #define BOOTP_REP	2	/**< A BOOTP reply packet */
 
-#define HWTYPE_ETHER		1	/**< Ethernet (10Mb) */
-#define HWTYPE_EXP_ETHER	2	/**< Experimental Ethernet (3Mb) */
-#define HWTYPE_AX25		3	/**< Amateur Radio AX.25 */
-#define HWTYPE_TOKEN_RING	4	/**< Proteon ProNET Token Ring */
-#define HWTYPE_CHAOS		5	/**< Chaos */
-#define HWTYPE_IEEE		6	/**< IEEE 802 Networks */
-#define HWTYPE_ARCNET		7	/**< ARCNET */
-
 /** DHCP broadcast flag
  *
  * Request a broadcast response (DHCPOFFER or DHCPACK) from the DHCP
@@ -116,10 +108,7 @@ struct bootph {
 	UINT8_t opcode;
 	/** NIC hardware type.
 	 *
-	 * Valid values are defined in RFC1010 ("Assigned numbers"),
-	 * and are #HWTYPE_ETHER, #HWTYPE_EXP_ETHER, #HWTYPE_AX25,
-	 * #HWTYPE_TOKEN_RING, #HWTYPE_CHAOS, #HWTYPE_IEEE and
-	 * #HWTYPE_ARCNET.
+	 * Valid values are as for s_PXENV_UNDI_GET_INFORMATION::HwType.
 	 */
 	UINT8_t Hardware;
 	UINT8_t Hardlen;		/**< MAC address length */
@@ -837,8 +826,65 @@ extern PXENV_EXIT_t pxenv_undi_close ( struct s_PXENV_UNDI_CLOSE *undi_close );
 /** PXE API function code for pxenv_undi_transmit() */
 #define	PXENV_UNDI_TRANSMIT		0x0008
 
+#define P_UNKNOWN	0		/**< Media header already filled in */
+#define P_IP		1		/**< IP protocol */
+#define P_ARP		2		/**< ARP protocol */
+#define P_RARP		3		/**< RARP protocol */
+#define P_OTHER		4		/**< Other protocol */
+
+#define XMT_DESTADDR	0x0000		/**< Unicast packet */
+#define XMT_BROADCAST	0x0001		/**< Broadcast packet */
+
+/** Maximum number of data blocks in a transmit buffer descriptor */
+#define MAX_DATA_BLKS	8
+
+/** A transmit buffer descriptor, as pointed to by s_PXENV_UNDI_TRANSMIT::TBD
+ */
+struct s_PXENV_UNDI_TBD {
+	UINT16_t ImmedLength;		/**< Length of the transmit buffer */
+	SEGOFF16_t Xmit;		/**< Address of the transmit buffer */
+	UINT16_t DataBlkCount;
+	/** Array of up to #MAX_DATA_BLKS additional transmit buffers */
+	struct DataBlk {
+		/** Always 1
+		 *
+		 * A value of 0 would indicate that #TDDataPtr were an
+		 * #ADDR32_t rather than a #SEGOFF16_t.  The PXE
+		 * specification version 2.1 explicitly states that
+		 * this is not supported; #TDDataPtr will always be a
+		 * #SEGOFF16_t.
+		 */
+		UINT8_t TDPtrType;
+		UINT8_t TDRsvdByte;	/**< Must be zero */
+		UINT16_t TDDataLen;	/**< Length of this transmit buffer */
+		SEGOFF16_t TDDataPtr;	/**< Address of this transmit buffer */
+	} DataBlock[MAX_DATA_BLKS];
+} PACKED;
+
+typedef struct s_PXENV_UNDI_TBD PXENV_UNDI_TBD_t;
+
 /** Parameter block for pxenv_undi_transmit() */
 struct s_PXENV_UNDI_TRANSMIT {
+	PXENV_STATUS_t	Status;		/**< PXE status code */
+	/** Protocol
+	 *
+	 * Valid values are #P_UNKNOWN, #P_IP, #P_ARP or #P_RARP.  If
+	 * the caller has already filled in the media header, this
+	 * field must be set to #P_UNKNOWN.
+	 */
+	UINT8_t Protocol;
+	/** Unicast/broadcast flag
+	 *
+	 * Valid values are #XMT_DESTADDR or #XMT_BROADCAST.
+	 */
+	UINT8_t XmitFlag;
+	SEGOFF16_t DestAddr;		/**< Destination MAC address */
+	/** Address of the Transmit Buffer Descriptor
+	 *
+	 * This is a pointer to a struct s_PXENV_UNDI_TBD.
+	 */
+	SEGOFF16_t TBD;
+	UINT32_t Reserved[2];		/**< Must be zero */
 } PACKED;
 
 typedef struct s_PXENV_UNDI_TRANSMIT PXENV_UNDI_TRANSMIT_t;
@@ -860,6 +906,9 @@ extern PXENV_EXIT_t pxenv_undi_transmit ( struct s_PXENV_UNDI_TRANSMIT
 
 /** Parameter block for pxenv_undi_set_mcast_address() */
 struct s_PXENV_UNDI_SET_MCAST_ADDRESS {
+	PXENV_STATUS_t	Status;		/**< PXE status code */
+	/** List of multicast addresses */
+	struct s_PXENV_UNDI_MCAST_ADDRESS R_Mcast_Buf;
 } PACKED;
 
 typedef struct s_PXENV_UNDI_SET_MCAST_ADDRESS PXENV_UNDI_SET_MCAST_ADDRESS_t;
@@ -881,6 +930,8 @@ extern PXENV_EXIT_t pxenv_undi_set_mcast_address (
 
 /** Parameter block for pxenv_undi_set_station_address() */
 struct s_PXENV_UNDI_SET_STATION_ADDRESS {
+	PXENV_STATUS_t	Status;		/**< PXE status code */
+	MAC_ADDR_t StationAddress;	/**< Station MAC address */
 } PACKED;
 
 typedef struct s_PXENV_UNDI_SET_STATION_ADDRESS PXENV_UNDI_SET_STATION_ADDRESS_t;
@@ -902,6 +953,18 @@ extern PXENV_EXIT_t pxenv_undi_set_station_address (
 
 /** Parameter block for pxenv_undi_set_packet_filter() */
 struct s_PXENV_UNDI_SET_PACKET_FILTER {
+	PXENV_STATUS_t	Status;		/**< PXE status code */
+	/** Receive packet filter
+	 *
+	 * This field takes the same values as
+	 * s_PXENV_UNDI_OPEN::PktFilter.
+	 *
+	 * @note Yes, this field is a different size to
+	 * s_PXENV_UNDI_OPEN::PktFilter.  Blame "the managers at Intel
+	 * who apparently let a consultant come up with the spec
+	 * without any kind of adult supervision" (quote from hpa).
+	 */
+	UINT8_t filter;
 } PACKED;
 
 typedef struct s_PXENV_UNDI_SET_PACKET_FILTER PXENV_UNDI_SET_PACKET_FILTER_t;
@@ -921,8 +984,33 @@ extern PXENV_EXIT_t pxenv_undi_set_packet_filter (
 /** PXE API function code for pxenv_undi_get_information() */
 #define	PXENV_UNDI_GET_INFORMATION	0x000c
 
+#define ETHER_TYPE		1	/**< Ethernet (10Mb) */
+#define EXP_ETHER_TYPE		2	/**< Experimental Ethernet (3Mb) */
+#define AX25_TYPE		3	/**< Amateur Radio AX.25 */
+#define TOKEN_RING_TYPE		4	/**< Proteon ProNET Token Ring */
+#define CHAOS_TYPE		5	/**< Chaos */
+#define IEEE_TYPE		6	/**< IEEE 802 Networks */
+#define ARCNET_TYPE		7	/**< ARCNET */
+
 /** Parameter block for pxenv_undi_get_information() */
 struct s_PXENV_UNDI_GET_INFORMATION {
+	PXENV_STATUS_t	Status;		/**< PXE status code */
+	UINT16_t BaseIo;		/**< I/O base address */
+	UINT16_t IntNumber;		/**< IRQ number */
+	UINT16_t MaxTranUnit;		/**< Adapter MTU */
+	/** Hardware type
+	 *
+	 * Valid values are defined in RFC1010 ("Assigned numbers"),
+	 * and are #ETHER_TYPE, #EXP_ETHER_TYPE, #AX25_TYPE,
+	 * #TOKEN_RING_TYPE, #CHAOS_TYPE, #IEEE_TYPE or #ARCNET_TYPE.
+	 */
+	UINT16_t HwType;
+	UINT16_t HwAddrLen;		/**< MAC address length */
+	MAC_ADDR_t CurrentNodeAddress;	/**< Current MAC address */
+	MAC_ADDR_t PermNodeAddress;	/**< Permanent (EEPROM) MAC address */
+	SEGSEL_t ROMAddress;		/**< Real-mode ROM segment address */
+	UINT16_t RxBufCt;		/**< Receive queue length */
+	UINT16_t TxBufCt;		/**< Transmit queue length */
 } PACKED;
 
 typedef struct s_PXENV_UNDI_GET_INFORMATION PXENV_UNDI_GET_INFORMATION_t;
@@ -944,6 +1032,11 @@ extern PXENV_EXIT_t pxenv_undi_get_information (
 
 /** Parameter block for pxenv_undi_get_statistics() */
 struct s_PXENV_UNDI_GET_STATISTICS {
+	PXENV_STATUS_t	Status;		/**< PXE status code */
+	UINT32_t XmtGoodFrames;		/**< Successful transmission count */
+	UINT32_t RcvGoodFrames;		/**< Successful reception count */
+	UINT32_t RcvCRCErrors;		/**< Receive CRC error count */
+	UINT32_t RcvResourceErrors;	/**< Receive queue overflow count */
 } PACKED;
 
 typedef struct s_PXENV_UNDI_GET_STATISTICS PXENV_UNDI_GET_STATISTICS_t;
@@ -965,6 +1058,7 @@ extern PXENV_EXIT_t pxenv_undi_get_statistics (
 
 /** Parameter block for pxenv_undi_clear_statistics() */
 struct s_PXENV_UNDI_CLEAR_STATISTICS {
+	PXENV_STATUS_t	Status;		/**< PXE status code */
 } PACKED;
 
 typedef struct s_PXENV_UNDI_CLEAR_STATISTICS PXENV_UNDI_CLEAR_STATISTICS_t;
@@ -986,6 +1080,7 @@ extern PXENV_EXIT_t pxenv_undi_clear_statistics (
 
 /** Parameter block for pxenv_undi_initiate_diags() */
 struct s_PXENV_UNDI_INITIATE_DIAGS {
+	PXENV_STATUS_t	Status;		/**< PXE status code */
 } PACKED;
 
 typedef struct s_PXENV_UNDI_INITIATE_DIAGS PXENV_UNDI_INITIATE_DIAGS_t;
@@ -1007,6 +1102,7 @@ extern PXENV_EXIT_t pxenv_undi_initiate_diags (
 
 /** Parameter block for pxenv_undi_force_interrupt() */
 struct s_PXENV_UNDI_FORCE_INTERRUPT {
+	PXENV_STATUS_t	Status;		/**< PXE status code */
 } PACKED;
 
 typedef struct s_PXENV_UNDI_FORCE_INTERRUPT PXENV_UNDI_FORCE_INTERRUPT_t;
@@ -1028,6 +1124,9 @@ extern PXENV_EXIT_t pxenv_undi_force_interrupt (
 
 /** Parameter block for pxenv_undi_get_mcast_address() */
 struct s_PXENV_UNDI_GET_MCAST_ADDRESS {
+	PXENV_STATUS_t	Status;		/**< PXE status code */
+	IP4_t InetAddr;			/**< Multicast IP address */
+	MAC_ADDR_t MediaAddr;		/**< Multicast MAC address */
 } PACKED;
 
 typedef struct s_PXENV_UNDI_GET_MCAST_ADDRESS PXENV_UNDI_GET_MCAST_ADDRESS_t;
@@ -1047,8 +1146,50 @@ extern PXENV_EXIT_t pxenv_undi_get_mcast_address (
 /** PXE API function code for pxenv_undi_get_nic_type() */
 #define	PXENV_UNDI_GET_NIC_TYPE		0x0012
 
+#define PCI_NIC		2		/**< PCI network card */
+#define PnP_NIC		3		/**< ISAPnP network card */
+#define CardBus_NIC	4		/**< CardBus network card */
+
+/** Information for a PCI or equivalent NIC */
+struct pci_nic_info {
+	UINT16_t Vendor_ID;		/**< PCI vendor ID */
+	UINT16_t Dev_ID;		/**< PCI device ID */
+	UINT8_t Base_Class;		/**< PCI base class */
+	UINT8_t Sub_Class;		/**< PCI sub class */
+	UINT8_t Prog_Intf;		/**< PCI programming interface */
+	UINT8_t Rev;			/**< PCI revision */
+	UINT16_t BusDevFunc;		/**< PCI bus:dev:fn address */
+	UINT16_t SubVendor_ID;		/**< PCI subvendor ID */
+	UINT16_t SubDevice_ID;		/**< PCI subdevice ID */
+} PACKED;
+ 
+/** Information for an ISAPnP or equivalent NIC */
+struct pnp_nic_info {
+	UINT32_t EISA_Dev_ID;		/**< EISA device ID */
+	UINT8_t Base_Class;		/**< Base class */
+	UINT8_t Sub_Class;		/**< Sub class */
+	UINT8_t Prog_Intf;		/**< Programming interface */
+	/** Card Select Number assigned to card */
+	UINT16_t CardSelNum;
+} PACKED;
+
 /** Parameter block for pxenv_undi_get_nic_type() */
 struct s_PXENV_UNDI_GET_NIC_TYPE {
+	PXENV_STATUS_t	Status;		/**< PXE status code */
+	/** NIC type
+	 *
+	 * Valid values are #PCI_NIC, #PnP_NIC or #CardBus_NIC.
+	 */
+	UINT8_t NicType;
+	/** NIC information */
+	union nic_type_info {
+		/** NIC information (if #NicType==#PCI_NIC) */
+		struct pci_nic_info pci;
+		/** NIC information (if #NicType==#CardBus_NIC) */
+		struct pci_nic_info cardbus;
+		/** NIC information (if #NicType==#PnP_NIC) */
+		struct pnp_nic_info pnp;
+	} info;
 } PACKED;
 
 typedef struct s_PXENV_UNDI_GET_NIC_TYPE PXENV_UNDI_GET_NIC_TYPE_t;
@@ -1070,6 +1211,27 @@ extern PXENV_EXIT_t pxenv_undi_get_nic_type (
 
 /** Parameter block for pxenv_undi_get_iface_info() */
 struct s_PXENV_UNDI_GET_IFACE_INFO {
+	PXENV_STATUS_t	Status;		/**< PXE status code */
+	/** Interface type
+	 *
+	 * This is defined in the NDIS 2.0 specification to be one of
+	 * the strings "802.3", "802.4", "802.5", "802.6", "DIX",
+	 * "DIX+802.3", "APPLETALK", "ARCNET", "FDDI", "SDLC", "BSC",
+	 * "HDLC", or "ISDN".
+	 *
+	 * "Normal" Ethernet, for various historical reasons, is
+	 * "DIX+802.3".
+	 */
+	UINT8_t IfaceType[16];
+	UINT32_t LinkSpeed;		/**< Link speed, in bits per second */
+	/** Service flags
+	 *
+	 * These are the "service flags" defined in the "MAC
+	 * Service-Specific Characteristics" table in the NDIS 2.0
+	 * specification.  Almost all of them are irrelevant to PXE.
+	 */
+	UINT32_t ServiceFlags;
+	UINT32_t Reserved[4];		/**< Must be zero */
 } PACKED;
 
 typedef struct s_PXENV_UNDI_GET_IFACE_INFO PXENV_UNDI_GET_IFACE_INFO_t;
@@ -1089,8 +1251,23 @@ extern PXENV_EXIT_t pxenv_undi_get_iface_info (
 /** PXE API function code for pxenv_undi_get_state() */
 #define PXENV_UNDI_GET_STATE		0x0015
 
+/** pxenv_start_undi() has been called */
+#define PXE_UNDI_GET_STATE_STARTED	1
+/** pxenv_undi_initialize() has been called */
+#define PXE_UNDI_GET_STATE_INITIALIZED	2
+/** pxenv_undi_open() has been called */
+#define PXE_UNDI_GET_STATE_OPENED	3
+
 /** Parameter block for pxenv_undi_get_state() */
 struct s_PXENV_UNDI_GET_STATE {
+	PXENV_STATUS_t	Status;		/**< PXE status code */
+	/** Current state of the UNDI driver
+	 *
+	 * Valid values are #PXE_UNDI_GET_STATE_STARTED,
+	 * #PXE_UNDI_GET_STATE_INITIALIZED or
+	 * #PXE_UNDI_GET_STATE_OPENED.
+	 */
+	UINT8_t UNDIstate;
 } PACKED;
 
 typedef struct s_PXENV_UNDI_GET_STATE PXENV_UNDI_GET_STATE_t;
@@ -1110,8 +1287,58 @@ extern PXENV_EXIT_t pxenv_undi_get_state ( struct s_PXENV_UNDI_GET_STATE
 /** PXE API function code for pxenv_undi_isr() */
 #define	PXENV_UNDI_ISR			0x0014
 
+/** Determine whether or not this is our interrupt */
+#define PXENV_UNDI_ISR_IN_START		1
+/** Start processing interrupt */
+#define PXENV_UNDI_ISR_IN_PROCESS	2
+/** Continue processing interrupt */
+#define PXENV_UNDI_ISR_IN_GET_NEXT	3
+/** This interrupt was ours */
+#define PXENV_UNDI_ISR_OUT_OURS		0
+/** This interrupt was not ours */
+#define PXENV_UNDI_ISR_OUT_NOT_OURS	1
+/** Finished processing interrupt */
+#define PXENV_UNDI_ISR_OUT_DONE		0
+/** A packet transmission has completed */
+#define PXENV_UNDI_ISR_OUT_TRANSMIT	2
+/** A packet has been received */
+#define PXENV_UNDI_ISR_OUT_RECEIVE	3
+/** We are already in the middle of processing an interrupt */
+#define PXENV_UNDI_ISR_OUT_BUSY		4
+
+/** Unicast packet (or packet captured in promiscuous mode) */
+#define P_DIRECTED	0
+/** Broadcast packet */
+#define P_BROADCAST	1
+/** Multicast packet */
+#define P_MULTICAST	2
+
 /** Parameter block for pxenv_undi_isr() */
 struct s_PXENV_UNDI_ISR {
+	PXENV_STATUS_t	Status;		/**< PXE status code */
+	/** Function flag
+	 *
+	 * Valid values are #PXENV_UNDI_ISR_IN_START,
+	 * #PXENV_UNDI_ISR_IN_PROCESS, #PXENV_UNDI_ISR_IN_GET_NEXT,
+	 * #PXENV_UNDI_ISR_OUT_OURS, #PXENV_UNDI_ISR_OUT_NOT_OURS,
+	 * #PXENV_UNDI_ISR_OUT_DONE, #PXENV_UNDI_ISR_OUT_TRANSMIT,
+	 * #PXENV_UNDI_ISR_OUT_RECEIVE or #PXENV_UNDI_ISR_OUT_BUSY.
+	 */
+	UINT16_t FuncFlag;
+	UINT16_t BufferLength;		/**< Data buffer length */
+	UINT16_t FrameLength;		/**< Total frame length */
+	UINT16_t FrameHeaderLength;	/**< Frame header length */
+	SEGOFF16_t Frame;		/**< Data buffer address */
+	/** Protocol type
+	 *
+	 * Valid values are #P_IP, #P_ARP, #P_RARP or #P_OTHER.
+	 */
+	UINT8_t ProtType;
+	/** Packet type
+	 *
+	 * Valid values are #P_DIRECTED, #P_BROADCAST or #P_MULTICAST.
+	 */
+	UINT8_t PktType;
 } PACKED;
 
 typedef struct s_PXENV_UNDI_ISR PXENV_UNDI_ISR_t;
