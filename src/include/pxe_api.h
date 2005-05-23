@@ -655,6 +655,7 @@ extern PXENV_EXIT_t pxenv_undi_startup ( struct s_PXENV_UNDI_STARTUP
 
 /** Parameter block for pxenv_undi_cleanup() */
 struct s_PXENV_UNDI_CLEANUP {
+	PXENV_STATUS_t	Status;		/**< PXE status code */
 } PACKED;
 
 typedef struct s_PXENV_UNDI_CLEANUP PXENV_UNDI_CLEANUP_t;
@@ -676,6 +677,16 @@ extern PXENV_EXIT_t pxenv_undi_cleanup ( struct s_PXENV_UNDI_CLEANUP
 
 /** Parameter block for pxenv_undi_initialize() */
 struct s_PXENV_UNDI_INITIALIZE {
+	PXENV_STATUS_t	Status;		/**< PXE status code */
+	/** NDIS 2.0 configuration information, or NULL
+	 *
+	 * This is a pointer to the data structure returned by the
+	 * NDIS 2.0 GetProtocolManagerInfo() API call.  The data
+	 * structure is documented, in a rather haphazard way, in
+	 * section 4-17 of the NDIS 2.0 specification.
+	 */
+	ADDR32_t ProtocolIni;
+	UINT8_t reserved[8];		/**< Must be zero */
 } PACKED;
 
 typedef struct s_PXENV_UNDI_INITIALIZE PXENV_UNDI_INITIALIZE_t;
@@ -695,8 +706,24 @@ extern PXENV_EXIT_t pxenv_undi_initialize ( struct s_PXENV_UNDI_INITIALIZE
 /** PXE API function code for pxenv_undi_reset_adapter() */
 #define	PXENV_UNDI_RESET_ADAPTER	0x0004
 
+/** Maximum number of multicast MAC addresses */
+#define MAXNUM_MCADDR	8
+
+/** List of multicast MAC addresses */
+struct s_PXENV_UNDI_MCAST_ADDRESS {
+	/** Number of multicast MAC addresses */
+	UINT16_t MCastAddrCount;
+	/** List of up to #MAXNUM_MCADDR multicast MAC addresses */
+	MAC_ADDR_t McastAddr[MAXNUM_MCADDR];
+} PACKED;
+
+typedef struct s_PXENV_UNDI_MCAST_ADDRESS PXENV_UNDI_MCAST_ADDRESS_t;
+
 /** Parameter block for pxenv_undi_reset_adapter() */
 struct s_PXENV_UNDI_RESET_ADAPTER {
+	PXENV_STATUS_t	Status;		/**< PXE status code */
+	/** Multicast MAC addresses */
+	struct s_PXENV_UNDI_MCAST_ADDRESS R_Mcast_Buf;
 } PACKED;
 
 typedef struct s_PXENV_UNDI_RESET_ADAPTER PXENV_UNDI_RESET_ADAPTER_t;
@@ -718,6 +745,7 @@ extern PXENV_EXIT_t pxenv_undi_reset_adapter ( struct s_PXENV_UNDI_RESET
 
 /** Parameter block for pxenv_undi_shutdown() */
 struct s_PXENV_UNDI_SHUTDOWN {
+	PXENV_STATUS_t	Status;		/**< PXE status code */
 } PACKED;
 
 typedef struct s_PXENV_UNDI_SHUTDOWN PXENV_UNDI_SHUTDOWN_t;
@@ -737,8 +765,39 @@ extern PXENV_EXIT_t pxenv_undi_shutdown ( struct s_PXENV_UNDI_SHUTDOWN
 /** PXE API function code for pxenv_undi_open() */
 #define	PXENV_UNDI_OPEN			0x0006
 
+/** Accept "directed" packets
+ *
+ * These are packets addresses to either this adapter's MAC address or
+ * to any of the configured multicast MAC addresses (see
+ * #s_PXENV_UNDI_MCAST_ADDRESS).
+ */
+#define FLTR_DIRECTED	0x0001
+/** Accept broadcast packets */
+#define FLTR_BRDCST	0x0002
+/** Accept all packets; listen in promiscuous mode */
+#define FLTR_PRMSCS	0x0004
+/** Accept source-routed packets */
+#define FLTR_SRC_RTG	0x0008
+
 /** Parameter block for pxenv_undi_open() */
 struct s_PXENV_UNDI_OPEN {
+	PXENV_STATUS_t	Status;		/**< PXE status code */
+	/** Open flags as defined in NDIS 2.0
+	 *
+	 * This is the OpenOptions field as passed to the NDIS 2.0
+	 * OpenAdapter() API call.  It is defined to be "adapter
+	 * specific", though 0 is guaranteed to be a valid value.
+	 */
+	UINT16_t OpenFlag;
+	/** Receive packet filter
+	 *
+	 * This is the bitwise-OR of any of the following flags:
+	 * #FLTR_DIRECTED, #FLTR_BRDCST, #FLTR_PRMSCS and
+	 * #FLTR_SRC_RTG.
+	 */
+	UINT16_t PktFilter;
+	/** Multicast MAC addresses */
+	struct s_PXENV_UNDI_MCAST_ADDRESS R_Mcast_Buf;
 } PACKED;
 
 typedef struct s_PXENV_UNDI_OPEN PXENV_UNDI_OPEN_t;
@@ -759,6 +818,7 @@ extern PXENV_EXIT_t pxenv_undi_open ( struct s_PXENV_UNDI_OPEN *undi_open );
 
 /** Parameter block for pxenv_undi_close() */
 struct s_PXENV_UNDI_CLOSE {
+	PXENV_STATUS_t	Status;		/**< PXE status code */
 } PACKED;
 
 typedef struct s_PXENV_UNDI_CLOSE PXENV_UNDI_CLOSE_t;
