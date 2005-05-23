@@ -135,6 +135,7 @@ SRCDIRS		+= proto
 SRCDIRS		+= drivers/bus
 SRCDIRS		+= drivers/net
 #SRCDIRS		+= drivers/disk 
+SRCDIRS		+= interface/pxe
 
 # NON_AUTO_SRCS lists files that are excluded from the normal
 # automatic build system.
