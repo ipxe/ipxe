@@ -213,8 +213,7 @@ extern PXENV_EXIT_t pxenv_get_cached_info ( struct s_PXENV_GET_CACHED_INFO
 #define	PXENV_RESTART_TFTP		0x0073
 
 /** Parameter block for pxenv_restart_tftp() */
-struct s_PXENV_RESTART_TFTP {
-} PACKED;
+struct s_PXENV_TFTP_READ_FILE;
 
 typedef struct s_PXENV_RESTART_TFTP PXENV_RESTART_TFTP_t;
 
@@ -235,6 +234,58 @@ extern PXENV_EXIT_t pxenv_restart_tftp ( struct s_PXENV_TFTP_READ_FILE
 
 /** Parameter block for pxenv_start_undi() */
 struct s_PXENV_START_UNDI {
+	PXENV_STATUS_t Status;			/**< PXE status code */
+	/** %ax register as passed to the Option ROM initialisation routine.
+	 *
+	 * For a PCI device, this should contain the bus:dev:fn value
+	 * that uniquely identifies the PCI device in the system.  For
+	 * a non-PCI device, this field is not defined.
+	 */
+	UINT16_t AX;
+	/** %bx register as passed to the Option ROM initialisation routine.
+	 *
+	 * For an ISAPnP device, this should contain the Card Select
+	 * Number assigned to the ISAPnP card.  For non-ISAPnP
+	 * devices, this should contain 0xffff.
+	 */
+	UINT16_t BX;
+	/** %dx register as passed to the Option ROM initialisation routine.
+	 *
+	 * For an ISAPnP device, this should contain the ISAPnP Read
+	 * Port address as currently set in all ISAPnP cards.  If
+	 * there are no ISAPnP cards, this should contain 0xffff.  (If
+	 * this is a non-ISAPnP device, but there are ISAPnP cards in
+	 * the system, this value is not well defined.)
+	 */
+	UINT16_t DX;
+	/** %di register as passed to the Option ROM initialisation routine.
+	 *
+	 * This contains the #OFF16_t portion of a struct #s_SEGOFF16
+	 * that points to the System BIOS Plug and Play Installation
+	 * Check Structure.  (Refer to section 4.4 of the Plug and
+	 * Play BIOS specification for a description of this
+	 * structure.)
+	 *
+	 * @note The PXE specification defines the type of this field
+	 * as #UINT16_t.  For x86, #OFF16_t and #UINT16_t are
+	 * equivalent anyway; for other architectures #OFF16_t makes
+	 * more sense.
+	 */
+	OFF16_t DI;
+	/** %es register as passed to the Option ROM initialisation routine.
+	 *
+	 * This contains the #SEGSEL_t portion of a struct #s_SEGOFF16
+	 * that points to the System BIOS Plug and Play Installation
+	 * Check Structure.  (Refer to section 4.4 of the Plug and
+	 * Play BIOS specification for a description of this
+	 * structure.)
+	 *
+	 * @note The PXE specification defines the type of this field
+	 * as #UINT16_t.  For x86, #SEGSEL_t and #UINT16_t are
+	 * equivalent anyway; for other architectures #SEGSEL_t makes
+	 * more sense.
+	 */
+	SEGSEL_t ES;
 } PACKED;
 
 typedef struct s_PXENV_START_UNDI PXENV_START_UNDI_t;
@@ -255,6 +306,7 @@ extern PXENV_EXIT_t pxenv_start_undi ( struct s_PXENV_START_UNDI *start_undi );
 
 /** Parameter block for pxenv_stop_undi() */
 struct s_PXENV_STOP_UNDI {
+	PXENV_STATUS_t Status;			/**< PXE status code */
 } PACKED;
 
 typedef struct s_PXENV_STOP_UNDI PXENV_STOP_UNDI_t;
@@ -275,6 +327,7 @@ extern PXENV_EXIT_t pxenv_stop_undi ( struct s_PXENV_STOP_UNDI *stop_undi );
 
 /** Parameter block for pxenv_start_base() */
 struct s_PXENV_START_BASE {
+	PXENV_STATUS_t Status;			/**< PXE status code */
 } PACKED;
 
 typedef struct s_PXENV_START_BASE PXENV_START_BASE_t;
@@ -295,6 +348,7 @@ extern PXENV_EXIT_t pxenv_start_base ( struct s_PXENV_START_BASE *start_base );
 
 /** Parameter block for pxenv_stop_base() */
 struct s_PXENV_STOP_BASE {
+	PXENV_STATUS_t Status;			/**< PXE status code */
 } PACKED;
 
 typedef struct s_PXENV_STOP_BASE PXENV_STOP_BASE_t;
@@ -324,6 +378,18 @@ extern PXENV_EXIT_t pxenv_stop_base ( struct s_PXENV_STOP_BASE *stop_base );
 
 /** Parameter block for pxenv_tftp_open() */
 struct s_PXENV_TFTP_OPEN {
+	PXENV_STATUS_t Status;			/**< PXE status code */
+	IP4_t ServerIPAddress;			/**< TFTP server IP address */
+	IP4_t GatewayIPAddress;			/**< Relay agent IP address */
+	UINT8_t FileName[128];			/**< File name */
+	UDP_PORT_t TFTPPort;			/**< TFTP server UDP port */
+	/** Requested size of TFTP packets
+	 *
+	 * This is the TFTP "blksize" option.  This must be at least
+	 * 512, according to the PXE specification, though no reason
+	 * is offered.
+	 */
+	UINT16_t PacketSize;
 } PACKED;
 
 typedef struct s_PXENV_TFTP_OPEN PXENV_TFTP_OPEN_t;
@@ -344,6 +410,7 @@ extern PXENV_EXIT_t pxenv_tftp_open ( struct s_PXENV_TFTP_OPEN *tftp_open );
 
 /** Parameter block for pxenv_tftp_close() */
 struct s_PXENV_TFTP_CLOSE {
+	PXENV_STATUS_t Status;			/**< PXE status code */
 } PACKED;
 
 typedef struct s_PXENV_TFTP_CLOSE PXENV_TFTP_CLOSE_t;
@@ -364,6 +431,10 @@ extern PXENV_EXIT_t pxenv_tftp_close ( struct s_PXENV_TFTP_CLOSE *tftp_close );
 
 /** Parameter block for pxenv_tftp_read() */
 struct s_PXENV_TFTP_READ {
+	PXENV_STATUS_t Status;			/**< PXE status code */
+	UINT16_t PacketNumber;			/**< TFTP packet number */
+	UINT16_t BufferSize;			/**< Size of data buffer */
+	SEGOFF16_t Buffer;			/**< Address of data buffer */
 } PACKED;
 
 typedef struct s_PXENV_TFTP_READ PXENV_TFTP_READ_t;
@@ -384,6 +455,22 @@ extern PXENV_EXIT_t pxenv_tftp_read ( struct s_PXENV_TFTP_READ *tftp_read );
 
 /** Parameter block for pxenv_tftp_read_file() */
 struct s_PXENV_TFTP_READ_FILE {
+	PXENV_STATUS_t Status;			/**< PXE status code */
+	UINT8_t FileName[128];			/**< File name */
+	UINT32_t BufferSize;			/**< Size of data buffer */
+	ADDR32_t Buffer;			/**< Address of data buffer */
+	IP4_t ServerIPAddress;			/**< TFTP server IP address */
+	IP4_t GatewayIPAddress;			/**< Relay agent IP address */
+	/** File multicast IP address */
+	IP4_t McastIPAddress;
+	/** Client multicast listening port */
+	UDP_PORT_t TFTPClntPort;
+	/** Server multicast listening port */
+	UDP_PORT_t TFTPSrvPort;
+	/** Timeout for receiving data or ACK packets */
+	UINT16_t TFTPOpenTimeOut;
+	/** Timeout before issuing MTFTP open */
+	UINT16_t TFTPReopenDelay;
 } PACKED;
 
 typedef struct s_PXENV_TFTP_READ_FILE PXENV_TFTP_READ_FILE_t;
@@ -405,6 +492,11 @@ extern PXENV_EXIT_t pxenv_tftp_read_file ( struct s_PXENV_TFTP_READ_FILE
 
 /** Parameter block for pxenv_tftp_get_fsize() */
 struct s_PXENV_TFTP_GET_FSIZE {
+	PXENV_STATUS_t Status;			/**< PXE status code */
+	IP4_t ServerIPAddress;			/**< TFTP server IP address */
+	IP4_t GatewayIPAddress;			/**< Relay agent IP address */
+	UINT8_t FileName[128];			/**< File name */
+	UINT32_t FileSize;			/**< Size of the file */
 } PACKED;
 
 typedef struct s_PXENV_TFTP_GET_FSIZE PXENV_TFTP_GET_FSIZE_t;
@@ -480,7 +572,7 @@ extern PXENV_EXIT_t pxenv_udp_close ( struct s_PXENV_UDP_CLOSE *udp_close );
 struct s_PXENV_UDP_WRITE {
 	PXENV_STATUS_t	Status;		/**< PXE status code */
 	IP4_t		ip;		/**< Destination IP address */
-	IP4_t		gw;		/**< Gateway IP address */
+	IP4_t		gw;		/**< Relay agent IP address */
 	UDP_PORT_t	src_port;	/**< Source UDP port */
 	UDP_PORT_t	dst_port;	/**< Destination UDP port */
 	UINT16_t	buffer_size;	/**< UDP payload buffer size */
@@ -541,6 +633,7 @@ extern PXENV_EXIT_t pxenv_udp_read ( struct s_PXENV_UDP_READ *udp_read );
 
 /** Parameter block for pxenv_undi_startup() */
 struct s_PXENV_UNDI_STARTUP {
+	PXENV_STATUS_t	Status;		/**< PXE status code */
 } PACKED;
 
 typedef struct s_PXENV_UNDI_STARTUP PXENV_UNDI_STARTUP_t;
