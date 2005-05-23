@@ -1,6 +1,22 @@
 #ifndef PXE_API_H
 #define PXE_API_H
 
+/*
+ * This program is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU General Public License as
+ * published by the Free Software Foundation; either version 2 of the
+ * License, or any later version.
+ *
+ * This program is distributed in the hope that it will be useful, but
+ * WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ * General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program; if not, write to the Free Software
+ * Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
+ */
+
 /** @file
  *
  * Preboot eXecution Environment (PXE) API
@@ -12,6 +28,260 @@
 /** @addtogroup pxe Preboot eXecution Environment (PXE) API
  *  @{
  */
+
+/** @defgroup pxe_api_call PXE entry points
+ *
+ * PXE entry points and calling conventions
+ *
+ *  @{
+ */
+
+/** The PXENV+ structure */
+struct s_PXENV {
+	/** Signature
+	 *
+	 * Contains the bytes 'P', 'X', 'E', 'N', 'V', '+'.
+	 */
+	UINT8_t		Signature[6];
+	/** PXE API version
+	 *
+	 * MSB is major version number, LSB is minor version number.
+	 * If the API version number is 0x0201 or greater, the !PXE
+	 * structure pointed to by #PXEPtr should be used instead of
+	 * this data structure.
+	 */
+	UINT16_t	Version;
+	UINT8_t		Length;		/**< Length of this structure */
+	/** Checksum
+	 *
+	 * The byte checksum of this structure (using the length in
+	 * #Length) must be zero.
+	 */
+	UINT8_t		Checksum;
+	SEGOFF16_t	RMEntry;	/**< Real-mode PXENV+ entry point */
+	/** Protected-mode PXENV+ entry point offset
+	 *
+	 * PXE 2.1 deprecates this entry point.  For protected-mode
+	 * API calls, use the !PXE structure pointed to by #PXEPtr
+	 * instead.
+	 */
+	UINT32_t	PMOffset;
+	/** Protected-mode PXENV+ entry point segment selector
+	 *
+	 * PXE 2.1 deprecates this entry point.  For protected-mode
+	 * API calls, use the !PXE structure pointed to by #PXEPtr
+	 * instead.
+	 */
+	SEGSEL_t	PMSelector;
+	SEGSEL_t	StackSeg;	/**< Stack segment selector */
+	UINT16_t	StackSize;	/**< Stack segment size */
+	SEGSEL_t	BC_CodeSeg;	/**< Base-code code segment selector */
+	UINT16_t	BC_CodeSize;	/**< Base-code code segment size */
+	SEGSEL_t	BC_DataSeg;	/**< Base-code data segment selector */
+	UINT16_t	BC_DataSize;	/**< Base-code data segment size */
+	SEGSEL_t	UNDIDataSeg;	/**< UNDI data segment selector */
+	UINT16_t	UNDIDataSize;	/**< UNDI data segment size */
+	SEGSEL_t	UNDICodeSeg;	/**< UNDI code segment selector */
+	UINT16_t	UNDICodeSize;	/**< UNDI code segment size */
+	/** Address of the !PXE structure
+	 *
+	 * This field is present only if #Version is 0x0201 or
+	 * greater.  If present, it points to a struct s_PXE.
+	 */
+	SEGOFF16_t	PXEPtr;
+} PACKED;
+
+typedef struct s_PXENV PXENV_t;
+
+/** The !PXE structure */
+struct s_PXE {
+	/** Signature
+	 *
+	 * Contains the bytes '!', 'P', 'X', 'E'.
+	 */
+	UINT8_t		Signature[4];
+	UINT8_t		StructLength;	/**< Length of this structure */
+	/** Checksum
+	 *
+	 * The byte checksum of this structure (using the length in
+	 * #StructLength) must be zero.
+	 */
+	UINT8_t		StructCksum;
+	/** Revision of this structure
+	 *
+	 * For PXE version 2.1, this field must be zero.
+	 */
+	UINT8_t		StructRev;
+	UINT8_t		reserved_1;	/**< Must be zero */
+	/** Address of the UNDI ROM ID structure
+	 *
+	 * This is a pointer to a struct s_UNDI_ROM_ID.
+	 */
+	SEGOFF16_t	UNDIROMID;
+	/** Address of the Base Code ROM ID structure
+	 *
+	 * This is a pointer to a struct s_BC_ROM_ID.
+	 */
+	SEGOFF16_t	BaseROMID;
+	/** 16-bit !PXE entry point
+	 *
+	 * This is the entry point for either real mode, or protected
+	 * mode with a 16-bit stack segment.
+	 */
+	SEGOFF16_t	EntryPointSP;
+	/** 32-bit !PXE entry point
+	 *
+	 * This is the entry point for protected mode with a 32-bit
+	 * stack segment.
+	 */
+	SEGOFF16_t	EntryPointESP;
+	/** Status call-out function
+	 *
+	 * @v 0		(if in a time-out loop)
+	 * @v n		Number of a received TFTP packet
+	 * @ret 0	Continue operation
+	 * @ret 1	Cancel operation
+	 *
+	 * This function will be called whenever the PXE stack is in
+	 * protected mode, is waiting for an event (e.g. a DHCP reply)
+	 * and wishes to allow the user to cancel the operation.
+	 * Parameters are passed in register %ax; the return value
+	 * must also be placed in register %ax.  All other registers
+	 * and flags @b must be preserved.
+	 *
+	 * In real mode, an internal function (that checks for a
+	 * keypress) will be used.
+	 *
+	 * If this field is set to -1, no status call-out function
+	 * will be used and consequently the user will not be allowed
+	 * to interrupt operations.
+	 *
+	 * @note The PXE specification version 2.1 defines the
+	 * StatusCallout field, mentions it 11 times, but nowhere
+	 * defines what it actually does or how it gets called.
+	 * Fortunately, the WfM specification version 1.1a deigns to
+	 * inform us of such petty details.
+	 */
+	SEGOFF16_t	StatusCallout;
+	UINT8_t		reserved_2;	/**< Must be zero */
+	/** Number of segment descriptors
+	 *
+	 * If this number is greater than 7, the remaining descriptors
+	 * follow immediately after #BC_CodeWrite.
+	 */
+	UINT8_t		SegDescCnt;
+	/** First protected-mode selector
+	 *
+	 * This is the segment selector value for the first segment
+	 * assigned to PXE.  Protected-mode selectors must be
+	 * consecutive, according to the PXE 2.1 specification, though
+	 * no reason is given.  Each #SEGDESC_t includes a field for
+	 * the segment selector, so this information is entirely
+	 * redundant.
+	 */
+	SEGSEL_t	FirstSelector;
+	/** Stack segment descriptor */
+	SEGDESC_t	Stack;
+	/** UNDI data segment descriptor */
+	SEGDESC_t	UNDIData;
+	/** UNDI code segment descriptor */
+	SEGDESC_t	UNDICode;
+	/** UNDI writable code segment descriptor */
+	SEGDESC_t	UNDICodeWrite;
+	/** Base-code data segment descriptor */
+	SEGDESC_t	BC_Data;
+	/** Base-code code segment descriptor */
+	SEGDESC_t	BC_Code;
+	/** Base-code writable code segment descriptor */
+	SEGDESC_t	BC_CodeWrite;
+} PACKED;
+
+typedef struct s_PXE PXE_t;
+
+/** @} */ /* pxe_api_call */
+
+/** @defgroup pxe_loader_api PXE Loader API
+ *
+ * The UNDI ROM loader API
+ *
+ * @{
+ */
+
+/** The UNDI ROM ID structure */
+struct s_UNDI_ROM_ID {
+	/** Signature
+	 *
+	 * Contains the bytes 'U', 'N', 'D', 'I'.
+	 */
+	UINT32_t Signature;
+	UINT8_t StructLength;		/**< Length of this structure */
+	/** Checksum
+	 *
+	 * The byte checksum of this structure (using the length in
+	 * #StructLength) must be zero.
+	 */
+	UINT8_t StructCksum;
+	/** Revision of this structure
+	 *
+	 * For PXE version 2.1, this field must be zero.
+	 */
+	UINT8_t StructRev;
+	/** UNDI revision
+	 *
+	 * UNDI revision, least significant byte first.  For UNDI
+	 * version 2.1.0, this field will contain { 0x00, 0x01, 0x02 }.
+	 */
+	UINT8_t UNDIRev[3];
+	/** UNDI loader routine entry point
+	 *
+	 * This is the entry point for calling undi_loader().
+	 */
+	UINT16_t UNDILoader;
+	/** Minimum required stack segment size */
+	UINT16_t StackSize;
+	/** Minimum required data segment size */
+	UINT16_t DataSize;
+	/** Minimum required code segment size */
+	UINT16_t CodeSize;
+} PACKED;
+
+typedef struct s_UNDI_ROM_ID UNDI_ROM_ID_t;
+
+/** Parameter block for undi_loader() */
+struct s_UNDI_LOADER {
+	/** struct s_UNDI_LOADER starts with a struct s_PXENV_START_UNDI */
+	union undi_loader_start_undi {
+		PXENV_STATUS_t Status;		/**< PXE status code */
+		/** Parameters to pass to pxenv_start_undi() */
+		struct s_PXENV_START_UNDI start_undi;
+	} u;
+	/** UNDI data segment
+	 *
+	 * @note The PXE specification defines the type of this field
+	 * as #UINT16_t.  For x86, #SEGSEL_t and #UINT16_t are
+	 * equivalent anyway; for other architectures #SEGSEL_t makes
+	 * more sense.
+	 */
+	SEGSEL_t	undi_ds;
+	/** UNDI code segment
+	 *
+	 * @note The PXE specification defines the type of this field
+	 * as #UINT16_t.  For x86, #SEGSEL_t and #UINT16_t are
+	 * equivalent anyway; for other architectures #SEGSEL_t makes
+	 * more sense.
+	 */
+	SEGSEL_t	undi_cs;
+	/** Address of the !PXE structure (a struct s_PXE) */
+	SEGOFF16_t	pxe_ptr;
+	/** Address of the PXENV+ structure (a struct s_PXENV) */
+	SEGOFF16_t	pxenv_ptr;
+} PACKED;
+
+typedef struct s_UNDI_LOADER UNDI_LOADER_t;
+
+extern PXENV_EXIT_t undi_loader ( struct s_UNDI_LOADER *undi_loader );
+
+/** @} */ /* pxe_loader_api */
 
 /** @defgroup pxe_preboot_api PXE Preboot API
  *
@@ -619,6 +889,13 @@ extern PXENV_EXIT_t pxenv_udp_read ( struct s_PXENV_UDP_READ *udp_read );
 
 /** PXE API function code for pxenv_undi_startup() */
 #define	PXENV_UNDI_STARTUP		0x0001
+
+#define PXENV_BUS_ISA		0	/**< ISA bus type */
+#define PXENV_BUS_EISA		1	/**< EISA bus type */
+#define PXENV_BUS_MCA		2	/**< MCA bus type */
+#define PXENV_BUS_PCI		3	/**< PCI bus type */
+#define PXENV_BUS_VESA		4	/**< VESA bus type */
+#define PXENV_BUS_PCMCIA	5	/**< PCMCIA bus type */
 
 /** Parameter block for pxenv_undi_startup() */
 struct s_PXENV_UNDI_STARTUP {
