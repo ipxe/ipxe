@@ -19,7 +19,7 @@ struct free_base_memory_header {
 };
 
 union free_base_memory_block {
-	struct free_base_memory_header;
+	struct free_base_memory_header header;
 	char bytes[1024];
 };
 

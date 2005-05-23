@@ -15,6 +15,7 @@ static inline char * nbns_make_name ( char *dest, const char *name ) {
 	char nb_name[16];
 	char c;
 	int i;
+	uint16_t *d;
 
 	*(dest++) = 32; /* Length is always 32 */
 
@@ -26,11 +27,13 @@ static inline char * nbns_make_name ( char *dest, const char *name ) {
 	memset ( nb_name, ' ', 15 );
 	nb_name[15] = '\0';
 	memcpy ( nb_name, name, strlen ( name ) ); /* Do not copy NUL */
+
+	d = ( uint16_t * ) dest;
 	for ( i = 0 ; i < 16 ; i++ ) {
 		c = nb_name[i];
-		*( ( ( uint16_t * ) dest ) ++ ) = 
-			htons ( ( ( c | ( c << 4 ) ) & 0x0f0f ) + 0x4141 );
+		*( d++ )  = htons ( ( ( c | ( c << 4 ) ) & 0x0f0f ) + 0x4141 );
 	}
+	dest = ( char * ) d;
 
 	*(dest++) = 0; /* Terminating 0-length name component */
 	return dest;

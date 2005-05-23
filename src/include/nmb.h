@@ -14,7 +14,7 @@
 #define NBNS_UDP_PORT		137
 
 struct dns_rr_info_nb {
-	struct dns_rr_info;
+	struct dns_rr_info info;
 	uint16_t	nb_flags;
 	struct in_addr	nb_address;
 } __attribute__ (( packed ));

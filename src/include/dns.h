@@ -70,12 +70,12 @@ struct dns_rr_info {
 } __attribute__ (( packed ));
 
 struct dns_rr_info_a {
-	struct dns_rr_info;
+	struct dns_rr_info info;
 	struct in_addr in_addr;
 } __attribute__ (( packed ));
 
 struct dns_rr_info_cname {
-	struct dns_rr_info;
+	struct dns_rr_info info;
 	char		cname[0];
 } __attribute__ (( packed ));
 

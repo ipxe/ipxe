@@ -17,8 +17,8 @@
 
 /* Real-mode call parameter block, as passed to real_call */
 struct real_call_params {
-	struct i386_seg_regs;
-	struct i386_regs;
+	struct i386_seg_regs segs;
+	struct i386_regs regs;
 	segoff_t rm_code;
 	segoff_t reserved;
 } PACKED;

@@ -40,18 +40,19 @@ static int send_tcp_request(int length, void *buffer, void *ptr) {
 /**************************************************************************
 RECV_TCP_CALLBACK - Receive data using TCP
 **************************************************************************/
-static int recv_tcp_request(int length, const void *buffer, void *ptr) {
+static int recv_tcp_request(int length, const void *data, void *ptr) {
 	struct send_recv_state *state = (struct send_recv_state *)ptr;
+	const char *buffer = data;
 
 	/* Assume that the lines in an HTTP header do not straddle a packet */
 	/* boundary. This is probably a reasonable assumption */
 	if (state->recv_state == RESULT_CODE) {
 		while (length > 0) {
 			/* Find HTTP result code */
-			if (*(const char *)buffer == ' ') {
-				const char *ptr = ((const char *)buffer) + 1;
+			if (*buffer == ' ') {
+				const char *ptr = buffer + 1;
 				int rc = strtoul(ptr, &ptr, 10);
-				if (ptr >= (const char *)buffer + length) {
+				if (ptr >= buffer + length) {
 					state->recv_state = ERROR;
 					DBG ( "HTTP got bad result code\n" );
 					return 0;
@@ -61,7 +62,7 @@ static int recv_tcp_request(int length, const void *buffer, void *ptr) {
 				DBG ( "HTTP got result code %d\n", rc );
 				goto header;
 			}
-			++(const char *)buffer;
+			++buffer;
 			length--;
 		}
 		state->recv_state = ERROR;
@@ -88,7 +89,7 @@ static int recv_tcp_request(int length, const void *buffer, void *ptr) {
 			/* Find beginning of line */
 			while (length > 0) {
 				length--;
-				if (*((const char *)buffer)++ == '\n')
+				if (*buffer++ == '\n')
 					break;
 			}
 			/* Check for end of header */
@@ -140,7 +141,7 @@ static int http ( char *url, struct sockaddr_in *server __unused,
 			
 			tcp_transaction ( server->sin_addr.s_addr,
 					  server->sin_port, &state,
-					  send_tcp_request, recv_tcp_request );
+					  send_tcp_request, (int (*)(int, const void *, void *))recv_tcp_request );
 		}
 
 		if ( state.recv_state == MOVED ) {

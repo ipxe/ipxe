@@ -130,8 +130,8 @@ void free_base_memory ( void *ptr, size_t size ) {
 	 */
 	for ( ; size_kb > 0 ; free_block++, size_kb-- ) {
 		/* Mark this block as unused */
-		free_block->magic = FREE_BLOCK_MAGIC;
-		free_block->size_kb = size_kb;
+		free_block->header.magic = FREE_BLOCK_MAGIC;
+		free_block->header.size_kb = size_kb;
 	}
 
 	/* Free up unused base memory */
@@ -161,12 +161,12 @@ static void free_unused_base_memory ( void ) {
 		 * if this is not a free block
 		 */
 		if ( ( fbms == FBMS_MAX ) ||
-		     ( free_block->magic != FREE_BLOCK_MAGIC ) ) {
+		     ( free_block->header.magic != FREE_BLOCK_MAGIC ) ) {
 			break;
 		}
 
 		/* Return memory to BIOS */
-		fbms += free_block->size_kb;
+		fbms += free_block->header.size_kb;
 
 		DBG ( "Freed %d kB of base memory at [%hx:0000,%hx:0000), "
 		      "%d kB now free\n",
