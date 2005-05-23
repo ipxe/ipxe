@@ -51,9 +51,9 @@ typedef UINT16_t PXENV_EXIT_t;
  */
 typedef UINT16_t PXENV_STATUS_t;
 
-/** An IP address.
+/** An IPv4 address.
  *
- * This is an IPv4 address in host byte order.
+ * @note This data type is in network (big-endian) byte order.
  *
  */
 typedef UINT32_t IP4_t;

@@ -5,8 +5,8 @@
  * SEGSEL_t for use in other PXE structures.  See pxe.h for details.
  */
 
-#ifndef PXE_TYPES_H
-#define PXE_TYPES_H
+#ifndef PXE_ADDR_H
+#define PXE_ADDR_H
 
 /* SEGOFF16_t defined in separate header
  */
@@ -32,4 +32,4 @@ typedef struct {
 typedef	uint16_t I386_SEGSEL_t;
 #define SEGSEL_t I386_SEGSEL_t
 
-#endif /* PXE_TYPES_H */
+#endif /* PXE_ADDR_H */
