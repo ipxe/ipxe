@@ -1631,4 +1631,26 @@ extern PXENV_EXIT_t undi_loader ( struct s_UNDI_LOADER *undi_loader );
 
 /** @} */ /* pxe */
 
+/** @page pxe_notes Etherboot PXE implementation notes
+
+@section pxe_x86_modes x86 processor mode restrictions
+
+On the x86 platform, different PXE API calls have different
+restrictions on the processor modes (real or protected) that can be
+used.  See the individual API call descriptions for the restrictions
+that apply to any particular call.
+
+@subsection pxe_x86_pmode16 Real mode, or protected-mode with 16-bit stack
+
+The PXE specification states that the API function can be called in
+protected mode only if the s_PXE::StatusCallout field is set to a
+non-zero value, and that the API function cannot be called with a
+32-bit stack segment.
+
+Etherboot does not enforce either of these restrictions; they seem (as
+with so much of the PXE specification) to be artifacts of the Intel
+implementation.
+
+*/
+
 #endif /* PXE_API_H */

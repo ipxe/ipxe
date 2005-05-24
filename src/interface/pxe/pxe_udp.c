@@ -43,23 +43,20 @@
  * pxenv_udp_read().  (If s_PXENV_UDP_OPEN::src_ip is 0.0.0.0, the
  * local station's IP address will remain unchanged.)
  *
- * You can have multiple UDP connections open simultaneously (and
- * even open concurrently with TFTP connections), provided that
+ * You can only have one open UDP connection at a time.  You cannot
+ * have a UDP connection open at the same time as a TFTP connection.
+ * (This is not strictly true for Etherboot; see the relevant @ref
+ * pxe_note_udp "implementation note" for more details.)
  *
- *   - they all have the same local IP address, and
+ * On x86, you must set the s_PXE::StatusCallout field to a nonzero
+ * value before calling this function in protected mode.  You cannot
+ * call this function with a 32-bit stack segment.  (See the relevant
+ * @ref pxe_x86_pmode16 "implementation note" for more details.)
  *
- *   - you take the multiple connections into account when calling
- *     pxenv_udp_read().
- *
- * On x86, you can call pxenv_udp_open() in real mode, 16-bit
- * protected mode with a 16-bit stack segment, 16-bit protected mode
- * with a 32-bit stack segment, or V86 mode.  The pxe::StatusCallout
- * field may be zero even in protected mode.
- * 
- * @note The PXE specification states that you have only one UDP
- * connection open at a time, and that you cannot have a UDP
- * connection open simultaneously with a TFTP connection.  Etherboot
- * does not enforce this unnecessary restriction.
+ * @note The PXE specification does not make it clear whether the IP
+ * address supplied in s_PXENV_UDP_OPEN::src_ip should be used only
+ * for this UDP connection, or retained for all future communication.
+ * The latter seems more consistent with typical PXE stack behaviour.
  *
  */
 PXENV_EXIT_t pxenv_udp_open ( struct s_PXENV_UDP_OPEN *udp_open ) {
@@ -85,21 +82,19 @@ PXENV_EXIT_t pxenv_udp_open ( struct s_PXENV_UDP_OPEN *udp_open ) {
  * @ret s_PXENV_UDP_CLOSE::Status	PXE status code
  * @err None				-
  *
- * Closes a UDP "connection" opened with pxenv_udp_open().  Since UDP
- * is a connectionless protocol, this is a no-op.
+ * Closes a UDP "connection" opened with pxenv_udp_open().
  *
- * You can call pxenv_udp_close() even if there is another active UDP
- * or TFTP connection, since it has no effect on anything.
+ * You can only have one open UDP connection at a time.  You cannot
+ * have a UDP connection open at the same time as a TFTP connection.
+ * You cannot use pxenv_udp_close() to close a TFTP connection; use
+ * pxenv_tftp_close() instead.  (This is not strictly true for
+ * Etherboot; see the relevant @ref pxe_note_udp "implementation note"
+ * for more details.)
  *
- * You can call pxenv_udp_close() in real mode, 16-bit protected mode
- * with a 16-bit stack segment, 16-bit protected mode with a 32-bit
- * stack segment, or V86 mode.  The pxe::StatusCallout field may be
- * zero even in protected mode.
- *
- * @note The PXE specification states that you have only one UDP
- * connection open at a time, and that you cannot have a UDP
- * connection open simultaneously with a TFTP connection.  Etherboot
- * does not enforce this unnecessary restriction.
+ * On x86, you must set the s_PXE::StatusCallout field to a nonzero
+ * value before calling this function in protected mode.  You cannot
+ * call this function with a 32-bit stack segment.  (See the relevant
+ * @ref pxe_x86_pmode16 "implementation note" for more details.)
  *
  */
 PXENV_EXIT_t pxenv_udp_close ( struct s_PXENV_UDP_CLOSE *udp_close __unused ) {
@@ -119,7 +114,7 @@ PXENV_EXIT_t pxenv_udp_close ( struct s_PXENV_UDP_CLOSE *udp_close __unused ) {
  * @v s_PXENV_UDP_WRITE::buffer_size	Length of the UDP payload
  * @v s_PXENV_UDP_WRITE::buffer		Address of the UDP payload
  * @ret #PXENV_EXIT_SUCCESS		Packet was transmitted successfully
- * @ret #PXENV_EXIT_FAILURE		Packet could not be transmitter
+ * @ret #PXENV_EXIT_FAILURE		Packet could not be transmitted
  * @ret s_PXENV_UDP_WRITE::Status	PXE status code
  * @err #PXENV_STATUS_UNDI_INVALID_STATE NIC could not be initialised
  * @err #PXENV_STATUS_OUT_OF_RESOURCES	Packet was too large to transmit
@@ -138,20 +133,15 @@ PXENV_EXIT_t pxenv_udp_close ( struct s_PXENV_UDP_CLOSE *udp_close __unused ) {
  *
  * If s_PXENV_UDP_WRITE::src_port is 0, port 2069 will be used.
  *
- * It is not necessary to call pxenv_udp_open() before using
- * pxenv_udp_write(), unless you want to change the local station's IP
- * address.  pxenv_udp_write() can be called even if there is another
- * active UDP or TFTP connection,.
+ * You must have opened a UDP connection with pxenv_udp_open() before
+ * calling pxenv_udp_write().  (This is not strictly true for
+ * Etherboot; see the relevant @ref pxe_note_udp "implementation note"
+ * for more details.)
  *
- * You can call pxenv_udp_write() in real mode, 16-bit protected mode
- * with a 16-bit stack segment, 16-bit protected mode with a 32-bit
- * stack segment, or V86 mode.  The pxe::StatusCallout field may be
- * zero even in protected mode.
- *
- * @note The PXE specification states that you have only one UDP
- * connection open at a time, and that you cannot have a UDP
- * connection open simultaneously with a TFTP connection.  Etherboot
- * does not enforce this unnecessary restriction.
+ * On x86, you must set the s_PXE::StatusCallout field to a nonzero
+ * value before calling this function in protected mode.  You cannot
+ * call this function with a 32-bit stack segment.  (See the relevant
+ * @ref pxe_x86_pmode16 "implementation note" for more details.)
  *
  * @bug s_PXENV_UDP_WRITE::gw is ignored; the default routing table is
  * always used.
@@ -278,26 +268,20 @@ static int await_pxe_udp ( int ival __unused, void *ptr,
  * s_PXENV_UDP_READ::Status==PXENV_STATUS_FAILURE.
  *
  * If s_PXENV_UDP_READ::dest_ip is 0.0.0.0, UDP packets addressed to
- * any IP address will be accepted and may be returned.
+ * any IP address will be accepted and may be returned to the caller.
  *
  * If s_PXENV_UDP_READ::d_port is 0, UDP packets addressed to any UDP
- * port will be accepted and may be returned.
+ * port will be accepted and may be returned to the caller.
  *
- * It is not necessary to call pxenv_udp_open() before using
- * pxenv_udp_read().  pxenv_udp_read() can be called even if there is
- * another active UDP or TFTP connection, but be aware that you might
- * then receive (or cause to be lost) a packet belonging to another
- * connection.
+ * You must have opened a UDP connection with pxenv_udp_open() before
+ * calling pxenv_udp_read().  (This is not strictly true for
+ * Etherboot; see the relevant @ref pxe_note_udp "implementation note"
+ * for more details.)
  *
- * You can call pxenv_udp_read() in real mode, 16-bit protected mode
- * with a 16-bit stack segment, 16-bit protected mode with a 32-bit
- * stack segment, or V86 mode.  The pxe::StatusCallout field may be
- * zero even in protected mode.
- *
- * @note The PXE specification states that you have only one UDP
- * connection open at a time, and that you cannot have a UDP
- * connection open simultaneously with a TFTP connection.  Etherboot
- * does not enforce this unnecessary restriction.
+ * On x86, you must set the s_PXE::StatusCallout field to a nonzero
+ * value before calling this function in protected mode.  You cannot
+ * call this function with a 32-bit stack segment.  (See the relevant
+ * @ref pxe_x86_pmode16 "implementation note" for more details.)
  *
  * @note The PXE specification (version 2.1) does not state that we
  * should fill in s_PXENV_UDP_READ::dest_ip and
@@ -319,3 +303,31 @@ PXENV_EXIT_t pxenv_udp_read ( struct s_PXENV_UDP_READ *udp_read ) {
 	udp_read->Status = PXENV_STATUS_SUCCESS;
 	return PXENV_EXIT_SUCCESS;
 }
+
+/** @page pxe_notes PXE implementation notes
+
+@section pxe_note_udp The connectionless nature of UDP
+
+The PXE specification states that it is possible to have only one open
+UDP or TFTP connection at any one time.  Etherboot does not
+rigourously enforce this restriction, on the UNIX principle that the
+code should not prevent the user from doing stupid things, because
+that would also prevent the user from doing clever things.  Since UDP
+is a connectionless protocol, it is perfectly possible to have
+multiple concurrent UDP "connections" open, provided that you take the
+multiplicity of connections into account when calling
+pxenv_udp_read().  Similarly, there is no technical reason that
+prevents you from calling pxenv_udp_write() in the middle of a TFTP
+download.
+
+Etherboot will therefore never return error codes indicating "a
+connection is already open", such as #PXENV_STATUS_UDP_OPEN.  If you
+want to have multiple concurrent connections, go for it (but don't
+expect your perfectly sensible code to work with any other PXE stack).
+
+Since Etherboot treats UDP as the connectionless protocol that it
+really is, pxenv_udp_close() is actually a no-op, and there is no need
+to call pxenv_udp_open() before using pxenv_udp_write() or
+pxenv_udp_read().
+
+*/
