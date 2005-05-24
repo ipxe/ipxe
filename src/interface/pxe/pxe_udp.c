@@ -83,7 +83,7 @@ PXENV_EXIT_t pxenv_udp_open ( struct s_PXENV_UDP_OPEN *udp_open ) {
  * @v udp_close				Pointer to a struct s_PXENV_UDP_CLOSE
  * @ret #PXENV_EXIT_SUCCESS		Always
  * @ret s_PXENV_UDP_CLOSE::Status	PXE status code
- * @err None
+ * @err None				-
  *
  * Closes a UDP "connection" opened with pxenv_udp_open().  Since UDP
  * is a connectionless protocol, this is a no-op.

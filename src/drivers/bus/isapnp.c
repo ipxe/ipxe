@@ -172,8 +172,8 @@ static inline void isapnp_reset_csn ( void ) {
  * Place a specified card into the Config state.
  *
  * @v csn		Card Select Number
- * @ret None
- * @err None
+ * @ret None		-
+ * @err None		-
  *
  * Only cards currently in the Sleep, Isolation, or Config states will
  * respond to this command.  The card that has the specified CSN will
@@ -196,8 +196,8 @@ static inline uint8_t isapnp_read_status ( void ) {
  * Assign a Card Select Number to a card, and enter the Config state.
  *
  * @v csn		Card Select Number
- * @ret None
- * @err None
+ * @ret None		-
+ * @err None		-
  *
  * Only cards in the Isolation state will respond to this command.
  * The isolation protocol is designed so that only one card will
@@ -241,7 +241,7 @@ static void isapnp_delay ( void ) {
  * @v lfsr		Current value of the LFSR
  * @v input_bit		Current input bit to the LFSR
  * @ret lfsr		Next value of the LFSR
- * @err None
+ * @err None		-
  *
  * This routine implements the linear feedback shift register as
  * described in Appendix B of the PnP ISA spec.  The hardware
@@ -286,7 +286,7 @@ static void isapnp_send_key ( void ) {
  *
  * @v identifier		ISAPnP identifier
  * @ret checksum		Expected checksum value
- * @err None
+ * @err None			-
  *
  */
 static uint8_t isapnp_checksum ( struct isapnp_identifier *identifier ) {
@@ -329,8 +329,8 @@ static inline uint8_t isapnp_peek_byte ( void ) {
  *
  * @v buf		Buffer in which to store data, or NULL
  * @v bytes		Number of bytes to read
- * @ret None
- * @err None
+ * @ret None		-
+ * @err None		-
  *
  * Resource data is read from the current location.  If #buf is NULL,
  * the data is discarded.
@@ -355,7 +355,7 @@ static void isapnp_peek ( uint8_t *buf, size_t bytes ) {
  * @v buf		Buffer in which to store the tag's contents
  * @ret True		Tag was found
  * @ret False		Tag was not found
- * @err None
+ * @err None		-
  *
  * Scan through the resource data until we find a particular tag, and
  * read its contents into a buffer.  It is the caller's responsibility
@@ -396,7 +396,7 @@ static int isapnp_find_tag ( uint8_t wanted_tag, uint8_t *buf ) {
  * @ret \>0		Number of ISAPnP cards found
  * @ret 0		There are no ISAPnP cards in the system
  * @ret \<0		A conflict was detected; try a new read port
- * @err None
+ * @err None		-
  *
  * The state diagram on page 18 (PDF page 24) of the PnP ISA spec
  * gives the best overview of what happens here.
@@ -550,7 +550,7 @@ static void isapnp_isolate ( void ) {
  * @v bus_loc		Bus location
  * @ret True		#bus_loc contains a valid ISAPnP location
  * @ret False		There are no more valid ISAPnP locations
- * @err None
+ * @err None		-
  *
  * If there are no more valid locations, the #bus_loc structure will
  * be zeroed.
@@ -578,7 +578,7 @@ static int isapnp_next_location ( struct bus_loc *bus_loc ) {
  * @v bus_loc		Bus location as filled in by isapnp_next_location()
  * @ret True		A device is present at this location
  * @ret False		No device is present at this location
- * @err None
+ * @err None		-
  *
  */
 static int isapnp_fill_device ( struct bus_dev *bus_dev,
@@ -677,7 +677,7 @@ static int isapnp_fill_device ( struct bus_dev *bus_dev,
  * @v device_driver	Device driver
  * @ret True		Driver is capable of driving this device
  * @ret False		Driver is not capable of driving this device
- * @err None
+ * @err None		-
  *
  */
 static int isapnp_check_driver ( struct bus_dev *bus_dev,
@@ -713,7 +713,7 @@ static int isapnp_check_driver ( struct bus_dev *bus_dev,
  *
  * @v bus_dev		Bus device as filled in by isapnp_fill_device()
  * @ret string		Printable string describing the device
- * @err None
+ * @err None		-
  *
  * The string returned by isapnp_describe_device() is valid only until
  * the next call to isapnp_describe_device().
@@ -733,7 +733,7 @@ static char * isapnp_describe_device ( struct bus_dev *bus_dev ) {
  *
  * @v bus_dev		Bus device as filled in by isapnp_fill_device()
  * @ret string		Printable string naming the device
- * @err None
+ * @err None		-
  *
  * The string returned by isapnp_name_device() is valid only until the
  * next call to isapnp_name_device().
@@ -763,8 +763,8 @@ struct bus_driver isapnp_driver __bus_driver = {
  *
  * @v isapnp		ISAPnP device
  * @v activation	True to enable, False to disable the device
- * @ret None
- * @err None
+ * @ret None		-
+ * @err None		-
  *
  * This routine simply activates the device in its current
  * configuration, or deactivates the device.  It does not attempt any
@@ -796,8 +796,8 @@ void isapnp_device_activation ( struct isapnp_device *isapnp,
  *
  * @v nic		NIC structure to be filled in
  * @v isapnp		ISAPnP device
- * @ret None
- * @err None
+ * @ret None		-
+ * @err None		-
  *
  * This fills in generic NIC parameters (e.g. I/O address and IRQ
  * number) that can be determined directly from the ISAPnP device,

@@ -12,8 +12,8 @@ static struct console_driver console_drivers_end[0] __table_end ( console );
  * Write a single character to each console device.
  *
  * @v character		Character to be written
- * @ret None
- * @err None
+ * @ret None		-
+ * @err None		-
  *
  * The character is written out to all enabled console devices, using
  * each device's console_driver::putchar() method.
@@ -36,10 +36,10 @@ void putchar ( int character ) {
 /**
  * Check to see if any input is available on any console.
  *
- * @v None
+ * @v None		-
  * @ret console		Console device that has input available, if any.
  * @ret NULL		No console device has input available.
- * @err None
+ * @err None		-
  *
  * All enabled console devices are checked once for available input
  * using each device's console_driver::iskey() method.  The first
@@ -62,9 +62,9 @@ static struct console_driver * has_input ( void ) {
 /**
  * Read a single character from any console.
  *
- * @v None
+ * @v None		-
  * @ret character	Character read from a console.
- * @err None
+ * @err None		-
  *
  * A character will be read from the first enabled console device that
  * has input available using that console's console_driver::getchar()
@@ -112,10 +112,10 @@ int getchar ( void ) {
 
 /** Check for available input on any console.
  *
- * @v None
+ * @v None		-
  * @ret True		Input is available on a console
  * @ret False		Input is not available on any console
- * @err None
+ * @err None		-
  *
  * All enabled console devices are checked once for available input
  * using each device's console_driver::iskey() method.  If any console

@@ -20,7 +20,7 @@
  * @v args		Arguments corresponding to the format string
  * @ret len		Length of string written to buffer (if buf != NULL)
  * @ret	0		(if buf == NULL)
- * @err None
+ * @err None		-
  *
  * If #buf==NULL, then the string will be written to the console
  * directly using putchar().
@@ -157,7 +157,7 @@ static int vsprintf(char *buf, const char *fmt, va_list args)
  * @v ...		Arguments corresponding to the format string
  * @ret len		Length of string written to buffer (if buf != NULL)
  * @ret	0		(if buf == NULL)
- * @err None
+ * @err None		-
  *
  * If #buf==NULL, then the string will be written to the console
  * directly using putchar().
@@ -178,8 +178,8 @@ int sprintf(char *buf, const char *fmt, ...)
  *
  * @v fmt		Format string
  * @v ...		Arguments corresponding to the format string
- * @ret	None
- * @err None
+ * @ret	None		-
+ * @err None		-
  *
  */
 void printf(const char *fmt, ...)

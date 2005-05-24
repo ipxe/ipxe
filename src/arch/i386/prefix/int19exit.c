@@ -15,8 +15,8 @@
  * Exit via INT19
  *
  * @v ix86		i386 register values to be loaded on exit
- * @ret Never
- * @err None
+ * @ret Never		-
+ * @err None		-
  *
  * Exit back to the BIOS by switching to real mode, reloading the
  * registers as they were before Etherboot started, and executing INT

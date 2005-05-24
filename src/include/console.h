@@ -43,17 +43,17 @@ struct console_driver {
 	/** Write a character to the console.
 	 *
 	 * @v character		Character to be written
-	 * @ret None
-	 * @err None
+	 * @ret None		-
+	 * @err None		-
 	 *
 	 */
 	void ( *putchar ) ( int character );
 
 	/** Read a character from the console.
 	 *
-	 * @v None
+	 * @v None		-
 	 * @ret character	Character read
-	 * @err None
+	 * @err None		-
 	 *
 	 * If no character is available to be read, this method will
 	 * block.  The character read should not be echoed back to the
@@ -64,10 +64,10 @@ struct console_driver {
 
 	/** Check for available input.
 	 *
-	 * @v None
+	 * @v None		-
 	 * @ret True		Input is available
 	 * @ret False		Input is not available
-	 * @err None
+	 * @err None		-
 	 *
 	 * This should return True if a subsequent call to getchar()
 	 * will not block.

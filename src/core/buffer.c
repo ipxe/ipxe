@@ -48,8 +48,8 @@
  * Initialise a buffer.
  *
  * @v buffer		The buffer to be initialised
- * @ret None
- * @err None
+ * @ret None		-
+ * @err None		-
  *
  * Set @c buffer->start and @c buffer->end before calling init_buffer().
  * init_buffer() will initialise the buffer to the state of being
@@ -72,8 +72,8 @@ void init_buffer ( struct buffer *buffer ) {
  * @v desc		A descriptor for the free block
  * @v block		Start address of the block
  * @v split		Address at which to split the block
- * @ret None
- * @err None
+ * @ret None		-
+ * @err None		-
  *
  * Split a free block into two separate free blocks.  If the split
  * point lies outside the block, no action is taken; this is not an
@@ -120,8 +120,8 @@ static void split_free_block ( struct buffer_free_block *desc,
  * @v buffer		The buffer containing the block
  * @v desc		A descriptor for the free block
  * @v prev_block	Address of the previous block
- * @ret None
- * @err None
+ * @ret None		-
+ * @err None		-
  *
  * Marks a free block as used, i.e. removes it from the free list.
  *
