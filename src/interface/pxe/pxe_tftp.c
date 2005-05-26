@@ -24,7 +24,52 @@
 
 #include "pxe.h"
 
-/* PXENV_TFTP_OPEN
+/**
+ * TFTP OPEN
+ *
+ * @v tftp_open				Pointer to a struct s_PXENV_TFTP_OPEN
+ * @v s_PXENV_TFTP_OPEN::ServerIPAddress TFTP server IP address
+ * @v s_PXENV_TFTP_OPEN::GatewayIPAddress Relay agent IP address, or 0.0.0.0
+ * @v s_PXENV_TFTP_OPEN::Filename	Name of file to open
+ * @v s_PXENV_TFTP_OPEN::TFTPPort	TFTP server UDP port
+ * @v s_PXENV_TFTP_OPEN::PacketSize	TFTP blksize option to request
+ * @ret #PXENV_EXIT_SUCCESS		File was opened
+ * @ret #PXENV_EXIT_FAILURE		File was not opened
+ * @ret s_PXENV_TFTP_OPEN::Status	PXE status code
+ * @ret s_PXENV_TFTP_OPEN::PacketSize	Negotiated 
+ * @err .......				..........
+ *
+ * Opens a TFTP connection for downloading a file a block at a time
+ * using pxenv_tftp_read().
+ *
+ * If s_PXENV_TFTP_OPEN::GatewayIPAddress is 0.0.0.0, normal IP
+ * routing will take place.  See the relevant
+ * @ref pxe_routing "implementation note" for more details.
+ *
+ * s_PXENV_TFTP_OPEN::PacketSize must be at least 512.
+ *
+ * You can only have one TFTP connection open at a time, because the
+ * PXE API requires the PXE stack to keep state about the open TFTP
+ * connection (rather than letting the caller do so).
+ *
+ * It is unclear precisely what constitutes a "TFTP open" operation.
+ * Clearly, we must send the TFTP open request to the server.  Since
+ * we must know whether or not the open succeeded, we must wait for
+ * the first reply packet from the TFTP server.  If the TFTP server
+ * supports options, the first reply packet will be an OACK; otherwise
+ * it will be a DATA packet.  In other words, we may only get to
+ * discover whether or not the open succeeded when we receive the
+ * first block of data.  However, the pxenv_tftp_open() API provides
+ * no way for us to return this block of data at this time.  See the
+ * relevant @ref pxe_note_tftp "implementation note" for Etherboot's
+ * solution to this problem.
+ *
+ * 
+
+ * @note According to the PXE specification version 2.1, this call
+ * "opens a file for reading/writing", though how writing is to be
+ * achieved without the existence of an API call %pxenv_tftp_write()
+ * is not made clear.
  *
  * Status: working
  */
@@ -197,3 +242,98 @@ PXENV_EXIT_t pxenv_tftp_get_fsize ( struct s_PXENV_TFTP_GET_FSIZE
 	tftp_get_fsize->Status = PXENV_STATUS_SUCCESS;
 	return PXENV_EXIT_SUCCESS;
 }
+
+/** @page pxe_notes Etherboot PXE implementation notes
+
+@section pxe_note_tftp Welding together the TFTP protocol and the PXE TFTP API
+
+The PXE TFTP API is fundamentally poorly designed; the TFTP protocol
+simply does not map well into "open file", "read file block", "close
+file" operations.  The problem is the unreliable nature of UDP
+transmissions and the lock-step mechanism employed by TFTP to
+guarantee file transfer.  The lock-step mechanism requires that if we
+time out waiting for a packet to arrive, we must trigger its
+retransmission by retransmitting our previously transmitted packet.
+
+For example, suppose that pxenv_tftp_read() is called to read the
+first data block of a file from a server that does not support TFTP
+options, and that no data block is received within the timeout period.
+In order to trigger the retransmission of this data block
+pxenv_tftp_read() must retransmit the TFTP open request.  However, the
+information used to build the TFTP open request is not available at
+this time; it was provided only to the pxenv_tftp_open() call.
+
+The question of when to transmit the ACK packets is also awkward.  At
+a first glance, it would seem to be fairly simple: acknowledge a
+packet immediately after receiving it.  However, since the ACK packet
+may itself be lost, the next call to pxenv_tftp_read() must be
+prepared to re-acknowledge the packet.
+
+Another problem to consider is that the pxenv_tftp_open() API call
+must return an indication of whether or not the TFTP open request
+succeeded.  In the case of a TFTP server that doesn't support TFTP
+options, the only indication of a successful open is the reception of
+the first data block.  However, the pxenv_tftp_open() API provides no
+way to return this data block at this time.  Pretending that we lost
+the data block and requesting retransmission is problematic, because
+the only way to request retransmission of the first data block in such
+a case is to reissue the TFTP open request, which has side effects
+such as requiring the allocation of a new local port number.
+
+At least some PXE stacks (e.g. NILO) solve this problem by violating
+the TFTP protocol and never bothering with retransmissions, relying on
+the TFTP server to retransmit when it times out waiting for an ACK.
+This approach is dubious at best.
+
+The only viable solution seems to be to allocate a buffer for the
+storage of the first data packet returned by the TFTP server, since we
+may receive this packet during the pxenv_tftp_open() call but have to
+return it from the subsequent pxenv_tftp_read() call.  This buffer
+must be statically allocated and must be dedicated to providing a
+temporary home to TFTP packets.  There is nothing in the PXE
+specification that prevents a caller from calling
+e.g. pxenv_undi_transmit() between calls to the TFTP API, so we cannot
+use the normal transmit/receive buffer for this purpose.
+
+Having paid the storage penalty for this buffer, we can then gain some
+simplicity by exploiting it in full.  There is at least one
+circumstance (pxenv_tftp_open() called to open a file on a server that
+does not support TFTP options) in which we will have to enter
+pxenv_tftp_read() knowing that our previous transmission (the open
+request, in this situation) has already been acknowledged.
+Implementation of pxenv_tftp_read() can be made simpler by making this
+condition an invariant.  Specifically, on each call to
+pxenv_tftp_read(), we shall ensure that the following are true:
+
+  - Our previous transmission has already been acknowledged.  We
+    therefore do not need to keep state about our previous
+    transmission.
+
+  - The next packet to read is already in a buffer in memory.
+
+In order to maintain these two conditions, pxenv_tftp_read() must do
+the following:
+
+  - Copy the data packet from our buffer to the caller's buffer.
+
+  - Acknowledge the data packet that we have just copied.  This will
+    trigger transmission of the next packet from the server.
+
+  - Retransmit this acknowledgement packet until the next packet
+    arrives.
+
+  - Copy the packet into our internal buffer, ready for the next call
+    to pxenv_tftp_read().
+
+It can be verified that this preserves the invariant condition, and it
+is clear that the resulting implementation of pxenv_tftp_read() can be
+relatively simple.  (For the special case of the last data packet,
+pxenv_tftp_read() should return immediately after sending a single
+acknowledgement packet.)
+
+In order to set up this invariant condition for the first call to
+pxenv_tftp_read(), pxenv_tftp_open() must do the following:
+
+  - 
+
+*/
