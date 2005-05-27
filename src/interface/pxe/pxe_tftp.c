@@ -24,6 +24,9 @@
 
 #include "pxe.h"
 
+static int pxe_tftp_read_block ( unsigned char *data, unsigned int block,
+				 unsigned int len, int eof );
+
 /**
  * TFTP OPEN
  *
@@ -74,6 +77,10 @@
  * relevant @ref pxe_note_tftp "implementation note" for Etherboot's
  * solution to this problem.
  *
+ * On x86, you must set the s_PXE::StatusCallout field to a nonzero
+ * value before calling this function in protected mode.  You cannot
+ * call this function with a 32-bit stack segment.  (See the relevant
+ * @ref pxe_x86_pmode16 "implementation note" for more details.)
  * 
  * @note If you pass in a value less than 512 for
  * s_PXENV_TFTP_OPEN::PacketSize, Etherboot will attempt to negotiate
@@ -89,7 +96,15 @@
  * achieved without the existence of an API call %pxenv_tftp_write()
  * is not made clear.
  *
- * Status: working
+ * @note Despite the existence of the numerous statements within the
+ * PXE specification of the form "...if a TFTP/MTFTP or UDP connection
+ * is active...", you cannot use pxenv_tftp_open() and
+ * pxenv_tftp_read() to read a file via MTFTP; only via plain old
+ * TFTP.  If you want to use MTFTP, use pxenv_tftp_read_file()
+ * instead.  Astute readers will note that, since
+ * pxenv_tftp_read_file() is an atomic operation from the point of
+ * view of the PXE API, it is conceptually impossible to issue any
+ * other PXE API call "if an MTFTP connection is active".
  */
 PXENV_EXIT_t pxenv_tftp_open ( struct s_PXENV_TFTP_OPEN *tftp_open ) {
 	struct sockaddr_in tftp_server;
@@ -134,9 +149,26 @@ PXENV_EXIT_t pxenv_tftp_open ( struct s_PXENV_TFTP_OPEN *tftp_open ) {
 	return PXENV_EXIT_SUCCESS;
 }
 
-/* PXENV_TFTP_CLOSE
+/**
+ * TFTP CLOSE
  *
- * Status: working
+ * @v tftp_close			Pointer to a struct s_PXENV_TFTP_CLOSE
+ * @ret #PXENV_EXIT_SUCCESS		File was closed successfully
+ * @ret #PXENV_EXIT_FAILURE		File was not closed
+ * @ret s_PXENV_TFTP_CLOSE::Status	PXE status code
+ * @err None				-
+ *
+ * Close a connection previously opened with pxenv_tftp_open().  You
+ * must have previously opened a connection with pxenv_tftp_open().
+ *
+ * On x86, you must set the s_PXE::StatusCallout field to a nonzero
+ * value before calling this function in protected mode.  You cannot
+ * call this function with a 32-bit stack segment.  (See the relevant
+ * @ref pxe_x86_pmode16 "implementation note" for more details.)
+ *
+ * @note Since TFTP runs over UDP, which is a connectionless protocol,
+ * the concept of closing a file is somewhat meaningless.  This call
+ * is a no-op for Etherboot.
  */
 PXENV_EXIT_t pxenv_tftp_close ( struct s_PXENV_TFTP_CLOSE *tftp_close ) {
 	DBG ( "PXENV_TFTP_CLOSE" );
@@ -145,9 +177,71 @@ PXENV_EXIT_t pxenv_tftp_close ( struct s_PXENV_TFTP_CLOSE *tftp_close ) {
 	return PXENV_EXIT_SUCCESS;
 }
 
-/* PXENV_TFTP_READ
+/**
+ * TFTP READ
  *
- * Status: working
+ * @v tftp_read				Pointer to a struct s_PXENV_TFTP_READ
+ * @v s_PXENV_TFTP_READ::Buffer		Address of data buffer
+ * @ret #PXENV_EXIT_SUCCESS		Data was read successfully
+ * @ret #PXENV_EXIT_FAILURE		Data was not read
+ * @ret s_PXENV_TFTP_READ::Status	PXE status code
+ * @ret s_PXENV_TFTP_READ::PacketNumber	TFTP packet number
+ * @ret s_PXENV_TFTP_READ::BufferSize	Length of data written into buffer
+ *
+ * Reads a single packet from a connection previously opened with
+ * pxenv_tftp_open() into the data buffer pointed to by
+ * s_PXENV_TFTP_READ::Buffer.  You must have previously opened a
+ * connection with pxenv_tftp_open().  The data written into
+ * s_PXENV_TFTP_READ::Buffer is just the file data; the various
+ * network headers have already been removed.
+ *
+ * The buffer must be large enough to contain a packet of the size
+ * negotiated via the s_PXENV_TFTP_OPEN::PacketSize field in the
+ * pxenv_tftp_open() call.  It is worth noting that the PXE
+ * specification does @b not require the caller to fill in
+ * s_PXENV_TFTP_READ::BufferSize before calling pxenv_tftp_read(), so
+ * the PXE stack is free to ignore whatever value the caller might
+ * place there and just assume that the buffer is large enough.  That
+ * said, it may be worth the caller always filling in
+ * s_PXENV_TFTP_READ::BufferSize to guard against PXE stacks that
+ * mistake it for an input parameter.
+ *
+ * The length of the TFTP data packet will be returned via
+ * s_PXENV_TFTP_READ::BufferSize.  If this length is less than the
+ * blksize negotiated via s_PXENV_TFTP_OPEN::PacketSize in the call to
+ * pxenv_tftp_open(), this indicates that the block is the last block
+ * in the file.  Note that zero is a valid length for
+ * s_PXENV_TFTP_READ::BufferSize, and will occur when the length of
+ * the file is a multiple of the blksize.
+ *
+ * The PXE specification doesn't actually state that calls to
+ * pxenv_tftp_read() will return the data packets in strict sequential
+ * order, though most PXE stacks will probably do so.  The sequence
+ * number of the packet will be returned in
+ * s_PXENV_TFTP_READ::PacketNumber.  The first packet in the file has
+ * a sequence number of one, not zero.
+ *
+ * To guard against flawed PXE stacks, the caller should probably set
+ * s_PXENV_TFTP_READ::PacketNumber to one less than the expected
+ * returned value (i.e. set it to zero for the first call to
+ * pxenv_tftp_read() and then re-use the returned s_PXENV_TFTP_READ
+ * parameter block for subsequent calls without modifying
+ * s_PXENV_TFTP_READ::PacketNumber between calls).  The caller should
+ * also guard against potential problems caused by flawed
+ * implementations returning the occasional duplicate packet, by
+ * checking that the value returned in s_PXENV_TFTP_READ::PacketNumber
+ * is as expected (i.e. one greater than that returned from the
+ * previous call to pxenv_tftp_read()).
+ *
+ * Nothing in the PXE specification indicates when the TFTP
+ * acknowledgement packets will be sent back to the server.  See the
+ * relevant @ref pxe_note_tftp "implementation note" for details on
+ * when Etherboot chooses to send these packets.
+ *
+ * On x86, you must set the s_PXE::StatusCallout field to a nonzero
+ * value before calling this function in protected mode.  You cannot
+ * call this function with a 32-bit stack segment.  (See the relevant
+ * @ref pxe_x86_pmode16 "implementation note" for more details.)
  */
 PXENV_EXIT_t pxenv_tftp_read ( struct s_PXENV_TFTP_READ *tftp_read ) {
 	struct tftpblk_info_t block;
@@ -180,23 +274,97 @@ PXENV_EXIT_t pxenv_tftp_read ( struct s_PXENV_TFTP_READ *tftp_read ) {
 	return PXENV_EXIT_SUCCESS;
 }
 
-/* PXENV_TFTP_READ_FILE
+/**
+ * TFTP/MTFTP read file
  *
- * Status: working
+ * @v tftp_read_file		     Pointer to a struct s_PXENV_TFTP_READ_FILE
+ * @v s_PXENV_TFTP_READ_FILE::FileName		File name
+ * @v s_PXENV_TFTP_READ_FILE::BufferSize 	Size of the receive buffer
+ * @v s_PXENV_TFTP_READ_FILE::Buffer		Address of the receive buffer
+ * @v s_PXENV_TFTP_READ_FILE::ServerIPAddress	TFTP server IP address
+ * @v s_PXENV_TFTP_READ_FILE::GatewayIPAddress	Relay agent IP address
+ * @v s_PXENV_TFTP_READ_FILE::McastIPAddress	File's multicast IP address
+ * @v s_PXENV_TFTP_READ_FILE::TFTPClntPort	Client multicast UDP port
+ * @v s_PXENV_TFTP_READ_FILE::TFTPSrvPort	Server multicast UDP port
+ * @v s_PXENV_TFTP_READ_FILE::TFTPOpenTimeOut	Time to wait for first packet
+ * @v s_PXENV_TFTP_READ_FILE::TFTPReopenDelay	MTFTP inactivity timeout
+ * @ret #PXENV_EXIT_SUCCESS			File downloaded successfully
+ * @ret #PXENV_EXIT_FAILURE			File not downloaded
+ * @ret s_PXENV_TFTP_READ_FILE::Status		PXE status code
+ * @ret s_PXENV_TFTP_READ_FILE::BufferSize	Length of downloaded file
+ *
+ * Downloads an entire file via either TFTP or MTFTP into the buffer
+ * pointed to by s_PXENV_TFTP_READ_FILE::Buffer.
+ *
+ * The PXE specification does not make it clear how the caller
+ * requests that MTFTP be used rather than TFTP (or vice versa).  One
+ * reasonable guess is that setting
+ * s_PXENV_TFTP_READ_FILE::McastIPAddress to 0.0.0.0 would cause TFTP
+ * to be used instead of MTFTP, though it is conceivable that some PXE
+ * stacks would interpret that as "use the DHCP-provided multicast IP
+ * address" instead.  Some PXE stacks will not implement MTFTP at all,
+ * and will always use TFTP.
+ *
+ * It is not specified whether or not
+ * s_PXENV_TFTP_READ_FILE::TFTPSrvPort will be used as the TFTP server
+ * port for TFTP (rather than MTFTP) downloads.  Callers should assume
+ * that the only way to access a TFTP server on a non-standard port is
+ * to use pxenv_tftp_open() and pxenv_tftp_read().
+ *
+ * If s_PXENV_TFTP_READ_FILE::GatewayIPAddress is 0.0.0.0, normal IP
+ * routing will take place.  See the relevant
+ * @ref pxe_routing "implementation note" for more details.
+ *
+ * It is interesting to note that s_PXENV_TFTP_READ_FILE::Buffer is an
+ * #ADDR32_t type, i.e. nominally a flat physical address.  Some PXE
+ * NBPs (e.g. NTLDR) are known to call pxenv_tftp_read_file() in real
+ * mode with s_PXENV_TFTP_READ_FILE::Buffer set to an address above
+ * 1MB.  This means that PXE stacks must be prepared to write to areas
+ * outside base memory.  Exactly how this is to be achieved is not
+ * specified, though using INT 15,87 is as close to a standard method
+ * as any, and should probably be used.  Switching to protected-mode
+ * in order to access high memory will fail if pxenv_tftp_read_file()
+ * is called in V86 mode; it is reasonably to expect that a V86
+ * monitor would intercept the relatively well-defined INT 15,87 if it
+ * wants the PXE stack to be able to write to high memory.
+ *
+ * Things get even more interesting if pxenv_tftp_read_file() is
+ * called in protected mode, because there is then absolutely no way
+ * for the PXE stack to write to an absolute physical address.  You
+ * can't even get around the problem by creating a special "access
+ * everything" segment in the s_PXE data structure, because the
+ * #SEGDESC_t descriptors are limited to 64kB in size.
+ *
+ * Previous versions of the PXE specification (e.g. WfM 1.1a) provide
+ * a separate API call, %pxenv_tftp_read_file_pmode(), specifically to
+ * work around this problem.  The s_PXENV_TFTP_READ_FILE_PMODE
+ * parameter block splits s_PXENV_TFTP_READ_FILE::Buffer into
+ * s_PXENV_TFTP_READ_FILE_PMODE::BufferSelector and
+ * s_PXENV_TFTP_READ_FILE_PMODE::BufferOffset, i.e. it provides a
+ * protected-mode segment:offset address for the data buffer.  This
+ * API call is no longer present in version 2.1 of the PXE
+ * specification.
+ *
+ * Etherboot makes the assumption that s_PXENV_TFTP_READ_FILE::Buffer
+ * is an offset relative to the caller's data segment, when
+ * pxenv_tftp_read_file() is called in protected mode.
+ *
+ * On x86, you must set the s_PXE::StatusCallout field to a nonzero
+ * value before calling this function in protected mode.  You cannot
+ * call this function with a 32-bit stack segment.  (See the relevant
+ * @ref pxe_x86_pmode16 "implementation note" for more details.)
+ *
+ * @note Microsoft's NTLDR assumes that the filename passed in via
+ * s_PXENV_TFTP_READ_FILE::FileName will be stored in the "file" field
+ * of the stored DHCPACK packet, whence it will be returned via any
+ * subsequent calls to pxenv_get_cached_info().  Though this is
+ * essentially a bug in the Intel PXE implementation (not, for once,
+ * in the specification!), it is a bug that Microsoft relies upon, and
+ * so we implement this bug-for-bug compatibility by overwriting the
+ * filename stored DHCPACK packet with the filename passed in
+ * s_PXENV_TFTP_READ_FILE::FileName.
+ *
  */
-
-int pxe_tftp_read_block ( unsigned char *data, unsigned int block __unused,
-			  unsigned int len, int eof ) {
-	if ( pxe_stack->readfile.buffer ) {
-		if ( pxe_stack->readfile.offset + len >=
-		     pxe_stack->readfile.bufferlen ) return -1;
-		memcpy ( pxe_stack->readfile.buffer +
-			 pxe_stack->readfile.offset, data, len );
-	}
-	pxe_stack->readfile.offset += len;
-	return eof ? 0 : 1;
-}
-
 PXENV_EXIT_t pxenv_tftp_read_file ( struct s_PXENV_TFTP_READ_FILE
 				    *tftp_read_file ) {
 	struct sockaddr_in tftp_server;
@@ -233,11 +401,60 @@ PXENV_EXIT_t pxenv_tftp_read_file ( struct s_PXENV_TFTP_READ_FILE
 	return PXENV_EXIT_SUCCESS;
 }
 
-/* PXENV_TFTP_GET_FSIZE
+static int pxe_tftp_read_block ( unsigned char *data,
+				 unsigned int block __unused,
+				 unsigned int len, int eof ) {
+	if ( pxe_stack->readfile.buffer ) {
+		if ( pxe_stack->readfile.offset + len >=
+		     pxe_stack->readfile.bufferlen ) return -1;
+		memcpy ( pxe_stack->readfile.buffer +
+			 pxe_stack->readfile.offset, data, len );
+	}
+	pxe_stack->readfile.offset += len;
+	return eof ? 0 : 1;
+}
+
+/**
+ * TFTP GET FILE SIZE
  *
- * Status: working, though ugly (we actually read the whole file,
- * because it's too ugly to make Etherboot request the tsize option
- * and hand it to us).
+ * @v tftp_get_fsize		     Pointer to a struct s_PXENV_TFTP_GET_FSIZE
+ * @v s_PXENV_TFTP_GET_FSIZE::ServerIPAddress	TFTP server IP address
+ * @v s_PXENV_TFTP_GET_FSIZE::GatewayIPAddress	Relay agent IP address
+ * @v s_PXENV_TFTP_GET_FSIZE::FileName	File name
+ * @ret #PXENV_EXIT_SUCCESS		File size was determined successfully
+ * @ret #PXENV_EXIT_FAILURE		File size was not determined
+ * @ret s_PXENV_TFTP_GET_FSIZE::Status	PXE status code
+ * @ret s_PXENV_TFTP_GET_FSIZE::FileSize	File size
+ *
+ * Determine the size of a file on a TFTP server.  This uses the
+ * "tsize" TFTP option, and so will not work with a TFTP server that
+ * does not support TFTP options, or that does not support the "tsize"
+ * option.
+ *
+ * The PXE specification states that this API call will @b not open a
+ * TFTP connection for subsequent use with pxenv_tftp_read().  (This
+ * is somewhat daft, since the only way to obtain the file size via
+ * the "tsize" option involves issuing a TFTP open request, but that's
+ * life.)
+ *
+ * You cannot call pxenv_tftp_get_fsize() while a TFTP or UDP
+ * connection is open.
+ *
+ * If s_PXENV_TFTP_GET_FSIZE::GatewayIPAddress is 0.0.0.0, normal IP
+ * routing will take place.  See the relevant
+ * @ref pxe_routing "implementation note" for more details.
+ *
+ * On x86, you must set the s_PXE::StatusCallout field to a nonzero
+ * value before calling this function in protected mode.  You cannot
+ * call this function with a 32-bit stack segment.  (See the relevant
+ * @ref pxe_x86_pmode16 "implementation note" for more details.)
+ * 
+ * @note There is no way to specify the TFTP server port with this API
+ * call.  Though you can open a file using a non-standard TFTP server
+ * port (via s_PXENV_TFTP_OPEN::TFTPPort or, potentially,
+ * s_PXENV_TFTP_READ_FILE::TFTPSrvPort), you can only get the size of
+ * a file from a TFTP server listening on the standard TFTP port.
+ * "Consistency" is not a word in Intel's vocabulary.
  */
 PXENV_EXIT_t pxenv_tftp_get_fsize ( struct s_PXENV_TFTP_GET_FSIZE
 				    *tftp_get_fsize ) {
