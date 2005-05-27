@@ -36,12 +36,14 @@
  * @err #PXENV_STATUS_UNDI_INVALID_STATE NIC could not be initialised
  *
  * Prepares the PXE stack for communication using pxenv_udp_write()
- * and pxenv_udp_read().  The IP address supplied in
- * s_PXENV_UDP_OPEN::src_ip will be recorded and used as the local
- * station's IP address for all further communication, including
- * communication by means other than pxenv_udp_write() and
- * pxenv_udp_read().  (If s_PXENV_UDP_OPEN::src_ip is 0.0.0.0, the
- * local station's IP address will remain unchanged.)
+ * and pxenv_udp_read().
+ *
+ * The IP address supplied in s_PXENV_UDP_OPEN::src_ip will be
+ * recorded and used as the local station's IP address for all further
+ * communication, including communication by means other than
+ * pxenv_udp_write() and pxenv_udp_read().  (If
+ * s_PXENV_UDP_OPEN::src_ip is 0.0.0.0, the local station's IP address
+ * will remain unchanged.)
  *
  * You can only have one open UDP connection at a time.  You cannot
  * have a UDP connection open at the same time as a TFTP connection.
@@ -108,7 +110,7 @@ PXENV_EXIT_t pxenv_udp_close ( struct s_PXENV_UDP_CLOSE *udp_close __unused ) {
  *
  * @v udp_write				Pointer to a struct s_PXENV_UDP_WRITE
  * @v s_PXENV_UDP_WRITE::ip		Destination IP address
- * @v s_PXENV_UDP_WRITE::gw		Gateway IP address, or 0.0.0.0
+ * @v s_PXENV_UDP_WRITE::gw		Relay agent IP address, or 0.0.0.0
  * @v s_PXENV_UDP_WRITE::src_port	Source UDP port, or 0
  * @v s_PXENV_UDP_WRITE::dst_port	Destination UDP port
  * @v s_PXENV_UDP_WRITE::buffer_size	Length of the UDP payload
@@ -128,8 +130,8 @@ PXENV_EXIT_t pxenv_udp_close ( struct s_PXENV_UDP_CLOSE *udp_close __unused ) {
  * header.
  *
  * If s_PXENV_UDP_WRITE::gw is 0.0.0.0, normal IP routing will take
- * place (using, for example, the default gateway IP address returned
- * by the DHCP server).
+ * place.  See the relevant @ref pxe_routing "implementation note" for
+ * more details.
  *
  * If s_PXENV_UDP_WRITE::src_port is 0, port 2069 will be used.
  *
@@ -142,9 +144,6 @@ PXENV_EXIT_t pxenv_udp_close ( struct s_PXENV_UDP_CLOSE *udp_close __unused ) {
  * value before calling this function in protected mode.  You cannot
  * call this function with a 32-bit stack segment.  (See the relevant
  * @ref pxe_x86_pmode16 "implementation note" for more details.)
- *
- * @bug s_PXENV_UDP_WRITE::gw is ignored; the default routing table is
- * always used.
  *
  */
 PXENV_EXIT_t pxenv_udp_write ( struct s_PXENV_UDP_WRITE *udp_write ) {
@@ -304,7 +303,7 @@ PXENV_EXIT_t pxenv_udp_read ( struct s_PXENV_UDP_READ *udp_read ) {
 	return PXENV_EXIT_SUCCESS;
 }
 
-/** @page pxe_notes PXE implementation notes
+/** @page pxe_notes Etherboot PXE implementation notes
 
 @section pxe_note_udp The connectionless nature of UDP
 
