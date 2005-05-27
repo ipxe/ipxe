@@ -646,9 +646,18 @@ struct s_PXENV_TFTP_READ_FILE {
 	UDP_PORT_t TFTPClntPort;
 	/** Server multicast listening port */
 	UDP_PORT_t TFTPSrvPort;
-	/** Timeout for receiving data or ACK packets */
+	/** TFTP open timeout.
+	 *
+	 * This is the timeout for receiving the first DATA or ACK
+	 * packets during the MTFTP Listen phase.
+	 */
 	UINT16_t TFTPOpenTimeOut;
-	/** Timeout before issuing MTFTP open */
+	/** TFTP reopen timeout.
+	 *
+	 * This is the timeout for receiving an ACK packet while in
+	 * the MTFTP Listen phase (when at least one ACK packet has
+	 * already been seen).
+	 */
 	UINT16_t TFTPReopenDelay;
 } PACKED;
 
