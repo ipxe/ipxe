@@ -565,8 +565,8 @@ struct s_PXENV_TFTP_OPEN {
 	/** Requested size of TFTP packets
 	 *
 	 * This is the TFTP "blksize" option.  This must be at least
-	 * 512, according to the PXE specification, though no reason
-	 * is offered.
+	 * 512, since servers that do not support TFTP options cannot
+	 * negotiate blocksizes smaller than this.
 	 */
 	UINT16_t PacketSize;
 } PACKED;
@@ -1632,6 +1632,37 @@ extern PXENV_EXIT_t undi_loader ( struct s_UNDI_LOADER *undi_loader );
 /** @} */ /* pxe */
 
 /** @page pxe_notes Etherboot PXE implementation notes
+
+@section pxe_routing IP routing
+
+Several PXE API calls (e.g. pxenv_tftp_open() and pxenv_udp_write())
+allow for the caller to specify a "relay agent IP address", often in a
+field called "gateway" or similar.  The PXE specification states that
+"The IP layer should provide space for a minimum of four routing
+entries obtained from the default router and static route DHCP option
+tags in the DHCPACK message, plus any non-zero giaddr field from the
+DHCPOFFER message(s) accepted by the client".
+
+The DHCP static route option ("option static-routes" in dhcpd.conf)
+works only for classed IP routing (i.e. it provides no way to specify
+a subnet mask).  Since virtually everything now uses classless IP
+routing, the DHCP static route option is almost totally useless, and
+is (according to the dhcp-options man page) not implemented by any of
+the popular DHCP clients.
+
+This leaves the caller-specified "relay agent IP address", the giaddr
+field from the DHCPOFFER message(s) and the default gateway(s)
+provided via the routers option ("option routers" in dhcpd.conf) in
+the DHCPACK message.  Each of these is a default gateway address.
+It's a fair bet that the routers option should take priority over the
+giaddr field, since the routers option has to be explicitly specified
+by the DHCP server operator.  Similarly, it's fair to assume that the
+caller-specified "relay agent IP address", if present, should take
+priority over any other routing table entries.
+
+@bug Etherboot currently ignores all potential sources of routing
+information other than the first router provided to it by a DHCP
+routers option.
 
 @section pxe_x86_modes x86 processor mode restrictions
 
