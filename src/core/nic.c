@@ -740,7 +740,7 @@ static int bootp(void)
 		remaining_time = rfc2131_sleep_interval(BOOTP_TIMEOUT, retry++);
 		stop_time = currticks() + remaining_time;
 #ifdef	NO_DHCP_SUPPORT
-		if (await_reply(await_bootp, 0, NULL, timeout))
+		if (await_reply(await_bootp, 0, NULL, remaining_time))
 			return(1);
 #else
 		while ( remaining_time > 0 ) {
