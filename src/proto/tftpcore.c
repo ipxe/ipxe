@@ -25,10 +25,20 @@
  * (i.e. comes from the TFTP server, has the correct destination port,
  * and is addressed either to our IP address or to our multicast
  * listening address).
+ *
+ * Invoke await_tftp() using code such as
+ *
+ * @code
+ *
+ * if ( await_reply ( await_tftp, 0, &tftp_state, timeout ) ) {
+ *	...
+ * }
+ *
+ * @endcode
  */
-static int await_tftp ( int ival __unused, void *ptr,
-			unsigned short ptype __unused, struct iphdr *ip,
-			struct udphdr *udp, struct tcphdr *tcp __unused ) {
+int await_tftp ( int ival __unused, void *ptr, unsigned short ptype __unused,
+		 struct iphdr *ip, struct udphdr *udp,
+		 struct tcphdr *tcp __unused ) {
 	struct tftp_state *state = ptr;
 
 	/* Must have valid UDP (and, therefore, also IP) headers */
@@ -55,13 +65,13 @@ static int await_tftp ( int ival __unused, void *ptr,
 /**
  * Issue a TFTP open request (RRQ)
  *
- * @v filename				File name
  * @v state				TFTP transfer state
  * @v tftp_state::server::sin_addr	TFTP server IP address
  * @v tftp_state::server::sin_port	TFTP server UDP port, or 0
  * @v tftp_state::client::sin_addr	Client multicast IP address, or 0.0.0.0
  * @v tftp_state::client::sin_port	Client UDP port, or 0
  * @v tftp_state::blksize		Requested blksize, or 0
+ * @v filename				File name
  * @ret True				Received a non-error response
  * @ret False				Received error response / no response
  * @ret tftp_state::client::sin_port	Client UDP port
@@ -120,7 +130,7 @@ static int await_tftp ( int ival __unused, void *ptr,
  * leave_group() at appropriate times.
  *
  */
-int tftp_open ( const char *filename, struct tftp_state *state,
+int tftp_open ( struct tftp_state *state, const char *filename,
 		union tftp_any **tftp ) {
 	static unsigned short lport = 2000; /* local port */
 	int fixed_lport;
@@ -165,6 +175,9 @@ int tftp_open ( const char *filename, struct tftp_state *state,
 			state->client.sin_port = ++lport;
 		
 		/* Send the RRQ */
+		DBG ( "TFTPCORE: requesting %@:%d/%s from port %d\n",
+		      state->server.sin_addr.s_addr, state->server.sin_port,
+		      rrq.data, state->client.sin_port );
 		if ( ! udp_transmit ( state->server.sin_addr.s_addr,
 				      state->client.sin_port,
 				      state->server.sin_port,
@@ -185,8 +198,8 @@ int tftp_open ( const char *filename, struct tftp_state *state,
 /**
  * Process a TFTP OACK packet
  *
- * @v oack				The TFTP OACK packet
  * @v state				TFTP transfer state
+ * @v oack				The TFTP OACK packet
  * @ret True				Options were processed successfully
  * @ret False				Options were not processed successfully
  * @ret tftp_state::blksize		Negotiated blksize
@@ -213,7 +226,7 @@ int tftp_open ( const char *filename, struct tftp_state *state,
  * #TFTP_DEFAULT_BLKSIZE before returning, you probably don't need to
  * worry about this.
  */
-int tftp_process_opts ( struct tftp_oack *oack, struct tftp_state *state ) {
+int tftp_process_opts ( struct tftp_state *state, struct tftp_oack *oack ) {
 	const char *p;
 	const char *end;
 
@@ -296,4 +309,57 @@ int tftp_process_opts ( struct tftp_oack *oack, struct tftp_state *state ) {
 	}
 
 	return 1;
+}
+
+/**
+ * Acknowledge a TFTP packet
+ *
+ * @v state				TFTP transfer state
+ * @v tftp_state::server::sin_addr	TFTP server IP address
+ * @v tftp_state::server::sin_port	TFTP server UDP port
+ * @v tftp_state::client::sin_port	Client UDP port
+ * @v tftp_state::block			Most recently received block number
+ * @ret True				Acknowledgement packet was sent
+ * @ret False				Acknowledgement packet was not sent
+ * 
+ * Send a TFTP ACK packet for the most recently received block.
+ *
+ * This sends only a single ACK packet; it does not wait for the
+ * server's response.
+ */
+int tftp_ack ( struct tftp_state *state ) {
+	struct tftp_ack ack;
+
+	ack.opcode = htons ( TFTP_ACK );
+	ack.block = htons ( state->block );
+	return udp_transmit ( state->server.sin_addr.s_addr,
+			      state->client.sin_port, state->server.sin_port,
+			      sizeof ( ack ), &ack );
+}
+
+/**
+ * Send a TFTP error
+ *
+ * @v state				TFTP transfer state
+ * @v tftp_state::server::sin_addr	TFTP server IP address
+ * @v tftp_state::server::sin_port	TFTP server UDP port
+ * @v tftp_state::client::sin_port	Client UDP port
+ * @v err				TFTP error code
+ * @v errmsg				Descriptive error string
+ * @ret True				Error packet was sent
+ * @ret False				Error packet was not sent
+ *
+ * Send a TFTP ERROR packet back to the server to terminate the
+ * transfer.
+ */
+int tftp_error ( struct tftp_state *state, int err, const char *errmsg ) {
+	struct tftp_error error;
+
+	DBG ( "TFTPCORE: aborting with error %d (%s)\n", err, errmsg );
+	error.opcode = htons ( TFTP_ERROR );
+	error.errcode = htons ( err );
+	strncpy ( error.errmsg, errmsg, sizeof ( error.errmsg ) );
+	return udp_transmit ( state->server.sin_addr.s_addr,
+			      state->client.sin_port, state->server.sin_port,
+			      sizeof ( error ), &error );
 }
