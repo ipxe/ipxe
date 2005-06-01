@@ -13,7 +13,7 @@
 #include "tftp.h"
 
 extern int tftp_open ( struct tftp_state *state, const char *filename,
-		       union tftp_any **reply );
+		       union tftp_any **reply, int multicast );
 
 extern int tftp_process_opts ( struct tftp_state *state,
 			       struct tftp_oack *oack );

@@ -125,6 +125,7 @@ int tftp_get ( struct tftp_state *state, long timeout,
  * @v tftp_state::client::sin_port	Client UDP port, or 0
  * @v tftp_state::blksize		Requested blksize, or 0
  * @v filename				File name
+ * @v multicast				Enable/disable rfc2090 multicast TFTP
  * @ret True				Received a non-error response
  * @ret False				Received error response / no response
  * @ret tftp_state::server::sin_port	TFTP server UDP port
@@ -182,9 +183,10 @@ int tftp_get ( struct tftp_state *state, long timeout,
  * the server's response originated.  This may or may not be the port
  * to which the open request was sent.
  *
- * The options "blksize", "tsize" and "multicast" will always be
- * appended to a TFTP open request.  Servers that do not understand
- * any of these options should simply ignore them.
+ * The options "blksize" and "tsize" will always be appended to a TFTP
+ * open request.  The option "multicast" will be appended to the
+ * request if #multicast is True.  Servers that do not understand any
+ * of these options should simply ignore them.
  *
  * tftp_open() will not automatically join or leave multicast groups;
  * the caller is responsible for calling join_group() and
@@ -194,10 +196,11 @@ int tftp_get ( struct tftp_state *state, long timeout,
  * will return False and #errno will be set accordingly.
  */
 int tftp_open ( struct tftp_state *state, const char *filename,
-		union tftp_any **reply ) {
+		union tftp_any **reply, int multicast ) {
 	static unsigned short lport = 2000; /* local port */
 	int fixed_lport;
 	struct tftp_rrq rrq;
+	char *p;
 	unsigned int rrqlen;
 	int retry;
 
@@ -217,11 +220,13 @@ int tftp_open ( struct tftp_state *state, const char *filename,
 
 	/* Set up RRQ */
 	rrq.opcode = htons ( TFTP_RRQ );
-	rrqlen = ( offsetof ( typeof ( rrq ), data ) +
-		    sprintf ( rrq.data,
-			      "%s%coctet%cblksize%c%d%ctsize%c0%cmulticast%c",
-			      filename, 0, 0, 0, state->blksize, 0, 0, 0, 0 )
-		    + 1 );
+	p = rrq.data;
+	p += sprintf ( p, "%s%coctet%cblksize%c%d%ctsize%c0",
+		       filename, 0, 0, 0, state->blksize, 0, 0 ) + 1;
+	if ( multicast ) {
+		p += sprintf ( p, "multicast%c", 0 ) + 1;
+	}
+	rrqlen = ( p - ( char * ) &rrq );
 
 	/* Set negotiated blksize to default value */
 	state->blksize = TFTP_DEFAULT_BLKSIZE;
@@ -257,7 +262,7 @@ int tftp_open ( struct tftp_state *state, const char *filename,
 			      state->server.sin_port );
 			return 1;
 		}
-		if ( reply ) {
+		if ( *reply ) {
 			/* We got an error response; abort */
 			return 0;
 		}
@@ -463,7 +468,7 @@ int tftp_ack ( struct tftp_state *state, union tftp_any **reply ) {
 			/* We got a non-error response */
 			return 1;
 		}
-		if ( reply ) {
+		if ( *reply ) {
 			/* We got an error response */
 			return 0;
 		}
