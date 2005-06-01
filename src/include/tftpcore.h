@@ -1,11 +1,19 @@
 #ifndef TFTPCORE_H
 #define TFTPCORE_H
 
+/** @file
+ *
+ * TFTP core functions
+ *
+ * This file provides functions that are common to the TFTP (rfc1350),
+ * TFTM (rfc2090) and MTFTP (PXE) protocols.
+ *
+ */
+
 #include "tftp.h"
 
-extern int await_tftp ( int ival, void *ptr, unsigned short ptype,
-			struct iphdr *ip, struct udphdr *udp,
-			struct tcphdr *tcp );
+extern int tftp_get ( struct tftp_state *state, long timeout,
+		      union tftp_any **reply );
 
 extern int tftp_open ( struct tftp_state *state, const char *filename,
 		       union tftp_any **reply );

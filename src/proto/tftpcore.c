@@ -4,17 +4,10 @@
 #include "etherboot.h"
 #include "tftpcore.h"
 
-/** @file
- *
- * TFTP core functions
- *
- * This file provides functions that are common to the TFTP (rfc1350),
- * TFTM (rfc2090) and MTFTP (PXE) protocols.
- *
- */
+/** @file */
 
 /**
- * Wait for a TFTP packet
+ * await_reply() filter for TFTP packets
  *
  * @v ptr			Pointer to a struct tftp_state
  * @v tftp_state::server::sin_addr TFTP server IP address
@@ -30,7 +23,7 @@
  * and is addressed either to our IP address or to our multicast
  * listening address).
  *
- * Invoke await_tftp() using code such as
+ * Use await_tftp() in code such as
  *
  * @code
  *
@@ -40,9 +33,9 @@
  *
  * @endcode
  */
-int await_tftp ( int ival __unused, void *ptr, unsigned short ptype __unused,
-		 struct iphdr *ip, struct udphdr *udp,
-		 struct tcphdr *tcp __unused ) {
+static int await_tftp ( int ival __unused, void *ptr,
+			unsigned short ptype __unused, struct iphdr *ip,
+			struct udphdr *udp, struct tcphdr *tcp __unused ) {
 	struct tftp_state *state = ptr;
 
 	/* Must have valid UDP (and, therefore, also IP) headers */
@@ -76,6 +69,51 @@ int await_tftp ( int ival __unused, void *ptr, unsigned short ptype __unused,
 	return 1;
 }
 
+/**
+ * Retrieve a TFTP packet
+ *
+ * @v state			TFTP transfer state
+ * @v tftp_state::server::sin_addr TFTP server IP address
+ * @v tftp_state::client::sin_addr Client multicast IP address, or 0.0.0.0
+ * @v tftp_state::client::sin_port Client UDP port
+ * @v timeout			Time to wait for a response
+ * @ret True			Received a non-error response
+ * @ret False			Received error response / no response
+ * @ret *reply			The server's response, if any
+ * @err #PXENV_STATUS_TFTP_READ_TIMEOUT No response received in time
+ * @err other			As set by tftp_set_errno()
+ *
+ * Retrieve the next packet sent by the TFTP server, if any is sent
+ * within the specified timeout period.  The packet is returned via
+ * #reply.  If no packet is received within the timeout period, a NULL
+ * value will be stored in #reply.
+ *
+ * If the response from the server is a TFTP ERROR packet, tftp_get()
+ * will return False and #errno will be set accordingly.
+ *
+ * You can differentiate between "received no response" and "received
+ * an error response" by checking #reply; if #reply is NULL then no
+ * response was received.
+ */
+int tftp_get ( struct tftp_state *state, long timeout,
+	       union tftp_any **reply ) {
+
+	*reply = NULL;
+
+	if ( ! await_reply ( await_tftp, 0, state, timeout ) ) {
+		errno = PXENV_STATUS_TFTP_READ_TIMEOUT;
+		return 0;
+	}
+
+	*reply = ( union tftp_any * ) &nic.packet[ETH_HLEN];
+	DBG ( "TFTPCORE: got reply (type %d)\n",
+	      ntohs ( (*reply)->common.opcode ) );
+	if ( ntohs ( (*reply)->common.opcode ) == TFTP_ERROR ){
+		tftp_set_errno ( &(*reply)->error );
+		return 0;
+	}
+	return 1;
+}
 
 /**
  * Issue a TFTP open request (RRQ)
@@ -210,19 +248,18 @@ int tftp_open ( struct tftp_state *state, const char *filename,
 			return 0;
 		
 		/* Wait for response */
-		if ( await_reply ( await_tftp, 0, state, timeout ) ) {
-			*reply = ( union tftp_any * ) &nic.packet[ETH_HLEN];
-			state->server.sin_port =
-				ntohs ( (*reply)->common.udp.src );
-			DBG ( "TFTPCORE: got reply from %@:%d (type %d)\n",
+		if ( tftp_get ( state, timeout, reply ) ) {
+			/* We got a non-error response */
+			state->server.sin_port
+				= ntohs ( (*reply)->common.udp.src );
+			DBG ( "TFTP server is at %@:%d\n",
 			      state->server.sin_addr.s_addr,
-			      state->server.sin_port,
-			      ntohs ( (*reply)->common.opcode ) );
-			if ( ntohs ( (*reply)->common.opcode ) == TFTP_ERROR ){
-				tftp_set_errno ( &(*reply)->error );
-				return 0;
-			}
+			      state->server.sin_port );
 			return 1;
+		}
+		if ( reply ) {
+			/* We got an error response; abort */
+			return 0;
 		}
 	}
 
@@ -421,17 +458,14 @@ int tftp_ack ( struct tftp_state *state, union tftp_any **reply ) {
 		if ( ! tftp_ack_nowait ( state ) ) {
 			DBG ( "TFTP: could not send ACK: %m\n" );
 			return 0;
-		}	
-		if ( await_reply ( await_tftp, 0, state, timeout ) ) {
-			/* We received a reply */
-			*reply = ( union tftp_any * ) &nic.packet[ETH_HLEN];
-			DBG ( "TFTPCORE: got reply (type %d)\n",
-			      ntohs ( (*reply)->common.opcode ) );
-			if ( ntohs ( (*reply)->common.opcode ) == TFTP_ERROR ){
-				tftp_set_errno ( &(*reply)->error );
-				return 0;
-			}
+		}
+		if ( tftp_get ( state, timeout, reply ) ) {
+			/* We got a non-error response */
 			return 1;
+		}
+		if ( reply ) {
+			/* We got an error response */
+			return 0;
 		}
 	}
 	DBG ( "TFTP: timed out during read\n" );
@@ -447,12 +481,15 @@ int tftp_ack ( struct tftp_state *state, union tftp_any **reply ) {
  * @v tftp_state::server::sin_port	TFTP server UDP port
  * @v tftp_state::client::sin_port	Client UDP port
  * @v errcode				TFTP error code
- * @v errmsg				Descriptive error string
+ * @v errmsg				Descriptive error string, or NULL
  * @ret True				Error packet was sent
  * @ret False				Error packet was not sent
  *
  * Send a TFTP ERROR packet back to the server to terminate the
  * transfer.
+ *
+ * If #errmsg is NULL, the current error message string as returned by
+ * strerror(errno) will be used as the error text.
  */
 int tftp_error ( struct tftp_state *state, int errcode, const char *errmsg ) {
 	struct tftp_error error;
@@ -460,7 +497,8 @@ int tftp_error ( struct tftp_state *state, int errcode, const char *errmsg ) {
 	DBG ( "TFTPCORE: aborting with error %d (%s)\n", errcode, errmsg );
 	error.opcode = htons ( TFTP_ERROR );
 	error.errcode = htons ( errcode );
-	strncpy ( error.errmsg, errmsg, sizeof ( error.errmsg ) );
+	strncpy ( error.errmsg, errmsg ? errmsg : strerror ( errno ),
+		  sizeof ( error.errmsg ) );
 	return udp_transmit ( state->server.sin_addr.s_addr,
 			      state->client.sin_port, state->server.sin_port,
 			      sizeof ( error ), &error );

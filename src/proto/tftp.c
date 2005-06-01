@@ -103,40 +103,47 @@ static int tftp ( char *url __unused, struct sockaddr_in *server, char *file,
 		return 0;
 	}
 	
-	/* Process OACK, if any */
-	if ( ntohs ( reply->common.opcode ) == TFTP_OACK ) {
-		if ( ! tftp_process_opts ( &state, &reply->oack ) ) {
-			DBG ( "TFTP: option processing failed : %m\n" );
-			return 0;
-		}
-		reply = NULL;
-	}
-
 	/* Fetch file, a block at a time */
 	do {
-		/* Get next block to process.  (On the first time
-		 * through, we may already have a block from
-		 * tftp_open()).
-		 */
-		if ( ! reply ) {
-			if ( ! tftp_ack ( &state, &reply ) ) {
-				DBG ( "TFTP: could not get next block: %m\n" );
+		twiddle();
+		switch ( ntohs ( reply->common.opcode ) ) {
+		case TFTP_DATA:
+			if ( ! process_tftp_data ( &state, &reply->data,
+						   buffer, &eof ) ) {
+				tftp_error ( &state, TFTP_ERR_ILLEGAL_OP,
+					     NULL );
 				return 0;
 			}
-		}
-		twiddle();
-		/* Check it's a DATA block */
-		if ( ntohs ( reply->common.opcode ) != TFTP_DATA ) {
+			break;
+		case TFTP_OACK:
+			if ( state.block ) {
+				/* OACK must be first block, if present */
+				DBG ( "TFTP: OACK after block %d\n",
+				      state.block );
+				errno = PXENV_STATUS_TFTP_UNKNOWN_OPCODE;
+				tftp_error ( &state, TFTP_ERR_ILLEGAL_OP,
+					     NULL ); 
+				return 0;
+			}
+			if ( ! tftp_process_opts ( &state, &reply->oack ) ) {
+				DBG ( "TFTP: option processing failed: %m\n" );
+				tftp_error ( &state, TFTP_ERR_BAD_OPTS, NULL );
+				return 0;
+			}
+			break;
+		default:
 			DBG ( "TFTP: unexpected opcode %d\n",
 			      ntohs ( reply->common.opcode ) );
 			errno = PXENV_STATUS_TFTP_UNKNOWN_OPCODE;
+			tftp_error ( &state, TFTP_ERR_ILLEGAL_OP, NULL );
 			return 0;
 		}
-		/* Process the DATA block */
-		if ( ! process_tftp_data ( &state, &reply->data, buffer,
-					   &eof ) )
+		/* Fetch the next data block */
+		if ( ! tftp_ack ( &state, &reply ) ) {
+			DBG ( "TFTP: could not get next block: %m\n" );
+			tftp_error ( &state, TFTP_ERR_ILLEGAL_OP, NULL );
 			return 0;
-		reply = NULL;
+		}
 	} while ( ! eof );
 
 	/* ACK the final packet, as a courtesy to the server */
