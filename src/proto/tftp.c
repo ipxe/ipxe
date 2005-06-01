@@ -12,6 +12,28 @@
 /**
  * Process a TFTP block
  *
+ * @v state			TFTP transfer state
+ * @v tftp_state::block		Last received data block
+ * @v tftp_state::blksize	Transfer block size
+ * @v data			The data block to process
+ * @v buffer			The buffer to fill with the data
+ * @ret True			Block processed successfully
+ * @ret False			Block not processed successfully
+ * @ret tftp_state::block	Incremented if applicable
+ * @ret *eof			End-of-file marker
+ * @err #PXENV_STATUS_TFTP_INVALID_PACKET_SIZE Packet is too large
+ * @err other			As returned by fill_buffer()
+ *
+ * Process a TFTP DATA packet that has been received.  If the data
+ * packet is the next data packet in the stream, its contents will be
+ * placed in the #buffer and tftp_state::block will be incremented.
+ * If the packet is the final packet, end-of-file will be indicated
+ * via #eof.
+ *
+ * If the data packet is a duplicate, then process_tftp_data() will
+ * still return True, though nothing will be done with the packet.  A
+ * False return value always indicates an error that should abort the
+ * transfer.
  */
 static inline int process_tftp_data ( struct tftp_state *state,
 				      struct tftp_data *data,
@@ -32,7 +54,8 @@ static inline int process_tftp_data ( struct tftp_state *state,
 	if ( blksize > state->blksize ) {
 		DBG ( "TFTP: oversized block size %d (max %d)\n",
 		      blksize, state->blksize );
-		return 1;
+		errno = PXENV_STATUS_TFTP_INVALID_PACKET_SIZE;
+		return 0;
 	}
 	/* Place block in the buffer */
 	if ( ! fill_buffer ( buffer, data->data, state->block * state->blksize,
@@ -50,9 +73,21 @@ static inline int process_tftp_data ( struct tftp_state *state,
 /**
  * Download a file via TFTP
  *
+ * @v server				TFTP server
+ * @v file				File name
+ * @v buffer				Buffer into which to load file
+ * @ret True				File was downloaded successfully
+ * @ret False				File was not downloaded successfully
+ * @err #PXENV_STATUS_TFTP_UNKNOWN_OPCODE Unknown type of TFTP block received
+ * @err other				As returned by tftp_open()
+ * @err other				As returned by tftp_process_opts()
+ * @err other				As returned by tftp_ack()
+ * @err other				As returned by tftp_process_data()
+ *
+ * Download a file from a TFTP server into the specified buffer.
  */
-int tftp ( char *url __unused, struct sockaddr_in *server, char *file,
-	   struct buffer *buffer ) {
+static int tftp ( char *url __unused, struct sockaddr_in *server, char *file,
+		  struct buffer *buffer ) {
 	struct tftp_state state;
 	union tftp_any *reply;
 	int eof = 0;
