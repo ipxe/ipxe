@@ -47,21 +47,32 @@ int await_tftp ( int ival __unused, void *ptr, unsigned short ptype __unused,
 
 	/* Must have valid UDP (and, therefore, also IP) headers */
 	if ( ! udp ) {
+		DBG2 ( "TFTPCORE: not UDP\n" );
 		return 0;
 	}
 	/* Packet must come from the TFTP server */
-	if ( ip->src.s_addr != state->server.sin_addr.s_addr )
+	if ( ip->src.s_addr != state->server.sin_addr.s_addr ) {
+		DBG2 ( "TFTPCORE: from %@, not from TFTP server %@\n",
+		       ip->src.s_addr, state->server.sin_addr.s_addr );
 		return 0;
+	}
 	/* Packet must be addressed to the correct UDP port */
-	if ( ntohs ( udp->dest ) != state->client.sin_port )
+	if ( ntohs ( udp->dest ) != state->client.sin_port ) {
+		DBG2 ( "TFTPCORE: to UDP port %d, not to TFTP port %d\n",
+		       ntohs ( udp->dest ), state->client.sin_port );
 		return 0;
+	}
 	/* Packet must be addressed to us, or to our multicast
 	 * listening address (if we have one).
 	 */
 	if ( ! ( ( ip->dest.s_addr == arptable[ARP_CLIENT].ipaddr.s_addr ) ||
 		 ( ( state->client.sin_addr.s_addr ) && 
-		   ( ip->dest.s_addr == state->client.sin_addr.s_addr ) ) ) )
+		   ( ip->dest.s_addr == state->client.sin_addr.s_addr ) ) ) ) {
+		DBG2 ( "TFTPCORE: to %@, not to %@ (or %@)\n",
+		       ip->dest.s_addr, arptable[ARP_CLIENT].ipaddr.s_addr,
+		       state->client.sin_addr.s_addr );
 		return 0;
+	}
 	return 1;
 }
 
@@ -164,7 +175,7 @@ int tftp_open ( struct tftp_state *state, const char *filename,
 		state->server.sin_port = TFTP_PORT;
 
 	/* Determine whether or not to use lport */
-	fixed_lport = state->server.sin_port;
+	fixed_lport = state->client.sin_port;
 
 	/* Set up RRQ */
 	rrq.opcode = htons ( TFTP_RRQ );
@@ -202,7 +213,11 @@ int tftp_open ( struct tftp_state *state, const char *filename,
 		if ( await_reply ( await_tftp, 0, state, timeout ) ) {
 			*reply = ( union tftp_any * ) &nic.packet[ETH_HLEN];
 			state->server.sin_port =
-				ntohs ( (*reply)->common.udp.dest );
+				ntohs ( (*reply)->common.udp.src );
+			DBG ( "TFTPCORE: got reply from %@:%d (type %d)\n",
+			      state->server.sin_addr.s_addr,
+			      state->server.sin_port,
+			      ntohs ( (*reply)->common.opcode ) );
 			if ( ntohs ( (*reply)->common.opcode ) == TFTP_ERROR ){
 				tftp_set_errno ( &(*reply)->error );
 				return 0;
@@ -211,6 +226,7 @@ int tftp_open ( struct tftp_state *state, const char *filename,
 		}
 	}
 
+	DBG ( "TFTPCORE: open request timed out\n" );
 	errno = PXENV_STATUS_TFTP_OPEN_TIMEOUT;
 	return 0;
 }
@@ -250,6 +266,8 @@ int tftp_process_opts ( struct tftp_state *state, struct tftp_oack *oack ) {
 	const char *p;
 	const char *end;
 
+	DBG ( "TFTPCORE: processing OACK\n" );
+
 	/* End of options */
 	end = ( ( char * ) &oack->udp ) + ntohs ( oack->udp.len );
 
@@ -266,6 +284,7 @@ int tftp_process_opts ( struct tftp_state *state, struct tftp_oack *oack ) {
 				return 0;
 			}
 			p++;
+			DBG ( "TFTPCORE: got blksize %d\n", state->blksize );
 		} else if ( strcasecmp ( "tsize", p ) == 0 ) {
 			p += 6;
 			state->tsize = strtoul ( p, &p, 10 );
@@ -275,6 +294,7 @@ int tftp_process_opts ( struct tftp_state *state, struct tftp_oack *oack ) {
 				return 0;
 			}
 			p++;
+			DBG ( "TFTPCORE: got tsize %d\n", state->tsize );
 		} else if ( strcasecmp ( "multicast", p ) == 0 ) {
 			char *e = strchr ( p, ',' );
 			if ( ( ! e ) || ( e >= end ) ) {
@@ -317,7 +337,12 @@ int tftp_process_opts ( struct tftp_state *state, struct tftp_oack *oack ) {
 				return 0;
 			}
 			p++;
+			DBG ( "TFTPCORE: got multicast %@:%d (%s)\n",
+			      state->client.sin_addr.s_addr,
+			      state->client.sin_port,
+			      ( state->master ? "master" : "not master" ) );
 		} else {
+			DBG ( "TFTPCORE: unknown option \"%s\"\n", p );
 			p += strlen ( p ) + 1; /* skip option name */
 			p += strlen ( p ) + 1; /* skip option value */
 		}
@@ -351,6 +376,7 @@ int tftp_process_opts ( struct tftp_state *state, struct tftp_oack *oack ) {
 int tftp_ack_nowait ( struct tftp_state *state ) {
 	struct tftp_ack ack;
 
+	DBG ( "TFTPCORE: acknowledging data block %d\n", state->block );
 	ack.opcode = htons ( TFTP_ACK );
 	ack.block = htons ( state->block );
 	return udp_transmit ( state->server.sin_addr.s_addr,
@@ -396,9 +422,11 @@ int tftp_ack ( struct tftp_state *state, union tftp_any **reply ) {
 			DBG ( "TFTP: could not send ACK: %m\n" );
 			return 0;
 		}	
-		if ( await_reply ( await_tftp, 0, &state, timeout ) ) {
+		if ( await_reply ( await_tftp, 0, state, timeout ) ) {
 			/* We received a reply */
 			*reply = ( union tftp_any * ) &nic.packet[ETH_HLEN];
+			DBG ( "TFTPCORE: got reply (type %d)\n",
+			      ntohs ( (*reply)->common.opcode ) );
 			if ( ntohs ( (*reply)->common.opcode ) == TFTP_ERROR ){
 				tftp_set_errno ( &(*reply)->error );
 				return 0;
@@ -406,7 +434,7 @@ int tftp_ack ( struct tftp_state *state, union tftp_any **reply ) {
 			return 1;
 		}
 	}
-	DBG ( "TFTP: ACK retries exceeded\n" );
+	DBG ( "TFTP: timed out during read\n" );
 	errno = PXENV_STATUS_TFTP_READ_TIMEOUT;
 	return 0;
 }

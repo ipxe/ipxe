@@ -4,6 +4,7 @@
 #include "pxe_types.h"
 #include "pxe_api.h"
 #include "etherboot.h"
+#include "tftp.h"
 
 /* Union used for PXE API calls; we don't know the type of the
  * structure until we interpret the opcode.  Also, Status is available
@@ -88,7 +89,7 @@ typedef struct pxe_stack {
 			uint32_t magic_cookie;
 			unsigned int len;
 			int eof;
-			char data[TFTP_MAX_PACKET];
+			char data[TFTP_MAX_BLKSIZE];
 		} tftpdata;
 		struct {
 			char *buffer;

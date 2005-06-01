@@ -1,7 +1,7 @@
 #include "etherboot.h"
 #include "ip.h"
 #include "tcp.h"
-
+#include "nic.h"
 
 void build_tcp_hdr(unsigned long destip, unsigned int srcsock,
 		  unsigned int destsock, long send_seq, long recv_seq,

@@ -154,7 +154,6 @@ enum {
 #include	"udp.h"
 #include	"tcp.h"
 #include	"bootp.h"
-#include	"tftp.h"
 #include	"igmp.h"
 #include	"nfs.h"
 #include	"console.h"

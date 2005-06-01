@@ -131,7 +131,7 @@ PXENV_EXIT_t pxenv_tftp_open ( struct s_PXENV_TFTP_OPEN *tftp_open ) {
 	request.blksize = tftp_open->PacketSize;
 	DBG ( " %@:%d/%s (%d)", tftp_open->ServerIPAddress,
 	      tftp_open->TFTPPort, request.name, request.blksize );
-	if ( !request.blksize ) request.blksize = TFTP_DEFAULTSIZE_PACKET;
+	if ( !request.blksize ) request.blksize = TFTP_DEFAULT_BLKSIZE;
 	/* Make request and get first packet */
 	if ( !tftp_block ( &request, &block ) ) {
 		tftp_open->Status = PXENV_STATUS_TFTP_FILE_NOT_FOUND;

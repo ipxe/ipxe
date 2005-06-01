@@ -1,3 +1,5 @@
+#if 0
+
 /**************************************************************************
 *
 *    proto_tftm.c -- Etherboot Multicast TFTP 
@@ -481,3 +483,5 @@ static struct protocol tftm_protocol __protocol = {
 	.default_port = TFTM_PORT,
 	.load = url_tftm,
 };
+
+#endif
