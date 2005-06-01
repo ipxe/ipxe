@@ -161,13 +161,4 @@ struct tftpblk_info_t {
 
 #define TFTP_MIN_PACKET	(sizeof(struct iphdr) + sizeof(struct udphdr) + 4)
 
-/*
- * Functions in tftp.c.  Needed for pxe_export.c
- *
- */
-extern int tftp_block ( struct tftpreq_info_t *request,
-			struct tftpblk_info_t *block );
-extern int tftp ( char *url, struct sockaddr_in *server, char *file,
-		  struct buffer *buffer );
-
 #endif	/* TFTP_H */
