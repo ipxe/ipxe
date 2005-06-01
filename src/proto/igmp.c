@@ -5,6 +5,7 @@
 
 #include "ip.h"
 #include "igmp.h"
+#include "background.h"
 #include "nic.h"
 #include "etherboot.h"
 
@@ -56,7 +57,8 @@ static void send_igmp_reports ( unsigned long now ) {
 	}
 }
 
-static void process_igmp ( struct iphdr *ip, unsigned long now ) {
+static void process_igmp ( unsigned long now, unsigned short ptype __unused,
+			   struct iphdr *ip ) {
 	struct igmp *igmp;
 	int i;
 	unsigned iplen;
@@ -110,6 +112,11 @@ static void process_igmp ( struct iphdr *ip, unsigned long now ) {
 	}
 }
 
+static struct background igmp_background __background = {
+	.send = send_igmp_reports,
+	.process = process_igmp,
+};
+
 void leave_group ( int slot ) {
 	/* Be very stupid and always send a leave group message if 
 	 * I have subscribed.  Imperfect but it is standards
@@ -157,4 +164,3 @@ void join_group ( int slot, unsigned long group ) {
 		igmptable[slot].time = currticks();
 	}
 }
-

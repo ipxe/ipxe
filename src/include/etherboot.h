@@ -130,16 +130,11 @@ enum {
 	MAX_ARP
 };
 
-#define IGMP_SERVER	0
-#define MAX_IGMP	IGMP_SERVER+1
-
 #define	RARP_REQUEST	3
 #define	RARP_REPLY	4
 
 #include	"in.h"
 
-#define MULTICAST_MASK    0xF0000000
-#define MULTICAST_NETWORK 0xE0000000
 
 /* Helper macros used to identify when DHCP options are valid/invalid in/outside of encapsulation */
 #define NON_ENCAP_OPT in_encapsulated_options == 0 &&
@@ -162,11 +157,6 @@ enum {
 struct arptable_t {
 	struct in_addr ipaddr;
 	uint8_t node[6];
-} PACKED;
-
-struct igmptable_t {
-	in_addr group;
-	unsigned long time;
 } PACKED;
 
 #define	KERNEL_BUF	(BOOTP_DATA_ADDR->bootp_reply.bp_file)
@@ -214,14 +204,11 @@ int tcp_reset(struct iphdr *ip);
 typedef int (*reply_t)(int ival, void *ptr, unsigned short ptype, struct iphdr *ip, struct udphdr *udp, struct tcphdr *tcp);
 extern int await_reply P((reply_t reply,	int ival, void *ptr, long timeout));
 extern int decode_rfc1533 P((unsigned char *, unsigned int, unsigned int, int));
-extern void join_group(int slot, unsigned long group);
-extern void leave_group(int slot);
 #define RAND_MAX 2147483647L
 extern uint16_t ipchksum P((const void *ip, unsigned long len));
 extern uint16_t add_ipchksums P((unsigned long offset, uint16_t sum, uint16_t new));
 extern int32_t random P((void));
 extern long rfc2131_sleep_interval P((long base, int exp));
-extern long rfc1112_sleep_interval P((long base, int exp));
 extern void cleanup P((void));
 
 /* osloader.c */
