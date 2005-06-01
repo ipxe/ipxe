@@ -35,7 +35,7 @@
  * False return value always indicates an error that should abort the
  * transfer.
  */
-static inline int process_tftp_data ( struct tftp_state *state,
+static inline int tftp_process_data ( struct tftp_state *state,
 				      struct tftp_data *data,
 				      struct buffer *buffer,
 				      int *eof ) {
@@ -97,18 +97,18 @@ static int tftp ( char *url __unused, struct sockaddr_in *server, char *file,
 	state.server = *server;
 	
 	/* Open the file */
-	if ( ! tftp_open ( &state, file, &reply ) ) {
+	if ( ! tftp_open ( &state, file, &reply, 0 ) ) {
 		DBG ( "TFTP: could not open %@:%d/%s : %m\n",
 		      server->sin_addr.s_addr, server->sin_port, file );
 		return 0;
 	}
 	
 	/* Fetch file, a block at a time */
-	do {
+	while ( 1 ) {
 		twiddle();
 		switch ( ntohs ( reply->common.opcode ) ) {
 		case TFTP_DATA:
-			if ( ! process_tftp_data ( &state, &reply->data,
+			if ( ! tftp_process_data ( &state, &reply->data,
 						   buffer, &eof ) ) {
 				tftp_error ( &state, TFTP_ERR_ILLEGAL_OP,
 					     NULL );
@@ -138,13 +138,19 @@ static int tftp ( char *url __unused, struct sockaddr_in *server, char *file,
 			tftp_error ( &state, TFTP_ERR_ILLEGAL_OP, NULL );
 			return 0;
 		}
+		/* If we have reached EOF, stop here */
+		if ( eof )
+			break;
 		/* Fetch the next data block */
 		if ( ! tftp_ack ( &state, &reply ) ) {
 			DBG ( "TFTP: could not get next block: %m\n" );
-			tftp_error ( &state, TFTP_ERR_ILLEGAL_OP, NULL );
+			if ( ! reply ) {
+				tftp_error ( &state, TFTP_ERR_ILLEGAL_OP,
+					     NULL );
+			}
 			return 0;
 		}
-	} while ( ! eof );
+	}
 
 	/* ACK the final packet, as a courtesy to the server */
 	tftp_ack_nowait ( &state );
