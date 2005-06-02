@@ -29,9 +29,16 @@
 #define LINUX_OUT_MACROS 1
 #define SMC9000_DEBUG    0
 
+#if SMC9000_DEBUG > 1
+#define PRINTK2 printf
+#else
+#define PRINTK2(args...)
+#endif
+
 #include "etherboot.h"
 #include "nic.h"
 #include "isa.h"
+#include "timer.h"
 #include "smc9000.h"
 
 # define _outb outb
@@ -47,10 +54,448 @@ static const char       *chip_ids[ 15 ] =  {
    NULL,
    /* 7 */ "SMC91C100",
    /* 8 */ "SMC91C100FD",
-   NULL, NULL, NULL,
+   /* 9 */ "SMC91C11xFD",
+   NULL, NULL,
    NULL, NULL, NULL
 };
 static const char      smc91c96_id[] = "SMC91C96";
+
+/*------------------------------------------------------------
+ . Reads a register from the MII Management serial interface
+ .-------------------------------------------------------------*/
+static word smc_read_phy_register(int ioaddr, byte phyaddr, byte phyreg)
+{
+    int oldBank;
+    unsigned int i;
+    byte mask;
+    word mii_reg;
+    byte bits[64];
+    int clk_idx = 0;
+    int input_idx;
+    word phydata;
+
+    // 32 consecutive ones on MDO to establish sync
+    for (i = 0; i < 32; ++i)
+        bits[clk_idx++] = MII_MDOE | MII_MDO;
+
+    // Start code <01>
+    bits[clk_idx++] = MII_MDOE;
+    bits[clk_idx++] = MII_MDOE | MII_MDO;
+
+    // Read command <10>
+    bits[clk_idx++] = MII_MDOE | MII_MDO;
+    bits[clk_idx++] = MII_MDOE;
+
+    // Output the PHY address, msb first
+    mask = (byte)0x10;
+    for (i = 0; i < 5; ++i)
+    {
+        if (phyaddr & mask)
+            bits[clk_idx++] = MII_MDOE | MII_MDO;
+        else
+            bits[clk_idx++] = MII_MDOE;
+
+        // Shift to next lowest bit
+        mask >>= 1;
+    }
+
+    // Output the phy register number, msb first
+    mask = (byte)0x10;
+    for (i = 0; i < 5; ++i)
+    {
+        if (phyreg & mask)
+            bits[clk_idx++] = MII_MDOE | MII_MDO;
+        else
+            bits[clk_idx++] = MII_MDOE;
+
+        // Shift to next lowest bit
+        mask >>= 1;
+    }
+
+    // Tristate and turnaround (2 bit times)
+    bits[clk_idx++] = 0;
+    //bits[clk_idx++] = 0;
+
+    // Input starts at this bit time
+    input_idx = clk_idx;
+
+    // Will input 16 bits
+    for (i = 0; i < 16; ++i)
+        bits[clk_idx++] = 0;
+
+    // Final clock bit
+    bits[clk_idx++] = 0;
+
+    // Save the current bank
+    oldBank = inw( ioaddr+BANK_SELECT );
+
+    // Select bank 3
+    SMC_SELECT_BANK(ioaddr, 3);
+
+    // Get the current MII register value
+    mii_reg = inw( ioaddr+MII_REG );
+
+    // Turn off all MII Interface bits
+    mii_reg &= ~(MII_MDOE|MII_MCLK|MII_MDI|MII_MDO);
+
+    // Clock all 64 cycles
+    for (i = 0; i < sizeof(bits); ++i)
+    {
+        // Clock Low - output data
+        outw( mii_reg | bits[i], ioaddr+MII_REG );
+        udelay(50);
+
+
+        // Clock Hi - input data
+        outw( mii_reg | bits[i] | MII_MCLK, ioaddr+MII_REG );
+        udelay(50);
+        bits[i] |= inw( ioaddr+MII_REG ) & MII_MDI;
+    }
+
+    // Return to idle state
+    // Set clock to low, data to low, and output tristated
+    outw( mii_reg, ioaddr+MII_REG );
+    udelay(50);
+
+    // Restore original bank select
+    SMC_SELECT_BANK(ioaddr, oldBank);
+
+    // Recover input data
+    phydata = 0;
+    for (i = 0; i < 16; ++i)
+    {
+        phydata <<= 1;
+
+        if (bits[input_idx++] & MII_MDI)
+            phydata |= 0x0001;
+    }
+
+#if (SMC_DEBUG > 2 )
+        printf("smc_read_phy_register(): phyaddr=%x,phyreg=%x,phydata=%x\n",
+               phyaddr, phyreg, phydata);
+#endif
+
+        return(phydata);
+}
+
+
+/*------------------------------------------------------------
+ . Writes a register to the MII Management serial interface
+ .-------------------------------------------------------------*/
+static void smc_write_phy_register(int ioaddr,
+                                   byte phyaddr, byte phyreg, word phydata)
+{
+    int oldBank;
+    unsigned int i;
+    word mask;
+    word mii_reg;
+    byte bits[65];
+    int clk_idx = 0;
+
+    // 32 consecutive ones on MDO to establish sync
+    for (i = 0; i < 32; ++i)
+        bits[clk_idx++] = MII_MDOE | MII_MDO;
+
+    // Start code <01>
+    bits[clk_idx++] = MII_MDOE;
+    bits[clk_idx++] = MII_MDOE | MII_MDO;
+
+    // Write command <01>
+    bits[clk_idx++] = MII_MDOE;
+    bits[clk_idx++] = MII_MDOE | MII_MDO;
+
+    // Output the PHY address, msb first
+    mask = (byte)0x10;
+    for (i = 0; i < 5; ++i)
+    {
+        if (phyaddr & mask)
+            bits[clk_idx++] = MII_MDOE | MII_MDO;
+        else
+            bits[clk_idx++] = MII_MDOE;
+
+                // Shift to next lowest bit
+        mask >>= 1;
+    }
+
+    // Output the phy register number, msb first
+    mask = (byte)0x10;
+    for (i = 0; i < 5; ++i)
+    {
+        if (phyreg & mask)
+            bits[clk_idx++] = MII_MDOE | MII_MDO;
+        else
+            bits[clk_idx++] = MII_MDOE;
+
+        // Shift to next lowest bit
+        mask >>= 1;
+    }
+
+    // Tristate and turnaround (2 bit times)
+    bits[clk_idx++] = 0;
+    bits[clk_idx++] = 0;
+
+    // Write out 16 bits of data, msb first
+    mask = 0x8000;
+    for (i = 0; i < 16; ++i)
+    {
+        if (phydata & mask)
+            bits[clk_idx++] = MII_MDOE | MII_MDO;
+        else
+            bits[clk_idx++] = MII_MDOE;
+
+        // Shift to next lowest bit
+        mask >>= 1;
+    }
+
+    // Final clock bit (tristate)
+    bits[clk_idx++] = 0;
+
+    // Save the current bank
+    oldBank = inw( ioaddr+BANK_SELECT );
+
+    // Select bank 3
+    SMC_SELECT_BANK(ioaddr, 3);
+
+    // Get the current MII register value
+    mii_reg = inw( ioaddr+MII_REG );
+
+    // Turn off all MII Interface bits
+    mii_reg &= ~(MII_MDOE|MII_MCLK|MII_MDI|MII_MDO);
+
+    // Clock all cycles
+    for (i = 0; i < sizeof(bits); ++i)
+    {
+        // Clock Low - output data
+        outw( mii_reg | bits[i], ioaddr+MII_REG );
+        udelay(50);
+
+
+        // Clock Hi - input data
+        outw( mii_reg | bits[i] | MII_MCLK, ioaddr+MII_REG );
+        udelay(50);
+        bits[i] |= inw( ioaddr+MII_REG ) & MII_MDI;
+    }
+
+    // Return to idle state
+    // Set clock to low, data to low, and output tristated
+    outw( mii_reg, ioaddr+MII_REG );
+    udelay(50);
+
+    // Restore original bank select
+    SMC_SELECT_BANK(ioaddr, oldBank);
+
+#if (SMC_DEBUG > 2 )
+        printf("smc_write_phy_register(): phyaddr=%x,phyreg=%x,phydata=%x\n",
+               phyaddr, phyreg, phydata);
+#endif
+}
+
+
+/*------------------------------------------------------------
+ . Finds and reports the PHY address
+ .-------------------------------------------------------------*/
+static int smc_detect_phy(int ioaddr, byte *pphyaddr)
+{
+    word phy_id1;
+    word phy_id2;
+    int phyaddr;
+    int found = 0;
+
+    // Scan all 32 PHY addresses if necessary
+    for (phyaddr = 0; phyaddr < 32; ++phyaddr)
+    {
+        // Read the PHY identifiers
+        phy_id1  = smc_read_phy_register(ioaddr, phyaddr, PHY_ID1_REG);
+        phy_id2  = smc_read_phy_register(ioaddr, phyaddr, PHY_ID2_REG);
+
+        // Make sure it is a valid identifier
+        if ((phy_id2 > 0x0000) && (phy_id2 < 0xffff) &&
+             (phy_id1 > 0x0000) && (phy_id1 < 0xffff))
+        {
+            if ((phy_id1 != 0x8000) && (phy_id2 != 0x8000))
+            {
+                // Save the PHY's address
+                *pphyaddr = phyaddr;
+                found = 1;
+                break;
+            }
+        }
+    }
+
+    if (!found)
+    {
+        printf("No PHY found\n");
+        return(0);
+    }
+
+    // Set the PHY type
+    if ( (phy_id1 == 0x0016) && ((phy_id2 & 0xFFF0) == 0xF840 ) )
+    {
+        printf("PHY=LAN83C183 (LAN91C111 Internal)\n");
+    }
+
+    if ( (phy_id1 == 0x0282) && ((phy_id2 & 0xFFF0) == 0x1C50) )
+    {
+        printf("PHY=LAN83C180\n");
+    }
+
+    return(1);
+}
+
+/*------------------------------------------------------------
+ . Configures the specified PHY using Autonegotiation. Calls
+ . smc_phy_fixed() if the user has requested a certain config.
+ .-------------------------------------------------------------*/
+static void smc_phy_configure(int ioaddr)
+{
+    int timeout;
+    byte phyaddr;
+    word my_phy_caps; // My PHY capabilities
+    word my_ad_caps; // My Advertised capabilities
+    word status;
+    int failed = 0;
+    int rpc_cur_mode = RPC_DEFAULT;
+    int lastPhy18;
+
+    // Find the address and type of our phy
+    if (!smc_detect_phy(ioaddr, &phyaddr))
+    {
+        return;
+    }
+
+    // Reset the PHY, setting all other bits to zero
+    smc_write_phy_register(ioaddr, phyaddr, PHY_CNTL_REG, PHY_CNTL_RST);
+
+    // Wait for the reset to complete, or time out
+    timeout = 6; // Wait up to 3 seconds
+    while (timeout--)
+    {
+        if (!(smc_read_phy_register(ioaddr, phyaddr, PHY_CNTL_REG)
+              & PHY_CNTL_RST))
+        {
+            // reset complete
+            break;
+        }
+
+        mdelay(500); // wait 500 millisecs
+    }
+
+    if (timeout < 1)
+    {
+        PRINTK2("PHY reset timed out\n");
+        return;
+    }
+
+    // Read PHY Register 18, Status Output
+    lastPhy18 = smc_read_phy_register(ioaddr, phyaddr, PHY_INT_REG);
+
+    // Enable PHY Interrupts (for register 18)
+    // Interrupts listed here are disabled
+    smc_write_phy_register(ioaddr, phyaddr, PHY_MASK_REG,
+                           PHY_INT_LOSSSYNC | PHY_INT_CWRD | PHY_INT_SSD |
+                                   PHY_INT_ESD | PHY_INT_RPOL | PHY_INT_JAB |
+                                   PHY_INT_SPDDET | PHY_INT_DPLXDET);
+
+    /* Configure the Receive/Phy Control register */
+    SMC_SELECT_BANK(ioaddr, 0);
+    outw( rpc_cur_mode, ioaddr + RPC_REG );
+
+    // Copy our capabilities from PHY_STAT_REG to PHY_AD_REG
+    my_phy_caps = smc_read_phy_register(ioaddr, phyaddr, PHY_STAT_REG);
+    my_ad_caps  = PHY_AD_CSMA; // I am CSMA capable
+
+    if (my_phy_caps & PHY_STAT_CAP_T4)
+        my_ad_caps |= PHY_AD_T4;
+
+    if (my_phy_caps & PHY_STAT_CAP_TXF)
+        my_ad_caps |= PHY_AD_TX_FDX;
+
+    if (my_phy_caps & PHY_STAT_CAP_TXH)
+        my_ad_caps |= PHY_AD_TX_HDX;
+
+    if (my_phy_caps & PHY_STAT_CAP_TF)
+        my_ad_caps |= PHY_AD_10_FDX;
+
+    if (my_phy_caps & PHY_STAT_CAP_TH)
+        my_ad_caps |= PHY_AD_10_HDX;
+
+    // Update our Auto-Neg Advertisement Register
+    smc_write_phy_register(ioaddr, phyaddr, PHY_AD_REG, my_ad_caps);
+
+    PRINTK2("phy caps=%x\n", my_phy_caps);
+    PRINTK2("phy advertised caps=%x\n", my_ad_caps);
+
+    // Restart auto-negotiation process in order to advertise my caps
+    smc_write_phy_register( ioaddr, phyaddr, PHY_CNTL_REG,
+                            PHY_CNTL_ANEG_EN | PHY_CNTL_ANEG_RST );
+
+    // Wait for the auto-negotiation to complete.  This may take from
+    // 2 to 3 seconds.
+    // Wait for the reset to complete, or time out
+    timeout = 20; // Wait up to 10 seconds
+    while (timeout--)
+    {
+        status = smc_read_phy_register(ioaddr, phyaddr, PHY_STAT_REG);
+        if (status & PHY_STAT_ANEG_ACK)
+        {
+            // auto-negotiate complete
+            break;
+        }
+
+        mdelay(500); // wait 500 millisecs
+
+        // Restart auto-negotiation if remote fault
+        if (status & PHY_STAT_REM_FLT)
+        {
+            PRINTK2("PHY remote fault detected\n");
+
+            // Restart auto-negotiation
+            PRINTK2("PHY restarting auto-negotiation\n");
+            smc_write_phy_register( ioaddr, phyaddr, PHY_CNTL_REG,
+                                    PHY_CNTL_ANEG_EN | PHY_CNTL_ANEG_RST |
+                                    PHY_CNTL_SPEED | PHY_CNTL_DPLX);
+        }
+    }
+
+    if (timeout < 1)
+    {
+        PRINTK2("PHY auto-negotiate timed out\n");
+        failed = 1;
+    }
+
+    // Fail if we detected an auto-negotiate remote fault
+    if (status & PHY_STAT_REM_FLT)
+    {
+        PRINTK2("PHY remote fault detected\n");
+        failed = 1;
+    }
+
+    // Set our sysctl parameters to match auto-negotiation results
+    if ( lastPhy18 & PHY_INT_SPDDET )
+    {
+        PRINTK2("PHY 100BaseT\n");
+        rpc_cur_mode |= RPC_SPEED;
+    }
+    else
+    {
+        PRINTK2("PHY 10BaseT\n");
+        rpc_cur_mode &= ~RPC_SPEED;
+    }
+
+    if ( lastPhy18 & PHY_INT_DPLXDET )
+    {
+        PRINTK2("PHY Full Duplex\n");
+        rpc_cur_mode |= RPC_DPLX;
+    }
+    else
+    {
+        PRINTK2("PHY Half Duplex\n");
+        rpc_cur_mode &= ~RPC_DPLX;
+    }
+
+    // Re-Configure the Receive/Phy Control register
+    outw( rpc_cur_mode, ioaddr + RPC_REG );
+}
 
 /*
  * Function: smc_reset( int ioaddr )
@@ -476,6 +921,8 @@ static int smc9000_probe ( struct nic *nic, struct isa_device *isa ) {
 	   nic->ioaddr + CONFIG );
    }
 
+   smc_phy_configure(nic->ioaddr);
+ 
    nic->nic_op	= &smc9000_operations;
    return 1;
 }

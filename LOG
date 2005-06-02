@@ -2868,3 +2868,5 @@ driver
 that it supports the Gigabit nVidia NICs
 
 + Timothy Legge fixed relocation issues with the eepro driver
+
++ Jan Kiszka provided a patch for the smc9000 for missing phy-setup
