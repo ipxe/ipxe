@@ -9,19 +9,20 @@
 /**
  * await_reply() filter for TFTP packets
  *
- * @v ptr			Pointer to a struct tftp_state
- * @v tftp_state::server::sin_addr TFTP server IP address
- * @v tftp_state::client::sin_addr Client multicast IP address, or 0.0.0.0
- * @v tftp_state::client::sin_port Client UDP port
- * @v ip			IP header
- * @v udp			UDP header
- * @ret True			This is our TFTP packet
- * @ret False			This is not one of our TFTP packets
+ * @v ptr				Pointer to a struct tftp_state
+ * @v tftp_state::server::sin_addr	TFTP server IP address
+ * @v tftp_state::lport			Client UDP port
+ * @v tftp_state::multicast::sin_addr	Multicast IP address, or 0.0.0.0
+ * @v tftp_state::multicast::sin_port	Multicast UDP port, or 0
+ * @v ip				IP header
+ * @v udp				UDP header
+ * @ret True				This is our TFTP packet
+ * @ret False				This is not one of our TFTP packets
  *
  * Wait for a TFTP packet that is part of the current connection
  * (i.e. comes from the TFTP server, has the correct destination port,
- * and is addressed either to our IP address or to our multicast
- * listening address).
+ * and is addressed either to our IP address and UDP port, or to our
+ * multicast listening address and UDP port).
  *
  * Use await_tftp() in code such as
  *
@@ -49,39 +50,42 @@ static int await_tftp ( int ival __unused, void *ptr,
 		       ip->src.s_addr, state->server.sin_addr.s_addr );
 		return 0;
 	}
-	/* Packet must be addressed to the correct UDP port */
-	if ( ntohs ( udp->dest ) != state->client.sin_port ) {
-		DBG2 ( "TFTPCORE: to UDP port %d, not to TFTP port %d\n",
-		       ntohs ( udp->dest ), state->client.sin_port );
-		return 0;
-	}
-	/* Packet must be addressed to us, or to our multicast
-	 * listening address (if we have one).
+	/* Packet may be addressed to our IP address and unicast UDP
+	 * port
 	 */
-	if ( ! ( ( ip->dest.s_addr == arptable[ARP_CLIENT].ipaddr.s_addr ) ||
-		 ( ( state->client.sin_addr.s_addr ) && 
-		   ( ip->dest.s_addr == state->client.sin_addr.s_addr ) ) ) ) {
-		DBG2 ( "TFTPCORE: to %@, not to %@ (or %@)\n",
-		       ip->dest.s_addr, arptable[ARP_CLIENT].ipaddr.s_addr,
-		       state->client.sin_addr.s_addr );
-		return 0;
+	if ( ( ip->dest.s_addr == arptable[ARP_CLIENT].ipaddr.s_addr ) &&
+	     ( ntohs ( udp->dest ) == state->lport ) ) {
+		return 1;
 	}
-	return 1;
+	/* Packet may be addressed to our multicast IP address and UDP
+	 * port, if we have one
+	 */
+	if ( ( state->multicast.sin_addr.s_addr ) && 
+	     ( ip->dest.s_addr == state->multicast.sin_addr.s_addr ) &&
+	     ( ntohs ( udp->dest ) == state->multicast.sin_port ) ) {
+		return 1;
+	}
+	DBG2 ( "TFTPCORE: to %@:%d, not to %@:%d (or %@:%d)\n",
+	       ip->dest.s_addr, ntohs ( udp->dest ),
+	       arptable[ARP_CLIENT].ipaddr.s_addr, state->lport,
+	       state->multicast.sin_addr.s_addr, state->multicast.sin_port );
+	return 0;
 }
 
 /**
  * Retrieve a TFTP packet
  *
- * @v state			TFTP transfer state
- * @v tftp_state::server::sin_addr TFTP server IP address
- * @v tftp_state::client::sin_addr Client multicast IP address, or 0.0.0.0
- * @v tftp_state::client::sin_port Client UDP port
- * @v timeout			Time to wait for a response
- * @ret True			Received a non-error response
- * @ret False			Received error response / no response
- * @ret *reply			The server's response, if any
- * @err #PXENV_STATUS_TFTP_READ_TIMEOUT No response received in time
- * @err other			As set by tftp_set_errno()
+ * @v state				TFTP transfer state
+ * @v tftp_state::server::sin_addr	TFTP server IP address
+ * @v tftp_state::lport			Client UDP port
+ * @v tftp_state::multicast::sin_addr	Multicast IP address, or 0.0.0.0
+ * @v tftp_state::multicast::sin_port	Multicast UDP port, or 0
+ * @v timeout				Time to wait for a response
+ * @ret True				Received a non-error response
+ * @ret False				Received error response / no response
+ * @ret *reply				The server's response, if any
+ * @err #PXENV_STATUS_TFTP_READ_TIMEOUT	No response received in time
+ * @err other				As set by tftp_set_errno()
  *
  * Retrieve the next packet sent by the TFTP server, if any is sent
  * within the specified timeout period.  The packet is returned via
@@ -121,15 +125,16 @@ int tftp_get ( struct tftp_state *state, long timeout,
  * @v state				TFTP transfer state
  * @v tftp_state::server::sin_addr	TFTP server IP address
  * @v tftp_state::server::sin_port	TFTP server UDP port, or 0
- * @v tftp_state::client::sin_addr	Client multicast IP address, or 0.0.0.0
- * @v tftp_state::client::sin_port	Client UDP port, or 0
+ * @v tftp_state::lport			Client UDP port, or 0
+ * @v tftp_state::multicast::sin_addr	Multicast IP address, or 0.0.0.0
+ * @v tftp_state::multicast::sin_port	Multicast UDP port, or 0
  * @v tftp_state::blksize		Requested blksize, or 0
  * @v filename				File name
  * @v multicast				Enable/disable rfc2090 multicast TFTP
  * @ret True				Received a non-error response
  * @ret False				Received error response / no response
  * @ret tftp_state::server::sin_port	TFTP server UDP port
- * @ret tftp_state::client::sin_port	Client UDP port
+ * @ret tftp_state::lport		Client UDP port
  * @ret tftp_state::blksize		Always #TFTP_DEFAULT_BLKSIZE
  * @ret *reply				The server's response, if any
  * @err #PXENV_STATUS_TFTP_OPEN_TIMEOUT	TFTP open timed out
@@ -144,32 +149,35 @@ int tftp_get ( struct tftp_state *state, long timeout,
  * If tftp_state::server::sin_port is 0, the standard TFTP server port
  * (#TFTP_PORT) will be used.
  *
- * If tftp_state::client::sin_addr is not 0.0.0.0, it will be used as
- * a multicast listening address for replies from the TFTP server.
- *
- * If tftp_state::client::sin_port is 0, the standard mechanism of
+ * If tftp_state::lport is 0, the standard mechanism of
  * using a new, unique port number for each TFTP request will be used.
  * 
+ * If tftp_state::multicast::sin_addr is not 0.0.0.0, it (and
+ * tftp_state::multicast::sin_port) will be used as a multicast
+ * listening address for replies from the TFTP server.
+ *
  * For the various different types of TFTP server, you should treat
- * tftp_state::client as follows:
+ * tftp_state::lport and tftp_state::multicast as follows:
  *
- *   - Standard TFTP server: set tftp_state::client::sin_addr to
- *     0.0.0.0 and tftp_state::client::sin_port to 0.  tftp_open()
- *     will set tftp_state::client::sin_port to the assigned local UDP
- *     port.
+ *   - Standard TFTP server: set tftp_state::lport to 0,
+ *     tftp_state::multicast::sin_addr to 0.0.0.0 and
+ *     tftp_state::multicast::sin_port to 0.  tftp_open() will set
+ *     tftp_state::lport to the assigned local UDP port.
  *
- *   - TFTM server: set tftp_state::client::sin_addr to 0.0.0.0 and
- *     tftp_state::client::sin_port to 0.  tftp_open() will set
- *     tftp_state::client::sin_port to the assigned local UDP port.
- *     (Your call to tftp_process_opts() will then overwrite both
- *     tftp_state::client::sin_addr and tftp_state::client::sin_port
- *     with the values return in the OACK packet.)
+ *   - TFTM server: set tftp_state::lport to 0,
+ *     tftp_state::multicast::sin_addr to 0.0.0.0 and
+ *     tftp_state::multicast::sin_port to 0.  tftp_open() will set
+ *     tftp_state::lport to the assigned local UDP port.  (Your call
+ *     to tftp_process_opts() will then overwrite both
+ *     tftp_state::multicast::sin_addr and
+ *     tftp_state::multicast::sin_port with the values specified in
+ *     the OACK packet.)
  *
- *   - MTFTP server: set tftp_state::client::sin_addr to the client
- *     multicast address and tftp_state::client::sin_port to the
- *     client multicast port (both of which must be previously known,
- *     e.g. provided by a DHCP server).  tftp_open() will not alter
- *     these values.
+ *   - MTFTP server: set tftp_state::multicast::sin_addr to the
+ *     multicast address and both tftp_state::lport and
+ *     tftp_state::multicast::sin_port to the multicast port (both of
+ *     which must be previously known, e.g. provided by a DHCP
+ *     server).  tftp_open() will not alter these values.
  *
  * If tftp_state::blksize is 0, the maximum blocksize
  * (#TFTP_MAX_BLKSIZE) will be requested.
@@ -216,7 +224,7 @@ int tftp_open ( struct tftp_state *state, const char *filename,
 		state->server.sin_port = TFTP_PORT;
 
 	/* Determine whether or not to use lport */
-	fixed_lport = state->client.sin_port;
+	fixed_lport = state->lport;
 
 	/* Set up RRQ */
 	rrq.opcode = htons ( TFTP_RRQ );
@@ -240,15 +248,14 @@ int tftp_open ( struct tftp_state *state, const char *filename,
 
 		/* Set client UDP port, if not already fixed */
 		if ( ! fixed_lport )
-			state->client.sin_port = ++lport;
+			state->lport = ++lport;
 		
 		/* Send the RRQ */
 		DBG ( "TFTPCORE: requesting %@:%d/%s from port %d\n",
 		      state->server.sin_addr.s_addr, state->server.sin_port,
-		      rrq.data, state->client.sin_port );
+		      rrq.data, state->lport );
 		if ( ! udp_transmit ( state->server.sin_addr.s_addr,
-				      state->client.sin_port,
-				      state->server.sin_port,
+				      state->lport, state->server.sin_port,
 				      rrqlen, &rrq ) )
 			return 0;
 		
@@ -282,8 +289,8 @@ int tftp_open ( struct tftp_state *state, const char *filename,
  * @ret False				Options were not processed successfully
  * @ret tftp_state::blksize		Negotiated blksize
  * @ret tftp_state::tsize		File size (if known), or 0
- * @ret tftp_state::client::sin_addr	Client multicast IP address, or 0.0.0.0
- * @ret tftp_state::client::sin_port	Client UDP port
+ * @ret tftp_state::multicast::sin_addr	Multicast IP address, or 0.0.0.0
+ * @ret tftp_state::multicast::sin_port	Multicast UDP port, or 0
  * @ret tftp_state::master		Client is master
  * @err EINVAL				An invalid option value was encountered
  *
@@ -338,6 +345,7 @@ int tftp_process_opts ( struct tftp_state *state, struct tftp_oack *oack ) {
 			p++;
 			DBG ( "TFTPCORE: got tsize %d\n", state->tsize );
 		} else if ( strcasecmp ( "multicast", p ) == 0 ) {
+			p += 10;
 			char *e = strchr ( p, ',' );
 			if ( ( ! e ) || ( e >= end ) ) {
 				DBG ( "TFTPCORE: malformed multicast field "
@@ -345,13 +353,14 @@ int tftp_process_opts ( struct tftp_state *state, struct tftp_oack *oack ) {
 				return 0;
 			}
 			/* IP address may be missing, in which case we
-			 * should leave state->client.sin_addr
+			 * should leave state->multicast.sin_addr
 			 * unaltered.
 			 */
 			if ( e != p ) {
 				int rc;
 				*e = '\0';
-				rc = inet_aton ( p, &state->client.sin_addr );
+				rc = inet_aton ( p,
+						 &state->multicast.sin_addr );
 				*e = ',';
 				if ( ! rc ) {
 					DBG ( "TFTPCORE: malformed multicast "
@@ -362,15 +371,15 @@ int tftp_process_opts ( struct tftp_state *state, struct tftp_oack *oack ) {
 			p = e + 1;
 			/* UDP port may also be missing */
 			if ( *p != ',' ) {
-				state->client.sin_port = strtoul ( p, &p, 10 );
+				state->multicast.sin_port
+					= strtoul ( p, &p, 10 );
 				if ( *p != ',' ) {
 					DBG ( "TFTPCORE: garbage \"%s\" "
 					      "after multicast port\n", p );
 					return 0;
 				}
-			} else {
-				p++;
 			}
+			p++;
 			/* "Master Client" must always be present */
 			state->master = strtoul ( p, &p, 10 );
 			if ( *p ) {
@@ -380,8 +389,8 @@ int tftp_process_opts ( struct tftp_state *state, struct tftp_oack *oack ) {
 			}
 			p++;
 			DBG ( "TFTPCORE: got multicast %@:%d (%s)\n",
-			      state->client.sin_addr.s_addr,
-			      state->client.sin_port,
+			      state->multicast.sin_addr.s_addr,
+			      state->multicast.sin_port,
 			      ( state->master ? "master" : "not master" ) );
 		} else {
 			DBG ( "TFTPCORE: unknown option \"%s\"\n", p );
@@ -404,7 +413,7 @@ int tftp_process_opts ( struct tftp_state *state, struct tftp_oack *oack ) {
  * @v state				TFTP transfer state
  * @v tftp_state::server::sin_addr	TFTP server IP address
  * @v tftp_state::server::sin_port	TFTP server UDP port
- * @v tftp_state::client::sin_port	Client UDP port
+ * @v tftp_state::lport			Client UDP port
  * @v tftp_state::block			Most recently received block number
  * @ret True				Acknowledgement packet was sent
  * @ret False				Acknowledgement packet was not sent
@@ -422,7 +431,7 @@ int tftp_ack_nowait ( struct tftp_state *state ) {
 	ack.opcode = htons ( TFTP_ACK );
 	ack.block = htons ( state->block );
 	return udp_transmit ( state->server.sin_addr.s_addr,
-			      state->client.sin_port, state->server.sin_port,
+			      state->lport, state->server.sin_port,
 			      sizeof ( ack ), &ack );
 }
 
@@ -432,7 +441,7 @@ int tftp_ack_nowait ( struct tftp_state *state ) {
  * @v state				TFTP transfer state
  * @v tftp_state::server::sin_addr	TFTP server IP address
  * @v tftp_state::server::sin_port	TFTP server UDP port
- * @v tftp_state::client::sin_port	Client UDP port
+ * @v tftp_state::lport			Client UDP port
  * @v tftp_state::block			Most recently received block number
  * @ret True				Received a non-error response
  * @ret False				Received error response / no response
@@ -484,7 +493,7 @@ int tftp_ack ( struct tftp_state *state, union tftp_any **reply ) {
  * @v state				TFTP transfer state
  * @v tftp_state::server::sin_addr	TFTP server IP address
  * @v tftp_state::server::sin_port	TFTP server UDP port
- * @v tftp_state::client::sin_port	Client UDP port
+ * @v tftp_state::lport			Client UDP port
  * @v errcode				TFTP error code
  * @v errmsg				Descriptive error string, or NULL
  * @ret True				Error packet was sent
@@ -505,7 +514,7 @@ int tftp_error ( struct tftp_state *state, int errcode, const char *errmsg ) {
 	strncpy ( error.errmsg, errmsg ? errmsg : strerror ( errno ),
 		  sizeof ( error.errmsg ) );
 	return udp_transmit ( state->server.sin_addr.s_addr,
-			      state->client.sin_port, state->server.sin_port,
+			      state->lport, state->server.sin_port,
 			      sizeof ( error ), &error );
 }
 

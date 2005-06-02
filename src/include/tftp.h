@@ -100,19 +100,18 @@ struct tftp_state {
 	 * will be sent, and to which ACK packets should be sent.
 	 */
 	struct sockaddr_in server;
-	/** TFTP client address
+	/** TFTP client port
 	 *
-	 * The IP address, if any, is the multicast address to which
-	 * data packets will be sent.  The client will always send
-	 * packets from its own IP address.
-	 *
-	 * The UDP port is the port from which the open request will
-	 * be sent, and to which data packets will be sent.  (Due to
-	 * the "design" of the MTFTP protocol, the master client will
-	 * receive its first data packet as unicast, and subsequent
-	 * packets as multicast.)
+	 * This is the UDP port from which the open request will be
+	 * sent, and to which any unicast data packets will be sent.
 	 */
-	struct sockaddr_in client;
+	in_port_t lport;
+	/** TFTP multicast address
+	 *
+	 * This is the IP address and UDP port to which multicast data
+	 * packets, if any, will be sent.
+	 */
+	struct sockaddr_in multicast;
 	/** Master client
 	 *
 	 * This will be true if the client is the master client for a

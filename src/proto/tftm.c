@@ -14,20 +14,20 @@
 
 static inline int tftm_process_opts ( struct tftp_state *state,
 				      struct tftp_oack *oack ) {
-	struct in_addr old_mcast_addr = state->client.sin_addr;
+	struct in_addr old_mcast_addr = state->multicast.sin_addr;
 
 	if ( ! tftp_process_opts ( state, oack ) )
 		return 0;
 
-	if ( old_mcast_addr.s_addr != state->client.sin_addr.s_addr ) {
+	if ( old_mcast_addr.s_addr != state->multicast.sin_addr.s_addr ) {
 		if ( old_mcast_addr.s_addr ) {
 			DBG ( "TFTM: Leaving multicast group %@\n",
 			      old_mcast_addr.s_addr );
 			leave_group ( IGMP_SERVER );
 		}
 		DBG ( "TFTM: Joining multicast group %@\n",
-		      state->client.sin_addr.s_addr );
-		join_group ( IGMP_SERVER, state->client.sin_addr.s_addr );
+		      state->multicast.sin_addr.s_addr );
+		join_group ( IGMP_SERVER, state->multicast.sin_addr.s_addr );
 	}
 
 	DBG ( "TFTM: I am a %s client\n",
@@ -195,7 +195,7 @@ static int tftm ( char *url __unused, struct sockaddr_in *server, char *file,
 
 	rc = 1;
  out:
-	if ( state.client.sin_addr.s_addr ) {
+	if ( state.multicast.sin_addr.s_addr ) {
 		leave_group ( IGMP_SERVER );
 	}
 	return rc;
