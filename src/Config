@@ -295,7 +295,7 @@ CFLAGS+=	-DALLOW_ONLY_ENCAPSULATED
 
 # Limit the delay on packet loss/congestion to a more bearable value. See
 # description above.  If unset, do not limit the delay between resend.
-CFLAGS+=	-DBACKOFF_LIMIT=7 -DCONGESTED
+CFLAGS+=	-DBACKOFF_LIMIT=5 -DCONGESTED
 
 # More optional features
 # CFLAGS+=	-DTRY_FLOPPY_FIRST=4
