@@ -424,7 +424,6 @@ int ip_transmit(int len, const void *buf)
 	destip = ip->dest.s_addr;
 	if (destip == IP_BROADCAST) {
 		eth_transmit(broadcast, ETH_P_IP, len, buf);
-#ifdef MULTICAST_LEVEL1 
 	} else if ((destip & htonl(MULTICAST_MASK)) == htonl(MULTICAST_NETWORK)) {
 		unsigned char multicast[6];
 		unsigned long hdestip;
@@ -436,7 +435,6 @@ int ip_transmit(int len, const void *buf)
 		multicast[4] = (hdestip >> 8) & 0xff;
 		multicast[5] = hdestip & 0xff;
 		eth_transmit(multicast, ETH_P_IP, len, buf);
-#endif
 	} else {
 		if (((destip & netmask) !=
 			(arptable[ARP_CLIENT].ipaddr.s_addr & netmask)) &&
@@ -1152,10 +1150,8 @@ RFC2131_SLEEP_INTERVAL - sleep for expotentially longer times (base << exp) +- 1
 long rfc2131_sleep_interval(long base, int exp)
 {
 	unsigned long tmo;
-#ifdef BACKOFF_LIMIT
 	if (exp > BACKOFF_LIMIT)
 		exp = BACKOFF_LIMIT;
-#endif
 	tmo = (base << exp) + (TICKS_PER_SEC - (random()/TWO_SECOND_DIVISOR));
 	return tmo;
 }
