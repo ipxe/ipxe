@@ -66,6 +66,28 @@ void init_buffer ( struct buffer *buffer ) {
 	DBG ( "BUFFER [%x,%x) initialised\n", buffer->start, buffer->end );
 }
 
+/**
+ * Move to the next block in the free list
+ *
+ * @v block		The current free block
+ * @v buffer		The buffer
+ * @ret True		Successfully moved to the next free block
+ * @ret False		There are no more free blocks
+ * @ret block		The next free block
+ * @err None		-
+ *
+ * Move to the next block in the free block list, filling in @c block
+ * with the descriptor for this next block.  If the next block is the
+ * tail block, @c block will be filled with the values calculated for
+ * the tail block, otherwise the descriptor will be read from the free
+ * block itself.
+ *
+ * If there are no more free blocks, next_free_block() returns False
+ * and leaves @c block with invalid contents.
+ *
+ * Set <tt> block->next = buffer->start + buffer->fill </tt> for the
+ * first call to next_free_block().
+ */
 static inline int next_free_block ( struct buffer_free_block *block,
 				    struct buffer *buffer ) {
 	/* Move to next block */
@@ -89,6 +111,17 @@ static inline int next_free_block ( struct buffer_free_block *block,
 	return 1;
 }
 
+/**
+ * Store a free block descriptor
+ *
+ * @v block		The free block descriptor to store
+ * @ret None		-
+ * @err None		-
+ *
+ * Writes a free block descriptor back to a free block.  If the block
+ * is a tail block, only the tail marker will be written, otherwise
+ * the whole block descriptor will be written.
+ */
 static inline void store_free_block ( struct buffer_free_block *block ) {
 	copy_to_phys ( block->start, block,
 		       ( block->tail ?
@@ -124,7 +157,7 @@ static inline void store_free_block ( struct buffer_free_block *block ) {
  * @b NOTE: It is the caller's responsibility to ensure that the
  * boundaries between data blocks are more than @c sizeof(struct @c
  * buffer_free_block) apart.  If this condition is not satisfied, data
- * corruption will occur.  (See split_free_block() for details.)
+ * corruption will occur.
  *
  * In practice this is not a problem.  Callers of fill_buffer() will
  * be download protocols such as TFTP, and very few protocols have a
@@ -175,6 +208,8 @@ int fill_buffer ( struct buffer *buffer, const void *data,
 	/* Write back 'before' block, if any */
 	if ( before.start ) {
 		before.tail = 0;
+		ASSERT ( ( before.end - before.start ) >=
+			 sizeof ( struct buffer_free_block ) );
 		store_free_block ( &before );
 	} else {
 		buffer->fill = before.next - buffer->start;
@@ -182,6 +217,9 @@ int fill_buffer ( struct buffer *buffer, const void *data,
 
 	/* Write back 'after' block, if any */
 	if ( after.start < buffer->end ) {
+		ASSERT ( after.tail ||
+			 ( ( after.end - after.start ) >=
+			   sizeof ( struct buffer_free_block ) ) );
 		store_free_block ( &after );
 	}
 	
