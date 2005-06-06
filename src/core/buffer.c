@@ -66,88 +66,33 @@ void init_buffer ( struct buffer *buffer ) {
 	DBG ( "BUFFER [%x,%x) initialised\n", buffer->start, buffer->end );
 }
 
-/**
- * Split a free block.
- *
- * @v desc		A descriptor for the free block
- * @v block		Start address of the block
- * @v split		Address at which to split the block
- * @ret None		-
- * @err None		-
- *
- * Split a free block into two separate free blocks.  If the split
- * point lies outside the block, no action is taken; this is not an
- * error.
- *
- * @b NOTE: It is the reponsibility of the caller to ensure that there
- * is enough room in each of the two portions for a free block
- * descriptor (a @c struct @c buffer_free_block, except in the case of
- * a tail block which requires only a one byte descriptor).  If the
- * caller fails to do this, data corruption will occur.
- *
- * In practice, this means that the granularity at which blocks are
- * split must be at least @c sizeof(struct @c buffer_free_block).
- *
- */
-static void split_free_block ( struct buffer_free_block *desc,
-			       physaddr_t block, physaddr_t split ) {
-	/* If split point is before start of block, do nothing */
-	if ( split <= block )
-		return;
+static inline int next_free_block ( struct buffer_free_block *block,
+				    struct buffer *buffer ) {
+	/* Move to next block */
+	block->start = block->next;
 
-	/* If split point is after end of block, do nothing */
-	if ( split >= desc->end )
-		return;
+	/* If at end of buffer, return 0 */
+	if ( block->start >= buffer->end )
+		return 0;
 
-	DBG ( "BUFFER splitting [%x,%x) -> [%x,%x) [%x,%x)\n",
-	      block, desc->end, block, split, split, desc->end );
+	/* Set up ->next and ->end as for a tail block */
+	block->next = block->end = buffer->end;
 
-	/* Create descriptor for new free block */
-	copy_to_phys ( split, &desc->tail, sizeof ( desc->tail ) );
-	if ( ! desc->tail )
-		copy_to_phys ( split, desc, sizeof ( *desc ) );
+	/* Read tail marker from block */
+	copy_from_phys ( &block->tail, block->start, sizeof ( block->tail ) );
 
-	/* Update descriptor for old free block */
-	desc->tail = 0;
-	desc->next_free = split;
-	desc->end = split;
-	copy_to_phys ( block, desc, sizeof ( *desc ) );
-}
-
-/**
- * Mark a free block as used.
- *
- * @v buffer		The buffer containing the block
- * @v desc		A descriptor for the free block
- * @v prev_block	Address of the previous block
- * @ret None		-
- * @err None		-
- *
- * Marks a free block as used, i.e. removes it from the free list.
- *
- */
-static inline void unfree_block ( struct buffer *buffer,
-				  struct buffer_free_block *desc,
-				  physaddr_t prev_block ) {
-	struct buffer_free_block prev_desc;
-	
-	/* If this is the first block, just update buffer->fill */
-	if ( ! prev_block ) {
-		DBG ( "BUFFER marking [%x,%x) as used\n",
-		      buffer->start + buffer->fill, desc->end );
-		buffer->fill = desc->next_free - buffer->start;
-		return;
+	/* If not a tail block, read whole block descriptor from block */
+	if ( ! block->tail ) {
+		copy_from_phys ( block, block->start, sizeof ( *block ) );
 	}
 
-	/* Get descriptor for previous block (which cannot be a tail block) */
-	copy_from_phys ( &prev_desc, prev_block, sizeof ( prev_desc ) );
+	return 1;
+}
 
-	DBG ( "BUFFER marking [%x,%x) as used\n",
-	      prev_desc.next_free, desc->end );
-
-	/* Modify descriptor for previous block and write it back */
-	prev_desc.next_free = desc->next_free;
-	copy_to_phys ( prev_block, &prev_desc, sizeof ( prev_desc ) );
+static inline void store_free_block ( struct buffer_free_block *block ) {
+	copy_to_phys ( block->start, block,
+		       ( block->tail ?
+			 sizeof ( block->tail ) : sizeof ( *block ) ) );
 }
 
 /**
@@ -188,8 +133,7 @@ static inline void unfree_block ( struct buffer *buffer,
  */
 int fill_buffer ( struct buffer *buffer, const void *data,
 		  off_t offset, size_t len ) {
-	struct buffer_free_block desc;
-	physaddr_t block, prev_block;
+	struct buffer_free_block block, before, after;
 	physaddr_t data_start, data_end;
 
 	/* Calculate start and end addresses of data */
@@ -206,37 +150,47 @@ int fill_buffer ( struct buffer *buffer, const void *data,
 		return 0;
 	}
 
-	/* Iterate through the buffer's free blocks */
-	prev_block = 0;
-	block = buffer->start + buffer->fill;
-	while ( block < buffer->end ) {
-		/* Read block descriptor */
-		desc.next_free = buffer->end;
-		desc.end = buffer->end;
-		copy_from_phys ( &desc.tail, block, sizeof ( desc.tail ) );
-		if ( ! desc.tail )
-			copy_from_phys ( &desc, block, sizeof ( desc ) );
-
-		/* Split block at data start and end markers */
-		split_free_block ( &desc, block, data_start );
-		split_free_block ( &desc, block, data_end );
-
-		/* Block is now either completely contained by or
-		 * completely outside the data area
-		 */
-		if ( ( block >= data_start ) && ( block < data_end ) ) {
-			/* Block is within the data area */
-			unfree_block ( buffer, &desc, prev_block );
-			copy_to_phys ( block, data + ( block - data_start ),
-				       desc.end - block );
-		} else {
-			/* Block is outside the data area */
-			prev_block = block;
-		}
-
-		/* Move to next free block */
-		block = desc.next_free;
+	/* Find 'before' and 'after' blocks, if any */
+	before.start = before.end = 0;
+	after.start = after.end = buffer->end;
+	block.next = buffer->start + buffer->fill;
+	while ( next_free_block ( &block, buffer ) ) {
+		if ( ( block.start < data_start ) &&
+		     ( block.start >= before.start ) )
+			memcpy ( &before, &block, sizeof ( before ) );
+		if ( ( block.end > data_end ) &&
+		     ( block.end <= after.end ) )
+			memcpy ( &after, &block, sizeof ( after ) );
 	}
+
+	/* Truncate 'before' and 'after' blocks around data. */
+	if ( data_start < before.end )
+		before.end = data_start;
+	if ( data_end > after.start )
+		after.start = data_end;
+
+	/* Link 'after' block to 'before' block */
+	before.next = after.start;
+
+	/* Write back 'before' block, if any */
+	if ( before.start ) {
+		before.tail = 0;
+		store_free_block ( &before );
+	} else {
+		buffer->fill = before.next - buffer->start;
+	}
+
+	/* Write back 'after' block, if any */
+	if ( after.start < buffer->end ) {
+		store_free_block ( &after );
+	}
+	
+	DBG ( "BUFFER [%x,%x) before [%x,%x) after [%x,%x)\n",
+	      buffer->start, buffer->end, before.start, before.end,
+	      after.start, after.end );
+	
+	/* Copy data into buffer */
+	copy_to_phys ( data_start, data, len );
 
 	DBG ( "BUFFER [%x,%x) full up to %x\n",
 	      buffer->start, buffer->end, buffer->start + buffer->fill );

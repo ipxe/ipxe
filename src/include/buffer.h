@@ -82,7 +82,9 @@ struct buffer {
  */
 struct buffer_free_block {
 	char		tail;		/**< Tail byte marker */
-	physaddr_t	next_free;	/**< Address of next free block */
+	char		reserved[3];	/**< Padding */
+	physaddr_t	start;		/**< Address of this free block */
+	physaddr_t	next;		/**< Address of next free block */
 	physaddr_t	end;		/**< End of this block */
 } __attribute__ (( packed ));
 
