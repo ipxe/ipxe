@@ -29,7 +29,7 @@ include arch/$(ARCH)/Config
 # If invoked with no build target, print out a helpfully suggestive
 # message.
 #
-noargs : blib
+noargs :
 	@echo '===================================================='
 	@echo 'No target specified. To specify a target, do: '
 	@echo
