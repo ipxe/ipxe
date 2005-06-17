@@ -1703,6 +1703,8 @@ static void init_media(struct nic *nic)
         outl(0x11000 | inw(ioaddr + 0xa0), ioaddr + 0xa0);
         break;
     case COMET:
+        /* Enable automatic Tx underrun recovery */
+        outl(inl(ioaddr + 0x88) | 1, ioaddr + 0x88);
         tp->if_port = 0;
 	tp->csr6 = 0x00040000;
         break;
