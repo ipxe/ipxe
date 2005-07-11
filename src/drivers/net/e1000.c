@@ -72,6 +72,9 @@ typedef enum {
  * and the corresponding inplace checks inserted instead.
  * Pieces such as LED handling that we definitely don't need are deleted.
  *
+ * Please keep the function ordering so that it is easy to produce diffs
+ * against the linux driver.
+ *
  * The following defines should not be needed normally,
  * but may be helpful for debugging purposes. */
 
@@ -120,7 +123,9 @@ static int e1000_write_phy_reg_ex(struct e1000_hw *hw, uint32_t reg_addr, uint16
 static void e1000_phy_hw_reset(struct e1000_hw *hw);
 static int e1000_phy_reset(struct e1000_hw *hw);
 static int e1000_detect_gig_phy(struct e1000_hw *hw);
-static void e1000_irq(struct nic *nic, irq_action_t action);
+static int e1000_read_eeprom(struct e1000_hw *hw, uint16_t offset, uint16_t words, uint16_t *data);
+static void e1000_init_rx_addrs(struct e1000_hw *hw);
+static void e1000_clear_vfta(struct e1000_hw *hw);
 
 /* Printing macros... */
 
@@ -174,11 +179,18 @@ static void e1000_irq(struct nic *nic, irq_action_t action);
 
 #define E1000_WRITE_FLUSH(a) {uint32_t x; x = E1000_READ_REG(a, STATUS);}
 
+
+/******************************************************************************
+ * Inline functions from e1000_main.c of the linux driver
+ ******************************************************************************/
+
+#if 0
 static inline uint32_t
 e1000_io_read(struct e1000_hw *hw __unused, uint32_t port)
 {
         return inl(port);
 }
+#endif
 
 static inline void
 e1000_io_write(struct e1000_hw *hw __unused, uint32_t port, uint32_t value)
@@ -197,529 +209,10 @@ static inline void e1000_pci_clear_mwi(struct e1000_hw *hw)
 			      hw->pci_cmd_word & ~PCI_COMMAND_INVALIDATE);
 }
 
-/******************************************************************************
- * Raises the EEPROM's clock input.
- *
- * hw - Struct containing variables accessed by shared code
- * eecd - EECD's current value
- *****************************************************************************/
-static void
-e1000_raise_ee_clk(struct e1000_hw *hw,
-                   uint32_t *eecd)
-{
-	/* Raise the clock input to the EEPROM (by setting the SK bit), and then
-	 * wait <delay> microseconds.
-	 */
-	*eecd = *eecd | E1000_EECD_SK;
-	E1000_WRITE_REG(hw, EECD, *eecd);
-	E1000_WRITE_FLUSH(hw);
-	udelay(hw->eeprom.delay_usec);
-}
 
 /******************************************************************************
- * Lowers the EEPROM's clock input.
- *
- * hw - Struct containing variables accessed by shared code 
- * eecd - EECD's current value
- *****************************************************************************/
-static void
-e1000_lower_ee_clk(struct e1000_hw *hw,
-                   uint32_t *eecd)
-{
-	/* Lower the clock input to the EEPROM (by clearing the SK bit), and then 
-	 * wait 50 microseconds. 
-	 */
-	*eecd = *eecd & ~E1000_EECD_SK;
-	E1000_WRITE_REG(hw, EECD, *eecd);
-	E1000_WRITE_FLUSH(hw);
-	udelay(hw->eeprom.delay_usec);
-}
-
-/******************************************************************************
- * Shift data bits out to the EEPROM.
- *
- * hw - Struct containing variables accessed by shared code
- * data - data to send to the EEPROM
- * count - number of bits to shift out
- *****************************************************************************/
-static void
-e1000_shift_out_ee_bits(struct e1000_hw *hw,
-                        uint16_t data,
-                        uint16_t count)
-{
-	struct e1000_eeprom_info *eeprom = &hw->eeprom;
-	uint32_t eecd;
-	uint32_t mask;
-	
-	/* We need to shift "count" bits out to the EEPROM. So, value in the
-	 * "data" parameter will be shifted out to the EEPROM one bit at a time.
-	 * In order to do this, "data" must be broken down into bits. 
-	 */
-	mask = 0x01 << (count - 1);
-	eecd = E1000_READ_REG(hw, EECD);
-	if (eeprom->type == e1000_eeprom_microwire) {
-		eecd &= ~E1000_EECD_DO;
-	} else if (eeprom->type == e1000_eeprom_spi) {
-		eecd |= E1000_EECD_DO;
-	}
-	do {
-		/* A "1" is shifted out to the EEPROM by setting bit "DI" to a "1",
-		 * and then raising and then lowering the clock (the SK bit controls
-		 * the clock input to the EEPROM).  A "0" is shifted out to the EEPROM
-		 * by setting "DI" to "0" and then raising and then lowering the clock.
-		 */
-		eecd &= ~E1000_EECD_DI;
-		
-		if(data & mask)
-			eecd |= E1000_EECD_DI;
-		
-		E1000_WRITE_REG(hw, EECD, eecd);
-		E1000_WRITE_FLUSH(hw);
-		
-		udelay(eeprom->delay_usec);
-		
-		e1000_raise_ee_clk(hw, &eecd);
-		e1000_lower_ee_clk(hw, &eecd);
-		
-		mask = mask >> 1;
-		
-	} while(mask);
-
-	/* We leave the "DI" bit set to "0" when we leave this routine. */
-	eecd &= ~E1000_EECD_DI;
-	E1000_WRITE_REG(hw, EECD, eecd);
-}
-
-/******************************************************************************
- * Shift data bits in from the EEPROM
- *
- * hw - Struct containing variables accessed by shared code
- *****************************************************************************/
-static uint16_t
-e1000_shift_in_ee_bits(struct e1000_hw *hw,
-                       uint16_t count)
-{
-	uint32_t eecd;
-	uint32_t i;
-	uint16_t data;
-	
-	/* In order to read a register from the EEPROM, we need to shift 'count' 
-	 * bits in from the EEPROM. Bits are "shifted in" by raising the clock
-	 * input to the EEPROM (setting the SK bit), and then reading the value of
-	 * the "DO" bit.  During this "shifting in" process the "DI" bit should
-	 * always be clear.
-	 */
-	
-	eecd = E1000_READ_REG(hw, EECD);
-	
-	eecd &= ~(E1000_EECD_DO | E1000_EECD_DI);
-	data = 0;
-	
-	for(i = 0; i < count; i++) {
-		data = data << 1;
-		e1000_raise_ee_clk(hw, &eecd);
-		
-		eecd = E1000_READ_REG(hw, EECD);
-		
-		eecd &= ~(E1000_EECD_DI);
-		if(eecd & E1000_EECD_DO)
-			data |= 1;
-		
-		e1000_lower_ee_clk(hw, &eecd);
-	}
-	
-	return data;
-}
-
-/******************************************************************************
- * Prepares EEPROM for access
- *
- * hw - Struct containing variables accessed by shared code
- *
- * Lowers EEPROM clock. Clears input pin. Sets the chip select pin. This 
- * function should be called before issuing a command to the EEPROM.
- *****************************************************************************/
-static int32_t
-e1000_acquire_eeprom(struct e1000_hw *hw)
-{
-	struct e1000_eeprom_info *eeprom = &hw->eeprom;
-	uint32_t eecd, i=0;
-
-	eecd = E1000_READ_REG(hw, EECD);
-
-	/* Request EEPROM Access */
-	if(hw->mac_type > e1000_82544) {
-		eecd |= E1000_EECD_REQ;
-		E1000_WRITE_REG(hw, EECD, eecd);
-		eecd = E1000_READ_REG(hw, EECD);
-		while((!(eecd & E1000_EECD_GNT)) &&
-		      (i < E1000_EEPROM_GRANT_ATTEMPTS)) {
-			i++;
-			udelay(5);
-			eecd = E1000_READ_REG(hw, EECD);
-		}
-		if(!(eecd & E1000_EECD_GNT)) {
-			eecd &= ~E1000_EECD_REQ;
-			E1000_WRITE_REG(hw, EECD, eecd);
-			DEBUGOUT("Could not acquire EEPROM grant\n");
-			return -E1000_ERR_EEPROM;
-		}
-	}
-
-	/* Setup EEPROM for Read/Write */
-
-	if (eeprom->type == e1000_eeprom_microwire) {
-		/* Clear SK and DI */
-		eecd &= ~(E1000_EECD_DI | E1000_EECD_SK);
-		E1000_WRITE_REG(hw, EECD, eecd);
-
-		/* Set CS */
-		eecd |= E1000_EECD_CS;
-		E1000_WRITE_REG(hw, EECD, eecd);
-	} else if (eeprom->type == e1000_eeprom_spi) {
-		/* Clear SK and CS */
-		eecd &= ~(E1000_EECD_CS | E1000_EECD_SK);
-		E1000_WRITE_REG(hw, EECD, eecd);
-		udelay(1);
-	}
-
-	return E1000_SUCCESS;
-}
-
-/******************************************************************************
- * Returns EEPROM to a "standby" state
- * 
- * hw - Struct containing variables accessed by shared code
- *****************************************************************************/
-static void
-e1000_standby_eeprom(struct e1000_hw *hw)
-{
-	struct e1000_eeprom_info *eeprom = &hw->eeprom;
-	uint32_t eecd;
-	
-	eecd = E1000_READ_REG(hw, EECD);
-
-	if(eeprom->type == e1000_eeprom_microwire) {
-
-		/* Deselect EEPROM */
-		eecd &= ~(E1000_EECD_CS | E1000_EECD_SK);
-		E1000_WRITE_REG(hw, EECD, eecd);
-		E1000_WRITE_FLUSH(hw);
-		udelay(eeprom->delay_usec);
-	
-		/* Clock high */
-		eecd |= E1000_EECD_SK;
-		E1000_WRITE_REG(hw, EECD, eecd);
-		E1000_WRITE_FLUSH(hw);
-		udelay(eeprom->delay_usec);
-	
-		/* Select EEPROM */
-		eecd |= E1000_EECD_CS;
-		E1000_WRITE_REG(hw, EECD, eecd);
-		E1000_WRITE_FLUSH(hw);
-		udelay(eeprom->delay_usec);
-
-		/* Clock low */
-		eecd &= ~E1000_EECD_SK;
-		E1000_WRITE_REG(hw, EECD, eecd);
-		E1000_WRITE_FLUSH(hw);
-		udelay(eeprom->delay_usec);
-	} else if(eeprom->type == e1000_eeprom_spi) {
-		/* Toggle CS to flush commands */
-		eecd |= E1000_EECD_CS;
-		E1000_WRITE_REG(hw, EECD, eecd);
-		E1000_WRITE_FLUSH(hw);
-		udelay(eeprom->delay_usec);
-		eecd &= ~E1000_EECD_CS;
-		E1000_WRITE_REG(hw, EECD, eecd);
-		E1000_WRITE_FLUSH(hw);
-		udelay(eeprom->delay_usec);
-	}
-}
-
-/******************************************************************************
- * Terminates a command by inverting the EEPROM's chip select pin
- *
- * hw - Struct containing variables accessed by shared code
- *****************************************************************************/
-static void
-e1000_release_eeprom(struct e1000_hw *hw)
-{
-	uint32_t eecd;
-
-	eecd = E1000_READ_REG(hw, EECD);
-
-	if (hw->eeprom.type == e1000_eeprom_spi) {
-		eecd |= E1000_EECD_CS;  /* Pull CS high */
-		eecd &= ~E1000_EECD_SK; /* Lower SCK */
-
-		E1000_WRITE_REG(hw, EECD, eecd);
-
-		udelay(hw->eeprom.delay_usec);
-	} else if(hw->eeprom.type == e1000_eeprom_microwire) {
-		/* cleanup eeprom */
-
-		/* CS on Microwire is active-high */
-		eecd &= ~(E1000_EECD_CS | E1000_EECD_DI);
-
-		E1000_WRITE_REG(hw, EECD, eecd);
-
-		/* Rising edge of clock */
-		eecd |= E1000_EECD_SK;
-		E1000_WRITE_REG(hw, EECD, eecd);
-		E1000_WRITE_FLUSH(hw);
-		udelay(hw->eeprom.delay_usec);
-
-		/* Falling edge of clock */
-		eecd &= ~E1000_EECD_SK;
-		E1000_WRITE_REG(hw, EECD, eecd);
-		E1000_WRITE_FLUSH(hw);
-		udelay(hw->eeprom.delay_usec);
-	}
-
-	/* Stop requesting EEPROM access */
-	if(hw->mac_type > e1000_82544) {
-		eecd &= ~E1000_EECD_REQ;
-		E1000_WRITE_REG(hw, EECD, eecd);
-	}
-}
-
-/******************************************************************************
- * Reads a 16 bit word from the EEPROM.
- *
- * hw - Struct containing variables accessed by shared code
- *****************************************************************************/
-static int32_t
-e1000_spi_eeprom_ready(struct e1000_hw *hw)
-{
-	uint16_t retry_count = 0;
-	uint8_t spi_stat_reg;
-
-	/* Read "Status Register" repeatedly until the LSB is cleared.  The
-	 * EEPROM will signal that the command has been completed by clearing
-	 * bit 0 of the internal status register.  If it's not cleared within
-	 * 5 milliseconds, then error out.
-	 */
-	retry_count = 0;
-	do {
-		e1000_shift_out_ee_bits(hw, EEPROM_RDSR_OPCODE_SPI,
-		hw->eeprom.opcode_bits);
-		spi_stat_reg = (uint8_t)e1000_shift_in_ee_bits(hw, 8);
-		if (!(spi_stat_reg & EEPROM_STATUS_RDY_SPI))
-			break;
-
-		udelay(5);
-		retry_count += 5;
-
-	} while(retry_count < EEPROM_MAX_RETRY_SPI);
-
-	/* ATMEL SPI write time could vary from 0-20mSec on 3.3V devices (and
-	 * only 0-5mSec on 5V devices)
-	 */
-	if(retry_count >= EEPROM_MAX_RETRY_SPI) {
-		DEBUGOUT("SPI EEPROM Status error\n");
-		return -E1000_ERR_EEPROM;
-	}
-
-	return E1000_SUCCESS;
-}
-
-/******************************************************************************
- * Reads a 16 bit word from the EEPROM.
- *
- * hw - Struct containing variables accessed by shared code
- * offset - offset of  word in the EEPROM to read
- * data - word read from the EEPROM
- * words - number of words to read
- *****************************************************************************/
-static int
-e1000_read_eeprom(struct e1000_hw *hw,
-                  uint16_t offset,
-		  uint16_t words,
-                  uint16_t *data)
-{
-	struct e1000_eeprom_info *eeprom = &hw->eeprom;
-	uint32_t i = 0;
-	
-	DEBUGFUNC("e1000_read_eeprom");
-
-	/* A check for invalid values:  offset too large, too many words, and not
-	 * enough words.
-	 */
-	if((offset > eeprom->word_size) || (words > eeprom->word_size - offset) ||
-	   (words == 0)) {
-		DEBUGOUT("\"words\" parameter out of bounds\n");
-		return -E1000_ERR_EEPROM;
-	}
-
-	/*  Prepare the EEPROM for reading  */
-	if(e1000_acquire_eeprom(hw) != E1000_SUCCESS)
-		return -E1000_ERR_EEPROM;
-
-	if(eeprom->type == e1000_eeprom_spi) {
-		uint16_t word_in;
-		uint8_t read_opcode = EEPROM_READ_OPCODE_SPI;
-
-		if(e1000_spi_eeprom_ready(hw)) {
-			e1000_release_eeprom(hw);
-			return -E1000_ERR_EEPROM;
-		}
-
-		e1000_standby_eeprom(hw);
-
-		/* Some SPI eeproms use the 8th address bit embedded in the opcode */
-		if((eeprom->address_bits == 8) && (offset >= 128))
-			read_opcode |= EEPROM_A8_OPCODE_SPI;
-
-		/* Send the READ command (opcode + addr)  */
-		e1000_shift_out_ee_bits(hw, read_opcode, eeprom->opcode_bits);
-		e1000_shift_out_ee_bits(hw, (uint16_t)(offset*2), eeprom->address_bits);
-
-		/* Read the data.  The address of the eeprom internally increments with
-		 * each byte (spi) being read, saving on the overhead of eeprom setup
-		 * and tear-down.  The address counter will roll over if reading beyond
-		 * the size of the eeprom, thus allowing the entire memory to be read
-		 * starting from any offset. */
-		for (i = 0; i < words; i++) {
-			word_in = e1000_shift_in_ee_bits(hw, 16);
-			data[i] = (word_in >> 8) | (word_in << 8);
-		}
-	} else if(eeprom->type == e1000_eeprom_microwire) {
-		for (i = 0; i < words; i++) {
-			/*  Send the READ command (opcode + addr)  */
-			e1000_shift_out_ee_bits(hw, EEPROM_READ_OPCODE_MICROWIRE,
-						eeprom->opcode_bits);
-			e1000_shift_out_ee_bits(hw, (uint16_t)(offset + i),
-			                        eeprom->address_bits);
-
-			/* Read the data.  For microwire, each word requires the overhead
-			 * of eeprom setup and tear-down. */
-			data[i] = e1000_shift_in_ee_bits(hw, 16);
-			e1000_standby_eeprom(hw);
-		}
-	}
-
-	/* End this read operation */
-	e1000_release_eeprom(hw);
-
-	return E1000_SUCCESS;
-}
-
-/******************************************************************************
- * Verifies that the EEPROM has a valid checksum
- * 
- * hw - Struct containing variables accessed by shared code
- *
- * Reads the first 64 16 bit words of the EEPROM and sums the values read.
- * If the the sum of the 64 16 bit words is 0xBABA, the EEPROM's checksum is
- * valid.
- *****************************************************************************/
-static int
-e1000_validate_eeprom_checksum(struct e1000_hw *hw)
-{
-	uint16_t checksum = 0;
-	uint16_t i, eeprom_data;
-
-	DEBUGFUNC("e1000_validate_eeprom_checksum");
-
-	for(i = 0; i < (EEPROM_CHECKSUM_REG + 1); i++) {
-		if(e1000_read_eeprom(hw, i, 1, &eeprom_data) < 0) {
-			DEBUGOUT("EEPROM Read Error\n");
-			return -E1000_ERR_EEPROM;
-		}
-		checksum += eeprom_data;
-	}
-	
-	if(checksum == (uint16_t) EEPROM_SUM)
-		return E1000_SUCCESS;
-	else {
-		DEBUGOUT("EEPROM Checksum Invalid\n");    
-		return -E1000_ERR_EEPROM;
-	}
-}
-
-/******************************************************************************
- * Reads the adapter's MAC address from the EEPROM and inverts the LSB for the
- * second function of dual function devices
- *
- * hw - Struct containing variables accessed by shared code
- *****************************************************************************/
-static int 
-e1000_read_mac_addr(struct e1000_hw *hw)
-{
-	uint16_t offset;
-	uint16_t eeprom_data;
-	int i;
-
-	DEBUGFUNC("e1000_read_mac_addr");
-
-	for(i = 0; i < NODE_ADDRESS_SIZE; i += 2) {
-		offset = i >> 1;
-		if(e1000_read_eeprom(hw, offset, 1, &eeprom_data) < 0) {
-			DEBUGOUT("EEPROM Read Error\n");
-			return -E1000_ERR_EEPROM;
-		}
-		hw->mac_addr[i] = eeprom_data & 0xff;
-		hw->mac_addr[i+1] = (eeprom_data >> 8) & 0xff;
-	}
-	if(((hw->mac_type == e1000_82546) || (hw->mac_type == e1000_82546_rev_3)) &&
-		(E1000_READ_REG(hw, STATUS) & E1000_STATUS_FUNC_1))
-		/* Invert the last bit if this is the second device */
-		hw->mac_addr[5] ^= 1;
-	return E1000_SUCCESS;
-}
-
-/******************************************************************************
- * Initializes receive address filters.
- *
- * hw - Struct containing variables accessed by shared code 
- *
- * Places the MAC address in receive address register 0 and clears the rest
- * of the receive addresss registers. Clears the multicast table. Assumes
- * the receiver is in reset when the routine is called.
- *****************************************************************************/
-static void
-e1000_init_rx_addrs(struct e1000_hw *hw)
-{
-	uint32_t i;
-	uint32_t addr_low;
-	uint32_t addr_high;
-	
-	DEBUGFUNC("e1000_init_rx_addrs");
-	
-	/* Setup the receive address. */
-	DEBUGOUT("Programming MAC Address into RAR[0]\n");
-	addr_low = (hw->mac_addr[0] |
-		(hw->mac_addr[1] << 8) |
-		(hw->mac_addr[2] << 16) | (hw->mac_addr[3] << 24));
-	
-	addr_high = (hw->mac_addr[4] |
-		(hw->mac_addr[5] << 8) | E1000_RAH_AV);
-	
-	E1000_WRITE_REG_ARRAY(hw, RA, 0, addr_low);
-	E1000_WRITE_REG_ARRAY(hw, RA, 1, addr_high);
-	
-	/* Zero out the other 15 receive addresses. */
-	DEBUGOUT("Clearing RAR[1-15]\n");
-	for(i = 1; i < E1000_RAR_ENTRIES; i++) {
-		E1000_WRITE_REG_ARRAY(hw, RA, (i << 1), 0);
-		E1000_WRITE_REG_ARRAY(hw, RA, ((i << 1) + 1), 0);
-	}
-}
-
-/******************************************************************************
- * Clears the VLAN filer table
- *
- * hw - Struct containing variables accessed by shared code
- *****************************************************************************/
-static void
-e1000_clear_vfta(struct e1000_hw *hw)
-{
-	uint32_t offset;
-    
-	for(offset = 0; offset < E1000_VLAN_FILTER_TBL_SIZE; offset++)
-		E1000_WRITE_REG_ARRAY(hw, VFTA, offset, 0);
-}
+ * Inline functions from e1000_hw.c of the linux driver
+ ******************************************************************************/
 
 /******************************************************************************
 * Writes a value to one of the devices registers using port I/O (as opposed to
@@ -732,6 +225,11 @@ static inline void e1000_write_reg_io(struct e1000_hw *hw, uint32_t offset,
 	e1000_io_write(hw, hw->io_base, offset);
 	e1000_io_write(hw, hw->io_base + 4, value);
 }
+
+
+/******************************************************************************
+ * Functions from e1000_hw.c of the linux driver
+ ******************************************************************************/
 
 /******************************************************************************
  * Set the phy type member in the hw struct.
@@ -3252,6 +2750,535 @@ e1000_init_eeprom_params(struct e1000_hw *hw)
 	}
 }
 
+/******************************************************************************
+ * Raises the EEPROM's clock input.
+ *
+ * hw - Struct containing variables accessed by shared code
+ * eecd - EECD's current value
+ *****************************************************************************/
+static void
+e1000_raise_ee_clk(struct e1000_hw *hw,
+                   uint32_t *eecd)
+{
+	/* Raise the clock input to the EEPROM (by setting the SK bit), and then
+	 * wait <delay> microseconds.
+	 */
+	*eecd = *eecd | E1000_EECD_SK;
+	E1000_WRITE_REG(hw, EECD, *eecd);
+	E1000_WRITE_FLUSH(hw);
+	udelay(hw->eeprom.delay_usec);
+}
+
+/******************************************************************************
+ * Lowers the EEPROM's clock input.
+ *
+ * hw - Struct containing variables accessed by shared code 
+ * eecd - EECD's current value
+ *****************************************************************************/
+static void
+e1000_lower_ee_clk(struct e1000_hw *hw,
+                   uint32_t *eecd)
+{
+	/* Lower the clock input to the EEPROM (by clearing the SK bit), and then 
+	 * wait 50 microseconds. 
+	 */
+	*eecd = *eecd & ~E1000_EECD_SK;
+	E1000_WRITE_REG(hw, EECD, *eecd);
+	E1000_WRITE_FLUSH(hw);
+	udelay(hw->eeprom.delay_usec);
+}
+
+/******************************************************************************
+ * Shift data bits out to the EEPROM.
+ *
+ * hw - Struct containing variables accessed by shared code
+ * data - data to send to the EEPROM
+ * count - number of bits to shift out
+ *****************************************************************************/
+static void
+e1000_shift_out_ee_bits(struct e1000_hw *hw,
+                        uint16_t data,
+                        uint16_t count)
+{
+	struct e1000_eeprom_info *eeprom = &hw->eeprom;
+	uint32_t eecd;
+	uint32_t mask;
+	
+	/* We need to shift "count" bits out to the EEPROM. So, value in the
+	 * "data" parameter will be shifted out to the EEPROM one bit at a time.
+	 * In order to do this, "data" must be broken down into bits. 
+	 */
+	mask = 0x01 << (count - 1);
+	eecd = E1000_READ_REG(hw, EECD);
+	if (eeprom->type == e1000_eeprom_microwire) {
+		eecd &= ~E1000_EECD_DO;
+	} else if (eeprom->type == e1000_eeprom_spi) {
+		eecd |= E1000_EECD_DO;
+	}
+	do {
+		/* A "1" is shifted out to the EEPROM by setting bit "DI" to a "1",
+		 * and then raising and then lowering the clock (the SK bit controls
+		 * the clock input to the EEPROM).  A "0" is shifted out to the EEPROM
+		 * by setting "DI" to "0" and then raising and then lowering the clock.
+		 */
+		eecd &= ~E1000_EECD_DI;
+		
+		if(data & mask)
+			eecd |= E1000_EECD_DI;
+		
+		E1000_WRITE_REG(hw, EECD, eecd);
+		E1000_WRITE_FLUSH(hw);
+		
+		udelay(eeprom->delay_usec);
+		
+		e1000_raise_ee_clk(hw, &eecd);
+		e1000_lower_ee_clk(hw, &eecd);
+		
+		mask = mask >> 1;
+		
+	} while(mask);
+
+	/* We leave the "DI" bit set to "0" when we leave this routine. */
+	eecd &= ~E1000_EECD_DI;
+	E1000_WRITE_REG(hw, EECD, eecd);
+}
+
+/******************************************************************************
+ * Shift data bits in from the EEPROM
+ *
+ * hw - Struct containing variables accessed by shared code
+ *****************************************************************************/
+static uint16_t
+e1000_shift_in_ee_bits(struct e1000_hw *hw,
+                       uint16_t count)
+{
+	uint32_t eecd;
+	uint32_t i;
+	uint16_t data;
+	
+	/* In order to read a register from the EEPROM, we need to shift 'count' 
+	 * bits in from the EEPROM. Bits are "shifted in" by raising the clock
+	 * input to the EEPROM (setting the SK bit), and then reading the value of
+	 * the "DO" bit.  During this "shifting in" process the "DI" bit should
+	 * always be clear.
+	 */
+	
+	eecd = E1000_READ_REG(hw, EECD);
+	
+	eecd &= ~(E1000_EECD_DO | E1000_EECD_DI);
+	data = 0;
+	
+	for(i = 0; i < count; i++) {
+		data = data << 1;
+		e1000_raise_ee_clk(hw, &eecd);
+		
+		eecd = E1000_READ_REG(hw, EECD);
+		
+		eecd &= ~(E1000_EECD_DI);
+		if(eecd & E1000_EECD_DO)
+			data |= 1;
+		
+		e1000_lower_ee_clk(hw, &eecd);
+	}
+	
+	return data;
+}
+
+/******************************************************************************
+ * Prepares EEPROM for access
+ *
+ * hw - Struct containing variables accessed by shared code
+ *
+ * Lowers EEPROM clock. Clears input pin. Sets the chip select pin. This 
+ * function should be called before issuing a command to the EEPROM.
+ *****************************************************************************/
+static int32_t
+e1000_acquire_eeprom(struct e1000_hw *hw)
+{
+	struct e1000_eeprom_info *eeprom = &hw->eeprom;
+	uint32_t eecd, i=0;
+
+	eecd = E1000_READ_REG(hw, EECD);
+
+	/* Request EEPROM Access */
+	if(hw->mac_type > e1000_82544) {
+		eecd |= E1000_EECD_REQ;
+		E1000_WRITE_REG(hw, EECD, eecd);
+		eecd = E1000_READ_REG(hw, EECD);
+		while((!(eecd & E1000_EECD_GNT)) &&
+		      (i < E1000_EEPROM_GRANT_ATTEMPTS)) {
+			i++;
+			udelay(5);
+			eecd = E1000_READ_REG(hw, EECD);
+		}
+		if(!(eecd & E1000_EECD_GNT)) {
+			eecd &= ~E1000_EECD_REQ;
+			E1000_WRITE_REG(hw, EECD, eecd);
+			DEBUGOUT("Could not acquire EEPROM grant\n");
+			return -E1000_ERR_EEPROM;
+		}
+	}
+
+	/* Setup EEPROM for Read/Write */
+
+	if (eeprom->type == e1000_eeprom_microwire) {
+		/* Clear SK and DI */
+		eecd &= ~(E1000_EECD_DI | E1000_EECD_SK);
+		E1000_WRITE_REG(hw, EECD, eecd);
+
+		/* Set CS */
+		eecd |= E1000_EECD_CS;
+		E1000_WRITE_REG(hw, EECD, eecd);
+	} else if (eeprom->type == e1000_eeprom_spi) {
+		/* Clear SK and CS */
+		eecd &= ~(E1000_EECD_CS | E1000_EECD_SK);
+		E1000_WRITE_REG(hw, EECD, eecd);
+		udelay(1);
+	}
+
+	return E1000_SUCCESS;
+}
+
+/******************************************************************************
+ * Returns EEPROM to a "standby" state
+ * 
+ * hw - Struct containing variables accessed by shared code
+ *****************************************************************************/
+static void
+e1000_standby_eeprom(struct e1000_hw *hw)
+{
+	struct e1000_eeprom_info *eeprom = &hw->eeprom;
+	uint32_t eecd;
+	
+	eecd = E1000_READ_REG(hw, EECD);
+
+	if(eeprom->type == e1000_eeprom_microwire) {
+
+		/* Deselect EEPROM */
+		eecd &= ~(E1000_EECD_CS | E1000_EECD_SK);
+		E1000_WRITE_REG(hw, EECD, eecd);
+		E1000_WRITE_FLUSH(hw);
+		udelay(eeprom->delay_usec);
+	
+		/* Clock high */
+		eecd |= E1000_EECD_SK;
+		E1000_WRITE_REG(hw, EECD, eecd);
+		E1000_WRITE_FLUSH(hw);
+		udelay(eeprom->delay_usec);
+	
+		/* Select EEPROM */
+		eecd |= E1000_EECD_CS;
+		E1000_WRITE_REG(hw, EECD, eecd);
+		E1000_WRITE_FLUSH(hw);
+		udelay(eeprom->delay_usec);
+
+		/* Clock low */
+		eecd &= ~E1000_EECD_SK;
+		E1000_WRITE_REG(hw, EECD, eecd);
+		E1000_WRITE_FLUSH(hw);
+		udelay(eeprom->delay_usec);
+	} else if(eeprom->type == e1000_eeprom_spi) {
+		/* Toggle CS to flush commands */
+		eecd |= E1000_EECD_CS;
+		E1000_WRITE_REG(hw, EECD, eecd);
+		E1000_WRITE_FLUSH(hw);
+		udelay(eeprom->delay_usec);
+		eecd &= ~E1000_EECD_CS;
+		E1000_WRITE_REG(hw, EECD, eecd);
+		E1000_WRITE_FLUSH(hw);
+		udelay(eeprom->delay_usec);
+	}
+}
+
+/******************************************************************************
+ * Terminates a command by inverting the EEPROM's chip select pin
+ *
+ * hw - Struct containing variables accessed by shared code
+ *****************************************************************************/
+static void
+e1000_release_eeprom(struct e1000_hw *hw)
+{
+	uint32_t eecd;
+
+	eecd = E1000_READ_REG(hw, EECD);
+
+	if (hw->eeprom.type == e1000_eeprom_spi) {
+		eecd |= E1000_EECD_CS;  /* Pull CS high */
+		eecd &= ~E1000_EECD_SK; /* Lower SCK */
+
+		E1000_WRITE_REG(hw, EECD, eecd);
+
+		udelay(hw->eeprom.delay_usec);
+	} else if(hw->eeprom.type == e1000_eeprom_microwire) {
+		/* cleanup eeprom */
+
+		/* CS on Microwire is active-high */
+		eecd &= ~(E1000_EECD_CS | E1000_EECD_DI);
+
+		E1000_WRITE_REG(hw, EECD, eecd);
+
+		/* Rising edge of clock */
+		eecd |= E1000_EECD_SK;
+		E1000_WRITE_REG(hw, EECD, eecd);
+		E1000_WRITE_FLUSH(hw);
+		udelay(hw->eeprom.delay_usec);
+
+		/* Falling edge of clock */
+		eecd &= ~E1000_EECD_SK;
+		E1000_WRITE_REG(hw, EECD, eecd);
+		E1000_WRITE_FLUSH(hw);
+		udelay(hw->eeprom.delay_usec);
+	}
+
+	/* Stop requesting EEPROM access */
+	if(hw->mac_type > e1000_82544) {
+		eecd &= ~E1000_EECD_REQ;
+		E1000_WRITE_REG(hw, EECD, eecd);
+	}
+}
+
+/******************************************************************************
+ * Reads a 16 bit word from the EEPROM.
+ *
+ * hw - Struct containing variables accessed by shared code
+ *****************************************************************************/
+static int32_t
+e1000_spi_eeprom_ready(struct e1000_hw *hw)
+{
+	uint16_t retry_count = 0;
+	uint8_t spi_stat_reg;
+
+	/* Read "Status Register" repeatedly until the LSB is cleared.  The
+	 * EEPROM will signal that the command has been completed by clearing
+	 * bit 0 of the internal status register.  If it's not cleared within
+	 * 5 milliseconds, then error out.
+	 */
+	retry_count = 0;
+	do {
+		e1000_shift_out_ee_bits(hw, EEPROM_RDSR_OPCODE_SPI,
+		hw->eeprom.opcode_bits);
+		spi_stat_reg = (uint8_t)e1000_shift_in_ee_bits(hw, 8);
+		if (!(spi_stat_reg & EEPROM_STATUS_RDY_SPI))
+			break;
+
+		udelay(5);
+		retry_count += 5;
+
+	} while(retry_count < EEPROM_MAX_RETRY_SPI);
+
+	/* ATMEL SPI write time could vary from 0-20mSec on 3.3V devices (and
+	 * only 0-5mSec on 5V devices)
+	 */
+	if(retry_count >= EEPROM_MAX_RETRY_SPI) {
+		DEBUGOUT("SPI EEPROM Status error\n");
+		return -E1000_ERR_EEPROM;
+	}
+
+	return E1000_SUCCESS;
+}
+
+/******************************************************************************
+ * Reads a 16 bit word from the EEPROM.
+ *
+ * hw - Struct containing variables accessed by shared code
+ * offset - offset of  word in the EEPROM to read
+ * data - word read from the EEPROM
+ * words - number of words to read
+ *****************************************************************************/
+static int
+e1000_read_eeprom(struct e1000_hw *hw,
+                  uint16_t offset,
+		  uint16_t words,
+                  uint16_t *data)
+{
+	struct e1000_eeprom_info *eeprom = &hw->eeprom;
+	uint32_t i = 0;
+	
+	DEBUGFUNC("e1000_read_eeprom");
+
+	/* A check for invalid values:  offset too large, too many words, and not
+	 * enough words.
+	 */
+	if((offset > eeprom->word_size) || (words > eeprom->word_size - offset) ||
+	   (words == 0)) {
+		DEBUGOUT("\"words\" parameter out of bounds\n");
+		return -E1000_ERR_EEPROM;
+	}
+
+	/*  Prepare the EEPROM for reading  */
+	if(e1000_acquire_eeprom(hw) != E1000_SUCCESS)
+		return -E1000_ERR_EEPROM;
+
+	if(eeprom->type == e1000_eeprom_spi) {
+		uint16_t word_in;
+		uint8_t read_opcode = EEPROM_READ_OPCODE_SPI;
+
+		if(e1000_spi_eeprom_ready(hw)) {
+			e1000_release_eeprom(hw);
+			return -E1000_ERR_EEPROM;
+		}
+
+		e1000_standby_eeprom(hw);
+
+		/* Some SPI eeproms use the 8th address bit embedded in the opcode */
+		if((eeprom->address_bits == 8) && (offset >= 128))
+			read_opcode |= EEPROM_A8_OPCODE_SPI;
+
+		/* Send the READ command (opcode + addr)  */
+		e1000_shift_out_ee_bits(hw, read_opcode, eeprom->opcode_bits);
+		e1000_shift_out_ee_bits(hw, (uint16_t)(offset*2), eeprom->address_bits);
+
+		/* Read the data.  The address of the eeprom internally increments with
+		 * each byte (spi) being read, saving on the overhead of eeprom setup
+		 * and tear-down.  The address counter will roll over if reading beyond
+		 * the size of the eeprom, thus allowing the entire memory to be read
+		 * starting from any offset. */
+		for (i = 0; i < words; i++) {
+			word_in = e1000_shift_in_ee_bits(hw, 16);
+			data[i] = (word_in >> 8) | (word_in << 8);
+		}
+	} else if(eeprom->type == e1000_eeprom_microwire) {
+		for (i = 0; i < words; i++) {
+			/*  Send the READ command (opcode + addr)  */
+			e1000_shift_out_ee_bits(hw, EEPROM_READ_OPCODE_MICROWIRE,
+						eeprom->opcode_bits);
+			e1000_shift_out_ee_bits(hw, (uint16_t)(offset + i),
+			                        eeprom->address_bits);
+
+			/* Read the data.  For microwire, each word requires the overhead
+			 * of eeprom setup and tear-down. */
+			data[i] = e1000_shift_in_ee_bits(hw, 16);
+			e1000_standby_eeprom(hw);
+		}
+	}
+
+	/* End this read operation */
+	e1000_release_eeprom(hw);
+
+	return E1000_SUCCESS;
+}
+
+/******************************************************************************
+ * Verifies that the EEPROM has a valid checksum
+ * 
+ * hw - Struct containing variables accessed by shared code
+ *
+ * Reads the first 64 16 bit words of the EEPROM and sums the values read.
+ * If the the sum of the 64 16 bit words is 0xBABA, the EEPROM's checksum is
+ * valid.
+ *****************************************************************************/
+static int
+e1000_validate_eeprom_checksum(struct e1000_hw *hw)
+{
+	uint16_t checksum = 0;
+	uint16_t i, eeprom_data;
+
+	DEBUGFUNC("e1000_validate_eeprom_checksum");
+
+	for(i = 0; i < (EEPROM_CHECKSUM_REG + 1); i++) {
+		if(e1000_read_eeprom(hw, i, 1, &eeprom_data) < 0) {
+			DEBUGOUT("EEPROM Read Error\n");
+			return -E1000_ERR_EEPROM;
+		}
+		checksum += eeprom_data;
+	}
+	
+	if(checksum == (uint16_t) EEPROM_SUM)
+		return E1000_SUCCESS;
+	else {
+		DEBUGOUT("EEPROM Checksum Invalid\n");    
+		return -E1000_ERR_EEPROM;
+	}
+}
+
+/******************************************************************************
+ * Reads the adapter's MAC address from the EEPROM and inverts the LSB for the
+ * second function of dual function devices
+ *
+ * hw - Struct containing variables accessed by shared code
+ *****************************************************************************/
+static int 
+e1000_read_mac_addr(struct e1000_hw *hw)
+{
+	uint16_t offset;
+	uint16_t eeprom_data;
+	int i;
+
+	DEBUGFUNC("e1000_read_mac_addr");
+
+	for(i = 0; i < NODE_ADDRESS_SIZE; i += 2) {
+		offset = i >> 1;
+		if(e1000_read_eeprom(hw, offset, 1, &eeprom_data) < 0) {
+			DEBUGOUT("EEPROM Read Error\n");
+			return -E1000_ERR_EEPROM;
+		}
+		hw->mac_addr[i] = eeprom_data & 0xff;
+		hw->mac_addr[i+1] = (eeprom_data >> 8) & 0xff;
+	}
+	if(((hw->mac_type == e1000_82546) || (hw->mac_type == e1000_82546_rev_3)) &&
+		(E1000_READ_REG(hw, STATUS) & E1000_STATUS_FUNC_1))
+		/* Invert the last bit if this is the second device */
+		hw->mac_addr[5] ^= 1;
+	return E1000_SUCCESS;
+}
+
+/******************************************************************************
+ * Initializes receive address filters.
+ *
+ * hw - Struct containing variables accessed by shared code 
+ *
+ * Places the MAC address in receive address register 0 and clears the rest
+ * of the receive addresss registers. Clears the multicast table. Assumes
+ * the receiver is in reset when the routine is called.
+ *****************************************************************************/
+static void
+e1000_init_rx_addrs(struct e1000_hw *hw)
+{
+	uint32_t i;
+	uint32_t addr_low;
+	uint32_t addr_high;
+	
+	DEBUGFUNC("e1000_init_rx_addrs");
+	
+	/* Setup the receive address. */
+	DEBUGOUT("Programming MAC Address into RAR[0]\n");
+	addr_low = (hw->mac_addr[0] |
+		(hw->mac_addr[1] << 8) |
+		(hw->mac_addr[2] << 16) | (hw->mac_addr[3] << 24));
+	
+	addr_high = (hw->mac_addr[4] |
+		(hw->mac_addr[5] << 8) | E1000_RAH_AV);
+	
+	E1000_WRITE_REG_ARRAY(hw, RA, 0, addr_low);
+	E1000_WRITE_REG_ARRAY(hw, RA, 1, addr_high);
+	
+	/* Zero out the other 15 receive addresses. */
+	DEBUGOUT("Clearing RAR[1-15]\n");
+	for(i = 1; i < E1000_RAR_ENTRIES; i++) {
+		E1000_WRITE_REG_ARRAY(hw, RA, (i << 1), 0);
+		E1000_WRITE_REG_ARRAY(hw, RA, ((i << 1) + 1), 0);
+	}
+}
+
+/******************************************************************************
+ * Clears the VLAN filer table
+ *
+ * hw - Struct containing variables accessed by shared code
+ *****************************************************************************/
+static void
+e1000_clear_vfta(struct e1000_hw *hw)
+{
+	uint32_t offset;
+    
+	for(offset = 0; offset < E1000_VLAN_FILTER_TBL_SIZE; offset++)
+		E1000_WRITE_REG_ARRAY(hw, VFTA, offset, 0);
+}
+
+
+/******************************************************************************
+ * Functions from e1000_main.c of the linux driver
+ ******************************************************************************/
+
 /**
  * e1000_reset - Reset the adapter
  */
@@ -3356,6 +3383,11 @@ e1000_sw_init(struct pci_device *pdev, struct e1000_hw *hw)
 #endif
 	return E1000_SUCCESS;
 }
+
+
+/******************************************************************************
+ * Functions not present in the linux driver
+ ******************************************************************************/
 
 static void fill_rx (void)
 {
