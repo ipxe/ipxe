@@ -110,9 +110,9 @@ UNDIROMID:
 	.byte	0			/* Structure revision */
 	.byte	0,1,2			/* PXE version 2.1.0 */
 	.word	UNDILoader - _prefix	/* Offset to loader routine */
-	.word	UNDIStackSize		/* Stack segment size */
-	.word	UNDIDataSize		/* Data segment size */
-	.word	UNDICodeSize		/* Code segment size */
+	.word	_real_mode_stack_size	/* Stack segment size */
+	.word	_real_mode_stack_size	/* Data segment size */
+	.word	_pxe_stack_size		/* Code segment size */
 	.ascii	"PCIR"
 
 	/* The code segment contains our pxe_stack_t plus the PXE and

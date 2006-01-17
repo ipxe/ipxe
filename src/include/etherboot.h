@@ -285,7 +285,6 @@ extern int hostnamelen;
 extern jmp_buf restart_etherboot;
 extern int url_port;
 extern struct arptable_t arptable[MAX_ARP];
-extern struct igmptable_t igmptable[MAX_IGMP];
 #ifdef	IMAGE_MENU
 extern int menutmo,menudefault;
 extern unsigned char *defparams;

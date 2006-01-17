@@ -133,7 +133,7 @@ CFLAGS+=	-falign-jumps=1 -falign-loops=1 -falign-functions=1
 endif
 GCC_MINORVERSION = $(word 2, $(GCC_VERSION))
 ifneq ($(GCC_MINORVERSION),4)
-CFLAGS+=	-mcpu=i386
+CFLAGS+=	-march=i386
 endif
 
 LDFLAGS+=	-N
