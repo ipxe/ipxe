@@ -56,28 +56,82 @@ struct multiboot_header {
 };
 
 static struct multiboot_header *mbheader;
+static unsigned int mbimgoffset, mboffset;
+static unsigned char mbbuffer[12];
 
 static struct multiboot_info mbinfo;
 
-static void multiboot_probe(unsigned char *data, int len)
+static void multiboot_init(void)
 {
-    int offset;
+	mbheader = NULL;
+	mbimgoffset = 0;
+	mboffset = 0;
+}
+
+/* Remember this probing function is actually different from the usual probing
+ * functions, since the Multiboot header is somewhere in the first 8KB of the
+ * image and it is byte aligned, but there is not much more known about how to
+ * find it.  In the Etherboot context the most complicated issue is that the
+ * image has to be processed block-by-block, with unknown block size and no
+ * guarantees about block alignment with respect to the image.  */
+static void multiboot_peek(unsigned char *data, int len)
+{
     struct multiboot_header *h;
 
-    /* Multiboot spec requires the header to be in first 8KB of the image */
-    if (len > 8192)
-	    len = 8192;
+	/* If we have already searched the first 8KB of the image or if we have
+	 * already found a valid Multiboot header, skip this code.  */
+    if ((mboffset == 12) || (mbimgoffset >= 8192))
+		return;
 
-    for (offset = 0; offset < len; offset += 4) {
-	    h = (struct multiboot_header *) (data + offset);
-	    if (h->magic == MULTIBOOT_HEADER_MAGIC
-			    && h->magic + h->flags + h->checksum == 0) {
-		    printf("/Multiboot");
-		    mbheader = h;
-		    return;
-	    }
-    }
-    mbheader = 0;
+	if (mbimgoffset + len >= 8192)
+	    len = 8192 - mbimgoffset;
+
+	/* This piece of code is pretty stupid, since it always copies data, even
+	 * if it is word aligned.  This shouldn't matter too much on platforms that
+	 * use the Multiboot spec, since the processors are usually reasonably fast
+	 * and this code is only executed for the first 8KB of the image.  Feel
+	 * free to improve it, but be prepared to write quite a lot of code that
+	 * deals with non-aligned data with respect to the image to load.  */
+	while (len > 0) {
+		mbimgoffset++;
+		memcpy(mbbuffer + mboffset, data, 1);
+		mboffset++;
+		data++;
+		len--;
+		if (mboffset == 4) {
+			/* Accumulated a word into the buffer.  */
+			h = (struct multiboot_header *)mbbuffer;
+			if (h->magic != MULTIBOOT_HEADER_MAGIC) {
+				/* Wrong magic, this cannot be the start of the header.  */
+				mboffset = 0;
+			}
+		} else if (mboffset == 12) {
+			/* Accumulated the minimum header data into the buffer.  */
+			h = (struct multiboot_header *)mbbuffer;
+			if (h->magic + h->flags + h->checksum != 0) {
+				/* Checksum error, not a valid header.  Check for a possible
+				 * header starting in the current flag/checksum field.  */
+				if (h->flags == MULTIBOOT_HEADER_MAGIC) {
+					mboffset -= 4;
+					memmove(mbbuffer, mbbuffer + 4, mboffset);
+				} else if (h->checksum == MULTIBOOT_HEADER_MAGIC) {
+					mboffset -= 8;
+					memmove(mbbuffer, mbbuffer + 8, mboffset);
+				} else {
+					mboffset = 0;
+				}
+			} else {
+			    printf("Multiboot... ");
+			    mbheader = h;
+				if ((h->flags & 0xfffc) != 0) {
+					printf("\nERROR: Unsupported Multiboot requirements flags\n");
+					longjmp(restart_etherboot, -2);
+				}
+				break;
+			}
+		}
+	}
+	mbimgoffset += len;
 }
 
 static inline void multiboot_boot(unsigned long entry)
@@ -94,7 +148,7 @@ static inline void multiboot_boot(unsigned long entry)
 	 * strings of the maximum size are possible.  Note this buffer
 	 * can overrun if a stupid file name is chosen.  Oh well.  */
 	c = cmdline;
-	for (i = 0; KERNEL_BUF[i] != 0; i++) {
+	for (i = 0; KERNEL_BUF[i] != '\0'; i++) {
 		switch (KERNEL_BUF[i]) {
 		case ' ':
 		case '\\':
@@ -105,6 +159,11 @@ static inline void multiboot_boot(unsigned long entry)
 			break;
 		}
 		*c++ = KERNEL_BUF[i];
+	}
+	if (addparam != NULL) {
+		*c++ = ' ';
+		memcpy(c, addparam, addparamlen);
+		c += addparamlen;
 	}
 	(void)sprintf(c, " -retaddr %#lX", virt_to_phys(xend32));
 
@@ -139,5 +198,11 @@ static inline void multiboot_boot(unsigned long entry)
 	os_regs.eax = 0x2BADB002;
 	os_regs.ebx = virt_to_phys(&mbinfo);
 	xstart32(entry);
-	longjmp(restart_etherboot, -2);
+	/* A Multiboot kernel by default never returns - there is nothing in the
+	 * specification about what happens to the boot loader after the kernel has
+	 * been started.  Thus if the kernel returns it is definitely aware of the
+	 * semantics involved (i.e. the "-retaddr" parameter).  Do not treat this
+	 * as an error, but restart with a fresh DHCP request in order to activate
+	 * the menu again in case one is used.  */
+	longjmp(restart_etherboot, 2);
 }
