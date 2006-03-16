@@ -719,7 +719,7 @@ static int a3c90x_probe ( struct nic *nic, struct pci_device *pci ) {
     nic->ioaddr = pci->ioaddr;
     nic->irqno = 0;
 
-    INF_3C90X.is3c556 = (pci->dev_id == 0x6055);
+    INF_3C90X.is3c556 = (pci->device_id == 0x6055);
     INF_3C90X.IOAddr = pci->ioaddr & ~3;
     INF_3C90X.CurrentWindow = 255;
     switch (a3c90x_internal_ReadEeprom(INF_3C90X.IOAddr, 0x03))
