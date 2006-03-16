@@ -3389,25 +3389,6 @@ e1000_sw_init(struct pci_device *pdev, struct e1000_hw *hw)
  * Functions not present in the linux driver
  ******************************************************************************/
 
-#if 0
-static uint32_t
-e1000_io_read(struct e1000_hw *hw __unused, uint32_t port)
-{
-        return inl(port);
-}
-#endif
-
-static void
-e1000_io_write(struct e1000_hw *hw __unused, uint32_t port, uint32_t value)
-{
-        outl(value, port);
-}
-
-
-/******************************************************************************
- * Functions not present in the linux driver
- ******************************************************************************/
-
 static void fill_rx (void)
 {
 	struct e1000_rx_desc *rd;
