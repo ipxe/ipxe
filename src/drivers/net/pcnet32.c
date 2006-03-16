@@ -434,6 +434,7 @@ static void pcnet32_reset(struct nic *nic)
 	if (lp->options & PCNET32_PORT_ASEL)
 		val |= 2;
 	lp->a.write_bcr(ioaddr, 2, val);
+
 	/* handle full duplex setting */
 	if (lp->full_duplex) {
 		val = lp->a.read_bcr(ioaddr, 9) & ~3;
@@ -483,6 +484,19 @@ static void pcnet32_reset(struct nic *nic)
 		lp->a.write_csr(ioaddr, 3, val);
 	}
 #endif
+	if (1)
+	{
+		//disable interrupts
+		val = lp->a.read_csr(ioaddr, 3);
+		val = val
+			| (1 << 14) //BABLM intr disabled
+			| (1 << 12) //MISSM missed frame mask intr disabled
+			| (1 << 10) //RINTM receive intr disabled
+			| (1 << 9) //TINTM transmit intr disabled
+			| (1 << 8) //IDONM init done intr disabled
+			;
+		lp->a.write_csr(ioaddr, 3, val);
+	}
 
 	if (lp->ltint) {	/* Enable TxDone-intr inhibitor */
 		val = lp->a.read_csr(ioaddr, 5);
@@ -625,10 +639,10 @@ static void pcnet32_disable ( struct nic *nic __unused ) {
 	lp->a.write_csr(ioaddr, 0, 0x0004);
 
 	/*
-	 * Switch back to 16-bit mode to avoid problesm with dumb 
+	 * Switch back to 16-bit mode to avoid problems with dumb 
 	 * DOS packet driver after a warm reboot
 	 */
-	lp->a.write_bcr(ioaddr, 20, 4);
+	lp->a.write_bcr(ioaddr, 20, 0);
 }
 
 /**************************************************************************
@@ -691,7 +705,7 @@ static int pcnet32_probe ( struct nic *nic, struct pci_device *pci ) {
 	chip_version =
 	    a->read_csr(ioaddr, 88) | (a->read_csr(ioaddr, 89) << 16);
 
-	dprintf(("PCnet chip version is %0xhX\n", chip_version));
+	dprintf(("PCnet chip version is 0x%X\n", chip_version));
 	if ((chip_version & 0xfff) != 0x003)
 		return 0;
 
@@ -753,6 +767,7 @@ static int pcnet32_probe ( struct nic *nic, struct pci_device *pci ) {
 		mii = 1;
 		break;
 	default:
+		chipname = "UNKNOWN";
 		printf("PCnet version %#x, no PCnet32 chip.\n",
 		       chip_version);
 		return 0;
@@ -785,7 +800,7 @@ static int pcnet32_probe ( struct nic *nic, struct pci_device *pci ) {
 		nic->node_addr[i] = promaddr[i];
 	}
 	/* Print out some hardware info */
-	printf("%s: %! at ioaddr %hX, ", pci->name, nic->node_addr,
+	printf("%s: %! at ioaddr 0x%hX, ", chipname, nic->node_addr,
 	       ioaddr);
 
 	/* Set to pci bus master */
@@ -872,7 +887,6 @@ static int pcnet32_probe ( struct nic *nic, struct pci_device *pci ) {
 	/* switch pcnet32 to 32bit mode */
 	a->write_bcr(ioaddr, 20, 2);
 
-
 	a->write_csr(ioaddr, 1, (virt_to_bus(&lp->init_block)) & 0xffff);
 	a->write_csr(ioaddr, 2, (virt_to_bus(&lp->init_block)) >> 16);
 
@@ -883,15 +897,16 @@ static int pcnet32_probe ( struct nic *nic, struct pci_device *pci ) {
 	 */
 	/* Trigger an initialization just for the interrupt. */
 
-	a->write_csr(ioaddr, 0, 0x41);
-	mdelay(1);
+	
+//	a->write_csr(ioaddr, 0, 0x41); 
+//	mdelay(1);
 
 	cards_found++;
 
 	/* point to NIC specific routines */
 	pcnet32_reset(nic);
-	if (1) {
-	        int tmp;
+	if (mii) {
+		int tmp;
 		int phy, phy_idx = 0;
 		u16 mii_lpa;
 		lp->phys[0] = 1;	/* Default Setting */
@@ -928,6 +943,13 @@ static int pcnet32_probe ( struct nic *nic, struct pci_device *pci ) {
 			printf("10Mbps Half-Duplex\n");
 		else
 			printf("\n");
+	} else {
+		/* The older chips are fixed 10Mbps, and some support full duplex,
+		 * although not via autonegotiation, but only via configuration.  */
+		if (fdx)
+			printf("10Mbps Full-Duplex\n");
+		else
+			printf("10Mbps Half-Duplex\n");
 	}
 
 	nic->nic_op	= &pcnet32_operations;
@@ -979,9 +1001,9 @@ static struct nic_operations pcnet32_operations = {
 };
 
 static struct pci_id pcnet32_nics[] = {
-	PCI_ROM(0x1022, 0x2000, "lancepci", "AMD Lance/PCI"),
-	PCI_ROM(0x1022, 0x2625, "pcnetfastiii", "AMD Lance/PCI PCNet/32"),
-	PCI_ROM(0x1022, 0x2001, "amdhomepna", "AMD Lance/HomePNA"),
+	PCI_ROM(0x1022, 0x2000, "pcnet32", "AMD PCnet/PCI"),
+	PCI_ROM(0x1022, 0x2625, "pcnetfastiii", "AMD PCNet FAST III"),
+	PCI_ROM(0x1022, 0x2001, "amdhomepna", "AMD PCnet/HomePNA"),
 };
 
 PCI_DRIVER ( pcnet32_driver, pcnet32_nics, PCI_NO_CLASS );

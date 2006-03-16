@@ -116,8 +116,9 @@ os_regs_ptr:
 	movl	%esp, %ebp
 	subl	$os_regs, %ebp
 	
-	/* Load the stack pointer */
+	/* Load the stack pointer and convert it to physical address */
 	movl	52(%esp), %esp
+	addl	%ebp, %esp
 
 	/* Enable the virtual addresses */
 	leal	_phys_to_virt(%ebp), %eax

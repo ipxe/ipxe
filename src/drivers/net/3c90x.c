@@ -242,6 +242,7 @@ typedef struct
 /*** Global variables ***/
 static struct
     {
+    unsigned int	is3c556;
     unsigned char	isBrev;
     unsigned char	CurrentWindow;
     unsigned int	IOAddr;
@@ -305,7 +306,15 @@ a3c90x_internal_ReadEeprom(int ioaddr, int address)
 	while((1<<15) & inw(ioaddr + regEepromCommand_0_w));
 
 	/** Read the value. **/
-	outw(address + ((0x02)<<6), ioaddr + regEepromCommand_0_w);
+	if (INF_3C90X.is3c556)
+	 {
+	     outw(address + (0x230), ioaddr + regEepromCommand_0_w);
+	 }
+	else
+	 {
+	     outw(address + ((0x02)<<6), ioaddr + regEepromCommand_0_w);
+	 }
+ 
 	while((1<<15) & inw(ioaddr + regEepromCommand_0_w));
 	val = inw(ioaddr + regEepromData_0_w);
 
@@ -710,6 +719,7 @@ static int a3c90x_probe ( struct nic *nic, struct pci_device *pci ) {
     nic->ioaddr = pci->ioaddr;
     nic->irqno = 0;
 
+    INF_3C90X.is3c556 = (pci->dev_id == 0x6055);
     INF_3C90X.IOAddr = pci->ioaddr & ~3;
     INF_3C90X.CurrentWindow = 255;
     switch (a3c90x_internal_ReadEeprom(INF_3C90X.IOAddr, 0x03))
@@ -794,6 +804,15 @@ static int a3c90x_probe ( struct nic *nic, struct pci_device *pci ) {
     INF_3C90X.HWAddr[4] = eeprom[HWADDR_OFFSET + 2]>>8;
     INF_3C90X.HWAddr[5] = eeprom[HWADDR_OFFSET + 2]&0xFF;
     printf("MAC Address = %!\n", INF_3C90X.HWAddr);
+
+    /** 3C556: Invert MII power **/
+    if (INF_3C90X.is3c556) {
+	unsigned int tmp;
+	a3c90x_internal_SetWindow(INF_3C90X.IOAddr, winAddressing2);
+	tmp = inw(INF_3C90X.IOAddr + regResetOptions_2_w);
+	tmp |= 0x4000;
+	outw(tmp, INF_3C90X.IOAddr + regResetOptions_2_w);
+    }
 
     /* Test if the link is good, if not continue */
     a3c90x_internal_SetWindow(INF_3C90X.IOAddr, winDiagnostics4);
@@ -967,6 +986,7 @@ static struct nic_operations a3c90x_operations = {
 
 static struct pci_id a3c90x_nics[] = {
 /* Original 90x revisions: */
+PCI_ROM(0x10b7, 0x6055, "3c556",	 "3C556"),		/* Huricane */
 PCI_ROM(0x10b7, 0x9000, "3c905-tpo",     "3Com900-TPO"),	/* 10 Base TPO */
 PCI_ROM(0x10b7, 0x9001, "3c905-t4",      "3Com900-Combo"),	/* 10/100 T4 */
 PCI_ROM(0x10b7, 0x9050, "3c905-tpo100",  "3Com905-TX"),		/* 100 Base TX / 10/100 TPO */
