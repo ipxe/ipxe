@@ -99,7 +99,7 @@ PXENV_EXIT_t pxenv_get_cached_info ( struct s_PXENV_GET_CACHED_INFO
 	memcpy ( cached_info->bootfile, KERNEL_BUF,
 		 sizeof(cached_info->bootfile) );
 	/* Copy DHCP vendor options */
-	memcpy ( &cached_info->vendor.d, BOOTP_DATA_ADDR->bootp_reply.bp_vend,
+	memcpy ( &cached_info->vendor.d, bootp_data.bootp_reply.bp_vend,
 		 sizeof(cached_info->vendor.d) );
 	
 	/* Copy to user-specified buffer, or set pointer to our buffer */

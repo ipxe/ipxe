@@ -39,11 +39,6 @@ int	url_port;
 
 char as_main_program = 1;
 
-#ifdef	IMAGE_FREEBSD
-int freebsd_howto = 0;
-char freebsd_kernel_env[FREEBSD_KERNEL_ENV_SIZE];
-#endif
-
 #if 0
 
 static inline unsigned long ask_boot(unsigned *index)
@@ -281,6 +276,16 @@ static int main_loop(int state)
 			dev->how_probe = ops->probe(dev);
 			if (dev->how_probe == PROBE_FAILED) {
 				state = -1;
+			}
+			if (state == 1) {
+				/* The bootp reply might have been changed, re-parse.  */
+				decode_rfc1533(bootp_data.bootp_reply.bp_vend, 0,
+#ifdef	NO_DHCP_SUPPORT
+				               BOOTP_VENDOR_LEN + MAX_BOOTP_EXTLEN, 
+#else
+				               DHCP_OPT_LEN + MAX_BOOTP_EXTLEN, 
+#endif	/* NO_DHCP_SUPPORT */
+				               1);
 			}
 		}
 	}

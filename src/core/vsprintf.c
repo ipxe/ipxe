@@ -45,7 +45,7 @@ static int vsprintf(char *buf, const char *fmt, va_list args)
 		while (*fmt >= '0' && *fmt <= '9')
 			fmt++;
 		if (*fmt == 's') {
-			for(p = va_arg(args, char *); *p != '\0'; p++) 
+			for(p = va_arg(args, char *); *p != '\0'; p++)
 				buf ? *s++ = *p : putchar(*p);
 		} else if (*fmt == 'm') {
 			for(p = strerror(errno); *p != '\0'; p++)
@@ -70,7 +70,7 @@ static int vsprintf(char *buf, const char *fmt, va_list args)
 					fmt++;
 				}
 			}
-			
+
 			/*
 			 * Before each format q points to tmp buffer
 			 * After each format q points past end of item
@@ -182,11 +182,12 @@ int sprintf(char *buf, const char *fmt, ...)
  * @err None		-
  *
  */
-void printf(const char *fmt, ...)
+int printf(const char *fmt, ...)
 {
 	va_list args;
 	int i;
 	va_start(args, fmt);
 	i=vsprintf(0, fmt, args);
 	va_end(args);
+	return i;
 }
