@@ -1,4 +1,3 @@
-#define EB54 1
 /**************************************************************************
 *    via-velocity.c: Etherboot device driver for the VIA 6120 Gigabit
 *    Changes for Etherboot port:
@@ -627,7 +626,6 @@ static void velocity_disable(struct dev *dev __unused)
 	vptr->flags &= (~VELOCITY_FLAGS_OPENED);
 }
 
-#ifdef EB54
 /**************************************************************************
 IRQ - handle interrupts
 ***************************************************************************/
@@ -660,13 +658,17 @@ static void velocity_irq(struct nic *nic __unused, irq_action_t action)
 		break;
 	}
 }
-#endif
+
+static struct nic_operations velocity_operations = {
+	.connect	= dummy_connect,
+	.poll		= velocity_poll,
+	.transmit	= velocity_transmit,
+	.irq		= velocity_irq,
+};
+
 /**************************************************************************
 PROBE - Look for an adapter, this routine's visible to the outside
 ***************************************************************************/
-
-#define board_found 1
-#define valid_link 0
 static int velocity_probe(struct dev *dev, struct pci_device *pci)
 {
 	struct nic *nic = (struct nic *) dev;
@@ -674,7 +676,7 @@ static int velocity_probe(struct dev *dev, struct pci_device *pci)
 	struct mac_regs *regs;
 
 	printf("via-velocity.c: Found %s Vendor=0x%hX Device=0x%hX\n",
-	       pci->name, pci->vendor, pci->dev_id);
+	       pci->name, pci->vendor_id, pci->device_id);
 
 	/* point to private storage */
 	vptr = &vptx;
@@ -740,14 +742,7 @@ static int velocity_probe(struct dev *dev, struct pci_device *pci)
 	velocity_open(nic, pci);
 
 	/* store NIC parameters */
-#ifdef EB54
-	nic->ioaddr = pci->ioaddr & ~3;
-	nic->irqno = pci->irq;
-	nic->irq = velocity_irq;
-#endif
-	dev->disable = velocity_disable;
-	nic->poll = velocity_poll;
-	nic->transmit = velocity_transmit;
+	nic->nic_op = &velocity_operations;
 	return 1;
 }
 
@@ -1939,11 +1934,7 @@ static struct pci_id velocity_nics[] = {
 	PCI_ROM(0x1106, 0x3119, "via-velocity", "VIA Networking Velocity Family Gigabit Ethernet Adapter"),
 };
 
-static struct pci_driver velocity_driver __pci_driver = {
-	.type = NIC_DRIVER,
-	.name = "VIA-VELOCITY/PCI",
-	.probe = velocity_probe,
-	.ids = velocity_nics,
-	.id_count = sizeof(velocity_nics) / sizeof(velocity_nics[0]),
-	.class = 0,
-};
+PCI_DRIVER ( velocity_driver, velocity_nics, PCI_NO_CLASS );
+
+DRIVER ( "VIA-VELOCITY/PCI", nic_driver, pci_driver, velocity_driver,
+         velocity_probe, velocity_disable );
