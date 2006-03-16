@@ -131,6 +131,7 @@ DEBUG_TARGETS	+= dbg2.o dbg.o c s
 #
 SRCDIRS		+= core
 SRCDIRS		+= proto
+SRCDIRS		+= proto/uip
 #SRCDIRS		+= image
 SRCDIRS		+= drivers/bus
 SRCDIRS		+= drivers/net
