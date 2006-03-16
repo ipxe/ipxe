@@ -1,0 +1,176 @@
+.Boot over IB over Mellanox HCAs README - Pre-Alpha release
+==========================================================
+Document #2442, Rev 0.10, December 2005
+
+
+1. General
+-----------
+This README describes the Boot over IB package which enables booting a Linux 
+kernel from a remote server using one of the Mellanox Technologies HCA 
+devices. The package is based on Etherboot 5.4.1.
+
+The package actually implements a network driver for Etherboot. The wire 
+protocol is compliant with IP Over IB 
+(see http://www.ietf.org/html.charters/ipoib-charter.html for related 
+documents).
+
+Etherboot uses a traditional setup of a DHCP server and a TFTP server to 
+perform a remote boot in a similar manner to Ethernet NICs. The binary code is 
+exported by the device as an expansion ROM image.
+
+
+2. Supported Devices
+---------------------
+The following Mellanox Technologies HCA devices are supported:
+
+	PCI Device ID		Mellanox HCA Device
+	----------------------------------------------
+	23108			InfiniHost (P/N MT23108)
+	25208			InfiniHost III Ex (P/N MT25208) (InfiniHost)
+	25218			InfiniHost III Ex (P/N MT25208) (MemFree)
+	25204			InfiniHost III Lx (P/N MT25204)
+
+	
+	Note:	For devices with more than one IB port, port 1 is used for 
+	communications.
+
+
+3. Compiling
+----------------
+From the src directory:
+Run" make bin/<device>.<ext>
+where device can be any of:
+	MT23108
+	MT25218
+	MT25208
+	MT25204
+	
+and ext can be rom, zrom etc. (see Etherbot doumentation for more details)
+
+4. Directory Structure
+-----------------------
+All driver files are available under src/drivers/net/mlx_ipoib/. Under this 
+directory the following files can be found:
+	
+	*** 	doc - Contains related documents including this file.
+	***		patches - Contains needed patch files.
+	*** 	samples - Contains sample files.
+	*** 	. Contains driver source files.
+	
+
+5. Burning the Flash Memory
+----------------------------
+The binary code resides in the same Flash device of the device firmware. 
+However the binary files are distinct and do not affect each other. Mellanox's 
+'mlxburn' tool is available for burning, however, it is not possible to burn 
+the expansion ROM image by itself; rather, both the firmware and expansion ROM 
+images must be burnt simultaneously.
+
+'mlxburn' is part of the Mellanox Firmware Tools (MFT) package 	available for 
+download from www.mellanox.com under 'Firmware Downloads'.
+
+Example:
+The following command burns a firmware image and an expansion ROM image to an 
+InfiniHost Adapter Card (P/N MHX-CE128-T.ini):
+	  
+   mlxburn -fw fw-23108-a1-rel.mlx -exp_rom MT23108.bin
+			 /dev/mst/mt23108_pci_cr0 -conf MHX-CE128-T.ini
+
+*** Important Note: The .ini file must support burning expansion ROMs. For 
+example, the following lines must appear in the .ini file. If they do not, 
+please add them	manually.
+
+[ADAPTER]
+exp_rom_en = true
+
+Mellanox's web site contains firmware binary files with extension .bin.gz. 
+These files contain contain EVERYTHING the goes in the flash memory and thus 
+are NOT suitable for including the expansion rom image. Therefore, one use the 
+files with .mlx extension also available from Mellanox's web site.
+
+	
+
+6. Preparing the DHCP Server
+-----------------------------
+DHCP messages over IP Over IB are transmitted as broadcasts. In order to 
+distinguish between messages belonging to a certain DHCP session, the messages 
+must carry the client identifier option (see ietf documentation	referred to 
+above). As of November 2005, ISC DHCP servers do not support this feature. 
+They are expected to support this at the end of 2005. In order to work this 
+out, the appropriate patch must be applied (see patches directory). It has 
+been tested on version isc-dhcpd-V3.0.4b2.
+
+The DHCP server must run on a machine which supports IP Over IB. The Mellanox 
+IBGD package (gen1 or gen2) can be used to provide this.
+To run the DHCP server from the command line use: dhcpd ib0
+
+7. DHCP Server Configuration File
+----------------------------------
+In order for the DHCP server to provide configuration records for clients, an 
+appropriate configuration file dhcpd.conf must be created and put under /etc/. 
+A sample configuration file with comments can be found in the samples directory.
+
+
+8. OpenSM
+----------
+To successfully boot over IB, the IB network must contain a Subnet Manager 
+which configures the IB network. OpenSM is part of the IBGD distribution and 
+can be used to accomplish that. Note that OpenSM may be run on the same host 
+running the DHCP server but it is not mandatory.
+
+
+9. TFTP Server
+---------------
+When the DHCP session is completed, the client has the IP address of the TFTP 
+server from which it should download the kernel image. This TFTP server must 
+run on a machine with InfiniBand support. The client loads first a loader 
+image based on PXE API which then loads the kernel image. The image can be 
+found in the Linux kernel homepage:
+
+http://www.kernel.org/pub/linux/boot/syslinux/
+
+
+10. BIOS Configuration
+-----------------------
+The expansion ROM image presents itself to the BIOS as a boot device. As a 
+result, the BIOS will add it to the list of boot devices. The priority of this 
+list can be modified when entering the BIOS setup. The boot over IB	image must 
+be set first for the BIOS to attempt to use it first.
+
+
+11. Operation
+--------------
+When booting the client, a message appears on the screen describing the device 
+found and the revision of the code. The user has 3 seconds to press a key for 
+increased functionality:
+'V' will increase verbosity.
+'I' will prinit some information to aid in configuring the DHCP configuration 
+    file. In this case the display will hold for 5 seconds to let the user 
+	grasp the information.
+	
+Note that increasing verbosity will significantly slow boot time and will 
+print lots of debug messages to the screen.
+
+
+12. Diskless Machines
+----------------------
+Most often it is required to boot a diskless machine. In these 	cases the 
+kernel mounts its root file system over NFS over one of the interfaces. For 
+this to happen on a client with only InfiniBand interfaces, the kernel image 
+must be configured accordingly and must include IP Over IB support. This can 
+be achieved either by compiling this into the kernel or using initrd images 
+that contain IP Over IB support.
+
+
+13. Changing Defaults
+----------------------
+As stated the driver uses port 1 for its communications. To use another port 
+edit the file src/drivers/net/ib_driver.h and modify the definition of 
+PXE_IB_PORT.
+
+
+14. Installing a package from Mellanox
+--------------------------------------
+When using a package obtained from Mellanox Technologies' web site, the
+directory src/bin will contain the driver binary files. The files have a .bin
+extension and are equivalent to the same files with .zrom extension.
