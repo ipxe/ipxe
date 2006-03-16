@@ -23,7 +23,9 @@
 *    Written 2002 ShuChen <shuchen@realtek.com.tw>
 *	  See Linux Driver for full information
 *	
-*    Linux Driver Version 1.27a, 10.02.2002
+*    Linux Driver Versions: 
+*	1.27a, 10.02.2002
+*	RTL8169_VERSION "2.2"   <2004/08/09>
 * 
 *    Thanks to:
 *    	Jean Chen of RealTek Semiconductor Corp. for
@@ -37,6 +39,7 @@
 *    v1.0	11-26-2003	timlegge	Initial port of Linux driver
 *    v1.5	01-17-2004	timlegge	Initial driver output cleanup
 *    v1.6	03-27-2004	timlegge	Additional Cleanup
+*    v1.7	11-22-2005	timlegge	Update to RealTek Driver Version 2.2
 *    
 *    Indent Options: indent -kr -i8
 ***************************************************************************/
@@ -68,6 +71,25 @@ static u32 ioaddr;
 
 #define ARRAY_SIZE(x) (sizeof(x) / sizeof((x)[0]))
 
+#undef RTL8169_DEBUG
+#undef RTL8169_JUMBO_FRAME_SUPPORT
+#undef RTL8169_HW_FLOW_CONTROL_SUPPORT
+
+
+#undef RTL8169_IOCTL_SUPPORT
+#undef RTL8169_DYNAMIC_CONTROL
+#define RTL8169_USE_IO
+
+
+#ifdef RTL8169_DEBUG
+#define assert(expr) \
+               if(!(expr)) { printk( "Assertion failed! %s,%s,%s,line=%d\n", #expr,__FILE__,__FUNCTION__,__LINE__); }
+#define DBG_PRINT( fmt, args...)   printk("r8169: " fmt, ## args);
+#else
+#define assert(expr) do {} while (0)
+#define DBG_PRINT( fmt, args...)   ;
+#endif				// end of #ifdef RTL8169_DEBUG
+
 /* media options 
         _10_Half = 0x01,
         _10_Full = 0x02,
@@ -97,8 +119,10 @@ static int multicast_filter_limit = 32;
 #define TX_FIFO_THRESH 256	/* In bytes */
 
 #define RX_FIFO_THRESH	7	/* 7 means NO threshold, Rx buffer level before first PCI xfer.  */
-#define RX_DMA_BURST	6	/* Maximum PCI burst, '6' is 1024 */
-#define TX_DMA_BURST	6	/* Maximum PCI burst, '6' is 1024 */
+#define RX_DMA_BURST	7	/* Maximum PCI burst, '6' is 1024 */
+#define TX_DMA_BURST	7	/* Maximum PCI burst, '6' is 1024 */
+#define ETTh                0x3F	/* 0x3F means NO threshold */
+
 #define EarlyTxThld 	0x3F	/* 0x3F means NO early transmit */
 #define RxPacketMaxSize	0x0800	/* Maximum size supported is 16K-1 */
 #define InterFrameGap	0x03	/* 3 means InterFrameGap = the shortest one */
@@ -110,6 +134,28 @@ static int multicast_filter_limit = 32;
 #define RTL_MIN_IO_SIZE 0x80
 #define TX_TIMEOUT  (6*HZ)
 
+#define RTL8169_TIMER_EXPIRE_TIME 100	//100
+
+#define ETH_HDR_LEN         14
+#define DEFAULT_MTU         1500
+#define DEFAULT_RX_BUF_LEN  1536
+
+
+#ifdef RTL8169_JUMBO_FRAME_SUPPORT
+#define MAX_JUMBO_FRAME_MTU    ( 10000 )
+#define MAX_RX_SKBDATA_SIZE    ( MAX_JUMBO_FRAME_MTU + ETH_HDR_LEN )
+#else
+#define MAX_RX_SKBDATA_SIZE 1600
+#endif				//end #ifdef RTL8169_JUMBO_FRAME_SUPPORT
+
+#ifdef RTL8169_USE_IO
+#define RTL_W8(reg, val8)   outb ((val8), ioaddr + (reg))
+#define RTL_W16(reg, val16) outw ((val16), ioaddr + (reg))
+#define RTL_W32(reg, val32) outl ((val32), ioaddr + (reg))
+#define RTL_R8(reg)         inb (ioaddr + (reg))
+#define RTL_R16(reg)        inw (ioaddr + (reg))
+#define RTL_R32(reg)        ((unsigned long) inl (ioaddr + (reg)))
+#else
 /* write/read MMIO register */
 #define RTL_W8(reg, val8)	writeb ((val8), ioaddr + (reg))
 #define RTL_W16(reg, val16)	writew ((val16), ioaddr + (reg))
@@ -117,10 +163,30 @@ static int multicast_filter_limit = 32;
 #define RTL_R8(reg)		readb (ioaddr + (reg))
 #define RTL_R16(reg)		readw (ioaddr + (reg))
 #define RTL_R32(reg)		((unsigned long) readl (ioaddr + (reg)))
+#endif
+
+#define MCFG_METHOD_1		0x01
+#define MCFG_METHOD_2		0x02
+#define MCFG_METHOD_3		0x03
+#define MCFG_METHOD_4		0x04
+
+#define PCFG_METHOD_1		0x01	//PHY Reg 0x03 bit0-3 == 0x0000
+#define PCFG_METHOD_2		0x02	//PHY Reg 0x03 bit0-3 == 0x0001
+#define PCFG_METHOD_3		0x03	//PHY Reg 0x03 bit0-3 == 0x0002
+
+static struct {
+	const char *name;
+	u8 mcfg;		/* depend on RTL8169 docs */
+	u32 RxConfigMask;	/* should clear the bits supported by this chip */
+} rtl_chip_info[] = {
+	{
+	"RTL-8169", MCFG_METHOD_1, 0xff7e1880,}, {
+	"RTL8169s/8110s", MCFG_METHOD_2, 0xff7e1880}, {
+"RTL8169s/8110s", MCFG_METHOD_3, 0xff7e1880},};
 
 enum RTL8169_registers {
-	MAC0 = 0,		/* Ethernet hardware address. */
-	MAR0 = 8,		/* Multicast filter. */
+	MAC0 = 0x0,		/* Ethernet hardware address. */
+	MAR0 = 0x8,		/* Multicast filter. */
 	TxDescStartAddr = 0x20,
 	TxHDescStartAddr = 0x28,
 	FLASH = 0x30,
@@ -148,7 +214,7 @@ enum RTL8169_registers {
 	RxMaxSize = 0xDA,
 	CPlusCmd = 0xE0,
 	RxDescStartAddr = 0xE4,
-	EarlyTxThres = 0xEC,
+	ETThReg = 0xEC,
 	FuncEvent = 0xF0,
 	FuncEventMask = 0xF4,
 	FuncPresetState = 0xF8,
@@ -162,7 +228,7 @@ enum RTL8169_register_content {
 	SWInt = 0x0100,
 	TxDescUnavail = 0x80,
 	RxFIFOOver = 0x40,
-	RxUnderrun = 0x20,
+	LinkChg = 0x20,
 	RxOverflow = 0x10,
 	TxErr = 0x08,
 	TxOK = 0x04,
@@ -232,6 +298,10 @@ enum RTL8169_register_content {
 
 	/* PHY_1000_CTRL_REG = 9; */
 	PHY_Cap_1000_Full = 0x0200,
+	PHY_Cap_1000_Half = 0x0100,
+
+	PHY_Cap_PAUSE = 0x0400,
+	PHY_Cap_ASYM_PAUSE = 0x0800,
 
 	PHY_Cap_Null = 0x0,
 
@@ -245,14 +315,6 @@ enum RTL8169_register_content {
 	/*_TBICSRBit*/
 	TBILinkOK = 0x02000000,
 };
-
-static struct {
-	const char *name;
-	u8 version;		/* depend on RTL8169 docs */
-	u32 RxConfigMask;	/* should clear the bits supported by this chip */
-} rtl_chip_info[] = {
-	{
-"RTL-8169", 0x00, 0xff7e1880,},};
 
 enum _DescStatusBit {
 	OWNbit = 0x80000000,
@@ -299,6 +361,8 @@ struct {
 static struct rtl8169_private {
 	void *mmio_addr;	/* memory map physical address */
 	int chipset;
+	int pcfg;
+	int mcfg;
 	unsigned long cur_rx;	/* Index into the Rx descriptor buffer of next Rx pkt. */
 	unsigned long cur_tx;	/* Index into the Tx descriptor buffer of next Rx pkt. */
 	struct TxDesc *TxDescArray;	/* Index of 256-alignment Tx Descriptor buffer */
@@ -310,10 +374,67 @@ static struct rtl8169_private {
 static struct rtl8169_private *tpc;
 
 static const u16 rtl8169_intr_mask =
-    SYSErr | PCSTimeout | RxUnderrun | RxOverflow | RxFIFOOver | TxErr |
-    TxOK | RxErr | RxOK;
+    LinkChg | RxOverflow | RxFIFOOver | TxErr | TxOK | RxErr | RxOK;
 static const unsigned int rtl8169_rx_config =
-    (RX_FIFO_THRESH << RxCfgFIFOShift) | (RX_DMA_BURST << RxCfgDMAShift);
+    (RX_FIFO_THRESH << RxCfgFIFOShift) | (RX_DMA_BURST << RxCfgDMAShift) |
+    0x0000000E;
+
+static void rtl8169_hw_PHY_config(struct nic *nic __unused);
+//static void rtl8169_hw_PHY_reset(struct net_device *dev);
+
+#define RTL8169_WRITE_GMII_REG_BIT( ioaddr, reg, bitnum, bitval )\
+{ \
+       int val; \
+       if( bitval == 1 ){ val = ( RTL8169_READ_GMII_REG( ioaddr, reg ) | (bitval<<bitnum) ) & 0xffff ; } \
+       else{ val = ( RTL8169_READ_GMII_REG( ioaddr, reg ) & (~(0x0001<<bitnum)) ) & 0xffff ; } \
+       RTL8169_WRITE_GMII_REG( ioaddr, reg, val ); \
+ }
+
+//=================================================================
+//      PHYAR
+//      bit             Symbol
+//      31              Flag
+//      30-21   reserved
+//      20-16   5-bit GMII/MII register address
+//      15-0    16-bit GMII/MII register data
+//=================================================================
+void RTL8169_WRITE_GMII_REG(unsigned long ioaddr, int RegAddr, int value)
+{
+	int i;
+
+	RTL_W32(PHYAR, 0x80000000 | (RegAddr & 0xFF) << 16 | value);
+	udelay(1000);
+
+	for (i = 2000; i > 0; i--) {
+		// Check if the RTL8169 has completed writing to the specified MII register
+		if (!(RTL_R32(PHYAR) & 0x80000000)) {
+			break;
+		} else {
+			udelay(100);
+		}		// end of if( ! (RTL_R32(PHYAR)&0x80000000) )
+	}			// end of for() loop
+}
+
+//=================================================================
+int RTL8169_READ_GMII_REG(unsigned long ioaddr, int RegAddr)
+{
+	int i, value = -1;
+
+	RTL_W32(PHYAR, 0x0 | (RegAddr & 0xFF) << 16);
+	udelay(1000);
+
+	for (i = 2000; i > 0; i--) {
+		// Check if the RTL8169 has completed retrieving data from the specified MII register
+		if (RTL_R32(PHYAR) & 0x80000000) {
+			value = (int) (RTL_R32(PHYAR) & 0xFFFF);
+			break;
+		} else {
+			udelay(100);
+		}		// end of if( RTL_R32(PHYAR) & 0x80000000 )
+	}			// end of for() loop
+	return value;
+}
+
 
 static void mdio_write(int RegAddr, int value)
 {
@@ -351,27 +472,41 @@ static int mdio_read(int RegAddr)
 	return value;
 }
 
+#define IORESOURCE_MEM 0x00000200
+
 static int rtl8169_init_board(struct pci_device *pdev)
 {
 	int i;
-	unsigned long rtreg_base, rtreg_len;
-	u32 tmp;
-
-	rtreg_base = pci_bar_start(pdev, PCI_BASE_ADDRESS_1);
-	rtreg_len = pci_bar_size(pdev, PCI_BASE_ADDRESS_1);
-
-	/* check for weird/broken PCI region reporting */
-	if (rtreg_len < RTL_MIN_IO_SIZE) {
-		printf("Invalid PCI region size(s), aborting\n");
-	}
+	unsigned long mmio_start, mmio_end, mmio_flags, mmio_len;
 
 	adjust_pci_device(pdev);
-/*      pm_cap = pci_find_capability(pdev, PCI_CAP_ID_PM); */
 
-	/* ioremap MMIO region */
-	ioaddr = (unsigned long) ioremap(rtreg_base, rtreg_len);
-	if (ioaddr == 0)
+	mmio_start = pci_bar_start(pdev, PCI_BASE_ADDRESS_1);
+//       mmio_end = pci_resource_end (pdev, 1);
+//       mmio_flags = pci_resource_flags (pdev, PCI_BASE_ADDRESS_1);
+	mmio_len = pci_bar_size(pdev, PCI_BASE_ADDRESS_1);
+
+	// make sure PCI base addr 1 is MMIO
+//     if (!(mmio_flags & IORESOURCE_MEM)) {
+//             printf ("region #1 not an MMIO resource, aborting\n");
+//             return 0;
+//     }
+
+	// check for weird/broken PCI region reporting
+	if (mmio_len < RTL_MIN_IO_SIZE) {
+		printf("Invalid PCI region size(s), aborting\n");
 		return 0;
+	}
+#ifdef RTL8169_USE_IO
+	ioaddr = pci_bar_start(pdev, PCI_BASE_ADDRESS_0);
+#else
+	// ioremap MMIO region
+	ioaddr = (unsigned long) ioremap(mmio_start, mmio_len);
+	if (ioaddr == 0) {
+		printk("cannot remap MMIO, aborting\n");
+		return 0;
+	}
+#endif
 
 	tpc->mmio_addr = &ioaddr;
 	/* Soft reset the chip. */
@@ -383,13 +518,40 @@ static int rtl8169_init_board(struct pci_device *pdev)
 			break;
 		else
 			udelay(10);
+	// identify config method
+	{
+		unsigned long val32 = (RTL_R32(TxConfig) & 0x7c800000);
+		if (val32 == (0x1 << 28)) {
+			tpc->mcfg = MCFG_METHOD_4;
+		} else if (val32 == (0x1 << 26)) {
+			tpc->mcfg = MCFG_METHOD_3;
+		} else if (val32 == (0x1 << 23)) {
+			tpc->mcfg = MCFG_METHOD_2;
+		} else if (val32 == 0x00000000) {
+			tpc->mcfg = MCFG_METHOD_1;
+		} else {
+			tpc->mcfg = MCFG_METHOD_1;
+		}
+	}
+	{
+		unsigned char val8 =
+		    (unsigned char) (RTL8169_READ_GMII_REG(ioaddr, 3) &
+				     0x000f);
+		if (val8 == 0x00) {
+			tpc->pcfg = PCFG_METHOD_1;
+		} else if (val8 == 0x01) {
+			tpc->pcfg = PCFG_METHOD_2;
+		} else if (val8 == 0x02) {
+			tpc->pcfg = PCFG_METHOD_3;
+		} else {
+			tpc->pcfg = PCFG_METHOD_3;
+		}
+	}
 
 	/* identify chip attached to board */
-	tmp = RTL_R32(TxConfig);
-	tmp = ((tmp & 0x7c000000) + ((tmp & 0x00800000) << 2)) >> 24;
 
 	for (i = ARRAY_SIZE(rtl_chip_info) - 1; i >= 0; i--)
-		if (tmp == rtl_chip_info[i].version) {
+		if (tpc->mcfg == rtl_chip_info[i].mcfg) {
 			tpc->chipset = i;
 			goto match;
 		}
@@ -397,8 +559,10 @@ static int rtl8169_init_board(struct pci_device *pdev)
 	dprintf(("PCI device: unknown chip version, assuming RTL-8169\n"));
 	dprintf(("PCI device: TxConfig = 0x%hX\n",
 		 (unsigned long) RTL_R32(TxConfig)));
+
 	tpc->chipset = 0;
 	return 1;
+
       match:
 	return 0;
 
@@ -407,6 +571,31 @@ static int rtl8169_init_board(struct pci_device *pdev)
 /**************************************************************************
 IRQ - Wait for a frame
 ***************************************************************************/
+void r8169_irq(struct nic *nic __unused, irq_action_t action)
+{
+	int intr_status = 0;
+	int interested = RxOverflow | RxFIFOOver | RxErr | RxOK;
+
+	switch (action) {
+	case DISABLE:
+	case ENABLE:
+		intr_status = RTL_R16(IntrStatus);
+		/* h/w no longer present (hotplug?) or major error, 
+		   bail */
+		if (intr_status == 0xFFFF)
+			break;
+		
+		intr_status = intr_status & ~interested;
+		if (action == ENABLE)
+			intr_status = intr_status | interested;
+		RTL_W16(IntrMask, intr_status);
+		break;
+	case FORCE:
+		RTL_W8(TxPoll, (RTL_R8(TxPoll) | 0x01));
+		break;
+	}
+}
+
 static void r8169_irq ( struct nic *nic __unused, irq_action_t action ) {
 	int intr_status = 0;
 	int interested = RxUnderrun | RxOverflow | RxFIFOOver | RxErr | RxOK;
@@ -443,15 +632,15 @@ static int r8169_poll(struct nic *nic, int retreive)
 	unsigned int intr_status = 0;
 	cur_rx = tpc->cur_rx;
 	if ((tpc->RxDescArray[cur_rx].status & OWNbit) == 0) {
-	         /* There is a packet ready */
-  	         if(!retreive)
-  	                 return 1;
+		/* There is a packet ready */
+		if (!retreive)
+			return 1;
 		intr_status = RTL_R16(IntrStatus);
 		/* h/w no longer present (hotplug?) or major error,
-			bail */
+		   bail */
 		if (intr_status == 0xFFFF)
 			return 0;
-		RTL_W16(IntrStatus, intr_status & 
+		RTL_W16(IntrStatus, intr_status &
 			~(RxFIFOOver | RxOverflow | RxOK));
 
 		if (!(tpc->RxDescArray[cur_rx].status & RxRES)) {
@@ -472,7 +661,7 @@ static int r8169_poll(struct nic *nic, int retreive)
 		/* FIXME: shouldn't I reset the status on an error */
 		cur_rx = (cur_rx + 1) % NUM_RX_DESC;
 		tpc->cur_rx = cur_rx;
-		RTL_W16(IntrStatus, intr_status & 
+		RTL_W16(IntrStatus, intr_status &
 			(RxFIFOOver | RxOverflow | RxOK));
 
 		return 1;
@@ -569,7 +758,7 @@ static void rtl8169_hw_start(struct nic *nic)
 
 	RTL_W8(Cfg9346, Cfg9346_Unlock);
 	RTL_W8(ChipCmd, CmdTxEnb | CmdRxEnb);
-	RTL_W8(EarlyTxThres, EarlyTxThld);
+	RTL_W8(ETThReg, ETTh);
 
 	/* For gigabit rtl8169 */
 	RTL_W16(RxMaxSize, RxPacketMaxSize);
@@ -585,6 +774,27 @@ static void rtl8169_hw_start(struct nic *nic)
 						TxInterFrameGapShift));
 
 
+	RTL_W16(CPlusCmd, RTL_R16(CPlusCmd));
+
+	if (tpc->mcfg == MCFG_METHOD_2 || tpc->mcfg == MCFG_METHOD_3) {
+		RTL_W16(CPlusCmd,
+			(RTL_R16(CPlusCmd) | (1 << 14) | (1 << 3)));
+		DBG_PRINT
+		    ("Set MAC Reg C+CR Offset 0xE0: bit-3 and bit-14\n");
+	} else {
+		RTL_W16(CPlusCmd, (RTL_R16(CPlusCmd) | (1 << 3)));
+		DBG_PRINT("Set MAC Reg C+CR Offset 0xE0: bit-3.\n");
+	}
+
+	{
+		//RTL_W16(0xE2, 0x1517);
+		//RTL_W16(0xE2, 0x152a);
+		//RTL_W16(0xE2, 0x282a);
+		RTL_W16(0xE2, 0x0000);
+	}
+
+
+
 	tpc->cur_rx = 0;
 
 	RTL_W32(TxDescStartAddr, virt_to_le32desc(tpc->TxDescArray));
@@ -598,6 +808,9 @@ static void rtl8169_hw_start(struct nic *nic)
 
 	/* no early-rx interrupts */
 	RTL_W16(MultiIntr, RTL_R16(MultiIntr) & 0xF000);
+
+	RTL_W16(IntrMask, rtl8169_intr_mask);
+
 }
 
 static void rtl8169_init_ring(struct nic *nic __unused)
@@ -616,9 +829,9 @@ static void rtl8169_init_ring(struct nic *nic __unused)
 	for (i = 0; i < NUM_RX_DESC; i++) {
 		if (i == (NUM_RX_DESC - 1))
 			tpc->RxDescArray[i].status =
-			    (OWNbit | EORbit) + RX_BUF_SIZE;
+			    (OWNbit | EORbit) | RX_BUF_SIZE;
 		else
-			tpc->RxDescArray[i].status = OWNbit + RX_BUF_SIZE;
+			tpc->RxDescArray[i].status = OWNbit | RX_BUF_SIZE;
 
 		tpc->RxBufferRing[i] = &rxb[i * RX_BUF_SIZE];
 		tpc->RxDescArray[i].buf_addr =
@@ -681,6 +894,8 @@ static struct nic_operations r8169_operations = {
 
 static struct pci_id r8169_nics[] = {
 	PCI_ROM(0x10ec, 0x8169, "r8169", "RealTek RTL8169 Gigabit Ethernet"),
+        PCI_ROM(0x16ec, 0x0116, "usr-r8169", "US Robotics RTL8169 Gigabit Ethernet"),
+        PCI_ROM(0x1186, 0x4300, "dlink-r8169", "D-Link RTL8169 Gigabit Ethernet"),
 };
 
 PCI_DRIVER ( r8169_driver, r8169_nics, PCI_NO_CLASS );
@@ -720,9 +935,31 @@ static int r8169_probe ( struct nic *nic, struct pci_device *pci ) {
 	printf("%s: %! at ioaddr %hX, ", pci->name, nic->node_addr,
 	       ioaddr);
 
+	// Config PHY
+	rtl8169_hw_PHY_config(nic);
+
+	DBG_PRINT("Set MAC Reg C+CR Offset 0x82h = 0x01h\n");
+	RTL_W8(0x82, 0x01);
+
+	if (tpc->mcfg < MCFG_METHOD_3) {
+		DBG_PRINT("Set PCI Latency=0x40\n");
+		pci_write_config_byte(pci, PCI_LATENCY_TIMER, 0x40);
+	}
+
+	if (tpc->mcfg == MCFG_METHOD_2) {
+		DBG_PRINT("Set MAC Reg C+CR Offset 0x82h = 0x01h\n");
+		RTL_W8(0x82, 0x01);
+		DBG_PRINT("Set PHY Reg 0x0bh = 0x00h\n");
+		RTL8169_WRITE_GMII_REG(ioaddr, 0x0b, 0x0000);	//w 0x0b 15 0 0
+	}
+
 	/* if TBI is not endbled */
 	if (!(RTL_R8(PHYstatus) & TBI_Enable)) {
-		int val = mdio_read(PHY_AUTO_NEGO_REG);
+		int val = RTL8169_READ_GMII_REG(ioaddr, PHY_AUTO_NEGO_REG);
+
+#ifdef RTL8169_HW_FLOW_CONTROL_SUPPORT
+		val |= PHY_Cap_PAUSE | PHY_Cap_ASYM_PAUSE;
+#endif				//end #define RTL8169_HW_FLOW_CONTROL_SUPPORT
 
 		option = media;
 		/* Force RTL8169 in 10/100/1000 Full/Half mode. */
@@ -753,34 +990,38 @@ static int r8169_probe ( struct nic *nic, struct pci_device *pci ) {
 			default:
 				break;
 			}
-			/* leave PHY_AUTO_NEGO_REG bit4:0 unchanged */
-			mdio_write(PHY_AUTO_NEGO_REG,
-				   Cap10_100 | (val & 0x1F));
-			mdio_write(PHY_1000_CTRL_REG, Cap1000);
+			RTL8169_WRITE_GMII_REG(ioaddr, PHY_AUTO_NEGO_REG, Cap10_100 | (val & 0xC1F));	//leave PHY_AUTO_NEGO_REG bit4:0 unchanged
+			RTL8169_WRITE_GMII_REG(ioaddr, PHY_1000_CTRL_REG,
+					       Cap1000);
 		} else {
 			dprintf(("Auto-negotiation Enabled.\n",
 				 pci->name));
 
-			/* enable 10/100 Full/Half Mode, leave PHY_AUTO_NEGO_REG bit4:0 unchanged */
-			mdio_write(PHY_AUTO_NEGO_REG,
-				   PHY_Cap_10_Half | PHY_Cap_10_Full |
-				   PHY_Cap_100_Half | PHY_Cap_100_Full |
-				   (val & 0x1F));
+			// enable 10/100 Full/Half Mode, leave PHY_AUTO_NEGO_REG bit4:0 unchanged
+			RTL8169_WRITE_GMII_REG(ioaddr, PHY_AUTO_NEGO_REG,
+					       PHY_Cap_10_Half |
+					       PHY_Cap_10_Full |
+					       PHY_Cap_100_Half |
+					       PHY_Cap_100_Full | (val &
+								   0xC1F));
 
-			/* enable 1000 Full Mode */
-			mdio_write(PHY_1000_CTRL_REG, PHY_Cap_1000_Full);
+			// enable 1000 Full Mode
+//                     RTL8169_WRITE_GMII_REG( ioaddr, PHY_1000_CTRL_REG, PHY_Cap_1000_Full );
+			RTL8169_WRITE_GMII_REG(ioaddr, PHY_1000_CTRL_REG, PHY_Cap_1000_Full | PHY_Cap_1000_Half);	//rtl8168
 
-		}
+		}		// end of if( option > 0 )
 
-		/* Enable auto-negotiation and restart auto-nigotiation */
-		mdio_write(PHY_CTRL_REG,
-			   PHY_Enable_Auto_Nego | PHY_Restart_Auto_Nego);
+		// Enable auto-negotiation and restart auto-nigotiation
+		RTL8169_WRITE_GMII_REG(ioaddr, PHY_CTRL_REG,
+				       PHY_Enable_Auto_Nego |
+				       PHY_Restart_Auto_Nego);
 		udelay(100);
 
-		/* wait for auto-negotiation process */
+		// wait for auto-negotiation process
 		for (i = 10000; i > 0; i--) {
-			/* Check if auto-negotiation complete */
-			if (mdio_read(PHY_STAT_REG) & PHY_Auto_Neco_Comp) {
+			//check if auto-negotiation complete
+			if (RTL8169_READ_GMII_REG(ioaddr, PHY_STAT_REG) &
+			    PHY_Auto_Neco_Comp) {
 				udelay(100);
 				option = RTL_R8(PHYstatus);
 				if (option & _1000bpsF) {
@@ -797,8 +1038,9 @@ static int r8169_probe ( struct nic *nic, struct pci_device *pci ) {
 				break;
 			} else {
 				udelay(100);
-			}
-		}		/* end for-loop to wait for auto-negotiation process */
+			}	// end of if( RTL8169_READ_GMII_REG(ioaddr, 1) & 0x20 )
+		}		// end for-loop to wait for auto-negotiation process
+
 
 	} else {
 		udelay(100);
@@ -817,6 +1059,145 @@ static int r8169_probe ( struct nic *nic, struct pci_device *pci ) {
 	nic->ioaddr = ioaddr;
 	return 1;
 
+}
+
+//======================================================================================================
+/*
+static void rtl8169_hw_PHY_reset(struct nic *nic __unused)
+{
+        int val, phy_reset_expiretime = 50;
+        struct rtl8169_private *priv = dev->priv;
+        unsigned long ioaddr = priv->ioaddr;
+
+        DBG_PRINT("%s: Reset RTL8169s PHY\n", dev->name);
+
+        val = ( RTL8169_READ_GMII_REG( ioaddr, 0 ) | 0x8000 ) & 0xffff;
+        RTL8169_WRITE_GMII_REG( ioaddr, 0, val );
+
+        do //waiting for phy reset
+        {
+                if( RTL8169_READ_GMII_REG( ioaddr, 0 ) & 0x8000 ){
+                        phy_reset_expiretime --;
+                        udelay(100);
+                }
+                else{
+                        break;
+                }
+        }while( phy_reset_expiretime >= 0 );
+
+        assert( phy_reset_expiretime > 0 );
+}
+
+*/
+
+//======================================================================================================
+static void rtl8169_hw_PHY_config(struct nic *nic __unused)
+{
+
+	DBG_PRINT("priv->mcfg=%d, priv->pcfg=%d\n", tpc->mcfg, tpc->pcfg);
+
+	if (tpc->mcfg == MCFG_METHOD_4) {
+/*
+                RTL8169_WRITE_GMII_REG( (unsigned long)ioaddr, 0x1F, 0x0001 );
+                RTL8169_WRITE_GMII_REG( (unsigned long)ioaddr, 0x1b, 0x841e );
+                RTL8169_WRITE_GMII_REG( (unsigned long)ioaddr, 0x0e, 0x7bfb );
+                RTL8169_WRITE_GMII_REG( (unsigned long)ioaddr, 0x09, 0x273a );
+*/
+
+		RTL8169_WRITE_GMII_REG((unsigned long) ioaddr, 0x1F,
+				       0x0002);
+		RTL8169_WRITE_GMII_REG((unsigned long) ioaddr, 0x01,
+				       0x90D0);
+		RTL8169_WRITE_GMII_REG((unsigned long) ioaddr, 0x1F,
+				       0x0000);
+	} else if ((tpc->mcfg == MCFG_METHOD_2)
+		   || (tpc->mcfg == MCFG_METHOD_3)) {
+		RTL8169_WRITE_GMII_REG((unsigned long) ioaddr, 0x1F,
+				       0x0001);
+		RTL8169_WRITE_GMII_REG((unsigned long) ioaddr, 0x15,
+				       0x1000);
+		RTL8169_WRITE_GMII_REG((unsigned long) ioaddr, 0x18,
+				       0x65C7);
+		RTL8169_WRITE_GMII_REG((unsigned long) ioaddr, 0x04,
+				       0x0000);
+		RTL8169_WRITE_GMII_REG((unsigned long) ioaddr, 0x03,
+				       0x00A1);
+		RTL8169_WRITE_GMII_REG((unsigned long) ioaddr, 0x02,
+				       0x0008);
+		RTL8169_WRITE_GMII_REG((unsigned long) ioaddr, 0x01,
+				       0x1020);
+		RTL8169_WRITE_GMII_REG((unsigned long) ioaddr, 0x00,
+				       0x1000);
+		RTL8169_WRITE_GMII_REG((unsigned long) ioaddr, 0x04,
+				       0x0800);
+		RTL8169_WRITE_GMII_REG((unsigned long) ioaddr, 0x04,
+				       0x0000);
+		RTL8169_WRITE_GMII_REG((unsigned long) ioaddr, 0x04,
+				       0x7000);
+		RTL8169_WRITE_GMII_REG((unsigned long) ioaddr, 0x03,
+				       0xFF41);
+		RTL8169_WRITE_GMII_REG((unsigned long) ioaddr, 0x02,
+				       0xDE60);
+		RTL8169_WRITE_GMII_REG((unsigned long) ioaddr, 0x01,
+				       0x0140);
+		RTL8169_WRITE_GMII_REG((unsigned long) ioaddr, 0x00,
+				       0x0077);
+		RTL8169_WRITE_GMII_REG((unsigned long) ioaddr, 0x04,
+				       0x7800);
+		RTL8169_WRITE_GMII_REG((unsigned long) ioaddr, 0x04,
+				       0x7000);
+		RTL8169_WRITE_GMII_REG((unsigned long) ioaddr, 0x04,
+				       0xA000);
+		RTL8169_WRITE_GMII_REG((unsigned long) ioaddr, 0x03,
+				       0xDF01);
+		RTL8169_WRITE_GMII_REG((unsigned long) ioaddr, 0x02,
+				       0xDF20);
+		RTL8169_WRITE_GMII_REG((unsigned long) ioaddr, 0x01,
+				       0xFF95);
+		RTL8169_WRITE_GMII_REG((unsigned long) ioaddr, 0x00,
+				       0xFA00);
+		RTL8169_WRITE_GMII_REG((unsigned long) ioaddr, 0x04,
+				       0xA800);
+		RTL8169_WRITE_GMII_REG((unsigned long) ioaddr, 0x04,
+				       0xA000);
+		RTL8169_WRITE_GMII_REG((unsigned long) ioaddr, 0x04,
+				       0xB000);
+		RTL8169_WRITE_GMII_REG((unsigned long) ioaddr, 0x03,
+				       0xFF41);
+		RTL8169_WRITE_GMII_REG((unsigned long) ioaddr, 0x02,
+				       0xDE20);
+		RTL8169_WRITE_GMII_REG((unsigned long) ioaddr, 0x01,
+				       0x0140);
+		RTL8169_WRITE_GMII_REG((unsigned long) ioaddr, 0x00,
+				       0x00BB);
+		RTL8169_WRITE_GMII_REG((unsigned long) ioaddr, 0x04,
+				       0xB800);
+		RTL8169_WRITE_GMII_REG((unsigned long) ioaddr, 0x04,
+				       0xB000);
+		RTL8169_WRITE_GMII_REG((unsigned long) ioaddr, 0x04,
+				       0xF000);
+		RTL8169_WRITE_GMII_REG((unsigned long) ioaddr, 0x03,
+				       0xDF01);
+		RTL8169_WRITE_GMII_REG((unsigned long) ioaddr, 0x02,
+				       0xDF20);
+		RTL8169_WRITE_GMII_REG((unsigned long) ioaddr, 0x01,
+				       0xFF95);
+		RTL8169_WRITE_GMII_REG((unsigned long) ioaddr, 0x00,
+				       0xBF00);
+		RTL8169_WRITE_GMII_REG((unsigned long) ioaddr, 0x04,
+				       0xF800);
+		RTL8169_WRITE_GMII_REG((unsigned long) ioaddr, 0x04,
+				       0xF000);
+		RTL8169_WRITE_GMII_REG((unsigned long) ioaddr, 0x04,
+				       0x0000);
+		RTL8169_WRITE_GMII_REG((unsigned long) ioaddr, 0x1F,
+				       0x0000);
+		RTL8169_WRITE_GMII_REG((unsigned long) ioaddr, 0x0B,
+				       0x0000);
+	} else {
+		DBG_PRINT("tpc->mcfg=%d. Discard hw PHY config.\n",
+			  tpc->mcfg);
+	}
 }
 
 DRIVER ( "r8169/PCI", nic_driver, pci_driver, r8169_driver,
