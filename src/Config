@@ -195,6 +195,18 @@
 #
 #	Obscure options you probably don't need to touch:
 #
+#	-DZPXE_SUFFIX_STRIP
+#			If the last 5 characters of the filename passed to Etherboot is
+#			".zpxe" then strip it off. This is useful in cases where a DHCP server
+#			is not able to be configured to support conditionals. The way it works
+#			is that the DHCP server is configured with a filename like
+#			"foo.nbi.zpxe" so that when PXE asks for a filename it gets that, and
+#			loads Etherboot from that file. Etherboot then starts up and once
+#			again asks the DHCP server for a filename and once again gets
+#			foo.nbi.zpxe, but with this option turned on loads "foo.nbi" instead.
+#			This allows people to use Etherboot who might not otherwise be able to
+#			because their DHCP servers won't let them.
+#
 #	-DPOWERSAVE
 #			Halt the processor when waiting for keyboard input
 #			which saves power while waiting for user interaction.
