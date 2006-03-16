@@ -575,7 +575,7 @@ nfssymlink:
 			return 0;
 		}
 		if (err) {
-			printf("reading at offset %d: ", offs);
+			printf("\nError reading at offset %d: ", offs);
 			nfs_printerror(err);
 			nfs_reset();
 			return 0;
