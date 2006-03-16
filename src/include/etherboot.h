@@ -159,7 +159,7 @@ struct arptable_t {
 	uint8_t node[6];
 } PACKED;
 
-#define	KERNEL_BUF	(BOOTP_DATA_ADDR->bootp_reply.bp_file)
+#define	KERNEL_BUF	(bootp_data.bootp_reply.bp_file)
 
 #define	FLOPPY_BOOT_LOCATION	0x7c00
 
@@ -282,6 +282,8 @@ External variables
 extern struct rom_info rom;
 extern char *hostname;
 extern int hostnamelen;
+extern unsigned char *addparam;
+extern int addparamlen;
 extern jmp_buf restart_etherboot;
 extern int url_port;
 extern struct arptable_t arptable[MAX_ARP];
