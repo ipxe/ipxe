@@ -199,7 +199,6 @@ static inline os_download_t elf32_probe(unsigned char *data, unsigned int len)
 	}
 	printf("(ELF");
 	elf_freebsd_probe();
-	multiboot_probe(data, len);
 	printf(")... ");
 	phdr_size = estate.e.elf32.e_phnum * estate.e.elf32.e_phentsize;
 	if (estate.e.elf32.e_phoff + phdr_size > len) {
@@ -207,7 +206,7 @@ static inline os_download_t elf32_probe(unsigned char *data, unsigned int len)
 		return dead_download;
 	}
 	if (phdr_size > sizeof(estate.p.dummy)) {
-		printf("Program header to big\n");
+		printf("Program header too big\n");
 		return dead_download;
 	}
 	memcpy(&estate.p.phdr32, data + estate.e.elf32.e_phoff, phdr_size);
@@ -251,6 +250,7 @@ static inline os_download_t elf32_probe(unsigned char *data, unsigned int len)
 	}
 #if ELF_NOTES
 	/* Load ELF notes from the image */
+	estate.check_ip_checksum = 0;
 	for(estate.segment = 0; estate.segment < estate.e.elf32.e_phnum; estate.segment++) {
 		if (estate.p.phdr32[estate.segment].p_type != PT_NOTE)
 			continue;
@@ -289,6 +289,7 @@ static inline os_download_t elf32_probe(unsigned char *data, unsigned int len)
 	estate.loc = 0;
 	estate.skip = 0;
 	estate.toread = 0;
+	multiboot_init();
 	return elf32_download;
 }
 
@@ -516,6 +517,7 @@ static inline os_download_t elf64_probe(unsigned char *data, unsigned int len)
 	}
 #if ELF_NOTES
 	/* Load ELF notes from the image */
+	estate.check_ip_checksum = 0;
 	for(estate.segment = 0; estate.segment < estate.e.elf64.e_phnum; estate.segment++) {
 		if (estate.p.phdr64[estate.segment].p_type != PT_NOTE)
 			continue;

@@ -82,6 +82,10 @@ MEDIA			+= dsk
 OBJS_dskprefix		= dskprefix zdskprefix
 CFLAGS_zdskprefix	= $(CFLAGS_ZPREFIX)
 
+MEDIA			+= hd
+OBJS_hdprefix		= hdprefix zhdprefix
+CFLAGS_zhdprefix	= $(CFLAGS_ZPREFIX)
+
 MEDIA			+= raw
 OBJS_rawprefix		= rawprefix zrawprefix
 CFLAGS_zrawprefix	= $(CFLAGS_ZPREFIX)

@@ -256,11 +256,12 @@ unsigned long pci_bar_start ( struct pci_device *pci, unsigned int index ) {
 			pci_read_config_dword ( pci, index + 4, &hi );
 			if ( hi ) {
 #if ULONG_MAX > 0xffffffff
-					bar = hi;
-					bar <<= 32;
+				bar = hi;
+				bar <<= 32;
 #else
-					printf ( "Unhandled 64bit BAR\n" );
-					return -1UL;
+				printf ( "Unhandled 64bit BAR %08x:%08x\n",
+					 hi, lo );
+				return -1UL;
 #endif
 			}
 		}

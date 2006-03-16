@@ -898,7 +898,7 @@ struct Elf_Bhdr *prepare_boot_params(void *header)
 	notes.nf1.n_descsz = sizeof(notes.nf1_bootp_data);
 	notes.nf1.n_type   = EB_BOOTP_DATA;
 	CP(notes.nf1_name,   EB_PARAM_NOTE);
-	notes.nf1_bootp_data = virt_to_phys(BOOTP_DATA_ADDR);
+	notes.nf1_bootp_data = virt_to_phys(&bootp_data);
 
 	notes.nf2.n_namesz = sizeof(EB_PARAM_NOTE);
 	notes.nf2.n_descsz = sizeof(notes.nf2_header);
