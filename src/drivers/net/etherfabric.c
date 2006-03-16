@@ -30,8 +30,6 @@
  **************************************************************************
  */
 
-#define DBG(...)
-
 #define EFAB_ASSERT(x)                                                        \
         do {                                                                  \
                 if ( ! (x) ) {                                                \
@@ -2923,8 +2921,8 @@ static void etherfabric_transmit ( struct nic *nic, const char *dest,
 /**************************************************************************
 DISABLE - Turn off ethernet interface
 ***************************************************************************/
-static void etherfabric_disable ( struct dev *dev ) {
-	struct nic *nic = ( struct nic * ) dev;
+static void etherfabric_disable ( struct nic *nic,
+				  struct pci_device *pci __unused ) {
 	struct efab_nic *efab = nic->priv_data;
 
 	efab->op->reset ( efab );
@@ -2954,6 +2952,13 @@ static void etherfabric_irq ( struct nic *nic, irq_action_t action ) {
 	return;
 }
 
+static struct nic_operations etherfabric_operations = {
+	.connect	= dummy_connect,
+	.poll		= etherfabric_poll,
+	.transmit	= etherfabric_transmit,
+	.irq		= etherfabric_irq,
+};
+
 /**************************************************************************
 PROBE - Look for an adapter, this routine's visible to the outside
 ***************************************************************************/
@@ -2970,7 +2975,7 @@ static int etherfabric_probe ( struct dev *dev, struct pci_device *pci ) {
 	memset ( &efab_buffers, 0, sizeof ( efab_buffers ) );
 
 	/* Hook in appropriate operations table.  Do this early. */
-	if ( pci->dev_id == EF1002_DEVID ) {
+	if ( pci->device_id == EF1002_DEVID ) {
 		efab.op = &ef1002_operations;
 	} else {
 		efab.op = &falcon_operations;
@@ -3011,10 +3016,7 @@ static int etherfabric_probe ( struct dev *dev, struct pci_device *pci ) {
 	printf ( "Found EtherFabric %s NIC %!\n", pci->name, nic->node_addr );
 
 	/* point to NIC specific routines */
-	dev->disable  = etherfabric_disable;
-	nic->poll     = etherfabric_poll;
-	nic->transmit = etherfabric_transmit;
-	nic->irq      = etherfabric_irq;
+	nic->nic_op = &etherfabric_operations;
 
 	return 1;
 }
@@ -3024,14 +3026,10 @@ PCI_ROM(0x1924, 0xC101, "ef1002", "EtherFabric EF1002"),
 PCI_ROM(0x1924, 0x0703, "falcon", "EtherFabric Falcon"),
 };
 
-static struct pci_driver etherfabric_driver __pci_driver = {
-	.type     = NIC_DRIVER,
-	.name     = "EFAB",
-	.probe    = etherfabric_probe,
-	.ids      = etherfabric_nics,
-	.id_count = sizeof(etherfabric_nics)/sizeof(etherfabric_nics[0]),
-	.class    = 0,
-};
+PCI_DRIVER ( etherfabric_driver, etherfabric_nics, PCI_NO_CLASS );
+
+DRIVER ( "EFAB", nic_driver, pci_driver, etherfabric_driver,
+	 etherfabric_probe, etherfabric_disable );
 
 /*
  * Local variables:
