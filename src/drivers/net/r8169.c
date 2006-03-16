@@ -571,7 +571,7 @@ static int rtl8169_init_board(struct pci_device *pdev)
 /**************************************************************************
 IRQ - Wait for a frame
 ***************************************************************************/
-void r8169_irq(struct nic *nic __unused, irq_action_t action)
+static void r8169_irq(struct nic *nic __unused, irq_action_t action)
 {
 	int intr_status = 0;
 	int interested = RxOverflow | RxFIFOOver | RxErr | RxOK;
@@ -593,30 +593,6 @@ void r8169_irq(struct nic *nic __unused, irq_action_t action)
 	case FORCE:
 		RTL_W8(TxPoll, (RTL_R8(TxPoll) | 0x01));
 		break;
-	}
-}
-
-static void r8169_irq ( struct nic *nic __unused, irq_action_t action ) {
-	int intr_status = 0;
-	int interested = RxUnderrun | RxOverflow | RxFIFOOver | RxErr | RxOK;
- 
-	switch ( action ) {
-		case DISABLE:
-		case ENABLE:
-			intr_status = RTL_R16(IntrStatus);
-			/* h/w no longer present (hotplug?) or major error, 
-				bail */
-			if (intr_status == 0xFFFF)
-				break;
-
-			intr_status = intr_status & ~interested;
-			if ( action == ENABLE )
-				intr_status = intr_status | interested;
-			RTL_W16(IntrMask, intr_status);
-			break;
-		case FORCE :
-			RTL_W8(TxPoll, (RTL_R8(TxPoll) | 0x01));
-			break;
 	}
 }
 
