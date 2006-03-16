@@ -1,3 +1,7 @@
+#warning "Needs fixing up for gpxe"
+
+#if 0
+
 /****************************************************************\
 
 hdprefix.S Copyright (C) 2005 Per Dalgas Jakobsen
@@ -294,3 +298,4 @@ _bios_lba_high:	.word	0
 		.word BOOTMAGIC
 
 /*** END ********************************************************/
+#endif
