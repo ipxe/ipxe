@@ -40,6 +40,12 @@ struct hijack_options {
 
 static int daemonised = 0;
 
+static int signalled = 0;
+
+static void flag_signalled ( int signal __attribute__ (( unused )) ) {
+	signalled = 1;
+}
+
 /**
  * Log error message
  *
@@ -363,13 +369,21 @@ static int listen_for_hijackers ( struct hijack_listener *listener,
 
 	logmsg ( LOG_INFO, "Listening on %s\n", listener->sun.sun_path );
 
-	while ( 1 ) {
-		/* Accept new connection */
+	while ( ! signalled ) {
+		/* Accept new connection, interruptibly */
+		siginterrupt ( SIGINT, 1 );
+		siginterrupt ( SIGHUP, 1 );
 		fd = accept ( listener->fd, NULL, 0 );
+		siginterrupt ( SIGINT, 0 );
+		siginterrupt ( SIGHUP, 0 );
 		if ( fd < 0 ) {
-			logmsg ( LOG_ERR, "accept failed: %s\n",
-				 strerror ( errno ) );
-			goto err;
+			if ( errno == EINTR ) {
+				continue;
+			} else {
+				logmsg ( LOG_ERR, "accept failed: %s\n",
+					 strerror ( errno ) );
+				goto err;
+			}
 		}
 
 		/* Fork child process */
@@ -389,6 +403,8 @@ static int listen_for_hijackers ( struct hijack_listener *listener,
 		close ( fd );
 	}
 
+	logmsg ( LOG_INFO, "Stopped listening on %s\n",
+		 listener->sun.sun_path );
 	return 0;
 
  err:
@@ -527,7 +543,7 @@ static int daemonise ( const char *interface ) {
 int main ( int argc, char **argv ) {
 	struct hijack_options options;
 	struct hijack_listener listener;
-	struct sigaction sigchld;
+	struct sigaction sa;
 
 	/* Parse command-line options */
 	if ( parse_options ( argc, argv, &options ) < 0 )
@@ -547,11 +563,25 @@ int main ( int argc, char **argv ) {
 	}
 
 	/* Avoid creating zombies */
-	memset ( &sigchld, 0, sizeof ( sigchld ) );
-	sigchld.sa_handler = SIG_IGN;
-	sigchld.sa_flags = SA_NOCLDWAIT;
-	if ( sigaction ( SIGCHLD, &sigchld, NULL ) < 0 ) {
-		logmsg ( LOG_ERR, "Could not set signal handler: %s",
+	memset ( &sa, 0, sizeof ( sa ) );
+	sa.sa_handler = SIG_IGN;
+	sa.sa_flags = SA_RESTART | SA_NOCLDWAIT;
+	if ( sigaction ( SIGCHLD, &sa, NULL ) < 0 ) {
+		logmsg ( LOG_ERR, "Could not set SIGCHLD handler: %s",
+			 strerror ( errno ) );
+		exit ( 1 );
+	}
+
+	/* Set 'signalled' flag on SIGINT or SIGHUP */
+	sa.sa_handler = flag_signalled;
+	sa.sa_flags = SA_RESTART | SA_RESETHAND;
+	if ( sigaction ( SIGINT, &sa, NULL ) < 0 ) {
+		logmsg ( LOG_ERR, "Could not set SIGINT handler: %s",
+			 strerror ( errno ) );
+		exit ( 1 );
+	}
+	if ( sigaction ( SIGHUP, &sa, NULL ) < 0 ) {
+		logmsg ( LOG_ERR, "Could not set SIGHUP handler: %s",
 			 strerror ( errno ) );
 		exit ( 1 );
 	}
