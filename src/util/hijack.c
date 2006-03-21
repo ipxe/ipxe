@@ -8,6 +8,7 @@
 #include <libgen.h>
 #include <signal.h>
 #include <net/if.h>
+#include <net/ethernet.h>
 #include <sys/select.h>
 #include <sys/socket.h>
 #include <sys/stat.h>
@@ -21,6 +22,10 @@
 struct hijack {
 	pcap_t *pcap;
 	int fd;
+	int datalink;
+	int filtered;
+	unsigned long rx_count;
+	unsigned long tx_count;
 };
 
 struct hijack_listener {
@@ -39,7 +44,8 @@ static int daemonised = 0;
  * Log error message
  *
  */
-static void logmsg ( int level, const char *format, ... ) {
+static __attribute__ (( format ( printf, 2, 3 ) )) void
+logmsg ( int level, const char *format, ... ) {
 	va_list ap;
 
 	va_start ( ap, format );
@@ -84,6 +90,9 @@ static int hijack_open ( const char *interface, struct hijack *hijack ) {
 		goto err;
 	}
 
+	/* Get link layer type */
+	hijack->datalink = pcap_datalink ( hijack->pcap );
+
 	return 0;
 
  err:
@@ -101,6 +110,78 @@ static void hijack_close ( struct hijack *hijack ) {
 }
 
 /**
+ * Install filter for hijacked connection
+ *
+ */
+static int hijack_install_filter ( struct hijack *hijack,
+				   char *filter ) {
+	struct bpf_program program;
+
+	/* Compile filter */
+	if ( pcap_compile ( hijack->pcap, &program, filter, 1, 0 ) < 0 ) {
+		logmsg ( LOG_ERR, "could not compile filter \"%s\": %s\n",
+			 filter, pcap_geterr ( hijack->pcap ) );
+		goto err_nofree;
+	}
+
+	/* Install filter */
+	if ( pcap_setfilter ( hijack->pcap, &program ) < 0 ) {
+		logmsg ( LOG_ERR, "could not install filter \"%s\": %s\n",
+			 filter, pcap_geterr ( hijack->pcap ) );
+		goto err;
+	}
+	
+	logmsg ( LOG_INFO, "using filter \"%s\"\n", filter );
+
+	pcap_freecode ( &program );
+	return 0;
+
+ err:	
+	pcap_freecode ( &program );
+ err_nofree:
+	return -1;
+}
+
+/**
+ * Set up filter for hijacked ethernet connection
+ *
+ */
+static int hijack_filter_ethernet ( struct hijack *hijack, const char *buf,
+				    size_t len ) {
+	char filter[55]; /* see format string */
+	struct ether_header *ether_header = ( struct ether_header * ) buf;
+	unsigned char *hwaddr = ether_header->ether_shost;
+
+	if ( len < sizeof ( *ether_header ) )
+		return -1;
+
+	snprintf ( filter, sizeof ( filter ), "broadcast or multicast or "
+		   "ether host %02x:%02x:%02x:%02x:%02x:%02x", hwaddr[0],
+		   hwaddr[1], hwaddr[2], hwaddr[3], hwaddr[4], hwaddr[5] );
+
+	return hijack_install_filter ( hijack, filter );
+}
+
+/**
+ * Set up filter for hijacked connection
+ *
+ */
+static int hijack_filter ( struct hijack *hijack, const char *buf,
+			   size_t len ) {
+	switch ( hijack->datalink ) {
+	case DLT_EN10MB:
+		return hijack_filter_ethernet ( hijack, buf, len );
+	default:
+		logmsg ( LOG_ERR, "unsupported protocol %s: cannot filter\n",
+			 ( pcap_datalink_val_to_name ( hijack->datalink ) ?
+			   pcap_datalink_val_to_name ( hijack->datalink ) :
+			   "UNKNOWN" ) );
+		/* Return success so we don't get called again */
+		return 0;
+	}
+}
+
+/**
  * Forward data from hijacker
  *
  */
@@ -108,24 +189,30 @@ static ssize_t forward_from_hijacker ( struct hijack *hijack, int fd ) {
 	char buf[SNAPLEN];
 	ssize_t len;
 
+	/* Read packet from hijacker */
 	len = read ( fd, buf, sizeof ( buf ) );
 	if ( len < 0 ) {
 		logmsg ( LOG_ERR, "read from hijacker failed: %s\n",
 			 strerror ( errno ) );
 		return -1;
 	}
-
 	if ( len == 0 )
 		return 0;
 
-	if ( write ( hijack->fd, buf, len ) != len ) {
+	/* Set up filter if not already in place */
+	if ( ! hijack->filtered ) {
+		if ( hijack_filter ( hijack, buf, len ) == 0 )
+			hijack->filtered = 1;
+	}
+
+	/* Transmit packet to network */
+	if ( pcap_inject ( hijack->pcap, buf, len ) != len ) {
 		logmsg ( LOG_ERR, "write to hijacked port failed: %s\n",
-			 strerror ( errno ) );
+			 pcap_geterr ( hijack->pcap ) );
 		return -1;
 	}
 
-	logmsg ( LOG_INFO, "forwarded %zd bytes from hijacker\n", len );
-
+	hijack->tx_count++;
 	return len;
 };
 
@@ -134,27 +221,33 @@ static ssize_t forward_from_hijacker ( struct hijack *hijack, int fd ) {
  *
  */
 static ssize_t forward_to_hijacker ( int fd, struct hijack *hijack ) {
-	char buf[SNAPLEN];
+	struct pcap_pkthdr *pkt_header;
+	const unsigned char *pkt_data;
 	ssize_t len;
 
-	len = read ( hijack->fd, buf, sizeof ( buf ) );
-	if ( len < 0 ) {
+	/* Receive packet from network */
+	if ( pcap_next_ex ( hijack->pcap, &pkt_header, &pkt_data ) < 0 ) {
 		logmsg ( LOG_ERR, "read from hijacked port failed: %s\n",
-			 strerror ( errno ) );
+			 pcap_geterr ( hijack->pcap ) );
 		return -1;
 	}
-
-	if ( len == 0 )
+	if ( pkt_header->caplen != pkt_header->len ) {
+		logmsg ( LOG_ERR, "read partial packet (%d of %d bytes)\n",
+			 pkt_header->caplen, pkt_header->len );
+		return -1;
+	}
+	if ( pkt_header->caplen == 0 )
 		return 0;
+	len = pkt_header->caplen;
 
-	if ( write ( fd, buf, len ) != len ) {
+	/* Write packet to hijacker */
+	if ( write ( fd, pkt_data, len ) != len ) {
 		logmsg ( LOG_ERR, "write to hijacker failed: %s\n",
 			 strerror ( errno ) );
 		return -1;
 	}
 
-	logmsg ( LOG_INFO, "forwarded %zd bytes to hijacker\n", len );
-
+	hijack->rx_count++;
 	return len;
 };
 
@@ -169,10 +262,10 @@ static int run_hijacker ( const char *interface, int fd ) {
 	int max_fd;
 	ssize_t len;
 
-	memset ( &hijack, 0, sizeof ( hijack ) );
-
 	logmsg ( LOG_INFO, "new connection for %s\n", interface );
 
+	/* Open connection to network */
+	memset ( &hijack, 0, sizeof ( hijack ) );
 	if ( hijack_open ( interface, &hijack ) < 0 )
 		goto err;
 	
@@ -206,6 +299,8 @@ static int run_hijacker ( const char *interface, int fd ) {
 
 	hijack_close ( &hijack );
 	logmsg ( LOG_INFO, "closed connection for %s\n", interface );
+	logmsg ( LOG_INFO, "received %ld packets, sent %ld packets\n",
+		 hijack.rx_count, hijack.tx_count );
 
 	return 0;
 
@@ -297,6 +392,8 @@ static int listen_for_hijackers ( struct hijack_listener *listener,
 	return 0;
 
  err:
+	if ( fd >= 0 )
+		close ( fd );
 	return -1;
 }
 
