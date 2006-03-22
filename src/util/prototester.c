@@ -323,21 +323,100 @@ static int http_get ( struct http_request *http ) {
 	return tcp_connect ( &http->sin );
 }
 
+
+
+
+struct http_options {
+	struct sockaddr_in server;
+	char *filename;
+};
+
+static void http_usage ( char **argv ) {
+	fprintf ( stderr,
+		  "Usage: %s [global options] http [http-specific options]\n"
+		  "\n"
+		  "http-specific options:\n"
+		  "  -h|--host              Host IP address\n"
+		  "  -f|--file              Filename\n",
+		  argv[0] );
+}
+
+static int http_parse_options ( int argc, char **argv,
+				struct http_options *options ) {
+	static struct option long_options[] = {
+		{ "host", 1, NULL, 'h' },
+		{ "file", 1, NULL, 'f' },
+		{ },
+	};
+	int c;
+
+	/* Set default options */
+	memset ( options, 0, sizeof ( *options ) );
+	inet_aton ( "192.168.0.1", &options->server.sin_addr );
+	options->server.sin_port = htons ( 80 );
+	options->filename = "index.html";
+
+	/* Parse command-line options */
+	while ( 1 ) {
+		int option_index = 0;
+		
+		c = getopt_long ( argc, argv, "h:f:", long_options,
+				  &option_index );
+		if ( c < 0 )
+			break;
+
+		switch ( c ) {
+		case 'h':
+			if ( inet_aton ( optarg,
+					 &options->server.sin_addr ) == 0 ) {
+				fprintf ( stderr, "Invalid IP address %s\n",
+					  optarg );
+				return -1;
+			}
+			break;
+		case 'f':
+			options->filename = optarg;
+			break;
+		case '?':
+			/* Unrecognised option */
+			return -1;
+		default:
+			fprintf ( stderr, "Unrecognised option '-%c'\n", c );
+			return -1;
+		}
+	}
+
+	/* Check there are no remaining arguments */
+	if ( optind != argc ) {
+		http_usage ( argv );
+		return -1;
+	}
+	
+	return optind;
+}
+
 static void test_http_callback ( struct http_request *http ) {
 	
 }
 
 static int test_http ( int argc, char **argv ) {
+	struct http_options options;
 	struct http_request http;
 
-	memset ( &http, 0, sizeof ( http ) );
-	http.filename = "/";
-	http.callback = test_http_callback;
-	inet_aton ( "192.168.0.1", &http.sin.sin_addr );
-	http.sin.sin_port = htons ( 80 );
+	/* Parse http-specific options */
+	if ( http_parse_options ( argc, argv, &options ) < 0 )
+		return -1;
 
+	/* Construct http request */
+	memset ( &http, 0, sizeof ( http ) );
+	http.filename = options.filename;
+	http.sin = options.server;
+	http.callback = test_http_callback;
+	fprintf ( stderr, "http fetching http://%s/%s\n",
+		  inet_ntoa ( http.sin.sin_addr ), http.filename );
+
+	/* Issue http request and run to completion */
 	http_get ( &http );
-	
 	while ( ! http.complete ) {
 		run_tcpip ();
 	}
@@ -475,7 +554,7 @@ int main ( int argc, char **argv ) {
 	test = get_test_from_name ( argv[optind] );
 	if ( ! test ) {
 		fprintf ( stderr, "Unrecognised test \"%s\"\n", argv[optind] );
-		return -1;
+		exit ( 1 );
 	}
 	optind++;
 
