@@ -9,6 +9,7 @@
 #include <net/if.h>
 #include <net/ethernet.h>
 #include <netinet/in.h>
+#include <arpa/inet.h>
 #include <getopt.h>
 
 typedef int irq_action_t;
@@ -31,6 +32,57 @@ struct nic_operations {
 
 /*****************************************************************************
  *
+ * Net device layer
+ *
+ */
+
+#include "../proto/uip/uip_arp.h"
+
+static unsigned char node_addr[ETH_ALEN];
+static unsigned char packet[ETH_FRAME_LEN];
+struct nic static_nic = {
+	.node_addr = node_addr,
+	.packet = packet,
+};
+
+/* Must be a macro because priv_data[] is of variable size */
+#define alloc_netdevice( priv_size ) ( {	\
+	static char priv_data[priv_size];	\
+	static_nic.priv_data = priv_data;	\
+	&static_nic; } )
+
+static int register_netdevice ( struct nic *nic ) {
+	struct uip_eth_addr hwaddr;
+
+	memcpy ( &hwaddr, nic->node_addr, sizeof ( hwaddr ) );
+	uip_setethaddr ( hwaddr );
+	return 0;
+}
+
+static inline void unregister_netdevice ( struct nic *nic ) {
+	/* Do nothing */
+}
+
+static inline void free_netdevice ( struct nic *nic ) {
+	/* Do nothing */
+}
+
+static int netdev_poll ( int retrieve, void **data, size_t *len ) {
+	int rc = static_nic.nic_op->poll ( &static_nic, retrieve );
+	*data = static_nic.packet;
+	*len = static_nic.packetlen;
+	return rc;
+}
+
+static void netdev_transmit ( const void *data, size_t len ) {
+	uint16_t type = ntohs ( *( ( uint16_t * ) ( data + 12 ) ) );
+	static_nic.nic_op->transmit ( &static_nic, data, type,
+				      len - ETH_HLEN,
+				      data + ETH_HLEN );
+}
+
+/*****************************************************************************
+ *
  * Hijack device interface
  *
  * This requires a hijack daemon to be running
@@ -43,7 +95,17 @@ struct hijack {
 
 struct hijack_device {
 	char *name;
+	void *priv;
 };
+
+static inline void hijack_set_drvdata ( struct hijack_device *hijack_dev,
+					void *data ) {
+	hijack_dev->priv = data;
+}
+
+static inline void * hijack_get_drvdata ( struct hijack_device *hijack_dev ) {
+	return hijack_dev->priv;
+}
 
 static int hijack_poll ( struct nic *nic, int retrieve ) {
 	struct hijack *hijack = nic->priv_data;
@@ -118,16 +180,23 @@ static struct nic_operations hijack_operations = {
 	.irq		= hijack_irq,
 };
 
-static int hijack_probe ( struct nic *nic, struct hijack_device *hijack_dev ) {
-	static struct hijack hijack;
+int hijack_probe ( struct hijack_device *hijack_dev ) {
+	struct nic *nic;
+	struct hijack *hijack;
 	struct sockaddr_un sun;
 	int i;
 
-	memset ( &hijack, 0, sizeof ( hijack ) );
+	nic = alloc_netdevice ( sizeof ( *hijack ) );
+	if ( ! nic ) {
+		fprintf ( stderr, "alloc_netdevice() failed\n" );
+		goto err_alloc;
+	}
+	hijack = nic->priv_data;
+	memset ( hijack, 0, sizeof ( *hijack ) );
 
 	/* Create socket */
-	hijack.fd = socket ( PF_UNIX, SOCK_SEQPACKET, 0 );
-	if ( hijack.fd < 0 ) {
+	hijack->fd = socket ( PF_UNIX, SOCK_SEQPACKET, 0 );
+	if ( hijack->fd < 0 ) {
 		fprintf ( stderr, "socket() failed: %s\n",
 			  strerror ( errno ) );
 		goto err;
@@ -137,7 +206,7 @@ static int hijack_probe ( struct nic *nic, struct hijack_device *hijack_dev ) {
 	sun.sun_family = AF_UNIX;
 	snprintf ( sun.sun_path, sizeof ( sun.sun_path ), "/var/run/hijack-%s",
 		   hijack_dev->name );
-	if ( connect ( hijack.fd, ( struct sockaddr * ) &sun,
+	if ( connect ( hijack->fd, ( struct sockaddr * ) &sun,
 		       sizeof ( sun ) ) < 0 ) {
 		fprintf ( stderr, "could not connect to %s: %s\n",
 			  sun.sun_path, strerror ( errno ) );
@@ -152,21 +221,164 @@ static int hijack_probe ( struct nic *nic, struct hijack_device *hijack_dev ) {
 	nic->node_addr[0] &= 0xfe; /* clear multicast bit */
 	nic->node_addr[0] |= 0x02; /* set "locally-assigned" bit */
 
-	nic->priv_data = &hijack;
 	nic->nic_op = &hijack_operations;
+	if ( register_netdevice ( nic ) < 0 )
+		goto err;
+
+	hijack_set_drvdata ( hijack_dev, nic );
 	return 1;
 
  err:
-	if ( hijack.fd >= 0 )
-		close ( hijack.fd );
+	if ( hijack->fd >= 0 )
+		close ( hijack->fd );
+	free_netdevice ( nic );
+ err_alloc:
 	return 0;
 }
 
-static void hijack_disable ( struct nic *nic,
-			     struct hijack_device *hijack_dev ) {
+static void hijack_disable ( struct hijack_device *hijack_dev ) {
+	struct nic *nic = hijack_get_drvdata ( hijack_dev );
 	struct hijack *hijack = nic->priv_data;
 	
+	unregister_netdevice ( nic );
 	close ( hijack->fd );
+}
+
+/*****************************************************************************
+ *
+ * uIP wrapper layer
+ *
+ */
+
+#include "../proto/uip/uip.h"
+#include "../proto/uip/uip_arp.h"
+
+void UIP_APPCALL ( void ) {
+	printf ( "appcall\n" );
+}
+
+void udp_appcall ( void ) {
+}
+
+static void init_tcpip ( void ) {
+	uip_init();
+	uip_arp_init();
+}
+
+static void uip_transmit ( void ) {
+	uip_arp_out();
+	netdev_transmit ( uip_buf, uip_len );
+	uip_len = 0;
+}
+
+static int tcp_connect ( struct sockaddr_in *sin ) {
+	u16_t ipaddr[2];
+
+	* ( ( uint32_t * ) ipaddr ) = sin->sin_addr.s_addr;
+	return uip_connect ( ipaddr, sin->sin_port ) ? 1 : 0;
+}
+
+static void run_tcpip ( void ) {
+	void *data;
+	size_t len;
+	uint16_t type;
+	int i;
+	
+	if ( netdev_poll ( 1, &data, &len ) ) {
+		/* We have data */
+		memcpy ( uip_buf, data, len );
+		uip_len = len;
+		type = ntohs ( *( ( uint16_t * ) ( uip_buf + 12 ) ) );
+		if ( type == ETHERTYPE_ARP ) {
+			uip_arp_arpin();
+		} else {
+			uip_arp_ipin();
+			uip_input();
+		}
+		if ( uip_len > 0 )
+			uip_transmit();
+	} else {
+		for ( i = 0 ; i < UIP_CONNS ; i++ ) {
+			uip_periodic ( i );
+			if ( uip_len > 0 )
+				uip_transmit();
+		}
+	}
+}
+
+/*****************************************************************************
+ *
+ * HTTP protocol tester
+ *
+ */
+
+struct http_request {
+	struct sockaddr_in sin;
+	const char *filename;
+	void ( *callback ) ( struct http_request *http );
+	int complete;
+};
+
+static int http_get ( struct http_request *http ) {
+	return tcp_connect ( &http->sin );
+}
+
+static void test_http_callback ( struct http_request *http ) {
+	
+}
+
+static int test_http ( int argc, char **argv ) {
+	struct http_request http;
+
+	memset ( &http, 0, sizeof ( http ) );
+	http.filename = "/";
+	http.callback = test_http_callback;
+	inet_aton ( "192.168.0.1", &http.sin.sin_addr );
+	http.sin.sin_port = htons ( 80 );
+
+	http_get ( &http );
+	
+	while ( ! http.complete ) {
+		run_tcpip ();
+	}
+
+	return 0;
+}
+
+/*****************************************************************************
+ *
+ * Protocol tester
+ *
+ */
+
+struct protocol_test {
+	const char *name;
+	int ( *exec ) ( int argc, char **argv );
+};
+
+static struct protocol_test tests[] = {
+	{ "http", test_http },
+};
+
+#define NUM_TESTS ( sizeof ( tests ) / sizeof ( tests[0] ) )
+
+static void list_tests ( void ) {
+	int i;
+
+	for ( i = 0 ; i < NUM_TESTS ; i++ ) {
+		printf ( "%s\n", tests[i].name );
+	}
+}
+
+static struct protocol_test * get_test_from_name ( const char *name ) {
+	int i;
+
+	for ( i = 0 ; i < NUM_TESTS ; i++ ) {
+		if ( strcmp ( name, tests[i].name ) == 0 )
+			return &tests[i];
+	}
+
+	return NULL;
 }
 
 /*****************************************************************************
@@ -181,18 +393,22 @@ struct tester_options {
 
 static void usage ( char **argv ) {
 	fprintf ( stderr,
-		  "Usage: %s [options]\n"
+		  "Usage: %s [global options] <test> [test-specific options]\n"
 		  "\n"
-		  "Options:\n"
+		  "Global options:\n"
 		  "  -h|--help              Print this help message\n"
-		  "  -i|--interface intf    Use specified network interface\n",
-		  argv[0] );
+		  "  -i|--interface intf    Use specified network interface\n"
+		  "  -l|--list              List available tests\n"
+		  "\n"
+		  "Use \"%s <test> -h\" to view test-specific options\n",
+		  argv[0], argv[0] );
 }
 
 static int parse_options ( int argc, char **argv,
 			   struct tester_options *options ) {
 	static struct option long_options[] = {
 		{ "interface", 1, NULL, 'i' },
+		{ "list", 0, NULL, 'l' },
 		{ "help", 0, NULL, 'h' },
 		{ },
 	};
@@ -206,7 +422,7 @@ static int parse_options ( int argc, char **argv,
 	while ( 1 ) {
 		int option_index = 0;
 		
-		c = getopt_long ( argc, argv, "i:h", long_options,
+		c = getopt_long ( argc, argv, "+i:hl", long_options,
 				  &option_index );
 		if ( c < 0 )
 			break;
@@ -216,8 +432,11 @@ static int parse_options ( int argc, char **argv,
 			strncpy ( options->interface, optarg,
 				  sizeof ( options->interface ) );
 			break;
+		case 'l':
+			list_tests ();
+			return -1;
 		case 'h':
-			usage( argv );
+			usage ( argv );
 			return -1;
 		case '?':
 			/* Unrecognised option */
@@ -228,79 +447,13 @@ static int parse_options ( int argc, char **argv,
 		}
 	}
 
-	/* Check there's nothing left over on the command line */
-	if ( optind != argc ) {
+	/* Check there is a test specified */
+	if ( optind == argc ) {
 		usage ( argv );
 		return -1;
 	}
-
-	return 0;
-}
-
-/*****************************************************************************
- *
- * uIP wrapper layer
- *
- */
-
-#include "../proto/uip/uip.h"
-#include "../proto/uip/uip_arp.h"
-
-static int done;
-
-void UIP_APPCALL ( void ) {
-	printf ( "appcall\n" );
-}
-
-void udp_appcall ( void ) {
-}
-
-static void uip_transmit ( struct nic *nic ) {
-	uip_arp_out();
-	nic->nic_op->transmit ( nic, ( char * ) uip_buf,
-				ntohs ( *( ( uint16_t * ) ( uip_buf + 12 ) ) ),
-				uip_len - ETH_HLEN,
-				( char * ) uip_buf + ETH_HLEN );
-	uip_len = 0;
-}
-
-static void run_stack ( struct nic *nic ) {
-	struct uip_eth_addr hwaddr;
-	u16_t ipaddr[2];
-	uint16_t type;
-	int i;
-
-	uip_init();
-	uip_arp_init();
-	memcpy ( &hwaddr, nic->node_addr, sizeof ( hwaddr ) );
-	uip_setethaddr ( hwaddr );
-
-	uip_ipaddr(ipaddr, 192,168,0,1);
-	uip_connect(ipaddr, HTONS(80));
-
-	done = 0;
-	while ( ! done ) {
-		if ( nic->nic_op->poll ( nic, 1 ) ) {
-			/* We have data */
-			memcpy ( uip_buf, nic->packet, nic->packetlen );
-			uip_len = nic->packetlen;
-			type = ntohs ( *( ( uint16_t * ) ( uip_buf + 12 ) ) );
-			if ( type == ETHERTYPE_ARP ) {
-				uip_arp_arpin();
-			} else {
-				uip_arp_ipin();
-				uip_input();
-			}
-			if ( uip_len > 0 )
-				uip_transmit ( nic );
-		} else {
-			for ( i = 0 ; i < UIP_CONNS ; i++ ) {
-				uip_periodic ( i );
-				if ( uip_len > 0 )
-					uip_transmit ( nic );
-			}
-		}
-	}
+	
+	return optind;
 }
 
 /*****************************************************************************
@@ -311,28 +464,35 @@ static void run_stack ( struct nic *nic ) {
 
 int main ( int argc, char **argv ) {
 	struct tester_options options;
+	struct protocol_test *test;
 	struct hijack_device hijack_dev;
-	static unsigned char node_addr[ETH_ALEN];
-	static unsigned char packet[ETH_FRAME_LEN];
-	struct nic nic = {
-		.node_addr = node_addr,
-		.packet = packet,
-	};
 
 	/* Parse command-line options */
 	if ( parse_options ( argc, argv, &options ) < 0 )
 		exit ( 1 );
 
+	/* Identify test */
+	test = get_test_from_name ( argv[optind] );
+	if ( ! test ) {
+		fprintf ( stderr, "Unrecognised test \"%s\"\n", argv[optind] );
+		return -1;
+	}
+	optind++;
+
+	/* Initialise the protocol stack */
+	init_tcpip();
+
 	/* Open the hijack device */
 	hijack_dev.name = options.interface;
-	if ( ! hijack_probe ( &nic, &hijack_dev ) )
+	if ( ! hijack_probe ( &hijack_dev ) )
 		exit ( 1 );
 
-	/* Run the stack to completion */
-	run_stack ( &nic );
+	/* Run the test */
+	if ( test->exec ( argc, argv ) < 0 )
+		exit ( 1 );
 
 	/* Close the hijack device */
-	hijack_disable ( &nic, &hijack_dev );
+	hijack_disable ( &hijack_dev );
 
 	return 0;
 }
