@@ -11,6 +11,7 @@
 #include <netinet/in.h>
 #include <arpa/inet.h>
 #include <getopt.h>
+#include <assert.h>
 
 typedef int irq_action_t;
 
@@ -253,11 +254,80 @@ static void hijack_disable ( struct hijack_device *hijack_dev ) {
 #include "../proto/uip/uip.h"
 #include "../proto/uip/uip_arp.h"
 
-void UIP_APPCALL ( void ) {
-	printf ( "appcall\n" );
+struct tcp_connection;
+
+struct tcp_operations {
+	void ( * aborted ) ( struct tcp_connection *conn );
+	void ( * timedout ) ( struct tcp_connection *conn );
+	void ( * closed ) ( struct tcp_connection *conn );
+	void ( * connected ) ( struct tcp_connection *conn );
+	void ( * acked ) ( struct tcp_connection *conn, size_t len );
+	void ( * newdata ) ( struct tcp_connection *conn );
+	void ( * senddata ) ( struct tcp_connection *conn );
+};
+
+struct tcp_connection {
+	struct sockaddr_in sin;
+	struct tcp_operations *tcp_op;
+};
+
+static int tcp_connect ( struct tcp_connection *conn ) {
+	struct uip_conn *uip_conn;
+	u16_t ipaddr[2];
+
+	assert ( conn->sin.sin_addr.s_addr != 0 );
+	assert ( conn->sin.sin_port != 0 );
+	assert ( conn->tcp_op != NULL );
+	assert ( sizeof ( uip_conn->appstate ) == sizeof ( conn ) );
+
+	* ( ( uint32_t * ) ipaddr ) = conn->sin.sin_addr.s_addr;
+	uip_conn = uip_connect ( ipaddr, conn->sin.sin_port );
+	if ( ! uip_conn )
+		return -1;
+
+	*( ( void ** ) uip_conn->appstate ) = conn;
+	return 0;
 }
 
-void udp_appcall ( void ) {
+static void tcp_send ( struct tcp_connection *conn, const void *data,
+		       size_t len ) {
+	assert ( conn = *( ( void ** ) uip_conn->appstate ) );
+	uip_send ( ( void * ) data, len );
+}
+
+static void tcp_close ( struct tcp_connection *conn ) {
+	assert ( conn = *( ( void ** ) uip_conn->appstate ) );
+	uip_close();
+}
+
+void uip_tcp_appcall ( void ) {
+	struct tcp_connection *conn = *( ( void ** ) uip_conn->appstate );
+	struct tcp_operations *op = conn->tcp_op;
+
+	assert ( conn->tcp_op->closed != NULL );
+	assert ( conn->tcp_op->connected != NULL );
+	assert ( conn->tcp_op->acked != NULL );
+	assert ( conn->tcp_op->newdata != NULL );
+	assert ( conn->tcp_op->senddata != NULL );
+
+	if ( uip_aborted() && op->aborted ) /* optional method */
+		op->aborted ( conn );
+	if ( uip_timedout() && op->timedout ) /* optional method */
+		op->timedout ( conn );
+	if ( uip_closed() && op->closed ) /* optional method */
+		op->closed ( conn );
+	if ( uip_connected() )
+		op->connected ( conn );
+	if ( uip_acked() )
+		op->acked ( conn, uip_conn->len );
+	if ( uip_newdata() )
+		op->newdata ( conn );
+	if ( uip_rexmit() || uip_newdata() || uip_acked() ||
+	     uip_connected() || uip_poll() )
+		op->senddata ( conn );
+}
+
+void uip_udp_appcall ( void ) {
 }
 
 static void init_tcpip ( void ) {
@@ -265,17 +335,16 @@ static void init_tcpip ( void ) {
 	uip_arp_init();
 }
 
+#define UIP_HLEN ( 40 + UIP_LLH_LEN )
+
 static void uip_transmit ( void ) {
 	uip_arp_out();
+	if ( uip_len > UIP_HLEN ) {
+		memcpy ( uip_buf + UIP_HLEN, ( void * ) uip_appdata,
+			 uip_len - UIP_HLEN );
+	}
 	netdev_transmit ( uip_buf, uip_len );
 	uip_len = 0;
-}
-
-static int tcp_connect ( struct sockaddr_in *sin ) {
-	u16_t ipaddr[2];
-
-	* ( ( uint32_t * ) ipaddr ) = sin->sin_addr.s_addr;
-	return uip_connect ( ipaddr, sin->sin_port ) ? 1 : 0;
 }
 
 static void run_tcpip ( void ) {
@@ -308,59 +377,143 @@ static void run_tcpip ( void ) {
 
 /*****************************************************************************
  *
- * HTTP protocol tester
+ * "Hello world" protocol tester
  *
  */
 
-struct http_request {
-	struct sockaddr_in sin;
-	const char *filename;
-	void ( *callback ) ( struct http_request *http );
+#include <stddef.h>
+#define container_of(ptr, type, member) ({                      \
+	const typeof( ((type *)0)->member ) *__mptr = (ptr);    \
+	(type *)( (char *)__mptr - offsetof(type,member) );})
+
+enum hello_state {
+	HELLO_SENDING_MESSAGE = 0,
+	HELLO_SENDING_ENDL,
+};
+
+struct hello_request {
+	struct tcp_connection tcp;
+	const char *message;
+	enum hello_state state;
+	int remaining;
+	void ( *callback ) ( struct hello_request *hello );
 	int complete;
 };
 
-static int http_get ( struct http_request *http ) {
-	return tcp_connect ( &http->sin );
+static inline struct hello_request *
+tcp_to_hello ( struct tcp_connection *conn ) {
+	return container_of ( conn, struct hello_request, tcp );
 }
 
+static void hello_aborted ( struct tcp_connection *conn ) {
+	struct hello_request *hello = tcp_to_hello ( conn );
 
+	printf ( "Connection aborted\n" );
+	hello->complete = 1;
+}
 
+static void hello_timedout ( struct tcp_connection *conn ) {
+	struct hello_request *hello = tcp_to_hello ( conn );
 
-struct http_options {
-	struct sockaddr_in server;
-	char *filename;
+	printf ( "Connection timed out\n" );
+	hello->complete = 1;
+}
+
+static void hello_closed ( struct tcp_connection *conn ) {
+	struct hello_request *hello = tcp_to_hello ( conn );
+
+	hello->complete = 1;
+}
+
+static void hello_connected ( struct tcp_connection *conn ) {
+	struct hello_request *hello = tcp_to_hello ( conn );
+}
+
+static void hello_acked ( struct tcp_connection *conn, size_t len ) {
+	struct hello_request *hello = tcp_to_hello ( conn );
+
+	hello->message += len;
+	hello->remaining -= len;
+	if ( hello->remaining <= 0 ) {
+		switch ( hello->state ) {
+		case HELLO_SENDING_MESSAGE:
+			hello->state = HELLO_SENDING_ENDL;
+			hello->message = "\r\n";
+			hello->remaining = 2;
+			break;
+		case HELLO_SENDING_ENDL:
+			tcp_close ( conn );
+			break;
+		default:
+			assert ( 0 );
+		}
+	}
+}
+
+static void hello_newdata ( struct tcp_connection *conn ) {
+	struct hello_request *hello = tcp_to_hello ( conn );
+}
+
+static void hello_senddata ( struct tcp_connection *conn ) {
+	struct hello_request *hello = tcp_to_hello ( conn );
+
+	tcp_send ( conn, hello->message, hello->remaining );
+}
+
+static struct tcp_operations hello_tcp_operations = {
+	.aborted	= hello_aborted,
+	.timedout	= hello_timedout,
+	.closed		= hello_closed,
+	.connected	= hello_connected,
+	.acked		= hello_acked,
+	.newdata	= hello_newdata,
+	.senddata	= hello_senddata,
 };
 
-static void http_usage ( char **argv ) {
+static int hello_connect ( struct hello_request *hello ) {
+	hello->tcp.tcp_op = &hello_tcp_operations;
+	hello->remaining = strlen ( hello->message );
+	return tcp_connect ( &hello->tcp );
+}
+
+struct hello_options {
+	struct sockaddr_in server;
+	const char *message;
+};
+
+static void hello_usage ( char **argv ) {
 	fprintf ( stderr,
-		  "Usage: %s [global options] http [http-specific options]\n"
+		  "Usage: %s [global options] hello [hello-specific options]\n"
 		  "\n"
-		  "http-specific options:\n"
+		  "hello-specific options:\n"
 		  "  -h|--host              Host IP address\n"
-		  "  -f|--file              Filename\n",
+		  "  -p|--port              Port number\n"
+		  "  -m|--message           Message to send\n",
 		  argv[0] );
 }
 
-static int http_parse_options ( int argc, char **argv,
-				struct http_options *options ) {
+static int hello_parse_options ( int argc, char **argv,
+				 struct hello_options *options ) {
 	static struct option long_options[] = {
 		{ "host", 1, NULL, 'h' },
-		{ "file", 1, NULL, 'f' },
+		{ "port", 1, NULL, 'p' },
+		{ "message", 1, NULL, 'm' },
 		{ },
 	};
 	int c;
+	char *endptr;
 
 	/* Set default options */
 	memset ( options, 0, sizeof ( *options ) );
 	inet_aton ( "192.168.0.1", &options->server.sin_addr );
 	options->server.sin_port = htons ( 80 );
-	options->filename = "index.html";
+	options->message = "Hello world!";
 
 	/* Parse command-line options */
 	while ( 1 ) {
 		int option_index = 0;
 		
-		c = getopt_long ( argc, argv, "h:f:", long_options,
+		c = getopt_long ( argc, argv, "h:p:", long_options,
 				  &option_index );
 		if ( c < 0 )
 			break;
@@ -374,8 +527,17 @@ static int http_parse_options ( int argc, char **argv,
 				return -1;
 			}
 			break;
-		case 'f':
-			options->filename = optarg;
+		case 'p':
+			options->server.sin_port =
+				htons ( strtoul ( optarg, &endptr, 0 ) );
+			if ( *endptr != '\0' ) {
+				fprintf ( stderr, "Invalid port %s\n",
+					  optarg );
+				return -1;
+			}
+			break;
+		case 'm':
+			options->message = optarg;
 			break;
 		case '?':
 			/* Unrecognised option */
@@ -388,36 +550,37 @@ static int http_parse_options ( int argc, char **argv,
 
 	/* Check there are no remaining arguments */
 	if ( optind != argc ) {
-		http_usage ( argv );
+		hello_usage ( argv );
 		return -1;
 	}
 	
 	return optind;
 }
 
-static void test_http_callback ( struct http_request *http ) {
+static void test_hello_callback ( struct hello_request *hello ) {
 	
 }
 
-static int test_http ( int argc, char **argv ) {
-	struct http_options options;
-	struct http_request http;
+static int test_hello ( int argc, char **argv ) {
+	struct hello_options options;
+	struct hello_request hello;
 
-	/* Parse http-specific options */
-	if ( http_parse_options ( argc, argv, &options ) < 0 )
+	/* Parse hello-specific options */
+	if ( hello_parse_options ( argc, argv, &options ) < 0 )
 		return -1;
 
-	/* Construct http request */
-	memset ( &http, 0, sizeof ( http ) );
-	http.filename = options.filename;
-	http.sin = options.server;
-	http.callback = test_http_callback;
-	fprintf ( stderr, "http fetching http://%s/%s\n",
-		  inet_ntoa ( http.sin.sin_addr ), http.filename );
+	/* Construct hello request */
+	memset ( &hello, 0, sizeof ( hello ) );
+	hello.tcp.sin = options.server;
+	hello.message = options.message;
+	hello.callback = test_hello_callback;
+	fprintf ( stderr, "Saying \"%s\" to %s:%d\n", hello.message,
+		  inet_ntoa ( hello.tcp.sin.sin_addr ),
+		  ntohs ( hello.tcp.sin.sin_port ) );
 
-	/* Issue http request and run to completion */
-	http_get ( &http );
-	while ( ! http.complete ) {
+	/* Issue hello request and run to completion */
+	hello_connect ( &hello );
+	while ( ! hello.complete ) {
 		run_tcpip ();
 	}
 
@@ -436,7 +599,7 @@ struct protocol_test {
 };
 
 static struct protocol_test tests[] = {
-	{ "http", test_http },
+	{ "hello", test_hello },
 };
 
 #define NUM_TESTS ( sizeof ( tests ) / sizeof ( tests[0] ) )
