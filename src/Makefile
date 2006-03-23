@@ -90,6 +90,7 @@ BIN		?= bin
 CFLAGS		+= -I include -I arch/$(ARCH)/include -I . -DARCH=$(ARCH)
 CFLAGS		+= -Os -ffreestanding
 CFLAGS		+= -Wall -W -Wno-format
+CFLAGS		+= -g
 CFLAGS		+= $(EXTRA_CFLAGS)
 ASFLAGS		+= $(EXTRA_ASFLAGS)
 LDFLAGS		+= $(EXTRA_LDFLAGS)
