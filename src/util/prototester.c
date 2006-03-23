@@ -8,10 +8,10 @@
 #include <sys/un.h>
 #include <net/if.h>
 #include <net/ethernet.h>
-#include <netinet/in.h>
-#include <arpa/inet.h>
 #include <getopt.h>
 #include <assert.h>
+
+#include <gpxe/tcp.h>
 
 typedef int irq_action_t;
 
@@ -68,14 +68,14 @@ static inline void free_netdevice ( struct nic *nic ) {
 	/* Do nothing */
 }
 
-static int netdev_poll ( int retrieve, void **data, size_t *len ) {
+int netdev_poll ( int retrieve, void **data, size_t *len ) {
 	int rc = static_nic.nic_op->poll ( &static_nic, retrieve );
 	*data = static_nic.packet;
 	*len = static_nic.packetlen;
 	return rc;
 }
 
-static void netdev_transmit ( const void *data, size_t len ) {
+void netdev_transmit ( const void *data, size_t len ) {
 	uint16_t type = ntohs ( *( ( uint16_t * ) ( data + 12 ) ) );
 	static_nic.nic_op->transmit ( &static_nic, data, type,
 				      len - ETH_HLEN,
@@ -243,137 +243,6 @@ static void hijack_disable ( struct hijack_device *hijack_dev ) {
 	
 	unregister_netdevice ( nic );
 	close ( hijack->fd );
-}
-
-/*****************************************************************************
- *
- * uIP wrapper layer
- *
- */
-
-#include "../proto/uip/uip.h"
-#include "../proto/uip/uip_arp.h"
-
-struct tcp_connection;
-
-struct tcp_operations {
-	void ( * aborted ) ( struct tcp_connection *conn );
-	void ( * timedout ) ( struct tcp_connection *conn );
-	void ( * closed ) ( struct tcp_connection *conn );
-	void ( * connected ) ( struct tcp_connection *conn );
-	void ( * acked ) ( struct tcp_connection *conn, size_t len );
-	void ( * newdata ) ( struct tcp_connection *conn,
-			     void *data, size_t len );
-	void ( * senddata ) ( struct tcp_connection *conn );
-};
-
-struct tcp_connection {
-	struct sockaddr_in sin;
-	struct tcp_operations *tcp_op;
-};
-
-int tcp_connect ( struct tcp_connection *conn ) {
-	struct uip_conn *uip_conn;
-	u16_t ipaddr[2];
-
-	assert ( conn->sin.sin_addr.s_addr != 0 );
-	assert ( conn->sin.sin_port != 0 );
-	assert ( conn->tcp_op != NULL );
-	assert ( sizeof ( uip_conn->appstate ) == sizeof ( conn ) );
-
-	* ( ( uint32_t * ) ipaddr ) = conn->sin.sin_addr.s_addr;
-	uip_conn = uip_connect ( ipaddr, conn->sin.sin_port );
-	if ( ! uip_conn )
-		return -1;
-
-	*( ( void ** ) uip_conn->appstate ) = conn;
-	return 0;
-}
-
-void tcp_send ( struct tcp_connection *conn, const void *data,
-		       size_t len ) {
-	assert ( conn = *( ( void ** ) uip_conn->appstate ) );
-	uip_send ( ( void * ) data, len );
-}
-
-void tcp_close ( struct tcp_connection *conn ) {
-	assert ( conn = *( ( void ** ) uip_conn->appstate ) );
-	uip_close();
-}
-
-void uip_tcp_appcall ( void ) {
-	struct tcp_connection *conn = *( ( void ** ) uip_conn->appstate );
-	struct tcp_operations *op = conn->tcp_op;
-
-	assert ( conn->tcp_op->closed != NULL );
-	assert ( conn->tcp_op->connected != NULL );
-	assert ( conn->tcp_op->acked != NULL );
-	assert ( conn->tcp_op->newdata != NULL );
-	assert ( conn->tcp_op->senddata != NULL );
-
-	if ( uip_aborted() && op->aborted ) /* optional method */
-		op->aborted ( conn );
-	if ( uip_timedout() && op->timedout ) /* optional method */
-		op->timedout ( conn );
-	if ( uip_closed() && op->closed ) /* optional method */
-		op->closed ( conn );
-	if ( uip_connected() )
-		op->connected ( conn );
-	if ( uip_acked() )
-		op->acked ( conn, uip_conn->len );
-	if ( uip_newdata() )
-		op->newdata ( conn, ( void * ) uip_appdata, uip_len );
-	if ( uip_rexmit() || uip_newdata() || uip_acked() ||
-	     uip_connected() || uip_poll() )
-		op->senddata ( conn );
-}
-
-void uip_udp_appcall ( void ) {
-}
-
-static void init_tcpip ( void ) {
-	uip_init();
-	uip_arp_init();
-}
-
-#define UIP_HLEN ( 40 + UIP_LLH_LEN )
-
-static void uip_transmit ( void ) {
-	uip_arp_out();
-	if ( uip_len > UIP_HLEN ) {
-		memcpy ( uip_buf + UIP_HLEN, ( void * ) uip_appdata,
-			 uip_len - UIP_HLEN );
-	}
-	netdev_transmit ( uip_buf, uip_len );
-	uip_len = 0;
-}
-
-static void run_tcpip ( void ) {
-	void *data;
-	size_t len;
-	uint16_t type;
-	int i;
-	
-	if ( netdev_poll ( 1, &data, &len ) ) {
-		/* We have data */
-		memcpy ( uip_buf, data, len );
-		uip_len = len;
-		type = ntohs ( *( ( uint16_t * ) ( uip_buf + 12 ) ) );
-		if ( type == ETHERTYPE_ARP ) {
-			uip_arp_arpin();
-		} else {
-			uip_arp_ipin();
-			uip_input();
-		}
-		if ( uip_len > 0 )
-			uip_transmit();
-	} else {
-		for ( i = 0 ; i < UIP_CONNS ; i++ ) {
-			uip_periodic ( i );
-			if ( uip_len > 0 )
-				uip_transmit();
-		}
-	}
 }
 
 /*****************************************************************************
