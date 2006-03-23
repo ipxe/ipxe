@@ -277,7 +277,8 @@ typedef unsigned short uip_stats_t;
  *
  * \hideinitializer
  */
-#define UIP_UDP_APPCALL  udp_appcall
+extern void uip_udp_appcall ( void );
+#define UIP_UDP_APPCALL  uip_udp_appcall
 
 /** @} */
 /*------------------------------------------------------------------------------*/
@@ -539,6 +540,8 @@ struct httpd_state {
  * response to TCP/IP events.
  *
  */
+extern void uip_tcp_appcall ( void );
+#define UIP_APPCALL uip_tcp_appcall
 
 /**
  * \var #define UIP_APPSTATE_SIZE
@@ -546,7 +549,7 @@ struct httpd_state {
  * The size of the application state that is to be stored in the
  * uip_conn structure.
  */
-#define UIP_APPSTATE_SIZE 0
+#define UIP_APPSTATE_SIZE sizeof ( void * )
 /** @} */
 
 /* Include the header file for the application program that should be
