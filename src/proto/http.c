@@ -1,5 +1,5 @@
 #include "proto.h"
-#include "tcp.h"
+#include "old_tcp.h"
 #include "url.h"
 #include "etherboot.h"
 

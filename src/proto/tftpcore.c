@@ -1,5 +1,5 @@
 #include "tftp.h"
-#include "tcp.h" /* for struct tcphdr */
+#include "old_tcp.h" /* for struct tcphdr */
 #include "errno.h"
 #include "etherboot.h"
 #include "tftpcore.h"

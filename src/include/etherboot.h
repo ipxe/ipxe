@@ -147,7 +147,7 @@ enum {
 #include	"if_arp.h"
 #include	"ip.h"
 #include	"udp.h"
-#include	"tcp.h"
+#include	"old_tcp.h"
 #include	"bootp.h"
 #include	"igmp.h"
 #include	"nfs.h"
