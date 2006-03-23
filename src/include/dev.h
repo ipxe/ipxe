@@ -6,6 +6,7 @@
 #include "buffer.h"
 #include "dhcp.h" /* for dhcp_dev_id */
 #include "tables.h"
+#include <assert.h>
 
 /*
  * Forward declarations
@@ -100,17 +101,11 @@ struct bus_dev {
  *
  */
 
-#define LINKER_ASSERT(test,error_symbol)		\
-	if ( ! (test) ) {				\
-		extern void error_symbol ( void );	\
-		error_symbol();				\
-	}
-
 #define BUS_LOC_CHECK(datatype)					      \
-	LINKER_ASSERT( ( sizeof (datatype) <= sizeof (struct bus_loc) ),  \
+	linker_assert( ( sizeof (datatype) <= sizeof (struct bus_loc) ),  \
 		       __BUS_LOC_SIZE_is_too_small__see_dev_h )
 #define BUS_DEV_CHECK(datatype)					      \
-	LINKER_ASSERT( ( sizeof (datatype) <= sizeof (struct bus_dev) ),    \
+	linker_assert( ( sizeof (datatype) <= sizeof (struct bus_dev) ),    \
 		       __BUS_DEV_SIZE_is_too_small__see_dev_h )
 
 /*

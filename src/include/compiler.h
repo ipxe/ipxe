@@ -15,7 +15,7 @@
  * Global compiler definitions.
  *
  * This file is implicitly included by every @c .c file in Etherboot.
- * It defines global macros such as DBG() and ASSERT().
+ * It defines global macros such as DBG().
  *
  * We arrange for each object to export the symbol @c obj_OBJECT
  * (where @c OBJECT is the object name, e.g. @c rtl8139) as a global
@@ -138,25 +138,8 @@ __asm__ ( ".equ\tDEBUG_LEVEL, " DEBUG_SYMBOL_STR );
 #define DBG2 DBG_PRINT
 #endif
 
-/**
- * Assert a condition.
- *
- * If the condition is not true, a debug message will be printed.
- * Assertions only take effect if the debug level is non-zero (see
- * DBG()).
- *
- */
-#define ASSERT(x)
-
-#if DEBUG_SYMBOL >= 1
-#undef ASSERT
-#define ASSERT(x) 							      \
-	do { 								      \
-		if ( ! (x) ) { 						      \
-			DBG ( "ASSERT(%s) failed at %s line %d [%s]\n", #x,   \
-			      __FILE__, __LINE__, __FUNCTION__ );	      \
-		} 							      \
-	} while (0)
+#if DEBUG_SYMBOL == 0
+#define NDEBUG
 #endif
 
 /** Declare a data structure as packed. */

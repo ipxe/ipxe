@@ -42,6 +42,7 @@
 #include "string.h"
 #include "io.h"
 #include "errno.h"
+#include <assert.h>
 #include "buffer.h"
 
 /**
@@ -208,7 +209,7 @@ int fill_buffer ( struct buffer *buffer, const void *data,
 	/* Write back 'before' block, if any */
 	if ( before.start ) {
 		before.tail = 0;
-		ASSERT ( ( before.end - before.start ) >=
+		assert ( ( before.end - before.start ) >=
 			 sizeof ( struct buffer_free_block ) );
 		store_free_block ( &before );
 	} else {
@@ -217,7 +218,7 @@ int fill_buffer ( struct buffer *buffer, const void *data,
 
 	/* Write back 'after' block, if any */
 	if ( after.start < buffer->end ) {
-		ASSERT ( after.tail ||
+		assert ( after.tail ||
 			 ( ( after.end - after.start ) >=
 			   sizeof ( struct buffer_free_block ) ) );
 		store_free_block ( &after );

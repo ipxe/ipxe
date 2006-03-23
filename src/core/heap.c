@@ -1,6 +1,7 @@
 #include "etherboot.h"
 #include "init.h"
 #include "memsizes.h"
+#include <assert.h>
 #include "heap.h"
 
 struct heap_block {
@@ -76,7 +77,7 @@ static void init_heap ( void ) {
 		}
 	}
 
-	ASSERT ( size != 0 );
+	assert ( size != 0 );
 	DBG ( "HEAP using region [%x,%x)\n", heap_start, heap_end );
 	heap_ptr = heap_end;
 }
@@ -95,7 +96,7 @@ void * emalloc ( size_t size, unsigned int align ) {
 	struct heap_block *block;
 	physaddr_t addr;
 	
-	ASSERT ( ( align & ( align - 1 ) ) == 0 );
+	assert ( ( align & ( align - 1 ) ) == 0 );
 
 	addr = block_alloc_addr ( heap_ptr, size, align );
 	if ( addr < heap_start ) {
@@ -133,7 +134,7 @@ static inline physaddr_t block_free_addr ( size_t size ) {
 void efree ( void *ptr ) {
 	struct heap_block *block;
 
-	ASSERT ( ptr == phys_to_virt ( heap_ptr + sizeof ( size_t ) ) );
+	assert ( ptr == phys_to_virt ( heap_ptr + sizeof ( size_t ) ) );
 	
 	block = ( struct heap_block * )
 		( ptr - offsetof ( struct heap_block, data ) );
@@ -142,7 +143,7 @@ void efree ( void *ptr ) {
 	DBG ( "HEAP freed %x [%x,%x)\n", virt_to_phys ( ptr ),
 	      virt_to_phys ( block ), heap_ptr );
 
-	ASSERT ( heap_ptr <= heap_end );
+	assert ( heap_ptr <= heap_end );
 }
 
 /*
@@ -199,7 +200,7 @@ void * erealloc ( void *ptr, size_t size ) {
 	 * already checked that there was sufficient space.
 	 */
 	ptr = emalloc ( size, old_align );
-	ASSERT ( ptr != NULL );
+	assert ( ptr != NULL );
 
 	return ptr;
 }
