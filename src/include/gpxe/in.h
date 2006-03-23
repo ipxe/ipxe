@@ -29,5 +29,6 @@ struct sockaddr_in {
 };
 
 extern int inet_aton ( const char *cp, struct in_addr *inp );
+extern char * inet_ntoa ( struct in_addr in );
 
 #endif	/* _IN_H */
