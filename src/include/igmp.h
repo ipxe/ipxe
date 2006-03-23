@@ -2,7 +2,7 @@
 #define	IGMP_H
 
 #include "stdint.h"
-#include "in.h"
+#include <gpxe/in.h>
 
 #define IGMP_QUERY	0x11
 #define IGMPv1_REPORT	0x12

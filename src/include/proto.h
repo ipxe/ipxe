@@ -3,7 +3,7 @@
 
 #include "tables.h"
 #include "buffer.h"
-#include "in.h"
+#include <gpxe/in.h>
 
 struct protocol {
 	char *name;

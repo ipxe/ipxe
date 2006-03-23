@@ -2,7 +2,7 @@
 #define DNS_RESOLVER_H
 
 #include "stdint.h"
-#include "in.h"
+#include <gpxe/in.h>
 #include "ip.h"
 #include "udp.h"
 

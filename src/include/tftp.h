@@ -3,7 +3,7 @@
 
 /** @file */
 
-#include "in.h"
+#include <gpxe/in.h>
 #include "buffer.h"
 #include "nic.h"
 #include "ip.h"
@@ -139,6 +139,15 @@ struct tftp_state {
 	 * TFTP server.  Note that the first data block is block 1; a
 	 * value of 0 indicates that no data blocks have yet been
 	 * received.
+	 *
+	 * For multicast TFTP protocols, where the blocks may not be
+	 * received in strict order, the meaning of this field changes
+	 * slightly, to "first missing block minus one".  For example,
+	 * suppose that we have received blocks 1, 2, 4 and 5; this
+	 * field would then have the value 2, since the first missing
+	 * block is block 3.  If the blocks do arrive in strict order,
+	 * this definition is exactly equivalent to "most recently
+	 * received block".
 	 */
 	unsigned int block;
 };

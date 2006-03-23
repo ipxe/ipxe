@@ -133,7 +133,7 @@ enum {
 #define	RARP_REQUEST	3
 #define	RARP_REPLY	4
 
-#include	"in.h"
+#include <gpxe/in.h>
 
 
 /* Helper macros used to identify when DHCP options are valid/invalid in/outside of encapsulation */

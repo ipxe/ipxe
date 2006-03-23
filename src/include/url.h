@@ -2,7 +2,7 @@
 #define URL_H
 
 #include "proto.h"
-#include "in.h"
+#include <gpxe/in.h>
 
 extern int parse_url ( char *url, struct protocol **proto,
 		       struct sockaddr_in *server, char **filename );

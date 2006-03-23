@@ -1,7 +1,7 @@
 #ifndef RESOLV_H
 #define RESOLV_H
 
-#include "in.h"
+#include <gpxe/in.h>
 #include "tables.h"
 
 struct resolver {

@@ -3,7 +3,7 @@
 
 #include "stddef.h"
 #include "stdint.h"
-#include "in.h"
+#include <gpxe/in.h>
 
 struct iphdr {
 	uint8_t  verhdrlen;

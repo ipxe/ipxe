@@ -1,7 +1,7 @@
 #include "etherboot.h"
 #include "init.h"
 #include "proto.h"
-#include "in.h"
+#include <gpxe/in.h>
 #include "nic.h"
 
 /* NOTE: the NFS code is heavily inspired by the NetBSD netboot code (read:

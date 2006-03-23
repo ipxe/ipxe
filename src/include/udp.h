@@ -3,7 +3,7 @@
 
 #include "stddef.h"
 #include "stdint.h"
-#include "in.h"
+#include <gpxe/in.h>
 #include "ip.h"
 
 struct udp_pseudo_hdr {
