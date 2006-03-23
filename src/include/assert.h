@@ -47,5 +47,6 @@
 #ifdef NDEBUG
 #undef assert
 #define assert(x) do {} while ( 0 )
+#endif
 
 #endif /* _ASSERT_H */
