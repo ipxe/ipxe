@@ -262,7 +262,8 @@ struct tcp_operations {
 	void ( * closed ) ( struct tcp_connection *conn );
 	void ( * connected ) ( struct tcp_connection *conn );
 	void ( * acked ) ( struct tcp_connection *conn, size_t len );
-	void ( * newdata ) ( struct tcp_connection *conn );
+	void ( * newdata ) ( struct tcp_connection *conn,
+			     void *data, size_t len );
 	void ( * senddata ) ( struct tcp_connection *conn );
 };
 
@@ -271,7 +272,7 @@ struct tcp_connection {
 	struct tcp_operations *tcp_op;
 };
 
-static int tcp_connect ( struct tcp_connection *conn ) {
+int tcp_connect ( struct tcp_connection *conn ) {
 	struct uip_conn *uip_conn;
 	u16_t ipaddr[2];
 
@@ -289,13 +290,13 @@ static int tcp_connect ( struct tcp_connection *conn ) {
 	return 0;
 }
 
-static void tcp_send ( struct tcp_connection *conn, const void *data,
+void tcp_send ( struct tcp_connection *conn, const void *data,
 		       size_t len ) {
 	assert ( conn = *( ( void ** ) uip_conn->appstate ) );
 	uip_send ( ( void * ) data, len );
 }
 
-static void tcp_close ( struct tcp_connection *conn ) {
+void tcp_close ( struct tcp_connection *conn ) {
 	assert ( conn = *( ( void ** ) uip_conn->appstate ) );
 	uip_close();
 }
@@ -321,7 +322,7 @@ void uip_tcp_appcall ( void ) {
 	if ( uip_acked() )
 		op->acked ( conn, uip_conn->len );
 	if ( uip_newdata() )
-		op->newdata ( conn );
+		op->newdata ( conn, ( void * ) uip_appdata, uip_len );
 	if ( uip_rexmit() || uip_newdata() || uip_acked() ||
 	     uip_connected() || uip_poll() )
 		op->senddata ( conn );
@@ -387,7 +388,7 @@ static void run_tcpip ( void ) {
 	(type *)( (char *)__mptr - offsetof(type,member) );})
 
 enum hello_state {
-	HELLO_SENDING_MESSAGE = 0,
+	HELLO_SENDING_MESSAGE = 1,
 	HELLO_SENDING_ENDL,
 };
 
@@ -395,8 +396,8 @@ struct hello_request {
 	struct tcp_connection tcp;
 	const char *message;
 	enum hello_state state;
-	int remaining;
-	void ( *callback ) ( struct hello_request *hello );
+	size_t remaining;
+	void ( *callback ) ( char *data, size_t len );
 	int complete;
 };
 
@@ -427,6 +428,9 @@ static void hello_closed ( struct tcp_connection *conn ) {
 
 static void hello_connected ( struct tcp_connection *conn ) {
 	struct hello_request *hello = tcp_to_hello ( conn );
+
+	printf ( "Connection established\n" );
+	hello->state = HELLO_SENDING_MESSAGE;
 }
 
 static void hello_acked ( struct tcp_connection *conn, size_t len ) {
@@ -434,7 +438,7 @@ static void hello_acked ( struct tcp_connection *conn, size_t len ) {
 
 	hello->message += len;
 	hello->remaining -= len;
-	if ( hello->remaining <= 0 ) {
+	if ( hello->remaining == 0 ) {
 		switch ( hello->state ) {
 		case HELLO_SENDING_MESSAGE:
 			hello->state = HELLO_SENDING_ENDL;
@@ -442,7 +446,9 @@ static void hello_acked ( struct tcp_connection *conn, size_t len ) {
 			hello->remaining = 2;
 			break;
 		case HELLO_SENDING_ENDL:
-			tcp_close ( conn );
+			/* Nothing to do once we've finished sending
+			 * the end-of-line indicator.
+			 */
 			break;
 		default:
 			assert ( 0 );
@@ -450,8 +456,11 @@ static void hello_acked ( struct tcp_connection *conn, size_t len ) {
 	}
 }
 
-static void hello_newdata ( struct tcp_connection *conn ) {
+static void hello_newdata ( struct tcp_connection *conn, void *data,
+			    size_t len ) {
 	struct hello_request *hello = tcp_to_hello ( conn );
+
+	hello->callback ( data, len );
 }
 
 static void hello_senddata ( struct tcp_connection *conn ) {
@@ -557,8 +566,20 @@ static int hello_parse_options ( int argc, char **argv,
 	return optind;
 }
 
-static void test_hello_callback ( struct hello_request *hello ) {
-	
+static void test_hello_callback ( char *data, size_t len ) {
+	int i;
+	char c;
+
+	for ( i = 0 ; i < len ; i++ ) {
+		c = data[i];
+		if ( c == '\r' ) {
+			/* Print nothing */
+		} else if ( ( c == '\n' ) || ( c >= 32 ) || ( c <= 126 ) ) {
+			putchar ( c );
+		} else {
+			putchar ( '.' );
+		}
+	}	
 }
 
 static int test_hello ( int argc, char **argv ) {
