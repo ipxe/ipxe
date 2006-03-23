@@ -12,6 +12,7 @@
 #include <assert.h>
 
 #include <gpxe/tcp.h>
+#include <gpxe/hello.h>
 
 typedef int irq_action_t;
 
@@ -250,109 +251,6 @@ static void hijack_disable ( struct hijack_device *hijack_dev ) {
  * "Hello world" protocol tester
  *
  */
-
-#include <stddef.h>
-#define container_of(ptr, type, member) ({                      \
-	const typeof( ((type *)0)->member ) *__mptr = (ptr);    \
-	(type *)( (char *)__mptr - offsetof(type,member) );})
-
-enum hello_state {
-	HELLO_SENDING_MESSAGE = 1,
-	HELLO_SENDING_ENDL,
-};
-
-struct hello_request {
-	struct tcp_connection tcp;
-	const char *message;
-	enum hello_state state;
-	size_t remaining;
-	void ( *callback ) ( char *data, size_t len );
-	int complete;
-};
-
-static inline struct hello_request *
-tcp_to_hello ( struct tcp_connection *conn ) {
-	return container_of ( conn, struct hello_request, tcp );
-}
-
-static void hello_aborted ( struct tcp_connection *conn ) {
-	struct hello_request *hello = tcp_to_hello ( conn );
-
-	printf ( "Connection aborted\n" );
-	hello->complete = 1;
-}
-
-static void hello_timedout ( struct tcp_connection *conn ) {
-	struct hello_request *hello = tcp_to_hello ( conn );
-
-	printf ( "Connection timed out\n" );
-	hello->complete = 1;
-}
-
-static void hello_closed ( struct tcp_connection *conn ) {
-	struct hello_request *hello = tcp_to_hello ( conn );
-
-	hello->complete = 1;
-}
-
-static void hello_connected ( struct tcp_connection *conn ) {
-	struct hello_request *hello = tcp_to_hello ( conn );
-
-	printf ( "Connection established\n" );
-	hello->state = HELLO_SENDING_MESSAGE;
-}
-
-static void hello_acked ( struct tcp_connection *conn, size_t len ) {
-	struct hello_request *hello = tcp_to_hello ( conn );
-
-	hello->message += len;
-	hello->remaining -= len;
-	if ( hello->remaining == 0 ) {
-		switch ( hello->state ) {
-		case HELLO_SENDING_MESSAGE:
-			hello->state = HELLO_SENDING_ENDL;
-			hello->message = "\r\n";
-			hello->remaining = 2;
-			break;
-		case HELLO_SENDING_ENDL:
-			/* Nothing to do once we've finished sending
-			 * the end-of-line indicator.
-			 */
-			break;
-		default:
-			assert ( 0 );
-		}
-	}
-}
-
-static void hello_newdata ( struct tcp_connection *conn, void *data,
-			    size_t len ) {
-	struct hello_request *hello = tcp_to_hello ( conn );
-
-	hello->callback ( data, len );
-}
-
-static void hello_senddata ( struct tcp_connection *conn ) {
-	struct hello_request *hello = tcp_to_hello ( conn );
-
-	tcp_send ( conn, hello->message, hello->remaining );
-}
-
-static struct tcp_operations hello_tcp_operations = {
-	.aborted	= hello_aborted,
-	.timedout	= hello_timedout,
-	.closed		= hello_closed,
-	.connected	= hello_connected,
-	.acked		= hello_acked,
-	.newdata	= hello_newdata,
-	.senddata	= hello_senddata,
-};
-
-static int hello_connect ( struct hello_request *hello ) {
-	hello->tcp.tcp_op = &hello_tcp_operations;
-	hello->remaining = strlen ( hello->message );
-	return tcp_connect ( &hello->tcp );
-}
 
 struct hello_options {
 	struct sockaddr_in server;
