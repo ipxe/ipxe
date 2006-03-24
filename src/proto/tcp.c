@@ -3,7 +3,6 @@
 #include <byteswap.h>
 #include <gpxe/tcp.h>
 #include "uip/uip.h"
-#include "uip/uip_arp.h"
 
 /** @file
  *
