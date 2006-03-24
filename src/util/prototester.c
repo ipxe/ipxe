@@ -11,6 +11,7 @@
 #include <getopt.h>
 #include <assert.h>
 
+#include <gpxe/ip.h>
 #include <gpxe/tcp.h>
 #include <gpxe/hello.h>
 
@@ -419,6 +420,7 @@ static struct protocol_test * get_test_from_name ( const char *name ) {
 
 struct tester_options {
 	char interface[IF_NAMESIZE];
+	struct in_addr in_addr;
 };
 
 static void usage ( char **argv ) {
@@ -428,6 +430,7 @@ static void usage ( char **argv ) {
 		  "Global options:\n"
 		  "  -h|--help              Print this help message\n"
 		  "  -i|--interface intf    Use specified network interface\n"
+		  "  -f|--from ip-address   Use specified local IP address\n"
 		  "  -l|--list              List available tests\n"
 		  "\n"
 		  "Use \"%s <test> -h\" to view test-specific options\n",
@@ -438,6 +441,7 @@ static int parse_options ( int argc, char **argv,
 			   struct tester_options *options ) {
 	static struct option long_options[] = {
 		{ "interface", 1, NULL, 'i' },
+		{ "from", 1, NULL, 'f' },
 		{ "list", 0, NULL, 'l' },
 		{ "help", 0, NULL, 'h' },
 		{ },
@@ -447,12 +451,13 @@ static int parse_options ( int argc, char **argv,
 	/* Set default options */
 	memset ( options, 0, sizeof ( *options ) );
 	strncpy ( options->interface, "eth0", sizeof ( options->interface ) );
+	inet_aton ( "192.168.0.2", &options->in_addr );
 
 	/* Parse command-line options */
 	while ( 1 ) {
 		int option_index = 0;
 		
-		c = getopt_long ( argc, argv, "+i:hl", long_options,
+		c = getopt_long ( argc, argv, "+i:f:hl", long_options,
 				  &option_index );
 		if ( c < 0 )
 			break;
@@ -461,6 +466,13 @@ static int parse_options ( int argc, char **argv,
 		case 'i':
 			strncpy ( options->interface, optarg,
 				  sizeof ( options->interface ) );
+			break;
+		case 'f':
+			if ( inet_aton ( optarg, &options->in_addr ) == 0 ) {
+				fprintf ( stderr, "Invalid IP address %s\n",
+					  optarg );
+				return -1;
+			}
 			break;
 		case 'l':
 			list_tests ();
@@ -511,6 +523,7 @@ int main ( int argc, char **argv ) {
 
 	/* Initialise the protocol stack */
 	init_tcpip();
+	set_ipaddr ( options.in_addr );
 
 	/* Open the hijack device */
 	hijack_dev.name = options.interface;
