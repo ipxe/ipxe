@@ -19,6 +19,13 @@
 
 #define SNAPLEN 1600
 
+/*
+ * FIXME: is there a way to detect the version of the libpcap library?
+ * Version 0.9 has pcap_inject; version 0.8 doesn't, but both report
+ * their version number as 2.4.
+ */
+#define HAVE_PCAP_INJECT 0
+
 struct hijack {
 	pcap_t *pcap;
 	int fd;
@@ -45,6 +52,31 @@ static int signalled = 0;
 static void flag_signalled ( int signal __attribute__ (( unused )) ) {
 	signalled = 1;
 }
+
+#if ! HAVE_PCAP_INJECT
+/**
+ * Substitute for pcap_inject(), if this version of libpcap doesn't
+ * have it.  Will almost certainly only work under Linux.
+ *
+ */
+static int pcap_inject ( pcap_t *pcap, const void *data, size_t len ) {
+	int fd;
+	char *errbuf = pcap_geterr ( pcap );
+
+	fd = pcap_get_selectable_fd ( pcap );
+	if ( fd < 0 ) {
+		snprintf ( errbuf, PCAP_ERRBUF_SIZE,
+			   "could not get file descriptor" );
+		return -1;
+	}
+	if ( write ( fd, data, len ) != len ) {
+		snprintf ( errbuf, PCAP_ERRBUF_SIZE,
+			   "could not write data: %s", strerror ( errno ) );
+		return -1;
+	}
+	return len;
+}
+#endif /* ! HAVE_PCAP_INJECT */
 
 /**
  * Log error message
