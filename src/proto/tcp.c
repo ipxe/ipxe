@@ -25,6 +25,36 @@
  */
 
 /**
+ * TCP transmit buffer
+ *
+ * When a tcp_operations::senddata() method is called, it is
+ * guaranteed to be able to use this buffer as temporary space for
+ * constructing the data to be sent.  For example, code such as
+ *
+ * @code
+ *
+ *     static void my_senddata ( struct tcp_connection *conn ) {
+ *         int len;
+ *
+ *         len = snprintf ( tcp_buffer, tcp_buflen, "FETCH %s\r\n", filename );
+ *         tcp_send ( conn, tcp_buffer + already_sent, len - already_sent );
+ *     }
+ *
+ * @endcode
+ *
+ * is allowed, and is probably the best way to deal with
+ * variably-sized data.
+ *
+ * Note that you cannot use this simple mechanism if you want to be
+ * able to construct single data blocks of more than #tcp_buflen
+ * bytes.
+ */
+void *tcp_buffer = uip_buf + ( 40 + UIP_LLH_LEN );
+
+/** Size of #tcp_buffer */
+size_t tcp_buflen = UIP_BUFSIZE - ( 40 + UIP_LLH_LEN );
+
+/**
  * Open a TCP connection
  *
  * @v conn	TCP connection
@@ -67,13 +97,19 @@ int tcp_connect ( struct tcp_connection *conn ) {
  * Data will be automatically limited to the current TCP window size.
  *
  * If retransmission is required, the connection's
- * tcp_operations::newdata() method will be called again in order to
+ * tcp_operations::senddata() method will be called again in order to
  * regenerate the data.
  */
 void tcp_send ( struct tcp_connection *conn __unused,
 		const void *data, size_t len ) {
+
 	assert ( conn = *( ( void ** ) uip_conn->appstate ) );
-	uip_send ( ( void * ) data, len );
+
+	if ( len > tcp_buflen )
+		len = tcp_buflen;
+	memmove ( tcp_buffer, data, len );
+
+	uip_send ( tcp_buffer, len );
 }
 
 /**
