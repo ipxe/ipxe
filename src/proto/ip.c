@@ -32,6 +32,34 @@ void set_ipaddr ( struct in_addr address ) {
 }
 
 /**
+ * Set netmask
+ *
+ */
+void set_netmask ( struct in_addr address ) {
+	union {
+		struct in_addr address;
+		uint16_t uip_address[2];
+	} u;
+
+	u.address = address;
+	uip_setnetmask ( u.uip_address );
+}
+
+/**
+ * Set default gateway
+ *
+ */
+void set_gateway ( struct in_addr address ) {
+	union {
+		struct in_addr address;
+		uint16_t uip_address[2];
+	} u;
+
+	u.address = address;
+	uip_setdraddr ( u.uip_address );
+}
+
+/**
  * Initialise TCP/IP stack
  *
  */
