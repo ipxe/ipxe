@@ -14,6 +14,7 @@
 #include <gpxe/ip.h>
 #include <gpxe/tcp.h>
 #include <gpxe/hello.h>
+#include <gpxe/iscsi.h>
 
 typedef int irq_action_t;
 
@@ -82,6 +83,23 @@ void netdev_transmit ( const void *data, size_t len ) {
 	static_nic.nic_op->transmit ( &static_nic, data, type,
 				      len - ETH_HLEN,
 				      data + ETH_HLEN );
+}
+
+/*****************************************************************************
+ *
+ * Utility functions
+ *
+ */
+
+static void hex_dump ( const void *data, size_t len ) {
+	unsigned int index;
+	for ( index = 0; index < len; index++ ) {
+		if ( ( index % 16 ) == 0 ) {
+			printf ( "\n%08x :", index );
+		}
+		printf ( " %02x", * ( ( unsigned char * ) ( data + index ) ) );
+	}
+	printf ( "\n" );
 }
 
 /*****************************************************************************
@@ -263,18 +281,20 @@ static void hello_usage ( char **argv ) {
 		  "Usage: %s [global options] hello [hello-specific options]\n"
 		  "\n"
 		  "hello-specific options:\n"
-		  "  -h|--host              Host IP address\n"
-		  "  -p|--port              Port number\n"
-		  "  -m|--message           Message to send\n",
+		  "  -h|--help              Print this help message\n"
+		  "  -s|--server ip_addr    Server IP address\n"
+		  "  -p|--port port         Port number\n"
+		  "  -m|--message msg       Message to send\n",
 		  argv[0] );
 }
 
 static int hello_parse_options ( int argc, char **argv,
 				 struct hello_options *options ) {
 	static struct option long_options[] = {
-		{ "host", 1, NULL, 'h' },
+		{ "server", 1, NULL, 's' },
 		{ "port", 1, NULL, 'p' },
 		{ "message", 1, NULL, 'm' },
+		{ "help", 0, NULL, 'h' },
 		{ },
 	};
 	int c;
@@ -290,13 +310,13 @@ static int hello_parse_options ( int argc, char **argv,
 	while ( 1 ) {
 		int option_index = 0;
 		
-		c = getopt_long ( argc, argv, "h:p:", long_options,
+		c = getopt_long ( argc, argv, "s:p:m:h", long_options,
 				  &option_index );
 		if ( c < 0 )
 			break;
 
 		switch ( c ) {
-		case 'h':
+		case 's':
 			if ( inet_aton ( optarg,
 					 &options->server.sin_addr ) == 0 ) {
 				fprintf ( stderr, "Invalid IP address %s\n",
@@ -316,6 +336,9 @@ static int hello_parse_options ( int argc, char **argv,
 		case 'm':
 			options->message = optarg;
 			break;
+		case 'h':
+			hello_usage ( argv );
+			return -1;
 		case '?':
 			/* Unrecognised option */
 			return -1;
@@ -378,6 +401,170 @@ static int test_hello ( int argc, char **argv ) {
 
 /*****************************************************************************
  *
+ * iSCSI protocol tester
+ *
+ */
+
+struct iscsi_options {
+	struct sockaddr_in server;
+	const char *initiator;
+	const char *target;
+};
+
+static void iscsi_usage ( char **argv ) {
+	fprintf ( stderr,
+		  "Usage: %s [global options] iscsi [iscsi-specific options]\n"
+		  "\n"
+		  "iscsi-specific options:\n"
+		  "  -h|--help              Print this help message\n"
+		  "  -s|--server ip_addr    Server IP address\n"
+		  "  -p|--port port         Port number\n"
+		  "  -i|--initiator iqn     iSCSI initiator name\n"
+		  "  -t|--target iqn        iSCSI target name\n",
+		  argv[0] );
+}
+
+static int iscsi_parse_options ( int argc, char **argv,
+				 struct iscsi_options *options ) {
+	static struct option long_options[] = {
+		{ "server", 1, NULL, 's' },
+		{ "port", 1, NULL, 'p' },
+		{ "initiator", 1, NULL, 'i' },
+		{ "target", 1, NULL, 't' },
+		{ "help", 0, NULL, 'h' },
+		{ },
+	};
+	int c;
+	char *endptr;
+
+	/* Set default options */
+	memset ( options, 0, sizeof ( *options ) );
+	inet_aton ( "192.168.0.1", &options->server.sin_addr );
+	options->server.sin_port = htons ( 3260 );
+	options->initiator = "iqn.1900-01.localdomain.localhost:initiator";
+	options->target = "iqn.1900-01.localdomain.localhost:target";
+
+	/* Parse command-line options */
+	while ( 1 ) {
+		int option_index = 0;
+		
+		c = getopt_long ( argc, argv, "s:p:i:t:h", long_options,
+				  &option_index );
+		if ( c < 0 )
+			break;
+
+		switch ( c ) {
+		case 's':
+			if ( inet_aton ( optarg,
+					 &options->server.sin_addr ) == 0 ) {
+				fprintf ( stderr, "Invalid IP address %s\n",
+					  optarg );
+				return -1;
+			}
+			break;
+		case 'p':
+			options->server.sin_port =
+				htons ( strtoul ( optarg, &endptr, 0 ) );
+			if ( *endptr != '\0' ) {
+				fprintf ( stderr, "Invalid port %s\n",
+					  optarg );
+				return -1;
+			}
+			break;
+		case 'i':
+			options->initiator = optarg;
+			break;
+		case 't':
+			options->target = optarg;
+			break;
+		case 'h':
+			iscsi_usage ( argv );
+			return -1;
+		case '?':
+			/* Unrecognised option */
+			return -1;
+		default:
+			fprintf ( stderr, "Unrecognised option '-%c'\n", c );
+			return -1;
+		}
+	}
+
+	/* Check there are no remaining arguments */
+	if ( optind != argc ) {
+		iscsi_usage ( argv );
+		return -1;
+	}
+	
+	return optind;
+}
+
+struct test_iscsi_buffer {
+	unsigned char data[512];
+};
+
+static void test_iscsi_callback ( void *private, const void *data,
+				  unsigned long offset, size_t len ) {
+	struct test_iscsi_buffer *buffer = private;
+
+	assert ( ( offset + len ) <= sizeof ( buffer->data ) );
+	memcpy ( buffer->data + offset, data, len );
+}
+
+static int test_iscsi_block ( struct iscsi_session *iscsi,
+			      unsigned int block ) {
+	struct test_iscsi_buffer buffer;
+
+	iscsi->block_size = 512;
+	iscsi->block_start = block;
+	iscsi->block_count = 1;
+	iscsi->block_read_callback = test_iscsi_callback;
+	iscsi->block_read_private = &buffer;
+	memset ( buffer.data, 0x61, sizeof ( buffer.data ) );
+
+	/* Start up iscsi session */
+	iscsi_wakeup ( iscsi );
+	while ( iscsi_busy ( iscsi ) ) {
+		run_tcpip ();
+	}
+
+	/* Check for errors */
+	if ( iscsi_error ( iscsi ) ) {
+		fprintf ( stderr, "iSCSI error on block %d\n", block );
+		return -1;
+	}
+
+	/* Dump out data */
+	hex_dump ( buffer.data, sizeof ( buffer.data ) );
+
+	return 0;
+}
+
+static int test_iscsi ( int argc, char **argv ) {
+	struct iscsi_options options;
+	struct iscsi_session iscsi;
+	unsigned int block;
+
+	/* Parse iscsi-specific options */
+	if ( iscsi_parse_options ( argc, argv, &options ) < 0 )
+		return -1;
+
+	/* Construct iscsi session */
+	memset ( &iscsi, 0, sizeof ( iscsi ) );
+	iscsi.tcp.sin = options.server;
+	iscsi.initiator = options.initiator;
+	iscsi.target = options.target;
+
+	/* Read some blocks */
+	for ( block = 0 ; block < 4 ; block += 2 ) {
+		if ( test_iscsi_block ( &iscsi, block ) < 0 )
+			return -1;
+	}
+
+	return 0;
+}
+
+/*****************************************************************************
+ *
  * Protocol tester
  *
  */
@@ -389,6 +576,7 @@ struct protocol_test {
 
 static struct protocol_test tests[] = {
 	{ "hello", test_hello },
+	{ "iscsi", test_iscsi },
 };
 
 #define NUM_TESTS ( sizeof ( tests ) / sizeof ( tests[0] ) )
@@ -421,6 +609,8 @@ static struct protocol_test * get_test_from_name ( const char *name ) {
 struct tester_options {
 	char interface[IF_NAMESIZE];
 	struct in_addr in_addr;
+	struct in_addr netmask;
+	struct in_addr gateway;
 };
 
 static void usage ( char **argv ) {
@@ -430,7 +620,9 @@ static void usage ( char **argv ) {
 		  "Global options:\n"
 		  "  -h|--help              Print this help message\n"
 		  "  -i|--interface intf    Use specified network interface\n"
-		  "  -f|--from ip-address   Use specified local IP address\n"
+		  "  -f|--from ip-addr      Use specified local IP address\n"
+		  "  -n|--netmask mask      Use specified netmask\n"
+		  "  -g|--gateway ip-addr   Use specified default gateway\n"
 		  "  -l|--list              List available tests\n"
 		  "\n"
 		  "Use \"%s <test> -h\" to view test-specific options\n",
@@ -442,6 +634,8 @@ static int parse_options ( int argc, char **argv,
 	static struct option long_options[] = {
 		{ "interface", 1, NULL, 'i' },
 		{ "from", 1, NULL, 'f' },
+		{ "netmask", 1, NULL, 'n' },
+		{ "gateway", 1, NULL, 'g' },
 		{ "list", 0, NULL, 'l' },
 		{ "help", 0, NULL, 'h' },
 		{ },
@@ -457,7 +651,7 @@ static int parse_options ( int argc, char **argv,
 	while ( 1 ) {
 		int option_index = 0;
 		
-		c = getopt_long ( argc, argv, "+i:f:hl", long_options,
+		c = getopt_long ( argc, argv, "+i:f:n:g:hl", long_options,
 				  &option_index );
 		if ( c < 0 )
 			break;
@@ -469,6 +663,20 @@ static int parse_options ( int argc, char **argv,
 			break;
 		case 'f':
 			if ( inet_aton ( optarg, &options->in_addr ) == 0 ) {
+				fprintf ( stderr, "Invalid IP address %s\n",
+					  optarg );
+				return -1;
+			}
+			break;
+		case 'n':
+			if ( inet_aton ( optarg, &options->netmask ) == 0 ) {
+				fprintf ( stderr, "Invalid IP address %s\n",
+					  optarg );
+				return -1;
+			}
+			break;
+		case 'g':
+			if ( inet_aton ( optarg, &options->gateway ) == 0 ) {
 				fprintf ( stderr, "Invalid IP address %s\n",
 					  optarg );
 				return -1;
@@ -524,6 +732,8 @@ int main ( int argc, char **argv ) {
 	/* Initialise the protocol stack */
 	init_tcpip();
 	set_ipaddr ( options.in_addr );
+	set_netmask ( options.netmask );
+	set_gateway ( options.gateway );
 
 	/* Open the hijack device */
 	hijack_dev.name = options.interface;
