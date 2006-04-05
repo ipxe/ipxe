@@ -59,7 +59,7 @@ static void flag_signalled ( int signal __attribute__ (( unused )) ) {
  * have it.  Will almost certainly only work under Linux.
  *
  */
-static int pcap_inject ( pcap_t *pcap, const void *data, size_t len ) {
+int pcap_inject ( pcap_t *pcap, const void *data, size_t len ) {
 	int fd;
 	char *errbuf = pcap_geterr ( pcap );
 
