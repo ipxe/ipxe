@@ -69,12 +69,33 @@ static inline void * pkb_put ( struct pk_buff *pkb, size_t len ) {
 }
 
 /**
+ * Remove data from end of packet buffer
+ *
+ * @v pkb	Packet buffer
+ * @v len	Length to remove
+ */
+static inline void pkb_unput ( struct pk_buff *pkb, size_t len ) {
+	pkb->tail -= len;
+	assert ( pkb->tail >= pkb->data );
+}
+
+/**
  * Empty a packet buffer
  *
  * @v pkb	Packet buffer
  */
 static inline void pkb_empty ( struct pk_buff *pkb ) {
 	pkb->tail = pkb->data;
+}
+
+/**
+ * Calculate length of data in a packet buffer
+ *
+ * @v pkb	Packet buffer
+ * @ret len	Length of data in buffer
+ */
+static inline size_t pkb_len ( struct pk_buff *pkb ) {
+	return ( pkb->tail - pkb->data );
 }
 
 #endif /* _PKBUFF_H */
