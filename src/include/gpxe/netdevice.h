@@ -8,12 +8,17 @@
  */
 
 #include <stdint.h>
-#include <gpxe/llh.h>
 #include <gpxe/list.h>
 
 struct net_device;
 struct net_interface;
 struct pk_buff;
+
+/** Maximum length of a link-layer address */
+#define MAX_LLH_ADDR_LEN 6
+
+/** Maximum length of a network-layer address */
+#define MAX_NET_ADDR_LEN 4
 
 /**
  * A network device
@@ -45,7 +50,6 @@ struct net_device {
 	/** Poll for received packet
 	 *
 	 * @v netdev	Network device
-	 * @v retrieve	Flag indicating whether or not to retrieve packet
 	 * @v pkb	Packet buffer to contain received packet
 	 * @ret rc	Return status code
 	 *
@@ -53,55 +57,42 @@ struct net_device {
 	 * received packet.  If no packet is available, the method
 	 * should return -EAGAIN (i.e. this method is *always*
 	 * considered to be a non-blocking read).  If a packet is
-	 * available, but @c retrieve is false, the method should
-	 * return zero for success.  If a packet is available and @c
-	 * retrieve is true, the method should fill the packet buffer
-	 * and return zero for success.
+	 * available, the method should fill the packet buffer and
+	 * return zero for success.
 	 */
-	int ( * poll ) ( struct net_device *netdev, int retrieve,
-			 struct pk_buff *pkb );
-	/** Build media-specific link-layer header
+	int ( * poll ) ( struct net_device *netdev, struct pk_buff *pkb );
+	/** Build link-layer header
 	 *
 	 * @v netdev	Network device
 	 * @v pkb	Packet buffer
 	 * @ret rc	Return status code
 	 *
-	 * This method should convert the packet buffer's generic
-	 * link-layer header (a struct gpxehdr) into a media-specific
-	 * link-layer header (e.g. a struct ethhdr).  The generic
-	 * header should be removed from the buffer (via pkb_pull())
-	 * and the media-specific header should be prepended (via
-	 * pkb_push()) in its place.
+	 * This method should fill in the link-layer header based on
+	 * the metadata contained in @c pkb.
 	 *
 	 * If a link-layer header cannot be constructed (e.g. because
 	 * of a missing ARP cache entry), then this method should
 	 * return an error (after transmitting an ARP request, if
 	 * applicable).
 	 */
-	int ( * make_media_header ) ( struct net_device *netdev,
-				      struct pk_buff *pkb );
-	/** Build media-independent link-layer header
+	int ( * build_llh ) ( struct net_device *netdev, struct pk_buff *pkb );
+	/** Parse link-layer header
 	 *
 	 * @v netdev	Network device
 	 * @v pkb	Packet buffer
 	 * @ret rc	Return status code
 	 *
-	 * This method should convert the packet buffer's
-	 * media-specific link-layer header (e.g. a struct ethhdr)
-	 * into a generic link-layer header (a struct gpxehdr).  It
-	 * performs the converse function of make_media_header().
-	 *
-	 * Note that the gpxehdr::addr and gpxehdr::addrlen fields
-	 * will not be filled in by this function, since doing so
-	 * would require understanding the network-layer header.
+	 * This method should parse the link-layer header and fill in
+	 * the metadata in @c pkb.
 	 */
-	int ( * make_generic_header ) ( struct net_device *netdev,
-					struct pk_buff *pkb );
+	int ( * parse_llh ) ( struct net_device *netdev, struct pk_buff *pkb );
 	/** Link-layer protocol
 	 *
 	 * This is an ARPHRD_XXX constant, in network byte order.
 	 */
 	uint16_t ll_proto;
+	/** Link-layer header length */
+	uint8_t ll_hlen;
 	/** Link-layer address length */
 	uint8_t ll_addr_len;
 	/** Link-layer address
@@ -151,17 +142,18 @@ struct net_interface {
 	 */
 	int ( * process ) ( struct net_interface *netif,
 			    struct pk_buff *pkb );
-	/** Add media-independent link-layer header
+	/** Fill in packet metadata
 	 *
 	 * @v netif	Network interface
 	 * @v pkb	Packet buffer
 	 * @ret rc	Return status code
 	 *
-	 * This method should prepend a generic link-layer header (a
-	 * struct @c gpxehdr) to the packet buffer using pkb_push().
+	 * This method should fill in the @c pkb metadata with enough
+	 * information to enable net_device::build_llh to construct
+	 * the link-layer header.
 	 */
-	int ( * add_generic_header ) ( struct net_interface *netif,
-				       struct pk_buff *pkb );
+	int ( * add_llh_metadata ) ( struct net_interface *netif,
+				     struct pk_buff *pkb );
 };
 
 /**
@@ -196,9 +188,7 @@ extern struct net_device static_single_netdev;
 
 extern int register_netdevice ( struct net_device *netdev );
 
-static inline void unregister_netdevice ( struct net_device *netdev __unused ){
-	/* Do nothing */
-}
+extern void unregister_netdevice ( struct net_device *netdev );
 
 static inline void free_netdevice ( struct net_device *netdev __unused ) {
 	/* Do nothing */

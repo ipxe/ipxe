@@ -23,7 +23,6 @@
 #include <gpxe/if_ether.h>
 #include <gpxe/if_arp.h>
 #include <gpxe/pkbuff.h>
-#include <gpxe/llh.h>
 #include <gpxe/netdevice.h>
 #include <gpxe/arp.h>
 
@@ -91,45 +90,43 @@ arp_find_entry ( uint16_t ll_proto, uint16_t net_proto, const void *net_addr,
  *
  * @v netdev		Network device
  * @v pkb		Packet buffer
- * @v ll_addr		Buffer to contain link-layer address
+ * @ret ll_addr		Pointer to link-layer address
  * @ret rc		Return status code
  *
- * The packet buffer must start with a media-independent link-layer
- * header (a struct @c gpxehdr).  This function will use the ARP cache
- * to look up the link-layer address for the media corresponding to
- * @c netdev and the network-layer address as specified in @c gpxehdr.
+ * This function will use the ARP cache to look up the link-layer
+ * address for the media corresponding to @c netdev and the
+ * network-layer address as specified in the @c pkb metadata.
  *
  * If no address is found in the ARP cache, an ARP request will be
  * transmitted, -ENOENT will be returned, and the packet buffer
  * contents will be undefined.
  */
 int arp_resolve ( struct net_device *netdev, struct pk_buff *pkb,
-		  void *ll_addr ) {
-	struct gpxehdr *gpxehdr = pkb->data;
+		  const void **ll_addr ) {
 	const struct arp_entry *arp;
 	struct net_interface *netif;
 	struct arphdr *arphdr;
 
 	/* Look for existing entry in ARP table */
-	arp = arp_find_entry ( netdev->ll_proto, gpxehdr->net_proto,
-			       gpxehdr->net_addr, gpxehdr->net_addr_len );
+	arp = arp_find_entry ( netdev->ll_proto, pkb->net_proto,
+			       pkb->net_addr, pkb->net_addr_len );
 	if ( arp ) {
-		memcpy ( ll_addr, arp->ll_addr, netdev->ll_addr_len );
+		*ll_addr = arp->ll_addr;
 		return 0;
 	}
 
 	/* Find interface for this protocol */
-	netif = netdev_find_netif ( netdev, gpxehdr->net_proto );
+	netif = netdev_find_netif ( netdev, pkb->net_proto );
 	if ( ! netif )
 		return -EAFNOSUPPORT;
 
 	/* Build up ARP request */
-	pkb_unput ( pkb, pkb_len ( pkb ) - sizeof ( *gpxehdr ) );
+	pkb_empty ( pkb );
 	arphdr = pkb_put ( pkb, sizeof ( *arphdr ) );
 	arphdr->ar_hrd = netdev->ll_proto;
 	arphdr->ar_hln = netdev->ll_addr_len;
-	arphdr->ar_pro = gpxehdr->net_proto;
-	arphdr->ar_pln = gpxehdr->net_addr_len;
+	arphdr->ar_pro = pkb->net_proto;
+	arphdr->ar_pln = pkb->net_addr_len;
 	arphdr->ar_op = htons ( ARPOP_REQUEST );
 	memcpy ( pkb_put ( pkb, netdev->ll_addr_len ),
 		 netdev->ll_addr, netdev->ll_addr_len );
@@ -138,8 +135,7 @@ int arp_resolve ( struct net_device *netdev, struct pk_buff *pkb,
 	memset ( pkb_put ( pkb, netdev->ll_addr_len ),
 		 0xff, netdev->ll_addr_len );
 	memcpy ( pkb_put ( pkb, netif->net_addr_len ),
-		 gpxehdr->net_addr, netif->net_addr_len );
-	pkb_pull ( pkb, sizeof ( *gpxehdr ) );
+		 pkb->net_addr, netif->net_addr_len );
 
 	/* Locate ARP interface and send ARP request */
 	netif = netdev_find_netif ( netdev, htons ( ETH_P_ARP ) );
@@ -228,17 +224,14 @@ int arp_process ( struct net_interface *arp_netif, struct pk_buff *pkb ) {
  * @v pkb		Packet buffer
  * @ret rc		Return status code
  */
-int arp_add_generic_header ( struct net_interface *arp_netif __unused,
-			     struct pk_buff *pkb ) {
+int arp_add_llh_metadata ( struct net_interface *arp_netif __unused,
+			   struct pk_buff *pkb ) {
 	struct arphdr *arphdr = pkb->data;
-	struct gpxehdr *gpxehdr;
 
-	/* We're ARP; we always know the raw link-layer address we want */
-	gpxehdr = pkb_push ( pkb, sizeof ( *gpxehdr ) );
-	gpxehdr->net_proto = htons ( ETH_P_ARP );
-	gpxehdr->flags = GPXE_FL_RAW;
-	gpxehdr->net_addr_len = arphdr->ar_hln;
-	memcpy ( gpxehdr->net_addr, arp_target_ha ( arphdr ), arphdr->ar_hln );
+	pkb->net_proto = htons ( ETH_P_ARP );
+	pkb->flags = PKB_FL_RAW_NET_ADDR;
+	pkb->net_addr_len = arphdr->ar_hln;
+	pkb->net_addr = arp_target_ha ( arphdr );
 	
 	return 0;
 }
