@@ -1,5 +1,5 @@
 #include <stdarg.h>
-#include "if_ether.h" /* for ETH_ALEN */
+#include <gpxe/if_ether.h> /* for ETH_ALEN */
 #include "limits.h" /* for CHAR_BIT */
 #include "console.h"
 #include "errno.h"

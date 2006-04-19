@@ -1,11 +1,7 @@
 #ifndef	_IN_H
 #define	_IN_H
 
-#include "stdint.h"
-#include <if_ether.h>
-#define IP		ETH_P_IP
-#define ARP		ETH_P_ARP
-#define	RARP		ETH_P_RARP
+#include <stdint.h>
 
 #define IP_ICMP		1
 #define IP_IGMP		2
