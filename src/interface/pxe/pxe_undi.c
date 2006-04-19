@@ -168,9 +168,9 @@ PXENV_EXIT_t pxenv_undi_transmit ( struct s_PXENV_UNDI_TRANSMIT
 	 * the pre-assembled packet, then skip over the header.
 	 */
 	switch ( undi_transmit->Protocol ) {
-	case P_IP:	type = IP;	break;
-	case P_ARP:	type = ARP;	break;
-	case P_RARP:	type = RARP;	break;
+	case P_IP:	type = ETH_P_IP;	break;
+	case P_ARP:	type = ETH_P_ARP;	break;
+	case P_RARP:	type = ETH_P_RARP;	break;
 	case P_UNKNOWN:
 		media_header = (media_header_t*)data;
 		dest = media_header->dest;
@@ -496,9 +496,9 @@ PXENV_EXIT_t pxenv_undi_isr ( struct s_PXENV_UNDI_ISR *undi_isr ) {
 			memcpy ( pxe_stack->packet, nic.packet, nic.packetlen);
 			PTR_TO_SEGOFF16 ( pxe_stack->packet, undi_isr->Frame );
 			switch ( ntohs(media_header->nstype) ) {
-			case IP :	undi_isr->ProtType = P_IP;	break;
-			case ARP :	undi_isr->ProtType = P_ARP;	break;
-			case RARP :	undi_isr->ProtType = P_RARP;	break;
+			case ETH_P_IP:	undi_isr->ProtType = P_IP;	break;
+			case ETH_P_ARP:	undi_isr->ProtType = P_ARP;	break;
+			case ETH_P_RARP: undi_isr->ProtType = P_RARP;	break;
 			default :	undi_isr->ProtType = P_UNKNOWN;
 			}
 			if ( memcmp ( media_header->dest, broadcast_mac,
