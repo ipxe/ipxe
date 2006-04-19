@@ -18,6 +18,12 @@
 /** Maximum length of a network-layer address */
 #define MAX_NET_ADDR_LEN 4
 
+/* Network-layer address may be required to contain a raw link-layer address */
+#if MAX_NET_ADDR_LEN < MAX_LLH_ADDR_LEN
+#undef MAX_NET_ADDR_LEN
+#define MAX_NET_ADDR_LEN MAX_LLH_ADDR_LEN
+#endif
+
 /** A media-independent link-layer header
  *
  * This structure represents a generic link-layer header.  It never
@@ -31,16 +37,12 @@ struct gpxehdr {
 	 * ETH_P_XXX constant, in network-byte order.
 	 */
 	uint16_t net_proto;
-	/** Broadcast flag
+	/** Flags
 	 *
-	 * Filled in only on outgoing packets.
+	 * Filled in only on outgoing packets.  Value is the
+	 * bitwise-OR of zero or more GPXE_FL_XXX constants.
 	 */
-	int broadcast : 1;
-	/** Multicast flag
-	 *
-	 * Filled in only on outgoing packets.
-	 */
-	int multicast : 1;
+	uint8_t flags;
 	/** Network-layer address length 
 	 *
 	 * Filled in only on outgoing packets.
@@ -52,5 +54,10 @@ struct gpxehdr {
 	 */
 	uint8_t net_addr[MAX_NET_ADDR_LEN];
 } __attribute__ (( packed ));
+
+/* Media-independent link-layer header flags */
+#define GPXE_FL_BROADCAST	0x01
+#define GPXE_FL_MULTICAST	0x02
+#define GPXE_FL_RAW		0x04
 
 #endif /* _LLH_H */
