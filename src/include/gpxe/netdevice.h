@@ -100,6 +100,8 @@ struct net_device {
 	 * For Ethernet, this is the MAC address.
 	 */
 	uint8_t ll_addr[MAX_LLH_ADDR_LEN];
+	/** Linked list of network devices */
+	struct list_head devices;
 	/** List of network interfaces */
 	struct list_head interfaces;
 	/** Driver private data */
@@ -117,7 +119,7 @@ struct net_interface {
 	/** Underlying net device */
 	struct net_device *netdev;
 	/** Linked list of interfaces for this device */
-	struct list_head list;
+	struct list_head interfaces;
 	/** Network-layer protocol
 	 *
 	 * This is an ETH_P_XXX constant, in network byte order.
@@ -127,21 +129,6 @@ struct net_interface {
 	uint8_t net_addr_len;
 	/** Network-layer address */
 	uint8_t net_addr[MAX_NET_ADDR_LEN];
-	/** Packet processor
-	 *
-	 * @v netif	Network interface
-	 * @v pkb	Packet buffer
-	 * @ret rc	Return status code
-	 *
-	 * This method is called for packets arriving on the
-	 * associated network device that match this interface's
-	 * network-layer protocol.
-	 *
-	 * When this method is called, the link-layer header will
-	 * already have been stripped from the packet.
-	 */
-	int ( * process ) ( struct net_interface *netif,
-			    struct pk_buff *pkb );
 	/** Fill in packet metadata
 	 *
 	 * @v netif	Network interface
@@ -154,6 +141,21 @@ struct net_interface {
 	 */
 	int ( * add_llh_metadata ) ( struct net_interface *netif,
 				     struct pk_buff *pkb );
+	/** Received packet processor
+	 *
+	 * @v netif	Network interface
+	 * @v pkb	Packet buffer
+	 * @ret rc	Return status code
+	 *
+	 * This method is called for packets arriving on the
+	 * associated network device that match this interface's
+	 * network-layer protocol.
+	 *
+	 * When this method is called, the link-layer header will
+	 * already have been stripped from the packet.
+	 */
+	int ( * rx_packet ) ( struct net_interface *netif,
+			      struct pk_buff *pkb );
 };
 
 /**
@@ -168,15 +170,22 @@ static inline struct net_interface *
 netdev_find_netif ( const struct net_device *netdev, uint16_t net_proto ) {
 	struct net_interface *netif;
 
-	list_for_each_entry ( netif, &netdev->interfaces, list ) {
+	list_for_each_entry ( netif, &netdev->interfaces, interfaces ) {
 		if ( netif->net_proto == net_proto )
 			return netif;
 	}
 	return NULL;
 }
 
+extern int register_netdevice ( struct net_device *netdev );
+extern void unregister_netdevice ( struct net_device *netdev );
 extern int netdev_send ( struct net_device *netdev, struct pk_buff *pkb );
+extern int netdev_poll ( struct net_device *netdev, struct pk_buff *pkb );
 extern int netif_send ( struct net_interface *netif, struct pk_buff *pkb );
+extern int netdev_rx_packet ( struct net_device *netdev, struct pk_buff *pkb );
+extern int net_poll ( struct pk_buff *pkb, struct net_device **netdev );
+
+
 
 extern struct net_device static_single_netdev;
 
@@ -186,9 +195,6 @@ extern struct net_device static_single_netdev;
 	static_single_netdev.priv = priv_data;	\
 	&static_single_netdev; } )
 
-extern int register_netdevice ( struct net_device *netdev );
-
-extern void unregister_netdevice ( struct net_device *netdev );
 
 static inline void free_netdevice ( struct net_device *netdev __unused ) {
 	/* Do nothing */

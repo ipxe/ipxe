@@ -12,11 +12,12 @@
 #define	ETH_MAX_MTU		(ETH_FRAME_LEN-ETH_HLEN)
 #endif
 
-#define ETH_P_IP	0x0800		/* Internet Protocl Packet */
-#define ETH_P_ARP	0x0806		/* Address Resolution Protocol */
-#define ETH_P_RARP	0x8035		/* Reverse Address resolution Protocol */
-#define ETH_P_IPV6	0x86DD		/* IPv6 over blueblook */
-#define ETH_P_SLOW	0x8809		/* Ethernet slow protocols */
+#define ETH_P_RAW	0x0000	/* Raw packet */
+#define ETH_P_IP	0x0800	/* Internet Protocl Packet */
+#define ETH_P_ARP	0x0806	/* Address Resolution Protocol */
+#define ETH_P_RARP	0x8035	/* Reverse Address resolution Protocol */
+#define ETH_P_IPV6	0x86DD	/* IPv6 over blueblook */
+#define ETH_P_SLOW	0x8809	/* Ethernet slow protocols */
 
 /** An Ethernet link-layer header */
 struct ethhdr {
