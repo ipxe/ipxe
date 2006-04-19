@@ -122,6 +122,8 @@
 #define EIMGRET		0xd1
 #define ETIMEDOUT	0xd2
 #define EINVAL		0xd3
+#define ENOENT		0xd4
+#define EAFNOSUPPORT	0xd5
 
 /* Data structures and declarations */
 
