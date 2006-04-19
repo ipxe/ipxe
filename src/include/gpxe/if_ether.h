@@ -1,13 +1,7 @@
 #ifndef	_IF_ETHER_H
 #define	_IF_ETHER_H
 
-/*
-   I'm moving towards the defined names in linux/if_ether.h for clarity.
-   The confusion between 60/64 and 1514/1518 arose because the NS8390
-   counts the 4 byte frame checksum in the incoming packet, but not
-   in the outgoing packet. 60/1514 are the correct numbers for most
-   if not all of the other NIC controllers.
-*/
+#include <stdint.h>
 
 #define ETH_ALEN		6	/* Size of Ethernet address */
 #define ETH_HLEN		14	/* Size of ethernet header */
@@ -23,5 +17,15 @@
 #define ETH_P_RARP	0x8035		/* Reverse Address resolution Protocol */
 #define ETH_P_IPV6	0x86DD		/* IPv6 over blueblook */
 #define ETH_P_SLOW	0x8809		/* Ethernet slow protocols */
+
+/** An Ethernet link-layer header */
+struct ethhdr {
+	/** Destination MAC address */
+        uint8_t h_dest[ETH_ALEN];
+	/** Source MAC address */
+        uint8_t h_source[ETH_ALEN];
+	/** Protocol ID */
+        uint16_t h_protocol;
+} __attribute__ ((packed));
 
 #endif	/* _IF_ETHER_H */

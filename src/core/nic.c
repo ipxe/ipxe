@@ -24,6 +24,18 @@ Literature dealing with the network protocols:
 #include "background.h"
 #include "elf.h" /* FOR EM_CURRENT */
 
+struct arprequest {
+        uint16_t hwtype;
+        uint16_t protocol;
+        uint8_t  hwlen;
+        uint8_t  protolen;
+        uint16_t opcode;
+        uint8_t  shwaddr[6];
+        uint8_t  sipaddr[4];
+        uint8_t  thwaddr[6];
+        uint8_t  tipaddr[4];
+} PACKED;
+
 struct arptable_t	arptable[MAX_ARP];
 /* Put rom_info in .nocompress section so romprefix.S can write to it */
 struct rom_info	rom __attribute__ ((section (".text16.nocompress"))) = {0,0};
@@ -427,7 +439,7 @@ static int await_arp(int ival, void *ptr,
 		return 0;
 	arpreply = (struct arprequest *)&nic.packet[ETH_HLEN];
 
-	if (arpreply->opcode != htons(ARP_REPLY)) 
+	if (arpreply->opcode != htons(ARPOP_REPLY)) 
 		return 0;
 	if (memcmp(arpreply->sipaddr, ptr, sizeof(in_addr)) != 0)
 		return 0;
@@ -474,10 +486,10 @@ int ip_transmit(int len, const void *buf)
 				break;
 		if (i == ETH_ALEN) {	/* Need to do arp request */
 			arpreq.hwtype = htons(1);
-			arpreq.protocol = htons(IP);
+			arpreq.protocol = htons(ETH_P_IP);
 			arpreq.hwlen = ETH_ALEN;
 			arpreq.protolen = 4;
-			arpreq.opcode = htons(ARP_REQUEST);
+			arpreq.opcode = htons(ARPOP_REQUEST);
 			memcpy(arpreq.shwaddr, arptable[ARP_CLIENT].node, ETH_ALEN);
 			memcpy(arpreq.sipaddr, &arptable[ARP_CLIENT].ipaddr, sizeof(in_addr));
 			memset(arpreq.thwaddr, 0, ETH_ALEN);
@@ -974,9 +986,9 @@ int await_reply(reply_t reply, int ival, void *ptr, long timeout)
 		
 			arpreply = (struct arprequest *)&nic.packet[ETH_HLEN];
 			memcpy(&tmp, arpreply->tipaddr, sizeof(in_addr));
-			if ((arpreply->opcode == htons(ARP_REQUEST)) &&
+			if ((arpreply->opcode == htons(ARPOP_REQUEST)) &&
 				(tmp == arptable[ARP_CLIENT].ipaddr.s_addr)) {
-				arpreply->opcode = htons(ARP_REPLY);
+				arpreply->opcode = htons(ARPOP_REPLY);
 				memcpy(arpreply->tipaddr, arpreply->sipaddr, sizeof(in_addr));
 				memcpy(arpreply->thwaddr, arpreply->shwaddr, ETH_ALEN);
 				memcpy(arpreply->sipaddr, &arptable[ARP_CLIENT].ipaddr, sizeof(in_addr));

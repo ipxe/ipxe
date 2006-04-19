@@ -119,7 +119,7 @@
 #define NULL	((void *)0)
 #endif
 
-#include	"if_ether.h"
+#include	<gpxe/if_ether.h>
 
 enum {
 	ARP_CLIENT, ARP_SERVER, ARP_GATEWAY,
@@ -144,7 +144,7 @@ enum {
 #define ENCAP_OPT
 #endif
 
-#include	"if_arp.h"
+#include	<gpxe/if_arp.h>
 #include	"ip.h"
 #include	"udp.h"
 #include	"old_tcp.h"
