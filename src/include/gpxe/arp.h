@@ -18,6 +18,6 @@ extern int arp_process ( struct net_interface *arp_netif,
 			 struct pk_buff *pkb );
 
 extern int arp_add_generic_header ( struct net_interface *arp_netif,
-				    struct pk_buff *pkb ) {
+				    struct pk_buff *pkb );
 
 #endif /* _ARP_H */
