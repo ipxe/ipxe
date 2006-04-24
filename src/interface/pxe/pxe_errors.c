@@ -13,7 +13,7 @@
  * followed by a little manual tweaking.
  *
  */
-static struct errortab pxe_errortab[] __errortab = {
+struct errortab pxe_errortab[] __errortab = {
 	{ PXENV_STATUS_SUCCESS, "Success" },
 	{ PXENV_STATUS_FAILURE, "Failure" },
 	{ PXENV_STATUS_BAD_FUNC, "Bad function" },

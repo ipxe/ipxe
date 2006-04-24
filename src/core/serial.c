@@ -91,7 +91,7 @@
 #define uart_writeb(val,addr) outb((val),(addr))
 #endif
 
-static struct console_driver serial_console;
+struct console_driver serial_console;
 
 /*
  * void serial_putc(int ch);
@@ -229,7 +229,7 @@ static void serial_fini ( void ) {
 	/* Don't mark it as disabled; it's still usable */
 }
 
-static struct console_driver serial_console __console_driver = {
+struct console_driver serial_console __console_driver = {
 	.putchar = serial_putc,
 	.getchar = serial_getc,
 	.iskey = serial_ischar,

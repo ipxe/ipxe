@@ -434,7 +434,7 @@ static void btext_putc(int c)
         btext_drawchar((unsigned char)c);
 }
 
-static struct console_driver btext_console __console_driver = {
+struct console_driver btext_console __console_driver = {
 	.putchar = btext_putc,
 	.disabled = 1,
 };

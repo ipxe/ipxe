@@ -610,7 +610,7 @@ nfssymlink:
 
 INIT_FN ( INIT_RPC, rpc_init, nfs_reset, nfs_reset );
 
-static struct protocol nfs_protocol __protocol = {
+struct protocol nfs_protocol __protocol = {
 	.name = "nfs",
 	.default_port = SUNRPC_PORT,
 	.load = nfs,

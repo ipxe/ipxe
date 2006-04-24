@@ -961,7 +961,7 @@ static struct nic_operations ns8390_operations = {
 }
 
 #ifdef	INCLUDE_WD
-static struct isa_driver wd_driver __isa_driver = {
+struct isa_driver wd_driver __isa_driver = {
 	.type    = NIC_DRIVER,
 	.name    = "WD",
 	.probe   = wd_probe,
@@ -971,7 +971,7 @@ ISA_ROM("wd","WD8003/8013, SMC8216/8416, SMC 83c790 (EtherEZ)");
 #endif
 
 #ifdef	INCLUDE_3C503
-static struct isa_driver t503_driver __isa_driver = {
+struct isa_driver t503_driver __isa_driver = {
 	.type    = NIC_DRIVER,
 	.name    = "3C503",
 	.probe   = t503_probe,
@@ -981,7 +981,7 @@ ISA_ROM("3c503","3Com503, Etherlink II[/16]");
 #endif
 
 #ifdef	INCLUDE_NE
-static struct isa_driver ne_driver __isa_driver = {
+struct isa_driver ne_driver __isa_driver = {
 	.type    = NIC_DRIVER,
 	.name    = "NE*000",
 	.probe   = ne_probe,

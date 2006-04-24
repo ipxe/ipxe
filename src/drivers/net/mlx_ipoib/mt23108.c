@@ -235,7 +235,7 @@ static struct pci_id tavor_nics[] = {
 	PCI_ROM(0x15b3, 0x6278, "MT25208", "MT25208 HCA driver"),
 };
 
-static struct pci_driver tavor_driver __pci_driver = {
+struct pci_driver tavor_driver __pci_driver = {
 	.type = NIC_DRIVER,
 	.name = "MT23108/MT25208",
 	.probe = tavor_probe,

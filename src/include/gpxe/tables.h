@@ -131,7 +131,7 @@
  *	...
  *   }
  *
- *   static struct frob my_frobnicator __frobnicator = {
+ *   struct frob my_frobnicator __frobnicator = {
  *	.name = "my_frob",
  *	.frob = my_frob,
  *   };
@@ -184,7 +184,7 @@
  *
  * @code
  *
- *   static struct my_foo __table ( foo, 01 ) = {
+ *   struct my_foo __table ( foo, 01 ) = {
  *      ...
  *   };
  *

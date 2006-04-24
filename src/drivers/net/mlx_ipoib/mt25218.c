@@ -235,7 +235,7 @@ static struct pci_id mt25218_nics[] = {
 	PCI_ROM(0x15b3, 0x6274, "MT25204", "MT25204 HCA driver"),
 };
 
-static struct pci_driver mt25218_driver __pci_driver = {
+struct pci_driver mt25218_driver __pci_driver = {
 	.type = NIC_DRIVER,
 	.name = "MT25218",
 	.probe = mt25218_probe,

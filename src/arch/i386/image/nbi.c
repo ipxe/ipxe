@@ -404,7 +404,7 @@ static int nbi_boot ( void *context ) {
 }
 
 /** Declaration of the NBI image format */
-static struct image nbi_image __image = {
+struct image nbi_image __image = {
 	.name	= "NBI",
 	.probe	= nbi_probe,
 	.load	= nbi_load,

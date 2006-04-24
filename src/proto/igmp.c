@@ -112,7 +112,7 @@ static void process_igmp ( unsigned long now, unsigned short ptype __unused,
 	}
 }
 
-static struct background igmp_background __background = {
+struct background igmp_background __background = {
 	.send = send_igmp_reports,
 	.process = process_igmp,
 };

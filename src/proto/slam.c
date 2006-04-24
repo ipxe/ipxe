@@ -534,7 +534,7 @@ static int url_slam ( char *url __unused, struct sockaddr_in *server,
 	return proto_slam(&info);
 }
 
-static struct protocol slam_protocol __protocol = {
+struct protocol slam_protocol __protocol = {
 	.name = "x-slam",
 	.default_port = SLAM_PORT,
 	.load = url_slam,

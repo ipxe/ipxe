@@ -107,6 +107,6 @@ static int kbd_getc(void)
     return c;
 }
 
-static struct console_driver pc_kbd_console __console_driver = {
+struct console_driver pc_kbd_console __console_driver = {
 	.getchar = kbd_getc,
 };

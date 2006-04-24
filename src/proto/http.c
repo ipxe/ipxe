@@ -166,7 +166,7 @@ static int http ( char *url, struct sockaddr_in *server __unused,
 	return 1;
 }
 
-static struct protocol http_protocol __protocol = {
+struct protocol http_protocol __protocol = {
 	.name = "http",
 	.default_port = 80,
 	.load = http,

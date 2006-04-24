@@ -311,7 +311,7 @@ static const char * t509_name_device ( struct bus_dev *bus_dev __unused ) {
  * T509 bus operations table
  *
  */
-static struct bus_driver t509_driver __bus_driver = {
+struct bus_driver t509_driver __bus_driver = {
 	.name			= "T509",
 	.next_location		= t509_next_location,
 	.fill_device		= t509_fill_device,
@@ -392,7 +392,7 @@ static void el3_t509_disable ( struct nic *nic, struct t509_device *t509 ) {
 	deactivate_t509_device ( t509 );
 }
 
-static struct {} el3_t509_driver;
+struct {} el3_t509_driver;
 
 DRIVER ( "3c509", nic_driver, t509_driver, el3_t509_driver,
 	 el3_t509_probe, el3_t509_disable );

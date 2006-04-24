@@ -100,7 +100,7 @@ static int nmb_resolv ( struct in_addr *addr, const char *name ) {
 	return 1;
 }
 
-static struct resolver nmb_resolver __resolver = {
+struct resolver nmb_resolver __resolver = {
 	.name = "NMB",
 	.resolv = nmb_resolv,
 };

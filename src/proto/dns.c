@@ -355,7 +355,7 @@ static int dns_resolv ( struct in_addr *addr, const char *name ) {
 	}
 }
 
-static struct resolver dns_resolver __resolver = {
+struct resolver dns_resolver __resolver = {
 	.name = "DNS",
 	.resolv = dns_resolv,
 };

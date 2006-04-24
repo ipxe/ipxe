@@ -12,7 +12,7 @@
 #include "init.h"
 #include "vga.h"
 
-static struct console_driver vga_console;
+struct console_driver vga_console;
 
 static char *vidmem;		/* The video buffer */
 static int video_line, video_col;
@@ -94,7 +94,7 @@ static void vga_putc(int byte)
 	write_crtc((video_col + (video_line *COLS)) & 0x0ff, CRTC_CURSOR_LO);
 }
 
-static struct console_driver vga_console __console_driver = {
+struct console_driver vga_console __console_driver = {
 	.putchar = vga_putc,
 	.disabled = 1,
 };

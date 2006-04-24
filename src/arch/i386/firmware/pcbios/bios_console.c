@@ -68,7 +68,7 @@ static int bios_iskey ( void ) {
 	return ( ( flags & ZF ) == 0 );
 }
 
-static struct console_driver bios_console __console_driver = {
+struct console_driver bios_console __console_driver = {
 	.putchar = bios_putchar,
 	.getchar = bios_getchar,
 	.iskey = bios_iskey,
