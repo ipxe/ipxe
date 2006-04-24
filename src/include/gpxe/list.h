@@ -1,5 +1,5 @@
-#ifndef _LIST_H
-#define _LIST_H
+#ifndef _GPXE_LIST_H
+#define _GPXE_LIST_H
 
 /** @file
  *
@@ -10,14 +10,6 @@
  */
 
 #include <stddef.h>
-
-/*
- * These are non-NULL pointers that will result in page faults
- * under normal circumstances, used to verify that nobody uses
- * non-initialized list entries.
- */
-#define LIST_POISON1 ( ( void * ) 0x00100100 )
-#define LIST_POISON2 ( ( void * ) 0x00200200 )
 
 /*
  * Simple doubly linked list implementation.
@@ -108,8 +100,6 @@ static inline void __list_del ( struct list_head * prev,
  */
 static inline void list_del ( struct list_head *entry ) {
 	__list_del ( entry->prev, entry->next );
-	entry->next = LIST_POISON1;
-	entry->prev = LIST_POISON2;
 }
 
 /**
@@ -152,4 +142,4 @@ static inline int list_empty ( const struct list_head *head ) {
 	      &pos->member != (head);					      \
 	      pos = list_entry ( pos->member.next, typeof ( *pos ), member ) )
 
-#endif /* _LIST_H */
+#endif /* _GPXE_LIST_H */
