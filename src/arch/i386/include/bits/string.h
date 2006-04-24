@@ -3,6 +3,9 @@
 /*
  * Taken from Linux /usr/include/asm/string.h
  * All except memcpy, memmove, memset and memcmp removed.
+ *
+ * Non-standard memswap() function added because it saves quite a bit
+ * of code (mbrown@fensystems.co.uk).
  */
 
 /*
@@ -19,18 +22,121 @@
  */
 
 #define __HAVE_ARCH_MEMCPY
-static inline void * memcpy(void *dest, const void *src, size_t n)
-{
-int d0, d1, d2;
-__asm__ __volatile__ (
-	"cld\n\t"
-	"rep\n\t"
-	"movsb"
-	: "=&c" (d0), "=&S" (d1), "=&D" (d2)
-	:"0" (n), "1" (src), "2" (dest)
-	: "memory");
-return dest; 
+static inline __attribute__ (( always_inline )) void *
+__memcpy ( void *dest, const void *src, size_t len ) {
+	int d0, d1, d2;
+	__asm__ __volatile__ ( "rep ; movsb"
+			       : "=&c" ( d0 ), "=&S" ( d1 ), "=&D" ( d2 )
+			       : "0" ( len ), "1" ( src ), "2" ( dest )
+			       : "memory" );
+	return dest; 
 }
+
+static inline __attribute__ (( always_inline )) void *
+__constant_memcpy ( void *dest, const void *src, size_t len ) {
+	const void *esi;
+	void *edi;
+
+	switch ( len ) {
+	case 0 : /* 0 bytes */
+		return dest;
+	/*
+	 * Single-register moves; these are always better than a
+	 * string operation.  We can clobber an arbitrary two
+	 * registers (data, source, dest can re-use source register)
+	 * instead of being restricted to esi and edi.  There's also a
+	 * much greater potential for optimising with nearby code.
+	 *
+	 */
+	case 1 : /* 4 bytes */
+		* ( uint8_t  * ) ( dest + 0 ) = * ( uint8_t  * ) ( src + 0 );
+		return dest;
+	case 2 : /* 6 bytes */
+		* ( uint16_t * ) ( dest + 0 ) = * ( uint16_t * ) ( src + 0 );
+		return dest;
+	case 4 : /* 4 bytes */
+		* ( uint32_t * ) ( dest + 0 ) = * ( uint32_t * ) ( src + 0 );
+		return dest;
+	/*
+	 * Double-register moves; these are probably still a win.
+	 *
+	 */
+	case 3 : /* 12 bytes */
+		* ( uint16_t * ) ( dest + 0 ) = * ( uint16_t * ) ( src + 0 );
+		* ( uint8_t  * ) ( dest + 2 ) = * ( uint8_t  * ) ( src + 2 );
+		return dest;
+	case 5 : /* 10 bytes */
+		* ( uint32_t * ) ( dest + 0 ) = * ( uint32_t * ) ( src + 0 );
+		* ( uint8_t  * ) ( dest + 4 ) = * ( uint8_t  * ) ( src + 4 );
+		return dest;
+	case 6 : /* 12 bytes */
+		* ( uint32_t * ) ( dest + 0 ) = * ( uint32_t * ) ( src + 0 );
+		* ( uint16_t * ) ( dest + 4 ) = * ( uint16_t * ) ( src + 4 );
+		return dest;
+	case 8 : /* 10 bytes */
+		* ( uint32_t * ) ( dest + 0 ) = * ( uint32_t * ) ( src + 0 );
+		* ( uint32_t * ) ( dest + 4 ) = * ( uint32_t * ) ( src + 4 );
+		return dest;
+	}
+
+	/* Even if we have to load up esi and edi ready for a string
+	 * operation, we can sometimes save space by using multiple
+	 * single-byte "movs" operations instead of loading up ecx and
+	 * using "rep movsb".
+	 *
+	 * "load ecx, rep movsb" is 7 bytes, plus an average of 1 byte
+	 * to allow for saving/restoring ecx 50% of the time.
+	 *
+	 * "movsl" and "movsb" are 1 byte each, "movsw" is two bytes.
+	 * (In 16-bit mode, "movsl" is 2 bytes and "movsw" is 1 byte,
+	 * but "movsl" moves twice as much data, so it balances out).
+	 *
+	 * The cutoff point therefore occurs around 26 bytes; the byte
+	 * requirements for each method are:
+	 *
+	 * len		   16 17 18 19 20 21 22 23 24 25 26 27 28 29 30 31
+	 * #bytes (ecx)	    8  8  8  8  8  8  8  8  8  8  8  8  8  8  8  8
+	 * #bytes (no ecx)  4  5  6  7  5  6  7  8  6  7  8  9  7  8  9 10
+	 */
+
+	esi = src;
+	edi = dest;
+	
+	if ( len >= 26 )
+		return __memcpy ( dest, src, len );
+	
+	if ( len >= 6*4 )
+		__asm__ __volatile__ ( "movsl" : "=&D" ( edi ), "=&S" ( esi )
+				       : "0" ( edi ), "1" ( esi ) : "memory" );
+	if ( len >= 5*4 )
+		__asm__ __volatile__ ( "movsl" : "=&D" ( edi ), "=&S" ( esi )
+				       : "0" ( edi ), "1" ( esi ) : "memory" );
+	if ( len >= 4*4 )
+		__asm__ __volatile__ ( "movsl" : "=&D" ( edi ), "=&S" ( esi )
+				       : "0" ( edi ), "1" ( esi ) : "memory" );
+	if ( len >= 3*4 )
+		__asm__ __volatile__ ( "movsl" : "=&D" ( edi ), "=&S" ( esi )
+				       : "0" ( edi ), "1" ( esi ) : "memory" );
+	if ( len >= 2*4 )
+		__asm__ __volatile__ ( "movsl" : "=&D" ( edi ), "=&S" ( esi )
+				       : "0" ( edi ), "1" ( esi ) : "memory" );
+	if ( len >= 1*4 )
+		__asm__ __volatile__ ( "movsl" : "=&D" ( edi ), "=&S" ( esi )
+				       : "0" ( edi ), "1" ( esi ) : "memory" );
+	if ( ( len % 4 ) >= 2 )
+		__asm__ __volatile__ ( "movsw" : "=&D" ( edi ), "=&S" ( esi )
+				       : "0" ( edi ), "1" ( esi ) : "memory" );
+	if ( ( len % 2 ) >= 1 )
+		__asm__ __volatile__ ( "movsb" : "=&D" ( edi ), "=&S" ( esi )
+				       : "0" ( edi ), "1" ( esi ) : "memory" );
+
+	return dest;
+}
+
+#define memcpy( dest, src, len )			\
+	( __builtin_constant_p ( (len) ) ?		\
+	  __constant_memcpy ( (dest), (src), (len) ) :	\
+	  __memcpy ( (dest), (src), (len) ) )
 
 #define __HAVE_ARCH_MEMMOVE
 static inline void * memmove(void * dest,const void * src, size_t n)
@@ -59,7 +165,7 @@ return dest;
 }
 
 #define __HAVE_ARCH_MEMSET
-static inline void *memset(void *s, int c,size_t count)
+static inline void * memset(void *s, int c,size_t count)
 {
 int d0, d1;
 __asm__ __volatile__(
@@ -70,6 +176,23 @@ __asm__ __volatile__(
 	:"a" (c),"1" (s),"0" (count)
 	:"memory");
 return s;
+}
+
+#define __HAVE_ARCH_MEMSWAP
+static inline void * memswap(void *dest, void *src, size_t n)
+{
+int d0, d1, d2, d3;
+__asm__ __volatile__(
+	"\n1:\t"
+	"movb (%%edi),%%al\n\t"
+	"xchgb (%%esi),%%al\n\t"
+	"incl %%esi\n\t"
+	"stosb\n\t"
+	"loop 1b"
+	: "=&c" (d0), "=&S" (d1), "=&D" (d2), "=&a" (d3)
+	: "0" (n), "1" (src), "2" (dest)
+	: "memory" );
+return dest;
 }
 
 #define __HAVE_ARCH_STRNCMP
