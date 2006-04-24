@@ -131,7 +131,7 @@ static u8_t iss[4];          /* The iss variable is used for the TCP
 				initial sequence number. */
 
 #if UIP_ACTIVE_OPEN
-static u16_t lastport;       /* Keeps track of the last port used for
+static u16_t lastport = 1024;  /* Keeps track of the last port used for
 				a new connection. */
 #endif /* UIP_ACTIVE_OPEN */
 
@@ -174,6 +174,7 @@ void uip_log(char *msg);
 #endif /* UIP_LOGGING == 1 */
 
 /*-----------------------------------------------------------------------------------*/
+#if 0
 void
 uip_init(void)
 {
@@ -200,6 +201,7 @@ uip_init(void)
 #endif /* UIP_FIXEDADDR */
 
 }
+#endif
 /*-----------------------------------------------------------------------------------*/
 #if UIP_ACTIVE_OPEN
 struct uip_conn *
