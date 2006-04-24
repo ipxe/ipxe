@@ -119,7 +119,7 @@ RULE_c		= $(COMPILE_c) -c $< -o $@
 RULE_c_to_dbg.o	= $(COMPILE_c) -Ddebug_$(OBJECT) -c $< -o $@
 RULE_c_to_dbg2.o = $(COMPILE_c) -Ddebug_$(OBJECT)=2 -c $< -o $@
 RULE_c_to_c	= $(COMPILE_c) -E -c $< > $@
-RULE_c_to_s	= $(COMPILE_c) -S -c $< -o $@ 
+RULE_c_to_s	= $(COMPILE_c) -S -g0 -c $< -o $@ 
 
 PREPROCESS_S	= $(CPP) $(CFLAGS) $(CFLAGS_S) $(OBJ_CFLAGS)
 ASSEMBLE_S	= $(AS) $(ASFLAGS)
@@ -132,6 +132,7 @@ DEBUG_TARGETS	+= dbg2.o dbg.o c s
 #
 SRCDIRS		+= core
 SRCDIRS		+= proto
+SRCDIRS		+= net
 SRCDIRS		+= proto/uip
 #SRCDIRS		+= image
 SRCDIRS		+= drivers/bus
