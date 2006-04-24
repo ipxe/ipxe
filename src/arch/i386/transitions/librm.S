@@ -584,7 +584,7 @@ EXPORT(prot_call):
 	 */
 	call	1f
 1:	popl	%ebp
-	movl	OFFSET(librm_base-1b)(%ebp), %ebx
+	movl	(librm_base-1b)(%ebp), %ebx
 	
 	/* Jump to running in installed copy of librm */
 	addl	$OFFSET(1f), %ebx
