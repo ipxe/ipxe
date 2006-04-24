@@ -5,7 +5,7 @@
 #include "string.h"
 #include "buffer.h"
 #include "dhcp.h" /* for dhcp_dev_id */
-#include "tables.h"
+#include <gpxe/tables.h>
 #include <assert.h>
 
 /*
@@ -202,7 +202,7 @@ struct device_driver {
 
 #define DRIVER(_name,_type_driver,_bus_driver,_bus_info,	 	      \
 	       _probe,_disable) 		 			      \
-	static struct device_driver device_ ## _bus_info __device_driver = {  \
+	struct device_driver device_ ## _bus_info __device_driver = {  \
 		.name = _name,						      \
 		.type_driver = &_type_driver,				      \
 		.bus_driver = &_bus_driver,				      \

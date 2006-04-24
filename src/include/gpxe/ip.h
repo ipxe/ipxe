@@ -1,5 +1,5 @@
-#ifndef _IP_H
-#define _IP_H
+#ifndef _GPXE_IP_H
+#define _GPXE_IP_H
 
 /** @file
  *
@@ -17,4 +17,4 @@ extern void set_gateway ( struct in_addr address );
 extern void init_tcpip ( void );
 extern void run_tcpip ( void );
 
-#endif /* _IP_H */
+#endif /* _GPXE_IP_H */

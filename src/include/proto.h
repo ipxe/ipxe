@@ -1,7 +1,7 @@
 #ifndef PROTO_H
 #define PROTO_H
 
-#include "tables.h"
+#include <gpxe/tables.h>
 #include "buffer.h"
 #include <gpxe/in.h>
 

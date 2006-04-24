@@ -31,7 +31,7 @@
 #include "etherboot.h"
 #include "nic.h"
 #include "mii.h"
-#include "pci.h"
+#include <gpxe/pci.h>
 #include "timer.h"
 #include "string.h"
 #include "stdint.h"

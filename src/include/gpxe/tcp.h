@@ -1,5 +1,5 @@
-#ifndef _TCP_H
-#define _TCP_H
+#ifndef _GPXE_TCP_H
+#define _GPXE_TCP_H
 
 /** @file
  *
@@ -99,4 +99,4 @@ extern void tcp_send ( struct tcp_connection *conn, const void *data,
 		       size_t len );
 extern void tcp_close ( struct tcp_connection *conn );
 
-#endif /* _TCP_H */
+#endif /* _GPXE_TCP_H */

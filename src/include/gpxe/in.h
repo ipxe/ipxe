@@ -1,5 +1,5 @@
-#ifndef	_IN_H
-#define	_IN_H
+#ifndef	_GPXE_IN_H
+#define	_GPXE_IN_H
 
 #include <stdint.h>
 
@@ -8,8 +8,11 @@
 #define IP_TCP		6
 #define IP_UDP		17
 
-/* Same after going through htonl */
-#define IP_BROADCAST	0xFFFFFFFF
+#define INADDR_NONE 0xffffffff
+
+#define INADDR_BROADCAST 0xffffffff
+
+#define IN_MULTICAST(addr) ( ( (addr) & 0xf0000000 ) == 0xe0000000 )
 
 struct in_addr {
 	uint32_t	s_addr;
@@ -27,4 +30,4 @@ struct sockaddr_in {
 extern int inet_aton ( const char *cp, struct in_addr *inp );
 extern char * inet_ntoa ( struct in_addr in );
 
-#endif	/* _IN_H */
+#endif	/* _GPXE_IN_H */

@@ -52,7 +52,7 @@ Drivers are port from Intel's Linux driver e1000-4.3.15
 /* to get the interface to the body of the program */
 #include "nic.h"
 /* to get the PCI support functions, if this is a PCI NIC */
-#include "pci.h"
+#include <gpxe/pci.h>
 #include "timer.h"
 
 typedef unsigned char *dma_addr_t;

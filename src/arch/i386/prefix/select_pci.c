@@ -1,5 +1,5 @@
 #include "dev.h"
-#include "pci.h"
+#include <gpxe/pci.h>
 #include "registers.h"
 
 /*

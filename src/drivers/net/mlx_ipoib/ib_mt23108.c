@@ -21,7 +21,7 @@
 
 #include "mt23108.h"
 #include "ib_driver.h"
-#include "pci.h"
+#include <gpxe/pci.h>
 
 struct device_buffers_st {
 	union recv_wqe_u mads_qp_rcv_queue[NUM_MADS_RCV_WQES]

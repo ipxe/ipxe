@@ -12,7 +12,7 @@
 */
 #include "etherboot.h"
 #include "init.h"
-#include "pci.h"
+#include <gpxe/pci.h>
 #include "pci_io.h"
 #ifdef KEEP_IT_REAL
 #include "realmode.h"

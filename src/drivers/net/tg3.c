@@ -14,7 +14,7 @@
 
 #include "etherboot.h"
 #include "nic.h"
-#include "pci.h"
+#include <gpxe/pci.h>
 #include "timer.h"
 #include "string.h"
 #include "tg3.h"

@@ -39,7 +39,7 @@
 
 #include "etherboot.h"
 #include "nic.h"
-#include "pci.h"
+#include <gpxe/pci.h>
 #include "timer.h"
 
 static struct nic_operations a3c90x_operations;

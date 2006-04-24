@@ -5,7 +5,7 @@
 #define LINUX_OUT_MACROS
 
 #include "etherboot.h"
-#include "pci.h"
+#include <gpxe/pci.h>
 #include "nic.h"
 #include "timer.h"
 #include "console.h"

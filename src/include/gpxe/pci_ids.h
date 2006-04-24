@@ -1,3 +1,6 @@
+#ifndef _GPXE_PCI_IDS_H
+#define _GPXE_PCI_IDS_H
+
 /*
  *	PCI Class, Vendor and Device IDs
  *
@@ -341,3 +344,5 @@
 #define PCI_SUBVENDOR_ID_EXSYS		0xd84d
 #define PCI_VENDOR_ID_TIGERJET		0xe159
 #define PCI_VENDOR_ID_ARK		0xedd8
+
+#endif /* _GPXE_PCI_IDS_H */

@@ -3,7 +3,7 @@
 
 #include "stdint.h"
 #include "vsprintf.h"
-#include "tables.h"
+#include <gpxe/tables.h>
 
 /** @file
  *

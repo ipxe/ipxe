@@ -1,5 +1,5 @@
-#ifndef	_IF_ARP_H
-#define	_IF_ARP_H
+#ifndef	_GPXE_IF_ARP_H
+#define	_GPXE_IF_ARP_H
 
 /** @file
  *
@@ -97,4 +97,4 @@ static inline void * arp_target_pa ( struct arphdr *arphdr ) {
 	return ( arp_target_ha ( arphdr ) + arphdr->ar_hln );
 }
 
-#endif	/* _IF_ARP_H */
+#endif	/* _GPXE_IF_ARP_H */

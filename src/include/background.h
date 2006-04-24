@@ -17,7 +17,7 @@
  *
  */
 
-#include "tables.h"
+#include <gpxe/tables.h>
 #include "ip.h"
 
 /** A background protocol */

@@ -33,7 +33,7 @@ SMC8416 PIO support added by Andrew Bettison (andrewb@zip.com.au) on 4/3/02
 #include "nic.h"
 #include "ns8390.h"
 #ifdef	INCLUDE_NS8390
-#include "pci.h"
+#include <gpxe/pci.h>
 #else
 #include "isa.h"
 #endif

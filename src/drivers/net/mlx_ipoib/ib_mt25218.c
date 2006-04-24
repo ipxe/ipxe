@@ -21,7 +21,7 @@
 
 #include "mt25218.h"
 #include "ib_driver.h"
-#include "pci.h"
+#include <gpxe/pci.h>
 
 #define MOD_INC(counter, max_count) (counter) = ((counter)+1) & ((max_count) - 1)
 

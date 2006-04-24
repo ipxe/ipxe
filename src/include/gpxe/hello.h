@@ -1,5 +1,5 @@
-#ifndef _HELLO_H
-#define _HELLO_H
+#ifndef _GPXE_HELLO_H
+#define _GPXE_HELLO_H
 
 /** @file
  *

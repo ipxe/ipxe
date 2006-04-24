@@ -1,5 +1,5 @@
-#ifndef _SCSI_H
-#define _SCSI_H
+#ifndef _GPXE_SCSI_H
+#define _GPXE_SCSI_H
 
 #include <stdint.h>
 
@@ -31,4 +31,4 @@ union scsi_cdb {
 	char bytes[16];
 };
 
-#endif /* _SCSI_H */
+#endif /* _GPXE_SCSI_H */

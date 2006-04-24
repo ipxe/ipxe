@@ -2,7 +2,7 @@
 #include "string.h"
 #include "console.h"
 #include "nic.h"
-#include "pci.h"
+#include <gpxe/pci.h>
 
 /*
  * pci_io.c may know how many buses we have, in which case it can

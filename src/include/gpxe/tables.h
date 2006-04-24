@@ -1,5 +1,5 @@
-#ifndef TABLES_H
-#define TABLES_H
+#ifndef _GPXE_TABLES_H
+#define _GPXE_TABLES_H
 
 /** @page ifdef_harmful #ifdef considered harmful
  *
@@ -164,7 +164,9 @@
  *
  */
 
-#include "compiler.h" /* for doxygen */
+#ifdef DOXYGEN
+#define __attribute__(x)
+#endif
 
 #define __table_str(x) #x
 #define __table_section(table,idx) \
@@ -224,4 +226,4 @@
 #define __table_end(table) \
 	__attribute__ (( unused, __table_section_end(table) ))
 
-#endif /* TABLES_H */
+#endif /* _GPXE_TABLES_H */

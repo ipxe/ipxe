@@ -40,7 +40,7 @@
 /* to get the interface to the body of the program */
 #include "nic.h"
 /* to get the PCI support functions, if this is a PCI NIC */
-#include "pci.h"
+#include <gpxe/pci.h>
 
 #if ARCH == ia64		/* Support 64-bit addressing */
 #define USE_64BIT_ADDR

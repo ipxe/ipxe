@@ -3,7 +3,7 @@
 
 #include "stdint.h"
 #include "io.h"
-#include "tables.h"
+#include <gpxe/tables.h>
 #include "dev.h"
 
 struct image {

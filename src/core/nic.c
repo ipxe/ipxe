@@ -457,7 +457,7 @@ int ip_transmit(int len, const void *buf)
 
 	ip = (struct iphdr *)buf;
 	destip = ip->dest.s_addr;
-	if (destip == IP_BROADCAST) {
+	if (destip == INADDR_BROADCAST) {
 		eth_transmit(broadcast, ETH_P_IP, len, buf);
 	} else if ((destip & htonl(MULTICAST_MASK)) == htonl(MULTICAST_NETWORK)) {
 		unsigned char multicast[6];
@@ -765,7 +765,7 @@ static int bootp(void)
 		memset ( arptable, 0, sizeof(arptable) );
 		memcpy ( arptable[ARP_CLIENT].node, my_hwaddr, ETH_ALEN );
 
-		udp_transmit(IP_BROADCAST, BOOTP_CLIENT, BOOTP_SERVER,
+		udp_transmit(INADDR_BROADCAST, BOOTP_CLIENT, BOOTP_SERVER,
 			sizeof(struct bootpip_t), &ip);
 		remaining_time = rfc2131_sleep_interval(BOOTP_TIMEOUT, retry++);
 		stop_time = currticks() + remaining_time;
@@ -804,8 +804,9 @@ static int bootp(void)
 		for (reqretry = 0; reqretry < MAX_BOOTP_RETRIES; ) {
 			unsigned long timeout;
 
-			udp_transmit(IP_BROADCAST, BOOTP_CLIENT, BOOTP_SERVER,
-				     sizeof(struct bootpip_t), &ip);
+			udp_transmit(INADDR_BROADCAST, BOOTP_CLIENT,
+				     BOOTP_SERVER, sizeof(struct bootpip_t),
+				     &ip);
 			dhcp_reply=0;
 			timeout = rfc2131_sleep_interval(TIMEOUT, reqretry++);
 			if (!await_reply(await_bootp, 0, NULL, timeout))

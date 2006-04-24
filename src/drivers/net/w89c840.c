@@ -79,7 +79,7 @@
 
 #include "etherboot.h"
 #include "nic.h"
-#include "pci.h"
+#include <gpxe/pci.h>
 #include "timer.h"
 
 static const char *w89c840_version = "driver Version 0.94 - December 12, 2003";

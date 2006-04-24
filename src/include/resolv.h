@@ -2,7 +2,7 @@
 #define RESOLV_H
 
 #include <gpxe/in.h>
-#include "tables.h"
+#include <gpxe/tables.h>
 
 struct resolver {
 	const char *name;

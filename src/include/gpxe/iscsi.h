@@ -1,5 +1,5 @@
-#ifndef _ISCSI_H
-#define _ISCSI_H
+#ifndef _GPXE_ISCSI_H
+#define _GPXE_ISCSI_H
 
 /** @file
  *
@@ -457,4 +457,4 @@ static inline int iscsi_error ( struct iscsi_session *iscsi ) {
 	return ( iscsi->state == ISCSI_STATE_FAILED );
 }
 
-#endif /* _ISCSI_H */
+#endif /* _GPXE_ISCSI_H */

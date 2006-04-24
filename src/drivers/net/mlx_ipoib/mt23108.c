@@ -15,7 +15,7 @@ Skeleton NIC driver for Etherboot
 /* to get the interface to the body of the program */
 #include "nic.h"
 /* to get the PCI support functions, if this is a PCI NIC */
-#include "pci.h"
+#include <gpxe/pci.h>
 /* to get the ISA support functions, if this is an ISA NIC */
 #include "isa.h"
 

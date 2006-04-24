@@ -55,7 +55,7 @@
 
 #include "etherboot.h"
 #include "nic.h"
-#include "pci.h"
+#include <gpxe/pci.h>
 
 /* defines */
 

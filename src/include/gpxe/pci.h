@@ -1,5 +1,5 @@
-#ifndef	PCI_H
-#define PCI_H
+#ifndef	_GPXEPCI_H
+#define _GPXEPCI_H
 
 /*
 ** Support for NE2000 PCI clones added David Monro June 1997
@@ -21,8 +21,7 @@
  * your option) any later version.
  */
 
-#include "stdint.h"
-#include "nic.h"
+#include <stdint.h>
 #include "pci_ids.h"
 
 #define	PCI_BUS_TYPE	1
@@ -256,7 +255,8 @@ struct pci_device {
 	uint16_t	busdevfn;
 	uint8_t		revision;
 	uint8_t		irq;
-} __attribute__ (( packed ));
+	void *priv;
+};
 
 /*
  * Useful busdevfn calculations
@@ -348,7 +348,6 @@ extern unsigned long pci_bar_start ( struct pci_device *pci,
 				     unsigned int bar );
 extern unsigned long pci_bar_size ( struct pci_device *pci, unsigned int bar );
 extern int pci_find_capability ( struct pci_device *pci, int capability );
-extern void pci_fill_nic ( struct nic *nic, struct pci_device *pci );
 
 /*
  * PCI bus global definition
@@ -356,4 +355,12 @@ extern void pci_fill_nic ( struct nic *nic, struct pci_device *pci );
  */
 extern struct bus_driver pci_driver;
 
-#endif	/* PCI_H */
+static inline void pci_set_drvdata ( struct pci_device *pci, void *priv ) {
+	pci->priv = priv;
+}
+
+static inline void * pci_get_drvdata ( struct pci_device *pci ) {
+	return pci->priv;
+}
+
+#endif	/* _GPXE_PCI_H */

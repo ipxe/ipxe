@@ -43,7 +43,7 @@
 /* to get the interface to the body of the program */
 #include "nic.h"
 /* to get the PCI support functions, if this is a PCI NIC */
-#include "pci.h"
+#include <gpxe/pci.h>
 
 
 #include "via-velocity.h"

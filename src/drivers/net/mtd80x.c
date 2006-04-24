@@ -28,7 +28,7 @@
 /* to get the interface to the body of the program */
 #include "nic.h"
 /* to get the PCI support functions, if this is a PCI NIC */
-#include "pci.h"
+#include <gpxe/pci.h>
 
 /* Condensed operations for readability. */
 #define virt_to_le32desc(addr)  cpu_to_le32(virt_to_bus(addr))

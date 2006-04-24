@@ -33,7 +33,7 @@ $Id$
 /* to get the interface to the body of the program */
 #include "nic.h"
 /* to get the PCI support functions, if this is a PCI NIC */
-#include "pci.h"
+#include <gpxe/pci.h>
 /* UNDI and PXE defines.  Includes pxe.h. */
 #include "undi.h"
 /* 8259 PIC defines */

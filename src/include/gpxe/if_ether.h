@@ -1,5 +1,5 @@
-#ifndef	_IF_ETHER_H
-#define	_IF_ETHER_H
+#ifndef	_GPXE_IF_ETHER_H
+#define	_GPXE_IF_ETHER_H
 
 #include <stdint.h>
 
@@ -29,4 +29,4 @@ struct ethhdr {
         uint16_t h_protocol;
 } __attribute__ ((packed));
 
-#endif	/* _IF_ETHER_H */
+#endif	/* _GPXE_IF_ETHER_H */

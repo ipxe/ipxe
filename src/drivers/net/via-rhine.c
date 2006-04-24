@@ -48,7 +48,7 @@ static const char *version = "rhine.c v1.0.2 2004-10-29\n";
 
 #include "etherboot.h"
 #include "nic.h"
-#include "pci.h"
+#include <gpxe/pci.h>
 #include "timer.h"
 
 /* define all ioaddr */

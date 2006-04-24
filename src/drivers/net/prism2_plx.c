@@ -14,7 +14,7 @@ $Id$
  * your option) any later version.
  */
 
-#include "pci.h"
+#include <gpxe/pci.h>
 #include "nic.h"
 
 #define WLAN_HOSTIF WLAN_PLX

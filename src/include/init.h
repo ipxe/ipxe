@@ -2,7 +2,7 @@
 #define INIT_H
 
 #include "stddef.h" /* for NULL */
-#include "tables.h"
+#include <gpxe/tables.h>
 
 /*
  * In order to avoid having objects dragged in just because main()

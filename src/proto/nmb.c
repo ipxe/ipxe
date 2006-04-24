@@ -54,7 +54,7 @@ static int nmb_resolv ( struct in_addr *addr, const char *name ) {
 	DBG ( "NMB resolving %s\n", name );
 
 	/* Set up the query data */
-	nameserver.sin_addr.s_addr = IP_BROADCAST;
+	nameserver.sin_addr.s_addr = INADDR_BROADCAST;
 	nameserver.sin_port = NBNS_UDP_PORT;
 	memset ( &query, 0, sizeof ( query ) );
 	query.dns.id = htons ( 1 );

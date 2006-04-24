@@ -125,10 +125,11 @@
 #define ENOENT		0xd4
 #define EAFNOSUPPORT	0xd5
 #define EAGAIN		0xd6
+#define EIO		0xd7
 
 /* Data structures and declarations */
 
-#include "tables.h"
+#include <gpxe/tables.h>
 
 extern int errno;
 
