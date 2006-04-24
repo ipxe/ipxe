@@ -1,5 +1,5 @@
-#ifndef _ARP_H
-#define _ARP_H
+#ifndef _GPXE_ARP_H
+#define _GPXE_ARP_H
 
 /** @file
  *
@@ -7,17 +7,10 @@
  *
  */
 
-struct net_device;
-struct net_interface;
-struct pk_buff;
+struct net_header;
+struct ll_header;
 
-extern int arp_resolve ( struct net_device *netdev, struct pk_buff *pkb,
-			 const void **ll_addr );
+extern int arp_resolve ( const struct net_header *nethdr,
+			 struct ll_header *llhdr );
 
-extern int arp_process ( struct net_interface *arp_netif,
-			 struct pk_buff *pkb );
-
-extern int arp_add_generic_header ( struct net_interface *arp_netif,
-				    struct pk_buff *pkb );
-
-#endif /* _ARP_H */
+#endif /* _GPXE_ARP_H */

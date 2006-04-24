@@ -20,10 +20,12 @@
 #include <string.h>
 #include <byteswap.h>
 #include <assert.h>
+#include <gpxe/if_arp.h>
 #include <gpxe/if_ether.h>
 #include <gpxe/netdevice.h>
 #include <gpxe/pkbuff.h>
 #include <gpxe/arp.h>
+#include <gpxe/ethernet.h>
 
 /** @file
  *
@@ -32,85 +34,104 @@
  */
 
 /** Ethernet broadcast MAC address */
-static uint8_t eth_broadcast[] = { 0xff, 0xff, 0xff, 0xff, 0xff, 0xff };
+static uint8_t eth_broadcast[ETH_ALEN] = { 0xff, 0xff, 0xff, 0xff, 0xff, 0xff};
 
 /**
- * Build Ethernet link-layer header
+ * Perform Ethernet routing
  *
- * @v netdev	Network device
- * @v pkb	Packet buffer
+ * @v nethdr	Generic network-layer header
+ * @ret llhdr	Generic link-layer header
  * @ret rc	Return status code
  *
- * This constructs the Ethernet link-layer header (destination MAC,
- * source MAC, network-layer protocol) based on the metadata found in
- * @c pkb.
+ * Constructs the generic link-layer header based on the generic
+ * network-layer header, i.e. maps network-layer addresses (e.g. IPv4
+ * addresses) to MAC addresses.
  *
  * If the destination MAC address cannot be determined, an ARP request
- * is sent for the requested network-layer address instead.
+ * is sent for the requested network-layer address and -ENOENT is
+ * returned.
  */
-int eth_build_llh ( struct net_device *netdev, struct pk_buff *pkb ) {
-	struct ethhdr *ethhdr = pkb->data;
-	const void *eth_dest;
+static int eth_route ( const struct net_header *nethdr,
+		       struct ll_header *llhdr ) {
 	int rc;
 
-	/* Do the easy bits */
-	ethhdr->h_protocol = pkb->net_proto;
-	memcpy ( ethhdr->h_source, netdev->ll_addr,
-		 sizeof ( ethhdr->h_source ) );
-
 	/* Work out the destination MAC address */
-	if ( pkb->flags & PKB_FL_RAW_NET_ADDR ) {
-		eth_dest = pkb->net_addr;
-	} else if ( pkb->flags & PKB_FL_BROADCAST ) {
-		eth_dest = eth_broadcast;
-	} else if ( pkb->flags & PKB_FL_MULTICAST ) {
+	if ( nethdr->dest_flags & NETADDR_FL_RAW ) {
+		memcpy ( llhdr->dest_ll_addr, nethdr->dest_net_addr, ETH_ALEN);
+	} else if ( nethdr->dest_flags & NETADDR_FL_BROADCAST ) {
+		memcpy ( llhdr->dest_ll_addr, eth_broadcast, ETH_ALEN );
+	} else if ( nethdr->dest_flags & NETADDR_FL_MULTICAST ) {
 		/* IP multicast is a special case; there exists a
 		 * direct mapping from IP address to MAC address
 		 */
-		assert ( pkb->net_proto == htons ( ETH_P_IP ) );
-		ethhdr->h_dest[0] = 0x01;
-		ethhdr->h_dest[1] = 0x00;
-		ethhdr->h_dest[2] = 0x5e;
-		ethhdr->h_dest[3] = *( ( char * ) pkb->net_addr + 1 ) & 0x7f;
-		ethhdr->h_dest[4] = *( ( char * ) pkb->net_addr + 2 );
-		ethhdr->h_dest[5] = *( ( char * ) pkb->net_addr + 3 );
-		eth_dest = ethhdr->h_dest;
+		assert ( nethdr->net_protocol->net_proto == htons(ETH_P_IP) );
+		llhdr->dest_ll_addr[0] = 0x01;
+		llhdr->dest_ll_addr[1] = 0x00;
+		llhdr->dest_ll_addr[2] = 0x5e;
+		llhdr->dest_ll_addr[3] = nethdr->dest_net_addr[1] & 0x7f;
+		llhdr->dest_ll_addr[4] = nethdr->dest_net_addr[2];
+		llhdr->dest_ll_addr[5] = nethdr->dest_net_addr[3];
 	} else {
 		/* Otherwise, look up the address using ARP */
-		if ( ( rc = arp_resolve ( netdev, pkb, &eth_dest ) ) != 0 )
+		if ( ( rc = arp_resolve ( nethdr, llhdr ) ) != 0 )
 			return rc;
 	}
 
-	/* Fill in destination MAC address */
-	memcpy ( ethhdr->h_dest, eth_dest, sizeof ( ethhdr->h_dest ) );
-
 	return 0;
+}
+
+/**
+ * Fill in Ethernet link-layer header
+ *
+ * @v pkb	Packet buffer
+ * @v llhdr	Generic link-layer header
+ *
+ * Fills in the Ethernet link-layer header in the packet buffer based
+ * on information in the generic link-layer header.
+ */
+static void eth_fill_llh ( const struct ll_header *llhdr,
+			   struct pk_buff *pkb ) {
+	struct ethhdr *ethhdr = pkb->data;
+
+	memcpy ( ethhdr->h_dest, llhdr->dest_ll_addr, ETH_ALEN );
+	memcpy ( ethhdr->h_source, llhdr->source_ll_addr, ETH_ALEN );
+	ethhdr->h_protocol = llhdr->net_proto;
 }
 
 /**
  * Parse Ethernet link-layer header
  *
- * @v netdev	Network device
  * @v pkb	Packet buffer
- * @ret rc	Return status code
+ * @v llhdr	Generic link-layer header
  *
- * This parses the Ethernet link-layer header (destination MAC, source
- * MAC, network-layer protocol) and fills in the metadata in @c pkb.
+ * Fills in the generic link-layer header based on information in the
+ * Ethernet link-layer header in the packet buffer.
  */
-int eth_parse_llh ( struct net_device *netdev __unused, struct pk_buff *pkb ) {
+static void eth_parse_llh ( const struct pk_buff *pkb,
+			    struct ll_header *llhdr ) {
 	struct ethhdr *ethhdr = pkb->data;
 
-	pkb->net_proto = ethhdr->h_protocol;
-	pkb->flags = PKB_FL_RAW_NET_ADDR;
-	pkb->net_addr_len = sizeof ( ethhdr->h_dest );
-	pkb->net_addr = ethhdr->h_dest;
+	memcpy ( llhdr->dest_ll_addr, ethhdr->h_dest, ETH_ALEN );
+	memcpy ( llhdr->source_ll_addr, ethhdr->h_source, ETH_ALEN );
+	llhdr->net_proto = ethhdr->h_protocol;
 
-	if ( memcmp ( ethhdr->h_dest, eth_broadcast,
-		      sizeof ( ethhdr->h_dest ) ) == 0 ) {
-		pkb->flags |= PKB_FL_BROADCAST;
+	if ( memcmp ( ethhdr->h_dest, eth_broadcast, ETH_ALEN ) == 0 ) {
+		llhdr->dest_flags = NETADDR_FL_BROADCAST;
 	} else if ( ethhdr->h_dest[0] & 0x01 ) {
-		pkb->flags |= PKB_FL_MULTICAST;
+		llhdr->dest_flags = NETADDR_FL_MULTICAST;
+	} else {
+		llhdr->dest_flags = 0;
 	}
-
-	return 0;
 }
+
+/** Ethernet protocol */
+struct ll_protocol ethernet_protocol = {
+	.ll_proto = htons ( ARPHRD_ETHER ),
+	.ll_addr_len = ETH_ALEN,
+	.ll_header_len = ETH_HLEN,
+	.route = eth_route,
+	.fill_llh = eth_fill_llh,
+	.parse_llh = eth_parse_llh,
+};
+
+LL_PROTOCOL ( ethernet_protocol );

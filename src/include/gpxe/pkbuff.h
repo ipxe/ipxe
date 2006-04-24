@@ -1,5 +1,5 @@
-#ifndef _PKBUFF_H
-#define _PKBUFF_H
+#ifndef _GPXE_PKBUFF_H
+#define _GPXE_PKBUFF_H
 
 /** @file
  *
@@ -12,6 +12,10 @@
 
 #include <stdint.h>
 #include <assert.h>
+#include <gpxe/list.h>
+
+struct net_protocol;
+struct ll_protocol;
 
 /** A packet buffer
  *
@@ -27,38 +31,14 @@ struct pk_buff {
 	/** End of the buffer */
         void *end;
 
-	/** The network-layer protocol
-	 *
-	 * This is the network-layer protocol expressed as an
-	 * ETH_P_XXX constant, in network-byte order.
-	 */
-	uint16_t net_proto;
-	/** Flags
-	 *
-	 * Filled in only on outgoing packets.  Value is the
-	 * bitwise-OR of zero or more PKB_FL_XXX constants.
-	 */
-	uint8_t flags;
-	/** Network-layer address length 
-	 *
-	 * Filled in only on outgoing packets.
-	 */
-	uint8_t net_addr_len;
-	/** Network-layer address
-	 *
-	 * Filled in only on outgoing packets.
-	 */
-	void *net_addr;
+	/** List of which this buffer is a member */
+	struct list_head list;
+
+	/** The network-layer protocol */
+	struct net_protocol *net_protocol;
+	/** The link-layer protocol */
+	struct ll_protocol *ll_protocol;
 };
-
-/** Packet is a broadcast packet */
-#define PKB_FL_BROADCAST 0x01
-
-/** Packet is a multicast packet */
-#define PKB_FL_MULTICAST 0x02
-
-/** Network-layer address is a raw hardware address */
-#define PKB_FL_RAW_NET_ADDR 0x04
 
 /**
  * Add data to start of packet buffer
@@ -130,4 +110,7 @@ static inline size_t pkb_len ( struct pk_buff *pkb ) {
 	return ( pkb->tail - pkb->data );
 }
 
-#endif /* _PKBUFF_H */
+extern struct pk_buff * alloc_pkb ( size_t len );
+extern void free_pkb ( struct pk_buff *pkb );
+
+#endif /* _GPXE_PKBUFF_H */

@@ -464,7 +464,7 @@ void uip_log(char *msg);
  *
  * \hideinitializer
  */
-#define UIP_LLH_LEN     14
+#define UIP_LLH_LEN     0
 
 
 /** @} */

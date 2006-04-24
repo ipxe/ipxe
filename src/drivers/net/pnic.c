@@ -12,21 +12,21 @@ Bochs Pseudo NIC driver for Etherboot
  * See pnic_api.h for an explanation of the Bochs Pseudo NIC.
  */
 
-/* to get some global routines like printf */
-#include "etherboot.h"
-/* to get the interface to the body of the program */
-#include "nic.h"
-/* to get the PCI support functions, if this is a PCI NIC */
-#include "pci.h"
+#include <stdint.h>
+#include <io.h>
+#include <vsprintf.h>
+#include <errno.h>
+#include <gpxe/pci.h>
+#include <gpxe/if_ether.h>
+#include <gpxe/ethernet.h>
+#include <gpxe/pkbuff.h>
+#include <gpxe/netdevice.h>
 
-/* PNIC API */
 #include "pnic_api.h"
 
-/* Function prototypes */
-static int pnic_api_check ( uint16_t api_version );
-
-/* NIC specific static variables go here */
-uint8_t tx_buffer[ETH_FRAME_LEN] __shared;
+struct pnic {
+	unsigned short ioaddr;
+};
 
 /* 
  * Utility functions: issue a PNIC command, retrieve result.  Use
@@ -40,7 +40,7 @@ uint8_t tx_buffer[ETH_FRAME_LEN] __shared;
  * of data).
  */
 
-static uint16_t pnic_command_quiet ( struct nic *nic, uint16_t command,
+static uint16_t pnic_command_quiet ( struct pnic *pnic, uint16_t command,
 				     void *input, uint16_t input_length,
 				     void *output, uint16_t output_max_length,
 				     uint16_t *output_length ) {
@@ -50,18 +50,19 @@ static uint16_t pnic_command_quiet ( struct nic *nic, uint16_t command,
 
 	if ( input != NULL ) {
 		/* Write input length */
-		outw ( input_length, nic->ioaddr + PNIC_REG_LEN );
+		outw ( input_length, pnic->ioaddr + PNIC_REG_LEN );
 		/* Write input data */
 		for ( i = 0; i < input_length; i++ ) {
-			outb( ((char*)input)[i], nic->ioaddr + PNIC_REG_DATA );
+			outb( ((char*)input)[i],
+			      pnic->ioaddr + PNIC_REG_DATA );
 		}
 	}
 	/* Write command */
-	outw ( command, nic->ioaddr + PNIC_REG_CMD );
+	outw ( command, pnic->ioaddr + PNIC_REG_CMD );
 	/* Retrieve status */
-	status = inw ( nic->ioaddr + PNIC_REG_STAT );
+	status = inw ( pnic->ioaddr + PNIC_REG_STAT );
 	/* Retrieve output length */
-	_output_length = inw ( nic->ioaddr + PNIC_REG_LEN );
+	_output_length = inw ( pnic->ioaddr + PNIC_REG_LEN );
 	if ( output_length == NULL ) {
 		if ( _output_length != output_max_length ) {
 			printf ( "pnic_command %#hx: wrong data length "
@@ -81,17 +82,17 @@ static uint16_t pnic_command_quiet ( struct nic *nic, uint16_t command,
 		/* Retrieve output data */
 		for ( i = 0; i < _output_length; i++ ) {
 			((char*)output)[i] =
-				inb ( nic->ioaddr + PNIC_REG_DATA );
+				inb ( pnic->ioaddr + PNIC_REG_DATA );
 		}
 	}
 	return status;
 }
 
-static uint16_t pnic_command ( struct nic *nic, uint16_t command,
+static uint16_t pnic_command ( struct pnic *pnic, uint16_t command,
 			       void *input, uint16_t input_length,
 			       void *output, uint16_t output_max_length,
 			       uint16_t *output_length ) {
-	uint16_t status = pnic_command_quiet ( nic, command,
+	uint16_t status = pnic_command_quiet ( pnic, command,
 					       input, input_length,
 					       output, output_max_length,
 					       output_length );
@@ -110,135 +111,134 @@ static int pnic_api_check ( uint16_t api_version ) {
 			 PNIC_API_VERSION >> 8, PNIC_API_VERSION & 0xff );
 	}
 	if ( api_version < PNIC_API_VERSION ) {
-		printf ( "*** You may need to update your copy of Bochs ***\n" );
+		printf ( "** You may need to update your copy of Bochs **\n" );
 	}
 	return ( api_version == PNIC_API_VERSION );
 }
 
 /**************************************************************************
-CONNECT - connect adapter to the network
-***************************************************************************/
-static int pnic_connect ( struct nic *nic __unused ) {
-	/* Nothing to do */
-	return 1;
-}
-
-/**************************************************************************
 POLL - Wait for a frame
 ***************************************************************************/
-static int pnic_poll ( struct nic *nic, int retrieve ) {
+static void pnic_poll ( struct net_device *netdev ) {
+	struct pnic *pnic = netdev->priv;
+	struct pk_buff *pkb;
 	uint16_t length;
 	uint16_t qlen;
 
-	/* Check receive queue length to see if there's anything to
-	 * get.  Necessary since once we've called PNIC_CMD_RECV we
-	 * have to read out the packet, otherwise it's lost forever.
-	 */
-	if ( pnic_command ( nic, PNIC_CMD_RECV_QLEN, NULL, 0,
-			    &qlen, sizeof(qlen), NULL )
-	     != PNIC_STATUS_OK ) return ( 0 );
-	if ( qlen == 0 ) return ( 0 );
-
-	/* There is a packet ready.  Return 1 if we're only checking. */
-	if ( ! retrieve ) return ( 1 );
-
-	/* Retrieve the packet */
-	if ( pnic_command ( nic, PNIC_CMD_RECV, NULL, 0,
-			    nic->packet, ETH_FRAME_LEN, &length )
-	     != PNIC_STATUS_OK ) return ( 0 );
-	nic->packetlen = length;
-	return ( 1 );
+	/* Fetch all available packets */
+	while ( 1 ) {
+		if ( pnic_command ( pnic, PNIC_CMD_RECV_QLEN, NULL, 0,
+				    &qlen, sizeof ( qlen ), NULL )
+		     != PNIC_STATUS_OK )
+			break;
+		if ( qlen == 0 )
+			break;
+		pkb = alloc_pkb ( ETH_FRAME_LEN );
+		if ( ! pkb )
+			break;
+		if ( pnic_command ( pnic, PNIC_CMD_RECV, NULL, 0,
+				    pkb->data, ETH_FRAME_LEN, &length )
+		     != PNIC_STATUS_OK ) {
+			free_pkb ( pkb );
+			break;
+		}
+		pkb_put ( pkb, length );
+		netdev_rx ( netdev, pkb );
+	}
 }
 
 /**************************************************************************
 TRANSMIT - Transmit a frame
 ***************************************************************************/
-static void pnic_transmit ( struct nic *nic, const char *dest,
-			    unsigned int type, unsigned int size,
-			    const char *data ) {
-	unsigned int nstype = htons ( type );
+static int pnic_transmit ( struct net_device *netdev, struct pk_buff *pkb ) {
+	struct pnic *pnic = netdev->priv;
 
-	if ( ( ETH_HLEN + size ) >= ETH_FRAME_LEN ) {
-		printf ( "pnic_transmit: packet too large\n" );
-		return;
-	}
-
-	/* Assemble packet */
-	memcpy ( tx_buffer, dest, ETH_ALEN );
-	memcpy ( tx_buffer + ETH_ALEN, nic->node_addr, ETH_ALEN );
-	memcpy ( tx_buffer + 2 * ETH_ALEN, &nstype, 2 );
-	memcpy ( tx_buffer + ETH_HLEN, data, size );
-
-	pnic_command ( nic, PNIC_CMD_XMIT, tx_buffer, ETH_HLEN + size,
+	pnic_command ( pnic, PNIC_CMD_XMIT, pkb, pkb_len ( pkb ),
 		       NULL, 0, NULL );
-}
-
-/**************************************************************************
-DISABLE - Turn off ethernet interface
-***************************************************************************/
-static void pnic_disable ( struct nic *nic, struct pci_device *pci __unused ) {
-	nic_disable ( nic );
-	pnic_command ( nic, PNIC_CMD_RESET, NULL, 0, NULL, 0, NULL );
+	free_pkb ( pkb );
+	return 0;
 }
 
 /**************************************************************************
 IRQ - Handle card interrupt status
 ***************************************************************************/
-static void pnic_irq ( struct nic *nic, irq_action_t action ) {
+#if 0
+static void pnic_irq ( struct net_device *netdev, irq_action_t action ) {
+	struct pnic *pnic = netdev->priv;
 	uint8_t enabled;
 
 	switch ( action ) {
 	case DISABLE :
 	case ENABLE :
 		enabled = ( action == ENABLE ? 1 : 0 );
-		pnic_command ( nic, PNIC_CMD_MASK_IRQ,
-			       &enabled, sizeof(enabled), NULL, 0, NULL );
+		pnic_command ( pnic, PNIC_CMD_MASK_IRQ,
+			       &enabled, sizeof ( enabled ), NULL, 0, NULL );
 		break;
 	case FORCE :
-		pnic_command ( nic, PNIC_CMD_FORCE_IRQ,
+		pnic_command ( pnic, PNIC_CMD_FORCE_IRQ,
 			       NULL, 0, NULL, 0, NULL );
 		break;
 	}
 }
+#endif
 
 /**************************************************************************
-NIC operations table
+DISABLE - Turn off ethernet interface
 ***************************************************************************/
-static struct nic_operations pnic_operations = {
-	.connect	= pnic_connect,
-	.poll		= pnic_poll,
-	.transmit	= pnic_transmit,
-	.irq		= pnic_irq,
-};
+static void pnic_remove ( struct pci_device *pci ) {
+	struct net_device *netdev = pci_get_drvdata ( pci );
+	struct pnic *pnic = netdev->priv;
+
+	unregister_netdev ( netdev );
+	pnic_command ( pnic, PNIC_CMD_RESET, NULL, 0, NULL, 0, NULL );
+}
 
 /**************************************************************************
 PROBE - Look for an adapter, this routine's visible to the outside
 ***************************************************************************/
-static int pnic_probe ( struct nic *nic, struct pci_device *pci ) {
+static int pnic_probe ( struct pci_device *pci ) {
+	struct net_device *netdev;
+	struct pnic *pnic;
 	uint16_t api_version;
 	uint16_t status;
+	int rc;
 
-	/* Retrieve relevant information about PCI device */
-	pci_fill_nic ( nic, pci );
+	/* Allocate net device */
+	netdev = alloc_etherdev ( sizeof ( *pnic ) );
+	if ( ! netdev ) {
+		rc = -ENOMEM;
+		goto err;
+	}
+	pnic = netdev->priv;
+	pci_set_drvdata ( pci, netdev );
+	pnic->ioaddr = pci->ioaddr;
 
 	/* API version check */
-	status = pnic_command_quiet( nic, PNIC_CMD_API_VER, NULL, 0,
-				     &api_version,
-				     sizeof(api_version), NULL );
+	status = pnic_command_quiet ( pnic, PNIC_CMD_API_VER, NULL, 0,
+				      &api_version,
+				      sizeof ( api_version ), NULL );
 	if ( status != PNIC_STATUS_OK ) {
 		printf ( "PNIC failed installation check, code %#hx\n",
 			 status );
-		return 0;
+		rc = -EIO;
+		goto err;
 	}
-	pnic_api_check(api_version);
+	pnic_api_check ( api_version );
 
 	/* Get MAC address */
-	status = pnic_command ( nic, PNIC_CMD_READ_MAC, NULL, 0,
-				nic->node_addr, ETH_ALEN, NULL );
+	status = pnic_command ( pnic, PNIC_CMD_READ_MAC, NULL, 0,
+				netdev->ll_addr, ETH_ALEN, NULL );
 
-	/* point to NIC specific routines */
-	nic->nic_op	= &pnic_operations;
-	return 1;
+	/* Point to NIC specific routines */
+	netdev->poll	 = pnic_poll;
+	netdev->transmit = pnic_transmit;
+
+	return 0;
+
+ err:
+	/* Free net device */
+	free_netdev ( netdev );
+	return rc;
 }
 
 static struct pci_id pnic_nics[] = {
@@ -246,7 +246,18 @@ static struct pci_id pnic_nics[] = {
 PCI_ROM ( 0xfefe, 0xefef, "pnic", "Bochs Pseudo NIC Adaptor" ),
 };
 
-PCI_DRIVER ( pnic_driver, pnic_nics, PCI_NO_CLASS );
+static struct pci_driver pnic_driver = {
+	.ids = pnic_nics,
+	.id_count = ( sizeof ( pnic_nics ) / sizeof ( pnic_nics[0] ) ),
+	.class = PCI_NO_CLASS,
+	//	.probe = pnic_probe,
+	//	.remove = pnic_remove,
+};
 
-DRIVER ( "PNIC", nic_driver, pci_driver, pnic_driver,
-	 pnic_probe, pnic_disable );
+// PCI_DRIVER ( pnic_driver );
+
+#include "dev.h"
+extern struct type_driver test_driver;
+
+DRIVER ( "PNIC", test_driver, pci_driver, pnic_driver,
+	 pnic_probe, pnic_remove );

@@ -39,13 +39,13 @@
 /** An ARP cache entry */
 struct arp_entry {
 	/** Network-layer protocol */
-	uint16_t net_proto;
+	struct net_protocol *net_protocol;
 	/** Link-layer protocol */
-	uint16_t ll_proto;
+	struct ll_protocol *ll_protocol;
 	/** Network-layer address */
 	uint8_t net_addr[MAX_NET_ADDR_LEN];
 	/** Link-layer address */
-	uint8_t ll_addr[MAX_LLH_ADDR_LEN];
+	uint8_t ll_addr[MAX_LL_ADDR_LEN];
 };
 
 /** Number of entries in the ARP cache
@@ -61,25 +61,28 @@ static struct arp_entry arp_table[NUM_ARP_ENTRIES];
 
 static unsigned int next_new_arp_entry = 0;
 
+struct net_protocol arp_protocol;
+
 /**
  * Find entry in the ARP cache
  *
- * @v ll_proto		Link-layer protocol
- * @v net_proto		Network-layer protocol
+ * @v ll_protocol	Link-layer protocol
+ * @v net_protocol	Network-layer protocol
  * @v net_addr		Network-layer address
- * @v net_addr_len	Network-layer address length
  * @ret arp		ARP cache entry, or NULL if not found
  *
  */
 static struct arp_entry *
-arp_find_entry ( uint16_t ll_proto, uint16_t net_proto, const void *net_addr,
-		 size_t net_addr_len ) {
+arp_find_entry ( struct ll_protocol *ll_protocol,
+		 struct net_protocol *net_protocol,
+		 const void *net_addr ) {
 	struct arp_entry *arp;
 
 	for ( arp = arp_table ; arp < arp_table_end ; arp++ ) {
-		if ( ( arp->ll_proto == ll_proto ) &&
-		     ( arp->net_proto == net_proto ) &&
-		     ( memcmp ( arp->net_addr, net_addr, net_addr_len ) == 0 ))
+		if ( ( arp->ll_protocol == ll_protocol ) &&
+		     ( arp->net_protocol == net_protocol ) &&
+		     ( memcmp ( arp->net_addr, net_addr,
+				net_protocol->net_addr_len ) == 0 ) )
 			return arp;
 	}
 	return NULL;
@@ -88,59 +91,64 @@ arp_find_entry ( uint16_t ll_proto, uint16_t net_proto, const void *net_addr,
 /**
  * Look up media-specific link-layer address in the ARP cache
  *
- * @v netdev		Network device
- * @v pkb		Packet buffer
- * @ret ll_addr		Pointer to link-layer address
+ * @v nethdr		Generic network-layer header
+ * @ret llhdr		Generic link-layer header
  * @ret rc		Return status code
  *
  * This function will use the ARP cache to look up the link-layer
- * address for the media corresponding to @c netdev and the
- * network-layer address as specified in the @c pkb metadata.
+ * address for the link-layer protocol specified in @c llhdr and the
+ * network-layer protocol and address as specified in @c nethdr.  If
+ * found, the destination link-layer address will be filled in in @c
+ * llhdr.
  *
  * If no address is found in the ARP cache, an ARP request will be
- * transmitted, -ENOENT will be returned, and the packet buffer
- * contents will be undefined.
+ * transmitted and -ENOENT will be returned.
  */
-int arp_resolve ( struct net_device *netdev, struct pk_buff *pkb,
-		  const void **ll_addr ) {
+int arp_resolve ( const struct net_header *nethdr, struct ll_header *llhdr ) {
+	struct net_protocol *net_protocol = nethdr->net_protocol;
+	struct ll_protocol *ll_protocol = llhdr->ll_protocol;
 	const struct arp_entry *arp;
-	struct net_interface *netif;
+	struct pk_buff *pkb;
 	struct arphdr *arphdr;
+	int rc;
 
 	/* Look for existing entry in ARP table */
-	arp = arp_find_entry ( netdev->ll_proto, pkb->net_proto,
-			       pkb->net_addr, pkb->net_addr_len );
+	arp = arp_find_entry ( ll_protocol, net_protocol,
+			       nethdr->dest_net_addr );
 	if ( arp ) {
-		*ll_addr = arp->ll_addr;
+		memcpy ( llhdr->dest_ll_addr, arp->ll_addr,
+			 sizeof ( llhdr->dest_ll_addr ) );
 		return 0;
 	}
 
-	/* Find interface for this protocol */
-	netif = netdev_find_netif ( netdev, pkb->net_proto );
-	if ( ! netif )
-		return -EAFNOSUPPORT;
+	/* Allocate ARP packet */
+	pkb = alloc_pkb ( sizeof ( *arphdr ) +
+			  2 * ( MAX_LL_ADDR_LEN + MAX_NET_ADDR_LEN ) );
+	if ( ! pkb )
+		return -ENOMEM;
+	pkb->net_protocol = &arp_protocol;
 
 	/* Build up ARP request */
-	pkb_empty ( pkb );
 	arphdr = pkb_put ( pkb, sizeof ( *arphdr ) );
-	arphdr->ar_hrd = netdev->ll_proto;
-	arphdr->ar_hln = netdev->ll_addr_len;
-	arphdr->ar_pro = pkb->net_proto;
-	arphdr->ar_pln = pkb->net_addr_len;
+	arphdr->ar_hrd = ll_protocol->ll_proto;
+	arphdr->ar_hln = ll_protocol->ll_addr_len;
+	arphdr->ar_pro = net_protocol->net_proto;
+	arphdr->ar_pln = net_protocol->net_addr_len;
 	arphdr->ar_op = htons ( ARPOP_REQUEST );
-	memcpy ( pkb_put ( pkb, netdev->ll_addr_len ),
-		 netdev->ll_addr, netdev->ll_addr_len );
-	memcpy ( pkb_put ( pkb, netif->net_addr_len ),
-		 netif->net_addr, netif->net_addr_len );
-	memset ( pkb_put ( pkb, netdev->ll_addr_len ),
-		 0xff, netdev->ll_addr_len );
-	memcpy ( pkb_put ( pkb, netif->net_addr_len ),
-		 pkb->net_addr, netif->net_addr_len );
+	memcpy ( pkb_put ( pkb, ll_protocol->ll_addr_len ),
+		 llhdr->source_ll_addr, ll_protocol->ll_addr_len );
+	memcpy ( pkb_put ( pkb, net_protocol->net_addr_len ),
+		 nethdr->source_net_addr, net_protocol->net_addr_len );
+	memset ( pkb_put ( pkb, ll_protocol->ll_addr_len ),
+		 0, ll_protocol->ll_addr_len );
+	memcpy ( pkb_put ( pkb, net_protocol->net_addr_len ),
+		 nethdr->dest_net_addr, net_protocol->net_addr_len );
 
-	/* Locate ARP interface and send ARP request */
-	netif = netdev_find_netif ( netdev, htons ( ETH_P_ARP ) );
-	assert ( netif != NULL );
-	netif_send ( netif, pkb );
+	/* Transmit ARP request */
+	if ( ( rc = net_transmit ( pkb ) ) != 0 ) {
+		free_pkb ( pkb );
+		return rc;
+	}
 
 	return -ENOENT;
 }
@@ -148,7 +156,6 @@ int arp_resolve ( struct net_device *netdev, struct pk_buff *pkb,
 /**
  * Process incoming ARP packets
  *
- * @v arp_netif		Network interface for ARP packets
  * @v pkb		Packet buffer
  * @ret rc		Return status code
  *
@@ -158,80 +165,96 @@ int arp_resolve ( struct net_device *netdev, struct pk_buff *pkb,
  * avoiding the need for extraneous ARP requests; read the RFC for
  * details.
  */
-int arp_process ( struct net_interface *arp_netif, struct pk_buff *pkb ) {
+static int arp_rx ( struct pk_buff *pkb ) {
 	struct arphdr *arphdr = pkb->data;
-	struct net_device *netdev = arp_netif->netdev;
-	struct net_interface *netif;
+	struct ll_protocol *ll_protocol;
+	struct net_protocol *net_protocol;
 	struct arp_entry *arp;
+	struct net_device *netdev;
 	int merge = 0;
 
-	/* Check for correct link-layer protocol and length */
-	if ( ( arphdr->ar_hrd != netdev->ll_proto ) ||
-	     ( arphdr->ar_hln != netdev->ll_addr_len ) )
-		return 0;
+	/* Identify link-layer and network-layer protocols */
+	ll_protocol = pkb->ll_protocol;
+	net_protocol = net_find_protocol ( arphdr->ar_pro );
+	if ( ! net_protocol )
+		goto done;
 
-	/* See if we have an interface for this network-layer protocol */
-	netif = netdev_find_netif ( netdev, arphdr->ar_pro );
-	if ( ! netif )
-		return 0;
-	if ( arphdr->ar_pln != netif->net_addr_len )
-		return 0;
+	/* Sanity checks */
+	if ( ( arphdr->ar_hrd != ll_protocol->ll_proto ) ||
+	     ( arphdr->ar_hln != ll_protocol->ll_addr_len ) ||
+	     ( arphdr->ar_pln != net_protocol->net_addr_len ) )
+		goto done;
 
 	/* See if we have an entry for this sender, and update it if so */
-	arp = arp_find_entry ( arphdr->ar_hrd, arphdr->ar_pro,
-			       arp_sender_pa ( arphdr ), arphdr->ar_pln );
+	arp = arp_find_entry ( ll_protocol, net_protocol,
+			       arp_sender_pa ( arphdr ) );
 	if ( arp ) {
 		memcpy ( arp->ll_addr, arp_sender_ha ( arphdr ),
 			 arphdr->ar_hln );
 		merge = 1;
 	}
 
-	/* See if we are the target protocol address */
-	if ( memcmp ( arp_target_pa ( arphdr ), netif->net_addr,
-		      arphdr->ar_pln ) != 0 )
-		return 0;
-
+	/* See if we own the target protocol address */
+	netdev = net_find_address ( net_protocol, arp_target_pa ( arphdr ) );
+	if ( ! netdev )
+		goto done;
+	
 	/* Create new ARP table entry if necessary */
 	if ( ! merge ) {
 		arp = &arp_table[next_new_arp_entry++ % NUM_ARP_ENTRIES];
-		arp->ll_proto = arphdr->ar_hrd;
-		arp->net_proto = arphdr->ar_pro;
+		arp->ll_protocol = ll_protocol;
+		arp->net_protocol = net_protocol;
 		memcpy ( arp->ll_addr, arp_sender_ha ( arphdr ),
 			 arphdr->ar_hln );
 		memcpy ( arp->net_addr, arp_sender_pa ( arphdr ),
-			 arphdr->ar_pln );
+			 arphdr->ar_pln);
 	}
 
 	/* If it's not a request, there's nothing more to do */
 	if ( arphdr->ar_op != htons ( ARPOP_REQUEST ) )
-		return 0;
+		goto done;
 
 	/* Change request to a reply, and send it */
 	arphdr->ar_op = htons ( ARPOP_REPLY );
-	memcpy ( arp_sender_ha ( arphdr ), arp_target_ha ( arphdr ),
+	memswap ( arp_sender_ha ( arphdr ), arp_target_ha ( arphdr ),
 		 arphdr->ar_hln + arphdr->ar_pln );
 	memcpy ( arp_target_ha ( arphdr ), netdev->ll_addr, arphdr->ar_hln );
-	memcpy ( arp_target_pa ( arphdr ), netif->net_addr, arphdr->ar_pln );
-	netif_send ( arp_netif, pkb );
+	if ( net_transmit ( pkb ) == 0 )
+		pkb = NULL;
 
+ done:
+	free_pkb ( pkb );
 	return 0;
 }
 
 /**
- * Add media-independent link-layer header
+ * Perform ARP network-layer routing
  *
- * @v arp_netif		Network interface for ARP packets
- * @v pkb		Packet buffer
- * @ret rc		Return status code
+ * @v pkb	Packet buffer
+ * @ret source	Network-layer source address
+ * @ret dest	Network-layer destination address
+ * @ret rc	Return status code
  */
-int arp_add_llh_metadata ( struct net_interface *arp_netif __unused,
-			   struct pk_buff *pkb ) {
+static int arp_route ( const struct pk_buff *pkb,
+		       struct net_header *nethdr ) {
 	struct arphdr *arphdr = pkb->data;
 
-	pkb->net_proto = htons ( ETH_P_ARP );
-	pkb->flags = PKB_FL_RAW_NET_ADDR;
-	pkb->net_addr_len = arphdr->ar_hln;
-	pkb->net_addr = arp_target_ha ( arphdr );
+	memcpy ( nethdr->source_net_addr, arp_sender_ha ( arphdr ),
+		 arphdr->ar_hln );
+	memcpy ( nethdr->dest_net_addr, arp_target_ha ( arphdr ),
+		 arphdr->ar_hln );
+	nethdr->dest_flags = NETADDR_FL_RAW;
+	if ( arphdr->ar_op == htons ( ARPOP_REQUEST ) )
+		nethdr->dest_flags |= NETADDR_FL_BROADCAST;
 	
 	return 0;
 }
+
+/** ARP protocol */
+struct net_protocol arp_protocol = {
+	.net_proto = ETH_P_ARP,
+	.rx = arp_rx,
+	.route = arp_route,
+};
+
+NET_PROTOCOL ( arp_protocol );
