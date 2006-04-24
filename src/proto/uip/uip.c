@@ -63,6 +63,8 @@ TCP/IP stack will calculate the checksums, and fill in the necessary
 header fields and finally send the packet back to the peer.
 */
 
+#include <stdint.h>
+#include <byteswap.h>
 #include "uip.h"
 #include "uipopt.h"
 #include "uip_arch.h"
