@@ -191,6 +191,7 @@ static void pnic_remove ( struct pci_device *pci ) {
 
 	unregister_netdev ( netdev );
 	pnic_command ( pnic, PNIC_CMD_RESET, NULL, 0, NULL, 0, NULL );
+	free_netdev ( netdev );
 }
 
 /**************************************************************************
@@ -233,6 +234,10 @@ static int pnic_probe ( struct pci_device *pci ) {
 	netdev->poll	 = pnic_poll;
 	netdev->transmit = pnic_transmit;
 
+	/* Register network device */
+	if ( ( rc = register_netdev ( netdev ) ) != 0 )
+		goto err;
+
 	return 0;
 
  err:
@@ -256,8 +261,17 @@ static struct pci_driver pnic_driver = {
 
 // PCI_DRIVER ( pnic_driver );
 
+
+static int pnic_hack_probe ( void *dummy, struct pci_device *pci ) {
+	return ( pnic_probe ( pci ) == 0 );
+}
+
+static void pnic_hack_disable ( void *dummy, struct pci_device *pci ) {
+	pnic_remove ( pci );
+}
+
 #include "dev.h"
 extern struct type_driver test_driver;
 
 DRIVER ( "PNIC", test_driver, pci_driver, pnic_driver,
-	 pnic_probe, pnic_remove );
+	 pnic_hack_probe, pnic_hack_disable );
