@@ -41,6 +41,20 @@ struct pk_buff {
 };
 
 /**
+ * Reserve space at start of packet buffer
+ *
+ * @v pkb	Packet buffer
+ * @v len	Length to reserve
+ * @ret data	Pointer to new start of buffer
+ */
+static inline void * pkb_reserve ( struct pk_buff *pkb, size_t len ) {
+	pkb->data += len;
+	pkb->tail += len;
+	assert ( pkb->tail <= pkb->end );
+	return pkb->data;
+}
+
+/**
  * Add data to start of packet buffer
  *
  * @v pkb	Packet buffer
