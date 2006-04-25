@@ -2,6 +2,7 @@
 #define STDINT_H
 
 typedef unsigned long		size_t;
+typedef signed long		ssize_t;
 typedef signed long		off_t;
 
 typedef unsigned char		uint8_t;
