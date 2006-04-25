@@ -252,7 +252,7 @@ static int arp_route ( const struct pk_buff *pkb,
 
 /** ARP protocol */
 struct net_protocol arp_protocol = {
-	.net_proto = ETH_P_ARP,
+	.net_proto = htons ( ETH_P_ARP ),
 	.rx = arp_rx,
 	.route = arp_route,
 };
