@@ -74,6 +74,7 @@ void * alloc_memblock ( size_t size, size_t align ) {
 	/* Round up alignment and size to multiples of MIN_MEMBLOCK_SIZE */
 	align = ( align + MIN_MEMBLOCK_SIZE - 1 ) & ~( MIN_MEMBLOCK_SIZE - 1 );
 	size = ( size + MIN_MEMBLOCK_SIZE - 1 ) & ~( MIN_MEMBLOCK_SIZE - 1 );
+	DBG ( "Allocating %zx (aligned %zx)\n", size, align );
 
 	/* Search through blocks for the first one with enough space */
 	list_for_each_entry ( block, &free_blocks, list ) {
@@ -88,6 +89,9 @@ void * alloc_memblock ( size_t size, size_t align ) {
 			pre   = block;
 			block = ( ( ( void * ) pre   ) + pre_size );
 			post  = ( ( ( void * ) block ) + size     );
+			DBG ( "[%p,%p) ->  [%p,%p) + [%p,%p)\n", pre,
+			      ( ( ( void * ) pre ) + pre->size ), pre, block,
+			      post, ( ( ( void * ) pre ) + pre->size ) );
 			/* If there is a "post" block, add it in to
 			 * the free list.  Leak it if it is too small
 			 * (which can happen only at the very end of
@@ -111,6 +115,8 @@ void * alloc_memblock ( size_t size, size_t align ) {
 				list_del ( &pre->list );
 			/* Zero allocated memory, for calloc() */
 			memset ( block, 0, size );
+			DBG ( "Allocated [%p,%p)\n", block,
+			      ( ( ( void * ) block ) + size ) );
 			return block;
 		}
 	}
@@ -129,7 +135,7 @@ void free_memblock ( void *ptr, size_t size ) {
 	struct memory_block *freeing;
 	struct memory_block *block;
 	ssize_t gap_before;
-	ssize_t gap_after;
+	ssize_t gap_after = -1;
 
 	/* Allow for ptr==NULL */
 	if ( ! ptr )
@@ -141,6 +147,7 @@ void free_memblock ( void *ptr, size_t size ) {
 	size = ( size + MIN_MEMBLOCK_SIZE - 1 ) & ~( MIN_MEMBLOCK_SIZE - 1 );
 	freeing = ptr;
 	freeing->size = size;
+	DBG ( "Freeing [%p,%p)\n", freeing, ( ( ( void * ) freeing ) + size ));
 
 	/* Insert/merge into free list */
 	list_for_each_entry ( block, &free_blocks, list ) {
@@ -151,22 +158,32 @@ void free_memblock ( void *ptr, size_t size ) {
 			      ( ( ( void * ) freeing ) + freeing->size ) );
 		/* Merge with immediately preceding block, if possible */
 		if ( gap_before == 0 ) {
+			DBG ( "[%p,%p) + [%p,%p) -> [%p,%p)\n", block,
+			      ( ( ( void * ) block ) + block->size ), freeing,
+			      ( ( ( void * ) freeing ) + freeing->size ),block,
+			      ( ( ( void * ) freeing ) + freeing->size ) );
 			block->size += size;
 			list_del ( &block->list );
 			freeing = block;
 		}
-		/* Insert before the immediately following block.  If
-		 * possible, merge the following block into the
-		 * "freeing" block.
-		 */
-		if ( gap_after >= 0 ) {
-			list_add_tail ( &freeing->list, &block->list );
-			if ( gap_after == 0 ) {
-				freeing->size += block->size;
-				list_del ( &block->list );
-			}
+		/* Stop processing as soon as we reach a following block */
+		if ( gap_after >= 0 )
 			break;
-		}
+	}
+
+	/* Insert before the immediately following block.  If
+	 * possible, merge the following block into the "freeing"
+	 * block.
+	 */
+	DBG ( "[%p,%p)\n", freeing, ( ( ( void * ) freeing ) + freeing->size));
+	list_add_tail ( &freeing->list, &block->list );
+	if ( gap_after == 0 ) {
+		DBG ( "[%p,%p) + [%p,%p) -> [%p,%p)\n", freeing,
+		      ( ( ( void * ) freeing ) + freeing->size ), block,
+		      ( ( ( void * ) block ) + block->size ), freeing,
+		      ( ( ( void * ) block ) + block->size ) );
+		freeing->size += block->size;
+		list_del ( &block->list );
 	}
 }
 
@@ -192,7 +209,7 @@ void * malloc ( size_t size ) {
 	block = alloc_memblock ( total_size, 1 );
 	if ( ! block )
 		return NULL;
-	block->size = size;
+	block->size = total_size;
 	return &block->data;
 }
 
@@ -227,10 +244,13 @@ void free ( void *ptr ) {
  * @c start must be aligned to at least a multiple of sizeof(void*).
  */
 void mpopulate ( void *start, size_t len ) {
+	/* Prevent free_memblock() from rounding up len beyond the end
+	 * of what we were actually given...
+	 */
 	free_memblock ( start, ( len & ~( MIN_MEMBLOCK_SIZE - 1 ) ) );
 }
 
-#if 1
+#if 0
 #include <vsprintf.h>
 /**
  * Dump free block list
@@ -246,4 +266,3 @@ void mdumpfree ( void ) {
 	}
 }
 #endif
-
