@@ -97,7 +97,7 @@ void * alloc_memblock ( size_t size, size_t align ) {
 			 * (which can happen only at the very end of
 			 * the heap).
 			 */
-			if ( ( size_t ) post_size > MIN_MEMBLOCK_SIZE ) {
+			if ( ( size_t ) post_size >= MIN_MEMBLOCK_SIZE ) {
 				post->size = post_size;
 				list_add ( &post->list, &pre->list );
 			}
