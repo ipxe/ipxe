@@ -195,11 +195,6 @@ void free_memblock ( void *ptr, size_t size ) {
  *
  * Allocates memory with no particular alignment requirement.  @c ptr
  * will be aligned to at least a multiple of sizeof(void*).
- *
- * Note that malloc() is very inefficient for allocating blocks where
- * the size is a power of two; if you have many of these
- * (e.g. descriptor rings, data buffers) you should use malloc_dma()
- * instead.
  */
 void * malloc ( size_t size ) {
 	size_t total_size;
