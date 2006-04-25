@@ -17,7 +17,7 @@
  */
 
 #include <stdint.h>
-#include <gpxe/malloc.h>
+#include <malloc.h>
 #include <gpxe/pkbuff.h>
 
 /** @file
@@ -31,35 +31,24 @@
  *
  * @v len	Required length of buffer
  * @ret pkb	Packet buffer, or NULL if none available
- *
- * The packet buffer will be aligned as per gmalloc().
  */
 struct pk_buff * alloc_pkb ( size_t len ) {
 	struct pk_buff *pkb = NULL;
-	void *data;
 
-	/* Align buffer length */
-	len = ( len + __alignof__ ( *pkb ) - 1 ) & ~ __alignof__ ( *pkb );
-	
 	/* Allocate memory for buffer plus descriptor */
-	data = gmalloc ( len + sizeof ( *pkb ) );
-	if ( ! data )
-		return NULL;
-
-	pkb = ( struct pk_buff * ) ( data + len );
-	pkb->head = pkb->data = pkb->tail = data;
-	pkb->end = pkb;
+	pkb = malloc ( sizeof ( *pkb ) + len );
+	if ( pkb ) {
+		pkb->head = pkb->data = pkb->tail = ( void * ) ( pkb + 1 );
+		pkb->end = pkb->head + len;
+	}
 	return pkb;
 }
 
 /**
  * Free packet buffer
  *
- * @v pkb	Packet buffer
+ * @v pkb	Packet buffer, or NULL
  */
 void free_pkb ( struct pk_buff *pkb ) {
-	if ( pkb ) {
-		gfree ( pkb->head,
-			( pkb->end - pkb->head ) + sizeof ( *pkb ) );
-	}
+	free ( pkb );
 }
