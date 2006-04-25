@@ -66,19 +66,22 @@ static LIST_HEAD ( free_blocks );
  */
 void * alloc_memblock ( size_t size, size_t align ) {
 	struct memory_block *block;
+	size_t align_mask;
 	size_t pre_size;
 	ssize_t post_size;
 	struct memory_block *pre;
 	struct memory_block *post;
 
-	/* Round up alignment and size to multiples of MIN_MEMBLOCK_SIZE */
-	align = ( align + MIN_MEMBLOCK_SIZE - 1 ) & ~( MIN_MEMBLOCK_SIZE - 1 );
+	/* Round up size to multiple of MIN_MEMBLOCK_SIZE and
+	 * calculate alignment mask.
+	 */
 	size = ( size + MIN_MEMBLOCK_SIZE - 1 ) & ~( MIN_MEMBLOCK_SIZE - 1 );
+	align_mask = ( align - 1 ) | ( MIN_MEMBLOCK_SIZE - 1 );
 	DBG ( "Allocating %zx (aligned %zx)\n", size, align );
 
 	/* Search through blocks for the first one with enough space */
 	list_for_each_entry ( block, &free_blocks, list ) {
-		pre_size = ( - virt_to_phys ( block ) ) & ( align - 1 );
+		pre_size = ( - virt_to_phys ( block ) ) & align_mask;
 		post_size = block->size - pre_size - size;
 		if ( post_size >= 0 ) {
 			/* Split block into pre-block, block, and
