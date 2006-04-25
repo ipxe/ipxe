@@ -17,6 +17,17 @@
 struct net_protocol;
 struct ll_protocol;
 
+/**
+ * Packet buffer alignment
+ *
+ * Packet buffers allocated via alloc_pkb() are guaranteed to be
+ * physically aligned to this boundary.  Some cards cannot DMA across
+ * a 4kB boundary.  With a standard Ethernet MTU, aligning to a 2kB
+ * boundary is sufficient to guarantee no 4kB boundary crossings.  For
+ * a jumbo Ethernet MTU, a packet may be larger than 4kB anyway.
+ */
+#define PKBUFF_ALIGN 2048
+
 /** A packet buffer
  *
  * This structure is used to represent a network packet within gPXE.

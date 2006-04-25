@@ -31,24 +31,36 @@
  *
  * @v len	Required length of buffer
  * @ret pkb	Packet buffer, or NULL if none available
+ *
+ * The packet buffer will be physically aligned to a multiple of
+ * @c PKBUFF_SIZE.
  */
 struct pk_buff * alloc_pkb ( size_t len ) {
 	struct pk_buff *pkb = NULL;
+	void *data;
 
+	/* Align buffer length */
+	len = ( len + __alignof__ ( *pkb ) - 1 ) & ~ __alignof__ ( *pkb );
+	
 	/* Allocate memory for buffer plus descriptor */
-	pkb = malloc ( sizeof ( *pkb ) + len );
-	if ( pkb ) {
-		pkb->head = pkb->data = pkb->tail = ( void * ) ( pkb + 1 );
-		pkb->end = pkb->head + len;
-	}
+	data = malloc_dma ( len + sizeof ( *pkb ), PKBUFF_ALIGN );
+	if ( ! data )
+		return NULL;
+
+	pkb = ( struct pk_buff * ) ( data + len );
+	pkb->head = pkb->data = pkb->tail = data;
+	pkb->end = pkb;
 	return pkb;
 }
 
 /**
  * Free packet buffer
  *
- * @v pkb	Packet buffer, or NULL
+ * @v pkb	Packet buffer
  */
 void free_pkb ( struct pk_buff *pkb ) {
-	free ( pkb );
+	if ( pkb ) {
+		free_dma ( pkb->head,
+			   ( pkb->end - pkb->head ) + sizeof ( *pkb ) );
+	}
 }
