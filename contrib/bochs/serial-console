@@ -142,7 +142,7 @@ sub patch_bochsrc {
       or die "Could not back up $active to $backup: $!\n";
 
   # Derive line to be inserted
-  my $patch = "com1: enabled=1, dev=$pty\n";
+  my $patch = "com1: enabled=1, mode=term, dev=$pty\n";
 
   # Modify file
   open my $old, "<$backup" or die "Could not open $backup: $!\n";
