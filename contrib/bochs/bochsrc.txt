@@ -74,7 +74,7 @@
 # now supported, but we still recommend to use the BIOS distributed with
 # Bochs. Now the start address can be calculated from image size.
 #=======================================================================
-romimage: file=bios/BIOS-bochs-latest, address=0xf0000
+romimage: file=bochs/bios/BIOS-bochs-latest, address=0xf0000
 #romimage: file=mybios.bin, address=0xfff80000 # 512k at memory top
 #romimage: file=mybios.bin # calculate start address from image size
 
@@ -156,7 +156,7 @@ optromimage1: file=rom.img, address=0xd0000
 # You now need to load a VGA ROM BIOS into C0000.
 #=======================================================================
 #vgaromimage: file=bios/VGABIOS-elpin-2.40
-vgaromimage: file=bios/VGABIOS-lgpl-latest
+vgaromimage: file=bochs/bios/VGABIOS-lgpl-latest
 #vgaromimage: file=bios/VGABIOS-lgpl-latest-cirrus
 
 #=======================================================================
