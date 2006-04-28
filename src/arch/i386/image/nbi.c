@@ -95,7 +95,7 @@ static struct ebinfo loaderinfo = {
  * @v context		NBI image context
  * @ret	True		Image is a valid NBI image
  * @ret	False		Image is not a valid NBI image
- * @err	EBADIMG		Image is not a valid NBI image
+ * @err	ENOEXEC		Image is not a valid NBI image
  * 
  * "context" is filled in with a context pointer suitable for passing to
  * nbi_load() and nbi_boot().
@@ -106,14 +106,14 @@ static int nbi_probe ( physaddr_t start, off_t len, void **context ) {
 
 	if ( (unsigned)len < sizeof ( imgheader ) ) {
 		DBG ( "NBI image too small\n" );
-		errno = EBADIMG;
+		errno = ENOEXEC;
 		return 0;
 	}
 
 	copy_from_phys ( &imgheader, start, sizeof ( imgheader ) );
 
 	if ( imgheader.magic != NBI_MAGIC ) {
-		errno = EBADIMG;
+		errno = ENOEXEC;
 		return 0;
 	}
 
@@ -168,7 +168,7 @@ static int nbi_load_segment ( physaddr_t dest, off_t imglen,
  * @v process		Function to call for each segment
  * @ret True		All segments were processed successfully
  * @ret False		An error occurred processing a segment
- * @err EBADIMG		Image is not a valid NBI image
+ * @err ENOEXEC		Image is not a valid NBI image
  * @err other		As returned by the "process" function
  *
  */
@@ -200,7 +200,7 @@ static int nbi_process_segments ( physaddr_t start, off_t len,
 		if ( sh.length == 0 ) {
 			/* Avoid infinite loop? */
 			DBG ( "NBI invalid segheader length 0\n" );
-			errno = EBADIMG;
+			errno = ENOEXEC;
 			return 0;
 		}
 		
@@ -240,7 +240,7 @@ static int nbi_process_segments ( physaddr_t start, off_t len,
 		sh_off += NBI_LENGTH ( sh.length );
 		if ( sh_off >= NBI_HEADER_LENGTH ) {
 			DBG ( "NBI header overflow\n" );
-			errno = EBADIMG;
+			errno = ENOEXEC;
 			return 0;
 		}
 
@@ -249,7 +249,7 @@ static int nbi_process_segments ( physaddr_t start, off_t len,
 	if ( offset != len ) {
 		DBG ( "NBI length mismatch (file %d, metadata %d)\n",
 		      len, offset );
-		errno = EBADIMG;
+		errno = ENOEXEC;
 		return 0;
 	}
 
@@ -264,7 +264,7 @@ static int nbi_process_segments ( physaddr_t start, off_t len,
  * @v context		NBI context (as returned by nbi_probe())
  * @ret True		Image loaded into memory
  * @ret False		Image not loaded into memory
- * @err EBADIMG		Image is not a valid NBI image
+ * @err ENOEXEC		Image is not a valid NBI image
  * @err other		As returned by nbi_process_segments()
  * @err other		As returned by nbi_prepare_segment()
  * @err other		As returned by nbi_load_segment()
@@ -275,7 +275,7 @@ static int nbi_load ( physaddr_t start, off_t len, void *context ) {
 
 	/* If we don't have enough data give up */
 	if ( len < NBI_HEADER_LENGTH ) {
-		errno = EBADIMG;
+		errno = ENOEXEC;
 		return 0;
 	}
 	
@@ -305,7 +305,7 @@ static int nbi_load ( physaddr_t start, off_t len, void *context ) {
  * @v imgheader		Image header information
  * @ret Never		NBI program booted successfully
  * @ret False		NBI program returned
- * @err EIMGRET		NBI program returned
+ * @err ECANCELED	NBI program returned
  *
  */
 static int nbi_boot16 ( struct imgheader *imgheader ) {
@@ -340,7 +340,7 @@ static int nbi_boot16 ( struct imgheader *imgheader ) {
 		    CLOBBER ( "eax", "ecx", "edx", "ebp" ) );
 	BASEMEM_PARAMETER_DONE ( bootp_data );
 	
-	errno = EIMGRET;
+	errno = ECANCELED;
 	return 0;
 }
 
@@ -350,11 +350,11 @@ static int nbi_boot16 ( struct imgheader *imgheader ) {
  * @v imgheader		Image header information
  * @ret False		NBI program should not have returned
  * @ret other		As returned by NBI program
- * @err EIMGRET		NBI program should not have returned
+ * @err ECANCELED	NBI program should not have returned
  *
  * To distinguish between the case of an NBI program returning false,
  * and an NBI program that should not have returned, check errno.
- * errno will be set to EIMGRET only if the NBI program should not
+ * errno will be set to ECANCELED only if the NBI program should not
  * have returned.
  *
  */
@@ -374,7 +374,7 @@ static int nbi_boot32 ( struct imgheader *imgheader ) {
 	printf ( "Secondary program returned %d\n", rc );
 	if ( ! NBI_PROGRAM_RETURNS ( imgheader->flags ) ) {
 		/* We shouldn't have returned */
-		errno = EIMGRET;
+		errno = ECANCELED;
 		rc = 0;
 	}
 
@@ -388,7 +388,7 @@ static int nbi_boot32 ( struct imgheader *imgheader ) {
  * @ret Never		NBI program booted successfully
  * @ret False		NBI program should not have returned
  * @ret other		As returned by NBI program
- * @err EIMGRET		NBI program should not have returned
+ * @err ECANCELED	NBI program should not have returned
  *
  * See also nbi_boot16() and nbi_boot32().
  *

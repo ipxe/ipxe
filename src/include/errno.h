@@ -111,21 +111,61 @@
 
 /*
  * The range 0xd0 to 0xff is defined as "Vendor errors" by the PXE
- * spec.  We place all our Etherboot-specific errors in this range.
- * We also define some generic errors as aliases to the PXE errors.
- *
+ * spec.  We use this space for POSIX-like errors that aren't
+ * accounted for by the (somewhat implementation-specific) PXE error
+ * list.
  */
 
-#define ENOERR		0x00
+#define ENOERR		0x00	/**< Operation completed successfully */
+#define EACCES		0xd0	/**< Permission denied */
+#define EADDRNOTAVAIL	0xd1	/**< Cannot assign requested address */
+#define EADDRINUSE	EADDRNOTAVAIL /**< Address already in use */
+#define EAFNOSUPPORT	0xd2	/**< Address family not supported by protocol*/
+#define EAGAIN		0xd3	/**< Resource temporarily unavailable */
+#define EBUSY		0xd4	/**< Device or resource busy */
+/** Operation cancelled */
+#define ECANCELED	PXENV_STATUS_BINL_CANCELED_BY_KEYSTROKE
+#define ECONNABORTED	0xd5	/**< Software caused connection abort */
+#define ECONNREFUSED	0xd6	/**< Connection refused */
+#define ECONNRESET	0xd7	/**< Connection reset by peer */
+#define EDESTADDRREQ	0xd8	/**< Destination address required */
+#define EFBIG		0xd9	/**< File too large */
+#define EHOSTUNREACH	0xda	/**< No route to host */
+#define EINPROGRESS	0xdb	/**< Operation now in progress */
+#define EINTR		0xdc	/**< Interrupted system call */
+#define EINVAL		0xdd	/**< Invalid argument */
+#define EIO		0xde	/**< Input/output error */
+#define EISCONN		0xdf	/**< Transport endpoint is already connected */
+#define EMFILE		0xe0	/**< Too many open files */
+#define EMSGSIZE	0xe1	/**< Message too long */
+#define ENAMETOOLONG	0xe2	/**< File name too long */
+#define ENETDOWN	0xe3	/**< Network is down */
+#define ENETRESET	0xe4	/**< Network dropped connection on reset */
+#define ENETUNREACH	0xe5	/**< Network is unreachable */
+#define ENFILE		EMFILE	/**< Too many open files in system */
+/** Cannot allocate memory */
 #define ENOMEM		PXENV_STATUS_OUT_OF_RESOURCES
-#define	EBADIMG		0xd0
-#define EIMGRET		0xd1
-#define ETIMEDOUT	0xd2
-#define EINVAL		0xd3
-#define ENOENT		0xd4
-#define EAFNOSUPPORT	0xd5
-#define EAGAIN		0xd6
-#define EIO		0xd7
+#define ENOBUFS		ENOMEM	/**< No buffer space available */
+#define ENODATA		0xe6	/**< No data available */
+#define ENODEV		0xe7	/**< No such device */
+#define ENOENT		0xe8	/**< No such file or directory */
+#define ENOEXEC		0xe9	/**< Exec format error */
+#define ENOMSG		ENODATA	/**< No message of the desired type */
+#define ENOSR		0xea	/**< No stream resources */
+#define ENOSTR		0xeb	/**< Not a stream */
+#define ENOSYS		0xec	/**< Function not implemented */
+#define ENOTCONN	0xed	/**< Transport endpoint is not connected */
+#define ENOTSOCK	0xee	/**< Socket operation on non-socket */
+#define EOPNOTSUPP	0xef	/**< Operation not supported */
+#define ENOTSUP		EOPNOTSUPP /**< Not supported */
+#define ENOTTY		0xf0	/**< Inappropriate ioctl for device */
+#define ENXIO		ENODEV	/**< No such device or address */
+#define EPERM		EACCES	/**< Operation not permitted */
+#define EPROTO		0xf1	/**< Protocol error */
+#define EPROTONOSUPPORT	0xf2	/**< Protocol not supported */
+#define EPROTOTYPE	0xf3	/**< Protocol wrong type for socket */
+#define ETIMEDOUT	0xf4	/**< Connection timed out */
+#define EWOULDBLOCK	EAGAIN	/**< Resource temporarily unavailable */
 
 /* Data structures and declarations */
 
