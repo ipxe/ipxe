@@ -1,6 +1,7 @@
 #include <string.h>
 #include <stdint.h>
 #include <byteswap.h>
+#include <vsprintf.h>
 #include <gpxe/in.h>
 
 
@@ -153,7 +154,8 @@ static int ipv4_rx ( struct pk_buff *pkb ) {
 	/* Transfer to uIP buffer.  Horrendously space-inefficient,
 	 * but will do as a proof-of-concept for now.
 	 */
-	memcpy ( uip_buf, pkb->data, pkb_len ( pkb ) );
+	uip_len = pkb_len ( pkb );
+	memcpy ( uip_buf, pkb->data, uip_len );
 
 	/* Hand to uIP for processing */
 	uip_input ();
@@ -198,22 +200,40 @@ static int ipv4_route ( const struct pk_buff *pkb,
 	}
 
 	/* Set broadcast and multicast flags as applicable */
-	nethdr->dest_flags = 0;
+	nethdr->flags = 0;
 	if ( dest->s_addr == htonl ( INADDR_BROADCAST ) ) {
-		nethdr->dest_flags = NETADDR_FL_BROADCAST;
+		nethdr->flags = PKT_FL_BROADCAST;
 	} else if ( IN_MULTICAST ( dest->s_addr ) ) {
-		nethdr->dest_flags = NETADDR_FL_MULTICAST;
+		nethdr->flags = PKT_FL_MULTICAST;
 	}
 
 	return 0;
 }
 
+/**
+ * Transcribe IP address
+ *
+ * @v net_addr	IP address
+ * @ret string	IP address in dotted-quad notation
+ *
+ */
+static const char * ipv4_ntoa ( const void *net_addr ) {
+	static char buf[16]; /* "xxx.xxx.xxx.xxx" */
+	uint8_t *ip_addr = net_addr;
+
+	sprintf ( buf, "%d.%d.%d.%d", ip_addr[0], ip_addr[1], ip_addr[2],
+		  ip_addr[3] );
+	return buf;
+}
+
 /** IPv4 protocol */
 struct net_protocol ipv4_protocol = {
-	.net_proto = ETH_P_IP,
+	.name = "IP",
+	.net_proto = htons ( ETH_P_IP ),
 	.net_addr_len = sizeof ( struct in_addr ),
 	.rx = ipv4_rx,
 	.route = ipv4_route,
+	.ntoa = ipv4_ntoa,
 };
 
 NET_PROTOCOL ( ipv4_protocol );
@@ -221,6 +241,18 @@ NET_PROTOCOL ( ipv4_protocol );
 /** IPv4 address for the static single net device */
 struct net_address static_single_ipv4_address = {
 	.net_protocol = &ipv4_protocol,
+
+#warning "Remove this static-IP hack"
+	.net_addr = { 0x0a, 0xfe, 0xfe, 0x01 },
 };
 
 STATIC_SINGLE_NETDEV_ADDRESS ( static_single_ipv4_address );
+
+#warning "Remove this static-IP hack"
+static struct ipv4_route routing_table[NUM_ROUTES] = {
+	{ { htonl ( 0x0afefe00 ) }, { htonl ( 0xfffffffc ) },
+	  { htonl ( 0x00000000 ) }, { htonl ( 0x0afefe01 ) } },
+	{ { htonl ( 0x00000000 ) }, { htonl ( 0x00000000 ) },
+	  { htonl ( 0x0afefe02 ) }, { htonl ( 0x0afefe01 ) } },
+};
+

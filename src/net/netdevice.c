@@ -61,6 +61,22 @@ static struct net_address static_single_netdev_addresses_end[0]
 static LIST_HEAD ( rx_queue );
 
 /**
+ * Add packet to receive queue
+ *
+ * @v netdev		Network device
+ * @v pkb		Packet buffer
+ *
+ * The packet is added to the RX queue.  Ownership of the packet is
+ * transferred to the RX queue; the caller must not touch the packet
+ * buffer after calling netdev_rx().
+ */
+void netdev_rx ( struct net_device *netdev, struct pk_buff *pkb ) {
+	DBG ( "Packet received\n" );
+	pkb->ll_protocol = netdev->ll_protocol;
+	list_add_tail ( &pkb->list, &rx_queue );
+}
+
+/**
  * Identify network protocol
  *
  * @v net_proto		Network-layer protocol, in network-byte order
@@ -69,7 +85,7 @@ static LIST_HEAD ( rx_queue );
  * Identify a network-layer protocol from a protocol number, which
  * must be an ETH_P_XXX constant in network-byte order.
  */
-struct net_protocol * net_find_protocol ( uint16_t net_proto ) {
+struct net_protocol * find_net_protocol ( uint16_t net_proto ) {
 	struct net_protocol *net_protocol;
 
 	for ( net_protocol = net_protocols ; net_protocol < net_protocols_end ;
@@ -93,8 +109,9 @@ struct net_protocol * net_find_protocol ( uint16_t net_proto ) {
  * Note that even with a static single network device, this function
  * can still return NULL.
  */
-struct net_device * net_find_address ( struct net_protocol *net_protocol,
-				       void *net_addr ) {
+struct net_device *
+find_netdev_by_net_addr ( struct net_protocol *net_protocol,
+			  void *net_addr ) {
 	struct net_address *net_address;
 	struct net_device *netdev = &static_single_netdev;
 	
@@ -106,7 +123,75 @@ struct net_device * net_find_address ( struct net_protocol *net_protocol,
 				net_protocol->net_addr_len ) == 0 ) )
 			return netdev;
 	}
+
 	return NULL;
+}
+
+/**
+ * Transmit packet via a network device
+ *
+ * @v pkb		Packet buffer
+ * @v netdev		Network device, or NULL
+ * @ret rc		Return status code
+ *
+ * Transmits the packet via the specified network device.  The packet
+ * must begin with a network-layer header, and the @c net_protocol
+ * field must have been filled in.  If @c netdev is NULL, the network
+ * device is identified via the packet contents, if possible.  If this
+ * function returns success, it has taken ownership of the packet
+ * buffer.
+ */
+int net_transmit_via ( struct pk_buff *pkb, struct net_device *netdev ) {
+	struct net_protocol *net_protocol;
+	struct net_header nethdr;
+	struct ll_protocol *ll_protocol;
+	struct ll_header llhdr;
+	int rc;
+
+	/* Perform network-layer routing */
+	net_protocol = pkb->net_protocol;
+	nethdr.net_protocol = net_protocol;
+	if ( ( rc = net_protocol->route ( pkb, &nethdr ) ) != 0 ) {
+		DBG ( "Could not route to %s address %s\n",
+		      net_protocol->name,
+		      net_protocol->ntoa ( nethdr.dest_net_addr ) );
+		return rc;
+	}
+
+	/* Identify transmitting network device, if not specified */
+	if ( ! netdev ) {
+		netdev = find_netdev_by_net_addr ( net_protocol,
+						   nethdr.source_net_addr );
+		if ( ! netdev ) {
+			DBG ( "No network device for %s address %s\n",
+			      net_protocol->name,
+			      net_protocol->ntoa ( nethdr.source_net_addr ) );
+			return -EHOSTUNREACH;
+		}
+	}
+
+	/* Perform link-layer routing */
+	ll_protocol = netdev->ll_protocol;
+	llhdr.ll_protocol = ll_protocol;
+	if ( ( rc = ll_protocol->route ( netdev, &nethdr, &llhdr ) ) != 0 ) {
+		DBG ( "No link-layer route to %s address %s\n",
+		      net_protocol->name,
+		      net_protocol->ntoa ( nethdr.dest_net_addr ) );
+		return rc;
+	}
+
+	/* Prepend link-layer header */
+	pkb_push ( pkb, ll_protocol->ll_header_len );
+	ll_protocol->fill_llh ( &llhdr, pkb );
+
+	/* Transmit packet */
+	if ( ( rc = netdev->transmit ( netdev, pkb ) ) != 0 ) {
+		DBG ( "Device failed to transmit packet\n" );
+		return rc;
+	}
+	
+	DBG ( "Packet transmitted\n" );
+	return 0;
 }
 
 /**
@@ -120,46 +205,7 @@ struct net_device * net_find_address ( struct net_protocol *net_protocol,
  * buffer.
  */
 int net_transmit ( struct pk_buff *pkb ) {
-	struct net_protocol *net_protocol;
-	struct net_header nethdr;
-	struct ll_protocol *ll_protocol;
-	struct ll_header llhdr;
-	struct net_device *netdev;
-	int rc;
-
-	/* Perform network-layer routing */
-	net_protocol = pkb->net_protocol;
-	nethdr.net_protocol = net_protocol;
-	if ( ( rc = net_protocol->route ( pkb, &nethdr ) ) != 0 )
-		goto err;
-
-	/* Identify transmitting network device */
-	netdev = net_find_address ( net_protocol, nethdr.source_net_addr );
-	if ( ! netdev )
-		goto err;
-
-	/* Perform link-layer routing */
-	ll_protocol = netdev->ll_protocol;
-	llhdr.ll_protocol = ll_protocol;
-	llhdr.net_proto = net_protocol->net_proto;
-	memcpy ( llhdr.source_ll_addr, netdev->ll_addr,
-		 ll_protocol->ll_addr_len);
-	if ( ( rc = ll_protocol->route ( &nethdr, &llhdr ) ) != 0 )
-		goto err;
-
-	/* Prepend link-layer header */
-	pkb_push ( pkb, ll_protocol->ll_header_len );
-	ll_protocol->fill_llh ( &llhdr, pkb );
-
-	/* Transmit packet */
-	if ( ( rc = netdev->transmit ( netdev, pkb ) ) != 0 )
-		goto err;
-
-	return 0;
-
- err:
-	free_pkb ( pkb );
-	return rc;
+	return net_transmit_via ( pkb, NULL );
 }
 
 /**
@@ -174,24 +220,10 @@ int net_transmit ( struct pk_buff *pkb ) {
 int net_poll ( void ) {
 	struct net_device *netdev = &static_single_netdev;
 
+	DBG ( "Polling network\n" );
 	netdev->poll ( netdev );
 
 	return ( ! list_empty ( &rx_queue ) );
-}
-
-/**
- * Add packet to receive queue
- *
- * @v netdev		Network device
- * @v pkb		Packet buffer
- *
- * The packet is added to the RX queue.  Ownership of the packet is
- * transferred to the RX queue; the caller must not touch the packet
- * buffer after calling netdev_rx().
- */
-void netdev_rx ( struct net_device *netdev, struct pk_buff *pkb ) {
-	pkb->ll_protocol = netdev->ll_protocol;
-	list_add_tail ( &pkb->list, &rx_queue );
 }
 
 /**
@@ -225,22 +257,26 @@ void net_run ( void ) {
 		ll_protocol->parse_llh ( pkb, &llhdr );
 
 		/* Identify network-layer protocol */
-		net_protocol = net_find_protocol ( llhdr.net_proto );
+		net_protocol = find_net_protocol ( llhdr.net_proto );
 		if ( ! net_protocol ) {
-			DBG ( "Unknown network-layer protocol %02x\n",
+			DBG ( "Unknown network-layer protocol %x\n",
 			      ntohs ( llhdr.net_proto ) );
 			free_pkb ( pkb );
 			continue;
 		}
+		pkb->net_protocol = net_protocol;
 
 		/* Strip off link-layer header */
 		pkb_pull ( pkb, ll_protocol->ll_header_len );
 
 		/* Hand off to network layer */
 		if ( net_protocol->rx ( pkb ) != 0 ) {
+			DBG ( "Network-layer protocol refused packet\n" );
 			free_pkb ( pkb );
 			continue;
 		}
+
+		DBG ( "Processed received packet\n" );
 	}
 }
 

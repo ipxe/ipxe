@@ -91,6 +91,7 @@ arp_find_entry ( struct ll_protocol *ll_protocol,
 /**
  * Look up media-specific link-layer address in the ARP cache
  *
+ * @v netdev		Network device
  * @v nethdr		Generic network-layer header
  * @ret llhdr		Generic link-layer header
  * @ret rc		Return status code
@@ -102,9 +103,11 @@ arp_find_entry ( struct ll_protocol *ll_protocol,
  * llhdr.
  *
  * If no address is found in the ARP cache, an ARP request will be
- * transmitted and -ENOENT will be returned.
+ * transmitted on the specified network device and -ENOENT will be
+ * returned.
  */
-int arp_resolve ( const struct net_header *nethdr, struct ll_header *llhdr ) {
+int arp_resolve ( struct net_device *netdev, const struct net_header *nethdr,
+		  struct ll_header *llhdr ) {
 	struct net_protocol *net_protocol = nethdr->net_protocol;
 	struct ll_protocol *ll_protocol = llhdr->ll_protocol;
 	const struct arp_entry *arp;
@@ -116,17 +119,23 @@ int arp_resolve ( const struct net_header *nethdr, struct ll_header *llhdr ) {
 	arp = arp_find_entry ( ll_protocol, net_protocol,
 			       nethdr->dest_net_addr );
 	if ( arp ) {
+		DBG ( "ARP cache hit: %s %s => %s %s\n",
+		      net_protocol->name, net_protocol->ntoa ( arp->net_addr ),
+		      ll_protocol->name, ll_protocol->ntoa ( arp->ll_addr ) );
 		memcpy ( llhdr->dest_ll_addr, arp->ll_addr,
 			 sizeof ( llhdr->dest_ll_addr ) );
 		return 0;
 	}
+	DBG ( "ARP cache miss: %s %s\n", net_protocol->name,
+	      net_protocol->ntoa ( nethdr->dest_net_addr ) );
 
 	/* Allocate ARP packet */
-	pkb = alloc_pkb ( sizeof ( *arphdr ) +
+	pkb = alloc_pkb ( MAX_LL_HEADER_LEN + sizeof ( *arphdr ) +
 			  2 * ( MAX_LL_ADDR_LEN + MAX_NET_ADDR_LEN ) );
 	if ( ! pkb )
 		return -ENOMEM;
 	pkb->net_protocol = &arp_protocol;
+	pkb_reserve ( pkb, MAX_LL_HEADER_LEN );
 
 	/* Build up ARP request */
 	arphdr = pkb_put ( pkb, sizeof ( *arphdr ) );
@@ -145,7 +154,7 @@ int arp_resolve ( const struct net_header *nethdr, struct ll_header *llhdr ) {
 		 nethdr->dest_net_addr, net_protocol->net_addr_len );
 
 	/* Transmit ARP request */
-	if ( ( rc = net_transmit ( pkb ) ) != 0 ) {
+	if ( ( rc = net_transmit_via ( pkb, netdev ) ) != 0 ) {
 		free_pkb ( pkb );
 		return rc;
 	}
@@ -175,7 +184,7 @@ static int arp_rx ( struct pk_buff *pkb ) {
 
 	/* Identify link-layer and network-layer protocols */
 	ll_protocol = pkb->ll_protocol;
-	net_protocol = net_find_protocol ( arphdr->ar_pro );
+	net_protocol = find_net_protocol ( arphdr->ar_pro );
 	if ( ! net_protocol )
 		goto done;
 
@@ -192,10 +201,14 @@ static int arp_rx ( struct pk_buff *pkb ) {
 		memcpy ( arp->ll_addr, arp_sender_ha ( arphdr ),
 			 arphdr->ar_hln );
 		merge = 1;
+		DBG ( "ARP cache update: %s %s => %s %s\n",
+		      net_protocol->name, net_protocol->ntoa ( arp->net_addr ),
+		      ll_protocol->name, ll_protocol->ntoa ( arp->ll_addr ) );
 	}
 
 	/* See if we own the target protocol address */
-	netdev = net_find_address ( net_protocol, arp_target_pa ( arphdr ) );
+	netdev = find_netdev_by_net_addr ( net_protocol,
+					   arp_target_pa ( arphdr ) );
 	if ( ! netdev )
 		goto done;
 	
@@ -208,6 +221,9 @@ static int arp_rx ( struct pk_buff *pkb ) {
 			 arphdr->ar_hln );
 		memcpy ( arp->net_addr, arp_sender_pa ( arphdr ),
 			 arphdr->ar_pln);
+		DBG ( "ARP cache add: %s %s => %s %s\n",
+		      net_protocol->name, net_protocol->ntoa ( arp->net_addr ),
+		      ll_protocol->name, ll_protocol->ntoa ( arp->ll_addr ) );
 	}
 
 	/* If it's not a request, there's nothing more to do */
@@ -215,11 +231,14 @@ static int arp_rx ( struct pk_buff *pkb ) {
 		goto done;
 
 	/* Change request to a reply, and send it */
+	DBG ( "ARP reply: %s %s => %s %s\n", net_protocol->name,
+	      net_protocol->ntoa ( arp_target_pa ( arphdr ) ),
+	      ll_protocol->name, ll_protocol->ntoa ( netdev->ll_addr ) );
 	arphdr->ar_op = htons ( ARPOP_REPLY );
 	memswap ( arp_sender_ha ( arphdr ), arp_target_ha ( arphdr ),
 		 arphdr->ar_hln + arphdr->ar_pln );
 	memcpy ( arp_target_ha ( arphdr ), netdev->ll_addr, arphdr->ar_hln );
-	if ( net_transmit ( pkb ) == 0 )
+	if ( net_transmit_via ( pkb, netdev ) == 0 )
 		pkb = NULL;
 
  done:
@@ -243,18 +262,33 @@ static int arp_route ( const struct pk_buff *pkb,
 		 arphdr->ar_hln );
 	memcpy ( nethdr->dest_net_addr, arp_target_ha ( arphdr ),
 		 arphdr->ar_hln );
-	nethdr->dest_flags = NETADDR_FL_RAW;
+	nethdr->flags = PKT_FL_RAW_ADDR;
 	if ( arphdr->ar_op == htons ( ARPOP_REQUEST ) )
-		nethdr->dest_flags |= NETADDR_FL_BROADCAST;
+		nethdr->flags |= PKT_FL_BROADCAST;
 	
 	return 0;
 }
 
+/**
+ * Transcribe ARP address
+ *
+ * @v net_addr	ARP address
+ * @ret string	"<ARP>"
+ *
+ * This operation is meaningless for the ARP protocol.
+ */
+static const char *
+arp_ntoa ( const void *net_addr __attribute__ (( unused )) ) {
+	return "<ARP>";
+}
+
 /** ARP protocol */
 struct net_protocol arp_protocol = {
+	.name = "ARP",
 	.net_proto = htons ( ETH_P_ARP ),
 	.rx = arp_rx,
 	.route = arp_route,
+	.ntoa = arp_ntoa,
 };
 
 NET_PROTOCOL ( arp_protocol );

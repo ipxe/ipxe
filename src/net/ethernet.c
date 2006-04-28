@@ -51,16 +51,21 @@ static uint8_t eth_broadcast[ETH_ALEN] = { 0xff, 0xff, 0xff, 0xff, 0xff, 0xff};
  * is sent for the requested network-layer address and -ENOENT is
  * returned.
  */
-static int eth_route ( const struct net_header *nethdr,
+static int eth_route ( struct net_device *netdev,
+		       const struct net_header *nethdr,
 		       struct ll_header *llhdr ) {
 	int rc;
 
+	/* Fill in the easy bits */
+	llhdr->net_proto = nethdr->net_protocol->net_proto;
+	memcpy ( llhdr->source_ll_addr, netdev->ll_addr, ETH_ALEN );
+
 	/* Work out the destination MAC address */
-	if ( nethdr->dest_flags & NETADDR_FL_RAW ) {
-		memcpy ( llhdr->dest_ll_addr, nethdr->dest_net_addr, ETH_ALEN);
-	} else if ( nethdr->dest_flags & NETADDR_FL_BROADCAST ) {
+	if ( nethdr->flags & PKT_FL_BROADCAST ) {
 		memcpy ( llhdr->dest_ll_addr, eth_broadcast, ETH_ALEN );
-	} else if ( nethdr->dest_flags & NETADDR_FL_MULTICAST ) {
+	} else if ( nethdr->flags & PKT_FL_RAW_ADDR ) {
+		memcpy ( llhdr->dest_ll_addr, nethdr->dest_net_addr, ETH_ALEN);
+	} else if ( nethdr->flags & PKT_FL_MULTICAST ) {
 		/* IP multicast is a special case; there exists a
 		 * direct mapping from IP address to MAC address
 		 */
@@ -73,7 +78,7 @@ static int eth_route ( const struct net_header *nethdr,
 		llhdr->dest_ll_addr[5] = nethdr->dest_net_addr[3];
 	} else {
 		/* Otherwise, look up the address using ARP */
-		if ( ( rc = arp_resolve ( nethdr, llhdr ) ) != 0 )
+		if ( ( rc = arp_resolve ( netdev, nethdr, llhdr ) ) != 0 )
 			return rc;
 	}
 
@@ -116,22 +121,40 @@ static void eth_parse_llh ( const struct pk_buff *pkb,
 	llhdr->net_proto = ethhdr->h_protocol;
 
 	if ( memcmp ( ethhdr->h_dest, eth_broadcast, ETH_ALEN ) == 0 ) {
-		llhdr->dest_flags = NETADDR_FL_BROADCAST;
+		llhdr->flags = PKT_FL_BROADCAST;
 	} else if ( ethhdr->h_dest[0] & 0x01 ) {
-		llhdr->dest_flags = NETADDR_FL_MULTICAST;
+		llhdr->flags = PKT_FL_MULTICAST;
 	} else {
-		llhdr->dest_flags = 0;
+		llhdr->flags = 0;
 	}
+}
+
+/**
+ * Transcribe Ethernet address
+ *
+ * @v ll_addr	Link-layer address
+ * @ret string	Link-layer address in human-readable format
+ */
+static const char * eth_ntoa ( const void *ll_addr ) {
+	static char buf[18]; /* "00:00:00:00:00:00" */
+	uint8_t *eth_addr = ll_addr;
+
+	sprintf ( buf, "%hhx:%hhx:%hhx:%hhx:%hhx:%hhx",
+		  eth_addr[0], eth_addr[1], eth_addr[2],
+		  eth_addr[3], eth_addr[4], eth_addr[5] );
+	return buf;
 }
 
 /** Ethernet protocol */
 struct ll_protocol ethernet_protocol = {
+	.name = "Ethernet",
 	.ll_proto = htons ( ARPHRD_ETHER ),
 	.ll_addr_len = ETH_ALEN,
 	.ll_header_len = ETH_HLEN,
 	.route = eth_route,
 	.fill_llh = eth_fill_llh,
 	.parse_llh = eth_parse_llh,
+	.ntoa = eth_ntoa,
 };
 
 LL_PROTOCOL ( ethernet_protocol );

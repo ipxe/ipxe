@@ -11,11 +11,15 @@
 #include <gpxe/tables.h>
 
 struct pk_buff;
+struct net_device;
 struct net_protocol;
 struct ll_protocol;
 
 /** Maximum length of a link-layer address */
 #define MAX_LL_ADDR_LEN 6
+
+/** Maximum length of a link-layer header */
+#define MAX_LL_HEADER_LEN 16
 
 /** Maximum length of a network-layer address */
 #define MAX_NET_ADDR_LEN 4
@@ -32,37 +36,37 @@ struct ll_protocol;
 struct net_header {
 	/** Network-layer protocol */
 	struct net_protocol *net_protocol;
-	/** Destination address flags
+	/** Flags
 	 *
-	 * This is the bitwise OR of zero or more NETADDR_FL_XXX
+	 * This is the bitwise OR of zero or more PKT_FL_XXX
 	 * values.
 	 */
-	int dest_flags;
+	int flags;
 	/** Network-layer destination address */
 	uint8_t dest_net_addr[MAX_NET_ADDR_LEN];
 	/** Network-layer source address */
 	uint8_t source_net_addr[MAX_NET_ADDR_LEN];
 };
 
-/** Address is a broadcast address */
-#define NETADDR_FL_BROADCAST 0x01
+/** Packet is a broadcast packet */
+#define PKT_FL_BROADCAST 0x01
 
-/** Address is a multicast address */
-#define NETADDR_FL_MULTICAST 0x02
+/** Packet is a multicast packet */
+#define PKT_FL_MULTICAST 0x02
 
-/** Address is a raw hardware address */
-#define NETADDR_FL_RAW 0x04
+/** Addresses are raw hardware addresses */
+#define PKT_FL_RAW_ADDR 0x04
 
 /** A generic link-layer header */
 struct ll_header {
 	/** Link-layer protocol */
 	struct ll_protocol *ll_protocol;
-	/** Destination address flags
+	/** Flags
 	 *
-	 * This is the bitwise OR of zero or more NETADDR_FL_XXX
+	 * This is the bitwise OR of zero or more PKT_FL_XXX
 	 * values.
 	 */
-	int dest_flags;
+	int flags;
 	/** Link-layer destination address */
 	uint8_t dest_ll_addr[MAX_LL_ADDR_LEN];
 	/** Link-layer source address */
@@ -80,21 +84,21 @@ struct ll_header {
  *
  */
 struct net_protocol {
+	/** Protocol name */
+	const char *name;
 	/**
 	 * Perform network-layer routing
 	 *
 	 * @v pkb	Packet buffer
-	 * @ret source	Network-layer source address
-	 * @ret dest	Network-layer destination address
+	 * @v nethdr	Generic network-layer header
 	 * @ret rc	Return status code
 	 *
-	 * This method should fill in the source and destination
-	 * addresses with enough information to allow the link layer
-	 * to route the packet.
+	 * This method should fill in the network header with enough
+	 * information to allow the link layer to route the packet.
 	 *
 	 * For example, in the case of IPv4, this method should fill
-	 * in @c source with the IP addresses of the local adapter and
-	 * @c dest with the next hop destination (e.g. the gateway).
+	 * in the IP addresses of the local adapter and the next hop
+	 * destination (e.g. the gateway).
 	 */
 	int ( * route ) ( const struct pk_buff *pkb,
 			  struct net_header *nethdr );
@@ -108,6 +112,19 @@ struct net_protocol {
 	 * the packet buffer.
 	 */
 	int ( * rx ) ( struct pk_buff *pkb );
+	/**
+	 * Transcribe network-layer address
+	 *
+	 * @v net_addr	Network-layer address
+	 * @ret string	Human-readable transcription of address
+	 *
+	 * This method should convert the network-layer address into a
+	 * human-readable format (e.g. dotted quad notation for IPv4).
+	 *
+	 * The buffer used to hold the transcription is statically
+	 * allocated.
+	 */
+	const char * ( *ntoa ) ( const void * net_addr );
 	/** Network-layer protocol
 	 *
 	 * This is an ETH_P_XXX constant, in network-byte order
@@ -122,9 +139,12 @@ struct net_protocol {
  *
  */
 struct ll_protocol {
+	/** Protocol name */
+	const char *name;
 	/**
 	 * Perform link-layer routing
 	 *
+	 * @v netdev	Network device
 	 * @v nethdr	Generic network-layer header
 	 * @ret llhdr	Generic link-layer header
 	 * @ret rc	Return status code
@@ -137,7 +157,8 @@ struct ll_protocol {
 	 * return an error (after transmitting an ARP request, if
 	 * applicable).
 	 */
-	int ( * route ) ( const struct net_header *nethdr,
+	int ( * route ) ( struct net_device *netdev,
+			  const struct net_header *nethdr,
 			  struct ll_header *llhdr );
 	/**
 	 * Fill media-specific link-layer header
@@ -164,6 +185,19 @@ struct ll_protocol {
 	void ( * parse_llh ) ( const struct pk_buff *pkb,
 			       struct ll_header *llhdr );
 
+	/**
+	 * Transcribe link-layer address
+	 *
+	 * @v ll_addr	Link-layer address
+	 * @ret string	Human-readable transcription of address
+	 *
+	 * This method should convert the link-layer address into a
+	 * human-readable format.
+	 *
+	 * The buffer used to hold the transcription is statically
+	 * allocated.
+	 */
+	const char * ( *ntoa ) ( const void * ll_addr );
 	/** Link-layer protocol
 	 *
 	 * This is an ARPHRD_XXX constant, in network byte order.
@@ -291,12 +325,29 @@ free_netdev ( struct net_device *netdev __attribute__ (( unused )) ) {
 }
 
 /**
+ * Transmit raw packet via network device
+ *
+ * @v netdev		Network device
+ * @v pkb		Packet buffer
+ * @ret rc		Return status code
+ *
+ * Transmits the packet via the specified network device.  The
+ * link-layer header must already have been filled in.  If this
+ * function returns success, it has taken ownership of the packet
+ * buffer.
+ */
+static inline int netdev_transmit ( struct net_device *netdev,
+				    struct pk_buff *pkb ) {
+	return netdev->transmit ( netdev, pkb );
+}
+
+/**
  * Register a link-layer protocol
  *
  * @v protocol		Link-layer protocol
  */
 #define LL_PROTOCOL( protocol ) \
-	struct ll_protocol protocol __table ( ll_protocols, 00 )
+	struct ll_protocol protocol __table ( ll_protocols, 01 )
 
 /**
  * Register a network-layer protocol
@@ -304,7 +355,7 @@ free_netdev ( struct net_device *netdev __attribute__ (( unused )) ) {
  * @v protocol		Network-layer protocol
  */
 #define NET_PROTOCOL( protocol ) \
-	struct net_protocol protocol __table ( net_protocols, 00 )
+	struct net_protocol protocol __table ( net_protocols, 01 )
 
 /**
  * Register a network-layer address for the static single network device
@@ -312,15 +363,17 @@ free_netdev ( struct net_device *netdev __attribute__ (( unused )) ) {
  * @v net_address	Network-layer address
  */
 #define STATIC_SINGLE_NETDEV_ADDRESS( address ) \
-	struct net_address address __table ( sgl_netdev_addresses, 00 )
+	struct net_address address __table ( sgl_netdev_addresses, 01 )
 
-extern struct net_protocol *net_find_protocol ( uint16_t net_proto );
-extern struct net_device * net_find_address ( struct net_protocol *net_proto,
-					      void *net_addr );
+extern void netdev_rx ( struct net_device *netdev, struct pk_buff *pkb );
 
+extern struct net_protocol *find_net_protocol ( uint16_t net_proto );
+extern struct net_device *
+find_netdev_by_net_addr ( struct net_protocol *net_protocol, void *net_addr );
+
+extern int net_transmit_via ( struct pk_buff *pkb, struct net_device *netdev );
 extern int net_transmit ( struct pk_buff *pkb );
 extern int net_poll ( void );
-extern void netdev_rx ( struct net_device *netdev, struct pk_buff *pkb );
 extern struct pk_buff * net_rx_dequeue ( void );
 
 #endif /* _GPXE_NETDEVICE_H */
