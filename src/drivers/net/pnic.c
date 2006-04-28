@@ -134,8 +134,10 @@ static void pnic_poll ( struct net_device *netdev ) {
 		if ( qlen == 0 )
 			break;
 		pkb = alloc_pkb ( ETH_FRAME_LEN );
-		if ( ! pkb )
+		if ( ! pkb ) {
+			printf ( "could not allocate buffer\n" );
 			break;
+		}
 		if ( pnic_command ( pnic, PNIC_CMD_RECV, NULL, 0,
 				    pkb->data, ETH_FRAME_LEN, &length )
 		     != PNIC_STATUS_OK ) {
@@ -153,7 +155,7 @@ TRANSMIT - Transmit a frame
 static int pnic_transmit ( struct net_device *netdev, struct pk_buff *pkb ) {
 	struct pnic *pnic = netdev->priv;
 
-	pnic_command ( pnic, PNIC_CMD_XMIT, pkb, pkb_len ( pkb ),
+	pnic_command ( pnic, PNIC_CMD_XMIT, pkb->data, pkb_len ( pkb ),
 		       NULL, 0, NULL );
 	free_pkb ( pkb );
 	return 0;
