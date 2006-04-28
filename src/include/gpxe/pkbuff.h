@@ -33,7 +33,7 @@ struct ll_protocol;
  * This structure is used to represent a network packet within gPXE.
  */
 struct pk_buff {
-	/** Head of the buffer */
+	/** Start of the buffer */
 	void *head;
 	/** Start of data */
 	void *data;
@@ -87,7 +87,7 @@ static inline void * pkb_push ( struct pk_buff *pkb, size_t len ) {
  */
 static inline void * pkb_pull ( struct pk_buff *pkb, size_t len ) {
 	pkb->data += len;
-	assert ( pkb->data >= pkb->tail );
+	assert ( pkb->data <= pkb->tail );
 	return pkb->data;
 }
 

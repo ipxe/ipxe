@@ -40,7 +40,7 @@ struct pk_buff * alloc_pkb ( size_t len ) {
 	void *data;
 
 	/* Align buffer length */
-	len = ( len + __alignof__ ( *pkb ) - 1 ) & ~ __alignof__ ( *pkb );
+	len = ( len + __alignof__( *pkb ) - 1 ) & ~( __alignof__( *pkb ) - 1 );
 	
 	/* Allocate memory for buffer plus descriptor */
 	data = malloc_dma ( len + sizeof ( *pkb ), PKBUFF_ALIGN );
@@ -60,6 +60,9 @@ struct pk_buff * alloc_pkb ( size_t len ) {
  */
 void free_pkb ( struct pk_buff *pkb ) {
 	if ( pkb ) {
+		assert ( pkb->head <= pkb->data );
+		assert ( pkb->data <= pkb->tail );
+		assert ( pkb->tail <= pkb->end );
 		free_dma ( pkb->head,
 			   ( pkb->end - pkb->head ) + sizeof ( *pkb ) );
 	}
