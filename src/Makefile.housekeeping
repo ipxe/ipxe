@@ -294,6 +294,10 @@ $(BIN)/%.tmp : $(BLIB) $(MAKEDEPS) $(LDSCRIPT)
 $(BIN)/%.map : $(BIN)/%.tmp
 	@less $(BIN)/$*.tmp.map
 
+# Build bochs symbol table
+$(BIN)/%.bxs : $(BIN)/%.tmp
+	$(NM) $< | cut -d" " -f1,3 > $@
+
 # Rules for each media format.  These are generated and placed in an
 # external Makefile fragment.  We could do this via $(eval ...), but
 # that would require make >= 3.80.
@@ -404,7 +408,8 @@ otherarchs :
 TAGS : TAGS.$(ARCH)
 
 TAGS.$(ARCH) : 
-	ctags -e -R -f $@ $(foreach ARCH,$(OTHER_ARCHS),--exclude=arch/$(ARCH))
+	ctags -e -R -f $@ --exclude=bin \
+		$(foreach ARCH,$(OTHER_ARCHS),--exclude=arch/$(ARCH))
 CLEANUP	+= TAGS*
 
 # Symbol table checks
