@@ -123,6 +123,8 @@ void * alloc_memblock ( size_t size, size_t align ) {
 			return block;
 		}
 	}
+
+	DBG ( "Failed to allocate %z (aligned %zx)\n", size, align );
 	return NULL;
 }
 
