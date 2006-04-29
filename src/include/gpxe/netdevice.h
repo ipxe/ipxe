@@ -103,15 +103,14 @@ struct net_protocol {
 	int ( * route ) ( const struct pk_buff *pkb,
 			  struct net_header *nethdr );
 	/**
-	 * Handle received packets
+	 * Process received packet
 	 *
 	 * @v pkb	Packet buffer
 	 * @ret rc	Return status code
 	 *
-	 * If this method returns success, it has taken ownership of
-	 * the packet buffer.
+	 * This method takes ownership of the packet buffer.
 	 */
-	int ( * rx ) ( struct pk_buff *pkb );
+	int ( * rx_process ) ( struct pk_buff *pkb );
 	/**
 	 * Transcribe network-layer address
 	 *
@@ -240,9 +239,9 @@ struct net_device {
 	 * This method should cause the hardware to initiate
 	 * transmission of the packet buffer.
 	 *
-	 * If the method returns success, ownership of the packet
-	 * buffer is transferred to the @c net_device, which must
-	 * eventually call free_pkb() to release the buffer.
+	 * Ownership of the packet buffer is transferred to the @c
+	 * net_device, which must eventually call free_pkb() to
+	 * release the buffer.
 	 */
 	int ( * transmit ) ( struct net_device *netdev, struct pk_buff *pkb );
 	/** Poll for received packet
@@ -332,9 +331,8 @@ free_netdev ( struct net_device *netdev __attribute__ (( unused )) ) {
  * @ret rc		Return status code
  *
  * Transmits the packet via the specified network device.  The
- * link-layer header must already have been filled in.  If this
- * function returns success, it has taken ownership of the packet
- * buffer.
+ * link-layer header must already have been filled in.  This function
+ * takes ownership of the packet buffer.
  */
 static inline int netdev_transmit ( struct net_device *netdev,
 				    struct pk_buff *pkb ) {
@@ -375,5 +373,6 @@ extern int net_transmit_via ( struct pk_buff *pkb, struct net_device *netdev );
 extern int net_transmit ( struct pk_buff *pkb );
 extern int net_poll ( void );
 extern struct pk_buff * net_rx_dequeue ( void );
+extern int net_rx_process ( struct pk_buff *pkb );
 
 #endif /* _GPXE_NETDEVICE_H */

@@ -154,10 +154,8 @@ int arp_resolve ( struct net_device *netdev, const struct net_header *nethdr,
 		 nethdr->dest_net_addr, net_protocol->net_addr_len );
 
 	/* Transmit ARP request */
-	if ( ( rc = net_transmit_via ( pkb, netdev ) ) != 0 ) {
-		free_pkb ( pkb );
+	if ( ( rc = net_transmit_via ( pkb, netdev ) ) != 0 )
 		return rc;
-	}
 
 	return -ENOENT;
 }
@@ -230,7 +228,7 @@ static int arp_rx ( struct pk_buff *pkb ) {
 	if ( arphdr->ar_op != htons ( ARPOP_REQUEST ) )
 		goto done;
 
-	/* Change request to a reply, and send it */
+	/* Change request to a reply */
 	DBG ( "ARP reply: %s %s => %s %s\n", net_protocol->name,
 	      net_protocol->ntoa ( arp_target_pa ( arphdr ) ),
 	      ll_protocol->name, ll_protocol->ntoa ( netdev->ll_addr ) );
@@ -238,8 +236,10 @@ static int arp_rx ( struct pk_buff *pkb ) {
 	memswap ( arp_sender_ha ( arphdr ), arp_target_ha ( arphdr ),
 		 arphdr->ar_hln + arphdr->ar_pln );
 	memcpy ( arp_target_ha ( arphdr ), netdev->ll_addr, arphdr->ar_hln );
-	if ( net_transmit_via ( pkb, netdev ) == 0 )
-		pkb = NULL;
+
+	/* Send reply */
+	net_transmit_via ( pkb, netdev );
+	pkb = NULL;
 
  done:
 	free_pkb ( pkb );
@@ -286,7 +286,7 @@ arp_ntoa ( const void *net_addr __attribute__ (( unused )) ) {
 struct net_protocol arp_protocol = {
 	.name = "ARP",
 	.net_proto = htons ( ETH_P_ARP ),
-	.rx = arp_rx,
+	.rx_process = arp_rx,
 	.route = arp_route,
 	.ntoa = arp_ntoa,
 };

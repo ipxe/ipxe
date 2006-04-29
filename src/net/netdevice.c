@@ -23,6 +23,7 @@
 #include <gpxe/if_ether.h>
 #include <gpxe/pkbuff.h>
 #include <gpxe/tables.h>
+#include <gpxe/process.h>
 #include <gpxe/netdevice.h>
 
 /** @file
@@ -66,9 +67,8 @@ static LIST_HEAD ( rx_queue );
  * @v netdev		Network device
  * @v pkb		Packet buffer
  *
- * The packet is added to the RX queue.  Ownership of the packet is
- * transferred to the RX queue; the caller must not touch the packet
- * buffer after calling netdev_rx().
+ * The packet is added to the RX queue.  This function takes ownership
+ * of the packet buffer.
  */
 void netdev_rx ( struct net_device *netdev, struct pk_buff *pkb ) {
 	DBG ( "Packet received\n" );
@@ -137,9 +137,8 @@ find_netdev_by_net_addr ( struct net_protocol *net_protocol,
  * Transmits the packet via the specified network device.  The packet
  * must begin with a network-layer header, and the @c net_protocol
  * field must have been filled in.  If @c netdev is NULL, the network
- * device is identified via the packet contents, if possible.  If this
- * function returns success, it has taken ownership of the packet
- * buffer.
+ * device is identified via the packet contents, if possible.  This
+ * function takes ownership of the packet buffer.
  */
 int net_transmit_via ( struct pk_buff *pkb, struct net_device *netdev ) {
 	struct net_protocol *net_protocol;
@@ -155,6 +154,7 @@ int net_transmit_via ( struct pk_buff *pkb, struct net_device *netdev ) {
 		DBG ( "Could not route to %s address %s\n",
 		      net_protocol->name,
 		      net_protocol->ntoa ( nethdr.dest_net_addr ) );
+		free_pkb ( pkb );
 		return rc;
 	}
 
@@ -166,6 +166,7 @@ int net_transmit_via ( struct pk_buff *pkb, struct net_device *netdev ) {
 			DBG ( "No network device for %s address %s\n",
 			      net_protocol->name,
 			      net_protocol->ntoa ( nethdr.source_net_addr ) );
+			free_pkb ( pkb );
 			return -EHOSTUNREACH;
 		}
 	}
@@ -177,6 +178,7 @@ int net_transmit_via ( struct pk_buff *pkb, struct net_device *netdev ) {
 		DBG ( "No link-layer route to %s address %s\n",
 		      net_protocol->name,
 		      net_protocol->ntoa ( nethdr.dest_net_addr ) );
+		free_pkb ( pkb );
 		return rc;
 	}
 
@@ -184,7 +186,7 @@ int net_transmit_via ( struct pk_buff *pkb, struct net_device *netdev ) {
 	pkb_push ( pkb, ll_protocol->ll_header_len );
 	ll_protocol->fill_llh ( &llhdr, pkb );
 
-	/* Transmit packet */
+	/* Hand off packet to network device */
 	if ( ( rc = netdev->transmit ( netdev, pkb ) ) != 0 ) {
 		DBG ( "Device failed to transmit packet\n" );
 		return rc;
@@ -200,9 +202,8 @@ int net_transmit_via ( struct pk_buff *pkb, struct net_device *netdev ) {
  * @v pkb		Packet buffer
  * @ret rc		Return status code
  *
- * Transmits the packet via the appropriate network device.  If this
- * function returns success, it has taken ownership of the packet
- * buffer.
+ * Transmits the packet via the appropriate network device.  This
+ * function takes ownership of the packet buffer.
  */
 int net_transmit ( struct pk_buff *pkb ) {
 	return net_transmit_via ( pkb, NULL );
@@ -244,41 +245,83 @@ struct pk_buff * net_rx_dequeue ( void ) {
 	return NULL;
 }
 
-void net_run ( void ) {
-	struct pk_buff *pkb;
+/**
+ * Process received packet
+ *
+ * @v pkb		Packet buffer
+ * @ret rc		Return status code
+ *
+ * Processes a packet received from the network (and, usually, removed
+ * from the RX queue by net_rx_dequeue()).  This call takes ownership
+ * of the packet buffer.
+ */
+int net_rx_process ( struct pk_buff *pkb ) {
 	struct ll_protocol *ll_protocol;
 	struct ll_header llhdr;
 	struct net_protocol *net_protocol;
+	int rc;
 
-	while ( ( pkb = net_rx_dequeue () ) ) {
-
-		/* Parse link-layer header */
-		ll_protocol = pkb->ll_protocol;
-		ll_protocol->parse_llh ( pkb, &llhdr );
-
-		/* Identify network-layer protocol */
-		net_protocol = find_net_protocol ( llhdr.net_proto );
-		if ( ! net_protocol ) {
-			DBG ( "Unknown network-layer protocol %x\n",
-			      ntohs ( llhdr.net_proto ) );
-			free_pkb ( pkb );
-			continue;
-		}
-		pkb->net_protocol = net_protocol;
-
-		/* Strip off link-layer header */
-		pkb_pull ( pkb, ll_protocol->ll_header_len );
-
-		/* Hand off to network layer */
-		if ( net_protocol->rx ( pkb ) != 0 ) {
-			DBG ( "Network-layer protocol refused packet\n" );
-			free_pkb ( pkb );
-			continue;
-		}
-
-		DBG ( "Processed received packet\n" );
+	/* Parse link-layer header */
+	ll_protocol = pkb->ll_protocol;
+	ll_protocol->parse_llh ( pkb, &llhdr );
+	
+	/* Identify network-layer protocol */
+	net_protocol = find_net_protocol ( llhdr.net_proto );
+	if ( ! net_protocol ) {
+		DBG ( "Unknown network-layer protocol %x\n",
+		      ntohs ( llhdr.net_proto ) );
+		free_pkb ( pkb );
+		return -EPROTONOSUPPORT;
 	}
+	pkb->net_protocol = net_protocol;
+	
+	/* Strip off link-layer header */
+	pkb_pull ( pkb, ll_protocol->ll_header_len );
+	
+	/* Hand off to network layer */
+	if ( ( rc = net_protocol->rx_process ( pkb ) ) != 0 ) {
+		DBG ( "Network-layer protocol dropped packet\n" );
+		return rc;
+	}
+
+	return 0;
 }
 
 
 
+/**
+ * Single-step the network stack
+ *
+ * @v process		Network stack process
+ *
+ * This polls all interfaces for any received packets, and processes
+ * any packets that are received during this poll.
+ */
+static void net_step ( struct process *process ) {
+	struct pk_buff *pkb;
+
+	/* Poll for new packets */
+	net_poll();
+
+	/* Handle any received packets */
+	while ( ( pkb = net_rx_dequeue () ) ) {
+		net_rx_process ( pkb );
+		DBG ( "Processed received packet\n" );
+	}
+
+	/* Re-schedule ourself */
+	schedule ( process );
+}
+
+/** Networking stack process */
+static struct process net_process = {
+	.step = net_step,
+};
+
+static void init_net ( void ) {
+	schedule ( &net_process );
+}
+
+#include <init.h>
+
+INIT_FN ( INIT_RPC, init_net, NULL, NULL );

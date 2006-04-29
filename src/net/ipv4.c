@@ -163,8 +163,7 @@ static int ipv4_rx ( struct pk_buff *pkb ) {
 		pkb_empty ( pkb );
 		pkb_put ( pkb, uip_len );
 		memcpy ( pkb->data, uip_buf, uip_len );
-		if ( net_transmit ( pkb ) != 0 )
-			free_pkb ( pkb );
+		net_transmit ( pkb );
 	} else {
 		free_pkb ( pkb );
 	}
@@ -231,7 +230,7 @@ struct net_protocol ipv4_protocol = {
 	.name = "IP",
 	.net_proto = htons ( ETH_P_IP ),
 	.net_addr_len = sizeof ( struct in_addr ),
-	.rx = ipv4_rx,
+	.rx_process = ipv4_rx,
 	.route = ipv4_route,
 	.ntoa = ipv4_ntoa,
 };
