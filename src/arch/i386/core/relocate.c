@@ -2,7 +2,7 @@
 #include "memsizes.h"
 #include "osdep.h"
 #include "etherboot.h"
-#include "init.h"
+#include <gpxe/init.h>
 #include "relocate.h"
 
 #ifndef KEEP_IT_REAL

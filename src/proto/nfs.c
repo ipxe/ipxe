@@ -1,5 +1,5 @@
 #include "etherboot.h"
-#include "init.h"
+#include <gpxe/init.h>
 #include "proto.h"
 #include <gpxe/in.h>
 #include "nic.h"

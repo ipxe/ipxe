@@ -1,7 +1,7 @@
 #include "stdint.h"
 #include "stddef.h"
 #include "realmode.h"
-#include "init.h"
+#include <gpxe/init.h>
 #include "etherboot.h"
 #include "memsizes.h"
 

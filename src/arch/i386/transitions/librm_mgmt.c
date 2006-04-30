@@ -14,7 +14,7 @@
 #include "string.h"
 #include "basemem.h"
 #include "relocate.h"
-#include "init.h"
+#include <gpxe/init.h>
 #include "librm.h"
 
 /*

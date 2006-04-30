@@ -24,6 +24,7 @@
 #include <gpxe/pkbuff.h>
 #include <gpxe/tables.h>
 #include <gpxe/process.h>
+#include <gpxe/init.h>
 #include <gpxe/netdevice.h>
 
 /** @file
@@ -287,8 +288,6 @@ int net_rx_process ( struct pk_buff *pkb ) {
 	return 0;
 }
 
-
-
 /**
  * Single-step the network stack
  *
@@ -318,10 +317,9 @@ static struct process net_process = {
 	.step = net_step,
 };
 
+/** Initialise the networking stack process */
 static void init_net ( void ) {
 	schedule ( &net_process );
 }
 
-#include <init.h>
-
-INIT_FN ( INIT_RPC, init_net, NULL, NULL );
+INIT_FN ( INIT_PROCESS, init_net, NULL, NULL );

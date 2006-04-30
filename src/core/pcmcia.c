@@ -29,7 +29,7 @@
 #define	CODE_VERSION "0.1.3"
 #include "pcmcia-opts.h"
 #include "console.h"
-#include "init.h"
+#include <gpxe/init.h>
 
 int	sockets; /* AHTODO: Phase this out! */
 u_int	pccsocks;

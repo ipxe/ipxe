@@ -10,7 +10,7 @@
 #include	"etherboot.h"
 #include	"timer.h"
 #include	"latch.h"
-#include	"init.h"
+#include	<gpxe/init.h>
 
 void __load_timer2(unsigned int ticks)
 {

@@ -7,7 +7,7 @@
  **************************************************************************
  */
 
-#include "init.h"
+#include <gpxe/init.h>
 
 static struct init_fn init_fns[0] __table_start(init_fn);
 static struct init_fn init_fns_end[0] __table_end(init_fn);

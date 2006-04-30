@@ -9,7 +9,7 @@
 #include "string.h"
 #include "io.h"
 #include "console.h"
-#include "init.h"
+#include <gpxe/init.h>
 #include "vga.h"
 
 struct console_driver vga_console;

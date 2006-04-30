@@ -9,7 +9,7 @@
 
 #include "etherboot.h"
 #include "console.h"
-#include "init.h"
+#include <gpxe/init.h>
 #include <gpxe/pci.h>
 
 #ifdef CONFIG_FILO

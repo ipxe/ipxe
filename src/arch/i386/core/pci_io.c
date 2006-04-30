@@ -11,7 +11,7 @@
 ** /usr/src/linux/drivers/net/ne.c
 */
 #include "etherboot.h"
-#include "init.h"
+#include <gpxe/init.h>
 #include <gpxe/pci.h>
 #include "pci_io.h"
 #ifdef KEEP_IT_REAL

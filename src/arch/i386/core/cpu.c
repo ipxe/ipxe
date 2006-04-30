@@ -2,7 +2,7 @@
 #include "stdint.h"
 #include "string.h"
 #include "bits/cpu.h"
-#include "init.h"
+#include <gpxe/init.h>
 
 
 /* Standard macro to see if a specific flag is changeable */

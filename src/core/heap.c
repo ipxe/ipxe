@@ -1,5 +1,5 @@
 #include "etherboot.h"
-#include "init.h"
+#include <gpxe/init.h>
 #include "memsizes.h"
 #include <assert.h>
 #include "heap.h"

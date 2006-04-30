@@ -23,7 +23,7 @@ Literature dealing with the network protocols:
 #include "timer.h"
 #include "cpu.h"
 #include "console.h"
-#include "init.h"
+#include <gpxe/init.h>
 #include "image.h"
 #include <stdarg.h>
 
