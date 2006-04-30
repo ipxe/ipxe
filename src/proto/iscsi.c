@@ -544,8 +544,7 @@ void iscsi_wakeup ( struct iscsi_session *iscsi ) {
 	switch ( iscsi->state ) {
 	case ISCSI_STATE_NOT_CONNECTED:
 	case ISCSI_STATE_FAILED:
-		if ( tcp_connect ( &iscsi->tcp ) != 0 )
-			iscsi_fail ( iscsi );
+		tcp_connect ( &iscsi->tcp );
 		iscsi_start_login ( iscsi );
 		break;
 	case ISCSI_STATE_IDLE:

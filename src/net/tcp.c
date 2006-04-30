@@ -64,18 +64,11 @@ size_t tcp_buflen = UIP_BUFSIZE - ( 40 + UIP_LLH_LEN );
  * Open a TCP connection
  *
  * @v conn	TCP connection
- * @ret 0	Success
- * @ret <0	Failure
  * 
  * This sets up a new TCP connection to the remote host specified in
- * tcp_connection::sin.  The actual SYN packet will not be sent out
- * until run_tcpip() is called for the first time.
- *
- * @todo Use linked lists instead of a static buffer, and thereby
- *       remove the only potential failure case, giving this function
- *       a void return type.
+ * tcp_connection::sin.
  */
-int tcp_connect ( struct tcp_connection *conn ) {
+void tcp_connect ( struct tcp_connection *conn ) {
 	struct uip_conn *uip_conn;
 	u16_t ipaddr[2];
 
@@ -86,11 +79,9 @@ int tcp_connect ( struct tcp_connection *conn ) {
 
 	* ( ( uint32_t * ) ipaddr ) = conn->sin.sin_addr.s_addr;
 	uip_conn = uip_connect ( ipaddr, conn->sin.sin_port );
-	if ( ! uip_conn )
-		return -1;
-
+#warning "Use linked lists so that uip_connect() cannot fail"
+	assert ( uip_conn != NULL );
 	*( ( void ** ) uip_conn->appstate ) = conn;
-	return 0;
 }
 
 /**

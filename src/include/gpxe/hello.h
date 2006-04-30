@@ -41,6 +41,6 @@ struct hello_request {
 	int complete;
 };
 
-extern int hello_connect ( struct hello_request *hello );
+extern void hello_connect ( struct hello_request *hello );
 
 #endif

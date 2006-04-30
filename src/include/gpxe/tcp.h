@@ -94,7 +94,7 @@ struct tcp_connection {
 
 extern void *tcp_buffer;
 extern size_t tcp_buflen;
-extern int tcp_connect ( struct tcp_connection *conn );
+extern void tcp_connect ( struct tcp_connection *conn );
 extern void tcp_send ( struct tcp_connection *conn, const void *data,
 		       size_t len );
 extern void tcp_close ( struct tcp_connection *conn );
