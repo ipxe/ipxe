@@ -7,4 +7,6 @@
  * sleep_latch and the definitions of it's length here...
  */
 
+extern unsigned long currticks ( void );
+
 #endif /* LATCH_H */

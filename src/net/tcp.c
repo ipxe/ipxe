@@ -1,6 +1,12 @@
 #include <string.h>
 #include <assert.h>
 #include <byteswap.h>
+#include <latch.h>
+#include <gpxe/process.h>
+#include <gpxe/init.h>
+#include <gpxe/netdevice.h>
+#include <gpxe/pkbuff.h>
+#include <gpxe/ip.h>
 #include <gpxe/tcp.h>
 #include "uip/uip.h"
 
@@ -162,3 +168,59 @@ void uip_tcp_appcall ( void ) {
  */
 void uip_udp_appcall ( void ) {
 }
+
+/**
+ * Perform periodic processing of all TCP connections
+ *
+ * This allows TCP connections to retransmit data if necessary.
+ */
+static void tcp_periodic ( void ) {
+	struct pk_buff *pkb;
+	int i;
+
+	for ( i = 0 ; i < UIP_CONNS ; i++ ) {
+		uip_periodic ( i );
+		if ( uip_len > 0 ) {
+			pkb = alloc_pkb ( uip_len + MAX_LL_HEADER_LEN);
+			if ( ! pkb )
+				continue;
+				
+			pkb_reserve ( pkb, MAX_LL_HEADER_LEN );
+			pkb_put ( pkb, uip_len );
+			memcpy ( pkb->data, uip_buf, uip_len );
+			pkb->net_protocol = &ipv4_protocol;
+			
+			net_transmit ( pkb );
+		}
+	}
+}
+
+/**
+ * Single-step the TCP stack
+ *
+ * @v process	TCP process
+ *
+ * This calls tcp_periodic() at regular intervals.
+ */
+static void tcp_step ( struct process *process ) {
+	static long timeout = 0;
+
+	if ( currticks() > timeout ) {
+		timeout = currticks() + ( TICKS_PER_SEC / 10 );
+		tcp_periodic ();
+	}
+
+	schedule ( process );
+}
+
+/** TCP stack process */
+static struct process tcp_process = {
+	.step = tcp_step,
+};
+
+/** Initialise the TCP stack */
+static void init_tcp ( void ) {
+	schedule ( &tcp_process );
+}
+
+INIT_FN ( INIT_PROCESS, init_tcp, NULL, NULL );

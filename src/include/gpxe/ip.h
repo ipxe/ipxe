@@ -5,16 +5,10 @@
  *
  * IP protocol
  *
- * This file defines the gPXE IP API.
- *
  */
 
-#include <gpxe/in.h>
+struct net_protocol;
 
-extern void set_ipaddr ( struct in_addr address );
-extern void set_netmask ( struct in_addr address );
-extern void set_gateway ( struct in_addr address );
-extern void init_tcpip ( void );
-extern void run_tcpip ( void );
+extern struct net_protocol ipv4_protocol;
 
 #endif /* _GPXE_IP_H */
