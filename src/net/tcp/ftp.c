@@ -12,25 +12,49 @@
  *
  */
 
-const char *ftp_strings[] = {
-	[FTP_CONNECT] = "",
-	[FTP_USER] = "USER anonymous\r\n",
-	[FTP_PASS] = "PASS etherboot@etherboot.org\r\n",
-	[FTP_TYPE] = "TYPE I\r\n",
-	[FTP_PASV] = "PASV\r\n",
-	[FTP_RETR] = "RETR %s\r\n",
-	[FTP_QUIT] = "QUIT\r\n",
-	[FTP_DONE] = "",
+/** An FTP control channel string */
+struct ftp_string {
+	/** String format */
+	const char *format;
+	/** Offset to string data
+	 *
+	 * This is the offset within the struct ftp_request to the
+	 * pointer to the string data.  Use ftp_string_data() to get a
+	 * pointer to the actual data.
+	 */
+	off_t data_offset;
+};
+
+#define ftp_string_offset( fieldname ) \
+	offsetof ( struct ftp_request, fieldname )
+
+/**
+ * Get data associated with an FTP control channel string
+ *
+ * @v ftp		FTP request
+ * @v data_offset	Data offset field from ftp_string structure
+ * @ret data		Pointer to data
+ */
+static inline const void * ftp_string_data ( struct ftp_request *ftp,
+					     off_t data_offset ) {
+	return * ( ( void ** ) ( ( ( void * ) ftp ) + data_offset ) );
+}
+
+/** FTP control channel strings */
+const struct ftp_string ftp_strings[] = {
+	[FTP_CONNECT]	= { "", 0 },
+	[FTP_USER]	= { "USER anonymous\r\n", 0 },
+	[FTP_PASS]	= { "PASS etherboot@etherboot.org\r\n", 0 },
+	[FTP_TYPE]	= { "TYPE I\r\n", 0 },
+	[FTP_PASV]	= { "PASV\r\n", 0 },
+	[FTP_RETR]	= { "RETR %s\r\n", ftp_string_offset ( filename ) },
+	[FTP_QUIT]	= { "QUIT\r\n", 0 },
+	[FTP_DONE]	= { "", 0 },
 };
 
 static inline struct ftp_request *
 tcp_to_ftp ( struct tcp_connection *conn ) {
 	return container_of ( conn, struct ftp_request, tcp );
-}
-
-static inline struct ftp_request *
-tcp_to_ftp_data ( struct tcp_connection *conn ) {
-	return container_of ( conn, struct ftp_request, tcp_data );
 }
 
 static void ftp_complete ( struct ftp_request *ftp, int complete ) {
@@ -39,6 +63,142 @@ static void ftp_complete ( struct ftp_request *ftp, int complete ) {
 	tcp_close ( &ftp->tcp );
 }
 
+/**
+ * Parse FTP byte sequence value
+ *
+ * @v text	Text string
+ * @v value	Value buffer
+ * @v len	Length of value buffer
+ *
+ * This parses an FTP byte sequence value (e.g. the "aaa,bbb,ccc,ddd"
+ * form for IP addresses in PORT commands) into a byte sequence.  @c
+ * *text will be updated to point beyond the end of the parsed byte
+ * sequence.
+ *
+ * This function is safe in the presence of malformed data, though the
+ * output is undefined.
+ */
+static void ftp_parse_value ( char **text, uint8_t *value, size_t len ) {
+	do {
+		*(value++) = strtoul ( *text, text, 10 );
+		if ( **text )
+			(*text)++;
+	} while ( --len );
+}
+
+/**
+ * Handle a response from an FTP server
+ *
+ * @v ftp	FTP request
+ *
+ * This is called once we have received a complete repsonse line.
+ */
+static void ftp_reply ( struct ftp_request *ftp ) {
+	char status_major = ftp->status_text[0];
+
+	/* Ignore "intermediate" responses (1xx codes) */
+	if ( status_major == '1' )
+		return;
+
+	/* Anything other than success (2xx) or, in the case of a
+	 * repsonse to a "USER" command, a password prompt (3xx), is a
+	 * fatal error.
+	 */
+	if ( ! ( ( status_major == '2' ) ||
+		 ( ( status_major == '3' ) && ( ftp->state == FTP_USER ) ) ) )
+		goto err;
+
+	/* Open passive connection when we get "PASV" response */
+	if ( ftp->state == FTP_PASV ) {
+		char *ptr = ftp->passive_text;
+
+		ftp_parse_value ( &ptr,
+				  ( uint8_t * ) &ftp->tcp_data.sin.sin_addr,
+				  sizeof ( ftp->tcp_data.sin.sin_addr ) );
+		ftp_parse_value ( &ptr,
+				  ( uint8_t * ) &ftp->tcp_data.sin.sin_port,
+				  sizeof ( ftp->tcp_data.sin.sin_port ) );
+		tcp_connect ( &ftp->tcp_data );
+	}
+
+	/* Move to next state */
+	if ( ftp->state < FTP_DONE )
+		ftp->state++;
+	ftp->already_sent = 0;
+	return;
+
+ err:
+	/* Flag protocol error and close connections */
+	ftp_complete ( ftp, -EPROTO );
+}
+
+static void ftp_newdata ( struct tcp_connection *conn,
+			  void *data, size_t len ) {
+	struct ftp_request *ftp = tcp_to_ftp ( conn );
+	char *recvbuf = ftp->recvbuf;
+	size_t recvsize = ftp->recvsize;
+	char c;
+	
+	while ( len-- ) {
+		c = * ( ( char * ) data++ );
+		switch ( c ) {
+		case '\r' :
+		case '\n' :
+			/* End of line: call ftp_reply() to handle
+			 * completed reply.  Avoid calling ftp_reply()
+			 * twice if we receive both \r and \n.
+			 */
+			if ( recvsize == 0 )
+				ftp_reply ( ftp );
+			/* Start filling up the status code buffer */
+			recvbuf = ftp->status_text;
+			recvsize = sizeof ( ftp->status_text ) - 1;
+			break;
+		case '(' :
+			/* Start filling up the passive parameter buffer */
+			recvbuf = ftp->passive_text;
+			recvsize = sizeof ( ftp->passive_text ) - 1;
+			break;
+		case ')' :
+			/* Stop filling the passive parameter buffer */
+			recvsize = 0;
+			break;
+		default :
+			/* Fill up buffer if applicable */
+			if ( recvsize > 0 ) {
+				*(recvbuf++) = c;
+				recvsize--;
+			}
+			break;
+		}
+	}
+
+	/* Store for next invocation */
+	ftp->recvbuf = recvbuf;
+	ftp->recvsize = recvsize;
+}
+
+static void ftp_acked ( struct tcp_connection *conn, size_t len ) {
+	struct ftp_request *ftp = tcp_to_ftp ( conn );
+	
+	/* Mark off ACKed portion of the currently-transmitted data */
+	ftp->already_sent += len;
+}
+
+static void ftp_senddata ( struct tcp_connection *conn ) {
+	struct ftp_request *ftp = tcp_to_ftp ( conn );
+	const struct ftp_string *string;
+	size_t len;
+
+	/* Send the as-yet-unACKed portion of the string for the
+	 * current state.
+	 */
+	string = &ftp_strings[ftp->state];
+	len = snprintf ( tcp_buffer, tcp_buflen, string->format,
+			 ftp_string_data ( ftp, string->data_offset ) );
+	tcp_send ( conn, tcp_buffer + ftp->already_sent,
+		   len - ftp->already_sent );
+}
 
 static void ftp_aborted ( struct tcp_connection *conn ) {
 	struct ftp_request *ftp = tcp_to_ftp ( conn );
@@ -58,128 +218,6 @@ static void ftp_closed ( struct tcp_connection *conn ) {
 	ftp_complete ( ftp, 1 );
 }
 
-static void ftp_acked ( struct tcp_connection *conn, size_t len ) {
-	struct ftp_request *ftp = tcp_to_ftp ( conn );
-	
-	ftp->already_sent += len;
-}
-
-int ftp_open_passive ( struct ftp_request *ftp ) {
-	char *ptr = ftp->passive_text;
-	uint8_t *byte = ( uint8_t * ) ( &ftp->tcp_data.sin );
-	int i;
-
-	/* Parse the IP address and port from the PASV repsonse */
-	for ( i = 6 ; i ; i-- ) {
-		if ( ! *ptr )
-			return -EINVAL;
-		*(byte++) = strtoul ( ptr, &ptr, 10 );
-		if ( *ptr )
-			ptr++;
-	}
-	if ( *ptr )
-		return -EINVAL;
-
-	tcp_connect ( &ftp->tcp_data );
-	return 0;
-}
-
-void ftp_reply ( struct ftp_request *ftp ) {
-	char status_major = ftp->status_text[0];
-	int success;
-
-	/* Ignore "intermediate" messages */
-	if ( status_major == '1' )
-		return;
-
-	/* Check for success */
-	success = ( status_major == '2' );
-
-	/* Special-case the "USER"-"PASS" sequence */
-	if ( ftp->state == FTP_USER ) {
-		if ( success ) {
-			/* No password was asked for; pretend we have
-			 * already entered it
-			 */
-			ftp->state = FTP_PASS;
-		} else if ( status_major == '3' ) {
-			/* Password requested, treat this as success
-			 * for our purposes
-			 */
-			success = 1;
-		}
-	}
-	
-	/* Abort on failure */
-	if ( ! success )
-		goto err;
-
-	/* Open passive connection when we get "PASV" response */
-	if ( ftp->state == FTP_PASV ) {
-		if ( ftp_open_passive ( ftp ) != 0 )
-			goto err;
-	}
-
-	/* Move to next state */
-	if ( ftp->state < FTP_DONE )
-		ftp->state++;
-	ftp->already_sent = 0;
-	return;
-
- err:
-	ftp->complete = -EPROTO;
-	tcp_close ( &ftp->tcp );
-}
-
-static void ftp_newdata ( struct tcp_connection *conn,
-			  void *data, size_t len ) {
-	struct ftp_request *ftp = tcp_to_ftp ( conn );
-	char c;
-
-	for ( ; len ; data++, len-- ) {
-		c = * ( ( char * ) data );
-		if ( ( c == '\r' ) || ( c == '\n' ) ) {
-			if ( ftp->recvsize == 0 )
-				ftp_reply ( ftp );
-			ftp->recvbuf = ftp->status_text;
-			ftp->recvsize = sizeof ( ftp->status_text ) - 1;
-		} else if ( c == '(' ) {
-			ftp->recvbuf = ftp->passive_text;
-			ftp->recvsize = sizeof ( ftp->passive_text ) - 1;
-		} else if ( c == ')' ) {
-			ftp->recvsize = 0;
-		} else if ( ftp->recvsize > 0 ) {
-			*(ftp->recvbuf++) = c;
-			ftp->recvsize--;
-		}
-	}
-}
-
-static void ftp_senddata ( struct tcp_connection *conn ) {
-	struct ftp_request *ftp = tcp_to_ftp ( conn );
-	const char *format;
-	const char *data;
-	size_t len;
-
-	/* Select message format string and data */
-	format = ftp_strings[ftp->state];
-	switch ( ftp->state ) {
-	case FTP_RETR:
-		data = ftp->filename;
-		break;
-	default:
-		data = NULL;
-		break;
-	}
-	if ( ! data )
-		data = "";
-	
-	/* Build message */
-	len = snprintf ( tcp_buffer, tcp_buflen, format, data );
-	tcp_send ( conn, tcp_buffer + ftp->already_sent,
-		   len - ftp->already_sent );
-}
-
 static struct tcp_operations ftp_tcp_operations = {
 	.aborted	= ftp_aborted,
 	.timedout	= ftp_timedout,
@@ -188,6 +226,11 @@ static struct tcp_operations ftp_tcp_operations = {
 	.newdata	= ftp_newdata,
 	.senddata	= ftp_senddata,
 };
+
+static inline struct ftp_request *
+tcp_to_ftp_data ( struct tcp_connection *conn ) {
+	return container_of ( conn, struct ftp_request, tcp_data );
+}
 
 static void ftp_data_aborted ( struct tcp_connection *conn ) {
 	struct ftp_request *ftp = tcp_to_ftp_data ( conn );
