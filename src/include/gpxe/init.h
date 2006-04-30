@@ -1,5 +1,5 @@
-#ifndef INIT_H
-#define INIT_H
+#ifndef _GPXE_INIT_H
+#define _GPXE_INIT_H
 
 #include <gpxe/tables.h>
 
@@ -63,4 +63,4 @@ void call_init_fns ( void );
 void call_reset_fns ( void );
 void call_exit_fns ( void );
 
-#endif /* INIT_H */
+#endif /* _GPXE_INIT_H */
