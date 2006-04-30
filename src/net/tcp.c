@@ -137,20 +137,20 @@ void uip_tcp_appcall ( void ) {
 	assert ( conn->tcp_op->newdata != NULL );
 	assert ( conn->tcp_op->senddata != NULL );
 
-	if ( uip_aborted() && op->aborted ) /* optional method */
+	if ( uip_aborted() && op->aborted )
 		op->aborted ( conn );
-	if ( uip_timedout() && op->timedout ) /* optional method */
+	if ( uip_timedout() && op->timedout )
 		op->timedout ( conn );
-	if ( uip_closed() && op->closed ) /* optional method */
+	if ( uip_closed() && op->closed )
 		op->closed ( conn );
-	if ( uip_connected() )
+	if ( uip_connected() && op->connected )
 		op->connected ( conn );
-	if ( uip_acked() )
+	if ( uip_acked() && op->acked )
 		op->acked ( conn, uip_conn->len );
-	if ( uip_newdata() )
+	if ( uip_newdata() && op->newdata )
 		op->newdata ( conn, ( void * ) uip_appdata, uip_len );
-	if ( uip_rexmit() || uip_newdata() || uip_acked() ||
-	     uip_connected() || uip_poll() )
+	if ( ( uip_rexmit() || uip_newdata() || uip_acked() ||
+	       uip_connected() || uip_poll() ) && op->senddata )
 		op->senddata ( conn );
 }
 
@@ -194,7 +194,7 @@ static void tcp_periodic ( void ) {
  * This calls tcp_periodic() at regular intervals.
  */
 static void tcp_step ( struct process *process ) {
-	static long timeout = 0;
+	static unsigned long timeout = 0;
 
 	if ( currticks() > timeout ) {
 		timeout = currticks() + ( TICKS_PER_SEC / 10 );

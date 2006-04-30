@@ -58,19 +58,13 @@ static void ftp_closed ( struct tcp_connection *conn ) {
 	ftp_complete ( ftp, 1 );
 }
 
-static void ftp_connected ( struct tcp_connection *conn ) {
-	struct ftp_request *ftp = tcp_to_ftp ( conn );
-
-	/* Nothing to do */
-}
-
 static void ftp_acked ( struct tcp_connection *conn, size_t len ) {
 	struct ftp_request *ftp = tcp_to_ftp ( conn );
 	
 	ftp->already_sent += len;
 }
 
-static int ftp_open_passive ( struct ftp_request *ftp ) {
+int ftp_open_passive ( struct ftp_request *ftp ) {
 	char *ptr = ftp->passive_text;
 	uint8_t *byte = ( uint8_t * ) ( &ftp->tcp_data.sin );
 	int i;
@@ -90,7 +84,7 @@ static int ftp_open_passive ( struct ftp_request *ftp ) {
 	return 0;
 }
 
-static void ftp_reply ( struct ftp_request *ftp ) {
+void ftp_reply ( struct ftp_request *ftp ) {
 	char status_major = ftp->status_text[0];
 	int success;
 
@@ -190,7 +184,6 @@ static struct tcp_operations ftp_tcp_operations = {
 	.aborted	= ftp_aborted,
 	.timedout	= ftp_timedout,
 	.closed		= ftp_closed,
-	.connected	= ftp_connected,
 	.acked		= ftp_acked,
 	.newdata	= ftp_newdata,
 	.senddata	= ftp_senddata,
@@ -208,24 +201,6 @@ static void ftp_data_timedout ( struct tcp_connection *conn ) {
 	ftp_complete ( ftp, -ETIMEDOUT );
 }
 
-static void ftp_data_closed ( struct tcp_connection *conn ) {
-	struct ftp_request *ftp = tcp_to_ftp_data ( conn );
-
-	/* Nothing to do */
-}
-
-static void ftp_data_connected ( struct tcp_connection *conn ) {
-	struct ftp_request *ftp = tcp_to_ftp_data ( conn );
-
-	/* Nothing to do */
-}
-
-static void ftp_data_acked ( struct tcp_connection *conn, size_t len ) {
-	struct ftp_request *ftp = tcp_to_ftp_data ( conn );
-	
-	/* Nothing to do */
-}
-
 static void ftp_data_newdata ( struct tcp_connection *conn,
 			       void *data, size_t len ) {
 	struct ftp_request *ftp = tcp_to_ftp_data ( conn );
@@ -233,20 +208,10 @@ static void ftp_data_newdata ( struct tcp_connection *conn,
 	ftp->callback ( data, len );
 }
 
-static void ftp_data_senddata ( struct tcp_connection *conn ) {
-	struct ftp_request *ftp = tcp_to_ftp_data ( conn );
-	
-	/* Nothing to do */
-}
-
 static struct tcp_operations ftp_data_tcp_operations = {
 	.aborted	= ftp_data_aborted,
 	.timedout	= ftp_data_timedout,
-	.closed		= ftp_data_closed,
-	.connected	= ftp_data_connected,
-	.acked		= ftp_data_acked,
 	.newdata	= ftp_data_newdata,
-	.senddata	= ftp_data_senddata,
 };
 
 /**
