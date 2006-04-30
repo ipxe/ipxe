@@ -13,7 +13,7 @@
  * message (hello_request::message).  Any data received from the
  * server will be passed to the callback function,
  * hello_request::callback(), and once the connection has been closed,
- * hello_request::complete will be set to 1.
+ * hello_request::complete will be set to a non-zero value.
  *
  * To use this code, do something like:
  *
@@ -49,24 +49,10 @@ tcp_to_hello ( struct tcp_connection *conn ) {
 	return container_of ( conn, struct hello_request, tcp );
 }
 
-static void hello_aborted ( struct tcp_connection *conn ) {
+static void hello_closed ( struct tcp_connection *conn, int status ) {
 	struct hello_request *hello = tcp_to_hello ( conn );
 
-	printf ( "Connection aborted\n" );
-	hello->complete = 1;
-}
-
-static void hello_timedout ( struct tcp_connection *conn ) {
-	struct hello_request *hello = tcp_to_hello ( conn );
-
-	printf ( "Connection timed out\n" );
-	hello->complete = 1;
-}
-
-static void hello_closed ( struct tcp_connection *conn ) {
-	struct hello_request *hello = tcp_to_hello ( conn );
-
-	hello->complete = 1;
+	hello->complete = ( status ? status : 1 );
 }
 
 static void hello_connected ( struct tcp_connection *conn ) {
@@ -113,8 +99,6 @@ static void hello_senddata ( struct tcp_connection *conn ) {
 }
 
 static struct tcp_operations hello_tcp_operations = {
-	.aborted	= hello_aborted,
-	.timedout	= hello_timedout,
 	.closed		= hello_closed,
 	.connected	= hello_connected,
 	.acked		= hello_acked,

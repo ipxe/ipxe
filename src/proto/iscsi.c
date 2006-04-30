@@ -251,17 +251,7 @@ tcp_to_iscsi ( struct tcp_connection *conn ) {
 	return container_of ( conn, struct iscsi_session, tcp );
 }
 
-static void iscsi_aborted ( struct tcp_connection *conn ) {
-	struct iscsi_session *iscsi = tcp_to_iscsi ( conn );
-
-}
-
-static void iscsi_timedout ( struct tcp_connection *conn ) {
-	struct iscsi_session *iscsi = tcp_to_iscsi ( conn );
-
-}
-
-static void iscsi_closed ( struct tcp_connection *conn ) {
+static void iscsi_closed ( struct tcp_connection *conn, int status ) {
 	struct iscsi_session *iscsi = tcp_to_iscsi ( conn );
 
 }
@@ -523,8 +513,6 @@ static void iscsi_newdata ( struct tcp_connection *conn, void *data,
 
 /** iSCSI TCP operations */
 static struct tcp_operations iscsi_tcp_operations = {
-	.aborted	= iscsi_aborted,
-	.timedout	= iscsi_timedout,
 	.closed		= iscsi_closed,
 	.connected	= iscsi_connected,
 	.acked		= iscsi_acked,

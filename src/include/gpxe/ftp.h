@@ -10,6 +10,12 @@
 #include <stdint.h>
 #include <gpxe/tcp.h>
 
+/**
+ * FTP states
+ *
+ * These @b must be sequential, i.e. a successful FTP session must
+ * pass through each of these states in order.
+ */
 enum ftp_state {
 	FTP_CONNECT = 0,
 	FTP_USER,

@@ -2,6 +2,7 @@
 #include <assert.h>
 #include <byteswap.h>
 #include <latch.h>
+#include <errno.h>
 #include <gpxe/process.h>
 #include <gpxe/init.h>
 #include <gpxe/netdevice.h>
@@ -131,18 +132,14 @@ void uip_tcp_appcall ( void ) {
 	struct tcp_connection *conn = *( ( void ** ) uip_conn->appstate );
 	struct tcp_operations *op = conn->tcp_op;
 
-	assert ( conn->tcp_op->closed != NULL );
-	assert ( conn->tcp_op->connected != NULL );
-	assert ( conn->tcp_op->acked != NULL );
-	assert ( conn->tcp_op->newdata != NULL );
-	assert ( conn->tcp_op->senddata != NULL );
-
-	if ( uip_aborted() && op->aborted )
-		op->aborted ( conn );
-	if ( uip_timedout() && op->timedout )
-		op->timedout ( conn );
-	if ( uip_closed() && op->closed )
-		op->closed ( conn );
+	if ( op->closed ) {
+		if ( uip_aborted() )
+			op->closed ( conn, -ECONNABORTED );
+		if ( uip_timedout() )
+			op->closed ( conn, -ETIMEDOUT );
+		if ( uip_closed() )
+			op->closed ( conn, 0 );
+	}
 	if ( uip_connected() && op->connected )
 		op->connected ( conn );
 	if ( uip_acked() && op->acked )

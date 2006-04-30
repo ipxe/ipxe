@@ -19,28 +19,24 @@ struct tcp_connection;
  *
  */
 struct tcp_operations {
-	/**
-	 * Connection aborted (RST received)
+	/*
+	 * Connection closed
 	 *
 	 * @v conn	TCP connection
-	 */
-	void ( * aborted ) ( struct tcp_connection *conn );
-	/**
-	 * Connection timed out
+	 * @v status	Error code, if any
 	 *
-	 * @v conn	TCP connection
-	 */
-	void ( * timedout ) ( struct tcp_connection *conn );
-	/**
-	 * Connection aborted (FIN received)
-	 *
-	 * @v conn	TCP connection
+	 * This is called when the connection is closed for any
+	 * reason, including timeouts or aborts.  The status code
+	 * contains the negative error number, if the closure is due
+	 * to an error.
 	 *
 	 * Note that acked() and newdata() may be called after
 	 * closed(), if the packet containing the FIN also
-	 * acknowledged data or contained new data.
+	 * acknowledged data or contained new data.  Note also that
+	 * connected() may not have been called before closed(), if
+	 * the close is due to an error.
 	 */
-	void ( * closed ) ( struct tcp_connection *conn );
+	void ( * closed ) ( struct tcp_connection *conn, int status );
 	/**
 	 * Connection established (SYNACK received)
 	 *

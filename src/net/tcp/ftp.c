@@ -12,6 +12,12 @@
  *
  */
 
+/*****************************************************************************
+ *
+ * FTP control channel
+ *
+ */
+
 /** An FTP control channel string */
 struct ftp_string {
 	/** String format */
@@ -25,8 +31,18 @@ struct ftp_string {
 	off_t data_offset;
 };
 
-#define ftp_string_offset( fieldname ) \
-	offsetof ( struct ftp_request, fieldname )
+/** FTP control channel strings */
+static const struct ftp_string ftp_strings[] = {
+	[FTP_CONNECT]	= { "", 0 },
+	[FTP_USER]	= { "USER anonymous\r\n", 0 },
+	[FTP_PASS]	= { "PASS etherboot@etherboot.org\r\n", 0 },
+	[FTP_TYPE]	= { "TYPE I\r\n", 0 },
+	[FTP_PASV]	= { "PASV\r\n", 0 },
+	[FTP_RETR]	= { "RETR %s\r\n", 
+			    offsetof ( struct ftp_request, filename ) },
+	[FTP_QUIT]	= { "QUIT\r\n", 0 },
+	[FTP_DONE]	= { "", 0 },
+};
 
 /**
  * Get data associated with an FTP control channel string
@@ -40,23 +56,23 @@ static inline const void * ftp_string_data ( struct ftp_request *ftp,
 	return * ( ( void ** ) ( ( ( void * ) ftp ) + data_offset ) );
 }
 
-/** FTP control channel strings */
-const struct ftp_string ftp_strings[] = {
-	[FTP_CONNECT]	= { "", 0 },
-	[FTP_USER]	= { "USER anonymous\r\n", 0 },
-	[FTP_PASS]	= { "PASS etherboot@etherboot.org\r\n", 0 },
-	[FTP_TYPE]	= { "TYPE I\r\n", 0 },
-	[FTP_PASV]	= { "PASV\r\n", 0 },
-	[FTP_RETR]	= { "RETR %s\r\n", ftp_string_offset ( filename ) },
-	[FTP_QUIT]	= { "QUIT\r\n", 0 },
-	[FTP_DONE]	= { "", 0 },
-};
-
-static inline struct ftp_request *
-tcp_to_ftp ( struct tcp_connection *conn ) {
+/**
+ * Get FTP request from control TCP connection
+ *
+ * @v conn		TCP connection
+ * @ret ftp		FTP request
+ */
+static inline struct ftp_request * tcp_to_ftp ( struct tcp_connection *conn ) {
 	return container_of ( conn, struct ftp_request, tcp );
 }
 
+/**
+ * Mark FTP request as complete
+ *
+ * @v ftp		FTP request
+ * @v complete		Completion indicator
+ *
+ */
 static void ftp_complete ( struct ftp_request *ftp, int complete ) {
 	ftp->complete = complete;
 	tcp_close ( &ftp->tcp_data );
@@ -87,7 +103,7 @@ static void ftp_parse_value ( char **text, uint8_t *value, size_t len ) {
 }
 
 /**
- * Handle a response from an FTP server
+ * Handle an FTP control channel response
  *
  * @v ftp	FTP request
  *
@@ -132,6 +148,16 @@ static void ftp_reply ( struct ftp_request *ftp ) {
 	ftp_complete ( ftp, -EPROTO );
 }
 
+/**
+ * Handle new data arriving on FTP control channel
+ *
+ * @v conn	TCP connection
+ * @v data	New data
+ * @v len	Length of new data
+ *
+ * Data is collected until a complete line is received, at which point
+ * its information is passed to ftp_reply().
+ */
 static void ftp_newdata ( struct tcp_connection *conn,
 			  void *data, size_t len ) {
 	struct ftp_request *ftp = tcp_to_ftp ( conn );
@@ -178,6 +204,11 @@ static void ftp_newdata ( struct tcp_connection *conn,
 	ftp->recvsize = recvsize;
 }
 
+/**
+ * Handle acknowledgement of data sent on FTP control channel
+ *
+ * @v conn	TCP connection
+ */
 static void ftp_acked ( struct tcp_connection *conn, size_t len ) {
 	struct ftp_request *ftp = tcp_to_ftp ( conn );
 	
@@ -185,6 +216,11 @@ static void ftp_acked ( struct tcp_connection *conn, size_t len ) {
 	ftp->already_sent += len;
 }
 
+/**
+ * Construct data to send on FTP control channel
+ *
+ * @v conn	TCP connection
+ */
 static void ftp_senddata ( struct tcp_connection *conn ) {
 	struct ftp_request *ftp = tcp_to_ftp ( conn );
 	const struct ftp_string *string;
@@ -200,50 +236,72 @@ static void ftp_senddata ( struct tcp_connection *conn ) {
 		   len - ftp->already_sent );
 }
 
-static void ftp_aborted ( struct tcp_connection *conn ) {
+/**
+ * Handle control channel being closed
+ *
+ * @v conn		TCP connection
+ *
+ * When the control channel is closed, the data channel must also be
+ * closed, if it is currently open.
+ */
+static void ftp_closed ( struct tcp_connection *conn, int status ) {
 	struct ftp_request *ftp = tcp_to_ftp ( conn );
 
-	ftp_complete ( ftp, -ECONNABORTED );
+	ftp_complete ( ftp, status ? status : 1 );
 }
 
-static void ftp_timedout ( struct tcp_connection *conn ) {
-	struct ftp_request *ftp = tcp_to_ftp ( conn );
-
-	ftp_complete ( ftp, -ETIMEDOUT );
-}
-
-static void ftp_closed ( struct tcp_connection *conn ) {
-	struct ftp_request *ftp = tcp_to_ftp ( conn );
-
-	ftp_complete ( ftp, 1 );
-}
-
+/** FTP control channel operations */
 static struct tcp_operations ftp_tcp_operations = {
-	.aborted	= ftp_aborted,
-	.timedout	= ftp_timedout,
 	.closed		= ftp_closed,
 	.acked		= ftp_acked,
 	.newdata	= ftp_newdata,
 	.senddata	= ftp_senddata,
 };
 
+/*****************************************************************************
+ *
+ * FTP control channel
+ *
+ */
+
+/**
+ * Get FTP request from data TCP connection
+ *
+ * @v conn		TCP connection
+ * @ret ftp		FTP request
+ */
 static inline struct ftp_request *
 tcp_to_ftp_data ( struct tcp_connection *conn ) {
 	return container_of ( conn, struct ftp_request, tcp_data );
 }
 
-static void ftp_data_aborted ( struct tcp_connection *conn ) {
+/**
+ * Handle data channel being closed
+ *
+ * @v conn		TCP connection
+ *
+ * When the data channel is closed, the control channel should be left
+ * alone; the server will send a completion message via the control
+ * channel which we'll pick up.
+ *
+ * If the data channel is closed due to an error, we abort the request.
+ */
+static void ftp_data_closed ( struct tcp_connection *conn, int status ) {
 	struct ftp_request *ftp = tcp_to_ftp_data ( conn );
 
-	ftp_complete ( ftp, -ECONNABORTED );
+	if ( status )
+		ftp_complete ( ftp, status );
 }
 
-static void ftp_data_timedout ( struct tcp_connection *conn ) {
-	struct ftp_request *ftp = tcp_to_ftp_data ( conn );
-
-	ftp_complete ( ftp, -ETIMEDOUT );
-}
-
+/**
+ * Handle new data arriving on the FTP data channel
+ *
+ * @v conn	TCP connection
+ * @v data	New data
+ * @v len	Length of new data
+ *
+ * Data is handed off to the callback registered in the FTP request.
+ */
 static void ftp_data_newdata ( struct tcp_connection *conn,
 			       void *data, size_t len ) {
 	struct ftp_request *ftp = tcp_to_ftp_data ( conn );
@@ -251,9 +309,9 @@ static void ftp_data_newdata ( struct tcp_connection *conn,
 	ftp->callback ( data, len );
 }
 
+/** FTP data channel operations */
 static struct tcp_operations ftp_data_tcp_operations = {
-	.aborted	= ftp_data_aborted,
-	.timedout	= ftp_data_timedout,
+	.closed		= ftp_data_closed,
 	.newdata	= ftp_data_newdata,
 };
 
