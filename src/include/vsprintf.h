@@ -45,6 +45,7 @@
  */
 
 extern int sprintf ( char *buf, const char *fmt, ... );
+extern int snprintf ( char *buf, size_t size, const char *fmt, ... );
 extern int printf ( const char *fmt, ... );
 
 #endif /* VSPRINTF_H */

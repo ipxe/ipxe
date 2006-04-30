@@ -173,6 +173,17 @@ int sprintf(char *buf, const char *fmt, ...)
 	return i;
 }
 
+#warning "Remove this buffer-overflow-in-waiting at some point"
+int snprintf ( char *buf, size_t size, const char *fmt, ... ) {
+	va_list args;
+	int i;
+
+	va_start ( args, fmt );
+	i = vsprintf ( buf, fmt, args );
+	va_end ( args );
+	return i;
+}
+
 /**
  * Write a formatted string to the console.
  *
