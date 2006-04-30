@@ -260,7 +260,7 @@ static struct tcp_operations ftp_tcp_operations = {
 
 /*****************************************************************************
  *
- * FTP control channel
+ * FTP data channel
  *
  */
 
@@ -314,6 +314,12 @@ static struct tcp_operations ftp_data_tcp_operations = {
 	.closed		= ftp_data_closed,
 	.newdata	= ftp_data_newdata,
 };
+
+/*****************************************************************************
+ *
+ * API
+ *
+ */
 
 /**
  * Initiate an FTP connection
