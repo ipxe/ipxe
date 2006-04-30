@@ -166,7 +166,7 @@ int inet_aton ( const char *cp, struct in_addr *inp ) {
 	return 0;
 }
 
-unsigned long strtoul(const char *p, const char **endp, int base)
+unsigned long strtoul(const char *p, char **endp, int base)
 {
 	unsigned long ret = 0;
 	if (base != 10) return 0;
