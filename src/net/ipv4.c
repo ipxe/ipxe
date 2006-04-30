@@ -11,7 +11,7 @@
 #include <gpxe/if_ether.h>
 #include <gpxe/pkbuff.h>
 #include <gpxe/netdevice.h>
-#include "../proto/uip/uip.h"
+#include "uip/uip.h"
 
 /** @file
  *
