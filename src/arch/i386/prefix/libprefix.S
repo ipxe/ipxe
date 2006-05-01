@@ -1,178 +1,267 @@
+/*
+ * Copyright (C) 2006 Michael Brown <mbrown@fensystems.co.uk>.
+ *
+ * This program is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU General Public License as
+ * published by the Free Software Foundation; either version 2 of the
+ * License, or any later version.
+ *
+ * This program is distributed in the hope that it will be useful, but
+ * WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ * General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program; if not, write to the Free Software
+ * Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
+ *
+ */
 
 #define CR0_PE 1
-	
-	
-	.arch i386
-	.section ".prefix", "awx", @progbits
 
+	.arch i386
+	.section ".prefix.lib", "awx", @progbits
+
+/****************************************************************************
+ * install_block (real-mode near call)
+ *
+ * Install block to specified address
+ *
+ * Parameters:
+ *   %esi : byte offset within loaded image (must be a multiple of 16)
+ *   %es:edi : destination address
+ *   %ecx : length to install
+ * Returns:
+ *   none
+ * Corrupts:
+ *   %esi, %edi, %ecx
+ ****************************************************************************
+ */
+	.section ".prefix.lib"
+	.code16
+install_block:
+	/* Preserve registers */
+	pushw	%ds
+	pushw	%ax
+	
+	/* Starting segment => %ds */
+	movw	%cs, %ax
+	shrl	$4, %esi
+	addw	%si, %ax
+	movw	%ax, %ds
+	xorl	%esi, %esi
+
+	/* Do the copy */
+	cld
+	addr32 rep movsb /* or "call decompress16" */
+
+	/* Restore registers */
+	popw	%ax
+	popw	%ds
+	ret
+	.size install_block, . - install_block
+	
 /****************************************************************************
  * alloc_basemem (real-mode near call)
  *
- * Allocate space from base memory via the BIOS free base memory
- * counter at 40: 13
+ * Allocate space for .text16 and .data16 from top of base memory.
+ * Memory is allocated using the BIOS free base memory counter at
+ * 0x40:13.
  *
  * Parameters: 
- *   %cx : Number of bytes to allocate
+ *   none
  * Returns:
- *   %es : Segment address of newly allocated memory
+ *   %ax : .text16 segment address
+ *   %bx : .data16 segment address
+ * Corrupts:
+ *   none
  ****************************************************************************
  */
-	.section ".prefix"
+	.section ".prefix.lib"
 	.code16
 alloc_basemem:
-	/* Preserve registers */
-	pushw	%cx
-	pushw	%ax
-	
-	/* %fs = 0x40, %ax = fbms */
+	/* FBMS => %ax as segment address */
 	movw	$40, %ax
 	movw	%ax, %fs
-
-	/* Round up %cx to nearest kB, subtract from FBMS */
-	addw	$0x03ff, %cx
-	andw	$0xfc00, %cx
-	shrw	$10, %cx
 	movw	%fs:0x13, %ax
-	subw	%cx, %ax
+	shlw	$6, %ax
+
+	/* .data16 segment address */
+	subw	$_data16_size, %ax
+	pushw	%ax
+
+	/* .text16 segment address */
+	subw	$_text16_size, %ax
+	pushw	%ax
+
+	/* Update FBMS */
+	shrw	$6, %ax
 	movw	%ax, %fs:0x13
 
-	/* Convert to segment address in %es */
-	shlw	$6, %ax
-	movw	%ax, %es
-
-	/* Restore registers and return */
+	/* Return */
 	popw	%ax
-	popw	%cx
+	popw	%bx
 	ret
+	.size alloc_basemem, . - alloc_basemem
 
+/****************************************************************************
+ * install_basemem (real-mode near call)
+ *
+ * Install .text16 and .data16 into base memory
+ *
+ * Parameters: 
+ *   %ax : .text16 segment address
+ *   %bx : .data16 segment address
+ * Returns:
+ *   none
+ * Corrupts:
+ *   none
+ ****************************************************************************
+ */
+	.section ".prefix.lib"
+	.code16
+install_basemem:
+	/* Preserve registers */
+	pushw	%es
+	pushl	%esi
+	pushl	%edi
+	pushl	%ecx
 
-	.section ".prefix"
+	/* Install .text16 */
+	movw	%ax, %es
+	xorl	%edi, %edi
+	movl	$_text16_load_offset, %esi
+	movl	$_text16_size, %ecx
+	call	install_block
+
+	/* Install .data16 */
+	movw	%bx, %es
+	xorl	%edi, %edi	
+	movl	$_data16_load_offset_pgh, %esi
+	movl	$_data16_progbits_size, %ecx
+	call	install_block
+
+	/* Restore registers */
+	popl	%ecx
+	popl	%edi
+	popl	%esi
+	popw	%es
+	ret
+	.size install_basemem, . - install_basemem
+
+/****************************************************************************
+ * GDT for flat real mode
+ *
+ * We only ever use this GDT to set segment limits; the bases are
+ * unused.  Also, we only flatten data segments, so we don't need to
+ * worry about the code or stack segments.  This makes everything much
+ * simpler.
+ ****************************************************************************
+ */
+	.section ".prefix.lib"
 	.align 16
 gdt:
 gdt_limit:		.word gdt_length - 1
-gdt_base:		.long gdt
+gdt_base:		.long 0
 			.word 0 /* padding */
 
-cs16: 		/* 16 bit code segment, base at real-mode %cs:0000 */
-	.equ	CS16, cs16 - gdt
-	.word	0xffff, 0
-	.byte	0, 0x9b, 0, 0
-	
-ss16:		/* 16 bit stack segment, base at real-mode %ss:0000 */
-	.equ	SS16, ss16 - gdt
+real_ds:	/* Genuine real mode data segment */
+	.equ	REAL_DS, real_ds - gdt
 	.word	0xffff, 0
 	.byte	0, 0x93, 0, 0
 
-flat_ds:	/* 16 bit data segment, zero base, 4GB limit */
+flat_ds:	/* Flat real mode data segment */
 	.equ	FLAT_DS, flat_ds - gdt
 	.word	0xffff, 0
-	.byte	0, 0x9f, 0xcf, 0
-	
+	.byte	0, 0x93, 0xcf, 0
+
 gdt_end:
 	.equ	gdt_length, gdt_end - gdt
+	.size gdt, . - gdt
 
-
-
-	
-	.section ".prefix"
+/****************************************************************************
+ * set_segment_limits (real-mode near call)
+ *
+ * Sets limits on the data segments %ds and %es.
+ *
+ * Parameters: 
+ *   %cx : Segment limit ($REAL_DS or $FLAT_DS)
+ ****************************************************************************
+ */
+	.section ".prefix.lib"
 	.code16
-prot16_call:
+set_segment_limits:
+	/* Preserve real-mode segment values and temporary registers */
+	pushw	%es
+	pushw	%ds
+	pushl	%eax
 
-
-	/* Install .data16 to top of base memory */
-	movw	%cs, %ax
-	addw	$_data16_load_offset_pgh, %ax
-	movw	%ax, %ds
-	movw	$_data16_size, %cx
-	call	alloc_basemem
-	xorw	%si, %si
-	xorw	%di, %di	
-	movw	$_data16_progbits_size, %cx
-	rep movsb /* or "call decompress16" */
-
-	/* Install .code16 to top of base memory */
-	movw	%cs, %ax
-	addw	$_code16_load_offset_pgh, %ax
-	movw	%ax, %ds
-	movw	$_code16_size, %cx
-	call	alloc_basemem
-	xorw	%si, %si
-	xorw	%di, %di	
-	rep movsb /* or "call decompress16" */
-	
-	/* Push flags and real-mode segment registers */
-	pushfl
-	push	%gs
-	push	%fs
-	push	%es
-	push	%ds
-	push	%ss
-	push	%cs
-
-	/* Physical address of %cs:0000 to %ebx, of %ss:0000 to %eax */
-	xorl	%ebx, %ebx
-	movw	%cs, %bx
-	shll	$4, %ebx
+	/* Set GDT base and load GDT */
 	xorl	%eax, %eax
-	movw	%ss, %ax
-	shll	$4, %eax
-	
-	/* Set up GDT and switch to protected mode */
-	addl	%ebx, %cs:gdt_base
-	orl	%ebx, %cs:(cs16+2)
-	orl	%eax, %cs:(ss16+2)
-	cli
-	data32 lgdt	%cs:gdt
+	movw	%cs, %ax
+	shrl	$4, %eax
+	addl	$gdt, %eax
+	movl	%eax, %cs:gdt_base
+	lgdt	%cs:gdt
+
+	/* Switch to protected mode, set segment limits, switch back */
 	movl	%cr0, %eax
 	orb	$CR0_PE, %al
 	movl	%eax, %cr0
-	data32 ljmp	$CS16, $1f
-1:	movw	$SS16, %ax
-	movw	%ax, %ss
-	movw	$FLAT_DS, %ax
-	movw	%ax, %ds
-	movw	%ax, %es
-	movw	%ax, %fs
-	movw	%ax, %gs
-
-	/* Install .text and .data to 2MB mark.  Use 2MB to avoid
-	 * having to deal with A20.
-	 */
-	leal	_text_load_offset(%ebx), %esi
-	movl	$( 2 * 1024 * 1024 ), %edi
-	movl	$_text_and_data_progbits_size, %ecx
-	addr32 rep movsb /* or "call decompress16" */
-	
-	/* Restore real-mode segment limits */
-	movw	%ss, %ax
-	movw	%ax, %ds
-	movw	%ax, %es
-	movw	%ax, %fs
-	movw	%ax, %gs
-	
-	/* Return to real mode, restore segment registers and flags */
-	pushw	$1f
-	movl	%cr0, %eax
+	movw	%cx, %ds
+	movw	%cx, %es
 	andb	$0!CR0_PE, %al
 	movl	%eax, %cr0
-	lret	/* used as equivalent of pop %cs */
-1:	pop	%ss
-	pop	%ds
-	pop	%es
-	pop	%fs
-	pop	%gs
-	popfl
 
-	/* Call init_gdt */
-	pushw	%cs
-	pushw	$1f
-	pushw	%es
-	pushw	$init_gdt
-	lret /* lcall %es:init_gdt */
-1:	
-	
-
-	
+	/* Restore real-mode segment values and temporary registers */
+	popl	%eax
+	popw	%ds
+	popw	%es
 	ret
+	.size set_segment_limits, . - set_segment_limits
 	
+/****************************************************************************
+ * install_highmem (real-mode near call)
+ *
+ * Install .text and .data into high memory
+ *
+ * Parameters:
+ *   %edi : physical address in high memory
+ * Returns:
+ *   none
+ * Corrupts:
+ *   none
+ ****************************************************************************
+ */
+	.section ".prefix.lib"
+	.code16
+install_highmem:
+	/* Preserve registers and interrupt status */
+	pushfl
+	pushl	%esi
+	pushl	%edi
+	pushl	%ecx
+		
+	/* Disable interrupts and flatten real mode */
+	cli
+	movw	$FLAT_DS, %cx
+	call	set_segment_limits
 
+	/* Install .text and .data to specified address */
+	xorw	%ax, %ax
+	movw	%ax, %es
+	movl	$_text_load_offset, %esi
+	movl	$_text_and_data_progbits_size, %ecx
+	call	install_block
+
+	/* Unflatten real mode */
+	movw	$REAL_DS, %cx
+	call	set_segment_limits
+
+	/* Restore registers and interrupt status */
+	popl	%ecx
+	popl	%edi
+	popl	%esi
+	popfl
+	ret
+	.size install_highmem, . - install_highmem
