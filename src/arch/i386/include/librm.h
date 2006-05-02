@@ -77,7 +77,6 @@ extern void remove_from_rm_stack ( void *data, size_t size );
 /* REAL_FRAGMENT: Declare and define a real-mode code fragment in .text16 */
 #define	REAL_FRAGMENT( name, asm_code_str )				\
 	extern void name ( void );					\
-	extern char name ## _size[];					\
 	__asm__ __volatile__ (						\
 		".section \".text16\"\n\t"				\
 		".code16\n\t"						\
@@ -85,8 +84,7 @@ extern void remove_from_rm_stack ( void *data, size_t size );
 		#name ":\n\t"						\
 		asm_code_str "\n\t"					\
 		"ret\n\t"						\
-		#name "_end:\n\t"					\
-		".equ " #name "_size, " #name "_end - " #name "\n\t"	\
+		".size " #name ", . - " #name "\n\t"			\
 		".code32\n\t"						\
 		".previous\n\t"						\
 		: :							\
