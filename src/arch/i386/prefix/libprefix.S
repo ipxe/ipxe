@@ -79,9 +79,10 @@ install_block:
  */
 	.section ".prefix.lib"
 	.code16
+	.globl alloc_basemem
 alloc_basemem:
 	/* FBMS => %ax as segment address */
-	movw	$40, %ax
+	movw	$0x40, %ax
 	movw	%ax, %fs
 	movw	%fs:0x13, %ax
 	shlw	$6, %ax
@@ -120,6 +121,7 @@ alloc_basemem:
  */
 	.section ".prefix.lib"
 	.code16
+	.globl install_basemem
 install_basemem:
 	/* Preserve registers */
 	pushw	%es
@@ -137,7 +139,7 @@ install_basemem:
 	/* Install .data16 */
 	movw	%bx, %es
 	xorl	%edi, %edi	
-	movl	$_data16_load_offset_pgh, %esi
+	movl	$_data16_load_offset, %esi
 	movl	$_data16_progbits_size, %ecx
 	call	install_block
 
@@ -199,7 +201,7 @@ set_segment_limits:
 	/* Set GDT base and load GDT */
 	xorl	%eax, %eax
 	movw	%cs, %ax
-	shrl	$4, %eax
+	shll	$4, %eax
 	addl	$gdt, %eax
 	movl	%eax, %cs:gdt_base
 	lgdt	%cs:gdt
@@ -235,6 +237,7 @@ set_segment_limits:
  */
 	.section ".prefix.lib"
 	.code16
+	.globl install_highmem
 install_highmem:
 	/* Preserve registers and interrupt status */
 	pushfl
@@ -248,10 +251,10 @@ install_highmem:
 	call	set_segment_limits
 
 	/* Install .text and .data to specified address */
-	xorw	%ax, %ax
-	movw	%ax, %es
+	xorw	%cx, %cx
+	movw	%cx, %es
 	movl	$_text_load_offset, %esi
-	movl	$_text_and_data_progbits_size, %ecx
+	movl	$_text_progbits_size, %ecx
 	call	install_block
 
 	/* Unflatten real mode */
