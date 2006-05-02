@@ -357,7 +357,7 @@ prot_call:
 	popw	%gs
 	popal
 	popfl
-	ret
+	data32 ret
 
 /****************************************************************************
  * real_call (protected-mode near call, 32-bit virtual return address)

@@ -30,11 +30,12 @@
  * Parameters:
  *   %esi : byte offset within loaded image (must be a multiple of 16)
  *   %es:edi : destination address
- *   %ecx : length to install
+ *   %ecx : length of (decompressed) data
+ *   %edx : total length of block (including any uninitialised data portion)
  * Returns:
  *   none
  * Corrupts:
- *   %esi, %edi, %ecx
+ *   %esi, %edi, %ecx, %edx
  ****************************************************************************
  */
 	.section ".prefix.lib"
@@ -42,7 +43,7 @@
 install_block:
 	/* Preserve registers */
 	pushw	%ds
-	pushw	%ax
+	pushw	%eax
 	
 	/* Starting segment => %ds */
 	movw	%cs, %ax
@@ -51,12 +52,22 @@ install_block:
 	movw	%ax, %ds
 	xorl	%esi, %esi
 
+	/* Calculate start and length of uninitialised data portion */
+	leal	(%edi,%ecx), %eax
+	subl	%ecx, %edx
+	
 	/* Do the copy */
 	cld
-	addr32 rep movsb /* or "call decompress16" */
+	rep addr32 movsb /* or "call decompress16" */
+
+	/* Zero remaining space */
+	movl	%eax, %edi
+	movl	%edx, %ecx
+	xorb	%al, %al
+	rep addr32 stosb
 
 	/* Restore registers */
-	popw	%ax
+	popw	%eax
 	popw	%ds
 	ret
 	.size install_block, . - install_block
@@ -79,7 +90,6 @@ install_block:
  */
 	.section ".prefix.lib"
 	.code16
-	.globl alloc_basemem
 alloc_basemem:
 	/* FBMS => %ax as segment address */
 	movw	$0x40, %ax
@@ -121,19 +131,20 @@ alloc_basemem:
  */
 	.section ".prefix.lib"
 	.code16
-	.globl install_basemem
 install_basemem:
 	/* Preserve registers */
 	pushw	%es
 	pushl	%esi
 	pushl	%edi
 	pushl	%ecx
+	pushl	%edx
 
 	/* Install .text16 */
 	movw	%ax, %es
 	xorl	%edi, %edi
 	movl	$_text16_load_offset, %esi
 	movl	$_text16_size, %ecx
+	movl	%ecx, %edx
 	call	install_block
 
 	/* Install .data16 */
@@ -141,9 +152,11 @@ install_basemem:
 	xorl	%edi, %edi	
 	movl	$_data16_load_offset, %esi
 	movl	$_data16_progbits_size, %ecx
+	movl	$_data16_size, %edx
 	call	install_block
 
 	/* Restore registers */
+	popl	%edx
 	popl	%ecx
 	popl	%edi
 	popl	%esi
@@ -160,6 +173,9 @@ install_basemem:
  * simpler.
  ****************************************************************************
  */
+	
+#ifndef KEEP_IT_REAL
+	
 	.section ".prefix.lib"
 	.align 16
 gdt:
@@ -180,6 +196,8 @@ flat_ds:	/* Flat real mode data segment */
 gdt_end:
 	.equ	gdt_length, gdt_end - gdt
 	.size gdt, . - gdt
+	
+#endif /* KEEP_IT_REAL */
 
 /****************************************************************************
  * set_segment_limits (real-mode near call)
@@ -190,6 +208,9 @@ gdt_end:
  *   %cx : Segment limit ($REAL_DS or $FLAT_DS)
  ****************************************************************************
  */
+
+#ifndef KEEP_IT_REAL
+	
 	.section ".prefix.lib"
 	.code16
 set_segment_limits:
@@ -222,6 +243,8 @@ set_segment_limits:
 	ret
 	.size set_segment_limits, . - set_segment_limits
 	
+#endif /* KEEP_IT_REAL */
+	
 /****************************************************************************
  * install_highmem (real-mode near call)
  *
@@ -235,15 +258,18 @@ set_segment_limits:
  *   none
  ****************************************************************************
  */
+
+#ifndef KEEP_IT_REAL
+
 	.section ".prefix.lib"
 	.code16
-	.globl install_highmem
 install_highmem:
 	/* Preserve registers and interrupt status */
 	pushfl
 	pushl	%esi
 	pushl	%edi
 	pushl	%ecx
+	pushl	%edx
 		
 	/* Disable interrupts and flatten real mode */
 	cli
@@ -253,8 +279,9 @@ install_highmem:
 	/* Install .text and .data to specified address */
 	xorw	%cx, %cx
 	movw	%cx, %es
-	movl	$_text_load_offset, %esi
-	movl	$_text_progbits_size, %ecx
+	movl	$_textdata_load_offset, %esi
+	movl	$_textdata_progbits_size, %ecx
+	movl	$_textdata_size, %edx
 	call	install_block
 
 	/* Unflatten real mode */
@@ -262,9 +289,71 @@ install_highmem:
 	call	set_segment_limits
 
 	/* Restore registers and interrupt status */
+	popl	%edx
 	popl	%ecx
 	popl	%edi
 	popl	%esi
 	popfl
 	ret
 	.size install_highmem, . - install_highmem
+	
+#endif /* KEEP_IT_REAL */
+	
+/****************************************************************************
+ * install (real-mode near call)
+ * install_prealloc (real-mode near call)
+ *
+ * Install all text and data segments.
+ *
+ * Parameters:
+ *   %ax : .text16 segment address (install_prealloc only)
+ *   %bx : .data16 segment address (install_prealloc only)
+ * Returns:
+ *   %ax : .text16 segment address
+ *   %bx : .data16 segment address
+ *   %edi : .text physical address (if applicable)
+ * Corrupts:
+ *   none
+ ****************************************************************************
+ */
+	.section ".prefix.lib"
+	.code16
+	.globl install
+install:
+	/* Allocate space for .text16 and .data16 */
+	call	alloc_basemem
+	.size install, . - install
+	.globl install_prealloc
+install_prealloc:
+	/* Install .text16 and .data16 */
+	call	install_basemem
+
+#ifndef KEEP_IT_REAL
+	/* Install .text and .data to 2MB mark.  Use 2MB to avoid
+	 * problems with A20.
+	 */
+	movl	$(2<<20), %edi
+	call	install_highmem
+
+	/* Continue executing in .text16 segment */
+	pushw	%cs
+	pushw	$2f
+	pushw	%ax
+	pushw	$1f
+	lret
+	.section ".text16", "awx", @progbits
+1:
+	/* Set up protected-mode GDT, call relocate(), reset GDT */
+	call	init_gdt
+	pushl	$relocate
+	data32 call	prot_call
+	addw	$4, %sp
+	call	init_gdt
+
+	/* Return to executing in .prefix section */
+	lret
+	.section ".prefix.lib"
+2:
+#endif
+	ret
+	.size install_prealloc, . - install_prealloc

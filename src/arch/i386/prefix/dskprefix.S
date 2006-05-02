@@ -348,13 +348,7 @@ msg1end:
 	.word 0xAA55
 
 start_runtime:
-	/* Install .text16 and .data16 to top of base memory */
-	call	alloc_basemem
-	call	install_basemem
-
-	/* Install .text and .data to 2MB mark */
-	movl	$(2<<20), %edi
-	call	install_highmem
+	call	install
 
 	/* Jump to .text16 segment */
 	pushw	%ax
@@ -362,7 +356,6 @@ start_runtime:
 	lret
 	.section ".text16", "awx", @progbits
 1:
-	call	init_gdt
 	pushl	$initialise
 	data32 call	prot_call
 	popl	%eax /* discard */
