@@ -43,7 +43,7 @@
 install_block:
 	/* Preserve registers */
 	pushw	%ds
-	pushw	%eax
+	pushl	%eax
 	
 	/* Starting segment => %ds */
 	movw	%cs, %ax
@@ -67,7 +67,7 @@ install_block:
 	rep addr32 stosb
 
 	/* Restore registers */
-	popw	%eax
+	popl	%eax
 	popw	%ds
 	ret
 	.size install_block, . - install_block
