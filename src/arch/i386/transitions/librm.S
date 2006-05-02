@@ -8,98 +8,6 @@
 /* Drag in local definitions */
 #include "librm.h"
 
-/* Drag in FREE_BASEMEM_HEADER_SIZE */
-#include "basemem.h"
-
-/****************************************************************************
- * This file defines librm: a block of code that is designed to reside
- * permanently in base memory and provide the interface between
- * real-mode code running in base memory and protected-mode code
- * running in high memory.  It provides the following functions:
- *
- *   real_to_prot &	switch between real and protected mode 
- *   prot_to_real	while running in base memory, preserving 
- *			all non-segment registers
- *
- *   real_call		issue a call to a real-mode routine from
- *			protected-mode code running in high memory
- *
- *   prot_call		issue a call to a protected-mode routine from
- *			real-mode code running in base memory
- *
- * librm requires the following functions to be present in the
- * protected-mode code:
- *
- *   _phys_to_virt	Switch from physical to virtual addressing.  This
- *			routine must be position-independent and must
- *			*not* assume that it is genuinely running with
- *			flat physical addresses
- *
- *   _virt_to_phys	Switch from virtual to physical addresses.
- *
- *   gateA20_set	Enable the A20 line to permit access to the odd
- *			megabytes of RAM.  (This function will be called
- *			with virtual addresses set up).
- *
- * librm needs to be linked against the protected-mode binary so that
- * it can import the symbols for these functions.
- *
- * librm requires that the protected-mode code set up the following
- * segments:
- *
- *   PHYSICAL_CS	32-bit pmode code and data segments with flat
- *   PHYSICAL_DS	physical addresses.
- *
- *   VIRTUAL_CS		32-bit pmode code segment with virtual
- *			addressing, such that a protected-mode routine
- *			can always be found at $VIRTUAL_CS:routine.
- *
- * These segments must be set as #define constants when compiling
- * librm.  Edit librm.h to change the values.
- *
- * librm does not know the location of the code executing in high
- * memory.  It relies on the code running in high memory setting up a
- * GDT such that the high-memory code is accessible at virtual
- * addresses fixed at compile-time.
- *
- * librm symbols are exported as absolute values and represent offsets
- * into librm.  This is the most useful form of the symbols, since
- * librm is basically a binary blob that you place somewhere in base
- * memory.
- *
- * librm.h provides convenient ways to use these symbols: you simply
- * set the pointer ( char * ) installed_librm to point to wherever
- * librm is installed, and can then use e.g. inst_rm_stack just like
- * any other variable and have it automatically refer to the value of
- * rm_stack in the installed librm.  Macro trickery makes this
- * completely transparent, and the resulting assembler code is
- * amazingly efficient.
- *
- * Note that librm must be called in genuine real mode, not 16:16 or
- * 16:32 protected mode.  It makes the assumption that
- * physical_address = 16*segment+offset, and also that it can use
- * OFFSET(%bp) to access stack variables.  The former assumption will
- * break in either protected mode, the latter may break in 16:32
- * protected mode.
- ****************************************************************************
- */
-
-/*
- * Default values for pmode segments if not defined
- */
-#ifndef PHYSICAL_CS
-#warning "Assuming PHYSICAL_CS = 0x08"
-#define PHYSICAL_CS 0x08
-#endif
-#ifndef PHYSICAL_DS
-#warning "Assuming PHYSICAL_DS = 0x10"
-#define PHYSICAL_DS 0x10
-#endif
-#ifndef VIRTUAL_CS
-#warning "Assuming VIRTUAL_CS = 0x18"
-#define VIRTUAL_CS 0x18
-#endif
-
 /* For switches to/from protected mode */
 #define CR0_PE 1
 
@@ -109,101 +17,26 @@
 #define SIZEOF_REAL_MODE_REGS	( SIZEOF_I386_SEG_REGS + SIZEOF_I386_REGS )
 #define SIZEOF_I386_FLAGS	4
 #define SIZEOF_I386_ALL_REGS	( SIZEOF_REAL_MODE_REGS + SIZEOF_I386_FLAGS )
-#define SIZEOF_SEGOFF_T		4
-#define SIZEOF_REAL_CALL_PARAMS ( SIZEOF_REAL_MODE_REGS + 2 * SIZEOF_SEGOFF_T )
 	
-	.text
 	.arch i386
-	.section ".librm", "awx", @progbits
-	.align 16
-
-	.globl	librm
-librm:
-	
-_librm_start:
-
-#undef OFFSET
-#define OFFSET(sym) ( sym - _librm_start )
-
-#undef EXPORT
-#define EXPORT(sym) \
-	.globl sym ; \
-	.globl _ ## sym ;  \
-	.equ _ ## sym, OFFSET(sym) ; \
-	sym
+	.section ".text16", "awx", @progbits
 
 /****************************************************************************
- * Note that the first sizeof(struct free_base_memory_header) bytes of
- * librm will get vapourised by free_base_memory().  Since we need
- * librm to continue working even when this happens, we put some
- * padding here.
+ * Global descriptor table
  *
- * We must also ensure that the total size of librm is <1kB, otherwise
- * free_base_memory() will stomp somewhere in the middle of us as
- * well...
- ****************************************************************************
- */
-	.fill FREE_BASEMEM_HEADER_SIZE, 1, 0
-
-/****************************************************************************
- * Record of the current physical location of the installed copy.
- * Used by prot_call in order to return via the current installed copy
- * even if Etherboot has been relocated during the protected-mode
- * call.
- ****************************************************************************
- */
-EXPORT(librm_base):
-librm_base:	.long 0
-		
-/****************************************************************************
- * GDT for initial transition to protected mode
+ * Call init_gdt to set up the GDT before attempting to use any
+ * protected-mode code.
  *
- * PHYSICAL_CS and PHYSICAL_DS are defined in an external header file.
- * We use only those selectors, and construct our GDT to match the
- * selector values we're asked to use.  Use PHYSICAL_CS=0x08 and
- * PHYSICAL_DS=0x10 to minimise the space occupied by this GDT.
- *
- * Note: pm_gdt is also used to store the location of the
- * protected-mode GDT as recorded on entry to prot_to_real.
- ****************************************************************************
- */
-	.align 16
-pm_gdt:
-pm_gdt_limit:		.word pm_gdt_length - 1
-pm_gdt_addr:		.long 0
-			.word 0 /* padding */
-	
-	.org	pm_gdt + PHYSICAL_CS
-pm_gdt_pm_cs:
-	/* 32 bit protected mode code segment, physical addresses */
-	.word	0xffff, 0
-	.byte	0, 0x9f, 0xcf, 0
-	
-	.org	pm_gdt + PHYSICAL_DS
-pm_gdt_pm_ds:
-	/* 32 bit protected mode data segment, physical addresses */
-	.word	0xffff,0
-	.byte	0,0x93,0xcf,0
-	
-pm_gdt_end:		
-	.equ	pm_gdt_length, pm_gdt_end - pm_gdt
-
-/****************************************************************************
- * GDT for transition to real mode
- *
- * This is used primarily to set 64kB segment limits.  Define
- * FLATTEN_REAL_MODE if you want to use so-called "flat real mode"
- * with 4GB limits instead.  The base address of each of the segments
- * will be adjusted at run-time.
+ * Define FLATTEN_REAL_MODE if you want to use so-called "flat real
+ * mode" with 4GB limits instead.
  *
  * NOTE: This must be located before prot_to_real, otherwise gas
  * throws a "can't handle non absolute segment in `ljmp'" error due to
- * not knowing the value of RM_CS when the ljmp is encountered.
+ * not knowing the value of REAL_CS when the ljmp is encountered.
  *
- * Note also that putting ".word rm_gdt_end - rm_gdt - 1" directly
- * into rm_gdt_limit, rather than going via rm_gdt_length, will also
- * produce the "non absolute segment" error.  This is most probably a
- * bug in gas.
+ * Note also that putting ".word gdt_end - gdt - 1" directly into
+ * gdt_limit, rather than going via gdt_length, will also produce the
+ * "non absolute segment" error.  This is most probably a bug in gas.
  ****************************************************************************
  */
 	
@@ -212,252 +45,242 @@ pm_gdt_end:
 #else
 #define RM_LIMIT_16_19__AVL__SIZE__GRANULARITY 0x00
 #endif
+	.section ".text16"
 	.align 16
-rm_gdt:
-rm_gdt_limit:		.word rm_gdt_length - 1
-rm_gdt_base:		.long 0
+gdt:
+gdt_limit:		.word gdt_length - 1
+gdt_base:		.long 0
 			.word 0 /* padding */
+
+	.org	gdt + VIRTUAL_CS, 0
+virtual_cs:	/* 32 bit protected mode code segment, virtual addresses */
+	.word	0xffff, 0
+	.byte	0, 0x9f, 0xcf, 0
+
+	.org	gdt + VIRTUAL_DS, 0
+virtual_ds:	/* 32 bit protected mode data segment, virtual addresses */
+	.word	0xffff, 0
+	.byte	0, 0x93, 0xcf, 0
 	
-rm_gdt_rm_cs: 	/* 16 bit real mode code segment */
-	.equ	RM_CS, rm_gdt_rm_cs - rm_gdt
-	.word	0xffff,(0&0xffff)
-	.byte	(0>>16),0x9b,RM_LIMIT_16_19__AVL__SIZE__GRANULARITY,(0>>24)
+	.org	gdt + PHYSICAL_CS, 0
+physical_cs:	/* 32 bit protected mode code segment, physical addresses */
+	.word	0xffff, 0
+	.byte	0, 0x9f, 0xcf, 0
+
+	.org	gdt + PHYSICAL_DS, 0
+physical_ds:	/* 32 bit protected mode data segment, physical addresses */
+	.word	0xffff, 0
+	.byte	0, 0x93, 0xcf, 0	
+
+	.org	gdt + REAL_CS, 0
+real_cs: 	/* 16 bit real mode code segment */
+	.word	0xffff, 0
+	.byte	0, 0x9b, RM_LIMIT_16_19__AVL__SIZE__GRANULARITY, 0
+
+	.org	gdt + REAL_DS	
+real_ds:	/* 16 bit real mode data segment */
+	.word	0xffff, 0
+	.byte	0, 0x93, RM_LIMIT_16_19__AVL__SIZE__GRANULARITY, 0
 	
-rm_gdt_rm_ds:	/* 16 bit real mode data segment */
-	.equ	RM_DS, rm_gdt_rm_ds - rm_gdt
-	.word	0xffff,(0&0xffff)
-	.byte	(0>>16),0x93,RM_LIMIT_16_19__AVL__SIZE__GRANULARITY,(0>>24)
-	
-rm_gdt_end:
-	.equ	rm_gdt_length, rm_gdt_end - rm_gdt
+gdt_end:
+	.equ	gdt_length, gdt_end - gdt
 
 /****************************************************************************
- * real_to_prot (real-mode far call)
+ * init_gdt (real-mode near call, 16-bit real-mode return address)
  *
- * Switch from 16-bit real-mode to 32-bit protected mode with flat
- * physical addresses.  %esp is restored from the saved pm_esp.  All
- * segment registers are set to flat physical-mode values.  All other
- * registers are preserved.  Interrupts are disabled.
+ * Initialise the GDT ready for transitions to protected mode.
  *
- * Note that this routine can be called *without* having first set up
- * a stored pm_esp or stored GDT.  If you do this, real_to_prot will
- * return with a temporary stack that is only *FOUR BYTES* in size.
- * This is just enough to enable you to do a "call 1f; popl %ebp"
- * sequence in order to find out your physical address and then load a
- * proper 32-bit protected-mode stack pointer.  Do *NOT* use more than
- * four bytes since this will overwrite code in librm!
- *
- * Parameters: none
+ * Parameters: 
+ *   %edi : Physical base of protected-mode code
  ****************************************************************************
  */
-
-	.code16		
-EXPORT(real_to_prot):
-	/* Disable interrupts */
-	cli
-
-	/* Set %ds = %cs, for easier access to variables */
-	pushw	%cs
-	popw	%ds
-	
+	.section ".text16"
+	.code16
+	.globl init_gdt
+init_gdt:
 	/* Preserve registers */
-	movl	%eax, %ds:OFFSET(save_eax)
-	movl	%ebx, %ds:OFFSET(save_ebx)
-
-	/* Extract real-mode far return address from stack */
-	popl	%ds:OFFSET(save_retaddr)
-
-	/* Record real-mode stack pointer */
-	movw	%sp, %ds:OFFSET(rm_sp)
-	pushw	%ss
-	popw	%ds:OFFSET(rm_ss)
-
-	/* Physical base address of librm to %ebx */
-	xorl	%ebx, %ebx
-	movw	%cs, %bx
-	shll	$4, %ebx
-
-	/* Record physical base address of librm */
-	movl	%ebx, %ds:OFFSET(librm_base)
-		
-	/* Check base address of stored protected-mode GDT.  If it's
-	 * zero, set it up to use our internal GDT (with physical
-	 * segments only).
-	 */
-	movl	%ds:OFFSET(pm_gdt_addr), %eax
-	testl	%eax, %eax
-	jnz	1f
-	/* Use internal GDT */
-	movl	%ebx, %eax
-	addl	$OFFSET(pm_gdt), %eax
-	movl	%eax, %ds:OFFSET(pm_gdt_addr)
-1:	
-	
-	/* Set up protected-mode continuation address on real-mode stack */
-	pushl	$PHYSICAL_CS
-	movl	%ebx, %eax
-	addl	$OFFSET(1f), %eax
 	pushl	%eax
+	pushw	%bx
+
+	/* Record virt_offset */
+	movl	%edi, %cs:virt_offset_rm_copy
+
+	/* Set virtual_cs and virtual_ds base */
+	movl	%edi, %eax
+	movw	$virtual_cs, %bx
+	call	set_seg_base
+
+	/* Set real_cs and real_ds base, and GDT base */
+	movw	$real_cs, %bx
+	xorl	%eax, %eax
+	movw	%cs, %ax
+	shll	$4, %eax
+	call	set_seg_base
+	addl	$gdt, %eax
+	movl	%eax, %cs:gdt_base
+
+	/* Restore registers */
+	popw	%bx
+	popl	%eax
+	ret
+
+	.section ".text16"
+	.code16
+set_seg_base:
+	pushl	%eax
+	movw	%ax, %cs:(0+2)(%bx)
+	movw	%ax, %cs:(8+2)(%bx)
+	shrl	$16, %eax
+	movb	%al, %cs:(0+4)(%bx)
+	movb	%al, %cs:(8+4)(%bx)
+	movb	%ah, %cs:(0+7)(%bx)
+	movb	%ah, %cs:(8+7)(%bx)
+	popl	%eax
+	ret
 	
-	/* Restore protected-mode GDT */
-	data32 lgdt	%ds:OFFSET(pm_gdt)
+/****************************************************************************
+ * real_to_prot (real-mode near call, 32-bit virtual return address)
+ *
+ * Switch from 16-bit real-mode to 32-bit protected mode with virtual
+ * addresses.  The real-mode %ss:sp is stored in rm_ss and rm_sp, and
+ * the protected-mode %esp is restored from the saved pm_esp.
+ * Interrupts are disabled.  All other registers may be destroyed.
+ *
+ * The return address for this function should be a 32-bit virtual
+ * address.
+ *
+ * Parameters: 
+ *   %ecx : number of bytes to move from RM stack to PM stack
+ *
+ ****************************************************************************
+ */
+	.section ".text16"
+	.code16
+real_to_prot:
+	/* Protected-mode return address => %ebx */
+	popl	%ebx
+
+	/* Real-mode %cs => %dx, %ss => %bp */
+	movw	%cs, %dx
+	movw	%ss, %bp
+
+	/* virt_offset => %edi */
+	movl	%cs:virt_offset_rm_copy, %edi
 
 	/* Switch to protected mode */
+	cli
+	data32 lgdt	%cs:gdt
 	movl	%cr0, %eax
 	orb	$CR0_PE, %al
 	movl	%eax, %cr0
-
-	/* Flush prefetch queue and reload %cs:eip */
-	data32 lret
-1:	.code32
-
-	/* Set up protected-mode stack and data segments */
-	movw	$PHYSICAL_DS, %ax
+	data32 ljmp	$VIRTUAL_CS, $1f
+	.section ".text"
+	.code32
+1:
+	/* Set up protected-mode data segments */
+	movw	$VIRTUAL_DS, %ax
 	movw	%ax, %ds
 	movw	%ax, %es
 	movw	%ax, %fs
 	movw	%ax, %gs
+
+	/* Record virt_offset */
+	movl	%edi, virt_offset
+
+	/* Move data from RM stack to PM stack and set up PM stack */
+	movzwl	%sp, %esi
+	movl	pm_esp, %esp
+	subl	%ecx, %esp
+	movl	%esp, %edi
+	rep ss movsb
 	movw	%ax, %ss
 
-	/* Switch to saved protected-mode stack.  Note that there may
-	 * not actually *be* a saved protected-mode stack.
-	 */
-	movl	OFFSET(pm_esp)(%ebx), %esp
-	testl	%esp, %esp
-	jnz	1f
-	/* No stack - use save_retaddr as a 4-byte temporary stack */
-	leal	OFFSET(save_retaddr+4)(%ebx), %esp
-1:	
-	
-	/* Convert real-mode far return address to physical address
-	 * and place on stack
-	 */
-	pushl	OFFSET(save_retaddr)(%ebx)
-	xorl	%eax, %eax
-	xchgw	2(%esp), %ax
-	shll	$4, %eax
-	addl	%eax, 0(%esp)
+	/* Record real-mode %cs and %ss:sp */
+	movw	%dx, rm_cs
+	movw	%bp, rm_ss
+	movw	%si, rm_sp
 
-	/* Restore registers and return */
-	movl	OFFSET(save_eax)(%ebx), %eax
-	movl	OFFSET(save_ebx)(%ebx), %ebx
-	ret
+	/* Return to virtual address */
+	jmp	*%ebx
 
 /****************************************************************************
- * prot_to_real (protected-mode near call, physical addresses)
+ * prot_to_real (protected-mode near call, 32-bit real-mode return address)
  *
- * Switch from 32-bit protected mode with flat physical addresses to
- * 16-bit real mode.  %ss:sp is restored from the saved rm_ss and
- * rm_sp.  %cs is set such that %cs:0000 is the start of librm.  All
- * other segment registers are set to %ss.  All other registers are
- * preserved.  Interrupts are *not* enabled, since we want to be able
- * to use this routine inside an ISR.
+ * Switch from 32-bit protected mode with virtual addresses to 16-bit
+ * real mode.  The protected-mode %esp is stored in pm_esp and the
+ * real-mode %ss:sp is restored from the saved rm_ss and rm_sp.  All
+ * real-mode data segment registers are set equal to %ss.  Interrupts
+ * are *not* enabled, since we want to be able to use prot_to_real in
+ * an ISR.  All other registers may be destroyed.
  *
- * Note that since %cs:0000 points to the start of librm on exit, it
- * follows that the code calling prot_to_real must be located within
- * 64kB of the start of librm.
+ * The return address for this function should be a 32-bit (sic)
+ * real-mode offset within .code16.
  *
- * Parameters: none
+ * Parameters: 
+ *   %ecx : number of bytes to move from PM stack to RM stack
+ *
  ****************************************************************************
  */
-
+	.section ".text"
 	.code32
-EXPORT(prot_to_real):
-	/* Calculate physical base address of librm in %ebx, preserve
-	 * original %eax and %ebx in save_eax and save_ebx
-	 */
-	pushl	%ebx
-	call	1f
-1:	popl	%ebx
-	subl	$OFFSET(1b), %ebx
-	popl	OFFSET(save_ebx)(%ebx)
-	movl	%eax, OFFSET(save_eax)(%ebx)
-
-	/* Record physical base address of librm */
-	movl	%ebx, OFFSET(librm_base)(%ebx)
-
-	/* Extract return address from the stack, convert to offset
-	 * within librm and save in save_retaddr
-	 */
-	popl	%eax
-	subl	%ebx, %eax
-	movl	%eax, OFFSET(save_retaddr)(%ebx)
-
-	/* Record protected-mode stack pointer */
-	movl	%esp, OFFSET(pm_esp)(%ebx)
-
-	/* Record protected-mode GDT */
-	sgdt	OFFSET(pm_gdt)(%ebx)
-
-	/* Set up real-mode GDT */
-	leal	OFFSET(rm_gdt)(%ebx), %eax
-	movl	%eax, OFFSET(rm_gdt_base)(%ebx)
-	movl	%ebx, %eax
-	rorl	$16, %eax
-	movw	%bx, OFFSET(rm_gdt_rm_cs+2)(%ebx)
-	movb	%al, OFFSET(rm_gdt_rm_cs+4)(%ebx)
-	movw	%bx, OFFSET(rm_gdt_rm_ds+2)(%ebx)
-	movb	%al, OFFSET(rm_gdt_rm_ds+4)(%ebx)
+prot_to_real:
+	/* Real-mode return address => %ebx */
+	popl	%ebx
 	
-	/* Switch to real-mode GDT and reload segment registers to get
-	 * 64kB limits.  Stack is invalidated by this process.
-	 */
-	lgdt	OFFSET(rm_gdt)(%ebx)
-	ljmp	$RM_CS, $1f
-1:	.code16
-	movw	$RM_DS, %ax
+	/* Real-mode %ss:sp => %ebp:edx */
+	movzwl	rm_ss, %ebp
+	movzwl	rm_sp, %edx
+	subl	%ecx, %edx
+	
+	/* Copy data from PM stack to RM stack */
+	movl	%ebp, %eax
+	shll	$4, %eax
+	leal	(%eax,%edx), %edi
+	subl	virt_offset, %edi
+	movl	%esp, %esi
+	rep movsb
+	
+	/* Record protected-mode %esp */
+	movl	%esi, pm_esp
+
+	/* Real-mode %cs => %di */
+	movw	rm_cs, %di
+
+	/* Load real-mode segment limits */
+	movw	$REAL_DS, %ax
 	movw	%ax, %ds
 	movw	%ax, %es
 	movw	%ax, %fs
 	movw	%ax, %gs
 	movw	%ax, %ss
-
-	/* Calculate real-mode code segment in %ax and store in ljmp
-	 * instruction
-	 */
-	movl	%ebx, %eax
-	shrl	$4, %eax
-	movw	%ax, OFFSET(p2r_ljmp) + 3
-
+	ljmp	$REAL_CS, $1f
+	.section ".text16"
+	.code16
+1:
+	/* Set up real-mode ljmp instruction */
+	movw	%di, %ds:(p2r_ljmp + 3)
+	
 	/* Switch to real mode */
-	movl	%cr0, %ebx
-	andb	$0!CR0_PE, %bl
-	movl	%ebx, %cr0
+	movl	%cr0, %eax
+	andb	$0!CR0_PE, %al
+	movl	%eax, %cr0
 
-	/* Intersegment jump to flush prefetch queue and reload
-	 * %cs:eip.  The segment gets filled in by the above code.  We
-	 * can't just use lret to achieve this, because we have no
-	 * stack at the moment.
-	 */
 p2r_ljmp:
-	ljmp	$0, $OFFSET(1f)
-1:	
+	ljmp	$0, $1f /* Segment is filled in by above code */
+1:
+	/* Set up real-mode stack and data segments, and stack pointer */
+	movw	%bp, %ds
+	movw	%bp, %es
+	movw	%bp, %fs
+	movw	%bp, %gs
+	movw	%bp, %ss
+	movw	%dx, %sp
 
-	/* Set %ds to point to code segment for easier data access */
-	movw	%ax, %ds
-			
-	/* Restore registers */
-	movl	OFFSET(save_eax), %eax
-	movl	OFFSET(save_ebx), %ebx
-
-	/* Set up real-mode data segments and stack */
-	movw	OFFSET(rm_ss), %ss
-	movw	OFFSET(rm_sp), %sp
-	pushw	%ss
-	pushw	%ss
-	pushw	%ss
-	pushw	%ss
-	popw	%ds
-	popw	%es
-	popw	%fs
-	popw	%gs
-
-	/* Set up return address on stack and return */
-	pushw	%cs:OFFSET(save_retaddr)
-	ret
-
+	/* Return to real-mode address */
+	jmp	*%bx
+	
 /****************************************************************************
- * prot_call (real-mode far call)
+ * prot_call (real-mode near call, 32-bit real-mode return address)
  *
  * Call a specific C function in the protected-mode code.  The
  * prototype of the C function must be
@@ -469,30 +292,12 @@ p2r_ljmp:
  * function explicitly overwrites values in ix86.  Interrupt status
  * will also be preserved.  Gate A20 will be enabled.
  *
- * The protected-mode code may install librm to a new location.  If it
- * does so, it must update librm_base in *this* copy of librm to point
- * to the new physical location.  prot_call will then return via the
- * newly installed copy.
- *
- * Note that when Etherboot performs its initial relocation, "*this*"
- * copy in the above paragraph will refer to the "master" copy, since
- * that is the initial installed copy.  Etherboot will return to
- * prot_call using a virtual address, so will return to the master
- * copy in high memory (rather than the original copy in base memory).
- * The master copy in high memory will have the physical address of
- * the newly installed copy in librm_base, since install_librm()
- * writes it there.  Thus, Etherboot's initialise() function will
- * return to the master copy of prot_call(), which will then jump to
- * the installed copy.
- *
- * It works, trust me.
- *
  * Parameters:
  *   function : virtual address of protected-mode function to call
  *
  * Example usage:
  *	pushl	$pxe_api_call
- *	lcall	$LIBRM_SEGMENT, $prot_call
+ *	call	prot_call
  *	addw	$4, %sp
  * to call in to the C function
  *      void pxe_api_call ( struct i386_all_regs *ix86 );
@@ -502,10 +307,13 @@ p2r_ljmp:
 #define PC_OFFSET_IX86 ( 0 )
 #define PC_OFFSET_RETADDR ( PC_OFFSET_IX86 + SIZEOF_I386_ALL_REGS )
 #define PC_OFFSET_FUNCTION ( PC_OFFSET_RETADDR + 4 )
-	
+#define PC_OFFSET_END ( PC_OFFSET_FUNCTION + 4 )
+
+	.section ".text16"
 	.code16
-EXPORT(prot_call):
-	/* Preserve registers and flags on RM stack */
+	.globl prot_call
+prot_call:
+	/* Preserve registers and flags on external RM stack */
 	pushfl
 	pushal
 	pushw	%gs
@@ -513,101 +321,46 @@ EXPORT(prot_call):
 	pushw	%es
 	pushw	%ds
 	pushw	%ss
-	pushw	%cs	
-	
-	/* Record RM stack pointer */
-	xorl	%ebp, %ebp
-	movw	%sp, %bp
-	
-	/* Physical address of RM stack pointer to %esi */
-	xorl	%esi, %esi
-	pushw	%ss
-	popw	%si
-	shll	$4, %esi
-	addl	%ebp, %esi
-
-	/* Address of pmode function to %ebx */
-	movl	%ss:(PC_OFFSET_FUNCTION)(%bp), %ebx
-	
-	/* Switch to protected mode */
 	pushw	%cs
-	call	real_to_prot
+
+	/* For sanity's sake, clear the direction flag as soon as possible */
+	cld
+
+	/* Switch to protected mode and move register dump to PM stack */
+	movl	$PC_OFFSET_END, %ecx
+	pushl	$1f
+	jmp	real_to_prot
+	.section ".text"
 	.code32
+1:
+	/* Set up environment expected by C code */
+	call	gateA20_set
 
-	/* Copy ix86 from RM stack to PM stack */
-	movl	$SIZEOF_I386_ALL_REGS, %ecx
-	subl	%ecx, %esp
-	movl	%esp, %edi
-	pushl	%esi
-	cld
-	rep movsb
-	popl	%edi		/* %edi = phys addr of RM copy of ix86 */
-	
-	/* Switch to virtual addresses. */
-	call	1f
-	jmp	2f
-1:	ljmp	$VIRTUAL_CS, $_phys_to_virt
-2:	
-
-	/* Enable A20 line */
-	pushal
-	lcall	$VIRTUAL_CS, $gateA20_set
-	popl	%eax	/* discard */
-	popal
-
-	/* Push &ix86 on the stack, and call function */
+	/* Call function */
 	pushl	%esp
-	call	*%ebx
+	call	*(PC_OFFSET_FUNCTION+4)(%esp)
 	popl	%eax /* discard */
 
-	/* Switch to physical addresses, discard PM register store */
-	lcall	$VIRTUAL_CS, $_virt_to_phys
-	popl	%eax /* discard */
-
-	/* Copy ix86 from PM stack to RM stack, and remove ix86
-	 * from PM stack.  (%edi still contains physical address of
-	 * ix86 on RM stack from earlier, since C code preserves
-	 * %edi).
-	 */
-	movl	%esp, %esi
-	movl	$SIZEOF_I386_ALL_REGS, %ecx
-	cld
-	rep movsb
-	movl	%esi, %esp	/* remove ix86 from PM stack */
-
-	/* Obtain physical base address of installed copy of librm in
-	 * %ebx.  (It's possible that this *isn't* the physical base
-	 * address of the copy we're currently executing in, because
-	 * the protected-mode call could have moved librm.  If it does
-	 * so, it must update librm_base in our copy to reflect the
-	 * new location.
-	 */
-	call	1f
-1:	popl	%ebp
-	movl	(librm_base-1b)(%ebp), %ebx
-	
-	/* Jump to running in installed copy of librm */
-	addl	$OFFSET(1f), %ebx
-	jmp	*%ebx
-1:	
-	
-	/* Switch to real mode */
-	call	prot_to_real
+	/* Switch to real mode and move register dump back to RM stack */
+	movl	$PC_OFFSET_END, %ecx
+	pushl	$1f
+	jmp	prot_to_real
+	.section ".text16"
 	.code16
-
-	/* Restore registers and flags, and return */
-	popw	%ax	/* skip %cs */
-	popw	%ax	/* skip %ss */
+1:	
+	/* Restore registers and flags and return */
+	popw	%ax	/* skip %cs - it is already set */
+	popw	%ax	/* skip %ss - it is already set */
 	popw	%ds
 	popw	%es
 	popw	%fs
 	popw	%gs
 	popal
 	popfl
-	lret
+	ret
 
 /****************************************************************************
- * real_call (protected-mode near call, virtual addresses)
+ * real_call (protected-mode near call, 32-bit virtual return address)
  *
  * Call a real-mode function from protected-mode code.
  *
@@ -625,80 +378,58 @@ EXPORT(prot_call):
  * and examples.
  *
  * Parameters:
- *   far pointer to real-mode function to call
+ *   (32-bit) near pointer to real-mode function to call
  *
  * Returns: none
  ****************************************************************************
  */
 
 #define RC_OFFSET_PRESERVE_REGS ( 0 )
-#define RC_OFFSET_RETADDR ( RC_OFFSET_PRESERVE_REGS + 8 )
-#define RC_OFFSET_RM_FUNCTION ( RC_OFFSET_RETADDR + 4 )
-	
+#define RC_OFFSET_RETADDR ( RC_OFFSET_PRESERVE_REGS + SIZEOF_I386_REGS )
+#define RC_OFFSET_FUNCTION ( RC_OFFSET_RETADDR + 4 )
+#define RC_OFFSET_END ( RC_OFFSET_FUNCTION + 4 )
+
+	.section ".text"
 	.code32
-EXPORT(real_call):
-	/* Preserve registers */
-	pushl	%ebp
-	pushl	%eax
-	
-	/* Switch to physical addresses */
-	lcall	$VIRTUAL_CS, $_virt_to_phys
-	addl	$4, %esp
-
-	/* Extract real-mode function address and store in ljmp instruction */
-	call	1f
-1:	popl	%ebp
-	movl	RC_OFFSET_RM_FUNCTION(%esp), %eax
-	movl	%eax, (rc_ljmp + 1 - 1b)(%ebp)
-
-	/* Restore registers */
-	popl	%eax
-	popl	%ebp
-
-	/* Switch to real mode, preserving non-segment registers */
-	call	prot_to_real
-	.code16
-
-	/* Far call to real-mode routine */
-	pushw	%cs
-	call	rc_ljmp
-	jmp	2f
-rc_ljmp:	
-	ljmp	$0, $0	/* address filled in by above code */
-2:	
-	
-	/* Switch to protected mode */
-	pushw	%cs
-	call	real_to_prot
-	.code32
-
-	/* Switch to virtual addresses */
-	call	1f
-	jmp	2f
-1:	ljmp	$VIRTUAL_CS, $_phys_to_virt
-2:	
-
-	/* Enable A20 line */
+	.globl real_call
+real_call:
+	/* Create register dump on PM stack */
 	pushal
-	lcall	$VIRTUAL_CS, $gateA20_set
-	popl	%eax	/* discard */
+
+	/* Switch to real mode and move register dump to RM stack */
+	movl	$RC_OFFSET_END, %ecx
+	pushl	$1f
+	jmp	prot_to_real
+	.section ".text16"
+	.code16
+1:
+	/* Construct call to real-mode function */
+	movw	%sp, %bp
+	movw	RC_OFFSET_FUNCTION(%bp), %ax
+	movw	%ax, %cs:rc_function
+
+	/* Call real-mode function */
 	popal
+	call	*%cs:rc_function
+	pushal
 
-	/* Return */
+	/* Switch to protected mode and move register dump back to PM stack */
+	movl	$RC_OFFSET_END, %ecx
+	pushl	$1f
+	jmp	real_to_prot
+	.section ".text"
+	.code32
+1:
+	/* Set up environment expected by C code */
+	call	gateA20_set
+
+	/* Restore registers and return */
+	popal
 	ret
-	
-/****************************************************************************
- * Relocation lock counter
- *
- * librm may be moved in base memory only when this counter is zero.
- * The counter gets incremented whenever a reference to librm is
- * generated (e.g. a real_call is made, resulting in a return address
- * pointing to librm being placed on the stack), and decremented when
- * the reference goes out of scope (e.g. the real_call returns).
- ****************************************************************************
- */
-EXPORT(librm_ref_count):	.byte 0
 
+	.section ".text16"
+rc_function:	.word 0
+	
 /****************************************************************************
  * Stored real-mode and protected-mode stack pointers
  *
@@ -734,25 +465,18 @@ EXPORT(librm_ref_count):	.byte 0
  ****************************************************************************
  */
 
-EXPORT(rm_stack):	/* comprises rm_ss and rm_sp */
-rm_sp:		.word 0
-rm_ss:		.word 0
+	.section ".data"
+	.globl rm_sp
+rm_sp:	.word 0
+	.globl rm_ss
+rm_ss:	.word 0
+	.globl rm_cs
+rm_cs:	.word 0
+	.globl pm_esp
+pm_esp:	.long _estack
 
-EXPORT(pm_stack):
-pm_esp:		.long 0
-
-/****************************************************************************
- * Temporary variables
- ****************************************************************************
- */
-save_eax:	.long 0
-save_ebx:	.long 0
-save_retaddr:	.long 0
-	
-/****************************************************************************
- * End of librm
- ****************************************************************************
- */
-_librm_end:
-	.globl _librm_size
-	.equ _librm_size, _librm_end - _librm_start
+	.section ".text16"
+virt_offset_rm_copy:	.long 0
+	.section ".data"
+	.globl virt_offset
+virt_offset:		.long 0	

@@ -18,7 +18,7 @@
 typedef struct {
 	uint16_t offset;
 	uint16_t segment;
-} segoff_t PACKED;
+} __attribute__ (( packed )) segoff_t;
 
 /* Macro hackery needed to stringify bits of inline assembly */
 #define RM_XSTR(x) #x

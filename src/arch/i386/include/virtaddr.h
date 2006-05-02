@@ -5,12 +5,17 @@
  *
  * Don't change these unless you really know what you're doing.
  */
-#define PHYSICAL_CS 0x08
-#define PHYSICAL_DS 0x10
-#define VIRTUAL_CS 0x18
-#define VIRTUAL_DS 0x20
-#define LONG_CS 0x28
-#define LONG_DS 0x30
+
+#define VIRTUAL_CS 0x08
+#define VIRTUAL_DS 0x10
+#define PHYSICAL_CS 0x18
+#define PHYSICAL_DS 0x20
+#define REAL_CS 0x28
+#define REAL_DS 0x30
+#if 0
+#define LONG_CS 0x38
+#define LONG_DS 0x40
+#endif
 
 #ifndef ASSEMBLY
 

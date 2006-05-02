@@ -15,63 +15,15 @@
  *
  */
 
-/* Real-mode call parameter block, as passed to real_call */
-struct real_call_params {
-	struct i386_seg_regs segs;
-	struct i386_regs regs;
-	segoff_t rm_code;
-	segoff_t reserved;
-} PACKED;
-
-/* Current location of librm in base memory */
-extern char *installed_librm;
-
-/* Start and size of our source copy of librm (i.e. the one that we
- * can install by copying it to base memory and setting
- * installed_librm)
- */
-extern char librm[];
-extern size_t _librm_size[];
-
-/* Linker symbols for offsets within librm.  Other symbols should
- * almost certainly not be referred to from C code.
- */
-extern void (*_real_to_prot[]) ( void );
-extern void (*_prot_to_real[]) ( void );
-extern void (*_prot_call[]) ( void );
-extern void (*_real_call[]) ( void );
-extern uint32_t _librm_base[];
-extern segoff_t _rm_stack[];
-extern uint32_t _pm_stack[];
-extern char _librm_ref_count[];
-
-/* Symbols within current installation of librm */
-#define LIBRM_VAR( sym ) \
-	( * ( ( typeof ( * _ ## sym ) * ) \
-	      & ( installed_librm [ (int) _ ## sym ] ) ) )
-#define LIBRM_FN( sym ) \
-	 ( ( typeof ( * _ ## sym ) ) \
-	      & ( installed_librm [ (int) _ ## sym ] ) )
-#define LIBRM_CONSTANT( sym ) \
-	( ( typeof ( * _ ## sym ) ) ( _ ## sym ) )
-#define inst_real_to_prot	LIBRM_FN ( real_to_prot )
-#define inst_prot_to_real	LIBRM_FN ( prot_to_real )
-#define inst_prot_call		LIBRM_FN ( prot_call )
-#define inst_real_call		LIBRM_FN ( real_call )
-#define inst_librm_base		LIBRM_VAR ( librm_base )
-#define inst_rm_stack		LIBRM_VAR ( rm_stack )
-#define inst_pm_stack		LIBRM_VAR ( pm_stack )
-#define inst_librm_ref_count	LIBRM_VAR ( librm_ref_count )
-#define librm_size		LIBRM_CONSTANT ( librm_size )
-
-/* Symbols within local (uninstalled) copy of librm */
-extern uint32_t librm_base;
+/* Variables in librm.S, present in the normal data segment */
+extern uint16_t rm_sp;
+extern uint16_t rm_ss;
+extern uint16_t rm_cs;
+extern uint32_t pm_esp;
 
 /* Functions that librm expects to be able to link to.  Included here
  * so that the compiler will catch prototype mismatches.
  */
-extern void _phys_to_virt ( void );
-extern void _virt_to_phys ( void );
 extern void gateA20_set ( void );
 
 /*
@@ -132,7 +84,7 @@ extern void remove_from_rm_stack ( void *data, size_t size );
 		".arch i386\n\t"					\
 		#name ":\n\t"						\
 		asm_code_str "\n\t"					\
-		"lret\n\t"						\
+		"ret\n\t"						\
 		#name "_end:\n\t"					\
 		".equ " #name "_size, " #name "_end - " #name "\n\t"	\
 		".code32\n\t"						\
@@ -143,26 +95,19 @@ extern void remove_from_rm_stack ( void *data, size_t size );
 
 /* REAL_CALL: call a real-mode routine via librm */
 #define OUT_CONSTRAINTS(...) __VA_ARGS__
-#define IN_CONSTRAINTS(...) "m" ( __routine ), ## __VA_ARGS__
+#define IN_CONSTRAINTS(...) __VA_ARGS__
 #define CLOBBER(...) __VA_ARGS__
-#define REAL_CALL( routine, num_out_constraints, out_constraints,	     \
-		   in_constraints, clobber )				     \
-	do {								     \
-		segoff_t __routine = routine;				     \
-		__asm__ __volatile__ (					     \
-				      "pushl %" #num_out_constraints "\n\t"  \
-				      "call 1f\n\t"			     \
-				      "jmp 2f\n\t"			     \
-				      "\n1:\n\t"			     \
-				      "pushl installed_librm\n\t"	     \
-				      "addl $_real_call, 0(%%esp)\n\t"	     \
-				      "ret\n\t"				     \
-				      "\n2:\n\t"			     \
-				      "addl $4, %%esp\n\t"		     \
-				      : out_constraints			     \
-				      : in_constraints			     \
-				      : clobber				     \
-				      );				     \
+#define REAL_CALL( routine, num_out_constraints, out_constraints,	\
+		   in_constraints, clobber )				\
+	do {								\
+		__asm__ __volatile__ (					\
+				      "pushl $" #routine "\n\t"		\
+				      "call real_call\n\t"		\
+				      "addl $4, %%esp\n\t"		\
+				      : out_constraints			\
+				      : in_constraints			\
+				      : clobber				\
+				      );				\
 	} while ( 0 )
 
 /* REAL_EXEC: combine RM_FRAGMENT and REAL_CALL into one handy unit */
@@ -170,20 +115,12 @@ extern void remove_from_rm_stack ( void *data, size_t size );
 #define REAL_EXEC( name, asm_code_str, num_out_constraints, out_constraints, \
 		   in_constraints, clobber )				     \
 	do {								     \
-		segoff_t fragment;					     \
-									     \
 		REAL_FRAGMENT ( name, asm_code_str );			     \
 									     \
-		fragment.segment = inst_rm_stack.segment;		     \
-		fragment.offset =					     \
-			copy_to_rm_stack ( name, FRAGMENT_SIZE ( name ) );   \
-									     \
-		REAL_CALL ( fragment, num_out_constraints,		     \
+		REAL_CALL ( name, num_out_constraints,			     \
 			    PASSTHRU ( out_constraints ),		     \
 			    PASSTHRU ( in_constraints ),		     \
 			    PASSTHRU ( clobber ) );			     \
-									     \
-		remove_from_rm_stack ( NULL, FRAGMENT_SIZE ( name ) );	     \
 	} while ( 0 )
 
 #endif /* ASSEMBLY */

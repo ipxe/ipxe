@@ -15,14 +15,12 @@ SECTIONS {
      * addresses, but may have individual link addresses depending on
      * the memory model being used.
      *
-     * The linker symbols {prefix,decompress,text,data}_link_addr,
-     * load_addr, and _max_align may be specified explicitly.  If not
-     * specified, they will default to:
+     * The linker symbols {prefix,text}_link_addr, load_addr, and
+     * _max_align may be specified explicitly.  If not specified, they
+     * will default to:
      *
      *   _prefix_link_addr	= 0
-     *   _decompress_link_addr	= 0
      *   _text_link_addr	= 0
-     *   _data_link_addr	= _text_link_addr + sizeof ( text sections )
      *   _load_addr		= 0
      *   _max_align		= 16
      * 
@@ -39,24 +37,6 @@ SECTIONS {
      * >16-byte alignment of physical addresses when -DKEEP_IT_REAL is
      * used (though virtual addresses will still be fully aligned).
      *
-     * The real-mode prefixes rely on _text_link_addr and
-     * _decompress_link_addr being 0, since they issue far calls into
-     * those sections, thus requiring that symbol_value ==
-     * symbol_offset therein.  Using the linker to calculate
-     * e.g. offset_setup16=setup16-_text will not work, since you then
-     * cannot use the reference from the prefix to setup16 to drag in
-     * setup16.o.  Life is hard.
-     *
-     * If librm is included, then it must go at offset 0 within the
-     * text section.  This is because librm is dual-usage: it is
-     * called from setup16 with %cs:0000 pointing to the start of the
-     * text section, and later it will be copied to base memory and
-     * called with %cs:0000 pointing to the start of librm.
-     *
-     * The decompressor is designed to decompress in-place.  After
-     * calling the decompressor, the image will look exactly the same
-     * as the uncompressed image; the compressed data and the
-     * decompressor code itself will have been overwritten.
      */
 
     /*
@@ -72,47 +52,65 @@ SECTIONS {
 	_entry = .;
 	*(.prefix)
 	*(.prefix.*)
+	_eprefix_progbits = .;
     }
     
     _eprefix = .;
 
     /*
-     * The decompressor (may be absent)
+     * The 16-bit sections, if present
      */
 
-    _decompress_link_addr = DEFINED ( _decompress_link_addr ) ?
-			      _decompress_link_addr : 0;
-    . = _decompress_link_addr;
-    _decompress = .;
+    _text16_link_addr = 0;
+    . = _text16_link_addr;
+    _text16 = .;
 
-    .decompress : AT ( _decompress_load_offset + __decompress ) {
-	    __decompress = .;
-	    *(.decompress)
-	    *(.decompress.*)
+    .text16 : AT ( _text16_load_offset + __text16 ) {
+	__text16 = .;
+	*(.text16)
+	*(.text16.*)
+	_etext16_progbits = .;
+    } = 0x9090
+
+    _etext16 = .;
+
+    _data16_link_addr = 0;
+    . = _data16_link_addr;
+    _data16 = .;
+
+    .rodata16 : AT ( _data16_load_offset + __rodata16 ) {
+	__rodata16 = .;
+	*(.rodata16)
+	*(.rodata16.*)
+    }
+    .data16 : AT ( _data16_load_offset + __data16 ) {
+	__data16 = .;
+	*(.data16)
+	*(.data16.*)
+	_edata16_progbits = .;
+    }
+    .bss16 : AT ( _data16_load_offset + __bss16 ) {
+	__bss16 = .;
+	_bss16 = .;
+	*(.bss16)
+	*(.bss16.*)
+	_ebss16 = .;
+    }
+    .stack16 : AT ( _data16_load_offset + __stack16 ) {
+	__stack16 = .;
+	*(.stack16)
+	*(.stack16.*)
     }
 
-    _edecompress = .;
+    _edata16 = .;
 
     /*
-     * The text sections
+     * The 32-bit sections
      */
 
     _text_link_addr = DEFINED ( _text_link_addr ) ? _text_link_addr : 0;
     . = _text_link_addr;
     _text = .;
-
-    .text16 : AT ( _text_load_offset + __text16 ) {
-	__text16 = .;
-
-	/* librm is a special case; it must go at the start of the
-	 * text section if it is included.
-	 */
-	_assert = ASSERT ( ( . == _text_link_addr ), "librm cannot go first" );
-	*(.librm)
-
-	*(.text16)
-	*(.text16.*)
-    } = 0x9090
 
     .text : AT ( _text_load_offset + __text ) {
 	__text = .;
@@ -122,29 +120,21 @@ SECTIONS {
 
     _etext = .;
 
-    /*
-     * The data sections
-     */
-
-    _data_link_addr = DEFINED ( _data_link_addr ) ? _data_link_addr : .;
-    . = _data_link_addr;
     _data = .;
 
-    .rodata : AT ( _data_load_offset + __rodata ) {
+    .rodata : AT ( _text_load_offset + __rodata ) {
 	__rodata = .;
 	*(.rodata)
 	*(.rodata.*)
     }
-
-    .data : AT ( _data_load_offset + __data ) {
+    .data : AT ( _text_load_offset + __data ) {
 	__data = .;
 	*(.data)
 	*(.data.*)
 	*(SORT(.tbl.*))		/* Various tables.  See include/tables.h */
-	_progbits_end = .;
+	_etext_progbits = .;
     }
-
-    .bss : AT ( _data_load_offset + __bss ) {
+    .bss : AT ( _text_load_offset + __bss ) {
 	__bss = .;
 	_bss = .;
 	*(.bss)
@@ -152,8 +142,7 @@ SECTIONS {
 	*(COMMON)
 	_ebss = .;
     }
-
-    .stack : AT ( _data_load_offset + __stack ) {
+    .stack : AT ( _text_load_offset + __stack ) {
 	__stack = .;
 	*(.stack)
 	*(.stack.*)
@@ -188,25 +177,33 @@ SECTIONS {
     _prefix_load_offset	    = ALIGN ( _max_align );
     _prefix_load_addr	    = _prefix_link_addr + _prefix_load_offset;
     _prefix_size	    = _eprefix - _prefix;
-    .			    = _prefix_load_addr + _prefix_size;
+    _prefix_progbits_size   = _eprefix_progbits - _prefix;
+    .			    = _prefix_load_addr + _prefix_progbits_size;
 
-    .			   -= _decompress_link_addr;
-    _decompress_load_offset = ALIGN ( _max_align );
-    _decompress_load_addr   = _decompress_link_addr + _decompress_load_offset;
-    _decompress_size	    = _edecompress - _decompress;
-    .			    = _decompress_load_addr + _decompress_size;
+    .			   -= _text16_link_addr;
+    _text16_load_offset	    = ALIGN ( _max_align );
+    _text16_load_addr	    = _text16_link_addr + _text16_load_offset;
+    _text16_size	    = _etext16 - _text16;
+    _text16_progbits_size   = _etext16_progbits - _text16;
+    .			    = _text16_load_addr + _text16_progbits_size;
+
+    .			   -= _data16_link_addr;
+    _data16_load_offset	    = ALIGN ( _max_align );
+    _data16_load_addr	    = _data16_link_addr + _data16_load_offset;
+    _data16_size	    = _edata16 - _data16;
+    _data16_progbits_size   = _edata16_progbits - _data16;
+    .			    = _data16_load_addr + _data16_progbits_size;
 
     .			   -= _text_link_addr;
     _text_load_offset	    = ALIGN ( _max_align );
     _text_load_addr	    = _text_link_addr + _text_load_offset;
     _text_size		    = _etext - _text;
-    .			    = _text_load_addr + _text_size;
+    _text_progbits_size	    = _etext_progbits - _text;
+    .			    = _text_load_addr + _text_progbits_size;
 
-    .			   -= _data_link_addr;
-    _data_load_offset	    = ALIGN ( _max_align );
-    _data_load_addr	    = _data_link_addr + _data_load_offset;
-    _data_size		    = _edata - _data;
-    .			    = _data_load_addr + _data_size;
+    .			    = ALIGN ( _max_align );
+
+    _load_size		    = . - _load_addr;
 
     /*
      * Alignment checks.  ALIGN() can only operate on the location
@@ -218,34 +215,20 @@ SECTIONS {
     _assert = ASSERT ( ( . == ALIGN ( _max_align ) ),
 		       "_prefix is badly aligned" );
 
-    . = _decompress_load_addr - _prefix_link_addr;
+    . = _text16_load_addr - _text16_link_addr;
     _assert = ASSERT ( ( . == ALIGN ( _max_align ) ),
-		       "_decompress is badly aligned" );
+		       "_text16 is badly aligned" );
+
+    . = _data16_load_addr - _data16_link_addr;
+    _assert = ASSERT ( ( . == ALIGN ( _max_align ) ),
+		       "_data16 is badly aligned" );
 
     . = _text_load_addr - _text_link_addr;
     _assert = ASSERT ( ( . == ALIGN ( _max_align ) ),
 		       "_text is badly aligned" );
 
-    . = _data_load_addr - _data_link_addr;
-    _assert = ASSERT ( ( . == ALIGN ( _max_align ) ),
-		       "_data is badly aligned" );
-
     /*
-     * setup16 needs to know this when KEEP_IT_REAL is used.  There
-     * are no harmful side-effects of calculating it all the time.
+     * Values calculated to save code from doing it
      */
-    _text_load_size_pgh = ( _data_load_addr - _text_load_addr ) / 16 ;
-
-    /*
-     * Useful-to-know values.
-     */
-
-    /* Size of the decompressed runtime image */
-    _runtime_size = _edata - _text;
-    /* Size of the initialised-contents portion of the runtime image */
-    _runtime_progbits_size = _progbits_end - _text;
-    /* Size of the (non-compressed) binary file */
-    _file_size = _prefix_size + _runtime_progbits_size;
-    /* Size of the non-compressed portion of the compressed binary file */
-    _zfile_noncompressed_size = _prefix_size + _decompress_size;
+    _load_size_pgh	= ( _load_size / 16 );
 }

@@ -1,30 +1,11 @@
-#include "virtaddr.h"
-#include "memsizes.h"
-#include "osdep.h"
-#include "etherboot.h"
-#include <gpxe/init.h>
-#include "relocate.h"
-
-#ifndef KEEP_IT_REAL
-
-/* by Eric Biederman */
-
-/* On some platforms etherboot is compiled as a shared library, and we use
- * the ELF pic support to make it relocateable.  This works very nicely
- * for code, but since no one has implemented PIC data yet pointer
- * values in variables are a a problem.  Global variables are a
- * pain but the return addresses on the stack are the worst.  On these
- * platforms relocate_to will restart etherboot, to ensure the stack
- * is reinitialize and hopefully get the global variables
- * appropriately reinitialized as well.
- * 
- */
+#include <virtaddr.h>
+#include <registers.h>
+#include <memsizes.h>
 
 /*
- * relocate() must be called without any hardware resources pointing
- * at the current copy of Etherboot.  The easiest way to achieve this
- * is to call relocate() from within arch_initialise(), before the NIC
- * gets touched in any way.
+ * Originally by Eric Biederman
+ *
+ * Heavily modified by Michael Brown 
  *
  */
 
@@ -40,14 +21,27 @@ extern char _max_align[];
 extern char _text[];
 extern char _end[];
 
-/* Post-relocation function table */
-static struct post_reloc_fn post_reloc_fns[0] __table_start(post_reloc_fn);
-static struct post_reloc_fn post_reloc_fns_end[0] __table_end(post_reloc_fn);
+/* within 1MB of 4GB is too close. 
+ * MAX_ADDR is the maximum address we can easily do DMA to.
+ *
+ * Not sure where this constraint comes from, but kept it from Eric's
+ * old code - mcb30
+ */
+#define MAX_ADDR (0xfff00000UL)
 
-static void relocate ( void ) {
+/**
+ * Relocate Etherboot
+ *
+ * @v ix86		x86 register dump from prefix
+ * @ret ix86		x86 registers to return to prefix
+ *
+ * This copies Etherboot to a suitable location near the top of 32-bit
+ * address space, and returns the physical address of the new location
+ * to the prefix in %edi.
+ */
+void relocate ( struct i386_all_regs *ix86 ) {
 	unsigned long addr, eaddr, size;
 	unsigned i;
-	struct post_reloc_fn *post_reloc_fn;
 
 	/* Walk through the memory map and find the highest address
 	 * below 4GB that etherboot will fit into.  Ensure etherboot
@@ -183,25 +177,9 @@ static void relocate ( void ) {
 		      virt_to_phys ( _text ), virt_to_phys ( _end ),
 		      addr, addr + _end - _text );
 
-		relocate_to ( addr );
-		/* Note that we cannot make real-mode calls
-		 * (e.g. printf) at this point, because librm has just
-		 * been moved to high memory.
-		 */
-
-		/* Call any registered post-relocation functions.
-		 * librm has a post-relocation function to install a
-		 * new librm into base memory.
-		 */
-		for ( post_reloc_fn = post_reloc_fns;
-		      post_reloc_fn < post_reloc_fns_end ; post_reloc_fn++ ) {
-			if ( post_reloc_fn->post_reloc )
-				post_reloc_fn->post_reloc ();
-		}
-		
+		memcpy ( phys_to_virt ( addr ), _text, _end - _text );
 	}
+	
+	/* Let prefix know where the new copy is */
+	ix86->regs.edi = addr;
 }
-
-INIT_FN ( INIT_RELOCATE, relocate, NULL, NULL );
-
-#endif /* ! KEEP_IT_REAL */

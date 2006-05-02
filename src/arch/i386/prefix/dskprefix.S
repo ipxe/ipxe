@@ -3,7 +3,8 @@
  *
  * SYS_SIZE is the number of clicks (16 bytes) to be loaded.
  */
-.equ	SYSSIZE, 8192	# 8192 * 16 bytes = 128kB maximum size of .ROM file
+.globl	SYSSIZE
+.equ	SYSSIZE, _load_size_pgh
 
 /*	floppyload.S Copyright (C) 1991, 1992 Linus Torvalds
  *	modified by Drew Eckhardt
@@ -143,36 +144,8 @@ got_sectors:
 	 * start of loaded image.
 	 */
 
-start_runtime:
-
-#ifdef	COMPRESS
-	/* Decompress runtime image.  %es:0000 points to decompressed
-	 * image on exit.
-	 */
-	lcall	$SYSSEG, $decompress16
-#endif
-	
-	/* Set up internal environment.  Address of entry-point
-	 * function is returned in %es:di.
-	 */
-	pushw	%es		/* setup16 says %ds:0000 must point to image */
-	popw	%ds
-	movw	$setup16, %di
-	pushw	%cs
-	call	ljmp_to_es_di
-
-	/* Call to arch_main.  Register INT19 as an exit path.  This
-	 * call will never return.
-	 */
-	movl	$exit_via_int19, %eax
-	pushl	$arch_main
-	pushl	%eax		/* Dummy return address */
-
-	/* Do the equivalent of ljmp *%es:di */
-ljmp_to_es_di:	
-	pushw	%es
-	pushw	%di
-	lret
+	/* Jump to loaded copy */
+	ljmp	$SYSSEG, $start_runtime
 
 /* This routine loads the system at address SYSSEG<<4, making sure no 64kB
  * boundaries are crossed. We try to load it as fast as possible, loading whole
@@ -181,7 +154,7 @@ ljmp_to_es_di:
  * in:	es - starting address segment (normally SYSSEG)
  */
 read_it: 
-	movw	$1,sread		/* don't reload the prefix */
+	movw	$0,sread		/* load whole image including prefix */
 	movw	%es,%ax
 	testw	$0x0fff, %ax
 die:	jne	die			/* es must be at 64kB boundary */
@@ -373,4 +346,30 @@ msg1end:
 
 	.org 510, 0
 	.word 0xAA55
+
+start_runtime:
+	/* Install .text16 and .data16 to top of base memory */
+	call	alloc_basemem
+	call	install_basemem
+
+	/* Install .text and .data to 2MB mark */
+	movl	$(2<<20), %edi
+	call	install_highmem
+
+	/* Jump to .text16 segment */
+	pushw	%ax
+	pushw	$1f
+	lret
+	.section ".text16", "awx", @progbits
+1:
+	call	init_gdt
+	pushl	$initialise
+	data32 call	prot_call
+	popl	%eax /* discard */
+	pushl	$main
+	data32 call	prot_call
+	popl	%eax /* discard */
+
+	/* Boot next device */
+	int $0x18
 
