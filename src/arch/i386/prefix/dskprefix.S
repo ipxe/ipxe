@@ -356,9 +356,6 @@ start_runtime:
 	lret
 	.section ".text16", "awx", @progbits
 1:
-	pushl	$initialise
-	data32 call	prot_call
-	popl	%eax /* discard */
 	pushl	$main
 	data32 call	prot_call
 	popl	%eax /* discard */

@@ -141,21 +141,6 @@ static int exit_status;
 static int initialized;
 
 
-/**************************************************************************
- * initialise() - perform any C-level initialisation
- *
- * This does not include initialising the NIC, but it does include
- * e.g. getting the memory map, relocating to high memory,
- * initialising the console, etc.
- **************************************************************************
- */
-void initialise ( void ) {
-	/* Zero the BSS */
-	memset ( _bss, 0, _ebss - _bss );
-
-	/* Call all registered initialisation functions */
-	call_init_fns ();
-}
 
 /**************************************************************************
 MAIN - Kick off routine
@@ -164,6 +149,9 @@ int main ( void ) {
 	struct image *image;
 	void *image_context;
 	int skip = 0;
+
+	/* Call all registered initialisation functions */
+	call_init_fns ();
 
 	/* Print out configuration */
 	print_config();
