@@ -24,7 +24,7 @@
 /****************************************************************************
  * Global descriptor table
  *
- * Call init_gdt to set up the GDT before attempting to use any
+ * Call init_librm to set up the GDT before attempting to use any
  * protected-mode code.
  *
  * Define FLATTEN_REAL_MODE if you want to use so-called "flat real
@@ -45,7 +45,7 @@
 #else
 #define RM_LIMIT_16_19__AVL__SIZE__GRANULARITY 0x00
 #endif
-	.section ".text16"
+	.section ".data16", "aw", @progbits
 	.align 16
 gdt:
 gdt_limit:		.word gdt_length - 1
@@ -86,56 +86,71 @@ gdt_end:
 	.equ	gdt_length, gdt_end - gdt
 
 /****************************************************************************
- * init_gdt (real-mode near call, 16-bit real-mode return address)
+ * init_librm (real-mode near call, 16-bit real-mode return address)
  *
  * Initialise the GDT ready for transitions to protected mode.
  *
- * Parameters: 
- *   %edi : Physical base of protected-mode code
+ * Parameters:
+ *   %cs : .text16 segment
+ *   %ds : .data16 segment
+ *   %edi : Physical base of protected-mode code (virt_offset)
  ****************************************************************************
  */
 	.section ".text16"
 	.code16
-	.globl init_gdt
-init_gdt:
+	.globl init_librm
+init_librm:
 	/* Preserve registers */
 	pushl	%eax
-	pushw	%bx
+	pushl	%ebx
 
-	/* Record virt_offset */
-	movl	%edi, %cs:virt_offset_rm_copy
-
-	/* Set virtual_cs and virtual_ds base */
+	/* Store _virt_offset and set up virtual_cs and virtual_ds segments */
 	movl	%edi, %eax
 	movw	$virtual_cs, %bx
 	call	set_seg_base
+	movw	$virtual_ds, %bx
+	call	set_seg_base	
+	movl	%edi, _virt_offset
 
-	/* Set real_cs and real_ds base, and GDT base */
-	movw	$real_cs, %bx
+	/* Negate virt_offset */
+	negl	%edi
+		
+	/* Store rm_cs and _text16, set up real_cs segment */
 	xorl	%eax, %eax
 	movw	%cs, %ax
+	movw	%ax, rm_cs
 	shll	$4, %eax
+	movw	$real_cs, %bx
 	call	set_seg_base
-	addl	$gdt, %eax
-	movl	%eax, %cs:gdt_base
+	leal	(%eax, %edi), %ebx
+	movl	%ebx, _text16
 
+	/* Store rm_ds and _data16, set up real_ds segment and set GDT base */
+	xorl	%eax, %eax
+	movw	%ds, %ax
+	movw	%ax, %cs:rm_ds
+	shll	$4, %eax
+	movw	$real_ds, %bx
+	call	set_seg_base
+	leal	(%eax, %edi), %ebx
+	movl	%ebx, _data16
+	addl	$gdt, %eax
+	movl	%eax, gdt_base
+		
 	/* Restore registers */
-	popw	%bx
+	negl	%edi
+	popl	%ebx
 	popl	%eax
 	ret
 
 	.section ".text16"
 	.code16
 set_seg_base:
-	pushl	%eax
-	movw	%ax, %cs:(0+2)(%bx)
-	movw	%ax, %cs:(8+2)(%bx)
-	shrl	$16, %eax
-	movb	%al, %cs:(0+4)(%bx)
-	movb	%al, %cs:(8+4)(%bx)
-	movb	%ah, %cs:(0+7)(%bx)
-	movb	%ah, %cs:(8+7)(%bx)
-	popl	%eax
+1:	movw	%ax, 2(%bx)
+	rorl	$16, %eax
+	movb	%al, 4(%bx)
+	movb	%ah, 7(%bx)
+	roll	$16, %eax
 	ret
 	
 /****************************************************************************
@@ -157,19 +172,25 @@ set_seg_base:
 	.section ".text16"
 	.code16
 real_to_prot:
-	/* Protected-mode return address => %ebx */
-	popl	%ebx
-
-	/* Real-mode %cs => %dx, %ss => %bp */
-	movw	%cs, %dx
+	/* Make sure we have our data segment available */
+	movw	%cs:rm_ds, %ax
+	movw	%ax, %ds
+	
+	/* Add _virt_offset, _text16 and _data16 to stack to be
+	 * copied, and also copy the return address.
+	 */
+	pushl	_virt_offset
+	pushl	_text16
+	pushl	_data16
+	addw	$16, %cx /* %ecx must be less than 64kB anyway */
+	
+	/* Real-mode %ss:%sp => %bp:%esi */
 	movw	%ss, %bp
-
-	/* virt_offset => %edi */
-	movl	%cs:virt_offset_rm_copy, %edi
+	movzwl	%sp, %esi
 
 	/* Switch to protected mode */
 	cli
-	data32 lgdt	%cs:gdt
+	data32 lgdt	gdt
 	movl	%cr0, %eax
 	orb	$CR0_PE, %al
 	movl	%eax, %cr0
@@ -184,24 +205,24 @@ real_to_prot:
 	movw	%ax, %fs
 	movw	%ax, %gs
 
-	/* Record virt_offset */
-	movl	%edi, virt_offset
-
 	/* Move data from RM stack to PM stack and set up PM stack */
-	movzwl	%sp, %esi
 	movl	pm_esp, %esp
 	subl	%ecx, %esp
 	movl	%esp, %edi
 	rep ss movsb
 	movw	%ax, %ss
 
-	/* Record real-mode %cs and %ss:sp */
-	movw	%dx, rm_cs
+	/* Record real-mode %ss:sp (after removal of data) */
 	movw	%bp, rm_ss
 	movw	%si, rm_sp
 
+	/* Publish virt_offset, text16 and data16 for PM code to use */
+	popl	data16
+	popl	text16
+	popl	virt_offset
+
 	/* Return to virtual address */
-	jmp	*%ebx
+	ret
 
 /****************************************************************************
  * prot_to_real (protected-mode near call, 32-bit real-mode return address)
@@ -209,9 +230,9 @@ real_to_prot:
  * Switch from 32-bit protected mode with virtual addresses to 16-bit
  * real mode.  The protected-mode %esp is stored in pm_esp and the
  * real-mode %ss:sp is restored from the saved rm_ss and rm_sp.  All
- * real-mode data segment registers are set equal to %ss.  Interrupts
- * are *not* enabled, since we want to be able to use prot_to_real in
- * an ISR.  All other registers may be destroyed.
+ * real-mode data segment registers are loaded from the saved rm_ds.
+ * Interrupts are *not* enabled, since we want to be able to use
+ * prot_to_real in an ISR.  All other registers may be destroyed.
  *
  * The return address for this function should be a 32-bit (sic)
  * real-mode offset within .code16.
@@ -224,15 +245,15 @@ real_to_prot:
 	.section ".text"
 	.code32
 prot_to_real:
-	/* Real-mode return address => %ebx */
-	popl	%ebx
+	/* Add return address to data to be moved to RM stack */
+	addl	$4, %ecx
 	
 	/* Real-mode %ss:sp => %ebp:edx */
 	movzwl	rm_ss, %ebp
 	movzwl	rm_sp, %edx
 	subl	%ecx, %edx
 	
-	/* Copy data from PM stack to RM stack */
+	/* Move data from PM stack to RM stack */
 	movl	%ebp, %eax
 	shll	$4, %eax
 	leal	(%eax,%edx), %edi
@@ -240,11 +261,8 @@ prot_to_real:
 	movl	%esp, %esi
 	rep movsb
 	
-	/* Record protected-mode %esp */
+	/* Record protected-mode %esp (after removal of data) */
 	movl	%esi, pm_esp
-
-	/* Real-mode %cs => %di */
-	movw	rm_cs, %di
 
 	/* Load real-mode segment limits */
 	movw	$REAL_DS, %ax
@@ -257,27 +275,40 @@ prot_to_real:
 	.section ".text16"
 	.code16
 1:
-	/* Set up real-mode ljmp instruction */
-	movw	%di, %ds:(p2r_ljmp + 3)
-	
 	/* Switch to real mode */
 	movl	%cr0, %eax
 	andb	$0!CR0_PE, %al
 	movl	%eax, %cr0
+	ljmp	*p2r_jump_vector
+p2r_jump_target:
 
-p2r_ljmp:
-	ljmp	$0, $1f /* Segment is filled in by above code */
-1:
-	/* Set up real-mode stack and data segments, and stack pointer */
-	movw	%bp, %ds
-	movw	%bp, %es
-	movw	%bp, %fs
-	movw	%bp, %gs
+	/* Set up real-mode stack */
 	movw	%bp, %ss
 	movw	%dx, %sp
+	
+	/* Set up real-mode data segments */
+	movw	%cs:rm_ds, %ax
+	movw	%ax, %ds
+	movw	%ax, %es
+	movw	%ax, %fs
+	movw	%ax, %gs
 
 	/* Return to real-mode address */
-	jmp	*%bx
+	data32 ret
+
+
+	/* Real-mode code and data segments.  Assigned by the call to
+	 * init_librm.  rm_cs doubles as the segment part of the jump
+	 * vector used by prot_to_real.  rm_ds is located in .text16
+	 * rather than .data16 because code needs to be able to locate
+	 * the data segment.
+	 */
+	.section ".data16"
+p2r_jump_vector:
+	.word	p2r_jump_target
+rm_cs:	.word 0
+	.section ".text16"
+rm_ds:	.word 0
 	
 /****************************************************************************
  * prot_call (real-mode near call, 32-bit real-mode return address)
@@ -406,11 +437,12 @@ real_call:
 	/* Construct call to real-mode function */
 	movw	%sp, %bp
 	movw	RC_OFFSET_FUNCTION(%bp), %ax
-	movw	%ax, %cs:rc_function
+	movw	%ax, rc_function
 
 	/* Call real-mode function */
 	popal
-	call	*%cs:rc_function
+	call	*RC_OFFSET_FUNCTION(%esp)
+	call	*rc_function
 	pushal
 
 	/* Switch to protected mode and move register dump back to PM stack */
@@ -427,7 +459,9 @@ real_call:
 	popal
 	ret
 
-	.section ".text16"
+
+	/* Function vector, used because */
+	.section ".data16"
 rc_function:	.word 0
 	
 /****************************************************************************
@@ -464,19 +498,33 @@ rc_function:	.word 0
  * to us.
  ****************************************************************************
  */
-
 	.section ".data"
 	.globl rm_sp
 rm_sp:	.word 0
 	.globl rm_ss
 rm_ss:	.word 0
-	.globl rm_cs
-rm_cs:	.word 0
 	.globl pm_esp
 pm_esp:	.long _estack
 
-	.section ".text16"
-virt_offset_rm_copy:	.long 0
+/****************************************************************************
+ * Virtual address offsets
+ *
+ * These are used by the protected-mode code to map between virtual
+ * and physical addresses, and to access variables in the .text16 or
+ * .data16 segments.
+ ****************************************************************************
+ */
+	/* Internal copies, created by init_librm (which runs in real mode) */
+	.section ".data16"
+_virt_offset:	.long 0
+_text16:	.long 0
+_data16:	.long 0
+
+	/* Externally-visible copies, created by real_to_prot */
 	.section ".data"
 	.globl virt_offset
-virt_offset:		.long 0	
+virt_offset:	.long 0	
+	.globl text16
+text16:		.long 0
+	.globl data16
+data16:		.long 0

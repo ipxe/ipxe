@@ -336,6 +336,7 @@ install_prealloc:
 	call	install_highmem
 
 	/* Continue executing in .text16 segment */
+	movw	%bx, %ds
 	pushw	%cs
 	pushw	$2f
 	pushw	%ax
@@ -344,11 +345,11 @@ install_prealloc:
 	.section ".text16", "awx", @progbits
 1:
 	/* Set up protected-mode GDT, call relocate(), reset GDT */
-	call	init_gdt
+	call	init_librm
 	pushl	$relocate
 	data32 call	prot_call
 	addw	$4, %sp
-	call	init_gdt
+	call	init_librm
 
 	/* Return to executing in .prefix section */
 	lret
