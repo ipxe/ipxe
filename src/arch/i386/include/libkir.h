@@ -10,6 +10,10 @@
  *
  */
 
+/* Access to variables in .data16, in a way compatible with librm */
+#define __data16( variable ) variable
+#define __use_data16( variable ) variable
+
 /* Copy to/from base memory */
 
 static inline void copy_to_real_libkir ( uint16_t dest_seg, uint16_t dest_off,

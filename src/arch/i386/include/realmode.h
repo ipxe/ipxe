@@ -39,6 +39,50 @@ typedef struct {
  */
 
 /*
+ * Declaration of variables in .data16
+ *
+ * To place a variable in the .data16 segment, declare it using the
+ * pattern:
+ *
+ *   int __data16 ( foo );
+ *   #define foo __use_data16 ( foo );
+ *
+ *   extern uint32_t __data16 ( bar );
+ *   #define bar __use_data16 ( bar );
+ *
+ *   extern long __data16 ( baz ) = 0xff000000UL;
+ *   #define bar __use_data16 ( baz );
+ *
+ * i.e. take a normal declaration, add __data16() around the variable
+ * name, and add a line saying "#define <name> __use_data16 ( <name> )
+ *
+ * You can then access them just like any other variable, for example
+ *
+ *   int x = foo + bar;
+ *
+ * This magic is achieved at a cost of only around 7 extra bytes per
+ * group of accesses to .data16 variables.  When using KEEP_IT_REAL,
+ * there is no extra cost.
+ *
+ * You should place variables in .data16 when they need to be accessed
+ * by real-mode code.  Real-mode assembly (e.g. as created by
+ * REAL_EXEC()) can access these variables via the usual data segment.
+ * You can therefore write something like
+ *
+ *   static uint16_t __data16 ( foo );
+ *   #define foo __use_data16 ( foo )
+ *
+ *   int bar ( void ) {
+ *     REAL_EXEC ( baz,
+ *                 "int $0xff\n\t"
+ *                 "movw %ax, foo",
+ *                 ... );
+ *     return foo;
+ *   }
+ *
+ */
+
+/*
  * void copy_to_real ( uint16_t dest_seg, uint16_t dest_off,
  *		       void *src, size_t n )
  * void copy_from_real ( void *dest, uint16_t src_seg, uint16_t src_off,
