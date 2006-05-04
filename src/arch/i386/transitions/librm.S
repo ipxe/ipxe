@@ -441,7 +441,6 @@ real_call:
 
 	/* Call real-mode function */
 	popal
-	call	*RC_OFFSET_FUNCTION(%esp)
 	call	*rc_function
 	pushal
 
