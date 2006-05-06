@@ -229,10 +229,11 @@ real_to_prot:
  *
  * Switch from 32-bit protected mode with virtual addresses to 16-bit
  * real mode.  The protected-mode %esp is stored in pm_esp and the
- * real-mode %ss:sp is restored from the saved rm_ss and rm_sp.  All
- * real-mode data segment registers are loaded from the saved rm_ds.
- * Interrupts are *not* enabled, since we want to be able to use
- * prot_to_real in an ISR.  All other registers may be destroyed.
+ * real-mode %ss:sp is restored from the saved rm_ss and rm_sp.  The
+ * high word of the real-mode %esp is set to zero.  All real-mode data
+ * segment registers are loaded from the saved rm_ds.  Interrupts are
+ * *not* enabled, since we want to be able to use prot_to_real in an
+ * ISR.  All other registers may be destroyed.
  *
  * The return address for this function should be a 32-bit (sic)
  * real-mode offset within .code16.
@@ -284,7 +285,7 @@ p2r_jump_target:
 
 	/* Set up real-mode stack */
 	movw	%bp, %ss
-	movw	%dx, %sp
+	movl	%edx, %esp
 	
 	/* Set up real-mode data segments */
 	movw	%cs:rm_ds, %ax
@@ -321,7 +322,7 @@ rm_ds:	.word 0
  *
  * All registers will be preserved across prot_call(), unless the C
  * function explicitly overwrites values in ix86.  Interrupt status
- * will also be preserved.  Gate A20 will be enabled.
+ * and GDT will also be preserved.  Gate A20 will be enabled.
  *
  * Parameters:
  *   function : virtual address of protected-mode function to call
@@ -384,7 +385,9 @@ prot_call:
 	.section ".text16"
 	.code16
 1:	
-	/* Reload GDT, restore registers and flags and return */
+	/* Reload GDT, restore registers and flags and return.  Note
+	 * that %esp is restored manually, since popal discards it.
+	 */
 	movw	%sp, %bp
 	lgdt	(%bp)
 	addw	$12, %sp /* also skip %cs and %ss */
@@ -393,6 +396,10 @@ prot_call:
 	popw	%fs
 	popw	%gs
 	popal
+	movl	-20(%esp), %esp /* -20(%sp) is not a valid 80386 expression.
+				 * -20(%esp) is safe because prot_to_real
+				 * zeroes the high word of %esp, and interrupts
+				 * are still disabled at this point. */
 	popfl
 	data32 ret
 
