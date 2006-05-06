@@ -10,9 +10,11 @@
  *
  */
 
-/* Access to variables in .data16, in a way compatible with librm */
+/* Access to variables in .data16 and .text16 in a way compatible with librm */
 #define __data16( variable ) variable
+#define __text16( variable ) variable
 #define __use_data16( variable ) variable
+#define __use_text16( variable ) variable
 
 /* Copy to/from base memory */
 

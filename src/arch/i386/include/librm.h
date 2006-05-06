@@ -15,16 +15,25 @@
  *
  */
 
-/* Access to variables in .data16 */
+/* Access to variables in .data16 and .text16 */
 extern char *data16;
+extern char *text16;
 
 #define __data16( variable )						\
 	_data16_ ## variable __asm__ ( #variable )			\
 	__attribute__ (( section ( ".data16" ) ))
 
+#define __text16( variable )						\
+	_text16_ ## variable __asm__ ( #variable )			\
+	__attribute__ (( section ( ".text16" ) ))
+
 #define __use_data16( variable )					\
 	( * ( ( typeof ( _data16_ ## variable ) * )			\
 	      & ( data16 [ ( size_t ) & ( _data16_ ## variable ) ] ) ) )
+
+#define __use_text16( variable )					\
+	( * ( ( typeof ( _text16_ ## variable ) * )			\
+	      & ( text16 [ ( size_t ) & ( _text16_ ## variable ) ] ) ) )
 
 /* Variables in librm.S, present in the normal data segment */
 extern uint16_t rm_sp;

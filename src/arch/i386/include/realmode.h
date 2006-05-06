@@ -80,6 +80,9 @@ typedef struct {
  *     return foo;
  *   }
  *
+ * Variables may also be placed in .text16 using __text16 and
+ * __use_text16.  Some variables (e.g. chained interrupt vectors) fit
+ * most naturally in .text16; most should be in .data16.
  */
 
 /*
