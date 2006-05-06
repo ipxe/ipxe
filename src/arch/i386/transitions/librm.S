@@ -335,7 +335,8 @@ rm_ds:	.word 0
  ****************************************************************************
  */
 
-#define PC_OFFSET_IX86 ( 0 )
+#define PC_OFFSET_GDT ( 0 )
+#define PC_OFFSET_IX86 ( PC_OFFSET_GDT + 8 /* pad to 8 to keep alignment */ )
 #define PC_OFFSET_RETADDR ( PC_OFFSET_IX86 + SIZEOF_I386_ALL_REGS )
 #define PC_OFFSET_FUNCTION ( PC_OFFSET_RETADDR + 4 )
 #define PC_OFFSET_END ( PC_OFFSET_FUNCTION + 4 )
@@ -344,7 +345,7 @@ rm_ds:	.word 0
 	.code16
 	.globl prot_call
 prot_call:
-	/* Preserve registers and flags on external RM stack */
+	/* Preserve registers, flags and GDT on external RM stack */
 	pushfl
 	pushal
 	pushw	%gs
@@ -353,6 +354,9 @@ prot_call:
 	pushw	%ds
 	pushw	%ss
 	pushw	%cs
+	subw	$8, %sp
+	movw	%sp, %bp
+	sgdt	(%bp)
 
 	/* For sanity's sake, clear the direction flag as soon as possible */
 	cld
@@ -368,7 +372,8 @@ prot_call:
 	call	gateA20_set
 
 	/* Call function */
-	pushl	%esp
+	leal	PC_OFFSET_IX86(%esp), %eax
+	pushl	%eax
 	call	*(PC_OFFSET_FUNCTION+4)(%esp)
 	popl	%eax /* discard */
 
@@ -379,9 +384,10 @@ prot_call:
 	.section ".text16"
 	.code16
 1:	
-	/* Restore registers and flags and return */
-	popw	%ax	/* skip %cs - it is already set */
-	popw	%ax	/* skip %ss - it is already set */
+	/* Reload GDT, restore registers and flags and return */
+	movw	%sp, %bp
+	lgdt	(%bp)
+	addw	$12, %sp /* also skip %cs and %ss */
 	popw	%ds
 	popw	%es
 	popw	%fs
