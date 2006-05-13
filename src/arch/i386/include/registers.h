@@ -176,4 +176,12 @@ struct i386_all_regs {
 	uint32_t flags;
 } PACKED;
 
+/* Flags */
+#define CF ( 1 <<  0 )
+#define PF ( 1 <<  2 )
+#define AF ( 1 <<  4 )
+#define ZF ( 1 <<  6 )
+#define SF ( 1 <<  7 )
+#define OF ( 1 << 11 )
+
 #endif /* REGISTERS_H */
