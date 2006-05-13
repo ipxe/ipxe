@@ -8,6 +8,17 @@
  */
 
 /**
+ * Hooked interrupt count
+ *
+ * At exit, after unhooking all possible interrupts, this counter
+ * should be examined.  If it is non-zero, it means that we failed to
+ * unhook at least one interrupt vector, and so must not free up the
+ * memory we are using.  (Note that this also implies that we should
+ * re-hook INT 15 in order to hide ourselves from the memory map).
+ */
+int hooked_bios_interrupts = 0;
+
+/**
  * Hook INT vector
  *
  * @v interrupt		INT number
@@ -26,9 +37,15 @@ void hook_bios_interrupt ( unsigned int interrupt, unsigned int handler,
 		.offset = handler,
 	};
 
+	if ( ( chain_vector->segment != 0 ) ||
+	     ( chain_vector->offset != 0 ) ) {
+		/* Already hooked; do nothing */
+		return;
+	}
 	copy_from_real ( chain_vector, 0, ( interrupt * 4 ),
 			 sizeof ( *chain_vector ) );
 	copy_to_real ( 0, ( interrupt * 4 ), &vector, sizeof ( vector ) );
+	hooked_bios_interrupts++;
 }
 
 /**
@@ -53,5 +70,8 @@ int unhook_bios_interrupt ( unsigned int interrupt, unsigned int handler,
 		return -EBUSY;
 	copy_to_real ( 0, ( interrupt * 4 ), chain_vector,
 		       sizeof ( *chain_vector ) );
+	chain_vector->segment = 0;
+	chain_vector->offset = 0;
+	hooked_bios_interrupts--;
 	return 0;
 }
