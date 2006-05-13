@@ -25,7 +25,7 @@ extern char *text16;
 
 #define __text16( variable )						\
 	_text16_ ## variable __asm__ ( #variable )			\
-	__attribute__ (( section ( ".text16" ) ))
+	__attribute__ (( section ( ".text16.data" ) ))
 
 #define __use_data16( variable )					\
 	( * ( ( typeof ( _data16_ ## variable ) * )			\
@@ -34,6 +34,14 @@ extern char *text16;
 #define __use_text16( variable )					\
 	( * ( ( typeof ( _text16_ ## variable ) * )			\
 	      & ( text16 [ ( size_t ) & ( _text16_ ## variable ) ] ) ) )
+
+#define __from_data16( variable )					\
+	( * ( ( typeof ( variable ) * )					\
+	      ( ( ( void * ) &(variable) ) - ( ( void * ) data16 ) ) ) )
+
+#define __from_text16( variable )					\
+	( * ( ( typeof ( variable ) * )					\
+	      ( ( ( void * ) &(variable) ) - ( ( void * ) text16 ) ) ) )
 
 /* Variables in librm.S, present in the normal data segment */
 extern uint16_t rm_sp;
@@ -58,13 +66,14 @@ extern void gateA20_set ( void );
 #define VIRTUAL(x,y) ( phys_to_virt ( ( ( x ) << 4 ) + ( y ) ) )
 
 /* Copy to/from base memory */
-static inline void copy_to_real_librm ( uint16_t dest_seg, uint16_t dest_off,
-					void *src, size_t n ) {
+static inline __attribute__ (( always_inline )) void
+copy_to_real_librm ( unsigned int dest_seg, unsigned int dest_off,
+		     void *src, size_t n ) {
 	memcpy ( VIRTUAL ( dest_seg, dest_off ), src, n );
 }
-static inline void copy_from_real_librm ( void *dest,
-					  uint16_t src_seg, uint16_t src_off,
-					  size_t n ) {
+static inline __attribute__ (( always_inline )) void
+copy_from_real_librm ( void *dest, unsigned int src_seg,
+		       unsigned int src_off, size_t n ) {
 	memcpy ( dest, VIRTUAL ( src_seg, src_off ), n );
 }
 #define put_real_librm( var, dest_seg, dest_off )			      \

@@ -15,10 +15,12 @@
 /* Segment:offset structure.  Note that the order within the structure
  * is offset:segment.
  */
-typedef struct {
+struct segoff {
 	uint16_t offset;
 	uint16_t segment;
-} __attribute__ (( packed )) segoff_t;
+} __attribute__ (( packed ));
+
+typedef struct segoff segoff_t;
 
 /* Macro hackery needed to stringify bits of inline assembly */
 #define RM_XSTR(x) #x
@@ -50,8 +52,8 @@ typedef struct {
  *   extern uint32_t __data16 ( bar );
  *   #define bar __use_data16 ( bar );
  *
- *   extern long __data16 ( baz ) = 0xff000000UL;
- *   #define bar __use_data16 ( baz );
+ *   static long __data16 ( baz ) = 0xff000000UL;
+ *   #define baz __use_data16 ( baz );
  *
  * i.e. take a normal declaration, add __data16() around the variable
  * name, and add a line saying "#define <name> __use_data16 ( <name> )
@@ -83,6 +85,12 @@ typedef struct {
  * Variables may also be placed in .text16 using __text16 and
  * __use_text16.  Some variables (e.g. chained interrupt vectors) fit
  * most naturally in .text16; most should be in .data16.
+ *
+ * If you have only a pointer to a magic symbol within .data16 or
+ * .text16, rather than the symbol itself, you can attempt to extract
+ * the underlying symbol name using __from_data16() or
+ * __from_text16().  This is not for the faint-hearted; check the
+ * assembler output to make sure that it's doing the right thing.
  */
 
 /*

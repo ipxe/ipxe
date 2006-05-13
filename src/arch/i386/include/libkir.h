@@ -15,6 +15,8 @@
 #define __text16( variable ) variable
 #define __use_data16( variable ) variable
 #define __use_text16( variable ) variable
+#define __from_data16( variable ) variable
+#define __from_text16( variable ) variable
 
 /* Copy to/from base memory */
 

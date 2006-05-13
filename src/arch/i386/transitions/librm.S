@@ -19,7 +19,9 @@
 #define SIZEOF_I386_ALL_REGS	( SIZEOF_REAL_MODE_REGS + SIZEOF_I386_FLAGS )
 	
 	.arch i386
-	.section ".text16", "awx", @progbits
+	.section ".text16", "ax", @progbits
+	.section ".text16.data", "aw", @progbits
+	.section ".data16", "aw", @progbits
 
 /****************************************************************************
  * Global descriptor table
@@ -45,7 +47,7 @@
 #else
 #define RM_LIMIT_16_19__AVL__SIZE__GRANULARITY 0x00
 #endif
-	.section ".data16", "aw", @progbits
+	.section ".data16"
 	.align 16
 gdt:
 gdt_limit:		.word gdt_length - 1
@@ -308,7 +310,7 @@ p2r_jump_target:
 p2r_jump_vector:
 	.word	p2r_jump_target
 rm_cs:	.word 0
-	.section ".text16"
+	.section ".text16.data"
 rm_ds:	.word 0
 	
 /****************************************************************************
