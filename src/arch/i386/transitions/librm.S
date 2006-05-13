@@ -309,7 +309,9 @@ p2r_jump_target:
 	.section ".data16"
 p2r_jump_vector:
 	.word	p2r_jump_target
+	.globl rm_cs
 rm_cs:	.word 0
+	.globl rm_ds
 	.section ".text16.data"
 rm_ds:	.word 0
 	
