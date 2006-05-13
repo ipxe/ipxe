@@ -34,6 +34,16 @@ __memcpy ( void *dest, const void *src, size_t len ) {
 
 static inline __attribute__ (( always_inline )) void *
 __constant_memcpy ( void *dest, const void *src, size_t len ) {
+	union {
+		uint32_t u32[2];
+		uint16_t u16[4];
+		uint8_t  u8[8];
+	} __attribute__ (( __may_alias__ )) *dest_u = dest;
+	const union {
+		uint32_t u32[2];
+		uint16_t u16[4];
+		uint8_t  u8[8];
+	} __attribute__ (( __may_alias__ )) *src_u = src;
 	const void *esi;
 	void *edi;
 
@@ -49,33 +59,33 @@ __constant_memcpy ( void *dest, const void *src, size_t len ) {
 	 *
 	 */
 	case 1 : /* 4 bytes */
-		* ( uint8_t  * ) ( dest + 0 ) = * ( uint8_t  * ) ( src + 0 );
+		dest_u->u8[0]  = src_u->u8[0];
 		return dest;
 	case 2 : /* 6 bytes */
-		* ( uint16_t * ) ( dest + 0 ) = * ( uint16_t * ) ( src + 0 );
+		dest_u->u16[0] = src_u->u16[0];
 		return dest;
 	case 4 : /* 4 bytes */
-		* ( uint32_t * ) ( dest + 0 ) = * ( uint32_t * ) ( src + 0 );
+		dest_u->u32[0] = src_u->u32[0];
 		return dest;
 	/*
 	 * Double-register moves; these are probably still a win.
 	 *
 	 */
 	case 3 : /* 12 bytes */
-		* ( uint16_t * ) ( dest + 0 ) = * ( uint16_t * ) ( src + 0 );
-		* ( uint8_t  * ) ( dest + 2 ) = * ( uint8_t  * ) ( src + 2 );
+		dest_u->u16[0] = src_u->u16[0];
+		dest_u->u8[2]  = src_u->u8[2];
 		return dest;
 	case 5 : /* 10 bytes */
-		* ( uint32_t * ) ( dest + 0 ) = * ( uint32_t * ) ( src + 0 );
-		* ( uint8_t  * ) ( dest + 4 ) = * ( uint8_t  * ) ( src + 4 );
+		dest_u->u32[0] = src_u->u32[0];
+		dest_u->u8[4]  = src_u->u8[4];
 		return dest;
 	case 6 : /* 12 bytes */
-		* ( uint32_t * ) ( dest + 0 ) = * ( uint32_t * ) ( src + 0 );
-		* ( uint16_t * ) ( dest + 4 ) = * ( uint16_t * ) ( src + 4 );
+		dest_u->u32[0] = src_u->u32[0];
+		dest_u->u16[2] = src_u->u16[2];
 		return dest;
 	case 8 : /* 10 bytes */
-		* ( uint32_t * ) ( dest + 0 ) = * ( uint32_t * ) ( src + 0 );
-		* ( uint32_t * ) ( dest + 4 ) = * ( uint32_t * ) ( src + 4 );
+		dest_u->u32[0] = src_u->u32[0];
+		dest_u->u32[1] = src_u->u32[1];
 		return dest;
 	}
 
