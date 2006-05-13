@@ -14,25 +14,28 @@ but it doesn't seem to quite work.)
 
 To get bochs running is fairly simple:
 
-1.  Get the bochs source code:
+1.  Build the utilities in this directory
+      make
+
+2.  Get the bochs source code:
       cvs -d:pserver:anonymous@cvs.sourceforge.net:/cvsroot/bochs login
       cvs -d:pserver:anonymous@cvs.sourceforge.net:/cvsroot/bochs co bochs
 
-2.  Configure bochs with
+3.  Configure bochs with
       pushd bochs
       ./configure --enable-all-optimisations --enable-pci --enable-pnic
                   --enable-debugger --enable-magic-breakpoints --enable-disasm
       popd
 
-3.  Build bochs:
+4.  Build bochs:
       make -C bochs
 
-4.  Set up a TAP virtual network device:
+5.  Set up a TAP virtual network device:
       modprobe tun
-      tunctl -u <username> -t tap0
+      ./tunctl -u <username> -t tap0
       ifconfig tap0 up 10.254.254.2 netmask 255.255.255.0
 
-5.  Add the following fragment to /etc/dhcpd.conf:
+6.  Add the following fragment to /etc/dhcpd.conf:
       subnet 10.254.254.0 netmask 255.255.255.252 {
         range dynamic-bootp 10.254.254.1 10.254.254.1;
       }
@@ -42,15 +45,15 @@ To get bochs running is fairly simple:
     machine you are using for running Bochs.  If not, then you're on
     your own.
 
-6.  Restart dhcpd
+7.  Restart dhcpd
       /etc/init.d/dhcpd restart
 
-7.  Build Etherboot images
+8.  Build Etherboot images
       pushd ../../src
       make bin/pnic.dsk
       popd
 
-8.  Start Bochs
+9.  Start Bochs
       ./bochs/bochs -q
     You should get to the debugger prompt "<bochs:1>".  Type "c" to
     start running Bochs.
