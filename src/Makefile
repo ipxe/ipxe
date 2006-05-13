@@ -136,6 +136,7 @@ SRCDIRS		+= net net/uip net/tcp
 #SRCDIRS		+= image
 SRCDIRS		+= drivers/bus
 SRCDIRS		+= drivers/net
+SRCDIRS		+= drivers/block
 #SRCDIRS		+= drivers/disk 
 SRCDIRS		+= interface/pxe
 

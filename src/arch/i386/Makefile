@@ -6,6 +6,7 @@ SRCDIRS		+= arch/i386/image
 SRCDIRS		+= arch/i386/drivers/bus
 SRCDIRS		+= arch/i386/drivers/net
 SRCDIRS		+= arch/i386/drivers/disk
+SRCDIRS		+= arch/i386/interface/pcbios
 
 # The various xxx_loader.c files are #included into core/loader.c and
 # should not be compiled directly.
