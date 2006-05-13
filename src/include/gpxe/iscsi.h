@@ -82,6 +82,60 @@ struct iscsi_bhs_common {
 #define ISCSI_FLAG_FINAL 0x80
 
 /**
+ * iSCSI basic header segment common request fields
+ *
+ */
+struct iscsi_bhs_common_request {
+	/** Opcode */
+	uint8_t opcode;
+	/** Flags */
+	uint8_t flags;
+	/** Fields specific to the PDU type */
+	uint8_t other_a[2];
+	/** Segment lengths */
+	union iscsi_segment_lengths lengths;
+	/** Fields specific to the PDU type */
+	uint8_t other_b[8];
+	/** Initiator Task Tag */
+	uint32_t itt;
+	/** Fields specific to the PDU type */
+	uint8_t other_c[4];
+	/** Command sequence number */
+	uint32_t cmdsn;
+	/** Expected status sequence number */
+	uint32_t expstatsn;
+	/** Fields specific to the PDU type */
+	uint8_t other_d[16];
+};
+
+/**
+ * iSCSI basic header segment common request fields
+ *
+ */
+struct iscsi_bhs_common_response {
+	/** Opcode */
+	uint8_t opcode;
+	/** Flags */
+	uint8_t flags;
+	/** Fields specific to the PDU type */
+	uint8_t other_a[2];
+	/** Segment lengths */
+	union iscsi_segment_lengths lengths;
+	/** Fields specific to the PDU type */
+	uint8_t other_b[8];
+	/** Initiator Task Tag */
+	uint32_t itt;
+	/** Fields specific to the PDU type */
+	uint8_t other_c[4];
+	/** Status sequence number */
+	uint32_t statsn;
+	/** Expected command sequence number */
+	uint32_t expcmdsn;
+	/** Fields specific to the PDU type */
+	uint8_t other_d[16];
+};
+
+/**
  * iSCSI login request basic header segment
  *
  */
@@ -203,7 +257,7 @@ struct iscsi_bhs_scsi_command {
 	/** Segment lengths */
 	union iscsi_segment_lengths lengths;
 	/** SCSI Logical Unit Number */
-	uint8_t lun[8];
+	uint64_t lun;
 	/** Initiator Task Tag */
 	uint32_t itt;
 	/** Expected data transfer length */
@@ -290,7 +344,7 @@ struct iscsi_bhs_data_in {
 	/** Segment lengths */
 	union iscsi_segment_lengths lengths;
 	/** Logical Unit Number */
-	uint8_t lun[8];
+	uint64_t lun;
 	/** Initiator Task Tag */
 	uint32_t itt;
 	/** Target Transfer Tag */
@@ -329,6 +383,8 @@ struct iscsi_bhs_data_in {
  */
 union iscsi_bhs {
 	struct iscsi_bhs_common common;
+	struct iscsi_bhs_common_request common_request;
+	struct iscsi_bhs_common_response common_response;
 	struct iscsi_bhs_login_request login_request;
 	struct iscsi_bhs_login_response login_response;
 	struct iscsi_bhs_scsi_command scsi_command;
@@ -339,12 +395,10 @@ union iscsi_bhs {
 
 /** State */
 enum iscsi_state {
-	/** In the process of logging in */
-	ISCSI_STATE_FAILED = -1,
-	ISCSI_STATE_NOT_CONNECTED = 0,
 	ISCSI_STATE_IDLE,
-	ISCSI_STATE_LOGGING_IN,
-	ISCSI_STATE_READING_DATA,
+	ISCSI_STATE_LOGIN,
+	ISCSI_STATE_LOGIN_CONT,
+	ISCSI_STATE_COMMAND,
 };
 
 /** State of an iSCSI TX engine */
@@ -377,40 +431,32 @@ enum iscsi_rx_state {
 struct iscsi_session {
 	/** TCP connection for this session */
 	struct tcp_connection tcp;
+	/** Session status
+	 *
+	 * This is the bitwise-OR of zero or more ISCSI_STATUS_XXX
+	 * constants.
+	 */
+	int status;
+	/** Retry count
+	 *
+	 * Number of times that the connection has been retried.
+	 * Reset upon a successful connection.
+	 */
+	int retry_count;
 
 	/** Initiator IQN */
 	const char *initiator;
 	/** Target IQN */
 	const char *target;
+	/** Logical Unit Number (LUN) */
+	uint64_t lun;
 
-	/** Block size in bytes */
-	size_t block_size;
-	/** Starting block number of the current data transfer */
-	unsigned long block_start;
-	/** Block count of the current data transfer */
-	unsigned long block_count;
-	/** Block read callback function
-	 *
-	 * Note that this may be called several times, since it is
-	 * called per-packet rather than per-block.
-	 */
-	void ( * block_read_callback ) ( void *private, const void *data,
-					 unsigned long offset, size_t len );
-	/** Block read callback private data
-	 *
-	 * This is passed to block_read_callback()
-	 */
-	void *block_read_private;
-
-	/** State of the session */
-	enum iscsi_state state;
 	/** Target session identifying handle
 	 *
 	 * This is assigned by the target when we first log in, and
 	 * must be reused on subsequent login attempts.
 	 */
 	uint16_t tsih;
-
 	/** Initiator task tag
 	 *
 	 * This is the tag of the current command.  It is incremented
@@ -447,14 +493,34 @@ struct iscsi_session {
 	enum iscsi_rx_state rx_state;
 	/** Byte offset within the current RX state */
 	size_t rx_offset;
+
+	/** Current SCSI command
+	 *
+	 * Set to NULL when command is complete.
+	 */
+	struct scsi_command *command;
 };
 
-static inline int iscsi_busy ( struct iscsi_session *iscsi ) {
-	return ( iscsi->state > ISCSI_STATE_IDLE );
-}
+/** Session is currently connected */
+#define ISCSI_STATUS_CONNECTED 0x01
 
-static inline int iscsi_error ( struct iscsi_session *iscsi ) {
-	return ( iscsi->state == ISCSI_STATE_FAILED );
-}
+/** Session has completed */
+#define ISCSI_STATUS_DONE 0x02
+
+/** Session failed */
+#define ISCSI_STATUS_ERR 0x04
+
+/** Maximum number of retries at connecting */
+#define ISCSI_MAX_RETRIES 2
+
+/** An iSCSI device */
+struct iscsi_device {
+	/** SCSI device interface */
+	struct scsi_device scsi;
+	/** iSCSI protocol instance */
+	struct iscsi_session iscsi;
+};
+
+extern int init_iscsidev ( struct iscsi_device *iscsidev );
 
 #endif /* _GPXE_ISCSI_H */
