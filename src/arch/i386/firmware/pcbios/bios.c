@@ -3,10 +3,9 @@
  * Body of routines taken from old pcbios.S
  */
 
-#include "stdint.h"
-#include "realmode.h"
-
-#define BIOS_DATA_SEG 0x0040
+#include <stdint.h>
+#include <realmode.h>
+#include <bios.h>
 
 #define CF ( 1 << 0 )
 
@@ -39,12 +38,12 @@ unsigned long currticks ( void ) {
 		    IN_CONSTRAINTS (),
 		    CLOBBER ( "eax" ) ); /* can't have an empty clobber list */
 
-	get_real ( ticks, BIOS_DATA_SEG, 0x006c );
-	get_real ( midnight, BIOS_DATA_SEG, 0x0070 );
+	get_real ( ticks, BDA_SEG, 0x006c );
+	get_real ( midnight, BDA_SEG, 0x0070 );
 
 	if ( midnight ) {
 		midnight = 0;
-		put_real ( midnight, BIOS_DATA_SEG, 0x0070 );
+		put_real ( midnight, BDA_SEG, 0x0070 );
 		days += 0x1800b0;
 	}
 	return ( days + ticks );
