@@ -12,8 +12,10 @@
 #endif
 
 /* Make routines available to all */
+#define swap64(x)	__bswap_64(x)
 #define swap32(x)	__bswap_32(x)
 #define swap16(x)	__bswap_16(x)
+#define bswap_64(x)	__bswap_64(x)
 #define bswap_32(x)	__bswap_32(x)
 #define bswap_16(x)	__bswap_16(x)
 	
