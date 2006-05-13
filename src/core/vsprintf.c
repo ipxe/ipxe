@@ -5,10 +5,11 @@
 #include "errno.h"
 #include "vsprintf.h"
 
-#define LONG_SHIFT  ((int)((sizeof(unsigned long)*CHAR_BIT) - 4))
-#define INT_SHIFT   ((int)((sizeof(unsigned int)*CHAR_BIT) - 4))
-#define SHRT_SHIFT  ((int)((sizeof(unsigned short)*CHAR_BIT) - 4))
-#define CHAR_SHIFT  ((int)((sizeof(unsigned char)*CHAR_BIT) - 4))
+#define LONGLONG_SHIFT	((int)((sizeof(unsigned long long)*CHAR_BIT) - 4))
+#define LONG_SHIFT	((int)((sizeof(unsigned long)*CHAR_BIT) - 4))
+#define INT_SHIFT	((int)((sizeof(unsigned int)*CHAR_BIT) - 4))
+#define SHRT_SHIFT	((int)((sizeof(unsigned short)*CHAR_BIT) - 4))
+#define CHAR_SHIFT	((int)((sizeof(unsigned char)*CHAR_BIT) - 4))
 
 /** @file */
 
@@ -62,7 +63,11 @@ static int vsprintf(char *buf, const char *fmt, va_list args)
 				shift = LONG_SHIFT;
 				fmt++;
 			}
-			else if (*fmt == 'h') {
+			if (*fmt == 'l') {
+				shift = LONGLONG_SHIFT;
+				fmt++;
+			}
+			if (*fmt == 'h') {
 				shift = SHRT_SHIFT;
 				fmt++;
 				if (*fmt == 'h') {
@@ -79,7 +84,9 @@ static int vsprintf(char *buf, const char *fmt, va_list args)
 				/* With x86 gcc, sizeof(long) == sizeof(int) */
 				unsigned long h;
 				int ncase;
-				if (shift > INT_SHIFT) {
+				if (shift > LONG_SHIFT) {
+					h = va_arg(args, unsigned long long);
+				} else if (shift > INT_SHIFT) {
 					h = va_arg(args, unsigned long);
 				} else {
 					h = va_arg(args, unsigned int);
@@ -95,7 +102,9 @@ static int vsprintf(char *buf, const char *fmt, va_list args)
 			else if (*fmt == 'd') {
 				char *r, *t;
 				long i;
-				if (shift > INT_SHIFT) {
+				if (shift > LONG_SHIFT) {
+					i = va_arg(args, long long);
+				} else if (shift > INT_SHIFT) {
 					i = va_arg(args, long);
 				} else {
 					i = va_arg(args, int);
