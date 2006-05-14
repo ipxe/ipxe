@@ -513,6 +513,9 @@ struct iscsi_session {
 /** Maximum number of retries at connecting */
 #define ISCSI_MAX_RETRIES 2
 
+extern int iscsi_issue ( struct iscsi_session *iscsi,
+			 struct scsi_command *command );
+
 /** An iSCSI device */
 struct iscsi_device {
 	/** SCSI device interface */
