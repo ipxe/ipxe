@@ -559,10 +559,10 @@ int int13_boot ( unsigned int drive ) {
 		    "\n99:\n\t",
 		    1,
 		    OUT_CONSTRAINTS ( "=d" ( d1 ) ),
-		    IN_CONSTRAINTS ( "d" ( drive ) ),
+		    IN_CONSTRAINTS ( "0" ( drive ) ),
 		    CLOBBER ( "eax", "ebx", "ecx", "esi", "edi", "ebp" ) );
 
-	DBG ( "Booted disk returned via INT 18\n" );
+	DBG ( "Booted disk returned via INT 18 or 19\n" );
 
 	/* Unhook INTs 18 and 19 */
 	unhook_bios_interrupt ( 0x18, ( unsigned int ) int13_exec_fail,
