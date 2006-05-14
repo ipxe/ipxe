@@ -153,5 +153,6 @@ struct int13_disk_parameters {
 
 extern void register_int13_drive ( struct int13_drive *drive );
 extern void unregister_int13_drive ( struct int13_drive *drive );
+extern int int13_boot ( unsigned int drive );
 
 #endif /* INT13_H */

@@ -16,7 +16,10 @@
  * Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
  */
 
+#include <stdint.h>
 #include <limits.h>
+#include <byteswap.h>
+#include <errno.h>
 #include <assert.h>
 #include <gpxe/list.h>
 #include <gpxe/blockdev.h>
@@ -40,6 +43,16 @@ static struct segoff __text16 ( int13_vector );
 
 /** Assembly wrapper */
 extern void int13_wrapper ( void );
+
+/** Vector for storing original INT 18 handler
+ *
+ * We do not chain to this vector, so there is no need to place it in
+ * .text16.
+ */
+static struct segoff int18_vector;
+
+/** Restart point for INT 18 */
+extern void int13_exec_fail ( void );
 
 /** List of registered emulated drives */
 static LIST_HEAD ( drives );
@@ -472,4 +485,79 @@ void unregister_int13_drive ( struct int13_drive *drive ) {
 	/* Unhook INT 13 vector if no more drives */
 	if ( list_empty ( &drives ) )
 		unhook_int13();
+}
+
+/**
+ * Attempt to boot from an INT 13 drive
+ *
+ * @v drive		Drive number
+ * @ret rc		Return status code
+ *
+ * This boots from the specified INT 13 drive by loading the Master
+ * Boot Record to 0000:7c00 and jumping to it.  INT 18 is hooked to
+ * capture an attempt by the MBR to boot the next device.  (This is
+ * the closest thing to a return path from an MBR).
+ *
+ * Note that this function can never return success, by definition.
+ */
+int int13_boot ( unsigned int drive ) {
+	int status, signature;
+	int d0, d1;
+
+	DBG ( "Booting from INT 13 drive %02x\n", drive );
+
+	/* Use INT 13 to read the boot sector */
+	REAL_EXEC ( rm_int13_boot,
+		    "pushw $0\n\t"
+		    "popw %%es\n\t"
+		    "int $0x13\n\t"
+		    "jc 1f\n\t"
+		    "xorl %%eax, %%eax\n\t"
+		    "\n1:\n\t"
+		    "movzwl %%es:0x7dfe, %%ebx\n\t",
+		    4,
+		    OUT_CONSTRAINTS ( "=a" ( status ), "=b" ( signature ),
+				      "=c" ( d0 ), "=d" ( drive ) ),
+		    IN_CONSTRAINTS ( "0" ( 0x0201 ), "1" ( 0x7c00 ),
+				     "2" ( 0x0001 ), "3" ( drive ) ),
+		    CLOBBER ( "ebp" ) );
+	if ( status )
+		return -EIO;
+
+	/* Check signature is correct */
+	if ( signature != be16_to_cpu ( 0x55aa ) ) {
+		DBG ( "Invalid disk signature %#04x (should be 0x55aa)\n",
+		      cpu_to_be16 ( signature ) );
+		return -ENOEXEC;
+	}
+
+	/* Hook INT 18 to capture failure path */
+	hook_bios_interrupt ( 0x18, ( unsigned int ) int13_exec_fail,
+			      &int18_vector );
+
+	/* Boot the loaded sector */
+	REAL_EXEC ( rm_int13_exec,
+		    "movw %%ss, %%ax\n\t" /* Preserve stack pointer */
+		    "movw %%ax, %%cs:int13_exec_saved_ss\n\t"
+		    "movw %%sp, %%cs:int13_exec_saved_sp\n\t"
+		    "ljmp $0, $0x7c00\n\t"
+		    "\nint13_exec_saved_ss: .word 0\n\t"
+		    "\nint13_exec_saved_sp: .word 0\n\t"
+		    "\nint13_exec_fail:\n\t"
+		    "movw %%cs:int13_exec_saved_ss, %%ax\n\t"
+		    "movw %%ax, %%ss\n\t"
+		    "movw %%cs:int13_exec_saved_sp, %%sp\n\t"
+		    "\n99:\n\t",
+		    1,
+		    OUT_CONSTRAINTS ( "=d" ( d1 ) ),
+		    IN_CONSTRAINTS ( "d" ( drive ) ),
+		    CLOBBER ( "eax", "ebx", "ecx", "esi", "edi", "ebp" ) );
+
+	DBG ( "Booted disk returned via INT 18\n" );
+
+	/* Unhook INT 18 */
+	unhook_bios_interrupt ( 0x18, ( unsigned int ) int13_exec_fail,
+				&int18_vector );
+	
+	return -ECANCELED;
 }
