@@ -228,7 +228,7 @@ size_t vcprintf ( struct printf_context *ctx, const char *fmt, va_list args ) {
 		ptr = tmp_buf + sizeof ( tmp_buf ) - 1;
 		*ptr = '\0';
 		if ( *fmt == 'c' ) {
-			*(--ptr) = va_arg ( args, unsigned int );
+			ctx->handler ( ctx, va_arg ( args, unsigned int ) );
 		} else if ( *fmt == 's' ) {
 			ptr = va_arg ( args, char * );
 		} else if ( *fmt == 'p' ) {
