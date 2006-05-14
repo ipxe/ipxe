@@ -1,15 +1,35 @@
+/*
+ * Copyright (C) 2006 Michael Brown <mbrown@fensystems.co.uk>.
+ *
+ * This program is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU General Public License as
+ * published by the Free Software Foundation; either version 2 of the
+ * License, or any later version.
+ *
+ * This program is distributed in the hope that it will be useful, but
+ * WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ * General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program; if not, write to the Free Software
+ * Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
+ */
+
 #include <stddef.h>
 #include <stdarg.h>
 #include <console.h>
 #include <errno.h>
 #include <vsprintf.h>
 
-#define CHAR_LEN	1
-#define SHORT_LEN	2
-#define INT_LEN		3
-#define LONG_LEN	4
-#define LONGLONG_LEN	5
-#define SIZE_T_LEN	6
+/** @file */
+
+#define CHAR_LEN	0	/**< "hh" length modifier */
+#define SHORT_LEN	1	/**< "h" length modifier */
+#define INT_LEN		2	/**< no length modifier */
+#define LONG_LEN	3	/**< "l" length modifier */
+#define LONGLONG_LEN	4	/**< "ll" length modifier */
+#define SIZE_T_LEN	5	/**< "z" length modifier */
 
 static uint8_t type_sizes[] = {
 	[CHAR_LEN]	= sizeof ( char ),
@@ -19,8 +39,6 @@ static uint8_t type_sizes[] = {
 	[LONGLONG_LEN]	= sizeof ( long long ),
 	[SIZE_T_LEN]	= sizeof ( size_t ),
 };
-
-/** @file */
 
 /**
  * A printf context
@@ -48,36 +66,80 @@ struct printf_context {
 	size_t max_len;
 };
 
+/**
+ * Use lower-case for hexadecimal digits
+ *
+ * Note that this value is set to 0x20 since that makes for very
+ * efficient calculations.  (Bitwise-ORing with @c LCASE converts to a
+ * lower-case character, for example.)
+ */
 #define LCASE 0x20
+
+/**
+ * Use "alternate form"
+ *
+ * For hexadecimal numbers, this means to add a "0x" or "0X" prefix to
+ * the number.
+ */
 #define ALT_FORM 0x02
 
-static char * format_hex ( char *buf, unsigned long long num, int width,
+/**
+ * Format a hexadecimal number
+ *
+ * @v end		End of buffer to contain number
+ * @v num		Number to format
+ * @v width		Minimum field width
+ * @ret ptr		End of buffer
+ *
+ * Fills a buffer in reverse order with a formatted hexadecimal
+ * number.  The number will be zero-padded to the specified width.
+ * Lower-case and "alternate form" (i.e. "0x" prefix) flags may be
+ * set.
+ *
+ * There must be enough space in the buffer to contain the largest
+ * number that this function can format.
+ */
+static char * format_hex ( char *end, unsigned long long num, int width,
 			   int flags ) {
-	char *ptr = buf;
+	char *ptr = end;
 	int case_mod;
 
 	/* Generate the number */
 	case_mod = flags & LCASE;
 	do {
-		*ptr++ = "0123456789ABCDEF"[ num & 0xf ] | case_mod;
+		*(--ptr) = "0123456789ABCDEF"[ num & 0xf ] | case_mod;
 		num >>= 4;
 	} while ( num );
 
 	/* Zero-pad to width */
-	while ( ( ptr - buf ) < width )
-		*ptr++ = '0';
+	while ( ( end - ptr ) < width )
+		*(--ptr) = '0';
 
 	/* Add "0x" or "0X" if alternate form specified */
 	if ( flags & ALT_FORM ) {
-		*ptr++ = 'X' | case_mod;
-		*ptr++ = '0';
+		*(--ptr) = 'X' | case_mod;
+		*(--ptr) = '0';
 	}
 
 	return ptr;
 }
 
-static char * format_decimal ( char *buf, signed long num, int width ) {
-	char *ptr = buf;
+/**
+ * Format a decimal number
+ *
+ * @v end		End of buffer to contain number
+ * @v num		Number to format
+ * @v width		Minimum field width
+ * @ret ptr		End of buffer
+ *
+ * Fills a buffer in reverse order with a formatted decimal number.
+ * The number will be space-padded to the specified width.
+ *
+ * There must be enough space in the buffer to contain the largest
+ * number that this function can format.
+ */
+static char * format_decimal ( char *end, signed long num, int width ) {
+	char *ptr = end;
 	int negative = 0;
 
 	/* Generate the number */
@@ -86,21 +148,20 @@ static char * format_decimal ( char *buf, signed long num, int width ) {
 		num = -num;
 	}
 	do {
-		*ptr++ = '0' + ( num % 10 );
+		*(--ptr) = '0' + ( num % 10 );
 		num /= 10;
 	} while ( num );
 
 	/* Add "-" if necessary */
 	if ( negative )
-		*ptr++ = '-';
+		*(--ptr) = '-';
 
 	/* Space-pad to width */
-	while ( ( ptr - buf ) < width )
-		*ptr++ = ' ';
+	while ( ( end - ptr ) < width )
+		*(--ptr) = ' ';
 
 	return ptr;
 }
-
 
 /**
  * Write a formatted string to a printf context
@@ -114,11 +175,9 @@ int vcprintf ( struct printf_context *ctx, const char *fmt, va_list args ) {
 	int flags;
 	int width;
 	uint8_t *length;
-	int character;
-	unsigned long long hex;
-	signed long decimal;
-	char num_buf[32];
 	char *ptr;
+	char tmp_buf[32]; /* 32 is enough for all numerical formats.
+			   * Insane width fields could overflow this buffer. */
 
 	/* Initialise context */
 	ctx->len = 0;
@@ -166,22 +225,21 @@ int vcprintf ( struct printf_context *ctx, const char *fmt, va_list args ) {
 			}
 		}
 		/* Process conversion specifier */
+		ptr = tmp_buf + sizeof ( tmp_buf ) - 1;
+		*ptr = '\0';
 		if ( *fmt == 'c' ) {
-			character = va_arg ( args, unsigned int );
-			ctx->handler ( ctx, character );
+			*(--ptr) = va_arg ( args, unsigned int );
 		} else if ( *fmt == 's' ) {
 			ptr = va_arg ( args, char * );
-			for ( ; *ptr ; ptr++ ) {
-				ctx->handler ( ctx, *ptr );
-			}
 		} else if ( *fmt == 'p' ) {
-			hex = ( intptr_t ) va_arg ( args, void * );
-			ptr = format_hex ( num_buf, hex, width,
+			intptr_t ptrval;
+
+			ptrval = ( intptr_t ) va_arg ( args, void * );
+			ptr = format_hex ( ptr, ptrval, width, 
 					   ( ALT_FORM | LCASE ) );
-			do {
-				ctx->handler ( ctx, *(--ptr) );
-			} while ( ptr != num_buf );
 		} else if ( ( *fmt & ~0x20 ) == 'X' ) {
+			unsigned long long hex;
+
 			flags |= ( *fmt & 0x20 ); /* LCASE */
 			if ( *length >= sizeof ( unsigned long long ) ) {
 				hex = va_arg ( args, unsigned long long );
@@ -190,22 +248,22 @@ int vcprintf ( struct printf_context *ctx, const char *fmt, va_list args ) {
 			} else {
 				hex = va_arg ( args, unsigned int );
 			}
-			ptr = format_hex ( num_buf, hex, width, flags );
-			do {
-				ctx->handler ( ctx, *(--ptr) );
-			} while ( ptr != num_buf );
+			ptr = format_hex ( ptr, hex, width, flags );
 		} else if ( *fmt == 'd' ) {
+			signed long decimal;
+
 			if ( *length >= sizeof ( signed long ) ) {
 				decimal = va_arg ( args, signed long );
 			} else {
 				decimal = va_arg ( args, signed int );
 			}
-			ptr = format_decimal ( num_buf, decimal, width );
-			do {
-				ctx->handler ( ctx, *(--ptr) );
-			} while ( ptr != num_buf );
+			ptr = format_decimal ( ptr, decimal, width );
 		} else {
-			ctx->handler ( ctx, *fmt );
+			*(--ptr) = *fmt;
+		}
+		/* Write out conversion result */
+		for ( ; *ptr ; ptr++ ) {
+			ctx->handler ( ctx, *ptr );
 		}
 	}
 
