@@ -27,6 +27,8 @@ struct block_device;
 #define INT13_WRITE_SECTORS		0x03
 /** Get drive parameters */
 #define INT13_GET_PARAMETERS		0x08
+/** Extensions installation check */
+#define INT13_EXTENSION_CHECK		0x41
 /** Extended read */
 #define INT13_EXTENDED_READ		0x42
 /** Extended write */
@@ -148,6 +150,20 @@ struct int13_disk_parameters {
 #define INT13_FL_LOCKABLE	 0x20
 /** CHS is max possible, not current media (valid only for removable drives) */
 #define INT13_FL_CHS_MAX	 0x40
+
+/** @} */
+
+/**
+ * @defgroup int13exts INT 13 extension flags
+ * @{
+ */
+
+/** Extended disk access functions supported */
+#define INT13_EXTENSION_LINEAR		0x01
+/** Removable drive functions supported */
+#define INT13_EXTENSION_REMOVABLE	0x02
+/** EDD functions supported */
+#define INT13_EXTENSION_EDD		0x04
 
 /** @} */
 

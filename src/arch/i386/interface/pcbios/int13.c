@@ -268,6 +268,27 @@ static int int13_get_parameters ( struct int13_drive *drive,
 }
 
 /**
+ * INT 13, 41 - Extensions installation check
+ *
+ * @v drive		Emulated drive
+ * @v bx		0x55aa
+ * @ret bx		0xaa55
+ * @ret cx		Extensions API support bitmap
+ * @ret status		Status code
+ */
+static int int13_extension_check ( struct int13_drive *drive __unused,
+				   struct i386_all_regs *ix86 ) {
+	if ( ix86->regs.bx == 0x55aa ) {
+		DBG ( "INT 13 extensions installation check\n" );
+		ix86->regs.bx = 0xaa55;
+		ix86->regs.cx = INT13_EXTENSION_LINEAR;
+		return 0;
+	} else {
+		return INT13_STATUS_INVALID;
+	}
+}
+
+/**
  * INT 13, 42 - Extended read
  *
  * @v drive		Emulated drive
@@ -356,6 +377,9 @@ static void int13 ( struct i386_all_regs *ix86 ) {
 			break;
 		case INT13_GET_PARAMETERS:
 			status = int13_get_parameters ( drive, ix86 );
+			break;
+		case INT13_EXTENSION_CHECK:
+			status = int13_extension_check ( drive, ix86 );
 			break;
 		case INT13_EXTENDED_READ:
 			status = int13_extended_read ( drive, ix86 );
