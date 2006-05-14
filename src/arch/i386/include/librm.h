@@ -110,7 +110,7 @@ extern void remove_from_rm_stack ( void *data, size_t size );
 #define	REAL_FRAGMENT( name, asm_code_str )				\
 	extern void name ( void );					\
 	__asm__ __volatile__ (						\
-		".section \".text16\"\n\t"				\
+		".section \".text16\", \"ax\", @progbits\n\t"		\
 		".code16\n\t"						\
 		".arch i386\n\t"					\
 		#name ":\n\t"						\
