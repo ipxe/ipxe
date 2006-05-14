@@ -51,7 +51,14 @@ extern void int13_wrapper ( void );
  */
 static struct segoff int18_vector;
 
-/** Restart point for INT 18 */
+/** Vector for storing original INT 19 handler
+ *
+ * We do not chain to this vector, so there is no need to place it in
+ * .text16.
+ */
+static struct segoff int19_vector;
+
+/** Restart point for INT 18 or 19 */
 extern void int13_exec_fail ( void );
 
 /** List of registered emulated drives */
@@ -531,9 +538,11 @@ int int13_boot ( unsigned int drive ) {
 		return -ENOEXEC;
 	}
 
-	/* Hook INT 18 to capture failure path */
+	/* Hook INTs 18 and 19 to capture failure paths */
 	hook_bios_interrupt ( 0x18, ( unsigned int ) int13_exec_fail,
 			      &int18_vector );
+	hook_bios_interrupt ( 0x19, ( unsigned int ) int13_exec_fail,
+			      &int19_vector );
 
 	/* Boot the loaded sector */
 	REAL_EXEC ( rm_int13_exec,
@@ -555,9 +564,11 @@ int int13_boot ( unsigned int drive ) {
 
 	DBG ( "Booted disk returned via INT 18\n" );
 
-	/* Unhook INT 18 */
+	/* Unhook INTs 18 and 19 */
 	unhook_bios_interrupt ( 0x18, ( unsigned int ) int13_exec_fail,
 				&int18_vector );
+	unhook_bios_interrupt ( 0x19, ( unsigned int ) int13_exec_fail,
+				&int19_vector );
 	
 	return -ECANCELED;
 }
