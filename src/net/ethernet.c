@@ -20,6 +20,7 @@
 #include <string.h>
 #include <byteswap.h>
 #include <assert.h>
+#include <vsprintf.h>
 #include <gpxe/if_arp.h>
 #include <gpxe/if_ether.h>
 #include <gpxe/netdevice.h>

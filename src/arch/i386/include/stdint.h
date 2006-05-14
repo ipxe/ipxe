@@ -16,6 +16,7 @@ typedef signed long		int32_t;
 typedef signed long long	int64_t;
 
 typedef unsigned long		physaddr_t;
+typedef unsigned long		intptr_t;
 
 typedef signed char	   s8;
 typedef unsigned char      u8;

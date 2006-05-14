@@ -1,196 +1,307 @@
+#include <stddef.h>
 #include <stdarg.h>
-#include <gpxe/if_ether.h> /* for ETH_ALEN */
-#include "limits.h" /* for CHAR_BIT */
-#include "console.h"
-#include "errno.h"
-#include "vsprintf.h"
+#include <console.h>
+#include <errno.h>
+#include <vsprintf.h>
 
-#define LONGLONG_SHIFT	((int)((sizeof(unsigned long long)*CHAR_BIT) - 4))
-#define LONG_SHIFT	((int)((sizeof(unsigned long)*CHAR_BIT) - 4))
-#define INT_SHIFT	((int)((sizeof(unsigned int)*CHAR_BIT) - 4))
-#define SHRT_SHIFT	((int)((sizeof(unsigned short)*CHAR_BIT) - 4))
-#define CHAR_SHIFT	((int)((sizeof(unsigned char)*CHAR_BIT) - 4))
+#define CHAR_LEN	1
+#define SHORT_LEN	2
+#define INT_LEN		3
+#define LONG_LEN	4
+#define LONGLONG_LEN	5
+#define SIZE_T_LEN	6
+
+static uint8_t type_sizes[] = {
+	[CHAR_LEN]	= sizeof ( char ),
+	[SHORT_LEN]	= sizeof ( short ),
+	[INT_LEN]	= sizeof ( int ),
+	[LONG_LEN]	= sizeof ( long ),
+	[LONGLONG_LEN]	= sizeof ( long long ),
+	[SIZE_T_LEN]	= sizeof ( size_t ),
+};
 
 /** @file */
 
 /**
- * Write a formatted string to a buffer.
+ * A printf context
  *
- * @v buf		Buffer into which to write the string, or NULL
+ * Contexts are used in order to be able to share code between
+ * vprintf() and vsnprintf(), without requiring the allocation of a
+ * buffer for vprintf().
+ */
+struct printf_context {
+	/**
+	 * Character handler
+	 *
+	 * @v ctx	Context
+	 * @v c		Character
+	 *
+	 * This method is called for each character written to the
+	 * formatted string.  It must increment @len.
+	 */
+	void ( * handler ) ( struct printf_context *ctx, unsigned int c );
+	/** Length of formatted string */
+	size_t len;
+	/** Buffer for formatted string (used by printf_sputc()) */
+	char *buf;
+	/** Buffer length (used by printf_sputc()) */
+	size_t max_len;
+};
+
+#define LCASE 0x20
+#define ALT_FORM 0x02
+
+static char * format_hex ( char *buf, unsigned long long num, int width,
+			   int flags ) {
+	char *ptr = buf;
+	int case_mod;
+
+	/* Generate the number */
+	case_mod = flags & LCASE;
+	do {
+		*ptr++ = "0123456789ABCDEF"[ num & 0xf ] | case_mod;
+		num >>= 4;
+	} while ( num );
+
+	/* Zero-pad to width */
+	while ( ( ptr - buf ) < width )
+		*ptr++ = '0';
+
+	/* Add "0x" or "0X" if alternate form specified */
+	if ( flags & ALT_FORM ) {
+		*ptr++ = 'X' | case_mod;
+		*ptr++ = '0';
+	}
+
+	return ptr;
+}
+
+static char * format_decimal ( char *buf, signed long num, int width ) {
+	char *ptr = buf;
+	int negative = 0;
+
+	/* Generate the number */
+	if ( num < 0 ) {
+		negative = 1;
+		num = -num;
+	}
+	do {
+		*ptr++ = '0' + ( num % 10 );
+		num /= 10;
+	} while ( num );
+
+	/* Add "-" if necessary */
+	if ( negative )
+		*ptr++ = '-';
+
+	/* Space-pad to width */
+	while ( ( ptr - buf ) < width )
+		*ptr++ = ' ';
+
+	return ptr;
+}
+
+
+/**
+ * Write a formatted string to a printf context
+ *
+ * @v ctx		Context
  * @v fmt		Format string
  * @v args		Arguments corresponding to the format string
- * @ret len		Length of string written to buffer (if buf != NULL)
- * @ret	0		(if buf == NULL)
- * @err None		-
- *
- * If #buf==NULL, then the string will be written to the console
- * directly using putchar().
- *
+ * @ret len		Length of formatted string
  */
-static int vsprintf(char *buf, const char *fmt, va_list args)
-{
-	const char *p;
-	char *s;
-	s = buf;
-	for ( ; *fmt != '\0'; ++fmt) {
-		if (*fmt != '%') {
-			buf ? *s++ = *fmt : putchar(*fmt);
+int vcprintf ( struct printf_context *ctx, const char *fmt, va_list args ) {
+	int flags;
+	int width;
+	uint8_t *length;
+	int character;
+	unsigned long long hex;
+	signed long decimal;
+	char num_buf[32];
+	char *ptr;
+
+	/* Initialise context */
+	ctx->len = 0;
+
+	for ( ; *fmt ; fmt++ ) {
+		/* Pass through ordinary characters */
+		if ( *fmt != '%' ) {
+			ctx->handler ( ctx, *fmt );
 			continue;
 		}
-		/* skip width specs */
 		fmt++;
-		while (*fmt >= '0' && *fmt <= '9')
-			fmt++;
-		if (*fmt == '.')
-			fmt++;
-		while (*fmt >= '0' && *fmt <= '9')
-			fmt++;
-		if (*fmt == 's') {
-			for(p = va_arg(args, char *); *p != '\0'; p++)
-				buf ? *s++ = *p : putchar(*p);
-		} else if (*fmt == 'm') {
-			for(p = strerror(errno); *p != '\0'; p++)
-				buf ? *s++ = *p : putchar(*p);
-		} else {	/* Length of item is bounded */
-			char tmp[40], *q = tmp;
-			int alt = 0;
-			int shift = INT_SHIFT;
-			if (*fmt == '#') {
-				alt = 1;
-				fmt++;
+		/* Process flag characters */
+		flags = 0;
+		for ( ; ; fmt++ ) {
+			if ( *fmt == '#' ) {
+				flags |= ALT_FORM;
+			} else if ( *fmt == '0' ) {
+				/* We always 0-pad hex and space-pad decimal */
+			} else {
+				/* End of flag characters */
+				break;
 			}
-			if (*fmt == 'l') {
-				shift = LONG_SHIFT;
-				fmt++;
+		}
+		/* Process field width */
+		width = 0;
+		for ( ; ; fmt++ ) {
+			if ( ( ( unsigned ) ( *fmt - '0' ) ) < 10 ) {
+				width = ( width * 10 ) + ( *fmt - '0' );
+			} else {
+				break;
 			}
-			if (*fmt == 'l') {
-				shift = LONGLONG_SHIFT;
-				fmt++;
+		}
+		/* We don't do floating point */
+		/* Process length modifier */
+		length = &type_sizes[INT_LEN];
+		for ( ; ; fmt++ ) {
+			if ( *fmt == 'h' ) {
+				length--;
+			} else if ( *fmt == 'l' ) {
+				length++;
+			} else if ( *fmt == 'z' ) {
+				length = &type_sizes[SIZE_T_LEN];
+			} else {
+				break;
 			}
-			if (*fmt == 'h') {
-				shift = SHRT_SHIFT;
-				fmt++;
-				if (*fmt == 'h') {
-					shift = CHAR_SHIFT;
-					fmt++;
-				}
+		}
+		/* Process conversion specifier */
+		if ( *fmt == 'c' ) {
+			character = va_arg ( args, unsigned int );
+			ctx->handler ( ctx, character );
+		} else if ( *fmt == 's' ) {
+			ptr = va_arg ( args, char * );
+			for ( ; *ptr ; ptr++ ) {
+				ctx->handler ( ctx, *ptr );
 			}
-
-			/*
-			 * Before each format q points to tmp buffer
-			 * After each format q points past end of item
-			 */
-			if ((*fmt | 0x20) == 'x') {
-				/* With x86 gcc, sizeof(long) == sizeof(int) */
-				unsigned long h;
-				int ncase;
-				if (shift > LONG_SHIFT) {
-					h = va_arg(args, unsigned long long);
-				} else if (shift > INT_SHIFT) {
-					h = va_arg(args, unsigned long);
-				} else {
-					h = va_arg(args, unsigned int);
-				}
-				ncase = (*fmt & 0x20);
-				if (alt) {
-					*q++ = '0';
-					*q++ = 'X' | ncase;
-				}
-				for ( ; shift >= 0; shift -= 4)
-					*q++ = "0123456789ABCDEF"[(h >> shift) & 0xF] | ncase;
+		} else if ( *fmt == 'p' ) {
+			hex = ( intptr_t ) va_arg ( args, void * );
+			ptr = format_hex ( num_buf, hex, width,
+					   ( ALT_FORM | LCASE ) );
+			do {
+				ctx->handler ( ctx, *(--ptr) );
+			} while ( ptr != num_buf );
+		} else if ( ( *fmt & ~0x20 ) == 'X' ) {
+			flags |= ( *fmt & 0x20 ); /* LCASE */
+			if ( *length >= sizeof ( unsigned long long ) ) {
+				hex = va_arg ( args, unsigned long long );
+			} else if ( *length >= sizeof ( unsigned long ) ) {
+				hex = va_arg ( args, unsigned long );
+			} else {
+				hex = va_arg ( args, unsigned int );
 			}
-			else if (*fmt == 'd') {
-				char *r, *t;
-				long i;
-				if (shift > LONG_SHIFT) {
-					i = va_arg(args, long long);
-				} else if (shift > INT_SHIFT) {
-					i = va_arg(args, long);
-				} else {
-					i = va_arg(args, int);
-				}
-				if (i < 0) {
-					*q++ = '-';
-					i = -i;
-				}
-				t = q;		/* save beginning of digits */
-				do {
-					*q++ = '0' + (i % 10);
-					i /= 10;
-				} while (i);
-				/* reverse digits, stop in middle */
-				r = q;		/* don't alter q */
-				while (--r > t) {
-					i = *r;
-					*r = *t;
-					*t++ = i;
-				}
+			ptr = format_hex ( num_buf, hex, width, flags );
+			do {
+				ctx->handler ( ctx, *(--ptr) );
+			} while ( ptr != num_buf );
+		} else if ( *fmt == 'd' ) {
+			if ( *length >= sizeof ( signed long ) ) {
+				decimal = va_arg ( args, signed long );
+			} else {
+				decimal = va_arg ( args, signed int );
 			}
-			else if (*fmt == '@') {
-				unsigned char *r;
-				union {
-					uint32_t	l;
-					unsigned char	c[4];
-				} u;
-				u.l = va_arg(args, uint32_t);
-				for (r = &u.c[0]; r < &u.c[4]; ++r)
-					q += sprintf(q, "%d.", *r);
-				--q;
-			}
-			else if (*fmt == '!') {
-				const char *r;
-				p = va_arg(args, char *);
-				for (r = p + ETH_ALEN; p < r; ++p)
-					q += sprintf(q, "%hhX:", *p);
-				--q;
-			}
-			else if (*fmt == 'c')
-				*q++ = va_arg(args, int);
-			else
-				*q++ = *fmt;
-			/* now output the saved string */
-			for (p = tmp; p < q; ++p)
-				buf ? *s++ = *p : putchar(*p);
+			ptr = format_decimal ( num_buf, decimal, width );
+			do {
+				ctx->handler ( ctx, *(--ptr) );
+			} while ( ptr != num_buf );
+		} else {
+			ctx->handler ( ctx, *fmt );
 		}
 	}
-	if (buf)
-		*s = '\0';
-	return (s - buf);
+
+	return ctx->len;
 }
 
 /**
- * Write a formatted string to a buffer.
+ * Write character to buffer
  *
- * @v buf		Buffer into which to write the string, or NULL
- * @v fmt		Format string
- * @v ...		Arguments corresponding to the format string
- * @ret len		Length of string written to buffer (if buf != NULL)
- * @ret	0		(if buf == NULL)
- * @err None		-
- *
- * If #buf==NULL, then the string will be written to the console
- * directly using putchar().
- *
+ * @v ctx		Context
+ * @v c			Character
  */
-int sprintf(char *buf, const char *fmt, ...)
-{
-	va_list args;
-	int i;
-	va_start(args, fmt);
-	i=vsprintf(buf, fmt, args);
-	va_end(args);
-	return i;
+static void printf_sputc ( struct printf_context *ctx, unsigned int c ) {
+	if ( ++ctx->len < ctx->max_len )
+		ctx->buf[ctx->len-1] = c;
 }
 
-#warning "Remove this buffer-overflow-in-waiting at some point"
+/**
+ * Write a formatted string to a buffer
+ *
+ * @v buf		Buffer into which to write the string
+ * @v size		Size of buffer
+ * @v fmt		Format string
+ * @v args		Arguments corresponding to the format string
+ * @ret len		Length of formatted string
+ *
+ * If the buffer is too small to contain the string, the returned
+ * length is the length that would have been written had enough space
+ * been available.
+ */
+int vsnprintf ( char *buf, size_t size, const char *fmt, va_list args ) {
+	struct printf_context ctx;
+	int len;
+
+	/* Ensure last byte is NUL if a size is specified.  This
+	 * catches the case of the buffer being too small, in which
+	 * case a trailing NUL would not otherwise be added.
+	 */
+	if ( size != PRINTF_NO_LENGTH )
+		buf[size-1] = '\0';
+
+	/* Hand off to vcprintf */
+	ctx.handler = printf_sputc;
+	ctx.buf = buf;
+	ctx.max_len = size;
+	len = vcprintf ( &ctx, fmt, args );
+
+	/* Add trailing NUL */
+	printf_sputc ( &ctx, '\0' );
+
+	return len;
+}
+
+/**
+ * Write a formatted string to a buffer
+ *
+ * @v buf		Buffer into which to write the string
+ * @v size		Size of buffer
+ * @v fmt		Format string
+ * @v ...		Arguments corresponding to the format string
+ * @ret len		Length of formatted string
+ */
 int snprintf ( char *buf, size_t size, const char *fmt, ... ) {
 	va_list args;
 	int i;
 
 	va_start ( args, fmt );
-	i = vsprintf ( buf, fmt, args );
+	i = vsnprintf ( buf, size, fmt, args );
 	va_end ( args );
 	return i;
+}
+
+/**
+ * Write character to console
+ *
+ * @v ctx		Context
+ * @v c			Character
+ */
+static void printf_putchar ( struct printf_context *ctx, unsigned int c ) {
+	++ctx->len;
+	putchar ( c );
+}
+
+/**
+ * Write a formatted string to the console
+ *
+ * @v fmt		Format string
+ * @v args		Arguments corresponding to the format string
+ * @ret len		Length of formatted string
+ */
+int vprintf ( const char *fmt, va_list args ) {
+	struct printf_context ctx;
+
+	/* Hand off to vcprintf */
+	ctx.handler = printf_putchar;	
+	return vcprintf ( &ctx, fmt, args );	
 }
 
 /**
@@ -198,16 +309,14 @@ int snprintf ( char *buf, size_t size, const char *fmt, ... ) {
  *
  * @v fmt		Format string
  * @v ...		Arguments corresponding to the format string
- * @ret	None		-
- * @err None		-
- *
+ * @ret	len		Length of formatted string
  */
-int printf(const char *fmt, ...)
-{
+int printf ( const char *fmt, ... ) {
 	va_list args;
 	int i;
-	va_start(args, fmt);
-	i=vsprintf(0, fmt, args);
-	va_end(args);
+
+	va_start ( args, fmt );
+	i = vprintf ( fmt, args );
+	va_end ( args );
 	return i;
 }
