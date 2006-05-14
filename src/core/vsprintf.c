@@ -171,7 +171,7 @@ static char * format_decimal ( char *end, signed long num, int width ) {
  * @v args		Arguments corresponding to the format string
  * @ret len		Length of formatted string
  */
-int vcprintf ( struct printf_context *ctx, const char *fmt, va_list args ) {
+size_t vcprintf ( struct printf_context *ctx, const char *fmt, va_list args ) {
 	int flags;
 	int width;
 	uint8_t *length;
@@ -296,14 +296,8 @@ static void printf_sputc ( struct printf_context *ctx, unsigned int c ) {
  */
 int vsnprintf ( char *buf, size_t size, const char *fmt, va_list args ) {
 	struct printf_context ctx;
-	int len;
-
-	/* Ensure last byte is NUL if a size is specified.  This
-	 * catches the case of the buffer being too small, in which
-	 * case a trailing NUL would not otherwise be added.
-	 */
-	if ( size != PRINTF_NO_LENGTH )
-		buf[size-1] = '\0';
+	size_t len;
+	size_t end;
 
 	/* Hand off to vcprintf */
 	ctx.handler = printf_sputc;
@@ -312,7 +306,12 @@ int vsnprintf ( char *buf, size_t size, const char *fmt, va_list args ) {
 	len = vcprintf ( &ctx, fmt, args );
 
 	/* Add trailing NUL */
-	printf_sputc ( &ctx, '\0' );
+	if ( size ) {
+		end = size - 1;
+		if ( len < end )
+			end = len;
+		buf[end] = '\0';
+	}
 
 	return len;
 }
