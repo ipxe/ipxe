@@ -172,9 +172,11 @@ int waddchnstr ( WINDOW *win, const chtype *chstr, int n ) {
 		_advcurs_nowrap( win );
 		/* set rendition code here */
 	}
-	_restore_curs_pos( win, pos ) && return OK;
+	_restore_curs_pos( win, pos );
+	return OK;
  err:
-	_restore_curs_pos( win, pos ) && return ERR;
+	_restore_curs_pos( win, pos );
+	return ERR;
 }
 
 /**
