@@ -28,6 +28,29 @@ typedef chtype attr_t;
 
 /** Curses SCREEN object */
 typedef struct _curses_screen {
+	/**
+	 * Move cursor to position specified by x,y coords
+	 *
+	 * @v scr	screen on which to operate
+	 * @v y		Y position
+	 * @v x		X position
+	 */
+	void ( * movetoyx ) ( struct _curses_screen *scr,
+			      unsigned int y, unsigned int x );
+	/**
+	 * Write character to current cursor position
+	 *
+	 * @v scr	screen on which to operate
+	 * @v c		character to be written
+	 */
+	void ( * putc ) ( struct _curses_screen *scr, chtype c );
+	/**
+	 * Read a character
+	 *
+	 * @v scr	screen on which to operate
+	 * @ret c	character
+	 */
+	int ( * getc ) ( struct _curses_screen *scr );
 } SCREEN;
 
 /** Curses Window struct */
@@ -812,32 +835,6 @@ static inline int waddstr ( WINDOW *win, const char *str ) {
 /*
  * Primitives
  */
-/**
- * Move cursor to position specified by x,y coords
- *
- * @v *scr	screen on which to operate
- * @v y		Y position
- * @v x		X position
- * @ret rc	void function
- */
-void _movetoyx ( struct _curses_screen *scr, unsigned int y, unsigned int x );
-/**
- * Write character (c) to current cursor position
- *
- * @v *scr	screen on which to operate
- * @v c		character to be written
- * @ret rc	void function
- */
-void _putc ( struct _curses_screen *scr, unsigned int c );
-/**
- * Retrieve a character from current cursor position and store
- * it in c
- *
- * @v *scr	screen on which to operate
- * @v *c	char ptr where retrieved character is to be stored
- * @ret rc	void function
- */
-void _getc ( struct _curses_screen *scr, unsigned int *c );
 /**
  * Advance cursor (wrap text)
  *
