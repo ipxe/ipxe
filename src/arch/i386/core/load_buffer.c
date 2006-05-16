@@ -1,5 +1,4 @@
 #include "io.h"
-#include "heap.h"
 #include "load_buffer.h"
 
 /*
