@@ -200,6 +200,7 @@ struct device_driver {
 
 #define __device_driver __table ( device_driver, 01 )
 
+#if 0
 #define DRIVER(_name,_type_driver,_bus_driver,_bus_info,	 	      \
 	       _probe,_disable) 		 			      \
 	struct device_driver device_ ## _bus_info __device_driver = {  \
@@ -210,6 +211,9 @@ struct device_driver {
 		.probe = ( int (*) () ) _probe,				      \
 		.disable = ( void (*) () ) _disable,			      \
 	};
+#endif
+
+#define DRIVER(a,b,c,d,e,f)
 
 /*
  * A bootable device, comprising a physical device on a bus, a driver
