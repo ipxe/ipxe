@@ -457,7 +457,7 @@ static int dmfe_probe ( struct nic *nic, struct pci_device *pci ) {
 
 	BASE = pci->ioaddr;
 	printf("dmfe.c: Found %s Vendor=0x%hX Device=0x%hX\n",
-	       pci->name, pci->vendor_id, pci->device_id);
+	       pci->name, pci->vendor, pci->device);
 
 	/* Read Chip revision */
 	pci_read_config_dword(pci, PCI_REVISION_ID, &dev_rev);
@@ -466,7 +466,7 @@ static int dmfe_probe ( struct nic *nic, struct pci_device *pci ) {
 	/* point to private storage */
 	db = &dfx;
 
-	db->chip_id = ((u32) pci->device_id << 16) | pci->vendor_id;
+	db->chip_id = ((u32) pci->device << 16) | pci->vendor;
 	BASE = pci_bar_start(pci, PCI_BASE_ADDRESS_0);
 	db->chip_revision = dev_rev;
 
@@ -1205,7 +1205,7 @@ static struct nic_operations dmfe_operations = {
 
 };
 
-static struct pci_id dmfe_nics[] = {
+static struct pci_device_id dmfe_nics[] = {
 	PCI_ROM(0x1282, 0x9100, "dmfe9100", "Davicom 9100"),
 	PCI_ROM(0x1282, 0x9102, "dmfe9102", "Davicom 9102"),
 	PCI_ROM(0x1282, 0x9009, "dmfe9009", "Davicom 9009"),

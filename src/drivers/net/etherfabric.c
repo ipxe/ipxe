@@ -2975,7 +2975,7 @@ static int etherfabric_probe ( struct dev *dev, struct pci_device *pci ) {
 	memset ( &efab_buffers, 0, sizeof ( efab_buffers ) );
 
 	/* Hook in appropriate operations table.  Do this early. */
-	if ( pci->device_id == EF1002_DEVID ) {
+	if ( pci->device == EF1002_DEVID ) {
 		efab.op = &ef1002_operations;
 	} else {
 		efab.op = &falcon_operations;
@@ -3021,7 +3021,7 @@ static int etherfabric_probe ( struct dev *dev, struct pci_device *pci ) {
 	return 1;
 }
 
-static struct pci_id etherfabric_nics[] = {
+static struct pci_device_id etherfabric_nics[] = {
 PCI_ROM(0x1924, 0xC101, "ef1002", "EtherFabric EF1002"),
 PCI_ROM(0x1924, 0x0703, "falcon", "EtherFabric Falcon"),
 };

@@ -991,7 +991,7 @@ ISA_ROM("ne","NE1000/2000 and clones");
 #endif
 
 #ifdef	INCLUDE_NS8390
-static struct pci_id nepci_nics[] = {
+static struct pci_device_id nepci_nics[] = {
 /* A few NE2000 PCI clones, list not exhaustive */
 PCI_ROM(0x10ec, 0x8029, "rtl8029",      "Realtek 8029"),
 PCI_ROM(0x1186, 0x0300, "dlink-528",    "D-Link DE-528"),

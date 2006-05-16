@@ -653,7 +653,7 @@ static struct nic_operations mtd_operations = {
 
 };
 
-static struct pci_id mtd80x_nics[] = {
+static struct pci_device_id mtd80x_nics[] = {
         PCI_ROM(0x1516, 0x0800, "MTD800", "Myson MTD800"),
         PCI_ROM(0x1516, 0x0803, "MTD803", "Surecom EP-320X"),
         PCI_ROM(0x1516, 0x0891, "MTD891", "Myson MTD891"),
@@ -676,7 +676,7 @@ static int mtd_probe ( struct nic *nic, struct pci_device *pci ) {
     adjust_pci_device(pci);
 
     mtdx.nic_name = pci->name;
-    mtdx.dev_id = pci->device_id;
+    mtdx.dev_id = pci->device;
     mtdx.ioaddr = nic->ioaddr;
 
     /* read ethernet id */

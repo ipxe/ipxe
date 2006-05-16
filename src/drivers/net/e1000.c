@@ -3707,7 +3707,7 @@ static struct nic_operations e1000_operations = {
 
 };
 
-static struct pci_id e1000_nics[] = {
+static struct pci_device_id e1000_nics[] = {
 PCI_ROM(0x8086, 0x1000, "e1000-82542",               "Intel EtherExpressPro1000"),
 PCI_ROM(0x8086, 0x1001, "e1000-82543gc-fiber",       "Intel EtherExpressPro1000 82543GC Fiber"),
 PCI_ROM(0x8086, 0x1004, "e1000-82543gc-copper",	     "Intel EtherExpressPro1000 82543GC Copper"),

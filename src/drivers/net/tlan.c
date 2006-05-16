@@ -811,7 +811,7 @@ static int tlan_probe ( struct nic *nic, struct pci_device *pci ) {
 	i = 0;
 	chip_idx = -1;
 	while (tlan_pci_tbl[i].name) {
-		if ((((u32) pci->device_id << 16) | pci->vendor_id) ==
+		if ((((u32) pci->device << 16) | pci->vendor) ==
 		    (tlan_pci_tbl[i].id.pci & 0xffffffff)) {
 			chip_idx = i;
 			break;
@@ -819,8 +819,8 @@ static int tlan_probe ( struct nic *nic, struct pci_device *pci ) {
 		i++;
 	}
 
-	priv->vendor_id = pci->vendor_id;
-	priv->dev_id = pci->device_id;
+	priv->vendor_id = pci->vendor;
+	priv->dev_id = pci->device;
 	priv->nic_name = pci->name;
 	priv->eoc = 0;
 
@@ -1704,7 +1704,7 @@ void TLan_PhyMonitor(struct net_device *dev)
 
 #endif				/* MONITOR */
 
-static struct pci_id tlan_nics[] = {
+static struct pci_device_id tlan_nics[] = {
 	PCI_ROM(0x0e11, 0xae34, "netel10", "Compaq Netelligent 10 T PCI UTP"),
 	PCI_ROM(0x0e11, 0xae32, "netel100","Compaq Netelligent 10/100 TX PCI UTP"),
 	PCI_ROM(0x0e11, 0xae35, "netflex3i", "Compaq Integrated NetFlex-3/P"),

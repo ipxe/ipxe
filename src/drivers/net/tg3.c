@@ -2852,9 +2852,9 @@ static int tg3_get_invariants(struct tg3 *tp)
 	if (((GET_ASIC_REV(tp->pci_chip_rev_id) == ASIC_REV_5703) &&
 		    ((grc_misc_cfg == 0x8000) || (grc_misc_cfg == 0x4000))) ||
 		((GET_ASIC_REV(tp->pci_chip_rev_id) == ASIC_REV_5705) &&
-			(tp->pdev->vendor_id == PCI_VENDOR_ID_BROADCOM) &&
-			((tp->pdev->device_id == PCI_DEVICE_ID_TIGON3_5901) ||
-				(tp->pdev->device_id == PCI_DEVICE_ID_TIGON3_5901_2)))) {
+			(tp->pdev->vendor == PCI_VENDOR_ID_BROADCOM) &&
+			((tp->pdev->device == PCI_DEVICE_ID_TIGON3_5901) ||
+				(tp->pdev->device == PCI_DEVICE_ID_TIGON3_5901_2)))) {
 		tp->tg3_flags |= TG3_FLAG_10_100_ONLY;
 	}
 
@@ -2886,7 +2886,7 @@ static int  tg3_get_device_address(struct tg3 *tp)
 	struct nic *nic = tp->nic;
 	uint32_t hi, lo, mac_offset;
 
-	if (PCI_FUNC(tp->pdev->busdevfn) == 0)
+	if (PCI_FUNC(tp->pdev->devfn) == 0)
 		mac_offset = 0x7c;
 	else
 		mac_offset = 0xcc;
@@ -3362,7 +3362,7 @@ static int tg3_probe ( struct nic *nic, struct pci_device *pdev ) {
 }
 
 
-static struct pci_id tg3_nics[] = {
+static struct pci_device_id tg3_nics[] = {
 PCI_ROM(0x14e4, 0x1644, "tg3-5700",        "Broadcom Tigon 3 5700"),
 PCI_ROM(0x14e4, 0x1645, "tg3-5701",        "Broadcom Tigon 3 5701"),
 PCI_ROM(0x14e4, 0x1646, "tg3-5702",        "Broadcom Tigon 3 5702"),

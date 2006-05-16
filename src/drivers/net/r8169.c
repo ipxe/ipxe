@@ -868,7 +868,7 @@ static struct nic_operations r8169_operations = {
 
 };
 
-static struct pci_id r8169_nics[] = {
+static struct pci_device_id r8169_nics[] = {
 	PCI_ROM(0x10ec, 0x8169, "r8169", "RealTek RTL8169 Gigabit Ethernet"),
         PCI_ROM(0x16ec, 0x0116, "usr-r8169", "US Robotics RTL8169 Gigabit Ethernet"),
         PCI_ROM(0x1186, 0x4300, "dlink-r8169", "D-Link RTL8169 Gigabit Ethernet"),
@@ -890,7 +890,7 @@ static int r8169_probe ( struct nic *nic, struct pci_device *pci ) {
 	int option = -1, Cap10_100 = 0, Cap1000 = 0;
 
 	printf("r8169.c: Found %s, Vendor=%hX Device=%hX\n",
-	       pci->name, pci->vendor_id, pci->device_id);
+	       pci->name, pci->vendor, pci->device);
 
 	board_idx++;
 

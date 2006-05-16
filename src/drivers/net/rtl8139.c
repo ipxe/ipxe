@@ -528,7 +528,7 @@ static struct nic_operations rtl_operations = {
 
 };
 
-static struct pci_id rtl8139_nics[] = {
+static struct pci_device_id rtl8139_nics[] = {
 PCI_ROM(0x10ec, 0x8129, "rtl8129",       "Realtek 8129"),
 PCI_ROM(0x10ec, 0x8139, "rtl8139",       "Realtek 8139"),
 PCI_ROM(0x10ec, 0x8138, "rtl8139b",      "Realtek 8139B"),

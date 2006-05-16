@@ -517,7 +517,7 @@ static struct nic_operations epic100_operations = {
 
 };
 
-static struct pci_id epic100_nics[] = {
+static struct pci_device_id epic100_nics[] = {
 PCI_ROM(0x10b8, 0x0005, "epic100",    "SMC EtherPowerII"),		/* SMC 83c170 EPIC/100 */
 PCI_ROM(0x10b8, 0x0006, "smc-83c175", "SMC EPIC/C 83c175"),
 };

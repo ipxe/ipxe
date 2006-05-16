@@ -590,7 +590,7 @@ static int sundance_probe ( struct nic *nic, struct pci_device *pci ) {
 	/* BASE is used throughout to address the card */
 	BASE = pci->ioaddr;
 	printf(" sundance.c: Found %s Vendor=0x%hX Device=0x%hX\n",
-	       pci->name, pci->vendor_id, pci->device_id);
+	       pci->name, pci->vendor, pci->device);
 
 	/* Get the MAC Address by reading the EEPROM */
 	for (i = 0; i < 3; i++) {
@@ -873,7 +873,7 @@ static void set_rx_mode(struct nic *nic __unused)
 	return;
 }
 
-static struct pci_id sundance_nics[] = {
+static struct pci_device_id sundance_nics[] = {
 	PCI_ROM(0x13f0, 0x0201, "sundance", "ST201 Sundance 'Alta' based Adaptor"),
 	PCI_ROM(0x1186, 0x1002, "dfe530txs", "D-Link DFE530TXS (Sundance ST201 Alta)"),
 };

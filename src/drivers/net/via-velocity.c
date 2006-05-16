@@ -676,7 +676,7 @@ static int velocity_probe(struct dev *dev, struct pci_device *pci)
 	struct mac_regs *regs;
 
 	printf("via-velocity.c: Found %s Vendor=0x%hX Device=0x%hX\n",
-	       pci->name, pci->vendor_id, pci->device_id);
+	       pci->name, pci->vendor, pci->device);
 
 	/* point to private storage */
 	vptr = &vptx;
@@ -1930,7 +1930,7 @@ int pci_set_power_state(struct pci_device *dev, int state)
 	return 0;
 }
 
-static struct pci_id velocity_nics[] = {
+static struct pci_device_id velocity_nics[] = {
 	PCI_ROM(0x1106, 0x3119, "via-velocity", "VIA Networking Velocity Family Gigabit Ethernet Adapter"),
 };
 

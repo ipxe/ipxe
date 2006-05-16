@@ -609,7 +609,7 @@ static struct nic_operations w89c840_operations = {
 
 };
 
-static struct pci_id w89c840_nics[] = {
+static struct pci_device_id w89c840_nics[] = {
 PCI_ROM(0x1050, 0x0840, "winbond840",     "Winbond W89C840F"),
 PCI_ROM(0x11f6, 0x2011, "compexrl100atx", "Compex RL100ATX"),
 };
@@ -643,20 +643,20 @@ static int w89c840_probe ( struct nic *nic, struct pci_device *p ) {
 #define PCI_DEVICE_ID_COMPEX_RL100ATX   0x2011
 
     /* From Matt Hortman <mbhortman@acpthinclient.com> */
-    if (p->vendor_id == PCI_VENDOR_ID_WINBOND2
-        && p->device_id == PCI_DEVICE_ID_WINBOND2_89C840) {
+    if (p->vendor == PCI_VENDOR_ID_WINBOND2
+        && p->device == PCI_DEVICE_ID_WINBOND2_89C840) {
 
         /* detected "Winbond W89c840 Fast Ethernet PCI NIC" */
 
-    } else if ( p->vendor_id == PCI_VENDOR_ID_COMPEX
-                && p->device_id == PCI_DEVICE_ID_COMPEX_RL100ATX) {
+    } else if ( p->vendor == PCI_VENDOR_ID_COMPEX
+                && p->device == PCI_DEVICE_ID_COMPEX_RL100ATX) {
 
         /* detected "Compex RL100ATX Fast Ethernet PCI NIC" */
 
     } else {
         /* Gee, guess what? They missed again. */
         printf("device ID : %X - is not a Compex RL100ATX NIC.\n",
-	       p->device_id);
+	       p->device);
         return 0;
     }
 

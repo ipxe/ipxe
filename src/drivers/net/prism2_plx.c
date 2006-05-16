@@ -95,7 +95,7 @@ static void prism2_plx_disable ( struct nic *nic,
   prism2_disable ( nic );
 }
 
-static struct pci_id prism2_plx_nics[] = {
+static struct pci_device_id prism2_plx_nics[] = {
 PCI_ROM(0x1385, 0x4100, "ma301",         "Netgear MA301"),
 PCI_ROM(0x10b7, 0x7770, "3c-airconnect", "3Com AirConnect"),
 PCI_ROM(0x111a, 0x1023, "ss1023",        "Siemens SpeedStream SS1023"),

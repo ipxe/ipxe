@@ -1,367 +1,339 @@
-#include "stdint.h"
-#include "string.h"
-#include "console.h"
-#include "nic.h"
+/*
+ * Copyright (C) 2006 Michael Brown <mbrown@fensystems.co.uk>.
+ *
+ * Based in part on pci.c from Etherboot 5.4, by Ken Yap and David
+ * Munro, in turn based on the Linux kernel's PCI implementation.
+ *
+ * This program is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU General Public License as
+ * published by the Free Software Foundation; either version 2 of the
+ * License, or any later version.
+ *
+ * This program is distributed in the hope that it will be useful, but
+ * WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ * General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program; if not, write to the Free Software
+ * Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
+ */
+
+#include <stdint.h>
+#include <string.h>
+#include <errno.h>
+#include <malloc.h>
+#include <gpxe/tables.h>
+#include <gpxe/device.h>
 #include <gpxe/pci.h>
 
-/*
- * pci_io.c may know how many buses we have, in which case it can
- * overwrite this value.
+/** @file
+ *
+ * PCI bus
+ *
+ */
+
+static struct pci_driver pci_drivers[0] __table_start ( pci_drivers );
+static struct pci_driver pci_drivers_end[0] __table_end ( pci_drivers );
+
+static void pcibus_remove ( struct root_device *rootdev );
+
+/**
+ * Maximum PCI bus number
+ *
+ * Architecture-specific code may know how many buses we have, in
+ * which case it can overwrite this value.
  *
  */
 unsigned int pci_max_bus = 0xff;
 
-/*
- * Increment a bus_loc structure to the next possible PCI location.
- * Leave the structure zeroed and return 0 if there are no more valid
- * locations.
+/**
+ * Read PCI BAR
  *
+ * @v pci		PCI device
+ * @v reg		PCI register number
+ * @ret bar		Base address register
+ *
+ * Reads the specified PCI base address register, including the flags
+ * portion.  64-bit BARs will be handled automatically.  If the value
+ * of the 64-bit BAR exceeds the size of an unsigned long (i.e. if the
+ * high dword is non-zero on a 32-bit platform), then the value
+ * returned will be zero plus the flags for a 64-bit BAR.  Unreachable
+ * 64-bit BARs are therefore returned as uninitialised 64-bit BARs.
  */
-static int pci_next_location ( struct bus_loc *bus_loc ) {
-	struct pci_loc *pci_loc = ( struct pci_loc * ) bus_loc;
-	
-	/*
-	 * Ensure that there is sufficient space in the shared bus
-	 * structures for a struct pci_loc and a struct
-	 * pci_dev, as mandated by bus.h.
-	 *
-	 */
-	BUS_LOC_CHECK ( struct pci_loc );
-	BUS_DEV_CHECK ( struct pci_device );
+static unsigned long pci_bar ( struct pci_device *pci, unsigned int reg ) {
+	uint32_t low;
+	uint32_t high;
 
-	return ( ++pci_loc->busdevfn );
-}
-
-/*
- * Fill in parameters (vendor & device ids, class, membase etc.) for a
- * PCI device based on bus & devfn.
- *
- * Returns 1 if a device was found, 0 for no device present.
- *
- */
-static int pci_fill_device ( struct bus_dev *bus_dev,
-			     struct bus_loc *bus_loc ) {
-	struct pci_loc *pci_loc = ( struct pci_loc * ) bus_loc;
-	struct pci_device *pci = ( struct pci_device * ) bus_dev;
-	uint16_t busdevfn = pci_loc->busdevfn;
-	static struct {
-		uint16_t busdevfn0;
-		int is_present;
-	} cache = { 0, 1 };
-	uint32_t l;
-	int reg;
-
-	/* Store busdevfn in struct pci_device and set default values */
-	pci->busdevfn = busdevfn;
-	pci->name = "?";
-
-	/* Check bus is within range */
-	if ( PCI_BUS ( busdevfn ) > pci_max_bus ) {
-		return 0;
-	}
-
-	/* Check to see if we've cached the result that this is a
-	 * non-zero function on a non-existent card.  This is done to
-	 * increase scan speed by a factor of 8.
-	 */
-	if ( ( PCI_FUNC ( busdevfn ) != 0 ) &&
-	     ( PCI_FN0 ( busdevfn ) == cache.busdevfn0 ) &&
-	     ( ! cache.is_present ) ) {
-		return 0;
-	}
-	
-	/* Check to see if there's anything physically present.
-	 */
-	pci_read_config_dword ( pci, PCI_VENDOR_ID, &l );
-	/* some broken boards return 0 if a slot is empty: */
-	if ( ( l == 0xffffffff ) || ( l == 0x00000000 ) ) {
-		if ( PCI_FUNC ( busdevfn ) == 0 ) {
-			/* Don't look for subsequent functions if the
-			 * card itself is not present.
-			 */
-			cache.busdevfn0 = busdevfn;
-			cache.is_present = 0;
-		}
-		return 0;
-	}
-	pci->vendor_id = l & 0xffff;
-	pci->device_id = ( l >> 16 ) & 0xffff;
-	
-	/* Check that we're not a duplicate function on a
-	 * non-multifunction device.
-	 */
-	if ( PCI_FUNC ( busdevfn ) != 0 ) {
-		uint8_t header_type;
-
-		pci->busdevfn &= PCI_FN0 ( busdevfn );
-		pci_read_config_byte ( pci, PCI_HEADER_TYPE, &header_type );
-		pci->busdevfn = busdevfn;
-
-		if ( ! ( header_type & 0x80 ) ) {
-			return 0;
-		}
-	}
-	
-	/* Get device class */
-	pci_read_config_word ( pci, PCI_SUBCLASS_CODE, &pci->class );
-
-	/* Get revision */
-	pci_read_config_byte ( pci, PCI_REVISION, &pci->revision );
-
-	/* Get the "membase" */
-	pci_read_config_dword ( pci, PCI_BASE_ADDRESS_1, &pci->membase );
-				
-	/* Get the "ioaddr" */
-	pci->ioaddr = 0;
-	for ( reg = PCI_BASE_ADDRESS_0; reg <= PCI_BASE_ADDRESS_5; reg += 4 ) {
-		pci_read_config_dword ( pci, reg, &pci->ioaddr );
-		if ( pci->ioaddr & PCI_BASE_ADDRESS_SPACE_IO ) {
-			pci->ioaddr &= PCI_BASE_ADDRESS_IO_MASK;
-			if ( pci->ioaddr ) {
-				break;
+	pci_read_config_dword ( pci, reg, &low );
+	if ( ( low & (PCI_BASE_ADDRESS_SPACE|PCI_BASE_ADDRESS_MEM_TYPE_MASK) )
+	     == (PCI_BASE_ADDRESS_SPACE_MEMORY|PCI_BASE_ADDRESS_MEM_TYPE_64) ){
+		pci_read_config_dword ( pci, reg + 4, &high );
+		if ( high ) {
+			if ( sizeof ( unsigned long ) > sizeof ( uint32_t ) ) {
+				return ( ( ( uint64_t ) high << 32 ) | low );
+			} else {
+				DBG ( "Unhandled 64-bit BAR %08x%08x\n",
+				      high, low );
+				return PCI_BASE_ADDRESS_MEM_TYPE_64;
 			}
 		}
-		pci->ioaddr = 0;
 	}
-
-	/* Get the irq */
-	pci_read_config_byte ( pci, PCI_INTERRUPT_PIN, &pci->irq );
-	if ( pci->irq ) {
-		pci_read_config_byte ( pci, PCI_INTERRUPT_LINE, &pci->irq );
-	}
-
-	DBG ( "PCI found device %hhx:%hhx.%d Class %hx: %hx:%hx (rev %hhx)\n",
-	      PCI_BUS ( pci->busdevfn ), PCI_DEV ( pci->busdevfn ),
-	      PCI_FUNC ( pci->busdevfn ), pci->class, pci->vendor_id,
-	      pci->device_id, pci->revision );
-
-	return 1;
+	return low;
 }
 
-/*
- * Test whether or not a driver is capable of driving the device.
+/**
+ * Find the start of a PCI BAR
  *
+ * @v pci		PCI device
+ * @v reg		PCI register number
+ * @ret start		BAR start address
+ *
+ * Reads the specified PCI base address register, and returns the
+ * address portion of the BAR (i.e. without the flags).
+ *
+ * If the address exceeds the size of an unsigned long (i.e. if a
+ * 64-bit BAR has a non-zero high dword on a 32-bit machine), the
+ * return value will be zero.
  */
-static int pci_check_driver ( struct bus_dev *bus_dev,
-			      struct device_driver *device_driver ) {
-	struct pci_device *pci = ( struct pci_device * ) bus_dev;
-	struct pci_driver *pci_driver
-		= ( struct pci_driver * ) device_driver->bus_driver_info;
-	unsigned int i;
+unsigned long pci_bar_start ( struct pci_device *pci, unsigned int reg ) {
+	unsigned long bar;
 
-	/* If driver has a class, and class matches, use it */
-	if ( pci_driver->class && 
-	     ( pci_driver->class == pci->class ) ) {
-		DBG ( "PCI driver %s matches class %hx\n",
-		      device_driver->name, pci_driver->class );
-		pci->name = device_driver->name;
-		return 1;
+	bar = pci_bar ( pci, reg );
+	if ( (bar & PCI_BASE_ADDRESS_SPACE) == PCI_BASE_ADDRESS_SPACE_MEMORY ){
+		return ( bar & PCI_BASE_ADDRESS_MEM_MASK );
+	} else {
+		return ( bar & PCI_BASE_ADDRESS_IO_MASK );
 	}
-		
-	/* If any of driver's IDs match, use it */
-	for ( i = 0 ; i < pci_driver->id_count; i++ ) {
-		struct pci_id *id = &pci_driver->ids[i];
-		
-		if ( ( pci->vendor_id == id->vendor_id ) &&
-		     ( pci->device_id == id->device_id ) ) {
-			DBG ( "PCI driver %s device %s matches ID %hx:%hx\n",
-			      device_driver->name, id->name,
-			      id->vendor_id, id->device_id );
-			pci->name = id->name;
-			return 1;
+}
+
+/**
+ * Read membase and ioaddr for a PCI device
+ *
+ * @v pci		PCI device
+ *
+ * This scans through all PCI BARs on the specified device.  The first
+ * valid memory BAR is recorded as pci_device::membase, and the first
+ * valid IO BAR is recorded as pci_device::ioaddr.
+ *
+ * 64-bit BARs are handled automatically.  On a 32-bit platform, if a
+ * 64-bit BAR has a non-zero high dword, it will be regarded as
+ * invalid.
+ */
+static void pci_read_bases ( struct pci_device *pci ) {
+	unsigned long bar;
+	int reg;
+
+	for ( reg = PCI_BASE_ADDRESS_0; reg <= PCI_BASE_ADDRESS_5; reg += 4 ) {
+		bar = pci_bar ( pci, reg );
+		if ( bar & PCI_BASE_ADDRESS_SPACE_IO ) {
+			if ( ! pci->ioaddr )
+				pci->ioaddr = 
+					( bar & PCI_BASE_ADDRESS_IO_MASK );
+		} else {
+			if ( ! pci->membase )
+				pci->membase =
+					( bar & PCI_BASE_ADDRESS_MEM_MASK );
+			/* Skip next BAR if 64-bit */
+			if ( bar & PCI_BASE_ADDRESS_MEM_TYPE_64 )
+				reg += 4;
 		}
 	}
-
-	return 0;
 }
 
-/*
- * Describe a PCI device
+/**
+ * Enable PCI device
  *
- */
-static char * pci_describe_device ( struct bus_dev *bus_dev ) {
-	struct pci_device *pci = ( struct pci_device * ) bus_dev;
-	static char pci_description[] = "PCI 00:00.0";
-
-	sprintf ( pci_description + 4, "%hhx:%hhx.%d",
-		  PCI_BUS ( pci->busdevfn ), PCI_DEV ( pci->busdevfn ),
-		  PCI_FUNC ( pci->busdevfn ) );
-	return pci_description;
-}
-
-/*
- * Name a PCI device
+ * @v pci		PCI device
  *
- */
-static const char * pci_name_device ( struct bus_dev *bus_dev ) {
-	struct pci_device *pci = ( struct pci_device * ) bus_dev;
-	
-	return pci->name;
-}
-
-/*
- * PCI bus operations table
- *
- */
-struct bus_driver pci_driver __bus_driver = {
-	.name			= "PCI",
-	.next_location		= pci_next_location,
-	.fill_device		= pci_fill_device,
-	.check_driver		= pci_check_driver,
-	.describe_device	= pci_describe_device,
-	.name_device		= pci_name_device,
-};
-
-/*
  * Set device to be a busmaster in case BIOS neglected to do so.  Also
  * adjust PCI latency timer to a reasonable value, 32.
  */
 void adjust_pci_device ( struct pci_device *pci ) {
-	unsigned short	new_command, pci_command;
-	unsigned char	pci_latency;
+	unsigned short new_command, pci_command;
+	unsigned char pci_latency;
 
 	pci_read_config_word ( pci, PCI_COMMAND, &pci_command );
 	new_command = pci_command | PCI_COMMAND_MASTER | PCI_COMMAND_IO;
 	if ( pci_command != new_command ) {
-		DBG ( "PCI BIOS has not enabled device %hhx:%hhx.%d! "
-		      "Updating PCI command %hX->%hX\n",
-		      PCI_BUS ( pci->busdevfn ), PCI_DEV ( pci->busdevfn ),
-		      PCI_FUNC ( pci->busdevfn ), pci_command, new_command );
+		DBG ( "PCI BIOS has not enabled device %02x:%02x.%x! "
+		      "Updating PCI command %04x->%04x\n", pci->bus,
+		      PCI_SLOT ( pci->devfn ), PCI_FUNC ( pci->devfn ),
+		      pci_command, new_command );
 		pci_write_config_word ( pci, PCI_COMMAND, new_command );
 	}
+
 	pci_read_config_byte ( pci, PCI_LATENCY_TIMER, &pci_latency);
 	if ( pci_latency < 32 ) {
-		DBG ( "PCI device %hhx:%hhx.%d latency timer is "
-		      "unreasonably low at %d. Setting to 32.\n",
-		      PCI_BUS ( pci->busdevfn ), PCI_DEV ( pci->busdevfn ),
-		      PCI_FUNC ( pci->busdevfn ), pci_latency );
+		DBG ( "PCI device %02x:%02x.%x latency timer is unreasonably "
+		      "low at %d. Setting to 32.\n", pci->bus,
+		      PCI_SLOT ( pci->devfn ), PCI_FUNC ( pci->devfn ),
+		      pci_latency );
 		pci_write_config_byte ( pci, PCI_LATENCY_TIMER, 32);
 	}
 }
 
-/*
- * Find the start of a pci resource.
+/**
+ * Register PCI device
+ *
+ * @v pci		PCI device
+ * @ret rc		Return status code
+ *
+ * Searches for a driver for the PCI device.  If a driver is found,
+ * its probe() routine is called, and the device is added to the
+ * device hierarchy.
  */
-unsigned long pci_bar_start ( struct pci_device *pci, unsigned int index ) {
-	uint32_t lo, hi;
-	unsigned long bar;
+static int register_pcidev ( struct pci_device *pci ) {
+	struct pci_driver *driver;
+	struct pci_device_id *id;
+	unsigned int i;
+	int rc;
 
-	pci_read_config_dword ( pci, index, &lo );
-	if ( lo & PCI_BASE_ADDRESS_SPACE_IO ) {
-		bar = lo & PCI_BASE_ADDRESS_IO_MASK;
-	} else {
-		bar = 0;
-		if ( ( lo & PCI_BASE_ADDRESS_MEM_TYPE_MASK ) ==
-		     PCI_BASE_ADDRESS_MEM_TYPE_64) {
-			pci_read_config_dword ( pci, index + 4, &hi );
-			if ( hi ) {
-#if ULONG_MAX > 0xffffffff
-				bar = hi;
-				bar <<= 32;
-#else
-				printf ( "Unhandled 64bit BAR %08x:%08x\n",
-					 hi, lo );
-				return -1UL;
-#endif
+	DBG ( "Registering PCI device %02x:%02x.%x (%04x:%04x mem %lx "
+	      "io %lx irq %d)\n", pci->bus, PCI_SLOT ( pci->devfn ),
+	      PCI_FUNC ( pci->devfn ), pci->vendor, pci->device,
+	      pci->membase, pci->ioaddr, pci->irq );
+
+	for ( driver = pci_drivers ; driver < pci_drivers_end ; driver++ ) {
+		for ( i = 0 ; i < driver->id_count ; i++ ) {
+			id = &driver->ids[i];
+			if ( ( id->vendor != pci->vendor ) ||
+			     ( id->device != pci->device ) )
+				continue;
+			pci->driver = driver;
+			pci->name = id->name;
+			DBG ( "...using driver %s\n", pci->name );
+			if ( ( rc = driver->probe ( pci, id ) ) != 0 ) {
+				DBG ( "......probe failed\n" );
+				continue;
 			}
+			list_add ( &pci->dev.siblings,
+				   &pci->dev.parent->children );
+			return 0;
 		}
-		bar |= lo & PCI_BASE_ADDRESS_MEM_MASK;
 	}
-	return bar + pci_bus_base ( pci );
-}
 
-/*
- * Find the size of a pci resource.
- */
-unsigned long pci_bar_size ( struct pci_device *pci, unsigned int bar ) {
-	uint32_t start, size;
-
-	/* Save the original bar */
-	pci_read_config_dword ( pci, bar, &start );
-	/* Compute which bits can be set */
-	pci_write_config_dword ( pci, bar, ~0 );
-	pci_read_config_dword ( pci, bar, &size );
-	/* Restore the original size */
-	pci_write_config_dword ( pci, bar, start );
-	/* Find the significant bits */
-	if ( start & PCI_BASE_ADDRESS_SPACE_IO ) {
-		size &= PCI_BASE_ADDRESS_IO_MASK;
-	} else {
-		size &= PCI_BASE_ADDRESS_MEM_MASK;
-	}
-	/* Find the lowest bit set */
-	size = size & ~( size - 1 );
-	return size;
+	DBG ( "...no driver found\n" );
+	return -ENOTTY;
 }
 
 /**
- * pci_find_capability - query for devices' capabilities 
- * @pci: PCI device to query
- * @cap: capability code
+ * Unregister a PCI device
  *
- * Tell if a device supports a given PCI capability.
- * Returns the address of the requested capability structure within the
- * device's PCI configuration space or 0 in case the device does not
- * support it.  Possible values for @cap:
+ * @v pci		PCI device
  *
- *  %PCI_CAP_ID_PM           Power Management 
- *
- *  %PCI_CAP_ID_AGP          Accelerated Graphics Port 
- *
- *  %PCI_CAP_ID_VPD          Vital Product Data 
- *
- *  %PCI_CAP_ID_SLOTID       Slot Identification 
- *
- *  %PCI_CAP_ID_MSI          Message Signalled Interrupts
- *
- *  %PCI_CAP_ID_CHSWP        CompactPCI HotSwap 
+ * Calls the device's driver's remove() routine, and removes the
+ * device from the device hierarchy.
  */
-int pci_find_capability ( struct pci_device *pci, int cap ) {
-	uint16_t status;
-	uint8_t pos, id;
-	uint8_t hdr_type;
-	int ttl = 48;
+static void unregister_pcidev ( struct pci_device *pci ) {
+	pci->driver->remove ( pci );
+	list_del ( &pci->dev.siblings );
+	DBG ( "Unregistered PCI device %02x:%02x.%x\n", pci->bus,
+	      PCI_SLOT ( pci->devfn ), PCI_FUNC ( pci->devfn ) );
+}
 
-	pci_read_config_word ( pci, PCI_STATUS, &status );
-	if ( ! ( status & PCI_STATUS_CAP_LIST ) )
-		return 0;
+/**
+ * Probe PCI root bus
+ *
+ * @v rootdev		PCI bus root device
+ *
+ * Scans the PCI bus for devices and registers all devices it can
+ * find.
+ */
+static int pcibus_probe ( struct root_device *rootdev ) {
+	struct pci_device *pci = NULL;
+	unsigned int bus;
+	unsigned int devfn;
+	uint8_t hdrtype;
+	uint32_t tmp;
+	int rc;
 
-	pci_read_config_byte ( pci, PCI_HEADER_TYPE, &hdr_type );
-	switch ( hdr_type & 0x7F ) {
-	case PCI_HEADER_TYPE_NORMAL:
-	case PCI_HEADER_TYPE_BRIDGE:
-	default:
-		pci_read_config_byte ( pci, PCI_CAPABILITY_LIST, &pos );
-		break;
-	case PCI_HEADER_TYPE_CARDBUS:
-		pci_read_config_byte ( pci, PCI_CB_CAPABILITY_LIST, &pos );
-		break;
+	for ( bus = 0 ; bus <= pci_max_bus ; bus++ ) {
+		for ( devfn = 0 ; devfn <= 0xff ; devfn++ ) {
+
+			/* Allocate struct pci_device */
+			if ( ! pci )
+				pci = malloc ( sizeof ( *pci ) );
+			if ( ! pci ) {
+				rc = -ENOMEM;
+				goto err;
+			}
+			memset ( pci, 0, sizeof ( *pci ) );
+			pci->bus = bus;
+			pci->devfn = devfn;
+			
+			/* Skip all but the first function on
+			 * non-multifunction cards
+			 */
+			if ( PCI_FUNC ( devfn ) == 0 ) {
+				pci_read_config_byte ( pci, PCI_HEADER_TYPE,
+						       &hdrtype );
+			} else if ( ! ( hdrtype & 0x80 ) ) {
+					continue;
+			}
+
+			/* Check for physical device presence */
+			pci_read_config_dword ( pci, PCI_VENDOR_ID, &tmp );
+			if ( ( tmp == 0xffffffff ) || ( tmp == 0 ) )
+				continue;
+			
+			/* Populate struct pci_device */
+			pci->vendor = ( tmp & 0xffff );
+			pci->device = ( tmp >> 16 );
+			pci_read_config_dword ( pci, PCI_REVISION, &tmp );
+			pci->class = ( tmp >> 8 );
+			pci_read_config_byte ( pci, PCI_INTERRUPT_LINE,
+					       &pci->irq );
+			pci_read_bases ( pci );
+			INIT_LIST_HEAD ( &pci->dev.children );
+			pci->dev.parent = &rootdev->dev;
+			
+			/* Look for a driver */
+			if ( register_pcidev ( pci ) == 0 ) {
+				/* pcidev registered, we can drop our ref */
+				pci = NULL;
+			} else {
+				/* Not registered; re-use struct pci_device */
+			}
+		}
 	}
-	while ( ttl-- && pos >= 0x40 ) {
-		pos &= ~3;
-		pci_read_config_byte ( pci, pos + PCI_CAP_LIST_ID, &id );
-		DBG ( "PCI Capability: %d\n", id );
-		if ( id == 0xff )
-			break;
-		if ( id == cap )
-			return pos;
-		pci_read_config_byte ( pci, pos + PCI_CAP_LIST_NEXT, &pos );
-	}
+
+	free ( pci );
 	return 0;
+
+ err:
+	free ( pci );
+	pcibus_remove ( rootdev );
+	return rc;
 }
 
-/*
- * Fill in a nic structure
+/**
+ * Remove PCI root bus
  *
+ * @v rootdev		PCI bus root device
  */
-void pci_fill_nic ( struct nic *nic, struct pci_device *pci ) {
+static void pcibus_remove ( struct root_device *rootdev ) {
+	struct pci_device *pci;
+	struct pci_device *tmp;
 
-	/* Fill in ioaddr and irqno */
-	nic->ioaddr = pci->ioaddr;
-	nic->irqno = pci->irq;
-
-	/* Fill in DHCP device ID structure */
-	nic->dhcp_dev_id.bus_type = PCI_BUS_TYPE;
-	nic->dhcp_dev_id.vendor_id = htons ( pci->vendor_id );
-	nic->dhcp_dev_id.device_id = htons ( pci->device_id );
+	list_for_each_entry_safe ( pci, tmp, &rootdev->dev.children,
+				   dev.siblings ) {
+		unregister_pcidev ( pci );
+		free ( pci );
+	}
 }
+
+/** PCI bus root device driver */
+static struct root_driver pci_root_driver = {
+	.probe = pcibus_probe,
+	.remove = pcibus_remove,
+};
+
+/** PCI bus root device */
+struct root_device pci_root_device __root_device = {
+	.name = "PCI",
+	.driver = &pci_root_driver,
+	.dev = {
+		.children = LIST_HEAD_INIT ( pci_root_device.dev.children ),
+	},
+};

@@ -259,8 +259,8 @@ natsemi_probe ( struct nic *nic, struct pci_device *pci ) {
     nic->ioaddr = pci->ioaddr;
 
     ioaddr     = pci->ioaddr;
-    vendor     = pci->vendor_id;
-    dev_id     = pci->device_id;
+    vendor     = pci->vendor;
+    dev_id     = pci->device;
     nic_name   = pci->name;
 
     /* natsemi has a non-standard PM control register
@@ -770,7 +770,7 @@ static struct nic_operations natsemi_operations = {
 
 };
 
-static struct pci_id natsemi_nics[] = {
+static struct pci_device_id natsemi_nics[] = {
 PCI_ROM(0x100b, 0x0020, "dp83815", "DP83815"),
 };
 

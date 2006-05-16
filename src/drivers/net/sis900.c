@@ -121,18 +121,20 @@ static struct mii_phy {
 
 
 // PCI to ISA bridge for SIS640E access
-static struct pci_id   pci_isa_bridge_list[] = {
-	{ 0x1039, 0x0008,
-		"SIS 85C503/5513 PCI to ISA bridge"},
+static struct pci_device_id pci_isa_bridge_list[] = {
+	{ .vendor = 0x1039, .device = 0x0008,
+		.name = "SIS 85C503/5513 PCI to ISA bridge"},
 };
 
 PCI_DRIVER ( sis_bridge_pci_driver, pci_isa_bridge_list, PCI_NO_CLASS );
 
+#if 0
 static struct device_driver sis_bridge_driver = {
     .name = "SIS ISA bridge",
     .bus_driver = &pci_driver,
     .bus_driver_info = ( struct bus_driver_info * ) &sis_bridge_pci_driver,
 };
+#endif
 
 /* Function Prototypes */
 
@@ -254,10 +256,12 @@ static int sis630e_get_mac_addr(struct pci_device * pci_dev __unused, struct nic
 	    struct pci_device isa_bridge;
 	} u;
 
+#if 0
 	/* find PCI to ISA bridge */
 	memset(&bus_loc, 0, sizeof(bus_loc));
 	if ( ! find_by_driver ( &bus_loc, &u.bus_dev, &sis_bridge_driver, 0 ) )
 	    return 0;
+#endif
 
 	pci_read_config_byte(&u.isa_bridge, 0x48, &reg);
 	pci_write_config_byte(&u.isa_bridge, 0x48, reg | 0x40);
@@ -337,8 +341,8 @@ static int sis900_probe ( struct nic *nic, struct pci_device *pci ) {
     pci_fill_nic ( nic, pci );
     nic->ioaddr = pci->ioaddr;
     ioaddr  = pci->ioaddr;
-    vendor  = pci->vendor_id;
-    dev_id  = pci->device_id;
+    vendor  = pci->vendor;
+    dev_id  = pci->device;
 
     /* wakeup chip */
     pci_write_config_dword(pci, 0x40, 0x00000000);
@@ -1266,7 +1270,7 @@ static struct nic_operations sis900_operations = {
 	.irq		= sis900_irq,
 };
 
-static struct pci_id sis900_nics[] = {
+static struct pci_device_id sis900_nics[] = {
 PCI_ROM(0x1039, 0x0900, "sis900",  "SIS900"),
 PCI_ROM(0x1039, 0x7016, "sis7016", "SIS7016"),
 };

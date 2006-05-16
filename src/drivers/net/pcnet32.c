@@ -680,7 +680,7 @@ static int pcnet32_probe ( struct nic *nic, struct pci_device *pci ) {
 	/* BASE is used throughout to address the card */
 	ioaddr = pci->ioaddr;
 	printf("pcnet32.c: Found %s, Vendor=0x%hX Device=0x%hX\n",
-	       pci->name, pci->vendor_id, pci->device_id);
+	       pci->name, pci->vendor, pci->device);
 
 	nic->irqno  = 0;
 	pci_fill_nic ( nic, pci );
@@ -1000,7 +1000,7 @@ static struct nic_operations pcnet32_operations = {
 
 };
 
-static struct pci_id pcnet32_nics[] = {
+static struct pci_device_id pcnet32_nics[] = {
 	PCI_ROM(0x1022, 0x2000, "pcnet32", "AMD PCnet/PCI"),
 	PCI_ROM(0x1022, 0x2625, "pcnetfastiii", "AMD PCNet FAST III"),
 	PCI_ROM(0x1022, 0x2001, "amdhomepna", "AMD PCnet/HomePNA"),

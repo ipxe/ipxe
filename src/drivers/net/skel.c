@@ -218,7 +218,7 @@ static void skel_pci_disable ( struct nic *nic __unused,
 	 */
 }
 
-static struct pci_id skel_pci_nics[] = {
+static struct pci_device_id skel_pci_nics[] = {
 PCI_ROM ( 0x0000, 0x0000, "skel-pci", "Skeleton PCI Adapter" ),
 };
 

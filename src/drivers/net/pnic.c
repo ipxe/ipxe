@@ -199,13 +199,17 @@ static void pnic_remove ( struct pci_device *pci ) {
 /**************************************************************************
 PROBE - Look for an adapter, this routine's visible to the outside
 ***************************************************************************/
-static int pnic_probe ( struct pci_device *pci ) {
+static int pnic_probe ( struct pci_device *pci,
+			const struct pci_device_id *id __unused ) {
 	struct net_device *netdev;
 	struct pnic *pnic;
 	uint16_t api_version;
 	uint16_t status;
 	int rc;
 
+	/* Fix up PCI device */
+	adjust_pci_device ( pci );
+	
 	/* Allocate net device */
 	netdev = alloc_etherdev ( sizeof ( *pnic ) );
 	if ( ! netdev ) {
@@ -248,32 +252,14 @@ static int pnic_probe ( struct pci_device *pci ) {
 	return rc;
 }
 
-static struct pci_id pnic_nics[] = {
+static struct pci_device_id pnic_nics[] = {
 /* genrules.pl doesn't let us use macros for PCI IDs...*/
 PCI_ROM ( 0xfefe, 0xefef, "pnic", "Bochs Pseudo NIC Adaptor" ),
 };
 
-static struct pci_driver pnic_driver = {
+struct pci_driver pnic_driver __pci_driver = {
 	.ids = pnic_nics,
 	.id_count = ( sizeof ( pnic_nics ) / sizeof ( pnic_nics[0] ) ),
-	.class = PCI_NO_CLASS,
-	//	.probe = pnic_probe,
-	//	.remove = pnic_remove,
+	.probe = pnic_probe,
+	.remove = pnic_remove,
 };
-
-// PCI_DRIVER ( pnic_driver );
-
-
-static int pnic_hack_probe ( void *dummy, struct pci_device *pci ) {
-	return ( pnic_probe ( pci ) == 0 );
-}
-
-static void pnic_hack_disable ( void *dummy, struct pci_device *pci ) {
-	pnic_remove ( pci );
-}
-
-#include "dev.h"
-extern struct type_driver test_driver;
-
-DRIVER ( "PNIC", test_driver, pci_driver, pnic_driver,
-	 pnic_hack_probe, pnic_hack_disable );

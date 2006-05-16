@@ -791,7 +791,7 @@ static struct nic_operations eepro100_operations = {
 
 };
 
-static struct pci_id eepro100_nics[] = {
+static struct pci_device_id eepro100_nics[] = {
 PCI_ROM(0x8086, 0x1029, "id1029",        "Intel EtherExpressPro100 ID1029"),
 PCI_ROM(0x8086, 0x1030, "id1030",        "Intel EtherExpressPro100 ID1030"),
 PCI_ROM(0x8086, 0x1031, "82801cam",      "Intel 82801CAM (ICH3) Chipset Ethernet Controller"),

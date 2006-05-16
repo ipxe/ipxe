@@ -1249,8 +1249,8 @@ static int tulip_probe ( struct nic *nic, struct pci_device *pci ) {
     /* point to private storage */
     tp = &tulip_bss.tpx;
 
-    tp->vendor_id  = pci->vendor_id;
-    tp->dev_id     = pci->device_id;
+    tp->vendor_id  = pci->vendor;
+    tp->dev_id     = pci->device;
     tp->nic_name   = pci->name;
 
     tp->if_port = 0;
@@ -1275,7 +1275,7 @@ static int tulip_probe ( struct nic *nic, struct pci_device *pci ) {
 #ifdef TULIP_DEBUG
     if (tulip_debug > 1)
 	printf ("%s: Looking for Tulip Chip: Vendor=%hX  Device=%hX\n", tp->nic_name,
-		tp->vendor_id, tp->dev_id);
+		tp->vendor, tp->dev_id);
 #endif
 
     /* Figure out which chip we're dealing with */
@@ -2042,7 +2042,7 @@ static int tulip_check_duplex(struct nic *nic)
         return 0;
 }
 
-static struct pci_id tulip_nics[] = {
+static struct pci_device_id tulip_nics[] = {
 PCI_ROM(0x1011, 0x0002, "dc21040",     "Digital Tulip"),
 PCI_ROM(0x1011, 0x0009, "ds21140",     "Digital Tulip Fast"),
 PCI_ROM(0x1011, 0x0014, "dc21041",     "Digital Tulip+"),

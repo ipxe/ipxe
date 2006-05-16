@@ -522,7 +522,7 @@ static struct nic_operations t595_operations = {
 
 };
 
-static struct pci_id t595_nics[] = {
+static struct pci_device_id t595_nics[] = {
 PCI_ROM(0x10b7, 0x5900, "3c590",           "3Com590"),		/* Vortex 10Mbps */
 PCI_ROM(0x10b7, 0x5950, "3c595",           "3Com595"),		/* Vortex 100baseTx */
 PCI_ROM(0x10b7, 0x5951, "3c595-1",         "3Com595"),		/* Vortex 100baseT4 */

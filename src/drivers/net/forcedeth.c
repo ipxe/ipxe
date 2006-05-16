@@ -1245,7 +1245,7 @@ static int forcedeth_probe ( struct nic *nic, struct pci_device *pci ) {
 		return 0;
 
 	printf("forcedeth.c: Found %s, vendor=0x%hX, device=0x%hX\n",
-	       pci->name, pci->vendor_id, pci->device_id);
+	       pci->name, pci->vendor, pci->device);
 
 	pci_fill_nic ( nic, pci );
 
@@ -1263,9 +1263,9 @@ static int forcedeth_probe ( struct nic *nic, struct pci_device *pci ) {
 		return 0;
 
 	/* handle different descriptor versions */
-	if (pci->device_id == PCI_DEVICE_ID_NVIDIA_NVENET_1 ||
-	    pci->device_id == PCI_DEVICE_ID_NVIDIA_NVENET_2 ||
-	    pci->device_id == PCI_DEVICE_ID_NVIDIA_NVENET_3)
+	if (pci->device == PCI_DEVICE_ID_NVIDIA_NVENET_1 ||
+	    pci->device == PCI_DEVICE_ID_NVIDIA_NVENET_2 ||
+	    pci->device == PCI_DEVICE_ID_NVIDIA_NVENET_3)
 		np->desc_ver = DESC_VER_1;
 	else
 		np->desc_ver = DESC_VER_2;
@@ -1316,7 +1316,7 @@ static int forcedeth_probe ( struct nic *nic, struct pci_device *pci ) {
  		np->tx_flags = NV_TX2_LASTPACKET | NV_TX2_VALID;
  	}
 
-  	switch (pci->device_id) {
+  	switch (pci->device) {
   	case 0x01C3:		// nforce
  		// DEV_IRQMASK_1|DEV_NEED_TIMERIRQ|DEV_NEED_LINKTIMER,
  		np->irqmask = NVREG_IRQMASK_WANTED_2 | NVREG_IRQ_TIMER;
@@ -1406,7 +1406,7 @@ static int forcedeth_probe ( struct nic *nic, struct pci_device *pci ) {
 	return 1;
 }
 
-static struct pci_id forcedeth_nics[] = {
+static struct pci_device_id forcedeth_nics[] = {
 PCI_ROM(0x10de, 0x01C3, "nforce", "nForce NVENET_1 Ethernet Controller"),
 PCI_ROM(0x10de, 0x0066, "nforce2", "nForce NVENET_2 Ethernet Controller"),
 PCI_ROM(0x10de, 0x00D6, "nforce3", "nForce NVENET_3 Ethernet Controller"),

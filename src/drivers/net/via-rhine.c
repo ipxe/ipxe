@@ -966,7 +966,7 @@ rhine_probe ( struct nic *nic, struct pci_device *pci ) {
 
     if (!pci->ioaddr)
 	return 0;
-    rhine_probe1 (nic, pci, pci->ioaddr, pci->device_id, -1);
+    rhine_probe1 (nic, pci, pci->ioaddr, pci->device, -1);
 
     adjust_pci_device ( pci );
     rhine_reset (nic);
@@ -1412,7 +1412,7 @@ static struct nic_operations rhine_operations = {
 
 };
 
-static struct pci_id rhine_nics[] = {
+static struct pci_device_id rhine_nics[] = {
 PCI_ROM(0x1106, 0x3065, "dlink-530tx",     "VIA 6102"),
 PCI_ROM(0x1106, 0x3106, "via-rhine-6105",  "VIA 6105"),
 PCI_ROM(0x1106, 0x3043, "dlink-530tx-old", "VIA 3043"),		/* Rhine-I 86c100a */

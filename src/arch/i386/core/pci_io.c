@@ -21,8 +21,9 @@
 /* Macros for direct PCI access */
 #define CONFIG_ADDRESS	0xcf8
 #define CONFIG_DATA	0xcfc
-#define CONFIG_CMD( pci, where ) \
-	( 0x80000000 | (pci->busdevfn << 8) | (where & ~3) )
+#define CONFIG_CMD( pci, where )					\
+	( 0x80000000 | ( pci->bus << 16 ) | ( pci->devfn << 8 ) |	\
+	  ( where & ~3 ) )
 
 /* Signatures for PCI BIOS */
 #define BIOS_SIG(a,b,c,d)	( ( a<<0 ) + ( b<<8 ) + ( c<<16 ) + ( d<<24 ) )
@@ -343,8 +344,9 @@ INIT_FN ( INIT_PCIBIOS, find_pcibios32, NULL, NULL );
 			    "=S" ( discard_S ), "=D" ( discard_D )	\
 			  : "a" ( ( PCIBIOS_PCI_FUNCTION_ID << 8 )	\
 				  + command ),			       	\
-			    "b" ( pci->busdevfn ), "c" ( value ),	\
-			    "D" ( where ), "S" ( pcibios32_entry )	\
+			    "b" ( ( pci->bus << 8 ) | pci->devfn ),	\
+			    "c" ( value ), "D" ( where ),		\
+			    "S" ( pcibios32_entry )			\
 			  : "edx", "ebp" );				\
 									\
 		( ret >> 8 );						\

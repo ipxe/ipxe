@@ -719,7 +719,7 @@ static int a3c90x_probe ( struct nic *nic, struct pci_device *pci ) {
     nic->ioaddr = pci->ioaddr;
     nic->irqno = 0;
 
-    INF_3C90X.is3c556 = (pci->device_id == 0x6055);
+    INF_3C90X.is3c556 = (pci->device == 0x6055);
     INF_3C90X.IOAddr = pci->ioaddr & ~3;
     INF_3C90X.CurrentWindow = 255;
     switch (a3c90x_internal_ReadEeprom(INF_3C90X.IOAddr, 0x03))
@@ -984,7 +984,7 @@ static struct nic_operations a3c90x_operations = {
 
 };
 
-static struct pci_id a3c90x_nics[] = {
+static struct pci_device_id a3c90x_nics[] = {
 /* Original 90x revisions: */
 PCI_ROM(0x10b7, 0x6055, "3c556",	 "3C556"),		/* Huricane */
 PCI_ROM(0x10b7, 0x9000, "3c905-tpo",     "3Com900-TPO"),	/* 10 Base TPO */

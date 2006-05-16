@@ -662,8 +662,8 @@ static int davicom_probe ( struct nic *nic, struct pci_device *pci ) {
   if (pci->ioaddr == 0)
     return 0;
 
-  vendor  = pci->vendor_id;
-  dev_id  = pci->device_id;
+  vendor  = pci->vendor;
+  dev_id  = pci->device;
   ioaddr  = pci->ioaddr;
 
   pci_fill_nic ( nic, pci );
@@ -703,7 +703,7 @@ static struct nic_operations davicom_operations = {
 
 };
 
-static struct pci_id davicom_nics[] = {
+static struct pci_device_id davicom_nics[] = {
 PCI_ROM(0x1282, 0x9100, "davicom9100", "Davicom 9100"),
 PCI_ROM(0x1282, 0x9102, "davicom9102", "Davicom 9102"),
 PCI_ROM(0x1282, 0x9009, "davicom9009", "Davicom 9009"),
