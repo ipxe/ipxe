@@ -18,6 +18,8 @@ void print_images ( void ) {
 	}
 }
 
+#if 0
+
 /*
  * Identify the image format
  *
@@ -80,3 +82,5 @@ int autoload ( struct dev *dev, struct image **image, void **context ) {
  out:
 	return rc;
 }
+
+#endif

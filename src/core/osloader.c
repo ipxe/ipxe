@@ -30,7 +30,6 @@ Modifications: Ken Yap (for Etherboot/16)
  */
 
 #include "io.h"
-#include "heap.h"
 #include "memsizes.h"
 
 /* Linker symbols */
@@ -54,18 +53,6 @@ int prep_segment ( physaddr_t start, physaddr_t mid, physaddr_t end ) {
 		      "overlapping etherboot [%lX, %lX)\n",
 		      start, end,
 		      virt_to_phys ( _text ), virt_to_phys ( _end ) );
-		return 0;
-	}
-
-	/* Check for overlap with used portion of heap.  Since the
-	 * heap code just finds the biggest available memory area, we
-	 * check only against the used heap area, rather than the
-	 * whole heap area.
-	 */
-	if ( ( end > heap_ptr ) && ( start < heap_end ) ) {
-		DBG ( "OSLOADER got segment [%lX, %lX) "
-		      "overlapping used heap [%lX, %lX)\n",
-		      start, end, heap_ptr, heap_end );
 		return 0;
 	}
 
