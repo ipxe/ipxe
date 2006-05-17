@@ -154,7 +154,7 @@ int inet_aton ( const char *cp, struct in_addr *inp ) {
 	int j;
 	for(j = 0; j <= 3; j++) {
 		digits_start = p;
-		val = strtoul(p, &p, 10);
+		val = strtoul(p, ( char ** ) &p, 10);
 		if ((p == digits_start) || (val > 255)) return 0;
 		if ( ( j < 3 ) && ( *(p++) != '.' ) ) return 0;
 		ip = (ip << 8) | val;
@@ -175,99 +175,10 @@ unsigned long strtoul(const char *p, char **endp, int base)
 		p++;
 	}
 	if (endp)
-		*endp = p;
+		*endp = ( char * ) p;
 	return(ret);
 	
 }
-
-
-#if DEBUG_UTILS
-
-void pause ( void ) {
-	printf ( "\nPress a key" );
-	getchar();
-	printf ( "\r           \r" );
-}
-
-void more ( void ) {
-	printf ( "---more---" );
-	getchar();
-	printf ( "\r          \r" );
-}
-
-/* Produce a paged hex dump of the specified data and length */
-void hex_dump ( const char *data, const unsigned int len ) {
-	unsigned int index;
-	for ( index = 0; index < len; index++ ) {
-		if ( ( index % 16 ) == 0 ) {
-			printf ( "\n" );
-		}
-		if ( ( index % 368 ) == 352 ) {
-			more();
-		}
-		if ( ( index % 16 ) == 0 ) {
-			printf ( "%X [%X] : %hX :", data + index,
-				 virt_to_phys ( data + index ), index );
-		}
-		printf ( " %hhX", data[index] );
-	}
-	printf ( "\n" );
-}
-
-#define GUARD_SYMBOL ( ( 'M' << 24 ) | ( 'I' << 16 ) | ( 'N' << 8 ) | 'E' )
-/* Fill a region with guard markers.  We use a 4-byte pattern to make
- * it less likely that check_region will find spurious 1-byte regions
- * of non-corruption.
- */
-void guard_region ( void *region, size_t len ) {
-	uint32_t offset = 0;
-
-	len &= ~0x03;
-	for ( offset = 0; offset < len ; offset += 4 ) {
-		*((uint32_t *)(region + offset)) = GUARD_SYMBOL;
-	}
-}
-
-/* Check a region that has been guarded with guard_region() for
- * corruption.
- */
-int check_region ( void *region, size_t len ) {
-	uint8_t corrupted = 0;
-	uint8_t in_corruption = 0;
-	uint32_t offset = 0;
-	uint32_t test = 0;
-
-	len &= ~0x03;
-	for ( offset = 0; offset < len ; offset += 4 ) {
-		test = *((uint32_t *)(region + offset)) = GUARD_SYMBOL;
-		if ( ( in_corruption == 0 ) &&
-		     ( test != GUARD_SYMBOL ) ) {
-			/* Start of corruption */
-			if ( corrupted == 0 ) {
-				corrupted = 1;
-				printf ( "Region %#x-%#x (physical %#x-%#x) "
-					 "corrupted\n",
-					 region, region + len,
-					 virt_to_phys ( region ),
-					 virt_to_phys ( region + len ) );
-			}
-			in_corruption = 1;
-			printf ( "--- offset %#x ", offset );
-		} else if ( ( in_corruption != 0 ) &&
-			    ( test == GUARD_SYMBOL ) ) {
-			/* End of corruption */
-			in_corruption = 0;
-			printf ( "to offset %#x", offset );
-		}
-
-	}
-	if ( in_corruption != 0 ) {
-		printf ( "to offset %#x (end of region)\n", len-1 );
-	}
-	return corrupted;
-}
-
-#endif /* DEBUG_UTILS */
 
 /*
  * Local variables:
