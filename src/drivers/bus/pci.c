@@ -39,15 +39,6 @@ static struct pci_driver pci_drivers_end[0] __table_end ( pci_drivers );
 static void pcibus_remove ( struct root_device *rootdev );
 
 /**
- * Maximum PCI bus number
- *
- * Architecture-specific code may know how many buses we have, in
- * which case it can overwrite this value.
- *
- */
-unsigned int pci_max_bus = 0xff;
-
-/**
  * Read PCI BAR
  *
  * @v pci		PCI device
@@ -242,13 +233,15 @@ static void unregister_pcidev ( struct pci_device *pci ) {
  */
 static int pcibus_probe ( struct root_device *rootdev ) {
 	struct pci_device *pci = NULL;
+	unsigned int max_bus;
 	unsigned int bus;
 	unsigned int devfn;
-	uint8_t hdrtype;
+	uint8_t hdrtype = 0;
 	uint32_t tmp;
 	int rc;
 
-	for ( bus = 0 ; bus <= pci_max_bus ; bus++ ) {
+	max_bus = pci_max_bus();
+	for ( bus = 0 ; bus <= max_bus ; bus++ ) {
 		for ( devfn = 0 ; devfn <= 0xff ; devfn++ ) {
 
 			/* Allocate struct pci_device */

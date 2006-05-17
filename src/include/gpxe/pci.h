@@ -19,6 +19,7 @@
 #include <stdint.h>
 #include <gpxe/device.h>
 #include <gpxe/tables.h>
+#include <pci_io.h>
 #include "pci_ids.h"
 
 /*
@@ -318,19 +319,6 @@ struct pci_driver {
 	.name = _name,						\
 }
 
-extern unsigned int pci_max_bus;
-extern int pci_read_config_byte	( struct pci_device *pci, unsigned int where,
-				  uint8_t *value );
-extern int pci_write_config_byte ( struct pci_device *pci, unsigned int where,
-				   uint8_t value );
-extern int pci_read_config_word ( struct pci_device *pci, unsigned int where,
-				  uint16_t *value );
-extern int pci_write_config_word ( struct pci_device *pci, unsigned int where,
-				   uint16_t value );
-extern int pci_read_config_dword ( struct pci_device *pci, unsigned int where,
-				   uint32_t *value );
-extern int pci_write_config_dword ( struct pci_device *pci, unsigned int where,
-				    uint32_t value );
 extern void adjust_pci_device ( struct pci_device *pci );
 extern unsigned long pci_bar_start ( struct pci_device *pci,
 				     unsigned int reg );
