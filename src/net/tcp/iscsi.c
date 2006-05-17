@@ -124,9 +124,10 @@ static int iscsi_build_login_request_strings ( struct iscsi_session *iscsi,
 			  "MaxRecvDataSegmentLength=512%c"
 			  "SessionType=Normal%c"
 			  "DataDigest=None%c"
-			  "HeaderDigest=None%c",
+			  "HeaderDigest=None%c"
+			  "ErrorRecoveryLevel=0%c",
 			  iscsi->initiator, 0, iscsi->target, 0,
-			  0, 0, 0, 0 );
+			  0, 0, 0, 0, 0 );
 }
 
 /**
