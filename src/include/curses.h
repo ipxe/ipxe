@@ -477,7 +477,7 @@ extern int wattr_off ( WINDOW *, attr_t, void * );
 extern int wattr_on ( WINDOW *, attr_t, void * );
 extern int wattr_set ( WINDOW *, attr_t, short, void * );
 extern int wbkgd ( WINDOW *, chtype );
-extern void wbkgdset ( WINDOW *, chtype );
+/*extern void wbkgdset ( WINDOW *, chtype );*/
 extern int wborder ( WINDOW *, chtype, chtype, chtype, chtype, chtype, chtype,
 		   chtype, chtype );
 extern int wchgat ( WINDOW *, int, attr_t, short, const void * );
@@ -628,7 +628,7 @@ static inline int bkgd ( chtype ch ) {
  * Set background rendition attributes for stdscr
  */
 static inline void bkgdset ( chtype ch ) {
-	wbkgdset ( stdscr, ch );
+	wattrset ( stdscr, ch );
 }
 
 /**
@@ -832,37 +832,16 @@ static inline int waddstr ( WINDOW *win, const char *str ) {
 	return waddnstr ( win, str, -1 );
 }
 
-/*
- * Primitives
- */
 /**
- * Advance cursor (wrap text)
+ * Set background rendition attributes for a window and apply to
+ * contents
  *
- * @v *win	window in which to advance
- * @ret rc	void function
- */
-void _advcurs_wrap ( struct _curses_window *win );
-/**
- * Advance cursor (no wrap text)
- *
- * @v *win	window in which to advance
- * @ret rc	void function
- */
-void _advcurs_nowrap ( struct _curses_window *win );
-/**
- * Store cursor position for later restoration
- *
- * @v *win	window on which to operate
- * @ret rc	return encoded position
- */
-unsigned int _store_curs_pos ( WINDOW *win );
-/**
- * Restore cursor position from encoded backup variable
- *
- * @v *win	window on which to operate
- * @v pos	encoded position
+ * @v *win	window to be operated on
+ * @v ch	chtype containing rendition attributes
  * @ret rc	return status code
  */
-int _restore_curs_pos ( WINDOW *win, unsigned int pos );
+static inline int wbkgdset ( WINDOW *win, chtype ch ) {
+	return wattrset( win, ch );
+}
 
 #endif /* CURSES_H */

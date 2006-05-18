@@ -8,6 +8,106 @@
  *
  */
 
+#define WRAP 0
+#define NOWRAP 1
+
+struct cursor_pos {
+	unsigned int y, x;
+};
+
+/*
+  Primitives
+*/
+
+/**
+ * Write a single character rendition to a window
+ *
+ * @v *win	window in which to write
+ * @v ch	character rendition to write
+ */
+static void _wputch ( WINDOW *win, chtype ch, int wrap ) {
+	win->scr->putc(win->scr, ch);
+	if ( ++(win->curs_x) > win->width ) {
+		if ( wrap == WRAP ) {
+			win->curs_x = 0;
+			(win->curs_y)++;
+		} else {
+			(win->curs_x)--;
+		}
+	}
+}
+
+/**
+ * Write a chtype string to a window
+ *
+ * @v *win	window in which to write
+ * @v *chstr	chtype string
+ * @v wrap	wrap "switch"
+ * @v n		write at most n chtypes
+ */
+static void _wputchstr ( WINDOW *win, chtype *chstr, int wrap, int n ) {
+	for ( ; *chstr && n-- ; chstr++ ) {
+		_wputch(win,*chstr,wrap);
+	}
+}
+
+/**
+ * Write a standard c-style string to a window
+ * @v *win	window in which to write
+ * @v *str	string
+ * @v wrap	wrap "switch"
+ * @v n		write at most n chars from *str
+ */
+static void _wputstr ( WINDOW *win, char *str, int wrap, int n ) {
+	for ( ; *str && n-- ; str++ ) {
+		_wputch( win, *str | win->attrs, wrap );
+	}
+}
+
+/**
+ * Restore cursor position from encoded backup variable
+ *
+ * @v *win	window on which to operate
+ * @v *pos	pointer to struct in which original cursor position is stored
+ */
+static void _restore_curs_pos ( WINDOW *win, struct cursor_pos *pos ){
+	win->curs_y = pos->y;
+	win->curs_x = pos->x;
+}
+
+/**
+ * Store cursor position for later restoration
+ *
+ * @v *win	window on which to operate
+ * @v *pos	pointer to struct in which to store cursor position
+ */
+static void _store_curs_pos ( WINDOW *win, struct cursor_pos *pos ) {
+	pos->y = win->curs_y;
+	pos->x = win->curs_x;
+}
+
+/**
+ * Move a window's cursor to the specified position
+ *
+ * @v *win	window to be operated on
+ * @v y		Y position
+ * @v x		X position
+ * @ret rc	return status code
+ */
+int wmove ( WINDOW *win, int y, int x ) {
+	/* chech for out-of-bounds errors */
+	if ( ( ( (unsigned)x - win->ori_x ) > win->width ) ||
+	     ( ( (unsigned)y - win->ori_y ) > win->height ) ) {
+		return ERR;
+	}
+
+	win->scr->movetoyx( win->scr, y, x );
+	return OK;
+}
+
+
+
+
 WINDOW _stdscr = {
 	.attrs = A_DEFAULT,
 	.ori_y = 0,
@@ -146,8 +246,6 @@ WINDOW *newwin ( int nlines, int ncols, int begin_y, int begin_x ) {
  * @ret rc	return status code
  */
 int waddch ( WINDOW *win, const chtype ch ) {
-	_putc( win->scr, ch & A_CHARTEXT );
-	_advcurs_wrap( win );
 	return OK;
  err:
 	return ERR;
@@ -162,21 +260,12 @@ int waddch ( WINDOW *win, const chtype ch ) {
  * @ret rc	return status code
  */
 int waddchnstr ( WINDOW *win, const chtype *chstr, int n ) {
-	unsigned int ch, pos, count = 0;
-	chtype *chptr = chstr;
+	struct cursor_pos pos;	
 
-	pos = _store_curs_pos ( win );
-	while ( ( ( ( ch = ( *chptr & A_CHARTEXT ) ) ) != '\0' )
-		&& ( count++ < (unsigned)n ) ) {
-		_putc( win, ch );
-		_advcurs_nowrap( win );
-		/* set rendition code here */
-	}
-	_restore_curs_pos( win, pos );
+	_store_curs_pos( win, &pos );
+	_wputchstr( win, chstr, NOWRAP, n );
+	_restore_curs_pos( win, &pos );
 	return OK;
- err:
-	_restore_curs_pos( win, pos );
-	return ERR;
 }
 
 /**
@@ -193,8 +282,6 @@ int waddnstr ( WINDOW *win, const char *str, int n ) {
 
 	while ( ( ( ch = *strptr ) != '\0' )
 		&& ( count++ < (unsigned)n ) ) {
-		_putc( win, ch );
-		_advcurs_wrap( win );
 	}
 
 	return OK;
@@ -239,29 +326,6 @@ int wattrset ( WINDOW *win, int attrs ) {
 }
 
 /**
- * Set background rendition attributes for a window and apply to
- * contents
- *
- * @v *win	window to be operated on
- * @v ch	chtype containing rendition attributes
- * @ret rc	return status code
- */
-int wbkgd ( WINDOW *win, chtype ch ) {
-	return OK;
- err:
-	return ERR;
-}
-
-/**
- * Set background rendition attributes for a window
- *
- * @v *win	window to be operated on
- * @v ch	chtype containing rendition attributes
- */
-void wbkgdset ( WINDOW *win, chtype ch ) {
-}
-
-/**
  * Draw borders from single-byte characters and renditions around a
  * window
  *
@@ -276,25 +340,11 @@ void wbkgdset ( WINDOW *win, chtype ch ) {
  * @v br	bottom right corner
  * @ret rc	return status code
  */
-int wborder ( WINDOW *win, chtype ls, chtype rs, 
-			   chtype ts, chtype bs, chtype tl,
-			   chtype tr, chtype bl, chtype br ) {
+int wborder ( WINDOW *win, chtype ls, chtype rs,
+	      chtype ts, chtype bs, chtype tl,
+	      chtype tr, chtype bl, chtype br ) {
 	return OK;
  err:
 	return ERR;
 }
 
-/**
- * Move a window's cursor to the specified position
- *
- * @v *win	window to be operated on
- * @v y		Y position
- * @v x		X position
- * @ret rc	return status code
- */
-int wmove ( WINDOW *win, int y, int x ) {
-	_movetoyx( win->scr, y, x );
-	return OK;
- err:
-	return ERR;
-}
