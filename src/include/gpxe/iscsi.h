@@ -393,14 +393,6 @@ union iscsi_bhs {
 	unsigned char bytes[ sizeof ( struct iscsi_bhs_common ) ];
 };
 
-/** State */
-enum iscsi_state {
-	ISCSI_STATE_IDLE,
-	ISCSI_STATE_LOGIN,
-	ISCSI_STATE_LOGIN_CONT,
-	ISCSI_STATE_COMMAND,
-};
-
 /** State of an iSCSI TX engine */
 enum iscsi_tx_state {
 	/** Nothing to send */
