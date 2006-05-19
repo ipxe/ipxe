@@ -160,11 +160,13 @@
 #define ENOTSUP		EOPNOTSUPP /**< Not supported */
 #define ENOTTY		0xf0	/**< Inappropriate ioctl for device */
 #define ENXIO		ENODEV	/**< No such device or address */
+#define EOVERFLOW	0xf1	/**< Result too large */
 #define EPERM		EACCES	/**< Operation not permitted */
-#define EPROTO		0xf1	/**< Protocol error */
-#define EPROTONOSUPPORT	0xf2	/**< Protocol not supported */
-#define EPROTOTYPE	0xf3	/**< Protocol wrong type for socket */
-#define ETIMEDOUT	0xf4	/**< Connection timed out */
+#define EPROTO		0xf2	/**< Protocol error */
+#define EPROTONOSUPPORT	0xf3	/**< Protocol not supported */
+#define EPROTOTYPE	0xf4	/**< Protocol wrong type for socket */
+#define ERANGE		EOVERFLOW /**< Result too large */
+#define ETIMEDOUT	0xf5	/**< Connection timed out */
 #define EWOULDBLOCK	EAGAIN	/**< Resource temporarily unavailable */
 
 /* Data structures and declarations */
