@@ -259,17 +259,17 @@ static void iscsi_tx_data_out ( struct iscsi_session *iscsi ) {
  *     HeaderDigest=None
  *     DataDigest=None
  *     MaxConnections is irrelevant; we make only one connection anyway
- *     InitialR2T=Yes (default) [1]
+ *     InitialR2T=Yes [1]
  *     ImmediateData is irrelevant; we never send immediate data
- *     MaxRecvDataSegmentLength=8192 (default)
- *     MaxBurstLength=262144 (default)
- *     FirstBurstLength=262144 (default)
+ *     MaxRecvDataSegmentLength=8192 (default; we don't care)
+ *     MaxBurstLength=262144 (default; we don't care)
+ *     FirstBurstLength=262144 (default; we don't care)
  *     DefaultTime2Wait=0 [2]
  *     DefaultTime2Retain=0 [2]
- *     MaxOutstandingR2T=1 (default)
- *     DataPDUInOrder=Yes (default)
- *     DataSequenceInOrder=Yes (default)
- *     ErrorRecoveryLevel=0 (default)
+ *     MaxOutstandingR2T=1
+ *     DataPDUInOrder=Yes
+ *     DataSequenceInOrder=Yes
+ *     ErrorRecoveryLevel=0
  *
  * [1] InitialR2T has an OR resolution function, so the target may
  * force us to use it.  We therefore simplify our logic by always
@@ -285,12 +285,17 @@ static int iscsi_build_login_request_strings ( struct iscsi_session *iscsi,
 			  "InitiatorName=%s%c"
 			  "TargetName=%s%c"
 			  "SessionType=Normal%c"
-			  "DataDigest=None%c"
 			  "HeaderDigest=None%c"
+			  "DataDigest=None%c"
+			  "InitialR2T=Yes%c"
 			  "DefaultTime2Wait=0%c"
-			  "DefaultTime2Retain=0%c",
+			  "DefaultTime2Retain=0%c"
+			  "MaxOutstandingR2T=1%c"
+			  "DataPDUInOrder=Yes%c"
+			  "DataSequenceInOrder=Yes%c"
+			  "ErrorRecoveryLevel=0%c",
 			  iscsi->initiator, 0, iscsi->target, 0,
-			  0, 0, 0, 0, 0 );
+			  0, 0, 0, 0, 0, 0, 0, 0, 0, 0 );
 }
 
 /**
