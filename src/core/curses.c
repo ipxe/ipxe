@@ -1,6 +1,7 @@
 #include <curses.h>
 #include <malloc.h>
 #include <stddef.h>
+#include <vsprintf.h>
 
 /** @file
  *
@@ -11,26 +12,53 @@
 #define WRAP 0
 #define NOWRAP 1
 
+unsigned short _COLS;
+unsigned short _LINES;
+unsigned short _COLOURS;
+unsigned int *_COLOUR_PAIRS; /* basically this is an array, but as its
+			       length is determined only when initscr
+			       is run, I can only think to make it a
+			       pointer and malloc the array into being
+			       ... */
+
 struct cursor_pos {
 	unsigned int y, x;
 };
 
+WINDOW _stdscr = {
+	.attrs = A_DEFAULT,
+	.ori_y = 0,
+	.ori_x = 0,
+	.curs_y = 0,
+	.curs_x = 0,
+};
+
 /*
-  Primitives
-*/
+ *  Primitives
+ */
 
 /**
  * Write a single character rendition to a window
  *
  * @v *win	window in which to write
  * @v ch	character rendition to write
+ * @v wrap	wrap "switch"
  */
 static void _wputch ( WINDOW *win, chtype ch, int wrap ) {
+	/* make sure we set the screen cursor to the right position
+	   first! */
+	win->scr->movetoyx( win->scr, win->ori_y + win->curs_y,
+				      win->ori_x + win->curs_x );
 	win->scr->putc(win->scr, ch);
 	if ( ++(win->curs_x) > win->width ) {
 		if ( wrap == WRAP ) {
 			win->curs_x = 0;
-			(win->curs_y)++;
+			/* specification says we should really scroll,
+			   but we have no buffer to scroll with, so we
+			   can only overwrite back at the beginning of
+			   the window */
+			win->curs_y += ( ( win->curs_y - win->height ) == 0 ?
+					 -(win->curs_y) : 1 );
 		} else {
 			(win->curs_x)--;
 		}
@@ -45,7 +73,7 @@ static void _wputch ( WINDOW *win, chtype ch, int wrap ) {
  * @v wrap	wrap "switch"
  * @v n		write at most n chtypes
  */
-static void _wputchstr ( WINDOW *win, chtype *chstr, int wrap, int n ) {
+static void _wputchstr ( WINDOW *win, const chtype *chstr, int wrap, int n ) {
 	for ( ; *chstr && n-- ; chstr++ ) {
 		_wputch(win,*chstr,wrap);
 	}
@@ -53,12 +81,13 @@ static void _wputchstr ( WINDOW *win, chtype *chstr, int wrap, int n ) {
 
 /**
  * Write a standard c-style string to a window
+ *
  * @v *win	window in which to write
  * @v *str	string
  * @v wrap	wrap "switch"
  * @v n		write at most n chars from *str
  */
-static void _wputstr ( WINDOW *win, char *str, int wrap, int n ) {
+static void _wputstr ( WINDOW *win, const char *str, int wrap, int n ) {
 	for ( ; *str && n-- ; str++ ) {
 		_wputch( win, *str | win->attrs, wrap );
 	}
@@ -106,16 +135,6 @@ int wmove ( WINDOW *win, int y, int x ) {
 }
 
 
-
-
-WINDOW _stdscr = {
-	.attrs = A_DEFAULT,
-	.ori_y = 0,
-	.ori_x = 0,
-	.curs_y = 0,
-	.curs_x = 0,
-};
-
 /**
  * get terminal baud rate
  *
@@ -131,11 +150,7 @@ int baudrate ( void ) {
  * @ret rc	return status code
  */
 int beep ( void ) {
-	/* ok, so I can't waste memory buffering the screen (or in
-	   this case, backing up the background colours of the screen
-	   elements), but maybe I can buffer the border and flash that
-	   - or maybe even just the top and bottom? Assuming I can't
-	   make the system speaker beep, of course... */
+	printf("\a");
 	return OK;
 }
 
@@ -149,42 +164,57 @@ int beep ( void ) {
  * @ret rc	return status code
  */
 int box ( WINDOW *win, chtype verch, chtype horch ) {
-	return OK;
- err:
-	return ERR;
+	int corner = '+' | win->attrs; /* default corner character */
+	return wborder( win, verch, verch, horch, horch,
+			corner, corner, corner, corner );
 }
 
 /**
- * Indicates whether the attached terminal is capable of having
- * colours redefined
+ * Indicates whether the underlying terminal device is capable of
+ * having colours redefined
  *
- * @ret bool	returns boolean dependent on colour changing caps of terminal
+ * @ret bool	returns boolean
  */
 bool can_change_colour ( void ) {
 	return (bool)TRUE;
- err:
-	return (bool)FALSE;
 }
 
 /**
- * Identifies the intensity components of colour number "colour" and
- * stores the RGB intensity values in the respective addresses pointed
- * to by "red", "green" and "blue" respectively
+ * Identify the RGB components of a given colour value
+ *
+ * @v colour	colour value
+ * @v *red	address to store red component
+ * @v *green	address to store green component
+ * @v *blue	address to store blue component
+ * @ret rc	return status code
  */
 int colour_content ( short colour, short *red, short *green, short *blue ) {
-	return OK;
- err:
-	return ERR;
-}
-
-/**
- * Window colour attribute control function
- *
- * @v colour_pair_number	colour pair integer
- * @v *opts			pointer to options
- * @ret rc			return status code
- */
-int colour_set ( short colour_pair_number, void *opts ) {
+	/* we do not have a particularly large range of colours (3
+	   primary, 3 secondary and black), so let's just put in a
+	   basic switch... */
+	switch(colour) {
+	case COLOUR_BLACK:
+		*red = 0; *green = 0; *blue = 0;
+		break;
+	case COLOUR_BLUE:
+		*red = 0; *green = 0; *blue = 1000;
+		break;
+	case COLOUR_GREEN:
+		*red = 0; *green = 1000; *blue = 0;
+		break;
+	case COLOUR_CYAN:
+		*red = 0; *green = 1000; *blue = 1000;
+		break;
+	case COLOUR_RED:
+		*red = 1000; *green = 0; *blue = 0;
+		break;
+	case COLOUR_MAGENTA:
+		*red = 1000; *green = 0; *blue = 1000;
+		break;
+	case COLOUR_YELLOW:
+		*red = 1000; *green = 1000; *blue = 0;
+		break;
+	}
 	return OK;
 }
 
@@ -203,6 +233,16 @@ int delwin ( WINDOW *win ) {
 	return OK;
  err:
 	return ERR;
+}
+
+/**
+ * Get the background rendition attributes for a window
+ *
+ * @v *win	subject window
+ * @ret ch	chtype rendition representation
+ */
+inline chtype getbkgd ( WINDOW *win ) {
+	return win->attrs;
 }
 
 /**
@@ -246,9 +286,8 @@ WINDOW *newwin ( int nlines, int ncols, int begin_y, int begin_x ) {
  * @ret rc	return status code
  */
 int waddch ( WINDOW *win, const chtype ch ) {
+	_wputch( win, ch, WRAP );
 	return OK;
- err:
-	return ERR;
 }
 
 /**
@@ -277,20 +316,12 @@ int waddchnstr ( WINDOW *win, const chtype *chstr, int n ) {
  * @ret rc	return status code
  */
 int waddnstr ( WINDOW *win, const char *str, int n ) {
-	unsigned int ch, count = 0;
-	char *strptr = str;
-
-	while ( ( ( ch = *strptr ) != '\0' )
-		&& ( count++ < (unsigned)n ) ) {
-	}
-
+	_wputstr( win, str, WRAP, n );
 	return OK;
- err:
-	return ERR;
 }
 
 /**
- * Turn off attributes
+ * Turn off attributes in a window
  *
  * @v win	subject window
  * @v attrs	attributes to enable
@@ -302,7 +333,7 @@ int wattroff ( WINDOW *win, int attrs ) {
 }
 
 /**
- * Turn on attributes
+ * Turn on attributes in a window
  *
  * @v win	subject window
  * @v attrs	attributes to enable
@@ -314,14 +345,69 @@ int wattron ( WINDOW *win, int attrs ) {
 }
 
 /**
- * Set attributes
+ * Set attributes in a window
  *
  * @v win	subject window
  * @v attrs	attributes to enable
  * @ret rc	return status code
  */
 int wattrset ( WINDOW *win, int attrs ) {
-	win->attrs = attrs;
+	win->attrs = ( attrs | ( win->attrs & A_COLOR ) );
+	return OK;
+}
+
+/**
+ * Get attributes and colour pair information
+ *
+ * @v *win	window to obtain information from
+ * @v *attrs	address in which to store attributes
+ * @v *pair	address in which to store colour pair
+ * @v *opts	undefined (for future implementation)
+ * @ret rc	return status cude
+ */
+int wattr_get ( WINDOW *win, attr_t *attrs, short *pair, void *opts ) {
+	*attrs = win->attrs & A_ATTRIBUTES;
+	*pair = (short)(( win->attrs & A_COLOR ) >> CPAIR_SHIFT);
+	return OK;
+}
+
+/**
+ * Turn off attributes in a window
+ *
+ * @v *win	subject window
+ * @v attrs	attributes to toggle
+ * @v *opts	undefined (for future implementation)
+ * @ret rc	return status code
+ */
+int wattr_off ( WINDOW *win, attr_t attrs, void *opts ) {
+	wattroff( win, attrs );
+	return OK;
+}
+
+/**
+ * Turn on attributes in a window
+ *
+ * @v *win	subject window
+ * @v attrs	attributes to toggle
+ * @v *opts	undefined (for future implementation)
+ * @ret rc	return status code
+ */
+int wattr_on ( WINDOW *win, attr_t attrs, void *opts ) {
+	wattron( win, attrs );
+	return OK;
+}
+
+/**
+ * Set attributes and colour pair information in a window
+ *
+ * @v *win	subject window
+ * @v attrs	attributes to set
+ * @v cpair	colour pair to set
+ * @v *opts	undefined (for future implementation)
+ * @ret rc	return status code
+ */
+int wattr_set ( WINDOW *win, attr_t attrs, short cpair, void *opts ) {
+	wattrset( win, attrs | ( ( (unsigned short)cpair ) << CPAIR_SHIFT ) );
 	return OK;
 }
 
@@ -343,8 +429,81 @@ int wattrset ( WINDOW *win, int attrs ) {
 int wborder ( WINDOW *win, chtype ls, chtype rs,
 	      chtype ts, chtype bs, chtype tl,
 	      chtype tr, chtype bl, chtype br ) {
+
+	wmove(win,0,0);
+
+	_wputch(win,tl,WRAP);
+	while ( win->width - win->curs_x ) {
+		_wputch(win,ts,WRAP);
+	}
+	_wputch(win,tr,WRAP);
+
+	while ( ( win->height - 1 ) - win->curs_y ) {
+		_wputch(win,ls,WRAP);
+		wmove(win,win->curs_y,win->width-1);
+		_wputch(win,rs,WRAP);
+	}
+
+	_wputch(win,bl,WRAP);
+	while ( win->width - win->curs_x ) {
+		_wputch(win,bs,WRAP);
+	}
+	_wputch(win,br,NOWRAP); /* do not wrap last char to leave
+				   cursor in last position */
+
 	return OK;
- err:
-	return ERR;
+}
+
+/**
+ * Clear a window to the bottom
+ *
+ * @v *win	subject window
+ * @ret rc	return status code
+ */
+int wclrtobot ( WINDOW *win ) {
+	struct cursor_pos pos;
+
+	_store_curs_pos( win, &pos );
+	while ( win->curs_y + win->curs_x ) {
+		_wputch( win, (unsigned)' ', WRAP );
+	}
+	_restore_curs_pos( win, &pos );
+
+	return OK;
+}
+
+/**
+ * Clear a window to the end of the current line
+ *
+ * @v *win	subject window
+ * @ret rc	return status code
+ */
+int wclrtoeol ( WINDOW *win ) {
+	struct cursor_pos pos;
+
+	_store_curs_pos( win, &pos );
+	while ( ( win->curs_y - pos.y ) == 0 ) {
+		_wputch( win, (unsigned)' ', WRAP );
+	}
+	_restore_curs_pos( win, &pos );
+
+	return OK;
+}
+
+/**
+ * Set colour pair for a window
+ *
+ * @v *win			subject window
+ * @v colour_pair_number	colour pair integer
+ * @v *opts			undefined (for future implementation)
+ * @ret rc			return status code
+ */
+int wcolour_set ( WINDOW *win, short colour_pair_number, void *opts ) {
+	if ( ( unsigned short )colour_pair_number > COLORS )
+		return ERR;
+
+	win->attrs = ( (unsigned short)colour_pair_number << CPAIR_SHIFT ) |
+		( win->attrs & A_ATTRIBUTES );
+	return OK;
 }
 
