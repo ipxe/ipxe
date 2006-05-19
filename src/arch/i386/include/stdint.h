@@ -1,7 +1,7 @@
 #ifndef STDINT_H
 #define STDINT_H
 
-typedef unsigned long		size_t;
+typedef typeof(sizeof(int))	size_t;
 typedef signed long		ssize_t;
 typedef signed long		off_t;
 
