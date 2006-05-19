@@ -96,12 +96,41 @@ static int scsi_write ( struct block_device *blockdev, uint64_t block,
 }
 
 /**
- * Read capacity of SCSI device
+ * Read capacity of SCSI device via READ CAPACITY (10)
  *
  * @v blockdev		Block device
  * @ret rc		Return status code
  */
-static int scsi_read_capacity ( struct block_device *blockdev ) {
+static int scsi_read_capacity_10 ( struct block_device *blockdev ) {
+	struct scsi_device *scsi = block_to_scsi ( blockdev );
+	struct scsi_command command;
+	struct scsi_cdb_read_capacity_10 *cdb = &command.cdb.readcap10;
+	struct scsi_capacity_10 capacity;
+	int rc;
+
+	/* Issue READ CAPACITY (10) */
+	memset ( &command, 0, sizeof ( command ) );
+	cdb->opcode = SCSI_OPCODE_READ_CAPACITY_10;
+	command.data_in = virt_to_user ( &capacity );
+	command.data_in_len = sizeof ( capacity );
+
+	if ( ( rc = scsi_command ( scsi, &command ) ) != 0 )
+		return rc;
+
+	/* Fill in block device fields */
+	blockdev->blksize = be32_to_cpu ( capacity.blksize );
+	blockdev->blocks = ( be32_to_cpu ( capacity.lba ) + 1 );
+
+	return 0;
+}
+
+/**
+ * Read capacity of SCSI device via READ CAPACITY (16)
+ *
+ * @v blockdev		Block device
+ * @ret rc		Return status code
+ */
+static int scsi_read_capacity_16 ( struct block_device *blockdev ) {
 	struct scsi_device *scsi = block_to_scsi ( blockdev );
 	struct scsi_command command;
 	struct scsi_cdb_read_capacity_16 *cdb = &command.cdb.readcap16;
@@ -122,6 +151,32 @@ static int scsi_read_capacity ( struct block_device *blockdev ) {
 	/* Fill in block device fields */
 	blockdev->blksize = be32_to_cpu ( capacity.blksize );
 	blockdev->blocks = ( be64_to_cpu ( capacity.lba ) + 1 );
+	return 0;
+}
+
+/**
+ * Read capacity of SCSI device
+ *
+ * @v blockdev		Block device
+ * @ret rc		Return status code
+ */
+static int scsi_read_capacity ( struct block_device *blockdev ) {
+	int rc;
+
+	/* Try READ CAPACITY (10), which is a mandatory command, first. */
+	if ( ( rc = scsi_read_capacity_10 ( blockdev ) ) != 0 )
+		return rc;
+
+	/* If capacity range was exceeded (i.e. capacity.lba was
+	 * 0xffffffff, meaning that blockdev->blocks is now zero), use
+	 * READ CAPACITY (16) instead.  READ CAPACITY (16) is not
+	 * mandatory, so we can't just use it straight off.
+	 */
+	if ( blockdev->blocks == 0 ) {
+		if ( ( rc = scsi_read_capacity_16 ( blockdev ) ) != 0 )
+			return rc;
+	}
+
 	return 0;
 }
 

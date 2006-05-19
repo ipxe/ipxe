@@ -12,6 +12,7 @@
 
 #define SCSI_OPCODE_READ_16		0x88	/**< READ (16) */
 #define SCSI_OPCODE_WRITE_16		0x8a	/**< WRITE (16) */
+#define SCSI_OPCODE_READ_CAPACITY_10	0x25	/**< READ CAPACITY (10) */
 #define SCSI_OPCODE_SERVICE_ACTION_IN	0x9e	/**< SERVICE ACTION IN */
 #define SCSI_SERVICE_ACTION_READ_CAPACITY_16 0x10 /**< READ CAPACITY (16) */
 
@@ -77,6 +78,31 @@ struct scsi_cdb_write_16 {
 	uint8_t control;
 } __attribute__ (( packed ));
 
+/** A SCSI "READ CAPACITY (10)" CDB */
+struct scsi_cdb_read_capacity_10 {
+	/** Opcode (0x25) */
+	uint8_t opcode;
+	/** Reserved */
+	uint8_t reserved_a;
+	/** Logical block address
+	 *
+	 * Applicable only if the PMI bit is set.
+	 */
+	uint32_t lba;
+	/** Reserved */
+	uint8_t reserved_b[3];
+	/** Control byte */
+	uint8_t control;	
+} __attribute__ (( packed ));
+
+/** SCSI "READ CAPACITY (10)" parameter data */
+struct scsi_capacity_10 {
+	/** Maximum logical block number */
+	uint32_t lba;
+	/** Block length in bytes */
+	uint32_t blksize;
+} __attribute__ (( packed ));
+
 /** A SCSI "READ CAPACITY (16)" CDB */
 struct scsi_cdb_read_capacity_16 {
 	/** Opcode (0x9e) */
@@ -113,6 +139,7 @@ struct scsi_capacity_16 {
 union scsi_cdb {
 	struct scsi_cdb_read_16 read16;
 	struct scsi_cdb_write_16 write16;
+	struct scsi_cdb_read_capacity_10 readcap10;
 	struct scsi_cdb_read_capacity_16 readcap16;
 	char bytes[16];
 };
