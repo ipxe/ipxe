@@ -249,7 +249,30 @@ static void iscsi_tx_data_out ( struct iscsi_session *iscsi ) {
  * @v iscsi		iSCSI session
  *
  * These are the initial set of strings sent in the first login
- * request PDU.
+ * request PDU.  We want the following settings:
+ *
+ *     HeaderDigest=None
+ *     DataDigest=None
+ *     MaxConnections is irrelevant; we make only one connection anyway
+ *     InitialR2T=Yes (default) [1]
+ *     ImmediateData is irrelevant; we never send immediate data
+ *     MaxRecvDataSegmentLength=8192 (default)
+ *     MaxBurstLength=262144 (default)
+ *     FirstBurstLength=262144 (default)
+ *     DefaultTime2Wait=0 [2]
+ *     DefaultTime2Retain=0 [2]
+ *     MaxOutstandingR2T=1 (default)
+ *     DataPDUInOrder=Yes (default)
+ *     DataSequenceInOrder=Yes (default)
+ *     ErrorRecoveryLevel=0 (default)
+ *
+ * [1] InitialR2T has an OR resolution function, so the target may
+ * force us to use it.  We therefore simplify our logic by always
+ * using it.
+ *
+ * [2] These ensure that we can safely start a new task once we have
+ * reconnected after a failure, without having to manually tidy up
+ * after the old one.
  */
 static int iscsi_build_login_request_strings ( struct iscsi_session *iscsi,
 					       void *data, size_t len ) {
