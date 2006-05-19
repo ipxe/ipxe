@@ -85,33 +85,6 @@ struct iscsi_bhs_common {
  * iSCSI basic header segment common request fields
  *
  */
-struct iscsi_bhs_common_request {
-	/** Opcode */
-	uint8_t opcode;
-	/** Flags */
-	uint8_t flags;
-	/** Fields specific to the PDU type */
-	uint8_t other_a[2];
-	/** Segment lengths */
-	union iscsi_segment_lengths lengths;
-	/** Fields specific to the PDU type */
-	uint8_t other_b[8];
-	/** Initiator Task Tag */
-	uint32_t itt;
-	/** Fields specific to the PDU type */
-	uint8_t other_c[4];
-	/** Command sequence number */
-	uint32_t cmdsn;
-	/** Expected status sequence number */
-	uint32_t expstatsn;
-	/** Fields specific to the PDU type */
-	uint8_t other_d[16];
-};
-
-/**
- * iSCSI basic header segment common request fields
- *
- */
 struct iscsi_bhs_common_response {
 	/** Opcode */
 	uint8_t opcode;
@@ -328,8 +301,16 @@ struct iscsi_bhs_scsi_response {
 /** SCSI target failure */
 #define ISCSI_RESPONSE_TARGET_FAILURE 0x01
 
+/** SCSI sense response code offset
+ *
+ * The SCSI response may contain unsolicited sense data in the data
+ * segment.  If it does, this is the offset to the sense response code
+ * byte, which is the only byte we care about.
+ */
+#define ISCSI_SENSE_RESPONSE_CODE_OFFSET 2
+
 /**
- * iSCSI data in basic header segment
+ * iSCSI data-in basic header segment
  *
  */
 struct iscsi_bhs_data_in {
@@ -363,7 +344,7 @@ struct iscsi_bhs_data_in {
 	uint32_t residual_count;
 };
 
-/** Data in opcode */
+/** Data-in opcode */
 #define ISCSI_OPCODE_DATA_IN 0x25
 
 /** Data requires acknowledgement */
@@ -375,21 +356,94 @@ struct iscsi_bhs_data_in {
 /** Data underflow occurred */
 #define ISCSI_DATA_FLAG_UNDERFLOW 0x02
 
-/** SCSI status code and verflow/underflow flags are valid */
+/** SCSI status code and overflow/underflow flags are valid */
 #define ISCSI_DATA_FLAG_STATUS 0x01
+
+/**
+ * iSCSI data-out basic header segment
+ *
+ */
+struct iscsi_bhs_data_out {
+	/** Opcode */
+	uint8_t opcode;
+	/** Flags */
+	uint8_t flags;
+	/** Reserved */
+	uint16_t reserved_a;
+	/** Segment lengths */
+	union iscsi_segment_lengths lengths;
+	/** Logical Unit Number */
+	uint64_t lun;
+	/** Initiator Task Tag */
+	uint32_t itt;
+	/** Target Transfer Tag */
+	uint32_t ttt;
+	/** Reserved */
+	uint32_t reserved_b;
+	/** Expected status sequence number */
+	uint32_t expstatsn;
+	/** Reserved */
+	uint32_t reserved_c;
+	/** Data sequence number */
+	uint32_t datasn;
+	/** Buffer offset */
+	uint32_t offset;
+	/** Reserved */
+	uint32_t reserved_d;
+};
+
+/** Data-out opcode */
+#define ISCSI_OPCODE_DATA_OUT 0x05
+
+/**
+ * iSCSI request to transfer basic header segment
+ *
+ */
+struct iscsi_bhs_r2t {
+	/** Opcode */
+	uint8_t opcode;
+	/** Flags */
+	uint8_t flags;
+	/** Reserved */
+	uint16_t reserved_a;
+	/** Segment lengths */
+	union iscsi_segment_lengths lengths;
+	/** Logical Unit Number */
+	uint64_t lun;
+	/** Initiator Task Tag */
+	uint32_t itt;
+	/** Target Transfer Tag */
+	uint32_t ttt;
+	/** Status sequence number */
+	uint32_t statsn;
+	/** Expected command sequence number */
+	uint32_t expcmdsn;
+	/** Maximum command sequence number */
+	uint32_t maxcmdsn;
+	/** R2T sequence number */
+	uint32_t r2tsn;
+	/** Buffer offset */
+	uint32_t offset;
+	/** Desired data transfer length */
+	uint32_t len;
+};
+
+/** R2T opcode */
+#define ISCSI_OPCODE_R2T 0x31
 
 /**
  * An iSCSI basic header segment
  */
 union iscsi_bhs {
 	struct iscsi_bhs_common common;
-	struct iscsi_bhs_common_request common_request;
 	struct iscsi_bhs_common_response common_response;
 	struct iscsi_bhs_login_request login_request;
 	struct iscsi_bhs_login_response login_response;
 	struct iscsi_bhs_scsi_command scsi_command;
 	struct iscsi_bhs_scsi_response scsi_response;
 	struct iscsi_bhs_data_in data_in;
+	struct iscsi_bhs_data_out data_out;
+	struct iscsi_bhs_r2t r2t;
 	unsigned char bytes[ sizeof ( struct iscsi_bhs_common ) ];
 };
 
@@ -452,9 +506,29 @@ struct iscsi_session {
 	/** Initiator task tag
 	 *
 	 * This is the tag of the current command.  It is incremented
-	 * whenever a final response PDU is received.
+	 * whenever a new command is started.
 	 */
 	uint32_t itt;
+	/** Target transfer tag
+	 *
+	 * This is the tag attached to a sequence of data-out PDUs in
+	 * response to an R2T.
+	 */
+	uint32_t ttt;
+	/**
+	 * Transfer offset
+	 *
+	 * This is the offset for an in-progress sequence of data-out
+	 * PDUs in response to an R2T.
+	 */
+	uint32_t transfer_offset;
+	/**
+	 * Transfer length
+	 *
+	 * This is the length for an in-progress sequence of data-out
+	 * PDUs in response to an R2T.
+	 */
+	uint32_t transfer_len;
 	/** Command sequence number
 	 *
 	 * This is the sequence number of the current command, used to

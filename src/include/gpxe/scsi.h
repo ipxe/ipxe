@@ -136,6 +136,10 @@ struct scsi_command {
 	 * Must be zero if @c data_in is NULL
 	 */
 	size_t data_in_len;
+	/** SCSI statua code */
+	uint8_t status;
+	/** SCSI sense response code */
+	uint8_t sense_response;
 };
 
 /** A SCSI device */
@@ -154,6 +158,12 @@ struct scsi_device {
 	 * @v scsi		SCSI device
 	 * @v command		SCSI command
 	 * @ret rc		Return status code
+	 *
+	 * Note that a successful return status code indicates only
+	 * that the SCSI command completed.  The caller must check the
+	 * status field in the command structure to see if, for
+	 * example, the device returned CHECK CONDITION or some other
+	 * non-success status code.
 	 */
 	int ( * command ) ( struct scsi_device *scsi,
 			    struct scsi_command *command );

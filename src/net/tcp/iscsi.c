@@ -33,6 +33,8 @@
  */
 
 static void iscsi_start_tx ( struct iscsi_session *iscsi );
+static void iscsi_start_data_out ( struct iscsi_session *iscsi,
+				   unsigned int datasn );
 
 /****************************************************************************
  *
@@ -44,6 +46,11 @@ static void iscsi_start_tx ( struct iscsi_session *iscsi );
  * Build iSCSI SCSI command BHS
  *
  * @v iscsi		iSCSI session
+ *
+ * We don't currently support bidirectional commands (i.e. with both
+ * Data-In and Data-Out segments); these would require providing code
+ * to generate an AHS, and there doesn't seem to be any need for it at
+ * the moment.
  */
 static void iscsi_start_command ( struct iscsi_session *iscsi ) {
 	struct iscsi_bhs_scsi_command *command = &iscsi->tx_bhs.scsi_command;
@@ -59,21 +66,49 @@ static void iscsi_start_command ( struct iscsi_session *iscsi ) {
 		command->flags |= ISCSI_COMMAND_FLAG_READ;
 	if ( iscsi->command->data_out )
 		command->flags |= ISCSI_COMMAND_FLAG_WRITE;
-	ISCSI_SET_LENGTHS ( command->lengths, 0, iscsi->command->data_out_len);
+	/* lengths left as zero */
 	command->lun = iscsi->lun;
-	command->itt = htonl ( iscsi->itt );
-	command->exp_len = htonl ( iscsi->command->data_in_len );
+	command->itt = htonl ( ++iscsi->itt );
+	command->exp_len = htonl ( iscsi->command->data_in_len |
+				   iscsi->command->data_out_len );
+	command->cmdsn = htonl ( iscsi->cmdsn );
+	command->expstatsn = htonl ( iscsi->statsn + 1 );
 	memcpy ( &command->cdb, &iscsi->command->cdb, sizeof ( command->cdb ));
 }
 
 /**
- * Send iSCSI SCSI command data
+ * Receive data segment of an iSCSI SCSI response PDU
  *
  * @v iscsi		iSCSI session
+ * @v data		Received data
+ * @v len		Length of received data
+ * @v remaining		Data remaining after this data
+ * 
  */
-static void iscsi_tx_command ( struct iscsi_session *iscsi ) {
-	tcp_send ( &iscsi->tcp, iscsi->command->data_out + iscsi->tx_offset,
-		   iscsi->command->data_out_len - iscsi->tx_offset );
+static void iscsi_rx_scsi_response ( struct iscsi_session *iscsi, void *data,
+				     size_t len, size_t remaining ) {
+	struct iscsi_bhs_scsi_response *response
+		= &iscsi->rx_bhs.scsi_response;
+	int sense_offset;
+
+	/* Capture the sense response code as it floats past, if present */
+	sense_offset = ISCSI_SENSE_RESPONSE_CODE_OFFSET - iscsi->rx_offset;
+	if ( ( sense_offset >= 0 ) && len ) {
+		iscsi->command->sense_response =
+			* ( ( char * ) data + sense_offset );
+	}
+
+	/* Wait for whole SCSI response to arrive */
+	if ( remaining )
+		return;
+	
+	/* Record SCSI status code */
+	iscsi->command->status = response->status;
+
+	/* Mark as completed, with error if applicable */
+	iscsi->status |= ISCSI_STATUS_DONE;
+	if ( response->response != ISCSI_RESPONSE_COMMAND_COMPLETE )
+		iscsi->status |= ISCSI_STATUS_ERR;
 }
 
 /**
@@ -86,7 +121,7 @@ static void iscsi_tx_command ( struct iscsi_session *iscsi ) {
  * 
  */
 static void iscsi_rx_data_in ( struct iscsi_session *iscsi, void *data,
-			       size_t len, size_t remaining ) {
+			       size_t len, size_t remaining __unused ) {
 	struct iscsi_bhs_data_in *data_in = &iscsi->rx_bhs.data_in;
 	unsigned long offset;
 
@@ -97,9 +132,109 @@ static void iscsi_rx_data_in ( struct iscsi_session *iscsi, void *data,
 	assert ( ( offset + len ) <= iscsi->command->data_in_len );
 	memcpy ( ( iscsi->command->data_in + offset ), data, len );
 
+	/* Record SCSI status, if present */
+	if ( data_in->flags & ISCSI_DATA_FLAG_STATUS )
+		iscsi->command->status = data_in->status;
+
 	/* If this is the end, flag as complete */
-	if ( ( data_in->flags & ISCSI_FLAG_FINAL ) && ( remaining == 0 ) )
+	if ( ( offset + len ) == iscsi->command->data_in_len ) {
+		assert ( data_in->flags & ISCSI_FLAG_FINAL );
+		assert ( remaining == 0 );
 		iscsi->status |= ISCSI_STATUS_DONE;
+	}
+}
+
+/**
+ * Receive data segment of an iSCSI R2T PDU
+ *
+ * @v iscsi		iSCSI session
+ * @v data		Received data
+ * @v len		Length of received data
+ * @v remaining		Data remaining after this data
+ * 
+ */
+static void iscsi_rx_r2t ( struct iscsi_session *iscsi, void *data __unused,
+			   size_t len __unused, size_t remaining __unused ) {
+	struct iscsi_bhs_r2t *r2t = &iscsi->rx_bhs.r2t;
+
+	/* Record transfer parameters and trigger first data-out */
+	iscsi->ttt = ntohl ( r2t->ttt );
+	iscsi->transfer_offset = ntohl ( r2t->offset );
+	iscsi->transfer_len = ntohl ( r2t->len );
+	iscsi_start_data_out ( iscsi, 0 );
+}
+
+/**
+ * Build iSCSI data-out BHS
+ *
+ * @v iscsi		iSCSI session
+ * @v datasn		Data sequence number within the transfer
+ *
+ */
+static void iscsi_start_data_out ( struct iscsi_session *iscsi,
+				   unsigned int datasn ) {
+	struct iscsi_bhs_data_out *data_out = &iscsi->tx_bhs.data_out;
+	unsigned long offset;
+	unsigned long remaining;
+	unsigned long len;
+
+	/* We always send 512-byte Data-Out PDUs; this removes the
+	 * need to worry about the target's MaxRecvDataSegmentLength.
+	 */
+	offset = datasn * 512;
+	remaining = iscsi->transfer_len - offset;
+	len = remaining;
+	if ( len > 512 )
+		len = 512;
+
+	/* Construct BHS and initiate transmission */
+	iscsi_start_tx ( iscsi );
+	data_out->opcode = ISCSI_OPCODE_DATA_OUT;
+	if ( len == remaining )
+		data_out->flags = ( ISCSI_FLAG_FINAL );
+	ISCSI_SET_LENGTHS ( data_out->lengths, 0, len );
+	data_out->lun = iscsi->lun;
+	data_out->itt = htonl ( iscsi->itt );
+	data_out->ttt = htonl ( iscsi->ttt );
+	data_out->expstatsn = htonl ( iscsi->statsn + 1 );
+	data_out->datasn = htonl ( datasn );
+	data_out->offset = htonl ( iscsi->transfer_offset + offset );
+}
+
+/**
+ * Complete iSCSI data-out PDU transmission
+ *
+ * @v iscsi		iSCSI session
+ *
+ */
+static void iscsi_data_out_done ( struct iscsi_session *iscsi ) {
+	struct iscsi_bhs_data_out *data_out = &iscsi->tx_bhs.data_out;
+
+	/* If we haven't reached the end of the sequence, start
+	 * sending the next data-out PDU.
+	 */
+	if ( ! ( data_out->flags & ISCSI_FLAG_FINAL ) )
+		iscsi_start_data_out ( iscsi, ntohl ( data_out->datasn ) + 1 );
+}
+
+/**
+ * Send iSCSI data-out data segment
+ *
+ * @v iscsi		iSCSI session
+ */
+static void iscsi_tx_data_out ( struct iscsi_session *iscsi ) {
+	struct iscsi_bhs_data_out *data_out = &iscsi->tx_bhs.data_out;
+	unsigned long offset;
+	unsigned long len;
+
+	offset = ( iscsi->transfer_offset + ntohl ( data_out->offset ) +
+		   iscsi->tx_offset );
+	len = ( ISCSI_DATA_LEN ( data_out->lengths ) - iscsi->tx_offset );
+	assert ( iscsi->command != NULL );
+	assert ( iscsi->command->data_out != NULL );
+	assert ( ( offset + len ) <= iscsi->command->data_out_len );
+	
+	tcp_send ( &iscsi->tcp, iscsi->command->data_out + offset, len );
 }
 
 /****************************************************************************
@@ -121,11 +256,11 @@ static int iscsi_build_login_request_strings ( struct iscsi_session *iscsi,
 	return snprintf ( data, len,
 			  "InitiatorName=%s%c"
 			  "TargetName=%s%c"
-			  "MaxRecvDataSegmentLength=512%c"
 			  "SessionType=Normal%c"
 			  "DataDigest=None%c"
 			  "HeaderDigest=None%c"
-			  "ErrorRecoveryLevel=0%c",
+			  "DefaultTime2Wait=0%c"
+			  "DefaultTime2Retain=0%c",
 			  iscsi->initiator, 0, iscsi->target, 0,
 			  0, 0, 0, 0, 0 );
 }
@@ -134,7 +269,7 @@ static int iscsi_build_login_request_strings ( struct iscsi_session *iscsi,
  * Build iSCSI login request BHS
  *
  * @v iscsi		iSCSI session
- * @v first		Login request is the first request of a session
+ * @v first		Login request is the first in a sequence
  */
 static void iscsi_start_login ( struct iscsi_session *iscsi, int first ) {
 	struct iscsi_bhs_login_request *request = &iscsi->tx_bhs.login_request;
@@ -156,8 +291,12 @@ static void iscsi_start_login ( struct iscsi_session *iscsi, int first ) {
 					IANA_EN_FEN_SYSTEMS );
 	/* isid_iana_qual left as zero */
 	request->tsih = htons ( iscsi->tsih );
-	/* itt left as zero */
+	if ( first )
+		iscsi->itt++;
+	request->itt = htonl ( iscsi->itt );
 	/* cid left as zero */
+	request->cmdsn = htonl ( iscsi->cmdsn );
+	request->expstatsn = htonl ( iscsi->statsn + 1 );
 }
 
 /**
@@ -240,8 +379,6 @@ static void iscsi_start_tx ( struct iscsi_session *iscsi ) {
 	
 	/* Initialise TX BHS */
 	memset ( &iscsi->tx_bhs, 0, sizeof ( iscsi->tx_bhs ) );
-	iscsi->tx_bhs.common_request.cmdsn = htonl ( iscsi->cmdsn );
-	iscsi->tx_bhs.common_request.expstatsn = htonl ( iscsi->statsn + 1 );
 
 	/* Flag TX engine to start transmitting */
 	iscsi->tx_state = ISCSI_TX_BHS;
@@ -260,14 +397,35 @@ static void iscsi_tx_data ( struct iscsi_session *iscsi ) {
 	struct iscsi_bhs_common *common = &iscsi->tx_bhs.common;
 
 	switch ( common->opcode & ISCSI_OPCODE_MASK ) {
-	case ISCSI_OPCODE_SCSI_COMMAND:
-		iscsi_tx_command ( iscsi );
+	case ISCSI_OPCODE_DATA_OUT:
+		iscsi_tx_data_out ( iscsi );
 		break;
 	case ISCSI_OPCODE_LOGIN_REQUEST:
 		iscsi_tx_login_request ( iscsi );
 		break;
 	default:
 		assert ( 0 );
+		break;
+	}
+}
+
+/**
+ * Complete iSCSI PDU transmission
+ *
+ * @v iscsi		iSCSI session
+ *
+ * Called when a PDU has been completely transmitted and the TX state
+ * machine is about to enter the idle state.  iscsi::tx_bhs will be
+ * valid for the just-completed PDU when this is called.
+ */
+static void iscsi_tx_done ( struct iscsi_session *iscsi ) {
+	struct iscsi_bhs_common *common = &iscsi->tx_bhs.common;
+
+	switch ( common->opcode & ISCSI_OPCODE_MASK ) {
+	case ISCSI_OPCODE_DATA_OUT:
+		iscsi_data_out_done ( iscsi );
+	default:
+		/* No action */
 		break;
 	}
 }
@@ -318,9 +476,14 @@ static void iscsi_acked ( struct tcp_connection *conn, size_t len ) {
 		 */
 		if ( iscsi->tx_offset != max_tx_offset )
 			return;
-		
+
+		/* Move to next state.  Call iscsi_tx_done() when PDU
+		 * transmission is complete.
+		 */
 		iscsi->tx_state = next_state;
 		iscsi->tx_offset = 0;
+		if ( next_state == ISCSI_TX_IDLE )
+			iscsi_tx_done ( iscsi );
 	}
 }
 
@@ -381,16 +544,18 @@ static void iscsi_rx_data ( struct iscsi_session *iscsi, void *data,
 	iscsi->cmdsn = ntohl ( response->expcmdsn );
 	iscsi->statsn = ntohl ( response->statsn );
 
-	/* Increment itt when we receive a final response */
-	if ( response->flags & ISCSI_FLAG_FINAL )
-		iscsi->itt++;
-
 	switch ( response->opcode & ISCSI_OPCODE_MASK ) {
 	case ISCSI_OPCODE_LOGIN_RESPONSE:
 		iscsi_rx_login_response ( iscsi, data, len, remaining );
 		break;
+	case ISCSI_OPCODE_SCSI_RESPONSE:
+		iscsi_rx_scsi_response ( iscsi, data, len, remaining );
+		break;
 	case ISCSI_OPCODE_DATA_IN:
 		iscsi_rx_data_in ( iscsi, data, len, remaining );
+		break;
+	case ISCSI_OPCODE_R2T:
+		iscsi_rx_r2t ( iscsi, data, len, remaining );
 		break;
 	default:
 		printf ( "Unknown iSCSI opcode %02x\n", response->opcode );
@@ -521,6 +686,7 @@ static void iscsi_closed ( struct tcp_connection *conn, int status __unused ) {
 	if ( ++iscsi->retry_count <= ISCSI_MAX_RETRIES ) {
 		tcp_connect ( conn );
 	} else {
+		printf ( "iSCSI retry count exceeded\n" );
 		iscsi->status |= ( ISCSI_STATUS_DONE | ISCSI_STATUS_ERR );
 	}
 }
