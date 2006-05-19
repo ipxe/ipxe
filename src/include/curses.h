@@ -68,21 +68,33 @@ typedef struct _curses_window {
 } WINDOW;
 
 extern WINDOW _stdscr;
-#define stdscr ( &_stdscr )
+extern SCREEN _curscr;
+extern unsigned short _COLS;
+extern unsigned short _LINES;
+extern unsigned short _COLOURS;
+extern unsigned int *_COLOUR_PAIRS;
 
-#define MUCURSES_ATTR_SHIFT	16
-#define MUCURSES_BITS( mask, shift ) (( mask ) << (( shift ) + MUCURSES_ATTR_SHIFT ))
+#define stdscr ( &_stdscr )
+#define curscr ( &_curscr )
+#define COLS _COLS
+#define LINES _LINES
+#define COLORS _COLOURS
+#define COLOR_PAIRS COLOUR_PAIRS
+
+#define MUCURSES_BITS( mask, shift ) (( mask ) << (shift))
+#define CPAIR_SHIFT	8
+#define ATTRS_SHIFT	16
 
 #define A_DEFAULT	( 1UL - 1UL )
-#define A_ALTCHARSET	MUCURSES_BITS( 1UL, 0 )
-#define A_BLINK		MUCURSES_BITS( 1UL, 1 )
-#define A_BOLD		MUCURSES_BITS( 1UL, 2 )
-#define A_DIM		MUCURSES_BITS( 1UL, 3 )
-#define A_INVIS		MUCURSES_BITS( 1UL, 4 )
-#define A_PROTECT	MUCURSES_BITS( 1UL, 5 )
-#define A_REVERSE	MUCURSES_BITS( 1UL, 6 )
-#define A_STANDOUT	MUCURSES_BITS( 1UL, 7 )
-#define A_UNDERLINE	MUCURSES_BITS( 1UL, 8 )
+#define A_ALTCHARSET	MUCURSES_BITS( 1UL, ATTRS_SHIFT + 0 )
+#define A_BLINK		MUCURSES_BITS( 1UL, ATTRS_SHIFT + 1 )
+#define A_BOLD		MUCURSES_BITS( 1UL, ATTRS_SHIFT + 2 )
+#define A_DIM		MUCURSES_BITS( 1UL, ATTRS_SHIFT + 3 )
+#define A_INVIS		MUCURSES_BITS( 1UL, ATTRS_SHIFT + 4 )
+#define A_PROTECT	MUCURSES_BITS( 1UL, ATTRS_SHIFT + 5 )
+#define A_REVERSE	MUCURSES_BITS( 1UL, ATTRS_SHIFT + 6 )
+#define A_STANDOUT	MUCURSES_BITS( 1UL, ATTRS_SHIFT + 7 )
+#define A_UNDERLINE	MUCURSES_BITS( 1UL, ATTRS_SHIFT + 8 )
 
 #define WA_ALTCHARSET	A_ALTCHARSET
 #define WA_BLINK	A_BLINK
@@ -93,16 +105,16 @@ extern WINDOW _stdscr;
 #define WA_REVERSE	A_REVERSE
 #define WA_STANDOUT	A_STANDOUT
 #define WA_UNDERLINE	A_UNDERLINE
-#define WA_HORIZONTAL	MUCURSES_BITS( 1UL, 9 )
-#define WA_VERTICAL	MUCURSES_BITS( 1UL, 10 )
-#define WA_LEFT		MUCURSES_BITS( 1UL, 11 )
-#define WA_RIGHT	MUCURSES_BITS( 1UL, 12 )
-#define WA_LOW		MUCURSES_BITS( 1UL, 13 )
-#define WA_TOP		MUCURSES_BITS( 1UL, 14 )
+#define WA_HORIZONTAL	MUCURSES_BITS( 1UL, ATTRS_SHIFT + 9 )
+#define WA_VERTICAL	MUCURSES_BITS( 1UL, ATTRS_SHIFT + 10 )
+#define WA_LEFT		MUCURSES_BITS( 1UL, ATTRS_SHIFT + 11 )
+#define WA_RIGHT	MUCURSES_BITS( 1UL, ATTRS_SHIFT + 12 )
+#define WA_LOW		MUCURSES_BITS( 1UL, ATTRS_SHIFT + 13 )
+#define WA_TOP		MUCURSES_BITS( 1UL, ATTRS_SHIFT + 14 )
 
-#define A_ATTRIBUTES	MUCURSES_BITS( ~( 1UL - 1UL ), 0 )
+#define A_ATTRIBUTES	( MUCURSES_BITS( 1UL, ATTRS_SHIFT ) - 1UL )
 #define A_CHARTEXT	( MUCURSES_BITS( 1UL, 0 ) - 1UL )
-#define A_COLOR		MUCURSES_BITS( ( 1UL << 8 ) - 1UL, 0 )
+#define A_COLOR		MUCURSES_BITS( ( 1UL << 8 ) - 1UL, CPAIR_SHIFT )
 
 #define ACS_ULCORNER	'+'
 #define ACS_LLCORNER	'+'
@@ -258,7 +270,6 @@ extern int attr_on ( attr_t, void * );
 extern int attr_set ( attr_t, short, void * );
 extern int baudrate ( void );
 extern int beep ( void );
-/*extern int bkgd ( chtype );*/
 /*extern void bkgdset ( chtype );*/
 /*extern int border ( chtype, chtype, chtype, chtype, chtype, chtype, chtype,
   chtype );*/
@@ -266,15 +277,12 @@ extern int box ( WINDOW *, chtype, chtype );
 extern bool can_change_colour ( void );
 #define can_change_color() can_change_colour()
 extern int cbreak ( void ); 
-extern int chgat ( int, attr_t, short, const void * );
-extern int clearok ( WINDOW *, bool );
-extern int clear ( void );
-extern int clrtobot ( void );
-extern int clrtoeol ( void );
+/*extern int clrtobot ( void );*/
+/*extern int clrtoeol ( void );*/
 extern int colour_content ( short, short *, short *, short * );
 #define color_content( col, r, g, b ) colour_content( (col), (r), (g), (b) )
-extern int colour_set ( short, void * );
-#define color_set( cpno, opts ) colour_set( (cpno), (opts) )
+/*extern int colour_set ( short, void * );*/
+/*#define color_set( cpno, opts ) colour_set( (cpno), (opts) )*/
 extern int copywin ( const WINDOW *, WINDOW *, int, int, int, 
 		     int, int, int, int );
 extern int curs_set ( int );
@@ -337,7 +345,6 @@ extern int meta ( WINDOW *, bool );
 /*extern int mvaddchstr ( int, int, const chtype * );*/
 /*extern int mvaddnstr ( int, int, const char *, int );*/
 /*extern int mvaddstr ( int, int, const char * );*/
-extern int mvchgat ( int, int, int, attr_t, short, const void * );
 extern int mvcur ( int, int, int, int );
 extern int mvdelch ( int, int );
 extern int mvderwin ( WINDOW *, int, int );
@@ -361,7 +368,6 @@ extern int mvvline ( int, int, chtype, int );
 /*extern int mvwaddchstr ( WINDOW *, int, int, const chtype * );*/
 /*extern int mvwaddnstr ( WINDOW *, int, int, const char *, int );*/
 /*extern int mvwaddstr ( WINDOW *, int, int, const char * );*/
-extern int mvwchgat ( WINDOW *, int, int, int, attr_t, short, const void * );
 extern int mvwdelch ( WINDOW *, int, int );
 extern int mvwgetch ( WINDOW *, int, int );
 extern int mvwgetnstr ( WINDOW *, int, int, char *, int );
@@ -476,16 +482,14 @@ extern int wattr_get ( WINDOW *, attr_t *, short *, void * );
 extern int wattr_off ( WINDOW *, attr_t, void * );
 extern int wattr_on ( WINDOW *, attr_t, void * );
 extern int wattr_set ( WINDOW *, attr_t, short, void * );
-extern int wbkgd ( WINDOW *, chtype );
 /*extern void wbkgdset ( WINDOW *, chtype );*/
 extern int wborder ( WINDOW *, chtype, chtype, chtype, chtype, chtype, chtype,
 		   chtype, chtype );
-extern int wchgat ( WINDOW *, int, attr_t, short, const void * );
-extern int wclear ( WINDOW * );
 extern int wclrtobot ( WINDOW * );
 extern int wclrtoeol ( WINDOW * );
 extern void wcursyncup ( WINDOW * );
-extern int wcolor_set ( WINDOW *, short, void * );
+/*extern int wcolor_set ( WINDOW *, short, void * );*/
+#define wcolor_set(w,s,v) wcolour_set((w),(s),(v))
 extern int wdelch ( WINDOW * );
 extern int wdeleteln ( WINDOW * );
 extern int wechochar ( WINDOW *, const chtype );
@@ -520,326 +524,124 @@ extern void wtimeout ( WINDOW *, int );
 extern int wtouchln ( WINDOW *, int, int, int );
 extern int wvline ( WINDOW *, chtype, int );
 
-#define COLOUR_PAIR(n)	MUCURSES_BITS( (n), -8 )
-#define COLOR_PAIR(n)	COLOUR_PAIR(n)
-
 /*
- * static inlines
+ * There is frankly a ridiculous amount of redundancy within the
+ * curses API - ncurses decided to get around this by using #define
+ * macros, but I've decided to be type-safe and implement them all as
+ * static inlines instead...
  */
 
-/**
- * Add a single-byte character and rendition to stdscr and advance the
- * cursor
- *
- * @v ch	character to be added at cursor
- * @ret rc	return status code
- */
 static inline int addch ( const chtype ch ) {
 	return waddch( stdscr, ch );
 }
 
-/**
- * Add string of single-byte characters and renditions to stdscr
- *
- * @v *chstr	pointer to first chtype in "string"
- * @v n		number of chars from chstr to render
- * @ret rc	return status code
- */
 static inline int addchnstr ( const chtype *chstr, int n ) {
 	return waddchnstr ( stdscr, chstr, n );
 }
 
-/**
- * Add string of single-byte characters and renditions to stdscr
- *
- * @v *chstr	pointer to first chtype in "string"
- * @ret rc	return status code
- */
 static inline int addchstr ( const chtype *chstr ) {
 	return waddchnstr ( stdscr, chstr, -1 );
 }
 
-/**
- * Add string of single-byte characters to stdscr
- *
- * @v *str	standard c-style string
- * @v n		max number of chars from string to render
- * @ret rc	return status code
- */
 static inline int addnstr ( const char *str, int n ) {
 	return waddnstr ( stdscr, str, n );
 }
 
-/**
- * Add string of single-byte characters to stdscr
- *
- * @v *str	standard c-style string
- * @ret rc	return status code
- */
 static inline int addstr ( const char *str ) {
 	return waddnstr ( stdscr, str, -1 );
 }
 
-/**
- * Turn off attributes
- *
- * @v win	subject window
- * @v attrs	attributes to enable
- * @ret rc	return status code
- */
 static inline int attroff ( int attrs ) {
 	return wattroff ( stdscr, attrs );
 }
 
-/**
- * Turn on attributes
- *
- * @v win	subject window
- * @v attrs	attributes to enable
- * @ret rc	return status code
- */
 static inline int attron ( int attrs ) {
 	return wattron ( stdscr, attrs );
 }
 
-/**
- * Set attributes
- *
- * @v win	subject window
- * @v attrs	attributes to enable
- * @ret rc	return status code
- */
 static inline int attrset ( int attrs ) {
 	return wattrset ( stdscr, attrs );
 }
 
-/**
- * Set background rendition attributes for stdscr and apply to
- * contents
- *
- * @v ch	chtype containing rendition attributes
- * @ret rc	return status code
- */
-static inline int bkgd ( chtype ch ) {
-	return wbkgd ( stdscr, ch );
-}
-
-/**
- * Set background rendition attributes for stdscr
- */
 static inline void bkgdset ( chtype ch ) {
 	wattrset ( stdscr, ch );
 }
 
-/**
- * Draw borders from single-byte characters and renditions around
- * stdscr
- *
- * @v ls	left side
- * @v rs	right side
- * @v ts	top
- * @v bs	bottom
- * @v tl	top left corner
- * @v tr	top right corner
- * @v bl	bottom left corner
- * @v br	bottom right corner
- * @ret rc	return status code
- */
 static inline int border ( chtype ls, chtype rs, chtype ts, chtype bs,
 			   chtype tl, chtype tr, chtype bl, chtype br ) {
 	return wborder ( stdscr, ls, rs, ts, bs, tl, tr, bl, br );
 }
 
-/**
- * Move stdscr cursor to the specified position
- *
- * @v y		Y position
- * @v x		X position
- * @ret rc	return status code
- */
+static inline int clrtobot ( void ) {
+	return wclrtobot( stdscr );
+}
+
+static inline int clrtoeol ( void ) {
+	return wclrtoeol( stdscr );
+}
+
 static inline int move ( int y, int x ) {
 	return wmove ( stdscr, y, x );
 }
 
-/**
- * Add a single-byte character and rendition to stdscr at the
- * specified position and advance the cursor
- *
- * @v y		Y position
- * @v x		X position
- * @v ch	character to be added at cursor
- * @ret rc	return status code
- */
 static inline int mvaddch ( int y, int x, const chtype ch ) {
 	return ( wmove ( stdscr, y, x ) == ERR 
 		 ? ERR : waddch( stdscr, ch ) );
 }
 
-/**
- * Add string of single-byte characters and renditions to stdscr at
- * the specified position
- *
- * @v y		Y position
- * @v x		X position
- * @v *chstr	pointer to first chtype in "string"
- * @v n		max number of chars from chstr to render
- * @ret rc	return status code
- */
 static inline int mvaddchnstr ( int y, int x, const chtype *chstr, int n ) {
 	return ( wmove ( stdscr, y, x ) == ERR
 		 ? ERR : waddchnstr ( stdscr, chstr, n ) );
 }
 
-/**
- * Add string of single-byte characters and renditions to stdscr at
- * the specified position
- *
- * @v y		Y position
- * @v x		X position
- * @v *chstr	pointer to first chtype in "string"
- * @ret rc	return status code
- */
 static inline int mvaddchstr ( int y, int x, const chtype *chstr ) {
 	return ( wmove ( stdscr, y, x ) == ERR
 		 ? ERR : waddchnstr ( stdscr, chstr, -1 ) );
 }
 
-/**
- * Add string of single-byte characters to stdscr at the specified
- * position
- *
- * @v y		Y position
- * @v x		X position
- * @v *str	standard c-style string
- * @v n		max number of chars from string to render
- * @ret rc	return status code
- */
 static inline int mvaddnstr ( int y, int x, const char *str, int n ) {
 	return ( wmove ( stdscr, y, x ) == ERR
 		 ? ERR : waddnstr ( stdscr, str, n ) );
 }
 
-/**
- * Add string of single-byte characters to stdscr at the specified
- * position
- *
- * @v y		Y position
- * @v x		X position
- * @v *str	standard c-style string
- * @ret rc	return status code
- */
 static inline int mvaddstr ( int y, int x, const char *str ) {
 	return ( wmove ( stdscr, y, x ) == ERR
 		 ? ERR : waddnstr ( stdscr, str, -1 ) );
 }
 
-/**
- * Add a single-byte character and rendition to a window at the
- * specified position and advance the cursor
- *
- * @v *win	subject window
- * @v y		Y position
- * @v x		X position
- * @v ch	character to be added at cursor
- * @ret rc	return status code
- */
 static inline int mvwaddch ( WINDOW *win, int y, int x, const chtype ch ) {
 	return ( wmove( win, y, x ) == ERR 
 		 ? ERR : waddch ( win, ch ) );
 }
 
-/**
- * Add string of single-byte characters and renditions to a window at
- * the specified position
- *
- * @v *win	subject window
- * @v y		Y position
- * @v x		X position
- * @v *chstr	pointer to first chtype in "string"
- * @v n		max number of chars from chstr to render
- * @ret rc	return status code
- */
 static inline int mvwaddchnstr ( WINDOW *win, int y, int x, const chtype *chstr, int n ) {
 	return ( wmove ( win, y, x ) == ERR 
 		 ? ERR : waddchnstr ( win, chstr, n ) );
 }
 
-/**
- * Add string of single-byte characters and renditions to a window at
- * the specified position
- *
- * @v *win	subject window
- * @v y		Y position
- * @v x		X position
- * @v *chstr	pointer to first chtype in "string"
- * @ret rc	return status code
- */
 static inline int mvwaddchstr ( WINDOW *win, int y, int x, const chtype *chstr ) {
 	return ( wmove ( win, y, x ) == ERR 
 		 ? ERR : waddchnstr ( win, chstr, -1 ) );
 }
 
-/**
- * Add string of single-byte characters to a window at the specified
- * position
- *
- * @v *win	window to be rendered in
- * @v y		Y position
- * @v x		X position
- * @v *str	standard c-style string
- * @v n		max number of chars from string to render
- * @ret rc	return status code
- */
 static inline int mvwaddnstr ( WINDOW *win, int y, int x, const char *str, int n ) {
 	return ( wmove ( win, y, x ) == ERR
 		 ? ERR : waddnstr ( win, str, n ) );
 }
 
-/**
- * Add string of single-byte characters to a window at the specified
- * position
- *
- * @v *win	window to be rendered in
- * @v y		Y position
- * @v x		X position
- * @v *str	standard c-style string
- * @ret rc	return status code
- */
 static inline int mvwaddstr ( WINDOW *win, int y, int x, const char *str ) {
 	return ( wmove ( win, y, x ) == ERR
 		 ? ERR : waddnstr ( win, str, -1 ) );
 }
 
-/**
- * Add string of single-byte characters and renditions to a window
- *
- * @v *win	subject window
- * @v *chstr	pointer to first chtype in "string"
- * @ret rc	return status code
- */
 static inline int waddchstr ( WINDOW *win, const chtype *chstr ) {
 	return waddchnstr ( win, chstr, -1 );
 }
 
-/**
- * Add string of single-byte characters to a window
- *
- * @v *win	window to be rendered in
- * @v *str	standard c-style string
- * @ret rc	return status code
- */
 static inline int waddstr ( WINDOW *win, const char *str ) {
 	return waddnstr ( win, str, -1 );
 }
 
-/**
- * Set background rendition attributes for a window and apply to
- * contents
- *
- * @v *win	window to be operated on
- * @v ch	chtype containing rendition attributes
- * @ret rc	return status code
- */
 static inline int wbkgdset ( WINDOW *win, chtype ch ) {
 	return wattrset( win, ch );
 }
