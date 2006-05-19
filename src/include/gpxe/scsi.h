@@ -3,6 +3,7 @@
 
 #include <stdint.h>
 #include <gpxe/blockdev.h>
+#include <gpxe/uaccess.h>
 
 /**
  * @defgroup scsiops SCSI operation codes
@@ -123,14 +124,14 @@ struct scsi_command {
 	/** CDB for this command */
 	union scsi_cdb cdb;
 	/** Data-out buffer (may be NULL) */
-	const void *data_out;
+	userptr_t data_out;
 	/** Data-out buffer length
 	 *
 	 * Must be zero if @c data_out is NULL
 	 */
 	size_t data_out_len;
 	/** Data-in buffer (may be NULL) */
-	void *data_in;
+	userptr_t data_in;
 	/** Data-in buffer length
 	 *
 	 * Must be zero if @c data_in is NULL

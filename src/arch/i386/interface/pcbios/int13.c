@@ -93,7 +93,7 @@ static unsigned long chs_to_lba ( struct int13_drive *drive,
 	lba = ( ( ( ( cylinder * drive->heads ) + head )
 		  * drive->sectors_per_track ) + sector - 1 );
 
-	DBG ( "C/H/S address %x/%x/%x -> LBA %x\n",
+	DBG ( "C/H/S address %x/%x/%x -> LBA %lx\n",
 	      cylinder, head, sector, lba );
 
 	return lba;
@@ -111,19 +111,15 @@ static unsigned long chs_to_lba ( struct int13_drive *drive,
 static int int13_read ( struct int13_drive *drive, uint64_t lba,
 			struct segoff data, unsigned long count ) {
 	struct block_device *blockdev = drive->blockdev;
-	size_t blksize = blockdev->blksize;
-	uint8_t buffer[blksize];
+	userptr_t buffer = real_to_user ( data.segment, data.offset );
 	int rc;
 
 	DBG ( "Read %lx sectors from %llx to %04x:%04x\n", count,
 	      ( unsigned long long ) lba, data.segment, data.offset );
-	while ( count-- ) {
-		if ( ( rc = blockdev->read ( blockdev, lba, buffer ) ) != 0 )
-			return INT13_STATUS_READ_ERROR;
-		copy_to_real ( data.segment, data.offset, buffer, blksize );
-		data.offset += blksize;
-		lba++;
-	}
+	
+	if ( ( rc = blockdev->read ( blockdev, lba, count, buffer ) ) != 0 )
+		return INT13_STATUS_READ_ERROR;
+
 	return 0;
 }
 
@@ -139,19 +135,15 @@ static int int13_read ( struct int13_drive *drive, uint64_t lba,
 static int int13_write ( struct int13_drive *drive, uint64_t lba,
 			 struct segoff data, unsigned long count ) {
 	struct block_device *blockdev = drive->blockdev;
-	size_t blksize = blockdev->blksize;
-	uint8_t buffer[blksize];
+	userptr_t buffer = real_to_user ( data.segment, data.offset );
 	int rc;
 
 	DBG ( "Write %lx sectors from %04x:%04x to %llx\n", count,
 	      data.segment, data.offset, ( unsigned long long ) lba );
-	while ( count-- ) {
-		copy_from_real ( buffer, data.segment, data.offset, blksize );
-		if ( ( rc = blockdev->write ( blockdev, lba, buffer ) ) != 0 )
-			return INT13_STATUS_WRITE_ERROR;
-		data.offset += blksize;
-		lba++;
-	}
+
+	if ( ( rc = blockdev->write ( blockdev, lba, count, buffer ) ) != 0 )
+		return INT13_STATUS_WRITE_ERROR;
+
 	return 0;
 }
 
@@ -202,7 +194,7 @@ static int int13_read_sectors ( struct int13_drive *drive,
 	};
 
 	if ( drive->blockdev->blksize != INT13_BLKSIZE ) {
-		DBG ( "Invalid blocksize (%d) for non-extended read\n",
+		DBG ( "Invalid blocksize (%zd) for non-extended read\n",
 		      drive->blockdev->blksize );
 		return INT13_STATUS_INVALID;
 	}
@@ -233,7 +225,7 @@ static int int13_write_sectors ( struct int13_drive *drive,
 	};
 
 	if ( drive->blockdev->blksize != INT13_BLKSIZE ) {
-		DBG ( "Invalid blocksize (%d) for non-extended write\n",
+		DBG ( "Invalid blocksize (%zd) for non-extended write\n",
 		      drive->blockdev->blksize );
 		return INT13_STATUS_INVALID;
 	}

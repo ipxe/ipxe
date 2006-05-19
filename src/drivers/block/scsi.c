@@ -50,11 +50,12 @@ static int scsi_command ( struct scsi_device *scsi,
  *
  * @v blockdev		Block device
  * @v block		LBA block number
+ * @v count		Block count
  * @v buffer		Data buffer
  * @ret rc		Return status code
  */
 static int scsi_read ( struct block_device *blockdev, uint64_t block,
-		       void *buffer ) {
+		       unsigned long count, userptr_t buffer ) {
 	struct scsi_device *scsi = block_to_scsi ( blockdev );
 	struct scsi_command command;
 	struct scsi_cdb_read_16 *cdb = &command.cdb.read16;
@@ -63,9 +64,9 @@ static int scsi_read ( struct block_device *blockdev, uint64_t block,
 	memset ( &command, 0, sizeof ( command ) );
 	cdb->opcode = SCSI_OPCODE_READ_16;
 	cdb->lba = cpu_to_be64 ( block );
-	cdb->len = cpu_to_be32 ( 1 ); /* always a single block */
+	cdb->len = cpu_to_be32 ( count );
 	command.data_in = buffer;
-	command.data_in_len = blockdev->blksize;
+	command.data_in_len = ( count * blockdev->blksize );
 	return scsi_command ( scsi, &command );
 }
 
@@ -74,11 +75,12 @@ static int scsi_read ( struct block_device *blockdev, uint64_t block,
  *
  * @v blockdev		Block device
  * @v block		LBA block number
+ * @v count		Block count
  * @v buffer		Data buffer
  * @ret rc		Return status code
  */
 static int scsi_write ( struct block_device *blockdev, uint64_t block,
-			const void *buffer ) {
+		        unsigned long count, userptr_t buffer ) {
 	struct scsi_device *scsi = block_to_scsi ( blockdev );
 	struct scsi_command command;
 	struct scsi_cdb_write_16 *cdb = &command.cdb.write16;
@@ -87,9 +89,9 @@ static int scsi_write ( struct block_device *blockdev, uint64_t block,
 	memset ( &command, 0, sizeof ( command ) );
 	cdb->opcode = SCSI_OPCODE_WRITE_16;
 	cdb->lba = cpu_to_be64 ( block );
-	cdb->len = cpu_to_be32 ( 1 ); /* always a single block */
+	cdb->len = cpu_to_be32 ( count );
 	command.data_out = buffer;
-	command.data_out_len = blockdev->blksize;
+	command.data_out_len = ( count * blockdev->blksize );
 	return scsi_command ( scsi, &command );
 }
 
@@ -111,7 +113,7 @@ static int scsi_read_capacity ( struct block_device *blockdev ) {
 	cdb->opcode = SCSI_OPCODE_SERVICE_ACTION_IN;
 	cdb->service_action = SCSI_SERVICE_ACTION_READ_CAPACITY_16;
 	cdb->len = cpu_to_be32 ( sizeof ( capacity ) );
-	command.data_in = &capacity;
+	command.data_in = virt_to_user ( &capacity );
 	command.data_in_len = sizeof ( capacity );
 
 	if ( ( rc = scsi_command ( scsi, &command ) ) != 0 )

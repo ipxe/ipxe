@@ -92,6 +92,69 @@ copy_from_real_librm ( void *dest, unsigned int src_seg,
 #define put_real put_real_librm
 #define get_real get_real_librm
 
+/**
+ * A pointer to a user buffer
+ *
+ * Even though we could just use a void *, we use an intptr_t so that
+ * attempts to use normal pointers show up as compiler warnings.  Such
+ * code is actually valid for librm, but not for libkir (i.e. under
+ * KEEP_IT_REAL), so it's good to have the warnings even under librm.
+ */
+typedef intptr_t userptr_t;
+
+/**
+ * Copy data to user buffer
+ *
+ * @v buffer	User buffer
+ * @v offset	Offset within user buffer
+ * @v src	Source
+ * @v len	Length
+ */
+static inline __attribute__ (( always_inline )) void
+copy_to_user ( userptr_t buffer, off_t offset, const void *src, size_t len ) {
+	memcpy ( ( void * ) buffer + offset, src, len );
+}
+
+/**
+ * Copy data from user buffer
+ *
+ * @v dest	Destination
+ * @v buffer	User buffer
+ * @v offset	Offset within user buffer
+ * @v len	Length
+ */
+static inline __attribute__ (( always_inline )) void
+copy_from_user ( void *dest, userptr_t buffer, off_t offset, size_t len ) {
+	memcpy ( dest, ( void * ) buffer + offset, len );
+}
+
+/**
+ * Convert virtual address to user buffer
+ *
+ * @v virtual	Virtual address
+ * @ret buffer	User buffer
+ *
+ * This constructs a user buffer from an ordinary pointer.  Use it
+ * when you need to pass a pointer to an internal buffer to a function
+ * that expects a @c userptr_t.
+ */
+static inline __attribute__ (( always_inline )) userptr_t
+virt_to_user ( void * virtual ) {
+	return ( ( intptr_t ) virtual );
+}
+
+/**
+ * Convert segment:offset address to user buffer
+ *
+ * @v segment	Real-mode segment
+ * @v offset	Real-mode offset
+ * @ret buffer	User buffer
+ */
+static inline __attribute__ (( always_inline )) userptr_t
+real_to_user ( unsigned int segment, unsigned int offset ) {
+	return virt_to_user ( VIRTUAL ( segment, offset ) );
+}
+
 /* Copy to/from real-mode stack */
 extern uint16_t copy_to_rm_stack ( void *data, size_t size );
 extern void remove_from_rm_stack ( void *data, size_t size );

@@ -6,7 +6,7 @@
 
 #include <etherboot.h>
 #include "pic8259.h"
-#include "realmode.h"
+#include "old_realmode.h"
 
 /* State of trivial IRQ handler */
 irq_t trivial_irq_installed_on = IRQ_NONE;

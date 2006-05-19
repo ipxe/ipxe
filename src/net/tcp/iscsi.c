@@ -24,6 +24,7 @@
 #include <byteswap.h>
 #include <gpxe/scsi.h>
 #include <gpxe/process.h>
+#include <gpxe/uaccess.h>
 #include <gpxe/iscsi.h>
 
 /** @file
@@ -130,7 +131,7 @@ static void iscsi_rx_data_in ( struct iscsi_session *iscsi, void *data,
 	assert ( iscsi->command != NULL );
 	assert ( iscsi->command->data_in != NULL );
 	assert ( ( offset + len ) <= iscsi->command->data_in_len );
-	memcpy ( ( iscsi->command->data_in + offset ), data, len );
+	copy_to_user ( iscsi->command->data_in, offset, data, len );
 
 	/* Record SCSI status, if present */
 	if ( data_in->flags & ISCSI_DATA_FLAG_STATUS )
@@ -234,7 +235,11 @@ static void iscsi_tx_data_out ( struct iscsi_session *iscsi ) {
 	assert ( iscsi->command->data_out != NULL );
 	assert ( ( offset + len ) <= iscsi->command->data_out_len );
 	
-	tcp_send ( &iscsi->tcp, iscsi->command->data_out + offset, len );
+	if ( len > tcp_buflen )
+		len = tcp_buflen;
+	copy_from_user ( tcp_buffer, iscsi->command->data_out, offset, len );
+
+	tcp_send ( &iscsi->tcp, tcp_buffer, len );
 }
 
 /****************************************************************************

@@ -149,25 +149,6 @@ typedef struct segoff segoff_t;
  * "(discard)" in the above code.
  */
 
-#warning "realmode.h contains placeholders for obsolete macros"
-
-
-/* Just for now */
-#define SEGMENT(x) ( virt_to_phys ( x ) >> 4 )
-#define OFFSET(x) ( virt_to_phys ( x ) & 0xf )
-#define SEGOFF(x) { OFFSET(x), SEGMENT(x) }
-
-/* To make basemem.c compile */
-extern int lock_real_mode_stack;
-extern char *real_mode_stack;
-extern char real_mode_stack_size[];
-
-#define RM_FRAGMENT(name,asm) \
-	void name ( void ) {} \
-	extern char name ## _size[];
-
-
-
 #endif /* ASSEMBLY */
 
 #endif /* REALMODE_H */

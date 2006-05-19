@@ -8,6 +8,8 @@
  *
  */
 
+#include <gpxe/uaccess.h>
+
 /** A block device */
 struct block_device {
 	/** Block size */
@@ -19,21 +21,23 @@ struct block_device {
 	 *
 	 * @v blockdev	Block device
 	 * @v block	Block number
+	 * @v count	Block count
 	 * @v buffer	Data buffer
 	 * @ret rc	Return status code
 	 */
 	int ( * read ) ( struct block_device *blockdev, uint64_t block,
-			 void *buffer );
+			 unsigned long count, userptr_t buffer );
 	/**
 	 * Write block
 	 *
 	 * @v blockdev	Block device
 	 * @v block	Block number
+	 * @v count	Block count
 	 * @v buffer	Data buffer
 	 * @ret rc	Return status code
 	 */
 	int ( * write ) ( struct block_device *blockdev, uint64_t block,
-			  const void *buffer );
+			  unsigned long count, userptr_t buffer );
 };
 
 #endif /* _GPXE_BLOCKDEV_H */
