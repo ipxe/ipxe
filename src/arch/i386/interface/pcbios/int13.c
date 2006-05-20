@@ -65,89 +65,6 @@ extern void int13_exec_fail ( void );
 static LIST_HEAD ( drives );
 
 /**
- * Convert CHS address to linear address
- *
- * @v drive		Emulated drive
- * @v ch		Low bits of cylinder number
- * @v cl (bits 7:6)	High bits of cylinder number
- * @v cl (bits 5:0)	Sector number
- * @v dh		Head number
- * @ret lba		LBA address
- * 
- */
-static unsigned long chs_to_lba ( struct int13_drive *drive,
-				  struct i386_all_regs *ix86 ) {
-	unsigned int cylinder;
-	unsigned int head;
-	unsigned int sector;
-	unsigned long lba;
-
-	cylinder = ( ( ( ix86->regs.cl & 0xc0 ) << 8 ) | ix86->regs.ch );
-	head = ix86->regs.dh;
-	sector = ( ix86->regs.cl & 0x3f );
-
-	assert ( cylinder < drive->cylinders );
-	assert ( head < drive->heads );
-	assert ( ( sector >= 1 ) && ( sector <= drive->sectors_per_track ) );
-
-	lba = ( ( ( ( cylinder * drive->heads ) + head )
-		  * drive->sectors_per_track ) + sector - 1 );
-
-	DBG ( "C/H/S address %x/%x/%x -> LBA %lx\n",
-	      cylinder, head, sector, lba );
-
-	return lba;
-}
-
-/**
- * Read from drive to real-mode data buffer
- *
- * @v drive		Emulated drive
- * @v lba		LBA starting sector number
- * @v data		Data buffer
- * @v count		Number of sectors to read
- * @ret status		Status code
- */
-static int int13_read ( struct int13_drive *drive, uint64_t lba,
-			struct segoff data, unsigned long count ) {
-	struct block_device *blockdev = drive->blockdev;
-	userptr_t buffer = real_to_user ( data.segment, data.offset );
-	int rc;
-
-	DBG ( "Read %lx sectors from %llx to %04x:%04x\n", count,
-	      ( unsigned long long ) lba, data.segment, data.offset );
-	
-	if ( ( rc = blockdev->read ( blockdev, lba, count, buffer ) ) != 0 )
-		return INT13_STATUS_READ_ERROR;
-
-	return 0;
-}
-
-/**
- * Write from real-mode data buffer to drive
- *
- * @v drive		Emulated drive
- * @v lba		LBA starting sector number
- * @v data		Data buffer
- * @v count		Number of sectors to read
- * @ret status		Status code
- */
-static int int13_write ( struct int13_drive *drive, uint64_t lba,
-			 struct segoff data, unsigned long count ) {
-	struct block_device *blockdev = drive->blockdev;
-	userptr_t buffer = real_to_user ( data.segment, data.offset );
-	int rc;
-
-	DBG ( "Write %lx sectors from %04x:%04x to %llx\n", count,
-	      data.segment, data.offset, ( unsigned long long ) lba );
-
-	if ( ( rc = blockdev->write ( blockdev, lba, count, buffer ) ) != 0 )
-		return INT13_STATUS_WRITE_ERROR;
-
-	return 0;
-}
-
-/**
  * INT 13, 00 - Reset disk system
  *
  * @v drive		Emulated drive
@@ -172,6 +89,61 @@ static int int13_get_last_status ( struct int13_drive *drive,
 }
 
 /**
+ * Read / write sectors
+ *
+ * @v drive		Emulated drive
+ * @v al		Number of sectors to read or write (must be nonzero)
+ * @v ch		Low bits of cylinder number
+ * @v cl (bits 7:6)	High bits of cylinder number
+ * @v cl (bits 5:0)	Sector number
+ * @v dh		Head number
+ * @v es:bx		Data buffer
+ * @v io		Read / write method
+ * @ret status		Status code
+ * @ret al		Number of sectors read or written
+ */
+static int int13_rw_sectors ( struct int13_drive *drive,
+			      struct i386_all_regs *ix86,
+			      int ( * io ) ( struct block_device *blockdev,
+					     uint64_t block,
+					     unsigned long count,
+					     userptr_t buffer ) ) {
+	struct block_device *blockdev = drive->blockdev;
+	unsigned int cylinder, head, sector;
+	unsigned long lba;
+	unsigned int count;
+	userptr_t buffer;
+
+	/* Calculate parameters */
+	cylinder = ( ( ( ix86->regs.cl & 0xc0 ) << 8 ) | ix86->regs.ch );
+	assert ( cylinder < drive->cylinders );
+	head = ix86->regs.dh;
+	assert ( head < drive->heads );
+	sector = ( ix86->regs.cl & 0x3f );
+	assert ( ( sector >= 1 ) && ( sector <= drive->sectors_per_track ) );
+	lba = ( ( ( ( cylinder * drive->heads ) + head )
+		  * drive->sectors_per_track ) + sector - 1 );
+	count = ix86->regs.al;
+	buffer = real_to_user ( ix86->segs.es, ix86->regs.bx );
+
+	DBG ( "C/H/S %d/%d/%d = LBA %#lx <-> %04x:%04x (count %d)\n", cylinder,
+	      head, sector, lba, ix86->segs.es, ix86->regs.bx, count );
+
+	/* Validate blocksize */
+	if ( blockdev->blksize != INT13_BLKSIZE ) {
+		DBG ( "Invalid blocksize (%zd) for non-extended read/write\n",
+		      blockdev->blksize );
+		return INT13_STATUS_INVALID;
+	}
+	
+	/* Read from / write to block device */
+	if ( io ( blockdev, lba, count, buffer ) != 0 )
+		return INT13_STATUS_READ_ERROR;
+
+	return 0;
+}
+
+/**
  * INT 13, 02 - Read sectors
  *
  * @v drive		Emulated drive
@@ -186,20 +158,8 @@ static int int13_get_last_status ( struct int13_drive *drive,
  */
 static int int13_read_sectors ( struct int13_drive *drive,
 				struct i386_all_regs *ix86 ) {
-	unsigned long lba = chs_to_lba ( drive, ix86 );
-	unsigned int count = ix86->regs.al;
-	struct segoff data = {
-		.segment = ix86->segs.es,
-		.offset = ix86->regs.bx,
-	};
-
-	if ( drive->blockdev->blksize != INT13_BLKSIZE ) {
-		DBG ( "Invalid blocksize (%zd) for non-extended read\n",
-		      drive->blockdev->blksize );
-		return INT13_STATUS_INVALID;
-	}
-
-	return int13_read ( drive, lba, data, count );
+	DBG ( "Read: " );
+	return int13_rw_sectors ( drive, ix86, drive->blockdev->read );
 }
 
 /**
@@ -217,20 +177,8 @@ static int int13_read_sectors ( struct int13_drive *drive,
  */
 static int int13_write_sectors ( struct int13_drive *drive,
 				 struct i386_all_regs *ix86 ) {
-	unsigned long lba = chs_to_lba ( drive, ix86 );
-	unsigned int count = ix86->regs.al;
-	struct segoff data = {
-		.segment = ix86->segs.es,
-		.offset = ix86->regs.bx,
-	};
-
-	if ( drive->blockdev->blksize != INT13_BLKSIZE ) {
-		DBG ( "Invalid blocksize (%zd) for non-extended write\n",
-		      drive->blockdev->blksize );
-		return INT13_STATUS_INVALID;
-	}
-
-	return int13_write ( drive, lba, data, count );
+	DBG ( "Write: " );
+	return int13_rw_sectors ( drive, ix86, drive->blockdev->write );
 }
 
 /**
@@ -281,6 +229,42 @@ static int int13_extension_check ( struct int13_drive *drive __unused,
 }
 
 /**
+ * Extended read / write
+ *
+ * @v drive		Emulated drive
+ * @v ds:si		Disk address packet
+ * @v io		Read / write method
+ * @ret status		Status code
+ */
+static int int13_extended_rw ( struct int13_drive *drive,
+			       struct i386_all_regs *ix86,
+			       int ( * io ) ( struct block_device *blockdev,
+					      uint64_t block,
+					      unsigned long count,
+					      userptr_t buffer ) ) {
+	struct block_device *blockdev = drive->blockdev;
+	struct int13_disk_address addr;
+	uint64_t lba;
+	unsigned long count;
+	userptr_t buffer;
+
+	/* Read parameters from disk address structure */
+	copy_from_real ( &addr, ix86->segs.ds, ix86->regs.si, sizeof ( addr ));
+	lba = addr.lba;
+	count = addr.count;
+	buffer = real_to_user ( addr.buffer.segment, addr.buffer.offset );
+
+	DBG ( "LBA %#llx <-> %04x:%04x (count %ld)\n", (unsigned long long)lba,
+	      addr.buffer.segment, addr.buffer.offset, count );
+	
+	/* Read from / write to block device */
+	if ( io ( blockdev, lba, count, buffer ) != 0 )
+		return INT13_STATUS_READ_ERROR;
+
+	return 0;
+}
+
+/**
  * INT 13, 42 - Extended read
  *
  * @v drive		Emulated drive
@@ -289,11 +273,8 @@ static int int13_extension_check ( struct int13_drive *drive __unused,
  */
 static int int13_extended_read ( struct int13_drive *drive,
 				 struct i386_all_regs *ix86 ) {
-	struct int13_disk_address addr;
-
-	copy_from_real ( &addr, ix86->segs.ds, ix86->regs.si,
-			 sizeof ( addr ) );
-	return int13_read ( drive, addr.lba, addr.buffer, addr.count );
+	DBG ( "Extended read: " );
+	return int13_extended_rw ( drive, ix86, drive->blockdev->read );
 }
 
 /**
@@ -305,11 +286,8 @@ static int int13_extended_read ( struct int13_drive *drive,
  */
 static int int13_extended_write ( struct int13_drive *drive,
 				  struct i386_all_regs *ix86 ) {
-	struct int13_disk_address addr;
-
-	copy_from_real ( &addr, ix86->segs.ds, ix86->regs.si,
-			 sizeof ( addr ) );
-	return int13_write ( drive, addr.lba, addr.buffer, addr.count );
+	DBG ( "Extended write: " );
+	return int13_extended_rw ( drive, ix86, drive->blockdev->write );
 }
 
 /**
@@ -351,7 +329,7 @@ static void int13 ( struct i386_all_regs *ix86 ) {
 		if ( drive->drive != ix86->regs.dl )
 			continue;
 		
-		DBG ( "INT 13, %02x on drive %02x\n", ix86->regs.ah,
+		DBG ( "INT 13,%02x (%02x): ", ix86->regs.ah,
 		      ix86->regs.dl );
 	
 		switch ( ix86->regs.ah ) {
