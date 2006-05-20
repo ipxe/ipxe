@@ -44,7 +44,6 @@ static uint16_t pnic_command_quiet ( struct pnic *pnic, uint16_t command,
 				     void *input, uint16_t input_length,
 				     void *output, uint16_t output_max_length,
 				     uint16_t *output_length ) {
-	int i;
 	uint16_t status;
 	uint16_t _output_length;
 
@@ -52,10 +51,7 @@ static uint16_t pnic_command_quiet ( struct pnic *pnic, uint16_t command,
 		/* Write input length */
 		outw ( input_length, pnic->ioaddr + PNIC_REG_LEN );
 		/* Write input data */
-		for ( i = 0; i < input_length; i++ ) {
-			outb( ((char*)input)[i],
-			      pnic->ioaddr + PNIC_REG_DATA );
-		}
+		outsb ( pnic->ioaddr + PNIC_REG_DATA, input, input_length );
 	}
 	/* Write command */
 	outw ( command, pnic->ioaddr + PNIC_REG_CMD );
@@ -80,10 +76,7 @@ static uint16_t pnic_command_quiet ( struct pnic *pnic, uint16_t command,
 			_output_length = output_max_length;
 		}
 		/* Retrieve output data */
-		for ( i = 0; i < _output_length; i++ ) {
-			((char*)output)[i] =
-				inb ( pnic->ioaddr + PNIC_REG_DATA );
-		}
+		insb ( pnic->ioaddr + PNIC_REG_DATA, output, _output_length );
 	}
 	return status;
 }
