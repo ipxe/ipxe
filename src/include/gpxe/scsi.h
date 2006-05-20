@@ -5,6 +5,12 @@
 #include <gpxe/blockdev.h>
 #include <gpxe/uaccess.h>
 
+/** @file
+ *
+ * SCSI devices
+ *
+ */
+
 /**
  * @defgroup scsiops SCSI operation codes
  * @{
