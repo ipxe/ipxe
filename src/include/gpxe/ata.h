@@ -20,14 +20,14 @@
  * set" (LBA48), in which case each of these byte-wide registers is
  * actually a two-entry FIFO, and the "previous" byte pushed into the
  * FIFO is used as the corresponding high-order byte.  So, to set up
- * the 48-bit address 0x12345678abcd, you would issue
+ * the 48-bit address 0x123456abcdef, you would issue
  *
  *     0x56 -> LBA Low register
- *     0xcd -> LBA Low register
+ *     0xef -> LBA Low register
  *     0x34 -> LBA Mid register
- *     0xab -> LBA Mid register
+ *     0xcd -> LBA Mid register
  *     0x12 -> LBA High register
- *     0x78 -> LBA High register
+ *     0xab -> LBA High register
  *
  * This structure encapsulates this information by providing a single
  * 64-bit integer in native byte order, unioned with bytes named so
