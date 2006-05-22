@@ -41,32 +41,6 @@ static uint8_t type_sizes[] = {
 };
 
 /**
- * A printf context
- *
- * Contexts are used in order to be able to share code between
- * vprintf() and vsnprintf(), without requiring the allocation of a
- * buffer for vprintf().
- */
-struct printf_context {
-	/**
-	 * Character handler
-	 *
-	 * @v ctx	Context
-	 * @v c		Character
-	 *
-	 * This method is called for each character written to the
-	 * formatted string.  It must increment @len.
-	 */
-	void ( * handler ) ( struct printf_context *ctx, unsigned int c );
-	/** Length of formatted string */
-	size_t len;
-	/** Buffer for formatted string (used by printf_sputc()) */
-	char *buf;
-	/** Buffer length (used by printf_sputc()) */
-	size_t max_len;
-};
-
-/**
  * Use lower-case for hexadecimal digits
  *
  * Note that this value is set to 0x20 since that makes for very
@@ -164,6 +138,20 @@ static char * format_decimal ( char *end, signed long num, int width ) {
 }
 
 /**
+ * Print character via a printf context
+ *
+ * @v ctx		Context
+ * @v c			Character
+ *
+ * Call's the printf_context::handler() method and increments
+ * printf_context::len.
+ */
+static inline void cputchar ( struct printf_context *ctx, unsigned int c ) {
+	ctx->handler ( ctx, c );
+	++ctx->len;
+}
+
+/**
  * Write a formatted string to a printf context
  *
  * @v ctx		Context
@@ -185,7 +173,7 @@ size_t vcprintf ( struct printf_context *ctx, const char *fmt, va_list args ) {
 	for ( ; *fmt ; fmt++ ) {
 		/* Pass through ordinary characters */
 		if ( *fmt != '%' ) {
-			ctx->handler ( ctx, *fmt );
+			cputchar ( ctx, *fmt );
 			continue;
 		}
 		fmt++;
@@ -228,7 +216,7 @@ size_t vcprintf ( struct printf_context *ctx, const char *fmt, va_list args ) {
 		ptr = tmp_buf + sizeof ( tmp_buf ) - 1;
 		*ptr = '\0';
 		if ( *fmt == 'c' ) {
-			ctx->handler ( ctx, va_arg ( args, unsigned int ) );
+			cputchar ( ctx, va_arg ( args, unsigned int ) );
 		} else if ( *fmt == 's' ) {
 			ptr = va_arg ( args, char * );
 		} else if ( *fmt == 'p' ) {
@@ -263,12 +251,21 @@ size_t vcprintf ( struct printf_context *ctx, const char *fmt, va_list args ) {
 		}
 		/* Write out conversion result */
 		for ( ; *ptr ; ptr++ ) {
-			ctx->handler ( ctx, *ptr );
+			cputchar ( ctx, *ptr );
 		}
 	}
 
 	return ctx->len;
 }
+
+/** Context used by vsnprintf() and friends */
+struct sputc_context {
+	struct printf_context ctx;
+	/** Buffer for formatted string (used by printf_sputc()) */
+	char *buf;
+	/** Buffer length (used by printf_sputc()) */
+	size_t max_len;	
+};
 
 /**
  * Write character to buffer
@@ -277,8 +274,11 @@ size_t vcprintf ( struct printf_context *ctx, const char *fmt, va_list args ) {
  * @v c			Character
  */
 static void printf_sputc ( struct printf_context *ctx, unsigned int c ) {
-	if ( ++ctx->len < ctx->max_len )
-		ctx->buf[ctx->len-1] = c;
+	struct sputc_context * sctx =
+		container_of ( ctx, struct sputc_context, ctx );
+
+	if ( ctx->len <= sctx->max_len )
+		sctx->buf[ctx->len] = c;
 }
 
 /**
@@ -295,15 +295,15 @@ static void printf_sputc ( struct printf_context *ctx, unsigned int c ) {
  * been available.
  */
 int vsnprintf ( char *buf, size_t size, const char *fmt, va_list args ) {
-	struct printf_context ctx;
+	struct sputc_context sctx;
 	size_t len;
 	size_t end;
 
 	/* Hand off to vcprintf */
-	ctx.handler = printf_sputc;
-	ctx.buf = buf;
-	ctx.max_len = size;
-	len = vcprintf ( &ctx, fmt, args );
+	sctx.ctx.handler = printf_sputc;
+	sctx.buf = buf;
+	sctx.max_len = size;
+	len = vcprintf ( &sctx.ctx, fmt, args );
 
 	/* Add trailing NUL */
 	if ( size ) {
@@ -341,8 +341,8 @@ int snprintf ( char *buf, size_t size, const char *fmt, ... ) {
  * @v ctx		Context
  * @v c			Character
  */
-static void printf_putchar ( struct printf_context *ctx, unsigned int c ) {
-	++ctx->len;
+static void printf_putchar ( struct printf_context *ctx __unused,
+			     unsigned int c ) {
 	putchar ( c );
 }
 
