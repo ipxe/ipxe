@@ -65,6 +65,8 @@ typedef struct _curses_window {
 	unsigned int curs_x, curs_y;
 	/** window dimensions */
 	unsigned int width, height;
+	/** parent/child ptrs */
+	struct _curses_window *parent, *child;
 } WINDOW;
 
 extern WINDOW _stdscr;
@@ -289,12 +291,12 @@ extern int curs_set ( int );
 extern int def_prog_mode ( void );
 extern int def_shell_mode ( void );
 extern int delay_output ( int );
-extern int delch ( void );
-extern int deleteln ( void );
+/*extern int delch ( void );*/
+/*extern int deleteln ( void );*/
 extern void delscreen ( SCREEN * ); 
 extern int delwin ( WINDOW * );
 extern WINDOW *derwin ( WINDOW *, int, int, int, int );
-extern int doupdate ( void );
+/*extern int doupdate ( void );*/
 extern WINDOW *dupwin ( WINDOW * );
 extern int echo ( void );
 extern int echochar ( const chtype );
@@ -324,8 +326,6 @@ extern int init_color ( short, short, short, short );
 extern int init_pair ( short, short, short );
 extern int innstr ( char *, int );
 extern int insch ( chtype );
-extern int insdelln ( int );
-extern int insertln ( void );
 extern int insnstr ( const char *, int );
 extern int insstr ( const char * );
 extern int instr ( char * );
@@ -346,7 +346,7 @@ extern int meta ( WINDOW *, bool );
 /*extern int mvaddnstr ( int, int, const char *, int );*/
 /*extern int mvaddstr ( int, int, const char * );*/
 extern int mvcur ( int, int, int, int );
-extern int mvdelch ( int, int );
+/*extern int mvdelch ( int, int );*/
 extern int mvderwin ( WINDOW *, int, int );
 extern int mvgetch ( int, int );
 extern int mvgetnstr ( int, int, char *, int );
@@ -368,7 +368,7 @@ extern int mvvline ( int, int, chtype, int );
 /*extern int mvwaddchstr ( WINDOW *, int, int, const chtype * );*/
 /*extern int mvwaddnstr ( WINDOW *, int, int, const char *, int );*/
 /*extern int mvwaddstr ( WINDOW *, int, int, const char * );*/
-extern int mvwdelch ( WINDOW *, int, int );
+/*extern int mvwdelch ( WINDOW *, int, int );*/
 extern int mvwgetch ( WINDOW *, int, int );
 extern int mvwgetnstr ( WINDOW *, int, int, char *, int );
 extern int mvwgetstr ( WINDOW *, int, int, char * );
@@ -407,21 +407,17 @@ extern int printw ( char *, ... );
 extern int putp ( const char * );
 extern void qiflush ( void );
 extern int raw ( void );
-extern int redrawwin ( WINDOW * );
-extern int refresh ( void );
+/*extern int redrawwin ( WINDOW * );*/
+/*extern int refresh ( void );*/
 extern int reset_prog_mode ( void );
 extern int reset_shell_mode ( void );
 extern int resetty ( void );
 extern int ripoffline ( int, int  ( *) ( WINDOW *, int) );
 extern int savetty ( void );
 extern int scanw ( char *, ... );
-extern int scr_dump ( const char * );
-extern int scr_init ( const char * );
 extern int scrl ( int );
 extern int scroll ( WINDOW * );
 extern int scrollok ( WINDOW *, bool );
-extern int scr_restore ( const char * );
-extern int scr_set ( const char * );
 extern int setscrreg ( int, int );
 extern SCREEN *set_term ( SCREEN * );
 extern int setupterm ( char *, int, int * );
@@ -503,18 +499,16 @@ extern int winchnstr ( WINDOW *, chtype *, int );
 extern int winchstr ( WINDOW *, chtype * );
 extern int winnstr ( WINDOW *, char *, int );
 extern int winsch ( WINDOW *, chtype );
-extern int winsdelln ( WINDOW *, int );
-extern int winsertln ( WINDOW * );
 extern int winsnstr ( WINDOW *, const char *, int );
 extern int winsstr ( WINDOW *, const char * );
 extern int winstr ( WINDOW *, char * );
 extern int wmove ( WINDOW *, int, int );
 extern int wnoutrefresh ( WINDOW * );
 extern int wprintw ( WINDOW *, char *, ... );
-extern int wredrawln ( WINDOW *, int, int );
-extern int wrefresh ( WINDOW * );
+/*extern int wredrawln ( WINDOW *, int, int );*/
+/*extern int wrefresh ( WINDOW * );*/
 extern int wscanw ( WINDOW *, char *, ... );
-extern int wscrl ( WINDOW *, int );
+/*extern int wscrl ( WINDOW *, int );*/
 extern int wsetscrreg ( WINDOW *, int, int );
 extern int wstandend ( WINDOW * );
 extern int wstandout ( WINDOW * );
@@ -580,6 +574,14 @@ static inline int clrtoeol ( void ) {
 	return wclrtoeol( stdscr );
 }
 
+static inline int delch ( void ) {
+	return wdelch ( stdscr );
+}
+
+static inline int deleteln ( void ) {
+	return wdeleteln( stdscr );
+}
+
 static inline int move ( int y, int x ) {
 	return wmove ( stdscr, y, x );
 }
@@ -609,6 +611,11 @@ static inline int mvaddstr ( int y, int x, const char *str ) {
 		 ? ERR : waddnstr ( stdscr, str, -1 ) );
 }
 
+static inline int mvdelch ( int y, int x ) {
+	return ( wmove ( stdscr, y, x ) == ERR
+		 ? ERR : wdelch ( stdscr ) );
+}
+
 static inline int mvwaddch ( WINDOW *win, int y, int x, const chtype ch ) {
 	return ( wmove( win, y, x ) == ERR 
 		 ? ERR : waddch ( win, ch ) );
@@ -632,6 +639,11 @@ static inline int mvwaddnstr ( WINDOW *win, int y, int x, const char *str, int n
 static inline int mvwaddstr ( WINDOW *win, int y, int x, const char *str ) {
 	return ( wmove ( win, y, x ) == ERR
 		 ? ERR : waddnstr ( win, str, -1 ) );
+}
+
+static inline int mvwdelch ( WINDOW *win, int y, int x ) {
+	return ( wmove ( win, y, x ) == ERR
+		 ? ERR : wdelch ( win ) );
 }
 
 static inline int waddchstr ( WINDOW *win, const chtype *chstr ) {

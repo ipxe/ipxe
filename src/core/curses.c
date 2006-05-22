@@ -31,6 +31,7 @@ WINDOW _stdscr = {
 	.ori_x = 0,
 	.curs_y = 0,
 	.curs_x = 0,
+	.scr = curscr,
 };
 
 /*
@@ -50,15 +51,15 @@ static void _wputch ( WINDOW *win, chtype ch, int wrap ) {
 	win->scr->movetoyx( win->scr, win->ori_y + win->curs_y,
 				      win->ori_x + win->curs_x );
 	win->scr->putc(win->scr, ch);
-	if ( ++(win->curs_x) > win->width ) {
+	if ( ++(win->curs_x) == win->width ) {
 		if ( wrap == WRAP ) {
 			win->curs_x = 0;
 			/* specification says we should really scroll,
 			   but we have no buffer to scroll with, so we
 			   can only overwrite back at the beginning of
 			   the window */
-			win->curs_y += ( ( win->curs_y - win->height ) == 0 ?
-					 -(win->curs_y) : 1 );
+			if ( ++(win->curs_y) == win->height )
+				win->curs_y = 0;
 		} else {
 			(win->curs_x)--;
 		}
@@ -130,7 +131,10 @@ int wmove ( WINDOW *win, int y, int x ) {
 		return ERR;
 	}
 
-	win->scr->movetoyx( win->scr, y, x );
+	win->curs_y = y;
+	win->curs_x = x;
+	win->scr->movetoyx( win->scr, win->ori_y + win->curs_y, 
+			    	      win->ori_x + win->curs_x );
 	return OK;
 }
 
@@ -253,6 +257,8 @@ inline chtype getbkgd ( WINDOW *win ) {
 WINDOW *initscr ( void ) {
 	/* determine console size */
 	/* initialise screen */
+	stdscr->width = 80;
+	stdscr->height = 25;
 	/* set previously unknown window attributes */
 	/* refresh screen */
 	return stdscr;
@@ -274,6 +280,8 @@ WINDOW *newwin ( int nlines, int ncols, int begin_y, int begin_x ) {
 	win->height = nlines;
 	win->width = ncols;
 	win->scr = stdscr->scr;
+	win->parent = NULL;
+	win->child = NULL;
 	return win;
 }
 
@@ -433,19 +441,19 @@ int wborder ( WINDOW *win, chtype ls, chtype rs,
 	wmove(win,0,0);
 
 	_wputch(win,tl,WRAP);
-	while ( win->width - win->curs_x ) {
+	while ( ( win->width - 1 ) - win->curs_x ) {
 		_wputch(win,ts,WRAP);
 	}
 	_wputch(win,tr,WRAP);
 
 	while ( ( win->height - 1 ) - win->curs_y ) {
 		_wputch(win,ls,WRAP);
-		wmove(win,win->curs_y,win->width-1);
+		wmove(win,win->curs_y,(win->width)-1);
 		_wputch(win,rs,WRAP);
 	}
 
 	_wputch(win,bl,WRAP);
-	while ( win->width - win->curs_x ) {
+	while ( ( win->width -1 ) - win->curs_x ) {
 		_wputch(win,bs,WRAP);
 	}
 	_wputch(win,br,NOWRAP); /* do not wrap last char to leave
@@ -507,3 +515,32 @@ int wcolour_set ( WINDOW *win, short colour_pair_number, void *opts ) {
 	return OK;
 }
 
+/**
+ * Delete character under the cursor in a window
+ *
+ * @v *win	subject window
+ * @ret rc	return status code
+ */
+int wdelch ( WINDOW *win ) {
+	struct cursor_pos pos;
+
+	_store_curs_pos( win, &pos );
+	_wputch( win, (unsigned)' ', NOWRAP );
+	_restore_curs_pos( win, &pos );
+
+	return OK;
+}
+
+/**
+ * Delete line under a window's cursor
+ *
+ * @v *win	subject window
+ * @ret rc	return status code
+ */
+int wdeleteln ( WINDOW *win ) {
+	/* let's just set the cursor to the beginning of the line and
+	   let wclrtoeol do the work :) */
+	wmove( win, win->curs_y, 0 );
+	wclrtoeol( win );
+	return OK;
+}
