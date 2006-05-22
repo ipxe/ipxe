@@ -293,7 +293,7 @@ extern int def_shell_mode ( void );
 extern int delay_output ( int );
 /*extern int delch ( void );*/
 /*extern int deleteln ( void );*/
-extern void delscreen ( SCREEN * ); 
+extern void delscreen ( SCREEN * );
 extern int delwin ( WINDOW * );
 extern WINDOW *derwin ( WINDOW *, int, int, int, int );
 /*extern int doupdate ( void );*/
@@ -314,21 +314,21 @@ extern int halfdelay ( int );
 extern bool has_colors ( void );
 extern bool has_ic ( void );
 extern bool has_il ( void );
-extern int hline ( chtype, int );
+//extern int hline ( chtype, int );
 extern void idcok ( WINDOW *, bool );
 extern int idlok ( WINDOW *, bool );
 extern void immedok ( WINDOW *, bool );
-extern chtype inch ( void );
-extern int inchnstr ( chtype *, int );
-extern int inchstr ( chtype * );
+/*extern chtype inch ( void );*/
+/*extern int inchnstr ( chtype *, int );*/
+/*extern int inchstr ( chtype * );*/
 extern WINDOW *initscr ( void );
 extern int init_color ( short, short, short, short );
 extern int init_pair ( short, short, short );
-extern int innstr ( char *, int );
-extern int insch ( chtype );
-extern int insnstr ( const char *, int );
-extern int insstr ( const char * );
-extern int instr ( char * );
+//extern int innstr ( char *, int );
+//extern int insch ( chtype );
+//extern int insnstr ( const char *, int );
+//extern int insstr ( const char * );
+//extern int instr ( char * );
 extern int intrflush ( WINDOW *, bool );
 extern bool isendwin ( void );
 extern bool is_linetouched ( WINDOW *, int );
@@ -351,18 +351,18 @@ extern int mvderwin ( WINDOW *, int, int );
 extern int mvgetch ( int, int );
 extern int mvgetnstr ( int, int, char *, int );
 extern int mvgetstr ( int, int, char * );
-extern int mvhline ( int, int, chtype, int );
-extern chtype mvinch ( int, int );
-extern int mvinchnstr ( int, int, chtype *, int );
-extern int mvinchstr ( int, int, chtype * );
-extern int mvinnstr ( int, int, char *, int );
-extern int mvinsch ( int, int, chtype );
-extern int mvinsnstr ( int, int, const char *, int );
-extern int mvinsstr ( int, int, const char * );
-extern int mvinstr ( int, int, char * );
-extern int mvprintw ( int, int, char *,  ... );
+//extern int mvhline ( int, int, chtype, int );
+//extern chtype mvinch ( int, int );
+/*extern int mvinchnstr ( int, int, chtype *, int );*/
+/*extern int mvinchstr ( int, int, chtype * );*/
+/*extern int mvinnstr ( int, int, char *, int );*/
+//extern int mvinsch ( int, int, chtype );
+//extern int mvinsnstr ( int, int, const char *, int );
+//extern int mvinsstr ( int, int, const char * );
+//extern int mvinstr ( int, int, char * );
+//extern int mvprintw ( int, int, char *,  ... );
 extern int mvscanw ( int, int, char *, ... );
-extern int mvvline ( int, int, chtype, int );
+//extern int mvvline ( int, int, chtype, int );
 /*extern int mvwaddch ( WINDOW *, int, int, const chtype );*/
 /*extern int mvwaddchnstr ( WINDOW *, int, int, const chtype *, int );*/
 /*extern int mvwaddchstr ( WINDOW *, int, int, const chtype * );*/
@@ -372,19 +372,19 @@ extern int mvvline ( int, int, chtype, int );
 extern int mvwgetch ( WINDOW *, int, int );
 extern int mvwgetnstr ( WINDOW *, int, int, char *, int );
 extern int mvwgetstr ( WINDOW *, int, int, char * );
-extern int mvwhline ( WINDOW *, int, int, chtype, int );
+//extern int mvwhline ( WINDOW *, int, int, chtype, int );
 extern int mvwin ( WINDOW *, int, int );
-extern chtype mvwinch ( WINDOW *, int, int );
-extern int mvwinchnstr ( WINDOW *, int, int, chtype *, int );
-extern int mvwinchstr ( WINDOW *, int, int, chtype * );
-extern int mvwinnstr ( WINDOW *, int, int, char *, int );
-extern int mvwinsch ( WINDOW *, int, int, chtype );
-extern int mvwinsnstr ( WINDOW *, int, int, const char *, int );
-extern int mvwinsstr ( WINDOW *, int, int, const char * );
-extern int mvwinstr ( WINDOW *, int, int, char * );
-extern int mvwprintw ( WINDOW *, int, int, char *, ... );
+//extern chtype mvwinch ( WINDOW *, int, int );
+//extern int mvwinchnstr ( WINDOW *, int, int, chtype *, int );
+//extern int mvwinchstr ( WINDOW *, int, int, chtype * );
+//extern int mvwinnstr ( WINDOW *, int, int, char *, int );
+//extern int mvwinsch ( WINDOW *, int, int, chtype );
+//extern int mvwinsnstr ( WINDOW *, int, int, const char *, int );
+//extern int mvwinsstr ( WINDOW *, int, int, const char * );
+//extern int mvwinstr ( WINDOW *, int, int, char * );
+//extern int mvwprintw ( WINDOW *, int, int, char *, ... );
 extern int mvwscanw ( WINDOW *, int, int, char *, ... );
-extern int mvwvline ( WINDOW *, int, int, chtype, int );
+//extern int mvwvline ( WINDOW *, int, int, chtype, int );
 extern int napms ( int );
 extern WINDOW *newpad ( int, int );
 extern WINDOW *newwin ( int, int, int, int );
@@ -461,11 +461,11 @@ extern int vid_attr ( attr_t, short, void * );
 extern int vidattr ( chtype );
 extern int vid_puts ( attr_t, short, void *, int  ( *) ( int) );
 extern int vidputs ( chtype, int  ( *) ( int) );
-extern int vline ( chtype, int );
-extern int vwprintw ( WINDOW *, char *, va_list * );
-extern int vw_printw ( WINDOW *, char *, va_list * );
-extern int vwscanw ( WINDOW *, char *, va_list * );
-extern int vw_scanw ( WINDOW *, char *, va_list * );
+//extern int vline ( chtype, int );
+//extern int vwprintw ( WINDOW *, const char *, va_list );
+extern int vw_printw ( WINDOW *, const char *, va_list );
+extern int vwscanw ( WINDOW *, char *, va_list );
+extern int vw_scanw ( WINDOW *, char *, va_list );
 extern int waddch ( WINDOW *, const chtype );
 extern int waddchnstr ( WINDOW *, const chtype *, int );
 /*extern int waddchstr ( WINDOW *, const chtype * );*/
@@ -494,17 +494,17 @@ extern int wgetch ( WINDOW * );
 extern int wgetnstr ( WINDOW *, char *, int );
 extern int wgetstr ( WINDOW *, char * );
 extern int whline ( WINDOW *, chtype, int );
-extern chtype winch ( WINDOW * );
-extern int winchnstr ( WINDOW *, chtype *, int );
-extern int winchstr ( WINDOW *, chtype * );
-extern int winnstr ( WINDOW *, char *, int );
-extern int winsch ( WINDOW *, chtype );
-extern int winsnstr ( WINDOW *, const char *, int );
-extern int winsstr ( WINDOW *, const char * );
-extern int winstr ( WINDOW *, char * );
+//extern chtype winch ( WINDOW * );
+//extern int winchnstr ( WINDOW *, chtype *, int );
+//extern int winchstr ( WINDOW *, chtype * );
+//extern int winnstr ( WINDOW *, char *, int );
+//extern int winsch ( WINDOW *, chtype );
+//extern int winsnstr ( WINDOW *, const char *, int );
+//extern int winsstr ( WINDOW *, const char * );
+//extern int winstr ( WINDOW *, char * );
 extern int wmove ( WINDOW *, int, int );
 extern int wnoutrefresh ( WINDOW * );
-extern int wprintw ( WINDOW *, char *, ... );
+extern int wprintw ( WINDOW *, const char *, ... );
 /*extern int wredrawln ( WINDOW *, int, int );*/
 /*extern int wrefresh ( WINDOW * );*/
 extern int wscanw ( WINDOW *, char *, ... );
@@ -582,68 +582,112 @@ static inline int deleteln ( void ) {
 	return wdeleteln( stdscr );
 }
 
+static inline int hline ( chtype ch, int n ) {
+	return whline ( stdscr, ch, n );
+}
+
 static inline int move ( int y, int x ) {
 	return wmove ( stdscr, y, x );
 }
 
 static inline int mvaddch ( int y, int x, const chtype ch ) {
-	return ( wmove ( stdscr, y, x ) == ERR 
-		 ? ERR : waddch( stdscr, ch ) );
+	return ( wmove ( stdscr, y, x ) == OK
+		 ? waddch( stdscr, ch ) : ERR );
 }
 
 static inline int mvaddchnstr ( int y, int x, const chtype *chstr, int n ) {
-	return ( wmove ( stdscr, y, x ) == ERR
-		 ? ERR : waddchnstr ( stdscr, chstr, n ) );
+	return ( wmove ( stdscr, y, x ) == OK
+		 ? waddchnstr ( stdscr, chstr, n ) : ERR );
 }
 
 static inline int mvaddchstr ( int y, int x, const chtype *chstr ) {
-	return ( wmove ( stdscr, y, x ) == ERR
-		 ? ERR : waddchnstr ( stdscr, chstr, -1 ) );
+	return ( wmove ( stdscr, y, x ) == OK
+		 ? waddchnstr ( stdscr, chstr, -1 ) : ERR );
 }
 
 static inline int mvaddnstr ( int y, int x, const char *str, int n ) {
-	return ( wmove ( stdscr, y, x ) == ERR
-		 ? ERR : waddnstr ( stdscr, str, n ) );
+	return ( wmove ( stdscr, y, x ) == OK
+		 ? waddnstr ( stdscr, str, n ) : ERR );
 }
 
 static inline int mvaddstr ( int y, int x, const char *str ) {
-	return ( wmove ( stdscr, y, x ) == ERR
-		 ? ERR : waddnstr ( stdscr, str, -1 ) );
+	return ( wmove ( stdscr, y, x ) == OK
+		 ? waddnstr ( stdscr, str, -1 ) : ERR );
 }
 
 static inline int mvdelch ( int y, int x ) {
-	return ( wmove ( stdscr, y, x ) == ERR
-		 ? ERR : wdelch ( stdscr ) );
+	return ( wmove ( stdscr, y, x ) == OK
+		 ? wdelch ( stdscr ) : ERR );
+}
+
+static inline int mvhline ( int y, int x, chtype ch, int n ) {
+	return ( wmove ( stdscr, y, x ) == OK
+		 ? whline ( stdscr, ch, n ) : ERR );
+}
+
+// OK, so maybe a few I did with macros...
+#define mvprintw( y, x, fmt, ... ) \
+	( wmove(stdscr,(y),(x)) == OK \
+	  ? wprintw(stdscr,(fmt), ## __VA_ARGS__ : ERR )
+
+static inline int mvvline ( int y, int x, chtype ch, int n ) {
+	return ( wmove ( stdscr, y, x ) == OK
+		 ? wvline ( stdscr, ch, n ) : ERR );
 }
 
 static inline int mvwaddch ( WINDOW *win, int y, int x, const chtype ch ) {
-	return ( wmove( win, y, x ) == ERR 
-		 ? ERR : waddch ( win, ch ) );
+	return ( wmove( win, y, x ) == OK
+		 ? waddch ( win, ch ) : ERR );
 }
 
 static inline int mvwaddchnstr ( WINDOW *win, int y, int x, const chtype *chstr, int n ) {
-	return ( wmove ( win, y, x ) == ERR 
-		 ? ERR : waddchnstr ( win, chstr, n ) );
+	return ( wmove ( win, y, x ) == OK
+		 ? waddchnstr ( win, chstr, n ) : ERR );
 }
 
 static inline int mvwaddchstr ( WINDOW *win, int y, int x, const chtype *chstr ) {
-	return ( wmove ( win, y, x ) == ERR 
-		 ? ERR : waddchnstr ( win, chstr, -1 ) );
+	return ( wmove ( win, y, x ) == OK
+		 ? waddchnstr ( win, chstr, -1 ) : ERR );
 }
 
 static inline int mvwaddnstr ( WINDOW *win, int y, int x, const char *str, int n ) {
-	return ( wmove ( win, y, x ) == ERR
-		 ? ERR : waddnstr ( win, str, n ) );
+	return ( wmove ( win, y, x ) == OK
+		 ? waddnstr ( win, str, n ) : ERR );
 }
 
 static inline int mvwaddstr ( WINDOW *win, int y, int x, const char *str ) {
-	return ( wmove ( win, y, x ) == ERR
-		 ? ERR : waddnstr ( win, str, -1 ) );
+	return ( wmove ( win, y, x ) == OK
+		 ? waddnstr ( win, str, -1 ) : ERR );
 }
 
 static inline int mvwdelch ( WINDOW *win, int y, int x ) {
-	return ( wmove ( win, y, x ) == ERR
-		 ? ERR : wdelch ( win ) );
+	return ( wmove ( win, y, x ) == OK
+		 ? wdelch ( win ) : ERR );
+}
+
+static inline int mvwhline ( WINDOW *win, int y, int x, chtype ch, int n ) {
+	return ( wmove ( win, y, x ) == OK
+		 ? whline ( win, ch, n ) : ERR );
+}
+
+#define mvwprintw( win, y, x, fmt, ... ) \
+	( wmove((win),(y),(x)) == OK \
+	  ? wprintw((win),(fmt), ## __VA_ARGS__) : ERR )
+
+static inline int mvwvline ( WINDOW *win, int y, int x, chtype ch, int n ) {
+	return ( wmove ( win, y, x ) == OK
+		 ? wvline ( win, ch, n ) : ERR );
+}
+
+#define printw( fmt, ... ) wprintw(stdscr,(fmt), ## __VA_ARGS__ )
+
+static inline int vline ( chtype ch, int n ) {
+	return wvline ( stdscr, ch, n );
+}
+
+// marked for removal
+static inline int vwprintw ( WINDOW *win, const char *fmt, va_list varglist ) {
+	return vw_printw ( win, fmt, varglist );
 }
 
 static inline int waddchstr ( WINDOW *win, const chtype *chstr ) {

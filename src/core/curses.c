@@ -103,6 +103,7 @@ static void _wputstr ( WINDOW *win, const char *str, int wrap, int n ) {
 static void _restore_curs_pos ( WINDOW *win, struct cursor_pos *pos ){
 	win->curs_y = pos->y;
 	win->curs_x = pos->x;
+	win->scr->movetoyx ( win->scr, win->curs_y, win->curs_x );
 }
 
 /**
@@ -285,6 +286,37 @@ WINDOW *newwin ( int nlines, int ncols, int begin_y, int begin_x ) {
 	return win;
 }
 
+
+struct printw_context {
+	struct printf_context ctx;
+	WINDOW *win;
+};
+
+static void _printw_handler ( struct printf_context *ctx, unsigned int c ) {
+	struct printw_context *wctx =
+		container_of ( ctx, struct printw_context, ctx );
+
+	_wputch( wctx->win, c | wctx->win->attrs, WRAP );
+}
+
+/**
+ * Print formatted output in a window
+ *
+ * @v *win	subject window
+ * @v *fmt	formatted string
+ * @v varglist	argument list
+ * @ret rc	return status code
+ */
+int vw_printw ( WINDOW *win, const char *fmt, va_list varglist ) {
+	struct printw_context wctx = {
+		.win = win,
+		.ctx = { .handler = _printw_handler, },
+	};
+
+	vcprintf ( &(wctx.ctx), fmt, varglist );
+	return OK;
+}
+
 /**
  * Add a single-byte character and rendition to a window and advance
  * the cursor
@@ -373,7 +405,8 @@ int wattrset ( WINDOW *win, int attrs ) {
  * @v *opts	undefined (for future implementation)
  * @ret rc	return status cude
  */
-int wattr_get ( WINDOW *win, attr_t *attrs, short *pair, void *opts ) {
+int wattr_get ( WINDOW *win, attr_t *attrs, short *pair, 
+		void *opts __unused ) {
 	*attrs = win->attrs & A_ATTRIBUTES;
 	*pair = (short)(( win->attrs & A_COLOR ) >> CPAIR_SHIFT);
 	return OK;
@@ -387,7 +420,8 @@ int wattr_get ( WINDOW *win, attr_t *attrs, short *pair, void *opts ) {
  * @v *opts	undefined (for future implementation)
  * @ret rc	return status code
  */
-int wattr_off ( WINDOW *win, attr_t attrs, void *opts ) {
+int wattr_off ( WINDOW *win, attr_t attrs, 
+		void *opts __unused ) {
 	wattroff( win, attrs );
 	return OK;
 }
@@ -400,7 +434,8 @@ int wattr_off ( WINDOW *win, attr_t attrs, void *opts ) {
  * @v *opts	undefined (for future implementation)
  * @ret rc	return status code
  */
-int wattr_on ( WINDOW *win, attr_t attrs, void *opts ) {
+int wattr_on ( WINDOW *win, attr_t attrs, 
+	       void *opts __unused ) {
 	wattron( win, attrs );
 	return OK;
 }
@@ -414,7 +449,8 @@ int wattr_on ( WINDOW *win, attr_t attrs, void *opts ) {
  * @v *opts	undefined (for future implementation)
  * @ret rc	return status code
  */
-int wattr_set ( WINDOW *win, attr_t attrs, short cpair, void *opts ) {
+int wattr_set ( WINDOW *win, attr_t attrs, short cpair, 
+		void *opts __unused ) {
 	wattrset( win, attrs | ( ( (unsigned short)cpair ) << CPAIR_SHIFT ) );
 	return OK;
 }
@@ -472,9 +508,9 @@ int wclrtobot ( WINDOW *win ) {
 	struct cursor_pos pos;
 
 	_store_curs_pos( win, &pos );
-	while ( win->curs_y + win->curs_x ) {
+	do {
 		_wputch( win, (unsigned)' ', WRAP );
-	}
+	} while ( win->curs_y + win->curs_x );
 	_restore_curs_pos( win, &pos );
 
 	return OK;
@@ -506,7 +542,8 @@ int wclrtoeol ( WINDOW *win ) {
  * @v *opts			undefined (for future implementation)
  * @ret rc			return status code
  */
-int wcolour_set ( WINDOW *win, short colour_pair_number, void *opts ) {
+int wcolour_set ( WINDOW *win, short colour_pair_number, 
+		  void *opts __unused ) {
 	if ( ( unsigned short )colour_pair_number > COLORS )
 		return ERR;
 
@@ -542,5 +579,64 @@ int wdeleteln ( WINDOW *win ) {
 	   let wclrtoeol do the work :) */
 	wmove( win, win->curs_y, 0 );
 	wclrtoeol( win );
+	return OK;
+}
+
+/**
+ * Create a horizontal line in a window
+ *
+ * @v *win	subject window
+ * @v ch	rendition and character
+ * @v n		max number of chars (wide) to render
+ * @ret rc	return status code
+ */
+int whline ( WINDOW *win, chtype ch, int n ) {
+	struct cursor_pos pos;
+
+	_store_curs_pos ( win, &pos );
+	while ( ( win->curs_x - win->width ) && n-- ) {
+		_wputch ( win, ch, NOWRAP );
+	}
+	_restore_curs_pos ( win, &pos );
+
+	return OK;
+}
+
+/**
+ * Print formatted output to a window
+ *
+ * @v *win	subject window
+ * @v *fmt	formatted string
+ * @v ...	string arguments
+ * @ret rc	return status code
+ */
+int wprintw ( WINDOW *win, const char *fmt, ... ) {
+	va_list args;
+	int i;
+
+	va_start ( args, fmt );
+	i = vw_printw ( win, fmt, args );
+	va_end ( args );
+	return i;
+}
+
+/**
+ * Create a vertical line in a window
+ *
+ * @v *win	subject window
+ * @v ch	rendition and character
+ * @v n		max number of lines to render
+ * @ret rc	return status code
+ */
+int wvline ( WINDOW *win, chtype ch, int n ) {
+	struct cursor_pos pos;
+
+	_store_curs_pos ( win, &pos );
+	while ( ( win->curs_y - win->height ) && n-- ) {
+		_wputch ( win, ch, NOWRAP );
+		wmove( win, ++(win->curs_y), pos.x);
+	}
+	_restore_curs_pos ( win, &pos );
+
 	return OK;
 }
