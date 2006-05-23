@@ -1,296 +1,423 @@
-#undef CODE16
-#if defined(PCBIOS)
-#define	CODE16
-#endif
-
-#ifdef CODE16
-	
-#define BOCHSBP xchgw %bx,%bx
+/*
+ * Copyright (C) 2006 Michael Brown <mbrown@fensystems.co.uk>.
+ *
+ * This program is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU General Public License as
+ * published by the Free Software Foundation; either version 2 of the
+ * License, or any later version.
+ *
+ * This program is distributed in the hope that it will be useful, but
+ * WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ * General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program; if not, write to the Free Software
+ * Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
+ */
 	
 	.text
 	.arch i386
 	.section ".text16", "ax", @progbits
+	.section ".data16", "aw", @progbits
+	.section ".text16.data", "aw", @progbits
 	.code16
 
-/****************************************************************************
- * Memory map mangling code
- ****************************************************************************
- */
+#define SMAP 0x534d4150
 
-	.globl	e820mangler
-e820mangler:
-
-/* Macro to calculate offset of labels within code segment in
- * installed copy of code.
- */
-#define INSTALLED(x) ( (x) - e820mangler )
-	
 /****************************************************************************
- * Intercept INT 15 memory calls and remove the hidden memory ranges
- * from the resulting memory map.
- ****************************************************************************
- */
-	.globl	_intercept_int15
-_intercept_int15:
-	/* Preserve registers */
-	pushw	%bp
-	/* Store %ax for future reference */
-	pushw	%ax
-	/* Make INT-style call to old INT15 routine */
-	pushfw
-	lcall	%cs:*INSTALLED(_intercepted_int15)
-	/* Preserve flags returned by original E820 routine */
-	pushfw
-	/* Check for valid INT15 routine */
-	jc	intercept_int15_exit
-	/* Check for a routine we want to intercept */
-	movw	%sp, %bp
-	cmpw	$0xe820, 2(%bp)
-	je	intercept_e820
-	cmpw	$0xe801, 2(%bp)
-	je	intercept_e801
-	cmpb	$0x88, 3(%bp)
-	je	intercept_88
-intercept_int15_exit:
-	/* Restore registers and return */
-	popfw
-	popw	%bp			/* discard original %ax */
-	popw	%bp
-	lret	$2			/* 'iret' - flags already loaded */
-
-	.globl	_intercepted_int15
-_intercepted_int15:	.word 0,0
-		
-/****************************************************************************
- * Exclude an address range from a potentially overlapping address range
- *
- * Note: this *can* be called even if the range doesn't overlap; it
- * will simply return the range unaltered.  It copes with all the
- * possible cases of overlap, including total overlap (which will
- * modify the range to length zero).  If the to-be-excluded range is
- * in the middle of the target range, then the larger remaining
- * portion will be returned.  If %di is nonzero on entry then the
- * range will only be truncated from the high end, i.e. the base
- * address will never be altered.  All this in less than 30
- * instructions.  :)
+ * Check for overlap
  *
  * Parameters:
- *  %eax	Base address of memory range
- *  %ecx	Length of memory range
- *  %ebx	Base address of memory range to exclude
- *  %edx	Length of memory range to exclude
- *  %di		0 => truncate either end, 1 => truncate high end only
+ *  %edx:%eax	Region start
+ *  %ecx:%ebx	Region end
+ *  %si		Pointer to hidden region descriptor
  * Returns:
- *  %eax	Updated base address of range
- *  %ecx	Updated length of range
- *  %ebx,%edx	Undefined
- *		All other registers (including %di) preserved
- *
- * Note: "ja" is used rather than "jg" because we are comparing
- * unsigned ints
+ *  CF set	Region overlaps
+ *  CF clear	No overlap
  ****************************************************************************
- */
-#ifdef TEST_EXCLUDE_ALGORITHM
-	.code32
-#endif /* TEST_EXCLUDE_ALGORITHM */
-exclude_memory_range:
-	/* Convert (start,length) to (start,end) */
-	addl	%eax, %ecx
-	addl	%ebx, %edx
-	/* Calculate "prefix" length */
-	subl	%eax, %ebx		/* %ebx = "prefix" length */
-	ja	1f
-	xorl	%ebx, %ebx		/* Truncate to zero if negative */
-1:	/* %di == 0 => truncate either end
-	 * %di != 0 => truncate only high end
-	 */
-	testw	%di, %di
-	je	use_either
-	cmpl	%eax, %edx
-	jbe	99f			/* excl. range is below target range */
-use_prefix:	/* Use prefix, discard suffix */
-	addl	%eax, %ebx		/* %ebx = candidate end address */
-	cmpl	%ecx, %ebx		/* %ecx = min ( %ebx, %ecx ) */
-	ja	1f
-	movl	%ebx, %ecx
-1:	jmp	99f
-use_either:		
-	/* Calculate "suffix" length */
-	subl	%ecx, %edx		/* %edx = -( "suffix" length ) */
-	jb	1f
-	xorl	%edx, %edx		/* Truncate to zero if negative */
-1:	negl	%edx			/* %edx = "suffix" length */
-	/* Use whichever is longest of "prefix" and "suffix" */
-	cmpl	%ebx, %edx
-	jbe	use_prefix
-use_suffix:	/* Use suffix, discard prefix */
-	negl	%edx
-	addl	%ecx, %edx		/* %edx = candidate start address */
-	cmpl	%eax, %edx		/* %eax = max ( %eax, %edx ) */
-	jb	1f
-	movl	%edx, %eax
-1:	
-99:	subl	%eax, %ecx		/* Convert back to (start,length) */
+ */ 
+	.section ".text16"
+check_overlap:
+	/* If start >= hidden_end, there is no overlap. */
+	testl	%edx, %edx
+	jnz	no_overlap
+	cmpl	4(%si), %eax
+	jae	no_overlap
+	/* If end <= hidden_start, there is no overlap; equivalently,
+	 * if end > hidden_start, there is overlap.
+	*/
+	testl	%ecx, %ecx
+	jnz	overlap
+	cmpl	0(%si), %ebx
+	ja	overlap
+no_overlap:
+	clc
 	ret
+overlap:
+	stc
+	ret
+	.size check_overlap, . - check_overlap
 
-#ifdef TEST_EXCLUDE_ALGORITHM
-	.globl	__test_exclude
-__test_exclude:
-	pushl   %ebx
-	pushl	%edi
-	movl    12(%esp), %eax
-	movl    16(%esp), %ecx
-	movl    20(%esp), %ebx
-	movl    24(%esp), %edx
-	movl	28(%esp), %edi
-	call    exclude_memory_range
-	shll    $16, %eax
-	orl     %ecx, %eax
-	popl	%edi
-	popl	%ebx
-	ret
-	.code16
-#endif /* TEST_EXCLUDE_ALGORITHM */
-	
 /****************************************************************************
- * Exclude Etherboot-reserved address ranges from a potentially
- * overlapping address range
+ * Check for overflow/underflow
  *
  * Parameters:
- *  %eax	Base address of memory range
- *  %ecx	Length of memory range
- *  %di		0 => truncate either end, 1 => truncate high end only
+ *  %edx:%eax	Region start
+ *  %ecx:%ebx	Region end
  * Returns:
- *  %eax	Updated base address of range
- *  %ecx	Updated length of range
- *		All other registers (including %di) preserved
+ *  CF set	start < end
+ *  CF clear	start >= end
  ****************************************************************************
  */
-exclude_hidden_memory_ranges:
-	pushw	%si
+	.section ".text16"
+check_overflow:
+	pushl	%ecx
 	pushl	%ebx
-	pushl	%edx
-	movw	$INSTALLED(_hide_memory), %si
-2:	movl	%cs:0(%si), %ebx
-	movl	%cs:4(%si), %edx
-	call	exclude_memory_range
-	addw	$8, %si
-	cmpw	$INSTALLED(_hide_memory_end), %si
-	jl	2b
-	popl	%edx
+	subl	%eax, %ebx
+	sbbl	%edx, %ecx
 	popl	%ebx
+	popl	%ecx
+	ret
+	.size check_overflow, . - check_overflow
+	
+/****************************************************************************
+ * Truncate towards start of region
+ *
+ * Parameters:
+ *  %edx:%eax	Region start
+ *  %ecx:%ebx	Region end
+ *  %si		Pointer to hidden region descriptor
+ * Returns:
+ *  %edx:%eax	Modified region start
+ *  %ecx:%ebx	Modified region end
+ *  CF set	Region was truncated
+ *  CF clear	Region was not truncated
+ ****************************************************************************
+ */
+	.section ".text16"
+truncate_to_start:
+	/* If overlaps, set region end = hidden region start */
+	call	check_overlap
+	jnc	99f
+	movl	0(%si), %ebx
+	xorl	%ecx, %ecx
+	/* If region end < region start, set region end = region start */
+	call	check_overflow
+	jnc	1f
+	movl	%eax, %ebx
+	movl	%edx, %ecx
+1:	stc
+99:	ret
+	.size truncate_to_start, . - truncate_to_start
+
+/****************************************************************************
+ * Truncate towards end of region
+ *
+ * Parameters:
+ *  %edx:%eax	Region start
+ *  %ecx:%ebx	Region end
+ *  %si		Pointer to hidden region descriptor
+ * Returns:
+ *  %edx:%eax	Modified region start
+ *  %ecx:%ebx	Modified region end
+ *  CF set	Region was truncated
+ *  CF clear	Region was not truncated
+ ****************************************************************************
+ */
+	.section ".text16"
+truncate_to_end:
+	/* If overlaps, set region start = hidden region end */
+	call	check_overlap
+	jnc	99f
+	movl	4(%si), %eax
+	xorl	%edx, %edx
+	/* If region start > region end, set region start = region end */
+	call	check_overflow
+	jnc	1f
+	movl	%ebx, %eax
+	movl	%ecx, %edx
+1:	stc
+99:	ret
+	.size truncate_to_end, . - truncate_to_end
+	
+/****************************************************************************
+ * Truncate region
+ *
+ * Parameters:
+ *  %edx:%eax	Region start
+ *  %ecx:%ebx	Region length (*not* region end)
+ *  %bp		truncate_to_start or truncate_to_end
+ * Returns:
+ *  %edx:%eax	Modified region start
+ *  %ecx:%ebx	Modified region length
+ *  CF set	Region was truncated
+ *  CF clear	Region was not truncated
+ ****************************************************************************
+ */
+	.section ".text16"
+truncate:
+	pushw	%si
+	pushfw
+	/* Convert (start,len) to (start,end) */
+	addl	%eax, %ebx
+	adcl	%edx, %ecx
+	/* Hide all hidden regions, truncating as directed */
+	movw	$hidden_regions, %si
+1:	call	*%bp
+	jnc	2f
+	popfw	/* If CF was set, set stored CF in flags word on stack */
+	stc
+	pushfw
+2:	addw	$8, %si
+	cmpl	$0, 0(%si)
+	jne	1b
+	/* Convert modified (start,end) back to (start,len) */
+	subl	%eax, %ebx
+	sbbl	%edx, %ecx
+	popfw
 	popw	%si
 	ret
-	
-	.globl	_hide_memory	
-_hide_memory:
-	.long	0,0			/* Etherboot text (base,length) */
-	.long	0,0			/* Heap (base,length) */
-_hide_memory_end:
+	.size truncate, . - truncate
 
 /****************************************************************************
- * Intercept INT 15,E820 calls and remove the hidden memory ranges
- * from the resulting memory map.
+ * Patch "memory above 1MB" figure
+ *
+ * Parameters:
+ *  %ax		Memory above 1MB, in 1kB blocks
+ * Returns:
+ *  %ax		Modified memory above 1M in 1kB blocks
+ *  CF set	Region was truncated
+ *  CF clear	Region was not truncated
  ****************************************************************************
  */
-#define SMAP ( 0x534d4150 )
-intercept_e820:
-	/* Check for valid E820 routine */
-	cmpl	$SMAP, %eax
-	jne	intercept_int15_exit
-	/* If base address isn't in the low 4GB, return unaltered
-	 * (since we never claim memory above 4GB).  WARNING: we cheat
-	 * by assuming that no E820 region will straddle the 4GB
-	 * boundary: if this is not a valid assumption then things
-	 * will probably break.
-	 */
-	cmpl	$0, %es:4(%di)
-	jne	intercept_int15_exit
-	/* Preserve registers */
-	pushl	%eax
-	pushl	%ecx
-	/* Update returned memory range */
-	movl	%es:0(%di), %eax	/* Base */
-	movl	%es:8(%di), %ecx	/* Length */
-	pushw	%di
-	xorw	%di, %di		/* "truncate either end" flag */
-	call	exclude_hidden_memory_ranges
-	popw	%di
-	movl	%eax, %es:0(%di)	/* Store updated base */
-	movl	%ecx, %es:8(%di)	/* Store updated length */
-	/* Restore registers and return */
-	popl	%ecx
-	popl	%eax
-	jmp	intercept_int15_exit
-
-/****************************************************************************
- * Intercept INT 15,E801 calls and remove the hidden memory ranges
- * from the resulting memory map.
- ****************************************************************************
- */
-intercept_e801:
-	/* Adjust return values */
-	call	e801_adjust
-	xchgw	%ax, %cx
-	xchgw	%bx, %dx
-	call	e801_adjust
-	xchgw	%ax, %cx
-	xchgw	%bx, %dx
-	jmp	intercept_int15_exit
-	
-	/* %ax = #KB from 1MB+, %bx = #64KB from 16MB+
-	 * Return with modified values in %ax, %bx.  Preserver other regs.
-	 */
-e801_adjust:
-	pushw	%di
-	pushl	%ecx
-	pushl	%eax
-	movw	$1, %di			/* "truncate only high end" flag */
-
-	/* Truncate #64KB from 16MB+ as appropriate */
-	movw	%bx, %cx		/* (no need to zero high word) */
-	shll	$16, %ecx		/* %ecx = length in bytes */
-	movl	$(1<<24), %eax		/* 16MB start address */
-	call	exclude_hidden_memory_ranges
-	shrl	$16, %ecx		/* %cx = updated length in 64KB */
-	movw	%cx, %bx		/* Return in %bx */
-	
-	/* Truncate #KB from 1MB+ as appropriate */
-	popw	%cx			/* Orig. %ax (high word already 0) */
-	shll	$10, %ecx		/* %ecx = length in bytes */
-	shrl	$4, %eax		/* 1MB start address */
-	call	exclude_hidden_memory_ranges
-	shrl	$10, %ecx		/* %cx = updated length in KB */
-	pushw	%cx			/* Will be picked up in %eax */
-	
-	popl	%eax
-	popl	%ecx
-	popw	%di
+	.section ".text16"
+patch_1m:
+	pushal
+	/* Convert to (start,len) format and call truncate */
+	movw	$truncate_to_start, %bp
+	xorl	%ecx, %ecx
+	movzwl	%ax, %ebx
+	shll	$10, %ebx
+	xorl	%edx, %edx
+	movl	$0x100000, %eax
+	call	truncate
+	/* Convert back to "memory above 1MB" format and return via %ax */
+	pushfw
+	shrl	$10, %ebx
+	popfw
+	movw	%sp, %bp
+	movw	%bx, 28(%bp)
+	popal
 	ret
+	.size patch_1m, . - patch_1m
 
 /****************************************************************************
- * Intercept INT 15,88 calls and remove the hidden memory ranges
- * from the resulting memory map.
+ * Patch "memory above 16MB" figure
+ *
+ * Parameters:
+ *  %bx		Memory above 16MB, in 64kB blocks
+ * Returns:
+ *  %bx		Modified memory above 16M in 64kB blocks
+ *  CF set	Region was truncated
+ *  CF clear	Region was not truncated
  ****************************************************************************
  */
-intercept_88:
-	pushw	%bx			/* E801 adjust, ignore %bx */
-	call	e801_adjust
-	popw	%bx
-	jmp	intercept_int15_exit
+	.section ".text16"
+patch_16m:
+	pushal
+	/* Convert to (start,len) format and call truncate */
+	movw	$truncate_to_start, %bp
+	xorl	%ecx, %ecx
+	shll	$16, %ebx
+	xorl	%edx, %edx
+	movl	$0x1000000, %eax
+	call	truncate
+	/* Convert back to "memory above 16MB" format and return via %bx */
+	pushfw
+	shrl	$16, %ebx
+	popfw
+	movw	%sp, %bp
+	movw	%bx, 24(%bp)
+	popal
+	ret
+	.size patch_16m, . - patch_16m
 
-	.globl	e820mangler_end
-e820mangler_end:
+/****************************************************************************
+ * Patch "memory between 1MB and 16MB" and "memory above 16MB" figures
+ *
+ * Parameters:
+ *  %ax		Memory between 1MB and 16MB, in 1kB blocks
+ *  %bx		Memory above 16MB, in 64kB blocks
+ * Returns:
+ *  %ax		Modified memory between 1MB and 16MB, in 1kB blocks
+ *  %bx		Modified memory above 16MB, in 64kB blocks
+ *  CF set	Region was truncated
+ *  CF clear	Region was not truncated
+ ****************************************************************************
+ */
+	.section ".text16"
+patch_1m_16m:
+	call	patch_1m
+	jc	1f
+	call	patch_16m
+	ret
+1:	/* 1m region was truncated; kill the 16m region */
+	xorw	%bx, %bx
+	ret
+	.size patch_1m_16m, . - patch_1m_16m
 
-	.globl	_e820mangler_size
-	.equ	_e820mangler_size, e820mangler_end - e820mangler
-	.globl	e820mangler_size
-e820mangler_size:
-	.word	_e820mangler_size
+/****************************************************************************
+ * Patch E820 memory map entry
+ *
+ * Parameters:
+ *  %es:di	Pointer to E820 memory map descriptor
+ *  %bp		truncate_to_start or truncate_to_end
+ * Returns:
+ *  %es:di	Pointer to now-modified E820 memory map descriptor
+ *  CF set	Region was truncated
+ *  CF clear	Region was not truncated
+ ****************************************************************************
+ */
+	.section ".text16"
+patch_e820:
+	pushal
+	movl	%es:0(%di), %eax
+	movl	%es:4(%di), %edx
+	movl	%es:8(%di), %ebx
+	movl	%es:12(%di), %ecx
+	call	truncate
+	movl	%eax, %es:0(%di)
+	movl	%edx, %es:4(%di)
+	movl	%ebx, %es:8(%di)
+	movl	%ecx, %es:12(%di)
+	popal
+	ret
+	.size patch_e820, . - patch_e820
 
-#else
+/****************************************************************************
+ * INT 15,e820 handler
+ ****************************************************************************
+ */
+	.section ".text16"
+int15_e820:
+	pushw	%si
+	pushw	%bp
+	/* Caller's %bx => %si, real %ebx to %ebx, call previous handler */
+	pushfw
+	movw	%bx, %si
+	testl	%ebx, %ebx
+	jnz	1f
+	movl	%ebx, %cs:real_ebx
+1:	movl	%cs:real_ebx, %ebx
+	lcall	*%cs:int15_vector
+	pushfw
+	/* Edit result */
+	pushw	%ds
+	pushw	%cs:rm_ds
+	popw	%ds
+	movw	$truncate_to_start, %bp
+	incw	%si
+	jns	2f
+	movw	$truncate_to_end, %bp
+2:	call	patch_e820
+	jnc	3f
+	xorw	$0x8000, %si
+3:	testw	%si, %si
+	js	4f
+	movl	%ebx, %cs:real_ebx
+	testl	%ebx, %ebx
+	jz	5f
+4:	movw	%si, %bx
+5:	popw	%ds
+	/* Restore flags returned by previous handler and return */
+	popfw
+	popw	%bp
+	popw	%si
+	lret	$2
+	.size int15_e820, . - int15_e820
 
-	.globl	_e820mangler_size
-	.equ	_e820mangler_size, 0
+	.section ".text16.data"
+real_ebx:
+	.long 0
+	.size real_ebx, . - real_ebx
 	
-#endif /* CODE16 */
+/****************************************************************************
+ * INT 15,e801 handler
+ ****************************************************************************
+ */
+	.section ".text16"
+int15_e801:
+	/* Call previous handler */
+	pushfw
+	lcall	*%cs:int15_vector
+	pushfw
+	/* Edit result */
+	pushw	%ds
+	pushw	%cs:rm_ds
+	popw	%ds
+	call	patch_1m_16m
+	xchgw	%ax, %cx
+	xchgw	%bx, %dx
+	call	patch_1m_16m
+	xchgw	%ax, %cx
+	xchgw	%bx, %dx
+	popw	%ds
+	/* Restore flags returned by previous handler and return */
+	popfw
+	lret	$2
+	.size int15_e801, . - int15_e801
+	
+/****************************************************************************
+ * INT 15,88 handler
+ ****************************************************************************
+ */
+	.section ".text16"
+int15_88:
+	/* Call previous handler */
+	pushfw
+	lcall	*%cs:int15_vector
+	pushfw
+	/* Edit result */
+	pushw	%ds
+	pushw	%cs:rm_ds
+	popw	%ds
+	call	patch_1m
+	popw	%ds
+	/* Restore flags returned by previous handler and return */
+	popfw
+	lret	$2
+	.size int15_88, . - int15_88
+		
+/****************************************************************************
+ * INT 15 handler
+ ****************************************************************************
+ */
+	.section ".text16"
+	.globl int15
+int15:
+	/* See if we want to intercept this call */
+	pushfw
+	cmpw	$0xe820, %ax
+	jne	1f
+	cmpl	$SMAP, %edx
+	jne	1f
+	popfw
+	jmp	int15_e820
+1:	cmpw	$0xe801, %ax
+	jne	2f
+	popfw
+	jmp	int15_e801
+2:	cmpb	$0x88, %ah
+	jne	3f
+	popfw
+	jmp	int15_88
+3:	popfw
+	ljmp	*%cs:int15_vector
+	.size int15, . - int15
+	
+	.section ".text16.data"
+	.globl int15_vector
+int15_vector:
+	.long 0
+	.size int15_vector, . - int15_vector
