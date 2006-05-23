@@ -20,12 +20,20 @@ extern char *data16;
 extern char *text16;
 
 #define __data16( variable )						\
-	_data16_ ## variable __asm__ ( #variable )			\
-	__attribute__ (( section ( ".data16" ) ))
+	__attribute__ (( section ( ".data16" ) ))			\
+	_data16_ ## variable __asm__ ( #variable )
+
+#define __data16_array( variable, array )				\
+	__attribute__ (( section ( ".data16" ) ))			\
+	_data16_ ## variable array __asm__ ( #variable )
 
 #define __text16( variable )						\
-	_text16_ ## variable __asm__ ( #variable )			\
-	__attribute__ (( section ( ".text16.data" ) ))
+	__attribute__ (( section ( ".text16.data" ) ))			\
+	_text16_ ## variable __asm__ ( #variable )
+
+#define __text16_array( variable, array )				\
+	__attribute__ (( section ( ".text16.data" ) ))			\
+	_text16_ ## variable array __asm__ ( #variable )
 
 #define __use_data16( variable )					\
 	( * ( ( typeof ( _data16_ ## variable ) * )			\

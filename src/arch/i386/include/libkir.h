@@ -12,7 +12,9 @@
 
 /* Access to variables in .data16 and .text16 in a way compatible with librm */
 #define __data16( variable ) variable
+#define __data16_array( variable, array ) variable array
 #define __text16( variable ) variable
+#define __text16_array( variable,array ) variable array
 #define __use_data16( variable ) variable
 #define __use_text16( variable ) variable
 #define __from_data16( variable ) variable
