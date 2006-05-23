@@ -1,94 +1,92 @@
-/* Utility functions to hide Etherboot by manipulating the E820 memory
- * map.  These could go in memsizes.c, but are placed here because not
- * all images will need them.
+/* Copyright (C) 2006 Michael Brown <mbrown@fensystems.co.uk>.
+ *
+ * This program is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU General Public License as
+ * published by the Free Software Foundation; either version 2 of the
+ * License, or any later version.
+ *
+ * This program is distributed in the hope that it will be useful, but
+ * WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ * General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program; if not, write to the Free Software
+ * Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
  */
 
-#include "etherboot.h"
-#include "hidemem.h"
+#include <realmode.h>
+#include <biosint.h>
 
-#ifdef	CODE16
-
-static int mangling = 0;
-static void *mangler = NULL;
-
-#define INSTALLED(x)	( (typeof(&x)) ( (void*)(&x) - (void*)e820mangler \
-					 + mangler ) )
-#define intercept_int15		INSTALLED(_intercept_int15)
-#define intercepted_int15	INSTALLED(_intercepted_int15)
-#define hide_memory		INSTALLED(_hide_memory)
-#define INT15_VECTOR ( (segoff_t*) ( phys_to_virt( 4 * 0x15 ) ) )
-
-int install_e820mangler ( void *new_mangler ) {
-	if ( mangling ) return 0;
-	memcpy ( new_mangler, &e820mangler, e820mangler_size );
-	mangler = new_mangler;
-	return 1;
-}
-
-/* Intercept INT15 calls and pass them through the mangler.  The
- * mangler must have been copied to base memory before making this
- * call, and "mangler" must point to the base memory copy, which must
- * be 16-byte aligned.
+/**
+ * A hidden region of Etherboot
+ *
+ * This represents a region that will be edited out of the system's
+ * memory map.
+ *
+ * This structure is accessed by assembly code, so must not be
+ * changed.
  */
-int hide_etherboot ( void ) {
-	if ( mangling ) return 1;
-	if ( !mangler ) return 0;
+struct hidden_region {
+	/* Physical start address */
+	uint32_t start;
+	/* Physical end address */
+	uint32_t end;
+};
 
-	/* Hook INT15 handler */
-	*intercepted_int15 = *INT15_VECTOR;
-	(*hide_memory)[0].start = virt_to_phys(_text);
-	(*hide_memory)[0].length = _end - _text;
-	/* IMPORTANT, possibly even FIXME:
-	 *
-	 * Etherboot has a tendency to claim a very large area of
-	 * memory as possible heap; enough to make it impossible to
-	 * load an OS if we hide all of it.  We hide only the portion
-	 * that's currently in use.  This means that we MUST NOT
-	 * perform further allocations from the heap while the mangler
-	 * is active.
-	 */
-	(*hide_memory)[1].start = heap_ptr;
-	(*hide_memory)[1].length = heap_bot - heap_ptr;
-	INT15_VECTOR->segment = SEGMENT(mangler);
-	INT15_VECTOR->offset = 0;
+/* Linker-defined symbols */
+extern char _text[];
+extern char _end[];
 
-	mangling = 1;
-	return 1;
+/** Assembly routine in e820mangler.S */
+extern void int15();
+
+/** Vector for storing original INT 15 handler */
+extern struct segoff __text16 ( int15_vector );
+#define int15_vector __use_text16 ( int15_vector )
+
+/**
+ * Unique IDs for hidden regions
+ */
+enum {
+	TEXT = 0,
+};
+
+/**
+ * List of hidden regions
+ *
+ * Must be terminated by a zero entry.
+ */
+struct hidden_region __data16_array ( hidden_regions, [] ) = {
+	[TEXT] = { 0, 0 },
+	{ 0, 0, } /* Terminator */
+};
+#define hidden_regions __use_data16 ( hidden_regions )
+
+/**
+ * Hide Etherboot
+ *
+ * Installs an INT 15 handler to edit Etherboot out of the memory map
+ * returned by the BIOS.
+ */
+void hide_etherboot ( void ) {
+	hidden_regions[TEXT].start = virt_to_phys ( _text );
+	hidden_regions[TEXT].end = virt_to_phys ( _end );
+
+	DBG ( "Hiding [%x,%x)\n", hidden_regions[TEXT].start,
+	      hidden_regions[TEXT].end );
+
+	hook_bios_interrupt ( 0x15, ( unsigned int ) int15,
+			      &int15_vector );
 }
 
-int unhide_etherboot ( void ) {
-	if ( !mangling ) return 1;
-
-	/* Restore original INT15 handler
-	 */
-	if ( VIRTUAL(INT15_VECTOR->segment,INT15_VECTOR->offset) != mangler ) {
-		/* Oh dear... */
-
-#ifdef WORK_AROUND_BPBATCH_BUG
-		/* BpBatch intercepts INT15, so can't unhook it, and
-		 * then proceeds to ignore our PXENV_KEEP_UNDI return
-		 * status, which means that it ends up zeroing out the
-		 * INT15 handler routine.
-		 *
-		 * This rather ugly hack involves poking into
-		 * BpBatch's code and changing it's stored value for
-		 * the "next handler" in the INT15 chain.
-		 */
-		segoff_t *bp_chain = VIRTUAL ( 0x0060, 0x8254 );
-
-		if ( ( bp_chain->segment == SEGMENT(mangler) ) &&
-		     ( bp_chain->offset == 0 ) ) {
-			printf ( "\nBPBATCH bug workaround enabled\n" );
-			*bp_chain = *intercepted_int15;
-		}
-#endif /* WORK_AROUND_BPBATCH_BUG */
-
-		return 0;
-	}
-	*INT15_VECTOR = *intercepted_int15;
-
-	mangling = 0;
-	return 1;
+/**
+ * Unhide Etherboot
+ *
+ * Uninstalls the INT 15 handler installed by hide_etherboot(), if
+ * possible.
+ */
+void unhide_etherboot ( void ) {
+	unhook_bios_interrupt ( 0x15, ( unsigned int ) int15,
+				&int15_vector );
 }
-
-#endif	/* CODE16 */
