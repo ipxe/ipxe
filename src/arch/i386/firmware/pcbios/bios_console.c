@@ -1,71 +1,73 @@
-/* Etherboot routines for PCBIOS firmware.
+/*
+ * Copyright (C) 2006 Michael Brown <mbrown@fensystems.co.uk>.
  *
- * Body of routines taken from old pcbios.S
+ * This program is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU General Public License as
+ * published by the Free Software Foundation; either version 2 of the
+ * License, or any later version.
+ *
+ * This program is distributed in the hope that it will be useful, but
+ * WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ * General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program; if not, write to the Free Software
+ * Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
  */
 
-#include "realmode.h"
-#include "console.h"
+#include <realmode.h>
+#include <console.h>
 
-#define ZF ( 1 << 6 )
-
-/**************************************************************************
-bios_putchar - Print a character on console
-**************************************************************************/
+/**
+ * Print a character to BIOS console
+ *
+ * @v character		Character to be printed
+ */
 static void bios_putchar ( int character ) {
-	REAL_EXEC ( rm_console_putc,
-		    "sti\n\t"
-		    "movb $0x0e, %%ah\n\t"
-		    "movl $1, %%ebx\n\t"
-		    "int $0x10\n\t"
-		    "cli\n\t",
-		    1,
-		    OUT_CONSTRAINTS ( "=a" ( character ) ),
-		    IN_CONSTRAINTS ( "a" ( character ) ),
-		    CLOBBER ( "ebx", "ecx", "edx", "ebp", "esi", "edi" ) );
 
-	/* NOTE: %eax may be clobbered, so must be specified as an output
-	 * parameter, even though we don't then do anything with it.
-	 */
+	__asm__ __volatile__ ( REAL_CODE ( "sti\n\t"
+					   "int $0x10\n\t"
+					   "cli\n\t" )
+			       : : "a" ( character | 0x0e00 ), "b" ( 1 )
+			       : "ebp" );
 }
 
-/**************************************************************************
-bios_getchar - Get a character from console
-**************************************************************************/
+/**
+ * Get character from BIOS console
+ *
+ * @ret character	Character read from console
+ */
 static int bios_getchar ( void ) {
-	uint16_t character;
+	uint8_t character;
 	
-	REAL_EXEC ( rm_console_getc,
-		    "sti\n\t"
-		    "xorw %%ax, %%ax\n\t"
-		    "int $0x16\n\t"
-		    "cli\n\t",
-		    1,
-		    OUT_CONSTRAINTS ( "=a" ( character ) ),
-		    IN_CONSTRAINTS (),
-		    CLOBBER ( "ebx", "ecx", "edx", "ebp", "esi", "edi" ) );
-	
-	return ( character & 0xff );
+	__asm__ __volatile__ ( REAL_CODE ( "sti\n\t"
+					   "int $0x16\n\t"
+					   "cli\n\t" )
+			       : "=a" ( character ) : "a" ( 0x0000 ) );
+
+	return character;
 }
 
-/**************************************************************************
-bios_iskey - Check for keyboard interrupt
-**************************************************************************/
+/**
+ * Check for character ready to read from BIOS console
+ *
+ * @ret True		Character available to read
+ * @ret False		No character available to read
+ */
 static int bios_iskey ( void ) {
-	uint16_t flags;
+	unsigned int discard_a;
+	unsigned int flags;
 	
-	REAL_EXEC ( rm_console_ischar,
-		    "sti\n\t"
-		    "movb $1, %%ah\n\t"
-		    "int $0x16\n\t"
-		    "pushfw\n\t"
-		    "popw %%ax\n\t"
-		    "cli\n\t",
-		    1,
-		    OUT_CONSTRAINTS ( "=a" ( flags ) ),
-		    IN_CONSTRAINTS (),
-		    CLOBBER ( "ebx", "ecx", "edx", "ebp", "esi", "edi" ) );
+	__asm__ __volatile__ ( REAL_CODE ( "sti\n\t"
+					   "int $0x16\n\t"
+					   "pushfw\n\t"
+					   "popw %w0\n\t"
+					   "cli\n\t" )
+			       : "=r" ( flags ), "=a" ( discard_a )
+			       : "a" ( 0x0001 ) );
 	
-	return ( ( flags & ZF ) == 0 );
+	return ( ! ( flags & ZF ) );
 }
 
 struct console_driver bios_console __console_driver = {
