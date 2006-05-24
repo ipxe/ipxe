@@ -75,19 +75,16 @@ static unsigned int extmemsize_e801 ( void ) {
 	unsigned int flags;
 	unsigned int extmem;
 
-	REAL_EXEC ( rm_mem_e801,
-		    "stc\n\t"
-		    "int $0x15\n\t"
-		    "pushfw\n\t"
-		    "popw %w0\n\t",
-		    5,
-		    OUT_CONSTRAINTS ( "=r" ( flags ),
-				      "=a" ( extmem_1m_to_16m_k ),
-				      "=b" ( extmem_16m_plus_64k ),
-				      "=c" ( confmem_1m_to_16m_k ),
-				      "=d" ( confmem_16m_plus_64k ) ),
-		    IN_CONSTRAINTS ( "a" ( 0xe801 ) ),
-		    CLOBBER ( "cc" ) );
+	__asm__ __volatile__ ( REAL_CODE ( "stc\n\t"
+					   "int $0x15\n\t"
+					   "pushfw\n\t"
+					   "popw %w0\n\t" )
+			       : "=r" ( flags ),
+				 "=a" ( extmem_1m_to_16m_k ),
+				 "=b" ( extmem_16m_plus_64k ),
+				 "=c" ( confmem_1m_to_16m_k ),
+				 "=d" ( confmem_16m_plus_64k )
+			       : "a" ( 0xe801 ) );
 
 	if ( flags & CF )
 		return 0;
@@ -111,13 +108,9 @@ static unsigned int extmemsize_e801 ( void ) {
 static unsigned int extmemsize_88 ( void ) {
 	uint16_t extmem;
 
-	REAL_EXEC ( rm_mem_88,
-		    /* Ignore CF; it is not reliable for this call */
-		    "int $0x15\n\t",
-		    1,
-		    OUT_CONSTRAINTS ( "=a" ( extmem ) ),
-		    IN_CONSTRAINTS ( "a" ( 0x8800 ) ),
-		    CLOBBER ( "cc" ) );
+	/* Ignore CF; it is not reliable for this call */
+	__asm__ __volatile__ ( REAL_CODE ( "int $0x15" )
+			       : "=a" ( extmem ) : "a" ( 0x8800 ) );
 
 	DBG ( "Extended memory size %d kB\n", extmem );
 	return extmem;
@@ -153,32 +146,30 @@ static int meme820 ( struct memory_region *memmap, unsigned int entries ) {
 	unsigned int discard_c, discard_d, discard_D;
 
 	do {
-		REAL_EXEC ( rm_mem_e820,
-			    "stc\n\t"
-			    "int $0x15\n\t"
-			    "pushfw\n\t"
-			    "popw %w0\n\t",
-			    6,
-			    OUT_CONSTRAINTS ( "=r" ( flags ),
-					      "=a" ( smap ),
-					      "=b" ( next ),
-					      "=D" ( discard_D ),
-					      "=c" ( discard_c ),
-					      "=d" ( discard_d ) ),
-			    IN_CONSTRAINTS ( "a" ( 0xe820 ),
-					     "b" ( next ),
-					     "D" ( &__from_data16 ( e820buf )),
-					     "c" ( sizeof ( e820buf ) ),
-					     "d" ( SMAP ) ),
-			    CLOBBER ( "memory" ) );
+		__asm__ __volatile__ ( REAL_CODE ( "stc\n\t"
+						   "int $0x15\n\t"
+						   "pushfw\n\t"
+						   "popw %w0\n\t" )
+				       : "=r" ( flags ), "=a" ( smap ),
+					 "=b" ( next ), "=D" ( discard_D ),
+					 "=c" ( discard_c ), "=d" ( discard_d )
+				       : "a" ( 0xe820 ), "b" ( next ),
+					 "D" ( &__from_data16 ( e820buf ) ),
+					 "c" ( sizeof ( e820buf ) ),
+					 "d" ( SMAP )
+				       : "memory" );
+
 		if ( smap != SMAP )
 			return -ENOTSUP;
+
 		if ( flags & CF )
 			break;
+
 		DBG ( "E820 region [%llx,%llx) type %d\n", e820buf.start,
 		      ( e820buf.start + e820buf.len ), ( int ) e820buf.type );
 		if ( e820buf.type != E820_TYPE_RAM )
 			continue;
+
 		memmap[index].start = e820buf.start;
 		memmap[index].end = e820buf.start + e820buf.len;
 		index++;
