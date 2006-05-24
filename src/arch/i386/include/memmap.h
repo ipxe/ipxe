@@ -18,6 +18,14 @@ struct memory_region {
 	uint64_t end;
 };
 
-extern void get_memmap ( struct memory_region *memmap, unsigned int entries );
+/** Maximum number of memory regions we expect to encounter */
+#define MAX_MEMORY_REGIONS 8
+
+/** A memory map */
+struct memory_map {
+	struct memory_region regions[MAX_MEMORY_REGIONS];
+};
+
+extern void get_memmap ( struct memory_map *memmap );
 
 #endif /* _MEMMAP_H */

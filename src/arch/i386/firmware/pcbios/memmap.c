@@ -135,10 +135,9 @@ static unsigned int extmemsize ( void ) {
  * Get e820 memory map
  *
  * @v memmap		Memory map to fill in
- * @v entries		Maximum number of entries in memory map
  * @ret rc		Return status code
  */
-static int meme820 ( struct memory_region *memmap, unsigned int entries ) {
+static int meme820 ( struct memory_map *memmap ) {
 	unsigned int index = 0;
 	uint32_t next = 0;
 	uint32_t smap;
@@ -170,10 +169,12 @@ static int meme820 ( struct memory_region *memmap, unsigned int entries ) {
 		if ( e820buf.type != E820_TYPE_RAM )
 			continue;
 
-		memmap[index].start = e820buf.start;
-		memmap[index].end = e820buf.start + e820buf.len;
+		memmap->regions[index].start = e820buf.start;
+		memmap->regions[index].end = e820buf.start + e820buf.len;
 		index++;
-	} while ( ( index < entries ) && ( next != 0 ) );
+	} while ( ( next != 0 ) && 
+		  ( index < ( sizeof ( memmap->regions ) /
+			      sizeof ( memmap->regions[0] ) ) ) );
 	return 0;
 }
 
@@ -181,25 +182,24 @@ static int meme820 ( struct memory_region *memmap, unsigned int entries ) {
  * Get memory map
  *
  * @v memmap		Memory map to fill in
- * @v entries		Maximum number of entries in memory map (minimum 2)
  */
-void get_memmap ( struct memory_region *memmap, unsigned int entries ) {
+void get_memmap ( struct memory_map *memmap ) {
 	unsigned int basemem, extmem;
 	int rc;
 
 	/* Clear memory map */
-	memset ( memmap, 0, ( entries * sizeof ( *memmap ) ) );
+	memset ( memmap, 0, sizeof ( *memmap ) );
 
 	/* Get base and extended memory sizes */
 	basemem = basememsize();
 	extmem = extmemsize();
 	
 	/* Try INT 15,e820 first */
-	if ( ( rc = meme820 ( memmap, entries ) ) == 0 )
+	if ( ( rc = meme820 ( memmap ) ) == 0 )
 		return;
 
 	/* Fall back to constructing a map from basemem and extmem sizes */
-	memmap[0].end = ( basemem * 1024 );
-	memmap[1].start = 0x100000;
-	memmap[1].end = 0x100000 + ( extmem * 1024 );
+	memmap->regions[0].end = ( basemem * 1024 );
+	memmap->regions[1].start = 0x100000;
+	memmap->regions[1].end = 0x100000 + ( extmem * 1024 );
 }
