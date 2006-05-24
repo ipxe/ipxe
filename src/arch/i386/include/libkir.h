@@ -213,31 +213,32 @@ virt_to_user ( void * virtual ) {
 #define BASEMEM_PARAMETER_INIT BASEMEM_PARAMETER_INIT_LIBKIR
 #define BASEMEM_PARAMETER_DONE BASEMEM_PARAMETER_DONE_LIBKIR
 
+/* REAL_CODE: declare a fragment of code that executes in real mode */
+#define REAL_CODE( asm_code_str )	\
+	".code16\n\t"			\
+	"pushw %%gs\n\t"		\
+	"pushw %%fs\n\t"		\
+	"pushw %%es\n\t"		\
+	"pushw %%ds\n\t"		\
+	asm_code_str			\
+	"popw %%ds\n\t"			\
+	"popw %%es\n\t"			\
+	"popw %%fs\n\t"			\
+	"popw %%gs\n\t"			\
+	".code16gcc\n\t"
+
 /* REAL_EXEC: execute some inline assembly code in a way that matches
  * the interface of librm
  */
 #define OUT_CONSTRAINTS(...) __VA_ARGS__
 #define IN_CONSTRAINTS(...)  __VA_ARGS__
 #define CLOBBER(...) __VA_ARGS__
-#define REAL_EXEC( name, asm_code_str, num_out_constraints, out_constraints, \
-		   in_constraints, clobber )				     \
-	__asm__ __volatile__ (						     \
-		".code16\n\t"						     \
-		"pushw %%gs\n\t"					     \
-		"pushw %%fs\n\t"					     \
-		"pushw %%es\n\t"					     \
-		"pushw %%ds\n\t"					     \
-		"\n" #name ":\n\t"					     \
-		asm_code_str						     \
-		"popw %%ds\n\t"						     \
-		"popw %%es\n\t"						     \
-		"popw %%fs\n\t"						     \
-		"popw %%gs\n\t"						     \
-		".code16gcc\n\t"					     \
-		: out_constraints					     \
-		: in_constraints					     \
-		: clobber				   		     \
-		);
+#define REAL_EXEC( name, asm_code_str, num_out_constraints,		\
+		   out_constraints, in_constraints, clobber ) do {	\
+	__asm__ __volatile__ (						\
+		REAL_CODE ( asm_code_str )				\
+		: out_constraints : in_constraints : clobber );		\
+	} while ( 0 )
 
 #endif /* ASSEMBLY */
 

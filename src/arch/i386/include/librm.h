@@ -177,6 +177,20 @@ extern void remove_from_rm_stack ( void *data, size_t size );
 #define BASEMEM_PARAMETER_INIT BASEMEM_PARAMETER_INIT_LIBRM
 #define BASEMEM_PARAMETER_DONE BASEMEM_PARAMETER_DONE_LIBRM
 
+/* REAL_CODE: declare a fragment of code that executes in real mode */
+#define REAL_CODE( asm_code_str )			\
+	"pushl $1f\n\t"					\
+	"call real_call\n\t"				\
+	"addl $4, %%esp\n\t"				\
+	".section \".text16\", \"ax\", @progbits\n\t"	\
+	".code16\n\t"					\
+	".arch i386\n\t"				\
+	"\n1:\n\t"					\
+	asm_code_str "\n\t"				\
+	"ret\n\t"					\
+	".code32\n\t"					\
+	".previous\n\t"
+
 /* REAL_EXEC: execute a fragment of code in real mode */
 #define OUT_CONSTRAINTS(...) __VA_ARGS__
 #define IN_CONSTRAINTS(...) __VA_ARGS__
@@ -184,18 +198,7 @@ extern void remove_from_rm_stack ( void *data, size_t size );
 #define REAL_EXEC( name, asm_code_str, num_out_constraints,		\
 		   out_constraints, in_constraints, clobber ) do {	\
 	__asm__ __volatile__ (						\
-		".section \".text16\", \"ax\", @progbits\n\t"		\
-		".code16\n\t"						\
-		".arch i386\n\t"					\
-		#name ":\n\t"						\
-		asm_code_str "\n\t"					\
-		"ret\n\t"						\
-		".size " #name ", . - " #name "\n\t"			\
-		".code32\n\t"						\
-		".previous\n\t"						\
-		"pushl $" #name "\n\t"					\
-		"call real_call\n\t"					\
-		"addl $4, %%esp\n\t"					\
+		REAL_CODE ( asm_code_str )				\
 		: out_constraints : in_constraints : clobber );		\
 	} while ( 0 )
 
