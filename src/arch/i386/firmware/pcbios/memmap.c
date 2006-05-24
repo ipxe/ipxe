@@ -76,6 +76,7 @@ static unsigned int extmemsize_e801 ( void ) {
 	unsigned int extmem;
 
 	REAL_EXEC ( rm_mem_e801,
+		    "stc\n\t"
 		    "int $0x15\n\t"
 		    "pushfw\n\t"
 		    "popw %w0\n\t",
@@ -111,10 +112,8 @@ static unsigned int extmemsize_88 ( void ) {
 	uint16_t extmem;
 
 	REAL_EXEC ( rm_mem_88,
-		    "int $0x15\n\t"
-		    "jnc 1f\n\t"
-		    "xorw %%ax, %%ax\n\t"
-		    "\n1:\n\t",
+		    /* Ignore CF; it is not reliable for this call */
+		    "int $0x15\n\t",
 		    1,
 		    OUT_CONSTRAINTS ( "=a" ( extmem ) ),
 		    IN_CONSTRAINTS ( "a" ( 0x8800 ) ),
@@ -155,6 +154,7 @@ static int meme820 ( struct memory_region *memmap, unsigned int entries ) {
 
 	do {
 		REAL_EXEC ( rm_mem_e820,
+			    "stc\n\t"
 			    "int $0x15\n\t"
 			    "pushfw\n\t"
 			    "popw %w0\n\t",
