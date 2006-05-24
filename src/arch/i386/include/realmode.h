@@ -113,15 +113,8 @@ typedef struct segoff segoff_t;
  */
 
 /*
- * REAL_CALL ( routine, num_out_constraints, out_constraints,
- *	       in_constraints, clobber )
  * REAL_EXEC ( name, asm_code_str, num_out_constraints, out_constraints,
  *	       in_constraints, clobber )
- *
- * If you have a pre-existing real-mode routine that you want to make
- * a far call to, use REAL_CALL.  If you have a code fragment that you
- * want to copy down to base memory, execute, and then remove, use
- * REAL_EXEC.
  *
  * out_constraints must be of the form OUT_CONSTRAINTS(constraints),
  * and in_constraints must be of the form IN_CONSTRAINTS(constraints),
