@@ -20,10 +20,26 @@
 #define __from_data16( variable ) variable
 #define __from_text16( variable ) variable
 
+/* Real-mode data and code segments */
+static inline __attribute__ (( always_inline )) unsigned int _rm_cs ( void ) {
+	uint16_t cs;
+	__asm__ __volatile__ ( "movw %%cs, %w0" : "=r" ( cs ) );
+	return cs;
+}
+
+static inline __attribute__ (( always_inline )) unsigned int _rm_ds ( void ) {
+	uint16_t ds;
+	__asm__ __volatile__ ( "movw %%ds, %w0" : "=r" ( ds ) );
+	return ds;
+}
+
+#define rm_cs ( _rm_cs() )
+#define rm_ds ( _rm_ds() )
+
 /* Copy to/from base memory */
 
 static inline void copy_to_real_libkir ( uint16_t dest_seg, uint16_t dest_off,
-					 void *src, size_t n ) {
+					 const void *src, size_t n ) {
 	__asm__ __volatile__ ( "movw %4, %%es\n\t"
 			       "cld\n\t"
 			       "rep movsb\n\t"
@@ -125,6 +141,69 @@ static inline void copy_from_real_libkir ( void *dest,
 #define put_real put_real_kir
 #define get_real get_real_kir
 
+/**
+ * A pointer to a user buffer
+ *
+ * This is actually a struct segoff, but encoded as a uint32_t to
+ * ensure that gcc passes it around efficiently.
+ */
+typedef uint32_t userptr_t;
+
+/**
+ * Copy data to user buffer
+ *
+ * @v buffer	User buffer
+ * @v offset	Offset within user buffer
+ * @v src	Source
+ * @v len	Length
+ */
+static inline __attribute__ (( always_inline )) void
+copy_to_user ( userptr_t buffer, off_t offset, const void *src, size_t len ) {
+	copy_to_real ( ( buffer >> 16 ), ( ( buffer & 0xffff ) + offset ),
+		       src, len );
+}
+
+/**
+ * Copy data from user buffer
+ *
+ * @v dest	Destination
+ * @v buffer	User buffer
+ * @v offset	Offset within user buffer
+ * @v len	Length
+ */
+static inline __attribute__ (( always_inline )) void
+copy_from_user ( void *dest, userptr_t buffer, off_t offset, size_t len ) {
+	copy_from_real ( dest, ( buffer >> 16 ),
+			 ( ( buffer & 0xffff ) + offset ), len );
+}
+
+/**
+ * Convert segment:offset address to user buffer
+ *
+ * @v segment	Real-mode segment
+ * @v offset	Real-mode offset
+ * @ret buffer	User buffer
+ */
+static inline __attribute__ (( always_inline )) userptr_t
+real_to_user ( unsigned int segment, unsigned int offset ) {
+	return ( ( segment << 16 ) | offset );
+}
+
+/**
+ * Convert virtual address to user buffer
+ *
+ * @v virtual	Virtual address
+ * @ret buffer	User buffer
+ *
+ * This constructs a user buffer from an ordinary pointer.  Use it
+ * when you need to pass a pointer to an internal buffer to a function
+ * that expects a @c userptr_t.
+ */
+static inline __attribute__ (( always_inline )) userptr_t
+virt_to_user ( void * virtual ) {
+	return real_to_user ( rm_ds, ( intptr_t ) virtual );
+}
+
 /* Place/remove parameter on real-mode stack in a way that's
  * compatible with libkir
  */
@@ -134,72 +213,12 @@ static inline void copy_from_real_libkir ( void *dest,
 #define BASEMEM_PARAMETER_INIT BASEMEM_PARAMETER_INIT_LIBKIR
 #define BASEMEM_PARAMETER_DONE BASEMEM_PARAMETER_DONE_LIBKIR
 
-/* REAL_FRAGMENT: Declare and define a real-mode code fragment in
- * .text16.  We don't need this for REAL_EXEC, since we can just
- * execute our real-mode code inline, but it's handy in case someone
- * genuinely wants to create a block of code that can be copied to a
- * specific location and then executed.
- *
- * Note that we put the code in the data segment, since otherwise we
- * can't (easily) access it in order to copy it to its target
- * location.  We should never be calling any REAL_FRAGMENT routines
- * directly anyway.
- */
-#define	REAL_FRAGMENT( name, asm_code_str )				\
-	extern void name ( void );					\
-	extern char name ## _size[];					\
-	__asm__ __volatile__ (						\
-		".section \".data.text16\"\n\t"				\
-		".code16\n\t"						\
-		".arch i386\n\t"					\
-		#name ":\n\t"						\
-		asm_code_str "\n\t"					\
-		"lret\n\t"						\
-		#name "_end:\n\t"					\
-		".equ " #name "_size, " #name "_end - " #name "\n\t"	\
-		".code16gcc\n\t"					\
-		".previous\n\t"						\
-		: :							\
-	)
-#define FRAGMENT_SIZE( fragment ) ( (size_t) fragment ## _size )
-
-/* REAL_CALL: call an external real-mode routine */
-#define OUT_CONSTRAINTS(...) __VA_ARGS__
-#define IN_CONSTRAINTS(...) "m" ( __routine ), ## __VA_ARGS__
-#define CLOBBER(...) __VA_ARGS__
-#define REAL_CALL( routine, num_out_constraints, out_constraints,	     \
-		   in_constraints, clobber )				     \
-	do {								     \
-		segoff_t __routine = routine;				     \
-		__asm__ __volatile__ (					     \
-			"pushl %" #num_out_constraints "\n\t"		     \
-			".code16\n\t"					     \
-			"pushw %%gs\n\t"	/* preserve segs */	     \
-			"pushw %%fs\n\t"				     \
-			"pushw %%es\n\t"				     \
-			"pushw %%ds\n\t"				     \
-			"pushw %%cs\n\t"	/* lcall to routine */	     \
-			"call 1f\n\t"					     \
-			"jmp 2f\n\t"					     \
-			"\n1:\n\t"					     \
-			"addr32 pushl 12(%%esp)\n\t"			     \
-			"lret\n\t"					     \
-			"\n2:\n\t"					     \
-			"popw %%ds\n\t"		/* restore segs */	     \
-			"popw %%es\n\t"					     \
-			"popw %%fs\n\t"					     \
-			"popw %%gs\n\t"					     \
-			"addw $4, %%sp\n\t"				     \
-			".code16gcc\n\t"				     \
-			: out_constraints : in_constraints : clobber  	     \
-		);							     \
-	} while ( 0 )
-
 /* REAL_EXEC: execute some inline assembly code in a way that matches
  * the interface of librm
  */
-
-#define IN_CONSTRAINTS_NO_ROUTINE( routine, ... ) __VA_ARGS__
+#define OUT_CONSTRAINTS(...) __VA_ARGS__
+#define IN_CONSTRAINTS(...)  __VA_ARGS__
+#define CLOBBER(...) __VA_ARGS__
 #define REAL_EXEC( name, asm_code_str, num_out_constraints, out_constraints, \
 		   in_constraints, clobber )				     \
 	__asm__ __volatile__ (						     \
@@ -216,7 +235,7 @@ static inline void copy_from_real_libkir ( void *dest,
 		"popw %%gs\n\t"						     \
 		".code16gcc\n\t"					     \
 		: out_constraints					     \
-		: IN_CONSTRAINTS_NO_ROUTINE ( in_constraints )		     \
+		: in_constraints					     \
 		: clobber				   		     \
 		);
 

@@ -177,9 +177,12 @@ extern void remove_from_rm_stack ( void *data, size_t size );
 #define BASEMEM_PARAMETER_INIT BASEMEM_PARAMETER_INIT_LIBRM
 #define BASEMEM_PARAMETER_DONE BASEMEM_PARAMETER_DONE_LIBRM
 
-/* REAL_FRAGMENT: Declare and define a real-mode code fragment in .text16 */
-#define	REAL_FRAGMENT( name, asm_code_str )				\
-	extern void name ( void );					\
+/* REAL_EXEC: execute a fragment of code in real mode */
+#define OUT_CONSTRAINTS(...) __VA_ARGS__
+#define IN_CONSTRAINTS(...) __VA_ARGS__
+#define CLOBBER(...) __VA_ARGS__
+#define REAL_EXEC( name, asm_code_str, num_out_constraints,		\
+		   out_constraints, in_constraints, clobber ) do {	\
 	__asm__ __volatile__ (						\
 		".section \".text16\", \"ax\", @progbits\n\t"		\
 		".code16\n\t"						\
@@ -190,38 +193,10 @@ extern void remove_from_rm_stack ( void *data, size_t size );
 		".size " #name ", . - " #name "\n\t"			\
 		".code32\n\t"						\
 		".previous\n\t"						\
-		: :							\
-	)
-#define FRAGMENT_SIZE( fragment ) ( (size_t) fragment ## _size )
-
-/* REAL_CALL: call a real-mode routine via librm */
-#define OUT_CONSTRAINTS(...) __VA_ARGS__
-#define IN_CONSTRAINTS(...) __VA_ARGS__
-#define CLOBBER(...) __VA_ARGS__
-#define REAL_CALL( routine, num_out_constraints, out_constraints,	\
-		   in_constraints, clobber )				\
-	do {								\
-		__asm__ __volatile__ (					\
-				      "pushl $" #routine "\n\t"		\
-				      "call real_call\n\t"		\
-				      "addl $4, %%esp\n\t"		\
-				      : out_constraints			\
-				      : in_constraints			\
-				      : clobber				\
-				      );				\
-	} while ( 0 )
-
-/* REAL_EXEC: combine RM_FRAGMENT and REAL_CALL into one handy unit */
-#define PASSTHRU(...) __VA_ARGS__
-#define REAL_EXEC( name, asm_code_str, num_out_constraints, out_constraints, \
-		   in_constraints, clobber )				     \
-	do {								     \
-		REAL_FRAGMENT ( name, asm_code_str );			     \
-									     \
-		REAL_CALL ( name, num_out_constraints,			     \
-			    PASSTHRU ( out_constraints ),		     \
-			    PASSTHRU ( in_constraints ),		     \
-			    PASSTHRU ( clobber ) );			     \
+		"pushl $" #name "\n\t"					\
+		"call real_call\n\t"					\
+		"addl $4, %%esp\n\t"					\
+		: out_constraints : in_constraints : clobber );		\
 	} while ( 0 )
 
 #endif /* ASSEMBLY */
