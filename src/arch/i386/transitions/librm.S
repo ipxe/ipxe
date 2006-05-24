@@ -421,7 +421,7 @@ prot_call:
  * callee to preserve.  Gate A20 will be re-enabled in case the
  * real-mode routine disabled it.
  *
- * librm.h defines a convenient macro REAL_EXEC() for using real_call.
+ * librm.h defines a convenient macro REAL_CODE() for using real_call.
  * See librm.h and realmode.h for details and examples.
  *
  * Parameters:

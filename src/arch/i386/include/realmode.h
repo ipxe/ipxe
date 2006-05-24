@@ -68,17 +68,16 @@ typedef struct segoff segoff_t;
  *
  * You should place variables in .data16 when they need to be accessed
  * by real-mode code.  Real-mode assembly (e.g. as created by
- * REAL_EXEC()) can access these variables via the usual data segment.
+ * REAL_CODE()) can access these variables via the usual data segment.
  * You can therefore write something like
  *
  *   static uint16_t __data16 ( foo );
  *   #define foo __use_data16 ( foo )
  *
  *   int bar ( void ) {
- *     REAL_EXEC ( baz,
- *                 "int $0xff\n\t"
- *                 "movw %ax, foo",
- *                 ... );
+ *     __asm__ __volatile__ ( REAL_CODE ( "int $0xff\n\t"
+ *                                        "movw %ax, foo" )
+ *                            : : );
  *     return foo;
  *   }
  *
@@ -113,33 +112,15 @@ typedef struct segoff segoff_t;
  */
 
 /*
- * REAL_EXEC ( name, asm_code_str, num_out_constraints, out_constraints,
- *	       in_constraints, clobber )
+ * REAL_CODE ( asm_code_str )
  *
- * out_constraints must be of the form OUT_CONSTRAINTS(constraints),
- * and in_constraints must be of the form IN_CONSTRAINTS(constraints),
- * where "constraints" is a constraints list as would be used in an
- * inline __asm__()
+ * This can be used in inline assembly to create a fragment of code
+ * that will execute in real mode.  For example: to write a character
+ * to the BIOS console using INT 10, you would do something like:
  *
- * clobber must be of the form CLOBBER ( clobber_list ), where
- * "clobber_list" is a clobber list as would be used in an inline
- * __asm__().
+ *     __asm__ __volatile__ ( REAL_CODE ( "int $0x16" )
+ *			      : "=a" ( character ) : "a" ( 0x0000 ) );
  *
- * These are best illustrated by example.  To write a character to the
- * console using INT 10, you would do something like:
- *
- *	REAL_EXEC ( rm_test_librm,
- *		    "int $0x10",
- *		    1,
- *		    OUT_CONSTRAINTS ( "=a" ( discard ) ),
- *		    IN_CONSTRAINTS ( "a" ( 0x0e00 + character ),
- *				     "b" ( 1 ) ),
- *		    CLOBBER ( "ebx", "ecx", "edx", "ebp", "esi", "edi" ) );
- *
- * IMPORTANT: gcc does not automatically assume that input operands
- * get clobbered.  The only way to specify that an input operand may
- * be modified is to also specify it as an output operand; hence the
- * "(discard)" in the above code.
  */
 
 #endif /* ASSEMBLY */

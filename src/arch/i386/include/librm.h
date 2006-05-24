@@ -191,17 +191,6 @@ extern void remove_from_rm_stack ( void *data, size_t size );
 	".code32\n\t"					\
 	".previous\n\t"
 
-/* REAL_EXEC: execute a fragment of code in real mode */
-#define OUT_CONSTRAINTS(...) __VA_ARGS__
-#define IN_CONSTRAINTS(...) __VA_ARGS__
-#define CLOBBER(...) __VA_ARGS__
-#define REAL_EXEC( name, asm_code_str, num_out_constraints,		\
-		   out_constraints, in_constraints, clobber ) do {	\
-	__asm__ __volatile__ (						\
-		REAL_CODE ( asm_code_str )				\
-		: out_constraints : in_constraints : clobber );		\
-	} while ( 0 )
-
 #endif /* ASSEMBLY */
 
 #endif /* LIBRM_H */
