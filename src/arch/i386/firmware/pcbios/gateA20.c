@@ -50,26 +50,23 @@ static void empty_8042 ( void )
  */
 void gateA20_set ( void ) {
 	static char reentry_guard = 0;
-	uint16_t flags, status;
+	unsigned int discard_a;
+	unsigned int flags;
 
 	if ( reentry_guard )
 		return;
 	reentry_guard = 1;
 
-	REAL_EXEC ( rm_enableA20,
-		    "sti\n\t"
-		    "stc\n\t"
-		    "int $0x15\n\t"
-		    "pushfw\n\t"
-		    "popw %%bx\n\t"
-		    "cli\n\t",
-		    2,
-		    OUT_CONSTRAINTS ( "=a" ( status ), "=b" ( flags ) ),
-		    IN_CONSTRAINTS ( "a" ( Enable_A20 ) ),
-		    CLOBBER ( "ecx", "edx", "ebp", "esi", "edi" ) );
+	__asm__ __volatile__ ( REAL_CODE ( "sti\n\t"
+					   "stc\n\t"
+					   "int $0x15\n\t"
+					   "pushfw\n\t"
+					   "popw %w0\n\t"
+					   "cli\n\t" )
+			       : "=r" ( flags ), "=a" ( discard_a )
+			       : "a" ( Enable_A20 ) );
 
-	if ( ( flags & CF ) ||
-	     ( ( status >> 8 ) & 0xff ) ) {
+	if ( flags & CF ) {
 		/* INT 15 method failed, try alternatives */
 #ifdef	IBM_L40
 		outb(0x2, 0x92);
