@@ -216,15 +216,7 @@ virt_to_user ( void * virtual ) {
 /* REAL_CODE: declare a fragment of code that executes in real mode */
 #define REAL_CODE( asm_code_str )	\
 	".code16\n\t"			\
-	"pushw %%gs\n\t"		\
-	"pushw %%fs\n\t"		\
-	"pushw %%es\n\t"		\
-	"pushw %%ds\n\t"		\
 	asm_code_str "\n\t"		\
-	"popw %%ds\n\t"			\
-	"popw %%es\n\t"			\
-	"popw %%fs\n\t"			\
-	"popw %%gs\n\t"			\
 	".code16gcc\n\t"
 
 #endif /* ASSEMBLY */
