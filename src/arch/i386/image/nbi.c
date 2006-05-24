@@ -6,6 +6,9 @@
 #include "etherboot.h"
 #include "errno.h"
 
+#warning "This file is obsolete"
+#if 0
+
 /** @file
  *
  * NBI image format.
@@ -410,3 +413,5 @@ struct image nbi_image __image = {
 	.load	= nbi_load,
 	.boot	= nbi_boot,
 };
+
+#endif
