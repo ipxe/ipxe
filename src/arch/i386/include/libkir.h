@@ -220,25 +220,12 @@ virt_to_user ( void * virtual ) {
 	"pushw %%fs\n\t"		\
 	"pushw %%es\n\t"		\
 	"pushw %%ds\n\t"		\
-	asm_code_str			\
+	asm_code_str "\n\t"		\
 	"popw %%ds\n\t"			\
 	"popw %%es\n\t"			\
 	"popw %%fs\n\t"			\
 	"popw %%gs\n\t"			\
 	".code16gcc\n\t"
-
-/* REAL_EXEC: execute some inline assembly code in a way that matches
- * the interface of librm
- */
-#define OUT_CONSTRAINTS(...) __VA_ARGS__
-#define IN_CONSTRAINTS(...)  __VA_ARGS__
-#define CLOBBER(...) __VA_ARGS__
-#define REAL_EXEC( name, asm_code_str, num_out_constraints,		\
-		   out_constraints, in_constraints, clobber ) do {	\
-	__asm__ __volatile__ (						\
-		REAL_CODE ( asm_code_str )				\
-		: out_constraints : in_constraints : clobber );		\
-	} while ( 0 )
 
 #endif /* ASSEMBLY */
 
