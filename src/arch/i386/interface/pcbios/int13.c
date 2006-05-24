@@ -503,25 +503,26 @@ void unregister_int13_drive ( struct int13_drive *drive ) {
  */
 int int13_boot ( unsigned int drive ) {
 	int status, signature;
-	int d0, d1;
+	int discard_c, discard_d;
 
 	DBG ( "Booting from INT 13 drive %02x\n", drive );
 
 	/* Use INT 13 to read the boot sector */
-	REAL_EXEC ( rm_int13_boot,
-		    "pushw $0\n\t"
-		    "popw %%es\n\t"
-		    "int $0x13\n\t"
-		    "jc 1f\n\t"
-		    "xorl %%eax, %%eax\n\t"
-		    "\n1:\n\t"
-		    "movzwl %%es:0x7dfe, %%ebx\n\t",
-		    4,
-		    OUT_CONSTRAINTS ( "=a" ( status ), "=b" ( signature ),
-				      "=c" ( d0 ), "=d" ( drive ) ),
-		    IN_CONSTRAINTS ( "0" ( 0x0201 ), "1" ( 0x7c00 ),
-				     "2" ( 0x0001 ), "3" ( drive ) ),
-		    CLOBBER ( "ebp" ) );
+	__asm__ __volatile__ ( REAL_CODE ( "pushw %%es\n\t"
+					   "pushw $0\n\t"
+					   "popw %%es\n\t"
+					   "stc\n\t"
+					   "int $0x13\n\t"
+					   "sti\n\t" /* BIOS bugs */
+					   "jc 1f\n\t"
+					   "xorl %%eax, %%eax\n\t"
+					   "\n1:\n\t"
+					   "movzwl %%es:0x7dfe, %%ebx\n\t"
+					   "popw %%es\n\t" )
+			       : "=a" ( status ), "=b" ( signature ),
+				 "=c" ( discard_c ), "=d" ( discard_d )
+			       : "a" ( 0x0201 ), "b" ( 0x7c00 ),
+				 "c" ( 1 ), "d" ( drive ) );
 	if ( status )
 		return -EIO;
 
@@ -539,22 +540,28 @@ int int13_boot ( unsigned int drive ) {
 			      &int19_vector );
 
 	/* Boot the loaded sector */
-	REAL_EXEC ( rm_int13_exec,
-		    "movw %%ss, %%ax\n\t" /* Preserve stack pointer */
-		    "movw %%ax, %%cs:int13_exec_saved_ss\n\t"
-		    "movw %%sp, %%cs:int13_exec_saved_sp\n\t"
-		    "ljmp $0, $0x7c00\n\t"
-		    "\nint13_exec_saved_ss: .word 0\n\t"
-		    "\nint13_exec_saved_sp: .word 0\n\t"
-		    "\nint13_exec_fail:\n\t"
-		    "movw %%cs:int13_exec_saved_ss, %%ax\n\t"
-		    "movw %%ax, %%ss\n\t"
-		    "movw %%cs:int13_exec_saved_sp, %%sp\n\t"
-		    "\n99:\n\t",
-		    1,
-		    OUT_CONSTRAINTS ( "=d" ( d1 ) ),
-		    IN_CONSTRAINTS ( "0" ( drive ) ),
-		    CLOBBER ( "eax", "ebx", "ecx", "esi", "edi", "ebp" ) );
+	__asm__ __volatile__ ( REAL_CODE ( /* Save segment registers */
+					   "pushw %%ds\n\t"
+					   "pushw %%es\n\t"
+					   "pushw %%fs\n\t"
+					   "pushw %%gs\n\t"
+					   /* Save stack pointer */
+					   "movw %%ss, %%ax\n\t"
+					   "movw %%ax, %%cs:int13_saved_ss\n\t"
+					   "movw %%sp, %%cs:int13_saved_sp\n\t"
+					   "ljmp $0, $0x7c00\n\t"
+					   "\nint13_saved_ss: .word 0\n\t"
+					   "\nint13_saved_sp: .word 0\n\t"
+					   "\nint13_exec_fail:\n\t"
+					   "movw %%cs:int13_saved_ss, %%ax\n\t"
+					   "movw %%ax, %%ss\n\t"
+					   "movw %%cs:int13_saved_sp, %%sp\n\t"
+					   "popw %%gs\n\t"
+					   "popw %%fs\n\t"
+					   "popw %%es\n\t"
+					   "popw %%ds\n\t" )
+			       : "=d" ( discard_d ) : "d" ( drive )
+			       : "eax", "ebx", "ecx", "esi", "edi", "ebp" );
 
 	DBG ( "Booted disk returned via INT 18 or 19\n" );
 
