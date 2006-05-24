@@ -33,20 +33,20 @@
  * @ret max_bus		Maximum bus number
  */
 int pcibios_max_bus ( void ) {
-	int discard_a;
+	int discard_a, discard_D;
 	uint8_t max_bus;
 
-	REAL_EXEC ( rm_pcibios_check,
-		    "stc\n\t"
-		    "int $0x1a\n\t"
-		    "jnc 1f\n\t"
-		    "xorw %%cx, %%cx\n\t"
-		    "\n1:\n\t",
-		    2,
-		    OUT_CONSTRAINTS ( "=a" ( discard_a ), "=c" ( max_bus ) ),
-		    IN_CONSTRAINTS ( "a" ( PCIBIOS_INSTALLATION_CHECK >> 16 )),
-		    CLOBBER ( "ebx", "edx", "edi" ) );
-	
+	__asm__ __volatile__ ( REAL_CODE ( "stc\n\t"
+					   "int $0x1a\n\t"
+					   "jnc 1f\n\t"
+					   "xorw %%cx, %%cx\n\t"
+					   "\n1:\n\t" )
+			       : "=c" ( max_bus ), "=a" ( discard_a ),
+				 "=D" ( discard_D )
+			       : "a" ( PCIBIOS_INSTALLATION_CHECK >> 16 ),
+				 "D" ( 0 )
+			       : "ebx", "edx" );
+
 	return max_bus;
 }
 
@@ -62,22 +62,19 @@ int pcibios_read ( struct pci_device *pci, uint32_t command, uint32_t *value ){
 	int discard_b, discard_D;
 	int status;
 
-	REAL_EXEC ( rm_pcibios_read,
-		    "stc\n\t"
-		    "int $0x1a\n\t"
-		    "jnc 1f\n\t"
-		    "xorl %%eax, %%eax\n\t"
-		    "decl %%eax\n\t"
-		    "movl %%eax, %%ecx\n\t"
-		    "\n1:\n\t",
-		    4,
-		    OUT_CONSTRAINTS ( "=a" ( status ), "=b" ( discard_b ),
-				      "=c" ( *value ), "=D" ( discard_D ) ),
-		    IN_CONSTRAINTS ( "a" ( command >> 16 ),
-				     "b" ( ( pci->bus << 8 ) | pci->devfn ),
-				     "D" ( command ) ),
-		    CLOBBER ( "edx" ) );
-	
+	__asm__ __volatile__ ( REAL_CODE ( "stc\n\t"
+					   "int $0x1a\n\t"
+					   "jnc 1f\n\t"
+					   "xorl %%eax, %%eax\n\t"
+					   "decl %%eax\n\t"
+					   "movl %%eax, %%ecx\n\t"
+					   "\n1:\n\t" )
+			       : "=a" ( status ), "=b" ( discard_b ),
+				 "=c" ( *value ), "=D" ( discard_D )
+			       : "a" ( command >> 16 ), "D" ( command ),
+				 "b" ( ( pci->bus << 8 ) | pci->devfn )
+			       : "edx" );
+
 	return ( ( status >> 8 ) & 0xff );
 }
 
@@ -93,19 +90,17 @@ int pcibios_write ( struct pci_device *pci, uint32_t command, uint32_t value ){
 	int discard_b, discard_c, discard_D;
 	int status;
 
-	REAL_EXEC ( rm_pcibios_write,
-		    "stc\n\t"
-		    "int $0x1a\n\t"
-		    "jnc 1f\n\t"
-		    "movb $0xff, %%ah\n\t"
-		    "\n1:\n\t",
-		    4,
-		    OUT_CONSTRAINTS ( "=a" ( status ), "=b" ( discard_b ),
-				      "=c" ( discard_c ), "=D" ( discard_D ) ),
-		    IN_CONSTRAINTS ( "a" ( command >> 16 ),
-				     "b" ( ( pci->bus << 8 ) | pci->devfn ),
-				     "c" ( value ), "D" ( command ) ),
-		    CLOBBER ( "edx" ) );
+	__asm__ __volatile__ ( REAL_CODE ( "stc\n\t"
+					   "int $0x1a\n\t"
+					   "jnc 1f\n\t"
+					   "movb $0xff, %%ah\n\t"
+					   "\n1:\n\t" )
+			       : "=a" ( status ), "=b" ( discard_b ),
+				 "=c" ( discard_c ), "=D" ( discard_D )
+			       : "a" ( command >> 16 ),	"D" ( command ),
+				 "b" ( ( pci->bus << 8 ) | pci->devfn ),
+				 "c" ( value )
+			       : "edx" );
 	
 	return ( ( status >> 8 ) & 0xff );
 }
