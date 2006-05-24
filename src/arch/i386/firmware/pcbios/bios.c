@@ -28,15 +28,10 @@ unsigned long currticks ( void ) {
 
 	/* Re-enable interrupts so that the timer interrupt can occur
 	 */
-	REAL_EXEC ( rm_currticks,
-		    "sti\n\t"
-		    "nop\n\t"
-		    "nop\n\t"
-		    "cli\n\t",
-		    0,
-		    OUT_CONSTRAINTS (),
-		    IN_CONSTRAINTS (),
-		    CLOBBER ( "eax" ) ); /* can't have an empty clobber list */
+	__asm__ __volatile__ ( REAL_CODE ( "sti\n\t"
+					   "nop\n\t"
+					   "nop\n\t"
+					   "cli\n\t" ) : : );
 
 	get_real ( ticks, BDA_SEG, 0x006c );
 	get_real ( midnight, BDA_SEG, 0x0070 );
@@ -54,12 +49,7 @@ unsigned long currticks ( void ) {
 CPU_NAP - Save power by halting the CPU until the next interrupt
 **************************************************************************/
 void cpu_nap ( void ) {
-	REAL_EXEC ( rm_cpu_nap,
-		    "sti\n\t"
-		    "hlt\n\t"
-		    "cli\n\t",
-		    0,
-		    OUT_CONSTRAINTS (),
-		    IN_CONSTRAINTS (),
-		    CLOBBER ( "eax" ) ); /* can't have an empty clobber list */
+	__asm__ __volatile__ ( REAL_CODE ( "sti\n\t"
+					   "hlt\n\t"
+					   "cli\n\t" ) : : );
 }
