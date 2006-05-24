@@ -3,6 +3,9 @@
 #include "disk.h"
 #include "bios_disks.h"
 
+#warning "This file is obsolete"
+#if 0
+
 #define CF ( 1 << 0 )
 #define BIOS_DISK_NONE 0
 
@@ -197,3 +200,5 @@ void bios_disk_fill_disk ( struct disk *disk __unused,
 			   struct bios_disk_device *bios_disk __unused ) {
 
 }
+
+#endif
