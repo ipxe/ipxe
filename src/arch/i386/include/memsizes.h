@@ -1,6 +1,8 @@
 #ifndef MEMSIZES_H
 #define MEMSIZES_H
 
+#warning "This header is no longer functional; use memmap.h instead"
+
 /*
  * These structures seem to be very i386 (and, in fact, PCBIOS)
  * specific, so I've moved them out of etherboot.h.
