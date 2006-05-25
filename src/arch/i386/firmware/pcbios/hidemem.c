@@ -73,8 +73,9 @@ void hide_etherboot ( void ) {
 	hidden_regions[TEXT].start = virt_to_phys ( _text );
 	hidden_regions[TEXT].end = virt_to_phys ( _end );
 
-	DBG ( "Hiding [%x,%x)\n", hidden_regions[TEXT].start,
-	      hidden_regions[TEXT].end );
+	DBG ( "Hiding [%lx,%lx)\n",
+	      ( unsigned long ) hidden_regions[TEXT].start,
+	      ( unsigned long ) hidden_regions[TEXT].end );
 
 	hook_bios_interrupt ( 0x15, ( unsigned int ) int15,
 			      &int15_vector );
