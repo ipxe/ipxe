@@ -35,16 +35,11 @@ struct init_fn {
 };
 
 /* Use double digits to avoid problems with "10" < "9" on alphabetic sort */
-#define	INIT_LIBRM	01
 #define	INIT_CONSOLE	02
 #define	INIT_CPU	03
 #define	INIT_TIMERS	04
-#define	INIT_PCIBIOS	05
-#define	INIT_MEMSIZES	06
-#define	INIT_RELOCATE	07
 #define	INIT_LOADBUF	08
 #define	INIT_PCMCIA	09
-#define	INIT_HEAP	10
 #define	INIT_RPC	11
 #define INIT_PROCESS	12
 
