@@ -137,15 +137,6 @@ REQUIRE_OBJECT ( pc_kbd );
 #endif
 
 /*
- * Drag in relocate.o if required
- *
- */
-
-#ifdef RELOCATE
-REQUIRE_OBJECT ( relocate );
-#endif
-
-/*
  * Drag in all requested protocols
  *
  */

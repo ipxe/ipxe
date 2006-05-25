@@ -118,7 +118,6 @@
  *
  */
 
-#define	RELOCATE		/* Relocate to high memory */
 #undef	BUILD_SERIAL		/* Include an automatic build serial
 				 * number.  Add "bs" to the list of
 				 * make targets.  For example:
