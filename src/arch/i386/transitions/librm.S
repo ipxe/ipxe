@@ -328,6 +328,15 @@ rm_ds:	.word 0
  * function explicitly overwrites values in ix86.  Interrupt status
  * and GDT will also be preserved.  Gate A20 will be enabled.
  *
+ * Note that prot_call() does not rely on the real-mode stack
+ * remaining intact in order to return, since everything relevant is
+ * copied to the protected-mode stack for the duration of the call.
+ * In particular, this means that a real-mode prefix can make a call
+ * to main() which will return correctly even if the prefix's stack
+ * gets vapourised during the Etherboot run.  (The prefix cannot rely
+ * on anything else on the stack being preserved, so should move any
+ * critical data to registers before calling main()).
+ *
  * Parameters:
  *   function : virtual address of protected-mode function to call
  *
