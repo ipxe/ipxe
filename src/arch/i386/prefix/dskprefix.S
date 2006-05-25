@@ -357,7 +357,8 @@ start_runtime:
 	.section ".text16", "awx", @progbits
 1:
 	pushl	$main
-	data32 call	prot_call
+	pushw	%cs
+	call	prot_call
 	popl	%eax /* discard */
 
 	/* Boot next device */

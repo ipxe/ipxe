@@ -21,6 +21,7 @@
 
 	.arch i386
 	.section ".prefix.lib", "awx", @progbits
+	.section ".data16", "aw", @progbits
 
 /****************************************************************************
  * install_block (real-mode near call)
@@ -165,6 +166,47 @@ install_basemem:
 	.size install_basemem, . - install_basemem
 
 /****************************************************************************
+ * install_highmem (flat real-mode near call)
+ *
+ * Install .text and .data into high memory
+ *
+ * Parameters:
+ *   %es:edi : address in high memory
+ * Returns:
+ *   none
+ * Corrupts:
+ *   none
+ ****************************************************************************
+ */
+
+#ifndef KEEP_IT_REAL
+
+	.section ".prefix.lib"
+	.code16
+install_highmem:
+	/* Preserve registers */
+	pushl	%esi
+	pushl	%edi
+	pushl	%ecx
+	pushl	%edx
+		
+	/* Install .text and .data to specified address */
+	movl	$_textdata_load_offset, %esi
+	movl	$_textdata_progbits_size, %ecx
+	movl	$_textdata_size, %edx
+	call	install_block
+
+	/* Restore registers and interrupt status */
+	popl	%edx
+	popl	%ecx
+	popl	%edi
+	popl	%esi
+	ret
+	.size install_highmem, . - install_highmem
+	
+#endif /* KEEP_IT_REAL */
+	
+/****************************************************************************
  * GDT for flat real mode
  *
  * We only ever use this GDT to set segment limits; the bases are
@@ -183,11 +225,6 @@ gdt_limit:		.word gdt_length - 1
 gdt_base:		.long 0
 			.word 0 /* padding */
 
-real_ds:	/* Genuine real mode data segment */
-	.equ	REAL_DS, real_ds - gdt
-	.word	0xffff, 0
-	.byte	0, 0x93, 0, 0
-
 flat_ds:	/* Flat real mode data segment */
 	.equ	FLAT_DS, flat_ds - gdt
 	.word	0xffff, 0
@@ -200,12 +237,12 @@ gdt_end:
 #endif /* KEEP_IT_REAL */
 
 /****************************************************************************
- * set_segment_limits (real-mode near call)
+ * flatten_real_mode (real-mode near call)
  *
- * Sets limits on the data segments %ds and %es.
+ * Sets 4GB limits on the data segments %ds and %es.
  *
  * Parameters: 
- *   %cx : Segment limit ($REAL_DS or $FLAT_DS)
+ *   none
  ****************************************************************************
  */
 
@@ -213,7 +250,7 @@ gdt_end:
 	
 	.section ".prefix.lib"
 	.code16
-set_segment_limits:
+flatten_real_mode:
 	/* Preserve real-mode segment values and temporary registers */
 	pushw	%es
 	pushw	%ds
@@ -227,12 +264,18 @@ set_segment_limits:
 	movl	%eax, %cs:gdt_base
 	lgdt	%cs:gdt
 
-	/* Switch to protected mode, set segment limits, switch back */
+	/* Switch to protected mode */
 	movl	%cr0, %eax
 	orb	$CR0_PE, %al
 	movl	%eax, %cr0
-	movw	%cx, %ds
-	movw	%cx, %es
+
+	/* Set flat segment limits */
+	movw	$FLAT_DS, %ax
+	movw	%ax, %ds
+	movw	%ax, %es
+
+	/* Switch back to real mode */
+	movl	%cr0, %eax
 	andb	$0!CR0_PE, %al
 	movl	%eax, %cr0
 
@@ -241,61 +284,7 @@ set_segment_limits:
 	popw	%ds
 	popw	%es
 	ret
-	.size set_segment_limits, . - set_segment_limits
-	
-#endif /* KEEP_IT_REAL */
-	
-/****************************************************************************
- * install_highmem (real-mode near call)
- *
- * Install .text and .data into high memory
- *
- * Parameters:
- *   %edi : physical address in high memory
- * Returns:
- *   none
- * Corrupts:
- *   none
- ****************************************************************************
- */
-
-#ifndef KEEP_IT_REAL
-
-	.section ".prefix.lib"
-	.code16
-install_highmem:
-	/* Preserve registers and interrupt status */
-	pushfl
-	pushl	%esi
-	pushl	%edi
-	pushl	%ecx
-	pushl	%edx
-		
-	/* Disable interrupts and flatten real mode */
-	cli
-	movw	$FLAT_DS, %cx
-	call	set_segment_limits
-
-	/* Install .text and .data to specified address */
-	xorw	%cx, %cx
-	movw	%cx, %es
-	movl	$_textdata_load_offset, %esi
-	movl	$_textdata_progbits_size, %ecx
-	movl	$_textdata_size, %edx
-	call	install_block
-
-	/* Unflatten real mode */
-	movw	$REAL_DS, %cx
-	call	set_segment_limits
-
-	/* Restore registers and interrupt status */
-	popl	%edx
-	popl	%ecx
-	popl	%edi
-	popl	%esi
-	popfl
-	ret
-	.size install_highmem, . - install_highmem
+	.size flatten_real_mode, . - flatten_real_mode
 	
 #endif /* KEEP_IT_REAL */
 	
@@ -329,32 +318,71 @@ install_prealloc:
 	call	install_basemem
 
 #ifndef KEEP_IT_REAL
+	/* Preserve registers and interrupt status, and disable interrupts */
+	pushfw
+	pushw	%ds
+	pushw	%es
+	pushl	%esi
+	pushl	%ecx
+	cli
+
+	/* Load up %ds and %es, and set up vectors for far calls to .text16 */
+	movw	%bx, %ds
+	xorw	%si, %si
+	movw	%si, %es
+	movw	%ax, (init_librm_vector+2)
+	movw	%ax, (prot_call_vector+2)
+	
 	/* Install .text and .data to 2MB mark.  Use 2MB to avoid
 	 * problems with A20.
 	 */
+	call	flatten_real_mode
 	movl	$(2<<20), %edi
 	call	install_highmem
 
-	/* Continue executing in .text16 segment */
-	movw	%bx, %ds
-	pushw	%cs
-	pushw	$2f
-	pushw	%ax
-	pushw	$1f
-	lret
-	.section ".text16", "awx", @progbits
-1:
-	/* Set up protected-mode GDT, call relocate(), reset GDT */
-	call	init_librm
+	/* Set up initial protected-mode GDT, call relocate().
+	 * relocate() will return with %esi, %edi and %ecx set up
+	 * ready for the copy to the new location.
+	 */
+	lcall	*init_librm_vector
 	pushl	$relocate
-	data32 call	prot_call
+	lcall	*prot_call_vector
 	addw	$4, %sp
-	call	init_librm
 
-	/* Return to executing in .prefix section */
-	lret
-	.section ".prefix.lib"
-2:
+	/* Move code to new location, set up new protected-mode GDT */
+	call	flatten_real_mode
+	pushl	%edi
+	es rep addr32 movsb
+	popl	%edi
+	lcall	*init_librm_vector
+	
+	/* Hide Etherboot from BIOS memory map.  Note that making this
+	 * protected-mode call will also restore normal (non-flat)
+	 * real mode, as part of the protected-to-real transition.
+	 */
+	pushl	$hide_etherboot
+	lcall	*prot_call_vector
+	addw	$4, %sp
+
+	/* Restore registers and interrupt status */
+	popl	%ecx
+	popl	%esi
+	popw	%es
+	popw	%ds
+	popfw
 #endif
 	ret
 	.size install_prealloc, . - install_prealloc
+
+#ifndef KEEP_IT_REAL
+	/* Vectors for far calls to .text16 functions */
+	.section ".data16"
+init_librm_vector:
+	.word init_librm
+	.word 0
+	.size init_librm_vector, . - init_librm_vector
+prot_call_vector:
+	.word prot_call
+	.word 0
+	.size prot_call_vector, . - prot_call_vector
+#endif

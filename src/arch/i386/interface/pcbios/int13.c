@@ -393,7 +393,8 @@ static void hook_int13 ( void ) {
 				"\nint13_wrapper:\n\t"
 				"orb $0, %%al\n\t" /* clear CF and OF */
 				"pushl %0\n\t" /* call int13() */
-				"data32 call prot_call\n\t"
+				"pushw %%cs\n\t"
+				"call prot_call\n\t"
 				"jo 1f\n\t" /* chain if OF not set */
 				"pushfw\n\t"
 				"lcall *%%cs:int13_vector\n\t"

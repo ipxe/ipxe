@@ -88,7 +88,7 @@ gdt_end:
 	.equ	gdt_length, gdt_end - gdt
 
 /****************************************************************************
- * init_librm (real-mode near call, 16-bit real-mode return address)
+ * init_librm (real-mode far call, 16-bit real-mode far return address)
  *
  * Initialise the GDT ready for transitions to protected mode.
  *
@@ -143,7 +143,7 @@ init_librm:
 	negl	%edi
 	popl	%ebx
 	popl	%eax
-	ret
+	lret
 
 	.section ".text16"
 	.code16
@@ -316,7 +316,7 @@ rm_cs:	.word 0
 rm_ds:	.word 0
 	
 /****************************************************************************
- * prot_call (real-mode near call, 32-bit real-mode return address)
+ * prot_call (real-mode far call, 16-bit real-mode far return address)
  *
  * Call a specific C function in the protected-mode code.  The
  * prototype of the C function must be
@@ -405,7 +405,7 @@ prot_call:
 				 * zeroes the high word of %esp, and interrupts
 				 * are still disabled at this point. */
 	popfl
-	data32 ret
+	lret
 
 /****************************************************************************
  * real_call (protected-mode near call, 32-bit virtual return address)
