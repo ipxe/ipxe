@@ -23,7 +23,10 @@ struct memory_region {
 
 /** A memory map */
 struct memory_map {
+	/** Memory regions */
 	struct memory_region regions[MAX_MEMORY_REGIONS];
+	/** Number of used regions */
+	unsigned int count;
 };
 
 extern void get_memmap ( struct memory_map *memmap );

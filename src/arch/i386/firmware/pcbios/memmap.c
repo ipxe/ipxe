@@ -138,7 +138,7 @@ static unsigned int extmemsize ( void ) {
  * @ret rc		Return status code
  */
 static int meme820 ( struct memory_map *memmap ) {
-	unsigned int index = 0;
+	struct memory_region *region = memmap->regions;
 	uint32_t next = 0;
 	uint32_t smap;
 	unsigned int flags;
@@ -169,12 +169,13 @@ static int meme820 ( struct memory_map *memmap ) {
 		if ( e820buf.type != E820_TYPE_RAM )
 			continue;
 
-		memmap->regions[index].start = e820buf.start;
-		memmap->regions[index].end = e820buf.start + e820buf.len;
-		index++;
+		region->start = e820buf.start;
+		region->end = e820buf.start + e820buf.len;
+		region++;
+		memmap->count++;
 	} while ( ( next != 0 ) && 
-		  ( index < ( sizeof ( memmap->regions ) /
-			      sizeof ( memmap->regions[0] ) ) ) );
+		  ( memmap->count < ( sizeof ( memmap->regions ) /
+				      sizeof ( memmap->regions[0] ) ) ) );
 	return 0;
 }
 
@@ -202,4 +203,5 @@ void get_memmap ( struct memory_map *memmap ) {
 	memmap->regions[0].end = ( basemem * 1024 );
 	memmap->regions[1].start = 0x100000;
 	memmap->regions[1].end = 0x100000 + ( extmem * 1024 );
+	memmap->count = 2;
 }
