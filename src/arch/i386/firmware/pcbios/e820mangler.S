@@ -238,7 +238,7 @@ patch_16m:
 	shrl	$16, %ebx
 	popfw
 	movw	%sp, %bp
-	movw	%bx, 24(%bp)
+	movw	%bx, 16(%bp)
 	popal
 	ret
 	.size patch_16m, . - patch_16m
