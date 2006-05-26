@@ -138,6 +138,7 @@ SRCDIRS		+= drivers/bus
 SRCDIRS		+= drivers/net
 SRCDIRS		+= drivers/block
 SRCDIRS		+= drivers/scsi
+SRCDIRS		+= drivers/nvs
 SRCDIRS		+= interface/pxe
 
 # NON_AUTO_SRCS lists files that are excluded from the normal
