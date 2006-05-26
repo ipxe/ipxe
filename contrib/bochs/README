@@ -34,7 +34,7 @@ To get bochs running is fairly simple:
 
 5.  As root, set up a TAP virtual network device:
       /sbin/modprobe tun
-      chmod o+r /dev/net/tun
+      chmod o+rw /dev/net/tun
       ./tunctl -u <username> -t tap0
       /sbin/ifconfig tap0 up 10.254.254.2 netmask 255.255.255.0
 
