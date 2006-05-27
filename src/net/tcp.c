@@ -184,6 +184,19 @@ static void tcp_periodic ( void ) {
 }
 
 /**
+ * Kick a connection into life
+ *
+ * @v conn	TCP connection
+ *
+ * Call this function when you have new data to send and are not
+ * already being called as part of TCP processing.
+ */
+void tcp_kick ( struct tcp_connection *conn __unused ) {
+	/* Just kick all the connections; this will work for now */
+	tcp_periodic();
+}
+
+/**
  * Single-step the TCP stack
  *
  * @v process	TCP process
