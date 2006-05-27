@@ -17,6 +17,10 @@
 /*********************************************************************/
 
 /*
+  27 May 2006	mcb30@users.sourceforge.net (Michael Brown)
+     Rewrote to use the new net driver API, the updated PCI API, and
+     the generic three-wire serial device support for EEPROM access.
+
   28 Dec 2002	ken_yap@users.sourceforge.net (Ken Yap)
      Put in virt_to_bus calls to allow Etherboot relocation.
 
@@ -62,26 +66,47 @@
 
 */
 
-#include "etherboot.h"
-#include "nic.h"
+#include <io.h>
+#include <errno.h>
+#include <vsprintf.h>
+#include <timer.h>
+#include <malloc.h>
+#include <byteswap.h>
 #include <gpxe/pci.h>
-#include "timer.h"
+#include <gpxe/if_ether.h>
+#include <gpxe/ethernet.h>
+#include <gpxe/pkbuff.h>
+#include <gpxe/netdevice.h>
+#include <gpxe/nvs/threewire.h>
 
-#define RTL_TIMEOUT (1*TICKS_PER_SEC)
+#define TX_RING_SIZE 4
 
-/* PCI Tuning Parameters
-   Threshold is bytes transferred to chip before transmission starts. */
-#define TX_FIFO_THRESH 256      /* In bytes, rounded down to 32 byte units. */
-#define RX_FIFO_THRESH  4       /* Rx buffer level before first PCI xfer.  */
-#define RX_DMA_BURST    4       /* Maximum PCI burst, '4' is 256 bytes */
-#define TX_DMA_BURST    4       /* Calculate as 16<<val. */
-#define NUM_TX_DESC     4       /* Number of Tx descriptor registers. */
-#define TX_BUF_SIZE	ETH_FRAME_LEN	/* FCS is added by the chip */
-#define RX_BUF_LEN_IDX 0	/* 0, 1, 2 is allowed - 8,16,32K rx buffer */
-#define RX_BUF_LEN (8192 << RX_BUF_LEN_IDX)
+struct rtl8139_tx {
+	unsigned int next;
+	struct pk_buff *pkb[TX_RING_SIZE];
+};
 
-#undef DEBUG_TX
-#undef DEBUG_RX
+struct rtl8139_rx {
+	void *ring;
+	unsigned int offset;
+};
+
+struct rtl8139_nic {
+	struct threewire eeprom;
+	unsigned short ioaddr;
+	struct rtl8139_tx tx;
+	struct rtl8139_rx rx;
+};
+
+/* Tuning Parameters */
+#define TX_FIFO_THRESH	256	/* In bytes, rounded down to 32 byte units. */
+#define RX_FIFO_THRESH	4	/* Rx buffer level before first PCI xfer.  */
+#define RX_DMA_BURST	4	/* Maximum PCI burst, '4' is 256 bytes */
+#define TX_DMA_BURST	4	/* Calculate as 16<<val. */
+#define TX_IPG		3	/* This is the only valid value */
+#define RX_BUF_LEN_IDX	0	/* 0, 1, 2 is allowed - 8,16,32K rx buffer */
+#define RX_BUF_LEN ( (8192 << RX_BUF_LEN_IDX) )
+#define RX_BUF_PAD 4
 
 /* Symbolic offsets to registers. */
 enum RTL8139_registers {
@@ -159,327 +184,300 @@ enum CSCRBits {
 	CSCR_LinkDownCmd=0x0f3c0,
 };
 
-/* Bits in RxConfig. */
-enum rx_mode_bits {
+enum RxConfigBits {
 	RxCfgWrap=0x80,
+	Eeprom9356=0x40,
 	AcceptErr=0x20, AcceptRunt=0x10, AcceptBroadcast=0x08,
 	AcceptMulticast=0x04, AcceptMyPhys=0x02, AcceptAllPhys=0x01,
 };
 
-static unsigned int cur_rx,cur_tx;
+/*  EEPROM access */
+#define EE_MODE_PROGRAM	0x80
+#define EE_MODE_NORMAL	0x00
+#define EE_CS		0x08	/* EEPROM chip select */
+#define EE_SK		0x04	/* EEPROM shift clock */
+#define EE_DI		0x02	/* Data in */
+#define EE_DO		0x01	/* Data out */
 
-/* The RTL8139 can only transmit from a contiguous, aligned memory block.  */
-struct {
-	unsigned char tx_buffer[TX_BUF_SIZE] __attribute__((aligned(4)));
-	unsigned char rx_ring[RX_BUF_LEN+16] __attribute__((aligned(4)));
-} rtl8139_bufs __shared;
-#define tx_buffer rtl8139_bufs.tx_buffer
-#define rx_ring rtl8139_bufs.rx_ring
+/* Offsets within EEPROM (these are word offsets) */
+#define EE_MAC 7
 
-static int rtl8139_probe(struct nic *nic,struct pci_device *pci);
-static int read_eeprom(struct nic *nic, int location, int addr_len);
-static void rtl_reset(struct nic *nic);
-static void rtl_transmit(struct nic *nic, const char *destaddr,
-	unsigned int type, unsigned int len, const char *data);
-static int rtl_poll(struct nic *nic, int retrieve);
-static void rtl_disable(struct nic *nic, struct pci_device *pci);
-static void rtl_irq(struct nic *nic, irq_action_t action);
-static struct nic_operations rtl_operations;
-static struct pci_driver rtl8139_driver;
+static inline struct rtl8139_nic * three_to_rtl ( struct threewire *three ) {
+	return container_of ( three, struct rtl8139_nic, eeprom );
+}
 
-static int rtl8139_probe ( struct nic *nic, struct pci_device *pci ) {
+static void rtl_setcs ( struct threewire *three, int cs ) {
+	struct rtl8139_nic *rtl = three_to_rtl ( three );
+	unsigned int eereg;
 
+	eereg = cs ? ( EE_MODE_PROGRAM | EE_CS ) : ( EE_MODE_NORMAL );
+	outb ( eereg, rtl->ioaddr + Cfg9346 );
+}
+
+static void rtl_setsk ( struct threewire *three, int sk ) {
+	struct rtl8139_nic *rtl = three_to_rtl ( three );
+	unsigned int eereg;
+
+	eereg = inb ( rtl->ioaddr + Cfg9346 );
+	eereg = ( eereg & ~EE_SK ) | ( sk ? EE_SK : 0 );
+	outb ( eereg, rtl->ioaddr + Cfg9346 );
+}
+
+static void rtl_setdi ( struct threewire *three, int di ) {
+	struct rtl8139_nic *rtl = three_to_rtl ( three );
+	unsigned int eereg;
+
+	eereg = inb ( rtl->ioaddr + Cfg9346 );
+	eereg = ( eereg & ~EE_DI ) | ( di ? EE_DI : 0 );
+	outb ( eereg, rtl->ioaddr + Cfg9346 );
+}
+
+static int rtl_getdo ( struct threewire *three ) {
+	struct rtl8139_nic *rtl = three_to_rtl ( three );
+	unsigned int eereg;
+
+	eereg = ( inb ( rtl->ioaddr + Cfg9346 ) & EE_DO );
+	return eereg;
+}
+
+static struct threewire_operations rtl_three_ops = {
+	.setcs = rtl_setcs,
+	.setsk = rtl_setsk,
+	.setdi = rtl_setdi,
+	.getdo = rtl_getdo,
+};
+
+/**
+ * Set up for EEPROM access
+ *
+ * @v rtl		RTL8139 NIC
+ */
+static void rtl_init_eeprom ( struct rtl8139_nic *rtl ) {
+	int ee9356;
+
+	ee9356 = ( inw ( rtl->ioaddr + RxConfig ) & Eeprom9356 );
+	DBG ( "EEPROM is an %s\n", ee9356 ? "AT93C56" : "AT93C46" );
+	rtl->eeprom.ops = &rtl_three_ops;
+	rtl->eeprom.adrsize =
+		( ee9356 ? AT93C56_ORG16_ADRSIZE : AT93C46_ORG16_ADRSIZE );
+	rtl->eeprom.datasize =
+		( ee9356 ? AT93C56_ORG16_DATASIZE : AT93C46_ORG16_DATASIZE );
+	rtl->eeprom.udelay = 1;
+}
+
+/**
+ * Read the MAC address
+ *
+ * @v rtl		RTL8139 NIC
+ * @v mac_addr		Buffer to contain MAC address (ETH_ALEN bytes)
+ */
+static void rtl_read_mac ( struct rtl8139_nic *rtl, uint8_t *mac_addr ) {
+	union {
+		uint16_t word;
+		uint8_t bytes[2];
+	} u;
 	int i;
-	int speed10, fullduplex;
-	int addr_len;
-	unsigned short *ap = (unsigned short*)nic->node_addr;
-
-	/* Copy ioaddr and IRQ from PCI information */
-	pci_fill_nic ( nic, pci );
-	nic->ioaddr = pci->ioaddr;
-	nic->irqno = pci->irq;
-
-	adjust_pci_device(pci);
-
-	/* Bring the chip out of low-power mode. */
-	outb(0x00, nic->ioaddr + Config1);
-
-	addr_len = read_eeprom(nic,0,8) == 0x8129 ? 8 : 6;
-	for (i = 0; i < 3; i++)
-	  *ap++ = read_eeprom(nic,i + 7,addr_len);
-
-	rtl_reset(nic);
-
-	speed10 = inb(nic->ioaddr + MediaStatus) & MSRSpeed10;
-	nic->mbps = speed10 ? 10 : 100;
-	fullduplex = inw(nic->ioaddr + MII_BMCR) & BMCRDuplex;
-	nic->duplex = fullduplex ? FULL_DUPLEX : HALF_DUPLEX;
-
-	nic->nic_op	= &rtl_operations;
-	return 1;
-}
-
-/* Serial EEPROM section. */
-
-/*  EEPROM_Ctrl bits. */
-#define EE_SHIFT_CLK    0x04    /* EEPROM shift clock. */
-#define EE_CS           0x08    /* EEPROM chip select. */
-#define EE_DATA_WRITE   0x02    /* EEPROM chip data in. */
-#define EE_WRITE_0      0x00
-#define EE_WRITE_1      0x02
-#define EE_DATA_READ    0x01    /* EEPROM chip data out. */
-#define EE_ENB          (0x80 | EE_CS)
-
-/*
-	Delay between EEPROM clock transitions.
-	No extra delay is needed with 33Mhz PCI, but 66Mhz may change this.
-*/
-
-#define eeprom_delay()  inl(ee_addr)
-
-/* The EEPROM commands include the alway-set leading bit. */
-#define EE_WRITE_CMD    (5)
-#define EE_READ_CMD     (6)
-#define EE_ERASE_CMD    (7)
-
-static int read_eeprom(struct nic *nic, int location, int addr_len)
-{
-	int i;
-	unsigned int retval = 0;
-	long ee_addr = nic->ioaddr + Cfg9346;
-	int read_cmd = location | (EE_READ_CMD << addr_len);
-
-	outb(EE_ENB & ~EE_CS, ee_addr);
-	outb(EE_ENB, ee_addr);
-	eeprom_delay();
-
-	/* Shift the read command bits out. */
-	for (i = 4 + addr_len; i >= 0; i--) {
-		int dataval = (read_cmd & (1 << i)) ? EE_DATA_WRITE : 0;
-		outb(EE_ENB | dataval, ee_addr);
-		eeprom_delay();
-		outb(EE_ENB | dataval | EE_SHIFT_CLK, ee_addr);
-		eeprom_delay();
-	}
-	outb(EE_ENB, ee_addr);
-	eeprom_delay();
-
-	for (i = 16; i > 0; i--) {
-		outb(EE_ENB | EE_SHIFT_CLK, ee_addr);
-		eeprom_delay();
-		retval = (retval << 1) | ((inb(ee_addr) & EE_DATA_READ) ? 1 : 0);
-		outb(EE_ENB, ee_addr);
-		eeprom_delay();
-	}
-
-	/* Terminate the EEPROM access. */
-	outb(~EE_CS, ee_addr);
-	eeprom_delay();
-	return retval;
-}
-
-static const unsigned int rtl8139_rx_config = 
-	(RX_BUF_LEN_IDX << 11) |
-	(RX_FIFO_THRESH << 13) |
-	(RX_DMA_BURST << 8);
 	
-static void set_rx_mode(struct nic *nic) {
-	unsigned int mc_filter[2];
-	int rx_mode;
-	/* !IFF_PROMISC */
-	rx_mode = AcceptBroadcast | AcceptMulticast | AcceptMyPhys;
-	mc_filter[1] = mc_filter[0] = 0xffffffff;
-
-	outl(rtl8139_rx_config | rx_mode, nic->ioaddr + RxConfig);
-
-	outl(mc_filter[0], nic->ioaddr + MAR0 + 0);
-	outl(mc_filter[1], nic->ioaddr + MAR0 + 4);
-}
-
-static int rtl_connect ( struct nic *nic ) {
-	if (inb(nic->ioaddr + MediaStatus) & MSRLinkFail) {
-		printf("Cable not connected or other link failure\n");
-		return 0;
+	DBG ( "MAC address is " );
+	for ( i = 0 ; i < ( ETH_ALEN / 2 ) ; i++ ) {
+		u.word = cpu_to_le16 ( threewire_read ( &rtl->eeprom,
+							EE_MAC + i ) );
+		*mac_addr++ = u.bytes[0];
+		*mac_addr++ = u.bytes[1];
+		DBG ( "%02x%02x", u.bytes[0], u.bytes[1] );
 	}
-	return 1;
+	DBG ( "\n" );
 }
-	
-static void rtl_reset(struct nic* nic)
-{
+
+/**
+ * Reset NIC
+ *
+ * @v rtl		RTL8139 NIC
+ *
+ * Issues a hardware reset and waits for the reset to complete.
+ */
+static void rtl_reset ( struct rtl8139_nic *rtl ) {
+
+	/* Reset chip */
+	outb ( CmdReset, rtl->ioaddr + ChipCmd );
+	mdelay ( 10 );
+	rtl->tx.next = 0;
+	rtl->rx.offset = 0;
+}
+
+/**
+ * Open NIC
+ *
+ * @v netdev		Net device
+ * @ret rc		Return status code
+ */
+static int rtl_open ( struct net_device *netdev ) {
+	struct rtl8139_nic *rtl = netdev->priv;
 	int i;
 
-	outb(CmdReset, nic->ioaddr + ChipCmd);
+	/* Program the MAC address */
+	for ( i = 0 ; i < ETH_ALEN ; i++ )
+		outb ( netdev->ll_addr[i], rtl->ioaddr + MAC0 + i );
 
-	cur_rx = 0;
-	cur_tx = 0;
+	/* Set up RX ring */
+	rtl->rx.ring = malloc ( RX_BUF_LEN + RX_BUF_PAD );
+	if ( ! rtl->rx.ring )
+		return -ENOMEM;
+	outl ( virt_to_bus ( rtl->rx.ring ), rtl->ioaddr + RxBuf );
+	DBG ( "RX ring at %lx\n", virt_to_bus ( rtl->rx.ring ) );
 
-	/* Give the chip 10ms to finish the reset. */
-	load_timer2(10*TICKS_PER_MS);
-	while ((inb(nic->ioaddr + ChipCmd) & CmdReset) != 0 &&
-	       timer2_running())
-		/* wait */;
+	/* Enable TX and RX */
+	outb ( ( CmdRxEnb | CmdTxEnb ), rtl->ioaddr + ChipCmd );
+	outl ( ( ( RX_FIFO_THRESH << 13 ) | ( RX_BUF_LEN_IDX << 11 ) |
+		 ( RX_DMA_BURST << 8 ) | AcceptBroadcast | AcceptMulticast |
+		 AcceptMyPhys ), rtl->ioaddr + RxConfig );
+	outl ( 0xffffffffUL, rtl->ioaddr + MAR0 + 0 );
+	outl ( 0xffffffffUL, rtl->ioaddr + MAR0 + 4 );
+	outl ( ( ( TX_DMA_BURST << 8 ) | ( TX_IPG << 24 ) ),
+	       rtl->ioaddr + TxConfig );
 
-	for (i = 0; i < ETH_ALEN; i++)
-		outb(nic->node_addr[i], nic->ioaddr + MAC0 + i);
-
-	/* Must enable Tx/Rx before setting transfer thresholds! */
-	outb(CmdRxEnb | CmdTxEnb, nic->ioaddr + ChipCmd);
-	outl((RX_FIFO_THRESH<<13) | (RX_BUF_LEN_IDX<<11) | (RX_DMA_BURST<<8),
-		nic->ioaddr + RxConfig);	  /* accept no frames yet!  */
-	outl((TX_DMA_BURST<<8)|0x03000000, nic->ioaddr + TxConfig);
-
-	/* The Linux driver changes Config1 here to use a different LED pattern
-	 * for half duplex or full/autodetect duplex (for full/autodetect, the
-	 * outputs are TX/RX, Link10/100, FULL, while for half duplex it uses
-	 * TX/RX, Link100, Link10).  This is messy, because it doesn't match
-	 * the inscription on the mounting bracket.  It should not be changed
-	 * from the configuration EEPROM default, because the card manufacturer
-	 * should have set that to match the card.  */
-
-#ifdef	DEBUG_RX
-	printf("rx ring address is %X\n",(unsigned long)rx_ring);
-#endif
-	outl((unsigned long)virt_to_bus(rx_ring), nic->ioaddr + RxBuf);
-
-
-
-	/* If we add multicast support, the MAR0 register would have to be
-	 * initialized to 0xffffffffffffffff (two 32 bit accesses).  Etherboot
-	 * only needs broadcast (for ARP/RARP/BOOTP/DHCP) and unicast.  */
-
-	outb(CmdRxEnb | CmdTxEnb, nic->ioaddr + ChipCmd);
-	
-	outl(rtl8139_rx_config, nic->ioaddr + RxConfig);
-	
-	/* Start the chip's Tx and Rx process. */
-	outl(0, nic->ioaddr + RxMissed);
-
-	/* set_rx_mode */
-	set_rx_mode(nic);
-	
-	/* Disable all known interrupts by setting the interrupt mask. */
-	outw(0, nic->ioaddr + IntrMask);
+	return 0;
 }
 
-static void rtl_transmit(struct nic *nic, const char *destaddr,
-	unsigned int type, unsigned int len, const char *data)
-{
-	unsigned int status, to, nstype;
-	unsigned long txstatus;
+/**
+ * Close NIC
+ *
+ * @v netdev		Net device
+ */
+static void rtl_close ( struct net_device *netdev ) {
+	struct rtl8139_nic *rtl = netdev->priv;
+	int i;
 
-	/* nstype assignment moved up here to avoid gcc 3.0.3 compiler bug */
-	nstype = htons(type);
-	memcpy(tx_buffer, destaddr, ETH_ALEN);
-	memcpy(tx_buffer + ETH_ALEN, nic->node_addr, ETH_ALEN);
-	memcpy(tx_buffer + 2 * ETH_ALEN, &nstype, 2);
-	memcpy(tx_buffer + ETH_HLEN, data, len);
+	/* Reset the hardware to disable everything in one go */
+	rtl_reset ( rtl );
 
-	len += ETH_HLEN;
-#ifdef	DEBUG_TX
-	printf("sending %d bytes ethtype %hX\n", len, type);
-#endif
+	/* Free RX ring */
+	free ( rtl->rx.ring );
+	rtl->rx.ring = NULL;
 
-	/* Note: RTL8139 doesn't auto-pad, send minimum payload (another 4
-	 * bytes are sent automatically for the FCS, totalling to 64 bytes). */
-	while (len < ETH_ZLEN) {
-		tx_buffer[len++] = '\0';
-	}
-
-	outl((unsigned long)virt_to_bus(tx_buffer), nic->ioaddr + TxAddr0 + cur_tx*4);
-	outl(((TX_FIFO_THRESH<<11) & 0x003f0000) | len,
-		nic->ioaddr + TxStatus0 + cur_tx*4);
-
-	to = currticks() + RTL_TIMEOUT;
-
-	do {
-		status = inw(nic->ioaddr + IntrStatus);
-		/* Only acknlowledge interrupt sources we can properly handle
-		 * here - the RxOverflow/RxFIFOOver MUST be handled in the
-		 * rtl_poll() function.  */
-		outw(status & (TxOK | TxErr | PCIErr), nic->ioaddr + IntrStatus);
-		if ((status & (TxOK | TxErr | PCIErr)) != 0) break;
-	} while (currticks() < to);
-
-	txstatus = inl(nic->ioaddr+ TxStatus0 + cur_tx*4);
-
-	if (status & TxOK) {
-		cur_tx = (cur_tx + 1) % NUM_TX_DESC;
-#ifdef	DEBUG_TX
-		printf("tx done (%d ticks), status %hX txstatus %X\n",
-			to-currticks(), status, txstatus);
-#endif
-	} else {
-#ifdef	DEBUG_TX
-		printf("tx timeout/error (%d ticks), status %hX txstatus %X\n",
-			currticks()-to, status, txstatus);
-#endif
-		rtl_reset(nic);
+	/* Free any old TX buffers that hadn't yet completed */
+	for ( i = 0 ; i < TX_RING_SIZE ; i++ ) {
+		if ( rtl->tx.pkb[i] ) {
+			free_pkb ( rtl->tx.pkb[i] );
+			rtl->tx.pkb[i] = NULL;
+			DBG ( "TX id %d discarded\n", i );
+		}
 	}
 }
 
-static int rtl_poll(struct nic *nic, int retrieve)
-{
+/** 
+ * Transmit packet
+ *
+ * @v netdev	Network device
+ * @v pkb	Packet buffer
+ * @ret rc	Return status code
+ */
+static int rtl_transmit ( struct net_device *netdev, struct pk_buff *pkb ) {
+	struct rtl8139_nic *rtl = netdev->priv;
+	int align;
+	int pad_len;
+
+	/* Check for space in TX ring */
+	if ( rtl->tx.pkb[rtl->tx.next] != NULL ) {
+		printf ( "TX overflow\n" );
+		free_pkb ( pkb );
+		return -ENOBUFS;
+	}
+
+	/* Align packet data */
+	align = ( virt_to_bus ( pkb->data ) & 0x3 );
+	pkb_push ( pkb, align );
+	memmove ( pkb->data, pkb->data + align, pkb_len ( pkb ) - align );
+	pkb_unput ( pkb, align );
+
+	/* Pad to minimum packet length */
+	pad_len = ( ETH_ZLEN - pkb_len ( pkb ) );
+	if ( pad_len > 0 )
+		memset ( pkb_put ( pkb, pad_len ), 0, pad_len );
+
+	/* Add to TX ring */
+	DBG ( "TX id %d at %lx+%x\n", rtl->tx.next,
+	      virt_to_bus ( pkb->data ), pkb_len ( pkb ) );
+	rtl->tx.pkb[rtl->tx.next] = pkb;
+	outl ( virt_to_bus ( pkb->data ),
+	       rtl->ioaddr + TxAddr0 + 4 * rtl->tx.next );
+	outl ( ( ( ( TX_FIFO_THRESH & 0x7e0 ) << 11 ) | pkb_len ( pkb ) ),
+	       rtl->ioaddr + TxStatus0 + 4 * rtl->tx.next );
+	rtl->tx.next = ( rtl->tx.next + 1 ) % TX_RING_SIZE;
+
+	return 0;
+}
+
+/** 
+ * Poll for received packets
+ *
+ * @v netdev	Network device
+ */
+static void rtl_poll ( struct net_device *netdev ) {
+	struct rtl8139_nic *rtl = netdev->priv;
 	unsigned int status;
-	unsigned int ring_offs;
-	unsigned int rx_size, rx_status;
+	unsigned int tsad;
+	unsigned int rx_status;
+	unsigned int rx_len;
+	struct pk_buff *rx_pkb;
+	int wrapped_len;
+	int i;
 
-	if (inb(nic->ioaddr + ChipCmd) & RxBufEmpty) {
-		return 0;
+	/* Acknowledge interrupts */
+	status = inw ( rtl->ioaddr + IntrStatus );
+	if ( ! status )
+		return;
+	outw ( status, rtl->ioaddr + IntrStatus );
+
+	/* Handle TX completions */
+	tsad = inw ( rtl->ioaddr + TxSummary );
+	for ( i = 0 ; i < TX_RING_SIZE ; i++ ) {
+		if ( ( rtl->tx.pkb[i] != NULL ) && ( tsad & ( 1 << i ) ) ) {
+			DBG ( "TX id %d complete\n", i );
+			free_pkb ( rtl->tx.pkb[i] );
+			rtl->tx.pkb[i] = NULL;
+		}
 	}
 
-	/* There is a packet ready */
-	if ( ! retrieve ) return 1;
+	/* Handle received packets */
+	while ( ! ( inw ( rtl->ioaddr + ChipCmd ) & RxBufEmpty ) ) {
+		rx_status = * ( ( uint16_t * )
+				( rtl->rx.ring + rtl->rx.offset ) );
+		rx_len = * ( ( uint16_t * )
+			     ( rtl->rx.ring + rtl->rx.offset + 2 ) );
+		if ( rx_status & RxOK ) {
+			DBG ( "RX packet at offset %x+%x\n", rtl->rx.offset,
+			      rx_len );
 
-	status = inw(nic->ioaddr + IntrStatus);
-	/* See below for the rest of the interrupt acknowledges.  */
-	outw(status & ~(RxFIFOOver | RxOverflow | RxOK), nic->ioaddr + IntrStatus);
+			rx_pkb = alloc_pkb ( rx_len );
+			if ( ! rx_pkb ) {
+				/* Leave packet for next call to poll() */
+				break;
+			}
 
-#ifdef	DEBUG_RX
-	printf("rtl_poll: int %hX ", status);
-#endif
+			wrapped_len = ( ( rtl->rx.offset + 4 + rx_len )
+					- RX_BUF_LEN );
+			if ( wrapped_len < 0 )
+				wrapped_len = 0;
 
-	ring_offs = cur_rx % RX_BUF_LEN;
-	rx_status = *(unsigned int*)(rx_ring + ring_offs);
-	rx_size = rx_status >> 16;
-	rx_status &= 0xffff;
+			memcpy ( pkb_put ( rx_pkb, rx_len - wrapped_len ),
+				 rtl->rx.ring + rtl->rx.offset + 4,
+				 rx_len - wrapped_len );
+			memcpy ( pkb_put ( rx_pkb, wrapped_len ),
+				 rtl->rx.ring, wrapped_len );
 
-	if ((rx_status & (RxBadSymbol|RxRunt|RxTooLong|RxCRCErr|RxBadAlign)) ||
-	    (rx_size < ETH_ZLEN) || (rx_size > ETH_FRAME_LEN + 4)) {
-		printf("rx error %hX\n", rx_status);
-		rtl_reset(nic);	/* this clears all interrupts still pending */
-		return 0;
+			netdev_rx ( netdev, rx_pkb );
+		} else {
+			DBG ( "RX bad packet (status %#04x len %d)\n",
+			      rx_status, rx_len );
+		}
+		rtl->rx.offset = ( ( ( rtl->rx.offset + 4 + rx_len + 3 ) & ~3 )
+				   % RX_BUF_LEN );
+		outw ( rtl->rx.offset - 16, rtl->ioaddr + RxBufPtr );
 	}
-
-	/* Received a good packet */
-	nic->packetlen = rx_size - 4;	/* no one cares about the FCS */
-	if (ring_offs+4+rx_size-4 > RX_BUF_LEN) {
-		int semi_count = RX_BUF_LEN - ring_offs - 4;
-
-		memcpy(nic->packet, rx_ring + ring_offs + 4, semi_count);
-		memcpy(nic->packet+semi_count, rx_ring, rx_size-4-semi_count);
-#ifdef	DEBUG_RX
-		printf("rx packet %d+%d bytes", semi_count,rx_size-4-semi_count);
-#endif
-	} else {
-		memcpy(nic->packet, rx_ring + ring_offs + 4, nic->packetlen);
-#ifdef	DEBUG_RX
-		printf("rx packet %d bytes", rx_size-4);
-#endif
-	}
-#ifdef	DEBUG_RX
-	printf(" at %X type %hhX%hhX rxstatus %hX\n",
-		(unsigned long)(rx_ring+ring_offs+4),
-		nic->packet[12], nic->packet[13], rx_status);
-#endif
-	cur_rx = (cur_rx + rx_size + 4 + 3) & ~3;
-	outw(cur_rx - 16, nic->ioaddr + RxBufPtr);
-	/* See RTL8139 Programming Guide V0.1 for the official handling of
-	 * Rx overflow situations.  The document itself contains basically no
-	 * usable information, except for a few exception handling rules.  */
-	outw(status & (RxFIFOOver | RxOverflow | RxOK), nic->ioaddr + IntrStatus);
-	return 1;
 }
 
+#if 0
 static void rtl_irq(struct nic *nic, irq_action_t action)
 {
 	unsigned int mask;
@@ -489,10 +487,10 @@ static void rtl_irq(struct nic *nic, irq_action_t action)
 	switch ( action ) {
 	case DISABLE :
 	case ENABLE :
-		mask = inw(nic->ioaddr + IntrMask);
+		mask = inw(rtl->ioaddr + IntrMask);
 		mask = mask & ~interested;
 		if ( action == ENABLE ) mask = mask | interested;
-		outw(mask, nic->ioaddr + IntrMask);
+		outw(mask, rtl->ioaddr + IntrMask);
 		break;
 	case FORCE :
 		/* Apparently writing a 1 to this read-only bit of a
@@ -501,32 +499,88 @@ static void rtl_irq(struct nic *nic, irq_action_t action)
 		 * not to write a datasheet, read the one for the
 		 * RTL8139...
 		 */
-		outb(EROK, nic->ioaddr + RxEarlyStatus);
+		outb(EROK, rtl->ioaddr + RxEarlyStatus);
 		break;
 	}
 }
+#endif
 
-static void rtl_disable ( struct nic *nic, struct pci_device *pci __unused ) {
-	nic_disable ( nic );
-	/* merge reset and disable */
-	rtl_reset(nic);
+/**
+ * Probe PCI device
+ *
+ * @v pci	PCI device
+ * @v id	PCI ID
+ * @ret rc	Return status code
+ */
+static int rtl_probe ( struct pci_device *pci,
+		       const struct pci_device_id *id __unused ) {
+	struct net_device *netdev;
+	struct rtl8139_nic *rtl = NULL;
+	int rc;
 
-	/* reset the chip */
-	outb(CmdReset, nic->ioaddr + ChipCmd);
+	/* Fix up PCI device */
+	adjust_pci_device ( pci );
 
-	/* 10 ms timeout */
-	load_timer2(10*TICKS_PER_MS);
-	while ((inb(nic->ioaddr + ChipCmd) & CmdReset) != 0 && timer2_running())
-		/* wait */;
+	/* Allocate net device */
+	netdev = alloc_etherdev ( sizeof ( *rtl ) );
+	if ( ! netdev ) {
+		rc = -ENOMEM;
+		goto err;
+	}
+	rtl = netdev->priv;
+	pci_set_drvdata ( pci, netdev );
+	memset ( rtl, 0, sizeof ( *rtl ) );
+	rtl->ioaddr = pci->ioaddr;
+
+	/* Reset the NIC, set up EEPROM access and read MAC address */
+	rtl_reset ( rtl );
+	rtl_init_eeprom ( rtl );
+	rtl_read_mac ( rtl, netdev->ll_addr );
+	
+	/* Point to NIC specific routines */
+	//	netdev->open	 = rtl_open;
+	//	netdev->close	 = rtl_close;
+	netdev->transmit = rtl_transmit;
+	netdev->poll	 = rtl_poll;
+
+	/* Register network device */
+	if ( ( rc = register_netdev ( netdev ) ) != 0 )
+		goto err;
+
+
+#warning "Hack alert"
+	rtl_open ( netdev );
+
+
+	return 0;
+
+ err:
+	/* Disable NIC */
+	if ( rtl )
+		rtl_reset ( rtl );
+	/* Free net device */
+	free_netdev ( netdev );
+	return rc;
 }
 
-static struct nic_operations rtl_operations = {
-	.connect	= rtl_connect,
-	.poll		= rtl_poll,
-	.transmit	= rtl_transmit,
-	.irq		= rtl_irq,
+/**
+ * Remove PCI device
+ *
+ * @v pci	PCI device
+ */
+static void rtl_remove ( struct pci_device *pci ) {
+	struct net_device *netdev = pci_get_drvdata ( pci );
+	struct rtl8139_nic *rtl = netdev->priv;
 
-};
+
+#warning "Hack alert"	
+	rtl_close ( netdev );
+
+
+	unregister_netdev ( netdev );
+	rtl_reset ( rtl );
+	free_netdev ( netdev );
+}
 
 static struct pci_device_id rtl8139_nics[] = {
 PCI_ROM(0x10ec, 0x8129, "rtl8129",       "Realtek 8129"),
@@ -545,7 +599,9 @@ PCI_ROM(0x14ea, 0xab07, "fnw3800tx",     "Planex FNW-3800-TX"),
 PCI_ROM(0xffff, 0x8139, "clone-rtl8139", "Cloned 8139"),
 };
 
-PCI_DRIVER ( rtl8139_driver, rtl8139_nics, PCI_NO_CLASS );
-
-DRIVER ( "RTL8139", nic_driver, pci_driver, rtl8139_driver,
-	 rtl8139_probe, rtl_disable );
+struct pci_driver rtl8139_driver __pci_driver = {
+	.ids = rtl8139_nics,
+	.id_count = ( sizeof ( rtl8139_nics ) / sizeof ( rtl8139_nics[0] ) ),
+	.probe = rtl_probe,
+	.remove = rtl_remove,
+};
