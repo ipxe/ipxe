@@ -1,5 +1,6 @@
 #include <string.h>
 #include <stdint.h>
+#include <errno.h>
 #include <byteswap.h>
 #include <vsprintf.h>
 #include <gpxe/in.h>
@@ -23,6 +24,8 @@
  * to uIP (which has a somewhat baroque API).
  *
  */
+
+struct net_protocol ipv4_protocol;
 
 /** An IPv4 routing table entry */
 struct ipv4_route {
@@ -156,16 +159,18 @@ static int ipv4_rx ( struct pk_buff *pkb ) {
 	 */
 	uip_len = pkb_len ( pkb );
 	memcpy ( uip_buf, pkb->data, uip_len );
+	free_pkb ( pkb );
 
 	/* Hand to uIP for processing */
 	uip_input ();
 	if ( uip_len > 0 ) {
-		pkb_empty ( pkb );
-		pkb_put ( pkb, uip_len );
-		memcpy ( pkb->data, uip_buf, uip_len );
+		pkb = alloc_pkb ( MAX_LL_HEADER_LEN + uip_len );
+		if ( ! pkb )
+			return -ENOMEM;
+		pkb->net_protocol = &ipv4_protocol;
+		pkb_reserve ( pkb, MAX_LL_HEADER_LEN );
+		memcpy ( pkb_put ( pkb, uip_len ), uip_buf, uip_len );
 		net_transmit ( pkb );
-	} else {
-		free_pkb ( pkb );
 	}
 	return 0;
 }
