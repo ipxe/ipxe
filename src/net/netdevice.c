@@ -294,7 +294,13 @@ int net_rx_process ( struct pk_buff *pkb ) {
  * @v process		Network stack process
  *
  * This polls all interfaces for any received packets, and processes
- * any packets that are received during this poll.
+ * at most one packet from the RX queue.
+ *
+ * We avoid processing all received packets, because processing the
+ * received packet can trigger transmission of a new packet (e.g. an
+ * ARP response).  Since TX completions will be processed as part of
+ * the poll operation, it is easy to overflow small TX queues if
+ * multiple packets are processed per poll.
  */
 static void net_step ( struct process *process ) {
 	struct pk_buff *pkb;
@@ -302,8 +308,8 @@ static void net_step ( struct process *process ) {
 	/* Poll for new packets */
 	net_poll();
 
-	/* Handle any received packets */
-	while ( ( pkb = net_rx_dequeue () ) ) {
+	/* Handle at most one received packet */
+	if ( ( pkb = net_rx_dequeue () ) ) {
 		net_rx_process ( pkb );
 		DBG ( "Processed received packet\n" );
 	}
