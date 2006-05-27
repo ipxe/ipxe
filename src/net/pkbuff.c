@@ -39,6 +39,10 @@ struct pk_buff * alloc_pkb ( size_t len ) {
 	struct pk_buff *pkb = NULL;
 	void *data;
 
+	/* Pad to minimum length */
+	if ( len < PKB_ZLEN )
+		len = PKB_ZLEN;
+
 	/* Align buffer length */
 	len = ( len + __alignof__( *pkb ) - 1 ) & ~( __alignof__( *pkb ) - 1 );
 	

@@ -28,6 +28,15 @@ struct ll_protocol;
  */
 #define PKBUFF_ALIGN 2048
 
+/**
+ * Minimum packet buffer length
+ *
+ * alloc_pkb() will round up the allocated length to this size if
+ * necessary.  This is used on behalf of hardware that is not capable
+ * of auto-padding.
+ */
+#define PKB_ZLEN 64
+
 /** A packet buffer
  *
  * This structure is used to represent a network packet within gPXE.
