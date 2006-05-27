@@ -77,7 +77,7 @@ void * alloc_memblock ( size_t size, size_t align ) {
 	 */
 	size = ( size + MIN_MEMBLOCK_SIZE - 1 ) & ~( MIN_MEMBLOCK_SIZE - 1 );
 	align_mask = ( align - 1 ) | ( MIN_MEMBLOCK_SIZE - 1 );
-	DBG ( "Allocating %zx (aligned %zx)\n", size, align );
+	DBG ( "Allocating %#zx (aligned %#zx)\n", size, align );
 
 	/* Search through blocks for the first one with enough space */
 	list_for_each_entry ( block, &free_blocks, list ) {
@@ -92,7 +92,7 @@ void * alloc_memblock ( size_t size, size_t align ) {
 			pre   = block;
 			block = ( ( ( void * ) pre   ) + pre_size );
 			post  = ( ( ( void * ) block ) + size     );
-			DBG ( "[%p,%p) ->  [%p,%p) + [%p,%p)\n", pre,
+			DBG ( "[%p,%p) -> [%p,%p) + [%p,%p)\n", pre,
 			      ( ( ( void * ) pre ) + pre->size ), pre, block,
 			      post, ( ( ( void * ) pre ) + pre->size ) );
 			/* If there is a "post" block, add it in to
@@ -124,7 +124,7 @@ void * alloc_memblock ( size_t size, size_t align ) {
 		}
 	}
 
-	DBG ( "Failed to allocate %zx (aligned %zx)\n", size, align );
+	DBG ( "Failed to allocate %#zx (aligned %#zx)\n", size, align );
 	return NULL;
 }
 
@@ -261,7 +261,7 @@ void mdumpfree ( void ) {
 
 	printf ( "Free block list:\n" );
 	list_for_each_entry ( block, &free_blocks, list ) {
-		printf ( "[%p,%p] (size %zx)\n", block,
+		printf ( "[%p,%p] (size %#zx)\n", block,
 			 ( ( ( void * ) block ) + block->size ), block->size );
 	}
 }
