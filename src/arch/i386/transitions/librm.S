@@ -409,10 +409,11 @@ prot_call:
 	popw	%fs
 	popw	%gs
 	popal
-	addr32 movl	-20(%esp), %esp /* -20(%sp) is not a valid 80386 expression.
-				 * -20(%esp) is safe because prot_to_real
-				 * zeroes the high word of %esp, and interrupts
-				 * are still disabled at this point. */
+	addr32 movl -20(%esp), %esp /* -20(%sp) is not a valid 80386
+				     * expression.  -20(%esp) is safe
+				     * because prot_to_real zeroes the
+				     * high word of %esp, and interrupts
+				     * are still disabled at this point. */
 	popfl
 	lret
 
