@@ -56,9 +56,9 @@ union ata_lba {
 		uint8_t low_prev;
 		uint8_t mid_prev;
 		uint8_t high_prev;
-		uint8_t pad[2];
+		uint16_t pad;
 #elif __BYTE_ORDER == __BIG_ENDIAN
-		uint8_t pad[2];
+		uint16_t pad;
 		uint8_t high_prev;
 		uint8_t mid_prev;
 		uint8_t low_prev;
@@ -101,21 +101,9 @@ struct ata_cb {
 	uint8_t device;
 	/** Command/status register */
 	uint8_t cmd_stat;
-	/** Flags
-	 *
-	 * This field does not correspond to any ATA register.
-	 */
-	uint8_t flags;
+	/** LBA48 addressing flag */
+	int lba48;
 };
-
-/** LBA48 extended addressing */
-#define ATA_FL_LBA48 0x40
-
-/** Device 1 ("slave") */
-#define ATA_FL_SLAVE 0x10
-
-/** Write command */
-#define ATA_FL_WRITE 0x01
 
 /** Obsolete bits in the ATA device register */
 #define ATA_DEV_OBSOLETE 0xa0
@@ -123,30 +111,45 @@ struct ata_cb {
 /** LBA flag in the ATA device register */
 #define ATA_DEV_LBA 0x40
 
+/** Slave ("device 1") flag in the ATA device register */
+#define ATA_DEV_SLAVE 0x10
+
+/** Master ("device 0") flag in the ATA device register */
+#define ATA_DEV_MASTER 0x00
+
 /** "Read sectors" command */
 #define ATA_CMD_READ 0x20
+
+/** "Read sectors (ext)" command */
+#define ATA_CMD_READ_EXT 0x24
 
 /** "Write sectors" command */
 #define ATA_CMD_WRITE 0x30
 
+/** "Write sectors (ext)" command */
+#define ATA_CMD_WRITE_EXT 0x34
+
 /** "Identify" command */
 #define ATA_CMD_IDENTIFY 0xec
-
-/** "Extended (LBA48)" command modifier
- *
- * This doesn't apply to all ATA commands, but it does for @c
- * ATA_CMD_READ and @c ATA_CMD_WRITE.
- */
-#define ATA_CMD_EXT 0x04
 
 /** An ATA command */
 struct ata_command {
 	/** ATA command block */
 	struct ata_cb cb;
-	/** Data buffer */
-	userptr_t data;
-	/** Data buffer length */
-	size_t data_len;
+	/** Data-out buffer (may be NULL) */
+	userptr_t data_out;
+	/** Data-out buffer length
+	 *
+	 * Must be zero if @c data_out is NULL
+	 */
+	size_t data_out_len;
+	/** Data-in buffer (may be NULL) */
+	userptr_t data_in;
+	/** Data-in buffer length
+	 *
+	 * Must be zero if @c data_in is NULL
+	 */
+	size_t data_in_len;
 };
 
 /**
@@ -175,8 +178,13 @@ struct ata_identity {
 struct ata_device {
 	/** Block device interface */
 	struct block_device blockdev;
-	/** Flags */
-	int flags;
+	/** Device number
+	 *
+	 * Must be ATA_DEV_MASTER or ATA_DEV_SLAVE.
+	 */
+	int device;
+	/** LBA48 extended addressing */
+	int lba48;
 	/**
 	 * Issue ATA command
 	 *

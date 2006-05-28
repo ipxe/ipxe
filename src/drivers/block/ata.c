@@ -51,39 +51,6 @@ ata_command ( struct ata_device *ata, struct ata_command *command ) {
 }
 
 /**
- * Read block from / write block to ATA device
- *
- * @v write		Write flag (ATA_FL_WRITE or 0)
- * @v blockdev		Block device
- * @v block		LBA block number
- * @v count		Block count
- * @v buffer		Data buffer
- * @ret rc		Return status code
- */
-static __attribute__ (( regparm ( 1 ) )) int
-ata_rw ( int write, struct block_device *blockdev, uint64_t block,
-	 unsigned long count, userptr_t buffer ) {
-	struct ata_device *ata = block_to_ata ( blockdev );
-	struct ata_command command;
-	int lba48 = ( ata->flags & ATA_FL_LBA48 );
-
-	memset ( &command, 0, sizeof ( command ) );
-	command.cb.lba.native = block;
-	command.cb.count.native = count;
-	command.cb.device = ( ata->flags | ATA_DEV_OBSOLETE | ATA_DEV_LBA );
-	command.cb.flags = ( ata->flags | write );
-	command.cb.cmd_stat = ( write ? ATA_CMD_WRITE : ATA_CMD_READ );
-	if ( lba48 ) {
-		command.cb.cmd_stat |= ATA_CMD_EXT;
-	} else {
-		command.cb.device |= command.cb.lba.bytes.low_prev;
-	}
-	command.data = buffer;
-	command.data_len = ( count * blockdev->blksize );
-	return ata_command ( ata, &command );
-}
-
-/**
  * Read block from ATA device
  *
  * @v blockdev		Block device
@@ -94,10 +61,20 @@ ata_rw ( int write, struct block_device *blockdev, uint64_t block,
  */
 static int ata_read ( struct block_device *blockdev, uint64_t block,
 		      unsigned long count, userptr_t buffer ) {
-	/* Pass through to ata_rw().  Since ata_rw is regparm(1), this
-	 * is extremely efficient; just a mov and a jmp.
-	 */
-	return ata_rw ( 0, blockdev, block, count, buffer );
+	struct ata_device *ata = block_to_ata ( blockdev );
+	struct ata_command command;
+
+	memset ( &command, 0, sizeof ( command ) );
+	command.cb.lba.native = block;
+	command.cb.count.native = count;
+	command.cb.device = ( ata->device | ATA_DEV_OBSOLETE | ATA_DEV_LBA );
+	command.cb.lba48 = ata->lba48;
+	if ( ! ata->lba48 )
+		command.cb.device |= command.cb.lba.bytes.low_prev;
+	command.cb.cmd_stat = ( ata->lba48 ? ATA_CMD_READ_EXT : ATA_CMD_READ );
+	command.data_in = buffer;
+	command.data_in_len = ( count * blockdev->blksize );
+	return ata_command ( ata, &command );
 }
 
 /**
@@ -111,10 +88,21 @@ static int ata_read ( struct block_device *blockdev, uint64_t block,
  */
 static int ata_write ( struct block_device *blockdev, uint64_t block,
 		       unsigned long count, userptr_t buffer ) {
-	/* Pass through to ata_rw().  Since ata_rw is regparm(1), this
-	 * is extremely efficient; just a mov and a jmp.
-	 */
-	return ata_rw ( ATA_FL_WRITE, blockdev, block, count, buffer );
+	struct ata_device *ata = block_to_ata ( blockdev );
+	struct ata_command command;
+	
+	memset ( &command, 0, sizeof ( command ) );
+	command.cb.lba.native = block;
+	command.cb.count.native = count;
+	command.cb.device = ( ata->device | ATA_DEV_OBSOLETE | ATA_DEV_LBA );
+	command.cb.lba48 = ata->lba48;
+	if ( ! ata->lba48 )
+		command.cb.device |= command.cb.lba.bytes.low_prev;
+	command.cb.cmd_stat = ( ata->lba48 ?
+				ATA_CMD_WRITE_EXT : ATA_CMD_WRITE );
+	command.data_out = buffer;
+	command.data_out_len = ( count * blockdev->blksize );
+	return ata_command ( ata, &command );
 }
 
 /**
@@ -131,17 +119,19 @@ static int ata_identify ( struct block_device *blockdev ) {
 
 	/* Issue IDENTIFY */
 	memset ( &command, 0, sizeof ( command ) );
-	command.cb.device = ( ata->flags | ATA_DEV_OBSOLETE | ATA_DEV_LBA );
+	command.cb.count.native = 1; /* n/a according to spec, but at least
+				      * AoE vblade devices require it. */
+	command.cb.device = ( ata->device | ATA_DEV_OBSOLETE | ATA_DEV_LBA );
 	command.cb.cmd_stat = ATA_CMD_IDENTIFY;
-	command.data = virt_to_user ( &identity );
-	command.data_len = sizeof ( identity );
+	command.data_in = virt_to_user ( &identity );
+	command.data_in_len = sizeof ( identity );
 	if ( ( rc = ata_command ( ata, &command ) ) != 0 )
 		return rc;
 
 	/* Fill in block device parameters */
 	blockdev->blksize = ATA_SECTOR_SIZE;
 	if ( identity.supports_lba48 & cpu_to_le16 ( ATA_SUPPORTS_LBA48 ) ) {
-		ata->flags |= ATA_FL_LBA48;
+		ata->lba48 = 1;
 		blockdev->blocks = le64_to_cpu ( identity.lba48_sectors );
 	} else {
 		blockdev->blocks = le32_to_cpu ( identity.lba_sectors );
