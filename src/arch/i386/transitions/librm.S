@@ -124,7 +124,7 @@ init_librm:
 	shll	$4, %eax
 	movw	$real_cs, %bx
 	call	set_seg_base
-	leal	(%eax, %edi), %ebx
+	addr32 leal	(%eax, %edi), %ebx
 	movl	%ebx, _text16
 
 	/* Store rm_ds and _data16, set up real_ds segment and set GDT base */
@@ -134,7 +134,7 @@ init_librm:
 	shll	$4, %eax
 	movw	$real_ds, %bx
 	call	set_seg_base
-	leal	(%eax, %edi), %ebx
+	addr32 leal	(%eax, %edi), %ebx
 	movl	%ebx, _data16
 	addl	$gdt, %eax
 	movl	%eax, gdt_base
@@ -409,7 +409,7 @@ prot_call:
 	popw	%fs
 	popw	%gs
 	popal
-	movl	-20(%esp), %esp /* -20(%sp) is not a valid 80386 expression.
+	addr32 movl	-20(%esp), %esp /* -20(%sp) is not a valid 80386 expression.
 				 * -20(%esp) is safe because prot_to_real
 				 * zeroes the high word of %esp, and interrupts
 				 * are still disabled at this point. */

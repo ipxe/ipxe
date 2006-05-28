@@ -54,7 +54,7 @@ install_block:
 	xorl	%esi, %esi
 
 	/* Calculate start and length of uninitialised data portion */
-	leal	(%edi,%ecx), %eax
+	addr32 leal	(%edi,%ecx), %eax
 	subl	%ecx, %edx
 	
 	/* Do the copy */
