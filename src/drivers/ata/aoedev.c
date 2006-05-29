@@ -37,7 +37,7 @@ static int aoe_command ( struct ata_device *ata,
 	struct aoe_device *aoedev
 		= container_of ( ata, struct aoe_device, ata );
 
-	return aoe_issue ( &aoedev->aoe, command );
+	return aoe_issue_split ( &aoedev->aoe, command );
 }
 
 /**

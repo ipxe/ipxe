@@ -117,6 +117,9 @@ struct ata_cb {
 /** Master ("device 0") flag in the ATA device register */
 #define ATA_DEV_MASTER 0x00
 
+/** Mask of non-LBA portion of device register */
+#define ATA_DEV_MASK 0xf0
+
 /** "Read sectors" command */
 #define ATA_CMD_READ 0x20
 

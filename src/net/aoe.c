@@ -84,7 +84,7 @@ static int aoe_send_command ( struct aoe_session *aoe ) {
 	aoecmd->cmd_stat = command->cb.cmd_stat;
 	aoecmd->lba.u64 = cpu_to_le64 ( command->cb.lba.native );
 	if ( ! command->cb.lba48 )
-		aoecmd->lba.bytes[3] |= command->cb.device;
+		aoecmd->lba.bytes[3] |= ( command->cb.device & ATA_DEV_MASK );
 
 	/* Fill data payload */
 	copy_from_user ( pkb_put ( pkb, command->data_out_len ),
@@ -244,8 +244,11 @@ void aoe_kick ( struct aoe_session *aoe ) {
  * Issue ATA command via an open AoE session
  *
  * @v aoe		AoE session
- * @v command		AoE command
+ * @v command		ATA command
  * @ret rc		Return status code
+ *
+ * The ATA command must fit within a single AoE frame (i.e. the sector
+ * count must not exceed AOE_MAX_COUNT).
  */
 int aoe_issue ( struct aoe_session *aoe, struct ata_command *command ) {
 	aoe->command = command;
@@ -258,4 +261,47 @@ int aoe_issue ( struct aoe_session *aoe, struct ata_command *command ) {
 	aoe->command = NULL;
 
 	return ( ( aoe->status & AOE_STATUS_ERR_MASK ) ? -EIO : 0 );
+}
+
+/**
+ * Issue ATA command via an open AoE session
+ *
+ * @v aoe		AoE session
+ * @v command		ATA command
+ * @ret rc		Return status code
+ *
+ * The ATA command will be split into several smaller ATA commands,
+ * each with a sector count no larger than AOE_MAX_COUNT.
+ */
+int aoe_issue_split ( struct aoe_session *aoe, struct ata_command *command ) {
+	struct ata_command subcommand;
+	unsigned int offset;
+	unsigned int count;
+	unsigned int data_len;
+	unsigned int status = 0;
+	int rc = 0;
+
+	/* Split ATA command into AoE-sized subcommands */
+	for ( offset = 0; offset < command->cb.count.native; offset += count ){
+		memcpy ( &subcommand, command, sizeof ( subcommand ) );
+		count = ( command->cb.count.native - offset );
+		if ( count > AOE_MAX_COUNT )
+			count = AOE_MAX_COUNT;
+		data_len = count * ATA_SECTOR_SIZE;
+		if ( subcommand.data_in_len )
+			subcommand.data_in_len = data_len;
+		if ( subcommand.data_out_len )
+			subcommand.data_out_len = data_len;
+		aoe->command_offset = ( offset * ATA_SECTOR_SIZE );
+		subcommand.cb.lba.native += offset;
+		subcommand.cb.count.native = count;
+		if ( ( rc = aoe_issue ( aoe, &subcommand ) ) != 0 )
+			goto done;
+		status |= subcommand.cb.cmd_stat;
+	}
+	command->cb.cmd_stat = status;
+
+ done:
+	aoe->command_offset = 0;
+	return rc;
 }
