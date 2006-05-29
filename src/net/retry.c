@@ -107,7 +107,7 @@ static void retry_step ( struct process *process ) {
 	unsigned long now = currticks();
 
 	list_for_each_entry_safe ( timer, tmp, &timers, list ) {
-		if ( timer->expiry >= now ) {
+		if ( timer->expiry <= now ) {
 			timer->retries++;
 			reload_timer ( timer );
 			timer->expired ( timer );
