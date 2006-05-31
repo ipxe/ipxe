@@ -139,20 +139,18 @@ struct ata_cb {
 struct ata_command {
 	/** ATA command block */
 	struct ata_cb cb;
-	/** Data-out buffer (may be NULL) */
+	/** Data-out buffer (may be NULL)
+	 *
+	 * If non-NULL, this buffer must be ata_command::cb::count
+	 * sectors in size.
+	 */
 	userptr_t data_out;
-	/** Data-out buffer length
+	/** Data-in buffer (may be NULL)
 	 *
-	 * Must be zero if @c data_out is NULL
+	 * If non-NULL, this buffer must be ata_command::cb::count
+	 * sectors in size.
 	 */
-	size_t data_out_len;
-	/** Data-in buffer (may be NULL) */
 	userptr_t data_in;
-	/** Data-in buffer length
-	 *
-	 * Must be zero if @c data_in is NULL
-	 */
-	size_t data_in_len;
 };
 
 /**

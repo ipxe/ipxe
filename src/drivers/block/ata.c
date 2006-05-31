@@ -18,6 +18,7 @@
 
 #include <stddef.h>
 #include <string.h>
+#include <assert.h>
 #include <byteswap.h>
 #include <gpxe/blockdev.h>
 #include <gpxe/ata.h>
@@ -73,7 +74,6 @@ static int ata_read ( struct block_device *blockdev, uint64_t block,
 		command.cb.device |= command.cb.lba.bytes.low_prev;
 	command.cb.cmd_stat = ( ata->lba48 ? ATA_CMD_READ_EXT : ATA_CMD_READ );
 	command.data_in = buffer;
-	command.data_in_len = ( count * blockdev->blksize );
 	return ata_command ( ata, &command );
 }
 
@@ -101,7 +101,6 @@ static int ata_write ( struct block_device *blockdev, uint64_t block,
 	command.cb.cmd_stat = ( ata->lba48 ?
 				ATA_CMD_WRITE_EXT : ATA_CMD_WRITE );
 	command.data_out = buffer;
-	command.data_out_len = ( count * blockdev->blksize );
 	return ata_command ( ata, &command );
 }
 
@@ -119,12 +118,12 @@ static int ata_identify ( struct block_device *blockdev ) {
 
 	/* Issue IDENTIFY */
 	memset ( &command, 0, sizeof ( command ) );
-	command.cb.count.native = 1; /* n/a according to spec, but at least
-				      * AoE vblade devices require it. */
+	command.cb.count.native = 1;
 	command.cb.device = ( ata->device | ATA_DEV_OBSOLETE | ATA_DEV_LBA );
 	command.cb.cmd_stat = ATA_CMD_IDENTIFY;
 	command.data_in = virt_to_user ( &identity );
-	command.data_in_len = sizeof ( identity );
+	linker_assert ( sizeof ( identity ) == ATA_SECTOR_SIZE,
+			__ata_identity_bad_size__ );
 	if ( ( rc = ata_command ( ata, &command ) ) != 0 )
 		return rc;
 

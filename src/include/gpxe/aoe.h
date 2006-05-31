@@ -10,6 +10,8 @@
 #include <stdint.h>
 #include <gpxe/list.h>
 #include <gpxe/if_ether.h>
+#include <gpxe/retry.h>
+#include <gpxe/async.h>
 #include <gpxe/ata.h>
 
 /** An AoE ATA command */
@@ -89,29 +91,31 @@ struct aoe_session {
 	/** Target MAC address */
 	uint8_t target[ETH_ALEN];
 
-	/** Tag for current command */
+	/** Tag for current AoE command */
 	uint32_t tag;
+
 	/** Current ATA command */
 	struct ata_command *command;
-	/** Status of the command */
-	int status;
+	/** Overall status of current ATA command */
+	unsigned int status;
 	/** Byte offset within command's data buffer */
 	unsigned int command_offset;
+	/** Asynchronous operation for this command */
+	struct async_operation aop;
+
+	/** Retransmission timer */
+	struct retry_timer timer;
 };
 
 #define AOE_STATUS_ERR_MASK	0x0f /**< Error portion of status code */ 
 #define AOE_STATUS_PENDING	0x80 /**< Command pending */
-#define AOE_STATUS_UNDERRUN	0x40 /**< Buffer overrun */
-#define AOE_STATUS_OVERRUN	0x20 /**< Buffer underrun */
 
 /** Maximum number of sectors per packet */
 #define AOE_MAX_COUNT 2
 
 extern void aoe_open ( struct aoe_session *aoe );
 extern void aoe_close ( struct aoe_session *aoe );
-extern int aoe_issue ( struct aoe_session *aoe, struct ata_command *command );
-extern int aoe_issue_split ( struct aoe_session *aoe,
-			     struct ata_command *command );
+extern void aoe_issue ( struct aoe_session *aoe, struct ata_command *command );
 
 /** An AoE device */
 struct aoe_device {

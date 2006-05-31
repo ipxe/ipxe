@@ -28,7 +28,7 @@
 #include <gpxe/uaccess.h>
 #include <gpxe/ata.h>
 #include <gpxe/netdevice.h>
-#include <gpxe/process.h>
+#include <gpxe/async.h>
 #include <gpxe/aoe.h>
 
 /** @file
@@ -41,6 +41,22 @@ struct net_protocol aoe_protocol;
 
 /** List of all AoE sessions */
 static LIST_HEAD ( aoe_sessions );
+
+/**
+ * Mark current AoE command complete
+ *
+ * @v aoe		AoE session
+ * @v rc		Return status code
+ */
+static void aoe_done ( struct aoe_session *aoe, int rc ) {
+
+	/* Record overall command status */
+	aoe->command->cb.cmd_stat = aoe->status;
+	aoe->command = NULL;
+
+	/* Mark async operation as complete */
+	async_done ( &aoe->aop, rc );
+}
 
 /**
  * Send AoE command
@@ -56,10 +72,18 @@ static int aoe_send_command ( struct aoe_session *aoe ) {
 	struct pk_buff *pkb;
 	struct aoehdr *aoehdr;
 	struct aoecmd *aoecmd;
+	unsigned int count;
+	unsigned int data_out_len;
+
+	/* Calculate count and data_out_len for this subcommand */
+	count = command->cb.count.native;
+	if ( count > AOE_MAX_COUNT )
+		count = AOE_MAX_COUNT;
+	data_out_len = ( command->data_out ? ( count * ATA_SECTOR_SIZE ) : 0 );
 
 	/* Create outgoing packet buffer */
 	pkb = alloc_pkb ( ETH_HLEN + sizeof ( *aoehdr ) + sizeof ( *aoecmd ) +
-			  command->data_out_len );
+			  data_out_len );
 	if ( ! pkb )
 		return -ENOMEM;
 	pkb->net_protocol = &aoe_protocol;
@@ -78,18 +102,17 @@ static int aoe_send_command ( struct aoe_session *aoe ) {
 	linker_assert ( AOE_FL_DEV_HEAD	== ATA_DEV_SLAVE, __fix_ata_h__ );
 	aoecmd->aflags = ( ( command->cb.lba48 ? AOE_FL_EXTENDED : 0 ) |
 			   ( command->cb.device & ATA_DEV_SLAVE ) |
-			   ( command->data_out_len ? AOE_FL_WRITE : 0 ) );
+			   ( data_out_len ? AOE_FL_WRITE : 0 ) );
 	aoecmd->err_feat = command->cb.err_feat.bytes.cur;
-	aoecmd->count = command->cb.count.bytes.cur;
+	aoecmd->count = count;
 	aoecmd->cmd_stat = command->cb.cmd_stat;
 	aoecmd->lba.u64 = cpu_to_le64 ( command->cb.lba.native );
 	if ( ! command->cb.lba48 )
 		aoecmd->lba.bytes[3] |= ( command->cb.device & ATA_DEV_MASK );
 
 	/* Fill data payload */
-	copy_from_user ( pkb_put ( pkb, command->data_out_len ),
-			 command->data_out, aoe->command_offset,
-			 command->data_out_len );
+	copy_from_user ( pkb_put ( pkb, data_out_len ), command->data_out,
+			 aoe->command_offset, data_out_len );
 
 	/* Send packet */
 	return net_transmit_via ( pkb, aoe->netdev );
@@ -106,33 +129,51 @@ static int aoe_rx_response ( struct aoe_session *aoe, struct aoehdr *aoehdr,
 			     unsigned int len ) {
 	struct aoecmd *aoecmd = aoehdr->arg.command;
 	struct ata_command *command = aoe->command;
-	unsigned int data_in_len;
+	unsigned int rx_data_len;
+	unsigned int count;
+	unsigned int data_len;
 	
 	/* Sanity check */
 	if ( len < ( sizeof ( *aoehdr ) + sizeof ( *aoecmd ) ) )
 		return -EINVAL;
+	rx_data_len = ( len - sizeof ( *aoehdr ) - sizeof ( *aoecmd ) );
 
-	/* Set overall status code */
-	aoe->status = ( ( aoehdr->ver_flags & AOE_FL_ERROR ) ?
-			aoehdr->error : 0 );
-
-	/* Copy ATA results */
-	command->cb.err_feat.bytes.cur = aoecmd->err_feat;
-	command->cb.count.bytes.cur = aoecmd->count;
-	command->cb.cmd_stat = aoecmd->cmd_stat;
-	command->cb.lba.native = le64_to_cpu ( aoecmd->lba.u64 );
-	command->cb.lba.bytes.pad = 0;
-	
-	/* Copy data payload */
-	data_in_len = ( len - sizeof ( *aoehdr ) - sizeof ( *aoecmd ) );
-	if ( data_in_len > command->data_in_len ) {
-		data_in_len = command->data_in_len;
-		aoe->status |= AOE_STATUS_OVERRUN;
-	} else if ( data_in_len < command->data_in_len ) {
-		aoe->status |= AOE_STATUS_UNDERRUN;
+	/* Check for fatal errors */
+	if ( aoehdr->ver_flags & AOE_FL_ERROR ) {
+		aoe_done ( aoe, -EIO );
+		return 0;
 	}
-	copy_to_user ( command->data_in, aoe->command_offset,
-		       aoecmd->data, data_in_len );
+
+	/* Calculate count and data_len for this subcommand */
+	count = command->cb.count.native;
+	if ( count > AOE_MAX_COUNT )
+		count = AOE_MAX_COUNT;
+	data_len = count * ATA_SECTOR_SIZE;
+
+	/* Merge into overall ATA status */
+	aoe->status |= aoecmd->cmd_stat;
+
+	/* Copy data payload */
+	if ( command->data_in ) {
+		if ( rx_data_len > data_len )
+			rx_data_len = data_len;
+		copy_to_user ( command->data_in, aoe->command_offset,
+			       aoecmd->data, rx_data_len );
+	}
+
+	/* Update ATA command and offset */
+	aoe->command_offset += data_len;
+	command->cb.lba.native += count;
+	command->cb.count.native -= count;
+
+	/* Check for operation complete */
+	if ( ! command->cb.count.native ) {
+		aoe_done ( aoe, 0 );
+		return 0;
+	}
+
+	/* Transmit next portion of request */
+	aoe_send_command ( aoe );
 
 	return 0;
 }
@@ -229,79 +270,18 @@ void aoe_close ( struct aoe_session *aoe ) {
 }
 
 /**
- * Kick an AoE session into life
- *
- * @v aoe		AoE session
- *
- * Transmits an AoE request.  Call this function to issue a new
- * command, or when a retransmission timer expires.
- */
-void aoe_kick ( struct aoe_session *aoe ) {
-	aoe_send_command ( aoe );
-}
-
-/**
  * Issue ATA command via an open AoE session
  *
  * @v aoe		AoE session
  * @v command		ATA command
- * @ret rc		Return status code
  *
- * The ATA command must fit within a single AoE frame (i.e. the sector
- * count must not exceed AOE_MAX_COUNT).
+ * Only one command may be issued concurrently per session.  This call
+ * is non-blocking; use async_wait() to wait for the command to
+ * complete.
  */
-int aoe_issue ( struct aoe_session *aoe, struct ata_command *command ) {
+void aoe_issue ( struct aoe_session *aoe, struct ata_command *command ) {
 	aoe->command = command;
-	aoe->status = AOE_STATUS_PENDING;
-
-	aoe_kick ( aoe );
-	while ( aoe->status & AOE_STATUS_PENDING ) {
-		step();
-	}
-	aoe->command = NULL;
-
-	return ( ( aoe->status & AOE_STATUS_ERR_MASK ) ? -EIO : 0 );
-}
-
-/**
- * Issue ATA command via an open AoE session
- *
- * @v aoe		AoE session
- * @v command		ATA command
- * @ret rc		Return status code
- *
- * The ATA command will be split into several smaller ATA commands,
- * each with a sector count no larger than AOE_MAX_COUNT.
- */
-int aoe_issue_split ( struct aoe_session *aoe, struct ata_command *command ) {
-	struct ata_command subcommand;
-	unsigned int offset;
-	unsigned int count;
-	unsigned int data_len;
-	unsigned int status = 0;
-	int rc = 0;
-
-	/* Split ATA command into AoE-sized subcommands */
-	for ( offset = 0; offset < command->cb.count.native; offset += count ){
-		memcpy ( &subcommand, command, sizeof ( subcommand ) );
-		count = ( command->cb.count.native - offset );
-		if ( count > AOE_MAX_COUNT )
-			count = AOE_MAX_COUNT;
-		data_len = count * ATA_SECTOR_SIZE;
-		if ( subcommand.data_in_len )
-			subcommand.data_in_len = data_len;
-		if ( subcommand.data_out_len )
-			subcommand.data_out_len = data_len;
-		aoe->command_offset = ( offset * ATA_SECTOR_SIZE );
-		subcommand.cb.lba.native += offset;
-		subcommand.cb.count.native = count;
-		if ( ( rc = aoe_issue ( aoe, &subcommand ) ) != 0 )
-			goto done;
-		status |= subcommand.cb.cmd_stat;
-	}
-	command->cb.cmd_stat = status;
-
- done:
+	aoe->status = 0;
 	aoe->command_offset = 0;
-	return rc;
+	aoe_send_command ( aoe );
 }
