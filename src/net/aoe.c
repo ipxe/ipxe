@@ -188,6 +188,7 @@ static int aoe_rx_response ( struct aoe_session *aoe, struct aoehdr *aoehdr,
 static int aoe_rx ( struct pk_buff *pkb ) {
 	struct aoehdr *aoehdr = pkb->data;
 	unsigned int len = pkb_len ( pkb );
+	struct ethhdr *ethhdr = pkb_push ( pkb, sizeof ( *ethhdr ) );
 	struct aoe_session *aoe;
 	int rc = 0;
 
@@ -213,9 +214,8 @@ static int aoe_rx ( struct pk_buff *pkb ) {
 			continue;
 		if ( ntohl ( aoehdr->tag ) != aoe->tag )
 			continue;
-
-#warning "Need a way to get the MAC address for future reference"
-
+		memcpy ( aoe->target, ethhdr->h_source,
+			 sizeof ( aoe->target ) );
 		rc = aoe_rx_response ( aoe, aoehdr, len );
 		break;
 	}
@@ -235,10 +235,20 @@ static int aoe_rx ( struct pk_buff *pkb ) {
  */
 static int aoe_route ( const struct pk_buff *pkb __unused,
 		       struct net_header *nethdr ) {
+	struct aoehdr *aoehdr = pkb->data;
+	struct aoe_session *aoe;
 
-#warning "Need a way to find out the MAC address"
-	nethdr->flags = PKT_FL_BROADCAST;
-	return 0;
+	list_for_each_entry ( aoe, &aoe_sessions, list ) {
+		if ( ( ntohs ( aoehdr->major ) == aoe->major ) &&
+		     ( aoehdr->minor == aoe->minor ) ) {
+			nethdr->flags = PKT_FL_RAW_ADDR;
+			memcpy ( nethdr->dest_net_addr, aoe->target,
+				 sizeof ( aoe->target ) );
+			return 0;
+		}
+	}
+		
+	return -EHOSTUNREACH;
 }
 
 /** AoE protocol */
@@ -257,6 +267,7 @@ NET_PROTOCOL ( aoe_protocol );
  * @v aoe		AoE session
  */
 void aoe_open ( struct aoe_session *aoe ) {
+	memset ( aoe->target, 0xff, sizeof ( aoe->target ) );
 	list_add ( &aoe->list, &aoe_sessions );
 }
 
