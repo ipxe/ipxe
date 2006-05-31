@@ -115,7 +115,8 @@ struct aoe_session {
 
 extern void aoe_open ( struct aoe_session *aoe );
 extern void aoe_close ( struct aoe_session *aoe );
-extern void aoe_issue ( struct aoe_session *aoe, struct ata_command *command );
+extern struct async_operation * aoe_issue ( struct aoe_session *aoe,
+					    struct ata_command *command );
 
 /** An AoE device */
 struct aoe_device {

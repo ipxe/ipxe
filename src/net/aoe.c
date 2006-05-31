@@ -274,14 +274,17 @@ void aoe_close ( struct aoe_session *aoe ) {
  *
  * @v aoe		AoE session
  * @v command		ATA command
+ * @ret aop		Asynchronous operation
  *
  * Only one command may be issued concurrently per session.  This call
  * is non-blocking; use async_wait() to wait for the command to
  * complete.
  */
-void aoe_issue ( struct aoe_session *aoe, struct ata_command *command ) {
+struct async_operation * aoe_issue ( struct aoe_session *aoe,
+				     struct ata_command *command ) {
 	aoe->command = command;
 	aoe->status = 0;
 	aoe->command_offset = 0;
 	aoe_send_command ( aoe );
+	return &aoe->aop;
 }
