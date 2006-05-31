@@ -138,6 +138,7 @@ SRCDIRS		+= drivers/bus
 SRCDIRS		+= drivers/net
 SRCDIRS		+= drivers/block
 SRCDIRS		+= drivers/scsi
+SRCDIRS		+= drivers/ata
 SRCDIRS		+= drivers/nvs
 SRCDIRS		+= interface/pxe
 
