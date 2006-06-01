@@ -141,6 +141,8 @@ static int exit_status;
 static int initialized;
 
 
+extern struct net_device static_single_netdev;
+
 
 /**************************************************************************
 MAIN - Kick off routine
@@ -151,87 +153,21 @@ int main ( void ) {
 	int skip = 0;
 
 	/* Call all registered initialisation functions */
+	init_heap();
 	call_init_fns ();
+	probe_devices();
 
-	/* Print out configuration */
-	print_config();
+	test_aoeboot ( &static_single_netdev );
+	printf ( "Press any key to exit\n" );
+	getchar();
 
-	/*
-	 * Trivial main loop: we need to think about how we want to
-	 * prompt the user etc.
-	 *
-	 */
-	for ( ; ; disable ( &dev ), call_reset_fns() ) {
-
-		/* Get next boot device */
-		if ( ! find_any_with_driver ( &dev, skip ) ) {
-			/* Reached end of device list */
-			printf ( "No more boot devices\n" );
-			skip = 0;
-			sleep ( 2 );
-			continue;
-		}
-
-		/* Skip this device the next time we encounter it */
-		skip = 1;
-
-		/* Print out device information */
-		printf ( "%s (%s) %s at %s\n",
-			 dev.bus_driver->name_device ( &dev.bus_dev ),
-			 dev.device_driver->name,
-			 dev.type_driver->name,
-			 dev.bus_driver->describe_device ( &dev.bus_dev ) );
-
-		/* Probe boot device */
-		if ( ! probe ( &dev ) ) {
-			/* Device found on bus, but probe failed */
-			printf ( "...probe failed: %m\n" );
-			continue;
-		}
-
-		/* Print out device information */
-		printf ( "%s %s has %s\n",
-			 dev.bus_driver->name_device ( &dev.bus_dev ),
-			 dev.type_driver->name,
-			 dev.type_driver->describe_device ( dev.type_dev ) );
-
-		/* Configure boot device */
-		if ( ! configure ( &dev ) ) {
-			/* Configuration (e.g. DHCP) failed */
-			printf ( "...configuration failed: %m\n" );
-			continue;
-		}
-
-		/* Load boot file from the device */
-		if ( ! autoload ( &dev, &image, &image_context ) ) {
-			/* Load (e.g. TFTP) failed */
-			printf ( "...load failed: %m\n" );
-			continue;
-		}
-
-		/* Print out image information */
-		printf ( "\nLoaded %s image\n", image->name );
-
-		/* Disable devices? */
-		cleanup();
-		/* arch_on_exit(0); */
-
-		/* Boot the image */
-		if ( ! image->boot ( image_context ) ) {
-			/* Boot failed */
-			printf ( "...boot failed: %m\n" );
-			continue;
-		}
-		
-		/* Image returned */
-		printf ( "...image returned\n" );
-	}
-
-	/* Call registered per-object exit functions */
+	remove_devices();
 	call_exit_fns ();
 
 	return exit_status;
 }
+
+#if 0
 
 void exit(int status)
 {
@@ -242,7 +178,6 @@ void exit(int status)
 }
 
 
-#if 0
 
 static int main_loop(int state)
 {
