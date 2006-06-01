@@ -71,6 +71,8 @@ struct aoehdr {
 #define AOE_CMD_ATA	0x00	/**< Issue ATA command */
 #define AOE_CMD_CONFIG	0x01	/**< Query Config Information */
 
+#define AOE_TAG_MAGIC	0xebeb0000
+
 #define AOE_ERR_BAD_COMMAND	1 /**< Unrecognised command code */
 #define AOE_ERR_BAD_PARAMETER	2 /**< Bad argument parameter */
 #define AOE_ERR_UNAVAILABLE	3 /**< Device unavailable */

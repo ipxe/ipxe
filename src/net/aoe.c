@@ -294,6 +294,7 @@ NET_PROTOCOL ( aoe_protocol );
  */
 void aoe_open ( struct aoe_session *aoe ) {
 	memset ( aoe->target, 0xff, sizeof ( aoe->target ) );
+	aoe->tag = AOE_TAG_MAGIC;
 	aoe->timer.expired = aoe_timer_expired;
 	list_add ( &aoe->list, &aoe_sessions );
 }
