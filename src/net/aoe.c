@@ -115,7 +115,25 @@ static int aoe_send_command ( struct aoe_session *aoe ) {
 			 aoe->command_offset, data_out_len );
 
 	/* Send packet */
+	start_timer ( &aoe->timer );
 	return net_transmit_via ( pkb, aoe->netdev );
+}
+
+/**
+ * Handle AoE retry timer expiry
+ *
+ * @v timer		AoE retry timer
+ * @v fail		Failure indicator
+ */
+static void aoe_timer_expired ( struct retry_timer *timer, int fail ) {
+	struct aoe_session *aoe =
+		container_of ( timer, struct aoe_session, timer );
+
+	if ( fail ) {
+		aoe_done ( aoe, -ETIMEDOUT );
+	} else {
+		aoe_send_command ( aoe );
+	}
 }
 
 /**
@@ -134,9 +152,17 @@ static int aoe_rx_response ( struct aoe_session *aoe, struct aoehdr *aoehdr,
 	unsigned int data_len;
 	
 	/* Sanity check */
-	if ( len < ( sizeof ( *aoehdr ) + sizeof ( *aoecmd ) ) )
+	if ( len < ( sizeof ( *aoehdr ) + sizeof ( *aoecmd ) ) ) {
+		/* Ignore packet; allow timer to trigger retransmit */
 		return -EINVAL;
+	}
 	rx_data_len = ( len - sizeof ( *aoehdr ) - sizeof ( *aoecmd ) );
+
+	/* Stop retry timer.  After this point, every code path must
+	 * either terminate the AoE operation via aoe_done(), or
+	 * transmit a new packet.
+	 */
+	stop_timer ( &aoe->timer );
 
 	/* Check for fatal errors */
 	if ( aoehdr->ver_flags & AOE_FL_ERROR ) {
@@ -268,6 +294,7 @@ NET_PROTOCOL ( aoe_protocol );
  */
 void aoe_open ( struct aoe_session *aoe ) {
 	memset ( aoe->target, 0xff, sizeof ( aoe->target ) );
+	aoe->timer.expired = aoe_timer_expired;
 	list_add ( &aoe->list, &aoe_sessions );
 }
 

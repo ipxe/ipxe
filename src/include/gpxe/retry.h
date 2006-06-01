@@ -9,28 +9,27 @@
 
 #include <gpxe/list.h>
 
-/** Effective maximum retry count for exponential backoff calculation */
-#define BACKOFF_LIMIT 5
-
 /** A retry timer */
 struct retry_timer {
 	/** List of active timers */
 	struct list_head list;
-	/** Base timeout (in ticks) */
-	unsigned int base;
-	/** Retry count */
-	unsigned int retries;
-	/** Expiry time (in ticks) */
-	unsigned long expiry;
+	/** Timeout value (in ticks) */
+	unsigned long timeout;
+	/** Start time (in ticks) */
+	unsigned long start;
 	/** Timer expired callback
 	 *
 	 * @v timer	Retry timer
+	 * @v fail	Failure indicator
+	 *
+	 * The timer will already be stopped when this method is
+	 * called.  The failure indicator will be True if the retry
+	 * timeout has already exceeded @c MAX_TIMEOUT.
 	 */
-	void ( * expired ) ( struct retry_timer *timer );
+	void ( * expired ) ( struct retry_timer *timer, int over );
 };
 
 extern void start_timer ( struct retry_timer *timer );
-extern void reset_timer ( struct retry_timer *timer );
 extern void stop_timer ( struct retry_timer *timer );
 
 #endif /* _GPXE_RETRY_H */
