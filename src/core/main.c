@@ -27,6 +27,10 @@ Literature dealing with the network protocols:
 #include "image.h"
 #include <stdarg.h>
 
+#include <gpxe/device.h>
+#include <gpxe/heap.h>
+#include <gpxe/netdevice.h>
+
 #ifdef CONFIG_FILO
 #include <lib.h>
 #endif
@@ -148,16 +152,24 @@ extern struct net_device static_single_netdev;
 MAIN - Kick off routine
 **************************************************************************/
 int main ( void ) {
-	struct image *image;
-	void *image_context;
-	int skip = 0;
+	struct net_device *netdev;
 
 	/* Call all registered initialisation functions */
 	init_heap();
 	call_init_fns ();
 	probe_devices();
 
-	test_aoeboot ( &static_single_netdev );
+	/* Quick hack until netdevice.c uses proper dynamic registration */
+	netdev = &static_single_netdev;
+	if ( ! netdev->poll )
+		netdev = NULL;
+
+	if ( netdev ) {
+		test_aoeboot ( &static_single_netdev );
+	} else {
+		printf ( "No network device found\n" );
+	}
+
 	printf ( "Press any key to exit\n" );
 	getchar();
 
