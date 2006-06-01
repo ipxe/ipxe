@@ -124,7 +124,7 @@ __asm__ ( ".equ\tDEBUG_LEVEL, " DEBUG_SYMBOL_STR );
 #endif
 
 #define DBG_PRINT(...) printf ( __VA_ARGS__ )
-#define DBG_DISCARD(...)
+#define DBG_DISCARD(...) do {} while ( 0 )
 #define DBG  DBG_DISCARD
 #define DBG2 DBG_DISCARD
 
