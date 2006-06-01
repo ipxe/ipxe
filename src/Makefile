@@ -141,6 +141,7 @@ SRCDIRS		+= drivers/scsi
 SRCDIRS		+= drivers/ata
 SRCDIRS		+= drivers/nvs
 SRCDIRS		+= interface/pxe
+SRCDIRS		+= tests
 
 # NON_AUTO_SRCS lists files that are excluded from the normal
 # automatic build system.
