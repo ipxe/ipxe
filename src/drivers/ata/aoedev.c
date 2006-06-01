@@ -30,14 +30,15 @@
  *
  * @v ata		ATA device
  * @v command		ATA command
- * @ret aop		Asynchronous operation
+ * @ret rc		Return status code
  */
-static struct async_operation * aoe_command ( struct ata_device *ata,
-					      struct ata_command *command ) {
+static int aoe_command ( struct ata_device *ata,
+			 struct ata_command *command ) {
 	struct aoe_device *aoedev
 		= container_of ( ata, struct aoe_device, ata );
 
-	return aoe_issue ( &aoedev->aoe, command );
+	aoe_issue ( &aoedev->aoe, command );
+	return async_wait ( &aoedev->aoe.aop );
 }
 
 /**

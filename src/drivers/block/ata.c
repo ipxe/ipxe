@@ -20,7 +20,6 @@
 #include <string.h>
 #include <assert.h>
 #include <byteswap.h>
-#include <gpxe/async.h>
 #include <gpxe/blockdev.h>
 #include <gpxe/ata.h>
 
@@ -49,7 +48,7 @@ ata_command ( struct ata_device *ata, struct ata_command *command ) {
 	      ( unsigned long long ) command->cb.lba.native,
 	      command->cb.count.native );
 
-	return async_wait ( ata->command ( ata, command ) );
+	return ata->command ( ata, command );	
 }
 
 /**

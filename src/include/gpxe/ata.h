@@ -11,8 +11,6 @@
  *
  */
 
-struct async_operation;
-
 /**
  * An ATA Logical Block Address
  *
@@ -193,10 +191,10 @@ struct ata_device {
 	 *
 	 * @v ata		ATA device
 	 * @v command		ATA command
-	 * @ret aop		Asynchronous operation
+	 * @ret rc		Return status code
 	 */
-	struct async_operation * ( * command ) ( struct ata_device *ata,
-						 struct ata_command *command );
+	int ( * command ) ( struct ata_device *ata,
+			    struct ata_command *command );
 };
 
 extern int init_atadev ( struct ata_device *ata );
