@@ -147,9 +147,17 @@ TRANSMIT - Transmit a frame
 ***************************************************************************/
 static int pnic_transmit ( struct net_device *netdev, struct pk_buff *pkb ) {
 	struct pnic *pnic = netdev->priv;
+	int pad_len;
 
+	/* Pad to minimum packet length */
+	pad_len = ( ETH_ZLEN - pkb_len ( pkb ) );
+	if ( pad_len > 0 )
+		memset ( pkb_put ( pkb, pad_len ), 0, pad_len );
+
+	/* Send packet */
 	pnic_command ( pnic, PNIC_CMD_XMIT, pkb->data, pkb_len ( pkb ),
 		       NULL, 0, NULL );
+
 	free_pkb ( pkb );
 	return 0;
 }
