@@ -8,8 +8,8 @@
 #ifndef	NIC_H
 #define NIC_H
 
-#include "dev.h"
-#include "byteswap.h"
+#include <byteswap.h>
+#include <gpxe/pci.h>
 #include "dhcp.h"
 
 typedef enum {
@@ -49,26 +49,7 @@ struct nic_operations {
 	void ( *irq ) ( struct nic *, irq_action_t );
 };
 
-extern struct type_driver nic_driver;
-
-/*
- * Function prototypes
- *
- */
-extern int dummy_connect ( struct nic *nic );
-extern void dummy_irq ( struct nic *nic, irq_action_t irq_action );
-extern void nic_disable ( struct nic *nic );
-
-/*
- * Functions that implicitly operate on the current boot device
- *
- */
-
 extern struct nic nic;
-
-static inline int eth_connect ( void ) {
-	return nic.nic_op->connect ( &nic );
-}
 
 static inline int eth_poll ( int retrieve ) {
 	return nic.nic_op->poll ( &nic, retrieve );
@@ -79,11 +60,40 @@ static inline void eth_transmit ( const char *dest, unsigned int type,
 	nic.nic_op->transmit ( &nic, dest, type, size, packet );
 }
 
-static inline void eth_irq ( irq_action_t action ) {
-	nic.nic_op->irq ( &nic, action );
-}
+/*
+ * Function prototypes
+ *
+ */
+extern int dummy_connect ( struct nic *nic );
+extern void dummy_irq ( struct nic *nic, irq_action_t irq_action );
+extern int legacy_probe ( struct pci_device *pci,
+			  const struct pci_device_id *id,
+			  int ( * probe ) ( struct nic *nic,
+					    struct pci_device *pci ),
+			  void ( * disable ) ( struct nic *nic ) );
+extern void legacy_remove ( struct pci_device *pci,
+			    void ( * disable ) ( struct nic *nic ) );
+extern void pci_fill_nic ( struct nic *nic, struct pci_device *pci );
 
-/* Should be using disable() rather than eth_disable() */
-extern void eth_disable ( void ) __attribute__ (( deprecated ));
+#define PCI_DRIVER(_name,_ids,_class) 					\
+	static int _name ## _legacy_probe ( struct pci_device *pci,	\
+					    const struct pci_device_id *id ); \
+	static void _name ## _legacy_remove ( struct pci_device *pci );	\
+	struct pci_driver _name __pci_driver = {			\
+		.ids = _ids,						\
+		.id_count = sizeof ( _ids ) / sizeof ( _ids[0] ),	\
+		.probe = _name ## _legacy_probe,			\
+		.remove = _name ## _legacy_remove,			\
+	};
+
+#undef DRIVER
+#define DRIVER(_unused1,_unused2,_unused3,_name,_probe,_disable)	\
+	static int _name ## _legacy_probe ( struct pci_device *pci,	\
+					    const struct pci_device_id *id ) {\
+		return legacy_probe ( pci, id, _probe, _disable );	\
+	}								\
+	static void _name ## _legacy_remove ( struct pci_device *pci ) {\
+		return legacy_remove ( pci, _disable );			\
+	}
 
 #endif	/* NIC_H */

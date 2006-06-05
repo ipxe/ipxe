@@ -189,7 +189,6 @@ enum dmfe_CR6_bits {
 
 /* Global variable declaration ----------------------------- */
 static struct nic_operations dmfe_operations;
-static struct pci_driver dmfe_driver;
 
 static unsigned char dmfe_media_mode = DMFE_AUTO;
 static u32 dmfe_cr6_user_set;

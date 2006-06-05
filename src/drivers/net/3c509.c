@@ -9,6 +9,7 @@
 #include "timer.h"
 #include "string.h"
 #include "console.h"
+#include "dev.h"
 #include "3c509.h"
 
 /*

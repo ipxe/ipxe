@@ -123,7 +123,6 @@ struct rxdesc {
 /*********************************************************************/
 
 static struct nic_operations davicom_operations;
-static struct pci_driver davicom_driver;
 
 /* PCI Bus parameters */
 static unsigned short vendor, dev_id;

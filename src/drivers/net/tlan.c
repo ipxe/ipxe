@@ -65,8 +65,6 @@
 #define dprintf(x)
 #endif
 
-static struct pci_driver tlan_driver;
-
 static void TLan_ResetLists(struct nic *nic __unused);
 static void TLan_ResetAdapter(struct nic *nic __unused);
 static void TLan_FinishReset(struct nic *nic __unused);

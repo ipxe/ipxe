@@ -572,7 +572,6 @@ static struct nic_operations sundance_operations = {
 	.irq		= sundance_irq,
 
 };
-static struct pci_driver sundance_driver;
 
 /**************************************************************************
 PROBE - Look for an adapter, this routine's visible to the outside

@@ -47,6 +47,7 @@
 #include "nic.h"
 #include <gpxe/pci.h>
 #include "timer.h"
+#include "dev.h"
 
 #include "sis900.h"
 

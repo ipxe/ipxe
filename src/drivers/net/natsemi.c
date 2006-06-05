@@ -175,7 +175,6 @@ enum desc_status_bits {
 /* Globals */
 
 static struct nic_operations natsemi_operations;
-static struct pci_driver natsemi_driver;
 
 static int natsemi_debug = 1;			/* 1 normal messages, 0 quiet .. 7 verbose. */
 

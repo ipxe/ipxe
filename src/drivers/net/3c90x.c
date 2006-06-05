@@ -43,7 +43,6 @@
 #include "timer.h"
 
 static struct nic_operations a3c90x_operations;
-static struct pci_driver a3c90x_driver;
 
 #define	XCVR_MAGIC	(0x5A00)
 /** any single transmission fails after 16 collisions or other errors

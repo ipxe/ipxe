@@ -957,7 +957,6 @@ void rhine_irq ( struct nic *nic, irq_action_t action ) {
 }
 
 static struct nic_operations rhine_operations;
-static struct pci_driver rhine_driver;
 
 static int
 rhine_probe ( struct nic *nic, struct pci_device *pci ) {

@@ -89,7 +89,6 @@ typedef enum {
 
 /* NIC specific static variables go here */
 static struct nic_operations e1000_operations;
-static struct pci_driver e1000_driver;
 
 static struct e1000_hw hw;
 

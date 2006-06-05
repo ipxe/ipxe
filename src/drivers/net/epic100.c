@@ -61,7 +61,6 @@ static int	mii_read(int phy_id, int location);
 static void     epic100_irq(struct nic *nic, irq_action_t action);
 
 static struct nic_operations epic100_operations;
-static struct pci_driver epic100_driver;
 
 static int	ioaddr;
 

@@ -32,7 +32,6 @@
 #include "timer.h"
 
 static struct nic_operations t595_operations;
-static struct pci_driver t595_driver;
 
 static unsigned short	eth_nic_base;
 static unsigned short	vx_connector, vx_connectors;

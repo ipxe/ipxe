@@ -252,7 +252,6 @@ struct RxFD {               /* Receive frame descriptor. */
 };
 
 static struct nic_operations eepro100_operations;
-static struct pci_driver eepro100_driver;
 
 #define RXFD_COUNT 4
 struct {

@@ -56,7 +56,6 @@
 
 static u32 ioaddr;		/* Globally used for the card's io address */
 static struct nic_operations pcnet32_operations;
-static struct pci_driver pcnet32_driver;
 
 #ifdef EDEBUG
 #define dprintf(x) printf x

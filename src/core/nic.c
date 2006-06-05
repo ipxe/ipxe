@@ -388,6 +388,7 @@ struct type_driver nic_driver = {
 	.load			= nic_load,
 };
 
+#if 0
 /* Careful.  We need an aligned buffer to avoid problems on machines
  * that care about alignment.  To trivally align the ethernet data
  * (the ip hdr and arp requests) we offset the packet by 2 bytes.
@@ -400,16 +401,8 @@ struct nic nic = {
 	.node_addr = arptable[ARP_CLIENT].node,
 	.packet = packet + ETH_DATA_ALIGN,
 };
+#endif
 
-
-
-int dummy_connect ( struct nic *nic __unused ) {
-	return 1;
-}
-
-void dummy_irq ( struct nic *nic __unused, irq_action_t irq_action __unused ) {
-	return;
-}
 
 /**************************************************************************
 DEFAULT_NETMASK - Return default netmask for IP address
