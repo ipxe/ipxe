@@ -81,6 +81,9 @@ int legacy_probe ( struct pci_device *pci,
 		return rc;
 	}
 
+	/* Do not remove this message */
+	printf ( "WARNING: Using legacy NIC wrapper\n" );
+
 	return 0;
 }
 
@@ -106,3 +109,5 @@ int dummy_connect ( struct nic *nic __unused ) {
 void dummy_irq ( struct nic *nic __unused, irq_action_t irq_action __unused ) {
 	return;
 }
+
+REQUIRE_OBJECT ( pci );
