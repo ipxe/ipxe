@@ -64,6 +64,7 @@
 #include "timer.h"
 #include "io.h"
 #include "console.h"
+#include "dev.h"
 #include "isapnp.h"
 
 /**

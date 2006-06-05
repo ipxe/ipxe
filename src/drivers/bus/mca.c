@@ -8,6 +8,7 @@
 #include "string.h"
 #include "io.h"
 #include "console.h"
+#include "dev.h"
 #include "mca.h"
 
 /*

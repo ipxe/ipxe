@@ -1,6 +1,7 @@
 #include "string.h"
 #include "console.h"
 #include "config/isa.h"
+#include "dev.h"
 #include "isa.h"
 
 /*

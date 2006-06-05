@@ -2,6 +2,7 @@
 #include "io.h"
 #include "timer.h"
 #include "console.h"
+#include "dev.h"
 #include "eisa.h"
 
 /*
