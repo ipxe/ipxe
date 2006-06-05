@@ -21,7 +21,11 @@ struct nic nic;
 static int legacy_transmit ( struct net_device *netdev, struct pk_buff *pkb ) {
 	struct nic *nic = netdev->priv;
 	struct ethhdr *ethhdr = pkb->data;
+	int pad_len;
 
+	pad_len = ( ETH_ZLEN - pkb_len ( pkb ) );
+	if ( pad_len > 0 )
+		memset ( pkb_put ( pkb, pad_len ), 0, pad_len );
 	pkb_pull ( pkb, sizeof ( *ethhdr ) );
 	nic->nic_op->transmit ( nic, ( const char * ) ethhdr->h_dest,
 				ntohs ( ethhdr->h_protocol ),
