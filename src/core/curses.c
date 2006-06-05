@@ -2,6 +2,7 @@
 #include <malloc.h>
 #include <stddef.h>
 #include <vsprintf.h>
+#include <string.h>
 
 /** @file
  *
@@ -24,6 +25,26 @@ unsigned int *_COLOUR_PAIRS; /* basically this is an array, but as its
 struct cursor_pos {
 	unsigned int y, x;
 };
+
+struct _softlabel {
+	/* Format of soft label 
+	   0: left justify
+	   1: centre justify
+	   2: right justify
+	 */
+	int fmt;
+	// label string
+	char *label;
+};
+
+struct _softlabelkeys {
+	struct _softlabel fkeys[12];
+	attr_t attrs;
+	unsigned int fmt;
+	unsigned int maxlablen;
+};
+
+struct _softlabelkeys *slks;
 
 WINDOW _stdscr = {
 	.attrs = A_DEFAULT,
@@ -146,7 +167,7 @@ int wmove ( WINDOW *win, int y, int x ) {
  * @ret bps	return baud rate in bits per second
  */
 int baudrate ( void ) {
-	return 0;
+	return OK;
 }
 
 /**
@@ -286,6 +307,177 @@ WINDOW *newwin ( int nlines, int ncols, int begin_y, int begin_x ) {
 	return win;
 }
 
+/**
+ * Return the attribute used for the soft function keys
+ *
+ * @ret attrs	the current attributes of the soft function keys
+ */
+attr_t slk_attr ( void ) {
+	return ( slks == NULL ? 0 : slks->attrs );
+}
+
+/**
+ * Turn off soft function key attributes
+ *
+ * @v attrs	attribute bit mask
+ * @ret rc	return status code
+ */
+int slk_attroff ( const chtype attrs ) {
+	if ( slks == NULL ) 
+		return ERR;
+	slks->attrs &= ~( attrs & A_ATTRIBUTES );
+	return OK;
+}
+
+/**
+ * Turn on soft function key attributes
+ *
+ * @v attrs	attribute bit mask
+ * @ret rc	return status code
+ */
+int slk_attron ( const chtype attrs ) {
+	if ( slks == NULL )
+		return ERR;
+	slks->attrs |= ( attrs & A_ATTRIBUTES );
+	return OK;
+}
+
+/**
+ * Set soft function key attributes
+ *
+ * @v attrs	attribute bit mask
+ * @ret rc	return status code
+ */
+int slk_attrset ( const chtype attrs ) {
+	if ( slks == NULL ) 
+		return ERR;
+	slks->attrs = ( attrs & A_ATTRIBUTES );
+	return OK;
+}
+
+/**
+ * Turn off soft function key attributes
+ *
+ * @v attrs	attribute bit mask
+ * @v *opts	undefined (for future implementation)
+ * @ret rc	return status code
+ */
+int slk_attr_off ( const attr_t attrs, void *opts __unused ) {
+	return slk_attroff( attrs );
+}
+
+/**
+ * Turn on soft function key attributes
+ *
+ * @v attrs	attribute bit mask
+ * @v *opts	undefined (for future implementation)
+ * @ret rc	return status code
+ */
+int slk_attr_on ( attr_t attrs, void *opts __unused ) {
+	return slk_attron( attrs );
+}
+
+/**
+ * Set soft function key attributes
+ *
+ * @v attrs			attribute bit mask
+ * @v colour_pair_number	colour pair integer
+ * @v *opts			undefined (for future implementation)
+ * @ret rc			return status code
+ */
+int slk_attr_set ( const attr_t attrs, short colour_pair_number,
+		   void *opts __unused ) {
+	if ( slks == NULL ) 
+		return ERR;
+
+	if ( ( unsigned short )colour_pair_number > COLORS )
+		return ERR;
+
+	slks->attrs = ( (unsigned short)colour_pair_number << CPAIR_SHIFT ) |
+		( attrs & A_ATTRIBUTES );
+	return OK;
+}
+
+/**
+ * Clear the soft function key labels from the screen
+ *
+ * @ret rc	return status code
+ */
+int slk_clear ( void ) {
+	if ( slks == NULL )
+		return ERR;
+
+	wmove(stdscr,stdscr->height-1,0);
+	wclrtoeol(stdscr);
+	return 0;
+}
+
+/**
+ * Initialise the soft function keys
+ *
+ * @v fmt	format of keys
+ * @ret rc	return status code
+ */
+int slk_init ( int fmt ) {
+	if ( (unsigned)fmt > 3 ) {
+		return ERR;
+	}
+
+	slks = malloc(sizeof(struct _softlabelkeys));
+	slks->attrs = A_DEFAULT;
+	slks->fmt = fmt;
+	slks->maxlablen = 5;
+	return OK;
+}
+
+/**
+ * Return the label for the specified soft key
+ *
+ * @v labnum	soft key identifier
+ * @ret label	return label
+ */
+char* slk_label ( int labnum ) {
+	if ( slks == NULL ) 
+		return NULL;
+
+	return slks->fkeys[labnum].label;
+}
+
+/**
+ * Restore soft function key labels to the screen
+ *
+ * @ret rc	return status code
+ */
+int slk_restore ( void ) {
+	if ( slks == NULL ) 
+		return ERR;
+
+	return OK;
+}
+
+/**
+ * Configure specified soft key
+ *
+ * @v labnum	soft label position to configure
+ * @v *label	string to use as soft key label
+ * @v fmt	justification format of label
+ * @ret rc	return status code
+ */
+int slk_set ( int labnum, const char *label, int fmt ) {
+	if ( slks == NULL ) 
+		return ERR;
+	if ( labnum == 0 || (unsigned)labnum > 12 )
+		return ERR;
+	if ( (unsigned)fmt >= 3 )
+		return ERR;
+	if ( strlen(label) > slks->maxlablen )
+		return ERR;
+
+	strcpy( slks->fkeys[labnum].label, label );
+	slks->fkeys[labnum].fmt = fmt;
+
+	return OK;
+}
 
 struct printw_context {
 	struct printf_context ctx;
@@ -369,7 +561,7 @@ int waddnstr ( WINDOW *win, const char *str, int n ) {
  */
 int wattroff ( WINDOW *win, int attrs ) {
 	win->attrs &= ~attrs;
-	return 0;
+	return OK;
 }
 
 /**
