@@ -254,6 +254,7 @@ flatten_real_mode:
 	/* Preserve real-mode segment values and temporary registers */
 	pushw	%es
 	pushw	%ds
+	pushw	%bp
 	pushl	%eax
 
 	/* Set GDT base and load GDT */
@@ -261,8 +262,11 @@ flatten_real_mode:
 	movw	%cs, %ax
 	shll	$4, %eax
 	addl	$gdt, %eax
-	movl	%eax, %cs:gdt_base
-	lgdt	%cs:gdt
+	pushl	%eax
+	pushw	%cs:gdt_limit
+	movw	%sp, %bp
+	lgdt	(%bp)
+	addw	$6, %sp
 
 	/* Switch to protected mode */
 	movl	%cr0, %eax
@@ -281,6 +285,7 @@ flatten_real_mode:
 
 	/* Restore real-mode segment values and temporary registers */
 	popl	%eax
+	popw	%bp
 	popw	%ds
 	popw	%es
 	ret
