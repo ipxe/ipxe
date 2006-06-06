@@ -45,11 +45,8 @@ LDSCRIPT		= arch/i386/scripts/i386.lds
 CFLAGS_ZPREFIX		= -DCOMPRESS
 
 MEDIA			+= rom
-OBJS_romprefix		= isaprefix zisaprefix pciprefix zpciprefix
-CFLAGS_isaprefix	=
-CFLAGS_zisaprefix	= $(CFLAGS_ZPREFIX)
-CFLAGS_pciprefix	= -DPCI_PNP_HEADER
-CFLAGS_zpciprefix	= $(CFLAGS_pciprefix) $(CFLAGS_ZPREFIX)
+OBJS_romprefix		= romprefix zromprefix
+CFLAGS_zromprefix	= $(CFLAGS_ZPREFIX)
 
 MEDIA			+= pxe
 OBJS_pxeprefix		= pxeprefix zpxeprefix

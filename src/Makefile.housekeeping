@@ -178,14 +178,12 @@ TGT_DRIVERS	= $(strip $(if $(DRIVERS_$(TGT_ROM_NAME)), \
 			         $(call CARD_DRIVER,$(TGT_ELEMENT))) ))
 TGT_MEDIA	= $(subst z,,$(TGT_PREFIX))
 
-# Look up ROM type and IDs for the current target
+# Look up ROM IDs for the current target
 # (e.g. "bin/dfe538--prism2_pci.zrom.tmp") and derive the variables:
 #
-# TGT_ROM_TYPE   : PCI/ISA indicator (e.g. "pci")
 # TGT_PCI_VENDOR : the PCI vendor ID (e.g. "0x1186")
 # TGT_PCI_DEVICE : the PCI device ID (e.g. "0x1300")
 #
-TGT_ROM_TYPE	= $(ROM_TYPE_$(TGT_ROM_NAME))
 TGT_PCI_VENDOR	= $(PCI_VENDOR_$(TGT_ROM_NAME))
 TGT_PCI_DEVICE	= $(PCI_DEVICE_$(TGT_ROM_NAME))
 
@@ -194,13 +192,11 @@ TGT_PCI_DEVICE	= $(PCI_DEVICE_$(TGT_ROM_NAME))
 #
 # TGT_LD_DRIVERS : symbols to require in order to drag in the relevant drivers
 #		   (e.g. "obj_rtl8139 obj_prism2_pci")
-# TGT_LD_PREFIX  : symbols to require in order to drag in the relevant prefix
-#		   (e.g. "obj_zpciprefix")
 # TGT_LD_IDS :     symbols to define in order to fill in ID structures in the
 #		   ROM header (e.g."pci_vendor_id=0x1186 pci_device_id=0x1300")
 #
 TGT_LD_DRIVERS	= $(subst -,_,$(patsubst %,obj_%,$(TGT_DRIVERS)))
-TGT_LD_PREFIX	= obj_$(subst rom,$(TGT_ROM_TYPE),$(TGT_PREFIX))prefix
+TGT_LD_PREFIX	= obj_$(TGT_PREFIX)prefix
 TGT_LD_IDS	= $(if $(TGT_PCI_VENDOR),pci_vendor_id=$(TGT_PCI_VENDOR)) \
 		  $(if $(TGT_PCI_DEVICE),pci_device_id=$(TGT_PCI_DEVICE))
 
@@ -246,7 +242,6 @@ $(BIN)/%.info :
 	@echo 'ROM name             : $(TGT_ROM_NAME)'
 	@echo 'Media                : $(TGT_MEDIA)'
 	@echo
-	@echo 'ROM type             : $(TGT_ROM_TYPE)'
 	@echo 'PCI vendor           : $(TGT_PCI_VENDOR)'
 	@echo 'PCI device           : $(TGT_PCI_DEVICE)'
 	@echo
