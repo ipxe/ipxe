@@ -236,4 +236,5 @@ SECTIONS {
      * Values calculated to save code from doing it
      */
     _load_size_pgh	= ( _load_size / 16 );
+    _rom_size		= ( ( _load_size + 511 ) / 512 );
 }
