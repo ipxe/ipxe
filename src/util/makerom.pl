@@ -131,9 +131,9 @@ sub writerom ($$) {
 sub checksum ($) {
 	my ($romref) = @_;
 
-	substr($$romref, 5, 1) = "\x00";
+	substr($$romref, 6, 1) = "\x00";
 	my $sum = unpack('%8C*', $$romref);
-	substr($$romref, 5, 1) = chr(256 - $sum);
+	substr($$romref, 6, 1) = chr(256 - $sum);
 	# Double check
 	$sum = unpack('%8C*', $$romref);
 	if ($sum != 0) {
@@ -168,14 +168,10 @@ sub makerom () {
 			$romsize = ($filesize + 511) & ~511
 		}
 	} else {
-		$romsize = getromsize(\$rom);
-		# 0 put there by *loader.S means makerom should pick the size
-		if ($romsize == 0) {
-			# Shrink romsize down to the smallest power of two that will do
-			for ($romsize = MAXROMSIZE;
-				$romsize > MINROMSIZE and $romsize >= 2*$filesize;
-				$romsize /= 2) { }
-		}
+		# Shrink romsize down to the smallest power of two that will do
+		for ($romsize = MAXROMSIZE;
+		     $romsize > MINROMSIZE and $romsize >= 2*$filesize;
+		     $romsize /= 2) { }
 	}
 	if ($filesize > $romsize) {
 		print STDERR "ROM size of $romsize not big enough for data, ";
