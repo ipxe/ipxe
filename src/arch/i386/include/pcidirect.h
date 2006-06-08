@@ -71,7 +71,7 @@ static inline __attribute__ (( always_inline )) int
 pcidirect_read_config_dword ( struct pci_device *pci, unsigned int where,
 			      uint32_t *value ) {
 	pcidirect_prepare ( pci, where );
-	*value = inl ( PCIDIRECT_CONFIG_DATA + where );
+	*value = inl ( PCIDIRECT_CONFIG_DATA );
 	return 0;
 }
 
@@ -103,7 +103,7 @@ static inline __attribute__ (( always_inline )) int
 pcidirect_write_config_word ( struct pci_device *pci, unsigned int where,
 			      uint16_t value ) {
 	pcidirect_prepare ( pci, where );
-	outb ( value, PCIDIRECT_CONFIG_DATA + ( where & 2 ) );
+	outw ( value, PCIDIRECT_CONFIG_DATA + ( where & 2 ) );
 	return 0;
 }
 
@@ -119,7 +119,7 @@ static inline __attribute__ (( always_inline )) int
 pcidirect_write_config_dword ( struct pci_device *pci, unsigned int where,
 			       uint32_t value ) {
 	pcidirect_prepare ( pci, where );
-	outb ( value, PCIDIRECT_CONFIG_DATA + where );
+	outl ( value, PCIDIRECT_CONFIG_DATA );
 	return 0;
 }
 
