@@ -115,7 +115,7 @@ static int int13_rw_sectors ( struct int13_drive *drive,
 	userptr_t buffer;
 
 	/* Calculate parameters */
-	cylinder = ( ( ( ix86->regs.cl & 0xc0 ) << 8 ) | ix86->regs.ch );
+	cylinder = ( ( ( ix86->regs.cl & 0xc0 ) << 2 ) | ix86->regs.ch );
 	assert ( cylinder < drive->cylinders );
 	head = ix86->regs.dh;
 	assert ( head < drive->heads );
@@ -133,12 +133,12 @@ static int int13_rw_sectors ( struct int13_drive *drive,
 	if ( blockdev->blksize != INT13_BLKSIZE ) {
 		DBG ( "Invalid blocksize (%zd) for non-extended read/write\n",
 		      blockdev->blksize );
-		return INT13_STATUS_INVALID;
+		return -INT13_STATUS_INVALID;
 	}
 	
 	/* Read from / write to block device */
 	if ( io ( blockdev, lba, count, buffer ) != 0 )
-		return INT13_STATUS_READ_ERROR;
+		return -INT13_STATUS_READ_ERROR;
 
 	return 0;
 }
@@ -214,7 +214,7 @@ static int int13_get_parameters ( struct int13_drive *drive,
  * @v bx		0x55aa
  * @ret bx		0xaa55
  * @ret cx		Extensions API support bitmap
- * @ret status		Status code
+ * @ret status		Status code / API version
  */
 static int int13_extension_check ( struct int13_drive *drive __unused,
 				   struct i386_all_regs *ix86 ) {
@@ -222,9 +222,9 @@ static int int13_extension_check ( struct int13_drive *drive __unused,
 		DBG ( "INT 13 extensions installation check\n" );
 		ix86->regs.bx = 0xaa55;
 		ix86->regs.cx = INT13_EXTENSION_LINEAR;
-		return 0;
+		return INT13_EXTENSION_VER_1_X;
 	} else {
-		return INT13_STATUS_INVALID;
+		return -INT13_STATUS_INVALID;
 	}
 }
 
@@ -259,7 +259,7 @@ static int int13_extended_rw ( struct int13_drive *drive,
 	
 	/* Read from / write to block device */
 	if ( io ( blockdev, lba, count, buffer ) != 0 )
-		return INT13_STATUS_READ_ERROR;
+		return -INT13_STATUS_READ_ERROR;
 
 	return 0;
 }
@@ -322,6 +322,7 @@ static int int13_get_extended_parameters ( struct int13_drive *drive,
  *
  */
 static void int13 ( struct i386_all_regs *ix86 ) {
+	int command = ix86->regs.ah;
 	struct int13_drive *drive;
 	int status;
 
@@ -329,10 +330,9 @@ static void int13 ( struct i386_all_regs *ix86 ) {
 		if ( drive->drive != ix86->regs.dl )
 			continue;
 		
-		DBG ( "INT 13,%02x (%02x): ", ix86->regs.ah,
-		      ix86->regs.dl );
-	
-		switch ( ix86->regs.ah ) {
+		DBG ( "INT 13,%02x (%02x): ", command, drive->drive );
+
+		switch ( command ) {
 		case INT13_RESET:
 			status = int13_reset ( drive, ix86 );
 			break;
@@ -362,18 +362,21 @@ static void int13 ( struct i386_all_regs *ix86 ) {
 			break;
 		default:
 			DBG ( "Unrecognised INT 13\n" );
-			status = INT13_STATUS_INVALID;
+			status = -INT13_STATUS_INVALID;
 			break;
 		}
 
 		/* Store status for INT 13,01 */
 		drive->last_status = status;
-		/* All functions return status via %ah and CF */
-		ix86->regs.ah = status;
-		if ( status ) {
+
+		/* Negative status indicates an error */
+		if ( status < 0 ) {
 			ix86->flags |= CF;
+			status = -status;
 			DBG ( "INT13 failed with status %x\n", status );
 		}
+		ix86->regs.ah = status;
+
 		/* Set OF to indicate to wrapper not to chain this call */
 		ix86->flags |= OF;
 	}
