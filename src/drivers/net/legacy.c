@@ -18,6 +18,8 @@
 
 struct nic nic;
 
+static int legacy_registered = 0;
+
 static int legacy_transmit ( struct net_device *netdev, struct pk_buff *pkb ) {
 	struct nic *nic = netdev->priv;
 	struct ethhdr *ethhdr = pkb->data;
@@ -58,6 +60,9 @@ int legacy_probe ( struct pci_device *pci,
 		   void ( * disable ) ( struct nic *nic ) ) {
 	struct net_device *netdev;
 	int rc;
+
+	if ( legacy_registered )
+		return -EBUSY;
 	
 	netdev = alloc_etherdev ( 0 );
 	if ( ! netdev )
@@ -84,6 +89,7 @@ int legacy_probe ( struct pci_device *pci,
 	/* Do not remove this message */
 	printf ( "WARNING: Using legacy NIC wrapper\n" );
 
+	legacy_registered = 1;
 	return 0;
 }
 
@@ -95,6 +101,7 @@ void legacy_remove ( struct pci_device *pci,
 	unregister_netdev ( netdev );
 	disable ( nic );
 	free_netdev ( netdev );
+	legacy_registered = 0;
 }
 
 void pci_fill_nic ( struct nic *nic, struct pci_device *pci ) {
