@@ -140,6 +140,7 @@ SRCDIRS		+= drivers/block
 SRCDIRS		+= drivers/scsi
 SRCDIRS		+= drivers/ata
 SRCDIRS		+= drivers/nvs
+SRCDIRS		+= drivers/bitbash
 SRCDIRS		+= interface/pxe
 SRCDIRS		+= tests
 
