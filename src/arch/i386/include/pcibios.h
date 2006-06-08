@@ -102,7 +102,7 @@ pcibios_write_config_byte ( struct pci_device *pci, unsigned int where,
 static inline __attribute__ (( always_inline )) int
 pcibios_write_config_word ( struct pci_device *pci, unsigned int where,
 			    uint16_t value ) {
-	return pcibios_write ( pci, PCIBIOS_WRITE_CONFIG_BYTE | where, value );
+	return pcibios_write ( pci, PCIBIOS_WRITE_CONFIG_WORD | where, value );
 }
 
 /**
@@ -116,7 +116,7 @@ pcibios_write_config_word ( struct pci_device *pci, unsigned int where,
 static inline __attribute__ (( always_inline )) int
 pcibios_write_config_dword ( struct pci_device *pci, unsigned int where,
 			     uint32_t value ) {
-	return pcibios_write ( pci, PCIBIOS_WRITE_CONFIG_BYTE | where, value );
+	return pcibios_write ( pci, PCIBIOS_WRITE_CONFIG_DWORD | where, value);
 }
 
 #endif /* _PCIBIOS_H */
