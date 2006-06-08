@@ -1,0 +1,115 @@
+#include <curses.h>
+
+/**
+ * Turn off attributes in a window
+ *
+ * @v win	subject window
+ * @v attrs	attributes to enable
+ * @ret rc	return status code
+ */
+int wattroff ( WINDOW *win, int attrs ) {
+	win->attrs &= ~attrs;
+	return OK;
+}
+
+/**
+ * Turn on attributes in a window
+ *
+ * @v win	subject window
+ * @v attrs	attributes to enable
+ * @ret rc	return status code
+ */
+int wattron ( WINDOW *win, int attrs ) {
+	win->attrs |= attrs;
+	return OK;
+}
+
+/**
+ * Set attributes in a window
+ *
+ * @v win	subject window
+ * @v attrs	attributes to enable
+ * @ret rc	return status code
+ */
+int wattrset ( WINDOW *win, int attrs ) {
+	win->attrs = ( attrs | ( win->attrs & A_COLOR ) );
+	return OK;
+}
+
+/**
+ * Get attributes and colour pair information
+ *
+ * @v *win	window to obtain information from
+ * @v *attrs	address in which to store attributes
+ * @v *pair	address in which to store colour pair
+ * @v *opts	undefined (for future implementation)
+ * @ret rc	return status cude
+ */
+int wattr_get ( WINDOW *win, attr_t *attrs, short *pair, 
+		void *opts __unused ) {
+	*attrs = win->attrs & A_ATTRIBUTES;
+	*pair = (short)(( win->attrs & A_COLOR ) >> CPAIR_SHIFT);
+	return OK;
+}
+
+/**
+ * Turn off attributes in a window
+ *
+ * @v *win	subject window
+ * @v attrs	attributes to toggle
+ * @v *opts	undefined (for future implementation)
+ * @ret rc	return status code
+ */
+int wattr_off ( WINDOW *win, attr_t attrs, 
+		void *opts __unused ) {
+	wattroff( win, attrs );
+	return OK;
+}
+
+/**
+ * Turn on attributes in a window
+ *
+ * @v *win	subject window
+ * @v attrs	attributes to toggle
+ * @v *opts	undefined (for future implementation)
+ * @ret rc	return status code
+ */
+int wattr_on ( WINDOW *win, attr_t attrs, 
+	       void *opts __unused ) {
+	wattron( win, attrs );
+	return OK;
+}
+
+/**
+ * Set attributes and colour pair information in a window
+ *
+ * @v *win	subject window
+ * @v attrs	attributes to set
+ * @v cpair	colour pair to set
+ * @v *opts	undefined (for future implementation)
+ * @ret rc	return status code
+ */
+int wattr_set ( WINDOW *win, attr_t attrs, short cpair, 
+		void *opts __unused ) {
+	wattrset( win, attrs | ( ( (unsigned short)cpair ) << CPAIR_SHIFT ) );
+	return OK;
+}
+
+/**
+ * Set colour pair for a window
+ *
+ * @v *win			subject window
+ * @v colour_pair_number	colour pair integer
+ * @v *opts			undefined (for future implementation)
+ * @ret rc			return status code
+ */
+int wcolour_set ( WINDOW *win, short colour_pair_number, 
+		  void *opts __unused ) {
+	if ( ( unsigned short )colour_pair_number > COLORS )
+		return ERR;
+
+	win->attrs = ( (unsigned short)colour_pair_number << CPAIR_SHIFT ) |
+		( win->attrs & A_ATTRIBUTES );
+	return OK;
+}
+
