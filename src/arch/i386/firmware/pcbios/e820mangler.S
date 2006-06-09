@@ -296,11 +296,19 @@ patch_e820:
 	.size patch_e820, . - patch_e820
 
 /****************************************************************************
- * INT 15,e820 handler
+ * Split E820 memory map entry if necessary
+ *
+ * Parameters:
+ *   As for INT 15,e820
+ * Returns:
+ *   As for INT 15,e820
+ *
+ * Calls the underlying INT 15,e820 and returns a modified memory map.
+ * Regions will be split around any hidden regions.
  ****************************************************************************
  */
 	.section ".text16"
-int15_e820:
+split_e820:
 	pushw	%si
 	pushw	%bp
 	/* Caller's %bx => %si, real %ebx to %ebx, call previous handler */
@@ -334,13 +342,43 @@ int15_e820:
 	popfw
 	popw	%bp
 	popw	%si
-	lret	$2
-	.size int15_e820, . - int15_e820
+	ret
+	.size split_e820, . - split_e820
 
 	.section ".text16.data"
 real_ebx:
 	.long 0
 	.size real_ebx, . - real_ebx
+
+/****************************************************************************
+ * INT 15,e820 handler
+ ****************************************************************************
+ */
+	.section ".text16"
+int15_e820:
+	pushl	%eax
+	pushl	%ecx
+	pushl	%edx	
+	call	split_e820
+	pushfw
+	jc	1f
+	/* Check for an empty region */
+	pushl	%eax
+	movl	%es:8(%di), %eax
+	orl	%es:12(%di), %eax
+	popl	%eax
+	jnz	1f
+	/* Strip empty regions out of the returned map */
+	popfw
+	popl	%edx
+	popl	%ecx
+	popl	%eax
+	jmp	int15_e820
+	/* Restore flags from original INT 15,e820 call and return */
+1:	popfw
+	leal	12(%esp), %esp /* avoid changing flags */
+	lret	$2
+	.size int15_e820, . - int15_e820
 	
 /****************************************************************************
  * INT 15,e801 handler
