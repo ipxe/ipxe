@@ -167,6 +167,22 @@ struct int13_disk_parameters {
 
 /** @} */
 
+/**
+ * @defgroup int13vers INT 13 extension versions
+ * @{
+ */
+
+/** INT13 extensions version 1.x */
+#define INT13_EXTENSION_VER_1_X		0x01
+/** INT13 extensions version 2.0 (EDD-1.0) */
+#define INT13_EXTENSION_VER_2_0		0x20
+/** INT13 extensions version 2.1 (EDD-1.1) */
+#define INT13_EXTENSION_VER_2_1		0x21
+/** INT13 extensions version 3.0 (EDD-3.0) */
+#define INT13_EXTENSION_VER_3_0		0x30
+
+/** @} */ 
+
 extern void register_int13_drive ( struct int13_drive *drive );
 extern void unregister_int13_drive ( struct int13_drive *drive );
 extern int int13_boot ( unsigned int drive );
