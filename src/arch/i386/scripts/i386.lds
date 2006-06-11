@@ -117,6 +117,7 @@ SECTIONS {
 
     .text : AT ( _textdata_load_offset + __text ) {
 	__text = .;
+	*(.text.null_trap)
 	*(.text)
 	*(.text.*)
     } = 0x9090
