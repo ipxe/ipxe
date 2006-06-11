@@ -42,7 +42,7 @@
  */
 #undef	COMPRESERVE
 
-#ifdef COMPRESERVE
+#ifndef COMPRESERVE
 #define	COMSPEED	9600		/* Baud rate */
 #define	COMDATA		8		/* Data bits */ 
 #define	COMPARITY	0		/* Parity: 0=None, 1=Odd, 2=Even */
