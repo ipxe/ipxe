@@ -199,3 +199,11 @@ REQUIRE_OBJECT ( wince );
 #ifdef	PXE_IMAGE
 REQUIRE_OBJECT ( pxe );
 #endif
+
+/*
+ * Drag in miscellaneous objects
+ *
+ */
+#ifdef	NULL_TRAP
+REQUIRE_OBJECT ( nulltrap );
+#endif

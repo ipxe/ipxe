@@ -124,5 +124,6 @@
 				 * "make bin/rtl8139.dsk bs" */
 #undef	BUILD_ID		/* Include a custom build ID string,
 				 * e.g "test-foo" */
+#undef	NULL_TRAP		/* Attempt to catch NULL function calls */
 
 /* @END general.h */
