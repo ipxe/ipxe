@@ -19,6 +19,8 @@
 #include "etherboot.h"
 #include "nic.h"
 #include <gpxe/pci.h>
+#include <gpxe/bitbash.h>
+#include <gpxe/i2c.h>
 #include "timer.h"
 #define dma_addr_t unsigned long
 #include "etherfabric.h"
@@ -185,224 +187,12 @@ struct efab_nic {
 
 	/** INT_REG_KER for Falcon */
 	efab_oword_t int_ker __attribute__ (( aligned ( 16 ) ));
+
+	/** EEPROM access */
+	struct i2c_bit_basher ef1002_i2c;
+	unsigned long ef1002_i2c_outputs;
+	struct i2c_device ef1002_eeprom;
 };
-
-/**************************************************************************
- *
- * EEPROM access
- *
- **************************************************************************
- */
-
-#define EFAB_EEPROM_SDA		0x80000000u
-#define EFAB_EEPROM_SCL		0x40000000u
-#define ARIZONA_24xx00_SLAVE	0xa0
-#define EFAB_EEPROM_READ_SELECT	( ARIZONA_24xx00_SLAVE | 1 )
-#define EFAB_EEPROM_WRITE_SELECT ( ARIZONA_24xx00_SLAVE | 0 )
-
-static void eeprom_release ( uint32_t *eeprom_reg ) {
-	unsigned int dev;
-
-	udelay ( 10 );
-	dev = readl ( eeprom_reg );
-	writel ( dev | ( EFAB_EEPROM_SDA | EFAB_EEPROM_SCL ),
-		 eeprom_reg );
-	udelay ( 10 );
-}
-
-static void eeprom_start ( uint32_t *eeprom_reg ) {
-	unsigned int dev;
-	
-	udelay ( 10 );
-	dev = readl ( eeprom_reg );
-	
-	if ( ( dev & ( EFAB_EEPROM_SDA | EFAB_EEPROM_SCL ) ) !=
-	     ( EFAB_EEPROM_SDA | EFAB_EEPROM_SCL ) ) {
-		udelay ( 10 );
-		writel ( dev | ( EFAB_EEPROM_SDA | EFAB_EEPROM_SCL ),
-			 eeprom_reg );
-		udelay ( 1 );
-	}
-	dev &=~ ( EFAB_EEPROM_SDA | EFAB_EEPROM_SCL );
-	
-	udelay ( 10 );
-	writel ( dev | EFAB_EEPROM_SCL, eeprom_reg) ;
-	udelay ( 1) ;
-
-	udelay ( 10 );
-	writel ( dev, eeprom_reg );
-	udelay ( 10 );
-}
-
-static void eeprom_stop ( uint32_t *eeprom_reg ) { 
-	unsigned int dev;
-	
-	udelay ( 10 );
-	dev = readl ( eeprom_reg );
-	EFAB_ASSERT ( ! ( dev & EFAB_EEPROM_SCL ) );
-	
-	if ( dev & ( EFAB_EEPROM_SDA | EFAB_EEPROM_SCL ) ) {
-		dev &=~ ( EFAB_EEPROM_SDA | EFAB_EEPROM_SCL );
-		udelay ( 10 );
-		writel ( dev, eeprom_reg );
-		udelay ( 10 );
-	}
-	
-	udelay ( 10 );
-	dev |= EFAB_EEPROM_SCL;
-	writel ( dev, eeprom_reg );
-	udelay ( 10 );
-	
-	udelay ( 10 );
-	dev |= EFAB_EEPROM_SDA;
-	writel ( dev, eeprom_reg );
-	udelay ( 10 );
-}
-
-static void eeprom_write ( uint32_t *eeprom_reg, unsigned char data ) {
-	int i;
-	unsigned int dev;
-	
-	udelay ( 10 );
-	dev = readl ( eeprom_reg );
-	udelay ( 10 );
-	EFAB_ASSERT ( ! ( dev & EFAB_EEPROM_SCL ) );
-	
-	for ( i = 0 ; i < 8 ; i++, data <<= 1 ) {
-		if ( data & 0x80 ) {
-			dev |=  EFAB_EEPROM_SDA;
-		} else {
-			dev &=~ EFAB_EEPROM_SDA;
-		}
-		udelay ( 10 );
-		writel ( dev, eeprom_reg );
-		udelay ( 10 );
-		
-		udelay ( 10 );
-		writel ( dev | EFAB_EEPROM_SCL, eeprom_reg );
-		udelay ( 10 );
-		
-		udelay ( 10 );
-		writel ( dev, eeprom_reg );
-		udelay ( 10 );
-	}
-	
-	if( ! ( dev & EFAB_EEPROM_SDA ) ) {
-		udelay ( 10 );
-		writel ( dev | EFAB_EEPROM_SDA, eeprom_reg );
-		udelay ( 10 );
-	}
-}
-
-static unsigned char eeprom_read ( uint32_t *eeprom_reg ) {
-	unsigned int i, dev, rd;
-	unsigned char val = 0;
-	
-	udelay ( 10 );
-	dev = readl ( eeprom_reg );
-	udelay ( 10 );
-	EFAB_ASSERT ( ! ( dev & EFAB_EEPROM_SCL ) );
-	
-	if( ! ( dev & EFAB_EEPROM_SDA ) ) {
-		dev |= EFAB_EEPROM_SDA;
-		udelay ( 10 );
-		writel ( dev, eeprom_reg );
-		udelay ( 10 );
-	}
-	
-	for( i = 0 ; i < 8 ; i++ ) {
-		udelay ( 10 );
-		writel ( dev | EFAB_EEPROM_SCL, eeprom_reg );
-		udelay ( 10 );
-		
-		udelay ( 10 );
-		rd = readl ( eeprom_reg );
-		udelay ( 10 );
-		val = ( val << 1 ) | ( ( rd & EFAB_EEPROM_SDA ) != 0 );
-		
-		udelay ( 10 );
-		writel ( dev, eeprom_reg );
-		udelay ( 10 );
-	}
-
-	return val;
-}
-
-static int eeprom_check_ack ( uint32_t *eeprom_reg ) {
-	int ack;
-	unsigned int dev;
-	
-	udelay ( 10 );
-	dev = readl ( eeprom_reg );
-	EFAB_ASSERT ( ! ( dev & EFAB_EEPROM_SCL ) );
-	
-	writel ( dev | EFAB_EEPROM_SCL, eeprom_reg );
-	udelay ( 10 );
-	
-	udelay ( 10 );
-	ack = readl ( eeprom_reg ) & EFAB_EEPROM_SDA;
-	
-	udelay ( 10 );
-	writel ( ack & ~EFAB_EEPROM_SCL, eeprom_reg );
-	udelay ( 10 );
-	
-	return ( ack == 0 );
-}
-
-static void eeprom_send_ack ( uint32_t *eeprom_reg ) {
-	unsigned int dev;
-	
-	udelay ( 10 );
-	dev = readl ( eeprom_reg );
-	EFAB_ASSERT ( ! ( dev & EFAB_EEPROM_SCL ) );
-	
-	udelay ( 10 );
-	dev &= ~EFAB_EEPROM_SDA;	
-	writel ( dev, eeprom_reg );
-	udelay ( 10 );
-	
-	udelay ( 10 );
-	dev |= EFAB_EEPROM_SCL;     
-	writel ( dev, eeprom_reg );
-	udelay ( 10 );
-	
-	udelay ( 10 );
-	dev |= EFAB_EEPROM_SDA;	
-	writel ( dev & ~EFAB_EEPROM_SCL, eeprom_reg );
-	udelay ( 10 );
-}
-
-static int efab_eeprom_read_mac ( uint32_t *eeprom_reg, uint8_t *mac_addr ) {
-	int i;
-
-	eeprom_start ( eeprom_reg );
-
-	eeprom_write ( eeprom_reg, EFAB_EEPROM_WRITE_SELECT );
-	if ( ! eeprom_check_ack ( eeprom_reg ) )
-		return 0;
-	
-	eeprom_write ( eeprom_reg, 0 );
-	if ( ! eeprom_check_ack ( eeprom_reg ) )
-		return 0;
-	
-	eeprom_stop ( eeprom_reg );
-	eeprom_start ( eeprom_reg );
-	
-	eeprom_write ( eeprom_reg, EFAB_EEPROM_READ_SELECT );
-	if ( ! eeprom_check_ack ( eeprom_reg ) )
-		return 0;
-	
-	for ( i = 0 ; i < ETH_ALEN ; i++ ) {
-		mac_addr[i] = eeprom_read ( eeprom_reg );
-		eeprom_send_ack ( eeprom_reg );
-	}
-	
-	eeprom_stop ( eeprom_reg );
-	
-	eeprom_release ( eeprom_reg );
-	
-	return 1;
-}
 
 /**************************************************************************
  *
@@ -973,6 +763,8 @@ static int mentormac_mdio_read ( struct efab_nic *efab, int phy_id,
 
 /** EEPROM access */
 #define EF1_EEPROM_REG 0x0040
+#define EF1_EEPROM_LBN 0
+#define EF1_EEPROM_WIDTH 32
 
 /** Control register 2 */
 #define EF1_CTL2_REG 0x4c
@@ -1107,6 +899,12 @@ static int mentormac_mdio_read ( struct efab_nic *efab, int phy_id,
 #define EF1_TX_EV_IDX_LBN 0
 #define EF1_TX_EV_IDX_WIDTH 16
 
+/* I2C ID of the EEPROM */
+#define EF1_EEPROM_I2C_ID 0x50
+
+/* Offset of MAC address within EEPROM */
+#define EF1_EEPROM_HWADDR_OFFSET 0x0
+
 /**
  * Write dword to EF1002 register
  *
@@ -1163,6 +961,49 @@ static const unsigned int efab_pci_reg_addr[] = {
 struct efab_pci_reg {
 	uint32_t reg[EFAB_NUM_PCI_REG];
 };
+
+/*
+ * I2C interface and EEPROM
+ *
+ */
+
+static unsigned long ef1002_i2c_bits[] = {
+	[I2C_BIT_SCL] = ( 1 << 30 ),
+	[I2C_BIT_SDA] = ( 1 << 31 ),
+};
+
+static void ef1002_i2c_write_bit ( struct bit_basher *basher,
+				   unsigned int bit_id, unsigned long data ) {
+	struct efab_nic *efab = container_of ( basher, struct efab_nic,
+					       ef1002_i2c.basher );
+	unsigned long mask;
+	efab_dword_t reg;
+
+	mask = ef1002_i2c_bits[bit_id];
+	efab->ef1002_i2c_outputs &= ~mask;
+	efab->ef1002_i2c_outputs |= ( data & mask );
+	EFAB_POPULATE_DWORD_1 ( reg, EF1_EEPROM, efab->ef1002_i2c_outputs );
+	ef1002_writel ( efab, &reg, EF1_EEPROM_REG );
+}
+
+static int ef1002_i2c_read_bit ( struct bit_basher *basher,
+				 unsigned int bit_id ) {
+	struct efab_nic *efab = container_of ( basher, struct efab_nic,
+					       ef1002_i2c.basher );
+	unsigned long mask;
+	efab_dword_t reg;
+
+	mask = ef1002_i2c_bits[bit_id];
+	ef1002_readl ( efab, &reg, EF1_EEPROM_REG );
+	return ( EFAB_DWORD_FIELD ( reg, EF1_EEPROM ) & mask );
+}
+
+static void ef1002_init_eeprom ( struct efab_nic *efab ) {
+	efab->ef1002_i2c.basher.write = ef1002_i2c_write_bit;
+	efab->ef1002_i2c.basher.read = ef1002_i2c_read_bit;
+	init_i2c_bit_basher ( &efab->ef1002_i2c );
+	efab->ef1002_eeprom.address = EF1_EEPROM_I2C_ID;
+}
 
 /**
  * Reset device
@@ -1295,6 +1136,9 @@ static int ef1002_init_nic ( struct efab_nic *efab ) {
 	/* Give PHY time to wake up.  It takes a while. */
 	sleep ( 2 );
 
+	/* Attach I2C bus */
+	ef1002_init_eeprom ( efab );
+
 	return 1;
 }
 
@@ -1303,8 +1147,11 @@ static int ef1002_init_nic ( struct efab_nic *efab ) {
  *
  */
 static int ef1002_read_eeprom ( struct efab_nic *efab ) {
-	return efab_eeprom_read_mac ( efab->membase + EF1_EEPROM_REG,
-				      efab->mac_addr );
+	struct i2c_interface *i2c = &efab->ef1002_i2c.i2c;
+	struct i2c_device *i2cdev = &efab->ef1002_eeprom;
+
+	return i2c->read ( i2c, i2cdev, EF1_EEPROM_HWADDR_OFFSET,
+			   efab->mac_addr, sizeof ( efab->mac_addr ) );
 }
 
 /** RX descriptor */
@@ -2921,8 +2768,7 @@ static void etherfabric_transmit ( struct nic *nic, const char *dest,
 /**************************************************************************
 DISABLE - Turn off ethernet interface
 ***************************************************************************/
-static void etherfabric_disable ( struct nic *nic,
-				  struct pci_device *pci __unused ) {
+static void etherfabric_disable ( struct nic *nic ) {
 	struct efab_nic *efab = nic->priv_data;
 
 	efab->op->reset ( efab );
@@ -2962,8 +2808,7 @@ static struct nic_operations etherfabric_operations = {
 /**************************************************************************
 PROBE - Look for an adapter, this routine's visible to the outside
 ***************************************************************************/
-static int etherfabric_probe ( struct dev *dev, struct pci_device *pci ) {
-	struct nic *nic = ( struct nic * ) dev;
+static int etherfabric_probe ( struct nic *nic, struct pci_device *pci ) {
 	static struct efab_nic efab;
 	static int nic_port = 1;
 	struct efab_buffers *buffers;
