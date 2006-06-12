@@ -43,8 +43,9 @@ block_to_ata ( struct block_device *blockdev ) {
  */
 static inline __attribute__ (( always_inline )) int
 ata_command ( struct ata_device *ata, struct ata_command *command ) {
-	DBG ( "ATA cmd %02x dev %02x fl %02x LBA %llx count %04x\n",
-	      command->cb.cmd_stat, command->cb.device, command->cb.flags,
+	DBG ( "ATA cmd %02x dev %02x LBA%s %llx count %04x\n",
+	      command->cb.cmd_stat, command->cb.device,
+	      ( command->cb.lba48 ? "48" : "" ),
 	      ( unsigned long long ) command->cb.lba.native,
 	      command->cb.count.native );
 
