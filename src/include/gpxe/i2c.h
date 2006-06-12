@@ -82,7 +82,9 @@ struct i2c_bit_basher {
 
 /** Bit indices used for I2C bit-bashing interface */
 enum {
+	/** Serial clock */
 	I2C_BIT_SCL = 0,
+	/** Serial data */
 	I2C_BIT_SDA,
 };
 

@@ -153,7 +153,7 @@ static uint8_t i2c_recv_byte ( struct bit_basher *basher ) {
 	/* Receive byte */
 	for ( i = 8 ; i ; i-- ) {
 		value <<= 1;
-		value |= i2c_recv_bit ( basher );
+		value |= ( i2c_recv_bit ( basher ) & 0x1 );
 	}
 
 	/* Send NACK */

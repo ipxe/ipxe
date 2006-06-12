@@ -48,8 +48,10 @@ void write_bit ( struct bit_basher *basher, unsigned int bit_id,
  * @v bit_id		Bit number
  * @ret data		Value read
  *
- * @c data will always be either 0 or 1.
+ * @c data will always be either 0 or -1UL.  The idea is that the
+ * caller can simply binary-AND the returned value with whatever mask
+ * it needs to apply.
  */
 int read_bit ( struct bit_basher *basher, unsigned int bit_id ) {
-	return ( basher->read ( basher, bit_id ) ? 1 : 0 );
+	return ( basher->read ( basher, bit_id ) ? -1UL : 0 );
 }
