@@ -376,7 +376,7 @@ int15_e820:
 	jmp	int15_e820
 	/* Restore flags from original INT 15,e820 call and return */
 1:	popfw
-	leal	12(%esp), %esp /* avoid changing flags */
+	addr32 leal	12(%esp), %esp /* avoid changing flags */
 	lret	$2
 	.size int15_e820, . - int15_e820
 	
