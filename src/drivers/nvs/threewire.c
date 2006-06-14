@@ -16,53 +16,42 @@
  * Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
  */
 
-#include <timer.h>
-#include <gpxe/nvs/threewire.h>
+#include <stddef.h>
+#include <byteswap.h>
+#include <gpxe/spi.h>
+#include <gpxe/threewire.h>
 
 /** @file
  *
- * Three-wire serial interface
+ * Three-wire serial devices
  *
  */
 
 /**
  * Read from a three-wire device
  *
- * @v three	Three-wire interface
+ * @v three	Three-wire device
  * @v address	Address
  * @ret data	Data
  */
-unsigned long threewire_read ( struct threewire *three,
+unsigned long threewire_read ( struct threewire_device *three,
 			       unsigned long address ) {
-	struct threewire_operations *ops = three->ops;
-	unsigned long command;
-	unsigned long data;
-	int i;
+	struct spi_interface *spi = three->spi;
+	uint32_t data;
 
-	ops->setcs ( three, 1 );
-	
+	/* Activate chip select line */
+	spi->select_slave ( spi, three->slave );
+
 	/* Send command and address */
-	command = threewire_cmd_read ( three, address );
-	for ( i = ( threewire_cmd_len ( three ) - 1 ) ; i >= 0 ; i-- ) {
-		ops->setdi ( three, ( command >> i ) & 0x1 );
-		udelay ( three->udelay );
-		ops->setsk ( three, 1 );
-		udelay ( three->udelay );
-		ops->setsk ( three, 0 );
-	}
-
+	data = cpu_to_le32 ( threewire_cmd_read ( three, address ) );
+	spi->transfer ( spi, &data, NULL, threewire_cmd_len ( three ) );
+	
 	/* Read back data */
 	data = 0;
-	for ( i = three->datasize ; i ; i-- ) {
-		udelay ( three->udelay );
-		ops->setsk ( three, 1 );
-		udelay ( three->udelay );
-		data <<= 1;
-		data |= ops->getdo ( three );
-		ops->setsk ( three, 0 );
-	}
+	spi->transfer ( spi, NULL, &data, three->datasize );
 
-	ops->setcs ( three, 0 );
+	/* Deactivate chip select line */
+	spi->deselect_slave ( spi );
 
-	return data;
+	return le32_to_cpu ( data );;
 }

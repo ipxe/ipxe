@@ -77,7 +77,8 @@
 #include <gpxe/ethernet.h>
 #include <gpxe/pkbuff.h>
 #include <gpxe/netdevice.h>
-#include <gpxe/nvs/threewire.h>
+#include <gpxe/spi.h>
+#include <gpxe/threewire.h>
 
 #define TX_RING_SIZE 4
 
@@ -92,10 +93,11 @@ struct rtl8139_rx {
 };
 
 struct rtl8139_nic {
-	struct threewire eeprom;
 	unsigned short ioaddr;
 	struct rtl8139_tx tx;
 	struct rtl8139_rx rx;
+	struct spi_bit_basher spibit;
+	struct threewire_device eeprom;
 };
 
 /* Tuning Parameters */
@@ -192,8 +194,8 @@ enum RxConfigBits {
 };
 
 /*  EEPROM access */
-#define EE_MODE_PROGRAM	0x80
-#define EE_MODE_NORMAL	0x00
+#define EE_M1		0x80	/* Mode select bit 1 */
+#define EE_M0		0x40	/* Mode select bit 0 */
 #define EE_CS		0x08	/* EEPROM chip select */
 #define EE_SK		0x04	/* EEPROM shift clock */
 #define EE_DI		0x02	/* Data in */
@@ -202,50 +204,39 @@ enum RxConfigBits {
 /* Offsets within EEPROM (these are word offsets) */
 #define EE_MAC 7
 
-static inline struct rtl8139_nic * three_to_rtl ( struct threewire *three ) {
-	return container_of ( three, struct rtl8139_nic, eeprom );
+static inline struct rtl8139_nic *
+basher_to_rtl ( struct bit_basher *basher ) {
+	return container_of ( basher, struct rtl8139_nic, spibit.basher );
 }
 
-static void rtl_setcs ( struct threewire *three, int cs ) {
-	struct rtl8139_nic *rtl = three_to_rtl ( three );
-	unsigned int eereg;
-
-	eereg = cs ? ( EE_MODE_PROGRAM | EE_CS ) : ( EE_MODE_NORMAL );
-	outb ( eereg, rtl->ioaddr + Cfg9346 );
-}
-
-static void rtl_setsk ( struct threewire *three, int sk ) {
-	struct rtl8139_nic *rtl = three_to_rtl ( three );
-	unsigned int eereg;
-
-	eereg = inb ( rtl->ioaddr + Cfg9346 );
-	eereg = ( eereg & ~EE_SK ) | ( sk ? EE_SK : 0 );
-	outb ( eereg, rtl->ioaddr + Cfg9346 );
-}
-
-static void rtl_setdi ( struct threewire *three, int di ) {
-	struct rtl8139_nic *rtl = three_to_rtl ( three );
-	unsigned int eereg;
-
-	eereg = inb ( rtl->ioaddr + Cfg9346 );
-	eereg = ( eereg & ~EE_DI ) | ( di ? EE_DI : 0 );
-	outb ( eereg, rtl->ioaddr + Cfg9346 );
-}
-
-static int rtl_getdo ( struct threewire *three ) {
-	struct rtl8139_nic *rtl = three_to_rtl ( three );
-	unsigned int eereg;
-
-	eereg = ( inb ( rtl->ioaddr + Cfg9346 ) & EE_DO );
-	return eereg;
-}
-
-static struct threewire_operations rtl_three_ops = {
-	.setcs = rtl_setcs,
-	.setsk = rtl_setsk,
-	.setdi = rtl_setdi,
-	.getdo = rtl_getdo,
+static const uint8_t rtl_ee_bits[] = {
+	[SPI_BIT_SCLK]	= EE_SK,
+	[SPI_BIT_MOSI]	= EE_DI,
+	[SPI_BIT_MISO]	= EE_DO,
+	[SPI_BIT_SS(0)]	= ( EE_CS | EE_M1 ),
 };
+
+static int rtl_spi_read_bit ( struct bit_basher *basher,
+			      unsigned int bit_id ) {
+	struct rtl8139_nic *rtl = basher_to_rtl ( basher );
+	uint8_t mask = rtl_ee_bits[bit_id];
+	uint8_t eereg;
+
+	eereg = inb ( rtl->ioaddr + Cfg9346 );
+	return ( eereg & mask );
+}
+
+static void rtl_spi_write_bit ( struct bit_basher *basher,
+				unsigned int bit_id, unsigned long data ) {
+	struct rtl8139_nic *rtl = basher_to_rtl ( basher );
+	uint8_t mask = rtl_ee_bits[bit_id];
+	uint8_t eereg;
+
+	eereg = inb ( rtl->ioaddr + Cfg9346 );
+	eereg &= ~mask;
+	eereg |= ( data & mask );
+	outb ( eereg, rtl->ioaddr + Cfg9346 );
+}
 
 /**
  * Set up for EEPROM access
@@ -255,14 +246,20 @@ static struct threewire_operations rtl_three_ops = {
 static void rtl_init_eeprom ( struct rtl8139_nic *rtl ) {
 	int ee9356;
 
+	/* Initialise three-wire bus */
+	rtl->spibit.basher.read = rtl_spi_read_bit;
+	rtl->spibit.basher.write = rtl_spi_write_bit;
+	rtl->spibit.spi.mode = SPI_MODE_THREEWIRE;
+	init_spi_bit_basher ( &rtl->spibit );
+
+	/* Detect EEPROM type and initialise three-wire device */
 	ee9356 = ( inw ( rtl->ioaddr + RxConfig ) & Eeprom9356 );
 	DBG ( "EEPROM is an %s\n", ee9356 ? "AT93C56" : "AT93C46" );
-	rtl->eeprom.ops = &rtl_three_ops;
 	rtl->eeprom.adrsize =
 		( ee9356 ? AT93C56_ORG16_ADRSIZE : AT93C46_ORG16_ADRSIZE );
 	rtl->eeprom.datasize =
 		( ee9356 ? AT93C56_ORG16_DATASIZE : AT93C46_ORG16_DATASIZE );
-	rtl->eeprom.udelay = 1;
+	rtl->eeprom.spi = &rtl->spibit.spi;
 }
 
 /**
@@ -279,9 +276,8 @@ static void rtl_read_mac ( struct rtl8139_nic *rtl, uint8_t *mac_addr ) {
 	int i;
 	
 	DBG ( "MAC address is " );
-	for ( i = 0 ; i < ( ETH_ALEN / 2 ) ; i++ ) {
-		u.word = cpu_to_le16 ( threewire_read ( &rtl->eeprom,
-							EE_MAC + i ) );
+	for ( i = EE_MAC ; i < ( EE_MAC + ( ETH_ALEN / 2 ) ) ; i++ ) {
+		u.word = cpu_to_le16 ( threewire_read ( &rtl->eeprom, i ) );
 		*mac_addr++ = u.bytes[0];
 		*mac_addr++ = u.bytes[1];
 		DBG ( "%02x%02x", u.bytes[0], u.bytes[1] );
