@@ -11,6 +11,9 @@
 #include <gpxe/tcp.h>
 #include <gpxe/scsi.h>
 
+/** Default iSCSI port */
+#define ISCSI_PORT 3260
+
 /**
  * iSCSI segment lengths
  *
