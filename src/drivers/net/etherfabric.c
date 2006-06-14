@@ -1150,8 +1150,8 @@ static int ef1002_read_eeprom ( struct efab_nic *efab ) {
 	struct i2c_interface *i2c = &efab->ef1002_i2c.i2c;
 	struct i2c_device *i2cdev = &efab->ef1002_eeprom;
 
-	return i2c->read ( i2c, i2cdev, EF1_EEPROM_HWADDR_OFFSET,
-			   efab->mac_addr, sizeof ( efab->mac_addr ) );
+	return ( i2c->read ( i2c, i2cdev, EF1_EEPROM_HWADDR_OFFSET,
+			     efab->mac_addr, sizeof ( efab->mac_addr ) ) == 0);
 }
 
 /** RX descriptor */
