@@ -38,7 +38,6 @@
 void write_bit ( struct bit_basher *basher, unsigned int bit_id,
 		 unsigned long data ) {
 	basher->write ( basher, bit_id, ( data ? -1UL : 0 ) );
-	udelay ( basher->udelay );
 }
 
 /**

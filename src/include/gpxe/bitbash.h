@@ -33,8 +33,6 @@ struct bit_basher {
 	 * @ret non-zero	Input is a logic 1
 	 */
 	int ( * read ) ( struct bit_basher *basher, unsigned int bit_id );
-	/** Delay between subsequent calls to write(), in microseconds */
-	unsigned int udelay;
 };
 
 extern void write_bit ( struct bit_basher *basher, unsigned int bit_id,

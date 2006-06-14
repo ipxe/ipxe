@@ -32,14 +32,24 @@
  */
 
 /**
+ * Delay between output state changes
+ *
+ * Max rated i2c speed (for the basic i2c protocol) is 100kbps,
+ * i.e. 200k clock transitions per second.
+ */
+static void i2c_delay ( void ) {
+	udelay ( I2C_UDELAY );
+}
+
+/**
  * Set state of I2C SCL line
  *
  * @v basher		Bit-bashing interface
  * @v state		New state of SCL
  */
-static inline __attribute__ (( always_inline )) void
-setscl ( struct bit_basher *basher, int state ) {
+static void setscl ( struct bit_basher *basher, int state ) {
 	write_bit ( basher, I2C_BIT_SCL, state );
+	i2c_delay();
 }
 
 /**
@@ -48,9 +58,9 @@ setscl ( struct bit_basher *basher, int state ) {
  * @v basher		Bit-bashing interface
  * @v state		New state of SDA
  */
-static inline __attribute__ (( always_inline )) void
-setsda ( struct bit_basher *basher, int state ) {
+static void setsda ( struct bit_basher *basher, int state ) {
 	write_bit ( basher, I2C_BIT_SDA, state );
+	i2c_delay();
 }
 
 /**
@@ -59,8 +69,7 @@ setsda ( struct bit_basher *basher, int state ) {
  * @v basher		Bit-bashing interface
  * @ret state		State of SDA
  */
-static inline __attribute__ (( always_inline )) int
-getsda ( struct bit_basher *basher ) {
+static int getsda ( struct bit_basher *basher ) {
 	return read_bit ( basher, I2C_BIT_SDA );
 }
 
@@ -308,6 +317,5 @@ void init_i2c_bit_basher ( struct i2c_bit_basher *i2cbit ) {
 	assert ( basher->write != NULL );
 	i2cbit->i2c.read = i2c_bit_read;
 	i2cbit->i2c.write = i2c_bit_write;
-	basher->udelay = I2C_UDELAY;
 	i2c_stop ( basher );
 }
