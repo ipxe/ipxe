@@ -557,7 +557,7 @@ static void mentormac_init ( struct efab_nic *efab,
 	udelay ( 10 );
 
 	/* Max frame len register */
-	EFAB_POPULATE_DWORD_1 ( reg, GM_MAX_FLEN, ETH_FRAME_LEN );
+	EFAB_POPULATE_DWORD_1 ( reg, GM_MAX_FLEN, ETH_FRAME_LEN + 4 /* FCS */);
 	efab->op->mac_writel ( efab, &reg, GM_MAX_FLEN_REG_MAC );
 	udelay ( 10 );
 
