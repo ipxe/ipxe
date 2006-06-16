@@ -746,6 +746,12 @@ static int mentormac_mdio_read ( struct efab_nic *efab, int phy_id,
 #define EF1_TX_ENGINE_EN_WIDTH 1
 #define EF1_RX_ENGINE_EN_LBN 18
 #define EF1_RX_ENGINE_EN_WIDTH 1
+#define EF1_TURBO2_LBN 17
+#define EF1_TURBO2_WIDTH 1
+#define EF1_TURBO1_LBN 16
+#define EF1_TURBO1_WIDTH 1
+#define EF1_TURBO3_LBN 14
+#define EF1_TURBO3_WIDTH 1
 #define EF1_LB_RESET_LBN 3
 #define EF1_LB_RESET_WIDTH 1
 #define EF1_MAC_RESET_LBN 2
@@ -900,6 +906,7 @@ static int mentormac_mdio_read ( struct efab_nic *efab, int phy_id,
 #define EF1_EV_CODE_WIDTH 8
 #define EF1_RX_EV_DECODE 0x01
 #define EF1_TX_EV_DECODE 0x02
+#define EF1_TIMER_EV_DECODE 0x0b
 #define EF1_DRV_GEN_EV_DECODE 0x0f
 
 /* Receive events */
@@ -1097,6 +1104,9 @@ static int ef1002_init_nic ( struct efab_nic *efab ) {
 	EFAB_SET_DWORD_FIELD ( reg, EF1_MASTER_EVENTS, 0 );
 	EFAB_SET_DWORD_FIELD ( reg, EF1_TX_ENGINE_EN, 0 );
 	EFAB_SET_DWORD_FIELD ( reg, EF1_RX_ENGINE_EN, 0 );
+	EFAB_SET_DWORD_FIELD ( reg, EF1_TURBO2, 1 );
+	EFAB_SET_DWORD_FIELD ( reg, EF1_TURBO1, 1 );
+	EFAB_SET_DWORD_FIELD ( reg, EF1_TURBO3, 1 );
 	EFAB_SET_DWORD_FIELD ( reg, EF1_CAM_ENABLE, 1 );
 	ef1002_writel ( efab, &reg, EF1_CTR_GEN_STATUS0_REG );
 	udelay ( 1000 );
@@ -1184,6 +1194,7 @@ static void ef1002_build_rx_desc ( struct efab_nic *efab,
 				EF1_RX_KER_BUF_ADR,
 				virt_to_bus ( rx_buf->addr ) );
 	ef1002_writel ( efab, &rxd.dword[0], EF1_RX_DESC_FIFO + 0 );
+	wmb();
 	ef1002_writel ( efab, &rxd.dword[1], EF1_RX_DESC_FIFO + 4 );
 	udelay ( 10 );
 }
@@ -1219,6 +1230,7 @@ static void ef1002_build_tx_desc ( struct efab_nic *efab,
 
 	ef1002_writel ( efab, &txd.dword[0], EF1_TX_DESC_FIFO + 0 );
 	ef1002_writel ( efab, &txd.dword[1], EF1_TX_DESC_FIFO + 4 );
+	wmb();
 	ef1002_writel ( efab, &txd.dword[2], EF1_TX_DESC_FIFO + 8 );
 	udelay ( 10 );
 }
@@ -1265,6 +1277,13 @@ static int ef1002_fetch_event ( struct efab_nic *efab,
 		event->rx_id = EFAB_DWORD_FIELD ( reg, EF1_RX_EV_IDX );
 		/* RX len not available via event FIFO */
 		event->rx_len = ETH_FRAME_LEN;
+		break;
+	case EF1_TIMER_EV_DECODE:
+		/* These are safe to ignore.  We seem to get some at
+		 * start of day, presumably due to the timers starting
+		 * up with random contents.
+		 */
+		event->type = EFAB_EV_NONE;
 		break;
 	default:
 		printf ( "Unknown event type %d data %08lx\n", ev_code,
@@ -2716,6 +2735,14 @@ static int etherfabric_poll ( struct nic *nic, int retrieve ) {
 	/* If we don't want to retrieve it just yet, return 1 */
 	if ( ! retrieve )
 		return 1;
+
+	/* There seems to be a hardware race.  The event can show up
+	 * on the event FIFO before the DMA has completed, so we
+	 * insert a tiny delay.  If this proves unreliable, we should
+	 * switch to using event DMA rather than the event FIFO, since
+	 * event DMA ordering is guaranteed.
+	 */
+	udelay ( 1 );
 
 	/* Copy packet contents */
 	nic->packetlen = rx_buf->len;
