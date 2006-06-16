@@ -495,22 +495,31 @@ struct efab_mentormac_parameters {
  * Reset Mentor MAC
  *
  */
-static void mentormac_reset ( struct efab_nic *efab, int reset ) {
+static void mentormac_reset ( struct efab_nic *efab ) {
 	efab_dword_t reg;
+	int save_port;
 
-	EFAB_POPULATE_DWORD_1 ( reg, GM_SW_RST, reset );
+	/* Take into reset */
+	EFAB_POPULATE_DWORD_1 ( reg, GM_SW_RST, 1 );
 	efab->op->mac_writel ( efab, &reg, GM_CFG1_REG_MAC );
 	udelay ( 1000 );
 
-	if ( ( ! reset ) && ( efab->port == 0 ) ) {
-		/* Configure GMII interface so PHY is accessible.
-		 * Note that GMII interface is connected only to port
-		 * 0
-		 */
-		EFAB_POPULATE_DWORD_1 ( reg, GM_MGMT_CLK_SEL, 0x4 );
-		efab->op->mac_writel ( efab, &reg, GM_MII_MGMT_CFG_REG_MAC );
-		udelay ( 10 );
-	}
+	/* Take out of reset */
+	EFAB_POPULATE_DWORD_1 ( reg, GM_SW_RST, 0 );
+	efab->op->mac_writel ( efab, &reg, GM_CFG1_REG_MAC );
+	udelay ( 1000 );
+
+	/* Mentor MAC connects both PHYs to MAC 0 */
+	save_port = efab->port;
+	efab->port = 0;
+	/* Configure GMII interface so PHY is accessible.  Note that
+	 * GMII interface is connected only to port 0, and that on
+	 * Falcon this is a no-op.
+	 */
+	EFAB_POPULATE_DWORD_1 ( reg, GM_MGMT_CLK_SEL, 0x4 );
+	efab->op->mac_writel ( efab, &reg, GM_MII_MGMT_CFG_REG_MAC );
+	udelay ( 10 );
+	efab->port = save_port;
 }
 
 /**
@@ -1038,7 +1047,7 @@ static int ef1002_reset ( struct efab_nic *efab ) {
 		pci_read_config_dword ( pci_dev, efab_pci_reg_addr[i], &tmp );
 		if ( tmp != pci_reg.reg[i] ) {
 			printf ( "PCI restore failed on register %02x "
-				 "(is %08x, should be %08x); reboot\n",
+				 "(is %08lx, should be %08lx); reboot\n",
 				 i, tmp, pci_reg.reg[i] );
 			return 0;
 		}
@@ -1060,7 +1069,6 @@ static int ef1002_reset ( struct efab_nic *efab ) {
  */
 static int ef1002_init_nic ( struct efab_nic *efab ) {
 	efab_dword_t reg;
-	int save_port;
 
 	/* No idea what CAM is, but the 'datasheet' says that we have
 	 * to write these values in at start of day
@@ -1110,31 +1118,8 @@ static int ef1002_init_nic ( struct efab_nic *efab ) {
 	wmb();
 	udelay ( 10000 );
 
-	/* Reset both MACs */
-	save_port = efab->port;
-	efab->port = 0;
-	mentormac_reset ( efab, 1 );
-	efab->port = 1;
-	mentormac_reset ( efab, 1 );
-
-	/* Reset both PHYs */
-	ef1002_readl ( efab, &reg, EF1_CTR_GEN_STATUS0_REG );
-	EFAB_SET_DWORD_FIELD ( reg, EF1_MAC_RESET, 1 );
-	ef1002_writel ( efab, &reg, EF1_CTR_GEN_STATUS0_REG );
-	udelay ( 10000 );
-	EFAB_SET_DWORD_FIELD ( reg, EF1_MAC_RESET, 0 );
-	ef1002_writel ( efab, &reg, EF1_CTR_GEN_STATUS0_REG );
-	udelay ( 10000 );
-
-	/* Take MACs out of reset */
-	efab->port = 0;
-	mentormac_reset ( efab, 0 );
-	efab->port = 1;
-	mentormac_reset ( efab, 0 );
-	efab->port = save_port;
-
-	/* Give PHY time to wake up.  It takes a while. */
-	sleep ( 2 );
+	/* Reset MAC */
+	mentormac_reset ( efab );
 
 	/* Attach I2C bus */
 	ef1002_init_eeprom ( efab );
@@ -1254,7 +1239,8 @@ static int ef1002_fetch_event ( struct efab_nic *efab,
 		event->rx_len = ETH_FRAME_LEN;
 		break;
 	default:
-		printf ( "Unknown event type %d\n", ev_code );
+		printf ( "Unknown event type %d data %08lx\n", ev_code,
+			 EFAB_DWORD_FIELD ( reg, EFAB_DWORD_0 ) );
 		event->type = EFAB_EV_NONE;
 	}
 
@@ -2026,9 +2012,7 @@ static int falcon_init_nic ( struct efab_nic *efab ) {
 	udelay ( 1000 );
 	
 	/* Reset the MAC */
-	mentormac_reset ( efab, 1 );
-	/* Take MAC out of reset */
-	mentormac_reset ( efab, 0 );
+	mentormac_reset ( efab );
 
 	/* Set up event queue */
 	falcon_create_special_buffer ( efab, efab->eventq, FALCON_EVQ_ID );
@@ -2628,10 +2612,6 @@ static int efab_init_mac ( struct efab_nic *efab ) {
  */
 static int efab_init_nic ( struct efab_nic *efab ) {
 	int i;
-
-	/* Reset NIC */
-	if ( ! efab->op->reset ( efab ) )
-		return 0;
 
 	/* Initialise NIC */
 	if ( ! efab->op->init_nic ( efab ) )
