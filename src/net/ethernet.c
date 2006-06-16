@@ -49,7 +49,7 @@ static uint8_t eth_broadcast[ETH_ALEN] = { 0xff, 0xff, 0xff, 0xff, 0xff, 0xff};
 static int eth_transmit ( struct pk_buff *pkb, struct net_device *netdev,
 			  struct net_protocol *net_protocol,
 			  const void *ll_dest ) {
-	struct ethhdr *ethhdr = pkb_push ( pkb, ETH_HLEN );
+	struct ethhdr *ethhdr = pkb_push ( pkb, sizeof ( *ethhdr ) );
 
 	memcpy ( ethhdr->h_dest, ll_dest, ETH_ALEN );
 	memcpy ( ethhdr->h_source, netdev->ll_addr, ETH_ALEN );
