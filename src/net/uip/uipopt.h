@@ -328,7 +328,7 @@ extern void uip_udp_appcall ( void );
  *
  * \hideinitializer
  */
-#define UIP_RECEIVE_WINDOW   32768
+#define UIP_RECEIVE_WINDOW   4096
 
 /**
  * Determines if support for TCP urgent data notification should be
