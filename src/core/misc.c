@@ -64,8 +64,7 @@ int32_t random(void)
 	static int32_t seed = 0;
 	int32_t q;
 	if (!seed) /* Initialize linear congruential generator */
-		seed = currticks() + *(int32_t *)&arptable[ARP_CLIENT].node
-		       + ((int16_t *)arptable[ARP_CLIENT].node)[2];
+		seed = currticks();
 	/* simplified version of the LCG given in Bruce Schneier's
 	   "Applied Cryptography" */
 	q = seed/53668;
