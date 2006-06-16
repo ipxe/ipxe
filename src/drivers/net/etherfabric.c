@@ -771,16 +771,28 @@ static int mentormac_mdio_read ( struct efab_nic *efab, int phy_id,
 #define EF1_EVT3_REG 0x38
 
 /** EEPROM access */
-#define EF1_EEPROM_REG 0x0040
+#define EF1_EEPROM_REG 0x40
+#define EF1_EEPROM_SDA_LBN 31
+#define EF1_EEPROM_SDA_WIDTH 1
+#define EF1_EEPROM_SCL_LBN 30
+#define EF1_EEPROM_SCL_WIDTH 1
+#define EF1_JTAG_DISCONNECT_LBN 17
+#define EF1_JTAG_DISCONNECT_WIDTH 1
 #define EF1_EEPROM_LBN 0
 #define EF1_EEPROM_WIDTH 32
 
 /** Control register 2 */
 #define EF1_CTL2_REG 0x4c
+#define EF1_PLL_TRAP_LBN 31
+#define EF1_PLL_TRAP_WIDTH 1
 #define EF1_MEM_MAP_4MB_LBN 11
 #define EF1_MEM_MAP_4MB_WIDTH 1
 #define EF1_EV_INTR_CLR_WRITE_LBN 6
 #define EF1_EV_INTR_CLR_WRITE_WIDTH 1
+#define EF1_BURST_MERGE_LBN 5
+#define EF1_BURST_MERGE_WIDTH 1
+#define EF1_CLEAR_NULL_PAD_LBN 4
+#define EF1_CLEAR_NULL_PAD_WIDTH 1
 #define EF1_SW_RESET_LBN 2
 #define EF1_SW_RESET_WIDTH 1
 #define EF1_INTR_AFTER_EVENT_LBN 1
@@ -1083,15 +1095,20 @@ static int ef1002_init_nic ( struct efab_nic *efab ) {
 	/* General control register 0 */
 	ef1002_readl ( efab, &reg, EF1_CTR_GEN_STATUS0_REG );
 	EFAB_SET_DWORD_FIELD ( reg, EF1_MASTER_EVENTS, 0 );
+	EFAB_SET_DWORD_FIELD ( reg, EF1_TX_ENGINE_EN, 0 );
+	EFAB_SET_DWORD_FIELD ( reg, EF1_RX_ENGINE_EN, 0 );
 	EFAB_SET_DWORD_FIELD ( reg, EF1_CAM_ENABLE, 1 );
 	ef1002_writel ( efab, &reg, EF1_CTR_GEN_STATUS0_REG );
 	udelay ( 1000 );
 
 	/* General control register 2 */
 	ef1002_readl ( efab, &reg, EF1_CTL2_REG );
-	EFAB_SET_DWORD_FIELD ( reg, EF1_INTR_AFTER_EVENT, 1 );
-	EFAB_SET_DWORD_FIELD ( reg, EF1_EV_INTR_CLR_WRITE, 0 );
+	EFAB_SET_DWORD_FIELD ( reg, EF1_PLL_TRAP, 1 );
 	EFAB_SET_DWORD_FIELD ( reg, EF1_MEM_MAP_4MB, 0 );
+	EFAB_SET_DWORD_FIELD ( reg, EF1_EV_INTR_CLR_WRITE, 0 );
+	EFAB_SET_DWORD_FIELD ( reg, EF1_BURST_MERGE, 0 );
+	EFAB_SET_DWORD_FIELD ( reg, EF1_CLEAR_NULL_PAD, 1 );
+	EFAB_SET_DWORD_FIELD ( reg, EF1_INTR_AFTER_EVENT, 1 );
 	ef1002_writel ( efab, &reg, EF1_CTL2_REG );
 	udelay ( 1000 );
 
@@ -1110,6 +1127,17 @@ static int ef1002_init_nic ( struct efab_nic *efab ) {
 	EFAB_SET_DWORD_FIELD ( reg, EF1_DMA_TX_CSR_INT_EN, 0 /* ?? */ );
 	ef1002_writel ( efab, &reg, EF1_DMA_TX_CSR_REG );
 	udelay ( 1000 );
+
+	/* Disconnect the JTAG chain.  Read-modify-write is impossible
+	 * on the I2C control bits, since reading gives the state of
+	 * the line inputs rather than the last written state.
+	 */
+	ef1002_readl ( efab, &reg, EF1_EEPROM_REG );
+	EFAB_SET_DWORD_FIELD ( reg, EF1_EEPROM_SDA, 1 );
+	EFAB_SET_DWORD_FIELD ( reg, EF1_EEPROM_SCL, 1 );
+	EFAB_SET_DWORD_FIELD ( reg, EF1_JTAG_DISCONNECT, 1 );
+	ef1002_writel ( efab, &reg, EF1_EEPROM_REG );
+	udelay ( 10 );
 
 	/* Flush descriptor queues */
 	EFAB_ZERO_DWORD ( reg );
