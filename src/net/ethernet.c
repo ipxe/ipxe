@@ -25,7 +25,6 @@
 #include <gpxe/if_ether.h>
 #include <gpxe/netdevice.h>
 #include <gpxe/pkbuff.h>
-#include <gpxe/arp.h>
 #include <gpxe/ethernet.h>
 
 /** @file
@@ -38,70 +37,24 @@
 static uint8_t eth_broadcast[ETH_ALEN] = { 0xff, 0xff, 0xff, 0xff, 0xff, 0xff};
 
 /**
- * Perform Ethernet routing
+ * Transmit Ethernet packet
  *
- * @v nethdr	Generic network-layer header
- * @ret llhdr	Generic link-layer header
- * @ret rc	Return status code
+ * @v pkb		Packet buffer
+ * @v netdev		Network device
+ * @v net_protocol	Network-layer protocol
+ * @v ll_dest		Link-layer destination address
  *
- * Constructs the generic link-layer header based on the generic
- * network-layer header, i.e. maps network-layer addresses (e.g. IPv4
- * addresses) to MAC addresses.
- *
- * If the destination MAC address cannot be determined, an ARP request
- * is sent for the requested network-layer address and -ENOENT is
- * returned.
+ * Prepends the Ethernet link-layer header and transmits the packet.
  */
-static int eth_route ( struct net_device *netdev,
-		       const struct net_header *nethdr,
-		       struct ll_header *llhdr ) {
-	int rc;
+static int eth_transmit ( struct pk_buff *pkb, struct net_device *netdev,
+			  struct net_protocol *net_protocol,
+			  const void *ll_dest ) {
+	struct ethhdr *ethhdr = pkb_push ( pkb, ETH_HLEN );
 
-	/* Fill in the easy bits */
-	llhdr->net_proto = nethdr->net_protocol->net_proto;
-	memcpy ( llhdr->source_ll_addr, netdev->ll_addr, ETH_ALEN );
-
-	/* Work out the destination MAC address */
-	if ( nethdr->flags & PKT_FL_BROADCAST ) {
-		memcpy ( llhdr->dest_ll_addr, eth_broadcast, ETH_ALEN );
-	} else if ( nethdr->flags & PKT_FL_RAW_ADDR ) {
-		memcpy ( llhdr->dest_ll_addr, nethdr->dest_net_addr, ETH_ALEN);
-	} else if ( nethdr->flags & PKT_FL_MULTICAST ) {
-		/* IP multicast is a special case; there exists a
-		 * direct mapping from IP address to MAC address
-		 */
-		assert ( nethdr->net_protocol->net_proto == htons(ETH_P_IP) );
-		llhdr->dest_ll_addr[0] = 0x01;
-		llhdr->dest_ll_addr[1] = 0x00;
-		llhdr->dest_ll_addr[2] = 0x5e;
-		llhdr->dest_ll_addr[3] = nethdr->dest_net_addr[1] & 0x7f;
-		llhdr->dest_ll_addr[4] = nethdr->dest_net_addr[2];
-		llhdr->dest_ll_addr[5] = nethdr->dest_net_addr[3];
-	} else {
-		/* Otherwise, look up the address using ARP */
-		if ( ( rc = arp_resolve ( netdev, nethdr, llhdr ) ) != 0 )
-			return rc;
-	}
-
-	return 0;
-}
-
-/**
- * Fill in Ethernet link-layer header
- *
- * @v pkb	Packet buffer
- * @v llhdr	Generic link-layer header
- *
- * Fills in the Ethernet link-layer header in the packet buffer based
- * on information in the generic link-layer header.
- */
-static void eth_fill_llh ( const struct ll_header *llhdr,
-			   struct pk_buff *pkb ) {
-	struct ethhdr *ethhdr = pkb->data;
-
-	memcpy ( ethhdr->h_dest, llhdr->dest_ll_addr, ETH_ALEN );
-	memcpy ( ethhdr->h_source, llhdr->source_ll_addr, ETH_ALEN );
-	ethhdr->h_protocol = llhdr->net_proto;
+	memcpy ( ethhdr->h_dest, ll_dest, ETH_ALEN );
+	memcpy ( ethhdr->h_source, netdev->ll_addr, ETH_ALEN );
+	ethhdr->h_protocol = net_protocol->net_proto;
+	return netdev_transmit ( netdev, pkb );
 }
 
 /**
@@ -138,7 +91,7 @@ static void eth_parse_llh ( const struct pk_buff *pkb,
  */
 static const char * eth_ntoa ( const void *ll_addr ) {
 	static char buf[18]; /* "00:00:00:00:00:00" */
-	uint8_t *eth_addr = ll_addr;
+	const uint8_t *eth_addr = ll_addr;
 
 	sprintf ( buf, "%02x:%02x:%02x:%02x:%02x:%02x",
 		  eth_addr[0], eth_addr[1], eth_addr[2],
@@ -148,14 +101,13 @@ static const char * eth_ntoa ( const void *ll_addr ) {
 
 /** Ethernet protocol */
 struct ll_protocol ethernet_protocol = {
-	.name = "Ethernet",
-	.ll_proto = htons ( ARPHRD_ETHER ),
-	.ll_addr_len = ETH_ALEN,
-	.ll_header_len = ETH_HLEN,
-	.route = eth_route,
-	.fill_llh = eth_fill_llh,
-	.parse_llh = eth_parse_llh,
-	.ntoa = eth_ntoa,
+	.name		= "Ethernet",
+	.ll_proto	= htons ( ARPHRD_ETHER ),
+	.ll_addr_len	= ETH_ALEN,
+	.ll_broadcast	= eth_broadcast,
+	.transmit	= eth_transmit,
+	.parse_llh	= eth_parse_llh,
+	.ntoa		= eth_ntoa,
 };
 
 LL_PROTOCOL ( ethernet_protocol );

@@ -87,22 +87,6 @@ struct net_protocol {
 	/** Protocol name */
 	const char *name;
 	/**
-	 * Perform network-layer routing
-	 *
-	 * @v pkb	Packet buffer
-	 * @v nethdr	Generic network-layer header
-	 * @ret rc	Return status code
-	 *
-	 * This method should fill in the network header with enough
-	 * information to allow the link layer to route the packet.
-	 *
-	 * For example, in the case of IPv4, this method should fill
-	 * in the IP addresses of the local adapter and the next hop
-	 * destination (e.g. the gateway).
-	 */
-	int ( * route ) ( const struct pk_buff *pkb,
-			  struct net_header *nethdr );
-	/**
 	 * Process received packet
 	 *
 	 * @v pkb	Packet buffer
@@ -141,36 +125,21 @@ struct ll_protocol {
 	/** Protocol name */
 	const char *name;
 	/**
-	 * Perform link-layer routing
+	 * Transmit network-layer packet via network device
 	 *
-	 * @v netdev	Network device
-	 * @v nethdr	Generic network-layer header
-	 * @ret llhdr	Generic link-layer header
-	 * @ret rc	Return status code
 	 *
-	 * This method should construct the generic link-layer header
-	 * based on the generic network-layer header.
+	 * @v pkb		Packet buffer
+	 * @v netdev		Network device
+	 * @v net_protocol	Network-layer protocol
+	 * @v ll_dest		Link-layer destination address
+	 * @ret rc		Return status code
 	 *
-	 * If a link-layer header cannot be constructed (e.g. because
-	 * of a missing ARP cache entry), then this method should
-	 * return an error (after transmitting an ARP request, if
-	 * applicable).
+	 * This method should prepend in the link-layer header
+	 * (e.g. the Ethernet DIX header) and transmit the packet.
 	 */
-	int ( * route ) ( struct net_device *netdev,
-			  const struct net_header *nethdr,
-			  struct ll_header *llhdr );
-	/**
-	 * Fill media-specific link-layer header
-	 *
-	 * @v llhdr	Generic link-layer header
-	 * @v pkb	Packet buffer
-	 *
-	 * This method should fill in the link-layer header in the
-	 * packet buffer based on information in the generic
-	 * link-layer header.
-	 */
-	void ( * fill_llh ) ( const struct ll_header *llhdr,
-			      struct pk_buff *pkb );
+	int ( * transmit ) ( struct pk_buff *pkb, struct net_device *netdev,
+			     struct net_protocol *net_protocol,
+			     const void *ll_dest );
 	/**
 	 * Parse media-specific link-layer header
 	 *
@@ -204,8 +173,8 @@ struct ll_protocol {
 	uint16_t ll_proto;
 	/** Link-layer address length */
 	uint8_t ll_addr_len;
-	/** Link-layer header length */
-	uint8_t ll_header_len;
+	/** Link-layer broadcast address */
+	const uint8_t *ll_broadcast;
 };
 
 /**
@@ -289,31 +258,6 @@ extern struct net_device static_single_netdev;
 	&static_single_netdev; } )
 
 /**
- * Register network device
- *
- * @v netdev		Network device
- * @ret rc		Return status code
- *
- * Adds the network device to the list of network devices.
- */
-static inline int
-register_netdev ( struct net_device *netdev __attribute__ (( unused )) ) {
-	return 0;
-}
-
-/**
- * Unregister network device
- *
- * @v netdev		Network device
- *
- * Removes the network device from the list of network devices.
- */
-static inline void 
-unregister_netdev ( struct net_device *netdev __attribute__ (( unused )) ) {
-	/* Nothing to do */
-}
-
-/**
  * Free network device
  *
  * @v netdev		Network device
@@ -340,6 +284,27 @@ static inline int netdev_transmit ( struct net_device *netdev,
 }
 
 /**
+ * Transmit network-layer packet
+ *
+ * @v pkb		Packet buffer
+ * @v netdev		Network device
+ * @v net_protocol	Network-layer protocol
+ * @v ll_dest		Destination link-layer address
+ * @ret rc		Return status code
+ *
+ * Prepends link-layer headers to the packet buffer and transmits the
+ * packet via the specified network device.  This function takes
+ * ownership of the packet buffer.
+ */
+static inline int net_transmit ( struct pk_buff *pkb,
+				 struct net_device *netdev,
+				 struct net_protocol *net_protocol,
+				 const void *ll_dest ) {
+	return netdev->ll_protocol->transmit ( pkb, netdev, net_protocol,
+					       ll_dest );
+}
+
+/**
  * Register a link-layer protocol
  *
  * @v protocol		Link-layer protocol
@@ -363,14 +328,14 @@ static inline int netdev_transmit ( struct net_device *netdev,
 #define STATIC_SINGLE_NETDEV_ADDRESS( address ) \
 	struct net_address address __table ( sgl_netdev_addresses, 01 )
 
+extern int register_netdev ( struct net_device *netdev );
+extern void unregister_netdev ( struct net_device *netdev );
 extern void netdev_rx ( struct net_device *netdev, struct pk_buff *pkb );
 
 extern struct net_protocol *find_net_protocol ( uint16_t net_proto );
 extern struct net_device *
 find_netdev_by_net_addr ( struct net_protocol *net_protocol, void *net_addr );
 
-extern int net_transmit_via ( struct pk_buff *pkb, struct net_device *netdev );
-extern int net_transmit ( struct pk_buff *pkb );
 extern int net_poll ( void );
 extern struct pk_buff * net_rx_dequeue ( void );
 extern int net_rx_process ( struct pk_buff *pkb );

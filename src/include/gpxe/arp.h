@@ -8,11 +8,12 @@
  */
 
 struct net_device;
-struct net_header;
-struct ll_header;
+struct net_protocol;
 
 extern int arp_resolve ( struct net_device *netdev,
-			 const struct net_header *nethdr,
-			 struct ll_header *llhdr );
+			 struct net_protocol *net_protocol,
+			 const void *dest_net_addr,
+			 const void *source_net_addr,
+			 void *dest_ll_addr );
 
 #endif /* _GPXE_ARP_H */

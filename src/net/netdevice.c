@@ -62,6 +62,50 @@ static struct net_address static_single_netdev_addresses_end[0]
 /** Recevied packet queue */
 static LIST_HEAD ( rx_queue );
 
+#warning "Remove this static IP address hack"
+#include <ip.h>
+#include <gpxe/ip.h>
+
+/**
+ * Register network device
+ *
+ * @v netdev		Network device
+ * @ret rc		Return status code
+ *
+ * Adds the network device to the list of network devices.
+ */
+int register_netdev ( struct net_device *netdev ) {
+	
+#warning "Remove this static IP address hack"
+	{
+		const struct in_addr static_address = { htonl ( 0x0afefe01 ) };
+		const struct in_addr static_netmask = { htonl ( 0xffffff00 ) };
+		const struct in_addr static_gateway = { INADDR_NONE };
+		int rc;
+		
+		if ( ( rc = add_ipv4_address ( netdev, static_address,
+					       static_netmask,
+					       static_gateway ) ) != 0 )
+			return rc;
+	}
+
+	return 0;
+}
+
+/**
+ * Unregister network device
+ *
+ * @v netdev		Network device
+ *
+ * Removes the network device from the list of network devices.
+ */
+void unregister_netdev ( struct net_device *netdev ) {
+
+#warning "Remove this static IP address hack"
+	del_ipv4_address ( netdev );
+
+}
+
 /**
  * Add packet to receive queue
  *
@@ -126,88 +170,6 @@ find_netdev_by_net_addr ( struct net_protocol *net_protocol,
 	}
 
 	return NULL;
-}
-
-/**
- * Transmit packet via a network device
- *
- * @v pkb		Packet buffer
- * @v netdev		Network device, or NULL
- * @ret rc		Return status code
- *
- * Transmits the packet via the specified network device.  The packet
- * must begin with a network-layer header, and the @c net_protocol
- * field must have been filled in.  If @c netdev is NULL, the network
- * device is identified via the packet contents, if possible.  This
- * function takes ownership of the packet buffer.
- */
-int net_transmit_via ( struct pk_buff *pkb, struct net_device *netdev ) {
-	struct net_protocol *net_protocol;
-	struct net_header nethdr;
-	struct ll_protocol *ll_protocol;
-	struct ll_header llhdr;
-	int rc;
-
-	/* Perform network-layer routing */
-	net_protocol = pkb->net_protocol;
-	nethdr.net_protocol = net_protocol;
-	if ( ( rc = net_protocol->route ( pkb, &nethdr ) ) != 0 ) {
-		DBG ( "Could not route to %s address %s\n",
-		      net_protocol->name,
-		      net_protocol->ntoa ( nethdr.dest_net_addr ) );
-		free_pkb ( pkb );
-		return rc;
-	}
-
-	/* Identify transmitting network device, if not specified */
-	if ( ! netdev ) {
-		netdev = find_netdev_by_net_addr ( net_protocol,
-						   nethdr.source_net_addr );
-		if ( ! netdev ) {
-			DBG ( "No network device for %s address %s\n",
-			      net_protocol->name,
-			      net_protocol->ntoa ( nethdr.source_net_addr ) );
-			free_pkb ( pkb );
-			return -EHOSTUNREACH;
-		}
-	}
-
-	/* Perform link-layer routing */
-	ll_protocol = netdev->ll_protocol;
-	llhdr.ll_protocol = ll_protocol;
-	if ( ( rc = ll_protocol->route ( netdev, &nethdr, &llhdr ) ) != 0 ) {
-		DBG ( "No link-layer route to %s address %s\n",
-		      net_protocol->name,
-		      net_protocol->ntoa ( nethdr.dest_net_addr ) );
-		free_pkb ( pkb );
-		return rc;
-	}
-
-	/* Prepend link-layer header */
-	pkb_push ( pkb, ll_protocol->ll_header_len );
-	ll_protocol->fill_llh ( &llhdr, pkb );
-
-	/* Hand off packet to network device */
-	if ( ( rc = netdev->transmit ( netdev, pkb ) ) != 0 ) {
-		DBG ( "Device failed to transmit packet\n" );
-		return rc;
-	}
-	
-	DBG ( "Packet transmitted\n" );
-	return 0;
-}
-
-/**
- * Transmit packet
- *
- * @v pkb		Packet buffer
- * @ret rc		Return status code
- *
- * Transmits the packet via the appropriate network device.  This
- * function takes ownership of the packet buffer.
- */
-int net_transmit ( struct pk_buff *pkb ) {
-	return net_transmit_via ( pkb, NULL );
 }
 
 /**
@@ -277,7 +239,8 @@ int net_rx_process ( struct pk_buff *pkb ) {
 	pkb->net_protocol = net_protocol;
 	
 	/* Strip off link-layer header */
-	pkb_pull ( pkb, ll_protocol->ll_header_len );
+#warning "Temporary hack"
+	pkb_pull ( pkb, ETH_HLEN );
 	
 	/* Hand off to network layer */
 	if ( ( rc = net_protocol->rx_process ( pkb ) ) != 0 ) {

@@ -24,6 +24,7 @@
 #include <byteswap.h>
 #include <gpxe/list.h>
 #include <gpxe/if_ether.h>
+#include <gpxe/ethernet.h>
 #include <gpxe/pkbuff.h>
 #include <gpxe/uaccess.h>
 #include <gpxe/ata.h>
@@ -116,7 +117,7 @@ static int aoe_send_command ( struct aoe_session *aoe ) {
 
 	/* Send packet */
 	start_timer ( &aoe->timer );
-	return net_transmit_via ( pkb, aoe->netdev );
+	return net_transmit ( pkb, aoe->netdev, &aoe_protocol, aoe->target );
 }
 
 /**
@@ -251,38 +252,11 @@ static int aoe_rx ( struct pk_buff *pkb ) {
 	return rc;
 }
 
-/**
- * Perform AoE network-layer routing
- *
- * @v pkb	Packet buffer
- * @ret source	Network-layer source address
- * @ret dest	Network-layer destination address
- * @ret rc	Return status code
- */
-static int aoe_route ( const struct pk_buff *pkb __unused,
-		       struct net_header *nethdr ) {
-	struct aoehdr *aoehdr = pkb->data;
-	struct aoe_session *aoe;
-
-	list_for_each_entry ( aoe, &aoe_sessions, list ) {
-		if ( ( ntohs ( aoehdr->major ) == aoe->major ) &&
-		     ( aoehdr->minor == aoe->minor ) ) {
-			nethdr->flags = PKT_FL_RAW_ADDR;
-			memcpy ( nethdr->dest_net_addr, aoe->target,
-				 sizeof ( aoe->target ) );
-			return 0;
-		}
-	}
-		
-	return -EHOSTUNREACH;
-}
-
 /** AoE protocol */
 struct net_protocol aoe_protocol = {
 	.name = "AoE",
 	.net_proto = htons ( ETH_P_AOE ),
 	.rx_process = aoe_rx,
-	.route = aoe_route,
 };
 
 NET_PROTOCOL ( aoe_protocol );
@@ -293,7 +267,8 @@ NET_PROTOCOL ( aoe_protocol );
  * @v aoe		AoE session
  */
 void aoe_open ( struct aoe_session *aoe ) {
-	memset ( aoe->target, 0xff, sizeof ( aoe->target ) );
+	memcpy ( aoe->target, ethernet_protocol.ll_broadcast,
+		 sizeof ( aoe->target ) );
 	aoe->tag = AOE_TAG_MAGIC;
 	aoe->timer.expired = aoe_timer_expired;
 	list_add ( &aoe->list, &aoe_sessions );

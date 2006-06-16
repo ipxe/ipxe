@@ -176,9 +176,8 @@ static void tcp_periodic ( void ) {
 			pkb_reserve ( pkb, MAX_LL_HEADER_LEN );
 			pkb_put ( pkb, uip_len );
 			memcpy ( pkb->data, uip_buf, uip_len );
-			pkb->net_protocol = &ipv4_protocol;
-			
-			net_transmit ( pkb );
+
+			ipv4_uip_transmit ( pkb );
 		}
 	}
 }

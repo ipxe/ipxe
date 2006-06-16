@@ -2,9 +2,11 @@
 #include <stdint.h>
 #include <errno.h>
 #include <byteswap.h>
+#include <malloc.h>
 #include <vsprintf.h>
+#include <gpxe/list.h>
 #include <gpxe/in.h>
-
+#include <gpxe/arp.h>
 
 #include <ip.h>
 
@@ -13,6 +15,7 @@
 #include <gpxe/pkbuff.h>
 #include <gpxe/netdevice.h>
 #include "uip/uip.h"
+#include <gpxe/ip.h>
 
 /** @file
  *
@@ -27,121 +30,144 @@
 
 struct net_protocol ipv4_protocol;
 
-/** An IPv4 routing table entry */
-struct ipv4_route {
-	/** Network address */
-	struct in_addr network;
+/** An IPv4 address/routing table entry */
+struct ipv4_miniroute {
+	/** List of miniroutes */
+	struct list_head list;
+	/** Network device */
+	struct net_device *netdev;
+	/** IPv4 address */
+	struct in_addr address;
 	/** Subnet mask */
 	struct in_addr netmask;
 	/** Gateway address */
 	struct in_addr gateway;
-	/** Gateway device */
-	struct in_addr gatewaydev;
 };
 
-enum {
-	STATIC_SINGLE_NETDEV_ROUTE = 0,
-	DEFAULT_ROUTE,
-	NUM_ROUTES
-};
-
-/** IPv4 routing table */
-static struct ipv4_route routing_table[NUM_ROUTES];
-
-#define routing_table_end ( routing_table + NUM_ROUTES )
-
-#if 0
-/**
- * Set IP address
- *
- */
-void set_ipaddr ( struct in_addr address ) {
-	union {
-		struct in_addr address;
-		uint16_t uip_address[2];
-	} u;
-
-	u.address = address;
-	uip_sethostaddr ( u.uip_address );
-}
+/** List of IPv4 miniroutes */
+static LIST_HEAD ( miniroutes );
 
 /**
- * Set netmask
+ * Add IPv4 interface
+ *
+ * @v netdev	Network device
+ * @v address	IPv4 address
+ * @v netmask	Subnet mask
+ * @v gateway	Gateway address (or @c INADDR_NONE for no gateway)
+ * @ret rc	Return status code
  *
  */
-void set_netmask ( struct in_addr address ) {
-	union {
-		struct in_addr address;
-		uint16_t uip_address[2];
-	} u;
+int add_ipv4_address ( struct net_device *netdev, struct in_addr address,
+		       struct in_addr netmask, struct in_addr gateway ) {
+	struct ipv4_miniroute *miniroute;
 
-	u.address = address;
-	uip_setnetmask ( u.uip_address );
-}
-
-/**
- * Set default gateway
- *
- */
-void set_gateway ( struct in_addr address ) {
-	union {
-		struct in_addr address;
-		uint16_t uip_address[2];
-	} u;
-
-	u.address = address;
-	uip_setdraddr ( u.uip_address );
-}
-
-/**
- * Run the TCP/IP stack
- *
- * Call this function in a loop in order to allow TCP/IP processing to
- * take place.  This call takes the stack through a single iteration;
- * it will typically be used in a loop such as
- *
- * @code
- *
- * struct tcp_connection *my_connection;
- * ...
- * tcp_connect ( my_connection );
- * while ( ! my_connection->finished ) {
- *   run_tcpip();
- * }
- *
- * @endcode
- *
- * where @c my_connection->finished is set by one of the connection's
- * #tcp_operations methods to indicate completion.
- */
-void run_tcpip ( void ) {
-	void *data;
-	size_t len;
-	uint16_t type;
-	int i;
+	/* Allocate and populate miniroute structure */
+	miniroute = malloc ( sizeof ( *miniroute ) );
+	if ( ! miniroute )
+		return -ENOMEM;
+	miniroute->netdev = netdev;
+	miniroute->address = address;
+	miniroute->netmask = netmask;
+	miniroute->gateway = gateway;
 	
-	if ( netdev_poll ( 1, &data, &len ) ) {
-		/* We have data */
-		memcpy ( uip_buf, data, len );
-		uip_len = len;
-		type = ntohs ( *( ( uint16_t * ) ( uip_buf + 12 ) ) );
-		if ( type == UIP_ETHTYPE_ARP ) {
-			uip_arp_arpin();
-		} else {
-			uip_arp_ipin();
-			uip_input();
-		}
-		if ( uip_len > 0 )
-			uip_transmit();
+	/* Add to end of list if we have a gateway, otherwise to start
+	 * of list.
+	 */
+	if ( gateway.s_addr != INADDR_NONE ) {
+		list_add_tail ( &miniroute->list, &miniroutes );
 	} else {
-		for ( i = 0 ; i < UIP_CONNS ; i++ ) {
-			uip_periodic ( i );
-			if ( uip_len > 0 )
-				uip_transmit();
+		list_add ( &miniroute->list, &miniroutes );
+	}
+	return 0;
+}
+
+/**
+ * Remove IPv4 interface
+ *
+ * @v netdev	Network device
+ */
+void del_ipv4_address ( struct net_device *netdev ) {
+	struct ipv4_miniroute *miniroute;
+
+	list_for_each_entry ( miniroute, &miniroutes, list ) {
+		if ( miniroute->netdev == netdev ) {
+			list_del ( &miniroute->list );
+			break;
 		}
 	}
 }
-#endif
+
+/**
+ * Transmit packet constructed by uIP
+ *
+ * @v pkb		Packet buffer
+ * @ret rc		Return status code
+ *
+ */
+int ipv4_uip_transmit ( struct pk_buff *pkb ) {
+	struct iphdr *iphdr = pkb->data;
+	struct ipv4_miniroute *miniroute;
+	struct net_device *netdev = NULL;
+	struct in_addr next_hop;
+	struct in_addr source;
+	uint8_t ll_dest_buf[MAX_LL_ADDR_LEN];
+	const uint8_t *ll_dest = ll_dest_buf;
+	int rc;
+
+	/* Use routing table to identify next hop and transmitting netdev */
+	next_hop = iphdr->dest;
+	list_for_each_entry ( miniroute, &miniroutes, list ) {
+		if ( ( ( ( iphdr->dest.s_addr ^ miniroute->address.s_addr ) &
+			 miniroute->netmask.s_addr ) == 0 ) ||
+		     ( miniroute->gateway.s_addr != INADDR_NONE ) ) {
+			netdev = miniroute->netdev;
+			source = miniroute->address;
+			if ( miniroute->gateway.s_addr != INADDR_NONE )
+				next_hop = miniroute->gateway;
+			break;
+		}
+	}
+
+	/* Abort if no network device identified */
+	if ( ! netdev ) {
+		DBG ( "No route to %s\n", inet_ntoa ( iphdr->dest ) );
+		rc = -EHOSTUNREACH;
+		goto err;
+	}
+
+	/* Determine link-layer destination address */
+	if ( next_hop.s_addr == INADDR_BROADCAST ) {
+		/* Broadcast address */
+		ll_dest = netdev->ll_protocol->ll_broadcast;
+	} else if ( IN_MULTICAST ( next_hop.s_addr ) ) {
+		/* Special case: IPv4 multicast over Ethernet.  This
+		 * code may need to be generalised once we find out
+		 * what happens for other link layers.
+		 */
+		uint8_t *next_hop_bytes = ( uint8_t * ) &next_hop;
+		ll_dest_buf[0] = 0x01;
+		ll_dest_buf[0] = 0x00;
+		ll_dest_buf[0] = 0x5e;
+		ll_dest_buf[3] = next_hop_bytes[1] & 0x7f;
+		ll_dest_buf[4] = next_hop_bytes[2];
+		ll_dest_buf[5] = next_hop_bytes[3];
+	} else {
+		/* Unicast address: resolve via ARP */
+		if ( ( rc = arp_resolve ( netdev, &ipv4_protocol, &next_hop,
+					  &source, ll_dest_buf ) ) != 0 ) {
+			DBG ( "No ARP entry for %s\n",
+			      inet_ntoa ( iphdr->dest ) );
+			goto err;
+		}
+	}
+	
+	/* Hand off to link layer */
+	return net_transmit ( pkb, netdev, &ipv4_protocol, ll_dest );
+
+ err:
+	free_pkb ( pkb );
+	return rc;
+}
 
 /**
  * Process incoming IP packets
@@ -167,51 +193,25 @@ static int ipv4_rx ( struct pk_buff *pkb ) {
 		pkb = alloc_pkb ( MAX_LL_HEADER_LEN + uip_len );
 		if ( ! pkb )
 			return -ENOMEM;
-		pkb->net_protocol = &ipv4_protocol;
 		pkb_reserve ( pkb, MAX_LL_HEADER_LEN );
 		memcpy ( pkb_put ( pkb, uip_len ), uip_buf, uip_len );
-		net_transmit ( pkb );
+		ipv4_uip_transmit ( pkb );
 	}
 	return 0;
 }
 
 /**
- * Perform IP layer routing
+ * Convert IPv4 address to dotted-quad notation
  *
- * @v pkb	Packet buffer
- * @ret source	Network-layer source address
- * @ret dest	Network-layer destination address
- * @ret rc	Return status code
+ * @v in	IP address
+ * @ret string	IP address in dotted-quad notation
  */
-static int ipv4_route ( const struct pk_buff *pkb,
-			struct net_header *nethdr ) {
-	struct iphdr *iphdr = pkb->data;
-	struct in_addr *source = ( struct in_addr * ) nethdr->source_net_addr;
-	struct in_addr *dest = ( struct in_addr * ) nethdr->dest_net_addr;
-	struct ipv4_route *route;
-
-	/* Route IP packet according to routing table */
-	source->s_addr = INADDR_NONE;
-	dest->s_addr = iphdr->dest.s_addr;
-	for ( route = routing_table ; route < routing_table_end ; route++ ) {
-		if ( ( dest->s_addr & route->netmask.s_addr )
-		     == route->network.s_addr ) {
-			source->s_addr = route->gatewaydev.s_addr;
-			if ( route->gateway.s_addr )
-				dest->s_addr = route->gateway.s_addr;
-			break;
-		}
-	}
-
-	/* Set broadcast and multicast flags as applicable */
-	nethdr->flags = 0;
-	if ( dest->s_addr == htonl ( INADDR_BROADCAST ) ) {
-		nethdr->flags = PKT_FL_BROADCAST;
-	} else if ( IN_MULTICAST ( dest->s_addr ) ) {
-		nethdr->flags = PKT_FL_MULTICAST;
-	}
-
-	return 0;
+char * inet_ntoa ( struct in_addr in ) {
+	static char buf[16]; /* "xxx.xxx.xxx.xxx" */
+	uint8_t *bytes = ( uint8_t * ) &in;
+	
+	sprintf ( buf, "%d.%d.%d.%d", bytes[0], bytes[1], bytes[2], bytes[3] );
+	return buf;
 }
 
 /**
@@ -222,12 +222,7 @@ static int ipv4_route ( const struct pk_buff *pkb,
  *
  */
 static const char * ipv4_ntoa ( const void *net_addr ) {
-	static char buf[16]; /* "xxx.xxx.xxx.xxx" */
-	uint8_t *ip_addr = net_addr;
-
-	sprintf ( buf, "%d.%d.%d.%d", ip_addr[0], ip_addr[1], ip_addr[2],
-		  ip_addr[3] );
-	return buf;
+	return inet_ntoa ( * ( ( struct in_addr * ) net_addr ) );
 }
 
 /** IPv4 protocol */
@@ -236,7 +231,6 @@ struct net_protocol ipv4_protocol = {
 	.net_proto = htons ( ETH_P_IP ),
 	.net_addr_len = sizeof ( struct in_addr ),
 	.rx_process = ipv4_rx,
-	.route = ipv4_route,
 	.ntoa = ipv4_ntoa,
 };
 
@@ -251,12 +245,3 @@ struct net_address static_single_ipv4_address = {
 };
 
 STATIC_SINGLE_NETDEV_ADDRESS ( static_single_ipv4_address );
-
-#warning "Remove this static-IP hack"
-static struct ipv4_route routing_table[NUM_ROUTES] = {
-	{ { htonl ( 0x0afefe00 ) }, { htonl ( 0xfffffffc ) },
-	  { htonl ( 0x00000000 ) }, { htonl ( 0x0afefe01 ) } },
-	{ { htonl ( 0x00000000 ) }, { htonl ( 0x00000000 ) },
-	  { htonl ( 0x0afefe02 ) }, { htonl ( 0x0afefe01 ) } },
-};
-
