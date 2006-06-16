@@ -173,7 +173,6 @@ struct efab_nic {
 	unsigned int eventq_read_ptr;	/* Falcon only */
 	unsigned int tx_write_ptr;
 	unsigned int rx_write_ptr;
-	int tx_in_progress;
 
 	/** Port 0/1 on the NIC */
 	int port;
@@ -2706,7 +2705,6 @@ static int etherfabric_poll ( struct nic *nic, int retrieve ) {
 			/* TX completed - mark as done */
 			DBG ( "TX id %x complete\n",
 			      efab->tx_buf.id );
-			efab->tx_in_progress = 0;
 		} else if ( event.type == EFAB_EV_RX ) {
 			/* RX - find corresponding buffer */
 			for ( i = 0 ; i < EFAB_RX_BUFS ; i++ ) {
@@ -2766,15 +2764,6 @@ static void etherfabric_transmit ( struct nic *nic, const char *dest,
 	struct efab_nic *efab = nic->priv_data;
 	unsigned int nstype = htons ( type );
 
-	/* We can only transmit one packet at a time; a TX completion
-	 * event must be received before we can transmit the next
-	 * packet.  Since there is only one static TX buffer, we don't
-	 * worry unduly about overflow, but we report it anyway.
-	 */
-	if ( efab->tx_in_progress ) {
-		printf ( "TX overflow!\n" );
-	}
-
 	/* Fill TX buffer, pad to ETH_ZLEN */
 	memcpy ( efab->tx_buf.addr, dest, ETH_ALEN );
 	memcpy ( efab->tx_buf.addr + ETH_ALEN, nic->node_addr, ETH_ALEN );
@@ -2789,13 +2778,10 @@ static void etherfabric_transmit ( struct nic *nic, const char *dest,
 	/* Push TX descriptor */
 	efab_push_tx_buffer ( efab, &efab->tx_buf );
 
-	/* There is no way to wait for TX complete (i.e. TX buffer
-	 * available to re-use for the next transmit) without reading
-	 * from the event queue.  We therefore simply leave the TX
-	 * buffer marked as "in use" until a TX completion event
-	 * happens to be picked up by a call to etherfabric_poll().
+	/* Allow enough time for the packet to be transmitted.  This
+	 * is a temporary hack until we update to the new driver API.
 	 */
-	efab->tx_in_progress = 1;
+	udelay ( 20 );
 
 	return;
 }
@@ -2891,9 +2877,6 @@ static int etherfabric_probe ( struct nic *nic, struct pci_device *pci ) {
 	if ( ! efab_init_nic ( &efab ) )
 		return 0;
 	memcpy ( nic->node_addr, efab.mac_addr, ETH_ALEN );
-
-	/* hello world */
-	printf ( "Found EtherFabric %s NIC %!\n", pci->name, nic->node_addr );
 
 	/* point to NIC specific routines */
 	nic->nic_op = &etherfabric_operations;
