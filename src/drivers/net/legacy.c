@@ -1,5 +1,6 @@
 #include <stdint.h>
 #include <errno.h>
+#include <vsprintf.h>
 #include <gpxe/if_ether.h>
 #include <gpxe/netdevice.h>
 #include <gpxe/ethernet.h>
@@ -25,6 +26,7 @@ static int legacy_transmit ( struct net_device *netdev, struct pk_buff *pkb ) {
 	struct ethhdr *ethhdr = pkb->data;
 	int pad_len;
 
+	DBG ( "Transmitting %d bytes\n", pkb_len ( pkb ) );
 	pad_len = ( ETH_ZLEN - pkb_len ( pkb ) );
 	if ( pad_len > 0 )
 		memset ( pkb_put ( pkb, pad_len ), 0, pad_len );
@@ -46,6 +48,7 @@ static void legacy_poll ( struct net_device *netdev ) {
 
 	nic->packet = pkb->data;
 	if ( nic->nic_op->poll ( nic, 1 ) ) {
+		DBG ( "Received %d bytes\n", nic->packetlen );
 		pkb_put ( pkb, nic->packetlen );
 		netdev_rx ( netdev, pkb );
 	} else {
@@ -87,7 +90,8 @@ int legacy_probe ( struct pci_device *pci,
 	}
 
 	/* Do not remove this message */
-	printf ( "WARNING: Using legacy NIC wrapper\n" );
+	printf ( "WARNING: Using legacy NIC wrapper on %s\n",
+		 ethernet_protocol.ntoa ( nic.node_addr ) );
 
 	legacy_registered = 1;
 	return 0;
