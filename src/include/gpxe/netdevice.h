@@ -8,6 +8,7 @@
  */
 
 #include <stdint.h>
+#include <gpxe/list.h>
 #include <gpxe/tables.h>
 
 struct pk_buff;
@@ -24,61 +25,6 @@ struct ll_protocol;
 /** Maximum length of a network-layer address */
 #define MAX_NET_ADDR_LEN 4
 
-/* Network-layer address may be required to hold a link-layer address
- * (if NETADDR_FL_RAW is set
- */
-#if MAX_NET_ADDR_LEN < MAX_LL_ADDR_LEN
-#undef MAX_NET_ADDR_LEN
-#define MAX_NET_ADDR_LEN MAX_LL_ADDR_LEN
-#endif
-
-/** A generic network-layer header */
-struct net_header {
-	/** Network-layer protocol */
-	struct net_protocol *net_protocol;
-	/** Flags
-	 *
-	 * This is the bitwise OR of zero or more PKT_FL_XXX
-	 * values.
-	 */
-	int flags;
-	/** Network-layer destination address */
-	uint8_t dest_net_addr[MAX_NET_ADDR_LEN];
-	/** Network-layer source address */
-	uint8_t source_net_addr[MAX_NET_ADDR_LEN];
-};
-
-/** Packet is a broadcast packet */
-#define PKT_FL_BROADCAST 0x01
-
-/** Packet is a multicast packet */
-#define PKT_FL_MULTICAST 0x02
-
-/** Addresses are raw hardware addresses */
-#define PKT_FL_RAW_ADDR 0x04
-
-/** A generic link-layer header */
-struct ll_header {
-	/** Link-layer protocol */
-	struct ll_protocol *ll_protocol;
-	/** Flags
-	 *
-	 * This is the bitwise OR of zero or more PKT_FL_XXX
-	 * values.
-	 */
-	int flags;
-	/** Link-layer destination address */
-	uint8_t dest_ll_addr[MAX_LL_ADDR_LEN];
-	/** Link-layer source address */
-	uint8_t source_ll_addr[MAX_LL_ADDR_LEN];
-	/** Network-layer protocol
-	 *
-	 *
-	 * This is an ETH_P_XXX constant, in network-byte order
-	 */
-	uint16_t net_proto;
-};
-
 /**
  * A network-layer protocol
  *
@@ -90,11 +36,13 @@ struct net_protocol {
 	 * Process received packet
 	 *
 	 * @v pkb	Packet buffer
-	 * @ret rc	Return status code
+	 * @v netdev	Network device
+	 * @v ll_source	Link-layer source address
 	 *
 	 * This method takes ownership of the packet buffer.
 	 */
-	int ( * rx_process ) ( struct pk_buff *pkb );
+	int ( * rx ) ( struct pk_buff *pkb, struct net_device *netdev,
+		       const void *ll_source );
 	/**
 	 * Transcribe network-layer address
 	 *
@@ -127,7 +75,6 @@ struct ll_protocol {
 	/**
 	 * Transmit network-layer packet via network device
 	 *
-	 *
 	 * @v pkb		Packet buffer
 	 * @v netdev		Network device
 	 * @v net_protocol	Network-layer protocol
@@ -137,22 +84,20 @@ struct ll_protocol {
 	 * This method should prepend in the link-layer header
 	 * (e.g. the Ethernet DIX header) and transmit the packet.
 	 */
-	int ( * transmit ) ( struct pk_buff *pkb, struct net_device *netdev,
-			     struct net_protocol *net_protocol,
-			     const void *ll_dest );
+	int ( * tx ) ( struct pk_buff *pkb, struct net_device *netdev,
+		       struct net_protocol *net_protocol,
+		       const void *ll_dest );
 	/**
-	 * Parse media-specific link-layer header
+	 * Handle received packet
 	 *
 	 * @v pkb	Packet buffer
-	 * @v llhdr	Generic link-layer header
+	 * @v netdev	Network device
 	 *
-	 * This method should fill in the generic link-layer header
-	 * based on information in the link-layer header in the packet
-	 * buffer.
+	 * This method should strip off the link-layer header
+	 * (e.g. the Ethernet DIX header) and pass the packet to
+	 * net_rx().
 	 */
-	void ( * parse_llh ) ( const struct pk_buff *pkb,
-			       struct ll_header *llhdr );
-
+	void ( * rx ) ( struct pk_buff *pkb, struct net_device *netdev );
 	/**
 	 * Transcribe link-layer address
 	 *
@@ -165,7 +110,7 @@ struct ll_protocol {
 	 * The buffer used to hold the transcription is statically
 	 * allocated.
 	 */
-	const char * ( *ntoa ) ( const void * ll_addr );
+	const char * ( * ntoa ) ( const void * ll_addr );
 	/** Link-layer protocol
 	 *
 	 * This is an ARPHRD_XXX constant, in network byte order.
@@ -175,17 +120,6 @@ struct ll_protocol {
 	uint8_t ll_addr_len;
 	/** Link-layer broadcast address */
 	const uint8_t *ll_broadcast;
-};
-
-/**
- * A network-layer address assigned to a network device
- *
- */
-struct net_address {
-	/** Network-layer protocol */
-	struct net_protocol *net_protocol;
-	/** Network-layer address */
-	uint8_t net_addr[MAX_NET_ADDR_LEN];
 };
 
 /**
@@ -199,6 +133,8 @@ struct net_address {
  * not just an Ethernet device.
  */
 struct net_device {
+	/** List of network devices */
+	struct list_head list;
 	/** Transmit packet
 	 *
 	 * @v netdev	Network device
@@ -231,78 +167,12 @@ struct net_device {
 	 */
 	uint8_t ll_addr[MAX_LL_ADDR_LEN];
 
+	/** Received packet queue */
+	struct list_head rx_queue;
+
 	/** Driver private data */
 	void *priv;
 };
-
-extern struct net_device static_single_netdev;
-
-/**
- * Allocate network device
- *
- * @v priv_size		Size of private data area (net_device::priv)
- * @ret netdev		Network device, or NULL
- *
- * Allocates space for a network device and its private data area.
- *
- * This macro allows for a very efficient implementation in the case
- * of a single static network device; it neatly avoids dynamic
- * allocation and can never return failure, meaning that the failure
- * path will be optimised away.  However, driver writers should not
- * rely on this feature; the drivers should be written to allow for
- * multiple instances of network devices.
- */
-#define alloc_netdev( priv_size ) ( {		\
-	static char priv_data[priv_size];	\
-	static_single_netdev.priv = priv_data;	\
-	&static_single_netdev; } )
-
-/**
- * Free network device
- *
- * @v netdev		Network device
- */
-static inline void
-free_netdev ( struct net_device *netdev __attribute__ (( unused )) ) {
-	/* Nothing to do */
-}
-
-/**
- * Transmit raw packet via network device
- *
- * @v netdev		Network device
- * @v pkb		Packet buffer
- * @ret rc		Return status code
- *
- * Transmits the packet via the specified network device.  The
- * link-layer header must already have been filled in.  This function
- * takes ownership of the packet buffer.
- */
-static inline int netdev_transmit ( struct net_device *netdev,
-				    struct pk_buff *pkb ) {
-	return netdev->transmit ( netdev, pkb );
-}
-
-/**
- * Transmit network-layer packet
- *
- * @v pkb		Packet buffer
- * @v netdev		Network device
- * @v net_protocol	Network-layer protocol
- * @v ll_dest		Destination link-layer address
- * @ret rc		Return status code
- *
- * Prepends link-layer headers to the packet buffer and transmits the
- * packet via the specified network device.  This function takes
- * ownership of the packet buffer.
- */
-static inline int net_transmit ( struct pk_buff *pkb,
-				 struct net_device *netdev,
-				 struct net_protocol *net_protocol,
-				 const void *ll_dest ) {
-	return netdev->ll_protocol->transmit ( pkb, netdev, net_protocol,
-					       ll_dest );
-}
 
 /**
  * Register a link-layer protocol
@@ -321,23 +191,29 @@ static inline int net_transmit ( struct pk_buff *pkb,
 	struct net_protocol protocol __table ( net_protocols, 01 )
 
 /**
- * Register a network-layer address for the static single network device
+ * Get network device name
  *
- * @v net_address	Network-layer address
+ * @v netdev		Network device
+ * @ret name		Network device name
+ *
+ * The name will be the device's link-layer address.
  */
-#define STATIC_SINGLE_NETDEV_ADDRESS( address ) \
-	struct net_address address __table ( sgl_netdev_addresses, 01 )
+static inline const char * netdev_name ( struct net_device *netdev ) {
+	return netdev->ll_protocol->ntoa ( netdev->ll_addr );
+}
 
+extern int netdev_tx ( struct net_device *netdev, struct pk_buff *pkb );
+extern void netdev_rx ( struct net_device *netdev, struct pk_buff *pkb );
+extern int net_tx ( struct pk_buff *pkb, struct net_device *netdev,
+		    struct net_protocol *net_protocol, const void *ll_dest );
+extern void net_rx ( struct pk_buff *pkb, struct net_device *netdev,
+		     uint16_t net_proto, const void *ll_source );
+extern int netdev_poll ( struct net_device *netdev );
+extern struct pk_buff * netdev_rx_dequeue ( struct net_device *netdev );
+extern struct net_device * alloc_netdev ( size_t priv_size );
 extern int register_netdev ( struct net_device *netdev );
 extern void unregister_netdev ( struct net_device *netdev );
-extern void netdev_rx ( struct net_device *netdev, struct pk_buff *pkb );
-
-extern struct net_protocol *find_net_protocol ( uint16_t net_proto );
-extern struct net_device *
-find_netdev_by_net_addr ( struct net_protocol *net_protocol, void *net_addr );
-
-extern int net_poll ( void );
-extern struct pk_buff * net_rx_dequeue ( void );
-extern int net_rx_process ( struct pk_buff *pkb );
+extern void free_netdev ( struct net_device *netdev );
+extern struct net_device * next_netdev ( void );
 
 #endif /* _GPXE_NETDEVICE_H */

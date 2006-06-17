@@ -145,9 +145,6 @@ static int exit_status;
 static int initialized;
 
 
-extern struct net_device static_single_netdev;
-
-
 /**************************************************************************
 MAIN - Kick off routine
 **************************************************************************/
@@ -159,13 +156,9 @@ int main ( void ) {
 	call_init_fns ();
 	probe_devices();
 
-	/* Quick hack until netdevice.c uses proper dynamic registration */
-	netdev = &static_single_netdev;
-	if ( ! netdev->poll )
-		netdev = NULL;
-
+	netdev = next_netdev ();
 	if ( netdev ) {
-		test_aoeboot ( &static_single_netdev );
+		test_aoeboot ( netdev );
 	} else {
 		printf ( "No network device found\n" );
 	}

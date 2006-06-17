@@ -18,11 +18,14 @@ extern struct ll_protocol ethernet_protocol;
  * @v priv_size		Size of driver private data
  * @ret netdev		Network device, or NULL
  */
-#define alloc_etherdev( priv_size ) ( {				\
-	struct net_device *netdev;				\
-	netdev = alloc_netdev ( priv_size );			\
-	if ( netdev )						\
-		netdev->ll_protocol = &ethernet_protocol;	\
-	netdev;	} )
+static inline struct net_device * alloc_etherdev ( size_t priv_size ) {
+	struct net_device *netdev;
+
+	netdev = alloc_netdev ( priv_size );
+	if ( netdev ) {
+		netdev->ll_protocol = &ethernet_protocol;
+	}
+	return netdev;
+}
 
 #endif /* _GPXE_ETHERNET_H */

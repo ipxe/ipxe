@@ -36,6 +36,12 @@
  *
  */
 
+/** Registered ARP protocols */
+static struct arp_net_protocol arp_net_protocols[0]
+	__table_start ( arp_net_protocols );
+static struct arp_net_protocol arp_net_protocols_end[0]
+	__table_end ( arp_net_protocols );
+
 /** An ARP cache entry */
 struct arp_entry {
 	/** Network-layer protocol */
@@ -134,7 +140,6 @@ int arp_resolve ( struct net_device *netdev, struct net_protocol *net_protocol,
 			  2 * ( MAX_LL_ADDR_LEN + MAX_NET_ADDR_LEN ) );
 	if ( ! pkb )
 		return -ENOMEM;
-	pkb->net_protocol = &arp_protocol;
 	pkb_reserve ( pkb, MAX_LL_HEADER_LEN );
 
 	/* Build up ARP request */
@@ -154,17 +159,38 @@ int arp_resolve ( struct net_device *netdev, struct net_protocol *net_protocol,
 		 dest_net_addr, net_protocol->net_addr_len );
 
 	/* Transmit ARP request */
-	if ( ( rc = net_transmit ( pkb, netdev, &arp_protocol, 
-				   ll_protocol->ll_broadcast ) ) != 0 )
+	if ( ( rc = net_tx ( pkb, netdev, &arp_protocol, 
+			     ll_protocol->ll_broadcast ) ) != 0 )
 		return rc;
 
 	return -ENOENT;
 }
 
 /**
+ * Identify ARP protocol
+ *
+ * @v net_proto			Network-layer protocol, in network-endian order
+ * @ret arp_net_protocol	ARP protocol, or NULL
+ *
+ */
+static struct arp_net_protocol * arp_find_protocol ( uint16_t net_proto ) {
+	struct arp_net_protocol *arp_net_protocol;
+
+	for ( arp_net_protocol = arp_net_protocols ;
+	      arp_net_protocol < arp_net_protocols_end ; arp_net_protocol++ ) {
+		if ( arp_net_protocol->net_protocol->net_proto == net_proto ) {
+			return arp_net_protocol;
+		}
+	}
+	return NULL;
+}
+
+/**
  * Process incoming ARP packets
  *
  * @v pkb		Packet buffer
+ * @v netdev		Network device
+ * @v ll_source		Link-layer source address
  * @ret rc		Return status code
  *
  * This handles ARP requests and responses as detailed in RFC826.  The
@@ -173,19 +199,21 @@ int arp_resolve ( struct net_device *netdev, struct net_protocol *net_protocol,
  * avoiding the need for extraneous ARP requests; read the RFC for
  * details.
  */
-static int arp_rx ( struct pk_buff *pkb ) {
+static int arp_rx ( struct pk_buff *pkb, struct net_device *netdev,
+		    const void *ll_source __unused ) {
 	struct arphdr *arphdr = pkb->data;
-	struct ll_protocol *ll_protocol;
+	struct arp_net_protocol *arp_net_protocol;
 	struct net_protocol *net_protocol;
+	struct ll_protocol *ll_protocol;
 	struct arp_entry *arp;
-	struct net_device *netdev;
 	int merge = 0;
 
-	/* Identify link-layer and network-layer protocols */
-	ll_protocol = pkb->ll_protocol;
-	net_protocol = find_net_protocol ( arphdr->ar_pro );
-	if ( ! net_protocol )
+	/* Identify network-layer and link-layer protocols */
+	arp_net_protocol = arp_find_protocol ( arphdr->ar_pro );
+	if ( ! arp_net_protocol )
 		goto done;
+	net_protocol = arp_net_protocol->net_protocol;
+	ll_protocol = netdev->ll_protocol;
 
 	/* Sanity checks */
 	if ( ( arphdr->ar_hrd != ll_protocol->ll_proto ) ||
@@ -206,9 +234,7 @@ static int arp_rx ( struct pk_buff *pkb ) {
 	}
 
 	/* See if we own the target protocol address */
-	netdev = find_netdev_by_net_addr ( net_protocol,
-					   arp_target_pa ( arphdr ) );
-	if ( ! netdev )
+	if ( arp_net_protocol->check ( netdev, arp_target_pa ( arphdr ) ) != 0)
 		goto done;
 	
 	/* Create new ARP table entry if necessary */
@@ -239,7 +265,7 @@ static int arp_rx ( struct pk_buff *pkb ) {
 	memcpy ( arp_sender_ha ( arphdr ), netdev->ll_addr, arphdr->ar_hln );
 
 	/* Send reply */
-	net_transmit ( pkb, netdev, &arp_protocol, arp_target_ha (arphdr ) );
+	net_tx ( pkb, netdev, &arp_protocol, arp_target_ha (arphdr ) );
 	pkb = NULL;
 
  done:
@@ -264,7 +290,7 @@ arp_ntoa ( const void *net_addr __attribute__ (( unused )) ) {
 struct net_protocol arp_protocol = {
 	.name = "ARP",
 	.net_proto = htons ( ETH_P_ARP ),
-	.rx_process = arp_rx,
+	.rx = arp_rx,
 	.ntoa = arp_ntoa,
 };
 

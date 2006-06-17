@@ -46,41 +46,43 @@ static uint8_t eth_broadcast[ETH_ALEN] = { 0xff, 0xff, 0xff, 0xff, 0xff, 0xff};
  *
  * Prepends the Ethernet link-layer header and transmits the packet.
  */
-static int eth_transmit ( struct pk_buff *pkb, struct net_device *netdev,
-			  struct net_protocol *net_protocol,
-			  const void *ll_dest ) {
+static int eth_tx ( struct pk_buff *pkb, struct net_device *netdev,
+		    struct net_protocol *net_protocol, const void *ll_dest ) {
 	struct ethhdr *ethhdr = pkb_push ( pkb, sizeof ( *ethhdr ) );
 
+	/* Build Ethernet header */
 	memcpy ( ethhdr->h_dest, ll_dest, ETH_ALEN );
 	memcpy ( ethhdr->h_source, netdev->ll_addr, ETH_ALEN );
 	ethhdr->h_protocol = net_protocol->net_proto;
-	return netdev_transmit ( netdev, pkb );
+
+	/* Hand off to network device */
+	return netdev_tx ( netdev, pkb );
 }
 
 /**
- * Parse Ethernet link-layer header
+ * Process received Ethernet packet
  *
  * @v pkb	Packet buffer
- * @v llhdr	Generic link-layer header
+ * @v netdev	Network device
  *
- * Fills in the generic link-layer header based on information in the
- * Ethernet link-layer header in the packet buffer.
+ * Strips off the Ethernet link-layer header and passes up to the
+ * network-layer protocol.
  */
-static void eth_parse_llh ( const struct pk_buff *pkb,
-			    struct ll_header *llhdr ) {
+static void eth_rx ( struct pk_buff *pkb, struct net_device *netdev ) {
 	struct ethhdr *ethhdr = pkb->data;
 
-	memcpy ( llhdr->dest_ll_addr, ethhdr->h_dest, ETH_ALEN );
-	memcpy ( llhdr->source_ll_addr, ethhdr->h_source, ETH_ALEN );
-	llhdr->net_proto = ethhdr->h_protocol;
-
-	if ( memcmp ( ethhdr->h_dest, eth_broadcast, ETH_ALEN ) == 0 ) {
-		llhdr->flags = PKT_FL_BROADCAST;
-	} else if ( ethhdr->h_dest[0] & 0x01 ) {
-		llhdr->flags = PKT_FL_MULTICAST;
-	} else {
-		llhdr->flags = 0;
+	/* Sanity check */
+	if ( pkb_len ( pkb ) < sizeof ( *ethhdr ) ) {
+		DBG ( "Ethernet packet too short (%d bytes)\n",
+		      pkb_len ( pkb ) );
+		return;
 	}
+
+	/* Strip off Ethernet header */
+	pkb_pull ( pkb, sizeof ( *ethhdr ) );
+
+	/* Hand off to network-layer protocol */
+	net_rx ( pkb, netdev, ethhdr->h_protocol, ethhdr->h_source );
 }
 
 /**
@@ -105,8 +107,8 @@ struct ll_protocol ethernet_protocol = {
 	.ll_proto	= htons ( ARPHRD_ETHER ),
 	.ll_addr_len	= ETH_ALEN,
 	.ll_broadcast	= eth_broadcast,
-	.transmit	= eth_transmit,
-	.parse_llh	= eth_parse_llh,
+	.tx		= eth_tx,
+	.rx		= eth_rx,
 	.ntoa		= eth_ntoa,
 };
 

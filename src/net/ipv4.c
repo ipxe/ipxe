@@ -7,10 +7,6 @@
 #include <gpxe/list.h>
 #include <gpxe/in.h>
 #include <gpxe/arp.h>
-
-#include <ip.h>
-
-
 #include <gpxe/if_ether.h>
 #include <gpxe/pkbuff.h>
 #include <gpxe/netdevice.h>
@@ -104,7 +100,7 @@ void del_ipv4_address ( struct net_device *netdev ) {
  * @ret rc		Return status code
  *
  */
-int ipv4_uip_transmit ( struct pk_buff *pkb ) {
+int ipv4_uip_tx ( struct pk_buff *pkb ) {
 	struct iphdr *iphdr = pkb->data;
 	struct ipv4_miniroute *miniroute;
 	struct net_device *netdev = NULL;
@@ -162,7 +158,7 @@ int ipv4_uip_transmit ( struct pk_buff *pkb ) {
 	}
 	
 	/* Hand off to link layer */
-	return net_transmit ( pkb, netdev, &ipv4_protocol, ll_dest );
+	return net_tx ( pkb, netdev, &ipv4_protocol, ll_dest );
 
  err:
 	free_pkb ( pkb );
@@ -173,12 +169,15 @@ int ipv4_uip_transmit ( struct pk_buff *pkb ) {
  * Process incoming IP packets
  *
  * @v pkb		Packet buffer
+ * @v netdev		Network device
+ * @v ll_source		Link-layer source address
  * @ret rc		Return status code
  *
  * This handles IP packets by handing them off to the uIP protocol
  * stack.
  */
-static int ipv4_rx ( struct pk_buff *pkb ) {
+static int ipv4_rx ( struct pk_buff *pkb, struct net_device *netdev __unused,
+		     const void *ll_source __unused ) {
 
 	/* Transfer to uIP buffer.  Horrendously space-inefficient,
 	 * but will do as a proof-of-concept for now.
@@ -195,9 +194,30 @@ static int ipv4_rx ( struct pk_buff *pkb ) {
 			return -ENOMEM;
 		pkb_reserve ( pkb, MAX_LL_HEADER_LEN );
 		memcpy ( pkb_put ( pkb, uip_len ), uip_buf, uip_len );
-		ipv4_uip_transmit ( pkb );
+		ipv4_uip_tx ( pkb );
 	}
 	return 0;
+}
+
+/** 
+ * Check existence of IPv4 address for ARP
+ *
+ * @v netdev		Network device
+ * @v net_addr		Network-layer address
+ * @ret rc		Return status code
+ */
+static int ipv4_arp_check ( struct net_device *netdev, const void *net_addr ) {
+	const struct in_addr *address = net_addr;
+	struct ipv4_miniroute *miniroute;
+
+	list_for_each_entry ( miniroute, &miniroutes, list ) {
+		if ( ( miniroute->netdev == netdev ) &&
+		     ( miniroute->address.s_addr == address->s_addr ) ) {
+			/* Found matching address */
+			return 0;
+		}
+	}
+	return -ENOENT;
 }
 
 /**
@@ -230,18 +250,16 @@ struct net_protocol ipv4_protocol = {
 	.name = "IP",
 	.net_proto = htons ( ETH_P_IP ),
 	.net_addr_len = sizeof ( struct in_addr ),
-	.rx_process = ipv4_rx,
+	.rx = ipv4_rx,
 	.ntoa = ipv4_ntoa,
 };
 
 NET_PROTOCOL ( ipv4_protocol );
 
-/** IPv4 address for the static single net device */
-struct net_address static_single_ipv4_address = {
+/** IPv4 ARP protocol */
+struct arp_net_protocol ipv4_arp_protocol = {
 	.net_protocol = &ipv4_protocol,
-
-#warning "Remove this static-IP hack"
-	.net_addr = { 0x0a, 0xfe, 0xfe, 0x01 },
+	.check = ipv4_arp_check,
 };
 
-STATIC_SINGLE_NETDEV_ADDRESS ( static_single_ipv4_address );
+ARP_NET_PROTOCOL ( ipv4_arp_protocol );

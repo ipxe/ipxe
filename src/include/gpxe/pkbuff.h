@@ -14,9 +14,6 @@
 #include <assert.h>
 #include <gpxe/list.h>
 
-struct net_protocol;
-struct ll_protocol;
-
 /**
  * Packet buffer alignment
  *
@@ -42,6 +39,9 @@ struct ll_protocol;
  * This structure is used to represent a network packet within gPXE.
  */
 struct pk_buff {
+	/** List of which this buffer is a member */
+	struct list_head list;
+
 	/** Start of the buffer */
 	void *head;
 	/** Start of data */
@@ -50,14 +50,6 @@ struct pk_buff {
 	void *tail;
 	/** End of the buffer */
         void *end;
-
-	/** List of which this buffer is a member */
-	struct list_head list;
-
-	/** The network-layer protocol */
-	struct net_protocol *net_protocol;
-	/** The link-layer protocol */
-	struct ll_protocol *ll_protocol;
 };
 
 /**

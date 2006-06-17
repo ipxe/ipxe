@@ -87,7 +87,6 @@ static int aoe_send_command ( struct aoe_session *aoe ) {
 			  data_out_len );
 	if ( ! pkb )
 		return -ENOMEM;
-	pkb->net_protocol = &aoe_protocol;
 	pkb_reserve ( pkb, ETH_HLEN );
 	aoehdr = pkb_put ( pkb, sizeof ( *aoehdr ) );
 	aoecmd = pkb_put ( pkb, sizeof ( *aoecmd ) );
@@ -117,7 +116,7 @@ static int aoe_send_command ( struct aoe_session *aoe ) {
 
 	/* Send packet */
 	start_timer ( &aoe->timer );
-	return net_transmit ( pkb, aoe->netdev, &aoe_protocol, aoe->target );
+	return net_tx ( pkb, aoe->netdev, &aoe_protocol, aoe->target );
 }
 
 /**
@@ -209,13 +208,15 @@ static int aoe_rx_response ( struct aoe_session *aoe, struct aoehdr *aoehdr,
  * Process incoming AoE packets
  *
  * @v pkb		Packet buffer
+ * @v netdev		Network device
+ * @v ll_source		Link-layer source address
  * @ret rc		Return status code
  *
  */
-static int aoe_rx ( struct pk_buff *pkb ) {
+static int aoe_rx ( struct pk_buff *pkb, struct net_device *netdev __unused,
+		    const void *ll_source ) {
 	struct aoehdr *aoehdr = pkb->data;
 	unsigned int len = pkb_len ( pkb );
-	struct ethhdr *ethhdr = pkb_push ( pkb, sizeof ( *ethhdr ) );
 	struct aoe_session *aoe;
 	int rc = 0;
 
@@ -241,8 +242,7 @@ static int aoe_rx ( struct pk_buff *pkb ) {
 			continue;
 		if ( ntohl ( aoehdr->tag ) != aoe->tag )
 			continue;
-		memcpy ( aoe->target, ethhdr->h_source,
-			 sizeof ( aoe->target ) );
+		memcpy ( aoe->target, ll_source, sizeof ( aoe->target ) );
 		rc = aoe_rx_response ( aoe, aoehdr, len );
 		break;
 	}
@@ -256,7 +256,7 @@ static int aoe_rx ( struct pk_buff *pkb ) {
 struct net_protocol aoe_protocol = {
 	.name = "AoE",
 	.net_proto = htons ( ETH_P_AOE ),
-	.rx_process = aoe_rx,
+	.rx = aoe_rx,
 };
 
 NET_PROTOCOL ( aoe_protocol );

@@ -177,7 +177,7 @@ static void tcp_periodic ( void ) {
 			pkb_put ( pkb, uip_len );
 			memcpy ( pkb->data, uip_buf, uip_len );
 
-			ipv4_uip_transmit ( pkb );
+			ipv4_uip_tx ( pkb );
 		}
 	}
 }

@@ -20,6 +20,7 @@
 #include <byteswap.h>
 #include <string.h>
 #include <errno.h>
+#include <malloc.h>
 #include <gpxe/if_ether.h>
 #include <gpxe/pkbuff.h>
 #include <gpxe/tables.h>
@@ -33,38 +34,140 @@
  *
  */
 
-/**
- * Static single instance of a network device
- *
- * The gPXE API is designed to accommodate multiple network devices.
- * However, in the interests of code size, the implementation behind
- * the API supports only a single instance of a network device.
- *
- * No code outside of netdevice.c should ever refer directly to @c
- * static_single_netdev.
- *
- * Callers should always check the return status of alloc_netdev(),
- * register_netdev() etc.  In the current implementation this code
- * will be optimised out by the compiler, so there is no penalty.
- */
-struct net_device static_single_netdev;
-
 /** Registered network-layer protocols */
 static struct net_protocol net_protocols[0] __table_start ( net_protocols );
 static struct net_protocol net_protocols_end[0] __table_end ( net_protocols );
 
-/** Network-layer addresses for @c static_single_netdev */
-static struct net_address static_single_netdev_addresses[0]
-	__table_start ( sgl_netdev_addresses );
-static struct net_address static_single_netdev_addresses_end[0]
-	__table_end ( sgl_netdev_addresses );
-
-/** Recevied packet queue */
-static LIST_HEAD ( rx_queue );
+/** List of network devices */
+static LIST_HEAD ( net_devices );
 
 #warning "Remove this static IP address hack"
 #include <ip.h>
 #include <gpxe/ip.h>
+
+/**
+ * Transmit raw packet via network device
+ *
+ * @v netdev		Network device
+ * @v pkb		Packet buffer
+ * @ret rc		Return status code
+ *
+ * Transmits the packet via the specified network device.  This
+ * function takes ownership of the packet buffer.
+ */
+int netdev_tx ( struct net_device *netdev, struct pk_buff *pkb ) {
+	DBG ( "%s transmitting %p+%zx\n", netdev_name ( netdev ),
+	      pkb->data, pkb_len ( pkb ) );
+	return netdev->transmit ( netdev, pkb );
+}
+
+/**
+ * Add packet to receive queue
+ *
+ * @v netdev		Network device
+ * @v pkb		Packet buffer
+ *
+ * The packet is added to the network device's RX queue.  This
+ * function takes ownership of the packet buffer.
+ */
+void netdev_rx ( struct net_device *netdev, struct pk_buff *pkb ) {
+	DBG ( "%s received %p+%zx\n", netdev_name ( netdev ),
+	      pkb->data, pkb_len ( pkb ) );
+	list_add_tail ( &pkb->list, &netdev->rx_queue );
+}
+
+/**
+ * Transmit network-layer packet
+ *
+ * @v pkb		Packet buffer
+ * @v netdev		Network device
+ * @v net_protocol	Network-layer protocol
+ * @v ll_dest		Destination link-layer address
+ * @ret rc		Return status code
+ *
+ * Prepends link-layer headers to the packet buffer and transmits the
+ * packet via the specified network device.  This function takes
+ * ownership of the packet buffer.
+ */
+int net_tx ( struct pk_buff *pkb, struct net_device *netdev,
+	     struct net_protocol *net_protocol, const void *ll_dest ) {
+	return netdev->ll_protocol->tx ( pkb, netdev, net_protocol, ll_dest );
+}
+
+/**
+ * Process received network-layer packet
+ *
+ * @v pkb		Packet buffer
+ * @v netdev		Network device
+ * @v net_proto		Network-layer protocol, in network-byte order
+ * @v ll_source		Source link-layer address
+ */
+void net_rx ( struct pk_buff *pkb, struct net_device *netdev,
+	      uint16_t net_proto, const void *ll_source ) {
+	struct net_protocol *net_protocol;
+
+	/* Hand off to network-layer protocol, if any */
+	for ( net_protocol = net_protocols ; net_protocol < net_protocols_end ;
+	      net_protocol++ ) {
+		if ( net_protocol->net_proto == net_proto ) {
+			net_protocol->rx ( pkb, netdev, ll_source );
+			break;
+		}
+	}
+}
+
+/**
+ * Poll for packet on network device
+ *
+ * @v netdev		Network device
+ * @ret True		There are packets present in the receive queue
+ * @ret False		There are no packets present in the receive queue
+ *
+ * Polls the network device for received packets.  Any received
+ * packets will be added to the RX packet queue via netdev_rx().
+ */
+int netdev_poll ( struct net_device *netdev ) {
+	netdev->poll ( netdev );
+	return ( ! list_empty ( &netdev->rx_queue ) );
+}
+
+/**
+ * Remove packet from device's receive queue
+ *
+ * @v netdev		Network device
+ * @ret pkb		Packet buffer, or NULL
+ *
+ * Removes the first packet from the device's RX queue and returns it.
+ * Ownership of the packet is transferred to the caller.
+ */
+struct pk_buff * netdev_rx_dequeue ( struct net_device *netdev ) {
+	struct pk_buff *pkb;
+
+	list_for_each_entry ( pkb, &netdev->rx_queue, list ) {
+		list_del ( &pkb->list );
+		return pkb;
+	}
+	return NULL;
+}
+
+/**
+ * Allocate network device
+ *
+ * @v priv_size		Size of private data area (net_device::priv)
+ * @ret netdev		Network device, or NULL
+ *
+ * Allocates space for a network device and its private data area.
+ */
+struct net_device * alloc_netdev ( size_t priv_size ) {
+	struct net_device *netdev;
+
+	netdev = calloc ( 1, sizeof ( *netdev ) + priv_size );
+	if ( netdev ) {
+		INIT_LIST_HEAD ( &netdev->rx_queue );
+		netdev->priv = ( ( ( void * ) netdev ) + sizeof ( *netdev ) );
+	}
+	return netdev;
+}
 
 /**
  * Register network device
@@ -89,6 +192,10 @@ int register_netdev ( struct net_device *netdev ) {
 			return rc;
 	}
 
+	/* Add to device list */
+	list_add_tail ( &netdev->list, &net_devices );
+	DBG ( "%s registered\n", netdev_name ( netdev ) );
+
 	return 0;
 }
 
@@ -100,155 +207,50 @@ int register_netdev ( struct net_device *netdev ) {
  * Removes the network device from the list of network devices.
  */
 void unregister_netdev ( struct net_device *netdev ) {
+	struct pk_buff *pkb;
 
 #warning "Remove this static IP address hack"
 	del_ipv4_address ( netdev );
 
+	/* Discard any packets in the RX queue */
+	while ( ( pkb = netdev_rx_dequeue ( netdev ) ) ) {
+		DBG ( "%s discarding %p+%zx\n", netdev_name ( netdev ),
+		      pkb->data, pkb_len ( pkb ) );
+		free_pkb ( pkb );
+	}
+
+	/* Remove from device list */
+	list_del ( &netdev->list );
+	DBG ( "%s unregistered\n", netdev_name ( netdev ) );
 }
 
 /**
- * Add packet to receive queue
+ * Free network device
  *
  * @v netdev		Network device
- * @v pkb		Packet buffer
- *
- * The packet is added to the RX queue.  This function takes ownership
- * of the packet buffer.
  */
-void netdev_rx ( struct net_device *netdev, struct pk_buff *pkb ) {
-	DBG ( "Packet received\n" );
-	pkb->ll_protocol = netdev->ll_protocol;
-	list_add_tail ( &pkb->list, &rx_queue );
+void free_netdev ( struct net_device *netdev ) {
+	free ( netdev );
 }
 
 /**
- * Identify network protocol
+ * Iterate through network devices
  *
- * @v net_proto		Network-layer protocol, in network-byte order
- * @ret net_protocol	Network-layer protocol, or NULL
- *
- * Identify a network-layer protocol from a protocol number, which
- * must be an ETH_P_XXX constant in network-byte order.
- */
-struct net_protocol * find_net_protocol ( uint16_t net_proto ) {
-	struct net_protocol *net_protocol;
-
-	for ( net_protocol = net_protocols ; net_protocol < net_protocols_end ;
-	      net_protocol++ ) {
-		if ( net_protocol->net_proto == net_proto )
-			return net_protocol;
-	}
-	return NULL;
-}
-
-/**
- * Identify network device by network-layer address
- *
- * @v net_protocol	Network-layer protocol
- * @v net_addr		Network-layer address
  * @ret netdev		Network device, or NULL
  *
- * Searches through all network devices to find the device with the
- * specified network-layer address.
- *
- * Note that even with a static single network device, this function
- * can still return NULL.
+ * This returns the registered network devices in the order of
+ * registration.  If no network devices are registered, it will return
+ * NULL.
  */
-struct net_device *
-find_netdev_by_net_addr ( struct net_protocol *net_protocol,
-			  void *net_addr ) {
-	struct net_address *net_address;
-	struct net_device *netdev = &static_single_netdev;
-	
-	for ( net_address = static_single_netdev_addresses ;
-	      net_address < static_single_netdev_addresses_end ;
-	      net_address ++ ) {
-		if ( ( net_address->net_protocol == net_protocol ) &&
-		     ( memcmp ( net_address->net_addr, net_addr,
-				net_protocol->net_addr_len ) == 0 ) )
-			return netdev;
-	}
+struct net_device * next_netdev ( void ) {
+	struct net_device *netdev;
 
-	return NULL;
-}
-
-/**
- * Poll for packet on all network devices
- *
- * @ret True		There are packets present in the receive queue
- * @ret False		There are no packets present in the receive queue
- *
- * Polls all network devices for received packets.  Any received
- * packets will be added to the RX packet queue via netdev_rx().
- */
-int net_poll ( void ) {
-	struct net_device *netdev = &static_single_netdev;
-
-	DBG ( "Polling network\n" );
-	netdev->poll ( netdev );
-
-	return ( ! list_empty ( &rx_queue ) );
-}
-
-/**
- * Remove packet from receive queue
- *
- * @ret pkb		Packet buffer, or NULL
- *
- * Removes the first packet from the RX queue and returns it.
- * Ownership of the packet is transferred to the caller.
- */
-struct pk_buff * net_rx_dequeue ( void ) {
-	struct pk_buff *pkb;
-
-	list_for_each_entry ( pkb, &rx_queue, list ) {
-		list_del ( &pkb->list );
-		return pkb;
+	list_for_each_entry ( netdev, &net_devices, list ) {
+		list_del ( &netdev->list );
+		list_add_tail ( &netdev->list, &net_devices );
+		return netdev;
 	}
 	return NULL;
-}
-
-/**
- * Process received packet
- *
- * @v pkb		Packet buffer
- * @ret rc		Return status code
- *
- * Processes a packet received from the network (and, usually, removed
- * from the RX queue by net_rx_dequeue()).  This call takes ownership
- * of the packet buffer.
- */
-int net_rx_process ( struct pk_buff *pkb ) {
-	struct ll_protocol *ll_protocol;
-	struct ll_header llhdr;
-	struct net_protocol *net_protocol;
-	int rc;
-
-	/* Parse link-layer header */
-	ll_protocol = pkb->ll_protocol;
-	ll_protocol->parse_llh ( pkb, &llhdr );
-	
-	/* Identify network-layer protocol */
-	net_protocol = find_net_protocol ( llhdr.net_proto );
-	if ( ! net_protocol ) {
-		DBG ( "Unknown network-layer protocol %x\n",
-		      ntohs ( llhdr.net_proto ) );
-		free_pkb ( pkb );
-		return -EPROTONOSUPPORT;
-	}
-	pkb->net_protocol = net_protocol;
-	
-	/* Strip off link-layer header */
-#warning "Temporary hack"
-	pkb_pull ( pkb, ETH_HLEN );
-	
-	/* Hand off to network layer */
-	if ( ( rc = net_protocol->rx_process ( pkb ) ) != 0 ) {
-		DBG ( "Network-layer protocol dropped packet\n" );
-		return rc;
-	}
-
-	return 0;
 }
 
 /**
@@ -266,15 +268,21 @@ int net_rx_process ( struct pk_buff *pkb ) {
  * multiple packets are processed per poll.
  */
 static void net_step ( struct process *process ) {
+	struct net_device *netdev;
 	struct pk_buff *pkb;
 
-	/* Poll for new packets */
-	net_poll();
+	/* Poll and process each network device */
+	list_for_each_entry ( netdev, &net_devices, list ) {
 
-	/* Handle at most one received packet */
-	if ( ( pkb = net_rx_dequeue () ) ) {
-		net_rx_process ( pkb );
-		DBG ( "Processed received packet\n" );
+		/* Poll for new packets */
+		netdev_poll ( netdev );
+
+		/* Handle at most one received packet per poll */
+		if ( ( pkb = netdev_rx_dequeue ( netdev ) ) ) {
+			DBG ( "%s processing %p+%zx\n", netdev_name ( netdev ),
+			      pkb->data, pkb_len ( pkb ) );
+			netdev->ll_protocol->rx ( pkb, netdev );
+		}
 	}
 
 	/* Re-schedule ourself */
