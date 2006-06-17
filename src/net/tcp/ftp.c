@@ -220,20 +220,21 @@ static void ftp_acked ( struct tcp_connection *conn, size_t len ) {
  * Construct data to send on FTP control channel
  *
  * @v conn	TCP connection
+ * @v buf	Temporary data buffer
+ * @v len	Length of temporary data buffer
  */
-static void ftp_senddata ( struct tcp_connection *conn ) {
+static void ftp_senddata ( struct tcp_connection *conn,
+			   void *buf, size_t len ) {
 	struct ftp_request *ftp = tcp_to_ftp ( conn );
 	const struct ftp_string *string;
-	size_t len;
 
 	/* Send the as-yet-unACKed portion of the string for the
 	 * current state.
 	 */
 	string = &ftp_strings[ftp->state];
-	len = snprintf ( tcp_buffer, tcp_buflen, string->format,
+	len = snprintf ( buf, len, string->format,
 			 ftp_string_data ( ftp, string->data_offset ) );
-	tcp_send ( conn, tcp_buffer + ftp->already_sent,
-		   len - ftp->already_sent );
+	tcp_send ( conn, buf + ftp->already_sent, len - ftp->already_sent );
 }
 
 /**

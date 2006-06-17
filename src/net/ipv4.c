@@ -176,8 +176,9 @@ int ipv4_uip_tx ( struct pk_buff *pkb ) {
  * This handles IP packets by handing them off to the uIP protocol
  * stack.
  */
-static int ipv4_rx ( struct pk_buff *pkb, struct net_device *netdev __unused,
-		     const void *ll_source __unused ) {
+static int ipv4_uip_rx ( struct pk_buff *pkb,
+			 struct net_device *netdev __unused,
+			 const void *ll_source __unused ) {
 
 	/* Transfer to uIP buffer.  Horrendously space-inefficient,
 	 * but will do as a proof-of-concept for now.
@@ -250,7 +251,11 @@ struct net_protocol ipv4_protocol = {
 	.name = "IP",
 	.net_proto = htons ( ETH_P_IP ),
 	.net_addr_len = sizeof ( struct in_addr ),
+#if USE_UIP
+	.rx = ipv4_uip_rx,
+#else
 	.rx = ipv4_rx,
+#endif
 	.ntoa = ipv4_ntoa,
 };
 

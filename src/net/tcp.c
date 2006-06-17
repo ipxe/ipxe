@@ -40,11 +40,10 @@
  *
  * @code
  *
- *     static void my_senddata ( struct tcp_connection *conn ) {
- *         int len;
- *
- *         len = snprintf ( tcp_buffer, tcp_buflen, "FETCH %s\r\n", filename );
- *         tcp_send ( conn, tcp_buffer + already_sent, len - already_sent );
+ *     static void my_senddata ( struct tcp_connection *conn, void *buf,
+ *				 size_t len ) {
+ *         len = snprintf ( buf, len, "FETCH %s\r\n", filename );
+ *         tcp_send ( conn, buf + already_sent, len - already_sent );
  *     }
  *
  * @endcode
@@ -53,13 +52,12 @@
  * variably-sized data.
  *
  * Note that you cannot use this simple mechanism if you want to be
- * able to construct single data blocks of more than #tcp_buflen
- * bytes.
+ * able to construct single data blocks of more than #len bytes.
  */
-void *tcp_buffer = uip_buf + ( 40 + UIP_LLH_LEN );
+static void *tcp_buffer = uip_buf + ( 40 + UIP_LLH_LEN );
 
 /** Size of #tcp_buffer */
-size_t tcp_buflen = UIP_BUFSIZE - ( 40 + UIP_LLH_LEN );
+static size_t tcp_buflen = UIP_BUFSIZE - ( 40 + UIP_LLH_LEN );
 
 /**
  * Open a TCP connection
@@ -148,7 +146,7 @@ void uip_tcp_appcall ( void ) {
 		op->newdata ( conn, ( void * ) uip_appdata, uip_len );
 	if ( ( uip_rexmit() || uip_newdata() || uip_acked() ||
 	       uip_connected() || uip_poll() ) && op->senddata )
-		op->senddata ( conn );
+		op->senddata ( conn, tcp_buffer, tcp_buflen );
 }
 
 /* Present here to allow everything to link.  Will go into separate

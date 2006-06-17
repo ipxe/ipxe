@@ -569,4 +569,6 @@ extern void uip_tcp_appcall ( void );
 #define UIP_IPADDR2 254
 #define UIP_IPADDR3 1
 
+#define USE_UIP 1
+
 #endif /* __UIPOPT_H__ */

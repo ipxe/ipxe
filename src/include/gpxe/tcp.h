@@ -66,6 +66,8 @@ struct tcp_operations {
 	 * Transmit data
 	 *
 	 * @v conn	TCP connection
+	 * @v buf	Temporary data buffer
+	 * @v len	Length of temporary data buffer
 	 *
 	 * The application should transmit whatever it currently wants
 	 * to send using tcp_send().  If retransmissions are required,
@@ -73,8 +75,16 @@ struct tcp_operations {
 	 * regenerate the data.  The easiest way to implement this is
 	 * to ensure that senddata() never changes the application's
 	 * state.
+	 *
+	 * The application may use the temporary data buffer to
+	 * construct the data to be sent.  Note that merely filling
+	 * the buffer will do nothing; the application must call
+	 * tcp_send() in order to actually transmit the data.  Use of
+	 * the buffer is not compulsory; the application may call
+	 * tcp_send() on any block of data.
 	 */
-	void ( * senddata ) ( struct tcp_connection *conn );
+	void ( * senddata ) ( struct tcp_connection *conn, void *buf,
+			      size_t len );
 };
 
 /**
@@ -88,8 +98,6 @@ struct tcp_connection {
 	struct tcp_operations *tcp_op;
 };
 
-extern void *tcp_buffer;
-extern size_t tcp_buflen;
 extern void tcp_connect ( struct tcp_connection *conn );
 extern void tcp_send ( struct tcp_connection *conn, const void *data,
 		       size_t len );

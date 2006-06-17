@@ -222,24 +222,27 @@ static void iscsi_data_out_done ( struct iscsi_session *iscsi ) {
  * Send iSCSI data-out data segment
  *
  * @v iscsi		iSCSI session
+ * @v buf		Temporary data buffer
+ * @v len		Length of temporary data buffer
  */
-static void iscsi_tx_data_out ( struct iscsi_session *iscsi ) {
+static void iscsi_tx_data_out ( struct iscsi_session *iscsi,
+				void *buf, size_t len ) {
 	struct iscsi_bhs_data_out *data_out = &iscsi->tx_bhs.data_out;
 	unsigned long offset;
-	unsigned long len;
+	unsigned long remaining;
 
 	offset = ( iscsi->transfer_offset + ntohl ( data_out->offset ) +
 		   iscsi->tx_offset );
-	len = ( ISCSI_DATA_LEN ( data_out->lengths ) - iscsi->tx_offset );
+	remaining = ( ISCSI_DATA_LEN ( data_out->lengths ) - iscsi->tx_offset);
 	assert ( iscsi->command != NULL );
 	assert ( iscsi->command->data_out != NULL );
 	assert ( ( offset + len ) <= iscsi->command->data_out_len );
 	
-	if ( len > tcp_buflen )
-		len = tcp_buflen;
-	copy_from_user ( tcp_buffer, iscsi->command->data_out, offset, len );
+	if ( remaining < len )
+		len = remaining;
+	copy_from_user ( buf, iscsi->command->data_out, offset, len );
 
-	tcp_send ( &iscsi->tcp, tcp_buffer, len );
+	tcp_send ( &iscsi->tcp, buf, len );
 }
 
 /****************************************************************************
@@ -336,15 +339,15 @@ static void iscsi_start_login ( struct iscsi_session *iscsi, int first ) {
  * Transmit data segment of an iSCSI login request PDU
  *
  * @v iscsi		iSCSI session
+ * @v buf		Temporary data buffer
+ * @v len		Length of temporary data buffer
  *
  * For login requests, the data segment consists of the login strings.
  */
-static void iscsi_tx_login_request ( struct iscsi_session *iscsi ) {
-	int len;
-
-	len = iscsi_build_login_request_strings ( iscsi, tcp_buffer,
-						  tcp_buflen );
-	tcp_send ( &iscsi->tcp, tcp_buffer + iscsi->tx_offset,
+static void iscsi_tx_login_request ( struct iscsi_session *iscsi,
+				     void *buf, size_t len ) {
+	len = iscsi_build_login_request_strings ( iscsi, buf, len );
+	tcp_send ( &iscsi->tcp, buf + iscsi->tx_offset,
 		   len - iscsi->tx_offset );
 }
 
@@ -422,19 +425,22 @@ static void iscsi_start_tx ( struct iscsi_session *iscsi ) {
  * Transmit data segment of an iSCSI PDU
  *
  * @v iscsi		iSCSI session
+ * @v buf		Temporary data buffer
+ * @v len		Length of temporary data buffer
  * 
  * Handle transmission of part of a PDU data segment.  iscsi::tx_bhs
  * will be valid when this is called.
  */
-static void iscsi_tx_data ( struct iscsi_session *iscsi ) {
+static void iscsi_tx_data ( struct iscsi_session *iscsi,
+			    void *buf, size_t len ) {
 	struct iscsi_bhs_common *common = &iscsi->tx_bhs.common;
 
 	switch ( common->opcode & ISCSI_OPCODE_MASK ) {
 	case ISCSI_OPCODE_DATA_OUT:
-		iscsi_tx_data_out ( iscsi );
+		iscsi_tx_data_out ( iscsi, buf, len );
 		break;
 	case ISCSI_OPCODE_LOGIN_REQUEST:
-		iscsi_tx_login_request ( iscsi );
+		iscsi_tx_login_request ( iscsi, buf, len );
 		break;
 	default:
 		assert ( 0 );
@@ -524,10 +530,13 @@ static void iscsi_acked ( struct tcp_connection *conn, size_t len ) {
  * Transmit iSCSI PDU
  *
  * @v iscsi		iSCSI session
+ * @v buf		Temporary data buffer
+ * @v len		Length of temporary data buffer
  * 
  * Constructs data to be sent for the current TX state
  */
-static void iscsi_senddata ( struct tcp_connection *conn ) {
+static void iscsi_senddata ( struct tcp_connection *conn,
+			     void *buf, size_t len ) {
 	struct iscsi_session *iscsi = tcp_to_iscsi ( conn );
 	struct iscsi_bhs_common *common = &iscsi->tx_bhs.common;
 	static const char pad[] = { '\0', '\0', '\0' };
@@ -545,7 +554,7 @@ static void iscsi_senddata ( struct tcp_connection *conn ) {
 		assert ( 0 );
 		break;
 	case ISCSI_TX_DATA:
-		iscsi_tx_data ( iscsi );
+		iscsi_tx_data ( iscsi, buf, len );
 		break;
 	case ISCSI_TX_DATA_PADDING:
 		tcp_send ( conn, pad, ( ISCSI_DATA_PAD_LEN ( common->lengths )
