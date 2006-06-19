@@ -9,6 +9,7 @@
 
 #include <stdint.h>
 #include <gpxe/tcp.h>
+#include <gpxe/async.h>
 
 enum hello_state {
 	HELLO_SENDING_MESSAGE = 1,
@@ -37,10 +38,10 @@ struct hello_request {
 	 * remote server.
 	 */
 	void ( *callback ) ( char *data, size_t len );
-	/** Connection complete indicator */
-	int complete;
+	/** Asynchronous operation */
+	struct async_operation aop;
 };
 
-extern void hello_connect ( struct hello_request *hello );
+extern struct async_operation * say_hello ( struct hello_request *hello );
 
 #endif

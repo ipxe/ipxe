@@ -2,6 +2,7 @@
 #include <string.h>
 #include <vsprintf.h>
 #include <assert.h>
+#include <gpxe/async.h>
 #include <gpxe/hello.h>
 
 /** @file
@@ -13,7 +14,8 @@
  * message (hello_request::message).  Any data received from the
  * server will be passed to the callback function,
  * hello_request::callback(), and once the connection has been closed,
- * hello_request::complete will be set to a non-zero value.
+ * the asynchronous operation associated with the request will be
+ * marked as complete.
  *
  * To use this code, do something like:
  *
@@ -31,10 +33,7 @@
  *   hello.sin.sin_addr.s_addr = ... server IP address ...
  *   hello.sin.sin_port = ... server port ...
  *
- *   hello_connect ( &hello );
- *   while ( ! hello.completed ) {
- *     run_tcpip();
- *   }
+ *   rc = async_wait ( say_hello ( &hello ) );
  *
  * @endcode
  *
@@ -52,7 +51,7 @@ tcp_to_hello ( struct tcp_connection *conn ) {
 static void hello_closed ( struct tcp_connection *conn, int status ) {
 	struct hello_request *hello = tcp_to_hello ( conn );
 
-	hello->complete = ( status ? status : 1 );
+	async_done ( &hello->aop, status );
 }
 
 static void hello_connected ( struct tcp_connection *conn ) {
@@ -92,7 +91,8 @@ static void hello_newdata ( struct tcp_connection *conn, void *data,
 	hello->callback ( data, len );
 }
 
-static void hello_senddata ( struct tcp_connection *conn ) {
+static void hello_senddata ( struct tcp_connection *conn,
+			     void *buf __unused, size_t len __unused ) {
 	struct hello_request *hello = tcp_to_hello ( conn );
 
 	tcp_send ( conn, hello->message, hello->remaining );
@@ -111,7 +111,8 @@ static struct tcp_operations hello_tcp_operations = {
  *
  * @v hello	"Hello world" request
  */
-void hello_connect ( struct hello_request *hello ) {
+struct async_operation * say_hello ( struct hello_request *hello ) {
 	hello->tcp.tcp_op = &hello_tcp_operations;
 	tcp_connect ( &hello->tcp );
+	return &hello->aop;
 }

@@ -4,6 +4,7 @@
 #include <vsprintf.h>
 #include <assert.h>
 #include <errno.h>
+#include <gpxe/async.h>
 #include <gpxe/ftp.h>
 
 /** @file
@@ -70,13 +71,13 @@ static inline struct ftp_request * tcp_to_ftp ( struct tcp_connection *conn ) {
  * Mark FTP request as complete
  *
  * @v ftp		FTP request
- * @v complete		Completion indicator
+ * @v rc		Return status code
  *
  */
-static void ftp_complete ( struct ftp_request *ftp, int complete ) {
-	ftp->complete = complete;
+static void ftp_done ( struct ftp_request *ftp, int rc ) {
 	tcp_close ( &ftp->tcp_data );
 	tcp_close ( &ftp->tcp );
+	async_done ( &ftp->aop, rc );
 }
 
 /**
@@ -145,7 +146,7 @@ static void ftp_reply ( struct ftp_request *ftp ) {
 
  err:
 	/* Flag protocol error and close connections */
-	ftp_complete ( ftp, -EPROTO );
+	ftp_done ( ftp, -EPROTO );
 }
 
 /**
@@ -248,7 +249,7 @@ static void ftp_senddata ( struct tcp_connection *conn,
 static void ftp_closed ( struct tcp_connection *conn, int status ) {
 	struct ftp_request *ftp = tcp_to_ftp ( conn );
 
-	ftp_complete ( ftp, status ? status : 1 );
+	ftp_done ( ftp, status );
 }
 
 /** FTP control channel operations */
@@ -291,7 +292,7 @@ static void ftp_data_closed ( struct tcp_connection *conn, int status ) {
 	struct ftp_request *ftp = tcp_to_ftp_data ( conn );
 
 	if ( status )
-		ftp_complete ( ftp, status );
+		ftp_done ( ftp, status );
 }
 
 /**
@@ -327,10 +328,11 @@ static struct tcp_operations ftp_data_tcp_operations = {
  *
  * @v ftp	FTP request
  */
-void ftp_connect ( struct ftp_request *ftp ) {
+struct async_operation * ftp_get ( struct ftp_request *ftp ) {
 	ftp->tcp.tcp_op = &ftp_tcp_operations;
 	ftp->tcp_data.tcp_op = &ftp_data_tcp_operations;
 	ftp->recvbuf = ftp->status_text;
 	ftp->recvsize = sizeof ( ftp->status_text ) - 1;
 	tcp_connect ( &ftp->tcp );
+	return &ftp->aop;
 }

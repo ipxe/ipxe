@@ -8,7 +8,11 @@
  */
 
 #include <stdint.h>
+#include <gpxe/async.h>
 #include <gpxe/tcp.h>
+
+/** FTP default port */
+#define FTP_PORT 21
 
 /**
  * FTP states
@@ -45,12 +49,8 @@ struct ftp_request {
 	 * remote server.
 	 */
 	void ( *callback ) ( char *data, size_t len );
-	/** Completion indicator
-	 *
-	 * This will be set to a non-zero value when the transfer is
-	 * complete.  A negative value indicates an error.
-	 */
-	int complete;
+	/** Asynchronous operation for this FTP operation */
+	struct async_operation aop;
 
 	/** Current state */
 	enum ftp_state state;
@@ -69,6 +69,6 @@ struct ftp_request {
 	struct tcp_connection tcp_data;
 };
 
-extern void ftp_connect ( struct ftp_request *ftp );
+struct async_operation * ftp_get ( struct ftp_request *ftp );
 
-#endif
+#endif /* _GPXE_FTP_H */
