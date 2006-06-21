@@ -2,6 +2,12 @@
 #include "core.h"
 #include "cursor.h"
 
+/** @file
+ *
+ * MuCurses edging functions
+ *
+ */
+
 /**
  * Draw borders from single-byte characters and renditions around a
  * window
@@ -88,7 +94,7 @@ int whline ( WINDOW *win, chtype ch, int n ) {
  *
  * @v *win	subject window
  * @v ch	rendition and character
- * @v n		max number of lines to render
+ * @v n		max number of chars (high) to render
  * @ret rc	return status code
  */
 int wvline ( WINDOW *win, chtype ch, int n ) {
