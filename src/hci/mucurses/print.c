@@ -3,7 +3,39 @@
 #include <stddef.h>
 #include "core.h"
 
-static printw_context {
+/** @file
+ *
+ * MuCurses printing functions
+ *
+ */
+
+/**
+ * Add a single-byte character and rendition to a window and advance
+ * the cursor
+ *
+ * @v *win	window to be rendered in
+ * @v ch	character to be added at cursor
+ * @ret rc	return status code
+ */
+int waddch ( WINDOW *win, const chtype ch ) {
+	_wputch( win, ch, WRAP );
+	return OK;
+}
+
+/**
+ * Add string of single-byte characters to a window
+ *
+ * @v *win	window to be rendered in
+ * @v *str	standard c-style string
+ * @v n		max number of chars from string to render
+ * @ret rc	return status code
+ */
+int waddnstr ( WINDOW *win, const char *str, int n ) {
+	_wputstr( win, str, WRAP, n );
+	return OK;
+}
+
+struct printw_context {
 	struct printf_context ctx;
 	WINDOW *win;
 };
