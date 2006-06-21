@@ -1,5 +1,21 @@
 #include <curses.h>
 
+/** @file
+ *
+ * MuCurses window attribute functions
+ *
+ */
+
+/**
+ * Get the background rendition attributes for a window
+ *
+ * @v *win	subject window
+ * @ret ch	chtype rendition representation
+ */
+inline chtype getbkgd ( WINDOW *win ) {
+	return win->attrs;
+}
+
 /**
  * Turn off attributes in a window
  *
