@@ -1,6 +1,12 @@
 #include <curses.h>
 #include "core.h"
 
+/** @file
+ *
+ * MuCurses core functions
+ *
+ */
+
 WINDOW _stdscr = {
 	.attrs = A_DEFAULT,
 	.ori_y = 0,
@@ -9,8 +15,6 @@ WINDOW _stdscr = {
 	.curs_x = 0,
 	.scr = curscr,
 };
-
-struct _softlabelkeys *slks;
 
 /*
  *  Primitives
@@ -29,14 +33,14 @@ void _wputch ( WINDOW *win, chtype ch, int wrap ) {
 	win->scr->movetoyx( win->scr, win->ori_y + win->curs_y,
 				      win->ori_x + win->curs_x );
 	win->scr->putc(win->scr, ch);
-	if ( ++(win->curs_x) == win->width ) {
+	if ( ++(win->curs_x) - win->width == 0 ) {
 		if ( wrap == WRAP ) {
 			win->curs_x = 0;
 			/* specification says we should really scroll,
 			   but we have no buffer to scroll with, so we
 			   can only overwrite back at the beginning of
 			   the window */
-			if ( ++(win->curs_y) == win->height )
+			if ( ++(win->curs_y) - win->height == 0 )
 				win->curs_y = 0;
 		} else {
 			(win->curs_x)--;
@@ -82,8 +86,8 @@ void _wputstr ( WINDOW *win, const char *str, int wrap, int n ) {
  */
 int wmove ( WINDOW *win, int y, int x ) {
 	/* chech for out-of-bounds errors */
-	if ( ( ( (unsigned)x - win->ori_x ) > win->width ) ||
-	     ( ( (unsigned)y - win->ori_y ) > win->height ) ) {
+	if ( ( (unsigned)y >= win->height ) ||
+	     ( (unsigned)x >= win->width ) ) {
 		return ERR;
 	}
 
