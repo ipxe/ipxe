@@ -1,8 +1,10 @@
 #include <curses.h>
-#include <stddef.h>
-#include "core.h"
 
-extern struct _softlabelkeys *slks;
+/** @file
+ *
+ * MuCurses initialisation functions
+ *
+ */
 
 /**
  * Initialise console environment
@@ -12,8 +14,8 @@ extern struct _softlabelkeys *slks;
 WINDOW *initscr ( void ) {
 	/* determine console size */
 	/* initialise screen */
-	stdscr->width = 80;
-	stdscr->height = ( slks == NULL ? 25 : 24 );
+	stdscr->height = LINES;
+	stdscr->width = COLS;
 	/* set previously unknown window attributes */
 	/* refresh screen */
 	return stdscr;
