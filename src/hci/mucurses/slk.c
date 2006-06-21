@@ -23,7 +23,7 @@ struct _softlabel {
 };
 
 struct _softlabelkeys {
-	struct _softlabel fkeys[12];
+	struct _softlabel *fkeys;
 	attr_t attrs;
 	/* Soft label layout format
 	   0: 3-2-3
@@ -41,6 +41,8 @@ struct _softlabelkeys {
 
 struct _softlabelkeys *slks;
 
+static unsigned short pos_x;
+
 /*
   I either need to break the primitives here, or write a collection of
   functions specifically for SLKs that directly access the screen
@@ -50,6 +52,43 @@ struct _softlabelkeys *slks;
 
 static void _movetoslk ( void ) {
 	stdscr->scr->movetoyx( stdscr->scr, LINES, 0 );
+}
+
+static void _print_label ( struct _softlabel sl ) {
+	unsigned short i = 0;
+	int space_ch;
+	char *str = malloc((size_t)slks->max_label_len);
+
+	space_ch = ' ';
+
+	// protect against gaps in the soft label keys array
+	if ( sl.label == NULL ) {
+		memset( str, space_ch, (size_t)(slks->max_label_len) );
+	} else {
+		/* we need to pad the label with varying amounts of leading
+		   pad depending on the format of the label */
+		if ( sl.fmt == 1 ) {
+			memset( str, space_ch, 
+				(size_t)(slks->max_label_len 
+					 - strlen(sl.label)) / 2 );
+		}
+		if ( sl.fmt == 2 ) {
+			memset( str, space_ch,
+				(size_t)(slks->max_label_len 
+					 - strlen(sl.label)) );
+		}
+		strcat(str,sl.label);
+		
+		// post-padding
+		memset(str+strlen(str), space_ch,
+		       (size_t)(slks->max_label_len - strlen(str)) );
+		str[slks->max_label_len] = '\0';
+	}
+
+	// print the formatted label
+	for ( ; i < slks->max_label_len; i++ ) {
+		stdscr->scr->putc( stdscr->scr, (chtype)str[i] | slks->attrs );
+	}
 }
 
 /**
@@ -149,9 +188,18 @@ int slk_attr_set ( const attr_t attrs, short colour_pair_number,
  * @ret rc	return status code
  */
 int slk_clear ( void ) {
+	chtype space_ch;
 	if ( slks == NULL )
 		return ERR;
-	return 0;
+
+	_movetoslk();
+	pos_x = 0;
+	space_ch = (chtype)' ' | slks->attrs;
+
+	for ( ; pos_x < COLS; pos_x++ )
+		stdscr->scr->putc( stdscr->scr, space_ch );
+
+	return OK;
 }
 
 /**
@@ -211,8 +259,11 @@ int slk_init ( int fmt ) {
 	// determine maximum label length and major space size
 	available_width = COLS - ( ( MIN_SPACE_SIZE * nmaj ) + nmin );
 	slks->max_label_len = available_width / nblocks;
-	slks->maj_space_len = ( available_width % nblocks ) / nmaj;
+	slks->maj_space_len = MIN_SPACE_SIZE + 
+		( available_width % nblocks ) / nmaj;
 	slks->num_spaces = nmaj;
+	slks->num_labels = nblocks;
+	slks->fkeys = calloc( nblocks, sizeof(struct _softlabel) );
 
 	// strip a line from the screen
 	LINES -= 1;
@@ -242,28 +293,31 @@ int slk_restore ( void ) {
 	unsigned short i, j,
 		*next_space, *last_space;
 	chtype space_ch;
-	char c;
 
-	if ( slks == NULL ) 
+	if ( slks == NULL )
 		return ERR;
+
+	pos_x = 0;
 
 	_movetoslk();
 
-	space_ch = (int)' ' | slks->attrs;
+	space_ch = (chtype)' ' | slks->attrs;
 	next_space = &(slks->spaces[0]);
 	last_space = &(slks->spaces[slks->num_spaces-1]);
 
 	for ( i = 0; i < slks->num_labels ; i++ ) {
-		while ( ( c = *(slks->fkeys[i].label++) ) != '\0' ) {
-			stdscr->scr->putc( stdscr->scr, (int)c | slks->attrs );
-		}
+		_print_label( slks->fkeys[i] );
+		pos_x += slks->max_label_len;
+
 		if ( i == *next_space ) {
-			for ( j = 0; j < slks->maj_space_len; j++ )
+			for ( j = 0; j < slks->maj_space_len; j++, pos_x++ )
 				stdscr->scr->putc( stdscr->scr, space_ch );
 			if ( next_space < last_space )
 				next_space++;
 		} else {
-			stdscr->scr->putc( stdscr->scr, space_ch );
+			if ( pos_x < COLS )
+				stdscr->scr->putc( stdscr->scr, space_ch );
+			pos_x++;
 		}
 	}
 
@@ -281,14 +335,13 @@ int slk_restore ( void ) {
 int slk_set ( int labnum, const char *label, int fmt ) {
 	if ( slks == NULL ) 
 		return ERR;
-	if ( (unsigned short)labnum > 12 )
+	if ( (unsigned short)labnum >= slks->num_labels )
 		return ERR;
 	if ( (unsigned short)fmt >= 3 )
 		return ERR;
-	if ( strlen(label) > slks->max_label_len )
-		return ERR;
 
-	strcpy( slks->fkeys[labnum].label, label );
+	slks->fkeys[labnum].label = malloc((size_t)slks->max_label_len + 1);
+	strncpy(slks->fkeys[labnum].label, label, (size_t)slks->max_label_len);
 	slks->fkeys[labnum].fmt = fmt;
 
 	return OK;
