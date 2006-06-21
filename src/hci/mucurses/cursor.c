@@ -1,6 +1,12 @@
 #include <curses.h>
 #include "cursor.h"
 
+/** @file
+ *
+ * MuCurses cursor preserving functions
+ *
+ */
+
 /**
  * Restore cursor position from encoded backup variable
  *

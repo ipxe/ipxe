@@ -1,6 +1,12 @@
 #ifndef CURSOR_H
 #define CURSOR_H
 
+/** @file
+ *
+ * MuCurses cursor implementation specific header file
+ *
+ */
+
 struct cursor_pos {
 	unsigned int y, x;
 };

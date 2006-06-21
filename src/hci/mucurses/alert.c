@@ -1,6 +1,12 @@
 #include <curses.h>
 #include <vsprintf.h>
 
+/** @file
+ *
+ * MuCurses alert functions
+ *
+ */
+
 /**
  * Audible signal
  *
