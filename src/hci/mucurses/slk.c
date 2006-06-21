@@ -203,6 +203,9 @@ int slk_init ( int fmt ) {
 		slks->spaces = calloc(2, sizeof(unsigned short));
 		slks->spaces[0] = 3; slks->spaces[1] = 7;
 		break;
+	default:
+		nblocks = 0; nmaj = 0; nmin = 0;
+		break;
 	}
 
 	// determine maximum label length and major space size
