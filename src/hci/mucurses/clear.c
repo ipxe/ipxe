@@ -2,6 +2,12 @@
 #include "core.h"
 #include "cursor.h"
 
+/** @file
+ *
+ * MuCurses clearing functions
+ *
+ */
+
 /**
  * Clear a window to the bottom from current cursor position
  *
@@ -35,6 +41,40 @@ int wclrtoeol ( WINDOW *win ) {
 	}
 	_restore_curs_pos( win, &pos );
 
+	return OK;
+}
+
+/**
+ * Delete character under the cursor in a window
+ *
+ * @v *win	subject window
+ * @ret rc	return status code
+ */
+int wdelch ( WINDOW *win ) {
+	struct cursor_pos pos;
+
+	_store_curs_pos( win, &pos );
+	_wputch( win, (unsigned)' ', NOWRAP );
+	_restore_curs_pos( win, &pos );
+
+	return OK;
+}
+
+/**
+ * Delete line under a window's cursor
+ *
+ * @v *win	subject window
+ * @ret rc	return status code
+ */
+int wdeleteln ( WINDOW *win ) {
+	struct cursor_pos pos;
+
+	_store_curs_pos( win, &pos );
+	/* let's just set the cursor to the beginning of the line and
+	   let wclrtoeol do the work :) */
+	wmove( win, win->curs_y, 0 );
+	wclrtoeol( win );
+	_restore_curs_pos( win, &pos );
 	return OK;
 }
 
