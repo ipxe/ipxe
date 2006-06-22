@@ -143,6 +143,7 @@ SRCDIRS		+= drivers/nvs
 SRCDIRS		+= drivers/bitbash
 SRCDIRS		+= interface/pxe
 SRCDIRS		+= tests
+SRCDIRS		+= crypto
 
 # NON_AUTO_SRCS lists files that are excluded from the normal
 # automatic build system.
