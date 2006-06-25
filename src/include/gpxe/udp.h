@@ -11,6 +11,29 @@
 
 #include <stddef.h>
 #include <gpxe/in.h>
+#include <gpxe/pkbuff.h>
+#include <gpxe/if_ether.h>
+
+/**
+ * UDP constants
+ */
+
+#define UDP_HLEN    	8
+#define UDP_MAX_HLEN	72
+#define UDP_MAX_TXPKB	ETH_MAX_MTU
+#define UDP_MIN_TXPKB	ETH_ZLEN
+
+typedef uint16_t port_t;
+
+/**
+ * A UDP header
+ */
+struct udp_header {
+        port_t source_port;
+        port_t dest_port;
+        uint16_t len;
+        uint16_t chksum;
+};
 
 struct udp_connection;
 
@@ -35,15 +58,42 @@ struct udp_operations {
  *
  */
 struct udp_connection {
-	/** Address of the remote end of the connection */
-	struct sockaddr_in sin;
-	/** Operations table for this connection */
-	struct udp_operations *udp_op;
+       /** Address of the remote end of the connection */
+        struct sockaddr sin;
+        /** Local port on which the connection receives packets */
+        port_t local_port;
+        /** Transmit buffer */
+        struct pk_buff *tx_pkb;
+        /** List of registered connections */
+        struct list_head list;
+        /** Operations table for this connection */
+        struct udp_operations *udp_op;
 };
 
-extern void udp_connect ( struct udp_connection *conn );
-extern void udp_send ( struct udp_connection *conn, const void *data,
-		       size_t len );
+/**
+ * List of registered UDP connections
+ */
+static LIST_HEAD ( udp_conns );
+
+/**
+ * Functions provided to the application layer
+ */
+
+extern void udp_init ( struct udp_connection *conn, struct udp_operations *udp_op );
+extern int udp_open ( struct udp_connection *conn, uint16_t local_port );
+
+extern void udp_connect ( struct udp_connection *conn, struct sockaddr *peer );
 extern void udp_close ( struct udp_connection *conn );
+
+extern int udp_send ( struct udp_connection *conn, const void *data, size_t len );
+extern int udp_sendto ( struct udp_connection *conn, struct sockaddr *peer, const void *data, size_t len );
+
+static inline void * udp_buffer ( struct udp_connection *conn ) {
+	return conn->tx_pkb->data;
+}
+
+static inline int udp_buflen ( struct udp_connection *conn ) {
+	return pkb_len ( conn->tx_pkb );
+}
 
 #endif /* _GPXE_UDP_H */
