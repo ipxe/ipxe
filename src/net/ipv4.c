@@ -12,6 +12,7 @@
 #include <gpxe/netdevice.h>
 #include "uip/uip.h"
 #include <gpxe/ip.h>
+#include <gpxe/interface.h>
 
 /** @file
  *
@@ -23,6 +24,9 @@
  * to uIP (which has a somewhat baroque API).
  *
  */
+
+/* Unique IP datagram identification number */
+static uint16_t next_ident = 0;
 
 struct net_protocol ipv4_protocol;
 
@@ -91,6 +95,39 @@ void del_ipv4_address ( struct net_device *netdev ) {
 			break;
 		}
 	}
+}
+
+/**
+ * Complete the transport-layer checksum
+ *
+ * Refer to the note made in net/interface.c about this function
+ */
+void ipv4_tx_csum ( struct pk_buff *pkb, uint8_t trans_proto ) {
+
+        struct iphdr *iphdr = pkb->data;
+        void *pshdr = malloc ( IP_PSHLEN );
+        void *csum_offset = iphdr + IP_HLEN + ( trans_proto == IP_UDP ? 6 : 16 );
+        int offset = 0;
+
+        /* Calculate pseudo header */
+        memcpy ( pshdr, &iphdr->src, sizeof ( in_addr ) );
+        offset += sizeof ( in_addr );
+        memcpy ( pshdr + offset, &iphdr->dest, sizeof ( in_addr ) );
+        offset += sizeof ( in_addr );
+        *( ( uint8_t* ) ( pshdr + offset++ ) ) = 0x00;
+        *( ( uint8_t* ) ( pshdr + offset++ ) ) = iphdr->protocol;
+        *( ( uint16_t* ) ( pshdr + offset ) ) = pkb_len ( pkb ) - IP_HLEN;
+
+	/* Update the checksum value */
+        *( ( uint16_t* ) csum_offset ) = *( ( uint16_t* ) csum_offset ) + calc_chksum ( pshdr, IP_PSHLEN );
+}
+
+/**
+ * Calculate the transport-layer checksum while processing packets
+ */
+uint16_t ipv4_rx_csum ( struct pk_buff *pkb __unused, uint8_t trans_proto __unused ) {
+	/** This function needs to be implemented. Until then, it will return 0xffffffff every time */
+	return 0xffff;
 }
 
 /**
@@ -166,6 +203,132 @@ int ipv4_uip_tx ( struct pk_buff *pkb ) {
 }
 
 /**
+ * Transmit IP packet (without uIP)
+ *
+ * @v pkb		Packet buffer
+ * @v trans_proto	Transport-layer protocol number
+ * @v dest		Destination network-layer address
+ * @ret rc		Status
+ *
+ * This function expects a transport-layer segment and prepends the IP header
+ */
+int ipv4_tx ( struct pk_buff *pkb, uint16_t trans_proto, struct in_addr *dest ) {
+	struct iphdr *iphdr = pkb_push ( pkb, IP_HLEN );
+        struct ipv4_miniroute *miniroute;
+        struct net_device *netdev = NULL;
+        struct in_addr next_hop;
+        struct in_addr source;
+        uint8_t ll_dest_buf[MAX_LL_ADDR_LEN];
+        const uint8_t *ll_dest = ll_dest_buf;
+        int rc;
+
+        /* Fill up the IP header, except source address */
+        iphdr->verhdrlen = ( IP_VER << 4 ) | ( IP_HLEN / 4 );	/* Version = 4, Header length = 5 */
+        iphdr->service = IP_TOS;                               	/* Service = 0, is not implemented */
+        iphdr->len = htons ( pkb_len ( pkb ) );                 /* Total packet length, in network byte order */
+        iphdr->ident = next_ident++;				/* Identification number */
+        iphdr->frags = 0;                                       /* Fragmentation is not implemented at the host */
+        iphdr->ttl = IP_TTL;                                    /* Time to live */
+        iphdr->protocol = trans_proto;                          /* Transport-layer protocol - IP_XXX */
+
+	/* Calculate header checksum, in network byte order */
+        iphdr->chksum = 0;
+        iphdr->chksum = htons ( calc_chksum ( iphdr, IP_HLEN ) );
+	/* Copy destination address */
+        memcpy ( &iphdr->dest, dest, sizeof ( struct in_addr ) );
+
+	/**
+	 * All fields in the IP header filled in except the source network address (which requires routing). As
+	 * the pseudo header requires the source address as well and updating the transport-layer checksum is
+	 * done after routing.
+	 *
+	 * Continue processing as in ipv4_uip_tx()
+	 */
+
+        /* Use routing table to identify next hop and transmitting netdev */
+        next_hop = iphdr->dest;
+        list_for_each_entry ( miniroute, &miniroutes, list ) {
+                if ( ( ( ( iphdr->dest.s_addr ^ miniroute->address.s_addr ) &
+                         miniroute->netmask.s_addr ) == 0 ) ||
+                     ( miniroute->gateway.s_addr != INADDR_NONE ) ) {
+                        netdev = miniroute->netdev;
+                        source = miniroute->address;
+                        if ( miniroute->gateway.s_addr != INADDR_NONE )
+                                next_hop = miniroute->gateway;
+                        break;
+                }
+	}
+        /* Abort if no network device identified */
+        if ( ! netdev ) {
+                DBG ( "No route to %s\n", inet_ntoa ( iphdr->dest ) );
+                rc = -EHOSTUNREACH;
+                goto err;
+        }
+
+        /* Copy the source address, after this the IP header is complete */
+        memcpy ( &iphdr->src, &source, sizeof ( struct in_addr ) );
+        /* Calculate the transport layer checksum */
+        ipv4_tx_csum ( pkb, trans_proto );
+
+        /* Print IP4 header for debugging */
+        DBG ( "IP4 header at %#x + %d\n", iphdr, IP_HLEN  );
+        DBG ( "\tVersion = %d\n", ( iphdr->verhdrlen & IP_MASK_VER ) / 16 );
+        DBG ( "\tHeader length = %d\n", iphdr->verhdrlen & IP_MASK_HLEN );
+        DBG ( "\tService = %d\n", iphdr->service );
+        DBG ( "\tTotal length = %d\n", iphdr->len );
+        DBG ( "\tIdent = %d\n", iphdr->ident );
+        DBG ( "\tFrags/Offset = %d\n", iphdr->frags );
+        DBG ( "\tIP TTL = %d\n", iphdr->ttl );
+        DBG ( "\tProtocol = %d\n", iphdr->protocol );
+        DBG ( "\tHeader Checksum (at %#x) = %x\n", &iphdr->chksum, iphdr->chksum );
+        DBG ( "\tSource = %s\n", inet_ntoa ( iphdr->src) );
+        DBG ( "\tDestination = %s\n", inet_ntoa ( iphdr->dest ) );
+
+
+        /* Determine link-layer destination address */
+        if ( next_hop.s_addr == INADDR_BROADCAST ) {
+                /* Broadcast address */
+                ll_dest = netdev->ll_protocol->ll_broadcast;
+        } else if ( IN_MULTICAST ( next_hop.s_addr ) ) {
+                /* Special case: IPv4 multicast over Ethernet.  This
+                 * code may need to be generalised once we find out
+                 * what happens for other link layers.
+                 */
+                uint8_t *next_hop_bytes = ( uint8_t * ) &next_hop;
+                ll_dest_buf[0] = 0x01;
+                ll_dest_buf[0] = 0x00;
+                ll_dest_buf[0] = 0x5e;
+                ll_dest_buf[3] = next_hop_bytes[1] & 0x7f;
+                ll_dest_buf[4] = next_hop_bytes[2];
+                ll_dest_buf[5] = next_hop_bytes[3];
+        } else {
+                /* Unicast address: resolve via ARP */
+                if ( ( rc = arp_resolve ( netdev, &ipv4_protocol, &next_hop, &source, ll_dest_buf ) ) != 0 ) {
+                        DBG ( "No ARP entry for %s\n", inet_ntoa ( iphdr->dest ) );
+                        goto err;
+                }
+        }
+
+        /* Hand off to link layer */
+        return net_tx ( pkb, netdev, &ipv4_protocol, ll_dest );
+
+ err:
+        /* Warning: Allowing this function to execute causes bochs to go into an infinite loop */
+        free_pkb ( pkb );
+        return rc;
+}
+
+/**
+ * Transmit IP6 packets
+ * 
+ * Placeholder to allow linking. The function should be placed in net/ipv6.c
+ */
+int ipv6_tx ( struct pk_buff *pkb __unused, uint16_t trans_proto __unused, struct in6_addr *dest __unused) {
+	return -ENOSYS;
+}
+
+
+/**
  * Process incoming IP packets
  *
  * @v pkb		Packet buffer
@@ -198,6 +361,74 @@ static int ipv4_uip_rx ( struct pk_buff *pkb,
 		ipv4_uip_tx ( pkb );
 	}
 	return 0;
+}
+
+/**
+ * Process incoming IP6 packets
+ * 
+ * Placeholder function. Should rewrite in net/ipv6.c
+ */
+void ipv6_rx ( struct pk_buff *pkb __unused, struct net_device *netdev __unused, const void *ll_source __unused ) {
+}
+
+/**
+ * Process incoming packets (without uIP)
+ *
+ * @v pkb	Packet buffer
+ * @v netdev	Network device
+ * @v ll_source	Link-layer destination source
+ *
+ * This function expects an IP4 network datagram. It will process the headers and send it to the transport layer
+ */
+void ipv4_rx ( struct pk_buff *pkb, struct net_device *netdev __unused,
+                        const void *ll_source __unused ) {
+        struct iphdr *iphdr = pkb->data;
+        struct in_addr *src = &iphdr->src;
+        struct in_addr *dest = &iphdr->dest;
+	uint16_t chksum;
+
+        /* Print IP4 header for debugging */
+        DBG ( "IP4 header at %#x + %d\n", iphdr, IP_HLEN  );
+        DBG ( "\tVersion = %d\n", ( iphdr->verhdrlen & IP_MASK_VER ) / 16 );
+        DBG ( "\tHeader length = %d\n", iphdr->verhdrlen & IP_MASK_HLEN );
+        DBG ( "\tService = %d\n", iphdr->service );
+        DBG ( "\tTotal length = %d\n", iphdr->len );
+        DBG ( "\tIdent = %d\n", iphdr->ident );
+        DBG ( "\tFrags/Offset = %d\n", iphdr->frags );
+        DBG ( "\tIP TTL = %d\n", iphdr->ttl );
+        DBG ( "\tProtocol = %d\n", iphdr->protocol );
+        DBG ( "\tHeader Checksum (at %#x) = %x\n", &iphdr->chksum, iphdr->chksum );
+        DBG ( "\tSource = %s\n", inet_ntoa ( iphdr->src) );
+        DBG ( "\tDestination = %s\n", inet_ntoa ( iphdr->dest ) );
+
+        /* Process headers */
+	if ( iphdr->verhdrlen != 0x45 ) {
+		DBG ( "Bad version and header length %x\n", iphdr->verhdrlen );
+		return;
+	}
+
+	if ( iphdr->len != pkb_len ( pkb ) ) {
+		DBG ( "Bad total length %d\n", iphdr->len );
+		return;
+	}
+
+	if ( ( chksum = ipv4_rx_csum ( pkb, iphdr->protocol ) ) != 0xffff ) {
+		DBG ( "Bad checksum %x\n", chksum );
+	}
+
+	/* Todo: Compute and verify the header checksum */
+
+	/* To reduce code size, the following functions are not implemented:
+	 * 1. Check the destination address
+	 * 2. Check the TTL field
+	 * 3. Check the service field
+	 */
+
+        /* Strip header */
+        pkb_pull ( pkb, IP_HLEN );
+
+        /* Send it to the transport layer */
+        trans_rx ( pkb, iphdr->protocol, src, dest );
 }
 
 /** 
