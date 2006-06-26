@@ -98,6 +98,27 @@ void del_ipv4_address ( struct net_device *netdev ) {
 }
 
 /**
+ * Dump IPv4 packet header
+ *
+ * @v iphdr	IPv4 header
+ */
+static void ipv4_dump ( struct iphdr *iphdr __unused ) {
+	DBG ( "IP4 header at %p+%zx\n", iphdr, sizeof ( *iphdr ) );
+	DBG ( "\tVersion = %d\n", ( iphdr->verhdrlen & IP_MASK_VER ) / 16 );
+	DBG ( "\tHeader length = %d\n", iphdr->verhdrlen & IP_MASK_HLEN );
+	DBG ( "\tService = %d\n", iphdr->service );
+	DBG ( "\tTotal length = %d\n", iphdr->len );
+	DBG ( "\tIdent = %d\n", iphdr->ident );
+	DBG ( "\tFrags/Offset = %d\n", iphdr->frags );
+	DBG ( "\tIP TTL = %d\n", iphdr->ttl );
+	DBG ( "\tProtocol = %d\n", iphdr->protocol );
+	DBG ( "\tHeader Checksum (at %p) = %x\n", &iphdr->chksum,
+	      iphdr->chksum );
+	DBG ( "\tSource = %s\n", inet_ntoa ( iphdr->src ) );
+	DBG ( "\tDestination = %s\n", inet_ntoa ( iphdr->dest ) );
+}
+
+/**
  * Complete the transport-layer checksum
  *
  * Refer to the note made in net/interface.c about this function
@@ -271,19 +292,7 @@ int ipv4_tx ( struct pk_buff *pkb, uint16_t trans_proto, struct in_addr *dest ) 
 	ipv4_tx_csum ( pkb, trans_proto );
 
 	/* Print IP4 header for debugging */
-	DBG ( "IP4 header at %#x + %d\n", iphdr, IP_HLEN  );
-	DBG ( "\tVersion = %d\n", ( iphdr->verhdrlen & IP_MASK_VER ) / 16 );
-	DBG ( "\tHeader length = %d\n", iphdr->verhdrlen & IP_MASK_HLEN );
-	DBG ( "\tService = %d\n", iphdr->service );
-	DBG ( "\tTotal length = %d\n", iphdr->len );
-	DBG ( "\tIdent = %d\n", iphdr->ident );
-	DBG ( "\tFrags/Offset = %d\n", iphdr->frags );
-	DBG ( "\tIP TTL = %d\n", iphdr->ttl );
-	DBG ( "\tProtocol = %d\n", iphdr->protocol );
-	DBG ( "\tHeader Checksum (at %#x) = %x\n", &iphdr->chksum, iphdr->chksum );
-	DBG ( "\tSource = %s\n", inet_ntoa ( iphdr->src) );
-	DBG ( "\tDestination = %s\n", inet_ntoa ( iphdr->dest ) );
-
+	ipv4_dump ( iphdr );
 
 	/* Determine link-layer destination address */
 	if ( next_hop.s_addr == INADDR_BROADCAST ) {
@@ -370,18 +379,7 @@ void ipv4_rx ( struct pk_buff *pkb, struct net_device *netdev __unused,
 	uint16_t chksum;
 
 	/* Print IP4 header for debugging */
-	DBG ( "IP4 header at %#x + %d\n", iphdr, IP_HLEN  );
-	DBG ( "\tVersion = %d\n", ( iphdr->verhdrlen & IP_MASK_VER ) / 16 );
-	DBG ( "\tHeader length = %d\n", iphdr->verhdrlen & IP_MASK_HLEN );
-	DBG ( "\tService = %d\n", iphdr->service );
-	DBG ( "\tTotal length = %d\n", iphdr->len );
-	DBG ( "\tIdent = %d\n", iphdr->ident );
-	DBG ( "\tFrags/Offset = %d\n", iphdr->frags );
-	DBG ( "\tIP TTL = %d\n", iphdr->ttl );
-	DBG ( "\tProtocol = %d\n", iphdr->protocol );
-	DBG ( "\tHeader Checksum (at %#x) = %x\n", &iphdr->chksum, iphdr->chksum );
-	DBG ( "\tSource = %s\n", inet_ntoa ( iphdr->src) );
-	DBG ( "\tDestination = %s\n", inet_ntoa ( iphdr->dest ) );
+	ipv4_dump ( iphdr );
 
 	/* Process headers */
 	if ( iphdr->verhdrlen != 0x45 ) {
