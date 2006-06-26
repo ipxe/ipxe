@@ -319,16 +319,6 @@ int ipv4_tx ( struct pk_buff *pkb, uint16_t trans_proto, struct in_addr *dest ) 
 }
 
 /**
- * Transmit IP6 packets
- * 
- * Placeholder to allow linking. The function should be placed in net/ipv6.c
- */
-int ipv6_tx ( struct pk_buff *pkb __unused, uint16_t trans_proto __unused, struct in6_addr *dest __unused) {
-	return -ENOSYS;
-}
-
-
-/**
  * Process incoming IP packets
  *
  * @v pkb		Packet buffer
@@ -361,14 +351,6 @@ static int ipv4_uip_rx ( struct pk_buff *pkb,
 		ipv4_uip_tx ( pkb );
 	}
 	return 0;
-}
-
-/**
- * Process incoming IP6 packets
- * 
- * Placeholder function. Should rewrite in net/ipv6.c
- */
-void ipv6_rx ( struct pk_buff *pkb __unused, struct net_device *netdev __unused, const void *ll_source __unused ) {
 }
 
 /**
