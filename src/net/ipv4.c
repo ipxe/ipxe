@@ -238,7 +238,6 @@ int ipv4_tx ( struct pk_buff *pkb, uint16_t trans_proto, struct in_addr *dest ) 
 	struct ipv4_miniroute *miniroute;
 	struct net_device *netdev = NULL;
 	struct in_addr next_hop;
-	struct in_addr source;
 	uint8_t ll_dest_buf[MAX_LL_ADDR_LEN];
 	const uint8_t *ll_dest = ll_dest_buf;
 	int rc;
@@ -273,7 +272,7 @@ int ipv4_tx ( struct pk_buff *pkb, uint16_t trans_proto, struct in_addr *dest ) 
 			 miniroute->netmask.s_addr ) == 0 ) ||
 		     ( miniroute->gateway.s_addr != INADDR_NONE ) ) {
 			netdev = miniroute->netdev;
-			source = miniroute->address;
+			iphdr->src = miniroute->address;
 			if ( miniroute->gateway.s_addr != INADDR_NONE )
 				next_hop = miniroute->gateway;
 			break;
@@ -286,8 +285,6 @@ int ipv4_tx ( struct pk_buff *pkb, uint16_t trans_proto, struct in_addr *dest ) 
 		goto err;
 	}
 
-	/* Copy the source address, after this the IP header is complete */
-	memcpy ( &iphdr->src, &source, sizeof ( struct in_addr ) );
 	/* Calculate the transport layer checksum */
 	ipv4_tx_csum ( pkb, trans_proto );
 
@@ -312,8 +309,10 @@ int ipv4_tx ( struct pk_buff *pkb, uint16_t trans_proto, struct in_addr *dest ) 
 		ll_dest_buf[5] = next_hop_bytes[3];
 	} else {
 		/* Unicast address: resolve via ARP */
-		if ( ( rc = arp_resolve ( netdev, &ipv4_protocol, &next_hop, &source, ll_dest_buf ) ) != 0 ) {
-			DBG ( "No ARP entry for %s\n", inet_ntoa ( iphdr->dest ) );
+		if ( ( rc = arp_resolve ( netdev, &ipv4_protocol, &next_hop,
+					  &iphdr->src, ll_dest_buf ) ) != 0 ) {
+			DBG ( "No ARP entry for %s\n",
+			      inet_ntoa ( iphdr->dest ) );
 			goto err;
 		}
 	}
@@ -322,7 +321,6 @@ int ipv4_tx ( struct pk_buff *pkb, uint16_t trans_proto, struct in_addr *dest ) 
 	return net_tx ( pkb, netdev, &ipv4_protocol, ll_dest );
 
  err:
-	/* Warning: Allowing this function to execute causes bochs to go into an infinite loop */
 	free_pkb ( pkb );
 	return rc;
 }
