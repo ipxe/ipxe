@@ -11,7 +11,7 @@
  */
 
 #undef  ERR
-#define ERR	(1)
+#define ERR	(-1)
 
 #undef  FALSE
 #define FALSE	(0)
@@ -22,12 +22,14 @@
 #undef  TRUE
 #define TRUE	(1)
 
-typedef uint32_t bool;
+typedef short bool;
 typedef uint32_t chtype;
-typedef chtype attr_t;
+typedef uint32_t attr_t;
 
 /** Curses SCREEN object */
 typedef struct _curses_screen {
+	void ( *init ) ( struct _curses_screen *scr );
+	void ( *exit ) ( struct _curses_screen *scr );
 	/**
 	 * Move cursor to position specified by x,y coords
 	 *
@@ -45,12 +47,20 @@ typedef struct _curses_screen {
 	 */
 	void ( * putc ) ( struct _curses_screen *scr, chtype c );
 	/**
-	 * Read a character
+	 * Pop a character from the keyboard input stream
 	 *
 	 * @v scr	screen on which to operate
-	 * @ret c	character
+	 * @ret c	popped character
 	 */
 	int ( * getc ) ( struct _curses_screen *scr );
+	/**
+	 * Checks to see whether a character is waiting in the input stream
+	 *
+	 * @v scr	screen on which to operate
+	 * @ret TRUE	character waiting in stream
+	 * @ret FALSE	no character waiting in stream
+	 */
+	bool ( *peek ) ( struct _curses_screen *scr );
 } SCREEN;
 
 /** Curses Window struct */
@@ -65,23 +75,27 @@ typedef struct _curses_window {
 	unsigned int curs_x, curs_y;
 	/** window dimensions */
 	unsigned int width, height;
-	/** parent/child ptrs */
-	struct _curses_window *parent, *child;
+	/** parent window */
+	struct _curses_window *parent;
+	/** windows that share the same parent as this one */
+	//struct list_head siblings;
+	/** windows der'd or sub'd from this one */
+	//struct list_head children;
 } WINDOW;
 
 extern WINDOW _stdscr;
 extern SCREEN _curscr;
 extern unsigned short _COLS;
 extern unsigned short _LINES;
-extern unsigned short _COLOURS;
-extern unsigned int *_COLOUR_PAIRS;
+extern unsigned int _COLOURS;
+extern unsigned int _COLOUR_PAIRS;
 
 #define stdscr ( &_stdscr )
 #define curscr ( &_curscr )
 #define COLS _COLS
 #define LINES _LINES
 #define COLORS _COLOURS
-#define COLOR_PAIRS COLOUR_PAIRS
+#define COLOR_PAIRS _COLOUR_PAIRS
 
 #define MUCURSES_BITS( mask, shift ) (( mask ) << (shift))
 #define CPAIR_SHIFT	8
@@ -116,7 +130,8 @@ extern unsigned int *_COLOUR_PAIRS;
 
 #define A_ATTRIBUTES	( MUCURSES_BITS( 1UL, ATTRS_SHIFT ) - 1UL )
 #define A_CHARTEXT	( MUCURSES_BITS( 1UL, 0 ) - 1UL )
-#define A_COLOR		MUCURSES_BITS( ( 1UL << 8 ) - 1UL, CPAIR_SHIFT )
+#define A_COLOUR	MUCURSES_BITS( ( 1UL << 8 ) - 1UL, CPAIR_SHIFT )
+#define A_COLOR		A_COLOUR
 
 #define ACS_ULCORNER	'+'
 #define ACS_LLCORNER	'+'
@@ -145,13 +160,18 @@ extern unsigned int *_COLOUR_PAIRS;
 #define ACS_BLOCK	'#'
 
 #define COLOUR_BLACK	0
-#define COLOUR_BLUE	1
+#define COLOUR_RED	1
 #define COLOUR_GREEN	2
-#define COLOUR_CYAN	3
-#define COLOUR_RED	4
+#define COLOUR_YELLOW	3
+#define COLOUR_BLUE	4
 #define COLOUR_MAGENTA	5
-#define COLOUR_YELLOW	6
+#define COLOUR_CYAN	6
 #define COLOUR_WHITE	7
+
+#define COLOUR_FG	30
+#define COLOUR_BG	40
+#define COLOR_FG	COLOUR_FG
+#define COLOR_BG	COLOUR_BG
 
 #define COLOR_BLACK	COLOUR_BLACK
 #define COLOR_BLUE	COLOUR_BLUE
@@ -258,58 +278,58 @@ extern unsigned int *_COLOUR_PAIRS;
 
 #define KEY_MAX		0777		/* Maximum key value is 0633 */
 
-/*extern int addch ( const chtype * );*/
-/*extern int addchnstr ( const chtype *, int );*/
-/*extern int addchstr ( const chtype * );*/
-/*extern int addnstr ( const char *, int );*/
-/*extern int addstr ( const char * );*/
-/*extern int attroff ( int );*/
-/*extern int attron ( int );*/
-/*extern int attrset ( int );*/
+//extern int addch ( const chtype * );
+//extern int addchnstr ( const chtype *, int );
+//extern int addchstr ( const chtype * );
+//extern int addnstr ( const char *, int );
+//extern int addstr ( const char * );
+//extern int attroff ( int );
+//extern int attron ( int );
+//extern int attrset ( int );
 extern int attr_get ( attr_t *, short *, void * );
 extern int attr_off ( attr_t, void * );
 extern int attr_on ( attr_t, void * );
 extern int attr_set ( attr_t, short, void * );
 extern int baudrate ( void );
 extern int beep ( void );
-/*extern void bkgdset ( chtype );*/
+//extern void bkgdset ( chtype );
 /*extern int border ( chtype, chtype, chtype, chtype, chtype, chtype, chtype,
   chtype );*/
 extern int box ( WINDOW *, chtype, chtype );
 extern bool can_change_colour ( void );
 #define can_change_color() can_change_colour()
 extern int cbreak ( void ); 
-/*extern int clrtobot ( void );*/
-/*extern int clrtoeol ( void );*/
+//extern int clrtobot ( void );
+//extern int clrtoeol ( void );
 extern int colour_content ( short, short *, short *, short * );
-#define color_content( col, r, g, b ) colour_content( (col), (r), (g), (b) )
-/*extern int colour_set ( short, void * );*/
-/*#define color_set( cpno, opts ) colour_set( (cpno), (opts) )*/
+#define color_content( c, r, g, b ) colour_content( (c), (r), (g), (b) )
+//extern int colour_set ( short, void * );
+//#define color_set( cpno, opts ) colour_set( (cpno), (opts) )
 extern int copywin ( const WINDOW *, WINDOW *, int, int, int, 
 		     int, int, int, int );
 extern int curs_set ( int );
 extern int def_prog_mode ( void );
 extern int def_shell_mode ( void );
 extern int delay_output ( int );
-/*extern int delch ( void );*/
-/*extern int deleteln ( void );*/
+//extern int delch ( void );
+//extern int deleteln ( void );
 extern void delscreen ( SCREEN * );
 extern int delwin ( WINDOW * );
 extern WINDOW *derwin ( WINDOW *, int, int, int, int );
-/*extern int doupdate ( void );*/
+//extern int doupdate ( void );
 extern WINDOW *dupwin ( WINDOW * );
 extern int echo ( void );
 extern int echochar ( const chtype );
 extern int endwin ( void );
 extern char erasechar ( void );
-extern int erase ( void );
+//extern int erase ( void );
 extern void filter ( void );
 extern int flash ( void );
 extern int flushinp ( void );
 extern chtype getbkgd ( WINDOW * );
-extern int getch ( void );
-extern int getnstr ( char *, int );
-extern int getstr ( char * );
+//extern int getch ( void );
+//extern int getnstr ( char *, int );
+//extern int getstr ( char * );
 extern int halfdelay ( int );
 extern bool has_colors ( void );
 extern bool has_ic ( void );
@@ -317,12 +337,13 @@ extern bool has_il ( void );
 //extern int hline ( chtype, int );
 extern void idcok ( WINDOW *, bool );
 extern int idlok ( WINDOW *, bool );
-extern void immedok ( WINDOW *, bool );
-/*extern chtype inch ( void );*/
-/*extern int inchnstr ( chtype *, int );*/
-/*extern int inchstr ( chtype * );*/
+//extern void immedok ( WINDOW *, bool );
+//extern chtype inch ( void );
+//extern int inchnstr ( chtype *, int );
+//extern int inchstr ( chtype * );
 extern WINDOW *initscr ( void );
-extern int init_color ( short, short, short, short );
+extern int init_colour ( short, short, short, short );
+#define init_color ( c, r, g, b ) init_colour ( (c), (r), (g), (b) )
 extern int init_pair ( short, short, short );
 //extern int innstr ( char *, int );
 //extern int insch ( chtype );
@@ -331,47 +352,47 @@ extern int init_pair ( short, short, short );
 //extern int instr ( char * );
 extern int intrflush ( WINDOW *, bool );
 extern bool isendwin ( void );
-extern bool is_linetouched ( WINDOW *, int );
-extern bool is_wintouched ( WINDOW * );
+//extern bool is_linetouched ( WINDOW *, int );
+//extern bool is_wintouched ( WINDOW * );
 extern char *keyname ( int );
 extern int keypad ( WINDOW *, bool );
 extern char killchar ( void );
 extern int leaveok ( WINDOW *, bool );
 extern char *longname ( void );
 extern int meta ( WINDOW *, bool );
-/*extern int move ( int, int );*/
-/*extern int mvaddch ( int, int, const chtype );*/
-/*extern int mvaddchnstr ( int, int, const chtype *, int );*/
-/*extern int mvaddchstr ( int, int, const chtype * );*/
-/*extern int mvaddnstr ( int, int, const char *, int );*/
-/*extern int mvaddstr ( int, int, const char * );*/
+//extern int move ( int, int );
+//extern int mvaddch ( int, int, const chtype );
+//extern int mvaddchnstr ( int, int, const chtype *, int );
+//extern int mvaddchstr ( int, int, const chtype * );
+//extern int mvaddnstr ( int, int, const char *, int );
+//extern int mvaddstr ( int, int, const char * );
 extern int mvcur ( int, int, int, int );
-/*extern int mvdelch ( int, int );*/
+//extern int mvdelch ( int, int );
 extern int mvderwin ( WINDOW *, int, int );
-extern int mvgetch ( int, int );
-extern int mvgetnstr ( int, int, char *, int );
-extern int mvgetstr ( int, int, char * );
+//extern int mvgetch ( int, int );
+//extern int mvgetnstr ( int, int, char *, int );
+//extern int mvgetstr ( int, int, char * );
 //extern int mvhline ( int, int, chtype, int );
 //extern chtype mvinch ( int, int );
-/*extern int mvinchnstr ( int, int, chtype *, int );*/
-/*extern int mvinchstr ( int, int, chtype * );*/
-/*extern int mvinnstr ( int, int, char *, int );*/
+//extern int mvinchnstr ( int, int, chtype *, int );
+//extern int mvinchstr ( int, int, chtype * );
+//extern int mvinnstr ( int, int, char *, int );
 //extern int mvinsch ( int, int, chtype );
 //extern int mvinsnstr ( int, int, const char *, int );
 //extern int mvinsstr ( int, int, const char * );
 //extern int mvinstr ( int, int, char * );
 //extern int mvprintw ( int, int, char *,  ... );
-extern int mvscanw ( int, int, char *, ... );
+//extern int mvscanw ( int, int, char *, ... );
 //extern int mvvline ( int, int, chtype, int );
-/*extern int mvwaddch ( WINDOW *, int, int, const chtype );*/
-/*extern int mvwaddchnstr ( WINDOW *, int, int, const chtype *, int );*/
-/*extern int mvwaddchstr ( WINDOW *, int, int, const chtype * );*/
-/*extern int mvwaddnstr ( WINDOW *, int, int, const char *, int );*/
-/*extern int mvwaddstr ( WINDOW *, int, int, const char * );*/
-/*extern int mvwdelch ( WINDOW *, int, int );*/
-extern int mvwgetch ( WINDOW *, int, int );
-extern int mvwgetnstr ( WINDOW *, int, int, char *, int );
-extern int mvwgetstr ( WINDOW *, int, int, char * );
+//extern int mvwaddch ( WINDOW *, int, int, const chtype );
+//extern int mvwaddchnstr ( WINDOW *, int, int, const chtype *, int );
+//extern int mvwaddchstr ( WINDOW *, int, int, const chtype * );
+//extern int mvwaddnstr ( WINDOW *, int, int, const char *, int );
+//extern int mvwaddstr ( WINDOW *, int, int, const char * );
+//extern int mvwdelch ( WINDOW *, int, int );
+//extern int mvwgetch ( WINDOW *, int, int );
+//extern int mvwgetnstr ( WINDOW *, int, int, char *, int );
+//extern int mvwgetstr ( WINDOW *, int, int, char * );
 //extern int mvwhline ( WINDOW *, int, int, chtype, int );
 extern int mvwin ( WINDOW *, int, int );
 //extern chtype mvwinch ( WINDOW *, int, int );
@@ -383,10 +404,10 @@ extern int mvwin ( WINDOW *, int, int );
 //extern int mvwinsstr ( WINDOW *, int, int, const char * );
 //extern int mvwinstr ( WINDOW *, int, int, char * );
 //extern int mvwprintw ( WINDOW *, int, int, char *, ... );
-extern int mvwscanw ( WINDOW *, int, int, char *, ... );
+//extern int mvwscanw ( WINDOW *, int, int, char *, ... );
 //extern int mvwvline ( WINDOW *, int, int, chtype, int );
 extern int napms ( int );
-extern WINDOW *newpad ( int, int );
+//extern WINDOW *newpad ( int, int );
 extern WINDOW *newwin ( int, int, int, int );
 extern int nl ( void );
 extern int nocbreak ( void );
@@ -400,25 +421,25 @@ extern int overlay ( const WINDOW *, WINDOW * );
 extern int overwrite ( const WINDOW *, WINDOW * );
 extern int pair_content ( short, short *, short * );
 extern int PAIR_NUMBER ( int );
-extern int pechochar ( WINDOW *, chtype );
-extern int pnoutrefresh ( WINDOW *, int, int, int, int, int, int );
-extern int prefresh ( WINDOW *, int, int, int, int, int, int );
+//extern int pechochar ( WINDOW *, chtype );
+//extern int pnoutrefresh ( WINDOW *, int, int, int, int, int, int );
+//extern int prefresh ( WINDOW *, int, int, int, int, int, int );
 extern int printw ( char *, ... );
 extern int putp ( const char * );
 extern void qiflush ( void );
 extern int raw ( void );
-/*extern int redrawwin ( WINDOW * );*/
-/*extern int refresh ( void );*/
+//extern int redrawwin ( WINDOW * );
+//extern int refresh ( void );
 extern int reset_prog_mode ( void );
 extern int reset_shell_mode ( void );
 extern int resetty ( void );
-extern int ripoffline ( int, int  ( *) ( WINDOW *, int) );
+extern int ripoffline ( int, int  (*) ( WINDOW *, int) );
 extern int savetty ( void );
-extern int scanw ( char *, ... );
-extern int scrl ( int );
-extern int scroll ( WINDOW * );
-extern int scrollok ( WINDOW *, bool );
-extern int setscrreg ( int, int );
+//extern int scanw ( char *, ... );
+//extern int scrl ( int );
+//extern int scroll ( WINDOW * );
+//extern int scrollok ( WINDOW *, bool );
+//extern int setscrreg ( int, int );
 extern SCREEN *set_term ( SCREEN * );
 extern int setupterm ( char *, int, int * );
 extern int slk_attr_off ( const attr_t, void * );
@@ -428,18 +449,20 @@ extern int slk_attron ( const chtype );
 extern int slk_attr_set ( const attr_t, short, void * );
 extern int slk_attrset ( const chtype );
 extern int slk_clear ( void );
-extern int slk_color ( short );
+extern int slk_colour ( short );
+#define slk_color( c ) slk_colour( (c) )
 extern int slk_init ( int );
 extern char *slk_label ( int );
 extern int slk_noutrefresh ( void );
-extern int slk_refresh ( void );
+//extern int slk_refresh ( void );
 extern int slk_restore ( void );
 extern int slk_set ( int, const char *, int );
 extern int slk_touch ( void );
 extern int standend ( void );
 extern int standout ( void );
-extern int start_color ( void );
-extern WINDOW *subpad ( WINDOW *, int, int, int, int );
+extern int start_colour ( void );
+#define start_color() start_colour()
+//extern WINDOW *subpad ( WINDOW *, int, int, int, int );
 extern WINDOW *subwin ( WINDOW *, int, int, int, int );
 extern int syncok ( WINDOW *, bool );
 extern chtype termattrs ( void );
@@ -449,13 +472,13 @@ extern int tigetflag ( char * );
 extern int tigetnum ( char * );
 extern char *tigetstr ( char * );
 extern void timeout ( int );
-extern int touchline ( WINDOW *, int, int );
-extern int touchwin ( WINDOW * );
+//extern int touchline ( WINDOW *, int, int );
+//extern int touchwin ( WINDOW * );
 extern char *tparm ( char *, long, long, long, long, long, long, long, long,
 		   long );
 extern int typeahead ( int );
-extern int ungetch ( int );
-extern int untouchwin ( WINDOW * );
+//extern int ungetch ( int );
+//extern int untouchwin ( WINDOW * );
 extern void use_env ( bool );
 extern int vid_attr ( attr_t, short, void * );
 extern int vidattr ( chtype );
@@ -464,13 +487,13 @@ extern int vidputs ( chtype, int  ( *) ( int) );
 //extern int vline ( chtype, int );
 //extern int vwprintw ( WINDOW *, const char *, va_list );
 extern int vw_printw ( WINDOW *, const char *, va_list );
-extern int vwscanw ( WINDOW *, char *, va_list );
-extern int vw_scanw ( WINDOW *, char *, va_list );
+//extern int vwscanw ( WINDOW *, char *, va_list );
+//extern int vw_scanw ( WINDOW *, char *, va_list );
 extern int waddch ( WINDOW *, const chtype );
 extern int waddchnstr ( WINDOW *, const chtype *, int );
-/*extern int waddchstr ( WINDOW *, const chtype * );*/
+//extern int waddchstr ( WINDOW *, const chtype * );
 extern int waddnstr ( WINDOW *, const char *, int );
-/*extern int waddstr ( WINDOW *, const char * );*/
+//extern int waddstr ( WINDOW *, const char * );
 extern int wattroff ( WINDOW *, int );
 extern int wattron ( WINDOW *, int );
 extern int wattrset ( WINDOW *, int );
@@ -478,13 +501,13 @@ extern int wattr_get ( WINDOW *, attr_t *, short *, void * );
 extern int wattr_off ( WINDOW *, attr_t, void * );
 extern int wattr_on ( WINDOW *, attr_t, void * );
 extern int wattr_set ( WINDOW *, attr_t, short, void * );
-/*extern void wbkgdset ( WINDOW *, chtype );*/
+//extern void wbkgdset ( WINDOW *, chtype );
 extern int wborder ( WINDOW *, chtype, chtype, chtype, chtype, chtype, chtype,
 		   chtype, chtype );
 extern int wclrtobot ( WINDOW * );
 extern int wclrtoeol ( WINDOW * );
 extern void wcursyncup ( WINDOW * );
-/*extern int wcolor_set ( WINDOW *, short, void * );*/
+//extern int wcolor_set ( WINDOW *, short, void * );
 #define wcolor_set(w,s,v) wcolour_set((w),(s),(v))
 extern int wdelch ( WINDOW * );
 extern int wdeleteln ( WINDOW * );
@@ -492,7 +515,7 @@ extern int wechochar ( WINDOW *, const chtype );
 extern int werase ( WINDOW * );
 extern int wgetch ( WINDOW * );
 extern int wgetnstr ( WINDOW *, char *, int );
-extern int wgetstr ( WINDOW *, char * );
+//extern int wgetstr ( WINDOW *, char * );
 extern int whline ( WINDOW *, chtype, int );
 //extern chtype winch ( WINDOW * );
 //extern int winchnstr ( WINDOW *, chtype *, int );
@@ -503,19 +526,19 @@ extern int whline ( WINDOW *, chtype, int );
 //extern int winsstr ( WINDOW *, const char * );
 //extern int winstr ( WINDOW *, char * );
 extern int wmove ( WINDOW *, int, int );
-extern int wnoutrefresh ( WINDOW * );
+//extern int wnoutrefresh ( WINDOW * );
 extern int wprintw ( WINDOW *, const char *, ... );
-/*extern int wredrawln ( WINDOW *, int, int );*/
-/*extern int wrefresh ( WINDOW * );*/
-extern int wscanw ( WINDOW *, char *, ... );
-/*extern int wscrl ( WINDOW *, int );*/
-extern int wsetscrreg ( WINDOW *, int, int );
-extern int wstandend ( WINDOW * );
-extern int wstandout ( WINDOW * );
+//extern int wredrawln ( WINDOW *, int, int );
+//extern int wrefresh ( WINDOW * );
+//extern int wscanw ( WINDOW *, char *, ... );
+//extern int wscrl ( WINDOW *, int );
+//extern int wsetscrreg ( WINDOW *, int, int );
+//extern int wstandend ( WINDOW * );
+//extern int wstandout ( WINDOW * );
 extern void wsyncup ( WINDOW * );
 extern void wsyncdown ( WINDOW * );
 extern void wtimeout ( WINDOW *, int );
-extern int wtouchln ( WINDOW *, int, int, int );
+//extern int wtouchln ( WINDOW *, int, int, int );
 extern int wvline ( WINDOW *, chtype, int );
 
 /*
@@ -582,6 +605,22 @@ static inline int deleteln ( void ) {
 	return wdeleteln( stdscr );
 }
 
+static inline int erase ( void ) {
+	return werase ( stdscr );
+}
+
+static inline int getch ( void ) {
+	return wgetch ( stdscr );
+}
+
+static inline int getnstr ( char *str, int n ) {
+	return wgetnstr ( stdscr, str, n );
+}
+
+static inline int getstr ( char *str ) {
+	return wgetnstr ( stdscr, str, -1 );
+}
+
 static inline int hline ( chtype ch, int n ) {
 	return whline ( stdscr, ch, n );
 }
@@ -618,6 +657,21 @@ static inline int mvaddstr ( int y, int x, const char *str ) {
 static inline int mvdelch ( int y, int x ) {
 	return ( wmove ( stdscr, y, x ) == OK
 		 ? wdelch ( stdscr ) : ERR );
+}
+
+static inline int mvgetch ( int y, int x ) {
+	return ( wmove ( stdscr, y, x ) == OK
+		 ? wgetch ( stdscr ) : ERR );
+}
+
+static inline int mvgetnstr ( int y, int x, char *str, int n ) {
+	return ( wmove ( stdscr, y, x ) == OK
+		 ? wgetnstr ( stdscr, str, n ) : ERR );
+}
+
+static inline int mvgetstr ( int y, int x, char *str ) {
+	return ( wmove ( stdscr, y, x ) == OK
+		 ? wgetnstr ( stdscr, str, -1 ) : ERR );
 }
 
 static inline int mvhline ( int y, int x, chtype ch, int n ) {
@@ -665,6 +719,21 @@ static inline int mvwdelch ( WINDOW *win, int y, int x ) {
 		 ? wdelch ( win ) : ERR );
 }
 
+static inline int mvwgetch ( WINDOW *win, int y, int x ) {
+	return ( wmove ( win, y, x ) == OK
+		 ? wgetch ( win ) : ERR );
+}
+
+static inline int mvwgetnstr ( WINDOW *win, int y, int x, char *str, int n ) {
+	return ( wmove ( win, y, x ) == OK
+		 ? wgetnstr ( win, str, n ) : ERR );
+}
+
+static inline int mvwgetstr ( WINDOW *win, int y, int x, char *str ) {
+	return ( wmove ( win, y, x ) == OK
+		 ? wgetnstr ( win, str, -1 ) : ERR );
+}
+
 static inline int mvwhline ( WINDOW *win, int y, int x, chtype ch, int n ) {
 	return ( wmove ( win, y, x ) == OK
 		 ? whline ( win, ch, n ) : ERR );
@@ -680,6 +749,16 @@ static inline int mvwvline ( WINDOW *win, int y, int x, chtype ch, int n ) {
 }
 
 #define printw( fmt, ... ) wprintw(stdscr,(fmt), ## __VA_ARGS__ )
+
+static inline int slk_refresh ( void ) {
+	if ( slk_clear() == OK )
+		return slk_restore();
+	else
+		return ERR;
+}
+
+#define standend() wstandend( stdscr )
+#define standout() wstandout( stdscr )
 
 static inline int vline ( chtype ch, int n ) {
 	return wvline ( stdscr, ch, n );
@@ -700,6 +779,18 @@ static inline int waddstr ( WINDOW *win, const char *str ) {
 
 static inline int wbkgdset ( WINDOW *win, chtype ch ) {
 	return wattrset( win, ch );
+}
+
+static inline int wgetstr ( WINDOW *win, char *str ) {
+	return wgetnstr ( win, str, -1 );
+}
+
+static inline int wstandend ( WINDOW *win ) {
+	return wattrset ( win, A_DEFAULT );
+}
+
+static inline int wstandout ( WINDOW *win ) {
+	return wattrset ( win, A_STANDOUT );
 }
 
 #endif /* CURSES_H */
