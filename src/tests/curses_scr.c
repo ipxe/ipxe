@@ -23,9 +23,9 @@ void _init_screen( struct _curses_screen *scr __unused ) {
 }
 
 void _exit_screen( struct _curses_screen *scr __unused ) {
+	printf("%c[1;1H",ESC);
+	printf("%c[2J",ESC);
 	tcsetattr(fileno(stdin),TCSANOW,&original);
-	printf("%c[0",ESC);
-	printf("%c[u",ESC);
 }
 
 void _movetoyx( struct _curses_screen *scr __unused, unsigned int y, unsigned int x ) {
@@ -42,6 +42,7 @@ void _putc( struct _curses_screen *scr __unused, chtype c ) {
 	// print rendition (character)
 	//printf("char is \"%d\"", c );
 	putchar( c );
+	fflush(stdout); // There must be a better way to do this...
 }
 
 int _getc( struct _curses_screen *scr __unused ) {
