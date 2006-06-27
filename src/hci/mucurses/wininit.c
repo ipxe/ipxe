@@ -14,9 +14,10 @@
 WINDOW *initscr ( void ) {
 	/* determine console size */
 	/* initialise screen */
+	curscr->init( curscr );
 	stdscr->height = LINES;
 	stdscr->width = COLS;
-	/* set previously unknown window attributes */
-	/* refresh screen */
+	werase( stdscr );
+
 	return stdscr;
 }
