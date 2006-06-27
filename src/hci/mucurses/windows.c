@@ -51,10 +51,11 @@ WINDOW *derwin ( WINDOW *parent, int nlines, int ncols,
 	WINDOW *child;
 	if ( parent == NULL )
 		return NULL;
+	if ( ( child = malloc( sizeof( WINDOW ) ) ) == NULL )
+		return NULL;
 	if ( ( (unsigned)ncols > parent->width ) || 
 	     ( (unsigned)nlines > parent->height ) )
 		return NULL;
-	child = malloc( sizeof( WINDOW ) );
 	child->ori_y = parent->ori_y + begin_y;
 	child->ori_x = parent->ori_x + begin_x;
 	child->height = nlines;
@@ -74,7 +75,8 @@ WINDOW *dupwin ( WINDOW *orig ) {
 	WINDOW *copy;
 	if ( orig == NULL )
 		return NULL;
-	copy = malloc( sizeof( WINDOW ) );
+	if ( ( copy = malloc( sizeof( WINDOW ) ) ) == NULL )
+		return NULL;
 	copy->scr = orig->scr;
 	copy->attrs = orig->attrs;
 	copy->ori_y = orig->ori_y;
@@ -117,7 +119,9 @@ int mvwin ( WINDOW *win, int y, int x ) {
  * @ret *win	return pointer to new window
  */
 WINDOW *newwin ( int nlines, int ncols, int begin_y, int begin_x ) {
-	WINDOW *win = malloc( sizeof(WINDOW) );
+	WINDOW *win;
+	if ( ( win = malloc( sizeof(WINDOW) ) ) == NULL )
+		return NULL;
 	if ( ( (unsigned)( begin_y + nlines ) > stdscr->height ) &&
 	     ( (unsigned)( begin_x + ncols ) > stdscr->width ) )
 		return NULL;
@@ -145,7 +149,8 @@ WINDOW *subwin ( WINDOW *parent, int nlines, int ncols,
 	WINDOW *child;
 	if ( parent == NULL )
 		return NULL;
-	child = malloc( sizeof( WINDOW ) );
+	if ( ( child = malloc( sizeof( WINDOW ) ) ) == NULL )
+		return NULL;
 	child = newwin( nlines, ncols, begin_y, begin_x );
 	child->parent = parent;
 	child->scr = parent->scr;
