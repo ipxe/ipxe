@@ -2,12 +2,22 @@
 #include <stddef.h>
 #include <timer.h>
 #include "core.h"
-#include "input.h"
 
 /** @file
  *
  * MuCurses keyboard input handling functions
  */
+
+#define INPUT_DELAY 		200 // half-blocking delay timer resolution (ms)
+#define INPUT_DELAY_TIMEOUT 	1000 // half-blocking delay timeout
+
+int m_delay; /* 
+		< 0 : blocking read
+		0   : non-blocking read
+		> 0 : timed blocking read
+	     */
+bool m_echo;
+bool m_cbreak;
 
 /**
  * Check KEY_ code supported status
@@ -84,7 +94,7 @@ int wgetnstr ( WINDOW *win, char *str, int n ) {
 
 	_str = str;
 
-	while ( ( ( c = wgetch( win ) ) != KEY_ENTER ) && !( n == 0 ) ) {
+	while ( ( ( c = wgetch( win ) ) != '\n' ) && !( n == 0 ) ) {
 		if ( c >= 0401 && c <= 0633 ) {
 			switch(c) {
 			case KEY_LEFT :
@@ -103,5 +113,22 @@ int wgetnstr ( WINDOW *win, char *str, int n ) {
 		}
 	}
 
+	return OK;
+}
+
+
+/**
+ *
+ */
+int echo ( void ) {
+	m_echo = TRUE;
+	return OK;
+}
+
+/**
+ *
+ */
+int noecho ( void ) {
+	m_echo = FALSE;
 	return OK;
 }
