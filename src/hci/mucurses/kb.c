@@ -94,7 +94,8 @@ int wgetnstr ( WINDOW *win, char *str, int n ) {
 
 	_str = str;
 
-	while ( ( ( c = wgetch( win ) ) != '\n' ) && !( n == 0 ) ) {
+	while (!( n == 0 ) ) {
+		c = wgetch( win );
 		if ( c >= 0401 && c <= 0633 ) {
 			switch(c) {
 			case KEY_LEFT :
@@ -107,7 +108,10 @@ int wgetnstr ( WINDOW *win, char *str, int n ) {
 				*_str = '\0';
 				break;
 			}
-		} else { // *should* only be ASCII chars now
+		} else if ( c == '\n' ) {
+			*_str = '\0';
+			break;
+		}else { // *should* only be ASCII chars now
 			*(_str++) = (char)c;
 			n--;
 		}
