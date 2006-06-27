@@ -1,65 +1,74 @@
 #include <curses.h>
 #include <stddef.h>
+#include <timer.h>
 #include "core.h"
+#include "input.h"
 
 /** @file
  *
  * MuCurses keyboard input handling functions
  */
 
-#define INPUT_BUFFER_LEN 80
-
-bool echo_on = FALSE;
-bool delay = FALSE;
-
 /**
+ * Check KEY_ code supported status
  *
+ * @v kc	keycode value to check
+ * @ret TRUE	KEY_* supported
+ * @ret FALSE	KEY_* unsupported
  */
-int has_key ( int ch ) {
+int has_key ( int kc __unused ) {
 	return TRUE;
-}
-
-/**
- * Push a character back onto the FIFO
- *
- * @v ch	char to push to head of input stream
- * @ret rc	return status code
- */
-int ungetch ( int ch ) {
-	stdscr->scr->pushc( stdscr->scr, ch );
-	return OK;
 }
 
 /**
  * Pop a character from the FIFO into a window
  *
  * @v *win	window in which to echo input
- * @ret ch	char from input stream
+ * @ret c	char from input stream
  */
 int wgetch ( WINDOW *win ) {
-	int ch;
+	int c, timer;
 	if ( win == NULL )
 		return ERR;
 
-	ch = win->scr->popc( win->scr );
+	timer = INPUT_DELAY_TIMEOUT;
+	while ( ! win->scr->peek( win->scr ) ) {
+		if ( m_delay == 0 ) // non-blocking read
+			return ERR;
+		if ( timer > 0 ) {
+			if ( m_delay > 0 )
+				timer -= INPUT_DELAY;
+			mdelay( INPUT_DELAY );
+		} else { return ERR; }
+	}
 
-	if ( echo_on ) {
-		if ( ch == KEY_LEFT || ch == KEY_BACKSPACE ) {
-			if ( win->curs_x == 0 ) {
-				wmove( win, --(win->curs_y), win->width - 1 );
+	c = win->scr->getc( win->scr );
+
+	if ( m_echo ) {
+		if ( c >= 0401 && c <= 0633 ) {
+			switch(c) {
+			case KEY_LEFT :
+			case KEY_BACKSPACE :
+				if ( win->curs_x == 0 )
+					wmove( win, 
+					       --(win->curs_y), 
+					       win->width - 1 );
+				else
+					wmove( win, 
+					       win->curs_y, 
+					       --(win->curs_x) );
 				wdelch( win );
-			} else {
-				wmove( win, win->curs_y, --(win->curs_x) );
-				wdelch( win );
+				break;
+			default :
+				beep();
+				break;
 			}
-		} else if ( ch >= 0401 && ch <= 0633 ) {
-			beep();
 		} else {
-			_wputch( win, (chtype)( ch | win->attrs ), WRAP );
+			_wputch( win, (chtype)( c | win->attrs ), WRAP );
 		}
 	}
 
-	return ch;
+	return c;
 }
 
 /**
@@ -67,33 +76,30 @@ int wgetch ( WINDOW *win ) {
  *
  * @v *win	window in which to echo input
  * @v *str	pointer to string in which to store result
+ * @ret rc	return status code
  */
 int wgetnstr ( WINDOW *win, char *str, int n ) {
-	char *str_start;
+	char *_str;
 	int c;
 
-	if ( n < 0 )
-		return ERR;
+	_str = str;
 
-	str_start = str;
-
-	for ( ; ( c = wgetch(win) ) && n; n-- ) {
-		if ( n == 1 ) { // last character must be a newline...
-			if ( c == '\n' ) {
-				*str = '\0';
-			} else { // ...otherwise beep and wait for one
-				beep();
-				++n;
-				continue;
+	while ( ( ( c = wgetch( win ) ) != KEY_ENTER ) && !( n == 0 ) ) {
+		if ( c >= 0401 && c <= 0633 ) {
+			switch(c) {
+			case KEY_LEFT :
+			case KEY_BACKSPACE :
+				if ( _str > str ) {
+					_str--; n++;
+				}
+				break;
+			case KEY_ENTER :
+				*_str = '\0';
+				break;
 			}
-		} else if ( c == '\n' ) {
-			*str = '\0';
-			break;
-		} else {
-			if ( c == KEY_LEFT || c == KEY_BACKSPACE ) {
-				if ( ! ( str == str_start ) )
-					str--;
-			} else { *str = c; str++; }
+		} else { // *should* only be ASCII chars now
+			*(_str++) = (char)c;
+			n--;
 		}
 	}
 
