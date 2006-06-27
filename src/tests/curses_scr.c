@@ -1,4 +1,4 @@
-#include "/home/dan/cvs/extcvs/eb/src/include/curses.h"
+#include "../include/curses.h"
 #include <termios.h>
 #include <stddef.h>
 #include <stdio.h>
@@ -18,7 +18,7 @@ void _init_screen( struct _curses_screen *scr __unused ) {
 	tcgetattr(fileno(stdin),&runtime);
 	runtime.c_lflag &= ~(ICANON|ECHO);
 	tcsetattr(fileno(stdin),TCSANOW,&runtime);
-	printf("%c[=%dh",ESC,MODE);
+	//printf("%c[=%dh",ESC,MODE);
 	LINES = 25; COLS = 80;
 }
 
@@ -40,16 +40,17 @@ void _putc( struct _curses_screen *scr __unused, chtype c ) {
 	//printf( "%c[%d;%d",ESC, 
 	//	cpairs[pairno][0], cpairs[pairno][1] );
 	// print rendition (character)
-	printf( "%c", (char)(c & A_CHARTEXT) );
+	//printf("char is \"%d\"", c );
+	putchar( c );
 }
 
 int _getc( struct _curses_screen *scr __unused ) {
-	return getc(stdin);
+	return getchar();
 }
 
 bool _peek( struct _curses_screen *scr __unused ) {
 	int c;
-	if ( ( c = getc(stdin) ) != EOF ) {
+	if ( ( c = getchar() ) != EOF ) {
 		ungetc( c, stdin );
 		return TRUE;
 	} else { return FALSE; }
