@@ -18,7 +18,6 @@
  * UDP constants
  */
 
-#define UDP_HLEN    	8
 #define UDP_MAX_HLEN	72
 #define UDP_MAX_TXPKB	ETH_MAX_MTU
 #define UDP_MIN_TXPKB	ETH_ZLEN
@@ -29,10 +28,10 @@ typedef uint16_t port_t;
  * A UDP header
  */
 struct udp_header {
-        port_t source_port;
-        port_t dest_port;
-        uint16_t len;
-        uint16_t chksum;
+	port_t source_port;
+	port_t dest_port;
+	uint16_t len;
+	uint16_t chksum;
 };
 
 struct udp_connection;
@@ -59,15 +58,15 @@ struct udp_operations {
  */
 struct udp_connection {
        /** Address of the remote end of the connection */
-        struct sockaddr sin;
-        /** Local port on which the connection receives packets */
-        port_t local_port;
-        /** Transmit buffer */
-        struct pk_buff *tx_pkb;
-        /** List of registered connections */
-        struct list_head list;
-        /** Operations table for this connection */
-        struct udp_operations *udp_op;
+	struct sockaddr sin;
+	/** Local port on which the connection receives packets */
+	port_t local_port;
+	/** Transmit buffer */
+	struct pk_buff *tx_pkb;
+	/** List of registered connections */
+	struct list_head list;
+	/** Operations table for this connection */
+	struct udp_operations *udp_op;
 };
 
 /**
