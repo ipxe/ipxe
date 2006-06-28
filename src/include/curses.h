@@ -682,7 +682,7 @@ static inline int mvhline ( int y, int x, chtype ch, int n ) {
 // OK, so maybe a few I did with macros...
 #define mvprintw( y, x, fmt, ... ) \
 	( wmove(stdscr,(y),(x)) == OK \
-	  ? wprintw(stdscr,(fmt), ## __VA_ARGS__ : ERR )
+	  ? wprintw( stdscr,(fmt), ## __VA_ARGS__ ) : ERR )
 
 static inline int mvvline ( int y, int x, chtype ch, int n ) {
 	return ( wmove ( stdscr, y, x ) == OK
