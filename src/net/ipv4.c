@@ -12,7 +12,7 @@
 #include <gpxe/netdevice.h>
 #include "uip/uip.h"
 #include <gpxe/ip.h>
-#include <gpxe/interface.h>
+#include <gpxe/tcpip_if.h>
 
 /** @file
  *
@@ -103,6 +103,7 @@ void del_ipv4_address ( struct net_device *netdev ) {
  * @v iphdr	IPv4 header
  */
 static void ipv4_dump ( struct iphdr *iphdr __unused ) {
+
 	DBG ( "IP4 header at %p+%zx\n", iphdr, sizeof ( *iphdr ) );
 	DBG ( "\tVersion = %d\n", ( iphdr->verhdrlen & IP_MASK_VER ) / 16 );
 	DBG ( "\tHeader length = %d\n", iphdr->verhdrlen & IP_MASK_HLEN );
@@ -120,12 +121,19 @@ static void ipv4_dump ( struct iphdr *iphdr __unused ) {
 
 /**
  * Complete the transport-layer checksum
+ *
+ * @v pkb	Packet buffer
+ * @v tcpip	Transport-layer protocol
+ *
+ * This function calculates the tcpip 
  */
-void ipv4_tx_csum ( struct pk_buff *pkb, uint8_t trans_proto ) {
+void ipv4_tx_csum ( struct pk_buff *pkb, struct tcpip_protocol *tcpip ) {
 
 	struct iphdr *iphdr = pkb->data;
 	struct ipv4_pseudo_header pshdr;
-	void *csum_offset = iphdr + sizeof ( *iphdr ) + ( trans_proto == IP_UDP ? 6 : 16 );
+	void *csum_offset = iphdr + sizeof ( *iphdr ) + tcpip->csum_offset;
+	uint16_t partial_csum = *( ( uint16_t* ) csum_offset );
+	uint16_t csum;
 
 	/* Calculate pseudo header */
 	pshdr.src = iphdr->src;
@@ -135,14 +143,19 @@ void ipv4_tx_csum ( struct pk_buff *pkb, uint8_t trans_proto ) {
 	pshdr.len = htons ( pkb_len ( pkb ) - sizeof ( *iphdr ) );
 
 	/* Update the checksum value */
-	*( ( uint16_t* ) csum_offset ) = *( ( uint16_t* ) csum_offset ) + calc_chksum ( &pshdr, IP_PSHLEN );
+	csum = partial_csum + calc_chksum ( &pshdr, sizeof ( pshdr ) );
+	memcpy ( csum_offset, &csum, 2 );
 }
 
 /**
  * Calculate the transport-layer checksum while processing packets
  */
-uint16_t ipv4_rx_csum ( struct pk_buff *pkb __unused, uint8_t trans_proto __unused ) {
-	/** This function needs to be implemented. Until then, it will return 0xffffffff every time */
+uint16_t ipv4_rx_csum ( struct pk_buff *pkb __unused,
+			uint8_t trans_proto __unused ) {
+	/** 
+	 * This function needs to be implemented. Until then, it will return
+	 * 0xffffffff every time
+	 */
 	return 0xffff;
 }
 
@@ -222,13 +235,14 @@ int ipv4_uip_tx ( struct pk_buff *pkb ) {
  * Transmit IP packet (without uIP)
  *
  * @v pkb		Packet buffer
- * @v trans_proto	Transport-layer protocol number
+ * @v tcpip		Transport-layer protocol
  * @v dest		Destination network-layer address
  * @ret rc		Status
  *
  * This function expects a transport-layer segment and prepends the IP header
  */
-int ipv4_tx ( struct pk_buff *pkb, uint16_t trans_proto, struct in_addr *dest ) {
+int ipv4_tx ( struct pk_buff *pkb, struct tcpip_protocol *tcpip,
+	      struct in_addr *dest ) {
 	struct iphdr *iphdr = pkb_push ( pkb, sizeof ( *iphdr ) );
 	struct ipv4_miniroute *miniroute;
 	struct net_device *netdev = NULL;
@@ -244,7 +258,7 @@ int ipv4_tx ( struct pk_buff *pkb, uint16_t trans_proto, struct in_addr *dest ) 
 	iphdr->ident = htons ( next_ident++ );
 	iphdr->frags = 0;
 	iphdr->ttl = IP_TTL;
-	iphdr->protocol = trans_proto;
+	iphdr->protocol = tcpip->trans_proto;
 
 	/* Copy destination address */
 	iphdr->dest = *dest;
@@ -280,7 +294,7 @@ int ipv4_tx ( struct pk_buff *pkb, uint16_t trans_proto, struct in_addr *dest ) 
 	}
 
 	/* Calculate the transport layer checksum */
-	ipv4_tx_csum ( pkb, trans_proto );
+	ipv4_tx_csum ( pkb, tcpip );
 
 	/* Calculate header checksum, in network byte order */
 	iphdr->chksum = 0;
@@ -476,6 +490,14 @@ struct net_protocol ipv4_protocol = {
 };
 
 NET_PROTOCOL ( ipv4_protocol );
+
+/** IPv4 TCPIP net protocol */
+struct tcpip_net_protocol ipv4_tcpip_protocol = {
+	.net_protocol = &ipv4_protocol,
+	.tx_csum = ipv4_tx_csum,
+};
+
+TCPIP_NET_PROTOCOL ( ipv4_tcpip_protocol );
 
 /** IPv4 ARP protocol */
 struct arp_net_protocol ipv4_arp_protocol = {

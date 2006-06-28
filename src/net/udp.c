@@ -6,11 +6,12 @@
 #include <errno.h>
 #include <gpxe/in.h>
 #include <gpxe/ip.h>
+#include <gpxe/ip6.h>
 #include <gpxe/udp.h>
 #include <gpxe/init.h>
 #include <gpxe/pkbuff.h>
 #include <gpxe/netdevice.h>
-#include <gpxe/interface.h>
+#include <gpxe/tcpip_if.h>
 
 /** @file
  *
@@ -149,7 +150,7 @@ int udp_send ( struct udp_connection *conn, const void *data, size_t len ) {
 	udp_dump ( udphdr );
 
 	/* Send it to the next layer for processing */
-	return trans_tx ( conn->tx_pkb, IP_UDP, sock );
+	return trans_tx ( conn->tx_pkb, &udp_protocol, sock );
 }
 
 /**
@@ -268,10 +269,11 @@ void udp_rx ( struct pk_buff *pkb, struct in_addr *src_net_addr __unused,
 	conn->udp_op->newdata ( conn, pkb->data, ulen - sizeof ( *udphdr ) );
 }
 
-struct trans_protocol udp_protocol  = {
+struct tcpip_protocol udp_protocol  = {
 	.name = "UDP",
 	.rx = udp_rx,
 	.trans_proto = IP_UDP,
+	.csum_offset = 6,
 };
 
-TRANS_PROTOCOL ( udp_protocol );
+TCPIP_PROTOCOL ( udp_protocol );

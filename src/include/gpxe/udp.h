@@ -75,6 +75,11 @@ struct udp_connection {
 static LIST_HEAD ( udp_conns );
 
 /**
+ * UDP protocol
+ */
+extern struct tcpip_protocol udp_protocol;
+
+/**
  * Functions provided to the application layer
  */
 
