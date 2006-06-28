@@ -93,10 +93,6 @@ static inline unsigned int dhcp_option_len ( struct dhcp_option *option ) {
  * the option data is well-formatted, and so must guard against flaws
  * such as options missing a @c DHCP_END terminator, or options whose
  * length would take them beyond the end of the data block.
- *
- * Searching for @c DHCP_PAD or @c DHCP_END tags, or using either @c
- * DHCP_PAD or @c DHCP_END as the encapsulator when constructing the
- * tag via DHCP_ENCAP_OPT() will produce undefined behaviour.
  */
 static struct dhcp_option * find_dhcp_option_raw ( unsigned int tag,
 						   void *data, size_t len ) {
@@ -104,14 +100,7 @@ static struct dhcp_option * find_dhcp_option_raw ( unsigned int tag,
 	ssize_t remaining = len;
 	unsigned int option_len;
 
-	assert ( tag != DHCP_PAD );
-	assert ( tag != DHCP_END );
-	assert ( DHCP_ENCAPSULATOR ( tag ) != DHCP_END );
-
 	while ( remaining ) {
-		/* Check for explicit end marker */
-		if ( option->tag == DHCP_END )
-			break;
 		/* Calculate length of this option.  Abort processing
 		 * if the length is malformed (i.e. takes us beyond
 		 * the end of the data block).
@@ -123,6 +112,9 @@ static struct dhcp_option * find_dhcp_option_raw ( unsigned int tag,
 		/* Check for matching tag */
 		if ( option->tag == tag )
 			return option;
+		/* Check for explicit end marker */
+		if ( option->tag == DHCP_END )
+			break;
 		/* Check for start of matching encapsulation block */
 		if ( DHCP_ENCAPSULATOR ( tag ) &&
 		     ( option->tag == DHCP_ENCAPSULATOR ( tag ) ) ) {
@@ -137,6 +129,46 @@ static struct dhcp_option * find_dhcp_option_raw ( unsigned int tag,
 }
 
 /**
+ * Find DHCP option within options block
+ *
+ * @v tag		DHCP option tag to search for
+ * @v options		DHCP options block
+ * @ret option		DHCP option, or NULL if not found
+ *
+ * Searches for the DHCP option matching the specified tag within the
+ * options block.  Encapsulated options may be searched for by using
+ * DHCP_ENCAP_OPT() to construct the tag value.
+ */
+struct dhcp_option * find_dhcp_option ( unsigned int tag,
+					struct dhcp_option_block *options ) {
+	return find_dhcp_option_raw ( tag, options->data, options->len );
+}
+
+/**
+ * Find length of used portion of DHCP options block
+ *
+ * @v options		DHCP options block
+ * @ret len		Length of used portion of data block
+ *
+ * This searches for the @c DHCP_END marker within the options block.
+ * If found, the length of the used portion of the block (i.e. the
+ * portion containing everything @b before the @c DHCP_END marker, but
+ * excluding the @c DHCP_END marker itself) is returned.
+ *
+ * If no @c DHCP_END marker is present, the length of the whole
+ * options block is returned.
+ */
+size_t dhcp_option_block_len ( struct dhcp_option_block *options ) {
+	void *dhcpend;
+
+	if ( ( dhcpend = find_dhcp_option ( DHCP_END, options ) ) ) {
+		return ( dhcpend - options->data );
+	} else {
+		return options->len;
+	}
+}
+
+/**
  * Find DHCP option within all registered DHCP options blocks
  *
  * @v tag		DHCP option tag to search for
@@ -145,14 +177,19 @@ static struct dhcp_option * find_dhcp_option_raw ( unsigned int tag,
  * Searches within all registered DHCP option blocks for the specified
  * tag.  Encapsulated options may be searched for by using
  * DHCP_ENCAP_OPT() to construct the tag value.
+ *
+ * Where multiple option blocks contain the same DHCP option, the
+ * option from the highest-priority block will be returned.  (Priority
+ * of an options block is determined by the value of the @c
+ * DHCP_EB_PRIORITY option within the block, if present; the default
+ * priority is zero).
  */
-struct dhcp_option * find_dhcp_option ( unsigned int tag ) {
+struct dhcp_option * find_global_dhcp_option ( unsigned int tag ) {
 	struct dhcp_option_block *options;
 	struct dhcp_option *option;
 
 	list_for_each_entry ( options, &option_blocks, list ) {
-		if ( ( option = find_dhcp_option_raw ( tag, options->data,
-						       options->len ) ) )
+		if ( ( option = find_dhcp_option ( tag, options ) ) )
 			return option;
 	}
 	return NULL;
@@ -163,10 +200,24 @@ struct dhcp_option * find_dhcp_option ( unsigned int tag ) {
  *
  * @v options		DHCP option block
  *
- * Register a block of DHCP options
+ * Register a block of DHCP options.
  */
 void register_dhcp_options ( struct dhcp_option_block *options ) {
-	list_add ( &options->list, &option_blocks );
+	struct dhcp_option_block *existing_options;
+	signed int existing_priority;
+	signed int priority;
+
+	/* Determine priority of new block */
+	priority = find_dhcp_num_option ( DHCP_EB_PRIORITY, options );
+
+	/* Insert after any existing blocks which have a higher priority */
+	list_for_each_entry ( existing_options, &option_blocks, list ) {
+		existing_priority = find_dhcp_num_option ( DHCP_EB_PRIORITY,
+							   existing_options );
+		if ( priority > existing_priority )
+			break;
+	}
+	list_add_tail ( &options->list, &existing_options->list );
 }
 
 /**

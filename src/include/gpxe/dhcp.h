@@ -84,4 +84,13 @@ struct dhcp_option_block {
 	size_t len;
 };
 
+extern unsigned long dhcp_num_option ( struct dhcp_option *option );
+extern struct dhcp_option * find_dhcp_option ( unsigned int tag,
+					   struct dhcp_option_block *options );
+
+static inline unsigned long
+find_dhcp_num_option ( unsigned int tag, struct dhcp_option_block *options ) {
+	return dhcp_num_option ( find_dhcp_option ( tag, options ) );
+}
+
 #endif /* _GPXE_DHCP_H */
