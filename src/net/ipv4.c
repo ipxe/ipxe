@@ -124,21 +124,18 @@ static void ipv4_dump ( struct iphdr *iphdr __unused ) {
 void ipv4_tx_csum ( struct pk_buff *pkb, uint8_t trans_proto ) {
 
 	struct iphdr *iphdr = pkb->data;
-	void *pshdr = malloc ( IP_PSHLEN );
-	void *csum_offset = iphdr + IP_HLEN + ( trans_proto == IP_UDP ? 6 : 16 );
-	int offset = 0;
+	struct ipv4_pseudo_header pshdr;
+	void *csum_offset = iphdr + sizeof ( *iphdr ) + ( trans_proto == IP_UDP ? 6 : 16 );
 
 	/* Calculate pseudo header */
-	memcpy ( pshdr, &iphdr->src, sizeof ( in_addr ) );
-	offset += sizeof ( in_addr );
-	memcpy ( pshdr + offset, &iphdr->dest, sizeof ( in_addr ) );
-	offset += sizeof ( in_addr );
-	*( ( uint8_t* ) ( pshdr + offset++ ) ) = 0x00;
-	*( ( uint8_t* ) ( pshdr + offset++ ) ) = iphdr->protocol;
-	*( ( uint16_t* ) ( pshdr + offset ) ) = pkb_len ( pkb ) - IP_HLEN;
+	pshdr.src = iphdr->src;
+	pshdr.dest = iphdr->dest;
+	pshdr.zero_padding = 0x00;
+	pshdr.protocol = iphdr->protocol;
+	pshdr.len = htons ( pkb_len ( pkb ) - sizeof ( *iphdr ) );
 
 	/* Update the checksum value */
-	*( ( uint16_t* ) csum_offset ) = *( ( uint16_t* ) csum_offset ) + calc_chksum ( pshdr, IP_PSHLEN );
+	*( ( uint16_t* ) csum_offset ) = *( ( uint16_t* ) csum_offset ) + calc_chksum ( &pshdr, IP_PSHLEN );
 }
 
 /**

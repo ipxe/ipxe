@@ -11,7 +11,6 @@
 
 /* IP constants */
 
-#define IP_HLEN 	20
 #define IP_VER		4
 #define IP_MASK_VER	0xf0
 #define IP_MASK_HLEN 	0x0f
@@ -21,16 +20,20 @@
 #define IP_TOS		0
 #define IP_TTL		64
 
-/* IP6 constants */
-
-#define IP6_HLEN	38
+/* IP4 pseudo header */
+struct ipv4_pseudo_header {
+	struct in_addr src;
+	struct in_addr dest;
+	uint8_t zero_padding;
+	uint8_t protocol;
+	uint16_t len;
+};
 
 struct pk_buff;
 struct net_device;
 struct net_protocol;
 
 extern struct net_protocol ipv4_protocol;
-extern struct net_protocol ipv6_protocol;
 
 extern int add_ipv4_address ( struct net_device *netdev,
 			      struct in_addr address, struct in_addr netmask,
@@ -38,11 +41,6 @@ extern int add_ipv4_address ( struct net_device *netdev,
 extern void del_ipv4_address ( struct net_device *netdev );
 
 extern int ipv4_uip_tx ( struct pk_buff *pkb );
-
 extern int ipv4_tx ( struct pk_buff *pkb, uint16_t trans_proto, struct in_addr *dest );
-extern int ipv6_tx ( struct pk_buff *pkb, uint16_t trans_proto, struct in6_addr *dest );
-
-extern void ipv4_rx ( struct pk_buff *pkb, struct net_device *netdev, const void *ll_source );
-extern void ipv6_rx ( struct pk_buff *pkb, struct net_device *netdev, const void *ll_source );
 
 #endif /* _GPXE_IP_H */
