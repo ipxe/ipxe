@@ -25,7 +25,7 @@ int main ( void ) {
 void get_iscsi_chap_secret( char *sec ) {
 	char 	*title = "Set new iSCSI CHAP secret",
 		*msg = "Configure the iSCSI access secret",
-		pw1[16], pw2[16];
+		pw1[17], pw2[17];
 	WINDOW *secret;
 
 	secret = newwin( stdscr->height / 2,
@@ -44,9 +44,9 @@ void get_iscsi_chap_secret( char *sec ) {
 	mvwhline( secret, 8, 12, '_' | secret->attrs, 16 );
 
 	wmove( secret, 6, 12 );
-	wgetnstr( secret, pw1, 12 );
+	wgetnstr( secret, pw1, 16 );
 	wmove( secret, 8, 12 );
-	wgetnstr( secret, pw2, 12 );
+	wgetnstr( secret, pw2, 16 );
 
 	if ( strcmp( pw1, pw2 ) == 0 ) {
 		strcpy( sec, pw1 );
