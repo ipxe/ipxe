@@ -2,6 +2,7 @@
 #include <termios.h>
 #include <stddef.h>
 #include <stdio.h>
+#include <string.h>
 
 #define ESC 27
 #define MODE 3
@@ -46,7 +47,27 @@ void _putc( struct _curses_screen *scr __unused, chtype c ) {
 }
 
 int _getc( struct _curses_screen *scr __unused ) {
-	return getchar();
+	int c;
+	char buffer[16];
+	char *ptr;
+	c = getchar();
+	if ( c == '\n' )
+		return KEY_ENTER;
+	/*
+	  WE NEED TO PROCESS ANSI SEQUENCES TO PASS BACK KEY_* VALUES
+	if ( c == ESC ) {
+		ptr = buffer;
+		while ( scr->peek( scr ) == TRUE ) {
+			*(ptr++) = getchar();
+		}
+
+		// ANSI sequences
+		if ( strcmp ( buffer, "[D" ) == 0 )
+			return KEY_LEFT;
+	}
+	*/
+
+	return c;
 }
 
 bool _peek( struct _curses_screen *scr __unused ) {
