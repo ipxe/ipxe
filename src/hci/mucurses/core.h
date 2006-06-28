@@ -13,6 +13,7 @@
 void _wputch ( WINDOW *win, chtype ch, int wrap );
 void _wputchstr ( WINDOW *win, const chtype *chstr, int wrap, int n );
 void _wputstr ( WINDOW *win, const char *str, int wrap, int n );
+void _wcursback ( WINDOW *win );
 int wmove ( WINDOW *win, int y, int x );
 
 #endif /* CURSES_H */

@@ -51,11 +51,8 @@ int wclrtoeol ( WINDOW *win ) {
  * @ret rc	return status code
  */
 int wdelch ( WINDOW *win ) {
-	struct cursor_pos pos;
-
-	_store_curs_pos( win, &pos );
 	_wputch( win, (unsigned)' ', NOWRAP );
-	_restore_curs_pos( win, &pos );
+	_wcursback( win );
 
 	return OK;
 }

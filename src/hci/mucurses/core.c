@@ -49,6 +49,25 @@ void _wputch ( WINDOW *win, chtype ch, int wrap ) {
 }
 
 /**
+ * Retreat the cursor back one position (useful for a whole host of
+ * ops)
+ *
+ * @v *win	window in which to retreat
+ */
+void _wcursback ( WINDOW *win ) {
+	if ( win->curs_x == 0 ) {
+		if ( win->curs_y == 0 )
+			win->curs_y = win->height - 1;
+		win->curs_x = win->width = 1;
+	} else {
+		win->curs_x--;
+	}
+
+	win->scr->movetoyx( win->scr, win->ori_y + win->curs_y,
+   			     	      win->ori_x + win->curs_x );
+}
+
+/**
  * Write a chtype string to a window
  *
  * @v *win	window in which to write

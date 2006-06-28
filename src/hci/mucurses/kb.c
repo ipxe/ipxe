@@ -30,14 +30,9 @@ int has_key ( int kc __unused ) {
 	return TRUE;
 }
 
-/**
- * Pop a character from the FIFO into a window
- *
- * @v *win	window in which to echo input
- * @ret c	char from input stream
- */
-int wgetch ( WINDOW *win ) {
-	int c, timer;
+int _wgetc ( WINDOW *win ) {
+	int timer, c;
+
 	if ( win == NULL )
 		return ERR;
 
@@ -45,28 +40,38 @@ int wgetch ( WINDOW *win ) {
 	while ( ! win->scr->peek( win->scr ) ) {
 		if ( m_delay == 0 ) // non-blocking read
 			return ERR;
-		if ( timer > 0 ) {
+		if ( timer > 0 ) {  // time-limited blocking read
 			if ( m_delay > 0 )
 				timer -= INPUT_DELAY;
 			mdelay( INPUT_DELAY );
-		} else { return ERR; }
+		} else { return ERR; } // non-blocking read
 	}
 
 	c = win->scr->getc( win->scr );
+
+	if ( m_echo && ( c >= 32 && c <= 126 ) ) // printable ASCII characters
+		_wputch( win, (chtype) ( c | win->attrs ), WRAP );
+
+	return c;
+}
+
+/**
+ * Pop a character from the FIFO into a window
+ *
+ * @v *win	window in which to echo input
+ * @ret c	char from input stream
+ */
+int wgetch ( WINDOW *win ) {
+	int c;
+
+	c = _wgetc( win );
 
 	if ( m_echo ) {
 		if ( c >= 0401 && c <= 0633 ) {
 			switch(c) {
 			case KEY_LEFT :
 			case KEY_BACKSPACE :
-				if ( win->curs_x == 0 )
-					wmove( win, 
-					       --(win->curs_y), 
-					       win->width - 1 );
-				else
-					wmove( win, 
-					       win->curs_y, 
-					       --(win->curs_x) );
+				_wcursback( win );
 				wdelch( win );
 				break;
 			default :
@@ -86,38 +91,49 @@ int wgetch ( WINDOW *win ) {
  *
  * @v *win	window in which to echo input
  * @v *str	pointer to string in which to store result
+ * @v n		maximum number of characters to read into string (inc. NUL)
  * @ret rc	return status code
  */
 int wgetnstr ( WINDOW *win, char *str, int n ) {
 	char *_str;
 	int c;
 
+	if ( n == 0 ) {
+		str = '\0';
+		return OK;
+	}
+
 	_str = str;
 
-	while (!( n == 0 ) ) {
-		c = wgetch( win );
-		if ( c >= 0401 && c <= 0633 ) {
-			switch(c) {
-			case KEY_LEFT :
-			case KEY_BACKSPACE :
-				if ( _str > str ) {
-					_str--; n++;
+	while ( ( c = _wgetc( win ) ) != ERR ) {
+		/* termination enforcement - don't let us go past the
+		   end of the allocated buffer... */
+		if ( n == 0 && ( c >= 32 && c <= 126 ) ) {
+			_wcursback( win );
+			wdelch( win );
+		} else {
+			if ( c >= 0401 && c <= 0633 ) {
+				switch(c) {
+				case KEY_LEFT :
+				case KEY_BACKSPACE :
+					_wcursback( win );
+					wdelch( win );
+					break;
+				case KEY_ENTER :
+					*_str = '\0';
+					return OK;
+				default :
+					beep();
+					break;
 				}
-				break;
-			case KEY_ENTER :
-				*_str = '\0';
-				break;
 			}
-		} else if ( c == '\n' ) {
-			*_str = '\0';
-			break;
-		}else { // *should* only be ASCII chars now
-			*(_str++) = (char)c;
-			n--;
+			if ( c >= 32 && c <= 126 ) {
+				*(_str++) = c; n--;
+			}
 		}
 	}
 
-	return OK;
+	return ERR;
 }
 
 
