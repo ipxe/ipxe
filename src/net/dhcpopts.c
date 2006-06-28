@@ -37,34 +37,30 @@ static LIST_HEAD ( option_blocks );
  * Obtain value of a numerical DHCP option
  *
  * @v option		DHCP option, or NULL
- * @v value		Unsigned long for storing the result
- * @ret rc		Return status code
+ * @ret value		Numerical value of the option, or 0
  *
  * Parses the numerical value from a DHCP option, if present.  It is
  * permitted to call dhcp_num_option() with @c option set to NULL; in
- * this case the result value will not be modified and an error will
- * be returned.
+ * this case 0 will be returned.
  *
  * The caller does not specify the size of the DHCP option data; this
  * is implied by the length field stored within the DHCP option
  * itself.
  */
-int dhcp_num_option ( struct dhcp_option *option, unsigned long *value ) {
+unsigned long dhcp_num_option ( struct dhcp_option *option ) {
+	unsigned long value = 0;
 	uint8_t *data;
-	unsigned long tmp = 0;
 
-	if ( ! option )
-		return -EINVAL;
-
-	/* This is actually smaller code than using htons() etc., and
-	 * will also cope well with malformed options (such as
-	 * zero-length options).
-	 */
-	for ( data = option->data.bytes ;
-	      data < ( option->data.bytes + option->len ) ; data++ )
-		tmp = ( ( tmp << 8 ) | *data );
-	*value = tmp;
-	return 0;
+	if ( option ) {
+		/* This is actually smaller code than using htons()
+		 * etc., and will also cope well with malformed
+		 * options (such as zero-length options).
+		 */
+		for ( data = option->data.bytes ;
+		      data < ( option->data.bytes + option->len ) ; data++ )
+			value = ( ( value << 8 ) | *data );
+	}
+	return value;
 }
 
 /**
