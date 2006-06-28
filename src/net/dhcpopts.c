@@ -78,26 +78,32 @@ static inline unsigned int dhcp_option_len ( struct dhcp_option *option ) {
 }
 
 /**
- * Find DHCP option within block of raw data
+ * Find DHCP option within DHCP options block, and its encapsulator (if any)
  *
  * @v tag		DHCP option tag to search for
- * @v data		Data block
- * @v len		Length of data block
+ * @v options		DHCP options block
+ * @ret encapsulator	Encapsulating option (if applicable, may be NULL)
  * @ret option		DHCP option, or NULL if not found
  *
  * Searches for the DHCP option matching the specified tag within the
  * block of data.  Encapsulated options may be searched for by using
- * DHCP_ENCAP_OPT() to construct the tag value.
+ * DHCP_ENCAP_OPT() to construct the tag value.  If the option is an
+ * encapsulated option, and @c encapsulator is non-NULL, it will be
+ * filled in with a pointer to the encapsulating option, if present.
+ * Note that the encapsulating option may be present even if the
+ * encapsulated option is absent, in which case @c encapsulator will
+ * be set but the function will return NULL.
  *
  * This routine is designed to be paranoid.  It does not assume that
  * the option data is well-formatted, and so must guard against flaws
  * such as options missing a @c DHCP_END terminator, or options whose
  * length would take them beyond the end of the data block.
  */
-static struct dhcp_option * find_dhcp_option_raw ( unsigned int tag,
-						   void *data, size_t len ) {
-	struct dhcp_option *option = data;
-	ssize_t remaining = len;
+static struct dhcp_option *
+find_dhcp_option_encap ( unsigned int tag, struct dhcp_option_block *options,
+			 struct dhcp_option **encapsulator ) {
+	struct dhcp_option *option = options->data;
+	ssize_t remaining = options->len;
 	unsigned int option_len;
 
 	while ( remaining ) {
@@ -118,10 +124,12 @@ static struct dhcp_option * find_dhcp_option_raw ( unsigned int tag,
 		/* Check for start of matching encapsulation block */
 		if ( DHCP_ENCAPSULATOR ( tag ) &&
 		     ( option->tag == DHCP_ENCAPSULATOR ( tag ) ) ) {
-			/* Search within encapsulated option block */
-			return find_dhcp_option_raw ( DHCP_ENCAPSULATED( tag ),
-						      &option->data,
-						      option->len );
+			/* Continue search within encapsulated option block */
+			if ( encapsulator )
+				*encapsulator = option;
+			remaining = option->len;
+			option = ( void * ) &option->data;
+			continue;
 		}
 		option = ( ( ( void * ) option ) + option_len );
 	}
@@ -129,19 +137,19 @@ static struct dhcp_option * find_dhcp_option_raw ( unsigned int tag,
 }
 
 /**
- * Find DHCP option within options block
+ * Find DHCP option within DHCP options block
  *
  * @v tag		DHCP option tag to search for
  * @v options		DHCP options block
  * @ret option		DHCP option, or NULL if not found
  *
  * Searches for the DHCP option matching the specified tag within the
- * options block.  Encapsulated options may be searched for by using
+ * block of data.  Encapsulated options may be searched for by using
  * DHCP_ENCAP_OPT() to construct the tag value.
  */
 struct dhcp_option * find_dhcp_option ( unsigned int tag,
 					struct dhcp_option_block *options ) {
-	return find_dhcp_option_raw ( tag, options->data, options->len );
+	return find_dhcp_option_encap ( tag, options, NULL );
 }
 
 /**

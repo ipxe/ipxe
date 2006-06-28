@@ -88,6 +88,20 @@ extern unsigned long dhcp_num_option ( struct dhcp_option *option );
 extern struct dhcp_option * find_dhcp_option ( unsigned int tag,
 					   struct dhcp_option_block *options );
 
+/**
+ * Find DHCP numerical option, and return its value
+ *
+ * @v tag		DHCP option tag to search for
+ * @v options		DHCP options block
+ * @ret value		Numerical value of the option, or 0 if not found
+ *
+ * This function exists merely as a notational shorthand for a call to
+ * find_dhcp_option() followed by a call to dhcp_num_option().  It is
+ * not possible to distinguish between the cases "option not found"
+ * and "option has a value of zero" using this function; if this
+ * matters to you then issue the two constituent calls directly and
+ * check that find_dhcp_option() returns a non-NULL value.
+ */
 static inline unsigned long
 find_dhcp_num_option ( unsigned int tag, struct dhcp_option_block *options ) {
 	return dhcp_num_option ( find_dhcp_option ( tag, options ) );
