@@ -25,10 +25,10 @@ void hex_dump ( const char *data, const unsigned int len ) {
 			more();
 		}
 		if ( ( index % 16 ) == 0 ) {
-			printf ( "%X [%X] : %hX :", data + index,
+			printf ( "%p [%lX] : %X :", data + index,
 				 virt_to_phys ( data + index ), index );
 		}
-		printf ( " %hhX", data[index] );
+		printf ( " %02X", data[index] );
 	}
 	printf ( "\n" );
 }
@@ -64,19 +64,19 @@ int check_region ( void *region, size_t len ) {
 			/* Start of corruption */
 			if ( corrupted == 0 ) {
 				corrupted = 1;
-				printf ( "Region %#x-%#x (physical %#x-%#x) "
+				printf ( "Region %p-%p (physical %#lx-%#lx) "
 					 "corrupted\n",
 					 region, region + len,
 					 virt_to_phys ( region ),
 					 virt_to_phys ( region + len ) );
 			}
 			in_corruption = 1;
-			printf ( "--- offset %#x ", offset );
+			printf ( "--- offset %#lx ", offset );
 		} else if ( ( in_corruption != 0 ) &&
 			    ( test == GUARD_SYMBOL ) ) {
 			/* End of corruption */
 			in_corruption = 0;
-			printf ( "to offset %#x", offset );
+			printf ( "to offset %#lx", offset );
 		}
 
 	}

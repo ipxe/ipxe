@@ -2,6 +2,7 @@
 #include "buffer.h"
 #include "load_buffer.h"
 #include "image.h"
+#include <console.h>
 
 static struct image images[0] __image_start;
 static struct image images_end[0] __image_end;
