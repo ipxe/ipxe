@@ -12,10 +12,6 @@
 #include <gpxe/init.h>
 #include <gpxe/pci.h>
 
-#ifdef CONFIG_FILO
-#include <lib.h>
-#endif
-
 #undef __BIG_ENDIAN
 #if 0
 #define __LITTLE_ENDIAN 
@@ -388,13 +384,6 @@ draw_byte_8(const unsigned char *font, u32 *base, u32 rb)
 	}
 }
 
-#ifdef CONFIG_FILO
-#define USE_FILO_PCI_FIND 1
-#else
-#define USE_FILO_PCI_FIND 0
-#endif
-
-
 static void btext_init(void)
 {
 #if 0
@@ -403,7 +392,6 @@ static void btext_init(void)
 #else
     uint32_t frame_buffer;//  0xfc000000
 
-#if USE_FILO_PCI_FIND==0
     struct pci_device dev;
 
     #warning "pci_find_device_x no longer exists; use find_pci_device instead"
@@ -411,18 +399,6 @@ static void btext_init(void)
     if(dev.vendor==0) return; // no fb
 
     frame_buffer = (uint32_t)dev.membase;
-#else
-    struct pci_device *dev = 0;
-
-    pci_init();
-    dev = pci_find_device(0x1002, 0x4752, -1, -1, 0);
-    if(!dev) {
-	 return; // no fb
-    }
-        
-    pci_read_config_dword(dev, 0x10, &frame_buffer);
-#endif
-    
 #endif
 
 	btext_setup_display(640, 480, 8, 640,frame_buffer);

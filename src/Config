@@ -283,13 +283,6 @@ CFLAGS+=	-DASK_BOOT=3 -DBOOT_FIRST=BOOT_NIC
 # CFLAGS+=	-DDHCP_USER_CLASS="5,'A','L','P','H','A',4,'B','E','T','A'" \
 #		-DDHCP_USER_CLASS_LEN=11
 
-# Set to enable FILO support
-# for FILO support it will make main call pci_init
-# INCLUDE_FILO=y
-ifdef	INCLUDE_FILO
-CFLAGS+=	-DCONFIG_FILO
-endif
-
 # Enabling this causes Etherboot to ignore Etherboot-specific options
 # that are not within an Etherboot encapsulated options field.
 # This option should be enabled unless you have a legacy DHCP server

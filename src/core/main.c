@@ -31,10 +31,6 @@ Literature dealing with the network protocols:
 #include <gpxe/heap.h>
 #include <gpxe/netdevice.h>
 
-#ifdef CONFIG_FILO
-#include <lib.h>
-#endif
-
 /* Linker symbols */
 extern char _bss[], _ebss[];
 
