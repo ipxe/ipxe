@@ -267,6 +267,8 @@ endif
 
 $(BLIB_LIST) :
 
+VERYCLEANUP	+= $(BLIB_LIST)
+
 # Library of all objects
 #
 BLIB		= $(BIN)/blib.a
