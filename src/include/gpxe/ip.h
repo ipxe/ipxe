@@ -8,17 +8,24 @@
  */
 
 #include <ip.h>
+#include <gpxe/retry.h>
 
 /* IP constants */
 
 #define IP_VER		4
 #define IP_MASK_VER	0xf0
 #define IP_MASK_HLEN 	0x0f
+#define IP_MASK_OFFSET	0x1fff
+#define IP_MASK_DONOTFRAG	0x4000
+#define IP_MASK_MOREFRAGS	0x2000
 #define IP_PSHLEN 	12
 
 /* IP header defaults */
 #define IP_TOS		0
 #define IP_TTL		64
+
+#define IP_FRAG_PKB_SIZE	1500
+#define IP_FRAG_TIMEOUT		50
 
 /* IP4 pseudo header */
 struct ipv4_pseudo_header {
@@ -27,6 +34,22 @@ struct ipv4_pseudo_header {
 	uint8_t zero_padding;
 	uint8_t protocol;
 	uint16_t len;
+};
+
+/* Fragment reassembly buffer */
+struct frag_buffer {
+	/* Identification number */
+	uint16_t ident;
+	/* Source network address */
+	struct in_addr src;
+	/* Destination network address */
+	struct in_addr dest;
+	/* Reassembled packet buffer */
+	struct pk_buff *frag_pkb;
+	/* Reassembly timer */
+	struct retry_timer frag_timer;
+	/* List of fragment reassembly buffers */
+	struct list_head list;
 };
 
 struct pk_buff;

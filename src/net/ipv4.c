@@ -47,6 +47,9 @@ struct ipv4_miniroute {
 /** List of IPv4 miniroutes */
 static LIST_HEAD ( miniroutes );
 
+/** List of fragment reassembly buffers */
+static LIST_HEAD ( frag_buffers );
+
 /**
  * Add IPv4 interface
  *
@@ -118,6 +121,110 @@ static void ipv4_dump ( struct iphdr *iphdr __unused ) {
 	DBG ( "\tSource = %s\n", inet_ntoa ( iphdr->src ) );
 	DBG ( "\tDestination = %s\n", inet_ntoa ( iphdr->dest ) );
 }
+
+/**
+ * Fragment reassembly counter timeout
+ *
+ * @v timer	Retry timer
+ * @v over	If asserted, the timer is greater than @c MAX_TIMEOUT 
+ */
+void ipv4_frag_expired ( struct retry_timer *timer __unused , int over ) {
+	if ( over ) {
+		DBG ( "Fragment reassembly timeout" );
+		/* Free the fragment buffer */
+	}
+}
+
+/**
+ * Free fragment buffer
+ *
+ * @v fragbug	Fragment buffer
+ */
+void free_fragbuf ( struct frag_buffer *fragbuf ) {
+	if ( fragbuf ) {
+		free_dma ( fragbuf, sizeof ( *fragbuf ) );
+	}
+}
+
+/**
+ * Fragment reassembler
+ *
+ * @v pkb		Packet buffer, fragment of the datagram
+ * @ret frag_pkb	Reassembled packet, or NULL
+ */
+struct pk_buff * ipv4_reassemble ( struct pk_buff * pkb ) {
+	struct iphdr *iphdr = pkb->data;
+	struct frag_buffer *fragbuf;
+	
+	/**
+	 * Check if the fragment belongs to any fragment series
+	 */
+	list_for_each_entry ( fragbuf, &frag_buffers, list ) {
+		if ( fragbuf->ident == iphdr->ident &&
+		     fragbuf->src.s_addr == iphdr->src.s_addr ) {
+			/**
+			 * Check if the packet is the expected fragment
+			 * 
+			 * The offset of the new packet must be equal to the
+			 * length of the data accumulated so far (the length of
+			 * the reassembled packet buffer
+			 */
+			if ( pkb_len ( fragbuf->frag_pkb ) == 
+			      ( iphdr->frags & IP_MASK_OFFSET ) ) {
+				/**
+				 * Append the contents of the fragment to the
+				 * reassembled packet buffer
+				 */
+				pkb_pull ( pkb, sizeof ( *iphdr ) );
+				memcpy ( pkb_put ( fragbuf->frag_pkb,
+							pkb_len ( pkb ) ),
+					 pkb->data, pkb_len ( pkb ) );
+				free_pkb ( pkb );
+
+				/** Check if the fragment series is over */
+				if ( !iphdr->frags & IP_MASK_MOREFRAGS ) {
+					pkb = fragbuf->frag_pkb;
+					free_fragbuf ( fragbuf );
+					return pkb;
+				}
+
+			} else {
+				/* Discard the fragment series */
+				free_fragbuf ( fragbuf );
+				free_pkb ( pkb );
+			}
+			return NULL;
+		}
+	}
+	
+	/** Check if the fragment is the first in the fragment series */
+	if ( iphdr->frags & IP_MASK_MOREFRAGS &&
+			( ( iphdr->frags & IP_MASK_OFFSET ) == 0 ) ) {
+	
+		/** Create a new fragment buffer */
+		fragbuf = ( struct frag_buffer* ) malloc ( sizeof( *fragbuf ) );
+		fragbuf->ident = iphdr->ident;
+		fragbuf->src = iphdr->src;
+
+		/* Set up the reassembly packet buffer */
+		fragbuf->frag_pkb = alloc_pkb ( IP_FRAG_PKB_SIZE );
+		pkb_pull ( pkb, sizeof ( *iphdr ) );
+		memcpy ( pkb_put ( fragbuf->frag_pkb, pkb_len ( pkb ) ),
+			 pkb->data, pkb_len ( pkb ) );
+		free_pkb ( pkb );
+
+		/* Set the reassembly timer */
+		fragbuf->frag_timer.timeout = IP_FRAG_TIMEOUT;
+		fragbuf->frag_timer.expired = ipv4_frag_expired;
+		start_timer ( &fragbuf->frag_timer );
+
+		/* Add the fragment buffer to the list of fragment buffers */
+		list_add ( &fragbuf->list, &frag_buffers );
+	}
+	
+	return NULL;
+}
+
 
 /**
  * Complete the transport-layer checksum
@@ -294,7 +401,9 @@ int ipv4_tx ( struct pk_buff *pkb, struct tcpip_protocol *tcpip,
 	}
 
 	/* Calculate the transport layer checksum */
-	ipv4_tx_csum ( pkb, tcpip );
+	if ( tcpip->csum_offset > 0 ) {
+		ipv4_tx_csum ( pkb, tcpip );
+	}
 
 	/* Calculate header checksum, in network byte order */
 	iphdr->chksum = 0;
@@ -415,6 +524,18 @@ void ipv4_rx ( struct pk_buff *pkb, struct net_device *netdev __unused,
 	/* Verify the checksum */
 	if ( ( chksum = ipv4_rx_csum ( pkb, iphdr->protocol ) )	!= 0xffff ) {
 		DBG ( "Bad checksum %x\n", chksum );
+	}
+	/* Fragment reassembly */
+	if ( iphdr->frags & IP_MASK_MOREFRAGS || 
+		( !iphdr->frags & IP_MASK_MOREFRAGS &&
+			iphdr->frags & IP_MASK_OFFSET != 0 ) ) {
+		/* Pass the fragment to the reassembler ipv4_ressable() which
+		 * either returns a fully reassembled packet buffer or NULL.
+		 */
+		pkb = ipv4_reassemble ( pkb );
+		if ( !pkb ) {
+			return;
+		}
 	}
 
 	/* To reduce code size, the following functions are not implemented:

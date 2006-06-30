@@ -22,19 +22,14 @@ static inline void copy_sockaddr ( struct sockaddr *source, struct sockaddr *des
 	memcpy ( dest, source, sizeof ( *dest ) );
 }
 
-static inline uint16_t dest_port ( struct sockaddr *sock, uint16_t *dest ) {
+static inline uint16_t * dest_port ( struct sockaddr *sock ) {
 	switch ( sock->sa_family ) {
 	case AF_INET:
-		dest = &sock->sin.sin_port;
-		break;
+		return &sock->sin.sin_port;
 	case AF_INET6:
-		dest = &sock->sin6.sin6_port;
-		break;
-	default:
-		DBG ( "Network family %d not supported\n", sock->sa_family );
-		return -EAFNOSUPPORT;
+		return &sock->sin6.sin6_port;
 	}
-	return 0;
+	return NULL;
 }
 
 /**
@@ -49,7 +44,7 @@ void udp_dump ( struct udp_header *udphdr ) {
 	DBG ( "\tSource Port = %d\n", ntohs ( udphdr->source_port ) );
 	DBG ( "\tDestination Port = %d\n", ntohs ( udphdr->dest_port ) );
 	DBG ( "\tLength = %d\n", ntohs ( udphdr->len ) );
-	DBG ( "\tChecksum = %d\n", ntohs ( udphdr->chksum ) );
+	DBG ( "\tChecksum = %x\n", ntohs ( udphdr->chksum ) );
 	DBG ( "\tChecksum located at %#x\n", &udphdr->chksum );
 }
 
@@ -139,11 +134,12 @@ int udp_send ( struct udp_connection *conn, const void *data, size_t len ) {
 	 * sending it over the network
 	 */
 	udphdr = pkb_push ( conn->tx_pkb, sizeof ( *udphdr ) );
-	if ( (rc = dest_port ( sock, dest ) ) != 0 ) {
-		return rc;
+	if ( (dest = dest_port ( sock ) ) == NULL ) {
+		DBG ( "Network family %d not supported\n", sock->sa_family );
+		return -EAFNOSUPPORT;
 	}
-	udphdr->dest_port = htons ( *dest );
-	udphdr->source_port = htons ( conn->local_port );
+	udphdr->dest_port = *dest;
+	udphdr->source_port = conn->local_port;
 	udphdr->len = htons ( pkb_len ( conn->tx_pkb ) );
 	udphdr->chksum = htons ( calc_chksum ( udphdr, sizeof ( *udphdr ) ) );
 
