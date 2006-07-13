@@ -23,6 +23,8 @@
 /** Extract encapsulated option tag from encapsulated tag value */
 #define DHCP_ENCAPSULATED( encap_opt ) ( (encap_opt) & 0xff )
 
+#define DHCP_IS_ENCAP_OPT( opt ) DHCP_ENCAPSULATOR( opt )
+
 /**
  * @defgroup dhcpopts DHCP option tags
  * @{
@@ -74,6 +76,17 @@ struct dhcp_option {
 	} data;
 } __attribute__ (( packed ));
 
+/**
+ * Length of a DHCP option header
+ *
+ * The header is the portion excluding the data, i.e. the tag and the
+ * length.
+ */
+#define DHCP_OPTION_HEADER_LEN ( offsetof ( struct dhcp_option, data ) )
+
+/** Maximum length for a single DHCP option */
+#define DHCP_MAX_LEN 0xff
+
 /** A DHCP options block */
 struct dhcp_option_block {
 	/** List of option blocks */
@@ -82,17 +95,35 @@ struct dhcp_option_block {
 	void *data;
 	/** Option block length */
 	size_t len;
+	/** Option block maximum length */
+	size_t max_len;
+	/** Block priority
+	 *
+	 * This is determined at the time of the call to
+	 * register_options() by searching for the @c DHCP_EB_PRIORITY
+	 * option.
+	 */
+	signed int priority;
 };
 
 extern unsigned long dhcp_num_option ( struct dhcp_option *option );
-extern struct dhcp_option * find_dhcp_option ( unsigned int tag,
-					   struct dhcp_option_block *options );
+extern struct dhcp_option *
+find_dhcp_option ( struct dhcp_option_block *options, unsigned int tag );
+extern struct dhcp_option * find_global_dhcp_option ( unsigned int tag );
+extern void register_dhcp_options ( struct dhcp_option_block *options );
+extern void unregister_dhcp_options ( struct dhcp_option_block *options );
+extern struct dhcp_option_block * alloc_dhcp_options ( size_t max_len );
+extern void free_dhcp_options ( struct dhcp_option_block *options );
+extern struct dhcp_option *
+set_dhcp_option ( struct dhcp_option_block *options, unsigned int tag,
+		  const void *data, size_t len );
+
 
 /**
  * Find DHCP numerical option, and return its value
  *
- * @v tag		DHCP option tag to search for
  * @v options		DHCP options block
+ * @v tag		DHCP option tag to search for
  * @ret value		Numerical value of the option, or 0 if not found
  *
  * This function exists merely as a notational shorthand for a call to
@@ -103,8 +134,37 @@ extern struct dhcp_option * find_dhcp_option ( unsigned int tag,
  * check that find_dhcp_option() returns a non-NULL value.
  */
 static inline unsigned long
-find_dhcp_num_option ( unsigned int tag, struct dhcp_option_block *options ) {
-	return dhcp_num_option ( find_dhcp_option ( tag, options ) );
+find_dhcp_num_option ( struct dhcp_option_block *options, unsigned int tag ) {
+	return dhcp_num_option ( find_dhcp_option ( options, tag ) );
+}
+
+/**
+ * Find DHCP numerical option, and return its value
+ *
+ * @v tag		DHCP option tag to search for
+ * @ret value		Numerical value of the option, or 0 if not found
+ *
+ * This function exists merely as a notational shorthand for a call to
+ * find_global_dhcp_option() followed by a call to dhcp_num_option().
+ * It is not possible to distinguish between the cases "option not
+ * found" and "option has a value of zero" using this function; if
+ * this matters to you then issue the two constituent calls directly
+ * and check that find_global_dhcp_option() returns a non-NULL value.
+ */
+static inline unsigned long
+find_global_dhcp_num_option ( unsigned int tag ) {
+	return dhcp_num_option ( find_global_dhcp_option ( tag ) );
+}
+
+/**
+ * Delete DHCP option
+ *
+ * @v options		DHCP options block
+ * @v tag		DHCP option tag
+ */
+static inline void delete_dhcp_option ( struct dhcp_option_block *options,
+					unsigned int tag ) {
+	set_dhcp_option ( options, tag, NULL, 0 );
 }
 
 #endif /* _GPXE_DHCP_H */
