@@ -15,7 +15,7 @@ void more ( void ) {
 }
 
 /* Produce a paged hex dump of the specified data and length */
-void hex_dump ( const char *data, const unsigned int len ) {
+void hex_dump ( const unsigned char *data, const unsigned int len ) {
 	unsigned int index;
 	for ( index = 0; index < len; index++ ) {
 		if ( ( index % 16 ) == 0 ) {
