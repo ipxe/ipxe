@@ -9,6 +9,87 @@
 
 #include <stdint.h>
 #include <gpxe/list.h>
+#include <gpxe/in.h>
+
+/**
+ * A DHCP packet
+ *
+ */
+struct dhcp_packet {
+	/** Operation
+	 *
+	 * This must be either @c BOOTP_REQUEST or @c BOOTP_REPLY.
+	 */
+	uint8_t op;
+	/** Hardware address type
+	 *
+	 * This is an ARPHRD_XXX constant.
+	 */
+	uint8_t htype;
+	/** Hardware address length */
+	uint8_t hlen;
+	/** Number of hops from server */
+	uint8_t hops;
+	/** Transaction ID */
+	uint32_t xid;
+	/** Seconds since start of acquisition */
+	uint16_t secs;
+	/** Flags */
+	uint16_t flags;
+	/** "Client" IP address
+	 *
+	 * This is filled in if the client already has an IP address
+	 * assigned and can respond to ARP requests.
+	 */
+	struct in_addr ciaddr;
+	/** "Your" IP address
+	 *
+	 * This is the IP address assigned by the server to the client.
+	 */
+	struct in_addr yiaddr;
+	/** "Server" IP address
+	 *
+	 * This is the IP address of the next server to be used in the
+	 * boot process.
+	 */
+	struct in_addr siaddr;
+	/** "Gateway" IP address
+	 *
+	 * This is the IP address of the DHCP relay agent, if any.
+	 */
+	struct in_addr giaddr;
+	/** Client hardware address */
+	uint8_t chaddr[16];
+	/** Server host name (null terminated)
+	 *
+	 * This field may be overridden and contain DHCP options
+	 */
+	uint8_t sname[64];
+	/** Boot file name (null terminated)
+	 *
+	 * This field may be overridden and contain DHCP options
+	 */
+	uint8_t file[128];
+	/** DHCP magic cookie
+	 *
+	 * Must have the value @c DHCP_MAGIC_COOKIE.
+	 */
+	uint32_t magic;
+	/** DHCP options
+	 *
+	 * Variable length; extends to the end of the packet.
+	 */
+	uint8_t options[0];
+};
+
+/** Opcode for a request from client to server */
+#define BOOTP_REQUEST 1
+
+/** Opcode for a reply from server to client */
+#define BOOTP_REPLY 2
+
+/** DHCP magic cookie */
+#define DHCP_MAGIC_COOKIE 0x63825363UL
 
 /** Construct a tag value for an encapsulated option
  *
@@ -22,7 +103,7 @@
 #define DHCP_ENCAPSULATOR( encap_opt ) ( (encap_opt) >> 8 )
 /** Extract encapsulated option tag from encapsulated tag value */
 #define DHCP_ENCAPSULATED( encap_opt ) ( (encap_opt) & 0xff )
-
+/** Option is encapsulated */
 #define DHCP_IS_ENCAP_OPT( opt ) DHCP_ENCAPSULATOR( opt )
 
 /**
@@ -30,12 +111,79 @@
  * @{
  */
 
+/** Padding
+ *
+ * This tag does not have a length field; it is always only a single
+ * byte in length.
+ */
 #define DHCP_PAD 0
-#define DHCP_END 255
 
+/** Option overloading
+ *
+ * The value of this option is the bitwise-OR of zero or more
+ * DHCP_OPTION_OVERLOAD_XXX constants.
+ */
+#define DHCP_OPTION_OVERLOAD 52
+
+/** The "file" field is overloaded to contain extra DHCP options */
+#define DHCP_OPTION_OVERLOAD_FILE 1
+
+/** The "sname" field is overloaded to contain extra DHCP options */
+#define DHCP_OPTION_OVERLOAD_SNAME 2
+
+/** TFTP server name
+ *
+ * This option replaces the fixed "sname" field, when that field is
+ * used to contain overloaded options.
+ */
+#define DHCP_TFTP_SERVER_NAME 66
+
+/** Bootfile name
+ *
+ * This option replaces the fixed "file" field, when that field is
+ * used to contain overloaded options.
+ */
+#define DHCP_BOOTFILE_NAME 67
+
+/** Etherboot-specific encapsulated options
+ *
+ * This encapsulated options field is used to contain all options
+ * specific to Etherboot (i.e. not assigned by IANA or other standards
+ * bodies).
+ */
 #define DHCP_EB_ENCAP 175
 
+/** Priority of this options block
+ *
+ * This is a signed 8-bit integer field indicating the priority of
+ * this block of options.  It can be used to specify the relative
+ * priority of multiple option blocks (e.g. options from non-volatile
+ * storage versus options from a DHCP server).
+ */
 #define DHCP_EB_PRIORITY DHCP_ENCAP_OPT ( DHCP_EB_ENCAP, 1 )
+
+/** "Your" IP address
+ *
+ * This option is used internally to contain the value of the "yiaddr"
+ * field, in order to provide a consistent approach to storing and
+ * processing options.  It should never be present in a DHCP packet.
+ */
+#define DHCP_EB_YIADDR DHCP_ENCAP_OPT ( DHCP_EB_ENCAP, 2 )
+
+/** "Server" IP address
+ *
+ * This option is used internally to contain the value of the "siaddr"
+ * field, in order to provide a consistent approach to storing and
+ * processing options.  It should never be present in a DHCP packet.
+ */
+#define DHCP_EB_SIADDR DHCP_ENCAP_OPT ( DHCP_EB_ENCAP, 3 )
+
+/** End of options
+ *
+ * This tag does not have a length field; it is always only a single
+ * byte in length.
+ */
+#define DHCP_END 255
 
 /** @} */
 
@@ -117,7 +265,6 @@ extern void free_dhcp_options ( struct dhcp_option_block *options );
 extern struct dhcp_option *
 set_dhcp_option ( struct dhcp_option_block *options, unsigned int tag,
 		  const void *data, size_t len );
-
 
 /**
  * Find DHCP numerical option, and return its value
