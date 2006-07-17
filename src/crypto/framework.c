@@ -1,3 +1,6 @@
+/* mcb - this file breaks the build process; temporarily deactivating */
+#if 0
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <sys/types.h>
@@ -80,3 +83,5 @@ int main(int argc, char *argv[])
 
   return 0;
 }
+
+#endif
