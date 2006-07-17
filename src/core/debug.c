@@ -25,10 +25,10 @@ void hex_dump ( const unsigned char *data, const unsigned int len ) {
 			more();
 		}
 		if ( ( index % 16 ) == 0 ) {
-			printf ( "%p [%lX] : %X :", data + index,
+			printf ( "%p [%lx] : %04x :", data + index,
 				 virt_to_phys ( data + index ), index );
 		}
-		printf ( " %02X", data[index] );
+		printf ( " %02x", data[index] );
 	}
 	printf ( "\n" );
 }
