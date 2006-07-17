@@ -228,6 +228,27 @@ void unregister_dhcp_options ( struct dhcp_option_block *options ) {
 }
 
 /**
+ * Initialise empty block of DHCP options
+ *
+ * @v options		Uninitialised DHCP option block
+ * @v data		Memory for DHCP option data
+ * @v max_len		Length of memory for DHCP option data
+ *
+ * Populates the DHCP option data with a single @c DHCP_END option and
+ * fills in the fields of the @c dhcp_option_block structure.
+ */
+void init_dhcp_options ( struct dhcp_option_block *options,
+			 void *data, size_t max_len ) {
+	struct dhcp_option *option;
+
+	options->data = data;
+	options->max_len = max_len;
+	option = options->data;
+	option->tag = DHCP_END;
+	options->len = 1;
+}
+
+/**
  * Allocate space for a block of DHCP options
  *
  * @v max_len		Maximum length of option block
@@ -238,17 +259,12 @@ void unregister_dhcp_options ( struct dhcp_option_block *options ) {
  */
 struct dhcp_option_block * alloc_dhcp_options ( size_t max_len ) {
 	struct dhcp_option_block *options;
-	struct dhcp_option *option;
 
 	options = malloc ( sizeof ( *options ) + max_len );
 	if ( options ) {
-		options->data = ( ( void * ) options + sizeof ( *options ) );
-		options->max_len = max_len;
-		if ( max_len ) {
-			option = options->data;
-			option->tag = DHCP_END;
-			options->len = 1;
-		}
+		init_dhcp_options ( options, 
+				    ( (void *) options + sizeof ( *options ) ),
+				    max_len );
 	}
 	return options;
 }

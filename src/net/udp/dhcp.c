@@ -17,6 +17,7 @@
  */
 
 #include <string.h>
+#include <errno.h>
 #include <assert.h>
 #include <byteswap.h>
 #include <gpxe/netdevice.h>
@@ -27,6 +28,197 @@
  * Dynamic Host Configuration Protocol
  *
  */
+
+struct dhcp_session {
+	struct net_device *netdev;
+	uint32_t xid;
+};
+
+/** DHCP operation types
+ *
+ * This table maps from DHCP message types (i.e. values of the @c
+ * DHCP_MESSAGE_TYPE option) to values of the "op" field within a DHCP
+ * packet.
+ */
+static const uint8_t dhcp_op[] = {
+	[DHCPDISCOVER]	= BOOTP_REQUEST,
+	[DHCPOFFER]	= BOOTP_REPLY,
+	[DHCPREQUEST]	= BOOTP_REQUEST,
+	[DHCPDECLINE]	= BOOTP_REQUEST,
+	[DHCPACK]	= BOOTP_REPLY,
+	[DHCPNAK]	= BOOTP_REPLY,
+	[DHCPRELEASE]	= BOOTP_REQUEST,
+	[DHCPINFORM]	= BOOTP_REQUEST,
+};
+
+/** DHCP packet option block fill order
+ *
+ * This is the order in which option blocks are filled when
+ * reassembling a DHCP packet.  We fill the smallest field ("sname")
+ * first, to maximise the chances of being able to fit large options
+ * within fields which are large enough to contain them.
+ */
+enum dhcp_packet_option_block_fill_order {
+	OPTS_SNAME = 0,
+	OPTS_FILE,
+	OPTS_MAIN,
+	NUM_OPT_BLOCKS
+};
+
+/** DHCP option blocks within a DHCP packet
+ *
+ * A DHCP packet contains three fields which can be used to contain
+ * options: the actual "options" field plus the "file" and "sname"
+ * fields (which can be overloaded to contain options).
+ */
+struct dhcp_packet_option_blocks {
+	struct dhcp_option_block options[NUM_OPT_BLOCKS];
+};
+
+/**
+ * Set option within DHCP packet
+ *
+ * @v optblocks		DHCP packet option blocks
+ * @v tag		DHCP option tag
+ * @v data		New value for DHCP option
+ * @v len		Length of value, in bytes
+ * @ret option		DHCP option, or NULL
+ *
+ * Sets the option within the first available options block within the
+ * DHCP packet.  Option blocks are tried in the order specified by @c
+ * dhcp_option_block_fill_order.
+ */
+static struct dhcp_option *
+set_dhcp_packet_option ( struct dhcp_packet_option_blocks *optblocks,
+			 unsigned int tag, const void *data, size_t len ) {
+	struct dhcp_option_block *options;
+	struct dhcp_option *option;
+
+	for ( options = optblocks->options ;
+	      options < &optblocks->options[NUM_OPT_BLOCKS] ; options++ ) {
+		option = set_dhcp_option ( options, tag, data, len );
+		if ( option )
+			return option;
+	}
+	return NULL;
+}
+
+/**
+ * Copy options to DHCP packet
+ *
+ * @v optblocks		DHCP packet option blocks
+ * @v encapsulator	Encapsulating option, or zero
+ * @ret rc		Return status code
+ * 
+ * Copies options from DHCP options blocks into a DHCP packet.  Most
+ * options are copied verbatim.  Recognised encapsulated options
+ * fields are handled as such.  Selected options (e.g. @c
+ * DHCP_OPTION_OVERLOAD) are always ignored, since these special cases
+ * are handled by other code.
+ */
+static int
+copy_dhcp_options_to_packet ( struct dhcp_packet_option_blocks *optblocks,
+			      unsigned int encapsulator ) {
+	unsigned int subtag;
+	unsigned int tag;
+	struct dhcp_option *option;
+	struct dhcp_option *copied;
+	int rc;
+
+	for ( subtag = DHCP_MIN_OPTION; subtag <= DHCP_MAX_OPTION; subtag++ ) {
+		tag = DHCP_ENCAP_OPT ( encapsulator, subtag );
+		switch ( tag ) {
+		case DHCP_OPTION_OVERLOAD:
+			/* Hard-coded in packets we reassemble; skip
+			 * this option
+			 */
+			break;
+		case DHCP_EB_ENCAP:
+		case DHCP_VENDOR_ENCAP:
+			/* Process encapsulated options field */
+			if ( ( rc = copy_dhcp_options_to_packet ( optblocks,
+								  tag ) ) != 0)
+				return rc;
+			break;
+		default:
+			/* Copy option to reassembled packet */
+			option = find_global_dhcp_option ( tag );
+			if ( ! option )
+				break;
+			copied = set_dhcp_packet_option ( optblocks, tag,
+							  &option->data,
+							  option->len );
+			if ( ! copied )
+				return -ENOSPC;
+			break;
+		};
+	}
+
+	return 0;
+}
+
+/**
+ * Assemble a DHCP packet
+ *
+ * @v dhcp		DHCP session
+ * @v data		Packet to be filled in
+ * @v max_len		Length of packet buffer
+ * @ret len		Length of assembled packet
+ *
+ * Reconstruct a DHCP packet from a DHCP options list.
+ */
+size_t dhcp_assemble ( struct dhcp_session *dhcp, void *data,
+		       size_t max_len ) {
+	struct dhcp_packet *dhcppkt = data;
+	struct dhcp_option *option;
+	struct dhcp_packet_option_blocks optblocks;
+	unsigned int dhcp_message_type;
+	static const uint8_t overloading = ( DHCP_OPTION_OVERLOAD_FILE |
+					     DHCP_OPTION_OVERLOAD_SNAME );
+
+	/* Fill in constant fields */
+	memset ( dhcppkt, 0, max_len );
+	dhcppkt->xid = dhcp->xid;
+	dhcppkt->magic = htonl ( DHCP_MAGIC_COOKIE );
+
+	/* Derive "op" field from DHCP_MESSAGE_TYPE option value */
+	dhcp_message_type = find_global_dhcp_num_option ( DHCP_MESSAGE_TYPE );
+	dhcppkt->op = dhcp_op[dhcp_message_type];
+
+	/* Fill in NIC details */
+	dhcppkt->htype = dhcp->netdev->ll_protocol->ll_proto;
+	dhcppkt->hlen = dhcp->netdev->ll_protocol->ll_addr_len;
+	memcpy ( dhcppkt->chaddr, dhcp->netdev->ll_addr, dhcppkt->hlen );
+
+	/* Fill in IP addresses if present */
+	option = find_global_dhcp_option ( DHCP_EB_YIADDR );
+	if ( option ) {
+		memcpy ( &dhcppkt->yiaddr, &option->data,
+			 sizeof ( dhcppkt->yiaddr ) );
+	}
+	option = find_global_dhcp_option ( DHCP_EB_SIADDR );
+	if ( option ) {
+		memcpy ( &dhcppkt->siaddr, &option->data,
+			 sizeof ( dhcppkt->siaddr ) );
+	}
+
+	/* Initialise option blocks */
+	init_dhcp_options ( &optblocks.options[OPTS_MAIN], dhcppkt->options,
+			    ( max_len -
+			      offsetof ( typeof ( *dhcppkt ), options ) ) );
+	init_dhcp_options ( &optblocks.options[OPTS_FILE], dhcppkt->file,
+			    sizeof ( dhcppkt->file ) );
+	init_dhcp_options ( &optblocks.options[OPTS_SNAME], dhcppkt->sname,
+			    sizeof ( dhcppkt->sname ) );
+	set_dhcp_option ( &optblocks.options[OPTS_MAIN], DHCP_OPTION_OVERLOAD,
+			  &overloading, sizeof ( overloading ) );
+
+	/* Populate option blocks */
+	copy_dhcp_options_to_packet ( &optblocks, 0 );
+
+	return ( offsetof ( typeof ( *dhcppkt ), options )
+		 + optblocks.options[OPTS_MAIN].len );
+}
 
 /**
  * Calculate used length of a field containing DHCP options
@@ -106,6 +298,10 @@ struct dhcp_option_block * dhcp_parse ( const void *data, size_t len ) {
 	struct dhcp_option_block *options;
 	size_t options_len;
 	unsigned int overloading;
+
+	/* Sanity check */
+	if ( len < sizeof ( *dhcppkt ) )
+		return NULL;
 
 	/* Calculate size of resulting concatenated option block:
 	 *

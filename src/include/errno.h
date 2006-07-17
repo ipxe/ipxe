@@ -151,6 +151,7 @@
 #define ENOENT		0xe8	/**< No such file or directory */
 #define ENOEXEC		0xe9	/**< Exec format error */
 #define ENOMSG		ENODATA	/**< No message of the desired type */
+#define ENOSPC		ENOMEM	/**< No space left on device */
 #define ENOSR		0xea	/**< No stream resources */
 #define ENOSTR		0xeb	/**< Not a stream */
 #define ENOSYS		0xec	/**< Function not implemented */

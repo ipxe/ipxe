@@ -118,6 +118,12 @@ struct dhcp_packet {
  */
 #define DHCP_PAD 0
 
+/** Minimum normal DHCP option */
+#define DHCP_MIN_OPTION 1
+
+/** Vendor encapsulated options */
+#define DHCP_VENDOR_ENCAP 43
+
 /** Option overloading
  *
  * The value of this option is the bitwise-OR of zero or more
@@ -130,6 +136,17 @@ struct dhcp_packet {
 
 /** The "sname" field is overloaded to contain extra DHCP options */
 #define DHCP_OPTION_OVERLOAD_SNAME 2
+
+/** DHCP message type */
+#define DHCP_MESSAGE_TYPE 53
+#define DHCPDISCOVER 1
+#define DHCPOFFER 2
+#define DHCPREQUEST 3
+#define DHCPDECLINE 4
+#define DHCPACK 5
+#define DHCPNAK 6
+#define DHCPRELEASE 7
+#define DHCPINFORM 8
 
 /** TFTP server name
  *
@@ -177,6 +194,9 @@ struct dhcp_packet {
  * processing options.  It should never be present in a DHCP packet.
  */
 #define DHCP_EB_SIADDR DHCP_ENCAP_OPT ( DHCP_EB_ENCAP, 3 )
+
+/** Maximum normal DHCP option */
+#define DHCP_MAX_OPTION 254
 
 /** End of options
  *
@@ -260,6 +280,8 @@ find_dhcp_option ( struct dhcp_option_block *options, unsigned int tag );
 extern struct dhcp_option * find_global_dhcp_option ( unsigned int tag );
 extern void register_dhcp_options ( struct dhcp_option_block *options );
 extern void unregister_dhcp_options ( struct dhcp_option_block *options );
+extern void init_dhcp_options ( struct dhcp_option_block *options,
+				void *data, size_t max_len );
 extern struct dhcp_option_block * alloc_dhcp_options ( size_t max_len );
 extern void free_dhcp_options ( struct dhcp_option_block *options );
 extern struct dhcp_option *
