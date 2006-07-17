@@ -23,7 +23,9 @@ struct dhcp_packet {
 	uint8_t op;
 	/** Hardware address type
 	 *
-	 * This is an ARPHRD_XXX constant.
+	 * This is an ARPHRD_XXX constant.  Note that ARPHRD_XXX
+	 * constants are nominally 16 bits wide; this could be
+	 * considered to be a bug in the BOOTP/DHCP specification.
 	 */
 	uint8_t htype;
 	/** Hardware address length */
@@ -272,6 +274,14 @@ struct dhcp_option_block {
 	 * option.
 	 */
 	signed int priority;
+};
+
+/** A DHCP session */
+struct dhcp_session {
+	/** Network device being configured */
+	struct net_device *netdev;
+	/** Transaction ID, in network-endian order */
+	uint32_t xid;
 };
 
 extern unsigned long dhcp_num_option ( struct dhcp_option *option );

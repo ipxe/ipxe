@@ -29,11 +29,6 @@
  *
  */
 
-struct dhcp_session {
-	struct net_device *netdev;
-	uint32_t xid;
-};
-
 /** DHCP operation types
  *
  * This table maps from DHCP message types (i.e. values of the @c
@@ -186,7 +181,7 @@ size_t dhcp_assemble ( struct dhcp_session *dhcp, void *data,
 	dhcppkt->op = dhcp_op[dhcp_message_type];
 
 	/* Fill in NIC details */
-	dhcppkt->htype = dhcp->netdev->ll_protocol->ll_proto;
+	dhcppkt->htype = ntohs ( dhcp->netdev->ll_protocol->ll_proto );
 	dhcppkt->hlen = dhcp->netdev->ll_protocol->ll_addr_len;
 	memcpy ( dhcppkt->chaddr, dhcp->netdev->ll_addr, dhcppkt->hlen );
 
