@@ -109,9 +109,10 @@ int udp_senddata ( struct udp_connection *conn ) {
 }
 		
 /**
- * Transmit data via a UDP connection
+ * Transmit data via a UDP connection to a specified address
  *
  * @v conn      UDP connection
+ * @v peer	Destination address
  * @v data      Data to send
  * @v len       Length of data
  *
@@ -119,9 +120,9 @@ int udp_senddata ( struct udp_connection *conn ) {
  * network protocol through the sa_family field in the destination socket
  * address.
  */
-int udp_send ( struct udp_connection *conn, const void *data, size_t len ) {
+int udp_sendto ( struct udp_connection *conn, struct sockaddr *peer,
+		 const void *data, size_t len ) {
        	struct udp_header *udphdr;		/* UDP header */
-	struct sockaddr *sock = &conn->sin;	/* Destination sockaddr */
 	uint16_t *dest;
 
 	/* Copy payload */
@@ -134,8 +135,8 @@ int udp_send ( struct udp_connection *conn, const void *data, size_t len ) {
 	 * sending it over the network
 	 */
 	udphdr = pkb_push ( conn->tx_pkb, sizeof ( *udphdr ) );
-	if ( (dest = dest_port ( sock ) ) == NULL ) {
-		DBG ( "Network family %d not supported\n", sock->sa_family );
+	if ( (dest = dest_port ( peer ) ) == NULL ) {
+		DBG ( "Network family %d not supported\n", peer->sa_family );
 		return -EAFNOSUPPORT;
 	}
 	udphdr->dest_port = *dest;
@@ -146,25 +147,18 @@ int udp_send ( struct udp_connection *conn, const void *data, size_t len ) {
 	udp_dump ( udphdr );
 
 	/* Send it to the next layer for processing */
-	return trans_tx ( conn->tx_pkb, &udp_protocol, sock );
+	return trans_tx ( conn->tx_pkb, &udp_protocol, peer );
 }
 
 /**
- * Send data to a specified address
+ * Transmit data via a UDP connection to a specified address
  *
  * @v conn      UDP connection
- * @v peer      Destination address
  * @v data      Data to send
  * @v len       Length of data
  */
-int udp_sendto ( struct udp_connection *conn, struct sockaddr *peer,
-		 const void *data, size_t len ) {
-	struct sockaddr tempsock;
-	copy_sockaddr ( &conn->sin, &tempsock );
-	copy_sockaddr ( peer, &conn->sin );
-	int rc = udp_send ( conn, data, len );
-	copy_sockaddr ( &tempsock, &conn->sin );
-	return rc;
+int udp_send ( struct udp_connection *conn, const void *data, size_t len ) {
+	return udp_sendto ( conn, &conn->sin, data, len );
 }
 
 /**
