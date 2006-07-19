@@ -18,6 +18,14 @@
  * UDP protocol
  */
 
+/**
+ * List of registered UDP connections
+ */
+static LIST_HEAD ( udp_conns );
+
+/**
+ * Some utility functions
+ */
 static inline void copy_sockaddr ( struct sockaddr *source, struct sockaddr *dest ) {
 	memcpy ( dest, source, sizeof ( *dest ) );
 }
@@ -98,7 +106,27 @@ int udp_buf_alloc ( struct udp_connection *conn, size_t len ) {
 }
 
 /**
- * Send data via a UDP connection
+ * User request to send data via a UDP connection
+ *
+ * @v conn	UDP connection
+ *
+ * This function allocates buffer space and invokes the function's senddata()
+ * callback. The callback may use the buffer space
+ */
+int udp_senddata ( struct udp_connection *conn ) {
+	conn->tx_pkb = pkb_alloc ( UDP_MAX_TXPKB );
+	if ( conn->tx_pkb == NULL ) {
+		DBG ( "Error allocating packet buffer of length %d\n",
+							UDP_MAX_TXPKB );
+		return -ENOMEM;
+	}
+	conn->udp_op->senddata ( conn, conn->tx_pkb, pkb_len ( conn->tx_pkb ) );
+	return 0;
+}
+		
+
+/**
+ * Transmit data via a UDP connection
  *
  * @v conn      UDP connection
  * @v data      Data to send
@@ -124,7 +152,7 @@ int udp_send ( struct udp_connection *conn, const void *data, size_t len ) {
 
 		/* Reserve space for the headers and copy contents */
 		pkb_reserve ( conn->tx_pkb, UDP_MAX_HLEN );
-		memcpy ( pkb_put ( conn->tx_pkb, len ), data, len );
+		memmove ( pkb_put ( conn->tx_pkb, len ), data, len );
 	}
 
 	/*

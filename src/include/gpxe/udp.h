@@ -41,6 +41,23 @@ struct udp_connection;
  *
  */
 struct udp_operations {
+	
+	/**
+	 * Transmit data
+	 *
+	 * @v conn	UDP connection
+	 * @v buf	Temporary data buffer
+	 * @v len	Length of temporary data buffer
+	 *
+	 * The application may use the temporary data buffer to
+	 * construct the data to be sent.  Note that merely filling
+	 * the buffer will do nothing; the application must call
+	 * udp_send() in order to actually transmit the data.  Use of
+	 * the buffer is not compulsory; the application may call
+	 * udp_send() on any block of data.
+	 */
+	void ( * senddata ) ( struct tcp_connection *conn, void *buf,
+			      size_t len );
 	/**
 	 * New data received
 	 *
@@ -68,11 +85,6 @@ struct udp_connection {
 	/** Operations table for this connection */
 	struct udp_operations *udp_op;
 };
-
-/**
- * List of registered UDP connections
- */
-static LIST_HEAD ( udp_conns );
 
 /**
  * UDP protocol

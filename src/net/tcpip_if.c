@@ -107,30 +107,19 @@ int trans_tx ( struct pk_buff *pkb, struct tcpip_protocol *tcpip,
 /**
  * Calculate internet checksum
  *
- * @v data      Pointer to the data
- * @v len       Length of data to be checksummed
- * @ret chksum  16 bit internet checksum
- *
- * This function calculates the internet checksum (refer RFC1071) for "len"
- * bytes beginning at the location "data"
+ * @v b		Pointer to the data
+ * @v len	Length of data to be checksummed
+ * @ret result	16 bit internet checksum
  */
-uint16_t calc_chksum ( void *data, size_t len ) {
-	register long sum = 0;
-	uint16_t checksum;
-	unsigned short *temp;
-	while ( len > 1 ) {
-		temp = (unsigned short*) data++;
-		sum += *temp;
-		len -= 2;
-	}
-	if ( len > 0 ) {
-		sum += *(unsigned char *)data;
-	}
-	while ( sum >> 16 ) {
-		sum = ( sum & 0xffff ) + ( sum >> 16 );
-	}
-	checksum = ~sum;
-	return checksum;
+uint16_t calc_chksum(void *b, int len) {
+	uint16_t *buf = b, result;
+	uint16_t sum=0;
+	for ( sum = 0; len > 1; len -= 2 ) /* Sum all 16b words */
+		sum += *buf++;
+	if ( len == 1 )                  /* If any stray bytes, */
+		sum += *(unsigned char*)buf;          /* add to sum */
+	sum = (sum >> 16) + (sum & 0xffff);    /* Add the carry */
+	sum += (sum >> 16);                          /* (again) */
+	result = ~sum;             /* Take the one's complement */
+	return result;                      /* Return 16b value */
 }
-
-
