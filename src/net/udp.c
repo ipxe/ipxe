@@ -103,7 +103,7 @@ int udp_senddata ( struct udp_connection *conn ) {
 		return -ENOMEM;
 	}
 	pkb_reserve ( conn->tx_pkb, UDP_MAX_HLEN );
-	conn->udp_op->senddata ( conn, conn->tx_pkb, 
+	conn->udp_op->senddata ( conn, conn->tx_pkb->data, 
 				 pkb_available ( conn->tx_pkb ) );
 	return 0;
 }
