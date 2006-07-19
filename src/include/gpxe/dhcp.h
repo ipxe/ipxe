@@ -42,8 +42,29 @@
 /** Minimum normal DHCP option */
 #define DHCP_MIN_OPTION 1
 
+/** Subnet mask */
+#define DHCP_SUBNET_MASK 1
+
+/** Routers */
+#define DHCP_ROUTERS 3
+
+/** DNS servers */
+#define DHCP_DNS_SERVERS 4
+
+/** Host name */
+#define DHCP_HOST_NAME 12
+
+/** Domain name */
+#define DHCP_DOMAIN_NAME 15
+
+/** Root path */
+#define DHCP_ROOT_PATH 17
+
 /** Vendor encapsulated options */
 #define DHCP_VENDOR_ENCAP 43
+
+/** Requested IP address */
+#define DHCP_REQUESTED_ADDRESS 50
 
 /** Option overloading
  *
@@ -68,6 +89,18 @@
 #define DHCPNAK 6
 #define DHCPRELEASE 7
 #define DHCPINFORM 8
+
+/** DHCP server identifier */
+#define DHCP_SERVER_IDENTIFIER 54
+
+/** Parameter request list */
+#define DHCP_PARAMETER_REQUEST_LIST 55
+
+/** Maximum DHCP message size */
+#define DHCP_MAX_MESSAGE_SIZE 57
+
+/** Vendor class identifier */
+#define DHCP_VENDOR_CLASS_ID 60
 
 /** TFTP server name
  *
@@ -378,7 +411,6 @@ struct dhcp_session {
 	uint32_t xid;
 };
 
-extern const struct dhcp_option_block dhcp_request_options;
 extern unsigned long dhcp_num_option ( struct dhcp_option *option );
 extern struct dhcp_option *
 find_dhcp_option ( struct dhcp_option_block *options, unsigned int tag );
