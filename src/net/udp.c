@@ -88,24 +88,6 @@ void udp_init ( struct udp_connection *conn, struct udp_operations *udp_op ) {
 }
 
 /**
- * Allocate space to the UDP buffer
- *
- * @v conn      UDP connection
- * @v len       Length to allocate
- * @ret rc      Status
- *
- * Allocate "len" amount of space in the transmit buffer
- */
-int udp_buf_alloc ( struct udp_connection *conn, size_t len ) {
-	if ( conn->tx_pkb != NULL ) {
-		free_pkb ( conn->tx_pkb );
-		conn->tx_pkb = NULL;
-	}
-	conn->tx_pkb = alloc_pkb ( len < UDP_MIN_TXPKB ? UDP_MIN_TXPKB : len );
-	return !conn ? -ENOMEM : 0;
-}
-
-/**
  * User request to send data via a UDP connection
  *
  * @v conn	UDP connection
@@ -120,11 +102,12 @@ int udp_senddata ( struct udp_connection *conn ) {
 							UDP_MAX_TXPKB );
 		return -ENOMEM;
 	}
-	conn->udp_op->senddata ( conn, conn->tx_pkb, pkb_len ( conn->tx_pkb ) );
+	pkb_reserve ( conn->tx_pkb, UDP_MAX_HLEN );
+	conn->udp_op->senddata ( conn, conn->tx_pkb, 
+				 pkb_available ( conn->tx_pkb ) );
 	return 0;
 }
 		
-
 /**
  * Transmit data via a UDP connection
  *
@@ -140,20 +123,9 @@ int udp_send ( struct udp_connection *conn, const void *data, size_t len ) {
        	struct udp_header *udphdr;		/* UDP header */
 	struct sockaddr *sock = &conn->sin;	/* Destination sockaddr */
 	uint16_t *dest;
-	int rc;
 
-	/* Copy data into packet buffer, if necessary */
-	if ( data != conn->tx_pkb->data ) {
-		/* Allocate space for data and lower layer headers */
-		if ( ( rc = udp_buf_alloc ( conn, len + UDP_MAX_HLEN ) ) != 0 ) {
-			DBG ( "Error allocating buffer" );
-			return rc;
-		}
-
-		/* Reserve space for the headers and copy contents */
-		pkb_reserve ( conn->tx_pkb, UDP_MAX_HLEN );
-		memmove ( pkb_put ( conn->tx_pkb, len ), data, len );
-	}
+	/* Copy payload */
+	memmove ( pkb_put ( conn->tx_pkb, len ), data, len );
 
 	/*
 	 * Add the UDP header
