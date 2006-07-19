@@ -56,7 +56,7 @@ struct udp_operations {
 	 * the buffer is not compulsory; the application may call
 	 * udp_send() on any block of data.
 	 */
-	void ( * senddata ) ( struct tcp_connection *conn, void *buf,
+	void ( * senddata ) ( struct udp_connection *conn, void *buf,
 			      size_t len );
 	/**
 	 * New data received
