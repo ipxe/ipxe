@@ -11,88 +11,6 @@
 #include <gpxe/list.h>
 #include <gpxe/in.h>
 
-/**
- * A DHCP packet
- *
- */
-struct dhcp_packet {
-	/** Operation
-	 *
-	 * This must be either @c BOOTP_REQUEST or @c BOOTP_REPLY.
-	 */
-	uint8_t op;
-	/** Hardware address type
-	 *
-	 * This is an ARPHRD_XXX constant.  Note that ARPHRD_XXX
-	 * constants are nominally 16 bits wide; this could be
-	 * considered to be a bug in the BOOTP/DHCP specification.
-	 */
-	uint8_t htype;
-	/** Hardware address length */
-	uint8_t hlen;
-	/** Number of hops from server */
-	uint8_t hops;
-	/** Transaction ID */
-	uint32_t xid;
-	/** Seconds since start of acquisition */
-	uint16_t secs;
-	/** Flags */
-	uint16_t flags;
-	/** "Client" IP address
-	 *
-	 * This is filled in if the client already has an IP address
-	 * assigned and can respond to ARP requests.
-	 */
-	struct in_addr ciaddr;
-	/** "Your" IP address
-	 *
-	 * This is the IP address assigned by the server to the client.
-	 */
-	struct in_addr yiaddr;
-	/** "Server" IP address
-	 *
-	 * This is the IP address of the next server to be used in the
-	 * boot process.
-	 */
-	struct in_addr siaddr;
-	/** "Gateway" IP address
-	 *
-	 * This is the IP address of the DHCP relay agent, if any.
-	 */
-	struct in_addr giaddr;
-	/** Client hardware address */
-	uint8_t chaddr[16];
-	/** Server host name (null terminated)
-	 *
-	 * This field may be overridden and contain DHCP options
-	 */
-	uint8_t sname[64];
-	/** Boot file name (null terminated)
-	 *
-	 * This field may be overridden and contain DHCP options
-	 */
-	uint8_t file[128];
-	/** DHCP magic cookie
-	 *
-	 * Must have the value @c DHCP_MAGIC_COOKIE.
-	 */
-	uint32_t magic;
-	/** DHCP options
-	 *
-	 * Variable length; extends to the end of the packet.
-	 */
-	uint8_t options[0];
-};
-
-/** Opcode for a request from client to server */
-#define BOOTP_REQUEST 1
-
-/** Opcode for a reply from server to client */
-#define BOOTP_REPLY 2
-
-/** DHCP magic cookie */
-#define DHCP_MAGIC_COOKIE 0x63825363UL
-
 /** Construct a tag value for an encapsulated option
  *
  * This tag value can be passed to Etherboot functions when searching
@@ -274,6 +192,123 @@ struct dhcp_option_block {
 	 * option.
 	 */
 	signed int priority;
+};
+
+/**
+ * A DHCP header
+ *
+ */
+struct dhcphdr {
+	/** Operation
+	 *
+	 * This must be either @c BOOTP_REQUEST or @c BOOTP_REPLY.
+	 */
+	uint8_t op;
+	/** Hardware address type
+	 *
+	 * This is an ARPHRD_XXX constant.  Note that ARPHRD_XXX
+	 * constants are nominally 16 bits wide; this could be
+	 * considered to be a bug in the BOOTP/DHCP specification.
+	 */
+	uint8_t htype;
+	/** Hardware address length */
+	uint8_t hlen;
+	/** Number of hops from server */
+	uint8_t hops;
+	/** Transaction ID */
+	uint32_t xid;
+	/** Seconds since start of acquisition */
+	uint16_t secs;
+	/** Flags */
+	uint16_t flags;
+	/** "Client" IP address
+	 *
+	 * This is filled in if the client already has an IP address
+	 * assigned and can respond to ARP requests.
+	 */
+	struct in_addr ciaddr;
+	/** "Your" IP address
+	 *
+	 * This is the IP address assigned by the server to the client.
+	 */
+	struct in_addr yiaddr;
+	/** "Server" IP address
+	 *
+	 * This is the IP address of the next server to be used in the
+	 * boot process.
+	 */
+	struct in_addr siaddr;
+	/** "Gateway" IP address
+	 *
+	 * This is the IP address of the DHCP relay agent, if any.
+	 */
+	struct in_addr giaddr;
+	/** Client hardware address */
+	uint8_t chaddr[16];
+	/** Server host name (null terminated)
+	 *
+	 * This field may be overridden and contain DHCP options
+	 */
+	uint8_t sname[64];
+	/** Boot file name (null terminated)
+	 *
+	 * This field may be overridden and contain DHCP options
+	 */
+	uint8_t file[128];
+	/** DHCP magic cookie
+	 *
+	 * Must have the value @c DHCP_MAGIC_COOKIE.
+	 */
+	uint32_t magic;
+	/** DHCP options
+	 *
+	 * Variable length; extends to the end of the packet.
+	 */
+	uint8_t options[0];
+};
+
+/** Opcode for a request from client to server */
+#define BOOTP_REQUEST 1
+
+/** Opcode for a reply from server to client */
+#define BOOTP_REPLY 2
+
+/** DHCP magic cookie */
+#define DHCP_MAGIC_COOKIE 0x63825363UL
+
+/** DHCP packet option block fill order
+ *
+ * This is the order in which option blocks are filled when
+ * reassembling a DHCP packet.  We fill the smallest field ("sname")
+ * first, to maximise the chances of being able to fit large options
+ * within fields which are large enough to contain them.
+ */
+enum dhcp_packet_option_block_fill_order {
+	OPTS_SNAME = 0,
+	OPTS_FILE,
+	OPTS_MAIN,
+	NUM_OPT_BLOCKS
+};
+
+/**
+ * A DHCP packet
+ *
+ */
+struct dhcp_packet {
+	/** The DHCP packet contents */
+	struct dhcphdr *dhcphdr;
+	/** Maximum length of the DHCP packet buffer */
+	size_t max_len;
+	/** Used length of the DHCP packet buffer */
+	size_t len;
+	/** DHCP option blocks within a DHCP packet
+	 *
+	 * A DHCP packet contains three fields which can be used to
+	 * contain options: the actual "options" field plus the "file"
+	 * and "sname" fields (which can be overloaded to contain
+	 * options).
+	 */
+	struct dhcp_option_block options[NUM_OPT_BLOCKS];
 };
 
 /** A DHCP session */
