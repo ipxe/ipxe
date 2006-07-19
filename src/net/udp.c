@@ -48,12 +48,12 @@ static inline uint16_t * dest_port ( struct sockaddr *sock ) {
 void udp_dump ( struct udp_header *udphdr ) {
 
 	/* Print UDP header for debugging */
-	DBG ( "UDP header at %#x + %d\n", udphdr, sizeof ( *udphdr ) );
+	DBG ( "UDP header at %p + %#zx\n", udphdr, sizeof ( *udphdr ) );
 	DBG ( "\tSource Port = %d\n", ntohs ( udphdr->source_port ) );
 	DBG ( "\tDestination Port = %d\n", ntohs ( udphdr->dest_port ) );
 	DBG ( "\tLength = %d\n", ntohs ( udphdr->len ) );
 	DBG ( "\tChecksum = %x\n", ntohs ( udphdr->chksum ) );
-	DBG ( "\tChecksum located at %#x\n", &udphdr->chksum );
+	DBG ( "\tChecksum located at %p\n", &udphdr->chksum );
 }
 
 /**
