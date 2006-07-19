@@ -105,21 +105,56 @@ int trans_tx ( struct pk_buff *pkb, struct tcpip_protocol *tcpip,
 }
 
 /**
- * Calculate internet checksum
+ * Calculate continued TCP/IP checkum
  *
- * @v b		Pointer to the data
- * @v len	Length of data to be checksummed
- * @ret result	16 bit internet checksum
+ * @v partial		Checksum of already-summed data, in network byte order
+ * @v data		Data buffer
+ * @v len		Length of data buffer
+ * @ret cksum		Updated checksum, in network byte order
+ *
+ * Calculates a TCP/IP-style 16-bit checksum over the data block.  The
+ * checksum is returned in network byte order.
+ *
+ * This function may be used to add new data to an existing checksum.
+ * The function assumes that both the old data and the new data start
+ * on even byte offsets; if this is not the case then you will need to
+ * byte-swap either the input partial checksum, the output checksum,
+ * or both.  Deciding which to swap is left as an exercise for the
+ * interested reader.
  */
-uint16_t calc_chksum(void *b, int len) {
-	uint16_t *buf = b, result;
-	uint16_t sum=0;
-	for ( sum = 0; len > 1; len -= 2 ) /* Sum all 16b words */
-		sum += *buf++;
-	if ( len == 1 )                  /* If any stray bytes, */
-		sum += *(unsigned char*)buf;          /* add to sum */
-	sum = (sum >> 16) + (sum & 0xffff);    /* Add the carry */
-	sum += (sum >> 16);                          /* (again) */
-	result = ~sum;             /* Take the one's complement */
-	return result;                      /* Return 16b value */
+unsigned int tcpip_continue_chksum ( unsigned int partial, const void *data,
+				     size_t len ) {
+	unsigned int cksum = ( ( ~partial ) & 0xffff );
+	unsigned int value;
+	unsigned int i;
+	
+	for ( i = 0 ; i < len ; i++ ) {
+		value = * ( ( uint8_t * ) data + i );
+		if ( i & 1 ) {
+			/* Odd bytes: swap on little-endian systems */
+			value = be16_to_cpu ( value );
+		} else {
+			/* Even bytes: swap on big-endian systems */
+			value = le16_to_cpu ( value );
+		}
+		cksum += value;
+		if ( cksum > 0xffff )
+			cksum -= 0xffff;
+	}
+	
+	return ( ( ~cksum ) & 0xffff );
+}
+
+/**
+ * Calculate TCP/IP checkum
+ *
+ * @v data		Data buffer
+ * @v len		Length of data buffer
+ * @ret cksum		Checksum, in network byte order
+ *
+ * Calculates a TCP/IP-style 16-bit checksum over the data block.  The
+ * checksum is returned in network byte order.
+ */
+unsigned int tcpip_chksum ( const void *data, size_t len ) {
+	return tcpip_continue_chksum ( 0xffff, data, len );
 }

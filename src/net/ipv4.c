@@ -238,9 +238,8 @@ void ipv4_tx_csum ( struct pk_buff *pkb, struct tcpip_protocol *tcpip ) {
 
 	struct iphdr *iphdr = pkb->data;
 	struct ipv4_pseudo_header pshdr;
-	void *csum_offset = iphdr + sizeof ( *iphdr ) + tcpip->csum_offset;
-	uint16_t partial_csum = *( ( uint16_t* ) csum_offset );
-	uint16_t csum;
+	uint16_t *csum = ( ( ( void * ) iphdr ) + sizeof ( *iphdr )
+			   + tcpip->csum_offset );
 
 	/* Calculate pseudo header */
 	pshdr.src = iphdr->src;
@@ -250,8 +249,7 @@ void ipv4_tx_csum ( struct pk_buff *pkb, struct tcpip_protocol *tcpip ) {
 	pshdr.len = htons ( pkb_len ( pkb ) - sizeof ( *iphdr ) );
 
 	/* Update the checksum value */
-	csum = partial_csum + calc_chksum ( &pshdr, sizeof ( pshdr ) );
-	memcpy ( csum_offset, &csum, 2 );
+	*csum = tcpip_continue_chksum ( *csum, &pshdr, sizeof ( pshdr ) );
 }
 
 /**
@@ -407,7 +405,7 @@ int ipv4_tx ( struct pk_buff *pkb, struct tcpip_protocol *tcpip,
 
 	/* Calculate header checksum, in network byte order */
 	iphdr->chksum = 0;
-	iphdr->chksum = htons ( calc_chksum ( iphdr, sizeof ( *iphdr ) ) );
+	iphdr->chksum = tcpip_chksum ( iphdr, sizeof ( *iphdr ) );
 
 	/* Print IP4 header for debugging */
 	ipv4_dump ( iphdr );

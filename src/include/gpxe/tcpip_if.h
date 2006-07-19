@@ -83,7 +83,9 @@ extern void trans_rx ( struct pk_buff *pkb, uint8_t trans_proto,
 extern int trans_tx ( struct pk_buff *pkb, struct tcpip_protocol *tcpip, 
 		      struct sockaddr *dest );
 
-extern uint16_t calc_chksum ( void *b, int len );
+extern unsigned int tcpip_continue_chksum ( unsigned int partial,
+					    const void *data, size_t len );
+extern unsigned int tcpip_chksum ( const void *data, size_t len );
 
 extern struct tcpip_protocol * find_tcpip_protocol ( uint8_t trans_proto );
 extern struct tcpip_net_protocol * find_tcpip_net_protocol ( sa_family_t sa_family );

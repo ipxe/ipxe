@@ -142,11 +142,8 @@ int udp_sendto ( struct udp_connection *conn, struct sockaddr *peer,
 	udphdr->dest_port = *dest;
 	udphdr->source_port = conn->local_port;
 	udphdr->len = htons ( pkb_len ( conn->tx_pkb ) );
-	/**
-	 * Calculate the partial checksum. Note this is stored in host byte
-	 * order.
-	 */
-	udphdr->chksum = calc_chksum ( udphdr, sizeof ( *udphdr ) + len );
+	udphdr->chksum = 0;
+	udphdr->chksum = tcpip_chksum ( udphdr, sizeof ( *udphdr ) + len );
 
 	/**
 	 * Dump the contents of the UDP header
@@ -238,7 +235,7 @@ void udp_rx ( struct pk_buff *pkb, struct in_addr *src_net_addr __unused,
 	}
 
 	/* Verify the checksum */
-	chksum = calc_chksum ( pkb->data, pkb_len ( pkb ) );
+	chksum = tcpip_chksum ( pkb->data, pkb_len ( pkb ) );
 	if ( chksum != 0xffff ) {
 		DBG ( "Bad checksum %d\n", chksum );
 		return;
