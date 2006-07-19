@@ -433,4 +433,6 @@ extern unsigned long find_global_dhcp_num_option ( unsigned int tag );
 extern void delete_dhcp_option ( struct dhcp_option_block *options,
 				 unsigned int tag );
 
+extern struct async_operation * start_dhcp ( struct dhcp_session *dhcp );
+
 #endif /* _GPXE_DHCP_H */

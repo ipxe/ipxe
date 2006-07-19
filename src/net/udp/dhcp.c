@@ -58,6 +58,26 @@ static uint8_t dhcp_request_options_data[] = {
 	DHCP_END
 };
 
+/**
+ * Name a DHCP packet type
+ *
+ * @v msgtype		DHCP message type
+ * @ret string		DHCP mesasge type name
+ */
+static inline const char * dhcp_message_type_name ( unsigned int msgtype ) {
+	switch ( msgtype ) {
+	case DHCPDISCOVER:	return "DHCPDISCOVER";
+	case DHCPOFFER:		return "DHCPOFFER";
+	case DHCPREQUEST:	return "DHCPREQUEST";
+	case DHCPDECLINE:	return "DHCPDECLINE";
+	case DHCPACK:		return "DHCPACK";
+	case DHCPNAK:		return "DHCPNAK";
+	case DHCPRELEASE:	return "DHCPRELEASE";
+	case DHCPINFORM:	return "DHCPINFORM";
+	default:		return "DHCP<invalid>";
+	}
+}
+
 /** Options common to all DHCP requests */
 static struct dhcp_option_block dhcp_request_options = {
 	.data = dhcp_request_options_data,
@@ -419,6 +439,8 @@ static void dhcp_senddata ( struct udp_connection *conn,
 	struct dhcp_packet dhcppkt;
 	int rc;
 	
+	DBG ( "Transmitting %s\n", dhcp_message_type_name ( dhcp->state ) );
+
 	assert ( ( dhcp->state == DHCPDISCOVER ) ||
 		 ( dhcp->state == DHCPREQUEST ) );
 
@@ -455,7 +477,7 @@ static void dhcp_newdata ( struct udp_connection *conn,
 
 	/* Check for matching transaction ID */
 	if ( dhcphdr->xid != dhcp->xid ) {
-		DBG ( "DHCP wrong transaction ID (wanted %08x, got %08x)\n",
+		DBG ( "DHCP wrong transaction ID (wanted %08lx, got %08lx)\n",
 		      ntohl ( dhcphdr->xid ), ntohl ( dhcp->xid ) );
 		return;
 	};
@@ -466,6 +488,10 @@ static void dhcp_newdata ( struct udp_connection *conn,
 		DBG ( "Could not parse DHCP packet\n" );
 		return;
 	}
+
+	DBG ( "Received %s\n",
+	      dhcp_message_type_name ( find_dhcp_num_option ( options,
+						       DHCP_MESSAGE_TYPE ) ) );
 
 	/* Proof of concept: just dump out the parsed options */
 	hex_dump ( options->data, options->len );
