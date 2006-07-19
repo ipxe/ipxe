@@ -540,7 +540,7 @@ struct async_operation * start_dhcp ( struct dhcp_session *dhcp ) {
 			       - sizeof ( dhcp->xid ) ), sizeof ( dhcp->xid ));
 
 	/* Bind to local port */
-	if ( ( rc = udp_open ( &dhcp->udp, BOOTPC_PORT ) ) != 0 ) {
+	if ( ( rc = udp_open ( &dhcp->udp, htons ( BOOTPC_PORT ) ) ) != 0 ) {
 		async_done ( &dhcp->aop, rc );
 		goto out;
 	}
