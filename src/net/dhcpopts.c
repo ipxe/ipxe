@@ -118,19 +118,25 @@ static inline unsigned int dhcp_any_option_len ( struct dhcp_option *option ) {
  *
  * @v options		DHCP options block
  * @v tag		DHCP option tag to search for
+ * @ret encapsulator	Encapsulating DHCP option
  * @ret option		DHCP option, or NULL if not found
  *
  * Searches for the DHCP option matching the specified tag within the
- * block of data.  Encapsulated options may be searched for by using
- * DHCP_ENCAP_OPT() to construct the tag value.
+ * DHCP option block.  Encapsulated options may be searched for by
+ * using DHCP_ENCAP_OPT() to construct the tag value.
+ *
+ * If the option is encapsulated, and @c encapsulator is non-NULL, it
+ * will be filled in with a pointer to the encapsulating option.
  *
  * This routine is designed to be paranoid.  It does not assume that
  * the option data is well-formatted, and so must guard against flaws
  * such as options missing a @c DHCP_END terminator, or options whose
  * length would take them beyond the end of the data block.
  */
-struct dhcp_option * find_dhcp_option ( struct dhcp_option_block *options,
-					unsigned int tag ) {
+static struct dhcp_option *
+find_dhcp_option_with_encap ( struct dhcp_option_block *options,
+			      unsigned int tag,
+			      struct dhcp_option **encapsulator ) {
 	unsigned int original_tag __attribute__ (( unused )) = tag;
 	struct dhcp_option *option = options->data;
 	ssize_t remaining = options->len;
@@ -157,6 +163,8 @@ struct dhcp_option * find_dhcp_option ( struct dhcp_option_block *options,
 		/* Check for start of matching encapsulation block */
 		if ( DHCP_IS_ENCAP_OPT ( tag ) &&
 		     ( option->tag == DHCP_ENCAPSULATOR ( tag ) ) ) {
+			if ( encapsulator )
+				*encapsulator = option;
 			/* Continue search within encapsulated option block */
 			tag = DHCP_ENCAPSULATED ( tag );
 			remaining = option->len;
@@ -169,30 +177,36 @@ struct dhcp_option * find_dhcp_option ( struct dhcp_option_block *options,
 }
 
 /**
- * Find DHCP option within all registered DHCP options blocks
+ * Find DHCP option within DHCP options block
  *
+ * @v options		DHCP options block, or NULL
  * @v tag		DHCP option tag to search for
  * @ret option		DHCP option, or NULL if not found
  *
- * Searches within all registered DHCP option blocks for the specified
- * tag.  Encapsulated options may be searched for by using
- * DHCP_ENCAP_OPT() to construct the tag value.
+ * Searches for the DHCP option matching the specified tag within the
+ * DHCP option block.  Encapsulated options may be searched for by
+ * using DHCP_ENCAP_OPT() to construct the tag value.
  *
- * Where multiple option blocks contain the same DHCP option, the
- * option from the highest-priority block will be returned.  (Priority
- * of an options block is determined by the value of the @c
- * DHCP_EB_PRIORITY option within the block, if present; the default
- * priority is zero).
+ * If @c options is NULL, all registered option blocks will be
+ * searched.  Where multiple option blocks contain the same DHCP
+ * option, the option from the highest-priority block will be
+ * returned.  (Priority of an options block is determined by the value
+ * of the @c DHCP_EB_PRIORITY option within the block, if present; the
+ * default priority is zero).
  */
-struct dhcp_option * find_global_dhcp_option ( unsigned int tag ) {
-	struct dhcp_option_block *options;
+struct dhcp_option * find_dhcp_option ( struct dhcp_option_block *options,
+					unsigned int tag ) {
 	struct dhcp_option *option;
 
-	list_for_each_entry ( options, &option_blocks, list ) {
-		if ( ( option = find_dhcp_option ( options, tag ) ) )
-			return option;
+	if ( options ) {
+		return find_dhcp_option_with_encap ( options, tag, NULL );
+	} else {
+		list_for_each_entry ( options, &option_blocks, list ) {
+			if ( ( option = find_dhcp_option ( options, tag ) ) )
+				return option;
+		}
+		return NULL;
 	}
-	return NULL;
 }
 
 /**
@@ -348,7 +362,7 @@ struct dhcp_option * set_dhcp_option ( struct dhcp_option_block *options,
 	size_t new_len = ( len ? ( len + DHCP_OPTION_HEADER_LEN ) : 0 );
 
 	/* Find old instance of this option, if any */
-	option = find_dhcp_option ( options, tag );
+	option = find_dhcp_option_with_encap ( options, tag, &encapsulator );
 	if ( option ) {
 		old_len = dhcp_option_len ( option );
 		DBG ( "Resizing DHCP option %s from length %d to %d\n",
@@ -361,7 +375,6 @@ struct dhcp_option * set_dhcp_option ( struct dhcp_option_block *options,
 	
 	/* Ensure that encapsulator exists, if required */
 	if ( DHCP_IS_ENCAP_OPT ( tag ) ) {
-		encapsulator = find_dhcp_option ( options, encap_tag );
 		if ( ! encapsulator )
 			encapsulator = set_dhcp_option ( options, encap_tag,
 							 empty_encapsulator,
@@ -392,4 +405,67 @@ struct dhcp_option * set_dhcp_option ( struct dhcp_option_block *options,
 		set_dhcp_option ( options, encap_tag, NULL, 0 );
 
 	return option;
+}
+
+/**
+ * Find DHCP option within all registered DHCP options blocks
+ *
+ * @v tag		DHCP option tag to search for
+ * @ret option		DHCP option, or NULL if not found
+ *
+ * This function exists merely as a notational shorthand for
+ * find_dhcp_option() with @c options set to NULL.
+ */
+struct dhcp_option * find_global_dhcp_option ( unsigned int tag ) {
+	return find_dhcp_option ( NULL, tag );
+}
+
+/**
+ * Find DHCP numerical option, and return its value
+ *
+ * @v options		DHCP options block
+ * @v tag		DHCP option tag to search for
+ * @ret value		Numerical value of the option, or 0 if not found
+ *
+ * This function exists merely as a notational shorthand for a call to
+ * find_dhcp_option() followed by a call to dhcp_num_option().  It is
+ * not possible to distinguish between the cases "option not found"
+ * and "option has a value of zero" using this function; if this
+ * matters to you then issue the two constituent calls directly and
+ * check that find_dhcp_option() returns a non-NULL value.
+ */
+unsigned long find_dhcp_num_option ( struct dhcp_option_block *options,
+				     unsigned int tag ) {
+	return dhcp_num_option ( find_dhcp_option ( options, tag ) );
+}
+
+/**
+ * Find DHCP numerical option, and return its value
+ *
+ * @v tag		DHCP option tag to search for
+ * @ret value		Numerical value of the option, or 0 if not found
+ *
+ * This function exists merely as a notational shorthand for a call to
+ * find_global_dhcp_option() followed by a call to dhcp_num_option().
+ * It is not possible to distinguish between the cases "option not
+ * found" and "option has a value of zero" using this function; if
+ * this matters to you then issue the two constituent calls directly
+ * and check that find_global_dhcp_option() returns a non-NULL value.
+ */
+unsigned long find_global_dhcp_num_option ( unsigned int tag ) {
+	return dhcp_num_option ( find_global_dhcp_option ( tag ) );
+}
+
+/**
+ * Delete DHCP option
+ *
+ * @v options		DHCP options block
+ * @v tag		DHCP option tag
+ *
+ * This function exists merely as a notational shorthand for a call to
+ * set_dhcp_option() with @c len set to zero.
+ */
+void delete_dhcp_option ( struct dhcp_option_block *options,
+			  unsigned int tag ) {
+	set_dhcp_option ( options, tag, NULL, 0 );
 }

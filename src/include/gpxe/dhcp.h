@@ -287,7 +287,6 @@ struct dhcp_session {
 extern unsigned long dhcp_num_option ( struct dhcp_option *option );
 extern struct dhcp_option *
 find_dhcp_option ( struct dhcp_option_block *options, unsigned int tag );
-extern struct dhcp_option * find_global_dhcp_option ( unsigned int tag );
 extern void register_dhcp_options ( struct dhcp_option_block *options );
 extern void unregister_dhcp_options ( struct dhcp_option_block *options );
 extern void init_dhcp_options ( struct dhcp_option_block *options,
@@ -297,53 +296,11 @@ extern void free_dhcp_options ( struct dhcp_option_block *options );
 extern struct dhcp_option *
 set_dhcp_option ( struct dhcp_option_block *options, unsigned int tag,
 		  const void *data, size_t len );
-
-/**
- * Find DHCP numerical option, and return its value
- *
- * @v options		DHCP options block
- * @v tag		DHCP option tag to search for
- * @ret value		Numerical value of the option, or 0 if not found
- *
- * This function exists merely as a notational shorthand for a call to
- * find_dhcp_option() followed by a call to dhcp_num_option().  It is
- * not possible to distinguish between the cases "option not found"
- * and "option has a value of zero" using this function; if this
- * matters to you then issue the two constituent calls directly and
- * check that find_dhcp_option() returns a non-NULL value.
- */
-static inline unsigned long
-find_dhcp_num_option ( struct dhcp_option_block *options, unsigned int tag ) {
-	return dhcp_num_option ( find_dhcp_option ( options, tag ) );
-}
-
-/**
- * Find DHCP numerical option, and return its value
- *
- * @v tag		DHCP option tag to search for
- * @ret value		Numerical value of the option, or 0 if not found
- *
- * This function exists merely as a notational shorthand for a call to
- * find_global_dhcp_option() followed by a call to dhcp_num_option().
- * It is not possible to distinguish between the cases "option not
- * found" and "option has a value of zero" using this function; if
- * this matters to you then issue the two constituent calls directly
- * and check that find_global_dhcp_option() returns a non-NULL value.
- */
-static inline unsigned long
-find_global_dhcp_num_option ( unsigned int tag ) {
-	return dhcp_num_option ( find_global_dhcp_option ( tag ) );
-}
-
-/**
- * Delete DHCP option
- *
- * @v options		DHCP options block
- * @v tag		DHCP option tag
- */
-static inline void delete_dhcp_option ( struct dhcp_option_block *options,
-					unsigned int tag ) {
-	set_dhcp_option ( options, tag, NULL, 0 );
-}
+extern struct dhcp_option * find_global_dhcp_option ( unsigned int tag );
+extern unsigned long find_dhcp_num_option ( struct dhcp_option_block *options,
+					    unsigned int tag );
+extern unsigned long find_global_dhcp_num_option ( unsigned int tag );
+extern void delete_dhcp_option ( struct dhcp_option_block *options,
+				 unsigned int tag );
 
 #endif /* _GPXE_DHCP_H */
