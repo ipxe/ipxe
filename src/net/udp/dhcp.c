@@ -22,6 +22,7 @@
 #include <byteswap.h>
 #include <gpxe/if_ether.h>
 #include <gpxe/netdevice.h>
+#include <gpxe/udp.h>
 #include <gpxe/dhcp.h>
 
 /** @file
@@ -301,7 +302,7 @@ static void merge_dhcp_field ( struct dhcp_option_block *options,
 /**
  * Parse DHCP packet and construct DHCP options block
  *
- * @v data		DHCP packet
+ * @v dhcphdr		DHCP packet
  * @v len		Length of DHCP packet
  * @ret options		DHCP options block, or NULL
  *
@@ -320,8 +321,8 @@ static void merge_dhcp_field ( struct dhcp_option_block *options,
  * options block; it is the responsibility of the caller to eventually
  * free this memory.
  */
-struct dhcp_option_block * dhcp_parse ( const void *data, size_t len ) {
-	const struct dhcphdr *dhcphdr = data;
+static struct dhcp_option_block * dhcp_parse ( struct dhcphdr *dhcphdr,
+					       size_t len ) {
 	struct dhcp_option_block *options;
 	size_t options_len;
 	unsigned int overloading;
@@ -435,7 +436,8 @@ static void dhcp_senddata ( struct udp_connection *conn,
 		return;
 	}
 
-	
+	/* Transmit the packet */
+	udp_send ( conn, dhcppkt.dhcphdr, dhcppkt.len );
 }
 
 /**
@@ -448,6 +450,26 @@ static void dhcp_senddata ( struct udp_connection *conn,
 static void dhcp_newdata ( struct udp_connection *conn,
 			   void *data, size_t len ) {
 	struct dhcp_session *dhcp = udp_to_dhcp ( conn );
+	struct dhcphdr *dhcphdr = data;
+	struct dhcp_option_block *options;
+
+	/* Check for matching transaction ID */
+	if ( dhcphdr->xid != dhcp->xid ) {
+		DBG ( "DHCP wrong transaction ID (wanted %08x, got %08x)\n",
+		      ntohl ( dhcphdr->xid ), ntohl ( dhcp->xid ) );
+		return;
+	};
+
+	/* Parse packet and create options structure */
+	options = dhcp_parse ( dhcphdr, len );
+	if ( ! options ) {
+		DBG ( "Could not parse DHCP packet\n" );
+		return;
+	}
+
+	/* Proof of concept: just dump out the parsed options */
+	hex_dump ( options->data, options->len );
+	free_dhcp_options ( options );
 }
 
 /** DHCP UDP operations */
@@ -455,3 +477,23 @@ static struct udp_operations dhcp_udp_operations = {
 	.senddata	= dhcp_senddata,
 	.newdata	= dhcp_newdata,
 };
+
+/**
+ * Initiate DHCP on a network interface
+ *
+ * @v dhcp		DHCP session
+ * @ret aop		Asynchronous operation
+ */
+struct async_operation * start_dhcp ( struct dhcp_session *dhcp ) {
+	dhcp->udp.udp_op = &dhcp_udp_operations;
+	dhcp->state = DHCPDISCOVER;
+	/* Use least significant 32 bits of link-layer address as XID */
+	memcpy ( &dhcp->xid, ( dhcp->netdev->ll_addr
+			       + dhcp->netdev->ll_protocol->ll_addr_len
+			       - sizeof ( dhcp->xid ) ), sizeof ( dhcp->xid ));
+
+	/* Proof of concept: just send a single DHCPDISCOVER */
+	udp_senddata ( &dhcp->udp );
+
+	return &dhcp->aop;
+}

@@ -11,6 +11,7 @@
 #include <gpxe/list.h>
 #include <gpxe/in.h>
 #include <gpxe/udp.h>
+#include <gpxe/async.h>
 
 /** Construct a tag value for an encapsulated option
  *
@@ -404,6 +405,8 @@ struct dhcp_session {
 	 * (e.g. @c DHCPDISCOVER).
 	 */
 	int state;
+	/** Asynchronous operation for this DHCP session */
+	struct async_operation aop;
 	
 	/** Network device being configured */
 	struct net_device *netdev;
