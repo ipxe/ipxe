@@ -136,6 +136,16 @@ static inline size_t pkb_len ( struct pk_buff *pkb ) {
 	return ( pkb->tail - pkb->data );
 }
 
+/**
+ * Calculate available space in a packet buffer
+ *
+ * @v pkb	Packet buffer
+ * @ret len	Length of data available in buffer
+ */
+static inline size_t pkb_available ( struct pk_buff *pkb ) {
+	return ( pkb->end - pkb->tail );
+}
+
 extern struct pk_buff * alloc_pkb ( size_t len );
 extern void free_pkb ( struct pk_buff *pkb );
 
