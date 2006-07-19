@@ -114,7 +114,7 @@ int udp_buf_alloc ( struct udp_connection *conn, size_t len ) {
  * callback. The callback may use the buffer space
  */
 int udp_senddata ( struct udp_connection *conn ) {
-	conn->tx_pkb = pkb_alloc ( UDP_MAX_TXPKB );
+	conn->tx_pkb = alloc_pkb ( UDP_MAX_TXPKB );
 	if ( conn->tx_pkb == NULL ) {
 		DBG ( "Error allocating packet buffer of length %d\n",
 							UDP_MAX_TXPKB );
