@@ -20,6 +20,7 @@
 #include <errno.h>
 #include <assert.h>
 #include <byteswap.h>
+#include <gpxe/if_ether.h>
 #include <gpxe/netdevice.h>
 #include <gpxe/dhcp.h>
 
@@ -44,6 +45,23 @@ static const uint8_t dhcp_op[] = {
 	[DHCPNAK]	= BOOTP_REPLY,
 	[DHCPRELEASE]	= BOOTP_REQUEST,
 	[DHCPINFORM]	= BOOTP_REQUEST,
+};
+
+/** Raw option data for options common to all DHCP requests */
+static uint8_t dhcp_request_options_data[] = {
+	DHCP_MAX_MESSAGE_SIZE, DHCP_WORD ( ETH_MAX_MTU ),
+	DHCP_VENDOR_CLASS_ID,
+	DHCP_STRING (  'E', 't', 'h', 'e', 'r', 'b', 'o', 'o', 't' ),
+	DHCP_PARAMETER_REQUEST_LIST,
+	DHCP_OPTION ( DHCP_SUBNET_MASK, DHCP_ROUTERS, DHCP_HOST_NAME ),
+	DHCP_END
+};
+
+/** Options common to all DHCP requests */
+static struct dhcp_option_block dhcp_request_options = {
+	.data = dhcp_request_options_data,
+	.max_len = sizeof ( dhcp_request_options_data ),
+	.len = sizeof ( dhcp_request_options_data ),
 };
 
 /**
@@ -186,9 +204,9 @@ static int set_dhcp_packet_options ( struct dhcp_packet *dhcppkt,
  * dhcp_packet structure that can be passed to
  * set_dhcp_packet_option() or set_dhcp_packet_options().
  */
-int create_dhcp_packet ( struct dhcp_session *dhcp, uint8_t msgtype,
-			 void *data, size_t max_len,
-			 struct dhcp_packet *dhcppkt ) {
+static int create_dhcp_packet ( struct dhcp_session *dhcp, uint8_t msgtype,
+				void *data, size_t max_len,
+				struct dhcp_packet *dhcppkt ) {
 	struct dhcphdr *dhcphdr = data;
 	static const uint8_t overloading = ( DHCP_OPTION_OVERLOAD_FILE |
 					     DHCP_OPTION_OVERLOAD_SNAME );
@@ -375,3 +393,65 @@ struct dhcp_option_block * dhcp_parse ( const void *data, size_t len ) {
 
 	return options;
 }
+
+/****************************************************************************
+ *
+ * DHCP to UDP interface
+ *
+ */
+
+static inline struct dhcp_session *
+udp_to_dhcp ( struct udp_connection *conn ) {
+	return container_of ( conn, struct dhcp_session, udp );
+}
+
+/**
+ * Transmit DHCP request
+ *
+ * @v conn		UDP connection
+ * @v buf		Temporary data buffer
+ * @v len		Length of temporary data buffer
+ */
+static void dhcp_senddata ( struct udp_connection *conn,
+			    void *buf, size_t len ) {
+	struct dhcp_session *dhcp = udp_to_dhcp ( conn );
+	struct dhcp_packet dhcppkt;
+	int rc;
+	
+	assert ( ( dhcp->state == DHCPDISCOVER ) ||
+		 ( dhcp->state == DHCPREQUEST ) );
+
+	/* Create DHCP packet in temporary buffer */
+	if ( ( rc = create_dhcp_packet ( dhcp, dhcp->state, buf, len,
+					 &dhcppkt ) ) != 0 ) {
+		DBG ( "Could not create DHCP packet\n" );
+		return;
+	}
+
+	/* Copy in options common to all requests */
+	if ( ( rc = set_dhcp_packet_options ( &dhcppkt,
+					      &dhcp_request_options ) ) != 0 ){
+		DBG ( "Could not set common DHCP options\n" );
+		return;
+	}
+
+	
+}
+
+/**
+ * Receive new data
+ *
+ * @v udp		UDP connection
+ * @v data		Received data
+ * @v len		Length of received data
+ */
+static void dhcp_newdata ( struct udp_connection *conn,
+			   void *data, size_t len ) {
+	struct dhcp_session *dhcp = udp_to_dhcp ( conn );
+}
+
+/** DHCP UDP operations */
+static struct udp_operations dhcp_udp_operations = {
+	.senddata	= dhcp_senddata,
+	.newdata	= dhcp_newdata,
+};
