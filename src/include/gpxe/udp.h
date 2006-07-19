@@ -101,6 +101,7 @@ extern int udp_open ( struct udp_connection *conn, uint16_t local_port );
 extern void udp_connect ( struct udp_connection *conn, struct sockaddr *peer );
 extern void udp_close ( struct udp_connection *conn );
 
+extern int udp_senddata ( struct udp_connection *conn );
 extern int udp_send ( struct udp_connection *conn, const void *data, size_t len );
 extern int udp_sendto ( struct udp_connection *conn, struct sockaddr *peer, const void *data, size_t len );
 
