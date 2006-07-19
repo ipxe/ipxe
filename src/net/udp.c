@@ -65,7 +65,7 @@ void udp_dump ( struct udp_header *udphdr ) {
  * This function stores the socket address within the connection
  */
 void udp_connect ( struct udp_connection *conn, struct sockaddr *peer ) {
-	copy_sockaddr ( peer, &conn->sin );
+	copy_sockaddr ( peer, &conn->sa );
 
 	/* Not sure if this should add the connection to udp_conns; If it does,
 	 * uncomment the following code
@@ -142,8 +142,15 @@ int udp_sendto ( struct udp_connection *conn, struct sockaddr *peer,
 	udphdr->dest_port = *dest;
 	udphdr->source_port = conn->local_port;
 	udphdr->len = htons ( pkb_len ( conn->tx_pkb ) );
-	udphdr->chksum = htons ( calc_chksum ( udphdr, sizeof ( *udphdr ) ) );
+	/**
+	 * Calculate the partial checksum. Note this is stored in host byte
+	 * order.
+	 */
+	udphdr->chksum = calc_chksum ( udphdr, sizeof ( *udphdr ) + len );
 
+	/**
+	 * Dump the contents of the UDP header
+	 */
 	udp_dump ( udphdr );
 
 	/* Send it to the next layer for processing */
@@ -158,7 +165,7 @@ int udp_sendto ( struct udp_connection *conn, struct sockaddr *peer,
  * @v len       Length of data
  */
 int udp_send ( struct udp_connection *conn, const void *data, size_t len ) {
-	return udp_sendto ( conn, &conn->sin, data, len );
+	return udp_sendto ( conn, &conn->sa, data, len );
 }
 
 /**

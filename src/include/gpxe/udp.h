@@ -75,7 +75,7 @@ struct udp_operations {
  */
 struct udp_connection {
        /** Address of the remote end of the connection */
-	struct sockaddr sin;
+	struct sockaddr sa;
 	/** Local port on which the connection receives packets */
 	port_t local_port;
 	/** Transmit buffer */
