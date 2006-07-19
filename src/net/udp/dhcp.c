@@ -233,6 +233,10 @@ static int create_dhcp_packet ( struct dhcp_session *dhcp, uint8_t msgtype,
 					     DHCP_OPTION_OVERLOAD_SNAME );
 	int rc;
 
+	/* Sanity check */
+	if ( max_len < sizeof ( *dhcphdr ) )
+		return -ENOSPC;
+
 	/* Initialise DHCP packet content */
 	memset ( dhcphdr, 0, max_len );
 	dhcphdr->xid = dhcp->xid;
@@ -428,6 +432,15 @@ udp_to_dhcp ( struct udp_connection *conn ) {
 	return container_of ( conn, struct dhcp_session, udp );
 }
 
+/** Address for transmitting DHCP requests */
+static struct sockaddr sa_dhcp_server = {
+	.sa_family = AF_INET,
+	.sin = {
+		.sin_addr.s_addr = INADDR_BROADCAST,
+		.sin_port = htons ( BOOTPS_PORT ),
+	},
+};
+
 /**
  * Transmit DHCP request
  *
@@ -461,7 +474,11 @@ static void dhcp_senddata ( struct udp_connection *conn,
 	}
 
 	/* Transmit the packet */
-	udp_send ( conn, dhcppkt.dhcphdr, dhcppkt.len );
+	if ( ( rc = udp_sendto ( conn, &sa_dhcp_server,
+				 dhcppkt.dhcphdr, dhcppkt.len ) ) != 0 ) {
+		DBG ( "Could not transmit UDP packet\n" );
+		return;
+	}
 }
 
 /**
@@ -513,6 +530,8 @@ static struct udp_operations dhcp_udp_operations = {
  * @ret aop		Asynchronous operation
  */
 struct async_operation * start_dhcp ( struct dhcp_session *dhcp ) {
+	int rc;
+
 	dhcp->udp.udp_op = &dhcp_udp_operations;
 	dhcp->state = DHCPDISCOVER;
 	/* Use least significant 32 bits of link-layer address as XID */
@@ -520,8 +539,15 @@ struct async_operation * start_dhcp ( struct dhcp_session *dhcp ) {
 			       + dhcp->netdev->ll_protocol->ll_addr_len
 			       - sizeof ( dhcp->xid ) ), sizeof ( dhcp->xid ));
 
+	/* Bind to local port */
+	if ( ( rc = udp_open ( &dhcp->udp, BOOTPC_PORT ) ) != 0 ) {
+		async_done ( &dhcp->aop, rc );
+		goto out;
+	}
+
 	/* Proof of concept: just send a single DHCPDISCOVER */
 	udp_senddata ( &dhcp->udp );
 
+ out:
 	return &dhcp->aop;
 }

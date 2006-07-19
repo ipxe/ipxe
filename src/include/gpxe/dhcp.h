@@ -13,6 +13,12 @@
 #include <gpxe/udp.h>
 #include <gpxe/async.h>
 
+/** BOOTP/DHCP server port */
+#define BOOTPS_PORT 67
+
+/** BOOTP/DHCP client port */
+#define BOOTPC_PORT 68
+
 /** Construct a tag value for an encapsulated option
  *
  * This tag value can be passed to Etherboot functions when searching
@@ -345,9 +351,11 @@ struct dhcphdr {
 	uint32_t magic;
 	/** DHCP options
 	 *
-	 * Variable length; extends to the end of the packet.
+	 * Variable length; extends to the end of the packet.  Minimum
+	 * length (for the sake of sanity) is 1, to allow for a single
+	 * @c DHCP_END tag.
 	 */
-	uint8_t options[0];
+	uint8_t options[1];
 };
 
 /** Opcode for a request from client to server */
