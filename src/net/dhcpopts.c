@@ -153,8 +153,9 @@ find_dhcp_option_with_encap ( struct dhcp_option_block *options,
 			break;
 		/* Check for matching tag */
 		if ( option->tag == tag ) {
-			DBG ( "Found DHCP option %s (length %d)\n",
-			      dhcp_tag_name ( original_tag ), option->len );
+			DBG ( "Found DHCP option %s (length %d) in block %p\n",
+			      dhcp_tag_name ( original_tag ), option->len,
+			      options );
 			return option;
 		}
 		/* Check for explicit end marker */
@@ -221,8 +222,8 @@ void register_dhcp_options ( struct dhcp_option_block *options ) {
 
 	/* Determine priority of new block */
 	options->priority = find_dhcp_num_option ( options, DHCP_EB_PRIORITY );
-	DBG ( "Registering DHCP options block with priority %d\n",
-	      options->priority );
+	DBG ( "Registering DHCP options block %p with priority %d\n",
+	      options, options->priority );
 
 	/* Insert after any existing blocks which have a higher priority */
 	list_for_each_entry ( existing, &option_blocks, list ) {
@@ -260,6 +261,9 @@ void init_dhcp_options ( struct dhcp_option_block *options,
 	option = options->data;
 	option->tag = DHCP_END;
 	options->len = 1;
+
+	DBG ( "DHCP options block %p initialised (data %p max_len %#zx)\n",
+	      options, options->data, options->max_len );
 }
 
 /**
@@ -365,12 +369,12 @@ struct dhcp_option * set_dhcp_option ( struct dhcp_option_block *options,
 	option = find_dhcp_option_with_encap ( options, tag, &encapsulator );
 	if ( option ) {
 		old_len = dhcp_option_len ( option );
-		DBG ( "Resizing DHCP option %s from length %d to %d\n",
-		      dhcp_tag_name ( tag ), option->len, len );
+		DBG ( "Resizing DHCP option %s from length %d to %d in block "
+		      "%p\n", dhcp_tag_name (tag), option->len, len, options );
 	} else {
 		old_len = 0;
-		DBG ( "Creating DHCP option %s (length %d)\n",
-		      dhcp_tag_name ( tag ), new_len );
+		DBG ( "Creating DHCP option %s (length %d) in block %p\n",
+		      dhcp_tag_name ( tag ), len, options );
 	}
 	
 	/* Ensure that encapsulator exists, if required */
