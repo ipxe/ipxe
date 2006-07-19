@@ -231,6 +231,16 @@ static int create_dhcp_packet ( struct dhcp_session *dhcp, uint8_t msgtype,
 	struct dhcphdr *dhcphdr = data;
 	static const uint8_t overloading = ( DHCP_OPTION_OVERLOAD_FILE |
 					     DHCP_OPTION_OVERLOAD_SNAME );
+	int rc;
+
+	/* Initialise DHCP packet content */
+	memset ( dhcphdr, 0, max_len );
+	dhcphdr->xid = dhcp->xid;
+	dhcphdr->magic = htonl ( DHCP_MAGIC_COOKIE );
+	dhcphdr->htype = ntohs ( dhcp->netdev->ll_protocol->ll_proto );
+	dhcphdr->hlen = dhcp->netdev->ll_protocol->ll_addr_len;
+	memcpy ( dhcphdr->chaddr, dhcp->netdev->ll_addr, dhcphdr->hlen );
+	dhcphdr->op = dhcp_op[msgtype];
 
 	/* Initialise DHCP packet structure */
 	dhcppkt->dhcphdr = dhcphdr;
@@ -243,25 +253,17 @@ static int create_dhcp_packet ( struct dhcp_session *dhcp, uint8_t msgtype,
 	init_dhcp_options ( &dhcppkt->options[OPTS_SNAME], dhcphdr->sname,
 			    sizeof ( dhcphdr->sname ) );
 	
-	/* Initialise DHCP packet content */
-	memset ( dhcphdr, 0, max_len );
-	dhcphdr->xid = dhcp->xid;
-	dhcphdr->magic = htonl ( DHCP_MAGIC_COOKIE );
-	dhcphdr->htype = ntohs ( dhcp->netdev->ll_protocol->ll_proto );
-	dhcphdr->hlen = dhcp->netdev->ll_protocol->ll_addr_len;
-	memcpy ( dhcphdr->chaddr, dhcp->netdev->ll_addr, dhcphdr->hlen );
-	dhcphdr->op = dhcp_op[msgtype];
-
 	/* Set DHCP_OPTION_OVERLOAD option within the main options block */
-	if ( ! set_dhcp_option ( &dhcppkt->options[OPTS_MAIN],
-				 DHCP_OPTION_OVERLOAD, &overloading,
-				 sizeof ( overloading ) ) )
+	if ( set_dhcp_option ( &dhcppkt->options[OPTS_MAIN],
+			       DHCP_OPTION_OVERLOAD, &overloading,
+			       sizeof ( overloading ) ) == NULL )
 		return -ENOSPC;
 
 	/* Set DHCP_MESSAGE_TYPE option */
-	if ( ! set_dhcp_packet_option ( dhcppkt, DHCP_MESSAGE_TYPE,
-					&msgtype, sizeof ( msgtype ) ) )
-		return -ENOSPC;
+	if ( ( rc = set_dhcp_packet_option ( dhcppkt, DHCP_MESSAGE_TYPE,
+					     &msgtype,
+					     sizeof ( msgtype ) ) ) != 0 )
+		return rc;
 
 	return 0;
 }
