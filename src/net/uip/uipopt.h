@@ -557,18 +557,6 @@ extern void uip_tcp_appcall ( void );
    this. */
 //#include "httpd.h"
 
-#warning "Remove this static IP address hack"
-#undef UIP_FIXEDADDR
-#undef UIP_IPADDR0
-#undef UIP_IPADDR1
-#undef UIP_IPADDR2
-#undef UIP_IPADDR3
-#define UIP_FIXEDADDR 1
-#define UIP_IPADDR0 10
-#define UIP_IPADDR1 254
-#define UIP_IPADDR2 254
-#define UIP_IPADDR3 1
-
-#define USE_UIP 1
+#define USE_UIP 0
 
 #endif /* __UIPOPT_H__ */
