@@ -476,6 +476,14 @@ udp_to_dhcp ( struct udp_connection *conn ) {
  * @v rc		Return status code
  */
 static void dhcp_done ( struct dhcp_session *dhcp, int rc ) {
+	/* Free up options if we failed */
+	if ( rc != 0 ) {
+		if ( dhcp->options ) {
+			free_dhcp_options ( dhcp->options );
+			dhcp->options = NULL;
+		}
+	}
+
 	/* Mark async operation as complete */
 	async_done ( &dhcp->aop, rc );
 }
