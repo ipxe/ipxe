@@ -235,17 +235,20 @@ void udp_rx ( struct pk_buff *pkb, struct in_addr *src_net_addr __unused,
 	}
 
 	/* Verify the checksum */
+#warning "Don't we need to take the pseudo-header into account here?"
+#if 0
 	chksum = tcpip_chksum ( pkb->data, pkb_len ( pkb ) );
 	if ( chksum != 0xffff ) {
-		DBG ( "Bad checksum %d\n", chksum );
+		DBG ( "Bad checksum %#x\n", chksum );
 		return;
 	}
+#endif
 
 	/* Todo: Check if it is a broadcast or multicast address */
 
 	/* Demux the connection */
 	list_for_each_entry ( conn, &udp_conns, list ) {
-		if ( conn->local_port == ntohs ( udphdr->dest_port ) ) {
+		if ( conn->local_port == udphdr->dest_port ) {
 			goto conn;
 		}
 	}
