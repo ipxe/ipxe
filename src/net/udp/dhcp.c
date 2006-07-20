@@ -232,7 +232,6 @@ static int create_dhcp_packet ( struct dhcp_session *dhcp, uint8_t msgtype,
 	struct dhcphdr *dhcphdr = data;
 	static const uint8_t overloading = ( DHCP_OPTION_OVERLOAD_FILE |
 					     DHCP_OPTION_OVERLOAD_SNAME );
-	int rc;
 
 	/* Sanity check */
 	if ( max_len < sizeof ( *dhcphdr ) )
@@ -264,11 +263,14 @@ static int create_dhcp_packet ( struct dhcp_session *dhcp, uint8_t msgtype,
 			       sizeof ( overloading ) ) == NULL )
 		return -ENOSPC;
 
-	/* Set DHCP_MESSAGE_TYPE option */
-	if ( ( rc = set_dhcp_packet_option ( dhcppkt, DHCP_MESSAGE_TYPE,
-					     &msgtype,
-					     sizeof ( msgtype ) ) ) != 0 )
-		return rc;
+	/* Set DHCP_MESSAGE_TYPE option within the main options block.
+	 * This doesn't seem to be required by the RFCs, but at least
+	 * ISC dhcpd and ethereal refuse to recognise it otherwise.
+	 */
+	if ( set_dhcp_option ( &dhcppkt->options[OPTS_MAIN],
+			       DHCP_MESSAGE_TYPE, &msgtype,
+			       sizeof ( msgtype ) ) == NULL )
+		return -ENOSPC;
 
 	return 0;
 }
