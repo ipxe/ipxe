@@ -250,6 +250,7 @@ struct dhcp_option {
 		uint8_t byte;
 		uint16_t word;
 		uint32_t dword;
+		struct in_addr in;
 		uint8_t bytes[0];
 	} data;
 } __attribute__ (( packed ));
@@ -429,6 +430,8 @@ struct dhcp_session {
 };
 
 extern unsigned long dhcp_num_option ( struct dhcp_option *option );
+extern void dhcp_ipv4_option ( struct dhcp_option *option,
+			       struct in_addr *inp );
 extern struct dhcp_option *
 find_dhcp_option ( struct dhcp_option_block *options, unsigned int tag );
 extern void register_dhcp_options ( struct dhcp_option_block *options );
@@ -444,6 +447,10 @@ extern struct dhcp_option * find_global_dhcp_option ( unsigned int tag );
 extern unsigned long find_dhcp_num_option ( struct dhcp_option_block *options,
 					    unsigned int tag );
 extern unsigned long find_global_dhcp_num_option ( unsigned int tag );
+extern void find_dhcp_ipv4_option ( struct dhcp_option_block *options,
+				    unsigned int tag, struct in_addr *inp );
+extern void find_global_dhcp_ipv4_option ( unsigned int tag,
+					   struct in_addr *inp );
 extern void delete_dhcp_option ( struct dhcp_option_block *options,
 				 unsigned int tag );
 

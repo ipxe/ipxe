@@ -24,6 +24,7 @@
 #include <assert.h>
 #include <vsprintf.h>
 #include <gpxe/list.h>
+#include <gpxe/in.h>
 #include <gpxe/dhcp.h>
 
 /** @file
@@ -83,6 +84,21 @@ unsigned long dhcp_num_option ( struct dhcp_option *option ) {
 			value = ( ( value << 8 ) | *data );
 	}
 	return value;
+}
+
+/**
+ * Obtain value of an IPv4-address DHCP option
+ *
+ * @v option		DHCP option, or NULL
+ * @v inp		IPv4 address to fill in
+ *
+ * Parses the IPv4 address value from a DHCP option, if present.  It
+ * is permitted to call dhcp_ipv4_option() with @c option set to NULL;
+ * in this case the address will be set to 0.0.0.0.
+ */
+void dhcp_ipv4_option ( struct dhcp_option *option, struct in_addr *inp ) {
+	if ( option )
+		*inp = option->data.in;
 }
 
 /**
@@ -458,6 +474,45 @@ unsigned long find_dhcp_num_option ( struct dhcp_option_block *options,
  */
 unsigned long find_global_dhcp_num_option ( unsigned int tag ) {
 	return dhcp_num_option ( find_global_dhcp_option ( tag ) );
+}
+
+/**
+ * Find DHCP IPv4-address option, and return its value
+ *
+ * @v options		DHCP options block
+ * @v tag		DHCP option tag to search for
+ * @v inp		IPv4 address to fill in
+ * @ret value		Numerical value of the option, or 0 if not found
+ *
+ * This function exists merely as a notational shorthand for a call to
+ * find_dhcp_option() followed by a call to dhcp_ipv4_option().  It is
+ * not possible to distinguish between the cases "option not found"
+ * and "option has a value of 0.0.0.0" using this function; if this
+ * matters to you then issue the two constituent calls directly and
+ * check that find_dhcp_option() returns a non-NULL value.
+ */
+void find_dhcp_ipv4_option ( struct dhcp_option_block *options,
+			     unsigned int tag, struct in_addr *inp ) {
+	dhcp_ipv4_option ( find_dhcp_option ( options, tag ), inp );
+}
+
+/**
+ * Find DHCP IPv4-address option, and return its value
+ *
+ * @v options		DHCP options block
+ * @v tag		DHCP option tag to search for
+ * @v inp		IPv4 address to fill in
+ * @ret value		Numerical value of the option, or 0 if not found
+ *
+ * This function exists merely as a notational shorthand for a call to
+ * find_dhcp_option() followed by a call to dhcp_ipv4_option().  It is
+ * not possible to distinguish between the cases "option not found"
+ * and "option has a value of 0.0.0.0" using this function; if this
+ * matters to you then issue the two constituent calls directly and
+ * check that find_dhcp_option() returns a non-NULL value.
+ */
+void find_global_dhcp_ipv4_option ( unsigned int tag, struct in_addr *inp ) {
+	dhcp_ipv4_option ( find_global_dhcp_option ( tag ), inp );
 }
 
 /**
