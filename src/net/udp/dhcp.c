@@ -54,7 +54,8 @@ static uint8_t dhcp_request_options_data[] = {
 	DHCP_VENDOR_CLASS_ID,
 	DHCP_STRING (  'E', 't', 'h', 'e', 'r', 'b', 'o', 'o', 't' ),
 	DHCP_PARAMETER_REQUEST_LIST,
-	DHCP_OPTION ( DHCP_SUBNET_MASK, DHCP_ROUTERS, DHCP_HOST_NAME ),
+	DHCP_OPTION ( DHCP_SUBNET_MASK, DHCP_ROUTERS, DHCP_HOST_NAME,
+		      DHCP_EB_ENCAP ),
 	DHCP_END
 };
 
@@ -125,6 +126,7 @@ static int set_dhcp_packet_option ( struct dhcp_packet *dhcppkt,
 		return 0;
 	case DHCP_MESSAGE_TYPE:
 	case DHCP_REQUESTED_ADDRESS:
+	case DHCP_PARAMETER_REQUEST_LIST:
 		/* These options have to be within the main options
 		 * block.  This doesn't seem to be required by the
 		 * RFCs, but at least ISC dhcpd refuses to recognise
@@ -438,10 +440,10 @@ static struct dhcp_option_block * dhcp_parse ( struct dhcphdr *dhcphdr,
 	/* Merge in "file" and "sname" fields */
 	merge_dhcp_field ( options, dhcphdr->file, sizeof ( dhcphdr->file ),
 			   ( ( overloading & DHCP_OPTION_OVERLOAD_FILE ) ?
-			     DHCP_BOOTFILE_NAME : 0 ) );
+			     0 : DHCP_BOOTFILE_NAME ) );
 	merge_dhcp_field ( options, dhcphdr->sname, sizeof ( dhcphdr->sname ),
 			   ( ( overloading & DHCP_OPTION_OVERLOAD_SNAME ) ?
-			     DHCP_TFTP_SERVER_NAME : 0 ) );
+			     0 : DHCP_TFTP_SERVER_NAME ) );
 
 	/* Set magic options for "yiaddr" and "siaddr", if present */
 	if ( dhcphdr->yiaddr.s_addr ) {
