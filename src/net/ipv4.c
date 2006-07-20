@@ -107,7 +107,7 @@ void del_ipv4_address ( struct net_device *netdev ) {
  */
 static void ipv4_dump ( struct iphdr *iphdr __unused ) {
 
-	DBG ( "IP4 header at %p+%zx\n", iphdr, sizeof ( *iphdr ) );
+	DBG ( "IP4 header at %p+%#zx\n", iphdr, sizeof ( *iphdr ) );
 	DBG ( "\tVersion = %d\n", ( iphdr->verhdrlen & IP_MASK_VER ) / 16 );
 	DBG ( "\tHeader length = %d\n", iphdr->verhdrlen & IP_MASK_HLEN );
 	DBG ( "\tService = %d\n", iphdr->service );
