@@ -22,10 +22,20 @@ int test_dhcp ( struct net_device *netdev ) {
 	if ( ( rc = async_wait ( start_dhcp ( &dhcp ) ) ) != 0 )
 		goto out_no_options;
 
+	/* Register options received via DHCP */
+	register_dhcp_options ( dhcp.options );
+
 	/* Retrieve IP address configuration */
-	find_dhcp_ipv4_option ( dhcp.options, DHCP_EB_YIADDR, &address );
-	find_dhcp_ipv4_option ( dhcp.options, DHCP_SUBNET_MASK, &netmask );
-	find_dhcp_ipv4_option ( dhcp.options, DHCP_ROUTERS, &gateway );
+	find_global_dhcp_ipv4_option ( DHCP_EB_YIADDR, &address );
+	find_global_dhcp_ipv4_option ( DHCP_SUBNET_MASK, &netmask );
+	find_global_dhcp_ipv4_option ( DHCP_ROUTERS, &gateway );
+
+	printf ( "IP %s", inet_ntoa ( address ) );
+	printf ( " netmask %s", inet_ntoa ( netmask ) );
+	printf ( " gateway %s\n", inet_ntoa ( gateway ) );
+
+	printf ( "Lease time is %ld seconds\n",
+		 find_global_dhcp_num_option ( DHCP_LEASE_TIME ) );
 
 	/* Remove old IP address configuration */
 	del_ipv4_address ( netdev );
@@ -35,11 +45,8 @@ int test_dhcp ( struct net_device *netdev ) {
 				       gateway ) ) != 0 )
 		goto out_no_del_ipv4;
 
-	printf ( "IP %s", inet_ntoa ( address ) );
-	printf ( " netmask %s", inet_ntoa ( netmask ) );
-	printf ( " gateway %s\n", inet_ntoa ( gateway ) );
-
-	/* Free DHCP options */
+	/* Unregister and free DHCP options */
+	unregister_dhcp_options ( dhcp.options );
 	free_dhcp_options ( dhcp.options );
  out_no_options:
 	/* Take down IP interface */

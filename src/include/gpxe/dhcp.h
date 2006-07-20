@@ -74,6 +74,9 @@
 /** Requested IP address */
 #define DHCP_REQUESTED_ADDRESS 50
 
+/** Lease time */
+#define DHCP_LEASE_TIME 51
+
 /** Option overloading
  *
  * The value of this option is the bitwise-OR of zero or more
