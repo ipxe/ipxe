@@ -154,7 +154,7 @@ int main ( void ) {
 
 	netdev = next_netdev ();
 	if ( netdev ) {
-		test_aoeboot ( netdev );
+		test_dhcp ( netdev );
 	} else {
 		printf ( "No network device found\n" );
 	}

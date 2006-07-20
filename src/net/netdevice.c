@@ -41,10 +41,6 @@ static struct net_protocol net_protocols_end[0] __table_end ( net_protocols );
 /** List of network devices */
 static LIST_HEAD ( net_devices );
 
-#warning "Remove this static IP address hack"
-#include <ip.h>
-#include <gpxe/ip.h>
-
 /**
  * Transmit raw packet via network device
  *
@@ -179,19 +175,6 @@ struct net_device * alloc_netdev ( size_t priv_size ) {
  */
 int register_netdev ( struct net_device *netdev ) {
 	
-#warning "Remove this static IP address hack"
-	{
-		const struct in_addr static_address = { htonl ( 0x0afefe01 ) };
-		const struct in_addr static_netmask = { htonl ( 0xffffff00 ) };
-		const struct in_addr static_gateway = { INADDR_NONE };
-		int rc;
-		
-		if ( ( rc = add_ipv4_address ( netdev, static_address,
-					       static_netmask,
-					       static_gateway ) ) != 0 )
-			return rc;
-	}
-
 	/* Add to device list */
 	list_add_tail ( &netdev->list, &net_devices );
 	DBG ( "%s registered\n", netdev_name ( netdev ) );
@@ -208,9 +191,6 @@ int register_netdev ( struct net_device *netdev ) {
  */
 void unregister_netdev ( struct net_device *netdev ) {
 	struct pk_buff *pkb;
-
-#warning "Remove this static IP address hack"
-	del_ipv4_address ( netdev );
 
 	/* Discard any packets in the RX queue */
 	while ( ( pkb = netdev_rx_dequeue ( netdev ) ) ) {
