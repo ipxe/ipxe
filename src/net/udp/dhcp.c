@@ -66,6 +66,7 @@ static uint8_t dhcp_request_options_data[] = {
  */
 static inline const char * dhcp_message_type_name ( unsigned int msgtype ) {
 	switch ( msgtype ) {
+	case 0:			return "BOOTP"; /* Non-DHCP packet */
 	case DHCPDISCOVER:	return "DHCPDISCOVER";
 	case DHCPOFFER:		return "DHCPOFFER";
 	case DHCPREQUEST:	return "DHCPREQUEST";
