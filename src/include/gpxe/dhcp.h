@@ -12,6 +12,7 @@
 #include <gpxe/in.h>
 #include <gpxe/udp.h>
 #include <gpxe/async.h>
+#include <gpxe/retry.h>
 
 /** BOOTP/DHCP server port */
 #define BOOTPS_PORT 67
@@ -407,6 +408,14 @@ struct dhcp_session {
 	/** UDP connection for this session */
 	struct udp_connection udp;
 
+	/** Network device being configured */
+	struct net_device *netdev;
+
+	/** Options obtained from server */
+	struct dhcp_option_block *options;
+
+	/** Transaction ID, in network-endian order */
+	uint32_t xid;
 	/** State of the session
 	 *
 	 * This is a value for the @c DHCP_MESSAGE_TYPE option
@@ -415,11 +424,8 @@ struct dhcp_session {
 	int state;
 	/** Asynchronous operation for this DHCP session */
 	struct async_operation aop;
-	
-	/** Network device being configured */
-	struct net_device *netdev;
-	/** Transaction ID, in network-endian order */
-	uint32_t xid;
+	/** Retransmission timer */
+	struct retry_timer timer;
 };
 
 extern unsigned long dhcp_num_option ( struct dhcp_option *option );

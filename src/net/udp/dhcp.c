@@ -109,7 +109,7 @@ static int set_dhcp_packet_option ( struct dhcp_packet *dhcppkt,
 				    unsigned int tag, const void *data,
 				    size_t len ) {
 	struct dhcphdr *dhcphdr = dhcppkt->dhcphdr;
-	struct dhcp_option_block *options;
+	struct dhcp_option_block *options = dhcppkt->options;
 	struct dhcp_option *option = NULL;
 
 	/* Special-case the magic options */
@@ -123,14 +123,22 @@ static int set_dhcp_packet_option ( struct dhcp_packet *dhcppkt,
 	case DHCP_EB_SIADDR:
 		memcpy ( &dhcphdr->siaddr, data, sizeof ( dhcphdr->siaddr ) );
 		return 0;
+	case DHCP_MESSAGE_TYPE:
+	case DHCP_REQUESTED_ADDRESS:
+		/* These options have to be within the main options
+		 * block.  This doesn't seem to be required by the
+		 * RFCs, but at least ISC dhcpd refuses to recognise
+		 * them otherwise.
+		 */
+		options = &dhcppkt->options[OPTS_MAIN];
+		break;
 	default:
 		/* Continue processing as normal */
 		break;
 	}
 		
 	/* Set option in first available options block */
-	for ( options = dhcppkt->options ;
-	      options < &dhcppkt->options[NUM_OPT_BLOCKS] ; options++ ) {
+	for ( ; options < &dhcppkt->options[NUM_OPT_BLOCKS] ; options++ ) {
 		option = set_dhcp_option ( options, tag, data, len );
 		if ( option )
 			break;
@@ -144,7 +152,40 @@ static int set_dhcp_packet_option ( struct dhcp_packet *dhcppkt,
 }
 
 /**
- * Set options within DHCP packet
+ * Copy option into DHCP packet
+ *
+ * @v dhcppkt		DHCP packet
+ * @v options		DHCP option block, or NULL
+ * @v tag		DHCP option tag to search for
+ * @v new_tag		DHCP option tag to use for copied option
+ * @ret rc		Return status code
+ *
+ * Copies a single option, if present, from the DHCP options block
+ * into a DHCP packet.  The tag for the option may be changed if
+ * desired; this is required by other parts of the DHCP code.
+ *
+ * @c options may specify a single options block, or be left as NULL
+ * in order to search for the option within all registered options
+ * blocks.
+ */
+static int copy_dhcp_packet_option ( struct dhcp_packet *dhcppkt,
+				     struct dhcp_option_block *options,
+				     unsigned int tag, unsigned int new_tag ) {
+	struct dhcp_option *option;
+	int rc;
+
+	option = find_dhcp_option ( options, tag );
+	if ( option ) {
+		if ( ( rc = set_dhcp_packet_option ( dhcppkt, new_tag,
+						     &option->data,
+						     option->len ) ) != 0 )
+			return rc;
+	}
+	return 0;
+}
+
+/**
+ * Copy options into DHCP packet
  *
  * @v dhcppkt		DHCP packet
  * @v options		DHCP option block, or NULL
@@ -158,12 +199,11 @@ static int set_dhcp_packet_option ( struct dhcp_packet *dhcppkt,
  * @c options may specify a single options block, or be left as NULL
  * in order to copy options from all registered options blocks.
  */
-static int set_dhcp_packet_encap_options ( struct dhcp_packet *dhcppkt,
-					   struct dhcp_option_block *options,
-					   unsigned int encapsulator ) {
+static int copy_dhcp_packet_encap_options ( struct dhcp_packet *dhcppkt,
+					    struct dhcp_option_block *options,
+					    unsigned int encapsulator ) {
 	unsigned int subtag;
 	unsigned int tag;
-	struct dhcp_option *option;
 	int rc;
 
 	for ( subtag = DHCP_MIN_OPTION; subtag <= DHCP_MAX_OPTION; subtag++ ) {
@@ -172,19 +212,15 @@ static int set_dhcp_packet_encap_options ( struct dhcp_packet *dhcppkt,
 		case DHCP_EB_ENCAP:
 		case DHCP_VENDOR_ENCAP:
 			/* Process encapsulated options field */
-			if ( ( rc = set_dhcp_packet_encap_options ( dhcppkt,
-								    options,
-								    tag )) !=0)
+			if ( ( rc = copy_dhcp_packet_encap_options ( dhcppkt,
+								     options,
+								     tag)) !=0)
 				return rc;
 			break;
 		default:
 			/* Copy option to reassembled packet */
-			option = find_dhcp_option ( options, tag );
-			if ( ! option )
-				break;
-			if ( ( rc = set_dhcp_packet_option ( dhcppkt, tag,
-							     &option->data,
-							     option->len)) !=0)
+			if ( ( rc = copy_dhcp_packet_option ( dhcppkt, options,
+							      tag, tag ) ) !=0)
 				return rc;
 			break;
 		};
@@ -194,7 +230,7 @@ static int set_dhcp_packet_encap_options ( struct dhcp_packet *dhcppkt,
 }
 
 /**
- * Set options within DHCP packet
+ * Copy options into DHCP packet
  *
  * @v dhcppkt		DHCP packet
  * @v options		DHCP option block, or NULL
@@ -207,9 +243,9 @@ static int set_dhcp_packet_encap_options ( struct dhcp_packet *dhcppkt,
  * @c options may specify a single options block, or be left as NULL
  * in order to copy options from all registered options blocks.
  */
-static int set_dhcp_packet_options ( struct dhcp_packet *dhcppkt,
-				     struct dhcp_option_block *options ) {
-	return set_dhcp_packet_encap_options ( dhcppkt, options, 0 );
+static int copy_dhcp_packet_options ( struct dhcp_packet *dhcppkt,
+				      struct dhcp_option_block *options ) {
+	return copy_dhcp_packet_encap_options ( dhcppkt, options, 0 );
 }
 
 /**
@@ -224,7 +260,7 @@ static int set_dhcp_packet_options ( struct dhcp_packet *dhcppkt,
  *
  * Creates a DHCP packet in the specified buffer, and fills out a @c
  * dhcp_packet structure that can be passed to
- * set_dhcp_packet_option() or set_dhcp_packet_options().
+ * set_dhcp_packet_option() or copy_dhcp_packet_options().
  */
 static int create_dhcp_packet ( struct dhcp_session *dhcp, uint8_t msgtype,
 				void *data, size_t max_len,
@@ -232,6 +268,7 @@ static int create_dhcp_packet ( struct dhcp_session *dhcp, uint8_t msgtype,
 	struct dhcphdr *dhcphdr = data;
 	static const uint8_t overloading = ( DHCP_OPTION_OVERLOAD_FILE |
 					     DHCP_OPTION_OVERLOAD_SNAME );
+	int rc;
 
 	/* Sanity check */
 	if ( max_len < sizeof ( *dhcphdr ) )
@@ -263,14 +300,11 @@ static int create_dhcp_packet ( struct dhcp_session *dhcp, uint8_t msgtype,
 			       sizeof ( overloading ) ) == NULL )
 		return -ENOSPC;
 
-	/* Set DHCP_MESSAGE_TYPE option within the main options block.
-	 * This doesn't seem to be required by the RFCs, but at least
-	 * ISC dhcpd and ethereal refuse to recognise it otherwise.
-	 */
-	if ( set_dhcp_option ( &dhcppkt->options[OPTS_MAIN],
-			       DHCP_MESSAGE_TYPE, &msgtype,
-			       sizeof ( msgtype ) ) == NULL )
-		return -ENOSPC;
+	/* Set DHCP_MESSAGE_TYPE option */
+	if ( ( rc = set_dhcp_packet_option ( dhcppkt, DHCP_MESSAGE_TYPE,
+					     &msgtype,
+					     sizeof ( msgtype ) ) ) != 0 )
+		return rc;
 
 	return 0;
 }
@@ -435,6 +469,17 @@ udp_to_dhcp ( struct udp_connection *conn ) {
 	return container_of ( conn, struct dhcp_session, udp );
 }
 
+/**
+ * Mark DHCP session as complete
+ *
+ * @v dhcp		DHCP session
+ * @v rc		Return status code
+ */
+static void dhcp_done ( struct dhcp_session *dhcp, int rc ) {
+	/* Mark async operation as complete */
+	async_done ( &dhcp->aop, rc );
+}
+
 /** Address for transmitting DHCP requests */
 static struct sockaddr sa_dhcp_server = {
 	.sa_family = AF_INET,
@@ -470,10 +515,26 @@ static void dhcp_senddata ( struct udp_connection *conn,
 	}
 
 	/* Copy in options common to all requests */
-	if ( ( rc = set_dhcp_packet_options ( &dhcppkt,
-					      &dhcp_request_options ) ) != 0 ){
+	if ( ( rc = copy_dhcp_packet_options ( &dhcppkt,
+					       &dhcp_request_options ) ) != 0){
 		DBG ( "Could not set common DHCP options\n" );
 		return;
+	}
+
+	/* Copy any required options from previous server repsonse */
+	if ( dhcp->options ) {
+		if ( ( rc = copy_dhcp_packet_option ( &dhcppkt, dhcp->options,
+					    DHCP_SERVER_IDENTIFIER,
+					    DHCP_SERVER_IDENTIFIER ) ) != 0 ) {
+			DBG ( "Could not set server identifier option\n" );
+			return;
+		}
+		if ( ( rc = copy_dhcp_packet_option ( &dhcppkt, dhcp->options,
+					    DHCP_EB_YIADDR,
+					    DHCP_REQUESTED_ADDRESS ) ) != 0 ) {
+			DBG ( "Could not set requested address option\n" );
+			return;
+		}
 	}
 
 	/* Transmit the packet */
@@ -481,6 +542,33 @@ static void dhcp_senddata ( struct udp_connection *conn,
 				 dhcppkt.dhcphdr, dhcppkt.len ) ) != 0 ) {
 		DBG ( "Could not transmit UDP packet\n" );
 		return;
+	}
+}
+
+/**
+ * Transmit DHCP request
+ *
+ * @v dhcp		DHCP session
+ */
+static void dhcp_send_request ( struct dhcp_session *dhcp ) {
+	start_timer ( &dhcp->timer );
+	udp_senddata ( &dhcp->udp );
+}
+
+/**
+ * Handle DHCP retry timer expiry
+ *
+ * @v timer		DHCP retry timer
+ * @v fail		Failure indicator
+ */
+static void dhcp_timer_expired ( struct retry_timer *timer, int fail ) {
+	struct dhcp_session *dhcp =
+		container_of ( timer, struct dhcp_session, timer );
+
+	if ( fail ) {
+		dhcp_done ( dhcp, -ETIMEDOUT );
+	} else {
+		dhcp_send_request ( dhcp );
 	}
 }
 
@@ -496,6 +584,7 @@ static void dhcp_newdata ( struct udp_connection *conn,
 	struct dhcp_session *dhcp = udp_to_dhcp ( conn );
 	struct dhcphdr *dhcphdr = data;
 	struct dhcp_option_block *options;
+	unsigned int msgtype;
 
 	/* Check for matching transaction ID */
 	if ( dhcphdr->xid != dhcp->xid ) {
@@ -511,12 +600,42 @@ static void dhcp_newdata ( struct udp_connection *conn,
 		return;
 	}
 
-	DBG ( "Received %s\n",
-	      dhcp_msgtype_name ( find_dhcp_num_option ( options,
-							 DHCP_MESSAGE_TYPE )));
+	/* Determine message type */
+	msgtype = find_dhcp_num_option ( options, DHCP_MESSAGE_TYPE );
+	DBG ( "Received %s\n", dhcp_msgtype_name ( msgtype ) );
 
-	/* Proof of concept: just dump out the parsed options */
-	hex_dump ( options->data, options->len );
+	/* Handle DHCP reply */
+	switch ( dhcp->state ) {
+	case DHCPDISCOVER:
+		if ( msgtype != DHCPOFFER )
+			goto out_discard;
+		dhcp->state = DHCPREQUEST;
+		break;
+	case DHCPREQUEST:
+		if ( msgtype != DHCPACK )
+			goto out_discard;
+		dhcp->state = DHCPACK;
+		break;
+	default:
+		assert ( 0 );
+		goto out_discard;
+	}
+
+	/* Stop timer and update stored options */
+	stop_timer ( &dhcp->timer );
+	if ( dhcp->options )
+		free_dhcp_options ( dhcp->options );
+	dhcp->options = options;
+
+	/* Transmit next packet, or terminate session */
+	if ( dhcp->state < DHCPACK ) {
+		dhcp_send_request ( dhcp );
+	} else {
+		dhcp_done ( dhcp, 0 );
+	}
+	return;
+
+ out_discard:
 	free_dhcp_options ( options );
 }
 
@@ -535,7 +654,9 @@ static struct udp_operations dhcp_udp_operations = {
 struct async_operation * start_dhcp ( struct dhcp_session *dhcp ) {
 	int rc;
 
+	/* Initialise DHCP session */
 	dhcp->udp.udp_op = &dhcp_udp_operations;
+	dhcp->timer.expired = dhcp_timer_expired;
 	dhcp->state = DHCPDISCOVER;
 	/* Use least significant 32 bits of link-layer address as XID */
 	memcpy ( &dhcp->xid, ( dhcp->netdev->ll_addr
@@ -549,7 +670,7 @@ struct async_operation * start_dhcp ( struct dhcp_session *dhcp ) {
 	}
 
 	/* Proof of concept: just send a single DHCPDISCOVER */
-	udp_senddata ( &dhcp->udp );
+	dhcp_send_request ( dhcp );
 
  out:
 	return &dhcp->aop;
