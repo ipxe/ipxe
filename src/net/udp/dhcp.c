@@ -64,7 +64,7 @@ static uint8_t dhcp_request_options_data[] = {
  * @v msgtype		DHCP message type
  * @ret string		DHCP mesasge type name
  */
-static inline const char * dhcp_message_type_name ( unsigned int msgtype ) {
+static inline const char * dhcp_msgtype_name ( unsigned int msgtype ) {
 	switch ( msgtype ) {
 	case 0:			return "BOOTP"; /* Non-DHCP packet */
 	case DHCPDISCOVER:	return "DHCPDISCOVER";
@@ -457,7 +457,7 @@ static void dhcp_senddata ( struct udp_connection *conn,
 	struct dhcp_packet dhcppkt;
 	int rc;
 	
-	DBG ( "Transmitting %s\n", dhcp_message_type_name ( dhcp->state ) );
+	DBG ( "Transmitting %s\n", dhcp_msgtype_name ( dhcp->state ) );
 
 	assert ( ( dhcp->state == DHCPDISCOVER ) ||
 		 ( dhcp->state == DHCPREQUEST ) );
@@ -512,8 +512,8 @@ static void dhcp_newdata ( struct udp_connection *conn,
 	}
 
 	DBG ( "Received %s\n",
-	      dhcp_message_type_name ( find_dhcp_num_option ( options,
-						       DHCP_MESSAGE_TYPE ) ) );
+	      dhcp_msgtype_name ( find_dhcp_num_option ( options,
+							 DHCP_MESSAGE_TYPE )));
 
 	/* Proof of concept: just dump out the parsed options */
 	hex_dump ( options->data, options->len );
