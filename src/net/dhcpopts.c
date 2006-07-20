@@ -102,6 +102,40 @@ void dhcp_ipv4_option ( struct dhcp_option *option, struct in_addr *inp ) {
 }
 
 /**
+ * Print DHCP string option value into buffer
+ *
+ * @v buf		Buffer into which to write the string
+ * @v size		Size of buffer
+ * @v option		DHCP option, or NULL
+ * @ret len		Length of formatted string
+ *
+ * DHCP option strings are stored without a NUL terminator.  This
+ * function provides a convenient way to extract these DHCP strings
+ * into standard C strings.  It is permitted to call dhcp_snprintf()
+ * with @c option set to NULL; in this case the buffer will be filled
+ * with an empty string.
+ *
+ * The usual snprintf() semantics apply with regard to buffer size,
+ * return value when the buffer is too small, etc.
+ */
+int dhcp_snprintf ( char *buf, size_t size, struct dhcp_option *option ) {
+	size_t len;
+	char *content = "";
+
+	if ( option ) {
+		/* Shrink buffer size so that it is only just large
+		 * enough to contain the option data.  snprintf() will
+		 * take care of everything else (inserting the NUL etc.)
+		 */
+		len = ( option->len + 1 );
+		if ( len < size )
+			size = len;
+		content = option->data.string;
+	}
+	return snprintf ( buf, size, "%s", content );
+}
+
+/**
  * Calculate length of a normal DHCP option
  *
  * @v option		DHCP option

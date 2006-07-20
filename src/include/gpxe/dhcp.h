@@ -160,6 +160,13 @@
  */
 #define DHCP_EB_SIADDR DHCP_ENCAP_OPT ( DHCP_EB_ENCAP, 3 )
 
+/** BIOS drive number
+ *
+ * This is the drive number for a drive emulated via INT 13.  0x80 is
+ * the first hard disk, 0x81 is the second hard disk, etc.
+ */
+#define DHCP_EB_BIOS_DRIVE DHCP_ENCAP_OPT ( DHCP_EB_ENCAP, 0xbd )
+
 /** Maximum normal DHCP option */
 #define DHCP_MAX_OPTION 254
 
@@ -255,6 +262,7 @@ struct dhcp_option {
 		uint32_t dword;
 		struct in_addr in;
 		uint8_t bytes[0];
+		char string[0];
 	} data;
 } __attribute__ (( packed ));
 
@@ -435,6 +443,8 @@ struct dhcp_session {
 extern unsigned long dhcp_num_option ( struct dhcp_option *option );
 extern void dhcp_ipv4_option ( struct dhcp_option *option,
 			       struct in_addr *inp );
+extern int dhcp_snprintf ( char *buf, size_t size,
+			   struct dhcp_option *option );
 extern struct dhcp_option *
 find_dhcp_option ( struct dhcp_option_block *options, unsigned int tag );
 extern void register_dhcp_options ( struct dhcp_option_block *options );
