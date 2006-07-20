@@ -18,10 +18,14 @@ int test_dhcp ( struct net_device *netdev ) {
 		goto out_no_del_ipv4;
 
 	/* Issue DHCP request */
+	printf ( "DHCP..." );
 	memset ( &dhcp, 0, sizeof ( dhcp ) );
 	dhcp.netdev = netdev;
-	if ( ( rc = async_wait ( start_dhcp ( &dhcp ) ) ) != 0 )
+	if ( ( rc = async_wait ( start_dhcp ( &dhcp ) ) ) != 0 ) {
+		printf ( "failed\n" );
 		goto out_no_options;
+	}
+	printf ( "done\n" );
 
 	/* Register options received via DHCP */
 	register_dhcp_options ( dhcp.options );
