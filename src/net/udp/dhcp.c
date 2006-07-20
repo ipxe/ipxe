@@ -650,6 +650,11 @@ static struct udp_operations dhcp_udp_operations = {
  *
  * @v dhcp		DHCP session
  * @ret aop		Asynchronous operation
+ *
+ * If the DHCP operation completes successfully, the
+ * dhcp_session::options field will be filled in with the resulting
+ * options block.  The caller takes responsibility for eventually
+ * calling free_dhcp_options().
  */
 struct async_operation * start_dhcp ( struct dhcp_session *dhcp ) {
 	int rc;
