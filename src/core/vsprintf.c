@@ -237,7 +237,7 @@ size_t vcprintf ( struct printf_context *ctx, const char *fmt, va_list args ) {
 				hex = va_arg ( args, unsigned int );
 			}
 			ptr = format_hex ( ptr, hex, width, flags );
-		} else if ( *fmt == 'd' ) {
+		} else if ( ( *fmt == 'd' ) || ( *fmt == 'i' ) ){
 			signed long decimal;
 
 			if ( *length >= sizeof ( signed long ) ) {
