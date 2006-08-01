@@ -77,10 +77,10 @@ struct tcpip_net_protocol {
 #define TCPIP_NET_PROTOCOL( protocol ) \
         struct tcpip_net_protocol protocol __table ( tcpip_net_protocols, 01 )
 
-extern void trans_rx ( struct pk_buff *pkb, uint8_t trans_proto, 
+extern void tcpip_rx ( struct pk_buff *pkb, uint8_t trans_proto, 
 		       struct in_addr *src, struct in_addr *dest );
 
-extern int trans_tx ( struct pk_buff *pkb, struct tcpip_protocol *tcpip, 
+extern int tcpip_tx ( struct pk_buff *pkb, struct tcpip_protocol *tcpip, 
 		      struct sockaddr *dest );
 
 extern unsigned int tcpip_continue_chksum ( unsigned int partial,

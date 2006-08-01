@@ -70,7 +70,7 @@ struct tcpip_protocol* find_tcpip_protocol ( uint8_t trans_proto ) {
  *
  * This function expects a transport-layer segment from the network-layer
  */
-void trans_rx ( struct pk_buff *pkb, uint8_t trans_proto, struct in_addr *src,
+void tcpip_rx ( struct pk_buff *pkb, uint8_t trans_proto, struct in_addr *src,
 		struct in_addr *dest ) {
 	struct tcpip_protocol *tcpip;
 
@@ -90,7 +90,7 @@ void trans_rx ( struct pk_buff *pkb, uint8_t trans_proto, struct in_addr *src,
  * @v sock		Destination socket address
  * @ret			Status
  */
-int trans_tx ( struct pk_buff *pkb, struct tcpip_protocol *tcpip,
+int tcpip_tx ( struct pk_buff *pkb, struct tcpip_protocol *tcpip,
 	       struct sockaddr *sock ) {
 
 	/* Identify the network layer protocol and send it using xxx_tx() */

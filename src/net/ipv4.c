@@ -546,7 +546,7 @@ void ipv4_rx ( struct pk_buff *pkb, struct net_device *netdev __unused,
 	pkb_pull ( pkb, sizeof ( *iphdr ) );
 
 	/* Send it to the transport layer */
-	trans_rx ( pkb, iphdr->protocol, src, dest );
+	tcpip_rx ( pkb, iphdr->protocol, src, dest );
 }
 
 /** 

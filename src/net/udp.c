@@ -151,7 +151,7 @@ int udp_sendto ( struct udp_connection *conn, struct sockaddr *peer,
 	udp_dump ( udphdr );
 
 	/* Send it to the next layer for processing */
-	return trans_tx ( conn->tx_pkb, &udp_protocol, peer );
+	return tcpip_tx ( conn->tx_pkb, &udp_protocol, peer );
 }
 
 /**
