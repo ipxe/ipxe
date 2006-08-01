@@ -11,7 +11,7 @@
 #include <gpxe/init.h>
 #include <gpxe/pkbuff.h>
 #include <gpxe/netdevice.h>
-#include <gpxe/tcpip_if.h>
+#include <gpxe/tcpip.h>
 
 /** @file
  *

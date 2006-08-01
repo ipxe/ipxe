@@ -12,7 +12,7 @@
 #include <gpxe/netdevice.h>
 #include "uip/uip.h"
 #include <gpxe/ip.h>
-#include <gpxe/tcpip_if.h>
+#include <gpxe/tcpip.h>
 
 /** @file
  *

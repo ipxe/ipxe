@@ -8,7 +8,7 @@
 #include <gpxe/pkbuff.h>
 #include <gpxe/tables.h>
 #include <gpxe/netdevice.h>
-#include <gpxe/tcpip_if.h>
+#include <gpxe/tcpip.h>
 
 /** @file
  *
