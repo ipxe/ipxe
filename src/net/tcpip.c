@@ -5,6 +5,7 @@
 #include <byteswap.h>
 #include <gpxe/in.h>
 #include <gpxe/ip.h>
+#include <gpxe/ip6.h>
 #include <gpxe/pkbuff.h>
 #include <gpxe/tables.h>
 #include <gpxe/netdevice.h>
@@ -41,7 +42,6 @@ void tcpip_rx ( struct pk_buff *pkb, uint8_t trans_proto, struct in_addr *src,
 	/* Identify the transport layer protocol */
 	for ( tcpip = tcpip_protocols; tcpip <= tcpip_protocols_end; ++tcpip ) {
 		if ( tcpip->trans_proto == trans_proto ) {
-			DBG ( "Packet sent to %s module", tcpip->name );
 			tcpip->rx ( pkb, src, dest );
 		}
 	}
@@ -57,16 +57,37 @@ void tcpip_rx ( struct pk_buff *pkb, uint8_t trans_proto, struct in_addr *src,
 int tcpip_tx ( struct pk_buff *pkb, struct tcpip_protocol *tcpip,
 	       struct sockaddr *sock ) {
 
+#if 0 /* This is the right thing to do */
+
+	struct tcpip_net_protocol *tcpip_net;
+
+	/* Identify the network layer protocol */
+	for ( tcpip_net = tcpip_net_protocols; 
+			tcpip_net <= tcpip_net_protocols_end; ++tcpip_net ) {
+		if ( tcpip_net->sa_family == sock->sa_family ) {
+			DBG ( "Packet sent to %s module\n", tcpip_net->net_protocol->name );
+			return tcpip_net->tx ( pkb, tcpip, sock );
+		}
+	}
+	DBG ( "No suitable network layer protocol found for sa_family %s\n",
+						( sock->sa_family );
+	return -EAFNOSUPPORT;
+}
+
+#else
+
 	/* Identify the network layer protocol and send it using xxx_tx() */
 	switch ( sock->sa_family ) {
 	case AF_INET: /* IPv4 network family */
-		return ipv4_tx ( pkb, tcpip, &sock->sin.sin_addr );
+		return ipv4_tx ( pkb, tcpip, sock );
 	case AF_INET6: /* IPv6 network family */
-		return ipv6_tx ( pkb, tcpip, &sock->sin6.sin6_addr );
+		return ipv6_tx ( pkb, tcpip, sock );
 	}
 	DBG ( "Network family %d not supported", sock->sa_family );
 	return -EAFNOSUPPORT;
 }
+
+#endif
 
 /**
  * Calculate continued TCP/IP checkum

@@ -347,7 +347,8 @@ int ipv4_uip_tx ( struct pk_buff *pkb ) {
  * This function expects a transport-layer segment and prepends the IP header
  */
 int ipv4_tx ( struct pk_buff *pkb, struct tcpip_protocol *tcpip,
-	      struct in_addr *dest ) {
+	      struct sockaddr* sock ) {
+	struct in_addr *dest = &sock->sin.sin_addr;
 	struct iphdr *iphdr = pkb_push ( pkb, sizeof ( *iphdr ) );
 	struct ipv4_miniroute *miniroute;
 	struct net_device *netdev = NULL;
@@ -613,6 +614,8 @@ NET_PROTOCOL ( ipv4_protocol );
 /** IPv4 TCPIP net protocol */
 struct tcpip_net_protocol ipv4_tcpip_protocol = {
 	.net_protocol = &ipv4_protocol,
+	.sa_family = AF_INET,
+	.tx = ipv4_tx,
 	.tx_csum = ipv4_tx_csum,
 };
 

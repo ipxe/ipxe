@@ -66,6 +66,6 @@ extern void del_ipv4_address ( struct net_device *netdev );
 
 extern int ipv4_uip_tx ( struct pk_buff *pkb );
 extern int ipv4_tx ( struct pk_buff *pkb, struct tcpip_protocol *tcpip,
-		     struct in_addr *dest );
+		     struct sockaddr *sock );
 
 #endif /* _GPXE_IP_H */

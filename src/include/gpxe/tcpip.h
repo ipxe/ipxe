@@ -31,7 +31,9 @@ struct tcpip_protocol {
          *
          * This method takes ownership of the packet buffer.
          */
-        void ( * rx ) ( struct pk_buff *pkb, struct in_addr *src_net_addr, struct in_addr *dest_net_addr );
+        void ( * rx ) ( struct pk_buff *pkb, struct in_addr *src_net_addr,
+			struct in_addr *dest_net_addr );
+
         /** 
 	 * Transport-layer protocol number
 	 *
@@ -42,8 +44,8 @@ struct tcpip_protocol {
 	 * Checksum offset
 	 *
 	 * A negative number indicates that the protocol does not require
-	 * checksumming to be performed by the network layer. A positive number is
-	 * the offset of the checksum field in the transport-layer header.
+	 * checksumming to be performed by the network layer. A positive number
+	 * is the offset of the checksum field in the transport-layer header.
 	 */
 	int csum_offset;
 };
@@ -56,6 +58,15 @@ struct tcpip_net_protocol {
 	struct net_protocol *net_protocol;
 	/** Network address family */
 	sa_family_t sa_family;
+	/**
+	 * Transmit packet
+	 *
+	 * @v pkb		Packet buffer
+ 	 * @v tcpip		Transport-layer TCP/IP protocol
+	 * @v sock		Socket address
+	 */
+	int ( * tx ) ( struct pk_buff *pkb, struct tcpip_protocol *tcpip,
+			struct sockaddr *sock ); 
 	/** Complete transport-layer checksum calculation
 	 *
 	 * @v pkb		Packet buffer
