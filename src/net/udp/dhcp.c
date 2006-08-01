@@ -55,7 +55,7 @@ static uint8_t dhcp_request_options_data[] = {
 	DHCP_STRING (  'E', 't', 'h', 'e', 'r', 'b', 'o', 'o', 't' ),
 	DHCP_PARAMETER_REQUEST_LIST,
 	DHCP_OPTION ( DHCP_SUBNET_MASK, DHCP_ROUTERS, DHCP_HOST_NAME,
-		      DHCP_EB_ENCAP ),
+		      DHCP_BOOTFILE_NAME, DHCP_EB_ENCAP ),
 	DHCP_END
 };
 
