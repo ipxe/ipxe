@@ -258,10 +258,6 @@ void udp_rx ( struct pk_buff *pkb, struct in_addr *src_net_addr __unused,
 	/** Strip off the UDP header */
 	pkb_pull ( pkb, sizeof ( *udphdr ) );
 
-	/** Allocate max possible buffer space to the tx buffer */
-	conn->tx_pkb = alloc_pkb ( UDP_MAX_TXPKB );
-	pkb_reserve ( conn->tx_pkb, UDP_MAX_HLEN );
-
 	/** Call the application's callback */
 	conn->udp_op->newdata ( conn, pkb->data, ulen - sizeof ( *udphdr ) );
 }
