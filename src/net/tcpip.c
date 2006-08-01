@@ -21,45 +21,9 @@
 static struct tcpip_net_protocol tcpip_net_protocols[0] __table_start ( tcpip_net_protocols );
 static struct tcpip_net_protocol tcpip_net_protocols_end[0] __table_end ( tcpip_net_protocols );
 
-struct tcpip_protocol;
-
 /** Registered transport-layer protocols that support TCPIP */
 static struct tcpip_protocol tcpip_protocols[0] __table_start ( tcpip_protocols );
 static struct tcpip_protocol tcpip_protocols_end[0] __table_end ( tcpip_protocols );
-
-/** Identify TCPIP network-layer protocol
- *
- * @v sa_family	 Network address family
- * @ret tcpip	   Protocol supporting TCPIP, or NULL
- */
-static struct tcpip_net_protocol * tcpip_find_protocol ( sa_family_t sa_family ) {
-	struct tcpip_net_protocol *tcpip_net;
-
-	for ( tcpip_net = tcpip_net_protocols; 
-		tcpip_net < tcpip_net_protocols_end; ++tcpip_net ) {
-		if ( tcpip_net->sa_family == sa_family ) {
-			return tcpip_net;
-		}
-	}
-	return NULL;
-}
-
-/** Identify TCPIP transport-layer protocol
- *
- * @v trans_proto	Transport-layer protocol number, IP_XXX
- * @ret tcpip_protocol	Transport-layer protocol, or NULL
- */
-struct tcpip_protocol* find_tcpip_protocol ( uint8_t trans_proto ) {
-	struct tcpip_protocol *tcpip;
-
-	for ( tcpip = tcpip_protocols; tcpip <= tcpip_protocols_end; 
-		++tcpip ) {
-		if ( tcpip->trans_proto == trans_proto ) {
-			return tcpip;
-		}
-	}
-	return NULL;
-}
 
 /** Process a received packet
  *

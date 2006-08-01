@@ -1,5 +1,5 @@
-#ifndef _GPXE_INTERFACE_H
-#define _GPXE_INTERFACE_H
+#ifndef _GPXE_TCPIP_H
+#define _GPXE_TCPIP_H
 
 /** @file
  *
@@ -87,7 +87,4 @@ extern unsigned int tcpip_continue_chksum ( unsigned int partial,
 					    const void *data, size_t len );
 extern unsigned int tcpip_chksum ( const void *data, size_t len );
 
-extern struct tcpip_protocol * find_tcpip_protocol ( uint8_t trans_proto );
-extern struct tcpip_net_protocol * find_tcpip_net_protocol ( sa_family_t sa_family );
-
-#endif /* _GPXE_INTERFACE_H */
+#endif /* _GPXE_TCPIP_H */
