@@ -379,7 +379,8 @@ void tcp_init_conn ( struct tcp_connection *conn ) {
  * peer. It sends a SYN packet to peer. When the connection is established, the
  * TCP stack calls the connected() callback function.
  */
-int tcp_connectto ( struct tcp_connection *conn, struct sockaddr *peer ) {
+int tcp_connectto ( struct tcp_connection *conn,
+		    struct sockaddr_tcpip *peer ) {
 	int rc;
 
 	/* A connection can only be established from the CLOSED state */
@@ -393,7 +394,7 @@ int tcp_connectto ( struct tcp_connection *conn, struct sockaddr *peer ) {
 	if ( ( rc = tcp_listen ( conn, conn->local_port ) ) != 0 ) {
 		return rc;
 	}
-	memcpy ( &conn->sa, peer, sizeof ( *peer ) );
+	memcpy ( &conn->peer, peer, sizeof ( conn->peer ) );
 
 	/* Send a SYN packet and transition to TCP_SYN_SENT */
 	conn->snd_una = ( ( ( uint32_t ) random() ) << 16 ) & random();
@@ -407,7 +408,7 @@ int tcp_connectto ( struct tcp_connection *conn, struct sockaddr *peer ) {
 }
 
 int tcp_connect ( struct tcp_connection *conn ) {
-	return tcp_connectto ( conn, &conn->sa );
+	return tcp_connectto ( conn, &conn->peer );
 }
 
 /**
@@ -542,7 +543,7 @@ int tcp_senddata ( struct tcp_connection *conn ) {
  * This function sends data to the peer socket address
  */
 int tcp_send ( struct tcp_connection *conn, const void *data, size_t len ) {
-	struct sockaddr *peer = &conn->sa;
+	struct sockaddr_tcpip *peer = &conn->peer;
 	struct pk_buff *pkb = conn->tx_pkb;
 	int slen;
 
@@ -557,18 +558,7 @@ int tcp_send ( struct tcp_connection *conn, const void *data, size_t len ) {
 	/* Source port, assumed to be in network byte order in conn */
 	tcphdr->src = conn->local_port;
 	/* Destination port, assumed to be in network byte order in peer */
-	switch ( peer->sa_family ) {
-	case AF_INET:
-		tcphdr->dest = peer->sin.sin_port;
-		break;
-	case AF_INET6:
-		tcphdr->dest = peer->sin6.sin6_port;
-		break;
-	default:
-		DBG ( "Family type %d not supported\n", 
-					peer->sa_family );
-		return -EAFNOSUPPORT;
-	}
+	tcphdr->dest = peer->st_port;
 	tcphdr->seq = htonl ( conn->snd_una );
 	tcphdr->ack = htonl ( conn->rcv_nxt );
 	/* Header length, = 0x50 (without TCP options) */
@@ -597,7 +587,9 @@ int tcp_send ( struct tcp_connection *conn, const void *data, size_t len ) {
  * @v pkb	Packet buffer
  * @v partial	Partial checksum
  */
-void tcp_rx ( struct pk_buff *pkb, uint16_t partial ) {
+static int tcp_rx ( struct pk_buff *pkb,
+		    struct sockaddr_tcpip *st_src __unused,
+		    struct sockaddr_tcpip *st_dest __unused ) {
 	struct tcp_connection *conn;
 	struct tcp_header *tcphdr;
 	uint32_t acked, toack;
@@ -606,7 +598,7 @@ void tcp_rx ( struct pk_buff *pkb, uint16_t partial ) {
 	/* Sanity check */
 	if ( pkb_len ( pkb ) < sizeof ( *tcphdr ) ) {
 		DBG ( "Packet too short (%d bytes)\n", pkb_len ( pkb ) );
-		return;
+		return -EINVAL;
 	}
 
 	/* Process TCP header */
@@ -616,7 +608,7 @@ void tcp_rx ( struct pk_buff *pkb, uint16_t partial ) {
 	hlen = ( ( tcphdr->hlen & TCP_MASK_HLEN ) / 16 ) * 4;
 	if ( hlen != sizeof ( *tcphdr ) ) {
 		DBG ( "Bad header length (%d bytes)\n", hlen );
-		return;
+		return -EINVAL;
 	}
 	
 	/* TODO: Verify checksum */
@@ -629,7 +621,7 @@ void tcp_rx ( struct pk_buff *pkb, uint16_t partial ) {
 	}
 	
 	DBG ( "No connection found on port %d\n", ntohs ( tcphdr->dest ) );
-	return;
+	return 0;
 
   found_conn:
 	/* Set the advertised window */
@@ -642,7 +634,7 @@ void tcp_rx ( struct pk_buff *pkb, uint16_t partial ) {
 	case TCP_CLOSED:
 		DBG ( "tcp_rx(): Invalid state %s\n",
 				tcp_states[conn->tcp_state] );
-		return;
+		return -EINVAL;
 	case TCP_LISTEN:
 		if ( tcphdr->flags & TCP_SYN ) {
 			tcp_trans ( conn, TCP_SYN_RCVD );
@@ -687,7 +679,7 @@ void tcp_rx ( struct pk_buff *pkb, uint16_t partial ) {
 		if ( tcphdr->flags & TCP_RST ) {
 			tcp_trans ( conn, TCP_LISTEN );
 			conn->tcp_op->closed ( conn, CONN_RESTART );
-			return;
+			return 0;
 		}
 		if ( tcphdr->flags & TCP_ACK ) {
 			tcp_trans ( conn, TCP_ESTABLISHED );
@@ -697,7 +689,7 @@ void tcp_rx ( struct pk_buff *pkb, uint16_t partial ) {
 			 */
 			conn->snd_una = tcphdr->ack - 1;
 			conn->tcp_op->connected ( conn );
-			return;
+			return 0;
 		}
 		/* Unexpected packet */
 		goto unexpected;
@@ -744,7 +736,7 @@ void tcp_rx ( struct pk_buff *pkb, uint16_t partial ) {
 	case TCP_CLOSING:
 		if ( tcphdr->flags & TCP_ACK ) {
 			tcp_trans ( conn, TCP_TIME_WAIT );
-			return;
+			return 0;
 		}
 		/* Unexpected packet */
 		goto unexpected;
@@ -757,7 +749,7 @@ void tcp_rx ( struct pk_buff *pkb, uint16_t partial ) {
 	case TCP_LAST_ACK:
 		if ( tcphdr->flags & TCP_ACK ) {
 			tcp_trans ( conn, TCP_CLOSED );
-			return;
+			return 0;
 		}
 		/* Unexpected packet */
 		goto unexpected;
@@ -791,7 +783,7 @@ void tcp_rx ( struct pk_buff *pkb, uint16_t partial ) {
 		acked = ntohl ( tcphdr->ack ) - conn->snd_una;
 		if ( acked < 0 ) { /* TODO: Replace all uint32_t arith */
 			DBG ( "Previously ACKed (%d)\n", tcphdr->ack );
-			return;
+			return 0;
 		}
 		/* Advance snd stream */
 		conn->snd_una += acked;
@@ -802,7 +794,7 @@ void tcp_rx ( struct pk_buff *pkb, uint16_t partial ) {
 		/* Invoke the senddata() callback function */
 		tcp_senddata ( conn );
 	}
-	return;
+	return 0;
 
   send_tcp_nomsg:
 	free_pkb ( conn->tx_pkb );
@@ -812,20 +804,20 @@ void tcp_rx ( struct pk_buff *pkb, uint16_t partial ) {
 	if ( ( rc = tcp_send ( conn, TCP_NOMSG, TCP_NOMSG_LEN ) ) != 0 ) {
 		DBG ( "Error sending TCP message (rc = %d)\n", rc );
 	}
-	return;
+	return 0;
 
   unexpected:
 	DBG ( "Unexpected packet received in %d state with flags = %hd\n",
 			conn->tcp_state, tcphdr->flags & TCP_MASK_FLAGS );
 	free_pkb ( conn->tx_pkb );
-	return;
+	return -EINVAL;
 }
 
 /** TCP protocol */
 struct tcpip_protocol tcp_protocol = {
 	.name = "TCP",
 	.rx = tcp_rx,
-	.trans_proto = IP_TCP,
+	.tcpip_proto = IP_TCP,
 	.csum_offset = 16,
 };
 

@@ -10,8 +10,8 @@
  */
 
 #include <stddef.h>
-#include <gpxe/in.h>
 #include <gpxe/pkbuff.h>
+#include <gpxe/tcpip.h>
 #include <gpxe/if_ether.h>
 
 /**
@@ -65,8 +65,9 @@ struct udp_operations {
 	 * @v data	Data
 	 * @v len	Length of data
 	 */
-	void ( * newdata ) ( struct udp_connection *conn,
-			     void *data, size_t len );
+	int ( * newdata ) ( struct udp_connection *conn, void *data,
+			    size_t len, struct sockaddr_tcpip *st_src,
+			    struct sockaddr_tcpip *st_dest );
 };
 
 /**
@@ -75,7 +76,7 @@ struct udp_operations {
  */
 struct udp_connection {
        /** Address of the remote end of the connection */
-	struct sockaddr sa;
+	struct sockaddr_tcpip peer;
 	/** Local port on which the connection receives packets */
 	port_t local_port;
 	/** Transmit buffer */
@@ -86,31 +87,21 @@ struct udp_connection {
 	struct udp_operations *udp_op;
 };
 
-/**
- * UDP protocol
- */
-extern struct tcpip_protocol udp_protocol;
-
-/**
+/*
  * Functions provided to the application layer
  */
 
-extern void udp_init ( struct udp_connection *conn, struct udp_operations *udp_op );
+extern int udp_bind ( struct udp_connection *conn, uint16_t local_port );
+extern void udp_connect ( struct udp_connection *conn,
+			  struct sockaddr_tcpip *peer );
 extern int udp_open ( struct udp_connection *conn, uint16_t local_port );
-
-extern void udp_connect ( struct udp_connection *conn, struct sockaddr *peer );
 extern void udp_close ( struct udp_connection *conn );
 
 extern int udp_senddata ( struct udp_connection *conn );
-extern int udp_send ( struct udp_connection *conn, const void *data, size_t len );
-extern int udp_sendto ( struct udp_connection *conn, struct sockaddr *peer, const void *data, size_t len );
-
-static inline void * udp_buffer ( struct udp_connection *conn ) {
-	return conn->tx_pkb->data;
-}
-
-static inline int udp_buflen ( struct udp_connection *conn ) {
-	return pkb_len ( conn->tx_pkb );
-}
+extern int udp_send ( struct udp_connection *conn,
+		      const void *data, size_t len );
+extern int udp_sendto ( struct udp_connection *conn,
+			struct sockaddr_tcpip *peer,
+			const void *data, size_t len );
 
 #endif /* _GPXE_UDP_H */

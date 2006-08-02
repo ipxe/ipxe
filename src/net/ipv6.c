@@ -12,8 +12,9 @@
 /**
  * Transmit IP6 packets
  */
-int ipv6_tx ( struct pk_buff *pkb __unused, uint16_t trans_proto __unused,
-	      struct in6_addr *dest __unused) {
+static int ipv6_tx ( struct pk_buff *pkb,
+		     struct tcpip_protocol *tcpip_protocol,
+		     struct sockaddr_tcpip *st_dest ) {
 	return -ENOSYS;
 }
 
@@ -22,13 +23,10 @@ int ipv6_tx ( struct pk_buff *pkb __unused, uint16_t trans_proto __unused,
  *
  * Placeholder function. Should rewrite in net/ipv6.c
  */
-void ipv6_rx ( struct pk_buff *pkb __unused,
-	       struct net_device *netdev __unused,
-	       const void *ll_source __unused ) {
-}
-
-void ipv6_tx_csum ( struct pk_buff *pkb, struct tcpip_protocol *tcpip ) {
-	return;
+static int ipv6_rx ( struct pk_buff *pkb __unused,
+		     struct net_device *netdev __unused,
+		     const void *ll_source __unused ) {
+	return -ENOSYS;
 }
 
 static const char * ipv6_ntoa ( const void *net_addr ) {
@@ -49,10 +47,9 @@ NET_PROTOCOL ( ipv6_protocol );
 
 /** IPv6 TCPIP net protocol */
 struct tcpip_net_protocol ipv6_tcpip_protocol = {
-	.net_protocol = &ipv6_protocol,
+	.name = "IPv6",
 	.sa_family = AF_INET6,
 	.tx = ipv6_tx,
-	.tx_csum = ipv6_tx_csum,
 };
 
 TCPIP_NET_PROTOCOL ( ipv6_tcpip_protocol );

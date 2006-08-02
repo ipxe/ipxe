@@ -105,7 +105,7 @@ struct tftp_state {
 	 * This is the UDP port from which the open request will be
 	 * sent, and to which any unicast data packets will be sent.
 	 */
-	in_port_t lport;
+	uint16_t lport;
 	/** TFTP multicast address
 	 *
 	 * This is the IP address and UDP port to which multicast data

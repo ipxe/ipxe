@@ -2,6 +2,7 @@
 #define	_GPXE_IN_H
 
 #include <stdint.h>
+#include <gpxe/socket.h>
 
 /* Protocol numbers */
 
@@ -9,15 +10,6 @@
 #define IP_IGMP		2
 #define IP_TCP		6
 #define IP_UDP		17
-
-/* Network address family numbers */
-
-#define AF_INET		1
-#define AF_INET6	2
-#define AF_802          6
-#define AF_IPX          11
-
-typedef uint16_t sa_family_t;
 
 /* IP address constants */
 
@@ -50,33 +42,35 @@ struct in6_addr {
 #define s6_addr32       in6_u.u6_addr32
 };
 
-typedef uint16_t in_port_t;
-
 /**
- * IP socket address
+ * IPv4 socket address
  */
 struct sockaddr_in {
-	struct in_addr	sin_addr;
-	in_port_t	sin_port;
+	/** Socket address family (part of struct @c sockaddr)
+	 *
+	 * Always set to @c AF_INET for IPv4 addresses
+	 */
+	sa_family_t sin_family;
+	/** TCP/IP port (part of struct @c sockaddr_tcpip) */
+	uint16_t sin_port;
+	/** IPv4 address */
+	struct in_addr sin_addr;
 };
 
 /**
  * IPv6 socket address
  */
 struct sockaddr_in6 {
-        in_port_t       sin6_port;      /* Destination port */
+	/** Socket address family (part of struct @c sockaddr)
+	 *
+	 * Always set to @c AF_INET6 for IPv6 addresses
+	 */
+	sa_family_t sin_family;
+	/** TCP/IP port (part of struct @c sockaddr_tcpip) */
+	uint16_t sin_port;
         uint32_t        sin6_flowinfo;  /* Flow number */
         struct in6_addr sin6_addr;      /* 128-bit destination address */
         uint32_t        sin6_scope_id;  /* Scope ID */
-};
-
-/**
- * Generalized socket address structure
- */
-struct sockaddr {
-        sa_family_t             sa_family;      /* Socket address family */
-        struct sockaddr_in      sin;            /* IP4 socket address */
-        struct sockaddr_in6     sin6;           /* IP6 socket address */
 };
 
 extern int inet_aton ( const char *cp, struct in_addr *inp );

@@ -491,9 +491,12 @@ static void dhcp_done ( struct dhcp_session *dhcp, int rc ) {
 }
 
 /** Address for transmitting DHCP requests */
-static struct sockaddr sa_dhcp_server = {
-	.sa_family = AF_INET,
+static union {
+	struct sockaddr_tcpip st;
+	struct sockaddr_in sin;
+} sa_dhcp_server = {
 	.sin = {
+		.sin_family = AF_INET,
 		.sin_addr.s_addr = INADDR_BROADCAST,
 		.sin_port = htons ( BOOTPS_PORT ),
 	},
@@ -548,7 +551,7 @@ static void dhcp_senddata ( struct udp_connection *conn,
 	}
 
 	/* Transmit the packet */
-	if ( ( rc = udp_sendto ( conn, &sa_dhcp_server,
+	if ( ( rc = udp_sendto ( conn, &sa_dhcp_server.st,
 				 dhcppkt.dhcphdr, dhcppkt.len ) ) != 0 ) {
 		DBG ( "Could not transmit UDP packet\n" );
 		return;
@@ -588,9 +591,12 @@ static void dhcp_timer_expired ( struct retry_timer *timer, int fail ) {
  * @v udp		UDP connection
  * @v data		Received data
  * @v len		Length of received data
+ * @v st_src		Partially-filled source address
+ * @v st_dest		Partially-filled destination address
  */
-static void dhcp_newdata ( struct udp_connection *conn,
-			   void *data, size_t len ) {
+static int dhcp_newdata ( struct udp_connection *conn, void *data, size_t len,
+			  struct sockaddr_tcpip *st_src __unused,
+			  struct sockaddr_tcpip *st_dest __unused ) {
 	struct dhcp_session *dhcp = udp_to_dhcp ( conn );
 	struct dhcphdr *dhcphdr = data;
 	struct dhcp_option_block *options;
@@ -600,14 +606,14 @@ static void dhcp_newdata ( struct udp_connection *conn,
 	if ( dhcphdr->xid != dhcp->xid ) {
 		DBG ( "DHCP wrong transaction ID (wanted %08lx, got %08lx)\n",
 		      ntohl ( dhcphdr->xid ), ntohl ( dhcp->xid ) );
-		return;
+		return 0;
 	};
 
 	/* Parse packet and create options structure */
 	options = dhcp_parse ( dhcphdr, len );
 	if ( ! options ) {
 		DBG ( "Could not parse DHCP packet\n" );
-		return;
+		return -EINVAL;
 	}
 
 	/* Determine message type */
@@ -643,10 +649,11 @@ static void dhcp_newdata ( struct udp_connection *conn,
 	} else {
 		dhcp_done ( dhcp, 0 );
 	}
-	return;
+	return 0;
 
  out_discard:
 	free_dhcp_options ( options );
+	return 0;
 }
 
 /** DHCP UDP operations */

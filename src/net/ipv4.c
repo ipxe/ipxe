@@ -128,7 +128,8 @@ static void ipv4_dump ( struct iphdr *iphdr __unused ) {
  * @v timer	Retry timer
  * @v over	If asserted, the timer is greater than @c MAX_TIMEOUT 
  */
-void ipv4_frag_expired ( struct retry_timer *timer __unused , int over ) {
+static void ipv4_frag_expired ( struct retry_timer *timer __unused,
+				int over ) {
 	if ( over ) {
 		DBG ( "Fragment reassembly timeout" );
 		/* Free the fragment buffer */
@@ -140,7 +141,7 @@ void ipv4_frag_expired ( struct retry_timer *timer __unused , int over ) {
  *
  * @v fragbug	Fragment buffer
  */
-void free_fragbuf ( struct frag_buffer *fragbuf ) {
+static void free_fragbuf ( struct frag_buffer *fragbuf ) {
 	if ( fragbuf ) {
 		free_dma ( fragbuf, sizeof ( *fragbuf ) );
 	}
@@ -152,7 +153,7 @@ void free_fragbuf ( struct frag_buffer *fragbuf ) {
  * @v pkb		Packet buffer, fragment of the datagram
  * @ret frag_pkb	Reassembled packet, or NULL
  */
-struct pk_buff * ipv4_reassemble ( struct pk_buff * pkb ) {
+static struct pk_buff * ipv4_reassemble ( struct pk_buff * pkb ) {
 	struct iphdr *iphdr = pkb->data;
 	struct frag_buffer *fragbuf;
 	
@@ -234,8 +235,8 @@ struct pk_buff * ipv4_reassemble ( struct pk_buff * pkb ) {
  *
  * This function calculates the tcpip 
  */
-void ipv4_tx_csum ( struct pk_buff *pkb, struct tcpip_protocol *tcpip ) {
-
+static void ipv4_tx_csum ( struct pk_buff *pkb,
+			   struct tcpip_protocol *tcpip ) {
 	struct iphdr *iphdr = pkb->data;
 	struct ipv4_pseudo_header pshdr;
 	uint16_t *csum = ( ( ( void * ) iphdr ) + sizeof ( *iphdr )
@@ -255,8 +256,8 @@ void ipv4_tx_csum ( struct pk_buff *pkb, struct tcpip_protocol *tcpip ) {
 /**
  * Calculate the transport-layer checksum while processing packets
  */
-uint16_t ipv4_rx_csum ( struct pk_buff *pkb __unused,
-			uint8_t trans_proto __unused ) {
+static uint16_t ipv4_rx_csum ( struct pk_buff *pkb __unused,
+			       uint8_t trans_proto __unused ) {
 	/** 
 	 * This function needs to be implemented. Until then, it will return
 	 * 0xffffffff every time
@@ -265,91 +266,20 @@ uint16_t ipv4_rx_csum ( struct pk_buff *pkb __unused,
 }
 
 /**
- * Transmit packet constructed by uIP
- *
- * @v pkb		Packet buffer
- * @ret rc		Return status code
- *
- */
-int ipv4_uip_tx ( struct pk_buff *pkb ) {
-	struct iphdr *iphdr = pkb->data;
-	struct ipv4_miniroute *miniroute;
-	struct net_device *netdev = NULL;
-	struct in_addr next_hop;
-	struct in_addr source;
-	uint8_t ll_dest_buf[MAX_LL_ADDR_LEN];
-	const uint8_t *ll_dest = ll_dest_buf;
-	int rc;
-
-	/* Use routing table to identify next hop and transmitting netdev */
-	next_hop = iphdr->dest;
-	list_for_each_entry ( miniroute, &miniroutes, list ) {
-		if ( ( ( ( iphdr->dest.s_addr ^ miniroute->address.s_addr ) &
-			 miniroute->netmask.s_addr ) == 0 ) ||
-		     ( miniroute->gateway.s_addr != INADDR_NONE ) ) {
-			netdev = miniroute->netdev;
-			source = miniroute->address;
-			if ( miniroute->gateway.s_addr != INADDR_NONE )
-				next_hop = miniroute->gateway;
-			break;
-		}
-	}
-
-	/* Abort if no network device identified */
-	if ( ! netdev ) {
-		DBG ( "No route to %s\n", inet_ntoa ( iphdr->dest ) );
-		rc = -EHOSTUNREACH;
-		goto err;
-	}
-
-	/* Determine link-layer destination address */
-	if ( next_hop.s_addr == INADDR_BROADCAST ) {
-		/* Broadcast address */
-		ll_dest = netdev->ll_protocol->ll_broadcast;
-	} else if ( IN_MULTICAST ( next_hop.s_addr ) ) {
-		/* Special case: IPv4 multicast over Ethernet.	This
-		 * code may need to be generalised once we find out
-		 * what happens for other link layers.
-		 */
-		uint8_t *next_hop_bytes = ( uint8_t * ) &next_hop;
-		ll_dest_buf[0] = 0x01;
-		ll_dest_buf[0] = 0x00;
-		ll_dest_buf[0] = 0x5e;
-		ll_dest_buf[3] = next_hop_bytes[1] & 0x7f;
-		ll_dest_buf[4] = next_hop_bytes[2];
-		ll_dest_buf[5] = next_hop_bytes[3];
-	} else {
-		/* Unicast address: resolve via ARP */
-		if ( ( rc = arp_resolve ( netdev, &ipv4_protocol, &next_hop,
-					  &source, ll_dest_buf ) ) != 0 ) {
-			DBG ( "No ARP entry for %s\n",
-			      inet_ntoa ( iphdr->dest ) );
-			goto err;
-		}
-	}
-	
-	/* Hand off to link layer */
-	return net_tx ( pkb, netdev, &ipv4_protocol, ll_dest );
-
- err:
-	free_pkb ( pkb );
-	return rc;
-}
-
-/**
- * Transmit IP packet (without uIP)
+ * Transmit IP packet
  *
  * @v pkb		Packet buffer
  * @v tcpip		Transport-layer protocol
- * @v dest		Destination network-layer address
+ * @v st_dest		Destination network-layer address
  * @ret rc		Status
  *
  * This function expects a transport-layer segment and prepends the IP header
  */
-int ipv4_tx ( struct pk_buff *pkb, struct tcpip_protocol *tcpip,
-	      struct sockaddr* sock ) {
-	struct in_addr *dest = &sock->sin.sin_addr;
+static int ipv4_tx ( struct pk_buff *pkb,
+		     struct tcpip_protocol *tcpip_protocol,
+		     struct sockaddr_tcpip *st_dest ) {
 	struct iphdr *iphdr = pkb_push ( pkb, sizeof ( *iphdr ) );
+	struct sockaddr_in *sin_dest = ( ( struct sockaddr_in * ) st_dest );
 	struct ipv4_miniroute *miniroute;
 	struct net_device *netdev = NULL;
 	struct in_addr next_hop;
@@ -364,10 +294,10 @@ int ipv4_tx ( struct pk_buff *pkb, struct tcpip_protocol *tcpip,
 	iphdr->ident = htons ( next_ident++ );
 	iphdr->frags = 0;
 	iphdr->ttl = IP_TTL;
-	iphdr->protocol = tcpip->trans_proto;
+	iphdr->protocol = tcpip_protocol->tcpip_proto;
 
 	/* Copy destination address */
-	iphdr->dest = *dest;
+	iphdr->dest = sin_dest->sin_addr;
 
 	/**
 	 * All fields in the IP header filled in except the source network
@@ -375,8 +305,6 @@ int ipv4_tx ( struct pk_buff *pkb, struct tcpip_protocol *tcpip,
 	 * requires the source network address). As the pseudo header requires
 	 * the source address as well and the transport-layer checksum is
 	 * updated after routing.
-	 *
-	 * Continue processing as in ipv4_uip_tx()
 	 */
 
 	/* Use routing table to identify next hop and transmitting netdev */
@@ -400,8 +328,8 @@ int ipv4_tx ( struct pk_buff *pkb, struct tcpip_protocol *tcpip,
 	}
 
 	/* Calculate the transport layer checksum */
-	if ( tcpip->csum_offset > 0 ) {
-		ipv4_tx_csum ( pkb, tcpip );
+	if ( tcpip_protocol->csum_offset > 0 ) {
+		ipv4_tx_csum ( pkb, tcpip_protocol );
 	}
 
 	/* Calculate header checksum, in network byte order */
@@ -446,42 +374,7 @@ int ipv4_tx ( struct pk_buff *pkb, struct tcpip_protocol *tcpip,
 }
 
 /**
- * Process incoming IP packets
- *
- * @v pkb		Packet buffer
- * @v netdev		Network device
- * @v ll_source		Link-layer source address
- * @ret rc		Return status code
- *
- * This handles IP packets by handing them off to the uIP protocol
- * stack.
- */
-static int ipv4_uip_rx ( struct pk_buff *pkb,
-			 struct net_device *netdev __unused,
-			 const void *ll_source __unused ) {
-
-	/* Transfer to uIP buffer.  Horrendously space-inefficient,
-	 * but will do as a proof-of-concept for now.
-	 */
-	uip_len = pkb_len ( pkb );
-	memcpy ( uip_buf, pkb->data, uip_len );
-	free_pkb ( pkb );
-
-	/* Hand to uIP for processing */
-	uip_input ();
-	if ( uip_len > 0 ) {
-		pkb = alloc_pkb ( MAX_LL_HEADER_LEN + uip_len );
-		if ( ! pkb )
-			return -ENOMEM;
-		pkb_reserve ( pkb, MAX_LL_HEADER_LEN );
-		memcpy ( pkb_put ( pkb, uip_len ), uip_buf, uip_len );
-		ipv4_uip_tx ( pkb );
-	}
-	return 0;
-}
-
-/**
- * Process incoming packets (without uIP)
+ * Process incoming packets
  *
  * @v pkb	Packet buffer
  * @v netdev	Network device
@@ -490,18 +383,20 @@ static int ipv4_uip_rx ( struct pk_buff *pkb,
  * This function expects an IP4 network datagram. It processes the headers 
  * and sends it to the transport layer.
  */
-void ipv4_rx ( struct pk_buff *pkb, struct net_device *netdev __unused,
-			const void *ll_source __unused ) {
+static int ipv4_rx ( struct pk_buff *pkb, struct net_device *netdev __unused,
+		     const void *ll_source __unused ) {
 	struct iphdr *iphdr = pkb->data;
-	struct in_addr *src = &iphdr->src;
-	struct in_addr *dest = &iphdr->dest;
+	union {
+		struct sockaddr_in sin;
+		struct sockaddr_tcpip st;
+	} src, dest;
 	uint16_t chksum;
 
 	/* Sanity check */
 	if ( pkb_len ( pkb ) < sizeof ( *iphdr ) ) {
 		DBG ( "IP datagram too short (%d bytes)\n",
 			pkb_len ( pkb ) );
-		return;
+		return -EINVAL;
 	}
 
 	/* Print IP4 header for debugging */
@@ -510,14 +405,14 @@ void ipv4_rx ( struct pk_buff *pkb, struct net_device *netdev __unused,
 	/* Validate version and header length */
 	if ( iphdr->verhdrlen != 0x45 ) {
 		DBG ( "Bad version and header length %x\n", iphdr->verhdrlen );
-		return;
+		return -EINVAL;
 	}
 
 	/* Validate length of IP packet */
-	if ( ntohs ( iphdr->len ) != pkb_len ( pkb ) ) {
+	if ( ntohs ( iphdr->len ) > pkb_len ( pkb ) ) {
 		DBG ( "Inconsistent packet length %d\n",
-					ntohs ( iphdr->len ) );
-		return;
+		      ntohs ( iphdr->len ) );
+		return -EINVAL;
 	}
 
 	/* Verify the checksum */
@@ -533,7 +428,7 @@ void ipv4_rx ( struct pk_buff *pkb, struct net_device *netdev __unused,
 		 */
 		pkb = ipv4_reassemble ( pkb );
 		if ( !pkb ) {
-			return;
+			return 0;
 		}
 	}
 
@@ -543,11 +438,19 @@ void ipv4_rx ( struct pk_buff *pkb, struct net_device *netdev __unused,
 	 * 3. Check the service field
 	 */
 
+	/* Construct socket addresses */
+	memset ( &src, 0, sizeof ( src ) );
+	src.sin.sin_family = AF_INET;
+	src.sin.sin_addr = iphdr->src;
+	memset ( &dest, 0, sizeof ( dest ) );
+	dest.sin.sin_family = AF_INET;
+	dest.sin.sin_addr = iphdr->dest;
+
 	/* Strip header */
 	pkb_pull ( pkb, sizeof ( *iphdr ) );
 
 	/* Send it to the transport layer */
-	tcpip_rx ( pkb, iphdr->protocol, src, dest );
+	return tcpip_rx ( pkb, iphdr->protocol, &src.st, &dest.st );
 }
 
 /** 
@@ -601,11 +504,7 @@ struct net_protocol ipv4_protocol = {
 	.name = "IP",
 	.net_proto = htons ( ETH_P_IP ),
 	.net_addr_len = sizeof ( struct in_addr ),
-#if USE_UIP
-	.rx = ipv4_uip_rx,
-#else
 	.rx = ipv4_rx,
-#endif
 	.ntoa = ipv4_ntoa,
 };
 
@@ -613,10 +512,9 @@ NET_PROTOCOL ( ipv4_protocol );
 
 /** IPv4 TCPIP net protocol */
 struct tcpip_net_protocol ipv4_tcpip_protocol = {
-	.net_protocol = &ipv4_protocol,
+	.name = "IPv4",
 	.sa_family = AF_INET,
 	.tx = ipv4_tx,
-	.tx_csum = ipv4_tx_csum,
 };
 
 TCPIP_NET_PROTOCOL ( ipv4_tcpip_protocol );

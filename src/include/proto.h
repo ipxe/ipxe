@@ -7,7 +7,7 @@
 
 struct protocol {
 	char *name;
-	in_port_t default_port;
+	uint16_t default_port;
 	int ( * load ) ( char *url, struct sockaddr_in *server, char *file,
 			 struct buffer *buffer );
 };

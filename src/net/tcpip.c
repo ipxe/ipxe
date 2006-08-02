@@ -1,93 +1,85 @@
 #include <stdint.h>
 #include <string.h>
 #include <errno.h>
-#include <malloc.h>
 #include <byteswap.h>
-#include <gpxe/in.h>
-#include <gpxe/ip.h>
-#include <gpxe/ip6.h>
 #include <gpxe/pkbuff.h>
 #include <gpxe/tables.h>
-#include <gpxe/netdevice.h>
 #include <gpxe/tcpip.h>
 
 /** @file
  *
  * Transport-network layer interface
  *
- * This file contains functions and utilities for the transport-network layer interface
+ * This file contains functions and utilities for the
+ * TCP/IP transport-network layer interface
  */
 
-/** Registered network-layer protocols that support TCPIP */
-static struct tcpip_net_protocol tcpip_net_protocols[0] __table_start ( tcpip_net_protocols );
-static struct tcpip_net_protocol tcpip_net_protocols_end[0] __table_end ( tcpip_net_protocols );
+/** Registered network-layer protocols that support TCP/IP */
+static struct tcpip_net_protocol
+tcpip_net_protocols[0] __table_start ( tcpip_net_protocols );
+static struct tcpip_net_protocol
+tcpip_net_protocols_end[0] __table_end ( tcpip_net_protocols );
 
-/** Registered transport-layer protocols that support TCPIP */
-static struct tcpip_protocol tcpip_protocols[0] __table_start ( tcpip_protocols );
-static struct tcpip_protocol tcpip_protocols_end[0] __table_end ( tcpip_protocols );
+/** Registered transport-layer protocols that support TCP/IP */
+static struct tcpip_protocol
+tcpip_protocols[0]__table_start ( tcpip_protocols );
+static struct tcpip_protocol
+tcpip_protocols_end[0] __table_end ( tcpip_protocols );
 
-/** Process a received packet
+/** Process a received TCP/IP packet
  *
  * @v pkb		Packet buffer
- * @v trans_proto	Transport-layer protocol number
- * @v src		Source network-layer address
- * @v dest		Destination network-layer address
+ * @v tcpip_proto	Transport-layer protocol number
+ * @v st_src		Partially-filled source address
+ * @v st_dest		Partially-filled destination address
+ * @ret rc		Return status code
  *
- * This function expects a transport-layer segment from the network-layer
+ * This function expects a transport-layer segment from the network
+ * layer.  The network layer should fill in as much as it can of the
+ * source and destination addresses (i.e. it should fill in the
+ * address family and the network-layer addresses, but leave the ports
+ * and the rest of the structures as zero).
  */
-void tcpip_rx ( struct pk_buff *pkb, uint8_t trans_proto, struct in_addr *src,
-		struct in_addr *dest ) {
+int tcpip_rx ( struct pk_buff *pkb, uint8_t tcpip_proto, 
+	       struct sockaddr_tcpip *st_src,
+	       struct sockaddr_tcpip *st_dest ) {
 	struct tcpip_protocol *tcpip;
 
-	/* Identify the transport layer protocol */
-	for ( tcpip = tcpip_protocols; tcpip <= tcpip_protocols_end; ++tcpip ) {
-		if ( tcpip->trans_proto == trans_proto ) {
-			tcpip->rx ( pkb, src, dest );
+	/* Hand off packet to the appropriate transport-layer protocol */
+	for ( tcpip = tcpip_protocols; tcpip < tcpip_protocols_end; tcpip++ ) {
+		if ( tcpip->tcpip_proto == tcpip_proto ) {
+			DBG ( "TCP/IP received %s packet\n", tcpip->name );
+			return tcpip->rx ( pkb, st_src, st_dest );
 		}
 	}
+
+	DBG ( "Unrecognised TCP/IP protocol %d\n", tcpip_proto );
+	return -EPROTONOSUPPORT;
 }
 
-/** Transmit a transport-layer segment
+/** Transmit a TCP/IP packet
  *
  * @v pkb		Packet buffer
- * @v trans_proto	Transport-layer protocol
- * @v sock		Destination socket address
- * @ret			Status
+ * @v tcpip_protocol	Transport-layer protocol
+ * @v st_dest		Destination address
+ * @ret rc		Return status code
  */
-int tcpip_tx ( struct pk_buff *pkb, struct tcpip_protocol *tcpip,
-	       struct sockaddr *sock ) {
-
-#if 0 /* This is the right thing to do */
-
+int tcpip_tx ( struct pk_buff *pkb, struct tcpip_protocol *tcpip_protocol,
+	       struct sockaddr_tcpip *st_dest ) {
 	struct tcpip_net_protocol *tcpip_net;
 
-	/* Identify the network layer protocol */
-	for ( tcpip_net = tcpip_net_protocols; 
-			tcpip_net <= tcpip_net_protocols_end; ++tcpip_net ) {
-		if ( tcpip_net->sa_family == sock->sa_family ) {
-			DBG ( "Packet sent to %s module\n", tcpip_net->net_protocol->name );
-			return tcpip_net->tx ( pkb, tcpip, sock );
+	/* Hand off packet to the appropriate network-layer protocol */
+	for ( tcpip_net = tcpip_net_protocols ;
+	      tcpip_net < tcpip_net_protocols_end ; tcpip_net++ ) {
+		if ( tcpip_net->sa_family == st_dest->st_family ) {
+			DBG ( "TCP/IP sending %s packet\n", tcpip_net->name );
+			return tcpip_net->tx ( pkb, tcpip_protocol, st_dest );
 		}
 	}
-	DBG ( "No suitable network layer protocol found for sa_family %s\n",
-						( sock->sa_family );
+	
+	DBG ( "Unrecognised TCP/IP address family %d\n", st_dest->st_family );
 	return -EAFNOSUPPORT;
 }
-
-#else
-
-	/* Identify the network layer protocol and send it using xxx_tx() */
-	switch ( sock->sa_family ) {
-	case AF_INET: /* IPv4 network family */
-		return ipv4_tx ( pkb, tcpip, sock );
-	case AF_INET6: /* IPv6 network family */
-		return ipv6_tx ( pkb, tcpip, sock );
-	}
-	DBG ( "Network family %d not supported", sock->sa_family );
-	return -EAFNOSUPPORT;
-}
-
-#endif
 
 /**
  * Calculate continued TCP/IP checkum

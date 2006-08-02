@@ -2,21 +2,18 @@
 #include <string.h>
 #include <assert.h>
 #include <byteswap.h>
-#include <latch.h>
 #include <errno.h>
-#include <gpxe/in.h>
-#include <gpxe/ip.h>
-#include <gpxe/ip6.h>
-#include <gpxe/udp.h>
-#include <gpxe/init.h>
+#include <gpxe/tcpip.h>
 #include <gpxe/pkbuff.h>
 #include <gpxe/netdevice.h>
-#include <gpxe/tcpip.h>
+#include <gpxe/udp.h>
 
 /** @file
  *
  * UDP protocol
  */
+
+struct tcpip_protocol udp_protocol;
 
 /**
  * List of registered UDP connections
@@ -24,73 +21,101 @@
 static LIST_HEAD ( udp_conns );
 
 /**
- * Some utility functions
+ * Bind UDP connection to local port
+ *
+ * @v conn		UDP connection
+ * @v local_port	Local port, in network byte order
+ * @ret rc		Return status code
  */
-static inline void copy_sockaddr ( struct sockaddr *source, struct sockaddr *dest ) {
-	memcpy ( dest, source, sizeof ( *dest ) );
-}
+int udp_bind ( struct udp_connection *conn, uint16_t local_port ) {
+	struct udp_connection *existing;
 
-static inline uint16_t * dest_port ( struct sockaddr *sock ) {
-	switch ( sock->sa_family ) {
-	case AF_INET:
-		return &sock->sin.sin_port;
-	case AF_INET6:
-		return &sock->sin6.sin6_port;
+	list_for_each_entry ( existing, &udp_conns, list ) {
+		if ( existing->local_port == local_port )
+			return -EADDRINUSE;
 	}
-	return NULL;
+	conn->local_port = local_port;
+	return 0;
 }
 
 /**
- * Dump the UDP header
+ * Bind UDP connection to all local ports
  *
- * @v udphdr	UDP header
+ * @v conn		UDP connection
+ *
+ * A promiscuous UDP connection will receive packets with any
+ * destination UDP port.  This is required in order to support the PXE
+ * UDP API.
+ *
+ * If the promiscuous connection is not the only UDP connection, the
+ * behaviour is undefined.
  */
-void udp_dump ( struct udp_header *udphdr ) {
-
-	/* Print UDP header for debugging */
-	DBG ( "UDP header at %p + %#zx\n", udphdr, sizeof ( *udphdr ) );
-	DBG ( "\tSource Port = %d\n", ntohs ( udphdr->source_port ) );
-	DBG ( "\tDestination Port = %d\n", ntohs ( udphdr->dest_port ) );
-	DBG ( "\tLength = %d\n", ntohs ( udphdr->len ) );
-	DBG ( "\tChecksum = %x\n", ntohs ( udphdr->chksum ) );
-	DBG ( "\tChecksum located at %p\n", &udphdr->chksum );
+void udp_bind_promisc ( struct udp_connection *conn ) {
+	conn->local_port = 0;
 }
 
 /**
- * Open a UDP connection
+ * Connect UDP connection to remote host and port
  *
- * @v conn      UDP connection
- * @v peer      Destination socket address
+ * @v conn		UDP connection
+ * @v peer		Destination socket address
  *
  * This function stores the socket address within the connection
  */
-void udp_connect ( struct udp_connection *conn, struct sockaddr *peer ) {
-	copy_sockaddr ( peer, &conn->sa );
-
-	/* Not sure if this should add the connection to udp_conns; If it does,
-	 * uncomment the following code
-	 */
-//	list_add ( &conn->list, &udp_conns );
+void udp_connect ( struct udp_connection *conn, struct sockaddr_tcpip *peer ) {
+	memcpy ( &conn->peer, peer, sizeof ( conn->peer ) );
 }
 
 /**
- * Initialize a UDP connection
+ * Open a local port
  *
- * @v conn      UDP connection
- * @v udp_op	UDP operations
+ * @v conn		UDP connection
+ * @v local_port	Local port, in network byte order, or zero
+ * @ret rc		Return status code
+ *
+ * Opens the UDP connection and binds to a local port.  If no local
+ * port is specified, the first available port will be used.
  */
-void udp_init ( struct udp_connection *conn, struct udp_operations *udp_op ) {
-	conn->local_port = 0;
-	conn->tx_pkb = NULL;
-	if ( udp_op != NULL ) {
-		conn->udp_op = udp_op;
+int udp_open ( struct udp_connection *conn, uint16_t local_port ) {
+	static uint16_t try_port = 1024;
+	int rc;
+
+	/* If no port specified, find the first available port */
+	if ( ! local_port ) {
+		for ( ; try_port ; try_port++ ) {
+			if ( try_port < 1024 )
+				continue;
+			if ( udp_open ( conn, htons ( try_port ) ) == 0 )
+				return 0;
+		}
+		return -EADDRINUSE;
 	}
+
+	/* Attempt bind to local port */
+	if ( ( rc = udp_bind ( conn, local_port ) ) != 0 )
+		return rc;
+
+	/* Add to UDP connection list */
+	list_add ( &conn->list, &udp_conns );
+	DBG ( "UDP opened %p on port %d\n", conn, ntohs ( local_port ) );
+
+	return 0;
+}
+
+/**
+ * Close a UDP connection
+ *
+ * @v conn		UDP connection
+ */
+void udp_close ( struct udp_connection *conn ) {
+	list_del ( &conn->list );
+	DBG ( "UDP closed %p\n", conn );
 }
 
 /**
  * User request to send data via a UDP connection
  *
- * @v conn	UDP connection
+ * @v conn		UDP connection
  *
  * This function allocates buffer space and invokes the function's senddata()
  * callback. The callback may use the buffer space
@@ -98,8 +123,8 @@ void udp_init ( struct udp_connection *conn, struct udp_operations *udp_op ) {
 int udp_senddata ( struct udp_connection *conn ) {
 	conn->tx_pkb = alloc_pkb ( UDP_MAX_TXPKB );
 	if ( conn->tx_pkb == NULL ) {
-		DBG ( "Error allocating packet buffer of length %d\n",
-							UDP_MAX_TXPKB );
+		DBG ( "UDP %p cannot allocate packet buffer of length %d\n",
+		      conn, UDP_MAX_TXPKB );
 		return -ENOMEM;
 	}
 	pkb_reserve ( conn->tx_pkb, UDP_MAX_HLEN );
@@ -111,19 +136,25 @@ int udp_senddata ( struct udp_connection *conn ) {
 /**
  * Transmit data via a UDP connection to a specified address
  *
- * @v conn      UDP connection
- * @v peer	Destination address
- * @v data      Data to send
- * @v len       Length of data
+ * @v conn		UDP connection
+ * @v peer		Destination address
+ * @v data		Data to send
+ * @v len		Length of data
+ * @ret rc		Return status code
  *
- * This function fills up the UDP headers and sends the data. Discover the
- * network protocol through the sa_family field in the destination socket
- * address.
+ * This function fills up the UDP headers and sends the data.  It may
+ * be called only from within the context of an application's
+ * senddata() method; if the application wishes to send data it must
+ * call udp_senddata() and wait for its senddata() method to be
+ * called.
  */
-int udp_sendto ( struct udp_connection *conn, struct sockaddr *peer,
+int udp_sendto ( struct udp_connection *conn, struct sockaddr_tcpip *peer,
 		 const void *data, size_t len ) {
-       	struct udp_header *udphdr;		/* UDP header */
-	uint16_t *dest;
+       	struct udp_header *udphdr;
+
+	/* Avoid overflowing TX buffer */
+	if ( len > pkb_available ( conn->tx_pkb ) )
+		len = pkb_available ( conn->tx_pkb );
 
 	/* Copy payload */
 	memmove ( pkb_put ( conn->tx_pkb, len ), data, len );
@@ -135,104 +166,77 @@ int udp_sendto ( struct udp_connection *conn, struct sockaddr *peer,
 	 * sending it over the network
 	 */
 	udphdr = pkb_push ( conn->tx_pkb, sizeof ( *udphdr ) );
-	if ( (dest = dest_port ( peer ) ) == NULL ) {
-		DBG ( "Network family %d not supported\n", peer->sa_family );
-		return -EAFNOSUPPORT;
-	}
-	udphdr->dest_port = *dest;
+	udphdr->dest_port = peer->st_port;
 	udphdr->source_port = conn->local_port;
 	udphdr->len = htons ( pkb_len ( conn->tx_pkb ) );
 	udphdr->chksum = 0;
 	udphdr->chksum = tcpip_chksum ( udphdr, sizeof ( *udphdr ) + len );
 
-	/**
-	 * Dump the contents of the UDP header
-	 */
-	udp_dump ( udphdr );
+	/* Dump debugging information */
+	DBG ( "UDP %p transmitting %p+%#zx len %#x src %d dest %d "
+	      "chksum %#04x\n", conn, conn->tx_pkb->data,
+	      pkb_len ( conn->tx_pkb ), ntohs ( udphdr->len ),
+	      ntohs ( udphdr->source_port ), ntohs ( udphdr->dest_port ),
+	      ntohs ( udphdr->chksum ) );
 
 	/* Send it to the next layer for processing */
 	return tcpip_tx ( conn->tx_pkb, &udp_protocol, peer );
 }
 
 /**
- * Transmit data via a UDP connection to a specified address
- *
- * @v conn      UDP connection
- * @v data      Data to send
- * @v len       Length of data
- */
-int udp_send ( struct udp_connection *conn, const void *data, size_t len ) {
-	return udp_sendto ( conn, &conn->sa, data, len );
-}
-
-/**
- * Close a UDP connection
- *
- * @v conn      UDP connection
- */
-void udp_close ( struct udp_connection *conn ) {
-	list_del ( &conn->list );
-}
-
-/**
- * Open a local port
+ * Transmit data via a UDP connection
  *
  * @v conn		UDP connection
- * @v local_port	Local port on which to open connection
+ * @v data		Data to send
+ * @v len		Length of data
+ * @ret rc		Return status code
  *
- * This does not support the 0 port option correctly yet
+ * This function fills up the UDP headers and sends the data.  It may
+ * be called only from within the context of an application's
+ * senddata() method; if the application wishes to send data it must
+ * call udp_senddata() and wait for its senddata() method to be
+ * called.
  */
-int udp_open ( struct udp_connection *conn, uint16_t local_port ) {
-	struct udp_connection *connr;
-	uint16_t min_port = 0xffff;
-
-	/* Iterate through udp_conns to see if local_port is available */
-	list_for_each_entry ( connr, &udp_conns, list ) {
-		if ( connr->local_port == local_port ) {
-			return -EISCONN;
-		}
-		if ( min_port > connr->local_port ) {
-			min_port = connr->local_port;
-		}
-	}
-	/* This code is buggy. I will update it soon :) */
-	conn->local_port = local_port == 0 ? min_port > 1024 ? 1024 :
-						min_port + 1 : local_port;
-
-	/* Add the connection to the list of listening connections */
-	list_add ( &conn->list, &udp_conns );
-	return 0;
+int udp_send ( struct udp_connection *conn, const void *data, size_t len ) {
+	return udp_sendto ( conn, &conn->peer, data, len );
 }
 
 /**
  * Process a received packet
  *
- * @v pkb	       Packet buffer
- * @v src_net_addr      Source network address
- * @v dest_net_addr     Destination network address
+ * @v pkb		Packet buffer
+ * @v st_src		Partially-filled source address
+ * @v st_dest		Partially-filled destination address
+ * @ret rc		Return status code
  */
-void udp_rx ( struct pk_buff *pkb, struct in_addr *src_net_addr __unused,
-			struct in_addr *dest_net_addr __unused ) {
+static int udp_rx ( struct pk_buff *pkb, struct sockaddr_tcpip *st_src,
+		    struct sockaddr_tcpip *st_dest ) {
 	struct udp_header *udphdr = pkb->data;
 	struct udp_connection *conn;
-	uint16_t ulen;
+	unsigned int ulen;
 	uint16_t chksum;
 
-	udp_dump ( udphdr );
-
-	/* Validate the packet and the UDP length */
+	/* Sanity check */
 	if ( pkb_len ( pkb ) < sizeof ( *udphdr ) ) {
-		DBG ( "UDP packet too short (%d bytes)\n",
-		      pkb_len ( pkb ) );
-		return;
+		DBG ( "UDP received underlength packet %p+%#zx\n",
+		      pkb->data, pkb_len ( pkb ) );
+		return -EINVAL;
 	}
 
+	/* Dump debugging information */
+	DBG ( "UDP received %p+%#zx len %#x src %d dest %d chksum %#04x\n",
+	      pkb->data, pkb_len ( pkb ), ntohs ( udphdr->len ),
+	      ntohs ( udphdr->source_port ), ntohs ( udphdr->dest_port ),
+	      ntohs ( udphdr->chksum ) );
+
+	/* Check length and trim any excess */
 	ulen = ntohs ( udphdr->len );
-	if ( ulen != pkb_len ( pkb ) ) {
-		DBG ( "Inconsistent UDP packet length (%d bytes)\n",
-		      pkb_len ( pkb ) );
-		return;
+	if ( ulen > pkb_len ( pkb ) ) {
+		DBG ( "UDP received truncated packet %p+%#zx\n",
+		      pkb->data, pkb_len ( pkb ) );
+		return -EINVAL;
 	}
+	pkb_unput ( pkb, ( pkb_len ( pkb ) - ulen ) );
 
 	/* Verify the checksum */
 #warning "Don't we need to take the pseudo-header into account here?"
@@ -240,32 +244,49 @@ void udp_rx ( struct pk_buff *pkb, struct in_addr *src_net_addr __unused,
 	chksum = tcpip_chksum ( pkb->data, pkb_len ( pkb ) );
 	if ( chksum != 0xffff ) {
 		DBG ( "Bad checksum %#x\n", chksum );
-		return;
+		return -EINVAL;
 	}
 #endif
 
-	/* Todo: Check if it is a broadcast or multicast address */
+	/* Complete the socket addresses */
+	st_src->st_port = udphdr->source_port;
+	st_dest->st_port = udphdr->dest_port;
 
 	/* Demux the connection */
 	list_for_each_entry ( conn, &udp_conns, list ) {
-		if ( conn->local_port == udphdr->dest_port ) {
-			goto conn;
+		if ( conn->local_port &&
+		     ( conn->local_port != udphdr->dest_port ) ) {
+			/* Bound to local port and local port doesn't match */
+			continue;
 		}
+		if ( conn->peer.st_family &&
+		     ( memcmp ( &conn->peer, st_src,
+				sizeof ( conn->peer ) ) != 0 ) ) {
+			/* Connected to remote port and remote port
+			 * doesn't match
+			 */
+			continue;
+		}
+		
+		/* Strip off the UDP header */
+		pkb_pull ( pkb, sizeof ( *udphdr ) );
+
+		DBG ( "UDP delivering to %p\n", conn );
+		
+		/* Call the application's callback */
+		return conn->udp_op->newdata ( conn, pkb->data, pkb_len( pkb ),
+					       st_src, st_dest );
 	}
-	return;
 
-	conn:
-	/** Strip off the UDP header */
-	pkb_pull ( pkb, sizeof ( *udphdr ) );
-
-	/** Call the application's callback */
-	conn->udp_op->newdata ( conn, pkb->data, ulen - sizeof ( *udphdr ) );
+	DBG ( "No UDP connection listening on port %d\n",
+	      ntohs ( udphdr->dest_port ) );
+	return 0;
 }
 
 struct tcpip_protocol udp_protocol  = {
 	.name = "UDP",
 	.rx = udp_rx,
-	.trans_proto = IP_UDP,
+	.tcpip_proto = IP_UDP,
 	.csum_offset = 6,
 };
 

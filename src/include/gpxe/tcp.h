@@ -10,8 +10,8 @@
  */
 
 #include <stddef.h>
-#include <gpxe/in.h>
 #include <gpxe/list.h>
+#include <gpxe/tcpip.h>
 #include <gpxe/pkbuff.h>
 
 struct tcp_connection;
@@ -142,8 +142,11 @@ extern void tcp_close ( struct tcp_connection *conn );
  * A TCP connection
  */
 struct tcp_connection {
-	struct sockaddr sa;		/* Remote socket address */
-	struct sockaddr_in sin;		/* Internet socket address */
+	struct sockaddr_tcpip peer;	/* Remote socket address */
+
+	/* FIXME: this field should no longer be present */
+	struct sockaddr_in sin;
+
 	uint16_t local_port;		/* Local port, in network byte order */
 	int tcp_state;			/* TCP state */
 	int tcp_lstate;			/* Last TCP state */
@@ -200,7 +203,8 @@ extern struct tcpip_protocol tcp_protocol;
 
 extern void tcp_init_conn ( struct tcp_connection *conn );
 extern int tcp_connect ( struct tcp_connection *conn );
-extern int tcp_connectto ( struct tcp_connection *conn, struct sockaddr *peer );
+extern int tcp_connectto ( struct tcp_connection *conn,
+			   struct sockaddr_tcpip *peer );
 extern int tcp_listen ( struct tcp_connection *conn, uint16_t port );
 extern int tcp_senddata ( struct tcp_connection *conn );
 extern int tcp_close ( struct tcp_connection *conn );
