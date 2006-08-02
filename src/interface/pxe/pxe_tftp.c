@@ -22,6 +22,8 @@
  * Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
  */
 
+#if 0
+
 #include "pxe.h"
 
 static int pxe_tftp_read_block ( unsigned char *data, unsigned int block,
@@ -621,3 +623,5 @@ Note to future API designers at Intel: try to understand the
 underlying network protocol first!
 
 */
+
+#endif

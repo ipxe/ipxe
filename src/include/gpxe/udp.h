@@ -64,6 +64,9 @@ struct udp_operations {
 	 * @v conn	UDP connection
 	 * @v data	Data
 	 * @v len	Length of data
+	 * @v st_src	Source address
+	 * @v st_dest	Destination address
+	 * @ret rc	Return status code
 	 */
 	int ( * newdata ) ( struct udp_connection *conn, void *data,
 			    size_t len, struct sockaddr_tcpip *st_src,
@@ -92,8 +95,10 @@ struct udp_connection {
  */
 
 extern int udp_bind ( struct udp_connection *conn, uint16_t local_port );
+extern void udp_bind_promisc ( struct udp_connection *conn );
 extern void udp_connect ( struct udp_connection *conn,
 			  struct sockaddr_tcpip *peer );
+extern void udp_connect_promisc ( struct udp_connection *conn );
 extern int udp_open ( struct udp_connection *conn, uint16_t local_port );
 extern void udp_close ( struct udp_connection *conn );
 

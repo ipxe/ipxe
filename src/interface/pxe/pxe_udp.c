@@ -4,9 +4,12 @@
  *
  */
 
-#include "pxe.h"
-#include "io.h"
-#include "string.h"
+#include <string.h>
+#include <byteswap.h>
+#include <gpxe/udp.h>
+#include <gpxe/uaccess.h>
+#include <gpxe/process.h>
+#include <pxe.h>
 
 /*
  * Copyright (C) 2004 Michael Brown <mbrown@fensystems.co.uk>.
@@ -26,14 +29,116 @@
  * Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
  */
 
+/** A PXE UDP connection */
+struct pxe_udp_connection {
+	/** Etherboot UDP connection */
+	struct udp_connection udp;
+	/** "Connection is open" flag */
+	int open;
+	/** Current pxenv_udp_read() operation, if any */
+	struct s_PXENV_UDP_READ *pxenv_udp_read;
+	/** Current pxenv_udp_write() operation, if any */
+	struct s_PXENV_UDP_WRITE *pxenv_udp_write;
+};
+
+static inline struct pxe_udp_connection *
+udp_to_pxe ( struct udp_connection *conn ) {
+	return container_of ( conn, struct pxe_udp_connection, udp );
+}
+
+/**
+ * Send PXE UDP data
+ *
+ * @v conn			UDP connection
+ * @v data			Temporary data buffer
+ * @v len			Size of temporary data buffer
+ *
+ * Sends the packet belonging to the current pxenv_udp_write()
+ * operation.
+ */
+static void pxe_udp_senddata ( struct udp_connection *conn, void *data,
+			       size_t len ) {
+	struct pxe_udp_connection *pxe_udp = udp_to_pxe ( conn );
+	struct s_PXENV_UDP_WRITE *pxenv_udp_write = pxe_udp->pxenv_udp_write;
+	userptr_t buffer;
+
+	/* Transmit packet */
+	buffer = real_to_user ( pxenv_udp_write->buffer.segment,
+				pxenv_udp_write->buffer.offset );
+	if ( len > pxenv_udp_write->buffer_size )
+		len = pxenv_udp_write->buffer_size;
+	copy_from_user ( data, buffer, 0, len );
+	udp_send ( conn, data, len );
+}
+
+/**
+ * Receive PXE UDP data
+ *
+ * @v conn			UDP connection
+ * @v data			Received data
+ * @v len			Length of received data
+ * @v st_src			Source address
+ * @v st_dest			Destination address
+ *
+ * Receives a packet as part of the current pxenv_udp_read()
+ * operation.
+ */
+static int pxe_udp_newdata ( struct udp_connection *conn, void *data,
+			     size_t len, struct sockaddr_tcpip *st_src,
+			     struct sockaddr_tcpip *st_dest ) {
+	struct pxe_udp_connection *pxe_udp = udp_to_pxe ( conn );
+	struct s_PXENV_UDP_READ *pxenv_udp_read = pxe_udp->pxenv_udp_read;
+	struct sockaddr_in *sin_src = ( ( struct sockaddr_in * ) st_src );
+	struct sockaddr_in *sin_dest = ( ( struct sockaddr_in * ) st_dest );
+	userptr_t buffer;
+
+	if ( ! pxenv_udp_read ) {
+		DBG ( "PXE discarded UDP packet\n" );
+		return -ENOBUFS;
+	}
+
+	/* Copy packet to buffer and record length */
+	buffer = real_to_user ( pxenv_udp_read->buffer.segment,
+				pxenv_udp_read->buffer.offset );
+	if ( len > pxenv_udp_read->buffer_size )
+		len = pxenv_udp_read->buffer_size;
+	copy_to_user ( buffer, 0, data, len );
+	pxenv_udp_read->buffer_size = len;
+
+	/* Fill in source/dest information */
+	assert ( sin_src->sin_family == AF_INET );
+	pxenv_udp_read->src_ip = sin_src->sin_addr.s_addr;
+	pxenv_udp_read->s_port = sin_src->sin_port;
+	assert ( sin_dest->sin_family == AF_INET );
+	pxenv_udp_read->dest_ip = sin_dest->sin_addr.s_addr;
+	pxenv_udp_read->d_port = sin_dest->sin_port;
+
+	/* Mark as received */
+	pxe_udp->pxenv_udp_read = NULL;
+
+	return 0;
+}
+
+/** PXE UDP operations */
+static struct udp_operations pxe_udp_operations = {
+	.senddata = pxe_udp_senddata,
+	.newdata = pxe_udp_newdata,
+};
+
+/** The PXE UDP connection */
+static struct pxe_udp_connection pxe_udp = {
+	.udp.udp_op = &pxe_udp_operations,
+};
+
 /**
  * UDP OPEN
  *
- * @v udp_open				Pointer to a struct s_PXENV_UDP_OPEN
+ * @v pxenv_udp_open			Pointer to a struct s_PXENV_UDP_OPEN
  * @v s_PXENV_UDP_OPEN::src_ip		IP address of this station, or 0.0.0.0
  * @ret #PXENV_EXIT_SUCCESS		Always
  * @ret s_PXENV_UDP_OPEN::Status	PXE status code
- * @err #PXENV_STATUS_UNDI_INVALID_STATE NIC could not be initialised
+ * @err #PXENV_STATUS_UDP_OPEN		UDP connection already open
+ * @err #PXENV_STATUS_OUT_OF_RESOURCES	Could not open connection
  *
  * Prepares the PXE stack for communication using pxenv_udp_write()
  * and pxenv_udp_read().
@@ -45,10 +150,13 @@
  * s_PXENV_UDP_OPEN::src_ip is 0.0.0.0, the local station's IP address
  * will remain unchanged.)
  *
- * You can only have one open UDP connection at a time.  You cannot
- * have a UDP connection open at the same time as a TFTP connection.
- * (This is not strictly true for Etherboot; see the relevant @ref
- * pxe_note_udp "implementation note" for more details.)
+ * You can only have one open UDP connection at a time.  This is not a
+ * meaningful restriction, since pxenv_udp_write() and
+ * pxenv_udp_read() allow you to specify arbitrary local and remote
+ * ports and an arbitrary remote address for each packet.  According
+ * to the PXE specifiation, you cannot have a UDP connection open at
+ * the same time as a TFTP connection; this restriction does not apply
+ * to Etherboot.
  *
  * On x86, you must set the s_PXE::StatusCallout field to a nonzero
  * value before calling this function in protected mode.  You cannot
@@ -60,38 +168,52 @@
  * for this UDP connection, or retained for all future communication.
  * The latter seems more consistent with typical PXE stack behaviour.
  *
+ * @note Etherboot currently ignores the s_PXENV_UDP_OPEN::src_ip
+ * parameter.
+ *
  */
-PXENV_EXIT_t pxenv_udp_open ( struct s_PXENV_UDP_OPEN *udp_open ) {
-	DBG ( "PXENV_UDP_OPEN" );
-	ENSURE_READY ( udp_open );
+PXENV_EXIT_t pxenv_udp_open ( struct s_PXENV_UDP_OPEN *pxenv_udp_open ) {
+	struct in_addr new_ip = { .s_addr = pxenv_udp_open->src_ip };
 
-	if ( udp_open->src_ip &&
-	     udp_open->src_ip != arptable[ARP_CLIENT].ipaddr.s_addr ) {
-		/* Overwrite our IP address */
-		DBG ( " with new IP %@", udp_open->src_ip );
-		arptable[ARP_CLIENT].ipaddr.s_addr = udp_open->src_ip;
+	DBG ( "PXENV_UDP_OPEN" );
+
+	/* Check connection is not already open */
+	if ( pxe_udp.open ) {
+		pxenv_udp_open->Status = PXENV_STATUS_UDP_OPEN;
+		return PXENV_EXIT_FAILURE;
 	}
 
-	udp_open->Status = PXENV_STATUS_SUCCESS;
+	/* Set IP address if specified */
+	if ( new_ip.s_addr ) {
+		/* FIXME: actually do something here */
+		DBG ( " with new IP address %s", inet_ntoa ( new_ip ) );
+	}
+
+	/* Open UDP connection */
+	if ( udp_open ( &pxe_udp.udp, 0 ) != 0 ) {
+		pxenv_udp_open->Status = PXENV_STATUS_OUT_OF_RESOURCES;
+		return PXENV_EXIT_FAILURE;
+	}
+	pxe_udp.open = 1;
+
+	pxenv_udp_open->Status = PXENV_STATUS_SUCCESS;
 	return PXENV_EXIT_SUCCESS;
 }
 
 /**
  * UDP CLOSE
  *
- * @v udp_close				Pointer to a struct s_PXENV_UDP_CLOSE
+ * @v pxenv_udp_close			Pointer to a struct s_PXENV_UDP_CLOSE
  * @ret #PXENV_EXIT_SUCCESS		Always
  * @ret s_PXENV_UDP_CLOSE::Status	PXE status code
  * @err None				-
  *
- * Closes a UDP "connection" opened with pxenv_udp_open().
+ * Closes a UDP connection opened with pxenv_udp_open().
  *
  * You can only have one open UDP connection at a time.  You cannot
  * have a UDP connection open at the same time as a TFTP connection.
  * You cannot use pxenv_udp_close() to close a TFTP connection; use
- * pxenv_tftp_close() instead.  (This is not strictly true for
- * Etherboot; see the relevant @ref pxe_note_udp "implementation note"
- * for more details.)
+ * pxenv_tftp_close() instead.
  *
  * On x86, you must set the s_PXE::StatusCallout field to a nonzero
  * value before calling this function in protected mode.  You cannot
@@ -99,16 +221,27 @@ PXENV_EXIT_t pxenv_udp_open ( struct s_PXENV_UDP_OPEN *udp_open ) {
  * @ref pxe_x86_pmode16 "implementation note" for more details.)
  *
  */
-PXENV_EXIT_t pxenv_udp_close ( struct s_PXENV_UDP_CLOSE *udp_close __unused ) {
+PXENV_EXIT_t pxenv_udp_close ( struct s_PXENV_UDP_CLOSE *pxenv_udp_close ) {
 	DBG ( "PXENV_UDP_CLOSE" );
-	udp_close->Status = PXENV_STATUS_SUCCESS;
+
+	/* Check connection is open */
+	if ( ! pxe_udp.open ) {
+		pxenv_udp_close->Status = PXENV_STATUS_UDP_CLOSED;
+		return PXENV_EXIT_SUCCESS; /* Well, it *is* closed */
+	}
+
+	/* Close UDP connection */
+	udp_close ( &pxe_udp.udp );
+	pxe_udp.open = 0;
+
+	pxenv_udp_close->Status = PXENV_STATUS_SUCCESS;
 	return PXENV_EXIT_SUCCESS;
 }
 
 /**
  * UDP WRITE
  *
- * @v udp_write				Pointer to a struct s_PXENV_UDP_WRITE
+ * @v pxenv_udp_write			Pointer to a struct s_PXENV_UDP_WRITE
  * @v s_PXENV_UDP_WRITE::ip		Destination IP address
  * @v s_PXENV_UDP_WRITE::gw		Relay agent IP address, or 0.0.0.0
  * @v s_PXENV_UDP_WRITE::src_port	Source UDP port, or 0
@@ -118,9 +251,8 @@ PXENV_EXIT_t pxenv_udp_close ( struct s_PXENV_UDP_CLOSE *udp_close __unused ) {
  * @ret #PXENV_EXIT_SUCCESS		Packet was transmitted successfully
  * @ret #PXENV_EXIT_FAILURE		Packet could not be transmitted
  * @ret s_PXENV_UDP_WRITE::Status	PXE status code
- * @err #PXENV_STATUS_UNDI_INVALID_STATE NIC could not be initialised
- * @err #PXENV_STATUS_OUT_OF_RESOURCES	Packet was too large to transmit
- * @err other				Any error from pxenv_undi_transmit()
+ * @err #PXENV_STATUS_UDP_CLOSED	UDP connection is not open
+ * @err #PXENV_STATUS_UNDI_TRANSMIT_ERROR Could not transmit packet
  *
  * Transmits a single UDP packet.  A valid IP and UDP header will be
  * prepended to the payload in s_PXENV_UDP_WRITE::buffer; the buffer
@@ -136,116 +268,64 @@ PXENV_EXIT_t pxenv_udp_close ( struct s_PXENV_UDP_CLOSE *udp_close __unused ) {
  * If s_PXENV_UDP_WRITE::src_port is 0, port 2069 will be used.
  *
  * You must have opened a UDP connection with pxenv_udp_open() before
- * calling pxenv_udp_write().  (This is not strictly true for
- * Etherboot; see the relevant @ref pxe_note_udp "implementation note"
- * for more details.)
+ * calling pxenv_udp_write().
  *
  * On x86, you must set the s_PXE::StatusCallout field to a nonzero
  * value before calling this function in protected mode.  You cannot
  * call this function with a 32-bit stack segment.  (See the relevant
  * @ref pxe_x86_pmode16 "implementation note" for more details.)
  *
+ * @note Etherboot currently ignores the s_PXENV_UDP_WRITE::gw
+ * parameter.
+ *
  */
-PXENV_EXIT_t pxenv_udp_write ( struct s_PXENV_UDP_WRITE *udp_write ) {
-	uint16_t src_port;
-	uint16_t dst_port;
-	struct udppacket *packet = (struct udppacket *)nic.packet;
-	int packet_size;
+PXENV_EXIT_t pxenv_udp_write ( struct s_PXENV_UDP_WRITE *pxenv_udp_write ) {
+	union {
+		struct sockaddr_in sin;
+		struct sockaddr_tcpip st;
+	} dest;
 
 	DBG ( "PXENV_UDP_WRITE" );
-	ENSURE_READY ( udp_write );
 
-	/* PXE spec says source port is 2069 if not specified */
-	src_port = ntohs(udp_write->src_port);
-	if ( src_port == 0 ) src_port = 2069;
-	dst_port = ntohs(udp_write->dst_port);
-	DBG ( " %d->%@:%d (%d)", src_port, udp_write->ip, dst_port,
-	      udp_write->buffer_size );
-	
+	/* Check connection is open */
+	if ( ! pxe_udp.open ) {
+		pxenv_udp_write->Status = PXENV_STATUS_UDP_CLOSED;
+		return PXENV_EXIT_FAILURE;
+	}
+
+	/* Construct destination socket address */
+	memset ( &dest, 0, sizeof ( dest ) );
+	dest.sin.sin_family = AF_INET;
+	dest.sin.sin_addr.s_addr = pxenv_udp_write->ip;
+	dest.sin.sin_port = pxenv_udp_write->dst_port;
+
+	/* Set local (source) port.  PXE spec says source port is 2069
+	 * if not specified.  Really, this ought to be set at UDP open
+	 * time but hey, we didn't design this API.
+	 */
+	if ( ! pxenv_udp_write->src_port )
+		pxenv_udp_write->src_port = htons ( 2069 );
+	udp_bind ( &pxe_udp.udp, pxenv_udp_write->src_port );
+
 	/* FIXME: we ignore the gateway specified, since we're
 	 * confident of being able to do our own routing.  We should
 	 * probably allow for multiple gateways.
 	 */
 	
-	/* Copy payload to packet buffer */
-	packet_size = ( (void*)&packet->payload - (void*)packet )
-		+ udp_write->buffer_size;
-	if ( packet_size > ETH_FRAME_LEN ) {
-		udp_write->Status = PXENV_STATUS_OUT_OF_RESOURCES;
-		return PXENV_EXIT_FAILURE;
-	}
-	memcpy ( &packet->payload, SEGOFF16_TO_PTR(udp_write->buffer),
-		 udp_write->buffer_size );
-
 	/* Transmit packet */
-	if ( ! udp_transmit ( udp_write->ip, src_port, dst_port,
-			      packet_size, packet ) ) {
-		udp_write->Status = errno;
+	if ( udp_senddata ( &pxe_udp.udp ) != 0 ) {
+		pxenv_udp_write->Status = PXENV_STATUS_UNDI_TRANSMIT_ERROR;
 		return PXENV_EXIT_FAILURE;
 	}
 
-	udp_write->Status = PXENV_STATUS_SUCCESS;
+	pxenv_udp_write->Status = PXENV_STATUS_SUCCESS;
 	return PXENV_EXIT_SUCCESS;
-}
-
-/* Utility function for pxenv_udp_read() */
-static int await_pxe_udp ( int ival __unused, void *ptr,
-			   unsigned short ptype __unused,
-			   struct iphdr *ip, struct udphdr *udp,
-			   struct tcphdr *tcp __unused ) {
-	struct s_PXENV_UDP_READ *udp_read = (struct s_PXENV_UDP_READ*)ptr;
-	uint16_t d_port;
-	size_t size;
-
-	/* Ignore non-UDP packets */
-	if ( !udp ) {
-		DBG ( " non-UDP" );
-		return 0;
-	}
-	
-	/* Check dest_ip */
-	if ( udp_read->dest_ip && ( udp_read->dest_ip != ip->dest.s_addr ) ) {
-		DBG ( " wrong dest IP (got %@, wanted %@)",
-		      ip->dest.s_addr, udp_read->dest_ip );
-		return 0;
-	}
-
-	/* Check dest_port */
-	d_port = ntohs ( udp_read->d_port );
-	if ( d_port && ( d_port != ntohs(udp->dest) ) ) {
-		DBG ( " wrong dest port (got %d, wanted %d)",
-		      ntohs(udp->dest), d_port );
-		return 0;
-	}
-
-	/* Copy packet to buffer and fill in information */
-	udp_read->src_ip = ip->src.s_addr;
-	udp_read->s_port = udp->src; /* Both in network order */
-	size = ntohs(udp->len) - sizeof(*udp);
-	/* Workaround: NTLDR expects us to fill these in, even though
-	 * PXESPEC clearly defines them as input parameters.
-	 */
-	udp_read->dest_ip = ip->dest.s_addr;
-	udp_read->d_port = udp->dest;
-	DBG ( " %@:%d->%@:%d (%d)",
-	      udp_read->src_ip, ntohs(udp_read->s_port),
-	      udp_read->dest_ip, ntohs(udp_read->d_port), size );
-	if ( udp_read->buffer_size < size ) {
-		/* PXESPEC: what error code should we actually return? */
-		DBG ( " buffer too small (%d)", udp_read->buffer_size );
-		udp_read->Status = PXENV_STATUS_OUT_OF_RESOURCES;
-		return 0;
-	}
-	memcpy ( SEGOFF16_TO_PTR ( udp_read->buffer ), &udp->payload, size );
-	udp_read->buffer_size = size;
-
-	return 1;
 }
 
 /**
  * UDP READ
  *
- * @v udp_read				Pointer to a struct s_PXENV_UDP_READ
+ * @v pxenv_udp_read			Pointer to a struct s_PXENV_UDP_READ
  * @v s_PXENV_UDP_READ::dest_ip		Destination IP address, or 0.0.0.0
  * @v s_PXENV_UDP_READ::d_port		Destination UDP port, or 0
  * @v s_PXENV_UDP_READ::buffer_size	Size of the UDP payload buffer
@@ -258,8 +338,7 @@ static int await_pxe_udp ( int ival __unused, void *ptr,
  * @ret s_PXENV_UDP_READ::s_port	Source UDP port
  * @ret s_PXENV_UDP_READ::d_port	Destination UDP port
  * @ret s_PXENV_UDP_READ::buffer_size	Length of UDP payload
- * @err #PXENV_STATUS_UNDI_INVALID_STATE NIC could not be initialised
- * @err #PXENV_STATUS_OUT_OF_RESOURCES	Buffer was too small for payload
+ * @err #PXENV_STATUS_UDP_CLOSED	UDP connection is not open
  * @err #PXENV_STATUS_FAILURE		No packet was ready to read
  *
  * Receive a single UDP packet.  This is a non-blocking call; if no
@@ -273,9 +352,7 @@ static int await_pxe_udp ( int ival __unused, void *ptr,
  * port will be accepted and may be returned to the caller.
  *
  * You must have opened a UDP connection with pxenv_udp_open() before
- * calling pxenv_udp_read().  (This is not strictly true for
- * Etherboot; see the relevant @ref pxe_note_udp "implementation note"
- * for more details.)
+ * calling pxenv_udp_read().
  *
  * On x86, you must set the s_PXE::StatusCallout field to a nonzero
  * value before calling this function in protected mode.  You cannot
@@ -288,45 +365,40 @@ static int await_pxe_udp ( int ival __unused, void *ptr,
  * expects us to do so, and will fail if we don't.
  *
  */
-PXENV_EXIT_t pxenv_udp_read ( struct s_PXENV_UDP_READ *udp_read ) {
-	DBG ( "PXENV_UDP_READ" );
-	ENSURE_READY ( udp_read );
+PXENV_EXIT_t pxenv_udp_read ( struct s_PXENV_UDP_READ *pxenv_udp_read ) {
+	struct in_addr dest_ip = { .s_addr = pxenv_udp_read->dest_ip };
+	uint16_t d_port = pxenv_udp_read->d_port;
 
-	/* Use await_reply with a timeout of zero */
-	/* Allow await_reply to change Status if necessary */
-	udp_read->Status = PXENV_STATUS_FAILURE;
-	if ( ! await_reply ( await_pxe_udp, 0, udp_read, 0 ) ) {
+	DBG ( "PXENV_UDP_READ" );
+
+	/* Check connection is open */
+	if ( ! pxe_udp.open ) {
+		pxenv_udp_read->Status = PXENV_STATUS_UDP_CLOSED;
 		return PXENV_EXIT_FAILURE;
 	}
 
-	udp_read->Status = PXENV_STATUS_SUCCESS;
+	/* Bind promiscuously; we will do our own filtering */
+	udp_bind_promisc ( &pxe_udp.udp );
+
+	/* Try receiving a packet */
+	pxe_udp.pxenv_udp_read = pxenv_udp_read;
+	step();
+	if ( pxe_udp.pxenv_udp_read ) {
+		/* No packet received */
+		pxe_udp.pxenv_udp_read = NULL;
+		goto no_packet;
+	}
+
+	/* Filter on destination address and/or port */
+	if ( dest_ip.s_addr && ( dest_ip.s_addr != pxenv_udp_read->dest_ip ) )
+		goto no_packet;
+	if ( d_port && ( d_port != pxenv_udp_read->d_port ) )
+		goto no_packet;
+
+	pxenv_udp_read->Status = PXENV_STATUS_SUCCESS;
 	return PXENV_EXIT_SUCCESS;
+
+ no_packet:
+	pxenv_udp_read->Status = PXENV_STATUS_FAILURE;
+	return PXENV_EXIT_FAILURE;
 }
-
-/** @page pxe_notes Etherboot PXE implementation notes
-
-@section pxe_note_udp The connectionless nature of UDP
-
-The PXE specification states that it is possible to have only one open
-UDP or TFTP connection at any one time.  Etherboot does not
-rigourously enforce this restriction, on the UNIX principle that the
-code should not prevent the user from doing stupid things, because
-that would also prevent the user from doing clever things.  Since UDP
-is a connectionless protocol, it is perfectly possible to have
-multiple concurrent UDP "connections" open, provided that you take the
-multiplicity of connections into account when calling
-pxenv_udp_read().  Similarly, there is no technical reason that
-prevents you from calling pxenv_udp_write() in the middle of a TFTP
-download.
-
-Etherboot will therefore never return error codes indicating "a
-connection is already open", such as #PXENV_STATUS_UDP_OPEN.  If you
-want to have multiple concurrent connections, go for it (but don't
-expect your perfectly sensible code to work with any other PXE stack).
-
-Since Etherboot treats UDP as the connectionless protocol that it
-really is, pxenv_udp_close() is actually a no-op, and there is no need
-to call pxenv_udp_open() before using pxenv_udp_write() or
-pxenv_udp_read().
-
-*/

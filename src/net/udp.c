@@ -67,6 +67,18 @@ void udp_connect ( struct udp_connection *conn, struct sockaddr_tcpip *peer ) {
 }
 
 /**
+ * Connect UDP connection to all remote hosts and ports
+ *
+ * @v conn		UDP connection
+ *
+ * This undoes the effect of a call to udp_connect(), i.e. allows the
+ * connection to receive packets from all remote hosts and ports.
+ */
+void udp_connect_promisc ( struct udp_connection *conn ) {
+	memset ( &conn->peer, 0, sizeof ( conn->peer ) );
+}
+
+/**
  * Open a local port
  *
  * @v conn		UDP connection

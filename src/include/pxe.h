@@ -3,8 +3,13 @@
 
 #include "pxe_types.h"
 #include "pxe_api.h"
-#include "etherboot.h"
-#include "tftp.h"
+
+/* Parameter block for pxenv_unknown() */
+struct s_PXENV_UNKNOWN {
+	PXENV_STATUS_t Status;			/**< PXE status code */
+} PACKED;
+
+typedef struct s_PXENV_UNKNOWN PXENV_UNKNOWN_t;
 
 /* Union used for PXE API calls; we don't know the type of the
  * structure until we interpret the opcode.  Also, Status is available
@@ -14,6 +19,7 @@
 union u_PXENV_ANY {
 	/* Make it easy to read status for any operation */
 	PXENV_STATUS_t				Status;
+	struct s_PXENV_UNKNOWN			unknown;
 	struct s_PXENV_UNLOAD_STACK		unload_stack;
 	struct s_PXENV_GET_CACHED_INFO		get_cached_info;
 	struct s_PXENV_TFTP_READ_FILE		restart_tftp;
@@ -81,29 +87,11 @@ typedef enum {
 typedef struct pxe_stack {
 	struct s_PXE		pxe	__attribute__ ((aligned(16)));
 	struct s_PXENV		pxenv	__attribute__ ((aligned(16)));
-	pxe_stack_state_t state;
-	union {
-		BOOTPLAYER_t	cached_info;
-		char		packet[ETH_FRAME_LEN];
-		struct {
-			uint32_t magic_cookie;
-			unsigned int len;
-			int eof;
-			char data[TFTP_MAX_BLKSIZE];
-		} tftpdata;
-		struct {
-			char *buffer;
-			uint32_t offset;
-			uint32_t bufferlen;
-		} readfile;
-	};
-	struct {}	arch_data __attribute__ ((aligned(16)));
+	pxe_stack_state_t	state;
 } pxe_stack_t;
 
 extern int ensure_pxe_state ( pxe_stack_state_t wanted );
 
 extern pxe_stack_t *pxe_stack;
-
-extern PXENV_EXIT_t pxe_api_call ( int opcode, union u_PXENV_ANY *any );
 
 #endif /* PXE_H */
