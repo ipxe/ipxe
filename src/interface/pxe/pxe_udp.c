@@ -52,12 +52,13 @@ udp_to_pxe ( struct udp_connection *conn ) {
  * @v conn			UDP connection
  * @v data			Temporary data buffer
  * @v len			Size of temporary data buffer
+ * @ret rc			Return status code
  *
  * Sends the packet belonging to the current pxenv_udp_write()
  * operation.
  */
-static void pxe_udp_senddata ( struct udp_connection *conn, void *data,
-			       size_t len ) {
+static int pxe_udp_senddata ( struct udp_connection *conn, void *data,
+			      size_t len ) {
 	struct pxe_udp_connection *pxe_udp = udp_to_pxe ( conn );
 	struct s_PXENV_UDP_WRITE *pxenv_udp_write = pxe_udp->pxenv_udp_write;
 	userptr_t buffer;
@@ -68,7 +69,7 @@ static void pxe_udp_senddata ( struct udp_connection *conn, void *data,
 	if ( len > pxenv_udp_write->buffer_size )
 		len = pxenv_udp_write->buffer_size;
 	copy_from_user ( data, buffer, 0, len );
-	udp_send ( conn, data, len );
+	return udp_send ( conn, data, len );
 }
 
 /**

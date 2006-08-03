@@ -48,6 +48,7 @@ struct udp_operations {
 	 * @v conn	UDP connection
 	 * @v buf	Temporary data buffer
 	 * @v len	Length of temporary data buffer
+	 * @ret rc	Return status code
 	 *
 	 * The application may use the temporary data buffer to
 	 * construct the data to be sent.  Note that merely filling
@@ -56,8 +57,8 @@ struct udp_operations {
 	 * the buffer is not compulsory; the application may call
 	 * udp_send() on any block of data.
 	 */
-	void ( * senddata ) ( struct udp_connection *conn, void *buf,
-			      size_t len );
+	int ( * senddata ) ( struct udp_connection *conn, void *buf,
+			     size_t len );
 	/**
 	 * New data received
 	 *
@@ -98,7 +99,6 @@ extern int udp_bind ( struct udp_connection *conn, uint16_t local_port );
 extern void udp_bind_promisc ( struct udp_connection *conn );
 extern void udp_connect ( struct udp_connection *conn,
 			  struct sockaddr_tcpip *peer );
-extern void udp_connect_promisc ( struct udp_connection *conn );
 extern int udp_open ( struct udp_connection *conn, uint16_t local_port );
 extern void udp_close ( struct udp_connection *conn );
 

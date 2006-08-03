@@ -508,9 +508,10 @@ static union {
  * @v conn		UDP connection
  * @v buf		Temporary data buffer
  * @v len		Length of temporary data buffer
+ * @ret rc		Return status code
  */
-static void dhcp_senddata ( struct udp_connection *conn,
-			    void *buf, size_t len ) {
+static int dhcp_senddata ( struct udp_connection *conn,
+			   void *buf, size_t len ) {
 	struct dhcp_session *dhcp = udp_to_dhcp ( conn );
 	struct dhcp_packet dhcppkt;
 	int rc;
@@ -524,14 +525,14 @@ static void dhcp_senddata ( struct udp_connection *conn,
 	if ( ( rc = create_dhcp_packet ( dhcp, dhcp->state, buf, len,
 					 &dhcppkt ) ) != 0 ) {
 		DBG ( "Could not create DHCP packet\n" );
-		return;
+		return rc;
 	}
 
 	/* Copy in options common to all requests */
 	if ( ( rc = copy_dhcp_packet_options ( &dhcppkt,
 					       &dhcp_request_options ) ) != 0){
 		DBG ( "Could not set common DHCP options\n" );
-		return;
+		return rc;
 	}
 
 	/* Copy any required options from previous server repsonse */
@@ -540,13 +541,13 @@ static void dhcp_senddata ( struct udp_connection *conn,
 					    DHCP_SERVER_IDENTIFIER,
 					    DHCP_SERVER_IDENTIFIER ) ) != 0 ) {
 			DBG ( "Could not set server identifier option\n" );
-			return;
+			return rc;
 		}
 		if ( ( rc = copy_dhcp_packet_option ( &dhcppkt, dhcp->options,
 					    DHCP_EB_YIADDR,
 					    DHCP_REQUESTED_ADDRESS ) ) != 0 ) {
 			DBG ( "Could not set requested address option\n" );
-			return;
+			return rc;
 		}
 	}
 
@@ -554,8 +555,10 @@ static void dhcp_senddata ( struct udp_connection *conn,
 	if ( ( rc = udp_sendto ( conn, &sa_dhcp_server.st,
 				 dhcppkt.dhcphdr, dhcppkt.len ) ) != 0 ) {
 		DBG ( "Could not transmit UDP packet\n" );
-		return;
+		return rc;
 	}
+
+	return 0;
 }
 
 /**

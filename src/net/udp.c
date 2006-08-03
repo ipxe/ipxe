@@ -67,18 +67,6 @@ void udp_connect ( struct udp_connection *conn, struct sockaddr_tcpip *peer ) {
 }
 
 /**
- * Connect UDP connection to all remote hosts and ports
- *
- * @v conn		UDP connection
- *
- * This undoes the effect of a call to udp_connect(), i.e. allows the
- * connection to receive packets from all remote hosts and ports.
- */
-void udp_connect_promisc ( struct udp_connection *conn ) {
-	memset ( &conn->peer, 0, sizeof ( conn->peer ) );
-}
-
-/**
  * Open a local port
  *
  * @v conn		UDP connection
@@ -140,9 +128,8 @@ int udp_senddata ( struct udp_connection *conn ) {
 		return -ENOMEM;
 	}
 	pkb_reserve ( conn->tx_pkb, UDP_MAX_HLEN );
-	conn->udp_op->senddata ( conn, conn->tx_pkb->data, 
-				 pkb_available ( conn->tx_pkb ) );
-	return 0;
+	return conn->udp_op->senddata ( conn, conn->tx_pkb->data, 
+					pkb_available ( conn->tx_pkb ) );
 }
 		
 /**
@@ -269,14 +256,6 @@ static int udp_rx ( struct pk_buff *pkb, struct sockaddr_tcpip *st_src,
 		if ( conn->local_port &&
 		     ( conn->local_port != udphdr->dest_port ) ) {
 			/* Bound to local port and local port doesn't match */
-			continue;
-		}
-		if ( conn->peer.st_family &&
-		     ( memcmp ( &conn->peer, st_src,
-				sizeof ( conn->peer ) ) != 0 ) ) {
-			/* Connected to remote port and remote port
-			 * doesn't match
-			 */
 			continue;
 		}
 		
