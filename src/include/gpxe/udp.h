@@ -95,10 +95,63 @@ struct udp_connection {
  * Functions provided to the application layer
  */
 
+/**
+ * Bind UDP connection to all local ports
+ *
+ * @v conn		UDP connection
+ *
+ * A promiscuous UDP connection will receive packets with any
+ * destination UDP port.  This is required in order to support the PXE
+ * UDP API.
+ *
+ * If the promiscuous connection is not the only UDP connection, the
+ * behaviour is undefined.
+ */
+static inline void udp_bind_promisc ( struct udp_connection *conn ) {
+	conn->local_port = 0;
+}
+
+/**
+ * Connect UDP connection to remote host and port
+ *
+ * @v conn		UDP connection
+ * @v peer		Destination socket address
+ *
+ * This function sets the default address for transmitted packets,
+ * i.e. the address used when udp_send() is called rather than
+ * udp_sendto().
+ */
+static inline void udp_connect ( struct udp_connection *conn,
+				 struct sockaddr_tcpip *peer ) {
+	memcpy ( &conn->peer, peer, sizeof ( conn->peer ) );
+}
+
+/**
+ * Connect UDP connection to remote port
+ *
+ * @v conn		UDP connection
+ * @v port		Destination port
+ *
+ * This function sets only the port part of the default address for
+ * transmitted packets.
+ */
+static inline void udp_connect_port ( struct udp_connection *conn,
+				      uint16_t port ) {
+	conn->peer.st_port = port;
+}
+
+/**
+ * Get default address for transmitted packets
+ *
+ * @v conn		UDP connection
+ * @ret peer		Default destination socket address
+ */
+static inline struct sockaddr_tcpip *
+udp_peer ( struct udp_connection *conn ) {
+	return &conn->peer;
+}
+
 extern int udp_bind ( struct udp_connection *conn, uint16_t local_port );
-extern void udp_bind_promisc ( struct udp_connection *conn );
-extern void udp_connect ( struct udp_connection *conn,
-			  struct sockaddr_tcpip *peer );
 extern int udp_open ( struct udp_connection *conn, uint16_t local_port );
 extern void udp_close ( struct udp_connection *conn );
 

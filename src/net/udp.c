@@ -39,34 +39,6 @@ int udp_bind ( struct udp_connection *conn, uint16_t local_port ) {
 }
 
 /**
- * Bind UDP connection to all local ports
- *
- * @v conn		UDP connection
- *
- * A promiscuous UDP connection will receive packets with any
- * destination UDP port.  This is required in order to support the PXE
- * UDP API.
- *
- * If the promiscuous connection is not the only UDP connection, the
- * behaviour is undefined.
- */
-void udp_bind_promisc ( struct udp_connection *conn ) {
-	conn->local_port = 0;
-}
-
-/**
- * Connect UDP connection to remote host and port
- *
- * @v conn		UDP connection
- * @v peer		Destination socket address
- *
- * This function stores the socket address within the connection
- */
-void udp_connect ( struct udp_connection *conn, struct sockaddr_tcpip *peer ) {
-	memcpy ( &conn->peer, peer, sizeof ( conn->peer ) );
-}
-
-/**
  * Open a local port
  *
  * @v conn		UDP connection
