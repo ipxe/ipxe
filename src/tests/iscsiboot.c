@@ -8,14 +8,15 @@
 static struct iscsi_device test_iscsidev;
 
 int test_iscsiboot ( const char *initiator_iqn,
-		     struct in_addr target,
+		     struct sockaddr_tcpip *target,
 		     const char *target_iqn ) {
+	struct sockaddr_in *sin;
 	struct int13_drive drive;
 	int rc;
 
 	memset ( &test_iscsidev, 0, sizeof ( test_iscsidev ) );
-	test_iscsidev.iscsi.tcp.sin.sin_addr = target;
-	test_iscsidev.iscsi.tcp.sin.sin_port = htons ( ISCSI_PORT );
+	memcpy ( &test_iscsidev.iscsi.tcp.peer, target,
+		 sizeof ( test_iscsidev.iscsi.tcp.peer ) );
 	test_iscsidev.iscsi.initiator = initiator_iqn;
 	test_iscsidev.iscsi.target = target_iqn;
 

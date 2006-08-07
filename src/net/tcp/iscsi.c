@@ -777,7 +777,7 @@ int iscsi_issue ( struct iscsi_session *iscsi,
 
 	if ( iscsi->status & ISCSI_STATUS_CONNECTED ) {
 		iscsi_start_command ( iscsi );
-		tcp_kick ( &iscsi->tcp );
+		tcp_senddata ( &iscsi->tcp );
 	} else {
 		iscsi->tcp.tcp_op = &iscsi_tcp_operations;
 		tcp_connect ( &iscsi->tcp );

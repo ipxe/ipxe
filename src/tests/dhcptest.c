@@ -3,6 +3,48 @@
 #include <byteswap.h>
 #include <gpxe/ip.h>
 #include <gpxe/dhcp.h>
+#include <gpxe/iscsi.h>
+
+static int test_dhcp_aoe_boot ( struct net_device *netdev,
+				char *aoename ) {
+	unsigned int drivenum;
+	
+	drivenum = find_global_dhcp_num_option ( DHCP_EB_BIOS_DRIVE );
+	return test_aoeboot ( netdev, aoename, drivenum );
+}
+
+static int test_dhcp_iscsi_boot ( struct net_device *netdev __unused,
+				  char *iscsiname ) {
+	char *initiator_iqn = "iqn.1900-01.localdomain.localhost:initiator";
+	char *target_iqn;
+	union {
+		struct sockaddr_in sin;
+		struct sockaddr_tcpip st;
+	} target;
+
+	memset ( &target, 0, sizeof ( target ) );
+	target.sin.sin_family = AF_INET;
+	target.sin.sin_port = htons ( ISCSI_PORT );
+	target_iqn = strchr ( iscsiname, ':' ) + 1;
+	if ( ! target_iqn ) {
+		printf ( "Invalid iSCSI DHCP path\n" );
+		return -EINVAL;
+	}
+	inet_aton ( iscsiname, &target.sin.sin_addr );
+
+	return test_iscsiboot ( initiator_iqn, &target, target_iqn );
+}
+
+static int test_dhcp_boot ( struct net_device *netdev, char *filename ) {
+	if ( strncmp ( filename, "aoe:", 4 ) == 0 ) {
+		return test_dhcp_aoe_boot ( netdev, &filename[4] );
+	} else if ( strncmp ( filename, "iscsi:", 6 ) == 0 ) {
+		return test_dhcp_iscsi_boot ( netdev, &filename[6] );
+	} else {
+		printf ( "Don't know how to boot %s\n", filename );
+		return -EPROTONOSUPPORT;
+	}
+}
 
 int test_dhcp ( struct net_device *netdev ) {
 	struct dhcp_session dhcp;
@@ -56,16 +98,10 @@ int test_dhcp ( struct net_device *netdev ) {
 				       gateway ) ) != 0 )
 		goto out_no_del_ipv4;
 
-	/* Proof of concept: check for "aoe:" prefix and if found, do
-	 * test AoE boot with AoE options.
-	 */
-	if ( strncmp ( filename, "aoe:", 4 ) == 0 ) {
-		unsigned int drivenum;
-		
-		drivenum = find_global_dhcp_num_option ( DHCP_EB_BIOS_DRIVE );
-		test_aoeboot ( netdev, &filename[4], drivenum );
-	} else {
-		printf ( "Don't know how to boot %s\n", filename );
+	/* Test boot */
+	if ( ( rc = test_dhcp_boot ( netdev, filename ) ) != 0 ) {
+		printf ( "Boot failed\n" );
+		goto out;
 	}
 	
  out:
