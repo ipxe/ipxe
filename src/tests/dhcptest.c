@@ -25,14 +25,15 @@ static int test_dhcp_iscsi_boot ( struct net_device *netdev __unused,
 	memset ( &target, 0, sizeof ( target ) );
 	target.sin.sin_family = AF_INET;
 	target.sin.sin_port = htons ( ISCSI_PORT );
-	target_iqn = strchr ( iscsiname, ':' ) + 1;
+	target_iqn = strchr ( iscsiname, ':' );
+	*target_iqn++ = '\0';
 	if ( ! target_iqn ) {
 		printf ( "Invalid iSCSI DHCP path\n" );
 		return -EINVAL;
 	}
 	inet_aton ( iscsiname, &target.sin.sin_addr );
 
-	return test_iscsiboot ( initiator_iqn, &target, target_iqn );
+	return test_iscsiboot ( initiator_iqn, &target.st, target_iqn );
 }
 
 static int test_dhcp_boot ( struct net_device *netdev, char *filename ) {
