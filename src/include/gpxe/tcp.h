@@ -13,6 +13,7 @@
 #include <gpxe/list.h>
 #include <gpxe/tcpip.h>
 #include <gpxe/pkbuff.h>
+#include <gpxe/retry.h>
 
 struct tcp_connection;
 
@@ -157,8 +158,13 @@ struct tcp_connection {
 	uint8_t tcp_flags;		/* TCP header flags */
 	struct list_head list;		/* List of TCP connections */
 	struct pk_buff *tx_pkb;		/* Transmit packet buffer */
+	struct retry_timer timer;	/* Retransmission timer */
+	int retransmits;		/* Number of retransmits */
 	struct tcp_operations *tcp_op;	/* Operations table for connection */
 };
+
+/** Retry timer values */
+#define MAX_RETRANSMITS	3
 
 /**
  * Connection closed status codes

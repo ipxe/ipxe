@@ -11,6 +11,7 @@
 #include <gpxe/ip.h>
 #include <gpxe/tcp.h>
 #include <gpxe/tcpip.h>
+#include <gpxe/retry.h>
 #include "uip/uip.h"
 
 /** @file
@@ -369,6 +370,58 @@ void tcp_init_conn ( struct tcp_connection *conn ) {
 	conn->tcp_op = NULL;
 }
 
+/** Retry timer
+ *
+ * @v timer	Retry timer
+ * @v over	Failure indicator
+ */
+void tcp_expired ( struct retry_timer *timer, int over ) {
+	struct tcp_connection *conn;
+	if ( over ) {
+		conn = ( struct tcp_connection * ) container_of ( timer, 
+						struct tcp_connection, timer );
+		switch ( conn->tcp_state ) {
+		case TCP_SYN_SENT:
+			if ( conn->retransmits > MAX_RETRANSMITS ) {
+				tcp_trans ( conn, TCP_CLOSED );
+				return;
+			}
+			if ( conn->tcp_lstate == TCP_CLOSED ||
+			     conn->tcp_lstate == TCP_LISTEN ) {
+				goto send_tcp_nomsg;
+			}
+			return;
+		case TCP_SYN_RCVD:
+			tcp_trans ( conn, TCP_CLOSED );
+			if ( conn->tcp_lstate == TCP_LISTEN ||
+			     conn->tcp_lstate == TCP_SYN_SENT ) {
+				goto send_tcp_nomsg;
+			}
+			return;
+		case TCP_ESTABLISHED:
+			break;
+		case TCP_FIN_WAIT_1:
+		case TCP_FIN_WAIT_2:
+		case TCP_CLOSE_WAIT:
+			goto send_tcp_nomsg;
+		case TCP_CLOSING:
+		case TCP_LAST_ACK:
+			return;
+		case TCP_TIME_WAIT:
+			tcp_trans ( conn, TCP_CLOSED );
+			return;
+		}
+		/* Retransmit the data */
+		tcp_senddata ( conn );
+		conn->retransmits++;
+		return;
+
+  send_tcp_nomsg:
+		tcp_send ( conn, TCP_NOMSG, TCP_NOMSG_LEN );
+		return;
+	}
+}
+
 /**
  * Connect to a remote server
  *
@@ -395,6 +448,9 @@ int tcp_connectto ( struct tcp_connection *conn,
 		return rc;
 	}
 	memcpy ( &conn->peer, peer, sizeof ( conn->peer ) );
+
+	/* Initialize the TCP timer */
+	conn->timer.expired = tcp_expired;
 
 	/* Send a SYN packet and transition to TCP_SYN_SENT */
 	conn->snd_una = ( ( ( uint32_t ) random() ) << 16 ) & random();
@@ -577,6 +633,9 @@ int tcp_send ( struct tcp_connection *conn, const void *data, size_t len ) {
 	/* Dump the TCP header */
 	tcp_dump ( tcphdr );
 
+	/* Start the timer */
+	start_timer ( &conn->timer );
+
 	/* Transmit packet */
 	return tcpip_tx ( pkb, &tcp_protocol, peer );
 }
@@ -624,6 +683,10 @@ static int tcp_rx ( struct pk_buff *pkb,
 	return 0;
 
   found_conn:
+	/* Stop the timer */
+	stop_timer ( &conn->timer );
+	conn->retransmits = 0;
+
 	/* Set the advertised window */
 	conn->snd_win = tcphdr->win;
 
