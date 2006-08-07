@@ -13,8 +13,7 @@ static int test_dhcp_aoe_boot ( struct net_device *netdev,
 	return test_aoeboot ( netdev, aoename, drivenum );
 }
 
-static int test_dhcp_iscsi_boot ( struct net_device *netdev __unused,
-				  char *iscsiname ) {
+static int test_dhcp_iscsi_boot ( char *iscsiname ) {
 	char *initiator_iqn = "iqn.1900-01.localdomain.localhost:initiator";
 	char *target_iqn;
 	union {
@@ -36,11 +35,35 @@ static int test_dhcp_iscsi_boot ( struct net_device *netdev __unused,
 	return test_iscsiboot ( initiator_iqn, &target.st, target_iqn );
 }
 
+static int test_dhcp_hello ( char *helloname ) {
+	char *message;
+	union {
+		struct sockaddr_in sin;
+		struct sockaddr_tcpip st;
+	} target;
+
+	memset ( &target, 0, sizeof ( target ) );
+	target.sin.sin_family = AF_INET;
+	target.sin.sin_port = htons ( 80 );
+	message = strchr ( helloname, ':' );
+	*message++ = '\0';
+	if ( ! message ) {
+		printf ( "Invalid hello path\n" );
+		return -EINVAL;
+	}
+	inet_aton ( helloname, &target.sin.sin_addr );	
+
+	test_hello ( &target.st, message );
+	return 0;
+}
+
 static int test_dhcp_boot ( struct net_device *netdev, char *filename ) {
 	if ( strncmp ( filename, "aoe:", 4 ) == 0 ) {
 		return test_dhcp_aoe_boot ( netdev, &filename[4] );
 	} else if ( strncmp ( filename, "iscsi:", 6 ) == 0 ) {
-		return test_dhcp_iscsi_boot ( netdev, &filename[6] );
+		return test_dhcp_iscsi_boot ( &filename[6] );
+	} else if ( strncmp ( filename, "hello:", 6 ) == 0 ) {
+		return test_dhcp_hello ( &filename[6] );
 	} else {
 		printf ( "Don't know how to boot %s\n", filename );
 		return -EPROTONOSUPPORT;

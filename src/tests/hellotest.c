@@ -22,15 +22,17 @@ static void test_hello_callback ( char *data, size_t len ) {
 	}
 }
 
-void test_hello ( struct sockaddr_in *server, const char *message ) {
+void test_hello ( struct sockaddr_tcpip *server, const char *message ) {
+	/* Quick and dirty hack */
+	struct sockaddr_in *sin = ( struct sockaddr_in * ) server;
 	struct hello_request hello;
 	int rc;
 
 	printf ( "Saying \"%s\" to %s:%d\n", message,
-		 inet_ntoa ( server->sin_addr ), ntohs ( server->sin_port ) );
+		 inet_ntoa ( sin->sin_addr ), ntohs ( sin->sin_port ) );
 	
 	memset ( &hello, 0, sizeof ( hello ) );
-	hello.tcp.sin = *server;
+	memcpy ( &hello.tcp.peer, server, sizeof ( hello.tcp.peer ) );
 	hello.message = message;
 	hello.callback = test_hello_callback;
 
