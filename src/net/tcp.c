@@ -570,7 +570,7 @@ int tcp_send ( struct tcp_connection *conn, const void *data, size_t len ) {
 	tcphdr->win = htons ( conn->rcv_win );
 	/* Set urgent pointer to 0 */
 	tcphdr->urg = 0;
-	/* Calculate and store partial checksum, in network byte order */
+	/* Calculate and store partial checksum, in host byte order */
 	tcphdr->csum = 0;
 	tcphdr->csum = tcpip_chksum ( pkb->data, pkb_len ( pkb ) );
 	

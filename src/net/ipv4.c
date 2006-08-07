@@ -247,6 +247,7 @@ static void ipv4_tx_csum ( struct pk_buff *pkb,
 	pshdr.dest = iphdr->dest;
 	pshdr.zero_padding = 0x00;
 	pshdr.protocol = iphdr->protocol;
+	/* This is only valid when IPv4 does not have options */
 	pshdr.len = htons ( pkb_len ( pkb ) - sizeof ( *iphdr ) );
 
 	/* Update the checksum value */
