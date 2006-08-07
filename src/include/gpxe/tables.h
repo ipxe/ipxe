@@ -192,7 +192,7 @@
  *
  */
 #define __table(table,idx) \
-	__attribute__ (( unused, __table_section(table,idx) ))
+	__attribute__ (( __table_section(table,idx) ))
 
 /**
  * Linker table start marker.
@@ -208,7 +208,7 @@
  *
  */
 #define __table_start(table) \
-	__attribute__ (( unused, __table_section_start(table) ))
+	__attribute__ (( __table_section_start(table) ))
 
 /**
  * Linker table end marker.
@@ -224,6 +224,6 @@
  *
  */
 #define __table_end(table) \
-	__attribute__ (( unused, __table_section_end(table) ))
+	__attribute__ (( __table_section_end(table) ))
 
 #endif /* _GPXE_TABLES_H */
