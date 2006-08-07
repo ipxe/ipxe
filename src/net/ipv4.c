@@ -311,12 +311,15 @@ static int ipv4_tx ( struct pk_buff *pkb,
 	/* Use routing table to identify next hop and transmitting netdev */
 	next_hop = iphdr->dest;
 	list_for_each_entry ( miniroute, &miniroutes, list ) {
-		if ( ( ( ( iphdr->dest.s_addr ^ miniroute->address.s_addr ) &
-			 miniroute->netmask.s_addr ) == 0 ) ||
-		     ( miniroute->gateway.s_addr != INADDR_NONE ) ) {
+		int local, has_gw;
+
+		local = ( ( ( iphdr->dest.s_addr ^ miniroute->address.s_addr )
+			    & miniroute->netmask.s_addr ) == 0 );
+		has_gw = ( miniroute->gateway.s_addr != INADDR_NONE );
+		if ( local || has_gw ) {
 			netdev = miniroute->netdev;
 			iphdr->src = miniroute->address;
-			if ( miniroute->gateway.s_addr != INADDR_NONE )
+			if ( ! local )
 				next_hop = miniroute->gateway;
 			break;
 		}
