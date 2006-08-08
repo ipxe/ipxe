@@ -11,7 +11,8 @@
 
 /* IP6 constants */
 
-#define IP6_VER		6
+#define IP6_VERSION	0x6
+#define IP6_HOP_LIMIT	64
 
 /* IP6 header */
 

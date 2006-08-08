@@ -159,7 +159,6 @@ struct tcp_connection {
 	struct list_head list;		/* List of TCP connections */
 	struct pk_buff *tx_pkb;		/* Transmit packet buffer */
 	struct retry_timer timer;	/* Retransmission timer */
-	int retransmits;		/* Number of retransmits */
 	struct tcp_operations *tcp_op;	/* Operations table for connection */
 };
 
@@ -198,10 +197,10 @@ struct tcp_header {
 /**
  * TCP flags
  */
-#define TCP_RST		0x20
+#define TCP_URG		0x20
 #define TCP_ACK		0x10
 #define TCP_PSH		0x08
-#define TCP_URG		0x04
+#define TCP_RST		0x04
 #define TCP_SYN		0x02
 #define TCP_FIN		0x01
 

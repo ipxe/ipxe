@@ -258,17 +258,7 @@ static const char *tcp_states[] = {
  * @v conn	TCP connection
  * @v nxt_state Next TCP state
  */
-void tcp_trans ( struct tcp_connection *conn, int nxt_state ) {
-	/* Remember the last state */
-	conn->tcp_lstate = conn->tcp_state;
-	conn->tcp_state = nxt_state;
-
-	/* TODO: Check if this check is required */
-	if ( conn->tcp_lstate == conn->tcp_state || 
-	     conn->tcp_state == TCP_INVALID ) {
-		conn->tcp_flags = 0;
-		return;
-	}
+void tcp_set_flags ( struct tcp_connection *conn ) {
 
 	/* Set the TCP flags */
 	switch ( conn->tcp_state ) {
@@ -331,12 +321,29 @@ void tcp_trans ( struct tcp_connection *conn, int nxt_state ) {
 	}
 }
 
+void tcp_trans ( struct tcp_connection *conn, int nxt_state ) {
+	/* Remember the last state */
+	conn->tcp_lstate = conn->tcp_state;
+	conn->tcp_state = nxt_state;
+
+	printf ( "Transition from %s to %s\n", tcp_states[conn->tcp_lstate], tcp_states[conn->tcp_state] );
+
+	/* TODO: Check if this check is required */
+	if ( conn->tcp_lstate == conn->tcp_state || 
+	     conn->tcp_state == TCP_INVALID ) {
+		conn->tcp_flags = 0;
+		return;
+	}
+	tcp_set_flags ( conn );
+}
+
 /**
  * Dump TCP header
  *
  * @v tcphdr	TCP header
  */
 void tcp_dump ( struct tcp_header *tcphdr ) {
+/*
 	DBG ( "TCP header at %p+%d\n", tcphdr, sizeof ( *tcphdr ) );
 	DBG ( "\tSource port = %d, Destination port = %d\n",
 		ntohs ( tcphdr->src ), ntohs ( tcphdr->dest ) );
@@ -347,6 +354,10 @@ void tcp_dump ( struct tcp_header *tcphdr ) {
 		( tcphdr->flags & TCP_MASK_FLAGS ) );
 	DBG ( "\tAdvertised window = %ld, Checksum = %x, Urgent Pointer = %d\n",
 		ntohs ( tcphdr->win ), tcphdr->csum, ntohs ( tcphdr->urg ) );
+*/
+	DBG ( "TCP %p at %p src:%d dest:%d seq:%lld ack:%lld hlen:%hd flags:%#hx\n",
+		&tcp_protocol, tcphdr, ntohs ( tcphdr->src ), ntohs ( tcphdr->dest ), ntohl ( tcphdr->seq ),
+		ntohl ( tcphdr->ack ), ( ( tcphdr->hlen & TCP_MASK_HLEN ) / 16 ), ( tcphdr->flags & TCP_MASK_FLAGS ) );
 }
 
 /**
@@ -377,49 +388,64 @@ void tcp_init_conn ( struct tcp_connection *conn ) {
  */
 void tcp_expired ( struct retry_timer *timer, int over ) {
 	struct tcp_connection *conn;
-	if ( over ) {
-		conn = ( struct tcp_connection * ) container_of ( timer, 
-						struct tcp_connection, timer );
-		switch ( conn->tcp_state ) {
-		case TCP_SYN_SENT:
-			if ( conn->retransmits > MAX_RETRANSMITS ) {
-				tcp_trans ( conn, TCP_CLOSED );
-				return;
-			}
-			if ( conn->tcp_lstate == TCP_CLOSED ||
-			     conn->tcp_lstate == TCP_LISTEN ) {
-				goto send_tcp_nomsg;
-			}
-			return;
-		case TCP_SYN_RCVD:
+	conn = ( struct tcp_connection * ) container_of ( timer, 
+					struct tcp_connection, timer );
+	DBG ( "Timer expired in %s\n", tcp_states[conn->tcp_state] );
+	switch ( conn->tcp_state ) {
+	case TCP_SYN_SENT:
+		if ( over ) {
 			tcp_trans ( conn, TCP_CLOSED );
-			if ( conn->tcp_lstate == TCP_LISTEN ||
-			     conn->tcp_lstate == TCP_SYN_SENT ) {
-				goto send_tcp_nomsg;
-			}
-			return;
-		case TCP_ESTABLISHED:
-			break;
-		case TCP_FIN_WAIT_1:
-		case TCP_FIN_WAIT_2:
-		case TCP_CLOSE_WAIT:
-			goto send_tcp_nomsg;
-		case TCP_CLOSING:
-		case TCP_LAST_ACK:
-			return;
-		case TCP_TIME_WAIT:
-			tcp_trans ( conn, TCP_CLOSED );
+			stop_timer ( &conn->timer );
+			DBG ( "Timeout! Connection closed\n" );
 			return;
 		}
-		/* Retransmit the data */
-		tcp_senddata ( conn );
-		conn->retransmits++;
+		goto send_tcp_nomsg;
+	case TCP_SYN_RCVD:
+		if ( over ) {
+			tcp_trans ( conn, TCP_CLOSED );
+			stop_timer ( &conn->timer );
+			goto send_tcp_nomsg;
+		}
+		goto send_tcp_nomsg;
+	case TCP_ESTABLISHED:
+		if ( conn->tcp_lstate == TCP_SYN_SENT ) {
+			goto send_tcp_nomsg;
+		}
+		break;
+	case TCP_CLOSE_WAIT:
+		if ( conn->tcp_lstate == TCP_ESTABLISHED ) {
+			goto send_tcp_nomsg;
+		}
+		break;
+	case TCP_FIN_WAIT_1:
+	case TCP_FIN_WAIT_2:
+		goto send_tcp_nomsg;
+	case TCP_CLOSING:
+	case TCP_LAST_ACK:
+		if ( conn->tcp_lstate == TCP_CLOSE_WAIT ) {
+			goto send_tcp_nomsg;
+		}
 		return;
-
-  send_tcp_nomsg:
-		tcp_send ( conn, TCP_NOMSG, TCP_NOMSG_LEN );
+	case TCP_TIME_WAIT:
+		tcp_trans ( conn, TCP_CLOSED );
+		stop_timer ( &conn->timer );
 		return;
 	}
+	/* Retransmit the data */
+	tcp_set_flags ( conn );
+	tcp_senddata ( conn );
+	return;
+
+  send_tcp_nomsg:
+//	free_pkb ( conn->tx_pkb );
+	conn->tx_pkb = alloc_pkb ( MIN_PKB_LEN );
+	pkb_reserve ( conn->tx_pkb, MAX_HDR_LEN );
+	tcp_set_flags ( conn );
+	int rc;
+	if ( ( rc = tcp_send ( conn, TCP_NOMSG, TCP_NOMSG_LEN ) ) != 0 ) {
+		DBG ( "Error sending TCP message (rc = %d)\n", rc );
+	}
+	return;
 }
 
 /**
@@ -634,7 +660,13 @@ int tcp_send ( struct tcp_connection *conn, const void *data, size_t len ) {
 	tcp_dump ( tcphdr );
 
 	/* Start the timer */
-	start_timer ( &conn->timer );
+	if ( ( conn->tcp_state == TCP_ESTABLISHED && conn->tcp_lstate == TCP_SYN_SENT ) ||
+	     ( conn->tcp_state == TCP_LISTEN && conn->tcp_lstate == TCP_SYN_RCVD ) ||
+	     ( conn->tcp_state == TCP_CLOSED && conn->tcp_lstate == TCP_SYN_RCVD ) ) {
+		// Don't start the timer
+	} else {
+		start_timer ( &conn->timer );
+	}
 
 	/* Transmit packet */
 	return tcpip_tx ( pkb, &tcp_protocol, peer );
@@ -653,6 +685,7 @@ static int tcp_rx ( struct pk_buff *pkb,
 	struct tcp_header *tcphdr;
 	uint32_t acked, toack;
 	int hlen;
+	int add = 0;
 
 	/* Sanity check */
 	if ( pkb_len ( pkb ) < sizeof ( *tcphdr ) ) {
@@ -660,14 +693,21 @@ static int tcp_rx ( struct pk_buff *pkb,
 		return -EINVAL;
 	}
 
+
 	/* Process TCP header */
 	tcphdr = pkb->data;
+	tcp_dump ( tcphdr );
 
 	/* Verify header length */
 	hlen = ( ( tcphdr->hlen & TCP_MASK_HLEN ) / 16 ) * 4;
 	if ( hlen != sizeof ( *tcphdr ) ) {
-		DBG ( "Bad header length (%d bytes)\n", hlen );
-		return -EINVAL;
+		if ( hlen == sizeof ( *tcphdr ) + 4 ) {
+			DBG ( "TCP options sent\n" );
+			add = 4;
+		} else {
+			DBG ( "Bad header length (%d bytes)\n", hlen );
+			return -EINVAL;
+		}
 	}
 	
 	/* TODO: Verify checksum */
@@ -685,7 +725,6 @@ static int tcp_rx ( struct pk_buff *pkb,
   found_conn:
 	/* Stop the timer */
 	stop_timer ( &conn->timer );
-	conn->retransmits = 0;
 
 	/* Set the advertised window */
 	conn->snd_win = tcphdr->win;
@@ -729,6 +768,7 @@ static int tcp_rx ( struct pk_buff *pkb,
 				 */
 				conn->snd_una = ntohl ( tcphdr->ack );
 				conn->tcp_op->connected ( conn );
+				tcp_senddata ( conn );
 			} else {
 				tcp_trans ( conn, TCP_SYN_RCVD );
 				out_flags |= TCP_SYN;
@@ -752,6 +792,7 @@ static int tcp_rx ( struct pk_buff *pkb,
 			 */
 			conn->snd_una = tcphdr->ack - 1;
 			conn->tcp_op->connected ( conn );
+			tcp_senddata ( conn );
 			return 0;
 		}
 		/* Unexpected packet */
@@ -799,6 +840,7 @@ static int tcp_rx ( struct pk_buff *pkb,
 	case TCP_CLOSING:
 		if ( tcphdr->flags & TCP_ACK ) {
 			tcp_trans ( conn, TCP_TIME_WAIT );
+			start_timer ( &conn->timer );
 			return 0;
 		}
 		/* Unexpected packet */
@@ -831,7 +873,7 @@ static int tcp_rx ( struct pk_buff *pkb,
 		/* Check if expected sequence number */
 		if ( conn->rcv_nxt == ntohl ( tcphdr->seq ) ) {
 			conn->rcv_nxt += toack;
-			conn->tcp_op->newdata ( conn, pkb->data + sizeof ( *tcphdr ), toack );
+			conn->tcp_op->newdata ( conn, pkb->data + sizeof ( *tcphdr ) + add, toack );
 		}
 
 		/* Acknowledge new data */
@@ -870,8 +912,9 @@ static int tcp_rx ( struct pk_buff *pkb,
 	return 0;
 
   unexpected:
-	DBG ( "Unexpected packet received in %d state with flags = %hd\n",
-			conn->tcp_state, tcphdr->flags & TCP_MASK_FLAGS );
+	DBG ( "Unexpected packet received in %s with flags = %#hx\n",
+			tcp_states[conn->tcp_state], tcphdr->flags & TCP_MASK_FLAGS );
+	tcp_close ( conn );
 	free_pkb ( conn->tx_pkb );
 	return -EINVAL;
 }

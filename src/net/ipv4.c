@@ -107,6 +107,7 @@ void del_ipv4_address ( struct net_device *netdev ) {
  */
 static void ipv4_dump ( struct iphdr *iphdr __unused ) {
 
+/*
 	DBG ( "IP4 header at %p+%#zx\n", iphdr, sizeof ( *iphdr ) );
 	DBG ( "\tVersion = %d\n", ( iphdr->verhdrlen & IP_MASK_VER ) / 16 );
 	DBG ( "\tHeader length = %d\n", iphdr->verhdrlen & IP_MASK_HLEN );
@@ -120,6 +121,11 @@ static void ipv4_dump ( struct iphdr *iphdr __unused ) {
 				ntohs ( iphdr->chksum ) );
 	DBG ( "\tSource = %s\n", inet_ntoa ( iphdr->src ) );
 	DBG ( "\tDestination = %s\n", inet_ntoa ( iphdr->dest ) );
+*/
+	DBG ( "IP4 %p transmitting %p+%d ident %d protocol %d header-csum %x\n",
+		&ipv4_protocol, iphdr, ntohs ( iphdr->len ), ntohs ( iphdr->ident ),
+		iphdr->protocol, ntohs ( iphdr->chksum ) );
+	DBG ( "src %s, dest %s\n", inet_ntoa ( iphdr->src ), inet_ntoa ( iphdr->dest ) );
 }
 
 /**
