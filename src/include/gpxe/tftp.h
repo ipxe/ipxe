@@ -9,6 +9,8 @@
 
 #include <stdint.h>
 #include <gpxe/udp.h>
+#include <gpxe/async.h>
+#include <gpxe/retry.h>
 
 #define TFTP_PORT	       69 /**< Default TFTP server port */
 #define	TFTP_DEFAULT_BLKSIZE  512 /**< Default TFTP data block size */
@@ -59,7 +61,7 @@ struct tftp_error {
 /** A TFTP options acknowledgement (OACK) packet */
 struct tftp_oack {
 	uint16_t opcode;
-	uint8_t data[0];
+	char data[0];
 } __attribute__ (( packed ));
 
 /** The common header of all TFTP packets */
@@ -87,6 +89,17 @@ struct tftp_session {
 	struct udp_connection udp;
 	/** Filename */
 	const char *filename;
+
+	/**
+	 * Callback function
+	 *
+	 * @v tftp		TFTP connection
+	 * @v block		Block number
+	 * @v data		Data
+	 * @v len		Length of data
+	 */
+	void ( * callback ) ( struct tftp_session *tftp, unsigned int block,
+			      void *data, size_t len );
 	/**
 	 * Transfer ID
 	 *
@@ -119,7 +132,12 @@ struct tftp_session {
 	 * TFTP server.  If the TFTP server does not support the
 	 * "tsize" option, this value will be zero.
 	 */
-	off_t tsize;
+	unsigned long tsize;
+	
+	/** Asynchronous operation for this session */
+	struct async_operation aop;
+	/** Retransmission timer */
+	struct retry_timer timer;
 };
 
 #endif /* _GPXE_TFTP_H */
