@@ -530,9 +530,7 @@ struct tcpip_net_protocol ipv4_tcpip_protocol = {
 TCPIP_NET_PROTOCOL ( ipv4_tcpip_protocol );
 
 /** IPv4 ARP protocol */
-struct arp_net_protocol ipv4_arp_protocol = {
+struct arp_net_protocol ipv4_arp_protocol __arp_net_protocol = {
 	.net_protocol = &ipv4_protocol,
 	.check = ipv4_arp_check,
 };
-
-ARP_NET_PROTOCOL ( ipv4_arp_protocol );

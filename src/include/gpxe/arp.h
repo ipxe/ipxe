@@ -26,13 +26,8 @@ struct arp_net_protocol {
 			  const void *net_addr );
 };
 
-/**
- * Register an ARP protocol
- *
- * @v protocol		ARP protocol
- */
-#define ARP_NET_PROTOCOL( protocol ) \
-	struct arp_net_protocol protocol __table ( arp_net_protocols, 01 )
+/** Declare an ARP protocol */
+#define __arp_net_protocol __table ( arp_net_protocols, 01 )
 
 extern int arp_resolve ( struct net_device *netdev,
 			 struct net_protocol *net_protocol,
