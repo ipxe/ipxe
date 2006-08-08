@@ -107,21 +107,6 @@ void del_ipv4_address ( struct net_device *netdev ) {
  */
 static void ipv4_dump ( struct iphdr *iphdr __unused ) {
 
-/*
-	DBG ( "IP4 header at %p+%#zx\n", iphdr, sizeof ( *iphdr ) );
-	DBG ( "\tVersion = %d\n", ( iphdr->verhdrlen & IP_MASK_VER ) / 16 );
-	DBG ( "\tHeader length = %d\n", iphdr->verhdrlen & IP_MASK_HLEN );
-	DBG ( "\tService = %d\n", iphdr->service );
-	DBG ( "\tTotal length = %d\n", ntohs ( iphdr->len ) );
-	DBG ( "\tIdent = %d\n", ntohs ( iphdr->ident ) );
-	DBG ( "\tFrags/Offset = %d\n", ntohs ( iphdr->frags ) );
-	DBG ( "\tIP TTL = %d\n", iphdr->ttl );
-	DBG ( "\tProtocol = %d\n", iphdr->protocol );
-	DBG ( "\tHeader Checksum (at %p) = %x\n", &iphdr->chksum, 
-				ntohs ( iphdr->chksum ) );
-	DBG ( "\tSource = %s\n", inet_ntoa ( iphdr->src ) );
-	DBG ( "\tDestination = %s\n", inet_ntoa ( iphdr->dest ) );
-*/
 	DBG ( "IP4 %p transmitting %p+%d ident %d protocol %d header-csum %x\n",
 		&ipv4_protocol, iphdr, ntohs ( iphdr->len ), ntohs ( iphdr->ident ),
 		iphdr->protocol, ntohs ( iphdr->chksum ) );
@@ -458,6 +443,7 @@ static int ipv4_rx ( struct pk_buff *pkb, struct net_device *netdev __unused,
 
 	/* Strip header */
 	pkb_pull ( pkb, sizeof ( *iphdr ) );
+	pkb_unput ( pkb, pkb_len ( pkb ) - htons ( iphdr->len ) );
 
 	/* Send it to the transport layer */
 	return tcpip_rx ( pkb, iphdr->protocol, &src.st, &dest.st );
