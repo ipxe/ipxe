@@ -326,8 +326,6 @@ void tcp_trans ( struct tcp_connection *conn, int nxt_state ) {
 	conn->tcp_lstate = conn->tcp_state;
 	conn->tcp_state = nxt_state;
 
-	printf ( "Transition from %s to %s\n", tcp_states[conn->tcp_lstate], tcp_states[conn->tcp_state] );
-
 	/* TODO: Check if this check is required */
 	if ( conn->tcp_lstate == conn->tcp_state || 
 	     conn->tcp_state == TCP_INVALID ) {
@@ -343,20 +341,8 @@ void tcp_trans ( struct tcp_connection *conn, int nxt_state ) {
  * @v tcphdr	TCP header
  */
 void tcp_dump ( struct tcp_header *tcphdr ) {
-/*
-	DBG ( "TCP header at %p+%d\n", tcphdr, sizeof ( *tcphdr ) );
-	DBG ( "\tSource port = %d, Destination port = %d\n",
-		ntohs ( tcphdr->src ), ntohs ( tcphdr->dest ) );
-	DBG ( "\tSequence Number = %ld, Acknowledgement Number = %ld\n",
-		ntohl ( tcphdr->seq ), ntohl ( tcphdr->ack ) );
-	DBG ( "\tHeader length (/4) = %hd, Flags [..RAPUSF]= %#x\n",
-		( ( tcphdr->hlen & TCP_MASK_HLEN ) / 16 ),
-		( tcphdr->flags & TCP_MASK_FLAGS ) );
-	DBG ( "\tAdvertised window = %ld, Checksum = %x, Urgent Pointer = %d\n",
-		ntohs ( tcphdr->win ), tcphdr->csum, ntohs ( tcphdr->urg ) );
-*/
-	DBG ( "TCP %p at %p src:%d dest:%d seq:%lld ack:%lld hlen:%hd flags:%#hx\n",
-		&tcp_protocol, tcphdr, ntohs ( tcphdr->src ), ntohs ( tcphdr->dest ), ntohl ( tcphdr->seq ),
+	DBG ( "TCP %p src:%d dest:%d seq:%lld ack:%lld hlen:%hd flags:%#hx\n",
+		tcphdr, ntohs ( tcphdr->src ), ntohs ( tcphdr->dest ), ntohl ( tcphdr->seq ),
 		ntohl ( tcphdr->ack ), ( ( tcphdr->hlen & TCP_MASK_HLEN ) / 16 ), ( tcphdr->flags & TCP_MASK_FLAGS ) );
 }
 
@@ -437,7 +423,7 @@ void tcp_expired ( struct retry_timer *timer, int over ) {
 	return;
 
   send_tcp_nomsg:
-//	free_pkb ( conn->tx_pkb );
+	free_pkb ( conn->tx_pkb );
 	conn->tx_pkb = alloc_pkb ( MIN_PKB_LEN );
 	pkb_reserve ( conn->tx_pkb, MAX_HDR_LEN );
 	tcp_set_flags ( conn );
@@ -657,7 +643,6 @@ int tcp_send ( struct tcp_connection *conn, const void *data, size_t len ) {
 	tcphdr->csum = tcpip_chksum ( pkb->data, pkb_len ( pkb ) );
 	
 	/* Dump the TCP header */
-	tcp_dump ( tcphdr );
 
 	/* Start the timer */
 	if ( ( conn->tcp_state == TCP_ESTABLISHED && conn->tcp_lstate == TCP_SYN_SENT ) ||
@@ -685,7 +670,7 @@ static int tcp_rx ( struct pk_buff *pkb,
 	struct tcp_header *tcphdr;
 	uint32_t acked, toack;
 	int hlen;
-	int add = 0;
+	int add = 4;
 
 	/* Sanity check */
 	if ( pkb_len ( pkb ) < sizeof ( *tcphdr ) ) {
@@ -709,7 +694,8 @@ static int tcp_rx ( struct pk_buff *pkb,
 			return -EINVAL;
 		}
 	}
-	
+
+
 	/* TODO: Verify checksum */
 	
 	/* Demux TCP connection */
@@ -768,13 +754,14 @@ static int tcp_rx ( struct pk_buff *pkb,
 				 */
 				conn->snd_una = ntohl ( tcphdr->ack );
 				conn->tcp_op->connected ( conn );
+				out_flags |= TCP_ACK;
 				tcp_senddata ( conn );
+				return;
 			} else {
 				tcp_trans ( conn, TCP_SYN_RCVD );
 				out_flags |= TCP_SYN;
+				goto send_tcp_nomsg;
 			}
-			/* Send SYN,ACK or ACK packet */
-			goto send_tcp_nomsg;
 		}
 		/* Unexpected packet */
 		goto unexpected;
@@ -792,12 +779,12 @@ static int tcp_rx ( struct pk_buff *pkb,
 			 */
 			conn->snd_una = tcphdr->ack - 1;
 			conn->tcp_op->connected ( conn );
-			tcp_senddata ( conn );
 			return 0;
 		}
 		/* Unexpected packet */
 		goto unexpected;
 	case TCP_ESTABLISHED:
+#if 0
 		if ( tcphdr->flags & TCP_FIN ) {
 			tcp_trans ( conn, TCP_CLOSE_WAIT );
 			/* FIN consumes one byte */
@@ -806,6 +793,7 @@ static int tcp_rx ( struct pk_buff *pkb,
 			/* Send an acknowledgement */
 			goto send_tcp_nomsg;
 		}
+#endif
 		/* Packet might contain data */
 		break;
 	case TCP_FIN_WAIT_1:
@@ -874,6 +862,9 @@ static int tcp_rx ( struct pk_buff *pkb,
 		if ( conn->rcv_nxt == ntohl ( tcphdr->seq ) ) {
 			conn->rcv_nxt += toack;
 			conn->tcp_op->newdata ( conn, pkb->data + sizeof ( *tcphdr ) + add, toack );
+		} else {
+			printf ( "Unexpected sequence number %ld\n", 
+				ntohl ( tcphdr->seq ) );
 		}
 
 		/* Acknowledge new data */
@@ -892,12 +883,23 @@ static int tcp_rx ( struct pk_buff *pkb,
 		}
 		/* Advance snd stream */
 		conn->snd_una += acked;
-		/* Set the ACK flag */
-		conn->tcp_flags |= TCP_ACK;
 		/* Invoke the acked() callback function */
 		conn->tcp_op->acked ( conn, acked );
 		/* Invoke the senddata() callback function */
 		tcp_senddata ( conn );
+	}
+
+	/* If the connection is in ESTABLISHED and it receives a FIN */
+	if ( conn->tcp_state == ESTABLISHED && ( tcphdr->flags & TCP_FIN ) ) {
+		tcp_trans ( conn, TCP_CLOSE_WAIT );
+		conn->tcp_op->closed ( conn, CONN_SNDCLOSE );	
+		conn->rcv_nxt++;
+		if ( ! ( tcphdr->flags & TCP_ACK ) ) {
+			out_flags |= TCP_ACK;
+			/* Send an acknowledgement */
+			goto send_tcp_nomsg;
+		}
+		/* Otherwise, the packet has been ACKed already */
 	}
 	return 0;
 
