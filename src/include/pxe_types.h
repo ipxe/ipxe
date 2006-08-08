@@ -115,8 +115,8 @@ typedef struct s_SEGOFF16 {
 /** A segment descriptor */
 typedef struct s_SEGDESC {
 	SEGSEL_t	segment_address;	/**< Segment selector */
-	ADDR32_t	physical_address;	/**< Segment base address */
-	OFF16_t		seg_size;		/**< Size of the segment */
+	ADDR32_t	Physical_address;	/**< Segment base address */
+	OFF16_t		Seg_size;		/**< Size of the segment */
 } PACKED SEGDESC_t;
 
 /** @} */ /* pxe_types */
