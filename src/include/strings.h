@@ -51,4 +51,6 @@ extern int __flsl ( long x );
 #define fls( x ) \
 	( __builtin_constant_p ( x ) ? __constant_fls ( x ) : __fls ( x ) )
 
+extern int strcasecmp ( const char *s1, const char *s2 );
+
 #endif /* _STRINGS_H */
