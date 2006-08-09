@@ -138,10 +138,10 @@ pxe_entry_common:
 	pushw	%di
 	pushw	%bx
 	/* Load !PXE parameters from stack into PXENV+ registers */
-	movw	16(%esp), %bx
+	movw	18(%esp), %bx
 	movw	%bx, %es
-	movw	14(%esp), %di
-	movw	12(%esp), %bx
+	movw	16(%esp), %di
+	movw	14(%esp), %bx
 	/* Make call as for PXENV+ */
 	pushw	%cs
 	call	pxenv_entry
