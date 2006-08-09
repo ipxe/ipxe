@@ -314,6 +314,9 @@ void tcp_set_flags ( struct tcp_connection *conn ) {
 		if ( conn->tcp_lstate == TCP_CLOSE_WAIT ) {
 			conn->tcp_flags |= TCP_FIN;
 		}
+		if ( conn->tcp_lstate == TCP_ESTABLISHED ) {
+			conn->tcp_flags |= ( TCP_FIN | TCP_ACK );
+		}
 		break;
 	default:
 		DBG ( "TCP_INVALID state %d\n", conn->tcp_state );
@@ -909,10 +912,13 @@ static int tcp_rx ( struct pk_buff *pkb,
 			      ntohl ( tcphdr->seq ), conn->rcv_nxt );
 		}
 
-		/* Acknowledge new data */
-		conn->tcp_flags |= TCP_ACK;
-		if ( !( tcphdr->flags & TCP_ACK ) ) {
-			goto send_tcp_nomsg;
+		/* Send an ACK only if required to */
+		if ( conn->rcv_nxt <= ntohl ( tcphdr->seq ) ) {
+			/* Acknowledge new data */
+			conn->tcp_flags |= TCP_ACK;
+			if ( !( tcphdr->flags & TCP_ACK ) ) {
+				goto send_tcp_nomsg;
+			}
 		}
 	}
 
@@ -934,8 +940,12 @@ static int tcp_rx ( struct pk_buff *pkb,
 
 	/* If the connection is in ESTABLISHED and it receives a FIN */
 	if ( conn->tcp_state == ESTABLISHED && ( tcphdr->flags & TCP_FIN ) ) {
+		if ( tcphdr->flags & TCP_ACK ) {
+			tcp_trans ( conn, TCP_LAST_ACK );
+			goto send_tcp_nomsg;
+		}
 		tcp_trans ( conn, TCP_CLOSE_WAIT );
-		conn->tcp_op->closed ( conn, CONN_SNDCLOSE );	
+//		conn->tcp_op->closed ( conn, CONN_SNDCLOSE );	
 		conn->rcv_nxt++;
 		if ( ! ( tcphdr->flags & TCP_ACK ) ) {
 			conn->tcp_flags |= TCP_ACK;
