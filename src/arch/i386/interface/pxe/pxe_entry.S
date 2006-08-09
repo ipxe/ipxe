@@ -28,6 +28,7 @@
  */
 	.section ".text16.data"
 	.globl pxe
+	.align 16
 pxe:
 	.ascii "!PXE"			/* Signature */
 	.byte pxe_length		/* StructLength */
@@ -60,6 +61,7 @@ pxe_segments:
  */
 	.section ".text16.data"
 	.globl pxenv
+	.align 16
 pxenv:
 	.ascii "PXENV+"			/* Signature */
 	.word 0x0201			/* Version */
