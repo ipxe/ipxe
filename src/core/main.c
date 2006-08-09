@@ -157,7 +157,6 @@ int main ( void ) {
 	if ( netdev ) {
 		test_dhcp ( netdev );
 		//cmdl_start();
-		//test_aoeboot ( &static_single_netdev );
 	} else {
 		printf ( "No network device found\n" );
 	}
