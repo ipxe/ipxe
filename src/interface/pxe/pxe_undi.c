@@ -22,17 +22,7 @@
  * Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
  */
 
-#if 0
-
 #include "pxe.h"
-
-typedef struct {
-	char dest[ETH_ALEN];
-	char source[ETH_ALEN];
-	uint16_t nstype;
-} media_header_t;
-
-static const char broadcast_mac[] = { 0xFF,0xFF,0xFF,0xFF,0xFF,0xFF };
 
 /* PXENV_UNDI_STARTUP
  *
@@ -40,7 +30,6 @@ static const char broadcast_mac[] = { 0xFF,0xFF,0xFF,0xFF,0xFF,0xFF };
  */
 PXENV_EXIT_t pxenv_undi_startup ( struct s_PXENV_UNDI_STARTUP *undi_startup ) {
 	DBG ( "PXENV_UNDI_STARTUP" );
-	ENSURE_MIDWAY(undi_startup);
 
 	undi_startup->Status = PXENV_STATUS_SUCCESS;
 	return PXENV_EXIT_SUCCESS;
@@ -52,7 +41,6 @@ PXENV_EXIT_t pxenv_undi_startup ( struct s_PXENV_UNDI_STARTUP *undi_startup ) {
  */
 PXENV_EXIT_t pxenv_undi_cleanup ( struct s_PXENV_UNDI_CLEANUP *undi_cleanup ) {
 	DBG ( "PXENV_UNDI_CLEANUP" );
-	ENSURE_CAN_UNLOAD ( undi_cleanup );
 
 	undi_cleanup->Status = PXENV_STATUS_SUCCESS;
 	return PXENV_EXIT_SUCCESS;
@@ -65,7 +53,6 @@ PXENV_EXIT_t pxenv_undi_cleanup ( struct s_PXENV_UNDI_CLEANUP *undi_cleanup ) {
 PXENV_EXIT_t pxenv_undi_initialize ( struct s_PXENV_UNDI_INITIALIZE
 				     *undi_initialize ) {
 	DBG ( "PXENV_UNDI_INITIALIZE" );
-	ENSURE_MIDWAY ( undi_initialize );
 
 	undi_initialize->Status = PXENV_STATUS_SUCCESS;
 	return PXENV_EXIT_SUCCESS;
@@ -79,9 +66,6 @@ PXENV_EXIT_t pxenv_undi_reset_adapter ( struct s_PXENV_UNDI_RESET
 					*undi_reset_adapter ) {
 	DBG ( "PXENV_UNDI_RESET_ADAPTER" );
 
-	ENSURE_MIDWAY ( undi_reset_adapter );
-	ENSURE_READY ( undi_reset_adapter );
-
 	undi_reset_adapter->Status = PXENV_STATUS_SUCCESS;
 	return PXENV_EXIT_SUCCESS;
 }
@@ -93,7 +77,6 @@ PXENV_EXIT_t pxenv_undi_reset_adapter ( struct s_PXENV_UNDI_RESET
 PXENV_EXIT_t pxenv_undi_shutdown ( struct s_PXENV_UNDI_SHUTDOWN
 				   *undi_shutdown ) {
 	DBG ( "PXENV_UNDI_SHUTDOWN" );
-	ENSURE_MIDWAY ( undi_shutdown );
 
 	undi_shutdown->Status = PXENV_STATUS_SUCCESS;
 	return PXENV_EXIT_SUCCESS;
@@ -105,13 +88,14 @@ PXENV_EXIT_t pxenv_undi_shutdown ( struct s_PXENV_UNDI_SHUTDOWN
  */
 PXENV_EXIT_t pxenv_undi_open ( struct s_PXENV_UNDI_OPEN *undi_open ) {
 	DBG ( "PXENV_UNDI_OPEN" );
-	ENSURE_READY ( undi_open );
 
+#if 0
 	/* PXESPEC: This is where we choose to enable interrupts.
 	 * Can't actually find where we're meant to in the PXE spec,
 	 * but this should work.
 	 */
 	eth_irq ( ENABLE );
+#endif
 
 	undi_open->Status = PXENV_STATUS_SUCCESS;
 	return PXENV_EXIT_SUCCESS;
@@ -123,7 +107,6 @@ PXENV_EXIT_t pxenv_undi_open ( struct s_PXENV_UNDI_OPEN *undi_open ) {
  */
 PXENV_EXIT_t pxenv_undi_close ( struct s_PXENV_UNDI_CLOSE *undi_close ) {
 	DBG ( "PXENV_UNDI_CLOSE" );
-	ENSURE_MIDWAY ( undi_close );
 
 	undi_close->Status = PXENV_STATUS_SUCCESS;
 	return PXENV_EXIT_SUCCESS;
@@ -140,11 +123,10 @@ PXENV_EXIT_t pxenv_undi_transmit ( struct s_PXENV_UNDI_TRANSMIT
 	unsigned int type;
 	unsigned int length;
 	const char *data;
-	media_header_t *media_header;
 
 	DBG ( "PXENV_UNDI_TRANSMIT" );
-	ENSURE_READY ( undi_transmit );
 
+#if 0
 	/* We support only the "immediate" portion of the TBD.  Who
 	 * knows what Intel's "engineers" were smoking when they came
 	 * up with the array of transmit data blocks...
@@ -187,6 +169,7 @@ PXENV_EXIT_t pxenv_undi_transmit ( struct s_PXENV_UNDI_TRANSMIT
 
 	/* Send the packet */
 	eth_transmit ( dest, type, length, data );
+#endif
 	
 	undi_transmit->Status = PXENV_STATUS_SUCCESS;
 	return PXENV_EXIT_SUCCESS;
@@ -200,7 +183,7 @@ PXENV_EXIT_t
 pxenv_undi_set_mcast_address ( struct s_PXENV_UNDI_SET_MCAST_ADDRESS
 			       *undi_set_mcast_address ) {
 	DBG ( "PXENV_UNDI_SET_MCAST_ADDRESS" );
-	/* ENSURE_READY ( undi_set_mcast_address ); */
+
 	undi_set_mcast_address->Status = PXENV_STATUS_UNSUPPORTED;
 	return PXENV_EXIT_FAILURE;
 }
@@ -213,8 +196,8 @@ PXENV_EXIT_t
 pxenv_undi_set_station_address ( struct s_PXENV_UNDI_SET_STATION_ADDRESS
 				 *undi_set_station_address ) {
 	DBG ( "PXENV_UNDI_SET_STATION_ADDRESS" );
-	ENSURE_READY ( undi_set_station_address );
 
+#if 0
 	/* We don't offer a facility to set the MAC address; this
 	 * would require adding extra code to all the Etherboot
 	 * drivers, for very little benefit.  If we're setting it to
@@ -227,6 +210,8 @@ pxenv_undi_set_station_address ( struct s_PXENV_UNDI_SET_STATION_ADDRESS
 		undi_set_station_address->Status = PXENV_STATUS_SUCCESS;
 		return PXENV_EXIT_SUCCESS;
 	}
+#endif
+
 	undi_set_station_address->Status = PXENV_STATUS_UNSUPPORTED;
 	return PXENV_EXIT_FAILURE;
 }
@@ -240,7 +225,7 @@ PXENV_EXIT_t
 pxenv_undi_set_packet_filter ( struct s_PXENV_UNDI_SET_PACKET_FILTER
 			       *undi_set_packet_filter ) {
 	DBG ( "PXENV_UNDI_SET_PACKET_FILTER" );
-	/* ENSURE_READY ( undi_set_packet_filter ); */
+
 	undi_set_packet_filter->Status = PXENV_STATUS_UNSUPPORTED;
 	return PXENV_EXIT_FAILURE;
 }
@@ -252,8 +237,8 @@ pxenv_undi_set_packet_filter ( struct s_PXENV_UNDI_SET_PACKET_FILTER
 PXENV_EXIT_t pxenv_undi_get_information ( struct s_PXENV_UNDI_GET_INFORMATION
 					  *undi_get_information ) {
 	DBG ( "PXENV_UNDI_GET_INFORMATION" );
-	ENSURE_READY ( undi_get_information );
 
+#if 0
 	undi_get_information->BaseIo = nic.ioaddr;
 	undi_get_information->IntNumber = nic.irqno;
 	/* Cheat: assume all cards can cope with this */
@@ -276,6 +261,8 @@ PXENV_EXIT_t pxenv_undi_get_information ( struct s_PXENV_UNDI_GET_INFORMATION
 	 */
 	undi_get_information->RxBufCt = 1;
 	undi_get_information->TxBufCt = 1;
+#endif
+
 	undi_get_information->Status = PXENV_STATUS_SUCCESS;
 	return PXENV_EXIT_SUCCESS;
 }
@@ -288,7 +275,7 @@ PXENV_EXIT_t pxenv_undi_get_information ( struct s_PXENV_UNDI_GET_INFORMATION
 PXENV_EXIT_t pxenv_undi_get_statistics ( struct s_PXENV_UNDI_GET_STATISTICS
 					 *undi_get_statistics ) {
 	DBG ( "PXENV_UNDI_GET_STATISTICS" );
-	/* ENSURE_READY ( undi_get_statistics ); */
+
 	undi_get_statistics->Status = PXENV_STATUS_UNSUPPORTED;
 	return PXENV_EXIT_FAILURE;
 }
@@ -301,7 +288,7 @@ PXENV_EXIT_t pxenv_undi_get_statistics ( struct s_PXENV_UNDI_GET_STATISTICS
 PXENV_EXIT_t pxenv_undi_clear_statistics ( struct s_PXENV_UNDI_CLEAR_STATISTICS
 					   *undi_clear_statistics ) {
 	DBG ( "PXENV_UNDI_CLEAR_STATISTICS" );
-	/* ENSURE_READY ( undi_clear_statistics ); */
+
 	undi_clear_statistics->Status = PXENV_STATUS_UNSUPPORTED;
 	return PXENV_EXIT_FAILURE;
 }
@@ -314,7 +301,7 @@ PXENV_EXIT_t pxenv_undi_clear_statistics ( struct s_PXENV_UNDI_CLEAR_STATISTICS
 PXENV_EXIT_t pxenv_undi_initiate_diags ( struct s_PXENV_UNDI_INITIATE_DIAGS
 					 *undi_initiate_diags ) {
 	DBG ( "PXENV_UNDI_INITIATE_DIAGS" );
-	/* ENSURE_READY ( undi_initiate_diags ); */
+
 	undi_initiate_diags->Status = PXENV_STATUS_UNSUPPORTED;
 	return PXENV_EXIT_FAILURE;
 }
@@ -326,9 +313,11 @@ PXENV_EXIT_t pxenv_undi_initiate_diags ( struct s_PXENV_UNDI_INITIATE_DIAGS
 PXENV_EXIT_t pxenv_undi_force_interrupt ( struct s_PXENV_UNDI_FORCE_INTERRUPT
 					  *undi_force_interrupt ) {
 	DBG ( "PXENV_UNDI_FORCE_INTERRUPT" );
-	ENSURE_READY ( undi_force_interrupt );
 
+#if 0
 	eth_irq ( FORCE );
+#endif
+
 	undi_force_interrupt->Status = PXENV_STATUS_SUCCESS;
 	return PXENV_EXIT_SUCCESS;
 }
@@ -341,7 +330,7 @@ PXENV_EXIT_t
 pxenv_undi_get_mcast_address ( struct s_PXENV_UNDI_GET_MCAST_ADDRESS
 			       *undi_get_mcast_address ) {
 	DBG ( "PXENV_UNDI_GET_MCAST_ADDRESS" );
-	/* ENSURE_READY ( undi_get_mcast_address ); */
+
 	undi_get_mcast_address->Status = PXENV_STATUS_UNSUPPORTED;
 	return PXENV_EXIT_FAILURE;
 }
@@ -352,14 +341,11 @@ pxenv_undi_get_mcast_address ( struct s_PXENV_UNDI_GET_MCAST_ADDRESS
  */
 PXENV_EXIT_t pxenv_undi_get_nic_type ( struct s_PXENV_UNDI_GET_NIC_TYPE
 				       *undi_get_nic_type ) {
-#warning "device probing mechanism has changed completely"
-
-#if 0
-	struct dev *dev = &dev;
-	
 	DBG ( "PXENV_UNDI_GET_NIC_TYPE" );
-	ENSURE_READY ( undi_get_nic_type );
-	
+
+#warning "device probing mechanism has changed completely"
+#if 0
+	struct dev *dev = &dev;	
 	if ( dev->to_probe == PROBE_PCI ) {
 		struct pci_device *pci = &dev->state.pci.dev;
 
@@ -408,8 +394,8 @@ PXENV_EXIT_t pxenv_undi_get_nic_type ( struct s_PXENV_UNDI_GET_NIC_TYPE
 PXENV_EXIT_t pxenv_undi_get_iface_info ( struct s_PXENV_UNDI_GET_IFACE_INFO
 					 *undi_get_iface_info ) {
 	DBG ( "PXENV_UNDI_GET_IFACE_INFO" );
-	ENSURE_READY ( undi_get_iface_info );
 
+#if 0
 	/* Just hand back some info, doesn't really matter what it is.
 	 * Most PXE stacks seem to take this approach.
 	 */
@@ -418,6 +404,8 @@ PXENV_EXIT_t pxenv_undi_get_iface_info ( struct s_PXENV_UNDI_GET_IFACE_INFO
 	undi_get_iface_info->ServiceFlags = 0;
 	memset ( undi_get_iface_info->Reserved, 0,
 		 sizeof(undi_get_iface_info->Reserved) );
+#endif
+
 	undi_get_iface_info->Status = PXENV_STATUS_SUCCESS;
 	return PXENV_EXIT_SUCCESS;
 }
@@ -428,6 +416,8 @@ PXENV_EXIT_t pxenv_undi_get_iface_info ( struct s_PXENV_UNDI_GET_IFACE_INFO
  */
 PXENV_EXIT_t pxenv_undi_get_state ( struct s_PXENV_UNDI_GET_STATE
 				    *undi_get_state ) {
+	DBG ( "PXENV_UNDI_GET_STATE" );
+
 	undi_get_state->Status = PXENV_STATUS_UNSUPPORTED;
 	return PXENV_EXIT_FAILURE;
 };
@@ -437,9 +427,9 @@ PXENV_EXIT_t pxenv_undi_get_state ( struct s_PXENV_UNDI_GET_STATE
  * Status: working
  */
 PXENV_EXIT_t pxenv_undi_isr ( struct s_PXENV_UNDI_ISR *undi_isr ) {
-	media_header_t *media_header = (media_header_t*)nic.packet;
-
 	DBG ( "PXENV_UNDI_ISR" );
+
+#if 0
 	/* We can't call ENSURE_READY, because this could be being
 	 * called as part of an interrupt service routine.  Instead,
 	 * we should simply die if we're not READY.
@@ -534,9 +524,8 @@ PXENV_EXIT_t pxenv_undi_isr ( struct s_PXENV_UNDI_ISR *undi_isr ) {
 		undi_isr->Status = PXENV_STATUS_UNDI_INVALID_PARAMETER;
 		return PXENV_EXIT_FAILURE;
 	}
+#endif
 
 	undi_isr->Status = PXENV_STATUS_SUCCESS;
 	return PXENV_EXIT_SUCCESS;
 }
-
-#endif
