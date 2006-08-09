@@ -426,8 +426,6 @@ struct dhcp_session {
 	/** Options obtained from server */
 	struct dhcp_option_block *options;
 
-	/** Transaction ID, in network-endian order */
-	uint32_t xid;
 	/** State of the session
 	 *
 	 * This is a value for the @c DHCP_MESSAGE_TYPE option
@@ -467,6 +465,12 @@ extern void find_global_dhcp_ipv4_option ( unsigned int tag,
 extern void delete_dhcp_option ( struct dhcp_option_block *options,
 				 unsigned int tag );
 
+extern struct dhcp_option_block dhcp_request_options;
+extern int create_dhcp_packet ( struct net_device *netdev, uint8_t msgtype,
+				void *data, size_t max_len,
+				struct dhcp_packet *dhcppkt );
+extern int copy_dhcp_packet_options ( struct dhcp_packet *dhcppkt,
+				      struct dhcp_option_block *options );
 extern struct async_operation * start_dhcp ( struct dhcp_session *dhcp );
 
 #endif /* _GPXE_DHCP_H */

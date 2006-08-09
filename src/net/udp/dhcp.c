@@ -80,8 +80,25 @@ static inline const char * dhcp_msgtype_name ( unsigned int msgtype ) {
 	}
 }
 
+/**
+ * Calculate DHCP transaction ID for a network device
+ *
+ * @v netdev		Network device
+ * @ret xid		DHCP XID
+ *
+ * Extract the least significant bits of the hardware address for use
+ * as the transaction ID.
+ */
+static uint32_t dhcp_xid ( struct net_device *netdev ) {
+	uint32_t xid;
+
+	memcpy ( &xid, ( netdev->ll_addr + netdev->ll_protocol->ll_addr_len
+			 - sizeof ( xid ) ), sizeof ( xid ) );
+	return xid;
+}
+
 /** Options common to all DHCP requests */
-static struct dhcp_option_block dhcp_request_options = {
+struct dhcp_option_block dhcp_request_options = {
 	.data = dhcp_request_options_data,
 	.max_len = sizeof ( dhcp_request_options_data ),
 	.len = sizeof ( dhcp_request_options_data ),
@@ -245,15 +262,15 @@ static int copy_dhcp_packet_encap_options ( struct dhcp_packet *dhcppkt,
  * @c options may specify a single options block, or be left as NULL
  * in order to copy options from all registered options blocks.
  */
-static int copy_dhcp_packet_options ( struct dhcp_packet *dhcppkt,
-				      struct dhcp_option_block *options ) {
+int copy_dhcp_packet_options ( struct dhcp_packet *dhcppkt,
+			       struct dhcp_option_block *options ) {
 	return copy_dhcp_packet_encap_options ( dhcppkt, options, 0 );
 }
 
 /**
  * Create a DHCP packet
  *
- * @v dhcp		DHCP session
+ * @v netdev		Network device
  * @v msgtype		DHCP message type
  * @v data		Buffer for DHCP packet
  * @v max_len		Size of DHCP packet buffer
@@ -264,9 +281,9 @@ static int copy_dhcp_packet_options ( struct dhcp_packet *dhcppkt,
  * dhcp_packet structure that can be passed to
  * set_dhcp_packet_option() or copy_dhcp_packet_options().
  */
-static int create_dhcp_packet ( struct dhcp_session *dhcp, uint8_t msgtype,
-				void *data, size_t max_len,
-				struct dhcp_packet *dhcppkt ) {
+int create_dhcp_packet ( struct net_device *netdev, uint8_t msgtype,
+			 void *data, size_t max_len,
+			 struct dhcp_packet *dhcppkt ) {
 	struct dhcphdr *dhcphdr = data;
 	static const uint8_t overloading = ( DHCP_OPTION_OVERLOAD_FILE |
 					     DHCP_OPTION_OVERLOAD_SNAME );
@@ -278,11 +295,11 @@ static int create_dhcp_packet ( struct dhcp_session *dhcp, uint8_t msgtype,
 
 	/* Initialise DHCP packet content */
 	memset ( dhcphdr, 0, max_len );
-	dhcphdr->xid = dhcp->xid;
+	dhcphdr->xid = dhcp_xid ( netdev );
 	dhcphdr->magic = htonl ( DHCP_MAGIC_COOKIE );
-	dhcphdr->htype = ntohs ( dhcp->netdev->ll_protocol->ll_proto );
-	dhcphdr->hlen = dhcp->netdev->ll_protocol->ll_addr_len;
-	memcpy ( dhcphdr->chaddr, dhcp->netdev->ll_addr, dhcphdr->hlen );
+	dhcphdr->htype = ntohs ( netdev->ll_protocol->ll_proto );
+	dhcphdr->hlen = netdev->ll_protocol->ll_addr_len;
+	memcpy ( dhcphdr->chaddr, netdev->ll_addr, dhcphdr->hlen );
 	dhcphdr->op = dhcp_op[msgtype];
 
 	/* Initialise DHCP packet structure */
@@ -522,7 +539,7 @@ static int dhcp_senddata ( struct udp_connection *conn,
 		 ( dhcp->state == DHCPREQUEST ) );
 
 	/* Create DHCP packet in temporary buffer */
-	if ( ( rc = create_dhcp_packet ( dhcp, dhcp->state, buf, len,
+	if ( ( rc = create_dhcp_packet ( dhcp->netdev, dhcp->state, buf, len,
 					 &dhcppkt ) ) != 0 ) {
 		DBG ( "Could not create DHCP packet\n" );
 		return rc;
@@ -606,9 +623,10 @@ static int dhcp_newdata ( struct udp_connection *conn, void *data, size_t len,
 	unsigned int msgtype;
 
 	/* Check for matching transaction ID */
-	if ( dhcphdr->xid != dhcp->xid ) {
+	if ( dhcphdr->xid != dhcp_xid ( dhcp->netdev ) ) {
 		DBG ( "DHCP wrong transaction ID (wanted %08lx, got %08lx)\n",
-		      ntohl ( dhcphdr->xid ), ntohl ( dhcp->xid ) );
+		      ntohl ( dhcphdr->xid ),
+		      ntohl ( dhcp_xid ( dhcp->netdev ) ) );
 		return 0;
 	};
 
@@ -683,10 +701,6 @@ struct async_operation * start_dhcp ( struct dhcp_session *dhcp ) {
 	dhcp->udp.udp_op = &dhcp_udp_operations;
 	dhcp->timer.expired = dhcp_timer_expired;
 	dhcp->state = DHCPDISCOVER;
-	/* Use least significant 32 bits of link-layer address as XID */
-	memcpy ( &dhcp->xid, ( dhcp->netdev->ll_addr
-			       + dhcp->netdev->ll_protocol->ll_addr_len
-			       - sizeof ( dhcp->xid ) ), sizeof ( dhcp->xid ));
 
 	/* Bind to local port */
 	if ( ( rc = udp_open ( &dhcp->udp, htons ( BOOTPC_PORT ) ) ) != 0 ) {
