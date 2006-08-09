@@ -636,8 +636,12 @@ int tcp_senddata ( struct tcp_connection *conn ) {
  */
 int tcp_send ( struct tcp_connection *conn, const void *data, size_t len ) {
 	struct sockaddr_tcpip *peer = &conn->peer;
-	struct pk_buff *pkb = conn->tx_pkb;
+	struct pk_buff *pkb;
 	int slen;
+
+	/* Take ownership of the TX buffer from the connection */
+	pkb = conn->tx_pkb;
+	conn->tx_pkb = NULL;
 
 	/* Determine the amount of data to be sent */
 	slen = len < conn->snd_win ? len : conn->snd_win;
@@ -694,11 +698,13 @@ static int tcp_rx ( struct pk_buff *pkb,
 	struct tcp_header *tcphdr;
 	uint32_t acked, toack;
 	int hlen;
+	int rc;
 
 	/* Sanity check */
 	if ( pkb_len ( pkb ) < sizeof ( *tcphdr ) ) {
 		DBG ( "Packet too short (%d bytes)\n", pkb_len ( pkb ) );
-		return -EINVAL;
+		rc = -EINVAL;
+		goto done;
 	}
 
 
@@ -713,7 +719,8 @@ static int tcp_rx ( struct pk_buff *pkb,
 			DBG ( "TCP options sent\n" );
 		} else {
 			DBG ( "Bad header length (%d bytes)\n", hlen );
-			return -EINVAL;
+			rc = -EINVAL;
+			goto done;
 		}
 	}
 
@@ -728,7 +735,8 @@ static int tcp_rx ( struct pk_buff *pkb,
 	}
 	
 	DBG ( "No connection found on port %d\n", ntohs ( tcphdr->dest ) );
-	return 0;
+	rc = 0;
+	goto done;
 
   found_conn:
 	/* Stop the timer */
@@ -743,7 +751,8 @@ static int tcp_rx ( struct pk_buff *pkb,
 	case TCP_CLOSED:
 		DBG ( "tcp_rx(): Invalid state %s\n",
 				tcp_states[conn->tcp_state] );
-		return -EINVAL;
+		rc = -EINVAL;
+		goto done;
 	case TCP_LISTEN:
 		if ( tcphdr->flags & TCP_SYN ) {
 			tcp_trans ( conn, TCP_SYN_RCVD );
@@ -776,7 +785,8 @@ static int tcp_rx ( struct pk_buff *pkb,
 				conn->tcp_op->connected ( conn );
 				conn->tcp_flags |= TCP_ACK;
 				tcp_senddata ( conn );
-				return;
+				rc = 0;
+				goto done;
 			} else {
 				tcp_trans ( conn, TCP_SYN_RCVD );
 				conn->tcp_flags |= TCP_SYN;
@@ -789,7 +799,8 @@ static int tcp_rx ( struct pk_buff *pkb,
 		if ( tcphdr->flags & TCP_RST ) {
 			tcp_trans ( conn, TCP_LISTEN );
 			conn->tcp_op->closed ( conn, CONN_RESTART );
-			return 0;
+			rc = 0;
+			goto done;
 		}
 		if ( tcphdr->flags & TCP_ACK ) {
 			tcp_trans ( conn, TCP_ESTABLISHED );
@@ -799,7 +810,8 @@ static int tcp_rx ( struct pk_buff *pkb,
 			 */
 			conn->snd_una = tcphdr->ack - 1;
 			conn->tcp_op->connected ( conn );
-			return 0;
+			rc = 0;
+			goto done;
 		}
 		/* Unexpected packet */
 		goto unexpected;
@@ -849,7 +861,8 @@ static int tcp_rx ( struct pk_buff *pkb,
 		if ( tcphdr->flags & TCP_ACK ) {
 			tcp_trans ( conn, TCP_TIME_WAIT );
 			start_timer ( &conn->timer );
-			return 0;
+			rc = 0;
+			goto done;
 		}
 		/* Unexpected packet */
 		goto unexpected;
@@ -862,7 +875,8 @@ static int tcp_rx ( struct pk_buff *pkb,
 	case TCP_LAST_ACK:
 		if ( tcphdr->flags & TCP_ACK ) {
 			tcp_trans ( conn, TCP_CLOSED );
-			return 0;
+			rc = 0;
+			goto done;
 		}
 		/* Unexpected packet */
 		goto unexpected;
@@ -900,7 +914,8 @@ static int tcp_rx ( struct pk_buff *pkb,
 		acked = ntohl ( tcphdr->ack ) - conn->snd_una;
 		if ( acked < 0 ) { /* TODO: Replace all uint32_t arith */
 			DBG ( "Previously ACKed (%d)\n", tcphdr->ack );
-			return 0;
+			rc = 0;
+			goto done;
 		}
 		/* Advance snd stream */
 		conn->snd_una += acked;
@@ -922,24 +937,30 @@ static int tcp_rx ( struct pk_buff *pkb,
 		}
 		/* Otherwise, the packet has been ACKed already */
 	}
-	return 0;
+	rc = 0;
+	goto done;
 
   send_tcp_nomsg:
 	free_pkb ( conn->tx_pkb );
 	conn->tx_pkb = alloc_pkb ( MIN_PKB_LEN );
 	pkb_reserve ( conn->tx_pkb, MAX_HDR_LEN );
-	int rc;
 	if ( ( rc = tcp_send ( conn, TCP_NOMSG, TCP_NOMSG_LEN ) ) != 0 ) {
 		DBG ( "Error sending TCP message (rc = %d)\n", rc );
 	}
-	return 0;
+	goto done;
 
   unexpected:
 	DBG ( "Unexpected packet received in %s with flags = %#hx\n",
 			tcp_states[conn->tcp_state], tcphdr->flags & TCP_MASK_FLAGS );
 	tcp_close ( conn );
 	free_pkb ( conn->tx_pkb );
-	return -EINVAL;
+	conn->tx_pkb = NULL;
+	rc = -EINVAL;
+	goto done;
+
+ done:
+	free_pkb ( pkb );
+	return rc;
 }
 
 /** TCP protocol */
