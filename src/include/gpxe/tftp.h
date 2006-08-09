@@ -119,6 +119,12 @@ struct tftp_session {
 	 * (i.e. that no blocks have yet been received).
 	 */
 	int state;
+	/** Requested data block size
+	 *
+	 * This is the "blksize" option requested from the TFTP
+	 * server.  It may or may not be honoured.
+	 */
+	unsigned int request_blksize;
 	/** Data block size
 	 *
 	 * This is the "blksize" option negotiated with the TFTP
@@ -139,5 +145,9 @@ struct tftp_session {
 	/** Retransmission timer */
 	struct retry_timer timer;
 };
+
+/* Function prototypes */
+
+extern struct async_operation * tftp_get ( struct tftp_session *tftp );
 
 #endif /* _GPXE_TFTP_H */

@@ -207,9 +207,10 @@ static int tftp_send_rrq ( struct tftp_session *tftp, void *buf, size_t len ) {
 	end = ( buf + len );
 	if ( data > end )
 		goto overflow;
-	data += snprintf ( data, ( end - data ),
-			   "%s%coctet%cblksize%c%d%ctsize%c0",
-			   tftp->filename, 0, 0, 0, tftp->blksize, 0, 0 ) + 1;
+	data += ( snprintf ( data, ( end - data ),
+			     "%s%coctet%cblksize%c%d%ctsize%c0",
+			     tftp->filename, 0, 0, 0,
+			     tftp->request_blksize, 0, 0 ) + 1 );
 	if ( data > end )
 		goto overflow;
 	rrq->opcode = htons ( TFTP_RRQ );
@@ -456,6 +457,8 @@ struct async_operation * tftp_get ( struct tftp_session *tftp ) {
 	tftp->timer.expired = tftp_timer_expired;
 	tftp->state = -1;
 	tftp->blksize = TFTP_DEFAULT_BLKSIZE;
+	if ( ! tftp->request_blksize )
+		tftp->request_blksize = TFTP_MAX_BLKSIZE;
 
 	/* Open UDP connection */
 	if ( ( rc = udp_open ( &tftp->udp, 0 ) ) != 0 ) {

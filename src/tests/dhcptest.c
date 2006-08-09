@@ -57,6 +57,21 @@ static int test_dhcp_hello ( char *helloname ) {
 	return 0;
 }
 
+static int test_dhcp_tftp ( char *tftpname ) {
+	union {
+		struct sockaddr_in sin;
+		struct sockaddr_tcpip st;
+	} target;
+
+	memset ( &target, 0, sizeof ( target ) );
+	target.sin.sin_family = AF_INET;
+	target.sin.sin_port = htons ( 69 );
+	find_global_dhcp_ipv4_option ( DHCP_EB_SIADDR,
+				       &target.sin.sin_addr );
+
+	return test_tftp ( &target.st, tftpname );
+}
+
 static int test_dhcp_boot ( struct net_device *netdev, char *filename ) {
 	if ( strncmp ( filename, "aoe:", 4 ) == 0 ) {
 		return test_dhcp_aoe_boot ( netdev, &filename[4] );
@@ -65,8 +80,7 @@ static int test_dhcp_boot ( struct net_device *netdev, char *filename ) {
 	} else if ( strncmp ( filename, "hello:", 6 ) == 0 ) {
 		return test_dhcp_hello ( &filename[6] );
 	} else {
-		printf ( "Don't know how to boot %s\n", filename );
-		return -EPROTONOSUPPORT;
+		return test_dhcp_tftp ( filename );
 	}
 }
 
