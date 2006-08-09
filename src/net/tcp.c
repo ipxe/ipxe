@@ -465,7 +465,7 @@ int tcp_connectto ( struct tcp_connection *conn,
 	conn->timer.expired = tcp_expired;
 
 	/* Send a SYN packet and transition to TCP_SYN_SENT */
-	conn->snd_una = ( ( ( uint32_t ) random() ) << 16 ) & random();
+	conn->snd_una = random();
 	tcp_trans ( conn, TCP_SYN_SENT );
 	/* Allocate space for the packet */
 	free_pkb ( conn->tx_pkb );
@@ -598,7 +598,7 @@ int tcp_senddata ( struct tcp_connection *conn ) {
 	switch ( conn->tcp_state ) {
 	case TCP_LISTEN:
 		tcp_trans ( conn, TCP_SYN_SENT );
-		conn->snd_una = ( ( ( uint32_t ) random() ) << 16 ) & random();
+		conn->snd_una = random();
 		break;
 	case TCP_ESTABLISHED:
 	case TCP_CLOSE_WAIT:
@@ -738,7 +738,6 @@ static int tcp_rx ( struct pk_buff *pkb,
 	conn->snd_win = tcphdr->win;
 
 	/* TCP State Machine */
-	uint8_t out_flags = 0;
 	conn->tcp_lstate = conn->tcp_state;
 	switch ( conn->tcp_state ) {
 	case TCP_CLOSED:
@@ -750,12 +749,11 @@ static int tcp_rx ( struct pk_buff *pkb,
 			tcp_trans ( conn, TCP_SYN_RCVD );
 			/* Synchronize the sequence numbers */
 			conn->rcv_nxt = ntohl ( tcphdr->seq ) + 1;
-			out_flags |= TCP_ACK;
+			conn->tcp_flags |= TCP_ACK;
 
 			/* Set the sequence number for the snd stream */
-			conn->snd_una = ( ( ( uint32_t ) random() ) << 16 );
-			conn->snd_una &= random();
-			out_flags |= TCP_SYN;
+			conn->snd_una = random();
+			conn->tcp_flags |= TCP_SYN;
 
 			/* Send a SYN,ACK packet */
 			goto send_tcp_nomsg;
@@ -766,7 +764,7 @@ static int tcp_rx ( struct pk_buff *pkb,
 		if ( tcphdr->flags & TCP_SYN ) {
 			/* Synchronize the sequence number in rcv stream */
 			conn->rcv_nxt = ntohl ( tcphdr->seq ) + 1;
-			out_flags |= TCP_ACK;
+			conn->tcp_flags |= TCP_ACK;
 
 			if ( tcphdr->flags & TCP_ACK ) {
 				tcp_trans ( conn, TCP_ESTABLISHED );
@@ -776,12 +774,12 @@ static int tcp_rx ( struct pk_buff *pkb,
 				 */
 				conn->snd_una = ntohl ( tcphdr->ack );
 				conn->tcp_op->connected ( conn );
-				out_flags |= TCP_ACK;
+				conn->tcp_flags |= TCP_ACK;
 				tcp_senddata ( conn );
 				return;
 			} else {
 				tcp_trans ( conn, TCP_SYN_RCVD );
-				out_flags |= TCP_SYN;
+				conn->tcp_flags |= TCP_SYN;
 				goto send_tcp_nomsg;
 			}
 		}
@@ -811,7 +809,7 @@ static int tcp_rx ( struct pk_buff *pkb,
 			tcp_trans ( conn, TCP_CLOSE_WAIT );
 			/* FIN consumes one byte */
 			conn->rcv_nxt++;
-			out_flags |= TCP_ACK;
+			conn->tcp_flags |= TCP_ACK;
 			/* Send an acknowledgement */
 			goto send_tcp_nomsg;
 		}
@@ -821,7 +819,7 @@ static int tcp_rx ( struct pk_buff *pkb,
 	case TCP_FIN_WAIT_1:
 		if ( tcphdr->flags & TCP_FIN ) {
 			conn->rcv_nxt++;
-			out_flags |= TCP_ACK;
+			conn->tcp_flags |= TCP_ACK;
 			conn->tcp_op->closed ( conn, CONN_SNDCLOSE );
 
 			if ( tcphdr->flags & TCP_ACK ) {
@@ -842,7 +840,7 @@ static int tcp_rx ( struct pk_buff *pkb,
 			tcp_trans ( conn, TCP_TIME_WAIT );
 			/* FIN consumes one byte */
 			conn->rcv_nxt++;
-			out_flags |= TCP_ACK;
+			conn->tcp_flags |= TCP_ACK;
 			goto send_tcp_nomsg;
 		}
 		/* Packet might contain data */
@@ -886,12 +884,12 @@ static int tcp_rx ( struct pk_buff *pkb,
 			conn->tcp_op->newdata ( conn, pkb->data + hlen,
 						toack );
 		} else {
-			DBG ( "Unexpected sequence number %ld (wanted %ld)\n", 
+			DBG ( "Unexpected sequence number %lx (wanted %lx)\n", 
 			      ntohl ( tcphdr->seq ), conn->rcv_nxt );
 		}
 
 		/* Acknowledge new data */
-		out_flags |= TCP_ACK;
+		conn->tcp_flags |= TCP_ACK;
 		if ( !( tcphdr->flags & TCP_ACK ) ) {
 			goto send_tcp_nomsg;
 		}
@@ -918,7 +916,7 @@ static int tcp_rx ( struct pk_buff *pkb,
 		conn->tcp_op->closed ( conn, CONN_SNDCLOSE );	
 		conn->rcv_nxt++;
 		if ( ! ( tcphdr->flags & TCP_ACK ) ) {
-			out_flags |= TCP_ACK;
+			conn->tcp_flags |= TCP_ACK;
 			/* Send an acknowledgement */
 			goto send_tcp_nomsg;
 		}
