@@ -57,7 +57,7 @@ static int test_dhcp_hello ( char *helloname ) {
 	return 0;
 }
 
-static int test_dhcp_tftp ( char *tftpname ) {
+static int test_dhcp_tftp ( struct net_device *netdev, char *tftpname ) {
 	union {
 		struct sockaddr_in sin;
 		struct sockaddr_tcpip st;
@@ -69,7 +69,7 @@ static int test_dhcp_tftp ( char *tftpname ) {
 	find_global_dhcp_ipv4_option ( DHCP_EB_SIADDR,
 				       &target.sin.sin_addr );
 
-	return test_tftp ( &target.st, tftpname );
+	return test_tftp ( netdev, &target.st, tftpname );
 }
 
 static int test_dhcp_boot ( struct net_device *netdev, char *filename ) {
@@ -80,7 +80,7 @@ static int test_dhcp_boot ( struct net_device *netdev, char *filename ) {
 	} else if ( strncmp ( filename, "hello:", 6 ) == 0 ) {
 		return test_dhcp_hello ( &filename[6] );
 	} else {
-		return test_dhcp_tftp ( filename );
+		return test_dhcp_tftp ( netdev, filename );
 	}
 }
 
