@@ -441,8 +441,8 @@ static int ipv4_rx ( struct pk_buff *pkb, struct net_device *netdev __unused,
 	dest.sin.sin_addr = iphdr->dest;
 
 	/* Strip header */
+	pkb_unput ( pkb, pkb_len ( pkb ) - ntohs ( iphdr->len ) );
 	pkb_pull ( pkb, sizeof ( *iphdr ) );
-	pkb_unput ( pkb, pkb_len ( pkb ) - htons ( iphdr->len ) );
 
 	/* Send it to the transport layer */
 	return tcpip_rx ( pkb, iphdr->protocol, &src.st, &dest.st );
