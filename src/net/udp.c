@@ -93,6 +93,8 @@ void udp_close ( struct udp_connection *conn ) {
  * callback. The callback may use the buffer space
  */
 int udp_senddata ( struct udp_connection *conn ) {
+	int rc;
+
 	conn->tx_pkb = alloc_pkb ( UDP_MAX_TXPKB );
 	if ( conn->tx_pkb == NULL ) {
 		DBG ( "UDP %p cannot allocate packet buffer of length %d\n",
@@ -100,8 +102,11 @@ int udp_senddata ( struct udp_connection *conn ) {
 		return -ENOMEM;
 	}
 	pkb_reserve ( conn->tx_pkb, UDP_MAX_HLEN );
-	return conn->udp_op->senddata ( conn, conn->tx_pkb->data, 
-					pkb_available ( conn->tx_pkb ) );
+	rc = conn->udp_op->senddata ( conn, conn->tx_pkb->data, 
+				      pkb_available ( conn->tx_pkb ) );
+	if ( conn->tx_pkb )
+		free_pkb ( conn->tx_pkb );
+	return rc;
 }
 		
 /**
@@ -122,13 +127,20 @@ int udp_senddata ( struct udp_connection *conn ) {
 int udp_sendto ( struct udp_connection *conn, struct sockaddr_tcpip *peer,
 		 const void *data, size_t len ) {
        	struct udp_header *udphdr;
+	struct pk_buff *pkb;
+
+	/* Take ownership of packet buffer back from the
+	 * udp_connection structure.
+	 */
+	pkb = conn->tx_pkb;
+	conn->tx_pkb = NULL;
 
 	/* Avoid overflowing TX buffer */
-	if ( len > pkb_available ( conn->tx_pkb ) )
-		len = pkb_available ( conn->tx_pkb );
+	if ( len > pkb_available ( pkb ) )
+		len = pkb_available ( pkb );
 
 	/* Copy payload */
-	memmove ( pkb_put ( conn->tx_pkb, len ), data, len );
+	memmove ( pkb_put ( pkb, len ), data, len );
 
 	/*
 	 * Add the UDP header
@@ -136,22 +148,22 @@ int udp_sendto ( struct udp_connection *conn, struct sockaddr_tcpip *peer,
 	 * Covert all 16- and 32- bit integers into network btye order before
 	 * sending it over the network
 	 */
-	udphdr = pkb_push ( conn->tx_pkb, sizeof ( *udphdr ) );
+	udphdr = pkb_push ( pkb, sizeof ( *udphdr ) );
 	udphdr->dest_port = peer->st_port;
 	udphdr->source_port = conn->local_port;
-	udphdr->len = htons ( pkb_len ( conn->tx_pkb ) );
+	udphdr->len = htons ( pkb_len ( pkb ) );
 	udphdr->chksum = 0;
 	udphdr->chksum = tcpip_chksum ( udphdr, sizeof ( *udphdr ) + len );
 
 	/* Dump debugging information */
 	DBG ( "UDP %p transmitting %p+%#zx len %#x src %d dest %d "
-	      "chksum %#04x\n", conn, conn->tx_pkb->data,
-	      pkb_len ( conn->tx_pkb ), ntohs ( udphdr->len ),
+	      "chksum %#04x\n", conn, pkb->data,
+	      pkb_len ( pkb ), ntohs ( udphdr->len ),
 	      ntohs ( udphdr->source_port ), ntohs ( udphdr->dest_port ),
 	      ntohs ( udphdr->chksum ) );
 
 	/* Send it to the next layer for processing */
-	return tcpip_tx ( conn->tx_pkb, &udp_protocol, peer );
+	return tcpip_tx ( pkb, &udp_protocol, peer );
 }
 
 /**
@@ -186,12 +198,14 @@ static int udp_rx ( struct pk_buff *pkb, struct sockaddr_tcpip *st_src,
 	struct udp_connection *conn;
 	unsigned int ulen;
 	uint16_t chksum;
+	int rc;
 
 	/* Sanity check */
 	if ( pkb_len ( pkb ) < sizeof ( *udphdr ) ) {
 		DBG ( "UDP received underlength packet %p+%#zx\n",
 		      pkb->data, pkb_len ( pkb ) );
-		return -EINVAL;
+		rc = -EINVAL;
+		goto done;
 	}
 
 	/* Dump debugging information */
@@ -205,7 +219,8 @@ static int udp_rx ( struct pk_buff *pkb, struct sockaddr_tcpip *st_src,
 	if ( ulen > pkb_len ( pkb ) ) {
 		DBG ( "UDP received truncated packet %p+%#zx\n",
 		      pkb->data, pkb_len ( pkb ) );
-		return -EINVAL;
+		rc = -EINVAL;
+		goto done;
 	}
 	pkb_unput ( pkb, ( pkb_len ( pkb ) - ulen ) );
 
@@ -215,7 +230,8 @@ static int udp_rx ( struct pk_buff *pkb, struct sockaddr_tcpip *st_src,
 	chksum = tcpip_chksum ( pkb->data, pkb_len ( pkb ) );
 	if ( chksum != 0xffff ) {
 		DBG ( "Bad checksum %#x\n", chksum );
-		return -EINVAL;
+		rc = -EINVAL;
+		goto done;
 	}
 #endif
 
@@ -237,13 +253,18 @@ static int udp_rx ( struct pk_buff *pkb, struct sockaddr_tcpip *st_src,
 		DBG ( "UDP delivering to %p\n", conn );
 		
 		/* Call the application's callback */
-		return conn->udp_op->newdata ( conn, pkb->data, pkb_len( pkb ),
-					       st_src, st_dest );
+		rc = conn->udp_op->newdata ( conn, pkb->data, pkb_len( pkb ),
+					     st_src, st_dest );
+		goto done;
 	}
 
 	DBG ( "No UDP connection listening on port %d\n",
 	      ntohs ( udphdr->dest_port ) );
-	return 0;
+	rc = 0;
+
+ done:
+	free_pkb ( pkb );
+	return rc;
 }
 
 struct tcpip_protocol udp_protocol  = {

@@ -389,9 +389,8 @@ static int ipv4_rx ( struct pk_buff *pkb, struct net_device *netdev __unused,
 
 	/* Sanity check */
 	if ( pkb_len ( pkb ) < sizeof ( *iphdr ) ) {
-		DBG ( "IP datagram too short (%d bytes)\n",
-			pkb_len ( pkb ) );
-		return -EINVAL;
+		DBG ( "IP datagram too short (%d bytes)\n", pkb_len ( pkb ) );
+		goto err;
 	}
 
 	/* Print IP4 header for debugging */
@@ -400,14 +399,14 @@ static int ipv4_rx ( struct pk_buff *pkb, struct net_device *netdev __unused,
 	/* Validate version and header length */
 	if ( iphdr->verhdrlen != 0x45 ) {
 		DBG ( "Bad version and header length %x\n", iphdr->verhdrlen );
-		return -EINVAL;
+		goto err;
 	}
 
 	/* Validate length of IP packet */
 	if ( ntohs ( iphdr->len ) > pkb_len ( pkb ) ) {
 		DBG ( "Inconsistent packet length %d\n",
 		      ntohs ( iphdr->len ) );
-		return -EINVAL;
+		goto err;
 	}
 
 	/* Verify the checksum */
@@ -447,6 +446,10 @@ static int ipv4_rx ( struct pk_buff *pkb, struct net_device *netdev __unused,
 
 	/* Send it to the transport layer */
 	return tcpip_rx ( pkb, iphdr->protocol, &src.st, &dest.st );
+
+ err:
+	free_pkb ( pkb );
+	return -EINVAL;
 }
 
 /** 

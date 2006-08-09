@@ -83,6 +83,7 @@ struct ll_protocol {
 	 *
 	 * This method should prepend in the link-layer header
 	 * (e.g. the Ethernet DIX header) and transmit the packet.
+	 * This method takes ownership of the packet buffer.
 	 */
 	int ( * tx ) ( struct pk_buff *pkb, struct net_device *netdev,
 		       struct net_protocol *net_protocol,
@@ -95,9 +96,10 @@ struct ll_protocol {
 	 *
 	 * This method should strip off the link-layer header
 	 * (e.g. the Ethernet DIX header) and pass the packet to
-	 * net_rx().
+	 * net_rx().  This method takes ownership of the packet
+	 * buffer.
 	 */
-	void ( * rx ) ( struct pk_buff *pkb, struct net_device *netdev );
+	int ( * rx ) ( struct pk_buff *pkb, struct net_device *netdev );
 	/**
 	 * Transcribe link-layer address
 	 *
@@ -206,8 +208,8 @@ extern int netdev_tx ( struct net_device *netdev, struct pk_buff *pkb );
 extern void netdev_rx ( struct net_device *netdev, struct pk_buff *pkb );
 extern int net_tx ( struct pk_buff *pkb, struct net_device *netdev,
 		    struct net_protocol *net_protocol, const void *ll_dest );
-extern void net_rx ( struct pk_buff *pkb, struct net_device *netdev,
-		     uint16_t net_proto, const void *ll_source );
+extern int net_rx ( struct pk_buff *pkb, struct net_device *netdev,
+		    uint16_t net_proto, const void *ll_source );
 extern int netdev_poll ( struct net_device *netdev );
 extern struct pk_buff * netdev_rx_dequeue ( struct net_device *netdev );
 extern struct net_device * alloc_netdev ( size_t priv_size );

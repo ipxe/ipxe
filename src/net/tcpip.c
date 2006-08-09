@@ -54,6 +54,7 @@ int tcpip_rx ( struct pk_buff *pkb, uint8_t tcpip_proto,
 	}
 
 	DBG ( "Unrecognised TCP/IP protocol %d\n", tcpip_proto );
+	free_pkb ( pkb );
 	return -EPROTONOSUPPORT;
 }
 
@@ -78,6 +79,7 @@ int tcpip_tx ( struct pk_buff *pkb, struct tcpip_protocol *tcpip_protocol,
 	}
 	
 	DBG ( "Unrecognised TCP/IP address family %d\n", st_dest->st_family );
+	free_pkb ( pkb );
 	return -EAFNOSUPPORT;
 }
 

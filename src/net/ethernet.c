@@ -19,6 +19,7 @@
 #include <stdint.h>
 #include <string.h>
 #include <byteswap.h>
+#include <errno.h>
 #include <assert.h>
 #include <vsprintf.h>
 #include <gpxe/if_arp.h>
@@ -68,21 +69,22 @@ static int eth_tx ( struct pk_buff *pkb, struct net_device *netdev,
  * Strips off the Ethernet link-layer header and passes up to the
  * network-layer protocol.
  */
-static void eth_rx ( struct pk_buff *pkb, struct net_device *netdev ) {
+static int eth_rx ( struct pk_buff *pkb, struct net_device *netdev ) {
 	struct ethhdr *ethhdr = pkb->data;
 
 	/* Sanity check */
 	if ( pkb_len ( pkb ) < sizeof ( *ethhdr ) ) {
 		DBG ( "Ethernet packet too short (%d bytes)\n",
 		      pkb_len ( pkb ) );
-		return;
+		free_pkb ( pkb );
+		return -EINVAL;
 	}
 
 	/* Strip off Ethernet header */
 	pkb_pull ( pkb, sizeof ( *ethhdr ) );
 
 	/* Hand off to network-layer protocol */
-	net_rx ( pkb, netdev, ethhdr->h_protocol, ethhdr->h_source );
+	return net_rx ( pkb, netdev, ethhdr->h_protocol, ethhdr->h_source );
 }
 
 /**

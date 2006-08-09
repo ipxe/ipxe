@@ -97,8 +97,9 @@ int net_tx ( struct pk_buff *pkb, struct net_device *netdev,
  * @v netdev		Network device
  * @v net_proto		Network-layer protocol, in network-byte order
  * @v ll_source		Source link-layer address
+ * @ret rc		Return status code
  */
-void net_rx ( struct pk_buff *pkb, struct net_device *netdev,
+int net_rx ( struct pk_buff *pkb, struct net_device *netdev,
 	      uint16_t net_proto, const void *ll_source ) {
 	struct net_protocol *net_protocol;
 
@@ -106,10 +107,11 @@ void net_rx ( struct pk_buff *pkb, struct net_device *netdev,
 	for ( net_protocol = net_protocols ; net_protocol < net_protocols_end ;
 	      net_protocol++ ) {
 		if ( net_protocol->net_proto == net_proto ) {
-			net_protocol->rx ( pkb, netdev, ll_source );
-			break;
+			return net_protocol->rx ( pkb, netdev, ll_source );
 		}
 	}
+	free_pkb ( pkb );
+	return 0;
 }
 
 /**
