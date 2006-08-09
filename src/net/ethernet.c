@@ -104,7 +104,7 @@ static const char * eth_ntoa ( const void *ll_addr ) {
 }
 
 /** Ethernet protocol */
-struct ll_protocol ethernet_protocol = {
+struct ll_protocol ethernet_protocol __ll_protocol = {
 	.name		= "Ethernet",
 	.ll_proto	= htons ( ARPHRD_ETHER ),
 	.ll_addr_len	= ETH_ALEN,
@@ -113,5 +113,3 @@ struct ll_protocol ethernet_protocol = {
 	.rx		= eth_rx,
 	.ntoa		= eth_ntoa,
 };
-
-LL_PROTOCOL ( ethernet_protocol );

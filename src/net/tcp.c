@@ -922,13 +922,11 @@ static int tcp_rx ( struct pk_buff *pkb,
 }
 
 /** TCP protocol */
-struct tcpip_protocol tcp_protocol = {
+struct tcpip_protocol tcp_protocol __tcpip_protocol = {
 	.name = "TCP",
 	.rx = tcp_rx,
 	.tcpip_proto = IP_TCP,
 	.csum_offset = 16,
 };
-
-TCPIP_PROTOCOL ( tcp_protocol );
 
 #endif /* USE_UIP */

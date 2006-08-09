@@ -267,11 +267,9 @@ static int udp_rx ( struct pk_buff *pkb, struct sockaddr_tcpip *st_src,
 	return rc;
 }
 
-struct tcpip_protocol udp_protocol  = {
+struct tcpip_protocol udp_protocol __tcpip_protocol = {
 	.name = "UDP",
 	.rx = udp_rx,
 	.tcpip_proto = IP_UDP,
 	.csum_offset = 6,
 };
-
-TCPIP_PROTOCOL ( udp_protocol );

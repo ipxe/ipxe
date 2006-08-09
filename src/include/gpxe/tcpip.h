@@ -94,21 +94,11 @@ struct tcpip_net_protocol {
 		       struct sockaddr_tcpip *st_dest );
 };
 
-/**
- * Register a TCP/IP transport-layer protocol
- *
- * @v protocol		Transport-layer protocol
- */
-#define TCPIP_PROTOCOL( protocol ) \
-	struct tcpip_protocol protocol __table ( tcpip_protocols, 01 )
+/** Declare a TCP/IP transport-layer protocol */
+#define	__tcpip_protocol __table ( tcpip_protocols, 01 )
 
-/**
- * Register a TCP/IP network-layer protocol
- *
- * @v protocol		Network-layer protocol
- */
-#define TCPIP_NET_PROTOCOL( protocol ) \
-	struct tcpip_net_protocol protocol __table ( tcpip_net_protocols, 01 )
+/** Declare a TCP/IP network-layer protocol */
+#define	__tcpip_net_protocol __table ( tcpip_net_protocols, 01 )
 
 extern int tcpip_rx ( struct pk_buff *pkb, uint8_t tcpip_proto,
 		      struct sockaddr_tcpip *st_src,

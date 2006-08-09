@@ -499,7 +499,7 @@ static const char * ipv4_ntoa ( const void *net_addr ) {
 }
 
 /** IPv4 protocol */
-struct net_protocol ipv4_protocol = {
+struct net_protocol ipv4_protocol __net_protocol = {
 	.name = "IP",
 	.net_proto = htons ( ETH_P_IP ),
 	.net_addr_len = sizeof ( struct in_addr ),
@@ -507,16 +507,12 @@ struct net_protocol ipv4_protocol = {
 	.ntoa = ipv4_ntoa,
 };
 
-NET_PROTOCOL ( ipv4_protocol );
-
 /** IPv4 TCPIP net protocol */
-struct tcpip_net_protocol ipv4_tcpip_protocol = {
+struct tcpip_net_protocol ipv4_tcpip_protocol __tcpip_net_protocol = {
 	.name = "IPv4",
 	.sa_family = AF_INET,
 	.tx = ipv4_tx,
 };
-
-TCPIP_NET_PROTOCOL ( ipv4_tcpip_protocol );
 
 /** IPv4 ARP protocol */
 struct arp_net_protocol ipv4_arp_protocol __arp_net_protocol = {

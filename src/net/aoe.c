@@ -253,13 +253,11 @@ static int aoe_rx ( struct pk_buff *pkb, struct net_device *netdev __unused,
 }
 
 /** AoE protocol */
-struct net_protocol aoe_protocol = {
+struct net_protocol aoe_protocol __net_protocol = {
 	.name = "AoE",
 	.net_proto = htons ( ETH_P_AOE ),
 	.rx = aoe_rx,
 };
-
-NET_PROTOCOL ( aoe_protocol );
 
 /**
  * Open AoE session

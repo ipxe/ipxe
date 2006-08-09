@@ -287,11 +287,9 @@ arp_ntoa ( const void *net_addr __attribute__ (( unused )) ) {
 }
 
 /** ARP protocol */
-struct net_protocol arp_protocol = {
+struct net_protocol arp_protocol __net_protocol = {
 	.name = "ARP",
 	.net_proto = htons ( ETH_P_ARP ),
 	.rx = arp_rx,
 	.ntoa = arp_ntoa,
 };
-
-NET_PROTOCOL ( arp_protocol );

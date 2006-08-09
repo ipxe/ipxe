@@ -176,21 +176,11 @@ struct net_device {
 	void *priv;
 };
 
-/**
- * Register a link-layer protocol
- *
- * @v protocol		Link-layer protocol
- */
-#define LL_PROTOCOL( protocol ) \
-	struct ll_protocol protocol __table ( ll_protocols, 01 )
+/** Declare a link-layer protocol */
+#define __ll_protocol  __table ( ll_protocols, 01 )
 
-/**
- * Register a network-layer protocol
- *
- * @v protocol		Network-layer protocol
- */
-#define NET_PROTOCOL( protocol ) \
-	struct net_protocol protocol __table ( net_protocols, 01 )
+/** Declare a network-layer protocol */
+#define __net_protocol __table ( net_protocols, 01 )
 
 /**
  * Get network device name

@@ -35,7 +35,7 @@ static const char * ipv6_ntoa ( const void *net_addr ) {
 }
 
 /** IPv6 protocol */
-struct net_protocol ipv6_protocol = {
+struct net_protocol ipv6_protocol __net_protocol = {
 	.name = "IP6",
 	.net_proto = htons ( ETH_P_IPV6 ),
 	.net_addr_len = sizeof ( struct in6_addr ),
@@ -43,13 +43,9 @@ struct net_protocol ipv6_protocol = {
 	.ntoa = ipv6_ntoa,
 };
 
-NET_PROTOCOL ( ipv6_protocol );
-
 /** IPv6 TCPIP net protocol */
-struct tcpip_net_protocol ipv6_tcpip_protocol = {
+struct tcpip_net_protocol ipv6_tcpip_protocol __tcpip_net_protocol = {
 	.name = "IPv6",
 	.sa_family = AF_INET6,
 	.tx = ipv6_tx,
 };
-
-TCPIP_NET_PROTOCOL ( ipv6_tcpip_protocol );
