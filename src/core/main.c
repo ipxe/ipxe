@@ -22,6 +22,7 @@ Literature dealing with the network protocols:
 #include "disk.h"
 #include "timer.h"
 #include "cpu.h"
+#include "cmdline.h"
 #include "console.h"
 #include <gpxe/init.h>
 #include "image.h"
@@ -155,6 +156,8 @@ int main ( void ) {
 	netdev = next_netdev ();
 	if ( netdev ) {
 		test_dhcp ( netdev );
+		//cmdl_start();
+		//test_aoeboot ( &static_single_netdev );
 	} else {
 		printf ( "No network device found\n" );
 	}

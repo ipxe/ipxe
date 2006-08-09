@@ -91,6 +91,7 @@ CFLAGS		+= -I include -I arch/$(ARCH)/include -I . -DARCH=$(ARCH)
 CFLAGS		+= -Os -ffreestanding
 CFLAGS		+= -Wall -W
 CFLAGS		+= -g
+CFLAGS		+= -DCONSOLE_DUAL -DCOMCONSOLE=0x3F8 -DCONSPEED=9600
 CFLAGS		+= $(EXTRA_CFLAGS)
 ASFLAGS		+= $(EXTRA_ASFLAGS)
 LDFLAGS		+= $(EXTRA_LDFLAGS)
@@ -145,6 +146,8 @@ SRCDIRS		+= interface/pxe
 SRCDIRS		+= tests
 SRCDIRS		+= crypto
 SRCDIRS		+= hci/mucurses
+SRCDIRS		+= commandline
+SRCDIRS		+= commandline/commands
 
 # NON_AUTO_SRCS lists files that are excluded from the normal
 # automatic build system.
