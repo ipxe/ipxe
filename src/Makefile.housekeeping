@@ -9,7 +9,7 @@ CLEANUP	:= $(BIN)/*.* # *.* to avoid catching the "CVS" directory
 
 # Version number calculations 
 #
-VERSION_MAJOR	= 5
+VERSION_MAJOR	= 0
 VERSION_MINOR	= 5
 VERSION_PATCH	= 0
 EXTRAVERSION	=	
