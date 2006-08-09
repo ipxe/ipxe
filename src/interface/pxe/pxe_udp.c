@@ -285,6 +285,7 @@ PXENV_EXIT_t pxenv_udp_write ( struct s_PXENV_UDP_WRITE *pxenv_udp_write ) {
 		struct sockaddr_in sin;
 		struct sockaddr_tcpip st;
 	} dest;
+	int rc;
 
 	DBG ( "PXENV_UDP_WRITE" );
 
@@ -299,6 +300,7 @@ PXENV_EXIT_t pxenv_udp_write ( struct s_PXENV_UDP_WRITE *pxenv_udp_write ) {
 	dest.sin.sin_family = AF_INET;
 	dest.sin.sin_addr.s_addr = pxenv_udp_write->ip;
 	dest.sin.sin_port = pxenv_udp_write->dst_port;
+	udp_connect ( &pxe_udp.udp, &dest.st );
 
 	/* Set local (source) port.  PXE spec says source port is 2069
 	 * if not specified.  Really, this ought to be set at UDP open
@@ -312,9 +314,18 @@ PXENV_EXIT_t pxenv_udp_write ( struct s_PXENV_UDP_WRITE *pxenv_udp_write ) {
 	 * confident of being able to do our own routing.  We should
 	 * probably allow for multiple gateways.
 	 */
+
+	DBG ( " %04x:%04x+%x %d->%s:%d", pxenv_udp_write->buffer.segment,
+	      pxenv_udp_write->buffer.offset, pxenv_udp_write->buffer_size,
+	      ntohs ( pxenv_udp_write->src_port ),
+	      inet_ntoa ( dest.sin.sin_addr ),
+	      ntohs ( pxenv_udp_write->dst_port ) );
 	
 	/* Transmit packet */
-	if ( udp_senddata ( &pxe_udp.udp ) != 0 ) {
+	pxe_udp.pxenv_udp_write = pxenv_udp_write;
+	rc = udp_senddata ( &pxe_udp.udp );
+	pxe_udp.pxenv_udp_write = NULL;
+	if ( rc != 0 ) {
 		pxenv_udp_write->Status = PXENV_STATUS_UNDI_TRANSMIT_ERROR;
 		return PXENV_EXIT_FAILURE;
 	}
