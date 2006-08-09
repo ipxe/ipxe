@@ -23,6 +23,11 @@
  * Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
  */
 
+#include <stdint.h>
+#include <string.h>
+#include <malloc.h>
+#include <gpxe/uaccess.h>
+#include <gpxe/dhcp.h>
 #include "pxe.h"
 #include "pxe_callbacks.h"
 
@@ -34,8 +39,6 @@
  *
  */
 PXENV_EXIT_t pxenv_unload_stack ( struct s_PXENV_UNLOAD_STACK *unload_stack ) {
-	int success;
-
 	DBG ( "PXENV_UNLOAD_STACK" );
 
 #if 0
@@ -68,68 +71,67 @@ PXENV_EXIT_t pxenv_unload_stack ( struct s_PXENV_UNLOAD_STACK *unload_stack ) {
  */
 PXENV_EXIT_t pxenv_get_cached_info ( struct s_PXENV_GET_CACHED_INFO
 				     *get_cached_info ) {
+	struct dhcp_packet dhcppkt;
+	void *data = NULL;
+	size_t len;
+	int msgtype;
+	struct dhcp_option_block *options;
+	userptr_t buffer;
+	int rc;
+
 	DBG ( "PXENV_GET_CACHED_INFO %d", get_cached_info->PacketType );
 
-#if 0
-	/* Fill in cached_info structure in our pxe_stack */
-
-	/* I don't think there's actually any way we can be called in
-	 * the middle of a DHCP request... 
+	/* This is really, really awkward to support with our multiple
+	 * sources of options.
 	 */
-	cached_info->opcode = BOOTP_REP;
-	/* We only have Ethernet drivers */
-	cached_info->Hardware = ETHER_TYPE;
-	cached_info->Hardlen = ETH_ALEN;
-	/* PXESPEC: "Client sets" says the spec, but who's filling in
-	 * this structure?  It ain't the client.
-	 */
-	cached_info->Gatehops = 0;
-	cached_info->ident = 0;
-	cached_info->seconds = 0;
-	cached_info->Flags = BOOTP_BCAST;
-	/* PXESPEC: What do 'Client' and 'Your' IP address refer to? */
-	cached_info->cip = arptable[ARP_CLIENT].ipaddr.s_addr;
-	cached_info->yip = arptable[ARP_CLIENT].ipaddr.s_addr;
-	cached_info->sip = arptable[ARP_SERVER].ipaddr.s_addr;
-	/* PXESPEC: Does "GIP" mean "Gateway" or "Relay agent"? */
-	cached_info->gip = arptable[ARP_GATEWAY].ipaddr.s_addr;
-	memcpy ( cached_info->CAddr, arptable[ARP_CLIENT].node, ETH_ALEN );
-	/* Nullify server name */
-	cached_info->Sname[0] = '\0';
-	memcpy ( cached_info->bootfile, KERNEL_BUF,
-		 sizeof(cached_info->bootfile) );
-	/* Copy DHCP vendor options */
-	memcpy ( &cached_info->vendor.d, bootp_data.bootp_reply.bp_vend,
-		 sizeof(cached_info->vendor.d) );
-	
-	/* Copy to user-specified buffer, or set pointer to our buffer */
-	get_cached_info->BufferLimit = sizeof(*cached_info);
-	/* PXESPEC: says to test for Buffer == NULL *and* BufferSize =
-	 * 0, but what are we supposed to do with a null buffer of
-	 * non-zero size?!
-	 */
-	if ( IS_NULL_SEGOFF16 ( get_cached_info->Buffer ) ) {
-		/* Point back to our buffer */
-		PTR_TO_SEGOFF16 ( cached_info, get_cached_info->Buffer );
-		get_cached_info->BufferSize = sizeof(*cached_info);
-	} else {
-		/* Copy to user buffer */
-		size_t size = sizeof(*cached_info);
-		void *buffer = SEGOFF16_TO_PTR ( get_cached_info->Buffer );
-		if ( get_cached_info->BufferSize < size )
-			size = get_cached_info->BufferSize;
-		DBG ( " to %x", virt_to_phys ( buffer ) );
-		memcpy ( buffer, cached_info, size );
-		/* PXESPEC: Should we return an error if the user
-		 * buffer is too small?  We do return the actual size
-		 * of the buffer via BufferLimit, so the user does
-		 * have a way to detect this already.
-		 */
+	if ( get_cached_info->BufferLimit == 0 ) {
+		DBG ( " without an external buffer.  Aargh." );
+		goto err;
 	}
-#endif
 
+	DBG ( " to %04x:%04x+%x\n", get_cached_info->Buffer.segment,
+	      get_cached_info->Buffer.offset, get_cached_info->BufferLimit );
+
+	/* Allocate space for temporary copy */
+	len = get_cached_info->BufferLimit;
+	data = malloc ( len );
+	if ( ! data ) {
+		DBG ( " out of memory" );
+		goto err;
+	}
+
+	/* Construct DHCP packet */
+	if ( get_cached_info->PacketType == PXENV_PACKET_TYPE_DHCP_DISCOVER ) {
+		msgtype = DHCPDISCOVER;
+		options = &dhcp_request_options;
+	} else {
+		msgtype = DHCPACK;
+		options = NULL;
+	}
+	if ( ( rc = create_dhcp_packet ( pxe_netdev, msgtype, data, len,
+					 &dhcppkt ) ) != 0 ) {
+		DBG ( " failed to build packet" );
+		goto err;
+	}
+	if ( ( rc = copy_dhcp_packet_options ( &dhcppkt, options ) ) != 0 ) {
+		DBG ( " failed to copy options" );
+		goto err;
+	}
+
+	/* Copy packet to client buffer */
+	buffer = real_to_user ( get_cached_info->Buffer.segment,
+				get_cached_info->Buffer.offset );
+	copy_to_user ( buffer, 0, data, len );
+
+	free ( data );
 	get_cached_info->Status = PXENV_STATUS_SUCCESS;
 	return PXENV_EXIT_SUCCESS;
+
+ err:
+	if ( data )
+		free ( data );
+	get_cached_info->Status = PXENV_STATUS_OUT_OF_RESOURCES;
+	return PXENV_EXIT_FAILURE;
 }
 
 /* PXENV_RESTART_TFTP
@@ -138,8 +140,6 @@ PXENV_EXIT_t pxenv_get_cached_info ( struct s_PXENV_GET_CACHED_INFO
  */
 PXENV_EXIT_t pxenv_restart_tftp ( struct s_PXENV_TFTP_READ_FILE
 				  *restart_tftp ) {
-	PXENV_EXIT_t tftp_exit;
-
 	DBG ( "PXENV_RESTART_TFTP" );
 
 #if 0
@@ -168,7 +168,6 @@ PXENV_EXIT_t pxenv_restart_tftp ( struct s_PXENV_TFTP_READ_FILE
  * Status: working
  */
 PXENV_EXIT_t pxenv_start_undi ( struct s_PXENV_START_UNDI *start_undi ) {
-	unsigned char bus, devfn;
 
 	DBG ( "PXENV_START_UNDI" );
 
