@@ -562,6 +562,13 @@ int tcp_listen ( struct tcp_connection *conn, uint16_t local_port ) {
 	static uint16_t try_port = 1024;
 	int rc;
 
+#warning "Fix the port re-use bug"
+	/* If we re-use the same port, the connection should be reset
+	 * and a new connection set up.  This doesn't happen yet, so
+	 * randomise the port to avoid hitting the problem.
+	 */
+	try_port = random();
+
 	/* If no port specified, find the first available port */
 	if ( ! local_port ) {
 		for ( ; try_port ; try_port++ ) {
