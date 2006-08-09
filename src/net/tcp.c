@@ -341,7 +341,7 @@ void tcp_trans ( struct tcp_connection *conn, int nxt_state ) {
  * @v tcphdr	TCP header
  */
 void tcp_dump ( struct tcp_header *tcphdr ) {
-	DBG ( "TCP %p src:%d dest:%d seq:%lld ack:%lld hlen:%hd flags:%#hx\n",
+	DBG ( "TCP %p src:%d dest:%d seq:%lx ack:%lx hlen:%hd flags:%#hx\n",
 		tcphdr, ntohs ( tcphdr->src ), ntohs ( tcphdr->dest ), ntohl ( tcphdr->seq ),
 		ntohl ( tcphdr->ack ), ( ( tcphdr->hlen & TCP_MASK_HLEN ) / 16 ), ( tcphdr->flags & TCP_MASK_FLAGS ) );
 }
@@ -670,7 +670,6 @@ static int tcp_rx ( struct pk_buff *pkb,
 	struct tcp_header *tcphdr;
 	uint32_t acked, toack;
 	int hlen;
-	int add = 4;
 
 	/* Sanity check */
 	if ( pkb_len ( pkb ) < sizeof ( *tcphdr ) ) {
@@ -688,7 +687,6 @@ static int tcp_rx ( struct pk_buff *pkb,
 	if ( hlen != sizeof ( *tcphdr ) ) {
 		if ( hlen == sizeof ( *tcphdr ) + 4 ) {
 			DBG ( "TCP options sent\n" );
-			add = 4;
 		} else {
 			DBG ( "Bad header length (%d bytes)\n", hlen );
 			return -EINVAL;
@@ -861,10 +859,11 @@ static int tcp_rx ( struct pk_buff *pkb,
 		/* Check if expected sequence number */
 		if ( conn->rcv_nxt == ntohl ( tcphdr->seq ) ) {
 			conn->rcv_nxt += toack;
-			conn->tcp_op->newdata ( conn, pkb->data + sizeof ( *tcphdr ) + add, toack );
+			conn->tcp_op->newdata ( conn, pkb->data + hlen,
+						toack );
 		} else {
-			printf ( "Unexpected sequence number %ld\n", 
-				ntohl ( tcphdr->seq ) );
+			DBG ( "Unexpected sequence number %ld (wanted %ld)\n", 
+			      ntohl ( tcphdr->seq ), conn->rcv_nxt );
 		}
 
 		/* Acknowledge new data */
