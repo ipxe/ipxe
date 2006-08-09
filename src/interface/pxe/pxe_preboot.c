@@ -23,8 +23,6 @@
  * Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
  */
 
-#if 0
-
 #include "pxe.h"
 #include "pxe_callbacks.h"
 
@@ -39,8 +37,8 @@ PXENV_EXIT_t pxenv_unload_stack ( struct s_PXENV_UNLOAD_STACK *unload_stack ) {
 	int success;
 
 	DBG ( "PXENV_UNLOAD_STACK" );
-	success = ensure_pxe_state ( CAN_UNLOAD );
 
+#if 0
 	/* We need to call cleanup() at some point.  The network card
 	 * has already been disabled by ENSURE_CAN_UNLOAD(), but for
 	 * the sake of completeness we should call the console_fini()
@@ -58,6 +56,7 @@ PXENV_EXIT_t pxenv_unload_stack ( struct s_PXENV_UNLOAD_STACK *unload_stack ) {
 		unload_stack->Status = PXENV_STATUS_KEEP_ALL;
 		return PXENV_EXIT_FAILURE;
 	}
+#endif
 
 	unload_stack->Status = PXENV_STATUS_SUCCESS;
 	return PXENV_EXIT_SUCCESS;
@@ -69,10 +68,9 @@ PXENV_EXIT_t pxenv_unload_stack ( struct s_PXENV_UNLOAD_STACK *unload_stack ) {
  */
 PXENV_EXIT_t pxenv_get_cached_info ( struct s_PXENV_GET_CACHED_INFO
 				     *get_cached_info ) {
-	BOOTPLAYER_t *cached_info = &pxe_stack->cached_info;
 	DBG ( "PXENV_GET_CACHED_INFO %d", get_cached_info->PacketType );
-	ENSURE_READY ( get_cached_info );
 
+#if 0
 	/* Fill in cached_info structure in our pxe_stack */
 
 	/* I don't think there's actually any way we can be called in
@@ -128,6 +126,7 @@ PXENV_EXIT_t pxenv_get_cached_info ( struct s_PXENV_GET_CACHED_INFO
 		 * have a way to detect this already.
 		 */
 	}
+#endif
 
 	get_cached_info->Status = PXENV_STATUS_SUCCESS;
 	return PXENV_EXIT_SUCCESS;
@@ -142,8 +141,8 @@ PXENV_EXIT_t pxenv_restart_tftp ( struct s_PXENV_TFTP_READ_FILE
 	PXENV_EXIT_t tftp_exit;
 
 	DBG ( "PXENV_RESTART_TFTP" );
-	ENSURE_READY ( restart_tftp );
 
+#if 0
 	/* Words cannot describe the complete mismatch between the PXE
 	 * specification and any possible version of reality...
 	 */
@@ -156,6 +155,7 @@ PXENV_EXIT_t pxenv_restart_tftp ( struct s_PXENV_TFTP_READ_FILE
 
 	/* Fire up the new NBP */
 	restart_tftp->Status = xstartpxe();
+#endif
 
 	/* Not sure what "SUCCESS" actually means, since we can only
 	 * return if the new NBP failed to boot...
@@ -171,8 +171,8 @@ PXENV_EXIT_t pxenv_start_undi ( struct s_PXENV_START_UNDI *start_undi ) {
 	unsigned char bus, devfn;
 
 	DBG ( "PXENV_START_UNDI" );
-	ENSURE_MIDWAY(start_undi);
 
+#if 0
 	/* Record PCI bus & devfn passed by caller, so we know which
 	 * NIC they want to use.
 	 *
@@ -203,6 +203,8 @@ PXENV_EXIT_t pxenv_start_undi ( struct s_PXENV_START_UNDI *start_undi ) {
 	}
 #endif
 
+#endif
+
 	start_undi->Status = PXENV_STATUS_SUCCESS;
 	return PXENV_EXIT_SUCCESS;
 }
@@ -214,10 +216,12 @@ PXENV_EXIT_t pxenv_start_undi ( struct s_PXENV_START_UNDI *start_undi ) {
 PXENV_EXIT_t pxenv_stop_undi ( struct s_PXENV_STOP_UNDI *stop_undi ) {
 	DBG ( "PXENV_STOP_UNDI" );
 
+#if 0
 	if ( ! ensure_pxe_state(CAN_UNLOAD) ) {
 		stop_undi->Status = PXENV_STATUS_KEEP_UNDI;
 		return PXENV_EXIT_FAILURE;
 	}
+#endif
 
 	stop_undi->Status = PXENV_STATUS_SUCCESS;
 	return PXENV_EXIT_SUCCESS;
@@ -229,7 +233,7 @@ PXENV_EXIT_t pxenv_stop_undi ( struct s_PXENV_STOP_UNDI *stop_undi ) {
  */
 PXENV_EXIT_t pxenv_start_base ( struct s_PXENV_START_BASE *start_base ) {
 	DBG ( "PXENV_START_BASE" );
-	/* ENSURE_READY ( start_base ); */
+
 	start_base->Status = PXENV_STATUS_UNSUPPORTED;
 	return PXENV_EXIT_FAILURE;
 }
@@ -249,5 +253,3 @@ PXENV_EXIT_t pxenv_stop_base ( struct s_PXENV_STOP_BASE *stop_base ) {
 	stop_base->Status = PXENV_STATUS_SUCCESS;
 	return PXENV_EXIT_SUCCESS;
 }
-
-#endif

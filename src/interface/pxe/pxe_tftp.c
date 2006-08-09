@@ -22,8 +22,6 @@
  * Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
  */
 
-#if 0
-
 #include "pxe.h"
 
 static int pxe_tftp_read_block ( unsigned char *data, unsigned int block,
@@ -109,13 +107,9 @@ static int pxe_tftp_read_block ( unsigned char *data, unsigned int block,
  * other PXE API call "if an MTFTP connection is active".
  */
 PXENV_EXIT_t pxenv_tftp_open ( struct s_PXENV_TFTP_OPEN *tftp_open ) {
-	struct sockaddr_in tftp_server;
-	struct tftpreq_info_t request;
-	struct tftpblk_info_t block;
-
 	DBG ( "PXENV_TFTP_OPEN" );
-	ENSURE_READY ( tftp_open );
 
+#if 0
 	/* Set server address and port */
 	tftp_server.sin_addr.s_addr = tftp_open->ServerIPAddress
 		? tftp_open->ServerIPAddress
@@ -146,6 +140,7 @@ PXENV_EXIT_t pxenv_tftp_open ( struct s_PXENV_TFTP_OPEN *tftp_open ) {
 	pxe_stack->tftpdata.len = block.len;
 	pxe_stack->tftpdata.eof = block.eof;
 	memcpy ( pxe_stack->tftpdata.data, block.data, block.len );
+#endif
 
 	tftp_open->Status = PXENV_STATUS_SUCCESS;
 	return PXENV_EXIT_SUCCESS;
@@ -174,7 +169,7 @@ PXENV_EXIT_t pxenv_tftp_open ( struct s_PXENV_TFTP_OPEN *tftp_open ) {
  */
 PXENV_EXIT_t pxenv_tftp_close ( struct s_PXENV_TFTP_CLOSE *tftp_close ) {
 	DBG ( "PXENV_TFTP_CLOSE" );
-	ENSURE_READY ( tftp_close );
+
 	tftp_close->Status = PXENV_STATUS_SUCCESS;
 	return PXENV_EXIT_SUCCESS;
 }
@@ -246,11 +241,9 @@ PXENV_EXIT_t pxenv_tftp_close ( struct s_PXENV_TFTP_CLOSE *tftp_close ) {
  * @ref pxe_x86_pmode16 "implementation note" for more details.)
  */
 PXENV_EXIT_t pxenv_tftp_read ( struct s_PXENV_TFTP_READ *tftp_read ) {
-	struct tftpblk_info_t block;
-
 	DBG ( "PXENV_TFTP_READ" );
-	ENSURE_READY ( tftp_read );
 
+#if 0
 	/* Do we have a block pending */
 	if ( pxe_stack->tftpdata.magic_cookie == PXE_TFTP_MAGIC_COOKIE ) {
 		block.data = pxe_stack->tftpdata.data;
@@ -271,6 +264,7 @@ PXENV_EXIT_t pxenv_tftp_read ( struct s_PXENV_TFTP_READ *tftp_read ) {
 	memcpy ( SEGOFF16_TO_PTR(tftp_read->Buffer), block.data, block.len );
 	DBG ( " %d to %hx:%hx", block.len, tftp_read->Buffer.segment,
 	      tftp_read->Buffer.offset );
+#endif
  
 	tftp_read->Status = PXENV_STATUS_SUCCESS;
 	return PXENV_EXIT_SUCCESS;
@@ -369,14 +363,11 @@ PXENV_EXIT_t pxenv_tftp_read ( struct s_PXENV_TFTP_READ *tftp_read ) {
  */
 PXENV_EXIT_t pxenv_tftp_read_file ( struct s_PXENV_TFTP_READ_FILE
 				    *tftp_read_file ) {
-	struct sockaddr_in tftp_server;
-	int rc;
-
 	DBG ( "PXENV_TFTP_READ_FILE %s to [%x,%x)", tftp_read_file->FileName,
 	      tftp_read_file->Buffer,
 	      tftp_read_file->Buffer + tftp_read_file->BufferSize );
-	ENSURE_READY ( tftp_read_file );
 
+#if 0
 	/* inserted by Klaus Wittemeier */
 	/* KERNEL_BUF stores the name of the last required file */
 	/* This is a fix to make Microsoft Remote Install Services work (RIS) */
@@ -399,10 +390,13 @@ PXENV_EXIT_t pxenv_tftp_read_file ( struct s_PXENV_TFTP_READ_FILE
 		tftp_read_file->Status = PXENV_STATUS_FAILURE;
 		return PXENV_EXIT_FAILURE;
 	}
+#endif
+
 	tftp_read_file->Status = PXENV_STATUS_SUCCESS;
 	return PXENV_EXIT_SUCCESS;
 }
 
+#if 0
 static int pxe_tftp_read_block ( unsigned char *data,
 				 unsigned int block __unused,
 				 unsigned int len, int eof ) {
@@ -415,6 +409,7 @@ static int pxe_tftp_read_block ( unsigned char *data,
 	pxe_stack->readfile.offset += len;
 	return eof ? 0 : 1;
 }
+#endif
 
 /**
  * TFTP GET FILE SIZE
@@ -463,8 +458,8 @@ PXENV_EXIT_t pxenv_tftp_get_fsize ( struct s_PXENV_TFTP_GET_FSIZE
 	int rc;
 
 	DBG ( "PXENV_TFTP_GET_FSIZE" );
-	ENSURE_READY ( tftp_get_fsize );
 
+#if 0
 	pxe_stack->readfile.buffer = NULL;
 	pxe_stack->readfile.bufferlen = 0;
 	pxe_stack->readfile.offset = 0;
@@ -476,6 +471,8 @@ PXENV_EXIT_t pxenv_tftp_get_fsize ( struct s_PXENV_TFTP_GET_FSIZE
 		return PXENV_EXIT_FAILURE;
 	}
 	tftp_get_fsize->FileSize = pxe_stack->readfile.offset;
+#endif
+
 	tftp_get_fsize->Status = PXENV_STATUS_SUCCESS;
 	return PXENV_EXIT_SUCCESS;
 }
@@ -623,5 +620,3 @@ Note to future API designers at Intel: try to understand the
 underlying network protocol first!
 
 */
-
-#endif
