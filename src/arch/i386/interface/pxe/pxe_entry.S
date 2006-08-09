@@ -171,6 +171,7 @@ pxe_entry_common:
  */
 	.section ".text16"
 	.code16
+	.globl	pxe_int_1a
 pxe_int_1a:
 	pushfw
 	cmpw	$0x5650, %ax
