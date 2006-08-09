@@ -384,7 +384,6 @@ void tcp_expired ( struct retry_timer *timer, int over ) {
 	case TCP_SYN_SENT:
 		if ( over ) {
 			tcp_trans ( conn, TCP_CLOSED );
-			stop_timer ( &conn->timer );
 			DBG ( "Timeout! Connection closed\n" );
 			return;
 		}
@@ -392,7 +391,6 @@ void tcp_expired ( struct retry_timer *timer, int over ) {
 	case TCP_SYN_RCVD:
 		if ( over ) {
 			tcp_trans ( conn, TCP_CLOSED );
-			stop_timer ( &conn->timer );
 			goto send_tcp_nomsg;
 		}
 		goto send_tcp_nomsg;
@@ -417,7 +415,6 @@ void tcp_expired ( struct retry_timer *timer, int over ) {
 		return;
 	case TCP_TIME_WAIT:
 		tcp_trans ( conn, TCP_CLOSED );
-		stop_timer ( &conn->timer );
 		return;
 	}
 	/* Retransmit the data */
@@ -632,6 +629,10 @@ int tcp_senddata ( struct tcp_connection *conn ) {
 	/* Call the senddata() call back function */
 	conn->tcp_op->senddata ( conn, conn->tx_pkb->data, 
 					pkb_available ( conn->tx_pkb ) );
+	/* Send pure ACK if senddata() didn't call tcp_send() */
+	if ( conn->tx_pkb ) {
+		tcp_send ( conn, TCP_NOMSG, TCP_NOMSG_LEN );
+	}
 	return 0;
 }
 
@@ -685,7 +686,8 @@ int tcp_send ( struct tcp_connection *conn, const void *data, size_t len ) {
 	/* Start the timer */
 	if ( ( conn->tcp_state == TCP_ESTABLISHED && conn->tcp_lstate == TCP_SYN_SENT ) ||
 	     ( conn->tcp_state == TCP_LISTEN && conn->tcp_lstate == TCP_SYN_RCVD ) ||
-	     ( conn->tcp_state == TCP_CLOSED && conn->tcp_lstate == TCP_SYN_RCVD ) ) {
+	     ( conn->tcp_state == TCP_CLOSED && conn->tcp_lstate == TCP_SYN_RCVD ) ||
+	     ( conn->tcp_state == TCP_ESTABLISHED && ( len == 0 ) ) ) {
 		// Don't start the timer
 	} else {
 		start_timer ( &conn->timer );
@@ -912,13 +914,10 @@ static int tcp_rx ( struct pk_buff *pkb,
 			      ntohl ( tcphdr->seq ), conn->rcv_nxt );
 		}
 
-		/* Send an ACK only if required to */
-		if ( conn->rcv_nxt <= ntohl ( tcphdr->seq ) ) {
-			/* Acknowledge new data */
-			conn->tcp_flags |= TCP_ACK;
-			if ( !( tcphdr->flags & TCP_ACK ) ) {
-				goto send_tcp_nomsg;
-			}
+		/* Acknowledge new data */
+		conn->tcp_flags |= TCP_ACK;
+		if ( !( tcphdr->flags & TCP_ACK ) ) {
+			goto send_tcp_nomsg;
 		}
 	}
 
