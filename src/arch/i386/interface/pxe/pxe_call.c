@@ -391,7 +391,9 @@ int pxe_boot ( void ) {
 					   "lcall $0, $0x7c00\n\t" )
 			       : "=a" ( rc ), "=b" ( discard_b ),
 			         "=c" ( discard_c )
-			       :  "a" ( &pxe ), "b" ( &pxenv ), "c" ( rm_cs )
+			       :  "a" ( & __from_text16 ( pxe ) ),
+			          "b" ( & __from_text16 ( pxenv ) ),
+			          "c" ( rm_cs )
 			       : "edx", "esi", "edi", "ebp", "memory" );
 
 	return rc;
