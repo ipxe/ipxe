@@ -94,4 +94,6 @@ extern int ensure_pxe_state ( pxe_stack_state_t wanted );
 
 extern pxe_stack_t *pxe_stack;
 
+extern struct net_device *pxe_netdev;
+
 #endif /* PXE_H */

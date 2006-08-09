@@ -25,6 +25,8 @@
 #include "dev.h"
 #include "pxe.h"
 
+struct net_device *pxe_netdev = NULL;
+
 #if 0
 
 /* Global pointer to currently installed PXE stack */
