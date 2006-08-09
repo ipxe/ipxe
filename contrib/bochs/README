@@ -72,9 +72,8 @@ Serial console
 You can use the program "serial-console" to obtain a virtual serial
 console for Etherboot running within Bochs.  Simply run
 "./serial-console" on a spare tty (e.g. a separate xterm window)
-before starting Bochs, and ensure that you have compiled Etherboot
-with appropriate settings such as
-  CFLAGS+= -DCONSOLE_DUAL -DCOMCONSOLE=0x3F8 -DCONSPEED=9600
+before starting Bochs, and ensure that you have enabled CONSOLE_SERIAL
+in config.h.
 
 There is a manual page for "serial-console"; use
 "man ./serial-console.1" to view it.
