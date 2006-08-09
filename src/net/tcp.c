@@ -529,35 +529,59 @@ int tcp_close ( struct tcp_connection *conn ) {
 	return tcp_send ( conn, TCP_NOMSG, TCP_NOMSG_LEN );
 }
 
+/**
+ * Bind TCP connection to local port
+ *
+ * @v conn		TCP connection
+ * @v local_port	Local port, in network byte order
+ * @ret rc		Return status code
+ */
+int tcp_bind ( struct tcp_connection *conn, uint16_t local_port ) {
+	struct tcp_connection *existing;
+
+	list_for_each_entry ( existing, &tcp_conns, list ) {
+		if ( existing->local_port == local_port )
+			return -EADDRINUSE;
+	}
+	conn->local_port = local_port;
+	return 0;
+}
+
 
 /**
  * Listen for a packet
  *
- * @v conn	TCP connection
- * @v port	Local port, in network byte order
+ * @v conn		TCP connection
+ * @v local_port	Local port, in network byte order
  *
- * This function adds the connection to a list of registered tcp connections. If
- * the local port is 0, the connection is assigned the lowest available port
- * between MIN_TCP_PORT and 65535.
+ * This function adds the connection to a list of registered tcp
+ * connections. If the local port is 0, the connection is assigned an
+ * available port between MIN_TCP_PORT and 65535.
  */
-int tcp_listen ( struct tcp_connection *conn, uint16_t port ) {
-	struct tcp_connection *cconn;
-	if ( port != 0 ) {
-		list_for_each_entry ( cconn, &tcp_conns, list ) {
-			if ( cconn->local_port == port ) {
-				DBG ( "Error listening to %d\n", 
-							ntohs ( port ) );
-				return -EISCONN;
-			}
+int tcp_listen ( struct tcp_connection *conn, uint16_t local_port ) {
+	static uint16_t try_port = 1024;
+	int rc;
+
+	/* If no port specified, find the first available port */
+	if ( ! local_port ) {
+		for ( ; try_port ; try_port++ ) {
+			if ( try_port < 1024 )
+				continue;
+			if ( tcp_listen ( conn, htons ( try_port ) ) == 0 )
+				return 0;
 		}
-		/* Add the connection to the list of registered connections */
-		conn->local_port = port;
-		list_add ( &conn->list, &tcp_conns );
-		return 0;
+		return -EADDRINUSE;
 	}
-	/* Assigning lowest port not supported */
-	DBG ( "Assigning lowest port not implemented\n");
-	return -ENOSYS;
+
+	/* Attempt bind to local port */
+	if ( ( rc = tcp_bind ( conn, local_port ) ) != 0 )
+		return rc;
+
+	/* Add to TCP connection list */
+	list_add ( &conn->list, &tcp_conns );
+	DBG ( "TCP opened %p on port %d\n", conn, ntohs ( local_port ) );
+
+	return 0;
 }
 
 /**
