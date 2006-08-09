@@ -29,6 +29,11 @@
  *
  * A retry timer is a binary exponential backoff timer.  It can be
  * used to build automatic retransmission into network protocols.
+ *
+ * This implementation of the timer is designed to satisfy RFC 2988
+ * and therefore be usable as a TCP retransmission timer.
+ *
+ * 
  */
 
 /** Default timeout value */
@@ -94,12 +99,39 @@ void stop_timer ( struct retry_timer *timer ) {
 	 * t := ( 7 t / 8 ) + ( r / 2 )
 	 *
 	 */
-	timer->timeout -= ( timer->timeout >> 3 );
-	timer->timeout += ( runtime >> 1 );
-	if ( timer->timeout != old_timeout ) {
-		DBG ( "Timer updated to %dms\n",
-		      ( ( 1000 * timer->timeout ) / TICKS_PER_SEC ) );
+	if ( timer->count ) {
+		timer->count--;
+	} else {
+		timer->timeout -= ( timer->timeout >> 3 );
+		timer->timeout += ( runtime >> 1 );
+		if ( timer->timeout != old_timeout ) {
+			DBG ( "Timer updated to %dms\n",
+			      ( ( 1000 * timer->timeout ) / TICKS_PER_SEC ) );
+		}
 	}
+}
+
+/**
+ * Handle expired timer
+ *
+ * @v timer		Retry timer
+ */
+static void timer_expired ( struct retry_timer *timer ) {
+	int fail;
+
+	/* Stop timer without performing RTT calculations */
+	list_del ( &timer->list );
+	timer->count++;
+
+	/* Back off the timeout value */
+	timer->timeout <<= 1;
+	if ( ( fail = ( timer->timeout > MAX_TIMEOUT ) ) )
+		timer->timeout = MAX_TIMEOUT;
+	DBG ( "Timer backed off to %dms\n",
+	      ( ( 1000 * timer->timeout ) / TICKS_PER_SEC ) );
+
+	/* Call expiry callback */
+	timer->expired ( timer, fail );	
 }
 
 /**
@@ -112,22 +144,11 @@ static void retry_step ( struct process *process ) {
 	struct retry_timer *tmp;
 	unsigned long now = currticks();
 	unsigned long used;
-	int fail;
 
 	list_for_each_entry_safe ( timer, tmp, &timers, list ) {
 		used = ( now - timer->start );
-		if ( used >= timer->timeout ) {
-			/* Stop timer without performing RTT calculations */
-			list_del ( &timer->list );
-			/* Back off the timeout value */
-			timer->timeout <<= 1;
-			if ( ( fail = ( timer->timeout > MAX_TIMEOUT ) ) )
-				timer->timeout = MAX_TIMEOUT;
-			DBG ( "Timer backed off to %dms\n",
-			      ( ( 1000 * timer->timeout ) / TICKS_PER_SEC ) );
-			/* Call expiry callback */
-			timer->expired ( timer, fail );
-		}
+		if ( used >= timer->timeout )
+			timer_expired ( timer );
 	}
 
 	schedule ( process );

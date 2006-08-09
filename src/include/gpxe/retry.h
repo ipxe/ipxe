@@ -17,6 +17,8 @@ struct retry_timer {
 	unsigned long timeout;
 	/** Start time (in ticks) */
 	unsigned long start;
+	/** Retry count */
+	unsigned int count;
 	/** Timer expired callback
 	 *
 	 * @v timer	Retry timer
