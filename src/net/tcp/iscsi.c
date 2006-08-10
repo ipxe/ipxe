@@ -129,7 +129,7 @@ static void iscsi_rx_data_in ( struct iscsi_session *iscsi, void *data,
 	/* Copy data to data-in buffer */
 	offset = ntohl ( data_in->offset ) + iscsi->rx_offset;
 	assert ( iscsi->command != NULL );
-	assert ( iscsi->command->data_in != NULL );
+	assert ( iscsi->command->data_in );
 	assert ( ( offset + len ) <= iscsi->command->data_in_len );
 	copy_to_user ( iscsi->command->data_in, offset, data, len );
 
@@ -235,7 +235,7 @@ static void iscsi_tx_data_out ( struct iscsi_session *iscsi,
 		   iscsi->tx_offset );
 	remaining = ( ISCSI_DATA_LEN ( data_out->lengths ) - iscsi->tx_offset);
 	assert ( iscsi->command != NULL );
-	assert ( iscsi->command->data_out != NULL );
+	assert ( iscsi->command->data_out );
 	assert ( ( offset + remaining ) <= iscsi->command->data_out_len );
 	
 	if ( remaining < len )
