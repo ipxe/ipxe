@@ -236,7 +236,7 @@ static void iscsi_tx_data_out ( struct iscsi_session *iscsi,
 	remaining = ( ISCSI_DATA_LEN ( data_out->lengths ) - iscsi->tx_offset);
 	assert ( iscsi->command != NULL );
 	assert ( iscsi->command->data_out != NULL );
-	assert ( ( offset + len ) <= iscsi->command->data_out_len );
+	assert ( ( offset + remaining ) <= iscsi->command->data_out_len );
 	
 	if ( remaining < len )
 		len = remaining;
