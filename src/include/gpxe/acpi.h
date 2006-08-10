@@ -34,6 +34,6 @@ struct acpi_description_header {
 	char asl_compiler_id[4];
 	/** ASL compiler revision number */
 	uint32_t asl_compiler_revision;
-};
+} __attribute__ (( packed ));
 
 #endif /* _GPXE_ACPI_H */
