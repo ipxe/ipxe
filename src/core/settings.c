@@ -251,3 +251,16 @@ struct config_setting_type config_setting_type_ipv4 __config_setting_type = {
 	.set = set_ipv4,
 };
 
+/** Some basic setting definitions */
+struct config_setting basic_config_settings[] __config_setting = {
+	{
+		.name = "hostname",
+		.tag = DHCP_HOST_NAME,
+		.type = &config_setting_type_string,
+	},
+	{
+		.name = "ip",
+		.tag = DHCP_EB_YIADDR,
+		.type = &config_setting_type_ipv4,
+	},
+};
