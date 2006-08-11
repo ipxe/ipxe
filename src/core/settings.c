@@ -116,17 +116,19 @@ find_or_build_config_setting ( const char *name,
  *
  * @v context		Configuration context
  * @v name		Configuration setting name
- * @ret value		Setting value (as a string), or NULL
+ * @v buf		Buffer to contain value
+ * @v len		Length of buffer
+ * @ret rc		Return status code
  */
-const char * ( show_setting ) ( struct config_context *context,
-				const char *name ) {
+int ( show_setting ) ( struct config_context *context, const char *name,
+		       char *buf, size_t len ) {
 	struct config_setting *setting;
 	struct config_setting tmp_setting;
 
 	setting = find_or_build_config_setting ( name, &tmp_setting );
 	if ( ! setting )
-		return NULL;
-	return setting->type->show ( context, setting );
+		return -ENOENT;
+	return setting->type->show ( context, setting, buf, len );
 }
 
 /** Set value of setting
@@ -146,3 +148,50 @@ int ( set_setting ) ( struct config_context *context, const char *name,
 		return -ENOENT;
 	return setting->type->set ( context, setting, value );
 }
+
+/**
+ * Show value of string setting
+ *
+ * @v context		Configuration context
+ * @v setting		Configuration setting
+ * @v buf		Buffer to contain value
+ * @v len		Length of buffer
+ * @ret rc		Return status code
+ */
+static int show_string ( struct config_context *context,
+			 struct config_setting *setting,
+			 char *buf, size_t len ) {
+	struct dhcp_option *option;
+
+	option = find_dhcp_option ( context->options, setting->tag );
+	if ( ! option )
+		return -ENOENT;
+	dhcp_snprintf ( buf, len, option );
+	return 0;
+}
+
+/** Set value of string setting
+ *
+ * @v context		Configuration context
+ * @v setting		Configuration setting
+ * @v value		Setting value (as a string)
+ * @ret rc		Return status code
+ */ 
+static int set_string ( struct config_context *context,
+			struct config_setting *setting,
+			const char *value ) {
+	struct dhcp_option *option;
+
+	option = set_dhcp_option ( context->options, setting->tag,
+				   value, strlen ( value ) );
+	if ( ! option )
+		return -ENOMEM;
+	return 0;
+}
+
+/** A string configuration setting */
+struct config_setting_type config_setting_type_string __config_setting_type = {
+	.name = "string",
+	.show = show_string,
+	.set = set_string,
+};

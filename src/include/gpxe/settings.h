@@ -44,10 +44,13 @@ struct config_setting_type {
 	 *
 	 * @v context		Configuration context
 	 * @v setting		Configuration setting
-	 * @ret value		Setting value (as a string), or NULL
+	 * @v buf		Buffer to contain value
+	 * @v len		Length of buffer
+	 * @ret rc		Return status code
 	 */
-	const char * ( * show ) ( struct config_context *context,
-				  struct config_setting *setting );
+	int ( * show ) ( struct config_context *context,
+			 struct config_setting *setting,
+			 char *buf, size_t len );
 	/** Set value of setting
 	 *
 	 * @v context		Configuration context
@@ -95,8 +98,8 @@ struct config_setting {
 
 /* Function prototypes */
 
-extern const char * ( show_setting ) ( struct config_context *context,
-				       const char *name );
+extern int ( show_setting ) ( struct config_context *context, const char *name,
+			      char *buf, size_t len );
 extern int ( set_setting ) ( struct config_context *context, const char *name,
 			     const char *value );
 
