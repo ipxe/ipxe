@@ -409,11 +409,15 @@ struct dhcp_option * set_dhcp_option ( struct dhcp_option_block *options,
 				       const void *data, size_t len ) {
 	static const uint8_t empty_encapsulator[] = { DHCP_END };
 	struct dhcp_option *option;
-	void *insertion_point = options->data;
+	void *insertion_point;
 	struct dhcp_option *encapsulator = NULL;
 	unsigned int encap_tag = DHCP_ENCAPSULATOR ( tag );
 	size_t old_len = 0;
 	size_t new_len = ( len ? ( len + DHCP_OPTION_HEADER_LEN ) : 0 );
+
+	/* Return NULL if no options block specified */
+	if ( ! options )
+		return NULL;
 
 	/* Find old instance of this option, if any */
 	option = find_dhcp_option_with_encap ( options, tag, &encapsulator );
@@ -428,6 +432,7 @@ struct dhcp_option * set_dhcp_option ( struct dhcp_option_block *options,
 	}
 	
 	/* Ensure that encapsulator exists, if required */
+	insertion_point = options->data;
 	if ( DHCP_IS_ENCAP_OPT ( tag ) ) {
 		if ( ! encapsulator )
 			encapsulator = set_dhcp_option ( options, encap_tag,
