@@ -264,3 +264,23 @@ struct config_setting basic_config_settings[] __config_setting = {
 		.type = &config_setting_type_ipv4,
 	},
 };
+
+
+
+/* Quick and dirty proof of concept */
+int cmdl_show ( int argc, char **argv ) {
+	char buf[256];
+	struct config_context dummy_context = { NULL };
+	int rc;
+
+	if ( argc < 2 )
+		return -EINVAL;
+	
+	if ( ( rc = show_setting ( &dummy_context, argv[1],
+				   buf, sizeof ( buf ) ) ) != 0 )
+		return rc;
+
+	printf ( "%s = %s\n", argv[1], buf );
+	return 0;
+}
+
