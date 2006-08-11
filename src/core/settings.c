@@ -21,6 +21,8 @@
 #include <string.h>
 #include <errno.h>
 #include <assert.h>
+#include <vsprintf.h>
+#include <gpxe/in.h>
 #include <gpxe/settings.h>
 
 /** @file
@@ -195,3 +197,57 @@ struct config_setting_type config_setting_type_string __config_setting_type = {
 	.show = show_string,
 	.set = set_string,
 };
+
+/**
+ * Show value of IPv4 setting
+ *
+ * @v context		Configuration context
+ * @v setting		Configuration setting
+ * @v buf		Buffer to contain value
+ * @v len		Length of buffer
+ * @ret rc		Return status code
+ */
+static int show_ipv4 ( struct config_context *context,
+		       struct config_setting *setting,
+		       char *buf, size_t len ) {
+	struct dhcp_option *option;
+	struct in_addr ipv4;
+
+	option = find_dhcp_option ( context->options, setting->tag );
+	if ( ! option )
+		return -ENOENT;
+	dhcp_ipv4_option ( option, &ipv4 );
+	snprintf ( buf, len, inet_ntoa ( ipv4 ) );
+	return 0;
+}
+
+/** Set value of IPV4 setting
+ *
+ * @v context		Configuration context
+ * @v setting		Configuration setting
+ * @v value		Setting value (as a string)
+ * @ret rc		Return status code
+ */ 
+static int set_ipv4 ( struct config_context *context,
+		      struct config_setting *setting,
+		      const char *value ) {
+	struct dhcp_option *option;
+	struct in_addr ipv4;
+	int rc;
+	
+	if ( ( rc = inet_aton ( value, &ipv4 ) ) != 0 )
+		return rc;
+	option = set_dhcp_option ( context->options, setting->tag,
+				   &ipv4, sizeof ( ipv4 ) );
+	if ( ! option )
+		return -ENOMEM;
+	return 0;
+}
+
+/** An IPv4 configuration setting */
+struct config_setting_type config_setting_type_ipv4 __config_setting_type = {
+	.name = "ipv4",
+	.show = show_ipv4,
+	.set = set_ipv4,
+};
+
