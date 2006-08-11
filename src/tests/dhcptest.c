@@ -4,6 +4,7 @@
 #include <gpxe/ip.h>
 #include <gpxe/dhcp.h>
 #include <gpxe/iscsi.h>
+#include <gpxe/netdevice.h>
 
 static int test_dhcp_aoe_boot ( struct net_device *netdev,
 				char *aoename ) {
@@ -120,7 +121,7 @@ int test_dhcp ( struct net_device *netdev ) {
 		goto out_no_del_ipv4;
 
 	/* Issue DHCP request */
-	printf ( "DHCP..." );
+	printf ( "DHCP (%s)...", netdev_name ( netdev ) );
 	memset ( &dhcp, 0, sizeof ( dhcp ) );
 	dhcp.netdev = netdev;
 	if ( ( rc = async_wait ( start_dhcp ( &dhcp ) ) ) != 0 ) {
