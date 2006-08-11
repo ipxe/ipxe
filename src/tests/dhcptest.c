@@ -57,6 +57,26 @@ static int test_dhcp_hello ( char *helloname ) {
 	return 0;
 }
 
+static int test_dhcp_http ( struct net_device *netdev, char *url ) {
+	union {
+		struct sockaddr_in sin;
+		struct sockaddr_tcpip st;
+	} target;
+
+	memset ( &target, 0, sizeof ( target ) );
+	target.sin.sin_family = AF_INET;
+	target.sin.sin_port = htons ( 80 );
+
+	char *addr = url + 7; // http://
+        char *file = strchr(addr, '/');
+	*file = '\0'; // for printf and inet_aton to work
+	printf("connecting to %s\n", addr);
+	inet_aton ( addr, &target.sin.sin_addr );
+	*file = '/';
+	test_http ( netdev, &target.st, file );
+	return 0;
+}
+
 static int test_dhcp_tftp ( struct net_device *netdev, char *tftpname ) {
 	union {
 		struct sockaddr_in sin;
@@ -79,6 +99,8 @@ static int test_dhcp_boot ( struct net_device *netdev, char *filename ) {
 		return test_dhcp_iscsi_boot ( &filename[6] );
 	} else if ( strncmp ( filename, "hello:", 6 ) == 0 ) {
 		return test_dhcp_hello ( &filename[6] );
+	} else if ( strncmp ( filename, "http:", 5 ) == 0 ) {
+		return test_dhcp_http ( netdev, filename );
 	} else {
 		return test_dhcp_tftp ( netdev, filename );
 	}
