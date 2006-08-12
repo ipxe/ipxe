@@ -1,4 +1,5 @@
 #include <stddef.h>
+#include <stdlib.h>
 #include <string.h>
 #include <vsprintf.h>
 #include <assert.h>
@@ -158,13 +159,11 @@ static void http_newdata ( struct tcp_connection *conn, void *data,
  */
 static void http_senddata ( struct tcp_connection *conn, void *buf, size_t len ) {
 	struct http_request *http = tcp_to_http ( conn );
-	char buf[66]; // 16 request + 50 for filename
-	size_t len;
 
 	switch ( http->state ){
 	case HTTP_REQUEST_FILE:
-		len = snprintf(buf,66,"GET %s HTTP/1.0\r\n\r\n",http->filename);
-		printf("%s\n",buf);
+		len = snprintf(buf,len,"GET %s HTTP/1.0\r\n\r\n",http->filename);
+		printf("%s\n",(char *)buf);
         	// string is: GET <file> HTTP/1.0\r\n\r\n
 
 		tcp_send ( conn, buf, len);
