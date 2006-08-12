@@ -71,7 +71,7 @@ static void http_connected ( struct tcp_connection *conn ) {
  * @v conn	a TCP Connection
  * @v len	the length of data acked
  */
-static void http_acked ( struct tcp_connection *conn, size_t len ) {
+static void http_acked ( struct tcp_connection *conn, size_t len __attribute__ ((unused)) ) {
 	struct http_request *http = tcp_to_http ( conn );
 
 	// assume that the whole GET request was sent in on epacket
