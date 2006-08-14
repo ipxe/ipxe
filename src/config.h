@@ -98,7 +98,7 @@
  * you want to use.
  *
  */
-#define TAGGED_IMAGE		/* NBI image support */
+#undef	TAGGED_IMAGE		/* NBI image support */
 #undef	ELF64_IMAGE		/* ELF64 image support */
 #undef	ELF_IMAGE		/* ELF image support */
 #undef	COFF_IMAGE		/* COFF image support */
