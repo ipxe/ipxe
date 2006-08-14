@@ -883,11 +883,6 @@ int await_reply(reply_t reply, int ival, void *ptr, long timeout)
 		if (result == 0) {
 			/* We don't have anything */
 		
-			/* Check for abort key only if the Rx queue is empty -
-			 * as long as we have something to process, don't
-			 * assume that something failed.  It is unlikely that
-			 * we have no processing time left between packets.  */
-			poll_interruptions();
 			/* Do the timeout after at least a full queue walk.  */
 			if ((timeout == 0) || (currticks() > time)) {
 				break;

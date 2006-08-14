@@ -3536,7 +3536,6 @@ e1000_transmit (struct nic *nic, const char *d,	/* Destination */
 	E1000_WRITE_REG (&hw, TDT, tx_tail);
 	while (!(txp->upper.data & E1000_TXD_STAT_DD)) {
 		udelay(10);	/* give the nic a chance to write to the register */
-		poll_interruptions();
 	}
 	DEBUGFUNC("send end");
 }

@@ -3153,7 +3153,6 @@ static void tg3_transmit(struct nic *nic, const char *dst_addr,
 	while((tp->hw_status->idx[0].tx_consumer != entry) &&
 		(tp->hw_status->idx[0].tx_consumer != PREV_TX(entry))) {
 		mdelay(10);	/* give the nick a chance */
-		poll_interruptions();
 		if (++i > 500) { /* timeout 5s for transmit */
 			printf("transmit timed out\n");
 			tg3_halt(tp);

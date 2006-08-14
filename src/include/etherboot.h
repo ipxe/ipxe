@@ -222,7 +222,6 @@ extern int load_block P((unsigned char *, unsigned int, unsigned int, int ));
 extern void twiddle P((void));
 extern void sleep P((int secs));
 extern void interruptible_sleep P((int secs));
-extern void poll_interruptions P((void));
 extern int strcasecmp P((const char *a, const char *b));
 extern char *substr P((const char *a, const char *b));
 

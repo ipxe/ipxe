@@ -73,20 +73,6 @@ int32_t random(void)
 }
 
 /**************************************************************************
-POLL INTERRUPTIONS
-**************************************************************************/
-void poll_interruptions(void)
-{
-	int ch;
-	if ( ! as_main_program ) return;
-	/* If an interruption has occured restart etherboot */
-	if (iskey() && (ch = getchar(), (ch == K_ESC) || (ch == K_EOF) || (ch == K_INTR))) {
-		int state = (ch != K_INTR)? -1 : -3;
-		longjmp(restart_etherboot, state);
-	}
-}
-
-/**************************************************************************
 SLEEP
 **************************************************************************/
 void sleep(int secs)
@@ -94,7 +80,6 @@ void sleep(int secs)
 	unsigned long tmo;
 
 	for (tmo = currticks()+secs*TICKS_PER_SEC; currticks() < tmo; ) {
-		poll_interruptions();
 	}
 }
 

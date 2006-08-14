@@ -17,7 +17,6 @@ void mdelay(unsigned int msecs)
 	unsigned int i;
 	for(i = 0; i < msecs; i++) {
 		udelay(1000);
-		poll_interruptions();
 	}
 }
 
@@ -25,6 +24,5 @@ void waiton_timer2(unsigned int ticks)
 {
 	load_timer2(ticks);
 	while(timer2_running()) {
-		poll_interruptions();
 	}
 }

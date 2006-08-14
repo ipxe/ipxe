@@ -48,7 +48,6 @@ struct	driver_interact_t driver[] = {
 void	sleepticks(int numticks ) {
 	u_int	tmo;
 	for (tmo = currticks()+numticks; currticks() < tmo; ) {
-                poll_interruptions();
         }
 	return;
 }
