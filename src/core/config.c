@@ -41,67 +41,6 @@
 #endif
 
 /*
- * Print out configuration
- *
- */
-void print_config ( void ) {
-	printf( "Etherboot " VERSION BUILD_STRING
-		" (GPL) http://etherboot.org\n"
-		"Drivers: " );
-	print_drivers();
-	printf( "  Images: " );
-	print_images();
-
-#ifdef PXE_EXPORT /* All possible exports */
-	printf ( "  Exports: PXE  " );
-#endif /* All possible exports */
-
-#if	(BOOTP_SERVER != 67) || (BOOTP_CLIENT != 68)
-	printf( "[DHCP ports %d and %d] ",
-		BOOTP_SERVER, BOOTP_CLIENT);
-#endif
-	putchar('\n');
-	printf( "Protocols: "
-#ifdef RARP_NOT_BOOTP
-		"RARP "
-#else
-# ifndef NO_DHCP_SUPPORT
-		"DHCP "
-# else
-		"BOOTP "
-# endif
-#endif
-#ifdef DOWNLOAD_PROTO_TFTP
-		"TFTP "
-#endif
-#ifdef  DOWNLOAD_PROTO_FSP
-		"FSP "
-#endif				
-#ifdef  DOWNLOAD_PROTO_NFS
-		"NFS "
-#endif
-#ifdef  DOWNLOAD_PROTO_SLAM
-		"SLAM "
-#endif
-#ifdef  DOWNLOAD_PROTO_TFTM
-		"TFTM "
-#endif
-#ifdef  DOWNLOAD_PROTO_HTTP
-		"HTTP "
-#endif
-#ifdef  PROTO_LACP
-		"LACP "
-#endif
-#ifdef DNS_RESOLVER
-		"DNS "
-#endif
-		"\n");
-#ifdef KEEP_IT_REAL
-	printf( "Keeping It Real [EXPERIMENTAL]\n" );
-#endif
-}
-
-/*
  * Drag in all requested console types
  *
  * CONSOLE_DUAL sets both CONSOLE_FIRMWARE and CONSOLE_SERIAL for
