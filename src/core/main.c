@@ -345,16 +345,17 @@ static const struct proto protos[] = {
 };
 #endif
 
-
 /**************************************************************************
 CLEANUP - shut down networking and console so that the OS may be called 
 **************************************************************************/
+#if 0
 void cleanup(void)
 {
 	/* Stop receiving packets */
 	disable ( &dev );
 	initialized = 0;
 }
+#endif
 
 /*
  * Local variables:
