@@ -75,6 +75,11 @@ static void iscsi_start_command ( struct iscsi_session *iscsi ) {
 	command->cmdsn = htonl ( iscsi->cmdsn );
 	command->expstatsn = htonl ( iscsi->statsn + 1 );
 	memcpy ( &command->cdb, &iscsi->command->cdb, sizeof ( command->cdb ));
+	DBG ( "iSCSI %p start " SCSI_CDB_FORMAT " %s %#x\n",
+	      iscsi, SCSI_CDB_DATA ( command->cdb ),
+	      ( iscsi->command->data_in ? "in" : "out" ),
+	      ( iscsi->command->data_in ?
+		iscsi->command->data_in_len : iscsi->command->data_out_len ) );
 }
 
 /**
@@ -200,6 +205,8 @@ static void iscsi_start_data_out ( struct iscsi_session *iscsi,
 	data_out->expstatsn = htonl ( iscsi->statsn + 1 );
 	data_out->datasn = htonl ( datasn );
 	data_out->offset = htonl ( iscsi->transfer_offset + offset );
+	DBG ( "iSCSI %p start data out DataSN %#x len %#lx\n",
+	      iscsi, datasn, len );
 }
 
 /**
