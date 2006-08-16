@@ -147,8 +147,19 @@ union scsi_cdb {
 	struct scsi_cdb_write_16 write16;
 	struct scsi_cdb_read_capacity_10 readcap10;
 	struct scsi_cdb_read_capacity_16 readcap16;
-	char bytes[16];
+	unsigned char bytes[16];
 };
+
+/** printf() format for dumping a scsi_cdb */
+#define SCSI_CDB_FORMAT "%02x:%02x:%02x:%02x:%02x:%02x:%02x:%02x:" \
+			"%02x:%02x:%02x:%02x:%02x:%02x:%02x:%02x"
+
+/** printf() parameters for dumping a scsi_cdb */
+#define SCSI_CDB_DATA(cdb)						  \
+	(cdb).bytes[0], (cdb).bytes[1], (cdb).bytes[2], (cdb).bytes[3],	  \
+	(cdb).bytes[4], (cdb).bytes[5], (cdb).bytes[6], (cdb).bytes[7],	  \
+	(cdb).bytes[8], (cdb).bytes[9], (cdb).bytes[10], (cdb).bytes[11], \
+	(cdb).bytes[12], (cdb).bytes[13], (cdb).bytes[14], (cdb).bytes[15]
 
 /** @} */
 
