@@ -643,6 +643,11 @@ static void iscsi_rx_discard ( struct iscsi_session *iscsi __unused,
 static void iscsi_rx_bhs ( struct iscsi_session *iscsi, void *data,
 			   size_t len, size_t remaining __unused ) {
 	memcpy ( &iscsi->rx_bhs.bytes[iscsi->rx_offset], data, len );
+	if ( ( iscsi->rx_offset + len ) >= sizeof ( iscsi->rx_bhs ) ) {
+		DBG ( "iSCSI %p received PDU opcode %#x len %#lx\n",
+		      iscsi, iscsi->rx_bhs.common.opcode,
+		      ISCSI_DATA_LEN ( iscsi->rx_bhs.common.lengths ) );
+	}
 }
 
 /**
