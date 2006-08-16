@@ -3674,8 +3674,6 @@ static int e1000_probe ( struct nic *nic, struct pci_device *p ) {
 	e1000_read_mac_addr(&hw);
 	memcpy (nic->node_addr, hw.mac_addr, ETH_ALEN);
 	
-	printf("Ethernet addr: %!\n", nic->node_addr);
-
 	/* reset the hardware with the new settings */
 
 	ret_val = e1000_reset(&hw);
