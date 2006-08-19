@@ -329,6 +329,8 @@ void tcp_trans ( struct tcp_connection *conn, int nxt_state ) {
 	conn->tcp_lstate = conn->tcp_state;
 	conn->tcp_state = nxt_state;
 
+	DBG ( "Transition from %s to %s\n", tcp_states[conn->tcp_lstate], tcp_states[conn->tcp_state] );
+
 	/* TODO: Check if this check is required */
 	if ( conn->tcp_lstate == conn->tcp_state || 
 	     conn->tcp_state == TCP_INVALID ) {
@@ -682,6 +684,7 @@ int tcp_send ( struct tcp_connection *conn, const void *data, size_t len ) {
 	tcphdr->csum = tcpip_chksum ( pkb->data, pkb_len ( pkb ) );
 	
 	/* Dump the TCP header */
+	tcp_dump ( tcphdr );
 
 	/* Start the timer */
 	if ( ( conn->tcp_state == TCP_ESTABLISHED && conn->tcp_lstate == TCP_SYN_SENT ) ||
@@ -719,23 +722,21 @@ static int tcp_rx ( struct pk_buff *pkb,
 		goto done;
 	}
 
-
 	/* Process TCP header */
 	tcphdr = pkb->data;
 	tcp_dump ( tcphdr );
 
 	/* Verify header length */
 	hlen = ( ( tcphdr->hlen & TCP_MASK_HLEN ) / 16 ) * 4;
-	if ( hlen != sizeof ( *tcphdr ) ) {
-		if ( hlen == sizeof ( *tcphdr ) + 4 ) {
-			DBG ( "TCP options sent\n" );
-		} else {
-			DBG ( "Bad header length (%d bytes)\n", hlen );
-			rc = -EINVAL;
-			goto done;
-		}
+	if ( hlen < sizeof ( *tcphdr ) ) {
+		DBG ( "Bad header length (%d bytes)\n", hlen );
+		rc = -EINVAL;
+		goto done;
 	}
-
+	/* TODO: Parse TCP options */
+	if ( hlen != sizeof ( *tcphdr ) ) {
+		DBG ( "Ignoring TCP options\n" );
+	}
 
 	/* TODO: Verify checksum */
 	
@@ -828,16 +829,19 @@ static int tcp_rx ( struct pk_buff *pkb,
 		/* Unexpected packet */
 		goto unexpected;
 	case TCP_ESTABLISHED:
-#if 0
 		if ( tcphdr->flags & TCP_FIN ) {
-			tcp_trans ( conn, TCP_CLOSE_WAIT );
+			if ( tcphdr->flags & TCP_ACK ) {
+				tcp_trans ( conn, TCP_LAST_ACK );
+				conn->tcp_flags |= TCP_FIN;
+			} else {
+				tcp_trans ( conn, TCP_CLOSE_WAIT );
+			}
 			/* FIN consumes one byte */
 			conn->rcv_nxt++;
 			conn->tcp_flags |= TCP_ACK;
-			/* Send an acknowledgement */
+			/* Send the packet */
 			goto send_tcp_nomsg;
 		}
-#endif
 		/* Packet might contain data */
 		break;
 	case TCP_FIN_WAIT_1:
@@ -901,60 +905,45 @@ static int tcp_rx ( struct pk_buff *pkb,
 	assert ( ( tcphdr->flags & TCP_ACK ) ||
 		 pkb_len ( pkb ) > sizeof ( *tcphdr ) );
 
-	/* Check for new data */
-	toack = pkb_len ( pkb ) - hlen;
-	if ( toack > 0 ) {
-		/* Check if expected sequence number */
-		if ( conn->rcv_nxt == ntohl ( tcphdr->seq ) ) {
-			conn->rcv_nxt += toack;
-			conn->tcp_op->newdata ( conn, pkb->data + hlen,
-						toack );
-		} else {
-			DBG ( "Unexpected sequence number %lx (wanted %lx)\n", 
-			      ntohl ( tcphdr->seq ), conn->rcv_nxt );
-		}
-
-		/* Acknowledge new data */
-		conn->tcp_flags |= TCP_ACK;
-		if ( !( tcphdr->flags & TCP_ACK ) ) {
-			goto send_tcp_nomsg;
-		}
-	}
-
-	/* Process ACK */
+	/**
+	 * Check if the received packet ACKs sent data
+	 */
 	if ( tcphdr->flags & TCP_ACK ) {
 		acked = ntohl ( tcphdr->ack ) - conn->snd_una;
-		if ( acked < 0 ) { /* TODO: Replace all uint32_t arith */
-			DBG ( "Previously ACKed (%d)\n", tcphdr->ack );
+		if ( acked < 0 ) {
+			/* Packet ACKs previously ACKed data */
+			DBG ( "Previously ACKed data %lx\n", 
+						ntohl ( tcphdr->ack ) );
 			rc = 0;
 			goto done;
 		}
-		/* Advance snd stream */
+		/* Invoke the acked() callback */
 		conn->snd_una += acked;
-		/* Invoke the acked() callback function */
 		conn->tcp_op->acked ( conn, acked );
-		/* Invoke the senddata() callback function */
-		tcp_senddata ( conn );
 	}
-
-	/* If the connection is in ESTABLISHED and it receives a FIN */
-	if ( conn->tcp_state == ESTABLISHED && ( tcphdr->flags & TCP_FIN ) ) {
-		if ( tcphdr->flags & TCP_ACK ) {
-			tcp_trans ( conn, TCP_LAST_ACK );
-			goto send_tcp_nomsg;
+	
+	/**
+	 * Check if packet contains new data
+	 */
+	toack = pkb_len ( pkb ) - hlen;
+	if ( toack >= 0 ) {
+		/* Check the sequence number */
+		if ( conn->rcv_nxt == ntohl ( tcphdr->seq ) ) {
+			conn->rcv_nxt += toack;
+			conn->tcp_op->newdata ( conn,
+						pkb->data + hlen, toack );
+		} else {
+			DBG ( "Unexpected sequence number %lx (wanted %lx)\n",
+				ntohl ( tcphdr->ack ), conn->rcv_nxt );
 		}
-		tcp_trans ( conn, TCP_CLOSE_WAIT );
-//		conn->tcp_op->closed ( conn, CONN_SNDCLOSE );	
-		conn->rcv_nxt++;
-		if ( ! ( tcphdr->flags & TCP_ACK ) ) {
-			conn->tcp_flags |= TCP_ACK;
-			/* Send an acknowledgement */
-			goto send_tcp_nomsg;
-		}
-		/* Otherwise, the packet has been ACKed already */
+		conn->tcp_flags |= TCP_ACK;
 	}
-	rc = 0;
-	goto done;
+	
+	/**
+	 * Send data
+	 */
+	tcp_senddata ( conn );
+	return 0;
 
   send_tcp_nomsg:
 	free_pkb ( conn->tx_pkb );
