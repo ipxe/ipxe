@@ -10,6 +10,7 @@
 #define IP_IGMP		2
 #define IP_TCP		6
 #define IP_UDP		17
+#define IP_ICMP6	58
 
 /* IP address constants */
 
@@ -36,7 +37,7 @@ struct in6_addr {
                 uint8_t u6_addr8[16];
                 uint16_t u6_addr16[8];
                 uint32_t u6_addr32[4];
-        } in16_u;
+        } in6_u;
 #define s6_addr         in6_u.u6_addr8
 #define s6_addr16       in6_u.u6_addr16
 #define s6_addr32       in6_u.u6_addr32
@@ -67,7 +68,7 @@ struct sockaddr_in6 {
 	 */
 	sa_family_t sin_family;
 	/** TCP/IP port (part of struct @c sockaddr_tcpip) */
-	uint16_t sin_port;
+	uint16_t 	sin_port;
         uint32_t        sin6_flowinfo;  /* Flow number */
         struct in6_addr sin6_addr;      /* 128-bit destination address */
         uint32_t        sin6_scope_id;  /* Scope ID */
