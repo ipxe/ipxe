@@ -99,11 +99,11 @@ alloc_basemem:
 	shlw	$6, %ax
 
 	/* .data16 segment address */
-	subw	$_data16_size, %ax
+	subw	$_data16_size_pgh, %ax
 	pushw	%ax
 
 	/* .text16 segment address */
-	subw	$_text16_size, %ax
+	subw	$_text16_size_pgh, %ax
 	pushw	%ax
 
 	/* Update FBMS */
@@ -322,7 +322,14 @@ install_prealloc:
 	/* Install .text16 and .data16 */
 	call	install_basemem
 
-#ifndef KEEP_IT_REAL
+#ifdef KEEP_IT_REAL
+	/* Preserve %ds, call init_libkir, restore registers */
+	pushw	%ds
+	movw	%bx, %ds
+	movw	%ax, (init_libkir_vector+2)
+	lcall	*init_libkir_vector
+	popw	%ds
+#else
 	/* Preserve registers and interrupt status, and disable interrupts */
 	pushfw
 	pushw	%ds
@@ -379,9 +386,14 @@ install_prealloc:
 	ret
 	.size install_prealloc, . - install_prealloc
 
-#ifndef KEEP_IT_REAL
 	/* Vectors for far calls to .text16 functions */
 	.section ".data16"
+#ifdef KEEP_IT_REAL
+init_libkir_vector:
+	.word init_libkir
+	.word 0
+	.size init_libkir_vector, . - init_libkir_vector
+#else
 init_librm_vector:
 	.word init_librm
 	.word 0

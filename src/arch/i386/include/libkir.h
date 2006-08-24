@@ -213,6 +213,15 @@ virt_to_user ( void * virtual ) {
 #define BASEMEM_PARAMETER_INIT BASEMEM_PARAMETER_INIT_LIBKIR
 #define BASEMEM_PARAMETER_DONE BASEMEM_PARAMETER_DONE_LIBKIR
 
+/* TEXT16_CODE: declare a fragment of code that resides in .text16 */
+#define TEXT16_CODE( asm_code_str )			\
+	".section \".text16\", \"ax\", @progbits\n\t"	\
+	".code16\n\t"					\
+	".arch i386\n\t"				\
+	asm_code_str "\n\t"				\
+	".code16gcc\n\t"				\
+	".previous\n\t"
+
 /* REAL_CODE: declare a fragment of code that executes in real mode */
 #define REAL_CODE( asm_code_str )	\
 	".code16\n\t"			\

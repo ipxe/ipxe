@@ -15,12 +15,11 @@ SECTIONS {
      * addresses, but may have individual link addresses depending on
      * the memory model being used.
      *
-     * The linker symbols _{prefix,textdata}_link_addr, load_addr, and
+     * The linker symbols _prefix_link_addr, load_addr, and
      * _max_align may be specified explicitly.  If not specified, they
      * will default to:
      *
      *   _prefix_link_addr	= 0
-     *   _textdata_link_addr	= 0
      *   _load_addr		= 0
      *   _max_align		= 16
      * 
@@ -58,7 +57,7 @@ SECTIONS {
     _eprefix = .;
 
     /*
-     * The 16-bit sections, if present
+     * The 16-bit sections
      */
 
     _text16_link_addr = 0;
@@ -67,8 +66,11 @@ SECTIONS {
 
     .text16 : AT ( _text16_load_offset + __text16 ) {
 	__text16 = .;
+	*(.text.null_trap)
 	*(.text16)
 	*(.text16.*)
+	*(.text)
+	*(.text.*)
 	_etext16_progbits = .;
     } = 0x9090
 
@@ -82,11 +84,16 @@ SECTIONS {
 	__rodata16 = .;
 	*(.rodata16)
 	*(.rodata16.*)
+	*(.rodata)
+	*(.rodata.*)
     }
     .data16 : AT ( _data16_load_offset + __data16 ) {
 	__data16 = .;
 	*(.data16)
 	*(.data16.*)
+	*(.data)
+	*(.data.*)
+	*(SORT(.tbl.*))		/* Various tables.  See include/tables.h */
 	_edata16_progbits = .;
     }
     .bss16 : AT ( _data16_load_offset + __bss16 ) {
@@ -94,67 +101,20 @@ SECTIONS {
 	_bss16 = .;
 	*(.bss16)
 	*(.bss16.*)
+	*(.bss)
+	*(.bss.*)
+	*(COMMON)
 	_ebss16 = .;
     }
     .stack16 : AT ( _data16_load_offset + __stack16 ) {
 	__stack16 = .;
 	*(.stack16)
 	*(.stack16.*)
-    }
-
-    _edata16 = .;
-
-    /*
-     * The 32-bit sections
-     */
-
-    _textdata_link_addr = ( DEFINED ( _textdata_link_addr ) ?
-			    _textdata_link_addr : 0 );
-    . = _textdata_link_addr;
-    _textdata = .;
-
-    _text = .;
-
-    .text : AT ( _textdata_load_offset + __text ) {
-	__text = .;
-	*(.text.null_trap)
-	*(.text)
-	*(.text.*)
-    } = 0x9090
-
-    _etext = .;
-
-    _data = .;
-
-    .rodata : AT ( _textdata_load_offset + __rodata ) {
-	__rodata = .;
-	*(.rodata)
-	*(.rodata.*)
-    }
-    .data : AT ( _textdata_load_offset + __data ) {
-	__data = .;
-	*(.data)
-	*(.data.*)
-	*(SORT(.tbl.*))		/* Various tables.  See include/tables.h */
-	_etextdata_progbits = .;
-    }
-    .bss : AT ( _textdata_load_offset + __bss ) {
-	__bss = .;
-	_bss = .;
-	*(.bss)
-	*(.bss.*)
-	*(COMMON)
-	_ebss = .;
-    }
-    .stack : AT ( _textdata_load_offset + __stack ) {
-	__stack = .;
 	*(.stack)
 	*(.stack.*)
     }
 
-    _edata = .;
-
-    _etextdata = .;
+    _edata16 = .;
 
     _end = .;
 
@@ -200,13 +160,6 @@ SECTIONS {
     _data16_progbits_size   = _edata16_progbits - _data16;
     .			    = _data16_load_addr + _data16_progbits_size;
 
-    .			   -= _textdata_link_addr;
-    _textdata_load_offset   = ALIGN ( _max_align );
-    _textdata_load_addr	    = _textdata_link_addr + _textdata_load_offset;
-    _textdata_size	    = _etextdata - _textdata;
-    _textdata_progbits_size = _etextdata_progbits - _textdata;
-    .			    = _textdata_load_addr + _textdata_progbits_size;
-
     .			    = ALIGN ( _max_align );
 
     _load_size		    = . - _load_addr;
@@ -228,10 +181,6 @@ SECTIONS {
     . = _data16_load_addr - _data16_link_addr;
     _assert = ASSERT ( ( . == ALIGN ( _max_align ) ),
 		       "_data16 is badly aligned" );
-
-    . = _textdata_load_addr - _textdata_link_addr;
-    _assert = ASSERT ( ( . == ALIGN ( _max_align ) ),
-		       "_text is badly aligned" );
 
     /*
      * Values calculated to save code from doing it

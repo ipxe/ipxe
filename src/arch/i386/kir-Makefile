@@ -21,9 +21,6 @@ BIN		= bin-kir
 #
 CFLAGS		+= -DKEEP_IT_REAL -include kir.h
 
-# Link with _data_link_addr = 0; data symbols are relative to the data
-# segment.
-#
-LDFLAGS		+= --defsym _data_link_addr=0
-
 include Makefile
+
+LDSCRIPT	= arch/i386/scripts/i386-kir.lds

@@ -35,6 +35,23 @@
 	.code16
 	
 /****************************************************************************
+ * init_libkir (real-mode or 16:xx protected-mode far call)
+ *
+ * Initialise libkir ready for transitions to the kir environment
+ *
+ * Parameters:
+ *   %cs : .text16 segment
+ *   %ds : .data16 segment
+ ****************************************************************************
+ */
+	.globl	init_libkir
+init_libkir:
+	/* Record segment registers */
+	pushw	%ds
+	popw	%cs:kir_ds
+	lret
+	
+/****************************************************************************
  * ext_to_kir (real-mode or 16:xx protected-mode near call)
  *
  * Switch from external stack and segment registers to internal stack
@@ -44,10 +61,6 @@
  *
  * %cs:0000 must point to the start of the runtime image code segment
  * on entry.
- *
- * Note that this routine can be called *without* having first set up
- * a stored kir_ds and kir_sp.  If you do this, ext_to_kir will return
- * without altering the segment registers or stack pointer.
  *
  * Parameters: none
  ****************************************************************************
@@ -73,10 +86,8 @@ ext_to_kir:
 	movw	%ss, %ds:ext_ss
 	movl	%esp, %ds:ext_esp
 
-	/* Load internal segment registers and stack pointer, if available */
+	/* Load internal segment registers and stack pointer */
 	movw	%ds:kir_ds, %ax
-	testw	%ax, %ax
-	jz	1f
 	movw	%ax, %ss
 	movzwl	%ds:kir_sp, %esp
 	movw	%ax, %ds
@@ -144,12 +155,12 @@ kir_to_ext:
  * will also be preserved.
  *
  * Parameters:
- *   function : (16-bit) virtual address of protected-mode function to call
+ *   function : (32-bit) virtual address of C function to call
  *
  * Example usage:
- *	pushw	$pxe_api_call
+ *	pushl	$pxe_api_call
  *	lcall	$UNDI_CS, $kir_call
- *	addw	$2, %sp
+ *	addw	$4, %sp
  * to call in to the C function
  *      void pxe_api_call ( struct i386_all_regs *ix86 );
  ****************************************************************************
@@ -157,7 +168,6 @@ kir_to_ext:
 
 	.globl	kir_call
 kir_call:
-
 	/* Preserve flags.  Must do this before any operation that may
 	 * affect flags.
 	 */
@@ -174,8 +184,8 @@ kir_call:
 	 * either a 16-bit or a 32-bit stack segment.
 	 */
 	popl	%cs:save_retaddr	/* Scratch location */
-	popw	%cs:save_function
-	subl	$6, %esp		/* Restore %esp */
+	popl	%cs:save_function
+	subl	$8, %esp		/* Restore %esp */
 	
 	/* Switch to internal stack.  Note that the external stack is
 	 * inaccessible once we're running internally (since we have
@@ -191,6 +201,7 @@ kir_call:
 	pushl	%cs:ext_cs_and_ss
 
 	/* Push &ix86 on stack and call function */
+	sti
 	pushl	%esp
 	data32 call *%cs:save_function
 	popl	%eax /* discard */
@@ -231,13 +242,13 @@ ext_esp:	.long 0
 		.globl kir_ds
 kir_ds:		.word 0
 		.globl kir_sp
-kir_sp:		.word 0
+kir_sp:		.word _estack
 
 /****************************************************************************
  * Temporary variables
  ****************************************************************************
  */
 save_ax:	.word 0
-save_retaddr:	.word 0
+save_retaddr:	.long 0
 save_flags:	.long 0
 save_function:	.long 0

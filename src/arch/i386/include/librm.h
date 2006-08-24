@@ -177,19 +177,24 @@ extern void remove_from_rm_stack ( void *data, size_t size );
 #define BASEMEM_PARAMETER_INIT BASEMEM_PARAMETER_INIT_LIBRM
 #define BASEMEM_PARAMETER_DONE BASEMEM_PARAMETER_DONE_LIBRM
 
+/* TEXT16_CODE: declare a fragment of code that resides in .text16 */
+#define TEXT16_CODE( asm_code_str )			\
+	".section \".text16\", \"ax\", @progbits\n\t"	\
+	".code16\n\t"					\
+	".arch i386\n\t"				\
+	asm_code_str "\n\t"				\
+	".code32\n\t"					\
+	".previous\n\t"
+
 /* REAL_CODE: declare a fragment of code that executes in real mode */
 #define REAL_CODE( asm_code_str )			\
 	"pushl $1f\n\t"					\
 	"call real_call\n\t"				\
 	"addl $4, %%esp\n\t"				\
-	".section \".text16\", \"ax\", @progbits\n\t"	\
-	".code16\n\t"					\
-	".arch i386\n\t"				\
-	"\n1:\n\t"					\
-	asm_code_str "\n\t"				\
-	"ret\n\t"					\
-	".code32\n\t"					\
-	".previous\n\t"
+	TEXT16_CODE ( "\n1:\n\t"			\
+		      asm_code_str			\
+		      "\n\t"				\
+		      "ret\n\t" )
 
 #endif /* ASSEMBLY */
 
