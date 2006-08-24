@@ -391,24 +391,20 @@ static void hook_int13 ( void ) {
 	 * should not chain to the previous handler.  (The wrapper
 	 * clears CF and OF before calling int13()).
 	 */
-	__asm__  __volatile__ ( ".section \".text16\", \"ax\", @progbits\n\t"
-				".code16\n\t"
-				"\nint13_wrapper:\n\t"
-				"orb $0, %%al\n\t" /* clear CF and OF */
-				"pushl %0\n\t" /* call int13() */
-				"pushw %%cs\n\t"
-				"call prot_call\n\t"
-				"jo 1f\n\t" /* chain if OF not set */
-				"pushfw\n\t"
-				"lcall *%%cs:int13_vector\n\t"
-				"\n1:\n\t"
-				"call 2f\n\t" /* return with flags intact */
-				"lret $2\n\t"
-				"\n2:\n\t"
-				"ret $4\n\t"
-				".previous\n\t"
-				".code32\n\t" : :
-				"i" ( int13 ) );
+	__asm__  __volatile__ (
+	       TEXT16_CODE ( "\nint13_wrapper:\n\t"
+			     "orb $0, %%al\n\t" /* clear CF and OF */
+			     "pushl %0\n\t" /* call int13() */
+			     "pushw %%cs\n\t"
+			     "call prot_call\n\t"
+			     "jo 1f\n\t" /* chain if OF not set */
+			     "pushfw\n\t"
+			     "lcall *%%cs:int13_vector\n\t"
+			     "\n1:\n\t"
+			     "call 2f\n\t" /* return with flags intact */
+			     "lret $2\n\t"
+			     "\n2:\n\t"
+			     "ret $4\n\t" ) : : "i" ( int13 ) );
 
 	hook_bios_interrupt ( 0x13, ( unsigned int ) int13_wrapper,
 			      &int13_vector );
