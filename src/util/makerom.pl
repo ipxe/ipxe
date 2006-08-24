@@ -88,10 +88,12 @@ sub pcipnpheaders ($$) {
 				= pack('v', oct($pci_device_id)) if ($pci_device_id);
 		}
 	}
-	if ($pnp_hdr_offset > 0 and defined($identoffset)) {
-		# Point to device id string at end of ROM image
-		substr($$romref, $pnp_hdr_offset+PNP_DEVICE_OFF, 2)
-			= pack('v', $identoffset);
+	if ($pnp_hdr_offset > 0) {
+		if (defined($identoffset)) {
+			# Point to device id string at end of ROM image
+			substr($$romref, $pnp_hdr_offset+PNP_DEVICE_OFF, 2)
+				= pack('v', $identoffset);
+		}
 		substr($$romref, $pnp_hdr_offset+PNP_CHKSUM_OFF, 1) = "\x00";
 		my $sum = unpack('%8C*', substr($$romref, $pnp_hdr_offset,
 			PNP_HDR_SIZE));
