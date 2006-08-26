@@ -208,6 +208,22 @@ static int int13_get_parameters ( struct int13_drive *drive,
 }
 
 /**
+ * INT 13, 15 - Get disk type
+ *
+ * @v drive		Emulated drive
+ * @ret ah		Type code
+ * @ret cx:dx		Sector count
+ * @ret status		Status code / disk type
+ */
+static int int13_get_disk_type ( struct int13_drive *drive,
+				 struct i386_all_regs *ix86 ) {
+	DBG ( "Get disk type\n" );
+	ix86->regs.cx = ( drive->cylinders >> 16 );
+	ix86->regs.dx = ( drive->cylinders & 0xffff );
+	return INT13_DISK_TYPE_HDD;
+}
+
+/**
  * INT 13, 41 - Extensions installation check
  *
  * @v drive		Emulated drive
@@ -348,6 +364,9 @@ static void int13 ( struct i386_all_regs *ix86 ) {
 		case INT13_GET_PARAMETERS:
 			status = int13_get_parameters ( drive, ix86 );
 			break;
+		case INT13_GET_DISK_TYPE:
+			status = int13_get_disk_type ( drive, ix86 );
+			break;
 		case INT13_EXTENSION_CHECK:
 			status = int13_extension_check ( drive, ix86 );
 			break;
@@ -361,7 +380,7 @@ static void int13 ( struct i386_all_regs *ix86 ) {
 			status = int13_get_extended_parameters ( drive, ix86 );
 			break;
 		default:
-			DBG ( "Unrecognised INT 13\n" );
+			DBG ( "*** Unrecognised INT 13 ***\n" );
 			status = -INT13_STATUS_INVALID;
 			break;
 		}
