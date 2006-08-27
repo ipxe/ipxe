@@ -57,7 +57,7 @@
 #define DHCP_ROUTERS 3
 
 /** DNS servers */
-#define DHCP_DNS_SERVERS 4
+#define DHCP_DNS_SERVERS 6
 
 /** Host name */
 #define DHCP_HOST_NAME 12
