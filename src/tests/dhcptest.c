@@ -14,7 +14,7 @@ static int test_dhcp_aoe_boot ( struct net_device *netdev,
 	return test_aoeboot ( netdev, aoename, drivenum );
 }
 
-static int test_dhcp_iscsi_boot ( char *iscsiname ) {
+static int test_dhcp_iscsi_boot ( struct net_device *netdev, char *iscsiname ) {
 	char *initiator_iqn = "iqn.1900-01.localdomain.localhost:initiator";
 	char *target_iqn;
 	union {
@@ -33,7 +33,7 @@ static int test_dhcp_iscsi_boot ( char *iscsiname ) {
 	}
 	inet_aton ( iscsiname, &target.sin.sin_addr );
 
-	return test_iscsiboot ( initiator_iqn, &target.st, target_iqn );
+	return test_iscsiboot ( initiator_iqn, &target.st, target_iqn, netdev );
 }
 
 static int test_dhcp_hello ( char *helloname ) {
@@ -97,7 +97,7 @@ static int test_dhcp_boot ( struct net_device *netdev, char *filename ) {
 	if ( strncmp ( filename, "aoe:", 4 ) == 0 ) {
 		return test_dhcp_aoe_boot ( netdev, &filename[4] );
 	} else if ( strncmp ( filename, "iscsi:", 6 ) == 0 ) {
-		return test_dhcp_iscsi_boot ( &filename[6] );
+		return test_dhcp_iscsi_boot ( netdev, &filename[6] );
 	} else if ( strncmp ( filename, "hello:", 6 ) == 0 ) {
 		return test_dhcp_hello ( &filename[6] );
 	} else if ( strncmp ( filename, "http:", 5 ) == 0 ) {

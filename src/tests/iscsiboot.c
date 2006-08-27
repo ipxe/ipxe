@@ -3,14 +3,15 @@
 #include <vsprintf.h>
 #include <gpxe/netdevice.h>
 #include <gpxe/iscsi.h>
+#include <gpxe/ibft.h>
 #include <int13.h>
 
 static struct iscsi_device test_iscsidev;
 
 int test_iscsiboot ( const char *initiator_iqn,
 		     struct sockaddr_tcpip *target,
-		     const char *target_iqn ) {
-	struct sockaddr_in *sin;
+		     const char *target_iqn,
+		     struct net_device *netdev ) {
 	struct int13_drive drive;
 	int rc;
 
@@ -25,6 +26,8 @@ int test_iscsiboot ( const char *initiator_iqn,
 		printf ( "Could not reach %s\n", target_iqn );
 		return rc;
 	}
+
+	ibft_fill_data ( netdev, initiator_iqn, target, target_iqn );
 
 	memset ( &drive, 0, sizeof ( drive ) );
 	drive.blockdev = &test_iscsidev.scsi.blockdev;
