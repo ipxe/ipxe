@@ -36,4 +36,6 @@ struct acpi_description_header {
 	uint32_t asl_compiler_revision;
 } __attribute__ (( packed ));
 
+extern void acpi_fix_checksum ( struct acpi_description_header *acpi );
+
 #endif /* _GPXE_ACPI_H */
