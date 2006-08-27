@@ -27,6 +27,8 @@ struct block_device;
 #define INT13_WRITE_SECTORS		0x03
 /** Get drive parameters */
 #define INT13_GET_PARAMETERS		0x08
+/** Get disk type */
+#define INT13_GET_DISK_TYPE		0x15
 /** Extensions installation check */
 #define INT13_EXTENSION_CHECK		0x41
 /** Extended read */
@@ -130,6 +132,22 @@ struct int13_disk_parameters {
 	uint16_t sector_size;
 	
 };
+
+/**
+ * @defgroup int13types INT 13 disk types
+ * @{
+ */
+
+/** No such drive */
+#define INT13_DISK_TYPE_NONE	0x00
+/** Floppy without change-line support */
+#define INT13_DISK_TYPE_FDD	0x01
+/** Floppy with change-line support */
+#define INT13_DISK_TYPE_FDD_CL	0x02
+/** Hard disk */
+#define INT13_DISK_TYPE_HDD	0x03
+
+/** @} */
 
 /**
  * @defgroup int13flags INT 13 disk parameter flags
