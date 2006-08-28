@@ -1,0 +1,26 @@
+Index: qemu/cpu-exec.c
+===================================================================
+RCS file: /sources/qemu/qemu/cpu-exec.c,v
+retrieving revision 1.84
+diff -u -r1.84 cpu-exec.c
+--- qemu/cpu-exec.c	29 Jul 2006 19:09:31 -0000	1.84
++++ qemu/cpu-exec.c	28 Aug 2006 01:54:15 -0000
+@@ -788,6 +788,18 @@
+                     cpu_loop_exit();
+                 }
+ #endif
++#if 1
++#define MIN_CYCLE_COUNT 100
++		{
++                    static int cycle_count;
++		  
++		    if (++cycle_count > MIN_CYCLE_COUNT) {
++                        cycle_count = 0;
++                        env->exception_index = EXCP_INTERRUPT;
++                        cpu_loop_exit();
++                    }
++		}
++#endif
+             }
+         } else {
+             env_to_regs();

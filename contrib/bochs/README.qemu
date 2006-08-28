@@ -14,14 +14,21 @@ To get qemu running is fairly simple:
       cvs -d:pserver:anonymous@cvs.savannah.nongnu.org:/sources/qemu \
            co qemu
 
+2a. Patch the qemu code.  There is currently a bug that causes qemu to
+    execute Etherboot incredibly slowly.  The bug seems to be related
+    to the relative prioritisation of CPU and I/O operations within
+    qemu.  This patch (which I found via Google) isn't a proper fix,
+    but it does work around the problem:
+      patch -p0 < qemu-patch
+
 3.  Configure qemu with
       pushd qemu
-      ./configure --enable-system --enable-profiler 
+      ./configure --enable-system
       popd
 
-      Note that qemu will not compile with gcc4; if your system's
-      default compiler is gcc4 then specify the path to gcc3 using
-      e.g. --cc=gcc-3.3.6
+    Note that qemu will not compile with gcc4; if your system's
+    default compiler is gcc4 then specify the path to gcc3 using
+    e.g. --cc=gcc-3.3.6
 
 4.  Build qemu:
       make -C qemu
@@ -52,6 +59,7 @@ To get qemu running is fairly simple:
       popd
 
 9.  Start qemu
+      export SDL_VIDEO_X11_DGAMOUSE=0
       ./qemu/i386-softmmu/qemu -L qemu/pc-bios \
 			       -net nic,model=rtl8139 -net tap,ifname=tap0 \
 			       -boot a -fda ../../src/bin/rtl8139.dsk 
