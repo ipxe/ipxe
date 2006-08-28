@@ -144,7 +144,7 @@ megs: 32
 #optromimage2: file=optionalrom.bin, address=0xd1000
 #optromimage3: file=optionalrom.bin, address=0xd2000
 #optromimage4: file=optionalrom.bin, address=0xd3000
-optromimage1: file=../../src/bin/pnic.zrom, address=0xd0000
+optromimage1: file=../../src/bin/pnic.rom, address=0xd0000
 
 #optramimage1: file=/path/file1.img, address=0x0010000
 #optramimage2: file=/path/file2.img, address=0x0020000
