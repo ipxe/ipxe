@@ -64,10 +64,11 @@ static LIST_HEAD ( timers );
  * be stopped and the timer's callback function will be called.
  */
 void start_timer ( struct retry_timer *timer ) {
-	list_add ( &timer->list, &timers );
 	timer->start = currticks();
 	if ( timer->timeout < MIN_TIMEOUT )
 		timer->timeout = MIN_TIMEOUT;
+	list_add ( &timer->list, &timers );
+	DBG2 ( "Timer %p started\n", timer );
 }
 
 /**
@@ -81,6 +82,7 @@ void stop_timer ( struct retry_timer *timer ) {
 	unsigned long old_timeout = timer->timeout;
 	unsigned long runtime;
 
+	DBG2 ( "Timer %p stopped\n", timer );
 	list_del ( &timer->list );
 	runtime = currticks() - timer->start;
 
@@ -105,7 +107,7 @@ void stop_timer ( struct retry_timer *timer ) {
 		timer->timeout -= ( timer->timeout >> 3 );
 		timer->timeout += ( runtime >> 1 );
 		if ( timer->timeout != old_timeout ) {
-			DBG ( "Timer updated to %dms\n",
+			DBG ( "Timer %p updated to %ldms\n", timer,
 			      ( ( 1000 * timer->timeout ) / TICKS_PER_SEC ) );
 		}
 	}
@@ -120,6 +122,7 @@ static void timer_expired ( struct retry_timer *timer ) {
 	int fail;
 
 	/* Stop timer without performing RTT calculations */
+	DBG2 ( "Timer %p stopped on expiry\n", timer );
 	list_del ( &timer->list );
 	timer->count++;
 
@@ -127,7 +130,7 @@ static void timer_expired ( struct retry_timer *timer ) {
 	timer->timeout <<= 1;
 	if ( ( fail = ( timer->timeout > MAX_TIMEOUT ) ) )
 		timer->timeout = MAX_TIMEOUT;
-	DBG ( "Timer backed off to %dms\n",
+	DBG ( "Timer %p backed off to %ldms\n", timer,
 	      ( ( 1000 * timer->timeout ) / TICKS_PER_SEC ) );
 
 	/* Call expiry callback */
