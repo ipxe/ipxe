@@ -91,7 +91,7 @@
 #define uart_writeb(val,addr) outb((val),(addr))
 #endif
 
-struct console_driver serial_console;
+struct console_driver serial_console __console_driver;
 
 /*
  * void serial_putc(int ch);
