@@ -361,7 +361,12 @@ int15_e820:
 	pushl	%edx	
 	call	split_e820
 	pushfw
+	/* Skip empty region checking if we've reached the end of the
+	 * map or hit an error, to avoid a potential endless loop.
+	 */
 	jc	1f
+	testl	%ebx, %ebx
+	jz	1f
 	/* Check for an empty region */
 	pushl	%eax
 	movl	%es:8(%di), %eax
