@@ -1417,7 +1417,8 @@ static int tulip_probe ( struct nic *nic, struct pci_device *pci ) {
         tp->csr0 |= 0x2000;
 
     if (media_cap[tp->default_port] & MediaIsMII) {
-        u16 media2advert[] = { 0x20, 0x40, 0x03e0, 0x60, 0x80, 0x100, 0x200 };
+        static const u16 media2advert[] = { 0x20, 0x40, 0x03e0, 0x60,
+					    0x80, 0x100, 0x200 };
         tp->mii_advertise = media2advert[tp->default_port - 9];
         tp->mii_advertise |= (tp->flags & HAS_8023X); /* Matching bits! */
     }
