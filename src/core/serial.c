@@ -149,6 +149,8 @@ static void serial_init ( void ) {
 	int status;
 	int divisor, lcs;
 
+	DBG ( "Serial port %#x initialising\n", UART_BASE );
+
 	divisor = COMBRD;
 	lcs = UART_LCS;
 
