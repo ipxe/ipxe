@@ -165,23 +165,35 @@ static void serial_init ( void ) {
 	 */
 	uart_writeb(0x80 | lcs, UART_BASE + UART_LCR);
 	uart_writeb(0xaa, UART_BASE + UART_DLL);
-	if (uart_readb(UART_BASE + UART_DLL) != 0xaa) 
+	if (uart_readb(UART_BASE + UART_DLL) != 0xaa) {
+		DBG ( "Serial port %#x UART_DLL failed\n", UART_BASE );
 		goto out;
+	}
 	uart_writeb(0x55, UART_BASE + UART_DLL);
-	if (uart_readb(UART_BASE + UART_DLL) != 0x55)
+	if (uart_readb(UART_BASE + UART_DLL) != 0x55) {
+		DBG ( "Serial port %#x UART_DLL failed\n", UART_BASE );
 		goto out;
+	}
 	uart_writeb(divisor & 0xff, UART_BASE + UART_DLL);
-	if (uart_readb(UART_BASE + UART_DLL) != (divisor & 0xff))
+	if (uart_readb(UART_BASE + UART_DLL) != (divisor & 0xff)) {
+		DBG ( "Serial port %#x UART_DLL failed\n", UART_BASE );
 		goto out;
+	}
 	uart_writeb(0xaa, UART_BASE + UART_DLM);
-	if (uart_readb(UART_BASE + UART_DLM) != 0xaa) 
+	if (uart_readb(UART_BASE + UART_DLM) != 0xaa) {
+		DBG ( "Serial port %#x UART_DLM failed\n", UART_BASE );
 		goto out;
+	}
 	uart_writeb(0x55, UART_BASE + UART_DLM);
-	if (uart_readb(UART_BASE + UART_DLM) != 0x55)
+	if (uart_readb(UART_BASE + UART_DLM) != 0x55) {
+		DBG ( "Serial port %#x UART_DLM failed\n", UART_BASE );
 		goto out;
+	}
 	uart_writeb((divisor >> 8) & 0xff, UART_BASE + UART_DLM);
-	if (uart_readb(UART_BASE + UART_DLM) != ((divisor >> 8) & 0xff))
+	if (uart_readb(UART_BASE + UART_DLM) != ((divisor >> 8) & 0xff)) {
+		DBG ( "Serial port %#x UART_DLM failed\n", UART_BASE );
 		goto out;
+	}
 	uart_writeb(lcs, UART_BASE + UART_LCR);
 	
 	/* disable interrupts */
