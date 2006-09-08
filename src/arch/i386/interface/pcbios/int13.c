@@ -438,6 +438,60 @@ static void unhook_int13 ( void ) {
 }
 
 /**
+ * Guess INT 13 drive geometry
+ *
+ * @v drive		Emulated drive
+ *
+ * Guesses the drive geometry by inspecting the partition table.
+ */
+static void guess_int13_geometry ( struct int13_drive *drive ) {
+	struct master_boot_record mbr;
+	struct partition_table_entry *partition;
+	unsigned int guessed_heads = 255;
+	unsigned int guessed_sectors_per_track = 63;
+	unsigned long blocks;
+	unsigned long blocks_per_cyl;
+	unsigned int i;
+
+	/* Scan through partition table and modify guesses for heads
+	 * and sectors_per_track if we find any used partitions.
+	 */
+	if ( drive->blockdev->read ( drive->blockdev, 0, 1,
+				     virt_to_user ( &mbr ) ) == 0 ) {
+		for ( i = 0 ; i < 4 ; i++ ) {
+			partition = &mbr.partitions[i];
+			if ( ! partition->type )
+				continue;
+			guessed_heads =
+				( PART_HEAD ( partition->chs_end ) + 1 );
+			guessed_sectors_per_track = 
+				PART_SECTOR ( partition->chs_end );
+			DBG ( "Guessing C/H/S xx/%d/%d based on partition "
+			      "%d\n", guessed_heads,
+			      guessed_sectors_per_track, ( i + 1 ) );
+		}
+	} else {
+		DBG ( "Could not read partition table to guess geometry\n" );
+	}
+
+	/* Apply guesses if no geometry already specified */
+	if ( ! drive->heads )
+		drive->heads = guessed_heads;
+	if ( ! drive->sectors_per_track )
+		drive->sectors_per_track = guessed_sectors_per_track;
+	if ( ! drive->cylinders ) {
+		/* Avoid attempting a 64-bit divide on a 32-bit system */
+		blocks = ( ( drive->blockdev->blocks <= ULONG_MAX ) ?
+			   drive->blockdev->blocks : ULONG_MAX );
+		blocks_per_cyl = ( drive->heads * drive->sectors_per_track );
+		assert ( blocks_per_cyl != 0 );
+		drive->cylinders = ( blocks / blocks_per_cyl );
+		if ( drive->cylinders > 1024 )
+			drive->cylinders = 1024;
+	}
+}
+
+/**
  * Register INT 13 emulated drive
  *
  * @v drive		Emulated drive
@@ -450,22 +504,9 @@ static void unhook_int13 ( void ) {
  */
 void register_int13_drive ( struct int13_drive *drive ) {
 	uint8_t num_drives;
-	unsigned long blocks;
-	unsigned long blocks_per_cyl;
 
 	/* Give drive a default geometry if none specified */
-	if ( ! drive->heads )
-		drive->heads = 255;
-	if ( ! drive->sectors_per_track )
-		drive->sectors_per_track = 63;
-	if ( ! drive->cylinders ) {
-		/* Avoid attempting a 64-bit divide on a 32-bit system */
-		blocks = ( ( drive->blockdev->blocks <= ULONG_MAX ) ?
-			   drive->blockdev->blocks : ULONG_MAX );
-		blocks_per_cyl = ( drive->heads * drive->sectors_per_track );
-		assert ( blocks_per_cyl != 0 );
-		drive->cylinders = ( blocks / blocks_per_cyl );
-	}
+	guess_int13_geometry ( drive );
 
 	/* Assign drive number if none specified, update BIOS drive count */
 	get_real ( num_drives, BDA_SEG, BDA_NUM_DRIVES );

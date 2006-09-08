@@ -201,6 +201,45 @@ struct int13_disk_parameters {
 
 /** @} */ 
 
+/** A C/H/S address within a partition table entry */
+struct partition_chs {
+	/** Head number */
+	uint8_t head;
+	/** Sector number, plus high 2 bits of cylinder number */
+	uint8_t cyl_sector;
+	/** Low 8 bits of cylinder number */
+	uint8_t cyl;
+} __attribute__ (( packed ));
+
+#define PART_HEAD(chs) ( (chs).head )
+#define PART_SECTOR(chs) ( (chs).cyl_sector & 0x3f )
+#define PART_CYLINDER(chs) ( (chs).cyl | ( ( (chs).cyl_sector & 0xc0 ) << 2 ) )
+
+/** A partition table entry within the MBR */
+struct partition_table_entry {
+	/** Bootable flag */
+	uint8_t bootable;
+	/** C/H/S start address */
+	struct partition_chs chs_start;
+	/** System indicator (partition type) */
+	uint8_t type;
+	/** C/H/S end address */
+	struct partition_chs chs_end;
+	/** Linear start address */
+	uint32_t start;
+	/** Linear length */
+	uint32_t length;
+} __attribute__ (( packed ));
+
+/** A Master Boot Record */
+struct master_boot_record {
+	uint8_t pad[446];
+	/** Partition table */
+	struct partition_table_entry partitions[4];
+	/** 0x55aa MBR signature */
+	uint16_t signature;
+} __attribute__ (( packed ));
+
 extern void register_int13_drive ( struct int13_drive *drive );
 extern void unregister_int13_drive ( struct int13_drive *drive );
 extern int int13_boot ( unsigned int drive );
