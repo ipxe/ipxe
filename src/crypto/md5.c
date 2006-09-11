@@ -26,13 +26,90 @@
 #define MD5_BLOCK_WORDS		16
 #define MD5_HASH_WORDS		4
 
+#define __md5step __attribute__ (( regparm ( 3 ) ))
+
+struct md5_step {
+	uint32_t __md5step ( * f ) ( uint32_t b, uint32_t c, uint32_t d );
+	uint8_t coefficient;
+	uint8_t constant;
+};
+
+static uint32_t __md5step f1 ( uint32_t b, uint32_t c, uint32_t d ) {
+	return ( d ^ ( b & ( c ^ d ) ) );
+}
+
+static uint32_t __md5step f2 ( uint32_t b, uint32_t c, uint32_t d ) {
+	return ( c ^ ( d & ( b ^ c ) ) );
+}
+
+static uint32_t __md5step f3 ( uint32_t b, uint32_t c, uint32_t d ) {
+	return ( b ^ c ^ d );
+}
+
+static uint32_t __md5step f4 ( uint32_t b, uint32_t c, uint32_t d ) {
+	return ( c ^ ( b | ~d ) );
+}
+
+struct md5_step md5_steps[4] = {
+	{
+		.f = f1,
+		.coefficient = 1,
+		.constant = 0,
+	},
+	{
+		.f = f2,
+		.coefficient = 5,
+		.constant = 1,
+	},
+	{
+		.f = f3,
+		.coefficient = 3,
+		.constant = 5,
+	},
+	{
+		.f = f4,
+		.coefficient = 7,
+		.constant = 0,
+	}
+};
+
+static const uint8_t r[64] = {
+	7,12,17,22,7,12,17,22,7,12,17,22,7,12,17,22,
+	5,9,14,20,5,9,14,20,5,9,14,20,5,9,14,20,
+	4,11,16,23,4,11,16,23,4,11,16,23,4,11,16,23,
+	6,10,15,21,6,10,15,21,6,10,15,21,6,10,15,21
+};
+
+static const uint32_t k[] = {
+	0xd76aa478UL, 0xe8c7b756UL, 0x242070dbUL, 0xc1bdceeeUL,
+	0xf57c0fafUL, 0x4787c62aUL, 0xa8304613UL, 0xfd469501UL,
+	0x698098d8UL, 0x8b44f7afUL, 0xffff5bb1UL, 0x895cd7beUL,
+	0x6b901122UL, 0xfd987193UL, 0xa679438eUL, 0x49b40821UL,
+	0xf61e2562UL, 0xc040b340UL, 0x265e5a51UL, 0xe9b6c7aaUL,
+	0xd62f105dUL, 0x02441453UL, 0xd8a1e681UL, 0xe7d3fbc8UL,
+	0x21e1cde6UL, 0xc33707d6UL, 0xf4d50d87UL, 0x455a14edUL,
+	0xa9e3e905UL, 0xfcefa3f8UL, 0x676f02d9UL, 0x8d2a4c8aUL,
+	0xfffa3942UL, 0x8771f681UL, 0x6d9d6122UL, 0xfde5380cUL,
+	0xa4beea44UL, 0x4bdecfa9UL, 0xf6bb4b60UL, 0xbebfbc70UL,
+	0x289b7ec6UL, 0xeaa127faUL, 0xd4ef3085UL, 0x04881d05UL,
+	0xd9d4d039UL, 0xe6db99e5UL, 0x1fa27cf8UL, 0xc4ac5665UL,
+	0xf4292244UL, 0x432aff97UL, 0xab9423a7UL, 0xfc93a039UL,
+	0x655b59c3UL, 0x8f0ccc92UL, 0xffeff47dUL, 0x85845dd1UL,
+	0x6fa87e4fUL, 0xfe2ce6e0UL, 0xa3014314UL, 0x4e0811a1UL,
+	0xf7537e82UL, 0xbd3af235UL, 0x2ad7d2bbUL, 0xeb86d391UL,
+	0xe1f27f3aUL, 0xf5710fb0UL, 0xada0e5c4UL, 0x98e4c919UL
+};
+
+
 #define F1(x, y, z)	(z ^ (x & (y ^ z)))
 #define F2(x, y, z)	F1(z, x, y)
 #define F3(x, y, z)	(x ^ y ^ z)
 #define F4(x, y, z)	(y ^ (x | ~z))
 
-#define MD5STEP(f, w, x, y, z, in, s) \
-	(w += f(x, y, z) + in, w = (w<<s | w>>(32-s)) + x)
+#define MD5STEP(f, w, x, y, z, in, s) do { 			\
+		(w += f(x, y, z) + in, w = (w<<s | w>>(32-s)) + x) ; \
+		printf ( "a=%#08x, b=%#08x, c=%#08x, d=%#08x\n", a, b, c, d );\
+} while ( 0 )
 
 struct md5_ctx {
 	u32 hash[MD5_HASH_WORDS];
@@ -40,15 +117,33 @@ struct md5_ctx {
 	u64 byte_count;
 };
 
-static void md5_transform(u32 *hash, u32 const *in)
+static void md5_transform(u32 *hash, const u32 *in)
 {
-	u32 a, b, c, d;
+	u32 a, b, c, d, f, g, t, q;
+	int i;
+	struct md5_step *step;
 
 	a = hash[0];
 	b = hash[1];
 	c = hash[2];
 	d = hash[3];
 
+#if 1
+
+	for ( i = 0 ; i < 64 ; i++ ) {
+		step = &md5_steps[i >> 4];
+		f = step->f ( b, c, d );
+		g = ( ( i * step->coefficient + step->constant ) & 0xf );
+		t = d;
+		d = c;
+		c = b;
+		q = ( a + f + k[i] + in[g] );
+		b += ( ( q << r[i] ) | ( q >> ( 32-r[i] ) ) );
+		a = t;
+		printf ( "a=%#08x, b=%#08x, c=%#08x, d=%#08x\n", a, b, c, d );
+	}
+
+#else
 	MD5STEP(F1, a, b, c, d, in[0] + 0xd76aa478, 7);
 	MD5STEP(F1, d, a, b, c, in[1] + 0xe8c7b756, 12);
 	MD5STEP(F1, c, d, a, b, in[2] + 0x242070db, 17);
@@ -116,6 +211,7 @@ static void md5_transform(u32 *hash, u32 const *in)
 	MD5STEP(F4, d, a, b, c, in[11] + 0xbd3af235, 10);
 	MD5STEP(F4, c, d, a, b, in[2] + 0x2ad7d2bb, 15);
 	MD5STEP(F4, b, c, d, a, in[9] + 0xeb86d391, 21);
+#endif
 
 	hash[0] += a;
 	hash[1] += b;
