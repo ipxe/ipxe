@@ -6,8 +6,12 @@
  * Derived from cryptoapi implementation, originally based on the
  * public domain implementation written by Colin Plumb in 1993.
  *
+ * Reduced object size by around 50% compared to the original Linux
+ * version for use in Etherboot by Michael Brown.
+ *
  * Copyright (c) Cryptoapi developers.
  * Copyright (c) 2002 James Morris <jmorris@intercode.com.au>
+ * Copyright (c) 2006 Michael Brown <mbrown@fensystems.co.uk>
  * 
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by the Free
@@ -143,7 +147,7 @@ static void md5_transform(u32 *hash, const u32 *in)
 static inline void le32_to_cpu_array(u32 *buf, unsigned int words)
 {
 	while (words--) {
-		//		__le32_to_cpus(buf);
+		le32_to_cpus(buf);
 		buf++;
 	}
 }
@@ -151,7 +155,7 @@ static inline void le32_to_cpu_array(u32 *buf, unsigned int words)
 static inline void cpu_to_le32_array(u32 *buf, unsigned int words)
 {
 	while (words--) {
-		//		__cpu_to_le32s(buf);
+		cpu_to_le32s(buf);
 		buf++;
 	}
 }
