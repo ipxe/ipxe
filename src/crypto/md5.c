@@ -22,31 +22,40 @@
 #include <gpxe/crypto.h>
 
 #define MD5_DIGEST_SIZE		16
-#define MD5_HMAC_BLOCK_SIZE	64
 #define MD5_BLOCK_WORDS		16
 #define MD5_HASH_WORDS		4
+
+struct md5_ctx {
+	u32 hash[MD5_HASH_WORDS];
+	u32 block[MD5_BLOCK_WORDS];
+	u64 byte_count;
+};
 
 #define __md5step __attribute__ (( regparm ( 3 ) ))
 
 struct md5_step {
-	uint32_t __md5step ( * f ) ( uint32_t b, uint32_t c, uint32_t d );
-	uint8_t coefficient;
-	uint8_t constant;
+	u32 __md5step ( * f ) ( u32 b, u32 c, u32 d );
+	u8 coefficient;
+	u8 constant;
 };
 
-static uint32_t __md5step f1 ( uint32_t b, uint32_t c, uint32_t d ) {
+static u32 __md5step f1(u32 b, u32 c, u32 d)
+{
 	return ( d ^ ( b & ( c ^ d ) ) );
 }
 
-static uint32_t __md5step f2 ( uint32_t b, uint32_t c, uint32_t d ) {
+static u32 __md5step f2(u32 b, u32 c, u32 d)
+{
 	return ( c ^ ( d & ( b ^ c ) ) );
 }
 
-static uint32_t __md5step f3 ( uint32_t b, uint32_t c, uint32_t d ) {
+static u32 __md5step f3(u32 b, u32 c, u32 d)
+{
 	return ( b ^ c ^ d );
 }
 
-static uint32_t __md5step f4 ( uint32_t b, uint32_t c, uint32_t d ) {
+static u32 __md5step f4(u32 b, u32 c, u32 d)
+{
 	return ( c ^ ( b | ~d ) );
 }
 
@@ -73,14 +82,14 @@ struct md5_step md5_steps[4] = {
 	}
 };
 
-static const uint8_t r[64] = {
+static const u8 r[64] = {
 	7,12,17,22,7,12,17,22,7,12,17,22,7,12,17,22,
 	5,9,14,20,5,9,14,20,5,9,14,20,5,9,14,20,
 	4,11,16,23,4,11,16,23,4,11,16,23,4,11,16,23,
 	6,10,15,21,6,10,15,21,6,10,15,21,6,10,15,21
 };
 
-static const uint32_t k[] = {
+static const u32 k[] = {
 	0xd76aa478UL, 0xe8c7b756UL, 0x242070dbUL, 0xc1bdceeeUL,
 	0xf57c0fafUL, 0x4787c62aUL, 0xa8304613UL, 0xfd469501UL,
 	0x698098d8UL, 0x8b44f7afUL, 0xffff5bb1UL, 0x895cd7beUL,
@@ -100,26 +109,9 @@ static const uint32_t k[] = {
 	0xe1f27f3aUL, 0xf5710fb0UL, 0xada0e5c4UL, 0x98e4c919UL
 };
 
-
-#define F1(x, y, z)	(z ^ (x & (y ^ z)))
-#define F2(x, y, z)	F1(z, x, y)
-#define F3(x, y, z)	(x ^ y ^ z)
-#define F4(x, y, z)	(y ^ (x | ~z))
-
-#define MD5STEP(f, w, x, y, z, in, s) do { 			\
-		(w += f(x, y, z) + in, w = (w<<s | w>>(32-s)) + x) ; \
-		printf ( "a=%#08x, b=%#08x, c=%#08x, d=%#08x\n", a, b, c, d );\
-} while ( 0 )
-
-struct md5_ctx {
-	u32 hash[MD5_HASH_WORDS];
-	u32 block[MD5_BLOCK_WORDS];
-	u64 byte_count;
-};
-
 static void md5_transform(u32 *hash, const u32 *in)
 {
-	u32 a, b, c, d, f, g, t, q;
+	u32 a, b, c, d, f, g, temp;
 	int i;
 	struct md5_step *step;
 
@@ -128,90 +120,18 @@ static void md5_transform(u32 *hash, const u32 *in)
 	c = hash[2];
 	d = hash[3];
 
-#if 1
-
 	for ( i = 0 ; i < 64 ; i++ ) {
 		step = &md5_steps[i >> 4];
 		f = step->f ( b, c, d );
 		g = ( ( i * step->coefficient + step->constant ) & 0xf );
-		t = d;
+		temp = d;
 		d = c;
 		c = b;
-		q = ( a + f + k[i] + in[g] );
-		b += ( ( q << r[i] ) | ( q >> ( 32-r[i] ) ) );
-		a = t;
-		printf ( "a=%#08x, b=%#08x, c=%#08x, d=%#08x\n", a, b, c, d );
+		a += ( f + k[i] + in[g] );
+		a = ( ( a << r[i] ) | ( a >> ( 32-r[i] ) ) );
+		b += a;
+		a = temp;
 	}
-
-#else
-	MD5STEP(F1, a, b, c, d, in[0] + 0xd76aa478, 7);
-	MD5STEP(F1, d, a, b, c, in[1] + 0xe8c7b756, 12);
-	MD5STEP(F1, c, d, a, b, in[2] + 0x242070db, 17);
-	MD5STEP(F1, b, c, d, a, in[3] + 0xc1bdceee, 22);
-	MD5STEP(F1, a, b, c, d, in[4] + 0xf57c0faf, 7);
-	MD5STEP(F1, d, a, b, c, in[5] + 0x4787c62a, 12);
-	MD5STEP(F1, c, d, a, b, in[6] + 0xa8304613, 17);
-	MD5STEP(F1, b, c, d, a, in[7] + 0xfd469501, 22);
-	MD5STEP(F1, a, b, c, d, in[8] + 0x698098d8, 7);
-	MD5STEP(F1, d, a, b, c, in[9] + 0x8b44f7af, 12);
-	MD5STEP(F1, c, d, a, b, in[10] + 0xffff5bb1, 17);
-	MD5STEP(F1, b, c, d, a, in[11] + 0x895cd7be, 22);
-	MD5STEP(F1, a, b, c, d, in[12] + 0x6b901122, 7);
-	MD5STEP(F1, d, a, b, c, in[13] + 0xfd987193, 12);
-	MD5STEP(F1, c, d, a, b, in[14] + 0xa679438e, 17);
-	MD5STEP(F1, b, c, d, a, in[15] + 0x49b40821, 22);
-
-	MD5STEP(F2, a, b, c, d, in[1] + 0xf61e2562, 5);
-	MD5STEP(F2, d, a, b, c, in[6] + 0xc040b340, 9);
-	MD5STEP(F2, c, d, a, b, in[11] + 0x265e5a51, 14);
-	MD5STEP(F2, b, c, d, a, in[0] + 0xe9b6c7aa, 20);
-	MD5STEP(F2, a, b, c, d, in[5] + 0xd62f105d, 5);
-	MD5STEP(F2, d, a, b, c, in[10] + 0x02441453, 9);
-	MD5STEP(F2, c, d, a, b, in[15] + 0xd8a1e681, 14);
-	MD5STEP(F2, b, c, d, a, in[4] + 0xe7d3fbc8, 20);
-	MD5STEP(F2, a, b, c, d, in[9] + 0x21e1cde6, 5);
-	MD5STEP(F2, d, a, b, c, in[14] + 0xc33707d6, 9);
-	MD5STEP(F2, c, d, a, b, in[3] + 0xf4d50d87, 14);
-	MD5STEP(F2, b, c, d, a, in[8] + 0x455a14ed, 20);
-	MD5STEP(F2, a, b, c, d, in[13] + 0xa9e3e905, 5);
-	MD5STEP(F2, d, a, b, c, in[2] + 0xfcefa3f8, 9);
-	MD5STEP(F2, c, d, a, b, in[7] + 0x676f02d9, 14);
-	MD5STEP(F2, b, c, d, a, in[12] + 0x8d2a4c8a, 20);
-
-	MD5STEP(F3, a, b, c, d, in[5] + 0xfffa3942, 4);
-	MD5STEP(F3, d, a, b, c, in[8] + 0x8771f681, 11);
-	MD5STEP(F3, c, d, a, b, in[11] + 0x6d9d6122, 16);
-	MD5STEP(F3, b, c, d, a, in[14] + 0xfde5380c, 23);
-	MD5STEP(F3, a, b, c, d, in[1] + 0xa4beea44, 4);
-	MD5STEP(F3, d, a, b, c, in[4] + 0x4bdecfa9, 11);
-	MD5STEP(F3, c, d, a, b, in[7] + 0xf6bb4b60, 16);
-	MD5STEP(F3, b, c, d, a, in[10] + 0xbebfbc70, 23);
-	MD5STEP(F3, a, b, c, d, in[13] + 0x289b7ec6, 4);
-	MD5STEP(F3, d, a, b, c, in[0] + 0xeaa127fa, 11);
-	MD5STEP(F3, c, d, a, b, in[3] + 0xd4ef3085, 16);
-	MD5STEP(F3, b, c, d, a, in[6] + 0x04881d05, 23);
-	MD5STEP(F3, a, b, c, d, in[9] + 0xd9d4d039, 4);
-	MD5STEP(F3, d, a, b, c, in[12] + 0xe6db99e5, 11);
-	MD5STEP(F3, c, d, a, b, in[15] + 0x1fa27cf8, 16);
-	MD5STEP(F3, b, c, d, a, in[2] + 0xc4ac5665, 23);
-
-	MD5STEP(F4, a, b, c, d, in[0] + 0xf4292244, 6);
-	MD5STEP(F4, d, a, b, c, in[7] + 0x432aff97, 10);
-	MD5STEP(F4, c, d, a, b, in[14] + 0xab9423a7, 15);
-	MD5STEP(F4, b, c, d, a, in[5] + 0xfc93a039, 21);
-	MD5STEP(F4, a, b, c, d, in[12] + 0x655b59c3, 6);
-	MD5STEP(F4, d, a, b, c, in[3] + 0x8f0ccc92, 10);
-	MD5STEP(F4, c, d, a, b, in[10] + 0xffeff47d, 15);
-	MD5STEP(F4, b, c, d, a, in[1] + 0x85845dd1, 21);
-	MD5STEP(F4, a, b, c, d, in[8] + 0x6fa87e4f, 6);
-	MD5STEP(F4, d, a, b, c, in[15] + 0xfe2ce6e0, 10);
-	MD5STEP(F4, c, d, a, b, in[6] + 0xa3014314, 15);
-	MD5STEP(F4, b, c, d, a, in[13] + 0x4e0811a1, 21);
-	MD5STEP(F4, a, b, c, d, in[4] + 0xf7537e82, 6);
-	MD5STEP(F4, d, a, b, c, in[11] + 0xbd3af235, 10);
-	MD5STEP(F4, c, d, a, b, in[2] + 0x2ad7d2bb, 15);
-	MD5STEP(F4, b, c, d, a, in[9] + 0xeb86d391, 21);
-#endif
 
 	hash[0] += a;
 	hash[1] += b;
