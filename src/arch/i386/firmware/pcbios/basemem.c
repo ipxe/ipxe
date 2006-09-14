@@ -72,9 +72,9 @@ void * alloc_base_memory ( size_t size ) {
 	 */
 	memset ( ptr, 0, size_kb << 10 );
 
-	DBG ( "Allocated %d kB of base memory at [%hx:0000,%hx:0000), "
-	      "%d kB now free\n", size_kb,
-	      ( virt_to_phys ( ptr ) >> 4 ),
+	DBG ( "Allocated %d kB of base memory at [%hx:0000,%hx:0000), " \
+	      "%d kB now free\n", size_kb, \
+	      ( virt_to_phys ( ptr ) >> 4 ), \
 	      ( ( virt_to_phys ( ptr ) + ( size_kb << 10 ) ) >> 4 ), fbms );
 
 	/* Update our memory map */
@@ -170,10 +170,10 @@ static void free_unused_base_memory ( void ) {
 
 		DBG ( "Freed %d kB of base memory at [%hx:0000,%hx:0000), "
 		      "%d kB now free\n",
-		      free_block->size_kb,
+		      free_block->header.size_kb,
 		      ( virt_to_phys ( free_block ) >> 4 ),
 		      ( ( virt_to_phys ( free_block ) + 
-			  ( free_block->size_kb << 10 ) ) >> 4 ),
+			  ( free_block->header.size_kb << 10 ) ) >> 4 ),
 		      fbms );
 		
 		/* Do not zero out the freed block, because it might
