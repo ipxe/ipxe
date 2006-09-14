@@ -743,8 +743,8 @@ static void ns83820_transmit(struct nic *nic, const char *d,	/* Destination */
 /**************************************************************************
 DISABLE - Turn off ethernet interface
 ***************************************************************************/
-static void ns83820_disable ( struct nic *nic, struct pci_device *pci __unused ) {
-	nic_disable ( nic );
+static void ns83820_disable ( struct nic *nic ) {
+
 	/* put the card in its initial state */
 	/* This function serves 3 purposes.
 	 * This disables DMA and interrupts so we don't receive
@@ -814,7 +814,6 @@ PROBE - Look for an adapter, this routine's visible to the outside
 #define valid_link 0
 static int ns83820_probe ( struct nic *nic, struct pci_device *pci ) {
 
-	int sz;
 	long addr;
 	int using_dac = 0;
 
@@ -830,10 +829,8 @@ static int ns83820_probe ( struct nic *nic, struct pci_device *pci ) {
 	adjust_pci_device(pci);
 
 	addr = pci_bar_start(pci, PCI_BASE_ADDRESS_1);
-	sz = pci_bar_size(pci, PCI_BASE_ADDRESS_1);
 
 	ns->base = ioremap(addr, (1UL << 12));
-//      ns->base = ioremap(addr, sz);
 
 	if (!ns->base)
 		return 0;
@@ -982,7 +979,6 @@ static int ns83820_probe ( struct nic *nic, struct pci_device *pci ) {
 	writel(0, ns->base + WCSR);
 
 	ns83820_getmac(nic, nic->node_addr);
-	printf("%! at ioaddr 0x%hX, ", nic->node_addr, ns->base);
 
 	if (using_dac) {
 		dprintf(("%s: using 64 bit addressing.\n", pci->name));
