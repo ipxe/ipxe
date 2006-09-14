@@ -72,9 +72,9 @@ void * alloc_base_memory ( size_t size ) {
 	 */
 	memset ( ptr, 0, size_kb << 10 );
 
-	DBG ( "Allocated %d kB of base memory at [%hx:0000,%hx:0000), " \
-	      "%d kB now free\n", size_kb, \
-	      ( virt_to_phys ( ptr ) >> 4 ), \
+	DBG ( "Allocated %d kB of base memory at [%4.4lx:0000,%4.4lx:0000), "
+	      "%d kB now free\n", size_kb,
+	      ( virt_to_phys ( ptr ) >> 4 ),
 	      ( ( virt_to_phys ( ptr ) + ( size_kb << 10 ) ) >> 4 ), fbms );
 
 	/* Update our memory map */
@@ -108,7 +108,7 @@ void free_base_memory ( void *ptr, size_t size ) {
 		return; 
 	}
 
-	DBG ( "Trying to free %d bytes base memory at %hx:%hx "
+	DBG ( "Trying to free %d bytes base memory at %4.4lx:%4.4lx "
 	      "from %d kB free\n", size,
 	      ( virt_to_phys ( ptr - remainder ) >> 4 ),
 	      ( virt_to_phys ( ptr - remainder ) & 0xf ) + remainder,
@@ -168,7 +168,7 @@ static void free_unused_base_memory ( void ) {
 		/* Return memory to BIOS */
 		fbms += free_block->header.size_kb;
 
-		DBG ( "Freed %d kB of base memory at [%hx:0000,%hx:0000), "
+		DBG ( "Freed %ld kB of base memory at [%4.4lx:0000,%4.4lx:0000), "
 		      "%d kB now free\n",
 		      free_block->header.size_kb,
 		      ( virt_to_phys ( free_block ) >> 4 ),
