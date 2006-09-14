@@ -1403,7 +1403,9 @@ static int tulip_probe ( struct nic *nic, struct pci_device *pci ) {
     for (i = 0; i < ETH_ALEN; i++)
         last_phys_addr[i] = nic->node_addr[i];
 
+/*  FIXME: This should be printed out in a higher-level routine.
     printf("%s: %! at ioaddr %hX\n", tp->nic_name, nic->node_addr, ioaddr);
+*/
 
     tp->chip_id = chip_idx;
     tp->revision = chip_rev;
