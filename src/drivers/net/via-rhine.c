@@ -1164,7 +1164,7 @@ rhine_probe1 (struct nic *nic, struct pci_device *pci, int ioaddr, int chip_id, 
 
 static void 
 rhine_disable ( struct nic *nic, struct pci_device *pci __unused ) {
-    nic_disable ( nic );
+
     struct rhine_private *tp = (struct rhine_private *) nic->priv_data;
     int ioaddr = tp->ioaddr;
 

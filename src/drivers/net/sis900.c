@@ -1228,8 +1228,7 @@ sis900_poll(struct nic *nic, int retrieve)
 
 static void
 sis900_disable ( struct nic *nic, struct pci_device *pci __unused ) {
-    nic_disable ( nic );
-    /* merge reset and disable */
+
     sis900_init(nic);
 
     /* Disable interrupts by clearing the interrupt mask. */

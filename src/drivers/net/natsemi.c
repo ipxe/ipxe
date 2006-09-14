@@ -723,8 +723,7 @@ natsemi_poll(struct nic *nic, int retrieve)
 
 static void
 natsemi_disable ( struct nic *nic, struct pci_device *pci __unused ) {
-    nic_disable ( nic );
-    /* merge reset and disable */
+
     natsemi_init(nic);
 
     /* Disable interrupts using the mask. */

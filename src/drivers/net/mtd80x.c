@@ -636,12 +636,13 @@ static void mtd_transmit(
 DISABLE - Turn off ethernet interface
 ***************************************************************************/
 static void mtd_disable ( struct nic *nic, struct pci_device *pci __unused ) {
-    nic_disable ( nic );
-    /* put the card in its initial state */
+
     /* Disable Tx Rx*/
     outl( mtdx.crvalue & (~TxEnable) & (~RxEnable), mtdx.ioaddr + TCRRCR);
+
     /* Reset the chip to erase previous misconfiguration. */
     mtd_reset(nic);
+
     DBG(("DISABLE\n"));
 }
 

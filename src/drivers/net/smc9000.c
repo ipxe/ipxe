@@ -792,7 +792,7 @@ static int smc9000_poll(struct nic *nic, int retrieve)
 }
 
 static void smc9000_disable ( struct nic *nic, struct isa_device *isa __unused ) {
-   nic_disable ( nic );
+
    smc_reset(nic->ioaddr);
 
    /* no more interrupts for me */

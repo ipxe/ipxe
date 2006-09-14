@@ -1185,7 +1185,7 @@ static int tulip_poll(struct nic *nic, int retrieve)
 /* eth_disable - Disable the interface                               */
 /*********************************************************************/
 static void tulip_disable ( struct nic *nic, struct pci_device *pci __unused ) {
-nic_disable ( nic );
+
 #ifdef TULIP_DEBUG_WHERE
     whereami("tulip_disable\n");
 #endif

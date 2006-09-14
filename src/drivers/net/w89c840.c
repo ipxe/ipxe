@@ -576,7 +576,7 @@ static void w89c840_transmit(
 w89c840_disable - Turn off ethernet interface
 ***************************************************************************/
 static void w89c840_disable ( struct nic *nic, struct pci_device *pci __unused ) {
-    nic_disable ( nic );
+
     /* merge reset and disable */
     w89c840_reset(nic);
 
