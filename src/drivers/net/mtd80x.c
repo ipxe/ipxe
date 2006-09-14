@@ -473,7 +473,7 @@ static void init_ring(struct nic *nic __unused)
 /**************************************************************************
 RESET - Reset Adapter
 ***************************************************************************/
-static void mtd_reset(struct nic *nic)
+static void mtd_reset( struct nic *nic )
 {
     /* Reset the chip to erase previous misconfiguration. */
     outl(0x00000001, mtdx.ioaddr + BCR);
@@ -501,12 +501,12 @@ static void mtd_reset(struct nic *nic)
     getlinkstatus(nic);
     if (mtdx.linkok)
     {
-        char* texts[]={"half","full","10","100","1000"};
+        static const char* texts[]={"half","full","10","100","1000"};
         getlinktype(nic);
-        DBG(("Link is OK : %s %s\n", texts[mtdx.duplexmode-1], texts[mtdx.line_speed+1] ));
+        DBG ( "Link is OK : %s %s\n", texts[mtdx.duplexmode-1], texts[mtdx.line_speed+1] );
     } else
     {
-        DBG(("No link!!!\n"));
+        DBG ( "No link!!!\n" );
     }
 
     mtdx.crvalue |= /*TxEnable |*/ RxEnable | TxThreshold;
@@ -520,7 +520,7 @@ static void mtd_reset(struct nic *nic)
 /**************************************************************************
 POLL - Wait for a frame
 ***************************************************************************/
-static int mtd_poll(struct nic *nic, int retrieve)
+static int mtd_poll(struct nic *nic, __unused int retrieve)
 {
     s32 rx_status = mtdx.cur_rx->status;
     int retval = 0;
@@ -548,8 +548,8 @@ static int mtd_poll(struct nic *nic, int retrieve)
         /* Omit the four octet CRC from the length. */
         short pkt_len = ((rx_status & FLNGMASK) >> FLNGShift) - 4;
 
-        DBG(( "  netdev_rx() normal Rx pkt length %d"
-	      " status %x.\n", pkt_len, rx_status));
+        DBG ( " netdev_rx() normal Rx pkt length %d"
+ 	      " status %x.\n", pkt_len, rx_status );
 
         nic->packetlen = pkt_len;
         memcpy(nic->packet, mtdx.cur_rx->skbuff, pkt_len);
@@ -615,35 +615,35 @@ static void mtd_transmit(
 
     tx_status = mtdx.tx_ring[0].status;
     if (currticks() >= to){
-        DBG(("TX Time Out"));
+        DBG ( "TX Time Out" );
     } else if( tx_status & (CSL | LC | EC | UDF | HF)){
-        printf("Transmit error: %s %s %s %s %s.\n",
-               tx_status,
-               tx_status & EC ? "abort" : "",
-               tx_status & CSL ? "carrier" : "",
-               tx_status & LC ? "late" : "",
-               tx_status & UDF ? "fifo" : "",
-               tx_status & HF ? "heartbeat" : "" );
+        printf( "Transmit error: %8.8x %s %s %s %s %s\n",
+                tx_status,
+                tx_status & EC ? "abort" : "",
+                tx_status & CSL ? "carrier" : "",
+                tx_status & LC ? "late" : "",
+                tx_status & UDF ? "fifo" : "",
+                tx_status & HF ? "heartbeat" : "" );
     }
 
     /*hex_dump( txb, size );*/
     /*pause();*/
 
-    DBG(("TRANSMIT\n"));
+    DBG ( "TRANSMIT\n" );
 }
 
 /**************************************************************************
 DISABLE - Turn off ethernet interface
 ***************************************************************************/
-static void mtd_disable ( struct nic *nic, struct pci_device *pci __unused ) {
+static void mtd_disable ( struct nic *nic ) {
 
     /* Disable Tx Rx*/
-    outl( mtdx.crvalue & (~TxEnable) & (~RxEnable), mtdx.ioaddr + TCRRCR);
+    outl( mtdx.crvalue & (~TxEnable) & (~RxEnable), mtdx.ioaddr + TCRRCR );
 
     /* Reset the chip to erase previous misconfiguration. */
     mtd_reset(nic);
 
-    DBG(("DISABLE\n"));
+    DBG ( "DISABLE\n" );
 }
 
 static struct nic_operations mtd_operations = {
@@ -686,12 +686,12 @@ static int mtd_probe ( struct nic *nic, struct pci_device *pci ) {
         nic->node_addr[i] = inb(mtdx.ioaddr + PAR0 + i);
     }
 
-    if (memcmp(nic->node_addr, "\0\0\0\0\0", 6) == 0)
+    if (memcmp(nic->node_addr, "\0\0\0\0\0\0", 6) == 0)
     {
         return 0;
     }
 
-    DBG(("%s : ioaddr %#hX, addr %!\n",mtdx.nic_name, mtdx.ioaddr, nic->node_addr));
+    /*    DBG ( "%s: ioaddr %#hX, addr %!\n",mtdx.nic_name, mtdx.ioaddr, nic->node_addr ); */
 
     /* Reset the chip to erase previous misconfiguration. */
     outl(0x00000001, mtdx.ioaddr + BCR);
@@ -708,8 +708,8 @@ static int mtd_probe ( struct nic *nic, struct pci_device *pci ) {
             if (mii_status != 0xffff && mii_status != 0x0000) {
                 mtdx.phys[phy_idx] = phy;
 
-                DBG(("%s: MII PHY found at address %d, status "
-		     "0x%4.4x.\n", mtdx.nic_name, phy, mii_status));
+                DBG ( "%s: MII PHY found at address %d, status "
+		      "0x%4.4x.\n", mtdx.nic_name, phy, mii_status );
                 /* get phy type */
                 {
                     unsigned int data;
@@ -742,10 +742,10 @@ static int mtd_probe ( struct nic *nic, struct pci_device *pci ) {
         /* get phy type */
         if (inl(mtdx.ioaddr + PHYIDENTIFIER) == MysonPHYID ) {
             mtdx.PHYType = MysonPHY;
-            DBG(("MysonPHY\n"));
+            DBG ( "MysonPHY\n" );
         } else {
             mtdx.PHYType = OtherPHY;
-            DBG(("OtherPHY\n"));
+            DBG ( "OtherPHY\n" );
         }
     }
 
