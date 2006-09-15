@@ -12,6 +12,8 @@
 
 extern struct ll_protocol ethernet_protocol;
 
+extern const char * eth_ntoa ( const void *ll_addr );
+
 /**
  * Allocate Ethernet device
  *

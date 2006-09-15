@@ -93,7 +93,7 @@ static int eth_rx ( struct pk_buff *pkb, struct net_device *netdev ) {
  * @v ll_addr	Link-layer address
  * @ret string	Link-layer address in human-readable format
  */
-static const char * eth_ntoa ( const void *ll_addr ) {
+const char * eth_ntoa ( const void *ll_addr ) {
 	static char buf[18]; /* "00:00:00:00:00:00" */
 	const uint8_t *eth_addr = ll_addr;
 
