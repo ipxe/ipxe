@@ -105,6 +105,7 @@
 
 #include "etherboot.h"
 #include "nic.h"
+#include <gpxe/ethernet.h>
 #include <gpxe/pci.h>
 #include "timer.h"
 
@@ -635,7 +636,8 @@ static int eepro100_probe ( struct nic *nic, struct pci_device *p ) {
 	for (i=0;i<ETH_ALEN;i++) {
 		nic->node_addr[i] =  (eeprom[i/2] >> (8*(i&1))) & 0xff;
 	}
-	printf ("Ethernet addr: %!\n", nic->node_addr);
+
+	DBG ("Ethernet addr: %s\n", eth_ntoa ( nic->node_addr ) );
 
 	if (sum != 0xBABA)
 		printf("eepro100: Invalid EEPROM checksum %#hX, "
