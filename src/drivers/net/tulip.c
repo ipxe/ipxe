@@ -108,6 +108,8 @@
 
 #include "etherboot.h"
 #include "nic.h"
+
+#include <gpxe/ethernet.h>
 #include <gpxe/pci.h>
 
 /* User settable parameters */
@@ -496,7 +498,7 @@ static void tulip_reset(struct nic *nic);
 static void tulip_transmit(struct nic *nic, const char *d, unsigned int t,
                            unsigned int s, const char *p);
 static int tulip_poll(struct nic *nic, int retrieve);
-static void tulip_disable(struct nic *nic, struct pci_device *pci);
+static void tulip_disable(struct nic *nic);
 static void nway_start(struct nic *nic);
 static void pnic_do_nway(struct nic *nic);
 static void select_media(struct nic *nic, int startup);
@@ -1184,13 +1186,12 @@ static int tulip_poll(struct nic *nic, int retrieve)
 /*********************************************************************/
 /* eth_disable - Disable the interface                               */
 /*********************************************************************/
-static void tulip_disable ( struct nic *nic, struct pci_device *pci __unused ) {
+static void tulip_disable ( struct nic *nic ) {
 
 #ifdef TULIP_DEBUG_WHERE
     whereami("tulip_disable\n");
 #endif
 
-    /* merge reset and disable */
     tulip_reset(nic);
 
     /* disable interrupts */
@@ -1403,9 +1404,7 @@ static int tulip_probe ( struct nic *nic, struct pci_device *pci ) {
     for (i = 0; i < ETH_ALEN; i++)
         last_phys_addr[i] = nic->node_addr[i];
 
-/*  FIXME: This should be printed out in a higher-level routine.
-    printf("%s: %! at ioaddr %hX\n", tp->nic_name, nic->node_addr, ioaddr);
-*/
+    DBG ( "%s: %s at ioaddr %hX\n", tp->nic_name, eth_ntoa ( nic->node_addr ), ioaddr );
 
     tp->chip_id = chip_idx;
     tp->revision = chip_rev;
