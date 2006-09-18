@@ -1,3 +1,11 @@
+#if 0
+
+/* 
+   This file is (or should be) completely obsolete.  It is thus
+   commented out with the "#if 0" above, to make sure that no
+   functions from it are in use. --mdc 2006-09-18
+*/
+
 /**************************************************************************
 Etherboot -  Network Bootstrap Program
 
@@ -17,6 +25,8 @@ Literature dealing with the network protocols:
 #include "etherboot.h"
 #include "console.h"
 #include "url.h"
+#include "gpxe/in.h"
+#include "gpxe/netdevice.h"
 #include "proto.h"
 #include "resolv.h"
 #include "dev.h"
@@ -271,22 +281,23 @@ static int nic_configure ( struct type_dev *type_dev ) {
 		return 0;
 	}
 
-	printf("\nMe: %@", arptable[ARP_CLIENT].ipaddr.s_addr );
+#if 0
+	printf( "\nMe: %s", inet_ntoa ( arptable[ARP_CLIENT].ipaddr ) );
+#endif
 #ifndef NO_DHCP_SUPPORT
-	printf(", DHCP: %@", dhcp_server );
+	printf( ", DHCP: %s", inet_ntoa (dhcp_server) );
 #ifdef PXE_EXPORT       
 	if (arptable[ARP_PROXYDHCP].ipaddr.s_addr)
-		printf(" (& %@)",
-		       arptable[ARP_PROXYDHCP].ipaddr.s_addr);
+		printf ( " (& %s)", inet_ntoa ( arptable[ARP_PROXYDHCP].ipaddr ) );
 #endif /* PXE_EXPORT */
 #endif /* ! NO_DHCP_SUPPORT */
-	printf(", TFTP: %@", arptable[ARP_SERVER].ipaddr.s_addr);
+	printf(", TFTP: %s", inet_ntoa ( arptable[ARP_SERVER].ipaddr ) );
 	if (bootp_data.bootp_reply.bp_giaddr.s_addr)
-		printf(", Relay: %@", bootp_data.bootp_reply.bp_giaddr.s_addr);
+		printf ( ", Relay: %s", inet_ntoa ( bootp_data.bootp_reply.bp_giaddr ) );
 	if (arptable[ARP_GATEWAY].ipaddr.s_addr)
-		printf(", Gateway %@", arptable[ARP_GATEWAY].ipaddr.s_addr);
+		printf ( ", Gateway %s", inet_ntoa (arptable[ARP_GATEWAY].ipaddr ) );
 	if (arptable[ARP_NAMESERVER].ipaddr.s_addr)
-		printf(", Nameserver %@", arptable[ARP_NAMESERVER].ipaddr.s_addr);
+		printf ( ", Nameserver %s", inet_ntoa ( arptable[ARP_NAMESERVER].ipaddr ) );
 	putchar('\n');
 
 #ifdef	MDEBUG
@@ -372,7 +383,7 @@ static char * nic_describe_device ( struct type_dev *type_dev ) {
 	struct nic *nic = ( struct nic * ) type_dev;
 	static char nic_description[] = "MAC 00:00:00:00:00:00";
 	
-	sprintf ( nic_description + 4, "%!", nic->node_addr );
+	sprintf ( nic_description + 4, "%s", netdev_name ( nic ) );
 	return nic_description;
 }
 
@@ -471,7 +482,7 @@ int ip_transmit(int len, const void *buf)
 		for(arpentry = 0; arpentry<MAX_ARP; arpentry++)
 			if (arptable[arpentry].ipaddr.s_addr == destip) break;
 		if (arpentry == MAX_ARP) {
-			printf("%@ is not in my arp table!\n", destip);
+			printf ( "%s is not in my arp table!\n", inet_ntoa (destip) );
 			return(0);
 		}
 		for (i = 0; i < ETH_ALEN; i++)
@@ -813,7 +824,8 @@ static int bootp(void)
 				memcpy(ip.bp.bp_vend, rfc1533_cookie, sizeof rfc1533_cookie);
 				memcpy(ip.bp.bp_vend + sizeof rfc1533_cookie, proxydhcprequest, sizeof proxydhcprequest);
 				for (reqretry = 0; reqretry < MAX_BOOTP_RETRIES; ) {
-					printf ( "\nSending ProxyDHCP request to %@...", arptable[ARP_PROXYDHCP].ipaddr.s_addr);
+					printf ( "\nSending ProxyDHCP request to %s...", 
+						 inet_ntoa ( arptable[ARP_PROXYDHCP].ipaddr ) );
 					udp_transmit(arptable[ARP_PROXYDHCP].ipaddr.s_addr, BOOTP_CLIENT, PROXYDHCP_SERVER,
 						     sizeof(struct bootpip_t), &ip);
 					timeout = rfc2131_sleep_interval(TIMEOUT, reqretry++);
@@ -987,7 +999,7 @@ int await_reply(reply_t reply, int ival, void *ptr, long timeout)
 					arpreply);
 #ifdef	MDEBUG
 				memcpy(&tmp, arpreply->tipaddr, sizeof(in_addr));
-				printf("Sent ARP reply to: %@\n",tmp);
+				printf( "Sent ARP reply to: %s\n", inet_ntoa ( tmp ) );
 #endif	/* MDEBUG */
 			}
 		}
@@ -1195,4 +1207,4 @@ long rfc2131_sleep_interval(long base, int exp)
 	return tmo;
 }
 
-
+#endif
