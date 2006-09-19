@@ -40,6 +40,7 @@
 #include "etherboot.h"
 #include "nic.h"
 #include <gpxe/pci.h>
+#include <gpxe/ethernet.h>
 #include "timer.h"
 
 static struct nic_operations a3c90x_operations;
@@ -675,7 +676,6 @@ a3c90x_poll(struct nic *nic, int retrieve)
  ***/
 static void
 a3c90x_disable ( struct nic *nic __unused ) {
-	/* reset and disable merge */
 	a3c90x_reset();
 	/* Disable the receiver and transmitter. */
 	outw(cmdRxDisable, INF_3C90X.IOAddr + regCommandIntStatus_w);
@@ -802,7 +802,8 @@ static int a3c90x_probe ( struct nic *nic, struct pci_device *pci ) {
     INF_3C90X.HWAddr[3] = eeprom[HWADDR_OFFSET + 1]&0xFF;
     INF_3C90X.HWAddr[4] = eeprom[HWADDR_OFFSET + 2]>>8;
     INF_3C90X.HWAddr[5] = eeprom[HWADDR_OFFSET + 2]&0xFF;
-    printf("MAC Address = %!\n", INF_3C90X.HWAddr);
+
+    DBG ( "MAC Address = %s\n", eth_ntoa ( INF_3C90X.HWAddr ) );
 
     /** 3C556: Invert MII power **/
     if (INF_3C90X.is3c556) {
