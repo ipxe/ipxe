@@ -32,6 +32,7 @@
 #include "nic.h"
 #include "mii.h"
 #include <gpxe/pci.h>
+#include <gpxe/ethernet.h>
 #include "timer.h"
 #include "string.h"
 #include "stdint.h"
@@ -386,7 +387,8 @@ static int amd8111e_get_mac_address(struct amd8111e_priv *lp)
 	 */
 	for (i = 0; i < ETH_ALEN; i++)
 		nic->node_addr[i] = readb(mmio + PADR + i);
-	printf("Ethernet addr: %!\n", nic->node_addr);
+
+	DBG ( "Ethernet addr: %s\n", eth_ntoa ( nic->node_addr ) );
 
 	return 0;
 }
