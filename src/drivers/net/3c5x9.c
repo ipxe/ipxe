@@ -24,6 +24,7 @@ $Id$
 
 /* #define EDEBUG */
 
+#include <gpxe/ethernet.h>
 #include "etherboot.h"
 #include "nic.h"
 #include "isa.h"
@@ -397,7 +398,9 @@ int t5x9_probe ( struct nic *nic,
 		GO_WINDOW(nic->ioaddr,2);
 		outw(ntohs(p[i]), nic->ioaddr + EP_W2_ADDR_0 + (i * 2));
 	}
-	printf("Ethernet address: %!\n", nic->node_addr);
+
+	DBG ( "Ethernet Address: %s\n", eth_ntoa ( nic->node_addr ) );
+
 	t509_reset(nic);
 
 	nic->nic_op = &t509_operations;
