@@ -3,7 +3,9 @@
 #include <vsprintf.h>
 #include <gpxe/netdevice.h>
 #include <gpxe/iscsi.h>
+#if 0
 #include <gpxe/ibft.h>
+#endif
 #include <int13.h>
 
 static struct iscsi_device test_iscsidev;
@@ -26,9 +28,9 @@ int test_iscsiboot ( const char *initiator_iqn,
 		printf ( "Could not reach %s\n", target_iqn );
 		return rc;
 	}
-
+#if 0
 	ibft_fill_data ( netdev, initiator_iqn, target, target_iqn );
-
+#endif
 	memset ( &drive, 0, sizeof ( drive ) );
 	drive.blockdev = &test_iscsidev.scsi.blockdev;
 	register_int13_drive ( &drive );
