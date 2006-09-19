@@ -1331,8 +1331,7 @@ static void undi_transmit(
 /**************************************************************************
 DISABLE - Turn off ethernet interface
 ***************************************************************************/
-static void undi_disable ( struct nic *nic __unused,
-			   struct pci_device *pci __unused ) {
+static void undi_disable ( struct nic *nic __unused ) {
 	undi_full_shutdown();
 	free_base_mem_data();
 }
