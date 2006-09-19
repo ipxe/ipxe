@@ -28,6 +28,7 @@
 #include "etherboot.h"
 #include "nic.h"
 #include <gpxe/pci.h>
+#include <gpxe/ethernet.h>
 #include "3c595.h"
 #include "timer.h"
 
@@ -442,8 +443,8 @@ vxsetlink(void)
     GO_WINDOW(1); 
 }
 
-static void t595_disable ( struct nic *nic, struct pci_device *pci __unused ) {
-	nic_disable ( nic );
+static void t595_disable ( struct nic *nic ) {
+
 	t595_reset(nic);
 
 	outw(STOP_TRANSCEIVER, BASE + VX_COMMAND);
@@ -505,7 +506,7 @@ static int t595_probe ( struct nic *nic, struct pci_device *pci ) {
 		outw(ntohs(p[i]), BASE + VX_W2_ADDR_0 + (i * 2));
 	}
 
-	printf("Ethernet address: %!\n", nic->node_addr);
+	DBG ( "Ethernet address: %s\n", eth_ntoa (nic->node_addr) );
 
 	t595_reset(nic);
 	nic->nic_op	= &t595_operations;
