@@ -51,6 +51,7 @@
 #include "isapnp.h"
 #include "isa.h" /* for ISA_ROM */
 #include "timer.h"
+#include <gpxe/ethernet.h>
 
 static void t3c515_wait(unsigned int nticks)
 {
@@ -564,9 +565,6 @@ DISABLE - Turn off ethernet interface
 static void t515_disable ( struct nic *nic,
 			   struct isapnp_device *isapnp ) {
 
-	nic_disable ( nic );
-
-	/* merge reset an disable */
 	t515_reset(nic);
 
 	/* This is a hack.  Since ltsp worked on my
@@ -645,7 +643,7 @@ static int t515_probe ( struct nic *nic, struct isapnp_device *isapnp ) {
 		}
 
 	}
-	DBG ( "3c515 Resource configuration register 0x%hX, DCR 0x%hX.\n",
+	DBG ( "3c515 Resource configuration register 0x%lX, DCR 0x%hX.\n",
 	      inl(nic->ioaddr + 0x2002), inw(nic->ioaddr + 0x2000) );
 	corkscrew_found_device(nic->ioaddr, nic->irqno, CORKSCREW_ID,
 			       options, nic);
@@ -708,7 +706,8 @@ corkscrew_probe1(int ioaddr, int irq, int product_index __unused,
 	if (checksum != 0x00)
 		printf(" ***INVALID CHECKSUM 0x%hX*** ", checksum);
 
-	printf("%!", nic->node_addr);
+        DBG ( "%s", eth_ntoa ( nic->node_addr ) );
+
 	if (eeprom[16] == 0x11c7) {	/* Corkscrew */
 
 	}
