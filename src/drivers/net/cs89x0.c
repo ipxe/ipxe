@@ -66,6 +66,7 @@
 
   */
 
+#include <gpxe/ethernet.h>
 #include "etherboot.h"
 #include "nic.h"
 #include "isa.h"
@@ -554,7 +555,9 @@ static int cs89x0_probe ( struct nic *nic, struct isa_device *isa ) {
 	for (i=0; i<ETH_ALEN; i++) {
 		nic->node_addr[i] = ((unsigned char *)eeprom_buff)[i];
 	}
-	printf("%!\n", nic->node_addr);
+
+	DBG ( "%s\n", eth_ntoa ( nic->node_addr ) );
+
 #endif
 #ifdef EMBEDDED
 	/* Retrieve and print the ethernet address. */
@@ -562,7 +565,8 @@ static int cs89x0_probe ( struct nic *nic, struct isa_device *isa ) {
 		unsigned char MAC_HW_ADDR[6]={MAC_HW_ADDR_DRV};
 		memcpy(nic->node_addr, MAC_HW_ADDR, 6);
 	}
-	printf("\n%!\n", nic->node_addr);
+
+	DBG ( "%s\n", eth_ntoa ( nic->node_addr ) );
 	
 	eth_adapter_cnf = A_CNF_10B_T | A_CNF_MEDIA_10B_T;
 	eth_auto_neg_cnf = EE_AUTO_NEG_ENABLE | IMM_BIT;
