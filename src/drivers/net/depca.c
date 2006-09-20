@@ -238,6 +238,7 @@
 #include "nic.h"
 #include "isa.h"
 #include "console.h"
+#include <gpxe/ethernet.h>
 
 /*
 ** I/O addresses. Note that the 2k buffer option is not supported in
@@ -641,9 +642,7 @@ static void depca_transmit(
 /**************************************************************************
 DISABLE - Turn off ethernet interface
 ***************************************************************************/
-static void depca_disable ( struct nic *nic, struct isa_device *isa __unused ) {
-	nic_disable ( nic );
-	/* reset and disable merge */
+static void depca_disable ( struct nic *nic ) {
 	depca_reset(nic);
 
 	STOP_DEPCA(nic->ioaddr);
@@ -767,10 +766,9 @@ static int depca_probe ( struct nic *nic, struct isa_device *isa ) {
 	}
 	if (adapter != DEPCA)	/* enable shadow RAM */
 		outb(nicsr |= SHE, nic->ioaddr + DEPCA_NICSR);
-	printf("%s base %#hX, memory [%#hX-%#hX], addr %!",
+	DBG ( "%s base %4.4x, memory [%4.4lx-%4.4lx] addr %s",
 	       adapter_name[adapter], nic->ioaddr, mem_start,
-	       mem_start + mem_len,
-	       nic->node_addr);
+	       mem_start + mem_len, eth_ntoa ( nic->node_addr ) );
 	if (sum != chksum)
 		printf(" (bad checksum)");
 	putchar('\n');
