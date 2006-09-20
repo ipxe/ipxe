@@ -44,6 +44,7 @@
 #include "etherboot.h"
 #include "nic.h"
 #include <gpxe/pci.h>
+#include <gpxe/ethernet.h>
 
 #undef DAVICOM_DEBUG
 #undef DAVICOM_DEBUG_WHERE
@@ -159,7 +160,7 @@ static void davicom_reset(struct nic *nic);
 static void davicom_transmit(struct nic *nic, const char *d, unsigned int t,
 			   unsigned int s, const char *p);
 static int davicom_poll(struct nic *nic, int retrieve);
-static void davicom_disable(struct nic *nic, struct pci_device *pci);
+static void davicom_disable(struct nic *nic);
 #ifdef	DAVICOM_DEBUG
 static void davicom_more(void);
 #endif /* DAVICOM_DEBUG */
@@ -616,7 +617,7 @@ static int davicom_poll(struct nic *nic, int retrieve)
 /*********************************************************************/
 /* eth_disable - Disable the interface                               */
 /*********************************************************************/
-static void davicom_disable ( struct nic *nic, struct pci_device *pci __unused ) {
+static void davicom_disable ( struct nic *nic ) {
 
   whereami("davicom_disable\n");
 
@@ -686,7 +687,7 @@ static int davicom_probe ( struct nic *nic, struct pci_device *pci ) {
   for (i=0; i<ETH_ALEN; i++)
     nic->node_addr[i] = ee_data[20+i];
 
-  printf("Davicom %! at ioaddr %#hX\n", nic->node_addr, ioaddr);
+  DBG ( "Davicom %s at IOADDR %4.4lx\n", eth_ntoa ( nic->node_addr ), ioaddr );
 
   /* initialize device */
   davicom_reset(nic);
