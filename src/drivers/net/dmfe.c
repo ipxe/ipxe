@@ -42,6 +42,7 @@
 #include "nic.h"
 /* to get the PCI support functions, if this is a PCI NIC */
 #include <gpxe/pci.h>
+#include <gpxe/ethernet.h>
 #include "timer.h"
 
 /* #define EDEBUG 1 */
@@ -487,7 +488,7 @@ static int dmfe_probe ( struct nic *nic, struct pci_device *pci ) {
 		nic->node_addr[i] = db->srom[20 + i];
 
 	/* Print out some hardware info */
-	printf("%s: %! at ioaddr %hX\n", pci->name, nic->node_addr, BASE);
+	DBG ( "%s: %s at ioaddr %4.4lx\n", pci->name, eth_ntoa ( nic->node_addr ), BASE );
 
 	/* Set the card as PCI Bus Master */
 	adjust_pci_device(pci);
