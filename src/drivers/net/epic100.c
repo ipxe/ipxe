@@ -6,6 +6,7 @@
 
 #include "etherboot.h"
 #include <gpxe/pci.h>
+#include <gpxe/ethernet.h>
 #include "nic.h"
 #include "timer.h"
 #include "console.h"
@@ -50,7 +51,7 @@ struct epic_tx_desc {
 
 static void	epic100_open(void);
 static void	epic100_init_ring(void);
-static void	epic100_disable(struct nic *nic, struct pci_device *pci);
+static void	epic100_disable(struct nic *nic);
 static int	epic100_poll(struct nic *nic, int retrieve);
 static void	epic100_transmit(struct nic *nic, const char *destaddr,
 				 unsigned int type, unsigned int len, const char *data);
@@ -187,7 +188,7 @@ epic100_probe ( struct nic *nic, struct pci_device *pci ) {
     for (i = 0; i < 3; i++)
 	*ap++ = inw(lan0 + i*4);
 
-    printf(" I/O %#hX %! ", ioaddr, nic->node_addr);
+    DBG ( " I/O %4.4x %s ", ioaddr, eth_ntoa ( nic->node_addr ) );
 
     /* Find the connected MII xcvrs. */
     for (phy = 0, phy_idx = 0; phy < 32 && phy_idx < sizeof(phys); phy++) {
@@ -314,7 +315,7 @@ epic100_transmit(struct nic *nic, const char *destaddr, unsigned int type,
     entry = cur_tx % TX_RING_SIZE;
 
     if ((tx_ring[entry].status & TRING_OWN) == TRING_OWN) {
-	printf("eth_transmit: Unable to transmit. status=%hX. Resetting...\n",
+	printf("eth_transmit: Unable to transmit. status=%4.4lx. Resetting...\n",
 	       tx_ring[entry].status);
 
 	epic100_open();
@@ -353,7 +354,7 @@ epic100_transmit(struct nic *nic, const char *destaddr, unsigned int type,
 	/* Wait */;
 
     if ((le32_to_cpu(tx_ring[entry].status) & TRING_OWN) != 0)
-	printf("Oops, transmitter timeout, status=%hX\n",
+	printf("Oops, transmitter timeout, status=%4.4lX\n",
 	    tx_ring[entry].status);
 }
 
@@ -417,8 +418,7 @@ epic100_poll(struct nic *nic, int retrieve)
 }
 
 
-static void epic100_disable ( struct nic *nic __unused,
-			      struct pci_device *pci __unused ) {
+static void epic100_disable ( struct nic *nic __unused ) {
 	/* Soft reset the chip. */
 	outl(GC_SOFT_RESET, genctl);
 }
