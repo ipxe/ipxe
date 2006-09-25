@@ -39,15 +39,13 @@
 *    Indent Options: indent -kr -i8
 ***************************************************************************/
 
-/* to get some global routines like printf */
 #include "etherboot.h"
-/* to get the interface to the body of the program */
 #include "nic.h"
-/* to get the PCI support functions, if this is a PCI NIC */
 #include <gpxe/pci.h>
-/* Include the time functions */
+#include <gpxe/ethernet.h>
 #include "timer.h"
 #include "mii.h"
+
 /* void hex_dump(const char *data, const unsigned int len); */
 
 /* Etherboot Specific definations */
@@ -659,6 +657,7 @@ static void pcnet32_irq(struct nic *nic __unused, irq_action_t action __unused)
   }
 }
 
+
 /**************************************************************************
 PROBE - Look for an adapter, this routine's visible to the outside
 You should omit the last argument struct pci_device * for a non-PCI NIC
@@ -668,8 +667,8 @@ static int pcnet32_probe ( struct nic *nic, struct pci_device *pci ) {
 	int i, media;
 	int fdx, mii, fset, dxsuflo, ltint;
 	int chip_version;
-	char *chipname;
 	struct pcnet32_access *a = NULL;
+	char *chipname;
 	u8 promaddr[6];
 	int shared = 1;
 
@@ -788,7 +787,7 @@ static int pcnet32_probe ( struct nic *nic, struct pci_device *pci ) {
 		ltint = 1;
 	}
 
-	dprintf(("%s at %hX,", chipname, ioaddr));
+	DBG ( "%s at %hX,", chipname, ioaddr );
 
 	/* read PROM address */
 	for (i = 0; i < 6; i++)
@@ -798,9 +797,10 @@ static int pcnet32_probe ( struct nic *nic, struct pci_device *pci ) {
 	for (i = 0; i < ETH_ALEN; i++) {
 		nic->node_addr[i] = promaddr[i];
 	}
+
 	/* Print out some hardware info */
-	printf("%s: %! at ioaddr 0x%hX, ", chipname, nic->node_addr,
-	       ioaddr);
+	DBG ( "%s: IO Addr 0x%hX, MAC Addr %s\n ", chipname, ioaddr,
+	      eth_ntoa ( nic->node_addr ) );
 
 	/* Set to pci bus master */
 	adjust_pci_device(pci);
@@ -866,7 +866,15 @@ static int pcnet32_probe ( struct nic *nic, struct pci_device *pci ) {
 		printf("No access methods\n");
 		return 0;
 	}
-	lp->a = *a;
+
+	//  lp->a = *a;
+	//  Causes a loader:
+	//     bin/blib.a(pcnet32.o)(.text+0x6b6): In function `pcnet32_probe':
+	//     drivers/net/pcnet32.c:871: undefined reference to `memcpy'
+	//     make: *** [bin/pcnet32.dsk.tmp] Error 1
+	//  So we do:
+	memcpy ( &lp->a, a, sizeof ( a ) );
+	//   To explicity call memcpy.
 
 	/* detect special T1/E1 WAN card by checking for MAC address */
 	if (nic->node_addr[0] == 0x00 && nic->node_addr[1] == 0xe0
