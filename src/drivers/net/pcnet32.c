@@ -873,7 +873,7 @@ static int pcnet32_probe ( struct nic *nic, struct pci_device *pci ) {
 	//     drivers/net/pcnet32.c:871: undefined reference to `memcpy'
 	//     make: *** [bin/pcnet32.dsk.tmp] Error 1
 	//  So we do:
-	memcpy ( &lp->a, a, sizeof ( a ) );
+	memcpy ( &lp->a, a, sizeof ( lp->a ) );
 	//   To explicity call memcpy.
 
 	/* detect special T1/E1 WAN card by checking for MAC address */
