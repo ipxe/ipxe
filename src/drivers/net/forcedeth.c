@@ -50,6 +50,7 @@
 /* to get the PCI support functions, if this is a PCI NIC */
 #include <gpxe/pci.h>
 /* Include timer support functions */
+#include <gpxe/ethernet.h>
 #include "timer.h"
 #include "mii.h"
 
@@ -1304,7 +1305,8 @@ static int forcedeth_probe ( struct nic *nic, struct pci_device *pci ) {
 		get_random_bytes(&dev->dev_addr[3], 3);
 	}
 #endif
-	printf("%s: MAC Address %!, ", pci->name, nic->node_addr);
+
+	DBG ( "%s: MAC Address %s\n", pci->name, eth_ntoa ( nic->node_addr ) );
 
  	/* disable WOL */
 	writel(0, base + NvRegWakeUpFlags);
