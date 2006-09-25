@@ -29,6 +29,7 @@
 #include "nic.h"
 /* to get the PCI support functions, if this is a PCI NIC */
 #include <gpxe/pci.h>
+#include <gpxe/ethernet.h>
 
 /* Condensed operations for readability. */
 #define virt_to_le32desc(addr)  cpu_to_le32(virt_to_bus(addr))
@@ -691,7 +692,7 @@ static int mtd_probe ( struct nic *nic, struct pci_device *pci ) {
         return 0;
     }
 
-    /*    DBG ( "%s: ioaddr %#hX, addr %!\n",mtdx.nic_name, mtdx.ioaddr, nic->node_addr ); */
+    DBG ( "%s: ioaddr %4.4x MAC %s\n", mtdx.nic_name, mtdx.ioaddr, eth_ntoa ( nic->node_addr ) );
 
     /* Reset the chip to erase previous misconfiguration. */
     outl(0x00000001, mtdx.ioaddr + BCR);
