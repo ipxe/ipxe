@@ -32,6 +32,7 @@ SMC8416 PIO support added by Andrew Bettison (andrewb@zip.com.au) on 4/3/02
 #include "etherboot.h"
 #include "nic.h"
 #include "ns8390.h"
+#include <gpxe/ethernet.h>
 #ifdef	INCLUDE_NS8390
 #include <gpxe/pci.h>
 #else
@@ -588,7 +589,6 @@ static int ns8390_poll(struct nic *nic, int retrieve)
 NS8390_DISABLE - Turn off adapter
 **************************************************************************/
 static void ns8390_disable ( struct nic *nic ) {
-	/* reset and disable merge */
 	ns8390_reset(nic);
 }
 
@@ -687,15 +687,16 @@ static int eth_probe (struct dev *dev, unsigned short *probe_addrs __unused)
 	for (i=0; i<ETH_ALEN; i++) {
 		nic->node_addr[i] = inb(i+eth_asic_base+WD_LAR);
 	}
-	printf("\n%s base %#hx", brd->name, eth_asic_base);
+	DBG ( "\n%s base %4.4x", brd->name, eth_asic_base );
 	if (eth_flags & FLAG_790) {
 #ifdef	WD_790_PIO
-		printf(", PIO mode, addr %!\n", nic->node_addr);
+		DBG ( ", PIO mode, addr %s\n", eth_ntoa ( nic->node_addr ) );
 		eth_bmem = 0;
 		eth_flags |= FLAG_PIO;		/* force PIO mode */
 		outb(0, eth_asic_base+WD_MSR);
 #else
-		printf(", memory %#x, addr %!\n", eth_bmem, nic->node_addr);
+		DBG ( ", Memory %x, MAC Addr %s\n", eth_bmem, eth_ntoa ( nic->node_addr) );
+
 		outb(WD_MSR_MENB, eth_asic_base+WD_MSR);
 		outb((inb(eth_asic_base+0x04) |
 			0x80), eth_asic_base+0x04);
@@ -706,7 +707,9 @@ static int eth_probe (struct dev *dev, unsigned short *probe_addrs __unused)
 			~0x80), eth_asic_base+0x04);
 #endif
 	} else {
-		printf(", memory %#x, addr %!\n", eth_bmem, nic->node_addr);
+
+		DBG (", Memory %x, MAC Addr %s\n", eth_bmem, eth_ntoa ( nic->node_addr) );
+
 		outb(((unsigned)(eth_bmem >> 13) & 0x3F) | 0x40, eth_asic_base+WD_MSR);
 	}
 	if (eth_flags & FLAG_16BIT) {
@@ -818,16 +821,17 @@ static int eth_probe (struct dev *dev, unsigned short *probe_addrs __unused)
 
                 outb(_3COM_CR_EALO | _3COM_CR_XSEL, eth_asic_base + _3COM_CR);
 		nic->ioaddr = eth_nic_base;
-                printf("\n3Com 3c503 base %#hx, ", eth_nic_base);
+                DBG ( "\n3Com 3c503 base %4.4x, ", eth_nic_base );
                 if (eth_flags & FLAG_PIO)
-			printf("PIO mode");
+			DBG ( "PIO mode" );
                 else
-			printf("memory %#x", eth_bmem);
+			DBG ( "memory %4.4x", eth_bmem );
                 for (i=0; i<ETH_ALEN; i++) {
                         nic->node_addr[i] = inb(eth_nic_base+i);
                 }
-                printf(", %s, addr %!\n", nic->flags ? "AUI" : "internal xcvr",
-			nic->node_addr);
+                DBG ( ", %s, MAC Addr %s\n", nic->flags ? "AUI" : "internal xcvr",
+		      eth_ntoa ( nic->node_addr ) );
+
                 outb(_3COM_CR_XSEL, eth_asic_base + _3COM_CR);
         /*
          * Initialize GA configuration register. Set bank and enable shared
@@ -923,9 +927,9 @@ static int eth_probe (struct dev *dev, unsigned short *probe_addrs __unused)
 			nic->node_addr[i] = romdata[i + ((eth_flags & FLAG_16BIT) ? i : 0)];
 		}
 		nic->ioaddr = eth_nic_base;
-		printf("\nNE%c000 base %#hx, addr %!\n",
-			(eth_flags & FLAG_16BIT) ? '2' : '1', eth_nic_base,
-			nic->node_addr);
+		DBG ( "\nNE%c000 base %4.4x, MAC Addr %s\n",
+		      (eth_flags & FLAG_16BIT) ? '2' : '1', eth_nic_base,
+		      eth_ntoa ( nic->node_addr ) );
 	}
 }
 #endif
