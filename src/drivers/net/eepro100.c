@@ -637,7 +637,7 @@ static int eepro100_probe ( struct nic *nic, struct pci_device *p ) {
 		nic->node_addr[i] =  (eeprom[i/2] >> (8*(i&1))) & 0xff;
 	}
 
-	DBG ("Ethernet addr: %s\n", eth_ntoa ( nic->node_addr ) );
+	DBG ( "Ethernet addr: %s\n", eth_ntoa ( nic->node_addr ) );
 
 	if (sum != 0xBABA)
 		printf("eepro100: Invalid EEPROM checksum %#hX, "
