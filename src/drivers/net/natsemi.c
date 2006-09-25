@@ -55,7 +55,9 @@
 
 #include "etherboot.h"
 #include "nic.h"
+#include "pcibios.h"
 #include <gpxe/pci.h>
+#include <gpxe/ethernet.h>
 
 /* defines */
 
@@ -222,7 +224,7 @@ static void natsemi_set_rx_mode(struct nic *nic);
 static void natsemi_check_duplex(struct nic *nic);
 static void natsemi_transmit(struct nic *nic, const char *d, unsigned int t, unsigned int s, const char *p);
 static int  natsemi_poll(struct nic *nic, int retrieve);
-static void natsemi_disable(struct nic *nic, struct pci_device *pci);
+static void natsemi_disable(struct nic *nic);
 static void natsemi_irq(struct nic *nic, irq_action_t action);
 
 /* 
@@ -244,7 +246,7 @@ natsemi_probe ( struct nic *nic, struct pci_device *pci ) {
 
     int i;
     int prev_eedata;
-    u32 tmp;
+    uint32_t tmp;
 
     if (pci->ioaddr == 0)
         return 0;
@@ -266,7 +268,7 @@ natsemi_probe ( struct nic *nic, struct pci_device *pci ) {
      * in PCI config space.  Some boards apparently need
      * to be brought to D0 in this manner.
      */
-    pci_read_config_dword(pci, PCIPM, &tmp);
+    pci_read_config_dword ( pci, PCIPM, &tmp );
     if (tmp & (0x03|0x100)) {
 	/* D0 state, disable PME assertion */
 	u32 newtmp = tmp & ~(0x03|0x100);
@@ -283,9 +285,9 @@ natsemi_probe ( struct nic *nic, struct pci_device *pci ) {
 	prev_eedata = eedata;
     }
 
-    printf("\nnatsemi_probe: MAC addr %! at ioaddr %#hX\n",
-           nic->node_addr, ioaddr);
-    printf("natsemi_probe: Vendor:%#hX Device:%#hX\n", vendor, dev_id);
+    DBG ( "\nnatsemi_probe: MAC addr %s at ioaddr %4.4lx\n",
+	  eth_ntoa ( nic->node_addr ), ioaddr);
+    DBG ( "natsemi_probe: Vendor:%#hX Device:%#hX\n", vendor, dev_id );
     
     /* Reset the chip to erase any previous misconfiguration. */
     outl(ChipReset, ioaddr + ChipCmd);
@@ -507,7 +509,7 @@ natsemi_init_txd(struct nic *nic __unused)
     /* load Transmit Descriptor Register */
     outl(virt_to_bus(&txd), ioaddr + TxRingPtr); 
     if (natsemi_debug > 1)
-        printf("natsemi_init_txd: TX descriptor register loaded with: %X\n", 
+        printf("natsemi_init_txd: TX descriptor register loaded with: %lx\n", 
                inl(ioaddr + TxRingPtr));
 }
 
@@ -533,7 +535,7 @@ natsemi_init_rxd(struct nic *nic __unused)
         rxd[i].cmdsts = (u32) RX_BUF_SIZE;
         rxd[i].bufptr = virt_to_bus(&rxb[i*RX_BUF_SIZE]);
         if (natsemi_debug > 1)
-            printf("natsemi_init_rxd: rxd[%d]=%X link=%X cmdsts=%X bufptr=%X\n", 
+            printf("natsemi_init_rxd: rxd[%d]=%p link=%X cmdsts=%X bufptr=%4.4x\n", 
                    i, &rxd[i], rxd[i].link, rxd[i].cmdsts, rxd[i].bufptr);
     }
 
@@ -541,7 +543,7 @@ natsemi_init_rxd(struct nic *nic __unused)
     outl(virt_to_bus(&rxd[0]), ioaddr + RxRingPtr);
 
     if (natsemi_debug > 1)
-        printf("natsemi_init_rxd: RX descriptor register loaded with: %X\n", 
+        printf("natsemi_init_rxd: RX descriptor register loaded with: %lx\n", 
                inl(ioaddr + RxRingPtr));
 }
 
@@ -611,7 +613,7 @@ natsemi_transmit(struct nic  *nic,
     /* load Transmit Descriptor Register */
     outl(virt_to_bus(&txd), ioaddr + TxRingPtr);
     if (natsemi_debug > 1)
-        printf("natsemi_transmit: TX descriptor register loaded with: %X\n", 
+        printf("natsemi_transmit: TX descriptor register loaded with: %lx\n", 
                inl(ioaddr + TxRingPtr));
 
     memcpy(txb, d, ETH_ALEN);
@@ -722,7 +724,7 @@ natsemi_poll(struct nic *nic, int retrieve)
  */
 
 static void
-natsemi_disable ( struct nic *nic, struct pci_device *pci __unused ) {
+natsemi_disable ( struct nic *nic ) {
 
     natsemi_init(nic);
 
