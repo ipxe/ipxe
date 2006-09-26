@@ -31,13 +31,11 @@ has 34 pins, the top row of 2 are not used.
  * your option) any later version.
  */
 
-/* to get some global routines like printf */
 #include "etherboot.h"
-/* to get the interface to the body of the program */
 #include "nic.h"
 #include "isa.h"
-/* we use timer2 for microsecond waits */
 #include "timer.h"
+#include <gpxe/ethernet.h>
 
 /* Different 82595 chips */
 #define LAN595		0
@@ -463,7 +461,6 @@ static void eepro_transmit(
 DISABLE - Turn off ethernet interface
 ***************************************************************************/
 static void eepro_disable ( struct nic *nic, struct isa_device *isa __unused ) {
-	nic_disable ( nic );
 	eepro_sw2bank0(nic->ioaddr);	/* Switch to bank 0 */
 	/* Flush the Tx and disable Rx */
 	outb(STOP_RCV_CMD, nic->ioaddr);
@@ -596,7 +593,9 @@ static int eepro_probe ( struct nic *nic, struct isa_device *isa ) {
 	for (i = 0; i < ETH_ALEN; i++) {
 		nic->node_addr[i] = station_addr.caddr[i];
 	}
-	DBG("%s ioaddr %#hX, addr %!", isa->name, nic->ioaddr, nic->node_addr);
+
+	DBG ( "%s ioaddr %#hX, addr %s", isa->name, nic->ioaddr, eth_ntoa ( nic->node_addr ) );
+
 	mem_start = RCV_LOWER_LIMIT << 8;
 	if ((mem_end & 0x3F) < 3 || (mem_end & 0x3F) > 29)
 		mem_end = RCV_UPPER_LIMIT << 8;
