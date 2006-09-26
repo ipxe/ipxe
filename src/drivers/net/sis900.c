@@ -44,10 +44,10 @@
 /* Includes */
 
 #include "etherboot.h"
-#include "nic.h"
-#include <gpxe/pci.h>
-#include "timer.h"
 #include "dev.h"
+#include <gpxe/pci.h>
+#include "nic.h"
+#include "timer.h"
 
 #include "sis900.h"
 
@@ -121,15 +121,16 @@ static struct mii_phy {
 } mii;
 
 
+
+#if 0
 // PCI to ISA bridge for SIS640E access
 static struct pci_device_id pci_isa_bridge_list[] = {
 	{ .vendor = 0x1039, .device = 0x0008,
 		.name = "SIS 85C503/5513 PCI to ISA bridge"},
 };
 
-PCI_DRIVER ( sis_bridge_pci_driver, pci_isa_bridge_list, PCI_NO_CLASS );
+PCI_DRIVER( sis_bridge_pci_driver, pci_isa_bridge_list, PCI_NO_CLASS );
 
-#if 0
 static struct device_driver sis_bridge_driver = {
     .name = "SIS ISA bridge",
     .bus_driver = &pci_driver,
@@ -162,7 +163,7 @@ static void sis900_transmit(struct nic *nic, const char *d,
                             unsigned int t, unsigned int s, const char *p);
 static int  sis900_poll(struct nic *nic, int retrieve);
 
-static void sis900_disable(struct nic *nic, struct pci_device *pci);
+static void sis900_disable(struct nic *nic);
 
 static void sis900_irq(struct nic *nic, irq_action_t action);
 
@@ -251,7 +252,9 @@ static int sis630e_get_mac_addr(struct pci_device * pci_dev __unused, struct nic
 {
 	u8 reg;
 	int i;
+#if 0
 	struct bus_loc bus_loc;
+#endif
 	union {
 	    struct bus_dev bus_dev;
 	    struct pci_device isa_bridge;
@@ -376,9 +379,7 @@ static int sis900_probe ( struct nic *nic, struct pci_device *pci ) {
     if (revision == SIS630ET_900_REV)
 	outl(ACCESSMODE | inl(ioaddr + cr), ioaddr + cr);
 
-    printf("\nsis900_probe: MAC addr %! at ioaddr %#hX\n",
-           nic->node_addr, ioaddr);
-    printf("sis900_probe: Vendor:%#hX Device:%#hX\n", vendor, dev_id);
+    DBG( "sis900_probe: Vendor:%#hX Device:%#hX\n", vendor, dev_id );
 
     /* probe for mii transceiver */
     /* search for total of 32 possible mii phy addresses */
@@ -693,7 +694,7 @@ sis900_init_rxfilter(struct nic *nic)
         outl(w, ioaddr + rfdr);
 
         if (sis900_debug > 0)
-            printf("sis900_init_rxfilter: Receive Filter Addrss[%d]=%X\n",
+            printf("sis900_init_rxfilter: Receive Filter Addrss[%d]=%lX\n",
                    i, inl(ioaddr + rfdr));
     }
 
@@ -722,7 +723,7 @@ sis900_init_txd(struct nic *nic __unused)
     /* load Transmit Descriptor Register */
     outl(virt_to_bus(&txd), ioaddr + txdp); 
     if (sis900_debug > 0)
-        printf("sis900_init_txd: TX descriptor register loaded with: %X\n", 
+        printf("sis900_init_txd: TX descriptor register loaded with: %lX\n", 
                inl(ioaddr + txdp));
 }
 
@@ -749,7 +750,7 @@ sis900_init_rxd(struct nic *nic __unused)
         rxd[i].cmdsts = (u32) RX_BUF_SIZE;
         rxd[i].bufptr = virt_to_bus(&rxb[i*RX_BUF_SIZE]);
         if (sis900_debug > 0)
-            printf("sis900_init_rxd: rxd[%d]=%X link=%X cmdsts=%X bufptr=%X\n", 
+            printf("sis900_init_rxd: rxd[%d]=%p link=%X cmdsts=%X bufptr=%X\n", 
                    i, &rxd[i], rxd[i].link, rxd[i].cmdsts, rxd[i].bufptr);
     }
 
@@ -757,7 +758,7 @@ sis900_init_rxd(struct nic *nic __unused)
     outl(virt_to_bus(&rxd[0]), ioaddr + rxdp);
 
     if (sis900_debug > 0)
-        printf("sis900_init_rxd: RX descriptor register loaded with: %X\n", 
+        printf("sis900_init_rxd: RX descriptor register loaded with: %lX\n", 
                inl(ioaddr + rxdp));
 
 }
@@ -1110,7 +1111,7 @@ sis900_transmit(struct nic  *nic,
     /* load Transmit Descriptor Register */
     outl(virt_to_bus(&txd), ioaddr + txdp); 
     if (sis900_debug > 1)
-        printf("sis900_transmit: TX descriptor register loaded with: %X\n", 
+        printf("sis900_transmit: TX descriptor register loaded with: %lX\n", 
                inl(ioaddr + txdp));
 
     memcpy(txb, d, ETH_ALEN);
@@ -1227,7 +1228,7 @@ sis900_poll(struct nic *nic, int retrieve)
  */
 
 static void
-sis900_disable ( struct nic *nic, struct pci_device *pci __unused ) {
+sis900_disable ( struct nic *nic ) {
 
     sis900_init(nic);
 
