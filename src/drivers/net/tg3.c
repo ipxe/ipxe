@@ -15,6 +15,7 @@
 #include "etherboot.h"
 #include "nic.h"
 #include <gpxe/pci.h>
+#include <gpxe/ethernet.h>
 #include "timer.h"
 #include "string.h"
 #include "tg3.h"
@@ -1465,8 +1466,8 @@ static int tg3_stop_block(struct tg3 *tp, unsigned long ofs, uint32_t enable_bit
 	}
 
 	if (i == MAX_WAIT_CNT) {
-		printf("tg3_stop_block timed out, ofs=%lx enable_bit=%x\n",
-		       ofs, enable_bit);
+		printf( "tg3_stop_block timed out, ofs=%#lx enable_bit=%3lx\n",
+		       ofs, enable_bit );
 		return -ENODEV;
 	}
 
@@ -1651,8 +1652,8 @@ static int tg3_restart_fw(struct tg3 *tp, uint32_t state)
 	}
 	if (i >= 100000 &&
 		    !(tp->tg3_flags2 & TG3_FLG2_SUN_5704)) {
-		printf("Firmware will not restart magic=%x\n",
-			val);
+		printf ( "Firmware will not restart magic=%#lx\n",
+			val );
 		return -ENODEV;
 	}
 	if (!(tp->tg3_flags & TG3_FLAG_ENABLE_ASF)) {
@@ -3311,7 +3312,8 @@ static int tg3_probe ( struct nic *nic, struct pci_device *pdev ) {
 		printf("Could not obtain valid ethernet address, aborting.\n");
 		goto err_out_iounmap;
 	}
-	printf("Ethernet addr: %!\n", nic->node_addr);
+
+	DBG ( "Ethernet addr: %s\n", eth_ntoa ( nic->node_addr ) );
 
 	tg3_setup_dma(tp);
 

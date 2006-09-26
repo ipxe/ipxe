@@ -65,14 +65,6 @@ struct mii_if_info {
 	unsigned int full_duplex:1;	/* is full duplex? */
 };
 
-//#define EDEBUG
-#ifdef EDEBUG
-#define dprintf(x) printf x
-#else
-#define dprintf(x)
-#endif
-
-
 /* Set the mtu */
 static int mtu = 1514;
 
@@ -319,10 +311,10 @@ static void check_duplex(struct nic *nic)
 	duplex = (negotiated & 0x0100) || (negotiated & 0x01C0) == 0x0040;
 	if (sdc->mii_if.full_duplex != duplex) {
 		sdc->mii_if.full_duplex = duplex;
-		dprintf(("%s: Setting %s-duplex based on MII #%d "
+		DBG ("%s: Setting %s-duplex based on MII #%d "
 			 "negotiated capability %4.4x.\n", sdc->nic_name,
 			 duplex ? "full" : "half", sdc->phys[0],
-			 negotiated));
+			 negotiated );
 		outw(inw(BASE + MACCtrl0) | duplex ? 0x20 : 0,
 		     BASE + MACCtrl0);
 	}
@@ -424,11 +416,11 @@ static void sundance_reset(struct nic *nic)
 	txb[4] = nic->node_addr[4];
 	txb[5] = nic->node_addr[5];
 
-	dprintf(("%s: Done sundance_reset, status: Rx %hX Tx %hX "
-		 "MAC Control %hX, %hX %hX\n",
-		 sdc->nic_name, (int) inl(BASE + RxStatus),
-		 (int) inw(BASE + TxStatus), (int) inl(BASE + MACCtrl0),
-		 (int) inw(BASE + MACCtrl1), (int) inw(BASE + MACCtrl0)));
+	DBG ( "%s: Done sundance_reset, status: Rx %hX Tx %hX "
+	      "MAC Control %hX, %hX %hX\n",
+	      sdc->nic_name, (int) inl(BASE + RxStatus),
+	      (int) inw(BASE + TxStatus), (int) inl(BASE + MACCtrl0),
+	      (int) inw(BASE + MACCtrl1), (int) inw(BASE + MACCtrl0) );
 }
 
 /**************************************************************************
@@ -477,7 +469,7 @@ static int sundance_poll(struct nic *nic, int retreive)
 	pkt_len = frame_status & 0x1fff;
 
 	if (frame_status & 0x001f4000) {
-		dprintf(("Polling frame_status error\n"));	/* Do we really care about this */
+		DBG ( "Polling frame_status error\n" );	/* Do we really care about this */
 	} else {
 		if (pkt_len < rx_copybreak) {
 			/* FIXME: What should happen Will this ever occur */
@@ -615,9 +607,12 @@ static int sundance_probe ( struct nic *nic, struct pci_device *pci ) {
 	sdc->mtu = mtu;
 
 	pci_read_config_byte(pci, PCI_REVISION_ID, &sdc->pci_rev_id);
-	dprintf(("Device revision id: %hx\n", sdc->pci_rev_id));
+
+	DBG ( "Device revision id: %hx\n", sdc->pci_rev_id );
+
 	/* Print out some hardware info */
-	printf("%s: %! at ioaddr %hX, ", pci->name, nic->node_addr, BASE);
+	DBG ( "%s: %s at ioaddr %hX, ", pci->name, nic->node_addr, BASE);
+
 	sdc->mii_preamble_required = 0;
 	if (1) {
 		int phy, phy_idx = 0;
@@ -631,8 +626,8 @@ static int sundance_probe ( struct nic *nic, struct pci_device *pci ) {
 				    mdio_read(nic, phy, MII_ADVERTISE);
 				if ((mii_status & 0x0040) == 0)
 					sdc->mii_preamble_required++;
-				dprintf
-				    (("%s: MII PHY found at address %d, status " "%hX advertising %hX\n", sdc->nic_name, phy, mii_status, sdc->mii_if.advertising));
+				DBG 
+				    ( "%s: MII PHY found at address %d, status " "%hX advertising %hX\n", sdc->nic_name, phy, mii_status, sdc->mii_if.advertising );
 			}
 		}
 		sdc->mii_preamble_required--;
@@ -695,9 +690,9 @@ static int sundance_probe ( struct nic *nic, struct pci_device *pci ) {
 	}
 
 	/* Reset the chip to erase previous misconfiguration */
-	dprintf(("ASIC Control is %x.\n", inl(BASE + ASICCtrl)));
+	DBG ( "ASIC Control is %#lx\n", inl(BASE + ASICCtrl) );
 	outw(0x007f, BASE + ASICCtrl + 2);
-	dprintf(("ASIC Control is now %x.\n", inl(BASE + ASICCtrl)));
+	DBG ( "ASIC Control is now %#lx.\n", inl(BASE + ASICCtrl) );
 
 	sundance_reset(nic);
 	if (sdc->an_enable) {
