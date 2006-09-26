@@ -35,6 +35,7 @@
 #define PRINTK2(args...)
 #endif
 
+#include <gpxe/ethernet.h>
 #include "etherboot.h"
 #include "nic.h"
 #include "isa.h"
@@ -899,10 +900,8 @@ static int smc9000_probe ( struct nic *nic, struct isa_device *isa ) {
    printf("%s rev:%d I/O port:%hX Interface:%s RAM:%d bytes \n",
 	  version_string, revision & 0xF,
 	  nic->ioaddr, if_string, memory );
-   /*
-    * Print the Ethernet address
-    */
-   printf("Ethernet MAC address: %!\n", nic->node_addr);
+
+   DBG ( "Ethernet MAC address: %s\n", eth_ntoa ( nic->node_addr ) );
 
    SMC_SELECT_BANK(nic->ioaddr, 0);
 
