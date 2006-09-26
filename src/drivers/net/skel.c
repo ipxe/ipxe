@@ -10,12 +10,10 @@ Skeleton NIC driver for Etherboot
  * your option) any later version.
  */
 
-/* to get some global routines like printf */
 #include "etherboot.h"
-/* to get the interface to the body of the program */
 #include "nic.h"
-/* Drag in support for whichever bus(es) we want for this NIC */
 #include <gpxe/pci.h>
+#include <gpxe/ethernet.h>
 #include "isa.h"
 #include "eisa.h"
 #include "isapnp.h"
@@ -211,8 +209,7 @@ static int skel_pci_probe ( struct nic *nic, struct pci_device *pci ) {
 	return 1;
 }
 
-static void skel_pci_disable ( struct nic *nic __unused,
-			       struct pci_device *pci __unused ) {
+static void skel_pci_disable ( struct nic *nic __unused ) {
 	/* Reset the card to its initial state, disable DMA and
 	 * interrupts
 	 */
