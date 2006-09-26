@@ -28,14 +28,13 @@ static int prism2_pci_probe ( struct nic *nic, struct pci_device *pci ) {
   pci_read_config_dword( pci, PRISM2_PCI_MEM_BASE, &membase);
   membase &= PCI_BASE_ADDRESS_MEM_MASK;
   hw->membase = (uint32_t) phys_to_virt(membase);
-  printf ( "Prism2.5 has registers at %#x\n", hw->membase );
+  printf ( "Prism2.5 has registers at %#lx\n", hw->membase );
   nic->ioaddr = hw->membase;
 
   return prism2_probe ( nic, hw );
 }
 
-static void prism2_pci_disable ( struct nic *nic,
-				 struct pci_device *pci __unused ) {
+static void prism2_pci_disable ( struct nic *nic ) {
   prism2_disable ( nic );
 }
 

@@ -50,8 +50,8 @@ static int prism2_find_plx ( hfa384x_t *hw, struct pci_device *p )
   /* Fill out hw structure */
   hw->membase = attr_mem;
   hw->iobase = iobase;
-  printf ( "PLX9052 has local config registers at %#hx\n", plx_lcr );
-  printf ( "Prism2 has attribute memory at %#x and I/O base at %#hx\n", attr_mem, iobase );
+  printf ( "PLX9052 has local config registers at %#lx\n", plx_lcr );
+  printf ( "Prism2 has attribute memory at %#lx and I/O base at %#lx\n", attr_mem, iobase );
 
   /* Search for CIS strings */
   printf ( "Searching for PCMCIA card...\n" );
@@ -90,8 +90,7 @@ static int prism2_plx_probe ( struct nic *nic, struct pci_device *pci ) {
   return prism2_probe ( nic, hw );
 }
 
-static void prism2_plx_disable ( struct nic *nic,
-				 struct pci_device *pci __unused ) {
+static void prism2_plx_disable ( struct nic *nic ) {
   prism2_disable ( nic );
 }
 

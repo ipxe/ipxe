@@ -13,12 +13,10 @@ $Id$
  * your option) any later version.
  */
 
-/* to get some global routines like printf */
 #include "etherboot.h"
-/* to get the interface to the body of the program */
 #include "nic.h"
-/* to get the PCI support functions, if this is a PCI NIC */
 #include <gpxe/pci.h>
+#include <gpxe/ethernet.h>
 
 /*
  * Hard-coded SSID
@@ -770,9 +768,10 @@ static int prism2_probe ( struct nic *nic, hfa384x_t *hw ) {
   hfa384x_setreg(hw, 0, HFA384x_INTEN); /* Disable interrupts */
   hfa384x_setreg(hw, 0xffff, HFA384x_EVACK); /* Acknowledge any spurious events */
 
+  DBG ( "MAC address %s\n", eth_ntoa ( nic->node_addr ) );
+
   /* Retrieve MAC address (and fill out nic->node_addr) */
   hfa384x_drvr_getconfig ( hw, HFA384x_RID_CNFOWNMACADDR, nic->node_addr, HFA384x_RID_CNFOWNMACADDR_LEN );
-  printf ( "MAC address %!\n", nic->node_addr );
 
   /* Prepare card for autojoin */
   /* This procedure is reverse-engineered from a register-level trace of the Linux driver's join process */
@@ -841,7 +840,9 @@ static int prism2_probe ( struct nic *nic, hfa384x_t *hw ) {
     
   /* Retrieve BSSID and print Connected message */
   result = hfa384x_drvr_getconfig(hw, HFA384x_RID_CURRENTBSSID, hw->bssid, WLAN_BSSID_LEN);
-  printf ( "Link connected (BSSID %! - MAC address %!)\n", hw->bssid, nic->node_addr );
+
+  DBG ( "Link connected (BSSID %s - ", eth_ntoa ( hw->bssid ) );
+  DBG ( " MAC address %s)\n", eth_ntoa (nic->node_addr ) );
   
   /* point to NIC specific routines */
   nic->nic_op	= &prism2_operations;
