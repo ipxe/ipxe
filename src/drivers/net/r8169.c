@@ -44,12 +44,10 @@
 *    Indent Options: indent -kr -i8
 ***************************************************************************/
 
-/* to get some global routines like printf */
 #include "etherboot.h"
-/* to get the interface to the body of the program */
 #include "nic.h"
-/* to get the PCI support functions, if this is a PCI NIC */
 #include <gpxe/pci.h>
+#include <gpxe/ethernet.h>
 #include "timer.h"
 
 #define drv_version "v1.6"
@@ -58,12 +56,6 @@
 #define HZ 1000
 
 static u32 ioaddr;
-
-#ifdef EDEBUG
-#define dprintf(x) printf x
-#else
-#define dprintf(x)
-#endif
 
 /* Condensed operations for readability. */
 #define virt_to_le32desc(addr)  cpu_to_le32(virt_to_bus(addr))
@@ -84,10 +76,10 @@ static u32 ioaddr;
 #ifdef RTL8169_DEBUG
 #define assert(expr) \
                if(!(expr)) { printk( "Assertion failed! %s,%s,%s,line=%d\n", #expr,__FILE__,__FUNCTION__,__LINE__); }
-#define DBG_PRINT( fmt, args...)   printk("r8169: " fmt, ## args);
+#define DBG_PRINTF( fmt, args...)   printk("r8169: " fmt, ## args);
 #else
 #define assert(expr) do {} while (0)
-#define DBG_PRINT( fmt, args...)   ;
+#define DBG_PRINTF( fmt, args...)   ;
 #endif				// end of #ifdef RTL8169_DEBUG
 
 /* media options 
@@ -436,6 +428,7 @@ int RTL8169_READ_GMII_REG(unsigned long ioaddr, int RegAddr)
 }
 
 
+#if 0
 static void mdio_write(int RegAddr, int value)
 {
 	int i;
@@ -471,13 +464,15 @@ static int mdio_read(int RegAddr)
 	}
 	return value;
 }
+#endif
 
 #define IORESOURCE_MEM 0x00000200
 
 static int rtl8169_init_board(struct pci_device *pdev)
 {
 	int i;
-	unsigned long mmio_start, mmio_end, mmio_flags, mmio_len;
+//	unsigned long mmio_end, mmio_flags
+        unsigned long mmio_start, mmio_len;
 
 	adjust_pci_device(pdev);
 
@@ -556,9 +551,8 @@ static int rtl8169_init_board(struct pci_device *pdev)
 			goto match;
 		}
 	/* if unknown chip, assume array element #0, original RTL-8169 in this case */
-	dprintf(("PCI device: unknown chip version, assuming RTL-8169\n"));
-	dprintf(("PCI device: TxConfig = 0x%hX\n",
-		 (unsigned long) RTL_R32(TxConfig)));
+	DBG ( "PCI device: unknown chip version, assuming RTL-8169\n" );
+	DBG ( "PCI device: TxConfig = %#lX\n", ( unsigned long ) RTL_R32 ( TxConfig ) );
 
 	tpc->chipset = 0;
 	return 1;
@@ -755,11 +749,11 @@ static void rtl8169_hw_start(struct nic *nic)
 	if (tpc->mcfg == MCFG_METHOD_2 || tpc->mcfg == MCFG_METHOD_3) {
 		RTL_W16(CPlusCmd,
 			(RTL_R16(CPlusCmd) | (1 << 14) | (1 << 3)));
-		DBG_PRINT
+		DBG_PRINTF
 		    ("Set MAC Reg C+CR Offset 0xE0: bit-3 and bit-14\n");
 	} else {
 		RTL_W16(CPlusCmd, (RTL_R16(CPlusCmd) | (1 << 3)));
-		DBG_PRINT("Set MAC Reg C+CR Offset 0xE0: bit-3.\n");
+		DBG_PRINTF("Set MAC Reg C+CR Offset 0xE0: bit-3.\n");
 	}
 
 	{
@@ -889,8 +883,8 @@ static int r8169_probe ( struct nic *nic, struct pci_device *pci ) {
 	int i, rc;
 	int option = -1, Cap10_100 = 0, Cap1000 = 0;
 
-	printf("r8169.c: Found %s, Vendor=%hX Device=%hX\n",
-	       pci->name, pci->vendor, pci->device);
+	printf ( "r8169.c: Found %s, Vendor=%hX Device=%hX\n",
+	       pci->name, pci->vendor, pci->device );
 
 	board_idx++;
 
@@ -905,27 +899,28 @@ static int r8169_probe ( struct nic *nic, struct pci_device *pci ) {
 	for (i = 0; i < MAC_ADDR_LEN; i++)
 		nic->node_addr[i] = RTL_R8(MAC0 + i);
 
-	dprintf(("%s: Identified chip type is '%s'.\n", pci->name,
-		 rtl_chip_info[tpc->chipset].name));
-	/* Print out some hardware info */
-	printf("%s: %! at ioaddr %hX, ", pci->name, nic->node_addr,
-	       ioaddr);
+	DBG ( "%s: Identified chip type is '%s'.\n", pci->name,
+		 rtl_chip_info[tpc->chipset].name );
 
-	// Config PHY
+	/* Print out some hardware info */
+	DBG ( "%s: %s at IOAddr %#hX, ", pci->name, eth_ntoa ( nic->node_addr ),
+	       ioaddr );
+
+	/* Config PHY */
 	rtl8169_hw_PHY_config(nic);
 
-	DBG_PRINT("Set MAC Reg C+CR Offset 0x82h = 0x01h\n");
+	DBG_PRINTF("Set MAC Reg C+CR Offset 0x82h = 0x01h\n");
 	RTL_W8(0x82, 0x01);
 
 	if (tpc->mcfg < MCFG_METHOD_3) {
-		DBG_PRINT("Set PCI Latency=0x40\n");
+		DBG_PRINTF("Set PCI Latency=0x40\n");
 		pci_write_config_byte(pci, PCI_LATENCY_TIMER, 0x40);
 	}
 
 	if (tpc->mcfg == MCFG_METHOD_2) {
-		DBG_PRINT("Set MAC Reg C+CR Offset 0x82h = 0x01h\n");
+		DBG_PRINTF("Set MAC Reg C+CR Offset 0x82h = 0x01h\n");
 		RTL_W8(0x82, 0x01);
-		DBG_PRINT("Set PHY Reg 0x0bh = 0x00h\n");
+		DBG_PRINTF("Set PHY Reg 0x0bh = 0x00h\n");
 		RTL8169_WRITE_GMII_REG(ioaddr, 0x0b, 0x0000);	//w 0x0b 15 0 0
 	}
 
@@ -970,8 +965,7 @@ static int r8169_probe ( struct nic *nic, struct pci_device *pci ) {
 			RTL8169_WRITE_GMII_REG(ioaddr, PHY_1000_CTRL_REG,
 					       Cap1000);
 		} else {
-			dprintf(("Auto-negotiation Enabled.\n",
-				 pci->name));
+			DBG ( "%s: Auto-negotiation Enabled.\n",  pci->name );
 
 			// enable 10/100 Full/Half Mode, leave PHY_AUTO_NEGO_REG bit4:0 unchanged
 			RTL8169_WRITE_GMII_REG(ioaddr, PHY_AUTO_NEGO_REG,
@@ -1045,7 +1039,7 @@ static void rtl8169_hw_PHY_reset(struct nic *nic __unused)
         struct rtl8169_private *priv = dev->priv;
         unsigned long ioaddr = priv->ioaddr;
 
-        DBG_PRINT("%s: Reset RTL8169s PHY\n", dev->name);
+        DBG_PRINTF("%s: Reset RTL8169s PHY\n", dev->name);
 
         val = ( RTL8169_READ_GMII_REG( ioaddr, 0 ) | 0x8000 ) & 0xffff;
         RTL8169_WRITE_GMII_REG( ioaddr, 0, val );
@@ -1070,7 +1064,7 @@ static void rtl8169_hw_PHY_reset(struct nic *nic __unused)
 static void rtl8169_hw_PHY_config(struct nic *nic __unused)
 {
 
-	DBG_PRINT("priv->mcfg=%d, priv->pcfg=%d\n", tpc->mcfg, tpc->pcfg);
+	DBG_PRINTF("priv->mcfg=%d, priv->pcfg=%d\n", tpc->mcfg, tpc->pcfg);
 
 	if (tpc->mcfg == MCFG_METHOD_4) {
 /*
@@ -1171,7 +1165,7 @@ static void rtl8169_hw_PHY_config(struct nic *nic __unused)
 		RTL8169_WRITE_GMII_REG((unsigned long) ioaddr, 0x0B,
 				       0x0000);
 	} else {
-		DBG_PRINT("tpc->mcfg=%d. Discard hw PHY config.\n",
+		DBG_PRINTF("tpc->mcfg=%d. Discard hw PHY config.\n",
 			  tpc->mcfg);
 	}
 }
