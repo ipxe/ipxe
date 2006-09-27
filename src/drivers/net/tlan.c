@@ -38,12 +38,10 @@
 *    Indent Options: indent -kr -i8
 ***************************************************************************/
 
-/* to get some global routines like printf */
 #include "etherboot.h"
-/* to get the interface to the body of the program */
 #include "nic.h"
-/* to get the PCI support functions, if this is a PCI NIC */
 #include <gpxe/pci.h>
+#include <gpxe/ethernet.h>
 #include "timer.h"
 #include "tlan.h"
 
@@ -57,13 +55,6 @@
 /* Condensed operations for readability. */
 #define virt_to_le32desc(addr)  cpu_to_le32(virt_to_bus(addr))
 #define le32desc_to_virt(addr)  bus_to_virt(le32_to_cpu(addr))
-
-//#define EDEBUG
-#ifdef EDEBUG
-#define dprintf(x) printf x
-#else
-#define dprintf(x)
-#endif
 
 static void TLan_ResetLists(struct nic *nic __unused);
 static void TLan_ResetAdapter(struct nic *nic __unused);
@@ -414,7 +405,7 @@ void TLan_FinishReset(struct nic *nic)
 	if ((tlan_pci_tbl[chip_idx].flags & TLAN_ADAPTER_UNMANAGED_PHY)
 	    || (priv->aui)) {
 		status = MII_GS_LINK;
-		dprintf(("TLAN:  %s: Link forced.\n", priv->nic_name));
+		DBG ( "TLAN:  %s: Link forced.\n", priv->nic_name );
 	} else {
 		TLan_MiiReadReg(nic, phy, MII_GEN_STS, &status);
 		udelay(1000);
@@ -426,27 +417,27 @@ void TLan_FinishReset(struct nic *nic)
 			TLan_MiiReadReg(nic, phy, TLAN_TLPHY_PAR,
 					&tlphy_par);
 
-			dprintf(("TLAN: %s: Link active with ",
-			       priv->nic_name));
+			DBG ( "TLAN: %s: Link active with ",
+			       priv->nic_name );
 			if (!(tlphy_par & TLAN_PHY_AN_EN_STAT)) {
-				dprintf(("forced 10%sMbps %s-Duplex\n",
+				DBG ( "forced 10%sMbps %s-Duplex\n",
 				       tlphy_par & TLAN_PHY_SPEED_100 ? ""
 				       : "0",
 				       tlphy_par & TLAN_PHY_DUPLEX_FULL ?
-				       "Full" : "Half"));
+				       "Full" : "Half" );
 			} else {
-				dprintf
-				    (("AutoNegotiation enabled, at 10%sMbps %s-Duplex\n",
+				DBG 
+				    ( "AutoNegotiation enabled, at 10%sMbps %s-Duplex\n",
 				     tlphy_par & TLAN_PHY_SPEED_100 ? "" :
 				     "0",
 				     tlphy_par & TLAN_PHY_DUPLEX_FULL ?
-				     "Full" : "Half"));
-				dprintf(("TLAN: Partner capability: "));
+				     "Full" : "Half" );
+				DBG ( "TLAN: Partner capability: " );
 				for (i = 5; i <= 10; i++)
 					if (partner & (1 << i)) {
-						dprintf(("%s", media[i - 5]));
+						DBG ( "%s", media[i - 5] );
 					}
-				dprintf(("\n"));
+				DBG ( "\n" );
 			}
 
 			TLan_DioWrite8(BASE, TLAN_LED_REG, TLAN_LED_LINK);
@@ -459,7 +450,7 @@ void TLan_FinishReset(struct nic *nic)
 			TLan_PhyMonitor(nic);
 #endif
 		} else if (status & MII_GS_LINK) {
-			dprintf(("TLAN: %s: Link active\n", priv->nic_name));
+			DBG ( "TLAN: %s: Link active\n", priv->nic_name );
 			TLan_DioWrite8(BASE, TLAN_LED_REG, TLAN_LED_LINK);
 		}
 	}
@@ -480,9 +471,9 @@ void TLan_FinishReset(struct nic *nic)
 		outl(virt_to_bus(&rx_ring), BASE + TLAN_CH_PARM);
 		outl(TLAN_HC_GO | TLAN_HC_RT, BASE + TLAN_HOST_CMD);
 	} else {
-		dprintf
-		    (("TLAN: %s: Link inactive, will retry in 10 secs...\n",
-		     priv->nic_name));
+		DBG 
+		    ( "TLAN: %s: Link inactive, will retry in 10 secs...\n",
+		     priv->nic_name );
 		/* TLan_SetTimer( nic, (10*HZ), TLAN_TIMER_FINISH_RESET ); */
 		mdelay(10000);
 		TLan_FinishReset(nic);
@@ -524,14 +515,14 @@ static int tlan_poll(struct nic *nic, int retrieve)
 
 	nic->packetlen = framesize;
 
-	dprintf((".%d.", framesize)); 
+	DBG ( ".%d.", framesize ); 
      
 	memcpy(nic->packet, rxb +
 	       (priv->cur_rx * TLAN_MAX_FRAME_SIZE), nic->packetlen);
 
 	rx_ring[entry].cStat = 0;
 
-	dprintf(("%d", entry));  
+	DBG ( "%d", entry );  
 
 	entry = (entry + 1) % TLAN_NUM_RX_LISTS;
 	priv->cur_rx = entry;
@@ -546,8 +537,8 @@ static int tlan_poll(struct nic *nic, int retrieve)
 		host_cmd = TLAN_HC_ACK | ack | (0x000C0000);
 		outl(host_cmd, BASE + TLAN_HOST_CMD);
 		
-		dprintf(("AC: 0x%hX\n", inw(BASE + TLAN_CH_PARM))); 
-		dprintf(("PI-2: 0x%hX\n", inw(BASE + TLAN_HOST_INT)));
+		DBG ( "AC: 0x%hX\n", inw(BASE + TLAN_CH_PARM) ); 
+		DBG ( "PI-2: 0x%hX\n", inw(BASE + TLAN_HOST_INT) );
 	}
 	refill_rx(nic);
 	return (1);		/* initially as this is called to flush the input */
@@ -585,12 +576,11 @@ static void tlan_transmit(struct nic *nic, const char *d,	/* Destination */
 	u32 host_cmd;
 	int eoc = 0;
 	u16 tmpCStat;
-#ifdef EBDEBUG
 	u16 host_int = inw(BASE + TLAN_HOST_INT);
-#endif
+
 	int entry = 0;
 
-	dprintf(("INT0-0x%hX\n", host_int));
+	DBG ( "INT0-0x%hX\n", host_int );
 
 	if (!priv->phyOnline) {
 		printf("TRANSMIT:  %s PHY is not ready\n", priv->nic_name);
@@ -600,7 +590,7 @@ static void tlan_transmit(struct nic *nic, const char *d,	/* Destination */
 	tail_list = priv->txList + priv->txTail;
 
 	if (tail_list->cStat != TLAN_CSTAT_UNUSED) {
-		printf("TRANSMIT: %s is busy (Head=%d Tail=%d)\n",
+		printf("TRANSMIT: %s is busy (Head=%p Tail=%x)\n",
 		       priv->nic_name, priv->txList, priv->txTail);
 		tx_ring[entry].cStat = TLAN_CSTAT_UNUSED;
 //		priv->txBusyCount++;
@@ -649,7 +639,7 @@ static void tlan_transmit(struct nic *nic, const char *d,	/* Destination */
 
 	tail_list->cStat = TLAN_CSTAT_READY;
 
-	dprintf(("INT1-0x%hX\n", inw(BASE + TLAN_HOST_INT)));
+	DBG ( "INT1-0x%hX\n", inw(BASE + TLAN_HOST_INT) );
 
 	if (!priv->txInProgress) {
 		priv->txInProgress = 1;
@@ -657,11 +647,11 @@ static void tlan_transmit(struct nic *nic, const char *d,	/* Destination */
 		outl(TLAN_HC_GO, BASE + TLAN_HOST_CMD);
 	} else {
 		if (priv->txTail == 0) {
-			dprintf(("Out buffer\n"));
+			DBG ( "Out buffer\n" );
 			(priv->txList + (TLAN_NUM_TX_LISTS - 1))->forward =
 			    virt_to_le32desc(tail_list);
 		} else {
-			dprintf(("Fix this \n"));
+			DBG ( "Fix this \n" );
 			(priv->txList + (priv->txTail - 1))->forward =
 			    virt_to_le32desc(tail_list);
 		}
@@ -669,7 +659,7 @@ static void tlan_transmit(struct nic *nic, const char *d,	/* Destination */
 	
 	CIRC_INC(priv->txTail, TLAN_NUM_TX_LISTS);
 
-	dprintf(("INT2-0x%hX\n", inw(BASE + TLAN_HOST_INT)));
+	DBG ( "INT2-0x%hX\n", inw(BASE + TLAN_HOST_INT) );
 
 	to = currticks() + TX_TIME_OUT;
 	while ((tail_list->cStat == TLAN_CSTAT_READY) && currticks() < to);
@@ -829,12 +819,12 @@ static int tlan_probe ( struct nic *nic, struct pci_device *pci ) {
 				       addrOfs + i,
 				       (u8 *) & nic->node_addr[i]);
 	if (err) {
-		printf("TLAN: %s: Error reading MAC from eeprom: %d\n",
-		       pci->name, err);
-	} else 
-		/* Print out some hardware info */
-		printf("%s: %! at ioaddr %hX, ", 
-			pci->name, nic->node_addr, pci->ioaddr);
+  	    printf ( "TLAN: %s: Error reading MAC from eeprom: %d\n",
+		    pci->name, err);
+	} else {
+	    DBG ( "%s: %s at ioaddr %#lX, ", 
+		  pci->name, eth_ntoa ( nic->node_addr ), pci->ioaddr );
+	}
 
 	priv->tlanRev = TLan_DioRead8(BASE, TLAN_DEF_REVISION);
 	printf("revision: 0x%hX\n", priv->tlanRev);
@@ -1395,7 +1385,7 @@ void TLan_PhyPowerDown(struct nic *nic)
 {
 
 	u16 value;
-	dprintf(("%s: Powering down PHY(s).\n", priv->nic_name));
+	DBG ( "%s: Powering down PHY(s).\n", priv->nic_name );
 	value = MII_GC_PDOWN | MII_GC_LOOPBK | MII_GC_ISOLATE;
 	TLan_MiiSync(BASE);
 	TLan_MiiWriteReg(nic, priv->phy[priv->phyNum], MII_GEN_CTL, value);
@@ -1422,7 +1412,7 @@ void TLan_PhyPowerUp(struct nic *nic)
 {
 	u16 value;
 
-	dprintf(("%s: Powering up PHY.\n", priv->nic_name));
+	DBG ( "%s: Powering up PHY.\n", priv->nic_name );
 	TLan_MiiSync(BASE);
 	value = MII_GC_LOOPBK;
 	TLan_MiiWriteReg(nic, priv->phy[priv->phyNum], MII_GEN_CTL, value);
@@ -1444,7 +1434,7 @@ void TLan_PhyReset(struct nic *nic)
 
 	phy = priv->phy[priv->phyNum];
 
-	dprintf(("%s: Reseting PHY.\n", priv->nic_name));
+	DBG ( "%s: Reseting PHY.\n", priv->nic_name );
 	TLan_MiiSync(BASE);
 	value = MII_GC_LOOPBK | MII_GC_RESET;
 	TLan_MiiWriteReg(nic, phy, MII_GEN_CTL, value);
@@ -1475,7 +1465,7 @@ void TLan_PhyStartLink(struct nic *nic)
 	u16 tctl;
 
 	phy = priv->phy[priv->phyNum];
-	dprintf(("%s: Trying to activate link.\n", priv->nic_name));
+	DBG ( "%s: Trying to activate link.\n", priv->nic_name );
 	TLan_MiiReadReg(nic, phy, MII_GEN_STS, &status);
 	TLan_MiiReadReg(nic, phy, MII_GEN_STS, &ability);
 
@@ -1509,8 +1499,8 @@ void TLan_PhyStartLink(struct nic *nic)
 			 * but the card need additional time to start AN.
 			 * .5 sec should be plenty extra.
 			 */
-			dprintf(("TLAN: %s: Starting autonegotiation.\n",
-			       priv->nic_name));
+			DBG ( "TLAN: %s: Starting autonegotiation.\n",
+			       priv->nic_name );
 			mdelay(4000);
 			TLan_PhyFinishAutoNeg(nic);
 			/* TLan_SetTimer( dev, (2*HZ), TLAN_TIMER_PHY_FINISH_AN ); */
@@ -1593,7 +1583,7 @@ void TLan_PhyFinishAutoNeg(struct nic *nic)
 		return;
 	}
 
-	dprintf(("TLAN: %s: Autonegotiation complete.\n", priv->nic_name));
+	DBG ( "TLAN: %s: Autonegotiation complete.\n", priv->nic_name );
 	TLan_MiiReadReg(nic, phy, MII_AN_ADV, &an_adv);
 	TLan_MiiReadReg(nic, phy, MII_AN_LPA, &an_lpa);
 	mode = an_adv & an_lpa & 0x03E0;
@@ -1624,13 +1614,13 @@ void TLan_PhyFinishAutoNeg(struct nic *nic)
 		    || (an_adv & an_lpa & 0x0040)) {
 			TLan_MiiWriteReg(nic, phy, MII_GEN_CTL,
 					 MII_GC_AUTOENB | MII_GC_DUPLEX);
-			dprintf
-			    (("TLAN:  Starting internal PHY with FULL-DUPLEX\n"));
+			DBG 
+			    ( "TLAN:  Starting internal PHY with FULL-DUPLEX\n" );
 		} else {
 			TLan_MiiWriteReg(nic, phy, MII_GEN_CTL,
 					 MII_GC_AUTOENB);
-			dprintf
-			    (("TLAN:  Starting internal PHY with HALF-DUPLEX\n"));
+			DBG 
+			    ( "TLAN:  Starting internal PHY with HALF-DUPLEX\n" );
 		}
 	}
 
