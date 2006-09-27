@@ -123,9 +123,19 @@ __asm__ ( ".equ\t" OBJECT_SYMBOL_STR ", 0" );
 __asm__ ( ".equ\tDEBUG_LEVEL, " DEBUG_SYMBOL_STR );
 #endif
 
+/** Do not print
+ *
+ * This function is used only for printf()-style format string
+ * checking.  The function body does not exist, and no reference to it
+ * should ever appear in any compiled object.
+ */
+extern int __attribute__ (( format ( printf, 1, 2 ) ))
+__do_not_printf ( const char *fmt, ... );
+
 #define DBG_PRINT(...) printf ( __VA_ARGS__ )
-#define DBG_DISCARD(...) do { if ( 0 ) printf ( __VA_ARGS__ ); } while ( 0 )
-/*#define DBG_DISCARD(...) do {} while ( 0 )*/
+#define DBG_DISCARD(...) do {					\
+		if ( 0 ) __do_not_printf ( __VA_ARGS__ );	\
+	} while ( 0 )
 
 #define DBG  DBG_DISCARD
 #define DBG2 DBG_DISCARD
