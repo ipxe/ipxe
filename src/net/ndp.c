@@ -1,3 +1,4 @@
+#include "stdio.h"
 #include <stdint.h>
 #include <string.h>
 #include <byteswap.h>
@@ -147,8 +148,8 @@ int ndp_resolve ( struct net_device *netdev, struct in6_addr *dest,
  * @v st_src	Source address
  * @v st_dest	Destination address 
  */
-int ndp_process_advert ( struct pk_buff *pkb, struct sockaddr_tcpip *st_src,
-			   struct sockaddr_tcpip *st_dest ) {
+int ndp_process_advert ( struct pk_buff *pkb, struct sockaddr_tcpip *st_src __unused,
+			   struct sockaddr_tcpip *st_dest __unused ) {
 	struct neighbour_advert *nadvert = pkb->data;
 	struct ndp_entry *ndp;
 

@@ -1,3 +1,4 @@
+#include <stdio.h>
 #include "io.h"
 #include "load_buffer.h"
 

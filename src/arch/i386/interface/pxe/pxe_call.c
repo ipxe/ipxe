@@ -16,6 +16,7 @@
  * Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
  */
 
+#include <stdio.h>
 #include <gpxe/uaccess.h>
 #include <registers.h>
 #include <biosint.h>

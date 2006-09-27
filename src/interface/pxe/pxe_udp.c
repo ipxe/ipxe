@@ -4,6 +4,7 @@
  *
  */
 
+#include <stdio.h>
 #include <string.h>
 #include <byteswap.h>
 #include <gpxe/udp.h>

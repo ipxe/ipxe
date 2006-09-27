@@ -16,10 +16,12 @@
  * Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
  */
 
+#include <stdio.h>
 #include <stddef.h>
 #include <stdint.h>
 #include <errno.h>
 #include <assert.h>
+#include <timer.h>
 #include <gpxe/bitbash.h>
 #include <gpxe/i2c.h>
 

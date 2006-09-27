@@ -1,3 +1,4 @@
+#include <stdio.h>
 #include <stdint.h>
 #include <string.h>
 #include <byteswap.h>
@@ -23,7 +24,7 @@ struct tcpip_protocol icmp6_protocol;
  * This function prepares a neighbour solicitation packet and sends it to the
  * network layer.
  */
-int icmp6_send_solicit ( struct net_device *netdev, struct in6_addr *src,
+int icmp6_send_solicit ( struct net_device *netdev, struct in6_addr *src __unused,
 			 struct in6_addr *dest ) {
 	union {
 		struct sockaddr_in6 sin6;
@@ -60,7 +61,7 @@ int icmp6_send_solicit ( struct net_device *netdev, struct in6_addr *src,
 	st_dest.sin6.sin6_addr.in6_u.u6_addr8[13] = 0xff;
 	
 	/* Send packet over IP6 */
-	tcpip_tx ( pkb, &icmp6_protocol, &st_dest.st );
+	return ( tcpip_tx ( pkb, &icmp6_protocol, &st_dest.st ) );
 }
 
 /**
