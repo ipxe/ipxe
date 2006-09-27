@@ -49,6 +49,7 @@ static const char *version = "rhine.c v1.0.2 2004-10-29\n";
 #include "etherboot.h"
 #include "nic.h"
 #include <gpxe/pci.h>
+#include <gpxe/ethernet.h>
 #include "timer.h"
 
 /* define all ioaddr */
@@ -691,7 +692,7 @@ static int ReadMII (int byMIIIndex, int);
 static void WriteMII (char, char, char, int);
 static void MIIDelay (void);
 static void rhine_init_ring (struct nic *dev);
-static void rhine_disable (struct nic *nic, struct pci_device *pci);
+static void rhine_disable (struct nic *nic);
 static void rhine_reset (struct nic *nic);
 static int rhine_poll (struct nic *nic, int retreive);
 static void rhine_transmit (struct nic *nic, const char *d, unsigned int t,
@@ -1073,11 +1074,12 @@ rhine_probe1 (struct nic *nic, struct pci_device *pci, int ioaddr, int chip_id, 
     /* Perhaps this should be read from the EEPROM? */
     for (i = 0; i < ETH_ALEN; i++)
 	nic->node_addr[i] = inb (byPAR0 + i);
-    printf ("IO address %hX Ethernet Address: %!\n", ioaddr, nic->node_addr);
+
+    DBG ( "IO address %#hX Ethernet Address: %s\n", ioaddr, eth_ntoa ( nic->node_addr ) );
 
     /* restart MII auto-negotiation */
     WriteMII (0, 9, 1, ioaddr);
-    printf ("Analyzing Media type,this will take several seconds........");
+    printf ("Analyzing Media type,this may take several seconds... ");
     for (i = 0; i < 5; i++)
     {
 	/* need to wait 1 millisecond - we will round it up to 50-100ms */
@@ -1087,9 +1089,9 @@ rhine_probe1 (struct nic *nic, struct pci_device *pci, int ioaddr, int chip_id, 
 	if (ReadMII (1, ioaddr) & 0x0020)
 	    break;
     }
-    printf ("OK\n");
+    printf ("OK.\n");
 
-#if	0
+#if 0
 	/* JJM : for Debug */
 	printf("MII : Address %hhX ",inb(ioaddr+0x6c));
 	{
@@ -1163,12 +1165,11 @@ rhine_probe1 (struct nic *nic, struct pci_device *pci, int ioaddr, int chip_id, 
 }
 
 static void 
-rhine_disable ( struct nic *nic, struct pci_device *pci __unused ) {
+rhine_disable ( struct nic *nic ) {
 
     struct rhine_private *tp = (struct rhine_private *) nic->priv_data;
     int ioaddr = tp->ioaddr;
 
-    /* merge reset and disable */
     rhine_reset(nic);
 
     printf ("rhine disable\n");
