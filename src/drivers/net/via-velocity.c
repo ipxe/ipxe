@@ -38,13 +38,10 @@
 *    Indent Options: indent -kr -i8
 *************************************************************************/
 
-/* to get some global routines like printf */
 #include "etherboot.h"
-/* to get the interface to the body of the program */
 #include "nic.h"
-/* to get the PCI support functions, if this is a PCI NIC */
 #include <gpxe/pci.h>
-
+#include <gpxe/ethernet.h>
 
 #include "via-velocity.h"
 
@@ -476,7 +473,7 @@ extern void hex_dump(const char *data, const unsigned int len);
 POLL - Wait for a frame
 ***************************************************************************/
 //EB53 static int velocity_poll(struct nic *nic, int retrieve)
-static int velocity_poll(struct nic *nic __unused)
+static int  velocity_poll(struct nic *nic __unused)
 {
 	/* Work out whether or not there's an ethernet packet ready to
 	 * read.  Return 0 if not.
@@ -600,7 +597,7 @@ static void velocity_transmit(struct nic *nic, const char *dest,	/* Destination 
 /**************************************************************************
 DISABLE - Turn off ethernet interface
 ***************************************************************************/
-static void velocity_disable(struct dev *dev __unused)
+static void velocity_disable(struct nic *nic __unused)
 {
 	/* put the card in its initial state */
 	/* This function serves 3 purposes.
@@ -669,7 +666,7 @@ static struct nic_operations velocity_operations = {
 /**************************************************************************
 PROBE - Look for an adapter, this routine's visible to the outside
 ***************************************************************************/
-static int velocity_probe(struct dev *dev, struct pci_device *pci)
+static int velocity_probe(struct pci_device *dev, struct pci_device *pci)
 {
 	struct nic *nic = (struct nic *) dev;
 	int ret, i;
@@ -708,8 +705,7 @@ static int velocity_probe(struct dev *dev, struct pci_device *pci)
 	for (i = 0; i < 6; i++)
 		nic->node_addr[i] = readb(&regs->PAR[i]);
 
-	/* Print out some hardware info */
-	printf("%s: %! at ioaddr %hX, ", pci->name, nic->node_addr, BASE);
+	DBG ( "%s: %s at ioaddr %#hX\n", pci->name, eth_ntoa ( nic->node_addr ), BASE );
 
 	velocity_get_options(&vptr->options, 0, pci->name);
 
