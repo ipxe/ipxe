@@ -80,6 +80,7 @@
 #include "etherboot.h"
 #include "nic.h"
 #include <gpxe/pci.h>
+#include <gpxe/ethernet.h>
 #include "timer.h"
 
 static const char *w89c840_version = "driver Version 0.94 - December 12, 2003";
@@ -575,9 +576,8 @@ static void w89c840_transmit(
 /**************************************************************************
 w89c840_disable - Turn off ethernet interface
 ***************************************************************************/
-static void w89c840_disable ( struct nic *nic, struct pci_device *pci __unused ) {
+static void w89c840_disable ( struct nic *nic ) {
 
-    /* merge reset and disable */
     w89c840_reset(nic);
 
     /* Don't know what to do to disable the board. Is this needed at all? */
@@ -674,7 +674,8 @@ static int w89c840_probe ( struct nic *nic, struct pci_device *p ) {
     for (i=0;i<ETH_ALEN;i++) {
         nic->node_addr[i] =  (eeprom[i/2] >> (8*(i&1))) & 0xff;
     }
-    printf ("Ethernet addr: %!\n", nic->node_addr);
+
+    DBG ( "Ethernet addr: %s\n", eth_ntoa ( nic->node_addr ) );
 
 #if defined(W89C840_DEBUG)
     printf("winbond-840: EEPROM checksum %hX, got eeprom", sum);
