@@ -1,4 +1,3 @@
-#include <stdio.h>
 #include "ssl.h"
 #include "ssl_constructs.h"
 #include <string.h> // for bcopy()

@@ -19,7 +19,6 @@
 #include <gpxe/list.h>
 #include <gpxe/tables.h>
 #include <gpxe/device.h>
-#include "stdio.h"
 
 /**
  * @file

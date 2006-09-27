@@ -22,7 +22,6 @@
  * Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
  */
 
-#include <stdio.h>
 #include "pxe.h"
 
 static int pxe_tftp_read_block ( unsigned char *data, unsigned int block,

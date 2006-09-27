@@ -1,4 +1,3 @@
-#include "stdio.h"
 #include "resolv.h"
 #include "string.h"
 #include "dns.h"

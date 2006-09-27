@@ -1,4 +1,3 @@
-#include <stdio.h>
 #include <io.h>
 #include <registers.h>
 #include <memmap.h>

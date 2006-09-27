@@ -1,5 +1,4 @@
 #include "resolv.h"
-#include "stdio.h"
 
 static struct resolver resolvers[0] __table_start(resolver);
 static struct resolver resolvers_end[0] __table_end(resolver);
