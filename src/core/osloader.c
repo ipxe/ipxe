@@ -29,6 +29,7 @@ Modifications: Ken Yap (for Etherboot/16)
  * your option) any later version.
  */
 
+#include "stdio.h"
 #include "io.h"
 #include "memsizes.h"
 

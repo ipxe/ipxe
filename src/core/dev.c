@@ -132,7 +132,7 @@ int find_by_driver ( struct bus_loc *bus_loc, struct bus_dev *bus_dev,
 		return 1;
 	} while ( bus_driver->next_location ( bus_loc ) );
 
-	DBG ( "DEV found no device for driver %s\n" );
+	DBG ( "DEV found no device for driver %s\n", device_driver->name );
 	return 0;
 }
 

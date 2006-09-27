@@ -134,13 +134,15 @@ operations[] = {
 
 #endif
 
-
-
+#if 0
 static int main_loop(int state);
 static int exit_ok;
-static int exit_status;
 static int initialized;
+#endif
 
+static int exit_status;
+
+void test_dhcp ( struct net_device *netdev );
 
 /**************************************************************************
 MAIN - Kick off routine

@@ -16,6 +16,7 @@
  * Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
  */
 
+#include <stdio.h>
 #include <stddef.h>
 #include <stdint.h>
 #include <string.h>
@@ -77,6 +78,7 @@ void * alloc_memblock ( size_t size, size_t align ) {
 	 */
 	size = ( size + MIN_MEMBLOCK_SIZE - 1 ) & ~( MIN_MEMBLOCK_SIZE - 1 );
 	align_mask = ( align - 1 ) | ( MIN_MEMBLOCK_SIZE - 1 );
+
 	DBG ( "Allocating %#zx (aligned %#zx)\n", size, align );
 
 	/* Search through blocks for the first one with enough space */
