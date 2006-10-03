@@ -291,30 +291,45 @@ static void iscsi_tx_data_out ( struct iscsi_session *iscsi,
  */
 static int iscsi_build_login_request_strings ( struct iscsi_session *iscsi,
 					       void *data, size_t len ) {
-	return snprintf ( data, len,
-			  "InitiatorName=%s%c"
-			  "TargetName=%s%c"
-			  "SessionType=Normal%c"
-			  "HeaderDigest=None%c"
-			  "DataDigest=None%c"
-			  "InitialR2T=Yes%c"
-			  "DefaultTime2Wait=0%c"
-			  "DefaultTime2Retain=0%c"
-			  "MaxOutstandingR2T=1%c"
-			  "DataPDUInOrder=Yes%c"
-			  "DataSequenceInOrder=Yes%c"
-			  "ErrorRecoveryLevel=0%c",
-			  iscsi->initiator, 0, iscsi->target, 0,
-			  0, 0, 0, 0, 0, 0, 0, 0, 0, 0 );
+	struct iscsi_bhs_login_request *request = &iscsi->tx_bhs.login_request;
+
+	switch ( request->flags & ISCSI_LOGIN_CSG_MASK ) {
+	case ISCSI_LOGIN_CSG_SECURITY_NEGOTIATION:
+		return snprintf ( data, len,
+				  "InitiatorName=%s%c"
+				  "TargetName=%s%c"
+				  "SessionType=Normal%c"
+				  "AuthMethod=CHAP,None%c"
+				  "CHAP_A=5%c",
+				  iscsi->initiator, 0, iscsi->target, 0,
+				  0, 0, 0 );
+	case ISCSI_LOGIN_CSG_OPERATIONAL_NEGOTIATION:
+		return snprintf ( data, len,
+				  "HeaderDigest=None%c"
+				  "DataDigest=None%c"
+				  "InitialR2T=Yes%c"
+				  "DefaultTime2Wait=0%c"
+				  "DefaultTime2Retain=0%c"
+				  "MaxOutstandingR2T=1%c"
+				  "DataPDUInOrder=Yes%c"
+				  "DataSequenceInOrder=Yes%c"
+				  "ErrorRecoveryLevel=0%c",
+				  0, 0, 0, 0, 0, 0, 0, 0, 0 );
+	default:
+		assert ( 0 );
+		return 0;
+	}
 }
 
 /**
  * Build iSCSI login request BHS
  *
  * @v iscsi		iSCSI session
- * @v first		Login request is the first in a sequence
+ * @v stage		Current stage of iSCSI login
+ * @v send_strings	Send login strings with this login request
  */
-static void iscsi_start_login ( struct iscsi_session *iscsi, int first ) {
+static void iscsi_start_login ( struct iscsi_session *iscsi,
+				int stage, int send_strings ) {
 	struct iscsi_bhs_login_request *request = &iscsi->tx_bhs.login_request;
 	int len;
 
@@ -322,11 +337,10 @@ static void iscsi_start_login ( struct iscsi_session *iscsi, int first ) {
 	iscsi_start_tx ( iscsi );
 	request->opcode = ( ISCSI_OPCODE_LOGIN_REQUEST |
 			    ISCSI_FLAG_IMMEDIATE );
-	request->flags = ( ISCSI_LOGIN_FLAG_TRANSITION |
-			   ISCSI_LOGIN_CSG_OPERATIONAL_NEGOTIATION |
-			   ISCSI_LOGIN_NSG_FULL_FEATURE_PHASE );
+	request->flags = ( ISCSI_LOGIN_FLAG_TRANSITION | stage );
+
 	/* version_max and version_min left as zero */
-	if ( first ) {
+	if ( send_strings ) {
 		len = iscsi_build_login_request_strings ( iscsi, NULL, 0 );
 		ISCSI_SET_LENGTHS ( request->lengths, 0, len );
 	}
@@ -334,8 +348,6 @@ static void iscsi_start_login ( struct iscsi_session *iscsi, int first ) {
 					IANA_EN_FEN_SYSTEMS );
 	/* isid_iana_qual left as zero */
 	request->tsih = htons ( iscsi->tsih );
-	if ( first )
-		iscsi->itt++;
 	request->itt = htonl ( iscsi->itt );
 	/* cid left as zero */
 	request->cmdsn = htonl ( iscsi->cmdsn );
@@ -387,7 +399,17 @@ static void iscsi_rx_login_response ( struct iscsi_session *iscsi,
 	 * request without any login strings.
 	 */
 	if ( ! ( response->flags & ISCSI_LOGIN_FLAG_TRANSITION ) ) {
-		iscsi_start_login ( iscsi, 0 );
+		iscsi_start_login ( iscsi, ( response->flags &
+					     ISCSI_LOGIN_STAGE_MASK ), 0 );
+		return;
+	}
+
+	/* If we are transitioning to the operational phase, send the
+	 * operational phase login request.
+	 */
+	if ( ( response->flags & ISCSI_LOGIN_NSG_MASK ) ==
+	     ISCSI_LOGIN_NSG_OPERATIONAL_NEGOTIATION ) {
+		iscsi_start_login ( iscsi, ISCSI_LOGIN_STAGE_OP, 1 );
 		return;
 	}
 
@@ -762,8 +784,11 @@ static void iscsi_connected ( struct tcp_connection *conn ) {
 	iscsi->rx_state = ISCSI_RX_BHS;
 	iscsi->rx_offset = 0;
 
+	/* Assign fresh initiator task tag */
+	iscsi->itt++;
+
 	/* Start logging in */
-	iscsi_start_login ( iscsi, 1 );
+	iscsi_start_login ( iscsi, ISCSI_LOGIN_STAGE_SEC, 1 );
 }
 
 /** iSCSI TCP operations */
