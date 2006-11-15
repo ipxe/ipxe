@@ -24,16 +24,7 @@
 #include <string.h>
 #include <byteswap.h>
 #include <gpxe/crypto.h>
-
-#define MD5_DIGEST_SIZE		16
-#define MD5_BLOCK_WORDS		16
-#define MD5_HASH_WORDS		4
-
-struct md5_ctx {
-	u32 hash[MD5_HASH_WORDS];
-	u32 block[MD5_BLOCK_WORDS];
-	u64 byte_count;
-};
+#include <gpxe/md5.h>
 
 #define __md5step __attribute__ (( regparm ( 3 ) ))
 
@@ -93,7 +84,7 @@ static const u8 r[64] = {
 	6,10,15,21,6,10,15,21,6,10,15,21,6,10,15,21
 };
 
-static const u32 k[] = {
+static const u32 k[64] = {
 	0xd76aa478UL, 0xe8c7b756UL, 0x242070dbUL, 0xc1bdceeeUL,
 	0xf57c0fafUL, 0x4787c62aUL, 0xa8304613UL, 0xfd469501UL,
 	0x698098d8UL, 0x8b44f7afUL, 0xffff5bb1UL, 0x895cd7beUL,
@@ -110,7 +101,6 @@ static const u32 k[] = {
 	0x655b59c3UL, 0x8f0ccc92UL, 0xffeff47dUL, 0x85845dd1UL,
 	0x6fa87e4fUL, 0xfe2ce6e0UL, 0xa3014314UL, 0x4e0811a1UL,
 	0xf7537e82UL, 0xbd3af235UL, 0x2ad7d2bbUL, 0xeb86d391UL,
-	0xe1f27f3aUL, 0xf5710fb0UL, 0xada0e5c4UL, 0x98e4c919UL
 };
 
 static void md5_transform(u32 *hash, const u32 *in)
@@ -160,16 +150,15 @@ static inline void cpu_to_le32_array(u32 *buf, unsigned int words)
 	}
 }
 
-static inline void md5_transform_helper(struct md5_ctx *ctx)
+static inline void md5_transform_helper(struct md5_context *ctx)
 {
 	le32_to_cpu_array(ctx->block, sizeof(ctx->block) / sizeof(u32));
 	md5_transform(ctx->hash, ctx->block);
 }
 
-static void md5_init(void *context)
+void md5_init ( struct md5_context *context )
 {
-	struct md5_ctx *mctx = context;
-
+	struct md5_context *mctx = context;
 	mctx->hash[0] = 0x67452301;
 	mctx->hash[1] = 0xefcdab89;
 	mctx->hash[2] = 0x98badcfe;
@@ -177,9 +166,9 @@ static void md5_init(void *context)
 	mctx->byte_count = 0;
 }
 
-static void md5_update(void *context, const void *data, size_t len)
+void md5_update ( struct md5_context *context, const void *data, size_t len )
 {
-	struct md5_ctx *mctx = context;
+	struct md5_context *mctx = context;
 	const u32 avail = sizeof(mctx->block) - (mctx->byte_count & 0x3f);
 
 	mctx->byte_count += len;
@@ -207,9 +196,9 @@ static void md5_update(void *context, const void *data, size_t len)
 	memcpy(mctx->block, data, len);
 }
 
-static void md5_finish(void *context, void *out)
+void md5_finish ( struct md5_context *context, struct md5_hash *out )
 {
-	struct md5_ctx *mctx = context;
+	struct md5_context *mctx = context;
 	const unsigned int offset = mctx->byte_count & 0x3f;
 	char *p = (char *)mctx->block + offset;
 	int padding = 56 - (offset + 1);
@@ -233,10 +222,12 @@ static void md5_finish(void *context, void *out)
 	memset(mctx, 0, sizeof(*mctx));
 }
 
+/*
 struct digest_algorithm md5_algorithm = {
-	.context_len	= sizeof ( struct md5_ctx ),
+	.context_len	= sizeof ( struct md5_context ),
 	.digest_len	= MD5_DIGEST_SIZE,
 	.init		= md5_init,
 	.update		= md5_update,
 	.finish		= md5_finish,
 };
+*/
