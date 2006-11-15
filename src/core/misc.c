@@ -150,18 +150,34 @@ int inet_aton ( const char *cp, struct in_addr *inp ) {
 	return 0;
 }
 
-unsigned long strtoul(const char *p, char **endp, int base)
-{
+unsigned long strtoul ( const char *p, char **endp, int base ) {
 	unsigned long ret = 0;
-	if (base != 10) return 0;
-	while((*p >= '0') && (*p <= '9')) {
-		ret = ret*10 + (*p - '0');
-		p++;
+	unsigned int charval;
+
+	if ( base == 0 ) {
+		if ( ( p[0] == '0' ) && ( ( p[1] | 0x20 ) == 'x' ) ) {
+			base = 16;
+			p += 2;
+		} else {
+			base = 10;
+		}
 	}
-	if (endp)
+
+	while ( 1 ) {
+		charval = *(p++) - '0';
+		if ( charval > ( 'A' - '0' - 10 ) )
+			charval -= ( 'A' - '0' - 10 );
+		if ( charval > ( 'a' - 'A' ) )
+			charval -= ( 'a' - 'A' );
+		if ( charval >= ( unsigned int ) base )
+			break;
+		ret = ( ( ret * base ) + charval );
+	}
+
+	if ( endp )
 		*endp = ( char * ) p;
-	return(ret);
-	
+
+	return ( ret );
 }
 
 /*
