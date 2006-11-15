@@ -155,11 +155,14 @@ unsigned long strtoul ( const char *p, char **endp, int base ) {
 	unsigned int charval;
 
 	if ( base == 0 ) {
-		if ( ( p[0] == '0' ) && ( ( p[1] | 0x20 ) == 'x' ) ) {
-			base = 16;
-			p += 2;
-		} else {
-			base = 10;
+		base = 10;
+		if ( *p == '0' ) {
+			p++;
+			base = 8;
+			if ( ( *p | 0x20 ) == 'x' ) {
+				p++;
+				base = 16;
+			}
 		}
 	}
 
