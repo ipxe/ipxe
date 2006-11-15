@@ -164,7 +164,7 @@ unsigned long strtoul ( const char *p, char **endp, int base ) {
 	}
 
 	while ( 1 ) {
-		charval = *(p++) - '0';
+		charval = ( *p - '0' );
 		if ( charval > ( 'A' - '0' - 10 ) )
 			charval -= ( 'A' - '0' - 10 );
 		if ( charval > ( 'a' - 'A' ) )
@@ -172,6 +172,7 @@ unsigned long strtoul ( const char *p, char **endp, int base ) {
 		if ( charval >= ( unsigned int ) base )
 			break;
 		ret = ( ( ret * base ) + charval );
+		p++;
 	}
 
 	if ( endp )
