@@ -18,6 +18,7 @@
 
 #include <stddef.h>
 #include <stdlib.h>
+#include <string.h>
 #include <errno.h>
 #include <assert.h>
 #include <malloc.h>
@@ -43,24 +44,24 @@
  */
 int chap_init ( struct chap_challenge *chap,
 		struct digest_algorithm *digest ) {
+	size_t state_len;
+	void *state;
+
 	assert ( chap->digest == NULL );
 	assert ( chap->digest_context == NULL );
 	assert ( chap->response == NULL );
 
+	state_len = ( digest->context_len + digest->digest_len );
+	state = malloc ( state_len );
+	if ( ! state )
+		return -ENOMEM;
+	
 	chap->digest = digest;
-	chap->digest_context = malloc ( digest->context_len );
-	if ( ! chap->digest_context )
-		goto err;
-	chap->response = malloc ( digest->digest_len );
-	if ( ! chap->response )
-		goto err;
+	chap->digest_context = state;
+	chap->response = ( state + digest->context_len );
 	chap->response_len = digest->digest_len;
 	chap->digest->init ( chap->digest_context );
 	return 0;
-
- err:
-	chap_finish ( chap );
-	return -ENOMEM;
 }
 
 /**
@@ -100,9 +101,8 @@ void chap_respond ( struct chap_challenge *chap ) {
  * @v chap		CHAP challenge/response
  */
 void chap_finish ( struct chap_challenge *chap ) {
-	free ( chap->digest_context );
-	chap->digest_context = NULL;
-	free ( chap->response );
-	chap->response = NULL;
-	chap->digest = NULL;
+	void *state = chap->digest_context;
+
+	free ( state );
+	memset ( chap, 0, sizeof ( *chap ) );
 }
