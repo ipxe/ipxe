@@ -51,10 +51,15 @@ int chap_init ( struct chap_challenge *chap,
 	assert ( chap->digest_context == NULL );
 	assert ( chap->response == NULL );
 
+	DBG ( "CHAP %p initialising with %s digest\n", chap, digest->name );
+
 	state_len = ( digest->context_len + digest->digest_len );
 	state = malloc ( state_len );
-	if ( ! state )
+	if ( ! state ) {
+		DBG ( "CHAP %p could not allocate %d bytes for state\n",
+		      chap, state_len );
 		return -ENOMEM;
+	}
 	
 	chap->digest = digest;
 	chap->digest_context = state;
@@ -76,6 +81,9 @@ void chap_update ( struct chap_challenge *chap, const void *data,
 	assert ( chap->digest != NULL );
 	assert ( chap->digest_context != NULL );
 
+	if ( ! chap->digest )
+		return;
+
 	chap->digest->update ( chap->digest_context, data, len );
 }
 
@@ -92,6 +100,11 @@ void chap_respond ( struct chap_challenge *chap ) {
 	assert ( chap->digest_context != NULL );
 	assert ( chap->response != NULL );
 
+	DBG ( "CHAP %p responding to challenge\n", chap );
+
+	if ( ! chap->digest )
+		return;
+
 	chap->digest->finish ( chap->digest_context, chap->response );
 }
 
@@ -102,6 +115,8 @@ void chap_respond ( struct chap_challenge *chap ) {
  */
 void chap_finish ( struct chap_challenge *chap ) {
 	void *state = chap->digest_context;
+
+	DBG ( "CHAP %p finished\n", chap );
 
 	free ( state );
 	memset ( chap, 0, sizeof ( *chap ) );
