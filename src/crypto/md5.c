@@ -234,6 +234,7 @@ static void md5_finish(void *context, void *out)
 }
 
 struct digest_algorithm md5_algorithm = {
+	.name		= "md5",
 	.context_len	= sizeof ( struct md5_ctx ),
 	.digest_len	= MD5_DIGEST_SIZE,
 	.init		= md5_init,

@@ -14,6 +14,8 @@
  *
  */
 struct digest_algorithm {
+	/** Algorithm name */
+	const char *name;
 	/** Size of a context for this algorithm */
 	size_t context_len;
 	/** Size of a message digest for this algorithm */
