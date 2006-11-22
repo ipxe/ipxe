@@ -277,7 +277,7 @@ static void printf_sputc ( struct printf_context *ctx, unsigned int c ) {
 	struct sputc_context * sctx =
 		container_of ( ctx, struct sputc_context, ctx );
 
-	if ( ctx->len <= sctx->max_len )
+	if ( ctx->len < sctx->max_len )
 		sctx->buf[ctx->len] = c;
 }
 
