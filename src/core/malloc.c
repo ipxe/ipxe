@@ -49,6 +49,23 @@ struct autosized_block {
 	char data[0];
 };
 
+/**
+ * Address for zero-length memory blocks
+ *
+ * @c malloc(0) or @c realloc(ptr,0) will return the special value @c
+ * NOWHERE.  Calling @c free(NOWHERE) will have no effect.
+ *
+ * This is consistent with the ANSI C standards, which state that
+ * "either NULL or a pointer suitable to be passed to free()" must be
+ * returned in these cases.  Using a special non-NULL value means that
+ * the caller can take a NULL return value to indicate failure,
+ * without first having to check for a requested size of zero.
+ *
+ * Code outside of malloc.c do not ever need to refer to the actual
+ * value of @c NOWHERE; this is an internal definition.
+ */
+#define NOWHERE ( ( void * ) ~( ( intptr_t ) 0 ) )
+
 /** List of free memory blocks */
 static LIST_HEAD ( free_blocks );
 
@@ -194,6 +211,66 @@ void free_memblock ( void *ptr, size_t size ) {
 }
 
 /**
+ * Reallocate memory
+ *
+ * @v old_ptr		Memory previously allocated by malloc(), or NULL
+ * @v new_size		Requested size
+ * @ret new_ptr		Allocated memory, or NULL
+ *
+ * Allocates memory with no particular alignment requirement.  @c
+ * new_ptr will be aligned to at least a multiple of sizeof(void*).
+ * If @c old_ptr is non-NULL, then the contents of the newly allocated
+ * memory will be the same as the contents of the previously allocated
+ * memory, up to the minimum of the old and new sizes.  The old memory
+ * will be freed.
+ *
+ * If allocation fails the previously allocated block is left
+ * untouched and NULL is returned.
+ *
+ * Calling realloc() with a new size of zero is a valid way to free a
+ * memory block.
+ */
+void * realloc ( void *old_ptr, size_t new_size ) {
+	struct autosized_block *old_block;
+	struct autosized_block *new_block;
+	size_t old_total_size;
+	size_t new_total_size;
+	size_t old_size;
+	void *new_ptr = NOWHERE;
+
+	/* Allocate new memory if necessary.  If allocation fails,
+	 * return without touching the old block.
+	 */
+	if ( new_size ) {
+		new_total_size = ( new_size +
+				   offsetof ( struct autosized_block, data ) );
+		new_block = alloc_memblock ( new_total_size, 1 );
+		if ( ! new_block )
+			return NULL;
+		new_block->size = new_total_size;
+		new_ptr = &new_block->data;
+	}
+	
+	/* Copy across relevant part of the old data region (if any),
+	 * then free it.  Note that at this point either (a) new_ptr
+	 * is valid, or (b) new_size is 0; either way, the memcpy() is
+	 * valid.
+	 */
+	if ( old_ptr && ( old_ptr != NOWHERE ) ) {
+		old_block = container_of ( old_ptr, struct autosized_block,
+					   data );
+		old_total_size = old_block->size;
+		old_size = ( old_total_size -
+			     offsetof ( struct autosized_block, data ) );
+		memcpy ( new_ptr, old_ptr,
+			 ( ( old_size < new_size ) ? old_size : new_size ) );
+		free_memblock ( old_block, old_total_size );
+	}
+
+	return new_ptr;
+}
+
+/**
  * Allocate memory
  *
  * @v size		Requested size
@@ -203,15 +280,7 @@ void free_memblock ( void *ptr, size_t size ) {
  * will be aligned to at least a multiple of sizeof(void*).
  */
 void * malloc ( size_t size ) {
-	size_t total_size;
-	struct autosized_block *block;
-
-	total_size = size + offsetof ( struct autosized_block, data );
-	block = alloc_memblock ( total_size, 1 );
-	if ( ! block )
-		return NULL;
-	block->size = total_size;
-	return &block->data;
+	return realloc ( NULL, size );
 }
 
 /**
@@ -225,12 +294,7 @@ void * malloc ( size_t size ) {
  * If @c ptr is NULL, no action is taken.
  */
 void free ( void *ptr ) {
-	struct autosized_block *block;
-
-	if ( ptr ) {
-		block = container_of ( ptr, struct autosized_block, data );
-		free_memblock ( block, block->size );
-	}
+	realloc ( ptr, 0 );
 }
 
 /**

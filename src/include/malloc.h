@@ -11,6 +11,7 @@
 
 extern void * alloc_memblock ( size_t size, size_t align );
 extern void free_memblock ( void *ptr, size_t size );
+extern void * realloc ( void *old_ptr, size_t new_size );
 extern void * malloc ( size_t size );
 extern void free ( void *ptr );
 extern void mpopulate ( void *start, size_t len );
