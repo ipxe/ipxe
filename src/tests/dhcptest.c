@@ -16,8 +16,8 @@ static int test_dhcp_aoe_boot ( struct net_device *netdev,
 
 static int test_dhcp_iscsi_boot ( struct net_device *netdev, char *iscsiname ) {
 	char *initiator_iqn = "iqn.1900-01.localdomain.localhost:initiator";
-	char *username = "joe";
-	char *password = "secret";
+	char username[32];
+	char password[32];
 	char *target_iqn;
 	union {
 		struct sockaddr_in sin;
@@ -34,6 +34,11 @@ static int test_dhcp_iscsi_boot ( struct net_device *netdev, char *iscsiname ) {
 		return -EINVAL;
 	}
 	inet_aton ( iscsiname, &target.sin.sin_addr );
+
+	dhcp_snprintf ( username, sizeof ( username ),
+			find_global_dhcp_option ( DHCP_EB_USERNAME ) );
+	dhcp_snprintf ( password, sizeof ( password ),
+			find_global_dhcp_option ( DHCP_EB_PASSWORD ) );
 
 	return test_iscsiboot ( initiator_iqn, &target.st, target_iqn,
 				username, password, netdev );

@@ -167,6 +167,24 @@
  */
 #define DHCP_EB_BIOS_DRIVE DHCP_ENCAP_OPT ( DHCP_EB_ENCAP, 0xbd )
 
+/** Username
+ *
+ * This will be used as the username for any required authentication.
+ * It is expected that this option's value will be held in
+ * non-volatile storage, rather than transmitted as part of a DHCP
+ * packet.
+ */
+#define DHCP_EB_USERNAME DHCP_ENCAP_OPT ( DHCP_EB_ENCAP, 0xbe )
+
+/** Password
+ *
+ * This will be used as the password for any required authentication.
+ * It is expected that this option's value will be held in
+ * non-volatile storage, rather than transmitted as part of a DHCP
+ * packet.
+ */
+#define DHCP_EB_PASSWORD DHCP_ENCAP_OPT ( DHCP_EB_ENCAP, 0xbf )
+
 /** Maximum normal DHCP option */
 #define DHCP_MAX_OPTION 254
 
