@@ -37,7 +37,7 @@ static int iscsi_command ( struct scsi_device *scsi,
 	struct iscsi_device *iscsidev
 		= container_of ( scsi, struct iscsi_device, scsi );
 
-	return iscsi_issue ( &iscsidev->iscsi, command );
+	return async_wait ( iscsi_issue ( &iscsidev->iscsi, command ) );
 }
 
 /**

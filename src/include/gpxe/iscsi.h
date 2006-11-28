@@ -9,7 +9,9 @@
 
 #include <stdint.h>
 #include <gpxe/tcp.h>
+#include <gpxe/async.h>
 #include <gpxe/scsi.h>
+#include <gpxe/chap.h>
 
 /** Default iSCSI port */
 #define ISCSI_PORT 3260
@@ -166,13 +168,6 @@ struct iscsi_bhs_login_request {
 #define ISCSI_LOGIN_NSG_SECURITY_NEGOTIATION 0x00
 #define ISCSI_LOGIN_NSG_OPERATIONAL_NEGOTIATION 0x01
 #define ISCSI_LOGIN_NSG_FULL_FEATURE_PHASE 0x03
-
-/* Combined stage values and mask */
-#define ISCSI_LOGIN_STAGE_MASK ( ISCSI_LOGIN_CSG_MASK | ISCSI_LOGIN_NSG_MASK )
-#define ISCSI_LOGIN_STAGE_SEC ( ISCSI_LOGIN_CSG_SECURITY_NEGOTIATION | \
-				ISCSI_LOGIN_NSG_OPERATIONAL_NEGOTIATION )
-#define ISCSI_LOGIN_STAGE_OP ( ISCSI_LOGIN_CSG_OPERATIONAL_NEGOTIATION | \
-			       ISCSI_LOGIN_NSG_FULL_FEATURE_PHASE )
 
 /** ISID IANA format marker */
 #define ISCSI_ISID_IANA 0x40000000
@@ -483,6 +478,23 @@ enum iscsi_rx_state {
 	ISCSI_RX_DATA_PADDING,
 };
 
+enum iscsi_string_key_value {
+	STRING_KEY = 0,
+	STRING_VALUE,
+};
+
+/** iSCSI text string processor state */
+struct iscsi_string_state {
+	/** Text string key */
+	char key[16];
+	/** Text string value */
+	char value[8];
+	/** Key/value flag */
+	enum iscsi_string_key_value key_value;
+	/** Index into current string */
+	unsigned int index;
+};
+
 /** An iSCSI session */
 struct iscsi_session {
 	/** TCP connection for this session */
@@ -493,6 +505,8 @@ struct iscsi_session {
 	 * constants.
 	 */
 	int status;
+	/** Asynchronous operation for the current iSCSI operation */
+	struct async_operation aop;
 	/** Retry count
 	 *
 	 * Number of times that the connection has been retried.
@@ -506,6 +520,13 @@ struct iscsi_session {
 	const char *target;
 	/** Logical Unit Number (LUN) */
 	uint64_t lun;
+
+	/** Username */
+	const char *username;
+	/** Password */
+	const char *password;
+	/** CHAP challenge/response */
+	struct chap_challenge chap;
 
 	/** Target session identifying handle
 	 *
@@ -569,6 +590,8 @@ struct iscsi_session {
 	enum iscsi_rx_state rx_state;
 	/** Byte offset within the current RX state */
 	size_t rx_offset;
+	/** State of strings received during login phase */
+	struct iscsi_string_state string;
 
 	/** Current SCSI command
 	 *
@@ -577,20 +600,44 @@ struct iscsi_session {
 	struct scsi_command *command;
 };
 
-/** Session is currently connected */
-#define ISCSI_STATUS_CONNECTED 0x01
+/** iSCSI session is currently in the security negotiation phase */
+#define ISCSI_STATUS_SECURITY_NEGOTIATION_PHASE		\
+	( ISCSI_LOGIN_CSG_SECURITY_NEGOTIATION |	\
+	  ISCSI_LOGIN_NSG_OPERATIONAL_NEGOTIATION )
 
-/** Session has completed */
-#define ISCSI_STATUS_DONE 0x02
+/** iSCSI session is currently in the operational parameter
+ * negotiation phase
+ */
+#define ISCSI_STATUS_OPERATIONAL_NEGOTIATION_PHASE	\
+	( ISCSI_LOGIN_CSG_OPERATIONAL_NEGOTIATION |	\
+	  ISCSI_LOGIN_NSG_FULL_FEATURE_PHASE )
 
-/** Session failed */
-#define ISCSI_STATUS_ERR 0x04
+/** iSCSI session is currently in the full feature phase */
+#define ISCSI_STATUS_FULL_FEATURE_PHASE	ISCSI_LOGIN_CSG_FULL_FEATURE_PHASE
+
+/** Mask for all iSCSI session phases */
+#define ISCSI_STATUS_PHASE_MASK ( ISCSI_LOGIN_CSG_MASK | ISCSI_LOGIN_NSG_MASK )
+
+/** iSCSI session needs to send the initial security negotiation strings */
+#define ISCSI_STATUS_STRINGS_SECURITY 0x0100
+
+/** iSCSI session needs to send the CHAP_A string */
+#define ISCSI_STATUS_STRINGS_CHAP_ALGORITHM 0x0200
+
+/** iSCSI session needs to send the CHAP response */
+#define ISCSI_STATUS_STRINGS_CHAP_RESPONSE 0x0400
+
+/** iSCSI session needs to send the operational negotiation strings */
+#define ISCSI_STATUS_STRINGS_OPERATIONAL 0x0800
+
+/** Mask for all iSCSI "needs to send" flags */
+#define ISCSI_STATUS_STRINGS_MASK 0xff00
 
 /** Maximum number of retries at connecting */
 #define ISCSI_MAX_RETRIES 2
 
-extern int iscsi_issue ( struct iscsi_session *iscsi,
-			 struct scsi_command *command );
+extern struct async_operation * iscsi_issue ( struct iscsi_session *iscsi,
+					      struct scsi_command *command );
 
 /** An iSCSI device */
 struct iscsi_device {

@@ -18,6 +18,7 @@
 
 #include <stddef.h>
 #include <string.h>
+#include <stdlib.h>
 #include <vsprintf.h>
 #include <errno.h>
 #include <assert.h>
@@ -36,6 +37,46 @@
 static void iscsi_start_tx ( struct iscsi_session *iscsi );
 static void iscsi_start_data_out ( struct iscsi_session *iscsi,
 				   unsigned int datasn );
+
+/**
+ * Mark iSCSI operation as complete
+ *
+ * @v iscsi		iSCSI session
+ * @v rc		Return status code
+ *
+ * Note that iscsi_done() will not close the connection, and must
+ * therefore be called only when the internal state machines are in an
+ * appropriate state, otherwise bad things may happen on the next call
+ * to iscsi_issue().  The general rule is to call iscsi_done() only at
+ * the end of receiving a PDU; at this point the TX and RX engines
+ * should both be idle.
+ */
+static void iscsi_done ( struct iscsi_session *iscsi, int rc ) {
+	/* Clear current SCSI command */
+	iscsi->command = NULL;
+	/* Free any memory that may have been used for CHAP */
+	chap_finish ( &iscsi->chap );
+	/* Mark asynchronous operation as complete */
+	async_done ( &iscsi->aop, rc );
+}
+
+/**
+ * Mark iSCSI operation as complete, and close TCP connection
+ *
+ * @v iscsi		iSCSI session
+ * @v rc		Return status code
+ */
+static void iscsi_close ( struct iscsi_session *iscsi, int rc ) {
+
+	/* Clear session status */
+	iscsi->status = 0;
+
+	/* Close TCP connection */
+	tcp_close ( &iscsi->tcp );
+
+	/* Mark iSCSI operation as complete */
+	iscsi_done ( iscsi, rc );
+}
 
 /****************************************************************************
  *
@@ -112,9 +153,11 @@ static void iscsi_rx_scsi_response ( struct iscsi_session *iscsi, void *data,
 	iscsi->command->status = response->status;
 
 	/* Mark as completed, with error if applicable */
-	iscsi->status |= ISCSI_STATUS_DONE;
-	if ( response->response != ISCSI_RESPONSE_COMMAND_COMPLETE )
-		iscsi->status |= ISCSI_STATUS_ERR;
+	if ( response->response == ISCSI_RESPONSE_COMMAND_COMPLETE ) {
+		iscsi_done ( iscsi, 0 );
+	} else {
+		iscsi_done ( iscsi, -EIO );
+	}
 }
 
 /**
@@ -146,7 +189,7 @@ static void iscsi_rx_data_in ( struct iscsi_session *iscsi, void *data,
 	if ( ( offset + len ) == iscsi->command->data_in_len ) {
 		assert ( data_in->flags & ISCSI_FLAG_FINAL );
 		assert ( remaining == 0 );
-		iscsi->status |= ISCSI_STATUS_DONE;
+		iscsi_done ( iscsi, 0 );
 	}
 }
 
@@ -259,6 +302,32 @@ static void iscsi_tx_data_out ( struct iscsi_session *iscsi,
  */
 
 /**
+ * Version of snprintf() that accepts a signed buffer size
+ *
+ * @v buf		Buffer into which to write the string
+ * @v size		Size of buffer
+ * @v fmt		Format string
+ * @v args		Arguments corresponding to the format string
+ * @ret len		Length of formatted string
+ *
+ * This is a utility function for iscsi_build_login_request_strings().
+ */
+static int ssnprintf ( char *buf, ssize_t ssize, const char *fmt, ... ) {
+	va_list args;
+	int len;
+
+	/* Treat negative buffer size as zero buffer size */
+	if ( ssize < 0 )
+		ssize = 0;
+
+	/* Hand off to vsnprintf */
+	va_start ( args, fmt );
+	len = vsnprintf ( buf, ssize, fmt, args );
+	va_end ( args );
+	return len;
+}
+
+/**
  * Build iSCSI login request strings
  *
  * @v iscsi		iSCSI session
@@ -291,45 +360,57 @@ static void iscsi_tx_data_out ( struct iscsi_session *iscsi,
  */
 static int iscsi_build_login_request_strings ( struct iscsi_session *iscsi,
 					       void *data, size_t len ) {
-	struct iscsi_bhs_login_request *request = &iscsi->tx_bhs.login_request;
+	unsigned int used = 0;
+	unsigned int i;
 
-	switch ( request->flags & ISCSI_LOGIN_CSG_MASK ) {
-	case ISCSI_LOGIN_CSG_SECURITY_NEGOTIATION:
-		return snprintf ( data, len,
-				  "InitiatorName=%s%c"
-				  "TargetName=%s%c"
-				  "SessionType=Normal%c"
-				  "AuthMethod=CHAP,None%c"
-				  "CHAP_A=5%c",
-				  iscsi->initiator, 0, iscsi->target, 0,
-				  0, 0, 0 );
-	case ISCSI_LOGIN_CSG_OPERATIONAL_NEGOTIATION:
-		return snprintf ( data, len,
-				  "HeaderDigest=None%c"
-				  "DataDigest=None%c"
-				  "InitialR2T=Yes%c"
-				  "DefaultTime2Wait=0%c"
-				  "DefaultTime2Retain=0%c"
-				  "MaxOutstandingR2T=1%c"
-				  "DataPDUInOrder=Yes%c"
-				  "DataSequenceInOrder=Yes%c"
-				  "ErrorRecoveryLevel=0%c",
-				  0, 0, 0, 0, 0, 0, 0, 0, 0 );
-	default:
-		assert ( 0 );
-		return 0;
+	if ( iscsi->status & ISCSI_STATUS_STRINGS_SECURITY ) {
+		used += ssnprintf ( data + used, len - used,
+				    "InitiatorName=%s%c"
+				    "TargetName=%s%c"
+				    "SessionType=Normal%c"
+				    "AuthMethod=CHAP,None%c",
+				    iscsi->initiator, 0, iscsi->target, 0,
+				    0, 0 );
 	}
+
+	if ( iscsi->status & ISCSI_STATUS_STRINGS_CHAP_ALGORITHM ) {
+		used += ssnprintf ( data + used, len - used, "CHAP_A=5%c", 0 );
+	}
+	
+	if ( iscsi->status & ISCSI_STATUS_STRINGS_CHAP_RESPONSE ) {
+		used += ssnprintf ( data + used, len - used,
+				    "CHAP_N=%s%cCHAP_R=0x",
+				    iscsi->username, 0 );
+		for ( i = 0 ; i < iscsi->chap.response_len ; i++ ) {
+			used += ssnprintf ( data + used, len - used, "%02x",
+					    iscsi->chap.response[i] );
+		}
+		used += ssnprintf ( data + used, len - used, "%c", 0 );
+	}
+
+	if ( iscsi->status & ISCSI_STATUS_STRINGS_OPERATIONAL ) {
+		used += ssnprintf ( data + used, len - used,
+				    "HeaderDigest=None%c"
+				    "DataDigest=None%c"
+				    "InitialR2T=Yes%c"
+				    "DefaultTime2Wait=0%c"
+				    "DefaultTime2Retain=0%c"
+				    "MaxOutstandingR2T=1%c"
+				    "DataPDUInOrder=Yes%c"
+				    "DataSequenceInOrder=Yes%c"
+				    "ErrorRecoveryLevel=0%c",
+				    0, 0, 0, 0, 0, 0, 0, 0, 0 );
+	}
+
+	return used;
 }
 
 /**
  * Build iSCSI login request BHS
  *
  * @v iscsi		iSCSI session
- * @v stage		Current stage of iSCSI login
- * @v send_strings	Send login strings with this login request
  */
-static void iscsi_start_login ( struct iscsi_session *iscsi,
-				int stage, int send_strings ) {
+static void iscsi_start_login ( struct iscsi_session *iscsi ) {
 	struct iscsi_bhs_login_request *request = &iscsi->tx_bhs.login_request;
 	int len;
 
@@ -337,13 +418,11 @@ static void iscsi_start_login ( struct iscsi_session *iscsi,
 	iscsi_start_tx ( iscsi );
 	request->opcode = ( ISCSI_OPCODE_LOGIN_REQUEST |
 			    ISCSI_FLAG_IMMEDIATE );
-	request->flags = ( ISCSI_LOGIN_FLAG_TRANSITION | stage );
-
+	request->flags = ( ( iscsi->status & ISCSI_STATUS_PHASE_MASK ) |
+			   ISCSI_LOGIN_FLAG_TRANSITION );
 	/* version_max and version_min left as zero */
-	if ( send_strings ) {
-		len = iscsi_build_login_request_strings ( iscsi, NULL, 0 );
-		ISCSI_SET_LENGTHS ( request->lengths, 0, len );
-	}
+	len = iscsi_build_login_request_strings ( iscsi, NULL, 0 );
+	ISCSI_SET_LENGTHS ( request->lengths, 0, len );
 	request->isid_iana_en = htonl ( ISCSI_ISID_IANA |
 					IANA_EN_FEN_SYSTEMS );
 	/* isid_iana_qual left as zero */
@@ -352,6 +431,18 @@ static void iscsi_start_login ( struct iscsi_session *iscsi,
 	/* cid left as zero */
 	request->cmdsn = htonl ( iscsi->cmdsn );
 	request->expstatsn = htonl ( iscsi->statsn + 1 );
+}
+
+/**
+ * Complete iSCSI login request PDU transmission
+ *
+ * @v iscsi		iSCSI session
+ *
+ */
+static void iscsi_login_request_done ( struct iscsi_session *iscsi ) {
+
+	/* Clear any "strings to send" flags */
+	iscsi->status &= ~ISCSI_STATUS_STRINGS_MASK;
 }
 
 /**
@@ -371,6 +462,238 @@ static void iscsi_tx_login_request ( struct iscsi_session *iscsi,
 }
 
 /**
+ * Handle iSCSI AuthMethod text value
+ *
+ * @v iscsi		iSCSI session
+ * @v finished		Value is complete
+ */
+static void iscsi_handle_authmethod_value ( struct iscsi_session *iscsi,
+					    int finished ) {
+	struct iscsi_string_state *string = &iscsi->string;
+
+	if ( ! finished )
+		return;
+
+	/* If server requests CHAP, send the CHAP_A string */
+	if ( strcmp ( string->value, "CHAP" ) == 0 ) {
+		DBG ( "iSCSI %p initiating CHAP authentication\n", iscsi );
+		iscsi->status |= ISCSI_STATUS_STRINGS_CHAP_ALGORITHM;
+	}
+}
+
+/**
+ * Handle iSCSI CHAP_A text value
+ *
+ * @v iscsi		iSCSI session
+ * @v finished		Value is complete
+ */
+static void iscsi_handle_chap_a_value ( struct iscsi_session *iscsi,
+					int finished ) {
+	struct iscsi_string_state *string = &iscsi->string;
+	int rc;
+
+	if ( ! finished )
+		return;
+	
+	/* We only ever offer "5" (i.e. MD5) as an algorithm, so if
+	 * the server responds with anything else it is a protocol
+	 * violation.
+	 */
+	if ( strcmp ( string->value, "5" ) != 0 ) {
+		DBG ( "iSCSI %p got invalid CHAP algorithm \"%s\"\n",
+		      iscsi, string->value );
+	}
+
+	/* Prepare for CHAP with MD5 */
+	if ( ( rc = chap_init ( &iscsi->chap, &md5_algorithm ) ) != 0 ) {
+		DBG ( "iSCSI %p could not initialise CHAP\n", iscsi );
+		iscsi_close ( iscsi, rc );
+	}
+}
+
+/**
+ * Handle iSCSI CHAP_I text value
+ *
+ * @v iscsi		iSCSI session
+ * @v finished		Value is complete
+ */
+static void iscsi_handle_chap_i_value ( struct iscsi_session *iscsi,
+					int finished ) {
+	struct iscsi_string_state *string = &iscsi->string;
+	unsigned int identifier;
+	char *endp;
+
+	if ( ! finished )
+		return;
+
+	/* The CHAP identifier is an integer value */
+	identifier = strtoul ( string->value, &endp, 0 );
+	if ( *endp != '\0' ) {
+		DBG ( "iSCSI %p saw invalid CHAP identifier \"%s\"\n",
+		      iscsi, string->value );
+	}
+
+	/* Identifier and secret are the first two components of the
+	 * challenge.
+	 */
+	chap_set_identifier ( &iscsi->chap, identifier );
+	chap_update ( &iscsi->chap, iscsi->password,
+		      strlen ( iscsi->password ) );
+}
+
+/**
+ * Handle iSCSI CHAP_C text value
+ *
+ * @v iscsi		iSCSI session
+ * @v finished		Value is complete
+ */
+static void iscsi_handle_chap_c_value ( struct iscsi_session *iscsi,
+					int finished ) {
+	struct iscsi_string_state *string = &iscsi->string;
+	uint8_t byte;
+	char *endp;
+
+	/* Once the whole challenge is received, calculate the response */
+	if ( finished ) {
+		DBG ( "iSCSI %p sending CHAP response\n", iscsi );
+		chap_respond ( &iscsi->chap );
+		iscsi->status |= ISCSI_STATUS_STRINGS_CHAP_RESPONSE;
+		return;
+	}
+
+	/* Wait until a complete octet ("0x??") is received */
+	if ( string->index != 4 )
+		return;
+
+	/* Add octet to challenge */
+	byte = strtoul ( string->value, &endp, 0 );
+	if ( *endp != '\0' ) {
+		DBG ( "iSCSI %p saw invalid CHAP challenge portion \"%s\"\n",
+		      iscsi, string->value );
+	}
+	chap_update ( &iscsi->chap, &byte, sizeof ( byte ) );
+
+	/* Reset value back to "0x" */
+	string->index = 2;
+}
+
+/** An iSCSI text string that we want to handle */
+struct iscsi_string_type {
+	/** String name
+	 *
+	 * This is the portion before the "=" sign,
+	 * e.g. InitiatorName, CHAP_A, etc.
+	 */
+	const char *name;
+	/** Handle iSCSI string value
+	 *
+	 * @v iscsi		iSCSI session
+	 * @v finished		Value is complete
+	 *
+	 * Process the string in @c iscsi->string.  This method will
+	 * be called once for each character in the string, and once
+	 * again at the end of the string.
+	 */
+	void ( * handle_value ) ( struct iscsi_session *iscsi, int finished );
+};
+
+/** iSCSI text strings that we want to handle */
+struct iscsi_string_type iscsi_string_types[] = {
+	{ "AuthMethod", iscsi_handle_authmethod_value },
+	{ "CHAP_A", iscsi_handle_chap_a_value },
+	{ "CHAP_I", iscsi_handle_chap_i_value },
+	{ "CHAP_C", iscsi_handle_chap_c_value },
+	{ NULL, NULL }
+};
+
+/**
+ * Handle iSCSI string value
+ *
+ * @v iscsi		iSCSI session
+ * @v finished		Value is complete
+ *
+ * Process the string in @c iscsi->string.  This function will be
+ * called once for each character in the string, and once again at the
+ * end of the string.
+ */
+static void iscsi_handle_string_value ( struct iscsi_session *iscsi,
+					int finished ) {
+	struct iscsi_string_state *string = &iscsi->string;
+	struct iscsi_string_type *type = iscsi_string_types;
+
+	assert ( string->key_value == STRING_VALUE );
+
+	for ( type = iscsi_string_types ; type->name ; type++ ) {
+		if ( strcmp ( type->name, string->key ) == 0 ) {
+			if ( string->index <= 1 ) {
+				DBG ( "iSCSI %p handling key \"%s\"\n",
+				      iscsi, string->key );
+			}
+			type->handle_value ( iscsi, finished );
+			return;
+		}
+	}
+	if ( string->index <= 1 )
+		DBG ( "iSCSI %p ignoring key \"%s\"\n", iscsi, string->key );
+}
+
+/**
+ * Handle byte of an iSCSI string
+ *
+ * @v iscsi		iSCSI session
+ * @v byte		Byte of string
+ *
+ * Strings are handled a byte at a time in order to simplify the
+ * logic, and to ensure that we can provably cope with the TCP packet
+ * boundaries coming at inconvenient points, such as halfway through a
+ * string.
+ */
+static void iscsi_handle_string_byte ( struct iscsi_session *iscsi,
+				       uint8_t byte ) {
+	struct iscsi_string_state *string = &iscsi->string;
+
+	if ( string->key_value == STRING_KEY ) {
+		switch ( byte ) {
+		case '\0':
+			/* Premature termination */
+			DBG ( "iSCSI %p premature key termination on \"%s\"\n",
+			      iscsi, string->key );
+			string->index = 0;
+			break;
+		case '=':
+			/* End of key */
+			string->key_value = STRING_VALUE;
+			string->index = 0;
+			break;
+		default:
+			/* Part of key */
+			if ( string->index < ( sizeof ( string->key ) - 1 ) ) {
+				string->key[string->index++] = byte;
+				string->key[string->index] = '\0';
+			}
+			break;
+		}
+	} else {
+		switch ( byte ) {
+		case '\0':
+			/* End of string */
+			iscsi_handle_string_value ( iscsi, 1 );
+			string->key_value = STRING_KEY;
+			string->index = 0;
+			break;
+		default:
+			/* Part of value */
+			if ( string->index < ( sizeof ( string->value ) - 1 )){
+				string->value[string->index++] = byte;
+				string->value[string->index] = '\0';
+				iscsi_handle_string_value ( iscsi, 0 );
+			}
+			break;
+		}
+	}
+}
+
+/**
  * Receive data segment of an iSCSI login response PDU
  *
  * @v iscsi		iSCSI session
@@ -379,10 +702,8 @@ static void iscsi_tx_login_request ( struct iscsi_session *iscsi,
  * @v remaining		Data remaining after this data
  * 
  */
-static void iscsi_rx_login_response ( struct iscsi_session *iscsi,
-				      void *data __unused,
-				      size_t len __unused,
-				      size_t remaining __unused ) {
+static void iscsi_rx_login_response ( struct iscsi_session *iscsi, void *data,
+				      size_t len, size_t remaining ) {
 	struct iscsi_bhs_login_response *response
 		= &iscsi->rx_bhs.login_response;
 
@@ -390,33 +711,49 @@ static void iscsi_rx_login_response ( struct iscsi_session *iscsi,
 	if ( response->status_class != 0 ) {
 		printf ( "iSCSI login failure: class %02x detail %02x\n",
 			 response->status_class, response->status_detail );
-		iscsi->status |= ( ISCSI_STATUS_DONE | ISCSI_STATUS_ERR );
-		tcp_close ( &iscsi->tcp );
+		iscsi_close ( iscsi, -EPERM );
 		return;
 	}
 
-	/* If server did not transition, send back another login
-	 * request without any login strings.
-	 */
-	if ( ! ( response->flags & ISCSI_LOGIN_FLAG_TRANSITION ) ) {
-		iscsi_start_login ( iscsi, ( response->flags &
-					     ISCSI_LOGIN_STAGE_MASK ), 0 );
+	/* Process strings data */
+	for ( ; len-- ; data++ ) {
+		iscsi_handle_string_byte ( iscsi, * ( ( uint8_t * ) data ) );
+	}
+	if ( remaining )
 		return;
+
+	/* Handle login transitions */
+	if ( response->flags & ISCSI_LOGIN_FLAG_TRANSITION ) {
+		switch ( response->flags & ISCSI_LOGIN_NSG_MASK ) {
+		case ISCSI_LOGIN_NSG_OPERATIONAL_NEGOTIATION:
+			iscsi->status =
+				( ISCSI_STATUS_OPERATIONAL_NEGOTIATION_PHASE |
+				  ISCSI_STATUS_STRINGS_OPERATIONAL );
+			break;
+		case ISCSI_LOGIN_NSG_FULL_FEATURE_PHASE:
+			iscsi->status = ISCSI_STATUS_FULL_FEATURE_PHASE;
+			break;
+		default:
+			DBG ( "iSCSI %p got invalid response flags %02x\n",
+			      iscsi, response->flags );
+			iscsi_close ( iscsi, -EIO );
+			return;
+		}
 	}
 
-	/* If we are transitioning to the operational phase, send the
-	 * operational phase login request.
+	/* Send next login request PDU if we haven't reached the full
+	 * feature phase yet.
 	 */
-	if ( ( response->flags & ISCSI_LOGIN_NSG_MASK ) ==
-	     ISCSI_LOGIN_NSG_OPERATIONAL_NEGOTIATION ) {
-		iscsi_start_login ( iscsi, ISCSI_LOGIN_STAGE_OP, 1 );
+	if ( ( iscsi->status & ISCSI_STATUS_PHASE_MASK ) !=
+	     ISCSI_STATUS_FULL_FEATURE_PHASE ) {
+		iscsi_start_login ( iscsi );
 		return;
 	}
 
 	/* Record TSIH for future reference */
 	iscsi->tsih = ntohl ( response->tsih );
 	
-	/* Send the SCSI command */
+	/* Send the actual SCSI command */
 	iscsi_start_command ( iscsi );
 }
 
@@ -492,6 +829,8 @@ static void iscsi_tx_done ( struct iscsi_session *iscsi ) {
 	switch ( common->opcode & ISCSI_OPCODE_MASK ) {
 	case ISCSI_OPCODE_DATA_OUT:
 		iscsi_data_out_done ( iscsi );
+	case ISCSI_OPCODE_LOGIN_REQUEST:
+		iscsi_login_request_done ( iscsi );
 	default:
 		/* No action */
 		break;
@@ -629,8 +968,10 @@ static void iscsi_rx_data ( struct iscsi_session *iscsi, void *data,
 		iscsi_rx_r2t ( iscsi, data, len, remaining );
 		break;
 	default:
+		if ( remaining )
+			return;
 		printf ( "Unknown iSCSI opcode %02x\n", response->opcode );
-		iscsi->status |= ( ISCSI_STATUS_DONE | ISCSI_STATUS_ERR );
+		iscsi_done ( iscsi, -EOPNOTSUPP );
 		break;
 	}
 }
@@ -752,18 +1093,18 @@ static void iscsi_newdata ( struct tcp_connection *conn, void *data,
  * @v status		Error code, if any
  *
  */
-static void iscsi_closed ( struct tcp_connection *conn, int status __unused ) {
+static void iscsi_closed ( struct tcp_connection *conn, int status ) {
 	struct iscsi_session *iscsi = tcp_to_iscsi ( conn );
 
-	/* Clear connected flag */
-	iscsi->status &= ~ISCSI_STATUS_CONNECTED;
+	/* Clear session status */
+	iscsi->status = 0;
 
 	/* Retry connection if within the retry limit, otherwise fail */
 	if ( ++iscsi->retry_count <= ISCSI_MAX_RETRIES ) {
 		tcp_connect ( conn );
 	} else {
 		printf ( "iSCSI retry count exceeded\n" );
-		iscsi->status |= ( ISCSI_STATUS_DONE | ISCSI_STATUS_ERR );
+		iscsi_done ( iscsi, status );
 	}
 }
 
@@ -777,7 +1118,8 @@ static void iscsi_connected ( struct tcp_connection *conn ) {
 	struct iscsi_session *iscsi = tcp_to_iscsi ( conn );
 
 	/* Set connected flag and reset retry count */
-	iscsi->status |= ISCSI_STATUS_CONNECTED;
+	iscsi->status = ( ISCSI_STATUS_SECURITY_NEGOTIATION_PHASE |
+			  ISCSI_STATUS_STRINGS_SECURITY );
 	iscsi->retry_count = 0;
 
 	/* Prepare to receive PDUs. */
@@ -788,7 +1130,7 @@ static void iscsi_connected ( struct tcp_connection *conn ) {
 	iscsi->itt++;
 
 	/* Start logging in */
-	iscsi_start_login ( iscsi, ISCSI_LOGIN_STAGE_SEC, 1 );
+	iscsi_start_login ( iscsi );
 }
 
 /** iSCSI TCP operations */
@@ -805,14 +1147,14 @@ static struct tcp_operations iscsi_tcp_operations = {
  *
  * @v iscsi		iSCSI session
  * @v command		SCSI command
- * @ret rc		Return status code
+ * @ret aop		Asynchronous operation for this SCSI command
  */
-int iscsi_issue ( struct iscsi_session *iscsi,
-		  struct scsi_command *command ) {
+struct async_operation * iscsi_issue ( struct iscsi_session *iscsi,
+				       struct scsi_command *command ) {
+	assert ( iscsi->command == NULL );
 	iscsi->command = command;
-	iscsi->status &= ~( ISCSI_STATUS_DONE | ISCSI_STATUS_ERR );
 
-	if ( iscsi->status & ISCSI_STATUS_CONNECTED ) {
+	if ( iscsi->status ) {
 		iscsi_start_command ( iscsi );
 		tcp_senddata ( &iscsi->tcp );
 	} else {
@@ -820,11 +1162,5 @@ int iscsi_issue ( struct iscsi_session *iscsi,
 		tcp_connect ( &iscsi->tcp );
 	}
 
-	while ( ! ( iscsi->status & ISCSI_STATUS_DONE ) ) {
-		step();
-	}
-
-	iscsi->command = NULL;
-
-	return ( ( iscsi->status & ISCSI_STATUS_ERR ) ? -EIO : 0 );	
+	return &iscsi->aop;
 }
