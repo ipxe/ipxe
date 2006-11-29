@@ -15,7 +15,8 @@ int test_iscsiboot ( const char *initiator_iqn,
 		     const char *target_iqn,
 		     const char *username,
 		     const char *password,
-		     struct net_device *netdev ) {
+		     struct net_device *netdev,
+		     unsigned int drivenum ) {
 	struct int13_drive drive;
 	int rc;
 
@@ -36,6 +37,7 @@ int test_iscsiboot ( const char *initiator_iqn,
 	ibft_fill_data ( netdev, initiator_iqn, target, target_iqn );
 #endif
 	memset ( &drive, 0, sizeof ( drive ) );
+	drive.drive = drivenum;
 	drive.blockdev = &test_iscsidev.scsi.blockdev;
 	register_int13_drive ( &drive );
 	printf ( "Registered %s as BIOS drive %#02x\n",

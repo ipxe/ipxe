@@ -23,7 +23,8 @@ static int test_dhcp_iscsi_boot ( struct net_device *netdev, char *iscsiname ) {
 		struct sockaddr_in sin;
 		struct sockaddr_tcpip st;
 	} target;
-
+	unsigned int drivenum;
+	
 	memset ( &target, 0, sizeof ( target ) );
 	target.sin.sin_family = AF_INET;
 	target.sin.sin_port = htons ( ISCSI_PORT );
@@ -40,8 +41,10 @@ static int test_dhcp_iscsi_boot ( struct net_device *netdev, char *iscsiname ) {
 	dhcp_snprintf ( password, sizeof ( password ),
 			find_global_dhcp_option ( DHCP_EB_PASSWORD ) );
 
+	drivenum = find_global_dhcp_num_option ( DHCP_EB_BIOS_DRIVE );
+
 	return test_iscsiboot ( initiator_iqn, &target.st, target_iqn,
-				username, password, netdev );
+				username, password, netdev, drivenum );
 }
 
 static int test_dhcp_hello ( char *helloname ) {
