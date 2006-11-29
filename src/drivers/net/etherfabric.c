@@ -18,9 +18,11 @@
 
 #include "etherboot.h"
 #include "nic.h"
+#include <errno.h>
 #include <gpxe/pci.h>
 #include <gpxe/bitbash.h>
 #include <gpxe/i2c.h>
+#include <gpxe/nvs.h>
 #include "timer.h"
 #define dma_addr_t unsigned long
 #include "etherfabric.h"
@@ -210,6 +212,9 @@ struct efab_nic {
 	struct i2c_bit_basher ef1002_i2c;
 	unsigned long ef1002_i2c_outputs;
 	struct i2c_device ef1002_eeprom;
+
+	/** NVS access */
+	struct nvs_device nvs;
 };
 
 /**************************************************************************
@@ -2206,9 +2211,12 @@ struct efab_spi_device {
 	unsigned int device_id;
 	/** Address length (in bytes) */
 	unsigned int addr_len;
-	/** Read command */
-	unsigned int read_command;
+	/** Device size */
+	unsigned int len;
 };
+
+#define SPI_WRITE_CMD 0x02
+#define SPI_READ_CMD 0x03
 
 /**
  * Wait for SPI command completion
@@ -2234,8 +2242,8 @@ static int falcon_spi_wait ( struct efab_nic *efab ) {
  *
  */
 static int falcon_spi_read ( struct efab_nic *efab,
-			     struct efab_spi_device *spi,
-			     int address, void *data, unsigned int len ) {
+			     struct efab_spi_device *spi, int address,
+			     void *data, unsigned int len ) {
 	efab_oword_t reg;
 
 	/* Program address register */
@@ -2250,7 +2258,7 @@ static int falcon_spi_read ( struct efab_nic *efab,
 				FCN_EE_SPI_HCMD_READ, FCN_EE_SPI_READ,
 				FCN_EE_SPI_HCMD_DUBCNT, 0,
 				FCN_EE_SPI_HCMD_ADBCNT, spi->addr_len,
-				FCN_EE_SPI_HCMD_ENC, spi->read_command );
+				FCN_EE_SPI_HCMD_ENC, SPI_READ_CMD );
 	falcon_write ( efab, &reg, FCN_EE_SPI_HCMD_REG_KER );
 	
 	/* Wait for read to complete */
@@ -2264,24 +2272,61 @@ static int falcon_spi_read ( struct efab_nic *efab,
 	return 1;
 }
 
-#define SPI_READ_CMD 0x03
+/**
+ * Perform SPI write
+ *
+ */
+static int falcon_spi_write ( struct efab_nic *efab,
+			      struct efab_spi_device *spi, int address,
+			      const void *data, unsigned int len ) {
+	efab_oword_t reg;
+
+	/* Program address register */
+	EFAB_POPULATE_OWORD_1 ( reg, FCN_EE_SPI_HADR_ADR, address );
+	falcon_write ( efab, &reg, FCN_EE_SPI_HADR_REG_KER );
+	
+	/* Program data register */
+	memcpy ( &reg, data, len );
+	falcon_write ( efab, &reg, FCN_EE_SPI_HDATA_REG_KER );
+
+	/* Issue write command */
+	EFAB_POPULATE_OWORD_7 ( reg,
+				FCN_EE_SPI_HCMD_CMD_EN, 1, 
+				FCN_EE_SPI_HCMD_SF_SEL, spi->device_id,
+				FCN_EE_SPI_HCMD_DABCNT, len,
+				FCN_EE_SPI_HCMD_READ, FCN_EE_SPI_WRITE,
+				FCN_EE_SPI_HCMD_DUBCNT, 0,
+				FCN_EE_SPI_HCMD_ADBCNT, spi->addr_len,
+				FCN_EE_SPI_HCMD_ENC, SPI_WRITE_CMD );
+	falcon_write ( efab, &reg, FCN_EE_SPI_HCMD_REG_KER );
+	
+	/* Wait for read to complete */
+	if ( ! falcon_spi_wait ( efab ) )
+		return 0;
+	
+	return 1;
+}
+
 #define AT25F1024_ADDR_LEN 3
-#define AT25F1024_READ_CMD SPI_READ_CMD
+#define AT25040_ADDR_LEN 1
 #define MC25XX640_ADDR_LEN 2
-#define MC25XX640_READ_CMD SPI_READ_CMD
 
 /** Falcon Flash SPI device */
 static struct efab_spi_device falcon_spi_flash = {
 	.device_id	= FCN_EE_SPI_FLASH,
 	.addr_len	= AT25F1024_ADDR_LEN,
-	.read_command	= AT25F1024_READ_CMD,
 };
 
 /** Falcon EEPROM SPI device */
 static struct efab_spi_device falcon_spi_large_eeprom = {
 	.device_id	= FCN_EE_SPI_EEPROM,
 	.addr_len	= MC25XX640_ADDR_LEN,
-	.read_command	= MC25XX640_READ_CMD,
+};
+
+/** Falcon EEPROM SPI device */
+static struct efab_spi_device falcon_spi_small_eeprom = {
+	.device_id	= FCN_EE_SPI_EEPROM,
+	.addr_len	= AT25040_ADDR_LEN,
 };
 
 /** Offset of MAC address within EEPROM or Flash */
@@ -2300,6 +2345,49 @@ static int falcon_read_eeprom ( struct efab_nic *efab ) {
 				 FALCON_MAC_ADDRESS_OFFSET ( efab->port ),
 				 efab->mac_addr, sizeof ( efab->mac_addr ) );
 }
+
+#define FALCON_NVS_OFFSET 0x000
+
+static int falcon_read_nvs ( struct nvs_device *nvs, unsigned int offset,
+			     void *data, size_t len ) {
+	struct efab_nic *efab = container_of ( nvs, struct efab_nic, nvs );
+	struct efab_spi_device *spi = &falcon_spi_small_eeprom;
+
+	while ( len ) {
+		if ( ! falcon_spi_read ( efab, spi,
+					 ( offset + FALCON_NVS_OFFSET ),
+					 data, 16 ) ) {
+			return -EIO;
+		}
+		data += 16;
+		offset += 16;
+		len -=16;
+	}
+	return 0;
+}
+
+static int falcon_write_nvs ( struct nvs_device *nvs, unsigned int offset,
+			      const void *data, size_t len ) {
+	struct efab_nic *efab = container_of ( nvs, struct efab_nic, nvs );
+	struct efab_spi_device *spi = &falcon_spi_large_eeprom;
+
+	while ( len ) {
+		if ( ! falcon_spi_write ( efab, spi,
+					 ( offset + FALCON_NVS_OFFSET ),
+					 data, 16 ) ) {
+			return -EIO;
+		}
+		data += 16;
+		offset += 16;
+		len -=16;
+	}
+	return 0;
+}
+
+static struct nvs_operations falcon_nvs_operations = {
+	.read = falcon_read_nvs,
+	.write = falcon_write_nvs,
+};
 
 /** RX descriptor */
 typedef efab_qword_t falcon_rx_desc_t;
@@ -2952,6 +3040,14 @@ static int falcon_init_nic ( struct efab_nic *efab ) {
 	falcon_write ( efab, &reg, FCN_INT_ADR_REG_KER );
 	udelay ( 1000 );
 
+	/* Register non-volatile storage */
+	if ( efab->has_eeprom ) {
+		efab->nvs.op = &falcon_nvs_operations;
+		efab->nvs.len = 0x100;
+		if ( nvs_register ( &efab->nvs ) != 0 )
+			return 0;
+	}
+
 	return 1;
 }
 
@@ -3303,7 +3399,7 @@ PROBE - Look for an adapter, this routine's visible to the outside
 ***************************************************************************/
 static int etherfabric_probe ( struct nic *nic, struct pci_device *pci ) {
 	static struct efab_nic efab;
-	static int nic_port = 1;
+	static int nic_port = 0;
 	struct efab_buffers *buffers;
 	int i;
 
