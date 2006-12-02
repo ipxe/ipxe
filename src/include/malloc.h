@@ -9,11 +9,16 @@
  *
  */
 
+/*
+ * Prototypes for the standard functions (malloc() et al) are in
+ * stdlib.h.  Include <malloc.h> only if you need the non-standard
+ * functions, such as malloc_dma().
+ *
+ */
+#include <stdlib.h>
+
 extern void * alloc_memblock ( size_t size, size_t align );
 extern void free_memblock ( void *ptr, size_t size );
-extern void * realloc ( void *old_ptr, size_t new_size );
-extern void * malloc ( size_t size );
-extern void free ( void *ptr );
 extern void mpopulate ( void *start, size_t len );
 extern void mdumpfree ( void );
 
@@ -45,23 +50,6 @@ static inline void * malloc_dma ( size_t size, size_t phys_align ) {
  */
 static inline void free_dma ( void *ptr, size_t size ) {
 	free_memblock ( ptr, size );
-}
-
-/**
- * Allocate cleared memory
- *
- * @v nmemb		Number of members
- * @v size		Size of each member
- * @ret ptr		Allocated memory
- *
- * Allocate memory as per malloc(), and zero it.
- *
- * Note that malloc() and calloc() are identical, in the interests of
- * reducing code size.  Callers should not, however, rely on malloc()
- * clearing memory, since this behaviour may change in future.
- */
-static inline void * calloc ( size_t nmemb, size_t size ) {
-	return malloc ( nmemb * size );
 }
 
 #endif /* _MALLOC_H */
