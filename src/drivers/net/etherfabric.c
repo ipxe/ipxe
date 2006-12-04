@@ -2273,7 +2273,7 @@ static int falcon_spi_rw ( struct spi_bus *bus, struct spi_device *device,
 		memcpy ( data_in, &reg, len );
 	}
 	
-	return 1;
+	return 0;
 }
 
 /**
@@ -2315,8 +2315,8 @@ static int falcon_read_eeprom ( struct efab_nic *efab ) {
 	nvs = ( efab->has_flash ?
 		&efab->falcon_flash.nvs : &efab->falcon_eeprom.nvs );
 
-	return nvs_read ( nvs, FALCON_MAC_ADDRESS_OFFSET ( efab->port ),
-			  efab->mac_addr, sizeof ( efab->mac_addr ) );
+	return ( nvs_read ( nvs, FALCON_MAC_ADDRESS_OFFSET ( efab->port ),
+			    efab->mac_addr, sizeof ( efab->mac_addr ) ) == 0 );
 }
 
 /** RX descriptor */
