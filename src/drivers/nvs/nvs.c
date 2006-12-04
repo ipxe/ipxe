@@ -16,33 +16,16 @@
  * Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
  */
 
-#include <stddef.h>
-#include <assert.h>
-#include <gpxe/threewire.h>
+#include <stdint.h>
+#include <gpxe/nvs.h>
 
 /** @file
  *
- * Three-wire serial devices
+ * Non-volatile storage
  *
  */
 
-/** Read data from three-wire device
- *
- * @v nvs		NVS device
- * @v address		Address from which to read
- * @v data		Data buffer
- * @v len		Length of data buffer
- * @ret rc		Return status code
- */
-int threewire_read ( struct nvs_device *nvs, unsigned int address,
-		     void *data, size_t len ) {
-	struct spi_device *device = nvs_to_spi ( nvs );
-	struct spi_bus *bus = device->bus;
-
-	assert ( bus->mode == SPI_MODE_THREEWIRE );
-
-	DBG ( "3wire %p reading %d bytes at %04x\n", device, len, address );
-
-	return bus->rw ( bus, device, THREEWIRE_READ, address,
-			 NULL, data, len );
+int nvs_read ( struct nvs_device *nvs, unsigned int address,
+	       void *data, size_t len ) {
+	return nvs->read ( nvs, address, data, len );
 }

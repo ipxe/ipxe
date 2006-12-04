@@ -2388,11 +2388,6 @@ static int falcon_write_nvs ( struct nvs_device *nvs, unsigned int offset,
 	return 0;
 }
 
-static struct nvs_operations falcon_nvs_operations = {
-	.read = falcon_read_nvs,
-	.write = falcon_write_nvs,
-};
-
 /** RX descriptor */
 typedef efab_qword_t falcon_rx_desc_t;
 
@@ -3046,10 +3041,12 @@ static int falcon_init_nic ( struct efab_nic *efab ) {
 
 	/* Register non-volatile storage */
 	if ( efab->has_eeprom ) {
+		/*
 		efab->nvs.op = &falcon_nvs_operations;
 		efab->nvs.len = 0x100;
 		if ( nvs_register ( &efab->nvs ) != 0 )
 			return 0;
+		*/
 	}
 
 	return 1;

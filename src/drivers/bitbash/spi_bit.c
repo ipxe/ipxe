@@ -147,22 +147,21 @@ static int spi_bit_rw ( struct spi_bus *bus, struct spi_device *device,
 			const void *data_out, void *data_in, size_t len ) {
 	struct spi_bit_basher *spibit
 		= container_of ( bus, struct spi_bit_basher, bus );
-	struct spi_device_type *devtype = device->type;
 	uint32_t tmp;
 
 	/* Assert chip select on specified slave */
 	spi_bit_set_slave_select ( spibit, device->slave, SELECT_SLAVE );
 
 	/* Transmit command */
-	assert ( devtype->command_len <= ( 8 * sizeof ( tmp ) ) );
+	assert ( device->command_len <= ( 8 * sizeof ( tmp ) ) );
 	tmp = cpu_to_le32 ( command );
-	spi_bit_transfer ( spibit, &tmp, NULL, devtype->command_len );
+	spi_bit_transfer ( spibit, &tmp, NULL, device->command_len );
 
 	/* Transmit address, if present */
 	if ( address >= 0 ) {
-		assert ( devtype->address_len <= ( 8 * sizeof ( tmp ) ) );
+		assert ( device->address_len <= ( 8 * sizeof ( tmp ) ) );
 		tmp = cpu_to_le32 ( address );
-		spi_bit_transfer ( spibit, &tmp, NULL, devtype->address_len );
+		spi_bit_transfer ( spibit, &tmp, NULL, device->address_len );
 	}
 
 	/* Transmit/receive data */

@@ -8,6 +8,7 @@
  */
 
 #include <gpxe/spi.h>
+#include <gpxe/bitbash.h>
 
 /** A bit-bashing SPI bus */
 struct spi_bit_basher {

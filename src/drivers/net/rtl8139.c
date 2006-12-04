@@ -240,15 +240,12 @@ static struct bit_basher_operations rtl_basher_ops = {
 	.write = rtl_spi_write_bit,
 };
 
-static struct spi_device_type rtl_ee9346 = AT93C46 ( 16 );
-static struct spi_device_type rtl_ee9356 = AT93C56 ( 16 );
-
 /**
  * Set up for EEPROM access
  *
  * @v rtl		RTL8139 NIC
  */
-static void rtl_init_eeprom ( struct rtl8139_nic *rtl ) {
+ void rtl_init_eeprom ( struct rtl8139_nic *rtl ) {
 	int ee9356;
 
 	/* Initialise three-wire bus */
@@ -258,8 +255,13 @@ static void rtl_init_eeprom ( struct rtl8139_nic *rtl ) {
 
 	/* Detect EEPROM type and initialise three-wire device */
 	ee9356 = ( inw ( rtl->ioaddr + RxConfig ) & Eeprom9356 );
-	DBG ( "EEPROM is an %s\n", ( ee9356 ? "AT93C56" : "AT93C46" ) );
-	rtl->eeprom.type = ( ee9356 ? &rtl_ee9356 : &rtl_ee9346 );
+	if ( ee9356 ) {
+		DBG ( "EEPROM is an AT93C56\n" );
+		init_at93c56 ( &rtl->eeprom, 16 );
+	} else {
+		DBG ( "EEPROM is an AT93C46\n" );
+		init_at93c46 ( &rtl->eeprom, 16 );
+	}
 	rtl->eeprom.bus = &rtl->spibit.bus;
 }
 
@@ -271,12 +273,12 @@ static void rtl_init_eeprom ( struct rtl8139_nic *rtl ) {
  */
 static void rtl_read_mac ( struct rtl8139_nic *rtl, uint8_t *mac_addr ) {
 
-	struct spi_device *device = &rtl->eeprom;
+	struct nvs_device *nvs = &rtl->eeprom.nvs;
 	int i;
 	
 	DBG ( "MAC address is " );
 	for ( i = EE_MAC ; i < ( EE_MAC + ( ETH_ALEN / 2 ) ) ; i++ ) {
-		device->type->read ( device, i, mac_addr, 2 );
+		nvs_read ( nvs, i, mac_addr, 2 );
 		DBG ( "%02x%02x", mac_addr[0], mac_addr[1] );
 		mac_addr += 2;
 	}

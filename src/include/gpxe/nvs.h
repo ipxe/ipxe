@@ -9,22 +9,53 @@
 
 #include <stdint.h>
 
-struct nvs_operations;
-
+/** A non-volatile storage device */
 struct nvs_device {
-	struct dhcp_option_block *options;
-	size_t len;
-	struct nvs_operations *op;
-};
-
-struct nvs_operations {
-	int ( * read ) ( struct nvs_device *nvs, unsigned int offset,
+	/** Word length, in bits */
+	unsigned int word_len;
+	/** Device size (in words) */
+	unsigned int size;
+	/** Data block size (in words)
+	 *
+	 * This is the block size used by the device.  It must be a
+	 * power of two.  Data reads and writes must not cross a block
+	 * boundary.
+	 *
+	 * Many devices allow reads to cross a block boundary, and
+	 * restrict only writes.  For the sake of simplicity, we
+	 * assume that the same restriction applies to both reads and
+	 * writes.
+	 */
+	unsigned int block_size;
+	/** Read data from device
+	 *
+	 * @v nvs		NVS device
+	 * @v address		Address from which to read
+	 * @v data		Data buffer
+	 * @v len		Length of data buffer
+	 * @ret rc		Return status code
+	 *
+	 * Reads may not cross a block boundary.
+	 */
+	int ( * read ) ( struct nvs_device *nvs, unsigned int address,
 			 void *data, size_t len );
-	int ( * write ) ( struct nvs_device *nvs, unsigned int offset,
+	/** Write data to device
+	 *
+	 * @v nvs		NVS device
+	 * @v address		Address to which to write
+	 * @v data		Data buffer
+	 * @v len		Length of data buffer
+	 * @ret rc		Return status code
+	 *
+	 * Writes may not cross a block boundary.
+	 */
+	int ( * write ) ( struct nvs_device *nvs, unsigned int address,
 			  const void *data, size_t len );
 };
 
-extern int nvs_register ( struct nvs_device *nvs );
-extern void nvs_unregister ( struct nvs_device *nvs );
+extern int nvs_read ( struct nvs_device *nvs, unsigned int address,
+		      void *data, size_t len );
+extern int nvs_write ( struct nvs_device *nvs, unsigned int address,
+		       const void *data, size_t len );
 
 #endif /* _GPXE_NVS_H */

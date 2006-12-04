@@ -7,7 +7,7 @@
  *
  */
 
-#include <gpxe/bitbash.h>
+#include <gpxe/nvs.h>
 
 /**
  * @defgroup spicmds SPI commands
@@ -75,32 +75,19 @@
 
 /** @} */
 
-struct spi_device;
-
 /**
- * An SPI device type
+ * An SPI device
  *
- * This data structure represents all the characteristics belonging to
- * a particular type of SPI device, e.g. "an Atmel 251024 serial flash",
- * or "a Microchip 25040 serial EEPROM".
+ * This data structure represents a physical SPI device attached to an
+ * SPI bus.
  */
-struct spi_device_type {
-	/** Word length, in bits */
-	unsigned int word_len;
-	/** Device size (in words) */
-	unsigned int size;
-	/** Data block size (in words)
-	 *
-	 * This is the block size used by the device.  It must be a
-	 * power of two.  Data reads and writes must not cross a block
-	 * boundary.
-	 *
-	 * Many devices allow reads to cross a block boundary, and
-	 * restrict only writes.  For the sake of simplicity, we
-	 * assume that the same restriction applies to both reads and
-	 * writes.
-	 */
-	unsigned int block_size;
+struct spi_device {
+	/** NVS device */
+	struct nvs_device nvs;
+	/** SPI bus to which device is attached */
+	struct spi_bus *bus;
+	/** Slave number */
+	unsigned int slave;
 	/** Command length, in bits */
 	unsigned int command_len;
 	/** Address length, in bits */
@@ -113,64 +100,18 @@ struct spi_device_type {
 	 * commands should be munged in this way.
 	 */
 	unsigned int munge_address : 1;
-	/** Read data from device
-	 *
-	 * @v device		SPI device
-	 * @v address		Address from which to read
-	 * @v data		Data buffer
-	 * @v len		Length of data buffer
-	 * @ret rc		Return status code
-	 */
-	int ( * read ) ( struct spi_device *device, unsigned int address,
-			 void *data, size_t len );
-	/** Write data to device
-	 *
-	 * @v device		SPI device
-	 * @v address		Address to which to write
-	 * @v data		Data buffer
-	 * @v len		Length of data buffer
-	 * @ret rc		Return status code
-	 */
-	int ( * write ) ( struct spi_device *device, unsigned int address,
-			  const void *data, size_t len );
 };
 
-/**
- * @defgroup spidevs SPI device types
- * @{
- */
-
-/** Atmel AT25010 serial EEPROM */
-#define AT25010 {		\
-	.word_len = 8,		\
-	.size = 128,		\
-	.block_size = 8,	\
-	.command_len = 8,	\
-	.address_len = 8,	\
-	}
-
-/** @} */
-
-/**
- * An SPI device
- *
- * This data structure represents a real, physical SPI device attached
- * to an SPI controller.  It comprises the device type plus
- * instantiation-specific information such as the slave number.
- */
-struct spi_device {
-	/** SPI device type */
-	struct spi_device_type *type;
-	/** SPI bus to which device is attached */
-	struct spi_bus *bus;
-	/** Slave number */
-	unsigned int slave;
-};
+static inline __attribute__ (( always_inline )) struct spi_device *
+nvs_to_spi ( struct nvs_device *nvs ) {
+	return container_of ( nvs, struct spi_device, nvs );
+}
 
 /**
  * An SPI bus
  *
- * 
+ * This data structure represents an SPI bus controller capable of
+ * issuing commands to attached SPI devices.
  */
 struct spi_bus {
 	/** SPI interface mode

@@ -22,40 +22,48 @@
 
 /** @} */
 
+extern int threewire_read ( struct nvs_device *nvs, unsigned int address,
+			    void *data, size_t len );
+
 /**
- * @defgroup spidevs SPI device types
+ * @defgroup tdevs Three-wire device types
  * @{
  */
 
-/** Atmel AT93C46 serial EEPROM
- *
- * @v org	Word size (8 or 16)
- */
-#define AT93C46( org ) {				\
-	.word_len = (org),				\
-	.size = ( 1024 / (org) ),			\
-	.block_size = 1,				\
-	.command_len = 3,				\
-	.address_len = ( ( (org) == 8 ) ? 7 : 6 ),	\
-	.read = threewire_read,				\
-	}
+static inline __attribute__ (( always_inline )) void
+init_at93cx6 ( struct spi_device *device, unsigned int organisation ) {
+	device->nvs.word_len = organisation;
+	device->nvs.block_size = 1;
+	device->command_len = 3,
+	device->nvs.read = threewire_read;
+}
 
-/** Atmel AT93C56 serial EEPROM
+/**
+ * Initialise Atmel AT93C46 serial EEPROM
  *
- * @v org	Word size (8 or 16)
+ * @v device		SPI device
+ * @v organisation	Word organisation (8 or 16)
  */
-#define AT93C56( org ) {				\
-	.word_len = (org),				\
-	.size = ( 2048 / (org) ),			\
-	.block_size = 1,				\
-	.command_len = 3,				\
-	.address_len = ( ( (org) == 8 ) ? 9 : 8 ),	\
-	.read = threewire_read,				\
-	}
+static inline __attribute__ (( always_inline )) void
+init_at93c46 ( struct spi_device *device, unsigned int organisation ) {
+	device->nvs.size = ( 1024 / organisation );
+	device->address_len = ( ( organisation == 8 ) ? 7 : 6 );
+	init_at93cx6 ( device, organisation );
+}
+
+/**
+ * Initialise Atmel AT93C56 serial EEPROM
+ *
+ * @v device		SPI device
+ * @v organisation	Word organisation (8 or 16)
+ */
+static inline __attribute__ (( always_inline )) void
+init_at93c56 ( struct spi_device *device, unsigned int organisation ) {
+	device->nvs.size = ( 2048 / organisation );
+	device->address_len = ( ( organisation == 8 ) ? 9 : 8 );
+	init_at93cx6 ( device, organisation );
+}
 
 /** @} */
-
-extern int threewire_read ( struct spi_device *device, unsigned int address,
-			    void *data, size_t len );
 
 #endif /* _GPXE_THREEWIRE_H */
