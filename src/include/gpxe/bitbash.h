@@ -7,8 +7,10 @@
  *
  */
 
-/** A bit-bashing interface */
-struct bit_basher {
+struct bit_basher;
+
+/** Bit-bashing operations */
+struct bit_basher_operations {
 	/**
 	 * Set/clear output bit
 	 *
@@ -33,6 +35,12 @@ struct bit_basher {
 	 * @ret non-zero	Input is a logic 1
 	 */
 	int ( * read ) ( struct bit_basher *basher, unsigned int bit_id );
+};
+
+/** A bit-bashing interface */
+struct bit_basher {
+	/** Bit-bashing operations */
+	struct bit_basher_operations *op;
 };
 
 extern void write_bit ( struct bit_basher *basher, unsigned int bit_id,

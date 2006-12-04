@@ -314,8 +314,8 @@ static int i2c_bit_write ( struct i2c_interface *i2c,
 void init_i2c_bit_basher ( struct i2c_bit_basher *i2cbit ) {
 	struct bit_basher *basher = &i2cbit->basher;
 	
-	assert ( basher->read != NULL );
-	assert ( basher->write != NULL );
+	assert ( basher->op->read != NULL );
+	assert ( basher->op->write != NULL );
 	i2cbit->i2c.read = i2c_bit_read;
 	i2cbit->i2c.write = i2c_bit_write;
 	i2c_stop ( basher );

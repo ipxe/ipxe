@@ -10,56 +10,52 @@
  * support.
  */
 
-struct spi_interface;
-
-/** A three-wire device */
-struct threewire_device {
-	/** SPI interface to which device is attached */
-	struct spi_interface *spi;
-	/** SPI slave number */
-	unsigned int slave;
-	/** Address size (in bits) */
-	unsigned int adrsize;
-	/** Data size (in bits) */
-	unsigned int datasize;
-};
+#include <gpxe/spi.h>
 
 /**
- * Calculate read command for a specified address
- *
- * @v three	Three-wire interface
- * @v address	Address
- * @ret cmd	Command
+ * @defgroup tcmds Three-wire commands
+ * @{
  */
-static inline __attribute__ (( always_inline )) unsigned long
-threewire_cmd_read ( struct threewire_device *three, unsigned long address ) {
-	return ( ( 0x6 << three->adrsize ) | address );
-}
+
+/** Read data from memory array */
+#define THREEWIRE_READ 0x6
+
+/** @} */
 
 /**
- * Calculate command length
- *
- * @v three	Three-wire interface
- * @ret len	Command length, in bits
+ * @defgroup spidevs SPI device types
+ * @{
  */
-static inline __attribute__ (( always_inline )) unsigned int
-threewire_cmd_len ( struct threewire_device *three ) {
-	return ( three->adrsize + 3 );
-}
 
-/* Constants for some standard parts */
-#define AT93C46_ORG8_ADRSIZE	7
-#define AT93C46_ORG8_DATASIZE	8
-#define AT93C46_ORG16_ADRSIZE	6
-#define AT93C46_ORG16_DATASIZE	16
-#define AT93C46_UDELAY		1
-#define AT93C56_ORG8_ADRSIZE	9
-#define AT93C56_ORG8_DATASIZE	8
-#define AT93C56_ORG16_ADRSIZE	8
-#define AT93C56_ORG16_DATASIZE	16
-#define AT93C56_UDELAY		1
+/** Atmel AT93C46 serial EEPROM
+ *
+ * @v org	Word size (8 or 16)
+ */
+#define AT93C46( org ) {				\
+	.word_len = (org),				\
+	.size = ( 1024 / (org) ),			\
+	.block_size = 1,				\
+	.command_len = 3,				\
+	.address_len = ( ( (org) == 8 ) ? 7 : 6 ),	\
+	.read = threewire_read,				\
+	}
 
-extern unsigned long threewire_read ( struct threewire_device *three,
-				      unsigned long address );
+/** Atmel AT93C56 serial EEPROM
+ *
+ * @v org	Word size (8 or 16)
+ */
+#define AT93C56( org ) {				\
+	.word_len = (org),				\
+	.size = ( 2048 / (org) ),			\
+	.block_size = 1,				\
+	.command_len = 3,				\
+	.address_len = ( ( (org) == 8 ) ? 9 : 8 ),	\
+	.read = threewire_read,				\
+	}
+
+/** @} */
+
+extern int threewire_read ( struct spi_device *device, unsigned int address,
+			    void *data, unsigned int len );
 
 #endif /* _GPXE_THREEWIRE_H */

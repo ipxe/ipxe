@@ -77,7 +77,7 @@
 #include <gpxe/ethernet.h>
 #include <gpxe/pkbuff.h>
 #include <gpxe/netdevice.h>
-#include <gpxe/spi.h>
+#include <gpxe/spi_bit.h>
 #include <gpxe/threewire.h>
 
 #define TX_RING_SIZE 4
@@ -97,7 +97,7 @@ struct rtl8139_nic {
 	struct rtl8139_tx tx;
 	struct rtl8139_rx rx;
 	struct spi_bit_basher spibit;
-	struct threewire_device eeprom;
+	struct spi_device eeprom;
 };
 
 /* Tuning Parameters */
@@ -204,11 +204,6 @@ enum RxConfigBits {
 /* Offsets within EEPROM (these are word offsets) */
 #define EE_MAC 7
 
-static inline struct rtl8139_nic *
-basher_to_rtl ( struct bit_basher *basher ) {
-	return container_of ( basher, struct rtl8139_nic, spibit.basher );
-}
-
 static const uint8_t rtl_ee_bits[] = {
 	[SPI_BIT_SCLK]	= EE_SK,
 	[SPI_BIT_MOSI]	= EE_DI,
@@ -218,7 +213,8 @@ static const uint8_t rtl_ee_bits[] = {
 
 static int rtl_spi_read_bit ( struct bit_basher *basher,
 			      unsigned int bit_id ) {
-	struct rtl8139_nic *rtl = basher_to_rtl ( basher );
+	struct rtl8139_nic *rtl = container_of ( basher, struct rtl8139_nic,
+						 spibit.basher );
 	uint8_t mask = rtl_ee_bits[bit_id];
 	uint8_t eereg;
 
@@ -228,7 +224,8 @@ static int rtl_spi_read_bit ( struct bit_basher *basher,
 
 static void rtl_spi_write_bit ( struct bit_basher *basher,
 				unsigned int bit_id, unsigned long data ) {
-	struct rtl8139_nic *rtl = basher_to_rtl ( basher );
+	struct rtl8139_nic *rtl = container_of ( basher, struct rtl8139_nic,
+						 spibit.basher );
 	uint8_t mask = rtl_ee_bits[bit_id];
 	uint8_t eereg;
 
@@ -237,6 +234,14 @@ static void rtl_spi_write_bit ( struct bit_basher *basher,
 	eereg |= ( data & mask );
 	outb ( eereg, rtl->ioaddr + Cfg9346 );
 }
+
+static struct bit_basher_operations rtl_basher_ops = {
+	.read = rtl_spi_read_bit,
+	.write = rtl_spi_write_bit,
+};
+
+static struct spi_device_type rtl_ee9346 = AT93C46 ( 16 );
+static struct spi_device_type rtl_ee9356 = AT93C56 ( 16 );
 
 /**
  * Set up for EEPROM access
@@ -247,19 +252,15 @@ static void rtl_init_eeprom ( struct rtl8139_nic *rtl ) {
 	int ee9356;
 
 	/* Initialise three-wire bus */
-	rtl->spibit.basher.read = rtl_spi_read_bit;
-	rtl->spibit.basher.write = rtl_spi_write_bit;
-	rtl->spibit.spi.mode = SPI_MODE_THREEWIRE;
+	rtl->spibit.basher.op = &rtl_basher_ops;
+	rtl->spibit.bus.mode = SPI_MODE_THREEWIRE;
 	init_spi_bit_basher ( &rtl->spibit );
 
 	/* Detect EEPROM type and initialise three-wire device */
 	ee9356 = ( inw ( rtl->ioaddr + RxConfig ) & Eeprom9356 );
-	DBG ( "EEPROM is an %s\n", ee9356 ? "AT93C56" : "AT93C46" );
-	rtl->eeprom.adrsize =
-		( ee9356 ? AT93C56_ORG16_ADRSIZE : AT93C46_ORG16_ADRSIZE );
-	rtl->eeprom.datasize =
-		( ee9356 ? AT93C56_ORG16_DATASIZE : AT93C46_ORG16_DATASIZE );
-	rtl->eeprom.spi = &rtl->spibit.spi;
+	DBG ( "EEPROM is an %s\n", ( ee9356 ? "AT93C56" : "AT93C46" ) );
+	rtl->eeprom.type = ( ee9356 ? &rtl_ee9356 : &rtl_ee9346 );
+	rtl->eeprom.bus = &rtl->spibit.bus;
 }
 
 /**
@@ -269,18 +270,15 @@ static void rtl_init_eeprom ( struct rtl8139_nic *rtl ) {
  * @v mac_addr		Buffer to contain MAC address (ETH_ALEN bytes)
  */
 static void rtl_read_mac ( struct rtl8139_nic *rtl, uint8_t *mac_addr ) {
-	union {
-		uint16_t word;
-		uint8_t bytes[2];
-	} u;
+
+	struct spi_device *device = &rtl->eeprom;
 	int i;
 	
 	DBG ( "MAC address is " );
 	for ( i = EE_MAC ; i < ( EE_MAC + ( ETH_ALEN / 2 ) ) ; i++ ) {
-		u.word = cpu_to_le16 ( threewire_read ( &rtl->eeprom, i ) );
-		*mac_addr++ = u.bytes[0];
-		*mac_addr++ = u.bytes[1];
-		DBG ( "%02x%02x", u.bytes[0], u.bytes[1] );
+		device->type->read ( device, i, mac_addr, 1 );
+		DBG ( "%02x%02x", mac_addr[0], mac_addr[1] );
+		mac_addr += 2;
 	}
 	DBG ( "\n" );
 }

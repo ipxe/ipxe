@@ -1058,9 +1058,13 @@ static int ef1002_i2c_read_bit ( struct bit_basher *basher,
 	return ( EFAB_DWORD_FIELD ( reg, EF1_EEPROM ) & mask );
 }
 
+static struct bit_basher_operations ef1002_basher_ops = {
+	.read = ef1002_i2c_read_bit,
+	.write = ef1002_i2c_write_bit,
+};
+
 static void ef1002_init_eeprom ( struct efab_nic *efab ) {
-	efab->ef1002_i2c.basher.write = ef1002_i2c_write_bit;
-	efab->ef1002_i2c.basher.read = ef1002_i2c_read_bit;
+	efab->ef1002_i2c.basher.op = &ef1002_basher_ops;
 	init_i2c_bit_basher ( &efab->ef1002_i2c );
 	efab->ef1002_eeprom.address = EF1_EEPROM_I2C_ID;
 }

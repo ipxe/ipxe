@@ -37,7 +37,7 @@
  */
 void write_bit ( struct bit_basher *basher, unsigned int bit_id,
 		 unsigned long data ) {
-	basher->write ( basher, bit_id, ( data ? -1UL : 0 ) );
+	basher->op->write ( basher, bit_id, ( data ? -1UL : 0 ) );
 }
 
 /**
@@ -52,5 +52,5 @@ void write_bit ( struct bit_basher *basher, unsigned int bit_id,
  * it needs to apply.
  */
 int read_bit ( struct bit_basher *basher, unsigned int bit_id ) {
-	return ( basher->read ( basher, bit_id ) ? -1UL : 0 );
+	return ( basher->op->read ( basher, bit_id ) ? -1UL : 0 );
 }

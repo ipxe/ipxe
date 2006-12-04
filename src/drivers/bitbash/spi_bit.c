@@ -19,11 +19,12 @@
 #include <stddef.h>
 #include <stdint.h>
 #include <string.h>
+#include <byteswap.h>
 #include <errno.h>
 #include <assert.h>
 #include <timer.h>
 #include <gpxe/bitbash.h>
-#include <gpxe/spi.h>
+#include <gpxe/spi_bit.h>
 
 /** @file
  *
@@ -32,65 +33,43 @@
  */
 
 /** Delay between SCLK changes and around SS changes */
-static void spi_delay ( void ) {
-	udelay ( SPI_UDELAY );
+static void spi_bit_delay ( void ) {
+	udelay ( SPI_BIT_UDELAY );
 }
+
+/** Chip select line will be asserted */
+#define SELECT_SLAVE 0
+
+/** Chip select line will be deasserted */
+#define DESELECT_SLAVE SPI_MODE_SSPOL
 
 /**
  * Select/deselect slave
  *
- * @v spi		SPI bit-bashing interface
+ * @v spibit		SPI bit-bashing interface
  * @v slave		Slave number
  * @v state		Slave select state
  *
- * @c state must be set to zero to select the specified slave, or to
- * @c SPI_MODE_SSPOL to deselect the slave.
+ * @c state must be @c SELECT_SLAVE or @c DESELECT_SLAVE.
  */
 static void spi_bit_set_slave_select ( struct spi_bit_basher *spibit,
 				       unsigned int slave,
 				       unsigned int state ) {
 	struct bit_basher *basher = &spibit->basher;
 
-	state ^= ( spibit->spi.mode & SPI_MODE_SSPOL );
+	state ^= ( spibit->bus.mode & SPI_MODE_SSPOL );
 	DBG ( "Setting slave %d select %s\n", slave,
 	      ( state ? "high" : "low" ) );
 
-	spi_delay();
+	spi_bit_delay();
 	write_bit ( basher, SPI_BIT_SS ( slave ), state );
-	spi_delay();
+	spi_bit_delay();
 }
 
 /**
- * Select slave
+ * Transfer bits over SPI bit-bashing bus
  *
- * @v spi		SPI interface
- * @v slave		Slave number
- */
-static void spi_bit_select_slave ( struct spi_interface *spi,
-				   unsigned int slave ) {
-	struct spi_bit_basher *spibit
-		= container_of ( spi, struct spi_bit_basher, spi );
-
-	spibit->slave = slave;
-	spi_bit_set_slave_select ( spibit, slave, 0 );
-}
-
-/**
- * Deselect slave
- *
- * @v spi		SPI interface
- */
-static void spi_bit_deselect_slave ( struct spi_interface *spi ) {
-	struct spi_bit_basher *spibit
-		= container_of ( spi, struct spi_bit_basher, spi );
-
-	spi_bit_set_slave_select ( spibit, spibit->slave, SPI_MODE_SSPOL );
-}
-
-/**
- * Transfer bits over SPI bit-bashing interface
- *
- * @v spi		SPI interface
+ * @v bus		SPI bus
  * @v data_out		TX data buffer (or NULL)
  * @v data_in		RX data buffer (or NULL)
  * @v len		Length of transfer (in @b bits)
@@ -101,19 +80,19 @@ static void spi_bit_deselect_slave ( struct spi_interface *spi ) {
  * NULL, then the data sent will be all zeroes.  If @c data_in is
  * NULL, then the incoming data will be discarded.
  */
-static void spi_bit_transfer ( struct spi_interface *spi, const void *data_out,
-			       void *data_in, unsigned int len ) {
-	struct spi_bit_basher *spibit
-		= container_of ( spi, struct spi_bit_basher, spi );
+static void spi_bit_transfer ( struct spi_bit_basher *spibit,
+			       const void *data_out, void *data_in,
+			       unsigned int len ) {
+	struct spi_bus *bus = &spibit->bus;
 	struct bit_basher *basher = &spibit->basher;
-	unsigned int sclk = ( ( spi->mode & SPI_MODE_CPOL ) ? 1 : 0 );
-	unsigned int cpha = ( ( spi->mode & SPI_MODE_CPHA ) ? 1 : 0 );
+	unsigned int sclk = ( ( bus->mode & SPI_MODE_CPOL ) ? 1 : 0 );
+	unsigned int cpha = ( ( bus->mode & SPI_MODE_CPHA ) ? 1 : 0 );
 	unsigned int offset;
 	unsigned int mask;
 	unsigned int bit;
 	int step;
 
-	DBG ( "Transferring %d bits in mode %x\n", len, spi->mode );
+	DBG ( "Transferring %d bits in mode %x\n", len, bus->mode );
 
 	for ( step = ( ( len * 2 ) - 1 ) ; step >= 0 ; step-- ) {
 		/* Calculate byte offset within data and bit mask */
@@ -145,10 +124,56 @@ static void spi_bit_transfer ( struct spi_interface *spi, const void *data_out,
 		}
 
 		/* Toggle clock line */
-		spi_delay();
+		spi_bit_delay();
 		sclk = ~sclk;
 		write_bit ( basher, SPI_BIT_SCLK, sclk );
 	}
+}
+
+/**
+ * Read/write data via SPI bit-bashing bus
+ *
+ * @v bus		SPI bus
+ * @v device		SPI device
+ * @v command		Command
+ * @v address		Address to read/write (<0 for no address)
+ * @v data_out		TX data buffer (or NULL)
+ * @v data_in		RX data buffer (or NULL)
+ * @v len		Length of transfer (in @b words)
+ * @ret rc		Return status code
+ */
+static int spi_bit_rw ( struct spi_bus *bus, struct spi_device *device,
+			unsigned int command, int address,
+			const void *data_out, void *data_in,
+			unsigned int len ) {
+	struct spi_bit_basher *spibit
+		= container_of ( bus, struct spi_bit_basher, bus );
+	struct spi_device_type *devtype = device->type;
+	uint32_t tmp;
+
+	/* Assert chip select on specified slave */
+	spi_bit_set_slave_select ( spibit, device->slave, SELECT_SLAVE );
+
+	/* Transmit command */
+	assert ( devtype->command_len <= ( 8 * sizeof ( tmp ) ) );
+	tmp = cpu_to_le32 ( command );
+	spi_bit_transfer ( spibit, &tmp, NULL, devtype->command_len );
+
+	/* Transmit address, if present */
+	if ( address >= 0 ) {
+		assert ( devtype->address_len <= ( 8 * sizeof ( tmp ) ) );
+		tmp = cpu_to_le32 ( address );
+		spi_bit_transfer ( spibit, &tmp, NULL, devtype->address_len );
+	}
+
+	/* Transmit/receive data */
+	spi_bit_transfer ( spibit, data_out, data_in,
+			   ( len * devtype->word_len ) );
+
+	/* Deassert chip select on specified slave */
+	spi_bit_set_slave_select ( spibit, device->slave, DESELECT_SLAVE );
+
+	return 0;
 }
 
 /**
@@ -157,9 +182,7 @@ static void spi_bit_transfer ( struct spi_interface *spi, const void *data_out,
  * @v spibit		SPI bit-bashing interface
  */
 void init_spi_bit_basher ( struct spi_bit_basher *spibit ) {
-	assert ( &spibit->basher.read != NULL );
-	assert ( &spibit->basher.write != NULL );
-	spibit->spi.select_slave = spi_bit_select_slave;
-	spibit->spi.deselect_slave = spi_bit_deselect_slave;
-	spibit->spi.transfer = spi_bit_transfer;
+	assert ( &spibit->basher.op->read != NULL );
+	assert ( &spibit->basher.op->write != NULL );
+	spibit->bus.rw = spi_bit_rw;
 }
