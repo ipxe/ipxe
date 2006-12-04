@@ -28,79 +28,146 @@
  *
  */
 
-static size_t nvo_options_len ( struct nvs_options *nvo ) {
+/**
+ * Calculate total length of non-volatile stored options
+ *
+ * @v nvo		Non-volatile options block
+ * @ret total_len	Total length of all fragments
+ */
+static size_t nvo_total_len ( struct nvo_block *nvo ) {
+	struct nvo_fragment *fragment = nvo->fragments;
+	size_t total_len = 0;
+
+	for ( ; fragment->len ; fragment++ ) {
+		total_len += fragment->len;
+	}
+
+	return total_len;
+}
+
+/**
+ * Read non-volatile stored options from non-volatile storage device
+ *
+ * @v nvo		Non-volatile options block
+ * @ret rc		Return status code
+ */
+static int nvo_read ( struct nvo_block *nvo ) {
+	struct nvo_fragment *fragment = nvo->fragments;
+	void *data = nvo->options->data;
+	int rc;
+
+	for ( ; fragment->len ; fragment++ ) {
+		if ( ( rc = nvs_read ( nvo->nvs, fragment->address,
+				       data, fragment->len ) ) != 0 ) {
+			DBG ( "NVO %p could not read %zd bytes at %#04x\n",
+			      nvo, fragment->len, fragment->address );
+			return rc;
+		}
+		data += fragment->len;
+	}
+	
+	return 0;
+}
+
+/**
+ * Parse stored options
+ *
+ * @v nvo		Non-volatile options block
+ * @v total_len		Total length of options data
+ *
+ * Verifies that the options data is valid, and configures the DHCP
+ * options block.  If the data is not valid, it is replaced with an
+ * empty options block.
+ */
+static void nvo_init_dhcp ( struct nvo_block *nvo, size_t total_len ) {
+	struct dhcp_option_block *options = nvo->options;
 	struct dhcp_option *option;
 	uint8_t sum;
 	unsigned int i;
-	size_t len;
 
-	for ( sum = 0, i = 0 ; i < nvo->nvs->size ; i++ ) {
-		sum += * ( ( uint8_t * ) ( nvo->options->data + i ) );
+	/* Steal one byte for the checksum */
+	options->max_len = ( total_len - 1 );
+
+	/* Verify checksum over whole block */
+	for ( sum = 0, i = 0 ; i < total_len ; i++ ) {
+		sum += * ( ( uint8_t * ) ( options->data + i ) );
 	}
 	if ( sum != 0 ) {
 		DBG ( "NVO %p has bad checksum %02x; assuming empty\n",
 		      nvo, sum );
-		return 0;
+		goto empty;
 	}
 
-	option = nvo->options->data;
+	/* Check that we don't just have a block full of zeroes */
+	option = options->data;
 	if ( option->tag == DHCP_PAD ) {
 		DBG ( "NVO %p has bad start; assuming empty\n", nvo );
-		return 0;
+		goto empty;
 	}
 	
-	option = find_dhcp_option ( nvo->options, DHCP_END );
+	/* Search for the DHCP_END tag */
+	options->len = options->max_len;
+	option = find_dhcp_option ( options, DHCP_END );
 	if ( ! option ) {
 		DBG ( "NVO %p has no end tag; assuming empty\n", nvo );
-		return 0;
+		goto empty;
 	}
 
-	len = ( ( void * ) option - nvo->options->data + 1 );
+	/* Set correct length of DHCP options */
+	options->len = ( ( void * ) option - options->data + 1 );
 	DBG ( "NVO %p contains %zd bytes of options (maximum %zd)\n",
-	      nvo, len, nvo->nvs->size );
+	      nvo, options->len, options->max_len );
+	return;
 
-	return len;
+ empty:
+	/* No options found; initialise an empty options block */
+	option = options->data;
+	option->tag = DHCP_END;
+	options->len = 1;
+	return;
 }
 
-int nvo_register ( struct nvs_options *nvo ) {
-	struct dhcp_option *option;
+/**
+ * Register non-volatile stored options
+ *
+ * @v nvo		Non-volatile options block
+ * @ret rc		Return status code
+ */
+int nvo_register ( struct nvo_block *nvo ) {
+	size_t total_len;
 	int rc;
 
-	nvo->options = alloc_dhcp_options ( nvo->nvs->size );
+	/* Allocate memory for options and read in from NVS */
+	total_len = nvo_total_len ( nvo );
+	nvo->options = alloc_dhcp_options ( total_len );
 	if ( ! nvo->options ) {
 		DBG ( "NVO %p could not allocate %zd bytes\n",
-		      nvo, nvo->nvs->size );
+		      nvo, total_len );
 		rc = -ENOMEM;
 		goto err;
 	}
 
-	if ( ( rc = nvo->nvs->read ( nvo->nvs, 0, nvo->options->data,
-				     nvo->nvs->size ) ) != 0 ) {
-		DBG ( "NVO %p could not read [0,%zd)\n",
-		      nvo, nvo->nvs->size );
+	if ( ( rc = nvo_read ( nvo ) ) != 0 )
 		goto err;
-	}
 
-	nvo->options->len = nvo->options->max_len;
-	nvo->options->len = nvo_options_len ( nvo );
-	if ( ! nvo->options->len ) {
-		option = nvo->options->data;
-		option->tag = DHCP_END;
-		nvo->options->len = 1;
-	}
-
+	/* Verify and register options */
+	nvo_init_dhcp ( nvo, total_len );
 	register_dhcp_options ( nvo->options );
 
 	return 0;
 	
  err:
-	
 	free_dhcp_options ( nvo->options );
 	nvo->options = NULL;
 	return rc;
 }
 
-void nvo_unregister ( struct nvs_options *nvo ) {
+/**
+ * Unregister non-volatile stored options
+ *
+ * @v nvo		Non-volatile options block
+ */
+void nvo_unregister ( struct nvo_block *nvo ) {
 	if ( nvo->options ) {
 		unregister_dhcp_options ( nvo->options );
 		free_dhcp_options ( nvo->options );

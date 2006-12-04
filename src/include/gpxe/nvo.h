@@ -7,15 +7,37 @@
  *
  */
 
+#include <stdint.h>
+
 struct nvs_device;
 struct dhcp_option_block;
 
-struct nvs_options {
+/**
+ * A fragment of a non-volatile storage device used for stored options
+ */
+struct nvo_fragment {
+	/** Starting address of fragment within NVS device */
+	unsigned int address;
+	/** Length of fragment */
+	size_t len;
+};
+
+/**
+ * A block of non-volatile stored options
+ */
+struct nvo_block {
+	/** Underlying non-volatile storage device */
 	struct nvs_device *nvs;
+	/** List of option-containing fragments
+	 *
+	 * The list is terminated by a fragment with a length of zero.
+	 */
+	struct nvo_fragment *fragments;
+	/** DHCP options block */
 	struct dhcp_option_block *options;
 };
 
-extern int nvo_register ( struct nvs_options *nvo );
-extern void nvo_unregister ( struct nvs_options *nvo );
+extern int nvo_register ( struct nvo_block *nvo );
+extern void nvo_unregister ( struct nvo_block *nvo );
 
 #endif /* _GPXE_NVO_H */

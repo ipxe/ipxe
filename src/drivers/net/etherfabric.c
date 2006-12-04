@@ -23,6 +23,7 @@
 #include <gpxe/bitbash.h>
 #include <gpxe/i2c.h>
 #include <gpxe/spi.h>
+#include <gpxe/nvo.h>
 #include "timer.h"
 #define dma_addr_t unsigned long
 #include "etherfabric.h"
@@ -217,6 +218,9 @@ struct efab_nic {
 	struct spi_bus spi;
 	struct spi_device falcon_flash;
 	struct spi_device falcon_eeprom;
+
+	/** Non-volatile options */
+	struct nvo_block nvo;
 };
 
 /**************************************************************************
@@ -2304,6 +2308,11 @@ static void falcon_init_spi ( struct efab_nic *efab ) {
 /** Offset of MAC address within EEPROM or Flash */
 #define FALCON_MAC_ADDRESS_OFFSET(port) ( 0x310 + 0x08 * (port) )
 
+static struct nvo_fragment falcon_eeprom_fragments[] = {
+	{ 0, 0x100 },
+	{ 0, 0 }
+};
+
 /**
  * Read MAC address from EEPROM
  *
@@ -2972,12 +2981,10 @@ static int falcon_init_nic ( struct efab_nic *efab ) {
 
 	/* Register non-volatile storage */
 	if ( efab->has_eeprom ) {
-		/*
-		efab->nvs.op = &falcon_nvs_operations;
-		efab->nvs.len = 0x100;
-		if ( nvs_register ( &efab->nvs ) != 0 )
+		efab->nvo.nvs = &efab->falcon_eeprom.nvs;
+		efab->nvo.fragments = falcon_eeprom_fragments;
+		if ( nvo_register ( &efab->nvo ) != 0 )
 			return 0;
-		*/
 	}
 
 	return 1;
