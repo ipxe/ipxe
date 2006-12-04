@@ -29,34 +29,35 @@
  */
 
 /**
- * Calculate total length of non-volatile stored options
+ * Calculate checksum over non-volatile stored options
  *
  * @v nvo		Non-volatile options block
- * @ret total_len	Total length of all fragments
+ * @ret sum		Checksum
  */
-static size_t nvo_total_len ( struct nvo_block *nvo ) {
-	struct nvo_fragment *fragment = nvo->fragments;
-	size_t total_len = 0;
+static unsigned int nvo_checksum ( struct nvo_block *nvo ) {
+	uint8_t *data = nvo->options->data;
+	uint8_t sum = 0;
+	unsigned int i;
 
-	for ( ; fragment->len ; fragment++ ) {
-		total_len += fragment->len;
+	for ( i = 0 ; i < nvo->total_len ; i++ ) {
+		sum += *(data++);
 	}
-
-	return total_len;
+	return sum;
 }
 
 /**
- * Read non-volatile stored options from non-volatile storage device
+ * Load non-volatile stored options from non-volatile storage device
  *
  * @v nvo		Non-volatile options block
  * @ret rc		Return status code
  */
-static int nvo_read ( struct nvo_block *nvo ) {
-	struct nvo_fragment *fragment = nvo->fragments;
+static int nvo_load ( struct nvo_block *nvo ) {
 	void *data = nvo->options->data;
+	struct nvo_fragment *fragment;
 	int rc;
 
-	for ( ; fragment->len ; fragment++ ) {
+	/* Read data a fragment at a time */
+	for ( fragment = nvo->fragments ; fragment->len ; fragment++ ) {
 		if ( ( rc = nvs_read ( nvo->nvs, fragment->address,
 				       data, fragment->len ) ) != 0 ) {
 			DBG ( "NVO %p could not read %zd bytes at %#04x\n",
@@ -70,31 +71,54 @@ static int nvo_read ( struct nvo_block *nvo ) {
 }
 
 /**
+ * Save non-volatile stored options back to non-volatile storage device
+ *
+ * @v nvo		Non-volatile options block
+ * @ret rc		Return status code
+ */
+int nvo_save ( struct nvo_block *nvo ) {
+	void *data = nvo->options->data;
+	uint8_t *checksum = ( data + nvo->total_len - 1 );
+	struct nvo_fragment *fragment;
+	int rc;
+
+	/* Recalculate checksum */
+	checksum -= nvo_checksum ( nvo );
+
+	/* Write data a fragment at a time */
+	for ( fragment = nvo->fragments ; fragment->len ; fragment++ ) {
+		if ( ( rc = nvs_write ( nvo->nvs, fragment->address,
+					data, fragment->len ) ) != 0 ) {
+			DBG ( "NVO %p could not write %zd bytes at %#04x\n",
+			      nvo, fragment->len, fragment->address );
+			return rc;
+		}
+		data += fragment->len;
+	}
+	
+	return 0;
+}
+
+/**
  * Parse stored options
  *
  * @v nvo		Non-volatile options block
- * @v total_len		Total length of options data
  *
  * Verifies that the options data is valid, and configures the DHCP
  * options block.  If the data is not valid, it is replaced with an
  * empty options block.
  */
-static void nvo_init_dhcp ( struct nvo_block *nvo, size_t total_len ) {
+static void nvo_init_dhcp ( struct nvo_block *nvo ) {
 	struct dhcp_option_block *options = nvo->options;
 	struct dhcp_option *option;
-	uint8_t sum;
-	unsigned int i;
 
 	/* Steal one byte for the checksum */
-	options->max_len = ( total_len - 1 );
+	options->max_len = ( nvo->total_len - 1 );
 
 	/* Verify checksum over whole block */
-	for ( sum = 0, i = 0 ; i < total_len ; i++ ) {
-		sum += * ( ( uint8_t * ) ( options->data + i ) );
-	}
-	if ( sum != 0 ) {
+	if ( nvo_checksum ( nvo ) != 0 ) {
 		DBG ( "NVO %p has bad checksum %02x; assuming empty\n",
-		      nvo, sum );
+		      nvo, nvo_checksum ( nvo ) );
 		goto empty;
 	}
 
@@ -134,24 +158,28 @@ static void nvo_init_dhcp ( struct nvo_block *nvo, size_t total_len ) {
  * @ret rc		Return status code
  */
 int nvo_register ( struct nvo_block *nvo ) {
-	size_t total_len;
+	struct nvo_fragment *fragment = nvo->fragments;
 	int rc;
 
+	/* Calculate total length of all fragments */
+	nvo->total_len = 0;
+	for ( fragment = nvo->fragments ; fragment->len ; fragment++ ) {
+		nvo->total_len += fragment->len;
+	}
+
 	/* Allocate memory for options and read in from NVS */
-	total_len = nvo_total_len ( nvo );
-	nvo->options = alloc_dhcp_options ( total_len );
+	nvo->options = alloc_dhcp_options ( nvo->total_len );
 	if ( ! nvo->options ) {
 		DBG ( "NVO %p could not allocate %zd bytes\n",
-		      nvo, total_len );
+		      nvo, nvo->total_len );
 		rc = -ENOMEM;
 		goto err;
 	}
-
-	if ( ( rc = nvo_read ( nvo ) ) != 0 )
+	if ( ( rc = nvo_load ( nvo ) ) != 0 )
 		goto err;
 
 	/* Verify and register options */
-	nvo_init_dhcp ( nvo, total_len );
+	nvo_init_dhcp ( nvo );
 	register_dhcp_options ( nvo->options );
 
 	return 0;

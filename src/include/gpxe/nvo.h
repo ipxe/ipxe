@@ -33,11 +33,17 @@ struct nvo_block {
 	 * The list is terminated by a fragment with a length of zero.
 	 */
 	struct nvo_fragment *fragments;
+	/** Total length of all fragments
+	 *
+	 * This field is filled in by nvo_register().
+	 */
+	size_t total_len;
 	/** DHCP options block */
 	struct dhcp_option_block *options;
 };
 
 extern int nvo_register ( struct nvo_block *nvo );
+extern int nvo_save ( struct nvo_block *nvo );
 extern void nvo_unregister ( struct nvo_block *nvo );
 
 #endif /* _GPXE_NVO_H */
