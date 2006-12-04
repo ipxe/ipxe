@@ -118,21 +118,21 @@ struct spi_device_type {
 	 * @v device		SPI device
 	 * @v address		Address from which to read
 	 * @v data		Data buffer
-	 * @v len		Length of data to read, in @b words
+	 * @v len		Length of data buffer
 	 * @ret rc		Return status code
 	 */
 	int ( * read ) ( struct spi_device *device, unsigned int address,
-			 void *data, unsigned int len );
+			 void *data, size_t len );
 	/** Write data to device
 	 *
 	 * @v device		SPI device
 	 * @v address		Address to which to write
 	 * @v data		Data buffer
-	 * @v len		Length of data to write, in @b words
+	 * @v len		Length of data buffer
 	 * @ret rc		Return status code
 	 */
 	int ( * write ) ( struct spi_device *device, unsigned int address,
-			  const void *data, unsigned int len );
+			  const void *data, size_t len );
 };
 
 /**
@@ -192,18 +192,15 @@ struct spi_bus {
 	 * @v address		Address to read/write (<0 for no address)
 	 * @v data_out		TX data buffer (or NULL)
 	 * @v data_in		RX data buffer (or NULL)
-	 * @v len		Length of transfer (in @b words)
+	 * @v len		Length of data buffer(s)
 	 *
 	 * This issues the specified command and optional address to
 	 * the SPI device, then reads and/or writes data to/from the
-	 * data buffers.  Note that the transfer length is measured in
-	 * words, not in bytes.  Some SPI devices have 16-bit word
-	 * lengths; take care with these devices not to accidentally
-	 * read or write twice as much data as intended.
+	 * data buffers.
 	 */
 	int ( * rw ) ( struct spi_bus *bus, struct spi_device *device,
 		       unsigned int command, int address,
-		       const void *data_out, void *data_in, unsigned int len );
+		       const void *data_out, void *data_in, size_t len );
 };
 
 /** Clock phase (CPHA) mode bit

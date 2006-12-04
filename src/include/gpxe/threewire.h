@@ -56,6 +56,6 @@
 /** @} */
 
 extern int threewire_read ( struct spi_device *device, unsigned int address,
-			    void *data, unsigned int len );
+			    void *data, size_t len );
 
 #endif /* _GPXE_THREEWIRE_H */

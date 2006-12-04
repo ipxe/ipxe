@@ -31,17 +31,16 @@
  * @v device		SPI device
  * @v address		Address from which to read
  * @v data		Data buffer
- * @v len		Length of data to read, in @b words
+ * @v len		Length of data buffer
  * @ret rc		Return status code
  */
 int threewire_read ( struct spi_device *device, unsigned int address,
-		     void *data, unsigned int len ) {
+		     void *data, size_t len ) {
 	struct spi_bus *bus = device->bus;
 
 	assert ( bus->mode == SPI_MODE_THREEWIRE );
 
-	DBG ( "3wire %p reading words [%04x,%04x)\n", device,
-	      address, ( address + len ) );
+	DBG ( "3wire %p reading %d bytes at %04x\n", device, len, address );
 
 	return bus->rw ( bus, device, THREEWIRE_READ, address,
 			 NULL, data, len );

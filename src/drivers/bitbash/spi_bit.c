@@ -139,13 +139,12 @@ static void spi_bit_transfer ( struct spi_bit_basher *spibit,
  * @v address		Address to read/write (<0 for no address)
  * @v data_out		TX data buffer (or NULL)
  * @v data_in		RX data buffer (or NULL)
- * @v len		Length of transfer (in @b words)
+ * @v len		Length of transfer
  * @ret rc		Return status code
  */
 static int spi_bit_rw ( struct spi_bus *bus, struct spi_device *device,
 			unsigned int command, int address,
-			const void *data_out, void *data_in,
-			unsigned int len ) {
+			const void *data_out, void *data_in, size_t len ) {
 	struct spi_bit_basher *spibit
 		= container_of ( bus, struct spi_bit_basher, bus );
 	struct spi_device_type *devtype = device->type;
@@ -167,8 +166,7 @@ static int spi_bit_rw ( struct spi_bus *bus, struct spi_device *device,
 	}
 
 	/* Transmit/receive data */
-	spi_bit_transfer ( spibit, data_out, data_in,
-			   ( len * devtype->word_len ) );
+	spi_bit_transfer ( spibit, data_out, data_in, ( len * 8 ) );
 
 	/* Deassert chip select on specified slave */
 	spi_bit_set_slave_select ( spibit, device->slave, DESELECT_SLAVE );

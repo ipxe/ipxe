@@ -276,7 +276,7 @@ static void rtl_read_mac ( struct rtl8139_nic *rtl, uint8_t *mac_addr ) {
 	
 	DBG ( "MAC address is " );
 	for ( i = EE_MAC ; i < ( EE_MAC + ( ETH_ALEN / 2 ) ) ; i++ ) {
-		device->type->read ( device, i, mac_addr, 1 );
+		device->type->read ( device, i, mac_addr, 2 );
 		DBG ( "%02x%02x", mac_addr[0], mac_addr[1] );
 		mac_addr += 2;
 	}
