@@ -193,4 +193,47 @@ extern int spi_read ( struct nvs_device *nvs, unsigned int address,
 extern int spi_write ( struct nvs_device *nvs, unsigned int address,
 		       const void *data, size_t len );
 
+/**
+ * @defgroup spidevs SPI device types
+ * @{
+ */
+
+static inline __attribute__ (( always_inline )) void
+init_spi ( struct spi_device *device ) {
+	device->nvs.word_len_log2 = 0;
+	device->command_len = 8,
+	device->nvs.read = spi_read;
+	device->nvs.write = spi_write;	
+}
+
+/** Atmel AT25F1024 serial flash */
+static inline __attribute__ (( always_inline )) void
+init_at25f1024 ( struct spi_device *device ) {
+	device->address_len = 24;
+	device->nvs.size = ( 128 * 1024 );
+	device->nvs.block_size = 256;
+	init_spi ( device );
+}
+
+/** Atmel 25040 serial EEPROM */
+static inline __attribute__ (( always_inline )) void
+init_at25040 ( struct spi_device *device ) {
+	device->address_len = 8;
+	device->munge_address = 1;
+	device->nvs.size = 512;
+	device->nvs.block_size = 8;
+	init_spi ( device );
+}
+
+/** Microchip 25XX640 serial EEPROM */
+static inline __attribute__ (( always_inline )) void
+init_mc25xx640 ( struct spi_device *device ) {
+	device->address_len = 16;
+	device->nvs.size = ( 8 * 1024 );
+	device->nvs.block_size = 32;
+	init_spi ( device );
+}
+
+/** @} */
+
 #endif /* _GPXE_SPI_H */
