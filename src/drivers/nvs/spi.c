@@ -85,8 +85,16 @@ int spi_read ( struct nvs_device *nvs, unsigned int address,
 	struct spi_bus *bus = device->bus;
 	unsigned int command = spi_command ( SPI_READ, address,
 					     device->munge_address );
+	int rc;
 
-	return bus->rw ( bus, device, command, address, NULL, data, len );
+	DBG ( "SPI %p reading %d bytes from %#04x\n", device, len, address );
+	if ( ( rc = bus->rw ( bus, device, command, address,
+			      NULL, data, len ) ) != 0 ) {
+		DBG ( "SPI %p failed to read data from device\n", device );
+		return rc;
+	}
+
+	return 0;
 }
 
 /**
@@ -106,16 +114,24 @@ int spi_write ( struct nvs_device *nvs, unsigned int address,
 					     device->munge_address );
 	int rc;
 
+	DBG ( "SPI %p writing %d bytes to %#04x\n", device, len, address );
+
 	if ( ( rc = bus->rw ( bus, device, SPI_WREN, -1,
-			      NULL, NULL, 0 ) ) != 0 )
+			      NULL, NULL, 0 ) ) != 0 ) {
+		DBG ( "SPI %p failed to write-enable device\n", device );
 		return rc;
+	}
 
 	if ( ( rc = bus->rw ( bus, device, command, address,
-			      data, NULL, len ) ) != 0 )
+			      data, NULL, len ) ) != 0 ) {
+		DBG ( "SPI %p failed to write data to device\n", device );
 		return rc;
+	}
 	
-	if ( ( rc = spi_wait ( device ) ) != 0 )
+	if ( ( rc = spi_wait ( device ) ) != 0 ) {
+		DBG ( "SPI %p failed to complete write operation\n", device );
 		return rc;
+	}
 
 	return 0;
 }
