@@ -157,8 +157,8 @@ int main ( void ) {
 
 	netdev = next_netdev ();
 	if ( netdev ) {
+		cmdl_start();
 		test_dhcp ( netdev );
-		//cmdl_start();
 	} else {
 		printf ( "No network device found\n" );
 	}

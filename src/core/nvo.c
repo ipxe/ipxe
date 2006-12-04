@@ -28,6 +28,9 @@
  *
  */
 
+#warning "Temporary hack"
+struct nvo_block *ugly_nvo_hack = NULL;
+
 /**
  * Calculate checksum over non-volatile stored options
  *
@@ -83,7 +86,7 @@ int nvo_save ( struct nvo_block *nvo ) {
 	int rc;
 
 	/* Recalculate checksum */
-	checksum -= nvo_checksum ( nvo );
+	*checksum -= nvo_checksum ( nvo );
 
 	/* Write data a fragment at a time */
 	for ( fragment = nvo->fragments ; fragment->len ; fragment++ ) {
@@ -182,6 +185,8 @@ int nvo_register ( struct nvo_block *nvo ) {
 	nvo_init_dhcp ( nvo );
 	register_dhcp_options ( nvo->options );
 
+	ugly_nvo_hack = nvo;
+
 	return 0;
 	
  err:
@@ -201,4 +206,6 @@ void nvo_unregister ( struct nvo_block *nvo ) {
 		free_dhcp_options ( nvo->options );
 		nvo->options = NULL;
 	}
+
+	ugly_nvo_hack = NULL;
 }
