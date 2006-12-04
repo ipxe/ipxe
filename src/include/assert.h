@@ -10,6 +10,25 @@
  *
  */
 
+#ifdef NDEBUG
+#define ASSERTING 0
+#else
+#define ASSERTING 1
+#endif
+
+/** printf() for assertions
+ *
+ * This function exists so that the assert() macro can expand to
+ * printf() calls without dragging the printf() prototype into scope.
+ *
+ * As far as the compiler is concerned, assert_printf() and printf() are
+ * completely unrelated calls; it's only at the assembly stage that
+ * references to the assert_printf symbol are collapsed into references
+ * to the printf symbol.
+ */
+extern int __attribute__ (( format ( printf, 1, 2 ) )) 
+assert_printf ( const char *fmt, ... ) asm ( "printf" );
+
 /**
  * Assert a condition at run-time.
  *
@@ -21,10 +40,10 @@
  */
 #define assert( condition ) 						   \
 	do { 								   \
-		if ( ! (condition) ) { 					   \
-			printf ( "assert(%s) failed at %s line %d [%s]\n", \
-				 #condition, __FILE__, __LINE__,	   \
-				 __FUNCTION__ );			   \
+		if ( ASSERTING && ! (condition) ) { 			   \
+			assert_printf ( "assert(%s) failed at %s line "	   \
+					"%d [%s]\n", #condition, __FILE__, \
+					__LINE__, __FUNCTION__ );	   \
 		} 							   \
 	} while ( 0 )
 
@@ -43,10 +62,5 @@
                 extern void error_symbol ( void );	\
                 error_symbol();				\
         }
-
-#ifdef NDEBUG
-#undef assert
-#define assert(x) do {} while ( 0 )
-#endif
 
 #endif /* _ASSERT_H */
