@@ -188,4 +188,9 @@ struct spi_bus {
  */
 #define SPI_MODE_THREEWIRE ( SPI_MODE_MICROWIRE_PLUS | SPI_MODE_SSPOL )
 
+extern int spi_read ( struct nvs_device *nvs, unsigned int address,
+		      void *data, size_t len );
+extern int spi_write ( struct nvs_device *nvs, unsigned int address,
+		       const void *data, size_t len );
+
 #endif /* _GPXE_SPI_H */
