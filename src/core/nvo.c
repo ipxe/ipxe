@@ -69,7 +69,8 @@ static int nvo_load ( struct nvo_block *nvo ) {
 		}
 		data += fragment->len;
 	}
-	
+
+	DBG ( "NVO %p loaded from non-volatile storage\n", nvo );
 	return 0;
 }
 
@@ -98,7 +99,8 @@ int nvo_save ( struct nvo_block *nvo ) {
 		}
 		data += fragment->len;
 	}
-	
+
+	DBG ( "NVO %p saved to non-volatile storage\n", nvo );
 	return 0;
 }
 
@@ -187,6 +189,7 @@ int nvo_register ( struct nvo_block *nvo ) {
 
 	ugly_nvo_hack = nvo;
 
+	DBG ( "NVO %p registered\n", nvo );
 	return 0;
 	
  err:
@@ -201,11 +204,14 @@ int nvo_register ( struct nvo_block *nvo ) {
  * @v nvo		Non-volatile options block
  */
 void nvo_unregister ( struct nvo_block *nvo ) {
+
 	if ( nvo->options ) {
 		unregister_dhcp_options ( nvo->options );
 		free_dhcp_options ( nvo->options );
 		nvo->options = NULL;
 	}
+
+	DBG ( "NVO %p unregistered\n", nvo );
 
 	ugly_nvo_hack = NULL;
 }
