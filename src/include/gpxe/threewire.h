@@ -32,7 +32,7 @@ extern int threewire_read ( struct nvs_device *nvs, unsigned int address,
 
 static inline __attribute__ (( always_inline )) void
 init_at93cx6 ( struct spi_device *device, unsigned int organisation ) {
-	device->nvs.word_len = organisation;
+	device->nvs.word_len_log2 = ( ( organisation == 8 ) ? 0 : 1 );
 	device->nvs.block_size = 1;
 	device->command_len = 3,
 	device->nvs.read = threewire_read;

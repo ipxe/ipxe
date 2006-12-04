@@ -266,26 +266,6 @@ static struct bit_basher_operations rtl_basher_ops = {
 }
 
 /**
- * Read the MAC address
- *
- * @v rtl		RTL8139 NIC
- * @v mac_addr		Buffer to contain MAC address (ETH_ALEN bytes)
- */
-static void rtl_read_mac ( struct rtl8139_nic *rtl, uint8_t *mac_addr ) {
-
-	struct nvs_device *nvs = &rtl->eeprom.nvs;
-	int i;
-	
-	DBG ( "MAC address is " );
-	for ( i = EE_MAC ; i < ( EE_MAC + ( ETH_ALEN / 2 ) ) ; i++ ) {
-		nvs_read ( nvs, i, mac_addr, 2 );
-		DBG ( "%02x%02x", mac_addr[0], mac_addr[1] );
-		mac_addr += 2;
-	}
-	DBG ( "\n" );
-}
-
-/**
  * Reset NIC
  *
  * @v rtl		RTL8139 NIC
@@ -531,7 +511,7 @@ static int rtl_probe ( struct pci_device *pci,
 	/* Reset the NIC, set up EEPROM access and read MAC address */
 	rtl_reset ( rtl );
 	rtl_init_eeprom ( rtl );
-	rtl_read_mac ( rtl, netdev->ll_addr );
+	nvs_read ( &rtl->eeprom.nvs, EE_MAC, netdev->ll_addr, ETH_ALEN );
 	
 	/* Point to NIC specific routines */
 	//	netdev->open	 = rtl_open;

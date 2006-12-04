@@ -11,8 +11,13 @@
 
 /** A non-volatile storage device */
 struct nvs_device {
-	/** Word length, in bits */
-	unsigned int word_len;
+	/** Word length
+	 *
+	 * This is expressed as the base-2 logarithm of the word
+	 * length in bytes.  A value of 0 therefore translates as
+	 * 8-bit words, and a value of 1 translates as 16-bit words.
+	 */
+	unsigned int word_len_log2;
 	/** Device size (in words) */
 	unsigned int size;
 	/** Data block size (in words)
