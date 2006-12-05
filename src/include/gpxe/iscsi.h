@@ -583,6 +583,8 @@ struct iscsi_session {
 	enum iscsi_tx_state tx_state;
 	/** Byte offset within the current TX state */
 	size_t tx_offset;
+	/** Length of the current TX state */
+	size_t tx_len;
 
 	/** Basic header segment for current RX PDU */
 	union iscsi_bhs rx_bhs;
@@ -590,6 +592,10 @@ struct iscsi_session {
 	enum iscsi_rx_state rx_state;
 	/** Byte offset within the current RX state */
 	size_t rx_offset;
+	/** Length of the current RX state */
+	size_t rx_len;
+	/** Buffer for received data (not always used) */
+	void *rx_buffer;
 	/** State of strings received during login phase */
 	struct iscsi_string_state string;
 

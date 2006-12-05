@@ -39,6 +39,46 @@ static void iscsi_start_data_out ( struct iscsi_session *iscsi,
 				   unsigned int datasn );
 
 /**
+ * Receive PDU data into buffer
+ *
+ * @v iscsi		iSCSI session
+ * @v data		Data to receive
+ * @v len		Length of data
+ * @ret rc		Return status code
+ *
+ * This can be used when the RX PDU type handler wishes to buffer up
+ * all received data and process the PDU as a single unit.  The caller
+ * is repsonsible for calling iscsi_rx_buffered_data_done() after
+ * processing the data.
+ */
+static int iscsi_rx_buffered_data ( struct iscsi_session *iscsi,
+				    const void *data, size_t len ) {
+
+	/* Allocate buffer on first call */
+	if ( ! iscsi->rx_buffer ) {
+		iscsi->rx_buffer = malloc ( iscsi->rx_len );
+		if ( ! iscsi->rx_buffer )
+			return -ENOMEM;
+	}
+
+	/* Copy data to buffer */
+	assert ( ( iscsi->rx_offset + len ) <= iscsi->rx_len );
+	memcpy ( ( iscsi->rx_buffer + iscsi->rx_offset ), data, len );
+
+	return 0;
+}
+
+/**
+ * Finish receiving PDU data into buffer
+ *
+ * @v iscsi		iSCSI session
+ */
+static void iscsi_rx_buffered_data_done ( struct iscsi_session *iscsi ) {
+	free ( iscsi->rx_buffer );
+	iscsi->rx_buffer = NULL;
+}
+
+/**
  * Mark iSCSI operation as complete
  *
  * @v iscsi		iSCSI session
@@ -52,10 +92,14 @@ static void iscsi_start_data_out ( struct iscsi_session *iscsi,
  * should both be idle.
  */
 static void iscsi_done ( struct iscsi_session *iscsi, int rc ) {
+
 	/* Clear current SCSI command */
 	iscsi->command = NULL;
-	/* Free any memory that may have been used for CHAP */
+
+	/* Free any dynamically allocated memory */
 	chap_finish ( &iscsi->chap );
+	iscsi_rx_buffered_data_done ( iscsi );
+
 	/* Mark asynchronous operation as complete */
 	async_done ( &iscsi->aop, rc );
 }
@@ -283,7 +327,7 @@ static void iscsi_tx_data_out ( struct iscsi_session *iscsi,
 
 	offset = ( iscsi->transfer_offset + ntohl ( data_out->offset ) +
 		   iscsi->tx_offset );
-	remaining = ( ISCSI_DATA_LEN ( data_out->lengths ) - iscsi->tx_offset);
+	remaining = ( iscsi->tx_len - iscsi->tx_offset );
 	assert ( iscsi->command != NULL );
 	assert ( iscsi->command->data_out );
 	assert ( ( offset + remaining ) <= iscsi->command->data_out_len );
@@ -693,6 +737,14 @@ static void iscsi_handle_string_byte ( struct iscsi_session *iscsi,
 	}
 }
 
+static void iscsi_handle_strings ( struct iscsi_session *iscsi,
+				   const char *strings, size_t len ) {
+	for ( ; len-- ; strings++ ) {
+		iscsi_handle_string_byte ( iscsi,
+					   * ( ( uint8_t * ) strings ) );
+	}
+}
+
 /**
  * Receive data segment of an iSCSI login response PDU
  *
@@ -706,6 +758,20 @@ static void iscsi_rx_login_response ( struct iscsi_session *iscsi, void *data,
 				      size_t len, size_t remaining ) {
 	struct iscsi_bhs_login_response *response
 		= &iscsi->rx_bhs.login_response;
+	int rc;
+
+	/* Buffer up the PDU data */
+	if ( ( rc = iscsi_rx_buffered_data ( iscsi, data, len ) ) != 0 ) {
+		DBG ( "iSCSI %p could not buffer login response\n", iscsi );
+		iscsi_close ( iscsi, rc );
+		return;
+	}
+	if ( remaining )
+		return;
+
+	/* Process string data and discard string buffer */
+	iscsi_handle_strings ( iscsi, iscsi->rx_buffer, iscsi->rx_len );
+	iscsi_rx_buffered_data_done ( iscsi );
 
 	/* Check for fatal errors */
 	if ( response->status_class != 0 ) {
@@ -714,13 +780,6 @@ static void iscsi_rx_login_response ( struct iscsi_session *iscsi, void *data,
 		iscsi_close ( iscsi, -EPERM );
 		return;
 	}
-
-	/* Process strings data */
-	for ( ; len-- ; data++ ) {
-		iscsi_handle_string_byte ( iscsi, * ( ( uint8_t * ) data ) );
-	}
-	if ( remaining )
-		return;
 
 	/* Handle login transitions */
 	if ( response->flags & ISCSI_LOGIN_FLAG_TRANSITION ) {
@@ -848,26 +907,25 @@ static void iscsi_tx_done ( struct iscsi_session *iscsi ) {
 static void iscsi_acked ( struct tcp_connection *conn, size_t len ) {
 	struct iscsi_session *iscsi = tcp_to_iscsi ( conn );
 	struct iscsi_bhs_common *common = &iscsi->tx_bhs.common;
-	size_t max_tx_offset;
 	enum iscsi_tx_state next_state;
 	
 	iscsi->tx_offset += len;
 	while ( 1 ) {
 		switch ( iscsi->tx_state ) {
 		case ISCSI_TX_BHS:
-			max_tx_offset = sizeof ( iscsi->tx_bhs );
+			iscsi->tx_len = sizeof ( iscsi->tx_bhs );
 			next_state = ISCSI_TX_AHS;
 			break;
 		case ISCSI_TX_AHS:
-			max_tx_offset = 4 * ISCSI_AHS_LEN ( common->lengths );
+			iscsi->tx_len = 4 * ISCSI_AHS_LEN ( common->lengths );
 			next_state = ISCSI_TX_DATA;
 			break;
 		case ISCSI_TX_DATA:
-			max_tx_offset = ISCSI_DATA_LEN ( common->lengths );
+			iscsi->tx_len = ISCSI_DATA_LEN ( common->lengths );
 			next_state = ISCSI_TX_DATA_PADDING;
 			break;
 		case ISCSI_TX_DATA_PADDING:
-			max_tx_offset = ISCSI_DATA_PAD_LEN ( common->lengths );
+			iscsi->tx_len = ISCSI_DATA_PAD_LEN ( common->lengths );
 			next_state = ISCSI_TX_IDLE;
 			break;
 		case ISCSI_TX_IDLE:
@@ -876,12 +934,12 @@ static void iscsi_acked ( struct tcp_connection *conn, size_t len ) {
 			assert ( 0 );
 			return;
 		}
-		assert ( iscsi->tx_offset <= max_tx_offset );
+		assert ( iscsi->tx_offset <= iscsi->tx_len );
 
 		/* If the whole of the current portion has not yet
 		 * been acked, stay in this state for now.
 		 */
-		if ( iscsi->tx_offset != max_tx_offset )
+		if ( iscsi->tx_offset != iscsi->tx_len )
 			return;
 
 		/* Move to next state.  Call iscsi_tx_done() when PDU
@@ -1033,7 +1091,6 @@ static void iscsi_newdata ( struct tcp_connection *conn, void *data,
 	struct iscsi_bhs_common *common = &iscsi->rx_bhs.common;
 	void ( *process ) ( struct iscsi_session *iscsi, void *data,
 			    size_t len, size_t remaining );
-	size_t max_rx_offset;
 	enum iscsi_rx_state next_state;
 	size_t frag_len;
 	size_t remaining;
@@ -1042,22 +1099,22 @@ static void iscsi_newdata ( struct tcp_connection *conn, void *data,
 		switch ( iscsi->rx_state ) {
 		case ISCSI_RX_BHS:
 			process = iscsi_rx_bhs;
-			max_rx_offset = sizeof ( iscsi->rx_bhs );
+			iscsi->rx_len = sizeof ( iscsi->rx_bhs );
 			next_state = ISCSI_RX_AHS;			
 			break;
 		case ISCSI_RX_AHS:
 			process = iscsi_rx_discard;
-			max_rx_offset = 4 * ISCSI_AHS_LEN ( common->lengths );
+			iscsi->rx_len = 4 * ISCSI_AHS_LEN ( common->lengths );
 			next_state = ISCSI_RX_DATA;
 			break;
 		case ISCSI_RX_DATA:
 			process = iscsi_rx_data;
-			max_rx_offset = ISCSI_DATA_LEN ( common->lengths );
+			iscsi->rx_len = ISCSI_DATA_LEN ( common->lengths );
 			next_state = ISCSI_RX_DATA_PADDING;
 			break;
 		case ISCSI_RX_DATA_PADDING:
 			process = iscsi_rx_discard;
-			max_rx_offset = ISCSI_DATA_PAD_LEN ( common->lengths );
+			iscsi->rx_len = ISCSI_DATA_PAD_LEN ( common->lengths );
 			next_state = ISCSI_RX_BHS;
 			break;
 		default:
@@ -1065,10 +1122,10 @@ static void iscsi_newdata ( struct tcp_connection *conn, void *data,
 			return;
 		}
 
-		frag_len = max_rx_offset - iscsi->rx_offset;
+		frag_len = iscsi->rx_len - iscsi->rx_offset;
 		if ( frag_len > len )
 			frag_len = len;
-		remaining = max_rx_offset - iscsi->rx_offset - frag_len;
+		remaining = iscsi->rx_len - iscsi->rx_offset - frag_len;
 		process ( iscsi, data, frag_len, remaining );
 
 		iscsi->rx_offset += frag_len;
@@ -1078,7 +1135,7 @@ static void iscsi_newdata ( struct tcp_connection *conn, void *data,
 		/* If all the data for this state has not yet been
 		 * received, stay in this state for now.
 		 */
-		if ( iscsi->rx_offset != max_rx_offset )
+		if ( iscsi->rx_offset != iscsi->rx_len )
 			return;
 
 		iscsi->rx_state = next_state;
