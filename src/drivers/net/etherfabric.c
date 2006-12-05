@@ -1545,6 +1545,11 @@ static struct efab_mac_operations ef1002_mac_operations = {
 #define FCN_EE_SPI_HDATA0_LBN 0
 #define FCN_EE_SPI_HDATA0_WIDTH 32
 
+/* VPI configuration register */
+#define FCN_VPD_CONFIG_REG_KER 0x0140
+#define FCN_VPD_9BIT_LBN 1
+#define FCN_VPD_9BIT_WIDTH 1
+
 /* NIC status register */
 #define FCN_NIC_STAT_REG 0x0200
 #define ONCHIP_SRAM_LBN 16
@@ -2285,6 +2290,9 @@ static int falcon_spi_rw ( struct spi_bus *bus, struct spi_device *device,
  *
  */
 static void falcon_init_spi ( struct efab_nic *efab ) {
+	efab_oword_t reg;
+	int eeprom_9bit;
+
 	/* Initialise SPI bus */
 	efab->spi.rw = falcon_spi_rw;
 	efab->falcon_eeprom.bus = &efab->spi;
@@ -2292,16 +2300,31 @@ static void falcon_init_spi ( struct efab_nic *efab ) {
 	efab->falcon_flash.bus = &efab->spi;
 	efab->falcon_flash.slave = FCN_EE_SPI_FLASH;
 
-	/* Initialise EEPROM, if present */
+	/* Initialise flash if present */
 	if ( efab->has_flash ) {
+		DBG ( "Flash is present\n" );
 		init_at25f1024 ( &efab->falcon_flash );
-		init_at25040 ( &efab->falcon_eeprom );
-	} else {
-		init_mc25xx640 ( &efab->falcon_eeprom );
-		/* Falcon's SPI interface cannot support a block size
-		 * larger than 16, so forcibly reduce it
-		 */
-		efab->falcon_eeprom.nvs.block_size = 16;
+	}
+
+	/* Initialise EEPROM if present */
+	if ( efab->has_eeprom ) {
+		if ( efab->is_asic ) {
+			falcon_read ( efab, &reg, FCN_VPD_CONFIG_REG_KER );
+			eeprom_9bit = EFAB_OWORD_FIELD ( reg, FCN_VPD_9BIT );
+		} else {
+			eeprom_9bit = 1;
+		}
+		if ( eeprom_9bit ) {
+			DBG ( "Small EEPROM is present\n" );
+			init_at25040 ( &efab->falcon_eeprom );
+		} else {
+			DBG ( "Large EEPROM is present\n" );
+			init_mc25xx640 ( &efab->falcon_eeprom );
+			/* Falcon's SPI interface cannot support a block
+			   size larger than 16, so forcibly reduce it
+			 */
+			efab->falcon_eeprom.nvs.block_size = 16;
+		}
 	}
 }
 
