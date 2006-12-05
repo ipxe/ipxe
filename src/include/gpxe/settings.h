@@ -98,9 +98,9 @@ struct config_setting {
 
 /* Function prototypes */
 
-extern int ( show_setting ) ( struct config_context *context, const char *name,
-			      char *buf, size_t len );
-extern int ( set_setting ) ( struct config_context *context, const char *name,
-			     const char *value );
+extern int show_setting ( struct config_context *context, const char *name,
+			  char *buf, size_t len );
+extern int set_setting ( struct config_context *context, const char *name,
+			 const char *value );
 
 #endif /* _GPXE_SETTINGS_H */

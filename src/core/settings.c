@@ -122,8 +122,8 @@ find_or_build_config_setting ( const char *name,
  * @v len		Length of buffer
  * @ret rc		Return status code
  */
-int ( show_setting ) ( struct config_context *context, const char *name,
-		       char *buf, size_t len ) {
+int show_setting ( struct config_context *context, const char *name,
+		   char *buf, size_t len ) {
 	struct config_setting *setting;
 	struct config_setting tmp_setting;
 
@@ -140,8 +140,8 @@ int ( show_setting ) ( struct config_context *context, const char *name,
  * @v value		Setting value (as a string)
  * @ret rc		Return status code
  */
-int ( set_setting ) ( struct config_context *context, const char *name,
-		      const char *value ) {
+int set_setting ( struct config_context *context, const char *name,
+		  const char *value ) {
 	struct config_setting *setting;
 	struct config_setting tmp_setting;
 
@@ -167,7 +167,7 @@ static int show_string ( struct config_context *context,
 
 	option = find_dhcp_option ( context->options, setting->tag );
 	if ( ! option )
-		return -ENOENT;
+		return -ENODATA;
 	dhcp_snprintf ( buf, len, option );
 	return 0;
 }
@@ -215,7 +215,7 @@ static int show_ipv4 ( struct config_context *context,
 
 	option = find_dhcp_option ( context->options, setting->tag );
 	if ( ! option )
-		return -ENOENT;
+		return -ENODATA;
 	dhcp_ipv4_option ( option, &ipv4 );
 	snprintf ( buf, len, inet_ntoa ( ipv4 ) );
 	return 0;
@@ -252,35 +252,23 @@ struct config_setting_type config_setting_type_ipv4 __config_setting_type = {
 };
 
 /** Some basic setting definitions */
-struct config_setting basic_config_settings[] __config_setting = {
-	{
-		.name = "hostname",
-		.tag = DHCP_HOST_NAME,
-		.type = &config_setting_type_string,
-	},
-	{
-		.name = "ip",
-		.tag = DHCP_EB_YIADDR,
-		.type = &config_setting_type_ipv4,
-	},
+struct config_setting ip_config_setting __config_setting = {
+	.name = "ip",
+	.tag = DHCP_EB_YIADDR,
+	.type = &config_setting_type_ipv4,
 };
-
-
-
-/* Quick and dirty proof of concept */
-int cmdl_show ( int argc, char **argv ) {
-	char buf[256];
-	struct config_context dummy_context = { NULL };
-	int rc;
-
-	if ( argc < 2 )
-		return -EINVAL;
-	
-	if ( ( rc = show_setting ( &dummy_context, argv[1],
-				   buf, sizeof ( buf ) ) ) != 0 )
-		return rc;
-
-	printf ( "%s = %s\n", argv[1], buf );
-	return 0;
-}
-
+struct config_setting hostname_config_setting __config_setting = {
+	.name = "hostname",
+	.tag = DHCP_HOST_NAME,
+	.type = &config_setting_type_string,
+};
+struct config_setting username_config_setting __config_setting = {
+	.name = "username",
+	.tag = DHCP_EB_USERNAME,
+	.type = &config_setting_type_string,
+};
+struct config_setting password_config_setting __config_setting = {
+	.name = "password",
+	.tag = DHCP_EB_PASSWORD,
+	.type = &config_setting_type_string,
+};

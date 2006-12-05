@@ -6,20 +6,37 @@
 #include <command.h>
 #include <gpxe/nvo.h>
 #include <gpxe/dhcp.h>
+#include <gpxe/settings.h>
 
 void nvo_cmd_req() {}
 
 extern struct nvo_block *ugly_nvo_hack;
 
 static int show_exec ( int argc, char **argv ) {
+	struct config_context dummy_context;
+	char buf[256];
+	int rc;
 
 	if ( ! ugly_nvo_hack ) {
 		printf ( "No non-volatile option storage available\n" );
 		return 1;
 	}
 
-	hex_dump ( ugly_nvo_hack->options->data,
-		   ugly_nvo_hack->options->len );
+	if ( argc != 2 ) {
+		printf ( "Syntax: %s <identifier>\n", argv[0] );
+		return 1;
+	}
+
+	dummy_context.options = ugly_nvo_hack->options;
+	if ( ( rc = show_setting ( &dummy_context, argv[1], buf,
+				   sizeof ( buf ) ) ) != 0 ) {
+		printf ( "Could not find \"%s\": %s\n",
+			 argv[1], strerror ( -rc ) );
+		return 1;
+	}
+
+	printf ( "%s = %s\n", argv[1], buf );
+	return 0;
 }
 
 struct command show_command __command = {
@@ -30,8 +47,8 @@ struct command show_command __command = {
 };
 
 static int set_exec ( int argc, char **argv ) {
-	unsigned long tag;
-	struct dhcp_option *option;
+	struct config_context dummy_context;
+	int rc;
 
 	if ( ! ugly_nvo_hack ) {
 		printf ( "No non-volatile option storage available\n" );
@@ -39,19 +56,18 @@ static int set_exec ( int argc, char **argv ) {
 	}
 
 	if ( argc != 3 ) {
-		printf ( "Syntax: %s <option number> <option string>\n",
+		printf ( "Syntax: %s <identifier> <value>\n",
 			 argv[0] );
 		return 1;
 	}
 
-	tag = strtoul ( argv[1], NULL, 0 );
-	option = set_dhcp_option ( ugly_nvo_hack->options, tag, argv[2],
-				   strlen ( argv[2] ) );
-	if ( ! option ) {
-		printf ( "Could not set option %ld\n", tag );
+	dummy_context.options = ugly_nvo_hack->options;
+	if ( ( rc = set_setting ( &dummy_context, argv[1], argv[2] ) ) != 0 ) {
+		printf ( "Could not set \"%s\"=\"%s\": %s\n",
+			 argv[1], argv[2], strerror ( -rc ) );
 		return 1;
 	}
-
+	
 	if ( nvo_save ( ugly_nvo_hack ) != 0 ) {
 		printf ( "Could not save options to non-volatile storage\n" );
 		return 1;
