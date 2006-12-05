@@ -378,21 +378,27 @@ void tcp_init_conn ( struct tcp_connection *conn ) {
  * @v over	Failure indicator
  */
 void tcp_expired ( struct retry_timer *timer, int over ) {
-	struct tcp_connection *conn;
-	conn = ( struct tcp_connection * ) container_of ( timer, 
-					struct tcp_connection, timer );
+	struct tcp_connection *conn =
+		container_of ( timer, struct tcp_connection, timer );
+
 	DBG ( "Timer expired in %s\n", tcp_states[conn->tcp_state] );
 	switch ( conn->tcp_state ) {
 	case TCP_SYN_SENT:
 		if ( over ) {
+			list_del ( &conn->list );
 			tcp_trans ( conn, TCP_CLOSED );
+			if ( conn->tcp_op->closed )
+				conn->tcp_op->closed ( conn, -ETIMEDOUT );
 			DBG ( "Timeout! Connection closed\n" );
 			return;
 		}
 		goto send_tcp_nomsg;
 	case TCP_SYN_RCVD:
 		if ( over ) {
+			list_del ( &conn->list );
 			tcp_trans ( conn, TCP_CLOSED );
+			if ( conn->tcp_op->closed )
+				conn->tcp_op->closed ( conn, -ETIMEDOUT );
 			goto send_tcp_nomsg;
 		}
 		goto send_tcp_nomsg;
@@ -416,7 +422,10 @@ void tcp_expired ( struct retry_timer *timer, int over ) {
 		}
 		return;
 	case TCP_TIME_WAIT:
+		list_del ( &conn->list );
 		tcp_trans ( conn, TCP_CLOSED );
+		if ( conn->tcp_op->closed )
+			conn->tcp_op->closed ( conn, 0 );
 		return;
 	}
 	/* Retransmit the data */
@@ -496,8 +505,6 @@ int tcp_close ( struct tcp_connection *conn ) {
 	case TCP_SYN_RCVD:
 	case TCP_ESTABLISHED:
 		tcp_trans ( conn, TCP_FIN_WAIT_1 );
-		if ( conn->tcp_op->closed )
-			conn->tcp_op->closed ( conn, CONN_SNDCLOSE ); /* TODO: Check! */
 		/* FIN consumes one byte on the snd stream */
 //		conn->snd_una++;
 		goto send_tcp_nomsg;
@@ -511,12 +518,10 @@ int tcp_close ( struct tcp_connection *conn ) {
 		list_del ( &conn->list );
 		tcp_trans ( conn, TCP_CLOSED );
 		if ( conn->tcp_op->closed )
-			conn->tcp_op->closed ( conn, CONN_SNDCLOSE );
+			conn->tcp_op->closed ( conn, 0 );
 		return 0;
 	case TCP_CLOSE_WAIT:
 		tcp_trans ( conn, TCP_LAST_ACK );
-		if ( conn->tcp_op->closed )
-			conn->tcp_op->closed ( conn, CONN_SNDCLOSE ); /* TODO: Check! */
 		/* FIN consumes one byte on the snd stream */
 //		conn->snd_una++;
 		goto send_tcp_nomsg;
@@ -715,8 +720,8 @@ static int tcp_rx ( struct pk_buff *pkb,
 		    struct sockaddr_tcpip *st_dest __unused ) {
 	struct tcp_connection *conn;
 	struct tcp_header *tcphdr;
-	uint32_t acked, toack;
-	int hlen;
+	int32_t acked, toack;
+	unsigned int hlen;
 	int rc;
 
 	/* Sanity check */
@@ -817,7 +822,7 @@ static int tcp_rx ( struct pk_buff *pkb,
 		if ( tcphdr->flags & TCP_RST ) {
 			tcp_trans ( conn, TCP_LISTEN );
 			if ( conn->tcp_op->closed )
-				conn->tcp_op->closed ( conn, CONN_RESTART );
+				conn->tcp_op->closed ( conn, -ECONNRESET );
 			rc = 0;
 			goto done;
 		}
@@ -855,9 +860,6 @@ static int tcp_rx ( struct pk_buff *pkb,
 		if ( tcphdr->flags & TCP_FIN ) {
 			conn->rcv_nxt++;
 			conn->tcp_flags |= TCP_ACK;
-			if ( conn->tcp_op->closed )
-				conn->tcp_op->closed ( conn, CONN_SNDCLOSE );
-
 			if ( tcphdr->flags & TCP_ACK ) {
 				tcp_trans ( conn, TCP_TIME_WAIT );
 			} else {
@@ -898,7 +900,10 @@ static int tcp_rx ( struct pk_buff *pkb,
 		break;
 	case TCP_LAST_ACK:
 		if ( tcphdr->flags & TCP_ACK ) {
+			list_del ( &conn->list );
 			tcp_trans ( conn, TCP_CLOSED );
+			if ( conn->tcp_op->closed )
+				conn->tcp_op->closed ( conn, 0 );
 			rc = 0;
 			goto done;
 		}
