@@ -2878,10 +2878,10 @@ static int falcon_init_nic ( struct efab_nic *efab ) {
 		}
 	}
 
-	EFAB_LOG ( "NIC type: %s %dx%s\n",
-		   efab->is_asic ? "ASIC" : "FPGA",
-		   efab->is_dual ? 2 : 1,
-		   efab->is_10g ? "10G" : "1G" );
+	DBG ( "NIC type: %s %dx%s\n",
+	      efab->is_asic ? "ASIC" : "FPGA",
+	      efab->is_dual ? 2 : 1,
+	      efab->is_10g ? "10G" : "1G" );
 
 	/* patch in MAC operations */
 	if ( efab->is_10g )
@@ -2904,9 +2904,9 @@ static int falcon_init_nic ( struct efab_nic *efab ) {
 		efab->has_flash = EFAB_OWORD_FIELD ( reg, FCN_FLASH_PRESENT );
 		efab->has_eeprom = EFAB_OWORD_FIELD ( reg, FCN_EEPROM_PRESENT);
 	}
-	EFAB_LOG ( "flash is %s, EEPROM is %s\n",
-		   ( efab->has_flash ? "present" : "absent" ),
-		   ( efab->has_eeprom ? "present" : "absent" ) );
+	DBG ( "flash is %s, EEPROM is %s\n",
+	      ( efab->has_flash ? "present" : "absent" ),
+	      ( efab->has_eeprom ? "present" : "absent" ) );
 	falcon_init_spi ( efab );
 
 	/* Set up TX and RX descriptor caches in SRAM */
