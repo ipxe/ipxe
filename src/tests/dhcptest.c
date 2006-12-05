@@ -143,9 +143,11 @@ static int test_dhcp_boot ( struct net_device *netdev, char *filename ) {
 	if ( strncmp ( filename, "iscsi:", 6 ) == 0 ) {
 		return test_dhcp_iscsi_boot ( netdev, &filename[6] );
 	}
+	/*
 	if ( strncmp ( filename, "ftp:", 4 ) == 0 ) {
 		return test_dhcp_ftp ( netdev, &filename[4] );
 	}
+	*/
 	/*
 	if ( strncmp ( filename, "hello:", 6 ) == 0 ) {
 		return test_dhcp_hello ( &filename[6] );
@@ -153,8 +155,9 @@ static int test_dhcp_boot ( struct net_device *netdev, char *filename ) {
 	if ( strncmp ( filename, "http:", 5 ) == 0 ) {
 		return test_dhcp_http ( netdev, filename );
 	}
-	return test_dhcp_tftp ( netdev, filename );
 	*/
+	return test_dhcp_tftp ( netdev, filename );
+
 	return -EPROTONOSUPPORT;
 }
 
