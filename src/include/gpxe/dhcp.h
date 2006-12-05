@@ -113,6 +113,9 @@
 /** Vendor class identifier */
 #define DHCP_VENDOR_CLASS_ID 60
 
+/** Client identifier */
+#define DHCP_CLIENT_ID 61
+
 /** TFTP server name
  *
  * This option replaces the fixed "sname" field, when that field is
@@ -184,6 +187,15 @@
  * packet.
  */
 #define DHCP_EB_PASSWORD DHCP_ENCAP_OPT ( DHCP_EB_ENCAP, 0xbf )
+
+/** iSCSI primary target IQN */
+#define DHCP_ISCSI_PRIMARY_TARGET_IQN 201
+
+/** iSCSI secondary target IQN */
+#define DHCP_ISCSI_SECONDARY_TARGET_IQN 202
+
+/** iSCSI initiator IQN */
+#define DHCP_ISCSI_INITIATOR_IQN 203
 
 /** Maximum normal DHCP option */
 #define DHCP_MAX_OPTION 254
