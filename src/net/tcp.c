@@ -497,7 +497,8 @@ int tcp_close ( struct tcp_connection *conn ) {
 	case TCP_SYN_RCVD:
 	case TCP_ESTABLISHED:
 		tcp_trans ( conn, TCP_FIN_WAIT_1 );
-		conn->tcp_op->closed ( conn, CONN_SNDCLOSE ); /* TODO: Check! */
+		if ( conn->tcp_op->closed )
+			conn->tcp_op->closed ( conn, CONN_SNDCLOSE ); /* TODO: Check! */
 		/* FIN consumes one byte on the snd stream */
 //		conn->snd_una++;
 		goto send_tcp_nomsg;
@@ -510,11 +511,13 @@ int tcp_close ( struct tcp_connection *conn ) {
 		 */
 		list_del ( &conn->list );
 		tcp_trans ( conn, TCP_CLOSED );
-		conn->tcp_op->closed ( conn, CONN_SNDCLOSE );
+		if ( conn->tcp_op->closed )
+			conn->tcp_op->closed ( conn, CONN_SNDCLOSE );
 		return 0;
 	case TCP_CLOSE_WAIT:
 		tcp_trans ( conn, TCP_LAST_ACK );
-		conn->tcp_op->closed ( conn, CONN_SNDCLOSE ); /* TODO: Check! */
+		if ( conn->tcp_op->closed )
+			conn->tcp_op->closed ( conn, CONN_SNDCLOSE ); /* TODO: Check! */
 		/* FIN consumes one byte on the snd stream */
 //		conn->snd_una++;
 		goto send_tcp_nomsg;
@@ -630,8 +633,9 @@ int tcp_senddata ( struct tcp_connection *conn ) {
 	/* Set the advertised window */
 	conn->rcv_win = pkb_available ( conn->tx_pkb );
 	/* Call the senddata() call back function */
-	conn->tcp_op->senddata ( conn, conn->tx_pkb->data, 
-					pkb_available ( conn->tx_pkb ) );
+	if ( conn->tcp_op->senddata )
+		conn->tcp_op->senddata ( conn, conn->tx_pkb->data, 
+					 pkb_available ( conn->tx_pkb ) );
 	/* Send pure ACK if senddata() didn't call tcp_send() */
 	if ( conn->tx_pkb ) {
 		tcp_send ( conn, TCP_NOMSG, TCP_NOMSG_LEN );
@@ -796,7 +800,8 @@ static int tcp_rx ( struct pk_buff *pkb,
 				 * acked() callback function.
 				 */
 				conn->snd_una = ntohl ( tcphdr->ack );
-				conn->tcp_op->connected ( conn );
+				if ( conn->tcp_op->connected )
+					conn->tcp_op->connected ( conn );
 				conn->tcp_flags |= TCP_ACK;
 				tcp_senddata ( conn );
 				rc = 0;
@@ -812,7 +817,8 @@ static int tcp_rx ( struct pk_buff *pkb,
 	case TCP_SYN_RCVD:
 		if ( tcphdr->flags & TCP_RST ) {
 			tcp_trans ( conn, TCP_LISTEN );
-			conn->tcp_op->closed ( conn, CONN_RESTART );
+			if ( conn->tcp_op->closed )
+				conn->tcp_op->closed ( conn, CONN_RESTART );
 			rc = 0;
 			goto done;
 		}
@@ -823,7 +829,8 @@ static int tcp_rx ( struct pk_buff *pkb,
 			 * function nor does it send an ACK.
 			 */
 			conn->snd_una = tcphdr->ack - 1;
-			conn->tcp_op->connected ( conn );
+			if ( conn->tcp_op->connected )
+				conn->tcp_op->connected ( conn );
 			rc = 0;
 			goto done;
 		}
@@ -849,7 +856,8 @@ static int tcp_rx ( struct pk_buff *pkb,
 		if ( tcphdr->flags & TCP_FIN ) {
 			conn->rcv_nxt++;
 			conn->tcp_flags |= TCP_ACK;
-			conn->tcp_op->closed ( conn, CONN_SNDCLOSE );
+			if ( conn->tcp_op->closed )
+				conn->tcp_op->closed ( conn, CONN_SNDCLOSE );
 
 			if ( tcphdr->flags & TCP_ACK ) {
 				tcp_trans ( conn, TCP_TIME_WAIT );
@@ -920,7 +928,8 @@ static int tcp_rx ( struct pk_buff *pkb,
 		}
 		/* Invoke the acked() callback */
 		conn->snd_una += acked;
-		conn->tcp_op->acked ( conn, acked );
+		if ( conn->tcp_op->acked )
+			conn->tcp_op->acked ( conn, acked );
 	}
 	
 	/**
@@ -931,8 +940,9 @@ static int tcp_rx ( struct pk_buff *pkb,
 		/* Check the sequence number */
 		if ( conn->rcv_nxt == ntohl ( tcphdr->seq ) ) {
 			conn->rcv_nxt += toack;
-			conn->tcp_op->newdata ( conn,
-						pkb->data + hlen, toack );
+			if ( conn->tcp_op->newdata )
+				conn->tcp_op->newdata ( conn, pkb->data + hlen,
+							toack );
 		} else {
 			DBG ( "Unexpected sequence number %lx (wanted %lx)\n",
 				ntohl ( tcphdr->ack ), conn->rcv_nxt );
