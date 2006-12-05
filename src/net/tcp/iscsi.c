@@ -1125,9 +1125,10 @@ static void iscsi_closed ( struct tcp_connection *conn, int status ) {
 
 	/* Retry connection if within the retry limit, otherwise fail */
 	if ( ++iscsi->retry_count <= ISCSI_MAX_RETRIES ) {
+		DBG ( "iSCSI %p retrying connection\n", iscsi );
 		tcp_connect ( conn );
 	} else {
-		printf ( "iSCSI retry count exceeded\n" );
+		printf ( "iSCSI %p retry count exceeded\n", iscsi );
 		iscsi_done ( iscsi, status );
 	}
 }
