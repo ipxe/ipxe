@@ -953,7 +953,8 @@ static int tcp_rx ( struct pk_buff *pkb,
 	 * Send data
 	 */
 	tcp_senddata ( conn );
-	return 0;
+	rc = 0;
+	goto done;
 
   send_tcp_nomsg:
 	free_pkb ( conn->tx_pkb );
