@@ -41,7 +41,7 @@ static int show_exec ( int argc, char **argv ) {
 
 struct command show_command __command = {
 	.name = "show",
-	.usage = "show\n",
+	.usage = "show <identifier>\n",
 	.desc = "Show stored options",
 	.exec = show_exec,
 };
@@ -78,7 +78,7 @@ static int set_exec ( int argc, char **argv ) {
 
 struct command set_command __command = {
 	.name = "set",
-	.usage = "set <option number> <option string>\n",
+	.usage = "set <identifier> <value>\n",
 	.desc = "Set stored option",
 	.exec = set_exec,
 };

@@ -13,19 +13,19 @@ static int cmd_help_exec ( int argc, char **argv ) {
 	struct command *ccmd;
 	int unknown = 1;
 	if(argc == 1){
-		printf("Built in commands:\n\n\texit, quit\t\tExit the command line and boot\n\nCompiled in commands:\n\n");
+		printf("Available commands:\n\n  exit - Exit the command line and boot\n");
 
 		for ( ccmd = cmd_start ; ccmd < cmd_end ; ccmd++ ) {
-			printf ("\t%s\t\t%s\n", ccmd->name, ccmd->desc );
+			printf ("  %s - %s\n", ccmd->name, ccmd->desc );
 		}
 	}else{
 		if(!strcmp(argv[1], "exit") || !strcmp(argv[1], "quit")){
-			printf("exit, quit - The quit command\n\nUsage:\nquit or exit\n\n\tExample:\n\t\texit\n");
+			printf("exit - Exit the command line and boot\n\nUsage:\n  exit\n");
 		}else{
 			for ( ccmd = cmd_start ; ccmd < cmd_end ; ccmd++ ) {
 				if(!strcmp(ccmd->name, argv[1])){
 					unknown = 0;
-					printf ("\t%s - %s\n\nUsage:\n%s\n", ccmd->name, ccmd->desc, ccmd->usage );
+					printf ("%s - %s\n\nUsage:\n  %s\n", ccmd->name, ccmd->desc, ccmd->usage );
 					break;
 				}
 			}
@@ -40,7 +40,7 @@ static int cmd_help_exec ( int argc, char **argv ) {
 
 struct command help_command __command = {
 	.name = "help",
-	.usage = "help <command>\n\n\tExample:\n\t\thelp help\n",
+	.usage = "help <command>\n\nExample:\n  help help\n",
 	.desc = "The help command",
 	.exec = cmd_help_exec,
 };
