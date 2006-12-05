@@ -27,16 +27,17 @@ enum { Disable_A20 = 0x2400, Enable_A20 = 0x2401, Query_A20_Status = 0x2402,
 #define CF ( 1 << 0 )
 
 #ifndef IBM_L40
-static void empty_8042 ( void )
-{
+static void empty_8042 ( void ) {
 	unsigned long time;
-	char st;
 
 	time = currticks() + TICKS_PER_SEC;	/* max wait of 1 second */
-	while ((((st = inb(K_CMD)) & K_OBUF_FUL) ||
-	       (st & K_IBUF_FUL)) &&
-	       currticks() < time)
-		inb(K_RDWR);
+	while ( ( inb ( K_CMD ) & K_IBUF_FUL ) &&
+		currticks() < time ) {
+		/* Do nothing.  In particular, do *not* read from
+		 * K_RDWR, because that will drain the keyboard buffer
+		 * and lose keypresses.
+		 */
+	}
 }
 #endif	/* IBM_L40 */
 
@@ -66,6 +67,7 @@ void gateA20_set ( void ) {
 			       : "=r" ( flags ), "=a" ( discard_a )
 			       : "a" ( Enable_A20 ) );
 
+
 	if ( flags & CF ) {
 		/* INT 15 method failed, try alternatives */
 #ifdef	IBM_L40
@@ -78,7 +80,7 @@ void gateA20_set ( void ) {
 		empty_8042();
 #endif	/* IBM_L40 */
 	}
-	
+
 	reentry_guard = 0;
 }
 
