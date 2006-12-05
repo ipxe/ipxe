@@ -478,23 +478,6 @@ enum iscsi_rx_state {
 	ISCSI_RX_DATA_PADDING,
 };
 
-enum iscsi_string_key_value {
-	STRING_KEY = 0,
-	STRING_VALUE,
-};
-
-/** iSCSI text string processor state */
-struct iscsi_string_state {
-	/** Text string key */
-	char key[16];
-	/** Text string value */
-	char value[8];
-	/** Key/value flag */
-	enum iscsi_string_key_value key_value;
-	/** Index into current string */
-	unsigned int index;
-};
-
 /** An iSCSI session */
 struct iscsi_session {
 	/** TCP connection for this session */
@@ -596,8 +579,6 @@ struct iscsi_session {
 	size_t rx_len;
 	/** Buffer for received data (not always used) */
 	void *rx_buffer;
-	/** State of strings received during login phase */
-	struct iscsi_string_state string;
 
 	/** Current SCSI command
 	 *

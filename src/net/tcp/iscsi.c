@@ -509,17 +509,13 @@ static void iscsi_tx_login_request ( struct iscsi_session *iscsi,
  * Handle iSCSI AuthMethod text value
  *
  * @v iscsi		iSCSI session
- * @v finished		Value is complete
+ * @v value		AuthMethod value
  */
 static void iscsi_handle_authmethod_value ( struct iscsi_session *iscsi,
-					    int finished ) {
-	struct iscsi_string_state *string = &iscsi->string;
-
-	if ( ! finished )
-		return;
+					    const char *value ) {
 
 	/* If server requests CHAP, send the CHAP_A string */
-	if ( strcmp ( string->value, "CHAP" ) == 0 ) {
+	if ( strcmp ( value, "CHAP" ) == 0 ) {
 		DBG ( "iSCSI %p initiating CHAP authentication\n", iscsi );
 		iscsi->status |= ISCSI_STATUS_STRINGS_CHAP_ALGORITHM;
 	}
@@ -529,23 +525,19 @@ static void iscsi_handle_authmethod_value ( struct iscsi_session *iscsi,
  * Handle iSCSI CHAP_A text value
  *
  * @v iscsi		iSCSI session
- * @v finished		Value is complete
+ * @v value		CHAP_A value
  */
 static void iscsi_handle_chap_a_value ( struct iscsi_session *iscsi,
-					int finished ) {
-	struct iscsi_string_state *string = &iscsi->string;
+					const char *value ) {
 	int rc;
 
-	if ( ! finished )
-		return;
-	
 	/* We only ever offer "5" (i.e. MD5) as an algorithm, so if
 	 * the server responds with anything else it is a protocol
 	 * violation.
 	 */
-	if ( strcmp ( string->value, "5" ) != 0 ) {
+	if ( strcmp ( value, "5" ) != 0 ) {
 		DBG ( "iSCSI %p got invalid CHAP algorithm \"%s\"\n",
-		      iscsi, string->value );
+		      iscsi, value );
 	}
 
 	/* Prepare for CHAP with MD5 */
@@ -559,22 +551,18 @@ static void iscsi_handle_chap_a_value ( struct iscsi_session *iscsi,
  * Handle iSCSI CHAP_I text value
  *
  * @v iscsi		iSCSI session
- * @v finished		Value is complete
+ * @v value		CHAP_I value
  */
 static void iscsi_handle_chap_i_value ( struct iscsi_session *iscsi,
-					int finished ) {
-	struct iscsi_string_state *string = &iscsi->string;
+					const char *value ) {
 	unsigned int identifier;
 	char *endp;
 
-	if ( ! finished )
-		return;
-
 	/* The CHAP identifier is an integer value */
-	identifier = strtoul ( string->value, &endp, 0 );
+	identifier = strtoul ( value, &endp, 0 );
 	if ( *endp != '\0' ) {
 		DBG ( "iSCSI %p saw invalid CHAP identifier \"%s\"\n",
-		      iscsi, string->value );
+		      iscsi, value );
 	}
 
 	/* Identifier and secret are the first two components of the
@@ -589,159 +577,108 @@ static void iscsi_handle_chap_i_value ( struct iscsi_session *iscsi,
  * Handle iSCSI CHAP_C text value
  *
  * @v iscsi		iSCSI session
- * @v finished		Value is complete
+ * @v value		CHAP_C value
  */
 static void iscsi_handle_chap_c_value ( struct iscsi_session *iscsi,
-					int finished ) {
-	struct iscsi_string_state *string = &iscsi->string;
-	uint8_t byte;
+					const char *value ) {
+	char buf[3];
 	char *endp;
+	uint8_t byte;
 
-	/* Once the whole challenge is received, calculate the response */
-	if ( finished ) {
-		DBG ( "iSCSI %p sending CHAP response\n", iscsi );
-		chap_respond ( &iscsi->chap );
-		iscsi->status |= ISCSI_STATUS_STRINGS_CHAP_RESPONSE;
-		return;
+	/* Check and strip leading "0x" */
+	if ( ( value[0] != '0' ) || ( value[1] != 'x' ) ) {
+		DBG ( "iSCSI %p saw invalid CHAP challenge \"%s\"\n",
+		      iscsi, value );
+	}
+	value += 2;
+
+	/* Process challenge an octet at a time */
+	for ( ; ( value[0] && value[1] ) ; value += 2 ) {
+		memcpy ( buf, value, 2 );
+		buf[3] = 0;
+		byte = strtoul ( buf, &endp, 16 );
+		if ( *endp != '\0' ) {
+			DBG ( "iSCSI %p saw invalid CHAP challenge byte "
+			      "\"%s\"\n", iscsi, buf );
+		}
+		chap_update ( &iscsi->chap, &byte, sizeof ( byte ) );
 	}
 
-	/* Wait until a complete octet ("0x??") is received */
-	if ( string->index != 4 )
-		return;
-
-	/* Add octet to challenge */
-	byte = strtoul ( string->value, &endp, 0 );
-	if ( *endp != '\0' ) {
-		DBG ( "iSCSI %p saw invalid CHAP challenge portion \"%s\"\n",
-		      iscsi, string->value );
-	}
-	chap_update ( &iscsi->chap, &byte, sizeof ( byte ) );
-
-	/* Reset value back to "0x" */
-	string->index = 2;
+	/* Build CHAP response */
+	DBG ( "iSCSI %p sending CHAP response\n", iscsi );
+	chap_respond ( &iscsi->chap );
+	iscsi->status |= ISCSI_STATUS_STRINGS_CHAP_RESPONSE;
 }
 
 /** An iSCSI text string that we want to handle */
 struct iscsi_string_type {
-	/** String name
+	/** String key
 	 *
-	 * This is the portion before the "=" sign,
-	 * e.g. InitiatorName, CHAP_A, etc.
+	 * This is the portion up to and including the "=" sign,
+	 * e.g. "InitiatorName=", "CHAP_A=", etc.
 	 */
-	const char *name;
+	const char *key;
 	/** Handle iSCSI string value
 	 *
 	 * @v iscsi		iSCSI session
-	 * @v finished		Value is complete
-	 *
-	 * Process the string in @c iscsi->string.  This method will
-	 * be called once for each character in the string, and once
-	 * again at the end of the string.
+	 * @v value		iSCSI string value
 	 */
-	void ( * handle_value ) ( struct iscsi_session *iscsi, int finished );
+	void ( * handle_value ) ( struct iscsi_session *iscsi,
+				  const char *value );
 };
 
 /** iSCSI text strings that we want to handle */
 struct iscsi_string_type iscsi_string_types[] = {
-	{ "AuthMethod", iscsi_handle_authmethod_value },
-	{ "CHAP_A", iscsi_handle_chap_a_value },
-	{ "CHAP_I", iscsi_handle_chap_i_value },
-	{ "CHAP_C", iscsi_handle_chap_c_value },
+	{ "AuthMethod=", iscsi_handle_authmethod_value },
+	{ "CHAP_A=", iscsi_handle_chap_a_value },
+	{ "CHAP_I=", iscsi_handle_chap_i_value },
+	{ "CHAP_C=", iscsi_handle_chap_c_value },
 	{ NULL, NULL }
 };
 
 /**
- * Handle iSCSI string value
+ * Handle iSCSI string
  *
  * @v iscsi		iSCSI session
- * @v finished		Value is complete
- *
- * Process the string in @c iscsi->string.  This function will be
- * called once for each character in the string, and once again at the
- * end of the string.
+ * @v string		iSCSI string (in "key=value" format)
  */
-static void iscsi_handle_string_value ( struct iscsi_session *iscsi,
-					int finished ) {
-	struct iscsi_string_state *string = &iscsi->string;
-	struct iscsi_string_type *type = iscsi_string_types;
+static void iscsi_handle_string ( struct iscsi_session *iscsi,
+				  const char *string ) {
+	struct iscsi_string_type *type;
+	size_t key_len;
 
-	assert ( string->key_value == STRING_VALUE );
-
-	for ( type = iscsi_string_types ; type->name ; type++ ) {
-		if ( strcmp ( type->name, string->key ) == 0 ) {
-			if ( string->index <= 1 ) {
-				DBG ( "iSCSI %p handling key \"%s\"\n",
-				      iscsi, string->key );
-			}
-			type->handle_value ( iscsi, finished );
+	for ( type = iscsi_string_types ; type->key ; type++ ) {
+		key_len = strlen ( type->key );
+		if ( strncmp ( string, type->key, key_len ) == 0 ) {
+			DBG ( "iSCSI %p handling %s\n", iscsi, string );
+			type->handle_value ( iscsi, ( string + key_len ) );
 			return;
 		}
 	}
-	if ( string->index <= 1 )
-		DBG ( "iSCSI %p ignoring key \"%s\"\n", iscsi, string->key );
+	DBG ( "iSCSI %p ignoring %s\n", iscsi, string );
 }
 
 /**
- * Handle byte of an iSCSI string
+ * Handle iSCSI strings
  *
  * @v iscsi		iSCSI session
- * @v byte		Byte of string
- *
- * Strings are handled a byte at a time in order to simplify the
- * logic, and to ensure that we can provably cope with the TCP packet
- * boundaries coming at inconvenient points, such as halfway through a
- * string.
+ * @v string		iSCSI string buffer
+ * @v len		Length of string buffer
  */
-static void iscsi_handle_string_byte ( struct iscsi_session *iscsi,
-				       uint8_t byte ) {
-	struct iscsi_string_state *string = &iscsi->string;
-
-	if ( string->key_value == STRING_KEY ) {
-		switch ( byte ) {
-		case '\0':
-			/* Premature termination */
-			DBG ( "iSCSI %p premature key termination on \"%s\"\n",
-			      iscsi, string->key );
-			string->index = 0;
-			break;
-		case '=':
-			/* End of key */
-			string->key_value = STRING_VALUE;
-			string->index = 0;
-			break;
-		default:
-			/* Part of key */
-			if ( string->index < ( sizeof ( string->key ) - 1 ) ) {
-				string->key[string->index++] = byte;
-				string->key[string->index] = '\0';
-			}
-			break;
-		}
-	} else {
-		switch ( byte ) {
-		case '\0':
-			/* End of string */
-			iscsi_handle_string_value ( iscsi, 1 );
-			string->key_value = STRING_KEY;
-			string->index = 0;
-			break;
-		default:
-			/* Part of value */
-			if ( string->index < ( sizeof ( string->value ) - 1 )){
-				string->value[string->index++] = byte;
-				string->value[string->index] = '\0';
-				iscsi_handle_string_value ( iscsi, 0 );
-			}
-			break;
-		}
-	}
-}
-
 static void iscsi_handle_strings ( struct iscsi_session *iscsi,
 				   const char *strings, size_t len ) {
-	for ( ; len-- ; strings++ ) {
-		iscsi_handle_string_byte ( iscsi,
-					   * ( ( uint8_t * ) strings ) );
+	size_t string_len;
+
+	/* Handle each string in turn, taking care not to overrun the
+	 * data buffer in case of badly-terminated data.
+	 */
+	while ( 1 ) {
+		string_len = ( strnlen ( strings, len ) + 1 );
+		if ( string_len > len )
+			break;
+		iscsi_handle_string ( iscsi, strings );
+		strings += string_len;
+		len -= string_len;
 	}
 }
 
