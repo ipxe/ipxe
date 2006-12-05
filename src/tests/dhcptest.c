@@ -14,8 +14,10 @@ static int test_dhcp_aoe_boot ( struct net_device *netdev,
 	return test_aoeboot ( netdev, aoename, drivenum );
 }
 
-static int test_dhcp_iscsi_boot ( struct net_device *netdev, char *iscsiname ) {
-	char *initiator_iqn = "iqn.1900-01.localdomain.localhost:initiator";
+static int test_dhcp_iscsi_boot ( struct net_device *netdev,
+				  char *iscsiname ) {
+	char initiator_iqn_buf[32];
+	char *initiator_iqn = initiator_iqn_buf;
 	char username[32];
 	char password[32];
 	char *target_iqn;
@@ -24,6 +26,7 @@ static int test_dhcp_iscsi_boot ( struct net_device *netdev, char *iscsiname ) {
 		struct sockaddr_tcpip st;
 	} target;
 	unsigned int drivenum;
+	struct dhcp_option *option;
 	
 	memset ( &target, 0, sizeof ( target ) );
 	target.sin.sin_family = AF_INET;
@@ -36,6 +39,10 @@ static int test_dhcp_iscsi_boot ( struct net_device *netdev, char *iscsiname ) {
 	}
 	inet_aton ( iscsiname, &target.sin.sin_addr );
 
+	dhcp_snprintf ( initiator_iqn, sizeof ( initiator_iqn ),
+			find_global_dhcp_option ( DHCP_ISCSI_INITIATOR_IQN ) );
+	if ( ! *initiator_iqn )
+		initiator_iqn = "iqn.1900-01.localdomain.localhost:initiator";
 	dhcp_snprintf ( username, sizeof ( username ),
 			find_global_dhcp_option ( DHCP_EB_USERNAME ) );
 	dhcp_snprintf ( password, sizeof ( password ),
@@ -89,6 +96,29 @@ static int test_dhcp_http ( struct net_device *netdev, char *url ) {
 	return 0;
 }
 
+static int test_dhcp_ftp ( struct net_device *netdev, char *ftpname ) {
+	union {
+		struct sockaddr_in sin;
+		struct sockaddr_tcpip st;
+	} target;
+	char *filename;
+
+	filename = strchr ( ftpname, ':' );
+	if ( ! filename ) {
+		printf ( "Invalid FTP path \"%s\"\n", ftpname );
+		return -EINVAL;
+	}
+	*filename++ = '\0';
+
+	memset ( &target, 0, sizeof ( target ) );
+	target.sin.sin_family = AF_INET;
+	target.sin.sin_port = htons ( 21 );
+	inet_aton ( ftpname, &target.sin.sin_addr );
+
+	test_ftp ( &target, filename );
+	return 0;	
+}
+
 static int test_dhcp_tftp ( struct net_device *netdev, char *tftpname ) {
 	union {
 		struct sockaddr_in sin;
@@ -105,17 +135,27 @@ static int test_dhcp_tftp ( struct net_device *netdev, char *tftpname ) {
 }
 
 static int test_dhcp_boot ( struct net_device *netdev, char *filename ) {
+	/*
 	if ( strncmp ( filename, "aoe:", 4 ) == 0 ) {
 		return test_dhcp_aoe_boot ( netdev, &filename[4] );
-	} else if ( strncmp ( filename, "iscsi:", 6 ) == 0 ) {
+	} 
+	*/
+	if ( strncmp ( filename, "iscsi:", 6 ) == 0 ) {
 		return test_dhcp_iscsi_boot ( netdev, &filename[6] );
-	} else if ( strncmp ( filename, "hello:", 6 ) == 0 ) {
-		return test_dhcp_hello ( &filename[6] );
-	} else if ( strncmp ( filename, "http:", 5 ) == 0 ) {
-		return test_dhcp_http ( netdev, filename );
-	} else {
-		return test_dhcp_tftp ( netdev, filename );
 	}
+	if ( strncmp ( filename, "ftp:", 4 ) == 0 ) {
+		return test_dhcp_ftp ( netdev, &filename[4] );
+	}
+	/*
+	if ( strncmp ( filename, "hello:", 6 ) == 0 ) {
+		return test_dhcp_hello ( &filename[6] );
+	}
+	if ( strncmp ( filename, "http:", 5 ) == 0 ) {
+		return test_dhcp_http ( netdev, filename );
+	}
+	return test_dhcp_tftp ( netdev, filename );
+	*/
+	return -EPROTONOSUPPORT;
 }
 
 int test_dhcp ( struct net_device *netdev ) {

@@ -67,17 +67,22 @@ static inline struct ftp_request * tcp_to_ftp ( struct tcp_connection *conn ) {
 	return container_of ( conn, struct ftp_request, tcp );
 }
 
+static void ftp_set_status ( struct ftp_request *ftp, int rc ) {
+	if ( ! ftp->rc )
+		ftp->rc = rc;
+}
+
+static void ftp_clear_status ( struct ftp_request *ftp ) {
+	ftp->rc = 0;
+}
+
 /**
- * Mark FTP request as complete
+ * Mark FTP operation as complete
  *
  * @v ftp		FTP request
- * @v rc		Return status code
- *
  */
-static void ftp_done ( struct ftp_request *ftp, int rc ) {
-	tcp_close ( &ftp->tcp_data );
-	tcp_close ( &ftp->tcp );
-	async_done ( &ftp->aop, rc );
+static void ftp_done ( struct ftp_request *ftp ) {
+	async_done ( &ftp->aop, ftp->rc );
 }
 
 /**
@@ -128,13 +133,14 @@ static void ftp_reply ( struct ftp_request *ftp ) {
 	/* Open passive connection when we get "PASV" response */
 	if ( ftp->state == FTP_PASV ) {
 		char *ptr = ftp->passive_text;
+		struct sockaddr_in *sin =
+			( struct sockaddr_in * ) &ftp->tcp_data.peer;
 
-		ftp_parse_value ( &ptr,
-				  ( uint8_t * ) &ftp->tcp_data.sin.sin_addr,
-				  sizeof ( ftp->tcp_data.sin.sin_addr ) );
-		ftp_parse_value ( &ptr,
-				  ( uint8_t * ) &ftp->tcp_data.sin.sin_port,
-				  sizeof ( ftp->tcp_data.sin.sin_port ) );
+		sin->sin_family = AF_INET;
+		ftp_parse_value ( &ptr, ( uint8_t * ) &sin->sin_addr,
+				  sizeof ( sin->sin_addr ) );
+		ftp_parse_value ( &ptr, ( uint8_t * ) &sin->sin_port,
+				  sizeof ( sin->sin_port ) );
 		tcp_connect ( &ftp->tcp_data );
 	}
 
@@ -146,7 +152,8 @@ static void ftp_reply ( struct ftp_request *ftp ) {
 
  err:
 	/* Flag protocol error and close connections */
-	ftp_done ( ftp, -EPROTO );
+	ftp_set_status ( ftp, -EPROTO );
+	tcp_close ( &ftp->tcp );
 }
 
 /**
@@ -249,7 +256,15 @@ static void ftp_senddata ( struct tcp_connection *conn,
 static void ftp_closed ( struct tcp_connection *conn, int status ) {
 	struct ftp_request *ftp = tcp_to_ftp ( conn );
 
-	ftp_done ( ftp, status );
+	/* Close data channel and record status */
+	ftp_set_status ( ftp, status );
+	tcp_close ( &ftp->tcp_data );
+
+	/* Mark FTP operation as complete if we are the last
+	 * connection to close
+	 */
+	if ( tcp_closed ( &ftp->tcp_data ) )
+		ftp_done ( ftp );
 }
 
 /** FTP control channel operations */
@@ -290,9 +305,18 @@ tcp_to_ftp_data ( struct tcp_connection *conn ) {
  */
 static void ftp_data_closed ( struct tcp_connection *conn, int status ) {
 	struct ftp_request *ftp = tcp_to_ftp_data ( conn );
+	
+	/* If there was an error, close control channel and record status */
+	if ( status ) {
+		ftp_set_status ( ftp, status );
+		tcp_close ( &ftp->tcp );
+	}
 
-	if ( status )
-		ftp_done ( ftp, status );
+	/* Mark FTP operation as complete if we are the last
+	 * connection to close
+	 */
+	if ( tcp_closed ( &ftp->tcp ) )
+		ftp_done ( ftp );
 }
 
 /**
@@ -333,6 +357,7 @@ struct async_operation * ftp_get ( struct ftp_request *ftp ) {
 	ftp->tcp_data.tcp_op = &ftp_data_tcp_operations;
 	ftp->recvbuf = ftp->status_text;
 	ftp->recvsize = sizeof ( ftp->status_text ) - 1;
+	ftp_clear_status ( ftp );
 	tcp_connect ( &ftp->tcp );
 	return &ftp->aop;
 }

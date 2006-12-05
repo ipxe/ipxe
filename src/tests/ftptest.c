@@ -22,15 +22,14 @@ static void test_ftp_callback ( char *data, size_t len ) {
 	}
 }
 
-void test_ftp ( struct in_addr server, const char *filename ) {
+void test_ftp ( struct sockaddr_tcpip *server, const char *filename ) {
 	struct ftp_request ftp;
 	int rc;
 
-	printf ( "FTP fetching %s:%s\n", inet_ntoa ( server ), filename );
+	printf ( "FTP fetching %s\n", filename );
 	
 	memset ( &ftp, 0, sizeof ( ftp ) );
-	ftp.tcp.sin.sin_addr.s_addr = server.s_addr;
-	ftp.tcp.sin.sin_port = htons ( FTP_PORT );
+	memcpy ( &ftp.tcp.peer, server, sizeof ( ftp.tcp.peer ) );
 	ftp.filename = filename;
 	ftp.callback = test_ftp_callback;
 

@@ -144,10 +144,6 @@ extern void tcp_close ( struct tcp_connection *conn );
  */
 struct tcp_connection {
 	struct sockaddr_tcpip peer;	/* Remote socket address */
-
-	/* FIXME: this field should no longer be present */
-	struct sockaddr_in sin;
-
 	uint16_t local_port;		/* Local port, in network byte order */
 	int tcp_state;			/* TCP state */
 	int tcp_lstate;			/* Last TCP state */
@@ -205,6 +201,10 @@ struct tcp_header {
 #define TCP_FIN		0x01
 
 extern struct tcpip_protocol tcp_protocol;
+
+static inline int tcp_closed ( struct tcp_connection *conn ) {
+	return ( conn->tcp_state == TCP_CLOSED );
+}
 
 extern void tcp_init_conn ( struct tcp_connection *conn );
 extern int tcp_connect ( struct tcp_connection *conn );

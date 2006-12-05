@@ -49,6 +49,8 @@ struct ftp_request {
 	 * remote server.
 	 */
 	void ( *callback ) ( char *data, size_t len );
+	/** Eventual return status */
+	int rc;
 	/** Asynchronous operation for this FTP operation */
 	struct async_operation aop;
 
