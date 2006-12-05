@@ -506,6 +506,27 @@ static void iscsi_tx_login_request ( struct iscsi_session *iscsi,
 }
 
 /**
+ * Handle iSCSI TargetAddress text value
+ *
+ * @v iscsi		iSCSI session
+ * @v value		TargetAddress value
+ */
+static void iscsi_handle_targetaddress_value ( struct iscsi_session *iscsi,
+					       const char *value ) {
+	struct in_addr address;
+	struct sockaddr_in *sin = ( struct sockaddr_in * ) &iscsi->tcp.peer;
+
+	if ( inet_aton ( value, &address ) == 0 ) {
+		DBG ( "iSCSI %p received invalid TargetAddress \"%s\"\n",
+		      iscsi, value );
+		return;
+	}
+
+	DBG ( "iSCSI %p will redirect to %s\n", iscsi, value );
+	sin->sin_addr = address;
+}
+
+/**
  * Handle iSCSI AuthMethod text value
  *
  * @v iscsi		iSCSI session
@@ -629,6 +650,7 @@ struct iscsi_string_type {
 
 /** iSCSI text strings that we want to handle */
 struct iscsi_string_type iscsi_string_types[] = {
+	{ "TargetAddress=", iscsi_handle_targetaddress_value },
 	{ "AuthMethod=", iscsi_handle_authmethod_value },
 	{ "CHAP_A=", iscsi_handle_chap_a_value },
 	{ "CHAP_I=", iscsi_handle_chap_i_value },
@@ -709,6 +731,14 @@ static void iscsi_rx_login_response ( struct iscsi_session *iscsi, void *data,
 	/* Process string data and discard string buffer */
 	iscsi_handle_strings ( iscsi, iscsi->rx_buffer, iscsi->rx_len );
 	iscsi_rx_buffered_data_done ( iscsi );
+
+	/* Check for login redirection */
+	if ( response->status_class == ISCSI_STATUS_REDIRECT ) {
+		DBG ( "iSCSI %p redirecting to new server\n", iscsi );
+		iscsi_close ( iscsi, -EINPROGRESS );
+		tcp_connect ( &iscsi->tcp );
+		return;
+	}
 
 	/* Check for fatal errors */
 	if ( response->status_class != 0 ) {

@@ -221,6 +221,12 @@ struct iscsi_bhs_login_response {
 /** Login response opcode */
 #define ISCSI_OPCODE_LOGIN_RESPONSE 0x23
 
+/* Login response status codes */
+#define ISCSI_STATUS_SUCCESS		0x00
+#define ISCSI_STATUS_REDIRECT		0x01
+#define ISCSI_STATUS_INITIATOR_ERROR	0x02
+#define ISCSI_STATUS_TARGET_ERROR	0x03
+
 /**
  * iSCSI SCSI command basic header segment
  *
