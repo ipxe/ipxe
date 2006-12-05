@@ -17,6 +17,7 @@ void cmdl_start()
 
 	//printf("gPXE %s (GPL) etherboot.org ...  ", VERSION);
 	printf("gPXE %s (GPL) etherboot.org\n", VERSION);
+	printf("Press Ctrl-B for gPXE command line...");
 
 	stop = currticks() + CMDL_DELAY;
 	
@@ -29,12 +30,11 @@ void cmdl_start()
 		
 		if(iskey()){
 			if(getchar() == 2){
-				putchar('\n');
+				printf("\n\n");
 				cmdl_exec_cmdline();
 				break;
 			}else{
-				putchar('\n');
-				printf("Skipping command line.\n");
+				printf("skipping.\n");
 				break;
 			}
 		}
@@ -70,9 +70,6 @@ void cmdl_exec_cmdline(){
 	cmdl_setprintf(cmd, printf);
 
 	cmdl_setpropmt(cmd, "gPXE>");
-
-	printf("Welcome to Etherboot\n\n");
-
 
 	cmdl_enterloop(cmd);
 

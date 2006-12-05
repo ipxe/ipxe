@@ -548,11 +548,11 @@ cmd_line* cmdl_create()
 
 	struct command *cmd;
 
-	printf ( "Compiled in commands: ");
+	printf ( "Available commands: ");
 	for ( cmd = cmd_start ; cmd < cmd_end ; cmd++ ) {
 		printf("%s ", cmd->name);
 	}
-	printf("\n");
+	printf("exit\n\n");
 
 	return this;
 }
