@@ -2332,7 +2332,7 @@ static void falcon_init_spi ( struct efab_nic *efab ) {
 #define FALCON_MAC_ADDRESS_OFFSET(port) ( 0x310 + 0x08 * (port) )
 
 static struct nvo_fragment falcon_eeprom_fragments[] = {
-	{ 0, 0x100 },
+	{ 0x100, 0x100 },
 	{ 0, 0 }
 };
 
