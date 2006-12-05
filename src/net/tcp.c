@@ -466,6 +466,14 @@ int tcp_connectto ( struct tcp_connection *conn,
 		return -EISCONN;
 	}
 
+#warning "Fix the port re-use bug"
+	/* If we re-use the same port, the connection should be reset
+	 * and a new connection set up.  This doesn't happen yet, so
+	 * force the use of a new (random) port to avoid hitting the
+	 * problem.
+	 */
+	conn->local_port = 0;
+
 	/* Add the connection to the set of listening connections */
 	if ( ( rc = tcp_listen ( conn, conn->local_port ) ) != 0 ) {
 		return rc;
