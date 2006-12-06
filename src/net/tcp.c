@@ -516,6 +516,14 @@ int tcp_close ( struct tcp_connection *conn ) {
 		/* FIN consumes one byte on the snd stream */
 //		conn->snd_una++;
 		goto send_tcp_nomsg;
+	case TCP_TIME_WAIT:
+#warning "Fix me"
+		/* In TIME_WAIT, we should just be waiting for the
+		 * timer to expire, which will trigger the actual
+		 * closure.  However, because we get confused by RST
+		 * packets, we end up here.  This works around the
+		 * problem for now.
+		 */
 	case TCP_SYN_SENT:
 	case TCP_LISTEN:
 		/**
