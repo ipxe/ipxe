@@ -17,6 +17,8 @@
  */
 
 #include <stdint.h>
+#include <string.h>
+#include <errno.h>
 #include <assert.h>
 #include <gpxe/nvs.h>
 
@@ -70,6 +72,34 @@ int nvs_read ( struct nvs_device *nvs, unsigned int address,
 }
 
 /**
+ * Verify content of non-volatile storage device
+ *
+ * @v nvs		NVS device
+ * @v address		Address from which to read
+ * @v data		Data to compare against
+ * @v len		Length of data buffer
+ * @ret rc		Return status code
+ */
+static int nvs_verify ( struct nvs_device *nvs, unsigned int address,
+			const void *data, size_t len ) {
+	uint8_t read_data[len];
+	int rc;
+
+	/* Read data into temporary buffer */
+	if ( ( rc = nvs_read ( nvs, address, read_data, len ) ) != 0 )
+		return rc;
+
+	/* Compare data */
+	if ( memcmp ( data, read_data, len ) != 0 ) {
+		DBG ( "NVS %p verification failed at %#04x+%d\n",
+		      nvs, address, len );
+		return -EINVAL;
+	}
+
+	return 0;
+}
+
+/**
  * Write to non-volatile storage device
  *
  * @v nvs		NVS device
@@ -99,8 +129,12 @@ int nvs_write ( struct nvs_device *nvs, unsigned int address,
 		if ( frag_len > len )
 			frag_len = len;
 
-		/* Read this portion of the buffer from the device */
+		/* Write this portion of the buffer to the device */
 		if ( ( rc = nvs->write ( nvs, address, data, frag_len ) ) != 0)
+			return rc;
+
+		/* Read back and verify data */
+		if ( ( rc = nvs_verify ( nvs, address, data, frag_len ) ) != 0)
 			return rc;
 
 		/* Update parameters */
