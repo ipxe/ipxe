@@ -735,8 +735,11 @@ static void iscsi_rx_login_response ( struct iscsi_session *iscsi, void *data,
 	/* Check for login redirection */
 	if ( response->status_class == ISCSI_STATUS_REDIRECT ) {
 		DBG ( "iSCSI %p redirecting to new server\n", iscsi );
-		iscsi_close ( iscsi, -EINPROGRESS );
-		tcp_connect ( &iscsi->tcp );
+		/* Close the TCP connection; our TCP closed() method
+		 * will take care of the reconnection once this
+		 * connection has been cleanly terminated.
+		 */
+		tcp_close ( &iscsi->tcp );
 		return;
 	}
 
