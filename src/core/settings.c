@@ -235,7 +235,7 @@ static int set_ipv4 ( struct config_context *context,
 	struct in_addr ipv4;
 	int rc;
 	
-	if ( ( rc = inet_aton ( value, &ipv4 ) ) != 0 )
+	if ( ( rc = inet_aton ( value, &ipv4 ) ) == 0 )
 		return rc;
 	option = set_dhcp_option ( context->options, setting->tag,
 				   &ipv4, sizeof ( ipv4 ) );
