@@ -11,6 +11,7 @@
  */
 
 #include <gpxe/spi.h>
+#include <limits.h>
 
 /**
  * @defgroup tcmds Three-wire commands
@@ -20,10 +21,28 @@
 /** Read data from memory array */
 #define THREEWIRE_READ 0x6
 
+/** Write data to memory array */
+#define THREEWIRE_WRITE 0x5
+
+/** Write enable */
+#define THREEWIRE_EWEN 0x4
+
+/** Address to be used for write enable command */
+#define THREEWIRE_EWEN_ADDRESS INT_MAX
+
+/** Time to wait for write cycles to complete
+ *
+ * This is sufficient for AT93C46/AT93C56 devices, but may need to be
+ * increased in future when other devices are added.
+ */
+#define THREEWIRE_WRITE_MDELAY 10
+
 /** @} */
 
 extern int threewire_read ( struct nvs_device *nvs, unsigned int address,
 			    void *data, size_t len );
+extern int threewire_write ( struct nvs_device *nvs, unsigned int address,
+			     const void *data, size_t len );
 
 /**
  * @defgroup tdevs Three-wire device types
@@ -36,6 +55,7 @@ init_at93cx6 ( struct spi_device *device, unsigned int organisation ) {
 	device->nvs.block_size = 1;
 	device->command_len = 3,
 	device->nvs.read = threewire_read;
+	device->nvs.write = threewire_write;
 }
 
 /**

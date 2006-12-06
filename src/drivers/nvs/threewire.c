@@ -18,6 +18,7 @@
 
 #include <stddef.h>
 #include <assert.h>
+#include <timer.h>
 #include <gpxe/threewire.h>
 
 /** @file
@@ -26,7 +27,8 @@
  *
  */
 
-/** Read data from three-wire device
+/**
+ * Read data from three-wire device
  *
  * @v nvs		NVS device
  * @v address		Address from which to read
@@ -45,4 +47,42 @@ int threewire_read ( struct nvs_device *nvs, unsigned int address,
 
 	return bus->rw ( bus, device, THREEWIRE_READ, address,
 			 NULL, data, len );
+}
+
+/**
+ * Write data to three-wire device
+ *
+ * @v nvs		NVS device
+ * @v address		Address from which to read
+ * @v data		Data buffer
+ * @v len		Length of data buffer
+ * @ret rc		Return status code
+ */
+int threewire_write ( struct nvs_device *nvs, unsigned int address,
+		      const void *data, size_t len ) {
+	struct spi_device *device = nvs_to_spi ( nvs );
+	struct spi_bus *bus = device->bus;
+	int rc;
+
+	assert ( bus->mode == SPI_MODE_THREEWIRE );
+
+	DBG ( "3wire %p writing %d bytes at %04x\n", device, len, address );
+
+	/* Enable device for writing */
+	if ( ( rc = bus->rw ( bus, device, THREEWIRE_EWEN,
+			      THREEWIRE_EWEN_ADDRESS, NULL, NULL, 0 ) ) != 0 )
+		return rc;
+
+	/* Write data */
+	if ( ( rc = bus->rw ( bus, device, THREEWIRE_WRITE, address,
+			      data, NULL, len ) ) != 0 )
+		return rc;
+
+	/* Our model of an SPI bus doesn't provide a mechanism for
+	 * "assert CS, wait for MISO to become high, so just wait for
+	 * long enough to ensure that the write has completed.
+	 */
+	mdelay ( THREEWIRE_WRITE_MDELAY );
+
+	return 0;
 }
