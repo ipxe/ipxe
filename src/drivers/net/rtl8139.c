@@ -79,6 +79,7 @@
 #include <gpxe/netdevice.h>
 #include <gpxe/spi_bit.h>
 #include <gpxe/threewire.h>
+#include <gpxe/nvo.h>
 
 #define TX_RING_SIZE 4
 
@@ -98,6 +99,7 @@ struct rtl8139_nic {
 	struct rtl8139_rx rx;
 	struct spi_bit_basher spibit;
 	struct spi_device eeprom;
+	struct nvo_block nvo;
 };
 
 /* Tuning Parameters */
@@ -193,6 +195,10 @@ enum RxConfigBits {
 	AcceptMulticast=0x04, AcceptMyPhys=0x02, AcceptAllPhys=0x01,
 };
 
+enum Config1Bits {
+	VPDEnable=0x02,
+};
+
 /*  EEPROM access */
 #define EE_M1		0x80	/* Mode select bit 1 */
 #define EE_M0		0x40	/* Mode select bit 0 */
@@ -240,6 +246,17 @@ static struct bit_basher_operations rtl_basher_ops = {
 	.write = rtl_spi_write_bit,
 };
 
+/** Portion of EEPROM available for non-volatile stored options
+ *
+ * We use offset 0x40 (i.e. address 0x20), length 0x40.  This block is
+ * marked as VPD in the rtl8139 datasheets, so we use it only if we
+ * detect that the card is not supporting VPD.
+ */
+static struct nvo_fragment rtl_nvo_fragments[] = {
+	{ 0x20, 0x40 },
+	{ 0, 0 }
+};
+
 /**
  * Set up for EEPROM access
  *
@@ -247,6 +264,7 @@ static struct bit_basher_operations rtl_basher_ops = {
  */
  void rtl_init_eeprom ( struct rtl8139_nic *rtl ) {
 	int ee9356;
+	int vpd;
 
 	/* Initialise three-wire bus */
 	rtl->spibit.basher.op = &rtl_basher_ops;
@@ -263,6 +281,15 @@ static struct bit_basher_operations rtl_basher_ops = {
 		init_at93c46 ( &rtl->eeprom, 16 );
 	}
 	rtl->eeprom.bus = &rtl->spibit.bus;
+
+	/* Initialise space for non-volatile options, if available */
+	vpd = ( inw ( rtl->ioaddr + Config1 ) & VPDEnable );
+	if ( vpd ) {
+		DBG ( "EEPROM in use for VPD; cannot use for options\n" );
+	} else {
+		rtl->nvo.nvs = &rtl->eeprom.nvs;
+		rtl->nvo.fragments = rtl_nvo_fragments;
+	}
 }
 
 /**
@@ -492,6 +519,7 @@ static int rtl_probe ( struct pci_device *pci,
 		       const struct pci_device_id *id __unused ) {
 	struct net_device *netdev;
 	struct rtl8139_nic *rtl = NULL;
+	int registered_netdev = 0;
 	int rc;
 
 	/* Fix up PCI device */
@@ -522,7 +550,13 @@ static int rtl_probe ( struct pci_device *pci,
 	/* Register network device */
 	if ( ( rc = register_netdev ( netdev ) ) != 0 )
 		goto err;
+	registered_netdev = 1;
 
+	/* Register non-volatile storage */
+	if ( rtl->nvo.nvs ) {
+		if ( ( rc = nvo_register ( &rtl->nvo ) ) != 0 )
+			goto err;
+	}
 
 #warning "Hack alert"
 	rtl_open ( netdev );
@@ -534,6 +568,8 @@ static int rtl_probe ( struct pci_device *pci,
 	/* Disable NIC */
 	if ( rtl )
 		rtl_reset ( rtl );
+	if ( registered_netdev )
+		unregister_netdev ( netdev );
 	/* Free net device */
 	free_netdev ( netdev );
 	return rc;
@@ -552,7 +588,8 @@ static void rtl_remove ( struct pci_device *pci ) {
 #warning "Hack alert"	
 	rtl_close ( netdev );
 
-
+	if ( rtl->nvo.nvs )
+		nvo_unregister ( &rtl->nvo );
 	unregister_netdev ( netdev );
 	rtl_reset ( rtl );
 	free_netdev ( netdev );
