@@ -16,7 +16,7 @@ extern int execv ( const char *command, char * const argv[] );
  * This is a front end to execv().
  */
 #define execl( command, arg, ... ) ( {					\
-		char * const argv[] = { (arg), ## __VA_ARGS__, NULL };	\
+		char * const argv[] = { (arg), ## __VA_ARGS__ };	\
 		int rc = execv ( (command), argv );			\
 		rc;							\
 	} )
