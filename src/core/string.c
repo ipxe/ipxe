@@ -21,8 +21,9 @@
  *    reentrant and should be faster). Use only strsep() in new code, please.
  */
  
-#include "etherboot.h"
-
+#include <stdint.h>
+#include <stdlib.h>
+#include <string.h>
 
 /* *** FROM string.c *** */
 
@@ -538,3 +539,10 @@ void * memchr(const void *s, int c, size_t n)
 }
 
 #endif
+
+char * strdup(const char *s) {
+	char *new = malloc(strlen(s)+1);
+	if (new)
+		strcpy(new,s);
+	return new;
+}

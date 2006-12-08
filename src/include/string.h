@@ -66,5 +66,6 @@ int __attribute__ (( pure )) memcmp(const void * cs,const void * ct,
 void * memscan(void * addr, int c, size_t size);
 char * strstr(const char * s1,const char * s2);
 void * memchr(const void *s, int c, size_t n);
+char * strdup(const char *s);
 
 #endif /* ETHERBOOT_STRING */
