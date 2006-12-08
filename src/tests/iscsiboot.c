@@ -13,6 +13,7 @@ static struct iscsi_device test_iscsidev;
 int test_iscsiboot ( const char *initiator_iqn,
 		     struct sockaddr_tcpip *target,
 		     const char *target_iqn,
+		     unsigned int lun,
 		     const char *username,
 		     const char *password,
 		     struct net_device *netdev,
@@ -25,6 +26,7 @@ int test_iscsiboot ( const char *initiator_iqn,
 		 sizeof ( test_iscsidev.iscsi.tcp.peer ) );
 	test_iscsidev.iscsi.initiator = initiator_iqn;
 	test_iscsidev.iscsi.target = target_iqn;
+	test_iscsidev.iscsi.lun = lun;
 	test_iscsidev.iscsi.username = username;
 	test_iscsidev.iscsi.password = password;
 

@@ -1,4 +1,5 @@
 #include <string.h>
+#include <stdlib.h>
 #include <vsprintf.h>
 #include <byteswap.h>
 #include <gpxe/ip.h>
@@ -14,31 +15,73 @@ static int test_dhcp_aoe_boot ( struct net_device *netdev,
 	return test_aoeboot ( netdev, aoename, drivenum );
 }
 
-static int test_dhcp_iscsi_boot ( struct net_device *netdev,
-				  char *iscsiname ) {
+enum {
+	RP_LITERAL = 0,
+	RP_SERVERNAME,
+	RP_PROTOCOL,
+	RP_PORT,
+	RP_LUN,
+	RP_TARGETNAME,
+	NUM_RP_COMPONENTS
+};
+
+static int iscsi_split_root_path ( char *root_path,
+				   char * components[NUM_RP_COMPONENTS] ) {
+	int component = 0;
+	
+	while ( 1 ) {
+		components[component++] = root_path;
+		if ( component == NUM_RP_COMPONENTS ) {
+			return 0;
+		}
+		for ( ; *root_path != ':' ; root_path++ ) {
+			if ( ! *root_path )
+				return -EINVAL;
+		}
+		*(root_path++) = '\0';
+	}
+}
+
+static int test_dhcp_iscsi_boot ( struct net_device *netdev ) {
+	char root_path[256];
+	char *rp_components[NUM_RP_COMPONENTS];
 	char initiator_iqn_buf[32];
 	char *initiator_iqn = initiator_iqn_buf;
 	char username[32];
 	char password[32];
-	char *target_iqn;
 	union {
 		struct sockaddr_in sin;
 		struct sockaddr_tcpip st;
 	} target;
 	unsigned int drivenum;
+	unsigned int lun;
 	struct dhcp_option *option;
-	
+	int rc;
+
 	memset ( &target, 0, sizeof ( target ) );
 	target.sin.sin_family = AF_INET;
-	target.sin.sin_port = htons ( ISCSI_PORT );
-	target_iqn = strchr ( iscsiname, ':' );
-	*target_iqn++ = '\0';
-	if ( ! target_iqn ) {
-		printf ( "Invalid iSCSI DHCP path\n" );
-		return -EINVAL;
-	}
-	inet_aton ( iscsiname, &target.sin.sin_addr );
 
+	dhcp_snprintf ( root_path, sizeof ( root_path ),
+			find_global_dhcp_option ( DHCP_ROOT_PATH ) );
+
+	printf ( "Root path \"%s\"\n", root_path );
+
+	if ( ( rc = iscsi_split_root_path ( root_path, rp_components ) ) != 0 )
+		goto bad_root_path;
+
+	if ( strcmp ( rp_components[RP_LITERAL], "iscsi" ) != 0 )
+		goto bad_root_path;
+
+	if ( inet_aton ( rp_components[RP_SERVERNAME],
+			 &target.sin.sin_addr ) == 0 )
+		goto bad_root_path;
+
+	target.sin.sin_port = strtoul ( rp_components[RP_PORT], NULL, 0 );
+	if ( ! target.st.st_port )
+		target.st.st_port = htons ( ISCSI_PORT );
+
+	lun = strtoul ( rp_components[RP_LUN], NULL, 0 );
+	
 	dhcp_snprintf ( initiator_iqn, sizeof ( initiator_iqn ),
 			find_global_dhcp_option ( DHCP_ISCSI_INITIATOR_IQN ) );
 	if ( ! *initiator_iqn )
@@ -50,8 +93,13 @@ static int test_dhcp_iscsi_boot ( struct net_device *netdev,
 
 	drivenum = find_global_dhcp_num_option ( DHCP_EB_BIOS_DRIVE );
 
-	return test_iscsiboot ( initiator_iqn, &target.st, target_iqn,
+	return test_iscsiboot ( initiator_iqn, &target.st,
+				rp_components[RP_TARGETNAME], lun,
 				username, password, netdev, drivenum );
+
+ bad_root_path:
+	printf ( "Invalid iSCSI root path\n" );
+	return -EINVAL;
 }
 
 static int test_dhcp_hello ( char *helloname ) {
@@ -140,8 +188,9 @@ static int test_dhcp_boot ( struct net_device *netdev, char *filename ) {
 		return test_dhcp_aoe_boot ( netdev, &filename[4] );
 	} 
 	*/
-	if ( strncmp ( filename, "iscsi:", 6 ) == 0 ) {
-		return test_dhcp_iscsi_boot ( netdev, &filename[6] );
+	//	if ( strncmp ( filename, "iscsi:", 6 ) == 0 ) {
+	if ( ! filename[0] ) {
+		return test_dhcp_iscsi_boot ( netdev );
 	}
 	/*
 	if ( strncmp ( filename, "ftp:", 4 ) == 0 ) {
@@ -198,12 +247,9 @@ int test_dhcp ( struct net_device *netdev ) {
 
 	dhcp_snprintf ( filename, sizeof ( filename ),
 			find_global_dhcp_option ( DHCP_BOOTFILE_NAME ) );
-	if ( ! filename[0] ) {
-		printf ( "No filename specified!\n" );
-		goto out;
-	}
 	
-	printf ( "Bootfile name %s\n", filename );
+	if ( filename[0] )
+		printf ( "Bootfile name \"%s\"\n", filename );
 
 	/* Remove old IP address configuration */
 	del_ipv4_address ( netdev );
