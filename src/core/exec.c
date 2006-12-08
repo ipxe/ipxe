@@ -119,9 +119,12 @@ static int split_args ( char *args, char * argv[] ) {
  * Execute the named command and arguments.
  */
 int system ( const char *command ) {
-	char *args = strdup ( command );
+	char *args;
 	int argc;
-	
+	int rc;
+
+	/* Obtain temporary modifiable copy of command line */
+	args = strdup ( command );
 	if ( ! args )
 		return -ENOMEM;
 
@@ -134,6 +137,9 @@ int system ( const char *command ) {
 		
 		split_args ( args, argv );
 		argv[argc] = NULL;
-		return execv ( argv[0], argv );
+		rc = execv ( argv[0], argv );
 	}
+
+	free ( args );
+	return rc;
 }
