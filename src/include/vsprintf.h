@@ -31,6 +31,7 @@
  *
  */
 
+#include <stdint.h>
 #include <stdarg.h>
 
 #define PRINTF_NO_LENGTH ( ( size_t ) -1 )
