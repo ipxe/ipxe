@@ -48,14 +48,20 @@ static struct command commands_end[0] __table_end ( commands );
  */
 int execv ( const char *command, char * const argv[] ) {
 	struct command *cmd;
-	int argc = 0;
-
-	assert ( argv[0] != NULL );
+	int argc;
 
 	/* Count number of arguments */
-	do {
-		argc++;
-	} while ( argv[argc] != NULL );
+	for ( argc = 0 ; argv[argc] ; argc++ ) {}
+
+	/* Sanity checks */
+	if ( ! command ) {
+		DBG ( "No command\n" );
+		return -EINVAL;
+	}
+	if ( ! argc ) {
+		DBG ( "%s: empty argument list\n", command );
+		return -EINVAL;
+	}
 
 	/* Reset getopt() library ready for use by the command.  This
 	 * is an artefact of the POSIX getopt() API within the context
