@@ -19,6 +19,7 @@
 #include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
+#include <byteswap.h>
 #include <errno.h>
 #include <assert.h>
 #include <vsprintf.h>
@@ -172,7 +173,8 @@ static int show_string ( struct config_context *context,
 	return 0;
 }
 
-/** Set value of string setting
+/**
+ * Set value of string setting
  *
  * @v context		Configuration context
  * @v setting		Configuration setting
@@ -221,7 +223,8 @@ static int show_ipv4 ( struct config_context *context,
 	return 0;
 }
 
-/** Set value of IPV4 setting
+/**
+ * Set value of IPV4 setting
  *
  * @v context		Configuration context
  * @v setting		Configuration setting
@@ -251,6 +254,85 @@ struct config_setting_type config_setting_type_ipv4 __config_setting_type = {
 	.set = set_ipv4,
 };
 
+/**
+ * Show value of integer setting
+ *
+ * @v context		Configuration context
+ * @v setting		Configuration setting
+ * @v buf		Buffer to contain value
+ * @v len		Length of buffer
+ * @ret rc		Return status code
+ */
+static int show_int ( struct config_context *context,
+		      struct config_setting *setting,
+		      char *buf, size_t len ) {
+	struct dhcp_option *option;
+	long num;
+
+	option = find_dhcp_option ( context->options, setting->tag );
+	if ( ! option )
+		return -ENODATA;
+	num = dhcp_num_option ( option );
+	snprintf ( buf, len, "%ld", num );
+	return 0;
+}
+
+/**
+ * Set value of integer setting
+ *
+ * @v context		Configuration context
+ * @v setting		Configuration setting
+ * @v value		Setting value (as a string)
+ * @v size		Size of integer (in bytes)
+ * @ret rc		Return status code
+ */ 
+static int set_int ( struct config_context *context,
+		     struct config_setting *setting,
+		     const char *value, unsigned int size ) {
+	struct dhcp_option *option;
+	union {
+		uint32_t num;
+		uint8_t bytes[4];
+	} u;
+	char *endp;
+
+	/* Parse number */
+	if ( ! *value )
+		return -EINVAL;
+	u.num = htonl ( strtoul ( value, &endp, 0 ) );
+	if ( *endp )
+		return -EINVAL;
+
+	/* Set option */
+	option = set_dhcp_option ( context->options, setting->tag,
+				   &u.bytes[ sizeof ( u ) - size ], size );
+	if ( ! option )
+		return -ENOMEM;
+	return 0;
+}
+
+/**
+ * Set value of 8-bit integer setting
+ *
+ * @v context		Configuration context
+ * @v setting		Configuration setting
+ * @v value		Setting value (as a string)
+ * @v size		Size of integer (in bytes)
+ * @ret rc		Return status code
+ */ 
+static int set_int8 ( struct config_context *context,
+			   struct config_setting *setting,
+			   const char *value ) {
+	return set_int ( context, setting, value, 8 );
+}
+
+/** An 8-bit integer configuration setting */
+struct config_setting_type config_setting_type_int8 __config_setting_type = {
+	.name = "int8",
+	.show = show_int,
+	.set = set_int8,
+};
+
 /** Some basic setting definitions */
 struct config_setting ip_config_setting __config_setting = {
 	.name = "ip",
@@ -271,4 +353,14 @@ struct config_setting password_config_setting __config_setting = {
 	.name = "password",
 	.tag = DHCP_EB_PASSWORD,
 	.type = &config_setting_type_string,
+};
+struct config_setting root_path_config_setting __config_setting = {
+	.name = "root-path",
+	.tag = DHCP_ROOT_PATH,
+	.type = &config_setting_type_string,
+};
+struct config_setting priority_config_setting __config_setting = {
+	.name = "priority",
+	.tag = DHCP_EB_PRIORITY,
+	.type = &config_setting_type_int8,
 };
