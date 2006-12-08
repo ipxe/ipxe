@@ -5,6 +5,7 @@ extern unsigned long strtoul ( const char *p, char **endp, int base );
 extern void * realloc ( void *old_ptr, size_t new_size );
 extern void * malloc ( size_t size );
 extern void free ( void *ptr );
+extern int system ( const char *command );
 
 /**
  * Allocate cleared memory
