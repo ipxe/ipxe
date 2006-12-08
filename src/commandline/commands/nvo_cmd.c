@@ -3,10 +3,11 @@
 #include <string.h>
 #include <errno.h>
 #include <vsprintf.h>
-#include <command.h>
+#include <getopt.h>
 #include <gpxe/nvo.h>
 #include <gpxe/dhcp.h>
 #include <gpxe/settings.h>
+#include <gpxe/command.h>
 
 void nvo_cmd_req() {}
 
@@ -41,8 +42,6 @@ static int show_exec ( int argc, char **argv ) {
 
 struct command show_command __command = {
 	.name = "show",
-	.usage = "show <identifier>\n",
-	.desc = "Show stored options",
 	.exec = show_exec,
 };
 
@@ -78,7 +77,5 @@ static int set_exec ( int argc, char **argv ) {
 
 struct command set_command __command = {
 	.name = "set",
-	.usage = "set <identifier> <value>\n",
-	.desc = "Set stored option",
 	.exec = set_exec,
 };

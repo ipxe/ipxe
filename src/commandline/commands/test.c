@@ -1,5 +1,5 @@
-#include "command.h"
-#include "console.h"
+#include <vsprintf.h>
+#include <gpxe/command.h>
 
 void test_req(){}
 
@@ -15,8 +15,6 @@ static int cmd_test_exec ( int argc, char **argv ) {
 
 struct command test_command __command = {
 	.name = "test",
-	.usage = "A test command\nIt does nothing at all\n\nExample:\n\ttest",
-	.desc = "Does nothing",
 	.exec = cmd_test_exec,
 };
 
