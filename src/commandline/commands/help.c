@@ -11,10 +11,8 @@ void help_req(){}
 static int cmd_help_exec ( int argc, char **argv ) {
 
 	struct command *ccmd;
-	int unknown = 1;
 
-
-	printf("Available commands:\n\n  exit - Exit the command line and boot\n");
+	printf("Available commands:\n\n");
 
 	for ( ccmd = cmd_start ; ccmd < cmd_end ; ccmd++ ) {
 		printf ("  %s\n", ccmd->name );

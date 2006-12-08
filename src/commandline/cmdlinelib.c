@@ -24,23 +24,6 @@ void cmdl_setprintf(cmd_line* cmd, cmdl_printf_t in)
 	cmd->printf = in;
 }
       
-int cmdl_getexit(cmd_line* cmd)
-{
-	if(cmdl_check(cmd) && !cmd->exit){
-		return 0;
-	}else{
-		return 1;
-	}
-
-}
-
-void cmdl_setexit(cmd_line* cmd, int exit)
-{
-	if(cmdl_check(cmd)){
-		cmd->exit = exit;
-	}
-}
-
 int cmdl_printf(cmd_line* cmd, const char *format, ...)
 {
 	int ret;
@@ -86,16 +69,29 @@ char* cmdl_getbuffer(cmd_line* cmd){
 	}
 }
 
+static int cmdl_exit = 0;
+
+static int exit_exec ( int argc __unused, char **argv __unused ) {
+	cmdl_exit = 1;
+	return 0;
+}
+
+struct command exit_command __command = {
+	.name = "exit",
+	.exec = exit_exec,
+};
+
 void cmdl_enterloop(cmd_line* cmd)
 {
-	while(!cmdl_getexit(cmd)){
+	cmdl_exit = 0;
+	do {
 		if(cmd->refresh){
 			cmd->printf("%s %s", cmd->prompt, cmd->buffer);
 			cmd->refresh = 0;
 		}
 //		cmd->printf("Got %d\n", cmd->getchar());
 		cmdl_parsechar(cmd, cmd->getchar());
-	}
+	} while ( ! cmdl_exit );
 }
 
 void cmdl_addreplace(cmd_line* cmd, char in)
@@ -367,7 +363,6 @@ cmd_line* cmdl_create()
 	
 	this->cursor = 0;
 	//this->has_output = 0;
-	this->exit = 0;
 	this->refresh = 1;
 	this->tabstate = 0;
 	this->insert = 0;
@@ -386,7 +381,7 @@ cmd_line* cmdl_create()
 	for ( cmd = cmd_start ; cmd < cmd_end ; cmd++ ) {
 		printf("%s ", cmd->name);
 	}
-	printf("exit\n\n");
+	printf("\n\n");
 
 	return this;
 }
