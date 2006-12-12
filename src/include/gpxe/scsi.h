@@ -16,7 +16,9 @@
  * @{
  */
 
+#define SCSI_OPCODE_READ_10		0x28	/**< READ (10) */
 #define SCSI_OPCODE_READ_16		0x88	/**< READ (16) */
+#define SCSI_OPCODE_WRITE_10		0x2a	/**< WRITE (10) */
 #define SCSI_OPCODE_WRITE_16		0x8a	/**< WRITE (16) */
 #define SCSI_OPCODE_READ_CAPACITY_10	0x25	/**< READ CAPACITY (10) */
 #define SCSI_OPCODE_SERVICE_ACTION_IN	0x9e	/**< SERVICE ACTION IN */
@@ -40,6 +42,28 @@
  * @{
  */
 
+/** A SCSI "READ (10)" CDB */
+struct scsi_cdb_read_10 {
+	/** Opcode (0x28) */
+	uint8_t opcode;
+	/** Flags */
+	uint8_t flags;
+	/** Start address
+	 *
+	 * This is a logical block number, in big-endian order.
+	 */
+	uint32_t lba;
+	/** Group number */
+	uint8_t group;
+	/** Transfer length
+	 *
+	 * This is a logical block count, in big-endian order.
+	 */
+	uint16_t len;
+	/** Control byte */
+	uint8_t control;
+} __attribute__ (( packed ));
+
 /** A SCSI "READ (16)" CDB */
 struct scsi_cdb_read_16 {
 	/** Opcode (0x88) */
@@ -58,6 +82,28 @@ struct scsi_cdb_read_16 {
 	uint32_t len;
 	/** Group number */
 	uint8_t group;
+	/** Control byte */
+	uint8_t control;
+} __attribute__ (( packed ));
+
+/** A SCSI "WRITE (10)" CDB */
+struct scsi_cdb_write_10 {
+	/** Opcode (0x2a) */
+	uint8_t opcode;
+	/** Flags */
+	uint8_t flags;
+	/** Start address
+	 *
+	 * This is a logical block number, in big-endian order.
+	 */
+	uint32_t lba;
+	/** Group number */
+	uint8_t group;
+	/** Transfer length
+	 *
+	 * This is a logical block count, in big-endian order.
+	 */
+	uint16_t len;
 	/** Control byte */
 	uint8_t control;
 } __attribute__ (( packed ));
@@ -143,7 +189,9 @@ struct scsi_capacity_16 {
 
 /** A SCSI Command Data Block */
 union scsi_cdb {
+	struct scsi_cdb_read_10 read10;
 	struct scsi_cdb_read_16 read16;
+	struct scsi_cdb_write_10 write10;
 	struct scsi_cdb_write_16 write16;
 	struct scsi_cdb_read_capacity_10 readcap10;
 	struct scsi_cdb_read_capacity_16 readcap16;

@@ -70,7 +70,7 @@ static int scsi_command ( struct scsi_device *scsi,
 }
 
 /**
- * Read block from SCSI device
+ * Read block from SCSI device using READ (10)
  *
  * @v blockdev		Block device
  * @v block		LBA block number
@@ -78,8 +78,33 @@ static int scsi_command ( struct scsi_device *scsi,
  * @v buffer		Data buffer
  * @ret rc		Return status code
  */
-static int scsi_read ( struct block_device *blockdev, uint64_t block,
-		       unsigned long count, userptr_t buffer ) {
+static int scsi_read_10 ( struct block_device *blockdev, uint64_t block,
+			  unsigned long count, userptr_t buffer ) {
+	struct scsi_device *scsi = block_to_scsi ( blockdev );
+	struct scsi_command command;
+	struct scsi_cdb_read_10 *cdb = &command.cdb.read10;
+
+	/* Issue READ (10) */
+	memset ( &command, 0, sizeof ( command ) );
+	cdb->opcode = SCSI_OPCODE_READ_10;
+	cdb->lba = cpu_to_be32 ( block );
+	cdb->len = cpu_to_be16 ( count );
+	command.data_in = buffer;
+	command.data_in_len = ( count * blockdev->blksize );
+	return scsi_command ( scsi, &command );
+}
+
+/**
+ * Read block from SCSI device using READ (16)
+ *
+ * @v blockdev		Block device
+ * @v block		LBA block number
+ * @v count		Block count
+ * @v buffer		Data buffer
+ * @ret rc		Return status code
+ */
+static int scsi_read_16 ( struct block_device *blockdev, uint64_t block,
+			  unsigned long count, userptr_t buffer ) {
 	struct scsi_device *scsi = block_to_scsi ( blockdev );
 	struct scsi_command command;
 	struct scsi_cdb_read_16 *cdb = &command.cdb.read16;
@@ -95,7 +120,7 @@ static int scsi_read ( struct block_device *blockdev, uint64_t block,
 }
 
 /**
- * Write block to SCSI device
+ * Write block to SCSI device using WRITE (10)
  *
  * @v blockdev		Block device
  * @v block		LBA block number
@@ -103,8 +128,33 @@ static int scsi_read ( struct block_device *blockdev, uint64_t block,
  * @v buffer		Data buffer
  * @ret rc		Return status code
  */
-static int scsi_write ( struct block_device *blockdev, uint64_t block,
-		        unsigned long count, userptr_t buffer ) {
+static int scsi_write_10 ( struct block_device *blockdev, uint64_t block,
+			   unsigned long count, userptr_t buffer ) {
+	struct scsi_device *scsi = block_to_scsi ( blockdev );
+	struct scsi_command command;
+	struct scsi_cdb_write_10 *cdb = &command.cdb.write10;
+
+	/* Issue WRITE (10) */
+	memset ( &command, 0, sizeof ( command ) );
+	cdb->opcode = SCSI_OPCODE_WRITE_10;
+	cdb->lba = cpu_to_be32 ( block );
+	cdb->len = cpu_to_be16 ( count );
+	command.data_out = buffer;
+	command.data_out_len = ( count * blockdev->blksize );
+	return scsi_command ( scsi, &command );
+}
+
+/**
+ * Write block to SCSI device using WRITE (16)
+ *
+ * @v blockdev		Block device
+ * @v block		LBA block number
+ * @v count		Block count
+ * @v buffer		Data buffer
+ * @ret rc		Return status code
+ */
+static int scsi_write_16 ( struct block_device *blockdev, uint64_t block,
+			   unsigned long count, userptr_t buffer ) {
 	struct scsi_device *scsi = block_to_scsi ( blockdev );
 	struct scsi_command command;
 	struct scsi_cdb_write_16 *cdb = &command.cdb.write16;
@@ -179,39 +229,6 @@ static int scsi_read_capacity_16 ( struct block_device *blockdev ) {
 }
 
 /**
- * Read capacity of SCSI device
- *
- * @v blockdev		Block device
- * @ret rc		Return status code
- */
-static int scsi_read_capacity ( struct block_device *blockdev ) {
-	int rc;
-
-	/* Issue a theoretically extraneous READ CAPACITY (10)
-	 * command, solely in order to draw out the "CHECK CONDITION
-	 * (power-on occurred)" that some dumb targets insist on
-	 * sending as an error at start of day.
-	 */
-	scsi_read_capacity_10 ( blockdev );
-
-	/* Try READ CAPACITY (10), which is a mandatory command, first. */
-	if ( ( rc = scsi_read_capacity_10 ( blockdev ) ) != 0 )
-		return rc;
-
-	/* If capacity range was exceeded (i.e. capacity.lba was
-	 * 0xffffffff, meaning that blockdev->blocks is now zero), use
-	 * READ CAPACITY (16) instead.  READ CAPACITY (16) is not
-	 * mandatory, so we can't just use it straight off.
-	 */
-	if ( blockdev->blocks == 0 ) {
-		if ( ( rc = scsi_read_capacity_16 ( blockdev ) ) != 0 )
-			return rc;
-	}
-
-	return 0;
-}
-
-/**
  * Initialise SCSI device
  *
  * @v scsi		SCSI device
@@ -223,8 +240,32 @@ static int scsi_read_capacity ( struct block_device *blockdev ) {
  * CAPACITY call to determine the block size and total device size.
  */
 int init_scsidev ( struct scsi_device *scsi ) {
-	/** Fill in read and write methods, and get device capacity */
-	scsi->blockdev.read = scsi_read;
-	scsi->blockdev.write = scsi_write;
-	return scsi_read_capacity ( &scsi->blockdev );
+	int rc;
+
+	/* Issue a theoretically extraneous READ CAPACITY (10)
+	 * command, solely in order to draw out the "CHECK CONDITION
+	 * (power-on occurred)" that some dumb targets insist on
+	 * sending as an error at start of day.
+	 */
+	scsi_read_capacity_10 ( &scsi->blockdev );
+
+	/* Try READ CAPACITY (10), which is a mandatory command, first. */
+	scsi->blockdev.read = scsi_read_10;
+	scsi->blockdev.write = scsi_write_10;
+	if ( ( rc = scsi_read_capacity_10 ( &scsi->blockdev ) ) != 0 )
+		return rc;
+
+	/* If capacity range was exceeded (i.e. capacity.lba was
+	 * 0xffffffff, meaning that blockdev->blocks is now zero), use
+	 * READ CAPACITY (16) instead.  READ CAPACITY (16) is not
+	 * mandatory, so we can't just use it straight off.
+	 */
+	if ( scsi->blockdev.blocks == 0 ) {
+		scsi->blockdev.read = scsi_read_16;
+		scsi->blockdev.write = scsi_write_16;
+		if ( ( rc = scsi_read_capacity_16 ( &scsi->blockdev ) ) != 0 )
+			return rc;
+	}
+
+	return 0;
 }
