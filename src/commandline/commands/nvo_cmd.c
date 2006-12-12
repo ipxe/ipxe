@@ -79,3 +79,33 @@ struct command set_command __command = {
 	.name = "set",
 	.exec = set_exec,
 };
+
+static int clear_exec ( int argc, char **argv ) {
+	struct config_context dummy_context;
+	int rc;
+
+	if ( ! ugly_nvo_hack ) {
+		printf ( "No non-volatile option storage available\n" );
+		return 1;
+	}
+
+	if ( argc != 2 ) {
+		printf ( "Syntax: %s <identifier>\n",
+			 argv[0] );
+		return 1;
+	}
+
+	dummy_context.options = ugly_nvo_hack->options;
+	if ( ( rc = clear_setting ( &dummy_context, argv[1] ) ) != 0 ) {
+		printf ( "Could not clear \"%s\": %s\n",
+			 argv[1], strerror ( -rc ) );
+		return 1;
+	}
+	
+	return 0;
+}
+
+struct command clear_command __command = {
+	.name = "clear",
+	.exec = clear_exec,
+};
