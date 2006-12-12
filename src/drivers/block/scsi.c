@@ -19,6 +19,7 @@
 #include <stddef.h>
 #include <string.h>
 #include <byteswap.h>
+#include <errno.h>
 #include <gpxe/blockdev.h>
 #include <gpxe/scsi.h>
 
@@ -42,7 +43,30 @@ block_to_scsi ( struct block_device *blockdev ) {
  */
 static int scsi_command ( struct scsi_device *scsi,
 			  struct scsi_command *command ) {
-	return scsi->command ( scsi, command );
+	int rc;
+
+	/* Clear sense response code before issuing command */
+	command->sense_response = 0;
+
+	/* Issue SCSI command */
+	if ( ( rc = scsi->command ( scsi, command ) ) != 0 ) {
+		/* Something went wrong with the issuing mechanism,
+		 * (rather than with the command itself)
+		 */
+		DBG ( "SCSI %p " SCSI_CDB_FORMAT " err %d\n",
+		      scsi, SCSI_CDB_DATA ( command->cdb ), rc );
+		return rc;
+	}
+
+	/* Check for SCSI errors */
+	if ( command->status != 0 ) {
+		DBG ( "SCSI %p " SCSI_CDB_FORMAT " status %02x sense %02x\n",
+		      scsi, SCSI_CDB_DATA ( command->cdb ),
+		      command->status, command->sense_response );
+		return -EIO;
+	}
+
+	return 0;
 }
 
 /**
@@ -162,6 +186,13 @@ static int scsi_read_capacity_16 ( struct block_device *blockdev ) {
  */
 static int scsi_read_capacity ( struct block_device *blockdev ) {
 	int rc;
+
+	/* Issue a theoretically extraneous READ CAPACITY (10)
+	 * command, solely in order to draw out the "CHECK CONDITION
+	 * (power-on occurred)" that some dumb targets insist on
+	 * sending as an error at start of day.
+	 */
+	scsi_read_capacity_10 ( blockdev );
 
 	/* Try READ CAPACITY (10), which is a mandatory command, first. */
 	if ( ( rc = scsi_read_capacity_10 ( blockdev ) ) != 0 )
