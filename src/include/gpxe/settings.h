@@ -102,5 +102,6 @@ extern int show_setting ( struct config_context *context, const char *name,
 			  char *buf, size_t len );
 extern int set_setting ( struct config_context *context, const char *name,
 			 const char *value );
+extern int clear_setting ( struct config_context *context, const char *name );
 
 #endif /* _GPXE_SETTINGS_H */

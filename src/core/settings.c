@@ -115,7 +115,8 @@ find_or_build_config_setting ( const char *name,
 	return setting;
 }
 
-/** Show value of setting
+/**
+ * Show value of setting
  *
  * @v context		Configuration context
  * @v name		Configuration setting name
@@ -134,7 +135,8 @@ int show_setting ( struct config_context *context, const char *name,
 	return setting->type->show ( context, setting, buf, len );
 }
 
-/** Set value of setting
+/**
+ * Set value of setting
  *
  * @v context		Configuration context
  * @v name		Configuration setting name
@@ -150,6 +152,27 @@ int set_setting ( struct config_context *context, const char *name,
 	if ( ! setting )
 		return -ENOENT;
 	return setting->type->set ( context, setting, value );
+}
+
+/**
+ * Clear setting
+ *
+ * @v context		Configuration context
+ * @v name		Configuration setting name
+ * @ret rc		Return status code
+ */
+int clear_setting ( struct config_context *context, const char *name ) {
+	struct config_setting *setting;
+	struct config_setting tmp_setting;
+
+	setting = find_or_build_config_setting ( name, &tmp_setting );
+	if ( ! setting )
+		return -ENOENT;
+
+	/* All types of settings get cleared the same way */
+	delete_dhcp_option ( context->options, setting->tag );
+
+	return 0;
 }
 
 /**
