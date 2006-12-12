@@ -82,9 +82,9 @@ static int test_dhcp_iscsi_boot ( struct net_device *netdev ) {
 
 	lun = strtoul ( rp_components[RP_LUN], NULL, 0 );
 	
-	dhcp_snprintf ( initiator_iqn, sizeof ( initiator_iqn ),
+	dhcp_snprintf ( initiator_iqn_buf, sizeof ( initiator_iqn_buf ),
 			find_global_dhcp_option ( DHCP_ISCSI_INITIATOR_IQN ) );
-	if ( ! *initiator_iqn )
+	if ( ! initiator_iqn_buf[0] )
 		initiator_iqn = "iqn.1900-01.localdomain.localhost:initiator";
 	dhcp_snprintf ( username, sizeof ( username ),
 			find_global_dhcp_option ( DHCP_EB_USERNAME ) );
