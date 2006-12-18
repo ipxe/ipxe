@@ -4,6 +4,7 @@
 #include <string.h>
 #include <assert.h>
 #include "mucurses.h"
+#include "cursor.h"
 
 /** @file
  *
@@ -44,6 +45,9 @@ struct _softlabelkeys {
 	unsigned int num_labels;
 	unsigned int num_spaces;
 	unsigned int spaces[SLK_MAX_NUM_SPACES];
+	struct cursor_pos saved_cursor;
+	attr_t saved_attrs;
+	short saved_pair;
 };
 
 struct _softlabelkeys *slks;
@@ -55,12 +59,21 @@ struct _softlabelkeys *slks;
   this should be ok...
  */
 
-static void _movetoslk ( void ) {
-	stdscr->scr->movetoyx( stdscr->scr, LINES, 0 );
+static void _enter_slk ( void ) {
+	_store_curs_pos ( stdscr, &slks->saved_cursor );
+	wattr_get ( stdscr, &slks->saved_attrs, &slks->saved_pair, NULL );
+	LINES++;
+	wmove ( stdscr, LINES, 0 );
+	wattrset ( stdscr, slks->attrs );
+}
+
+static void _leave_slk ( void ) {
+	LINES--;
+	wattr_set ( stdscr, slks->saved_attrs, slks->saved_pair, NULL );
+	_restore_curs_pos ( stdscr, &slks->saved_cursor );
 }
 
 static void _print_label ( struct _softlabel sl ) {
-	unsigned short i = 0;
 	int space_ch;
 	char str[SLK_MAX_LABEL_LEN + 1];
 
@@ -88,13 +101,10 @@ static void _print_label ( struct _softlabel sl ) {
 		// post-padding
 		memset(str+strlen(str), space_ch,
 		       (size_t)(slks->max_label_len - strlen(str)) );
-		str[slks->max_label_len] = '\0';
 	}
 
 	// print the formatted label
-	for ( ; i < slks->max_label_len; i++ ) {
-		stdscr->scr->putc( stdscr->scr, (chtype)str[i] | slks->attrs );
-	}
+	_wputstr ( stdscr, str, NOWRAP, slks->max_label_len );
 }
 
 /**
@@ -194,18 +204,12 @@ int slk_attr_set ( const attr_t attrs, short colour_pair_number,
  * @ret rc	return status code
  */
 int slk_clear ( void ) {
-	chtype space_ch;
-	unsigned int pos_x;
-
 	if ( slks == NULL )
 		return ERR;
 
-	_movetoslk();
-	pos_x = 0;
-	space_ch = (chtype)' ' | slks->attrs;
-
-	for ( ; pos_x < COLS; pos_x++ )
-		stdscr->scr->putc( stdscr->scr, space_ch );
+	_enter_slk();
+	wclrtoeol ( stdscr );
+	_leave_slk();
 
 	return OK;
 }
@@ -308,7 +312,7 @@ int slk_restore ( void ) {
 
 	pos_x = 0;
 
-	_movetoslk();
+	_enter_slk();
 
 	space_ch = (chtype)' ' | slks->attrs;
 	next_space = &(slks->spaces[0]);
@@ -320,15 +324,17 @@ int slk_restore ( void ) {
 
 		if ( i == *next_space ) {
 			for ( j = 0; j < slks->maj_space_len; j++, pos_x++ )
-				stdscr->scr->putc( stdscr->scr, space_ch );
+				_wputch ( stdscr, space_ch, NOWRAP );
 			if ( next_space < last_space )
 				next_space++;
 		} else {
 			if ( pos_x < COLS )
-				stdscr->scr->putc( stdscr->scr, space_ch );
+				_wputch ( stdscr, space_ch, NOWRAP );
 			pos_x++;
 		}
 	}
+
+	_leave_slk();
 
 	return OK;
 }
