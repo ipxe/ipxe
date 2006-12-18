@@ -1,6 +1,7 @@
 #include <curses.h>
 #include <stddef.h>
 #include <timer.h>
+#include <console.h>
 #include "core.h"
 
 /** @file
@@ -37,7 +38,7 @@ int _wgetc ( WINDOW *win ) {
 		return ERR;
 
 	timer = INPUT_DELAY_TIMEOUT;
-	while ( ! win->scr->peek( win->scr ) ) {
+	while ( ! iskey() ) {
 		if ( m_delay == 0 ) // non-blocking read
 			return ERR;
 		if ( timer > 0 ) {  // time-limited blocking read
@@ -47,7 +48,7 @@ int _wgetc ( WINDOW *win ) {
 		} else { return ERR; } // non-blocking read
 	}
 
-	c = win->scr->getc( win->scr );
+	c = getchar();
 
 	if ( m_echo && ( c >= 32 && c <= 126 ) ) // printable ASCII characters
 		_wputch( win, (chtype) ( c | win->attrs ), WRAP );

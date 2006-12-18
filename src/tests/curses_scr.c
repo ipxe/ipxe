@@ -83,6 +83,6 @@ SCREEN _curscr = {
 	.exit = _exit_screen,
 	.movetoyx = _movetoyx,
 	.putc = _putc,
-	.getc = _getc,
-	.peek = _peek,
+	//	.getc = _getc,
+	//	.peek = _peek,
 };

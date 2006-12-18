@@ -46,21 +46,6 @@ typedef struct _curses_screen {
 	 * @v c		character to be written
 	 */
 	void ( * putc ) ( struct _curses_screen *scr, chtype c );
-	/**
-	 * Pop a character from the keyboard input stream
-	 *
-	 * @v scr	screen on which to operate
-	 * @ret c	popped character
-	 */
-	int ( * getc ) ( struct _curses_screen *scr );
-	/**
-	 * Checks to see whether a character is waiting in the input stream
-	 *
-	 * @v scr	screen on which to operate
-	 * @ret TRUE	character waiting in stream
-	 * @ret FALSE	no character waiting in stream
-	 */
-	bool ( *peek ) ( struct _curses_screen *scr );
 } SCREEN;
 
 /** Curses Window struct */
