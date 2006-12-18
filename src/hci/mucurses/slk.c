@@ -19,7 +19,7 @@ struct _softlabel {
 	   1: centre justify
 	   2: right justify
 	 */
-	unsigned short fmt;
+	unsigned int fmt;
 };
 
 struct _softlabelkeys {
@@ -31,12 +31,12 @@ struct _softlabelkeys {
 	   2: 4-4-4
 	   3: 4-4-4 with index line
 	*/
-	unsigned short fmt;
-	unsigned short max_label_len;
-	unsigned short maj_space_len;
-	unsigned short num_labels;
-	unsigned short num_spaces;
-	unsigned short *spaces;
+	unsigned int fmt;
+	unsigned int max_label_len;
+	unsigned int maj_space_len;
+	unsigned int num_labels;
+	unsigned int num_spaces;
+	unsigned int spaces[2];
 };
 
 struct _softlabelkeys *slks;
@@ -236,19 +236,16 @@ int slk_init ( int fmt ) {
 	switch(fmt) {
 	case 0:
 		nblocks = 8; nmaj = 2; nmin = 5;
-		slks->spaces = calloc(2, sizeof(unsigned short));
 		slks->spaces[0] = 2; slks->spaces[1] = 4;
 		break;
 	case 1:
 		nblocks = 8; nmaj = 1; nmin = 6;
-		slks->spaces = calloc(1, sizeof(unsigned short));
 		slks->spaces[0] = 3;
 		break;
 	case 2:
 		// same allocations as format 3
 	case 3:
 		nblocks = 12; nmaj = 2; nmin = 9;
-		slks->spaces = calloc(2, sizeof(unsigned short));
 		slks->spaces[0] = 3; slks->spaces[1] = 7;
 		break;
 	default:
@@ -290,7 +287,7 @@ char* slk_label ( int labnum ) {
  * @ret rc	return status code
  */
 int slk_restore ( void ) {
-	unsigned short i, j,
+	unsigned int i, j,
 		*next_space, *last_space;
 	chtype space_ch;
 
