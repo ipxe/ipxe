@@ -93,8 +93,23 @@ struct ansiesc_context {
  * @{
  */
 
-/** Character and line position */
-#define ANSIESC_HVP 'f'
+/** Cursor position */
+#define ANSIESC_CUP 'H'
+
+/** Erase in page */
+#define ANSIESC_ED 'J'
+
+/** Erase from cursor to end of page */
+#define ANSIESC_ED_TO_END 0
+
+/** Erase from start of page to cursor */
+#define ANSIESC_ED_FROM_START 1
+
+/** Erase whole page */
+#define ANSIESC_ED_ALL 2
+
+/** Select graphic rendition */
+#define ANSIESC_SGR 'm'
 
 /** @} */
 
