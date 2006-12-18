@@ -2,6 +2,7 @@
 #include <stddef.h>
 #include <malloc.h>
 #include <string.h>
+#include <assert.h>
 #include "mucurses.h"
 
 /** @file
@@ -11,9 +12,15 @@
 
 #define MIN_SPACE_SIZE 2
 
+#define SLK_MAX_LABEL_LEN 8
+
+#define SLK_MAX_NUM_LABELS 12
+
+#define SLK_MAX_NUM_SPACES 2
+
 struct _softlabel {
 	// label string
-	char *label;
+	char label[SLK_MAX_LABEL_LEN];
 	/* Format of soft label 
 	   0: left justify
 	   1: centre justify
@@ -23,7 +30,7 @@ struct _softlabel {
 };
 
 struct _softlabelkeys {
-	struct _softlabel *fkeys;
+	struct _softlabel fkeys[SLK_MAX_NUM_LABELS];
 	attr_t attrs;
 	/* Soft label layout format
 	   0: 3-2-3
@@ -36,7 +43,7 @@ struct _softlabelkeys {
 	unsigned int maj_space_len;
 	unsigned int num_labels;
 	unsigned int num_spaces;
-	unsigned int spaces[2];
+	unsigned int spaces[SLK_MAX_NUM_SPACES];
 };
 
 struct _softlabelkeys *slks;
@@ -55,8 +62,9 @@ static void _movetoslk ( void ) {
 static void _print_label ( struct _softlabel sl ) {
 	unsigned short i = 0;
 	int space_ch;
-	char *str = malloc((size_t)slks->max_label_len);
+	char str[SLK_MAX_LABEL_LEN + 1];
 
+	assert ( slks->max_label_len <= SLK_MAX_LABEL_LEN );
 	space_ch = ' ';
 
 	// protect against gaps in the soft label keys array
@@ -230,7 +238,12 @@ int slk_init ( int fmt ) {
 		return ERR;
 	}
 
-	slks = malloc(sizeof(struct _softlabelkeys));
+	/* There seems to be no API call to free this data structure... */
+	if ( ! slks )
+		slks = calloc(1,sizeof(*slks));
+	if ( ! slks )
+		return ERR;
+
 	slks->attrs = A_DEFAULT;
 	slks->fmt = fmt;
 	switch(fmt) {
@@ -260,7 +273,6 @@ int slk_init ( int fmt ) {
 		( available_width % nblocks ) / nmaj;
 	slks->num_spaces = nmaj;
 	slks->num_labels = nblocks;
-	slks->fkeys = calloc( nblocks, sizeof(struct _softlabel) );
 
 	// strip a line from the screen
 	LINES -= 1;
@@ -337,8 +349,8 @@ int slk_set ( int labnum, const char *label, int fmt ) {
 	if ( (unsigned short)fmt >= 3 )
 		return ERR;
 
-	slks->fkeys[labnum].label = malloc((size_t)slks->max_label_len + 1);
-	strncpy(slks->fkeys[labnum].label, label, (size_t)slks->max_label_len);
+	strncpy(slks->fkeys[labnum].label, label,
+		sizeof(slks->fkeys[labnum].label));
 	slks->fkeys[labnum].fmt = fmt;
 
 	return OK;
