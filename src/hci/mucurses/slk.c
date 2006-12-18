@@ -41,8 +41,6 @@ struct _softlabelkeys {
 
 struct _softlabelkeys *slks;
 
-static unsigned short pos_x;
-
 /*
   I either need to break the primitives here, or write a collection of
   functions specifically for SLKs that directly access the screen
@@ -189,6 +187,8 @@ int slk_attr_set ( const attr_t attrs, short colour_pair_number,
  */
 int slk_clear ( void ) {
 	chtype space_ch;
+	unsigned int pos_x;
+
 	if ( slks == NULL )
 		return ERR;
 
@@ -287,7 +287,7 @@ char* slk_label ( int labnum ) {
  * @ret rc	return status code
  */
 int slk_restore ( void ) {
-	unsigned int i, j,
+	unsigned int i, j, pos_x,
 		*next_space, *last_space;
 	chtype space_ch;
 
