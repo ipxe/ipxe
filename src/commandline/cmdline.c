@@ -3,6 +3,7 @@
 #include "cmdline.h"
 #include "cmdlinelib.h"
 #include "cmdlist.h"
+#include <gpxe/ansiesc.h>
 
 
 #define CMDL_DELAY (2000 * TICKS_PER_SEC) / 1000;
@@ -16,8 +17,10 @@ void cmdl_start()
 	//int spin;
 
 	//printf("gPXE %s (GPL) etherboot.org ...  ", VERSION);
-	printf("gPXE %s (GPL) etherboot.org\n", VERSION);
-	printf("Press Ctrl-B for gPXE command line...");
+	printf ( CSI "1m" /* bold */
+		 "gPXE " VERSION " (GPL) etherboot.org\n"
+		 CSI "0m" /* normal */
+		 "Press Ctrl-B for gPXE command line..." );
 
 	stop = currticks() + CMDL_DELAY;
 	
