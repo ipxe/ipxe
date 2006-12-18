@@ -2,7 +2,7 @@
 #include <stddef.h>
 #include <timer.h>
 #include <console.h>
-#include "core.h"
+#include "mucurses.h"
 
 /** @file
  *

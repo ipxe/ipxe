@@ -1,5 +1,5 @@
 #include <curses.h>
-#include "core.h"
+#include "mucurses.h"
 #include "cursor.h"
 
 /** @file

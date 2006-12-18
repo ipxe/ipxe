@@ -2,7 +2,7 @@
 #include <stddef.h>
 #include <malloc.h>
 #include <string.h>
-#include "core.h"
+#include "mucurses.h"
 
 /** @file
  *

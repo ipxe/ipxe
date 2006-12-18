@@ -1,5 +1,5 @@
-#ifndef CORE_H
-#define CORE_H
+#ifndef _MUCURSES_H
+#define _MUCURSES_H
 
 /** @file
  *
@@ -16,4 +16,4 @@ void _wputstr ( WINDOW *win, const char *str, int wrap, int n );
 void _wcursback ( WINDOW *win );
 int wmove ( WINDOW *win, int y, int x );
 
-#endif /* CURSES_H */
+#endif /* _MUCURSES_H */
