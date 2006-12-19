@@ -31,6 +31,44 @@
 #define READLINE_MAX 256
 
 /**
+ * Synchronise console with edited string
+ *
+ * @v string		Editable string
+ */
+static void sync_console ( struct edit_string *string ) {
+	unsigned int mod_start = string->mod_start;
+	unsigned int mod_end = string->mod_end;
+	unsigned int cursor = string->last_cursor;
+	size_t len = strlen ( string->buf );
+
+	/* Expand region back to old cursor position if applicable */
+	if ( mod_start > string->last_cursor )
+		mod_start = string->last_cursor;
+
+	/* Expand region forward to new cursor position if applicable */
+	if ( mod_end < string->cursor )
+		mod_end = string->cursor;
+
+	/* Backspace to start of region */
+	while ( cursor > mod_start ) {
+		putchar ( '\b' );
+		cursor--;
+	}
+
+	/* Print modified region */
+	while ( cursor < mod_end ) {
+		putchar ( ( cursor >= len ) ? ' ' : string->buf[cursor] );
+		cursor++;
+	}
+
+	/* Backspace to new cursor position */
+	while ( cursor > string->cursor ) {
+		putchar ( '\b' );
+		cursor--;
+	}
+}
+
+/**
  * Read line from console
  *
  * @v prompt		Prompt string
@@ -47,6 +85,7 @@ char * readline ( const char *prompt ) {
 		.cursor = 0,
 	};
 	int key;
+	char *line = NULL;
 
 	if ( prompt )
 		printf ( "%s", prompt );
@@ -54,15 +93,21 @@ char * readline ( const char *prompt ) {
 	buf[0] = '\0';
 	while ( 1 ) {
 		key = edit_string ( &string, getchar() );
+		sync_console ( &string );
 		switch ( key ) {
 		case 0x0d: /* Carriage return */
 		case 0x0a: /* Line feed */
-			return ( strdup ( buf ) );
+			line = strdup ( buf );
+			goto out;
 		case 0x03: /* Ctrl-C */
-			return NULL;
+			goto out;
 		default:
 			/* Do nothing */
 			break;
 		}
 	}
+
+ out:
+	putchar ( '\n' );
+	return line;
 }
