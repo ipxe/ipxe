@@ -144,7 +144,7 @@ SRCDIRS		+= drivers/bitbash
 SRCDIRS		+= interface/pxe
 SRCDIRS		+= tests
 SRCDIRS		+= crypto
-SRCDIRS		+= hci/mucurses
+SRCDIRS		+= hci hci/mucurses
 SRCDIRS		+= commandline
 SRCDIRS		+= commandline/commands
 
