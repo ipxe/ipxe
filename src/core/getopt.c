@@ -41,14 +41,14 @@ char *optarg;
  * This is an index into the argv[] array.  When getopt() returns -1,
  * @c optind is the index to the first element that is not an option.
  */
-int optind = 1;
+int optind;
 
 /**
  * Current option character index
  *
  * This is an index into the current element of argv[].
  */
-static int nextchar = 0;
+int nextchar;
 
 /**
  * Unrecognised option
@@ -57,22 +57,6 @@ static int nextchar = 0;
  * character is stored in @c optopt.
  */
 int optopt;
-
-/**
- * Reset getopt() internal state
- *
- * Due to a limitation of the POSIX getopt() API, it is necessary to
- * add a call to reset_getopt() before each set of calls to getopt()
- * or getopt_long().  This arises because POSIX assumes that each
- * process will parse command line arguments no more than once; this
- * assumption is not valid within Etherboot.  We work around the
- * limitation by arranging for execv() to call reset_getopt() before
- * executing the command.
- */
-void reset_getopt ( void ) {
-	optind = 1;
-	nextchar = 0;
-}
 
 /**
  * Get option argument from argv[] array
@@ -231,6 +215,9 @@ static int match_short_option ( int argc, char * const argv[],
  * @ret longindex	Index of long option (or NULL)
  * @ret option		Option found, or -1 for no more options
  *
+ * Note that the caller must arrange for reset_getopt() to be called
+ * before each set of calls to getopt_long().  In Etherboot, this is
+ * done automatically by execv().
  */
 int getopt_long ( int argc, char * const argv[], const char *optstring,
 		  const struct option *longopts, int *longindex ) {

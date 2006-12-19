@@ -49,9 +49,9 @@ struct option {
 
 extern char *optarg;
 extern int optind;
+extern int nextchar;
 extern int optopt;
 
-extern void reset_getopt();
 extern int getopt_long ( int argc, char * const argv[], const char *optstring,
 			 const struct option *longopts, int *longindex );
 
@@ -71,6 +71,22 @@ static inline int getopt ( int argc, char * const argv[],
 		{ NULL, 0, NULL, 0 }
 	};
 	return getopt_long ( argc, argv, optstring, no_options, NULL );
+}
+
+/**
+ * Reset getopt() internal state
+ *
+ * Due to a limitation of the POSIX getopt() API, it is necessary to
+ * add a call to reset_getopt() before each set of calls to getopt()
+ * or getopt_long().  This arises because POSIX assumes that each
+ * process will parse command line arguments no more than once; this
+ * assumption is not valid within Etherboot.  We work around the
+ * limitation by arranging for execv() to call reset_getopt() before
+ * executing the command.
+ */
+static inline void reset_getopt ( void ) {
+	optind = 1;
+	nextchar = 0;
 }
 
 #endif /* _GETOPT_H */
