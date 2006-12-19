@@ -4,18 +4,25 @@
 unsigned short _COLS = 80;
 unsigned short _LINES = 25;
 
-static void ansiscr_init ( struct _curses_screen *scr __unused ) {
+static void ansiscr_init ( struct _curses_screen *scr ) {
 	/* Reset terminal attributes and clear screen */
+	scr->attrs = 0;
+	scr->curs_x = 0;
+	scr->curs_y = 0;
 	printf ( "\033[0m\033[2J" );
 }
 
 static void ansiscr_exit ( struct _curses_screen *scr __unused ) {
 }
 
-static void ansiscr_movetoyx ( struct _curses_screen *scr __unused,
+static void ansiscr_movetoyx ( struct _curses_screen *scr,
 			       unsigned int y, unsigned int x ) {
-	/* ANSI escape sequence to update cursor position */
-	printf ( "\033[%d;%dH", ( y + 1 ), ( x + 1 ) );
+	if ( ( x != scr->curs_x ) || ( y != scr->curs_y ) ) {
+		/* ANSI escape sequence to update cursor position */
+		printf ( "\033[%d;%dH", ( y + 1 ), ( x + 1 ) );
+		scr->curs_x = x;
+		scr->curs_y = y;
+	}
 }
 
 static void ansiscr_putc ( struct _curses_screen *scr, chtype c ) {
@@ -26,13 +33,22 @@ static void ansiscr_putc ( struct _curses_screen *scr, chtype c ) {
 	short fcol;
 	short bcol;
 
+	/* Update attributes if changed */
 	if ( attrs != scr->attrs ) {
 		scr->attrs = attrs;
 		pair_content ( cpair, &fcol, &bcol );
 		/* ANSI escape sequence to update character attributes */
 		printf ( "\033[0;%d;3%d;4%dm", ( bold ? 1 : 22 ), fcol, bcol );
 	}
+
+	/* Print the actual character */
 	putchar ( character );
+
+	/* Update expected cursor position */
+	if ( ++(scr->curs_x) == _COLS ) {
+		scr->curs_x = 0;
+		++scr->curs_y;
+	}
 }
 
 static int ansiscr_getc ( struct _curses_screen *scr __unused ) {

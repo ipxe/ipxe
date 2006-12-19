@@ -28,6 +28,8 @@ typedef uint32_t attr_t;
 
 /** Curses SCREEN object */
 typedef struct _curses_screen {
+	/** Current cursor position */
+	unsigned int curs_x, curs_y;
 	/** Current attribute */
 	attr_t attrs;
 
