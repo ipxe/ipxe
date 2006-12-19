@@ -21,7 +21,6 @@
 #include <string.h>
 #include <errno.h>
 #include <assert.h>
-#include <malloc.h>
 #include <gpxe/crypto.h>
 #include <gpxe/chap.h>
 

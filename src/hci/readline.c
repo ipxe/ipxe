@@ -17,7 +17,7 @@
  */
 
 #include <string.h>
-#include <malloc.h>
+#include <stdlib.h>
 #include <console.h>
 #include <gpxe/editstring.h>
 #include <readline/readline.h>

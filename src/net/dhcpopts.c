@@ -17,10 +17,10 @@
  */
 
 #include <stdint.h>
+#include <stdlib.h>
 #include <byteswap.h>
 #include <errno.h>
 #include <string.h>
-#include <malloc.h>
 #include <assert.h>
 #include <vsprintf.h>
 #include <gpxe/list.h>

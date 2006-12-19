@@ -20,9 +20,9 @@
  */
 
 #include <stdint.h>
+#include <stdlib.h>
 #include <string.h>
 #include <errno.h>
-#include <malloc.h>
 #include <gpxe/tables.h>
 #include <gpxe/device.h>
 #include <gpxe/pci.h>

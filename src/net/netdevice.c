@@ -17,10 +17,10 @@
  */
 
 #include <stdint.h>
+#include <stdlib.h>
 #include <byteswap.h>
 #include <string.h>
 #include <errno.h>
-#include <malloc.h>
 #include <gpxe/if_ether.h>
 #include <gpxe/pkbuff.h>
 #include <gpxe/tables.h>
