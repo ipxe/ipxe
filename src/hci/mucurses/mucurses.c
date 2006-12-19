@@ -59,6 +59,17 @@ void _wputch ( WINDOW *win, chtype ch, int wrap ) {
 }
 
 /**
+ * Write a single character to a window
+ *
+ * @v *win	window in which to write
+ * @v c		character rendition to write
+ * @v wrap	wrap "switch"
+ */
+void _wputc ( WINDOW *win, char c, int wrap ) {
+	_wputch ( win, ( c | win->attrs ), wrap );
+}
+
+/**
  * Retreat the cursor back one position (useful for a whole host of
  * ops)
  *
@@ -100,7 +111,7 @@ void _wputchstr ( WINDOW *win, const chtype *chstr, int wrap, int n ) {
  */
 void _wputstr ( WINDOW *win, const char *str, int wrap, int n ) {
 	for ( ; *str && n-- ; str++ ) {
-		_wputch( win, *str | win->attrs, wrap );
+		_wputc ( win, *str, wrap );
 	}
 }
 

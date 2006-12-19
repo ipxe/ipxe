@@ -19,7 +19,7 @@ int wclrtobot ( WINDOW *win ) {
 
 	_store_curs_pos( win, &pos );
 	do {
-		_wputch( win, (unsigned)' ', WRAP );
+		_wputc( win, ' ', WRAP );
 	} while ( win->curs_y + win->curs_x );
 	_restore_curs_pos( win, &pos );
 
@@ -37,7 +37,7 @@ int wclrtoeol ( WINDOW *win ) {
 
 	_store_curs_pos( win, &pos );
 	while ( ( win->curs_y - pos.y ) == 0 ) {
-		_wputch( win, (unsigned)' ', WRAP );
+		_wputc( win, ' ', WRAP );
 	}
 	_restore_curs_pos( win, &pos );
 
@@ -51,7 +51,7 @@ int wclrtoeol ( WINDOW *win ) {
  * @ret rc	return status code
  */
 int wdelch ( WINDOW *win ) {
-	_wputch( win, (unsigned)' ', NOWRAP );
+	_wputc( win, ' ', NOWRAP );
 	_wcursback( win );
 
 	return OK;
