@@ -219,6 +219,8 @@ size_t vcprintf ( struct printf_context *ctx, const char *fmt, va_list args ) {
 			cputchar ( ctx, va_arg ( args, unsigned int ) );
 		} else if ( *fmt == 's' ) {
 			ptr = va_arg ( args, char * );
+			if ( ! ptr )
+				ptr = "<NULL>";
 		} else if ( *fmt == 'p' ) {
 			intptr_t ptrval;
 
