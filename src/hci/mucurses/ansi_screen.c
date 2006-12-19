@@ -2,7 +2,7 @@
 #include <console.h>
 
 unsigned short _COLS = 80;
-unsigned short _LINES = 25;
+unsigned short _LINES = 24;
 
 static void ansiscr_init ( struct _curses_screen *scr ) {
 	/* Reset terminal attributes and clear screen */
