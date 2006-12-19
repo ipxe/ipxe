@@ -148,26 +148,31 @@ static struct ansiesc_context bios_ansiesc_ctx = {
  * @v character		Character to be printed
  */
 static void bios_putchar ( int character ) {
+	int discard_a, discard_b, discard_c;
 
 	/* Intercept ANSI escape sequences */
 	character = ansiesc_process ( &bios_ansiesc_ctx, character );
 	if ( character < 0 )
 		return;
 
-	/* Set attribute for printable characters */
-	if ( character >= 0x20 ) {
-		__asm__ __volatile__ ( REAL_CODE ( "sti\n\t"
-						   "int $0x10\n\t"
-						   "cli\n\t" )
-				       : : "a" ( 0x0920 ), "b" ( bios_attr ),
-				           "c" ( 1 ) );
-	}
-
-	/* Print the character */
+	/* Print character with attribute */
 	__asm__ __volatile__ ( REAL_CODE ( "sti\n\t"
+					   /* Skip non-printable characters */
+					   "cmpb $0x20, %%al\n\t"
+					   "jb 1f\n\t"
+					   /* Set attribute */
+					   "movw $0x0001, %%cx\n\t"
+					   "movb $0x09, %%ah\n\t"
+					   "int $0x10\n\t"
+					   "\n1:\n\t"
+					   /* Print character */
+					   "xorw %%bx, %%bx\n\t"
+					   "movb $0x0e, %%ah\n\t"
 					   "int $0x10\n\t"
 					   "cli\n\t" )
-			       : : "a" ( character | 0x0e00 ), "b" ( 0 )
+			       : "=a" ( discard_a ), "=b" ( discard_b ),
+			         "=c" ( discard_c )
+			       : "a" ( character ), "b" ( bios_attr )
 			       : "ebp" );
 }
 
