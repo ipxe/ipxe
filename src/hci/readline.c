@@ -85,7 +85,7 @@ char * readline ( const char *prompt ) {
 		.cursor = 0,
 	};
 	int key;
-	char *line = NULL;
+	char *line;
 
 	if ( prompt )
 		printf ( "%s", prompt );
@@ -97,17 +97,17 @@ char * readline ( const char *prompt ) {
 		switch ( key ) {
 		case 0x0d: /* Carriage return */
 		case 0x0a: /* Line feed */
+			putchar ( '\n' );
 			line = strdup ( buf );
-			goto out;
+			if ( ! line )
+				printf ( "Out of memory\n" );
+			return line;
 		case 0x03: /* Ctrl-C */
-			goto out;
+			putchar ( '\n' );
+			return NULL;
 		default:
 			/* Do nothing */
 			break;
 		}
 	}
-
- out:
-	putchar ( '\n' );
-	return line;
 }
