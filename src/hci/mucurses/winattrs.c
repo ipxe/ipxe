@@ -64,7 +64,7 @@ int wattrset ( WINDOW *win, int attrs ) {
 int wattr_get ( WINDOW *win, attr_t *attrs, short *pair, 
 		void *opts __unused ) {
 	*attrs = win->attrs & A_ATTRIBUTES;
-	*pair = (short)(( win->attrs & A_COLOR ) >> CPAIR_SHIFT);
+	*pair = PAIR_NUMBER ( win->attrs );
 	return OK;
 }
 
@@ -107,7 +107,7 @@ int wattr_on ( WINDOW *win, attr_t attrs,
  */
 int wattr_set ( WINDOW *win, attr_t attrs, short cpair, 
 		void *opts __unused ) {
-	wattrset( win, attrs | ( ( (unsigned short)cpair ) << CPAIR_SHIFT ) );
+	wattrset( win, attrs | COLOUR_PAIR ( cpair ) );
 	return OK;
 }
 
@@ -121,11 +121,11 @@ int wattr_set ( WINDOW *win, attr_t attrs, short cpair,
  */
 int wcolour_set ( WINDOW *win, short colour_pair_number, 
 		  void *opts __unused ) {
-	if ( ( unsigned short )colour_pair_number > COLORS )
+	if ( ( unsigned short )colour_pair_number > COLOUR_PAIRS )
 		return ERR;
 
-	win->attrs = ( (unsigned short)colour_pair_number << CPAIR_SHIFT ) |
-		( win->attrs & A_ATTRIBUTES );
+	win->attrs = ( ( win->attrs & A_ATTRIBUTES ) |
+		       COLOUR_PAIR ( colour_pair_number ) );
 	return OK;
 }
 

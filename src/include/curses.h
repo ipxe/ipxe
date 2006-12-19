@@ -28,6 +28,9 @@ typedef uint32_t attr_t;
 
 /** Curses SCREEN object */
 typedef struct _curses_screen {
+	/** Current attribute */
+	attr_t attrs;
+
 	void ( *init ) ( struct _curses_screen *scr );
 	void ( *exit ) ( struct _curses_screen *scr );
 	/**
@@ -46,6 +49,21 @@ typedef struct _curses_screen {
 	 * @v c		character to be written
 	 */
 	void ( * putc ) ( struct _curses_screen *scr, chtype c );
+	/**
+	 * Pop a character from the keyboard input stream
+	 *
+	 * @v scr	screen on which to operate
+	 * @ret c	popped character
+	 */
+	int ( * getc ) ( struct _curses_screen *scr );
+	/**
+	 * Checks to see whether a character is waiting in the input stream
+	 *
+	 * @v scr	screen on which to operate
+	 * @ret TRUE	character waiting in stream
+	 * @ret FALSE	no character waiting in stream
+	 */
+	bool ( *peek ) ( struct _curses_screen *scr );
 } SCREEN;
 
 /** Curses Window struct */
@@ -69,54 +87,56 @@ typedef struct _curses_window {
 } WINDOW;
 
 extern WINDOW _stdscr;
-extern SCREEN _curscr;
 extern unsigned short _COLS;
 extern unsigned short _LINES;
-extern unsigned int _COLOURS;
-extern unsigned int _COLOUR_PAIRS;
 
 #define stdscr ( &_stdscr )
-#define curscr ( &_curscr )
 #define COLS _COLS
 #define LINES _LINES
-#define COLORS _COLOURS
-#define COLOR_PAIRS _COLOUR_PAIRS
 
 #define MUCURSES_BITS( mask, shift ) (( mask ) << (shift))
 #define CPAIR_SHIFT	8
 #define ATTRS_SHIFT	16
 
-#define A_DEFAULT	( 1UL - 1UL )
-#define A_ALTCHARSET	MUCURSES_BITS( 1UL, ATTRS_SHIFT + 0 )
-#define A_BLINK		MUCURSES_BITS( 1UL, ATTRS_SHIFT + 1 )
-#define A_BOLD		MUCURSES_BITS( 1UL, ATTRS_SHIFT + 2 )
-#define A_DIM		MUCURSES_BITS( 1UL, ATTRS_SHIFT + 3 )
-#define A_INVIS		MUCURSES_BITS( 1UL, ATTRS_SHIFT + 4 )
-#define A_PROTECT	MUCURSES_BITS( 1UL, ATTRS_SHIFT + 5 )
-#define A_REVERSE	MUCURSES_BITS( 1UL, ATTRS_SHIFT + 6 )
-#define A_STANDOUT	MUCURSES_BITS( 1UL, ATTRS_SHIFT + 7 )
-#define A_UNDERLINE	MUCURSES_BITS( 1UL, ATTRS_SHIFT + 8 )
+#define WA_DEFAULT	( 0x0000 << ATTRS_SHIFT )
+#define WA_ALTCHARSET	( 0x0001 << ATTRS_SHIFT )
+#define WA_BLINK	( 0x0002 << ATTRS_SHIFT )
+#define WA_BOLD		( 0x0004 << ATTRS_SHIFT )
+#define WA_DIM		( 0x0008 << ATTRS_SHIFT )
+#define WA_INVIS	( 0x0010 << ATTRS_SHIFT )
+#define WA_PROTECT	( 0x0020 << ATTRS_SHIFT )
+#define WA_REVERSE	( 0x0040 << ATTRS_SHIFT )
+#define WA_STANDOUT	( 0x0080 << ATTRS_SHIFT )
+#define WA_UNDERLINE	( 0x0100 << ATTRS_SHIFT )
+#define WA_HORIZONTAL	( 0x0200 << ATTRS_SHIFT )
+#define WA_VERTICAL	( 0x0400 << ATTRS_SHIFT )
+#define WA_LEFT		( 0x0800 << ATTRS_SHIFT )
+#define WA_RIGHT	( 0x1000 << ATTRS_SHIFT )
+#define WA_LOW		( 0x2000 << ATTRS_SHIFT )
+#define WA_TOP		( 0x4000 << ATTRS_SHIFT )
 
-#define WA_ALTCHARSET	A_ALTCHARSET
-#define WA_BLINK	A_BLINK
-#define WA_BOLD		A_BOLD
-#define WA_DIM		A_DIM
-#define WA_INVIS	A_INVIS
-#define WA_PROTECT	A_PROTECT
-#define WA_REVERSE	A_REVERSE
-#define WA_STANDOUT	A_STANDOUT
-#define WA_UNDERLINE	A_UNDERLINE
-#define WA_HORIZONTAL	MUCURSES_BITS( 1UL, ATTRS_SHIFT + 9 )
-#define WA_VERTICAL	MUCURSES_BITS( 1UL, ATTRS_SHIFT + 10 )
-#define WA_LEFT		MUCURSES_BITS( 1UL, ATTRS_SHIFT + 11 )
-#define WA_RIGHT	MUCURSES_BITS( 1UL, ATTRS_SHIFT + 12 )
-#define WA_LOW		MUCURSES_BITS( 1UL, ATTRS_SHIFT + 13 )
-#define WA_TOP		MUCURSES_BITS( 1UL, ATTRS_SHIFT + 14 )
+#define A_DEFAULT	WA_DEFAULT
+#define A_ALTCHARSET	WA_ALTCHARSET
+#define A_BLINK		WA_BLINK
+#define A_BOLD		WA_BOLD
+#define A_DIM		WA_DIM
+#define A_INVIS		WA_INVIS
+#define A_PROTECT	WA_PROTECT
+#define A_REVERSE	WA_REVERSE
+#define A_STANDOUT	WA_STANDOUT
+#define A_UNDERLINE	WA_UNDERLINE
 
-#define A_ATTRIBUTES	( MUCURSES_BITS( 1UL, ATTRS_SHIFT ) - 1UL )
-#define A_CHARTEXT	( MUCURSES_BITS( 1UL, 0 ) - 1UL )
-#define A_COLOUR	MUCURSES_BITS( ( 1UL << 8 ) - 1UL, CPAIR_SHIFT )
+#define A_ATTRIBUTES	( 0xffff << ATTRS_SHIFT )
+#define A_CHARTEXT	( 0xff )
+#define A_COLOUR	( 0xff << CPAIR_SHIFT )
 #define A_COLOR		A_COLOUR
+
+#define COLOUR_PAIR(n)	( (n) << CPAIR_SHIFT )
+#define COLOR_PAIR(n)	COLOUR_PAIR(n)
+#define PAIR_NUMBER(attrs) ( ( (attrs) & A_COLOUR ) >> CPAIR_SHIFT )
+
+#define COLOUR_PAIRS	4 /* Arbitrary limit */
+#define COLOR_PAIRS	COLOUR_PAIRS
 
 #define ACS_ULCORNER	'+'
 #define ACS_LLCORNER	'+'
@@ -152,6 +172,7 @@ extern unsigned int _COLOUR_PAIRS;
 #define COLOUR_MAGENTA	5
 #define COLOUR_CYAN	6
 #define COLOUR_WHITE	7
+#define COLOURS		7
 
 #define COLOUR_FG	30
 #define COLOUR_BG	40
@@ -166,6 +187,7 @@ extern unsigned int _COLOUR_PAIRS;
 #define COLOR_MAGENTA	COLOUR_MAGENTA
 #define COLOR_YELLOW	COLOUR_YELLOW
 #define COLOR_WHITE	COLOUR_WHITE
+#define COLORS		COLOURS
 
 /*
  * KEY code constants
@@ -281,7 +303,7 @@ extern int beep ( void );
 /*extern int border ( chtype, chtype, chtype, chtype, chtype, chtype, chtype,
   chtype );*/
 extern int box ( WINDOW *, chtype, chtype );
-extern bool can_change_colour ( void );
+//extern bool can_change_colour ( void );
 #define can_change_color() can_change_colour()
 extern int cbreak ( void ); 
 //extern int clrtobot ( void );
@@ -289,7 +311,7 @@ extern int cbreak ( void );
 extern int colour_content ( short, short *, short *, short * );
 #define color_content( c, r, g, b ) colour_content( (c), (r), (g), (b) )
 //extern int colour_set ( short, void * );
-//#define color_set( cpno, opts ) colour_set( (cpno), (opts) )
+#define color_set( cpno, opts ) colour_set( (cpno), (opts) )
 extern int copywin ( const WINDOW *, WINDOW *, int, int, int, 
 		     int, int, int, int );
 extern int curs_set ( int );
@@ -316,7 +338,7 @@ extern chtype getbkgd ( WINDOW * );
 //extern int getnstr ( char *, int );
 //extern int getstr ( char * );
 extern int halfdelay ( int );
-extern bool has_colors ( void );
+//extern bool has_colors ( void );
 extern bool has_ic ( void );
 extern bool has_il ( void );
 //extern int hline ( chtype, int );
@@ -405,7 +427,6 @@ extern int notimeout ( WINDOW *, bool );
 extern int overlay ( const WINDOW *, WINDOW * );
 extern int overwrite ( const WINDOW *, WINDOW * );
 extern int pair_content ( short, short *, short * );
-extern int PAIR_NUMBER ( int );
 //extern int pechochar ( WINDOW *, chtype );
 //extern int pnoutrefresh ( WINDOW *, int, int, int, int, int, int );
 //extern int prefresh ( WINDOW *, int, int, int, int, int, int );
@@ -445,7 +466,7 @@ extern int slk_set ( int, const char *, int );
 extern int slk_touch ( void );
 extern int standend ( void );
 extern int standout ( void );
-extern int start_colour ( void );
+//extern int start_colour ( void );
 #define start_color() start_colour()
 //extern WINDOW *subpad ( WINDOW *, int, int, int, int );
 extern WINDOW *subwin ( WINDOW *, int, int, int, int );
@@ -492,7 +513,7 @@ extern int wborder ( WINDOW *, chtype, chtype, chtype, chtype, chtype, chtype,
 extern int wclrtobot ( WINDOW * );
 extern int wclrtoeol ( WINDOW * );
 extern void wcursyncup ( WINDOW * );
-//extern int wcolor_set ( WINDOW *, short, void * );
+extern int wcolour_set ( WINDOW *, short, void * );
 #define wcolor_set(w,s,v) wcolour_set((w),(s),(v))
 extern int wdelch ( WINDOW * );
 extern int wdeleteln ( WINDOW * );
@@ -574,12 +595,20 @@ static inline int border ( chtype ls, chtype rs, chtype ts, chtype bs,
 	return wborder ( stdscr, ls, rs, ts, bs, tl, tr, bl, br );
 }
 
+static inline bool can_change_colour ( void ) {
+	return FALSE;
+}
+
 static inline int clrtobot ( void ) {
 	return wclrtobot( stdscr );
 }
 
 static inline int clrtoeol ( void ) {
 	return wclrtoeol( stdscr );
+}
+
+static inline int colour_set ( short colour_pair_number, void *opts ) {
+	return wcolour_set ( stdscr, colour_pair_number, opts );
 }
 
 static inline int delch ( void ) {
@@ -604,6 +633,10 @@ static inline int getnstr ( char *str, int n ) {
 
 static inline int getstr ( char *str ) {
 	return wgetnstr ( stdscr, str, -1 );
+}
+
+static inline bool has_colors ( void ) {
+	return TRUE;
 }
 
 static inline int hline ( chtype ch, int n ) {
@@ -744,6 +777,10 @@ static inline int slk_refresh ( void ) {
 
 #define standend() wstandend( stdscr )
 #define standout() wstandout( stdscr )
+
+static inline int start_colour ( void ) {
+	return OK;
+}
 
 static inline int vline ( chtype ch, int n ) {
 	return wvline ( stdscr, ch, n );

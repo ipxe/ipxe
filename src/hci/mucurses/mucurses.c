@@ -1,3 +1,4 @@
+#include <console.h>
 #include <curses.h>
 #include "mucurses.h"
 
@@ -13,12 +14,22 @@ WINDOW _stdscr = {
 	.ori_x = 0,
 	.curs_y = 0,
 	.curs_x = 0,
-	.scr = curscr,
+	.scr = &_ansi_screen,
 };
 
 /*
  *  Primitives
  */
+
+/**
+ * Update cursor position
+ *
+ * @v *win	window in which to update position
+ */
+static void _wupdcurs ( WINDOW *win ) {
+	win->scr->movetoyx ( win->scr, win->ori_y + win->curs_y,
+			     win->ori_x + win->curs_x );
+}
 
 /**
  * Write a single character rendition to a window
@@ -30,8 +41,7 @@ WINDOW _stdscr = {
 void _wputch ( WINDOW *win, chtype ch, int wrap ) {
 	/* make sure we set the screen cursor to the right position
 	   first! */
-	win->scr->movetoyx( win->scr, win->ori_y + win->curs_y,
-				      win->ori_x + win->curs_x );
+	_wupdcurs(win);
 	win->scr->putc(win->scr, ch);
 	if ( ++(win->curs_x) - win->width == 0 ) {
 		if ( wrap == WRAP ) {
@@ -63,8 +73,7 @@ void _wcursback ( WINDOW *win ) {
 		win->curs_x--;
 	}
 
-	win->scr->movetoyx( win->scr, win->ori_y + win->curs_y,
-   			     	      win->ori_x + win->curs_x );
+	_wupdcurs(win);
 }
 
 /**
@@ -112,7 +121,6 @@ int wmove ( WINDOW *win, int y, int x ) {
 
 	win->curs_y = y;
 	win->curs_x = x;
-	win->scr->movetoyx( win->scr, win->ori_y + win->curs_y, 
-			    	      win->ori_x + win->curs_x );
+	_wupdcurs(win);
 	return OK;
 }
