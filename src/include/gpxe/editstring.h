@@ -1,5 +1,5 @@
-#ifndef _EDITSTRING_H
-#define _EDITSTRING_H
+#ifndef _GPXE_EDITSTRING_H
+#define _GPXE_EDITSTRING_H
 
 /** @file
  *
@@ -15,8 +15,17 @@ struct edit_string {
 	size_t len;
 	/** Cursor position */
 	unsigned int cursor;
+
+	/* The following items are the edit history */
+
+	/** Last cursor position */
+	unsigned int last_cursor;
+	/** Start of modified portion of string */
+	unsigned int mod_start;
+	/** End of modified portion of string */
+	unsigned int mod_end;
 };
 
 extern int edit_string ( struct edit_string *string, int key );
 
-#endif /* _EDITSTRING_H */
+#endif /* _GPXE_EDITSTRING_H */

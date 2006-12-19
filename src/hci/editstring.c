@@ -35,7 +35,7 @@
  */
 static void insert_delete ( struct edit_string *string, size_t delete_len,
 			    const char *insert_text ) {
-	size_t old_len, max_delete_len, insert_len, max_insert_len;
+	size_t old_len, max_delete_len, insert_len, max_insert_len, new_len;
 
 	/* Calculate lengths */
 	old_len = strlen ( string->buf );
@@ -47,6 +47,11 @@ static void insert_delete ( struct edit_string *string, size_t delete_len,
 	max_insert_len = ( ( string->len - 1 ) - ( old_len - delete_len ) );
 	if ( insert_len > max_insert_len )
 		insert_len = max_insert_len;
+	new_len = ( old_len - delete_len + insert_len );
+
+	/* Fill in edit history */
+	string->mod_start = string->cursor;
+	string->mod_end = ( ( new_len > old_len ) ? new_len : old_len );
 
 	/* Move data following the cursor */
 	memmove ( ( string->buf + string->cursor + insert_len ),
@@ -113,10 +118,19 @@ static void kill_eol ( struct edit_string *string ) {
  * zero, otherwise it will return the original key.
  *
  * This function does not update the display in any way.
+ *
+ * The string's edit history will be updated to allow the caller to
+ * efficiently bring the display into sync with the string content.
  */
 int edit_string ( struct edit_string *string, int key ) {
 	int retval = 0;
 
+	/* Prepare edit history */
+	string->last_cursor = string->cursor;
+	string->mod_start = string->cursor;
+	string->mod_end = string->cursor;
+
+	/* Interpret key */
 	if ( ( key >= 0x20 ) && ( key <= 0x7e ) ) {
 		/* Printable character; insert at current position */
 		insert_character ( string, key );
