@@ -9,7 +9,7 @@ static void ansiscr_init ( struct _curses_screen *scr ) {
 	scr->attrs = 0;
 	scr->curs_x = 0;
 	scr->curs_y = 0;
-	printf ( "\033[0m\033[2J" );
+	printf ( "\033[0m\033[2J\033[1;1H" );
 }
 
 static void ansiscr_exit ( struct _curses_screen *scr __unused ) {
