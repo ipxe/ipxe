@@ -5,6 +5,8 @@ unsigned short _COLS = 80;
 unsigned short _LINES = 25;
 
 static void ansiscr_init ( struct _curses_screen *scr __unused ) {
+	/* Reset terminal attributes and clear screen */
+	printf ( "\033[0m\033[2J" );
 }
 
 static void ansiscr_exit ( struct _curses_screen *scr __unused ) {

@@ -17,8 +17,6 @@ WINDOW *initscr ( void ) {
 	stdscr->scr->init( stdscr->scr );
 	stdscr->height = LINES;
 	stdscr->width = COLS;
-	werase( stdscr );
-
 	return stdscr;
 }
 
