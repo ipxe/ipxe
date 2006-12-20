@@ -146,6 +146,9 @@ REQUIRE_OBJECT ( pxe );
 #ifdef NVO_CMD
 REQUIRE_OBJECT ( nvo_cmd );
 #endif
+#ifdef CONFIG_CMD
+REQUIRE_OBJECT ( config_cmd );
+#endif
 
 /*
  * Drag in miscellaneous objects

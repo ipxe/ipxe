@@ -116,6 +116,7 @@
  *
  */
 #define	NVO_CMD			/* Non-volatile option storage commands */
+#define CONFIG_CMD		/* Option configuration console */
 
 /* @END general.h */ 
 
