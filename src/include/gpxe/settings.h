@@ -96,12 +96,54 @@ struct config_setting {
 /** Declare a configuration setting */
 #define	__config_setting __table ( config_settings, 01 )
 
-/* Function prototypes */
+/**
+ * Show value of setting
+ *
+ * @v context		Configuration context
+ * @v setting		Configuration setting
+ * @v buf		Buffer to contain value
+ * @v len		Length of buffer
+ * @ret rc		Return status code
+ */
+static inline int show_setting ( struct config_context *context,
+				 struct config_setting *setting,
+				 char *buf, size_t len ) {
+	return setting->type->show ( context, setting, buf, len );
+}
 
-extern int show_setting ( struct config_context *context, const char *name,
-			  char *buf, size_t len );
-extern int set_setting ( struct config_context *context, const char *name,
+extern int set_setting ( struct config_context *context,
+			 struct config_setting *setting,
 			 const char *value );
-extern int clear_setting ( struct config_context *context, const char *name );
+
+/**
+ * Clear setting
+ *
+ * @v context		Configuration context
+ * @v setting		Configuration setting
+ * @ret rc		Return status code
+ */
+static inline int clear_setting ( struct config_context *context,
+				  struct config_setting *setting ) {
+	delete_dhcp_option ( context->options, setting->tag );
+	return 0;
+}
+
+/* Function prototypes */
+extern int show_named_setting ( struct config_context *context,
+				const char *name, char *buf, size_t len );
+extern int set_named_setting ( struct config_context *context,
+			       const char *name, const char *value );
+
+/**
+ * Clear named setting
+ *
+ * @v context		Configuration context
+ * @v name		Configuration setting name
+ * @ret rc		Return status code
+ */
+static inline int clear_named_setting ( struct config_context *context,
+					const char *name ) {
+	return set_named_setting ( context, name, NULL );
+}
 
 #endif /* _GPXE_SETTINGS_H */

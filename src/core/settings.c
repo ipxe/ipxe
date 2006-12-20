@@ -116,7 +116,7 @@ find_or_build_config_setting ( const char *name,
 }
 
 /**
- * Show value of setting
+ * Show value of named setting
  *
  * @v context		Configuration context
  * @v name		Configuration setting name
@@ -124,27 +124,27 @@ find_or_build_config_setting ( const char *name,
  * @v len		Length of buffer
  * @ret rc		Return status code
  */
-int show_setting ( struct config_context *context, const char *name,
-		   char *buf, size_t len ) {
+int show_named_setting ( struct config_context *context, const char *name,
+			 char *buf, size_t len ) {
 	struct config_setting *setting;
 	struct config_setting tmp_setting;
 
 	setting = find_or_build_config_setting ( name, &tmp_setting );
 	if ( ! setting )
 		return -ENOENT;
-	return setting->type->show ( context, setting, buf, len );
+	return show_setting ( context, setting, buf, len );
 }
 
 /**
- * Set value of setting
+ * Set value of named setting
  *
  * @v context		Configuration context
  * @v name		Configuration setting name
  * @v value		Setting value (as a string)
  * @ret rc		Return status code
  */
-int set_setting ( struct config_context *context, const char *name,
-		  const char *value ) {
+int set_named_setting ( struct config_context *context, const char *name,
+			const char *value ) {
 	struct config_setting *setting;
 	struct config_setting tmp_setting;
 
@@ -155,24 +155,21 @@ int set_setting ( struct config_context *context, const char *name,
 }
 
 /**
- * Clear setting
+ * Set value of setting
  *
  * @v context		Configuration context
- * @v name		Configuration setting name
+ * @v setting		Configuration setting
+ * @v value		Setting value (as a string), or NULL
  * @ret rc		Return status code
  */
-int clear_setting ( struct config_context *context, const char *name ) {
-	struct config_setting *setting;
-	struct config_setting tmp_setting;
-
-	setting = find_or_build_config_setting ( name, &tmp_setting );
-	if ( ! setting )
-		return -ENOENT;
-
-	/* All types of settings get cleared the same way */
-	delete_dhcp_option ( context->options, setting->tag );
-
-	return 0;
+int set_setting ( struct config_context *context,
+		  struct config_setting *setting,
+		  const char *value ) {
+	if ( ( ! value ) || ( ! *value ) ) {
+		/* Save putting deletion logic in each individual handler */
+		return clear_setting ( context, setting );
+	}
+	return setting->type->set ( context, setting, value );
 }
 
 /**
@@ -259,7 +256,6 @@ static int set_ipv4 ( struct config_context *context,
 		      const char *value ) {
 	struct dhcp_option *option;
 	struct in_addr ipv4;
-	int rc;
 	
 	if ( inet_aton ( value, &ipv4 ) == 0 )
 		return -EINVAL;

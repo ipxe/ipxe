@@ -91,9 +91,8 @@ static void load_setting ( struct setting_widget *widget ) {
 	widget->editing = 0;
 
 	/* Read current setting value */
-	if ( widget->setting->type->show ( widget->context, widget->setting,
-					   widget->value,
-					   sizeof ( widget->value ) ) != 0 ) {
+	if ( show_setting ( widget->context, widget->setting,
+			    widget->value, sizeof ( widget->value ) ) != 0 ) {
 		widget->value[0] = '\0';
 	}	
 
@@ -110,8 +109,7 @@ static void load_setting ( struct setting_widget *widget ) {
  * @v widget		Setting widget
  */
 static int save_setting ( struct setting_widget *widget ) {
-	return widget->setting->type->set ( widget->context, widget->setting,
-					    widget->value );
+	return set_setting ( widget->context, widget->setting, widget->value );
 }
 
 /**
@@ -252,7 +250,7 @@ static void main_loop ( struct config_context *context ) {
 				if ( ( rc = save_setting ( &widget ) ) != 0 ) {
 					alert ( " Could not set %s: %s ",
 						widget.setting->name,
-						strerror ( -rc ) );
+						strerror ( rc ) );
 				}
 				/* Fall through */
 			case 0x03: /* Ctrl-C */
