@@ -253,6 +253,7 @@ static void clearmsg ( unsigned int row ) {
  * @v args		printf() argument list
  */
 static void valert ( const char *fmt, va_list args ) {
+	clearmsg ( ALERT_ROW );
 	color_set ( CPAIR_ALERT, NULL );
 	vmsg ( ALERT_ROW, fmt, args );
 	sleep ( 2 );
