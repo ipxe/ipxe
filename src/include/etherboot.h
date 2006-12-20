@@ -9,6 +9,7 @@
 #include "compiler.h"
 #include "stddef.h"
 #include "stdint.h"
+#include <unistd.h>
 
 
 /*
@@ -220,7 +221,6 @@ extern int load_block P((unsigned char *, unsigned int, unsigned int, int ));
 
 /* misc.c */
 extern void twiddle P((void));
-extern void sleep P((int secs));
 extern void interruptible_sleep P((int secs));
 extern int strcasecmp P((const char *a, const char *b));
 extern char *substr P((const char *a, const char *b));

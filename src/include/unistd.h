@@ -4,6 +4,7 @@
 #include <stddef.h>
 #include <stdarg.h>
 
+extern unsigned int sleep ( unsigned int seconds );
 extern int execv ( const char *command, char * const argv[] );
 
 /**

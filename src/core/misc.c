@@ -75,12 +75,13 @@ int32_t random(void)
 /**************************************************************************
 SLEEP
 **************************************************************************/
-void sleep(int secs)
+unsigned int sleep(unsigned int secs)
 {
 	unsigned long tmo;
 
 	for (tmo = currticks()+secs*TICKS_PER_SEC; currticks() < tmo; ) {
 	}
+	return 0;
 }
 
 /**************************************************************************
@@ -89,7 +90,7 @@ INTERRUPTIBLE SLEEP
 void interruptible_sleep(int secs)
 {
 	printf("<sleep>\n");
-	return sleep(secs);
+	sleep(secs);
 }
 
 /**************************************************************************
