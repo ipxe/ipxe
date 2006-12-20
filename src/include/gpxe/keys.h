@@ -42,37 +42,41 @@
 
 #define BACKSPACE	CTRL_H
 #define TAB		CTRL_I
-#define ENTER		CTRL_M
+#define LF		CTRL_J
+#define CR		CTRL_M
 #define ESC		0x1b
 
 /*
  * Special keys outside the normal ASCII range 
  *
  *
- * These values are chosen to facilitate easy conversion from a
- * received ANSI escape sequence to a KEY_XXX constant.  The KEY_XXX
- * constant is simply 0x100 plus the first byte following CSI in the
- * ANSI escape sequence.  For example, KEY_LEFT is 0x144, since a left
- * cursor key is transmitted as the ANSI sequence "^[[D".
+ * The names are chosen to match those used by curses.  The values are
+ * chosen to facilitate easy conversion from a received ANSI escape
+ * sequence to a KEY_XXX constant.  The KEY_XXX constant is simply
+ * 0x100 plus the first byte following CSI in the ANSI escape
+ * sequence.  For example, KEY_LEFT is 0x144, since a left cursor key
+ * is transmitted as the ANSI sequence "^[[D".
  */
 
 #define KEY_ANSI( character ) ( 0x100 + (character) )
 
 #define KEY_MIN		0x101
-#define KEY_UP		KEY_ANSI ( 'A' )
-#define KEY_DOWN	KEY_ANSI ( 'B' )
-#define KEY_RIGHT	KEY_ANSI ( 'C' )
-#define KEY_LEFT	KEY_ANSI ( 'D' )
-#define KEY_END		KEY_ANSI ( 'E' )
-#define KEY_HOME	KEY_ANSI ( 'H' )
-#define KEY_PPAGE	KEY_ANSI ( '5' )
-#define KEY_NPAGE	KEY_ANSI ( '6' )
+#define KEY_UP		KEY_ANSI ( 'A' )	/**< Up arrow */
+#define KEY_DOWN	KEY_ANSI ( 'B' )	/**< Down arrow */
+#define KEY_RIGHT	KEY_ANSI ( 'C' )	/**< Right arrow */
+#define KEY_LEFT	KEY_ANSI ( 'D' )	/**< Left arrow */
+#define KEY_END		KEY_ANSI ( 'E' )	/**< End */
+#define KEY_HOME	KEY_ANSI ( 'H' )	/**< Home */
+#define KEY_IC		KEY_ANSI ( '2' )	/**< Insert */
+#define KEY_DC		KEY_ANSI ( '3' )	/**< Delete */
+#define KEY_PPAGE	KEY_ANSI ( '5' )	/**< Page up */
+#define KEY_NPAGE	KEY_ANSI ( '6' )	/**< Page down */
 #define KEY_MAX		0x1ff
 
 /* Not in the [KEY_MIN,KEY_MAX] range; terminals seem to send these as
  * normal ASCII values.
  */
 #define KEY_BACKSPACE	BACKSPACE
-#define KEY_ENTER	ENTER
+#define KEY_ENTER	LF
 
 #endif /* _GPXE_KEYS_H */
