@@ -176,8 +176,6 @@
 
 extern int errno;
 
-extern const char * strerror ( int errno );
-
 struct errortab {
 	int errno;
 	const char *text;
