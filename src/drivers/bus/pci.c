@@ -64,7 +64,7 @@ static unsigned long pci_bar ( struct pci_device *pci, unsigned int reg ) {
 			if ( sizeof ( unsigned long ) > sizeof ( uint32_t ) ) {
 				return ( ( ( uint64_t ) high << 32 ) | low );
 			} else {
-				DBG ( "Unhandled 64-bit BAR %08x%08x\n",
+				DBG ( "Unhandled 64-bit BAR %08lx%08lx\n",
 				      high, low );
 				return PCI_BASE_ADDRESS_MEM_TYPE_64;
 			}
