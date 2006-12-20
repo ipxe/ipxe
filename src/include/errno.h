@@ -151,23 +151,23 @@
 #define ENOENT		0xe8	/**< No such file or directory */
 #define ENOEXEC		0xe9	/**< Exec format error */
 #define ENOMSG		ENODATA	/**< No message of the desired type */
-#define ENOSPC		ENOMEM	/**< No space left on device */
-#define ENOSR		0xea	/**< No stream resources */
-#define ENOSTR		0xeb	/**< Not a stream */
-#define ENOSYS		0xec	/**< Function not implemented */
-#define ENOTCONN	0xed	/**< Transport endpoint is not connected */
-#define ENOTSOCK	0xee	/**< Socket operation on non-socket */
-#define EOPNOTSUPP	0xef	/**< Operation not supported */
+#define ENOSPC		0xea	/**< No space left on device */
+#define ENOSR		0xeb	/**< No stream resources */
+#define ENOSTR		0xec	/**< Not a stream */
+#define ENOSYS		0xed	/**< Function not implemented */
+#define ENOTCONN	0xee	/**< Transport endpoint is not connected */
+#define ENOTSOCK	0xef	/**< Socket operation on non-socket */
+#define EOPNOTSUPP	0xf0	/**< Operation not supported */
 #define ENOTSUP		EOPNOTSUPP /**< Not supported */
-#define ENOTTY		0xf0	/**< Inappropriate ioctl for device */
+#define ENOTTY		0xf1	/**< Inappropriate ioctl for device */
 #define ENXIO		ENODEV	/**< No such device or address */
-#define EOVERFLOW	0xf1	/**< Result too large */
+#define EOVERFLOW	0xf2	/**< Result too large */
 #define EPERM		EACCES	/**< Operation not permitted */
-#define EPROTO		0xf2	/**< Protocol error */
-#define EPROTONOSUPPORT	0xf3	/**< Protocol not supported */
-#define EPROTOTYPE	0xf4	/**< Protocol wrong type for socket */
+#define EPROTO		0xf3	/**< Protocol error */
+#define EPROTONOSUPPORT	0xf4	/**< Protocol not supported */
+#define EPROTOTYPE	0xf5	/**< Protocol wrong type for socket */
 #define ERANGE		EOVERFLOW /**< Result too large */
-#define ETIMEDOUT	0xf5	/**< Connection timed out */
+#define ETIMEDOUT	0xf6	/**< Connection timed out */
 #define EWOULDBLOCK	EAGAIN	/**< Resource temporarily unavailable */
 
 /* Data structures and declarations */
