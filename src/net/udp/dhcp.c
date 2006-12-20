@@ -506,6 +506,9 @@ static void dhcp_done ( struct dhcp_session *dhcp, int rc ) {
 		}
 	}
 
+	/* Close UDP connection */
+	udp_close ( &dhcp->udp );
+
 	/* Mark async operation as complete */
 	async_done ( &dhcp->aop, rc );
 }
