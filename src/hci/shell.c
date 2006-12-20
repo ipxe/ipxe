@@ -18,7 +18,7 @@
 
 #include <stdint.h>
 #include <stdlib.h>
-#include <console.h>
+#include <vsprintf.h>
 #include <readline/readline.h>
 #include <gpxe/command.h>
 #include <gpxe/shell.h>
