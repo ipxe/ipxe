@@ -23,6 +23,7 @@
 #include <console.h>
 #include <gpxe/settings.h>
 #include <gpxe/editbox.h>
+#include <gpxe/keys.h>
 #include <gpxe/settings_ui.h>
 
 /** @file
@@ -345,18 +346,19 @@ static int main_loop ( struct config_context *context ) {
 		draw_setting ( &widget );
 		color_set ( CPAIR_NORMAL, NULL );
 
-		key = getchar();
+		key = getkey();
 		if ( widget.editing ) {
 			key = edit_setting ( &widget, key );
 			switch ( key ) {
-			case 0x0a: /* Enter */
+			case CR:
+			case LF:
 				if ( ( rc = save_setting ( &widget ) ) != 0 ) {
 					alert ( " Could not set %s: %s ",
 						widget.setting->name,
 						strerror ( rc ) );
 				}
 				/* Fall through */
-			case 0x03: /* Ctrl-C */
+			case CTRL_C:
 				load_setting ( &widget );
 				break;
 			default:
@@ -366,15 +368,15 @@ static int main_loop ( struct config_context *context ) {
 		} else {
 			next = current;
 			switch ( key ) {
-			case '+':
+			case KEY_DOWN:
 				if ( next < ( NUM_SETTINGS - 1 ) )
 					next++;
 				break;
-			case '-':
+			case KEY_UP:
 				if ( next > 0 )
 					next--;
 				break;
-			case 0x13: /* Ctrl-S */
+			case CTRL_S:
 				if ( ( rc = nvo_save ( ugly_nvo_hack ) ) != 0){
 					alert ( " Could not save options: %s ",
 						strerror ( rc ) );
