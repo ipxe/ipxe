@@ -23,15 +23,17 @@
 #include <console.h>
 #include <gpxe/settings.h>
 #include <gpxe/editbox.h>
+#include <gpxe/settings_ui.h>
 
 /** @file
  *
- * Configuration settings UI
+ * Option configuration console
  *
  */
 
 #include <gpxe/nvo.h>
 extern struct nvo_block *ugly_nvo_hack;
+
 
 /* Colour pairs */
 #define CPAIR_NORMAL	1
@@ -40,11 +42,13 @@ extern struct nvo_block *ugly_nvo_hack;
 #define CPAIR_ALERT	4
 
 /* Screen layout */
-#define BANNER_ROW		1
+#define TITLE_ROW		1
 #define SETTINGS_LIST_ROW	3
 #define SETTINGS_LIST_COL	1
 #define INFO_ROW		20
 #define ALERT_ROW		20
+#define INSTRUCTION_ROW		22
+#define INSTRUCTION_PAD "     "
 
 /** Layout of text within a setting widget */
 struct setting_row {
@@ -69,7 +73,7 @@ struct setting_widget {
 	unsigned int col;
 	/** Edit box widget used for editing setting */
 	struct edit_box editbox;
-	/** Editing active flag */
+	/** Editing in progress flag */
 	int editing;
 	/** Buffer for setting's value */
 	char value[256]; /* enough size for a DHCP string */
@@ -275,6 +279,45 @@ static void alert ( const char *fmt, ... ) {
 	va_end ( args );
 }
 
+/**
+ * Draw title row
+ */
+static void draw_title_row ( void ) {
+	attron ( A_BOLD );
+	msg ( TITLE_ROW, "gPXE option configuration console" );
+	attroff ( A_BOLD );
+}
+
+/**
+ * Draw information row
+ *
+ * @v setting		Current configuration setting
+ */
+static void draw_info_row ( struct config_setting *setting ) {
+	clearmsg ( INFO_ROW );
+	attron ( A_BOLD );
+	msg ( INFO_ROW, "%s (%s) - %s", setting->name,
+	      setting->type->description, setting->description );
+	attroff ( A_BOLD );
+}
+
+/**
+ * Draw instruction row
+ *
+ * @v editing		Editing in progress flag
+ */
+static void draw_instruction_row ( int editing ) {
+	clearmsg ( INSTRUCTION_ROW );
+	if ( editing ) {
+		msg ( INSTRUCTION_ROW,
+		      "Enter - accept changes" INSTRUCTION_PAD
+		      "Ctrl-C - discard changes" );
+	} else {
+		msg ( INSTRUCTION_ROW,
+		      "Ctrl-S - save configuration" );
+	}
+}
+
 static void main_loop ( struct config_context *context ) {
 	struct setting_widget widget;
 	unsigned int current = 0;
@@ -284,21 +327,17 @@ static void main_loop ( struct config_context *context ) {
 	int rc;
 
 	/* Print initial screen content */
+	draw_title_row();
 	color_set ( CPAIR_NORMAL, NULL );
-	attron ( A_BOLD );
-	msg ( BANNER_ROW, "gPXE option configuration console" );
-	attroff ( A_BOLD );
 	for ( i = ( NUM_SETTINGS - 1 ) ; i >= 0 ; i-- ) {
 		init_setting_index ( &widget, context, i );
 		draw_setting ( &widget );
 	}
 
 	while ( 1 ) {
-		/* Redraw information row */
-		clearmsg ( INFO_ROW );
-		msg ( INFO_ROW, "%s (%s) - %s", widget.setting->name,
-		      widget.setting->type->description,
-		      widget.setting->description );
+		/* Redraw information and instruction rows */
+		draw_info_row ( widget.setting );
+		draw_instruction_row ( widget.editing );
 
 		/* Redraw current setting */
 		color_set ( ( widget.editing ? CPAIR_EDIT : CPAIR_SELECT ),
@@ -335,6 +374,12 @@ static void main_loop ( struct config_context *context ) {
 				if ( next > 0 )
 					next--;
 				break;
+			case 0x13: /* Ctrl-S */
+				if ( ( rc = nvo_save ( ugly_nvo_hack ) ) != 0){
+					alert ( " Could not save options: %s ",
+						strerror ( rc ) );
+				}
+				return;
 			default:
 				edit_setting ( &widget, key );
 				break;
@@ -349,11 +394,7 @@ static void main_loop ( struct config_context *context ) {
 	
 }
 
-void uitest ( void ) {
-	struct config_context dummy_context;
-
-	dummy_context.options = ugly_nvo_hack->options;
-
+void settings_ui ( struct config_context *context ) {
 	initscr();
 	start_color();
 	init_pair ( CPAIR_NORMAL, COLOR_WHITE, COLOR_BLUE );
@@ -363,7 +404,7 @@ void uitest ( void ) {
 	color_set ( CPAIR_NORMAL, NULL );
 	erase();
 	
-	main_loop ( &dummy_context );
+	main_loop ( context );
 
 	endwin();
 }
