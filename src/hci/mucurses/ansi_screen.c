@@ -4,15 +4,12 @@
 unsigned short _COLS = 80;
 unsigned short _LINES = 24;
 
-static void ansiscr_init ( struct _curses_screen *scr ) {
+static void ansiscr_reset ( struct _curses_screen *scr ) {
 	/* Reset terminal attributes and clear screen */
 	scr->attrs = 0;
 	scr->curs_x = 0;
 	scr->curs_y = 0;
 	printf ( "\033[0m\033[2J\033[1;1H" );
-}
-
-static void ansiscr_exit ( struct _curses_screen *scr __unused ) {
 }
 
 static void ansiscr_movetoyx ( struct _curses_screen *scr,
@@ -60,8 +57,8 @@ static bool ansiscr_peek ( struct _curses_screen *scr __unused ) {
 }
 
 SCREEN _ansi_screen = {
-	.init		= ansiscr_init,
-	.exit		= ansiscr_exit,
+	.init		= ansiscr_reset,
+	.exit		= ansiscr_reset,
 	.movetoyx	= ansiscr_movetoyx,
 	.putc		= ansiscr_putc,
 	.getc		= ansiscr_getc,
