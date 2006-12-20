@@ -140,6 +140,14 @@ REQUIRE_OBJECT ( pxe );
 #endif
 
 /*
+ * Drag in all requested commands
+ *
+ */
+#ifdef NVO_CMD
+REQUIRE_OBJECT ( nvo_cmd );
+#endif
+
+/*
  * Drag in miscellaneous objects
  *
  */

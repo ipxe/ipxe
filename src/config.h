@@ -112,6 +112,15 @@
 
 /* @BEGIN general.h
  *
+ * Command-line commands to include
+ *
+ */
+#define	NVO_CMD			/* Non-volatile option storage commands */
+
+/* @END general.h */ 
+
+/* @BEGIN general.h
+ *
  * Obscure configuration options
  *
  * You probably don't need to touch these.
