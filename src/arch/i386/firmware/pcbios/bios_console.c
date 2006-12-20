@@ -177,19 +177,89 @@ static void bios_putchar ( int character ) {
 }
 
 /**
+ * Pointer to current ANSI output sequence
+ *
+ * While we are in the middle of returning an ANSI sequence for a
+ * special key, this will point to the next character to return.  When
+ * not in the middle of such a sequence, this will point to a NUL
+ * (note: not "will be NULL").
+ */
+static const char *ansi_input = "";
+
+/**
+ * Lowest BIOS scancode of interest
+ *
+ * Most of the BIOS key scancodes that we are interested in are in a
+ * dense range, so subtracting a constant and treating them as offsets
+ * into an array works efficiently.
+ */
+#define BIOS_KEY_MIN 0x47
+
+/** Offset into list of interesting BIOS scancodes */
+#define BIOS_KEY(scancode) ( (scancode) - BIOS_KEY_MIN )
+
+/** Mapping from BIOS scan codes to ANSI escape sequences */
+static const char *ansi_sequences[] = {
+	[ BIOS_KEY ( 0x47 ) ] = "[H",	/* Home */
+	[ BIOS_KEY ( 0x48 ) ] = "[A",	/* Up arrow */
+	[ BIOS_KEY ( 0x4b ) ] = "[D",	/* Left arrow */
+	[ BIOS_KEY ( 0x4d ) ] = "[C",	/* Right arrow */
+	[ BIOS_KEY ( 0x4f ) ] = "[F",	/* End */
+	[ BIOS_KEY ( 0x50 ) ] = "[B",	/* Down arrow */
+	[ BIOS_KEY ( 0x53 ) ] = "[3~",	/* Delete */
+};
+
+/**
+ * Get ANSI escape sequence corresponding to BIOS scancode
+ *
+ * @v scancode		BIOS scancode
+ * @ret ansi_seq	ANSI escape sequence, if any, otherwise NULL
+ */
+static const char * scancode_to_ansi_seq ( unsigned int scancode ) {
+	unsigned int bios_key = BIOS_KEY ( scancode );
+	
+	if ( bios_key < ( sizeof ( ansi_sequences ) /
+			  sizeof ( ansi_sequences[0] ) ) ) {
+		return ansi_sequences[bios_key];
+	}
+	return NULL;
+}
+
+/**
  * Get character from BIOS console
  *
  * @ret character	Character read from console
  */
 static int bios_getchar ( void ) {
-	uint8_t character;
-	
+	uint16_t keypress;
+	unsigned int character;
+	char *ansi_seq;
+
+	/* If we are mid-sequence, pass out the next byte */
+	if ( ( character = *ansi_input ) ) {
+		ansi_input++;
+		return character;
+	}
+
+	/* Read character from real BIOS console */
 	__asm__ __volatile__ ( REAL_CODE ( "sti\n\t"
 					   "int $0x16\n\t"
 					   "cli\n\t" )
-			       : "=a" ( character ) : "a" ( 0x0000 ) );
+			       : "=a" ( keypress ) : "a" ( 0x1000 ) );
+	character = ( keypress & 0xff );
 
-	return character;
+	/* If it's a normal character, just return it */
+	if ( character )
+		return character;
+
+	/* Otherwise, check for a special key that we know about */
+	if ( ( ansi_seq = scancode_to_ansi_seq ( keypress >> 8 ) ) ) {
+		/* Start of escape sequence: return ESC (0x1b) */
+		ansi_input = ansi_seq;
+		return 0x1b;
+	}
+
+	return 0;
 }
 
 /**
@@ -201,7 +271,12 @@ static int bios_getchar ( void ) {
 static int bios_iskey ( void ) {
 	unsigned int discard_a;
 	unsigned int flags;
-	
+
+	/* If we are mid-sequence, we are always ready */
+	if ( *ansi_input )
+		return 1;
+
+	/* Otherwise check the real BIOS console */
 	__asm__ __volatile__ ( REAL_CODE ( "sti\n\t"
 					   "int $0x16\n\t"
 					   "pushfw\n\t"
@@ -209,7 +284,6 @@ static int bios_iskey ( void ) {
 					   "cli\n\t" )
 			       : "=r" ( flags ), "=a" ( discard_a )
 			       : "a" ( 0x0100 ) );
-	
 	return ( ! ( flags & ZF ) );
 }
 
