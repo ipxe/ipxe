@@ -62,31 +62,31 @@ void init_editbox ( struct edit_box *box, char *buf, size_t len,
 void draw_editbox ( struct edit_box *box ) {
 	size_t width = box->width;
 	char buf[ width + 1 ];
-	size_t keep_len;
-	signed int cursor_offset, underflow, overflow;
+	signed int cursor_offset, underflow, overflow, first;
 	size_t len;
 
 	/* Adjust starting offset so that cursor remains within box */
 	cursor_offset = ( box->string.cursor - box->first );
-	keep_len = strlen ( box->string.buf );
-	if ( keep_len > EDITBOX_MIN_CHARS )
-		keep_len = EDITBOX_MIN_CHARS;
-	underflow = ( keep_len - cursor_offset );
+	underflow = ( EDITBOX_MIN_CHARS - cursor_offset );
 	overflow = ( cursor_offset - ( width - 1 ) );
+	first = box->first;
 	if ( underflow > 0 ) {
-		box->first -= underflow;
+		first -= underflow;
+		if ( first < 0 )
+			first = 0;
 	} else if ( overflow > 0 ) {
-		box->first += overflow;
+		first += overflow;
 	}
-	cursor_offset = ( box->string.cursor - box->first );
+	box->first = first;
+	cursor_offset = ( box->string.cursor - first );
 
 	/* Construct underscore-padded string portion */
 	memset ( buf, '_', width );
 	buf[width] = '\0';
-	len = ( strlen ( box->string.buf ) - box->first );
+	len = ( strlen ( box->string.buf ) - first );
 	if ( len > width )
 		len = width;
-	memcpy ( buf, ( box->string.buf + box->first ), len );
+	memcpy ( buf, ( box->string.buf + first ), len );
 
 	/* Print box content and move cursor */
 	if ( ! box->win )
