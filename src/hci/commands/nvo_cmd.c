@@ -9,8 +9,6 @@
 #include <gpxe/settings.h>
 #include <gpxe/command.h>
 
-void nvo_cmd_req() {}
-
 extern struct nvo_block *ugly_nvo_hack;
 
 static int show_exec ( int argc, char **argv ) {
