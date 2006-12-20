@@ -18,6 +18,7 @@
 
 #include <assert.h>
 #include <string.h>
+#include <gpxe/keys.h>
 #include <gpxe/editstring.h>
 
 /** @file
@@ -124,6 +125,7 @@ static void kill_eol ( struct edit_string *string ) {
  */
 int edit_string ( struct edit_string *string, int key ) {
 	int retval = 0;
+	size_t len = strlen ( string->buf );
 
 	/* Prepare edit history */
 	string->last_cursor = string->cursor;
@@ -135,33 +137,39 @@ int edit_string ( struct edit_string *string, int key ) {
 		/* Printable character; insert at current position */
 		insert_character ( string, key );
 	} else switch ( key ) {
-	case 0x08: /* Ctrl-H */
+	case KEY_BACKSPACE:
 		/* Backspace */
 		backspace ( string );
 		break;
-	case 0x04: /* Ctrl-D */
+	case KEY_DC:
+	case CTRL_D:
 		/* Delete character */
 		delete_character ( string );
 		break;
-	case 0x0b: /* Ctrl-K */
+	case CTRL_K:
+		/* Delete to end of line */
 		kill_eol ( string );
 		break;
-	case 0x01: /* Ctrl-A */
+	case KEY_HOME:
+	case CTRL_A:
 		/* Start of line */
 		string->cursor = 0;
 		break;
-	case 0x05: /* Ctrl-E */
+	case KEY_END:
+	case CTRL_E:
 		/* End of line */
-		string->cursor = strlen ( string->buf );
+		string->cursor = len;
 		break;
-	case 0x02: /* Ctrl-B */
+	case KEY_LEFT:
+	case CTRL_B:
 		/* Cursor left */
 		if ( string->cursor > 0 )
 			string->cursor--;
 		break;
-	case 0x06: /* Ctrl-F */
+	case KEY_RIGHT:
+	case CTRL_F:
 		/* Cursor right */
-		if ( string->cursor < ( string->len - 1 ) )
+		if ( string->cursor < len )
 			string->cursor++;
 		break;
 	default:
