@@ -1,3 +1,4 @@
+#include <stddef.h>
 #include <curses.h>
 
 /** @file
@@ -17,6 +18,7 @@ WINDOW *initscr ( void ) {
 	stdscr->scr->init( stdscr->scr );
 	stdscr->height = LINES;
 	stdscr->width = COLS;
+	erase();
 	return stdscr;
 }
 
@@ -25,6 +27,9 @@ WINDOW *initscr ( void ) {
  *
  */
 int endwin ( void ) {
+	attrset ( 0 );
+	color_set ( 0, NULL );
+	erase();
 	stdscr->scr->exit( stdscr->scr );
 	return OK;
 }
