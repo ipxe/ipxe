@@ -100,5 +100,6 @@ struct console_driver {
 extern void putchar ( int character );
 extern int getchar ( void );
 extern int iskey ( void );
+extern int getkey ( void );
 
 #endif /* CONSOLE_H */
