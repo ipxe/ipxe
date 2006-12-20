@@ -212,7 +212,7 @@ static int set_string ( struct config_context *context,
 	option = set_dhcp_option ( context->options, setting->tag,
 				   value, strlen ( value ) );
 	if ( ! option )
-		return -ENOMEM;
+		return -ENOSPC;
 	return 0;
 }
 
@@ -261,12 +261,12 @@ static int set_ipv4 ( struct config_context *context,
 	struct in_addr ipv4;
 	int rc;
 	
-	if ( ( rc = inet_aton ( value, &ipv4 ) ) == 0 )
-		return rc;
+	if ( inet_aton ( value, &ipv4 ) == 0 )
+		return -EINVAL;
 	option = set_dhcp_option ( context->options, setting->tag,
 				   &ipv4, sizeof ( ipv4 ) );
 	if ( ! option )
-		return -ENOMEM;
+		return -ENOSPC;
 	return 0;
 }
 
@@ -330,7 +330,7 @@ static int set_int ( struct config_context *context,
 	option = set_dhcp_option ( context->options, setting->tag,
 				   &u.bytes[ sizeof ( u ) - size ], size );
 	if ( ! option )
-		return -ENOMEM;
+		return -ENOSPC;
 	return 0;
 }
 
