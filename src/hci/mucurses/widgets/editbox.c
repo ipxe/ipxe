@@ -94,22 +94,3 @@ void draw_editbox ( struct edit_box *box ) {
 	mvwprintw ( box->win, box->row, box->col, "%s", buf );
 	wmove ( box->win, box->row, ( box->col + cursor_offset ) );
 }
-
-/**
- * Edit text box widget
- *
- * @v box		Editable text box widget
- * @v key		Key pressed by user
- * @ret key		Key returned to application, or zero
- *
- */
-int edit_editbox ( struct edit_box *box, int key ) {
-
-	/* Update the string itself */
-	key = edit_string ( &box->string, key );
-
-	/* Update the display */
-	draw_editbox ( box );
-
-	return key;
-}

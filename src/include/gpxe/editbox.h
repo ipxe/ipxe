@@ -30,6 +30,20 @@ extern void init_editbox ( struct edit_box *box, char *buf, size_t len,
 			   WINDOW *win, unsigned int row, unsigned int col,
 			   unsigned int width );
 extern void draw_editbox ( struct edit_box *box );
-extern int edit_editbox ( struct edit_box *box, int key );
+
+/**
+ * Edit text box widget
+ *
+ * @v box		Editable text box widget
+ * @v key		Key pressed by user
+ * @ret key		Key returned to application, or zero
+ *
+ * You must call draw_editbox() to update the display after calling
+ * edit_editbox().
+ *
+ */
+static inline int edit_editbox ( struct edit_box *box, int key ) {
+	return edit_string ( &box->string, key );
+}
 
 #endif /* _GPXE_EDITBOX_H */
