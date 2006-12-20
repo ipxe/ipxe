@@ -345,7 +345,7 @@ static int set_int ( struct config_context *context,
 static int set_int8 ( struct config_context *context,
 			   struct config_setting *setting,
 			   const char *value ) {
-	return set_int ( context, setting, value, 8 );
+	return set_int ( context, setting, value, 1 );
 }
 
 /** An 8-bit integer configuration setting */
