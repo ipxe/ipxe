@@ -137,7 +137,7 @@ extern unsigned short _LINES;
 #define COLOR_PAIR(n)	COLOUR_PAIR(n)
 #define PAIR_NUMBER(attrs) ( ( (attrs) & A_COLOUR ) >> CPAIR_SHIFT )
 
-#define COLOUR_PAIRS	4 /* Arbitrary limit */
+#define COLOUR_PAIRS	8 /* Arbitrary limit */
 #define COLOR_PAIRS	COLOUR_PAIRS
 
 #define ACS_ULCORNER	'+'
