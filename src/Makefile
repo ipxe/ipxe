@@ -144,9 +144,7 @@ SRCDIRS		+= drivers/bitbash
 SRCDIRS		+= interface/pxe
 SRCDIRS		+= tests
 SRCDIRS		+= crypto
-SRCDIRS		+= hci hci/mucurses
-SRCDIRS		+= commandline
-SRCDIRS		+= commandline/commands
+SRCDIRS		+= hci hci/commands hci/mucurses
 
 # NON_AUTO_SRCS lists files that are excluded from the normal
 # automatic build system.
