@@ -1,6 +1,6 @@
-#include "etherboot.h"
-#include "errno.h"
-#include "vsprintf.h"
+#include <errno.h>
+#include <console.h>
+#include <gpxe/errortab.h>
 
 /** @file
  *

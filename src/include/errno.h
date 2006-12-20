@@ -170,17 +170,6 @@
 #define ETIMEDOUT	0xf6	/**< Connection timed out */
 #define EWOULDBLOCK	EAGAIN	/**< Resource temporarily unavailable */
 
-/* Data structures and declarations */
-
-#include <gpxe/tables.h>
-
 extern int errno;
-
-struct errortab {
-	int errno;
-	const char *text;
-};
-
-#define __errortab __table(errortab,01)
 
 #endif /* ERRNO_H */

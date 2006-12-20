@@ -1,4 +1,4 @@
-#include "errno.h"
+#include <gpxe/errortab.h>
 
 /*
  * This table was generated from the relevant section of errno.h using
