@@ -318,7 +318,7 @@ static void draw_instruction_row ( int editing ) {
 	}
 }
 
-static void main_loop ( struct config_context *context ) {
+static int main_loop ( struct config_context *context ) {
 	struct setting_widget widget;
 	unsigned int current = 0;
 	unsigned int next;
@@ -379,7 +379,7 @@ static void main_loop ( struct config_context *context ) {
 					alert ( " Could not save options: %s ",
 						strerror ( rc ) );
 				}
-				return;
+				return rc;
 			default:
 				edit_setting ( &widget, key );
 				break;
@@ -394,7 +394,9 @@ static void main_loop ( struct config_context *context ) {
 	
 }
 
-void settings_ui ( struct config_context *context ) {
+int settings_ui ( struct config_context *context ) {
+	int rc;
+
 	initscr();
 	start_color();
 	init_pair ( CPAIR_NORMAL, COLOR_WHITE, COLOR_BLUE );
@@ -404,7 +406,9 @@ void settings_ui ( struct config_context *context ) {
 	color_set ( CPAIR_NORMAL, NULL );
 	erase();
 	
-	main_loop ( context );
+	rc = main_loop ( context );
 
 	endwin();
+
+	return rc;
 }

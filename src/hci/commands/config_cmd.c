@@ -11,6 +11,7 @@ extern struct nvo_block *ugly_nvo_hack;
 
 static int config_exec ( int argc, char **argv ) {
 	struct config_context dummy_context;
+	int rc;
 
 	if ( argc != 1 ) {
 		printf ( "Usage: %s\n"
@@ -24,7 +25,11 @@ static int config_exec ( int argc, char **argv ) {
 	}
 
 	dummy_context.options = ugly_nvo_hack->options;
-	settings_ui ( &dummy_context );
+	if ( ( rc = settings_ui ( &dummy_context ) ) != 0 ) {
+		printf ( "Could not save settings: %s\n",
+			 strerror ( rc ) );
+		return 1;
+	}
 
 	return 0;
 }
