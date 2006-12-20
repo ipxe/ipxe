@@ -19,6 +19,7 @@
 #include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
+#include <strings.h>
 #include <byteswap.h>
 #include <errno.h>
 #include <assert.h>
@@ -56,7 +57,7 @@ find_config_setting_type ( const char *name ) {
 
 	for ( type = config_setting_types ; type < config_setting_types_end ;
 	      type++ ) {
-		if ( strcmp ( name, type->name ) == 0 )
+		if ( strcasecmp ( name, type->name ) == 0 )
 			return type;
 	}
 	return NULL;
@@ -73,7 +74,7 @@ static struct config_setting * find_config_setting ( const char *name ) {
 
 	for ( setting = config_settings ; setting < config_settings_end ;
 	      setting++ ) {
-		if ( strcmp ( name, setting->name ) == 0 )
+		if ( strcasecmp ( name, setting->name ) == 0 )
 			return setting;
 	}
 	return NULL;
@@ -216,6 +217,7 @@ static int set_string ( struct config_context *context,
 /** A string configuration setting */
 struct config_setting_type config_setting_type_string __config_setting_type = {
 	.name = "string",
+	.description = "Text string",
 	.show = show_string,
 	.set = set_string,
 };
@@ -269,6 +271,7 @@ static int set_ipv4 ( struct config_context *context,
 /** An IPv4 configuration setting */
 struct config_setting_type config_setting_type_ipv4 __config_setting_type = {
 	.name = "ipv4",
+	.description = "IPv4 address",
 	.show = show_ipv4,
 	.set = set_ipv4,
 };
@@ -348,6 +351,7 @@ static int set_int8 ( struct config_context *context,
 /** An 8-bit integer configuration setting */
 struct config_setting_type config_setting_type_int8 __config_setting_type = {
 	.name = "int8",
+	.description = "8-bit integer",
 	.show = show_int,
 	.set = set_int8,
 };
@@ -355,31 +359,37 @@ struct config_setting_type config_setting_type_int8 __config_setting_type = {
 /** Some basic setting definitions */
 struct config_setting ip_config_setting __config_setting = {
 	.name = "ip",
+	.description = "IP address of this machine (e.g. 192.168.0.1)",
 	.tag = DHCP_EB_YIADDR,
 	.type = &config_setting_type_ipv4,
 };
 struct config_setting hostname_config_setting __config_setting = {
 	.name = "hostname",
+	.description = "Host name of this machine",
 	.tag = DHCP_HOST_NAME,
 	.type = &config_setting_type_string,
 };
 struct config_setting username_config_setting __config_setting = {
 	.name = "username",
+	.description = "User name for authentication to servers",
 	.tag = DHCP_EB_USERNAME,
 	.type = &config_setting_type_string,
 };
 struct config_setting password_config_setting __config_setting = {
 	.name = "password",
+	.description = "Password for authentication to servers",
 	.tag = DHCP_EB_PASSWORD,
 	.type = &config_setting_type_string,
 };
 struct config_setting root_path_config_setting __config_setting = {
 	.name = "root-path",
+	.description = "NFS/iSCSI root path",
 	.tag = DHCP_ROOT_PATH,
 	.type = &config_setting_type_string,
 };
 struct config_setting priority_config_setting __config_setting = {
 	.name = "priority",
+	.description = "Priority of these options",
 	.tag = DHCP_EB_PRIORITY,
 	.type = &config_setting_type_int8,
 };

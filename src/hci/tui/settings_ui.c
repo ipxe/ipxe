@@ -16,6 +16,7 @@
  * Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
  */
 
+#include <stdarg.h>
 #include <unistd.h>
 #include <string.h>
 #include <curses.h>
@@ -39,8 +40,10 @@ extern struct nvo_block *ugly_nvo_hack;
 #define CPAIR_ALERT	4
 
 /* Screen layout */
+#define BANNER_ROW		1
 #define SETTINGS_LIST_ROW	3
 #define SETTINGS_LIST_COL	1
+#define INFO_ROW		20
 #define ALERT_ROW		20
 
 /** Layout of text within a setting widget */
@@ -203,21 +206,72 @@ static void init_setting_index ( struct setting_widget *widget,
 		       ( SETTINGS_LIST_ROW + index ), SETTINGS_LIST_COL );
 }
 
-static void alert ( const char *fmt, ... ) {
+/**
+ * Print message centred on specified row
+ *
+ * @v row		Row
+ * @v fmt		printf() format string
+ * @v args		printf() argument list
+ */
+static void vmsg ( unsigned int row, const char *fmt, va_list args ) {
 	char buf[COLS];
-	va_list args;
 	size_t len;
 
-	va_start ( args, fmt );
 	len = vsnprintf ( buf, sizeof ( buf ), fmt, args );
-	va_end ( args );
+	mvprintw ( row, ( ( COLS - len ) / 2 ), "%s", buf );
+}
 
+/**
+ * Print message centred on specified row
+ *
+ * @v row		Row
+ * @v fmt		printf() format string
+ * @v ..		printf() arguments
+ */
+static void msg ( unsigned int row, const char *fmt, ... ) {
+	va_list args;
+
+	va_start ( args, fmt );
+	vmsg ( row, fmt, args );
+	va_end ( args );
+}
+
+/**
+ * Clear message on specified row
+ *
+ * @v row		Row
+ */
+static void clearmsg ( unsigned int row ) {
+	move ( row, 0 );
+	clrtoeol();
+}
+
+/**
+ * Print alert message
+ *
+ * @v fmt		printf() format string
+ * @v args		printf() argument list
+ */
+static void valert ( const char *fmt, va_list args ) {
 	color_set ( CPAIR_ALERT, NULL );
-	mvprintw ( ALERT_ROW, ( ( COLS - len ) / 2 ), "%s", buf );
+	vmsg ( ALERT_ROW, fmt, args );
 	sleep ( 2 );
 	color_set ( CPAIR_NORMAL, NULL );
-	move ( ALERT_ROW, 0 );
-	clrtoeol();
+	clearmsg ( ALERT_ROW );
+}
+
+/**
+ * Print alert message
+ *
+ * @v fmt		printf() format string
+ * @v ...		printf() arguments
+ */
+static void alert ( const char *fmt, ... ) {
+	va_list args;
+
+	va_start ( args, fmt );
+	valert ( fmt, args );
+	va_end ( args );
 }
 
 static void main_loop ( struct config_context *context ) {
@@ -230,12 +284,21 @@ static void main_loop ( struct config_context *context ) {
 
 	/* Print initial screen content */
 	color_set ( CPAIR_NORMAL, NULL );
+	attron ( A_BOLD );
+	msg ( BANNER_ROW, "gPXE option configuration console" );
+	attroff ( A_BOLD );
 	for ( i = ( NUM_SETTINGS - 1 ) ; i >= 0 ; i-- ) {
 		init_setting_index ( &widget, context, i );
 		draw_setting ( &widget );
 	}
 
 	while ( 1 ) {
+		/* Redraw information row */
+		clearmsg ( INFO_ROW );
+		msg ( INFO_ROW, "%s (%s) - %s", widget.setting->name,
+		      widget.setting->type->description,
+		      widget.setting->description );
+
 		/* Redraw current setting */
 		color_set ( ( widget.editing ? CPAIR_EDIT : CPAIR_SELECT ),
 			    NULL );
@@ -293,7 +356,7 @@ void uitest ( void ) {
 	initscr();
 	start_color();
 	init_pair ( CPAIR_NORMAL, COLOR_WHITE, COLOR_BLUE );
-	init_pair ( CPAIR_SELECT, COLOR_BLACK, COLOR_WHITE );
+	init_pair ( CPAIR_SELECT, COLOR_WHITE, COLOR_RED );
 	init_pair ( CPAIR_EDIT, COLOR_BLACK, COLOR_CYAN );
 	init_pair ( CPAIR_ALERT, COLOR_WHITE, COLOR_RED );
 	color_set ( CPAIR_NORMAL, NULL );

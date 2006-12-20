@@ -40,6 +40,8 @@ struct config_setting_type {
 	 * This is the name exposed to the user (e.g. "string").
 	 */
 	const char *name;
+	/** Description */
+	const char *description;
 	/** Show value of setting
 	 *
 	 * @v context		Configuration context
@@ -79,6 +81,8 @@ struct config_setting {
 	 * dhcp-options(5)).
 	 */
 	const char *name;
+	/** Description */
+	const char *description;
 	/** DHCP option tag
 	 *
 	 * This is the DHCP tag used to identify the option in DHCP
