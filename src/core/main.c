@@ -31,6 +31,8 @@ Literature dealing with the network protocols:
 #include <gpxe/device.h>
 #include <gpxe/heap.h>
 #include <gpxe/netdevice.h>
+#include <gpxe/shell.h>
+#include <gpxe/shell_banner.h>
 
 /* Linker symbols */
 extern char _bss[], _ebss[];
@@ -155,9 +157,12 @@ int main ( void ) {
 	call_init_fns ();
 	probe_devices();
 
+	if ( shell_banner() ) {
+		shell();
+	}
+
 	netdev = next_netdev ();
 	if ( netdev ) {
-		cmdl_start();
 		test_dhcp ( netdev );
 	} else {
 		printf ( "No network device found\n" );
