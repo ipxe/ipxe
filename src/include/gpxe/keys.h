@@ -65,7 +65,7 @@
 #define KEY_DOWN	KEY_ANSI ( 'B' )	/**< Down arrow */
 #define KEY_RIGHT	KEY_ANSI ( 'C' )	/**< Right arrow */
 #define KEY_LEFT	KEY_ANSI ( 'D' )	/**< Left arrow */
-#define KEY_END		KEY_ANSI ( 'E' )	/**< End */
+#define KEY_END		KEY_ANSI ( 'F' )	/**< End */
 #define KEY_HOME	KEY_ANSI ( 'H' )	/**< Home */
 #define KEY_IC		KEY_ANSI ( '2' )	/**< Insert */
 #define KEY_DC		KEY_ANSI ( '3' )	/**< Delete */
