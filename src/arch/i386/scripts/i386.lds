@@ -65,6 +65,8 @@ SECTIONS {
     . = _text16_link_addr;
     _text16 = .;
 
+    . += 1;			/* Prevent NULL being valid */
+
     .text16 : AT ( _text16_load_offset + __text16 ) {
 	__text16 = .;
 	*(.text16)
@@ -77,6 +79,8 @@ SECTIONS {
     _data16_link_addr = 0;
     . = _data16_link_addr;
     _data16 = .;
+
+    . += 1;			/* Prevent NULL being valid */
 
     .rodata16 : AT ( _data16_load_offset + __rodata16 ) {
 	__rodata16 = .;
@@ -114,6 +118,8 @@ SECTIONS {
     _textdata = .;
 
     _text = .;
+
+    . += 1;			/* Prevent NULL being valid */
 
     .text : AT ( _textdata_load_offset + __text ) {
 	__text = .;
