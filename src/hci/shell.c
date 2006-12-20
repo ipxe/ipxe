@@ -39,8 +39,15 @@ static const char shell_prompt[] = "gPXE> ";
 static int exit_flag = 0;
 
 /** "exit" command body */
-static int exit_exec ( int argc __unused, char **argv __unused ) {
-	exit_flag = 1;
+static int exit_exec ( int argc, char **argv __unused ) {
+
+	if ( argc == 1 ) {
+		exit_flag = 1;
+	} else {
+		printf ( "Usage: exit\n"
+			 "Exits the command shell\n" );
+	}
+
 	return 0;
 }
 
