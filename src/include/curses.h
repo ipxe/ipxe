@@ -295,10 +295,10 @@ extern unsigned short _LINES;
 //extern int attroff ( int );
 //extern int attron ( int );
 //extern int attrset ( int );
-extern int attr_get ( attr_t *, short *, void * );
-extern int attr_off ( attr_t, void * );
-extern int attr_on ( attr_t, void * );
-extern int attr_set ( attr_t, short, void * );
+//extern int attr_get ( attr_t *, short *, void * );
+//extern int attr_off ( attr_t, void * );
+//extern int attr_on ( attr_t, void * );
+//extern int attr_set ( attr_t, short, void * );
 extern int baudrate ( void );
 extern int beep ( void );
 //extern void bkgdset ( chtype );
@@ -586,6 +586,22 @@ static inline int attron ( int attrs ) {
 
 static inline int attrset ( int attrs ) {
 	return wattrset ( stdscr, attrs );
+}
+
+static inline int attr_get ( attr_t *attrs, short *pair, void *opts ) {
+	return wattr_get ( stdscr, attrs, pair, opts );
+}
+
+static inline int attr_off ( attr_t attrs, void *opts ) {
+	return wattr_off ( stdscr, attrs, opts );
+}
+
+static inline int attr_on ( attr_t attrs, void *opts ) {
+	return wattr_on ( stdscr, attrs, opts );
+}
+
+static inline int attr_set ( attr_t attrs, short cpair, void *opts ) {
+	return wattr_set ( stdscr, attrs, cpair, opts );
 }
 
 static inline void bkgdset ( chtype ch ) {
