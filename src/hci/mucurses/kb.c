@@ -67,7 +67,7 @@ int wgetch ( WINDOW *win ) {
 	c = _wgetc( win );
 
 	if ( m_echo ) {
-		if ( c >= 0401 && c <= 0633 ) {
+		if ( c >= KEY_MIN ) {
 			switch(c) {
 			case KEY_LEFT :
 			case KEY_BACKSPACE :
@@ -112,7 +112,7 @@ int wgetnstr ( WINDOW *win, char *str, int n ) {
 			_wcursback( win );
 			wdelch( win );
 		} else {
-			if ( c >= 0401 && c <= 0633 ) {
+			if ( c >= KEY_MIN ) {
 				switch(c) {
 				case KEY_LEFT :
 				case KEY_BACKSPACE :

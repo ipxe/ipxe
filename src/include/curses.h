@@ -194,6 +194,7 @@ extern unsigned short _LINES;
 /*
  * KEY code constants
  */
+#define KEY_MIN		0401		/**< Minimum special key */
 #define KEY_BREAK	0401		/**< Break key */
 #define KEY_DOWN	0402		/**< down-arrow key */
 #define KEY_UP		0403		/**< up-arrow key */
