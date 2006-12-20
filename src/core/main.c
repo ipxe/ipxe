@@ -144,8 +144,6 @@ static int initialized;
 
 static int exit_status;
 
-void test_dhcp ( struct net_device *netdev );
-
 /**************************************************************************
 MAIN - Kick off routine
 **************************************************************************/
