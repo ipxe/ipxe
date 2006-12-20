@@ -19,6 +19,7 @@
 #include <string.h>
 #include <stdlib.h>
 #include <console.h>
+#include <gpxe/keys.h>
 #include <gpxe/editstring.h>
 #include <readline/readline.h>
 
@@ -92,17 +93,17 @@ char * readline ( const char *prompt ) {
 
 	buf[0] = '\0';
 	while ( 1 ) {
-		key = edit_string ( &string, getchar() );
+		key = edit_string ( &string, getkey() );
 		sync_console ( &string );
 		switch ( key ) {
-		case 0x0d: /* Carriage return */
-		case 0x0a: /* Line feed */
+		case CR:
+		case LF:
 			putchar ( '\n' );
 			line = strdup ( buf );
 			if ( ! line )
 				printf ( "Out of memory\n" );
 			return line;
-		case 0x03: /* Ctrl-C */
+		case CTRL_C:
 			putchar ( '\n' );
 			return NULL;
 		default:
