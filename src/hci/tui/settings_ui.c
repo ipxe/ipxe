@@ -16,6 +16,7 @@
  * Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
  */
 
+#include <unistd.h>
 #include <string.h>
 #include <curses.h>
 #include <console.h>
@@ -35,10 +36,12 @@ extern struct nvo_block *ugly_nvo_hack;
 #define CPAIR_NORMAL	1
 #define CPAIR_SELECT	2
 #define CPAIR_EDIT	3
+#define CPAIR_ALERT	4
 
 /* Screen layout */
 #define SETTINGS_LIST_ROW	3
 #define SETTINGS_LIST_COL	1
+#define ALERT_ROW		20
 
 /** Layout of text within a setting widget */
 struct setting_row {
@@ -107,7 +110,6 @@ static void load_setting ( struct setting_widget *widget ) {
  * @v widget		Setting widget
  */
 static int save_setting ( struct setting_widget *widget ) {
-	widget->editing = 0;
 	return widget->setting->type->set ( widget->context, widget->setting,
 					    widget->value );
 }
@@ -203,6 +205,23 @@ static void init_setting_index ( struct setting_widget *widget,
 		       ( SETTINGS_LIST_ROW + index ), SETTINGS_LIST_COL );
 }
 
+static void alert ( const char *fmt, ... ) {
+	char buf[COLS];
+	va_list args;
+	size_t len;
+
+	va_start ( args, fmt );
+	len = vsnprintf ( buf, sizeof ( buf ), fmt, args );
+	va_end ( args );
+
+	color_set ( CPAIR_ALERT, NULL );
+	mvprintw ( ALERT_ROW, ( ( COLS - len ) / 2 ), "%s", buf );
+	sleep ( 2 );
+	color_set ( CPAIR_NORMAL, NULL );
+	move ( ALERT_ROW, 0 );
+	clrtoeol();
+}
+
 static void main_loop ( struct config_context *context ) {
 	struct setting_widget widget;
 	unsigned int current = 0;
@@ -231,9 +250,11 @@ static void main_loop ( struct config_context *context ) {
 			switch ( key ) {
 			case 0x0a: /* Enter */
 				if ( ( rc = save_setting ( &widget ) ) != 0 ) {
-					
+					alert ( " Could not set %s: %s ",
+						widget.setting->name,
+						strerror ( -rc ) );
 				}
-				break;
+				/* Fall through */
 			case 0x03: /* Ctrl-C */
 				load_setting ( &widget );
 				break;
@@ -274,8 +295,9 @@ void uitest ( void ) {
 	initscr();
 	start_color();
 	init_pair ( CPAIR_NORMAL, COLOR_WHITE, COLOR_BLUE );
-	init_pair ( CPAIR_SELECT, COLOR_WHITE, COLOR_RED );
-	init_pair ( CPAIR_EDIT, COLOR_BLACK, COLOR_GREEN );
+	init_pair ( CPAIR_SELECT, COLOR_BLACK, COLOR_WHITE );
+	init_pair ( CPAIR_EDIT, COLOR_BLACK, COLOR_CYAN );
+	init_pair ( CPAIR_ALERT, COLOR_WHITE, COLOR_RED );
 	color_set ( CPAIR_NORMAL, NULL );
 	erase();
 	
