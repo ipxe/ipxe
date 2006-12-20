@@ -150,26 +150,19 @@ void test_dhcp ( struct net_device *netdev );
 MAIN - Kick off routine
 **************************************************************************/
 int main ( void ) {
-	struct net_device *netdev;
 
 	/* Call all registered initialisation functions */
 	init_heap();
 	call_init_fns ();
 	probe_devices();
 
-	if ( shell_banner() ) {
-		shell();
+	/* Try autobooting if we're not going straight to the shell */
+	if ( ! shell_banner() ) {
+		autoboot();
 	}
-
-	netdev = next_netdev ();
-	if ( netdev ) {
-		test_dhcp ( netdev );
-	} else {
-		printf ( "No network device found\n" );
-	}
-
-	printf ( "Press any key to exit\n" );
-	getchar();
+	
+	/* Autobooting failed or the user wanted the shell */
+	shell();
 
 	remove_devices();
 	call_exit_fns ();

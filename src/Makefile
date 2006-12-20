@@ -146,6 +146,7 @@ SRCDIRS		+= tests
 SRCDIRS		+= crypto
 SRCDIRS		+= hci hci/commands hci/tui
 SRCDIRS		+= hci/mucurses hci/mucurses/widgets
+SRCDIRS		+= usr
 
 # NON_AUTO_SRCS lists files that are excluded from the normal
 # automatic build system.

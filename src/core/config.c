@@ -143,6 +143,9 @@ REQUIRE_OBJECT ( pxe );
  * Drag in all requested commands
  *
  */
+#ifdef BOOT_CMD
+REQUIRE_OBJECT ( boot_cmd );
+#endif
 #ifdef NVO_CMD
 REQUIRE_OBJECT ( nvo_cmd );
 #endif
