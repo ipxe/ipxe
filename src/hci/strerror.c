@@ -53,8 +53,7 @@ const char * strerror ( int errno ) {
 }
 
 /** The most common errors */
-struct errortab common_errortab[] __errortab = {
-	{ ENOMEM, "Out of memory" },
-	{ EINVAL, "Invalid argument" },
-	{ ENOSPC, "No space left on device" },
-};
+struct errortab enoem __errortab = { ENOMEM, "Out of memory" };
+struct errortab einval __errortab = { EINVAL, "Invalid argument" };
+struct errortab enospc __errortab = { ENOSPC, "No space left on device" };
+struct errortab eio __errortab = { EIO, "Input/output error" };
