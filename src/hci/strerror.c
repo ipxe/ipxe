@@ -38,6 +38,10 @@ const char * strerror ( int errno ) {
 	static char *generic_message = "Error 0x0000";
 	struct errortab *errortab;
 
+	/* Allow for strerror(rc) as well as strerror(errno) */
+	if ( errno < 0 )
+		errno = -errno;
+
 	for ( errortab = errortab_start ; errortab < errortab_end ;
 	      errortab++ ) {
 		if ( errortab->errno == errno )
@@ -47,3 +51,10 @@ const char * strerror ( int errno ) {
 	sprintf ( generic_message + 8, "%hx", errno );
 	return generic_message;
 }
+
+/** The most common errors */
+struct errortab common_errortab[] __errortab = {
+	{ ENOMEM, "Out of memory" },
+	{ EINVAL, "Invalid argument" },
+	{ ENOSPC, "No space left on device" },
+};
