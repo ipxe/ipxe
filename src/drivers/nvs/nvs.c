@@ -93,7 +93,7 @@ static int nvs_verify ( struct nvs_device *nvs, unsigned int address,
 	if ( memcmp ( data, read_data, len ) != 0 ) {
 		DBG ( "NVS %p verification failed at %#04x+%d\n",
 		      nvs, address, len );
-		return -EINVAL;
+		return -EIO;
 	}
 
 	return 0;
