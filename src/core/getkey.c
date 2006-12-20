@@ -69,7 +69,7 @@ int getkey ( void ) {
 			continue;
 		if ( ! key )
 			key = KEY_ANSI ( character );
-		if ( ( character >= 0x40 ) && ( character <= 0x4f ) )
+		if ( character >= 0x40 )
 			break;
 	}
 
