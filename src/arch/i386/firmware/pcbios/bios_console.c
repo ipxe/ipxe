@@ -249,7 +249,7 @@ static int bios_getchar ( void ) {
 	character = ( keypress & 0xff );
 
 	/* If it's a normal character, just return it */
-	if ( character < 0x80 )
+	if ( character && ( character < 0x80 ) )
 		return character;
 
 	/* Otherwise, check for a special key that we know about */
