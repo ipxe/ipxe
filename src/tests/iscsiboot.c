@@ -1,4 +1,5 @@
 #include <stdint.h>
+#include <string.h>
 #include <byteswap.h>
 #include <vsprintf.h>
 #include <gpxe/netdevice.h>
@@ -30,7 +31,8 @@ int test_iscsiboot ( const char *initiator_iqn,
 
 	printf ( "Initialising %s\n", target_iqn );
 	if ( ( rc = init_iscsidev ( &test_iscsidev ) ) != 0 ) {
-		printf ( "Could not reach %s\n", target_iqn );
+		printf ( "Could not reach %s: %s\n", target_iqn,
+			 strerror ( errno ) );
 		return rc;
 	}
 	ibft_fill_data ( netdev, initiator_iqn, target, target_iqn );
