@@ -4,9 +4,7 @@
 /* Placeholder file */
 
 static inline int ibft_fill_data ( struct net_device *netdev __unused,
-				   const char *initiator_iqn __unused,
-				   struct sockaddr_tcpip *st_target __unused,
-				   const char *target_iqn __unused ) {
+				   struct iscsi_session *iscsi __unused ) {
 	return 0;
 }
  

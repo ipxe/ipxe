@@ -35,7 +35,7 @@ int test_iscsiboot ( const char *initiator_iqn,
 			 strerror ( rc ) );
 		return rc;
 	}
-	ibft_fill_data ( netdev, initiator_iqn, target, target_iqn );
+	ibft_fill_data ( netdev, &test_iscsidev.iscsi );
 	memset ( &drive, 0, sizeof ( drive ) );
 	drive.drive = drivenum;
 	drive.blockdev = &test_iscsidev.scsi.blockdev;
