@@ -393,3 +393,9 @@ struct config_setting priority_config_setting __config_setting = {
 	.tag = DHCP_EB_PRIORITY,
 	.type = &config_setting_type_int8,
 };
+struct config_setting iscsi_initiator_setting __config_setting = {
+	.name = "initiator-iqn",
+	.description = "iSCSI qualified name of this machine",
+	.tag = DHCP_ISCSI_INITIATOR_IQN,
+	.type = &config_setting_type_string,
+};
