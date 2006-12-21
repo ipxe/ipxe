@@ -3365,7 +3365,7 @@ PROBE - Look for an adapter, this routine's visible to the outside
 ***************************************************************************/
 static int etherfabric_probe ( struct nic *nic, struct pci_device *pci ) {
 	static struct efab_nic efab;
-	static int nic_port = 0;
+	static int nic_port = 1;
 	struct efab_buffers *buffers;
 	int i;
 
