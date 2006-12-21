@@ -104,24 +104,6 @@ static void iscsi_done ( struct iscsi_session *iscsi, int rc ) {
 	async_done ( &iscsi->aop, rc );
 }
 
-/**
- * Mark iSCSI operation as complete, and close TCP connection
- *
- * @v iscsi		iSCSI session
- * @v rc		Return status code
- */
-static void iscsi_close ( struct iscsi_session *iscsi, int rc ) {
-
-	/* Clear session status */
-	iscsi->status = 0;
-
-	/* Close TCP connection */
-	tcp_close ( &iscsi->tcp );
-
-	/* Mark iSCSI operation as complete */
-	iscsi_done ( iscsi, rc );
-}
-
 /****************************************************************************
  *
  * iSCSI SCSI command issuing
@@ -564,7 +546,7 @@ static void iscsi_handle_chap_a_value ( struct iscsi_session *iscsi,
 	/* Prepare for CHAP with MD5 */
 	if ( ( rc = chap_init ( &iscsi->chap, &md5_algorithm ) ) != 0 ) {
 		DBG ( "iSCSI %p could not initialise CHAP\n", iscsi );
-		iscsi_close ( iscsi, rc );
+		iscsi_done ( iscsi, rc );
 	}
 }
 
@@ -722,7 +704,7 @@ static void iscsi_rx_login_response ( struct iscsi_session *iscsi, void *data,
 	/* Buffer up the PDU data */
 	if ( ( rc = iscsi_rx_buffered_data ( iscsi, data, len ) ) != 0 ) {
 		DBG ( "iSCSI %p could not buffer login response\n", iscsi );
-		iscsi_close ( iscsi, rc );
+		iscsi_done ( iscsi, rc );
 		return;
 	}
 	if ( remaining )
@@ -747,7 +729,7 @@ static void iscsi_rx_login_response ( struct iscsi_session *iscsi, void *data,
 	if ( response->status_class != 0 ) {
 		printf ( "iSCSI login failure: class %02x detail %02x\n",
 			 response->status_class, response->status_detail );
-		iscsi_close ( iscsi, -EPERM );
+		iscsi_done ( iscsi, -EPERM );
 		return;
 	}
 
@@ -765,7 +747,7 @@ static void iscsi_rx_login_response ( struct iscsi_session *iscsi, void *data,
 		default:
 			DBG ( "iSCSI %p got invalid response flags %02x\n",
 			      iscsi, response->flags );
-			iscsi_close ( iscsi, -EIO );
+			iscsi_done ( iscsi, -EIO );
 			return;
 		}
 	}
@@ -1122,9 +1104,16 @@ static void iscsi_newdata ( struct tcp_connection *conn, void *data,
  */
 static void iscsi_closed ( struct tcp_connection *conn, int status ) {
 	struct iscsi_session *iscsi = tcp_to_iscsi ( conn );
+	int session_status = iscsi->status;
 
 	/* Clear session status */
 	iscsi->status = 0;
+
+	/* If we are deliberately closing down, exit cleanly */
+	if ( session_status & ISCSI_STATUS_CLOSING ) {
+		iscsi_done ( iscsi, status );
+		return;
+	}
 
 	/* Retry connection if within the retry limit, otherwise fail */
 	if ( ++iscsi->retry_count <= ISCSI_MAX_RETRIES ) {
@@ -1190,5 +1179,19 @@ struct async_operation * iscsi_issue ( struct iscsi_session *iscsi,
 		tcp_connect ( &iscsi->tcp );
 	}
 
+	return &iscsi->aop;
+}
+
+/**
+ * Close down iSCSI session
+ *
+ * @v iscsi		iSCSI session
+ * @ret aop		Asynchronous operation
+ */
+struct async_operation * iscsi_shutdown ( struct iscsi_session *iscsi ) {
+	if ( iscsi->status ) {
+		iscsi->status |= ISCSI_STATUS_CLOSING;
+		tcp_close ( &iscsi->tcp );
+	}
 	return &iscsi->aop;
 }

@@ -626,11 +626,15 @@ struct iscsi_session {
 /** Mask for all iSCSI "needs to send" flags */
 #define ISCSI_STATUS_STRINGS_MASK 0xff00
 
+/** iSCSI session is closing down */
+#define ISCSI_STATUS_CLOSING 0x00010000
+
 /** Maximum number of retries at connecting */
 #define ISCSI_MAX_RETRIES 2
 
 extern struct async_operation * iscsi_issue ( struct iscsi_session *iscsi,
 					      struct scsi_command *command );
+extern struct async_operation * iscsi_shutdown ( struct iscsi_session *iscsi );
 
 /** An iSCSI device */
 struct iscsi_device {
@@ -641,5 +645,6 @@ struct iscsi_device {
 };
 
 extern int init_iscsidev ( struct iscsi_device *iscsidev );
+extern void fini_iscsidev ( struct iscsi_device *iscsidev );
 
 #endif /* _GPXE_ISCSI_H */

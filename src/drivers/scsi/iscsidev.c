@@ -46,7 +46,22 @@ static int iscsi_command ( struct scsi_device *scsi,
  * @v iscsidev		iSCSI device
  */
 int init_iscsidev ( struct iscsi_device *iscsidev ) {
+	int rc;
+
 	iscsidev->scsi.command = iscsi_command;
 	iscsidev->scsi.lun = iscsidev->iscsi.lun;
-	return init_scsidev ( &iscsidev->scsi );
+	rc = init_scsidev ( &iscsidev->scsi );
+	if ( rc != 0 ) {
+		fini_iscsidev ( iscsidev );
+	}
+	return rc;
+}
+
+/**
+ * Shut down iSCSI device
+ *
+ * @v iscsidev		iSCSI device
+ */
+void fini_iscsidev ( struct iscsi_device *iscsidev ) {
+	async_wait ( iscsi_shutdown ( &iscsidev->iscsi ) );
 }

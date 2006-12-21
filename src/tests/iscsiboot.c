@@ -32,7 +32,7 @@ int test_iscsiboot ( const char *initiator_iqn,
 	printf ( "Initialising %s\n", target_iqn );
 	if ( ( rc = init_iscsidev ( &test_iscsidev ) ) != 0 ) {
 		printf ( "Could not reach %s: %s\n", target_iqn,
-			 strerror ( errno ) );
+			 strerror ( rc ) );
 		return rc;
 	}
 	ibft_fill_data ( netdev, initiator_iqn, target, target_iqn );
@@ -48,6 +48,8 @@ int test_iscsiboot ( const char *initiator_iqn,
 
 	printf ( "Unregistering BIOS drive %#02x\n", drive.drive );
 	unregister_int13_drive ( &drive );
+
+	fini_iscsidev ( &test_iscsidev );
 
 	return rc;
 }
