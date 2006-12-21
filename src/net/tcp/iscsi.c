@@ -727,8 +727,8 @@ static void iscsi_rx_login_response ( struct iscsi_session *iscsi, void *data,
 
 	/* Check for fatal errors */
 	if ( response->status_class != 0 ) {
-		printf ( "iSCSI login failure: class %02x detail %02x\n",
-			 response->status_class, response->status_detail );
+		DBG ( "iSCSI login failure: class %02x detail %02x\n",
+		      response->status_class, response->status_detail );
 		iscsi_done ( iscsi, -EPERM );
 		return;
 	}
@@ -1172,9 +1172,20 @@ struct async_operation * iscsi_issue ( struct iscsi_session *iscsi,
 	iscsi->command = command;
 
 	if ( iscsi->status ) {
-		iscsi_start_command ( iscsi );
-		tcp_senddata ( &iscsi->tcp );
+		if ( ( iscsi->status & ISCSI_STATUS_PHASE_MASK ) ==
+		     ISCSI_STATUS_FULL_FEATURE_PHASE ) {
+			/* Session already open: issue command */
+			iscsi_start_command ( iscsi );
+			tcp_senddata ( &iscsi->tcp );
+		} else {
+			/* Session failed to reach full feature phase:
+			 * abort immediately rather than retrying the
+			 * login.
+			 */
+			iscsi_done ( iscsi, -EPERM );
+		}
 	} else {
+		/* Session not open: initiate login */
 		iscsi->tcp.tcp_op = &iscsi_tcp_operations;
 		tcp_connect ( &iscsi->tcp );
 	}
