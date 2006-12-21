@@ -403,7 +403,8 @@ static int iscsi_build_login_request_strings ( struct iscsi_session *iscsi,
 		used += ssnprintf ( data + used, len - used, "CHAP_A=5%c", 0 );
 	}
 	
-	if ( iscsi->status & ISCSI_STATUS_STRINGS_CHAP_RESPONSE ) {
+	if ( ( iscsi->status & ISCSI_STATUS_STRINGS_CHAP_RESPONSE ) &&
+	     iscsi->username ) {
 		used += ssnprintf ( data + used, len - used,
 				    "CHAP_N=%s%cCHAP_R=0x",
 				    iscsi->username, 0 );
@@ -572,8 +573,10 @@ static void iscsi_handle_chap_i_value ( struct iscsi_session *iscsi,
 	 * challenge.
 	 */
 	chap_set_identifier ( &iscsi->chap, identifier );
-	chap_update ( &iscsi->chap, iscsi->password,
-		      strlen ( iscsi->password ) );
+	if ( iscsi->password ) {
+		chap_update ( &iscsi->chap, iscsi->password,
+			      strlen ( iscsi->password ) );
+	}
 }
 
 /**
