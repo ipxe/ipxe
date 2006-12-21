@@ -45,7 +45,7 @@ static int iscsi_split_root_path ( char *root_path,
 static int test_dhcp_iscsi_boot ( struct net_device *netdev ) {
 	char root_path[256];
 	char *rp_components[NUM_RP_COMPONENTS];
-	char initiator_iqn_buf[32];
+	char initiator_iqn_buf[64];
 	char *initiator_iqn = initiator_iqn_buf;
 	char username[32];
 	char password[32];
