@@ -4,6 +4,7 @@ MISC Support Routines
 
 #include "etherboot.h"
 #include "console.h"
+#include <stdlib.h>
 
 /**************************************************************************
 IPCHKSUM - Checksum IP Header
@@ -59,7 +60,7 @@ uint16_t add_ipchksums(unsigned long offset, uint16_t sum, uint16_t new)
 /**************************************************************************
 RANDOM - compute a random number between 0 and 2147483647L or 2147483562?
 **************************************************************************/
-int32_t random(void)
+long int random(void)
 {
 	static int32_t seed = 0;
 	int32_t q;

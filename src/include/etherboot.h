@@ -208,7 +208,6 @@ extern int decode_rfc1533 P((unsigned char *, unsigned int, unsigned int, int));
 #define RAND_MAX 2147483647L
 extern uint16_t ipchksum P((const void *ip, unsigned long len));
 extern uint16_t add_ipchksums P((unsigned long offset, uint16_t sum, uint16_t new));
-extern int32_t random P((void));
 extern long rfc2131_sleep_interval P((long base, int exp));
 extern void cleanup P((void));
 
