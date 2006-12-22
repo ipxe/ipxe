@@ -15,7 +15,10 @@ struct retry_timer {
 	struct list_head list;
 	/** Timeout value (in ticks) */
 	unsigned long timeout;
-	/** Start time (in ticks) */
+	/** Start time (in ticks)
+	 *
+	 * A start time of zero indicates a stopped timer.
+	 */
 	unsigned long start;
 	/** Retry count */
 	unsigned int count;
