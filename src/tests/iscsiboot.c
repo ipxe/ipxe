@@ -21,10 +21,10 @@ int test_iscsiboot ( const char *initiator_iqn,
 	int rc;
 
 	memset ( &test_iscsidev, 0, sizeof ( test_iscsidev ) );
-	memcpy ( &test_iscsidev.iscsi.tcp.peer, target,
-		 sizeof ( test_iscsidev.iscsi.tcp.peer ) );
-	test_iscsidev.iscsi.initiator = initiator_iqn;
-	test_iscsidev.iscsi.target = target_iqn;
+	memcpy ( &test_iscsidev.iscsi.target, target,
+		 sizeof ( test_iscsidev.iscsi.target ) );
+	test_iscsidev.iscsi.initiator_iqn = initiator_iqn;
+	test_iscsidev.iscsi.target_iqn = target_iqn;
 	test_iscsidev.iscsi.lun = lun;
 	test_iscsidev.iscsi.username = username;
 	test_iscsidev.iscsi.password = password;

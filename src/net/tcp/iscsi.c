@@ -395,8 +395,8 @@ static int iscsi_build_login_request_strings ( struct iscsi_session *iscsi,
 				    "TargetName=%s%c"
 				    "SessionType=Normal%c"
 				    "AuthMethod=CHAP,None%c",
-				    iscsi->initiator, 0, iscsi->target, 0,
-				    0, 0 );
+				    iscsi->initiator_iqn, 0,
+				    iscsi->target_iqn, 0, 0, 0 );
 	}
 
 	if ( iscsi->status & ISCSI_STATUS_STRINGS_CHAP_ALGORITHM ) {
@@ -497,7 +497,7 @@ static void iscsi_tx_login_request ( struct iscsi_session *iscsi,
 static void iscsi_handle_targetaddress_value ( struct iscsi_session *iscsi,
 					       const char *value ) {
 	struct in_addr address;
-	struct sockaddr_in *sin = ( struct sockaddr_in * ) &iscsi->tcp.peer;
+	struct sockaddr_in *sin = ( struct sockaddr_in * ) &iscsi->target;
 
 	if ( inet_aton ( value, &address ) == 0 ) {
 		DBG ( "iSCSI %p received invalid TargetAddress \"%s\"\n",
@@ -1121,6 +1121,9 @@ static void iscsi_closed ( struct tcp_connection *conn, int status ) {
 	/* Retry connection if within the retry limit, otherwise fail */
 	if ( ++iscsi->retry_count <= ISCSI_MAX_RETRIES ) {
 		DBG ( "iSCSI %p retrying connection\n", iscsi );
+		/* Re-copy address to handle redirection */
+		memcpy ( &iscsi->tcp.peer, &iscsi->target,
+			 sizeof ( iscsi->tcp.peer ) );
 		tcp_connect ( conn );
 	} else {
 		printf ( "iSCSI %p retry count exceeded\n", iscsi );
@@ -1190,6 +1193,8 @@ struct async_operation * iscsi_issue ( struct iscsi_session *iscsi,
 	} else {
 		/* Session not open: initiate login */
 		iscsi->tcp.tcp_op = &iscsi_tcp_operations;
+		memcpy ( &iscsi->tcp.peer, &iscsi->target,
+			 sizeof ( iscsi->tcp.peer ) );
 		tcp_connect ( &iscsi->tcp );
 	}
 

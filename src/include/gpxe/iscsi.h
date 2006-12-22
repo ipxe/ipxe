@@ -504,9 +504,15 @@ struct iscsi_session {
 	int retry_count;
 
 	/** Initiator IQN */
-	const char *initiator;
+	const char *initiator_iqn;
+	/** Target address
+	 *
+	 * Kept separate from the TCP connection structure because we
+	 * may need to handle login redirection.
+	 */
+	struct sockaddr_tcpip target;
 	/** Target IQN */
-	const char *target;
+	const char *target_iqn;
 	/** Logical Unit Number (LUN) */
 	uint64_t lun;
 
