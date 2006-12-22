@@ -1098,6 +1098,9 @@ static void iscsi_newdata ( struct tcp_connection *conn, void *data,
 	}
 }
 
+#warning "Remove me soon"
+static struct tcp_operations iscsi_tcp_operations;
+
 /**
  * Handle TCP connection closure
  *
@@ -1122,6 +1125,8 @@ static void iscsi_closed ( struct tcp_connection *conn, int status ) {
 	if ( ++iscsi->retry_count <= ISCSI_MAX_RETRIES ) {
 		DBG ( "iSCSI %p retrying connection\n", iscsi );
 		/* Re-copy address to handle redirection */
+		memset ( &iscsi->tcp, 0, sizeof ( iscsi->tcp ) );
+		iscsi->tcp.tcp_op = &iscsi_tcp_operations;
 		memcpy ( &iscsi->tcp.peer, &iscsi->target,
 			 sizeof ( iscsi->tcp.peer ) );
 		tcp_connect ( conn );
