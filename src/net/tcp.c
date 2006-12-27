@@ -573,12 +573,13 @@ static int tcp_rx_fin ( struct tcp_connection *conn, uint32_t seq ) {
 	if ( ( conn->rcv_ack - seq ) > 0 )
 		return 0;
 
-	/* Mark FIN as received and send our own FIN */
-	conn->tcp_state |= ( TCP_STATE_RCVD ( TCP_FIN ) |
-			     TCP_STATE_SENDING ( TCP_FIN ) );
-
-	/* Acknowledge FIN */
+	/* Mark FIN as received and acknowledge it */
+	conn->tcp_state |= TCP_STATE_RCVD ( TCP_FIN );
 	conn->rcv_ack++;
+
+	/* If we haven't already sent our FIN, send a FIN */
+	if ( ! ( conn->tcp_state & TCP_STATE_ACKED ( TCP_FIN ) ) )
+		conn->tcp_state |= TCP_STATE_SENDING ( TCP_FIN );
 
 	/* Break association with application */
 	tcp_disassociate ( conn );
