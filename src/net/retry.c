@@ -69,7 +69,8 @@ void start_timer ( struct retry_timer *timer ) {
 	timer->start = currticks();
 	if ( timer->timeout < MIN_TIMEOUT )
 		timer->timeout = MIN_TIMEOUT;
-	DBG2 ( "Timer %p started\n", timer );
+	DBG ( "Timer %p started at time %ld (expires at %ld)\n",
+	      timer, timer->start, ( timer->start + timer->timeout ) );
 }
 
 /**
@@ -81,16 +82,18 @@ void start_timer ( struct retry_timer *timer ) {
  */
 void stop_timer ( struct retry_timer *timer ) {
 	unsigned long old_timeout = timer->timeout;
+	unsigned long now = currticks();
 	unsigned long runtime;
 
 	/* If timer was already stopped, do nothing */
 	if ( ! timer->start )
 		return;
 
-	DBG2 ( "Timer %p stopped\n", timer );
 	list_del ( &timer->list );
-	runtime = currticks() - timer->start;
+	runtime = ( now - timer->start );
 	timer->start = 0;
+	DBG ( "Timer %p stopped at time %ld (ran for %ld)\n",
+	      timer, now, runtime );
 
 	/* Update timer.  Variables are:
 	 *
@@ -113,8 +116,8 @@ void stop_timer ( struct retry_timer *timer ) {
 		timer->timeout -= ( timer->timeout >> 3 );
 		timer->timeout += ( runtime >> 1 );
 		if ( timer->timeout != old_timeout ) {
-			DBG ( "Timer %p updated to %ldms\n", timer,
-			      ( ( 1000 * timer->timeout ) / TICKS_PER_SEC ) );
+			DBG ( "Timer %p timeout updated to %ld\n",
+			      timer, timer->timeout );
 		}
 	}
 }
@@ -128,7 +131,8 @@ static void timer_expired ( struct retry_timer *timer ) {
 	int fail;
 
 	/* Stop timer without performing RTT calculations */
-	DBG2 ( "Timer %p stopped on expiry\n", timer );
+	DBG ( "Timer %p stopped at time %ld on expiry\n",
+	      timer, currticks() );
 	list_del ( &timer->list );
 	timer->start = 0;
 	timer->count++;
@@ -137,8 +141,8 @@ static void timer_expired ( struct retry_timer *timer ) {
 	timer->timeout <<= 1;
 	if ( ( fail = ( timer->timeout > MAX_TIMEOUT ) ) )
 		timer->timeout = MAX_TIMEOUT;
-	DBG ( "Timer %p backed off to %ldms\n", timer,
-	      ( ( 1000 * timer->timeout ) / TICKS_PER_SEC ) );
+	DBG ( "Timer %p timeout backed off to %ld\n",
+	      timer, timer->timeout );
 
 	/* Call expiry callback */
 	timer->expired ( timer, fail );	
