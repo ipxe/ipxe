@@ -1,5 +1,6 @@
 #include "stddef.h"
 #include "console.h"
+#include <gpxe/process.h>
 
 /** @file */
 
@@ -97,6 +98,11 @@ int getchar ( void ) {
 		 * less CPU time in a VMware session.
 		 */
 		cpu_nap();
+
+		/* Keep processing background tasks while we wait for
+		 * input.
+		 */
+		step();
 		
 		console = has_input();
 		if ( console && console->getchar )

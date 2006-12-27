@@ -18,6 +18,7 @@
 
 #include <console.h>
 #include <latch.h>
+#include <gpxe/process.h>
 #include <gpxe/keys.h>
 
 /** @file
@@ -38,6 +39,7 @@ static int getchar_timeout ( unsigned long timeout ) {
 	unsigned long expiry = ( currticks() + timeout );
 
 	while ( currticks() < expiry ) {
+		step();
 		if ( iskey() )
 			return getchar();
 	}
