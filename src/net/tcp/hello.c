@@ -10,9 +10,9 @@
  * "Hello world" TCP protocol
  *
  * This file implements a trivial TCP-based protocol.  It connects to
- * the server specified in hello_request::tcp and transmits a single
- * message (hello_request::message).  Any data received from the
- * server will be passed to the callback function,
+ * the server specified in hello_request::server and transmits a
+ * single message (hello_request::message).  Any data received from
+ * the server will be passed to the callback function,
  * hello_request::callback(), and once the connection has been closed,
  * the asynchronous operation associated with the request will be
  * marked as complete.
@@ -26,12 +26,12 @@
  *   }
  *
  *   struct hello_request hello = {
+ *     .server = {
+ *       ...
+ *     },
  *     .message = "hello world!",
  *     .callback = my_callback,
  *   };
- *
- *   hello.sin.sin_addr.s_addr = ... server IP address ...
- *   hello.sin.sin_port = ... server port ...
  *
  *   rc = async_wait ( say_hello ( &hello ) );
  *
@@ -44,25 +44,25 @@
  */
 
 static inline struct hello_request *
-tcp_to_hello ( struct tcp_connection *conn ) {
-	return container_of ( conn, struct hello_request, tcp );
+tcp_to_hello ( struct tcp_application *app ) {
+	return container_of ( app, struct hello_request, tcp );
 }
 
-static void hello_closed ( struct tcp_connection *conn, int status ) {
-	struct hello_request *hello = tcp_to_hello ( conn );
+static void hello_closed ( struct tcp_application *app, int status ) {
+	struct hello_request *hello = tcp_to_hello ( app );
 
 	async_done ( &hello->aop, status );
 }
 
-static void hello_connected ( struct tcp_connection *conn ) {
-	struct hello_request *hello = tcp_to_hello ( conn );
+static void hello_connected ( struct tcp_application *app ) {
+	struct hello_request *hello = tcp_to_hello ( app );
 
 	hello->remaining = strlen ( hello->message );
 	hello->state = HELLO_SENDING_MESSAGE;
 }
 
-static void hello_acked ( struct tcp_connection *conn, size_t len ) {
-	struct hello_request *hello = tcp_to_hello ( conn );
+static void hello_acked ( struct tcp_application *app, size_t len ) {
+	struct hello_request *hello = tcp_to_hello ( app );
 	
 	hello->message += len;
 	hello->remaining -= len;
@@ -84,18 +84,18 @@ static void hello_acked ( struct tcp_connection *conn, size_t len ) {
 	}
 }
 
-static void hello_newdata ( struct tcp_connection *conn, void *data,
+static void hello_newdata ( struct tcp_application *app, void *data,
 			    size_t len ) {
-	struct hello_request *hello = tcp_to_hello ( conn );
+	struct hello_request *hello = tcp_to_hello ( app );
 
 	hello->callback ( data, len );
 }
 
-static void hello_senddata ( struct tcp_connection *conn,
+static void hello_senddata ( struct tcp_application *app,
 			     void *buf __unused, size_t len __unused ) {
-	struct hello_request *hello = tcp_to_hello ( conn );
+	struct hello_request *hello = tcp_to_hello ( app );
 
-	tcp_send ( conn, hello->message, hello->remaining );
+	tcp_send ( app, hello->message, hello->remaining );
 }
 
 static struct tcp_operations hello_tcp_operations = {
@@ -112,7 +112,11 @@ static struct tcp_operations hello_tcp_operations = {
  * @v hello	"Hello world" request
  */
 struct async_operation * say_hello ( struct hello_request *hello ) {
+	int rc;
+
 	hello->tcp.tcp_op = &hello_tcp_operations;
-	tcp_connect ( &hello->tcp );
+	if ( ( rc = tcp_connect ( &hello->tcp, &hello->server, 0 ) ) != 0 )
+		async_done ( &hello->aop, rc );
+
 	return &hello->aop;
 }

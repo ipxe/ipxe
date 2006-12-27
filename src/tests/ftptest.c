@@ -29,7 +29,7 @@ void test_ftp ( struct sockaddr_tcpip *server, const char *filename ) {
 	printf ( "FTP fetching %s\n", filename );
 	
 	memset ( &ftp, 0, sizeof ( ftp ) );
-	memcpy ( &ftp.tcp.peer, server, sizeof ( ftp.tcp.peer ) );
+	memcpy ( &ftp.server, server, sizeof ( ftp.server ) );
 	ftp.filename = filename;
 	ftp.callback = test_ftp_callback;
 

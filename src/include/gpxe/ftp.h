@@ -36,8 +36,8 @@ enum ftp_state {
  *
  */
 struct ftp_request {
-	/** TCP connection for this request */
-	struct tcp_connection tcp;
+	/** Server address */
+	struct sockaddr_tcpip server;
 	/** File to download */
 	const char *filename;
 	/** Callback function
@@ -49,10 +49,6 @@ struct ftp_request {
 	 * remote server.
 	 */
 	void ( *callback ) ( char *data, size_t len );
-	/** Eventual return status */
-	int rc;
-	/** Asynchronous operation for this FTP operation */
-	struct async_operation aop;
 
 	/** Current state */
 	enum ftp_state state;
@@ -67,8 +63,13 @@ struct ftp_request {
 	/** Passive-mode parameters, as text */
 	char passive_text[24]; /* "aaa,bbb,ccc,ddd,eee,fff" */
 
-	/** TCP connection for the data channel */
-	struct tcp_connection tcp_data;
+	/** TCP application for the control channel */
+	struct tcp_application tcp;
+	/** TCP application for the data channel */
+	struct tcp_application tcp_data;
+
+	/** Asynchronous operation for this FTP operation */
+	struct async_operation aop;
 };
 
 struct async_operation * ftp_get ( struct ftp_request *ftp );

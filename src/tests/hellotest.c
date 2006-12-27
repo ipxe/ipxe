@@ -32,7 +32,7 @@ void test_hello ( struct sockaddr_tcpip *server, const char *message ) {
 		 inet_ntoa ( sin->sin_addr ), ntohs ( sin->sin_port ) );
 	
 	memset ( &hello, 0, sizeof ( hello ) );
-	memcpy ( &hello.tcp.peer, server, sizeof ( hello.tcp.peer ) );
+	memcpy ( &hello.server, server, sizeof ( hello.server ) );
 	hello.message = message;
 	hello.callback = test_hello_callback;
 

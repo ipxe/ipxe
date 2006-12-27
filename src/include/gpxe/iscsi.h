@@ -486,40 +486,33 @@ enum iscsi_rx_state {
 
 /** An iSCSI session */
 struct iscsi_session {
-	/** TCP connection for this session */
-	struct tcp_connection tcp;
+	/** Initiator IQN */
+	const char *initiator_iqn;
+	/** Target address */
+	struct sockaddr_tcpip target;
+	/** Target IQN */
+	const char *target_iqn;
+	/** Logical Unit Number (LUN) */
+	uint64_t lun;
+	/** Username */
+	const char *username;
+	/** Password */
+	const char *password;
+
+	/** TCP application for this session */
+	struct tcp_application tcp;
 	/** Session status
 	 *
 	 * This is the bitwise-OR of zero or more ISCSI_STATUS_XXX
 	 * constants.
 	 */
 	int status;
-	/** Asynchronous operation for the current iSCSI operation */
-	struct async_operation aop;
 	/** Retry count
 	 *
 	 * Number of times that the connection has been retried.
 	 * Reset upon a successful connection.
 	 */
 	int retry_count;
-
-	/** Initiator IQN */
-	const char *initiator_iqn;
-	/** Target address
-	 *
-	 * Kept separate from the TCP connection structure because we
-	 * may need to handle login redirection.
-	 */
-	struct sockaddr_tcpip target;
-	/** Target IQN */
-	const char *target_iqn;
-	/** Logical Unit Number (LUN) */
-	uint64_t lun;
-
-	/** Username */
-	const char *username;
-	/** Password */
-	const char *password;
 	/** CHAP challenge/response */
 	struct chap_challenge chap;
 
@@ -597,6 +590,8 @@ struct iscsi_session {
 	 * Set to NULL when command is complete.
 	 */
 	struct scsi_command *command;
+	/** Asynchronous operation for the current iSCSI operation */
+	struct async_operation aop;
 };
 
 /** iSCSI session is currently in the security negotiation phase */
@@ -632,15 +627,12 @@ struct iscsi_session {
 /** Mask for all iSCSI "needs to send" flags */
 #define ISCSI_STATUS_STRINGS_MASK 0xff00
 
-/** iSCSI session is closing down */
-#define ISCSI_STATUS_CLOSING 0x00010000
-
 /** Maximum number of retries at connecting */
 #define ISCSI_MAX_RETRIES 2
 
 extern struct async_operation * iscsi_issue ( struct iscsi_session *iscsi,
 					      struct scsi_command *command );
-extern struct async_operation * iscsi_shutdown ( struct iscsi_session *iscsi );
+extern void iscsi_shutdown ( struct iscsi_session *iscsi );
 
 /** An iSCSI device */
 struct iscsi_device {

@@ -9,13 +9,215 @@
  *
  */
 
-#include <stddef.h>
-#include <gpxe/list.h>
+#include "latch.h"
 #include <gpxe/tcpip.h>
-#include <gpxe/pkbuff.h>
-#include <gpxe/retry.h>
 
-struct tcp_connection;
+/**
+ * A TCP header
+ */
+struct tcp_header {
+	uint16_t src;		/* Source port */
+	uint16_t dest;		/* Destination port */
+	uint32_t seq;		/* Sequence number */
+	uint32_t ack;		/* Acknowledgement number */
+	uint8_t hlen;		/* Header length (4), Reserved (4) */
+	uint8_t flags;		/* Reserved (2), Flags (6) */
+	uint16_t win;		/* Advertised window */
+	uint16_t csum;		/* Checksum */
+	uint16_t urg;		/* Urgent pointer */
+};
+
+/*
+ * TCP flags
+ */
+#define TCP_CWR		0x80
+#define TCP_ECE		0x40
+#define TCP_URG		0x20
+#define TCP_ACK		0x10
+#define TCP_PSH		0x08
+#define TCP_RST		0x04
+#define TCP_SYN		0x02
+#define TCP_FIN		0x01
+
+/**
+* @defgroup tcpstates TCP states
+*
+* The TCP state is defined by a combination of the flags that are
+* currently being sent in outgoing packets, the flags that have been
+* sent and acknowledged by the peer, and the flags that have been
+* received from the peer.
+*
+* @{
+*/
+
+/** TCP flags that are currently being sent in outgoing packets */
+#define TCP_STATE_SENDING(flags) ( (flags) << 0 )
+#define TCP_FLAGS_SENDING(state) ( ( (state) >> 0 ) & 0xff )
+
+/** TCP flags that have been acknowledged by the peer
+ *
+ * Note that this applies only to SYN and FIN.
+ */
+#define TCP_STATE_ACKED(flags) ( (flags) << 8 )
+#define TCP_FLAGS_ACKED(state) ( ( (state) >> 8 ) & 0x03 )
+
+/** TCP flags that have been received from the peer
+ *
+ * Note that this applies only to SYN and FIN, and that once SYN has
+ * been received, we should always be sending ACK.
+ */
+#define TCP_STATE_RCVD(flags) ( (flags) << 12 )
+#define TCP_FLAGS_RCVD(state) ( ( (state) >> 12 ) & 0x03 )
+
+/** CLOSED
+ *
+ * The connection has not yet been used for anything.
+ */
+#define TCP_CLOSED TCP_RST
+
+/** LISTEN
+ *
+ * Not currently used as a state; we have no support for listening
+ * connections.  Given a unique value to avoid compiler warnings.
+ */
+#define TCP_LISTEN 0
+
+/** SYN_SENT
+ *
+ * SYN has been sent, nothing has yet been received or acknowledged.
+ */
+#define TCP_SYN_SENT	( TCP_STATE_SENDING ( TCP_SYN ) )
+
+/** SYN_RCVD
+ *
+ * SYN has been sent but not acknowledged, SYN has been received.
+ */
+#define TCP_SYN_RCVD	( TCP_STATE_SENDING ( TCP_SYN | TCP_ACK ) |	\
+			  TCP_STATE_RCVD ( TCP_SYN ) )
+
+/** ESTABLISHED
+ *
+ * SYN has been sent and acknowledged, SYN has been received.
+ */
+#define TCP_ESTABLISHED	( TCP_STATE_SENDING ( TCP_ACK ) |		\
+			  TCP_STATE_ACKED ( TCP_SYN ) |			\
+			  TCP_STATE_RCVD ( TCP_SYN ) )
+
+/** FIN_WAIT_1
+ *
+ * SYN has been sent and acknowledged, SYN has been received, FIN has
+ * been sent but not acknowledged, FIN has not been received.
+ *
+ * RFC 793 shows that we can enter FIN_WAIT_1 without have had SYN
+ * acknowledged, i.e. if the application closes the connection after
+ * sending and receiving SYN, but before having had SYN acknowledged.
+ * However, we have to *pretend* that SYN has been acknowledged
+ * anyway, otherwise we end up sending SYN and FIN in the same
+ * sequence number slot.  Therefore, when we transition from SYN_RCVD
+ * to FIN_WAIT_1, we have to remember to set TCP_STATE_ACKED(TCP_SYN)
+ * and increment our sequence number.
+ */
+#define TCP_FIN_WAIT_1	( TCP_STATE_SENDING ( TCP_ACK | TCP_FIN ) |	\
+			  TCP_STATE_ACKED ( TCP_SYN ) |			\
+			  TCP_STATE_RCVD ( TCP_SYN ) )
+
+/** FIN_WAIT_2
+ *
+ * SYN has been sent and acknowledged, SYN has been received, FIN has
+ * been sent and acknowledged, FIN ha not been received.
+ */
+#define TCP_FIN_WAIT_2	( TCP_STATE_SENDING ( TCP_ACK ) |		\
+			  TCP_STATE_ACKED ( TCP_SYN | TCP_FIN ) |	\
+			  TCP_STATE_RCVD ( TCP_SYN ) )
+
+/** CLOSING / LAST_ACK
+ *
+ * SYN has been sent and acknowledged, SYN has been received, FIN has
+ * been sent but not acknowledged, FIN has been received.
+ *
+ * This state actually encompasses both CLOSING and LAST_ACK; they are
+ * identical with the definition of state that we use.  I don't
+ * *believe* that they need to be distinguished.
+ */
+#define TCP_CLOSING_OR_LAST_ACK					\
+			( TCP_STATE_SENDING ( TCP_ACK | TCP_FIN ) |	\
+			  TCP_STATE_ACKED ( TCP_SYN ) |			\
+			  TCP_STATE_RCVD ( TCP_SYN | TCP_FIN ) )
+
+/** TIME_WAIT
+ *
+ * SYN has been sent and acknowledged, SYN has been received, FIN has
+ * been sent and acknowledged, FIN has been received.
+ */
+#define TCP_TIME_WAIT	( TCP_STATE_SENDING ( TCP_ACK ) |		\
+			  TCP_STATE_ACKED ( TCP_SYN | TCP_FIN ) |	\
+			  TCP_STATE_RCVD ( TCP_SYN | TCP_FIN ) )
+
+/** CLOSE_WAIT
+ *
+ * SYN has been sent and acknowledged, SYN has been received, FIN has
+ * been received.
+ */
+#define TCP_CLOSE_WAIT	( TCP_STATE_SENDING ( TCP_ACK ) |		\
+			  TCP_STATE_ACKED ( TCP_SYN ) |			\
+			  TCP_STATE_RCVD ( TCP_SYN | TCP_FIN ) )
+
+/** Can send data in current state
+ *
+ * We can send data if and only if we have had our SYN acked and we
+ * have not yet sent our FIN.
+ */
+#define TCP_CAN_SEND_DATA(state)					\
+	( ( (state) & ( TCP_STATE_ACKED ( TCP_SYN | TCP_FIN ) |		\
+		      TCP_STATE_SENDING ( TCP_FIN ) ) )			\
+	  == TCP_STATE_ACKED ( TCP_SYN ) )
+
+/** Have closed gracefully
+ *
+ * We have closed gracefully if we have both received a FIN and had
+ * our own FIN acked.
+ */
+#define TCP_CLOSED_GRACEFULLY(state)					\
+	( ( (state) & ( TCP_STATE_ACKED ( TCP_FIN ) |			\
+			TCP_STATE_RCVD ( TCP_FIN ) ) )			\
+	  == ( TCP_STATE_ACKED ( TCP_FIN ) | TCP_STATE_RCVD ( TCP_FIN ) ) )
+
+/** @} */
+
+/** Mask for TCP header length field */
+#define TCP_MASK_HLEN	0xf0
+
+/** Smallest port number on which a TCP connection can listen */
+#define TCP_MIN_PORT 1
+
+/* Some PKB constants */
+#define MAX_HDR_LEN	100
+#define MAX_PKB_LEN	1500
+#define MIN_PKB_LEN	MAX_HDR_LEN + 100 /* To account for padding by LL */
+
+/**
+ * Advertised TCP window size
+ *
+ * Our TCP window is actually limited by the amount of space available
+ * for RX packets in the NIC's RX ring; we tend to populate the rings
+ * with far fewer descriptors than a typical driver.  Since we have no
+ * way of knowing how much of this RX ring space will be available for
+ * received TCP packets (consider, for example, that they may all be
+ * consumed by a series of unrelated ARP requests between other
+ * machines on the network), it is actually not even theoretically
+ * possible for us to specify an accurate window size.  We therefore
+ * guess an arbitrary number that is empirically as large as possible
+ * while avoiding retransmissions due to dropped packets.
+ */
+#define TCP_WINDOW_SIZE	2048
+
+/** TCP maximum segment lifetime
+ *
+ * Currently set to 2 minutes, as per RFC 793.
+ */
+#define TCP_MSL ( 2 * 60 * TICKS_PER_SEC )
+
+struct tcp_application;
 
 /**
  * TCP operations
@@ -25,7 +227,7 @@ struct tcp_operations {
 	/*
 	 * Connection closed
 	 *
-	 * @v conn	TCP connection
+	 * @v app	TCP application
 	 * @v status	Error code, if any
 	 *
 	 * This is called when the connection is closed for any
@@ -33,42 +235,41 @@ struct tcp_operations {
 	 * contains the negative error number, if the closure is due
 	 * to an error.
 	 *
-	 * Note that acked() and newdata() may be called after
-	 * closed(), if the packet containing the FIN also
-	 * acknowledged data or contained new data.  Note also that
-	 * connected() may not have been called before closed(), if
-	 * the close is due to an error.
+	 * When closed() is called, the application no longer has a
+	 * valid TCP connection.  Note that connected() may not have
+	 * been called before closed(), if the close is due to an
+	 * error during connection setup.
 	 */
-	void ( * closed ) ( struct tcp_connection *conn, int status );
+	void ( * closed ) ( struct tcp_application *app, int status );
 	/**
-	 * Connection established (SYNACK received)
+	 * Connection established
 	 *
-	 * @v conn	TCP connection
+	 * @v app	TCP application
 	 */
-	void ( * connected ) ( struct tcp_connection *conn );
+	void ( * connected ) ( struct tcp_application *app );
 	/**
 	 * Data acknowledged
 	 *
-	 * @v conn	TCP connection
+	 * @v app	TCP application
 	 * @v len	Length of acknowledged data
 	 *
 	 * @c len is guaranteed to not exceed the outstanding amount
 	 * of unacknowledged data.
 	 */
-	void ( * acked ) ( struct tcp_connection *conn, size_t len );
+	void ( * acked ) ( struct tcp_application *app, size_t len );
 	/**
 	 * New data received
 	 *
-	 * @v conn	TCP connection
+	 * @v app	TCP application
 	 * @v data	Data
 	 * @v len	Length of data
 	 */
-	void ( * newdata ) ( struct tcp_connection *conn,
+	void ( * newdata ) ( struct tcp_application *app,
 			     void *data, size_t len );
 	/**
 	 * Transmit data
 	 *
-	 * @v conn	TCP connection
+	 * @v app	TCP application
 	 * @v buf	Temporary data buffer
 	 * @v len	Length of temporary data buffer
 	 *
@@ -86,137 +287,36 @@ struct tcp_operations {
 	 * the buffer is not compulsory; the application may call
 	 * tcp_send() on any block of data.
 	 */
-	void ( * senddata ) ( struct tcp_connection *conn, void *buf,
+	void ( * senddata ) ( struct tcp_application *app, void *buf,
 			      size_t len );
 };
 
-#if USE_UIP
+struct tcp_connection;
 
 /**
- * A TCP connection
+ * A TCP application
  *
+ * This data structure represents an application with a TCP connection.
  */
-struct tcp_connection {
-	/** Address of the remote end of the connection */
-	struct sockaddr_in sin;
-	/** Operations table for this connection */
+struct tcp_application {
+	/** TCP connection data
+	 *
+	 * This is filled in by TCP calls that initiate a connection,
+	 * and reset to NULL when the connection is closed.
+	 */
+	struct tcp_connection *conn;
+	/** TCP connection operations table */
 	struct tcp_operations *tcp_op;
 };
 
-extern void tcp_connect ( struct tcp_connection *conn );
-extern void tcp_send ( struct tcp_connection *conn, const void *data,
-		       size_t len );
-extern void tcp_kick ( struct tcp_connection *conn );
-extern void tcp_close ( struct tcp_connection *conn );
-
-#else
-
-#define TCP_NOMSG ""
-#define TCP_NOMSG_LEN 0
-
-/* Smallest port number on which a TCP connection can listen */
-#define TCP_MIN_PORT 1
-
-/* Some PKB constants */
-#define MAX_HDR_LEN	100
-#define MAX_PKB_LEN	1500
-#define MIN_PKB_LEN	MAX_HDR_LEN + 100 /* To account for padding by LL */
-
-/**
- * TCP states
- */
-#define TCP_CLOSED	0
-#define TCP_LISTEN	1
-#define TCP_SYN_SENT	2
-#define TCP_SYN_RCVD	3
-#define TCP_ESTABLISHED	4
-#define TCP_FIN_WAIT_1	5
-#define TCP_FIN_WAIT_2	6
-#define TCP_CLOSING	7
-#define TCP_TIME_WAIT	8
-#define TCP_CLOSE_WAIT	9
-#define TCP_LAST_ACK	10
-
-#define TCP_INVALID	11
-
-/**
- * A TCP connection
- */
-struct tcp_connection {
-	struct sockaddr_tcpip peer;	/* Remote socket address */
-	uint16_t local_port;		/* Local port, in network byte order */
-	int tcp_state;			/* TCP state */
-	int tcp_lstate;			/* Last TCP state */
-	uint32_t snd_una;		/* Lowest unacked byte on snd stream */
-	uint32_t snd_win;		/* Offered by remote end */
-	uint32_t rcv_nxt;		/* Next expected byte on rcv stream */
-	uint32_t rcv_win;		/* Advertised to receiver */
-	uint8_t tcp_flags;		/* TCP header flags */
-	struct list_head list;		/* List of TCP connections */
-	struct pk_buff *tx_pkb;		/* Transmit packet buffer */
-	struct retry_timer timer;	/* Retransmission timer */
-	struct tcp_operations *tcp_op;	/* Operations table for connection */
-};
-
-/** Retry timer values */
-#define MAX_RETRANSMITS	3
-
-/**
- * Connection closed status codes
- */
-#define CONN_SNDCLOSE	0
-#define CONN_RESTART	1
-#define CONN_TIMEOUT	2
-#define CONN_RCVCLOSE	3
-
-/**
- * A TCP header
- */
-struct tcp_header {
-	uint16_t src;		/* Source port */
-	uint16_t dest;		/* Destination port */
-	uint32_t seq;		/* Sequence number */
-	uint32_t ack;		/* Acknowledgement number */
-	uint8_t hlen;		/* Header length (4), Reserved (4) */
-	uint8_t flags;		/* Reserved (2), Flags (6) */
-	uint16_t win;		/* Advertised window */
-	uint16_t csum;		/* Checksum */
-	uint16_t urg;		/* Urgent pointer */
-};
-
-/**
- * TCP masks
- */
-#define TCP_MASK_HLEN	0xf0
-#define TCP_MASK_FLAGS	0x3f
-
-/**
- * TCP flags
- */
-#define TCP_URG		0x20
-#define TCP_ACK		0x10
-#define TCP_PSH		0x08
-#define TCP_RST		0x04
-#define TCP_SYN		0x02
-#define TCP_FIN		0x01
-
-extern struct tcpip_protocol tcp_protocol;
-
-static inline int tcp_closed ( struct tcp_connection *conn ) {
-	return ( conn->tcp_state == TCP_CLOSED );
-}
-
-extern void tcp_init_conn ( struct tcp_connection *conn );
-extern int tcp_connect ( struct tcp_connection *conn );
-extern int tcp_connectto ( struct tcp_connection *conn,
-			   struct sockaddr_tcpip *peer );
-extern int tcp_listen ( struct tcp_connection *conn, uint16_t port );
-extern int tcp_senddata ( struct tcp_connection *conn );
-extern int tcp_close ( struct tcp_connection *conn );
-
-extern int tcp_send ( struct tcp_connection *conn, const void *data, 
+extern int tcp_connect ( struct tcp_application *app,
+			 struct sockaddr_tcpip *peer,
+			 uint16_t local_port );
+extern void tcp_close ( struct tcp_application *app );
+extern int tcp_senddata ( struct tcp_application *app );
+extern int tcp_send ( struct tcp_application *app, const void *data, 
 		      size_t len );
 
-#endif /* USE_UIP */
+extern struct tcpip_protocol tcp_protocol;
 
 #endif /* _GPXE_TCP_H */

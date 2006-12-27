@@ -63,5 +63,5 @@ int init_iscsidev ( struct iscsi_device *iscsidev ) {
  * @v iscsidev		iSCSI device
  */
 void fini_iscsidev ( struct iscsi_device *iscsidev ) {
-	async_wait ( iscsi_shutdown ( &iscsidev->iscsi ) );
+	iscsi_shutdown ( &iscsidev->iscsi );
 }

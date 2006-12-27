@@ -21,14 +21,10 @@ enum hello_state {
  *
  */
 struct hello_request {
-	/** TCP connection for this request */
-	struct tcp_connection tcp;
-	/** Current state */
-	enum hello_state state;
+	/** Server to connect to */
+	struct sockaddr_tcpip server;
 	/** Message to be transmitted */
 	const char *message;
-	/** Amount of message remaining to be transmitted */
-	size_t remaining;
 	/** Callback function
 	 *
 	 * @v data	Received data
@@ -38,6 +34,15 @@ struct hello_request {
 	 * remote server.
 	 */
 	void ( *callback ) ( char *data, size_t len );
+
+	/** Current state */
+	enum hello_state state;
+	/** Amount of message remaining to be transmitted */
+	size_t remaining;
+
+	/** TCP application for this request */
+	struct tcp_application tcp;
+
 	/** Asynchronous operation */
 	struct async_operation aop;
 };

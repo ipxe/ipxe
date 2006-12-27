@@ -29,8 +29,10 @@ enum http_state {
 struct http_request;
 
 struct http_request {
-	/** TCP connection for this request */
-	struct tcp_connection tcp;
+	/** Server address */
+	struct sockaddr_tcpip server;
+	/** TCP application for this request */
+	struct tcp_application tcp;
 	/** Current state */
 	enum http_state state;
         /** File to download */

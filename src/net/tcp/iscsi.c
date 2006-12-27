@@ -720,11 +720,14 @@ static void iscsi_rx_login_response ( struct iscsi_session *iscsi, void *data,
 	/* Check for login redirection */
 	if ( response->status_class == ISCSI_STATUS_REDIRECT ) {
 		DBG ( "iSCSI %p redirecting to new server\n", iscsi );
-		/* Close the TCP connection; our TCP closed() method
-		 * will take care of the reconnection once this
-		 * connection has been cleanly terminated.
-		 */
 		tcp_close ( &iscsi->tcp );
+		iscsi->status = 0;
+		if ( ( rc = tcp_connect ( &iscsi->tcp, &iscsi->target,
+					  0 ) ) != 0 ) {
+			DBG ( "iSCSI %p could not open TCP connection\n",
+			      iscsi );
+			iscsi_done ( iscsi, rc );
+		}
 		return;
 	}
 
@@ -778,8 +781,8 @@ static void iscsi_rx_login_response ( struct iscsi_session *iscsi, void *data,
  */
 
 static inline struct iscsi_session *
-tcp_to_iscsi ( struct tcp_connection *conn ) {
-	return container_of ( conn, struct iscsi_session, tcp );
+tcp_to_iscsi ( struct tcp_application *app ) {
+	return container_of ( app, struct iscsi_session, tcp );
 }
 
 /**
@@ -859,8 +862,8 @@ static void iscsi_tx_done ( struct iscsi_session *iscsi ) {
  * Updates iscsi->tx_offset and, if applicable, transitions to the
  * next TX state.
  */
-static void iscsi_acked ( struct tcp_connection *conn, size_t len ) {
-	struct iscsi_session *iscsi = tcp_to_iscsi ( conn );
+static void iscsi_acked ( struct tcp_application *app, size_t len ) {
+	struct iscsi_session *iscsi = tcp_to_iscsi ( app );
 	struct iscsi_bhs_common *common = &iscsi->tx_bhs.common;
 	enum iscsi_tx_state next_state;
 	
@@ -916,9 +919,9 @@ static void iscsi_acked ( struct tcp_connection *conn, size_t len ) {
  * 
  * Constructs data to be sent for the current TX state
  */
-static void iscsi_senddata ( struct tcp_connection *conn,
+static void iscsi_senddata ( struct tcp_application *app,
 			     void *buf, size_t len ) {
-	struct iscsi_session *iscsi = tcp_to_iscsi ( conn );
+	struct iscsi_session *iscsi = tcp_to_iscsi ( app );
 	struct iscsi_bhs_common *common = &iscsi->tx_bhs.common;
 	static const char pad[] = { '\0', '\0', '\0' };
 
@@ -927,7 +930,7 @@ static void iscsi_senddata ( struct tcp_connection *conn,
 		/* Nothing to send */
 		break;
 	case ISCSI_TX_BHS:
-		tcp_send ( conn, &iscsi->tx_bhs.bytes[iscsi->tx_offset],
+		tcp_send ( app, &iscsi->tx_bhs.bytes[iscsi->tx_offset],
 			   ( sizeof ( iscsi->tx_bhs ) - iscsi->tx_offset ) );
 		break;
 	case ISCSI_TX_AHS:
@@ -938,7 +941,7 @@ static void iscsi_senddata ( struct tcp_connection *conn,
 		iscsi_tx_data ( iscsi, buf, len );
 		break;
 	case ISCSI_TX_DATA_PADDING:
-		tcp_send ( conn, pad, ( ISCSI_DATA_PAD_LEN ( common->lengths )
+		tcp_send ( app, pad, ( ISCSI_DATA_PAD_LEN ( common->lengths )
 					- iscsi->tx_offset ) );
 		break;
 	default:
@@ -1029,7 +1032,7 @@ static void iscsi_rx_bhs ( struct iscsi_session *iscsi, void *data,
 /**
  * Receive new data
  *
- * @v tcp		TCP connection
+ * @v tcp		TCP application
  * @v data		Received data
  * @v len		Length of received data
  *
@@ -1040,9 +1043,9 @@ static void iscsi_rx_bhs ( struct iscsi_session *iscsi, void *data,
  * always has a full copy of the BHS available, even for portions of
  * the data in different packets to the BHS.
  */
-static void iscsi_newdata ( struct tcp_connection *conn, void *data,
+static void iscsi_newdata ( struct tcp_application *app, void *data,
 			    size_t len ) {
-	struct iscsi_session *iscsi = tcp_to_iscsi ( conn );
+	struct iscsi_session *iscsi = tcp_to_iscsi ( app );
 	struct iscsi_bhs_common *common = &iscsi->rx_bhs.common;
 	void ( *process ) ( struct iscsi_session *iscsi, void *data,
 			    size_t len, size_t remaining );
@@ -1098,38 +1101,28 @@ static void iscsi_newdata ( struct tcp_connection *conn, void *data,
 	}
 }
 
-#warning "Remove me soon"
-static struct tcp_operations iscsi_tcp_operations;
-
 /**
  * Handle TCP connection closure
  *
- * @v conn		TCP connection
+ * @v app		TCP application
  * @v status		Error code, if any
  *
  */
-static void iscsi_closed ( struct tcp_connection *conn, int status ) {
-	struct iscsi_session *iscsi = tcp_to_iscsi ( conn );
-	int session_status = iscsi->status;
+static void iscsi_closed ( struct tcp_application *app, int status ) {
+	struct iscsi_session *iscsi = tcp_to_iscsi ( app );
+	int rc;
 
 	/* Clear session status */
 	iscsi->status = 0;
 
-	/* If we are deliberately closing down, exit cleanly */
-	if ( session_status & ISCSI_STATUS_CLOSING ) {
-		iscsi_done ( iscsi, status );
-		return;
-	}
-
 	/* Retry connection if within the retry limit, otherwise fail */
 	if ( ++iscsi->retry_count <= ISCSI_MAX_RETRIES ) {
 		DBG ( "iSCSI %p retrying connection\n", iscsi );
-		/* Re-copy address to handle redirection */
-		memset ( &iscsi->tcp, 0, sizeof ( iscsi->tcp ) );
-		iscsi->tcp.tcp_op = &iscsi_tcp_operations;
-		memcpy ( &iscsi->tcp.peer, &iscsi->target,
-			 sizeof ( iscsi->tcp.peer ) );
-		tcp_connect ( conn );
+		if ( ( rc = tcp_connect ( app, &iscsi->target, 0 ) ) != 0 ) {
+			DBG ( "iSCSI %p could not open TCP connection\n",
+			      iscsi );
+			iscsi_done ( iscsi, rc );
+		}
 	} else {
 		printf ( "iSCSI %p retry count exceeded\n", iscsi );
 		iscsi_done ( iscsi, status );
@@ -1139,11 +1132,11 @@ static void iscsi_closed ( struct tcp_connection *conn, int status ) {
 /**
  * Handle TCP connection opening
  *
- * @v conn		TCP connection
+ * @v app		TCP application
  *
  */
-static void iscsi_connected ( struct tcp_connection *conn ) {
-	struct iscsi_session *iscsi = tcp_to_iscsi ( conn );
+static void iscsi_connected ( struct tcp_application *app ) {
+	struct iscsi_session *iscsi = tcp_to_iscsi ( app );
 
 	/* Set connected flag and reset retry count */
 	iscsi->status = ( ISCSI_STATUS_SECURITY_NEGOTIATION_PHASE |
@@ -1179,6 +1172,8 @@ static struct tcp_operations iscsi_tcp_operations = {
  */
 struct async_operation * iscsi_issue ( struct iscsi_session *iscsi,
 				       struct scsi_command *command ) {
+	int rc;
+
 	assert ( iscsi->command == NULL );
 	iscsi->command = command;
 
@@ -1198,9 +1193,12 @@ struct async_operation * iscsi_issue ( struct iscsi_session *iscsi,
 	} else {
 		/* Session not open: initiate login */
 		iscsi->tcp.tcp_op = &iscsi_tcp_operations;
-		memcpy ( &iscsi->tcp.peer, &iscsi->target,
-			 sizeof ( iscsi->tcp.peer ) );
-		tcp_connect ( &iscsi->tcp );
+		if ( ( rc = tcp_connect ( &iscsi->tcp, &iscsi->target,
+					  0 ) ) != 0 ) {
+			DBG ( "iSCSI %p could not open TCP connection\n",
+			      iscsi );
+			iscsi_done ( iscsi, rc );
+		}
 	}
 
 	return &iscsi->aop;
@@ -1212,10 +1210,7 @@ struct async_operation * iscsi_issue ( struct iscsi_session *iscsi,
  * @v iscsi		iSCSI session
  * @ret aop		Asynchronous operation
  */
-struct async_operation * iscsi_shutdown ( struct iscsi_session *iscsi ) {
-	if ( iscsi->status ) {
-		iscsi->status |= ISCSI_STATUS_CLOSING;
-		tcp_close ( &iscsi->tcp );
-	}
-	return &iscsi->aop;
+void iscsi_shutdown ( struct iscsi_session *iscsi ) {
+	iscsi->status = 0;
+	tcp_close ( &iscsi->tcp );
 }

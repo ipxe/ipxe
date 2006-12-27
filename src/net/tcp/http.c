@@ -39,28 +39,28 @@
  */
 
 static inline struct http_request *
-tcp_to_http ( struct tcp_connection *conn ) {
-	return container_of ( conn, struct http_request, tcp );
+tcp_to_http ( struct tcp_application *app ) {
+	return container_of ( app, struct http_request, tcp );
 }
 
 /**
  * Close an HTTP connection
  *
- * @v conn	a TCP Connection
+ * @v app	a TCP Application
  * @v status	connection status at close
  */
-static void http_closed ( struct tcp_connection *conn, int status ) {
-	struct http_request *http = tcp_to_http ( conn );
+static void http_closed ( struct tcp_application *app, int status ) {
+	struct http_request *http = tcp_to_http ( app );
 	async_done ( &http->aop, status );
 }
 
 /**
  * Callback after a TCP connection is established
  *
- * @v conn	a TCP Connection
+ * @v app	a TCP Application
  */
-static void http_connected ( struct tcp_connection *conn ) {
-	struct http_request *http = tcp_to_http ( conn );
+static void http_connected ( struct tcp_application *app ) {
+	struct http_request *http = tcp_to_http ( app );
 
 	http->state = HTTP_REQUEST_FILE;
 }
@@ -68,11 +68,11 @@ static void http_connected ( struct tcp_connection *conn ) {
 /**
  * Callback for when TCP data is acknowledged
  *
- * @v conn	a TCP Connection
+ * @v app	a TCP Application
  * @v len	the length of data acked
  */
-static void http_acked ( struct tcp_connection *conn, size_t len __attribute__ ((unused)) ) {
-	struct http_request *http = tcp_to_http ( conn );
+static void http_acked ( struct tcp_application *app, size_t len __attribute__ ((unused)) ) {
+	struct http_request *http = tcp_to_http ( app );
 
 	// assume that the whole GET request was sent in on epacket
 
@@ -84,7 +84,7 @@ static void http_acked ( struct tcp_connection *conn, size_t len __attribute__ (
 	case HTTP_RECV_FILE:
 		break;
 	case HTTP_DONE:
-		//tcp_close(conn);
+		//tcp_close(app);
 		break;
 	default:
 		break;
@@ -95,13 +95,13 @@ static void http_acked ( struct tcp_connection *conn, size_t len __attribute__ (
 /**
  * Callback when new TCP data is recieved
  *
- * @v conn	a TCP Connection
+ * @v app	a TCP Application
  * @v data	a pointer to the data recieved
  * @v len	length of data buffer
  */
-static void http_newdata ( struct tcp_connection *conn, void *data,
+static void http_newdata ( struct tcp_application *app, void *data,
 			    size_t len ) {
-	struct http_request *http = tcp_to_http ( conn );
+	struct http_request *http = tcp_to_http ( app );
 	char *content_length;
 	char *start = data;
 	char *rcp; int rc;
@@ -142,7 +142,7 @@ static void http_newdata ( struct tcp_connection *conn, void *data,
 		//printf("File recv is %d\n", http->file_recv);
 		if ( http->file_recv == http->file_size ){
 			http->state = HTTP_DONE;
-			tcp_close(conn);
+			tcp_close(app);
 		}
 		break;
 	case HTTP_REQUEST_FILE:
@@ -155,10 +155,10 @@ static void http_newdata ( struct tcp_connection *conn, void *data,
 /**
  * Callback for sending TCP data
  *
- * @v conn	a TCP Connection
+ * @v app	a TCP Application
  */
-static void http_senddata ( struct tcp_connection *conn, void *buf, size_t len ) {
-	struct http_request *http = tcp_to_http ( conn );
+static void http_senddata ( struct tcp_application *app, void *buf, size_t len ) {
+	struct http_request *http = tcp_to_http ( app );
 
 	switch ( http->state ){
 	case HTTP_REQUEST_FILE:
@@ -166,13 +166,13 @@ static void http_senddata ( struct tcp_connection *conn, void *buf, size_t len )
 		printf("%s\n",(char *)buf);
         	// string is: GET <file> HTTP/1.0\r\n\r\n
 
-		tcp_send ( conn, buf, len);
+		tcp_send ( app, buf, len);
 		break;
 	case HTTP_PARSE_HEADER:
 	case HTTP_RECV_FILE:
 		break;
 	case HTTP_DONE:
-		//tcp_close(conn)
+		//tcp_close(app)
 		break;
 	default:
 		break;
@@ -193,8 +193,12 @@ static struct tcp_operations http_tcp_operations = {
  * @v http	a HTTP request
  */
 struct async_operation * get_http ( struct http_request *http ) {
+	int rc;
+
 	http->tcp.tcp_op = &http_tcp_operations;
 	http->state = HTTP_REQUEST_FILE;
-	tcp_connect ( &http->tcp );
+	if ( ( rc = tcp_connect ( &http->tcp, &http->server, 0 ) ) != 0 )
+		async_done ( &http->aop, rc );
+
 	return &http->aop;
 }

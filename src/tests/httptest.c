@@ -21,7 +21,7 @@ void test_http ( struct net_device *netdev, struct sockaddr_tcpip *server, const
 	int rc;
 
 	memset ( &http, 0, sizeof ( http ) );
-	memcpy ( &http.tcp.peer, server, sizeof ( http.tcp.peer ) );
+	memcpy ( &http.server, server, sizeof ( http.server ) );
 	http.filename = filename;
 	http.callback = test_http_callback;
 
