@@ -100,15 +100,6 @@ __asm__ ( ".equ\t" OBJECT_SYMBOL_STR ", 0" );
  *
  */
 
-/** @def DBG2
- *
- * Print a level 2 debugging message.
- *
- * As for DBG().  DBG2() takes effect only when the debugging level is
- * 2 or greater.
- *
- */
-
 /*
  * If debug_OBJECT is set to a true value, the macro DBG(...) will
  * expand to printf(...) when compiling OBJECT, and the symbol
@@ -120,35 +111,56 @@ __asm__ ( ".equ\t" OBJECT_SYMBOL_STR ", 0" );
 #if DEBUG_SYMBOL
 #include "console.h"
 #define DEBUG_SYMBOL_STR _XSTR ( DEBUG_SYMBOL )
-__asm__ ( ".equ\tDEBUG_LEVEL, " DEBUG_SYMBOL_STR );
+__asm__ ( ".equ\tDBGLVL, " DEBUG_SYMBOL_STR );
 #endif
 
-/** Do not print
+/** printf() for debugging
  *
- * This function is used only for printf()-style format string
- * checking.  The function body does not exist, and no reference to it
- * should ever appear in any compiled object.
+ * This function exists so that the DBG() macros can expand to
+ * printf() calls without dragging the printf() prototype into scope.
+ *
+ * As far as the compiler is concerned, dbg_printf() and printf() are
+ * completely unrelated calls; it's only at the assembly stage that
+ * references to the dbg_printf symbol are collapsed into references
+ * to the printf symbol.
  */
-extern int __attribute__ (( format ( printf, 1, 2 ) ))
-__do_not_printf ( const char *fmt, ... );
+extern int __attribute__ (( format ( printf, 1, 2 ) )) 
+dbg_printf ( const char *fmt, ... ) asm ( "printf" );
 
-#define DBG_PRINT(...) printf ( __VA_ARGS__ )
-#define DBG_DISCARD(...) do {					\
-		if ( 0 ) __do_not_printf ( __VA_ARGS__ );	\
+extern void __attribute__ (( format ( printf, 2, 3 ) )) 
+dbg_printf_autocolour ( void *id, const char *fmt, ... );
+
+/* Compatibility with existing Makefile */
+#if DEBUG_SYMBOL >= 1
+#if DEBUG_SYMBOL >= 2
+#define DBGLVL 3
+#else
+#define DBGLVL 1
+#endif
+#else
+#define DBGLVL 0
+#endif
+
+#define DBGLVL_LOG	1
+#define DBG_LOG		( DBGLVL & DBGLVL_LOG )
+#define DBGLVL_EXTRA	2
+#define DBG_EXTRA	( DBGLVL & DBGLVL_EXTRA )
+
+#define DBG_IF( level, ... ) do {				\
+		if ( DBG_ ## level ) {				\
+			dbg_printf ( __VA_ARGS__ );		\
+		}						\
 	} while ( 0 )
 
-#define DBG  DBG_DISCARD
-#define DBG2 DBG_DISCARD
+#define DBGC_IF( level, ... ) do {				\
+		if ( DBG_ ## level ) {				\
+			dbg_printf_autocolour ( __VA_ARGS__ );	\
+		}						\
+	} while ( 0 )
 
-#if DEBUG_SYMBOL >= 1
-#undef DBG
-#define DBG DBG_PRINT
-#endif
-
-#if DEBUG_SYMBOL >= 2
-#undef DBG2
-#define DBG2 DBG_PRINT
-#endif
+#define DBG( ... )	DBG_IF ( LOG, __VA_ARGS__ )
+#define DBG2( ... )	DBG_IF ( EXTRA, __VA_ARGS__ )
+#define DBGC( ... )	DBGC_IF ( LOG, __VA_ARGS__ )
 
 #if DEBUG_SYMBOL == 0
 #define NDEBUG
@@ -157,23 +169,13 @@ __do_not_printf ( const char *fmt, ... );
 /** Declare a data structure as packed. */
 #define PACKED __attribute__ (( packed ))
 
-/** 
- * Declare a variable or data structure as unused.
- *
- * Note that using #__unused on a static global variable (such as a
- * table structure as mentioned in tables.h) is necessary in order to
- * inhibit compiler warnings.
- *
- */
+/** Declare a variable or data structure as unused. */
 #define __unused __attribute__ (( unused ))
 
 /**
  * Declare a function as used.
  *
  * Necessary only if the function is called only from assembler code.
- * You cannot use this attribute for static global variables; use
- * #__unused instead.
- *
  */
 #define __used __attribute__ (( used ))
 

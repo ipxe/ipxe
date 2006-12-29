@@ -1,4 +1,5 @@
 #include <stdint.h>
+#include <stdarg.h>
 #include <io.h>
 #include <console.h>
 
@@ -84,4 +85,59 @@ int check_region ( void *region, size_t len ) {
 		printf ( "to offset %#x (end of region)\n", len-1 );
 	}
 	return corrupted;
+}
+
+#define NUM_AUTO_COLOURS 6
+
+struct autocolour {
+	void * id;
+	unsigned long last_used;
+};
+
+static int autocolourise ( void *id ) {
+	static struct autocolour acs[NUM_AUTO_COLOURS];
+	static unsigned long use;
+	unsigned int i;
+	unsigned int oldest;
+	unsigned int oldest_last_used;
+
+	/* Increment usage iteration counter */
+	use++;
+
+	/* Scan through list for a currently assigned colour */
+	for ( i = 0 ; i < ( sizeof ( acs ) / sizeof ( acs[0] ) ) ; i++ ) {
+		if ( acs[i].id == id ) {
+			acs[i].last_used = use;
+			return i;
+		}
+	}
+
+	/* No colour found; evict the oldest from the list */
+	oldest = 0;
+	oldest_last_used = use;
+	for ( i = 0 ; i < ( sizeof ( acs ) / sizeof ( acs[0] ) ) ; i++ ) {
+		if ( acs[i].last_used < oldest_last_used ) {
+			oldest_last_used = acs[i].last_used;
+			oldest = i;
+		}
+	}
+	acs[oldest].id = id;
+	acs[oldest].last_used = use;
+	return oldest;
+}
+
+/** printf() for debugging with automatic colourisation
+ *
+ * @v id		Message stream ID
+ * @v fmt		printf() format
+ * @v ...		printf() argument list
+ */
+void dbg_printf_autocolour ( void *id, const char *fmt, ... ) {
+	va_list args;
+
+	printf ( "\033[%dm", ( id ? ( 31 + autocolourise ( id ) ) : 0 ) );
+	va_start ( args, fmt );
+	vprintf ( fmt, args );
+	va_end ( args );
+	printf ( "\033[0m" );
 }
