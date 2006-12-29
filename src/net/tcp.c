@@ -112,9 +112,9 @@ static inline __attribute__ (( always_inline )) void
 tcp_dump_state ( struct tcp_connection *conn ) {
 
 	if ( conn->tcp_state != conn->prev_tcp_state ) {
-		DBG ( "TCP %p transitioned from %s to %s\n", conn,
-		      tcp_state ( conn->prev_tcp_state ),
-		      tcp_state ( conn->tcp_state ) );
+		DBGC ( conn, "TCP %p transitioned from %s to %s\n", conn,
+		       tcp_state ( conn->prev_tcp_state ),
+		       tcp_state ( conn->tcp_state ) );
 	}
 	conn->prev_tcp_state = conn->tcp_state;
 }
@@ -125,17 +125,17 @@ tcp_dump_state ( struct tcp_connection *conn ) {
  * @v flags		TCP flags
  */
 static inline __attribute__ (( always_inline )) void
-tcp_dump_flags ( unsigned int flags ) {
+tcp_dump_flags ( struct tcp_connection *conn, unsigned int flags ) {
 	if ( flags & TCP_RST )
-		DBG ( " RST" );
+		DBGC ( conn, " RST" );
 	if ( flags & TCP_SYN )
-		DBG ( " SYN" );
+		DBGC ( conn, " SYN" );
 	if ( flags & TCP_PSH )
-		DBG ( " PSH" );
+		DBGC ( conn, " PSH" );
 	if ( flags & TCP_FIN )
-		DBG ( " FIN" );
+		DBGC ( conn, " FIN" );
 	if ( flags & TCP_ACK )
-		DBG ( " ACK" );
+		DBGC ( conn, " ACK" );
 }
 
 /**
@@ -150,7 +150,7 @@ static struct tcp_connection * alloc_tcp ( void ) {
 
 	conn = calloc ( 1, sizeof ( *conn ) );
 	if ( conn ) {
-		DBG ( "TCP %p allocated\n", conn );
+		DBGC ( conn, "TCP %p allocated\n", conn );
 		conn->tcp_state = conn->prev_tcp_state = TCP_CLOSED;
 		conn->snd_seq = random();
 		conn->timer.expired = tcp_expired;
@@ -176,7 +176,7 @@ static void free_tcp ( struct tcp_connection *conn ) {
 	stop_timer ( &conn->timer );
 	list_del ( &conn->list );
 	free ( conn );
-	DBG ( "TCP %p freed\n", conn );
+	DBGC ( conn, "TCP %p freed\n", conn );
 }
 
 /**
@@ -191,7 +191,7 @@ static void tcp_associate ( struct tcp_connection *conn,
 	assert ( app->conn == NULL );
 	conn->app = app;
 	app->conn = conn;
-	DBG ( "TCP %p associated with application %p\n", conn, app );
+	DBGC ( conn, "TCP %p associated with application %p\n", conn, app );
 }
 
 /**
@@ -206,8 +206,8 @@ static void tcp_disassociate ( struct tcp_connection *conn ) {
 		assert ( app->conn == conn );
 		conn->app = NULL;
 		app->conn = NULL;
-		DBG ( "TCP %p disassociated from application %p\n",
-		      conn, app );
+		DBGC ( conn, "TCP %p disassociated from application %p\n",
+		       conn, app );
 	}
 }
 
@@ -236,11 +236,11 @@ static int tcp_senddata_conn ( struct tcp_connection *conn, int force_send ) {
 	/* Allocate space to the TX buffer */
 	pkb = alloc_pkb ( MAX_PKB_LEN );
 	if ( ! pkb ) {
-		DBG ( "TCP %p could not allocate senddata buffer\n", conn );
+		DBGC ( conn, "TCP %p could not allocate data buffer\n", conn );
 		/* Start the retry timer so that we attempt to
 		 * retransmit this packet later.  (Start it
 		 * unconditionally, since without a packet buffer we
-		 * can't can the senddata() callback, and so may not
+		 * can't call the senddata() callback, and so may not
 		 * be able to tell whether or not we have something
 		 * that actually needs to be retransmitted).
 		 */
@@ -259,11 +259,15 @@ static int tcp_senddata_conn ( struct tcp_connection *conn, int force_send ) {
 		conn->tx_pkb = NULL;
 	}
 
+	/* Truncate payload length to fit transmit window */
+	len = pkb_len ( pkb );
+	if ( len > conn->snd_win )
+		len = conn->snd_win;
+
 	/* Calculate amount of sequence space that this transmission
 	 * consumes.  (SYN or FIN consume one byte, and we can never
 	 * send both at once).
 	 */
-	len = pkb_len ( pkb );
 	seq_len = len;
 	flags = TCP_FLAGS_SENDING ( conn->tcp_state );
 	assert ( ! ( ( flags & TCP_SYN ) && ( flags & TCP_FIN ) ) );
@@ -297,12 +301,12 @@ static int tcp_senddata_conn ( struct tcp_connection *conn, int force_send ) {
 	tcphdr->csum = tcpip_chksum ( pkb->data, pkb_len ( pkb ) );
 
 	/* Dump header */
-	DBG ( "TCP %p TX %d->%d %08lx..%08lx           %08lx %4zd", conn,
-	      ntohs ( tcphdr->src ), ntohs ( tcphdr->dest ),
-	      ntohl ( tcphdr->seq ), ( ntohl ( tcphdr->seq ) + seq_len ),
-	      ntohl ( tcphdr->ack ), len );
-	tcp_dump_flags ( tcphdr->flags );
-	DBG ( "\n" );
+	DBGC ( conn, "TCP %p TX %d->%d %08lx..%08lx           %08lx %4zd",
+	       conn, ntohs ( tcphdr->src ), ntohs ( tcphdr->dest ),
+	       ntohl ( tcphdr->seq ), ( ntohl ( tcphdr->seq ) + seq_len ),
+	       ntohl ( tcphdr->ack ), len );
+	tcp_dump_flags ( conn, tcphdr->flags );
+	DBGC ( conn, "\n" );
 
 	/* Transmit packet */
 	return tcpip_tx ( pkb, &tcp_protocol, &conn->peer );
@@ -359,10 +363,6 @@ int tcp_send ( struct tcp_application *app, const void *data, size_t len ) {
 		return -EINVAL;
 	}
 
-	/* Truncate length to fit transmit window */
-	if ( len > conn->snd_win )
-		len = conn->snd_win;
-
 	/* Truncate length to fit packet buffer */
 	if ( len > pkb_available ( pkb ) )
 		len = pkb_available ( pkb );
@@ -385,8 +385,8 @@ static void tcp_expired ( struct retry_timer *timer, int over ) {
 	struct tcp_application *app = conn->app;
 	int graceful_close = TCP_CLOSED_GRACEFULLY ( conn->tcp_state );
 
-	DBG ( "TCP %p timer %s in %s\n", conn,
-	      ( over ? "expired" : "fired" ), tcp_state ( conn->tcp_state ) );
+	DBGC ( conn, "TCP %p timer %s in %s\n", conn,
+	       ( over ? "expired" : "fired" ), tcp_state ( conn->tcp_state ) );
 
 	assert ( ( conn->tcp_state == TCP_SYN_SENT ) ||
 		 ( conn->tcp_state == TCP_SYN_RCVD ) ||
@@ -485,10 +485,10 @@ static int tcp_rx_ack ( struct tcp_connection *conn, uint32_t ack,
 
 	/* Ignore duplicate or out-of-range ACK */
 	if ( ack_len > conn->snd_sent ) {
-		DBG ( "TCP %p received ACK for [%08lx,%08lx), sent only "
-		      "[%08lx,%08lx)\n", conn, conn->snd_seq,
-		      ( conn->snd_seq + ack_len ), conn->snd_seq,
-		      ( conn->snd_seq + conn->snd_sent ) );
+		DBGC ( conn, "TCP %p received ACK for [%08lx,%08lx), "
+		       "sent only [%08lx,%08lx)\n", conn, conn->snd_seq,
+		       ( conn->snd_seq + ack_len ), conn->snd_seq,
+		       ( conn->snd_seq + conn->snd_sent ) );
 		return -EINVAL;
 	}
 
@@ -643,13 +643,13 @@ static int tcp_rx ( struct pk_buff *pkb,
 	len = pkb_len ( pkb );
 
 	/* Dump header */
-	DBG ( "TCP %p RX %d<-%d %08lx           %08lx..%08lx %4zd", conn,
-	      ntohs ( tcphdr->dest ), ntohs ( tcphdr->src ),
-	      ntohl ( tcphdr->ack ), ntohl ( tcphdr->seq ),
-	      ( ntohl ( tcphdr->seq ) + len +
-		( ( tcphdr->flags & ( TCP_SYN | TCP_FIN ) ) ? 1 : 0 ) ), len );
-	tcp_dump_flags ( tcphdr->flags );
-	DBG ( "\n" );
+	DBGC ( conn, "TCP %p RX %d<-%d           %08lx %08lx..%08lx %4zd",
+	       conn, ntohs ( tcphdr->dest ), ntohs ( tcphdr->src ),
+	       ntohl ( tcphdr->ack ), ntohl ( tcphdr->seq ),
+	       ( ntohl ( tcphdr->seq ) + len +
+		 ( ( tcphdr->flags & ( TCP_SYN | TCP_FIN ) ) ? 1 : 0 ) ), len);
+	tcp_dump_flags ( conn, tcphdr->flags );
+	DBGC ( conn, "\n" );
 
 	/* If no connection was found, create dummy connection for
 	 * sending RST
@@ -731,22 +731,21 @@ static int tcp_bind ( struct tcp_connection *conn, uint16_t local_port ) {
 			if ( tcp_bind ( conn, htons ( try_port ) ) == 0 )
 				return 0;
 		}
-		DBG ( "TCP %p could not bind: no free ports remaining\n",
-		      conn );
+		DBGC ( conn, "TCP %p could not bind: no free ports\n", conn );
 		return -EADDRINUSE;
 	}
 
 	/* Attempt bind to local port */
 	list_for_each_entry ( existing, &tcp_conns, list ) {
 		if ( existing->local_port == local_port ) {
-			DBG ( "TCP %p could not bind: port %d in use\n",
-			      conn, ntohs ( local_port ) );
+			DBGC ( conn, "TCP %p could not bind: port %d in use\n",
+			       conn, ntohs ( local_port ) );
 			return -EADDRINUSE;
 		}
 	}
 	conn->local_port = local_port;
 
-	DBG ( "TCP %p bound to port %d\n", conn, ntohs ( local_port ) );
+	DBGC ( conn, "TCP %p bound to port %d\n", conn, ntohs ( local_port ) );
 	return 0;
 }
 
