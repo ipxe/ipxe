@@ -229,6 +229,7 @@ static int tcp_senddata_conn ( struct tcp_connection *conn, int force_send ) {
 	struct tcp_application *app = conn->app;
 	struct pk_buff *pkb;
 	struct tcp_header *tcphdr;
+	unsigned int flags;
 	size_t len;
 	size_t seq_len;
 
@@ -264,9 +265,9 @@ static int tcp_senddata_conn ( struct tcp_connection *conn, int force_send ) {
 	 */
 	len = pkb_len ( pkb );
 	seq_len = len;
-	assert ( ! ( ( conn->tcp_state & TCP_STATE_SENDING ( TCP_SYN ) ) &&
-		     ( conn->tcp_state & TCP_STATE_SENDING ( TCP_FIN ) ) ) );
-	if ( conn->tcp_state & TCP_STATE_SENDING ( TCP_SYN | TCP_FIN ) )
+	flags = TCP_FLAGS_SENDING ( conn->tcp_state );
+	assert ( ! ( ( flags & TCP_SYN ) && ( flags & TCP_FIN ) ) );
+	if ( flags & ( TCP_SYN | TCP_FIN ) )
 		seq_len++;
 	conn->snd_sent = seq_len;
 
@@ -291,7 +292,7 @@ static int tcp_senddata_conn ( struct tcp_connection *conn, int force_send ) {
 	tcphdr->seq = htonl ( conn->snd_seq );
 	tcphdr->ack = htonl ( conn->rcv_ack );
 	tcphdr->hlen = ( ( sizeof ( *tcphdr ) / 4 ) << 4 );
-	tcphdr->flags = TCP_FLAGS_SENDING ( conn->tcp_state );
+	tcphdr->flags = flags;
 	tcphdr->win = htons ( TCP_WINDOW_SIZE );
 	tcphdr->csum = tcpip_chksum ( pkb->data, pkb_len ( pkb ) );
 
@@ -458,7 +459,7 @@ static int tcp_rx_syn ( struct tcp_connection *conn, uint32_t seq ) {
 		return 0;
 
 	/* Mark SYN as received and start sending ACKs with each packet */
-	conn->tcp_state |= ( TCP_STATE_SENDING ( TCP_ACK ) |
+	conn->tcp_state |= ( TCP_STATE_SENT ( TCP_ACK ) |
 			     TCP_STATE_RCVD ( TCP_SYN ) );
 
 	/* Acknowledge SYN */
@@ -517,10 +518,8 @@ static int tcp_rx_ack ( struct tcp_connection *conn, uint32_t ack,
 		app->tcp_op->acked ( app, len );
 
 	/* Mark SYN/FIN as acknowledged if applicable. */
-	if ( acked_flags ) {
-		conn->tcp_state &= ~TCP_STATE_SENDING ( TCP_SYN | TCP_FIN );
+	if ( acked_flags )
 		conn->tcp_state |= TCP_STATE_ACKED ( acked_flags );
-	}
 
 	/* Notify application of established connection, if applicable */
 	if ( ( acked_flags & TCP_SYN ) && app && app->tcp_op->connected )
@@ -573,13 +572,10 @@ static int tcp_rx_fin ( struct tcp_connection *conn, uint32_t seq ) {
 	if ( ( conn->rcv_ack - seq ) > 0 )
 		return 0;
 
-	/* Mark FIN as received and acknowledge it */
-	conn->tcp_state |= TCP_STATE_RCVD ( TCP_FIN );
+	/* Mark FIN as received, acknowledge it, and send our own FIN */
+	conn->tcp_state |= ( TCP_STATE_RCVD ( TCP_FIN ) |
+			     TCP_STATE_SENT ( TCP_FIN ) );
 	conn->rcv_ack++;
-
-	/* If we haven't already sent our FIN, send a FIN */
-	if ( ! ( conn->tcp_state & TCP_STATE_ACKED ( TCP_FIN ) ) )
-		conn->tcp_state |= TCP_STATE_SENDING ( TCP_FIN );
 
 	/* Break association with application */
 	tcp_disassociate ( conn );
@@ -832,15 +828,15 @@ void tcp_close ( struct tcp_application *app ) {
 		return;
 	}
 
-	/* If we have sent a SYN but not had it acknowledged (i.e. we
-	 * are in SYN_RCVD), pretend that it has been acknowledged so
-	 * that we can send a FIN without breaking things.
+	/* If we have not had our SYN acknowledged (i.e. we are in
+	 * SYN_RCVD), pretend that it has been acknowledged so that we
+	 * can send a FIN without breaking things.
 	 */
-	if ( conn->tcp_state & TCP_STATE_SENDING ( TCP_SYN ) )
+	if ( ! ( conn->tcp_state & TCP_STATE_ACKED ( TCP_SYN ) ) )
 		tcp_rx_ack ( conn, ( conn->snd_seq + 1 ), 0 );
 
 	/* Send a FIN to initiate the close */
-	conn->tcp_state |= TCP_STATE_SENDING ( TCP_FIN );
+	conn->tcp_state |= TCP_STATE_SENT ( TCP_FIN );
 	tcp_dump_state ( conn );
 	tcp_senddata_conn ( conn, 0 );
 }

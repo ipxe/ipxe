@@ -42,17 +42,16 @@ struct tcp_header {
 /**
 * @defgroup tcpstates TCP states
 *
-* The TCP state is defined by a combination of the flags that are
-* currently being sent in outgoing packets, the flags that have been
-* sent and acknowledged by the peer, and the flags that have been
-* received from the peer.
+* The TCP state is defined by a combination of the flags that have
+* been sent to the peer, the flags that have been acknowledged by the
+* peer, and the flags that have been received from the peer.
 *
 * @{
 */
 
-/** TCP flags that are currently being sent in outgoing packets */
-#define TCP_STATE_SENDING(flags) ( (flags) << 0 )
-#define TCP_FLAGS_SENDING(state) ( ( (state) >> 0 ) & 0xff )
+/** TCP flags that have been sent in outgoing packets */
+#define TCP_STATE_SENT(flags) ( (flags) << 0 )
+#define TCP_FLAGS_SENT(state) ( ( (state) >> 0 ) & 0xff )
 
 /** TCP flags that have been acknowledged by the peer
  *
@@ -68,6 +67,10 @@ struct tcp_header {
  */
 #define TCP_STATE_RCVD(flags) ( (flags) << 12 )
 #define TCP_FLAGS_RCVD(state) ( ( (state) >> 12 ) & 0x03 )
+
+/** TCP flags that are currently being sent in outgoing packets */
+#define TCP_FLAGS_SENDING(state) \
+	( TCP_FLAGS_SENT ( state ) & ~TCP_FLAGS_ACKED ( state ) )
 
 /** CLOSED
  *
@@ -86,21 +89,21 @@ struct tcp_header {
  *
  * SYN has been sent, nothing has yet been received or acknowledged.
  */
-#define TCP_SYN_SENT	( TCP_STATE_SENDING ( TCP_SYN ) )
+#define TCP_SYN_SENT	( TCP_STATE_SENT ( TCP_SYN ) )
 
 /** SYN_RCVD
  *
  * SYN has been sent but not acknowledged, SYN has been received.
  */
-#define TCP_SYN_RCVD	( TCP_STATE_SENDING ( TCP_SYN | TCP_ACK ) |	\
+#define TCP_SYN_RCVD	( TCP_STATE_SENT ( TCP_SYN | TCP_ACK ) |	    \
 			  TCP_STATE_RCVD ( TCP_SYN ) )
 
 /** ESTABLISHED
  *
  * SYN has been sent and acknowledged, SYN has been received.
  */
-#define TCP_ESTABLISHED	( TCP_STATE_SENDING ( TCP_ACK ) |		\
-			  TCP_STATE_ACKED ( TCP_SYN ) |			\
+#define TCP_ESTABLISHED	( TCP_STATE_SENT ( TCP_SYN | TCP_ACK ) |	    \
+			  TCP_STATE_ACKED ( TCP_SYN ) |			    \
 			  TCP_STATE_RCVD ( TCP_SYN ) )
 
 /** FIN_WAIT_1
@@ -117,8 +120,8 @@ struct tcp_header {
  * to FIN_WAIT_1, we have to remember to set TCP_STATE_ACKED(TCP_SYN)
  * and increment our sequence number.
  */
-#define TCP_FIN_WAIT_1	( TCP_STATE_SENDING ( TCP_ACK | TCP_FIN ) |	\
-			  TCP_STATE_ACKED ( TCP_SYN ) |			\
+#define TCP_FIN_WAIT_1	( TCP_STATE_SENT ( TCP_SYN | TCP_ACK | TCP_FIN ) |  \
+			  TCP_STATE_ACKED ( TCP_SYN ) |			    \
 			  TCP_STATE_RCVD ( TCP_SYN ) )
 
 /** FIN_WAIT_2
@@ -126,8 +129,8 @@ struct tcp_header {
  * SYN has been sent and acknowledged, SYN has been received, FIN has
  * been sent and acknowledged, FIN ha not been received.
  */
-#define TCP_FIN_WAIT_2	( TCP_STATE_SENDING ( TCP_ACK ) |		\
-			  TCP_STATE_ACKED ( TCP_SYN | TCP_FIN ) |	\
+#define TCP_FIN_WAIT_2	( TCP_STATE_SENT ( TCP_SYN | TCP_ACK | TCP_FIN ) |  \
+			  TCP_STATE_ACKED ( TCP_SYN | TCP_FIN ) |	    \
 			  TCP_STATE_RCVD ( TCP_SYN ) )
 
 /** CLOSING / LAST_ACK
@@ -139,9 +142,9 @@ struct tcp_header {
  * identical with the definition of state that we use.  I don't
  * *believe* that they need to be distinguished.
  */
-#define TCP_CLOSING_OR_LAST_ACK					\
-			( TCP_STATE_SENDING ( TCP_ACK | TCP_FIN ) |	\
-			  TCP_STATE_ACKED ( TCP_SYN ) |			\
+#define TCP_CLOSING_OR_LAST_ACK						    \
+			( TCP_STATE_SENT ( TCP_SYN | TCP_ACK | TCP_FIN ) |  \
+			  TCP_STATE_ACKED ( TCP_SYN ) |			    \
 			  TCP_STATE_RCVD ( TCP_SYN | TCP_FIN ) )
 
 /** TIME_WAIT
@@ -149,8 +152,8 @@ struct tcp_header {
  * SYN has been sent and acknowledged, SYN has been received, FIN has
  * been sent and acknowledged, FIN has been received.
  */
-#define TCP_TIME_WAIT	( TCP_STATE_SENDING ( TCP_ACK ) |		\
-			  TCP_STATE_ACKED ( TCP_SYN | TCP_FIN ) |	\
+#define TCP_TIME_WAIT	( TCP_STATE_SENT ( TCP_SYN | TCP_ACK | TCP_FIN ) |  \
+			  TCP_STATE_ACKED ( TCP_SYN | TCP_FIN ) |	    \
 			  TCP_STATE_RCVD ( TCP_SYN | TCP_FIN ) )
 
 /** CLOSE_WAIT
@@ -158,8 +161,8 @@ struct tcp_header {
  * SYN has been sent and acknowledged, SYN has been received, FIN has
  * been received.
  */
-#define TCP_CLOSE_WAIT	( TCP_STATE_SENDING ( TCP_ACK ) |		\
-			  TCP_STATE_ACKED ( TCP_SYN ) |			\
+#define TCP_CLOSE_WAIT	( TCP_STATE_SENT ( TCP_SYN | TCP_ACK ) |	    \
+			  TCP_STATE_ACKED ( TCP_SYN ) |			    \
 			  TCP_STATE_RCVD ( TCP_SYN | TCP_FIN ) )
 
 /** Can send data in current state
@@ -167,9 +170,9 @@ struct tcp_header {
  * We can send data if and only if we have had our SYN acked and we
  * have not yet sent our FIN.
  */
-#define TCP_CAN_SEND_DATA(state)					\
-	( ( (state) & ( TCP_STATE_ACKED ( TCP_SYN | TCP_FIN ) |		\
-		      TCP_STATE_SENDING ( TCP_FIN ) ) )			\
+#define TCP_CAN_SEND_DATA(state)					    \
+	( ( (state) & ( TCP_STATE_ACKED ( TCP_SYN ) |			    \
+			TCP_STATE_SENT ( TCP_FIN ) ) )			    \
 	  == TCP_STATE_ACKED ( TCP_SYN ) )
 
 /** Have closed gracefully
@@ -177,9 +180,9 @@ struct tcp_header {
  * We have closed gracefully if we have both received a FIN and had
  * our own FIN acked.
  */
-#define TCP_CLOSED_GRACEFULLY(state)					\
-	( ( (state) & ( TCP_STATE_ACKED ( TCP_FIN ) |			\
-			TCP_STATE_RCVD ( TCP_FIN ) ) )			\
+#define TCP_CLOSED_GRACEFULLY(state)					    \
+	( ( (state) & ( TCP_STATE_ACKED ( TCP_FIN ) |			    \
+			TCP_STATE_RCVD ( TCP_FIN ) ) )			    \
 	  == ( TCP_STATE_ACKED ( TCP_FIN ) | TCP_STATE_RCVD ( TCP_FIN ) ) )
 
 /** @} */
