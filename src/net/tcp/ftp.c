@@ -75,7 +75,7 @@ static inline struct ftp_request * tcp_to_ftp ( struct tcp_application *app ) {
  */
 static void ftp_done ( struct ftp_request *ftp, int rc ) {
 
-	DBG ( "FTP %p completed with status %d\n", ftp, rc );
+	DBGC ( ftp, "FTP %p completed with status %d\n", ftp, rc );
 
 	/* Close both TCP connections */
 	tcp_close ( &ftp->tcp );
@@ -118,7 +118,7 @@ static void ftp_parse_value ( char **text, uint8_t *value, size_t len ) {
 static void ftp_reply ( struct ftp_request *ftp ) {
 	char status_major = ftp->status_text[0];
 
-	DBG ( "FTP %p received status %s\n", ftp, ftp->status_text );
+	DBGC ( ftp, "FTP %p received status %s\n", ftp, ftp->status_text );
 
 	/* Ignore "intermediate" responses (1xx codes) */
 	if ( status_major == '1' )
@@ -149,8 +149,8 @@ static void ftp_reply ( struct ftp_request *ftp ) {
 		ftp_parse_value ( &ptr, ( uint8_t * ) &sa.sin.sin_port,
 				  sizeof ( sa.sin.sin_port ) );
 		if ( ( rc = tcp_connect ( &ftp->tcp_data, &sa.st, 0 ) ) != 0 ){
-			DBG ( "FTP %p could not create data connection\n",
-			      ftp );
+			DBGC ( ftp, "FTP %p could not make data connection\n",
+			       ftp );
 			ftp_done ( ftp, rc );
 			return;
 		}
@@ -162,9 +162,10 @@ static void ftp_reply ( struct ftp_request *ftp ) {
 	ftp->already_sent = 0;
 
 	if ( ftp->state < FTP_DONE ) {
-		DBG ( "FTP %p sending ", ftp );
-		DBG ( ftp_strings[ftp->state].format, ftp_string_data ( ftp,
-				       ftp_strings[ftp->state].data_offset ) );
+		const struct ftp_string *string = &ftp_strings[ftp->state];
+		DBGC ( ftp, "FTP %p sending ", ftp );
+		DBGC ( ftp, string->format,
+		       ftp_string_data ( ftp, string->data_offset ) );
 	}
 
 	return;
@@ -270,7 +271,8 @@ static void ftp_senddata ( struct tcp_application *app,
 static void ftp_closed ( struct tcp_application *app, int status ) {
 	struct ftp_request *ftp = tcp_to_ftp ( app );
 
-	DBG ( "FTP %p control connection closed (status %d)\n", ftp, status );
+	DBGC ( ftp, "FTP %p control connection closed (status %d)\n",
+	       ftp, status );
 
 	/* Complete FTP operation */
 	ftp_done ( ftp, status );
@@ -315,7 +317,8 @@ tcp_to_ftp_data ( struct tcp_application *app ) {
 static void ftp_data_closed ( struct tcp_application *app, int status ) {
 	struct ftp_request *ftp = tcp_to_ftp_data ( app );
 
-	DBG ( "FTP %p data connection closed (status %d)\n", ftp, status );
+	DBGC ( ftp, "FTP %p data connection closed (status %d)\n",
+	       ftp, status );
 	
 	/* If there was an error, close control channel and record status */
 	if ( status )
@@ -358,7 +361,7 @@ static struct tcp_operations ftp_data_tcp_operations = {
 struct async_operation * ftp_get ( struct ftp_request *ftp ) {
 	int rc;
 
-	DBG ( "FTP %p fetching %s\n", ftp, ftp->filename );
+	DBGC ( ftp, "FTP %p fetching %s\n", ftp, ftp->filename );
 
 	ftp->tcp.tcp_op = &ftp_tcp_operations;
 	ftp->tcp_data.tcp_op = &ftp_data_tcp_operations;
