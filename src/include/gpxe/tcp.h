@@ -58,15 +58,15 @@ struct tcp_header {
  * Note that this applies only to SYN and FIN.
  */
 #define TCP_STATE_ACKED(flags) ( (flags) << 8 )
-#define TCP_FLAGS_ACKED(state) ( ( (state) >> 8 ) & 0x03 )
+#define TCP_FLAGS_ACKED(state) ( ( (state) >> 8 ) & 0xff )
 
 /** TCP flags that have been received from the peer
  *
  * Note that this applies only to SYN and FIN, and that once SYN has
  * been received, we should always be sending ACK.
  */
-#define TCP_STATE_RCVD(flags) ( (flags) << 12 )
-#define TCP_FLAGS_RCVD(state) ( ( (state) >> 12 ) & 0x03 )
+#define TCP_STATE_RCVD(flags) ( (flags) << 16 )
+#define TCP_FLAGS_RCVD(state) ( ( (state) >> 16 ) & 0xff )
 
 /** TCP flags that are currently being sent in outgoing packets */
 #define TCP_FLAGS_SENDING(state) \
