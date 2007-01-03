@@ -101,16 +101,29 @@ void del_ipv4_address ( struct net_device *netdev ) {
 }
 
 /**
- * Dump IPv4 packet header
+ * Perform IPv4 routing
  *
- * @v iphdr	IPv4 header
+ * @v dest		Final destination address
+ * @ret dest		Next hop destination address
+ * @ret miniroute	Routing table entry to use, or NULL if no route
  */
-static void ipv4_dump ( struct iphdr *iphdr __unused ) {
+static struct ipv4_miniroute * ipv4_route ( struct in_addr *dest ) {
+	struct ipv4_miniroute *miniroute;
+	int local;
+	int has_gw;
 
-	DBG ( "IP4 %p transmitting %p+%d ident %d protocol %d header-csum %x\n",
-		&ipv4_protocol, iphdr, ntohs ( iphdr->len ), ntohs ( iphdr->ident ),
-		iphdr->protocol, ntohs ( iphdr->chksum ) );
-	DBG ( "src %s, dest %s\n", inet_ntoa ( iphdr->src ), inet_ntoa ( iphdr->dest ) );
+	list_for_each_entry ( miniroute, &miniroutes, list ) {
+		local = ( ( ( dest->s_addr ^ miniroute->address.s_addr )
+			    & miniroute->netmask.s_addr ) == 0 );
+		has_gw = ( miniroute->gateway.s_addr != INADDR_NONE );
+		if ( local || has_gw ) {
+			if ( ! local )
+				*dest = miniroute->gateway;
+			return miniroute;
+		}
+	}
+
+	return NULL;
 }
 
 /**
@@ -280,59 +293,39 @@ static int ipv4_tx ( struct pk_buff *pkb,
 	int rc;
 
 	/* Fill up the IP header, except source address */
-	iphdr->verhdrlen = ( IP_VER << 4 ) | ( sizeof ( *iphdr ) / 4 );
+	iphdr->verhdrlen = ( ( IP_VER << 4 ) | ( sizeof ( *iphdr ) / 4 ) );
 	iphdr->service = IP_TOS;
 	iphdr->len = htons ( pkb_len ( pkb ) );	
-	iphdr->ident = htons ( next_ident++ );
+	iphdr->ident = htons ( ++next_ident );
 	iphdr->frags = 0;
 	iphdr->ttl = IP_TTL;
 	iphdr->protocol = tcpip_protocol->tcpip_proto;
-
-	/* Copy destination address */
+	iphdr->chksum = 0;
 	iphdr->dest = sin_dest->sin_addr;
-
-	/**
-	 * All fields in the IP header filled in except the source network
-	 * address (which requires routing) and the header checksum (which
-	 * requires the source network address). As the pseudo header requires
-	 * the source address as well and the transport-layer checksum is
-	 * updated after routing.
-	 */
 
 	/* Use routing table to identify next hop and transmitting netdev */
 	next_hop = iphdr->dest;
-	list_for_each_entry ( miniroute, &miniroutes, list ) {
-		int local, has_gw;
-
-		local = ( ( ( iphdr->dest.s_addr ^ miniroute->address.s_addr )
-			    & miniroute->netmask.s_addr ) == 0 );
-		has_gw = ( miniroute->gateway.s_addr != INADDR_NONE );
-		if ( local || has_gw ) {
-			netdev = miniroute->netdev;
-			iphdr->src = miniroute->address;
-			if ( ! local )
-				next_hop = miniroute->gateway;
-			break;
-		}
-	}
-	/* Abort if no network device identified */
-	if ( ! netdev ) {
+	miniroute = ipv4_route ( &next_hop );
+	if ( ! miniroute ) {
 		DBG ( "No route to %s\n", inet_ntoa ( iphdr->dest ) );
 		rc = -EHOSTUNREACH;
 		goto err;
 	}
+	iphdr->src = miniroute->address;
+	netdev = miniroute->netdev;
 
 	/* Calculate the transport layer checksum */
-	if ( tcpip_protocol->csum_offset > 0 ) {
+	if ( tcpip_protocol->csum_offset > 0 )
 		ipv4_tx_csum ( pkb, tcpip_protocol );
-	}
 
 	/* Calculate header checksum, in network byte order */
-	iphdr->chksum = 0;
 	iphdr->chksum = tcpip_chksum ( iphdr, sizeof ( *iphdr ) );
 
 	/* Print IP4 header for debugging */
-	ipv4_dump ( iphdr );
+	DBG ( "IPv4 TX %s->", inet_ntoa ( iphdr->src ) );
+	DBG ( "%s len %d proto %d id %04x csum %04x\n",
+	      inet_ntoa ( iphdr->dest ), ntohs ( iphdr->len ), iphdr->protocol,
+	      ntohs ( iphdr->ident ), ntohs ( iphdr->chksum ) );
 
 	/* Determine link-layer destination address */
 	if ( next_hop.s_addr == INADDR_BROADCAST ) {
@@ -394,7 +387,10 @@ static int ipv4_rx ( struct pk_buff *pkb, struct net_device *netdev __unused,
 	}
 
 	/* Print IP4 header for debugging */
-	ipv4_dump ( iphdr );
+	DBG ( "IPv4 RX %s<-", inet_ntoa ( iphdr->dest ) );
+	DBG ( "%s len %d proto %d id %04x csum %04x\n",
+	      inet_ntoa ( iphdr->src ), ntohs ( iphdr->len ), iphdr->protocol,
+	      ntohs ( iphdr->ident ), ntohs ( iphdr->chksum ) );
 
 	/* Validate version and header length */
 	if ( iphdr->verhdrlen != 0x45 ) {
@@ -414,8 +410,8 @@ static int ipv4_rx ( struct pk_buff *pkb, struct net_device *netdev __unused,
 		DBG ( "Bad checksum %x\n", chksum );
 	}
 	/* Fragment reassembly */
-	if ( ( iphdr->frags & IP_MASK_MOREFRAGS ) || 
-	     ( ( iphdr->frags & IP_MASK_OFFSET ) != 0 ) ) {
+	if ( ( iphdr->frags & htons ( IP_MASK_MOREFRAGS ) ) || 
+	     ( ( iphdr->frags & htons ( IP_MASK_OFFSET ) ) != 0 ) ) {
 		/* Pass the fragment to the reassembler ipv4_ressable() which
 		 * either returns a fully reassembled packet buffer or NULL.
 		 */
