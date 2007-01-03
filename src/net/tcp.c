@@ -426,6 +426,49 @@ static void tcp_expired ( struct retry_timer *timer, int over ) {
 }
 
 /**
+ * Send RST response to incoming packet
+ *
+ * @v in_tcphdr		TCP header of incoming packet
+ * @ret rc		Return status code
+ */
+static int tcp_send_reset ( struct tcp_connection *conn,
+			    struct tcp_header *in_tcphdr ) {
+	struct pk_buff *pkb;
+	struct tcp_header *tcphdr;
+
+	/* Allocate space for dataless TX buffer */
+	pkb = alloc_pkb ( MAX_HDR_LEN );
+	if ( ! pkb ) {
+		DBGC ( conn, "TCP %p could not allocate data buffer\n", conn );
+		return -ENOMEM;
+	}
+	pkb_reserve ( pkb, MAX_HDR_LEN );
+
+	/* Construct RST response */
+	tcphdr = pkb_push ( pkb, sizeof ( *tcphdr ) );
+	memset ( tcphdr, 0, sizeof ( *tcphdr ) );
+	tcphdr->src = in_tcphdr->dest;
+	tcphdr->dest = in_tcphdr->src;
+	tcphdr->seq = in_tcphdr->ack;
+	tcphdr->ack = in_tcphdr->seq;
+	tcphdr->hlen = ( ( sizeof ( *tcphdr ) / 4 ) << 4 );
+	tcphdr->flags = ( TCP_RST | TCP_ACK );
+	tcphdr->win = htons ( TCP_WINDOW_SIZE );
+	tcphdr->csum = tcpip_chksum ( pkb->data, pkb_len ( pkb ) );
+
+	/* Dump header */
+	DBGC ( conn, "TCP %p TX %d->%d %08lx..%08lx           %08lx %4zd",
+	       conn, ntohs ( tcphdr->src ), ntohs ( tcphdr->dest ),
+	       ntohl ( tcphdr->seq ), ( ntohl ( tcphdr->seq ) ),
+	       ntohl ( tcphdr->ack ), 0 );
+	tcp_dump_flags ( conn, tcphdr->flags );
+	DBGC ( conn, "\n" );
+
+	/* Transmit packet */
+	return tcpip_tx ( pkb, &tcp_protocol, &conn->peer, &tcphdr->csum );
+}
+
+/**
  * Identify TCP connection by local port number
  *
  * @v local_port	Local port (in network-endian order)
@@ -700,18 +743,20 @@ static int tcp_rx ( struct pk_buff *pkb,
 	tcp_dump_flags ( conn, tcphdr->flags );
 	DBGC ( conn, "\n" );
 
-	/* If no connection was found, create dummy connection for
-	 * sending RST
-	 */
-#warning "Handle non-matched connections"
+	/* If no connection was found, send RST */
 	if ( ! conn ) {
+		tcp_send_reset ( conn, tcphdr );
 		rc = -ENOTCONN;
 		goto done;
 	}
 
 	/* Handle ACK, if present */
-	if ( flags & TCP_ACK )
-		tcp_rx_ack ( conn, ack, win );
+	if ( flags & TCP_ACK ) {
+		if ( ( rc = tcp_rx_ack ( conn, ack, win ) ) != 0 ) {
+			tcp_send_reset ( conn, tcphdr );
+			goto done;
+		}
+	}
 
 	/* Handle SYN, if present */
 	if ( flags & TCP_SYN ) {
@@ -772,9 +817,6 @@ static int tcp_rx ( struct pk_buff *pkb,
 static int tcp_bind ( struct tcp_connection *conn, uint16_t local_port ) {
 	struct tcp_connection *existing;
 	static uint16_t try_port = 1024;
-
-#warning "Fix the port re-use bug"
-	try_port = random();
 
 	/* If no port specified, find the first available port */
 	if ( ! local_port ) {
