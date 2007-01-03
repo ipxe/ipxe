@@ -12,7 +12,7 @@
 
 /* IP constants */
 
-#define IP_VER		4
+#define IP_VER		0x40
 #define IP_MASK_VER	0xf0
 #define IP_MASK_HLEN 	0x0f
 #define IP_MASK_OFFSET	0x1fff

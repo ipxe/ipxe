@@ -14,6 +14,13 @@
 
 struct pk_buff;
 
+/** Empty checksum value
+ *
+ * This is the TCP/IP checksum over a zero-length block of data.
+ */
+#define TCPIP_EMPTY_CSUM 0xffff
+
+/** Length of a @c struct @c sockaddr_tcpip */
 #define SA_TCPIP_LEN 32
 
 /**
@@ -45,30 +52,22 @@ struct tcpip_protocol {
        	/**
          * Process received packet
          *
-         * @v pkb	Packet buffer
-	 * @v st_src	Partially-filled source address
-	 * @v st_dest	Partially-filled destination address
-	 * @ret rc	Return status code
+         * @v pkb		Packet buffer
+	 * @v st_src		Partially-filled source address
+	 * @v st_dest		Partially-filled destination address
+	 * @v pshdr_csum	Pseudo-header checksum
+	 * @ret rc		Return status code
          *
          * This method takes ownership of the packet buffer.
          */
         int ( * rx ) ( struct pk_buff *pkb, struct sockaddr_tcpip *st_src,
-		       struct sockaddr_tcpip *st_dest );
+		       struct sockaddr_tcpip *st_dest, uint16_t pshdr_csum );
         /** 
 	 * Transport-layer protocol number
 	 *
 	 * This is a constant of the type IP_XXX
          */
         uint8_t tcpip_proto;
-	/**
-	 * Checksum offset
-	 *
-	 * A negative number indicates that the protocol does not
-	 * require checksumming to be performed by the network layer.
-	 * A positive number is the offset of the checksum field in
-	 * the transport-layer header.
-	 */
-	int csum_offset;
 };
 
 /**
@@ -85,13 +84,14 @@ struct tcpip_net_protocol {
 	 * @v pkb		Packet buffer
 	 * @v tcpip_protocol	Transport-layer protocol
 	 * @v st_dest		Destination address
+	 * @v trans_csum	Transport-layer checksum to complete, or NULL
 	 * @ret rc		Return status code
 	 *
 	 * This function takes ownership of the packet buffer.
 	 */
 	int ( * tx ) ( struct pk_buff *pkb,
 		       struct tcpip_protocol *tcpip_protocol,
-		       struct sockaddr_tcpip *st_dest );
+		       struct sockaddr_tcpip *st_dest, uint16_t *trans_csum );
 };
 
 /** Declare a TCP/IP transport-layer protocol */
@@ -102,11 +102,11 @@ struct tcpip_net_protocol {
 
 extern int tcpip_rx ( struct pk_buff *pkb, uint8_t tcpip_proto,
 		      struct sockaddr_tcpip *st_src,
-		      struct sockaddr_tcpip *st_dest );
+		      struct sockaddr_tcpip *st_dest, uint16_t pshdr_csum );
 extern int tcpip_tx ( struct pk_buff *pkb, struct tcpip_protocol *tcpip, 
-		      struct sockaddr_tcpip *st_dest );
-extern unsigned int tcpip_continue_chksum ( unsigned int partial,
-					    const void *data, size_t len );
-extern unsigned int tcpip_chksum ( const void *data, size_t len );
+		      struct sockaddr_tcpip *st_dest, uint16_t *trans_csum );
+extern uint16_t tcpip_continue_chksum ( uint16_t partial,
+					const void *data, size_t len );
+extern uint16_t tcpip_chksum ( const void *data, size_t len );
 
 #endif /* _GPXE_TCPIP_H */

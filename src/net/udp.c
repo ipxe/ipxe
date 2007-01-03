@@ -163,7 +163,7 @@ int udp_sendto ( struct udp_connection *conn, struct sockaddr_tcpip *peer,
 	      ntohs ( udphdr->chksum ) );
 
 	/* Send it to the next layer for processing */
-	return tcpip_tx ( pkb, &udp_protocol, peer );
+	return tcpip_tx ( pkb, &udp_protocol, peer, &udphdr->chksum );
 }
 
 /**
@@ -190,14 +190,15 @@ int udp_send ( struct udp_connection *conn, const void *data, size_t len ) {
  * @v pkb		Packet buffer
  * @v st_src		Partially-filled source address
  * @v st_dest		Partially-filled destination address
+ * @v pshdr_csum	Pseudo-header checksum
  * @ret rc		Return status code
  */
 static int udp_rx ( struct pk_buff *pkb, struct sockaddr_tcpip *st_src,
-		    struct sockaddr_tcpip *st_dest ) {
+		    struct sockaddr_tcpip *st_dest, uint16_t pshdr_csum ) {
 	struct udp_header *udphdr = pkb->data;
 	struct udp_connection *conn;
 	unsigned int ulen;
-	uint16_t chksum;
+	uint16_t csum;
 	int rc;
 
 	/* Sanity check */
@@ -225,15 +226,13 @@ static int udp_rx ( struct pk_buff *pkb, struct sockaddr_tcpip *st_src,
 	pkb_unput ( pkb, ( pkb_len ( pkb ) - ulen ) );
 
 	/* Verify the checksum */
-#warning "Don't we need to take the pseudo-header into account here?"
-#if 0
-	chksum = tcpip_chksum ( pkb->data, pkb_len ( pkb ) );
-	if ( chksum != 0xffff ) {
-		DBG ( "Bad checksum %#x\n", chksum );
+	csum = tcpip_continue_chksum ( pshdr_csum, pkb->data, pkb_len ( pkb ));
+	if ( csum != 0 ) {
+		DBG ( "UDP checksum incorrect (is %04x including checksum "
+		      "field, should be 0000)\n", csum );
 		rc = -EINVAL;
 		goto done;
 	}
-#endif
 
 	/* Complete the socket addresses */
 	st_src->st_port = udphdr->source_port;
@@ -271,5 +270,4 @@ struct tcpip_protocol udp_protocol __tcpip_protocol = {
 	.name = "UDP",
 	.rx = udp_rx,
 	.tcpip_proto = IP_UDP,
-	.csum_offset = 6,
 };

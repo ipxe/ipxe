@@ -230,44 +230,65 @@ static struct pk_buff * ipv4_reassemble ( struct pk_buff * pkb ) {
 	return NULL;
 }
 
-
 /**
- * Complete the transport-layer checksum
+ * Add IPv4 pseudo-header checksum to existing checksum
  *
- * @v pkb	Packet buffer
- * @v tcpip	Transport-layer protocol
- *
- * This function calculates the tcpip 
+ * @v pkb		Packet buffer
+ * @v csum		Existing checksum
+ * @ret csum		Updated checksum
  */
-static void ipv4_tx_csum ( struct pk_buff *pkb,
-			   struct tcpip_protocol *tcpip ) {
-	struct iphdr *iphdr = pkb->data;
+static uint16_t ipv4_pshdr_chksum ( struct pk_buff *pkb, uint16_t csum ) {
 	struct ipv4_pseudo_header pshdr;
-	uint16_t *csum = ( ( ( void * ) iphdr ) + sizeof ( *iphdr )
-			   + tcpip->csum_offset );
+	struct iphdr *iphdr = pkb->data;
+	size_t hdrlen = ( ( iphdr->verhdrlen & IP_MASK_HLEN ) * 4 );
 
-	/* Calculate pseudo header */
+	/* Build pseudo-header */
 	pshdr.src = iphdr->src;
 	pshdr.dest = iphdr->dest;
 	pshdr.zero_padding = 0x00;
 	pshdr.protocol = iphdr->protocol;
-	/* This is only valid when IPv4 does not have options */
-	pshdr.len = htons ( pkb_len ( pkb ) - sizeof ( *iphdr ) );
+	pshdr.len = htons ( pkb_len ( pkb ) - hdrlen );
 
 	/* Update the checksum value */
-	*csum = tcpip_continue_chksum ( *csum, &pshdr, sizeof ( pshdr ) );
+	return tcpip_continue_chksum ( csum, &pshdr, sizeof ( pshdr ) );
 }
 
 /**
- * Calculate the transport-layer checksum while processing packets
+ * Determine link-layer address
+ *
+ * @v dest		IPv4 destination address
+ * @v src		IPv4 source address
+ * @v netdev		Network device
+ * @v ll_dest		Link-layer destination address buffer
+ * @ret rc		Return status code
  */
-static uint16_t ipv4_rx_csum ( struct pk_buff *pkb __unused,
-			       uint8_t trans_proto __unused ) {
-	/** 
-	 * This function needs to be implemented. Until then, it will return
-	 * 0xffffffff every time
-	 */
-	return 0xffff;
+static int ipv4_ll_addr ( struct in_addr dest, struct in_addr src,
+			  struct net_device *netdev, uint8_t *ll_dest ) {
+	struct ll_protocol *ll_protocol = netdev->ll_protocol;
+	uint8_t *dest_bytes = ( ( uint8_t * ) &dest );
+
+	if ( dest.s_addr == INADDR_BROADCAST ) {
+		/* Broadcast address */
+		memcpy ( ll_dest, ll_protocol->ll_broadcast,
+			 ll_protocol->ll_addr_len );
+		return 0;
+	} else if ( IN_MULTICAST ( dest.s_addr ) ) {
+		/* Special case: IPv4 multicast over Ethernet.	This
+		 * code may need to be generalised once we find out
+		 * what happens for other link layers.
+		 */
+		ll_dest[0] = 0x01;
+		ll_dest[1] = 0x00;
+		ll_dest[2] = 0x5e;
+		ll_dest[3] = dest_bytes[1] & 0x7f;
+		ll_dest[4] = dest_bytes[2];
+		ll_dest[5] = dest_bytes[3];
+		return 0;
+	} else {
+		/* Unicast address: resolve via ARP */
+		return arp_resolve ( netdev, &ipv4_protocol, &dest,
+				     &src, ll_dest );
+	}
 }
 
 /**
@@ -276,24 +297,23 @@ static uint16_t ipv4_rx_csum ( struct pk_buff *pkb __unused,
  * @v pkb		Packet buffer
  * @v tcpip		Transport-layer protocol
  * @v st_dest		Destination network-layer address
+ * @v trans_csum	Transport-layer checksum to complete, or NULL
  * @ret rc		Status
  *
  * This function expects a transport-layer segment and prepends the IP header
  */
 static int ipv4_tx ( struct pk_buff *pkb,
 		     struct tcpip_protocol *tcpip_protocol,
-		     struct sockaddr_tcpip *st_dest ) {
+		     struct sockaddr_tcpip *st_dest, uint16_t *trans_csum ) {
 	struct iphdr *iphdr = pkb_push ( pkb, sizeof ( *iphdr ) );
 	struct sockaddr_in *sin_dest = ( ( struct sockaddr_in * ) st_dest );
 	struct ipv4_miniroute *miniroute;
-	struct net_device *netdev = NULL;
 	struct in_addr next_hop;
-	uint8_t ll_dest_buf[MAX_LL_ADDR_LEN];
-	const uint8_t *ll_dest = ll_dest_buf;
+	uint8_t ll_dest[MAX_LL_ADDR_LEN];
 	int rc;
 
 	/* Fill up the IP header, except source address */
-	iphdr->verhdrlen = ( ( IP_VER << 4 ) | ( sizeof ( *iphdr ) / 4 ) );
+	iphdr->verhdrlen = ( IP_VER | ( sizeof ( *iphdr ) / 4 ) );
 	iphdr->service = IP_TOS;
 	iphdr->len = htons ( pkb_len ( pkb ) );	
 	iphdr->ident = htons ( ++next_ident );
@@ -307,18 +327,23 @@ static int ipv4_tx ( struct pk_buff *pkb,
 	next_hop = iphdr->dest;
 	miniroute = ipv4_route ( &next_hop );
 	if ( ! miniroute ) {
-		DBG ( "No route to %s\n", inet_ntoa ( iphdr->dest ) );
+		DBG ( "IPv4 has no route to %s\n", inet_ntoa ( iphdr->dest ) );
 		rc = -EHOSTUNREACH;
 		goto err;
 	}
 	iphdr->src = miniroute->address;
-	netdev = miniroute->netdev;
 
-	/* Calculate the transport layer checksum */
-	if ( tcpip_protocol->csum_offset > 0 )
-		ipv4_tx_csum ( pkb, tcpip_protocol );
+	/* Determine link-layer destination address */
+	if ( ( rc = ipv4_ll_addr ( next_hop, iphdr->src, miniroute->netdev,
+				   ll_dest ) ) != 0 ) {
+		DBG ( "IPv4 has no link-layer address for %s\n",
+		      inet_ntoa ( iphdr->dest ) );
+		goto err;
+	}
 
-	/* Calculate header checksum, in network byte order */
+	/* Fix up checksums */
+	if ( trans_csum )
+		*trans_csum = ipv4_pshdr_chksum ( pkb, *trans_csum );
 	iphdr->chksum = tcpip_chksum ( iphdr, sizeof ( *iphdr ) );
 
 	/* Print IP4 header for debugging */
@@ -327,34 +352,8 @@ static int ipv4_tx ( struct pk_buff *pkb,
 	      inet_ntoa ( iphdr->dest ), ntohs ( iphdr->len ), iphdr->protocol,
 	      ntohs ( iphdr->ident ), ntohs ( iphdr->chksum ) );
 
-	/* Determine link-layer destination address */
-	if ( next_hop.s_addr == INADDR_BROADCAST ) {
-		/* Broadcast address */
-		ll_dest = netdev->ll_protocol->ll_broadcast;
-	} else if ( IN_MULTICAST ( next_hop.s_addr ) ) {
-		/* Special case: IPv4 multicast over Ethernet.	This
-		 * code may need to be generalised once we find out
-		 * what happens for other link layers.
-		 */
-		uint8_t *next_hop_bytes = ( uint8_t * ) &next_hop;
-		ll_dest_buf[0] = 0x01;
-		ll_dest_buf[0] = 0x00;
-		ll_dest_buf[0] = 0x5e;
-		ll_dest_buf[3] = next_hop_bytes[1] & 0x7f;
-		ll_dest_buf[4] = next_hop_bytes[2];
-		ll_dest_buf[5] = next_hop_bytes[3];
-	} else {
-		/* Unicast address: resolve via ARP */
-		if ( ( rc = arp_resolve ( netdev, &ipv4_protocol, &next_hop,
-					  &iphdr->src, ll_dest_buf ) ) != 0 ) {
-			DBG ( "No ARP entry for %s\n",
-			      inet_ntoa ( iphdr->dest ) );
-			goto err;
-		}
-	}
-
 	/* Hand off to link layer */
-	return net_tx ( pkb, netdev, &ipv4_protocol, ll_dest );
+	return net_tx ( pkb, miniroute->netdev, &ipv4_protocol, ll_dest );
 
  err:
 	free_pkb ( pkb );
@@ -374,73 +373,85 @@ static int ipv4_tx ( struct pk_buff *pkb,
 static int ipv4_rx ( struct pk_buff *pkb, struct net_device *netdev __unused,
 		     const void *ll_source __unused ) {
 	struct iphdr *iphdr = pkb->data;
+	size_t hdrlen;
+	size_t len;
 	union {
 		struct sockaddr_in sin;
 		struct sockaddr_tcpip st;
 	} src, dest;
-	uint16_t chksum;
+	uint16_t csum;
+	uint16_t pshdr_csum;
 
-	/* Sanity check */
+	/* Sanity check the IPv4 header */
 	if ( pkb_len ( pkb ) < sizeof ( *iphdr ) ) {
-		DBG ( "IP datagram too short (%d bytes)\n", pkb_len ( pkb ) );
+		DBG ( "IPv4 packet too short at %d bytes (min %d bytes)\n",
+		      pkb_len ( pkb ), sizeof ( *iphdr ) );
+		goto err;
+	}
+	if ( ( iphdr->verhdrlen & IP_MASK_VER ) != IP_VER ) {
+		DBG ( "IPv4 version %#02x not supported\n", iphdr->verhdrlen );
+		goto err;
+	}
+	hdrlen = ( ( iphdr->verhdrlen & IP_MASK_HLEN ) * 4 );
+	if ( hdrlen < sizeof ( *iphdr ) ) {
+		DBG ( "IPv4 header too short at %d bytes (min %d bytes)\n",
+		      hdrlen, sizeof ( *iphdr ) );
+		goto err;
+	}
+	if ( hdrlen > pkb_len ( pkb ) ) {
+		DBG ( "IPv4 header too long at %d bytes "
+		      "(packet is %d bytes)\n", hdrlen, pkb_len ( pkb ) );
+		goto err;
+	}
+	if ( ( csum = tcpip_chksum ( iphdr, hdrlen ) ) != 0 ) {
+		DBG ( "IPv4 checksum incorrect (is %04x including checksum "
+		      "field, should be 0000)\n", csum );
+		goto err;
+	}
+	len = ntohs ( iphdr->len );
+	if ( len < hdrlen ) {
+		DBG ( "IPv4 length too short at %d bytes "
+		      "(header is %d bytes)\n", len, hdrlen );
+		goto err;
+	}
+	if ( len > pkb_len ( pkb ) ) {
+		DBG ( "IPv4 length too long at %d bytes "
+		      "(packet is %d bytes)\n", len, pkb_len ( pkb ) );
 		goto err;
 	}
 
-	/* Print IP4 header for debugging */
+	/* Print IPv4 header for debugging */
 	DBG ( "IPv4 RX %s<-", inet_ntoa ( iphdr->dest ) );
 	DBG ( "%s len %d proto %d id %04x csum %04x\n",
 	      inet_ntoa ( iphdr->src ), ntohs ( iphdr->len ), iphdr->protocol,
 	      ntohs ( iphdr->ident ), ntohs ( iphdr->chksum ) );
 
-	/* Validate version and header length */
-	if ( iphdr->verhdrlen != 0x45 ) {
-		DBG ( "Bad version and header length %x\n", iphdr->verhdrlen );
-		goto err;
-	}
+	/* Truncate packet to correct length, calculate pseudo-header
+	 * checksum and then strip off the IPv4 header.
+	 */
+	pkb_unput ( pkb, ( pkb_len ( pkb ) - len ) );
+	pshdr_csum = ipv4_pshdr_chksum ( pkb, TCPIP_EMPTY_CSUM );
+	pkb_pull ( pkb, hdrlen );
 
-	/* Validate length of IP packet */
-	if ( ntohs ( iphdr->len ) > pkb_len ( pkb ) ) {
-		DBG ( "Inconsistent packet length %d\n",
-		      ntohs ( iphdr->len ) );
-		goto err;
-	}
-
-	/* Verify the checksum */
-	if ( ( chksum = ipv4_rx_csum ( pkb, iphdr->protocol ) )	!= 0xffff ) {
-		DBG ( "Bad checksum %x\n", chksum );
-	}
 	/* Fragment reassembly */
 	if ( ( iphdr->frags & htons ( IP_MASK_MOREFRAGS ) ) || 
 	     ( ( iphdr->frags & htons ( IP_MASK_OFFSET ) ) != 0 ) ) {
-		/* Pass the fragment to the reassembler ipv4_ressable() which
-		 * either returns a fully reassembled packet buffer or NULL.
+		/* Pass the fragment to ipv4_reassemble() which either
+		 * returns a fully reassembled packet buffer or NULL.
 		 */
 		pkb = ipv4_reassemble ( pkb );
-		if ( !pkb ) {
+		if ( ! pkb )
 			return 0;
-		}
 	}
 
-	/* To reduce code size, the following functions are not implemented:
-	 * 1. Check the destination address
-	 * 2. Check the TTL field
-	 * 3. Check the service field
-	 */
-
-	/* Construct socket addresses */
+	/* Construct socket addresses and hand off to transport layer */
 	memset ( &src, 0, sizeof ( src ) );
 	src.sin.sin_family = AF_INET;
 	src.sin.sin_addr = iphdr->src;
 	memset ( &dest, 0, sizeof ( dest ) );
 	dest.sin.sin_family = AF_INET;
 	dest.sin.sin_addr = iphdr->dest;
-
-	/* Strip header */
-	pkb_unput ( pkb, pkb_len ( pkb ) - ntohs ( iphdr->len ) );
-	pkb_pull ( pkb, sizeof ( *iphdr ) );
-
-	/* Send it to the transport layer */
-	return tcpip_rx ( pkb, iphdr->protocol, &src.st, &dest.st );
+	return tcpip_rx ( pkb, iphdr->protocol, &src.st, &dest.st, pshdr_csum);
 
  err:
 	free_pkb ( pkb );

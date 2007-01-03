@@ -32,6 +32,7 @@ tcpip_protocols_end[0] __table_end ( tcpip_protocols );
  * @v tcpip_proto	Transport-layer protocol number
  * @v st_src		Partially-filled source address
  * @v st_dest		Partially-filled destination address
+ * @v pshdr_csum	Pseudo-header checksum
  * @ret rc		Return status code
  *
  * This function expects a transport-layer segment from the network
@@ -42,14 +43,15 @@ tcpip_protocols_end[0] __table_end ( tcpip_protocols );
  */
 int tcpip_rx ( struct pk_buff *pkb, uint8_t tcpip_proto, 
 	       struct sockaddr_tcpip *st_src,
-	       struct sockaddr_tcpip *st_dest ) {
+	       struct sockaddr_tcpip *st_dest,
+	       uint16_t pshdr_csum ) {
 	struct tcpip_protocol *tcpip;
 
 	/* Hand off packet to the appropriate transport-layer protocol */
 	for ( tcpip = tcpip_protocols; tcpip < tcpip_protocols_end; tcpip++ ) {
 		if ( tcpip->tcpip_proto == tcpip_proto ) {
 			DBG ( "TCP/IP received %s packet\n", tcpip->name );
-			return tcpip->rx ( pkb, st_src, st_dest );
+			return tcpip->rx ( pkb, st_src, st_dest, pshdr_csum );
 		}
 	}
 
@@ -63,10 +65,11 @@ int tcpip_rx ( struct pk_buff *pkb, uint8_t tcpip_proto,
  * @v pkb		Packet buffer
  * @v tcpip_protocol	Transport-layer protocol
  * @v st_dest		Destination address
+ * @v trans_csum	Transport-layer checksum to complete, or NULL
  * @ret rc		Return status code
  */
 int tcpip_tx ( struct pk_buff *pkb, struct tcpip_protocol *tcpip_protocol,
-	       struct sockaddr_tcpip *st_dest ) {
+	       struct sockaddr_tcpip *st_dest, uint16_t *trans_csum ) {
 	struct tcpip_net_protocol *tcpip_net;
 
 	/* Hand off packet to the appropriate network-layer protocol */
@@ -74,7 +77,8 @@ int tcpip_tx ( struct pk_buff *pkb, struct tcpip_protocol *tcpip_protocol,
 	      tcpip_net < tcpip_net_protocols_end ; tcpip_net++ ) {
 		if ( tcpip_net->sa_family == st_dest->st_family ) {
 			DBG ( "TCP/IP sending %s packet\n", tcpip_net->name );
-			return tcpip_net->tx ( pkb, tcpip_protocol, st_dest );
+			return tcpip_net->tx ( pkb, tcpip_protocol, st_dest,
+					       trans_csum );
 		}
 	}
 	
@@ -101,8 +105,8 @@ int tcpip_tx ( struct pk_buff *pkb, struct tcpip_protocol *tcpip_protocol,
  * or both.  Deciding which to swap is left as an exercise for the
  * interested reader.
  */
-unsigned int tcpip_continue_chksum ( unsigned int partial, const void *data,
-				     size_t len ) {
+uint16_t tcpip_continue_chksum ( uint16_t partial, const void *data,
+				 size_t len ) {
 	unsigned int cksum = ( ( ~partial ) & 0xffff );
 	unsigned int value;
 	unsigned int i;
@@ -121,7 +125,7 @@ unsigned int tcpip_continue_chksum ( unsigned int partial, const void *data,
 			cksum -= 0xffff;
 	}
 	
-	return ( ( ~cksum ) & 0xffff );
+	return ( ~cksum );
 }
 
 /**
@@ -134,6 +138,6 @@ unsigned int tcpip_continue_chksum ( unsigned int partial, const void *data,
  * Calculates a TCP/IP-style 16-bit checksum over the data block.  The
  * checksum is returned in network byte order.
  */
-unsigned int tcpip_chksum ( const void *data, size_t len ) {
-	return tcpip_continue_chksum ( 0xffff, data, len );
+uint16_t tcpip_chksum ( const void *data, size_t len ) {
+	return tcpip_continue_chksum ( TCPIP_EMPTY_CSUM, data, len );
 }

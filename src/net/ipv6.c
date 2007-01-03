@@ -103,11 +103,9 @@ void del_ipv6_address ( struct net_device *netdev ) {
  * This function constructs the pseudo header and completes the checksum in the
  * upper layer header.
  */
-static void ipv6_tx_csum ( struct pk_buff *pkb, struct tcpip_protocol *tcpip ) {
+static uint16_t ipv6_tx_csum ( struct pk_buff *pkb, uint16_t csum ) {
 	struct ip6_header *ip6hdr = pkb->data;
 	struct ipv6_pseudo_header pshdr;
-	uint16_t *csum = ( ( ( void * ) ip6hdr ) + sizeof ( *ip6hdr ) +
-			tcpip->csum_offset );
 
 	/* Calculate pseudo header */
 	memset ( &pshdr, 0, sizeof ( pshdr ) );
@@ -117,7 +115,7 @@ static void ipv6_tx_csum ( struct pk_buff *pkb, struct tcpip_protocol *tcpip ) {
 	pshdr.nxt_hdr = ip6hdr->nxt_hdr;
 
 	/* Update checksum value */
-	*csum = tcpip_continue_chksum ( *csum, &pshdr, sizeof ( pshdr ) );
+	return tcpip_continue_chksum ( csum, &pshdr, sizeof ( pshdr ) );
 }
 
 /**
@@ -142,7 +140,8 @@ void ipv6_dump ( struct ip6_header *ip6hdr ) {
  */
 static int ipv6_tx ( struct pk_buff *pkb,
 		     struct tcpip_protocol *tcpip,
-		     struct sockaddr_tcpip *st_dest ) {
+		     struct sockaddr_tcpip *st_dest,
+		     uint16_t *trans_csum ) {
 	struct sockaddr_in6 *dest = ( struct sockaddr_in6* ) st_dest;
 	struct in6_addr next_hop;
 	struct ipv6_miniroute *miniroute;
@@ -184,9 +183,8 @@ static int ipv6_tx ( struct pk_buff *pkb,
 	}
 
 	/* Complete the transport layer checksum */
-	if ( tcpip->csum_offset > 0 ) {
-		ipv6_tx_csum ( pkb, tcpip );
-	}
+	if ( trans_csum )
+		*trans_csum = ipv6_tx_csum ( pkb, *trans_csum );
 
 	/* Print IPv6 header */
 	ipv6_dump ( ip6hdr );
@@ -244,7 +242,7 @@ static int ipv6_process_nxt_hdr ( struct pk_buff *pkb, uint8_t nxt_hdr,
 		return 0;
 	}
 	/* Next header is not a IPv6 extension header */
-	return tcpip_rx ( pkb, nxt_hdr, src, dest );
+	return tcpip_rx ( pkb, nxt_hdr, src, dest, 0 /* fixme */ );
 }
 
 /**

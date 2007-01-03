@@ -309,7 +309,7 @@ static int tcp_senddata_conn ( struct tcp_connection *conn, int force_send ) {
 	DBGC ( conn, "\n" );
 
 	/* Transmit packet */
-	return tcpip_tx ( pkb, &tcp_protocol, &conn->peer );
+	return tcpip_tx ( pkb, &tcp_protocol, &conn->peer, &tcphdr->csum );
 }
 
 /**
@@ -591,14 +591,19 @@ static int tcp_rx_fin ( struct tcp_connection *conn, uint32_t seq ) {
  * Process received packet
  *
  * @v pkb		Packet buffer
- * @v partial		Partial checksum
- */
+ * @v st_src		Partially-filled source address
+ * @v st_dest		Partially-filled destination address
+ * @v pshdr_csum	Pseudo-header checksum
+ * @ret rc		Return status code
+  */
 static int tcp_rx ( struct pk_buff *pkb,
 		    struct sockaddr_tcpip *st_src __unused,
-		    struct sockaddr_tcpip *st_dest __unused ) {
+		    struct sockaddr_tcpip *st_dest __unused,
+		    uint16_t pshdr_csum ) {
 	struct tcp_header *tcphdr;
 	struct tcp_connection *conn;
 	unsigned int hlen;
+	uint16_t csum;
 	uint32_t start_seq;
 	uint32_t seq;
 	uint32_t ack;
@@ -608,7 +613,7 @@ static int tcp_rx ( struct pk_buff *pkb,
 	size_t len;
 	int rc = 0;
 
-	/* Sanity check packet and strip TCP header */
+	/* Sanity check packet */
 	if ( pkb_len ( pkb ) < sizeof ( *tcphdr ) ) {
 		DBG ( "TCP packet too short at %d bytes (min %d bytes)\n",
 		      pkb_len ( pkb ), sizeof ( *tcphdr ) );
@@ -629,9 +634,12 @@ static int tcp_rx ( struct pk_buff *pkb,
 		rc = -EINVAL;
 		goto err;
 	}
-
-	/* TODO: Verify checksum */
-#warning "Verify checksum"
+	csum = tcpip_continue_chksum ( pshdr_csum, pkb->data, pkb_len ( pkb ));
+	if ( csum != 0 ) {
+		DBG ( "TCP checksum incorrect (is %04x including checksum "
+		      "field, should be 0000)\n", csum );
+		goto err;
+	}
 	
 	/* Parse parameters from header and strip header */
 	conn = tcp_demux ( tcphdr->dest );
@@ -845,5 +853,4 @@ struct tcpip_protocol tcp_protocol __tcpip_protocol = {
 	.name = "TCP",
 	.rx = tcp_rx,
 	.tcpip_proto = IP_TCP,
-	.csum_offset = 16,
 };
