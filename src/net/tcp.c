@@ -559,7 +559,8 @@ static int tcp_rx_data ( struct tcp_connection *conn, uint32_t seq,
 	return 0;
 }
 
-/** Handle TCP received FIN
+/**
+ * Handle TCP received FIN
  *
  * @v conn		TCP connection
  * @v seq		SEQ value (in host-endian order)
@@ -585,6 +586,46 @@ static int tcp_rx_fin ( struct tcp_connection *conn, uint32_t seq ) {
 		app->tcp_op->closed ( app, 0 );
 
 	return 0;
+}
+
+/**
+ * Handle TCP received RST
+ *
+ * @v conn		TCP connection
+ * @v seq		SEQ value (in host-endian order)
+ * @ret rc		Return status code
+ */
+static int tcp_rx_rst ( struct tcp_connection *conn, uint32_t seq ) {
+	struct tcp_application *app = conn->app;
+
+	/* Accept RST only if it falls within the window.  If we have
+	 * not yet received a SYN, then we have no window to test
+	 * against, so fall back to checking that our SYN has been
+	 * ACKed.
+	 */
+	if ( conn->tcp_state & TCP_STATE_RCVD ( TCP_SYN ) ) {
+		if ( ( conn->rcv_ack - seq ) > 0 )
+			return 0;
+	} else {
+		if ( ! ( conn->tcp_state & TCP_STATE_ACKED ( TCP_SYN ) ) )
+			return 0;
+	}
+
+	/* Transition to CLOSED */
+	conn->tcp_state = TCP_CLOSED;
+	tcp_dump_state ( conn );
+
+	/* Break association between application and connection */
+	tcp_disassociate ( conn );
+	
+	/* Free the connection */
+	free_tcp ( conn );
+	
+	/* Notify application */
+	if ( app && app->tcp_op->closed )
+		app->tcp_op->closed ( app, -ECONNRESET );
+
+	return -ECONNRESET;
 }
 
 /**
@@ -668,13 +709,6 @@ static int tcp_rx ( struct pk_buff *pkb,
 		goto done;
 	}
 
-	/* Handle RST, if present */
-#warning "Handle RST"
-	if ( flags & TCP_RST ) {
-		rc = -ECONNRESET;
-		goto done;
-	}
-
 	/* Handle ACK, if present */
 	if ( flags & TCP_ACK )
 		tcp_rx_ack ( conn, ack, win );
@@ -683,6 +717,12 @@ static int tcp_rx ( struct pk_buff *pkb,
 	if ( flags & TCP_SYN ) {
 		tcp_rx_syn ( conn, seq );
 		seq++;
+	}
+
+	/* Handle RST, if present */
+	if ( flags & TCP_RST ) {
+		if ( ( rc = tcp_rx_rst ( conn, seq ) ) != 0 )
+			goto done;
 	}
 
 	/* Handle new data, if any */
@@ -695,7 +735,7 @@ static int tcp_rx ( struct pk_buff *pkb,
 		seq++;
 	}
 
-	/* Dump out any state change as a result of SYN, FIN or ACK */
+	/* Dump out any state change as a result of the received packet */
 	tcp_dump_state ( conn );
 
 	/* Send out any pending data.  If peer is expecting an ACK for
