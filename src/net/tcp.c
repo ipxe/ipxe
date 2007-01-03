@@ -600,7 +600,7 @@ static int tcp_rx ( struct pk_buff *pkb,
 		    struct sockaddr_tcpip *st_src __unused,
 		    struct sockaddr_tcpip *st_dest __unused,
 		    uint16_t pshdr_csum ) {
-	struct tcp_header *tcphdr;
+	struct tcp_header *tcphdr = pkb->data;
 	struct tcp_connection *conn;
 	unsigned int hlen;
 	uint16_t csum;
@@ -611,34 +611,34 @@ static int tcp_rx ( struct pk_buff *pkb,
 	unsigned int flags;
 	void *data;
 	size_t len;
-	int rc = 0;
+	int rc;
 
 	/* Sanity check packet */
 	if ( pkb_len ( pkb ) < sizeof ( *tcphdr ) ) {
 		DBG ( "TCP packet too short at %d bytes (min %d bytes)\n",
 		      pkb_len ( pkb ), sizeof ( *tcphdr ) );
 		rc = -EINVAL;
-		goto err;
+		goto done;
 	}
-	tcphdr = pkb->data;
 	hlen = ( ( tcphdr->hlen & TCP_MASK_HLEN ) / 16 ) * 4;
 	if ( hlen < sizeof ( *tcphdr ) ) {
 		DBG ( "TCP header too short at %d bytes (min %d bytes)\n",
 		      hlen, sizeof ( *tcphdr ) );
 		rc = -EINVAL;
-		goto err;
+		goto done;
 	}
 	if ( hlen > pkb_len ( pkb ) ) {
 		DBG ( "TCP header too long at %d bytes (max %d bytes)\n",
 		      hlen, pkb_len ( pkb ) );
 		rc = -EINVAL;
-		goto err;
+		goto done;
 	}
 	csum = tcpip_continue_chksum ( pshdr_csum, pkb->data, pkb_len ( pkb ));
 	if ( csum != 0 ) {
 		DBG ( "TCP checksum incorrect (is %04x including checksum "
 		      "field, should be 0000)\n", csum );
-		goto err;
+		rc = -EINVAL;
+		goto done;
 	}
 	
 	/* Parse parameters from header and strip header */
@@ -663,13 +663,17 @@ static int tcp_rx ( struct pk_buff *pkb,
 	 * sending RST
 	 */
 #warning "Handle non-matched connections"
-	if ( ! conn )
-		goto err;
+	if ( ! conn ) {
+		rc = -ENOTCONN;
+		goto done;
+	}
 
 	/* Handle RST, if present */
 #warning "Handle RST"
-	if ( flags & TCP_RST )
-		goto err;
+	if ( flags & TCP_RST ) {
+		rc = -ECONNRESET;
+		goto done;
+	}
 
 	/* Handle ACK, if present */
 	if ( flags & TCP_ACK )
@@ -707,7 +711,8 @@ static int tcp_rx ( struct pk_buff *pkb,
 		start_timer ( &conn->timer );
 	}
 
- err:
+	rc = 0;
+ done:
 	/* Free received packet */
 	free_pkb ( pkb );
 	return rc;

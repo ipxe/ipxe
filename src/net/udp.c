@@ -69,7 +69,8 @@ int udp_open ( struct udp_connection *conn, uint16_t local_port ) {
 
 	/* Add to UDP connection list */
 	list_add ( &conn->list, &udp_conns );
-	DBG ( "UDP opened %p on port %d\n", conn, ntohs ( local_port ) );
+	DBGC ( conn, "UDP %p opened on port %d\n", conn,
+	       ntohs ( local_port ) );
 
 	return 0;
 }
@@ -81,7 +82,7 @@ int udp_open ( struct udp_connection *conn, uint16_t local_port ) {
  */
 void udp_close ( struct udp_connection *conn ) {
 	list_del ( &conn->list );
-	DBG ( "UDP closed %p\n", conn );
+	DBGC ( conn, "UDP %p closed\n", conn );
 }
 
 /**
@@ -97,8 +98,8 @@ int udp_senddata ( struct udp_connection *conn ) {
 
 	conn->tx_pkb = alloc_pkb ( UDP_MAX_TXPKB );
 	if ( conn->tx_pkb == NULL ) {
-		DBG ( "UDP %p cannot allocate packet buffer of length %d\n",
-		      conn, UDP_MAX_TXPKB );
+		DBGC ( conn, "UDP %p cannot allocate buffer of length %d\n",
+		       conn, UDP_MAX_TXPKB );
 		return -ENOMEM;
 	}
 	pkb_reserve ( conn->tx_pkb, UDP_MAX_HLEN );
@@ -156,11 +157,9 @@ int udp_sendto ( struct udp_connection *conn, struct sockaddr_tcpip *peer,
 	udphdr->chksum = tcpip_chksum ( udphdr, sizeof ( *udphdr ) + len );
 
 	/* Dump debugging information */
-	DBG ( "UDP %p transmitting %p+%#zx len %#x src %d dest %d "
-	      "chksum %#04x\n", conn, pkb->data,
-	      pkb_len ( pkb ), ntohs ( udphdr->len ),
-	      ntohs ( udphdr->source_port ), ntohs ( udphdr->dest_port ),
-	      ntohs ( udphdr->chksum ) );
+	DBGC ( conn, "UDP %p TX %d->%d len %zd\n", conn,
+	       ntohs ( udphdr->source_port ), ntohs ( udphdr->dest_port ),
+	       ntohs ( udphdr->len ) );
 
 	/* Send it to the next layer for processing */
 	return tcpip_tx ( pkb, &udp_protocol, peer, &udphdr->chksum );
@@ -185,6 +184,24 @@ int udp_send ( struct udp_connection *conn, const void *data, size_t len ) {
 }
 
 /**
+ * Identify UDP connection by local port number
+ *
+ * @v local_port	Local port (in network-endian order)
+ * @ret conn		TCP connection, or NULL
+ */
+static struct udp_connection * udp_demux ( uint16_t local_port ) {
+	struct udp_connection *conn;
+
+	list_for_each_entry ( conn, &udp_conns, list ) {
+		if ( ( conn->local_port == local_port ) ||
+		     ( conn->local_port == 0 ) ) {
+			return conn;
+		}
+	}
+	return NULL;
+}
+
+/**
  * Process a received packet
  *
  * @v pkb		Packet buffer
@@ -197,36 +214,32 @@ static int udp_rx ( struct pk_buff *pkb, struct sockaddr_tcpip *st_src,
 		    struct sockaddr_tcpip *st_dest, uint16_t pshdr_csum ) {
 	struct udp_header *udphdr = pkb->data;
 	struct udp_connection *conn;
-	unsigned int ulen;
+	size_t ulen;
 	uint16_t csum;
 	int rc;
 
-	/* Sanity check */
+	/* Sanity check packet */
 	if ( pkb_len ( pkb ) < sizeof ( *udphdr ) ) {
-		DBG ( "UDP received underlength packet %p+%#zx\n",
-		      pkb->data, pkb_len ( pkb ) );
+		DBG ( "UDP packet too short at %d bytes (min %d bytes)\n",
+		      pkb_len ( pkb ), sizeof ( *udphdr ) );
+		
 		rc = -EINVAL;
 		goto done;
 	}
-
-	/* Dump debugging information */
-	DBG ( "UDP received %p+%#zx len %#x src %d dest %d chksum %#04x\n",
-	      pkb->data, pkb_len ( pkb ), ntohs ( udphdr->len ),
-	      ntohs ( udphdr->source_port ), ntohs ( udphdr->dest_port ),
-	      ntohs ( udphdr->chksum ) );
-
-	/* Check length and trim any excess */
 	ulen = ntohs ( udphdr->len );
-	if ( ulen > pkb_len ( pkb ) ) {
-		DBG ( "UDP received truncated packet %p+%#zx\n",
-		      pkb->data, pkb_len ( pkb ) );
+	if ( ulen < sizeof ( *udphdr ) ) {
+		DBG ( "UDP length too short at %d bytes "
+		      "(header is %d bytes)\n", ulen, sizeof ( *udphdr ) );
 		rc = -EINVAL;
 		goto done;
 	}
-	pkb_unput ( pkb, ( pkb_len ( pkb ) - ulen ) );
-
-	/* Verify the checksum */
-	csum = tcpip_continue_chksum ( pshdr_csum, pkb->data, pkb_len ( pkb ));
+	if ( ulen > pkb_len ( pkb ) ) {
+		DBG ( "UDP length too long at %d bytes (packet is %d bytes)\n",
+		      ulen, pkb_len ( pkb ) );
+		rc = -EINVAL;
+		goto done;
+	}
+	csum = tcpip_continue_chksum ( pshdr_csum, pkb->data, ulen );
 	if ( csum != 0 ) {
 		DBG ( "UDP checksum incorrect (is %04x including checksum "
 		      "field, should be 0000)\n", csum );
@@ -234,32 +247,29 @@ static int udp_rx ( struct pk_buff *pkb, struct sockaddr_tcpip *st_src,
 		goto done;
 	}
 
-	/* Complete the socket addresses */
+	/* Parse parameters from header and strip header */
 	st_src->st_port = udphdr->source_port;
 	st_dest->st_port = udphdr->dest_port;
+	conn = udp_demux ( udphdr->dest_port );
+	pkb_unput ( pkb, ( pkb_len ( pkb ) - ulen ) );
+	pkb_pull ( pkb, sizeof ( *udphdr ) );
 
-	/* Demux the connection */
-	list_for_each_entry ( conn, &udp_conns, list ) {
-		if ( conn->local_port &&
-		     ( conn->local_port != udphdr->dest_port ) ) {
-			/* Bound to local port and local port doesn't match */
-			continue;
-		}
-		
-		/* Strip off the UDP header */
-		pkb_pull ( pkb, sizeof ( *udphdr ) );
+	/* Dump debugging information */
+	DBGC ( conn, "UDP %p RX %d<-%d len %zd\n", conn,
+	       ntohs ( udphdr->dest_port ), ntohs ( udphdr->source_port ),
+	       ulen );
 
-		DBG ( "UDP delivering to %p\n", conn );
-		
-		/* Call the application's callback */
-		rc = conn->udp_op->newdata ( conn, pkb->data, pkb_len( pkb ),
-					     st_src, st_dest );
+	/* Ignore if no matching connection found */
+	if ( ! conn ) {
+		DBG ( "No UDP connection listening on port %d\n",
+		      ntohs ( udphdr->dest_port ) );
+		rc = -ENOTCONN;
 		goto done;
 	}
 
-	DBG ( "No UDP connection listening on port %d\n",
-	      ntohs ( udphdr->dest_port ) );
-	rc = 0;
+	/* Pass data to application */
+	rc = conn->udp_op->newdata ( conn, pkb->data, pkb_len ( pkb ),
+				     st_src, st_dest );
 
  done:
 	free_pkb ( pkb );
