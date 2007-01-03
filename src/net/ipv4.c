@@ -414,9 +414,8 @@ static int ipv4_rx ( struct pk_buff *pkb, struct net_device *netdev __unused,
 		DBG ( "Bad checksum %x\n", chksum );
 	}
 	/* Fragment reassembly */
-	if ( iphdr->frags & IP_MASK_MOREFRAGS || 
-		( !iphdr->frags & IP_MASK_MOREFRAGS &&
-			iphdr->frags & IP_MASK_OFFSET != 0 ) ) {
+	if ( ( iphdr->frags & IP_MASK_MOREFRAGS ) || 
+	     ( ( iphdr->frags & IP_MASK_OFFSET ) != 0 ) ) {
 		/* Pass the fragment to the reassembler ipv4_ressable() which
 		 * either returns a fully reassembled packet buffer or NULL.
 		 */
