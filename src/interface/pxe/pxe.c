@@ -25,6 +25,7 @@
 #include "dev.h"
 #include "pxe.h"
 
+#warning "pxe_netdev should hold a persistent reference to the net device"
 struct net_device *pxe_netdev = NULL;
 
 #if 0
