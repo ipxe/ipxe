@@ -86,6 +86,9 @@ struct aoe_session {
 
 	/** Network device */
 	struct net_device *netdev;
+	/** Reference to network device */
+	struct reference netdev_ref;
+
 	/** Major number */
 	uint16_t major;
 	/** Minor number */
