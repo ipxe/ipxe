@@ -13,6 +13,7 @@
 #include <gpxe/retry.h>
 #include <gpxe/async.h>
 #include <gpxe/ata.h>
+#include <gpxe/hotplug.h>
 
 /** An AoE ATA command */
 struct aoecmd {
