@@ -38,13 +38,12 @@ assert_printf ( const char *fmt, ... ) asm ( "printf" );
  * @todo Make an assertion failure abort the program
  *
  */
-#define assert( condition ) 						   \
-	do { 								   \
-		if ( ASSERTING && ! (condition) ) { 			   \
-			assert_printf ( "assert(%s) failed at %s line "	   \
-					"%d [%s]\n", #condition, __FILE__, \
-					__LINE__, __FUNCTION__ );	   \
-		} 							   \
+#define assert( condition ) 						     \
+	do { 								     \
+		if ( ASSERTING && ! (condition) ) { 			     \
+			assert_printf ( "assert(%s) failed at %s line %d\n", \
+					#condition, __FILE__, __LINE__ );    \
+		} 							     \
 	} while ( 0 )
 
 /**
