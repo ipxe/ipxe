@@ -3,6 +3,7 @@
 
 #include "pxe_types.h"
 #include "pxe_api.h"
+#include <gpxe/device.h>
 
 /* Parameter block for pxenv_unknown() */
 struct s_PXENV_UNKNOWN {
@@ -61,38 +62,55 @@ union u_PXENV_ANY {
 
 typedef union u_PXENV_ANY PXENV_ANY_t;
 
-/* PXE stack status indicator.  See pxe_export.c for further
- * explanation.
+/** A PXE device */
+struct pxe_device {
+	/** Generic device */
+	struct device dev;
+	/** Driver-private data
+	 *
+	 * Use pxe_set_drvdata() and pxe_get_drvdata() to access this
+	 * field.
+	 */
+	void *priv;
+
+	/** PXENV+ structure address */
+	SEGOFF16_t pxenv;
+	/** !PXE structure address */
+	SEGOFF16_t ppxe;
+	/** Entry point */
+	SEGOFF16_t entry;
+	/** MAC address */
+	MAC_ADDR_t hwaddr;
+	/** Assigned IRQ number */
+	UINT16_t irq;
+	/** ROM address */
+	SEGSEL_t rom;
+};
+
+/**
+ * Set PXE driver-private data
+ *
+ * @v pxe		PXE device
+ * @v priv		Private data
  */
-typedef enum {
-	CAN_UNLOAD = 0,
-	MIDWAY,
-	READY
-} pxe_stack_state_t;
+static inline void pxe_set_drvdata ( struct pxe_device *pxe, void *priv ) {
+	pxe->priv = priv;
+}
 
-#define ENSURE_CAN_UNLOAD(structure) if ( ! ensure_pxe_state(CAN_UNLOAD) ) { \
-			structure->Status = PXENV_STATUS_UNDI_INVALID_STATE; \
-			return PXENV_EXIT_FAILURE; }
-#define ENSURE_MIDWAY(structure) if ( ! ensure_pxe_state(MIDWAY) ) { \
-			structure->Status = PXENV_STATUS_UNDI_INVALID_STATE; \
-			return PXENV_EXIT_FAILURE; }
-#define ENSURE_READY(structure) if ( ! ensure_pxe_state(READY) ) { \
-			structure->Status = PXENV_STATUS_UNDI_INVALID_STATE; \
-			return PXENV_EXIT_FAILURE; }
-
-/* Data structures installed as part of a PXE stack.  Architectures
- * will have extra information to append to the end of this.
+/**
+ * Get PXE driver-private data
+ *
+ * @v pxe		PXE device
+ * @ret priv		Private data
  */
-#define PXE_TFTP_MAGIC_COOKIE ( ( 'P'<<24 ) | ( 'x'<<16 ) | ( 'T'<<8 ) | 'f' )
-typedef struct pxe_stack {
-	struct s_PXE		pxe	__attribute__ ((aligned(16)));
-	struct s_PXENV		pxenv	__attribute__ ((aligned(16)));
-	pxe_stack_state_t	state;
-} pxe_stack_t;
+static inline void * pxe_get_drvdata ( struct pxe_device *pxe ) {
+	return pxe->priv;
+}
 
-extern int ensure_pxe_state ( pxe_stack_state_t wanted );
-
-extern pxe_stack_t *pxe_stack;
+extern int pxe_call ( struct pxe_device *pxe, unsigned int function,
+		      void *params, size_t params_len );
+extern int undi_probe ( struct pxe_device *pxe );
+extern void undi_remove ( struct pxe_device *pxe );
 
 extern struct net_device *pxe_netdev;
 
