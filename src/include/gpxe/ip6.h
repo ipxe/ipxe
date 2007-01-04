@@ -69,5 +69,10 @@ extern struct net_protocol ipv6_protocol;
 extern struct tcpip_net_protocol ipv6_tcpip_protocol;
 extern char * inet6_ntoa ( struct in6_addr in6 );
 
+extern int add_ipv6_address ( struct net_device *netdev,
+			      struct in6_addr prefix, int prefix_len,
+			      struct in6_addr address,
+			      struct in6_addr gateway );
+extern void del_ipv6_address ( struct net_device *netdev );
 
 #endif /* _GPXE_IP6_H */

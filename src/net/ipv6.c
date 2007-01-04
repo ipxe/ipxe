@@ -30,8 +30,12 @@ static struct in6_addr ip6_none = {
 struct ipv6_miniroute {
 	/* List of miniroutes */
 	struct list_head list;
+
 	/* Network device */
 	struct net_device *netdev;
+	/** Reference to network device */
+	struct reference netdev_ref;
+
 	/* Destination prefix */
 	struct in6_addr prefix;
 	/* Prefix length */
@@ -44,6 +48,71 @@ struct ipv6_miniroute {
 
 /** List of IPv6 miniroutes */
 static LIST_HEAD ( miniroutes );
+
+static void ipv6_forget_netdev ( struct reference *ref );
+
+/**
+ * Add IPv6 minirouting table entry
+ *
+ * @v netdev		Network device
+ * @v prefix		Destination prefix
+ * @v address		Address of the interface
+ * @v gateway		Gateway address (or ::0 for no gateway)
+ * @ret miniroute	Routing table entry, or NULL
+ */
+static struct ipv6_miniroute * add_ipv6_miniroute ( struct net_device *netdev,
+						    struct in6_addr prefix,
+						    int prefix_len,
+						    struct in6_addr address,
+						    struct in6_addr gateway ) {
+	struct ipv6_miniroute *miniroute;
+	
+	miniroute = malloc ( sizeof ( *miniroute ) );
+	if ( miniroute ) {
+		/* Record routing information */
+		miniroute->netdev = netdev;
+		miniroute->prefix = prefix;
+		miniroute->prefix_len = prefix_len;
+		miniroute->address = address;
+		miniroute->gateway = gateway;
+		
+		/* Add miniroute to list of miniroutes */
+		if ( !IP6_EQUAL ( gateway, ip6_none ) ) {
+			list_add_tail ( &miniroute->list, &miniroutes );
+		} else {
+			list_add ( &miniroute->list, &miniroutes );
+		}
+
+		/* Record reference to net_device */
+		miniroute->netdev_ref.forget = ipv6_forget_netdev;
+		ref_add ( &miniroute->netdev_ref, &netdev->references );
+	}
+
+	return miniroute;
+}
+
+/**
+ * Delete IPv6 minirouting table entry
+ *
+ * @v miniroute		Routing table entry
+ */
+static void del_ipv6_miniroute ( struct ipv6_miniroute *miniroute ) {
+	ref_del ( &miniroute->netdev_ref );
+	list_del ( &miniroute->list );
+	free ( miniroute );
+}
+
+/**
+ * Forget reference to net_device
+ *
+ * @v ref		Persistent reference
+ */
+static void ipv6_forget_netdev ( struct reference *ref ) {
+	struct ipv6_miniroute *miniroute
+		= container_of ( ref, struct ipv6_miniroute, netdev_ref );
+
+	del_ipv6_miniroute ( miniroute );
+}
 
 /**
  * Add IPv6 interface
@@ -58,23 +127,15 @@ int add_ipv6_address ( struct net_device *netdev, struct in6_addr prefix,
 		       struct in6_addr gateway ) {
 	struct ipv6_miniroute *miniroute;
 
-	miniroute = malloc ( sizeof ( *miniroute ) );
-	if ( !miniroute ) {
-		DBG ( "Not enough memory\n" );
-		return -ENOMEM;
-	}
-	miniroute->netdev = netdev;
-	miniroute->prefix = prefix;
-	miniroute->prefix_len = prefix_len;
-	miniroute->address = address;
-	miniroute->gateway = gateway;
+	/* Clear any existing address for this net device */
+	del_ipv6_address ( netdev );
 
-	/* Add miniroute to list of miniroutes */
-	if ( !IP6_EQUAL ( gateway, ip6_none ) ) {
-		list_add_tail ( &miniroute->list, &miniroutes );
-	} else {
-		list_add ( &miniroute->list, &miniroutes );
-	}
+	/* Add new miniroute */
+	miniroute = add_ipv6_miniroute ( netdev, prefix, prefix_len, address,
+					 gateway );
+	if ( ! miniroute )
+		return -ENOMEM;
+
 	return 0;
 }
 
@@ -88,7 +149,7 @@ void del_ipv6_address ( struct net_device *netdev ) {
 
 	list_for_each_entry ( miniroute, &miniroutes, list ) {
 		if ( miniroute->netdev == netdev ) {
-			list_del ( &miniroute->list );
+			del_ipv6_miniroute ( miniroute );
 			break;
 		}
 	}
