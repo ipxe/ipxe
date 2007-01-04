@@ -239,12 +239,14 @@ static int udp_rx ( struct pk_buff *pkb, struct sockaddr_tcpip *st_src,
 		rc = -EINVAL;
 		goto done;
 	}
-	csum = tcpip_continue_chksum ( pshdr_csum, pkb->data, ulen );
-	if ( csum != 0 ) {
-		DBG ( "UDP checksum incorrect (is %04x including checksum "
-		      "field, should be 0000)\n", csum );
-		rc = -EINVAL;
-		goto done;
+	if ( udphdr->chksum ) {
+		csum = tcpip_continue_chksum ( pshdr_csum, pkb->data, ulen );
+		if ( csum != 0 ) {
+			DBG ( "UDP checksum incorrect (is %04x including "
+			      "checksum field, should be 0000)\n", csum );
+			rc = -EINVAL;
+			goto done;
+		}
 	}
 
 	/* Parse parameters from header and strip header */
