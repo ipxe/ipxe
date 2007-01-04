@@ -428,8 +428,13 @@ prot_call:
  * function will be passed back to the protected-mode caller.  A
  * result of this is that this routine cannot be called directly from
  * C code, since it clobbers registers that the C ABI expects the
- * callee to preserve.  Gate A20 will be re-enabled in case the
- * real-mode routine disabled it.
+ * callee to preserve.  Gate A20 will *not* be automatically
+ * re-enabled.  Since we always run from an even megabyte of memory,
+ * we are guaranteed to return successfully to the protected-mode
+ * code, which should then call gateA20_set() if it suspects that gate
+ * A20 may have been disabled.  Note that enabling gate A20 is a
+ * potentially slow operation that may also cause keyboard input to be
+ * lost; this is why it is not done automatically.
  *
  * librm.h defines a convenient macro REAL_CODE() for using real_call.
  * See librm.h and realmode.h for details and examples.
@@ -477,9 +482,6 @@ real_call:
 	.section ".text"
 	.code32
 1:
-	/* Set up environment expected by C code */
-	call	gateA20_set
-
 	/* Restore registers and return */
 	popal
 	ret
