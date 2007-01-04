@@ -161,6 +161,7 @@ struct net_device * alloc_netdev ( size_t priv_size ) {
 
 	netdev = calloc ( 1, sizeof ( *netdev ) + priv_size );
 	if ( netdev ) {
+		INIT_LIST_HEAD ( &netdev->references );
 		INIT_LIST_HEAD ( &netdev->rx_queue );
 		netdev->priv = ( ( ( void * ) netdev ) + sizeof ( *netdev ) );
 	}
@@ -200,6 +201,9 @@ void unregister_netdev ( struct net_device *netdev ) {
 		      pkb->data, pkb_len ( pkb ) );
 		free_pkb ( pkb );
 	}
+
+	/* Kill off any persistent references to this device */
+	forget_references ( &netdev->references );
 
 	/* Remove from device list */
 	list_del ( &netdev->list );

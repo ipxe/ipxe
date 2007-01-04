@@ -10,6 +10,7 @@
 #include <stdint.h>
 #include <gpxe/list.h>
 #include <gpxe/tables.h>
+#include <gpxe/hotplug.h>
 
 struct pk_buff;
 struct net_device;
@@ -137,6 +138,10 @@ struct ll_protocol {
 struct net_device {
 	/** List of network devices */
 	struct list_head list;
+
+	/** List of persistent reference holders */
+	struct list_head references;
+
 	/** Transmit packet
 	 *
 	 * @v netdev	Network device
