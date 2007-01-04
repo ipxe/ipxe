@@ -34,8 +34,12 @@ struct net_protocol ipv4_protocol;
 struct ipv4_miniroute {
 	/** List of miniroutes */
 	struct list_head list;
+
 	/** Network device */
 	struct net_device *netdev;
+	/** Reference to network device */
+	struct reference netdev_ref;
+
 	/** IPv4 address */
 	struct in_addr address;
 	/** Subnet mask */
@@ -49,6 +53,86 @@ static LIST_HEAD ( miniroutes );
 
 /** List of fragment reassembly buffers */
 static LIST_HEAD ( frag_buffers );
+
+static void ipv4_forget_netdev ( struct reference *ref );
+
+/**
+ * Add IPv4 minirouting table entry
+ *
+ * @v netdev		Network device
+ * @v address		IPv4 address
+ * @v netmask		Subnet mask
+ * @v gateway		Gateway address (or @c INADDR_NONE for no gateway)
+ * @ret miniroute	Routing table entry, or NULL
+ */
+static struct ipv4_miniroute * add_ipv4_miniroute ( struct net_device *netdev,
+						    struct in_addr address,
+						    struct in_addr netmask,
+						    struct in_addr gateway ) {
+	struct ipv4_miniroute *miniroute;
+
+	/* Allocate and populate miniroute structure */
+	miniroute = malloc ( sizeof ( *miniroute ) );
+	if ( miniroute ) {
+
+		DBG ( "IPv4 add %s", inet_ntoa ( address ) );
+		DBG ( "/%s ", inet_ntoa ( netmask ) );
+		if ( gateway.s_addr != INADDR_NONE )
+			DBG ( "gw %s ", inet_ntoa ( gateway ) );
+		DBG ( "via %s\n", netdev_name ( netdev ) );
+
+		/* Record routing information */
+		miniroute->netdev = netdev;
+		miniroute->address = address;
+		miniroute->netmask = netmask;
+		miniroute->gateway = gateway;
+		
+		/* Add to end of list if we have a gateway, otherwise
+		 * to start of list.
+		 */
+		if ( gateway.s_addr != INADDR_NONE ) {
+			list_add_tail ( &miniroute->list, &miniroutes );
+		} else {
+			list_add ( &miniroute->list, &miniroutes );
+		}
+
+		/* Record reference to net_device */
+		miniroute->netdev_ref.forget = ipv4_forget_netdev;
+		ref_add ( &miniroute->netdev_ref, &netdev->references );
+	}
+
+	return miniroute;
+}
+
+/**
+ * Delete IPv4 minirouting table entry
+ *
+ * @v miniroute		Routing table entry
+ */
+static void del_ipv4_miniroute ( struct ipv4_miniroute *miniroute ) {
+
+	DBG ( "IPv4 del %s", inet_ntoa ( miniroute->address ) );
+	DBG ( "/%s ", inet_ntoa ( miniroute->netmask ) );
+	if ( miniroute->gateway.s_addr != INADDR_NONE )
+		DBG ( "gw %s ", inet_ntoa ( miniroute->gateway ) );
+	DBG ( "via %s\n", netdev_name ( miniroute->netdev ) );
+
+	ref_del ( &miniroute->netdev_ref );
+	list_del ( &miniroute->list );
+	free ( miniroute );
+}
+
+/**
+ * Forget reference to net_device
+ *
+ * @v ref		Persistent reference
+ */
+static void ipv4_forget_netdev ( struct reference *ref ) {
+	struct ipv4_miniroute *miniroute
+		= container_of ( ref, struct ipv4_miniroute, netdev_ref );
+
+	del_ipv4_miniroute ( miniroute );
+}
 
 /**
  * Add IPv4 interface
@@ -64,23 +148,14 @@ int add_ipv4_address ( struct net_device *netdev, struct in_addr address,
 		       struct in_addr netmask, struct in_addr gateway ) {
 	struct ipv4_miniroute *miniroute;
 
-	/* Allocate and populate miniroute structure */
-	miniroute = malloc ( sizeof ( *miniroute ) );
+	/* Clear any existing address for this net device */
+	del_ipv4_address ( netdev );
+
+	/* Add new miniroute */
+	miniroute = add_ipv4_miniroute ( netdev, address, netmask, gateway );
 	if ( ! miniroute )
 		return -ENOMEM;
-	miniroute->netdev = netdev;
-	miniroute->address = address;
-	miniroute->netmask = netmask;
-	miniroute->gateway = gateway;
-	
-	/* Add to end of list if we have a gateway, otherwise to start
-	 * of list.
-	 */
-	if ( gateway.s_addr != INADDR_NONE ) {
-		list_add_tail ( &miniroute->list, &miniroutes );
-	} else {
-		list_add ( &miniroute->list, &miniroutes );
-	}
+
 	return 0;
 }
 
@@ -94,7 +169,7 @@ void del_ipv4_address ( struct net_device *netdev ) {
 
 	list_for_each_entry ( miniroute, &miniroutes, list ) {
 		if ( miniroute->netdev == netdev ) {
-			list_del ( &miniroute->list );
+			del_ipv4_miniroute ( miniroute );
 			break;
 		}
 	}
