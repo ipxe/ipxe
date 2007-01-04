@@ -13,6 +13,7 @@
 #include <gpxe/udp.h>
 #include <gpxe/async.h>
 #include <gpxe/retry.h>
+#include <gpxe/hotplug.h>
 
 /** BOOTP/DHCP server port */
 #define BOOTPS_PORT 67
@@ -452,6 +453,8 @@ struct dhcp_session {
 
 	/** Network device being configured */
 	struct net_device *netdev;
+	/** Persistent reference to network device */
+	struct reference netdev_ref;
 
 	/** Options obtained from server */
 	struct dhcp_option_block *options;
