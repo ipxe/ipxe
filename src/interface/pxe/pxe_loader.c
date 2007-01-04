@@ -22,6 +22,8 @@
  * Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
  */
 
+#warning "Currently broken"
+#if 0
 #include "pxe.h"
 
 /* PXENV_UNDI_LOADER
@@ -81,3 +83,4 @@ PXENV_EXIT_t undi_loader ( struct s_UNDI_LOADER *undi_loader ) {
 	undi_loader->u.Status = PXENV_STATUS_SUCCESS;
 	return PXENV_EXIT_SUCCESS;
 }
+#endif
