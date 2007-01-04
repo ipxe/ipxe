@@ -54,6 +54,12 @@ static LIST_HEAD ( net_devices );
 int netdev_tx ( struct net_device *netdev, struct pk_buff *pkb ) {
 	DBG ( "%s transmitting %p+%zx\n", netdev_name ( netdev ),
 	      pkb->data, pkb_len ( pkb ) );
+
+	if ( ! ( netdev->state & NETDEV_OPEN ) ) {
+		free_pkb ( pkb );
+		return -ENETUNREACH;
+	}
+	
 	return netdev->transmit ( netdev, pkb );
 }
 
@@ -100,7 +106,7 @@ int net_tx ( struct pk_buff *pkb, struct net_device *netdev,
  * @ret rc		Return status code
  */
 int net_rx ( struct pk_buff *pkb, struct net_device *netdev,
-	      uint16_t net_proto, const void *ll_source ) {
+	     uint16_t net_proto, const void *ll_source ) {
 	struct net_protocol *net_protocol;
 
 	/* Hand off to network-layer protocol, if any */
@@ -125,7 +131,10 @@ int net_rx ( struct pk_buff *pkb, struct net_device *netdev,
  * packets will be added to the RX packet queue via netdev_rx().
  */
 int netdev_poll ( struct net_device *netdev ) {
-	netdev->poll ( netdev );
+
+	if ( netdev->state & NETDEV_OPEN )
+		netdev->poll ( netdev );
+
 	return ( ! list_empty ( &netdev->rx_queue ) );
 }
 
@@ -186,14 +195,45 @@ int register_netdev ( struct net_device *netdev ) {
 }
 
 /**
- * Unregister network device
+ * Open network device
  *
  * @v netdev		Network device
- *
- * Removes the network device from the list of network devices.
+ * @ret rc		Return status code
  */
-void unregister_netdev ( struct net_device *netdev ) {
+int netdev_open ( struct net_device *netdev ) {
+	int rc;
+
+	/* Do nothing if device is already open */
+	if ( netdev->state & NETDEV_OPEN )
+		return 0;
+
+	DBG ( "%s opening\n", netdev_name ( netdev ) );
+
+	/* Open the device */
+	if ( ( rc = netdev->open ( netdev ) ) != 0 )
+		return rc;
+
+	/* Mark as opened */
+	netdev->state |= NETDEV_OPEN;
+	return 0;
+}
+
+/**
+ * Close network device
+ *
+ * @v netdev		Network device
+ */
+void netdev_close ( struct net_device *netdev ) {
 	struct pk_buff *pkb;
+
+	/* Do nothing if device is already closed */
+	if ( ! ( netdev->state & NETDEV_OPEN ) )
+		return;
+
+	DBG ( "%s closing\n", netdev_name ( netdev ) );
+
+	/* Close the device */
+	netdev->close ( netdev );
 
 	/* Discard any packets in the RX queue */
 	while ( ( pkb = netdev_rx_dequeue ( netdev ) ) ) {
@@ -201,6 +241,22 @@ void unregister_netdev ( struct net_device *netdev ) {
 		      pkb->data, pkb_len ( pkb ) );
 		free_pkb ( pkb );
 	}
+
+	/* Mark as closed */
+	netdev->state &= ~NETDEV_OPEN;
+}
+
+/**
+ * Unregister network device
+ *
+ * @v netdev		Network device
+ *
+ * Removes the network device from the list of network devices.
+ */
+void unregister_netdev ( struct net_device *netdev ) {
+
+	/* Ensure device is closed */
+	netdev_close ( netdev );
 
 	/* Kill off any persistent references to this device */
 	forget_references ( &netdev->references );

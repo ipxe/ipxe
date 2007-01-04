@@ -186,6 +186,20 @@ static void pnic_irq ( struct net_device *netdev, irq_action_t action ) {
 #endif
 
 /**************************************************************************
+OPEN - Open network device
+***************************************************************************/
+static int pnic_open ( struct net_device *netdev __unused ) {
+	return 0;
+}
+
+/**************************************************************************
+CLOSE - Close network device
+***************************************************************************/
+static void pnic_close ( struct net_device *netdev __unused ) {
+	/* Nothing to do */
+}
+
+/**************************************************************************
 DISABLE - Turn off ethernet interface
 ***************************************************************************/
 static void pnic_remove ( struct pci_device *pci ) {
@@ -238,6 +252,8 @@ static int pnic_probe ( struct pci_device *pci,
 				netdev->ll_addr, ETH_ALEN, NULL );
 
 	/* Point to NIC specific routines */
+	netdev->open	 = pnic_open;
+	netdev->close	 = pnic_close;
 	netdev->poll	 = pnic_poll;
 	netdev->transmit = pnic_transmit;
 

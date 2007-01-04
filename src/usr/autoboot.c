@@ -16,7 +16,9 @@
  * Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
  */
 
+#include <string.h>
 #include <vsprintf.h>
+#include <gpxe/netdevice.h>
 #include <gpxe/autoboot.h>
 
 /** @file
@@ -30,11 +32,21 @@ void test_dhcp ( struct net_device *netdev );
 
 void autoboot ( void ) {
 	struct net_device *netdev;
+	int rc;
 
 	netdev = next_netdev ();
-	if ( netdev ) {
-		test_dhcp ( netdev );
-	} else {
+	if ( ! netdev ) {
 		printf ( "No network device found\n" );
+		return;
 	}
+
+	if ( ( rc = netdev_open ( netdev ) ) != 0 ) {
+		printf ( "Could not open %s: %s\n", netdev_name ( netdev ),
+			 strerror ( rc ) );
+		return;
+	}
+
+	test_dhcp ( netdev );
+
+	netdev_close ( netdev );
 }

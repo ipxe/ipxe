@@ -142,6 +142,23 @@ struct net_device {
 	/** List of persistent reference holders */
 	struct list_head references;
 
+	/** Open network device
+	 *
+	 * @v netdev	Network device
+	 * @ret rc	Return status code
+	 *
+	 * This method should allocate RX packet buffers and enable
+	 * the hardware to start transmitting and receiving packets.
+	 */
+	int ( * open ) ( struct net_device *netdev );
+	/** Close network device
+	 *
+	 * @v netdev	Network device
+	 *
+	 * This method should stop the flow of packets, and free up
+	 * any packets that are currently in the device's TX queue.
+	 */
+	void ( * close ) ( struct net_device *netdev );
 	/** Transmit packet
 	 *
 	 * @v netdev	Network device
@@ -154,6 +171,9 @@ struct net_device {
 	 * Ownership of the packet buffer is transferred to the @c
 	 * net_device, which must eventually call free_pkb() to
 	 * release the buffer.
+	 *
+	 * This method is guaranteed to be called only when the device
+	 * is open.
 	 */
 	int ( * transmit ) ( struct net_device *netdev, struct pk_buff *pkb );
 	/** Poll for received packet
@@ -163,6 +183,9 @@ struct net_device {
 	 * This method should cause the hardware to check for received
 	 * packets.  Any received packets should be delivered via
 	 * netdev_rx().
+	 *
+	 * This method is guaranteed to be called only when the device
+	 * is open.
 	 */
 	void ( * poll ) ( struct net_device *netdev );
 
@@ -174,12 +197,20 @@ struct net_device {
 	 */
 	uint8_t ll_addr[MAX_LL_ADDR_LEN];
 
+	/** Current device state
+	 *
+	 * This is the bitwise-OR of zero or more NETDEV_XXX constants.
+	 */
+	unsigned int state;
 	/** Received packet queue */
 	struct list_head rx_queue;
 
 	/** Driver private data */
 	void *priv;
 };
+
+/** Network device is open */
+#define NETDEV_OPEN 0x0001
 
 /** Declare a link-layer protocol */
 #define __ll_protocol  __table ( ll_protocols, 01 )
@@ -209,6 +240,8 @@ extern int netdev_poll ( struct net_device *netdev );
 extern struct pk_buff * netdev_rx_dequeue ( struct net_device *netdev );
 extern struct net_device * alloc_netdev ( size_t priv_size );
 extern int register_netdev ( struct net_device *netdev );
+extern int netdev_open ( struct net_device *netdev );
+extern void netdev_close ( struct net_device *netdev );
 extern void unregister_netdev ( struct net_device *netdev );
 extern void free_netdev ( struct net_device *netdev );
 extern struct net_device * next_netdev ( void );

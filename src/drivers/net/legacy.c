@@ -56,6 +56,14 @@ static void legacy_poll ( struct net_device *netdev ) {
 	}
 }
 
+static int legacy_open ( struct net_device *netdev __unused ) {
+	return 0;
+}
+
+static void legacy_close ( struct net_device *netdev __unused ) {
+	/* Nothing to do */
+}
+
 int legacy_probe ( struct pci_device *pci,
 		   const struct pci_device_id *id __unused,
 		   int ( * probe ) ( struct nic *nic,
@@ -74,6 +82,8 @@ int legacy_probe ( struct pci_device *pci,
 	memset ( &nic, 0, sizeof ( nic ) );
 	pci_set_drvdata ( pci, netdev );
 
+	netdev->open = legacy_open;
+	netdev->close = legacy_close;
 	netdev->transmit = legacy_transmit;
 	netdev->poll = legacy_poll;
 	nic.node_addr = netdev->ll_addr;

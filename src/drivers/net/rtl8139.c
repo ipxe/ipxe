@@ -542,8 +542,8 @@ static int rtl_probe ( struct pci_device *pci,
 	nvs_read ( &rtl->eeprom.nvs, EE_MAC, netdev->ll_addr, ETH_ALEN );
 	
 	/* Point to NIC specific routines */
-	//	netdev->open	 = rtl_open;
-	//	netdev->close	 = rtl_close;
+	netdev->open	 = rtl_open;
+	netdev->close	 = rtl_close;
 	netdev->transmit = rtl_transmit;
 	netdev->poll	 = rtl_poll;
 
@@ -557,10 +557,6 @@ static int rtl_probe ( struct pci_device *pci,
 		if ( ( rc = nvo_register ( &rtl->nvo ) ) != 0 )
 			goto err;
 	}
-
-#warning "Hack alert"
-	rtl_open ( netdev );
-
 
 	return 0;
 
@@ -583,10 +579,6 @@ static int rtl_probe ( struct pci_device *pci,
 static void rtl_remove ( struct pci_device *pci ) {
 	struct net_device *netdev = pci_get_drvdata ( pci );
 	struct rtl8139_nic *rtl = netdev->priv;
-
-
-#warning "Hack alert"	
-	rtl_close ( netdev );
 
 	if ( rtl->nvo.nvs )
 		nvo_unregister ( &rtl->nvo );
