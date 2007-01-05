@@ -97,7 +97,6 @@ static int pxedrv_parse_pcirheader ( struct pxe_driver *pxedrv,
 		       "signature %08lx\n", pxedrv, pcir_header.signature );
 		return -EINVAL;
 	}
-	DBGC ( pxedrv, "PXEDRV %p is a PCI ROM\n", pxedrv );
 
 	/* Fill in PXE driver PCI device fields */
 	pxedrv->bus_type = PCI_NIC;
