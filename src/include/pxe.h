@@ -155,7 +155,7 @@ struct pxe_driver {
 	/** ROM segment address */
 	unsigned int rom_segment;
 	/** UNDI loader entry point */
-	SEGOFF16_t loader;
+	SEGOFF16_t loader_entry;
 	/** Code segment size */
 	size_t code_size;
 	/** Data segment size */

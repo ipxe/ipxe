@@ -1562,54 +1562,20 @@ extern PXENV_EXIT_t pxenv_undi_isr ( struct s_PXENV_UNDI_ISR *undi_isr );
  * @{
  */
 
-/** The UNDI ROM ID structure */
-struct s_UNDI_ROM_ID {
-	/** Signature
-	 *
-	 * Contains the bytes 'U', 'N', 'D', 'I'.
-	 */
-	UINT32_t Signature;
-	UINT8_t StructLength;		/**< Length of this structure */
-	/** Checksum
-	 *
-	 * The byte checksum of this structure (using the length in
-	 * #StructLength) must be zero.
-	 */
-	UINT8_t StructCksum;
-	/** Revision of this structure
-	 *
-	 * For PXE version 2.1, this field must be zero.
-	 */
-	UINT8_t StructRev;
-	/** UNDI revision
-	 *
-	 * UNDI revision, least significant byte first.  For UNDI
-	 * version 2.1.0, this field will contain { 0x00, 0x01, 0x02 }.
-	 */
-	UINT8_t UNDIRev[3];
-	/** UNDI loader routine entry point
-	 *
-	 * This is the entry point for calling undi_loader().
-	 */
-	UINT16_t UNDILoader;
-	/** Minimum required stack segment size */
-	UINT16_t StackSize;
-	/** Minimum required data segment size */
-	UINT16_t DataSize;
-	/** Minimum required code segment size */
-	UINT16_t CodeSize;
-} PACKED;
-
-typedef struct s_UNDI_ROM_ID UNDI_ROM_ID_t;
-
 /** Parameter block for undi_loader() */
 struct s_UNDI_LOADER {
-	/** struct s_UNDI_LOADER starts with a struct s_PXENV_START_UNDI */
-	union undi_loader_start_undi {
-		PXENV_STATUS_t Status;		/**< PXE status code */
-		/** Parameters to pass to pxenv_start_undi() */
-		struct s_PXENV_START_UNDI start_undi;
-	} u;
+	/** PXE status code */
+	PXENV_STATUS_t Status;
+	/** %ax register as for PXENV_START_UNDI */
+	UINT16_t AX;
+	/** %bx register as for PXENV_START_UNDI */
+	UINT16_t BX;
+	/** %dx register as for PXENV_START_UNDI */
+	UINT16_t DX;
+	/** %di register as for PXENV_START_UNDI */
+	OFF16_t DI;
+	/** %es register as for PXENV_START_UNDI */
+	SEGSEL_t ES;
 	/** UNDI data segment
 	 *
 	 * @note The PXE specification defines the type of this field
@@ -1617,7 +1583,7 @@ struct s_UNDI_LOADER {
 	 * equivalent anyway; for other architectures #SEGSEL_t makes
 	 * more sense.
 	 */
-	SEGSEL_t	undi_ds;
+	SEGSEL_t UNDI_DS;
 	/** UNDI code segment
 	 *
 	 * @note The PXE specification defines the type of this field
@@ -1625,11 +1591,11 @@ struct s_UNDI_LOADER {
 	 * equivalent anyway; for other architectures #SEGSEL_t makes
 	 * more sense.
 	 */
-	SEGSEL_t	undi_cs;
+	SEGSEL_t UNDI_CS;
 	/** Address of the !PXE structure (a struct s_PXE) */
-	SEGOFF16_t	pxe_ptr;
+	SEGOFF16_t PXEptr;
 	/** Address of the PXENV+ structure (a struct s_PXENV) */
-	SEGOFF16_t	pxenv_ptr;
+	SEGOFF16_t PXENVptr;
 } PACKED;
 
 typedef struct s_UNDI_LOADER UNDI_LOADER_t;

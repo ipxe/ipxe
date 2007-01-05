@@ -21,6 +21,7 @@
 #include <string.h>
 #include <pxe.h>
 #include <realmode.h>
+#include <bios.h>
 
 /** @file
  *
@@ -62,14 +63,15 @@ static int pxedrv_parse_pxeromid ( struct pxe_driver *pxedrv,
 	}
 
 	/* Fill in PXE driver loader fields */
-	pxedrv->loader.segment = pxedrv->rom_segment;
-	pxedrv->loader.offset = undiloader;
+	pxedrv->loader_entry.segment = pxedrv->rom_segment;
+	pxedrv->loader_entry.offset = undiloader;
 	pxedrv->code_size = undi_rom_id.CodeSize;
 	pxedrv->data_size = undi_rom_id.DataSize;
 
 	DBGC ( pxedrv, "PXEDRV %p has UNDI loader at %04x:%04x "
-	       "(code %04x data %04x)\n", pxedrv, pxedrv->loader.segment,
-	       pxedrv->loader.offset, pxedrv->code_size, pxedrv->data_size );
+	       "(code %04x data %04x)\n", pxedrv,
+	       pxedrv->loader_entry.segment, pxedrv->loader_entry.offset,
+	       pxedrv->code_size, pxedrv->data_size );
 	return 0;
 }
 
@@ -220,4 +222,87 @@ struct pxe_driver * pxedrv_find_pci_driver ( unsigned int vendor_id,
 	DBG ( "No PXE driver matched PCI %04x:%04x (%08x)\n",
 	      vendor_id, device_id, rombase );
 	return NULL;
+}
+
+/** Parameter block for calling UNDI loader */
+static struct s_UNDI_LOADER __data16 ( undi_loader );
+#define undi_loader __use_data16 ( undi_loader )
+
+/** UNDI loader entry point */
+static SEGOFF16_t __data16 ( undi_loader_entry );
+#define undi_loader_entry __use_data16 ( undi_loader_entry )
+
+/**
+ * Call UNDI loader to create a pixie
+ *
+ * @v pxedrv		PXE driver
+ * @v pxe		PXE device to be created
+ * @v pci_busdevfn	PCI bus:dev.fn (PCI devices only), or 0
+ * @v isapnp_csn	ISAPnP Card Select Number, or -1U
+ * @v isapnp_read_port	ISAPnP read port, or -1U
+ * @ret rc		Return status code
+ */
+static int pxedrv_load ( struct pxe_driver *pxedrv, struct pxe_device *pxe,
+			 unsigned int pci_busdevfn, unsigned int isapnp_csn,
+			 unsigned int isapnp_read_port ) {
+	int discard;
+	uint16_t exit;
+	uint16_t fbms;
+	unsigned int fbms_seg;
+	int rc;
+
+	memset ( &undi_loader, 0, sizeof ( undi_loader ) );
+	undi_loader.AX = pci_busdevfn;
+	undi_loader.BX = isapnp_csn;
+	undi_loader.DX = isapnp_read_port;
+
+	/* Allocate base memory for PXE stack */
+	get_real ( fbms, BDA_SEG, BDA_FBMS );
+	fbms_seg = ( fbms << 6 );
+	fbms_seg -= ( ( pxedrv->data_size + 0x0f ) >> 4 );
+	undi_loader.UNDI_DS = fbms_seg;
+	fbms_seg -= ( ( pxedrv->code_size + 0x0f ) >> 4 );
+	undi_loader.UNDI_CS = fbms_seg;
+	DBGC ( pxedrv, "PXEDRV %p loading to CS %04x and DS %04x\n", pxedrv,
+	       undi_loader.UNDI_CS, undi_loader.UNDI_DS );
+
+	/* Call loader */
+	undi_loader_entry = pxedrv->loader_entry;
+	__asm__ __volatile__ ( REAL_CODE ( "pushw %%ds\n\t"
+					   "pushw %w0\n\t"
+					   "lcall *%c3\n\t"
+					   "addw $4, %%sp\n\t" )
+			       : "=a" ( exit ), "=r" ( discard )
+			       : "0" ( & __from_data16 ( undi_loader ) ),
+			         "p" ( & __from_data16 ( undi_loader_entry )));
+	if ( exit != PXENV_EXIT_SUCCESS ) {
+		rc = -undi_loader.Status;
+		if ( rc == 0 ) /* Paranoia */
+			rc = -EIO;
+		DBGC ( pxedrv, "PXEDRV %p loader failed: %s\n",
+		       strerror ( rc ) );
+		return rc;
+	}
+
+	/* Update free base memory counter */
+	fbms = ( fbms_seg >> 6 );
+	put_real ( fbms, BDA_SEG, BDA_FBMS );
+
+	/* Record location of pixie in PXE device structure */
+	pxe->pxenv = undi_loader.PXENVptr;
+	pxe->ppxe = undi_loader.PXEptr;
+	return 0;
+}
+
+/**
+ * Call UNDI loader to create a pixie
+ *
+ * @v pxedrv		PXE driver
+ * @v pxe		PXE device to be created
+ * @v pci_busdevfn	PCI bus:dev.fn
+ * @ret rc		Return status code
+ */
+int pxedrv_load_pci ( struct pxe_driver *pxedrv, struct pxe_device *pxe,
+		      unsigned int bus, unsigned int devfn ) {
+	return pxedrv_load ( pxedrv, pxe, ( ( bus << 8 ) | devfn ), -1U, -1U );
 }
