@@ -56,11 +56,10 @@ static void _printw_handler ( struct printf_context *ctx, unsigned int c ) {
  * @ret rc	return status code
  */
 int vw_printw ( WINDOW *win, const char *fmt, va_list varglist ) {
-	struct printw_context wctx = {
-		.win = win,
-		.ctx = { .handler = _printw_handler, },
-	};
+	struct printw_context wctx;
 
+	wctx.win = win;
+	wctx.ctx.handler = _printw_handler;
 	vcprintf ( &(wctx.ctx), fmt, varglist );
 	return OK;
 }

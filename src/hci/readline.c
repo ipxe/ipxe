@@ -80,18 +80,18 @@ static void sync_console ( struct edit_string *string ) {
  */
 char * readline ( const char *prompt ) {
 	char buf[READLINE_MAX];
-	struct edit_string string = {
-		.buf = buf,
-		.len = sizeof ( buf ),
-		.cursor = 0,
-	};
+	struct edit_string string;
 	int key;
 	char *line;
 
 	if ( prompt )
 		printf ( "%s", prompt );
 
+	memset ( &string, 0, sizeof ( string ) );
+	string.buf = buf;
+	string.len = sizeof ( buf );
 	buf[0] = '\0';
+
 	while ( 1 ) {
 		key = edit_string ( &string, getkey() );
 		sync_console ( &string );
