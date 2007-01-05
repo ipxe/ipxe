@@ -176,7 +176,7 @@ static int pxedev_get_instance_info ( struct pxe_device *pxe ) {
 	memcpy ( pxe->hwaddr, undi_info.PermNodeAddress,
 		 sizeof ( pxe->hwaddr ) );
 	pxe->irq = undi_info.IntNumber;
-	pxe->rom = undi_info.ROMAddress;
+	pxe->rom_segment = undi_info.ROMAddress;
 
 	return 0;
 }
