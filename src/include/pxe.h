@@ -62,6 +62,113 @@ union u_PXENV_ANY {
 
 typedef union u_PXENV_ANY PXENV_ANY_t;
 
+/** An UNDI expansion ROM */
+struct undi_rom {
+	/** Signature
+	 *
+	 * Must be equal to @c ROM_SIGNATURE
+	 */
+	UINT16_t Signature;
+	/** ROM length in 512-byte blocks */
+	UINT8_t ROMLength;
+	/** Unused */
+	UINT8_t unused[0x13];
+	/** Offset of the PXE ROM ID structure */
+	UINT16_t PXEROMID;
+	/** Offset of the PCI ROM structure */
+	UINT16_t PCIRHeader;
+} PACKED;
+
+/** Signature for an expansion ROM */
+#define ROM_SIGNATURE 0xaa55
+
+/** An UNDI ROM ID structure */
+struct undi_rom_id {
+	/** Signature
+	 *
+	 * Must be equal to @c UNDI_ROM_ID_SIGNATURE
+	 */
+	UINT32_t Signature;
+	/** Length of structure */
+	UINT8_t StructLength;
+	/** Checksum */
+	UINT8_t StructCksum;
+	/** Structure revision
+	 *
+	 * Must be zero.
+	 */
+	UINT8_t StructRev;
+	/** UNDI revision
+	 *
+	 * Version 2.1.0 is encoded as the byte sequence 0x00, 0x01, 0x02.
+	 */
+	UINT8_t UNDIRev[3];
+	/** Offset to UNDI loader */
+	UINT16_t UNDILoader;
+	/** Minimum required stack segment size */
+	UINT16_t StackSize;
+	/** Minimum required data segment size */
+	UINT16_t DataSize;
+	/** Minimum required code segment size */
+	UINT16_t CodeSize;
+} PACKED;
+
+/** Signature for an UNDI ROM ID structure */
+#define UNDI_ROM_ID_SIGNATURE \
+	( ( 'U' << 0 ) + ( 'N' << 8 ) + ( 'D' << 16 ) + ( 'I' << 24 ) )
+
+/** A PCI expansion header */
+struct pcir_header {
+	/** Signature
+	 *
+	 * Must be equal to @c PCIR_SIGNATURE
+	 */
+	uint32_t signature;
+	/** PCI vendor ID */
+	uint16_t vendor_id;
+	/** PCI device ID */
+	uint16_t device_id;
+} PACKED;
+
+/** Signature for an UNDI ROM ID structure */
+#define PCIR_SIGNATURE \
+	( ( 'P' << 0 ) + ( 'C' << 8 ) + ( 'I' << 16 ) + ( 'R' << 24 ) )
+
+/** A PXE PCI device ID */
+struct pxe_pci_device_id {
+	/** PCI vendor ID */
+	unsigned int vendor_id;
+	/** PCI device ID */
+	unsigned int device_id;
+};
+
+/** A PXE device ID */
+union pxe_device_id {
+	/** PCI device ID */
+	struct pxe_pci_device_id pci;
+};
+
+/** A PXE driver */
+struct pxe_driver {
+	/** List of PXE drivers */
+	struct list_head list;
+	/** ROM segment address */
+	unsigned int rom_segment;
+	/** UNDI loader entry point */
+	SEGOFF16_t loader;
+	/** Code segment size */
+	size_t code_size;
+	/** Data segment size */
+	size_t data_size;
+	/** Bus type
+	 *
+	 * Values are as used by @c PXENV_UNDI_GET_NIC_TYPE
+	 */
+	unsigned int bus_type;
+	/** Device ID */
+	union pxe_device_id bus_id;
+};
+
 /** A PXE device */
 struct pxe_device {
 	/** Generic device */
@@ -83,8 +190,8 @@ struct pxe_device {
 	MAC_ADDR_t hwaddr;
 	/** Assigned IRQ number */
 	UINT16_t irq;
-	/** ROM address */
-	SEGSEL_t rom;
+	/** ROM segment address */
+	SEGSEL_t rom_segment;
 };
 
 /**
@@ -111,6 +218,10 @@ extern int pxe_call ( struct pxe_device *pxe, unsigned int function,
 		      void *params, size_t params_len );
 extern int undi_probe ( struct pxe_device *pxe );
 extern void undi_remove ( struct pxe_device *pxe );
+
+extern struct pxe_driver * pxedrv_find_pci_driver ( unsigned int vendor_id,
+						    unsigned int device_id,
+						    unsigned int rombase );
 
 extern struct net_device *pxe_netdev;
 
