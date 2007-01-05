@@ -22,6 +22,7 @@
 #include <pxe.h>
 #include <realmode.h>
 #include <bios.h>
+#include <pnpbios.h>
 
 /** @file
  *
@@ -118,6 +119,7 @@ static int pxedrv_parse_pcirheader ( struct pxe_driver *pxedrv,
 static int pxedrv_probe_rom ( unsigned int rom_segment ) {
 	struct pxe_driver *pxedrv = NULL;
 	struct undi_rom rom;
+	size_t rom_len;
 	unsigned int pxeromid;
 	unsigned int pcirheader;
 	int rc;
@@ -128,6 +130,7 @@ static int pxedrv_probe_rom ( unsigned int rom_segment ) {
 		rc = -EINVAL;
 		goto err;
 	}
+	rom_len = ( rom.ROMLength * 512 );
 
 	/* Allocate memory for PXE driver */
 	pxedrv = malloc ( sizeof ( *pxedrv ) );
@@ -137,14 +140,19 @@ static int pxedrv_probe_rom ( unsigned int rom_segment ) {
 		goto err;
 	}
 	memset ( pxedrv, 0, sizeof ( *pxedrv ) );
-	DBGC ( pxedrv, "PXEDRV %p using expansion ROM at %04x:0000 (%zdkB)\n",
-	       pxedrv, rom_segment, ( rom.ROMLength / 2 ) );
+	DBGC ( pxedrv, "PXEDRV %p trying expansion ROM at %04x:0000 (%zdkB)\n",
+	       pxedrv, rom_segment, ( rom_len / 1024 ) );
 	pxedrv->rom_segment = rom_segment;
 
 	/* Check for and parse PXE ROM ID */
 	pxeromid = rom.PXEROMID;
 	if ( ! pxeromid ) {
 		DBGC ( pxedrv, "PXEDRV %p has no PXE ROM ID\n", pxedrv );
+		rc = -EINVAL;
+		goto err;
+	}
+	if ( pxeromid > rom_len ) {
+		DBGC ( pxedrv, "PXEDRV %p PXE ROM ID outside ROM\n", pxedrv );
 		rc = -EINVAL;
 		goto err;
 	}
@@ -245,16 +253,25 @@ static SEGOFF16_t __data16 ( undi_loader_entry );
 static int pxedrv_load ( struct pxe_driver *pxedrv, struct pxe_device *pxe,
 			 unsigned int pci_busdevfn, unsigned int isapnp_csn,
 			 unsigned int isapnp_read_port ) {
-	int discard;
-	uint16_t exit;
+	int pnpbios_offset;
 	uint16_t fbms;
 	unsigned int fbms_seg;
+	int discard;
+	uint16_t exit;
 	int rc;
 
+	/* Record device location information */
 	memset ( &undi_loader, 0, sizeof ( undi_loader ) );
 	undi_loader.AX = pci_busdevfn;
 	undi_loader.BX = isapnp_csn;
 	undi_loader.DX = isapnp_read_port;
+
+	/* Set up PnP BIOS pointer, if PnP BIOS present */
+	pnpbios_offset = find_pnp_bios();
+	if ( pnpbios_offset >= 0 ) {
+		undi_loader.ES = BIOS_SEG;
+		undi_loader.DI = pnpbios_offset;
+	}
 
 	/* Allocate base memory for PXE stack */
 	get_real ( fbms, BDA_SEG, BDA_FBMS );
@@ -279,7 +296,7 @@ static int pxedrv_load ( struct pxe_driver *pxedrv, struct pxe_device *pxe,
 		rc = -undi_loader.Status;
 		if ( rc == 0 ) /* Paranoia */
 			rc = -EIO;
-		DBGC ( pxedrv, "PXEDRV %p loader failed: %s\n",
+		DBGC ( pxedrv, "PXEDRV %p loader failed: %s\n", pxedrv,
 		       strerror ( rc ) );
 		return rc;
 	}
