@@ -658,8 +658,3 @@ void undi_remove ( struct pxe_device *pxe ) {
 	/* Free network device */
 	free_netdev ( netdev );
 }
-
-
-
-
-REQUIRE_OBJECT ( pxebus );
