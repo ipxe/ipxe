@@ -32,6 +32,8 @@
  *
  */
 
+static void undi_close ( struct net_device *netdev );
+
 /*****************************************************************************
  *
  * UNDI interrupt service routine
@@ -47,28 +49,33 @@
  */
 extern void undi_isr ( void );
 
-/** Vector for chaining to other interrupts handlers */
-static struct segoff __text16 ( undi_isr_chain );
-#define undi_isr_chain __use_text16 ( undi_isr_chain )
+/** Dummy chain vector */
+static struct segoff undi_isr_dummy_chain;
 
 /** IRQ trigger count */
-static volatile uint16_t __text16 ( trigger_count );
+static volatile uint16_t __text16 ( trigger_count ) = 0;
 #define trigger_count __use_text16 ( trigger_count )
 
 /**
  * Hook UNDI interrupt service routine
  *
  * @v irq		IRQ number
+ *
+ * The UNDI ISR specifically does @b not chain to the previous
+ * interrupt handler.  BIOSes seem to install somewhat perverse
+ * default interrupt handlers; some do nothing other than an iret (and
+ * so will cause a screaming interrupt if there really is another
+ * interrupting device) and some disable the interrupt at the PIC (and
+ * so will bring our own interrupts to a shuddering halt).
  */
 static void undi_hook_isr ( unsigned int irq ) {
 	__asm__ __volatile__ ( TEXT16_CODE ( "\nundi_isr:\n\t"
 					     "incl %%cs:%c0\n\t"
-					     "ljmp *%%cs:%c1\n\t" )
-			       : : "p" ( & __from_text16 ( trigger_count ) ),
-			           "p" ( & __from_text16 ( undi_isr_chain ) ));
+					     "iret\n\t" )
+			       : : "p" ( & __from_text16 ( trigger_count ) ) );
 
 	hook_bios_interrupt ( IRQ_INT ( irq ), ( ( unsigned int ) undi_isr ),
-			      &undi_isr_chain );
+			      &undi_isr_dummy_chain );
 
 }
 
@@ -79,7 +86,7 @@ static void undi_hook_isr ( unsigned int irq ) {
  */
 static void undi_unhook_isr ( unsigned int irq ) {
 	unhook_bios_interrupt ( IRQ_INT ( irq ), ( ( unsigned int ) undi_isr ),
-				&undi_isr_chain );
+				&undi_isr_dummy_chain );
 }
 
 /**
@@ -88,7 +95,7 @@ static void undi_unhook_isr ( unsigned int irq ) {
  * @ret triggered	ISR has been triggered since last check
  */
 static int undi_isr_triggered ( void ) {
-	static unsigned int last_trigger_count;
+	static unsigned int last_trigger_count = 0;
 	unsigned int this_trigger_count;
 
 	/* Read trigger_count.  Do this only once; it is volatile */
@@ -285,8 +292,9 @@ static int undi_open ( struct net_device *netdev ) {
 	struct s_PXENV_UNDI_OPEN open;
 	int rc;
 
-	/* Hook interrupt service routine */
+	/* Hook interrupt service routine and enable interrupt */
 	undi_hook_isr ( pxe->irq );
+	enable_irq ( pxe->irq );
 
 	/* Set station address.  Required for some PXE stacks; will
 	 * spuriously fail on others.  Ignore failures.  We only ever
@@ -307,10 +315,14 @@ static int undi_open ( struct net_device *netdev ) {
 	if ( ( rc = pxe_call ( pxe, PXENV_UNDI_OPEN, &open,
 			       sizeof ( open ) ) ) != 0 ) {
 		DBG ( "UNDI_OPEN failed: %s\n", strerror ( rc ) );
-		return rc;
+		goto err;
 	}
 
 	return 0;
+
+ err:
+	undi_close ( netdev );
+	return rc;
 }
 
 /**
@@ -329,7 +341,8 @@ static void undi_close ( struct net_device *netdev ) {
 		DBG ( "UNDI_CLOSE failed: %s\n", strerror ( rc ) );
 	}
 
-	/* Unhook ISR */
+	/* Disable interrupt and unhook ISR */
+	disable_irq ( pxe->irq );
 	undi_unhook_isr ( pxe->irq );
 }
 
@@ -369,6 +382,7 @@ int undi_probe ( struct pxe_device *pxe ) {
 
  err:
 	free_netdev ( netdev );
+	pxe_set_drvdata ( pxe, NULL );
 	return rc;
 }
 
