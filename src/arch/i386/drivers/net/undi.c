@@ -21,6 +21,7 @@
 #include <realmode.h>
 #include <pic8259.h>
 #include <biosint.h>
+#include <pnpbios.h>
 #include <gpxe/pkbuff.h>
 #include <gpxe/netdevice.h>
 #include <gpxe/if_ether.h>
@@ -32,7 +33,201 @@
  *
  */
 
+/** An UNDI NIC */
+struct undi_nic {
+	/** Entry point */
+	SEGOFF16_t entry;
+	/** Assigned IRQ number */
+	unsigned int irq;
+};
+
 static void undi_close ( struct net_device *netdev );
+
+/*****************************************************************************
+ *
+ * UNDI API call
+ *
+ *****************************************************************************
+ */
+
+/**
+ * Name UNDI API call
+ *
+ * @v function		API call number
+ * @ret name		API call name
+ */
+static inline __attribute__ (( always_inline )) const char *
+undi_function_name ( unsigned int function ) {
+	switch ( function ) {
+	case PXENV_UNLOAD_STACK:
+		return "PXENV_UNLOAD_STACK";
+	case PXENV_GET_CACHED_INFO:
+		return "PXENV_GET_CACHED_INFO";
+	case PXENV_RESTART_TFTP:
+		return "PXENV_RESTART_TFTP";
+	case PXENV_START_UNDI:
+		return "PXENV_START_UNDI";
+	case PXENV_STOP_UNDI:
+		return "PXENV_STOP_UNDI";
+	case PXENV_START_BASE:
+		return "PXENV_START_BASE";
+	case PXENV_STOP_BASE:
+		return "PXENV_STOP_BASE";
+	case PXENV_TFTP_OPEN:
+		return "PXENV_TFTP_OPEN";
+	case PXENV_TFTP_CLOSE:
+		return "PXENV_TFTP_CLOSE";
+	case PXENV_TFTP_READ:
+		return "PXENV_TFTP_READ";
+	case PXENV_TFTP_READ_FILE:
+		return "PXENV_TFTP_READ_FILE";
+	case PXENV_TFTP_GET_FSIZE:
+		return "PXENV_TFTP_GET_FSIZE";
+	case PXENV_UDP_OPEN:
+		return "PXENV_UDP_OPEN";
+	case PXENV_UDP_CLOSE:
+		return "PXENV_UDP_CLOSE";
+	case PXENV_UDP_WRITE:
+		return "PXENV_UDP_WRITE";
+	case PXENV_UDP_READ:
+		return "PXENV_UDP_READ";
+	case PXENV_UNDI_STARTUP:
+		return "PXENV_UNDI_STARTUP";
+	case PXENV_UNDI_CLEANUP:
+		return "PXENV_UNDI_CLEANUP";
+	case PXENV_UNDI_INITIALIZE:
+		return "PXENV_UNDI_INITIALIZE";
+	case PXENV_UNDI_RESET_ADAPTER:
+		return "PXENV_UNDI_RESET_ADAPTER";
+	case PXENV_UNDI_SHUTDOWN:
+		return "PXENV_UNDI_SHUTDOWN";
+	case PXENV_UNDI_OPEN:
+		return "PXENV_UNDI_OPEN";
+	case PXENV_UNDI_CLOSE:
+		return "PXENV_UNDI_CLOSE";
+	case PXENV_UNDI_TRANSMIT:
+		return "PXENV_UNDI_TRANSMIT";
+	case PXENV_UNDI_SET_MCAST_ADDRESS:
+		return "PXENV_UNDI_SET_MCAST_ADDRESS";
+	case PXENV_UNDI_SET_STATION_ADDRESS:
+		return "PXENV_UNDI_SET_STATION_ADDRESS";
+	case PXENV_UNDI_SET_PACKET_FILTER:
+		return "PXENV_UNDI_SET_PACKET_FILTER";
+	case PXENV_UNDI_GET_INFORMATION:
+		return "PXENV_UNDI_GET_INFORMATION";
+	case PXENV_UNDI_GET_STATISTICS:
+		return "PXENV_UNDI_GET_STATISTICS";
+	case PXENV_UNDI_CLEAR_STATISTICS:
+		return "PXENV_UNDI_CLEAR_STATISTICS";
+	case PXENV_UNDI_INITIATE_DIAGS:
+		return "PXENV_UNDI_INITIATE_DIAGS";
+	case PXENV_UNDI_FORCE_INTERRUPT:
+		return "PXENV_UNDI_FORCE_INTERRUPT";
+	case PXENV_UNDI_GET_MCAST_ADDRESS:
+		return "PXENV_UNDI_GET_MCAST_ADDRESS";
+	case PXENV_UNDI_GET_NIC_TYPE:
+		return "PXENV_UNDI_GET_NIC_TYPE";
+	case PXENV_UNDI_GET_IFACE_INFO:
+		return "PXENV_UNDI_GET_IFACE_INFO";
+	/*
+	 * Duplicate case value; this is a bug in the PXE specification.
+	 *
+	 *	case PXENV_UNDI_GET_STATE:
+	 *		return "PXENV_UNDI_GET_STATE";
+	 */
+	case PXENV_UNDI_ISR:
+		return "PXENV_UNDI_ISR";
+	default:
+		return "UNKNOWN API CALL";
+	}
+}
+
+/**
+ * UNDI parameter block
+ *
+ * Used as the paramter block for all UNDI API calls.  Resides in base
+ * memory.
+ */
+static union u_PXENV_ANY __data16 ( undi_params );
+#define undi_params __use_data16 ( undi_params )
+
+/** UNDI entry point
+ *
+ * Used as the indirection vector for all UNDI API calls.  Resides in
+ * base memory.
+ */
+static SEGOFF16_t __data16 ( undi_entry_point );
+#define undi_entry_point __use_data16 ( undi_entry_point )
+
+/**
+ * Issue UNDI API call
+ *
+ * @v undi		UNDI NIC
+ * @v function		API call number
+ * @v params		UNDI parameter block
+ * @v params_len	Length of UNDI parameter block
+ * @ret rc		Return status code
+ */
+static int undi_call ( struct undi_nic *undi, unsigned int function,
+		       void *params, size_t params_len ) {
+	union u_PXENV_ANY *pxenv_any = params;
+	PXENV_EXIT_t exit;
+	int discard_b, discard_D;
+	int rc;
+
+	/* Copy parameter block and entry point */
+	assert ( params_len <= sizeof ( undi_params ) );
+	memcpy ( &undi_params, params, params_len );
+	undi_entry_point = undi->entry;
+
+	/* Call real-mode entry point.  This calling convention will
+	 * work with both the !PXE and the PXENV+ entry points.
+	 */
+	__asm__ __volatile__ ( REAL_CODE ( "pushw %%es\n\t"
+					   "pushw %%di\n\t"
+					   "pushw %%bx\n\t"
+					   "lcall *%c3\n\t"
+					   "addw $6, %%sp\n\t" )
+			       : "=a" ( exit ), "=b" ( discard_b ),
+			         "=D" ( discard_D )
+			       : "p" ( & __from_data16 ( undi_entry_point ) ),
+			         "b" ( function ),
+			         "D" ( & __from_data16 ( undi_params ) )
+			       : "ecx", "edx", "esi", "ebp" );
+
+	/* UNDI API calls may rudely change the status of A20 and not
+	 * bother to restore it afterwards.  Intel is known to be
+	 * guilty of this.
+	 *
+	 * Note that we will return to this point even if A20 gets
+	 * screwed up by the UNDI driver, because Etherboot always
+	 * resides in an even megabyte of RAM.
+	 */	
+	gateA20_set();
+
+	/* Copy parameter block back */
+	memcpy ( params, &undi_params, params_len );
+
+	/* Determine return status code based on PXENV_EXIT and
+	 * PXENV_STATUS
+	 */
+	if ( exit == PXENV_EXIT_SUCCESS ) {
+		rc = 0;
+	} else {
+		rc = -pxenv_any->Status;
+		/* Paranoia; don't return success for the combination
+		 * of PXENV_EXIT_FAILURE but PXENV_STATUS_SUCCESS
+		 */
+		if ( rc == 0 )
+			rc = -EIO;
+	}
+
+	if ( rc != 0 ) {
+		DBGC ( undi, "UNDI %p %s failed: %s\n", undi,
+		       undi_function_name ( function ), strerror ( rc ) );
+	}
+	return rc;
+}
 
 /*****************************************************************************
  *
@@ -50,10 +245,10 @@ static void undi_close ( struct net_device *netdev );
 extern void undi_isr ( void );
 
 /** Dummy chain vector */
-static struct segoff undi_isr_dummy_chain;
+static struct segoff prev_handler[ IRQ_MAX + 1 ];
 
 /** IRQ trigger count */
-static volatile uint16_t __text16 ( trigger_count ) = 0;
+static volatile uint8_t __text16 ( trigger_count ) = 0;
 #define trigger_count __use_text16 ( trigger_count )
 
 /**
@@ -69,13 +264,16 @@ static volatile uint16_t __text16 ( trigger_count ) = 0;
  * so will bring our own interrupts to a shuddering halt).
  */
 static void undi_hook_isr ( unsigned int irq ) {
+
+	assert ( irq <= IRQ_MAX );
+
 	__asm__ __volatile__ ( TEXT16_CODE ( "\nundi_isr:\n\t"
-					     "incl %%cs:%c0\n\t"
+					     "incb %%cs:%c0\n\t"
 					     "iret\n\t" )
 			       : : "p" ( & __from_text16 ( trigger_count ) ) );
 
 	hook_bios_interrupt ( IRQ_INT ( irq ), ( ( unsigned int ) undi_isr ),
-			      &undi_isr_dummy_chain );
+			      &prev_handler[irq] );
 
 }
 
@@ -85,8 +283,11 @@ static void undi_hook_isr ( unsigned int irq ) {
  * @v irq		IRQ number
  */
 static void undi_unhook_isr ( unsigned int irq ) {
+
+	assert ( irq <= IRQ_MAX );
+
 	unhook_bios_interrupt ( IRQ_INT ( irq ), ( ( unsigned int ) undi_isr ),
-				&undi_isr_dummy_chain );
+				&prev_handler[irq] );
 }
 
 /**
@@ -142,7 +343,7 @@ static struct s_PXENV_UNDI_TBD __data16 ( undi_tbd );
  * @ret rc		Return status code
  */
 static int undi_transmit ( struct net_device *netdev, struct pk_buff *pkb ) {
-	struct pxe_device *pxe = netdev->priv;
+	struct undi_nic *undi = netdev->priv;
 	struct s_PXENV_UNDI_TRANSMIT undi_transmit;
 	size_t len = pkb_len ( pkb );
 	int rc;
@@ -168,10 +369,8 @@ static int undi_transmit ( struct net_device *netdev, struct pk_buff *pkb ) {
 		= ( ( unsigned ) & __from_data16 ( undi_pkb ) );
 
 	/* Issue PXE API call */
-	if ( ( rc = pxe_call ( pxe, PXENV_UNDI_TRANSMIT, &undi_transmit,
-			       sizeof ( undi_transmit ) ) ) != 0 ) {
-		DBG ( "UNDI_TRANSMIT failed: %s\n", strerror ( rc ) );
-	}
+	rc = undi_call ( undi, PXENV_UNDI_TRANSMIT, &undi_transmit,
+			 sizeof ( undi_transmit ) );
 
 	/* Free packet buffer and return */
 	free_pkb ( pkb );
@@ -200,7 +399,7 @@ static int undi_transmit ( struct net_device *netdev, struct pk_buff *pkb ) {
  * the wonderful 8259 Programmable Interrupt Controller.  Joy.
  */
 static void undi_poll ( struct net_device *netdev ) {
-	struct pxe_device *pxe = netdev->priv;
+	struct undi_nic *undi = netdev->priv;
 	struct s_PXENV_UNDI_ISR undi_isr;
 	struct pk_buff *pkb = NULL;
 	size_t len;
@@ -214,26 +413,21 @@ static void undi_poll ( struct net_device *netdev ) {
 	/* See if this was our interrupt */
 	memset ( &undi_isr, 0, sizeof ( undi_isr ) );
 	undi_isr.FuncFlag = PXENV_UNDI_ISR_IN_START;
-	if ( ( rc = pxe_call ( pxe, PXENV_UNDI_ISR, &undi_isr,
-			       sizeof ( undi_isr ) ) ) != 0 ) {
-		DBG ( "UNDI_ISR (START) failed: %s\n", strerror ( rc ) );
+	if ( ( rc = undi_call ( undi, PXENV_UNDI_ISR, &undi_isr,
+				sizeof ( undi_isr ) ) ) != 0 )
 		return;
-	}
 	if ( undi_isr.FuncFlag != PXENV_UNDI_ISR_OUT_OURS )
 		return;
 
 	/* Send EOI */
-	send_eoi ( pxe->irq );
+	send_eoi ( undi->irq );
 
 	/* Run through the ISR loop */
 	undi_isr.FuncFlag = PXENV_UNDI_ISR_IN_PROCESS;
 	while ( 1 ) {
-		if ( ( rc = pxe_call ( pxe, PXENV_UNDI_ISR, &undi_isr,
-				       sizeof ( undi_isr ) ) ) != 0 ) {
-			DBG ( "UNDI_ISR (PROCESS/GET_NEXT) failed: %s\n",
-			      strerror ( rc ) );
+		if ( ( rc = undi_call ( undi, PXENV_UNDI_ISR, &undi_isr,
+					sizeof ( undi_isr ) ) ) != 0 )
 			break;
-		}
 		switch ( undi_isr.FuncFlag ) {
 		case PXENV_UNDI_ISR_OUT_TRANSMIT:
 			/* We don't care about transmit completions */
@@ -245,12 +439,14 @@ static void undi_poll ( struct net_device *netdev ) {
 			if ( ! pkb )
 				pkb = alloc_pkb ( len );
 			if ( ! pkb ) {
-				DBG ( "UNDI could not allocate %zd bytes for "
-				      "receive buffer\n", len );
+				DBGC ( undi, "UNDI %p could not allocate %zd "
+				       "bytes for receive buffer\n",
+				       undi, len );
 				break;
 			}
 			if ( frag_len > pkb_available ( pkb ) ) {
-				DBG ( "UNDI fragment too large\n" );
+				DBGC ( undi, "UNDI %p fragment too large\n",
+				       undi );
 				frag_len = pkb_available ( pkb );
 			}
 			copy_from_real ( pkb_put ( pkb, frag_len ),
@@ -266,8 +462,8 @@ static void undi_poll ( struct net_device *netdev ) {
 			goto done;
 		default:
 			/* Should never happen */
-			DBG ( "UNDI ISR returned invalid FuncFlag %04x\n",
-			      undi_isr.FuncFlag );
+			DBGC ( undi, "UNDI %p ISR returned invalid FuncFlag "
+			       "%04x\n", undi, undi_isr.FuncFlag );
 			goto done;
 		}
 		undi_isr.FuncFlag = PXENV_UNDI_ISR_IN_GET_NEXT;
@@ -275,7 +471,7 @@ static void undi_poll ( struct net_device *netdev ) {
 
  done:
 	if ( pkb ) {
-		DBG ( "UNDI returned incomplete packet\n" );
+		DBGC ( undi, "UNDI %p returned incomplete packet\n", undi );
 		netdev_rx ( netdev, pkb );
 	}
 }
@@ -287,14 +483,14 @@ static void undi_poll ( struct net_device *netdev ) {
  * @ret rc		Return status code
  */
 static int undi_open ( struct net_device *netdev ) {
-	struct pxe_device *pxe = netdev->priv;
+	struct undi_nic *undi = netdev->priv;
 	struct s_PXENV_UNDI_SET_STATION_ADDRESS set_address;
 	struct s_PXENV_UNDI_OPEN open;
 	int rc;
 
 	/* Hook interrupt service routine and enable interrupt */
-	undi_hook_isr ( pxe->irq );
-	enable_irq ( pxe->irq );
+	undi_hook_isr ( undi->irq );
+	enable_irq ( undi->irq );
 
 	/* Set station address.  Required for some PXE stacks; will
 	 * spuriously fail on others.  Ignore failures.  We only ever
@@ -303,20 +499,15 @@ static int undi_open ( struct net_device *netdev ) {
 	 */
 	memcpy ( set_address.StationAddress, netdev->ll_addr,
 		 sizeof ( set_address.StationAddress ) );
-	if ( ( rc = pxe_call ( pxe, PXENV_UNDI_SET_STATION_ADDRESS,
-			       &set_address, sizeof ( set_address ) ) ) != 0 ){
-		DBG ( "UNDI_SET_STATION_ADDRESS failed: %s\n",
-		      strerror ( rc ) );
-	}
+	undi_call ( undi, PXENV_UNDI_SET_STATION_ADDRESS,
+		    &set_address, sizeof ( set_address ) );
 
 	/* Open NIC */
 	memset ( &open, 0, sizeof ( open ) );
 	open.PktFilter = ( FLTR_DIRECTED | FLTR_BRDCST );
-	if ( ( rc = pxe_call ( pxe, PXENV_UNDI_OPEN, &open,
-			       sizeof ( open ) ) ) != 0 ) {
-		DBG ( "UNDI_OPEN failed: %s\n", strerror ( rc ) );
+	if ( ( rc = undi_call ( undi, PXENV_UNDI_OPEN, &open,
+				sizeof ( open ) ) ) != 0 )
 		goto err;
-	}
 
 	return 0;
 
@@ -331,19 +522,15 @@ static int undi_open ( struct net_device *netdev ) {
  * @v netdev		Net device
  */
 static void undi_close ( struct net_device *netdev ) {
-	struct pxe_device *pxe = netdev->priv;
+	struct undi_nic *undi = netdev->priv;
 	struct s_PXENV_UNDI_CLOSE close;
-	int rc;
 
 	/* Close NIC */
-	if ( ( rc = pxe_call ( pxe, PXENV_UNDI_CLOSE, &close,
-			       sizeof ( close ) ) ) != 0 ) {
-		DBG ( "UNDI_CLOSE failed: %s\n", strerror ( rc ) );
-	}
+	undi_call ( undi, PXENV_UNDI_CLOSE, &close, sizeof ( close ) );
 
 	/* Disable interrupt and unhook ISR */
-	disable_irq ( pxe->irq );
-	undi_unhook_isr ( pxe->irq );
+	disable_irq ( undi->irq );
+	undi_unhook_isr ( undi->irq );
 }
 
 /**
@@ -354,19 +541,59 @@ static void undi_close ( struct net_device *netdev ) {
  */
 int undi_probe ( struct pxe_device *pxe ) {
 	struct net_device *netdev;
+	struct undi_nic *undi;
+	struct s_PXENV_START_UNDI start_undi;
+	struct s_PXENV_UNDI_STARTUP undi_startup;
+	struct s_PXENV_UNDI_INITIALIZE undi_initialize;
+	struct s_PXENV_UNDI_GET_INFORMATION undi_info;
+	struct s_PXENV_UNDI_SHUTDOWN undi_shutdown;
+	struct s_PXENV_UNDI_CLEANUP undi_cleanup;
+	struct s_PXENV_STOP_UNDI stop_undi;
 	int rc;
 
 	/* Allocate net device */
-	netdev = alloc_etherdev ( 0 );
-	if ( ! netdev ) {
-		rc = -ENOMEM;
-		goto err;
-	}
-	netdev->priv = pxe;
+	netdev = alloc_etherdev ( sizeof ( *undi ) );
+	if ( ! netdev )
+		return -ENOMEM;
+	undi = netdev->priv;
 	pxe_set_drvdata ( pxe, netdev );
+	memset ( undi, 0, sizeof ( *undi ) );
+	undi->entry = pxe->entry;
 
-	/* Fill in NIC information */
-	memcpy ( netdev->ll_addr, pxe->hwaddr, ETH_ALEN );
+	/* Hook in UNDI stack */
+	memset ( &start_undi, 0, sizeof ( start_undi ) );
+	start_undi.AX = pxe->pci_busdevfn;
+	start_undi.BX = pxe->isapnp_csn;
+	start_undi.DX = pxe->isapnp_read_port;
+	start_undi.ES = BIOS_SEG;
+	start_undi.DI = find_pnp_bios();
+	if ( ( rc = undi_call ( undi, PXENV_START_UNDI, &start_undi,
+				sizeof ( start_undi ) ) ) != 0 )
+		goto err_start_undi;
+
+	/* Bring up UNDI stack */
+	memset ( &undi_startup, 0, sizeof ( undi_startup ) );
+	if ( ( rc = undi_call ( undi, PXENV_UNDI_STARTUP, &undi_startup,
+				sizeof ( undi_startup ) ) ) != 0 )
+		goto err_undi_startup;
+	memset ( &undi_initialize, 0, sizeof ( undi_initialize ) );
+	if ( ( rc = undi_call ( undi, PXENV_UNDI_INITIALIZE, &undi_initialize,
+				sizeof ( undi_initialize ) ) ) != 0 )
+		goto err_undi_initialize;
+
+	/* Get device information */
+	memset ( &undi_info, 0, sizeof ( undi_info ) );
+	if ( ( rc = undi_call ( undi, PXENV_UNDI_GET_INFORMATION, &undi_info,
+				sizeof ( undi_info ) ) ) != 0 )
+		goto err_undi_get_information;
+	memcpy ( netdev->ll_addr, undi_info.PermNodeAddress, ETH_ALEN );
+	undi->irq = undi_info.IntNumber;
+	if ( undi->irq > IRQ_MAX ) {
+		DBGC ( undi, "UNDI %p invalid IRQ %d\n", undi, undi->irq );
+		goto err_bad_irq;
+	}
+	DBGC ( undi, "UNDI %p (%s) using IRQ %d\n",
+	       undi, eth_ntoa ( netdev->ll_addr ), undi->irq );
 
 	/* Point to NIC specific routines */
 	netdev->open	 = undi_open;
@@ -376,11 +603,26 @@ int undi_probe ( struct pxe_device *pxe ) {
 
 	/* Register network device */
 	if ( ( rc = register_netdev ( netdev ) ) != 0 )
-		goto err;
+		goto err_register;
 
 	return 0;
 
- err:
+ err_register:
+ err_bad_irq:
+ err_undi_get_information:
+ err_undi_initialize:
+	/* Shut down UNDI stack */
+	memset ( &undi_shutdown, 0, sizeof ( undi_shutdown ) );
+	undi_call ( undi, PXENV_UNDI_SHUTDOWN, &undi_shutdown,
+		    sizeof ( undi_shutdown ) );
+	memset ( &undi_cleanup, 0, sizeof ( undi_cleanup ) );
+	undi_call ( undi, PXENV_UNDI_CLEANUP, &undi_cleanup,
+		    sizeof ( undi_cleanup ) );
+ err_undi_startup:
+	/* Unhook UNDI stack */
+	memset ( &stop_undi, 0, sizeof ( stop_undi ) );
+	undi_call ( undi, PXENV_STOP_UNDI, &stop_undi, sizeof ( stop_undi ) );
+ err_start_undi:
 	free_netdev ( netdev );
 	pxe_set_drvdata ( pxe, NULL );
 	return rc;
@@ -393,7 +635,31 @@ int undi_probe ( struct pxe_device *pxe ) {
  */
 void undi_remove ( struct pxe_device *pxe ) {
 	struct net_device *netdev = pxe_get_drvdata ( pxe );
+	struct undi_nic *undi = netdev->priv;
+	struct s_PXENV_UNDI_SHUTDOWN undi_shutdown;
+	struct s_PXENV_UNDI_CLEANUP undi_cleanup;
+	struct s_PXENV_STOP_UNDI stop_undi;
 
+	/* Unregister net device */
 	unregister_netdev ( netdev );
+
+	/* Shut down UNDI stack */
+	memset ( &undi_shutdown, 0, sizeof ( undi_shutdown ) );
+	undi_call ( undi, PXENV_UNDI_SHUTDOWN, &undi_shutdown,
+		    sizeof ( undi_shutdown ) );
+	memset ( &undi_cleanup, 0, sizeof ( undi_cleanup ) );
+	undi_call ( undi, PXENV_UNDI_CLEANUP, &undi_cleanup,
+		    sizeof ( undi_cleanup ) );
+
+	/* Unhook UNDI stack */
+	memset ( &stop_undi, 0, sizeof ( stop_undi ) );
+	undi_call ( undi, PXENV_STOP_UNDI, &stop_undi, sizeof ( stop_undi ) );
+
+	/* Free network device */
 	free_netdev ( netdev );
 }
+
+
+
+
+REQUIRE_OBJECT ( pxebus );
