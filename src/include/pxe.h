@@ -62,8 +62,8 @@ union u_PXENV_ANY {
 
 typedef union u_PXENV_ANY PXENV_ANY_t;
 
-/** An UNDI expansion ROM */
-struct undi_rom {
+/** An UNDI expansion ROM header */
+struct undi_rom_header {
 	/** Signature
 	 *
 	 * Must be equal to @c ROM_SIGNATURE
@@ -134,94 +134,6 @@ struct pcir_header {
 #define PCIR_SIGNATURE \
 	( ( 'P' << 0 ) + ( 'C' << 8 ) + ( 'I' << 16 ) + ( 'R' << 24 ) )
 
-/** A PXE PCI device ID */
-struct pxe_pci_device_id {
-	/** PCI vendor ID */
-	unsigned int vendor_id;
-	/** PCI device ID */
-	unsigned int device_id;
-};
-
-/** A PXE device ID */
-union pxe_device_id {
-	/** PCI device ID */
-	struct pxe_pci_device_id pci;
-};
-
-/** A PXE driver */
-struct pxe_driver {
-	/** List of PXE drivers */
-	struct list_head list;
-	/** ROM segment address */
-	unsigned int rom_segment;
-	/** UNDI loader entry point */
-	SEGOFF16_t loader_entry;
-	/** Code segment size */
-	size_t code_size;
-	/** Data segment size */
-	size_t data_size;
-	/** Bus type
-	 *
-	 * Values are as used by @c PXENV_UNDI_GET_NIC_TYPE
-	 */
-	unsigned int bus_type;
-	/** Device ID */
-	union pxe_device_id bus_id;
-};
-
-/** A PXE device */
-struct pxe_device {
-	/** Generic device */
-	struct device dev;
-	/** Driver-private data
-	 *
-	 * Use pxe_set_drvdata() and pxe_get_drvdata() to access this
-	 * field.
-	 */
-	void *priv;
-
-	/** PXENV+ structure address */
-	SEGOFF16_t pxenv;
-	/** !PXE structure address */
-	SEGOFF16_t ppxe;
-	/** Entry point */
-	SEGOFF16_t entry;
-	/** MAC address */
-	MAC_ADDR_t hwaddr;
-	/** Assigned IRQ number */
-	UINT16_t irq;
-	/** ROM segment address */
-	SEGSEL_t rom_segment;
-};
-
-/**
- * Set PXE driver-private data
- *
- * @v pxe		PXE device
- * @v priv		Private data
- */
-static inline void pxe_set_drvdata ( struct pxe_device *pxe, void *priv ) {
-	pxe->priv = priv;
-}
-
-/**
- * Get PXE driver-private data
- *
- * @v pxe		PXE device
- * @ret priv		Private data
- */
-static inline void * pxe_get_drvdata ( struct pxe_device *pxe ) {
-	return pxe->priv;
-}
-
-extern int pxe_call ( struct pxe_device *pxe, unsigned int function,
-		      void *params, size_t params_len );
-extern int undi_probe ( struct pxe_device *pxe );
-extern void undi_remove ( struct pxe_device *pxe );
-
-extern struct pxe_driver * pxedrv_find_pci_driver ( unsigned int vendor_id,
-						    unsigned int device_id,
-						    unsigned int rombase );
 
 extern struct net_device *pxe_netdev;
 
