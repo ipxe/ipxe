@@ -7,6 +7,9 @@
  *
  */
 
+#include <gpxe/device.h>
+#include <pxe_types.h>
+
 /** An UNDI device */
 struct undi_device {
 	/** Generic device */
