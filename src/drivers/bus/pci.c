@@ -165,23 +165,22 @@ void adjust_pci_device ( struct pci_device *pci ) {
 }
 
 /**
- * Register PCI device
+ * Probe a PCI device
  *
  * @v pci		PCI device
  * @ret rc		Return status code
  *
  * Searches for a driver for the PCI device.  If a driver is found,
- * its probe() routine is called, and the device is added to the
- * device hierarchy.
+ * its probe() routine is called.
  */
-static int register_pcidev ( struct pci_device *pci ) {
+static int pci_probe ( struct pci_device *pci ) {
 	struct pci_driver *driver;
 	struct pci_device_id *id;
 	unsigned int i;
 	int rc;
 
-	DBG ( "Registering PCI device %02x:%02x.%x (%04x:%04x mem %lx "
-	      "io %lx irq %d)\n", pci->bus, PCI_SLOT ( pci->devfn ),
+	DBG ( "Adding PCI device %02x:%02x.%x (%04x:%04x mem %lx io %lx "
+	      "irq %d)\n", pci->bus, PCI_SLOT ( pci->devfn ),
 	      PCI_FUNC ( pci->devfn ), pci->vendor, pci->device,
 	      pci->membase, pci->ioaddr, pci->irq );
 
@@ -198,8 +197,6 @@ static int register_pcidev ( struct pci_device *pci ) {
 				DBG ( "......probe failed\n" );
 				continue;
 			}
-			list_add ( &pci->dev.siblings,
-				   &pci->dev.parent->children );
 			return 0;
 		}
 	}
@@ -209,17 +206,13 @@ static int register_pcidev ( struct pci_device *pci ) {
 }
 
 /**
- * Unregister a PCI device
+ * Remove a PCI device
  *
  * @v pci		PCI device
- *
- * Calls the device's driver's remove() routine, and removes the
- * device from the device hierarchy.
  */
-static void unregister_pcidev ( struct pci_device *pci ) {
+static void pci_remove ( struct pci_device *pci ) {
 	pci->driver->remove ( pci );
-	list_del ( &pci->dev.siblings );
-	DBG ( "Unregistered PCI device %02x:%02x.%x\n", pci->bus,
+	DBG ( "Removed PCI device %02x:%02x.%x\n", pci->bus,
 	      PCI_SLOT ( pci->devfn ), PCI_FUNC ( pci->devfn ) );
 }
 
@@ -278,15 +271,19 @@ static int pcibus_probe ( struct root_device *rootdev ) {
 			pci_read_config_byte ( pci, PCI_INTERRUPT_LINE,
 					       &pci->irq );
 			pci_read_bases ( pci );
-			INIT_LIST_HEAD ( &pci->dev.children );
+
+			/* Add to device hierarchy */
 			pci->dev.parent = &rootdev->dev;
+			list_add ( &pci->dev.siblings, &rootdev->dev.children);
+			INIT_LIST_HEAD ( &pci->dev.children );
 			
 			/* Look for a driver */
-			if ( register_pcidev ( pci ) == 0 ) {
+			if ( pci_probe ( pci ) == 0 ) {
 				/* pcidev registered, we can drop our ref */
 				pci = NULL;
 			} else {
 				/* Not registered; re-use struct pci_device */
+				list_del ( &pci->dev.siblings );
 			}
 		}
 	}
@@ -311,7 +308,8 @@ static void pcibus_remove ( struct root_device *rootdev ) {
 
 	list_for_each_entry_safe ( pci, tmp, &rootdev->dev.children,
 				   dev.siblings ) {
-		unregister_pcidev ( pci );
+		pci_remove ( pci );
+		list_del ( &pci->dev.siblings );
 		free ( pci );
 	}
 }
@@ -326,7 +324,4 @@ static struct root_driver pci_root_driver = {
 struct root_device pci_root_device __root_device = {
 	.name = "PCI",
 	.driver = &pci_root_driver,
-	.dev = {
-		.children = LIST_HEAD_INIT ( pci_root_device.dev.children ),
-	},
 };

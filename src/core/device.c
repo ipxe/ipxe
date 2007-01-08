@@ -16,6 +16,7 @@
  * Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
  */
 
+#include <string.h>
 #include <gpxe/list.h>
 #include <gpxe/tables.h>
 #include <gpxe/device.h>
@@ -34,35 +35,32 @@ static struct root_device root_devices_end[0] __table_end ( root_devices );
 static LIST_HEAD ( devices );
 
 /**
- * Register a root device
+ * Probe a root device
  *
  * @v rootdev		Root device
  * @ret rc		Return status code
- *
- * Calls the root device driver's probe() method, and adds it to the
- * list of registered root devices if successful.
  */
-static int register_rootdev ( struct root_device *rootdev ) {
+static int rootdev_probe ( struct root_device *rootdev ) {
 	int rc;
 
-	DBG ( "Registering %s root bus\n", rootdev->name );
-
-	if ( ( rc = rootdev->driver->probe ( rootdev ) ) != 0 )
+	DBG ( "Adding %s root bus\n", rootdev->name );
+	if ( ( rc = rootdev->driver->probe ( rootdev ) ) != 0 ) {
+		DBG ( "Failed to add %s root bus: %s\n",
+		      rootdev->name, strerror ( rc ) );
 		return rc;
+	}
 
-	list_add ( &rootdev->dev.siblings, &devices );
 	return 0;
 }
 
 /**
- * Unregister a root device
+ * Remove a root device
  *
  * @v rootdev		Root device
  */
-static void unregister_rootdev ( struct root_device *rootdev ) {
+static void rootdev_remove ( struct root_device *rootdev ) {
 	rootdev->driver->remove ( rootdev );
-	list_del ( &rootdev->dev.siblings );
-	DBG ( "Unregistered %s root bus\n", rootdev->name );
+	DBG ( "Removed %s root bus\n", rootdev->name );
 }
 
 /**
@@ -76,9 +74,13 @@ static void unregister_rootdev ( struct root_device *rootdev ) {
  */
 int probe_devices ( void ) {
 	struct root_device *rootdev;
+	int rc;
 
 	for ( rootdev = root_devices; rootdev < root_devices_end; rootdev++ ) {
-		register_rootdev ( rootdev );
+		list_add ( &rootdev->dev.siblings, &devices );
+		INIT_LIST_HEAD ( &rootdev->dev.children );
+		if ( ( rc = rootdev_probe ( rootdev ) ) != 0 )
+			list_del ( &rootdev->dev.siblings );
 	}
 	return 0;
 }
@@ -92,6 +94,7 @@ void remove_devices ( void ) {
 	struct root_device *tmp;
 
 	list_for_each_entry_safe ( rootdev, tmp, &devices, dev.siblings ) {
-		unregister_rootdev ( rootdev );
+		rootdev_remove ( rootdev );
+		list_del ( &rootdev->dev.siblings );
 	}
 }
