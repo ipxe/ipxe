@@ -73,7 +73,6 @@ static int undipci_probe ( struct pci_device *pci,
 	list_add ( &undi->dev.siblings, &pci->dev.children );
 
 	/* Call UNDI ROM loader to create pixie */
-	DBGC ( undi, "UNDI %p using UNDI ROM %p\n", undi, undirom );
 	if ( ( rc = undi_load_pci ( undi, undirom, pci->bus,
 				    pci->devfn ) ) != 0 )
 		goto err_load_pci;
