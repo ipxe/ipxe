@@ -311,6 +311,8 @@ struct pci_driver {
 #define PCI_SLOT( devfn )	( ( (devfn) >> 3 ) & 0x1f )
 #define PCI_FUNC( devfn )	( (devfn) & 0x07 )
 
+#define PCI_BASE_CLASS( class )	( (class) >> 16 )
+
 /*
  * PCI_ROM is used to build up entries in a struct pci_id array.  It
  * is also parsed by parserom.pl to generate Makefile rules and files
