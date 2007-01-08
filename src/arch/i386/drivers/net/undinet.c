@@ -538,6 +538,7 @@ int undinet_probe ( struct undi_device *undi ) {
 	undi_set_drvdata ( undi, netdev );
 	memset ( undinic, 0, sizeof ( *undinic ) );
 	undinic->entry = undi->entry;
+	DBGC ( undinic, "UNDINIC %p using UNDI %p\n", undinic, undi );
 
 	/* Hook in UNDI stack */
 	memset ( &start_undi, 0, sizeof ( start_undi ) );
@@ -573,7 +574,7 @@ int undinet_probe ( struct undi_device *undi ) {
 		       undinic, undinic->irq );
 		goto err_bad_irq;
 	}
-	DBGC ( undinic, "UNDINIC %p (%s) using IRQ %d\n",
+	DBGC ( undinic, "UNDINIC %p is %s on IRQ %d\n",
 	       undinic, eth_ntoa ( netdev->ll_addr ), undinic->irq );
 
 	/* Point to NIC specific routines */
