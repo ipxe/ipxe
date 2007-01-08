@@ -21,9 +21,6 @@
 #include <string.h>
 #include <pxe.h>
 #include <realmode.h>
-#include <bios.h>
-#include <pnpbios.h>
-#include <gpxe/pci.h>
 #include <undirom.h>
 
 /** @file
