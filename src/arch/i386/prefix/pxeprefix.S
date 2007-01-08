@@ -1,6 +1,6 @@
+#define PXENV_UNDI_SHUTDOWN	0x05
 #define	PXENV_STOP_UNDI		0x15
 #define PXENV_UNLOAD_STACK	0x70
-#define PXENV_STOP_BASE		0x76
 
 #define PXE_STACK_MAGIC		0x57ac	/* 'STac' */
 
@@ -139,12 +139,18 @@ find_undi_basemem_usage:
 	movw	%cx, undi_fbms_end
 
 /*****************************************************************************
+ * Leave NIC in a safe state
+ *****************************************************************************
+ */
+shutdown_nic:
+	movw	$PXENV_UNDI_SHUTDOWN, %bx
+	call	pxe_call
+
+/*****************************************************************************
  * Unload PXE base code
  *****************************************************************************
  */	
 unload_base_code:
-	movw	$PXENV_STOP_BASE, %bx
-	call	pxe_call
 	movw	$PXENV_UNLOAD_STACK, %bx
 	call	pxe_call
 	jnz	do_not_free_base_code
