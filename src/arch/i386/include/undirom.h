@@ -7,6 +7,8 @@
  *
  */
 
+#include <pxe_types.h>
+
 /** An UNDI PCI device ID */
 struct undi_pci_device_id {
 	/** PCI vendor ID */
