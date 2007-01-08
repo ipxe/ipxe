@@ -1,0 +1,119 @@
+/*
+ * Copyright (C) 2007 Michael Brown <mbrown@fensystems.co.uk>.
+ *
+ * This program is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU General Public License as
+ * published by the Free Software Foundation; either version 2 of the
+ * License, or any later version.
+ *
+ * This program is distributed in the hope that it will be useful, but
+ * WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ * General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program; if not, write to the Free Software
+ * Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
+ */
+
+#include <stdint.h>
+#include <stdlib.h>
+#include <string.h>
+#include <gpxe/pci.h>
+#include <undi.h>
+#include <undirom.h>
+#include <undiload.h>
+#include <undinet.h>
+
+/** @file
+ *
+ * UNDI PCI driver
+ *
+ */
+
+/**
+ * Probe PCI device
+ *
+ * @v pci	PCI device
+ * @v id	PCI ID
+ * @ret rc	Return status code
+ */
+static int undipci_probe ( struct pci_device *pci,
+			   const struct pci_device_id *id __unused ) {
+	struct undi_device *undi;
+	struct undi_rom *undirom;
+	unsigned long rombase;
+	int rc;
+
+	/* Ignore non-network devices */
+	if ( PCI_BASE_CLASS ( pci->class ) != PCI_BASE_CLASS_NETWORK )
+		return -ENOTTY;
+
+	/* Try to find a driver for this device.  Try an exact match
+	 * on the ROM address first, then fall back to a vendor/device
+	 * ID match only
+	 */
+	rombase = pci_bar_start ( pci, PCI_ROM_ADDRESS );
+	undirom = undirom_find_pci ( pci->vendor, pci->device, rombase );
+	if ( ! undirom )
+		undirom = undirom_find_pci ( pci->vendor, pci->device, 0 );
+	if ( ! undirom )
+		return -ENODEV;
+
+	/* Allocate UNDI device structure */
+	undi = malloc ( sizeof ( *undi ) );
+	if ( ! undi )
+		return -ENOMEM;
+	memset ( undi, 0, sizeof ( *undi ) );
+	pci_set_drvdata ( pci, undi );
+
+	/* Add to device hierarchy */
+	undi->dev.parent = &pci->dev;
+	INIT_LIST_HEAD ( &undi->dev.children );
+	list_add ( &undi->dev.siblings, &pci->dev.children );
+
+	/* Call UNDI ROM loader to create pixie */
+	DBGC ( undi, "UNDI %p using UNDI ROM %p\n", undi, undirom );
+	if ( ( rc = undi_load_pci ( undi, undirom, pci->bus,
+				    pci->devfn ) ) != 0 )
+		goto err_load_pci;
+
+	/* Create network device */
+	if ( ( rc = undinet_probe ( undi ) ) != 0 )
+		goto err_undinet_probe;
+	
+	return 0;
+
+ err_undinet_probe:
+	undi_unload ( undi );
+ err_load_pci:
+	list_del ( &undi->dev.siblings );
+	free ( undi );
+	pci_set_drvdata ( pci, NULL );
+	return rc;
+}
+
+/**
+ * Remove PCI device
+ *
+ * @v pci	PCI device
+ */
+static void undipci_remove ( struct pci_device *pci ) {
+	struct undi_device *undi = pci_get_drvdata ( pci );
+
+	undi_unload ( undi );
+	list_del ( &undi->dev.siblings );
+	free ( undi );
+	pci_set_drvdata ( pci, NULL );
+}
+
+static struct pci_device_id undipci_nics[] = {
+PCI_ROM ( 0xffff, 0xffff, "undipci", "UNDI (PCI)" ),
+};
+
+struct pci_driver undipci_driver __pci_driver = {
+	.ids = undipci_nics,
+	.id_count = ( sizeof ( undipci_nics ) / sizeof ( undipci_nics[0] ) ),
+	.probe = undipci_probe,
+	.remove = undipci_remove,
+};
