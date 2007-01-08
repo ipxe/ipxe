@@ -37,13 +37,21 @@ void hook_bios_interrupt ( unsigned int interrupt, unsigned int handler,
 		.offset = handler,
 	};
 
+	DBG ( "Hooking INT %#02x to %04x:%04x\n",
+	      interrupt, rm_cs, handler );
+
 	if ( ( chain_vector->segment != 0 ) ||
 	     ( chain_vector->offset != 0 ) ) {
 		/* Already hooked; do nothing */
+		DBG ( "...already hooked\n" );
 		return;
 	}
+
 	copy_from_real ( chain_vector, 0, ( interrupt * 4 ),
 			 sizeof ( *chain_vector ) );
+	DBG ( "...chaining to %04x:%04x\n",
+	      chain_vector->segment, chain_vector->offset );
+
 	copy_to_real ( 0, ( interrupt * 4 ), &vector, sizeof ( vector ) );
 	hooked_bios_interrupts++;
 }
@@ -65,11 +73,21 @@ int unhook_bios_interrupt ( unsigned int interrupt, unsigned int handler,
 			    struct segoff *chain_vector ) {
 	struct segoff vector;
 
+	DBG ( "Unhooking INT %#02x from %04x:%04x\n",
+	      interrupt, rm_cs, handler );
+
 	copy_from_real ( &vector, 0, ( interrupt * 4 ), sizeof ( vector ) );
-	if ( ( vector.segment != rm_cs ) || ( vector.offset != handler ) )
+	if ( ( vector.segment != rm_cs ) || ( vector.offset != handler ) ) {
+		DBG ( "...cannot unhook; vector points to %04x:%04x\n",
+		      vector.segment, vector.offset );
 		return -EBUSY;
+	}
+
+	DBG ( "...restoring to %04x:%04x\n",
+	      chain_vector->segment, chain_vector->offset );
 	copy_to_real ( 0, ( interrupt * 4 ), chain_vector,
 		       sizeof ( *chain_vector ) );
+
 	chain_vector->segment = 0;
 	chain_vector->offset = 0;
 	hooked_bios_interrupts--;
