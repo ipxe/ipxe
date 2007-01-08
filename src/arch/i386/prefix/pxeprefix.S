@@ -1,5 +1,3 @@
-#define PXENV_UNDI_CLEANUP	0x02
-#define PXENV_UNDI_SHUTDOWN	0x05
 #define	PXENV_STOP_UNDI		0x15
 #define PXENV_UNLOAD_STACK	0x70
 #define PXENV_STOP_BASE		0x76
@@ -118,88 +116,76 @@ print_structure_information:
 	call	print_segoff
 
 /*****************************************************************************
- * Unload PXE base code and UNDI driver
+ * Calculate base memory usage by UNDI
  *****************************************************************************
  */
-#ifdef PXELOADER_KEEP_ALL
-	xorw	%ax, %ax		/* Force zero flag to show success */
-	jmp	do_not_free_base_mem	/* Skip the unloading */
-#endif /* PXELOADER_KEEP_ALL */
-	
-unload_pxe:
+find_undi_basemem_usage:
+	movw	undi_code_segment, %ax
+	movw	undi_code_size, %bx
+	movw	undi_data_segment, %cx
+	movw	undi_data_size, %dx
+	cmpw	%ax, %cx
+	ja	1f
+	xchgw	%ax, %cx
+	xchgw	%bx, %dx
+1:	/* %ax:%bx now describes the lower region, %cx:%dx the higher */
+	shrw	$6, %ax			/* Round down to nearest kB */
+	movw	%ax, undi_fbms_start
+	addw	$0x0f, %dx		/* Round up to next segment */
+	shrw	$4, %dx
+	addw	%dx, %cx
+	addw	$((1024 / 16) - 1), %cx	/* Round up to next kB */
+	shrw	$6, %cx
+	movw	%cx, undi_fbms_end
+
+/*****************************************************************************
+ * Unload PXE base code
+ *****************************************************************************
+ */	
+unload_base_code:
+	movw	$PXENV_STOP_BASE, %bx
+	call	pxe_call
 	movw	$PXENV_UNLOAD_STACK, %bx
 	call	pxe_call
-	movw	$PXENV_STOP_UNDI, %bx
-	call	pxe_call
-	pushfw				/* Ignore PXENV_UNDI_CLEANUP errors */
-	movw	$PXENV_UNDI_CLEANUP, %bx
-	call	pxe_call
-	popfw
-	/* On exit, zero flag is set iff all calls were successful */
-		
+	jnz	do_not_free_base_code
+free_base_code:
+	movw	%fs:(0x13), %si
+	movw	undi_fbms_start, %di
+	call	free_basemem
+do_not_free_base_code:
+
 /*****************************************************************************
- * Free base memory
+ * Unload UNDI driver
  *****************************************************************************
  */
-free_base_mem:
-	jnz	do_not_free_base_mem	/* Using zero flag from unload_pxe */
-
-	movw	undi_code_segment, %bx
-	movw	undi_data_segment, %cx
-	movw	undi_code_size, %ax
-	cmpw	%bx, %cx
-	jb	1f
-	movw	%cx, %bx
-	movw	undi_data_size, %ax
-1:	addw	$0x0f, %ax		/* Round up to next segment */
-	shrw	$4, %ax
-	addw	%bx, %ax		/* Highest segment address into %ax */
-	addw	$(1024 / 16 - 1), %ax	/* Round up to next kb */
-	shrw	$6, %ax			/* New free basemem size in %ax */
-	movw	%fs:(0x13), %bx		/* Old free base memory in %bx */
-	movw	%ax, %fs:(0x13)		/* Store new free base memory size */
-
-	/* Note that zero_mem_loop will also zero out our stack, so make
-	 * sure the stack is empty at this point.
-	 */
-	movw	%ax, %dx
-	subw	%bx, %dx		/* numberof kb to zero in %dx */
-	shlw	$6, %bx			/* Segment address into %bx */
-zero_mem_loop:
-	movw	%bx, %es		/* kB boundary into %es:00 */
-	xorw	%ax, %ax
-	xorw	%di, %di
-	movw	$0x400, %cx
-	rep	stosb			/* fill kB with zeroes */
-	addw	$(1024 / 16), %bx
-	decw	%dx
-	jnz	zero_mem_loop
-	/* Will exit here with zero flag set, so no need to set it explicitly
-	 * in order to indicate success.
-	 */
-	
-do_not_free_base_mem:
-	pushfw				/* Save success (zero) flag status */
-	movw	%fs:(0x13), %ax		/* Free base memory in %ax */
-	call	print_hex_word		/* Print free base memory */
-	popfw				/* Restore success (zero) flag */
+unload_undi:
+	movw	$PXENV_STOP_UNDI, %bx
+	call	pxe_call
+#ifndef PXELOADER_KEEP_UNDI
+	jnz	do_not_free_undi
+free_undi:
+	movw	undi_fbms_start, %si
+	movw	undi_fbms_end, %di
+	call	free_basemem
+do_not_free_undi:
+#endif /* PXELOADER_KEEP_UNDI */
 
 /*****************************************************************************
  * Exit point
- * Jump to finished with the zero flag set to indicate success, or to
- * finished_with_error to always report an error
  *****************************************************************************
  */	
 finished:
 	movw	$10f, %si
+	movw	pxe_overall_status, %ax
+	testw	%ax, %ax
 	jz	1f
 finished_with_error:
 	movw	$20f, %si
 1:
 	call	print_message
 	jmp	run_etherboot
-10:	.asciz " ok\n"
-20:	.asciz " err\n"
+10:	.asciz "ok\n"
+20:	.asciz "err\n"
 
 /*****************************************************************************
  * Subroutine: print character in %al (with LF -> LF,CR translation)
@@ -262,13 +248,40 @@ print_segoff:
 	movb	$0x20, %al			/* ' ' */
 	call	print_character
 	ret
-	
+
+/*****************************************************************************
+ * Subroutine: free and zero base memory from %si kB to %di kB
+ *****************************************************************************
+ */
+free_basemem:
+	movw	%fs:(0x13), %ax		/* Current FBMS to %ax */
+	cmpw	%ax, %si		/* Update FBMS only if "old" value  */
+	jne	1f			/* is correct			    */
+	movw	%di, %fs:(0x13)
+1:	movw	%di, %bx
+zero_kb:
+	movw	%si, %ax		/* Zero kB at %si */
+	shlw	$6, %ax
+	movw	%ax, %es
+	xorw	%ax, %ax
+	xorw	%di, %di
+	movw	$0x400, %cx
+	rep stosb
+	incw	%si			/* Move to next kB */
+	cmpw	%si, %bx
+	jne	zero_kb			/* Loop until done */
+	movw	%fs:(0x13), %ax		/* Print free base memory */
+	call	print_hex_word
+	movb	$0x20, %al			/* ' ' */
+	call	print_character
+	ret
+
 /*****************************************************************************
  * Make a PXE API call.  Works with either !PXE or PXENV+ API.
  * Opcode in %bx.  pxe_parameter_structure always used.
- * Returns status code (not exit code) in %bx and prints it.
- * ORs status code with overall status code in pxe_overall_status, returns
- * with zero flag set iff all PXE API calls have been successful.
+ *
+ * Returns status code (not exit code) in %bx and prints it.  Returns
+ * with zero flag set if status code is zero (PXENV_STATUS_SUCCESS).
  *****************************************************************************
  */
 pxe_call:
@@ -291,14 +304,13 @@ pxe_call:
 	call	print_character
 	popw	%bx
 	orw	%bx, pxe_overall_status
+	testw	%bx, %bx
 	ret
 
 /*****************************************************************************
  * PXE data structures
  *****************************************************************************
  */
-
-pxe_overall_status:	.word 0
 
 pxe_entry_segoff:
 pxe_entry_offset:	.word 0
@@ -312,9 +324,14 @@ undi_data_segoff:
 undi_data_size:		.word 0
 undi_data_segment:	.word 0
 
+undi_fbms_start:	.word 0
+undi_fbms_end:		.word 0
+
 pxe_parameter_structure:
 	.word	0
 	.word	0,0,0,0,0
+
+pxe_overall_status:	.word 0
 
 /*****************************************************************************
  * Run Etherboot main code
