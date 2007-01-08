@@ -132,7 +132,7 @@ static int undi_load ( struct undi_device *undi, struct undi_rom *undirom ) {
 	fbms = ( fbms_seg >> 6 );
 	put_real ( fbms, BDA_SEG, BDA_FBMS );
 	undi->fbms = fbms;
-	DBGC ( undi, "UNDI %p using %dkB-%dkB\n",
+	DBGC ( undi, "UNDI %p using [%d,%d) kB of base memory\n",
 	       undi, undi->fbms, undi->restore_fbms );
 
 	return 0;
@@ -176,13 +176,13 @@ int undi_unload ( struct undi_device *undi ) {
 	/* Free base memory, if possible */
 	get_real ( fbms, BDA_SEG, BDA_FBMS );
 	if ( fbms == undi->fbms ) {
-		DBGC ( undi, "UNDI %p freeing %dkB-%dkB\n",
+		DBGC ( undi, "UNDI %p freeing [%d,%d) kB of base memory\n",
 		       undi, undi->fbms, undi->restore_fbms );
 		fbms = undi->restore_fbms;
 		put_real ( fbms, BDA_SEG, BDA_FBMS );
 		return 0;
 	} else {
-		DBGC ( undi, "UNDI %p leaking %dkB-%dkB\n",
+		DBGC ( undi, "UNDI %p leaking [%d,%d) kB of base memory\n",
 		       undi, undi->fbms, undi->restore_fbms );
 		return -EBUSY;
 	}
