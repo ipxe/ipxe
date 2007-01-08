@@ -239,6 +239,9 @@ struct pci_device_id {
 	uint16_t device;
 };
 
+/** Match-anything ID */
+#define PCI_ANY_ID 0xffff
+
 /** A PCI device */
 struct pci_device {
 	/** Generic device */

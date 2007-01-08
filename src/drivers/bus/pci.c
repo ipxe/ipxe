@@ -187,7 +187,10 @@ static int pci_probe ( struct pci_device *pci ) {
 	for ( driver = pci_drivers ; driver < pci_drivers_end ; driver++ ) {
 		for ( i = 0 ; i < driver->id_count ; i++ ) {
 			id = &driver->ids[i];
-			if ( ( id->vendor != pci->vendor ) ||
+			if ( ( id->vendor != PCI_ANY_ID ) &&
+			     ( id->vendor != pci->vendor ) )
+				continue;
+			if ( ( id->device != PCI_ANY_ID ) &&
 			     ( id->device != pci->device ) )
 				continue;
 			pci->driver = driver;
