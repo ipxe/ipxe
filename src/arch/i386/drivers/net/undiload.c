@@ -170,8 +170,10 @@ int undi_unload ( struct undi_device *undi ) {
 	DBGC ( undi, "UNDI %p unloading\n", undi );
 
 	/* Erase signatures */
-	put_real ( dead, undi->pxenv.segment, undi->pxenv.offset );
-	put_real ( dead, undi->ppxe.segment, undi->ppxe.offset );
+	if ( undi->pxenv.segment )
+		put_real ( dead, undi->pxenv.segment, undi->pxenv.offset );
+	if ( undi->ppxe_segment )
+		put_real ( dead, undi->ppxe.segment, undi->ppxe.offset );
 
 	/* Free base memory, if possible */
 	get_real ( fbms, BDA_SEG, BDA_FBMS );
