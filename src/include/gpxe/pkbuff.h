@@ -137,12 +137,22 @@ static inline size_t pkb_len ( struct pk_buff *pkb ) {
 }
 
 /**
- * Calculate available space in a packet buffer
+ * Calculate available space at start of a packet buffer
  *
  * @v pkb	Packet buffer
- * @ret len	Length of data available in buffer
+ * @ret len	Length of data available at start of buffer
  */
-static inline size_t pkb_available ( struct pk_buff *pkb ) {
+static inline size_t pkb_headroom ( struct pk_buff *pkb ) {
+	return ( pkb->data - pkb->head );
+}
+
+/**
+ * Calculate available space at end of a packet buffer
+ *
+ * @v pkb	Packet buffer
+ * @ret len	Length of data available at end of buffer
+ */
+static inline size_t pkb_tailroom ( struct pk_buff *pkb ) {
 	return ( pkb->end - pkb->tail );
 }
 

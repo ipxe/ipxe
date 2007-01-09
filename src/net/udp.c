@@ -104,7 +104,7 @@ int udp_senddata ( struct udp_connection *conn ) {
 	}
 	pkb_reserve ( conn->tx_pkb, UDP_MAX_HLEN );
 	rc = conn->udp_op->senddata ( conn, conn->tx_pkb->data, 
-				      pkb_available ( conn->tx_pkb ) );
+				      pkb_tailroom ( conn->tx_pkb ) );
 	if ( conn->tx_pkb )
 		free_pkb ( conn->tx_pkb );
 	return rc;
@@ -137,8 +137,8 @@ int udp_sendto ( struct udp_connection *conn, struct sockaddr_tcpip *peer,
 	conn->tx_pkb = NULL;
 
 	/* Avoid overflowing TX buffer */
-	if ( len > pkb_available ( pkb ) )
-		len = pkb_available ( pkb );
+	if ( len > pkb_tailroom ( pkb ) )
+		len = pkb_tailroom ( pkb );
 
 	/* Copy payload */
 	memmove ( pkb_put ( pkb, len ), data, len );

@@ -437,10 +437,10 @@ static void undinet_poll ( struct net_device *netdev ) {
 				/* Fragment will be dropped */
 				goto done;
 			}
-			if ( frag_len > pkb_available ( pkb ) ) {
+			if ( frag_len > pkb_tailroom ( pkb ) ) {
 				DBGC ( undinic, "UNDINIC %p fragment too "
 				       "large\n", undinic );
-				frag_len = pkb_available ( pkb );
+				frag_len = pkb_tailroom ( pkb );
 			}
 			copy_from_real ( pkb_put ( pkb, frag_len ),
 					 undi_isr.Frame.segment,

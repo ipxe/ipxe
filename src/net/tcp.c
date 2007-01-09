@@ -255,7 +255,7 @@ static int tcp_senddata_conn ( struct tcp_connection *conn, int force_send ) {
 	if ( TCP_CAN_SEND_DATA ( conn->tcp_state ) &&
 	     app && app->tcp_op->senddata ) {
 		conn->tx_pkb = pkb;
-		app->tcp_op->senddata ( app, pkb->data, pkb_available ( pkb ));
+		app->tcp_op->senddata ( app, pkb->data, pkb_tailroom ( pkb ) );
 		conn->tx_pkb = NULL;
 	}
 
@@ -364,8 +364,8 @@ int tcp_send ( struct tcp_application *app, const void *data, size_t len ) {
 	}
 
 	/* Truncate length to fit packet buffer */
-	if ( len > pkb_available ( pkb ) )
-		len = pkb_available ( pkb );
+	if ( len > pkb_tailroom ( pkb ) )
+		len = pkb_tailroom ( pkb );
 
 	/* Copy payload */
 	memmove ( pkb_put ( pkb, len ), data, len );
