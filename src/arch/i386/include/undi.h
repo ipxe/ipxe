@@ -10,8 +10,31 @@
 #include <gpxe/device.h>
 #include <pxe_types.h>
 
-/** An UNDI device */
+/** An UNDI device
+ *
+ * This structure is used by assembly code as well as C; do not alter
+ * this structure without editing pxeprefix.S to match.
+ */
 struct undi_device {
+	/** PXENV+ structure address */
+	SEGOFF16_t pxenv;
+	/** !PXE structure address */
+	SEGOFF16_t ppxe;
+	/** Entry point */
+	SEGOFF16_t entry;
+	/** Free base memory after load */
+	UINT16_t fbms;
+	/** Free base memory prior to load */
+	UINT16_t restore_fbms;
+	/** PCI bus:dev.fn, or 0xffff */
+	UINT16_t pci_busdevfn;
+	/** ISAPnP card select number, or 0xffff */
+	UINT16_t isapnp_csn;
+	/** ISAPnP read port, or 0xffff */
+	UINT16_t isapnp_read_port;
+	/** Padding */
+	UINT16_t pad;
+
 	/** Generic device */
 	struct device dev;
 	/** Driver-private data
@@ -20,24 +43,7 @@ struct undi_device {
 	 * field.
 	 */
 	void *priv;
-
-	/** PXENV+ structure address */
-	SEGOFF16_t pxenv;
-	/** !PXE structure address */
-	SEGOFF16_t ppxe;
-	/** Entry point */
-	SEGOFF16_t entry;
-	/** PCI bus:dev.fn, or 0 */
-	unsigned int pci_busdevfn;
-	/** ISAPnP card select number, or -1U */
-	unsigned int isapnp_csn;
-	/** ISAPnP read port, or -1U */
-	unsigned int isapnp_read_port;
-	/** Free base memory prior to load */
-	unsigned int restore_fbms;
-	/** Free base memory after load */
-	unsigned int fbms;
-};
+} __attribute__ (( packed ));
 
 /**
  * Set UNDI driver-private data
