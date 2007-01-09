@@ -1,22 +1,24 @@
-#define PXENV_UNDI_SHUTDOWN	0x05
-#define	PXENV_STOP_UNDI		0x15
-#define PXENV_UNLOAD_STACK	0x70
+#define PXENV_UNDI_SHUTDOWN		0x0005
+#define	PXENV_UNDI_GET_NIC_TYPE		0x0012
+#define	PXENV_STOP_UNDI			0x0015
+#define PXENV_UNLOAD_STACK		0x0070
 
 #define PXE_STACK_MAGIC		0x57ac	/* 'STac' */
 
 	.text
-	.code16
 	.arch i386
 	.org 0
 	.section ".prefix", "ax", @progbits
+	.section ".prefix.data", "aw", @progbits
+	.code16
+
 /*****************************************************************************
- * Entry point:	set cs, ds, bp, print welcome message
+ * Entry point:	set operating context, print welcome message
  *****************************************************************************
- */	
-	jmp	$0x7c0, $code_start
-10:	.asciz	"PXE->EB "
-code_start:
-	/* Preserve registers for return to PXE stack */
+ */
+	.section ".prefix"
+	jmp	$0x7c0, $1f
+1:	/* Preserve registers for return to PXE stack */
 	pushfl
 	pushal
 	pushw	%gs
@@ -28,92 +30,110 @@ code_start:
 	pushw	$PXE_STACK_MAGIC	/* PXE stack magic marker */
 	/* Set up stack just below 0x7c00 */
 	pushw	%ss
-	popw	%es
-	movw	%sp, %di
+	popw	%gs
+	movw	%sp, %bp		/* %gs:%bp points to old PXE stack */
 	xorw	%ax, %ax
 	movw	%ax, %ss
 	movw	$0x7c00, %sp
-	pushw	%es			/* Save old PXE stack pointer */
-	pushw	%di
+	pushw	%gs			/* Save old PXE stack pointer */
+	pushw	%bp
 	/* Set up our other segment registers */
 	pushw	%cs
 	popw	%ds
 	movw	$0x40, %ax		/* BIOS data segment access */
 	movw	%ax, %fs
+	/* Clear direction flag, for the sake of sanity */
+	cld
 	/* Print welcome message */
-	movw	$10b, %si
-	call	print_message
-
-/*****************************************************************************
- * Detect type of PXE available (!PXE, PXENV+ or none)
- *****************************************************************************
- */
-detect_pxe:
-	les	%es:54(%di), %di /* !PXE structure */
-	cmpl	$0x45585021, %es:(%di)	/* '!PXE' signature */
-	je	detected_pxe
-	movw	$0x5650, %ax
-	int	$0x1a
-	cmpw	$0x564e, %ax
-	jne	detected_nothing
-	cmpl	$0x4e455850, %es:(%bx)	/* 'PXEN' signature */
-	jne	detected_nothing
-	cmpw	$0x2b56, %es:4(%bx)	/* 'V+' signature */
-	je	detected_pxenv
-
-detected_nothing:
 	movw	$10f, %si
 	call	print_message
-	jmp	finished_with_error
-10:	.asciz	"No PXE "
+	.section ".prefix.data"
+10:	.asciz	"PXE->EB:"
+	.previous
 
-detected_pxenv: /* es:bx points to PXENV+ structure */
+/*****************************************************************************
+ * Verify PXENV+ structure and record parameters of interest
+ *****************************************************************************
+ */
+detect_pxenv:
+	/* Signature check */
+	cmpl	$0x4e455850, %es:(%bx)	/* 'PXEN' signature */
+	jne	99f
+	cmpw	$0x2b56, %es:4(%bx)	/* 'V+' signature */
+	jne	99f
+	/* Record structure address, entry point, and UNDI segments */
 	pushw	%es
-	pushw	%bx
+	popw	pxenv_segment
+	movw	%bx, pxenv_offset
+	pushl	%es:0x0a(%bx)		/* Entry point */
+	popl	entry_segoff
 	pushw	%es:0x24(%bx)		/* UNDI code segment */
 	pushw	%es:0x26(%bx)		/* UNDI code size */
+	popl	undi_code_segoff
 	pushw	%es:0x20(%bx)		/* UNDI data segment */
 	pushw	%es:0x22(%bx)		/* UNDI data size */
-	les	%es:0x0a(%bx), %di	/* Entry point to %es:%di */
+	popl	undi_data_segoff
+	/* Print "PXENV+ at <address>" */
 	movw	$10f, %si
-	jmp	pxe_setup_done
-10:	.asciz	"PXENV+ "
-
-detected_pxe:	/* es:di points to !PXE structure */
-	pushw	%es
-	pushw	%di
-	pushw	%es:0x30(%di)		/* UNDI code segment */
-	pushw	%es:0x36(%di)		/* UNDI code size */
-	pushw	%es:0x28(%di)		/* UNDI data segment */
-	pushw	%es:0x2e(%di)		/* UNDI data size */
-	les	%es:0x10(%di), %di	/* Entry point to %es:%di */
-	movw	$10f, %si
-	jmp	pxe_setup_done
-10:	.asciz	"!PXE "
-
-pxe_setup_done:
-	movw	%es, pxe_entry_segment
-	movw	%di, pxe_entry_offset
-	popw	undi_data_size
-	popw	undi_data_segment
-	popw	undi_code_size
-	popw	undi_code_segment
 	call	print_message
-	popw	%di
-	popw	%es	/* Exit with %es:%di containing structure address */
-
+	movw	%bx, %di
+	call	print_segoff
+	movb	$',', %al
+	call	print_character
+	.section ".prefix.data"
+10:	.asciz	" PXENV+ at "
+	.previous
+99:
+	
 /*****************************************************************************
- * Print information about located structure
+ * Verify !PXE structure and record parameters of interest
  *****************************************************************************
  */
-print_structure_information:
-	call	print_segoff	/* %es:%di contains address of structure */
-	les	pxe_entry_segoff, %di
+detect_ppxe:
+	/* Signature check */
+	les	%gs:54(%bp), %di	/* !PXE structure */
+	cmpl	$0x45585021, %es:(%di)	/* '!PXE' signature */
+	jne	99f
+	/* Record structure address, entry point, and UNDI segments */
+	pushw	%es
+	popw	ppxe_segment
+	movw	%di, ppxe_offset
+	pushl	%es:0x10(%di)		/* Entry point */
+	popl	entry_segoff
+	pushw	%es:0x30(%di)		/* UNDI code segment */
+	pushw	%es:0x36(%di)		/* UNDI code size */
+	popl	undi_code_segoff
+	pushw	%es:0x28(%di)		/* UNDI data segment */
+	pushw	%es:0x2e(%di)		/* UNDI data size */
+	popl	undi_data_segoff
+	/* Print "!PXE at <address>" */
+	movw	$10f, %si
+	call	print_message
 	call	print_segoff
-	les	undi_code_segoff, %di
-	call	print_segoff
-	les	undi_data_segoff, %di
-	call	print_segoff
+	movb	$',', %al
+	call	print_character
+	.section ".prefix.data"
+10:	.asciz	" !PXE at "
+	.previous
+99:
+
+/*****************************************************************************
+ * Sanity check: we must have an entry point
+ *****************************************************************************
+ */
+check_have_stack:
+	/* Check for entry point */
+	movl	entry_segoff, %eax
+	testl	%eax, %eax
+	jnz	99f
+	/* No entry point: print message and skip everything else */
+	movw	$10f, %si
+	call	print_message
+	jmp	finished
+	.section ".prefix.data"
+10:	.asciz	" No PXE stack found!\n"
+	.previous
+99:	
 
 /*****************************************************************************
  * Calculate base memory usage by UNDI
@@ -139,65 +159,177 @@ find_undi_basemem_usage:
 	movw	%cx, undi_fbms_end
 
 /*****************************************************************************
+ * Print information about detected PXE stack
+ *****************************************************************************
+ */
+print_structure_information:
+	/* Print entry point */
+	movw	$10f, %si
+	call	print_message
+	les	entry_segoff, %di
+	call	print_segoff
+	.section ".prefix.data"
+10:	.asciz	" entry point at "
+	.previous
+	/* Print UNDI code segment */
+	movw	$10f, %si
+	call	print_message
+	les	undi_code_segoff, %di
+	call	print_segoff
+	.section ".prefix.data"
+10:	.asciz	"\n         UNDI code segment "
+	.previous
+	/* Print UNDI data segment */
+	movw	$10f, %si
+	call	print_message
+	les	undi_data_segoff, %di
+	call	print_segoff
+	.section ".prefix.data"
+10:	.asciz	", data segment "
+	.previous
+	/* Print UNDI memory usage */
+	movw	$10f, %si
+	call	print_message
+	movw	undi_fbms_start, %ax
+	call	print_word
+	movb	$'-', %al
+	call	print_character
+	movw	undi_fbms_end, %ax
+	call	print_word
+	movw	$20f, %si
+	call	print_message
+	.section ".prefix.data"
+10:	.asciz	" ("
+20:	.asciz	"kB)\n"
+	.previous
+
+/*****************************************************************************
+ * Determine physical device
+ *****************************************************************************
+ */
+get_physical_device:
+	/* Issue PXENV_UNDI_GET_NIC_TYPE */
+	movw	$PXENV_UNDI_GET_NIC_TYPE, %bx
+	call	pxe_call
+	jnc	1f
+	call	print_pxe_error
+	jmp	no_physical_device
+1:	/* Determine physical device type */
+	movb	( pxe_parameter_structure + 0x02 ), %al
+	cmpb	$2, %al
+	je	pci_physical_device
+	jmp	no_physical_device
+
+pci_physical_device:
+	/* Record PCI bus:dev.fn */
+	movw	( pxe_parameter_structure + 0x0b ), %ax
+	movw	%ax, pci_busdevfn
+	movw	$10f, %si
+	call	print_message
+	call	print_pci_busdevfn
+	movb	$0x0a, %al
+	call	print_character
+	jmp	99f
+	.section ".prefix.data"
+10:	.asciz	"         UNDI device is PCI "
+	.previous
+
+no_physical_device:
+	/* No device found, or device type not understood */
+	movw	$10f, %si
+	call	print_message
+	.section ".prefix.data"
+10:	.asciz	"         Unable to determine UNDI physical device\n"
+	.previous
+
+99:
+
+/*****************************************************************************
  * Leave NIC in a safe state
  *****************************************************************************
  */
 shutdown_nic:
+	/* Issue PXENV_UNDI_SHUTDOWN */
 	movw	$PXENV_UNDI_SHUTDOWN, %bx
 	call	pxe_call
+	jnc	1f
+	call	print_pxe_error
+1:
 
 /*****************************************************************************
  * Unload PXE base code
  *****************************************************************************
  */	
 unload_base_code:
+	/* Issue PXENV_UNLOAD_STACK */
 	movw	$PXENV_UNLOAD_STACK, %bx
 	call	pxe_call
-	jnz	do_not_free_base_code
-free_base_code:
+	jnc	1f
+	call	print_pxe_error
+	jmp	99f
+1:	/* Free base memory used by PXE base code */
 	movw	%fs:(0x13), %si
 	movw	undi_fbms_start, %di
 	call	free_basemem
-do_not_free_base_code:
+99:
 
 /*****************************************************************************
  * Unload UNDI driver
  *****************************************************************************
  */
 unload_undi:
+	/* Issue PXENV_STOP_UNDI */
 	movw	$PXENV_STOP_UNDI, %bx
 	call	pxe_call
+	jnc	1f
+	call	print_pxe_error
+	jmp	99f
+1:	/* Free base memory used by UNDI */
 #ifndef PXELOADER_KEEP_UNDI
-	jnz	do_not_free_undi
-free_undi:
 	movw	undi_fbms_start, %si
 	movw	undi_fbms_end, %di
 	call	free_basemem
-do_not_free_undi:
 #endif /* PXELOADER_KEEP_UNDI */
+99:	
 
+/*****************************************************************************
+ * Print remaining free base memory
+ *****************************************************************************
+ */
+print_free_basemem:
+	movw	$10f, %si
+	call	print_message
+	movw	%fs:(0x13), %ax
+	call	print_word
+	movw	$20f, %si
+	call	print_message
+	.section ".prefix.data"
+10:	.asciz	"         "
+20:	.asciz	"kB free base memory after PXE unload\n"
+	.previous
+	
 /*****************************************************************************
  * Exit point
  *****************************************************************************
  */	
 finished:
-	movw	$10f, %si
-	movw	pxe_overall_status, %ax
-	testw	%ax, %ax
-	jz	1f
-finished_with_error:
-	movw	$20f, %si
-1:
-	call	print_message
 	jmp	run_etherboot
-10:	.asciz "ok\n"
-20:	.asciz "err\n"
 
 /*****************************************************************************
- * Subroutine: print character in %al (with LF -> LF,CR translation)
+ * Subroutine: print character (with LF -> LF,CR translation)
+ *
+ * Parameters:
+ *   %al : character to print
+ * Returns:
+ *   Nothing
  *****************************************************************************
  */
 print_character:
+	/* Preserve registers */
+	pushw	%ax
+	pushw	%bx
+	pushw	%bp
+	/* Print character */
 	movw	$0x0007, %bx		/* page 0, attribute 7 (normal) */
 	movb	$0x0e, %ah		/* write char, tty mode */
 	cmpb	$0x0a, %al		/* '\n'? */
@@ -205,122 +337,318 @@ print_character:
 	int	$0x10
 	movb	$0x0d, %al
 1:	int	$0x10
+	/* Restore registers and return */
+	popw	%bp
+	popw	%bx
+	popw	%ax
 	ret
 	
 /*****************************************************************************
- * Subroutine: print a zero-terminated message starting at %si
+ * Subroutine: print a NUL-terminated string
+ *
+ * Parameters:
+ *   %ds:%si : string to print
+ * Returns:
+ *   Nothing
  *****************************************************************************
  */	
 print_message:
+	/* Preserve registers */
+	pushw	%ax
+	pushw	%si
+	/* Print string */
 1: 	lodsb
 	testb	%al, %al
 	je	2f
 	call	print_character
 	jmp	1b
-2:	ret
+2:	/* Restore registers and return */
+	popw	%si
+	popw	%ax
+	ret
 
 /*****************************************************************************
- * Subroutine: print hex word in %ax
+ * Subroutine: print hex digit
+ *
+ * Parameters:
+ *   %al (low nibble) : digit to print
+ * Returns:
+ *   Nothing
  *****************************************************************************
  */
-print_hex_word:
-	movw	$4, %cx
-1:
+print_hex_nibble:
+	/* Preserve registers */
 	pushw	%ax
-	shrw	$12, %ax
-	/* Courtesy of Norbert Juffa <norbert.juffa@amd.com> */
-	cmpb	$10, %al	
+	/* Print digit (technique by Norbert Juffa <norbert.juffa@amd.com> */
+	andb	$0x0f, %al
+	cmpb	$10, %al
 	sbbb	$0x69, %al
 	das
 	call	print_character
+	/* Restore registers and return */
 	popw	%ax
-	shlw	$4, %ax
-	loop	1b
-	ret
-	
+	ret	
+
 /*****************************************************************************
- * Subroutine: print segment:offset address in %es:%di
+ * Subroutine: print hex byte
+ *
+ * Parameters:
+ *   %al : byte to print
+ * Returns:
+ *   Nothing
+ *****************************************************************************
+ */
+print_hex_byte:
+	rorb	$4, %al
+	call	print_hex_nibble
+	rorb	$4, %al
+	call	print_hex_nibble
+	ret
+
+/*****************************************************************************
+ * Subroutine: print hex word
+ *
+ * Parameters:
+ *   %ax : word to print
+ * Returns:
+ *   Nothing
+ *****************************************************************************
+ */
+print_hex_word:
+	xchgb	%al, %ah
+	call	print_hex_byte
+	xchgb	%al, %ah
+	call	print_hex_byte
+	ret
+
+/*****************************************************************************
+ * Subroutine: print segment:offset address
+ *
+ * Parameters:
+ *   %es:%di : segment:offset address to print
+ * Returns:
+ *   Nothing
  *****************************************************************************
  */
 print_segoff:
-	pushw	%di
-	pushw	%es
-	popw	%ax
+	/* Preserve registers */
+	pushw	%ax
+	/* Print "<segment>:offset" */
+	movw	%es, %ax
 	call	print_hex_word
-	movb	$0x3a,%al			/* ':' */
+	movb	$':', %al
 	call	print_character
-	popw	%ax
+	movw	%di, %ax
 	call	print_hex_word
-	movb	$0x20, %al			/* ' ' */
-	call	print_character
+	/* Restore registers and return */
+	popw	%ax
 	ret
 
 /*****************************************************************************
- * Subroutine: free and zero base memory from %si kB to %di kB
+ * Subroutine: print decimal word
+ *
+ * Parameters:
+ *   %ax : word to print
+ * Returns:
+ *   Nothing
+ *****************************************************************************
+ */
+print_word:
+	/* Preserve registers */
+	pushw	%ax
+	pushw	%bx
+	pushw	%cx
+	pushw	%dx
+	/* Build up digit sequence on stack */
+	movw	$10, %bx
+	xorw	%cx, %cx
+1:	xorw	%dx, %dx
+	divw	%bx, %ax
+	pushw	%dx
+	incw	%cx
+	testw	%ax, %ax
+	jnz	1b
+	/* Print digit sequence */
+1:	popw	%ax
+	call	print_hex_nibble
+	loop	1b
+	/* Restore registers and return */
+	popw	%dx
+	popw	%cx
+	popw	%bx
+	popw	%ax
+	ret
+	
+/*****************************************************************************
+ * Subroutine: print PCI bus:dev.fn
+ *
+ * Parameters:
+ *   %ax : PCI bus:dev.fn to print
+ * Returns:
+ *   Nothing
+ *****************************************************************************
+ */
+print_pci_busdevfn:
+	/* Preserve registers */
+	pushw	%ax
+	/* Print bus */
+	xchgb	%al, %ah
+	call	print_hex_byte
+	/* Print ":" */
+	movb	$':', %al
+	call	print_character
+	/* Print device */
+	movb	%ah, %al
+	shrb	$3, %al
+	call	print_hex_byte
+	/* Print "." */
+	movb	$'.', %al
+	call	print_character
+	/* Print function */
+	movb	%ah, %al
+	andb	$0x07, %al
+	call	print_hex_nibble
+	/* Restore registers and return */
+	popw	%ax
+	ret	
+
+/*****************************************************************************
+ * Subroutine: zero 1kB block of base memory
+ *
+ * Parameters:
+ *   %si : block to zero (in kB)
+ * Returns:
+ *   Nothing
+ *****************************************************************************
+ */
+zero_kb:
+	/* Preserve registers */
+	pushw	%ax
+	pushw	%cx
+	pushw	%di
+	pushw	%es
+	/* Zero block */
+	movw	%si, %ax
+	shlw	$6, %ax
+	movw	%ax, %es
+	movw	$0x400, %cx
+	xorw	%di, %di
+	xorw	%ax, %ax
+	rep stosb
+	/* Restore registers and return */
+	popw	%es
+	popw	%di
+	popw	%cx
+	popw	%ax
+	ret
+	
+/*****************************************************************************
+ * Subroutine: free and zero base memory
+ *
+ * Parameters:
+ *   %si : Expected current free base memory counter (in kB)
+ *   %di : Desired new free base memory counter (in kB)
+ *   %fs : BIOS data segment (0x40)
+ * Returns:
+ *   %ax : Actual new free base memory counter (in kB)
+ *
+ * The base memory from %si kB to %di kB is unconditionally zeroed.
+ * It will be freed if and only if the expected current free base
+ * memory counter (%si) matches the actual current free base memory
+ * counter in 0x40:0x13; if this does not match then the memory will
+ * be leaked.
  *****************************************************************************
  */
 free_basemem:
+	/* Zero base memory */
+	pushw	%si
+1:	cmpw	%si, %di
+	je	2f
+	call	zero_kb
+	incw	%si
+	jmp	1b
+2:	popw	%si
+	/* Free base memory */
 	movw	%fs:(0x13), %ax		/* Current FBMS to %ax */
 	cmpw	%ax, %si		/* Update FBMS only if "old" value  */
 	jne	1f			/* is correct			    */
-	movw	%di, %fs:(0x13)
-1:	movw	%di, %bx
-zero_kb:
-	movw	%si, %ax		/* Zero kB at %si */
-	shlw	$6, %ax
-	movw	%ax, %es
-	xorw	%ax, %ax
-	xorw	%di, %di
-	movw	$0x400, %cx
-	rep stosb
-	incw	%si			/* Move to next kB */
-	cmpw	%si, %bx
-	jne	zero_kb			/* Loop until done */
-	movw	%fs:(0x13), %ax		/* Print free base memory */
-	call	print_hex_word
-	movb	$0x20, %al			/* ' ' */
-	call	print_character
+	movw	%di, %ax
+1:	movw	%ax, %fs:(0x13)
 	ret
 
 /*****************************************************************************
- * Make a PXE API call.  Works with either !PXE or PXENV+ API.
- * Opcode in %bx.  pxe_parameter_structure always used.
+ * Subroutine: make a PXE API call.  Works with either !PXE or PXENV+ API.
  *
- * Returns status code (not exit code) in %bx and prints it.  Returns
- * with zero flag set if status code is zero (PXENV_STATUS_SUCCESS).
+ * Parameters:
+ *   %bx : PXE API call number
+ *   %ds:pxe_parameter_structure : Parameters for PXE API call
+ * Returns:
+ *   %ax : PXE status code (not exit code)
+ *   CF set if %ax is non-zero
  *****************************************************************************
  */
 pxe_call:
+	/* Preserve registers */
+	pushw	%di
+	pushw	%es
 	/* Set up registers for PXENV+ API.  %bx already set up */
 	pushw	%ds
 	popw	%es
 	movw	$pxe_parameter_structure, %di
 	/* Set up stack for !PXE API */
-	pushw   %cs
+	pushw   %es
 	pushw	%di
 	pushw	%bx
 	/* Make the API call */
-	lcall	*pxe_entry_segoff
+	lcall	*entry_segoff
 	/* Reset the stack */
 	addw	$6, %sp
 	movw	pxe_parameter_structure, %ax
-	pushw	%ax
-	call	print_hex_word
-	movw	$0x20, %ax		/* ' ' */
-	call	print_character
-	popw	%bx
-	orw	%bx, pxe_overall_status
-	testw	%bx, %bx
+	clc
+	testw	%ax, %ax
+	jz	1f
+	stc
+1:	/* Restore registers and return */
+	popw	%es
+	popw	%di
 	ret
+
+/*****************************************************************************
+ * Subroutine: print PXE API call error message
+ *
+ * Parameters:
+ *   %ax : PXE status code
+ *   %bx : PXE API call number
+ * Returns:
+ *   Nothing
+ *****************************************************************************
+ */
+print_pxe_error:
+	pushw	%si
+	movw	$10f, %si
+	call	print_message
+	xchgw	%ax, %bx
+	call	print_hex_word
+	movw	$20f, %si
+	call	print_message
+	xchgw	%ax, %bx
+	call	print_hex_word
+	movw	$30f, %si
+	call	print_message
+	popw	%si
+	ret
+	.section ".prefix.data"
+10:	.asciz	"         UNDI API call "
+20:	.asciz	" failed: status code "
+30:	.asciz	"\n"
+	.previous
 
 /*****************************************************************************
  * PXE data structures
  *****************************************************************************
  */
 
-pxe_entry_segoff:
-pxe_entry_offset:	.word 0
-pxe_entry_segment:	.word 0
+pxe_parameter_structure: .fill 20
 
 undi_code_segoff:
 undi_code_size:		.word 0
@@ -330,14 +658,30 @@ undi_data_segoff:
 undi_data_size:		.word 0
 undi_data_segment:	.word 0
 
+/* The following fields are part of a struct undi_device */
+
+undi_device:
+
+pxenv_segoff:
+pxenv_offset:		.word 0
+pxenv_segment:		.word 0
+
+ppxe_segoff:
+ppxe_offset:		.word 0
+ppxe_segment:		.word 0
+	
+entry_segoff:
+entry_offset:		.word 0
+entry_segment:		.word 0
+
 undi_fbms_start:	.word 0
 undi_fbms_end:		.word 0
 
-pxe_parameter_structure:
-	.word	0
-	.word	0,0,0,0,0
+pci_busdevfn:		.word 0xffff
+isapnp_csn:		.word 0xffff
+isapnp_read_port:	.word 0xffff
 
-pxe_overall_status:	.word 0
+	.equ undi_device_size, ( . - undi_device )
 
 /*****************************************************************************
  * Run Etherboot main code
