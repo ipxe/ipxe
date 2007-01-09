@@ -79,6 +79,28 @@ static void iscsi_rx_buffered_data_done ( struct iscsi_session *iscsi ) {
 }
 
 /**
+ * Close iSCSI connection
+ *
+ * @v iscsi		iSCSI session
+ */
+static void iscsi_close ( struct iscsi_session *iscsi ) {
+
+	/* Close TCP connection */
+	tcp_close ( &iscsi->tcp );
+
+	/* Clear connection status */
+	iscsi->status = 0;
+
+	/* Reset TX and RX state machines */
+	iscsi->tx_state = ISCSI_TX_IDLE;
+	iscsi->rx_state = ISCSI_RX_BHS;
+
+	/* Free any dynamically allocated memory */
+	chap_finish ( &iscsi->chap );
+	iscsi_rx_buffered_data_done ( iscsi );
+}
+
+/**
  * Mark iSCSI operation as complete
  *
  * @v iscsi		iSCSI session
@@ -93,12 +115,12 @@ static void iscsi_rx_buffered_data_done ( struct iscsi_session *iscsi ) {
  */
 static void iscsi_done ( struct iscsi_session *iscsi, int rc ) {
 
+	assert ( iscsi->tx_state == ISCSI_TX_IDLE );
+	assert ( iscsi->rx_state == ISCSI_RX_BHS );
+	assert ( iscsi->rx_offset == 0 );
+
 	/* Clear current SCSI command */
 	iscsi->command = NULL;
-
-	/* Free any dynamically allocated memory */
-	chap_finish ( &iscsi->chap );
-	iscsi_rx_buffered_data_done ( iscsi );
 
 	/* Mark asynchronous operation as complete */
 	async_done ( &iscsi->aop, rc );
@@ -470,6 +492,9 @@ static void iscsi_login_request_done ( struct iscsi_session *iscsi ) {
 
 	/* Clear any "strings to send" flags */
 	iscsi->status &= ~ISCSI_STATUS_STRINGS_MASK;
+
+	/* Free any dynamically allocated storage used for login */
+	chap_finish ( &iscsi->chap );
 }
 
 /**
@@ -547,6 +572,7 @@ static void iscsi_handle_chap_a_value ( struct iscsi_session *iscsi,
 	/* Prepare for CHAP with MD5 */
 	if ( ( rc = chap_init ( &iscsi->chap, &md5_algorithm ) ) != 0 ) {
 		DBG ( "iSCSI %p could not initialise CHAP\n", iscsi );
+		iscsi_close ( iscsi );
 		iscsi_done ( iscsi, rc );
 	}
 }
@@ -707,6 +733,7 @@ static void iscsi_rx_login_response ( struct iscsi_session *iscsi, void *data,
 	/* Buffer up the PDU data */
 	if ( ( rc = iscsi_rx_buffered_data ( iscsi, data, len ) ) != 0 ) {
 		DBG ( "iSCSI %p could not buffer login response\n", iscsi );
+		iscsi_close ( iscsi );
 		iscsi_done ( iscsi, rc );
 		return;
 	}
@@ -720,8 +747,7 @@ static void iscsi_rx_login_response ( struct iscsi_session *iscsi, void *data,
 	/* Check for login redirection */
 	if ( response->status_class == ISCSI_STATUS_REDIRECT ) {
 		DBG ( "iSCSI %p redirecting to new server\n", iscsi );
-		tcp_close ( &iscsi->tcp );
-		iscsi->status = 0;
+		iscsi_close ( iscsi );
 		if ( ( rc = tcp_connect ( &iscsi->tcp, &iscsi->target,
 					  0 ) ) != 0 ) {
 			DBG ( "iSCSI %p could not open TCP connection\n",
@@ -735,6 +761,8 @@ static void iscsi_rx_login_response ( struct iscsi_session *iscsi, void *data,
 	if ( response->status_class != 0 ) {
 		DBG ( "iSCSI login failure: class %02x detail %02x\n",
 		      response->status_class, response->status_detail );
+		iscsi->instant_rc = -EPERM;
+		iscsi_close ( iscsi );
 		iscsi_done ( iscsi, -EPERM );
 		return;
 	}
@@ -753,6 +781,7 @@ static void iscsi_rx_login_response ( struct iscsi_session *iscsi, void *data,
 		default:
 			DBG ( "iSCSI %p got invalid response flags %02x\n",
 			      iscsi, response->flags );
+			iscsi_close ( iscsi );
 			iscsi_done ( iscsi, -EIO );
 			return;
 		}
@@ -766,6 +795,9 @@ static void iscsi_rx_login_response ( struct iscsi_session *iscsi, void *data,
 		iscsi_start_login ( iscsi );
 		return;
 	}
+
+	/* Reset retry count */
+	iscsi->retry_count = 0;
 
 	/* Record TSIH for future reference */
 	iscsi->tsih = ntohl ( response->tsih );
@@ -986,7 +1018,8 @@ static void iscsi_rx_data ( struct iscsi_session *iscsi, void *data,
 	default:
 		if ( remaining )
 			return;
-		printf ( "Unknown iSCSI opcode %02x\n", response->opcode );
+		DBG ( "Unknown iSCSI opcode %02x\n", response->opcode );
+		iscsi_close ( iscsi );
 		iscsi_done ( iscsi, -EOPNOTSUPP );
 		break;
 	}
@@ -1112,19 +1145,25 @@ static void iscsi_closed ( struct tcp_application *app, int status ) {
 	struct iscsi_session *iscsi = tcp_to_iscsi ( app );
 	int rc;
 
-	/* Clear session status */
-	iscsi->status = 0;
+	/* Even a graceful close counts as an error for iSCSI */
+	if ( ! status )
+		status = -ECONNRESET;
+
+	/* Close session cleanly */
+	iscsi_close ( iscsi );
 
 	/* Retry connection if within the retry limit, otherwise fail */
 	if ( ++iscsi->retry_count <= ISCSI_MAX_RETRIES ) {
-		DBG ( "iSCSI %p retrying connection\n", iscsi );
+		DBG ( "iSCSI %p retrying connection (retry #%d)\n",
+		      iscsi, iscsi->retry_count );
 		if ( ( rc = tcp_connect ( app, &iscsi->target, 0 ) ) != 0 ) {
 			DBG ( "iSCSI %p could not open TCP connection\n",
 			      iscsi );
 			iscsi_done ( iscsi, rc );
 		}
 	} else {
-		printf ( "iSCSI %p retry count exceeded\n", iscsi );
+		DBG ( "iSCSI %p retry count exceeded\n", iscsi );
+		iscsi->instant_rc = status;
 		iscsi_done ( iscsi, status );
 	}
 }
@@ -1138,14 +1177,12 @@ static void iscsi_closed ( struct tcp_application *app, int status ) {
 static void iscsi_connected ( struct tcp_application *app ) {
 	struct iscsi_session *iscsi = tcp_to_iscsi ( app );
 
-	/* Set connected flag and reset retry count */
+	assert ( iscsi->rx_state == ISCSI_RX_BHS );
+	assert ( iscsi->rx_offset == 0 );
+
+	/* Enter security negotiation phase */
 	iscsi->status = ( ISCSI_STATUS_SECURITY_NEGOTIATION_PHASE |
 			  ISCSI_STATUS_STRINGS_SECURITY );
-	iscsi->retry_count = 0;
-
-	/* Prepare to receive PDUs. */
-	iscsi->rx_state = ISCSI_RX_BHS;
-	iscsi->rx_offset = 0;
 
 	/* Assign fresh initiator task tag */
 	iscsi->itt++;
@@ -1177,19 +1214,13 @@ struct async_operation * iscsi_issue ( struct iscsi_session *iscsi,
 	assert ( iscsi->command == NULL );
 	iscsi->command = command;
 
-	if ( iscsi->status ) {
-		if ( ( iscsi->status & ISCSI_STATUS_PHASE_MASK ) ==
-		     ISCSI_STATUS_FULL_FEATURE_PHASE ) {
-			/* Session already open: issue command */
-			iscsi_start_command ( iscsi );
-			tcp_senddata ( &iscsi->tcp );
-		} else {
-			/* Session failed to reach full feature phase:
-			 * abort immediately rather than retrying the
-			 * login.
-			 */
-			iscsi_done ( iscsi, -EPERM );
-		}
+	if ( iscsi->instant_rc ) {
+		/* Abort immediately rather than retrying */
+		iscsi_done ( iscsi, iscsi->instant_rc );
+	} else if ( iscsi->status ) {
+		/* Session already open: issue command */
+		iscsi_start_command ( iscsi );
+		tcp_senddata ( &iscsi->tcp );
 	} else {
 		/* Session not open: initiate login */
 		iscsi->tcp.tcp_op = &iscsi_tcp_operations;
@@ -1211,6 +1242,5 @@ struct async_operation * iscsi_issue ( struct iscsi_session *iscsi,
  * @ret aop		Asynchronous operation
  */
 void iscsi_shutdown ( struct iscsi_session *iscsi ) {
-	iscsi->status = 0;
-	tcp_close ( &iscsi->tcp );
+	iscsi_close ( iscsi );
 }

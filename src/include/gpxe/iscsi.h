@@ -592,6 +592,13 @@ struct iscsi_session {
 	struct scsi_command *command;
 	/** Asynchronous operation for the current iSCSI operation */
 	struct async_operation aop;
+	/** Instant return code
+	 *
+	 * Set to a non-zero value if all requests should return
+	 * immediately.  This can be used to e.g. avoid retrying
+	 * logins that are doomed to fail authentication.
+	 */
+	int instant_rc;
 };
 
 /** iSCSI session is currently in the security negotiation phase */
