@@ -24,6 +24,7 @@
 #include <undirom.h>
 #include <undiload.h>
 #include <undinet.h>
+#include <undipreload.h>
 
 /** @file
  *
@@ -32,33 +33,42 @@
  */
 
 /**
+ * Find UNDI ROM for PCI device
+ *
+ * @v pci		PCI device
+ * @ret undirom		UNDI ROM, or NULL
+ *
+ * Try to find a driver for this device.  Try an exact match on the
+ * ROM address first, then fall back to a vendor/device ID match only
+ */
+static struct undi_rom * undipci_find_rom ( struct pci_device *pci ) {
+	struct undi_rom *undirom;
+	unsigned long rombase;
+	
+	rombase = pci_bar_start ( pci, PCI_ROM_ADDRESS );
+	undirom = undirom_find_pci ( pci->vendor, pci->device, rombase );
+	if ( ! undirom )
+		undirom = undirom_find_pci ( pci->vendor, pci->device, 0 );
+	return undirom;
+}
+
+/**
  * Probe PCI device
  *
- * @v pci	PCI device
- * @v id	PCI ID
- * @ret rc	Return status code
+ * @v pci		PCI device
+ * @v id		PCI ID
+ * @ret rc		Return status code
  */
 static int undipci_probe ( struct pci_device *pci,
 			   const struct pci_device_id *id __unused ) {
 	struct undi_device *undi;
 	struct undi_rom *undirom;
-	unsigned long rombase;
+	unsigned int busdevfn = ( ( pci->bus << 8 ) | pci->devfn );
 	int rc;
 
 	/* Ignore non-network devices */
 	if ( PCI_BASE_CLASS ( pci->class ) != PCI_BASE_CLASS_NETWORK )
 		return -ENOTTY;
-
-	/* Try to find a driver for this device.  Try an exact match
-	 * on the ROM address first, then fall back to a vendor/device
-	 * ID match only
-	 */
-	rombase = pci_bar_start ( pci, PCI_ROM_ADDRESS );
-	undirom = undirom_find_pci ( pci->vendor, pci->device, rombase );
-	if ( ! undirom )
-		undirom = undirom_find_pci ( pci->vendor, pci->device, 0 );
-	if ( ! undirom )
-		return -ENODEV;
 
 	/* Allocate UNDI device structure */
 	undi = malloc ( sizeof ( *undi ) );
@@ -67,15 +77,29 @@ static int undipci_probe ( struct pci_device *pci,
 	memset ( undi, 0, sizeof ( *undi ) );
 	pci_set_drvdata ( pci, undi );
 
+	/* Find/create our pixie */
+	if ( preloaded_undi.pci_busdevfn == busdevfn ) {
+		/* Claim preloaded UNDI device */
+		DBGC ( undi, "UNDI %p using preloaded UNDI device\n", undi );
+		memcpy ( undi, &preloaded_undi, sizeof ( *undi ) );
+		memset ( &preloaded_undi, 0, sizeof ( preloaded_undi ) );
+	} else {
+		/* Find UNDI ROM for PCI device */
+		if ( ! ( undirom = undipci_find_rom ( pci ) ) ) {
+			rc = -ENODEV;
+			goto err_find_rom;
+		}
+
+		/* Call UNDI ROM loader to create pixie */
+		if ( ( rc = undi_load_pci ( undi, undirom, pci->bus,
+					    pci->devfn ) ) != 0 )
+			goto err_load_pci;
+	}
+
 	/* Add to device hierarchy */
 	undi->dev.parent = &pci->dev;
 	INIT_LIST_HEAD ( &undi->dev.children );
 	list_add ( &undi->dev.siblings, &pci->dev.children );
-
-	/* Call UNDI ROM loader to create pixie */
-	if ( ( rc = undi_load_pci ( undi, undirom, pci->bus,
-				    pci->devfn ) ) != 0 )
-		goto err_load_pci;
 
 	/* Create network device */
 	if ( ( rc = undinet_probe ( undi ) ) != 0 )
@@ -85,8 +109,9 @@ static int undipci_probe ( struct pci_device *pci,
 
  err_undinet_probe:
 	undi_unload ( undi );
- err_load_pci:
 	list_del ( &undi->dev.siblings );
+ err_find_rom:
+ err_load_pci:
 	free ( undi );
 	pci_set_drvdata ( pci, NULL );
 	return rc;
