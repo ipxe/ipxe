@@ -91,8 +91,7 @@ static int undipci_probe ( struct pci_device *pci,
 		}
 
 		/* Call UNDI ROM loader to create pixie */
-		if ( ( rc = undi_load_pci ( undi, undirom, pci->bus,
-					    pci->devfn ) ) != 0 )
+		if ( ( rc = undi_load_pci ( undi, undirom, busdevfn ) ) != 0 )
 			goto err_load_pci;
 	}
 

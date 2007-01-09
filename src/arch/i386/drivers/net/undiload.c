@@ -49,7 +49,7 @@ static SEGOFF16_t __data16 ( undi_loader_entry );
  * @v undirom		UNDI ROM
  * @ret rc		Return status code
  */
-static int undi_load ( struct undi_device *undi, struct undi_rom *undirom ) {
+int undi_load ( struct undi_device *undi, struct undi_rom *undirom ) {
 	struct s_PXE ppxe;
 	uint16_t fbms;
 	unsigned int fbms_seg;
@@ -139,22 +139,6 @@ static int undi_load ( struct undi_device *undi, struct undi_rom *undirom ) {
 }
 
 /**
- * Call UNDI loader to create a pixie
- *
- * @v undi		UNDI device
- * @v undirom		UNDI ROM
- * @v pci_busdevfn	PCI bus:dev.fn
- * @ret rc		Return status code
- */
-int undi_load_pci ( struct undi_device *undi, struct undi_rom *undirom,
-		    unsigned int bus, unsigned int devfn ) {
-	undi->pci_busdevfn = ( ( bus << 8 ) | devfn );
-	undi->isapnp_csn = 0xffff;
-	undi->isapnp_read_port = 0xffff;
-	return undi_load ( undi, undirom );
-}
-
-/**
  * Unload a pixie
  *
  * @v undi		UNDI device
@@ -172,7 +156,7 @@ int undi_unload ( struct undi_device *undi ) {
 	/* Erase signatures */
 	if ( undi->pxenv.segment )
 		put_real ( dead, undi->pxenv.segment, undi->pxenv.offset );
-	if ( undi->ppxe_segment )
+	if ( undi->ppxe.segment )
 		put_real ( dead, undi->ppxe.segment, undi->ppxe.offset );
 
 	/* Free base memory, if possible */
