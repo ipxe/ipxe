@@ -48,9 +48,9 @@ detect_pxenv:
 	/* Signature check */
 	les	pxenv_segoff, %di
 	cmpl	$0x4e455850, %es:(%di)	/* 'PXEN' signature */
-	jne	99f
+	jne	no_pxenv
 	cmpw	$0x2b56, %es:4(%di)	/* 'V+' signature */
-	jne	99f
+	jne	no_pxenv
 	/* Record entry point and UNDI segments */
 	pushl	%es:0x0a(%di)		/* Entry point */
 	popl	entry_segoff
@@ -67,9 +67,15 @@ detect_pxenv:
 	call	print_segoff
 	movb	$',', %al
 	call	print_character
+	jmp	99f
 	.section ".prefix.data"
 10:	.asciz	" PXENV+ at "
 	.previous
+
+no_pxenv:
+	xorl	%eax, %eax
+	movl	%eax, pxenv_segoff
+	
 99:
 	
 /*****************************************************************************
@@ -80,7 +86,7 @@ detect_ppxe:
 	/* Signature check */
 	les	ppxe_segoff, %di
 	cmpl	$0x45585021, %es:(%di)	/* '!PXE' signature */
-	jne	99f
+	jne	no_ppxe
 	/* Record structure address, entry point, and UNDI segments */
 	pushw	%es
 	popw	ppxe_segment
@@ -99,9 +105,15 @@ detect_ppxe:
 	call	print_segoff
 	movb	$',', %al
 	call	print_character
+	jmp	99f
 	.section ".prefix.data"
 10:	.asciz	" !PXE at "
 	.previous
+
+no_ppxe:
+	xorl	%eax, %eax
+	movl	%eax, ppxe_segoff
+
 99:
 
 /*****************************************************************************
