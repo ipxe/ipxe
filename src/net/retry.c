@@ -69,8 +69,8 @@ void start_timer ( struct retry_timer *timer ) {
 	timer->start = currticks();
 	if ( timer->timeout < MIN_TIMEOUT )
 		timer->timeout = MIN_TIMEOUT;
-	DBG ( "Timer %p started at time %ld (expires at %ld)\n",
-	      timer, timer->start, ( timer->start + timer->timeout ) );
+	DBG2 ( "Timer %p started at time %ld (expires at %ld)\n",
+	       timer, timer->start, ( timer->start + timer->timeout ) );
 }
 
 /**
@@ -92,8 +92,8 @@ void stop_timer ( struct retry_timer *timer ) {
 	list_del ( &timer->list );
 	runtime = ( now - timer->start );
 	timer->start = 0;
-	DBG ( "Timer %p stopped at time %ld (ran for %ld)\n",
-	      timer, now, runtime );
+	DBG2 ( "Timer %p stopped at time %ld (ran for %ld)\n",
+	       timer, now, runtime );
 
 	/* Update timer.  Variables are:
 	 *
@@ -131,8 +131,8 @@ static void timer_expired ( struct retry_timer *timer ) {
 	int fail;
 
 	/* Stop timer without performing RTT calculations */
-	DBG ( "Timer %p stopped at time %ld on expiry\n",
-	      timer, currticks() );
+	DBG2 ( "Timer %p stopped at time %ld on expiry\n",
+	       timer, currticks() );
 	list_del ( &timer->list );
 	timer->start = 0;
 	timer->count++;
