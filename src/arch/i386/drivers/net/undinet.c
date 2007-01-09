@@ -42,6 +42,8 @@ struct undi_nic {
 	SEGOFF16_t entry;
 	/** Assigned IRQ number */
 	unsigned int irq;
+	/** Currently processing ISR */
+	int isr_processing;
 };
 
 static void undinet_close ( struct net_device *netdev );
@@ -384,24 +386,32 @@ static void undinet_poll ( struct net_device *netdev ) {
 	size_t frag_len;
 	int rc;
 
-	/* Do nothing unless ISR has been triggered */
-	if ( ! undinet_isr_triggered() )
-		return;
+	if ( ! undinic->isr_processing ) {
+		/* Do nothing unless ISR has been triggered */
+		if ( ! undinet_isr_triggered() )
+			return;
+		
+		/* See if this was our interrupt */
+		memset ( &undi_isr, 0, sizeof ( undi_isr ) );
+		undi_isr.FuncFlag = PXENV_UNDI_ISR_IN_START;
+		if ( ( rc = undinet_call ( undinic, PXENV_UNDI_ISR, &undi_isr,
+					   sizeof ( undi_isr ) ) ) != 0 )
+			return;
+		if ( undi_isr.FuncFlag != PXENV_UNDI_ISR_OUT_OURS )
+			return;
+		
+		/* Send EOI */
+		send_eoi ( undinic->irq );
 
-	/* See if this was our interrupt */
-	memset ( &undi_isr, 0, sizeof ( undi_isr ) );
-	undi_isr.FuncFlag = PXENV_UNDI_ISR_IN_START;
-	if ( ( rc = undinet_call ( undinic, PXENV_UNDI_ISR, &undi_isr,
-				   sizeof ( undi_isr ) ) ) != 0 )
-		return;
-	if ( undi_isr.FuncFlag != PXENV_UNDI_ISR_OUT_OURS )
-		return;
-
-	/* Send EOI */
-	send_eoi ( undinic->irq );
+		/* Start ISR processing */
+		undinic->isr_processing = 1;
+		undi_isr.FuncFlag = PXENV_UNDI_ISR_IN_PROCESS;
+	} else {
+		/* Continue ISR processing */
+		undi_isr.FuncFlag = PXENV_UNDI_ISR_IN_GET_NEXT;
+	}
 
 	/* Run through the ISR loop */
-	undi_isr.FuncFlag = PXENV_UNDI_ISR_IN_PROCESS;
 	while ( 1 ) {
 		if ( ( rc = undinet_call ( undinic, PXENV_UNDI_ISR, &undi_isr,
 					   sizeof ( undi_isr ) ) ) != 0 )
@@ -420,7 +430,8 @@ static void undinet_poll ( struct net_device *netdev ) {
 				DBGC ( undinic, "UNDINIC %p could not "
 				       "allocate %zd bytes for RX buffer\n",
 				       undinic, len );
-				break;
+				/* Fragment will be dropped */
+				goto done;
 			}
 			if ( frag_len > pkb_available ( pkb ) ) {
 				DBGC ( undinic, "UNDINIC %p fragment too "
@@ -437,11 +448,13 @@ static void undinet_poll ( struct net_device *netdev ) {
 			break;
 		case PXENV_UNDI_ISR_OUT_DONE:
 			/* Processing complete */
+			undinic->isr_processing = 0;
 			goto done;
 		default:
 			/* Should never happen */
 			DBGC ( undinic, "UNDINIC %p ISR returned invalid "
 			       "FuncFlag %04x\n", undinic, undi_isr.FuncFlag );
+			undinic->isr_processing = 0;
 			goto done;
 		}
 		undi_isr.FuncFlag = PXENV_UNDI_ISR_IN_GET_NEXT;
@@ -504,6 +517,10 @@ static int undinet_open ( struct net_device *netdev ) {
 static void undinet_close ( struct net_device *netdev ) {
 	struct undi_nic *undinic = netdev->priv;
 	struct s_PXENV_UNDI_CLOSE close;
+
+	/* Ensure ISR has exited cleanly */
+	while ( undinic->isr_processing )
+		undinet_poll ( netdev );
 
 	/* Close NIC */
 	undinet_call ( undinic, PXENV_UNDI_CLOSE, &close, sizeof ( close ) );
