@@ -38,9 +38,12 @@ static int legacy_transmit ( struct net_device *netdev, struct pk_buff *pkb ) {
 	return 0;
 }
 
-static void legacy_poll ( struct net_device *netdev ) {
+static void legacy_poll ( struct net_device *netdev, unsigned int rx_quota ) {
 	struct nic *nic = netdev->priv;
 	struct pk_buff *pkb;
+
+	if ( ! rx_quota )
+		return;
 
 	pkb = alloc_pkb ( ETH_FRAME_LEN );
 	if ( ! pkb )

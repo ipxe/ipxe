@@ -112,14 +112,14 @@ static int pnic_api_check ( uint16_t api_version ) {
 /**************************************************************************
 POLL - Wait for a frame
 ***************************************************************************/
-static void pnic_poll ( struct net_device *netdev ) {
+static void pnic_poll ( struct net_device *netdev, unsigned int rx_quota ) {
 	struct pnic *pnic = netdev->priv;
 	struct pk_buff *pkb;
 	uint16_t length;
 	uint16_t qlen;
 
 	/* Fetch all available packets */
-	while ( 1 ) {
+	while ( rx_quota ) {
 		if ( pnic_command ( pnic, PNIC_CMD_RECV_QLEN, NULL, 0,
 				    &qlen, sizeof ( qlen ), NULL )
 		     != PNIC_STATUS_OK )
@@ -139,6 +139,7 @@ static void pnic_poll ( struct net_device *netdev ) {
 		}
 		pkb_put ( pkb, length );
 		netdev_rx ( netdev, pkb );
+		--rx_quota;
 	}
 }
 

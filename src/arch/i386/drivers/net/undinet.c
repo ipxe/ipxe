@@ -364,7 +364,8 @@ static int undinet_transmit ( struct net_device *netdev,
 /** 
  * Poll for received packets
  *
- * @v netdev	Network device
+ * @v netdev		Network device
+ * @v rx_quota		Maximum number of packets to receive
  *
  * Fun, fun, fun.  UNDI drivers don't use polling; they use
  * interrupts.  We therefore cheat and pretend that an interrupt has
@@ -382,7 +383,7 @@ static int undinet_transmit ( struct net_device *netdev,
  * of installing a genuine interrupt service routine and dealing with
  * the wonderful 8259 Programmable Interrupt Controller.  Joy.
  */
-static void undinet_poll ( struct net_device *netdev ) {
+static void undinet_poll ( struct net_device *netdev, unsigned int rx_quota ) {
 	struct undi_nic *undinic = netdev->priv;
 	struct s_PXENV_UNDI_ISR undi_isr;
 	struct pk_buff *pkb = NULL;
@@ -416,7 +417,7 @@ static void undinet_poll ( struct net_device *netdev ) {
 	}
 
 	/* Run through the ISR loop */
-	while ( 1 ) {
+	while ( rx_quota ) {
 		if ( ( rc = undinet_call ( undinic, PXENV_UNDI_ISR, &undi_isr,
 					   sizeof ( undi_isr ) ) ) != 0 )
 			break;
@@ -448,6 +449,7 @@ static void undinet_poll ( struct net_device *netdev ) {
 			if ( pkb_len ( pkb ) == len ) {
 				netdev_rx ( netdev, pkb );
 				pkb = NULL;
+				--rx_quota;
 			}
 			break;
 		case PXENV_UNDI_ISR_OUT_DONE:
@@ -480,8 +482,8 @@ static void undinet_poll ( struct net_device *netdev ) {
  */
 static int undinet_open ( struct net_device *netdev ) {
 	struct undi_nic *undinic = netdev->priv;
-	struct s_PXENV_UNDI_SET_STATION_ADDRESS set_address;
-	struct s_PXENV_UNDI_OPEN open;
+	struct s_PXENV_UNDI_SET_STATION_ADDRESS undi_set_address;
+	struct s_PXENV_UNDI_OPEN undi_open;
 	int rc;
 
 	/* Hook interrupt service routine and enable interrupt */
@@ -494,16 +496,16 @@ static int undinet_open ( struct net_device *netdev ) {
 	 * use it to set the MAC address to the card's permanent value
 	 * anyway.
 	 */
-	memcpy ( set_address.StationAddress, netdev->ll_addr,
-		 sizeof ( set_address.StationAddress ) );
+	memcpy ( undi_set_address.StationAddress, netdev->ll_addr,
+		 sizeof ( undi_set_address.StationAddress ) );
 	undinet_call ( undinic, PXENV_UNDI_SET_STATION_ADDRESS,
-		       &set_address, sizeof ( set_address ) );
+		       &undi_set_address, sizeof ( undi_set_address ) );
 
 	/* Open NIC */
-	memset ( &open, 0, sizeof ( open ) );
-	open.PktFilter = ( FLTR_DIRECTED | FLTR_BRDCST );
-	if ( ( rc = undinet_call ( undinic, PXENV_UNDI_OPEN, &open,
-				   sizeof ( open ) ) ) != 0 )
+	memset ( &undi_open, 0, sizeof ( undi_open ) );
+	undi_open.PktFilter = ( FLTR_DIRECTED | FLTR_BRDCST );
+	if ( ( rc = undinet_call ( undinic, PXENV_UNDI_OPEN, &undi_open,
+				   sizeof ( undi_open ) ) ) != 0 )
 		goto err;
 
 	return 0;
@@ -520,14 +522,31 @@ static int undinet_open ( struct net_device *netdev ) {
  */
 static void undinet_close ( struct net_device *netdev ) {
 	struct undi_nic *undinic = netdev->priv;
-	struct s_PXENV_UNDI_CLOSE close;
+	struct s_PXENV_UNDI_ISR undi_isr;
+	struct s_PXENV_UNDI_CLOSE undi_close;
+	int rc;
 
 	/* Ensure ISR has exited cleanly */
-	while ( undinic->isr_processing )
-		undinet_poll ( netdev );
+	while ( undinic->isr_processing ) {
+		undi_isr.FuncFlag = PXENV_UNDI_ISR_IN_GET_NEXT;
+		if ( ( rc = undinet_call ( undinic, PXENV_UNDI_ISR, &undi_isr,
+					   sizeof ( undi_isr ) ) ) != 0 )
+			break;
+		switch ( undi_isr.FuncFlag ) {
+		case PXENV_UNDI_ISR_OUT_TRANSMIT:
+		case PXENV_UNDI_ISR_OUT_RECEIVE:
+			/* Continue draining */
+			break;
+		default:
+			/* Stop processing */
+			undinic->isr_processing = 0;
+			break;
+		}
+	}
 
 	/* Close NIC */
-	undinet_call ( undinic, PXENV_UNDI_CLOSE, &close, sizeof ( close ) );
+	undinet_call ( undinic, PXENV_UNDI_CLOSE, &undi_close,
+		       sizeof ( undi_close ) );
 
 	/* Disable interrupt and unhook ISR */
 	disable_irq ( undinic->irq );

@@ -181,15 +181,16 @@ struct net_device {
 	/** Poll for received packet
 	 *
 	 * @v netdev	Network device
+	 * @v rx_quota	Maximum number of packets to receive
 	 *
 	 * This method should cause the hardware to check for received
 	 * packets.  Any received packets should be delivered via
-	 * netdev_rx().
+	 * netdev_rx(), up to a maximum of @c rx_quota packets.
 	 *
 	 * This method is guaranteed to be called only when the device
 	 * is open.
 	 */
-	void ( * poll ) ( struct net_device *netdev );
+	void ( * poll ) ( struct net_device *netdev, unsigned int rx_quota );
 
 	/** Link-layer protocol */
 	struct ll_protocol *ll_protocol;
@@ -238,7 +239,7 @@ extern int netdev_tx ( struct net_device *netdev, struct pk_buff *pkb );
 void netdev_tx_complete ( struct net_device *netdev, struct pk_buff *pkb );
 void netdev_tx_complete_next ( struct net_device *netdev );
 extern void netdev_rx ( struct net_device *netdev, struct pk_buff *pkb );
-extern int netdev_poll ( struct net_device *netdev );
+extern int netdev_poll ( struct net_device *netdev, unsigned int rx_quota );
 extern struct pk_buff * netdev_rx_dequeue ( struct net_device *netdev );
 extern struct net_device * alloc_netdev ( size_t priv_size );
 extern int register_netdev ( struct net_device *netdev );

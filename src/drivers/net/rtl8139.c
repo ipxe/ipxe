@@ -413,8 +413,9 @@ static int rtl_transmit ( struct net_device *netdev, struct pk_buff *pkb ) {
  * Poll for received packets
  *
  * @v netdev	Network device
+ * @v rx_quota	Maximum number of packets to receive
  */
-static void rtl_poll ( struct net_device *netdev ) {
+static void rtl_poll ( struct net_device *netdev, unsigned int rx_quota ) {
 	struct rtl8139_nic *rtl = netdev->priv;
 	unsigned int status;
 	unsigned int tsad;
@@ -441,7 +442,7 @@ static void rtl_poll ( struct net_device *netdev ) {
 	}
 
 	/* Handle received packets */
-	while ( ! ( inw ( rtl->ioaddr + ChipCmd ) & RxBufEmpty ) ) {
+	while ( rx_quota && ! ( inw ( rtl->ioaddr + ChipCmd ) & RxBufEmpty ) ){
 		rx_status = * ( ( uint16_t * )
 				( rtl->rx.ring + rtl->rx.offset ) );
 		rx_len = * ( ( uint16_t * )
