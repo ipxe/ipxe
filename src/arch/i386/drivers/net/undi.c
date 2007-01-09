@@ -124,6 +124,7 @@ static int undipci_probe ( struct pci_device *pci,
 static void undipci_remove ( struct pci_device *pci ) {
 	struct undi_device *undi = pci_get_drvdata ( pci );
 
+	undinet_remove ( undi );
 	undi_unload ( undi );
 	list_del ( &undi->dev.siblings );
 	free ( undi );
