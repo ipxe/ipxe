@@ -455,28 +455,25 @@ prot_call:
 	.code32
 	.globl real_call
 real_call:
-	/* Create register dump on PM stack */
+	/* Create register dump and function pointer copy on PM stack */
 	pushal
+	pushl	RC_OFFSET_FUNCTION(%esp)
 
-	/* Switch to real mode and move register dump to RM stack */
-	movl	$RC_OFFSET_END, %ecx
+	/* Switch to real mode and move register dump to RM stack  */
+	movl	$( RC_OFFSET_RETADDR + 4 /* function pointer copy */ ), %ecx
 	pushl	$1f
 	jmp	prot_to_real
 	.section ".text16"
 	.code16
 1:
-	/* Construct call to real-mode function */
-	movw	%sp, %bp
-	movw	RC_OFFSET_FUNCTION(%bp), %ax
-	movw	%ax, rc_function
-
 	/* Call real-mode function */
+	popl	rc_function
 	popal
 	call	*rc_function
 	pushal
 
 	/* Switch to protected mode and move register dump back to PM stack */
-	movl	$RC_OFFSET_END, %ecx
+	movl	$RC_OFFSET_RETADDR, %ecx
 	pushl	$1f
 	jmp	real_to_prot
 	.section ".text"
@@ -487,9 +484,11 @@ real_call:
 	ret
 
 
-	/* Function vector, used because */
+	/* Function vector, used because "call xx(%sp)" is not a valid
+	 * 16-bit expression.
+	 */
 	.section ".data16"
-rc_function:	.word 0
+rc_function:	.word 0, 0
 	
 /****************************************************************************
  * Stored real-mode and protected-mode stack pointers
