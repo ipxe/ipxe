@@ -164,11 +164,11 @@ static void iscsi_start_command ( struct iscsi_session *iscsi ) {
 	command->cmdsn = htonl ( iscsi->cmdsn );
 	command->expstatsn = htonl ( iscsi->statsn + 1 );
 	memcpy ( &command->cdb, &iscsi->command->cdb, sizeof ( command->cdb ));
-	DBG ( "iSCSI %p start " SCSI_CDB_FORMAT " %s %#x\n",
-	      iscsi, SCSI_CDB_DATA ( command->cdb ),
-	      ( iscsi->command->data_in ? "in" : "out" ),
-	      ( iscsi->command->data_in ?
-		iscsi->command->data_in_len : iscsi->command->data_out_len ) );
+	DBGC ( iscsi, "iSCSI %p start " SCSI_CDB_FORMAT " %s %#x\n",
+	       iscsi, SCSI_CDB_DATA ( command->cdb ),
+	       ( iscsi->command->data_in ? "in" : "out" ),
+	       ( iscsi->command->data_in ?
+		 iscsi->command->data_in_len : iscsi->command->data_out_len ));
 }
 
 /**
@@ -296,8 +296,8 @@ static void iscsi_start_data_out ( struct iscsi_session *iscsi,
 	data_out->expstatsn = htonl ( iscsi->statsn + 1 );
 	data_out->datasn = htonl ( datasn );
 	data_out->offset = htonl ( iscsi->transfer_offset + offset );
-	DBG ( "iSCSI %p start data out DataSN %#x len %#lx\n",
-	      iscsi, datasn, len );
+	DBGC ( iscsi, "iSCSI %p start data out DataSN %#x len %#lx\n",
+	       iscsi, datasn, len );
 }
 
 /**
@@ -525,12 +525,12 @@ static void iscsi_handle_targetaddress_value ( struct iscsi_session *iscsi,
 	struct sockaddr_in *sin = ( struct sockaddr_in * ) &iscsi->target;
 
 	if ( inet_aton ( value, &address ) == 0 ) {
-		DBG ( "iSCSI %p received invalid TargetAddress \"%s\"\n",
-		      iscsi, value );
+		DBGC ( iscsi, "iSCSI %p received invalid TargetAddress "
+		       "\"%s\"\n", iscsi, value );
 		return;
 	}
 
-	DBG ( "iSCSI %p will redirect to %s\n", iscsi, value );
+	DBGC ( iscsi, "iSCSI %p will redirect to %s\n", iscsi, value );
 	sin->sin_addr = address;
 }
 
@@ -545,7 +545,8 @@ static void iscsi_handle_authmethod_value ( struct iscsi_session *iscsi,
 
 	/* If server requests CHAP, send the CHAP_A string */
 	if ( strcmp ( value, "CHAP" ) == 0 ) {
-		DBG ( "iSCSI %p initiating CHAP authentication\n", iscsi );
+		DBGC ( iscsi, "iSCSI %p initiating CHAP authentication\n",
+		       iscsi );
 		iscsi->status |= ISCSI_STATUS_STRINGS_CHAP_ALGORITHM;
 	}
 }
@@ -565,13 +566,14 @@ static void iscsi_handle_chap_a_value ( struct iscsi_session *iscsi,
 	 * violation.
 	 */
 	if ( strcmp ( value, "5" ) != 0 ) {
-		DBG ( "iSCSI %p got invalid CHAP algorithm \"%s\"\n",
-		      iscsi, value );
+		DBGC ( iscsi, "iSCSI %p got invalid CHAP algorithm \"%s\"\n",
+		       iscsi, value );
 	}
 
 	/* Prepare for CHAP with MD5 */
 	if ( ( rc = chap_init ( &iscsi->chap, &md5_algorithm ) ) != 0 ) {
-		DBG ( "iSCSI %p could not initialise CHAP\n", iscsi );
+		DBGC ( iscsi, "iSCSI %p could not initialise CHAP: %s\n",
+		       iscsi, strerror ( rc ) );
 		iscsi_close ( iscsi );
 		iscsi_done ( iscsi, rc );
 	}
@@ -591,8 +593,8 @@ static void iscsi_handle_chap_i_value ( struct iscsi_session *iscsi,
 	/* The CHAP identifier is an integer value */
 	identifier = strtoul ( value, &endp, 0 );
 	if ( *endp != '\0' ) {
-		DBG ( "iSCSI %p saw invalid CHAP identifier \"%s\"\n",
-		      iscsi, value );
+		DBGC ( iscsi, "iSCSI %p saw invalid CHAP identifier \"%s\"\n",
+		       iscsi, value );
 	}
 
 	/* Identifier and secret are the first two components of the
@@ -619,8 +621,8 @@ static void iscsi_handle_chap_c_value ( struct iscsi_session *iscsi,
 
 	/* Check and strip leading "0x" */
 	if ( ( value[0] != '0' ) || ( value[1] != 'x' ) ) {
-		DBG ( "iSCSI %p saw invalid CHAP challenge \"%s\"\n",
-		      iscsi, value );
+		DBGC ( iscsi, "iSCSI %p saw invalid CHAP challenge \"%s\"\n",
+		       iscsi, value );
 	}
 	value += 2;
 
@@ -630,14 +632,14 @@ static void iscsi_handle_chap_c_value ( struct iscsi_session *iscsi,
 		buf[3] = 0;
 		byte = strtoul ( buf, &endp, 16 );
 		if ( *endp != '\0' ) {
-			DBG ( "iSCSI %p saw invalid CHAP challenge byte "
-			      "\"%s\"\n", iscsi, buf );
+			DBGC ( iscsi, "iSCSI %p saw invalid CHAP challenge "
+			       "byte \"%s\"\n", iscsi, buf );
 		}
 		chap_update ( &iscsi->chap, &byte, sizeof ( byte ) );
 	}
 
 	/* Build CHAP response */
-	DBG ( "iSCSI %p sending CHAP response\n", iscsi );
+	DBGC ( iscsi, "iSCSI %p sending CHAP response\n", iscsi );
 	chap_respond ( &iscsi->chap );
 	iscsi->status |= ISCSI_STATUS_STRINGS_CHAP_RESPONSE;
 }
@@ -683,12 +685,13 @@ static void iscsi_handle_string ( struct iscsi_session *iscsi,
 	for ( type = iscsi_string_types ; type->key ; type++ ) {
 		key_len = strlen ( type->key );
 		if ( strncmp ( string, type->key, key_len ) == 0 ) {
-			DBG ( "iSCSI %p handling %s\n", iscsi, string );
+			DBGC ( iscsi, "iSCSI %p handling %s\n",
+			       iscsi, string );
 			type->handle_value ( iscsi, ( string + key_len ) );
 			return;
 		}
 	}
-	DBG ( "iSCSI %p ignoring %s\n", iscsi, string );
+	DBGC ( iscsi, "iSCSI %p ignoring %s\n", iscsi, string );
 }
 
 /**
@@ -732,7 +735,8 @@ static void iscsi_rx_login_response ( struct iscsi_session *iscsi, void *data,
 
 	/* Buffer up the PDU data */
 	if ( ( rc = iscsi_rx_buffered_data ( iscsi, data, len ) ) != 0 ) {
-		DBG ( "iSCSI %p could not buffer login response\n", iscsi );
+		DBGC ( iscsi, "iSCSI %p could not buffer login response: %s\n",
+		       iscsi, strerror ( rc ) );
 		iscsi_close ( iscsi );
 		iscsi_done ( iscsi, rc );
 		return;
@@ -746,12 +750,12 @@ static void iscsi_rx_login_response ( struct iscsi_session *iscsi, void *data,
 
 	/* Check for login redirection */
 	if ( response->status_class == ISCSI_STATUS_REDIRECT ) {
-		DBG ( "iSCSI %p redirecting to new server\n", iscsi );
+		DBGC ( iscsi, "iSCSI %p redirecting to new server\n", iscsi );
 		iscsi_close ( iscsi );
 		if ( ( rc = tcp_connect ( &iscsi->tcp, &iscsi->target,
 					  0 ) ) != 0 ) {
-			DBG ( "iSCSI %p could not open TCP connection\n",
-			      iscsi );
+			DBGC ( iscsi, "iSCSI %p could not open TCP "
+			       "connection: %s\n", iscsi, strerror ( rc ) );
 			iscsi_done ( iscsi, rc );
 		}
 		return;
@@ -759,8 +763,8 @@ static void iscsi_rx_login_response ( struct iscsi_session *iscsi, void *data,
 
 	/* Check for fatal errors */
 	if ( response->status_class != 0 ) {
-		DBG ( "iSCSI login failure: class %02x detail %02x\n",
-		      response->status_class, response->status_detail );
+		DBGC ( iscsi, "iSCSI login failure: class %02x detail %02x\n",
+		       response->status_class, response->status_detail );
 		iscsi->instant_rc = -EPERM;
 		iscsi_close ( iscsi );
 		iscsi_done ( iscsi, -EPERM );
@@ -779,8 +783,8 @@ static void iscsi_rx_login_response ( struct iscsi_session *iscsi, void *data,
 			iscsi->status = ISCSI_STATUS_FULL_FEATURE_PHASE;
 			break;
 		default:
-			DBG ( "iSCSI %p got invalid response flags %02x\n",
-			      iscsi, response->flags );
+			DBGC ( iscsi, "iSCSI %p got invalid response flags "
+			       "%02x\n", iscsi, response->flags );
 			iscsi_close ( iscsi );
 			iscsi_done ( iscsi, -EIO );
 			return;
@@ -1018,7 +1022,8 @@ static void iscsi_rx_data ( struct iscsi_session *iscsi, void *data,
 	default:
 		if ( remaining )
 			return;
-		DBG ( "Unknown iSCSI opcode %02x\n", response->opcode );
+		DBGC ( iscsi, "iSCSI %p unknown opcode %02x\n", iscsi,
+		       response->opcode );
 		iscsi_close ( iscsi );
 		iscsi_done ( iscsi, -EOPNOTSUPP );
 		break;
@@ -1056,9 +1061,9 @@ static void iscsi_rx_bhs ( struct iscsi_session *iscsi, void *data,
 			   size_t len, size_t remaining __unused ) {
 	memcpy ( &iscsi->rx_bhs.bytes[iscsi->rx_offset], data, len );
 	if ( ( iscsi->rx_offset + len ) >= sizeof ( iscsi->rx_bhs ) ) {
-		DBG ( "iSCSI %p received PDU opcode %#x len %#lx\n",
-		      iscsi, iscsi->rx_bhs.common.opcode,
-		      ISCSI_DATA_LEN ( iscsi->rx_bhs.common.lengths ) );
+		DBGC ( iscsi, "iSCSI %p received PDU opcode %#x len %#lx\n",
+		       iscsi, iscsi->rx_bhs.common.opcode,
+		       ISCSI_DATA_LEN ( iscsi->rx_bhs.common.lengths ) );
 	}
 }
 
@@ -1154,15 +1159,15 @@ static void iscsi_closed ( struct tcp_application *app, int status ) {
 
 	/* Retry connection if within the retry limit, otherwise fail */
 	if ( ++iscsi->retry_count <= ISCSI_MAX_RETRIES ) {
-		DBG ( "iSCSI %p retrying connection (retry #%d)\n",
-		      iscsi, iscsi->retry_count );
+		DBGC ( iscsi, "iSCSI %p retrying connection (retry #%d)\n",
+		       iscsi, iscsi->retry_count );
 		if ( ( rc = tcp_connect ( app, &iscsi->target, 0 ) ) != 0 ) {
-			DBG ( "iSCSI %p could not open TCP connection\n",
-			      iscsi );
+			DBGC ( iscsi, "iSCSI %p could not open TCP "
+			       "connection: %s\n", iscsi, strerror ( rc ) );
 			iscsi_done ( iscsi, rc );
 		}
 	} else {
-		DBG ( "iSCSI %p retry count exceeded\n", iscsi );
+		DBGC ( iscsi, "iSCSI %p retry count exceeded\n", iscsi );
 		iscsi->instant_rc = status;
 		iscsi_done ( iscsi, status );
 	}
@@ -1226,8 +1231,8 @@ struct async_operation * iscsi_issue ( struct iscsi_session *iscsi,
 		iscsi->tcp.tcp_op = &iscsi_tcp_operations;
 		if ( ( rc = tcp_connect ( &iscsi->tcp, &iscsi->target,
 					  0 ) ) != 0 ) {
-			DBG ( "iSCSI %p could not open TCP connection\n",
-			      iscsi );
+			DBGC ( iscsi, "iSCSI %p could not open TCP "
+			       "connection: %s\n", iscsi, strerror ( rc ) );
 			iscsi_done ( iscsi, rc );
 		}
 	}
