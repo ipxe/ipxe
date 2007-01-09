@@ -691,6 +691,15 @@ run_etherboot:
 	/* Install Etherboot */
 	call	install
 
+#ifdef PXELOADER_KEEP_UNDI
+	/* Copy our undi_device structure to the preloaded_undi variable */
+	movw	%bx, %es
+	movw	$preloaded_undi, %di
+	movw	$undi_device, %si
+	movw	$undi_device_size, %cx
+	rep movsb
+#endif
+
 	/* Jump to .text16 segment with %ds pointing to .data16*/
 	movw	%bx, %ds
 	pushw	%ax
