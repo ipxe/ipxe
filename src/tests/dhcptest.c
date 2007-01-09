@@ -224,7 +224,7 @@ int test_dhcp ( struct net_device *netdev ) {
 		goto out_no_del_ipv4;
 
 	/* Issue DHCP request */
-	printf ( "DHCP (%s)...", netdev_name ( netdev ) );
+	printf ( "DHCP (%s)...", netdev->name );
 	memset ( &dhcp, 0, sizeof ( dhcp ) );
 	dhcp.netdev = netdev;
 	if ( ( rc = async_wait ( start_dhcp ( &dhcp ) ) ) != 0 ) {

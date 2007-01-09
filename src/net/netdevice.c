@@ -21,6 +21,7 @@
 #include <byteswap.h>
 #include <string.h>
 #include <errno.h>
+#include <vsprintf.h>
 #include <gpxe/if_ether.h>
 #include <gpxe/pkbuff.h>
 #include <gpxe/tables.h>
@@ -187,14 +188,20 @@ struct net_device * alloc_netdev ( size_t priv_size ) {
  * @v netdev		Network device
  * @ret rc		Return status code
  *
- * Adds the network device to the list of network devices.
+ * Gives the network device a name and adds it to the list of network
+ * devices.
  */
 int register_netdev ( struct net_device *netdev ) {
-	
+	static unsigned int ifindex = 0;
+
+	/* Create device name */
+	snprintf ( netdev->name, sizeof ( netdev->name ), "net%d",
+		   ifindex++ );
+
 	/* Add to device list */
 	list_add_tail ( &netdev->list, &net_devices );
-	DBGC ( netdev, "NETDEV %p registered as %s\n",
-	       netdev, netdev_name ( netdev ) );
+	DBGC ( netdev, "NETDEV %p registered as %s (%s)\n",
+	       netdev, netdev->name, netdev_hwaddr ( netdev ) );
 
 	return 0;
 }
@@ -283,6 +290,23 @@ void unregister_netdev ( struct net_device *netdev ) {
  */
 void free_netdev ( struct net_device *netdev ) {
 	free ( netdev );
+}
+
+/**
+ * Get network device by name
+ *
+ * @v name		Network device name
+ * @ret netdev		Network device, or NULL
+ */
+struct net_device * find_netdev ( const char *name ) {
+	struct net_device *netdev;
+
+	list_for_each_entry ( netdev, &net_devices, list ) {
+		if ( strcmp ( netdev->name, name ) == 0 )
+			return netdev;
+	}
+
+	return NULL;
 }
 
 /**

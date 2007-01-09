@@ -36,7 +36,7 @@ int test_aoeboot ( struct net_device *netdev, const char *aoename,
 	int rc;
 
 	printf ( "Attempting to boot from AoE device %s via %s\n",
-		 aoename, netdev_name ( netdev ) );
+		 aoename, netdev->name );
 
 	if ( ( rc = aoe_parse ( aoename, &test_aoedev.aoe ) ) != 0 ) {
 		printf ( "Invalid AoE device name \"%s\"\n", aoename );

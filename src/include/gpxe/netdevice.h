@@ -138,7 +138,8 @@ struct ll_protocol {
 struct net_device {
 	/** List of network devices */
 	struct list_head list;
-
+	/** Name of this network device */
+	char name[8];
 	/** List of persistent reference holders */
 	struct list_head references;
 
@@ -224,14 +225,12 @@ struct net_device {
 #define __net_protocol __table ( net_protocols, 01 )
 
 /**
- * Get network device name
+ * Get printable network device hardware address
  *
  * @v netdev		Network device
- * @ret name		Network device name
- *
- * The name will be the device's link-layer address.
+ * @ret name		Hardware address
  */
-static inline const char * netdev_name ( struct net_device *netdev ) {
+static inline const char * netdev_hwaddr ( struct net_device *netdev ) {
 	return netdev->ll_protocol->ntoa ( netdev->ll_addr );
 }
 
@@ -247,6 +246,7 @@ extern int netdev_open ( struct net_device *netdev );
 extern void netdev_close ( struct net_device *netdev );
 extern void unregister_netdev ( struct net_device *netdev );
 extern void free_netdev ( struct net_device *netdev );
+struct net_device * find_netdev ( const char *name );
 extern struct net_device * next_netdev ( void );
 extern int net_tx ( struct pk_buff *pkb, struct net_device *netdev,
 		    struct net_protocol *net_protocol, const void *ll_dest );

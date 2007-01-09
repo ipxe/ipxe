@@ -79,7 +79,7 @@ static struct ipv4_miniroute * add_ipv4_miniroute ( struct net_device *netdev,
 		DBG ( "/%s ", inet_ntoa ( netmask ) );
 		if ( gateway.s_addr != INADDR_NONE )
 			DBG ( "gw %s ", inet_ntoa ( gateway ) );
-		DBG ( "via %s\n", netdev_name ( netdev ) );
+		DBG ( "via %s\n", netdev->name );
 
 		/* Record routing information */
 		miniroute->netdev = netdev;
@@ -115,7 +115,7 @@ static void del_ipv4_miniroute ( struct ipv4_miniroute *miniroute ) {
 	DBG ( "/%s ", inet_ntoa ( miniroute->netmask ) );
 	if ( miniroute->gateway.s_addr != INADDR_NONE )
 		DBG ( "gw %s ", inet_ntoa ( miniroute->gateway ) );
-	DBG ( "via %s\n", netdev_name ( miniroute->netdev ) );
+	DBG ( "via %s\n", miniroute->netdev->name );
 
 	ref_del ( &miniroute->netdev_ref );
 	list_del ( &miniroute->list );

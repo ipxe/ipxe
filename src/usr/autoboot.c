@@ -41,7 +41,7 @@ void autoboot ( void ) {
 	}
 
 	if ( ( rc = netdev_open ( netdev ) ) != 0 ) {
-		printf ( "Could not open %s: %s\n", netdev_name ( netdev ),
+		printf ( "Could not open %s: %s\n", netdev->name,
 			 strerror ( rc ) );
 		return;
 	}
