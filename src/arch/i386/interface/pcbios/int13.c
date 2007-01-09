@@ -599,27 +599,32 @@ int int13_boot ( unsigned int drive ) {
 	hook_bios_interrupt ( 0x19, ( unsigned int ) int13_exec_fail,
 			      &int19_vector );
 
-	/* Boot the loaded sector */
-	__asm__ __volatile__ ( REAL_CODE ( /* Save segment registers */
-					   "pushw %%ds\n\t"
-					   "pushw %%es\n\t"
-					   "pushw %%fs\n\t"
-					   "pushw %%gs\n\t"
+	/* Boot the loaded sector
+	 *
+	 * We assume that the boot sector may completely destroy our
+	 * real-mode stack, so we preserve everything we need in
+	 * static storage.
+	 */
+	__asm__ __volatile__ ( REAL_CODE ( /* Save return address off-stack */
+					   "popw %%cs:int13_saved_retaddr\n\t"
 					   /* Save stack pointer */
 					   "movw %%ss, %%ax\n\t"
 					   "movw %%ax, %%cs:int13_saved_ss\n\t"
 					   "movw %%sp, %%cs:int13_saved_sp\n\t"
+					   /* Jump to boot sector */
 					   "ljmp $0, $0x7c00\n\t"
+					   /* Preserved variables */
 					   "\nint13_saved_ss: .word 0\n\t"
 					   "\nint13_saved_sp: .word 0\n\t"
+					   "\nint13_saved_retaddr: .word 0\n\t"
+					   /* Boot failure return point */
 					   "\nint13_exec_fail:\n\t"
+					   /* Restore stack pointer */
 					   "movw %%cs:int13_saved_ss, %%ax\n\t"
 					   "movw %%ax, %%ss\n\t"
 					   "movw %%cs:int13_saved_sp, %%sp\n\t"
-					   "popw %%gs\n\t"
-					   "popw %%fs\n\t"
-					   "popw %%es\n\t"
-					   "popw %%ds\n\t" )
+					   /* Return via saved address */
+					   "jmp *%%cs:int13_saved_retaddr\n\t")
 			       : "=d" ( discard_d ) : "d" ( drive )
 			       : "eax", "ebx", "ecx", "esi", "edi", "ebp" );
 
