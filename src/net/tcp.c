@@ -492,6 +492,7 @@ static struct tcp_connection * tcp_demux ( uint16_t local_port ) {
  * @ret rc		Return status code
  */
 static int tcp_rx_syn ( struct tcp_connection *conn, uint32_t seq ) {
+	struct tcp_application *app = conn->app;
 
 	/* Synchronise sequence numbers on first SYN */
 	if ( ! ( conn->tcp_state & TCP_STATE_RCVD ( TCP_SYN ) ) )
@@ -507,6 +508,11 @@ static int tcp_rx_syn ( struct tcp_connection *conn, uint32_t seq ) {
 
 	/* Acknowledge SYN */
 	conn->rcv_ack++;
+
+	/* Notify application of established connection, if applicable */
+	if ( ( conn->tcp_state & TCP_STATE_ACKED ( TCP_SYN ) ) &&
+	     app && app->tcp_op->connected )
+		app->tcp_op->connected ( app );
 
 	return 0;
 }
@@ -565,7 +571,9 @@ static int tcp_rx_ack ( struct tcp_connection *conn, uint32_t ack,
 		conn->tcp_state |= TCP_STATE_ACKED ( acked_flags );
 
 	/* Notify application of established connection, if applicable */
-	if ( ( acked_flags & TCP_SYN ) && app && app->tcp_op->connected )
+	if ( ( acked_flags & TCP_SYN ) &&
+	     ( conn->tcp_state & TCP_STATE_RCVD ( TCP_SYN ) ) &&
+	     app && app->tcp_op->connected )
 		app->tcp_op->connected ( app );
 
 	return 0;
