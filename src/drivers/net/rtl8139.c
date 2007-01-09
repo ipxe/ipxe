@@ -304,7 +304,7 @@ static void rtl_reset ( struct rtl8139_nic *rtl ) {
 	/* Reset chip */
 	outb ( CmdReset, rtl->ioaddr + ChipCmd );
 	mdelay ( 10 );
-	rtl->tx.next = 0;
+	memset ( &rtl->tx, 0, sizeof ( rtl->tx ) );
 	rtl->rx.offset = 0;
 }
 
@@ -349,7 +349,6 @@ static int rtl_open ( struct net_device *netdev ) {
  */
 static void rtl_close ( struct net_device *netdev ) {
 	struct rtl8139_nic *rtl = netdev->priv;
-	int i;
 
 	/* Reset the hardware to disable everything in one go */
 	rtl_reset ( rtl );
@@ -357,15 +356,6 @@ static void rtl_close ( struct net_device *netdev ) {
 	/* Free RX ring */
 	free ( rtl->rx.ring );
 	rtl->rx.ring = NULL;
-
-	/* Free any old TX buffers that hadn't yet completed */
-	for ( i = 0 ; i < TX_RING_SIZE ; i++ ) {
-		if ( rtl->tx.pkb[i] ) {
-			free_pkb ( rtl->tx.pkb[i] );
-			rtl->tx.pkb[i] = NULL;
-			DBG ( "TX id %d discarded\n", i );
-		}
-	}
 }
 
 /** 
@@ -383,7 +373,6 @@ static int rtl_transmit ( struct net_device *netdev, struct pk_buff *pkb ) {
 	/* Check for space in TX ring */
 	if ( rtl->tx.pkb[rtl->tx.next] != NULL ) {
 		printf ( "TX overflow\n" );
-		free_pkb ( pkb );
 		return -ENOBUFS;
 	}
 
@@ -437,7 +426,7 @@ static void rtl_poll ( struct net_device *netdev ) {
 	for ( i = 0 ; i < TX_RING_SIZE ; i++ ) {
 		if ( ( rtl->tx.pkb[i] != NULL ) && ( tsad & ( 1 << i ) ) ) {
 			DBG ( "TX id %d complete\n", i );
-			free_pkb ( rtl->tx.pkb[i] );
+			netdev_tx_complete ( netdev, rtl->tx.pkb[i] );
 			rtl->tx.pkb[i] = NULL;
 		}
 	}

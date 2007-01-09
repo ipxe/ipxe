@@ -52,15 +52,59 @@ static LIST_HEAD ( net_devices );
  * function takes ownership of the packet buffer.
  */
 int netdev_tx ( struct net_device *netdev, struct pk_buff *pkb ) {
-	DBG ( "%s transmitting %p+%zx\n", netdev_name ( netdev ),
-	      pkb->data, pkb_len ( pkb ) );
+	int rc;
+
+	DBGC ( netdev, "NETDEV %p transmitting %p (%p+%zx)\n",
+	       netdev, pkb, pkb->data, pkb_len ( pkb ) );
+
+	list_add_tail ( &pkb->list, &netdev->tx_queue );
 
 	if ( ! ( netdev->state & NETDEV_OPEN ) ) {
-		free_pkb ( pkb );
-		return -ENETUNREACH;
+		rc = -ENETUNREACH;
+		goto err;
 	}
-	
-	return netdev->transmit ( netdev, pkb );
+		
+	if ( ( rc = netdev->transmit ( netdev, pkb ) ) != 0 )
+		goto err;
+
+	return 0;
+
+ err:
+	DBGC ( netdev, "NETDEV %p transmission %p failed: %s\n",
+	       netdev, pkb, strerror ( rc ) );
+	netdev_tx_complete ( netdev, pkb );
+	return rc;
+}
+
+/**
+ * Complete network transmission
+ *
+ * @v netdev		Network device
+ * @v pkb		Packet buffer
+ *
+ * The packet must currently be in the network device's TX queue.
+ */
+void netdev_tx_complete ( struct net_device *netdev, struct pk_buff *pkb ) {
+	DBGC ( netdev, "NETDEV %p transmission %p complete\n", netdev, pkb );
+
+	list_del ( &pkb->list );
+	free_pkb ( pkb );
+}
+
+/**
+ * Complete network transmission
+ *
+ * @v netdev		Network device
+ *
+ * Completes the oldest outstanding packet in the TX queue.
+ */
+void netdev_tx_complete_next ( struct net_device *netdev ) {
+	struct pk_buff *pkb;
+
+	list_for_each_entry ( pkb, &netdev->tx_queue, list ) {
+		netdev_tx_complete ( netdev, pkb );
+		return;
+	}
 }
 
 /**
@@ -73,51 +117,9 @@ int netdev_tx ( struct net_device *netdev, struct pk_buff *pkb ) {
  * function takes ownership of the packet buffer.
  */
 void netdev_rx ( struct net_device *netdev, struct pk_buff *pkb ) {
-	DBG ( "%s received %p+%zx\n", netdev_name ( netdev ),
-	      pkb->data, pkb_len ( pkb ) );
+	DBGC ( netdev, "NETDEV %p received %p (%p+%zx)\n",
+	       netdev, pkb, pkb->data, pkb_len ( pkb ) );
 	list_add_tail ( &pkb->list, &netdev->rx_queue );
-}
-
-/**
- * Transmit network-layer packet
- *
- * @v pkb		Packet buffer
- * @v netdev		Network device
- * @v net_protocol	Network-layer protocol
- * @v ll_dest		Destination link-layer address
- * @ret rc		Return status code
- *
- * Prepends link-layer headers to the packet buffer and transmits the
- * packet via the specified network device.  This function takes
- * ownership of the packet buffer.
- */
-int net_tx ( struct pk_buff *pkb, struct net_device *netdev,
-	     struct net_protocol *net_protocol, const void *ll_dest ) {
-	return netdev->ll_protocol->tx ( pkb, netdev, net_protocol, ll_dest );
-}
-
-/**
- * Process received network-layer packet
- *
- * @v pkb		Packet buffer
- * @v netdev		Network device
- * @v net_proto		Network-layer protocol, in network-byte order
- * @v ll_source		Source link-layer address
- * @ret rc		Return status code
- */
-int net_rx ( struct pk_buff *pkb, struct net_device *netdev,
-	     uint16_t net_proto, const void *ll_source ) {
-	struct net_protocol *net_protocol;
-
-	/* Hand off to network-layer protocol, if any */
-	for ( net_protocol = net_protocols ; net_protocol < net_protocols_end ;
-	      net_protocol++ ) {
-		if ( net_protocol->net_proto == net_proto ) {
-			return net_protocol->rx ( pkb, netdev, ll_source );
-		}
-	}
-	free_pkb ( pkb );
-	return 0;
 }
 
 /**
@@ -171,6 +173,7 @@ struct net_device * alloc_netdev ( size_t priv_size ) {
 	netdev = calloc ( 1, sizeof ( *netdev ) + priv_size );
 	if ( netdev ) {
 		INIT_LIST_HEAD ( &netdev->references );
+		INIT_LIST_HEAD ( &netdev->tx_queue );
 		INIT_LIST_HEAD ( &netdev->rx_queue );
 		netdev->priv = ( ( ( void * ) netdev ) + sizeof ( *netdev ) );
 	}
@@ -189,7 +192,8 @@ int register_netdev ( struct net_device *netdev ) {
 	
 	/* Add to device list */
 	list_add_tail ( &netdev->list, &net_devices );
-	DBG ( "%s registered\n", netdev_name ( netdev ) );
+	DBGC ( netdev, "NETDEV %p registered as %s\n",
+	       netdev, netdev_name ( netdev ) );
 
 	return 0;
 }
@@ -207,7 +211,7 @@ int netdev_open ( struct net_device *netdev ) {
 	if ( netdev->state & NETDEV_OPEN )
 		return 0;
 
-	DBG ( "%s opening\n", netdev_name ( netdev ) );
+	DBGC ( netdev, "NETDEV %p opening\n", netdev );
 
 	/* Open the device */
 	if ( ( rc = netdev->open ( netdev ) ) != 0 )
@@ -230,15 +234,20 @@ void netdev_close ( struct net_device *netdev ) {
 	if ( ! ( netdev->state & NETDEV_OPEN ) )
 		return;
 
-	DBG ( "%s closing\n", netdev_name ( netdev ) );
+	DBGC ( netdev, "NETDEV %p closing\n", netdev );
 
 	/* Close the device */
 	netdev->close ( netdev );
 
+	/* Discard any packets in the TX queue */
+	while ( ! list_empty ( &netdev->tx_queue ) ) {
+		netdev_tx_complete_next ( netdev );
+	}
+
 	/* Discard any packets in the RX queue */
 	while ( ( pkb = netdev_rx_dequeue ( netdev ) ) ) {
-		DBG ( "%s discarding %p+%zx\n", netdev_name ( netdev ),
-		      pkb->data, pkb_len ( pkb ) );
+		DBGC ( netdev, "NETDEV %p discarding received %p\n",
+		       netdev, pkb );
 		free_pkb ( pkb );
 	}
 
@@ -263,7 +272,7 @@ void unregister_netdev ( struct net_device *netdev ) {
 
 	/* Remove from device list */
 	list_del ( &netdev->list );
-	DBG ( "%s unregistered\n", netdev_name ( netdev ) );
+	DBGC ( netdev, "NETDEV %p unregistered\n", netdev );
 }
 
 /**
@@ -296,6 +305,48 @@ struct net_device * next_netdev ( void ) {
 }
 
 /**
+ * Transmit network-layer packet
+ *
+ * @v pkb		Packet buffer
+ * @v netdev		Network device
+ * @v net_protocol	Network-layer protocol
+ * @v ll_dest		Destination link-layer address
+ * @ret rc		Return status code
+ *
+ * Prepends link-layer headers to the packet buffer and transmits the
+ * packet via the specified network device.  This function takes
+ * ownership of the packet buffer.
+ */
+int net_tx ( struct pk_buff *pkb, struct net_device *netdev,
+	     struct net_protocol *net_protocol, const void *ll_dest ) {
+	return netdev->ll_protocol->tx ( pkb, netdev, net_protocol, ll_dest );
+}
+
+/**
+ * Process received network-layer packet
+ *
+ * @v pkb		Packet buffer
+ * @v netdev		Network device
+ * @v net_proto		Network-layer protocol, in network-byte order
+ * @v ll_source		Source link-layer address
+ * @ret rc		Return status code
+ */
+int net_rx ( struct pk_buff *pkb, struct net_device *netdev,
+	     uint16_t net_proto, const void *ll_source ) {
+	struct net_protocol *net_protocol;
+
+	/* Hand off to network-layer protocol, if any */
+	for ( net_protocol = net_protocols ; net_protocol < net_protocols_end ;
+	      net_protocol++ ) {
+		if ( net_protocol->net_proto == net_proto ) {
+			return net_protocol->rx ( pkb, netdev, ll_source );
+		}
+	}
+	free_pkb ( pkb );
+	return 0;
+}
+
+/**
  * Single-step the network stack
  *
  * @v process		Network stack process
@@ -321,8 +372,8 @@ static void net_step ( struct process *process ) {
 
 		/* Handle at most one received packet per poll */
 		if ( ( pkb = netdev_rx_dequeue ( netdev ) ) ) {
-			DBG ( "%s processing %p+%zx\n", netdev_name ( netdev ),
-			      pkb->data, pkb_len ( pkb ) );
+			DBGC ( netdev, "NETDEV %p processing %p\n",
+			       netdev, pkb );
 			netdev->ll_protocol->rx ( pkb, netdev );
 		}
 	}

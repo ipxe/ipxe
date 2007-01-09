@@ -158,7 +158,7 @@ static int pnic_transmit ( struct net_device *netdev, struct pk_buff *pkb ) {
 	pnic_command ( pnic, PNIC_CMD_XMIT, pkb->data, pkb_len ( pkb ),
 		       NULL, 0, NULL );
 
-	free_pkb ( pkb );
+	netdev_tx_complete ( netdev, pkb );
 	return 0;
 }
 

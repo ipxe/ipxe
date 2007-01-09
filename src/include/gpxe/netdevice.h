@@ -168,9 +168,11 @@ struct net_device {
 	 * This method should cause the hardware to initiate
 	 * transmission of the packet buffer.
 	 *
-	 * Ownership of the packet buffer is transferred to the @c
-	 * net_device, which must eventually call free_pkb() to
-	 * release the buffer.
+	 * If this method returns success, the packet buffer remains
+	 * owned by the net device's TX queue, and the net device must
+	 * eventually call netdev_tx_complete() to free the buffer.
+	 * If this method returns failure, the packet buffer is
+	 * immediately released.
 	 *
 	 * This method is guaranteed to be called only when the device
 	 * is open.
@@ -202,7 +204,9 @@ struct net_device {
 	 * This is the bitwise-OR of zero or more NETDEV_XXX constants.
 	 */
 	unsigned int state;
-	/** Received packet queue */
+	/** TX packet queue */
+	struct list_head tx_queue;
+	/** RX packet queue */
 	struct list_head rx_queue;
 
 	/** Driver private data */
@@ -231,11 +235,9 @@ static inline const char * netdev_name ( struct net_device *netdev ) {
 }
 
 extern int netdev_tx ( struct net_device *netdev, struct pk_buff *pkb );
+void netdev_tx_complete ( struct net_device *netdev, struct pk_buff *pkb );
+void netdev_tx_complete_next ( struct net_device *netdev );
 extern void netdev_rx ( struct net_device *netdev, struct pk_buff *pkb );
-extern int net_tx ( struct pk_buff *pkb, struct net_device *netdev,
-		    struct net_protocol *net_protocol, const void *ll_dest );
-extern int net_rx ( struct pk_buff *pkb, struct net_device *netdev,
-		    uint16_t net_proto, const void *ll_source );
 extern int netdev_poll ( struct net_device *netdev );
 extern struct pk_buff * netdev_rx_dequeue ( struct net_device *netdev );
 extern struct net_device * alloc_netdev ( size_t priv_size );
@@ -245,5 +247,9 @@ extern void netdev_close ( struct net_device *netdev );
 extern void unregister_netdev ( struct net_device *netdev );
 extern void free_netdev ( struct net_device *netdev );
 extern struct net_device * next_netdev ( void );
+extern int net_tx ( struct pk_buff *pkb, struct net_device *netdev,
+		    struct net_protocol *net_protocol, const void *ll_dest );
+extern int net_rx ( struct pk_buff *pkb, struct net_device *netdev,
+		    uint16_t net_proto, const void *ll_source );
 
 #endif /* _GPXE_NETDEVICE_H */

@@ -34,7 +34,7 @@ static int legacy_transmit ( struct net_device *netdev, struct pk_buff *pkb ) {
 	nic->nic_op->transmit ( nic, ( const char * ) ethhdr->h_dest,
 				ntohs ( ethhdr->h_protocol ),
 				pkb_len ( pkb ), pkb->data );
-	free_pkb ( pkb );
+	netdev_tx_complete ( netdev, pkb );
 	return 0;
 }
 

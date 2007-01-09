@@ -349,11 +349,15 @@ static int undinet_transmit ( struct net_device *netdev,
 		= ( ( unsigned ) & __from_data16 ( undinet_pkb ) );
 
 	/* Issue PXE API call */
-	rc = undinet_call ( undinic, PXENV_UNDI_TRANSMIT, &undi_transmit,
-			    sizeof ( undi_transmit ) );
+	if ( ( rc = undinet_call ( undinic, PXENV_UNDI_TRANSMIT,
+				   &undi_transmit,
+				   sizeof ( undi_transmit ) ) ) != 0 )
+		goto done;
 
-	/* Free packet buffer and return */
-	free_pkb ( pkb );
+	/* Free packet buffer */
+	netdev_tx_complete ( netdev, pkb );
+
+ done:
 	return rc;
 }
 
