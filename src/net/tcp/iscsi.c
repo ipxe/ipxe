@@ -116,8 +116,6 @@ static void iscsi_close ( struct iscsi_session *iscsi ) {
 static void iscsi_done ( struct iscsi_session *iscsi, int rc ) {
 
 	assert ( iscsi->tx_state == ISCSI_TX_IDLE );
-	assert ( iscsi->rx_state == ISCSI_RX_BHS );
-	assert ( iscsi->rx_offset == 0 );
 
 	/* Clear current SCSI command */
 	iscsi->command = NULL;
