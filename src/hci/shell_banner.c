@@ -43,7 +43,7 @@ int shell_banner ( void ) {
 	int enter_shell = 0;
 
 	/* Print welcome banner */
-	printf ( "\n\n\n" BOLD "gPXE " VERSION
+	printf ( NORMAL "\n\n\n" BOLD "gPXE " VERSION
 		 NORMAL " -- Open Source Boot Firmware -- "
 		 CYAN "http://etherboot.org" NORMAL "\n"
 		 "Press Ctrl-B for the gPXE command line..." );
