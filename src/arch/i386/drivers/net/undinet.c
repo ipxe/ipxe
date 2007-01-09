@@ -470,6 +470,7 @@ static int undinet_open ( struct net_device *netdev ) {
 	/* Hook interrupt service routine and enable interrupt */
 	undinet_hook_isr ( undinic->irq );
 	enable_irq ( undinic->irq );
+	send_eoi ( undinic->irq );
 
 	/* Set station address.  Required for some PXE stacks; will
 	 * spuriously fail on others.  Ignore failures.  We only ever
