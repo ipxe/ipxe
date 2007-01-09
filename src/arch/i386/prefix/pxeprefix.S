@@ -3,8 +3,6 @@
 #define	PXENV_STOP_UNDI			0x0015
 #define PXENV_UNLOAD_STACK		0x0070
 
-#define PXE_STACK_MAGIC		0x57ac	/* 'STac' */
-
 	.text
 	.arch i386
 	.org 0
@@ -17,31 +15,22 @@
  *****************************************************************************
  */
 	.section ".prefix"
+	/* Set up our non-stack segment registers */
 	jmp	$0x7c0, $1f
-1:	/* Preserve registers for return to PXE stack */
-	pushfl
-	pushal
-	pushw	%gs
-	pushw	%fs
-	pushw	%es
-	pushw	%ds
-	pushw	%ss
-	pushw	%cs
-	pushw	$PXE_STACK_MAGIC	/* PXE stack magic marker */
+1:	movw	%cs, %ax
+	movw	%ax, %ds
+	movw	$0x40, %ax		/* BIOS data segment access */
+	movw	%ax, %fs
+	/* Record PXENV+ and !PXE nominal addresses */
+	movw	%es, %ax		/* PXENV+ address */
+	movw	%ax, pxenv_segment
+	movw	%bx, pxenv_offset
+	popl	%eax			/* Discard return address */
+	popl	ppxe_segoff		/* !PXE address */
 	/* Set up stack just below 0x7c00 */
-	pushw	%ss
-	popw	%gs
-	movw	%sp, %bp		/* %gs:%bp points to old PXE stack */
 	xorw	%ax, %ax
 	movw	%ax, %ss
 	movw	$0x7c00, %sp
-	pushw	%gs			/* Save old PXE stack pointer */
-	pushw	%bp
-	/* Set up our other segment registers */
-	pushw	%cs
-	popw	%ds
-	movw	$0x40, %ax		/* BIOS data segment access */
-	movw	%ax, %fs
 	/* Clear direction flag, for the sake of sanity */
 	cld
 	/* Print welcome message */
@@ -57,21 +46,19 @@
  */
 detect_pxenv:
 	/* Signature check */
-	cmpl	$0x4e455850, %es:(%bx)	/* 'PXEN' signature */
+	les	pxenv_segoff, %di
+	cmpl	$0x4e455850, %es:(%di)	/* 'PXEN' signature */
 	jne	99f
-	cmpw	$0x2b56, %es:4(%bx)	/* 'V+' signature */
+	cmpw	$0x2b56, %es:4(%di)	/* 'V+' signature */
 	jne	99f
-	/* Record structure address, entry point, and UNDI segments */
-	pushw	%es
-	popw	pxenv_segment
-	movw	%bx, pxenv_offset
-	pushl	%es:0x0a(%bx)		/* Entry point */
+	/* Record entry point and UNDI segments */
+	pushl	%es:0x0a(%di)		/* Entry point */
 	popl	entry_segoff
-	pushw	%es:0x24(%bx)		/* UNDI code segment */
-	pushw	%es:0x26(%bx)		/* UNDI code size */
+	pushw	%es:0x24(%di)		/* UNDI code segment */
+	pushw	%es:0x26(%di)		/* UNDI code size */
 	popl	undi_code_segoff
-	pushw	%es:0x20(%bx)		/* UNDI data segment */
-	pushw	%es:0x22(%bx)		/* UNDI data size */
+	pushw	%es:0x20(%di)		/* UNDI data segment */
+	pushw	%es:0x22(%di)		/* UNDI data size */
 	popl	undi_data_segoff
 	/* Print "PXENV+ at <address>" */
 	movw	$10f, %si
@@ -91,7 +78,7 @@ detect_pxenv:
  */
 detect_ppxe:
 	/* Signature check */
-	les	%gs:54(%bp), %di	/* !PXE structure */
+	les	ppxe_segoff, %di
 	cmpl	$0x45585021, %es:(%di)	/* '!PXE' signature */
 	jne	99f
 	/* Record structure address, entry point, and UNDI segments */
@@ -700,65 +687,19 @@ run_etherboot:
 	rep movsb
 #endif
 
-	/* Jump to .text16 segment with %ds pointing to .data16*/
+	/* Jump to .text16 segment with %ds pointing to .data16 */
 	movw	%bx, %ds
 	pushw	%ax
 	pushw	$1f
 	lret
 	.section ".text16", "ax", @progbits
 1:
-	/* Original PXE stack pointer to es:di.  We must hold it in
-	 * registers, because our current stack may be vapourised by
-	 * the time main() returns.  (main() will still be able to
-	 * return, because prot_call() transfers the return address to
-	 * the internal stack and back again).
-	 */
-	popw	%di
-	popw	%es
-
 	/* Run main program */
 	pushl	$main
 	pushw	%cs
 	call	prot_call
 	popl	%eax /* discard */
 
-	/* If original PXE stack is intact, return via PXE, else via INT 18 */
-	cmpw	$PXE_STACK_MAGIC, %es:0(%di)
-	jne	exit_via_int18
-exit_via_pxe:				/* Stack OK, return to PXE */
-	movw	$exit_via_pxe_message, %si
-	call	print_exit_message
-	pushw	%es			/* Restore original PXE stack */
-	popw	%ss
-	movw	%di, %sp
-	popw	%ax /* discard PXE_STACK_MAGIC */
-	popw	%ax /* discard %cs */
-	popw	%ax /* discard %ss */
-	popw	%ds
-	popw	%es
-	popw	%fs
-	popw	%gs
-	popal
-	popfl
-	xorw	%ax, %ax		/* Return PXENV_STATUS_SUCCESS */
-	lret
-exit_via_int18:				/* Stack damaged, do int 18 */
-	movw	$exit_via_int18_message, %si
-	call	print_exit_message
+	/* Boot next device */
 	int	$0x18
-
-print_exit_message:	
-	movw	$0x0007, %bx		/* page 0, attribute 7 (normal) */
-	movb	$0x0e, %ah		/* write char, tty mode */
-1: 	lodsb
-	testb	%al, %al
-	je	2f
-	int	$0x10
-	jmp	1b
-2:	ret
-
-	.section ".data16", "aw", @progbits
-exit_via_pxe_message:
-	.asciz	"EB->PXE\r\n"
-exit_via_int18_message:
-	.asciz	"EB->BIOS\r\n"
+	.previous
