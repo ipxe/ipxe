@@ -152,6 +152,9 @@ REQUIRE_OBJECT ( nvo_cmd );
 #ifdef CONFIG_CMD
 REQUIRE_OBJECT ( config_cmd );
 #endif
+#ifdef IFMGMT_CMD
+REQUIRE_OBJECT ( ifmgmt_cmd );
+#endif
 
 /*
  * Drag in miscellaneous objects

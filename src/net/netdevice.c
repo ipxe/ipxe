@@ -40,7 +40,7 @@ static struct net_protocol net_protocols[0] __table_start ( net_protocols );
 static struct net_protocol net_protocols_end[0] __table_end ( net_protocols );
 
 /** List of network devices */
-static LIST_HEAD ( net_devices );
+struct list_head net_devices = LIST_HEAD_INIT ( net_devices );
 
 /**
  * Transmit raw packet via network device
@@ -306,26 +306,6 @@ struct net_device * find_netdev ( const char *name ) {
 			return netdev;
 	}
 
-	return NULL;
-}
-
-/**
- * Iterate through network devices
- *
- * @ret netdev		Network device, or NULL
- *
- * This returns the registered network devices in the order of
- * registration.  If no network devices are registered, it will return
- * NULL.
- */
-struct net_device * next_netdev ( void ) {
-	struct net_device *netdev;
-
-	list_for_each_entry ( netdev, &net_devices, list ) {
-		list_del ( &netdev->list );
-		list_add_tail ( &netdev->list, &net_devices );
-		return netdev;
-	}
 	return NULL;
 }
 

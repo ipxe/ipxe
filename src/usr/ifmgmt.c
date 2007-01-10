@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2006 Michael Brown <mbrown@fensystems.co.uk>.
+ * Copyright (C) 2007 Michael Brown <mbrown@fensystems.co.uk>.
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License as
@@ -20,29 +20,47 @@
 #include <vsprintf.h>
 #include <gpxe/netdevice.h>
 #include <usr/ifmgmt.h>
-#include <gpxe/autoboot.h>
 
 /** @file
  *
- * Automatic booting
+ * Network interface management
  *
  */
 
-void test_dhcp ( struct net_device *netdev );
-
-void autoboot ( void ) {
-	struct net_device *netdev;
+/**
+ * Open network device
+ *
+ * @v netdev		Network device
+ * @ret rc		Return status code
+ */
+int ifopen ( struct net_device *netdev ) {
 	int rc;
 
-	for_each_netdev ( netdev ) {
-
-		if ( ( rc = ifopen ( netdev ) ) != 0 )
-			continue;
-
-		test_dhcp ( netdev );
-		
-		ifclose ( netdev );
+	if ( ( rc = netdev_open ( netdev ) ) != 0 ) {
+		printf ( "Could not open %s: %s\n",
+			 netdev->name, strerror ( rc ) );
+		return rc;
 	}
 
-	printf ( "No more network devices\n" );
+	return 0;
+}
+
+/**
+ * Close network device
+ *
+ * @v netdev		Network device
+ */
+void ifclose ( struct net_device *netdev ) {
+	netdev_close ( netdev );
+}
+
+/**
+ * Print status of network device
+ *
+ * @v netdev		Network device
+ */
+void ifstat ( struct net_device *netdev ) {
+	printf ( "%s %s %s\n",
+		 netdev->name, netdev_hwaddr ( netdev ),
+		 ( ( netdev->state & NETDEV_OPEN ) ? "open" : "closed" ) );
 }

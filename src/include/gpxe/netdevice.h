@@ -224,6 +224,8 @@ struct net_device {
 /** Declare a network-layer protocol */
 #define __net_protocol __table ( net_protocols, 01 )
 
+extern struct list_head net_devices;
+
 /**
  * Get printable network device hardware address
  *
@@ -232,6 +234,18 @@ struct net_device {
  */
 static inline const char * netdev_hwaddr ( struct net_device *netdev ) {
 	return netdev->ll_protocol->ntoa ( netdev->ll_addr );
+}
+
+/** Iterate over all network devices */
+#define for_each_netdev( netdev ) \
+	list_for_each_entry ( (netdev), &net_devices, list )
+
+/** There exist some network devices
+ *
+ * @ret existence	Existence of network devices
+ */
+static inline int have_netdevs ( void ) {
+	return ( ! list_empty ( &net_devices ) );
 }
 
 extern int netdev_tx ( struct net_device *netdev, struct pk_buff *pkb );
@@ -247,7 +261,6 @@ extern void netdev_close ( struct net_device *netdev );
 extern void unregister_netdev ( struct net_device *netdev );
 extern void free_netdev ( struct net_device *netdev );
 struct net_device * find_netdev ( const char *name );
-extern struct net_device * next_netdev ( void );
 extern int net_tx ( struct pk_buff *pkb, struct net_device *netdev,
 		    struct net_protocol *net_protocol, const void *ll_dest );
 extern int net_rx ( struct pk_buff *pkb, struct net_device *netdev,
