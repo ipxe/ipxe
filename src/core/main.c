@@ -33,7 +33,7 @@ Literature dealing with the network protocols:
 #include <gpxe/netdevice.h>
 #include <gpxe/shell.h>
 #include <gpxe/shell_banner.h>
-#include <gpxe/autoboot.h>
+#include <usr/autoboot.h>
 
 /* Linker symbols */
 extern char _bss[], _ebss[];

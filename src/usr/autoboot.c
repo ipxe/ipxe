@@ -20,7 +20,7 @@
 #include <vsprintf.h>
 #include <gpxe/netdevice.h>
 #include <usr/ifmgmt.h>
-#include <gpxe/autoboot.h>
+#include <usr/autoboot.h>
 
 /** @file
  *
@@ -38,6 +38,8 @@ void autoboot ( void ) {
 
 		if ( ( rc = ifopen ( netdev ) ) != 0 )
 			continue;
+
+		ifstat ( netdev );
 
 		test_dhcp ( netdev );
 		

@@ -1,18 +1,22 @@
 #include <vsprintf.h>
 #include <gpxe/command.h>
-#include <gpxe/autoboot.h>
+#include <usr/autoboot.h>
 
 static int boot_exec ( int argc, char **argv ) {
 
 	if ( argc != 1 ) {
-		printf ( "Usage: %s\n"
-			 "Attempts to boot the system\n", argv[0] );
+		printf ( "Usage:\n"
+			 "  %s\n"
+			 "\n"
+			 "Attempts to boot the system\n",
+			 argv[0] );
 		return 1;
 	}
 
 	autoboot();
 
-	return 0;
+	/* Can never return success by definition */
+	return 1;
 }
 
 struct command boot_command __command = {
