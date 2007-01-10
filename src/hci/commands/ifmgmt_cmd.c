@@ -143,11 +143,6 @@ static int ifopen_exec ( int argc, char **argv ) {
 	return ifcommon_exec ( ifopen_payload, "Open", argc, argv );
 }
 
-struct command ifopen_command __command = {
-	.name = "ifopen",
-	.exec = ifopen_exec,
-};
-
 /* "ifclose" command */
 
 static int ifclose_payload ( struct net_device *netdev ) {
@@ -158,11 +153,6 @@ static int ifclose_payload ( struct net_device *netdev ) {
 static int ifclose_exec ( int argc, char **argv ) {
 	return ifcommon_exec ( ifclose_payload, "Close", argc, argv );
 }
-
-struct command ifclose_command __command = {
-	.name = "ifclose",
-	.exec = ifclose_exec,
-};
 
 /* "ifstat" command */
 
@@ -176,7 +166,18 @@ static int ifstat_exec ( int argc, char **argv ) {
 			       argc, argv );
 }
 
-struct command ifstat_command __command = {
-	.name = "ifstat",
-	.exec = ifstat_exec,
+/** Interface management commands */
+struct command ifmgmt_commands[] __command = {
+	{
+		.name = "ifopen",
+		.exec = ifopen_exec,
+	},
+	{
+		.name = "ifclose",
+		.exec = ifclose_exec,
+	},
+	{
+		.name = "ifstat",
+		.exec = ifstat_exec,
+	},
 };
