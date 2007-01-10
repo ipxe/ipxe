@@ -314,6 +314,24 @@ struct net_device * find_netdev ( const char *name ) {
 }
 
 /**
+ * Get network device by PCI bus:dev.fn address
+ *
+ * @v busdevfn		PCI bus:dev.fn address
+ * @ret netdev		Network device, or NULL
+ */
+struct net_device * find_pci_netdev ( unsigned int busdevfn ) {
+	struct net_device *netdev;
+
+	list_for_each_entry ( netdev, &net_devices, list ) {
+		if ( ( netdev->dev->desc.bus_type == BUS_TYPE_PCI ) &&
+		     ( netdev->dev->desc.pci.busdevfn == busdevfn ) )
+			return netdev;
+	}
+
+	return NULL;	
+}
+
+/**
  * Transmit network-layer packet
  *
  * @v pkb		Packet buffer

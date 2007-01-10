@@ -264,6 +264,8 @@ extern void netdev_close ( struct net_device *netdev );
 extern void unregister_netdev ( struct net_device *netdev );
 extern void free_netdev ( struct net_device *netdev );
 struct net_device * find_netdev ( const char *name );
+struct net_device * find_pci_netdev ( unsigned int busdevfn );
+
 extern int net_tx ( struct pk_buff *pkb, struct net_device *netdev,
 		    struct net_protocol *net_protocol, const void *ll_dest );
 extern int net_rx ( struct pk_buff *pkb, struct net_device *netdev,
