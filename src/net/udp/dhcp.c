@@ -582,8 +582,8 @@ static int dhcp_senddata ( struct udp_connection *conn,
 	}
 
 	/* Transmit the packet */
-	if ( ( rc = udp_sendto ( conn, &sa_dhcp_server.st,
-				 dhcppkt.dhcphdr, dhcppkt.len ) ) != 0 ) {
+	if ( ( rc = udp_sendto_via ( conn, &sa_dhcp_server.st, dhcp->netdev,
+				     dhcppkt.dhcphdr, dhcppkt.len ) ) != 0 ) {
 		DBG ( "Could not transmit UDP packet\n" );
 		return rc;
 	}

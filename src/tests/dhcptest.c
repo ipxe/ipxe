@@ -218,11 +218,6 @@ int test_dhcp ( struct net_device *netdev ) {
 	char filename[256];
 	int rc;
 
-	/* Bring IP interface up with address 0.0.0.0 */
-	if ( ( rc = add_ipv4_address ( netdev, address, netmask,
-				       gateway ) ) != 0 )
-		goto out_no_del_ipv4;
-
 	/* Issue DHCP request */
 	printf ( "DHCP (%s)...", netdev->name );
 	memset ( &dhcp, 0, sizeof ( dhcp ) );
@@ -250,9 +245,6 @@ int test_dhcp ( struct net_device *netdev ) {
 	
 	if ( filename[0] )
 		printf ( "Bootfile name \"%s\"\n", filename );
-
-	/* Remove old IP address configuration */
-	del_ipv4_address ( netdev );
 
 	/* Set up new IP address configuration */
 	if ( ( rc = add_ipv4_address ( netdev, address, netmask,
