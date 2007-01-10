@@ -118,6 +118,7 @@
 #define	BOOT_CMD		/* Automatic booting */
 #define	NVO_CMD			/* Non-volatile option storage commands */
 #define	CONFIG_CMD		/* Option configuration console */
+#define	IFMGMT_CMD		/* Interface management commands */
 
 /* @END general.h */ 
 
