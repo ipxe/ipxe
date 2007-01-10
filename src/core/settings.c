@@ -357,45 +357,47 @@ struct config_setting_type config_setting_type_int8 __config_setting_type = {
 };
 
 /** Some basic setting definitions */
-struct config_setting ip_config_setting __config_setting = {
-	.name = "ip",
-	.description = "IP address of this machine (e.g. 192.168.0.1)",
-	.tag = DHCP_EB_YIADDR,
-	.type = &config_setting_type_ipv4,
-};
-struct config_setting hostname_config_setting __config_setting = {
-	.name = "hostname",
-	.description = "Host name of this machine",
-	.tag = DHCP_HOST_NAME,
-	.type = &config_setting_type_string,
-};
-struct config_setting username_config_setting __config_setting = {
-	.name = "username",
-	.description = "User name for authentication to servers",
-	.tag = DHCP_EB_USERNAME,
-	.type = &config_setting_type_string,
-};
-struct config_setting password_config_setting __config_setting = {
-	.name = "password",
-	.description = "Password for authentication to servers",
-	.tag = DHCP_EB_PASSWORD,
-	.type = &config_setting_type_string,
-};
-struct config_setting root_path_config_setting __config_setting = {
-	.name = "root-path",
-	.description = "NFS/iSCSI root path",
-	.tag = DHCP_ROOT_PATH,
-	.type = &config_setting_type_string,
-};
-struct config_setting priority_config_setting __config_setting = {
-	.name = "priority",
-	.description = "Priority of these options",
-	.tag = DHCP_EB_PRIORITY,
-	.type = &config_setting_type_int8,
-};
-struct config_setting iscsi_initiator_setting __config_setting = {
-	.name = "initiator-iqn",
-	.description = "iSCSI qualified name of this machine",
-	.tag = DHCP_ISCSI_INITIATOR_IQN,
-	.type = &config_setting_type_string,
+struct config_setting basic_config_settings[] __config_setting = {
+	{
+		.name = "ip",
+		.description = "IP address of this machine (e.g. 192.168.0.1)",
+		.tag = DHCP_EB_YIADDR,
+		.type = &config_setting_type_ipv4,
+	},
+	{
+		.name = "hostname",
+		.description = "Host name of this machine",
+		.tag = DHCP_HOST_NAME,
+		.type = &config_setting_type_string,
+	},
+	{
+		.name = "username",
+		.description = "User name for authentication to servers",
+		.tag = DHCP_EB_USERNAME,
+		.type = &config_setting_type_string,
+	},
+	{
+		.name = "password",
+		.description = "Password for authentication to servers",
+		.tag = DHCP_EB_PASSWORD,
+		.type = &config_setting_type_string,
+	},
+	{
+		.name = "root-path",
+		.description = "NFS/iSCSI root path",
+		.tag = DHCP_ROOT_PATH,
+		.type = &config_setting_type_string,
+	},
+	{
+		.name = "priority",
+		.description = "Priority of these options",
+		.tag = DHCP_EB_PRIORITY,
+		.type = &config_setting_type_int8,
+	},
+	{
+		.name = "initiator-iqn",
+		.description = "iSCSI qualified name of this machine",
+		.tag = DHCP_ISCSI_INITIATOR_IQN,
+		.type = &config_setting_type_string,
+	}
 };
