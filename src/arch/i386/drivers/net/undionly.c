@@ -58,6 +58,8 @@ static int undibus_probe ( struct root_device *rootdev ) {
 	}
 
 	/* Add to device hierarchy */
+	strncpy ( preloaded_undi.dev.name, "UNDI",
+		  ( sizeof ( preloaded_undi.dev.name ) - 1 ) );
 	preloaded_undi.dev.parent = &rootdev->dev;
 	list_add ( &preloaded_undi.dev.siblings, &rootdev->dev.children);
 	INIT_LIST_HEAD ( &preloaded_undi.dev.children );
@@ -91,6 +93,6 @@ static struct root_driver undi_root_driver = {
 
 /** UNDI bus root device */
 struct root_device undi_root_device __root_device = {
-	.name = "UNDI",
+	.dev = { .name = "UNDI" },
 	.driver = &undi_root_driver,
 };

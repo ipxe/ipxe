@@ -1,7 +1,9 @@
 #include "background.h"
 
-static struct background backgrounds[0] __table_start ( background );
-static struct background backgrounds_end[0] __table_end ( background );
+static struct background backgrounds[0]
+	__table_start ( struct background, background );
+static struct background backgrounds_end[0]
+	__table_end ( struct background, background );
 
 /** @file */
 

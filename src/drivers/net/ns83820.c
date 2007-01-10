@@ -821,7 +821,7 @@ static int ns83820_probe ( struct nic *nic, struct pci_device *pci ) {
 		return 0;
 
 	printf("ns83820.c: Found %s, vendor=0x%hX, device=0x%hX\n",
-	       pci->name, pci->vendor, pci->device);
+	       pci->driver_name, pci->vendor, pci->device);
 
 	/* point to private storage */
 	ns = &nsx;
@@ -860,12 +860,12 @@ static int ns83820_probe ( struct nic *nic, struct pci_device *pci ) {
 	ns->CFG_cache = readl(ns->base + CFG);
 
 	if ((ns->CFG_cache & CFG_PCI64_DET)) {
-		printf("%s: detected 64 bit PCI data bus.\n", pci->name);
+		printf("%s: detected 64 bit PCI data bus.\n", pci->driver_name);
 		/*dev->CFG_cache |= CFG_DATA64_EN; */
 		if (!(ns->CFG_cache & CFG_DATA64_EN))
 			printf
 			    ("%s: EEPROM did not enable 64 bit bus.  Disabled.\n",
-			     pci->name);
+			     pci->driver_name);
 	} else
 		ns->CFG_cache &= ~(CFG_DATA64_EN);
 
@@ -895,7 +895,7 @@ static int ns83820_probe ( struct nic *nic, struct pci_device *pci ) {
 
 	/* setup optical transceiver if we have one */
 	if (ns->CFG_cache & CFG_TBI_EN) {
-		dprintf(("%s: enabling optical transceiver\n", pci->name));
+		dprintf(("%s: enabling optical transceiver\n", pci->driver_name));
 		writel(readl(ns->base + GPIOR) | 0x3e8, ns->base + GPIOR);
 
 		/* setup auto negotiation feature advertisement */
@@ -916,7 +916,7 @@ static int ns83820_probe ( struct nic *nic, struct pci_device *pci ) {
 
 	/* FIXME: reset_phy is defaulted to 0, should we reset anyway? */
 	if (reset_phy) {
-		dprintf(("%s: resetting phy\n", pci->name));
+		dprintf(("%s: resetting phy\n", pci->driver_name));
 		writel(ns->CFG_cache | CFG_PHY_RST, ns->base + CFG);
 		writel(ns->CFG_cache, ns->base + CFG);
 	}
@@ -981,11 +981,11 @@ static int ns83820_probe ( struct nic *nic, struct pci_device *pci ) {
 	ns83820_getmac(nic, nic->node_addr);
 
 	if (using_dac) {
-		dprintf(("%s: using 64 bit addressing.\n", pci->name));
+		dprintf(("%s: using 64 bit addressing.\n", pci->driver_name));
 	}
 
 	dprintf(("%s: DP83820 %d.%d: %! io=0x%hX\n",
-		 pci->name,
+		 pci->driver_name,
 		 (unsigned) readl(ns->base + SRR) >> 8,
 		 (unsigned) readl(ns->base + SRR) & 0xff,
 		 nic->node_addr, pci->ioaddr));

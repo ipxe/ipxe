@@ -10,10 +10,14 @@
  */
 
 /* Linker symbols for the various tables */
-static struct bus_driver bus_drivers[0] __table_start ( bus_driver );
-static struct bus_driver bus_drivers_end[0] __table_end ( bus_driver );
-static struct device_driver device_drivers[0] __table_start ( device_driver );
-static struct device_driver device_drivers_end[0] __table_end (device_driver );
+static struct bus_driver bus_drivers[0]
+	__table_start ( struct bus_driver, bus_driver );
+static struct bus_driver bus_drivers_end[0]
+	__table_end ( struct bus_driver, bus_driver );
+static struct device_driver device_drivers[0]
+	__table_start ( struct device_driver, device_driver );
+static struct device_driver device_drivers_end[0]
+	__table_end ( struct device_driver, device_driver );
 
 /* Current attempted boot device */
 struct dev dev = {

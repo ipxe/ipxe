@@ -13,10 +13,10 @@ struct image {
 	int ( * boot ) ( void *context );
 };
 
-#define __image_start		__table_start(image)
-#define __image			__table(image,01)
-#define __default_image		__table(image,02)
-#define __image_end		__table_end(image)
+#define __image_start		__table_start ( struct image, image )
+#define __image			__table ( struct image, image, 01 )
+#define __default_image		__table ( struct image, image, 02 )
+#define __image_end		__table_end ( struct image, image )
 
 /* Functions in image.c */
 

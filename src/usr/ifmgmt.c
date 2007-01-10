@@ -19,6 +19,7 @@
 #include <string.h>
 #include <vsprintf.h>
 #include <gpxe/netdevice.h>
+#include <gpxe/device.h>
 #include <usr/ifmgmt.h>
 
 /** @file
@@ -60,7 +61,7 @@ void ifclose ( struct net_device *netdev ) {
  * @v netdev		Network device
  */
 void ifstat ( struct net_device *netdev ) {
-	printf ( "%s %s %s\n",
-		 netdev->name, netdev_hwaddr ( netdev ),
+	printf ( "%s: %s on %s (%s)\n",
+		 netdev->name, netdev_hwaddr ( netdev ), netdev->dev->name,
 		 ( ( netdev->state & NETDEV_OPEN ) ? "open" : "closed" ) );
 }

@@ -19,6 +19,7 @@
 #include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
+#include <vsprintf.h>
 #include <gpxe/pci.h>
 #include <undi.h>
 #include <undirom.h>
@@ -96,6 +97,8 @@ static int undipci_probe ( struct pci_device *pci,
 	}
 
 	/* Add to device hierarchy */
+	snprintf ( undi->dev.name, sizeof ( undi->dev.name ),
+		   "UNDI%04x:%04x", undi->entry.segment, undi->entry.offset );
 	undi->dev.parent = &pci->dev;
 	INIT_LIST_HEAD ( &undi->dev.children );
 	list_add ( &undi->dev.siblings, &pci->dev.children );

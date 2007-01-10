@@ -577,6 +577,7 @@ int undinet_probe ( struct undi_device *undi ) {
 		return -ENOMEM;
 	undinic = netdev->priv;
 	undi_set_drvdata ( undi, netdev );
+	netdev->dev = &undi->dev;
 	memset ( undinic, 0, sizeof ( *undinic ) );
 	undinic->entry = undi->entry;
 	DBGC ( undinic, "UNDINIC %p using UNDI %p\n", undinic, undi );

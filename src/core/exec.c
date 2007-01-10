@@ -33,8 +33,10 @@
  *
  */
 
-static struct command commands[0] __table_start ( commands );
-static struct command commands_end[0] __table_end ( commands );
+static struct command commands[0]
+	__table_start ( struct command, commands );
+static struct command commands_end[0]
+	__table_end ( struct command, commands );
 
 /* Avoid dragging in getopt.o unless a command really uses it */
 int optind;

@@ -6,8 +6,10 @@
 
 #include "bios.h"
 
-static struct console_driver console_drivers[0] __table_start ( console );
-static struct console_driver console_drivers_end[0] __table_end ( console );
+static struct console_driver console_drivers[0]
+	__table_start ( struct console_driver, console );
+static struct console_driver console_drivers_end[0]
+	__table_end ( struct console_driver, console );
 
 /**
  * Write a single character to each console device.

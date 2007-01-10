@@ -23,6 +23,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <errno.h>
+#include <vsprintf.h>
 #include <gpxe/tables.h>
 #include <gpxe/device.h>
 #include <gpxe/pci.h>
@@ -33,8 +34,10 @@
  *
  */
 
-static struct pci_driver pci_drivers[0] __table_start ( pci_drivers );
-static struct pci_driver pci_drivers_end[0] __table_end ( pci_drivers );
+static struct pci_driver pci_drivers[0]
+	__table_start ( struct pci_driver, pci_drivers );
+static struct pci_driver pci_drivers_end[0]
+	__table_end ( struct pci_driver, pci_drivers );
 
 static void pcibus_remove ( struct root_device *rootdev );
 
@@ -194,8 +197,8 @@ static int pci_probe ( struct pci_device *pci ) {
 			     ( id->device != pci->device ) )
 				continue;
 			pci->driver = driver;
-			pci->name = id->name;
-			DBG ( "...using driver %s\n", pci->name );
+			pci->driver_name = id->name;
+			DBG ( "...using driver %s\n", pci->driver_name );
 			if ( ( rc = driver->probe ( pci, id ) ) != 0 ) {
 				DBG ( "......probe failed\n" );
 				continue;
@@ -276,6 +279,9 @@ static int pcibus_probe ( struct root_device *rootdev ) {
 			pci_read_bases ( pci );
 
 			/* Add to device hierarchy */
+			snprintf ( pci->dev.name, sizeof ( pci->dev.name ),
+				   "PCI%02x:%02x.%x", bus,
+				   PCI_SLOT ( devfn ), PCI_FUNC ( devfn ) );
 			pci->dev.parent = &rootdev->dev;
 			list_add ( &pci->dev.siblings, &rootdev->dev.children);
 			INIT_LIST_HEAD ( &pci->dev.children );
@@ -325,6 +331,6 @@ static struct root_driver pci_root_driver = {
 
 /** PCI bus root device */
 struct root_device pci_root_device __root_device = {
-	.name = "PCI",
+	.dev = { .name = "PCI" },
 	.driver = &pci_root_driver,
 };

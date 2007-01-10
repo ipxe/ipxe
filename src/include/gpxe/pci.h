@@ -277,8 +277,8 @@ struct pci_device {
 	 * field.
 	 */
 	void *priv;
-	/** Device name */
-	const char *name;
+	/** Driver name */
+	const char *driver_name;
 };
 
 /** A PCI driver */
@@ -305,7 +305,7 @@ struct pci_driver {
 };
 
 /** Declare a PCI driver */
-#define __pci_driver __table ( pci_drivers, 01 )
+#define __pci_driver __table ( struct pci_driver, pci_drivers, 01 )
 
 #define PCI_DEVFN( slot, func )	( ( (slot) << 3 ) | (func) )
 #define PCI_SLOT( devfn )	( ( (devfn) >> 3 ) & 0x1f )

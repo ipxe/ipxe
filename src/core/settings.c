@@ -34,16 +34,16 @@
  */
 
 /** Registered configuration setting types */
-static struct config_setting_type
-config_setting_types[0] __table_start ( config_setting_types );
-static struct config_setting_type
-config_setting_types_end[0] __table_end ( config_setting_types );
+static struct config_setting_type config_setting_types[0]
+	__table_start ( struct config_setting_type, config_setting_types );
+static struct config_setting_type config_setting_types_end[0]
+	__table_end ( struct config_setting_type, config_setting_types );
 
 /** Registered configuration settings */
-static struct config_setting
-config_settings[0] __table_start ( config_settings );
-static struct config_setting
-config_settings_end[0] __table_end ( config_settings );
+static struct config_setting config_settings[0]
+	__table_start ( struct config_setting, config_settings );
+static struct config_setting config_settings_end[0]
+	__table_end ( struct config_setting, config_settings );
 
 /**
  * Find configuration setting type

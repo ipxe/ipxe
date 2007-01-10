@@ -1,7 +1,9 @@
 #include "resolv.h"
 
-static struct resolver resolvers[0] __table_start(resolver);
-static struct resolver resolvers_end[0] __table_end(resolver);
+static struct resolver resolvers[0]
+	__table_start ( struct resolver, resolver );
+static struct resolver resolvers_end[0]
+	__table_end ( struct resolver, resolver );
 
 /*
  * Resolve a name (which may be just a dotted quad IP address) to an

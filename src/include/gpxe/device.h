@@ -13,6 +13,8 @@
 
 /** A hardware device */
 struct device {
+	/** Name */
+	char name[16];
 	/** Devices on the same bus */
 	struct list_head siblings;
 	/** Devices attached to this device */
@@ -28,8 +30,6 @@ struct device {
  *
  */
 struct root_device {
-	/** Name */
-	const char *name;
 	/** Device chain
 	 *
 	 * A root device has a NULL parent field.
@@ -62,7 +62,7 @@ struct root_driver {
 };
 
 /** Declare a root device */
-#define __root_device __table ( root_devices, 01 )
+#define __root_device __table ( struct root_device, root_devices, 01 )
 
 extern int probe_devices ( void );
 extern void remove_devices ( void );

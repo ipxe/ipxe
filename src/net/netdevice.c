@@ -27,6 +27,7 @@
 #include <gpxe/tables.h>
 #include <gpxe/process.h>
 #include <gpxe/init.h>
+#include <gpxe/device.h>
 #include <gpxe/netdevice.h>
 
 /** @file
@@ -36,8 +37,10 @@
  */
 
 /** Registered network-layer protocols */
-static struct net_protocol net_protocols[0] __table_start ( net_protocols );
-static struct net_protocol net_protocols_end[0] __table_end ( net_protocols );
+static struct net_protocol net_protocols[0]
+	__table_start ( struct net_protocol, net_protocols );
+static struct net_protocol net_protocols_end[0]
+	__table_end ( struct net_protocol, net_protocols );
 
 /** List of network devices */
 struct list_head net_devices = LIST_HEAD_INIT ( net_devices );
@@ -200,8 +203,9 @@ int register_netdev ( struct net_device *netdev ) {
 
 	/* Add to device list */
 	list_add_tail ( &netdev->list, &net_devices );
-	DBGC ( netdev, "NETDEV %p registered as %s (%s)\n",
-	       netdev, netdev->name, netdev_hwaddr ( netdev ) );
+	DBGC ( netdev, "NETDEV %p registered as %s (phys %s hwaddr %s)\n",
+	       netdev, netdev->name, netdev->dev->name,
+	       netdev_hwaddr ( netdev ) );
 
 	return 0;
 }

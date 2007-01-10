@@ -155,7 +155,7 @@ struct bus_driver {
 	const char * ( *name_device ) ( struct bus_dev *bus_dev );
 };
 
-#define __bus_driver __table ( bus_driver, 01 )
+#define __bus_driver __table ( struct bus_driver, bus_driver, 01 )
 
 /*
  * A structure fully describing the bus-independent parts of a
@@ -181,7 +181,7 @@ struct type_driver {
 	int ( * load ) ( struct type_dev *type_dev, struct buffer *buffer );
 };
 
-#define __type_driver __table ( type_driver, 01 )
+#define __type_driver __table ( struct type_driver, type_driver, 01 )
 
 /*
  * A driver for a device.
@@ -198,7 +198,7 @@ struct device_driver {
 			     struct bus_dev *bus_dev );
 };
 
-#define __device_driver __table ( device_driver, 01 )
+#define __device_driver __table ( struct device_driver, device_driver, 01 )
 
 #if 0
 #define DRIVER(_name,_type_driver,_bus_driver,_bus_info,	 	      \

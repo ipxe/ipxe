@@ -1252,7 +1252,7 @@ static int tulip_probe ( struct nic *nic, struct pci_device *pci ) {
 
     tp->vendor_id  = pci->vendor;
     tp->dev_id     = pci->device;
-    tp->nic_name   = pci->name;
+    tp->nic_name   = pci->driver_name;
 
     tp->if_port = 0;
     tp->default_port = 0;

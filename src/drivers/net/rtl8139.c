@@ -532,6 +532,7 @@ static int rtl_probe ( struct pci_device *pci,
 	}
 	rtl = netdev->priv;
 	pci_set_drvdata ( pci, netdev );
+	netdev->dev = &pci->dev;
 	memset ( rtl, 0, sizeof ( *rtl ) );
 	rtl->ioaddr = pci->ioaddr;
 

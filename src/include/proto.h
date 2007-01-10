@@ -18,11 +18,11 @@ struct protocol {
  * should use __protocol.
  *
  */
-#define __protocol_start		__table_start(protocol)
-#define __protocol			__table(protocol,01)
-#define __default_protocol_start	__table(protocol,02)
-#define __default_protocol		__table(protocol,03)
-#define __protocol_end			__table_end(protocol)
+#define __protocol_start	 __table_start ( struct protocol, protocol )
+#define __protocol		 __table ( struct protocol, protocol, 01 )
+#define __default_protocol_start __table ( struct protocol, protocol, 02 )
+#define __default_protocol	 __table ( struct protocol, protocol, 03 )
+#define __protocol_end		 __table_end ( struct protocol, protocol )
 
 /*
  * Functions in proto.c

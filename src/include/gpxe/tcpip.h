@@ -99,10 +99,12 @@ struct tcpip_net_protocol {
 };
 
 /** Declare a TCP/IP transport-layer protocol */
-#define	__tcpip_protocol __table ( tcpip_protocols, 01 )
+#define	__tcpip_protocol \
+	__table ( struct tcpip_protocol, tcpip_protocols, 01 )
 
 /** Declare a TCP/IP network-layer protocol */
-#define	__tcpip_net_protocol __table ( tcpip_net_protocols, 01 )
+#define	__tcpip_net_protocol \
+	__table ( struct tcpip_net_protocol, tcpip_net_protocols, 01 )
 
 extern int tcpip_rx ( struct pk_buff *pkb, uint8_t tcpip_proto,
 		      struct sockaddr_tcpip *st_src,

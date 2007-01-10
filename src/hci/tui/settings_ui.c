@@ -81,10 +81,10 @@ struct setting_widget {
 };
 
 /** Registered configuration settings */
-static struct config_setting
-config_settings[0] __table_start ( config_settings );
-static struct config_setting
-config_settings_end[0] __table_end ( config_settings );
+static struct config_setting config_settings[0]
+	__table_start ( struct config_setting, config_settings );
+static struct config_setting config_settings_end[0]
+	__table_end ( struct config_setting, config_settings );
 #define NUM_SETTINGS ( ( unsigned ) ( config_settings_end - config_settings ) )
 
 /**

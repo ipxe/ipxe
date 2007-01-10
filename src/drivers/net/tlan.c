@@ -809,7 +809,7 @@ static int tlan_probe ( struct nic *nic, struct pci_device *pci ) {
 
 	priv->vendor_id = pci->vendor;
 	priv->dev_id = pci->device;
-	priv->nic_name = pci->name;
+	priv->nic_name = pci->driver_name;
 	priv->eoc = 0;
 
 	err = 0;
@@ -820,10 +820,10 @@ static int tlan_probe ( struct nic *nic, struct pci_device *pci ) {
 				       (u8 *) & nic->node_addr[i]);
 	if (err) {
   	    printf ( "TLAN: %s: Error reading MAC from eeprom: %d\n",
-		    pci->name, err);
+		    pci->driver_name, err);
 	} else {
 	    DBG ( "%s: %s at ioaddr %#lX, ", 
-		  pci->name, eth_ntoa ( nic->node_addr ), pci->ioaddr );
+		  pci->driver_name, eth_ntoa ( nic->node_addr ), pci->ioaddr );
 	}
 
 	priv->tlanRev = TLan_DioRead8(BASE, TLAN_DEF_REVISION);

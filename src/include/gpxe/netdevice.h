@@ -16,6 +16,7 @@ struct pk_buff;
 struct net_device;
 struct net_protocol;
 struct ll_protocol;
+struct device;
 
 /** Maximum length of a link-layer address */
 #define MAX_LL_ADDR_LEN 6
@@ -140,6 +141,8 @@ struct net_device {
 	struct list_head list;
 	/** Name of this network device */
 	char name[8];
+	/** Underlying hardware device */
+	struct device *dev;
 	/** List of persistent reference holders */
 	struct list_head references;
 
@@ -219,10 +222,10 @@ struct net_device {
 #define NETDEV_OPEN 0x0001
 
 /** Declare a link-layer protocol */
-#define __ll_protocol  __table ( ll_protocols, 01 )
+#define __ll_protocol  __table ( struct ll_protocol, ll_protocols, 01 )
 
 /** Declare a network-layer protocol */
-#define __net_protocol __table ( net_protocols, 01 )
+#define __net_protocol __table ( struct net_protocol, net_protocols, 01 )
 
 extern struct list_head net_devices;
 

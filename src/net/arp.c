@@ -38,9 +38,9 @@
 
 /** Registered ARP protocols */
 static struct arp_net_protocol arp_net_protocols[0]
-	__table_start ( arp_net_protocols );
+	__table_start ( struct arp_net_protocol, arp_net_protocols );
 static struct arp_net_protocol arp_net_protocols_end[0]
-	__table_end ( arp_net_protocols );
+	__table_end ( struct arp_net_protocol, arp_net_protocols );
 
 /** An ARP cache entry */
 struct arp_entry {

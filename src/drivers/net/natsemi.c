@@ -262,7 +262,7 @@ natsemi_probe ( struct nic *nic, struct pci_device *pci ) {
     ioaddr     = pci->ioaddr;
     vendor     = pci->vendor;
     dev_id     = pci->device;
-    nic_name   = pci->name;
+    nic_name   = pci->driver_name;
 
     /* natsemi has a non-standard PM control register
      * in PCI config space.  Some boards apparently need

@@ -40,7 +40,7 @@ struct background {
 };
 
 /** A member of the background protocols table */
-#define __background __table ( background, 01 )
+#define __background __table ( struct background, background, 01 )
 
 /* Functions in background.c */
 

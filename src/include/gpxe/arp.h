@@ -27,7 +27,8 @@ struct arp_net_protocol {
 };
 
 /** Declare an ARP protocol */
-#define __arp_net_protocol __table ( arp_net_protocols, 01 )
+#define __arp_net_protocol \
+	__table ( struct arp_net_protocol, arp_net_protocols, 01 )
 
 extern int arp_resolve ( struct net_device *netdev,
 			 struct net_protocol *net_protocol,

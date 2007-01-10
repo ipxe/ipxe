@@ -66,7 +66,8 @@ struct config_setting_type {
 };
 
 /** Declare a configuration setting type */
-#define	__config_setting_type __table ( config_setting_types, 01 )
+#define	__config_setting_type \
+	__table ( struct config_setting_type, config_setting_types, 01 )
 
 /**
  * A configuration setting
@@ -98,7 +99,7 @@ struct config_setting {
 };
 
 /** Declare a configuration setting */
-#define	__config_setting __table ( config_settings, 01 )
+#define	__config_setting __table ( struct config_setting, config_settings, 01 )
 
 /**
  * Show value of setting

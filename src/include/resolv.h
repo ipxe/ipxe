@@ -9,7 +9,7 @@ struct resolver {
 	int ( * resolv ) ( struct in_addr *address, const char *name );
 };
 
-#define __resolver __table(resolver,01)
+#define __resolver __table ( struct resolver, resolver, 01 )
 
 extern int resolv ( struct in_addr *address, const char *name );
 

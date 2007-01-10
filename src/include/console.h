@@ -93,7 +93,7 @@ struct console_driver {
  * @endcode
  *
  */
-#define __console_driver __table ( console, 01 )
+#define __console_driver __table ( struct console_driver, console, 01 )
 
 /* Function prototypes */
 

@@ -18,8 +18,10 @@
  *
  */
 
-static struct errortab errortab_start[0] __table_start(errortab);
-static struct errortab errortab_end[0] __table_end(errortab);
+static struct errortab errortab_start[0]
+	__table_start ( struct errortab, errortab );
+static struct errortab errortab_end[0]
+	__table_end ( struct errortab, errortab );
 
 /**
  * Retrieve string representation of error number.

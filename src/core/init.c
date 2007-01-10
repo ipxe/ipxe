@@ -9,8 +9,10 @@
 
 #include <gpxe/init.h>
 
-static struct init_fn init_fns[0] __table_start(init_fn);
-static struct init_fn init_fns_end[0] __table_end(init_fn);
+static struct init_fn init_fns[0]
+	__table_start ( struct init_fn, init_fn );
+static struct init_fn init_fns_end[0]
+	__table_end ( struct init_fn, init_fn );
 
 void call_init_fns ( void ) {
 	struct init_fn *init_fn;

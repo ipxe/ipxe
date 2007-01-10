@@ -84,6 +84,7 @@ int legacy_probe ( struct pci_device *pci,
 	netdev->priv = &nic;
 	memset ( &nic, 0, sizeof ( nic ) );
 	pci_set_drvdata ( pci, netdev );
+	netdev->dev = &pci->dev;
 
 	netdev->open = legacy_open;
 	netdev->close = legacy_close;

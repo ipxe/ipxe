@@ -15,16 +15,16 @@
  */
 
 /** Registered network-layer protocols that support TCP/IP */
-static struct tcpip_net_protocol
-tcpip_net_protocols[0] __table_start ( tcpip_net_protocols );
-static struct tcpip_net_protocol
-tcpip_net_protocols_end[0] __table_end ( tcpip_net_protocols );
+static struct tcpip_net_protocol tcpip_net_protocols[0]
+	__table_start ( struct tcpip_net_protocol, tcpip_net_protocols );
+static struct tcpip_net_protocol tcpip_net_protocols_end[0]
+	__table_end ( struct tcpip_net_protocol, tcpip_net_protocols );
 
 /** Registered transport-layer protocols that support TCP/IP */
-static struct tcpip_protocol
-tcpip_protocols[0]__table_start ( tcpip_protocols );
-static struct tcpip_protocol
-tcpip_protocols_end[0] __table_end ( tcpip_protocols );
+static struct tcpip_protocol tcpip_protocols[0]
+	__table_start ( struct tcpip_protocol, tcpip_protocols );
+static struct tcpip_protocol tcpip_protocols_end[0]
+	__table_end ( struct tcpip_protocol, tcpip_protocols );
 
 /** Process a received TCP/IP packet
  *

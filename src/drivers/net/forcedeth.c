@@ -1246,7 +1246,7 @@ static int forcedeth_probe ( struct nic *nic, struct pci_device *pci ) {
 		return 0;
 
 	printf("forcedeth.c: Found %s, vendor=0x%hX, device=0x%hX\n",
-	       pci->name, pci->vendor, pci->device);
+	       pci->driver_name, pci->vendor, pci->device);
 
 	pci_fill_nic ( nic, pci );
 
@@ -1306,7 +1306,7 @@ static int forcedeth_probe ( struct nic *nic, struct pci_device *pci ) {
 	}
 #endif
 
-	DBG ( "%s: MAC Address %s\n", pci->name, eth_ntoa ( nic->node_addr ) );
+	DBG ( "%s: MAC Address %s\n", pci->driver_name, eth_ntoa ( nic->node_addr ) );
 
  	/* disable WOL */
 	writel(0, base + NvRegWakeUpFlags);
@@ -1381,7 +1381,7 @@ static int forcedeth_probe ( struct nic *nic, struct pci_device *pci ) {
  		id2 = (id2 & PHYID2_OUI_MASK) >> PHYID2_OUI_SHFT;
  		dprintf
 			(("%s: open: Found PHY %hX:%hX at address %d.\n",
-			  pci->name, id1, id2, i));
+			  pci->driver_name, id1, id2, i));
  		np->phyaddr = i;
  		np->phy_oui = id1 | id2;
  		break;
@@ -1391,7 +1391,7 @@ static int forcedeth_probe ( struct nic *nic, struct pci_device *pci ) {
  		 * test loopback? Very odd, but can be correct.
  		 */
  		printf
-			("%s: open: Could not find a valid PHY.\n", pci->name);
+			("%s: open: Could not find a valid PHY.\n", pci->driver_name);
  	}
 	
  	if (i != 32) {
@@ -1400,7 +1400,7 @@ static int forcedeth_probe ( struct nic *nic, struct pci_device *pci ) {
  	}
 	
 	dprintf(("%s: forcedeth.c: subsystem: %hX:%hX bound to %s\n",
-		 pci->name, pci->vendor, pci->dev_id, pci->name));
+		 pci->driver_name, pci->vendor, pci->dev_id, pci->driver_name));
 	if(!forcedeth_reset(nic)) return 0; // no valid link
 
 	/* point to NIC specific routines */

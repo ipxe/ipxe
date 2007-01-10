@@ -678,7 +678,7 @@ static int pcnet32_probe ( struct nic *nic, struct pci_device *pci ) {
 	/* BASE is used throughout to address the card */
 	ioaddr = pci->ioaddr;
 	printf("pcnet32.c: Found %s, Vendor=0x%hX Device=0x%hX\n",
-	       pci->name, pci->vendor, pci->device);
+	       pci->driver_name, pci->vendor, pci->device);
 
 	nic->irqno  = 0;
 	pci_fill_nic ( nic, pci );

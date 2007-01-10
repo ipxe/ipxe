@@ -28,8 +28,10 @@
  *
  */
 
-static struct root_device root_devices[0] __table_start ( root_devices );
-static struct root_device root_devices_end[0] __table_end ( root_devices );
+static struct root_device root_devices[0]
+	__table_start ( struct root_device, root_devices );
+static struct root_device root_devices_end[0]
+	__table_end ( struct root_device, root_devices );
 
 /** Registered root devices */
 static LIST_HEAD ( devices );
@@ -43,10 +45,10 @@ static LIST_HEAD ( devices );
 static int rootdev_probe ( struct root_device *rootdev ) {
 	int rc;
 
-	DBG ( "Adding %s root bus\n", rootdev->name );
+	DBG ( "Adding %s root bus\n", rootdev->dev.name );
 	if ( ( rc = rootdev->driver->probe ( rootdev ) ) != 0 ) {
 		DBG ( "Failed to add %s root bus: %s\n",
-		      rootdev->name, strerror ( rc ) );
+		      rootdev->dev.name, strerror ( rc ) );
 		return rc;
 	}
 
@@ -60,7 +62,7 @@ static int rootdev_probe ( struct root_device *rootdev ) {
  */
 static void rootdev_remove ( struct root_device *rootdev ) {
 	rootdev->driver->remove ( rootdev );
-	DBG ( "Removed %s root bus\n", rootdev->name );
+	DBG ( "Removed %s root bus\n", rootdev->dev.name );
 }
 
 /**

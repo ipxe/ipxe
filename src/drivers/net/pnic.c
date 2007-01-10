@@ -234,6 +234,7 @@ static int pnic_probe ( struct pci_device *pci,
 	}
 	pnic = netdev->priv;
 	pci_set_drvdata ( pci, netdev );
+	netdev->dev = &pci->dev;
 	pnic->ioaddr = pci->ioaddr;
 
 	/* API version check */

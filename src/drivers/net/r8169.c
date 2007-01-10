@@ -884,7 +884,7 @@ static int r8169_probe ( struct nic *nic, struct pci_device *pci ) {
 	int option = -1, Cap10_100 = 0, Cap1000 = 0;
 
 	printf ( "r8169.c: Found %s, Vendor=%hX Device=%hX\n",
-	       pci->name, pci->vendor, pci->device );
+	       pci->driver_name, pci->vendor, pci->device );
 
 	board_idx++;
 
@@ -899,11 +899,11 @@ static int r8169_probe ( struct nic *nic, struct pci_device *pci ) {
 	for (i = 0; i < MAC_ADDR_LEN; i++)
 		nic->node_addr[i] = RTL_R8(MAC0 + i);
 
-	DBG ( "%s: Identified chip type is '%s'.\n", pci->name,
+	DBG ( "%s: Identified chip type is '%s'.\n", pci->driver_name,
 		 rtl_chip_info[tpc->chipset].name );
 
 	/* Print out some hardware info */
-	DBG ( "%s: %s at IOAddr %#hX, ", pci->name, eth_ntoa ( nic->node_addr ),
+	DBG ( "%s: %s at IOAddr %#hX, ", pci->driver_name, eth_ntoa ( nic->node_addr ),
 	       ioaddr );
 
 	/* Config PHY */
@@ -965,7 +965,7 @@ static int r8169_probe ( struct nic *nic, struct pci_device *pci ) {
 			RTL8169_WRITE_GMII_REG(ioaddr, PHY_1000_CTRL_REG,
 					       Cap1000);
 		} else {
-			DBG ( "%s: Auto-negotiation Enabled.\n",  pci->name );
+			DBG ( "%s: Auto-negotiation Enabled.\n",  pci->driver_name );
 
 			// enable 10/100 Full/Half Mode, leave PHY_AUTO_NEGO_REG bit4:0 unchanged
 			RTL8169_WRITE_GMII_REG(ioaddr, PHY_AUTO_NEGO_REG,
@@ -1016,7 +1016,7 @@ static int r8169_probe ( struct nic *nic, struct pci_device *pci ) {
 		udelay(100);
 		printf
 		    ("%s: 1000Mbps Full-duplex operation, TBI Link %s!\n",
-		     pci->name,
+		     pci->driver_name,
 		     (RTL_R32(TBICSR) & TBILinkOK) ? "OK" : "Failed");
 
 	}
