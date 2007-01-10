@@ -86,27 +86,48 @@ void udp_close ( struct udp_connection *conn ) {
 }
 
 /**
+ * Allocate packet buffer for UDP
+ *
+ * @v conn		UDP connection
+ * @ret pkb		Packet buffer, or NULL
+ */
+static struct pk_buff * udp_alloc_pkb ( struct udp_connection *conn ) {
+	struct pk_buff *pkb;
+
+	pkb = alloc_pkb ( UDP_MAX_TXPKB );
+	if ( ! pkb ) {
+		DBGC ( conn, "UDP %p cannot allocate buffer of length %d\n",
+		       conn, UDP_MAX_TXPKB );
+		return NULL;
+	}
+	pkb_reserve ( pkb, UDP_MAX_HLEN );
+	return pkb;
+}
+
+/**
  * User request to send data via a UDP connection
  *
  * @v conn		UDP connection
  *
- * This function allocates buffer space and invokes the function's senddata()
- * callback. The callback may use the buffer space
+ * This function allocates buffer space and invokes the function's
+ * senddata() callback.  The callback may use the buffer space as
+ * temporary storage space.
  */
 int udp_senddata ( struct udp_connection *conn ) {
 	int rc;
 
-	conn->tx_pkb = alloc_pkb ( UDP_MAX_TXPKB );
-	if ( conn->tx_pkb == NULL ) {
-		DBGC ( conn, "UDP %p cannot allocate buffer of length %d\n",
-		       conn, UDP_MAX_TXPKB );
+	conn->tx_pkb = udp_alloc_pkb ( conn );
+	if ( ! conn->tx_pkb )
 		return -ENOMEM;
-	}
-	pkb_reserve ( conn->tx_pkb, UDP_MAX_HLEN );
+
 	rc = conn->udp_op->senddata ( conn, conn->tx_pkb->data, 
 				      pkb_tailroom ( conn->tx_pkb ) );
-	if ( conn->tx_pkb )
+
+	if ( conn->tx_pkb ) {
 		free_pkb ( conn->tx_pkb );
+		conn->tx_pkb = NULL;
+	}
+
 	return rc;
 }
 		
@@ -119,12 +140,6 @@ int udp_senddata ( struct udp_connection *conn ) {
  * @v data		Data to send
  * @v len		Length of data
  * @ret rc		Return status code
- *
- * This function fills up the UDP headers and sends the data.  It may
- * be called only from within the context of an application's
- * senddata() method; if the application wishes to send data it must
- * call udp_senddata() and wait for its senddata() method to be
- * called.
  */
 int udp_sendto_via ( struct udp_connection *conn, struct sockaddr_tcpip *peer,
 		     struct net_device *netdev, const void *data,
@@ -132,11 +147,15 @@ int udp_sendto_via ( struct udp_connection *conn, struct sockaddr_tcpip *peer,
        	struct udp_header *udphdr;
 	struct pk_buff *pkb;
 
-	/* Take ownership of packet buffer back from the
-	 * udp_connection structure.
-	 */
-	pkb = conn->tx_pkb;
-	conn->tx_pkb = NULL;
+	/* Use precreated packet buffer if one is available */
+	if ( conn->tx_pkb ) {
+		pkb = conn->tx_pkb;
+		conn->tx_pkb = NULL;
+	} else {
+		pkb = udp_alloc_pkb ( conn );
+		if ( ! pkb )
+			return -ENOMEM;
+	}
 
 	/* Avoid overflowing TX buffer */
 	if ( len > pkb_tailroom ( pkb ) )
@@ -175,12 +194,6 @@ int udp_sendto_via ( struct udp_connection *conn, struct sockaddr_tcpip *peer,
  * @v data		Data to send
  * @v len		Length of data
  * @ret rc		Return status code
- *
- * This function fills up the UDP headers and sends the data.  It may
- * be called only from within the context of an application's
- * senddata() method; if the application wishes to send data it must
- * call udp_senddata() and wait for its senddata() method to be
- * called.
  */
 int udp_sendto ( struct udp_connection *conn, struct sockaddr_tcpip *peer,
 		 const void *data, size_t len ) {
@@ -194,12 +207,6 @@ int udp_sendto ( struct udp_connection *conn, struct sockaddr_tcpip *peer,
  * @v data		Data to send
  * @v len		Length of data
  * @ret rc		Return status code
- *
- * This function fills up the UDP headers and sends the data.  It may
- * be called only from within the context of an application's
- * senddata() method; if the application wishes to send data it must
- * call udp_senddata() and wait for its senddata() method to be
- * called.
  */
 int udp_send ( struct udp_connection *conn, const void *data, size_t len ) {
 	return udp_sendto ( conn, &conn->peer, data, len );
