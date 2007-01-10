@@ -202,11 +202,11 @@ void ipv6_dump ( struct ip6_header *ip6hdr ) {
 static int ipv6_tx ( struct pk_buff *pkb,
 		     struct tcpip_protocol *tcpip,
 		     struct sockaddr_tcpip *st_dest,
+		     struct net_device *netdev,
 		     uint16_t *trans_csum ) {
 	struct sockaddr_in6 *dest = ( struct sockaddr_in6* ) st_dest;
 	struct in6_addr next_hop;
 	struct ipv6_miniroute *miniroute;
-	struct net_device *netdev = NULL;
 	uint8_t ll_dest_buf[MAX_LL_ADDR_LEN];
 	const uint8_t *ll_dest = ll_dest_buf;
 	int rc;

@@ -162,7 +162,7 @@ int udp_sendto ( struct udp_connection *conn, struct sockaddr_tcpip *peer,
 	       ntohs ( udphdr->len ) );
 
 	/* Send it to the next layer for processing */
-	return tcpip_tx ( pkb, &udp_protocol, peer, &udphdr->chksum );
+	return tcpip_tx ( pkb, &udp_protocol, peer, NULL, &udphdr->chksum );
 }
 
 /**

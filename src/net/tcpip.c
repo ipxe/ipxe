@@ -65,11 +65,13 @@ int tcpip_rx ( struct pk_buff *pkb, uint8_t tcpip_proto,
  * @v pkb		Packet buffer
  * @v tcpip_protocol	Transport-layer protocol
  * @v st_dest		Destination address
+ * @v netdev		Network device (or NULL to route automatically)
  * @v trans_csum	Transport-layer checksum to complete, or NULL
  * @ret rc		Return status code
  */
 int tcpip_tx ( struct pk_buff *pkb, struct tcpip_protocol *tcpip_protocol,
-	       struct sockaddr_tcpip *st_dest, uint16_t *trans_csum ) {
+	       struct sockaddr_tcpip *st_dest, struct net_device *netdev,
+	       uint16_t *trans_csum ) {
 	struct tcpip_net_protocol *tcpip_net;
 
 	/* Hand off packet to the appropriate network-layer protocol */
@@ -78,7 +80,7 @@ int tcpip_tx ( struct pk_buff *pkb, struct tcpip_protocol *tcpip_protocol,
 		if ( tcpip_net->sa_family == st_dest->st_family ) {
 			DBG ( "TCP/IP sending %s packet\n", tcpip_net->name );
 			return tcpip_net->tx ( pkb, tcpip_protocol, st_dest,
-					       trans_csum );
+					       netdev, trans_csum );
 		}
 	}
 	

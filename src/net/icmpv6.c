@@ -60,7 +60,8 @@ int icmp6_send_solicit ( struct net_device *netdev, struct in6_addr *src __unuse
 	st_dest.sin6.sin6_addr.in6_u.u6_addr8[13] = 0xff;
 	
 	/* Send packet over IP6 */
-	return tcpip_tx ( pkb, &icmp6_protocol, &st_dest.st, &nsolicit->csum );
+	return tcpip_tx ( pkb, &icmp6_protocol, &st_dest.st,
+			  NULL, &nsolicit->csum );
 }
 
 /**

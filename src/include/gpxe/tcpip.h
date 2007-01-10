@@ -13,6 +13,7 @@
 #include <gpxe/tables.h>
 
 struct pk_buff;
+struct net_device;
 
 /** Empty checksum value
  *
@@ -84,6 +85,7 @@ struct tcpip_net_protocol {
 	 * @v pkb		Packet buffer
 	 * @v tcpip_protocol	Transport-layer protocol
 	 * @v st_dest		Destination address
+	 * @v netdev		Network device (or NULL to route automatically)
 	 * @v trans_csum	Transport-layer checksum to complete, or NULL
 	 * @ret rc		Return status code
 	 *
@@ -91,7 +93,9 @@ struct tcpip_net_protocol {
 	 */
 	int ( * tx ) ( struct pk_buff *pkb,
 		       struct tcpip_protocol *tcpip_protocol,
-		       struct sockaddr_tcpip *st_dest, uint16_t *trans_csum );
+		       struct sockaddr_tcpip *st_dest,
+		       struct net_device *netdev,
+		       uint16_t *trans_csum );
 };
 
 /** Declare a TCP/IP transport-layer protocol */
@@ -104,7 +108,9 @@ extern int tcpip_rx ( struct pk_buff *pkb, uint8_t tcpip_proto,
 		      struct sockaddr_tcpip *st_src,
 		      struct sockaddr_tcpip *st_dest, uint16_t pshdr_csum );
 extern int tcpip_tx ( struct pk_buff *pkb, struct tcpip_protocol *tcpip, 
-		      struct sockaddr_tcpip *st_dest, uint16_t *trans_csum );
+		      struct sockaddr_tcpip *st_dest,
+		      struct net_device *netdev,
+		      uint16_t *trans_csum );
 extern uint16_t tcpip_continue_chksum ( uint16_t partial,
 					const void *data, size_t len );
 extern uint16_t tcpip_chksum ( const void *data, size_t len );

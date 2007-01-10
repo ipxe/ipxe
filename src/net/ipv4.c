@@ -372,6 +372,7 @@ static int ipv4_ll_addr ( struct in_addr dest, struct in_addr src,
  * @v pkb		Packet buffer
  * @v tcpip		Transport-layer protocol
  * @v st_dest		Destination network-layer address
+ * @v netdev		Network device (or NULL to route automatically)
  * @v trans_csum	Transport-layer checksum to complete, or NULL
  * @ret rc		Status
  *
@@ -379,7 +380,9 @@ static int ipv4_ll_addr ( struct in_addr dest, struct in_addr src,
  */
 static int ipv4_tx ( struct pk_buff *pkb,
 		     struct tcpip_protocol *tcpip_protocol,
-		     struct sockaddr_tcpip *st_dest, uint16_t *trans_csum ) {
+		     struct sockaddr_tcpip *st_dest,
+		     struct net_device *netdev,
+		     uint16_t *trans_csum ) {
 	struct iphdr *iphdr = pkb_push ( pkb, sizeof ( *iphdr ) );
 	struct sockaddr_in *sin_dest = ( ( struct sockaddr_in * ) st_dest );
 	struct ipv4_miniroute *miniroute;
@@ -388,28 +391,29 @@ static int ipv4_tx ( struct pk_buff *pkb,
 	int rc;
 
 	/* Fill up the IP header, except source address */
+	memset ( iphdr, 0, sizeof ( *iphdr ) );
 	iphdr->verhdrlen = ( IP_VER | ( sizeof ( *iphdr ) / 4 ) );
 	iphdr->service = IP_TOS;
 	iphdr->len = htons ( pkb_len ( pkb ) );	
 	iphdr->ident = htons ( ++next_ident );
-	iphdr->frags = 0;
 	iphdr->ttl = IP_TTL;
 	iphdr->protocol = tcpip_protocol->tcpip_proto;
-	iphdr->chksum = 0;
 	iphdr->dest = sin_dest->sin_addr;
 
 	/* Use routing table to identify next hop and transmitting netdev */
 	next_hop = iphdr->dest;
-	miniroute = ipv4_route ( &next_hop );
-	if ( ! miniroute ) {
+	if ( ( miniroute = ipv4_route ( &next_hop ) ) ) {
+		iphdr->src = miniroute->address;
+		netdev = miniroute->netdev;
+	}
+	if ( ! netdev ) {
 		DBG ( "IPv4 has no route to %s\n", inet_ntoa ( iphdr->dest ) );
 		rc = -EHOSTUNREACH;
 		goto err;
 	}
-	iphdr->src = miniroute->address;
 
 	/* Determine link-layer destination address */
-	if ( ( rc = ipv4_ll_addr ( next_hop, iphdr->src, miniroute->netdev,
+	if ( ( rc = ipv4_ll_addr ( next_hop, iphdr->src, netdev,
 				   ll_dest ) ) != 0 ) {
 		DBG ( "IPv4 has no link-layer address for %s\n",
 		      inet_ntoa ( iphdr->dest ) );
@@ -428,7 +432,7 @@ static int ipv4_tx ( struct pk_buff *pkb,
 	      ntohs ( iphdr->ident ), ntohs ( iphdr->chksum ) );
 
 	/* Hand off to link layer */
-	return net_tx ( pkb, miniroute->netdev, &ipv4_protocol, ll_dest );
+	return net_tx ( pkb, netdev, &ipv4_protocol, ll_dest );
 
  err:
 	free_pkb ( pkb );

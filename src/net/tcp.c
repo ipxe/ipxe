@@ -309,7 +309,8 @@ static int tcp_senddata_conn ( struct tcp_connection *conn, int force_send ) {
 	DBGC ( conn, "\n" );
 
 	/* Transmit packet */
-	return tcpip_tx ( pkb, &tcp_protocol, &conn->peer, &tcphdr->csum );
+	return tcpip_tx ( pkb, &tcp_protocol, &conn->peer,
+			  NULL, &tcphdr->csum );
 }
 
 /**
@@ -465,7 +466,8 @@ static int tcp_send_reset ( struct tcp_connection *conn,
 	DBGC ( conn, "\n" );
 
 	/* Transmit packet */
-	return tcpip_tx ( pkb, &tcp_protocol, &conn->peer, &tcphdr->csum );
+	return tcpip_tx ( pkb, &tcp_protocol, &conn->peer,
+			  NULL, &tcphdr->csum );
 }
 
 /**
