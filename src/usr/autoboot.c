@@ -21,6 +21,7 @@
 #include <vsprintf.h>
 #include <gpxe/netdevice.h>
 #include <usr/ifmgmt.h>
+#include <usr/route.h>
 #include <usr/autoboot.h>
 
 /** @file
@@ -81,6 +82,8 @@ void netboot ( struct net_device *netdev ) {
 	ifstat ( netdev );
 
 	test_dhcp ( netdev );
+
+	route();
 }
 
 /**

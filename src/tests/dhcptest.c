@@ -236,10 +236,6 @@ int test_dhcp ( struct net_device *netdev ) {
 	find_global_dhcp_ipv4_option ( DHCP_SUBNET_MASK, &netmask );
 	find_global_dhcp_ipv4_option ( DHCP_ROUTERS, &gateway );
 
-	printf ( "IP %s", inet_ntoa ( address ) );
-	printf ( " netmask %s", inet_ntoa ( netmask ) );
-	printf ( " gateway %s\n", inet_ntoa ( gateway ) );
-
 	dhcp_snprintf ( filename, sizeof ( filename ),
 			find_global_dhcp_option ( DHCP_BOOTFILE_NAME ) );
 	
@@ -250,6 +246,8 @@ int test_dhcp ( struct net_device *netdev ) {
 	if ( ( rc = add_ipv4_address ( netdev, address, netmask,
 				       gateway ) ) != 0 )
 		goto out_no_del_ipv4;
+
+	route();
 
 	/* Test boot */
 	if ( ( rc = test_dhcp_boot ( netdev, filename ) ) != 0 ) {

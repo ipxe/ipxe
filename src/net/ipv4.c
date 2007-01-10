@@ -17,11 +17,6 @@
  *
  * IPv4 protocol
  *
- * The gPXE IP stack is currently implemented on top of the uIP
- * protocol stack.  This file provides wrappers around uIP so that
- * higher-level protocol implementations do not need to talk directly
- * to uIP (which has a somewhat baroque API).
- *
  */
 
 /* Unique IP datagram identification number */
@@ -29,26 +24,8 @@ static uint16_t next_ident = 0;
 
 struct net_protocol ipv4_protocol;
 
-/** An IPv4 address/routing table entry */
-struct ipv4_miniroute {
-	/** List of miniroutes */
-	struct list_head list;
-
-	/** Network device */
-	struct net_device *netdev;
-	/** Reference to network device */
-	struct reference netdev_ref;
-
-	/** IPv4 address */
-	struct in_addr address;
-	/** Subnet mask */
-	struct in_addr netmask;
-	/** Gateway address */
-	struct in_addr gateway;
-};
-
 /** List of IPv4 miniroutes */
-static LIST_HEAD ( miniroutes );
+struct list_head ipv4_miniroutes = LIST_HEAD_INIT ( ipv4_miniroutes );
 
 /** List of fragment reassembly buffers */
 static LIST_HEAD ( frag_buffers );
@@ -90,9 +67,9 @@ static struct ipv4_miniroute * add_ipv4_miniroute ( struct net_device *netdev,
 		 * to start of list.
 		 */
 		if ( gateway.s_addr != INADDR_NONE ) {
-			list_add_tail ( &miniroute->list, &miniroutes );
+			list_add_tail ( &miniroute->list, &ipv4_miniroutes );
 		} else {
-			list_add ( &miniroute->list, &miniroutes );
+			list_add ( &miniroute->list, &ipv4_miniroutes );
 		}
 
 		/* Record reference to net_device */
@@ -166,7 +143,7 @@ int add_ipv4_address ( struct net_device *netdev, struct in_addr address,
 void del_ipv4_address ( struct net_device *netdev ) {
 	struct ipv4_miniroute *miniroute;
 
-	list_for_each_entry ( miniroute, &miniroutes, list ) {
+	list_for_each_entry ( miniroute, &ipv4_miniroutes, list ) {
 		if ( miniroute->netdev == netdev ) {
 			del_ipv4_miniroute ( miniroute );
 			break;
@@ -186,7 +163,7 @@ static struct ipv4_miniroute * ipv4_route ( struct in_addr *dest ) {
 	int local;
 	int has_gw;
 
-	list_for_each_entry ( miniroute, &miniroutes, list ) {
+	list_for_each_entry ( miniroute, &ipv4_miniroutes, list ) {
 		local = ( ( ( dest->s_addr ^ miniroute->address.s_addr )
 			    & miniroute->netmask.s_addr ) == 0 );
 		has_gw = ( miniroute->gateway.s_addr != INADDR_NONE );
@@ -547,7 +524,7 @@ static int ipv4_arp_check ( struct net_device *netdev, const void *net_addr ) {
 	const struct in_addr *address = net_addr;
 	struct ipv4_miniroute *miniroute;
 
-	list_for_each_entry ( miniroute, &miniroutes, list ) {
+	list_for_each_entry ( miniroute, &ipv4_miniroutes, list ) {
 		if ( ( miniroute->netdev == netdev ) &&
 		     ( miniroute->address.s_addr == address->s_addr ) ) {
 			/* Found matching address */

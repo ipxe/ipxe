@@ -9,6 +9,7 @@
 
 #include <ip.h>
 #include <gpxe/retry.h>
+#include <gpxe/hotplug.h>
 
 /* IP constants */
 
@@ -36,6 +37,24 @@ struct ipv4_pseudo_header {
 	uint16_t len;
 };
 
+/** An IPv4 address/routing table entry */
+struct ipv4_miniroute {
+	/** List of miniroutes */
+	struct list_head list;
+
+	/** Network device */
+	struct net_device *netdev;
+	/** Reference to network device */
+	struct reference netdev_ref;
+
+	/** IPv4 address */
+	struct in_addr address;
+	/** Subnet mask */
+	struct in_addr netmask;
+	/** Gateway address */
+	struct in_addr gateway;
+};
+
 /* Fragment reassembly buffer */
 struct frag_buffer {
 	/* Identification number */
@@ -56,6 +75,8 @@ struct pk_buff;
 struct net_device;
 struct net_protocol;
 struct tcpip_protocol;
+
+extern struct list_head ipv4_miniroutes;
 
 extern struct net_protocol ipv4_protocol;
 
