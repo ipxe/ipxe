@@ -115,6 +115,7 @@ int udp_senddata ( struct udp_connection *conn ) {
  *
  * @v conn		UDP connection
  * @v peer		Destination address
+ * @v netdev		Net device via which to send (or NULL)
  * @v data		Data to send
  * @v len		Length of data
  * @ret rc		Return status code
@@ -125,8 +126,9 @@ int udp_senddata ( struct udp_connection *conn ) {
  * call udp_senddata() and wait for its senddata() method to be
  * called.
  */
-int udp_sendto ( struct udp_connection *conn, struct sockaddr_tcpip *peer,
-		 const void *data, size_t len ) {
+int udp_sendto_via ( struct udp_connection *conn, struct sockaddr_tcpip *peer,
+		     struct net_device *netdev, const void *data,
+		     size_t len ) {
        	struct udp_header *udphdr;
 	struct pk_buff *pkb;
 
@@ -162,7 +164,27 @@ int udp_sendto ( struct udp_connection *conn, struct sockaddr_tcpip *peer,
 	       ntohs ( udphdr->len ) );
 
 	/* Send it to the next layer for processing */
-	return tcpip_tx ( pkb, &udp_protocol, peer, NULL, &udphdr->chksum );
+	return tcpip_tx ( pkb, &udp_protocol, peer, netdev, &udphdr->chksum );
+}
+
+/**
+ * Transmit data via a UDP connection to a specified address
+ *
+ * @v conn		UDP connection
+ * @v peer		Destination address
+ * @v data		Data to send
+ * @v len		Length of data
+ * @ret rc		Return status code
+ *
+ * This function fills up the UDP headers and sends the data.  It may
+ * be called only from within the context of an application's
+ * senddata() method; if the application wishes to send data it must
+ * call udp_senddata() and wait for its senddata() method to be
+ * called.
+ */
+int udp_sendto ( struct udp_connection *conn, struct sockaddr_tcpip *peer,
+		 const void *data, size_t len ) {
+	return udp_sendto_via ( conn, peer, NULL, data, len );
 }
 
 /**

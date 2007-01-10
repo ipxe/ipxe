@@ -14,6 +14,8 @@
 #include <gpxe/tcpip.h>
 #include <gpxe/if_ether.h>
 
+struct net_device;
+
 /**
  * UDP constants
  */
@@ -161,5 +163,8 @@ extern int udp_send ( struct udp_connection *conn,
 extern int udp_sendto ( struct udp_connection *conn,
 			struct sockaddr_tcpip *peer,
 			const void *data, size_t len );
+int udp_sendto_via ( struct udp_connection *conn, struct sockaddr_tcpip *peer,
+		     struct net_device *netdev, const void *data,
+		     size_t len );
 
 #endif /* _GPXE_UDP_H */
