@@ -38,11 +38,6 @@ static int show_exec ( int argc, char **argv ) {
 	return 0;
 }
 
-struct command show_command __command = {
-	.name = "show",
-	.exec = show_exec,
-};
-
 static int set_exec ( int argc, char **argv ) {
 	struct config_context dummy_context;
 	int rc;
@@ -74,11 +69,6 @@ static int set_exec ( int argc, char **argv ) {
 	return 0;
 }
 
-struct command set_command __command = {
-	.name = "set",
-	.exec = set_exec,
-};
-
 static int clear_exec ( int argc, char **argv ) {
 	struct config_context dummy_context;
 	int rc;
@@ -104,7 +94,17 @@ static int clear_exec ( int argc, char **argv ) {
 	return 0;
 }
 
-struct command clear_command __command = {
-	.name = "clear",
-	.exec = clear_exec,
+struct command nvo_commands[] __command = {
+	{
+		.name = "show",
+		.exec = show_exec,
+	},
+	{
+		.name = "set",
+		.exec = set_exec,
+	},	
+	{
+		.name = "clear",
+		.exec = clear_exec,
+	},
 };
