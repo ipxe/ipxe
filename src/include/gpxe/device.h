@@ -11,10 +11,58 @@
 #include <gpxe/list.h>
 #include <gpxe/tables.h>
 
+/** A PCI device description */
+struct pci_device_description {
+	/** Bus type
+	 *
+	 * Must be @c BUS_TYPE_PCI.
+	 */
+	unsigned int bus_type;
+	/** Bus:dev.fn address
+	 *
+	 * As constructed by PCI_BUSDEVFN().
+	 */
+	unsigned int busdevfn;
+	/** Vendor ID */
+	unsigned int vendor;
+	/** Device ID */
+	unsigned int device;
+};
+
+/** PCI bus type */
+#define BUS_TYPE_PCI 1
+
+/** An ISAPnP device description */
+struct isapnp_device_description {
+	/** Bus type
+	 *
+	 * Must be @c BUS_TYPE_ISAPNP.
+	 */
+	unsigned int bus_type;
+};
+
+/** PCI bus type */
+#define BUS_TYPE_ISAPNP 2
+
+/** A hardware device description */
+union device_description {
+	/** Bus type
+	 *
+	 * This must be a BUS_TYPE_XXX constant.
+	 */
+	unsigned int bus_type;
+	/** PCI device description */
+	struct pci_device_description pci;
+	/** ISAPnP device description */
+	struct isapnp_device_description isapnp;
+};
+
 /** A hardware device */
 struct device {
 	/** Name */
 	char name[16];
+	/** Device description */
+	union device_description desc;
 	/** Devices on the same bus */
 	struct list_head siblings;
 	/** Devices attached to this device */

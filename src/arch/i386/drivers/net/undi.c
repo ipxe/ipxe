@@ -64,7 +64,7 @@ static int undipci_probe ( struct pci_device *pci,
 			   const struct pci_device_id *id __unused ) {
 	struct undi_device *undi;
 	struct undi_rom *undirom;
-	unsigned int busdevfn = ( ( pci->bus << 8 ) | pci->devfn );
+	unsigned int busdevfn = PCI_BUSDEVFN ( pci->bus, pci->devfn );
 	int rc;
 
 	/* Ignore non-network devices */
@@ -99,6 +99,7 @@ static int undipci_probe ( struct pci_device *pci,
 	/* Add to device hierarchy */
 	snprintf ( undi->dev.name, sizeof ( undi->dev.name ),
 		   "UNDI-%s", pci->dev.name );
+	memcpy ( &undi->dev.desc, &pci->dev.desc, sizeof ( undi->dev.desc ) );
 	undi->dev.parent = &pci->dev;
 	INIT_LIST_HEAD ( &undi->dev.children );
 	list_add ( &undi->dev.siblings, &pci->dev.children );

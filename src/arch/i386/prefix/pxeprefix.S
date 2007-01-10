@@ -220,7 +220,9 @@ get_physical_device:
 	jmp	no_physical_device
 
 pci_physical_device:
-	/* Record PCI bus:dev.fn */
+	/* Record PCI bus:dev.fn and vendor/device IDs */
+	movl	( pxe_parameter_structure + 0x03 ), %eax
+	movl	%eax, pci_vendor
 	movw	( pxe_parameter_structure + 0x0b ), %ax
 	movw	%ax, pci_busdevfn
 	movw	$10f, %si
@@ -679,6 +681,9 @@ undi_fbms_end:		.word 0
 pci_busdevfn:		.word 0xffff
 isapnp_csn:		.word 0xffff
 isapnp_read_port:	.word 0xffff
+
+pci_vendor:		.word 0
+pci_device:		.word 0
 
 	.equ undi_device_size, ( . - undi_device )
 

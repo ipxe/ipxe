@@ -282,6 +282,10 @@ static int pcibus_probe ( struct root_device *rootdev ) {
 			snprintf ( pci->dev.name, sizeof ( pci->dev.name ),
 				   "PCI%02x:%02x.%x", bus,
 				   PCI_SLOT ( devfn ), PCI_FUNC ( devfn ) );
+			pci->dev.desc.bus_type = BUS_TYPE_PCI;
+			pci->dev.desc.pci.busdevfn = PCI_BUSDEVFN (bus, devfn);
+			pci->dev.desc.pci.vendor = pci->vendor;
+			pci->dev.desc.pci.device = pci->device;
 			pci->dev.parent = &rootdev->dev;
 			list_add ( &pci->dev.siblings, &rootdev->dev.children);
 			INIT_LIST_HEAD ( &pci->dev.children );

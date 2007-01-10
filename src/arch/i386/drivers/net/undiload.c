@@ -76,13 +76,13 @@ int undi_load ( struct undi_device *undi, struct undi_rom *undirom ) {
 	/* Debug info */
 	DBGC ( undi, "UNDI %p loading UNDI ROM %p to CS %04x DS %04x for ",
 	       undi, undirom, undi_loader.UNDI_CS, undi_loader.UNDI_DS );
-	if ( undi->pci_busdevfn != 0xffff ) {
+	if ( undi->pci_busdevfn != UNDI_NO_PCI_BUSDEVFN ) {
 		unsigned int bus = ( undi->pci_busdevfn >> 8 );
 		unsigned int devfn = ( undi->pci_busdevfn & 0xff );
 		DBGC ( undi, "PCI %02x:%02x.%x\n",
 		       bus, PCI_SLOT ( devfn ), PCI_FUNC ( devfn ) );
 	}
-	if ( undi->isapnp_csn != 0xffff ) {
+	if ( undi->isapnp_csn != UNDI_NO_ISAPNP_CSN ) {
 		DBGC ( undi, "ISAPnP(%04x) CSN %04x\n",
 		       undi->isapnp_read_port, undi->isapnp_csn );
 	}

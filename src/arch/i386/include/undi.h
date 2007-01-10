@@ -26,12 +26,22 @@ struct undi_device {
 	UINT16_t fbms;
 	/** Free base memory prior to load */
 	UINT16_t restore_fbms;
-	/** PCI bus:dev.fn, or 0xffff */
+	/** PCI bus:dev.fn, or @c UNDI_NO_PCI_BUSDEVFN */
 	UINT16_t pci_busdevfn;
-	/** ISAPnP card select number, or 0xffff */
+	/** ISAPnP card select number, or @c UNDI_NO_ISAPNP_CSN */
 	UINT16_t isapnp_csn;
-	/** ISAPnP read port, or 0xffff */
+	/** ISAPnP read port, or @c UNDI_NO_ISAPNP_READ_PORT */
 	UINT16_t isapnp_read_port;
+	/** PCI vendor ID
+	 *
+	 * Filled in only for the preloaded UNDI device by pxeprefix.S
+	 */
+	UINT16_t pci_vendor;
+	/** PCI device ID 
+	 *
+	 * Filled in only for the preloaded UNDI device by pxeprefix.S
+	 */
+	UINT16_t pci_device;
 	/** Padding */
 	UINT16_t pad;
 
@@ -44,6 +54,15 @@ struct undi_device {
 	 */
 	void *priv;
 } __attribute__ (( packed ));
+
+/** PCI bus:dev.fn field is invalid */
+#define UNDI_NO_PCI_BUSDEVFN 0xffff
+
+/** ISAPnP card select number field is invalid */
+#define UNDI_NO_ISAPNP_CSN 0xffff
+
+/** ISAPnP read port field is invalid */
+#define UNDI_NO_ISAPNP_READ_PORT 0xffff
 
 /**
  * Set UNDI driver-private data

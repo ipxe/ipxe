@@ -49,29 +49,41 @@
  * find.
  */
 static int undibus_probe ( struct root_device *rootdev ) {
+	struct undi_device *undi = &preloaded_undi;
 	int rc;
 
 	/* Check for a valie preloaded UNDI device */
-	if ( ! preloaded_undi.entry.segment ) {
+	if ( ! undi->entry.segment ) {
 		DBG ( "No preloaded UNDI device found!\n" );
 		return -ENODEV;
 	}
 
 	/* Add to device hierarchy */
-	strncpy ( preloaded_undi.dev.name, "UNDI",
-		  ( sizeof ( preloaded_undi.dev.name ) - 1 ) );
-	preloaded_undi.dev.parent = &rootdev->dev;
-	list_add ( &preloaded_undi.dev.siblings, &rootdev->dev.children);
-	INIT_LIST_HEAD ( &preloaded_undi.dev.children );
+	strncpy ( undi->dev.name, "UNDI",
+		  ( sizeof ( undi->dev.name ) - 1 ) );
+	if ( undi->pci_busdevfn != UNDI_NO_PCI_BUSDEVFN ) {
+		struct pci_device_description *pcidesc = &undi->dev.desc.pci;
+		pcidesc->bus_type = BUS_TYPE_PCI;
+		pcidesc->busdevfn = undi->pci_busdevfn;
+		pcidesc->vendor = undi->pci_vendor;
+		pcidesc->device = undi->pci_device;
+	} else if ( undi->isapnp_csn != UNDI_NO_ISAPNP_CSN ) {
+		struct isapnp_device_description *isapnpdesc
+			= &undi->dev.desc.isapnp;
+		isapnpdesc->bus_type = BUS_TYPE_ISAPNP;
+	}
+	undi->dev.parent = &rootdev->dev;
+	list_add ( &undi->dev.siblings, &rootdev->dev.children);
+	INIT_LIST_HEAD ( &undi->dev.children );
 
 	/* Create network device */
-	if ( ( rc = undinet_probe ( &preloaded_undi ) ) != 0 )
+	if ( ( rc = undinet_probe ( undi ) ) != 0 )
 		goto err;
 
 	return 0;
 
  err:
-	list_del ( &preloaded_undi.dev.siblings );
+	list_del ( &undi->dev.siblings );
 	return rc;
 }
 
@@ -81,8 +93,10 @@ static int undibus_probe ( struct root_device *rootdev ) {
  * @v rootdev		UNDI bus root device
  */
 static void undibus_remove ( struct root_device *rootdev __unused ) {
-	undinet_remove ( &preloaded_undi );
-	list_del ( &preloaded_undi.dev.siblings );
+	struct undi_device *undi = &preloaded_undi;
+
+	undinet_remove ( undi );
+	list_del ( &undi->dev.siblings );
 }
 
 /** UNDI bus root device driver */

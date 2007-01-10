@@ -25,8 +25,8 @@ static inline int undi_load_pci ( struct undi_device *undi,
 				  struct undi_rom *undirom,
 				  unsigned int pci_busdevfn ) {
 	undi->pci_busdevfn = pci_busdevfn;
-	undi->isapnp_csn = 0xffff;
-	undi->isapnp_read_port = 0xffff;
+	undi->isapnp_csn = UNDI_NO_ISAPNP_CSN;
+	undi->isapnp_read_port = UNDI_NO_ISAPNP_READ_PORT;
 	return undi_load ( undi, undirom );
 }
 
