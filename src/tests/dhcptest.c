@@ -260,8 +260,6 @@ int test_dhcp ( struct net_device *netdev ) {
 	unregister_dhcp_options ( dhcp.options );
 	free_dhcp_options ( dhcp.options );
  out_no_options:
-	/* Take down IP interface */
-	del_ipv4_address ( netdev );
  out_no_del_ipv4:
 	return rc;
 }

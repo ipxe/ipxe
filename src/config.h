@@ -119,6 +119,7 @@
 #define	NVO_CMD			/* Non-volatile option storage commands */
 #define	CONFIG_CMD		/* Option configuration console */
 #define	IFMGMT_CMD		/* Interface management commands */
+#define	ROUTE_CMD		/* Routing table management commands */
 
 /* @END general.h */ 
 

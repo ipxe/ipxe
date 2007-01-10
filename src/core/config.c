@@ -155,6 +155,9 @@ REQUIRE_OBJECT ( config_cmd );
 #ifdef IFMGMT_CMD
 REQUIRE_OBJECT ( ifmgmt_cmd );
 #endif
+#ifdef ROUTE_CMD
+REQUIRE_OBJECT ( route_cmd );
+#endif
 
 /*
  * Drag in miscellaneous objects
