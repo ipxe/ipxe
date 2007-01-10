@@ -10,7 +10,6 @@
 #include <gpxe/if_ether.h>
 #include <gpxe/pkbuff.h>
 #include <gpxe/netdevice.h>
-#include "uip/uip.h"
 #include <gpxe/ip.h>
 #include <gpxe/tcpip.h>
 
