@@ -160,8 +160,10 @@ int fill_buffer ( struct buffer *buffer, const void *data,
 	int rc;
 
 	DBGC ( buffer, "BUFFER %p [%lx,%lx) filling portion [%lx,%lx)\n",
-	       buffer, buffer->addr, ( buffer->addr + buffer->len ),
-	       ( buffer->addr + data_start ), ( buffer->addr + data_end ) );
+	       buffer, user_to_phys ( buffer->addr, 0 ),
+	       user_to_phys ( buffer->addr, buffer->len ),
+	       user_to_phys ( buffer->addr, data_start ),
+	       user_to_phys ( buffer->addr, data_end ) );
 
 	/* Check that block fits within buffer, expand if necessary */
 	if ( data_end > buffer->len ) {
@@ -175,7 +177,8 @@ int fill_buffer ( struct buffer *buffer, const void *data,
 			return rc;
 		}
 		DBGC ( buffer, "BUFFER %p expanded to [%lx,%lx)\n", buffer,
-		       buffer->addr, ( buffer->addr + buffer->len ) );
+		       user_to_phys ( buffer->addr, 0 ),
+		       user_to_phys ( buffer->addr, buffer->len ) );
 		assert ( buffer->len >= data_end );
 	}
 
@@ -202,16 +205,17 @@ int fill_buffer ( struct buffer *buffer, const void *data,
 	before.next = after.start;
 
 	DBGC ( buffer, "BUFFER %p split before [%lx,%lx) after [%lx,%lx)\n",
-	       buffer, ( buffer->addr + before.start ),
-	       ( buffer->addr + before.end ), ( buffer->addr + after.start ),
-	       ( buffer->addr + after.end ) );
+	       buffer, user_to_phys ( buffer->addr, before.start ),
+	       user_to_phys ( buffer->addr, before.end ),
+	       user_to_phys ( buffer->addr, after.start ),
+	       user_to_phys ( buffer->addr, after.end ) );
 
 	/* Write back 'before' block, if any */
 	if ( before.end == 0 ) {
 		/* No 'before' block: update buffer->fill */
 		buffer->fill = after.start;
 		DBGC ( buffer, "BUFFER %p full up to %lx\n", buffer,
-		       ( buffer->addr + buffer->fill ) );
+		       user_to_phys ( buffer->addr, buffer->fill ) );
 	} else {
 		/* Write back 'before' block */
 		store_free_block ( buffer, &before );
@@ -222,7 +226,7 @@ int fill_buffer ( struct buffer *buffer, const void *data,
 		/* 'After' block is the final block: update buffer->free */
 		buffer->free = after.start;
 		DBGC ( buffer, "BUFFER %p free from %lx onwards\n", buffer,
-		       ( buffer->addr + buffer->free ) );
+		       user_to_phys ( buffer->addr, buffer->free ) );
 	} else {
 		/* Write back 'after' block */
 		store_free_block ( buffer, &after );
