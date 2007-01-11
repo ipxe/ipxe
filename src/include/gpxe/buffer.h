@@ -2,7 +2,7 @@
 #define _GPXE_BUFFER_H
 
 #include <stdint.h>
-#include <io.h>
+#include <gpxe/uaccess.h>
 
 /** @file
  *
@@ -28,7 +28,7 @@
  *   size_t len;
  *   
  *   // We have an area of memory [buf_start,buf_start+len) into which to
- *   // load a file, where buf_start is a physical addresse.
+ *   // load a file, where buf_start is a userptr_t.
  *   memset ( &buffer, 0, sizeof ( buffer ) );
  *   buffer->start = buf_start;
  *   buffer->len = len;
@@ -43,7 +43,7 @@
  *   }
  *   ...
  *   // The whole file is now present at [buf_start,buf_start+filesize),
- *   // where buf_start is a physical address.  The struct buffer can simply
+ *   // where buf_start is a userptr_t.  The struct buffer can simply
  *   // be discarded.
  *
  * @endcode
@@ -77,8 +77,8 @@
  *
  */
 struct buffer {
-	/** Physical start address of buffer */
-	physaddr_t addr;
+	/** Start of buffer */
+	userptr_t addr;
 	/** Total length of buffer */
 	size_t len;
 	/** Offset to first free block within buffer */

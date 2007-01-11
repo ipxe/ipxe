@@ -34,7 +34,7 @@ int test_buffer ( void ) {
 	test.source_len = sizeof ( source );
 	test.dest = dest;
 	test.dest_len = sizeof ( dest );
-	test.buffer.addr = virt_to_phys ( dest );
+	test.buffer.addr = virt_to_user ( dest );
 	test.buffer.len = sizeof ( dest );
 
 	test_fill_buffer ( &test,  20,  38 );

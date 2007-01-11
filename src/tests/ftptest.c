@@ -32,7 +32,7 @@ void test_ftp ( struct sockaddr_tcpip *server, const char *filename ) {
 	printf ( "FTP fetching %s\n", filename );
 	
 	memset ( &buffer, 0, sizeof ( buffer ) );
-	buffer.addr = virt_to_phys ( data );
+	buffer.addr = virt_to_user ( data );
 	buffer.len = sizeof ( data );
 
 	memset ( &ftp, 0, sizeof ( ftp ) );

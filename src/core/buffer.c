@@ -20,7 +20,7 @@
 #include <string.h>
 #include <errno.h>
 #include <assert.h>
-#include <io.h>
+#include <gpxe/uaccess.h>
 #include <gpxe/buffer.h>
 
 /** @file
@@ -49,7 +49,7 @@
  * block consists of the 1025th byte.
  * 
  * Note that the rather convoluted way of manipulating the buffer
- * descriptors (using copy_{to,from}_phys rather than straightforward
+ * descriptors (using copy_{to,from}_user rather than straightforward
  * pointers) is needed to cope with operation as a PXE stack, when we
  * may be running in real mode or 16-bit protected mode, and therefore
  * cannot directly access arbitrary areas of memory using simple
@@ -97,7 +97,7 @@ static int get_next_free_block ( struct buffer *buffer,
 		block->next = block->end = buffer->len;
 	} else {
 		/* Retrieve block descriptor */
-		copy_from_phys ( block, ( buffer->addr + block->start ),
+		copy_from_user ( block, buffer->addr, block->start,
 				 sizeof ( *block ) );
 	}
 
@@ -115,8 +115,7 @@ static void store_free_block ( struct buffer *buffer,
 	size_t free_block_size = ( block->end - block->start );
 
 	assert ( free_block_size >= sizeof ( *block ) );
-	copy_to_phys ( ( buffer->addr + block->start ), block,
-		       sizeof ( *block ) );
+	copy_to_user ( buffer->addr, block->start, block, sizeof ( *block ) );
 }
 
 /**
@@ -230,7 +229,7 @@ int fill_buffer ( struct buffer *buffer, const void *data,
 	}
 
 	/* Copy data into buffer */
-	copy_to_phys ( ( buffer->addr + data_start ), data, len );
+	copy_to_user ( buffer->addr, data_start, data, len );
 
 	return 0;
 }
