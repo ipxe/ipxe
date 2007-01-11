@@ -13,7 +13,7 @@
 /** An executable or loadable image */
 struct image {
 	/** Raw file image */
-	userptr_t image;
+	userptr_t data;
 	/** Length of raw file image */
 	size_t len;
 
