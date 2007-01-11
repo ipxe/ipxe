@@ -11,6 +11,7 @@
 #include <gpxe/udp.h>
 #include <gpxe/async.h>
 #include <gpxe/retry.h>
+#include <gpxe/buffer.h>
 
 #define TFTP_PORT	       69 /**< Default TFTP server port */
 #define	TFTP_DEFAULT_BLKSIZE  512 /**< Default TFTP data block size */
@@ -89,17 +90,30 @@ struct tftp_session {
 	struct udp_connection udp;
 	/** Filename */
 	const char *filename;
-
-	/**
-	 * Callback function
+	/** Data buffer to fill */
+	struct buffer *buffer;
+	/** Requested data block size
 	 *
-	 * @v tftp		TFTP connection
-	 * @v block		Block number
-	 * @v data		Data
-	 * @v len		Length of data
+	 * This is the "blksize" option requested from the TFTP
+	 * server.  It may or may not be honoured.
 	 */
-	void ( * callback ) ( struct tftp_session *tftp, unsigned int block,
-			      void *data, size_t len );
+	unsigned int request_blksize;
+
+	/** Data block size
+	 *
+	 * This is the "blksize" option negotiated with the TFTP
+	 * server.  (If the TFTP server does not support TFTP options,
+	 * this will default to 512).
+	 */
+	unsigned int blksize;
+	/** File size
+	 *
+	 * This is the value returned in the "tsize" option from the
+	 * TFTP server.  If the TFTP server does not support the
+	 * "tsize" option, this value will be zero.
+	 */
+	unsigned long tsize;
+
 	/**
 	 * Transfer ID
 	 *
@@ -119,26 +133,6 @@ struct tftp_session {
 	 * (i.e. that no blocks have yet been received).
 	 */
 	int state;
-	/** Requested data block size
-	 *
-	 * This is the "blksize" option requested from the TFTP
-	 * server.  It may or may not be honoured.
-	 */
-	unsigned int request_blksize;
-	/** Data block size
-	 *
-	 * This is the "blksize" option negotiated with the TFTP
-	 * server.  (If the TFTP server does not support TFTP options,
-	 * this will default to 512).
-	 */
-	unsigned int blksize;
-	/** File size
-	 *
-	 * This is the value returned in the "tsize" option from the
-	 * TFTP server.  If the TFTP server does not support the
-	 * "tsize" option, this value will be zero.
-	 */
-	unsigned long tsize;
 	
 	/** Asynchronous operation for this session */
 	struct async_operation aop;

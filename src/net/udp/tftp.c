@@ -59,10 +59,11 @@ static int tftp_process_blksize ( struct tftp_session *tftp,
 
 	tftp->blksize = strtoul ( value, &end, 10 );
 	if ( *end ) {
-		DBG ( "TFTP %p got invalid blksize \"%s\"\n", tftp, value );
+		DBGC ( tftp, "TFTP %p got invalid blksize \"%s\"\n",
+		       tftp, value );
 		return -EINVAL;
 	}
-	DBG ( "TFTP %p blksize=%d\n", tftp, tftp->blksize );
+	DBGC ( tftp, "TFTP %p blksize=%d\n", tftp, tftp->blksize );
 
 	return 0;
 }
@@ -80,10 +81,11 @@ static int tftp_process_tsize ( struct tftp_session *tftp,
 
 	tftp->tsize = strtoul ( value, &end, 10 );
 	if ( *end ) {
-		DBG ( "TFTP %p got invalid tsize \"%s\"\n", tftp, value );
+		DBGC ( tftp, "TFTP %p got invalid tsize \"%s\"\n",
+		       tftp, value );
 		return -EINVAL;
 	}
-	DBG ( "TFTP %p tsize=%ld\n", tftp, tftp->tsize );
+	DBGC ( tftp, "TFTP %p tsize=%ld\n", tftp, tftp->tsize );
 
 	return 0;
 }
@@ -112,8 +114,8 @@ static int tftp_process_option ( struct tftp_session *tftp,
 			return option->process ( tftp, value );
 	}
 
-	DBG ( "TFTP %p received unknown option \"%s\" = \"%s\"\n",
-	      tftp, name, value );
+	DBGC ( tftp, "TFTP %p received unknown option \"%s\" = \"%s\"\n",
+	       tftp, name, value );
 
 	return -EINVAL;
 }
@@ -201,7 +203,7 @@ static int tftp_send_rrq ( struct tftp_session *tftp, void *buf, size_t len ) {
 	void *data;
 	void *end;
 
-	DBG ( "TFTP %p requesting \"%s\"\n", tftp, tftp->filename );
+	DBGC ( tftp, "TFTP %p requesting \"%s\"\n", tftp, tftp->filename );
 
 	data = rrq->data;
 	end = ( buf + len );
@@ -218,7 +220,7 @@ static int tftp_send_rrq ( struct tftp_session *tftp, void *buf, size_t len ) {
 	return udp_send ( &tftp->udp, buf, ( data - buf ) );
 
  overflow:
-	DBG ( "TFTP %p RRQ out of space\n", tftp );
+	DBGC ( tftp, "TFTP %p RRQ out of space\n", tftp );
 	return -ENOBUFS;
 }
 
@@ -239,12 +241,13 @@ static int tftp_rx_oack ( struct tftp_session *tftp, void *buf, size_t len ) {
 
 	/* Sanity check */
 	if ( len < sizeof ( *oack ) ) {
-		DBG ( "TFTP %p received underlength OACK packet length %d\n",
-		      tftp, len );
+		DBGC ( tftp, "TFTP %p received underlength OACK packet "
+		       "length %d\n", tftp, len );
 		return -EINVAL;
 	}
 	if ( end[-1] != '\0' ) {
-		DBG ( "TFTP %p received OACK missing final NUL\n", tftp );
+		DBGC ( tftp, "TFTP %p received OACK missing final NUL\n",
+		       tftp );
 		return -EINVAL;
 	}
 
@@ -253,8 +256,8 @@ static int tftp_rx_oack ( struct tftp_session *tftp, void *buf, size_t len ) {
 	while ( name < end ) {
 		value = ( name + strlen ( name ) + 1 );
 		if ( value == end ) {
-			DBG ( "TFTP %p received OACK missing value for option "
-			      "\"%s\"\n", tftp, name );
+			DBGC ( tftp, "TFTP %p received OACK missing value "
+			       "for option \"%s\"\n", tftp, name );
 			return -EINVAL;
 		}
 		if ( ( rc = tftp_process_option ( tftp, name, value ) ) != 0 )
@@ -279,19 +282,28 @@ static int tftp_rx_oack ( struct tftp_session *tftp, void *buf, size_t len ) {
 static int tftp_rx_data ( struct tftp_session *tftp, void *buf, size_t len ) {
 	struct tftp_data *data = buf;
 	unsigned int block;
+	size_t data_offset;
 	size_t data_len;
+	int rc;
 
 	/* Sanity check */
 	if ( len < sizeof ( *data ) ) {
-		DBG ( "TFTP %p received underlength DATA packet length %d\n",
-		      tftp, len );
+		DBGC ( tftp, "TFTP %p received underlength DATA packet "
+		       "length %d\n", tftp, len );
 		return -EINVAL;
 	}
 
-	/* Pass to callback */
+	/* Fill data buffer */
 	block = ntohs ( data->block );
+	data_offset = ( ( block - 1 ) * tftp->blksize );
 	data_len = ( len - offsetof ( typeof ( *data ), data ) );
-	tftp->callback ( tftp, block, data->data, data_len );
+	if ( ( rc = fill_buffer ( tftp->buffer, data->data, data_offset,
+				  data_len ) ) != 0 ) {
+		DBGC ( tftp, "TFTP %p could not fill data buffer: %s\n",
+		       tftp, strerror ( rc ) );
+		tftp_done ( tftp, rc );
+		return rc;
+	}
 
 	/* Mark block as received */
 	tftp_received ( tftp, block );
@@ -334,13 +346,13 @@ static int tftp_rx_error ( struct tftp_session *tftp, void *buf, size_t len ) {
 
 	/* Sanity check */
 	if ( len < sizeof ( *error ) ) {
-		DBG ( "TFTP %p received underlength ERROR packet length %d\n",
-		      tftp, len );
+		DBGC ( tftp, "TFTP %p received underlength ERROR packet "
+		       "length %d\n", tftp, len );
 		return -EINVAL;
 	}
 
-	DBG ( "TFTP %p received ERROR packet with code %d, message \"%s\"\n",
-	      tftp, ntohs ( error->errcode ), error->errmsg );
+	DBGC ( tftp, "TFTP %p received ERROR packet with code %d, message "
+	       "\"%s\"\n", tftp, ntohs ( error->errcode ), error->errmsg );
 	
 	/* Determine final operation result */
 	err = ntohs ( error->errcode );
@@ -392,30 +404,31 @@ static int tftp_newdata ( struct udp_connection *conn, void *data, size_t len,
 	struct tftp_common *common = data;
 	
 	if ( len < sizeof ( *common ) ) {
-		DBG ( "TFTP %p received underlength packet length %d\n",
-		      tftp, len );
+		DBGC ( tftp, "TFTP %p received underlength packet length %d\n",
+		       tftp, len );
 		return -EINVAL;
 	}
 
 	/* Filter by TID.  Set TID on first response received */
 	if ( tftp->tid ) {
 		if ( tftp->tid != st_src->st_port ) {
-			DBG ( "TFTP %p received packet from wrong port "
-			      "(got %d, wanted %d)\n", tftp,
-			      ntohs ( st_src->st_port ), ntohs ( tftp->tid ) );
+			DBGC ( tftp, "TFTP %p received packet from wrong port "
+			       "(got %d, wanted %d)\n", tftp,
+			       ntohs ( st_src->st_port ), ntohs ( tftp->tid ));
 			return -EINVAL;
 		}
 	} else {
 		tftp->tid = st_src->st_port;
-		DBG ( "TFTP %p using remote port %d\n", tftp,
-		      ntohs ( tftp->tid ) );
+		DBGC ( tftp, "TFTP %p using remote port %d\n", tftp,
+		       ntohs ( tftp->tid ) );
 		udp_connect_port ( &tftp->udp, tftp->tid );
 	}
 
 	/* Filter by source address */
 	if ( memcmp ( st_src, udp_peer ( &tftp->udp ),
 		      sizeof ( *st_src ) ) != 0 ) {
-		DBG ( "TFTP %p received packet from foreign source\n", tftp );
+		DBGC ( tftp, "TFTP %p received packet from foreign source\n",
+		       tftp );
 		return -EINVAL;
 	}
 
@@ -427,8 +440,8 @@ static int tftp_newdata ( struct udp_connection *conn, void *data, size_t len,
 	case htons ( TFTP_ERROR ):
 		return tftp_rx_error ( tftp, data, len );
 	default:
-		DBG ( "TFTP %p received strange packet type %d\n", tftp,
-		      ntohs ( common->opcode ) );
+		DBGC ( tftp, "TFTP %p received strange packet type %d\n", tftp,
+		       ntohs ( common->opcode ) );
 		return -EINVAL;
 	};
 }
@@ -449,16 +462,18 @@ struct async_operation * tftp_get ( struct tftp_session *tftp ) {
 	int rc;
 
 	assert ( tftp->filename != NULL );
-	assert ( tftp->callback != NULL );
+	assert ( tftp->buffer != NULL );
 	assert ( tftp->udp.peer.st_family != 0 );
 
 	/* Initialise TFTP session */
-	tftp->udp.udp_op = &tftp_udp_operations;
-	tftp->timer.expired = tftp_timer_expired;
-	tftp->state = -1;
-	tftp->blksize = TFTP_DEFAULT_BLKSIZE;
 	if ( ! tftp->request_blksize )
 		tftp->request_blksize = TFTP_MAX_BLKSIZE;
+	tftp->blksize = TFTP_DEFAULT_BLKSIZE;
+	tftp->tsize = 0;
+	tftp->tid = 0;
+	tftp->state = -1;
+	tftp->udp.udp_op = &tftp_udp_operations;
+	tftp->timer.expired = tftp_timer_expired;
 
 	/* Open UDP connection */
 	if ( ( rc = udp_open ( &tftp->udp, 0 ) ) != 0 ) {
