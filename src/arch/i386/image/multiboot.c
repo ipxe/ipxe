@@ -74,8 +74,21 @@ struct multiboot_header_info {
  * @v image		ELF file
  * @ret rc		Return status code
  */
-static int multiboot_execute ( struct image *image __unused ) {
-	return -ENOTSUP;
+static int multiboot_execute ( struct image *image ) {
+	struct multiboot_info mbinfo;
+
+	/* Populate multiboot information structure */
+	memset ( &mbinfo, 0, sizeof ( mbinfo ) );
+	
+
+	/* Jump to OS with flat physical addressing */
+	__asm__ ( PHYS_CODE ( "call *%%edi\n\t" )
+		  : : "a" ( MULTIBOOT_BOOTLOADER_MAGIC ),
+		      "b" ( virt_to_phys ( &mbinfo ) ),
+		      "D" ( image->entry )
+		  : "ecx", "edx", "esi", "ebp" );
+
+	return -ECANCELED;
 }
 
 /**
