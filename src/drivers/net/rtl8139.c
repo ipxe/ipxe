@@ -367,10 +367,6 @@ static void rtl_close ( struct net_device *netdev ) {
  */
 static int rtl_transmit ( struct net_device *netdev, struct pk_buff *pkb ) {
 	struct rtl8139_nic *rtl = netdev->priv;
-	void *data;
-	size_t len;
-	size_t headroom;
-	signed int pad_len;
 
 	/* Check for space in TX ring */
 	if ( rtl->tx.pkb[rtl->tx.next] != NULL ) {
@@ -378,23 +374,8 @@ static int rtl_transmit ( struct net_device *netdev, struct pk_buff *pkb ) {
 		return -ENOBUFS;
 	}
 
-	/* Move packet data to start of packet buffer.  This will both
-	 * align the data (since packet buffers are aligned to
-	 * PKB_ALIGN) and give us sufficient space for the
-	 * zero-padding
-	 */
-	data = pkb->data;
-	len = pkb_len ( pkb );
-	headroom = pkb_headroom ( pkb );
-	pkb_push ( pkb, headroom );
-	memmove ( pkb->data, data, len );
-	pkb_unput ( pkb, headroom );
-	assert ( ( virt_to_bus ( pkb->data ) & 0x3 ) == 0 );
-
-	/* Pad to minimum packet length */
-	pad_len = ( ETH_ZLEN - pkb_len ( pkb ) );
-	if ( pad_len > 0 )
-		memset ( pkb_put ( pkb, pad_len ), 0, pad_len );
+	/* Pad and align packet */
+	pkb_pad ( pkb, ETH_ZLEN );
 
 	/* Add to TX ring */
 	DBG ( "TX id %d at %lx+%x\n", rtl->tx.next,

@@ -158,5 +158,6 @@ static inline size_t pkb_tailroom ( struct pk_buff *pkb ) {
 
 extern struct pk_buff * alloc_pkb ( size_t len );
 extern void free_pkb ( struct pk_buff *pkb );
+extern void pkb_pad ( struct pk_buff *pkb, size_t min_len );
 
 #endif /* _GPXE_PKBUFF_H */
