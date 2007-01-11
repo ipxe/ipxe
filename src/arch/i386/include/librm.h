@@ -248,6 +248,12 @@ extern void remove_from_rm_stack ( void *data, size_t size );
 		      "\n\t"				\
 		      "ret\n\t" )
 
+/* PHYS_CODE: declare a fragment of code that executes in flat physical mode */
+#define PHYS_CODE( asm_code_str )			\
+	"call _virt_to_phys\n\t"			\
+	asm_code_str					\
+	"call _phys_to_virt\n\t"
+
 #endif /* ASSEMBLY */
 
 #endif /* LIBRM_H */
