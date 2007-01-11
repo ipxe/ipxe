@@ -4,37 +4,44 @@
 /**
  * @file
  *
- * Executable/loadable image formats
+ * Executable/loadable images
  *
  */
 
 #include <gpxe/tables.h>
+#include <gpxe/list.h>
+#include <gpxe/uaccess.h>
+
+struct image_type;
 
 /** An executable or loadable image */
 struct image {
+	/** Name */
+	char name[16];
+	/** List of registered images */
+	struct list_head list;
+
+	/** Command line to pass to image */
+	const char *cmdline;
+
 	/** Raw file image */
 	userptr_t data;
 	/** Length of raw file image */
 	size_t len;
 
-	/** Execute method
-	 *
-	 * Filled in by the image loader.  If NULL, then the image
-	 * cannot be executed.
-	 */
-	int ( * execute ) ( struct image *image );
 	/** Entry point */
 	physaddr_t entry;
 
-	/** Command line to pass to image */
-	const char *cmdline;
+	/** Image type, if known */
+	struct image_type *type;
 };
 
 /** An executable or loadable image type */
 struct image_type {
 	/** Name of this image type */
 	char *name;
-	/** Load image into memory
+	/**
+	 * Load image into memory
 	 *
 	 * @v image		Executable/loadable image
 	 * @ret rc		Return status code
@@ -44,15 +51,23 @@ struct image_type {
 	 * information it may require later (e.g. the execution
 	 * address) within the @c image structure.
 	 *
-	 * The method should return -ENOEXEC if and only if the image
-	 * is not in the correct format.  Other errors will be
-	 * interpreted as "I claim this image format, but there's
-	 * something wrong with it that makes it unloadable".  In
-	 * particular, returning -ENOEXEC will cause the image probing
-	 * code to try the next available image type, while returning
-	 * any other error will terminate image probing.
+	 * If the file image is in the correct format, the method must
+	 * update @c image->type to point to its own type (unless @c
+	 * image->type is already set).  This allows the autoloading
+	 * code to disambiguate between "this is not my image format"
+	 * and "there is something wrong with this image".  In
+	 * particular, setting @c image->type and then returning an
+	 * error will cause image_autoload() to abort and return an
+	 * error, rather than continuing to the next image type.
 	 */
 	int ( * load ) ( struct image *image );
+	/**
+	 * Execute loaded image
+	 *
+	 * @v image		Loaded image
+	 * @ret rc		Return status code
+	 */
+	int ( * exec ) ( struct image *image );
 };
 
 /** An executable or loadable image type */
@@ -67,5 +82,17 @@ struct image_type {
  * in the list of image types.
  */
 #define __default_image_type __table ( struct image_type, image_types, 02 )
+
+extern struct list_head images;
+
+/** Iterate over all registered images */
+#define for_each_image( image ) \
+	list_for_each_entry ( (image), &images, list )
+
+extern int register_image ( struct image *image );
+extern void unregister_image ( struct image *image );
+extern int image_load ( struct image *image );
+extern int image_autoload ( struct image *image );
+extern int image_exec ( struct image *image );
 
 #endif /* _GPXE_IMAGE_H */

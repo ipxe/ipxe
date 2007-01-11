@@ -24,12 +24,15 @@
  */
 
 #include <errno.h>
+#include <alloca.h>
 #include <multiboot.h>
 #include <gpxe/uaccess.h>
 #include <gpxe/image.h>
 #include <gpxe/segment.h>
 #include <gpxe/memmap.h>
 #include <gpxe/elf.h>
+
+struct image_type multiboot_image_type __image_type;
 
 /** Multiboot flags that we support */
 #define MB_SUPPORTED_FLAGS ( MB_FLAG_PGALIGN | MB_FLAG_MEMMAP | \
@@ -58,57 +61,116 @@ struct multiboot_header_info {
 };
 
 /**
- * Execute multiboot image
+ * Build multiboot memory map
  *
- * @v image		ELF file
- * @ret rc		Return status code
+ * @v mbinfo		Multiboot information structure
+ * @v mbmemmap		Multiboot memory map
  */
-static int multiboot_execute ( struct image *image ) {
-	static const char *bootloader_name = "gPXE " VERSION;
-	struct multiboot_info mbinfo;
+static void multiboot_build_memmap ( struct multiboot_info *mbinfo,
+				     struct multiboot_memory_map *mbmemmap ) {
 	struct memory_map memmap;
-	struct multiboot_memory_map mbmemmap[ sizeof ( memmap.regions ) /
-					      sizeof ( memmap.regions[0] ) ];
 	unsigned int i;
 
-	/* Populate multiboot information structure */
-	memset ( &mbinfo, 0, sizeof ( mbinfo ) );
-
-	/* Set boot loader name */
-	mbinfo.flags |= MBI_FLAG_LOADER;
-	mbinfo.boot_loader_name = virt_to_phys ( bootloader_name );
-	
 	/* Get memory map */
 	get_memmap ( &memmap );
-	memset ( mbmemmap, 0, sizeof ( mbmemmap ) );
+
+	/* Translate into multiboot format */
+	memset ( mbmemmap, 0, sizeof ( *mbmemmap ) );
 	for ( i = 0 ; i < memmap.count ; i++ ) {
 		mbmemmap[i].size = sizeof ( mbmemmap[i] );
 		mbmemmap[i].base_addr = memmap.regions[i].start;
 		mbmemmap[i].length = ( memmap.regions[i].end -
 				       memmap.regions[i].start );
 		mbmemmap[i].type = MBMEM_RAM;
-		mbinfo.mmap_length += sizeof ( mbmemmap[i] );
+		mbinfo->mmap_length += sizeof ( mbmemmap[i] );
 		if ( memmap.regions[i].start == 0 )
-			mbinfo.mem_lower = memmap.regions[i].end;
+			mbinfo->mem_lower = memmap.regions[i].end;
 		if ( memmap.regions[i].start == 0x100000 )
-			mbinfo.mem_upper = ( memmap.regions[i].end - 0x100000);
+			mbinfo->mem_upper = ( memmap.regions[i].end -
+					      0x100000 );
 	}
-	mbinfo.flags |= ( MBI_FLAG_MEM | MBI_FLAG_MMAP );
+}
+
+/**
+ * Build multiboot module list
+ *
+ * @v image		Multiboot image
+ * @v modules		Module list to fill, or NULL
+ * @ret count		Number of modules
+ */
+static unsigned int
+multiboot_build_module_list ( struct image *image,
+			      struct multiboot_module *modules ) {
+	struct image *module_image;
+	struct multiboot_module *module;
+	unsigned int count = 0;
+
+	for_each_image ( module_image ) {
+		/* Do not include kernel image as a module */
+		if ( module_image == image )
+			continue;
+		module = &modules[count++];
+		/* Populate module data structure, if applicable */
+		if ( ! modules )
+			continue;
+		module->mod_start = user_to_phys ( module_image->data, 0 );
+		module->mod_end = user_to_phys ( module_image->data,
+						 module_image->len );
+		if ( image->cmdline )
+			module->string = virt_to_phys ( image->cmdline );
+	}
+
+	return count;
+}
+
+/**
+ * Execute multiboot image
+ *
+ * @v image		Multiboot image
+ * @ret rc		Return status code
+ */
+static int multiboot_exec ( struct image *image ) {
+	static const char *bootloader_name = "gPXE " VERSION;
+	struct multiboot_info mbinfo;
+	struct multiboot_memory_map mbmemmap[MAX_MEMORY_REGIONS];
+	struct multiboot_module *modules;
+	unsigned int num_modules;
+
+	/* Populate multiboot information structure */
+	memset ( &mbinfo, 0, sizeof ( mbinfo ) );
+
+	/* Set boot loader name */
+	mbinfo.boot_loader_name = virt_to_phys ( bootloader_name );
+	mbinfo.flags |= MBI_FLAG_LOADER;
+	
+	/* Build memory map */
+	multiboot_build_memmap ( &mbinfo, mbmemmap );
 	mbinfo.mmap_addr = virt_to_phys ( &mbmemmap[0].base_addr );
+	mbinfo.flags |= ( MBI_FLAG_MEM | MBI_FLAG_MMAP );
 
 	/* Set command line, if present */
 	if ( image->cmdline ) {
-		mbinfo.flags |= MBI_FLAG_CMDLINE;
 		mbinfo.cmdline = virt_to_phys ( image->cmdline );
+		mbinfo.flags |= MBI_FLAG_CMDLINE;
 	}
 
+	/* Construct module list */
+	num_modules = multiboot_build_module_list ( image, NULL );
+	modules = alloca ( num_modules * sizeof ( *modules ) );
+	multiboot_build_module_list ( image, modules );
+	mbinfo.mods_count = num_modules;
+	mbinfo.mods_addr = virt_to_phys ( modules );
+	mbinfo.flags |= MBI_FLAG_MODS;
+
 	/* Jump to OS with flat physical addressing */
-	__asm__ __volatile__ ( PHYS_CODE ( "xchgw %%bx,%%bx\n\t"
-					   "call *%%edi\n\t" )
+	__asm__ __volatile__ ( PHYS_CODE ( /* Preserve %ebp for alloca() */
+					   "pushl %%ebp\n\t"
+					   "call *%%edi\n\t"
+					   "popl %%ebp\n\t" )
 			       : : "a" ( MULTIBOOT_BOOTLOADER_MAGIC ),
 			           "b" ( virt_to_phys ( &mbinfo ) ),
 			           "D" ( image->entry )
-			       : "ecx", "edx", "esi", "ebp" );
+			       : "ecx", "edx", "esi", "memory" );
 
 	return -ECANCELED;
 }
@@ -191,7 +253,6 @@ static int multiboot_load_raw ( struct image *image,
 
 	/* Record execution entry point */
 	image->entry = hdr->mb.entry_addr;
-	image->execute = multiboot_execute;
 
 	return 0;
 }
@@ -209,20 +270,8 @@ static int multiboot_load_elf ( struct image *image ) {
 	if ( ( rc = elf_load ( image ) ) != 0 ) {
 		DBG ( "Multiboot ELF image failed to load: %s\n",
 		      strerror ( rc ) );
-		/* We must translate "not an ELF image" (i.e. ENOEXEC)
-		 * into "invalid multiboot image", to avoid screwing
-		 * up the image probing logic.
-		 */
-		if ( rc == -ENOEXEC ) {
-			return -ENOTSUP;
-		} else {
-			return rc;
-		}
+		return rc;
 	}
-
-	/* Capture execution method */
-	if ( image->execute )
-		image->execute = multiboot_execute;
 
 	return 0;
 }
@@ -243,6 +292,10 @@ int multiboot_load ( struct image *image ) {
 		return rc;
 	}
 	DBG ( "Found multiboot header with flags %08lx\n", hdr.mb.flags );
+
+	/* This is a multiboot image, valid or otherwise */
+	if ( ! image->type )
+		image->type = &multiboot_image_type;
 
 	/* Abort if we detect flags that we cannot support */
 	if ( hdr.mb.flags & MB_UNSUPPORTED_FLAGS ) {
@@ -267,4 +320,5 @@ int multiboot_load ( struct image *image ) {
 struct image_type multiboot_image_type __image_type = {
 	.name = "Multiboot",
 	.load = multiboot_load,
+	.exec = multiboot_exec,
 };

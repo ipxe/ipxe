@@ -1,85 +1,138 @@
-#include "dev.h"
-#include <gpxe/buffer.h>
-#include <console.h>
-
-#if 0
-
-static struct image images[0] __image_start;
-static struct image images_end[0] __image_end;
-
 /*
- * Print all images
+ * Copyright (C) 2006 Michael Brown <mbrown@fensystems.co.uk>.
+ *
+ * This program is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU General Public License as
+ * published by the Free Software Foundation; either version 2 of the
+ * License, or any later version.
+ *
+ * This program is distributed in the hope that it will be useful, but
+ * WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ * General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program; if not, write to the Free Software
+ * Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
+ */
+
+#include <stddef.h>
+#include <string.h>
+#include <stdlib.h>
+#include <errno.h>
+#include <assert.h>
+#include <vsprintf.h>
+#include <gpxe/list.h>
+#include <gpxe/image.h>
+
+/** @file
+ *
+ * Executable/loadable images
  *
  */
-void print_images ( void ) {
-	struct image *image;
 
-	for ( image = images ; image < images_end ; image++ ) {
-		printf ( "%s ", image->name );
-	}
-}
+/** List of registered images */
+struct list_head images = LIST_HEAD_INIT ( images );
 
-/*
- * Identify the image format
+/** List of image types */
+static struct image_type image_types[0]
+	__table_start ( struct image_type, image_types );
+static struct image_type image_types_end[0]
+	__table_end ( struct image_type, image_types );
+
+/**
+ * Register executable/loadable image
  *
+ * @v image		Executable/loadable image
+ * @ret rc		Return status code
  */
-static struct image * identify_image ( physaddr_t start, physaddr_t len,
-				       void **context ) {
-	struct image *image;
-	
-	for ( image = images ; image < images_end ; image++ ) {
-		if ( image->probe ( start, len, context ) )
-			return image;
-	}
-	
-	return NULL;
+int register_image ( struct image *image ) {
+	static unsigned int imgindex = 0;
+
+	/* Create image name */
+	snprintf ( image->name, sizeof ( image->name ), "img%d",
+		   imgindex++ );
+
+	/* Add to image list */
+	list_add_tail ( &image->list, &images );
+	DBGC ( image, "IMAGE %p registered as %s\n", image, image->name );
+
+	return 0;
 }
 
-/*
- * Load an image into memory at a location determined by the image
- * format
+/**
+ * Unregister executable/loadable image
  *
+ * @v image		Executable/loadable image
  */
-int autoload ( struct dev *dev, struct image **image, void **context ) {
-	struct buffer buffer;
-	int rc = 0;
-
-	/* Prepare the load buffer */
-	if ( ! init_load_buffer ( &buffer ) ) {
-		DBG ( "IMAGE could not initialise load buffer\n" );
-		goto out;
-	}
-
-	/* Load the image into the load buffer */
-	if ( ! load ( dev, &buffer ) ) {
-		DBG ( "IMAGE could not load image\n" );
-		goto out_free;
-	}
-
-	/* Shrink the load buffer */
-	trim_load_buffer ( &buffer );
-
-	/* Identify the image type */
-	*image = identify_image ( buffer.start, buffer.fill, context );
-	if ( ! *image ) {
-		DBG ( "IMAGE could not identify image type\n" );
-		goto out_free;
-	}
-
-	/* Move the image into the target location */
-	if ( ! (*image)->load ( buffer.start, buffer.fill, *context ) ) {
-		DBG ( "IMAGE could not move to target location\n" );
-		goto out_free;
-	}
-
-	/* Return success */
-	rc = 1;
-
- out_free:
-	/* Free the load buffer */
-	done_load_buffer ( &buffer );
- out:
-	return rc;
+void unregister_image ( struct image *image ) {
+	list_del ( &image->list );
+	DBGC ( image, "IMAGE %p unregistered\n", image );
 }
 
-#endif
+/**
+ * Load executable/loadable image into memory
+ *
+ * @v image		Executable/loadable image
+ * @ret rc		Return status code
+ */
+int image_load ( struct image *image ) {
+	int rc;
+
+	assert ( image->type != NULL );
+
+	if ( ( rc = image->type->load ( image ) ) != 0 ) {
+		DBGC ( image, "IMAGE %p could not load: %s\n",
+		       image, strerror ( rc ) );
+		return rc;
+	}
+
+	return 0;
+}
+
+/**
+ * Autodetect image type and load executable/loadable image into memory
+ *
+ * @v image		Executable/loadable image
+ * @ret rc		Return status code
+ */
+int image_autoload ( struct image *image ) {
+	struct image_type *type;
+	int rc;
+
+	for ( type = image_types ; type < image_types_end ; type++ ) {
+		rc = type->load ( image );
+		if ( image->type == NULL )
+			continue;
+		if ( rc != 0 ) {
+			DBGC ( image, "IMAGE %p (%s) could not load: %s\n",
+			       image, image->type->name, strerror ( rc ) );
+			return rc;
+		}
+		return 0;
+	}
+
+	DBGC ( image, "IMAGE %p format not recognised\n", image );
+	return -ENOEXEC;
+}
+
+/**
+ * Execute loaded image
+ *
+ * @v image		Loaded image
+ * @ret rc		Return status code
+ */
+int image_exec ( struct image *image ) {
+	int rc;
+
+	assert ( image->type != NULL );
+
+	if ( ( rc = image->type->exec ( image ) ) != 0 ) {
+		DBGC ( image, "IMAGE %p could not execute: %s\n",
+		       image, strerror ( rc ) );
+		return rc;
+	}
+
+	/* Well, some formats might return... */
+	return 0;
+}

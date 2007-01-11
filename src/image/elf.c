@@ -30,6 +30,8 @@
 #include <gpxe/image.h>
 #include <gpxe/elf.h>
 
+struct image_type elf_image_type __image_type;
+
 typedef Elf32_Ehdr	Elf_Ehdr;
 typedef Elf32_Phdr	Elf_Phdr;
 typedef Elf32_Off	Elf_Off;
@@ -40,7 +42,7 @@ typedef Elf32_Off	Elf_Off;
  * @v image		ELF file
  * @ret rc		Return status code
  */
-static int elf_execute ( struct image *image __unused ) {
+static int elf_exec ( struct image *image __unused ) {
 	return -ENOTSUP;
 }
 
@@ -63,7 +65,7 @@ static int elf_load_segment ( struct image *image, Elf_Phdr *phdr ) {
 	/* Check segment lies within image */
 	if ( ( phdr->p_offset + phdr->p_filesz ) > image->len ) {
 		DBG ( "ELF segment outside ELF file\n" );
-		return -ERANGE;
+		return -ENOEXEC;
 	}
 
 	/* Find start address: use physical address for preference,
@@ -75,7 +77,7 @@ static int elf_load_segment ( struct image *image, Elf_Phdr *phdr ) {
 		dest = phdr->p_vaddr;
 	if ( ! dest ) {
 		DBG ( "ELF segment loads to physical address 0\n" );
-		return -ERANGE;
+		return -ENOEXEC;
 	}
 	buffer = phys_to_user ( dest );
 
@@ -117,13 +119,17 @@ int elf_load ( struct image *image ) {
 		return -ENOEXEC;
 	}
 
+	/* This is an ELF image, valid or otherwise */
+	if ( ! image->type )
+		image->type = &elf_image_type;
+
 	/* Read ELF program headers */
 	for ( phoff = ehdr.e_phoff , phnum = ehdr.e_phnum ; phnum ;
 	      phoff += ehdr.e_phentsize, phnum-- ) {
 		if ( phoff > image->len ) {
 			DBG ( "ELF program header %d outside ELF image\n",
 			      phnum );
-			return -ERANGE;
+			return -ENOEXEC;
 		}
 		copy_from_user ( &phdr, image->data, phoff, sizeof ( phdr ) );
 		if ( ( rc = elf_load_segment ( image, &phdr ) ) != 0 )
@@ -132,7 +138,6 @@ int elf_load ( struct image *image ) {
 
 	/* Fill in entry point address */
 	image->entry = ehdr.e_entry;
-	image->execute = elf_execute;
 
 	return 0;
 }
@@ -141,4 +146,5 @@ int elf_load ( struct image *image ) {
 struct image_type elf_image_type __image_type = {
 	.name = "ELF",
 	.load = elf_load,
+	.exec = elf_exec,
 };
