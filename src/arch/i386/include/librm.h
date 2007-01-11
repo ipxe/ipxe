@@ -113,10 +113,10 @@ typedef intptr_t userptr_t;
 /**
  * Copy data to user buffer
  *
- * @v buffer	User buffer
- * @v offset	Offset within user buffer
- * @v src	Source
- * @v len	Length
+ * @v buffer		User buffer
+ * @v offset		Offset within user buffer
+ * @v src		Source
+ * @v len		Length
  */
 static inline __attribute__ (( always_inline )) void
 copy_to_user ( userptr_t buffer, off_t offset, const void *src, size_t len ) {
@@ -126,10 +126,10 @@ copy_to_user ( userptr_t buffer, off_t offset, const void *src, size_t len ) {
 /**
  * Copy data from user buffer
  *
- * @v dest	Destination
- * @v buffer	User buffer
- * @v offset	Offset within user buffer
- * @v len	Length
+ * @v dest		Destination
+ * @v buffer		User buffer
+ * @v offset		Offset within user buffer
+ * @v len		Length
  */
 static inline __attribute__ (( always_inline )) void
 copy_from_user ( void *dest, userptr_t buffer, off_t offset, size_t len ) {
@@ -139,11 +139,11 @@ copy_from_user ( void *dest, userptr_t buffer, off_t offset, size_t len ) {
 /**
  * Copy data between user buffers
  *
- * @v dest	Destination user buffer
- * @v dest_off	Offset within destination buffer
- * @v src	Source user buffer
- * @v src_off	Offset within source buffer
- * @v len	Length
+ * @v dest		Destination user buffer
+ * @v dest_off		Offset within destination buffer
+ * @v src		Source user buffer
+ * @v src_off		Offset within source buffer
+ * @v len		Length
  */
 static inline __attribute__ (( always_inline )) void
 copy_user ( userptr_t dest, off_t dest_off, userptr_t src, off_t src_off,
@@ -153,10 +153,23 @@ copy_user ( userptr_t dest, off_t dest_off, userptr_t src, off_t src_off,
 }
 
 /**
+ * Fill user buffer with a constant byte
+ *
+ * @v buffer		User buffer
+ * @v offset		Offset within buffer
+ * @v c			Constant byte with which to fill
+ * @v len		Length
+ */
+static inline __attribute__ (( always_inline )) void
+memset_user ( userptr_t buffer, off_t offset, int c, size_t len ) {
+	memset ( ( ( void * ) buffer + offset ), c, len );
+}
+
+/**
  * Convert virtual address to user buffer
  *
- * @v virtual	Virtual address
- * @ret buffer	User buffer
+ * @v virtual		Virtual address
+ * @ret buffer		User buffer
  *
  * This constructs a user buffer from an ordinary pointer.  Use it
  * when you need to pass a pointer to an internal buffer to a function
@@ -170,9 +183,9 @@ virt_to_user ( void * virtual ) {
 /**
  * Convert segment:offset address to user buffer
  *
- * @v segment	Real-mode segment
- * @v offset	Real-mode offset
- * @ret buffer	User buffer
+ * @v segment		Real-mode segment
+ * @v offset		Real-mode offset
+ * @ret buffer		User buffer
  */
 static inline __attribute__ (( always_inline )) userptr_t
 real_to_user ( unsigned int segment, unsigned int offset ) {
@@ -182,12 +195,24 @@ real_to_user ( unsigned int segment, unsigned int offset ) {
 /**
  * Convert physical address to user buffer
  *
- * @v physical	Physical address
- * @ret buffer	User buffer
+ * @v physical		Physical address
+ * @ret buffer		User buffer
  */
 static inline __attribute__ (( always_inline )) userptr_t
 phys_to_user ( physaddr_t physical ) {
 	return virt_to_user ( phys_to_virt ( physical ) );
+}
+
+/**
+ * Convert user buffer to physical address
+ *
+ * @v buffer		User buffer
+ * @v offset		Offset within user buffer
+ * @ret physical	Physical address
+ */
+static inline __attribute__ (( always_inline )) physaddr_t
+user_to_phys ( userptr_t buffer, off_t offset ) {
+	return virt_to_phys ( ( void * ) buffer + offset );
 }
 
 /* Copy to/from real-mode stack */
