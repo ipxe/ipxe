@@ -120,7 +120,7 @@ typedef intptr_t userptr_t;
  */
 static inline __attribute__ (( always_inline )) void
 copy_to_user ( userptr_t buffer, off_t offset, const void *src, size_t len ) {
-	memcpy ( ( void * ) buffer + offset, src, len );
+	memcpy ( ( ( void * ) buffer + offset ), src, len );
 }
 
 /**
@@ -133,7 +133,23 @@ copy_to_user ( userptr_t buffer, off_t offset, const void *src, size_t len ) {
  */
 static inline __attribute__ (( always_inline )) void
 copy_from_user ( void *dest, userptr_t buffer, off_t offset, size_t len ) {
-	memcpy ( dest, ( void * ) buffer + offset, len );
+	memcpy ( dest, ( ( void * ) buffer + offset ), len );
+}
+
+/**
+ * Copy data between user buffers
+ *
+ * @v dest	Destination user buffer
+ * @v dest_off	Offset within destination buffer
+ * @v src	Source user buffer
+ * @v src_off	Offset within source buffer
+ * @v len	Length
+ */
+static inline __attribute__ (( always_inline )) void
+copy_user ( userptr_t dest, off_t dest_off, userptr_t src, off_t src_off,
+	    size_t len ) {
+	memcpy ( ( ( void * ) dest + dest_off ), ( ( void * ) src + src_off ),
+		 len );
 }
 
 /**
@@ -161,6 +177,17 @@ virt_to_user ( void * virtual ) {
 static inline __attribute__ (( always_inline )) userptr_t
 real_to_user ( unsigned int segment, unsigned int offset ) {
 	return virt_to_user ( VIRTUAL ( segment, offset ) );
+}
+
+/**
+ * Convert physical address to user buffer
+ *
+ * @v physical	Physical address
+ * @ret buffer	User buffer
+ */
+static inline __attribute__ (( always_inline )) userptr_t
+phys_to_user ( physaddr_t physical ) {
+	return virt_to_user ( phys_to_virt ( physical ) );
 }
 
 /* Copy to/from real-mode stack */
