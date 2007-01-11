@@ -59,22 +59,22 @@ typedef struct multiboot_header
 } multiboot_header_t;
 
 /* The symbol table for a.out.  */
-typedef struct aout_symbol_table
+typedef struct multiboot_aout_symbol_table
 {
   unsigned long tabsize;
   unsigned long strsize;
   unsigned long addr;
   unsigned long reserved;
-} aout_symbol_table_t;
+} multiboot_aout_symbol_table_t;
 
 /* The section header table for ELF.  */
-typedef struct elf_section_header_table
+typedef struct multiboot_elf_section_header_table
 {
   unsigned long num;
   unsigned long size;
   unsigned long addr;
   unsigned long shndx;
-} elf_section_header_table_t;
+} multiboot_elf_section_header_table_t;
 
 /* The Multiboot information.  */
 typedef struct multiboot_info
@@ -88,8 +88,8 @@ typedef struct multiboot_info
   unsigned long mods_addr;
   union
   {
-    aout_symbol_table_t aout_sym;
-    elf_section_header_table_t elf_sec;
+    multiboot_aout_symbol_table_t aout_sym;
+    multiboot_elf_section_header_table_t elf_sec;
   } u;
   unsigned long mmap_length;
   unsigned long mmap_addr;
@@ -107,17 +107,17 @@ typedef struct multiboot_info
 } multiboot_info_t;
 
 /* The module structure.  */
-typedef struct module
+typedef struct multiboot_module
 {
   unsigned long mod_start;
   unsigned long mod_end;
   unsigned long string;
   unsigned long reserved;
-} module_t;
+} multiboot_module_t;
 
 /* The memory map. Be careful that the offset 0 is base_addr_low
    but no size.  */
-typedef struct memory_map
+typedef struct multiboot_memory_map
 {
   unsigned long size;
   unsigned long base_addr_low;
@@ -125,7 +125,7 @@ typedef struct memory_map
   unsigned long length_low;
   unsigned long length_high;
   unsigned long type;
-} memory_map_t;
+} multiboot_memory_map_t;
 
 #endif /* ! ASM */
 
