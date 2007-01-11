@@ -121,6 +121,7 @@
 #define ELFMAG3		'F'
 
 #define ELFMAG		"\177ELF"
+#define	SELFMAG		4
 
 #define EI_CLASS	4	/* File class byte index */
 #define ELFCLASSNONE	0	/* Invalid class */
@@ -141,6 +142,9 @@
 #define ELF32_PHDR_SIZE (8*4)	/* Size of an elf program header */
 
 #ifndef ASSEMBLY
+
+#include <stdint.h>
+
 /*
  * ELF definitions common to all 32-bit architectures.
  */
@@ -228,7 +232,5 @@ typedef struct {
 #include "bits/elf.h"
 
 #endif /* ASSEMBLY */
-
-#include "elf_boot.h"
 
 #endif /* ELF_H */
