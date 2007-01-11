@@ -251,7 +251,7 @@ int test_dhcp ( struct net_device *netdev ) {
 
 	/* Test boot */
 	if ( ( rc = test_dhcp_boot ( netdev, filename ) ) != 0 ) {
-		printf ( "Boot failed\n" );
+		printf ( "Boot failed: %s\n", strerror ( rc ) );
 		goto out;
 	}
 	
