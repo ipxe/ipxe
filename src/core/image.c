@@ -49,9 +49,11 @@ static struct image_type image_types_end[0]
 int register_image ( struct image *image ) {
 	static unsigned int imgindex = 0;
 
-	/* Create image name */
-	snprintf ( image->name, sizeof ( image->name ), "img%d",
-		   imgindex++ );
+	/* Create image name if it doesn't already have one */
+	if ( ! image->name[0] ) {
+		snprintf ( image->name, sizeof ( image->name ), "img%d",
+			   imgindex++ );
+	}
 
 	/* Add to image list */
 	list_add_tail ( &image->list, &images );
