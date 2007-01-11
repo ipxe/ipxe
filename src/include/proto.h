@@ -2,7 +2,7 @@
 #define PROTO_H
 
 #include <gpxe/tables.h>
-#include "buffer.h"
+#include <gpxe/buffer.h>
 #include <gpxe/in.h>
 
 struct protocol {

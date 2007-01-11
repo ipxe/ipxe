@@ -1,5 +1,5 @@
 #include "dev.h"
-#include "buffer.h"
+#include <gpxe/buffer.h>
 #include "load_buffer.h"
 #include "image.h"
 #include <console.h>

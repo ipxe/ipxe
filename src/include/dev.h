@@ -3,7 +3,7 @@
 
 #include "stdint.h"
 #include "string.h"
-#include "buffer.h"
+#include <gpxe/buffer.h>
 #include "dhcp.h" /* for dhcp_dev_id */
 #include <gpxe/tables.h>
 #include <assert.h>

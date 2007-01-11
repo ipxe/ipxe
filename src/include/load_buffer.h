@@ -1,7 +1,7 @@
 #ifndef LOAD_BUFFER_H
 #define LOAD_BUFFER_H
 
-#include "buffer.h"
+#include <gpxe/buffer.h>
 
 /*
  * These functions are architecture-dependent, but the interface must

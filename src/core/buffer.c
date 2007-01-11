@@ -43,7 +43,7 @@
 #include "io.h"
 #include "errno.h"
 #include <assert.h>
-#include "buffer.h"
+#include <gpxe/buffer.h>
 
 /**
  * Initialise a buffer.

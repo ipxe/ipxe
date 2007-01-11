@@ -1,5 +1,5 @@
-#ifndef BUFFER_H
-#define BUFFER_H
+#ifndef _GPXE_BUFFER_H
+#define _GPXE_BUFFER_H
 
 #include "compiler.h" /* for doxygen */
 #include "stdint.h"
@@ -94,4 +94,4 @@ extern void init_buffer ( struct buffer *buffer );
 extern int fill_buffer ( struct buffer *buffer, const void *data,
 			 off_t offset, size_t len );
 
-#endif /* BUFFER_H */
+#endif /* _GPXE_BUFFER_H */

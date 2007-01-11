@@ -4,7 +4,7 @@
 /** @file */
 
 #include <gpxe/in.h>
-#include "buffer.h"
+#include <gpxe/buffer.h>
 #include "nic.h"
 #include "ip.h"
 #include "udp.h"
