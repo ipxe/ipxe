@@ -25,6 +25,9 @@ struct image {
 	int ( * execute ) ( struct image *image );
 	/** Entry point */
 	physaddr_t entry;
+
+	/** Command line to pass to image */
+	const char *cmdline;
 };
 
 /** An executable or loadable image type */
