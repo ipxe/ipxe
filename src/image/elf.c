@@ -27,18 +27,11 @@
 #include <elf.h>
 #include <gpxe/uaccess.h>
 #include <gpxe/segment.h>
+#include <gpxe/elf.h>
 
 typedef Elf32_Ehdr	Elf_Ehdr;
 typedef Elf32_Phdr	Elf_Phdr;
 typedef Elf32_Off	Elf_Off;
-
-/** An ELF file */
-struct elf {
-	/** ELF file image */
-	userptr_t image;
-	/** Length of ELF file image */
-	size_t len;
-};
 
 /**
  * Load ELF segment into memory
@@ -125,6 +118,9 @@ int elf_load ( struct elf *elf ) {
 		if ( ( rc = elf_load_segment ( elf, &phdr ) ) != 0 )
 			return rc;
 	}
+
+	/* Fill in entry point address */
+	elf->entry = ehdr.e_entry;
 
 	return 0;
 }
