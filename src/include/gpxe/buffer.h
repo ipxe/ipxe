@@ -1,8 +1,8 @@
 #ifndef _GPXE_BUFFER_H
 #define _GPXE_BUFFER_H
 
-#include "compiler.h" /* for doxygen */
-#include "stdint.h"
+#include <stdint.h>
+#include <io.h>
 
 /** @file
  *
@@ -15,14 +15,8 @@
  * Some protocols do not provide a mechanism for us to know the size
  * of the file before we happen to receive a particular block
  * (e.g. the final block in an MTFTP transfer).  In addition, some
- * protocols (all the multicast protocols plus any TCP-based protocol)
- * can, in theory, provide the data in any order.
- *
- * Rather than requiring each protocol to implement its own equivalent
- * of "dd" to arrange the data into well-sized pieces before handing
- * off to the image loader, we provide these generic buffer functions
- * which assemble a file into a single contiguous block.  The whole
- * block is then passed to the image loader.
+ * protocols (e.g. the multicast protocols) can, in theory, provide
+ * the data in any order.
  *
  * Example usage:
  *
@@ -33,65 +27,78 @@
  *   off_t offset;
  *   size_t len;
  *   
- *   // We have an area of memory [buf_start,buf_end) into which we want
- *   // to load a file, where buf_start and buf_end are physical addresses.
+ *   // We have an area of memory [buf_start,buf_start+len) into which to
+ *   // load a file, where buf_start is a physical addresse.
+ *   memset ( &buffer, 0, sizeof ( buffer ) );
  *   buffer->start = buf_start;
- *   buffer->end = buf_end;
- *   init_buffer ( &buffer );
+ *   buffer->len = len;
  *   ...
  *   while ( get_file_block ( ... ) ) {
  *     // Downloaded block is stored in [data,data+len), and represents 
  *     // the portion of the file at offsets [offset,offset+len)
- *     if ( ! fill_buffer ( &buffer, data, offset, len ) ) {
+ *     if ( fill_buffer ( &buffer, data, offset, len ) != 0 ) {
  *       // An error occurred
- *       return 0;
  *     }
  *     ...
  *   }
  *   ...
  *   // The whole file is now present at [buf_start,buf_start+filesize),
  *   // where buf_start is a physical address.  The struct buffer can simply
- *   // be discarded; there is no done_buffer() call.
+ *   // be discarded.
  *
  * @endcode
  *
- * For a description of the internal operation, see buffer.c.
- *
  */
 
 /**
- * A buffer
+ * A data buffer
  *
- * #start and #end denote the real boundaries of the buffer, and are
- * physical addresses.  #fill denotes the offset to the first free
- * block in the buffer.  (If the buffer is full, #fill will equal
- * #end-#start.)
+ * A buffer looks something like this:
+ *
+ * @code
+ *
+ *     XXXXXXXXXXXXXXXXX.........XXX..........XXXXXXX........XXXXXX.........
+ *
+ *     ^
+ *     |
+ *   start
+ *
+ *     <----- fill ---->
+ *
+ *     <------------------------ free ---------------------------->
+ *
+ *     <------------------------------ len -------------------------------->
+ *
+ * @endcode
+ *
+ * #start and #len denote the real boundaries of the buffer.  #fill
+ * denotes the offset to the first free block in the buffer.  (If the
+ * buffer is full, #fill, #free and #len will all be equal.)
  *
  */
 struct buffer {
-	physaddr_t	start;		/**< Start of buffer in memory */
-	physaddr_t	end;		/**< End of buffer in memory */
-	off_t		fill;		/**< Offset to first gap in buffer */
+	/** Physical start address of buffer */
+	physaddr_t addr;
+	/** Total length of buffer */
+	size_t len;
+	/** Offset to first free block within buffer */
+	size_t fill;
+	/** Offset to last free block within buffer */
+	size_t free;
+	/** Expand data buffer
+	 *
+	 * @v buffer		Data buffer
+	 * @v new_len		New length
+	 * @ret rc		Return status code
+	 *
+	 * Expand the data buffer to accommodate more data.  This
+	 * method is optional; if it is @c NULL then the buffer will
+	 * not be expandable.
+	 */
+	int ( * expand ) ( struct buffer *buffer, size_t new_len );
 };
 
-/**
- * A free block descriptor.
- *
- * See buffer.c for a full description of the fields.
- *
- */
-struct buffer_free_block {
-	char		tail;		/**< Tail byte marker */
-	char		reserved[3];	/**< Padding */
-	physaddr_t	start;		/**< Address of this free block */
-	physaddr_t	next;		/**< Address of next free block */
-	physaddr_t	end;		/**< End of this block */
-} __attribute__ (( packed ));
-
-/* Functions in buffer.c */
-
-extern void init_buffer ( struct buffer *buffer );
 extern int fill_buffer ( struct buffer *buffer, const void *data,
-			 off_t offset, size_t len );
+			 size_t offset, size_t len );
 
 #endif /* _GPXE_BUFFER_H */

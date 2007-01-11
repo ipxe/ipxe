@@ -314,7 +314,7 @@ static unsigned char *reinit_slam_state(
 		return 0;
 	}
 	bitmap_len   = (state.total_packets + 1 + 7)/8;
-	state.image  = phys_to_virt ( state.buffer->start );
+	state.image  = phys_to_virt ( state.buffer->addr );
 	/* We don't use the buffer routines properly yet; fake it */
 	state.buffer->fill = total_bytes;
 	state.bitmap = state.image + total_bytes;
