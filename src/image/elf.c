@@ -27,6 +27,7 @@
 #include <elf.h>
 #include <gpxe/uaccess.h>
 #include <gpxe/segment.h>
+#include <gpxe/image.h>
 #include <gpxe/elf.h>
 
 typedef Elf32_Ehdr	Elf_Ehdr;
@@ -36,11 +37,11 @@ typedef Elf32_Off	Elf_Off;
 /**
  * Load ELF segment into memory
  *
- * @v elf		ELF file
+ * @v image		ELF file
  * @v phdr		ELF program header
  * @ret rc		Return status code
  */
-static int elf_load_segment ( struct elf *elf, Elf_Phdr *phdr ) {
+static int elf_load_segment ( struct image *image, Elf_Phdr *phdr ) {
 	physaddr_t dest;
 	userptr_t buffer;
 	int rc;
@@ -50,7 +51,7 @@ static int elf_load_segment ( struct elf *elf, Elf_Phdr *phdr ) {
 		return 0;
 
 	/* Check segment lies within image */
-	if ( ( phdr->p_offset + phdr->p_filesz ) > elf->len ) {
+	if ( ( phdr->p_offset + phdr->p_filesz ) > image->len ) {
 		DBG ( "ELF segment outside ELF file\n" );
 		return -ENOEXEC;
 	}
@@ -81,7 +82,7 @@ static int elf_load_segment ( struct elf *elf, Elf_Phdr *phdr ) {
 	}
 
 	/* Copy image to segment */
-	copy_user ( buffer, 0, elf->image, phdr->p_offset, phdr->p_filesz );
+	copy_user ( buffer, 0, image->data, phdr->p_offset, phdr->p_filesz );
 
 	return 0;
 }
@@ -89,10 +90,10 @@ static int elf_load_segment ( struct elf *elf, Elf_Phdr *phdr ) {
 /**
  * Load ELF image into memory
  *
- * @v elf		ELF file
+ * @v image		ELF file
  * @ret rc		Return status code
  */
-int elf_load ( struct elf *elf ) {
+int elf_load ( struct image *image ) {
 	Elf_Ehdr ehdr;
 	Elf_Phdr phdr;
 	Elf_Off phoff;
@@ -100,7 +101,7 @@ int elf_load ( struct elf *elf ) {
 	int rc;
 
 	/* Read ELF header */
-	copy_from_user ( &ehdr, elf->image, 0, sizeof ( ehdr ) );
+	copy_from_user ( &ehdr, image->data, 0, sizeof ( ehdr ) );
 	if ( memcmp ( &ehdr.e_ident[EI_MAG0], ELFMAG, SELFMAG ) != 0 ) {
 		DBG ( "Invalid ELF signature\n" );
 		return -ENOEXEC;
@@ -109,18 +110,24 @@ int elf_load ( struct elf *elf ) {
 	/* Read ELF program headers */
 	for ( phoff = ehdr.e_phoff , phnum = ehdr.e_phnum ; phnum ;
 	      phoff += ehdr.e_phentsize, phnum-- ) {
-		if ( phoff > elf->len ) {
+		if ( phoff > image->len ) {
 			DBG ( "ELF program header %d outside ELF image\n",
 			      phnum );
 			return -ENOEXEC;
 		}
-		copy_from_user ( &phdr, elf->image, phoff, sizeof ( phdr ) );
-		if ( ( rc = elf_load_segment ( elf, &phdr ) ) != 0 )
+		copy_from_user ( &phdr, image->data, phoff, sizeof ( phdr ) );
+		if ( ( rc = elf_load_segment ( image, &phdr ) ) != 0 )
 			return rc;
 	}
 
 	/* Fill in entry point address */
-	elf->entry = ehdr.e_entry;
+	image->entry = ehdr.e_entry;
 
 	return 0;
 }
+
+/** ELF image type */
+struct image_type elf_image_type __image_type = {
+	.name = "ELF",
+	.load = elf_load,
+};

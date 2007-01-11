@@ -6,6 +6,7 @@
 #include <gpxe/async.h>
 #include <gpxe/uaccess.h>
 #include <gpxe/buffer.h>
+#include <gpxe/image.h>
 #include <gpxe/elf.h>
 #include <bios.h>
 #include "pxe.h"
@@ -14,7 +15,7 @@ int test_tftp ( struct net_device *netdev, struct sockaddr_tcpip *target,
 		const char *filename ) {
 	struct tftp_session tftp;
 	struct buffer buffer;
-	struct elf elf;
+	struct image image;
 	uint16_t fbms;
 	int rc;
 
@@ -32,11 +33,11 @@ int test_tftp ( struct net_device *netdev, struct sockaddr_tcpip *target,
 	if ( ( rc = async_wait ( tftp_get ( &tftp ) ) ) != 0 )
 		return rc;
 
-	elf.image = buffer.addr;
-	elf.len = buffer.len;
-	if ( ( rc = elf_load ( &elf ) ) == 0 ) {
+	image.data = buffer.addr;
+	image.len = buffer.len;
+	if ( ( rc = elf_load ( &image ) ) == 0 ) {
 		printf ( "Got valid ELF image: execaddr at %lx\n",
-			 elf.entry );
+			 image.entry );
 		return 0;
 	}
 

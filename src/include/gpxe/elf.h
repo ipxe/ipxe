@@ -10,17 +10,6 @@
 
 #include <elf.h>
 
-/** An ELF file */
-struct elf {
-	/** ELF file image */
-	userptr_t image;
-	/** Length of ELF file image */
-	size_t len;
-
-	/** Entry point */
-	physaddr_t entry;
-};
-
-extern int elf_load ( struct elf *elf );
+extern int elf_load ( struct image *image );
 
 #endif /* _GPXE_ELF_H */
