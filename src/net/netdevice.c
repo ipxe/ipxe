@@ -91,6 +91,10 @@ int netdev_tx ( struct net_device *netdev, struct pk_buff *pkb ) {
 void netdev_tx_complete ( struct net_device *netdev, struct pk_buff *pkb ) {
 	DBGC ( netdev, "NETDEV %p transmission %p complete\n", netdev, pkb );
 
+	/* Catch data corruption as early as possible */
+	assert ( pkb->list.next != NULL );
+	assert ( pkb->list.prev != NULL );
+
 	list_del ( &pkb->list );
 	free_pkb ( pkb );
 }
