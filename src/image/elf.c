@@ -35,6 +35,16 @@ typedef Elf32_Phdr	Elf_Phdr;
 typedef Elf32_Off	Elf_Off;
 
 /**
+ * Execute ELF image
+ *
+ * @v image		ELF file
+ * @ret rc		Return status code
+ */
+static int elf_execute ( struct image *image __unused ) {
+	return -ENOTSUP;
+}
+
+/**
  * Load ELF segment into memory
  *
  * @v image		ELF file
@@ -122,6 +132,7 @@ int elf_load ( struct image *image ) {
 
 	/* Fill in entry point address */
 	image->entry = ehdr.e_entry;
+	image->execute = elf_execute;
 
 	return 0;
 }
