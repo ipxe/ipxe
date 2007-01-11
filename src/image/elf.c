@@ -53,7 +53,7 @@ static int elf_load_segment ( struct image *image, Elf_Phdr *phdr ) {
 	/* Check segment lies within image */
 	if ( ( phdr->p_offset + phdr->p_filesz ) > image->len ) {
 		DBG ( "ELF segment outside ELF file\n" );
-		return -ENOEXEC;
+		return -ERANGE;
 	}
 
 	/* Find start address: use physical address for preference,
@@ -65,7 +65,7 @@ static int elf_load_segment ( struct image *image, Elf_Phdr *phdr ) {
 		dest = phdr->p_vaddr;
 	if ( ! dest ) {
 		DBG ( "ELF segment loads to physical address 0\n" );
-		return -ENOEXEC;
+		return -ERANGE;
 	}
 	buffer = phys_to_user ( dest );
 
@@ -113,7 +113,7 @@ int elf_load ( struct image *image ) {
 		if ( phoff > image->len ) {
 			DBG ( "ELF program header %d outside ELF image\n",
 			      phnum );
-			return -ENOEXEC;
+			return -ERANGE;
 		}
 		copy_from_user ( &phdr, image->data, phoff, sizeof ( phdr ) );
 		if ( ( rc = elf_load_segment ( image, &phdr ) ) != 0 )

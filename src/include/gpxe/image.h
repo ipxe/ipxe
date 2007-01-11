@@ -40,6 +40,14 @@ struct image_type {
 	 * discarded after this call; the method must preserve any
 	 * information it may require later (e.g. the execution
 	 * address) within the @c image structure.
+	 *
+	 * The method should return -ENOEXEC if and only if the image
+	 * is not in the correct format.  Other errors will be
+	 * interpreted as "I claim this image format, but there's
+	 * something wrong with it that makes it unloadable".  In
+	 * particular, returning -ENOEXEC will cause the image probing
+	 * code to try the next available image type, while returning
+	 * any other error will terminate image probing.
 	 */
 	int ( * load ) ( struct image *image );
 };
