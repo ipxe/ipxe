@@ -1,5 +1,5 @@
-#ifndef _MEMMAP_H
-#define _MEMMAP_H
+#ifndef _GPXE_MEMMAP_H
+#define _GPXE_MEMMAP_H
 
 #include <stdint.h>
 
@@ -31,4 +31,4 @@ struct memory_map {
 
 extern void get_memmap ( struct memory_map *memmap );
 
-#endif /* _MEMMAP_H */
+#endif /* _GPXE_MEMMAP_H */

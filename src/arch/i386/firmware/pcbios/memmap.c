@@ -20,7 +20,7 @@
 #include <errno.h>
 #include <realmode.h>
 #include <bios.h>
-#include <memmap.h>
+#include <gpxe/memmap.h>
 
 /**
  * @file
