@@ -1,7 +1,8 @@
 #include "dev.h"
 #include <gpxe/buffer.h>
-#include "image.h"
 #include <console.h>
+
+#if 0
 
 static struct image images[0] __image_start;
 static struct image images_end[0] __image_end;
@@ -17,8 +18,6 @@ void print_images ( void ) {
 		printf ( "%s ", image->name );
 	}
 }
-
-#if 0
 
 /*
  * Identify the image format

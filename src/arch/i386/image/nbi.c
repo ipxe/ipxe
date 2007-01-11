@@ -1,12 +1,11 @@
-#include "image.h"
+#warning "This file is obsolete"
+#if 0
+
 #include "memsizes.h"
 #include "realmode.h"
 #include "gateA20.h"
 #include "etherboot.h"
 #include "errno.h"
-
-#warning "This file is obsolete"
-#if 0
 
 /** @file
  *

@@ -8,7 +8,6 @@
 #include "etherboot.h"
 #include "dev.h"
 #include "console.h"
-#include "image.h"
 
 #include "config/general.h"
 

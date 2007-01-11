@@ -25,7 +25,6 @@ Literature dealing with the network protocols:
 #include "cmdline.h"
 #include "console.h"
 #include <gpxe/init.h>
-#include "image.h"
 #include <stdarg.h>
 
 #include <gpxe/device.h>
