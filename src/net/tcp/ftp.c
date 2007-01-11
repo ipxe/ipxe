@@ -5,6 +5,7 @@
 #include <assert.h>
 #include <errno.h>
 #include <gpxe/async.h>
+#include <gpxe/buffer.h>
 #include <gpxe/ftp.h>
 
 /** @file
@@ -268,14 +269,14 @@ static void ftp_senddata ( struct tcp_application *app,
  * When the control channel is closed, the data channel must also be
  * closed, if it is currently open.
  */
-static void ftp_closed ( struct tcp_application *app, int status ) {
+static void ftp_closed ( struct tcp_application *app, int rc ) {
 	struct ftp_request *ftp = tcp_to_ftp ( app );
 
-	DBGC ( ftp, "FTP %p control connection closed (status %d)\n",
-	       ftp, status );
+	DBGC ( ftp, "FTP %p control connection closed: %s\n",
+	       ftp, strerror ( rc ) );
 
 	/* Complete FTP operation */
-	ftp_done ( ftp, status );
+	ftp_done ( ftp, rc );
 }
 
 /** FTP control channel operations */
@@ -314,15 +315,15 @@ tcp_to_ftp_data ( struct tcp_application *app ) {
  *
  * If the data channel is closed due to an error, we abort the request.
  */
-static void ftp_data_closed ( struct tcp_application *app, int status ) {
+static void ftp_data_closed ( struct tcp_application *app, int rc ) {
 	struct ftp_request *ftp = tcp_to_ftp_data ( app );
 
-	DBGC ( ftp, "FTP %p data connection closed (status %d)\n",
-	       ftp, status );
+	DBGC ( ftp, "FTP %p data connection closed: %s\n",
+	       ftp, strerror ( rc ) );
 	
 	/* If there was an error, close control channel and record status */
-	if ( status )
-		ftp_done ( ftp, status );
+	if ( rc )
+		ftp_done ( ftp, rc );
 }
 
 /**
@@ -331,14 +332,23 @@ static void ftp_data_closed ( struct tcp_application *app, int status ) {
  * @v app	TCP application
  * @v data	New data
  * @v len	Length of new data
- *
- * Data is handed off to the callback registered in the FTP request.
  */
 static void ftp_data_newdata ( struct tcp_application *app,
 			       void *data, size_t len ) {
 	struct ftp_request *ftp = tcp_to_ftp_data ( app );
+	int rc;
 
-	ftp->callback ( data, len );
+	/* Fill data buffer */
+	if ( ( rc = fill_buffer ( ftp->buffer, data,
+				  ftp->data_rcvd, len ) ) != 0 ){
+		DBGC ( ftp, "FTP %p failed to fill data buffer: %s\n",
+		       ftp, strerror ( rc ) );
+		ftp_done ( ftp, rc );
+		return;
+	}
+
+	/* Update received data total */
+	ftp->data_rcvd += len;
 }
 
 /** FTP data channel operations */
@@ -363,10 +373,13 @@ struct async_operation * ftp_get ( struct ftp_request *ftp ) {
 
 	DBGC ( ftp, "FTP %p fetching %s\n", ftp, ftp->filename );
 
-	ftp->tcp.tcp_op = &ftp_tcp_operations;
-	ftp->tcp_data.tcp_op = &ftp_data_tcp_operations;
+	ftp->state = FTP_CONNECT;
+	ftp->already_sent = 0;
 	ftp->recvbuf = ftp->status_text;
 	ftp->recvsize = sizeof ( ftp->status_text ) - 1;
+	ftp->data_rcvd = 0;
+	ftp->tcp.tcp_op = &ftp_tcp_operations;
+	ftp->tcp_data.tcp_op = &ftp_data_tcp_operations;
 	if ( ( rc = tcp_connect ( &ftp->tcp, &ftp->server, 0 ) ) != 0 )
 		ftp_done ( ftp, rc );
 

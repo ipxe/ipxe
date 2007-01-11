@@ -11,6 +11,8 @@
 #include <gpxe/async.h>
 #include <gpxe/tcp.h>
 
+struct buffer;
+
 /** FTP default port */
 #define FTP_PORT 21
 
@@ -40,15 +42,8 @@ struct ftp_request {
 	struct sockaddr_tcpip server;
 	/** File to download */
 	const char *filename;
-	/** Callback function
-	 *
-	 * @v data	Received data
-	 * @v len	Length of received data
-	 *
-	 * This function is called for all data received from the
-	 * remote server.
-	 */
-	void ( *callback ) ( char *data, size_t len );
+	/** Data buffer to fill */
+	struct buffer *buffer;
 
 	/** Current state */
 	enum ftp_state state;
@@ -62,6 +57,8 @@ struct ftp_request {
 	char status_text[4];
 	/** Passive-mode parameters, as text */
 	char passive_text[24]; /* "aaa,bbb,ccc,ddd,eee,fff" */
+	/** Amount of data received */
+	size_t data_rcvd;
 
 	/** TCP application for the control channel */
 	struct tcp_application tcp;
