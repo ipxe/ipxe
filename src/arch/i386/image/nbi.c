@@ -2,7 +2,6 @@
 #include "memsizes.h"
 #include "realmode.h"
 #include "gateA20.h"
-#include "osloader.h"
 #include "etherboot.h"
 #include "errno.h"
 
