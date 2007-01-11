@@ -28,19 +28,8 @@
 #include <gpxe/uaccess.h>
 #include <gpxe/image.h>
 #include <gpxe/segment.h>
+#include <gpxe/memmap.h>
 #include <gpxe/elf.h>
-
-/** Boot modules must be page aligned */
-#define MB_FLAG_PGALIGN 0x00000001
-
-/** Memory map must be provided */
-#define MB_FLAG_MEMMAP 0x00000002
-
-/** Video mode information must be provided */
-#define MB_FLAG_VIDMODE 0x00000004
-
-/** Image is a raw multiboot image (not ELF) */
-#define MB_FLAG_RAW 0x00010000
 
 /** Multiboot flags that we support */
 #define MB_SUPPORTED_FLAGS ( MB_FLAG_PGALIGN | MB_FLAG_MEMMAP | \
@@ -75,18 +64,51 @@ struct multiboot_header_info {
  * @ret rc		Return status code
  */
 static int multiboot_execute ( struct image *image ) {
+	static const char *bootloader_name = "gPXE " VERSION;
 	struct multiboot_info mbinfo;
+	struct memory_map memmap;
+	struct multiboot_memory_map mbmemmap[ sizeof ( memmap.regions ) /
+					      sizeof ( memmap.regions[0] ) ];
+	unsigned int i;
 
 	/* Populate multiboot information structure */
 	memset ( &mbinfo, 0, sizeof ( mbinfo ) );
+
+	/* Set boot loader name */
+	mbinfo.flags |= MBI_FLAG_LOADER;
+	mbinfo.boot_loader_name = virt_to_phys ( bootloader_name );
 	
+	/* Get memory map */
+	get_memmap ( &memmap );
+	memset ( mbmemmap, 0, sizeof ( mbmemmap ) );
+	for ( i = 0 ; i < memmap.count ; i++ ) {
+		mbmemmap[i].size = sizeof ( mbmemmap[i] );
+		mbmemmap[i].base_addr = memmap.regions[i].start;
+		mbmemmap[i].length = ( memmap.regions[i].end -
+				       memmap.regions[i].start );
+		mbmemmap[i].type = MBMEM_RAM;
+		mbinfo.mmap_length += sizeof ( mbmemmap[i] );
+		if ( memmap.regions[i].start == 0 )
+			mbinfo.mem_lower = memmap.regions[i].end;
+		if ( memmap.regions[i].start == 0x100000 )
+			mbinfo.mem_upper = ( memmap.regions[i].end - 0x100000);
+	}
+	mbinfo.flags |= ( MBI_FLAG_MEM | MBI_FLAG_MMAP );
+	mbinfo.mmap_addr = virt_to_phys ( &mbmemmap[0].base_addr );
+
+	/* Set command line, if present */
+	if ( image->cmdline ) {
+		mbinfo.flags |= MBI_FLAG_CMDLINE;
+		mbinfo.cmdline = virt_to_phys ( image->cmdline );
+	}
 
 	/* Jump to OS with flat physical addressing */
-	__asm__ ( PHYS_CODE ( "call *%%edi\n\t" )
-		  : : "a" ( MULTIBOOT_BOOTLOADER_MAGIC ),
-		      "b" ( virt_to_phys ( &mbinfo ) ),
-		      "D" ( image->entry )
-		  : "ecx", "edx", "esi", "ebp" );
+	__asm__ __volatile__ ( PHYS_CODE ( "xchgw %%bx,%%bx\n\t"
+					   "call *%%edi\n\t" )
+			       : : "a" ( MULTIBOOT_BOOTLOADER_MAGIC ),
+			           "b" ( virt_to_phys ( &mbinfo ) ),
+			           "D" ( image->entry )
+			       : "ecx", "edx", "esi", "ebp" );
 
 	return -ECANCELED;
 }
