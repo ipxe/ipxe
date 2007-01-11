@@ -80,21 +80,21 @@ struct buffer_free_block {
  * @ret block		Next free block descriptor
  * @ret rc		Return status code
  *
- * Set @c block->next=buffer->free before first call to
+ * Set @c block->next=buffer->fill before first call to
  * get_next_free_block().
  */
 static int get_next_free_block ( struct buffer *buffer,
 				 struct buffer_free_block *block ) {
 
 	/* Check for end of buffer */
-	if ( block->end >= buffer->len )
+	if ( block->next >= buffer->len )
 		return -ENOENT;
 
 	/* Move to next block */
 	block->start = block->next;
 	if ( block->start >= buffer->free ) {
 		/* Final block; no in-band descriptor */
-		block->end = buffer->len;
+		block->next = block->end = buffer->len;
 	} else {
 		/* Retrieve block descriptor */
 		copy_from_phys ( block, ( buffer->addr + block->start ),
