@@ -145,29 +145,29 @@
 #define ENFILE		EMFILE	/**< Too many open files in system */
 /** Cannot allocate memory */
 #define ENOMEM		PXENV_STATUS_OUT_OF_RESOURCES
-#define ENOBUFS		ENOMEM	/**< No buffer space available */
-#define ENODATA		0xe6	/**< No data available */
-#define ENODEV		0xe7	/**< No such device */
-#define ENOENT		0xe8	/**< No such file or directory */
-#define ENOEXEC		0xe9	/**< Exec format error */
+#define ENOBUFS		0xe6	/**< No buffer space available */
+#define ENODATA		0xe7	/**< No data available */
+#define ENODEV		0xe8	/**< No such device */
+#define ENOENT		0xe9	/**< No such file or directory */
+#define ENOEXEC		0xea	/**< Exec format error */
 #define ENOMSG		ENODATA	/**< No message of the desired type */
-#define ENOSPC		0xea	/**< No space left on device */
-#define ENOSR		0xeb	/**< No stream resources */
-#define ENOSTR		0xec	/**< Not a stream */
-#define ENOSYS		0xed	/**< Function not implemented */
-#define ENOTCONN	0xee	/**< Transport endpoint is not connected */
-#define ENOTSOCK	0xef	/**< Socket operation on non-socket */
-#define EOPNOTSUPP	0xf0	/**< Operation not supported */
+#define ENOSPC		0xeb	/**< No space left on device */
+#define ENOSR		0xec	/**< No stream resources */
+#define ENOSTR		0xed	/**< Not a stream */
+#define ENOSYS		0xee	/**< Function not implemented */
+#define ENOTCONN	0xef	/**< Transport endpoint is not connected */
+#define ENOTSOCK	0xf0	/**< Socket operation on non-socket */
+#define EOPNOTSUPP	0xf1	/**< Operation not supported */
 #define ENOTSUP		EOPNOTSUPP /**< Not supported */
-#define ENOTTY		0xf1	/**< Inappropriate ioctl for device */
+#define ENOTTY		0xf2	/**< Inappropriate ioctl for device */
 #define ENXIO		ENODEV	/**< No such device or address */
-#define EOVERFLOW	0xf2	/**< Result too large */
+#define EOVERFLOW	0xf3	/**< Result too large */
 #define EPERM		EACCES	/**< Operation not permitted */
-#define EPROTO		0xf3	/**< Protocol error */
-#define EPROTONOSUPPORT	0xf4	/**< Protocol not supported */
-#define EPROTOTYPE	0xf5	/**< Protocol wrong type for socket */
+#define EPROTO		0xf4	/**< Protocol error */
+#define EPROTONOSUPPORT	0xf5	/**< Protocol not supported */
+#define EPROTOTYPE	0xf6	/**< Protocol wrong type for socket */
 #define ERANGE		EOVERFLOW /**< Result too large */
-#define ETIMEDOUT	0xf6	/**< Connection timed out */
+#define ETIMEDOUT	0xf7	/**< Connection timed out */
 #define EWOULDBLOCK	EAGAIN	/**< Resource temporarily unavailable */
 
 extern int errno;
