@@ -30,33 +30,13 @@
 #include <gpxe/linebuf.h>
 
 /**
- * Line terminators
+ * Retrieve buffered-up line
  *
- * These values are used in the @c skip_terminators bitmask.
+ * @v linebuf		Line buffer
+ * @ret line		Buffered line, or NULL if no line ready to read
  */
-enum line_terminators {
-	TERM_CR = 1,
-	TERM_NL = 2,
-	TERM_NUL = 4,
-};
-
-/**
- * Get terminator ID corresponding to character
- *
- * @v character		Character
- * @ret terminator_id	Terminator ID, or -1
- */
-static int terminator_id ( unsigned int character ) {
-	switch ( character ) {
-	case '\r':
-		return TERM_CR;
-	case '\n':
-		return TERM_NL;
-	case '\0':
-		return TERM_NUL;
-	default:
-		return -1;
-	}
+char * buffered_line ( struct line_buffer *linebuf ) {
+	return ( linebuf->ready ? linebuf->data : NULL );
 }
 
 /**
@@ -68,6 +48,7 @@ void empty_line_buffer ( struct line_buffer *linebuf ) {
 	free ( linebuf->data );
 	linebuf->data = NULL;
 	linebuf->len = 0;
+	linebuf->ready = 0;
 }
 
 /**
@@ -76,61 +57,60 @@ void empty_line_buffer ( struct line_buffer *linebuf ) {
  * @v linebuf			Line buffer
  * @v data			New data to add
  * @v len			Length of new data to add
- * @ret buffered		Amount of data consumed and added to the buffer
- * @ret <0			Out of memory
+ * @ret rc			Return status code
  * 
- * If line_buffer() does not consume the entirety of the new data
- * (i.e. if @c buffered is not equal to @c len), then an end of line
- * has been reached and the buffered-up line can be obtained from
- * buffered_line().  Carriage returns and newlines will have been
- * stripped, and the line will be NUL-terminated.  This buffered line
- * is valid only until the next call to line_buffer() (or to
- * empty_line_buffer()).
+ * If line_buffer() returns >0, then an end of line has been reached
+ * and the buffered-up line can be obtained from buffered_line().
+ * Carriage returns and newlines will have been stripped, and the line
+ * will be NUL-terminated.  This buffered line is valid only until the
+ * next call to line_buffer() (or to empty_line_buffer()).
+ *
+ * @c data and @c len will be updated to reflect the data consumed by
+ * line_buffer().
  *
  * Note that line buffers use dynamically allocated storage; you
  * should call empty_line_buffer() before freeing a @c struct @c
  * line_buffer.
  */
-int line_buffer ( struct line_buffer *linebuf, const char *data, size_t len ) {
-	size_t consume = 0;
-	size_t copy = 0;
+int line_buffer ( struct line_buffer *linebuf,
+		  const char **data, size_t *len ) {
+	const char *eol;
+	size_t consume;
 	size_t new_len;
 	char *new_data;
-	int terminator;
 
-	/* First, handle the termination of the previous line */
-	if ( linebuf->skip_terminators ) {
-		/* Free buffered string */
+	/* Free any completed line from previous iteration */
+	if ( linebuf->ready )
 		empty_line_buffer ( linebuf );
-		/* Skip over any terminators from the end of a previous line */
-		for ( ; consume < len ; consume++ ) {
-			terminator = terminator_id ( data[consume] );
-			if ( ( terminator < 0 ) ||
-			     ! ( linebuf->skip_terminators & terminator ) ) {
-				linebuf->skip_terminators = 0;
-				break;
-			}
-			linebuf->skip_terminators &= ~terminator;
-		}
-	}
 
-	/* Scan up to the next terminator, if any */
-	for ( ; consume < len ; consume++, copy++ ) {
-		if ( terminator_id ( data[consume] ) >= 0 ) {
-			linebuf->skip_terminators = -1U;
-			break;
-		}
+	/* Search for line terminator */
+	if ( ( eol = memchr ( *data, '\n', *len ) ) ) {
+		consume = ( eol - *data + 1 );
+	} else {
+		consume = *len;
 	}
 
 	/* Reallocate data buffer and copy in new data */
-	new_len = ( linebuf->len + copy );
+	new_len = ( linebuf->len + consume );
 	new_data = realloc ( linebuf->data, ( new_len + 1 ) );
 	if ( ! new_data )
 		return -ENOMEM;
-	memcpy ( ( new_data + linebuf->len ), ( data + consume - copy ),
-		 copy );
+	memcpy ( ( new_data + linebuf->len ), *data, consume );
 	new_data[new_len] = '\0';
 	linebuf->data = new_data;
 	linebuf->len = new_len;
-	return consume;
+
+	/* Update data and len */
+	*data += consume;
+	*len -= consume;
+
+	/* If we have reached end of line, trim the line and mark as ready */
+	if ( eol ) {
+		linebuf->data[--linebuf->len] = '\0'; /* trim NL */
+		if ( linebuf->data[linebuf->len - 1] == '\r' )
+			linebuf->data[--linebuf->len] = '\0'; /* trim CR */
+		linebuf->ready = 1;
+	}
+
+	return 0;
 }

@@ -12,26 +12,17 @@
 
 /** A line buffer */
 struct line_buffer {
-	/** Current data in the buffer */
+	/** Current string in the buffer */
 	char *data;
-	/** Length of current data */
+	/** Length of current string, excluding the terminating NUL */
 	size_t len;
-	/** Bitmask of terminating characters to skip over */
-	unsigned int skip_terminators;
+	/** String is ready to read */
+	int ready;
 };
 
-/**
- * Retrieve buffered-up line
- *
- * @v linebuf		Line buffer
- * @ret line		Buffered line, or NULL if no line present
- */
-static inline char * buffered_line ( struct line_buffer *linebuf ) {
-	return linebuf->data;
-}
-
-extern int line_buffer ( struct line_buffer *linebuf, const char *data,
-			 size_t len );
+extern char * buffered_line ( struct line_buffer *linebuf );
+extern int line_buffer ( struct line_buffer *linebuf,
+		  const char **data, size_t *len );
 extern void empty_line_buffer ( struct line_buffer *linebuf );
 
 #endif /* _GPXE_LINEBUF_H */
