@@ -21,6 +21,7 @@
 #include <errno.h>
 #include <vsprintf.h>
 #include <gpxe/image.h>
+#include <gpxe/emalloc.h>
 #include <usr/fetch.h>
 #include <usr/imgmgmt.h>
 
@@ -65,7 +66,7 @@ int imgfetch ( const char *filename, const char *name,
 	return 0;
 
  err:
-	free_image ( image );
+	efree ( image->data );
 	free ( image );
 	return rc;
 }
@@ -77,7 +78,16 @@ int imgfetch ( const char *filename, const char *name,
  * @ret rc		Return status code
  */
 int imgload ( struct image *image ) {
-	return image_autoload ( image );
+	int rc;
+
+	/* Try to load image */
+	if ( ( rc = image_autoload ( image ) ) != 0 )
+		return rc;
+
+	/* If we succeed, move the image to the start of the list */
+	promote_image ( image );
+
+	return 0;
 }
 
 /**
@@ -129,6 +139,6 @@ void imgstat ( struct image *image ) {
  */
 void imgfree ( struct image *image ) {
 	unregister_image ( image );
-	free_image ( image );
+	efree ( image->data );
 	free ( image );
 }

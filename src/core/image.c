@@ -23,6 +23,7 @@
 #include <assert.h>
 #include <vsprintf.h>
 #include <gpxe/list.h>
+#include <gpxe/emalloc.h>
 #include <gpxe/image.h>
 
 /** @file
@@ -73,6 +74,20 @@ void unregister_image ( struct image *image ) {
 }
 
 /**
+ * Move image to start of list of registered images
+ *
+ * @v image		Executable/loadable image
+ *
+ * Move the image to the start of the image list.  This makes it
+ * easier to keep track of which of the images marked as loaded is
+ * likely to still be valid.
+ */
+void promote_image ( struct image *image ) {
+	list_del ( &image->list );
+	list_add ( &image->list, &images );
+}
+
+/**
  * Find image by name
  *
  * @v name		Image name
@@ -90,18 +105,24 @@ struct image * find_image ( const char *name ) {
 }
 
 /**
- * Free loaded image
+ * Load executable/loadable image into memory
  *
  * @v image		Executable/loadable image
- *
- * This releases the memory being used to store the image; it does not
- * release the @c struct @c image itself, nor does it unregister the
- * image.
+ * @v type		Executable/loadable image type
+ * @ret rc		Return status code
  */
-void free_image ( struct image *image ) {
-	efree ( image->data );
-	image->data = UNULL;
-	image->len = 0;
+static int image_load_type ( struct image *image, struct image_type *type ) {
+	int rc;
+
+	if ( ( rc = type->load ( image ) ) != 0 ) {
+		DBGC ( image, "IMAGE %p could not load as %s: %s\n",
+		       image, type->name, strerror ( rc ) );
+		return rc;
+	}
+
+	/* Flag as loaded */
+	image->flags |= IMAGE_LOADED;
+	return 0;
 }
 
 /**
@@ -111,18 +132,10 @@ void free_image ( struct image *image ) {
  * @ret rc		Return status code
  */
 int image_load ( struct image *image ) {
-	int rc;
 
 	assert ( image->type != NULL );
 
-	if ( ( rc = image->type->load ( image ) ) != 0 ) {
-		DBGC ( image, "IMAGE %p could not load: %s\n",
-		       image, strerror ( rc ) );
-		return rc;
-	}
-
-	image->flags |= IMAGE_LOADED;
-	return 0;
+	return image_load_type ( image, image->type );
 }
 
 /**
@@ -137,16 +150,10 @@ int image_autoload ( struct image *image ) {
 
 	for ( type = image_types ; type < image_types_end ; type++ ) {
 		DBGC ( image, "IMAGE %p trying type %s\n", image, type->name );
-		rc = type->load ( image );
+		rc = image_load_type ( image, type );
 		if ( image->type == NULL )
 			continue;
-		if ( rc != 0 ) {
-			DBGC ( image, "IMAGE %p (%s) could not load: %s\n",
-			       image, image->type->name, strerror ( rc ) );
-			return rc;
-		}
-		image->flags |= IMAGE_LOADED;
-		return 0;
+		return rc;
 	}
 
 	DBGC ( image, "IMAGE %p format not recognised\n", image );
