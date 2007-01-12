@@ -111,6 +111,18 @@ copy_from_real_librm ( void *dest, unsigned int src_seg,
 typedef intptr_t userptr_t;
 
 /**
+ * Add offset to user pointer
+ *
+ * @v ptr		User pointer
+ * @v offset		Offset
+ * @ret new_ptr		New pointer value
+ */
+static inline __attribute__ (( always_inline )) userptr_t
+userptr_add ( userptr_t ptr, off_t offset ) {
+	return ( ptr + offset );
+}
+
+/**
  * Copy data to user buffer
  *
  * @v buffer		User buffer
@@ -146,10 +158,26 @@ copy_from_user ( void *dest, userptr_t buffer, off_t offset, size_t len ) {
  * @v len		Length
  */
 static inline __attribute__ (( always_inline )) void
-copy_user ( userptr_t dest, off_t dest_off, userptr_t src, off_t src_off,
-	    size_t len ) {
+memcpy_user ( userptr_t dest, off_t dest_off, userptr_t src, off_t src_off,
+	      size_t len ) {
 	memcpy ( ( ( void * ) dest + dest_off ), ( ( void * ) src + src_off ),
 		 len );
+}
+
+/**
+ * Copy data between user buffers, allowing for overlap
+ *
+ * @v dest		Destination user buffer
+ * @v dest_off		Offset within destination buffer
+ * @v src		Source user buffer
+ * @v src_off		Offset within source buffer
+ * @v len		Length
+ */
+static inline __attribute__ (( always_inline )) void
+memmove_user ( userptr_t dest, off_t dest_off, userptr_t src, off_t src_off,
+	       size_t len ) {
+	memmove ( ( ( void * ) dest + dest_off ), ( ( void * ) src + src_off ),
+		  len );
 }
 
 /**

@@ -255,7 +255,7 @@ static int multiboot_load_raw ( struct image *image,
 	}
 
 	/* Copy image to segment */
-	copy_user ( buffer, 0, image->data, offset, filesz );
+	memcpy_user ( buffer, 0, image->data, offset, filesz );
 
 	/* Record execution entry point */
 	image->entry = hdr->mb.entry_addr;

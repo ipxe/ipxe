@@ -94,7 +94,7 @@ static int elf_load_segment ( struct image *image, Elf_Phdr *phdr ) {
 	}
 
 	/* Copy image to segment */
-	copy_user ( buffer, 0, image->data, phdr->p_offset, phdr->p_filesz );
+	memcpy_user ( buffer, 0, image->data, phdr->p_offset, phdr->p_filesz );
 
 	return 0;
 }
