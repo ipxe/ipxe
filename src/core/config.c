@@ -122,20 +122,23 @@ REQUIRE_OBJECT ( elf );
 #ifdef COFF_IMAGE
 REQUIRE_OBJECT ( coff );
 #endif
-#ifdef IMAGE_FREEBSD
+#ifdef FREEBSD_IMAGE
 REQUIRE_OBJECT ( freebsd );
 #endif
-#ifdef	IMAGE_MULTIBOOT
+#ifdef MULTIBOOT_IMAGE
 REQUIRE_OBJECT ( multiboot );
 #endif
-#ifdef	AOUT_IMAGE
+#ifdef AOUT_IMAGE
 REQUIRE_OBJECT ( aout );
 #endif
-#ifdef	WINCE_IMAGE
+#ifdef WINCE_IMAGE
 REQUIRE_OBJECT ( wince );
 #endif
-#ifdef	PXE_IMAGE
+#ifdef PXE_IMAGE
 REQUIRE_OBJECT ( pxe );
+#endif
+#ifdef SCRIPT_IMAGE
+REQUIRE_OBJECT ( script );
 #endif
 
 /*
