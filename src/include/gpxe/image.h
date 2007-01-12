@@ -55,10 +55,8 @@ struct image_type {
 	 * @v image		Executable/loadable image
 	 * @ret rc		Return status code
 	 *
-	 * Load the image into memory.  The file image may be
-	 * discarded after this call; the method must preserve any
-	 * information it may require later (e.g. the execution
-	 * address) within the @c image structure.
+	 * Load the image into memory at the correct location as
+	 * determined by the file format.
 	 *
 	 * If the file image is in the correct format, the method must
 	 * update @c image->type to point to its own type (unless @c
