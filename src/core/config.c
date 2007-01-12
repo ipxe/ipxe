@@ -157,6 +157,9 @@ REQUIRE_OBJECT ( ifmgmt_cmd );
 #ifdef ROUTE_CMD
 REQUIRE_OBJECT ( route_cmd );
 #endif
+#ifdef IMAGE_CMD
+REQUIRE_OBJECT ( image_cmd );
+#endif
 
 /*
  * Drag in miscellaneous objects

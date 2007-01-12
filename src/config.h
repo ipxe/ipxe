@@ -120,6 +120,7 @@
 #define	CONFIG_CMD		/* Option configuration console */
 #define	IFMGMT_CMD		/* Interface management commands */
 #define	ROUTE_CMD		/* Routing table management commands */
+#define IMAGE_CMD		/* Image management commands */
 
 /* @END general.h */ 
 
