@@ -8,6 +8,8 @@
  *
  */
 
+struct buffer;
+
 extern int ebuffer_alloc ( struct buffer *buffer, size_t len );
 
 #endif /* _GPXE_EBUFFER_H */
