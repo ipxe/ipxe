@@ -133,7 +133,7 @@ static int split_args ( char *args, char * argv[] ) {
 int system ( const char *command ) {
 	char *args;
 	int argc;
-	int rc;
+	int rc = 0;
 
 	/* Obtain temporary modifiable copy of command line */
 	args = strdup ( command );
@@ -144,12 +144,14 @@ int system ( const char *command ) {
 	argc = split_args ( args, NULL );
 
 	/* Create argv array and execute command */
-	{
+	if ( argc ) {
 		char * argv[argc + 1];
 		
 		split_args ( args, argv );
 		argv[argc] = NULL;
-		rc = execv ( argv[0], argv );
+
+		if ( argv[0][0] != '#' )
+			rc = execv ( argv[0], argv );
 	}
 
 	free ( args );
