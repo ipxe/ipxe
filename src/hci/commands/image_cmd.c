@@ -344,7 +344,8 @@ static int imgexec_exec ( int argc, char **argv ) {
 	}
 
 	if ( ( rc = imgexec ( image ) ) != 0 ) {
-		printf ( "Could not execute %s: %s\n", name, strerror ( rc ) );
+		printf ( "Could not execute %s: %s\n",
+			 image->name, strerror ( rc ) );
 		return 1;
 	}
 
