@@ -21,4 +21,7 @@
 
 #include <bits/uaccess.h>
 
+/** Equivalent of NULL for user pointers */
+#define UNULL ( ( userptr_t ) 0 )
+
 #endif /* _GPXE_UACCESS_H */
