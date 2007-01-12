@@ -58,12 +58,6 @@ static int ifcommon_do_all ( int ( * payload ) ( struct net_device * ) ) {
 	struct net_device *netdev;
 	int rc = 0;
 
-	/* Print error if no network devices exist */
-	if ( ! have_netdevs() ) {
-		printf ( "No network interfaces\n" );
-		return 1;
-	}
-
 	/* Execute payload for each network device */
 	for_each_netdev ( netdev ) {
 		if ( payload ( netdev ) != 0 )
