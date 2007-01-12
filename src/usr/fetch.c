@@ -23,7 +23,6 @@
  *
  */
 
-#include <libgen.h>
 #include <vsprintf.h>
 #include <gpxe/emalloc.h>
 #include <gpxe/ebuffer.h>
@@ -44,12 +43,6 @@
 int fetch ( struct image *image, const char *filename ) {
 	struct buffer buffer;
 	int rc;
-
-	/* Name the image, if it isn't explicitly named */
-	if ( ! image->name[0] ) {
-		strncpy ( image->name, basename ( filename ),
-			  ( sizeof ( image->name ) - 1 ) );
-	}
 
 	/* Allocate an expandable buffer to hold the file */
 	if ( ( rc = ebuffer_alloc ( &buffer, 0 ) ) != 0 )

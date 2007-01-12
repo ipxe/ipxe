@@ -17,8 +17,11 @@
  */
 
 #include <stdint.h>
+#include <stdlib.h>
+#include <errno.h>
 #include <vsprintf.h>
 #include <gpxe/image.h>
+#include <usr/fetch.h>
 #include <usr/imgmgmt.h>
 
 /** @file
@@ -28,18 +31,88 @@
  */
 
 /**
+ * Fetch an image
+ *
+ * @v filename		Filename for image
+ * @v name		Name for image, or NULL
+ * @ret new_image	Newly created image
+ * @ret rc		Return status code
+ */
+int imgfetch ( const char *filename, const char *name,
+	       struct image **new_image ) {
+	struct image *image;
+	int rc;
+
+	/* Allocate new image */
+	image = malloc ( sizeof ( *image ) );
+	if ( ! image )
+		return -ENOMEM;
+	memset ( image, 0, sizeof ( *image ) );
+
+	/* Fill in image name */
+	if ( name )
+		strncpy ( image->name, name, ( sizeof ( image->name ) - 1 ) );
+
+	/* Fetch the file */
+	if ( ( rc = fetch ( image, filename ) ) != 0 )
+		goto err;
+
+	/* Register the image */
+	if ( ( rc = register_image ( image ) ) != 0 )
+		goto err;
+
+	*new_image = image;
+	return 0;
+
+ err:
+	free_image ( image );
+	free ( image );
+	return rc;
+}
+
+/**
+ * Load an image
+ *
+ * @v image		Image
+ * @ret rc		Return status code
+ */
+int imgload ( struct image *image ) {
+	return image_autoload ( image );
+}
+
+/**
+ * Execute an image
+ *
+ * @v image		Image
+ * @ret rc		Return status code
+ */
+int imgexec ( struct image *image ) {
+	return image_exec ( image );
+}
+
+/**
  * Display status of an image
  *
  * @v image		Executable/loadable image
  */
 void imgstat ( struct image *image ) {
-	printf ( "%s: %zd bytes ", image->name, image->len );
+	printf ( "%s: %zd bytes", image->name, image->len );
 	if ( image->type )
 		printf ( " [%s]", image->type->name );
 	if ( image->flags & IMAGE_LOADED )
 		printf ( " [LOADED]" );
 	if ( image->cmdline[0] )
-		printf ( "\"%s\"", image->cmdline );
+		printf ( " \"%s\"", image->cmdline );
 	printf ( "\n" );
 }
 
+/**
+ * Free an image
+ *
+ * @v image		Executable/loadable image
+ */
+void imgfree ( struct image *image ) {
+	unregister_image ( image );
+	free_image ( image );
+	free ( image );
+}
