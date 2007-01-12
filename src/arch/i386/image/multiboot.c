@@ -78,17 +78,18 @@ static void multiboot_build_memmap ( struct multiboot_info *mbinfo,
 	/* Translate into multiboot format */
 	memset ( mbmemmap, 0, sizeof ( *mbmemmap ) );
 	for ( i = 0 ; i < memmap.count ; i++ ) {
-		mbmemmap[i].size = sizeof ( mbmemmap[i] );
+		mbmemmap[i].size = ( sizeof ( mbmemmap[i] ) -
+				     sizeof ( mbmemmap[i].size ) );
 		mbmemmap[i].base_addr = memmap.regions[i].start;
 		mbmemmap[i].length = ( memmap.regions[i].end -
 				       memmap.regions[i].start );
 		mbmemmap[i].type = MBMEM_RAM;
 		mbinfo->mmap_length += sizeof ( mbmemmap[i] );
 		if ( memmap.regions[i].start == 0 )
-			mbinfo->mem_lower = memmap.regions[i].end;
+			mbinfo->mem_lower = ( memmap.regions[i].end / 1024 );
 		if ( memmap.regions[i].start == 0x100000 )
-			mbinfo->mem_upper = ( memmap.regions[i].end -
-					      0x100000 );
+			mbinfo->mem_upper = ( ( memmap.regions[i].end -
+						0x100000 ) / 1024 );
 	}
 }
 
@@ -119,7 +120,11 @@ multiboot_build_module_list ( struct image *image,
 		module->mod_start = user_to_phys ( module_image->data, 0 );
 		module->mod_end = user_to_phys ( module_image->data,
 						 module_image->len );
-		module->string = virt_to_phys ( image->cmdline );
+		module->string = virt_to_phys ( module_image->cmdline );
+		module->reserved = 0;
+		DBG ( "Multiboot module %lx is [%lx,%lx)\n",
+		      virt_to_phys ( module ),
+		      module->mod_start, module->mod_end );
 
 		/* We promise to page-align modules, so at least check */
 		assert ( ( module->mod_start & 0xfff ) == 0 );
@@ -150,7 +155,7 @@ static int multiboot_exec ( struct image *image ) {
 	
 	/* Build memory map */
 	multiboot_build_memmap ( &mbinfo, mbmemmap );
-	mbinfo.mmap_addr = virt_to_phys ( &mbmemmap[0].base_addr );
+	mbinfo.mmap_addr = virt_to_phys ( mbmemmap );
 	mbinfo.flags |= ( MBI_FLAG_MEM | MBI_FLAG_MMAP );
 
 	/* Set command line */
