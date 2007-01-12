@@ -136,6 +136,7 @@ int image_autoload ( struct image *image ) {
 	int rc;
 
 	for ( type = image_types ; type < image_types_end ; type++ ) {
+		DBGC ( image, "IMAGE %p trying type %s\n", image, type->name );
 		rc = type->load ( image );
 		if ( image->type == NULL )
 			continue;
