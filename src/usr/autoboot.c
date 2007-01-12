@@ -20,8 +20,12 @@
 #include <errno.h>
 #include <vsprintf.h>
 #include <gpxe/netdevice.h>
+#include <gpxe/dhcp.h>
+#include <gpxe/image.h>
 #include <usr/ifmgmt.h>
 #include <usr/route.h>
+#include <usr/dhcpmgmt.h>
+#include <usr/imgmgmt.h>
 #include <usr/autoboot.h>
 
 /** @file
@@ -29,8 +33,6 @@
  * Automatic booting
  *
  */
-
-void test_dhcp ( struct net_device *netdev );
 
 /**
  * Identify the boot network device
@@ -75,15 +77,43 @@ static struct net_device * next_netdev ( void ) {
  * @v netdev		Network device
  */
 void netboot ( struct net_device *netdev ) {
+	char filename[256];
+	struct image *image;
+	int rc;
 
 	/* Open device and display device status */
-	if ( ifopen ( netdev ) != 0 )
+	if ( ( rc = ifopen ( netdev ) != 0 ) )
 		return;
 	ifstat ( netdev );
 
-	test_dhcp ( netdev );
-
+	/* Configure device via DHCP */
+	if ( ( rc = dhcp ( netdev ) != 0 ) )
+		return;
 	route();
+
+	/* Try to download and boot whatever we are given as a filename */
+	dhcp_snprintf ( filename, sizeof ( filename ),
+			find_global_dhcp_option ( DHCP_BOOTFILE_NAME ) );
+	if ( ! filename[0] ) {
+		printf ( "No boot filename\n" );
+		return;
+	}
+	printf ( "Booting \"%s\"\n", filename );
+	if ( ( rc = imgfetch ( filename, NULL, &image ) ) != 0 ) {
+		printf ( "Could not retrieve %s: %s\n",
+			 filename, strerror ( rc ) );
+		return;
+	}
+	if ( ( rc = imgload ( image ) ) != 0 ) {
+		printf ( "Could not load %s: %s\n", image->name,
+			 strerror ( rc ) );
+		return;
+	}
+	if ( ( rc = imgexec ( image ) ) != 0 ) {
+		printf ( "Could not execute %s: %s\n", image->name,
+			 strerror ( rc ) );
+		return;
+	}
 }
 
 /**
