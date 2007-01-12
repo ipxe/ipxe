@@ -19,10 +19,14 @@ int test_tftp ( struct net_device *netdev, struct sockaddr_tcpip *target,
 	uint16_t fbms;
 	int rc;
 
+
+	ebuffer_alloc ( &buffer, 0 );
+#if 0
 	memset ( &buffer, 0, sizeof ( buffer ) );
 	buffer.addr = real_to_user ( 0, 0x7c00 );
 	get_real ( fbms, BDA_SEG, BDA_FBMS );
 	buffer.len = ( fbms * 1024 - 0x7c00 );
+#endif
 
 	memset ( &tftp, 0, sizeof ( tftp ) );
 	udp_connect ( &tftp.udp, target );
@@ -33,11 +37,15 @@ int test_tftp ( struct net_device *netdev, struct sockaddr_tcpip *target,
 	if ( ( rc = async_wait ( tftp_get ( &tftp ) ) ) != 0 )
 		return rc;
 
+	memset ( &image, 0, sizeof ( image ) );
 	image.data = buffer.addr;
 	image.len = buffer.len;
-	if ( ( rc = elf_load ( &image ) ) == 0 ) {
-		printf ( "Got valid ELF image: execaddr at %lx\n",
+	if ( ( rc = multiboot_load ( &image ) ) == 0 ) {
+		printf ( "Got valid multiboot image: execaddr at %lx\n",
 			 image.entry );
+
+		image_exec ( &image );
+
 		return 0;
 	}
 
