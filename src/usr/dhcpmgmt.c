@@ -45,6 +45,10 @@ int dhcp ( struct net_device *netdev ) {
 	struct in_addr gateway = { INADDR_NONE };
 	int rc;
 
+	/* Check we can open the interface first */
+	if ( ( rc = ifopen ( netdev ) ) != 0 )
+		return rc;
+
 	/* Free up any previously-acquired options */
 	if ( dhcp_options ) {
 		unregister_dhcp_options ( dhcp_options );

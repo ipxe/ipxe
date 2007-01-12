@@ -163,6 +163,9 @@ REQUIRE_OBJECT ( route_cmd );
 #ifdef IMAGE_CMD
 REQUIRE_OBJECT ( image_cmd );
 #endif
+#ifdef DHCP_CMD
+REQUIRE_OBJECT ( dhcp_cmd );
+#endif
 
 /*
  * Drag in miscellaneous objects
