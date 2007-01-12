@@ -7,6 +7,8 @@
  *
  */
 
+struct image;
+
 extern int imgfetch ( const char *filename, const char *name,
 		      struct image **new_image );
 extern int imgload ( struct image *image );
