@@ -91,6 +91,22 @@ int imgexec ( struct image *image ) {
 }
 
 /**
+ * Identify the first loaded image
+ *
+ * @ret image		Image, or NULL
+ */
+struct image * imgautoselect ( void ) {
+	struct image *image;
+
+	for_each_image ( image ) {
+		if ( image->flags & IMAGE_LOADED )
+			return image;
+	}
+
+	return NULL;
+}
+
+/**
  * Display status of an image
  *
  * @v image		Executable/loadable image

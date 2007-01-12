@@ -304,7 +304,7 @@ static int imgexec_exec ( int argc, char **argv ) {
 		{ NULL, 0, NULL, 0 },
 	};
 	struct image *image;
-	const char *name;
+	const char *name = NULL;
 	int c;
 	int rc;
 
@@ -320,19 +320,29 @@ static int imgexec_exec ( int argc, char **argv ) {
 		}
 	}
 
-	/* Need exactly one image name */
-	if ( optind != ( argc - 1 ) ) {
+	/* Need no more than one image name */
+	if ( optind != argc )
+		name = argv[optind++];
+	if ( optind != argc ) {
 		imgexec_syntax ( argv );
 		return 1;
 	}
-	name = argv[optind];
 	
 	/* Execute specified image */
-	image = find_image ( name );
-	if ( ! image ) {
-		printf ( "No such image: %s\n", name );
-		return 1;
+	if ( name ) {
+		image = find_image ( name );
+		if ( ! image ) {
+			printf ( "No such image: %s\n", name );
+			return 1;
+		}
+	} else {
+		image = imgautoselect();
+		if ( ! image ) {
+			printf ( "No loaded images\n" );
+			return 1;
+		}
 	}
+
 	if ( ( rc = imgexec ( image ) ) != 0 ) {
 		printf ( "Could not execute %s: %s\n", name, strerror ( rc ) );
 		return 1;
@@ -447,7 +457,6 @@ static int imgfree_exec ( int argc, char **argv ) {
 	}
 	return 0;
 }
-
 
 /** Image management commands */
 struct command image_commands[] __command = {
