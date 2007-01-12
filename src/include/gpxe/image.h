@@ -31,14 +31,6 @@ struct image {
 	userptr_t data;
 	/** Length of raw file image */
 	size_t len;
-	/**
-	 * Free raw file image
-	 *
-	 * @v data		Raw file image
-	 *
-	 * Call this method before freeing up the @c struct @c image.
-	 */
-	void ( * free ) ( userptr_t data );
 
 	/** Entry point */
 	physaddr_t entry;

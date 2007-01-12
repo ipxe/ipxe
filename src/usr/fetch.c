@@ -34,13 +34,18 @@
 #include <gpxe/dhcp.h>
 
 /**
- * Fetch file as executable/loadable image
+ * Fetch file
  *
- * @v image		Executable/loadable image
- * @v filename		Filename
+ * @v filename		Filename to fetch
+ * @ret data		Loaded file
+ * @ret len		Length of loaded file
  * @ret rc		Return status code
+ *
+ * Fetch file to an external buffer allocated with emalloc().  The
+ * caller is responsible for eventually freeing the buffer with
+ * efree().
  */
-int fetch ( struct image *image, const char *filename ) {
+int fetch ( const char *filename, userptr_t *data, size_t *len ) {
 	struct buffer buffer;
 	int rc;
 
@@ -69,10 +74,9 @@ int fetch ( struct image *image, const char *filename ) {
 		return rc;
 	}
 
-	/* Transfer ownserhip of the data buffer to the image */
-	image->data = buffer.addr;
-	image->len = buffer.fill;
-	image->free = efree;
+	/* Fill in buffer address and length */
+	*data = buffer.addr;
+	*len = buffer.fill;
 
 	return 0;
 }

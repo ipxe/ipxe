@@ -4,10 +4,13 @@
 /**
  * @file
  *
- * Fetch file as executable/loadable image
+ * Fetch file
  *
  */
 
-extern int fetch ( struct image *image, const char *filename );
+#include <stdint.h>
+#include <gpxe/uaccess.h>
+
+extern int fetch ( const char *filename, userptr_t *data, size_t *len );
 
 #endif /* _USR_FETCH_H */

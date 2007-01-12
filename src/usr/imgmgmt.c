@@ -54,7 +54,7 @@ int imgfetch ( const char *filename, const char *name,
 		strncpy ( image->name, name, ( sizeof ( image->name ) - 1 ) );
 
 	/* Fetch the file */
-	if ( ( rc = fetch ( image, filename ) ) != 0 )
+	if ( ( rc = fetch ( filename, &image->data, &image->len ) ) != 0 )
 		goto err;
 
 	/* Register the image */

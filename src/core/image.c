@@ -99,9 +99,7 @@ struct image * find_image ( const char *name ) {
  * image.
  */
 void free_image ( struct image *image ) {
-	if ( image->free )
-		image->free ( image->data );
-	image->free = NULL;
+	efree ( image->data );
 	image->data = UNULL;
 	image->len = 0;
 }
