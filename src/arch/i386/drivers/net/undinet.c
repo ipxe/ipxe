@@ -301,13 +301,8 @@ static int undinet_isr_triggered ( void ) {
 /** Maximum length of a packet transmitted via the UNDI API */
 #define UNDI_PKB_LEN 1514
 
-/** A packet transmitted via the UNDI API */
-struct undi_packet {
-	uint8_t bytes[UNDI_PKB_LEN];
-};
-
 /** UNDI packet buffer */
-static struct undi_packet __data16 ( undinet_pkb );
+static char __data16_array ( undinet_pkb, [UNDI_PKB_LEN] );
 #define undinet_pkb __use_data16 ( undinet_pkb )
 
 /** UNDI transmit buffer descriptor */
