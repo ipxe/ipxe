@@ -17,22 +17,7 @@
 
 #include <realmode.h>
 #include <biosint.h>
-
-/**
- * A hidden region of Etherboot
- *
- * This represents a region that will be edited out of the system's
- * memory map.
- *
- * This structure is accessed by assembly code, so must not be
- * changed.
- */
-struct hidden_region {
-	/* Physical start address */
-	uint32_t start;
-	/* Physical end address */
-	uint32_t end;
-};
+#include <gpxe/hidemem.h>
 
 /* Linker-defined symbols */
 extern char _text[];
@@ -46,14 +31,6 @@ extern struct segoff __text16 ( int15_vector );
 #define int15_vector __use_text16 ( int15_vector )
 
 /**
- * Unique IDs for hidden regions
- */
-enum {
-	TEXT = 0,
-	BASEMEM,
-};
-
-/**
  * List of hidden regions
  *
  * Must be terminated by a zero entry.
@@ -61,9 +38,9 @@ enum {
 struct hidden_region __data16_array ( hidden_regions, [] ) = {
 	[TEXT] = { 0, 0 },
 	[BASEMEM] = { 0, ( 640 * 1024 ) },
+	[EXTMEM] = { 0, 0 },
 	{ 0, 0, } /* Terminator */
 };
-#define hidden_regions __use_data16 ( hidden_regions )
 
 /**
  * Hide Etherboot
