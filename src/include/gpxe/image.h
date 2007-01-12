@@ -23,23 +23,20 @@ struct image {
 	char name[16];
 	/** List of registered images */
 	struct list_head list;
+	/** Flags */
+	unsigned int flags;
 
 	/** Command line to pass to image */
 	char cmdline[CMDLINE_MAX];
-
 	/** Raw file image */
 	userptr_t data;
 	/** Length of raw file image */
 	size_t len;
 
-	/** Entry point */
-	physaddr_t entry;
-
 	/** Image type, if known */
 	struct image_type *type;
-
-	/** Flags */
-	unsigned int flags;
+	/** Entry point */
+	physaddr_t entry;
 };
 
 /** Image is loaded */
