@@ -58,7 +58,9 @@ int register_image ( struct image *image ) {
 
 	/* Add to image list */
 	list_add_tail ( &image->list, &images );
-	DBGC ( image, "IMAGE %p registered as %s\n", image, image->name );
+	DBGC ( image, "IMAGE %p at [%lx,%lx) registered as %s\n",
+	       image, user_to_phys ( image->data, 0 ),
+	       user_to_phys ( image->data, image->len ), image->name );
 
 	return 0;
 }
