@@ -286,7 +286,7 @@ void * malloc ( size_t size ) {
 /**
  * Free memory
  *
- * @v size		Memory allocated by malloc(), or NULL
+ * @v ptr		Memory allocated by malloc(), or NULL
  *
  * Memory allocated with malloc_dma() cannot be freed with free(); it
  * must be freed with free_dma() instead.
