@@ -119,8 +119,7 @@ multiboot_build_module_list ( struct image *image,
 		module->mod_start = user_to_phys ( module_image->data, 0 );
 		module->mod_end = user_to_phys ( module_image->data,
 						 module_image->len );
-		if ( image->cmdline )
-			module->string = virt_to_phys ( image->cmdline );
+		module->string = virt_to_phys ( image->cmdline );
 
 		/* We promise to page-align modules, so at least check */
 		assert ( ( module->mod_start & 0xfff ) == 0 );
@@ -154,11 +153,9 @@ static int multiboot_exec ( struct image *image ) {
 	mbinfo.mmap_addr = virt_to_phys ( &mbmemmap[0].base_addr );
 	mbinfo.flags |= ( MBI_FLAG_MEM | MBI_FLAG_MMAP );
 
-	/* Set command line, if present */
-	if ( image->cmdline ) {
-		mbinfo.cmdline = virt_to_phys ( image->cmdline );
-		mbinfo.flags |= MBI_FLAG_CMDLINE;
-	}
+	/* Set command line */
+	mbinfo.cmdline = virt_to_phys ( image->cmdline );
+	mbinfo.flags |= MBI_FLAG_CMDLINE;
 
 	/* Construct module list */
 	num_modules = multiboot_build_module_list ( image, NULL );

@@ -14,6 +14,9 @@
 
 struct image_type;
 
+/** Maximum length of a command line */
+#define CMDLINE_MAX 128
+
 /** An executable or loadable image */
 struct image {
 	/** Name */
@@ -22,12 +25,20 @@ struct image {
 	struct list_head list;
 
 	/** Command line to pass to image */
-	const char *cmdline;
+	char cmdline[CMDLINE_MAX];
 
 	/** Raw file image */
 	userptr_t data;
 	/** Length of raw file image */
 	size_t len;
+	/**
+	 * Free raw file image
+	 *
+	 * @v data		Raw file image
+	 *
+	 * Call this method before freeing up the @c struct @c image.
+	 */
+	void ( * free ) ( userptr_t data );
 
 	/** Entry point */
 	physaddr_t entry;
