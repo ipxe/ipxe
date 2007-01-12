@@ -61,3 +61,4 @@ struct errortab einval __errortab = { EINVAL, "Invalid argument" };
 struct errortab enospc __errortab = { ENOSPC, "No space left on device" };
 struct errortab eio __errortab = { EIO, "Input/output error" };
 struct errortab eacces __errortab = { EACCES, "Permission denied" };
+struct errortab enoent __errortab = { ENOENT, "File not found" };
