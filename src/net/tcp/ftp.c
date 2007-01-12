@@ -340,15 +340,12 @@ static void ftp_data_newdata ( struct tcp_application *app,
 
 	/* Fill data buffer */
 	if ( ( rc = fill_buffer ( ftp->buffer, data,
-				  ftp->data_rcvd, len ) ) != 0 ){
+				  ftp->buffer->fill, len ) ) != 0 ){
 		DBGC ( ftp, "FTP %p failed to fill data buffer: %s\n",
 		       ftp, strerror ( rc ) );
 		ftp_done ( ftp, rc );
 		return;
 	}
-
-	/* Update received data total */
-	ftp->data_rcvd += len;
 }
 
 /** FTP data channel operations */
@@ -377,7 +374,6 @@ struct async_operation * ftp_get ( struct ftp_request *ftp ) {
 	ftp->already_sent = 0;
 	ftp->recvbuf = ftp->status_text;
 	ftp->recvsize = sizeof ( ftp->status_text ) - 1;
-	ftp->data_rcvd = 0;
 	ftp->tcp.tcp_op = &ftp_tcp_operations;
 	ftp->tcp_data.tcp_op = &ftp_data_tcp_operations;
 	if ( ( rc = tcp_connect ( &ftp->tcp, &ftp->server, 0 ) ) != 0 )

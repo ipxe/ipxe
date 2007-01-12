@@ -57,8 +57,6 @@ struct ftp_request {
 	char status_text[4];
 	/** Passive-mode parameters, as text */
 	char passive_text[24]; /* "aaa,bbb,ccc,ddd,eee,fff" */
-	/** Amount of data received */
-	size_t data_rcvd;
 
 	/** TCP application for the control channel */
 	struct tcp_application tcp;
