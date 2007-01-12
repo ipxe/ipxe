@@ -152,9 +152,26 @@ int inet_aton ( const char *cp, struct in_addr *inp ) {
 	return 0;
 }
 
+int isspace ( int c ) {
+	switch ( c ) {
+	case ' ':
+	case '\f':
+	case '\n':
+	case '\r':
+	case '\t':
+	case '\v':
+		return 1;
+	default:
+		return 0;
+	}
+}
+
 unsigned long strtoul ( const char *p, char **endp, int base ) {
 	unsigned long ret = 0;
 	unsigned int charval;
+
+	while ( isspace ( *p ) )
+		p++;
 
 	if ( base == 0 ) {
 		base = 10;
