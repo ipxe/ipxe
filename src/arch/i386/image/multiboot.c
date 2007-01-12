@@ -25,7 +25,7 @@
 
 #include <errno.h>
 #include <assert.h>
-#include <alloca.h>
+#include <realmode.h>
 #include <multiboot.h>
 #include <gpxe/uaccess.h>
 #include <gpxe/image.h>
@@ -34,6 +34,18 @@
 #include <gpxe/elf.h>
 
 struct image_type multiboot_image_type __image_type ( PROBE_MULTIBOOT );
+
+/**
+ * Maximum number of modules we will allow for
+ *
+ * If this has bitten you: sorry.  I did have a perfect scheme with a
+ * dynamically allocated list of modules on the protected-mode stack,
+ * but it was incompatible with some broken OSes that can only access
+ * low memory at boot time (even though we kindly set up 4GB flat
+ * physical addressing as per the multiboot specification.
+ *
+ */
+#define MAX_MODULES 8
 
 /** Multiboot flags that we support */
 #define MB_SUPPORTED_FLAGS ( MB_FLAG_PGALIGN | MB_FLAG_MEMMAP | \
@@ -66,9 +78,11 @@ struct multiboot_header_info {
  *
  * @v mbinfo		Multiboot information structure
  * @v mbmemmap		Multiboot memory map
+ * @v limit		Maxmimum number of memory map entries
  */
 static void multiboot_build_memmap ( struct multiboot_info *mbinfo,
-				     struct multiboot_memory_map *mbmemmap ) {
+				     struct multiboot_memory_map *mbmemmap,
+				     unsigned int limit ) {
 	struct memory_map memmap;
 	unsigned int i;
 
@@ -78,6 +92,11 @@ static void multiboot_build_memmap ( struct multiboot_info *mbinfo,
 	/* Translate into multiboot format */
 	memset ( mbmemmap, 0, sizeof ( *mbmemmap ) );
 	for ( i = 0 ; i < memmap.count ; i++ ) {
+		if ( i >= limit ) {
+			DBG ( "Multiboot limit of %d memmap entries reached\n",
+			      limit );
+			break;
+		}
 		mbmemmap[i].size = ( sizeof ( mbmemmap[i] ) -
 				     sizeof ( mbmemmap[i].size ) );
 		mbmemmap[i].base_addr = memmap.regions[i].start;
@@ -102,7 +121,8 @@ static void multiboot_build_memmap ( struct multiboot_info *mbinfo,
  */
 static unsigned int
 multiboot_build_module_list ( struct image *image,
-			      struct multiboot_module *modules ) {
+			      struct multiboot_module *modules,
+			      unsigned int limit ) {
 	struct image *module_image;
 	struct multiboot_module *module;
 	unsigned int count = 0;
@@ -113,6 +133,12 @@ multiboot_build_module_list ( struct image *image,
 
 	/* Add each image as a multiboot module */
 	for_each_image ( module_image ) {
+
+		if ( count >= limit ) {
+			DBG ( "Multiboot limit of %d modules reached\n",
+			      limit );
+			break;
+		}
 
 		/* Do not include kernel image itself as a module */
 		if ( module_image == image )
@@ -159,51 +185,55 @@ multiboot_build_module_list ( struct image *image,
 }
 
 /**
+ * The multiboot information structure
+ *
+ * Kept in base memory because some OSes won't find it elsewhere,
+ * along with the other structures belonging to the Multiboot
+ * information table.
+ */
+static struct multiboot_info __data16 ( mbinfo );
+#define mbinfo __use_data16 ( mbinfo )
+
+/** The multiboot bootloader name */
+static const char * __data16 ( mb_bootloader_name ) = "gPXE " VERSION;
+#define mb_bootloader_name __use_data16 ( mb_bootloader_name )
+
+/** The multiboot memory map */
+static struct multiboot_memory_map
+	__data16_array ( mbmemmap, [MAX_MEMORY_REGIONS] );
+#define mbmemmap __use_data16 ( mbmemmap )
+
+/** The multiboot module list */
+static struct multiboot_module __data16_array ( mbmodules, [MAX_MODULES] );
+#define mbmodules __use_data16 ( mbmodules )
+
+/**
  * Execute multiboot image
  *
  * @v image		Multiboot image
  * @ret rc		Return status code
  */
 static int multiboot_exec ( struct image *image ) {
-	static const char *bootloader_name = "gPXE " VERSION;
-	struct multiboot_info mbinfo;
-	struct multiboot_memory_map mbmemmap[MAX_MEMORY_REGIONS];
-	struct multiboot_module *modules;
-	unsigned int num_modules;
 
 	/* Populate multiboot information structure */
 	memset ( &mbinfo, 0, sizeof ( mbinfo ) );
-
-	/* Set boot loader name */
-	mbinfo.boot_loader_name = virt_to_phys ( bootloader_name );
-	mbinfo.flags |= MBI_FLAG_LOADER;
-	
-	/* Build memory map */
-	multiboot_build_memmap ( &mbinfo, mbmemmap );
-	mbinfo.mmap_addr = virt_to_phys ( mbmemmap );
-	mbinfo.flags |= ( MBI_FLAG_MEM | MBI_FLAG_MMAP );
-
-	/* Set command line */
+	mbinfo.flags = ( MBI_FLAG_LOADER | MBI_FLAG_MEM | MBI_FLAG_MMAP |
+			 MBI_FLAG_CMDLINE | MBI_FLAG_MODS );
+	multiboot_build_memmap ( &mbinfo, mbmemmap,
+				 ( sizeof(mbmemmap) / sizeof(mbmemmap[0]) ) );
 	mbinfo.cmdline = virt_to_phys ( image->cmdline );
-	mbinfo.flags |= MBI_FLAG_CMDLINE;
-
-	/* Construct module list */
-	num_modules = multiboot_build_module_list ( image, NULL );
-	modules = alloca ( num_modules * sizeof ( *modules ) );
-	multiboot_build_module_list ( image, modules );
-	mbinfo.mods_count = num_modules;
-	mbinfo.mods_addr = virt_to_phys ( modules );
-	mbinfo.flags |= MBI_FLAG_MODS;
-
+	mbinfo.mods_count = multiboot_build_module_list ( image, mbmodules,
+				( sizeof(mbmodules) / sizeof(mbmodules[0]) ) );
+	mbinfo.mods_addr = virt_to_phys ( mbmodules );
+	mbinfo.mmap_addr = virt_to_phys ( mbmemmap );
+	mbinfo.boot_loader_name = virt_to_phys ( mb_bootloader_name );
+	
 	/* Jump to OS with flat physical addressing */
-	__asm__ __volatile__ ( PHYS_CODE ( /* Preserve %ebp for alloca() */
-					   "pushl %%ebp\n\t"
-					   "call *%%edi\n\t"
-					   "popl %%ebp\n\t" )
+	__asm__ __volatile__ ( PHYS_CODE ( "call *%%edi\n\t" )
 			       : : "a" ( MULTIBOOT_BOOTLOADER_MAGIC ),
 			           "b" ( virt_to_phys ( &mbinfo ) ),
 			           "D" ( image->entry )
-			       : "ecx", "edx", "esi", "memory" );
+			       : "ecx", "edx", "esi", "ebp", "memory" );
 
 	return -ECANCELED;
 }
