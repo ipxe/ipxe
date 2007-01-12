@@ -24,6 +24,7 @@
  */
 
 #include <errno.h>
+#include <assert.h>
 #include <alloca.h>
 #include <multiboot.h>
 #include <gpxe/uaccess.h>
@@ -106,10 +107,12 @@ multiboot_build_module_list ( struct image *image,
 	unsigned int count = 0;
 
 	for_each_image ( module_image ) {
-		/* Do not include kernel image as a module */
+
+		/* Do not include kernel image itself as a module */
 		if ( module_image == image )
 			continue;
 		module = &modules[count++];
+
 		/* Populate module data structure, if applicable */
 		if ( ! modules )
 			continue;
@@ -118,6 +121,9 @@ multiboot_build_module_list ( struct image *image,
 						 module_image->len );
 		if ( image->cmdline )
 			module->string = virt_to_phys ( image->cmdline );
+
+		/* We promise to page-align modules, so at least check */
+		assert ( ( module->mod_start & 0xfff ) == 0 );
 	}
 
 	return count;
