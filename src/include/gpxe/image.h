@@ -109,6 +109,7 @@ extern struct list_head images;
 extern int register_image ( struct image *image );
 extern void unregister_image ( struct image *image );
 struct image * find_image ( const char *name );
+extern void free_image ( struct image *image );
 extern int image_load ( struct image *image );
 extern int image_autoload ( struct image *image );
 extern int image_exec ( struct image *image );

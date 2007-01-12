@@ -90,6 +90,23 @@ struct image * find_image ( const char *name ) {
 }
 
 /**
+ * Free loaded image
+ *
+ * @v image		Executable/loadable image
+ *
+ * This releases the memory being used to store the image; it does not
+ * release the @c struct @c image itself, nor does it unregister the
+ * image.
+ */
+void free_image ( struct image *image ) {
+	if ( image->free )
+		image->free ( image->data );
+	image->free = NULL;
+	image->data = UNULL;
+	image->len = 0;
+}
+
+/**
  * Load executable/loadable image into memory
  *
  * @v image		Executable/loadable image
