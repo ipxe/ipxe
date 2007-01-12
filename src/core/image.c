@@ -73,6 +73,23 @@ void unregister_image ( struct image *image ) {
 }
 
 /**
+ * Find image by name
+ *
+ * @v name		Image name
+ * @ret image		Executable/loadable image, or NULL
+ */
+struct image * find_image ( const char *name ) {
+	struct image *image;
+
+	list_for_each_entry ( image, &images, list ) {
+		if ( strcmp ( image->name, name ) == 0 )
+			return image;
+	}
+
+	return NULL;
+}
+
+/**
  * Load executable/loadable image into memory
  *
  * @v image		Executable/loadable image
@@ -89,6 +106,7 @@ int image_load ( struct image *image ) {
 		return rc;
 	}
 
+	image->flags |= IMAGE_LOADED;
 	return 0;
 }
 
@@ -111,6 +129,7 @@ int image_autoload ( struct image *image ) {
 			       image, image->type->name, strerror ( rc ) );
 			return rc;
 		}
+		image->flags |= IMAGE_LOADED;
 		return 0;
 	}
 
@@ -127,8 +146,16 @@ int image_autoload ( struct image *image ) {
 int image_exec ( struct image *image ) {
 	int rc;
 
+	/* Image must be loaded first */
+	if ( ! ( image->flags & IMAGE_LOADED ) ) {
+		DBGC ( image, "IMAGE %p could not execute: not loaded\n",
+		       image );
+		return -ENOTTY;
+	}
+
 	assert ( image->type != NULL );
 
+	/* Try executing the image */
 	if ( ( rc = image->type->exec ( image ) ) != 0 ) {
 		DBGC ( image, "IMAGE %p could not execute: %s\n",
 		       image, strerror ( rc ) );

@@ -45,7 +45,13 @@ struct image {
 
 	/** Image type, if known */
 	struct image_type *type;
+
+	/** Flags */
+	unsigned int flags;
 };
+
+/** Image is loaded */
+#define IMAGE_LOADED 0x0001
 
 /** An executable or loadable image type */
 struct image_type {
@@ -102,6 +108,7 @@ extern struct list_head images;
 
 extern int register_image ( struct image *image );
 extern void unregister_image ( struct image *image );
+struct image * find_image ( const char *name );
 extern int image_load ( struct image *image );
 extern int image_autoload ( struct image *image );
 extern int image_exec ( struct image *image );
