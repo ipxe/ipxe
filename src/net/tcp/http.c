@@ -1,42 +1,37 @@
+/*
+ * Copyright (C) 2007 Michael Brown <mbrown@fensystems.co.uk>.
+ *
+ * This program is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU General Public License as
+ * published by the Free Software Foundation; either version 2 of the
+ * License, or any later version.
+ *
+ * This program is distributed in the hope that it will be useful, but
+ * WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ * General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program; if not, write to the Free Software
+ * Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
+ */
+
+/**
+ * @file
+ *
+ * Hyper Text Transfer Protocol (HTTP)
+ *
+ */
+
 #include <stddef.h>
 #include <stdlib.h>
 #include <string.h>
+#include <strings.h>
 #include <vsprintf.h>
 #include <assert.h>
 #include <gpxe/async.h>
+#include <gpxe/buffer.h>
 #include <gpxe/http.h>
-
-/** @file
- *
- * The Hyper Text Transfer Protocol (HTTP)
- *
- * This file implements the TCP-based HTTP protocol. It connects to the
- * server specified in http_request::tcp and transmit an HTTP GET request
- * for the file specified in http_request::filename. It then decoded the
- * HTTP header, determining file status and file size. Then sends the file
- * to the callback function at http_request::callback().
- * **NOTE**: still working on correcting the closing of the tcp connection
- *
- * To use this code, do something like:
- *
- * @code
- *
- *   static void my_callback ( struct http_request *http, char *data, size_t len ) {
- *     ... process data ...
- *   }
- *
- *   struct http_request http = {
- *     .filename = "path/to/file",
- *     .callback = my_callback,
- *   };
- *
- *   ... assign http.tcp.server ...
- *
- *   rc = async_wait ( get_http ( &http ) );
- *
- * @endcode
- *
- */
 
 static inline struct http_request *
 tcp_to_http ( struct tcp_application *app ) {
@@ -44,144 +39,308 @@ tcp_to_http ( struct tcp_application *app ) {
 }
 
 /**
- * Close an HTTP connection
+ * Mark HTTP request as complete
  *
- * @v app	a TCP Application
- * @v status	connection status at close
- */
-static void http_closed ( struct tcp_application *app, int status ) {
-	struct http_request *http = tcp_to_http ( app );
-	async_done ( &http->aop, status );
-}
-
-/**
- * Callback after a TCP connection is established
+ * @v http		HTTP request
+ * @v rc		Return status code
  *
- * @v app	a TCP Application
  */
-static void http_connected ( struct tcp_application *app ) {
-	struct http_request *http = tcp_to_http ( app );
+static void http_done ( struct http_request *http, int rc ) {
 
-	http->state = HTTP_REQUEST_FILE;
-}
+	/* Close TCP connection */
+	tcp_close ( &http->tcp );
 
-/**
- * Callback for when TCP data is acknowledged
- *
- * @v app	a TCP Application
- * @v len	the length of data acked
- */
-static void http_acked ( struct tcp_application *app, size_t len __attribute__ ((unused)) ) {
-	struct http_request *http = tcp_to_http ( app );
+	/* Prevent further processing of any current packet */
+	http->rx_state = HTTP_RX_DEAD;
 
-	// assume that the whole GET request was sent in on epacket
+	/* Free up any dynamically allocated storage */
+	empty_line_buffer ( &http->linebuf );
 
-	switch ( http->state ) {
-	case HTTP_REQUEST_FILE:
-		http->state = HTTP_PARSE_HEADER;
-		break;
-	case HTTP_PARSE_HEADER:
-	case HTTP_RECV_FILE:
-		break;
-	case HTTP_DONE:
-		//tcp_close(app);
-		break;
-	default:
-		break;
+	/* If we had a Content-Length, and the received content length
+	 * isn't correct, flag an error
+	 */
+	if ( http->content_length &&
+	     ( http->content_length != http->buffer->fill ) ) {
+		DBGC ( http, "HTTP %p incorrect length %zd, should be %zd\n",
+		       http, http->buffer->fill, http->content_length );
+		rc = -EIO;
 	}
-	//printf("acked\n");
+
+	/* Mark async operation as complete */
+	async_done ( &http->aop, rc );
 }
 
 /**
- * Callback when new TCP data is recieved
+ * Convert HTTP response code to return status code
  *
- * @v app	a TCP Application
- * @v data	a pointer to the data recieved
- * @v len	length of data buffer
+ * @v response		HTTP response code
+ * @ret rc		Return status code
  */
-static void http_newdata ( struct tcp_application *app, void *data,
-			    size_t len ) {
-	struct http_request *http = tcp_to_http ( app );
-	char *content_length;
-	char *start = data;
-	char *rcp; int rc;
+static int http_response_to_rc ( unsigned int response ) {
+	switch ( response ) {
+	case 200:
+		return 0;
+	case 404:
+		return -ENOENT;
+	case 403:
+		return -EPERM;
+	default:
+		return -EIO;
+	}
+}
 
-	switch ( http->state ) {
-	case HTTP_PARSE_HEADER:
-		if(strncmp("HTTP/",data,5) != 0){
-			// no http header
-			printf("Error: no HTTP Header\n");
-		}
-		// if rc is not 200, then handle problem
-		// either redirect or not there
-		rcp = strstr(data,"HTTP");
-		if(rcp == NULL){ printf("Could not find header status line.\n"); }
-		rcp += 9;
-		rc = strtoul(rcp,NULL,10);
-		printf("RC=%d\n",rc);
-		content_length = strstr(data,"Content-Length: ");
-		if(content_length != NULL){
-			content_length += 16;
-			http->file_size = strtoul(content_length,NULL,10);
-			http->file_recv = 0;
-			printf("http->file_size = %d\n", http->file_size);
-		}
-		start = strstr(data,"\r\n\r\n");
-		if(start == NULL){ printf("No end of header\n"); }
-		else{
-			start += 4;
-			len -= ((void *)start - data);
-			http->state = HTTP_RECV_FILE;
-		}
+/**
+ * Handle HTTP response
+ *
+ * @v http		HTTP request
+ * @v response		HTTP response
+ */
+static void http_rx_response ( struct http_request *http, char *response ) {
+	char *spc;
+	int rc = -EIO;
 
-		if ( http->state != HTTP_RECV_FILE )
+	DBGC ( http, "HTTP %p response \"%s\"\n", http, response );
+
+	/* Check response starts with "HTTP/" */
+	if ( strncmp ( response, "HTTP/", 5 ) != 0 )
+		goto err;
+
+	/* Locate and check response code */
+	spc = strchr ( response, ' ' );
+	if ( ! spc )
+		goto err;
+	http->response = strtoul ( spc, NULL, 10 );
+	if ( ( rc = http_response_to_rc ( http->response ) ) != 0 )
+		goto err;
+
+	/* Move to received headers */
+	http->rx_state = HTTP_RX_HEADER;
+	return;
+
+ err:
+	DBGC ( http, "HTTP %p bad response\n", http );
+	http_done ( http, rc );
+	return;
+}
+
+/**
+ * Handle HTTP Content-Length header
+ *
+ * @v http		HTTP request
+ * @v value		HTTP header value
+ * @ret rc		Return status code
+ */
+static int http_rx_content_length ( struct http_request *http,
+				    const char *value ) {
+	char *endp;
+
+	http->content_length = strtoul ( value, &endp, 10 );
+	if ( *endp != '\0' ) {
+		DBGC ( http, "HTTP %p invalid Content-Length \"%s\"\n",
+		       http, value );
+		return -EIO;
+	}
+
+	return 0;
+}
+
+/**
+ * An HTTP header handler
+ *
+ */
+struct http_header_handler {
+	/** Name (e.g. "Content-Length") */
+	const char *header;
+	/** Handle received header
+	 *
+	 * @v http	HTTP request
+	 * @v value	HTTP header value
+	 * @ret rc	Return status code
+	 */
+	int ( * rx ) ( struct http_request *http, const char *value );
+};
+
+/** List of HTTP header handlers */
+struct http_header_handler http_header_handlers[] = {
+	{
+		.header = "Content-Length",
+		.rx = http_rx_content_length,
+	},
+	{ NULL, NULL }
+};
+
+/**
+ * Handle HTTP header
+ *
+ * @v http		HTTP request
+ * @v header		HTTP header
+ */
+static void http_rx_header ( struct http_request *http, char *header ) {
+	struct http_header_handler *handler;
+	char *separator;
+	char *value;
+	int rc = -EIO;
+
+	/* An empty header line marks the transition to the data phase */
+	if ( ! header[0] ) {
+		DBGC ( http, "HTTP %p start of data\n", http );
+		empty_line_buffer ( &http->linebuf );
+		http->rx_state = HTTP_RX_DATA;
+		return;
+	}
+
+	DBGC ( http, "HTTP %p header \"%s\"\n", http, header );
+
+	/* Split header at the ": " */
+	separator = strstr ( header, ": " );
+	if ( ! separator )
+		goto err;
+	*separator = '\0';
+	value = ( separator + 2 );
+
+	/* Hand off to header handler, if one exists */
+	for ( handler = http_header_handlers ; handler->header ; handler++ ) {
+		if ( strcasecmp ( header, handler->header ) == 0 ) {
+			if ( ( rc = handler->rx ( http, value ) ) != 0 )
+				goto err;
 			break;
-	case HTTP_RECV_FILE:
-		http->callback(http,start,len);
-		//http->file_size -= len;
-		//printf("File recv is %d\n", http->file_recv);
-		if ( http->file_recv == http->file_size ){
-			http->state = HTTP_DONE;
-			tcp_close(app);
 		}
-		break;
-	case HTTP_REQUEST_FILE:
-	case HTTP_DONE:
-	default:
-		break;
+	}
+	return;
+
+ err:
+	DBGC ( http, "HTTP %p bad header\n", http );
+	http_done ( http, rc );
+	return;
+}
+
+/**
+ * Handle new data arriving via HTTP connection in the data phase
+ *
+ * @v http		HTTP request
+ * @v data		New data
+ * @v len		Length of new data
+ */
+static void http_rx_data ( struct http_request *http,
+			   const char *data, size_t len ) {
+	int rc;
+
+	/* Fill data buffer */
+	if ( ( rc = fill_buffer ( http->buffer, data,
+				  http->buffer->fill, len ) ) != 0 ) {
+		DBGC ( http, "HTTP %p failed to fill data buffer: %s\n",
+		       http, strerror ( rc ) );
+		http_done ( http, rc );
+		return;
+	}
+
+	/* If we have reached the content-length, stop now */
+	if ( http->content_length &&
+	     ( http->buffer->fill >= http->content_length ) ) {
+		http_done ( http, 0 );
 	}
 }
 
 /**
- * Callback for sending TCP data
+ * Handle new data arriving via HTTP connection
  *
- * @v app	a TCP Application
+ * @v http		HTTP request
+ * @v data		New data
+ * @v len		Length of new data
  */
-static void http_senddata ( struct tcp_application *app, void *buf, size_t len ) {
+static void http_newdata ( struct tcp_application *app,
+			   void *data, size_t len ) {
 	struct http_request *http = tcp_to_http ( app );
+	const char *buf = data;
+	char *line;
+	int rc;
 
-	switch ( http->state ){
-	case HTTP_REQUEST_FILE:
-		len = snprintf(buf,len,"GET %s HTTP/1.0\r\n\r\n",http->filename);
-		printf("%s\n",(char *)buf);
-        	// string is: GET <file> HTTP/1.0\r\n\r\n
-
-		tcp_send ( app, buf, len);
-		break;
-	case HTTP_PARSE_HEADER:
-	case HTTP_RECV_FILE:
-		break;
-	case HTTP_DONE:
-		//tcp_close(app)
-		break;
-	default:
-		break;
+	while ( len ) {
+		if ( http->rx_state == HTTP_RX_DEAD ) {
+			/* Do no further processing */
+			return;
+		} else if ( http->rx_state == HTTP_RX_DATA ) {
+			/* Once we're into the data phase, just fill
+			 * the data buffer
+			 */
+			http_rx_data ( http, buf, len );
+			return;
+		} else {
+			/* In the other phases, buffer and process a
+			 * line at a time
+			 */
+			if ( ( rc = line_buffer ( &http->linebuf, &buf,
+						  &len ) ) != 0 ) {
+				DBGC ( http, "HTTP %p could not buffer line: "
+				       "%s\n", http, strerror ( rc ) );
+				http_done ( http, rc );
+				return;
+			}
+			if ( ( line = buffered_line ( &http->linebuf ) ) ) {
+				switch ( http->rx_state ) {
+				case HTTP_RX_RESPONSE:
+					http_rx_response ( http, line );
+					break;
+				case HTTP_RX_HEADER:
+					http_rx_header ( http, line );
+					break;
+				default:
+					assert ( 0 );
+					break;
+				}
+			}
+		}
 	}
 }
 
+/**
+ * Send HTTP data
+ *
+ * @v app		TCP application
+ * @v buf		Temporary data buffer
+ * @v len		Length of temporary data buffer
+ */
+static void http_senddata ( struct tcp_application *app,
+			    void *buf, size_t len ) {
+	struct http_request *http = tcp_to_http ( app );
+
+	len = snprintf ( buf, len,
+			 "GET /%s HTTP/1.1\r\n"
+			 "User-Agent: gPXE/" VERSION "\r\n"
+			 "Host: %s\r\n"
+			 "\r\n", http->filename, http->hostname );
+	tcp_send ( app, ( buf + http->tx_offset ), ( len - http->tx_offset ) );
+}
+
+/**
+ * HTTP data acknowledged
+ *
+ * @v app		TCP application
+ * @v len		Length of acknowledged data
+ */
+static void http_acked ( struct tcp_application *app, size_t len ) {
+	struct http_request *http = tcp_to_http ( app );
+
+	http->tx_offset += len;
+}
+
+/**
+ * HTTP connection closed by network stack
+ *
+ * @v app		TCP application
+ */
+static void http_closed ( struct tcp_application *app, int rc ) {
+	struct http_request *http = tcp_to_http ( app );
+
+	DBGC ( http, "HTTP %p connection closed: %s\n",
+	       http, strerror ( rc ) );
+	
+	http_done ( http, rc );
+}
+
+/** HTTP TCP operations */
 static struct tcp_operations http_tcp_operations = {
 	.closed		= http_closed,
-	.connected	= http_connected,
 	.acked		= http_acked,
 	.newdata	= http_newdata,
 	.senddata	= http_senddata,
@@ -192,11 +351,10 @@ static struct tcp_operations http_tcp_operations = {
  *
  * @v http	a HTTP request
  */
-struct async_operation * get_http ( struct http_request *http ) {
+struct async_operation * http_get ( struct http_request *http ) {
 	int rc;
 
 	http->tcp.tcp_op = &http_tcp_operations;
-	http->state = HTTP_REQUEST_FILE;
 	if ( ( rc = tcp_connect ( &http->tcp, &http->server, 0 ) ) != 0 )
 		async_done ( &http->aop, rc );
 

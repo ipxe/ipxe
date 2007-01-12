@@ -10,51 +10,51 @@
 #include <stdint.h>
 #include <gpxe/tcp.h>
 #include <gpxe/async.h>
+#include <gpxe/linebuf.h>
 
 /** HTTP default port */
 #define HTTP_PORT 80
 
-enum http_state {
-	HTTP_INIT_CONN = 0,
-	HTTP_REQUEST_FILE,
-	HTTP_PARSE_HEADER,
-	HTTP_RECV_FILE,
-	HTTP_DONE,
+/** HTTP receive state */
+enum http_rx_state {
+	HTTP_RX_RESPONSE = 0,
+	HTTP_RX_HEADER,
+	HTTP_RX_DATA,
+	HTTP_RX_DEAD,
 };
 
 /**
- * A HTTP request
+ * An HTTP request
  *
  */
-struct http_request;
-
 struct http_request {
 	/** Server address */
 	struct sockaddr_tcpip server;
+	/** Server host name */
+	const char *hostname;
+	/** Filename */
+	const char *filename;
+	/** Data buffer to fill */
+	struct buffer *buffer;
+
+	/** HTTP response code */
+	unsigned int response;
+	/** HTTP Content-Length */
+	size_t content_length;
+
+	/** Number of bytes already sent */
+	size_t tx_offset;
+	/** RX state */
+	enum http_rx_state rx_state;
+	/** Line buffer for received header lines */
+	struct line_buffer linebuf;
+
 	/** TCP application for this request */
 	struct tcp_application tcp;
-	/** Current state */
-	enum http_state state;
-        /** File to download */
-        const char *filename;
-        /** Size of file downloading */
-        size_t file_size;
-	/** Number of bytes recieved so far */
-	size_t file_recv;
-	/** Callback function
-	 *
-	 * @v http	HTTP request struct
-	 * @v data	Received data
-	 * @v len	Length of received data
-	 *
-	 * This function is called for all data received from the
-	 * remote server.
-	 */
-	void ( *callback ) ( struct http_request *http, char *data, size_t len );
 	/** Asynchronous operation */
 	struct async_operation aop;
 };
 
-extern struct async_operation * get_http ( struct http_request *http );
+extern struct async_operation * http_get ( struct http_request *http );
 
 #endif /* _GPXE_HTTP_H */
