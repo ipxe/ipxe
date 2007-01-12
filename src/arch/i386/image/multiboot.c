@@ -106,28 +106,53 @@ multiboot_build_module_list ( struct image *image,
 	struct image *module_image;
 	struct multiboot_module *module;
 	unsigned int count = 0;
+	unsigned int insert;
+	physaddr_t start;
+	physaddr_t end;
+	unsigned int i;
 
+	/* Add each image as a multiboot module */
 	for_each_image ( module_image ) {
 
 		/* Do not include kernel image itself as a module */
 		if ( module_image == image )
 			continue;
-		module = &modules[count++];
 
-		/* Populate module data structure, if applicable */
-		if ( ! modules )
-			continue;
-		module->mod_start = user_to_phys ( module_image->data, 0 );
-		module->mod_end = user_to_phys ( module_image->data,
-						 module_image->len );
-		module->string = virt_to_phys ( module_image->cmdline );
-		module->reserved = 0;
-		DBG ( "Multiboot module %lx is [%lx,%lx)\n",
-		      virt_to_phys ( module ),
-		      module->mod_start, module->mod_end );
+		/* If we don't have a data structure to populate, just count */
+		if ( modules ) {
+			
+			/* At least some OSes expect the multiboot
+			 * modules to be in ascending order, so we
+			 * have to support it.
+			 */
+			start = user_to_phys ( module_image->data, 0 );
+			end = user_to_phys ( module_image->data,
+					     module_image->len );
+			for ( insert = 0 ; insert < count ; insert++ ) {
+				if ( start < modules[insert].mod_start )
+					break;
+			}
+			module = &modules[insert];
+			memmove ( ( module + 1 ), module,
+				  ( ( count - insert ) * sizeof ( *module ) ));
+			module->mod_start = start;
+			module->mod_end = end;
+			module->string = virt_to_phys ( module_image->cmdline);
+			module->reserved = 0;
+			
+			/* We promise to page-align modules */
+			assert ( ( module->mod_start & 0xfff ) == 0 );
+		}
 
-		/* We promise to page-align modules, so at least check */
-		assert ( ( module->mod_start & 0xfff ) == 0 );
+		count++;
+	}
+
+	/* Dump module configuration */
+	if ( modules ) {
+		for ( i = 0 ; i < count ; i++ ) {
+			DBG ( "Multiboot module %d is [%lx,%lx)\n", i,
+			      modules[i].mod_start, modules[i].mod_end );
+		}
 	}
 
 	return count;
