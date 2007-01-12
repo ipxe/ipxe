@@ -30,7 +30,7 @@
 #include <gpxe/image.h>
 #include <gpxe/elf.h>
 
-struct image_type elf_image_type __image_type;
+struct image_type elf_image_type __image_type ( PROBE_NORMAL );
 
 typedef Elf32_Ehdr	Elf_Ehdr;
 typedef Elf32_Phdr	Elf_Phdr;
@@ -143,7 +143,7 @@ int elf_load ( struct image *image ) {
 }
 
 /** ELF image type */
-struct image_type elf_image_type __image_type = {
+struct image_type elf_image_type __image_type ( PROBE_NORMAL ) = {
 	.name = "ELF",
 	.load = elf_load,
 	.exec = elf_exec,

@@ -79,18 +79,30 @@ struct image_type {
 	int ( * exec ) ( struct image *image );
 };
 
-/** An executable or loadable image type */
-#define __image_type __table ( struct image_type, image_types, 01 )
+/**
+ * Multiboot image probe priority
+ *
+ * Multiboot images are also valid executables in another format
+ * (e.g. ELF), so we must perform the multiboot probe first.
+ */
+#define PROBE_MULTIBOOT	01
 
 /**
- * An unverifiable executable or loadable image type
- *
- * This should be used to mark image types for which there are no
- * signature or other checks that can be used to verify the validity
- * of the image (such as PXE images).  These will then be tried last
- * in the list of image types.
+ * Normal image probe priority
  */
-#define __default_image_type __table ( struct image_type, image_types, 02 )
+#define PROBE_NORMAL 02
+
+/**
+ * PXE image probe priority
+ *
+ * PXE images have no signature checks, so will claim all image files.
+ * They must therefore be tried last in the probe order list.
+ */
+#define PROBE_PXE 03
+
+/** An executable or loadable image type */
+#define __image_type( probe_order ) \
+	 __table ( struct image_type, image_types, probe_order )
 
 extern struct list_head images;
 

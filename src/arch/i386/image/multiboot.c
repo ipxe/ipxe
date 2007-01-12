@@ -33,7 +33,7 @@
 #include <gpxe/memmap.h>
 #include <gpxe/elf.h>
 
-struct image_type multiboot_image_type __image_type;
+struct image_type multiboot_image_type __image_type ( PROBE_MULTIBOOT );
 
 /** Multiboot flags that we support */
 #define MB_SUPPORTED_FLAGS ( MB_FLAG_PGALIGN | MB_FLAG_MEMMAP | \
@@ -320,7 +320,7 @@ int multiboot_load ( struct image *image ) {
 }
 
 /** Multiboot image type */
-struct image_type multiboot_image_type __image_type = {
+struct image_type multiboot_image_type __image_type ( PROBE_MULTIBOOT ) = {
 	.name = "Multiboot",
 	.load = multiboot_load,
 	.exec = multiboot_exec,
