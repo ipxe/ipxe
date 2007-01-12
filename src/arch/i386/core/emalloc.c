@@ -27,6 +27,9 @@
 #include <gpxe/hidemem.h>
 #include <gpxe/emalloc.h>
 
+/** Alignment of external allocated memory */
+#define EM_ALIGN ( 4 * 1024 )
+
 /** Equivalent of NOWHERE for user pointers */
 #define UNOWHERE ( ~UNULL )
 
@@ -80,6 +83,7 @@ static void ecollect_free ( void ) {
 userptr_t erealloc ( userptr_t ptr, size_t new_size ) {
 	struct external_memory extmem;
 	userptr_t new = ptr;
+	size_t align;
 
 	/* Initialise external memory allocator if necessary */
 	if ( ! bottom  )
@@ -93,8 +97,8 @@ userptr_t erealloc ( userptr_t ptr, size_t new_size ) {
 	} else {
 		/* Create a zero-length block */
 		ptr = bottom = userptr_add ( bottom, -sizeof ( extmem ) );
-		DBGC ( "EXTMEM allocating [%lx,%lx)\n",
-		       user_to_phys ( ptr, 0 ), user_to_phys ( ptr, 0 ) );
+		DBG ( "EXTMEM allocating [%lx,%lx)\n",
+		      user_to_phys ( ptr, 0 ), user_to_phys ( ptr, 0 ) );
 		extmem.size = 0;
 	}
 	extmem.used = ( new_size > 0 );
@@ -103,6 +107,9 @@ userptr_t erealloc ( userptr_t ptr, size_t new_size ) {
 	if ( ptr == bottom ) {
 		/* Update block */
 		new = userptr_add ( ptr, - ( new_size - extmem.size ) );
+		align = ( user_to_phys ( new, 0 ) & ( EM_ALIGN - 1 ) );
+		new_size += align;
+		new = userptr_add ( new, -align );
 		DBG ( "EXTMEM expanding [%lx,%lx) to [%lx,%lx)\n",
 		      user_to_phys ( ptr, 0 ),
 		      user_to_phys ( ptr, extmem.size ),
