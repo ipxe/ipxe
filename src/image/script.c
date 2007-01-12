@@ -65,6 +65,7 @@ static int script_exec ( struct image *image ) {
 
 		/* Mark end of line and execute command */
 		*eol = '\0';
+		DBG ( "$ %s\n", cmdbuf );
 		if ( ( rc = system ( cmdbuf ) ) != 0 ) {
 			DBG ( "Command \"%s\" exited with status %d\n",
 			      cmdbuf, rc );
