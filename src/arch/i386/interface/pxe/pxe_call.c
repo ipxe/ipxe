@@ -20,6 +20,7 @@
 #include <registers.h>
 #include <biosint.h>
 #include <pxe.h>
+#include <pxe_call.h>
 
 /** @file
  *
