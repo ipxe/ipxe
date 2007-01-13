@@ -147,7 +147,6 @@ static SEGOFF16_t __data16 ( undinet_entry_point );
  */
 static int undinet_call ( struct undi_nic *undinic, unsigned int function,
 			  void *params, size_t params_len ) {
-	union u_PXENV_ANY *pxenv_any = params;
 	PXENV_EXIT_t exit;
 	int discard_b, discard_D;
 	int rc;
@@ -188,7 +187,7 @@ static int undinet_call ( struct undi_nic *undinic, unsigned int function,
 	if ( exit == PXENV_EXIT_SUCCESS ) {
 		rc = 0;
 	} else {
-		rc = -pxenv_any->Status;
+		rc = -undinet_params.Status;
 		/* Paranoia; don't return success for the combination
 		 * of PXENV_EXIT_FAILURE but PXENV_STATUS_SUCCESS
 		 */
