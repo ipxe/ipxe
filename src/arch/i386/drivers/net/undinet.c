@@ -527,6 +527,7 @@ static int undinet_open ( struct net_device *netdev ) {
 				   sizeof ( undi_open ) ) ) != 0 )
 		goto err;
 
+	DBGC ( undinic, "UNDINIC %p opened\n", undinic );
 	return 0;
 
  err:
@@ -570,6 +571,8 @@ static void undinet_close ( struct net_device *netdev ) {
 	/* Disable interrupt and unhook ISR */
 	disable_irq ( undinic->irq );
 	undinet_unhook_isr ( undinic->irq );
+
+	DBGC ( undinic, "UNDINIC %p closed\n", undinic );
 }
 
 /**
@@ -648,6 +651,7 @@ int undinet_probe ( struct undi_device *undi ) {
 	if ( ( rc = register_netdev ( netdev ) ) != 0 )
 		goto err_register;
 
+	DBGC ( undinic, "UNDINIC %p added\n", undinic );
 	return 0;
 
  err_register:
@@ -702,4 +706,6 @@ void undinet_remove ( struct undi_device *undi ) {
 
 	/* Free network device */
 	free_netdev ( netdev );
+
+	DBGC ( undinic, "UNDINIC %p removed\n", undinic );
 }
