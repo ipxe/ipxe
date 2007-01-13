@@ -15,23 +15,56 @@ void more ( void ) {
 	printf ( "\r          \r" );
 }
 
-/* Produce a paged hex dump of the specified data and length */
-void hex_dump ( const unsigned char *data, const unsigned int len ) {
-	unsigned int index;
-	for ( index = 0; index < len; index++ ) {
-		if ( ( index % 16 ) == 0 ) {
-			printf ( "\n" );
+/**
+ * Print row of a hex dump with specified display address
+ *
+ * @v dispaddr		Display address
+ * @v data		Data to print
+ * @v len		Length of data
+ * @v offset		Starting offset within data
+ */
+static void dbg_hex_dump_da_row ( unsigned long dispaddr, const void *data,
+				  unsigned long len, unsigned int offset ) {
+	const uint8_t *bytes = data;
+	unsigned int i;
+	uint8_t byte;
+
+	printf ( "%08lx :", ( dispaddr + offset ) );
+	for ( i = offset ; i < ( offset + 16 ) ; i++ ) {
+		if ( i >= len ) {
+			printf ( "   " );
+			continue;
 		}
-		if ( ( index % 368 ) == 352 ) {
-			more();
+		printf ( " %02x", bytes[i] );
+	}
+	printf ( " : " );
+	for ( i = offset ; i < ( offset + 16 ) ; i++ ) {
+		if ( i >= len ) {
+			printf ( " " );
+			continue;
 		}
-		if ( ( index % 16 ) == 0 ) {
-			printf ( "%p [%lx] : %04x :", data + index,
-				 virt_to_phys ( data + index ), index );
-		}
-		printf ( " %02x", data[index] );
+		byte = bytes[i];
+		if ( ( byte < 0x20 ) || ( byte >= 0x7f ) )
+			byte = '.';
+		printf ( "%c", byte );
 	}
 	printf ( "\n" );
+}
+
+/**
+ * Print hex dump with specified display address
+ *
+ * @v dispaddr		Display address
+ * @v data		Data to print
+ * @v len		Length of data
+ */
+void dbg_hex_dump_da ( unsigned long dispaddr, const void *data,
+		       unsigned long len ) {
+	unsigned int offset;
+
+	for ( offset = 0 ; offset < len ; offset += 16 ) {
+		dbg_hex_dump_da_row ( dispaddr, data, len, offset );
+	}
 }
 
 #define GUARD_SYMBOL ( ( 'M' << 24 ) | ( 'I' << 16 ) | ( 'N' << 8 ) | 'E' )
@@ -87,14 +120,30 @@ int check_region ( void *region, size_t len ) {
 	return corrupted;
 }
 
+/**
+ * Maximum number of separately coloured message streams
+ *
+ * Six is the realistic maximum; there are 8 basic ANSI colours, one
+ * of which will be the terminal default and one of which will be
+ * invisible on the terminal because it matches the background colour.
+ */
 #define NUM_AUTO_COLOURS 6
 
+/** A colour assigned to an autocolourised debug message stream */
 struct autocolour {
-	void * id;
+	/** Message stream ID */
+	unsigned long stream;
+	/** Last recorded usage */
 	unsigned long last_used;
 };
 
-static int autocolourise ( void *id ) {
+/**
+ * Choose colour index for debug autocolourisation
+ *
+ * @v stream		Message stream ID
+ * @ret colour		Colour ID
+ */
+static int dbg_autocolour ( unsigned long stream ) {
 	static struct autocolour acs[NUM_AUTO_COLOURS];
 	static unsigned long use;
 	unsigned int i;
@@ -106,7 +155,7 @@ static int autocolourise ( void *id ) {
 
 	/* Scan through list for a currently assigned colour */
 	for ( i = 0 ; i < ( sizeof ( acs ) / sizeof ( acs[0] ) ) ; i++ ) {
-		if ( acs[i].id == id ) {
+		if ( acs[i].stream == stream ) {
 			acs[i].last_used = use;
 			return i;
 		}
@@ -121,23 +170,25 @@ static int autocolourise ( void *id ) {
 			oldest = i;
 		}
 	}
-	acs[oldest].id = id;
+	acs[oldest].stream = stream;
 	acs[oldest].last_used = use;
 	return oldest;
 }
 
-/** printf() for debugging with automatic colourisation
+/**
+ * Select automatic colour for debug messages
  *
- * @v id		Message stream ID
- * @v fmt		printf() format
- * @v ...		printf() argument list
+ * @v stream		Message stream ID
  */
-void dbg_printf_autocolour ( void *id, const char *fmt, ... ) {
-	va_list args;
+void dbg_autocolourise ( unsigned long stream ) {
+	printf ( "\033[%dm",
+		 ( stream ? ( 31 + dbg_autocolour ( stream ) ) : 0 ) );
+}
 
-	printf ( "\033[%dm", ( id ? ( 31 + autocolourise ( id ) ) : 0 ) );
-	va_start ( args, fmt );
-	vprintf ( fmt, args );
-	va_end ( args );
+/**
+ * Revert to normal colour
+ *
+ */
+void dbg_decolourise ( void ) {
 	printf ( "\033[0m" );
 }

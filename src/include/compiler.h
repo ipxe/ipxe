@@ -127,8 +127,10 @@ __asm__ ( ".equ\tDBGLVL, " DEBUG_SYMBOL_STR );
 extern int __attribute__ (( format ( printf, 1, 2 ) )) 
 dbg_printf ( const char *fmt, ... ) asm ( "printf" );
 
-extern void __attribute__ (( format ( printf, 2, 3 ) )) 
-dbg_printf_autocolour ( void *id, const char *fmt, ... );
+extern void dbg_autocolourise ( unsigned long id );
+extern void dbg_decolourise ( void );
+extern void dbg_hex_dump_da ( unsigned long dispaddr,
+			      const void *data, unsigned long len );
 
 /* Compatibility with existing Makefile */
 #if DEBUG_SYMBOL >= 1
@@ -146,21 +148,107 @@ dbg_printf_autocolour ( void *id, const char *fmt, ... );
 #define DBGLVL_EXTRA	2
 #define DBG_EXTRA	( DBGLVL & DBGLVL_EXTRA )
 
+/**
+ * Print debugging message if we are at a certain debug level
+ *
+ * @v level		Debug level
+ * @v ...		printf() argument list
+ */
 #define DBG_IF( level, ... ) do {				\
 		if ( DBG_ ## level ) {				\
 			dbg_printf ( __VA_ARGS__ );		\
 		}						\
 	} while ( 0 )
 
-#define DBGC_IF( level, ... ) do {				\
+/**
+ * Print a hex dump if we are at a certain debug level
+ *
+ * @v level		Debug level
+ * @v dispaddr		Display address
+ * @v data		Data to print
+ * @v len		Length of data
+ */
+#define DBG_HDA_IF( level, dispaddr, data, len )  do {		\
 		if ( DBG_ ## level ) {				\
-			dbg_printf_autocolour ( __VA_ARGS__ );	\
+			union {					\
+				unsigned long ul;		\
+				typeof ( dispaddr ) raw;	\
+			} da;					\
+			da.raw = dispaddr;			\
+			dbg_hex_dump_da ( da.ul, data, len );	\
 		}						\
 	} while ( 0 )
 
+/**
+ * Print a hex dump if we are at a certain debug level
+ *
+ * @v level		Debug level
+ * @v data		Data to print
+ * @v len		Length of data
+ */
+#define DBG_HD_IF( level, data, len ) do {			\
+		DBG_HDA_IF ( level, data, data, len );		\
+	} while ( 0 )
+
+/**
+ * Select colour for debug messages if we are at a certain debug level
+ *
+ * @v level		Debug level
+ * @v id		Message stream ID
+ */
+#define DBG_AC_IF( level, id ) do {				\
+		if ( DBG_ ## level ) {				\
+			union {					\
+				unsigned long ul;		\
+				typeof ( id ) raw;		\
+			} stream;				\
+			stream.raw = id;			\
+			dbg_autocolourise ( stream.ul );	\
+		}						\
+	} while ( 0 )
+
+/**
+ * Revert colour for debug messages if we are at a certain debug level
+ *
+ * @v level		Debug level
+ */
+#define DBG_DC_IF( level ) do {					\
+		if ( DBG_ ## level ) {				\
+			dbg_decolourise();			\
+		}						\
+	} while ( 0 )
+
+/* Autocolourising versions of the DBGxxx_IF() macros */
+
+#define DBGC_IF( level, id, ... ) do {				\
+		DBG_AC_IF ( level, id );			\
+		DBG_IF ( level, __VA_ARGS__ );			\
+		DBG_DC_IF ( level );				\
+	} while ( 0 )
+
+#define DBGC_HDA_IF( level, id, ... ) do {			\
+		DBG_AC_IF ( level, id );			\
+		DBG_HDA_IF ( level, __VA_ARGS__ );		\
+		DBG_DC_IF ( level );				\
+	} while ( 0 )
+
+#define DBGC_HD_IF( level, id, ... ) do {			\
+		DBG_AC_IF ( level, id );			\
+		DBG_HD_IF ( level, __VA_ARGS__ );		\
+		DBG_DC_IF ( level );				\
+	} while ( 0 )
+
+/* Versions of the DBGxxx_IF() macros that imply DBGxxx_IF( LOG, ... )*/
+
 #define DBG( ... )	DBG_IF ( LOG, __VA_ARGS__ )
-#define DBG2( ... )	DBG_IF ( EXTRA, __VA_ARGS__ )
+#define DBG_HDA( ... )	DBG_HDA_IF ( LOG, __VA_ARGS__ )
+#define DBG_HD( ... )	DBG_HD_IF ( LOG, __VA_ARGS__ )
 #define DBGC( ... )	DBGC_IF ( LOG, __VA_ARGS__ )
+#define DBGC_HDA( ... )	DBGC_HDA_IF ( LOG, __VA_ARGS__ )
+#define DBGC_HD( ... )	DBGC_HD_IF ( LOG, __VA_ARGS__ )
+
+/* Backwards compatibility */
+#define DBG2( ... )	DBG_IF ( EXTRA, __VA_ARGS__ )
 
 #if DEBUG_SYMBOL == 0
 #define NDEBUG
