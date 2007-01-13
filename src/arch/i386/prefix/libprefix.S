@@ -17,6 +17,26 @@
  *
  */
 
+/**
+ * High memory temporary load address
+ *
+ * Temporary buffer into which to copy (or decompress) our runtime
+ * image, prior to calling get_memmap() and relocate().  We don't
+ * actually leave anything here once install() has returned.
+ *
+ * We use the start of an even megabyte so that we don't have to worry
+ * about the current state of the A20 line.
+ *
+ * We use 4MB rather than 2MB because there is at least one commercial
+ * PXE ROM ("Broadcom UNDI, PXE-2.1 (build 082) v2.0.4") which stores
+ * data required by the UNDI ROM loader (yes, the ROM loader; that's
+ * the component which should be impossible to damage short of
+ * screwing with the MMU) around the 2MB mark.  Sadly, this is not a
+ * joke.
+ *
+ */
+#define HIGHMEM_LOADPOINT ( 4 << 20 )
+
 #define CR0_PE 1
 
 	.arch i386
@@ -345,11 +365,12 @@ install_prealloc:
 	movw	%ax, (init_librm_vector+2)
 	movw	%ax, (prot_call_vector+2)
 	
-	/* Install .text and .data to 2MB mark.  Use 2MB to avoid
-	 * problems with A20.
+	/* Install .text and .data to temporary area in high memory,
+	 * prior to reading the E820 memory map and relocating
+	 * properly.
 	 */
 	call	flatten_real_mode
-	movl	$(2<<20), %edi
+	movl	$HIGHMEM_LOADPOINT, %edi
 	call	install_highmem
 
 	/* Set up initial protected-mode GDT, call relocate().
