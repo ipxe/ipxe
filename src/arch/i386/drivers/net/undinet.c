@@ -182,9 +182,6 @@ static int undinet_call ( struct undi_nic *undinic, unsigned int function,
 	 */	
 	gateA20_set();
 
-	/* Copy parameter block back */
-	memcpy ( params, &undinet_params, params_len );
-
 	/* Determine return status code based on PXENV_EXIT and
 	 * PXENV_STATUS
 	 */
@@ -199,10 +196,30 @@ static int undinet_call ( struct undi_nic *undinic, unsigned int function,
 			rc = -EIO;
 	}
 
+	/* If anything goes wrong, print as much debug information as
+	 * it's possible to give.
+	 */
 	if ( rc != 0 ) {
+		SEGOFF16_t rm_params = {
+			.segment = rm_ds,
+			.offset = (intptr_t) &__from_data16 ( undinet_params ),
+		};
+
 		DBGC ( undinic, "UNDINIC %p %s failed: %s\n", undinic,
 		       undinet_function_name ( function ), strerror ( rc ) );
+		DBGC ( undinic, "UNDINIC %p parameters at %04x:%04x length "
+		       "%#02x, entry point at %04x:%04x\n", undinic,
+		       rm_params.segment, rm_params.offset, params_len,
+		       undinic->entry.segment, undinic->entry.offset );
+		DBGC ( undinic, "UNDINIC %p parameters provided:\n", undinic );
+		DBGC_HDA ( undinic, rm_params, params, params_len );
+		DBGC ( undinic, "UNDINIC %p parameters returned:\n", undinic );
+		DBGC_HDA ( undinic, rm_params, &undinet_params, params_len );
 	}
+
+	/* Copy parameter block back */
+	memcpy ( params, &undinet_params, params_len );
+
 	return rc;
 }
 
