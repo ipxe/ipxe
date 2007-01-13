@@ -1,33 +1,33 @@
-#ifndef BASEMEM_H
-#define BASEMEM_H
+#ifndef _BASEMEM_H
+#define _BASEMEM_H
 
-#ifdef ASSEMBLY
+/** @file
+ *
+ * Base memory allocation
+ *
+ */
 
-/* Must match sizeof(struct free_base_memory_header) */
-#define FREE_BASEMEM_HEADER_SIZE 8
+#include <stdint.h>
+#include <realmode.h>
+#include <bios.h>
 
-#else /* ASSEMBLY */
+/**
+ * Read the BIOS free base memory counter
+ *
+ * @ret fbms		Free base memory counter (in kB)
+ */
+static inline unsigned int get_fbms ( void ) {
+	uint16_t fbms;
 
-#include "stdint.h"
+	get_real ( fbms, BDA_SEG, BDA_FBMS );
+	return fbms;
+}
 
-/* Structures that we use to represent a free block of base memory */
+extern void set_fbms ( unsigned int new_fbms );
 
-#define FREE_BLOCK_MAGIC ( ('!'<<0) + ('F'<<8) + ('R'<<16) + ('E'<<24) )
-struct free_base_memory_header {
-	uint32_t	magic;
-	uint32_t	size_kb;
-};
+/* Actually in hidemem.c, but putting it here avoids polluting the
+ * architecture-independent include/hidemem.h.
+ */
+extern void hide_basemem ( void );
 
-union free_base_memory_block {
-	struct free_base_memory_header header;
-	char bytes[1024];
-};
-
-/* Function prototypes */
-extern unsigned int get_free_base_memory ( void );
-extern void * alloc_base_memory ( size_t size );
-extern void free_base_memory ( void *ptr, size_t size );
-
-#endif /* ASSEMBLY */
-
-#endif /* BASEMEM_H */
+#endif /* _BASEMEM_H */

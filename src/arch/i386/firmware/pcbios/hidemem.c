@@ -16,8 +16,8 @@
  */
 
 #include <realmode.h>
-#include <bios.h>
 #include <biosint.h>
+#include <basemem.h>
 #include <gpxe/hidemem.h>
 
 /** Alignment for hidden memory regions */
@@ -71,10 +71,12 @@ void hide_region ( unsigned int region_id, physaddr_t start, physaddr_t end ) {
 	/* Some operating systems get a nasty shock if a region of the
 	 * E820 map seems to start on a non-page boundary.  Make life
 	 * safer by rounding out our edited region.
-	 */	
+	 */
 	region->start = ( start & ~( ALIGN_HIDDEN - 1 ) );
 	region->end = ( ( end + ALIGN_HIDDEN - 1 ) & ~( ALIGN_HIDDEN - 1 ) );
-	DBG ( "Hiding [%lx,%lx)\n", region->start, region->end );
+
+	DBG ( "Hiding region %d [%lx,%lx)\n",
+	      region_id, region->start, region->end );
 }
 
 /**
@@ -94,15 +96,12 @@ static void hide_text ( void ) {
  * Hide used base memory
  *
  */
-static void hide_basemem ( void ) {
-	uint16_t fbms;
-
+void hide_basemem ( void ) {
 	/* Hide from the top of free base memory to 640kB.  Don't use
 	 * hide_region(), because we don't want this rounded to the
 	 * nearest page boundary.
 	 */
-	get_real ( fbms, BDA_SEG, BDA_FBMS );
-	hidden_regions[BASEMEM].start = ( fbms * 1024 );
+	hidden_regions[BASEMEM].start = ( get_fbms() * 1024 );
 }
 
 /**
