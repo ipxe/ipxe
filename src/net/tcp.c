@@ -229,6 +229,8 @@ static int tcp_senddata_conn ( struct tcp_connection *conn, int force_send ) {
 	struct tcp_application *app = conn->app;
 	struct pk_buff *pkb;
 	struct tcp_header *tcphdr;
+	struct tcp_mss_option *mssopt;
+	void *payload;
 	unsigned int flags;
 	size_t len;
 	size_t seq_len;
@@ -289,13 +291,20 @@ static int tcp_senddata_conn ( struct tcp_connection *conn, int force_send ) {
 		start_timer ( &conn->timer );
 
 	/* Fill up the TCP header */
+	payload = pkb->data;
+	if ( flags & TCP_SYN ) {
+		mssopt = pkb_push ( pkb, sizeof ( *mssopt ) );
+		mssopt->kind = TCP_OPTION_MSS;
+		mssopt->length = sizeof ( *mssopt );
+		mssopt->mss = htons ( TCP_MSS );
+	}
 	tcphdr = pkb_push ( pkb, sizeof ( *tcphdr ) );
 	memset ( tcphdr, 0, sizeof ( *tcphdr ) );
 	tcphdr->src = conn->local_port;
 	tcphdr->dest = conn->peer.st_port;
 	tcphdr->seq = htonl ( conn->snd_seq );
 	tcphdr->ack = htonl ( conn->rcv_ack );
-	tcphdr->hlen = ( ( sizeof ( *tcphdr ) / 4 ) << 4 );
+	tcphdr->hlen = ( ( payload - pkb->data ) << 2 );
 	tcphdr->flags = flags;
 	tcphdr->win = htons ( TCP_WINDOW_SIZE );
 	tcphdr->csum = tcpip_chksum ( pkb->data, pkb_len ( pkb ) );

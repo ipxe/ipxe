@@ -27,6 +27,18 @@ struct tcp_header {
 	uint16_t urg;		/* Urgent pointer */
 };
 
+/**
+ * TCP MSS option
+ */
+struct tcp_mss_option {
+	uint8_t kind;
+	uint8_t length;
+	uint16_t mss;
+};
+
+/** Code for the TCP MSS option */
+#define TCP_OPTION_MSS 2
+
 /*
  * TCP flags
  */
@@ -212,7 +224,17 @@ struct tcp_header {
  * guess an arbitrary number that is empirically as large as possible
  * while avoiding retransmissions due to dropped packets.
  */
-#define TCP_WINDOW_SIZE	2048
+#define TCP_WINDOW_SIZE	4096
+
+/**
+ * Advertised TCP MSS
+ *
+ * We currently hardcode this to a reasonable value and hope that the
+ * sender uses path MTU discovery.  The alternative is breaking the
+ * abstraction layer so that we can find out the MTU from the IP layer
+ * (which would have to find out from the net device layer).
+ */
+#define TCP_MSS 1460
 
 /** TCP maximum segment lifetime
  *
