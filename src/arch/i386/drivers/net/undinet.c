@@ -390,19 +390,27 @@ static void undinet_poll ( struct net_device *netdev, unsigned int rx_quota ) {
 		/* Do nothing unless ISR has been triggered */
 		if ( ! undinet_isr_triggered() )
 			return;
-		
+
 		/* See if this was our interrupt */
 		memset ( &undi_isr, 0, sizeof ( undi_isr ) );
 		undi_isr.FuncFlag = PXENV_UNDI_ISR_IN_START;
 		if ( ( rc = undinet_call ( undinic, PXENV_UNDI_ISR, &undi_isr,
 					   sizeof ( undi_isr ) ) ) != 0 )
 			return;
+
+		/* Send EOI to the PIC.  In an ideal world, we'd do
+		 * this only for interrupts which the UNDI stack
+		 * reports as "ours".  However, since we don't (can't)
+		 * chain to the previous interrupt handler, we have to
+		 * acknowledge all interrupts.  See undinet_hook_isr()
+		 * for more background.
+		 */
+		send_eoi ( undinic->irq );
+
+		/* If this wasn't our interrupt, exit now */
 		if ( undi_isr.FuncFlag != PXENV_UNDI_ISR_OUT_OURS )
 			return;
 		
-		/* Send EOI */
-		send_eoi ( undinic->irq );
-
 		/* Start ISR processing */
 		undinic->isr_processing = 1;
 		undi_isr.FuncFlag = PXENV_UNDI_ISR_IN_PROCESS;
