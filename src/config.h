@@ -98,16 +98,16 @@
  * you want to use.
  *
  */
-#undef	TAGGED_IMAGE		/* NBI image support */
-#undef	ELF64_IMAGE		/* ELF64 image support */
-#undef	ELF_IMAGE		/* ELF image support */
-#undef	COFF_IMAGE		/* COFF image support */
-#undef	FREEBSD_IMAGE		/* FreeBSD kernel image support */
-#define	MULTIBOOT_IMAGE		/* MultiBoot image support */
-#undef	AOUT_IMAGE		/* a.out image support */
-#undef	WINCE_IMAGE		/* WinCE image support */
-#undef	PXE_IMAGE		/* PXE image support */
-#define SCRIPT_IMAGE		/* gPXE script image support */
+#undef	IMAGE_NBI		/* NBI image support */
+#undef	IMAGE_ELF64		/* ELF64 image support */
+#undef	IMAGE_ELF		/* ELF image support */
+#undef	IMAGE_COFF		/* COFF image support */
+#undef	IMAGE_FREEBSD		/* FreeBSD kernel image support */
+#define	IMAGE_MULTIBOOT		/* MultiBoot image support */
+#undef	IMAGE_AOUT		/* a.out image support */
+#undef	IMAGE_WINCE		/* WinCE image support */
+#define	IMAGE_PXE		/* PXE image support */
+#define IMAGE_SCRIPT		/* gPXE script image support */
 
 /* @END general.h */ 
 
@@ -122,6 +122,7 @@
 #define	IFMGMT_CMD		/* Interface management commands */
 #define	ROUTE_CMD		/* Routing table management commands */
 #define IMAGE_CMD		/* Image management commands */
+#define DHCP_CMD		/* DHCP management commands */
 
 /* @END general.h */ 
 

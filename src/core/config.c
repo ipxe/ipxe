@@ -110,34 +110,34 @@ REQUIRE_OBJECT ( nmb );
  * Drag in all requested image formats
  *
  */
-#ifdef TAGGED_IMAGE
+#ifdef IMAGE_NBI
 REQUIRE_OBJECT ( nbi );
 #endif
-#ifdef ELF64_IMAGE
+#ifdef IMAGE_ELF64
 REQUIRE_OBJECT ( elf64 );
 #endif
-#ifdef ELF_IMAGE
+#ifdef IMAGE_ELF
 REQUIRE_OBJECT ( elf );
 #endif
-#ifdef COFF_IMAGE
+#ifdef IMAGE_ELF
 REQUIRE_OBJECT ( coff );
 #endif
-#ifdef FREEBSD_IMAGE
+#ifdef IMAGE_FREEBSD
 REQUIRE_OBJECT ( freebsd );
 #endif
-#ifdef MULTIBOOT_IMAGE
+#ifdef IMAGE_MULTIBOOT
 REQUIRE_OBJECT ( multiboot );
 #endif
-#ifdef AOUT_IMAGE
+#ifdef IMAGE_AOUT
 REQUIRE_OBJECT ( aout );
 #endif
-#ifdef WINCE_IMAGE
+#ifdef IMAGE_WINCE
 REQUIRE_OBJECT ( wince );
 #endif
-#ifdef PXE_IMAGE
-REQUIRE_OBJECT ( pxe );
+#ifdef IMAGE_PXE
+REQUIRE_OBJECT ( pxe_image );
 #endif
-#ifdef SCRIPT_IMAGE
+#ifdef IMAGE_SCRIPT
 REQUIRE_OBJECT ( script );
 #endif
 
