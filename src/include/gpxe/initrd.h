@@ -9,6 +9,6 @@
  */
 
 #include <gpxe/image.h>
-extern struct image_type initrdimage_image_type __image_type ( PROBE_NORMAL );
+extern struct image_type initrd_image_type __image_type ( PROBE_NORMAL );
 
 #endif /* _GPXE_INITRD_H */
