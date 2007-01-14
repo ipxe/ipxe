@@ -33,8 +33,11 @@
 /** Equivalent of NOWHERE for user pointers */
 #define UNOWHERE ( ~UNULL )
 
+/** Start of Etherboot text, as defined by the linker */
+extern char _text[];
+
 /** Top of allocatable memory */
-#define TOP ( virt_to_user ( NULL ) )
+#define TOP ( virt_to_user ( _text ) )
 
 /** An external memory block */
 struct external_memory {
