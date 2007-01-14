@@ -23,6 +23,7 @@
 #include <realmode.h>
 #include <bios.h>
 #include <pnpbios.h>
+#include <basemem.h>
 #include <gpxe/pci.h>
 #include <undi.h>
 #include <undirom.h>
@@ -51,7 +52,6 @@ static SEGOFF16_t __data16 ( undi_loader_entry );
  */
 int undi_load ( struct undi_device *undi, struct undi_rom *undirom ) {
 	struct s_PXE ppxe;
-	uint16_t fbms;
 	unsigned int fbms_seg;
 	uint16_t exit;
 	int rc;
@@ -65,9 +65,8 @@ int undi_load ( struct undi_device *undi, struct undi_rom *undirom ) {
 	undi_loader.DI = find_pnp_bios();
 
 	/* Allocate base memory for PXE stack */
-	get_real ( fbms, BDA_SEG, BDA_FBMS );
-	undi->restore_fbms = fbms;
-	fbms_seg = ( fbms << 6 );
+	undi->restore_fbms = get_fbms();
+	fbms_seg = ( undi->restore_fbms << 6 );
 	fbms_seg -= ( ( undirom->code_size + 0x0f ) >> 4 );
 	undi_loader.UNDI_CS = fbms_seg;
 	fbms_seg -= ( ( undirom->data_size + 0x0f ) >> 4 );
@@ -129,9 +128,8 @@ int undi_load ( struct undi_device *undi, struct undi_rom *undirom ) {
 	       undi->entry.segment, undi->entry.offset );
 
 	/* Update free base memory counter */
-	fbms = ( fbms_seg >> 6 );
-	put_real ( fbms, BDA_SEG, BDA_FBMS );
-	undi->fbms = fbms;
+	undi->fbms = ( fbms_seg >> 6 );
+	set_fbms ( undi->fbms );
 	DBGC ( undi, "UNDI %p using [%d,%d) kB of base memory\n",
 	       undi, undi->fbms, undi->restore_fbms );
 
@@ -149,7 +147,6 @@ int undi_load ( struct undi_device *undi, struct undi_rom *undirom ) {
  */
 int undi_unload ( struct undi_device *undi ) {
 	static uint32_t dead = 0xdeaddead;
-	uint16_t fbms;
 
 	DBGC ( undi, "UNDI %p unloading\n", undi );
 
@@ -160,12 +157,10 @@ int undi_unload ( struct undi_device *undi ) {
 		put_real ( dead, undi->ppxe.segment, undi->ppxe.offset );
 
 	/* Free base memory, if possible */
-	get_real ( fbms, BDA_SEG, BDA_FBMS );
-	if ( fbms == undi->fbms ) {
+	if ( undi->fbms == get_fbms() ) {
 		DBGC ( undi, "UNDI %p freeing [%d,%d) kB of base memory\n",
 		       undi, undi->fbms, undi->restore_fbms );
-		fbms = undi->restore_fbms;
-		put_real ( fbms, BDA_SEG, BDA_FBMS );
+		set_fbms ( undi->restore_fbms );
 		return 0;
 	} else {
 		DBGC ( undi, "UNDI %p leaking [%d,%d) kB of base memory\n",
