@@ -155,6 +155,11 @@ int image_autoload ( struct image *image ) {
 	struct image_type *type;
 	int rc;
 
+	/* If image already has a type, use it */
+	if ( image->type )
+		return image_load ( image );
+
+	/* Otherwise probe for a suitable type */
 	for ( type = image_types ; type < image_types_end ; type++ ) {
 		DBGC ( image, "IMAGE %p trying type %s\n", image, type->name );
 		rc = image_load_type ( image, type );
