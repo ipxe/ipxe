@@ -227,6 +227,10 @@ int getopt_long ( int argc, char * const argv[], const char *optstring,
 	enum getopt_argument_requirement has_arg;
 	int option;
 
+	/* Check for end of argv array */
+	if ( optind >= argc )
+		return -1;
+
 	/* Check for end of options */
 	if ( *(opttext++) != '-' )
 		return -1;
