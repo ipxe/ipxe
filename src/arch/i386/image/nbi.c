@@ -2,6 +2,7 @@
 #include <assert.h>
 #include <realmode.h>
 #include <gateA20.h>
+#include <memsizes.h>
 #include <gpxe/uaccess.h>
 #include <gpxe/segment.h>
 #include <gpxe/image.h>

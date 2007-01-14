@@ -20,6 +20,7 @@
 #include <errno.h>
 #include <realmode.h>
 #include <bios.h>
+#include <memsizes.h>
 #include <gpxe/memmap.h>
 
 /**
@@ -50,19 +51,6 @@ struct e820_entry {
 /** Buffer for INT 15,e820 calls */
 static struct e820_entry __data16 ( e820buf );
 #define e820buf __use_data16 ( e820buf )
-
-/**
- * Get size of base memory from BIOS free base memory counter
- *
- * @ret basemem		Base memory size, in kB
- */
-static unsigned int basememsize ( void ) {
-	uint16_t basemem;
-
-	get_real ( basemem, BDA_SEG, 0x0013 );
-	DBG ( "Base memory size %dkB\n", basemem );
-	return basemem;
-}
 
 /**
  * Get size of extended memory via INT 15,e801
@@ -120,8 +108,11 @@ static unsigned int extmemsize_88 ( void ) {
  * Get size of extended memory
  *
  * @ret extmem		Extended memory size, in kB
+ *
+ * Note that this is only an approximation; for an accurate picture,
+ * use the E820 memory map obtained via get_memmap();
  */
-static unsigned int extmemsize ( void ) {
+unsigned int extmemsize ( void ) {
 	unsigned int extmem;
 
 	/* Try INT 15,e801 first, then fall back to INT 15,88 */
