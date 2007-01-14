@@ -50,16 +50,14 @@
 	.arch i386
 	.org	0
 	.section ".prefix", "ax", @progbits
-_prefix:
-
 /* 
 	This is a minimal boot sector.	If anyone tries to execute it (e.g., if
 	a .lilo file is dd'ed to a floppy), print an error message. 
 */
 
 bootsector: 
-	jmp	$BOOTSEG, $go - _prefix	/* reload cs:ip to match relocation addr */
-go: 
+	jmp	$BOOTSEG, $1f	/* reload cs:ip to match relocation addr */
+1:
 	movw	$0x2000, %di		/*  0x2000 is arbitrary value >= length
 					    of bootsect + room for stack */
 
@@ -73,7 +71,7 @@ go:
 	sti
 
 	movw	$why_end-why, %cx
-	movw	$why - _prefix, %si
+	movw	$why, %si
 
 	movw	$0x0007, %bx		/* page 0, attribute 7 (normal) */
 	movb	$0x0e, %ah		/* write char, tty mode */
@@ -93,7 +91,7 @@ setup_sects:
 root_flags: 
 	.word	0
 syssize: 
-	.word	_verbatim_size_pgh - PREFIXPGH
+	.word	_load_size_pgh - PREFIXPGH
 swap_dev: 
 	.word	0
 ram_size: 
@@ -105,6 +103,8 @@ root_dev:
 boot_flag: 
 	.word	0xAA55
 
+
+	.org	512
 /*
 	We're now at the beginning of the second sector of the image -
 	where the setup code goes.
@@ -115,27 +115,33 @@ boot_flag:
 	executing the Etherboot image that's loaded at SYSSEG:0 and
 	whose entry point is SYSSEG:0.
 */
-setup_code: 
-	pushl	$0		/* No parameters to preserve for exit path */
-	pushw	$0		/* Use prefix exit path mechanism */
+setup_code:
 	/* Etherboot expects to be contiguous in memory once loaded.
 	 * LILO doesn't do this, but since we don't need any
 	 * information that's left in the prefix, it doesn't matter:
 	 * we just have to ensure that %cs:0000 is where the start of
 	 * the Etherboot image *would* be.
 	 */
-	ljmp	$(SYSSEG-(PREFIXSIZE/16)), $_start
+	ljmp	$(SYSSEG-(PREFIXSIZE/16)), $run_etherboot
 
-	.section ".text16", "ax", @progbits
-prefix_exit:
-	int	$0x19		/* should try to boot machine */
-prefix_exit_end:
-	.previous
-	
-	.org	(PREFIXSIZE-1)
-	.byte	0
-prefix_end:
+
+	.org	PREFIXSIZE
 /*
-	That's about it.
-*/
+	We're now at the beginning of the kernel proper.
+ */
+run_etherboot:
+	call	install
 
+	/* Jump to .text16 segment */
+	pushw	%ax
+	pushw	$1f
+	lret
+	.section ".text16", "awx", @progbits
+1:
+	pushl	$main
+	pushw	%cs
+	call	prot_call
+	popl	%eax /* discard */
+
+	/* Boot next device */
+	int $0x18
