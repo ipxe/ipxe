@@ -35,8 +35,11 @@ struct image {
 
 	/** Image type, if known */
 	struct image_type *type;
-	/** Entry point */
-	physaddr_t entry;
+	/** Image type private data */
+	union {
+		physaddr_t phys;
+		userptr_t user;
+	} priv;
 };
 
 /** Image is loaded */

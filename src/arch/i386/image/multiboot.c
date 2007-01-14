@@ -218,6 +218,7 @@ static struct multiboot_module __data16_array ( mbmodules, [MAX_MODULES] );
  * @ret rc		Return status code
  */
 static int multiboot_exec ( struct image *image ) {
+	physaddr_t entry = image->priv.phys;
 
 	/* Populate multiboot information structure */
 	memset ( &mbinfo, 0, sizeof ( mbinfo ) );
@@ -241,7 +242,7 @@ static int multiboot_exec ( struct image *image ) {
 	__asm__ __volatile__ ( PHYS_CODE ( "call *%%edi\n\t" )
 			       : : "a" ( MULTIBOOT_BOOTLOADER_MAGIC ),
 			           "b" ( virt_to_phys ( &mbinfo ) ),
-			           "D" ( image->entry )
+			           "D" ( entry )
 			       : "ecx", "edx", "esi", "ebp", "memory" );
 
 	DBGC ( image, "MULTIBOOT %p returned\n", image );
@@ -328,8 +329,8 @@ static int multiboot_load_raw ( struct image *image,
 	/* Copy image to segment */
 	memcpy_user ( buffer, 0, image->data, offset, filesz );
 
-	/* Record execution entry point */
-	image->entry = hdr->mb.entry_addr;
+	/* Record execution entry point in image private data field */
+	image->priv.phys = hdr->mb.entry_addr;
 
 	return 0;
 }

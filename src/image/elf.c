@@ -136,8 +136,8 @@ int elf_load ( struct image *image ) {
 			return rc;
 	}
 
-	/* Fill in entry point address */
-	image->entry = ehdr.e_entry;
+	/* Record execution entry point in image private data field */
+	image->priv.phys = ehdr.e_entry;
 
 	return 0;
 }

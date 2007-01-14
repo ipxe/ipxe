@@ -277,6 +277,10 @@ int nbi_load ( struct image *image ) {
 					   nbi_load_segment ) ) != 0 )
 		return rc;
 
+	/* Record header address in image private data field */
+	image->priv.user = real_to_user ( imgheader.location.segment,
+					  imgheader.location.offset );
+
 	return 0;
 }
 
@@ -370,7 +374,7 @@ static int nbi_boot32 ( struct image *image, struct imgheader *imgheader ) {
 static int nbi_exec ( struct image *image ) {
 	struct imgheader imgheader;
 
-	copy_from_user ( &imgheader, phys_to_user ( image->entry ), 0,
+	copy_from_user ( &imgheader, image->priv.user, 0,
 			 sizeof ( imgheader ) );
 
 	if ( NBI_LINEAR_EXEC_ADDR ( imgheader.flags ) ) {
