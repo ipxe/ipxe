@@ -27,9 +27,9 @@
  ****************************************************************************
  */
 	.section ".text16.data"
-	.globl pxe
+	.globl ppxe
 	.align 16
-pxe:
+ppxe:
 	.ascii "!PXE"			/* Signature */
 	.byte pxe_length		/* StructLength */
 	.byte 0				/* StructCksum */
@@ -52,8 +52,8 @@ pxe_segments:
 	.word 0, 0, 0, 0		/* BC_Code */
 	.word 0, 0, 0, 0		/* BC_CodeWrite */
 	.equ	SegDescCnt, ( ( . - pxe_segments ) / 8 )
-	.equ	pxe_length, . - pxe
-	.size	pxe, . - pxe
+	.equ	pxe_length, . - ppxe
+	.size	ppxe, . - ppxe
 
 /****************************************************************************
  * PXENV+ structure
@@ -80,7 +80,7 @@ pxenv:
 	.word _data16_size		/* UNDIDataSize */
 	.word 0				/* UNDICodeSeg */
 	.word _text16_size		/* UNDICodeSize */
-	.word pxe, 0			/* PXEPtr */
+	.word ppxe, 0			/* PXEPtr */
 	.equ	pxenv_length, . - pxenv
 	.size	pxenv, . - pxenv
  

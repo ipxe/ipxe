@@ -23,10 +23,12 @@
  *
  */
 
+#include <pxe.h>
+#include <pxe_call.h>
 #include <gpxe/uaccess.h>
 #include <gpxe/image.h>
 #include <gpxe/segment.h>
-#include <pxe_call.h>
+#include <gpxe/netdevice.h>
 
 /** PXE load address segment */
 #define PXE_LOAD_SEGMENT 0
@@ -43,7 +45,33 @@ struct image_type pxe_image_type __image_type ( PROBE_PXE );
  * @ret rc		Return status code
  */
 static int pxe_exec ( struct image *image __unused ) {
-	return pxe_boot();
+	struct net_device *netdev;
+	int discard_b, discard_c;
+	uint16_t rc;
+
+	/* Ensure that PXE stack is ready to use */
+	pxe_init_structures();
+	pxe_hook_int1a();
+
+	/* Arbitrarily pick the first open network device to use for PXE */
+	for_each_netdev ( netdev ) {
+		pxe_netdev = netdev;
+		break;
+	}
+
+	/* Far call to PXE NBP */
+	__asm__ __volatile__ ( REAL_CODE ( "pushw %%cx\n\t"
+					   "pushw %%ax\n\t"
+					   "movw %%cx, %%es\n\t"
+					   "lcall $0, $0x7c00\n\t" )
+			       : "=a" ( rc ), "=b" ( discard_b ),
+			         "=c" ( discard_c )
+			       :  "a" ( & __from_text16 ( ppxe ) ),
+			          "b" ( & __from_text16 ( pxenv ) ),
+			          "c" ( rm_cs )
+			       : "edx", "esi", "edi", "ebp", "memory" );
+
+	return rc;
 }
 
 /**

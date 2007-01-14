@@ -34,14 +34,6 @@ extern struct segoff __text16 ( pxe_int_1a_vector );
 /** INT 1A handler */
 extern void pxe_int_1a ( void );
 
-/** !PXE structure */
-extern struct s_PXE __text16 ( pxe );
-#define pxe __use_text16 ( pxe )
-
-/** PXENV+ structure */
-extern struct s_PXENV __text16 ( pxenv );
-#define pxenv __use_text16 ( pxenv )
-
 /** A function pointer to hold any PXE API call
  *
  * Used by pxe_api_call() to avoid large swathes of duplicated code.
@@ -310,7 +302,7 @@ void pxe_api_call ( struct i386_all_regs *ix86 ) {
  * Hook INT 1A for PXE
  *
  */
-void pxe_hook_int ( void ) {
+void pxe_hook_int1a ( void ) {
 	hook_bios_interrupt ( 0x1a, ( unsigned int ) pxe_int_1a,
 			      &pxe_int_1a_vector );
 }
@@ -320,7 +312,7 @@ void pxe_hook_int ( void ) {
  *
  * @ret rc		Return status code
  */
-int pxe_unhook_int ( void ) {
+int pxe_unhook_int1a ( void ) {
 	return unhook_bios_interrupt ( 0x1a, ( unsigned int ) pxe_int_1a,
 				       &pxe_int_1a_vector );
 }
@@ -343,24 +335,24 @@ static uint8_t pxe_checksum ( void *data, size_t size ) {
 }
 
 /**
- * Initialise PXE stack
+ * Initialise !PXE and PXENV+ structures
  *
  */
-void init_pxe ( void ) {
+void pxe_init_structures ( void ) {
 	uint32_t rm_cs_phys = ( rm_cs << 4 );
 	uint32_t rm_ds_phys = ( rm_ds << 4 );
 
 	/* Fill in missing segment fields */
-	pxe.EntryPointSP.segment = rm_cs;
-	pxe.EntryPointESP.segment = rm_cs;
-	pxe.Stack.segment_address = rm_ds;
-	pxe.Stack.Physical_address = rm_ds_phys;
-	pxe.UNDIData.segment_address = rm_ds;
-	pxe.UNDIData.Physical_address = rm_ds_phys;
-	pxe.UNDICode.segment_address = rm_cs;
-	pxe.UNDICode.Physical_address = rm_cs_phys;
-	pxe.UNDICodeWrite.segment_address = rm_cs;
-	pxe.UNDICodeWrite.Physical_address = rm_cs_phys;
+	ppxe.EntryPointSP.segment = rm_cs;
+	ppxe.EntryPointESP.segment = rm_cs;
+	ppxe.Stack.segment_address = rm_ds;
+	ppxe.Stack.Physical_address = rm_ds_phys;
+	ppxe.UNDIData.segment_address = rm_ds;
+	ppxe.UNDIData.Physical_address = rm_ds_phys;
+	ppxe.UNDICode.segment_address = rm_cs;
+	ppxe.UNDICode.Physical_address = rm_cs_phys;
+	ppxe.UNDICodeWrite.segment_address = rm_cs;
+	ppxe.UNDICodeWrite.Physical_address = rm_cs_phys;
 	pxenv.RMEntry.segment = rm_cs;
 	pxenv.StackSeg = rm_ds;
 	pxenv.UNDIDataSeg = rm_ds;
@@ -368,34 +360,6 @@ void init_pxe ( void ) {
 	pxenv.PXEPtr.segment = rm_cs;
 
 	/* Update checksums */
-	pxe.StructCksum -= pxe_checksum ( &pxe, sizeof ( pxe ) );
+	ppxe.StructCksum -= pxe_checksum ( &ppxe, sizeof ( ppxe ) );
 	pxenv.Checksum -= pxe_checksum ( &pxenv, sizeof ( pxenv ) );
-}
-
-/**
- * Boot via PXE NBP
- *
- * @ret rc		Return status code
- */
-int pxe_boot ( void ) {
-	int discard_b, discard_c;
-	uint16_t rc;
-
-	/* Ensure that PXE stack is ready to use */
-	init_pxe();
-	pxe_hook_int();
-
-	/* Far call to PXE NBP */
-	__asm__ __volatile__ ( REAL_CODE ( "pushw %%cx\n\t"
-					   "pushw %%ax\n\t"
-					   "movw %%cx, %%es\n\t"
-					   "lcall $0, $0x7c00\n\t" )
-			       : "=a" ( rc ), "=b" ( discard_b ),
-			         "=c" ( discard_c )
-			       :  "a" ( & __from_text16 ( pxe ) ),
-			          "b" ( & __from_text16 ( pxenv ) ),
-			          "c" ( rm_cs )
-			       : "edx", "esi", "edi", "ebp", "memory" );
-
-	return rc;
 }
