@@ -76,17 +76,30 @@ struct bzimage_header {
 /** bzImage "load high" flag */
 #define BZI_LOAD_HIGH 0x01
 
+/** Load address for high-loaded kernels */
+#define BZI_LOAD_HIGH_ADDR 0x100000
+
+/** Load address for low-loaded kernels */
+#define BZI_LOAD_LOW_ADDR 0x10000
+
 /** bzImage "kernel can use heap" flag */
 #define BZI_CAN_USE_HEAP 0x80
 
+
+/** bzImage command-line structure used by older kernels */
+struct bzimage_cmdline {
+	/** Magic signature */
+	uint16_t magic;
+	/** Offset to command line */
+	uint16_t offset;
+} __attribute__ (( packed ));
+
+/** Offset of bzImage command-line structure within kernel image */
+#define BZI_CMDLINE_OFFSET 0x20
+
 /** bzImage command line present magic marker value */
-#define BZI_CMD_LINE_MAGIC 0xa33f
+#define BZI_CMDLINE_MAGIC 0xa33f
 
-/** bzImage command line present magic marker offset */
-#define BZI_CMD_LINE_MAGIC_OFFSET 0x20
-
-/** bzImage command line offset offset */
-#define BZI_CMD_LINE_OFFSET_OFFSET 0x22
 
 /** Amount of stack space to provide */
 #define BZI_STACK_SIZE 0x1000
