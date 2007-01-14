@@ -65,9 +65,30 @@ struct bzimage_header {
 } __attribute__ (( packed ));
 
 /** Offset of bzImage header within kernel image */
-#define BZHDR_OFFSET 0x1f1
+#define BZI_HDR_OFFSET 0x1f1
 
 /** bzImage magic signature value */
-#define BZIMAGE_SIGNATURE 0x53726448
+#define BZI_SIGNATURE 0x53726448
+
+/** bzImage boot loader identifier for Etherboot */
+#define BZI_LOADER_TYPE_ETHERBOOT 4
+
+/** bzImage "load high" flag */
+#define BZI_LOAD_HIGH 0x01
+
+/** bzImage "kernel can use heap" flag */
+#define BZI_CAN_USE_HEAP 0x80
+
+/** bzImage command line present magic marker value */
+#define BZI_CMD_LINE_MAGIC 0xa33f
+
+/** bzImage command line present magic marker offset */
+#define BZI_CMD_LINE_MAGIC_OFFSET 0x20
+
+/** bzImage command line offset offset */
+#define BZI_CMD_LINE_OFFSET_OFFSET 0x22
+
+/** Amount of stack space to provide */
+#define BZI_STACK_SIZE 0x1000
 
 #endif /* _BZIMAGE_H */

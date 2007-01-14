@@ -39,6 +39,7 @@ struct image {
 	union {
 		physaddr_t phys;
 		userptr_t user;
+		unsigned long ul;
 	} priv;
 };
 
