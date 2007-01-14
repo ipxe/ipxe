@@ -1,5 +1,5 @@
-#ifndef _INITRD_H
-#define _INITRD_H
+#ifndef _GPXE_INITRD_H
+#define _GPXE_INITRD_H
 
 /**
  * @file
@@ -11,4 +11,4 @@
 #include <gpxe/image.h>
 extern struct image_type initrdimage_image_type __image_type ( PROBE_NORMAL );
 
-#endif /* _INITRD_H */
+#endif /* _GPXE_INITRD_H */

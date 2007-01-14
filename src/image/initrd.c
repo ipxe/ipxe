@@ -28,8 +28,8 @@
  *
  */
 
-#include <initrd.h>
 #include <gpxe/image.h>
+#include <gpxe/initrd.h>
 
 /** Linux initrd image type */
 struct image_type initrd_image_type __image_type ( PROBE_NORMAL ) = {
