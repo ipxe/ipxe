@@ -1,3 +1,7 @@
+# Locations of utilities
+#
+ISOLINUX_BIN	= /usr/lib/syslinux/isolinux.bin
+
 # i386-specific directories containing source files
 #
 SRCDIRS		+= arch/i386/core arch/i386/transitions arch/i386/prefix
@@ -14,15 +18,10 @@ SRCDIRS		+= arch/i386/interface/pxe
 #
 NON_AUTO_SRCS	+= arch/i386/core/aout_loader.c
 NON_AUTO_SRCS	+= arch/i386/core/freebsd_loader.c
-NON_AUTO_SRCS	+= arch/i386/core/multiboot_loader.c
-NON_AUTO_SRCS	+= arch/i386/core/tagged_loader.c
 NON_AUTO_SRCS	+= arch/i386/core/wince_loader.c
 
-# setup.S and unnrv2b.S are both used to generate 16-bit as well as
-# 32-bit objects.
+# unnrv2b.S is used to generate a 16-bit as well as a 32-bit object.
 #
-OBJS_setup		= setup setup16
-CFLAGS_setup16		= -DCODE16
 OBJS_unnrv2b		= unnrv2b unnrv2b16
 CFLAGS_unnrv2b16	= -DCODE16
 
