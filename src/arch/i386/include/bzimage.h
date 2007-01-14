@@ -94,6 +94,8 @@ struct bzimage_header {
 /** bzImage special video mode "ask" */
 #define BZI_VID_MODE_ASK 0xfffd
 
+/** bzImage maximum initrd address for versions < 2.03 */
+#define BZI_INITRD_MAX 0x37ffffff
 
 /** bzImage command-line structure used by older kernels */
 struct bzimage_cmdline {
