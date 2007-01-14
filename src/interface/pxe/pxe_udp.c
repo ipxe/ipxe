@@ -407,6 +407,13 @@ PXENV_EXIT_t pxenv_udp_read ( struct s_PXENV_UDP_READ *pxenv_udp_read ) {
 	if ( d_port && ( d_port != pxenv_udp_read->d_port ) )
 		goto no_packet;
 
+	DBG ( " %04x:%04x+%x %s:%d<-%s:%d", pxenv_udp_read->buffer.segment,
+	      pxenv_udp_read->buffer.offset, pxenv_udp_read->buffer_size,
+	      inet_ntoa ( *( ( struct in_addr * ) &pxenv_udp_read->src_ip ) ),
+	      ntohs ( pxenv_udp_read->s_port ),
+	      inet_ntoa ( *( ( struct in_addr * ) &pxenv_udp_read->dest_ip ) ),
+	      ntohs ( pxenv_udp_read->d_port ) );
+
 	pxenv_udp_read->Status = PXENV_STATUS_SUCCESS;
 	return PXENV_EXIT_SUCCESS;
 
