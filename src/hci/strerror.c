@@ -55,10 +55,13 @@ const char * strerror ( int errno ) {
 }
 
 /** The most common errors */
-struct errortab enoerr __errortab = { 0, "No error" };
-struct errortab enoem __errortab = { ENOMEM, "Out of memory" };
-struct errortab einval __errortab = { EINVAL, "Invalid argument" };
-struct errortab enospc __errortab = { ENOSPC, "No space left on device" };
-struct errortab eio __errortab = { EIO, "Input/output error" };
-struct errortab eacces __errortab = { EACCES, "Permission denied" };
-struct errortab enoent __errortab = { ENOENT, "File not found" };
+struct errortab common_errors[] __errortab = {
+	{ 0, "No error" },
+	{ ENOMEM, "Out of memory" },
+	{ EINVAL, "Invalid argument" },
+	{ ENOSPC, "No space left on device" },
+	{ EIO, "Input/output error" },
+	{ EACCES, "Permission denied" },
+	{ ENOENT, "File not found" },
+	{ ENETUNREACH, "Network unreachable" },
+};

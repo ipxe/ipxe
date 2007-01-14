@@ -17,6 +17,7 @@
  */
 
 static void tcp_expired ( struct retry_timer *timer, int over );
+static int tcp_senddata_conn ( struct tcp_connection *conn, int force_send );
 
 /**
  * A TCP connection
@@ -212,6 +213,35 @@ static void tcp_disassociate ( struct tcp_connection *conn ) {
 }
 
 /**
+ * Abort TCP connection
+ *
+ * @v conn		TCP connection
+ * @v send_rst		Send a RST after closing
+ * @v rc		Reason code
+ */
+static void tcp_abort ( struct tcp_connection *conn, int send_rst, int rc ) {
+	struct tcp_application *app = conn->app;
+
+	/* Transition to CLOSED */
+	conn->tcp_state = TCP_CLOSED;
+	tcp_dump_state ( conn );
+
+	/* Send RST if requested to do so */
+	if ( send_rst )
+		tcp_senddata_conn ( conn, 1 );
+
+	/* Break association between application and connection */
+	tcp_disassociate ( conn );
+
+	/* Free the connection */
+	free_tcp ( conn );
+
+	/* Notify application */
+	if ( app && app->tcp_op->closed )
+		app->tcp_op->closed ( app, rc );
+}
+
+/**
  * Transmit any outstanding data
  *
  * @v conn		TCP connection
@@ -234,6 +264,7 @@ static int tcp_senddata_conn ( struct tcp_connection *conn, int force_send ) {
 	unsigned int flags;
 	size_t len;
 	size_t seq_len;
+	int rc;
 
 	/* Allocate space to the TX buffer */
 	pkb = alloc_pkb ( MAX_PKB_LEN );
@@ -318,8 +349,23 @@ static int tcp_senddata_conn ( struct tcp_connection *conn, int force_send ) {
 	DBGC ( conn, "\n" );
 
 	/* Transmit packet */
-	return tcpip_tx ( pkb, &tcp_protocol, &conn->peer,
-			  NULL, &tcphdr->csum );
+	rc = tcpip_tx ( pkb, &tcp_protocol, &conn->peer, NULL, &tcphdr->csum );
+
+	/* If we got -ENETUNREACH, kill the connection immediately
+	 * because there is no point retrying.  This isn't strictly
+	 * necessary (since we will eventually time out anyway), but
+	 * it avoids irritating needless delays.  Don't do this for
+	 * RST packets transmitted on connection abort, to avoid a
+	 * potential infinite loop.
+	 */
+	if ( ( ! ( conn->tcp_state & TCP_STATE_SENT ( TCP_RST ) ) ) &&
+	     ( rc == -ENETUNREACH ) ) {
+		DBGC ( conn, "TCP %p aborting after TX failed: %s\n",
+		       conn, strerror ( rc ) );
+		tcp_abort ( conn, 0, rc );
+	}
+
+	return rc;
 }
 
 /**
@@ -392,7 +438,6 @@ int tcp_send ( struct tcp_application *app, const void *data, size_t len ) {
 static void tcp_expired ( struct retry_timer *timer, int over ) {
 	struct tcp_connection *conn =
 		container_of ( timer, struct tcp_connection, timer );
-	struct tcp_application *app = conn->app;
 	int graceful_close = TCP_CLOSED_GRACEFULLY ( conn->tcp_state );
 
 	DBGC ( conn, "TCP %p timer %s in %s\n", conn,
@@ -406,29 +451,12 @@ static void tcp_expired ( struct retry_timer *timer, int over ) {
 		 ( conn->tcp_state == TCP_CLOSE_WAIT ) ||
 		 ( conn->tcp_state == TCP_CLOSING_OR_LAST_ACK ) );
 
-	/* If we have finally timed out and given up, or if this is
-	 * the result of a graceful close, terminate the connection
-	 */
 	if ( over || graceful_close ) {
-
-		/* Transition to CLOSED */
-		conn->tcp_state = TCP_CLOSED;
-		tcp_dump_state ( conn );
-
-		/* If we haven't closed gracefully, send a RST */
-		if ( ! graceful_close )
-			tcp_senddata_conn ( conn, 1 );
-
-		/* Break association between application and connection */
-		tcp_disassociate ( conn );
-
-		/* Free the connection */
-		free_tcp ( conn );
-
-		/* Notify application */
-		if ( app && app->tcp_op->closed )
-			app->tcp_op->closed ( app, -ETIMEDOUT );
-
+		/* If we have finally timed out and given up, or if
+		 * this is the result of a graceful close, terminate
+		 * the connection
+		 */
+		tcp_abort ( conn, 1, -ETIMEDOUT );
 	} else {
 		/* Otherwise, retransmit the packet */
 		tcp_senddata_conn ( conn, 0 );
@@ -658,7 +686,6 @@ static int tcp_rx_fin ( struct tcp_connection *conn, uint32_t seq ) {
  * @ret rc		Return status code
  */
 static int tcp_rx_rst ( struct tcp_connection *conn, uint32_t seq ) {
-	struct tcp_application *app = conn->app;
 
 	/* Accept RST only if it falls within the window.  If we have
 	 * not yet received a SYN, then we have no window to test
@@ -673,19 +700,8 @@ static int tcp_rx_rst ( struct tcp_connection *conn, uint32_t seq ) {
 			return 0;
 	}
 
-	/* Transition to CLOSED */
-	conn->tcp_state = TCP_CLOSED;
-	tcp_dump_state ( conn );
-
-	/* Break association between application and connection */
-	tcp_disassociate ( conn );
-	
-	/* Free the connection */
-	free_tcp ( conn );
-	
-	/* Notify application */
-	if ( app && app->tcp_op->closed )
-		app->tcp_op->closed ( app, -ECONNRESET );
+	/* Abort connection without sending a RST */
+	tcp_abort ( conn, 0, -ECONNRESET );
 
 	return -ECONNRESET;
 }
