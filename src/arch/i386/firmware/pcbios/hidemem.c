@@ -128,6 +128,22 @@ void hide_etherboot ( void ) {
  * possible.
  */
 void unhide_etherboot ( void ) {
+
+	/* If we have more than one hooked interrupt at this point, it
+	 * means that some other vector is still hooked, in which case
+	 * we can't safely unhook INT 15 because we need to keep our
+	 * memory protected.  (We expect there to be at least one
+	 * hooked interrupt, because INT 15 itself is still hooked).
+	 */
+	if ( hooked_bios_interrupts > 1 ) {
+		DBG ( "Cannot unhide: %d interrupt vectors still hooked\n",
+		      hooked_bios_interrupts );
+		return;
+	}
+
+	/* Try to unhook INT 15.  If it fails, then just leave it
+	 * hooked; it takes care of protecting itself.  :)
+	 */
 	unhook_bios_interrupt ( 0x15, ( unsigned int ) int15,
 				&int15_vector );
 }

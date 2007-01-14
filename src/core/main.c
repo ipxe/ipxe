@@ -20,6 +20,7 @@ Literature dealing with the network protocols:
 #include <gpxe/shell.h>
 #include <gpxe/shell_banner.h>
 #include <gpxe/shutdown.h>
+#include <gpxe/hidemem.h>
 #include <usr/autoboot.h>
 
 /**
@@ -28,8 +29,9 @@ Literature dealing with the network protocols:
  * Call this function only once, before doing (almost) anything else.
  */
 static void startup ( void ) {
+	hide_etherboot();
 	init_heap();
-	call_init_fns ();
+	call_init_fns();
 	probe_devices();
 }
 
@@ -41,7 +43,8 @@ static void startup ( void ) {
  */
 void shutdown ( void ) {
 	remove_devices();
-	call_exit_fns ();
+	call_exit_fns();
+	unhide_etherboot();
 }
 
 /**

@@ -17,6 +17,8 @@ enum hidemem_region_id {
 	EXTMEM,
 };
 
+extern void hide_etherboot();
+extern void unhide_etherboot();
 extern void hide_region ( unsigned int region_id, physaddr_t start,
 			  physaddr_t end );
 

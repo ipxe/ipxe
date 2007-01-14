@@ -230,7 +230,7 @@ install_highmem:
  * GDT for flat real mode
  *
  * We only ever use this GDT to set segment limits; the bases are
- * unused.  Also, we only flatten data segments, so we don't need to
+ * unused.  Also, we only change data segments, so we don't need to
  * worry about the code or stack segments.  This makes everything much
  * simpler.
  ****************************************************************************
@@ -250,6 +250,11 @@ flat_ds:	/* Flat real mode data segment */
 	.word	0xffff, 0
 	.byte	0, 0x93, 0xcf, 0
 
+real_ds:	/* Normal real mode data segment */
+	.equ	REAL_DS, real_ds - gdt
+	.word	0xffff, 0
+	.byte	0, 0x93, 0x00, 0
+
 gdt_end:
 	.equ	gdt_length, gdt_end - gdt
 	.size gdt, . - gdt
@@ -257,12 +262,12 @@ gdt_end:
 #endif /* KEEP_IT_REAL */
 
 /****************************************************************************
- * flatten_real_mode (real-mode near call)
+ * set_real_mode_limits (real-mode near call)
  *
- * Sets 4GB limits on the data segments %ds and %es.
+ * Sets limits on the data segments %ds and %es.
  *
- * Parameters: 
- *   none
+ * Parameters:
+ *   %cx : segment type (FLAT_DS for 4GB or REAL_DS for 64kB)
  ****************************************************************************
  */
 
@@ -270,7 +275,7 @@ gdt_end:
 	
 	.section ".prefix.lib"
 	.code16
-flatten_real_mode:
+set_real_mode_limits:
 	/* Preserve real-mode segment values and temporary registers */
 	pushw	%es
 	pushw	%ds
@@ -294,9 +299,8 @@ flatten_real_mode:
 	movl	%eax, %cr0
 
 	/* Set flat segment limits */
-	movw	$FLAT_DS, %ax
-	movw	%ax, %ds
-	movw	%ax, %es
+	movw	%cx, %ds
+	movw	%cx, %es
 
 	/* Switch back to real mode */
 	movl	%cr0, %eax
@@ -309,7 +313,7 @@ flatten_real_mode:
 	popw	%ds
 	popw	%es
 	ret
-	.size flatten_real_mode, . - flatten_real_mode
+	.size set_real_mode_limits, . - set_real_mode_limits
 	
 #endif /* KEEP_IT_REAL */
 	
@@ -369,7 +373,8 @@ install_prealloc:
 	 * prior to reading the E820 memory map and relocating
 	 * properly.
 	 */
-	call	flatten_real_mode
+	movw	$FLAT_DS, %cx
+	call	set_real_mode_limits
 	movl	$HIGHMEM_LOADPOINT, %edi
 	call	install_highmem
 
@@ -383,19 +388,16 @@ install_prealloc:
 	addw	$4, %sp
 
 	/* Move code to new location, set up new protected-mode GDT */
-	call	flatten_real_mode
+	movw	$FLAT_DS, %cx
+	call	set_real_mode_limits
 	pushl	%edi
 	es rep addr32 movsb
 	popl	%edi
 	lcall	*init_librm_vector
-	
-	/* Hide Etherboot from BIOS memory map.  Note that making this
-	 * protected-mode call will also restore normal (non-flat)
-	 * real mode, as part of the protected-to-real transition.
-	 */
-	pushl	$hide_etherboot
-	lcall	*prot_call_vector
-	addw	$4, %sp
+
+	/* Restore real-mode segment limits */
+	movw	$REAL_DS, %cx
+	call	set_real_mode_limits
 
 	/* Restore registers and interrupt status */
 	popl	%ecx
