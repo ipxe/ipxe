@@ -18,11 +18,13 @@
 
 #include <stdint.h>
 #include <stdlib.h>
+#include <errno.h>
 #include <libgen.h>
 #include <getopt.h>
 #include <vsprintf.h>
 #include <gpxe/image.h>
 #include <gpxe/command.h>
+#include <gpxe/initrd.h>
 #include <usr/imgmgmt.h>
 
 /** @file
@@ -72,16 +74,17 @@ static void imgfetch_core_syntax ( char **argv, int load ) {
  *
  * @v argc		Argument count
  * @v argv		Argument list
- * @v load		Load image after fetching
- * @ret rc		Exit code
+ * @v load		Image will be automatically loaded after fetching
+ * @ret image		Fetched image
+ * @ret rc		Return status code
  */
-static int imgfetch_core_exec ( int argc, char **argv, int load ) {
+static int imgfetch_core_exec ( int argc, char **argv, int load,
+				struct image **image ) {
 	static struct option longopts[] = {
 		{ "help", 0, NULL, 'h' },
 		{ "name", required_argument, NULL, 'n' },
 		{ NULL, 0, NULL, 0 },
 	};
-	struct image *image;
 	const char *name = NULL;
 	char *filename;
 	int c;
@@ -100,36 +103,27 @@ static int imgfetch_core_exec ( int argc, char **argv, int load ) {
 		default:
 			/* Unrecognised/invalid option */
 			imgfetch_core_syntax ( argv, load );
-			return 1;
+			return -EINVAL;
 		}
 	}
 
 	/* Need at least a filename remaining after the options */
 	if ( optind == argc ) {
 		imgfetch_core_syntax ( argv, load );
-		return 1;
+		return -EINVAL;
 	}
 	filename = argv[optind++];
 	if ( ! name )
 		name = basename ( filename );
 
 	/* Fetch the image */
-	if ( ( rc = imgfetch ( filename, name, &image ) ) != 0 ) {
+	if ( ( rc = imgfetch ( filename, name, image ) ) != 0 ) {
 		printf ( "Could not fetch %s: %s\n", name, strerror ( rc ) );
-		return 1;
+		return rc;
 	}
 
 	/* Fill in command line */
-	imgfill_cmdline ( image, ( argc - optind ), &argv[optind] );
-
-	/* Load image if required */
-	if ( load ) {
-		if ( ( rc = imgload ( image ) ) != 0 ) {
-			printf ( "Could not load %s: %s\n", name,
-				 strerror ( rc ) );
-			return 1;
-		}
-	}
+	imgfill_cmdline ( *image, ( argc - optind ), &argv[optind] );
 
 	return 0;
 }
@@ -142,7 +136,13 @@ static int imgfetch_core_exec ( int argc, char **argv, int load ) {
  * @ret rc		Exit code
  */
 static int imgfetch_exec ( int argc, char **argv ) {
-	return imgfetch_core_exec ( argc, argv, 0 );
+	struct image *image;
+	int rc;
+
+	if ( ( rc = imgfetch_core_exec ( argc, argv, 0, &image ) ) != 0 )
+		return 1;
+
+	return 0;
 }
 
 /**
@@ -153,7 +153,40 @@ static int imgfetch_exec ( int argc, char **argv ) {
  * @ret rc		Exit code
  */
 static int kernel_exec ( int argc, char **argv ) {
-	return imgfetch_core_exec ( argc, argv, 1  );
+	struct image *image;
+	int rc;
+
+	if ( ( rc = imgfetch_core_exec ( argc, argv, 1, &image ) != 0 ) )
+		return 1;
+
+	/* Load image */
+	if ( ( rc = imgload ( image ) ) != 0 ) {
+		printf ( "Could not load %s: %s\n", image->name,
+			 strerror ( rc ) );
+		return 1;
+	}
+
+	return 0;
+}
+
+/**
+ * The "initrd" command
+ *
+ * @v argc		Argument count
+ * @v argv		Argument list
+ * @ret rc		Exit code
+ */
+static int initrd_exec ( int argc, char **argv ) {
+	struct image *image;
+	int rc;
+
+	if ( ( rc = imgfetch_core_exec ( argc, argv, 0, &image ) != 0 ) )
+		return 1;
+
+	/* Mark image as an intird */
+	image->type = &initrd_image_type;
+
+	return 0;
 }
 
 /**
@@ -472,6 +505,10 @@ struct command image_commands[] __command = {
 	{
 		.name = "kernel",
 		.exec = kernel_exec,
+	},
+	{
+		.name = "initrd",
+		.exec = initrd_exec,
 	},
 	{
 		.name = "imgload",
