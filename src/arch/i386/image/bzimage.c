@@ -36,13 +36,30 @@
 struct image_type bzimage_image_type __image_type ( PROBE_NORMAL );
 
 /**
+ * bzImage execution context
+ */
+union bzimage_exec_context {
+	/** Real-mode parameters */
+	struct {
+		/** Kernel real-mode data segment */
+		uint16_t kernel_seg;
+		/** Kernel real-mode stack pointer */
+		uint16_t stack;
+	} rm;
+	unsigned long ul;
+};
+
+/**
  * Execute bzImage image
  *
  * @v image		bzImage image
  * @ret rc		Return status code
  */
 static int bzimage_exec ( struct image *image ) {
-	unsigned long rm_kernel_seg = image->priv.ul;
+	union bzimage_exec_context context;
+
+	/* Retrieve stored execution context */
+	context.ul = image->priv.ul;
 
 	/* Prepare for exiting */
 	shutdown();
@@ -57,13 +74,14 @@ static int bzimage_exec ( struct image *image ) {
 					   "pushw %w2\n\t"
 					   "pushw $0\n\t"
 					   "lret\n\t" )
-			       : : "r" ( rm_kernel_seg ),
-			           "i" ( BZI_STACK_SIZE ),
-			           "r" ( rm_kernel_seg + 0x20 ) );
+			       : : "r" ( context.rm.kernel_seg ),
+			           "r" ( context.rm.stack ),
+			           "r" ( context.rm.kernel_seg + 0x20 ) );
 
 	/* There is no way for the image to return, since we provide
 	 * no return address.
 	 */
+	assert ( 0 );
 
 	return -ECANCELED; /* -EIMPOSSIBLE */
 }
@@ -76,7 +94,8 @@ static int bzimage_exec ( struct image *image ) {
  */
 int bzimage_load ( struct image *image ) {
 	struct bzimage_header bzhdr;
-	unsigned int rm_kernel_seg = 0x7c0; /* place RM kernel at 07c0:0000 */
+	union bzimage_exec_context context;
+	unsigned int rm_kernel_seg = 0x1000; /* place RM kernel at 1000:0000 */
 	userptr_t rm_kernel = real_to_user ( rm_kernel_seg, 0 );
 	userptr_t pm_kernel;
 	size_t rm_filesz;
@@ -115,7 +134,7 @@ int bzimage_load ( struct image *image ) {
 	DBGC ( image, "bzImage %p version %04x\n", image, bzhdr.version );
 
 	/* Check size of base memory portions */
-	rm_filesz = ( ( bzhdr.setup_sects ? bzhdr.setup_sects : 4 ) << 9 );
+	rm_filesz = ( ( bzhdr.setup_sects ? bzhdr.setup_sects : 4 ) + 1 ) << 9;
 	if ( rm_filesz > image->len ) {
 		DBGC ( image, "bzImage %p too short for %zd byte of setup\n",
 		       image, rm_filesz );
@@ -177,8 +196,10 @@ int bzimage_load ( struct image *image ) {
 	}
 	copy_to_user ( rm_kernel, BZI_HDR_OFFSET, &bzhdr, sizeof ( bzhdr ) );
 
-	/* Record segment address in image private data field */
-	image->priv.ul = rm_kernel_seg;
+	/* Record execution context in image private data field */
+	context.rm.kernel_seg = rm_kernel_seg;
+	context.rm.stack = rm_heap_end;
+	image->priv.ul = context.ul;
 
 	return 0;
 }
