@@ -85,6 +85,15 @@ struct bzimage_header {
 /** bzImage "kernel can use heap" flag */
 #define BZI_CAN_USE_HEAP 0x80
 
+/** bzImage special video mode "normal" */
+#define BZI_VID_MODE_NORMAL 0xffff
+
+/** bzImage special video mode "ext" */
+#define BZI_VID_MODE_EXT 0xfffe
+
+/** bzImage special video mode "ask" */
+#define BZI_VID_MODE_ASK 0xfffd
+
 
 /** bzImage command-line structure used by older kernels */
 struct bzimage_cmdline {
@@ -103,5 +112,8 @@ struct bzimage_cmdline {
 
 /** Amount of stack space to provide */
 #define BZI_STACK_SIZE 0x1000
+
+/** Maximum size of command line */
+#define BZI_CMDLINE_SIZE 0x100
 
 #endif /* _BZIMAGE_H */

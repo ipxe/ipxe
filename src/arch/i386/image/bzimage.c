@@ -23,6 +23,9 @@
  *
  */
 
+#include <stdint.h>
+#include <stdlib.h>
+#include <string.h>
 #include <errno.h>
 #include <assert.h>
 #include <realmode.h>
@@ -61,11 +64,100 @@ struct bzimage_load_context {
  * bzImage execution context
  */
 struct bzimage_exec_context {
-	/** Kernel real-mode data segment */
-	uint16_t kernel_seg;
-	/** Kernel real-mode stack pointer */
-	uint16_t stack;
+	/** Real-mode kernel portion load segment address */
+	unsigned int rm_kernel_seg;
+	/** Real-mode kernel portion load address */
+	userptr_t rm_kernel;
+	/** Real-mode heap top (offset from rm_kernel) */
+	size_t rm_heap;
+	/** Command line (offset from rm_kernel) */
+	size_t rm_cmdline;
+	/** Video mode */
+	unsigned int vid_mode;
+	/** Memory limit */
+	uint64_t mem_limit;
 };
+
+/**
+ * Parse kernel command line for bootloader parameters
+ *
+ * @v image		bzImage file
+ * @v exec_ctx		Execution context
+ * @v cmdline		Kernel command line
+ * @ret rc		Return status code
+ */
+static int bzimage_parse_cmdline ( struct image *image,
+				   struct bzimage_exec_context *exec_ctx,
+				   const char *cmdline ) {
+	char *vga;
+	char *mem;
+
+	/* Look for "vga=" */
+	if ( ( vga = strstr ( cmdline, "vga=" ) ) ) {
+		vga += 4;
+		if ( strcmp ( vga, "normal" ) == 0 ) {
+			exec_ctx->vid_mode = BZI_VID_MODE_NORMAL;
+		} else if ( strcmp ( vga, "ext" ) == 0 ) {
+			exec_ctx->vid_mode = BZI_VID_MODE_EXT;
+		} else if ( strcmp ( vga, "ask" ) == 0 ) {
+			exec_ctx->vid_mode = BZI_VID_MODE_ASK;
+		} else {
+			exec_ctx->vid_mode = strtoul ( vga, &vga, 16 );
+			if ( *vga && ( *vga != ' ' ) ) {
+				DBGC ( image, "bzImage %p strange \"vga=\"\n",
+				       image );
+			}
+		}
+	}
+
+	/* Look for "mem=" */
+	if ( ( mem = strstr ( cmdline, "mem=" ) ) ) {
+		mem += 4;
+		exec_ctx->mem_limit = strtoul ( mem, &mem, 0 );
+		switch ( *mem ) {
+		case 'G':
+			exec_ctx->mem_limit <<= 10;
+		case 'M':
+			exec_ctx->mem_limit <<= 10;
+		case 'K':
+			exec_ctx->mem_limit <<= 10;
+			break;
+		case '\0':
+		case ' ':
+			break;
+		default:
+			DBGC ( image, "bzImage %p strange \"mem=\"\n",
+			       image );
+			break;
+		}
+	}
+
+	return 0;
+}
+
+/**
+ * Set command line
+ *
+ * @v image		bzImage image
+ * @v exec_ctx		Execution context
+ * @v cmdline		Kernel command line
+ * @ret rc		Return status code
+ */
+static int bzimage_set_cmdline ( struct image *image,
+				 struct bzimage_exec_context *exec_ctx,
+				 const char *cmdline ) {
+	size_t cmdline_len;
+
+	/* Copy command line down to real-mode portion */
+	cmdline_len = ( strlen ( cmdline ) + 1 );
+	if ( cmdline_len > BZI_CMDLINE_SIZE )
+		cmdline_len = BZI_CMDLINE_SIZE;
+	copy_to_user ( exec_ctx->rm_kernel, exec_ctx->rm_cmdline,
+		       cmdline, cmdline_len );
+	DBGC ( image, "bzImage %p command line \"%s\"\n", image, cmdline );
+
+	return 0;
+}
 
 /**
  * Execute bzImage image
@@ -74,13 +166,33 @@ struct bzimage_exec_context {
  * @ret rc		Return status code
  */
 static int bzimage_exec ( struct image *image ) {
-	union {
-		struct bzimage_exec_context bz;
-		unsigned long ul;
-	} exec_ctx;
+	struct bzimage_exec_context exec_ctx;
+	struct bzimage_header bzhdr;
+	const char *cmdline = ( image->cmdline ? image->cmdline : "" );
+	int rc;
 
-	/* Retrieve stored execution context */
-	exec_ctx.ul = image->priv.ul;
+	/* Retrieve kernel header */
+	exec_ctx.rm_kernel_seg = image->priv.ul;
+	exec_ctx.rm_kernel = real_to_user ( exec_ctx.rm_kernel_seg, 0 );
+	copy_from_user ( &bzhdr, exec_ctx.rm_kernel, BZI_HDR_OFFSET,
+			 sizeof ( bzhdr ) );
+	exec_ctx.rm_cmdline = exec_ctx.rm_heap = 
+		( bzhdr.heap_end_ptr + 0x200 );
+	exec_ctx.vid_mode = bzhdr.vid_mode;
+	exec_ctx.mem_limit = 0;
+
+	/* Parse command line for bootloader parameters */
+	if ( ( rc = bzimage_parse_cmdline ( image, &exec_ctx, cmdline ) ) != 0)
+		return rc;
+
+	/* Store command line */
+	if ( ( rc = bzimage_set_cmdline ( image, &exec_ctx, cmdline ) ) != 0 )
+		return rc;
+
+	/* Update and store kernel header */
+	bzhdr.vid_mode = exec_ctx.vid_mode;
+	copy_to_user ( exec_ctx.rm_kernel, BZI_HDR_OFFSET, &bzhdr,
+		       sizeof ( bzhdr ) );
 
 	/* Prepare for exiting */
 	shutdown();
@@ -95,9 +207,9 @@ static int bzimage_exec ( struct image *image ) {
 					   "pushw %w2\n\t"
 					   "pushw $0\n\t"
 					   "lret\n\t" )
-			       : : "r" ( exec_ctx.bz.kernel_seg ),
-			           "r" ( exec_ctx.bz.stack ),
-			           "r" ( exec_ctx.bz.kernel_seg + 0x20 ) );
+			       : : "r" ( exec_ctx.rm_kernel_seg ),
+			           "r" ( exec_ctx.rm_heap ),
+			           "r" ( exec_ctx.rm_kernel_seg + 0x20 ) );
 
 	/* There is no way for the image to return, since we provide
 	 * no return address.
@@ -168,22 +280,19 @@ static int bzimage_load_header ( struct image *image,
  *
  * @v image		bzImage file
  * @v load_ctx		Load context
- * @v cmdline		Kernel command line
  * @ret rc		Return status code
  */
 static int bzimage_load_real ( struct image *image,
-			       struct bzimage_load_context *load_ctx,
-			       const char *cmdline ) {
-	size_t cmdline_len = ( strlen ( cmdline ) + 1 );
+			       struct bzimage_load_context *load_ctx ) {
 	int rc;
 
 	/* Allow space for the stack and heap */
 	load_ctx->rm_memsz += BZI_STACK_SIZE;
 	load_ctx->rm_heap = load_ctx->rm_memsz;
 
-	/* Allow space for the command line, if one exists */
+	/* Allow space for the command line */
 	load_ctx->rm_cmdline = load_ctx->rm_memsz;
-	load_ctx->rm_memsz += cmdline_len;
+	load_ctx->rm_memsz += BZI_CMDLINE_SIZE;
 
 	/* Prepare, verify, and load the real-mode segment */
 	if ( ( rc = prep_segment ( load_ctx->rm_kernel, load_ctx->rm_filesz,
@@ -194,10 +303,6 @@ static int bzimage_load_real ( struct image *image,
 	}
 	memcpy_user ( load_ctx->rm_kernel, 0, image->data, 0,
 		      load_ctx->rm_filesz );
-
-	/* Copy command line */
-	copy_to_user ( load_ctx->rm_kernel, load_ctx->rm_cmdline,
-		       cmdline, cmdline_len );
 
 	return 0;
 }
@@ -225,7 +330,6 @@ static int bzimage_load_non_real ( struct image *image,
 
 	return 0;
 }
-
 
 /**
  * Update and store bzImage header
@@ -269,13 +373,8 @@ static int bzimage_write_header ( struct image *image __unused,
  * @ret rc		Return status code
  */
 int bzimage_load ( struct image *image ) {
-	struct bzimage_header bzhdr;
 	struct bzimage_load_context load_ctx;
-	union {
-		struct bzimage_exec_context bz;
-		unsigned long ul;
-	} exec_ctx;
-	const char *cmdline = ( image->cmdline ? image->cmdline : "" );
+	struct bzimage_header bzhdr;
 	int rc;
 
 	/* Load and verify header */
@@ -287,7 +386,7 @@ int bzimage_load ( struct image *image ) {
 		image->type = &bzimage_image_type;
 
 	/* Load real-mode portion */
-	if ( ( rc = bzimage_load_real ( image, &load_ctx, cmdline ) ) != 0 )
+	if ( ( rc = bzimage_load_real ( image, &load_ctx ) ) != 0 )
 		return rc;
 
 	/* Load non-real-mode portion */
@@ -298,10 +397,8 @@ int bzimage_load ( struct image *image ) {
 	if ( ( rc = bzimage_write_header ( image, &load_ctx, &bzhdr ) ) != 0 )
 		return rc;
 
-	/* Record execution context in image private data field */
-	exec_ctx.bz.kernel_seg = load_ctx.rm_kernel_seg;
-	exec_ctx.bz.stack = load_ctx.rm_heap;
-	image->priv.ul = exec_ctx.ul;
+	/* Record real-mode segment in image private data field */
+	image->priv.ul = load_ctx.rm_kernel_seg;
 
 	return 0;
 }
