@@ -116,6 +116,11 @@ struct image * find_image ( const char *name ) {
 static int image_load_type ( struct image *image, struct image_type *type ) {
 	int rc;
 
+	/* Check image is actually loadable */
+	if ( ! type->load )
+		return -ENOEXEC;
+
+	/* Try the image loader */
 	if ( ( rc = type->load ( image ) ) != 0 ) {
 		DBGC ( image, "IMAGE %p could not load as %s: %s\n",
 		       image, type->name, strerror ( rc ) );
@@ -179,6 +184,10 @@ int image_exec ( struct image *image ) {
 	}
 
 	assert ( image->type != NULL );
+
+	/* Check that image is actually executable */
+	if ( ! image->type->exec )
+		return -ENOEXEC;
 
 	/* Try executing the image */
 	if ( ( rc = image->type->exec ( image ) ) != 0 ) {
