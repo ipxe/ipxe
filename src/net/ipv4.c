@@ -384,7 +384,7 @@ static int ipv4_tx ( struct pk_buff *pkb,
 	}
 	if ( ! netdev ) {
 		DBG ( "IPv4 has no route to %s\n", inet_ntoa ( iphdr->dest ) );
-		rc = -EHOSTUNREACH;
+		rc = -ENETUNREACH;
 		goto err;
 	}
 

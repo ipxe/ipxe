@@ -239,7 +239,7 @@ static int ipv6_tx ( struct pk_buff *pkb,
 	/* No network interface identified */
 	if ( !netdev ) {
 		DBG ( "No route to host %s\n", inet6_ntoa ( ip6hdr->dest ) );
-		rc = -EHOSTUNREACH;
+		rc = -ENETUNREACH;
 		goto err;
 	}
 
