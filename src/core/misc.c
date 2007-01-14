@@ -95,32 +95,6 @@ void interruptible_sleep(int secs)
 }
 
 /**************************************************************************
-TWIDDLE
-**************************************************************************/
-void twiddle(void)
-{
-#ifdef BAR_PROGRESS
-	static int count=0;
-	static const char tiddles[]="-\\|/";
-	static unsigned long lastticks = 0;
-	unsigned long ticks;
-#endif
-	if ( ! as_main_program ) return;
-#ifdef	BAR_PROGRESS
-	/* Limit the maximum rate at which characters are printed */
-	ticks = currticks();
-	if ((lastticks + (TICKS_PER_SEC/18)) > ticks)
-		return;
-	lastticks = ticks;
-
-	putchar(tiddles[(count++)&3]);
-	putchar('\b');
-#else
-	putchar('.');
-#endif	/* BAR_PROGRESS */
-}
-
-/**************************************************************************
 STRCASECMP (not entirely correct, but this will do for our purposes)
 **************************************************************************/
 int strcasecmp(const char *a, const char *b)
