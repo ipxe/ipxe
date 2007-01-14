@@ -140,6 +140,9 @@ REQUIRE_OBJECT ( pxe_image );
 #ifdef IMAGE_SCRIPT
 REQUIRE_OBJECT ( script );
 #endif
+#ifdef IMAGE_BZIMAGE
+REQUIRE_OBJECT ( bzimage );
+#endif
 
 /*
  * Drag in all requested commands

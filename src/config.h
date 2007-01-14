@@ -108,6 +108,7 @@
 #undef	IMAGE_WINCE		/* WinCE image support */
 #define	IMAGE_PXE		/* PXE image support */
 #define IMAGE_SCRIPT		/* gPXE script image support */
+#define IMAGE_BZIMAGE		/* Linux bzImage image support */
 
 /* @END general.h */ 
 
