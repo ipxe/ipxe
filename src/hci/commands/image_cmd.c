@@ -486,6 +486,10 @@ struct command image_commands[] __command = {
 		.exec = imgexec_exec,
 	},
 	{
+		.name = "boot", /* synonym for "imgexec" */
+		.exec = imgexec_exec,
+	},
+	{
 		.name = "imgstat",
 		.exec = imgstat_exec,
 	},
