@@ -145,8 +145,8 @@ REQUIRE_OBJECT ( script );
  * Drag in all requested commands
  *
  */
-#ifdef BOOT_CMD
-REQUIRE_OBJECT ( boot_cmd );
+#ifdef AUTOBOOT_CMD
+REQUIRE_OBJECT ( autoboot_cmd );
 #endif
 #ifdef NVO_CMD
 REQUIRE_OBJECT ( nvo_cmd );

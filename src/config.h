@@ -116,7 +116,7 @@
  * Command-line commands to include
  *
  */
-#define	BOOT_CMD		/* Automatic booting */
+#define	AUTOBOOT_CMD		/* Automatic booting */
 #define	NVO_CMD			/* Non-volatile option storage commands */
 #define	CONFIG_CMD		/* Option configuration console */
 #define	IFMGMT_CMD		/* Interface management commands */

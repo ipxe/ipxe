@@ -2,7 +2,7 @@
 #include <gpxe/command.h>
 #include <usr/autoboot.h>
 
-static int boot_exec ( int argc, char **argv ) {
+static int autoboot_exec ( int argc, char **argv ) {
 
 	if ( argc != 1 ) {
 		printf ( "Usage:\n"
@@ -19,7 +19,7 @@ static int boot_exec ( int argc, char **argv ) {
 	return 1;
 }
 
-struct command boot_command __command = {
-	.name = "boot",
-	.exec = boot_exec,
+struct command autoboot_command __command = {
+	.name = "autoboot",
+	.exec = autoboot_exec,
 };
