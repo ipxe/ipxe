@@ -32,6 +32,7 @@
 #include <gpxe/segment.h>
 #include <gpxe/memmap.h>
 #include <gpxe/elf.h>
+#include <gpxe/shutdown.h>
 
 struct image_type multiboot_image_type __image_type ( PROBE_MULTIBOOT );
 
@@ -76,11 +77,13 @@ struct multiboot_header_info {
 /**
  * Build multiboot memory map
  *
+ * @v image		Multiboot image
  * @v mbinfo		Multiboot information structure
  * @v mbmemmap		Multiboot memory map
  * @v limit		Maxmimum number of memory map entries
  */
-static void multiboot_build_memmap ( struct multiboot_info *mbinfo,
+static void multiboot_build_memmap ( struct image *image,
+				     struct multiboot_info *mbinfo,
 				     struct multiboot_memory_map *mbmemmap,
 				     unsigned int limit ) {
 	struct memory_map memmap;
@@ -93,8 +96,8 @@ static void multiboot_build_memmap ( struct multiboot_info *mbinfo,
 	memset ( mbmemmap, 0, sizeof ( *mbmemmap ) );
 	for ( i = 0 ; i < memmap.count ; i++ ) {
 		if ( i >= limit ) {
-			DBG ( "Multiboot limit of %d memmap entries reached\n",
-			      limit );
+			DBGC ( image, "MULTIBOOT %p limit of %d memmap "
+			       "entries reached\n", image, limit );
 			break;
 		}
 		mbmemmap[i].size = ( sizeof ( mbmemmap[i] ) -
@@ -135,8 +138,8 @@ multiboot_build_module_list ( struct image *image,
 	for_each_image ( module_image ) {
 
 		if ( count >= limit ) {
-			DBG ( "Multiboot limit of %d modules reached\n",
-			      limit );
+			DBGC ( image, "MULTIBOOT %p limit of %d modules "
+			       "reached\n", image, limit );
 			break;
 		}
 
@@ -176,8 +179,9 @@ multiboot_build_module_list ( struct image *image,
 	/* Dump module configuration */
 	if ( modules ) {
 		for ( i = 0 ; i < count ; i++ ) {
-			DBG ( "Multiboot module %d is [%lx,%lx)\n", i,
-			      modules[i].mod_start, modules[i].mod_end );
+			DBGC ( image, "MULTIBOOT %p module %d is [%lx,%lx)\n",
+			       image, i, modules[i].mod_start,
+			       modules[i].mod_end );
 		}
 	}
 
@@ -219,7 +223,7 @@ static int multiboot_exec ( struct image *image ) {
 	memset ( &mbinfo, 0, sizeof ( mbinfo ) );
 	mbinfo.flags = ( MBI_FLAG_LOADER | MBI_FLAG_MEM | MBI_FLAG_MMAP |
 			 MBI_FLAG_CMDLINE | MBI_FLAG_MODS );
-	multiboot_build_memmap ( &mbinfo, mbmemmap,
+	multiboot_build_memmap ( image, &mbinfo, mbmemmap,
 				 ( sizeof(mbmemmap) / sizeof(mbmemmap[0]) ) );
 	mbinfo.cmdline = virt_to_phys ( image->cmdline );
 	mbinfo.mods_count = multiboot_build_module_list ( image, mbmodules,
@@ -227,7 +231,12 @@ static int multiboot_exec ( struct image *image ) {
 	mbinfo.mods_addr = virt_to_phys ( mbmodules );
 	mbinfo.mmap_addr = virt_to_phys ( mbmemmap );
 	mbinfo.boot_loader_name = virt_to_phys ( mb_bootloader_name );
-	
+
+	/* Multiboot images may not return and have no callback
+	 * interface, so shut everything down prior to booting the OS.
+	 */
+	shutdown();
+
 	/* Jump to OS with flat physical addressing */
 	__asm__ __volatile__ ( PHYS_CODE ( "call *%%edi\n\t" )
 			       : : "a" ( MULTIBOOT_BOOTLOADER_MAGIC ),
@@ -235,7 +244,12 @@ static int multiboot_exec ( struct image *image ) {
 			           "D" ( image->entry )
 			       : "ecx", "edx", "esi", "ebp", "memory" );
 
-	return -ECANCELED;
+	DBGC ( image, "MULTIBOOT %p returned\n", image );
+
+	/* It isn't safe to continue after calling shutdown() */
+	while ( 1 ) {}
+
+	return -ECANCELED;  /* -EIMPOSSIBLE, anyone? */
 }
 
 /**
@@ -306,8 +320,8 @@ static int multiboot_load_raw ( struct image *image,
 	memsz = ( hdr->mb.bss_end_addr - hdr->mb.load_addr );
 	buffer = phys_to_user ( hdr->mb.load_addr );
 	if ( ( rc = prep_segment ( buffer, filesz, memsz ) ) != 0 ) {
-		DBG ( "Multiboot could not prepare segment: %s\n",
-		      strerror ( rc ) );
+		DBGC ( image, "MULTIBOOT %p could not prepare segment: %s\n",
+		       image, strerror ( rc ) );
 		return rc;
 	}
 
@@ -331,8 +345,8 @@ static int multiboot_load_elf ( struct image *image ) {
 
 	/* Load ELF image*/
 	if ( ( rc = elf_load ( image ) ) != 0 ) {
-		DBG ( "Multiboot ELF image failed to load: %s\n",
-		      strerror ( rc ) );
+		DBGC ( image, "MULTIBOOT %p ELF image failed to load: %s\n",
+		       image, strerror ( rc ) );
 		return rc;
 	}
 
@@ -351,10 +365,12 @@ int multiboot_load ( struct image *image ) {
 
 	/* Locate multiboot header, if present */
 	if ( ( rc = multiboot_find_header ( image, &hdr ) ) != 0 ) {
-		DBG ( "No multiboot header\n" );
+		DBGC ( image, "MULTIBOOT %p has no multiboot header\n",
+		       image );
 		return rc;
 	}
-	DBG ( "Found multiboot header with flags %08lx\n", hdr.mb.flags );
+	DBGC ( image, "MULTIBOOT %p found header with flags %08lx\n",
+	       image, hdr.mb.flags );
 
 	/* This is a multiboot image, valid or otherwise */
 	if ( ! image->type )
@@ -362,8 +378,8 @@ int multiboot_load ( struct image *image ) {
 
 	/* Abort if we detect flags that we cannot support */
 	if ( hdr.mb.flags & MB_UNSUPPORTED_FLAGS ) {
-		DBG ( "Multiboot flags %08lx not supported\n",
-		      ( hdr.mb.flags & MB_UNSUPPORTED_FLAGS ) );
+		DBGC ( image, "MULTIBOOT %p flags %08lx not supported\n",
+		       image, ( hdr.mb.flags & MB_UNSUPPORTED_FLAGS ) );
 		return -ENOTSUP;
 	}
 
