@@ -122,6 +122,7 @@ PXENV_EXIT_t pxenv_get_cached_info ( struct s_PXENV_GET_CACHED_INFO
 	buffer = real_to_user ( get_cached_info->Buffer.segment,
 				get_cached_info->Buffer.offset );
 	copy_to_user ( buffer, 0, data, len );
+	get_cached_info->BufferSize = len;
 
 	free ( data );
 	get_cached_info->Status = PXENV_STATUS_SUCCESS;
