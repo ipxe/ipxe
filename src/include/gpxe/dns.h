@@ -1,10 +1,16 @@
-#ifndef DNS_RESOLVER_H
-#define DNS_RESOLVER_H
+#ifndef _GPXE_DNS_H
+#define _GPXE_DNS_H
 
-#include "stdint.h"
+/** @file
+ *
+ * DNS protocol
+ *
+ */
+
+#include <stdint.h>
 #include <gpxe/in.h>
-#include "ip.h"
-#include "udp.h"
+#include <gpxe/async.h>
+#include <gpxe/retry.h>
 
 /*
  * Constants
@@ -33,7 +39,7 @@
 #define DNS_FLAG_RCODE_NX	( 0x03 << 0 )
 #define DNS_FLAG_RCODE(flags)	( (flags) & ( 0x0f << 0 ) )
 
-#define	DNS_UDP_PORT		53
+#define	DNS_PORT		53
 #define	DNS_MAX_RETRIES		3
 #define	DNS_MAX_CNAME_RECURSION	0x30
 
@@ -56,13 +62,11 @@ struct dns_query_info {
 } __attribute__ (( packed ));
 
 struct dns_query {
-	struct iphdr	ip;
-	struct udphdr	udp;
 	struct dns_header dns;
 	char		payload[ 256 + sizeof ( struct dns_query_info ) ];
 } __attribute__ (( packed ));
 
-struct dns_rr_info {
+struct dns_rr_info_common {
 	uint16_t	type;
 	uint16_t	class;
 	uint32_t	ttl;
@@ -70,23 +74,36 @@ struct dns_rr_info {
 } __attribute__ (( packed ));
 
 struct dns_rr_info_a {
-	struct dns_rr_info info;
+	struct dns_rr_info_common common;
 	struct in_addr in_addr;
 } __attribute__ (( packed ));
 
 struct dns_rr_info_cname {
-	struct dns_rr_info info;
-	char		cname[0];
+	struct dns_rr_info_common common;
+	char cname[0];
 } __attribute__ (( packed ));
 
-/*
- * Functions in dns.c (used by nmb.c)
- *
- */
-extern struct dns_header * dns_query ( struct dns_query *query,
-				       unsigned int query_len, 
-				       struct sockaddr_in *nameserver );
-extern struct dns_rr_info * dns_find_rr ( struct dns_query *query,
-					  struct dns_header *reply );
+union dns_rr_info {
+	struct dns_rr_info_common common;
+	struct dns_rr_info_a a;
+	struct dns_rr_info_cname cname;
+};
 
-#endif /* DNS_RESOLVER_H */
+struct dns_request {
+
+	struct sockaddr_tcpip *st;
+
+	struct async async;
+	struct dns_query query;
+	struct dns_query_info *qinfo;
+
+	unsigned int recursion;
+
+	struct udp_connection udp;
+	struct retry_timer timer;
+};
+
+extern int dns_resolv ( const char *name, struct sockaddr_tcpip *st,
+			struct async *parent );
+
+#endif /* _GPXE_DNS_H */

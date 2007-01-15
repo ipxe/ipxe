@@ -137,6 +137,7 @@
 #define EINVAL		0xdd	/**< Invalid argument */
 #define EIO		0xde	/**< Input/output error */
 #define EISCONN		0xdf	/**< Transport endpoint is already connected */
+#define ELOOP		0xf8	/**< Too many symbolic links */
 #define EMFILE		0xe0	/**< Too many open files */
 #define EMSGSIZE	0xe1	/**< Message too long */
 #define ENAMETOOLONG	0xe2	/**< File name too long */

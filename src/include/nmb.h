@@ -1,7 +1,7 @@
 #ifndef NMB_H
 #define NMB_H
 
-#include "dns.h"
+#include <gpxe/dns.h>
 
 /*
  * NetBIOS name query packets are basically the same as DNS packets,

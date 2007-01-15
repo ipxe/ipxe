@@ -1,6 +1,8 @@
+#if 0
+
 #include "resolv.h"
 #include "string.h"
-#include "dns.h"
+#include <gpxe/dns.h>
 #include "nic.h"
 #include "nmb.h"
 
@@ -104,3 +106,5 @@ struct resolver nmb_resolver __resolver = {
 	.name = "NMB",
 	.resolv = nmb_resolv,
 };
+
+#endif
