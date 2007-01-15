@@ -424,5 +424,6 @@ int http_get ( struct uri *uri, struct buffer *buffer, struct async *parent ) {
  err:
 	DBGC ( http, "HTTP %p could not create request: %s\n", 
 	       http, strerror ( rc ) );
+	free ( http );
 	return rc;
 }
