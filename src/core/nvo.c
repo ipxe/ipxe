@@ -18,6 +18,7 @@
 
 #include <stdint.h>
 #include <string.h>
+#include <errno.h>
 #include <gpxe/dhcp.h>
 #include <gpxe/nvs.h>
 #include <gpxe/nvo.h>
