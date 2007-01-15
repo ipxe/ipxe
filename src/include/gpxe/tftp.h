@@ -135,7 +135,7 @@ struct tftp_session {
 	int state;
 	
 	/** Asynchronous operation for this session */
-	struct async_operation aop;
+	struct async async;
 	/** Retransmission timer */
 	struct retry_timer timer;
 };

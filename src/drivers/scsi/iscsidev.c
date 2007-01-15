@@ -36,8 +36,14 @@ static int iscsi_command ( struct scsi_device *scsi,
 			   struct scsi_command *command ) {
 	struct iscsi_device *iscsidev
 		= container_of ( scsi, struct iscsi_device, scsi );
+	struct async async;
+	int rc;
 
-	return async_wait ( iscsi_issue ( &iscsidev->iscsi, command ) );
+	async_init_orphan ( &async );
+	if ( ( rc = iscsi_issue ( &iscsidev->iscsi, command, &async ) ) != 0 )
+		return rc;
+	async_wait ( &async, &rc, 1 );
+	return rc;
 }
 
 /**

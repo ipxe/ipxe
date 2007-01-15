@@ -64,7 +64,7 @@ struct ftp_request {
 	struct tcp_application tcp_data;
 
 	/** Asynchronous operation for this FTP operation */
-	struct async_operation aop;
+	struct async async;
 };
 
 struct async_operation * ftp_get ( struct ftp_request *ftp );

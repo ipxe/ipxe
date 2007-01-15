@@ -23,10 +23,12 @@
  *
  */
 
+#include <errno.h>
 #include <vsprintf.h>
 #include <gpxe/emalloc.h>
 #include <gpxe/ebuffer.h>
 #include <gpxe/image.h>
+#include <gpxe/uri.h>
 #include <usr/fetch.h>
 
 #include <byteswap.h>
@@ -46,32 +48,30 @@
  * caller is responsible for eventually freeing the buffer with
  * efree().
  */
-int fetch ( const char *filename, userptr_t *data, size_t *len ) {
+int fetch ( const char *uri_string, userptr_t *data, size_t *len ) {
+	struct uri *uri;
 	struct buffer buffer;
 	int rc;
 
+	/* Parse the URI */
+	uri = parse_uri ( uri_string );
+	if ( ! uri ) {
+		rc = -ENOMEM;
+		goto err_parse_uri;
+	}
+
 	/* Allocate an expandable buffer to hold the file */
-	if ( ( rc = ebuffer_alloc ( &buffer, 0 ) ) != 0 )
-		return rc;
+	if ( ( rc = ebuffer_alloc ( &buffer, 0 ) ) != 0 ) {
+		goto err_ebuffer_alloc;
+	}
 
 #warning "Temporary pseudo-URL parsing code"
 
 	/* Retrieve the file */
-	union {
-		struct sockaddr_tcpip st;
-		struct sockaddr_in sin;
-	} server;
-	struct tftp_session tftp;
-	struct http_request http;
-	struct async_operation *aop;
+	struct async async;
 
-	memset ( &tftp, 0, sizeof ( tftp ) );
-	memset ( &http, 0, sizeof ( http ) );
-	memset ( &server, 0, sizeof ( server ) );
-	server.sin.sin_family = AF_INET;
-	find_global_dhcp_ipv4_option ( DHCP_EB_SIADDR,
-				       &server.sin.sin_addr );
-
+	int ( * download ) ( struct uri *uri, struct buffer *buffer,
+			     struct async *parent );
 
 #if 0
 	server.sin.sin_port = htons ( TFTP_PORT );
@@ -80,22 +80,31 @@ int fetch ( const char *filename, userptr_t *data, size_t *len ) {
 	tftp.buffer = &buffer;
 	aop = tftp_get ( &tftp );
 #else
-	server.sin.sin_port = htons ( HTTP_PORT );
-	memcpy ( &http.server, &server, sizeof ( http.server ) );
-	http.hostname = inet_ntoa ( server.sin.sin_addr );
-	http.filename = filename;
-	http.buffer = &buffer;
-	aop = http_get ( &http );
+	download = http_get;
 #endif
 
-	if ( ( rc = async_wait ( aop ) ) != 0 ) {
-		efree ( buffer.addr );
-		return rc;
-	}
+	async_init_orphan ( &async );
+	if ( ( rc = download ( uri, &buffer, &async ) ) != 0 )
+		goto err;
+	uri = NULL;
+	async_wait ( &async, &rc, 1 );
+	if ( rc != 0 )
+		goto err;
 
 	/* Fill in buffer address and length */
 	*data = buffer.addr;
 	*len = buffer.fill;
 
+	/* Release temporary resources.  The ebuffer storage is now
+	 * owned by our caller, so we don't free it.
+	 */
+
 	return 0;
+
+ err:
+	efree ( buffer.addr );
+ err_ebuffer_alloc:
+	free_uri ( uri );
+ err_parse_uri:
+	return rc;
 }

@@ -466,7 +466,7 @@ struct dhcp_session {
 	 */
 	int state;
 	/** Asynchronous operation for this DHCP session */
-	struct async_operation aop;
+	struct async async;
 	/** Retransmission timer */
 	struct retry_timer timer;
 };
@@ -504,6 +504,6 @@ extern int create_dhcp_packet ( struct net_device *netdev, uint8_t msgtype,
 				struct dhcp_packet *dhcppkt );
 extern int copy_dhcp_packet_options ( struct dhcp_packet *dhcppkt,
 				      struct dhcp_option_block *options );
-extern struct async_operation * start_dhcp ( struct dhcp_session *dhcp );
+extern int start_dhcp ( struct dhcp_session *dhcp, struct async *parent );
 
 #endif /* _GPXE_DHCP_H */

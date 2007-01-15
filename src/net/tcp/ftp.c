@@ -83,7 +83,7 @@ static void ftp_done ( struct ftp_request *ftp, int rc ) {
 	tcp_close ( &ftp->tcp_data );
 
 	/* Mark asynchronous operation as complete */
-	async_done ( &ftp->aop, rc );
+	async_done ( &ftp->async, rc );
 }
 
 /**
@@ -379,5 +379,5 @@ struct async_operation * ftp_get ( struct ftp_request *ftp ) {
 	if ( ( rc = tcp_connect ( &ftp->tcp, &ftp->server, 0 ) ) != 0 )
 		ftp_done ( ftp, rc );
 
-	return &ftp->aop;
+	return &ftp->async;
 }

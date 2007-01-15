@@ -44,7 +44,7 @@ struct hello_request {
 	struct tcp_application tcp;
 
 	/** Asynchronous operation */
-	struct async_operation aop;
+	struct async async;
 };
 
 extern struct async_operation * say_hello ( struct hello_request *hello );

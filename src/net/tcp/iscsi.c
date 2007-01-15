@@ -121,7 +121,7 @@ static void iscsi_done ( struct iscsi_session *iscsi, int rc ) {
 	iscsi->command = NULL;
 
 	/* Mark asynchronous operation as complete */
-	async_done ( &iscsi->aop, rc );
+	async_done ( &iscsi->async, rc );
 }
 
 /****************************************************************************
@@ -1208,10 +1208,11 @@ static struct tcp_operations iscsi_tcp_operations = {
  *
  * @v iscsi		iSCSI session
  * @v command		SCSI command
- * @ret aop		Asynchronous operation for this SCSI command
+ * @v parent		Parent asynchronous operation
+ * @ret rc		Return status code
  */
-struct async_operation * iscsi_issue ( struct iscsi_session *iscsi,
-				       struct scsi_command *command ) {
+int iscsi_issue ( struct iscsi_session *iscsi, struct scsi_command *command,
+		  struct async *parent ) {
 	int rc;
 
 	assert ( iscsi->command == NULL );
@@ -1219,7 +1220,7 @@ struct async_operation * iscsi_issue ( struct iscsi_session *iscsi,
 
 	if ( iscsi->instant_rc ) {
 		/* Abort immediately rather than retrying */
-		iscsi_done ( iscsi, iscsi->instant_rc );
+		return iscsi->instant_rc;
 	} else if ( iscsi->status ) {
 		/* Session already open: issue command */
 		iscsi_start_command ( iscsi );
@@ -1231,11 +1232,12 @@ struct async_operation * iscsi_issue ( struct iscsi_session *iscsi,
 					  0 ) ) != 0 ) {
 			DBGC ( iscsi, "iSCSI %p could not open TCP "
 			       "connection: %s\n", iscsi, strerror ( rc ) );
-			iscsi_done ( iscsi, rc );
+			return rc;
 		}
 	}
 
-	return &iscsi->aop;
+	async_init ( &iscsi->async, &default_async_operations, parent );
+	return 0;
 }
 
 /**

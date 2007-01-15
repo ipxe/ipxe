@@ -125,6 +125,7 @@
 #define EBUSY		0xd4	/**< Device or resource busy */
 /** Operation cancelled */
 #define ECANCELED	PXENV_STATUS_BINL_CANCELED_BY_KEYSTROKE
+#define ECHILD		ENOENT	/**< No child processes */
 #define ECONNABORTED	0xd5	/**< Software caused connection abort */
 #define ECONNREFUSED	0xd6	/**< Connection refused */
 #define ECONNRESET	0xd7	/**< Connection reset by peer */
@@ -157,10 +158,10 @@
 #define ENOSYS		0xee	/**< Function not implemented */
 #define ENOTCONN	0xef	/**< Transport endpoint is not connected */
 #define ENOTSOCK	0xf0	/**< Socket operation on non-socket */
-#define EOPNOTSUPP	0xf1	/**< Operation not supported */
-#define ENOTSUP		EOPNOTSUPP /**< Not supported */
+#define ENOTSUP		0xf1	/**< Not supported */
 #define ENOTTY		0xf2	/**< Inappropriate ioctl for device */
 #define ENXIO		ENODEV	/**< No such device or address */
+#define EOPNOTSUPP	ENOTSUP	/**< Operation not supported */
 #define EOVERFLOW	0xf3	/**< Result too large */
 #define EPERM		EACCES	/**< Operation not permitted */
 #define EPROTO		0xf4	/**< Protocol error */

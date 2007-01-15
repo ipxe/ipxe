@@ -51,7 +51,7 @@ tcp_to_hello ( struct tcp_application *app ) {
 static void hello_closed ( struct tcp_application *app, int status ) {
 	struct hello_request *hello = tcp_to_hello ( app );
 
-	async_done ( &hello->aop, status );
+	async_done ( &hello->async, status );
 }
 
 static void hello_connected ( struct tcp_application *app ) {
@@ -116,7 +116,7 @@ struct async_operation * say_hello ( struct hello_request *hello ) {
 
 	hello->tcp.tcp_op = &hello_tcp_operations;
 	if ( ( rc = tcp_connect ( &hello->tcp, &hello->server, 0 ) ) != 0 )
-		async_done ( &hello->aop, rc );
+		async_done ( &hello->async, rc );
 
-	return &hello->aop;
+	return &hello->async;
 }

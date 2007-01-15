@@ -107,7 +107,7 @@ struct aoe_session {
 	/** Byte offset within command's data buffer */
 	unsigned int command_offset;
 	/** Asynchronous operation for this command */
-	struct async_operation aop;
+	struct async async;
 
 	/** Retransmission timer */
 	struct retry_timer timer;
@@ -121,8 +121,9 @@ struct aoe_session {
 
 extern void aoe_open ( struct aoe_session *aoe );
 extern void aoe_close ( struct aoe_session *aoe );
-extern struct async_operation * aoe_issue ( struct aoe_session *aoe,
-					    struct ata_command *command );
+extern int aoe_issue ( struct aoe_session *aoe,
+		       struct ata_command *command,
+		       struct async *parent );
 
 /** An AoE device */
 struct aoe_device {

@@ -517,7 +517,7 @@ static void dhcp_done ( struct dhcp_session *dhcp, int rc ) {
 	ref_del ( &dhcp->netdev_ref );
 
 	/* Mark async operation as complete */
-	async_done ( &dhcp->aop, rc );
+	async_done ( &dhcp->async, rc );
 }
 
 /** Address for transmitting DHCP requests */
@@ -713,14 +713,15 @@ static void dhcp_forget_netdev ( struct reference *ref ) {
  * Initiate DHCP on a network interface
  *
  * @v dhcp		DHCP session
- * @ret aop		Asynchronous operation
+ * @v parent		Parent asynchronous operation
+ * @ret rc		Return status code
  *
  * If the DHCP operation completes successfully, the
  * dhcp_session::options field will be filled in with the resulting
  * options block.  The caller takes responsibility for eventually
  * calling free_dhcp_options().
  */
-struct async_operation * start_dhcp ( struct dhcp_session *dhcp ) {
+int start_dhcp ( struct dhcp_session *dhcp, struct async *parent ) {
 	int rc;
 
 	/* Initialise DHCP session */
@@ -729,10 +730,8 @@ struct async_operation * start_dhcp ( struct dhcp_session *dhcp ) {
 	dhcp->state = DHCPDISCOVER;
 
 	/* Bind to local port */
-	if ( ( rc = udp_open ( &dhcp->udp, htons ( BOOTPC_PORT ) ) ) != 0 ) {
-		async_done ( &dhcp->aop, rc );
-		goto out;
-	}
+	if ( ( rc = udp_open ( &dhcp->udp, htons ( BOOTPC_PORT ) ) ) != 0 )
+		return rc;
 
 	/* Add persistent reference to net device */
 	dhcp->netdev_ref.forget = dhcp_forget_netdev;
@@ -741,6 +740,6 @@ struct async_operation * start_dhcp ( struct dhcp_session *dhcp ) {
 	/* Proof of concept: just send a single DHCPDISCOVER */
 	dhcp_send_request ( dhcp );
 
- out:
-	return &dhcp->aop;
+	async_init ( &dhcp->async, &default_async_operations, parent );
+	return 0;
 }

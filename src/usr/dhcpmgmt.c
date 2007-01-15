@@ -23,6 +23,7 @@
 #include <gpxe/dhcp.h>
 #include <gpxe/async.h>
 #include <gpxe/netdevice.h>
+#include <usr/ifmgmt.h>
 #include <usr/dhcpmgmt.h>
 
 /** @file
@@ -43,6 +44,7 @@ int dhcp ( struct net_device *netdev ) {
 	struct in_addr address = { htonl ( 0 ) };
 	struct in_addr netmask = { htonl ( 0 ) };
 	struct in_addr gateway = { INADDR_NONE };
+	struct async async;
 	int rc;
 
 	/* Check we can open the interface first */
@@ -60,8 +62,14 @@ int dhcp ( struct net_device *netdev ) {
 	printf ( "DHCP (%s %s)...", netdev->name, netdev_hwaddr ( netdev ) );
 	memset ( &dhcp, 0, sizeof ( dhcp ) );
 	dhcp.netdev = netdev;
-	if ( ( rc = async_wait ( start_dhcp ( &dhcp ) ) ) != 0 ) {
-		printf ( "failed\n" );
+	async_init_orphan ( &async );
+	if ( ( rc = start_dhcp ( &dhcp, &async ) ) != 0 ) {
+		printf ( "could not start (%s)\n", strerror ( rc ) );
+		return rc;
+	}
+	async_wait ( &async, &rc, 1 );	
+	if ( rc != 0 ) {
+		printf ( "failed (%s)\n", strerror ( rc ) );
 		return rc;
 	}
 	printf ( "done\n" );

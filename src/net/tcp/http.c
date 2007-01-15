@@ -27,9 +27,11 @@
 #include <stdlib.h>
 #include <string.h>
 #include <strings.h>
-#include <vsprintf.h>
+#include <errno.h>
 #include <assert.h>
+#include <vsprintf.h>
 #include <gpxe/async.h>
+#include <gpxe/uri.h>
 #include <gpxe/buffer.h>
 #include <gpxe/http.h>
 
@@ -67,7 +69,7 @@ static void http_done ( struct http_request *http, int rc ) {
 	}
 
 	/* Mark async operation as complete */
-	async_done ( &http->aop, rc );
+	async_done ( &http->async, rc );
 }
 
 /**
@@ -303,12 +305,21 @@ static void http_newdata ( struct tcp_application *app,
 static void http_senddata ( struct tcp_application *app,
 			    void *buf, size_t len ) {
 	struct http_request *http = tcp_to_http ( app );
+	const char *path = http->uri->path;
+	const char *host = http->uri->host;
+
+	if ( ! path )
+		path = "/";
+
+	if ( ! host )
+		host = "";
 
 	len = snprintf ( buf, len,
-			 "GET /%s HTTP/1.1\r\n"
+			 "GET %s HTTP/1.1\r\n"
 			 "User-Agent: gPXE/" VERSION "\r\n"
 			 "Host: %s\r\n"
-			 "\r\n", http->filename, http->hostname );
+			 "\r\n", path, host );
+
 	tcp_send ( app, ( buf + http->tx_offset ), ( len - http->tx_offset ) );
 }
 
@@ -347,16 +358,71 @@ static struct tcp_operations http_tcp_operations = {
 };
 
 /**
+ * Reap asynchronous operation
+ *
+ * @v async		Asynchronous operation
+ */
+static void http_reap ( struct async *async ) {
+	struct http_request *http =
+		container_of ( async, struct http_request, async );
+
+	free_uri ( http->uri );
+	free ( http );
+}
+
+/** HTTP asynchronous operations */
+static struct async_operations http_async_operations = {
+	.reap			= http_reap,
+};
+
+#warning "Quick name resolution hack"
+#include <byteswap.h>
+
+/**
  * Initiate a HTTP connection
  *
- * @v http	a HTTP request
+ * @v uri		Uniform Resource Identifier
+ * @v buffer		Buffer into which to download file
+ * @v parent		Parent asynchronous operation
+ * @ret rc		Return status code
+ *
+ * If it returns success, this function takes ownership of the URI.
  */
-struct async_operation * http_get ( struct http_request *http ) {
+int http_get ( struct uri *uri, struct buffer *buffer, struct async *parent ) {
+	struct http_request *http;
 	int rc;
 
+	/* Allocate and populate HTTP structure */
+	http = malloc ( sizeof ( *http ) );
+	if ( ! http ) {
+		rc = -ENOMEM;
+		goto err;
+	}
+	memset ( http, 0, sizeof ( *http ) );
+	http->uri = uri;
+	http->buffer = buffer;
 	http->tcp.tcp_op = &http_tcp_operations;
-	if ( ( rc = tcp_connect ( &http->tcp, &http->server, 0 ) ) != 0 )
-		async_done ( &http->aop, rc );
 
-	return &http->aop;
+#warning "Quick name resolution hack"
+	union {
+		struct sockaddr_tcpip st;
+		struct sockaddr_in sin;
+	} server;
+	server.sin.sin_port = htons ( HTTP_PORT );
+	server.sin.sin_family = AF_INET;
+	if ( inet_aton ( uri->host, &server.sin.sin_addr ) == 0 ) {
+		rc = -EINVAL;
+		goto err;
+	}
+
+	if ( ( rc = tcp_connect ( &http->tcp, &server.st, 0 ) ) != 0 )
+		goto err;
+
+	async_init ( &http->async, &http_async_operations, parent );
+	return 0;
+
+ err:
+	DBGC ( http, "HTTP %p could not create request: %s\n", 
+	       http, strerror ( rc ) );
+	return rc;
 }

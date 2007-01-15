@@ -36,9 +36,14 @@ static int aoe_command ( struct ata_device *ata,
 			 struct ata_command *command ) {
 	struct aoe_device *aoedev
 		= container_of ( ata, struct aoe_device, ata );
+	struct async async;
+	int rc;
 
-	aoe_issue ( &aoedev->aoe, command );
-	return async_wait ( &aoedev->aoe.aop );
+	async_init_orphan ( &async );
+	if ( ( rc = aoe_issue ( &aoedev->aoe, command, &async ) ) != 0 )
+		return rc;
+	async_wait ( &async, &rc, 1 );
+	return rc;
 }
 
 /**

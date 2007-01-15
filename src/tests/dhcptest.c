@@ -1,11 +1,14 @@
 #include <string.h>
 #include <stdlib.h>
+#include <errno.h>
 #include <vsprintf.h>
 #include <byteswap.h>
 #include <gpxe/ip.h>
 #include <gpxe/dhcp.h>
 #include <gpxe/iscsi.h>
 #include <gpxe/netdevice.h>
+
+#if 0
 
 static int test_dhcp_aoe_boot ( struct net_device *netdev,
 				char *aoename ) {
@@ -263,3 +266,5 @@ int test_dhcp ( struct net_device *netdev ) {
  out_no_del_ipv4:
 	return rc;
 }
+
+#endif

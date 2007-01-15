@@ -1,5 +1,6 @@
 #include <stdint.h>
 #include <stdlib.h>
+#include <errno.h>
 #include <vsprintf.h>
 #include <console.h>
 #include <gpxe/netdevice.h>

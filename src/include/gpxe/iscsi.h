@@ -591,7 +591,7 @@ struct iscsi_session {
 	 */
 	struct scsi_command *command;
 	/** Asynchronous operation for the current iSCSI operation */
-	struct async_operation aop;
+	struct async async;
 	/** Instant return code
 	 *
 	 * Set to a non-zero value if all requests should return
@@ -637,8 +637,9 @@ struct iscsi_session {
 /** Maximum number of retries at connecting */
 #define ISCSI_MAX_RETRIES 2
 
-extern struct async_operation * iscsi_issue ( struct iscsi_session *iscsi,
-					      struct scsi_command *command );
+extern int iscsi_issue ( struct iscsi_session *iscsi,
+			 struct scsi_command *command,
+			 struct async *parent );
 extern void iscsi_shutdown ( struct iscsi_session *iscsi );
 
 /** An iSCSI device */

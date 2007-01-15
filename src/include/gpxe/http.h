@@ -11,6 +11,7 @@
 #include <gpxe/tcp.h>
 #include <gpxe/async.h>
 #include <gpxe/linebuf.h>
+#include <gpxe/uri.h>
 
 /** HTTP default port */
 #define HTTP_PORT 80
@@ -28,33 +29,29 @@ enum http_rx_state {
  *
  */
 struct http_request {
-	/** Server address */
-	struct sockaddr_tcpip server;
-	/** Server host name */
-	const char *hostname;
-	/** Filename */
-	const char *filename;
+	/** URI being fetched */
+	struct uri *uri;
 	/** Data buffer to fill */
 	struct buffer *buffer;
+	/** Asynchronous operation */
+	struct async async;
 
 	/** HTTP response code */
 	unsigned int response;
 	/** HTTP Content-Length */
 	size_t content_length;
 
+	/** TCP application for this request */
+	struct tcp_application tcp;
 	/** Number of bytes already sent */
 	size_t tx_offset;
 	/** RX state */
 	enum http_rx_state rx_state;
 	/** Line buffer for received header lines */
 	struct line_buffer linebuf;
-
-	/** TCP application for this request */
-	struct tcp_application tcp;
-	/** Asynchronous operation */
-	struct async_operation aop;
 };
 
-extern struct async_operation * http_get ( struct http_request *http );
+extern int http_get ( struct uri *uri, struct buffer *buffer,
+		      struct async *parent );
 
 #endif /* _GPXE_HTTP_H */

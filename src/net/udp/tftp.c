@@ -142,7 +142,7 @@ static void tftp_done ( struct tftp_session *tftp, int rc ) {
 	udp_close ( &tftp->udp );
 
 	/* Mark async operation as complete */
-	async_done ( &tftp->aop, rc );
+	async_done ( &tftp->async, rc );
 }
 
 /**
@@ -477,7 +477,7 @@ struct async_operation * tftp_get ( struct tftp_session *tftp ) {
 
 	/* Open UDP connection */
 	if ( ( rc = udp_open ( &tftp->udp, 0 ) ) != 0 ) {
-		async_done ( &tftp->aop, rc );
+		async_done ( &tftp->async, rc );
 		goto out;
 	}
 
@@ -485,5 +485,5 @@ struct async_operation * tftp_get ( struct tftp_session *tftp ) {
 	tftp_send_packet ( tftp );
 
  out:
-	return &tftp->aop;
+	return &tftp->async;
 }
