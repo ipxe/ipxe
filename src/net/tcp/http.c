@@ -366,7 +366,6 @@ static void http_reap ( struct async *async ) {
 	struct http_request *http =
 		container_of ( async, struct http_request, async );
 
-	free_uri ( http->uri );
 	free ( http );
 }
 
@@ -385,8 +384,6 @@ static struct async_operations http_async_operations = {
  * @v buffer		Buffer into which to download file
  * @v parent		Parent asynchronous operation
  * @ret rc		Return status code
- *
- * If it returns success, this function takes ownership of the URI.
  */
 int http_get ( struct uri *uri, struct buffer *buffer, struct async *parent ) {
 	struct http_request *http;

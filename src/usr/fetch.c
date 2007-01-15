@@ -86,7 +86,6 @@ int fetch ( const char *uri_string, userptr_t *data, size_t *len ) {
 	async_init_orphan ( &async );
 	if ( ( rc = download ( uri, &buffer, &async ) ) != 0 )
 		goto err;
-	uri = NULL;
 	async_wait ( &async, &rc, 1 );
 	if ( rc != 0 )
 		goto err;
@@ -98,7 +97,7 @@ int fetch ( const char *uri_string, userptr_t *data, size_t *len ) {
 	/* Release temporary resources.  The ebuffer storage is now
 	 * owned by our caller, so we don't free it.
 	 */
-
+	free_uri ( uri );
 	return 0;
 
  err:
