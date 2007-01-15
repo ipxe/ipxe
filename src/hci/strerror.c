@@ -64,4 +64,5 @@ struct errortab common_errors[] __errortab = {
 	{ EACCES, "Permission denied" },
 	{ ENOENT, "File not found" },
 	{ ENETUNREACH, "Network unreachable" },
+	{ ETIMEDOUT, "Connection timed out" },
 };
