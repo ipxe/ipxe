@@ -38,12 +38,12 @@ enum ftp_state {
  *
  */
 struct ftp_request {
-	/** Server address */
-	struct sockaddr_tcpip server;
-	/** File to download */
-	const char *filename;
+	/** URI being fetched */
+	struct uri *uri;
 	/** Data buffer to fill */
 	struct buffer *buffer;
+	/** Asynchronous operation */
+	struct async async;
 
 	/** Current state */
 	enum ftp_state state;
@@ -57,16 +57,13 @@ struct ftp_request {
 	char status_text[4];
 	/** Passive-mode parameters, as text */
 	char passive_text[24]; /* "aaa,bbb,ccc,ddd,eee,fff" */
-
 	/** TCP application for the control channel */
 	struct tcp_application tcp;
 	/** TCP application for the data channel */
 	struct tcp_application tcp_data;
-
-	/** Asynchronous operation for this FTP operation */
-	struct async async;
 };
 
-struct async_operation * ftp_get ( struct ftp_request *ftp );
+extern int ftp_get ( struct uri *uri, struct buffer *buffer,
+		     struct async *parent );
 
 #endif /* _GPXE_FTP_H */

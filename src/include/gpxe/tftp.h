@@ -86,12 +86,13 @@ union tftp_any {
  * This data structure holds the state for an ongoing TFTP transfer.
  */
 struct tftp_session {
-	/** UDP connection */
-	struct udp_connection udp;
-	/** Filename */
-	const char *filename;
+	/** URI being fetched */
+	struct uri *uri;
 	/** Data buffer to fill */
 	struct buffer *buffer;
+	/** Asynchronous operation */
+	struct async async;
+
 	/** Requested data block size
 	 *
 	 * This is the "blksize" option requested from the TFTP
@@ -133,15 +134,15 @@ struct tftp_session {
 	 * (i.e. that no blocks have yet been received).
 	 */
 	int state;
-	
-	/** Asynchronous operation for this session */
-	struct async async;
+	/** UDP connection */
+	struct udp_connection udp;
 	/** Retransmission timer */
 	struct retry_timer timer;
 };
 
 /* Function prototypes */
 
-extern struct async_operation * tftp_get ( struct tftp_session *tftp );
+extern int tftp_get ( struct uri *uri, struct buffer *buffer,
+		      struct async *parent );
 
 #endif /* _GPXE_TFTP_H */

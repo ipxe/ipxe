@@ -26,6 +26,7 @@
 #include <vsprintf.h>
 #include <gpxe/async.h>
 #include <gpxe/tftp.h>
+#include <gpxe/uri.h>
 
 /** @file
  *
@@ -203,7 +204,7 @@ static int tftp_send_rrq ( struct tftp_session *tftp, void *buf, size_t len ) {
 	void *data;
 	void *end;
 
-	DBGC ( tftp, "TFTP %p requesting \"%s\"\n", tftp, tftp->filename );
+	DBGC ( tftp, "TFTP %p requesting \"%s\"\n", tftp, tftp->uri->path );
 
 	data = rrq->data;
 	end = ( buf + len );
@@ -211,7 +212,7 @@ static int tftp_send_rrq ( struct tftp_session *tftp, void *buf, size_t len ) {
 		goto overflow;
 	data += ( snprintf ( data, ( end - data ),
 			     "%s%coctet%cblksize%c%d%ctsize%c0",
-			     tftp->filename, 0, 0, 0,
+			     tftp->uri->path, 0, 0, 0,
 			     tftp->request_blksize, 0, 0 ) + 1 );
 	if ( data > end )
 		goto overflow;
@@ -453,37 +454,84 @@ static struct udp_operations tftp_udp_operations = {
 };
 
 /**
+ * Reap asynchronous operation
+ *
+ * @v async		Asynchronous operation
+ */
+static void tftp_reap ( struct async *async ) {
+	struct tftp_session *tftp =
+		container_of ( async, struct tftp_session, async );
+
+	free ( tftp );
+}
+
+/** TFTP asynchronous operations */
+static struct async_operations tftp_async_operations = {
+	.reap = tftp_reap,
+};
+
+/**
  * Initiate TFTP download
  *
- * @v tftp		TFTP session
- * @ret aop		Asynchronous operation
+ * @v uri		Uniform Resource Identifier
+ * @v buffer		Buffer into which to download file
+ * @v parent		Parent asynchronous operation
+ * @ret rc		Return status code
  */
-struct async_operation * tftp_get ( struct tftp_session *tftp ) {
+int tftp_get ( struct uri *uri, struct buffer *buffer, struct async *parent ) {
+	struct tftp_session *tftp = NULL;
 	int rc;
 
-	assert ( tftp->filename != NULL );
-	assert ( tftp->buffer != NULL );
-	assert ( tftp->udp.peer.st_family != 0 );
+	/* Sanity checks */
+	if ( ! uri->path ) {
+		rc = -EINVAL;
+		goto err;
+	}
 
-	/* Initialise TFTP session */
+	/* Allocate and populate TFTP structure */
+	tftp = malloc ( sizeof ( *tftp ) );
+	if ( ! tftp ) {
+		rc = -ENOMEM;
+		goto err;
+	}
+	memset ( tftp, 0, sizeof ( *tftp ) );
+	tftp->uri = uri;
+	tftp->buffer = buffer;
 	if ( ! tftp->request_blksize )
 		tftp->request_blksize = TFTP_MAX_BLKSIZE;
 	tftp->blksize = TFTP_DEFAULT_BLKSIZE;
-	tftp->tsize = 0;
-	tftp->tid = 0;
 	tftp->state = -1;
 	tftp->udp.udp_op = &tftp_udp_operations;
 	tftp->timer.expired = tftp_timer_expired;
 
-	/* Open UDP connection */
-	if ( ( rc = udp_open ( &tftp->udp, 0 ) ) != 0 ) {
-		async_done ( &tftp->async, rc );
-		goto out;
+
+#warning "Quick name resolution hack"
+	union {
+		struct sockaddr_tcpip st;
+		struct sockaddr_in sin;
+	} server;
+	server.sin.sin_port = htons ( TFTP_PORT );
+	server.sin.sin_family = AF_INET;
+	if ( inet_aton ( uri->host, &server.sin.sin_addr ) == 0 ) {
+		rc = -EINVAL;
+		goto err;
 	}
+	udp_connect ( &tftp->udp, &server.st );
+
+
+	/* Open UDP connection */
+	if ( ( rc = udp_open ( &tftp->udp, 0 ) ) != 0 )
+		goto err;
 
 	/* Transmit initial RRQ */
 	tftp_send_packet ( tftp );
 
- out:
-	return &tftp->async;
+	async_init ( &tftp->async, &tftp_async_operations, parent );
+	return 0;
+
+ err:
+	DBGC ( tftp, "TFTP %p could not create session: %s\n",
+	       tftp, strerror ( rc ) );
+	free ( tftp );
+	return rc;
 }

@@ -6,6 +6,7 @@
 #include <errno.h>
 #include <gpxe/async.h>
 #include <gpxe/buffer.h>
+#include <gpxe/uri.h>
 #include <gpxe/ftp.h>
 
 /** @file
@@ -20,43 +21,22 @@
  *
  */
 
-/** An FTP control channel string */
-struct ftp_string {
-	/** String format */
-	const char *format;
-	/** Offset to string data
-	 *
-	 * This is the offset within the struct ftp_request to the
-	 * pointer to the string data.  Use ftp_string_data() to get a
-	 * pointer to the actual data.
-	 */
-	off_t data_offset;
-};
-
-/** FTP control channel strings */
-static const struct ftp_string ftp_strings[] = {
-	[FTP_CONNECT]	= { "", 0 },
-	[FTP_USER]	= { "USER anonymous\r\n", 0 },
-	[FTP_PASS]	= { "PASS etherboot@etherboot.org\r\n", 0 },
-	[FTP_TYPE]	= { "TYPE I\r\n", 0 },
-	[FTP_PASV]	= { "PASV\r\n", 0 },
-	[FTP_RETR]	= { "RETR %s\r\n", 
-			    offsetof ( struct ftp_request, filename ) },
-	[FTP_QUIT]	= { "QUIT\r\n", 0 },
-	[FTP_DONE]	= { "", 0 },
-};
-
-/**
- * Get data associated with an FTP control channel string
+/** FTP control channel strings
  *
- * @v ftp		FTP request
- * @v data_offset	Data offset field from ftp_string structure
- * @ret data		Pointer to data
+ * These are used as printf() format strings.  Since only one of them
+ * (RETR) takes an argument, we always supply that argument to the
+ * snprintf() call.
  */
-static inline const void * ftp_string_data ( struct ftp_request *ftp,
-					     off_t data_offset ) {
-	return * ( ( void ** ) ( ( ( void * ) ftp ) + data_offset ) );
-}
+static const char * ftp_strings[] = {
+	[FTP_CONNECT]	= "",
+	[FTP_USER]	= "USER anonymous\r\n",
+	[FTP_PASS]	= "PASS etherboot@etherboot.org\r\n",
+	[FTP_TYPE]	= "TYPE I\r\n",
+	[FTP_PASV]	= "PASV\r\n",
+	[FTP_RETR]	= "RETR %s\r\n", 
+	[FTP_QUIT]	= "QUIT\r\n",
+	[FTP_DONE]	= "",
+};
 
 /**
  * Get FTP request from control TCP application
@@ -163,10 +143,8 @@ static void ftp_reply ( struct ftp_request *ftp ) {
 	ftp->already_sent = 0;
 
 	if ( ftp->state < FTP_DONE ) {
-		const struct ftp_string *string = &ftp_strings[ftp->state];
 		DBGC ( ftp, "FTP %p sending ", ftp );
-		DBGC ( ftp, string->format,
-		       ftp_string_data ( ftp, string->data_offset ) );
+		DBGC ( ftp, ftp_strings[ftp->state], ftp->uri->path );
 	}
 
 	return;
@@ -250,14 +228,11 @@ static void ftp_acked ( struct tcp_application *app, size_t len ) {
 static void ftp_senddata ( struct tcp_application *app,
 			   void *buf, size_t len ) {
 	struct ftp_request *ftp = tcp_to_ftp ( app );
-	const struct ftp_string *string;
 
 	/* Send the as-yet-unACKed portion of the string for the
 	 * current state.
 	 */
-	string = &ftp_strings[ftp->state];
-	len = snprintf ( buf, len, string->format,
-			 ftp_string_data ( ftp, string->data_offset ) );
+	len = snprintf ( buf, len, ftp_strings[ftp->state], ftp->uri->path );
 	tcp_send ( app, buf + ftp->already_sent, len - ftp->already_sent );
 }
 
@@ -361,23 +336,82 @@ static struct tcp_operations ftp_data_tcp_operations = {
  */
 
 /**
+ * Reap asynchronous operation
+ *
+ * @v async		Asynchronous operation
+ */
+static void ftp_reap ( struct async *async ) {
+	struct ftp_request *ftp =
+		container_of ( async, struct ftp_request, async );
+
+	free ( ftp );
+}
+
+/** FTP asynchronous operations */
+static struct async_operations ftp_async_operations = {
+	.reap = ftp_reap,
+};
+
+#warning "Quick name resolution hack"
+#include <byteswap.h>
+
+/**
  * Initiate an FTP connection
  *
- * @v ftp	FTP request
+ * @v uri		Uniform Resource Identifier
+ * @v buffer		Buffer into which to download file
+ * @v parent		Parent asynchronous operation
+ * @ret rc		Return status code
  */
-struct async_operation * ftp_get ( struct ftp_request *ftp ) {
+int ftp_get ( struct uri *uri, struct buffer *buffer, struct async *parent ) {
+	struct ftp_request *ftp = NULL;
 	int rc;
 
-	DBGC ( ftp, "FTP %p fetching %s\n", ftp, ftp->filename );
+	/* Sanity checks */
+	if ( ! uri->path ) {
+		rc = -EINVAL;
+		goto err;
+	}
 
+	/* Allocate and populate FTP structure */
+	ftp = malloc ( sizeof ( *ftp ) );
+	if ( ! ftp ) {
+		rc = -ENOMEM;
+		goto err;
+	}
+	memset ( ftp, 0, sizeof ( *ftp ) );
+	ftp->uri = uri;
+	ftp->buffer = buffer;
 	ftp->state = FTP_CONNECT;
 	ftp->already_sent = 0;
 	ftp->recvbuf = ftp->status_text;
 	ftp->recvsize = sizeof ( ftp->status_text ) - 1;
 	ftp->tcp.tcp_op = &ftp_tcp_operations;
 	ftp->tcp_data.tcp_op = &ftp_data_tcp_operations;
-	if ( ( rc = tcp_connect ( &ftp->tcp, &ftp->server, 0 ) ) != 0 )
-		ftp_done ( ftp, rc );
 
-	return &ftp->async;
+#warning "Quick name resolution hack"
+	union {
+		struct sockaddr_tcpip st;
+		struct sockaddr_in sin;
+	} server;
+	server.sin.sin_port = htons ( FTP_PORT );
+	server.sin.sin_family = AF_INET;
+	if ( inet_aton ( uri->host, &server.sin.sin_addr ) == 0 ) {
+		rc = -EINVAL;
+		goto err;
+	}
+
+	DBGC ( ftp, "FTP %p fetching %s\n", ftp, ftp->uri->path );
+
+	if ( ( rc = tcp_connect ( &ftp->tcp, &server.st, 0 ) ) != 0 )
+		goto err;
+
+	async_init ( &ftp->async, &ftp_async_operations, parent );
+	return 0;
+
+ err:
+	DBGC ( ftp, "FTP %p could not create request: %s\n", 
+	       ftp, strerror ( rc ) );
+	free ( ftp );
+	return rc;
 }

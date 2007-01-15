@@ -35,6 +35,7 @@
 #include <gpxe/dhcp.h>
 #include <gpxe/tftp.h>
 #include <gpxe/http.h>
+#include <gpxe/ftp.h>
 
 /**
  * Fetch file
@@ -73,15 +74,17 @@ int fetch ( const char *uri_string, userptr_t *data, size_t *len ) {
 	int ( * download ) ( struct uri *uri, struct buffer *buffer,
 			     struct async *parent );
 
-#if 0
-	server.sin.sin_port = htons ( TFTP_PORT );
-	udp_connect ( &tftp.udp, &server.st );
-	tftp.filename = filename;
-	tftp.buffer = &buffer;
-	aop = tftp_get ( &tftp );
-#else
-	download = http_get;
-#endif
+	if ( ! uri->scheme ) {
+		download = tftp_get;
+	} else {
+		if ( strcmp ( uri->scheme, "http" ) == 0 ) {
+			download = http_get;
+		} else if ( strcmp ( uri->scheme, "ftp" ) == 0 ) {
+			download = ftp_get;
+		} else {
+			download = tftp_get;
+		}
+	}
 
 	async_init_orphan ( &async );
 	if ( ( rc = download ( uri, &buffer, &async ) ) != 0 )
