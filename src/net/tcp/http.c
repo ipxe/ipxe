@@ -311,9 +311,6 @@ static void http_senddata ( struct tcp_application *app,
 	if ( ! path )
 		path = "/";
 
-	if ( ! host )
-		host = "";
-
 	len = snprintf ( buf, len,
 			 "GET %s HTTP/1.1\r\n"
 			 "User-Agent: gPXE/" VERSION "\r\n"
@@ -386,8 +383,14 @@ static struct async_operations http_async_operations = {
  * @ret rc		Return status code
  */
 int http_get ( struct uri *uri, struct buffer *buffer, struct async *parent ) {
-	struct http_request *http;
+	struct http_request *http = NULL;
 	int rc;
+
+	/* Sanity check */
+	if ( ! uri->host ) {
+		rc = -EINVAL;
+		goto err;
+	}
 
 	/* Allocate and populate HTTP structure */
 	http = malloc ( sizeof ( *http ) );
@@ -408,9 +411,22 @@ int http_get ( struct uri *uri, struct buffer *buffer, struct async *parent ) {
 	server.sin.sin_port = htons ( HTTP_PORT );
 	server.sin.sin_family = AF_INET;
 	if ( inet_aton ( uri->host, &server.sin.sin_addr ) == 0 ) {
-		rc = -EINVAL;
-		goto err;
+		/* Try DNS */
+		struct async async;
+		
+		extern int dns_resolv ( const char *name,
+					struct sockaddr_tcpip *st,
+					struct async *parent );
+		
+		async_init_orphan ( &async );
+		if ( ( rc = dns_resolv ( uri->host, &server.st,
+					 &async ) ) != 0 )
+			goto err;
+		async_wait ( &async, &rc, 1 );
+		if ( rc != 0 )
+			goto err;
 	}
+	
 
 	if ( ( rc = tcp_connect ( &http->tcp, &server.st, 0 ) ) != 0 )
 		goto err;
