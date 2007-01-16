@@ -64,8 +64,11 @@ int udp_open ( struct udp_connection *conn, uint16_t local_port ) {
 	}
 
 	/* Attempt bind to local port */
-	if ( ( rc = udp_bind ( conn, local_port ) ) != 0 )
+	if ( ( rc = udp_bind ( conn, local_port ) ) != 0 ) {
+		DBGC ( conn, "UDP %p could not bind to local port %d: %s\n",
+		       conn, local_port, strerror ( rc ) );
 		return rc;
+	}
 
 	/* Add to UDP connection list */
 	list_add ( &conn->list, &udp_conns );
@@ -122,6 +125,10 @@ int udp_senddata ( struct udp_connection *conn ) {
 
 	rc = conn->udp_op->senddata ( conn, conn->tx_pkb->data, 
 				      pkb_tailroom ( conn->tx_pkb ) );
+	if ( rc != 0 ) {
+		DBGC ( conn, "UDP %p application could not send packet: %s\n",
+		       conn, strerror ( rc ) );
+	}
 
 	if ( conn->tx_pkb ) {
 		free_pkb ( conn->tx_pkb );
@@ -146,6 +153,7 @@ int udp_sendto_via ( struct udp_connection *conn, struct sockaddr_tcpip *peer,
 		     size_t len ) {
        	struct udp_header *udphdr;
 	struct pk_buff *pkb;
+	int rc;
 
 	/* Use precreated packet buffer if one is available */
 	if ( conn->tx_pkb ) {
@@ -183,7 +191,14 @@ int udp_sendto_via ( struct udp_connection *conn, struct sockaddr_tcpip *peer,
 	       ntohs ( udphdr->len ) );
 
 	/* Send it to the next layer for processing */
-	return tcpip_tx ( pkb, &udp_protocol, peer, netdev, &udphdr->chksum );
+	if ( ( rc = tcpip_tx ( pkb, &udp_protocol, peer, netdev,
+			       &udphdr->chksum ) ) != 0 ) {
+		DBGC ( conn, "UDP %p could not transmit packet: %s\n",
+		       conn, strerror ( rc ) );
+		return rc;
+	}
+
+	return 0;
 }
 
 /**
@@ -301,6 +316,10 @@ static int udp_rx ( struct pk_buff *pkb, struct sockaddr_tcpip *st_src,
 	/* Pass data to application */
 	rc = conn->udp_op->newdata ( conn, pkb->data, pkb_len ( pkb ),
 				     st_src, st_dest );
+	if ( rc != 0 ) {
+		DBGC ( conn, "UDP %p application rejected packet: %s\n",
+		       conn, strerror ( rc ) );
+	}
 
  done:
 	free_pkb ( pkb );
