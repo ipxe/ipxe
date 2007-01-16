@@ -17,6 +17,7 @@
  */
 
 #include <stddef.h>
+#include <gpxe/async.h>
 #include <gpxe/iscsi.h>
 
 /** @file
@@ -37,13 +38,9 @@ static int iscsi_command ( struct scsi_device *scsi,
 	struct iscsi_device *iscsidev
 		= container_of ( scsi, struct iscsi_device, scsi );
 	struct async async;
-	int rc;
 
-	async_init_orphan ( &async );
-	if ( ( rc = iscsi_issue ( &iscsidev->iscsi, command, &async ) ) != 0 )
-		return rc;
-	async_wait ( &async, &rc, 1 );
-	return rc;
+	return async_block ( &async, iscsi_issue ( &iscsidev->iscsi, command,
+						   &async ) );
 }
 
 /**
@@ -56,10 +53,13 @@ int init_iscsidev ( struct iscsi_device *iscsidev ) {
 
 	iscsidev->scsi.command = iscsi_command;
 	iscsidev->scsi.lun = iscsidev->iscsi.lun;
-	rc = init_scsidev ( &iscsidev->scsi );
-	if ( rc != 0 ) {
-		fini_iscsidev ( iscsidev );
-	}
+	if ( ( rc = init_scsidev ( &iscsidev->scsi ) ) != 0 )
+		goto err;
+
+	return 0;
+
+ err:
+	fini_iscsidev ( iscsidev );
 	return rc;
 }
 

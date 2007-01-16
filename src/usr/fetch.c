@@ -86,11 +86,8 @@ int fetch ( const char *uri_string, userptr_t *data, size_t *len ) {
 		}
 	}
 
-	async_init_orphan ( &async );
-	if ( ( rc = download ( uri, &buffer, &async ) ) != 0 )
-		goto err;
-	async_wait ( &async, &rc, 1 );
-	if ( rc != 0 )
+	if ( ( rc = async_block ( &async,
+				  download ( uri, &buffer, &async ) ) )  != 0 )
 		goto err;
 
 	/* Fill in buffer address and length */

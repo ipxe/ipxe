@@ -17,6 +17,7 @@
  */
 
 #include <stddef.h>
+#include <gpxe/async.h>
 #include <gpxe/aoe.h>
 
 /** @file
@@ -37,13 +38,9 @@ static int aoe_command ( struct ata_device *ata,
 	struct aoe_device *aoedev
 		= container_of ( ata, struct aoe_device, ata );
 	struct async async;
-	int rc;
 
-	async_init_orphan ( &async );
-	if ( ( rc = aoe_issue ( &aoedev->aoe, command, &async ) ) != 0 )
-		return rc;
-	async_wait ( &async, &rc, 1 );
-	return rc;
+	return async_block ( &async, aoe_issue ( &aoedev->aoe, command,
+						 &async ) );
 }
 
 /**

@@ -20,6 +20,7 @@
 #include <byteswap.h>
 #include <vsprintf.h>
 #include <gpxe/in.h>
+#include <gpxe/ip.h>
 #include <gpxe/dhcp.h>
 #include <gpxe/async.h>
 #include <gpxe/netdevice.h>
@@ -65,13 +66,8 @@ int dhcp ( struct net_device *netdev ) {
 	printf ( "DHCP (%s %s)...", netdev->name, netdev_hwaddr ( netdev ) );
 	memset ( &dhcp, 0, sizeof ( dhcp ) );
 	dhcp.netdev = netdev;
-	async_init_orphan ( &async );
-	if ( ( rc = start_dhcp ( &dhcp, &async ) ) != 0 ) {
-		printf ( "could not start (%s)\n", strerror ( rc ) );
-		return rc;
-	}
-	async_wait ( &async, &rc, 1 );	
-	if ( rc != 0 ) {
+	if ( ( rc = async_block ( &async,
+				  start_dhcp ( &dhcp, &async ) ) ) != 0 ) {
 		printf ( "failed (%s)\n", strerror ( rc ) );
 		return rc;
 	}
