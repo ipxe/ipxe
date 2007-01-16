@@ -47,35 +47,37 @@ static struct ipv4_miniroute * add_ipv4_miniroute ( struct net_device *netdev,
 						    struct in_addr gateway ) {
 	struct ipv4_miniroute *miniroute;
 
+	DBG ( "IPv4 add %s", inet_ntoa ( address ) );
+	DBG ( "/%s ", inet_ntoa ( netmask ) );
+	if ( gateway.s_addr != INADDR_NONE )
+		DBG ( "gw %s ", inet_ntoa ( gateway ) );
+	DBG ( "via %s\n", netdev->name );
+
 	/* Allocate and populate miniroute structure */
 	miniroute = malloc ( sizeof ( *miniroute ) );
-	if ( miniroute ) {
-
-		DBG ( "IPv4 add %s", inet_ntoa ( address ) );
-		DBG ( "/%s ", inet_ntoa ( netmask ) );
-		if ( gateway.s_addr != INADDR_NONE )
-			DBG ( "gw %s ", inet_ntoa ( gateway ) );
-		DBG ( "via %s\n", netdev->name );
-
-		/* Record routing information */
-		miniroute->netdev = netdev;
-		miniroute->address = address;
-		miniroute->netmask = netmask;
-		miniroute->gateway = gateway;
-		
-		/* Add to end of list if we have a gateway, otherwise
-		 * to start of list.
-		 */
-		if ( gateway.s_addr != INADDR_NONE ) {
-			list_add_tail ( &miniroute->list, &ipv4_miniroutes );
-		} else {
-			list_add ( &miniroute->list, &ipv4_miniroutes );
-		}
-
-		/* Record reference to net_device */
-		miniroute->netdev_ref.forget = ipv4_forget_netdev;
-		ref_add ( &miniroute->netdev_ref, &netdev->references );
+	if ( ! miniroute ) {
+		DBG ( "IPv4 could not add miniroute\n" );
+		return NULL;
 	}
+
+	/* Record routing information */
+	miniroute->netdev = netdev;
+	miniroute->address = address;
+	miniroute->netmask = netmask;
+	miniroute->gateway = gateway;
+		
+	/* Add to end of list if we have a gateway, otherwise
+	 * to start of list.
+	 */
+	if ( gateway.s_addr != INADDR_NONE ) {
+		list_add_tail ( &miniroute->list, &ipv4_miniroutes );
+	} else {
+		list_add ( &miniroute->list, &ipv4_miniroutes );
+	}
+
+	/* Record reference to net_device */
+	miniroute->netdev_ref.forget = ipv4_forget_netdev;
+	ref_add ( &miniroute->netdev_ref, &netdev->references );
 
 	return miniroute;
 }
@@ -391,8 +393,8 @@ static int ipv4_tx ( struct pk_buff *pkb,
 	/* Determine link-layer destination address */
 	if ( ( rc = ipv4_ll_addr ( next_hop, iphdr->src, netdev,
 				   ll_dest ) ) != 0 ) {
-		DBG ( "IPv4 has no link-layer address for %s\n",
-		      inet_ntoa ( iphdr->dest ) );
+		DBG ( "IPv4 has no link-layer address for %s: %s\n",
+		      inet_ntoa ( iphdr->dest ), strerror ( rc ) );
 		goto err;
 	}
 
@@ -408,7 +410,13 @@ static int ipv4_tx ( struct pk_buff *pkb,
 	      ntohs ( iphdr->ident ), ntohs ( iphdr->chksum ) );
 
 	/* Hand off to link layer */
-	return net_tx ( pkb, netdev, &ipv4_protocol, ll_dest );
+	if ( ( rc = net_tx ( pkb, netdev, &ipv4_protocol, ll_dest ) ) != 0 ) {
+		DBG ( "IPv4 could not transmit packet via %s: %s\n",
+		      netdev->name, strerror ( rc ) );
+		return rc;
+	}
+
+	return 0;
 
  err:
 	free_pkb ( pkb );
@@ -436,6 +444,7 @@ static int ipv4_rx ( struct pk_buff *pkb, struct net_device *netdev __unused,
 	} src, dest;
 	uint16_t csum;
 	uint16_t pshdr_csum;
+	int rc;
 
 	/* Sanity check the IPv4 header */
 	if ( pkb_len ( pkb ) < sizeof ( *iphdr ) ) {
@@ -506,7 +515,14 @@ static int ipv4_rx ( struct pk_buff *pkb, struct net_device *netdev __unused,
 	memset ( &dest, 0, sizeof ( dest ) );
 	dest.sin.sin_family = AF_INET;
 	dest.sin.sin_addr = iphdr->dest;
-	return tcpip_rx ( pkb, iphdr->protocol, &src.st, &dest.st, pshdr_csum);
+	if ( ( rc = tcpip_rx ( pkb, iphdr->protocol, &src.st,
+			       &dest.st, pshdr_csum ) ) != 0 ) {
+		DBG ( "IPv4 received packet rejected by stack: %s\n",
+		      strerror ( rc ) );
+		return rc;
+	}
+
+	return 0;
 
  err:
 	free_pkb ( pkb );
