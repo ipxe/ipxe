@@ -387,6 +387,7 @@ static void merge_dhcp_field ( struct dhcp_option_block *options,
 /**
  * Parse DHCP packet and construct DHCP options block
  *
+ * @v dhcp		DHCP session
  * @v dhcphdr		DHCP packet
  * @v len		Length of DHCP packet
  * @ret options		DHCP options block, or NULL
@@ -406,7 +407,8 @@ static void merge_dhcp_field ( struct dhcp_option_block *options,
  * options block; it is the responsibility of the caller to eventually
  * free this memory.
  */
-static struct dhcp_option_block * dhcp_parse ( struct dhcphdr *dhcphdr,
+static struct dhcp_option_block * dhcp_parse ( struct dhcp_session *dhcp,
+					       struct dhcphdr *dhcphdr,
 					       size_t len ) {
 	struct dhcp_option_block *options;
 	size_t options_len;
@@ -441,8 +443,8 @@ static struct dhcp_option_block * dhcp_parse ( struct dhcphdr *dhcphdr,
 	/* Allocate empty options block of required size */
 	options = alloc_dhcp_options ( options_len );
 	if ( ! options ) {
-		DBG ( "DHCP could not allocate %d-byte option block\n",
-		      options_len );
+		DBGC ( dhcp, "DHCP %p could not allocate %d-byte option "
+		       "block\n", dhcp, options_len );
 		return NULL;
 	}
 	
@@ -546,7 +548,8 @@ static int dhcp_senddata ( struct udp_connection *conn,
 	struct dhcp_packet dhcppkt;
 	int rc;
 	
-	DBG ( "Transmitting %s\n", dhcp_msgtype_name ( dhcp->state ) );
+	DBGC ( dhcp, "DHCP %p transmitting %s\n",
+	       dhcp, dhcp_msgtype_name ( dhcp->state ) );
 
 	assert ( ( dhcp->state == DHCPDISCOVER ) ||
 		 ( dhcp->state == DHCPREQUEST ) );
@@ -554,14 +557,16 @@ static int dhcp_senddata ( struct udp_connection *conn,
 	/* Create DHCP packet in temporary buffer */
 	if ( ( rc = create_dhcp_packet ( dhcp->netdev, dhcp->state, buf, len,
 					 &dhcppkt ) ) != 0 ) {
-		DBG ( "Could not create DHCP packet\n" );
+		DBGC ( dhcp, "DHCP %p could not create DHCP packet: %s\n",
+		       dhcp, strerror ( rc ) );
 		return rc;
 	}
 
 	/* Copy in options common to all requests */
 	if ( ( rc = copy_dhcp_packet_options ( &dhcppkt,
 					       &dhcp_request_options ) ) != 0){
-		DBG ( "Could not set common DHCP options\n" );
+		DBGC ( dhcp, "DHCP %p could not set common DHCP options: %s\n",
+		       dhcp, strerror ( rc ) );
 		return rc;
 	}
 
@@ -570,13 +575,15 @@ static int dhcp_senddata ( struct udp_connection *conn,
 		if ( ( rc = copy_dhcp_packet_option ( &dhcppkt, dhcp->options,
 					    DHCP_SERVER_IDENTIFIER,
 					    DHCP_SERVER_IDENTIFIER ) ) != 0 ) {
-			DBG ( "Could not set server identifier option\n" );
+			DBGC ( dhcp, "DHCP %p could not set server identifier "
+			       "option: %s\n", dhcp, strerror ( rc ) );
 			return rc;
 		}
 		if ( ( rc = copy_dhcp_packet_option ( &dhcppkt, dhcp->options,
 					    DHCP_EB_YIADDR,
 					    DHCP_REQUESTED_ADDRESS ) ) != 0 ) {
-			DBG ( "Could not set requested address option\n" );
+			DBGC ( dhcp, "DHCP %p could not set requested address "
+			       "option: %s\n", dhcp, strerror ( rc ) );
 			return rc;
 		}
 	}
@@ -584,7 +591,8 @@ static int dhcp_senddata ( struct udp_connection *conn,
 	/* Transmit the packet */
 	if ( ( rc = udp_sendto_via ( conn, &sa_dhcp_server.st, dhcp->netdev,
 				     dhcppkt.dhcphdr, dhcppkt.len ) ) != 0 ) {
-		DBG ( "Could not transmit UDP packet\n" );
+		DBGC ( dhcp, "DHCP %p could not transmit UDP packet: %s\n",
+		       dhcp, strerror ( rc ) );
 		return rc;
 	}
 
@@ -637,22 +645,23 @@ static int dhcp_newdata ( struct udp_connection *conn, void *data, size_t len,
 
 	/* Check for matching transaction ID */
 	if ( dhcphdr->xid != dhcp_xid ( dhcp->netdev ) ) {
-		DBG ( "DHCP wrong transaction ID (wanted %08lx, got %08lx)\n",
-		      ntohl ( dhcphdr->xid ),
-		      ntohl ( dhcp_xid ( dhcp->netdev ) ) );
+		DBGC ( dhcp, "DHCP %p wrong transaction ID (wanted %08lx, "
+			"got %08lx)\n", dhcp, ntohl ( dhcphdr->xid ),
+			ntohl ( dhcp_xid ( dhcp->netdev ) ) );
 		return 0;
 	};
 
 	/* Parse packet and create options structure */
-	options = dhcp_parse ( dhcphdr, len );
+	options = dhcp_parse ( dhcp, dhcphdr, len );
 	if ( ! options ) {
-		DBG ( "Could not parse DHCP packet\n" );
+		DBGC ( dhcp, "DHCP %p could not parse DHCP packet\n", dhcp );
 		return -EINVAL;
 	}
 
 	/* Determine message type */
 	msgtype = find_dhcp_num_option ( options, DHCP_MESSAGE_TYPE );
-	DBG ( "Received %s\n", dhcp_msgtype_name ( msgtype ) );
+	DBGC ( dhcp, "DHCP %p received %s\n",
+	       dhcp, dhcp_msgtype_name ( msgtype ) );
 
 	/* Handle DHCP reply */
 	switch ( dhcp->state ) {
