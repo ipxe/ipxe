@@ -23,7 +23,6 @@
 #include <assert.h>
 #include <vsprintf.h>
 #include <gpxe/list.h>
-#include <gpxe/emalloc.h>
 #include <gpxe/image.h>
 
 /** @file

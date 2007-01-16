@@ -25,7 +25,7 @@
 
 #include <errno.h>
 #include <gpxe/buffer.h>
-#include <gpxe/emalloc.h>
+#include <gpxe/umalloc.h>
 #include <gpxe/ebuffer.h>
 
 /**
@@ -46,7 +46,7 @@ static int ebuffer_expand ( struct buffer *buffer, size_t new_len ) {
 		actual_len <<= 1;
 
 	/* Reallocate buffer */
-	new_addr = erealloc ( buffer->addr, actual_len );
+	new_addr = urealloc ( buffer->addr, actual_len );
 	if ( ! new_addr )
 		return -ENOMEM;
 
@@ -63,7 +63,7 @@ static int ebuffer_expand ( struct buffer *buffer, size_t new_len ) {
  * @ret rc		Return status code
  *
  * Allocates space for the buffer and stores it in @c buffer->addr.
- * The space must eventually be freed by calling efree(buffer->addr).
+ * The space must eventually be freed by calling ufree(buffer->addr).
  */
 int ebuffer_alloc ( struct buffer *buffer, size_t len ) {
 	memset ( buffer, 0, sizeof ( *buffer ) );

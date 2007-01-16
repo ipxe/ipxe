@@ -25,7 +25,7 @@
 
 #include <gpxe/uaccess.h>
 #include <gpxe/hidemem.h>
-#include <gpxe/emalloc.h>
+#include <gpxe/umalloc.h>
 
 /** Alignment of external allocated memory */
 #define EM_ALIGN ( 4 * 1024 )
@@ -76,14 +76,14 @@ static void ecollect_free ( void ) {
 /**
  * Reallocate external memory
  *
- * @v old_ptr		Memory previously allocated by emalloc(), or UNULL
+ * @v old_ptr		Memory previously allocated by umalloc(), or UNULL
  * @v new_size		Requested size
  * @ret new_ptr		Allocated memory, or UNULL
  *
  * Calling realloc() with a new size of zero is a valid way to free a
  * memory block.
  */
-userptr_t erealloc ( userptr_t ptr, size_t new_size ) {
+userptr_t urealloc ( userptr_t ptr, size_t new_size ) {
 	struct external_memory extmem;
 	userptr_t new = ptr;
 	size_t align;
@@ -153,17 +153,17 @@ userptr_t erealloc ( userptr_t ptr, size_t new_size ) {
  *
  * Memory is guaranteed to be aligned to a page boundary.
  */
-userptr_t emalloc ( size_t size ) {
-	return erealloc ( UNULL, size );
+userptr_t umalloc ( size_t size ) {
+	return urealloc ( UNULL, size );
 }
 
 /**
  * Free external memory
  *
- * @v ptr		Memory allocated by emalloc(), or UNULL
+ * @v ptr		Memory allocated by umalloc(), or UNULL
  *
  * If @c ptr is UNULL, no action is taken.
  */
-void efree ( userptr_t ptr ) {
-	erealloc ( ptr, 0 );
+void ufree ( userptr_t ptr ) {
+	urealloc ( ptr, 0 );
 }

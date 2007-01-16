@@ -25,7 +25,7 @@
 
 #include <errno.h>
 #include <vsprintf.h>
-#include <gpxe/emalloc.h>
+#include <gpxe/umalloc.h>
 #include <gpxe/ebuffer.h>
 #include <gpxe/image.h>
 #include <gpxe/uri.h>
@@ -45,9 +45,9 @@
  * @ret len		Length of loaded file
  * @ret rc		Return status code
  *
- * Fetch file to an external buffer allocated with emalloc().  The
+ * Fetch file to an external buffer allocated with umalloc().  The
  * caller is responsible for eventually freeing the buffer with
- * efree().
+ * ufree().
  */
 int fetch ( const char *uri_string, userptr_t *data, size_t *len ) {
 	struct uri *uri;
@@ -101,7 +101,7 @@ int fetch ( const char *uri_string, userptr_t *data, size_t *len ) {
 	return 0;
 
  err:
-	efree ( buffer.addr );
+	ufree ( buffer.addr );
  err_ebuffer_alloc:
 	free_uri ( uri );
  err_parse_uri:

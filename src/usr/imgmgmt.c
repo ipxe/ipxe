@@ -21,7 +21,7 @@
 #include <errno.h>
 #include <vsprintf.h>
 #include <gpxe/image.h>
-#include <gpxe/emalloc.h>
+#include <gpxe/umalloc.h>
 #include <usr/fetch.h>
 #include <usr/imgmgmt.h>
 
@@ -66,7 +66,7 @@ int imgfetch ( const char *filename, const char *name,
 	return 0;
 
  err:
-	efree ( image->data );
+	ufree ( image->data );
 	free ( image );
 	return rc;
 }
@@ -139,6 +139,6 @@ void imgstat ( struct image *image ) {
  */
 void imgfree ( struct image *image ) {
 	unregister_image ( image );
-	efree ( image->data );
+	ufree ( image->data );
 	free ( image );
 }
