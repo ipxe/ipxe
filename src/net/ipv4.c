@@ -350,7 +350,7 @@ static int ipv4_ll_addr ( struct in_addr dest, struct in_addr src,
  * @v pkb		Packet buffer
  * @v tcpip		Transport-layer protocol
  * @v st_dest		Destination network-layer address
- * @v netdev		Network device (or NULL to route automatically)
+ * @v netdev		Network device to use if no route found, or NULL
  * @v trans_csum	Transport-layer checksum to complete, or NULL
  * @ret rc		Status
  *
@@ -394,7 +394,7 @@ static int ipv4_tx ( struct pk_buff *pkb,
 	if ( ( rc = ipv4_ll_addr ( next_hop, iphdr->src, netdev,
 				   ll_dest ) ) != 0 ) {
 		DBG ( "IPv4 has no link-layer address for %s: %s\n",
-		      inet_ntoa ( iphdr->dest ), strerror ( rc ) );
+		      inet_ntoa ( next_hop ), strerror ( rc ) );
 		goto err;
 	}
 

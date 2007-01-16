@@ -58,6 +58,9 @@ int dhcp ( struct net_device *netdev ) {
 		dhcp_options = NULL;
 	}
 
+	/* Clear any existing routing table entry */
+	del_ipv4_address ( netdev );
+
 	/* Issue DHCP request */
 	printf ( "DHCP (%s %s)...", netdev->name, netdev_hwaddr ( netdev ) );
 	memset ( &dhcp, 0, sizeof ( dhcp ) );

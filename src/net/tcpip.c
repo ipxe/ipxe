@@ -65,7 +65,7 @@ int tcpip_rx ( struct pk_buff *pkb, uint8_t tcpip_proto,
  * @v pkb		Packet buffer
  * @v tcpip_protocol	Transport-layer protocol
  * @v st_dest		Destination address
- * @v netdev		Network device (or NULL to route automatically)
+ * @v netdev		Network device to use if no route found, or NULL
  * @v trans_csum	Transport-layer checksum to complete, or NULL
  * @ret rc		Return status code
  */

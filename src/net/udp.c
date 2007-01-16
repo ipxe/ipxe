@@ -143,7 +143,7 @@ int udp_senddata ( struct udp_connection *conn ) {
  *
  * @v conn		UDP connection
  * @v peer		Destination address
- * @v netdev		Net device via which to send (or NULL)
+ * @v netdev		Network device to use if no route found, or NULL
  * @v data		Data to send
  * @v len		Length of data
  * @ret rc		Return status code
