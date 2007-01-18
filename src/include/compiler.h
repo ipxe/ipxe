@@ -133,12 +133,8 @@ extern void dbg_hex_dump_da ( unsigned long dispaddr,
 			      const void *data, unsigned long len );
 
 /* Compatibility with existing Makefile */
-#if DEBUG_SYMBOL >= 1
-#if DEBUG_SYMBOL >= 2
-#define DBGLVL 3
-#else
-#define DBGLVL 1
-#endif
+#if DEBUG_SYMBOL
+#define DBGLVL DEBUG_SYMBOL
 #else
 #define DBGLVL 0
 #endif
@@ -147,6 +143,8 @@ extern void dbg_hex_dump_da ( unsigned long dispaddr,
 #define DBG_LOG		( DBGLVL & DBGLVL_LOG )
 #define DBGLVL_EXTRA	2
 #define DBG_EXTRA	( DBGLVL & DBGLVL_EXTRA )
+#define DBGLVL_PROFILE	4
+#define DBG_PROFILE	( DBGLVL & DBGLVL_PROFILE )
 
 /**
  * Print debugging message if we are at a certain debug level
@@ -240,15 +238,31 @@ extern void dbg_hex_dump_da ( unsigned long dispaddr,
 
 /* Versions of the DBGxxx_IF() macros that imply DBGxxx_IF( LOG, ... )*/
 
-#define DBG( ... )	DBG_IF ( LOG, __VA_ARGS__ )
-#define DBG_HDA( ... )	DBG_HDA_IF ( LOG, __VA_ARGS__ )
-#define DBG_HD( ... )	DBG_HD_IF ( LOG, __VA_ARGS__ )
-#define DBGC( ... )	DBGC_IF ( LOG, __VA_ARGS__ )
-#define DBGC_HDA( ... )	DBGC_HDA_IF ( LOG, __VA_ARGS__ )
-#define DBGC_HD( ... )	DBGC_HD_IF ( LOG, __VA_ARGS__ )
+#define DBG( ... )		DBG_IF		( LOG, __VA_ARGS__ )
+#define DBG_HDA( ... )		DBG_HDA_IF	( LOG, __VA_ARGS__ )
+#define DBG_HD( ... )		DBG_HD_IF	( LOG, __VA_ARGS__ )
+#define DBGC( ... )		DBGC_IF		( LOG, __VA_ARGS__ )
+#define DBGC_HDA( ... )		DBGC_HDA_IF	( LOG, __VA_ARGS__ )
+#define DBGC_HD( ... )		DBGC_HD_IF	( LOG, __VA_ARGS__ )
 
-/* Backwards compatibility */
-#define DBG2( ... )	DBG_IF ( EXTRA, __VA_ARGS__ )
+/* Versions of the DBGxxx_IF() macros that imply DBGxxx_IF( EXTRA, ... )*/
+
+#define DBG2( ... )		DBG_IF		( EXTRA, __VA_ARGS__ )
+#define DBG2_HDA( ... )		DBG_HDA_IF	( EXTRA, __VA_ARGS__ )
+#define DBG2_HD( ... )		DBG_HD_IF	( EXTRA, __VA_ARGS__ )
+#define DBGC2( ... )		DBGC_IF		( EXTRA, __VA_ARGS__ )
+#define DBGC2_HDA( ... )	DBGC_HDA_IF	( EXTRA, __VA_ARGS__ )
+#define DBGC2_HD( ... )		DBGC_HD_IF	( EXTRA, __VA_ARGS__ )
+
+/* Versions of the DBGxxx_IF() macros that imply DBGxxx_IF( PROFILE, ... )*/
+
+#define DBGP( ... )		DBG_IF		( PROFILE, __VA_ARGS__ )
+#define DBGP_HDA( ... )		DBG_HDA_IF	( PROFILE, __VA_ARGS__ )
+#define DBGP_HD( ... )		DBG_HD_IF	( PROFILE, __VA_ARGS__ )
+#define DBGCP( ... )		DBGC_IF		( PROFILE, __VA_ARGS__ )
+#define DBGCP_HDA( ... )	DBGC_HDA_IF	( PROFILE, __VA_ARGS__ )
+#define DBGCP_HD( ... )		DBGC_HD_IF	( PROFILE, __VA_ARGS__ )
+
 
 #if DEBUG_SYMBOL == 0
 #define NDEBUG
