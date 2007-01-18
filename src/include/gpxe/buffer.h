@@ -2,6 +2,7 @@
 #define _GPXE_BUFFER_H
 
 #include <stdint.h>
+#include <errno.h>
 #include <gpxe/uaccess.h>
 
 /** @file
@@ -100,5 +101,25 @@ struct buffer {
 
 extern int fill_buffer ( struct buffer *buffer, const void *data,
 			 size_t offset, size_t len );
+
+/** Expand data buffer
+ *
+ * @v buffer		Data buffer
+ * @v new_len		New length
+ * @ret rc		Return status code
+ *
+ * Expand the data buffer to accommodate more data.  Some buffers may
+ * not support being expanded.
+ */
+static inline int expand_buffer ( struct buffer *buffer, size_t new_len ) {
+
+	if ( new_len <= buffer->len )
+		return 0;
+
+	if ( ! buffer->expand )
+		return -ENOBUFS;
+
+	return buffer->expand ( buffer, new_len );
+}
 
 #endif /* _GPXE_BUFFER_H */

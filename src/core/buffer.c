@@ -167,11 +167,7 @@ int fill_buffer ( struct buffer *buffer, const void *data,
 
 	/* Check that block fits within buffer, expand if necessary */
 	if ( data_end > buffer->len ) {
-		if ( ! buffer->expand ) {
-			DBGC ( buffer, "BUFFER %p not expandable\n", buffer );
-			return -ENOBUFS;
-		}
-		if ( ( rc = buffer->expand ( buffer, data_end ) ) != 0 ) {
+		if ( ( rc = expand_buffer ( buffer, data_end ) ) != 0 ) {
 			DBGC ( buffer, "BUFFER %p could not expand :%s\n",
 			       buffer, strerror ( rc ) );
 			return rc;
