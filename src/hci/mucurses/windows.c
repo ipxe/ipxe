@@ -1,6 +1,6 @@
 #include <curses.h>
 #include <stddef.h>
-#include <malloc.h>
+#include <stdlib.h>
 #include "mucurses.h"
 
 /** @file

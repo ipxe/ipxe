@@ -1,8 +1,8 @@
 #include <string.h>
 #include <stdint.h>
+#include <stdlib.h>
 #include <errno.h>
 #include <byteswap.h>
-#include <malloc.h>
 #include <vsprintf.h>
 #include <gpxe/list.h>
 #include <gpxe/in.h>
@@ -199,9 +199,7 @@ static void ipv4_frag_expired ( struct retry_timer *timer __unused,
  * @v fragbug	Fragment buffer
  */
 static void free_fragbuf ( struct frag_buffer *fragbuf ) {
-	if ( fragbuf ) {
-		free_dma ( fragbuf, sizeof ( *fragbuf ) );
-	}
+	free ( fragbuf );
 }
 
 /**

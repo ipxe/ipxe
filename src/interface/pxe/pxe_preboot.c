@@ -25,7 +25,7 @@
 
 #include <stdint.h>
 #include <string.h>
-#include <malloc.h>
+#include <stdlib.h>
 #include <gpxe/uaccess.h>
 #include <gpxe/dhcp.h>
 #include "pxe.h"

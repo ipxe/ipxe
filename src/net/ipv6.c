@@ -2,7 +2,6 @@
 #include <stdint.h>
 #include <string.h>
 #include <stdlib.h>
-#include <malloc.h>
 #include <vsprintf.h>
 #include <byteswap.h>
 #include <gpxe/in.h>

@@ -66,11 +66,12 @@
 
 */
 
+#include <stdint.h>
+#include <stdlib.h>
 #include <io.h>
 #include <errno.h>
 #include <vsprintf.h>
 #include <timer.h>
-#include <malloc.h>
 #include <byteswap.h>
 #include <gpxe/pci.h>
 #include <gpxe/if_ether.h>
