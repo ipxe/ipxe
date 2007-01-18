@@ -261,7 +261,6 @@ extern void remove_from_rm_stack ( void *data, size_t size );
 #define TEXT16_CODE( asm_code_str )			\
 	".section \".text16\", \"ax\", @progbits\n\t"	\
 	".code16\n\t"					\
-	".arch i386\n\t"				\
 	asm_code_str "\n\t"				\
 	".code32\n\t"					\
 	".previous\n\t"
