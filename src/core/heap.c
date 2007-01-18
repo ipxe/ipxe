@@ -1,4 +1,4 @@
-#include <malloc.h>
+#include <gpxe/malloc.h>
 #include <gpxe/heap.h>
 
 /**

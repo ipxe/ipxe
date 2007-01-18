@@ -17,7 +17,7 @@
  */
 
 #include <stdint.h>
-#include <malloc.h>
+#include <gpxe/malloc.h>
 #include <gpxe/pkbuff.h>
 
 /** @file

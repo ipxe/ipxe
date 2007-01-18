@@ -1,5 +1,5 @@
-#ifndef _MALLOC_H
-#define _MALLOC_H
+#ifndef _GPXE_MALLOC_H
+#define _GPXE_MALLOC_H
 
 #include <stdint.h>
 
@@ -11,11 +11,13 @@
 
 /*
  * Prototypes for the standard functions (malloc() et al) are in
- * stdlib.h.  Include <malloc.h> only if you need the non-standard
- * functions, such as malloc_dma().
+ * stdlib.h.  Include <gpxe/malloc.h> only if you need the
+ * non-standard functions, such as malloc_dma().
  *
  */
 #include <stdlib.h>
+
+extern size_t freemem;
 
 extern void * alloc_memblock ( size_t size, size_t align );
 extern void free_memblock ( void *ptr, size_t size );
@@ -52,4 +54,4 @@ static inline void free_dma ( void *ptr, size_t size ) {
 	free_memblock ( ptr, size );
 }
 
-#endif /* _MALLOC_H */
+#endif /* _GPXE_MALLOC_H */

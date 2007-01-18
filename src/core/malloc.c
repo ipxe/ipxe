@@ -22,7 +22,7 @@
 #include <strings.h>
 #include <io.h>
 #include <gpxe/list.h>
-#include <malloc.h>
+#include <gpxe/malloc.h>
 
 /** @file
  *
@@ -68,6 +68,9 @@ struct autosized_block {
 
 /** List of free memory blocks */
 static LIST_HEAD ( free_blocks );
+
+/** Total amount of free memory */
+size_t freemem;
 
 /**
  * Allocate a memory block
@@ -134,6 +137,9 @@ void * alloc_memblock ( size_t size, size_t align ) {
 			 */
 			if ( pre_size < MIN_MEMBLOCK_SIZE )
 				list_del ( &pre->list );
+			/* Update total free memory */
+			freemem -= size;
+			/* Return allocated block */
 			DBG ( "Allocated [%p,%p)\n", block,
 			      ( ( ( void * ) block ) + size ) );
 			return block;
@@ -206,6 +212,9 @@ void free_memblock ( void *ptr, size_t size ) {
 		freeing->size += block->size;
 		list_del ( &block->list );
 	}
+
+	/* Update free memory counter */
+	freemem += size;
 }
 
 /**
