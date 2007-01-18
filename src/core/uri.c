@@ -159,3 +159,14 @@ struct uri * parse_uri ( const char *uri_string ) {
 
 	return uri;
 }
+
+/**
+ * Get port from URI
+ *
+ * @v uri		URI
+ * @v default_port	Default port to use if none specified in URI
+ * @ret port		Port
+ */
+unsigned int uri_port ( struct uri *uri, unsigned int default_port ) {
+	return ( uri->port ? strtoul ( uri->port, NULL, 0 ) : default_port );
+}

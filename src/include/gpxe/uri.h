@@ -112,5 +112,6 @@ static inline void free_uri ( struct uri *uri ) {
 }
 
 extern struct uri * parse_uri ( const char *uri_string );
+unsigned int uri_port ( struct uri *uri, unsigned int default_port );
 
 #endif /* _GPXE_URI_H */
