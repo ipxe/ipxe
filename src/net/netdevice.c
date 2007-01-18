@@ -387,7 +387,6 @@ int net_rx ( struct pk_buff *pkb, struct net_device *netdev,
  *
  * This polls all interfaces for received packets, and processes
  * packets from the RX queue.
- *
  */
 static void net_step ( struct process *process ) {
 	struct net_device *netdev;
@@ -396,29 +395,11 @@ static void net_step ( struct process *process ) {
 	/* Poll and process each network device */
 	list_for_each_entry ( netdev, &net_devices, list ) {
 
-		/* Poll for new packets.  Limit RX queue size to a
-		 * single packet, because otherwise most drivers are
-		 * in serious danger of running out of memory and
-		 * having to drop packets.
-		 *
-		 * This limitation isn't relevant to devices that
-		 * preallocate packet buffers (i.e. devices with
-		 * descriptor-based RX datapaths).  We might at some
-		 * point want to relax the quota for such devices.
-		 */
-		netdev_poll ( netdev,
-			      ( list_empty ( &netdev->rx_queue ) ? 1 : 0 ) );
+		/* Poll for new packets */
+		netdev_poll ( netdev, -1U );
 
-		/* Handle at most one received packet per poll.  We
-		 * avoid processing more than one packet per call to
-		 * netdev_poll(), because processing the received
-		 * packet can trigger transmission of a new packet
-		 * (e.g. an ARP response).  Since TX completions will
-		 * be processed as part of the poll operation, it is
-		 * easy to overflow small TX queues if multiple
-		 * packets are processed per poll.
-		 */
-		if ( ( pkb = netdev_rx_dequeue ( netdev ) ) ) {
+		/* Process received packets */
+		while ( ( pkb = netdev_rx_dequeue ( netdev ) ) ) {
 			DBGC ( netdev, "NETDEV %p processing %p\n",
 			       netdev, pkb );
 			netdev->ll_protocol->rx ( pkb, netdev );
