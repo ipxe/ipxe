@@ -125,8 +125,15 @@ aid_t async_init ( struct async *async, struct async_operations *aop,
  * async).
  */
 void async_uninit ( struct async *async ) {
-	if ( async->parent )
+
+	assert ( async != NULL );
+
+	if ( async->parent ) {
+		assert ( list_empty ( &async->children ) );
+
+		DBGC ( async, "ASYNC %p uninitialising\n", async );
 		list_del ( &async->siblings );
+	}
 }
 
 /**
@@ -238,33 +245,6 @@ void async_signal_children ( struct async *async, enum signal signal ) {
 }
 
 /**
- * Mark asynchronous operation as complete
- *
- * @v async		Asynchronous operation
- * @v rc		Return status code
- *
- * An asynchronous operation should call this once it has completed.
- * After calling async_done(), it must be prepared to be reaped by
- * having its reap() method called.
- */
-void async_done ( struct async *async, int rc ) {
-
-	DBGC ( async, "ASYNC %p completing with status %d (%s)\n",
-	       async, rc, strerror ( rc ) );
-
-	assert ( async != NULL );
-	assert ( async->parent != NULL );
-	assert ( rc != -EINPROGRESS );
-
-	/* Store return status code */
-	async->rc = rc;
-
-	/* Send SIGCHLD to parent.  Guard against NULL pointer dereferences */
-	if ( async->parent )
-		async_signal ( async->parent, SIGCHLD );
-}
-
-/**
  * Reap default handler
  *
  * @v async		Asynchronous operation
@@ -276,6 +256,79 @@ static void async_reap_default ( struct async *async ) {
 	assert ( async != NULL );
 
 	/* Nothing to do */
+}
+
+/**
+ * Reap asynchronous operation
+ *
+ * @v async		Asynchronous operation
+ *
+ * Note that the asynchronous operation should have been freed by
+ * calling this function; you may not dereference @c async after this
+ * call.
+ */
+static void async_reap ( struct async *async ) {
+
+	DBGC ( async, "ASYNC %p being reaped, exit status %d (%s)\n",
+	       async, async->rc, strerror ( async->rc ) );
+
+	assert ( async != NULL );
+	assert ( async->aop != NULL );
+	assert ( list_empty ( &async->children ) );
+
+	/* Unlink from hierarchy */
+	if ( async->parent )
+		list_del ( &async->siblings );
+	async->parent = NULL;
+
+	/* Release all resources */
+	if ( async->aop->reap ) {
+		async->aop->reap ( async );
+	} else {
+		async_reap_default ( async );
+	}
+}
+
+/**
+ * Mark asynchronous operation as complete
+ *
+ * @v async		Asynchronous operation
+ * @v rc		Return status code
+ *
+ * An asynchronous operation should call this once it has completed.
+ * After calling async_done(), it must be prepared to be reaped by
+ * having its reap() method called.
+ */
+void async_done ( struct async *async, int rc ) {
+	struct async *child;
+	struct async *tmp;
+
+	DBGC ( async, "ASYNC %p completing with status %d (%s)\n",
+	       async, rc, strerror ( rc ) );
+
+	assert ( async != NULL );
+	assert ( async->parent != NULL );
+	assert ( rc != -EINPROGRESS );
+
+	/* Store return status code */
+	async->rc = rc;
+
+	/* Disown all of our children */
+	list_for_each_entry_safe ( child, tmp, &async->children, siblings ) {
+		DBGC ( async, "ASYNC %p disowning child ASYNC %p\n",
+		       async, child );
+		list_del ( &child->siblings );
+		child->parent = NULL;
+	}
+
+	/* Send SIGCHLD to parent.  If we don't have a parent then we
+	 * have to take care of our own funeral arrangements.
+	 */
+	if ( async->parent ) {
+		async_signal ( async->parent, SIGCHLD );
+	} else {
+		async_reap ( async );
+	}
 }
 
 /**
@@ -319,25 +372,11 @@ aid_t async_wait ( struct async *async, int *rc, int block ) {
 			*rc = child->rc;
 			child_aid = child->aid;
 
-			DBGC ( async, "ASYNC %p reaping child ASYNC %p (ID "
-			       "%ld), exit status %d (%s)\n", async, child,
-			       child_aid, child->rc, strerror ( child->rc ) );
+			DBGC ( async, "ASYNC %p reaping child ASYNC %p "
+			       "(ID %ld)\n", async, child, child_aid );
 
-			/* Reap the child */
-			assert ( child->aop != NULL );
-			assert ( list_empty ( &child->children ) );
-
-			/* Unlink from operations hierarchy */
-			list_del ( &child->siblings );
-			child->parent = NULL;
-
-			/* Release all resources */
-			if ( child->aop->reap ) {
-				child->aop->reap ( child );
-			} else {
-				async_reap_default ( child );
-			}
-
+			/* Reap the child and return */
+			async_reap ( child );
 			return child_aid;
 		}
 
