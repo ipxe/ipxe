@@ -398,8 +398,13 @@ static void net_step ( struct process *process ) {
 		/* Poll for new packets */
 		netdev_poll ( netdev, -1U );
 
-		/* Process received packets */
-		while ( ( pkb = netdev_rx_dequeue ( netdev ) ) ) {
+		/* Process at most one received packet.  Give priority
+		 * to getting packets out of the NIC over processing
+		 * the received packets, because we advertise a window
+		 * that assumes that we can receive packets from the
+		 * NIC faster than they arrive.
+		 */
+		if ( ( pkb = netdev_rx_dequeue ( netdev ) ) ) {
 			DBGC ( netdev, "NETDEV %p processing %p\n",
 			       netdev, pkb );
 			netdev->ll_protocol->rx ( pkb, netdev );

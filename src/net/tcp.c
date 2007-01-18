@@ -6,6 +6,7 @@
 #include <timer.h>
 #include <vsprintf.h>
 #include <gpxe/pkbuff.h>
+#include <gpxe/malloc.h>
 #include <gpxe/retry.h>
 #include <gpxe/tcpip.h>
 #include <gpxe/tcp.h>
@@ -265,6 +266,7 @@ static int tcp_senddata_conn ( struct tcp_connection *conn, int force_send ) {
 	unsigned int flags;
 	size_t len;
 	size_t seq_len;
+	size_t window;
 	int rc;
 
 	/* Allocate space to the TX buffer */
@@ -322,6 +324,12 @@ static int tcp_senddata_conn ( struct tcp_connection *conn, int force_send ) {
 	if ( seq_len )
 		start_timer ( &conn->timer );
 
+	/* Estimate window size */
+	window = freemem;
+	if ( window > TCP_MAX_WINDOW_SIZE )
+		window = TCP_MAX_WINDOW_SIZE;
+	window &= ~0x03; /* Keep everything dword-aligned */
+
 	/* Fill up the TCP header */
 	payload = pkb->data;
 	if ( flags & TCP_SYN ) {
@@ -338,7 +346,7 @@ static int tcp_senddata_conn ( struct tcp_connection *conn, int force_send ) {
 	tcphdr->ack = htonl ( conn->rcv_ack );
 	tcphdr->hlen = ( ( payload - pkb->data ) << 2 );
 	tcphdr->flags = flags;
-	tcphdr->win = htons ( TCP_WINDOW_SIZE );
+	tcphdr->win = htons ( window );
 	tcphdr->csum = tcpip_chksum ( pkb->data, pkb_len ( pkb ) );
 
 	/* Dump header */
@@ -492,7 +500,7 @@ static int tcp_send_reset ( struct tcp_connection *conn,
 	tcphdr->ack = in_tcphdr->seq;
 	tcphdr->hlen = ( ( sizeof ( *tcphdr ) / 4 ) << 4 );
 	tcphdr->flags = ( TCP_RST | TCP_ACK );
-	tcphdr->win = htons ( TCP_WINDOW_SIZE );
+	tcphdr->win = htons ( TCP_MAX_WINDOW_SIZE );
 	tcphdr->csum = tcpip_chksum ( pkb->data, pkb_len ( pkb ) );
 
 	/* Dump header */

@@ -211,41 +211,30 @@ struct tcp_mss_option {
 #define MIN_PKB_LEN	MAX_HDR_LEN + 100 /* To account for padding by LL */
 
 /**
- * Advertised TCP window size
+ * Maxmimum advertised TCP window size
  *
- * 
- * Our TCP window is actually limited by the amount of space available
- * for RX packets in the NIC's RX ring; we tend to populate the rings
- * with far fewer descriptors than a typical driver.  This would
- * result in a desperately small window size, which kills WAN download
- * performance; the maximum bandwidth on any link is limited to
- *
- *    max_bandwidth = ( tcp_window / round_trip_time )
- *
- * With a 4kB window, which probably accurately reflects our amount of
- * buffer space, and a WAN RTT of say 200ms, this gives a maximum
- * achievable bandwidth of 20kB/s, which is not acceptable.
- *
- * We therefore aim to process packets as fast as they arrive, and
- * advertise an "infinite" window.  If we don't process packets as
- * fast as they arrive, then we will drop packets and have to incur
- * the retransmission penalty.
+ * We estimate the TCP window size as the amount of free memory we
+ * have.  This is not strictly accurate (since it ignores any space
+ * already allocated as RX buffers), but it will do for now.
  *
  * Since we don't store out-of-order received packets, the
  * retransmission penalty is that the whole window contents must be
- * resent.
+ * resent.  This suggests keeping the window size small, but bear in
+ * mind that the maximum bandwidth on any link is limited to
  *
- * We choose to compromise on a window size of 64kB (which is the
- * maximum that can be represented without using TCP options).  This
- * gives a maximum bandwidth of 320kB/s at 200ms RTT, which is
- * probably faster than the actual link bandwidth.  It also limits
- * retransmissions to 64kB, which is reasonable.
+ *    max_bandwidth = ( tcp_window / round_trip_time )
+ *
+ * With a 48kB window, which probably accurately reflects our amount
+ * of free memory, and a WAN RTT of say 200ms, this gives a maximum
+ * bandwidth of 240kB/s.  This is sufficiently close to realistic that
+ * we will need to be careful that our advertised window doesn't end
+ * up limiting WAN download speeds.
  *
  * Finally, since the window goes into a 16-bit field and we cannot
  * actually use 65536, we use a window size of (65536-4) to ensure
  * that payloads remain dword-aligned.
  */
-#define TCP_WINDOW_SIZE	( 65536 - 4 )
+#define TCP_MAX_WINDOW_SIZE	( 65536 - 4 )
 
 /**
  * Advertised TCP MSS
