@@ -94,6 +94,42 @@ aid_t async_init ( struct async *async, struct async_operations *aop,
 }
 
 /**
+ * Uninitialise an asynchronous operation
+ *
+ * @v async		Asynchronous operation
+ *
+ * Abandon an asynchronous operation without signalling the parent.
+ * You may do this only during the period between calling async_init()
+ * and returning to the parent for the first time.  It is designed to
+ * simplify the error paths of asynchronous operations that themselves
+ * spawn further asynchronous operations.
+ *
+ * An example may help:
+ *
+ *     int start_something ( ..., struct async *parent ) {
+ *         struct my_data_structure *myself;
+ *
+ *         ... allocate memory for myself ...
+ *
+ *         async_init ( &myself->async, &my_async_operations, parent );
+ *         if ( ( rc = start_child_operation ( ..., &myself->async ) ) != 0 ) {
+ *             async_uninit ( &myself->async );
+ *             return rc;
+ *         }
+ *
+ *         return 0;
+ *     }
+ *
+ * It is valid to call async_uninit() on an asynchronous operation
+ * that has not yet been initialised (i.e. a zeroed-out @c struct @c
+ * async).
+ */
+void async_uninit ( struct async *async ) {
+	if ( async->parent )
+		list_del ( &async->siblings );
+}
+
+/**
  * SIGCHLD 'ignore' handler
  *
  * @v async		Asynchronous operation

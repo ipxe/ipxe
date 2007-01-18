@@ -138,6 +138,7 @@ extern struct async_operations orphan_async_operations;
 
 extern aid_t async_init ( struct async *async, struct async_operations *aop,
 			  struct async *parent );
+extern void async_uninit ( struct async *async );
 extern void async_ignore_signal ( struct async *async, enum signal signal );
 extern void async_signal ( struct async *async, enum signal signal );
 extern void async_signal_children ( struct async *async, enum signal signal );
