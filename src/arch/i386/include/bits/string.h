@@ -22,6 +22,12 @@
  */
 
 #define __HAVE_ARCH_MEMCPY
+
+extern __attribute__ (( regparm ( 3 ) )) void * __memcpy ( void *dest,
+							   const void *src,
+							   size_t len );
+
+#if 0
 static inline __attribute__ (( always_inline )) void *
 __memcpy ( void *dest, const void *src, size_t len ) {
 	int d0, d1, d2;
@@ -31,6 +37,7 @@ __memcpy ( void *dest, const void *src, size_t len ) {
 			       : "memory" );
 	return dest; 
 }
+#endif
 
 static inline __attribute__ (( always_inline )) void *
 __constant_memcpy ( void *dest, const void *src, size_t len ) {
