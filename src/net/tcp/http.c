@@ -35,6 +35,7 @@
 #include <gpxe/uri.h>
 #include <gpxe/buffer.h>
 #include <gpxe/download.h>
+#include <gpxe/resolv.h>
 #include <gpxe/http.h>
 
 static struct async_operations http_async_operations;
@@ -391,16 +392,11 @@ int http_get ( struct uri *uri, struct buffer *buffer, struct async *parent ) {
 	http->buffer = buffer;
 	async_init ( &http->async, &http_async_operations, parent );
 
-
-#warning "Quick name resolution hack"
-	extern int dns_resolv ( const char *name,
-				struct sockaddr *sa,
-				struct async *parent );
-		
-	if ( ( rc = dns_resolv ( uri->host, &http->server,
-				 &http->async ) ) != 0 )
+	/* Start name resolution.  The download proper will start when
+	 * name resolution completes.
+	 */
+	if ( ( rc = resolv ( uri->host, &http->server, &http->async ) ) != 0 )
 		goto err;
-
 
 	return 0;
 

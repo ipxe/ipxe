@@ -24,6 +24,7 @@
 #include <gpxe/dhcp.h>
 #include <gpxe/async.h>
 #include <gpxe/netdevice.h>
+#include <gpxe/dns.h>
 #include <usr/ifmgmt.h>
 #include <usr/dhcpmgmt.h>
 
@@ -32,6 +33,9 @@
  * DHCP management
  *
  */
+
+/* Avoid dragging in dns.o */
+struct in_addr nameserver;
 
 /**
  * Configure network device via DHCP
@@ -42,8 +46,8 @@
 int dhcp ( struct net_device *netdev ) {
 	static struct dhcp_option_block *dhcp_options = NULL;
 	struct dhcp_session dhcp;
-	struct in_addr address = { htonl ( 0 ) };
-	struct in_addr netmask = { htonl ( 0 ) };
+	struct in_addr address = { 0 };
+	struct in_addr netmask = { 0 };
 	struct in_addr gateway = { INADDR_NONE };
 	struct async async;
 	int rc;
@@ -89,6 +93,10 @@ int dhcp ( struct net_device *netdev ) {
 			 netdev->name, strerror ( rc ) );
 		return rc;
 	}
+
+	/* Retrieve other DHCP options that we care about */
+	find_dhcp_ipv4_option ( dhcp_options, DHCP_DNS_SERVERS,
+				&nameserver );
 
 	return 0;
 }

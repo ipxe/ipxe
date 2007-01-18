@@ -26,6 +26,7 @@
 #include <byteswap.h>
 #include <gpxe/async.h>
 #include <gpxe/udp.h>
+#include <gpxe/resolv.h>
 #include <gpxe/dns.h>
 
 /** @file
@@ -468,3 +469,9 @@ int dns_resolv ( const char *name, struct sockaddr *sa,
 	free ( dns );
 	return rc;
 }
+
+/** DNS name resolver */
+struct resolver dns_resolver __resolver = {
+	.name = "DNS",
+	.resolv = dns_resolv,
+};

@@ -72,7 +72,7 @@
 
 #define	DOWNLOAD_PROTO_TFTP	/* Trivial File Transfer Protocol */
 #undef	DOWNLOAD_PROTO_NFS	/* Network File System */
-#undef	DOWNLOAD_PROTO_HTTP	/* Hypertext Transfer Protocol */
+#define	DOWNLOAD_PROTO_HTTP	/* Hypertext Transfer Protocol */
 #undef	DOWNLOAD_PROTO_TFTM	/* Multicast Trivial File Transfer Protocol */
 #undef	DOWNLOAD_PROTO_SLAM	/* Scalable Local Area Multicast */
 #undef	DOWNLOAD_PROTO_FSP	/* FSP? */
@@ -85,7 +85,7 @@
  *
  */
 
-#undef	DNS_RESOLVER		/* DNS resolver */
+#define	DNS_RESOLVER		/* DNS resolver */
 #undef	NMB_RESOLVER		/* NMB resolver */
 
 /* @END general.h */
