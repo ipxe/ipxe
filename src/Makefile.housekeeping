@@ -226,7 +226,8 @@ TGT_MAKEROM_FLAGS = $(strip $(MAKEROM_FLAGS_$(TGT_ROM_NAME)) \
 #
 COMMA		:= ,
 DEBUG_LIST	= $(subst $(COMMA), ,$(DEBUG))
-DEBUG_OBJ_BASE	= $(word 1,$(subst :, ,$(1))).dbg$(word 2,$(subst :, ,$(1)))
+DEBUG_OBJ_LEVEL	= $(firstword $(word 2,$(subst :, ,$(1))) 1)
+DEBUG_OBJ_BASE	= $(word 1,$(subst :, ,$(1))).dbg$(call DEBUG_OBJ_LEVEL,$(1))
 DEBUG_OBJ	= $(BIN)/$(call DEBUG_OBJ_BASE,$(1)).o
 DEBUG_ORIG_OBJ	= $(BIN)/$(word 1,$(subst :, ,$(1))).o
 DEBUG_OBJS	= $(foreach D,$(DEBUG_LIST),$(call DEBUG_OBJ,$(D)))
