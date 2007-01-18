@@ -134,8 +134,6 @@ void * alloc_memblock ( size_t size, size_t align ) {
 			 */
 			if ( pre_size < MIN_MEMBLOCK_SIZE )
 				list_del ( &pre->list );
-			/* Zero allocated memory, for calloc() */
-			memset ( block, 0, size );
 			DBG ( "Allocated [%p,%p)\n", block,
 			      ( ( ( void * ) block ) + size ) );
 			return block;
@@ -295,6 +293,23 @@ void * malloc ( size_t size ) {
  */
 void free ( void *ptr ) {
 	realloc ( ptr, 0 );
+}
+
+/**
+ * Allocate cleared memory
+ *
+ * @v size		Requested size
+ * @ret ptr		Allocated memory
+ *
+ * Allocate memory as per malloc(), and zero it.
+ */
+void * _calloc ( size_t size ) {
+	void *data;
+
+	data = malloc ( size );
+	if ( data )
+		memset ( data, 0, size );
+	return data;
 }
 
 /**

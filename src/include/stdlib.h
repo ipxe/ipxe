@@ -8,6 +8,8 @@ extern void free ( void *ptr );
 extern int system ( const char *command );
 extern long int random ( void );
 
+extern void * _calloc ( size_t len );
+
 /**
  * Allocate cleared memory
  *
@@ -17,12 +19,12 @@ extern long int random ( void );
  *
  * Allocate memory as per malloc(), and zero it.
  *
- * Note that malloc() and calloc() are identical, in the interests of
- * reducing code size.  Callers should not, however, rely on malloc()
- * clearing memory, since this behaviour may change in future.
+ * This is implemented as a static inline, with the body of the
+ * function in _calloc(), since in most cases @c nmemb will be 1 and
+ * doing the multiply is just wasteful.
  */
 static inline void * calloc ( size_t nmemb, size_t size ) {
-	return malloc ( nmemb * size );
+	return _calloc ( nmemb * size );
 }
 
 #endif /* STDLIB_H */
