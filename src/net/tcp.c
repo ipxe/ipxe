@@ -149,9 +149,10 @@ tcp_dump_flags ( struct tcp_connection *conn, unsigned int flags ) {
 static struct tcp_connection * alloc_tcp ( void ) {
 	struct tcp_connection *conn;
 
-	conn = calloc ( 1, sizeof ( *conn ) );
+	conn = malloc ( sizeof ( *conn ) );
 	if ( conn ) {
 		DBGC ( conn, "TCP %p allocated\n", conn );
+		memset ( conn, 0, sizeof ( *conn ) );
 		conn->tcp_state = conn->prev_tcp_state = TCP_CLOSED;
 		conn->snd_seq = random();
 		conn->timer.expired = tcp_expired;

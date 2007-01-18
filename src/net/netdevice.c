@@ -178,9 +178,12 @@ struct pk_buff * netdev_rx_dequeue ( struct net_device *netdev ) {
  */
 struct net_device * alloc_netdev ( size_t priv_size ) {
 	struct net_device *netdev;
+	size_t total_len;
 
-	netdev = calloc ( 1, sizeof ( *netdev ) + priv_size );
+	total_len = ( sizeof ( *netdev ) + priv_size );
+	netdev = malloc ( total_len );
 	if ( netdev ) {
+		memset ( netdev, 0, total_len );
 		INIT_LIST_HEAD ( &netdev->references );
 		INIT_LIST_HEAD ( &netdev->tx_queue );
 		INIT_LIST_HEAD ( &netdev->rx_queue );
