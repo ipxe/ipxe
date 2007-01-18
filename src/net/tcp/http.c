@@ -139,12 +139,22 @@ static void http_rx_response ( struct http_request *http, char *response ) {
 static int http_rx_content_length ( struct http_request *http,
 				    const char *value ) {
 	char *endp;
+	int rc;
 
 	http->content_length = strtoul ( value, &endp, 10 );
 	if ( *endp != '\0' ) {
 		DBGC ( http, "HTTP %p invalid Content-Length \"%s\"\n",
 		       http, value );
 		return -EIO;
+	}
+
+	/* Try to presize the receive buffer */
+	if ( ( rc = expand_buffer ( http->buffer,
+				    http->content_length ) ) != 0 ) {
+		/* May as well abandon the download now; it will fail */
+		DBGC ( http, "HTTP %p could not presize buffer: %s\n",
+		       http, strerror ( rc ) );
+		return rc;
 	}
 
 	return 0;
@@ -162,6 +172,8 @@ struct http_header_handler {
 	 * @v http	HTTP request
 	 * @v value	HTTP header value
 	 * @ret rc	Return status code
+	 *
+	 * If an error is returned, the download will be aborted.
 	 */
 	int ( * rx ) ( struct http_request *http, const char *value );
 };
