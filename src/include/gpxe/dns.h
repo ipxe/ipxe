@@ -109,6 +109,8 @@ struct dns_request {
 	struct retry_timer timer;
 };
 
+extern struct in_addr nameserver;
+
 extern int dns_resolv ( const char *name, struct sockaddr *sa,
 			struct async *parent );
 

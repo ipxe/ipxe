@@ -26,7 +26,6 @@
 #include <byteswap.h>
 #include <gpxe/async.h>
 #include <gpxe/udp.h>
-#include <gpxe/dhcp.h>
 #include <gpxe/dns.h>
 
 /** @file
@@ -34,6 +33,9 @@
  * DNS protocol
  *
  */
+
+/* The DNS server */
+struct in_addr nameserver = { INADDR_NONE };
 
 /**
  * Compare DNS reply name against the query name from the original request
@@ -51,7 +53,7 @@ static int dns_name_cmp ( struct dns_request *dns, struct dns_header *reply,
 
 	while ( 1 ) {
 		/* Obtain next section of rname */
-		while ( ( *rname ) & 0xc0 ) {			
+		while ( ( *rname ) & 0xc0 ) {
 			rname = ( ( ( char * ) reply ) +
 				  ( ntohs( *((uint16_t *)rname) ) & ~0xc000 ));
 		}
@@ -402,16 +404,18 @@ static struct async_operations dns_async_operations = {
 /**
  * Resolve name using DNS
  *
+ * @v name		Host name to resolve
+ * @v sa		Socket address to fill in
+ * @v parent		Parent asynchronous operation
+ * @ret rc		Return status code
  */
 int dns_resolv ( const char *name, struct sockaddr *sa,
 		 struct async *parent ) {
 	struct dns_request *dns;
-	struct dhcp_option *option;
 	union {
 		struct sockaddr_tcpip st;
 		struct sockaddr_in sin;
-	} nameserver;
-
+	} server;
 	int rc;
 
 	/* Allocate DNS structure */
@@ -435,20 +439,20 @@ int dns_resolv ( const char *name, struct sockaddr *sa,
 	dns->qinfo->qclass = htons ( DNS_CLASS_IN );
 
 	/* Identify nameserver */
-	memset ( &nameserver, 0, sizeof ( nameserver ) );
-	nameserver.sin.sin_family = AF_INET;
-	nameserver.sin.sin_port = htons ( DNS_PORT );
-	if ( ! ( option = find_global_dhcp_option ( DHCP_DNS_SERVERS ) ) ) {
+	memset ( &server, 0, sizeof ( server ) );
+	server.sin.sin_family = AF_INET;
+	server.sin.sin_port = htons ( DNS_PORT );
+	server.sin.sin_addr = nameserver;
+	if ( server.sin.sin_addr.s_addr == INADDR_NONE ) {
 		DBGC ( dns, "DNS %p no name servers\n", dns );
 		rc = -ENXIO;
 		goto err;
 	}
-	dhcp_ipv4_option ( option, &nameserver.sin.sin_addr );
 
 	/* Open UDP connection */
 	DBGC ( dns, "DNS %p using nameserver %s\n", dns, 
-	       inet_ntoa ( nameserver.sin.sin_addr ) );
-	udp_connect ( &dns->udp, &nameserver.st );
+	       inet_ntoa ( server.sin.sin_addr ) );
+	udp_connect ( &dns->udp, &server.st );
 	if ( ( rc = udp_open ( &dns->udp, 0 ) ) != 0 )
 		goto err;
 
