@@ -308,7 +308,7 @@ static int dns_newdata ( struct udp_connection *conn, void *data, size_t len,
 			/* Found the target A record */
 			DBGC ( dns, "DNS %p found address %s\n",
 			       dns, inet_ntoa ( rr_info->a.in_addr ) );
-			sin = ( struct sockaddr_in * ) dns->st;
+			sin = ( struct sockaddr_in * ) dns->sa;
 			sin->sin_family = AF_INET;
 			sin->sin_addr = rr_info->a.in_addr;
 
@@ -403,13 +403,15 @@ static struct async_operations dns_async_operations = {
  * Resolve name using DNS
  *
  */
-int dns_resolv ( const char *name, struct sockaddr_tcpip *st,
+int dns_resolv ( const char *name, struct sockaddr *sa,
 		 struct async *parent ) {
 	struct dns_request *dns;
+	struct dhcp_option *option;
 	union {
 		struct sockaddr_tcpip st;
 		struct sockaddr_in sin;
 	} nameserver;
+
 	int rc;
 
 	/* Allocate DNS structure */
@@ -419,9 +421,10 @@ int dns_resolv ( const char *name, struct sockaddr_tcpip *st,
 		goto err;
 	}
 	memset ( dns, 0, sizeof ( *dns ) );
-	dns->st = st;
+	dns->sa = sa;
 	dns->timer.expired = dns_timer_expired;
 	dns->udp.udp_op = &dns_udp_operations;
+	async_init ( &dns->async, &dns_async_operations, parent );
 
 	/* Create query */
 	dns->query.dns.flags = htons ( DNS_FLAG_QUERY | DNS_FLAG_OPCODE_QUERY |
@@ -431,33 +434,33 @@ int dns_resolv ( const char *name, struct sockaddr_tcpip *st,
 	dns->qinfo->qtype = htons ( DNS_TYPE_A );
 	dns->qinfo->qclass = htons ( DNS_CLASS_IN );
 
-	/* Open UDP connection */
+	/* Identify nameserver */
 	memset ( &nameserver, 0, sizeof ( nameserver ) );
 	nameserver.sin.sin_family = AF_INET;
 	nameserver.sin.sin_port = htons ( DNS_PORT );
-#warning "DHCP-DNS hack"
-	struct dhcp_option *option =
-		find_global_dhcp_option ( DHCP_DNS_SERVERS );
-	if ( ! option ) {
+	if ( ! ( option = find_global_dhcp_option ( DHCP_DNS_SERVERS ) ) ) {
 		DBGC ( dns, "DNS %p no name servers\n", dns );
 		rc = -ENXIO;
 		goto err;
 	}
 	dhcp_ipv4_option ( option, &nameserver.sin.sin_addr );
+
+	/* Open UDP connection */
 	DBGC ( dns, "DNS %p using nameserver %s\n", dns, 
 	       inet_ntoa ( nameserver.sin.sin_addr ) );
 	udp_connect ( &dns->udp, &nameserver.st );
 	if ( ( rc = udp_open ( &dns->udp, 0 ) ) != 0 )
 		goto err;
 
+	/* Send first DNS packet */
 	dns_send_packet ( dns );
 
-	async_init ( &dns->async, &dns_async_operations, parent );
 	return 0;	
 
  err:
 	DBGC ( dns, "DNS %p could not create request: %s\n", 
 	       dns, strerror ( rc ) );
+	async_uninit ( &dns->async );
 	free ( dns );
 	return rc;
 }

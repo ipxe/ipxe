@@ -89,21 +89,27 @@ union dns_rr_info {
 	struct dns_rr_info_cname cname;
 };
 
+/** A DNS request */
 struct dns_request {
+	/** Socket address to fill in with resolved address */
+	struct sockaddr *sa;
 
-	struct sockaddr_tcpip *st;
-
-	struct async async;
+	/** Current query packet */
 	struct dns_query query;
+	/** Length of current query packet */
 	struct dns_query_info *qinfo;
-
+	/** Recursion counter */
 	unsigned int recursion;
 
+	/** Asynchronous operation */
+	struct async async;
+	/** UDP connection */
 	struct udp_connection udp;
+	/** Retry timer */
 	struct retry_timer timer;
 };
 
-extern int dns_resolv ( const char *name, struct sockaddr_tcpip *st,
+extern int dns_resolv ( const char *name, struct sockaddr *sa,
 			struct async *parent );
 
 #endif /* _GPXE_DNS_H */
