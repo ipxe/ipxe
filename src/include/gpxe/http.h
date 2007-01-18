@@ -41,6 +41,8 @@ struct http_request {
 	/** HTTP Content-Length */
 	size_t content_length;
 
+	/** Server address */
+	struct sockaddr server;
 	/** TCP application for this request */
 	struct tcp_application tcp;
 	/** Number of bytes already sent */

@@ -7,6 +7,7 @@
 #include <gpxe/async.h>
 #include <gpxe/buffer.h>
 #include <gpxe/uri.h>
+#include <gpxe/download.h>
 #include <gpxe/ftp.h>
 
 /** @file
@@ -415,3 +416,9 @@ int ftp_get ( struct uri *uri, struct buffer *buffer, struct async *parent ) {
 	free ( ftp );
 	return rc;
 }
+
+/** HTTP download protocol */
+struct download_protocol ftp_download_protocol __download_protocol = {
+	.name = "ftp",
+	.start_download = ftp_get,
+};

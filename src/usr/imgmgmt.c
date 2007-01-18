@@ -22,7 +22,7 @@
 #include <vsprintf.h>
 #include <gpxe/image.h>
 #include <gpxe/umalloc.h>
-#include <usr/fetch.h>
+#include <gpxe/download.h>
 #include <usr/imgmgmt.h>
 
 /** @file
@@ -34,14 +34,15 @@
 /**
  * Fetch an image
  *
- * @v filename		Filename for image
+ * @v uri_string	URI as a string (e.g. "http://www.nowhere.com/vmlinuz")
  * @v name		Name for image, or NULL
  * @ret new_image	Newly created image
  * @ret rc		Return status code
  */
-int imgfetch ( const char *filename, const char *name,
+int imgfetch ( const char *uri_string, const char *name,
 	       struct image **new_image ) {
 	struct image *image;
+	struct async async;
 	int rc;
 
 	/* Allocate new image */
@@ -54,8 +55,10 @@ int imgfetch ( const char *filename, const char *name,
 	if ( name )
 		strncpy ( image->name, name, ( sizeof ( image->name ) - 1 ) );
 
-	/* Fetch the file */
-	if ( ( rc = fetch ( filename, &image->data, &image->len ) ) != 0 )
+	/* Download the file */
+	if ( ( rc = async_block ( &async, start_download ( uri_string, &async,
+							   &image->data,
+							   &image->len ))) !=0)
 		goto err;
 
 	/* Register the image */

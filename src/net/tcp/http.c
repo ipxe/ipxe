@@ -27,12 +27,14 @@
 #include <stdlib.h>
 #include <string.h>
 #include <strings.h>
+#include <byteswap.h>
 #include <errno.h>
 #include <assert.h>
 #include <vsprintf.h>
 #include <gpxe/async.h>
 #include <gpxe/uri.h>
 #include <gpxe/buffer.h>
+#include <gpxe/download.h>
 #include <gpxe/http.h>
 
 static inline struct http_request *
@@ -366,13 +368,45 @@ static void http_reap ( struct async *async ) {
 	free ( http );
 }
 
+/**
+ * Handle name resolution completion
+ *
+ * @v async		HTTP asynchronous operation
+ * @v signal		SIGCHLD
+ */
+static void http_sigchld ( struct async *async, enum signal signal __unused ) {
+	struct http_request *http =
+		container_of ( async, struct http_request, async );
+	struct sockaddr_tcpip *st = ( struct sockaddr_tcpip * ) &http->server;
+	int rc;
+
+	/* Reap child */
+	async_wait ( async, &rc, 1 );
+
+	/* If name resolution failed, abort now */
+	if ( rc != 0 ) {
+		http_done ( http, rc );
+		return;
+	}
+
+	/* Otherwise, start the HTTP connection */
+	http->tcp.tcp_op = &http_tcp_operations;
+	st->st_port = htons ( uri_port ( http->uri, HTTP_PORT ) );
+	if ( ( rc = tcp_connect ( &http->tcp, st, 0 ) ) != 0 ) {
+		DBGC ( http, "HTTP %p could not open TCP connection: %s\n",
+		       http, strerror ( rc ) );
+		http_done ( http, rc );
+		return;
+	}
+}
+
 /** HTTP asynchronous operations */
 static struct async_operations http_async_operations = {
-	.reap			= http_reap,
+	.reap = http_reap,
+	.signal = {
+		[SIGCHLD] = http_sigchld,
+	},
 };
-
-#warning "Quick name resolution hack"
-#include <byteswap.h>
 
 /**
  * Initiate a HTTP connection
@@ -394,49 +428,36 @@ int http_get ( struct uri *uri, struct buffer *buffer, struct async *parent ) {
 
 	/* Allocate and populate HTTP structure */
 	http = malloc ( sizeof ( *http ) );
-	if ( ! http ) {
-		rc = -ENOMEM;
-		goto err;
-	}
+	if ( ! http )
+		return -ENOMEM;
 	memset ( http, 0, sizeof ( *http ) );
 	http->uri = uri;
 	http->buffer = buffer;
-	http->tcp.tcp_op = &http_tcp_operations;
+	async_init ( &http->async, &http_async_operations, parent );
+
 
 #warning "Quick name resolution hack"
-	union {
-		struct sockaddr_tcpip st;
-		struct sockaddr_in sin;
-	} server;
-	server.sin.sin_port = htons ( HTTP_PORT );
-	server.sin.sin_family = AF_INET;
-	if ( inet_aton ( uri->host, &server.sin.sin_addr ) == 0 ) {
-		/* Try DNS */
-		struct async async;
+	extern int dns_resolv ( const char *name,
+				struct sockaddr *sa,
+				struct async *parent );
 		
-		extern int dns_resolv ( const char *name,
-					struct sockaddr_tcpip *st,
-					struct async *parent );
-		
-		async_init_orphan ( &async );
-		if ( ( rc = dns_resolv ( uri->host, &server.st,
-					 &async ) ) != 0 )
-			goto err;
-		async_wait ( &async, &rc, 1 );
-		if ( rc != 0 )
-			goto err;
-	}
-	
-
-	if ( ( rc = tcp_connect ( &http->tcp, &server.st, 0 ) ) != 0 )
+	if ( ( rc = dns_resolv ( uri->host, &http->server,
+				 &http->async ) ) != 0 )
 		goto err;
 
-	async_init ( &http->async, &http_async_operations, parent );
+
 	return 0;
 
  err:
 	DBGC ( http, "HTTP %p could not create request: %s\n", 
 	       http, strerror ( rc ) );
+	async_uninit ( &http->async );
 	free ( http );
 	return rc;
 }
+
+/** HTTP download protocol */
+struct download_protocol http_download_protocol __download_protocol = {
+	.name = "http",
+	.start_download = http_get,
+};
