@@ -37,6 +37,8 @@
 #include <gpxe/download.h>
 #include <gpxe/http.h>
 
+static struct async_operations http_async_operations;
+
 static inline struct http_request *
 tcp_to_http ( struct tcp_application *app ) {
 	return container_of ( app, struct http_request, tcp );
@@ -357,58 +359,6 @@ static struct tcp_operations http_tcp_operations = {
 };
 
 /**
- * Reap asynchronous operation
- *
- * @v async		Asynchronous operation
- */
-static void http_reap ( struct async *async ) {
-	struct http_request *http =
-		container_of ( async, struct http_request, async );
-
-	free ( http );
-}
-
-/**
- * Handle name resolution completion
- *
- * @v async		HTTP asynchronous operation
- * @v signal		SIGCHLD
- */
-static void http_sigchld ( struct async *async, enum signal signal __unused ) {
-	struct http_request *http =
-		container_of ( async, struct http_request, async );
-	struct sockaddr_tcpip *st = ( struct sockaddr_tcpip * ) &http->server;
-	int rc;
-
-	/* Reap child */
-	async_wait ( async, &rc, 1 );
-
-	/* If name resolution failed, abort now */
-	if ( rc != 0 ) {
-		http_done ( http, rc );
-		return;
-	}
-
-	/* Otherwise, start the HTTP connection */
-	http->tcp.tcp_op = &http_tcp_operations;
-	st->st_port = htons ( uri_port ( http->uri, HTTP_PORT ) );
-	if ( ( rc = tcp_connect ( &http->tcp, st, 0 ) ) != 0 ) {
-		DBGC ( http, "HTTP %p could not open TCP connection: %s\n",
-		       http, strerror ( rc ) );
-		http_done ( http, rc );
-		return;
-	}
-}
-
-/** HTTP asynchronous operations */
-static struct async_operations http_async_operations = {
-	.reap = http_reap,
-	.signal = {
-		[SIGCHLD] = http_sigchld,
-	},
-};
-
-/**
  * Initiate a HTTP connection
  *
  * @v uri		Uniform Resource Identifier
@@ -419,12 +369,6 @@ static struct async_operations http_async_operations = {
 int http_get ( struct uri *uri, struct buffer *buffer, struct async *parent ) {
 	struct http_request *http = NULL;
 	int rc;
-
-	/* Sanity check */
-	if ( ! uri->host ) {
-		rc = -EINVAL;
-		goto err;
-	}
 
 	/* Allocate and populate HTTP structure */
 	http = malloc ( sizeof ( *http ) );
@@ -455,6 +399,53 @@ int http_get ( struct uri *uri, struct buffer *buffer, struct async *parent ) {
 	free ( http );
 	return rc;
 }
+
+/**
+ * Handle name resolution completion
+ *
+ * @v async		HTTP asynchronous operation
+ * @v signal		SIGCHLD
+ */
+static void http_sigchld ( struct async *async, enum signal signal __unused ) {
+	struct http_request *http =
+		container_of ( async, struct http_request, async );
+	struct sockaddr_tcpip *st = ( struct sockaddr_tcpip * ) &http->server;
+	int rc;
+
+	/* If name resolution failed, abort now */
+	async_wait ( async, &rc, 1 );
+	if ( rc != 0 ) {
+		http_done ( http, rc );
+		return;
+	}
+
+	/* Otherwise, start the HTTP connection */
+	http->tcp.tcp_op = &http_tcp_operations;
+	st->st_port = htons ( uri_port ( http->uri, HTTP_PORT ) );
+	if ( ( rc = tcp_connect ( &http->tcp, st, 0 ) ) != 0 ) {
+		DBGC ( http, "HTTP %p could not open TCP connection: %s\n",
+		       http, strerror ( rc ) );
+		http_done ( http, rc );
+		return;
+	}
+}
+
+/**
+ * Free HTTP connection
+ *
+ * @v async		Asynchronous operation
+ */
+static void http_reap ( struct async *async ) {
+	free ( container_of ( async, struct http_request, async ) );
+}
+
+/** HTTP asynchronous operations */
+static struct async_operations http_async_operations = {
+	.reap = http_reap,
+	.signal = {
+		[SIGCHLD] = http_sigchld,
+	},
+};
 
 /** HTTP download protocol */
 struct download_protocol http_download_protocol __download_protocol = {

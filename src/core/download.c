@@ -30,6 +30,8 @@
 #include <gpxe/ebuffer.h>
 #include <gpxe/download.h>
 
+static struct async_operations download_async_operations;
+
 /** Registered download protocols */
 static struct download_protocol download_protocols[0]
 	__table_start ( struct download_protocol, download_protocols );
@@ -52,53 +54,6 @@ static struct download_protocol * find_protocol ( const char *name ) {
 	}
 	return NULL;
 }
-
-/** Free download resources */
-static void download_reap ( struct async *async ) {
-	struct download *download =
-		container_of ( async, struct download, async );
-
-	free ( download );
-}
-
-/**
- * Handle download termination
- *
- * @v async		Download asynchronous operation
- * @v signal		SIGCHLD
- */
-static void download_sigchld ( struct async *async,
-			       enum signal signal __unused ) {
-	struct download *download =
-		container_of ( async, struct download, async );
-	int rc;
-
-	/* Reap child */
-	async_wait ( async, &rc, 1 );
-
-	/* Clean up */
-	if ( rc == 0 ) {
-		/* Transfer ownership of buffer to parent */
-		*(download->data) = download->buffer.addr;
-		*(download->len) = download->buffer.fill;
-	} else {
-		/* Discard the buffer */
-		ufree ( download->buffer.addr );
-	}
-	free_uri ( download->uri );
-	download->uri = NULL;
-
-	/* Terminate ourselves */
-	async_done ( async, rc );
-}
-
-/** Download asynchronous operations */
-static struct async_operations download_async_operations = {
-	.reap = download_reap,
-	.signal = {
-		[SIGCHLD] = download_sigchld,
-	},
-};
 
 /**
  * Start download
@@ -170,3 +125,51 @@ int start_download ( const char *uri_string, struct async *parent,
 	free ( download );
 	return rc;
 }
+
+/**
+ * Handle download termination
+ *
+ * @v async		Download asynchronous operation
+ * @v signal		SIGCHLD
+ */
+static void download_sigchld ( struct async *async,
+			       enum signal signal __unused ) {
+	struct download *download =
+		container_of ( async, struct download, async );
+	int rc;
+
+	/* Reap child */
+	async_wait ( async, &rc, 1 );
+
+	/* Clean up */
+	if ( rc == 0 ) {
+		/* Transfer ownership of buffer to parent */
+		*(download->data) = download->buffer.addr;
+		*(download->len) = download->buffer.fill;
+	} else {
+		/* Discard the buffer */
+		ufree ( download->buffer.addr );
+	}
+	free_uri ( download->uri );
+	download->uri = NULL;
+
+	/* Terminate ourselves */
+	async_done ( async, rc );
+}
+
+/**
+ * Free download resources
+ *
+ * @v async		Download asynchronous operation
+ */
+static void download_reap ( struct async *async ) {
+	free ( container_of ( async, struct download, async ) );
+}
+
+/** Download asynchronous operations */
+static struct async_operations download_async_operations = {
+	.reap = download_reap,
+	.signal = {
+		[SIGCHLD] = download_sigchld,
+	},
+};
