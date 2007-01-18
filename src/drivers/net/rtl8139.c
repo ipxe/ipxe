@@ -450,6 +450,7 @@ static void rtl_poll ( struct net_device *netdev, unsigned int rx_quota ) {
 				 rtl->rx.ring, wrapped_len );
 
 			netdev_rx ( netdev, rx_pkb );
+			rx_quota--;
 		} else {
 			DBG ( "RX bad packet (status %#04x len %d)\n",
 			      rx_status, rx_len );
