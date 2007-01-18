@@ -21,9 +21,6 @@ struct net_device;
  */
 #define TCPIP_EMPTY_CSUM 0xffff
 
-/** Length of a @c struct @c sockaddr_tcpip */
-#define SA_TCPIP_LEN 32
-
 /**
  * TCP/IP socket address
  *
@@ -41,7 +38,8 @@ struct sockaddr_tcpip {
 	 * enough to hold a socket address for any TCP/IP address
 	 * family.
 	 */
-	char pad[SA_TCPIP_LEN - sizeof ( sa_family_t ) - sizeof ( uint16_t )];
+	char pad[ sizeof ( struct sockaddr ) -
+		  ( sizeof ( sa_family_t ) + sizeof ( uint16_t ) ) ];
 };
 
 /** 

@@ -14,6 +14,9 @@
 /** A socket address family */
 typedef uint16_t sa_family_t;
 
+/** Length of a @c struct @c sockaddr */
+#define SA_LEN 32
+
 /**
  * Generalized socket address structure
  *
@@ -26,6 +29,13 @@ struct sockaddr {
 	 * This is an AF_XXX constant.
 	 */
         sa_family_t sa_family;
+	/** Padding
+	 *
+	 * This ensures that a struct @c sockaddr_tcpip is large
+	 * enough to hold a socket address for any TCP/IP address
+	 * family.
+	 */
+	char pad[ SA_LEN - sizeof ( sa_family_t ) ];
 };
 
 #endif /* _GPXE_SOCKET_H */
