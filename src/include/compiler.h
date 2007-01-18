@@ -109,7 +109,6 @@ __asm__ ( ".equ\t" OBJECT_SYMBOL_STR ", 0" );
 #define DEBUG_SYMBOL PREFIX_OBJECT(debug_)
 
 #if DEBUG_SYMBOL
-#include "console.h"
 #define DEBUG_SYMBOL_STR _XSTR ( DEBUG_SYMBOL )
 __asm__ ( ".equ\tDBGLVL, " DEBUG_SYMBOL_STR );
 #endif
