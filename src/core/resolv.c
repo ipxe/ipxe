@@ -56,6 +56,7 @@ int resolv ( const char *name, struct sockaddr *sa, struct async *parent ) {
 	resolution = malloc ( sizeof ( *resolution ) );
 	if ( ! resolution )
 		return -ENOMEM;
+	memset ( resolution, 0, sizeof ( *resolution ) );
 	async_init ( &resolution->async, &resolv_async_operations, parent );
 
 	/* Check for a dotted quad IP address first */
