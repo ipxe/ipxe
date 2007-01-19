@@ -55,24 +55,6 @@ uint16_t add_ipchksums(unsigned long offset, uint16_t sum, uint16_t new)
 	return (~checksum) & 0xFFFF;
 }
 
-
-
-/**************************************************************************
-RANDOM - compute a random number between 0 and 2147483647L or 2147483562?
-**************************************************************************/
-long int random(void)
-{
-	static int32_t seed = 0;
-	int32_t q;
-	if (!seed) /* Initialize linear congruential generator */
-		seed = currticks();
-	/* simplified version of the LCG given in Bruce Schneier's
-	   "Applied Cryptography" */
-	q = seed/53668;
-	if ((seed = 40014*(seed-53668*q) - 12211*q) < 0) seed += 2147483563L;
-	return seed;
-}
-
 /**************************************************************************
 SLEEP
 **************************************************************************/

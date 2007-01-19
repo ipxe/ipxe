@@ -2,14 +2,27 @@
 #define STDLIB_H
 
 #include <stdint.h>
+#include <assert.h>
+
+/*****************************************************************************
+ *
+ * Numeric parsing
+ *
+ ****************************************************************************
+ */
 
 extern unsigned long strtoul ( const char *p, char **endp, int base );
-extern void * realloc ( void *old_ptr, size_t new_size );
-extern void * malloc ( size_t size );
-extern void free ( void *ptr );
-extern int system ( const char *command );
-extern long int random ( void );
 
+/*****************************************************************************
+ *
+ * Memory allocation
+ *
+ ****************************************************************************
+ */
+
+extern void * malloc ( size_t size );
+extern void * realloc ( void *old_ptr, size_t new_size );
+extern void free ( void *ptr );
 extern void * _calloc ( size_t len );
 
 /**
@@ -28,5 +41,32 @@ extern void * _calloc ( size_t len );
 static inline void * calloc ( size_t nmemb, size_t size ) {
 	return _calloc ( nmemb * size );
 }
+
+/*****************************************************************************
+ *
+ * Random number generation
+ *
+ ****************************************************************************
+ */
+
+extern long int random ( void );
+extern void srandom ( unsigned int seed );
+
+static inline int rand ( void ) {
+	return random();
+}
+
+static inline void srand ( unsigned int seed ) {
+	srandom ( seed );
+}
+
+/*****************************************************************************
+ *
+ * Miscellaneous
+ *
+ ****************************************************************************
+ */
+
+extern int system ( const char *command );
 
 #endif /* STDLIB_H */
