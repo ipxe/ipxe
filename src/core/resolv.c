@@ -113,7 +113,7 @@ static void resolv_sigchld ( struct async *async,
 
 	/* If we have no children left, return failure */
 	if ( --(resolution->pending) == 0 )
-		async_done ( async, -ENXIO );
+		async_done ( async, rc );
 }
 
 /**
