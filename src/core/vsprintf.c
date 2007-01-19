@@ -21,7 +21,7 @@
 #include <stdio.h>
 #include <console.h>
 #include <errno.h>
-#include <vsprintf.h>
+#include <gpxe/vsprintf.h>
 
 /** @file */
 

@@ -1,5 +1,5 @@
-#ifndef VSPRINTF_H
-#define VSPRINTF_H
+#ifndef _GPXE_VSPRINTF_H
+#define _GPXE_VSPRINTF_H
 
 /** @file
  *
@@ -64,4 +64,4 @@ struct printf_context {
 
 extern size_t vcprintf ( struct printf_context *ctx, const char *fmt,
 			 va_list args );
-#endif /* VSPRINTF_H */
+#endif /* _GPXE_VSPRINTF_H */

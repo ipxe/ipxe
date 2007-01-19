@@ -1,7 +1,7 @@
 #include <curses.h>
 #include <stdio.h>
 #include <stddef.h>
-#include <vsprintf.h>
+#include <gpxe/vsprintf.h>
 #include "mucurses.h"
 
 /** @file
