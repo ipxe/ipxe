@@ -430,7 +430,7 @@ static int bzimage_write_header ( struct image *image __unused,
 	struct bzimage_cmdline cmdline;
 
 	/* Update the header and copy it into the loaded kernel */
-	bzhdr->type_of_loader = BZI_LOADER_TYPE_ETHERBOOT;
+	bzhdr->type_of_loader = BZI_LOADER_TYPE_GPXE;
 	if ( bzhdr->version >= 0x0201 ) {
 		bzhdr->heap_end_ptr = ( load_ctx->rm_heap - 0x200 );
 		bzhdr->loadflags |= BZI_CAN_USE_HEAP;

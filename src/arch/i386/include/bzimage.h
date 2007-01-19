@@ -71,7 +71,13 @@ struct bzimage_header {
 #define BZI_SIGNATURE 0x53726448
 
 /** bzImage boot loader identifier for Etherboot */
-#define BZI_LOADER_TYPE_ETHERBOOT 4
+#define BZI_LOADER_TYPE_ETHERBOOT 0x40
+
+/** bzImage boot loader identifier for gPXE
+ *
+ * We advertise ourselves as Etherboot version 6.
+ */
+#define BZI_LOADER_TYPE_GPXE ( BZI_LOADER_TYPE_ETHERBOOT | 0x06 )
 
 /** bzImage "load high" flag */
 #define BZI_LOAD_HIGH 0x01
