@@ -397,9 +397,24 @@ static void dns_reap ( struct async *async ) {
 	free ( dns );
 }
 
+/**
+ * Handle SIGKILL
+ *
+ * @v async		Asynchronous operation
+ */
+static void dns_sigkill ( struct async *async, enum signal signal __unused ) {
+	struct dns_request *dns =
+		container_of ( async, struct dns_request, async );
+
+	dns_done ( dns, -ECANCELED );
+}
+
 /** DNS asynchronous operations */
 static struct async_operations dns_async_operations = {
 	.reap = dns_reap,
+	.signal = {
+		[SIGKILL] = dns_sigkill,
+	},
 };
 
 /**
