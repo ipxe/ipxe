@@ -2,6 +2,7 @@
 #define _STRINGS_H
 
 #include <limits.h>
+#include <string.h>
 
 static inline __attribute__ (( always_inline )) int
 __constant_flsl ( unsigned long x ) {
@@ -52,5 +53,15 @@ extern int __flsl ( long x );
 	( __builtin_constant_p ( x ) ? __constant_fls ( x ) : __fls ( x ) )
 
 extern int strcasecmp ( const char *s1, const char *s2 );
+
+static inline __attribute__ (( always_inline )) void
+bcopy ( const void *src, void *dest, size_t n ) {
+	memmove ( dest, src, n );
+}
+
+static inline __attribute__ (( always_inline )) void
+bzero ( void *s, size_t n ) {
+	memset ( s, 0, n );
+}
 
 #endif /* _STRINGS_H */

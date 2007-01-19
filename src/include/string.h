@@ -59,7 +59,6 @@ char * strpbrk(const char * cs,const char * ct);
 char * strtok(char * s,const char * ct);
 char * strsep(char **s, const char *ct);
 void * memset(void * s,int c,size_t count);
-char * bcopy(const char * src, char * dest, int count);
 void * memmove(void * dest,const void *src,size_t count);
 int __attribute__ (( pure )) memcmp(const void * cs,const void * ct,
 				    size_t count);
