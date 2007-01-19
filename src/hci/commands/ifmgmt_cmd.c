@@ -16,8 +16,8 @@
  * Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
  */
 
+#include <stdio.h>
 #include <getopt.h>
-#include <vsprintf.h>
 #include <gpxe/netdevice.h>
 #include <gpxe/command.h>
 #include <usr/ifmgmt.h>

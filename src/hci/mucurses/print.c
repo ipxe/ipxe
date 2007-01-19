@@ -1,6 +1,7 @@
 #include <curses.h>
-#include <vsprintf.h>
+#include <stdio.h>
 #include <stddef.h>
+#include <vsprintf.h>
 #include "mucurses.h"
 
 /** @file

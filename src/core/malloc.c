@@ -340,7 +340,7 @@ void mpopulate ( void *start, size_t len ) {
 }
 
 #if 0
-#include <vsprintf.h>
+#include <stdio.h>
 /**
  * Dump free block list
  *

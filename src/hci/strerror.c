@@ -1,6 +1,6 @@
 #include <errno.h>
 #include <string.h>
-#include <vsprintf.h>
+#include <stdio.h>
 #include <gpxe/errortab.h>
 
 /** @file

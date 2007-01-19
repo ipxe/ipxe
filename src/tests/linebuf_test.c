@@ -1,6 +1,6 @@
 #include <stdint.h>
 #include <string.h>
-#include <vsprintf.h>
+#include <stdio.h>
 #include <gpxe/linebuf.h>
 
 static const char data1[] = 

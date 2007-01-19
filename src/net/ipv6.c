@@ -2,7 +2,7 @@
 #include <stdint.h>
 #include <string.h>
 #include <stdlib.h>
-#include <vsprintf.h>
+#include <stdio.h>
 #include <byteswap.h>
 #include <gpxe/in.h>
 #include <gpxe/ip6.h>

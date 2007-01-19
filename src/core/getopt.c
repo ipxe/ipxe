@@ -18,7 +18,7 @@
 
 #include <stdint.h>
 #include <string.h>
-#include <vsprintf.h>
+#include <stdio.h>
 #include <getopt.h>
 
 /** @file

@@ -1,7 +1,7 @@
 #include <stdint.h>
 #include <string.h>
+#include <stdio.h>
 #include <byteswap.h>
-#include <vsprintf.h>
 #include <gpxe/netdevice.h>
 #include <gpxe/iscsi.h>
 #include <gpxe/ibft.h>

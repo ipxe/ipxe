@@ -25,12 +25,12 @@
 
 #include <stddef.h>
 #include <stdlib.h>
+#include <stdio.h>
 #include <string.h>
 #include <strings.h>
 #include <byteswap.h>
 #include <errno.h>
 #include <assert.h>
-#include <vsprintf.h>
 #include <gpxe/async.h>
 #include <gpxe/uri.h>
 #include <gpxe/buffer.h>

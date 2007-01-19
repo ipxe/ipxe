@@ -18,8 +18,8 @@
 
 #include <stdint.h>
 #include <stdlib.h>
+#include <stdio.h>
 #include <string.h>
-#include <vsprintf.h>
 #include <gpxe/pci.h>
 #include <undi.h>
 #include <undirom.h>

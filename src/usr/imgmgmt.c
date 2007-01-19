@@ -18,8 +18,8 @@
 
 #include <stdint.h>
 #include <stdlib.h>
+#include <stdio.h>
 #include <errno.h>
-#include <vsprintf.h>
 #include <gpxe/image.h>
 #include <gpxe/umalloc.h>
 #include <gpxe/download.h>

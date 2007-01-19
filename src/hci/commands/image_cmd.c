@@ -18,10 +18,10 @@
 
 #include <stdint.h>
 #include <stdlib.h>
+#include <stdio.h>
 #include <errno.h>
 #include <libgen.h>
 #include <getopt.h>
-#include <vsprintf.h>
 #include <gpxe/image.h>
 #include <gpxe/command.h>
 #include <gpxe/initrd.h>

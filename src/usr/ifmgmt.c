@@ -17,7 +17,7 @@
  */
 
 #include <string.h>
-#include <vsprintf.h>
+#include <stdio.h>
 #include <gpxe/netdevice.h>
 #include <gpxe/device.h>
 #include <usr/ifmgmt.h>

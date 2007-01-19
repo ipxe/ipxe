@@ -1,7 +1,7 @@
 #include <string.h>
 #include <stdlib.h>
+#include <stdio.h>
 #include <errno.h>
-#include <vsprintf.h>
 #include <byteswap.h>
 #include <gpxe/ip.h>
 #include <gpxe/dhcp.h>

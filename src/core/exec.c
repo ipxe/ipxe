@@ -19,11 +19,11 @@
 #include <stdint.h>
 #include <string.h>
 #include <stdlib.h>
+#include <stdio.h>
 #include <unistd.h>
 #include <getopt.h>
 #include <errno.h>
 #include <assert.h>
-#include <vsprintf.h>
 #include <gpxe/tables.h>
 #include <gpxe/command.h>
 

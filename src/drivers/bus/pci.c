@@ -21,9 +21,9 @@
 
 #include <stdint.h>
 #include <stdlib.h>
+#include <stdio.h>
 #include <string.h>
 #include <errno.h>
-#include <vsprintf.h>
 #include <gpxe/tables.h>
 #include <gpxe/device.h>
 #include <gpxe/pci.h>

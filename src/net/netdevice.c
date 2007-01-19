@@ -18,10 +18,10 @@
 
 #include <stdint.h>
 #include <stdlib.h>
+#include <stdio.h>
 #include <byteswap.h>
 #include <string.h>
 #include <errno.h>
-#include <vsprintf.h>
 #include <gpxe/if_ether.h>
 #include <gpxe/pkbuff.h>
 #include <gpxe/tables.h>

@@ -1,8 +1,6 @@
 #ifndef CONSOLE_H
 #define CONSOLE_H
 
-#include "stdint.h"
-#include "vsprintf.h"
 #include <gpxe/tables.h>
 
 /** @file

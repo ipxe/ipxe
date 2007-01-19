@@ -1,7 +1,7 @@
 #include <stdint.h>
 #include <stdlib.h>
+#include <stdio.h>
 #include <errno.h>
-#include <vsprintf.h>
 #include <console.h>
 #include <gpxe/netdevice.h>
 #include <gpxe/aoe.h>

@@ -68,9 +68,9 @@
 
 #include <stdint.h>
 #include <stdlib.h>
+#include <stdio.h>
 #include <io.h>
 #include <errno.h>
-#include <vsprintf.h>
 #include <timer.h>
 #include <byteswap.h>
 #include <gpxe/pci.h>

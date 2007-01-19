@@ -1,6 +1,6 @@
 #include <stdint.h>
+#include <stdio.h>
 #include <errno.h>
-#include <vsprintf.h>
 #include <gpxe/if_ether.h>
 #include <gpxe/netdevice.h>
 #include <gpxe/ethernet.h>

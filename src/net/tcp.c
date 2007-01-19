@@ -1,10 +1,10 @@
 #include <string.h>
 #include <stdlib.h>
+#include <stdio.h>
 #include <assert.h>
 #include <errno.h>
 #include <byteswap.h>
 #include <timer.h>
-#include <vsprintf.h>
 #include <gpxe/pkbuff.h>
 #include <gpxe/malloc.h>
 #include <gpxe/retry.h>

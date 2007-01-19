@@ -18,12 +18,12 @@
 
 #include <stdint.h>
 #include <stdlib.h>
+#include <stdio.h>
 #include <string.h>
 #include <strings.h>
 #include <byteswap.h>
 #include <errno.h>
 #include <assert.h>
-#include <vsprintf.h>
 #include <gpxe/in.h>
 #include <gpxe/settings.h>
 

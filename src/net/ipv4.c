@@ -1,9 +1,9 @@
 #include <string.h>
 #include <stdint.h>
 #include <stdlib.h>
+#include <stdio.h>
 #include <errno.h>
 #include <byteswap.h>
-#include <vsprintf.h>
 #include <gpxe/list.h>
 #include <gpxe/in.h>
 #include <gpxe/arp.h>

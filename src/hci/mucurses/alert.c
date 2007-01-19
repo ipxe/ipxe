@@ -1,5 +1,5 @@
 #include <curses.h>
-#include <vsprintf.h>
+#include <stdio.h>
 
 /** @file
  *

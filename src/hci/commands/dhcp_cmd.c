@@ -18,8 +18,8 @@
 
 #include <stdint.h>
 #include <stdlib.h>
+#include <stdio.h>
 #include <getopt.h>
-#include <vsprintf.h>
 #include <gpxe/netdevice.h>
 #include <gpxe/command.h>
 #include <usr/dhcpmgmt.h>

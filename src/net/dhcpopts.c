@@ -18,11 +18,11 @@
 
 #include <stdint.h>
 #include <stdlib.h>
+#include <stdio.h>
 #include <byteswap.h>
 #include <errno.h>
 #include <string.h>
 #include <assert.h>
-#include <vsprintf.h>
 #include <gpxe/list.h>
 #include <gpxe/in.h>
 #include <gpxe/dhcp.h>

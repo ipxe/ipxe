@@ -1,4 +1,4 @@
-#include <vsprintf.h>
+#include <stdio.h>
 #include <gpxe/uaccess.h>
 #include <gpxe/umalloc.h>
 #include <gpxe/memmap.h>

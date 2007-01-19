@@ -1,5 +1,5 @@
 #include <string.h>
-#include <vsprintf.h>
+#include <stdio.h>
 #include <gpxe/command.h>
 #include <gpxe/settings.h>
 #include <gpxe/settings_ui.h>

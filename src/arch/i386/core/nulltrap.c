@@ -1,5 +1,5 @@
 #include <stdint.h>
-#include <vsprintf.h>
+#include <stdio.h>
 
 __attribute__ (( noreturn, section ( ".text.null_trap" ) ))
 void null_function_trap ( void ) {

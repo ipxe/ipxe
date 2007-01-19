@@ -17,8 +17,8 @@
  */
 
 #include <string.h>
+#include <stdio.h>
 #include <errno.h>
-#include <vsprintf.h>
 #include <gpxe/netdevice.h>
 #include <gpxe/dhcp.h>
 #include <gpxe/image.h>

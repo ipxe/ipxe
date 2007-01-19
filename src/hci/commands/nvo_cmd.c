@@ -1,8 +1,8 @@
 #include <stdint.h>
 #include <stdlib.h>
+#include <stdio.h>
 #include <string.h>
 #include <errno.h>
-#include <vsprintf.h>
 #include <getopt.h>
 #include <gpxe/nvo.h>
 #include <gpxe/dhcp.h>

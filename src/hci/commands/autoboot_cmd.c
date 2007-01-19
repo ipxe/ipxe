@@ -1,4 +1,4 @@
-#include <vsprintf.h>
+#include <stdio.h>
 #include <gpxe/command.h>
 #include <usr/autoboot.h>
 

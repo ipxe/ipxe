@@ -17,8 +17,8 @@
  */
 
 #include <string.h>
+#include <stdio.h>
 #include <byteswap.h>
-#include <vsprintf.h>
 #include <gpxe/in.h>
 #include <gpxe/ip.h>
 #include <gpxe/dhcp.h>
