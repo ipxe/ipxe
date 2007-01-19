@@ -103,8 +103,14 @@ static void resolv_sigchld ( struct async *async,
 		container_of ( async, struct resolution, async );
 	int rc;
 
-	/* If this child succeeded, kill all the others and return */
+	/* Reap the child */
 	async_wait ( async, &rc, 1 );
+
+	/* If this child succeeded, kill all the others and return.
+	 * Killing the others means that this routine may be
+	 * re-entered; this is safe provided that no child returns a
+	 * success exit status when killed by SIGKILL.
+	 */
 	if ( rc == 0 ) {
 		async_signal_children ( async, SIGKILL );
 		async_done ( async, 0 );
