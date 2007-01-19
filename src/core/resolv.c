@@ -106,18 +106,16 @@ static void resolv_sigchld ( struct async *async,
 	/* Reap the child */
 	async_wait ( async, &rc, 1 );
 
-	/* If this child succeeded, kill all the others and return.
-	 * Killing the others means that this routine may be
-	 * re-entered; this is safe provided that no child returns a
-	 * success exit status when killed by SIGKILL.
+	/* If this child succeeded, kill all the others.  They should
+	 * immediately die (invoking resolv_sigchld() again, which
+	 * won't do anything because the exit status is non-zero and
+	 * the pending count won't reach zero until this instance
+	 * completes).
 	 */
-	if ( rc == 0 ) {
+	if ( rc == 0 )
 		async_signal_children ( async, SIGKILL );
-		async_done ( async, 0 );
-		return;
-	}
 
-	/* If we have no children left, return failure */
+	/* When we have no children left, exit */
 	if ( --(resolution->pending) == 0 )
 		async_done ( async, rc );
 }
@@ -135,6 +133,7 @@ static void resolv_reap ( struct async *async ) {
 static struct async_operations resolv_async_operations = {
 	.reap = resolv_reap,
 	.signal = {
+		[SIGKILL] = async_signal_children,
 		[SIGCHLD] = resolv_sigchld,
 	},
 };
