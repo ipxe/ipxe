@@ -107,7 +107,7 @@ static int bzimage_parse_cmdline ( struct image *image,
 		} else if ( strcmp ( vga, "ask" ) == 0 ) {
 			exec_ctx->vid_mode = BZI_VID_MODE_ASK;
 		} else {
-			exec_ctx->vid_mode = strtoul ( vga, &vga, 10 );
+			exec_ctx->vid_mode = strtoul ( vga, &vga, 0 );
 			if ( *vga && ( *vga != ' ' ) ) {
 				DBGC ( image, "bzImage %p strange \"vga=\""
 				       "terminator '%c'\n", image, *vga );
