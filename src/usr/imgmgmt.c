@@ -56,9 +56,10 @@ int imgfetch ( const char *uri_string, const char *name,
 		strncpy ( image->name, name, ( sizeof ( image->name ) - 1 ) );
 
 	/* Download the file */
-	if ( ( rc = async_block ( &async, start_download ( uri_string, &async,
-							   &image->data,
-							   &image->len ))) !=0)
+	if ( ( rc = async_block_progress ( &async,
+					   start_download ( uri_string, &async,
+							    &image->data,
+							    &image->len )))!=0)
 		goto err;
 
 	/* Register the image */

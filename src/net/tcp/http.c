@@ -253,6 +253,10 @@ static void http_rx_data ( struct http_request *http,
 		return;
 	}
 
+	/* Update progress */
+	http->async.completed = http->buffer->fill;
+	http->async.total = http->content_length;
+
 	/* If we have reached the content-length, stop now */
 	if ( http->content_length &&
 	     ( http->buffer->fill >= http->content_length ) ) {

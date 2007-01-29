@@ -170,6 +170,7 @@ static void download_reap ( struct async *async ) {
 static struct async_operations download_async_operations = {
 	.reap = download_reap,
 	.signal = {
-		[SIGCHLD] = download_sigchld,
+		[SIGCHLD]	= download_sigchld,
+		[SIGUPDATE]	= SIG_IGN,
 	},
 };
