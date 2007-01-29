@@ -605,15 +605,19 @@ int undinet_probe ( struct undi_device *undi ) {
 	DBGC ( undinic, "UNDINIC %p using UNDI %p\n", undinic, undi );
 
 	/* Hook in UNDI stack */
-	memset ( &start_undi, 0, sizeof ( start_undi ) );
-	start_undi.AX = undi->pci_busdevfn;
-	start_undi.BX = undi->isapnp_csn;
-	start_undi.DX = undi->isapnp_read_port;
-	start_undi.ES = BIOS_SEG;
-	start_undi.DI = find_pnp_bios();
-	if ( ( rc = undinet_call ( undinic, PXENV_START_UNDI, &start_undi,
-				   sizeof ( start_undi ) ) ) != 0 )
-		goto err_start_undi;
+	if ( ! ( undi->flags & UNDI_FL_STARTED ) ) {
+		memset ( &start_undi, 0, sizeof ( start_undi ) );
+		start_undi.AX = undi->pci_busdevfn;
+		start_undi.BX = undi->isapnp_csn;
+		start_undi.DX = undi->isapnp_read_port;
+		start_undi.ES = BIOS_SEG;
+		start_undi.DI = find_pnp_bios();
+		if ( ( rc = undinet_call ( undinic, PXENV_START_UNDI,
+					   &start_undi,
+					   sizeof ( start_undi ) ) ) != 0 )
+			goto err_start_undi;
+	}
+	undi->flags |= UNDI_FL_STARTED;
 
 	/* Bring up UNDI stack */
 	memset ( &undi_startup, 0, sizeof ( undi_startup ) );
@@ -703,6 +707,7 @@ void undinet_remove ( struct undi_device *undi ) {
 	memset ( &stop_undi, 0, sizeof ( stop_undi ) );
 	undinet_call ( undinic, PXENV_STOP_UNDI, &stop_undi,
 		       sizeof ( stop_undi ) );
+	undi->flags &= ~UNDI_FL_STARTED;
 
 	/* Free network device */
 	free_netdev ( netdev );

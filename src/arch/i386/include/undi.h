@@ -7,6 +7,8 @@
  *
  */
 
+#ifndef ASSEMBLY
+
 #include <gpxe/device.h>
 #include <pxe_types.h>
 
@@ -42,8 +44,12 @@ struct undi_device {
 	 * Filled in only for the preloaded UNDI device by pxeprefix.S
 	 */
 	UINT16_t pci_device;
-	/** Padding */
-	UINT16_t pad;
+	/** Flags
+	 *
+	 * This is the bitwise OR of zero or more UNDI_FL_XXX
+	 * constants.
+	 */
+	UINT16_t flags;
 
 	/** Generic device */
 	struct device dev;
@@ -54,15 +60,6 @@ struct undi_device {
 	 */
 	void *priv;
 } __attribute__ (( packed ));
-
-/** PCI bus:dev.fn field is invalid */
-#define UNDI_NO_PCI_BUSDEVFN 0xffff
-
-/** ISAPnP card select number field is invalid */
-#define UNDI_NO_ISAPNP_CSN 0xffff
-
-/** ISAPnP read port field is invalid */
-#define UNDI_NO_ISAPNP_READ_PORT 0xffff
 
 /**
  * Set UNDI driver-private data
@@ -83,5 +80,19 @@ static inline void undi_set_drvdata ( struct undi_device *undi, void *priv ) {
 static inline void * undi_get_drvdata ( struct undi_device *undi ) {
 	return undi->priv;
 }
+
+#endif /* ASSEMBLY */
+
+/** PCI bus:dev.fn field is invalid */
+#define UNDI_NO_PCI_BUSDEVFN 0xffff
+
+/** ISAPnP card select number field is invalid */
+#define UNDI_NO_ISAPNP_CSN 0xffff
+
+/** ISAPnP read port field is invalid */
+#define UNDI_NO_ISAPNP_READ_PORT 0xffff
+
+/** UNDI flag: START_UNDI has been called */
+#define UNDI_FL_STARTED 0x0001
 
 #endif /* _UNDI_H */

@@ -10,6 +10,8 @@
 	.section ".prefix.data", "aw", @progbits
 	.code16
 
+#include <undi.h>
+
 /*****************************************************************************
  * Entry point:	set operating context, print welcome message
  *****************************************************************************
@@ -278,6 +280,7 @@ unload_base_code:
  * Unload UNDI driver
  *****************************************************************************
  */
+#ifndef PXELOADER_KEEP_UNDI
 unload_undi:
 	/* Issue PXENV_STOP_UNDI */
 	movw	$PXENV_STOP_UNDI, %bx
@@ -286,12 +289,13 @@ unload_undi:
 	call	print_pxe_error
 	jmp	99f
 1:	/* Free base memory used by UNDI */
-#ifndef PXELOADER_KEEP_UNDI
 	movw	undi_fbms_start, %si
 	movw	undi_fbms_end, %di
 	call	free_basemem
-#endif /* PXELOADER_KEEP_UNDI */
+	/* Clear UNDI_FL_STARTED */
+	andw	$~UNDI_FL_STARTED, flags
 99:	
+#endif /* PXELOADER_KEEP_UNDI */
 
 /*****************************************************************************
  * Print remaining free base memory
@@ -678,12 +682,13 @@ entry_segment:		.word 0
 undi_fbms_start:	.word 0
 undi_fbms_end:		.word 0
 
-pci_busdevfn:		.word 0xffff
-isapnp_csn:		.word 0xffff
-isapnp_read_port:	.word 0xffff
+pci_busdevfn:		.word UNDI_NO_PCI_BUSDEVFN
+isapnp_csn:		.word UNDI_NO_ISAPNP_CSN
+isapnp_read_port:	.word UNDI_NO_ISAPNP_READ_PORT
 
 pci_vendor:		.word 0
 pci_device:		.word 0
+flags:			.word UNDI_FL_STARTED
 
 	.equ undi_device_size, ( . - undi_device )
 
