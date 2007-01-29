@@ -154,6 +154,28 @@ static void async_ignore_sigchld ( struct async *async, enum signal signal ) {
 }
 
 /**
+ * SIGUPDATE 'ignore' handler
+ *
+ * @v async		Asynchronous operation
+ * @v signal		Signal received
+ */
+static void async_ignore_sigupdate ( struct async *async,
+				     enum signal signal ) {
+	struct async *child;
+
+	assert ( async != NULL );
+	assert ( signal == SIGUPDATE );
+
+	async_signal_children ( async, signal );
+	async->completed = 0;
+	async->total = 0;
+	list_for_each_entry ( child, &async->children, siblings ) {
+		async->completed += child->completed;
+		async->total += child->total;
+	}
+}
+
+/**
  * 'Ignore' signal handler
  *
  * @v async		Asynchronous operation
@@ -170,8 +192,10 @@ void async_ignore_signal ( struct async *async, enum signal signal ) {
 	case SIGCHLD:
 		async_ignore_sigchld ( async, signal );
 		break;
-	case SIGKILL:
 	case SIGUPDATE:
+		async_ignore_sigupdate ( async, signal );
+		break;
+	case SIGKILL:
 	default:
 		/* Nothing to do */
 		break;
@@ -392,6 +416,35 @@ aid_t async_wait ( struct async *async, int *rc, int block ) {
 }
 
 /**
+ * Wait for any child asynchronous operation to complete, with progress bar
+ * 
+ * @v child		Child asynchronous operation
+ * @v rc		Child exit status to fill in, or NULL
+ * @ret aid		Asynchronous operation ID, or -1 on error
+ */
+aid_t async_wait_progress ( struct async *async, int *rc ) {
+	struct async *child;
+	long last_progress = -1;
+	long progress;
+	aid_t child_aid;
+
+	do {
+		step();
+		async_signal ( async, SIGUPDATE );
+		if ( async->total ) {
+			progress = ( async->completed / (async->total / 100) );
+			if ( progress != last_progress )
+				printf ( "\rProgress: %d%%", progress );
+			last_progress = progress;
+		}
+		child_aid = async_wait ( async, rc, 0 );
+	} while ( *rc == -EINPROGRESS );
+
+	printf ( "\n" );
+	return child_aid;
+}
+
+/**
  * Default asynchronous operations
  *
  * The default is to ignore SIGCHLD (i.e. to automatically reap
@@ -400,7 +453,8 @@ aid_t async_wait ( struct async *async, int *rc, int block ) {
  */
 struct async_operations default_async_operations = {
 	.signal = {
-		[SIGCHLD] = SIG_IGN,
+		[SIGCHLD]	= SIG_IGN,
+		[SIGUPDATE]	= SIG_IGN,
 	},
 };
 
@@ -414,6 +468,7 @@ struct async_operations default_async_operations = {
  */
 struct async_operations orphan_async_operations = {
 	.signal = {
-		[SIGCHLD] = SIG_DFL,
+		[SIGCHLD]	= SIG_DFL,
+		[SIGUPDATE]	= SIG_IGN,
 	},
 };

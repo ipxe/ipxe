@@ -204,4 +204,25 @@ static inline aid_t async_init_orphan ( struct async *async ) {
 		rc;						\
 	} )
 
+/**
+ * Execute and block on an asynchronous operation, with progress indicator
+ *
+ * @v async_temp	Temporary asynchronous operation structure to use
+ * @v START		Code used to start the asynchronous operation
+ * @ret rc		Return status code
+ *
+ * As for async_block(), the argument START is a code snippet; it
+ * should initiate an asynchronous operation as a child of @c
+ * async_temp and return an error status code if it failed to do so
+ * (e.g. due to malloc() failure).
+ */
+#define async_block_progress( async_temp, START ) ( {		\
+		int rc;						\
+								\
+	 	async_init_orphan ( async_temp );		\
+		if ( ( rc = START ) == 0 )			\
+			async_wait_progress ( async_temp, &rc );\
+		rc;						\
+	} )
+
 #endif /* _GPXE_ASYNC_H */
