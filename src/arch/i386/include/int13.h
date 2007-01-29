@@ -37,6 +37,8 @@ struct block_device;
 #define INT13_EXTENDED_WRITE		0x43
 /** Get extended drive parameters */
 #define INT13_GET_EXTENDED_PARAMETERS	0x48
+/** Get CD-ROM status / terminate emulation */
+#define INT13_CDROM_STATUS_TERMINATE	0x4b
 
 /** @} */
 

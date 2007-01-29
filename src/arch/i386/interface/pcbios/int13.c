@@ -26,6 +26,7 @@
 #include <realmode.h>
 #include <bios.h>
 #include <biosint.h>
+#include <bootsector.h>
 #include <int13.h>
 
 /** @file
@@ -43,23 +44,6 @@ static struct segoff __text16 ( int13_vector );
 
 /** Assembly wrapper */
 extern void int13_wrapper ( void );
-
-/** Vector for storing original INT 18 handler
- *
- * We do not chain to this vector, so there is no need to place it in
- * .text16.
- */
-static struct segoff int18_vector;
-
-/** Vector for storing original INT 19 handler
- *
- * We do not chain to this vector, so there is no need to place it in
- * .text16.
- */
-static struct segoff int19_vector;
-
-/** Restart point for INT 18 or 19 */
-extern void int13_exec_fail ( void );
 
 /** List of registered emulated drives */
 static LIST_HEAD ( drives );
@@ -114,6 +98,13 @@ static int int13_rw_sectors ( struct int13_drive *drive,
 	unsigned int count;
 	userptr_t buffer;
 
+	/* Validate blocksize */
+	if ( blockdev->blksize != INT13_BLKSIZE ) {
+		DBG ( "Invalid blocksize (%zd) for non-extended read/write\n",
+		      blockdev->blksize );
+		return -INT13_STATUS_INVALID;
+	}
+	
 	/* Calculate parameters */
 	cylinder = ( ( ( ix86->regs.cl & 0xc0 ) << 2 ) | ix86->regs.ch );
 	assert ( cylinder < drive->cylinders );
@@ -129,13 +120,6 @@ static int int13_rw_sectors ( struct int13_drive *drive,
 	DBG ( "C/H/S %d/%d/%d = LBA %#lx <-> %04x:%04x (count %d)\n", cylinder,
 	      head, sector, lba, ix86->segs.es, ix86->regs.bx, count );
 
-	/* Validate blocksize */
-	if ( blockdev->blksize != INT13_BLKSIZE ) {
-		DBG ( "Invalid blocksize (%zd) for non-extended read/write\n",
-		      blockdev->blksize );
-		return -INT13_STATUS_INVALID;
-	}
-	
 	/* Read from / write to block device */
 	if ( io ( blockdev, lba, count, buffer ) != 0 )
 		return -INT13_STATUS_READ_ERROR;
@@ -333,6 +317,38 @@ static int int13_get_extended_parameters ( struct int13_drive *drive,
 	return 0;
 }
 
+struct int13_cdrom_specification {
+	/** Size of packet in bytes */
+	uint8_t size;
+	/** Boot media type */
+	uint8_t media_type;
+	/** Drive number */
+	uint8_t drive;
+};
+
+/**
+ * INT 13, 4b - Get CD-ROM status / terminate emulation
+ *
+ * @v drive		Emulated drive
+ * @v ds:si		El Torito specification packet to fill in
+ * @ret status		Status code
+ */
+static int int13_cdrom_status_terminate ( struct int13_drive *drive,
+					  struct i386_all_regs *ix86 ) {
+	struct int13_cdrom_specification specification;
+
+	DBG ( "Get CD-ROM emulation parameters to %04x:%04x\n",
+	      ix86->segs.ds, ix86->regs.di );
+
+	memset ( &specification, 0, sizeof ( specification ) );
+	specification.size = sizeof ( specification );
+	specification.drive = drive->drive;
+
+	copy_to_real ( ix86->segs.ds, ix86->regs.si, &specification,
+		       sizeof ( specification ) );
+	return 0;
+}
+
 /**
  * INT 13 handler
  *
@@ -346,7 +362,7 @@ static void int13 ( struct i386_all_regs *ix86 ) {
 		if ( drive->drive != ix86->regs.dl )
 			continue;
 		
-		DBG ( "INT 13,%02x (%02x): ", command, drive->drive );
+		DBG ( "INT 13,%04x (%02x): ", ix86->regs.ax, drive->drive );
 
 		switch ( command ) {
 		case INT13_RESET:
@@ -379,6 +395,9 @@ static void int13 ( struct i386_all_regs *ix86 ) {
 		case INT13_GET_EXTENDED_PARAMETERS:
 			status = int13_get_extended_parameters ( drive, ix86 );
 			break;
+		case INT13_CDROM_STATUS_TERMINATE:
+			status = int13_cdrom_status_terminate ( drive, ix86 );
+			break;
 		default:
 			DBG ( "*** Unrecognised INT 13 ***\n" );
 			status = -INT13_STATUS_INVALID;
@@ -398,6 +417,8 @@ static void int13 ( struct i386_all_regs *ix86 ) {
 
 		/* Set OF to indicate to wrapper not to chain this call */
 		ix86->flags |= OF;
+
+		break;
 	}
 }
 
@@ -452,6 +473,10 @@ static void guess_int13_geometry ( struct int13_drive *drive ) {
 	unsigned long blocks;
 	unsigned long blocks_per_cyl;
 	unsigned int i;
+
+	/* Don't even try when the blksize is invalid for C/H/S access */
+	if ( drive->blockdev->blksize != INT13_BLKSIZE )
+		return;
 
 	/* Scan through partition table and modify guesses for heads
 	 * and sectors_per_track if we find any used partitions.
@@ -564,6 +589,7 @@ void unregister_int13_drive ( struct int13_drive *drive ) {
 int int13_boot ( unsigned int drive ) {
 	int status, signature;
 	int discard_c, discard_d;
+	int rc;
 
 	DBG ( "Booting from INT 13 drive %02x\n", drive );
 
@@ -593,48 +619,11 @@ int int13_boot ( unsigned int drive ) {
 		return -ENOEXEC;
 	}
 
-	/* Hook INTs 18 and 19 to capture failure paths */
-	hook_bios_interrupt ( 0x18, ( unsigned int ) int13_exec_fail,
-			      &int18_vector );
-	hook_bios_interrupt ( 0x19, ( unsigned int ) int13_exec_fail,
-			      &int19_vector );
+	/* Jump to boot sector */
+	if ( ( rc = call_bootsector ( 0x0, 0x7c00, drive ) ) != 0 ) {
+		DBG ( "INT 13 drive %02x boot returned\n", drive );
+		return rc;
+	}
 
-	/* Boot the loaded sector
-	 *
-	 * We assume that the boot sector may completely destroy our
-	 * real-mode stack, so we preserve everything we need in
-	 * static storage.
-	 */
-	__asm__ __volatile__ ( REAL_CODE ( /* Save return address off-stack */
-					   "popw %%cs:int13_saved_retaddr\n\t"
-					   /* Save stack pointer */
-					   "movw %%ss, %%ax\n\t"
-					   "movw %%ax, %%cs:int13_saved_ss\n\t"
-					   "movw %%sp, %%cs:int13_saved_sp\n\t"
-					   /* Jump to boot sector */
-					   "ljmp $0, $0x7c00\n\t"
-					   /* Preserved variables */
-					   "\nint13_saved_ss: .word 0\n\t"
-					   "\nint13_saved_sp: .word 0\n\t"
-					   "\nint13_saved_retaddr: .word 0\n\t"
-					   /* Boot failure return point */
-					   "\nint13_exec_fail:\n\t"
-					   /* Restore stack pointer */
-					   "movw %%cs:int13_saved_ss, %%ax\n\t"
-					   "movw %%ax, %%ss\n\t"
-					   "movw %%cs:int13_saved_sp, %%sp\n\t"
-					   /* Return via saved address */
-					   "jmp *%%cs:int13_saved_retaddr\n\t")
-			       : "=d" ( discard_d ) : "d" ( drive )
-			       : "eax", "ebx", "ecx", "esi", "edi", "ebp" );
-
-	DBG ( "Booted disk returned via INT 18 or 19\n" );
-
-	/* Unhook INTs 18 and 19 */
-	unhook_bios_interrupt ( 0x18, ( unsigned int ) int13_exec_fail,
-				&int18_vector );
-	unhook_bios_interrupt ( 0x19, ( unsigned int ) int13_exec_fail,
-				&int19_vector );
-	
-	return -ECANCELED;
+	return -ECANCELED; /* -EIMPOSSIBLE */
 }

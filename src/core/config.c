@@ -143,6 +143,9 @@ REQUIRE_OBJECT ( script );
 #ifdef IMAGE_BZIMAGE
 REQUIRE_OBJECT ( bzimage );
 #endif
+#ifdef IMAGE_ELTORITO
+REQUIRE_OBJECT ( eltorito );
+#endif
 
 /*
  * Drag in all requested commands
