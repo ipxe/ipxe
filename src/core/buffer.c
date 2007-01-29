@@ -159,22 +159,16 @@ int fill_buffer ( struct buffer *buffer, const void *data,
 	size_t data_end = ( data_start + len );
 	int rc;
 
-	DBGC ( buffer, "BUFFER %p [%lx,%lx) filling portion [%lx,%lx)\n",
-	       buffer, user_to_phys ( buffer->addr, 0 ),
-	       user_to_phys ( buffer->addr, buffer->len ),
-	       user_to_phys ( buffer->addr, data_start ),
-	       user_to_phys ( buffer->addr, data_end ) );
+	DBGC2 ( buffer, "BUFFER %p [%lx,%lx) filling portion [%lx,%lx)\n",
+		buffer, user_to_phys ( buffer->addr, 0 ),
+		user_to_phys ( buffer->addr, buffer->len ),
+		user_to_phys ( buffer->addr, data_start ),
+		user_to_phys ( buffer->addr, data_end ) );
 
 	/* Check that block fits within buffer, expand if necessary */
 	if ( data_end > buffer->len ) {
-		if ( ( rc = expand_buffer ( buffer, data_end ) ) != 0 ) {
-			DBGC ( buffer, "BUFFER %p could not expand :%s\n",
-			       buffer, strerror ( rc ) );
+		if ( ( rc = expand_buffer ( buffer, data_end ) ) != 0 )
 			return rc;
-		}
-		DBGC ( buffer, "BUFFER %p expanded to [%lx,%lx)\n", buffer,
-		       user_to_phys ( buffer->addr, 0 ),
-		       user_to_phys ( buffer->addr, buffer->len ) );
 		assert ( buffer->len >= data_end );
 	}
 
@@ -200,18 +194,18 @@ int fill_buffer ( struct buffer *buffer, const void *data,
 	/* Link 'after' block to 'before' block */
 	before.next = after.start;
 
-	DBGC ( buffer, "BUFFER %p split before [%lx,%lx) after [%lx,%lx)\n",
-	       buffer, user_to_phys ( buffer->addr, before.start ),
-	       user_to_phys ( buffer->addr, before.end ),
-	       user_to_phys ( buffer->addr, after.start ),
-	       user_to_phys ( buffer->addr, after.end ) );
+	DBGC2 ( buffer, "BUFFER %p split before [%lx,%lx) after [%lx,%lx)\n",
+		buffer, user_to_phys ( buffer->addr, before.start ),
+		user_to_phys ( buffer->addr, before.end ),
+		user_to_phys ( buffer->addr, after.start ),
+		user_to_phys ( buffer->addr, after.end ) );
 
 	/* Write back 'before' block, if any */
 	if ( before.end == 0 ) {
 		/* No 'before' block: update buffer->fill */
 		buffer->fill = after.start;
-		DBGC ( buffer, "BUFFER %p full up to %lx\n", buffer,
-		       user_to_phys ( buffer->addr, buffer->fill ) );
+		DBGC2 ( buffer, "BUFFER %p full up to %lx\n", buffer,
+			user_to_phys ( buffer->addr, buffer->fill ) );
 	} else {
 		/* Write back 'before' block */
 		store_free_block ( buffer, &before );
@@ -221,8 +215,8 @@ int fill_buffer ( struct buffer *buffer, const void *data,
 	if ( after.end == buffer->len ) {
 		/* 'After' block is the final block: update buffer->free */
 		buffer->free = after.start;
-		DBGC ( buffer, "BUFFER %p free from %lx onwards\n", buffer,
-		       user_to_phys ( buffer->addr, buffer->free ) );
+		DBGC2 ( buffer, "BUFFER %p free from %lx onwards\n", buffer,
+			user_to_phys ( buffer->addr, buffer->free ) );
 	} else {
 		/* Write back 'after' block */
 		store_free_block ( buffer, &after );
@@ -230,6 +224,42 @@ int fill_buffer ( struct buffer *buffer, const void *data,
 
 	/* Copy data into buffer */
 	copy_to_user ( buffer->addr, data_start, data, len );
+
+	return 0;
+}
+
+/** Expand data buffer
+ *
+ * @v buffer		Data buffer
+ * @v new_len		New length
+ * @ret rc		Return status code
+ *
+ * Expand the data buffer to accommodate more data.  Some buffers may
+ * not support being expanded.
+ */
+int expand_buffer ( struct buffer *buffer, size_t new_len ) {
+	int rc;
+
+	if ( new_len <= buffer->len )
+		return 0;
+
+	DBGC ( buffer, "BUFFER %p attempting to expand from length %zx to "
+	       "length %zx\n", buffer, buffer->len, new_len );
+
+	if ( ! buffer->expand ) {
+		DBGC ( buffer, "BUFFER %p is not expandable\n", buffer );
+		return -ENOBUFS;
+	}
+
+	if ( ( rc = buffer->expand ( buffer, new_len ) ) != 0 ) {
+		DBGC ( buffer, "BUFFER %p could not expand: %s\n",
+		       buffer, strerror ( rc ) );
+		return rc;
+	}
+
+	DBGC ( buffer, "BUFFER %p expanded to [%lx,%lx)\n", buffer,
+	       user_to_phys ( buffer->addr, 0 ),
+	       user_to_phys ( buffer->addr, buffer->len ) );
 
 	return 0;
 }

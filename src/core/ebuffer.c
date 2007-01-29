@@ -40,13 +40,21 @@ static int ebuffer_expand ( struct buffer *buffer, size_t new_len ) {
 	userptr_t new_addr;
 
 	/* Round new_len up to the nearest power of two, to reduce
-	 * total number of reallocations required.
+	 * total number of reallocations required.  Don't do this for
+	 * the first expansion; this allows for protocols that do
+	 * actually know the exact length in advance.
 	 */
-	while ( actual_len < new_len )
-		actual_len <<= 1;
+	if ( buffer->len ) {
+		while ( actual_len < new_len )
+			actual_len <<= 1;
+	} else {
+		actual_len = new_len;
+	}
 
 	/* Reallocate buffer */
-	new_addr = urealloc ( buffer->addr, actual_len );
+#warning "urealloc() has issues with length zero"
+	new_addr = urealloc ( buffer->addr, // actual_len );
+			      actual_len ? actual_len : 1 );
 	if ( ! new_addr )
 		return -ENOMEM;
 
