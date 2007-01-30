@@ -198,9 +198,9 @@ extern void dbg_hex_dump_da ( unsigned long dispaddr,
 			union {					\
 				unsigned long ul;		\
 				typeof ( id ) raw;		\
-			} stream;				\
-			stream.raw = id;			\
-			dbg_autocolourise ( stream.ul );	\
+			} dbg_stream;				\
+			dbg_stream.raw = id;			\
+			dbg_autocolourise ( dbg_stream.ul );	\
 		}						\
 	} while ( 0 )
 
