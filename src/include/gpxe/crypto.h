@@ -8,6 +8,8 @@
  */
 
 #include <stdint.h>
+#include <stddef.h>
+#include <errno.h>
 
 /** A cryptographic algorithm */
 struct crypto_algorithm {
@@ -81,6 +83,30 @@ static inline void digest_update ( struct crypto_algorithm *crypto,
 static inline void digest_final ( struct crypto_algorithm *crypto,
 				  void *ctx, void *out ) {
 	crypto->final ( ctx, out );
+}
+
+static inline int cipher_encrypt ( struct crypto_algorithm *crypto,
+				   void *ctx, const void *src, void *dst,
+				   size_t len ) {
+	if ( ( len & ( crypto->blocksize - 1 ) ) ) {
+		return -EINVAL;
+	}
+	crypto->encode ( ctx, src, dst, len );
+	return 0;
+}
+
+static inline int cipher_decrypt ( struct crypto_algorithm *crypto,
+				   void *ctx, const void *src, void *dst,
+				   size_t len ) {
+	if ( ( len & ( crypto->blocksize - 1 ) ) ) {
+		return -EINVAL;
+	}
+	crypto->decode ( ctx, src, dst, len );
+	return 0;
+}
+
+static inline int is_stream_cipher ( struct crypto_algorithm *crypto ) {
+	return ( crypto->blocksize == 1 );
 }
 
 #endif /* _GPXE_CRYPTO_H */
