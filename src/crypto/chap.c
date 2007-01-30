@@ -42,7 +42,7 @@
  * eventually be freed by a call to chap_finish().
  */
 int chap_init ( struct chap_challenge *chap,
-		struct digest_algorithm *digest ) {
+		struct crypto_algorithm *digest ) {
 	size_t state_len;
 	void *state;
 
@@ -52,7 +52,7 @@ int chap_init ( struct chap_challenge *chap,
 
 	DBG ( "CHAP %p initialising with %s digest\n", chap, digest->name );
 
-	state_len = ( digest->context_len + digest->digest_len );
+	state_len = ( digest->ctxsize + digest->digestsize );
 	state = malloc ( state_len );
 	if ( ! state ) {
 		DBG ( "CHAP %p could not allocate %d bytes for state\n",
@@ -62,9 +62,9 @@ int chap_init ( struct chap_challenge *chap,
 	
 	chap->digest = digest;
 	chap->digest_context = state;
-	chap->response = ( state + digest->context_len );
-	chap->response_len = digest->digest_len;
-	chap->digest->init ( chap->digest_context );
+	chap->response = ( state + digest->ctxsize );
+	chap->response_len = digest->digestsize;
+	digest_init ( chap->digest, chap->digest_context );
 	return 0;
 }
 
@@ -83,7 +83,7 @@ void chap_update ( struct chap_challenge *chap, const void *data,
 	if ( ! chap->digest )
 		return;
 
-	chap->digest->update ( chap->digest_context, data, len );
+	digest_update ( chap->digest, chap->digest_context, data, len );
 }
 
 /**
@@ -104,7 +104,7 @@ void chap_respond ( struct chap_challenge *chap ) {
 	if ( ! chap->digest )
 		return;
 
-	chap->digest->finish ( chap->digest_context, chap->response );
+	digest_final ( chap->digest, chap->digest_context, chap->response );
 }
 
 /**
