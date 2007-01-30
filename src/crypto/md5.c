@@ -237,7 +237,7 @@ static void md5_final(void *context, void *out)
 struct crypto_algorithm md5_algorithm = {
 	.name		= "md5",
 	.ctxsize	= sizeof ( struct md5_ctx ),
-	.blocksize	= 1,
+	.blocksize	= ( MD5_BLOCK_WORDS * 4 ),
 	.digestsize	= MD5_DIGEST_SIZE,
 	.init		= md5_init,
 	.encode		= md5_update,
