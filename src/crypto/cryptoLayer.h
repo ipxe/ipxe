@@ -31,15 +31,17 @@ typedef void psPool_t;
 
 #define sslAssert( ... ) assert ( __VA_ARGS__ )
 
-static inline void * psMalloc ( psPool_t *pool __unused, size_t len ) {
+static inline __attribute__ (( always_inline )) void *
+psMalloc ( psPool_t *pool __unused, size_t len ) {
 	return malloc ( len );
 }
 
-static inline void * psRealloc ( void *ptr, size_t len ) {
+static inline __attribute__ (( always_inline )) void *
+psRealloc ( void *ptr, size_t len ) {
 	return realloc ( ptr, len );
 }
 
-static inline void psFree ( void *ptr ) {
+static inline __attribute__ (( always_inline )) void psFree ( void *ptr ) {
 	free ( ptr );
 }
 
