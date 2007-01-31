@@ -10,18 +10,18 @@
 
 /** A filter stream */
 struct filter_stream {
-	/** Upstream
-	 *
-	 * This is the end pointing towards the top-level application
-	 * (e.g. HTTP).
-	 */
-	struct stream_connection upstream;
 	/** Downstream
 	 *
 	 * This is the end pointing towards the bottom-level
 	 * connection (e.g. TCP).
 	 */
 	struct stream_application downstream;
+	/** Upstream
+	 *
+	 * This is the end pointing towards the top-level application
+	 * (e.g. HTTP).
+	 */
+	struct stream_connection upstream;
 };
 
 extern void filter_connected ( struct stream_application *app );
