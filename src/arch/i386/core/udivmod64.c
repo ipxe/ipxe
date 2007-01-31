@@ -303,6 +303,9 @@ UDItype __udivmoddi4 ( UDItype x, UDItype d, UDItype *r ) {
 
 	udivmod64 ( ( struct uint64 * ) _x, ( struct uint64 * ) _d,
 		    ( struct uint64 * ) _q, ( struct uint64 * ) _r );
+
+	assert ( ( x == ( ( d * q ) + (*r) ) ) );
+
 	return q;
 }
 
