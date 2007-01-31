@@ -23,6 +23,7 @@
  */
 
 #include <stddef.h>
+#include <errno.h>
 #include <gpxe/stream.h>
 #include <gpxe/filter.h>
 
@@ -160,4 +161,27 @@ int filter_kick ( struct stream_connection *conn ) {
 		container_of ( conn, struct filter_stream, upstream );
 
 	return stream_kick ( &filter->downstream );
+}
+
+/**
+ * Insert filter into stream
+ *
+ * @v app		Stream application
+ * @v filter		Filter stream
+ * @ret rc		Return status code
+ */
+int insert_filter ( struct stream_application *app,
+		    struct filter_stream *filter ) {
+	struct stream_connection *conn = app->conn;
+
+	if ( ! app->conn ) {
+		DBGC ( filter, "Filter %p cannot insert onto closed stream\n",
+		       filter );
+		return -ENOTCONN;
+	}
+
+	app->conn = &filter->upstream;
+	conn->app = &filter->downstream;
+
+	return 0;
 }

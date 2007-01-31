@@ -41,4 +41,7 @@ extern int filter_send ( struct stream_connection *conn,
 			 void *data, size_t len );
 extern int filter_kick ( struct stream_connection *conn );
 
+extern int insert_filter ( struct stream_application *app,
+			   struct filter_stream *filter );
+
 #endif /* _GPXE_FILTER_H */
