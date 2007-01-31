@@ -25,7 +25,25 @@
 #include <stdint.h>
 #include <string.h>
 #include <errno.h>
+#include <assert.h>
 #include <gpxe/stream.h>
+
+/**
+ * Associate application with connection
+ *
+ * @v app		Stream application
+ * @v conn		Stream connection
+ */
+void stream_associate ( struct stream_application *app,
+			struct stream_connection *conn ) {
+
+	DBGC ( app, "Stream %p associating with connection %p\n", app, conn );
+
+	assert ( conn->app == NULL );
+	assert ( app->conn == NULL );
+	conn->app = app;
+	app->conn = conn;
+}
 
 /**
  * Connection established
@@ -45,7 +63,8 @@ void stream_connected ( struct stream_connection *conn ) {
 	}
 
 	/* Hand off to application */
-	app->op->connected ( app );
+	if ( app->op->connected )
+		app->op->connected ( app );
 }
 
 /**
@@ -66,8 +85,13 @@ void stream_closed ( struct stream_connection *conn, int rc ) {
 		return;
 	}
 
+	/* Disassociate application from connection */
+	app->conn = NULL;
+	conn->app = NULL;
+
 	/* Hand off to application */
-	app->op->closed ( app, rc );
+	if ( app->op->closed )
+		app->op->closed ( app, rc );
 }
 
 /**
@@ -91,7 +115,8 @@ void stream_senddata ( struct stream_connection *conn,
 	}
 
 	/* Hand off to application */
-	app->op->senddata ( app, data, len );
+	if ( app->op->senddata )
+		app->op->senddata ( app, data, len );
 }
 
 /**
@@ -116,7 +141,8 @@ void stream_acked ( struct stream_connection *conn, size_t len ) {
 	}
 
 	/* Hand off to application */
-	app->op->acked ( app, len );
+	if ( app->op->acked )
+		app->op->acked ( app, len );
 }
 
 /**
@@ -140,7 +166,8 @@ void stream_newdata ( struct stream_connection *conn,
 	}
 
 	/* Hand off to application */
-	app->op->newdata ( app, data, len );
+	if ( app->op->newdata )
+		app->op->newdata ( app, data, len );
 }
 
 /**
@@ -163,6 +190,8 @@ int stream_bind ( struct stream_application *app, struct sockaddr *local ) {
 	}
 
 	/* Hand off to connection */
+	if ( ! conn->op->bind )
+		return -ENOTSUP;
 	if ( ( rc = conn->op->bind ( conn, local ) ) != 0 ) {
 		DBGC ( app, "Stream %p failed to bind: %s\n",
 		       app, strerror ( rc ) );
@@ -192,6 +221,8 @@ int stream_connect ( struct stream_application *app, struct sockaddr *peer ) {
 	}
 
 	/* Hand off to connection */
+	if ( ! conn->op->connect )
+		return -ENOTSUP;
 	if ( ( rc = conn->op->connect ( conn, peer ) ) != 0 ) {
 		DBGC ( app, "Stream %p failed to connect: %s\n",
 		       app, strerror ( rc ) );
@@ -217,7 +248,13 @@ void stream_close ( struct stream_application *app ) {
 		return;
 	}
 
+	/* Disassociate application from connection */
+	app->conn = NULL;
+	conn->app = NULL;
+
 	/* Hand off to connection */
+	if ( ! conn->op->close )
+		return;
 	conn->op->close ( conn );
 }
 
@@ -232,7 +269,8 @@ void stream_close ( struct stream_application *app ) {
  * This method should be called only in the context of an
  * application's senddata() method.
  */
-int stream_send ( struct stream_application *app, void *data, size_t len ) {
+int stream_send ( struct stream_application *app,
+		  const void *data, size_t len ) {
 	struct stream_connection *conn = app->conn;
 	int rc;
 
@@ -245,6 +283,8 @@ int stream_send ( struct stream_application *app, void *data, size_t len ) {
 	}
 
 	/* Hand off to connection */
+	if ( ! conn->op->send )
+		return -ENOTSUP;
 	if ( ( rc = conn->op->send ( conn, data, len ) ) != 0 ) {
 		DBGC ( app, "Stream %p failed to send %zd bytes: %s\n",
 		       app, len, strerror ( rc ) );
@@ -273,6 +313,8 @@ int stream_kick ( struct stream_application *app ) {
 	}
 
 	/* Hand off to connection */
+	if ( ! conn->op->send )
+		return -ENOTSUP;
 	if ( ( rc = conn->op->kick ( conn ) ) != 0 ) {
 		DBGC ( app, "Stream %p failed to kick connection: %s\n",
 		       app, strerror ( rc ) );

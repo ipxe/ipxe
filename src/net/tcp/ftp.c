@@ -4,10 +4,12 @@
 #include <string.h>
 #include <assert.h>
 #include <errno.h>
+#include <byteswap.h>
 #include <gpxe/async.h>
 #include <gpxe/buffer.h>
 #include <gpxe/uri.h>
 #include <gpxe/download.h>
+#include <gpxe/tcp.h>
 #include <gpxe/ftp.h>
 
 /** @file
@@ -40,13 +42,14 @@ static const char * ftp_strings[] = {
 };
 
 /**
- * Get FTP request from control TCP application
+ * Get FTP request from control stream application
  *
- * @v app		TCP application
+ * @v app		Stream application
  * @ret ftp		FTP request
  */
-static inline struct ftp_request * tcp_to_ftp ( struct tcp_application *app ) {
-	return container_of ( app, struct ftp_request, tcp );
+static inline struct ftp_request *
+stream_to_ftp ( struct stream_application *app ) {
+	return container_of ( app, struct ftp_request, stream );
 }
 
 /**
@@ -59,9 +62,9 @@ static void ftp_done ( struct ftp_request *ftp, int rc ) {
 
 	DBGC ( ftp, "FTP %p completed with status %d\n", ftp, rc );
 
-	/* Close both TCP connections */
-	tcp_close ( &ftp->tcp );
-	tcp_close ( &ftp->tcp_data );
+	/* Close both stream connections */
+	stream_close ( &ftp->stream );
+	stream_close ( &ftp->stream_data );
 
 	/* Mark asynchronous operation as complete */
 	async_done ( &ftp->async, rc );
@@ -70,9 +73,9 @@ static void ftp_done ( struct ftp_request *ftp, int rc ) {
 /**
  * Parse FTP byte sequence value
  *
- * @v text	Text string
- * @v value	Value buffer
- * @v len	Length of value buffer
+ * @v text		Text string
+ * @v value		Value buffer
+ * @v len		Length of value buffer
  *
  * This parses an FTP byte sequence value (e.g. the "aaa,bbb,ccc,ddd"
  * form for IP addresses in PORT commands) into a byte sequence.  @c
@@ -93,7 +96,7 @@ static void ftp_parse_value ( char **text, uint8_t *value, size_t len ) {
 /**
  * Handle an FTP control channel response
  *
- * @v ftp	FTP request
+ * @v ftp		FTP request
  *
  * This is called once we have received a complete response line.
  */
@@ -121,7 +124,7 @@ static void ftp_reply ( struct ftp_request *ftp ) {
 		char *ptr = ftp->passive_text;
 		union {
 			struct sockaddr_in sin;
-			struct sockaddr_tcpip st;
+			struct sockaddr sa;
 		} sa;
 		int rc;
 
@@ -130,7 +133,14 @@ static void ftp_reply ( struct ftp_request *ftp ) {
 				  sizeof ( sa.sin.sin_addr ) );
 		ftp_parse_value ( &ptr, ( uint8_t * ) &sa.sin.sin_port,
 				  sizeof ( sa.sin.sin_port ) );
-		if ( ( rc = tcp_connect ( &ftp->tcp_data, &sa.st, 0 ) ) != 0 ){
+		if ( ( rc = tcp_open ( &ftp->stream_data ) ) != 0 ) {
+			DBGC ( ftp, "FTP %p could not open data connection\n",
+			       ftp );
+			ftp_done ( ftp, rc );
+			return;
+		}
+		if ( ( rc = stream_connect ( &ftp->stream_data,
+					     &sa.sa ) ) != 0 ){
 			DBGC ( ftp, "FTP %p could not make data connection\n",
 			       ftp );
 			ftp_done ( ftp, rc );
@@ -154,16 +164,16 @@ static void ftp_reply ( struct ftp_request *ftp ) {
 /**
  * Handle new data arriving on FTP control channel
  *
- * @v app	TCP application
- * @v data	New data
- * @v len	Length of new data
+ * @v app		Stream application
+ * @v data		New data
+ * @v len		Length of new data
  *
  * Data is collected until a complete line is received, at which point
  * its information is passed to ftp_reply().
  */
-static void ftp_newdata ( struct tcp_application *app,
+static void ftp_newdata ( struct stream_application *app,
 			  void *data, size_t len ) {
-	struct ftp_request *ftp = tcp_to_ftp ( app );
+	struct ftp_request *ftp = stream_to_ftp ( app );
 	char *recvbuf = ftp->recvbuf;
 	size_t recvsize = ftp->recvsize;
 	char c;
@@ -210,10 +220,10 @@ static void ftp_newdata ( struct tcp_application *app,
 /**
  * Handle acknowledgement of data sent on FTP control channel
  *
- * @v app	TCP application
+ * @v app		Stream application
  */
-static void ftp_acked ( struct tcp_application *app, size_t len ) {
-	struct ftp_request *ftp = tcp_to_ftp ( app );
+static void ftp_acked ( struct stream_application *app, size_t len ) {
+	struct ftp_request *ftp = stream_to_ftp ( app );
 	
 	/* Mark off ACKed portion of the currently-transmitted data */
 	ftp->already_sent += len;
@@ -222,31 +232,31 @@ static void ftp_acked ( struct tcp_application *app, size_t len ) {
 /**
  * Construct data to send on FTP control channel
  *
- * @v app	TCP application
- * @v buf	Temporary data buffer
- * @v len	Length of temporary data buffer
+ * @v app		Stream application
+ * @v buf		Temporary data buffer
+ * @v len		Length of temporary data buffer
  */
-static void ftp_senddata ( struct tcp_application *app,
+static void ftp_senddata ( struct stream_application *app,
 			   void *buf, size_t len ) {
-	struct ftp_request *ftp = tcp_to_ftp ( app );
+	struct ftp_request *ftp = stream_to_ftp ( app );
 
 	/* Send the as-yet-unACKed portion of the string for the
 	 * current state.
 	 */
 	len = snprintf ( buf, len, ftp_strings[ftp->state], ftp->uri->path );
-	tcp_send ( app, buf + ftp->already_sent, len - ftp->already_sent );
+	stream_send ( app, buf + ftp->already_sent, len - ftp->already_sent );
 }
 
 /**
  * Handle control channel being closed
  *
- * @v app		TCP application
+ * @v app		Stream application
  *
  * When the control channel is closed, the data channel must also be
  * closed, if it is currently open.
  */
-static void ftp_closed ( struct tcp_application *app, int rc ) {
-	struct ftp_request *ftp = tcp_to_ftp ( app );
+static void ftp_closed ( struct stream_application *app, int rc ) {
+	struct ftp_request *ftp = stream_to_ftp ( app );
 
 	DBGC ( ftp, "FTP %p control connection closed: %s\n",
 	       ftp, strerror ( rc ) );
@@ -256,7 +266,7 @@ static void ftp_closed ( struct tcp_application *app, int rc ) {
 }
 
 /** FTP control channel operations */
-static struct tcp_operations ftp_tcp_operations = {
+static struct stream_application_operations ftp_stream_operations = {
 	.closed		= ftp_closed,
 	.acked		= ftp_acked,
 	.newdata	= ftp_newdata,
@@ -270,20 +280,20 @@ static struct tcp_operations ftp_tcp_operations = {
  */
 
 /**
- * Get FTP request from data TCP application
+ * Get FTP request from data stream application
  *
- * @v app		TCP application
+ * @v app		Stream application
  * @ret ftp		FTP request
  */
 static inline struct ftp_request *
-tcp_to_ftp_data ( struct tcp_application *app ) {
-	return container_of ( app, struct ftp_request, tcp_data );
+stream_to_ftp_data ( struct stream_application *app ) {
+	return container_of ( app, struct ftp_request, stream_data );
 }
 
 /**
  * Handle data channel being closed
  *
- * @v app		TCP application
+ * @v app		Stream application
  *
  * When the data channel is closed, the control channel should be left
  * alone; the server will send a completion message via the control
@@ -291,8 +301,8 @@ tcp_to_ftp_data ( struct tcp_application *app ) {
  *
  * If the data channel is closed due to an error, we abort the request.
  */
-static void ftp_data_closed ( struct tcp_application *app, int rc ) {
-	struct ftp_request *ftp = tcp_to_ftp_data ( app );
+static void ftp_data_closed ( struct stream_application *app, int rc ) {
+	struct ftp_request *ftp = stream_to_ftp_data ( app );
 
 	DBGC ( ftp, "FTP %p data connection closed: %s\n",
 	       ftp, strerror ( rc ) );
@@ -305,13 +315,13 @@ static void ftp_data_closed ( struct tcp_application *app, int rc ) {
 /**
  * Handle new data arriving on the FTP data channel
  *
- * @v app	TCP application
- * @v data	New data
- * @v len	Length of new data
+ * @v app		Stream application
+ * @v data		New data
+ * @v len		Length of new data
  */
-static void ftp_data_newdata ( struct tcp_application *app,
+static void ftp_data_newdata ( struct stream_application *app,
 			       void *data, size_t len ) {
-	struct ftp_request *ftp = tcp_to_ftp_data ( app );
+	struct ftp_request *ftp = stream_to_ftp_data ( app );
 	int rc;
 
 	/* Fill data buffer */
@@ -325,7 +335,7 @@ static void ftp_data_newdata ( struct tcp_application *app,
 }
 
 /** FTP data channel operations */
-static struct tcp_operations ftp_data_tcp_operations = {
+static struct stream_application_operations ftp_data_stream_operations = {
 	.closed		= ftp_data_closed,
 	.newdata	= ftp_data_newdata,
 };
@@ -352,9 +362,6 @@ static void ftp_reap ( struct async *async ) {
 static struct async_operations ftp_async_operations = {
 	.reap = ftp_reap,
 };
-
-#warning "Quick name resolution hack"
-#include <byteswap.h>
 
 /**
  * Initiate an FTP connection
@@ -387,12 +394,12 @@ int ftp_get ( struct uri *uri, struct buffer *buffer, struct async *parent ) {
 	ftp->already_sent = 0;
 	ftp->recvbuf = ftp->status_text;
 	ftp->recvsize = sizeof ( ftp->status_text ) - 1;
-	ftp->tcp.tcp_op = &ftp_tcp_operations;
-	ftp->tcp_data.tcp_op = &ftp_data_tcp_operations;
+	ftp->stream.op = &ftp_stream_operations;
+	ftp->stream_data.op = &ftp_data_stream_operations;
 
 #warning "Quick name resolution hack"
 	union {
-		struct sockaddr_tcpip st;
+		struct sockaddr sa;
 		struct sockaddr_in sin;
 	} server;
 	server.sin.sin_port = htons ( FTP_PORT );
@@ -404,7 +411,9 @@ int ftp_get ( struct uri *uri, struct buffer *buffer, struct async *parent ) {
 
 	DBGC ( ftp, "FTP %p fetching %s\n", ftp, ftp->uri->path );
 
-	if ( ( rc = tcp_connect ( &ftp->tcp, &server.st, 0 ) ) != 0 )
+	if ( ( rc = tcp_open ( &ftp->stream ) ) != 0 )
+		goto err;
+	if ( ( rc = stream_connect ( &ftp->stream, &server.sa ) ) != 0 )
 		goto err;
 
 	async_init ( &ftp->async, &ftp_async_operations, parent );

@@ -8,7 +8,7 @@
  */
 
 #include <stdint.h>
-#include <gpxe/tcp.h>
+#include <gpxe/stream.h>
 #include <gpxe/async.h>
 #include <gpxe/scsi.h>
 #include <gpxe/chap.h>
@@ -489,7 +489,7 @@ struct iscsi_session {
 	/** Initiator IQN */
 	const char *initiator_iqn;
 	/** Target address */
-	struct sockaddr_tcpip target;
+	struct sockaddr target;
 	/** Target IQN */
 	const char *target_iqn;
 	/** Logical Unit Number (LUN) */
@@ -499,8 +499,8 @@ struct iscsi_session {
 	/** Password */
 	const char *password;
 
-	/** TCP application for this session */
-	struct tcp_application tcp;
+	/** Stream application for this session */
+	struct stream_application stream;
 	/** Session status
 	 *
 	 * This is the bitwise-OR of zero or more ISCSI_STATUS_XXX

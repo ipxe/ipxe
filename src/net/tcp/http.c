@@ -36,13 +36,14 @@
 #include <gpxe/buffer.h>
 #include <gpxe/download.h>
 #include <gpxe/resolv.h>
+#include <gpxe/tcp.h>
 #include <gpxe/http.h>
 
 static struct async_operations http_async_operations;
 
 static inline struct http_request *
-tcp_to_http ( struct tcp_application *app ) {
-	return container_of ( app, struct http_request, tcp );
+stream_to_http ( struct stream_application *app ) {
+	return container_of ( app, struct http_request, stream );
 }
 
 /**
@@ -54,8 +55,8 @@ tcp_to_http ( struct tcp_application *app ) {
  */
 static void http_done ( struct http_request *http, int rc ) {
 
-	/* Close TCP connection */
-	tcp_close ( &http->tcp );
+	/* Close stream connection */
+	stream_close ( &http->stream );
 
 	/* Prevent further processing of any current packet */
 	http->rx_state = HTTP_RX_DEAD;
@@ -271,9 +272,9 @@ static void http_rx_data ( struct http_request *http,
  * @v data		New data
  * @v len		Length of new data
  */
-static void http_newdata ( struct tcp_application *app,
+static void http_newdata ( struct stream_application *app,
 			   void *data, size_t len ) {
-	struct http_request *http = tcp_to_http ( app );
+	struct http_request *http = stream_to_http ( app );
 	const char *buf = data;
 	char *line;
 	int rc;
@@ -319,13 +320,13 @@ static void http_newdata ( struct tcp_application *app,
 /**
  * Send HTTP data
  *
- * @v app		TCP application
+ * @v app		Stream application
  * @v buf		Temporary data buffer
  * @v len		Length of temporary data buffer
  */
-static void http_senddata ( struct tcp_application *app,
+static void http_senddata ( struct stream_application *app,
 			    void *buf, size_t len ) {
-	struct http_request *http = tcp_to_http ( app );
+	struct http_request *http = stream_to_http ( app );
 	const char *path = http->uri->path;
 	const char *host = http->uri->host;
 
@@ -338,17 +339,18 @@ static void http_senddata ( struct tcp_application *app,
 			 "Host: %s\r\n"
 			 "\r\n", path, host );
 
-	tcp_send ( app, ( buf + http->tx_offset ), ( len - http->tx_offset ) );
+	stream_send ( app, ( buf + http->tx_offset ),
+		      ( len - http->tx_offset ) );
 }
 
 /**
  * HTTP data acknowledged
  *
- * @v app		TCP application
+ * @v app		Stream application
  * @v len		Length of acknowledged data
  */
-static void http_acked ( struct tcp_application *app, size_t len ) {
-	struct http_request *http = tcp_to_http ( app );
+static void http_acked ( struct stream_application *app, size_t len ) {
+	struct http_request *http = stream_to_http ( app );
 
 	http->tx_offset += len;
 }
@@ -356,10 +358,10 @@ static void http_acked ( struct tcp_application *app, size_t len ) {
 /**
  * HTTP connection closed by network stack
  *
- * @v app		TCP application
+ * @v app		Stream application
  */
-static void http_closed ( struct tcp_application *app, int rc ) {
-	struct http_request *http = tcp_to_http ( app );
+static void http_closed ( struct stream_application *app, int rc ) {
+	struct http_request *http = stream_to_http ( app );
 
 	DBGC ( http, "HTTP %p connection closed: %s\n",
 	       http, strerror ( rc ) );
@@ -367,8 +369,8 @@ static void http_closed ( struct tcp_application *app, int rc ) {
 	http_done ( http, rc );
 }
 
-/** HTTP TCP operations */
-static struct tcp_operations http_tcp_operations = {
+/** HTTP stream operations */
+static struct stream_application_operations http_stream_operations = {
 	.closed		= http_closed,
 	.acked		= http_acked,
 	.newdata	= http_newdata,
@@ -395,6 +397,7 @@ int http_get ( struct uri *uri, struct buffer *buffer, struct async *parent ) {
 	http->uri = uri;
 	http->buffer = buffer;
 	async_init ( &http->async, &http_async_operations, parent );
+	http->stream.op = &http_stream_operations;
 
 	/* Start name resolution.  The download proper will start when
 	 * name resolution completes.
@@ -432,10 +435,15 @@ static void http_sigchld ( struct async *async, enum signal signal __unused ) {
 	}
 
 	/* Otherwise, start the HTTP connection */
-	http->tcp.tcp_op = &http_tcp_operations;
+	if ( ( rc = tcp_open ( &http->stream ) ) != 0 ) {
+		DBGC ( http, "HTTP %p could not open stream connection: %s\n",
+		       http, strerror ( rc ) );
+		http_done ( http, rc );
+		return;
+	}
 	st->st_port = htons ( uri_port ( http->uri, HTTP_PORT ) );
-	if ( ( rc = tcp_connect ( &http->tcp, st, 0 ) ) != 0 ) {
-		DBGC ( http, "HTTP %p could not open TCP connection: %s\n",
+	if ( ( rc = stream_connect ( &http->stream, &http->server ) ) != 0 ) {
+		DBGC ( http, "HTTP %p could not connect stream: %s\n",
 		       http, strerror ( rc ) );
 		http_done ( http, rc );
 		return;

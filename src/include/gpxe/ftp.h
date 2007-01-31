@@ -9,7 +9,7 @@
 
 #include <stdint.h>
 #include <gpxe/async.h>
-#include <gpxe/tcp.h>
+#include <gpxe/stream.h>
 
 struct buffer;
 
@@ -57,10 +57,10 @@ struct ftp_request {
 	char status_text[4];
 	/** Passive-mode parameters, as text */
 	char passive_text[24]; /* "aaa,bbb,ccc,ddd,eee,fff" */
-	/** TCP application for the control channel */
-	struct tcp_application tcp;
-	/** TCP application for the data channel */
-	struct tcp_application tcp_data;
+	/** Stream application for the control channel */
+	struct stream_application stream;
+	/** Stream application for the data channel */
+	struct stream_application stream_data;
 };
 
 extern int ftp_get ( struct uri *uri, struct buffer *buffer,

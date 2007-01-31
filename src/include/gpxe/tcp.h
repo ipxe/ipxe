@@ -11,6 +11,7 @@
 
 #include "latch.h"
 #include <gpxe/tcpip.h>
+#include <gpxe/stream.h>
 
 /**
  * A TCP header
@@ -252,105 +253,7 @@ struct tcp_mss_option {
  */
 #define TCP_MSL ( 2 * 60 * TICKS_PER_SEC )
 
-struct tcp_application;
-
-/**
- * TCP operations
- *
- */
-struct tcp_operations {
-	/*
-	 * Connection closed
-	 *
-	 * @v app	TCP application
-	 * @v status	Error code, if any
-	 *
-	 * This is called when the connection is closed for any
-	 * reason, including timeouts or aborts.  The status code
-	 * contains the negative error number, if the closure is due
-	 * to an error.
-	 *
-	 * When closed() is called, the application no longer has a
-	 * valid TCP connection.  Note that connected() may not have
-	 * been called before closed(), if the close is due to an
-	 * error during connection setup.
-	 */
-	void ( * closed ) ( struct tcp_application *app, int status );
-	/**
-	 * Connection established
-	 *
-	 * @v app	TCP application
-	 */
-	void ( * connected ) ( struct tcp_application *app );
-	/**
-	 * Data acknowledged
-	 *
-	 * @v app	TCP application
-	 * @v len	Length of acknowledged data
-	 *
-	 * @c len is guaranteed to not exceed the outstanding amount
-	 * of unacknowledged data.
-	 */
-	void ( * acked ) ( struct tcp_application *app, size_t len );
-	/**
-	 * New data received
-	 *
-	 * @v app	TCP application
-	 * @v data	Data
-	 * @v len	Length of data
-	 */
-	void ( * newdata ) ( struct tcp_application *app,
-			     void *data, size_t len );
-	/**
-	 * Transmit data
-	 *
-	 * @v app	TCP application
-	 * @v buf	Temporary data buffer
-	 * @v len	Length of temporary data buffer
-	 *
-	 * The application should transmit whatever it currently wants
-	 * to send using tcp_send().  If retransmissions are required,
-	 * senddata() will be called again and the application must
-	 * regenerate the data.  The easiest way to implement this is
-	 * to ensure that senddata() never changes the application's
-	 * state.
-	 *
-	 * The application may use the temporary data buffer to
-	 * construct the data to be sent.  Note that merely filling
-	 * the buffer will do nothing; the application must call
-	 * tcp_send() in order to actually transmit the data.  Use of
-	 * the buffer is not compulsory; the application may call
-	 * tcp_send() on any block of data.
-	 */
-	void ( * senddata ) ( struct tcp_application *app, void *buf,
-			      size_t len );
-};
-
-struct tcp_connection;
-
-/**
- * A TCP application
- *
- * This data structure represents an application with a TCP connection.
- */
-struct tcp_application {
-	/** TCP connection data
-	 *
-	 * This is filled in by TCP calls that initiate a connection,
-	 * and reset to NULL when the connection is closed.
-	 */
-	struct tcp_connection *conn;
-	/** TCP connection operations table */
-	struct tcp_operations *tcp_op;
-};
-
-extern int tcp_connect ( struct tcp_application *app,
-			 struct sockaddr_tcpip *peer,
-			 uint16_t local_port );
-extern void tcp_close ( struct tcp_application *app );
-extern int tcp_senddata ( struct tcp_application *app );
-extern int tcp_send ( struct tcp_application *app, const void *data, 
-		      size_t len );
+extern int tcp_open ( struct stream_application *app );
 
 extern struct tcpip_protocol tcp_protocol;
 

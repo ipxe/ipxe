@@ -26,6 +26,7 @@
 #include <gpxe/scsi.h>
 #include <gpxe/process.h>
 #include <gpxe/uaccess.h>
+#include <gpxe/tcp.h>
 #include <gpxe/iscsi.h>
 
 /** @file
@@ -85,8 +86,8 @@ static void iscsi_rx_buffered_data_done ( struct iscsi_session *iscsi ) {
  */
 static void iscsi_close ( struct iscsi_session *iscsi ) {
 
-	/* Close TCP connection */
-	tcp_close ( &iscsi->tcp );
+	/* Close stream connection */
+	stream_close ( &iscsi->stream );
 
 	/* Clear connection status */
 	iscsi->status = 0;
@@ -338,7 +339,7 @@ static void iscsi_tx_data_out ( struct iscsi_session *iscsi,
 		len = remaining;
 	copy_from_user ( buf, iscsi->command->data_out, offset, len );
 
-	tcp_send ( &iscsi->tcp, buf, len );
+	stream_send ( &iscsi->stream, buf, len );
 }
 
 /****************************************************************************
@@ -507,7 +508,7 @@ static void iscsi_login_request_done ( struct iscsi_session *iscsi ) {
 static void iscsi_tx_login_request ( struct iscsi_session *iscsi,
 				     void *buf, size_t len ) {
 	len = iscsi_build_login_request_strings ( iscsi, buf, len );
-	tcp_send ( &iscsi->tcp, buf + iscsi->tx_offset,
+	stream_send ( &iscsi->stream, buf + iscsi->tx_offset,
 		   len - iscsi->tx_offset );
 }
 
@@ -750,11 +751,18 @@ static void iscsi_rx_login_response ( struct iscsi_session *iscsi, void *data,
 	if ( response->status_class == ISCSI_STATUS_REDIRECT ) {
 		DBGC ( iscsi, "iSCSI %p redirecting to new server\n", iscsi );
 		iscsi_close ( iscsi );
-		if ( ( rc = tcp_connect ( &iscsi->tcp, &iscsi->target,
-					  0 ) ) != 0 ) {
-			DBGC ( iscsi, "iSCSI %p could not open TCP "
-			       "connection: %s\n", iscsi, strerror ( rc ) );
+		if ( ( rc = tcp_open ( &iscsi->stream ) ) != 0 ) {
+			DBGC ( iscsi, "iSCSI %p could not open stream: %s\n ",
+			       iscsi, strerror ( rc ) );
 			iscsi_done ( iscsi, rc );
+			return;
+		}
+		if ( ( rc = stream_connect ( &iscsi->stream,
+					     &iscsi->target ) != 0 ) != 0 ) {
+			DBGC ( iscsi, "iSCSI %p could not connect: %s\n ",
+			       iscsi, strerror ( rc ) );
+			iscsi_done ( iscsi, rc );
+			return;
 		}
 		return;
 	}
@@ -810,13 +818,13 @@ static void iscsi_rx_login_response ( struct iscsi_session *iscsi, void *data,
 
 /****************************************************************************
  *
- * iSCSI to TCP interface
+ * iSCSI to stream interface
  *
  */
 
 static inline struct iscsi_session *
-tcp_to_iscsi ( struct tcp_application *app ) {
-	return container_of ( app, struct iscsi_session, tcp );
+stream_to_iscsi ( struct stream_application *app ) {
+	return container_of ( app, struct iscsi_session, stream );
 }
 
 /**
@@ -889,15 +897,15 @@ static void iscsi_tx_done ( struct iscsi_session *iscsi ) {
 }
 
 /**
- * Handle TCP ACKs
+ * Handle stream ACKs
  *
  * @v iscsi		iSCSI session
  * 
  * Updates iscsi->tx_offset and, if applicable, transitions to the
  * next TX state.
  */
-static void iscsi_acked ( struct tcp_application *app, size_t len ) {
-	struct iscsi_session *iscsi = tcp_to_iscsi ( app );
+static void iscsi_acked ( struct stream_application *app, size_t len ) {
+	struct iscsi_session *iscsi = stream_to_iscsi ( app );
 	struct iscsi_bhs_common *common = &iscsi->tx_bhs.common;
 	enum iscsi_tx_state next_state;
 	
@@ -953,9 +961,9 @@ static void iscsi_acked ( struct tcp_application *app, size_t len ) {
  * 
  * Constructs data to be sent for the current TX state
  */
-static void iscsi_senddata ( struct tcp_application *app,
+static void iscsi_senddata ( struct stream_application *app,
 			     void *buf, size_t len ) {
-	struct iscsi_session *iscsi = tcp_to_iscsi ( app );
+	struct iscsi_session *iscsi = stream_to_iscsi ( app );
 	struct iscsi_bhs_common *common = &iscsi->tx_bhs.common;
 	static const char pad[] = { '\0', '\0', '\0' };
 
@@ -964,7 +972,7 @@ static void iscsi_senddata ( struct tcp_application *app,
 		/* Nothing to send */
 		break;
 	case ISCSI_TX_BHS:
-		tcp_send ( app, &iscsi->tx_bhs.bytes[iscsi->tx_offset],
+		stream_send ( app, &iscsi->tx_bhs.bytes[iscsi->tx_offset],
 			   ( sizeof ( iscsi->tx_bhs ) - iscsi->tx_offset ) );
 		break;
 	case ISCSI_TX_AHS:
@@ -975,8 +983,8 @@ static void iscsi_senddata ( struct tcp_application *app,
 		iscsi_tx_data ( iscsi, buf, len );
 		break;
 	case ISCSI_TX_DATA_PADDING:
-		tcp_send ( app, pad, ( ISCSI_DATA_PAD_LEN ( common->lengths )
-					- iscsi->tx_offset ) );
+		stream_send ( app, pad, ( ISCSI_DATA_PAD_LEN( common->lengths )
+					  - iscsi->tx_offset ) );
 		break;
 	default:
 		assert ( 0 );
@@ -1068,7 +1076,7 @@ static void iscsi_rx_bhs ( struct iscsi_session *iscsi, void *data,
 /**
  * Receive new data
  *
- * @v tcp		TCP application
+ * @v stream		Stream application
  * @v data		Received data
  * @v len		Length of received data
  *
@@ -1079,9 +1087,9 @@ static void iscsi_rx_bhs ( struct iscsi_session *iscsi, void *data,
  * always has a full copy of the BHS available, even for portions of
  * the data in different packets to the BHS.
  */
-static void iscsi_newdata ( struct tcp_application *app, void *data,
+static void iscsi_newdata ( struct stream_application *app, void *data,
 			    size_t len ) {
-	struct iscsi_session *iscsi = tcp_to_iscsi ( app );
+	struct iscsi_session *iscsi = stream_to_iscsi ( app );
 	struct iscsi_bhs_common *common = &iscsi->rx_bhs.common;
 	void ( *process ) ( struct iscsi_session *iscsi, void *data,
 			    size_t len, size_t remaining );
@@ -1138,14 +1146,14 @@ static void iscsi_newdata ( struct tcp_application *app, void *data,
 }
 
 /**
- * Handle TCP connection closure
+ * Handle stream connection closure
  *
- * @v app		TCP application
+ * @v app		Stream application
  * @v status		Error code, if any
  *
  */
-static void iscsi_closed ( struct tcp_application *app, int status ) {
-	struct iscsi_session *iscsi = tcp_to_iscsi ( app );
+static void iscsi_closed ( struct stream_application *app, int status ) {
+	struct iscsi_session *iscsi = stream_to_iscsi ( app );
 	int rc;
 
 	/* Even a graceful close counts as an error for iSCSI */
@@ -1159,26 +1167,34 @@ static void iscsi_closed ( struct tcp_application *app, int status ) {
 	if ( ++iscsi->retry_count <= ISCSI_MAX_RETRIES ) {
 		DBGC ( iscsi, "iSCSI %p retrying connection (retry #%d)\n",
 		       iscsi, iscsi->retry_count );
-		if ( ( rc = tcp_connect ( app, &iscsi->target, 0 ) ) != 0 ) {
-			DBGC ( iscsi, "iSCSI %p could not open TCP "
-			       "connection: %s\n", iscsi, strerror ( rc ) );
+		if ( ( rc = tcp_open ( app ) ) != 0 ) {
+			DBGC ( iscsi, "iSCSI %p could not open stream: %s\n ",
+			       iscsi, strerror ( rc ) );
 			iscsi_done ( iscsi, rc );
+			return;
+		}
+		if ( ( rc = stream_connect ( app, &iscsi->target ) ) != 0 ){
+			DBGC ( iscsi, "iSCSI %p could not connect: %s\n",
+			       iscsi, strerror ( rc ) );
+			iscsi_done ( iscsi, rc );
+			return;
 		}
 	} else {
 		DBGC ( iscsi, "iSCSI %p retry count exceeded\n", iscsi );
 		iscsi->instant_rc = status;
 		iscsi_done ( iscsi, status );
+		return;
 	}
 }
 
 /**
- * Handle TCP connection opening
+ * Handle stream connection opening
  *
- * @v app		TCP application
+ * @v app		Stream application
  *
  */
-static void iscsi_connected ( struct tcp_application *app ) {
-	struct iscsi_session *iscsi = tcp_to_iscsi ( app );
+static void iscsi_connected ( struct stream_application *app ) {
+	struct iscsi_session *iscsi = stream_to_iscsi ( app );
 
 	assert ( iscsi->rx_state == ISCSI_RX_BHS );
 	assert ( iscsi->rx_offset == 0 );
@@ -1194,8 +1210,8 @@ static void iscsi_connected ( struct tcp_application *app ) {
 	iscsi_start_login ( iscsi );
 }
 
-/** iSCSI TCP operations */
-static struct tcp_operations iscsi_tcp_operations = {
+/** iSCSI stream operations */
+static struct stream_application_operations iscsi_stream_operations = {
 	.closed		= iscsi_closed,
 	.connected	= iscsi_connected,
 	.acked		= iscsi_acked,
@@ -1224,14 +1240,19 @@ int iscsi_issue ( struct iscsi_session *iscsi, struct scsi_command *command,
 	} else if ( iscsi->status ) {
 		/* Session already open: issue command */
 		iscsi_start_command ( iscsi );
-		tcp_senddata ( &iscsi->tcp );
+		stream_kick ( &iscsi->stream );
 	} else {
 		/* Session not open: initiate login */
-		iscsi->tcp.tcp_op = &iscsi_tcp_operations;
-		if ( ( rc = tcp_connect ( &iscsi->tcp, &iscsi->target,
-					  0 ) ) != 0 ) {
-			DBGC ( iscsi, "iSCSI %p could not open TCP "
-			       "connection: %s\n", iscsi, strerror ( rc ) );
+		iscsi->stream.op = &iscsi_stream_operations;
+		if ( ( rc = tcp_open ( &iscsi->stream ) ) != 0 ) {
+			DBGC ( iscsi, "iSCSI %p could not open stream: %s\n ",
+			       iscsi, strerror ( rc ) );
+			return rc;
+		}
+		if ( ( rc = stream_connect ( &iscsi->stream,
+					     &iscsi->target ) ) != 0 ) {
+			DBGC ( iscsi, "iSCSI %p could not connect: %s\n",
+			       iscsi, strerror ( rc ) );
 			return rc;
 		}
 	}

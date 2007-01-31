@@ -125,7 +125,7 @@ struct stream_connection_operations {
 	 * application's senddata() method.
 	 */
 	int ( * send ) ( struct stream_connection *conn,
-			 void *data, size_t len );
+			 const void *data, size_t len );
 	/**
 	 * Notify connection that data is available to send
 	 *
@@ -167,6 +167,9 @@ struct stream_connection {
 	struct stream_connection_operations *op;	
 };
 
+extern void stream_associate ( struct stream_application *app,
+			       struct stream_connection *conn );
+
 extern void stream_connected ( struct stream_connection *conn );
 extern void stream_closed ( struct stream_connection *conn, int rc );
 extern void stream_senddata ( struct stream_connection *conn,
@@ -181,7 +184,7 @@ extern int stream_connect ( struct stream_application *app,
 			    struct sockaddr *peer );
 extern void stream_close ( struct stream_application *app );
 extern int stream_send ( struct stream_application *app,
-			 void *data, size_t len );
+			 const void *data, size_t len );
 extern int stream_kick ( struct stream_application *app );
 
 #endif /* _GPXE_STREAM_H */

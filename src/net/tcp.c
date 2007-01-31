@@ -8,6 +8,7 @@
 #include <gpxe/pkbuff.h>
 #include <gpxe/malloc.h>
 #include <gpxe/retry.h>
+#include <gpxe/stream.h>
 #include <gpxe/tcpip.h>
 #include <gpxe/tcp.h>
 
@@ -17,22 +18,22 @@
  *
  */
 
+struct tcp_connection;
 static void tcp_expired ( struct retry_timer *timer, int over );
-static int tcp_senddata_conn ( struct tcp_connection *conn, int force_send );
+static int tcp_senddata_conn ( struct tcp_connection *tcp, int force_send );
+static struct stream_connection_operations tcp_op;
 
 /**
  * A TCP connection
  *
  * This data structure represents the internal state of a TCP
- * connection.  It is kept separate from @c struct @c tcp_application
- * because the internal state is still required for some time after
- * the application closes the connection.
+ * connection.
  */
 struct tcp_connection {
+	/** The stream connection */
+	struct stream_connection stream;
 	/** List of TCP connections */
 	struct list_head list;
-	/** The associated TCP application, if any */
-	struct tcp_application *app;
 
 	/** Remote socket address */
 	struct sockaddr_tcpip peer;
@@ -108,17 +109,17 @@ tcp_state ( int state ) {
 /**
  * Dump TCP state transition
  *
- * @v conn		TCP connection
+ * @v tcp		TCP connection
  */
 static inline __attribute__ (( always_inline )) void
-tcp_dump_state ( struct tcp_connection *conn ) {
+tcp_dump_state ( struct tcp_connection *tcp ) {
 
-	if ( conn->tcp_state != conn->prev_tcp_state ) {
-		DBGC ( conn, "TCP %p transitioned from %s to %s\n", conn,
-		       tcp_state ( conn->prev_tcp_state ),
-		       tcp_state ( conn->tcp_state ) );
+	if ( tcp->tcp_state != tcp->prev_tcp_state ) {
+		DBGC ( tcp, "TCP %p transitioned from %s to %s\n", tcp,
+		       tcp_state ( tcp->prev_tcp_state ),
+		       tcp_state ( tcp->tcp_state ) );
 	}
-	conn->prev_tcp_state = conn->tcp_state;
+	tcp->prev_tcp_state = tcp->tcp_state;
 }
 
 /**
@@ -127,17 +128,17 @@ tcp_dump_state ( struct tcp_connection *conn ) {
  * @v flags		TCP flags
  */
 static inline __attribute__ (( always_inline )) void
-tcp_dump_flags ( struct tcp_connection *conn, unsigned int flags ) {
+tcp_dump_flags ( struct tcp_connection *tcp, unsigned int flags ) {
 	if ( flags & TCP_RST )
-		DBGC ( conn, " RST" );
+		DBGC ( tcp, " RST" );
 	if ( flags & TCP_SYN )
-		DBGC ( conn, " SYN" );
+		DBGC ( tcp, " SYN" );
 	if ( flags & TCP_PSH )
-		DBGC ( conn, " PSH" );
+		DBGC ( tcp, " PSH" );
 	if ( flags & TCP_FIN )
-		DBGC ( conn, " FIN" );
+		DBGC ( tcp, " FIN" );
 	if ( flags & TCP_ACK )
-		DBGC ( conn, " ACK" );
+		DBGC ( tcp, " ACK" );
 }
 
 /**
@@ -148,105 +149,68 @@ tcp_dump_flags ( struct tcp_connection *conn, unsigned int flags ) {
  * Allocates TCP connection and adds it to the TCP connection list.
  */
 static struct tcp_connection * alloc_tcp ( void ) {
-	struct tcp_connection *conn;
+	struct tcp_connection *tcp;
 
-	conn = malloc ( sizeof ( *conn ) );
-	if ( conn ) {
-		DBGC ( conn, "TCP %p allocated\n", conn );
-		memset ( conn, 0, sizeof ( *conn ) );
-		conn->tcp_state = conn->prev_tcp_state = TCP_CLOSED;
-		conn->snd_seq = random();
-		conn->timer.expired = tcp_expired;
-		list_add ( &conn->list, &tcp_conns );
+	tcp = malloc ( sizeof ( *tcp ) );
+	if ( tcp ) {
+		DBGC ( tcp, "TCP %p allocated\n", tcp );
+		memset ( tcp, 0, sizeof ( *tcp ) );
+		tcp->tcp_state = tcp->prev_tcp_state = TCP_CLOSED;
+		tcp->snd_seq = random();
+		tcp->timer.expired = tcp_expired;
+		tcp->stream.op = &tcp_op;
+		list_add ( &tcp->list, &tcp_conns );
 	}
-	return conn;
+	return tcp;
 }
 
 /**
  * Free TCP connection
  *
- * @v conn		TCP connection
+ * @v tcp		TCP connection
  *
  * Removes connection from TCP connection list and frees the data
  * structure.
  */
-static void free_tcp ( struct tcp_connection *conn ) {
+static void free_tcp ( struct tcp_connection *tcp ) {
 
-	assert ( conn );
-	assert ( conn->tcp_state == TCP_CLOSED );
-	assert ( conn->app == NULL );
+	assert ( tcp );
+	assert ( tcp->tcp_state == TCP_CLOSED );
 
-	stop_timer ( &conn->timer );
-	list_del ( &conn->list );
-	free ( conn );
-	DBGC ( conn, "TCP %p freed\n", conn );
-}
-
-/**
- * Associate TCP connection with application
- *
- * @v conn		TCP connection
- * @v app		TCP application
- */
-static void tcp_associate ( struct tcp_connection *conn,
-			    struct tcp_application *app ) {
-	assert ( conn->app == NULL );
-	assert ( app->conn == NULL );
-	conn->app = app;
-	app->conn = conn;
-	DBGC ( conn, "TCP %p associated with application %p\n", conn, app );
-}
-
-/**
- * Disassociate TCP connection from application
- *
- * @v conn		TCP connection
- */
-static void tcp_disassociate ( struct tcp_connection *conn ) {
-	struct tcp_application *app = conn->app;
-
-	if ( app ) {
-		assert ( app->conn == conn );
-		conn->app = NULL;
-		app->conn = NULL;
-		DBGC ( conn, "TCP %p disassociated from application %p\n",
-		       conn, app );
-	}
+	stop_timer ( &tcp->timer );
+	list_del ( &tcp->list );
+	free ( tcp );
+	DBGC ( tcp, "TCP %p freed\n", tcp );
 }
 
 /**
  * Abort TCP connection
  *
- * @v conn		TCP connection
+ * @v tcp		TCP connection
  * @v send_rst		Send a RST after closing
  * @v rc		Reason code
  */
-static void tcp_abort ( struct tcp_connection *conn, int send_rst, int rc ) {
-	struct tcp_application *app = conn->app;
+static void tcp_abort ( struct tcp_connection *tcp, int send_rst, int rc ) {
 
 	/* Transition to CLOSED */
-	conn->tcp_state = TCP_CLOSED;
-	tcp_dump_state ( conn );
+	tcp->tcp_state = TCP_CLOSED;
+	tcp_dump_state ( tcp );
 
 	/* Send RST if requested to do so */
 	if ( send_rst )
-		tcp_senddata_conn ( conn, 1 );
+		tcp_senddata_conn ( tcp, 1 );
 
-	/* Break association between application and connection */
-	tcp_disassociate ( conn );
+	/* Close stream */
+	stream_closed ( &tcp->stream, rc );
 
 	/* Free the connection */
-	free_tcp ( conn );
-
-	/* Notify application */
-	if ( app && app->tcp_op->closed )
-		app->tcp_op->closed ( app, rc );
+	free_tcp ( tcp );
 }
 
 /**
  * Transmit any outstanding data
  *
- * @v conn		TCP connection
+ * @v tcp		TCP connection
  * @v force_send	Force sending of packet
  * 
  * Transmits any outstanding data on the connection.  If the
@@ -257,8 +221,7 @@ static void tcp_abort ( struct tcp_connection *conn, int send_rst, int rc ) {
  * will have been started if necessary, and so the stack will
  * eventually attempt to retransmit the failed packet.
  */
-static int tcp_senddata_conn ( struct tcp_connection *conn, int force_send ) {
-	struct tcp_application *app = conn->app;
+static int tcp_senddata_conn ( struct tcp_connection *tcp, int force_send ) {
 	struct pk_buff *pkb;
 	struct tcp_header *tcphdr;
 	struct tcp_mss_option *mssopt;
@@ -272,7 +235,7 @@ static int tcp_senddata_conn ( struct tcp_connection *conn, int force_send ) {
 	/* Allocate space to the TX buffer */
 	pkb = alloc_pkb ( MAX_PKB_LEN );
 	if ( ! pkb ) {
-		DBGC ( conn, "TCP %p could not allocate data buffer\n", conn );
+		DBGC ( tcp, "TCP %p could not allocate data buffer\n", tcp );
 		/* Start the retry timer so that we attempt to
 		 * retransmit this packet later.  (Start it
 		 * unconditionally, since without a packet buffer we
@@ -280,7 +243,7 @@ static int tcp_senddata_conn ( struct tcp_connection *conn, int force_send ) {
 		 * be able to tell whether or not we have something
 		 * that actually needs to be retransmitted).
 		 */
-		start_timer ( &conn->timer );
+		start_timer ( &tcp->timer );
 		return -ENOMEM;
 	}
 	pkb_reserve ( pkb, MAX_HDR_LEN );
@@ -288,28 +251,28 @@ static int tcp_senddata_conn ( struct tcp_connection *conn, int force_send ) {
 	/* If we are connected, call the senddata() method, which may
 	 * call tcp_send() to queue up a data payload.
 	 */
-	if ( TCP_CAN_SEND_DATA ( conn->tcp_state ) &&
-	     app && app->tcp_op->senddata ) {
-		conn->tx_pkb = pkb;
-		app->tcp_op->senddata ( app, pkb->data, pkb_tailroom ( pkb ) );
-		conn->tx_pkb = NULL;
+	if ( TCP_CAN_SEND_DATA ( tcp->tcp_state ) ) {
+		tcp->tx_pkb = pkb;
+		stream_senddata ( &tcp->stream, pkb->data,
+				  pkb_tailroom ( pkb ) );
+		tcp->tx_pkb = NULL;
 	}
 
 	/* Truncate payload length to fit transmit window */
 	len = pkb_len ( pkb );
-	if ( len > conn->snd_win )
-		len = conn->snd_win;
+	if ( len > tcp->snd_win )
+		len = tcp->snd_win;
 
 	/* Calculate amount of sequence space that this transmission
 	 * consumes.  (SYN or FIN consume one byte, and we can never
 	 * send both at once).
 	 */
 	seq_len = len;
-	flags = TCP_FLAGS_SENDING ( conn->tcp_state );
+	flags = TCP_FLAGS_SENDING ( tcp->tcp_state );
 	assert ( ! ( ( flags & TCP_SYN ) && ( flags & TCP_FIN ) ) );
 	if ( flags & ( TCP_SYN | TCP_FIN ) )
 		seq_len++;
-	conn->snd_sent = seq_len;
+	tcp->snd_sent = seq_len;
 
 	/* If we have nothing to transmit, drop the packet */
 	if ( ( seq_len == 0 ) && ! force_send ) {
@@ -322,7 +285,7 @@ static int tcp_senddata_conn ( struct tcp_connection *conn, int force_send ) {
 	 * retransmission timer.
 	 */
 	if ( seq_len )
-		start_timer ( &conn->timer );
+		start_timer ( &tcp->timer );
 
 	/* Estimate window size */
 	window = freemem;
@@ -340,25 +303,25 @@ static int tcp_senddata_conn ( struct tcp_connection *conn, int force_send ) {
 	}
 	tcphdr = pkb_push ( pkb, sizeof ( *tcphdr ) );
 	memset ( tcphdr, 0, sizeof ( *tcphdr ) );
-	tcphdr->src = conn->local_port;
-	tcphdr->dest = conn->peer.st_port;
-	tcphdr->seq = htonl ( conn->snd_seq );
-	tcphdr->ack = htonl ( conn->rcv_ack );
+	tcphdr->src = tcp->local_port;
+	tcphdr->dest = tcp->peer.st_port;
+	tcphdr->seq = htonl ( tcp->snd_seq );
+	tcphdr->ack = htonl ( tcp->rcv_ack );
 	tcphdr->hlen = ( ( payload - pkb->data ) << 2 );
 	tcphdr->flags = flags;
 	tcphdr->win = htons ( window );
 	tcphdr->csum = tcpip_chksum ( pkb->data, pkb_len ( pkb ) );
 
 	/* Dump header */
-	DBGC ( conn, "TCP %p TX %d->%d %08lx..%08lx           %08lx %4zd",
-	       conn, ntohs ( tcphdr->src ), ntohs ( tcphdr->dest ),
+	DBGC ( tcp, "TCP %p TX %d->%d %08lx..%08lx           %08lx %4zd",
+	       tcp, ntohs ( tcphdr->src ), ntohs ( tcphdr->dest ),
 	       ntohl ( tcphdr->seq ), ( ntohl ( tcphdr->seq ) + seq_len ),
 	       ntohl ( tcphdr->ack ), len );
-	tcp_dump_flags ( conn, tcphdr->flags );
-	DBGC ( conn, "\n" );
+	tcp_dump_flags ( tcp, tcphdr->flags );
+	DBGC ( tcp, "\n" );
 
 	/* Transmit packet */
-	rc = tcpip_tx ( pkb, &tcp_protocol, &conn->peer, NULL, &tcphdr->csum );
+	rc = tcpip_tx ( pkb, &tcp_protocol, &tcp->peer, NULL, &tcphdr->csum );
 
 	/* If we got -ENETUNREACH, kill the connection immediately
 	 * because there is no point retrying.  This isn't strictly
@@ -367,11 +330,11 @@ static int tcp_senddata_conn ( struct tcp_connection *conn, int force_send ) {
 	 * RST packets transmitted on connection abort, to avoid a
 	 * potential infinite loop.
 	 */
-	if ( ( ! ( conn->tcp_state & TCP_STATE_SENT ( TCP_RST ) ) ) &&
+	if ( ( ! ( tcp->tcp_state & TCP_STATE_SENT ( TCP_RST ) ) ) &&
 	     ( rc == -ENETUNREACH ) ) {
-		DBGC ( conn, "TCP %p aborting after TX failed: %s\n",
-		       conn, strerror ( rc ) );
-		tcp_abort ( conn, 0, rc );
+		DBGC ( tcp, "TCP %p aborting after TX failed: %s\n",
+		       tcp, strerror ( rc ) );
+		tcp_abort ( tcp, 0, rc );
 	}
 
 	return rc;
@@ -380,28 +343,23 @@ static int tcp_senddata_conn ( struct tcp_connection *conn, int force_send ) {
 /**
  * Transmit any outstanding data
  *
- * @v conn	TCP connection
+ * @v stream		TCP stream
  * 
  * This function allocates space to the transmit buffer and invokes
  * the senddata() callback function, to allow the application to
  * transmit new data.
  */
-int tcp_senddata ( struct tcp_application *app ) {
-	struct tcp_connection *conn = app->conn;
+static int tcp_kick ( struct stream_connection *stream ) {
+	struct tcp_connection *tcp =
+		container_of ( stream, struct tcp_connection, stream );
 
-	/* Check connection actually exists */
-	if ( ! conn ) {
-		DBG ( "TCP app %p has no connection\n", app );
-		return -ENOTCONN;
-	}
-
-	return tcp_senddata_conn ( conn, 0 );
+	return tcp_senddata_conn ( tcp, 0 );
 }
 
 /**
  * Transmit data
  *
- * @v app		TCP application
+ * @v stream		TCP stream
  * @v data		Data to be sent
  * @v len		Length of the data
  * @ret rc		Return status code
@@ -410,21 +368,17 @@ int tcp_senddata ( struct tcp_application *app ) {
  * can be called only in the context of an application's senddata()
  * method.
  */
-int tcp_send ( struct tcp_application *app, const void *data, size_t len ) {
-	struct tcp_connection *conn = app->conn;
+static int tcp_send ( struct stream_connection *stream,
+		      const void *data, size_t len ) {
+	struct tcp_connection *tcp =
+		container_of ( stream, struct tcp_connection, stream );
 	struct pk_buff *pkb;
 
-	/* Check connection actually exists */
-	if ( ! conn ) {
-		DBG ( "TCP app %p has no connection\n", app );
-		return -ENOTCONN;
-	}
-
 	/* Check that we have a packet buffer to fill */
-	pkb = conn->tx_pkb;
+	pkb = tcp->tx_pkb;
 	if ( ! pkb ) {
-		DBG ( "TCP app %p tried to send data outside of the "
-		      "senddata() method\n", app );
+		DBGC ( tcp, "TCP %p tried to send data outside of the "
+		       "senddata() method\n", tcp );
 		return -EINVAL;
 	}
 
@@ -445,30 +399,30 @@ int tcp_send ( struct tcp_application *app, const void *data, size_t len ) {
  * @v over	Failure indicator
  */
 static void tcp_expired ( struct retry_timer *timer, int over ) {
-	struct tcp_connection *conn =
+	struct tcp_connection *tcp =
 		container_of ( timer, struct tcp_connection, timer );
-	int graceful_close = TCP_CLOSED_GRACEFULLY ( conn->tcp_state );
+	int graceful_close = TCP_CLOSED_GRACEFULLY ( tcp->tcp_state );
 
-	DBGC ( conn, "TCP %p timer %s in %s\n", conn,
-	       ( over ? "expired" : "fired" ), tcp_state ( conn->tcp_state ) );
+	DBGC ( tcp, "TCP %p timer %s in %s\n", tcp,
+	       ( over ? "expired" : "fired" ), tcp_state ( tcp->tcp_state ) );
 
-	assert ( ( conn->tcp_state == TCP_SYN_SENT ) ||
-		 ( conn->tcp_state == TCP_SYN_RCVD ) ||
-		 ( conn->tcp_state == TCP_ESTABLISHED ) ||
-		 ( conn->tcp_state == TCP_FIN_WAIT_1 ) ||
-		 ( conn->tcp_state == TCP_TIME_WAIT ) ||
-		 ( conn->tcp_state == TCP_CLOSE_WAIT ) ||
-		 ( conn->tcp_state == TCP_CLOSING_OR_LAST_ACK ) );
+	assert ( ( tcp->tcp_state == TCP_SYN_SENT ) ||
+		 ( tcp->tcp_state == TCP_SYN_RCVD ) ||
+		 ( tcp->tcp_state == TCP_ESTABLISHED ) ||
+		 ( tcp->tcp_state == TCP_FIN_WAIT_1 ) ||
+		 ( tcp->tcp_state == TCP_TIME_WAIT ) ||
+		 ( tcp->tcp_state == TCP_CLOSE_WAIT ) ||
+		 ( tcp->tcp_state == TCP_CLOSING_OR_LAST_ACK ) );
 
 	if ( over || graceful_close ) {
 		/* If we have finally timed out and given up, or if
 		 * this is the result of a graceful close, terminate
 		 * the connection
 		 */
-		tcp_abort ( conn, 1, -ETIMEDOUT );
+		tcp_abort ( tcp, 1, -ETIMEDOUT );
 	} else {
 		/* Otherwise, retransmit the packet */
-		tcp_senddata_conn ( conn, 0 );
+		tcp_senddata_conn ( tcp, 0 );
 	}
 }
 
@@ -478,7 +432,7 @@ static void tcp_expired ( struct retry_timer *timer, int over ) {
  * @v in_tcphdr		TCP header of incoming packet
  * @ret rc		Return status code
  */
-static int tcp_send_reset ( struct tcp_connection *conn,
+static int tcp_send_reset ( struct tcp_connection *tcp,
 			    struct tcp_header *in_tcphdr ) {
 	struct pk_buff *pkb;
 	struct tcp_header *tcphdr;
@@ -486,7 +440,7 @@ static int tcp_send_reset ( struct tcp_connection *conn,
 	/* Allocate space for dataless TX buffer */
 	pkb = alloc_pkb ( MAX_HDR_LEN );
 	if ( ! pkb ) {
-		DBGC ( conn, "TCP %p could not allocate data buffer\n", conn );
+		DBGC ( tcp, "TCP %p could not allocate data buffer\n", tcp );
 		return -ENOMEM;
 	}
 	pkb_reserve ( pkb, MAX_HDR_LEN );
@@ -504,15 +458,15 @@ static int tcp_send_reset ( struct tcp_connection *conn,
 	tcphdr->csum = tcpip_chksum ( pkb->data, pkb_len ( pkb ) );
 
 	/* Dump header */
-	DBGC ( conn, "TCP %p TX %d->%d %08lx..%08lx           %08lx %4zd",
-	       conn, ntohs ( tcphdr->src ), ntohs ( tcphdr->dest ),
+	DBGC ( tcp, "TCP %p TX %d->%d %08lx..%08lx           %08lx %4zd",
+	       tcp, ntohs ( tcphdr->src ), ntohs ( tcphdr->dest ),
 	       ntohl ( tcphdr->seq ), ( ntohl ( tcphdr->seq ) ),
 	       ntohl ( tcphdr->ack ), 0 );
-	tcp_dump_flags ( conn, tcphdr->flags );
-	DBGC ( conn, "\n" );
+	tcp_dump_flags ( tcp, tcphdr->flags );
+	DBGC ( tcp, "\n" );
 
 	/* Transmit packet */
-	return tcpip_tx ( pkb, &tcp_protocol, &conn->peer,
+	return tcpip_tx ( pkb, &tcp_protocol, &tcp->peer,
 			  NULL, &tcphdr->csum );
 }
 
@@ -520,14 +474,14 @@ static int tcp_send_reset ( struct tcp_connection *conn,
  * Identify TCP connection by local port number
  *
  * @v local_port	Local port (in network-endian order)
- * @ret conn		TCP connection, or NULL
+ * @ret tcp		TCP connection, or NULL
  */
 static struct tcp_connection * tcp_demux ( uint16_t local_port ) {
-	struct tcp_connection *conn;
+	struct tcp_connection *tcp;
 
-	list_for_each_entry ( conn, &tcp_conns, list ) {
-		if ( conn->local_port == local_port )
-			return conn;
+	list_for_each_entry ( tcp, &tcp_conns, list ) {
+		if ( tcp->local_port == local_port )
+			return tcp;
 	}
 	return NULL;
 }
@@ -535,32 +489,30 @@ static struct tcp_connection * tcp_demux ( uint16_t local_port ) {
 /**
  * Handle TCP received SYN
  *
- * @v conn		TCP connection
+ * @v tcp		TCP connection
  * @v seq		SEQ value (in host-endian order)
  * @ret rc		Return status code
  */
-static int tcp_rx_syn ( struct tcp_connection *conn, uint32_t seq ) {
-	struct tcp_application *app = conn->app;
+static int tcp_rx_syn ( struct tcp_connection *tcp, uint32_t seq ) {
 
 	/* Synchronise sequence numbers on first SYN */
-	if ( ! ( conn->tcp_state & TCP_STATE_RCVD ( TCP_SYN ) ) )
-		conn->rcv_ack = seq;
+	if ( ! ( tcp->tcp_state & TCP_STATE_RCVD ( TCP_SYN ) ) )
+		tcp->rcv_ack = seq;
 
 	/* Ignore duplicate SYN */
-	if ( ( conn->rcv_ack - seq ) > 0 )
+	if ( ( tcp->rcv_ack - seq ) > 0 )
 		return 0;
 
 	/* Mark SYN as received and start sending ACKs with each packet */
-	conn->tcp_state |= ( TCP_STATE_SENT ( TCP_ACK ) |
+	tcp->tcp_state |= ( TCP_STATE_SENT ( TCP_ACK ) |
 			     TCP_STATE_RCVD ( TCP_SYN ) );
 
 	/* Acknowledge SYN */
-	conn->rcv_ack++;
+	tcp->rcv_ack++;
 
 	/* Notify application of established connection, if applicable */
-	if ( ( conn->tcp_state & TCP_STATE_ACKED ( TCP_SYN ) ) &&
-	     app && app->tcp_op->connected )
-		app->tcp_op->connected ( app );
+	if ( ( tcp->tcp_state & TCP_STATE_ACKED ( TCP_SYN ) ) )
+		stream_connected ( &tcp->stream );
 
 	return 0;
 }
@@ -568,24 +520,23 @@ static int tcp_rx_syn ( struct tcp_connection *conn, uint32_t seq ) {
 /**
  * Handle TCP received ACK
  *
- * @v conn		TCP connection
+ * @v tcp		TCP connection
  * @v ack		ACK value (in host-endian order)
  * @v win		WIN value (in host-endian order)
  * @ret rc		Return status code
  */
-static int tcp_rx_ack ( struct tcp_connection *conn, uint32_t ack,
+static int tcp_rx_ack ( struct tcp_connection *tcp, uint32_t ack,
 			uint32_t win ) {
-	struct tcp_application *app = conn->app;
-	size_t ack_len = ( ack - conn->snd_seq );
+	size_t ack_len = ( ack - tcp->snd_seq );
 	size_t len;
 	unsigned int acked_flags = 0;
 
 	/* Ignore duplicate or out-of-range ACK */
-	if ( ack_len > conn->snd_sent ) {
-		DBGC ( conn, "TCP %p received ACK for [%08lx,%08lx), "
-		       "sent only [%08lx,%08lx)\n", conn, conn->snd_seq,
-		       ( conn->snd_seq + ack_len ), conn->snd_seq,
-		       ( conn->snd_seq + conn->snd_sent ) );
+	if ( ack_len > tcp->snd_sent ) {
+		DBGC ( tcp, "TCP %p received ACK for [%08lx,%08lx), "
+		       "sent only [%08lx,%08lx)\n", tcp, tcp->snd_seq,
+		       ( tcp->snd_seq + ack_len ), tcp->snd_seq,
+		       ( tcp->snd_seq + tcp->snd_sent ) );
 		return -EINVAL;
 	}
 
@@ -595,34 +546,34 @@ static int tcp_rx_ack ( struct tcp_connection *conn, uint32_t ack,
 	 * the last outstanding sequence point.)
 	 */
 	len = ack_len;
-	if ( ack_len == conn->snd_sent ) {
-		acked_flags = ( TCP_FLAGS_SENDING ( conn->tcp_state ) &
+	if ( ack_len == tcp->snd_sent ) {
+		acked_flags = ( TCP_FLAGS_SENDING ( tcp->tcp_state ) &
 				( TCP_SYN | TCP_FIN ) );
 		if ( acked_flags )
 			len--;
 	}
 
 	/* Update SEQ and sent counters, and window size */
-	conn->snd_seq = ack;
-	conn->snd_sent = 0;
-	conn->snd_win = win;
+	tcp->snd_seq = ack;
+	tcp->snd_sent = 0;
+	tcp->snd_win = win;
 
 	/* Stop the retransmission timer */
-	stop_timer ( &conn->timer );
+	stop_timer ( &tcp->timer );
 
 	/* Notify application of acknowledged data, if any */
-	if ( len && app && app->tcp_op->acked )
-		app->tcp_op->acked ( app, len );
+	if ( len )
+		stream_acked ( &tcp->stream, len );
 
 	/* Mark SYN/FIN as acknowledged if applicable. */
 	if ( acked_flags )
-		conn->tcp_state |= TCP_STATE_ACKED ( acked_flags );
+		tcp->tcp_state |= TCP_STATE_ACKED ( acked_flags );
 
 	/* Notify application of established connection, if applicable */
 	if ( ( acked_flags & TCP_SYN ) &&
-	     ( conn->tcp_state & TCP_STATE_RCVD ( TCP_SYN ) ) &&
-	     app && app->tcp_op->connected )
-		app->tcp_op->connected ( app );
+	     ( tcp->tcp_state & TCP_STATE_RCVD ( TCP_SYN ) ) ) {
+		stream_connected ( &tcp->stream );
+	}
 
 	return 0;
 }
@@ -630,30 +581,28 @@ static int tcp_rx_ack ( struct tcp_connection *conn, uint32_t ack,
 /**
  * Handle TCP received data
  *
- * @v conn		TCP connection
+ * @v tcp		TCP connection
  * @v seq		SEQ value (in host-endian order)
  * @v data		Data buffer
  * @v len		Length of data buffer
  * @ret rc		Return status code
  */
-static int tcp_rx_data ( struct tcp_connection *conn, uint32_t seq,
+static int tcp_rx_data ( struct tcp_connection *tcp, uint32_t seq,
 			 void *data, size_t len ) {
-	struct tcp_application *app = conn->app;
 	size_t already_rcvd;
 
 	/* Ignore duplicate data */
-	already_rcvd = ( conn->rcv_ack - seq );
+	already_rcvd = ( tcp->rcv_ack - seq );
 	if ( already_rcvd >= len )
 		return 0;
 	data += already_rcvd;
 	len -= already_rcvd;
 
 	/* Acknowledge new data */
-	conn->rcv_ack += len;
+	tcp->rcv_ack += len;
 
 	/* Notify application */
-	if ( app && app->tcp_op->newdata )
-		app->tcp_op->newdata ( app, data, len );
+	stream_newdata ( &tcp->stream, data, len );
 
 	return 0;
 }
@@ -661,28 +610,23 @@ static int tcp_rx_data ( struct tcp_connection *conn, uint32_t seq,
 /**
  * Handle TCP received FIN
  *
- * @v conn		TCP connection
+ * @v tcp		TCP connection
  * @v seq		SEQ value (in host-endian order)
  * @ret rc		Return status code
  */
-static int tcp_rx_fin ( struct tcp_connection *conn, uint32_t seq ) {
-	struct tcp_application *app = conn->app;
+static int tcp_rx_fin ( struct tcp_connection *tcp, uint32_t seq ) {
 
 	/* Ignore duplicate FIN */
-	if ( ( conn->rcv_ack - seq ) > 0 )
+	if ( ( tcp->rcv_ack - seq ) > 0 )
 		return 0;
 
 	/* Mark FIN as received, acknowledge it, and send our own FIN */
-	conn->tcp_state |= ( TCP_STATE_RCVD ( TCP_FIN ) |
+	tcp->tcp_state |= ( TCP_STATE_RCVD ( TCP_FIN ) |
 			     TCP_STATE_SENT ( TCP_FIN ) );
-	conn->rcv_ack++;
+	tcp->rcv_ack++;
 
-	/* Break association with application */
-	tcp_disassociate ( conn );
-
-	/* Notify application */
-	if ( app && app->tcp_op->closed )
-		app->tcp_op->closed ( app, 0 );
+	/* Close stream */
+	stream_closed ( &tcp->stream, 0 );
 
 	return 0;
 }
@@ -690,27 +634,27 @@ static int tcp_rx_fin ( struct tcp_connection *conn, uint32_t seq ) {
 /**
  * Handle TCP received RST
  *
- * @v conn		TCP connection
+ * @v tcp		TCP connection
  * @v seq		SEQ value (in host-endian order)
  * @ret rc		Return status code
  */
-static int tcp_rx_rst ( struct tcp_connection *conn, uint32_t seq ) {
+static int tcp_rx_rst ( struct tcp_connection *tcp, uint32_t seq ) {
 
 	/* Accept RST only if it falls within the window.  If we have
 	 * not yet received a SYN, then we have no window to test
 	 * against, so fall back to checking that our SYN has been
 	 * ACKed.
 	 */
-	if ( conn->tcp_state & TCP_STATE_RCVD ( TCP_SYN ) ) {
-		if ( ( conn->rcv_ack - seq ) > 0 )
+	if ( tcp->tcp_state & TCP_STATE_RCVD ( TCP_SYN ) ) {
+		if ( ( tcp->rcv_ack - seq ) > 0 )
 			return 0;
 	} else {
-		if ( ! ( conn->tcp_state & TCP_STATE_ACKED ( TCP_SYN ) ) )
+		if ( ! ( tcp->tcp_state & TCP_STATE_ACKED ( TCP_SYN ) ) )
 			return 0;
 	}
 
 	/* Abort connection without sending a RST */
-	tcp_abort ( conn, 0, -ECONNRESET );
+	tcp_abort ( tcp, 0, -ECONNRESET );
 
 	return -ECONNRESET;
 }
@@ -729,7 +673,7 @@ static int tcp_rx ( struct pk_buff *pkb,
 		    struct sockaddr_tcpip *st_dest __unused,
 		    uint16_t pshdr_csum ) {
 	struct tcp_header *tcphdr = pkb->data;
-	struct tcp_connection *conn;
+	struct tcp_connection *tcp;
 	unsigned int hlen;
 	uint16_t csum;
 	uint32_t start_seq;
@@ -770,7 +714,7 @@ static int tcp_rx ( struct pk_buff *pkb,
 	}
 	
 	/* Parse parameters from header and strip header */
-	conn = tcp_demux ( tcphdr->dest );
+	tcp = tcp_demux ( tcphdr->dest );
 	start_seq = seq = ntohl ( tcphdr->seq );
 	ack = ntohl ( tcphdr->ack );
 	win = ntohs ( tcphdr->win );
@@ -779,65 +723,65 @@ static int tcp_rx ( struct pk_buff *pkb,
 	len = pkb_len ( pkb );
 
 	/* Dump header */
-	DBGC ( conn, "TCP %p RX %d<-%d           %08lx %08lx..%08lx %4zd",
-	       conn, ntohs ( tcphdr->dest ), ntohs ( tcphdr->src ),
+	DBGC ( tcp, "TCP %p RX %d<-%d           %08lx %08lx..%08lx %4zd",
+	       tcp, ntohs ( tcphdr->dest ), ntohs ( tcphdr->src ),
 	       ntohl ( tcphdr->ack ), ntohl ( tcphdr->seq ),
 	       ( ntohl ( tcphdr->seq ) + len +
 		 ( ( tcphdr->flags & ( TCP_SYN | TCP_FIN ) ) ? 1 : 0 ) ), len);
-	tcp_dump_flags ( conn, tcphdr->flags );
-	DBGC ( conn, "\n" );
+	tcp_dump_flags ( tcp, tcphdr->flags );
+	DBGC ( tcp, "\n" );
 
 	/* If no connection was found, send RST */
-	if ( ! conn ) {
-		tcp_send_reset ( conn, tcphdr );
+	if ( ! tcp ) {
+		tcp_send_reset ( tcp, tcphdr );
 		rc = -ENOTCONN;
 		goto done;
 	}
 
 	/* Handle ACK, if present */
 	if ( flags & TCP_ACK ) {
-		if ( ( rc = tcp_rx_ack ( conn, ack, win ) ) != 0 ) {
-			tcp_send_reset ( conn, tcphdr );
+		if ( ( rc = tcp_rx_ack ( tcp, ack, win ) ) != 0 ) {
+			tcp_send_reset ( tcp, tcphdr );
 			goto done;
 		}
 	}
 
 	/* Handle SYN, if present */
 	if ( flags & TCP_SYN ) {
-		tcp_rx_syn ( conn, seq );
+		tcp_rx_syn ( tcp, seq );
 		seq++;
 	}
 
 	/* Handle RST, if present */
 	if ( flags & TCP_RST ) {
-		if ( ( rc = tcp_rx_rst ( conn, seq ) ) != 0 )
+		if ( ( rc = tcp_rx_rst ( tcp, seq ) ) != 0 )
 			goto done;
 	}
 
 	/* Handle new data, if any */
-	tcp_rx_data ( conn, seq, data, len );
+	tcp_rx_data ( tcp, seq, data, len );
 	seq += len;
 
 	/* Handle FIN, if present */
 	if ( flags & TCP_FIN ) {
-		tcp_rx_fin ( conn, seq );
+		tcp_rx_fin ( tcp, seq );
 		seq++;
 	}
 
 	/* Dump out any state change as a result of the received packet */
-	tcp_dump_state ( conn );
+	tcp_dump_state ( tcp );
 
 	/* Send out any pending data.  If peer is expecting an ACK for
 	 * this packet then force sending a reply.
 	 */
-	tcp_senddata_conn ( conn, ( start_seq != seq ) );
+	tcp_senddata_conn ( tcp, ( start_seq != seq ) );
 
 	/* If this packet was the last we expect to receive, set up
 	 * timer to expire and cause the connection to be freed.
 	 */
-	if ( TCP_CLOSED_GRACEFULLY ( conn->tcp_state ) ) {
-		conn->timer.timeout = ( 2 * TCP_MSL );
-		start_timer ( &conn->timer );
+	if ( TCP_CLOSED_GRACEFULLY ( tcp->tcp_state ) ) {
+		tcp->timer.timeout = ( 2 * TCP_MSL );
+		start_timer ( &tcp->timer );
 	}
 
 	rc = 0;
@@ -850,60 +794,135 @@ static int tcp_rx ( struct pk_buff *pkb,
 /**
  * Bind TCP connection to local port
  *
- * @v conn		TCP connection
- * @v local_port	Local port (in network byte order), or 0
+ * @v stream		TCP stream
+ * @v local		Local address
  * @ret rc		Return status code
  *
- * This function adds the connection to the list of registered TCP
- * connections.  If the local port is 0, the connection is assigned an
- * available port between 1024 and 65535.
+ * Only the port portion of the local address is used.  If the local
+ * port is 0, the connection is assigned an available port between
+ * 1024 and 65535.
  */
-static int tcp_bind ( struct tcp_connection *conn, uint16_t local_port ) {
+static int tcp_bind ( struct stream_connection *stream,
+		      struct sockaddr *local ) {
+	struct tcp_connection *tcp =
+		container_of ( stream, struct tcp_connection, stream );
+	struct sockaddr_tcpip *st = ( ( struct sockaddr_tcpip * ) local );
 	struct tcp_connection *existing;
+	struct sockaddr_tcpip try;
 	static uint16_t try_port = 1024;
+	uint16_t local_port = st->st_port;
 
 	/* If no port specified, find the first available port */
 	if ( ! local_port ) {
 		for ( ; try_port ; try_port++ ) {
 			if ( try_port < 1024 )
 				continue;
-			if ( tcp_bind ( conn, htons ( try_port ) ) == 0 )
+			try.st_port = htons ( try_port );
+			if ( tcp_bind ( stream,
+					( struct sockaddr * ) &try ) == 0 ) {
 				return 0;
+			}
 		}
-		DBGC ( conn, "TCP %p could not bind: no free ports\n", conn );
+		DBGC ( tcp, "TCP %p could not bind: no free ports\n", tcp );
 		return -EADDRINUSE;
 	}
 
 	/* Attempt bind to local port */
 	list_for_each_entry ( existing, &tcp_conns, list ) {
 		if ( existing->local_port == local_port ) {
-			DBGC ( conn, "TCP %p could not bind: port %d in use\n",
-			       conn, ntohs ( local_port ) );
+			DBGC ( tcp, "TCP %p could not bind: port %d in use\n",
+			       tcp, ntohs ( local_port ) );
 			return -EADDRINUSE;
 		}
 	}
-	conn->local_port = local_port;
+	tcp->local_port = local_port;
 
-	DBGC ( conn, "TCP %p bound to port %d\n", conn, ntohs ( local_port ) );
+	DBGC ( tcp, "TCP %p bound to port %d\n", tcp, ntohs ( local_port ) );
 	return 0;
 }
 
 /**
  * Connect to a remote server
  *
- * @v app		TCP application
+ * @v stream		TCP stream
  * @v peer		Remote socket address
- * @v local_port	Local port number (in network byte order), or 0
  * @ret rc		Return status code
  *
  * This function initiates a TCP connection to the socket address specified in
  * peer. It sends a SYN packet to peer. When the connection is established, the
  * TCP stack calls the connected() callback function.
  */
-int tcp_connect ( struct tcp_application *app, struct sockaddr_tcpip *peer,
-		  uint16_t local_port ) {
-	struct tcp_connection *conn;
+static int tcp_connect ( struct stream_connection *stream,
+			 struct sockaddr *peer ) {
+	struct tcp_connection *tcp =
+		container_of ( stream, struct tcp_connection, stream );
+	struct sockaddr_tcpip *st = ( ( struct sockaddr_tcpip * ) peer );
+	struct sockaddr_tcpip local;
 	int rc;
+
+	/* Bind to local port if not already bound */
+	if ( ! tcp->local_port ) {
+		local.st_port = 0;
+		if ( ( rc = tcp_bind ( stream,
+				       ( struct sockaddr * ) &local ) ) != 0 ){
+			return rc;
+		}
+	}
+
+	/* Bind to peer */
+	memcpy ( &tcp->peer, st, sizeof ( tcp->peer ) );
+
+	/* Transition to TCP_SYN_SENT and send the SYN */
+	tcp->tcp_state = TCP_SYN_SENT;
+	tcp_dump_state ( tcp );
+	tcp_senddata_conn ( tcp, 0 );
+
+	return 0;
+}
+
+/**
+ * Close the connection
+ *
+ * @v stream		TCP stream
+ *
+ * The TCP connection will persist until the state machine has
+ * returned to the TCP_CLOSED state.
+ */
+static void tcp_close ( struct stream_connection *stream ) {
+	struct tcp_connection *tcp =
+		container_of ( stream, struct tcp_connection, stream );
+
+	/* If we have not yet received a SYN (i.e. we are in CLOSED,
+	 * LISTEN or SYN_SENT), just delete the connection
+	 */
+	if ( ! ( tcp->tcp_state & TCP_STATE_RCVD ( TCP_SYN ) ) ) {
+		tcp->tcp_state = TCP_CLOSED;
+		tcp_dump_state ( tcp );
+		free_tcp ( tcp );
+		return;
+	}
+
+	/* If we have not had our SYN acknowledged (i.e. we are in
+	 * SYN_RCVD), pretend that it has been acknowledged so that we
+	 * can send a FIN without breaking things.
+	 */
+	if ( ! ( tcp->tcp_state & TCP_STATE_ACKED ( TCP_SYN ) ) )
+		tcp_rx_ack ( tcp, ( tcp->snd_seq + 1 ), 0 );
+
+	/* Send a FIN to initiate the close */
+	tcp->tcp_state |= TCP_STATE_SENT ( TCP_FIN );
+	tcp_dump_state ( tcp );
+	tcp_senddata_conn ( tcp, 0 );
+}
+
+/**
+ * Open TCP connection
+ *
+ * @v app		Stream application
+ * @ret rc		Return status code
+ */
+int tcp_open ( struct stream_application *app ) {
+	struct tcp_connection *tcp;
 
 	/* Application must not already have an open connection */
 	if ( app->conn ) {
@@ -912,72 +931,26 @@ int tcp_connect ( struct tcp_application *app, struct sockaddr_tcpip *peer,
 	}
 
 	/* Allocate connection state storage and add to connection list */
-	conn = alloc_tcp();
-	if ( ! conn ) {
+	tcp = alloc_tcp();
+	if ( ! tcp ) {
 		DBG ( "TCP app %p could not allocate connection\n", app );
 		return -ENOMEM;
 	}
 
-	/* Bind to peer and to local port */
-	memcpy ( &conn->peer, peer, sizeof ( conn->peer ) );
-	if ( ( rc = tcp_bind ( conn, local_port ) ) != 0 ) {
-		free_tcp ( conn );
-		return rc;
-	}
-
-	/* Associate with application */
-	tcp_associate ( conn, app );
-
-	/* Transition to TCP_SYN_SENT and send the SYN */
-	conn->tcp_state = TCP_SYN_SENT;
-	tcp_dump_state ( conn );
-	tcp_senddata_conn ( conn, 0 );
+	/* Associate application with connection */
+	stream_associate ( app, &tcp->stream );
 
 	return 0;
 }
 
-/**
- * Close the connection
- *
- * @v app		TCP application
- *
- * The association between the application and the TCP connection is
- * immediately severed, and the TCP application data structure can be
- * reused or freed immediately.  The TCP connection will persist until
- * the state machine has returned to the TCP_CLOSED state.
- */
-void tcp_close ( struct tcp_application *app ) {
-	struct tcp_connection *conn = app->conn;
-
-	/* If no connection exists, do nothing */
-	if ( ! conn )
-		return;
-
-	/* Break association between application and connection */
-	tcp_disassociate ( conn );
-
-	/* If we have not yet received a SYN (i.e. we are in CLOSED,
-	 * LISTEN or SYN_SENT), just delete the connection
-	 */
-	if ( ! ( conn->tcp_state & TCP_STATE_RCVD ( TCP_SYN ) ) ) {
-		conn->tcp_state = TCP_CLOSED;
-		tcp_dump_state ( conn );
-		free_tcp ( conn );
-		return;
-	}
-
-	/* If we have not had our SYN acknowledged (i.e. we are in
-	 * SYN_RCVD), pretend that it has been acknowledged so that we
-	 * can send a FIN without breaking things.
-	 */
-	if ( ! ( conn->tcp_state & TCP_STATE_ACKED ( TCP_SYN ) ) )
-		tcp_rx_ack ( conn, ( conn->snd_seq + 1 ), 0 );
-
-	/* Send a FIN to initiate the close */
-	conn->tcp_state |= TCP_STATE_SENT ( TCP_FIN );
-	tcp_dump_state ( conn );
-	tcp_senddata_conn ( conn, 0 );
-}
+/** TCP stream operations */
+static struct stream_connection_operations tcp_op = {
+	.bind		= tcp_bind,
+	.connect	= tcp_connect,
+	.close		= tcp_close,
+	.send		= tcp_send,
+	.kick		= tcp_kick,
+};
 
 /** TCP protocol */
 struct tcpip_protocol tcp_protocol __tcpip_protocol = {

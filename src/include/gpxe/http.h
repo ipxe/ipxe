@@ -8,7 +8,7 @@
  */
 
 #include <stdint.h>
-#include <gpxe/tcp.h>
+#include <gpxe/stream.h>
 #include <gpxe/async.h>
 #include <gpxe/linebuf.h>
 #include <gpxe/uri.h>
@@ -43,8 +43,8 @@ struct http_request {
 
 	/** Server address */
 	struct sockaddr server;
-	/** TCP application for this request */
-	struct tcp_application tcp;
+	/** Stream application for this request */
+	struct stream_application stream;
 	/** Number of bytes already sent */
 	size_t tx_offset;
 	/** RX state */
