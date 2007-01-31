@@ -53,6 +53,7 @@ static inline int fclose ( FILE *stream __unused ) {
 	return -1;
 }
 
+#define CONFIG_SSL_CERT_VERIFICATION 1
 #define CONFIG_SSL_MAX_CERTS 1
 #define CONFIG_X509_MAX_CA_CERTS 1
 #define CONFIG_SSL_EXPIRY_TIME 24
