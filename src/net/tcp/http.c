@@ -37,6 +37,7 @@
 #include <gpxe/download.h>
 #include <gpxe/resolv.h>
 #include <gpxe/tcp.h>
+#include <gpxe/tls.h>
 #include <gpxe/http.h>
 
 static struct async_operations http_async_operations;
@@ -387,6 +388,7 @@ static struct stream_application_operations http_stream_operations = {
  */
 int http_get ( struct uri *uri, struct buffer *buffer, struct async *parent ) {
 	struct http_request *http = NULL;
+	struct sockaddr_tcpip *st;
 	int rc;
 
 	/* Allocate and populate HTTP structure */
@@ -398,6 +400,17 @@ int http_get ( struct uri *uri, struct buffer *buffer, struct async *parent ) {
 	http->buffer = buffer;
 	async_init ( &http->async, &http_async_operations, parent );
 	http->stream.op = &http_stream_operations;
+	st = ( struct sockaddr_tcpip * ) &http->server;
+	st->st_port = htons ( uri_port ( http->uri, HTTP_PORT ) );
+
+	/* Open TCP connection */
+	if ( ( rc = tcp_open ( &http->stream ) ) != 0 )
+		goto err;
+	if ( strcmp ( http->uri->scheme, "https" ) == 0 ) {
+		st->st_port = htons ( uri_port ( http->uri, HTTPS_PORT ) );
+		if ( ( rc = add_tls ( &http->stream ) ) != 0 )
+			goto err;
+	}
 
 	/* Start name resolution.  The download proper will start when
 	 * name resolution completes.
@@ -424,7 +437,6 @@ int http_get ( struct uri *uri, struct buffer *buffer, struct async *parent ) {
 static void http_sigchld ( struct async *async, enum signal signal __unused ) {
 	struct http_request *http =
 		container_of ( async, struct http_request, async );
-	struct sockaddr_tcpip *st = ( struct sockaddr_tcpip * ) &http->server;
 	int rc;
 
 	/* If name resolution failed, abort now */
@@ -435,13 +447,6 @@ static void http_sigchld ( struct async *async, enum signal signal __unused ) {
 	}
 
 	/* Otherwise, start the HTTP connection */
-	if ( ( rc = tcp_open ( &http->stream ) ) != 0 ) {
-		DBGC ( http, "HTTP %p could not open stream connection: %s\n",
-		       http, strerror ( rc ) );
-		http_done ( http, rc );
-		return;
-	}
-	st->st_port = htons ( uri_port ( http->uri, HTTP_PORT ) );
 	if ( ( rc = stream_connect ( &http->stream, &http->server ) ) != 0 ) {
 		DBGC ( http, "HTTP %p could not connect stream: %s\n",
 		       http, strerror ( rc ) );
@@ -470,5 +475,11 @@ static struct async_operations http_async_operations = {
 /** HTTP download protocol */
 struct download_protocol http_download_protocol __download_protocol = {
 	.name = "http",
+	.start_download = http_get,
+};
+
+/** HTTPS download protocol */
+struct download_protocol https_download_protocol __download_protocol = {
+	.name = "https",
 	.start_download = http_get,
 };
