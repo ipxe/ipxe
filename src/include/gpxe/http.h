@@ -16,6 +16,9 @@
 /** HTTP default port */
 #define HTTP_PORT 80
 
+/** HTTPS default port */
+#define HTTPS_PORT 443
+
 /** HTTP receive state */
 enum http_rx_state {
 	HTTP_RX_RESPONSE = 0,
