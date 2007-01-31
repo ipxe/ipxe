@@ -37,12 +37,14 @@ static int null_setkey ( void *ctx __unused, void *key __unused,
 
 static void null_encode ( void *ctx __unused, const void *src,
 			  void *dst, size_t len ) {
-	memcpy ( dst, src, len );
+	if ( dst )
+		memcpy ( dst, src, len );
 }
 
 static void null_decode ( void *ctx __unused, const void *src,
 			  void *dst, size_t len ) {
-	memcpy ( dst, src, len );
+	if ( dst )
+		memcpy ( dst, src, len );
 }
 
 static void null_final ( void *ctx __unused, void *out __unused ) {
