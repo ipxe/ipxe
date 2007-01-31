@@ -22,6 +22,7 @@
  * Null crypto algorithm
  */
 
+#include <string.h>
 #include <gpxe/crypto.h>
 
 static void null_init ( void *ctx __unused ) {
@@ -34,14 +35,14 @@ static int null_setkey ( void *ctx __unused, void *key __unused,
 	return 0;
 }
 
-static void null_encode ( void *ctx __unused, const void *src __unused,
-			  void *dst __unused, size_t len __unused ) {
-	/* Do nothing */
+static void null_encode ( void *ctx __unused, const void *src,
+			  void *dst, size_t len ) {
+	memcpy ( dst, src, len );
 }
 
-static void null_decode ( void *ctx __unused, const void *src __unused,
-			  void *dst __unused, size_t len __unused ) {
-	/* Do nothing */
+static void null_decode ( void *ctx __unused, const void *src,
+			  void *dst, size_t len ) {
+	memcpy ( dst, src, len );
 }
 
 static void null_final ( void *ctx __unused, void *out __unused ) {
