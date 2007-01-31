@@ -115,15 +115,15 @@ $(BIN)/%.flags :
 # Rules for specific object types.
 #
 COMPILE_c	= $(CC) $(CFLAGS) $(CFLAGS_c) $(OBJ_CFLAGS)
-RULE_c		= $(COMPILE_c) -c $< -o $@
-RULE_c_to_dbg%.o = $(COMPILE_c) -Ddebug_$(OBJECT)=$* -c $< -o $@
-RULE_c_to_c	= $(COMPILE_c) -E -c $< > $@
-RULE_c_to_s	= $(COMPILE_c) -S -g0 -c $< -o $@ 
+RULE_c		= $(Q)$(COMPILE_c) -c $< -o $@
+RULE_c_to_dbg%.o = $(Q)$(COMPILE_c) -Ddebug_$(OBJECT)=$* -c $< -o $@
+RULE_c_to_c	= $(Q)$(COMPILE_c) -E -c $< > $@
+RULE_c_to_s	= $(Q)$(COMPILE_c) -S -g0 -c $< -o $@ 
 
 PREPROCESS_S	= $(CPP) $(CFLAGS) $(CFLAGS_S) $(OBJ_CFLAGS)
 ASSEMBLE_S	= $(AS) $(ASFLAGS)
-RULE_S		= $(PREPROCESS_S) $< | $(ASSEMBLE_S) -o $@
-RULE_S_to_s	= $(PREPROCESS_S) $< > $@
+RULE_S		= $(Q)$(PREPROCESS_S) $< | $(ASSEMBLE_S) -o $@
+RULE_S_to_s	= $(Q)$(PREPROCESS_S) $< > $@
 
 DEBUG_TARGETS	+= dbg%.o c s
 
