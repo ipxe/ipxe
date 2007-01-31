@@ -174,12 +174,16 @@ int insert_filter ( struct stream_application *app,
 		    struct filter_stream *filter ) {
 	struct stream_connection *conn = app->conn;
 
-	if ( ! app->conn ) {
+	if ( ! conn ) {
 		DBGC ( filter, "Filter %p cannot insert onto closed stream\n",
 		       filter );
 		return -ENOTCONN;
 	}
 
+	DBGC ( filter, "Filter %p inserted on stream %p\n", filter, app );
+
+	filter->upstream.app = app;
+	filter->downstream.conn = conn;
 	app->conn = &filter->upstream;
 	conn->app = &filter->downstream;
 
