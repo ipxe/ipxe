@@ -8,6 +8,7 @@
 #define HEADER_OS_PORT_H
 
 #include <stdint.h>
+#include <stddef.h>
 #include <stdlib.h>
 #include <time.h>
 #include <sys/time.h>
