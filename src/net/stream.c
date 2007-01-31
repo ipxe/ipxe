@@ -46,6 +46,24 @@ void stream_associate ( struct stream_application *app,
 }
 
 /**
+ * Disassociate application from connection
+ *
+ * @v app		Stream application
+ * @v conn		Stream connection
+ */
+static void stream_disassociate ( struct stream_application *app,
+				  struct stream_connection *conn ) {
+
+	DBGC ( app, "Stream %p disassociating from connection %p\n",
+	       app, conn );
+
+	assert ( conn->app == app );
+	assert ( app->conn == conn );
+	conn->app = NULL;
+	app->conn = NULL;	
+}
+
+/**
  * Connection established
  *
  * @v conn		Stream connection
@@ -76,18 +94,16 @@ void stream_connected ( struct stream_connection *conn ) {
 void stream_closed ( struct stream_connection *conn, int rc ) {
 	struct stream_application *app = conn->app;
 
-	DBGC ( app, "Stream %p closed (%s)\n", app, strerror ( rc ) );
-
 	/* Check connection actually exists */
 	if ( ! app ) {
-		DBGC ( conn, "Stream connection %p has no application\n",
-		       conn );
+		/* Not an error; don't display a debug message */
 		return;
 	}
 
+	DBGC ( app, "Stream %p closed (%s)\n", app, strerror ( rc ) );
+
 	/* Disassociate application from connection */
-	app->conn = NULL;
-	conn->app = NULL;
+	stream_disassociate ( app, conn );
 
 	/* Hand off to application */
 	if ( app->op->closed )
@@ -244,13 +260,12 @@ void stream_close ( struct stream_application *app ) {
 
 	/* Check connection actually exists */
 	if ( ! conn ) {
-		DBGC ( app, "Stream %p has no connection\n", app );
+		/* Not an error; don't display a debug message */
 		return;
 	}
 
 	/* Disassociate application from connection */
-	app->conn = NULL;
-	conn->app = NULL;
+	stream_disassociate ( app, conn );
 
 	/* Hand off to connection */
 	if ( ! conn->op->close )
