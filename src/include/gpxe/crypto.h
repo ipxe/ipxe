@@ -109,4 +109,6 @@ static inline int is_stream_cipher ( struct crypto_algorithm *crypto ) {
 	return ( crypto->blocksize == 1 );
 }
 
+extern struct crypto_algorithm crypto_null;
+
 #endif /* _GPXE_CRYPTO_H */
