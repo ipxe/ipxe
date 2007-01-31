@@ -317,3 +317,16 @@ UDItype __udivdi3 ( UDItype x, UDItype d ) {
 	UDItype r;
 	return __udivmoddi4 ( x, d, &r );
 }
+
+/**
+ * 64-bit modulus
+ *
+ * @v x			Dividend
+ * @v d			Divisor
+ * @ret q		Quotient
+ */
+UDItype __umoddi3 ( UDItype x, UDItype d ) {
+	UDItype r;
+	__udivmoddi4 ( x, d, &r );
+	return r;
+}
