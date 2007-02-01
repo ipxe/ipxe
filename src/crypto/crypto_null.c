@@ -29,10 +29,14 @@ static void null_init ( void *ctx __unused ) {
 	/* Do nothing */
 }
 
-static int null_setkey ( void *ctx __unused, void *key __unused,
+static int null_setkey ( void *ctx __unused, const void *key __unused,
 			 size_t keylen __unused ) {
 	/* Do nothing */
 	return 0;
+}
+
+static void null_setiv ( void *ctx __unused, const void *iv __unused ) {
+	/* Do nothing */
 }
 
 static void null_encode ( void *ctx __unused, const void *src,
@@ -58,6 +62,7 @@ struct crypto_algorithm crypto_null = {
 	.digestsize = 0,
 	.init = null_init,
 	.setkey = null_setkey,
+	.setiv = null_setiv,
 	.encode = null_encode,
 	.decode = null_decode,
 	.final = null_final,
