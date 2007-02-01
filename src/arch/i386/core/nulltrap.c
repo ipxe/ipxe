@@ -3,6 +3,7 @@
 
 __attribute__ (( noreturn, section ( ".text.null_trap" ) ))
 void null_function_trap ( void ) {
+	void *stack;
 
 	/* 128 bytes of NOPs; the idea of this is that if something
 	 * dereferences a NULL pointer and overwrites us, we at least
@@ -42,7 +43,9 @@ void null_function_trap ( void ) {
 	__asm__ __volatile__ ( "nop ; nop ; nop ; nop" );
 	__asm__ __volatile__ ( "nop ; nop ; nop ; nop" );
 
-	printf ( "NULL method called from %p\n", 
-		 __builtin_return_address ( 0 ) );
+	__asm__ __volatile__ ( "movl %%esp, %0" : "=r" ( stack ) );
+	printf ( "NULL method called from %p (stack %p)\n", 
+		 __builtin_return_address ( 0 ), stack );
+	DBG_HD ( stack, 256 );
 	while ( 1 ) {}
 }
