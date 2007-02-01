@@ -288,7 +288,7 @@ static int tcp_senddata_conn ( struct tcp_connection *tcp, int force_send ) {
 		start_timer ( &tcp->timer );
 
 	/* Estimate window size */
-	window = freemem;
+	window = ( ( freemem * 3 ) / 4 );
 	if ( window > TCP_MAX_WINDOW_SIZE )
 		window = TCP_MAX_WINDOW_SIZE;
 	window &= ~0x03; /* Keep everything dword-aligned */
