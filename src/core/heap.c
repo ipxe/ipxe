@@ -11,9 +11,9 @@
 /**
  * Heap size
  *
- * Currently fixed at 48kB.
+ * Currently fixed at 128kB.
  */
-#define HEAP_SIZE ( 48 * 1024 )
+#define HEAP_SIZE ( 128 * 1024 )
 
 /** The heap itself */
 char heap[HEAP_SIZE] __attribute__ (( aligned ( __alignof__(void *) )));
