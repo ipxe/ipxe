@@ -330,15 +330,17 @@ static void http_senddata ( struct stream_application *app,
 	struct http_request *http = stream_to_http ( app );
 	const char *path = http->uri->path;
 	const char *host = http->uri->host;
-
-	if ( ! path )
-		path = "/";
+	const char *query = http->uri->query;
 
 	len = snprintf ( buf, len,
-			 "GET %s HTTP/1.1\r\n"
+			 "GET %s%s%s HTTP/1.1\r\n"
 			 "User-Agent: gPXE/" VERSION "\r\n"
 			 "Host: %s\r\n"
-			 "\r\n", path, host );
+			 "\r\n",
+			 ( path ? path : "/" ),
+			 ( query ? "?" : "" ),
+			 ( query ? query : "" ),
+			 host );
 
 	stream_send ( app, ( buf + http->tx_offset ),
 		      ( len - http->tx_offset ) );
