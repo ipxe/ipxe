@@ -273,7 +273,10 @@ int RSA_encrypt(RSA_CTX *ctx, const uint8_t *in_data, uint16_t in_len,
     else /* randomize the encryption padding with non-zero bytes */   
     {
         out_data[1] = 2;
+        memset(&out_data[2], 0x01, num_pads_needed);
+#if 0
         get_random_NZ(num_pads_needed, &out_data[2]);
+#endif
     }
 
     out_data[2+num_pads_needed] = 0;
@@ -286,6 +289,8 @@ int RSA_encrypt(RSA_CTX *ctx, const uint8_t *in_data, uint16_t in_len,
     bi_export(ctx->bi_ctx, encrypt_bi, out_data, byte_size);
     return byte_size;
 }
+
+#if 0
 
 /**
  * Take a signature and decrypt it.
@@ -327,5 +332,7 @@ bigint *RSA_sign_verify(BI_CTX *ctx, const uint8_t *sig, int sig_len,
     free(block);
     return bir;
 }
+
+#endif
 
 #endif  /* CONFIG_SSL_CERT_VERIFICATION */
