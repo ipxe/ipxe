@@ -26,16 +26,6 @@
 #include <gpxe/crypto.h>
 #include <gpxe/md5.h>
 
-#define MD5_DIGEST_SIZE		16
-#define MD5_BLOCK_WORDS		16
-#define MD5_HASH_WORDS		4
-
-struct md5_ctx {
-	u32 hash[MD5_HASH_WORDS];
-	u32 block[MD5_BLOCK_WORDS];
-	u64 byte_count;
-};
-
 #define __md5step __attribute__ (( regparm ( 3 ) ))
 
 struct md5_step {
@@ -236,7 +226,7 @@ static void md5_final(void *context, void *out)
 
 struct crypto_algorithm md5_algorithm = {
 	.name		= "md5",
-	.ctxsize	= sizeof ( struct md5_ctx ),
+	.ctxsize	= MD5_CTX_SIZE,
 	.blocksize	= ( MD5_BLOCK_WORDS * 4 ),
 	.digestsize	= MD5_DIGEST_SIZE,
 	.init		= md5_init,

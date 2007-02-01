@@ -17,7 +17,7 @@ static void sha1_final ( void *ctx, void *out ) {
 
 struct crypto_algorithm sha1_algorithm = {
 	.name		= "sha1",
-	.ctxsize	= sizeof ( SHA1_CTX ),
+	.ctxsize	= SHA1_CTX_SIZE,
 	.blocksize	= 64,
 	.digestsize	= SHA1_SIZE,
 	.init		= sha1_init,
