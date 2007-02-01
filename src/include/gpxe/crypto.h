@@ -33,13 +33,13 @@ struct crypto_algorithm {
 	 * @v keylen		Key length
 	 * @ret rc		Return status code
 	 */
-	int ( * setkey ) ( void *ctx, void *key, size_t keylen );
+	int ( * setkey ) ( void *ctx, const void *key, size_t keylen );
 	/** Set initialisation vector
 	 *
 	 * @v ctx		Context
 	 * @v iv		Initialisation vector
 	 */
-	void ( *setiv ) ( void *ctx, void *iv );
+	void ( *setiv ) ( void *ctx, const void *iv );
 	/** Encode data
 	 *
 	 * @v ctx		Context
@@ -92,12 +92,12 @@ static inline void digest_final ( struct crypto_algorithm *crypto,
 }
 
 static inline void cipher_setiv ( struct crypto_algorithm *crypto,
-				 void *ctx, void *iv ) {
+				  void *ctx, const void *iv ) {
 	crypto->setiv ( ctx, iv );
 }
 
 static inline int cipher_setkey ( struct crypto_algorithm *crypto,
-				  void *ctx, void *key, size_t keylen ) {
+				  void *ctx, const void *key, size_t keylen ) {
 	return crypto->setkey ( ctx, key, keylen );
 }
 
