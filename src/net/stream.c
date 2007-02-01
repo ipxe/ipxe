@@ -156,6 +156,10 @@ void stream_acked ( struct stream_connection *conn, size_t len ) {
 		return;
 	}
 
+	/* Ignore zero-length blocks */
+	if ( len == 0 )
+		return;
+
 	/* Hand off to application */
 	if ( app->op->acked )
 		app->op->acked ( app, len );
@@ -180,6 +184,10 @@ void stream_newdata ( struct stream_connection *conn,
 		       conn );
 		return;
 	}
+
+	/* Ignore zero-length blocks */
+	if ( len == 0 )
+		return;
 
 	/* Hand off to application */
 	if ( app->op->newdata )
@@ -296,6 +304,10 @@ int stream_send ( struct stream_application *app,
 		DBGC ( app, "Stream %p has no connection\n", app );
 		return -ENOTCONN;
 	}
+
+	/* Ignore zero-length blocks */
+	if ( len == 0 )
+		return 0;
 
 	/* Hand off to connection */
 	if ( ! conn->op->send )
