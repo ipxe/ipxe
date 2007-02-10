@@ -27,9 +27,7 @@ static int legacy_transmit ( struct net_device *netdev, struct pk_buff *pkb ) {
 	int pad_len;
 
 	DBG ( "Transmitting %d bytes\n", pkb_len ( pkb ) );
-	pad_len = ( ETH_ZLEN - pkb_len ( pkb ) );
-	if ( pad_len > 0 )
-		memset ( pkb_put ( pkb, pad_len ), 0, pad_len );
+	pkb_pad ( pkb, ETH_ZLEN );
 	pkb_pull ( pkb, sizeof ( *ethhdr ) );
 	nic->nic_op->transmit ( nic, ( const char * ) ethhdr->h_dest,
 				ntohs ( ethhdr->h_protocol ),
