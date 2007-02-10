@@ -3167,16 +3167,16 @@ static void tg3_transmit(struct nic *nic, const char *dst_addr,
 	
 	/* Copy the packet to the our local buffer */
 	frame = &tg3_bss.tx_frame[frame_idx];
-	memcpy(frame[frame_idx].dst_addr, dst_addr, ETH_ALEN);
-	memcpy(frame[frame_idx].src_addr, nic->node_addr, ETH_ALEN);
-	frame[frame_idx].type = htons(type);
-	memset(frame[frame_idx].data, 0, sizeof(frame[frame_idx].data));
-	memcpy(frame[frame_idx].data, packet, size);
+	memcpy(frame->dst_addr, dst_addr, ETH_ALEN);
+	memcpy(frame->src_addr, nic->node_addr, ETH_ALEN);
+	frame->type = htons(type);
+	memset(frame->data, 0, sizeof(frame->data));
+	memcpy(frame->data, packet, size);
 
 	/* Setup the ring buffer entry to transmit */
 	txd            = &tp->tx_ring[entry];
 	txd->addr_hi   = 0; /* Etherboot runs under 4GB */
-	txd->addr_lo   = virt_to_bus(&frame[frame_idx]);
+	txd->addr_lo   = virt_to_bus(frame);
 	txd->len_flags = ((size + ETH_HLEN) << TXD_LEN_SHIFT) | TXD_FLAG_END;
 	txd->vlan_tag  = 0 << TXD_VLAN_TAG_SHIFT;
 
