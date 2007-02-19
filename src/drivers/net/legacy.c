@@ -24,7 +24,6 @@ static int legacy_registered = 0;
 static int legacy_transmit ( struct net_device *netdev, struct pk_buff *pkb ) {
 	struct nic *nic = netdev->priv;
 	struct ethhdr *ethhdr = pkb->data;
-	int pad_len;
 
 	DBG ( "Transmitting %d bytes\n", pkb_len ( pkb ) );
 	pkb_pad ( pkb, ETH_ZLEN );
