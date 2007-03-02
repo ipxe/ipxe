@@ -31,15 +31,19 @@ include arch/$(ARCH)/Config
 #
 noargs :
 	@echo '===================================================='
+	@echo
+	@echo ' *** WARNING: THE INSTRUCTIONS BELOW DO NOT FULLY WORK YET !!!  ***'
+	@echo ' ***                    PLEASE STAY TUNED                       ***' 
+	@echo
 	@echo 'No target specified. To specify a target, do: '
 	@echo
-	@echo '    $(MAKE) bin/<rom-name>.<output-format> '
+	@echo '    make bin/<rom-name>.<output-format> '
 	@echo
-	@echo 'where <output-format> is one of [z]{$(MEDIA) }'
+	@echo 'where <output-format> is one of {$(MEDIA) }'
 	@echo
 	@echo 'or: '
 	@echo
-	@echo '    $(MAKE) all<output-format>s'
+	@echo '    make all<output-format>s'
 	@echo
 	@echo 'to generate all possible images of format <output-format>'
 	@echo
