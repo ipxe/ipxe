@@ -11,7 +11,7 @@ CLEANUP	:= $(BIN)/*.* # *.* to avoid catching the "CVS" directory
 #
 VERSION_MAJOR	= 0
 VERSION_MINOR	= 5
-VERSION_PATCH	= 0
+VERSION_PATCH	= 1
 EXTRAVERSION	=	
 MM_VERSION	= $(VERSION_MAJOR).$(VERSION_MINOR)
 VERSION		= $(MM_VERSION).$(VERSION_PATCH)$(EXTRAVERSION)
@@ -471,3 +471,20 @@ clean :
 
 veryclean : clean
 	$(RM) -r $(VERYCLEANUP)
+
+# Make clean tarballs for release
+
+gpxe-tarball : ../VERSION
+	(echo -n $(VERSION) ''; date -u +'%Y-%m-%d') > ../VERSION
+	$(RM) -r /tmp/gpxe/gpxe-$(VERSION)
+	mkdir -p /tmp/gpxe/gpxe-$(VERSION)
+	cp -rP .. /tmp/gpxe/gpxe-$(VERSION)
+	$(RM) -r /tmp/gpxe/CVS
+	( cd /tmp/gpxe/gpxe-$(VERSION)/src ; $(RM) -r bin/deps ; $(MAKE) clean ; $(MAKE) veryclean )
+	( cd /tmp/gpxe; tar cf /tmp/gpxe/gpxe-$(VERSION).tar --exclude CVS --exclude "#*" \
+	  --exclude "*~" gpxe-$(VERSION) )
+	bzip2 -9 < /tmp/gpxe/gpxe-$(VERSION).tar > /tmp/gpxe/gpxe-$(VERSION).tar.bz2
+	gzip -9 < /tmp/gpxe/gpxe-$(VERSION).tar > /tmp/gpxe/gpxe-$(VERSION).tar.gz
+	$(RM) -r /tmp/gpxe/gpxe-$(VERSION)
+	$(RM) /tmp/gpxe/gpxe-$(VERSION).tar
+	( cd /tmp/gpxe ; tar -zxf /tmp/gpxe/gpxe-$(VERSION).tar.gz )
