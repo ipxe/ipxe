@@ -1,20 +1,26 @@
-Unless specifically noted, a file is under the GPL.  GPLed files are in
+
+In general gPXE files are licensed under the GPL.  GPLed files are in
 general either from Linux or have been explicitly put under GPL by the
-authors.  A few files are inherited from FreeBSD netboot and therefore
-can be used under BSD or GPL.
+authors.  The license for a file is usually documented at the top of
+the file.  
 
-File				Copyright status
+A few files are inherited from FreeBSD netboot and therefore can be
+used under BSD or GPL.  Documented in this file are some of the
+non-GPL'ed files.  If the internal documentation for a file disagrees
+with what is documented in this file, the internal documentation for
+the file shall be override this file.
 
-core/misc.c			BSD
-drivers/net/3c509.c		BSD
-drivers/net/3c509.h		BSD
-drivers/net/3c595.c		BSD
-drivers/net/3c595.h		BSD
-drivers/net/3c90x.c		Open Source
-drivers/net/epic100.c		None
-drivers/net/epic100.h		None
-drivers/net/ns8390.c		BSD
-drivers/net/ns8390.h		BSD
-drivers/net/tulip.c		BSD
-arch/i386/include/bits/string.h	None
-util/lzhuf.c			Open Source
+File					Copyright status
+
+src/core/misc.c				BSD
+src/drivers/net/3c509.c			BSD
+src/drivers/net/3c509.h			BSD
+src/drivers/net/3c595.c			BSD
+src/drivers/net/3c595.h			BSD
+src/drivers/net/3c90x.c			Open Source
+src/drivers/net/epic100.c		None
+src/drivers/net/epic100.h		None
+src/drivers/net/ns8390.c		BSD
+src/drivers/net/ns8390.h		BSD
+src/arch/i386/include/bits/string.h	None
+
