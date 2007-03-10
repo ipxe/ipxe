@@ -4,14 +4,13 @@
  *
  */
 
-#if 0
-
+#include <stdint.h>
+#include <stdlib.h>
+#include <string.h>
+#include <io.h>
+#include <timer.h>
+#include <gpxe/device.h>
 #include <gpxe/isa.h>
-#include "io.h"
-#include "timer.h"
-#include "string.h"
-#include "console.h"
-#include "dev.h"
 #include "3c509.h"
 
 /*
@@ -29,25 +28,46 @@
  *
  */
 
-static uint16_t t509_id_port = 0;
-static uint8_t t509_max_tag = 0;
+static void t509bus_remove ( struct root_device *rootdev );
 
-/*
- * A location on a t509 bus
- *
- */
-struct t509_loc {
-	uint8_t tag;
-};
+static unsigned int t509_id_port = 0;
+static unsigned int t509_max_tag = 0;
 
-/*
- * A physical t509 device
- *
- */
+/** A 3c509 device */
 struct t509_device {
+	/** Generic device */
+	struct device dev;
+	/** Tag */
+	unsigned int tag;
+	/** I/O address */
 	uint16_t ioaddr;
-	uint8_t tag;
+	/** Driver-private data
+	 *
+	 * Use t509_set_drvdata() and t509_get_drvdata() to access
+	 * this field.
+	 */
+	void *priv;
 };
+
+/**
+ * Set 3c509 driver-private data
+ *
+ * @v t509		3c509 device
+ * @v priv		Private data
+ */
+static inline void t509_set_drvdata ( struct t509_device *t509, void *priv ) {
+	t509->priv = priv;
+}
+
+/**
+ * Get 3c509 driver-private data
+ *
+ * @v t509		3c509 device
+ * @ret priv		Private data
+ */
+static inline void * t509_get_drvdata ( struct t509_device *t509 ) {
+	return t509->priv;
+}
 
 /*
  * t509 utility functions
@@ -105,12 +125,12 @@ static inline int t509_find_id_port ( void ) {
 		if ( inb ( t509_id_port ) & 0x01 ) {
 			/* Found a suitable port */
 			DBG ( "T509 using ID port at %hx\n", t509_id_port );
-			return 1;
+			return 0;
 		}
 	}
 	/* No id port available */
 	DBG ( "T509 found no available ID port\n" );
-	return 0;
+	return -ENOENT;
 }
 
 /*
@@ -160,13 +180,14 @@ static uint16_t t509_id_read_eeprom ( int offset ) {
  * Isolate and tag all t509 cards
  *
  */
-static void t509_isolate ( void ) {
+static int t509_isolate ( void ) {
 	unsigned int i;
 	uint16_t contend[3];
+	int rc;
 
 	/* Find a suitable ID port */
-	if ( ! t509_find_id_port () )
-		return;
+	if ( ( rc = t509_find_id_port () ) != 0 )
+		return rc;
 
 	while ( 1 ) {
 
@@ -202,7 +223,7 @@ static void t509_isolate ( void ) {
 
 		/* Only one device will still be left alive.  Tag it. */
 		++t509_max_tag;
-		DBG ( "T509 found card %hx%hx%hx, assigning tag %hhx\n",
+		DBG ( "T509 found card %04x%04x%04x, assigning tag %02x\n",
 		      contend[0], contend[1], contend[2], t509_max_tag );
 		t509_set_tag ( t509_max_tag );
 
@@ -210,118 +231,10 @@ static void t509_isolate ( void ) {
 		t509_wait_for_id_sequence();
 	}
 
-	DBG ( "T509 found %d cards using ID port %hx\n",
+	DBG ( "T509 found %d cards using ID port %04x\n",
 	      t509_max_tag, t509_id_port );
-	return;
+	return 0;
 }
-
-/*
- * Increment a bus_loc structure to the next possible T509 location.
- * Leave the structure zeroed and return 0 if there are no more valid
- * locations.
- *
- */
-static int t509_next_location ( struct bus_loc *bus_loc ) {
-	struct t509_loc *t509_loc = ( struct t509_loc * ) bus_loc;
-	
-	/*
-	 * Ensure that there is sufficient space in the shared bus
-	 * structures for a struct t509_loc and a struct t509_dev,
-	 * as mandated by bus.h.
-	 *
-	 */
-	BUS_LOC_CHECK ( struct t509_loc );
-	BUS_DEV_CHECK ( struct t509_device );
-
-	return ( t509_loc->tag = ( ++t509_loc->tag & EP_TAG_MAX ) );
-}
-
-/*
- * Fill in parameters for a T509 device based on tag
- *
- * Return 1 if device present, 0 otherwise
- *
- */
-static int t509_fill_device ( struct bus_dev *bus_dev,
-			      struct bus_loc *bus_loc ) {
-	struct t509_device *t509 = ( struct t509_device * ) bus_dev;
-	struct t509_loc *t509_loc = ( struct t509_loc * ) bus_loc;
-	uint16_t iobase;
-
-	/* Copy tag to struct t509 */
-	t509->tag = t509_loc->tag;
-
-	/* Tag 0 is never valid, but may be passed in */
-	if ( ! t509->tag )
-		return 0;
-
-	/* Perform isolation if it hasn't yet been done */
-	if ( ! t509_id_port )
-		t509_isolate();
-
-	/* Check tag is in range */
-	if ( t509->tag > t509_max_tag )
-		return 0;
-
-	/* Send the ID sequence */
-	t509_send_id_sequence ();
-
-	/* Select the specified tag */
-	t509_select_tag ( t509->tag );
-
-	/* Read the default I/O address */
-	iobase = t509_id_read_eeprom ( EEPROM_ADDR_CFG );
-	t509->ioaddr = 0x200 + ( ( iobase & 0x1f ) << 4 );
-
-	/* Send card back to ID_WAIT */
-	t509_wait_for_id_sequence();
-
-	DBG ( "T509 found device %hhx, base %hx\n", t509->tag, t509->ioaddr );
-	return 1;
-}
-
-/*
- * Test whether or not a driver is capable of driving the device.
- * This is a no-op for T509.
- *
- */
-static int t509_check_driver ( struct bus_dev *bus_dev __unused,
-			       struct device_driver *device_driver __unused ) {
-	return 1;
-}
-
-/*
- * Describe a T509 device
- *
- */
-static char * t509_describe_device ( struct bus_dev *bus_dev ) {
-	struct t509_device *t509 = ( struct t509_device * ) bus_dev;
-	static char t509_description[] = "T509 00";
-
-	sprintf ( t509_description + 4, "%hhx", t509->tag );
-	return t509_description;
-}
-
-/*
- * Name a T509 device
- *
- */
-static const char * t509_name_device ( struct bus_dev *bus_dev __unused ) {
-	return "T509";
-}
-
-/*
- * T509 bus operations table
- *
- */
-struct bus_driver t509_driver __bus_driver = {
-	.name			= "T509",
-	.next_location		= t509_next_location,
-	.fill_device		= t509_fill_device,
-	.check_driver		= t509_check_driver,
-	.describe_device	= t509_describe_device,
-	.name_device		= t509_name_device,
-};
 
 /*
  * Activate a T509 device
@@ -335,7 +248,7 @@ static inline void activate_t509_device ( struct t509_device *t509 ) {
 	t509_send_id_sequence ();
 	t509_select_tag ( t509->tag );
 	t509_activate ( t509->ioaddr );
-	DBG ( "T509 activated device %hhx at ioaddr %hx\n",
+	DBG ( "T509 activated device %02x at ioaddr %04x\n",
 	      t509->tag, t509->ioaddr );
 }
 
@@ -353,53 +266,160 @@ static inline void deactivate_t509_device ( struct t509_device *t509 ) {
 	t509_select_tag ( 0 );
 	t509_set_tag ( t509->tag );
 	t509_wait_for_id_sequence ();
-	DBG ( "T509 deactivated device at %hx and re-tagged as %hhx\n",
+	DBG ( "T509 deactivated device at %04x and re-tagged as %02x\n",
 	      t509->ioaddr, t509->tag );
-}
-
-/*
- * Fill in a nic structure
- *
- * Called only once, so inlined for efficiency
- *
- */
-static inline void t509_fill_nic ( struct nic *nic,
-				   struct t509_device *t509 ) {
-
-	/* Fill in ioaddr and irqno */
-	nic->ioaddr = t509->ioaddr;
-	nic->irqno = 0;
-
-	/* Fill in DHCP device ID structure */
-	nic->dhcp_dev_id.bus_type = ISA_BUS_TYPE;
-	nic->dhcp_dev_id.vendor_id = htons ( MFG_ID );
-	nic->dhcp_dev_id.device_id = htons ( PROD_ID );
 }
 
 /*
  * The ISA probe function
  *
  */
-static int el3_t509_probe ( struct nic *nic, struct t509_device *t509 ) {
+static int legacy_t509_probe ( struct nic *nic, void *t509 ) {
 	
 	/* We could change t509->ioaddr if we wanted to */
 	activate_t509_device ( t509 );
-	t509_fill_nic ( nic, t509 );
 
 	/* Hand off to generic t5x9 probe routine */
 	return t5x9_probe ( nic, ISA_PROD_ID ( PROD_ID ), ISA_PROD_ID_MASK );
 }
 
-static void el3_t509_disable ( struct nic *nic, struct t509_device *t509 ) {
+static void legacy_t509_disable ( struct nic *nic, void *t509 ) {
 	t5x9_disable ( nic );
 	deactivate_t509_device ( t509 );
 }
 
-struct {} el3_t509_driver;
+static inline void legacy_t509_set_drvdata ( void *hwdev, void *priv ) {
+	t509_set_drvdata ( hwdev, priv );
+}
 
-DRIVER ( "3c509", nic_driver, t509_driver, el3_t509_driver,
-	 el3_t509_probe, el3_t509_disable );
+static inline void * legacy_t509_get_drvdata ( void *hwdev ) {
+	return t509_get_drvdata ( hwdev );
+}
+
+/**
+ * Probe a 3c509 device
+ *
+ * @v t509		3c509 device
+ * @ret rc		Return status code
+ *
+ * Searches for a driver for the 3c509 device.  If a driver is found,
+ * its probe() routine is called.
+ */
+static int t509_probe ( struct t509_device *t509 ) {
+	DBG ( "Adding 3c509 device %02x (I/O %04x)\n",
+	      t509->tag, t509->ioaddr );
+	return legacy_probe ( t509, legacy_t509_set_drvdata, &t509->dev,
+			      legacy_t509_probe, legacy_t509_disable );
+}
+
+/**
+ * Remove a 3c509 device
+ *
+ * @v t509		3c509 device
+ */
+static void t509_remove ( struct t509_device *t509 ) {
+	legacy_remove ( t509, legacy_t509_get_drvdata, legacy_t509_disable );
+	DBG ( "Removed 3c509 device %02x\n", t509->tag );
+}
+
+/**
+ * Probe 3c509 root bus
+ *
+ * @v rootdev		3c509 bus root device
+ *
+ * Scans the 3c509 bus for devices and registers all devices it can
+ * find.
+ */
+static int t509bus_probe ( struct root_device *rootdev ) {
+	struct t509_device *t509 = NULL;
+	unsigned int tag;
+	unsigned int iobase;
+	int rc;
+
+	/* Perform isolation and tagging */
+	if ( ( rc = t509_isolate() ) != 0 )
+		return rc;
+
+	for ( tag = 1 ; tag <= t509_max_tag ; tag++ ) {
+		/* Allocate struct t509_device */
+		if ( ! t509 )
+			t509 = malloc ( sizeof ( *t509 ) );
+		if ( ! t509 ) {
+			rc = -ENOMEM;
+			goto err;
+		}
+		memset ( t509, 0, sizeof ( *t509 ) );
+		t509->tag = tag;
+
+		/* Send the ID sequence */
+		t509_send_id_sequence ();
+
+		/* Select the specified tag */
+		t509_select_tag ( t509->tag );
+
+		/* Read the default I/O address */
+		iobase = t509_id_read_eeprom ( EEPROM_ADDR_CFG );
+		t509->ioaddr = 0x200 + ( ( iobase & 0x1f ) << 4 );
+
+		/* Send card back to ID_WAIT */
+		t509_wait_for_id_sequence();
+
+		/* Add to device hierarchy */
+		snprintf ( t509->dev.name, sizeof ( t509->dev.name ),
+			   "t509%02x", tag );
+		t509->dev.desc.bus_type = BUS_TYPE_ISA;
+		t509->dev.desc.vendor = MFG_ID;
+		t509->dev.desc.device = PROD_ID;
+		t509->dev.parent = &rootdev->dev;
+		list_add ( &t509->dev.siblings, &rootdev->dev.children );
+		INIT_LIST_HEAD ( &t509->dev.children );
+			
+		/* Look for a driver */
+		if ( t509_probe ( t509 ) == 0 ) {
+			/* t509dev registered, we can drop our ref */
+			t509 = NULL;
+		} else {
+			/* Not registered; re-use struct */
+			list_del ( &t509->dev.siblings );
+		}
+	}
+
+	free ( t509 );
+	return 0;
+
+ err:
+	free ( t509 );
+	t509bus_remove ( rootdev );
+	return rc;
+}
+
+/**
+ * Remove 3c509 root bus
+ *
+ * @v rootdev		3c509 bus root device
+ */
+static void t509bus_remove ( struct root_device *rootdev ) {
+	struct t509_device *t509;
+	struct t509_device *tmp;
+
+	list_for_each_entry_safe ( t509, tmp, &rootdev->dev.children,
+				   dev.siblings ) {
+		t509_remove ( t509 );
+		list_del ( &t509->dev.siblings );
+		free ( t509 );
+	}
+}
+
+/** 3c509 bus root device driver */
+static struct root_driver t509_root_driver = {
+	.probe = t509bus_probe,
+	.remove = t509bus_remove,
+};
+
+/** 3c509 bus root device */
+struct root_device t509_root_device __root_device = {
+	.dev = { .name = "3c509" },
+	.driver = &t509_root_driver,
+};
 
 ISA_ROM ( "3c509", "3c509" );
-
-#endif
