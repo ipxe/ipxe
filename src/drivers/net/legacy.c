@@ -64,11 +64,11 @@ static void legacy_close ( struct net_device *netdev __unused ) {
 	/* Nothing to do */
 }
 
-int legacy_probe ( struct pci_device *pci,
-		   const struct pci_device_id *id __unused,
-		   int ( * probe ) ( struct nic *nic,
-				     struct pci_device *pci ),
-		   void ( * disable ) ( struct nic *nic ) ) {
+int legacy_probe ( void *hwdev,
+		   void ( * set_drvdata ) ( void *hwdev, void *priv ),
+		   struct device *dev,
+		   int ( * probe ) ( struct nic *nic, void *hwdev ),
+		   void ( * disable ) ( struct nic *nic, void *hwdev ) ) {
 	struct net_device *netdev;
 	int rc;
 
@@ -80,8 +80,8 @@ int legacy_probe ( struct pci_device *pci,
 		return -ENOMEM;
 	netdev->priv = &nic;
 	memset ( &nic, 0, sizeof ( nic ) );
-	pci_set_drvdata ( pci, netdev );
-	netdev->dev = &pci->dev;
+	set_drvdata ( hwdev, netdev );
+	netdev->dev = dev;
 
 	netdev->open = legacy_open;
 	netdev->close = legacy_close;
@@ -89,13 +89,13 @@ int legacy_probe ( struct pci_device *pci,
 	netdev->poll = legacy_poll;
 	nic.node_addr = netdev->ll_addr;
 
-	if ( ! probe ( &nic, pci ) ) {
+	if ( ! probe ( &nic, hwdev ) ) {
 		free_netdev ( netdev );
 		return -ENODEV;
 	}
 
 	if ( ( rc = register_netdev ( netdev ) ) != 0 ) {
-		disable ( &nic );
+		disable ( &nic, hwdev );
 		free_netdev ( netdev );
 		return rc;
 	}
@@ -108,20 +108,16 @@ int legacy_probe ( struct pci_device *pci,
 	return 0;
 }
 
-void legacy_remove ( struct pci_device *pci,
-		     void ( * disable ) ( struct nic *nic ) ) {
-	struct net_device *netdev = pci_get_drvdata ( pci );
+void legacy_remove ( void *hwdev,
+		     void * ( * get_drvdata ) ( void *hwdev ),
+		     void ( * disable ) ( struct nic *nic, void *hwdev ) ) {
+	struct net_device *netdev = get_drvdata ( hwdev );
 	struct nic *nic = netdev->priv;
 
 	unregister_netdev ( netdev );
-	disable ( nic );
+	disable ( nic, hwdev );
 	free_netdev ( netdev );
 	legacy_registered = 0;
-}
-
-void pci_fill_nic ( struct nic *nic, struct pci_device *pci ) {
-	nic->ioaddr = pci->ioaddr;
-	nic->irqno = pci->irq;
 }
 
 int dummy_connect ( struct nic *nic __unused ) {
@@ -131,5 +127,3 @@ int dummy_connect ( struct nic *nic __unused ) {
 void dummy_irq ( struct nic *nic __unused, irq_action_t irq_action __unused ) {
 	return;
 }
-
-REQUIRE_OBJECT ( pci );

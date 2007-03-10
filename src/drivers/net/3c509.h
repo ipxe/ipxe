@@ -31,6 +31,8 @@
 
  */
 
+#include "nic.h"
+
 /*
  * Ethernet software status per interface.
  */

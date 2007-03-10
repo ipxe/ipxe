@@ -28,13 +28,6 @@
 
 static struct tg3 tg3;
 
-/* Dummy defines for error handling */
-#define EBUSY  1
-#define ENODEV 2
-#define EINVAL 3
-#define ENOMEM 4
-
-
 /* These numbers seem to be hard coded in the NIC firmware somehow.
  * You can't change the ring sizes, but you can change where you place
  * them in the NIC onboard memory.

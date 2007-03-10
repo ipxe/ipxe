@@ -331,7 +331,7 @@ struct net_device * find_pci_netdev ( unsigned int busdevfn ) {
 
 	list_for_each_entry ( netdev, &net_devices, list ) {
 		if ( ( netdev->dev->desc.bus_type == BUS_TYPE_PCI ) &&
-		     ( netdev->dev->desc.pci.busdevfn == busdevfn ) )
+		     ( netdev->dev->desc.location == busdevfn ) )
 			return netdev;
 	}
 

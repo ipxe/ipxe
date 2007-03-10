@@ -33,7 +33,7 @@ has 34 pins, the top row of 2 are not used.
 
 #include "etherboot.h"
 #include "nic.h"
-#include "isa.h"
+#include <gpxe/isa.h>
 #include "timer.h"
 #include <gpxe/ethernet.h>
 
@@ -557,6 +557,7 @@ static int eepro_probe ( struct nic *nic, struct isa_device *isa ) {
 		unsigned char	caddr[ETH_ALEN];
 		unsigned short	saddr[ETH_ALEN/2];
 	} station_addr;
+	const char *name;
 
 	nic->irqno  = 0;
 	isa_fill_nic ( nic, isa );
@@ -576,16 +577,16 @@ static int eepro_probe ( struct nic *nic, struct isa_device *isa ) {
 	station_addr.saddr[1] = read_eeprom(nic->ioaddr,3);
 	station_addr.saddr[0] = read_eeprom(nic->ioaddr,4);
 	if (l_eepro)
-		isa->name = "Intel EtherExpress 10 ISA";
+		name = "Intel EtherExpress 10 ISA";
 	else if (read_eeprom(nic->ioaddr,7) == ee_FX_INT2IRQ) {
-		isa->name = "Intel EtherExpress Pro/10+ ISA";
+		name = "Intel EtherExpress Pro/10+ ISA";
 		l_eepro = 2;
 	} else if (station_addr.saddr[0] == SA_ADDR1) {
-		isa->name = "Intel EtherExpress Pro/10 ISA";
+		name = "Intel EtherExpress Pro/10 ISA";
 		l_eepro = 1;
 	} else {
 		l_eepro = 0;
-		isa->name = "Intel 82595-based LAN card";
+		name = "Intel 82595-based LAN card";
 	}
 	station_addr.saddr[0] = swap16(station_addr.saddr[0]);
 	station_addr.saddr[1] = swap16(station_addr.saddr[1]);
@@ -594,7 +595,7 @@ static int eepro_probe ( struct nic *nic, struct isa_device *isa ) {
 		nic->node_addr[i] = station_addr.caddr[i];
 	}
 
-	DBG ( "%s ioaddr %#hX, addr %s", isa->name, nic->ioaddr, eth_ntoa ( nic->node_addr ) );
+	DBG ( "%s ioaddr %#hX, addr %s", name, nic->ioaddr, eth_ntoa ( nic->node_addr ) );
 
 	mem_start = RCV_LOWER_LIMIT << 8;
 	if ((mem_end & 0x3F) < 3 || (mem_end & 0x3F) > 29)

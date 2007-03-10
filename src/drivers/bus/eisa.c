@@ -1,164 +1,24 @@
-#include "string.h"
-#include "io.h"
-#include "timer.h"
-#include "console.h"
-#include "dev.h"
-#include "eisa.h"
+#include <stdint.h>
+#include <string.h>
+#include <stdlib.h>
+#include <stdio.h>
+#include <errno.h>
+#include <io.h>
+#include <timer.h>
+#include <gpxe/eisa.h>
 
-/*
- * Increment a bus_loc structure to the next possible EISA location.
- * Leave the structure zeroed and return 0 if there are no more valid
- * locations.
- *
- */
-static int eisa_next_location ( struct bus_loc *bus_loc ) {
-	struct eisa_loc *eisa_loc = ( struct eisa_loc * ) bus_loc;
-	
-	/*
-	 * Ensure that there is sufficient space in the shared bus
-	 * structures for a struct isa_loc and a struct
-	 * isa_dev, as mandated by bus.h.
-	 *
-	 */
-	BUS_LOC_CHECK ( struct eisa_loc );
-	BUS_DEV_CHECK ( struct eisa_device );
+static struct eisa_driver eisa_drivers[0]
+	__table_start ( struct eisa_driver, eisa_drivers );
+static struct eisa_driver eisa_drivers_end[0]
+	__table_end ( struct eisa_driver, eisa_drivers );
 
-	return ( eisa_loc->slot = ( ++eisa_loc->slot & EISA_MAX_SLOT ) );
-}
+static void eisabus_remove ( struct root_device *rootdev );
 
-/*
- * Fill in parameters for an EISA device based on slot number
- *
- * Return 1 if device present, 0 otherwise
- *
- */
-static int eisa_fill_device  ( struct bus_dev *bus_dev,
-			       struct bus_loc *bus_loc ) {
-	struct eisa_loc *eisa_loc = ( struct eisa_loc * ) bus_loc;
-	struct eisa_device *eisa = ( struct eisa_device * ) bus_dev;
-	uint8_t present;
-
-	/* Copy slot number to struct eisa, set default values */
-	eisa->slot = eisa_loc->slot;
-	eisa->name = "?";
-
-	/* Slot 0 is never valid */
-	if ( ! eisa->slot )
-		return 0;
-
-	/* Set ioaddr */
-	eisa->ioaddr = EISA_SLOT_BASE ( eisa->slot );
-
-	/* Test for board present */
-	outb ( 0xff, eisa->ioaddr + EISA_MFG_ID_HI );
-	present = inb ( eisa->ioaddr + EISA_MFG_ID_HI );
-	if ( present & 0x80 ) {
-		/* No board present */
-		return 0;
-	}
-
-	/* Read mfg and product IDs.  Yes, the resulting uint16_ts
-	 * will be upside-down.  This appears to be by design.
-	 */
-	eisa->mfg_id = ( inb ( eisa->ioaddr + EISA_MFG_ID_LO ) << 8 )
-		+ present;
-	eisa->prod_id = ( inb ( eisa->ioaddr + EISA_PROD_ID_LO ) << 8 )
-		+ inb ( eisa->ioaddr + EISA_PROD_ID_HI );
-
-	DBG ( "EISA found slot %hhx (base %#hx) ID %hx:%hx (\"%s\")\n",
-	      eisa->slot, eisa->ioaddr, eisa->mfg_id, eisa->prod_id,
-	      isa_id_string ( eisa->mfg_id, eisa->prod_id ) );
-
-	return 1;
-}
-
-/*
- * Test whether or not a driver is capable of driving the device.
- *
- */
-static int eisa_check_driver ( struct bus_dev *bus_dev,
-				 struct device_driver *device_driver ) {
-	struct eisa_device *eisa = ( struct eisa_device * ) bus_dev;
-	struct eisa_driver *driver
-		= ( struct eisa_driver * ) device_driver->bus_driver_info;
-	unsigned int i;
-
-	/* Compare against driver's ID list */
-	for ( i = 0 ; i < driver->id_count ; i++ ) {
-		struct eisa_id *id = &driver->ids[i];
-		
-		if ( ( eisa->mfg_id == id->mfg_id ) &&
-		     ( ISA_PROD_ID ( eisa->prod_id ) ==
-		       ISA_PROD_ID ( id->prod_id ) ) ) {
-			DBG ( "EISA found ID %hx:%hx (\"%s\") "
-			      "(device %s) matching driver %s\n",
-			      eisa->mfg_id, eisa->prod_id,
-			      isa_id_string ( eisa->mfg_id,
-					      eisa->prod_id ),
-			      id->name, driver->name );
-			eisa->name = id->name;
-			return 1;
-		}
-	}
-
-	/* No device found */
-	return 0;
-}
-
-/*
- * Describe an EISA device
- *
- */
-static char * eisa_describe_device ( struct bus_dev *bus_dev ) {
-	struct eisa_device *eisa = ( struct eisa_device * ) bus_dev;
-	static char eisa_description[] = "EISA 00";
-
-	sprintf ( eisa_description + 5, "%hhx", eisa->slot );
-	return eisa_description;
-}
-
-/*
- * Name an EISA device
- *
- */
-static const char * eisa_name_device ( struct bus_dev *bus_dev ) {
-	struct eisa_device *eisa = ( struct eisa_device * ) bus_dev;
-	
-	return eisa->name;
-}
-
-/*
- * EISA bus operations table
- *
- */
-struct bus_driver eisa_driver __bus_driver = {
-	.name			= "EISA",
-	.next_location		= eisa_next_location,
-	.fill_device		= eisa_fill_device,
-	.check_driver		= eisa_check_driver,
-	.describe_device	= eisa_describe_device,
-	.name_device		= eisa_name_device,
-};
-
-/*
- * Fill in a nic structure
- *
- */
-void eisa_fill_nic ( struct nic *nic, struct eisa_device *eisa ) {
-
-	/* Fill in ioaddr and irqno */
-	nic->ioaddr = eisa->ioaddr;
-	nic->irqno = 0;
-
-	/* Fill in DHCP device ID structure */
-	nic->dhcp_dev_id.bus_type = ISA_BUS_TYPE;
-	nic->dhcp_dev_id.vendor_id = htons ( eisa->mfg_id );
-	nic->dhcp_dev_id.device_id = htons ( eisa->prod_id );
-}
-
-/*
+/**
  * Reset and enable/disable an EISA device
  *
+ * @v eisa		EISA device
+ * @v enabled		1=enable, 0=disable
  */
 void eisa_device_enabled ( struct eisa_device *eisa, int enabled ) {
 	/* Set reset line high for 1000 µs.  Spec says 500 µs, but
@@ -174,6 +34,152 @@ void eisa_device_enabled ( struct eisa_device *eisa, int enabled ) {
 	       eisa->ioaddr + EISA_GLOBAL_CONFIG );
 	udelay ( 1000 ); /* Must wait 800 */
 
-	DBG ( "EISA %s device %hhx\n", ( enabled ? "enabled" : "disabled" ),
+	DBG ( "EISA %s device %02x\n", ( enabled ? "enabled" : "disabled" ),
 	      eisa->slot );
 }
+
+/**
+ * Probe an EISA device
+ *
+ * @v eisa		EISA device
+ * @ret rc		Return status code
+ *
+ * Searches for a driver for the EISA device.  If a driver is found,
+ * its probe() routine is called.
+ */
+static int eisa_probe ( struct eisa_device *eisa ) {
+	struct eisa_driver *driver;
+	struct eisa_device_id *id;
+	unsigned int i;
+	int rc;
+
+	DBG ( "Adding EISA device %02x (%04x:%04x (\"%s\") io %x)\n",
+	      eisa->slot, eisa->vendor_id, eisa->prod_id,
+	      isa_id_string ( eisa->vendor_id, eisa->prod_id ), eisa->ioaddr );
+
+	for ( driver = eisa_drivers; driver < eisa_drivers_end; driver++ ) {
+		for ( i = 0 ; i < driver->id_count ; i++ ) {
+			id = &driver->ids[i];
+			if ( id->vendor_id != eisa->vendor_id )
+				continue;
+			if ( ISA_PROD_ID ( id->prod_id ) !=
+			     ISA_PROD_ID ( eisa->prod_id ) )
+				continue;
+			eisa->driver = driver;
+			eisa->driver_name = id->name;
+			DBG ( "...using driver %s\n", eisa->driver_name );
+			if ( ( rc = driver->probe ( eisa, id ) ) != 0 ) {
+				DBG ( "......probe failed\n" );
+				continue;
+			}
+			return 0;
+		}
+	}
+
+	DBG ( "...no driver found\n" );
+	return -ENOTTY;
+}
+
+/**
+ * Remove an EISA device
+ *
+ * @v eisa		EISA device
+ */
+static void eisa_remove ( struct eisa_device *eisa ) {
+	eisa->driver->remove ( eisa );
+	DBG ( "Removed EISA device %02x\n", eisa->slot );
+}
+
+/**
+ * Probe EISA root bus
+ *
+ * @v rootdev		EISA bus root device
+ *
+ * Scans the EISA bus for devices and registers all devices it can
+ * find.
+ */
+static int eisabus_probe ( struct root_device *rootdev ) {
+	struct eisa_device *eisa = NULL;
+	unsigned int slot;
+	int rc;
+
+	for ( slot = EISA_MIN_SLOT ; slot <= EISA_MAX_SLOT ; slot++ ) {
+		/* Allocate struct eisa_device */
+		if ( ! eisa )
+			eisa = malloc ( sizeof ( *eisa ) );
+		if ( ! eisa ) {
+			rc = -ENOMEM;
+			goto err;
+		}
+		memset ( eisa, 0, sizeof ( *eisa ) );
+		eisa->slot = slot;
+		eisa->ioaddr = EISA_SLOT_BASE ( eisa->slot );
+
+		/* Test for board present */
+		outb ( 0xff, eisa->ioaddr + EISA_VENDOR_ID );
+		eisa->vendor_id =
+			le16_to_cpu ( inw ( eisa->ioaddr + EISA_VENDOR_ID ) );
+		eisa->prod_id =
+			le16_to_cpu ( inw ( eisa->ioaddr + EISA_PROD_ID ) );
+		if ( eisa->vendor_id & 0x80 ) {
+			/* No board present */
+			continue;
+		}
+
+		/* Add to device hierarchy */
+		snprintf ( eisa->dev.name, sizeof ( eisa->dev.name ),
+			   "EISA%02x", slot );
+		eisa->dev.desc.bus_type = BUS_TYPE_EISA;
+		eisa->dev.desc.vendor = eisa->vendor_id;
+		eisa->dev.desc.device = eisa->prod_id;
+		eisa->dev.parent = &rootdev->dev;
+		list_add ( &eisa->dev.siblings, &rootdev->dev.children );
+		INIT_LIST_HEAD ( &eisa->dev.children );
+
+		/* Look for a driver */
+		if ( eisa_probe ( eisa ) == 0 ) {
+			/* eisadev registered, we can drop our ref */
+			eisa = NULL;
+		} else {
+			/* Not registered; re-use struct */
+			list_del ( &eisa->dev.siblings );
+		}
+	}
+
+	free ( eisa );
+	return 0;
+
+ err:
+	free ( eisa );
+	eisabus_remove ( rootdev );
+	return rc;
+}
+
+/**
+ * Remove EISA root bus
+ *
+ * @v rootdev		EISA bus root device
+ */
+static void eisabus_remove ( struct root_device *rootdev ) {
+	struct eisa_device *eisa;
+	struct eisa_device *tmp;
+
+	list_for_each_entry_safe ( eisa, tmp, &rootdev->dev.children,
+				   dev.siblings ) {
+		eisa_remove ( eisa );
+		list_del ( &eisa->dev.siblings );
+		free ( eisa );
+	}
+}
+
+/** EISA bus root device driver */
+static struct root_driver eisa_root_driver = {
+	.probe = eisabus_probe,
+	.remove = eisabus_remove,
+};
+
+/** EISA bus root device */
+struct root_device eisa_root_device __root_device = {
+	.dev = { .name = "EISA" },
+	.driver = &eisa_root_driver,
+};

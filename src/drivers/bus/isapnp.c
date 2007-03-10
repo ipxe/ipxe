@@ -60,80 +60,77 @@
  *
  */
 
-#include "string.h"
-#include "timer.h"
-#include "io.h"
-#include "console.h"
-#include "dev.h"
-#include "isapnp.h"
+#include <stdint.h>
+#include <stdlib.h>
+#include <string.h>
+#include <stdio.h>
+#include <errno.h>
+#include <io.h>
+#include <timer.h>
+#include <gpxe/isapnp.h>
 
 /**
  * ISAPnP Read Port address.
  *
+ * ROM prefix may be able to set this address, which is why this is
+ * non-static.
  */
 uint16_t isapnp_read_port;
 
-/**
- * Highest assigned CSN.
- *
- * Note that @b we do not necessarily assign CSNs; it could be done by
- * the PnP BIOS instead.  We therefore set this only when we first try
- * to Wake[CSN] a device and find that there's nothing there.  Page 16
- * (PDF page 22) of the ISAPnP spec states that "Valid Card Select
- * Numbers for identified ISA cards range from 1 to 255 and must be
- * assigned sequentially starting from 1", so we are (theoretically,
- * at least) safe to assume that there are no ISAPnP cards at CSNs
- * higher than the first unused CSN.
- *
- */
-static uint8_t isapnp_max_csn = 0xff;
+static struct isapnp_driver isapnp_drivers[0]
+	__table_start ( struct isapnp_driver, isapnp_drivers );
+static struct isapnp_driver isapnp_drivers_end[0]
+	__table_end ( struct isapnp_driver, isapnp_drivers );
+
+static void isapnpbus_remove ( struct root_device *rootdev );
 
 /*
  * ISAPnP utility functions
  *
  */
 
-#define ISAPNP_CARD_ID_FMT "ID %hx:%hx (\"%s\") serial %x"
+#define ISAPNP_CARD_ID_FMT "ID %04x:%04x (\"%s\") serial %lx"
 #define ISAPNP_CARD_ID_DATA(identifier)					  \
 	(identifier)->vendor_id, (identifier)->prod_id,			  \
 	isa_id_string ( (identifier)->vendor_id, (identifier)->prod_id ), \
 	(identifier)->serial
-#define ISAPNP_DEV_ID_FMT "ID %hx:%hx (\"%s\")"
+#define ISAPNP_DEV_ID_FMT "ID %04x:%04x (\"%s\")"
 #define ISAPNP_DEV_ID_DATA(isapnp)					  \
 	(isapnp)->vendor_id, (isapnp)->prod_id,				  \
 	isa_id_string ( (isapnp)->vendor_id, (isapnp)->prod_id )
 
-static inline void isapnp_write_address ( uint8_t address ) {
+static inline void isapnp_write_address ( unsigned int address ) {
 	outb ( address, ISAPNP_ADDRESS );
 }
 
-static inline void isapnp_write_data ( uint8_t data ) {
+static inline void isapnp_write_data ( unsigned int data ) {
 	outb ( data, ISAPNP_WRITE_DATA );
 }
 
-static inline uint8_t isapnp_read_data ( void ) {
+static inline unsigned int isapnp_read_data ( void ) {
 	return inb ( isapnp_read_port );
 }
 
-static inline void isapnp_write_byte ( uint8_t address, uint8_t value ) {
+static inline void isapnp_write_byte ( unsigned int address,
+				       unsigned int value ) {
 	isapnp_write_address ( address );
 	isapnp_write_data ( value );
 }
 
-static inline uint8_t isapnp_read_byte ( uint8_t address ) {
+static inline unsigned int isapnp_read_byte ( unsigned int address ) {
 	isapnp_write_address ( address );
 	return isapnp_read_data ();
 }
 
-static inline uint16_t isapnp_read_word ( uint8_t address ) {
+static inline unsigned int isapnp_read_word ( unsigned int address ) {
 	/* Yes, they're in big-endian order */
 	return ( ( isapnp_read_byte ( address ) << 8 )
-		 + isapnp_read_byte ( address + 1 ) );
+		 | isapnp_read_byte ( address + 1 ) );
 }
 
 /** Inform cards of a new read port address */
 static inline void isapnp_set_read_port ( void ) {
-	isapnp_write_byte ( ISAPNP_READPORT, isapnp_read_port >> 2 );
+	isapnp_write_byte ( ISAPNP_READPORT, ( isapnp_read_port >> 2 ) );
 }
 
 /**
@@ -141,7 +138,6 @@ static inline void isapnp_set_read_port ( void ) {
  *
  * Only cards currently in the Sleep state will respond to this
  * command.
- *
  */
 static inline void isapnp_serialisolation ( void ) {
 	isapnp_write_address ( ISAPNP_SERIALISOLATION );
@@ -152,7 +148,6 @@ static inline void isapnp_serialisolation ( void ) {
  *
  * All cards will respond to this command, regardless of their current
  * state.
- *
  */
 static inline void isapnp_wait_for_key ( void ) {
 	isapnp_write_byte ( ISAPNP_CONFIGCONTROL, ISAPNP_CONFIG_WAIT_FOR_KEY );
@@ -163,7 +158,6 @@ static inline void isapnp_wait_for_key ( void ) {
  *
  * Only cards currently in the Sleep state will respond to this
  * command.
- *
  */
 static inline void isapnp_reset_csn ( void ) {
 	isapnp_write_byte ( ISAPNP_CONFIGCONTROL, ISAPNP_CONFIG_RESET_CSN );
@@ -179,17 +173,16 @@ static inline void isapnp_reset_csn ( void ) {
  * Only cards currently in the Sleep, Isolation, or Config states will
  * respond to this command.  The card that has the specified CSN will
  * enter the Config state, all other cards will enter the Sleep state.
- *
  */
 static inline void isapnp_wake ( uint8_t csn ) {
 	isapnp_write_byte ( ISAPNP_WAKE, csn );
 }
 
-static inline uint8_t isapnp_read_resourcedata ( void ) {
+static inline unsigned int isapnp_read_resourcedata ( void ) {
 	return isapnp_read_byte ( ISAPNP_RESOURCEDATA );
 }
 
-static inline uint8_t isapnp_read_status ( void ) {
+static inline unsigned int isapnp_read_status ( void ) {
 	return isapnp_read_byte ( ISAPNP_STATUS );
 }
 
@@ -197,38 +190,35 @@ static inline uint8_t isapnp_read_status ( void ) {
  * Assign a Card Select Number to a card, and enter the Config state.
  *
  * @v csn		Card Select Number
- * @ret None		-
- * @err None		-
  *
  * Only cards in the Isolation state will respond to this command.
  * The isolation protocol is designed so that only one card will
  * remain in the Isolation state by the time the isolation protocol
  * completes.
- *
  */
-static inline void isapnp_write_csn ( uint8_t csn ) {
+static inline void isapnp_write_csn ( unsigned int csn ) {
 	isapnp_write_byte ( ISAPNP_CARDSELECTNUMBER, csn );
 }
 
-static inline void isapnp_logicaldevice ( uint8_t logdev ) {
+static inline void isapnp_logicaldevice ( unsigned int logdev ) {
 	isapnp_write_byte ( ISAPNP_LOGICALDEVICENUMBER, logdev );
 }
 
-static inline void isapnp_activate ( uint8_t logdev ) {
+static inline void isapnp_activate ( unsigned int logdev ) {
 	isapnp_logicaldevice ( logdev );
 	isapnp_write_byte ( ISAPNP_ACTIVATE, 1 );
 }
 
-static inline void isapnp_deactivate ( uint8_t logdev ) {
+static inline void isapnp_deactivate ( unsigned int logdev ) {
 	isapnp_logicaldevice ( logdev );
 	isapnp_write_byte ( ISAPNP_ACTIVATE, 0 );
 }
 
-static inline uint16_t isapnp_read_iobase ( unsigned int index ) {
+static inline unsigned int isapnp_read_iobase ( unsigned int index ) {
 	return isapnp_read_word ( ISAPNP_IOBASE ( index ) );
 }
 
-static inline uint8_t isapnp_read_irqno ( unsigned int index ) {
+static inline unsigned int isapnp_read_irqno ( unsigned int index ) {
 	return isapnp_read_byte ( ISAPNP_IRQNO ( index ) );
 }
 
@@ -242,7 +232,6 @@ static void isapnp_delay ( void ) {
  * @v lfsr		Current value of the LFSR
  * @v input_bit		Current input bit to the LFSR
  * @ret lfsr		Next value of the LFSR
- * @err None		-
  *
  * This routine implements the linear feedback shift register as
  * described in Appendix B of the PnP ISA spec.  The hardware
@@ -250,9 +239,9 @@ static void isapnp_delay ( void ) {
  * think this is probably the smallest possible implementation in
  * software.  Six instructions when input_bit is a constant 0 (for
  * isapnp_send_key).  :)
- *
  */
-static inline uint8_t isapnp_lfsr_next ( uint8_t lfsr, int input_bit ) {
+static inline unsigned int isapnp_lfsr_next ( unsigned int lfsr,
+					      unsigned int input_bit ) {
 	register uint8_t lfsr_next;
 
 	lfsr_next = lfsr >> 1;
@@ -265,11 +254,10 @@ static inline uint8_t isapnp_lfsr_next ( uint8_t lfsr, int input_bit ) {
  *
  * Sending the key causes all ISAPnP cards that are currently in the
  * Wait for Key state to transition into the Sleep state.
- *
  */
 static void isapnp_send_key ( void ) {
 	unsigned int i;
-	uint8_t lfsr;
+	unsigned int lfsr;
 
 	isapnp_delay();
 	isapnp_write_address ( 0x00 );
@@ -285,19 +273,17 @@ static void isapnp_send_key ( void ) {
 /**
  * Compute ISAPnP identifier checksum
  *
- * @v identifier		ISAPnP identifier
- * @ret checksum		Expected checksum value
- * @err None			-
- *
+ * @v identifier	ISAPnP identifier
+ * @ret checksum	Expected checksum value
  */
-static uint8_t isapnp_checksum ( struct isapnp_identifier *identifier ) {
-	int i, j;
-	uint8_t lfsr;
-	uint8_t byte;
+static unsigned int isapnp_checksum ( struct isapnp_identifier *identifier ) {
+	unsigned int i, j;
+	unsigned int lfsr;
+	unsigned int byte;
 
 	lfsr = ISAPNP_LFSR_SEED;
 	for ( i = 0 ; i < 8 ; i++ ) {
-		byte = ( (char *) identifier )[i];
+		byte = * ( ( ( uint8_t * ) identifier ) + i );
 		for ( j = 0 ; j < 8 ; j++ ) {
 			lfsr = isapnp_lfsr_next ( lfsr, byte );
 			byte >>= 1;
@@ -309,17 +295,18 @@ static uint8_t isapnp_checksum ( struct isapnp_identifier *identifier ) {
 /*
  * Read a byte of resource data from the current location
  *
+ * @ret byte		Byte of resource data
  */
-static inline uint8_t isapnp_peek_byte ( void ) {
-	int i;
+static inline unsigned int isapnp_peek_byte ( void ) {
+	unsigned int i;
 
 	/* Wait for data to be ready */
-	for ( i = 0 ; i < 20 ; i ++ ) {
+	for ( i = 0 ; i < 20 ; i++ ) {
 		if ( isapnp_read_status() & 0x01 ) {
 			/* Byte ready - read it */
 			return isapnp_read_resourcedata();
 		}
-		isapnp_delay ();
+		isapnp_delay();
 	}
 	/* Data never became ready - return 0xff */
 	return 0xff;
@@ -330,22 +317,18 @@ static inline uint8_t isapnp_peek_byte ( void ) {
  *
  * @v buf		Buffer in which to store data, or NULL
  * @v bytes		Number of bytes to read
- * @ret None		-
- * @err None		-
  *
  * Resource data is read from the current location.  If #buf is NULL,
  * the data is discarded.
- *
  */
-static void isapnp_peek ( uint8_t *buf, size_t bytes ) {
+static void isapnp_peek ( void *buf, size_t len ) {
 	unsigned int i;
-	uint8_t byte;
+	unsigned int byte;
 
-	for ( i = 0 ; i < bytes ; i++) {
+	for ( i = 0 ; i < len ; i++) {
 		byte = isapnp_peek_byte();
-		if ( buf ) {
-			buf[i] = byte;
-		}
+		if ( buf )
+			* ( ( uint8_t * ) buf + i ) = byte;
 	}
 }
 
@@ -354,40 +337,59 @@ static void isapnp_peek ( uint8_t *buf, size_t bytes ) {
  *
  * @v wanted_tag	The tag that we're looking for
  * @v buf		Buffer in which to store the tag's contents
- * @ret True		Tag was found
- * @ret False		Tag was not found
- * @err None		-
+ * @v len		Length of buffer
+ * @ret rc		Return status code
  *
  * Scan through the resource data until we find a particular tag, and
- * read its contents into a buffer.  It is the caller's responsibility
- * to ensure that #buf is large enough to contain a tag of the
- * requested size.
- *
+ * read its contents into a buffer.
  */
-static int isapnp_find_tag ( uint8_t wanted_tag, uint8_t *buf ) {
-	uint8_t tag;
-	uint16_t len;
+static int isapnp_find_tag ( unsigned int wanted_tag, void *buf, size_t len ) {
+	unsigned int tag;
+	unsigned int tag_len;
 
 	DBG2 ( "ISAPnP read tag" );
 	do {
 		tag = isapnp_peek_byte();
 		if ( ISAPNP_IS_SMALL_TAG ( tag ) ) {
-			len = ISAPNP_SMALL_TAG_LEN ( tag );
+			tag_len = ISAPNP_SMALL_TAG_LEN ( tag );
 			tag = ISAPNP_SMALL_TAG_NAME ( tag );
 		} else {
-			len = isapnp_peek_byte() + ( isapnp_peek_byte() << 8 );
+			tag_len = ( isapnp_peek_byte() +
+				    ( isapnp_peek_byte() << 8 ) );
 			tag = ISAPNP_LARGE_TAG_NAME ( tag );
 		}
-		DBG2 ( " %hhx (%hhx)", tag, len );
+		DBG2 ( " %02x (%02x)", tag, tag_len );
 		if ( tag == wanted_tag ) {
+			if ( len > tag_len )
+				len = tag_len;
 			isapnp_peek ( buf, len );
 			DBG2 ( "\n" );
-			return 1;
+			return 0;
 		} else {
-			isapnp_peek ( NULL, len );
+			isapnp_peek ( NULL, tag_len );
 		}
 	} while ( tag != ISAPNP_TAG_END );
 	DBG2 ( "\n" );
+	return -ENOENT;
+}
+
+/**
+ * Find specified Logical Device ID tag
+ *
+ * @v logdev		Logical device ID
+ * @v logdevid		Logical device ID structure to fill in
+ * @ret rc		Return status code
+ */
+static int isapnp_find_logdevid ( unsigned int logdev,
+				  struct isapnp_logdevid *logdevid ) {
+	unsigned int i;
+	int rc;
+
+	for ( i = 0 ; i <= logdev ; i++ ) {
+		if ( ( rc = isapnp_find_tag ( ISAPNP_TAG_LOGDEVID, logdevid,
+					      sizeof ( *logdevid ) ) ) != 0 )
+			return rc;
+	}
 	return 0;
 }
 
@@ -401,37 +403,36 @@ static int isapnp_find_tag ( uint8_t wanted_tag, uint8_t *buf ) {
  *
  * The state diagram on page 18 (PDF page 24) of the PnP ISA spec
  * gives the best overview of what happens here.
- *
  */
 static int isapnp_try_isolate ( void ) {
 	struct isapnp_identifier identifier;
 	unsigned int i, j;
 	unsigned int seen_55aa, seen_life;
 	unsigned int csn = 0;
-	uint16_t data;
-	uint8_t byte;
+	unsigned int data;
+	unsigned int byte;
 
-	DBG ( "ISAPnP attempting isolation at read port %hx\n",
+	DBG ( "ISAPnP attempting isolation at read port %04x\n",
 	      isapnp_read_port );
 
 	/* Place all cards into the Sleep state, whatever state
 	 * they're currently in.
 	 */
-	isapnp_wait_for_key ();
-	isapnp_send_key ();
+	isapnp_wait_for_key();
+	isapnp_send_key();
 
 	/* Reset all assigned CSNs */
-	isapnp_reset_csn ();
+	isapnp_reset_csn();
 	isapnp_delay();
 	isapnp_delay();
 	
 	/* Place all cards into the Isolation state */
 	isapnp_wait_for_key ();
-	isapnp_send_key ();
+	isapnp_send_key();
 	isapnp_wake ( 0x00 );
 	
 	/* Set the read port */
-	isapnp_set_read_port ();
+	isapnp_set_read_port();
 	isapnp_delay();
 
 	while ( 1 ) {
@@ -442,7 +443,7 @@ static int isapnp_try_isolate ( void ) {
 		 */
 
 		/* Initiate serial isolation */
-		isapnp_serialisolation ();
+		isapnp_serialisolation();
 		isapnp_delay();
 
 		/* Read identifier serially via the ISAPnP read port. */
@@ -451,9 +452,9 @@ static int isapnp_try_isolate ( void ) {
 		for ( i = 0 ; i < 9 ; i++ ) {
 			byte = 0;
 			for ( j = 0 ; j < 8 ; j++ ) {
-				data = isapnp_read_data ();
+				data = isapnp_read_data();
 				isapnp_delay();
-				data = ( data << 8 ) | isapnp_read_data ();
+				data = ( ( data << 8 ) | isapnp_read_data() );
 				isapnp_delay();
 				byte >>= 1;
 				if (  data != 0xffff ) {
@@ -464,7 +465,7 @@ static int isapnp_try_isolate ( void ) {
 					}
 				}
 			}
-			( (char *) &identifier )[i] = byte;
+			*( ( ( uint8_t * ) &identifier ) + i ) = byte;
 		}
 
 		/* If we didn't see any 55aa patterns, stop here */
@@ -487,8 +488,8 @@ static int isapnp_try_isolate ( void ) {
 		/* If the checksum was invalid stop here */
 		if ( identifier.checksum != isapnp_checksum ( &identifier) ) {
 			DBG ( "ISAPnP found malformed card "
-			      ISAPNP_CARD_ID_FMT "\n  with checksum %hhx "
-			      "(should be %hhx), trying new read port\n",
+			      ISAPNP_CARD_ID_FMT "\n  with checksum %02x "
+			      "(should be %02x), trying new read port\n",
 			      ISAPNP_CARD_ID_DATA ( &identifier ),
 			      identifier.checksum,
 			      isapnp_checksum ( &identifier) );
@@ -499,7 +500,7 @@ static int isapnp_try_isolate ( void ) {
 		/* Give the device a CSN */
 		csn++;
 		DBG ( "ISAPnP found card " ISAPNP_CARD_ID_FMT
-		      ", assigning CSN %hhx\n",
+		      ", assigning CSN %02x\n",
 		      ISAPNP_CARD_ID_DATA ( &identifier ), csn );
 		
 		isapnp_write_csn ( csn );
@@ -513,11 +514,11 @@ static int isapnp_try_isolate ( void ) {
 	}
 
 	/* Place all cards in Wait for Key state */
-	isapnp_wait_for_key ();
+	isapnp_wait_for_key();
 
 	/* Return number of cards found */
 	if ( csn > 0 ) {
-		DBG ( "ISAPnP found %d cards at read port %hx\n",
+		DBG ( "ISAPnP found %d cards at read port %04x\n",
 		      csn, isapnp_read_port );
 	}
 	return csn;
@@ -539,225 +540,10 @@ static void isapnp_isolate ( void ) {
 			continue;
 		
 		/* If we detect any ISAPnP cards at this location, stop */
-		if ( isapnp_try_isolate () >= 0 )
+		if ( isapnp_try_isolate() >= 0 )
 			return;
 	}
 }
-
-/**
- * Increment a #bus_loc structure to the next possible ISAPnP
- * location.
- *
- * @v bus_loc		Bus location
- * @ret True		#bus_loc contains a valid ISAPnP location
- * @ret False		There are no more valid ISAPnP locations
- * @err None		-
- *
- * If there are no more valid locations, the #bus_loc structure will
- * be zeroed.
- *
- */
-static int isapnp_next_location ( struct bus_loc *bus_loc ) {
-	struct isapnp_loc *isapnp_loc = ( struct isapnp_loc * ) bus_loc;
-	
-	/*
-	 * Ensure that there is sufficient space in the shared bus
-	 * structures for a struct isapnp_loc and a struct isapnp_dev,
-	 * as mandated by bus.h.
-	 *
-	 */
-	BUS_LOC_CHECK ( struct isapnp_loc );
-	BUS_DEV_CHECK ( struct isapnp_device );
-
-	return ( ++isapnp_loc->logdev ? 1 : ++isapnp_loc->csn );
-}
-
-/**
- * Fill in parameters for an ISAPnP device based on CSN.
- *
- * @v bus_dev		Bus device to be filled in
- * @v bus_loc		Bus location as filled in by isapnp_next_location()
- * @ret True		A device is present at this location
- * @ret False		No device is present at this location
- * @err None		-
- *
- */
-static int isapnp_fill_device ( struct bus_dev *bus_dev,
-				struct bus_loc *bus_loc ) {
-	struct isapnp_device *isapnp = ( struct isapnp_device * ) bus_dev;
-	struct isapnp_loc *isapnp_loc = ( struct isapnp_loc * ) bus_loc;
-	unsigned int i;
-	struct isapnp_identifier identifier;
-	struct isapnp_logdevid logdevid;
-	static struct {
-		uint8_t csn;
-		uint8_t first_nonexistent_logdev;
-	} cache = { 0, 0 };
-
-	/* Copy CSN and logdev to isapnp_device, set default values */
-	isapnp->csn = isapnp_loc->csn;
-	isapnp->logdev = isapnp_loc->logdev;
-	isapnp->name = "?";
-
-	/* CSN 0 is never valid, but may be passed in */
-	if ( ! isapnp->csn )
-		return 0;
-
-	/* Check to see if we are already past the maximum CSN */
-	if ( isapnp->csn > isapnp_max_csn )
-		return 0;
-
-	/* Check cache to see if we are already past the highest
-	 * logical device of this CSN
-	 */
-	if ( ( isapnp->csn == cache.csn ) &&
-	     ( isapnp->logdev >= cache.first_nonexistent_logdev ) )
-		return 0;
-
-	/* Perform isolation if it hasn't yet been done */
-	if ( ! isapnp_read_port )
-		isapnp_isolate();
-
-	/* Wake the card */
-	isapnp_wait_for_key ();
-	isapnp_send_key ();
-	isapnp_wake ( isapnp->csn );
-
-	/* Read the card identifier */
-	isapnp_peek ( ( char * ) &identifier, sizeof ( identifier ) );
-
-	/* Need to return 0 if no device exists at this CSN */
-	if ( identifier.vendor_id & 0x80 ) {
-		isapnp_max_csn = isapnp->csn - 1;
-		return 0;
-	}
-
-	/* Find the Logical Device ID tag corresponding to this device */
-	for ( i = 0 ; i <= isapnp->logdev ; i++ ) {
-		if ( ! isapnp_find_tag ( ISAPNP_TAG_LOGDEVID,
-					 ( char * ) &logdevid ) ) {
-			/* No tag for this device */
-			if ( isapnp->logdev == 0 ) {
-				DBG ( "ISAPnP found no device %hhx.0 on card "
-				      ISAPNP_CARD_ID_FMT "\n", isapnp->csn,
-				      ISAPNP_CARD_ID_DATA ( &identifier ) );
-			}
-			cache.csn = isapnp->csn;
-			cache.first_nonexistent_logdev = isapnp->logdev;
-			return 0;
-		}
-	}
-
-	/* Read information from logdevid structure */
-	isapnp->vendor_id = logdevid.vendor_id;
-	isapnp->prod_id = logdevid.prod_id;
-
-	/* Select the logical device */
-	isapnp_logicaldevice ( isapnp->logdev );
-
-	/* Read the current ioaddr and irqno */
-	isapnp->ioaddr = isapnp_read_iobase ( 0 );
-	isapnp->irqno = isapnp_read_irqno ( 0 );
-
-	/* Return all cards to Wait for Key state */
-	isapnp_wait_for_key ();
-
-	DBG ( "ISAPnP found device %hhx.%hhx " ISAPNP_DEV_ID_FMT
-	      ", base %hx irq %d\n", isapnp->csn, isapnp->logdev,
-	      ISAPNP_DEV_ID_DATA ( isapnp ), isapnp->ioaddr, isapnp->irqno );
-	DBG ( "  on card " ISAPNP_CARD_ID_FMT "\n",
-	      ISAPNP_CARD_ID_DATA ( &identifier ) );
-
-	return 1;
-}
-
-/**
- * Test whether or not a driver is capable of driving the device.
- *
- * @v bus_dev		Bus device as filled in by isapnp_fill_device()
- * @v device_driver	Device driver
- * @ret True		Driver is capable of driving this device
- * @ret False		Driver is not capable of driving this device
- * @err None		-
- *
- */
-static int isapnp_check_driver ( struct bus_dev *bus_dev,
-				 struct device_driver *device_driver ) {
-	struct isapnp_device *isapnp = ( struct isapnp_device * ) bus_dev;
-	struct isapnp_driver *driver
-		= ( struct isapnp_driver * ) device_driver->bus_driver_info;
-	unsigned int i;
-
-	/* Compare against driver's ID list */
-	for ( i = 0 ; i < driver->id_count ; i++ ) {
-		struct isapnp_id *id = &driver->ids[i];
-		
-		if ( ( isapnp->vendor_id == id->vendor_id ) &&
-		     ( ISA_PROD_ID ( isapnp->prod_id ) ==
-		       ISA_PROD_ID ( id->prod_id ) ) ) {
-			DBG ( "ISAPnP found ID %hx:%hx (\"%s\") (device %s) "
-			      "matching driver %s\n",
-			      isapnp->vendor_id, isapnp->prod_id,
-			      isa_id_string( isapnp->vendor_id,
-					     isapnp->prod_id ),
-			      id->name, device_driver->name );
-			isapnp->name = id->name;
-			return 1;
-		}
-	}
-
-	return 0;
-}
-
-/**
- * Describe an ISAPnP device.
- *
- * @v bus_dev		Bus device as filled in by isapnp_fill_device()
- * @ret string		Printable string describing the device
- * @err None		-
- *
- * The string returned by isapnp_describe_device() is valid only until
- * the next call to isapnp_describe_device().
- *
- */
-static char * isapnp_describe_device ( struct bus_dev *bus_dev ) {
-	struct isapnp_device *isapnp = ( struct isapnp_device * ) bus_dev;
-	static char isapnp_description[] = "ISAPnP 00:00";
-
-	sprintf ( isapnp_description + 7, "%hhx:%hhx",
-		  isapnp->csn, isapnp->logdev );
-	return isapnp_description;
-}
-
-/**
- * Name an ISAPnP device.
- *
- * @v bus_dev		Bus device as filled in by isapnp_fill_device()
- * @ret string		Printable string naming the device
- * @err None		-
- *
- * The string returned by isapnp_name_device() is valid only until the
- * next call to isapnp_name_device().
- *
- */
-static const char * isapnp_name_device ( struct bus_dev *bus_dev ) {
-	struct isapnp_device *isapnp = ( struct isapnp_device * ) bus_dev;
-	
-	return isapnp->name;
-}
-
-/*
- * ISAPnP bus operations table
- *
- */
-struct bus_driver isapnp_driver __bus_driver = {
-	.name			= "ISAPnP",
-	.next_location		= isapnp_next_location,
-	.fill_device		= isapnp_fill_device,
-	.check_driver		= isapnp_check_driver,
-	.describe_device	= isapnp_describe_device,
-	.name_device		= isapnp_name_device,
-};
 
 /**
  * Activate or deactivate an ISAPnP device.
@@ -787,33 +573,189 @@ void isapnp_device_activation ( struct isapnp_device *isapnp,
 	/* Return all cards to Wait for Key state */
 	isapnp_wait_for_key ();
 
-	DBG ( "ISAPnP %s device %hhx.%hhx\n",
+	DBG ( "ISAPnP %s device %02x:%02x\n",
 	      ( activation ? "activated" : "deactivated" ),
 	      isapnp->csn, isapnp->logdev );
 }
 
 /**
- * Fill in a nic structure.
+ * Probe an ISAPnP device
  *
- * @v nic		NIC structure to be filled in
  * @v isapnp		ISAPnP device
- * @ret None		-
- * @err None		-
+ * @ret rc		Return status code
  *
- * This fills in generic NIC parameters (e.g. I/O address and IRQ
- * number) that can be determined directly from the ISAPnP device,
- * without any driver-specific knowledge.
- *
+ * Searches for a driver for the ISAPnP device.  If a driver is found,
+ * its probe() routine is called.
  */
-void isapnp_fill_nic ( struct nic *nic, struct isapnp_device *isapnp ) {
+static int isapnp_probe ( struct isapnp_device *isapnp ) {
+	struct isapnp_driver *driver;
+	struct isapnp_device_id *id;
+	unsigned int i;
+	int rc;
 
-	/* Fill in ioaddr and irqno */
-	nic->ioaddr = isapnp->ioaddr;
-	nic->irqno = isapnp->irqno;
+	DBG ( "Adding ISAPnP device %02x:%02x (%04x:%04x (\"%s\") "
+	      "io %x irq %d)\n", isapnp->csn, isapnp->logdev,
+	      isapnp->vendor_id, isapnp->prod_id,
+	      isa_id_string ( isapnp->vendor_id, isapnp->prod_id ),
+	      isapnp->ioaddr, isapnp->irqno );
 
-	/* Fill in DHCP device ID structure */
-	nic->dhcp_dev_id.bus_type = ISA_BUS_TYPE;
-	nic->dhcp_dev_id.vendor_id = htons ( isapnp->vendor_id );
-	nic->dhcp_dev_id.device_id = htons ( isapnp->prod_id );
+	for ( driver = isapnp_drivers; driver < isapnp_drivers_end; driver++ ){
+		for ( i = 0 ; i < driver->id_count ; i++ ) {
+			id = &driver->ids[i];
+			if ( id->vendor_id != isapnp->vendor_id )
+				continue;
+			if ( ISA_PROD_ID ( id->prod_id ) !=
+			     ISA_PROD_ID ( isapnp->prod_id ) )
+				continue;
+			isapnp->driver = driver;
+			isapnp->driver_name = id->name;
+			DBG ( "...using driver %s\n", isapnp->driver_name );
+			if ( ( rc = driver->probe ( isapnp, id ) ) != 0 ) {
+				DBG ( "......probe failed\n" );
+				continue;
+			}
+			return 0;
+		}
+	}
+
+	DBG ( "...no driver found\n" );
+	return -ENOTTY;
 }
 
+/**
+ * Remove an ISAPnP device
+ *
+ * @v isapnp		ISAPnP device
+ */
+static void isapnp_remove ( struct isapnp_device *isapnp ) {
+	isapnp->driver->remove ( isapnp );
+	DBG ( "Removed ISAPnP device %02x:%02x\n",
+	      isapnp->csn, isapnp->logdev );
+}
+
+/**
+ * Probe ISAPnP root bus
+ *
+ * @v rootdev		ISAPnP bus root device
+ *
+ * Scans the ISAPnP bus for devices and registers all devices it can
+ * find.
+ */
+static int isapnpbus_probe ( struct root_device *rootdev ) {
+	struct isapnp_device *isapnp = NULL;
+	struct isapnp_identifier identifier;
+	struct isapnp_logdevid logdevid;
+	unsigned int csn;
+	unsigned int logdev;
+	int rc;
+
+	/* Perform isolation if it hasn't yet been done */
+	if ( ! isapnp_read_port )
+		isapnp_isolate();
+
+	for ( csn = 1 ; csn <= 0xff ; csn++ ) {
+		for ( logdev = 0 ; logdev <= 0xff ; logdev++ ) {
+
+			/* Allocate struct isapnp_device */
+			if ( ! isapnp )
+				isapnp = malloc ( sizeof ( *isapnp ) );
+			if ( ! isapnp ) {
+				rc = -ENOMEM;
+				goto err;
+			}
+			memset ( isapnp, 0, sizeof ( *isapnp ) );
+			isapnp->csn = csn;
+			isapnp->logdev = logdev;
+
+			/* Wake the card */
+			isapnp_wait_for_key();
+			isapnp_send_key();
+			isapnp_wake ( csn );
+
+			/* Read the card identifier */
+			isapnp_peek ( &identifier, sizeof ( identifier ) );
+			
+			/* No card with this CSN; stop here */
+			if ( identifier.vendor_id & 0x80 )
+				goto done;
+
+			/* Find the Logical Device ID tag */
+			if ( ( rc = isapnp_find_logdevid ( logdev,
+							   &logdevid ) ) != 0){
+				/* No more logical devices; go to next CSN */
+				break;
+			}
+			
+			/* Select the logical device */
+			isapnp_logicaldevice ( logdev );
+
+			/* Populate struct isapnp_device */
+			isapnp->vendor_id = logdevid.vendor_id;
+			isapnp->prod_id = logdevid.prod_id;
+			isapnp->ioaddr = isapnp_read_iobase ( 0 );
+			isapnp->irqno = isapnp_read_irqno ( 0 );
+
+			/* Return all cards to Wait for Key state */
+			isapnp_wait_for_key();
+
+			/* Add to device hierarchy */
+			snprintf ( isapnp->dev.name,
+				   sizeof ( isapnp->dev.name ),
+				   "ISAPnP%02x:%02x", csn, logdev );
+			isapnp->dev.desc.bus_type = BUS_TYPE_ISAPNP;
+			isapnp->dev.desc.vendor = isapnp->vendor_id;
+			isapnp->dev.desc.device = isapnp->prod_id;
+			isapnp->dev.parent = &rootdev->dev;
+			list_add ( &isapnp->dev.siblings,
+				   &rootdev->dev.children );
+			INIT_LIST_HEAD ( &isapnp->dev.children );
+			
+			/* Look for a driver */
+			if ( isapnp_probe ( isapnp ) == 0 ) {
+				/* isapnpdev registered, we can drop our ref */
+				isapnp = NULL;
+			} else {
+				/* Not registered; re-use struct */
+				list_del ( &isapnp->dev.siblings );
+			}
+		}
+	}
+
+ done:
+	free ( isapnp );
+	return 0;
+
+ err:
+	free ( isapnp );
+	isapnpbus_remove ( rootdev );
+	return rc;
+}
+
+/**
+ * Remove ISAPnP root bus
+ *
+ * @v rootdev		ISAPnP bus root device
+ */
+static void isapnpbus_remove ( struct root_device *rootdev ) {
+	struct isapnp_device *isapnp;
+	struct isapnp_device *tmp;
+
+	list_for_each_entry_safe ( isapnp, tmp, &rootdev->dev.children,
+				   dev.siblings ) {
+		isapnp_remove ( isapnp );
+		list_del ( &isapnp->dev.siblings );
+		free ( isapnp );
+	}
+}
+
+/** ISAPnP bus root device driver */
+static struct root_driver isapnp_root_driver = {
+	.probe = isapnpbus_probe,
+	.remove = isapnpbus_remove,
+};
+
+/** ISAPnP bus root device */
+struct root_device isapnp_root_device __root_device = {
+	.dev = { .name = "ISAPnP" },
+	.driver = &isapnp_root_driver,
+};

@@ -69,7 +69,7 @@
 #include <gpxe/ethernet.h>
 #include "etherboot.h"
 #include "nic.h"
-#include "isa.h"
+#include <gpxe/isa.h>
 #include "console.h"
 #include "cs89x0.h"
 

@@ -4,7 +4,9 @@
  *
  */
 
-#include "isa.h"
+#if 0
+
+#include <gpxe/isa.h>
 #include "io.h"
 #include "timer.h"
 #include "string.h"
@@ -399,3 +401,5 @@ DRIVER ( "3c509", nic_driver, t509_driver, el3_t509_driver,
 	 el3_t509_probe, el3_t509_disable );
 
 ISA_ROM ( "3c509", "3c509" );
+
+#endif

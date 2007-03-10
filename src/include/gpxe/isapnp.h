@@ -36,9 +36,10 @@
 #ifndef ISAPNP_H
 #define ISAPNP_H
 
-#include "stdint.h"
-#include "nic.h"
-#include "isa_ids.h"
+#include <stdint.h>
+#include <gpxe/isa_ids.h>
+#include <gpxe/device.h>
+#include <gpxe/tables.h>
 
 /*
  * ISAPnP constants
@@ -134,103 +135,134 @@
 #define ISAPNP_TAG_RSVDLONGF		0xFF
 #define ISAPNP_TAG_PSEUDO_NEWBOARD	0x100
 
-/*
- * An ISAPnP serial identifier
- *
- */
+/** An ISAPnP serial identifier */
 struct isapnp_identifier {
+	/** Vendor ID */
 	uint16_t vendor_id;
+	/** Product ID */
 	uint16_t prod_id;
+	/** Serial number */
 	uint32_t serial;
+	/** Checksum */
 	uint8_t checksum;
 } __attribute__ (( packed ));
 
-/*
- * An ISAPnP logical device ID structure
- *
- */
+/** An ISAPnP logical device ID structure */
 struct isapnp_logdevid {
+	/** Vendor ID */
 	uint16_t vendor_id;
+	/** Product ID */
 	uint16_t prod_id;
+	/** Flags */
 	uint16_t flags;
 } __attribute__ (( packed ));
 
-/*
- * A location on an ISAPnP bus
- *
- */
-struct isapnp_loc {
-	uint8_t csn;
-	uint8_t logdev;
-};
-
-/*
- * A physical ISAPnP device
- *
- */
-struct isapnp_device {
-	const char *name;
-	uint8_t csn;
-	uint8_t logdev;
-	uint16_t vendor_id;
-	uint16_t prod_id;
-	uint16_t ioaddr;
-	uint8_t irqno;
-};
-
-/*
- * An individual ISAPnP device identified by ID
- *
- */
-struct isapnp_id {
+/** An ISAPnP device ID list entry */
+struct isapnp_device_id {
+	/** Name */
         const char *name;
-	uint16_t vendor_id, prod_id;
+	/** Vendor ID */
+	uint16_t vendor_id;
+	/** Product ID */
+	uint16_t prod_id;
 };
 
-/*
- * An ISAPnP driver, with a device ID (struct isapnp_id) table.
- *
- */
+/** An ISAPnP device */
+struct isapnp_device {
+	/** Generic device */
+	struct device dev;
+	/** Vendor ID */
+	uint16_t vendor_id;
+	/** Product ID */
+	uint16_t prod_id;
+	/** I/O address */
+	uint16_t ioaddr;
+	/** Interrupt number */
+	uint8_t irqno;
+	/** Card Select Number */
+	uint8_t csn;
+	/** Logical Device ID */
+	uint8_t logdev;
+	/** Driver for this device */
+	struct isapnp_driver *driver;
+	/** Driver-private data
+	 *
+	 * Use isapnp_set_drvdata() and isapnp_get_drvdata() to access
+	 * this field.
+	 */
+	void *priv;
+	/** Driver name */
+	const char *driver_name;
+};
+
+/** An ISAPnP driver */
 struct isapnp_driver {
-	struct isapnp_id *ids;
+	/** ISAPnP ID table */
+	struct isapnp_device_id *ids;
+	/** Number of entries in ISAPnP ID table */
 	unsigned int id_count;
+	/**
+	 * Probe device
+	 *
+	 * @v isapnp	ISAPnP device
+	 * @v id	Matching entry in ID table
+	 * @ret rc	Return status code
+	 */
+	int ( * probe ) ( struct isapnp_device *isapnp,
+			  const struct isapnp_device_id *id );
+	/**
+	 * Remove device
+	 *
+	 * @v isapnp	ISAPnP device
+	 */
+	void ( * remove ) ( struct isapnp_device *isapnp );
 };
 
-/*
- * Define an ISAPnP driver
- *
- */
-#define ISAPNP_DRIVER( _name, _ids ) 					\
-	static struct isapnp_driver _name = {				\
-		.ids = _ids,						\
-		.id_count = sizeof ( _ids ) / sizeof ( _ids[0] ),	\
-	}
+/** Declare an ISAPnP driver */
+#define __isapnp_driver __table ( struct isapnp_driver, isapnp_drivers, 01 )
 
-/*
- * Functions in isapnp.c
- *
- */
+extern uint16_t isapnp_read_port;
+
 extern void isapnp_device_activation ( struct isapnp_device *isapnp,
 				       int activation );
-extern void isapnp_fill_nic ( struct nic *nic, struct isapnp_device *isapnp );
 
+/**
+ * Activate ISAPnP device
+ *
+ * @v isapnp		ISAPnP device
+ */
 static inline void activate_isapnp_device ( struct isapnp_device *isapnp ) {
 	isapnp_device_activation ( isapnp, 1 );
 }
+
+/**
+ * Deactivate ISAPnP device
+ *
+ * @v isapnp		ISAPnP device
+ */
 static inline void deactivate_isapnp_device ( struct isapnp_device *isapnp ) {
 	isapnp_device_activation ( isapnp, 0 );
 }
 
-/*
- * ISAPnP bus global definition
+/**
+ * Set ISAPnP driver-private data
  *
+ * @v isapnp		ISAPnP device
+ * @v priv		Private data
  */
-extern struct bus_driver isapnp_driver;
+static inline void isapnp_set_drvdata ( struct isapnp_device *isapnp,
+					void *priv ) {
+	isapnp->priv = priv;
+}
 
-/*
- * ISAPnP read port.  ROM prefix may be able to set this address.
+/**
+ * Get ISAPnP driver-private data
  *
+ * @v isapnp		ISAPnP device
+ * @ret priv		Private data
  */
-extern uint16_t isapnp_read_port;
+static inline void * isapnp_get_drvdata ( struct isapnp_device *isapnp ) {
+	return isapnp->priv;
+}
 
 #endif /* ISAPNP_H */

@@ -1768,11 +1768,11 @@ struct velocity_opt {
 
 #define RX_DESC_MIN     4
 #define RX_DESC_MAX     255
-#define RX_DESC_DEF     64
+#define RX_DESC_DEF     RX_DESC_MIN
 
 #define TX_DESC_MIN     1
 #define TX_DESC_MAX     256
-#define TX_DESC_DEF     4
+#define TX_DESC_DEF     TX_DESC_MIN
 
 struct velocity_info {
 //      struct list_head list;

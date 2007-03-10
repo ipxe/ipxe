@@ -4,8 +4,8 @@
  */
 
 #include "etherboot.h"
-#include "mca.h"
-#include "isa.h" /* for ISA_ROM */
+#include <gpxe/mca.h>
+#include <gpxe/isa.h> /* for ISA_ROM */
 #include "nic.h"
 #include "3c509.h"
 
@@ -37,7 +37,7 @@ static void t529_disable ( struct nic *nic, struct mca_device *mca __unused ) {
 	t5x9_disable ( nic );
 }
 
-static struct mca_id el3_mca_adapters[] = {
+static struct mca_device_id el3_mca_adapters[] = {
         { "3Com 3c529 EtherLink III (10base2)", 0x627c },
         { "3Com 3c529 EtherLink III (10baseT)", 0x627d },
         { "3Com 3c529 EtherLink III (test mode)", 0x62db },

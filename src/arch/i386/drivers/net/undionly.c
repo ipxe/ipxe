@@ -62,15 +62,12 @@ static int undibus_probe ( struct root_device *rootdev ) {
 	strncpy ( undi->dev.name, "UNDI",
 		  ( sizeof ( undi->dev.name ) - 1 ) );
 	if ( undi->pci_busdevfn != UNDI_NO_PCI_BUSDEVFN ) {
-		struct pci_device_description *pcidesc = &undi->dev.desc.pci;
-		pcidesc->bus_type = BUS_TYPE_PCI;
-		pcidesc->busdevfn = undi->pci_busdevfn;
-		pcidesc->vendor = undi->pci_vendor;
-		pcidesc->device = undi->pci_device;
+		undi->dev.desc.bus_type = BUS_TYPE_PCI;
+		undi->dev.desc.location = undi->pci_busdevfn;
+		undi->dev.desc.vendor = undi->pci_vendor;
+		undi->dev.desc.device = undi->pci_device;
 	} else if ( undi->isapnp_csn != UNDI_NO_ISAPNP_CSN ) {
-		struct isapnp_device_description *isapnpdesc
-			= &undi->dev.desc.isapnp;
-		isapnpdesc->bus_type = BUS_TYPE_ISAPNP;
+		undi->dev.desc.bus_type = BUS_TYPE_ISAPNP;
 	}
 	undi->dev.parent = &rootdev->dev;
 	list_add ( &undi->dev.siblings, &rootdev->dev.children);

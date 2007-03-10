@@ -27,7 +27,7 @@ $Id$
 #include <gpxe/ethernet.h>
 #include "etherboot.h"
 #include "nic.h"
-#include "isa.h"
+#include <gpxe/isa.h>
 #include "timer.h"
 #include "3c509.h"
 

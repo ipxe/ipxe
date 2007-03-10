@@ -36,7 +36,7 @@ SMC8416 PIO support added by Andrew Bettison (andrewb@zip.com.au) on 4/3/02
 #ifdef	INCLUDE_NS8390
 #include <gpxe/pci.h>
 #else
-#include "isa.h"
+#include <gpxe/isa.h>
 #endif
 
 static unsigned char	eth_vendor, eth_flags;

@@ -1,8 +1,10 @@
-#include "string.h"
-#include "console.h"
-#include "config/isa.h"
-#include "dev.h"
-#include "isa.h"
+#include <stdint.h>
+#include <string.h>
+#include <stdlib.h>
+#include <stdio.h>
+#include <errno.h>
+#include <io.h>
+#include <gpxe/isa.h>
 
 /*
  * isa.c implements a "classical" port-scanning method of ISA device
@@ -31,161 +33,143 @@ static isa_probe_addr_t isa_extra_probe_addrs[] = {
 	ISA_PROBE_ADDRS
 #endif
 };
-#define isa_extra_probe_addr_count \
+#define ISA_EXTRA_PROBE_ADDR_COUNT \
      ( sizeof ( isa_extra_probe_addrs ) / sizeof ( isa_extra_probe_addrs[0] ) )
 
+#define ISA_IOIDX_MIN( driver ) ( -ISA_EXTRA_PROBE_ADDR_COUNT )
 #ifdef ISA_PROBE_ONLY
-#define ISA_PROBE_ADDR_COUNT(driver) ( isa_extra_probe_addr_count )
+#define ISA_IOIDX_MAX( driver ) ( -1 )
 #else
-#define ISA_PROBE_ADDR_COUNT(driver) \
-	( isa_extra_probe_addr_count + (driver)->addr_count )
+#define ISA_IOIDX_MAX( driver ) ( (int) (driver)->addr_count - 1 )
 #endif
 
-/*
- * Symbols defined by linker
- *
- */
+#define ISA_IOADDR( driver, ioidx )					  \
+	( ( (ioidx) < 0 ) ?						  \
+	  isa_extra_probe_addrs[ (ioidx) + ISA_EXTRA_PROBE_ADDR_COUNT ] : \
+	  (driver)->probe_addrs[(ioidx)] )
+
 static struct isa_driver isa_drivers[0]
 	__table_start ( struct isa_driver, isa_driver );
 static struct isa_driver isa_drivers_end[0]
 	__table_end ( struct isa_driver, isa_driver );
 
-/*
- * Increment a bus_loc structure to the next possible ISA location.
- * Leave the structure zeroed and return 0 if there are no more valid
- * locations.
+static void isabus_remove ( struct root_device *rootdev );
+
+/**
+ * Probe an ISA device
  *
- * There is no sensible concept of a device location on an ISA bus, so
- * we use the probe address list for each ISA driver to define the
- * list of ISA locations.
- *
+ * @v isa		ISA device
+ * @ret rc		Return status code
  */
-static int isa_next_location ( struct bus_loc *bus_loc ) {
-	struct isa_loc *isa_loc = ( struct isa_loc * ) bus_loc;
+static int isa_probe ( struct isa_device *isa ) {
+	int rc;
+
+	DBG ( "Trying ISA driver %s at I/O %04x\n",
+	      isa->driver->name, isa->ioaddr );
+
+	if ( ( rc = isa->driver->probe ( isa ) ) != 0 ) {
+		DBG ( "...probe failed\n" );
+		return rc;
+	}
+
+	DBG ( "...device found\n" );
+	return 0;
+}
+
+/**
+ * Remove an ISA device
+ *
+ * @v isa		ISA device
+ */
+static void isa_remove ( struct isa_device *isa ) {
+	isa->driver->remove ( isa );
+	DBG ( "Removed ISA%04x\n", isa->ioaddr );
+}
+
+/**
+ * Probe ISA root bus
+ *
+ * @v rootdev		ISA bus root device
+ *
+ * Scans the ISA bus for devices and registers all devices it can
+ * find.
+ */
+static int isabus_probe ( struct root_device *rootdev ) {
+	struct isa_device *isa = NULL;
 	struct isa_driver *driver;
+	int ioidx;
+	int rc;
 
-	/*
-	 * Ensure that there is sufficient space in the shared bus
-	 * structures for a struct isa_loc and a struct
-	 * isa_dev, as mandated by bus.h.
-	 *
-	 */
-	BUS_LOC_CHECK ( struct isa_loc );
-	BUS_DEV_CHECK ( struct isa_device );
+	for ( driver = isa_drivers ; driver < isa_drivers_end ; driver++ ) {
+		for ( ioidx = ISA_IOIDX_MIN ( driver ) ;
+		      ioidx <= ISA_IOIDX_MAX ( driver ) ; ioidx++ ) {
+			/* Allocate struct isa_device */
+			if ( ! isa )
+				isa = malloc ( sizeof ( *isa ) );
+			if ( ! isa ) {
+				rc = -ENOMEM;
+				goto err;
+			}
+			memset ( isa, 0, sizeof ( *isa ) );
+			isa->driver = driver;
+			isa->ioaddr = ISA_IOADDR ( driver, ioidx );
 
-	/* Move to next probe address within this driver */
-	driver = &isa_drivers[isa_loc->driver];
-	if ( ++isa_loc->probe_idx < ISA_PROBE_ADDR_COUNT ( driver ) )
-		return 1;
+			/* Add to device hierarchy */
+			snprintf ( isa->dev.name, sizeof ( isa->dev.name ),
+				   "ISA%04x", isa->ioaddr );
+			isa->dev.desc.bus_type = BUS_TYPE_ISA;
+			isa->dev.desc.vendor = driver->vendor_id;
+			isa->dev.desc.device = driver->prod_id;
+			isa->dev.parent = &rootdev->dev;
+			list_add ( &isa->dev.siblings,
+				   &rootdev->dev.children );
+			INIT_LIST_HEAD ( &isa->dev.children );
 
-	/* Move to next driver */
-	isa_loc->probe_idx = 0;
-	if ( ( ++isa_loc->driver, ++driver ) < isa_drivers_end )
-		return 1;
-
-	isa_loc->driver = 0;
-	return 0;
-}
-
-/*
- * Fill in parameters (vendor & device ids, class, membase etc.) for
- * an ISA device based on bus_loc.
- *
- * Returns 1 if a device was found, 0 for no device present.
- *
- */
-static int isa_fill_device ( struct bus_dev *bus_dev,
-			     struct bus_loc *bus_loc ) {
-	struct isa_loc *isa_loc = ( struct isa_loc * ) bus_loc;
-	struct isa_device *isa = ( struct isa_device * ) bus_dev;
-	signed int driver_probe_idx;
-	
-	/* Fill in struct isa from struct isa_loc */
-	isa->driver = &isa_drivers[isa_loc->driver];
-	driver_probe_idx = isa_loc->probe_idx - isa_extra_probe_addr_count;
-	if ( driver_probe_idx < 0 ) {
-		isa->ioaddr = isa_extra_probe_addrs[isa_loc->probe_idx];
-	} else {
-		isa->ioaddr = isa->driver->probe_addrs[driver_probe_idx];
+			/* Try probing at this I/O address */
+			if ( isa_probe ( isa ) == 0 ) {
+				/* isadev registered, we can drop our ref */
+				isa = NULL;
+			} else {
+				/* Not registered; re-use struct */
+				list_del ( &isa->dev.siblings );
+			}
+		}
 	}
 
-	/* Call driver's probe_addr method to determine if a device is
-	 * physically present
-	 */
-	if ( isa->driver->probe_addr ( isa->ioaddr ) ) {
-		isa->name = isa->driver->name;
-		isa->mfg_id = isa->driver->mfg_id;
-		isa->prod_id = isa->driver->prod_id;
-		DBG ( "ISA found %s device at address %hx\n",
-		      isa->name, isa->ioaddr );
-		return 1;
-	}
-
+	free ( isa );
 	return 0;
+
+ err:
+	free ( isa );
+	isabus_remove ( rootdev );
+	return rc;
 }
 
-/*
- * Test whether or not a driver is capable of driving the specified
- * device.
+/**
+ * Remove ISA root bus
  *
+ * @v rootdev		ISA bus root device
  */
-int isa_check_driver ( struct bus_dev *bus_dev,
-		       struct device_driver *device_driver ) {
-	struct isa_device *isa = ( struct isa_device * ) bus_dev;
-	struct isa_driver *driver
-		= ( struct isa_driver * ) device_driver->bus_driver_info;
+static void isabus_remove ( struct root_device *rootdev ) {
+	struct isa_device *isa;
+	struct isa_device *tmp;
 
-	return ( driver == isa->driver );
+	list_for_each_entry_safe ( isa, tmp, &rootdev->dev.children,
+				   dev.siblings ) {
+		isa_remove ( isa );
+		list_del ( &isa->dev.siblings );
+		free ( isa );
+	}
 }
 
-/*
- * Describe a ISA device
- *
- */
-static char * isa_describe_device ( struct bus_dev *bus_dev ) {
-	struct isa_device *isa = ( struct isa_device * ) bus_dev;
-	static char isa_description[] = "ISA 0000 (00)";
-
-	sprintf ( isa_description + 4, "%hx (%hhx)", isa->ioaddr,
-		  isa->driver - isa_drivers );
-	return isa_description;
-}
-
-/*
- * Name a ISA device
- *
- */
-static const char * isa_name_device ( struct bus_dev *bus_dev ) {
-	struct isa_device *isa = ( struct isa_device * ) bus_dev;
-	
-	return isa->name;
-}
-
-/*
- * ISA bus operations table
- *
- */
-struct bus_driver isa_driver __bus_driver = {
-	.name			= "ISA",
-	.next_location		= isa_next_location,
-	.fill_device		= isa_fill_device,
-	.check_driver		= isa_check_driver,
-	.describe_device	= isa_describe_device,
-	.name_device		= isa_name_device,
+/** ISA bus root device driver */
+static struct root_driver isa_root_driver = {
+	.probe = isabus_probe,
+	.remove = isabus_remove,
 };
 
-/*
- * Fill in a nic structure
- *
- */
-void isa_fill_nic ( struct nic *nic, struct isa_device *isa ) {
-
-	/* Fill in ioaddr and irqno */
-	nic->ioaddr = isa->ioaddr;
-	nic->irqno = 0;
-
-	/* Fill in DHCP device ID structure */
-	nic->dhcp_dev_id.bus_type = ISA_BUS_TYPE;
-	nic->dhcp_dev_id.vendor_id = htons ( isa->mfg_id );
-	nic->dhcp_dev_id.device_id = htons ( isa->prod_id );
-}
+/** ISA bus root device */
+struct root_device isa_root_device __root_device = {
+	.dev = { .name = "ISA" },
+	.driver = &isa_root_driver,
+};

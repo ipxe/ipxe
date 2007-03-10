@@ -4,8 +4,8 @@
  *
  */
 
-#include "eisa.h"
-#include "isa.h"
+#include <gpxe/eisa.h>
+#include <gpxe/isa.h>
 #include "console.h"
 #include "3c509.h"
 
@@ -27,7 +27,7 @@ static void el3_eisa_disable ( struct nic *nic, struct eisa_device *eisa ) {
 	disable_eisa_device ( eisa );
 }
 
-static struct eisa_id el3_eisa_adapters[] = {
+static struct eisa_device_id el3_eisa_adapters[] = {
 	{ "3Com 3c509 EtherLink III (EISA)", MFG_ID, PROD_ID },
 };
 

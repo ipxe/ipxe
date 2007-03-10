@@ -11,18 +11,18 @@
 #include <gpxe/list.h>
 #include <gpxe/tables.h>
 
-/** A PCI device description */
-struct pci_device_description {
+/** A hardware device description */
+struct device_description {
 	/** Bus type
 	 *
-	 * Must be @c BUS_TYPE_PCI.
+	 * This must be a BUS_TYPE_XXX constant.
 	 */
 	unsigned int bus_type;
-	/** Bus:dev.fn address
+	/** Location
 	 *
-	 * As constructed by PCI_BUSDEVFN().
+	 * The interpretation of this field is bus-type-specific.
 	 */
-	unsigned int busdevfn;
+	unsigned int location;
 	/** Vendor ID */
 	unsigned int vendor;
 	/** Device ID */
@@ -32,37 +32,24 @@ struct pci_device_description {
 /** PCI bus type */
 #define BUS_TYPE_PCI 1
 
-/** An ISAPnP device description */
-struct isapnp_device_description {
-	/** Bus type
-	 *
-	 * Must be @c BUS_TYPE_ISAPNP.
-	 */
-	unsigned int bus_type;
-};
-
-/** PCI bus type */
+/** ISAPnP bus type */
 #define BUS_TYPE_ISAPNP 2
 
-/** A hardware device description */
-union device_description {
-	/** Bus type
-	 *
-	 * This must be a BUS_TYPE_XXX constant.
-	 */
-	unsigned int bus_type;
-	/** PCI device description */
-	struct pci_device_description pci;
-	/** ISAPnP device description */
-	struct isapnp_device_description isapnp;
-};
+/** EISA bus type */
+#define BUS_TYPE_EISA 3
+
+/** MCA bus type */
+#define BUS_TYPE_MCA 4
+
+/** ISA bus type */
+#define BUS_TYPE_ISA 5
 
 /** A hardware device */
 struct device {
 	/** Name */
 	char name[16];
 	/** Device description */
-	union device_description desc;
+	struct device_description desc;
 	/** Devices on the same bus */
 	struct list_head siblings;
 	/** Devices attached to this device */

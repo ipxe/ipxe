@@ -48,8 +48,8 @@
 #include "etherboot.h"
 /* to get the interface to the body of the program */
 #include "nic.h"
-#include "isapnp.h"
-#include "isa.h" /* for ISA_ROM */
+#include <gpxe/isapnp.h>
+#include <gpxe/isa.h> /* for ISA_ROM */
 #include "timer.h"
 #include <gpxe/ethernet.h>
 
@@ -753,7 +753,7 @@ corkscrew_probe1(int ioaddr, int irq, int product_index __unused,
 	return 0;
 }
 
-static struct isapnp_id t515_adapters[] = {
+static struct isapnp_device_id t515_adapters[] = {
 	{ "3c515 (ISAPnP)", ISAPNP_VENDOR('T','C','M'), 0x5051 },
 };
 

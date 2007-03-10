@@ -15,23 +15,25 @@
  *	   byte 1 bits 7-4  third hex digit of product number
  *		  bits 3-0  hex digit of revision level
  *
+ * ISA IDs are always expressed in little-endian order, even though
+ * the underlying "meaning" is big-endian.
  */
 
-#include "stdint.h"
-
-#define	ISA_BUS_TYPE	2
+#include <byteswap.h>
 
 /*
  * Construct a vendor ID from three ASCII characters
  *
  */
-#define ISA_VENDOR(a,b,c)	(((((a)-'A'+1)&0x3f)<<2)|\
-				((((b)-'A'+1)&0x18)>>3)|((((b)-'A'+1)&7)<<13)|\
-				((((c)-'A'+1)&0x1f)<<8))
-#define ISAPNP_VENDOR(a,b,c)	ISA_VENDOR(a,b,c)
-#define EISA_VENDOR(a,b,c)	ISA_VENDOR(a,b,c)
+#define ISA_VENDOR( a, b, c )					\
+	bswap_16 ( ( ( ( (a) - 'A' + 1 ) & 0x1f ) << 10 ) |	\
+		   ( ( ( (b) - 'A' + 1 ) & 0x1f ) << 5 ) |	\
+		   ( ( ( (c) - 'A' + 1 ) & 0x1f ) << 0 ) )
 
-#define	GENERIC_ISAPNP_VENDOR	ISAPNP_VENDOR('P','N','P')
+#define ISAPNP_VENDOR( a, b, c )	ISA_VENDOR ( a, b, c )
+#define EISA_VENDOR( a, b, c )		ISA_VENDOR ( a, b, c )
+
+#define	GENERIC_ISAPNP_VENDOR		ISAPNP_VENDOR ( 'P','N','P' )
 
 /*
  * Extract product ID and revision from combined product field
@@ -42,6 +44,6 @@
 #define ISA_PROD_REV(product)	( ( (product) & ~ISA_PROD_ID_MASK ) >> 8 )
 
 /* Functions in isa_ids.c */
-extern char * isa_id_string ( uint16_t vendor, uint16_t product );
+extern char * isa_id_string ( unsigned int vendor, unsigned int product );
 
 #endif /* ISA_IDS_H */
