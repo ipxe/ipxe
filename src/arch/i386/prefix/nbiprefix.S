@@ -1,0 +1,65 @@
+	.text
+	.arch i386
+	.section ".prefix", "ax", @progbits
+	.section ".prefix.data", "aw", @progbits
+	.code16
+	.section ".prefix"
+	.org 0
+
+nbi_header:
+	
+/*****************************************************************************
+ * NBI file header
+ *****************************************************************************
+ */
+file_header:
+	.long	0x1b031336	/* Signature */
+	.byte	0x04		/* 16 bytes header, no vendor info */
+	.byte	0
+	.byte	0
+	.byte	0		/* No flags */
+	.word	0x0000, 0x07c0	/* Load header to 0x07c0:0x0000 */
+	.word	entry, 0x07c0	/* Start execution at 0x07c0:entry */
+	.size	file_header, . - file_header
+
+/*****************************************************************************
+ * NBI segment header
+ *****************************************************************************
+ */
+segment_header:
+	.byte	0x04		/* 16 bytes header, no vendor info */
+	.byte	0
+	.byte	0
+	.byte	0x04		/* Last segment */
+	.long	0x00007e00
+	.long	_load_size - 512
+	.long	_load_size - 512
+	.size	segment_header, . - segment_header
+
+/*****************************************************************************
+ * NBI entry point
+ *****************************************************************************
+ */
+entry:
+	/* Install low and high memory regions */
+	call	install
+
+	/* Jump to .text16 segment */
+	pushw	%ax
+	pushw	$1f
+	lret
+	.section ".text16", "awx", @progbits
+1:
+	pushl	$main
+	pushw	%cs
+	call	prot_call
+	popl	%eax /* discard */
+
+	/* Reboot system */
+	int $0x19
+
+	.previous
+	.size	entry, . - entry
+
+nbi_header_end:
+	.org 512
