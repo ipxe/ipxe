@@ -124,7 +124,7 @@ static inline int t509_find_id_port ( void ) {
 		outb ( 0xff, t509_id_port );
 		if ( inb ( t509_id_port ) & 0x01 ) {
 			/* Found a suitable port */
-			DBG ( "T509 using ID port at %hx\n", t509_id_port );
+			DBG ( "T509 using ID port at %04x\n", t509_id_port );
 			return 0;
 		}
 	}
@@ -186,7 +186,7 @@ static int t509_isolate ( void ) {
 	int rc;
 
 	/* Find a suitable ID port */
-	if ( ( rc = t509_find_id_port () ) != 0 )
+	if ( ( rc = t509_find_id_port() ) != 0 )
 		return rc;
 
 	while ( 1 ) {
@@ -196,7 +196,7 @@ static int t509_isolate ( void ) {
 		 */
 
 		/* Send the ID sequence */
-		t509_send_id_sequence ();
+		t509_send_id_sequence();
 
 		/* First time through, reset all tags.  On subsequent
 		 * iterations, kill off any already-tagged cards
@@ -204,7 +204,7 @@ static int t509_isolate ( void ) {
 		if ( t509_max_tag == 0 ) {
 			t509_reset_tag();
 		} else {
-			t509_select_tag(0);
+			t509_select_tag ( 0 );
 		}
 	
 		/* Read the manufacturer ID, to see if there are any
@@ -274,16 +274,20 @@ static inline void deactivate_t509_device ( struct t509_device *t509 ) {
  * The ISA probe function
  *
  */
-static int legacy_t509_probe ( struct nic *nic, void *t509 ) {
-	
+static int legacy_t509_probe ( struct nic *nic, void *hwdev ) {
+	struct t509_device *t509 = hwdev;
+
 	/* We could change t509->ioaddr if we wanted to */
 	activate_t509_device ( t509 );
+	nic->ioaddr = t509->ioaddr;
 
 	/* Hand off to generic t5x9 probe routine */
 	return t5x9_probe ( nic, ISA_PROD_ID ( PROD_ID ), ISA_PROD_ID_MASK );
 }
 
-static void legacy_t509_disable ( struct nic *nic, void *t509 ) {
+static void legacy_t509_disable ( struct nic *nic, void *hwdev ) {
+	struct t509_device *t509 = hwdev;
+
 	t5x9_disable ( nic );
 	deactivate_t509_device ( t509 );
 }
