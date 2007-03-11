@@ -213,8 +213,6 @@ SECTIONS {
     _textdata_progbits_size = _etextdata_progbits - _textdata;
     .			    = _textdata_load_addr + _textdata_progbits_size;
 
-    .			    = ALIGN ( _max_align );
-
     _load_size		    = . - _load_addr;
 
     /*
