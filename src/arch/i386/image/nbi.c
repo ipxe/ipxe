@@ -5,6 +5,7 @@
 #include <memsizes.h>
 #include <gpxe/uaccess.h>
 #include <gpxe/segment.h>
+#include <gpxe/shutdown.h>
 #include <gpxe/image.h>
 
 /** @file
@@ -289,13 +290,11 @@ int nbi_load ( struct image *image ) {
  * Boot a 16-bit NBI image
  *
  * @v imgheader		Image header information
- * @ret Never		NBI program booted successfully
- * @ret False		NBI program returned
- * @err ECANCELED	NBI program returned
- *
+ * @ret rc		Return status code, if image returns
  */
 static int nbi_boot16 ( struct image *image, struct imgheader *imgheader ) {
 	int discard_D, discard_S, discard_b;
+	int rc;
 
 	DBGC ( image, "NBI %p executing 16-bit image at %04x:%04x\n", image,
 	       imgheader->execaddr.segoff.segment,
@@ -316,27 +315,22 @@ static int nbi_boot16 ( struct image *image, struct imgheader *imgheader ) {
 			    "lret\n\t"
 			    "\n2:\n\t"
 			    "addw $8,%%sp\n\t"	/* clean up stack */ )
-		: "=D" ( discard_D ), "=S" ( discard_S ), "=b" ( discard_b )
+		: "=a" ( rc ), "=D" ( discard_D ), "=S" ( discard_S ),
+		  "=b" ( discard_b )
 		: "D" ( imgheader->execaddr.segoff ),
 		  "S" ( imgheader->location ), "b" ( 0 /* bootp data */ )
-		: "eax", "ecx", "edx", "ebp" );
-	
-	return -ECANCELED;
+		: "ecx", "edx", "ebp" );
+
+	gateA20_set();
+
+	return rc;
 }
 
 /**
  * Boot a 32-bit NBI image
  *
  * @v imgheader		Image header information
- * @ret False		NBI program should not have returned
- * @ret other		As returned by NBI program
- * @err ECANCELED	NBI program should not have returned
- *
- * To distinguish between the case of an NBI program returning false,
- * and an NBI program that should not have returned, check errno.
- * errno will be set to ECANCELED only if the NBI program should not
- * have returned.
- *
+ * @ret rc		Return status code, if image returns
  */
 static int nbi_boot32 ( struct image *image, struct imgheader *imgheader ) {
 	int rc;
@@ -347,21 +341,21 @@ static int nbi_boot32 ( struct image *image, struct imgheader *imgheader ) {
 	/* no gateA20_unset for PM call */
 
 #warning "Should be providing bootp data"
-#warning "xstart32 no longer exists"
-#if 0
-	rc = xstart32 ( imgheader->execaddr.linear,
-			virt_to_phys ( &loaderinfo ),
-			( ( imgheader->location.segment << 4 ) +
-			  imgheader->location.offset ),
-			0 /* bootp data */ );
-#endif
 
-	DBGC ( image, "NBI %p returned %d\n", image, rc );
-
-	if ( ! NBI_PROGRAM_RETURNS ( imgheader->flags ) ) {
-		/* We shouldn't have returned */
-		rc = -ECANCELED;
-	}
+	/* Jump to OS with flat physical addressing */
+	__asm__ __volatile__ (
+		PHYS_CODE ( "pushl $0\n\t" /* bootp data */
+			    "pushl %3\n\t" /* imgheader */
+			    "pushl %2\n\t" /* loaderinfo */
+			    "xchgw %%bx,%%bx\n\t"
+			    "call *%1\n\t"
+			    "addl $12, %%esp\n\t" /* clean up stack */ )
+		: "=a" ( rc )
+		: "D" ( imgheader->execaddr.linear ),
+		  "a" ( virt_to_phys ( &loaderinfo ) ),
+		  "S" ( ( imgheader->location.segment << 4 ) +
+			imgheader->location.offset )
+		: "ebx", "ecx", "edx", "ebp", "memory" );
 
 	return rc;
 }
@@ -374,15 +368,32 @@ static int nbi_boot32 ( struct image *image, struct imgheader *imgheader ) {
  */
 static int nbi_exec ( struct image *image ) {
 	struct imgheader imgheader;
+	int may_return;
+	int rc;
 
 	copy_from_user ( &imgheader, image->priv.user, 0,
 			 sizeof ( imgheader ) );
 
+	may_return = NBI_PROGRAM_RETURNS ( imgheader.flags );
+	if ( ! may_return )
+		shutdown();
+
 	if ( NBI_LINEAR_EXEC_ADDR ( imgheader.flags ) ) {
-		return nbi_boot32 ( image, &imgheader );
+		rc = nbi_boot32 ( image, &imgheader );
 	} else {
-		return nbi_boot16 ( image, &imgheader );
+	        rc = nbi_boot16 ( image, &imgheader );
 	}
+
+	if ( ! may_return ) {
+		/* Cannot continue after shutdown() called */
+		DBGC ( image, "NBI %p returned %d from non-returnable image\n",
+		       image, rc  );
+		while ( 1 ) {}
+	}
+
+	DBGC ( image, "NBI %p returned %d\n", image, rc );
+
+	return rc;
 }
 
 /** NBI image type */
