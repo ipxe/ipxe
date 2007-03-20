@@ -82,12 +82,12 @@ void netboot ( struct net_device *netdev ) {
 	int rc;
 
 	/* Open device and display device status */
-	if ( ( rc = ifopen ( netdev ) != 0 ) )
+	if ( ( rc = ifopen ( netdev ) ) != 0 )
 		return;
 	ifstat ( netdev );
 
 	/* Configure device via DHCP */
-	if ( ( rc = dhcp ( netdev ) != 0 ) )
+	if ( ( rc = dhcp ( netdev ) ) != 0 )
 		return;
 	route();
 

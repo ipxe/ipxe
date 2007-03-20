@@ -91,7 +91,7 @@ int pxe_load ( struct image *image ) {
 		image->type = &pxe_image_type;
 
 	/* Verify and prepare segment */
-	if ( ( rc = prep_segment ( buffer, filesz, memsz ) != 0 ) ) {
+	if ( ( rc = prep_segment ( buffer, filesz, memsz ) ) != 0 ) {
 		DBG ( "PXE image could not prepare segment: %s\n",
 		      strerror ( rc ) );
 		return rc;

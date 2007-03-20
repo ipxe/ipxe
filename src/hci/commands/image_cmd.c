@@ -156,7 +156,7 @@ static int kernel_exec ( int argc, char **argv ) {
 	struct image *image;
 	int rc;
 
-	if ( ( rc = imgfetch_core_exec ( argc, argv, 1, &image ) != 0 ) )
+	if ( ( rc = imgfetch_core_exec ( argc, argv, 1, &image ) ) != 0 )
 		return 1;
 
 	/* Load image */
@@ -180,7 +180,7 @@ static int initrd_exec ( int argc, char **argv ) {
 	struct image *image;
 	int rc;
 
-	if ( ( rc = imgfetch_core_exec ( argc, argv, 0, &image ) != 0 ) )
+	if ( ( rc = imgfetch_core_exec ( argc, argv, 0, &image ) ) != 0 )
 		return 1;
 
 	/* Mark image as an intird */
