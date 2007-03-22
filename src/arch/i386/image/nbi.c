@@ -3,9 +3,12 @@
 #include <realmode.h>
 #include <gateA20.h>
 #include <memsizes.h>
+#include <dhcp_basemem.h>
 #include <gpxe/uaccess.h>
 #include <gpxe/segment.h>
 #include <gpxe/shutdown.h>
+#include <gpxe/netdevice.h>
+#include <gpxe/dhcp.h>
 #include <gpxe/image.h>
 
 /** @file
@@ -302,7 +305,6 @@ static int nbi_boot16 ( struct image *image, struct imgheader *imgheader ) {
 
 	gateA20_unset();
 
-#warning "Should be providing bootp data"
 	__asm__ __volatile__ (
 		REAL_CODE ( "pushw %%ds\n\t"	/* far pointer to bootp data */
 			    "pushw %%bx\n\t"
@@ -318,7 +320,8 @@ static int nbi_boot16 ( struct image *image, struct imgheader *imgheader ) {
 		: "=a" ( rc ), "=D" ( discard_D ), "=S" ( discard_S ),
 		  "=b" ( discard_b )
 		: "D" ( imgheader->execaddr.segoff ),
-		  "S" ( imgheader->location ), "b" ( 0 /* bootp data */ )
+		  "S" ( imgheader->location ),
+		  "b" ( __from_data16 ( dhcp_basemem ) )
 		: "ecx", "edx", "ebp" );
 
 	gateA20_set();
@@ -333,6 +336,7 @@ static int nbi_boot16 ( struct image *image, struct imgheader *imgheader ) {
  * @ret rc		Return status code, if image returns
  */
 static int nbi_boot32 ( struct image *image, struct imgheader *imgheader ) {
+	int discard_D, discard_S, discard_b;
 	int rc;
 
 	DBGC ( image, "NBI %p executing 32-bit image at %lx\n",
@@ -340,24 +344,71 @@ static int nbi_boot32 ( struct image *image, struct imgheader *imgheader ) {
 
 	/* no gateA20_unset for PM call */
 
-#warning "Should be providing bootp data"
-
 	/* Jump to OS with flat physical addressing */
 	__asm__ __volatile__ (
-		PHYS_CODE ( "pushl $0\n\t" /* bootp data */
-			    "pushl %3\n\t" /* imgheader */
-			    "pushl %2\n\t" /* loaderinfo */
-			    "xchgw %%bx,%%bx\n\t"
-			    "call *%1\n\t"
+		PHYS_CODE ( "pushl %%ebx\n\t" /* bootp data */
+			    "pushl %%esi\n\t" /* imgheader */
+			    "pushl %%eax\n\t" /* loaderinfo */
+			    "call *%%edi\n\t"
 			    "addl $12, %%esp\n\t" /* clean up stack */ )
-		: "=a" ( rc )
+		: "=a" ( rc ), "=D" ( discard_D ), "=S" ( discard_S ),
+		  "=b" ( discard_b )
 		: "D" ( imgheader->execaddr.linear ),
-		  "a" ( virt_to_phys ( &loaderinfo ) ),
 		  "S" ( ( imgheader->location.segment << 4 ) +
-			imgheader->location.offset )
-		: "ebx", "ecx", "edx", "ebp", "memory" );
+			imgheader->location.offset ),
+		  "b" ( virt_to_phys ( dhcp_basemem ) ),
+		  "a" ( virt_to_phys ( &loaderinfo ) )
+		: "ecx", "edx", "ebp", "memory" );
 
 	return rc;
+}
+
+/**
+ * Guess boot network device
+ *
+ * @ret netdev		Boot network device
+ */
+static struct net_device * guess_boot_netdev ( void ) {
+	struct net_device *boot_netdev;
+
+	/* Just use the first network device */
+	for_each_netdev ( boot_netdev ) {
+		return boot_netdev;
+	}
+
+	return NULL;
+}
+
+/**
+ * Prepare DHCP parameter block for NBI image
+ *
+ * @v image		NBI image
+ * @ret rc		Return status code
+ */
+static int nbi_prepare_dhcp ( struct image *image ) {
+	struct dhcp_packet dhcppkt;
+	struct net_device *boot_netdev;
+	int rc;
+
+	boot_netdev = guess_boot_netdev();
+	if ( ! boot_netdev ) {
+		DBGC ( image, "NBI %p could not identify a network device\n",
+		       image );
+		return -ENODEV;
+	}
+
+	if ( ( rc = create_dhcp_packet ( boot_netdev, DHCPACK,
+					 dhcp_basemem, sizeof ( dhcp_basemem ),
+					 &dhcppkt ) ) != 0 ) {
+		DBGC ( image, "NBI %p failed to build DHCP packet\n", image );
+		return rc;
+	}
+	if ( ( rc = copy_dhcp_packet_options ( &dhcppkt, NULL ) ) != 0 ) {
+		DBGC ( image, "NBI %p failed to copy DHCP options\n", image );
+		return rc;
+	}
+
+	return 0;
 }
 
 /**
@@ -374,10 +425,16 @@ static int nbi_exec ( struct image *image ) {
 	copy_from_user ( &imgheader, image->priv.user, 0,
 			 sizeof ( imgheader ) );
 
+	/* Prepare DHCP option block */
+	if ( ( rc = nbi_prepare_dhcp ( image ) ) != 0 )
+		return rc;
+
+	/* Shut down now if NBI image will not return */
 	may_return = NBI_PROGRAM_RETURNS ( imgheader.flags );
 	if ( ! may_return )
 		shutdown();
 
+	/* Execute NBI image */
 	if ( NBI_LINEAR_EXEC_ADDR ( imgheader.flags ) ) {
 		rc = nbi_boot32 ( image, &imgheader );
 	} else {
