@@ -74,6 +74,10 @@ REQUIRE_OBJECT ( btext );
 REQUIRE_OBJECT ( pc_kbd );
 #endif
 
+#ifdef CONSOLE_SYSLOG
+REQUIRE_OBJECT ( syslog );
+#endif
+
 /*
  * Drag in all requested protocols
  *

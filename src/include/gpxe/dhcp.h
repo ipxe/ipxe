@@ -60,6 +60,9 @@
 /** DNS servers */
 #define DHCP_DNS_SERVERS 6
 
+/** Syslog servers */
+#define DHCP_LOG_SERVERS 7
+
 /** Host name */
 #define DHCP_HOST_NAME 12
 

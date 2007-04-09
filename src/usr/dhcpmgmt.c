@@ -37,6 +37,9 @@
 /* Avoid dragging in dns.o */
 struct in_addr nameserver;
 
+/* Avoid dragging in syslog.o */
+struct in_addr syslogserver;
+
 /**
  * Configure network device via DHCP
  *
@@ -97,6 +100,8 @@ int dhcp ( struct net_device *netdev ) {
 	/* Retrieve other DHCP options that we care about */
 	find_dhcp_ipv4_option ( dhcp_options, DHCP_DNS_SERVERS,
 				&nameserver );
+	find_dhcp_ipv4_option ( dhcp_options, DHCP_LOG_SERVERS,
+				&syslogserver );
 
 	return 0;
 }

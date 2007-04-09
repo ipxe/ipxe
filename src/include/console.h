@@ -30,8 +30,8 @@
 struct console_driver {
 	/** Console is disabled.
 	 *
-	 * The console's putchar(), getchar() and iskey() methods will
-	 * not be called while #disabled==1.  Typically the
+	 * The console's putchar(), putline(), getchar() and iskey()
+	 * methods will not be called while #disabled==1. Typically the
 	 * console's initialisation functions (called via INIT_FN())
 	 * will set #disabled=0 upon completion.
 	 *
@@ -46,6 +46,17 @@ struct console_driver {
 	 *
 	 */
 	void ( *putchar ) ( int character );
+
+	/** Write an entire line to the console.
+	 * This is intended to be used by line-oriented output media,
+	 * like system logging facilities or line printers.
+	 * Line output will not contain non-printable characters.
+	 *
+	 * @v linebuffer	Pointer to the \0-terminated line
+	 * @ret None		-
+	 * @err None		-
+	 */
+	void ( * putline ) ( unsigned char * linebuffer );
 
 	/** Read a character from the console.
 	 *
