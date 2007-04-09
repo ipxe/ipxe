@@ -260,7 +260,7 @@ static int udp_rx ( struct pk_buff *pkb, struct sockaddr_tcpip *st_src,
 	struct udp_connection *conn;
 	size_t ulen;
 	uint16_t csum;
-	int rc;
+	int rc = 0;
 
 	/* Sanity check packet */
 	if ( pkb_len ( pkb ) < sizeof ( *udphdr ) ) {
@@ -314,11 +314,16 @@ static int udp_rx ( struct pk_buff *pkb, struct sockaddr_tcpip *st_src,
 	}
 
 	/* Pass data to application */
-	rc = conn->udp_op->newdata ( conn, pkb->data, pkb_len ( pkb ),
+	if ( conn->udp_op->newdata ) {
+		rc = conn->udp_op->newdata ( conn, pkb->data, pkb_len ( pkb ),
 				     st_src, st_dest );
-	if ( rc != 0 ) {
-		DBGC ( conn, "UDP %p application rejected packet: %s\n",
-		       conn, strerror ( rc ) );
+		if ( rc != 0 ) {
+			DBGC ( conn, "UDP %p application rejected packet: %s\n",
+			       conn, strerror ( rc ) );
+		}
+	} else {
+		DBGC ( conn, "UDP %p application has no newdata handler for " \
+			"incoming packet\n", conn );
 	}
 
  done:
