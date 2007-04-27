@@ -16,6 +16,7 @@
  * Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
  */
 
+#include <string.h>
 #include <errno.h>
 #include <gpxe/xfer.h>
 
@@ -39,23 +40,75 @@ int deliver ( struct xfer_interface *xfer, struct io_buffer *iobuf ) {
 }
 
 /**
- * Null deliver datagram
+ * Deliver datagram as raw data
  *
  * @v xfer		Data-transfer interface
  * @v src		Source interface
  * @v iobuf		Datagram I/O buffer
  * @ret rc		Return status code
+ *
+ * This function is intended to be used as the deliver() method for
+ * data transfer interfaces that prefer to handle raw data.
  */
-static int null_deliver ( struct xfer_interface *xfer __unused,
-			  struct xfer_interface *src __unused,
-			  struct io_buffer *iobuf ) {
+int deliver_as_raw ( struct xfer_interface *xfer,
+		     struct xfer_interface *src,
+		     struct io_buffer *iobuf ) {
+	int rc;
+
+	rc = xfer->op->deliver_raw ( xfer, src, iobuf->data,
+				     iob_len ( iobuf ) );
 	free_iob ( iobuf );
+	return rc;
+}
+
+/**
+ * Deliver datagram as I/O buffer
+ *
+ * @v xfer		Data-transfer interface
+ * @v src		Source interface
+ * @v data		Data buffer
+ * @v len		Length of data buffer
+ * @ret rc		Return status code
+ *
+ * This function is intended to be used as the deliver_raw() method
+ * for data transfer interfaces that prefer to handle I/O buffers.
+ */
+int deliver_as_iobuf ( struct xfer_interface *xfer,
+		       struct xfer_interface *src,
+		       const void *data, size_t len ) {
+	struct io_buffer *iobuf;
+
+#warning "Do we need interface-specific I/O buffer allocation?"
+	iobuf = alloc_iob ( len );
+	if ( ! iobuf )
+		return -ENOMEM;
+
+	memcpy ( iob_put ( iobuf, len ), data, len );
+	return xfer->op->deliver ( xfer, src, iobuf );
+}
+
+/**
+ * Null deliver datagram as raw data
+ *
+ * @v xfer		Data-transfer interface
+ * @v src		Source interface
+ * @v data		Data buffer
+ * @v len		Length of data buffer
+ * @ret rc		Return status code
+ */
+static int null_deliver_raw ( struct xfer_interface *xfer,
+			      struct xfer_interface *src,
+			      const void *data __unused, size_t len ) {
+	DBGC ( src, "XFER %p->%p %zd bytes delivered %s\n", src, xfer, len,
+	       ( ( xfer == &null_xfer ) ?
+		 "before connection" : "after termination" ) );
 	return -EPIPE;
 }
 
 /** Null data transfer interface operations */
 struct xfer_interface_operations null_xfer_ops = {
-	.deliver = null_deliver,
+	.deliver	= deliver_as_raw,
+	.deliver_raw	= null_deliver_raw,
 };
 
 /**
