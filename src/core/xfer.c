@@ -27,6 +27,38 @@
  */
 
 /**
+ * Send redirection event
+ *
+ * @v xfer		Data-transfer interface
+ * @v type		New location type
+ * @v args		Remaining arguments depend upon location type
+ * @ret rc		Return status code
+ */
+int vredirect ( struct xfer_interface *xfer, int type, va_list args ) {
+	struct xfer_interface *dest = xfer_dest ( xfer );
+
+	return dest->op->vredirect ( dest, type, args );
+}
+
+/**
+ * Send redirection event
+ *
+ * @v xfer		Data-transfer interface
+ * @v type		New location type
+ * @v ...		Remaining arguments depend upon location type
+ * @ret rc		Return status code
+ */
+int redirect ( struct xfer_interface *xfer, int type, ... ) {
+	va_list args;
+	int rc;
+
+	va_start ( args, type );
+	rc = vredirect ( xfer, type, args );
+	va_end ( args );
+	return rc;
+}
+
+/**
  * Deliver datagram
  *
  * @v xfer		Data-transfer interface
@@ -36,14 +68,35 @@
 int deliver ( struct xfer_interface *xfer, struct io_buffer *iobuf ) {
 	struct xfer_interface *dest = xfer_dest ( xfer );
 
-	return dest->op->deliver ( dest, xfer, iobuf );
+	return dest->op->deliver ( dest, iobuf );
 }
 
 /**
  * Deliver datagram as raw data
  *
  * @v xfer		Data-transfer interface
- * @v src		Source interface
+ * @v iobuf		Datagram I/O buffer
+ * @ret rc		Return status code
+ */
+int deliver_raw ( struct xfer_interface *xfer, const void *data, size_t len ) {
+	struct xfer_interface *dest = xfer_dest ( xfer );
+
+	return dest->op->deliver_raw ( dest, data, len );
+}
+
+/****************************************************************************
+ *
+ * Helper methods
+ *
+ * These functions are designed to be used as methods in the
+ * xfer_interface_operations table.
+ *
+ */
+
+/**
+ * Deliver datagram as raw data
+ *
+ * @v xfer		Data-transfer interface
  * @v iobuf		Datagram I/O buffer
  * @ret rc		Return status code
  *
@@ -51,12 +104,10 @@ int deliver ( struct xfer_interface *xfer, struct io_buffer *iobuf ) {
  * data transfer interfaces that prefer to handle raw data.
  */
 int deliver_as_raw ( struct xfer_interface *xfer,
-		     struct xfer_interface *src,
 		     struct io_buffer *iobuf ) {
 	int rc;
 
-	rc = xfer->op->deliver_raw ( xfer, src, iobuf->data,
-				     iob_len ( iobuf ) );
+	rc = xfer->op->deliver_raw ( xfer, iobuf->data, iob_len ( iobuf ) );
 	free_iob ( iobuf );
 	return rc;
 }
@@ -65,7 +116,6 @@ int deliver_as_raw ( struct xfer_interface *xfer,
  * Deliver datagram as I/O buffer
  *
  * @v xfer		Data-transfer interface
- * @v src		Source interface
  * @v data		Data buffer
  * @v len		Length of data buffer
  * @ret rc		Return status code
@@ -74,32 +124,34 @@ int deliver_as_raw ( struct xfer_interface *xfer,
  * for data transfer interfaces that prefer to handle I/O buffers.
  */
 int deliver_as_iobuf ( struct xfer_interface *xfer,
-		       struct xfer_interface *src,
 		       const void *data, size_t len ) {
 	struct io_buffer *iobuf;
 
-#warning "Do we need interface-specific I/O buffer allocation?"
 	iobuf = alloc_iob ( len );
 	if ( ! iobuf )
 		return -ENOMEM;
 
 	memcpy ( iob_put ( iobuf, len ), data, len );
-	return xfer->op->deliver ( xfer, src, iobuf );
+	return xfer->op->deliver ( xfer, iobuf );
 }
+
+/****************************************************************************
+ *
+ * Null data transfer interface
+ *
+ */
 
 /**
  * Null deliver datagram as raw data
  *
  * @v xfer		Data-transfer interface
- * @v src		Source interface
  * @v data		Data buffer
  * @v len		Length of data buffer
  * @ret rc		Return status code
  */
 static int null_deliver_raw ( struct xfer_interface *xfer,
-			      struct xfer_interface *src,
 			      const void *data __unused, size_t len ) {
-	DBGC ( src, "XFER %p->%p %zd bytes delivered %s\n", src, xfer, len,
+	DBGC ( xfer, "XFER %p %zd bytes delivered %s\n", xfer, len,
 	       ( ( xfer == &null_xfer ) ?
 		 "before connection" : "after termination" ) );
 	return -EPIPE;

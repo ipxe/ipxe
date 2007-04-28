@@ -8,6 +8,7 @@
  */
 
 #include <stddef.h>
+#include <stdarg.h>
 #include <gpxe/interface.h>
 #include <gpxe/iobuf.h>
 
@@ -15,10 +16,38 @@ struct xfer_interface;
 
 /** Data transfer interface operations */
 struct xfer_interface_operations {
+
+	/* Missing features:
+	 *
+	 * notification of non-close status - e.g. connected/opened, ...
+	 *
+	 * seek
+	 *
+	 * prompt for data delivery
+	 *
+	 * I/O buffer preparation
+	 *
+	 */
+
+
+	/** Close interface
+	 *
+	 * @v xfer		Data-transfer interface
+	 * @v rc		Reason for close
+	 */
+	void ( * close ) ( struct xfer_interface *xfer, int rc );
+	/** Redirect to new location
+	 *
+	 * @v xfer		Data-transfer interface
+	 * @v type		New location type
+	 * @v args		Remaining arguments depend upon location type
+	 * @ret rc		Return status code
+	 */
+	int ( * vredirect ) ( struct xfer_interface *xfer, int type,
+			      va_list args );
 	/** Deliver datagram
 	 *
 	 * @v xfer		Data-transfer interface
-	 * @v src		Source interface
 	 * @v iobuf		Datagram I/O buffer
 	 * @ret rc		Return status code
 	 *
@@ -27,12 +56,10 @@ struct xfer_interface_operations {
 	 * deliver_as_raw().
 	 */
 	int ( * deliver ) ( struct xfer_interface *xfer,
-			    struct xfer_interface *src,
 			    struct io_buffer *iobuf );
 	/** Deliver datagram as raw data
 	 *
 	 * @v xfer		Data-transfer interface
-	 * @v src		Source interface
 	 * @v data		Data buffer
 	 * @v len		Length of data buffer
 	 * @ret rc		Return status code
@@ -42,7 +69,6 @@ struct xfer_interface_operations {
 	 * deliver_as_iobuf().
 	 */
 	int ( * deliver_raw ) ( struct xfer_interface *xfer,
-				struct xfer_interface *src,
 				const void *data, size_t len );
 };
 
@@ -57,11 +83,15 @@ struct xfer_interface {
 extern struct xfer_interface null_xfer;
 extern struct xfer_interface_operations null_xfer_ops;
 
+extern int vredirect ( struct xfer_interface *xfer, int type, va_list args );
+extern int redirect ( struct xfer_interface *xfer, int type, ... );
+extern int deliver ( struct xfer_interface *xfer, struct io_buffer *iobuf );
+extern int deliver_raw ( struct xfer_interface *xfer,
+			 const void *data, size_t len );
+
 extern int deliver_as_raw ( struct xfer_interface *xfer,
-			    struct xfer_interface *src,
 			    struct io_buffer *iobuf );
 extern int deliver_as_iobuf ( struct xfer_interface *xfer,
-			      struct xfer_interface *src,
 			      const void *data, size_t len );
 
 /**
