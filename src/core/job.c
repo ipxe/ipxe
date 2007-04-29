@@ -71,7 +71,7 @@ struct job_interface_operations null_job_ops = {
 struct job_interface null_job = {
 	.intf = {
 		.dest = &null_job.intf,
-		.refcnt = null_refcnt,
+		.refcnt = NULL,
 	},
 	.op = &null_job_ops,
 };

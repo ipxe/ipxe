@@ -76,12 +76,11 @@ extern void ignore_progress ( struct job_interface *job,
  *
  * @v job		Job control interface
  * @v op		Job control interface operations
- * @v refcnt		Job control interface reference counting method
+ * @v refcnt		Containing object reference counter, or NULL
  */
 static inline void job_init ( struct job_interface *job,
-			       struct job_interface_operations *op,
-			       void ( * refcnt ) ( struct interface *intf,
-						   int delta ) ) {
+			      struct job_interface_operations *op,
+			      struct refcnt *refcnt ) {
 	job->intf.dest = &null_job.intf;
 	job->intf.refcnt = refcnt;
 	job->op = op;

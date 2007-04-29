@@ -16,7 +16,6 @@
  * Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
  */
 
-#include <assert.h>
 #include <gpxe/interface.h>
 
 /** @file
@@ -24,30 +23,6 @@
  * Object communication interfaces
  *
  */
-
-/**
- * Obtain reference to interface
- *
- * @v intf		Interface
- * @ret intf		Interface
- *
- * Increases the reference count on the interface.
- */
-static struct interface * intf_get ( struct interface *intf ) {
-	intf->refcnt ( intf, +1 );
-	return intf;
-}
-
-/**
- * Drop reference to interface
- *
- * @v intf		Interface
- *
- * Decreases the reference count on the interface.
- */
-static void intf_put ( struct interface *intf ) {
-	intf->refcnt ( intf, -1 );
-}
 
 /**
  * Plug an interface into a new destination interface
@@ -63,19 +38,7 @@ static void intf_put ( struct interface *intf ) {
  * interface into a null interface.
  */
 void plug ( struct interface *intf, struct interface *dest ) {
-	intf_put ( intf->dest );
-	intf->dest = intf_get ( dest );
-}
-
-/**
- * Null update reference count
- *
- * @v intf		Interface
- * @v delta		Change to apply to reference count
- *
- * Use this as the refcnt() method for an interface that does not need
- * to support reference counting.
- */
-void null_refcnt ( struct interface *intf __unused, int delta __unused ) {
-	/* Do nothing */
+	ref_put ( intf->refcnt );
+	ref_get ( dest->refcnt );
+	intf->dest = dest;
 }

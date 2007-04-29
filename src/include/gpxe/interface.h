@@ -7,6 +7,8 @@
  *
  */
 
+#include <gpxe/refcnt.h>
+
 /** An object communication interface */
 struct interface {
 	/** Destination interface
@@ -18,19 +20,14 @@ struct interface {
 	 * unplugged, it should point to a null interface.
 	 */
 	struct interface *dest;
-	/** Update reference count
+	/** Reference counter
 	 *
-	 * @v intf		Interface
-	 * @v delta		Change to apply to reference count
-	 *
-	 * This method updates the reference count for the object
-	 * containing the interface.
+	 * If this interface is not part of a reference-counted
+	 * object, this field may be NULL.
 	 */
-	void ( * refcnt ) ( struct interface *intf, int delta );
+	struct refcnt *refcnt;
 };
 
 extern void plug ( struct interface *intf, struct interface *dest );
-
-extern void null_refcnt ( struct interface *intf, int delta );
 
 #endif /* _GPXE_INTERFACE_H */

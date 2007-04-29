@@ -230,7 +230,7 @@ struct xfer_interface_operations null_xfer_ops = {
 struct xfer_interface null_xfer = {
 	.intf = {
 		.dest = &null_xfer.intf,
-		.refcnt = null_refcnt,
+		.refcnt = NULL,
 	},
 	.op = &null_xfer_ops,
 };

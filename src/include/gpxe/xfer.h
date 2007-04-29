@@ -114,12 +114,11 @@ extern int ignore_deliver_raw ( struct xfer_interface *xfer,
  *
  * @v xfer		Data transfer interface
  * @v op		Data transfer interface operations
- * @v refcnt		Data transfer interface reference counting method
+ * @v refcnt		Containing object reference counter, or NULL
  */
 static inline void xfer_init ( struct xfer_interface *xfer,
 			       struct xfer_interface_operations *op,
-			       void ( * refcnt ) ( struct interface *intf,
-						   int delta ) ) {
+			       struct refcnt *refcnt ) {
 	xfer->intf.dest = &null_xfer.intf;
 	xfer->intf.refcnt = refcnt;
 	xfer->op = op;
