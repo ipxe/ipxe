@@ -27,9 +27,35 @@
  */
 
 /**
+ * Close data transfer interface
+ *
+ * @v xfer		Data transfer interface
+ * @v rc		Reason for close
+ */
+void close ( struct xfer_interface *xfer, int rc ) {
+	struct xfer_interface *dest = xfer_dest ( xfer );
+
+	dest->op->close ( dest, rc );
+	xfer_unplug ( xfer );
+}
+
+/**
+ * Seek to position
+ *
+ * @v xfer		Data transfer interface
+ * @v pos		New position
+ * @ret rc		Return status code
+ */
+int seek ( struct xfer_interface *xfer, size_t pos ) {
+	struct xfer_interface *dest = xfer_dest ( xfer );
+
+	return dest->op->seek ( dest, pos );
+}
+
+/**
  * Send redirection event
  *
- * @v xfer		Data-transfer interface
+ * @v xfer		Data transfer interface
  * @v type		New location type
  * @v args		Remaining arguments depend upon location type
  * @ret rc		Return status code
@@ -43,7 +69,7 @@ int vredirect ( struct xfer_interface *xfer, int type, va_list args ) {
 /**
  * Send redirection event
  *
- * @v xfer		Data-transfer interface
+ * @v xfer		Data transfer interface
  * @v type		New location type
  * @v ...		Remaining arguments depend upon location type
  * @ret rc		Return status code
@@ -61,7 +87,7 @@ int redirect ( struct xfer_interface *xfer, int type, ... ) {
 /**
  * Deliver datagram
  *
- * @v xfer		Data-transfer interface
+ * @v xfer		Data transfer interface
  * @v iobuf		Datagram I/O buffer
  * @ret rc		Return status code
  */
@@ -74,7 +100,7 @@ int deliver ( struct xfer_interface *xfer, struct io_buffer *iobuf ) {
 /**
  * Deliver datagram as raw data
  *
- * @v xfer		Data-transfer interface
+ * @v xfer		Data transfer interface
  * @v iobuf		Datagram I/O buffer
  * @ret rc		Return status code
  */
@@ -94,9 +120,43 @@ int deliver_raw ( struct xfer_interface *xfer, const void *data, size_t len ) {
  */
 
 /**
+ * Ignore close()
+ *
+ * @v xfer		Data transfer interface
+ * @v rc		Reason for close
+ */
+void ignore_close ( struct xfer_interface *xfer __unused, int rc __unused ) {
+	/* Nothing to do */
+}
+
+/**
+ * Ignore vredirect()
+ *
+ * @v xfer		Data transfer interface
+ * @v type		New location type
+ * @v args		Remaining arguments depend upon location type
+ * @ret rc		Return status code
+ */
+int ignore_vredirect ( struct xfer_interface *xfer __unused,
+		       int type __unused, va_list args __unused ) {
+	return 0;
+}
+
+/**
+ * Ignore seek()
+ *
+ * @v xfer		Data transfer interface
+ * @v pos		New position
+ * @ret rc		Return status code
+ */
+int ignore_seek ( struct xfer_interface *xfer __unused, size_t pos __unused ) {
+	return 0;
+}
+
+/**
  * Deliver datagram as raw data
  *
- * @v xfer		Data-transfer interface
+ * @v xfer		Data transfer interface
  * @v iobuf		Datagram I/O buffer
  * @ret rc		Return status code
  *
@@ -115,7 +175,7 @@ int deliver_as_raw ( struct xfer_interface *xfer,
 /**
  * Deliver datagram as I/O buffer
  *
- * @v xfer		Data-transfer interface
+ * @v xfer		Data transfer interface
  * @v data		Data buffer
  * @v len		Length of data buffer
  * @ret rc		Return status code
@@ -135,32 +195,29 @@ int deliver_as_iobuf ( struct xfer_interface *xfer,
 	return xfer->op->deliver ( xfer, iobuf );
 }
 
-/****************************************************************************
- *
- * Null data transfer interface
- *
- */
-
 /**
- * Null deliver datagram as raw data
+ * Ignore datagram as raw data
  *
- * @v xfer		Data-transfer interface
+ * @v xfer		Data transfer interface
  * @v data		Data buffer
  * @v len		Length of data buffer
  * @ret rc		Return status code
  */
-static int null_deliver_raw ( struct xfer_interface *xfer,
-			      const void *data __unused, size_t len ) {
+int ignore_deliver_raw ( struct xfer_interface *xfer,
+			 const void *data __unused, size_t len ) {
 	DBGC ( xfer, "XFER %p %zd bytes delivered %s\n", xfer, len,
 	       ( ( xfer == &null_xfer ) ?
 		 "before connection" : "after termination" ) );
-	return -EPIPE;
+	return 0;
 }
 
 /** Null data transfer interface operations */
 struct xfer_interface_operations null_xfer_ops = {
+	.close		= ignore_close,
+	.vredirect	= ignore_vredirect,
+	.seek		= ignore_seek,
 	.deliver	= deliver_as_raw,
-	.deliver_raw	= null_deliver_raw,
+	.deliver_raw	= ignore_deliver_raw,
 };
 
 /**

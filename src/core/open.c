@@ -45,7 +45,7 @@ static struct socket_opener socket_openers_end[0]
 /**
  * Open URI
  *
- * @v xfer		Data-transfer interface
+ * @v xfer		Data transfer interface
  * @v uri_string	URI string (e.g. "http://etherboot.org/kernel")
  * @ret rc		Return status code
  */
@@ -74,7 +74,7 @@ int open_uri ( struct xfer_interface *xfer, const char *uri_string ) {
 /**
  * Open socket
  *
- * @v xfer		Data-transfer interface
+ * @v xfer		Data transfer interface
  * @v domain		Communication domain (e.g. PF_INET)
  * @v type		Communication semantics (e.g. SOCK_STREAM)
  */
@@ -101,7 +101,7 @@ int open_socket ( struct xfer_interface *xfer,
 /**
  * Open location
  *
- * @v xfer		Data-transfer interface
+ * @v xfer		Data transfer interface
  * @v type		Location type
  * @v args		Remaining arguments depend upon location type
  * @ret rc		Return status code
@@ -128,7 +128,7 @@ int vopen ( struct xfer_interface *xfer, int type, va_list args ) {
 /**
  * Open location
  *
- * @v xfer		Data-transfer interface
+ * @v xfer		Data transfer interface
  * @v type		Location type
  * @v ...		Remaining arguments depend upon location type
  * @ret rc		Return status code

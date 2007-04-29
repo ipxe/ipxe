@@ -41,7 +41,7 @@ struct uri_opener {
 	const char *scheme;
 	/** Open URI
 	 *
-	 * @v xfer		Data-transfer interface
+	 * @v xfer		Data transfer interface
 	 * @v uri		URI
 	 * @ret rc		Return status code
 	 *
@@ -62,7 +62,7 @@ struct socket_opener {
 	int type;
 	/** Open socket
 	 *
-	 * @v xfer		Data-transfer interface
+	 * @v xfer		Data transfer interface
 	 * @v sa		Socket address
 	 * @ret rc		Return status code
 	 */
