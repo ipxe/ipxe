@@ -42,3 +42,18 @@ void plug ( struct interface *intf, struct interface *dest ) {
 	ref_get ( dest->refcnt );
 	intf->dest = dest;
 }
+
+/**
+ * Plug two interfaces together
+ *
+ * @v a			Interface A
+ * @v b			Interface B
+ *
+ * Plugs interface A into interface B, and interface B into interface
+ * A.  (The basic plug() function is unidirectional; this function is
+ * merely a shorthand for two calls to plug(), hence the name.)
+ */
+void plug_plug ( struct interface *a, struct interface *b ) {
+	plug ( a, b );
+	plug ( b, a );
+}

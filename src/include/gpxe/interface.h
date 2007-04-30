@@ -29,5 +29,6 @@ struct interface {
 };
 
 extern void plug ( struct interface *intf, struct interface *dest );
+extern void plug_plug ( struct interface *a, struct interface *b );
 
 #endif /* _GPXE_INTERFACE_H */
