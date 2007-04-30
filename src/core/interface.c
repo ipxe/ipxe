@@ -38,9 +38,9 @@
  * interface into a null interface.
  */
 void plug ( struct interface *intf, struct interface *dest ) {
-	ref_put ( intf->refcnt );
-	ref_get ( dest->refcnt );
+	ref_put ( intf->dest->refcnt );
 	intf->dest = dest;
+	ref_get ( intf->dest->refcnt );
 }
 
 /**
