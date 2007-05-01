@@ -28,6 +28,26 @@ struct interface {
 	struct refcnt *refcnt;
 };
 
+/**
+ * Increment reference count on an interface
+ *
+ * @v intf		Interface
+ * @ret intf		Interface
+ */
+static inline struct interface * intf_get ( struct interface *intf ) {
+	ref_get ( intf->refcnt );
+	return intf;
+}
+
+/**
+ * Decrement reference count on an interface
+ *
+ * @v intf		Interface
+ */
+static inline void intf_put ( struct interface *intf ) {
+	ref_put ( intf->refcnt );
+}
+
 extern void plug ( struct interface *intf, struct interface *dest );
 extern void plug_plug ( struct interface *a, struct interface *b );
 
