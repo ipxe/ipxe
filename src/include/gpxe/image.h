@@ -11,6 +11,7 @@
 #include <gpxe/tables.h>
 #include <gpxe/list.h>
 #include <gpxe/uaccess.h>
+#include <gpxe/refcnt.h>
 
 struct image_type;
 
@@ -19,6 +20,9 @@ struct image_type;
 
 /** An executable or loadable image */
 struct image {
+	/** Reference count */
+	struct refcnt refcnt;
+
 	/** Name */
 	char name[16];
 	/** List of registered images */
@@ -116,5 +120,25 @@ struct image * find_image ( const char *name );
 extern int image_load ( struct image *image );
 extern int image_autoload ( struct image *image );
 extern int image_exec ( struct image *image );
+
+/**
+ * Increment reference count on an image
+ *
+ * @v image		Image
+ * @ret image		Image
+ */
+static inline struct image * image_get ( struct image *image ) {
+	ref_get ( &image->refcnt );
+	return image;
+}
+
+/**
+ * Decrement reference count on an image
+ *
+ * @v image		Image
+ */
+static inline void image_put ( struct image *image ) {
+	ref_put ( &image->refcnt );
+}
 
 #endif /* _GPXE_IMAGE_H */
