@@ -12,6 +12,11 @@
  *
  * This data structure is designed to be embedded within a
  * reference-counted object.
+ *
+ * Reference-counted objects are freed when their reference count
+ * drops below zero.  This means that a freshly allocated-and-zeroed
+ * reference-counted object will be freed on the first call to
+ * ref_put().
  */
 struct refcnt {
 	/** Current reference count
