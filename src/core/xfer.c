@@ -32,7 +32,7 @@
  * @v xfer		Data transfer interface
  * @v rc		Reason for close
  */
-void close ( struct xfer_interface *xfer, int rc ) {
+void xfer_close ( struct xfer_interface *xfer, int rc ) {
 	struct xfer_interface *dest = xfer_dest ( xfer );
 
 	dest->op->close ( dest, rc );
@@ -46,7 +46,7 @@ void close ( struct xfer_interface *xfer, int rc ) {
  * @v pos		New position
  * @ret rc		Return status code
  */
-int seek ( struct xfer_interface *xfer, size_t pos ) {
+int xfer_seek ( struct xfer_interface *xfer, size_t pos ) {
 	struct xfer_interface *dest = xfer_dest ( xfer );
 
 	return dest->op->seek ( dest, pos );
@@ -60,7 +60,7 @@ int seek ( struct xfer_interface *xfer, size_t pos ) {
  * @v args		Remaining arguments depend upon location type
  * @ret rc		Return status code
  */
-int vredirect ( struct xfer_interface *xfer, int type, va_list args ) {
+int xfer_vredirect ( struct xfer_interface *xfer, int type, va_list args ) {
 	struct xfer_interface *dest = xfer_dest ( xfer );
 
 	return dest->op->vredirect ( dest, type, args );
@@ -74,12 +74,12 @@ int vredirect ( struct xfer_interface *xfer, int type, va_list args ) {
  * @v ...		Remaining arguments depend upon location type
  * @ret rc		Return status code
  */
-int redirect ( struct xfer_interface *xfer, int type, ... ) {
+int xfer_redirect ( struct xfer_interface *xfer, int type, ... ) {
 	va_list args;
 	int rc;
 
 	va_start ( args, type );
-	rc = vredirect ( xfer, type, args );
+	rc = xfer_vredirect ( xfer, type, args );
 	va_end ( args );
 	return rc;
 }
@@ -91,7 +91,7 @@ int redirect ( struct xfer_interface *xfer, int type, ... ) {
  * @v iobuf		Datagram I/O buffer
  * @ret rc		Return status code
  */
-int deliver ( struct xfer_interface *xfer, struct io_buffer *iobuf ) {
+int xfer_deliver ( struct xfer_interface *xfer, struct io_buffer *iobuf ) {
 	struct xfer_interface *dest = xfer_dest ( xfer );
 
 	return dest->op->deliver ( dest, iobuf );
@@ -104,7 +104,8 @@ int deliver ( struct xfer_interface *xfer, struct io_buffer *iobuf ) {
  * @v iobuf		Datagram I/O buffer
  * @ret rc		Return status code
  */
-int deliver_raw ( struct xfer_interface *xfer, const void *data, size_t len ) {
+int xfer_deliver_raw ( struct xfer_interface *xfer,
+		       const void *data, size_t len ) {
 	struct xfer_interface *dest = xfer_dest ( xfer );
 
 	return dest->op->deliver_raw ( dest, data, len );
@@ -120,36 +121,47 @@ int deliver_raw ( struct xfer_interface *xfer, const void *data, size_t len ) {
  */
 
 /**
- * Ignore close()
+ * Ignore start() event
  *
  * @v xfer		Data transfer interface
- * @v rc		Reason for close
  */
-void ignore_close ( struct xfer_interface *xfer __unused, int rc __unused ) {
+void ignore_xfer_start ( struct xfer_interface *xfer __unused ) {
 	/* Nothing to do */
 }
 
 /**
- * Ignore vredirect()
+ * Ignore close() event
+ *
+ * @v xfer		Data transfer interface
+ * @v rc		Reason for close
+ */
+void ignore_xfer_close ( struct xfer_interface *xfer __unused,
+			 int rc __unused ) {
+	/* Nothing to do */
+}
+
+/**
+ * Ignore vredirect() event
  *
  * @v xfer		Data transfer interface
  * @v type		New location type
  * @v args		Remaining arguments depend upon location type
  * @ret rc		Return status code
  */
-int ignore_vredirect ( struct xfer_interface *xfer __unused,
-		       int type __unused, va_list args __unused ) {
+int ignore_xfer_vredirect ( struct xfer_interface *xfer __unused,
+			    int type __unused, va_list args __unused ) {
 	return 0;
 }
 
 /**
- * Ignore seek()
+ * Ignore seek() event
  *
  * @v xfer		Data transfer interface
  * @v pos		New position
  * @ret rc		Return status code
  */
-int ignore_seek ( struct xfer_interface *xfer __unused, size_t pos __unused ) {
+int ignore_xfer_seek ( struct xfer_interface *xfer __unused,
+		       size_t pos __unused ) {
 	return 0;
 }
 
@@ -163,8 +175,8 @@ int ignore_seek ( struct xfer_interface *xfer __unused, size_t pos __unused ) {
  * This function is intended to be used as the deliver() method for
  * data transfer interfaces that prefer to handle raw data.
  */
-int deliver_as_raw ( struct xfer_interface *xfer,
-		     struct io_buffer *iobuf ) {
+int xfer_deliver_as_raw ( struct xfer_interface *xfer,
+			  struct io_buffer *iobuf ) {
 	int rc;
 
 	rc = xfer->op->deliver_raw ( xfer, iobuf->data, iob_len ( iobuf ) );
@@ -183,8 +195,8 @@ int deliver_as_raw ( struct xfer_interface *xfer,
  * This function is intended to be used as the deliver_raw() method
  * for data transfer interfaces that prefer to handle I/O buffers.
  */
-int deliver_as_iobuf ( struct xfer_interface *xfer,
-		       const void *data, size_t len ) {
+int xfer_deliver_as_iobuf ( struct xfer_interface *xfer,
+			    const void *data, size_t len ) {
 	struct io_buffer *iobuf;
 
 	iobuf = alloc_iob ( len );
@@ -196,15 +208,15 @@ int deliver_as_iobuf ( struct xfer_interface *xfer,
 }
 
 /**
- * Ignore datagram as raw data
+ * Ignore datagram as raw data event
  *
  * @v xfer		Data transfer interface
  * @v data		Data buffer
  * @v len		Length of data buffer
  * @ret rc		Return status code
  */
-int ignore_deliver_raw ( struct xfer_interface *xfer,
-			 const void *data __unused, size_t len ) {
+int ignore_xfer_deliver_raw ( struct xfer_interface *xfer,
+			      const void *data __unused, size_t len ) {
 	DBGC ( xfer, "XFER %p %zd bytes delivered %s\n", xfer, len,
 	       ( ( xfer == &null_xfer ) ?
 		 "before connection" : "after termination" ) );
@@ -213,11 +225,12 @@ int ignore_deliver_raw ( struct xfer_interface *xfer,
 
 /** Null data transfer interface operations */
 struct xfer_interface_operations null_xfer_ops = {
-	.close		= ignore_close,
-	.vredirect	= ignore_vredirect,
-	.seek		= ignore_seek,
-	.deliver	= deliver_as_raw,
-	.deliver_raw	= ignore_deliver_raw,
+	.start		= ignore_xfer_start,
+	.close		= ignore_xfer_close,
+	.vredirect	= ignore_xfer_vredirect,
+	.seek		= ignore_xfer_seek,
+	.deliver	= xfer_deliver_as_raw,
+	.deliver_raw	= ignore_xfer_deliver_raw,
 };
 
 /**

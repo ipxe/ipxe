@@ -33,6 +33,11 @@ struct job_interface;
 
 /** Job control interface operations */
 struct job_interface_operations {
+	/** Start job
+	 *
+	 * @v job		Job control interface
+	 */
+	void ( * start ) ( struct job_interface *job );
 	/** Job completed
 	 *
 	 * @v job		Job control interface
@@ -64,12 +69,13 @@ struct job_interface {
 extern struct job_interface null_job;
 extern struct job_interface_operations null_job_ops;
 
-extern void done ( struct job_interface *job, int rc );
+extern void job_done ( struct job_interface *job, int rc );
 
-extern void ignore_done ( struct job_interface *job, int rc );
-extern void ignore_kill ( struct job_interface *job );
-extern void ignore_progress ( struct job_interface *job,
-			      struct job_progress *progress );
+extern void ignore_job_start ( struct job_interface *job );
+extern void ignore_job_done ( struct job_interface *job, int rc );
+extern void ignore_job_kill ( struct job_interface *job );
+extern void ignore_job_progress ( struct job_interface *job,
+				  struct job_progress *progress );
 
 /**
  * Initialise a job control interface
@@ -106,6 +112,37 @@ intf_to_job ( struct interface *intf ) {
 static inline struct job_interface *
 job_dest ( struct job_interface *job ) {
 	return intf_to_job ( job->intf.dest );
+}
+
+/**
+ * Plug a job control interface into a new destination interface
+ *
+ * @v job		Job control interface
+ * @v dest		New destination interface
+ */
+static inline void job_plug ( struct job_interface *job,
+			       struct job_interface *dest ) {
+	plug ( &job->intf, &dest->intf );
+}
+
+/**
+ * Plug two job control interfaces together
+ *
+ * @v a			Job control interface A
+ * @v b			Job control interface B
+ */
+static inline void job_plug_plug ( struct job_interface *a,
+				    struct job_interface *b ) {
+	plug_plug ( &a->intf, &b->intf );
+}
+
+/**
+ * Unplug a job control interface
+ *
+ * @v job		Job control interface
+ */
+static inline void job_unplug ( struct job_interface *job ) {
+	plug ( &job->intf, &null_job.intf );
 }
 
 /**

@@ -26,10 +26,11 @@
  *
  */
 
-void done ( struct job_interface *job, int rc ) {
+void job_done ( struct job_interface *job, int rc ) {
 	struct job_interface *dest = job_dest ( job );
 
 	dest->op->done ( dest, rc );
+	job_unplug ( job );
 }
 
 /****************************************************************************
@@ -41,24 +42,29 @@ void done ( struct job_interface *job, int rc ) {
  *
  */
 
-void ignore_done ( struct job_interface *job __unused, int rc __unused ) {
+void ignore_job_start ( struct job_interface *job __unused ) {
 	/* Nothing to do */
 }
 
-void ignore_kill ( struct job_interface *job __unused ) {
+void ignore_job_done ( struct job_interface *job __unused, int rc __unused ) {
 	/* Nothing to do */
 }
 
-void ignore_progress ( struct job_interface *job __unused,
-		       struct job_progress *progress ) {
+void ignore_job_kill ( struct job_interface *job __unused ) {
+	/* Nothing to do */
+}
+
+void ignore_job_progress ( struct job_interface *job __unused,
+			   struct job_progress *progress ) {
 	memset ( progress, 0, sizeof ( *progress ) );
 }
 
 /** Null job control interface operations */
 struct job_interface_operations null_job_ops = {
-	.done		= ignore_done,
-	.kill		= ignore_kill,
-	.progress	= ignore_progress,
+	.start		= ignore_job_start,
+	.done		= ignore_job_done,
+	.kill		= ignore_job_kill,
+	.progress	= ignore_job_progress,
 };
 
 /**

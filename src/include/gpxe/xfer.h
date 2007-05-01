@@ -21,15 +21,17 @@ struct xfer_interface_operations {
 	 *
 	 * notification of non-close status - e.g. connected/opened, ...
 	 *
-	 * seek
-	 *
 	 * prompt for data delivery
 	 *
 	 * I/O buffer preparation
 	 *
 	 */
 
-
+	/** Start data transfer
+	 *
+	 * @v xfer		Data transfer interface
+	 */
+	void ( * start ) ( struct xfer_interface *xfer );
 	/** Close interface
 	 *
 	 * @v xfer		Data transfer interface
@@ -60,7 +62,7 @@ struct xfer_interface_operations {
 	 *
 	 * A data transfer interface that wishes to support only raw
 	 * data delivery should set this method to
-	 * deliver_as_raw().
+	 * xfer_deliver_as_raw().
 	 */
 	int ( * deliver ) ( struct xfer_interface *xfer,
 			    struct io_buffer *iobuf );
@@ -73,7 +75,7 @@ struct xfer_interface_operations {
 	 *
 	 * A data transfer interface that wishes to support only I/O
 	 * buffer delivery should set this method to
-	 * deliver_as_iobuf().
+	 * xfer_deliver_as_iobuf().
 	 */
 	int ( * deliver_raw ) ( struct xfer_interface *xfer,
 				const void *data, size_t len );
@@ -90,24 +92,30 @@ struct xfer_interface {
 extern struct xfer_interface null_xfer;
 extern struct xfer_interface_operations null_xfer_ops;
 
-extern void close ( struct xfer_interface *xfer, int rc );
-extern int seek ( struct xfer_interface *xfer, size_t pos );
-extern int vredirect ( struct xfer_interface *xfer, int type, va_list args );
-extern int redirect ( struct xfer_interface *xfer, int type, ... );
-extern int deliver ( struct xfer_interface *xfer, struct io_buffer *iobuf );
-extern int deliver_raw ( struct xfer_interface *xfer,
-			 const void *data, size_t len );
-
-extern void ignore_close ( struct xfer_interface *xfer, int rc );
-extern int ignore_vredirect ( struct xfer_interface *xfer,
-			      int type, va_list args );
-extern int ignore_seek ( struct xfer_interface *xfer, size_t pos );
-extern int deliver_as_raw ( struct xfer_interface *xfer,
-			    struct io_buffer *iobuf );
-extern int deliver_as_iobuf ( struct xfer_interface *xfer,
+extern void xfer_start ( struct xfer_interface *xfer );
+extern void xfer_close ( struct xfer_interface *xfer, int rc );
+extern int xfer_seek ( struct xfer_interface *xfer, size_t pos );
+extern int xfer_vredirect ( struct xfer_interface *xfer, int type,
+			    va_list args );
+extern int xfer_redirect ( struct xfer_interface *xfer, int type, ... );
+extern int xfer_deliver ( struct xfer_interface *xfer,
+			  struct io_buffer *iobuf );
+extern int xfer_deliver_raw ( struct xfer_interface *xfer,
 			      const void *data, size_t len );
-extern int ignore_deliver_raw ( struct xfer_interface *xfer,
-				const void *data __unused, size_t len );
+
+extern void ignore_xfer_start ( struct xfer_interface *xfer );
+extern void ignore_xfer_close ( struct xfer_interface *xfer, int rc );
+extern int ignore_xfer_vredirect ( struct xfer_interface *xfer,
+				   int type, va_list args );
+extern int default_xfer_vredirect ( struct xfer_interface *xfer,
+				    int type, va_list args );
+extern int ignore_xfer_seek ( struct xfer_interface *xfer, size_t pos );
+extern int xfer_deliver_as_raw ( struct xfer_interface *xfer,
+				 struct io_buffer *iobuf );
+extern int xfer_deliver_as_iobuf ( struct xfer_interface *xfer,
+				   const void *data, size_t len );
+extern int ignore_xfer_deliver_raw ( struct xfer_interface *xfer,
+				     const void *data __unused, size_t len );
 
 /**
  * Initialise a data transfer interface
@@ -155,6 +163,17 @@ xfer_dest ( struct xfer_interface *xfer ) {
 static inline void xfer_plug ( struct xfer_interface *xfer,
 			       struct xfer_interface *dest ) {
 	plug ( &xfer->intf, &dest->intf );
+}
+
+/**
+ * Plug two data transfer interfaces together
+ *
+ * @v a			Data transfer interface A
+ * @v b			Data transfer interface B
+ */
+static inline void xfer_plug_plug ( struct xfer_interface *a,
+				    struct xfer_interface *b ) {
+	plug_plug ( &a->intf, &b->intf );
 }
 
 /**
