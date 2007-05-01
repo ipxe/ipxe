@@ -98,7 +98,7 @@ static inline void job_init ( struct job_interface *job,
  * @v intf		Generic object communication interface
  * @ret job		Job control interface
  */
-static inline struct job_interface *
+static inline __attribute__ (( always_inline )) struct job_interface *
 intf_to_job ( struct interface *intf ) {
 	return container_of ( intf, struct job_interface, intf );
 }
@@ -109,7 +109,7 @@ intf_to_job ( struct interface *intf ) {
  * @v job		Job control interface
  * @ret dest		Destination interface
  */
-static inline struct job_interface *
+static inline __attribute__ (( always_inline )) struct job_interface *
 job_dest ( struct job_interface *job ) {
 	return intf_to_job ( job->intf.dest );
 }

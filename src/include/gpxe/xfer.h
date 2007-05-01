@@ -138,7 +138,7 @@ static inline void xfer_init ( struct xfer_interface *xfer,
  * @v intf		Generic object communication interface
  * @ret xfer		Data transfer interface
  */
-static inline struct xfer_interface *
+static inline __attribute__ (( always_inline )) struct xfer_interface *
 intf_to_xfer ( struct interface *intf ) {
 	return container_of ( intf, struct xfer_interface, intf );
 }
@@ -149,7 +149,7 @@ intf_to_xfer ( struct interface *intf ) {
  * @v xfer		Data transfer interface
  * @ret dest		Destination interface
  */
-static inline struct xfer_interface *
+static inline __attribute__ (( always_inline )) struct xfer_interface *
 xfer_dest ( struct xfer_interface *xfer ) {
 	return intf_to_xfer ( xfer->intf.dest );
 }
