@@ -16,22 +16,6 @@ struct xfer_interface;
 
 /** Data transfer interface operations */
 struct xfer_interface_operations {
-
-	/* Missing features:
-	 *
-	 * notification of non-close status - e.g. connected/opened, ...
-	 *
-	 * prompt for data delivery
-	 *
-	 * I/O buffer preparation
-	 *
-	 */
-
-	/** Start data transfer
-	 *
-	 * @v xfer		Data transfer interface
-	 */
-	void ( * start ) ( struct xfer_interface *xfer );
 	/** Close interface
 	 *
 	 * @v xfer		Data transfer interface
@@ -47,14 +31,39 @@ struct xfer_interface_operations {
 	 */
 	int ( * vredirect ) ( struct xfer_interface *xfer, int type,
 			      va_list args );
+	/** Request data
+	 *
+	 * @v xfer		Data transfer interface
+	 * @v offset		Offset to new position
+	 * @v whence		Basis for new position
+	 * @v len		Length of requested data
+	 * @ret rc		Return status code
+	 */
+	int ( * request ) ( struct xfer_interface *xfer, off_t offset,
+			    int whence, size_t len );
 	/** Seek to position
 	 *
 	 * @v xfer		Data transfer interface
-	 * @v pos		New position
+	 * @v offset		Offset to new position
+	 * @v whence		Basis for new position
 	 * @ret rc		Return status code
+	 *
+	 * @c whence must be one of @c SEEK_SET or @c SEEK_CUR.  A
+	 * successful return indicates that the interface is ready to
+	 * immediately accept datagrams; return -EAGAIN if this is not
+	 * the case.
 	 */
-	int ( * seek ) ( struct xfer_interface *xfer, size_t pos );
-	/** Deliver datagram
+	int ( * seek ) ( struct xfer_interface *xfer, off_t offset,
+			 int whence );
+	/** Allocate I/O buffer
+	 *
+	 * @v xfer		Data transfer interface
+	 * @v len		I/O buffer payload length
+	 * @ret iobuf		I/O buffer
+	 */
+	struct io_buffer * ( * alloc_iob ) ( struct xfer_interface *xfer,
+					     size_t len );
+	/** Deliver datagram as I/O buffer
 	 *
 	 * @v xfer		Data transfer interface
 	 * @v iobuf		Datagram I/O buffer
@@ -63,9 +72,13 @@ struct xfer_interface_operations {
 	 * A data transfer interface that wishes to support only raw
 	 * data delivery should set this method to
 	 * xfer_deliver_as_raw().
+	 *
+	 * Interfaces may not temporarily refuse to accept data by
+	 * returning -EAGAIN; such a response may be treated as a
+	 * fatal error.
 	 */
-	int ( * deliver ) ( struct xfer_interface *xfer,
-			    struct io_buffer *iobuf );
+	int ( * deliver_iob ) ( struct xfer_interface *xfer,
+				struct io_buffer *iobuf );
 	/** Deliver datagram as raw data
 	 *
 	 * @v xfer		Data transfer interface
@@ -75,7 +88,11 @@ struct xfer_interface_operations {
 	 *
 	 * A data transfer interface that wishes to support only I/O
 	 * buffer delivery should set this method to
-	 * xfer_deliver_as_iobuf().
+	 * xfer_deliver_as_iob().
+	 *
+	 * Interfaces may not temporarily refuse to accept data by
+	 * returning -EAGAIN; such a response may be treated as a
+	 * fatal error.
 	 */
 	int ( * deliver_raw ) ( struct xfer_interface *xfer,
 				const void *data, size_t len );
@@ -89,31 +106,43 @@ struct xfer_interface {
 	struct xfer_interface_operations *op;
 };
 
+/** Basis positions for seek() events */
+enum seek_whence {
+	SEEK_SET = 0,
+	SEEK_CUR,
+};
+
 extern struct xfer_interface null_xfer;
 extern struct xfer_interface_operations null_xfer_ops;
 
-extern void xfer_start ( struct xfer_interface *xfer );
 extern void xfer_close ( struct xfer_interface *xfer, int rc );
-extern int xfer_seek ( struct xfer_interface *xfer, size_t pos );
 extern int xfer_vredirect ( struct xfer_interface *xfer, int type,
 			    va_list args );
 extern int xfer_redirect ( struct xfer_interface *xfer, int type, ... );
-extern int xfer_deliver ( struct xfer_interface *xfer,
-			  struct io_buffer *iobuf );
+extern int xfer_request ( struct xfer_interface *xfer, off_t offset,
+			  int whence, size_t len );
+extern int xfer_request_all ( struct xfer_interface *xfer );
+extern int xfer_seek ( struct xfer_interface *xfer, off_t offset, int whence );
+extern struct io_buffer * xfer_alloc_iob ( struct xfer_interface *xfer,
+					   size_t len );
+extern int xfer_deliver_iob ( struct xfer_interface *xfer,
+			      struct io_buffer *iobuf );
 extern int xfer_deliver_raw ( struct xfer_interface *xfer,
 			      const void *data, size_t len );
 
-extern void ignore_xfer_start ( struct xfer_interface *xfer );
 extern void ignore_xfer_close ( struct xfer_interface *xfer, int rc );
 extern int ignore_xfer_vredirect ( struct xfer_interface *xfer,
 				   int type, va_list args );
-extern int default_xfer_vredirect ( struct xfer_interface *xfer,
-				    int type, va_list args );
-extern int ignore_xfer_seek ( struct xfer_interface *xfer, size_t pos );
+extern int ignore_xfer_request ( struct xfer_interface *xfer, off_t offset,
+				 int whence, size_t len );
+extern int ignore_xfer_seek ( struct xfer_interface *xfer, off_t offset,
+			      int whence );
+extern struct io_buffer * default_xfer_alloc_iob ( struct xfer_interface *xfer,
+						   size_t len );
 extern int xfer_deliver_as_raw ( struct xfer_interface *xfer,
 				 struct io_buffer *iobuf );
-extern int xfer_deliver_as_iobuf ( struct xfer_interface *xfer,
-				   const void *data, size_t len );
+extern int xfer_deliver_as_iob ( struct xfer_interface *xfer,
+				 const void *data, size_t len );
 extern int ignore_xfer_deliver_raw ( struct xfer_interface *xfer,
 				     const void *data __unused, size_t len );
 

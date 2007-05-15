@@ -115,7 +115,7 @@ static void downloader_job_start ( struct job_interface *job ) {
 		container_of ( job, struct downloader, job );
 
 	/* Start data transfer */
-	xfer_start ( &downloader->xfer );
+	xfer_request_all ( &downloader->xfer );
 }
 
 /**
@@ -152,17 +152,30 @@ static struct job_interface_operations downloader_job_operations = {
  * @v pos		New position
  * @ret rc		Return status code
  */
-static int downloader_xfer_seek ( struct xfer_interface *xfer, size_t pos ) {
+static int downloader_xfer_seek ( struct xfer_interface *xfer, off_t offset,
+				  int whence ) {
 	struct downloader *downloader =
 		container_of ( xfer, struct downloader, xfer );
+	off_t new_pos;
 	int rc;
 
-	/* Ensure that we have enough buffer space for this buffer position */
-	if ( ( rc = downloader_ensure_size ( downloader, pos ) ) != 0 )
-		return rc;
+	/* Calculate new buffer position */
+	switch ( whence ) {
+	case SEEK_SET:
+		new_pos = offset;
+		break;
+	case SEEK_CUR:
+		new_pos = ( downloader->pos + offset );
+		break;
+	default:
+		assert ( 0 );
+		return -EINVAL;
+	}
 
-	/* Update current buffer position */
-	downloader->pos = pos;
+	/* Ensure that we have enough buffer space for this buffer position */
+	if ( ( rc = downloader_ensure_size ( downloader, new_pos ) ) != 0 )
+		return rc;
+	downloader->pos = new_pos;
 
 	return 0;
 }
@@ -216,11 +229,11 @@ static void downloader_xfer_close ( struct xfer_interface *xfer, int rc ) {
 
 /** Downloader data transfer interface operations */
 static struct xfer_interface_operations downloader_xfer_operations = {
-	.start		= ignore_xfer_start,
 	.close		= downloader_xfer_close,
-	.vredirect	= default_xfer_vredirect,
+	.vredirect	= vopen,
+	.request	= ignore_xfer_request,
 	.seek		= downloader_xfer_seek,
-	.deliver	= xfer_deliver_as_raw,
+	.deliver_iob	= xfer_deliver_as_raw,
 	.deliver_raw	= downloader_xfer_deliver_raw,
 };
 
