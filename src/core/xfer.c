@@ -33,10 +33,11 @@
  * @v rc		Reason for close
  */
 void xfer_close ( struct xfer_interface *xfer, int rc ) {
-	struct xfer_interface *dest = xfer_dest ( xfer );
+	struct xfer_interface *dest = xfer_get_dest ( xfer );
 
 	dest->op->close ( dest, rc );
 	xfer_unplug ( xfer );
+	xfer_put ( dest );
 }
 
 /**
@@ -48,9 +49,12 @@ void xfer_close ( struct xfer_interface *xfer, int rc ) {
  * @ret rc		Return status code
  */
 int xfer_vredirect ( struct xfer_interface *xfer, int type, va_list args ) {
-	struct xfer_interface *dest = xfer_dest ( xfer );
+	struct xfer_interface *dest = xfer_get_dest ( xfer );
+	int rc;
 
-	return dest->op->vredirect ( dest, type, args );
+	rc = dest->op->vredirect ( dest, type, args );
+	xfer_put ( dest );
+	return rc;
 }
 
 /**
@@ -82,9 +86,12 @@ int xfer_redirect ( struct xfer_interface *xfer, int type, ... ) {
  */
 int xfer_request ( struct xfer_interface *xfer, off_t offset, int whence,
 		   size_t len ) {
-	struct xfer_interface *dest = xfer_dest ( xfer );
+	struct xfer_interface *dest = xfer_get_dest ( xfer );
+	int rc;
 
-	return dest->op->request ( dest, offset, whence, len );
+	rc = dest->op->request ( dest, offset, whence, len );
+	xfer_put ( dest );
+	return rc;
 }
 
 /**
@@ -106,9 +113,12 @@ int xfer_request_all ( struct xfer_interface *xfer ) {
  * @ret rc		Return status code
  */
 int xfer_seek ( struct xfer_interface *xfer, off_t offset, int whence ) {
-	struct xfer_interface *dest = xfer_dest ( xfer );
+	struct xfer_interface *dest = xfer_get_dest ( xfer );
+	int rc;
 
-	return dest->op->seek ( dest, offset, whence );
+	rc = dest->op->seek ( dest, offset, whence );
+	xfer_put ( dest );
+	return rc;
 }
 
 /**
@@ -119,9 +129,12 @@ int xfer_seek ( struct xfer_interface *xfer, off_t offset, int whence ) {
  * @ret iobuf		I/O buffer
  */
 struct io_buffer * xfer_alloc_iob ( struct xfer_interface *xfer, size_t len ) {
-	struct xfer_interface *dest = xfer_dest ( xfer );
+	struct xfer_interface *dest = xfer_get_dest ( xfer );
+	struct io_buffer *iobuf;
 
-	return dest->op->alloc_iob ( dest, len );
+	iobuf = dest->op->alloc_iob ( dest, len );
+	xfer_put ( dest );
+	return iobuf;
 }
 
 /**
@@ -132,9 +145,12 @@ struct io_buffer * xfer_alloc_iob ( struct xfer_interface *xfer, size_t len ) {
  * @ret rc		Return status code
  */
 int xfer_deliver_iob ( struct xfer_interface *xfer, struct io_buffer *iobuf ) {
-	struct xfer_interface *dest = xfer_dest ( xfer );
+	struct xfer_interface *dest = xfer_get_dest ( xfer );
+	int rc;
 
-	return dest->op->deliver_iob ( dest, iobuf );
+	rc = dest->op->deliver_iob ( dest, iobuf );
+	xfer_put ( dest );
+	return rc;
 }
 
 /**
@@ -146,9 +162,12 @@ int xfer_deliver_iob ( struct xfer_interface *xfer, struct io_buffer *iobuf ) {
  */
 int xfer_deliver_raw ( struct xfer_interface *xfer,
 		       const void *data, size_t len ) {
-	struct xfer_interface *dest = xfer_dest ( xfer );
+	struct xfer_interface *dest = xfer_get_dest ( xfer );
+	int rc;
 
-	return dest->op->deliver_raw ( dest, data, len );
+	rc = dest->op->deliver_raw ( dest, data, len );
+	xfer_put ( dest );
+	return rc;
 }
 
 /****************************************************************************

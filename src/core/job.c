@@ -27,10 +27,11 @@
  */
 
 void job_done ( struct job_interface *job, int rc ) {
-	struct job_interface *dest = job_dest ( job );
+	struct job_interface *dest = job_get_dest ( job );
 
 	dest->op->done ( dest, rc );
 	job_unplug ( job );
+	job_put ( dest );
 }
 
 /****************************************************************************

@@ -51,6 +51,19 @@ struct downloader {
 };
 
 /**
+ * Free downloader object
+ *
+ * @v refcnt		Downloader reference counter
+ */
+static void downloader_free ( struct refcnt *refcnt ) {
+	struct downloader *downloader =
+		container_of ( refcnt, struct downloader, refcnt );
+
+	image_put ( downloader->image );
+	free ( downloader );
+}
+
+/**
  * Terminate download
  *
  * @v downloader	Downloader
@@ -63,12 +76,8 @@ static void downloader_finished ( struct downloader *downloader, int rc ) {
 	xfer_nullify ( &downloader->xfer );
 
 	/* Free resources and close interfaces */
-	image_put ( downloader->image );
 	xfer_close ( &downloader->xfer, rc );
 	job_done ( &downloader->job, rc );
-
-	/* Drop reference to self */
-	ref_put ( &downloader->refcnt );
 }
 
 /**
@@ -267,6 +276,7 @@ int create_downloader ( struct job_interface *job, const char *uri_string,
 	if ( ! downloader )
 		return -ENOMEM;
 	memset ( downloader, 0, sizeof ( *downloader ) );
+	downloader->refcnt.free = downloader_free;
 	job_init ( &downloader->job, &downloader_job_operations,
 		   &downloader->refcnt );
 	xfer_init ( &downloader->xfer, &downloader_xfer_operations,
@@ -279,11 +289,13 @@ int create_downloader ( struct job_interface *job, const char *uri_string,
 			   uri_string ) ) != 0 )
 		goto err;
 
-	/* Attach parent interface and return */
+	/* Attach parent interface, mortalise self, and return */
 	job_plug_plug ( &downloader->job, job );
+	ref_put ( &downloader->refcnt );
 	return 0;
 
  err:
 	downloader_finished ( downloader, rc );
+	ref_put ( &downloader->refcnt );
 	return rc;
 }

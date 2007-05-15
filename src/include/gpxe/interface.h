@@ -34,7 +34,8 @@ struct interface {
  * @v intf		Interface
  * @ret intf		Interface
  */
-static inline struct interface * intf_get ( struct interface *intf ) {
+static inline __attribute__ (( always_inline )) struct interface *
+intf_get ( struct interface *intf ) {
 	ref_get ( intf->refcnt );
 	return intf;
 }
@@ -44,7 +45,8 @@ static inline struct interface * intf_get ( struct interface *intf ) {
  *
  * @v intf		Interface
  */
-static inline void intf_put ( struct interface *intf ) {
+static inline __attribute__ (( always_inline )) void
+intf_put ( struct interface *intf ) {
 	ref_put ( intf->refcnt );
 }
 

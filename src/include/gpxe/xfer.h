@@ -173,14 +173,24 @@ intf_to_xfer ( struct interface *intf ) {
 }
 
 /**
- * Get destination data transfer interface
+ * Get reference to destination data transfer interface
  *
  * @v xfer		Data transfer interface
  * @ret dest		Destination interface
  */
 static inline __attribute__ (( always_inline )) struct xfer_interface *
-xfer_dest ( struct xfer_interface *xfer ) {
-	return intf_to_xfer ( xfer->intf.dest );
+xfer_get_dest ( struct xfer_interface *xfer ) {
+	return intf_to_xfer ( intf_get ( xfer->intf.dest ) );
+}
+
+/**
+ * Drop reference to data transfer interface
+ *
+ * @v xfer		Data transfer interface
+ */
+static inline __attribute__ (( always_inline )) void
+xfer_put ( struct xfer_interface *xfer ) {
+	intf_put ( &xfer->intf );
 }
 
 /**
@@ -189,8 +199,8 @@ xfer_dest ( struct xfer_interface *xfer ) {
  * @v xfer		Data transfer interface
  * @v dest		New destination interface
  */
-static inline void xfer_plug ( struct xfer_interface *xfer,
-			       struct xfer_interface *dest ) {
+static inline __attribute__ (( always_inline )) void
+xfer_plug ( struct xfer_interface *xfer, struct xfer_interface *dest ) {
 	plug ( &xfer->intf, &dest->intf );
 }
 
@@ -200,8 +210,8 @@ static inline void xfer_plug ( struct xfer_interface *xfer,
  * @v a			Data transfer interface A
  * @v b			Data transfer interface B
  */
-static inline void xfer_plug_plug ( struct xfer_interface *a,
-				    struct xfer_interface *b ) {
+static inline __attribute__ (( always_inline )) void
+xfer_plug_plug ( struct xfer_interface *a, struct xfer_interface *b ) {
 	plug_plug ( &a->intf, &b->intf );
 }
 
@@ -210,7 +220,8 @@ static inline void xfer_plug_plug ( struct xfer_interface *a,
  *
  * @v xfer		Data transfer interface
  */
-static inline void xfer_unplug ( struct xfer_interface *xfer ) {
+static inline __attribute__ (( always_inline )) void
+xfer_unplug ( struct xfer_interface *xfer ) {
 	plug ( &xfer->intf, &null_xfer.intf );
 }
 

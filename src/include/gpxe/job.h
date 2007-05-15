@@ -104,14 +104,24 @@ intf_to_job ( struct interface *intf ) {
 }
 
 /**
- * Get destination job control interface
+ * Get reference to destination job control interface
  *
  * @v job		Job control interface
  * @ret dest		Destination interface
  */
 static inline __attribute__ (( always_inline )) struct job_interface *
-job_dest ( struct job_interface *job ) {
-	return intf_to_job ( job->intf.dest );
+job_get_dest ( struct job_interface *job ) {
+	return intf_to_job ( intf_get ( job->intf.dest ) );
+}
+
+/**
+ * Drop reference to job control interface
+ *
+ * @v job		Job control interface
+ */
+static inline __attribute__ (( always_inline )) void
+job_put ( struct job_interface *job ) {
+	intf_put ( &job->intf );
 }
 
 /**
