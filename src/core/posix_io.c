@@ -224,6 +224,10 @@ int open ( const char *uri_string ) {
 	if ( ( rc = xfer_open_uri ( &file->xfer, uri_string ) ) != 0 )
 		goto err;
 
+	/* Request data */
+	if ( ( rc = xfer_request_all ( &file->xfer ) ) != 0 )
+		goto err;
+
 	/* Wait for open to succeed or fail */
 	while ( list_empty ( &file->data ) ) {
 		step();
