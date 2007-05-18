@@ -22,10 +22,60 @@
  * Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
  */
 
-#include "pxe.h"
+#include <stdlib.h>
+#include <stdio.h>
+#include <byteswap.h>
+#include <gpxe/uaccess.h>
+#include <gpxe/in.h>
+#include <gpxe/tftp.h>
+#include <gpxe/posix_io.h>
+#include <pxe.h>
 
-static int pxe_tftp_read_block ( unsigned char *data, unsigned int block,
-				 unsigned int len, int eof );
+/** File descriptor for "single-file-only" PXE TFTP transfer */
+static int pxe_single_fd = -1;
+
+/** Block size for "single-file-only" PXE TFTP transfer */
+static size_t pxe_single_blksize;
+
+/** Current block index for "single-file-only" PXE TFTP transfer */
+static unsigned int pxe_single_blkidx;
+
+/** Length of a PXE-derived URI
+ *
+ * The "single-file-only" API calls use a filename field of 128 bytes.
+ * 256 bytes provides plenty of space for constructing the (temporary)
+ * full URI.
+ */
+#define PXE_URI_LEN 256
+
+/**
+ * Build PXE URI string
+ *
+ * @v uri_string	URI string to fill in
+ * @v ipaddress		Server IP address (in network byte order)
+ * @v port		Server port (in network byte order)
+ * @v filename		File name
+ * @v blksize		Requested block size, or 0
+ */
+static void pxe_tftp_build_uri ( char uri_string[PXE_URI_LEN],
+				 uint32_t ipaddress, unsigned int port,
+				 const unsigned char *filename,
+				 int blksize ) {
+	struct in_addr address;
+
+	/* This is a fix to make Microsoft Remote Install Services work (RIS) */
+#warning "Overwrite DHCP filename"
+
+	address.s_addr = ipaddress;
+	if ( ! port )
+		port = htons ( TFTP_PORT );
+	if ( ! blksize )
+		blksize = TFTP_MAX_BLKSIZE;
+	snprintf ( uri_string, sizeof ( uri_string ),
+		   "tftp://%s:%d%s%s?blksize=%d", inet_ntoa ( address ),
+		   ntohs ( port ), ( ( filename[0] == '/' ) ? "" : "/" ),
+		   filename, blksize );
+}
 
 /**
  * TFTP OPEN
@@ -49,48 +99,16 @@ static int pxe_tftp_read_block ( unsigned char *data, unsigned int block,
  * routing will take place.  See the relevant
  * @ref pxe_routing "implementation note" for more details.
  *
- * The blksize negotiated with the TFTP server will be returned in
- * s_PXENV_TFTP_OPEN::PacketSize, and will be the size of data blocks
- * returned by subsequent calls to pxenv_tftp_read().  The TFTP server
- * may negotiate a smaller blksize than the caller requested.
- *
- * Some TFTP servers do not support TFTP options, and will therefore
- * not be able to use anything other than a fixed 512-byte blksize.
- * The PXE specification version 2.1 requires that the caller must
- * pass in s_PXENV_TFTP_OPEN::PacketSize with a value of 512 or
- * greater.
- *
- * You can only have one TFTP connection open at a time, because the
- * PXE API requires the PXE stack to keep state (e.g. local and remote
- * port numbers, data block index) about the open TFTP connection,
- * rather than letting the caller do so.
- *
- * It is unclear precisely what constitutes a "TFTP open" operation.
- * Clearly, we must send the TFTP open request to the server.  Since
- * we must know whether or not the open succeeded, we must wait for
- * the first reply packet from the TFTP server.  If the TFTP server
- * supports options, the first reply packet will be an OACK; otherwise
- * it will be a DATA packet.  In other words, we may only get to
- * discover whether or not the open succeeded when we receive the
- * first block of data.  However, the pxenv_tftp_open() API provides
- * no way for us to return this block of data at this time.  See the
- * relevant @ref pxe_note_tftp "implementation note" for Etherboot's
- * solution to this problem.
+ * Because we support arbitrary protocols, most of which have no
+ * notion of "block size" and will return data in arbitrary-sized
+ * chunks, we cheat and pretend to the caller that the blocksize is
+ * always accepted as-is.
  *
  * On x86, you must set the s_PXE::StatusCallout field to a nonzero
  * value before calling this function in protected mode.  You cannot
  * call this function with a 32-bit stack segment.  (See the relevant
  * @ref pxe_x86_pmode16 "implementation note" for more details.)
  * 
- * @note If you pass in a value less than 512 for
- * s_PXENV_TFTP_OPEN::PacketSize, Etherboot will attempt to negotiate
- * this blksize with the TFTP server, even though such a value is not
- * permitted according to the PXE specification.  If the TFTP server
- * ends up dictating a blksize larger than the value requested by the
- * caller (which is very probable in the case of a requested blksize
- * less than 512), then Etherboot will return the error
- * #PXENV_STATUS_TFTP_INVALID_PACKET_SIZE.
- *
  * @note According to the PXE specification version 2.1, this call
  * "opens a file for reading/writing", though how writing is to be
  * achieved without the existence of an API call %pxenv_tftp_write()
@@ -107,40 +125,30 @@ static int pxe_tftp_read_block ( unsigned char *data, unsigned int block,
  * other PXE API call "if an MTFTP connection is active".
  */
 PXENV_EXIT_t pxenv_tftp_open ( struct s_PXENV_TFTP_OPEN *tftp_open ) {
+	char uri_string[PXE_URI_LEN];
+
 	DBG ( "PXENV_TFTP_OPEN" );
 
-#if 0
-	/* Set server address and port */
-	tftp_server.sin_addr.s_addr = tftp_open->ServerIPAddress
-		? tftp_open->ServerIPAddress
-		: arptable[ARP_SERVER].ipaddr.s_addr;
-	tftp_server.sin_port = ntohs ( tftp_open->TFTPPort );
-#ifdef WORK_AROUND_BPBATCH_BUG        
-	/* Force use of port 69; BpBatch tries to use port 4 for some         
-	* bizarre reason.         */        
-	tftp_server.sin_port = TFTP_PORT;
-#endif
-	/* Ignore gateway address; we can route properly */
-	/* Fill in request structure */
-	request.server = &tftp_server;
-	request.name = tftp_open->FileName;
-	request.blksize = tftp_open->PacketSize;
-	DBG ( " %@:%d/%s (%d)", tftp_open->ServerIPAddress,
-	      tftp_open->TFTPPort, request.name, request.blksize );
-	if ( !request.blksize ) request.blksize = TFTP_DEFAULT_BLKSIZE;
-	/* Make request and get first packet */
-	if ( !tftp_block ( &request, &block ) ) {
-		tftp_open->Status = PXENV_STATUS_TFTP_FILE_NOT_FOUND;
+	/* Guard against callers that fail to close before re-opening */
+	close ( pxe_single_fd );
+	pxe_single_fd = -1;
+
+	/* Construct URI */
+	pxe_tftp_build_uri ( uri_string, tftp_open->ServerIPAddress,
+			     tftp_open->TFTPPort, tftp_open->FileName,
+			     tftp_open->PacketSize );
+	DBG ( " %s", uri_string );
+
+	/* Open URI */
+	pxe_single_fd = open ( uri_string );
+	if ( pxe_single_fd < 0 ) {
+		tftp_open->Status = PXENV_STATUS ( pxe_single_fd );
 		return PXENV_EXIT_FAILURE;
 	}
-	/* Fill in PacketSize */
-	tftp_open->PacketSize = request.blksize;
-	/* Store first block for later retrieval by TFTP_READ */
-	pxe_stack->tftpdata.magic_cookie = PXE_TFTP_MAGIC_COOKIE;
-	pxe_stack->tftpdata.len = block.len;
-	pxe_stack->tftpdata.eof = block.eof;
-	memcpy ( pxe_stack->tftpdata.data, block.data, block.len );
-#endif
+
+	/* Record parameters for later use */
+	pxe_single_blksize = tftp_open->PacketSize;
+	pxe_single_blkidx = 0;
 
 	tftp_open->Status = PXENV_STATUS_SUCCESS;
 	return PXENV_EXIT_SUCCESS;
@@ -162,14 +170,12 @@ PXENV_EXIT_t pxenv_tftp_open ( struct s_PXENV_TFTP_OPEN *tftp_open ) {
  * value before calling this function in protected mode.  You cannot
  * call this function with a 32-bit stack segment.  (See the relevant
  * @ref pxe_x86_pmode16 "implementation note" for more details.)
- *
- * @note Since TFTP runs over UDP, which is a connectionless protocol,
- * the concept of closing a file is somewhat meaningless.  This call
- * is a no-op for Etherboot.
  */
 PXENV_EXIT_t pxenv_tftp_close ( struct s_PXENV_TFTP_CLOSE *tftp_close ) {
 	DBG ( "PXENV_TFTP_CLOSE" );
 
+	close ( pxe_single_fd );
+	pxe_single_fd = -1;
 	tftp_close->Status = PXENV_STATUS_SUCCESS;
 	return PXENV_EXIT_SUCCESS;
 }
@@ -230,42 +236,28 @@ PXENV_EXIT_t pxenv_tftp_close ( struct s_PXENV_TFTP_CLOSE *tftp_close ) {
  * is as expected (i.e. one greater than that returned from the
  * previous call to pxenv_tftp_read()).
  *
- * Nothing in the PXE specification indicates when the TFTP
- * acknowledgement packets will be sent back to the server.  See the
- * relevant @ref pxe_note_tftp "implementation note" for details on
- * when Etherboot chooses to send these packets.
- *
  * On x86, you must set the s_PXE::StatusCallout field to a nonzero
  * value before calling this function in protected mode.  You cannot
  * call this function with a 32-bit stack segment.  (See the relevant
  * @ref pxe_x86_pmode16 "implementation note" for more details.)
  */
 PXENV_EXIT_t pxenv_tftp_read ( struct s_PXENV_TFTP_READ *tftp_read ) {
-	DBG ( "PXENV_TFTP_READ" );
+	userptr_t buffer;
+	ssize_t len;
 
-#if 0
-	/* Do we have a block pending */
-	if ( pxe_stack->tftpdata.magic_cookie == PXE_TFTP_MAGIC_COOKIE ) {
-		block.data = pxe_stack->tftpdata.data;
-		block.len = pxe_stack->tftpdata.len;
-		block.eof = pxe_stack->tftpdata.eof;
-		block.block = 1; /* Will be the first block */
-		pxe_stack->tftpdata.magic_cookie = 0;
-	} else {
-		if ( !tftp_block ( NULL, &block ) ) {
-			tftp_read->Status = PXENV_STATUS_TFTP_FILE_NOT_FOUND;
-			return PXENV_EXIT_FAILURE;
-		}
+	DBG ( "PXENV_TFTP_READ to %04x:%04x",
+	      tftp_read->Buffer.segment, tftp_read->Buffer.offset );
+
+	buffer = real_to_user ( tftp_read->Buffer.segment,
+				tftp_read->Buffer.offset );
+	len = read_user ( pxe_single_fd, buffer, 0, pxe_single_blksize );
+	if ( len < 0 ) {
+		tftp_read->Status = PXENV_STATUS ( len );
+		return PXENV_EXIT_FAILURE;
 	}
+	tftp_read->BufferSize = len;
+	tftp_read->PacketNumber = ++pxe_single_blkidx;
 
-	/* Return data */
-	tftp_read->PacketNumber = block.block;
-	tftp_read->BufferSize = block.len;
-	memcpy ( SEGOFF16_TO_PTR(tftp_read->Buffer), block.data, block.len );
-	DBG ( " %d to %hx:%hx", block.len, tftp_read->Buffer.segment,
-	      tftp_read->Buffer.offset );
-#endif
- 
 	tftp_read->Status = PXENV_STATUS_SUCCESS;
 	return PXENV_EXIT_SUCCESS;
 }
@@ -363,53 +355,47 @@ PXENV_EXIT_t pxenv_tftp_read ( struct s_PXENV_TFTP_READ *tftp_read ) {
  */
 PXENV_EXIT_t pxenv_tftp_read_file ( struct s_PXENV_TFTP_READ_FILE
 				    *tftp_read_file ) {
-	DBG ( "PXENV_TFTP_READ_FILE %s to [%x,%x)", tftp_read_file->FileName,
-	      tftp_read_file->Buffer,
-	      tftp_read_file->Buffer + tftp_read_file->BufferSize );
+	char uri_string[PXE_URI_LEN];
+	int fd;
+	userptr_t buffer;
+	size_t max_len;
+	ssize_t frag_len;
+	size_t len = 0;
+	int rc = -ENOBUFS;
 
-#if 0
-	/* inserted by Klaus Wittemeier */
-	/* KERNEL_BUF stores the name of the last required file */
-	/* This is a fix to make Microsoft Remote Install Services work (RIS) */
-	memcpy(KERNEL_BUF, tftp_read_file->FileName, sizeof(KERNEL_BUF));
-	/* end of insertion */
+	DBG ( "PXENV_TFTP_READ_FILE" );
 
-	/* Set server address and port */
-	tftp_server.sin_addr.s_addr = tftp_read_file->ServerIPAddress
-		? tftp_read_file->ServerIPAddress
-		: arptable[ARP_SERVER].ipaddr.s_addr;
-	tftp_server.sin_port = ntohs ( tftp_read_file->TFTPSrvPort );
+	/* Construct URI */
+	pxe_tftp_build_uri ( uri_string, tftp_read_file->ServerIPAddress,
+			     tftp_read_file->TFTPSrvPort,
+			     tftp_read_file->FileName, 0 );
+	DBG ( " %s", uri_string );
 
-	pxe_stack->readfile.buffer = phys_to_virt ( tftp_read_file->Buffer );
-	pxe_stack->readfile.bufferlen = tftp_read_file->BufferSize;
-	pxe_stack->readfile.offset = 0;
-
-	rc = tftp ( NULL, &tftp_server, tftp_read_file->FileName,
-		    pxe_tftp_read_block );
-	if ( rc ) {
-		tftp_read_file->Status = PXENV_STATUS_FAILURE;
+	/* Open URI */
+	fd = open ( uri_string );
+	if ( fd < 0 ) {
+		tftp_read_file->Status = PXENV_STATUS ( fd );
 		return PXENV_EXIT_FAILURE;
 	}
-#endif
 
-	tftp_read_file->Status = PXENV_STATUS_SUCCESS;
-	return PXENV_EXIT_SUCCESS;
-}
-
-#if 0
-static int pxe_tftp_read_block ( unsigned char *data,
-				 unsigned int block __unused,
-				 unsigned int len, int eof ) {
-	if ( pxe_stack->readfile.buffer ) {
-		if ( pxe_stack->readfile.offset + len >=
-		     pxe_stack->readfile.bufferlen ) return -1;
-		memcpy ( pxe_stack->readfile.buffer +
-			 pxe_stack->readfile.offset, data, len );
+	/* Read file */
+	buffer = phys_to_user ( tftp_read_file->Buffer );
+	max_len = tftp_read_file->BufferSize;
+	while ( max_len ) {
+		frag_len = read_user ( fd, buffer, len, max_len );
+		if ( frag_len <= 0 ) {
+			rc = frag_len;
+			break;
+		}
+		len += frag_len;
+		max_len -= frag_len;
 	}
-	pxe_stack->readfile.offset += len;
-	return eof ? 0 : 1;
+
+	close ( fd );
+	tftp_read_file->BufferSize = len;
+	tftp_read_file->Status = PXENV_STATUS ( rc );
+	return ( rc ? PXENV_EXIT_FAILURE : PXENV_EXIT_SUCCESS );	
 }
-#endif
 
 /**
  * TFTP GET FILE SIZE
@@ -455,168 +441,33 @@ static int pxe_tftp_read_block ( unsigned char *data,
  */
 PXENV_EXIT_t pxenv_tftp_get_fsize ( struct s_PXENV_TFTP_GET_FSIZE
 				    *tftp_get_fsize ) {
-	int rc;
+	char uri_string[PXE_URI_LEN];
+	int fd;
+	ssize_t size;
 
 	DBG ( "PXENV_TFTP_GET_FSIZE" );
 
-#if 0
-	pxe_stack->readfile.buffer = NULL;
-	pxe_stack->readfile.bufferlen = 0;
-	pxe_stack->readfile.offset = 0;
+	/* Construct URI */
+	pxe_tftp_build_uri ( uri_string, tftp_get_fsize->ServerIPAddress,
+			     0, tftp_get_fsize->FileName, 0 );
+	DBG ( " %s", uri_string );
 
-#warning "Rewrite pxenv_tftp_get_fsize, please"
-	if ( rc ) {
-		tftp_get_fsize->FileSize = 0;
-		tftp_get_fsize->Status = PXENV_STATUS_FAILURE;
+	/* Open URI */
+	fd = open ( uri_string );
+	if ( fd < 0 ) {
+		tftp_get_fsize->Status = PXENV_STATUS ( fd );
 		return PXENV_EXIT_FAILURE;
 	}
-	tftp_get_fsize->FileSize = pxe_stack->readfile.offset;
-#endif
 
+	/* Determine size */
+	size = fsize ( fd );
+	close ( fd );
+	if ( size < 0 ) {
+		tftp_get_fsize->Status = PXENV_STATUS ( size );
+		return PXENV_EXIT_FAILURE;
+	}
+
+	tftp_get_fsize->FileSize = size;
 	tftp_get_fsize->Status = PXENV_STATUS_SUCCESS;
 	return PXENV_EXIT_SUCCESS;
 }
-
-/** @page pxe_notes Etherboot PXE implementation notes
-
-@section pxe_note_tftp Welding together the TFTP protocol and the PXE TFTP API
-
-The PXE TFTP API is fundamentally poorly designed; the TFTP protocol
-simply does not map well into "open file", "read file block", "close
-file" operations.  The problem is the unreliable nature of UDP
-transmissions and the lock-step mechanism employed by TFTP to
-guarantee file transfer.  The lock-step mechanism requires that if we
-time out waiting for a packet to arrive, we must trigger its
-retransmission by retransmitting our own previously transmitted
-packet.
-
-For example, suppose that pxenv_tftp_read() is called to read the
-first data block of a file from a server that does not support TFTP
-options, and that no data block is received within the timeout period.
-In order to trigger the retransmission of this data block,
-pxenv_tftp_read() must retransmit the TFTP open request.  However, the
-information used to build the TFTP open request is not available at
-this time; it was provided only to the pxenv_tftp_open() call.  Even
-if we were able to retransmit a TFTP open request, we would have to
-allocate a new local port number (and be prepared for data to arrive
-from a new remote port number) in order to avoid violating the TFTP
-protocol specification.
-
-The question of when to transmit the ACK packets is also awkward.  At
-a first glance, it would seem to be fairly simple: acknowledge a
-packet immediately after receiving it.  However, since the ACK packet
-may itself be lost, the next call to pxenv_tftp_read() must be
-prepared to retransmit the acknowledgement.
-
-Another problem to consider is that the pxenv_tftp_open() API call
-must return an indication of whether or not the TFTP open request
-succeeded.  In the case of a TFTP server that doesn't support TFTP
-options, the only indication of a successful open is the reception of
-the first data block.  However, the pxenv_tftp_open() API provides no
-way to return this data block at this time.
-
-At least some PXE stacks (e.g. NILO) solve this problem by violating
-the TFTP protocol and never bothering with retransmissions, relying on
-the TFTP server to retransmit when it times out waiting for an ACK.
-This approach is dubious at best; if, for example, the initial TFTP
-open request is lost then NILO will believe that it has opened the
-file and will eventually time out and give up while waiting for the
-first packet to arrive.
-
-The only viable solution seems to be to allocate a buffer for the
-storage of the first data packet returned by the TFTP server, since we
-may receive this packet during the pxenv_tftp_open() call but have to
-return it from the subsequent pxenv_tftp_read() call.  This buffer
-must be statically allocated and must be dedicated to providing a
-temporary home for TFTP packets.  There is nothing in the PXE
-specification that prevents a caller from calling
-e.g. pxenv_undi_transmit() between calls to the TFTP API, so we cannot
-use the normal transmit/receive buffer for this purpose.
-
-Having paid the storage penalty for this buffer, we can then gain some
-simplicity by exploiting it in full.  There is at least one
-circumstance (pxenv_tftp_open() called to open a file on a server that
-does not support TFTP options) in which we will have to enter
-pxenv_tftp_read() knowing that our previous transmission (the open
-request, in this situation) has already been acknowledged.
-Implementation of pxenv_tftp_read() can be made simpler by making this
-condition an invariant.  Specifically, on each call to
-pxenv_tftp_read(), we shall ensure that the following are true:
-
-  - Our previous transmission has already been acknowledged.  We
-    therefore do not need to keep state about our previous
-    transmission.
-
-  - The next packet to read is already in a buffer in memory.
-
-In order to maintain these two conditions, pxenv_tftp_read() must do
-the following:
-
-  - Copy the data packet from our buffer to the caller's buffer.
-
-  - Acknowledge the data packet that we have just copied.  This will
-    trigger transmission of the next packet from the server.
-
-  - Retransmit this acknowledgement packet until the next packet
-    arrives.
-
-  - Copy the packet into our internal buffer, ready for the next call
-    to pxenv_tftp_read().
-
-It can be verified that this preserves the invariant condition, and it
-is clear that the resulting implementation of pxenv_tftp_read() can be
-relatively simple.  (For the special case of the last data packet,
-pxenv_tftp_read() should return immediately after sending a single
-acknowledgement packet.)
-
-In order to set up this invariant condition for the first call to
-pxenv_tftp_read(), pxenv_tftp_open() must do the following:
-
-  - Construct and transmit the TFTP open request.
-
-  - Retransmit the TFTP open request (using a new local port number as
-    necessary) until a response (DATA, OACK, or ERROR) is received.
-
-  - If the response is an OACK, acknowledge the OACK and retransmit
-    the acknowledgement until the first DATA packet arrives.
-
-  - If we have a DATA packet, store it in a buffer ready for the first
-    call to pxenv_tftp_read().
-
-This approach has the advantage of being fully compliant with both
-RFC1350 (TFTP) and RFC2347 (TFTP options).  It avoids unnecessary
-retransmissions.  The cost is approximately 1500 bytes of
-uninitialised storage.  Since there is demonstrably no way to avoid
-paying this cost without either violating the protocol specifications
-or introducing unnecessary retransmissions, we deem this to be a cost
-worth paying.
-
-A small performance gain may be obtained by adding a single extra
-"send ACK" in both pxenv_tftp_open() and pxenv_tftp_read() immediately
-after receiving the DATA packet and copying it into the internal
-buffer.   The sequence of events for pxenv_tftp_read() then becomes:
-
-  - Copy the data packet from our buffer to the caller's buffer.
-
-  - If this was the last data packet, return immediately.
-
-  - Check to see if a TFTP data packet is waiting.  If not, send an
-    ACK for the data packet that we have just copied, and retransmit
-    this ACK until the next data packet arrives.
-
-  - Copy the packet into our internal buffer, ready for the next call
-    to pxenv_tftp_read().
-
-  - Send a single ACK for this data packet.
-
-Sending the ACK at this point allows the server to transmit the next
-data block while our caller is processing the current packet.  If this
-ACK is lost, or the DATA packet it triggers is lost or is consumed by
-something other than pxenv_tftp_read() (e.g. by calls to
-pxenv_undi_isr()), then the next call to pxenv_tftp_read() will not
-find a TFTP data packet waiting and will retransmit the ACK anyway.
-
-Note to future API designers at Intel: try to understand the
-underlying network protocol first!
-
-*/
