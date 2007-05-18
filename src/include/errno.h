@@ -51,6 +51,9 @@
  *
  */
 
+/** Derive PXENV_STATUS code from gPXE error number */
+#define PXENV_STATUS( rc ) ( (-(rc)) & 0x00ff )
+
 /**
  * @defgroup pxeerrors PXE error codes
  *
