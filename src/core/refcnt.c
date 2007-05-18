@@ -66,8 +66,11 @@ void ref_put ( struct refcnt *refcnt ) {
 		return;
 
 	if ( refcnt->free ) {
+		DBGC ( refcnt, "REFCNT %p being freed via method %p\n",
+		       refcnt, refcnt->free );
 		refcnt->free ( refcnt );
 	} else {
+		DBGC ( refcnt, "REFCNT %p being freed\n", refcnt );
 		free ( refcnt );
 	}
 }
