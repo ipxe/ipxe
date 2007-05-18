@@ -49,7 +49,7 @@ static struct socket_opener socket_openers_end[0]
  * @v uri_string	URI string (e.g. "http://etherboot.org/kernel")
  * @ret rc		Return status code
  */
-int open_uri ( struct xfer_interface *xfer, const char *uri_string ) {
+int xfer_open_uri ( struct xfer_interface *xfer, const char *uri_string ) {
 	struct uri *uri;
 	struct uri_opener *opener;
 
@@ -78,8 +78,8 @@ int open_uri ( struct xfer_interface *xfer, const char *uri_string ) {
  * @v domain		Communication domain (e.g. PF_INET)
  * @v type		Communication semantics (e.g. SOCK_STREAM)
  */
-int open_socket ( struct xfer_interface *xfer,
-		  int domain, int type, struct sockaddr *sa ) {
+int xfer_open_socket ( struct xfer_interface *xfer,
+		       int domain, int type, struct sockaddr *sa ) {
 	struct socket_opener *opener;
 
 	DBGC ( xfer, "XFER %p opening (%s,%s) socket\n", xfer,
@@ -106,18 +106,18 @@ int open_socket ( struct xfer_interface *xfer,
  * @v args		Remaining arguments depend upon location type
  * @ret rc		Return status code
  */
-int vopen ( struct xfer_interface *xfer, int type, va_list args ) {
+int xfer_vopen ( struct xfer_interface *xfer, int type, va_list args ) {
 	switch ( type ) {
 	case LOCATION_URI: {
 		const char *uri_string = va_arg ( args, const char * );
 
-		return open_uri ( xfer, uri_string ); }
+		return xfer_open_uri ( xfer, uri_string ); }
 	case LOCATION_SOCKET: {
 		int domain = va_arg ( args, int );
 		int type = va_arg ( args, int );
 		struct sockaddr *sa = va_arg ( args, struct sockaddr * );
 
-		return open_socket ( xfer, domain, type, sa ); }
+		return xfer_open_socket ( xfer, domain, type, sa ); }
 	default:
 		DBGC ( xfer, "XFER %p attempted to open unsupported location "
 		       "type %d\n", xfer, type );
@@ -133,12 +133,12 @@ int vopen ( struct xfer_interface *xfer, int type, va_list args ) {
  * @v ...		Remaining arguments depend upon location type
  * @ret rc		Return status code
  */
-int open ( struct xfer_interface *xfer, int type, ... ) {
+int xfer_open ( struct xfer_interface *xfer, int type, ... ) {
 	va_list args;
 	int rc;
 
 	va_start ( args, type );
-	rc = vopen ( xfer, type, args );
+	rc = xfer_vopen ( xfer, type, args );
 	va_end ( args );
 	return rc;
 }

@@ -239,7 +239,7 @@ static void downloader_xfer_close ( struct xfer_interface *xfer, int rc ) {
 /** Downloader data transfer interface operations */
 static struct xfer_interface_operations downloader_xfer_operations = {
 	.close		= downloader_xfer_close,
-	.vredirect	= vopen,
+	.vredirect	= xfer_vopen,
 	.request	= ignore_xfer_request,
 	.seek		= downloader_xfer_seek,
 	.deliver_iob	= xfer_deliver_as_raw,
@@ -285,8 +285,8 @@ int create_downloader ( struct job_interface *job, const char *uri_string,
 	downloader->register_image = register_image;
 
 	/* Instantiate child objects and attach to our interfaces */
-	if ( ( rc = open ( &downloader->xfer, LOCATION_URI,
-			   uri_string ) ) != 0 )
+	if ( ( rc = xfer_open ( &downloader->xfer, LOCATION_URI,
+				uri_string ) ) != 0 )
 		goto err;
 
 	/* Attach parent interface, mortalise self, and return */

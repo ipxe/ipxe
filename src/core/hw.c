@@ -30,14 +30,15 @@ static void hw_xfer_close ( struct xfer_interface *xfer, int rc ) {
 	hw_finished ( hw, rc );
 }
 
-static void hw_xfer_request ( struct xfer_interface *xfer,
-			      off_t start __unused, int whence __unused,
-			      size_t len __unused ) {
+static int hw_xfer_request ( struct xfer_interface *xfer,
+			     off_t start __unused, int whence __unused,
+			     size_t len __unused ) {
 	struct hw *hw = container_of ( xfer, struct hw, xfer );
 	int rc;
 
 	rc = xfer_deliver_raw ( xfer, hw_msg, sizeof ( hw_msg ) );
 	hw_finished ( hw, rc );
+	return 0;
 }
 
 static struct xfer_interface_operations hw_xfer_operations = {

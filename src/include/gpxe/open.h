@@ -72,10 +72,11 @@ struct socket_opener {
 /** Register a socket opener */
 #define __socket_opener __table ( struct socket_opener, socket_openers, 01 )
 
-extern int open_uri ( struct xfer_interface *xfer, const char *uri_string );
-extern int open_socket ( struct xfer_interface *xfer,
-			 int domain, int type, struct sockaddr *sa );
-extern int vopen ( struct xfer_interface *xfer, int type, va_list args );
-extern int open ( struct xfer_interface *xfer, int type, ... );
+extern int xfer_open_uri ( struct xfer_interface *xfer,
+			   const char *uri_string );
+extern int xfer_open_socket ( struct xfer_interface *xfer,
+			      int domain, int type, struct sockaddr *sa );
+extern int xfer_vopen ( struct xfer_interface *xfer, int type, va_list args );
+extern int xfer_open ( struct xfer_interface *xfer, int type, ... );
 
 #endif /* _GPXE_OPEN_H */
