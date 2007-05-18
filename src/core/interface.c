@@ -38,6 +38,8 @@
  * interface into a null interface.
  */
 void plug ( struct interface *intf, struct interface *dest ) {
+	DBGC ( intf, "INTF %p moving from INTF %p to INTF %p\n",
+	       intf, intf->dest, dest );
 	intf_put ( intf->dest );
 	intf->dest = intf_get ( dest );
 }
