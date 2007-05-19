@@ -75,8 +75,9 @@ static void posix_file_free ( struct refcnt *refcnt ) {
 	struct posix_file *file =
 		container_of ( refcnt, struct posix_file, refcnt );
 	struct io_buffer *iobuf;
+	struct io_buffer *tmp;
 
-	list_for_each_entry ( iobuf, &file->data, list ) {
+	list_for_each_entry_safe ( iobuf, tmp, &file->data, list ) {
 		free_iob ( iobuf );
 	}
 	free ( file );
