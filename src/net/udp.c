@@ -4,7 +4,7 @@
 #include <byteswap.h>
 #include <errno.h>
 #include <gpxe/tcpip.h>
-#include <gpxe/pkbuff.h>
+#include <gpxe/iobuf.h>
 #include <gpxe/netdevice.h>
 #include <gpxe/udp.h>
 
@@ -89,22 +89,22 @@ void udp_close ( struct udp_connection *conn ) {
 }
 
 /**
- * Allocate packet buffer for UDP
+ * Allocate I/O buffer for UDP
  *
  * @v conn		UDP connection
- * @ret pkb		Packet buffer, or NULL
+ * @ret iobuf		I/O buffer, or NULL
  */
-static struct pk_buff * udp_alloc_pkb ( struct udp_connection *conn ) {
-	struct pk_buff *pkb;
+static struct io_buffer * udp_alloc_iob ( struct udp_connection *conn ) {
+	struct io_buffer *iobuf;
 
-	pkb = alloc_pkb ( UDP_MAX_TXPKB );
-	if ( ! pkb ) {
+	iobuf = alloc_iob ( UDP_MAX_TXIOB );
+	if ( ! iobuf ) {
 		DBGC ( conn, "UDP %p cannot allocate buffer of length %d\n",
-		       conn, UDP_MAX_TXPKB );
+		       conn, UDP_MAX_TXIOB );
 		return NULL;
 	}
-	pkb_reserve ( pkb, UDP_MAX_HLEN );
-	return pkb;
+	iob_reserve ( iobuf, UDP_MAX_HLEN );
+	return iobuf;
 }
 
 /**
@@ -119,20 +119,20 @@ static struct pk_buff * udp_alloc_pkb ( struct udp_connection *conn ) {
 int udp_senddata ( struct udp_connection *conn ) {
 	int rc;
 
-	conn->tx_pkb = udp_alloc_pkb ( conn );
-	if ( ! conn->tx_pkb )
+	conn->tx_iob = udp_alloc_iob ( conn );
+	if ( ! conn->tx_iob )
 		return -ENOMEM;
 
-	rc = conn->udp_op->senddata ( conn, conn->tx_pkb->data, 
-				      pkb_tailroom ( conn->tx_pkb ) );
+	rc = conn->udp_op->senddata ( conn, conn->tx_iob->data, 
+				      iob_tailroom ( conn->tx_iob ) );
 	if ( rc != 0 ) {
 		DBGC ( conn, "UDP %p application could not send packet: %s\n",
 		       conn, strerror ( rc ) );
 	}
 
-	if ( conn->tx_pkb ) {
-		free_pkb ( conn->tx_pkb );
-		conn->tx_pkb = NULL;
+	if ( conn->tx_iob ) {
+		free_iob ( conn->tx_iob );
+		conn->tx_iob = NULL;
 	}
 
 	return rc;
@@ -152,25 +152,25 @@ int udp_sendto_via ( struct udp_connection *conn, struct sockaddr_tcpip *peer,
 		     struct net_device *netdev, const void *data,
 		     size_t len ) {
        	struct udp_header *udphdr;
-	struct pk_buff *pkb;
+	struct io_buffer *iobuf;
 	int rc;
 
-	/* Use precreated packet buffer if one is available */
-	if ( conn->tx_pkb ) {
-		pkb = conn->tx_pkb;
-		conn->tx_pkb = NULL;
+	/* Use precreated I/O buffer if one is available */
+	if ( conn->tx_iob ) {
+		iobuf = conn->tx_iob;
+		conn->tx_iob = NULL;
 	} else {
-		pkb = udp_alloc_pkb ( conn );
-		if ( ! pkb )
+		iobuf = udp_alloc_iob ( conn );
+		if ( ! iobuf )
 			return -ENOMEM;
 	}
 
 	/* Avoid overflowing TX buffer */
-	if ( len > pkb_tailroom ( pkb ) )
-		len = pkb_tailroom ( pkb );
+	if ( len > iob_tailroom ( iobuf ) )
+		len = iob_tailroom ( iobuf );
 
 	/* Copy payload */
-	memmove ( pkb_put ( pkb, len ), data, len );
+	memmove ( iob_put ( iobuf, len ), data, len );
 
 	/*
 	 * Add the UDP header
@@ -178,10 +178,10 @@ int udp_sendto_via ( struct udp_connection *conn, struct sockaddr_tcpip *peer,
 	 * Covert all 16- and 32- bit integers into network btye order before
 	 * sending it over the network
 	 */
-	udphdr = pkb_push ( pkb, sizeof ( *udphdr ) );
+	udphdr = iob_push ( iobuf, sizeof ( *udphdr ) );
 	udphdr->dest_port = peer->st_port;
 	udphdr->source_port = conn->local_port;
-	udphdr->len = htons ( pkb_len ( pkb ) );
+	udphdr->len = htons ( iob_len ( iobuf ) );
 	udphdr->chksum = 0;
 	udphdr->chksum = tcpip_chksum ( udphdr, sizeof ( *udphdr ) + len );
 
@@ -191,7 +191,7 @@ int udp_sendto_via ( struct udp_connection *conn, struct sockaddr_tcpip *peer,
 	       ntohs ( udphdr->len ) );
 
 	/* Send it to the next layer for processing */
-	if ( ( rc = tcpip_tx ( pkb, &udp_protocol, peer, netdev,
+	if ( ( rc = tcpip_tx ( iobuf, &udp_protocol, peer, netdev,
 			       &udphdr->chksum ) ) != 0 ) {
 		DBGC ( conn, "UDP %p could not transmit packet: %s\n",
 		       conn, strerror ( rc ) );
@@ -248,24 +248,24 @@ static struct udp_connection * udp_demux ( uint16_t local_port ) {
 /**
  * Process a received packet
  *
- * @v pkb		Packet buffer
+ * @v iobuf		I/O buffer
  * @v st_src		Partially-filled source address
  * @v st_dest		Partially-filled destination address
  * @v pshdr_csum	Pseudo-header checksum
  * @ret rc		Return status code
  */
-static int udp_rx ( struct pk_buff *pkb, struct sockaddr_tcpip *st_src,
+static int udp_rx ( struct io_buffer *iobuf, struct sockaddr_tcpip *st_src,
 		    struct sockaddr_tcpip *st_dest, uint16_t pshdr_csum ) {
-	struct udp_header *udphdr = pkb->data;
+	struct udp_header *udphdr = iobuf->data;
 	struct udp_connection *conn;
 	size_t ulen;
 	uint16_t csum;
 	int rc = 0;
 
 	/* Sanity check packet */
-	if ( pkb_len ( pkb ) < sizeof ( *udphdr ) ) {
+	if ( iob_len ( iobuf ) < sizeof ( *udphdr ) ) {
 		DBG ( "UDP packet too short at %d bytes (min %d bytes)\n",
-		      pkb_len ( pkb ), sizeof ( *udphdr ) );
+		      iob_len ( iobuf ), sizeof ( *udphdr ) );
 		
 		rc = -EINVAL;
 		goto done;
@@ -277,14 +277,14 @@ static int udp_rx ( struct pk_buff *pkb, struct sockaddr_tcpip *st_src,
 		rc = -EINVAL;
 		goto done;
 	}
-	if ( ulen > pkb_len ( pkb ) ) {
+	if ( ulen > iob_len ( iobuf ) ) {
 		DBG ( "UDP length too long at %d bytes (packet is %d bytes)\n",
-		      ulen, pkb_len ( pkb ) );
+		      ulen, iob_len ( iobuf ) );
 		rc = -EINVAL;
 		goto done;
 	}
 	if ( udphdr->chksum ) {
-		csum = tcpip_continue_chksum ( pshdr_csum, pkb->data, ulen );
+		csum = tcpip_continue_chksum ( pshdr_csum, iobuf->data, ulen );
 		if ( csum != 0 ) {
 			DBG ( "UDP checksum incorrect (is %04x including "
 			      "checksum field, should be 0000)\n", csum );
@@ -297,8 +297,8 @@ static int udp_rx ( struct pk_buff *pkb, struct sockaddr_tcpip *st_src,
 	st_src->st_port = udphdr->source_port;
 	st_dest->st_port = udphdr->dest_port;
 	conn = udp_demux ( udphdr->dest_port );
-	pkb_unput ( pkb, ( pkb_len ( pkb ) - ulen ) );
-	pkb_pull ( pkb, sizeof ( *udphdr ) );
+	iob_unput ( iobuf, ( iob_len ( iobuf ) - ulen ) );
+	iob_pull ( iobuf, sizeof ( *udphdr ) );
 
 	/* Dump debugging information */
 	DBGC ( conn, "UDP %p RX %d<-%d len %zd\n", conn,
@@ -315,7 +315,7 @@ static int udp_rx ( struct pk_buff *pkb, struct sockaddr_tcpip *st_src,
 
 	/* Pass data to application */
 	if ( conn->udp_op->newdata ) {
-		rc = conn->udp_op->newdata ( conn, pkb->data, pkb_len ( pkb ),
+		rc = conn->udp_op->newdata ( conn, iobuf->data, iob_len ( iobuf ),
 				     st_src, st_dest );
 		if ( rc != 0 ) {
 			DBGC ( conn, "UDP %p application rejected packet: %s\n",
@@ -327,7 +327,7 @@ static int udp_rx ( struct pk_buff *pkb, struct sockaddr_tcpip *st_src,
 	}
 
  done:
-	free_pkb ( pkb );
+	free_iob ( iobuf );
 	return rc;
 }
 

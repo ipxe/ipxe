@@ -12,7 +12,7 @@
 #include <gpxe/tables.h>
 #include <gpxe/hotplug.h>
 
-struct pk_buff;
+struct io_buffer;
 struct net_device;
 struct net_protocol;
 struct ll_protocol;
@@ -37,13 +37,13 @@ struct net_protocol {
 	/**
 	 * Process received packet
 	 *
-	 * @v pkb	Packet buffer
+	 * @v iobuf	I/O buffer
 	 * @v netdev	Network device
 	 * @v ll_source	Link-layer source address
 	 *
-	 * This method takes ownership of the packet buffer.
+	 * This method takes ownership of the I/O buffer.
 	 */
-	int ( * rx ) ( struct pk_buff *pkb, struct net_device *netdev,
+	int ( * rx ) ( struct io_buffer *iobuf, struct net_device *netdev,
 		       const void *ll_source );
 	/**
 	 * Transcribe network-layer address
@@ -77,7 +77,7 @@ struct ll_protocol {
 	/**
 	 * Transmit network-layer packet via network device
 	 *
-	 * @v pkb		Packet buffer
+	 * @v iobuf		I/O buffer
 	 * @v netdev		Network device
 	 * @v net_protocol	Network-layer protocol
 	 * @v ll_dest		Link-layer destination address
@@ -85,15 +85,15 @@ struct ll_protocol {
 	 *
 	 * This method should prepend in the link-layer header
 	 * (e.g. the Ethernet DIX header) and transmit the packet.
-	 * This method takes ownership of the packet buffer.
+	 * This method takes ownership of the I/O buffer.
 	 */
-	int ( * tx ) ( struct pk_buff *pkb, struct net_device *netdev,
+	int ( * tx ) ( struct io_buffer *iobuf, struct net_device *netdev,
 		       struct net_protocol *net_protocol,
 		       const void *ll_dest );
 	/**
 	 * Handle received packet
 	 *
-	 * @v pkb	Packet buffer
+	 * @v iobuf	I/O buffer
 	 * @v netdev	Network device
 	 *
 	 * This method should strip off the link-layer header
@@ -101,7 +101,7 @@ struct ll_protocol {
 	 * net_rx().  This method takes ownership of the packet
 	 * buffer.
 	 */
-	int ( * rx ) ( struct pk_buff *pkb, struct net_device *netdev );
+	int ( * rx ) ( struct io_buffer *iobuf, struct net_device *netdev );
 	/**
 	 * Transcribe link-layer address
 	 *
@@ -151,7 +151,7 @@ struct net_device {
 	 * @v netdev	Network device
 	 * @ret rc	Return status code
 	 *
-	 * This method should allocate RX packet buffers and enable
+	 * This method should allocate RX I/O buffers and enable
 	 * the hardware to start transmitting and receiving packets.
 	 */
 	int ( * open ) ( struct net_device *netdev );
@@ -166,22 +166,22 @@ struct net_device {
 	/** Transmit packet
 	 *
 	 * @v netdev	Network device
-	 * @v pkb	Packet buffer
+	 * @v iobuf	I/O buffer
 	 * @ret rc	Return status code
 	 *
 	 * This method should cause the hardware to initiate
-	 * transmission of the packet buffer.
+	 * transmission of the I/O buffer.
 	 *
-	 * If this method returns success, the packet buffer remains
+	 * If this method returns success, the I/O buffer remains
 	 * owned by the net device's TX queue, and the net device must
 	 * eventually call netdev_tx_complete() to free the buffer.
-	 * If this method returns failure, the packet buffer is
+	 * If this method returns failure, the I/O buffer is
 	 * immediately released.
 	 *
 	 * This method is guaranteed to be called only when the device
 	 * is open.
 	 */
-	int ( * transmit ) ( struct net_device *netdev, struct pk_buff *pkb );
+	int ( * transmit ) ( struct net_device *netdev, struct io_buffer *iobuf );
 	/** Poll for received packet
 	 *
 	 * @v netdev	Network device
@@ -251,12 +251,12 @@ static inline int have_netdevs ( void ) {
 	return ( ! list_empty ( &net_devices ) );
 }
 
-extern int netdev_tx ( struct net_device *netdev, struct pk_buff *pkb );
-void netdev_tx_complete ( struct net_device *netdev, struct pk_buff *pkb );
+extern int netdev_tx ( struct net_device *netdev, struct io_buffer *iobuf );
+void netdev_tx_complete ( struct net_device *netdev, struct io_buffer *iobuf );
 void netdev_tx_complete_next ( struct net_device *netdev );
-extern void netdev_rx ( struct net_device *netdev, struct pk_buff *pkb );
+extern void netdev_rx ( struct net_device *netdev, struct io_buffer *iobuf );
 extern int netdev_poll ( struct net_device *netdev, unsigned int rx_quota );
-extern struct pk_buff * netdev_rx_dequeue ( struct net_device *netdev );
+extern struct io_buffer * netdev_rx_dequeue ( struct net_device *netdev );
 extern struct net_device * alloc_netdev ( size_t priv_size );
 extern int register_netdev ( struct net_device *netdev );
 extern int netdev_open ( struct net_device *netdev );
@@ -266,9 +266,9 @@ extern void free_netdev ( struct net_device *netdev );
 struct net_device * find_netdev ( const char *name );
 struct net_device * find_pci_netdev ( unsigned int busdevfn );
 
-extern int net_tx ( struct pk_buff *pkb, struct net_device *netdev,
+extern int net_tx ( struct io_buffer *iobuf, struct net_device *netdev,
 		    struct net_protocol *net_protocol, const void *ll_dest );
-extern int net_rx ( struct pk_buff *pkb, struct net_device *netdev,
+extern int net_rx ( struct io_buffer *iobuf, struct net_device *netdev,
 		    uint16_t net_proto, const void *ll_source );
 
 #endif /* _GPXE_NETDEVICE_H */

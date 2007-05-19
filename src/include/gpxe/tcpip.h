@@ -12,7 +12,7 @@
 #include <gpxe/in.h>
 #include <gpxe/tables.h>
 
-struct pk_buff;
+struct io_buffer;
 struct net_device;
 
 /** Empty checksum value
@@ -51,15 +51,15 @@ struct tcpip_protocol {
        	/**
          * Process received packet
          *
-         * @v pkb		Packet buffer
+         * @v iobuf		I/O buffer
 	 * @v st_src		Partially-filled source address
 	 * @v st_dest		Partially-filled destination address
 	 * @v pshdr_csum	Pseudo-header checksum
 	 * @ret rc		Return status code
          *
-         * This method takes ownership of the packet buffer.
+         * This method takes ownership of the I/O buffer.
          */
-        int ( * rx ) ( struct pk_buff *pkb, struct sockaddr_tcpip *st_src,
+        int ( * rx ) ( struct io_buffer *iobuf, struct sockaddr_tcpip *st_src,
 		       struct sockaddr_tcpip *st_dest, uint16_t pshdr_csum );
         /** 
 	 * Transport-layer protocol number
@@ -80,16 +80,16 @@ struct tcpip_net_protocol {
 	/**
 	 * Transmit packet
 	 *
-	 * @v pkb		Packet buffer
+	 * @v iobuf		I/O buffer
 	 * @v tcpip_protocol	Transport-layer protocol
 	 * @v st_dest		Destination address
 	 * @v netdev		Network device (or NULL to route automatically)
 	 * @v trans_csum	Transport-layer checksum to complete, or NULL
 	 * @ret rc		Return status code
 	 *
-	 * This function takes ownership of the packet buffer.
+	 * This function takes ownership of the I/O buffer.
 	 */
-	int ( * tx ) ( struct pk_buff *pkb,
+	int ( * tx ) ( struct io_buffer *iobuf,
 		       struct tcpip_protocol *tcpip_protocol,
 		       struct sockaddr_tcpip *st_dest,
 		       struct net_device *netdev,
@@ -104,10 +104,10 @@ struct tcpip_net_protocol {
 #define	__tcpip_net_protocol \
 	__table ( struct tcpip_net_protocol, tcpip_net_protocols, 01 )
 
-extern int tcpip_rx ( struct pk_buff *pkb, uint8_t tcpip_proto,
+extern int tcpip_rx ( struct io_buffer *iobuf, uint8_t tcpip_proto,
 		      struct sockaddr_tcpip *st_src,
 		      struct sockaddr_tcpip *st_dest, uint16_t pshdr_csum );
-extern int tcpip_tx ( struct pk_buff *pkb, struct tcpip_protocol *tcpip, 
+extern int tcpip_tx ( struct io_buffer *iobuf, struct tcpip_protocol *tcpip, 
 		      struct sockaddr_tcpip *st_dest,
 		      struct net_device *netdev,
 		      uint16_t *trans_csum );

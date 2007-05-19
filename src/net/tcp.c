@@ -5,7 +5,7 @@
 #include <errno.h>
 #include <byteswap.h>
 #include <timer.h>
-#include <gpxe/pkbuff.h>
+#include <gpxe/iobuf.h>
 #include <gpxe/malloc.h>
 #include <gpxe/retry.h>
 #include <gpxe/stream.h>
@@ -68,12 +68,12 @@ struct tcp_connection {
 	 */
 	uint32_t rcv_ack;
 
-	/** Transmit packet buffer
+	/** Transmit I/O buffer
 	 *
 	 * This buffer is allocated prior to calling the application's
 	 * senddata() method, to provide temporary storage space.
 	 */
-	struct pk_buff *tx_pkb;
+	struct io_buffer *tx_iob;
 	/** Retransmission timer */
 	struct retry_timer timer;
 };
@@ -222,7 +222,7 @@ static void tcp_abort ( struct tcp_connection *tcp, int send_rst, int rc ) {
  * eventually attempt to retransmit the failed packet.
  */
 static int tcp_senddata_conn ( struct tcp_connection *tcp, int force_send ) {
-	struct pk_buff *pkb;
+	struct io_buffer *iobuf;
 	struct tcp_header *tcphdr;
 	struct tcp_mss_option *mssopt;
 	void *payload;
@@ -233,12 +233,12 @@ static int tcp_senddata_conn ( struct tcp_connection *tcp, int force_send ) {
 	int rc;
 
 	/* Allocate space to the TX buffer */
-	pkb = alloc_pkb ( MAX_PKB_LEN );
-	if ( ! pkb ) {
+	iobuf = alloc_iob ( MAX_IOB_LEN );
+	if ( ! iobuf ) {
 		DBGC ( tcp, "TCP %p could not allocate data buffer\n", tcp );
 		/* Start the retry timer so that we attempt to
 		 * retransmit this packet later.  (Start it
-		 * unconditionally, since without a packet buffer we
+		 * unconditionally, since without a I/O buffer we
 		 * can't call the senddata() callback, and so may not
 		 * be able to tell whether or not we have something
 		 * that actually needs to be retransmitted).
@@ -246,20 +246,20 @@ static int tcp_senddata_conn ( struct tcp_connection *tcp, int force_send ) {
 		start_timer ( &tcp->timer );
 		return -ENOMEM;
 	}
-	pkb_reserve ( pkb, MAX_HDR_LEN );
+	iob_reserve ( iobuf, MAX_HDR_LEN );
 
 	/* If we are connected, call the senddata() method, which may
 	 * call tcp_send() to queue up a data payload.
 	 */
 	if ( TCP_CAN_SEND_DATA ( tcp->tcp_state ) ) {
-		tcp->tx_pkb = pkb;
-		stream_senddata ( &tcp->stream, pkb->data,
-				  pkb_tailroom ( pkb ) );
-		tcp->tx_pkb = NULL;
+		tcp->tx_iob = iobuf;
+		stream_senddata ( &tcp->stream, iobuf->data,
+				  iob_tailroom ( iobuf ) );
+		tcp->tx_iob = NULL;
 	}
 
 	/* Truncate payload length to fit transmit window */
-	len = pkb_len ( pkb );
+	len = iob_len ( iobuf );
 	if ( len > tcp->snd_win )
 		len = tcp->snd_win;
 
@@ -276,7 +276,7 @@ static int tcp_senddata_conn ( struct tcp_connection *tcp, int force_send ) {
 
 	/* If we have nothing to transmit, drop the packet */
 	if ( ( seq_len == 0 ) && ! force_send ) {
-		free_pkb ( pkb );
+		free_iob ( iobuf );
 		return 0;
 	}
 
@@ -294,23 +294,23 @@ static int tcp_senddata_conn ( struct tcp_connection *tcp, int force_send ) {
 	window &= ~0x03; /* Keep everything dword-aligned */
 
 	/* Fill up the TCP header */
-	payload = pkb->data;
+	payload = iobuf->data;
 	if ( flags & TCP_SYN ) {
-		mssopt = pkb_push ( pkb, sizeof ( *mssopt ) );
+		mssopt = iob_push ( iobuf, sizeof ( *mssopt ) );
 		mssopt->kind = TCP_OPTION_MSS;
 		mssopt->length = sizeof ( *mssopt );
 		mssopt->mss = htons ( TCP_MSS );
 	}
-	tcphdr = pkb_push ( pkb, sizeof ( *tcphdr ) );
+	tcphdr = iob_push ( iobuf, sizeof ( *tcphdr ) );
 	memset ( tcphdr, 0, sizeof ( *tcphdr ) );
 	tcphdr->src = tcp->local_port;
 	tcphdr->dest = tcp->peer.st_port;
 	tcphdr->seq = htonl ( tcp->snd_seq );
 	tcphdr->ack = htonl ( tcp->rcv_ack );
-	tcphdr->hlen = ( ( payload - pkb->data ) << 2 );
+	tcphdr->hlen = ( ( payload - iobuf->data ) << 2 );
 	tcphdr->flags = flags;
 	tcphdr->win = htons ( window );
-	tcphdr->csum = tcpip_chksum ( pkb->data, pkb_len ( pkb ) );
+	tcphdr->csum = tcpip_chksum ( iobuf->data, iob_len ( iobuf ) );
 
 	/* Dump header */
 	DBGC ( tcp, "TCP %p TX %d->%d %08lx..%08lx           %08lx %4zd",
@@ -321,7 +321,7 @@ static int tcp_senddata_conn ( struct tcp_connection *tcp, int force_send ) {
 	DBGC ( tcp, "\n" );
 
 	/* Transmit packet */
-	rc = tcpip_tx ( pkb, &tcp_protocol, &tcp->peer, NULL, &tcphdr->csum );
+	rc = tcpip_tx ( iobuf, &tcp_protocol, &tcp->peer, NULL, &tcphdr->csum );
 
 	/* If we got -ENETUNREACH, kill the connection immediately
 	 * because there is no point retrying.  This isn't strictly
@@ -372,22 +372,22 @@ static int tcp_send ( struct stream_connection *stream,
 		      const void *data, size_t len ) {
 	struct tcp_connection *tcp =
 		container_of ( stream, struct tcp_connection, stream );
-	struct pk_buff *pkb;
+	struct io_buffer *iobuf;
 
-	/* Check that we have a packet buffer to fill */
-	pkb = tcp->tx_pkb;
-	if ( ! pkb ) {
+	/* Check that we have a I/O buffer to fill */
+	iobuf = tcp->tx_iob;
+	if ( ! iobuf ) {
 		DBGC ( tcp, "TCP %p tried to send data outside of the "
 		       "senddata() method\n", tcp );
 		return -EINVAL;
 	}
 
-	/* Truncate length to fit packet buffer */
-	if ( len > pkb_tailroom ( pkb ) )
-		len = pkb_tailroom ( pkb );
+	/* Truncate length to fit I/O buffer */
+	if ( len > iob_tailroom ( iobuf ) )
+		len = iob_tailroom ( iobuf );
 
 	/* Copy payload */
-	memmove ( pkb_put ( pkb, len ), data, len );
+	memmove ( iob_put ( iobuf, len ), data, len );
 
 	return 0;
 }
@@ -434,19 +434,19 @@ static void tcp_expired ( struct retry_timer *timer, int over ) {
  */
 static int tcp_send_reset ( struct tcp_connection *tcp,
 			    struct tcp_header *in_tcphdr ) {
-	struct pk_buff *pkb;
+	struct io_buffer *iobuf;
 	struct tcp_header *tcphdr;
 
 	/* Allocate space for dataless TX buffer */
-	pkb = alloc_pkb ( MAX_HDR_LEN );
-	if ( ! pkb ) {
+	iobuf = alloc_iob ( MAX_HDR_LEN );
+	if ( ! iobuf ) {
 		DBGC ( tcp, "TCP %p could not allocate data buffer\n", tcp );
 		return -ENOMEM;
 	}
-	pkb_reserve ( pkb, MAX_HDR_LEN );
+	iob_reserve ( iobuf, MAX_HDR_LEN );
 
 	/* Construct RST response */
-	tcphdr = pkb_push ( pkb, sizeof ( *tcphdr ) );
+	tcphdr = iob_push ( iobuf, sizeof ( *tcphdr ) );
 	memset ( tcphdr, 0, sizeof ( *tcphdr ) );
 	tcphdr->src = in_tcphdr->dest;
 	tcphdr->dest = in_tcphdr->src;
@@ -455,7 +455,7 @@ static int tcp_send_reset ( struct tcp_connection *tcp,
 	tcphdr->hlen = ( ( sizeof ( *tcphdr ) / 4 ) << 4 );
 	tcphdr->flags = ( TCP_RST | TCP_ACK );
 	tcphdr->win = htons ( TCP_MAX_WINDOW_SIZE );
-	tcphdr->csum = tcpip_chksum ( pkb->data, pkb_len ( pkb ) );
+	tcphdr->csum = tcpip_chksum ( iobuf->data, iob_len ( iobuf ) );
 
 	/* Dump header */
 	DBGC ( tcp, "TCP %p TX %d->%d %08lx..%08lx           %08lx %4zd",
@@ -466,7 +466,7 @@ static int tcp_send_reset ( struct tcp_connection *tcp,
 	DBGC ( tcp, "\n" );
 
 	/* Transmit packet */
-	return tcpip_tx ( pkb, &tcp_protocol, &tcp->peer,
+	return tcpip_tx ( iobuf, &tcp_protocol, &tcp->peer,
 			  NULL, &tcphdr->csum );
 }
 
@@ -662,17 +662,17 @@ static int tcp_rx_rst ( struct tcp_connection *tcp, uint32_t seq ) {
 /**
  * Process received packet
  *
- * @v pkb		Packet buffer
+ * @v iobuf		I/O buffer
  * @v st_src		Partially-filled source address
  * @v st_dest		Partially-filled destination address
  * @v pshdr_csum	Pseudo-header checksum
  * @ret rc		Return status code
   */
-static int tcp_rx ( struct pk_buff *pkb,
+static int tcp_rx ( struct io_buffer *iobuf,
 		    struct sockaddr_tcpip *st_src __unused,
 		    struct sockaddr_tcpip *st_dest __unused,
 		    uint16_t pshdr_csum ) {
-	struct tcp_header *tcphdr = pkb->data;
+	struct tcp_header *tcphdr = iobuf->data;
 	struct tcp_connection *tcp;
 	unsigned int hlen;
 	uint16_t csum;
@@ -686,9 +686,9 @@ static int tcp_rx ( struct pk_buff *pkb,
 	int rc;
 
 	/* Sanity check packet */
-	if ( pkb_len ( pkb ) < sizeof ( *tcphdr ) ) {
+	if ( iob_len ( iobuf ) < sizeof ( *tcphdr ) ) {
 		DBG ( "TCP packet too short at %d bytes (min %d bytes)\n",
-		      pkb_len ( pkb ), sizeof ( *tcphdr ) );
+		      iob_len ( iobuf ), sizeof ( *tcphdr ) );
 		rc = -EINVAL;
 		goto done;
 	}
@@ -699,13 +699,13 @@ static int tcp_rx ( struct pk_buff *pkb,
 		rc = -EINVAL;
 		goto done;
 	}
-	if ( hlen > pkb_len ( pkb ) ) {
+	if ( hlen > iob_len ( iobuf ) ) {
 		DBG ( "TCP header too long at %d bytes (max %d bytes)\n",
-		      hlen, pkb_len ( pkb ) );
+		      hlen, iob_len ( iobuf ) );
 		rc = -EINVAL;
 		goto done;
 	}
-	csum = tcpip_continue_chksum ( pshdr_csum, pkb->data, pkb_len ( pkb ));
+	csum = tcpip_continue_chksum ( pshdr_csum, iobuf->data, iob_len ( iobuf ));
 	if ( csum != 0 ) {
 		DBG ( "TCP checksum incorrect (is %04x including checksum "
 		      "field, should be 0000)\n", csum );
@@ -719,8 +719,8 @@ static int tcp_rx ( struct pk_buff *pkb,
 	ack = ntohl ( tcphdr->ack );
 	win = ntohs ( tcphdr->win );
 	flags = tcphdr->flags;
-	data = pkb_pull ( pkb, hlen );
-	len = pkb_len ( pkb );
+	data = iob_pull ( iobuf, hlen );
+	len = iob_len ( iobuf );
 
 	/* Dump header */
 	DBGC ( tcp, "TCP %p RX %d<-%d           %08lx %08lx..%08lx %4zd",
@@ -787,7 +787,7 @@ static int tcp_rx ( struct pk_buff *pkb,
 	rc = 0;
  done:
 	/* Free received packet */
-	free_pkb ( pkb );
+	free_iob ( iobuf );
 	return rc;
 }
 

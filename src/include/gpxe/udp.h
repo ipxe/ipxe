@@ -10,7 +10,7 @@
  */
 
 #include <stddef.h>
-#include <gpxe/pkbuff.h>
+#include <gpxe/iobuf.h>
 #include <gpxe/tcpip.h>
 #include <gpxe/if_ether.h>
 
@@ -21,8 +21,8 @@ struct net_device;
  */
 
 #define UDP_MAX_HLEN	72
-#define UDP_MAX_TXPKB	ETH_MAX_MTU
-#define UDP_MIN_TXPKB	ETH_ZLEN
+#define UDP_MAX_TXIOB	ETH_MAX_MTU
+#define UDP_MIN_TXIOB	ETH_ZLEN
 
 typedef uint16_t port_t;
 
@@ -86,7 +86,7 @@ struct udp_connection {
 	/** Local port on which the connection receives packets */
 	port_t local_port;
 	/** Transmit buffer */
-	struct pk_buff *tx_pkb;
+	struct io_buffer *tx_iob;
 	/** List of registered connections */
 	struct list_head list;
 	/** Operations table for this connection */

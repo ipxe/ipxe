@@ -2,7 +2,7 @@
 #include <string.h>
 #include <errno.h>
 #include <byteswap.h>
-#include <gpxe/pkbuff.h>
+#include <gpxe/iobuf.h>
 #include <gpxe/tables.h>
 #include <gpxe/tcpip.h>
 
@@ -28,7 +28,7 @@ static struct tcpip_protocol tcpip_protocols_end[0]
 
 /** Process a received TCP/IP packet
  *
- * @v pkb		Packet buffer
+ * @v iobuf		I/O buffer
  * @v tcpip_proto	Transport-layer protocol number
  * @v st_src		Partially-filled source address
  * @v st_dest		Partially-filled destination address
@@ -41,7 +41,7 @@ static struct tcpip_protocol tcpip_protocols_end[0]
  * address family and the network-layer addresses, but leave the ports
  * and the rest of the structures as zero).
  */
-int tcpip_rx ( struct pk_buff *pkb, uint8_t tcpip_proto, 
+int tcpip_rx ( struct io_buffer *iobuf, uint8_t tcpip_proto, 
 	       struct sockaddr_tcpip *st_src,
 	       struct sockaddr_tcpip *st_dest,
 	       uint16_t pshdr_csum ) {
@@ -51,25 +51,25 @@ int tcpip_rx ( struct pk_buff *pkb, uint8_t tcpip_proto,
 	for ( tcpip = tcpip_protocols; tcpip < tcpip_protocols_end; tcpip++ ) {
 		if ( tcpip->tcpip_proto == tcpip_proto ) {
 			DBG ( "TCP/IP received %s packet\n", tcpip->name );
-			return tcpip->rx ( pkb, st_src, st_dest, pshdr_csum );
+			return tcpip->rx ( iobuf, st_src, st_dest, pshdr_csum );
 		}
 	}
 
 	DBG ( "Unrecognised TCP/IP protocol %d\n", tcpip_proto );
-	free_pkb ( pkb );
+	free_iob ( iobuf );
 	return -EPROTONOSUPPORT;
 }
 
 /** Transmit a TCP/IP packet
  *
- * @v pkb		Packet buffer
+ * @v iobuf		I/O buffer
  * @v tcpip_protocol	Transport-layer protocol
  * @v st_dest		Destination address
  * @v netdev		Network device to use if no route found, or NULL
  * @v trans_csum	Transport-layer checksum to complete, or NULL
  * @ret rc		Return status code
  */
-int tcpip_tx ( struct pk_buff *pkb, struct tcpip_protocol *tcpip_protocol,
+int tcpip_tx ( struct io_buffer *iobuf, struct tcpip_protocol *tcpip_protocol,
 	       struct sockaddr_tcpip *st_dest, struct net_device *netdev,
 	       uint16_t *trans_csum ) {
 	struct tcpip_net_protocol *tcpip_net;
@@ -79,13 +79,13 @@ int tcpip_tx ( struct pk_buff *pkb, struct tcpip_protocol *tcpip_protocol,
 	      tcpip_net < tcpip_net_protocols_end ; tcpip_net++ ) {
 		if ( tcpip_net->sa_family == st_dest->st_family ) {
 			DBG ( "TCP/IP sending %s packet\n", tcpip_net->name );
-			return tcpip_net->tx ( pkb, tcpip_protocol, st_dest,
+			return tcpip_net->tx ( iobuf, tcpip_protocol, st_dest,
 					       netdev, trans_csum );
 		}
 	}
 	
 	DBG ( "Unrecognised TCP/IP address family %d\n", st_dest->st_family );
-	free_pkb ( pkb );
+	free_iob ( iobuf );
 	return -EAFNOSUPPORT;
 }
 

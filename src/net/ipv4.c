@@ -8,7 +8,7 @@
 #include <gpxe/in.h>
 #include <gpxe/arp.h>
 #include <gpxe/if_ether.h>
-#include <gpxe/pkbuff.h>
+#include <gpxe/iobuf.h>
 #include <gpxe/netdevice.h>
 #include <gpxe/ip.h>
 #include <gpxe/tcpip.h>
@@ -205,11 +205,11 @@ static void free_fragbuf ( struct frag_buffer *fragbuf ) {
 /**
  * Fragment reassembler
  *
- * @v pkb		Packet buffer, fragment of the datagram
- * @ret frag_pkb	Reassembled packet, or NULL
+ * @v iobuf		I/O buffer, fragment of the datagram
+ * @ret frag_iob	Reassembled packet, or NULL
  */
-static struct pk_buff * ipv4_reassemble ( struct pk_buff * pkb ) {
-	struct iphdr *iphdr = pkb->data;
+static struct io_buffer * ipv4_reassemble ( struct io_buffer * iobuf ) {
+	struct iphdr *iphdr = iobuf->data;
 	struct frag_buffer *fragbuf;
 	
 	/**
@@ -223,31 +223,31 @@ static struct pk_buff * ipv4_reassemble ( struct pk_buff * pkb ) {
 			 * 
 			 * The offset of the new packet must be equal to the
 			 * length of the data accumulated so far (the length of
-			 * the reassembled packet buffer
+			 * the reassembled I/O buffer
 			 */
-			if ( pkb_len ( fragbuf->frag_pkb ) == 
+			if ( iob_len ( fragbuf->frag_iob ) == 
 			      ( iphdr->frags & IP_MASK_OFFSET ) ) {
 				/**
 				 * Append the contents of the fragment to the
-				 * reassembled packet buffer
+				 * reassembled I/O buffer
 				 */
-				pkb_pull ( pkb, sizeof ( *iphdr ) );
-				memcpy ( pkb_put ( fragbuf->frag_pkb,
-							pkb_len ( pkb ) ),
-					 pkb->data, pkb_len ( pkb ) );
-				free_pkb ( pkb );
+				iob_pull ( iobuf, sizeof ( *iphdr ) );
+				memcpy ( iob_put ( fragbuf->frag_iob,
+							iob_len ( iobuf ) ),
+					 iobuf->data, iob_len ( iobuf ) );
+				free_iob ( iobuf );
 
 				/** Check if the fragment series is over */
 				if ( !iphdr->frags & IP_MASK_MOREFRAGS ) {
-					pkb = fragbuf->frag_pkb;
+					iobuf = fragbuf->frag_iob;
 					free_fragbuf ( fragbuf );
-					return pkb;
+					return iobuf;
 				}
 
 			} else {
 				/* Discard the fragment series */
 				free_fragbuf ( fragbuf );
-				free_pkb ( pkb );
+				free_iob ( iobuf );
 			}
 			return NULL;
 		}
@@ -262,12 +262,12 @@ static struct pk_buff * ipv4_reassemble ( struct pk_buff * pkb ) {
 		fragbuf->ident = iphdr->ident;
 		fragbuf->src = iphdr->src;
 
-		/* Set up the reassembly packet buffer */
-		fragbuf->frag_pkb = alloc_pkb ( IP_FRAG_PKB_SIZE );
-		pkb_pull ( pkb, sizeof ( *iphdr ) );
-		memcpy ( pkb_put ( fragbuf->frag_pkb, pkb_len ( pkb ) ),
-			 pkb->data, pkb_len ( pkb ) );
-		free_pkb ( pkb );
+		/* Set up the reassembly I/O buffer */
+		fragbuf->frag_iob = alloc_iob ( IP_FRAG_IOB_SIZE );
+		iob_pull ( iobuf, sizeof ( *iphdr ) );
+		memcpy ( iob_put ( fragbuf->frag_iob, iob_len ( iobuf ) ),
+			 iobuf->data, iob_len ( iobuf ) );
+		free_iob ( iobuf );
 
 		/* Set the reassembly timer */
 		fragbuf->frag_timer.timeout = IP_FRAG_TIMEOUT;
@@ -284,13 +284,13 @@ static struct pk_buff * ipv4_reassemble ( struct pk_buff * pkb ) {
 /**
  * Add IPv4 pseudo-header checksum to existing checksum
  *
- * @v pkb		Packet buffer
+ * @v iobuf		I/O buffer
  * @v csum		Existing checksum
  * @ret csum		Updated checksum
  */
-static uint16_t ipv4_pshdr_chksum ( struct pk_buff *pkb, uint16_t csum ) {
+static uint16_t ipv4_pshdr_chksum ( struct io_buffer *iobuf, uint16_t csum ) {
 	struct ipv4_pseudo_header pshdr;
-	struct iphdr *iphdr = pkb->data;
+	struct iphdr *iphdr = iobuf->data;
 	size_t hdrlen = ( ( iphdr->verhdrlen & IP_MASK_HLEN ) * 4 );
 
 	/* Build pseudo-header */
@@ -298,7 +298,7 @@ static uint16_t ipv4_pshdr_chksum ( struct pk_buff *pkb, uint16_t csum ) {
 	pshdr.dest = iphdr->dest;
 	pshdr.zero_padding = 0x00;
 	pshdr.protocol = iphdr->protocol;
-	pshdr.len = htons ( pkb_len ( pkb ) - hdrlen );
+	pshdr.len = htons ( iob_len ( iobuf ) - hdrlen );
 
 	/* Update the checksum value */
 	return tcpip_continue_chksum ( csum, &pshdr, sizeof ( pshdr ) );
@@ -345,7 +345,7 @@ static int ipv4_ll_addr ( struct in_addr dest, struct in_addr src,
 /**
  * Transmit IP packet
  *
- * @v pkb		Packet buffer
+ * @v iobuf		I/O buffer
  * @v tcpip		Transport-layer protocol
  * @v st_dest		Destination network-layer address
  * @v netdev		Network device to use if no route found, or NULL
@@ -354,12 +354,12 @@ static int ipv4_ll_addr ( struct in_addr dest, struct in_addr src,
  *
  * This function expects a transport-layer segment and prepends the IP header
  */
-static int ipv4_tx ( struct pk_buff *pkb,
+static int ipv4_tx ( struct io_buffer *iobuf,
 		     struct tcpip_protocol *tcpip_protocol,
 		     struct sockaddr_tcpip *st_dest,
 		     struct net_device *netdev,
 		     uint16_t *trans_csum ) {
-	struct iphdr *iphdr = pkb_push ( pkb, sizeof ( *iphdr ) );
+	struct iphdr *iphdr = iob_push ( iobuf, sizeof ( *iphdr ) );
 	struct sockaddr_in *sin_dest = ( ( struct sockaddr_in * ) st_dest );
 	struct ipv4_miniroute *miniroute;
 	struct in_addr next_hop;
@@ -370,7 +370,7 @@ static int ipv4_tx ( struct pk_buff *pkb,
 	memset ( iphdr, 0, sizeof ( *iphdr ) );
 	iphdr->verhdrlen = ( IP_VER | ( sizeof ( *iphdr ) / 4 ) );
 	iphdr->service = IP_TOS;
-	iphdr->len = htons ( pkb_len ( pkb ) );	
+	iphdr->len = htons ( iob_len ( iobuf ) );	
 	iphdr->ident = htons ( ++next_ident );
 	iphdr->ttl = IP_TTL;
 	iphdr->protocol = tcpip_protocol->tcpip_proto;
@@ -398,7 +398,7 @@ static int ipv4_tx ( struct pk_buff *pkb,
 
 	/* Fix up checksums */
 	if ( trans_csum )
-		*trans_csum = ipv4_pshdr_chksum ( pkb, *trans_csum );
+		*trans_csum = ipv4_pshdr_chksum ( iobuf, *trans_csum );
 	iphdr->chksum = tcpip_chksum ( iphdr, sizeof ( *iphdr ) );
 
 	/* Print IP4 header for debugging */
@@ -408,7 +408,7 @@ static int ipv4_tx ( struct pk_buff *pkb,
 	      ntohs ( iphdr->ident ), ntohs ( iphdr->chksum ) );
 
 	/* Hand off to link layer */
-	if ( ( rc = net_tx ( pkb, netdev, &ipv4_protocol, ll_dest ) ) != 0 ) {
+	if ( ( rc = net_tx ( iobuf, netdev, &ipv4_protocol, ll_dest ) ) != 0 ) {
 		DBG ( "IPv4 could not transmit packet via %s: %s\n",
 		      netdev->name, strerror ( rc ) );
 		return rc;
@@ -417,23 +417,23 @@ static int ipv4_tx ( struct pk_buff *pkb,
 	return 0;
 
  err:
-	free_pkb ( pkb );
+	free_iob ( iobuf );
 	return rc;
 }
 
 /**
  * Process incoming packets
  *
- * @v pkb	Packet buffer
+ * @v iobuf	I/O buffer
  * @v netdev	Network device
  * @v ll_source	Link-layer destination source
  *
  * This function expects an IP4 network datagram. It processes the headers 
  * and sends it to the transport layer.
  */
-static int ipv4_rx ( struct pk_buff *pkb, struct net_device *netdev __unused,
+static int ipv4_rx ( struct io_buffer *iobuf, struct net_device *netdev __unused,
 		     const void *ll_source __unused ) {
-	struct iphdr *iphdr = pkb->data;
+	struct iphdr *iphdr = iobuf->data;
 	size_t hdrlen;
 	size_t len;
 	union {
@@ -445,9 +445,9 @@ static int ipv4_rx ( struct pk_buff *pkb, struct net_device *netdev __unused,
 	int rc;
 
 	/* Sanity check the IPv4 header */
-	if ( pkb_len ( pkb ) < sizeof ( *iphdr ) ) {
+	if ( iob_len ( iobuf ) < sizeof ( *iphdr ) ) {
 		DBG ( "IPv4 packet too short at %d bytes (min %d bytes)\n",
-		      pkb_len ( pkb ), sizeof ( *iphdr ) );
+		      iob_len ( iobuf ), sizeof ( *iphdr ) );
 		goto err;
 	}
 	if ( ( iphdr->verhdrlen & IP_MASK_VER ) != IP_VER ) {
@@ -460,9 +460,9 @@ static int ipv4_rx ( struct pk_buff *pkb, struct net_device *netdev __unused,
 		      hdrlen, sizeof ( *iphdr ) );
 		goto err;
 	}
-	if ( hdrlen > pkb_len ( pkb ) ) {
+	if ( hdrlen > iob_len ( iobuf ) ) {
 		DBG ( "IPv4 header too long at %d bytes "
-		      "(packet is %d bytes)\n", hdrlen, pkb_len ( pkb ) );
+		      "(packet is %d bytes)\n", hdrlen, iob_len ( iobuf ) );
 		goto err;
 	}
 	if ( ( csum = tcpip_chksum ( iphdr, hdrlen ) ) != 0 ) {
@@ -476,9 +476,9 @@ static int ipv4_rx ( struct pk_buff *pkb, struct net_device *netdev __unused,
 		      "(header is %d bytes)\n", len, hdrlen );
 		goto err;
 	}
-	if ( len > pkb_len ( pkb ) ) {
+	if ( len > iob_len ( iobuf ) ) {
 		DBG ( "IPv4 length too long at %d bytes "
-		      "(packet is %d bytes)\n", len, pkb_len ( pkb ) );
+		      "(packet is %d bytes)\n", len, iob_len ( iobuf ) );
 		goto err;
 	}
 
@@ -491,18 +491,18 @@ static int ipv4_rx ( struct pk_buff *pkb, struct net_device *netdev __unused,
 	/* Truncate packet to correct length, calculate pseudo-header
 	 * checksum and then strip off the IPv4 header.
 	 */
-	pkb_unput ( pkb, ( pkb_len ( pkb ) - len ) );
-	pshdr_csum = ipv4_pshdr_chksum ( pkb, TCPIP_EMPTY_CSUM );
-	pkb_pull ( pkb, hdrlen );
+	iob_unput ( iobuf, ( iob_len ( iobuf ) - len ) );
+	pshdr_csum = ipv4_pshdr_chksum ( iobuf, TCPIP_EMPTY_CSUM );
+	iob_pull ( iobuf, hdrlen );
 
 	/* Fragment reassembly */
 	if ( ( iphdr->frags & htons ( IP_MASK_MOREFRAGS ) ) || 
 	     ( ( iphdr->frags & htons ( IP_MASK_OFFSET ) ) != 0 ) ) {
 		/* Pass the fragment to ipv4_reassemble() which either
-		 * returns a fully reassembled packet buffer or NULL.
+		 * returns a fully reassembled I/O buffer or NULL.
 		 */
-		pkb = ipv4_reassemble ( pkb );
-		if ( ! pkb )
+		iobuf = ipv4_reassemble ( iobuf );
+		if ( ! iobuf )
 			return 0;
 	}
 
@@ -513,7 +513,7 @@ static int ipv4_rx ( struct pk_buff *pkb, struct net_device *netdev __unused,
 	memset ( &dest, 0, sizeof ( dest ) );
 	dest.sin.sin_family = AF_INET;
 	dest.sin.sin_addr = iphdr->dest;
-	if ( ( rc = tcpip_rx ( pkb, iphdr->protocol, &src.st,
+	if ( ( rc = tcpip_rx ( iobuf, iphdr->protocol, &src.st,
 			       &dest.st, pshdr_csum ) ) != 0 ) {
 		DBG ( "IPv4 received packet rejected by stack: %s\n",
 		      strerror ( rc ) );
@@ -523,7 +523,7 @@ static int ipv4_rx ( struct pk_buff *pkb, struct net_device *netdev __unused,
 	return 0;
 
  err:
-	free_pkb ( pkb );
+	free_iob ( iobuf );
 	return -EINVAL;
 }
 

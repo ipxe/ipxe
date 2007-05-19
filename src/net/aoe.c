@@ -25,7 +25,7 @@
 #include <gpxe/list.h>
 #include <gpxe/if_ether.h>
 #include <gpxe/ethernet.h>
-#include <gpxe/pkbuff.h>
+#include <gpxe/iobuf.h>
 #include <gpxe/uaccess.h>
 #include <gpxe/ata.h>
 #include <gpxe/netdevice.h>
@@ -70,7 +70,7 @@ static void aoe_done ( struct aoe_session *aoe, int rc ) {
  */
 static int aoe_send_command ( struct aoe_session *aoe ) {
 	struct ata_command *command = aoe->command;
-	struct pk_buff *pkb;
+	struct io_buffer *iobuf;
 	struct aoehdr *aoehdr;
 	struct aoecmd *aoecmd;
 	unsigned int count;
@@ -88,14 +88,14 @@ static int aoe_send_command ( struct aoe_session *aoe ) {
 		count = AOE_MAX_COUNT;
 	data_out_len = ( command->data_out ? ( count * ATA_SECTOR_SIZE ) : 0 );
 
-	/* Create outgoing packet buffer */
-	pkb = alloc_pkb ( ETH_HLEN + sizeof ( *aoehdr ) + sizeof ( *aoecmd ) +
+	/* Create outgoing I/O buffer */
+	iobuf = alloc_iob ( ETH_HLEN + sizeof ( *aoehdr ) + sizeof ( *aoecmd ) +
 			  data_out_len );
-	if ( ! pkb )
+	if ( ! iobuf )
 		return -ENOMEM;
-	pkb_reserve ( pkb, ETH_HLEN );
-	aoehdr = pkb_put ( pkb, sizeof ( *aoehdr ) );
-	aoecmd = pkb_put ( pkb, sizeof ( *aoecmd ) );
+	iob_reserve ( iobuf, ETH_HLEN );
+	aoehdr = iob_put ( iobuf, sizeof ( *aoehdr ) );
+	aoecmd = iob_put ( iobuf, sizeof ( *aoecmd ) );
 	memset ( aoehdr, 0, ( sizeof ( *aoehdr ) + sizeof ( *aoecmd ) ) );
 
 	/* Fill AoE header */
@@ -117,12 +117,12 @@ static int aoe_send_command ( struct aoe_session *aoe ) {
 		aoecmd->lba.bytes[3] |= ( command->cb.device & ATA_DEV_MASK );
 
 	/* Fill data payload */
-	copy_from_user ( pkb_put ( pkb, data_out_len ), command->data_out,
+	copy_from_user ( iob_put ( iobuf, data_out_len ), command->data_out,
 			 aoe->command_offset, data_out_len );
 
 	/* Send packet */
 	start_timer ( &aoe->timer );
-	return net_tx ( pkb, aoe->netdev, &aoe_protocol, aoe->target );
+	return net_tx ( iobuf, aoe->netdev, &aoe_protocol, aoe->target );
 }
 
 /**
@@ -213,16 +213,16 @@ static int aoe_rx_response ( struct aoe_session *aoe, struct aoehdr *aoehdr,
 /**
  * Process incoming AoE packets
  *
- * @v pkb		Packet buffer
+ * @v iobuf		I/O buffer
  * @v netdev		Network device
  * @v ll_source		Link-layer source address
  * @ret rc		Return status code
  *
  */
-static int aoe_rx ( struct pk_buff *pkb, struct net_device *netdev __unused,
+static int aoe_rx ( struct io_buffer *iobuf, struct net_device *netdev __unused,
 		    const void *ll_source ) {
-	struct aoehdr *aoehdr = pkb->data;
-	unsigned int len = pkb_len ( pkb );
+	struct aoehdr *aoehdr = iobuf->data;
+	unsigned int len = iob_len ( iobuf );
 	struct aoe_session *aoe;
 	int rc = 0;
 
@@ -254,7 +254,7 @@ static int aoe_rx ( struct pk_buff *pkb, struct net_device *netdev __unused,
 	}
 
  done:
-	free_pkb ( pkb );
+	free_iob ( iobuf );
 	return rc;
 }
 

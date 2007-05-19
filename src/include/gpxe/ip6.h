@@ -16,12 +16,12 @@
 #define IP6_HOP_LIMIT	255
 
 /**
- * Packet buffer contents
- * This is duplicated in tcp.h and here. Ideally it should go into pkbuff.h
+ * I/O buffer contents
+ * This is duplicated in tcp.h and here. Ideally it should go into iobuf.h
  */
 #define MAX_HDR_LEN	100
-#define MAX_PKB_LEN	1500
-#define MIN_PKB_LEN	MAX_HDR_LEN + 100 /* To account for padding by LL */
+#define MAX_IOB_LEN	1500
+#define MIN_IOB_LEN	MAX_HDR_LEN + 100 /* To account for padding by LL */
 
 #define IP6_EQUAL( in6_addr1, in6_addr2 ) \
         ( strncmp ( ( char* ) &( in6_addr1 ), ( char* ) &( in6_addr2 ),\
@@ -61,7 +61,7 @@ struct ipv6_pseudo_header {
 #define IP6_ICMP6		0x58
 #define IP6_NO_HEADER		0x59
 
-struct pk_buff;
+struct io_buffer;
 struct net_device;
 struct net_protocol;
 

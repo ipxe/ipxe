@@ -3,7 +3,7 @@
 #include <byteswap.h>
 #include <errno.h>
 #include <gpxe/if_ether.h>
-#include <gpxe/pkbuff.h>
+#include <gpxe/iobuf.h>
 #include <gpxe/ndp.h>
 #include <gpxe/icmp6.h>
 #include <gpxe/ip6.h>
@@ -143,18 +143,18 @@ int ndp_resolve ( struct net_device *netdev, struct in6_addr *dest,
 /**
  * Process neighbour advertisement
  *
- * @v pkb	Packet buffer
+ * @v iobuf	I/O buffer
  * @v st_src	Source address
  * @v st_dest	Destination address 
  */
-int ndp_process_advert ( struct pk_buff *pkb, struct sockaddr_tcpip *st_src __unused,
+int ndp_process_advert ( struct io_buffer *iobuf, struct sockaddr_tcpip *st_src __unused,
 			   struct sockaddr_tcpip *st_dest __unused ) {
-	struct neighbour_advert *nadvert = pkb->data;
+	struct neighbour_advert *nadvert = iobuf->data;
 	struct ndp_entry *ndp;
 
 	/* Sanity check */
-	if ( pkb_len ( pkb ) < sizeof ( *nadvert ) ) {
-		DBG ( "Packet too short (%d bytes)\n", pkb_len ( pkb ) );
+	if ( iob_len ( iobuf ) < sizeof ( *nadvert ) ) {
+		DBG ( "Packet too short (%d bytes)\n", iob_len ( iobuf ) );
 		return -EINVAL;
 	}
 

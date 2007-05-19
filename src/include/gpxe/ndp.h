@@ -6,7 +6,7 @@
 #include <gpxe/ip6.h>
 #include <gpxe/in.h>
 #include <gpxe/netdevice.h>
-#include <gpxe/pkbuff.h>
+#include <gpxe/iobuf.h>
 #include <gpxe/tcpip.h>
 
 #define NDP_STATE_INVALID 0
@@ -19,5 +19,5 @@
 static struct ndp_entry * ndp_find_entry ( struct in6_addr *in6 );
 int ndp_resolve ( struct net_device *netdev, struct in6_addr *src,
 		  struct in6_addr *dest, void *dest_ll_addr );
-int ndp_process_advert ( struct pk_buff *pkb, struct sockaddr_tcpip *st_src,
+int ndp_process_advert ( struct io_buffer *iobuf, struct sockaddr_tcpip *st_src,
 			 struct sockaddr_tcpip *st_dest );

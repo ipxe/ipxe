@@ -11,7 +11,7 @@
 #include <gpxe/icmp6.h>
 #include <gpxe/tcpip.h>
 #include <gpxe/socket.h>
-#include <gpxe/pkbuff.h>
+#include <gpxe/iobuf.h>
 #include <gpxe/netdevice.h>
 #include <gpxe/if_ether.h>
 
@@ -157,21 +157,21 @@ void del_ipv6_address ( struct net_device *netdev ) {
 /**
  * Calculate TCPIP checksum
  *
- * @v pkb	Packet buffer
+ * @v iobuf	I/O buffer
  * @v tcpip	TCP/IP protocol
  *
  * This function constructs the pseudo header and completes the checksum in the
  * upper layer header.
  */
-static uint16_t ipv6_tx_csum ( struct pk_buff *pkb, uint16_t csum ) {
-	struct ip6_header *ip6hdr = pkb->data;
+static uint16_t ipv6_tx_csum ( struct io_buffer *iobuf, uint16_t csum ) {
+	struct ip6_header *ip6hdr = iobuf->data;
 	struct ipv6_pseudo_header pshdr;
 
 	/* Calculate pseudo header */
 	memset ( &pshdr, 0, sizeof ( pshdr ) );
 	pshdr.src = ip6hdr->src;
 	pshdr.dest = ip6hdr->dest;
-	pshdr.len = htons ( pkb_len ( pkb ) - sizeof ( *ip6hdr ) );
+	pshdr.len = htons ( iob_len ( iobuf ) - sizeof ( *ip6hdr ) );
 	pshdr.nxt_hdr = ip6hdr->nxt_hdr;
 
 	/* Update checksum value */
@@ -192,13 +192,13 @@ void ipv6_dump ( struct ip6_header *ip6hdr ) {
 /**
  * Transmit IP6 packet
  *
- * pkb		Packet buffer
+ * iobuf		I/O buffer
  * tcpip	TCP/IP protocol
  * st_dest	Destination socket address
  *
  * This function prepends the IPv6 headers to the payload an transmits it.
  */
-static int ipv6_tx ( struct pk_buff *pkb,
+static int ipv6_tx ( struct io_buffer *iobuf,
 		     struct tcpip_protocol *tcpip,
 		     struct sockaddr_tcpip *st_dest,
 		     struct net_device *netdev,
@@ -211,10 +211,10 @@ static int ipv6_tx ( struct pk_buff *pkb,
 	int rc;
 
 	/* Construct the IPv6 packet */
-	struct ip6_header *ip6hdr = pkb_push ( pkb, sizeof ( *ip6hdr ) );
+	struct ip6_header *ip6hdr = iob_push ( iobuf, sizeof ( *ip6hdr ) );
 	memset ( ip6hdr, 0, sizeof ( *ip6hdr) );
 	ip6hdr->ver_traffic_class_flow_label = htonl ( 0x60000000 );//IP6_VERSION;
-	ip6hdr->payload_len = htons ( pkb_len ( pkb ) - sizeof ( *ip6hdr ) );
+	ip6hdr->payload_len = htons ( iob_len ( iobuf ) - sizeof ( *ip6hdr ) );
 	ip6hdr->nxt_hdr = tcpip->tcpip_proto;
 	ip6hdr->hop_limit = IP6_HOP_LIMIT; // 255
 
@@ -244,7 +244,7 @@ static int ipv6_tx ( struct pk_buff *pkb,
 
 	/* Complete the transport layer checksum */
 	if ( trans_csum )
-		*trans_csum = ipv6_tx_csum ( pkb, *trans_csum );
+		*trans_csum = ipv6_tx_csum ( iobuf, *trans_csum );
 
 	/* Print IPv6 header */
 	ipv6_dump ( ip6hdr );
@@ -267,24 +267,24 @@ static int ipv6_tx ( struct pk_buff *pkb,
 	}
 
 	/* Transmit packet */
-	return net_tx ( pkb, netdev, &ipv6_protocol, ll_dest );
+	return net_tx ( iobuf, netdev, &ipv6_protocol, ll_dest );
 
   err:
-	free_pkb ( pkb );
+	free_iob ( iobuf );
 	return rc;
 }
 
 /**
  * Process next IP6 header
  *
- * @v pkb	Packet buffer
+ * @v iobuf	I/O buffer
  * @v nxt_hdr	Next header number
  * @v src	Source socket address
  * @v dest	Destination socket address
  *
  * Refer http://www.iana.org/assignments/ipv6-parameters for the numbers
  */
-static int ipv6_process_nxt_hdr ( struct pk_buff *pkb, uint8_t nxt_hdr,
+static int ipv6_process_nxt_hdr ( struct io_buffer *iobuf, uint8_t nxt_hdr,
 		struct sockaddr_tcpip *src, struct sockaddr_tcpip *dest ) {
 	switch ( nxt_hdr ) {
 	case IP6_HOPBYHOP: 
@@ -302,31 +302,31 @@ static int ipv6_process_nxt_hdr ( struct pk_buff *pkb, uint8_t nxt_hdr,
 		return 0;
 	}
 	/* Next header is not a IPv6 extension header */
-	return tcpip_rx ( pkb, nxt_hdr, src, dest, 0 /* fixme */ );
+	return tcpip_rx ( iobuf, nxt_hdr, src, dest, 0 /* fixme */ );
 }
 
 /**
  * Process incoming IP6 packets
  *
- * @v pkb		Packet buffer
+ * @v iobuf		I/O buffer
  * @v netdev		Network device
  * @v ll_source		Link-layer source address
  *
  * This function processes a IPv6 packet
  */
-static int ipv6_rx ( struct pk_buff *pkb,
+static int ipv6_rx ( struct io_buffer *iobuf,
 		     struct net_device *netdev,
 		     const void *ll_source ) {
 
-	struct ip6_header *ip6hdr = pkb->data;
+	struct ip6_header *ip6hdr = iobuf->data;
 	union {
 		struct sockaddr_in6 sin6;
 		struct sockaddr_tcpip st;
 	} src, dest;
 
 	/* Sanity check */
-	if ( pkb_len ( pkb ) < sizeof ( *ip6hdr ) ) {
-		DBG ( "Packet too short (%d bytes)\n", pkb_len ( pkb ) );
+	if ( iob_len ( iobuf ) < sizeof ( *ip6hdr ) ) {
+		DBG ( "Packet too short (%d bytes)\n", iob_len ( iobuf ) );
 		goto drop;
 	}
 
@@ -342,7 +342,7 @@ static int ipv6_rx ( struct pk_buff *pkb,
 	}
 
 	/* Check the payload length */
-	if ( ntohs ( ip6hdr->payload_len ) > pkb_len ( pkb ) ) {
+	if ( ntohs ( ip6hdr->payload_len ) > iob_len ( iobuf ) ) {
 		DBG ( "Inconsistent packet length (%d bytes)\n",
 			ip6hdr->payload_len );
 		goto drop;
@@ -359,16 +359,16 @@ static int ipv6_rx ( struct pk_buff *pkb,
 	dest.sin6.sin6_addr = ip6hdr->dest;
 
 	/* Strip header */
-	pkb_unput ( pkb, pkb_len ( pkb ) - ntohs ( ip6hdr->payload_len ) -
+	iob_unput ( iobuf, iob_len ( iobuf ) - ntohs ( ip6hdr->payload_len ) -
 							sizeof ( *ip6hdr ) );
-	pkb_pull ( pkb, sizeof ( *ip6hdr ) );
+	iob_pull ( iobuf, sizeof ( *ip6hdr ) );
 
 	/* Send it to the transport layer */
-	return ipv6_process_nxt_hdr ( pkb, ip6hdr->nxt_hdr, &src.st, &dest.st );
+	return ipv6_process_nxt_hdr ( iobuf, ip6hdr->nxt_hdr, &src.st, &dest.st );
 
   drop:
 	DBG ( "Packet dropped\n" );
-	free_pkb ( pkb );
+	free_iob ( iobuf );
 	return -1;
 }
 

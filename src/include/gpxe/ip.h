@@ -25,7 +25,7 @@
 #define IP_TOS		0
 #define IP_TTL		64
 
-#define IP_FRAG_PKB_SIZE	1500
+#define IP_FRAG_IOB_SIZE	1500
 #define IP_FRAG_TIMEOUT		50
 
 /* IP4 pseudo header */
@@ -63,15 +63,15 @@ struct frag_buffer {
 	struct in_addr src;
 	/* Destination network address */
 	struct in_addr dest;
-	/* Reassembled packet buffer */
-	struct pk_buff *frag_pkb;
+	/* Reassembled I/O buffer */
+	struct io_buffer *frag_iob;
 	/* Reassembly timer */
 	struct retry_timer frag_timer;
 	/* List of fragment reassembly buffers */
 	struct list_head list;
 };
 
-struct pk_buff;
+struct io_buffer;
 struct net_device;
 struct net_protocol;
 struct tcpip_protocol;

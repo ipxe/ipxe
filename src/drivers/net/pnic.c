@@ -19,7 +19,7 @@ Bochs Pseudo NIC driver for Etherboot
 #include <gpxe/pci.h>
 #include <gpxe/if_ether.h>
 #include <gpxe/ethernet.h>
-#include <gpxe/pkbuff.h>
+#include <gpxe/iobuf.h>
 #include <gpxe/netdevice.h>
 
 #include "pnic_api.h"
@@ -114,7 +114,7 @@ POLL - Wait for a frame
 ***************************************************************************/
 static void pnic_poll ( struct net_device *netdev, unsigned int rx_quota ) {
 	struct pnic *pnic = netdev->priv;
-	struct pk_buff *pkb;
+	struct io_buffer *iobuf;
 	uint16_t length;
 	uint16_t qlen;
 
@@ -126,19 +126,19 @@ static void pnic_poll ( struct net_device *netdev, unsigned int rx_quota ) {
 			break;
 		if ( qlen == 0 )
 			break;
-		pkb = alloc_pkb ( ETH_FRAME_LEN );
-		if ( ! pkb ) {
+		iobuf = alloc_iob ( ETH_FRAME_LEN );
+		if ( ! iobuf ) {
 			printf ( "could not allocate buffer\n" );
 			break;
 		}
 		if ( pnic_command ( pnic, PNIC_CMD_RECV, NULL, 0,
-				    pkb->data, ETH_FRAME_LEN, &length )
+				    iobuf->data, ETH_FRAME_LEN, &length )
 		     != PNIC_STATUS_OK ) {
-			free_pkb ( pkb );
+			free_iob ( iobuf );
 			break;
 		}
-		pkb_put ( pkb, length );
-		netdev_rx ( netdev, pkb );
+		iob_put ( iobuf, length );
+		netdev_rx ( netdev, iobuf );
 		--rx_quota;
 	}
 }
@@ -146,17 +146,17 @@ static void pnic_poll ( struct net_device *netdev, unsigned int rx_quota ) {
 /**************************************************************************
 TRANSMIT - Transmit a frame
 ***************************************************************************/
-static int pnic_transmit ( struct net_device *netdev, struct pk_buff *pkb ) {
+static int pnic_transmit ( struct net_device *netdev, struct io_buffer *iobuf ) {
 	struct pnic *pnic = netdev->priv;
 
 	/* Pad the packet */
-	pkb_pad ( pkb, ETH_ZLEN );
+	iob_pad ( iobuf, ETH_ZLEN );
 
 	/* Send packet */
-	pnic_command ( pnic, PNIC_CMD_XMIT, pkb->data, pkb_len ( pkb ),
+	pnic_command ( pnic, PNIC_CMD_XMIT, iobuf->data, iob_len ( iobuf ),
 		       NULL, 0, NULL );
 
-	netdev_tx_complete ( netdev, pkb );
+	netdev_tx_complete ( netdev, iobuf );
 	return 0;
 }
 

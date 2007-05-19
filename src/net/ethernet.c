@@ -25,7 +25,7 @@
 #include <gpxe/if_arp.h>
 #include <gpxe/if_ether.h>
 #include <gpxe/netdevice.h>
-#include <gpxe/pkbuff.h>
+#include <gpxe/iobuf.h>
 #include <gpxe/ethernet.h>
 
 /** @file
@@ -40,16 +40,16 @@ static uint8_t eth_broadcast[ETH_ALEN] = { 0xff, 0xff, 0xff, 0xff, 0xff, 0xff};
 /**
  * Transmit Ethernet packet
  *
- * @v pkb		Packet buffer
+ * @v iobuf		I/O buffer
  * @v netdev		Network device
  * @v net_protocol	Network-layer protocol
  * @v ll_dest		Link-layer destination address
  *
  * Prepends the Ethernet link-layer header and transmits the packet.
  */
-static int eth_tx ( struct pk_buff *pkb, struct net_device *netdev,
+static int eth_tx ( struct io_buffer *iobuf, struct net_device *netdev,
 		    struct net_protocol *net_protocol, const void *ll_dest ) {
-	struct ethhdr *ethhdr = pkb_push ( pkb, sizeof ( *ethhdr ) );
+	struct ethhdr *ethhdr = iob_push ( iobuf, sizeof ( *ethhdr ) );
 
 	/* Build Ethernet header */
 	memcpy ( ethhdr->h_dest, ll_dest, ETH_ALEN );
@@ -57,34 +57,34 @@ static int eth_tx ( struct pk_buff *pkb, struct net_device *netdev,
 	ethhdr->h_protocol = net_protocol->net_proto;
 
 	/* Hand off to network device */
-	return netdev_tx ( netdev, pkb );
+	return netdev_tx ( netdev, iobuf );
 }
 
 /**
  * Process received Ethernet packet
  *
- * @v pkb	Packet buffer
+ * @v iobuf	I/O buffer
  * @v netdev	Network device
  *
  * Strips off the Ethernet link-layer header and passes up to the
  * network-layer protocol.
  */
-static int eth_rx ( struct pk_buff *pkb, struct net_device *netdev ) {
-	struct ethhdr *ethhdr = pkb->data;
+static int eth_rx ( struct io_buffer *iobuf, struct net_device *netdev ) {
+	struct ethhdr *ethhdr = iobuf->data;
 
 	/* Sanity check */
-	if ( pkb_len ( pkb ) < sizeof ( *ethhdr ) ) {
+	if ( iob_len ( iobuf ) < sizeof ( *ethhdr ) ) {
 		DBG ( "Ethernet packet too short (%d bytes)\n",
-		      pkb_len ( pkb ) );
-		free_pkb ( pkb );
+		      iob_len ( iobuf ) );
+		free_iob ( iobuf );
 		return -EINVAL;
 	}
 
 	/* Strip off Ethernet header */
-	pkb_pull ( pkb, sizeof ( *ethhdr ) );
+	iob_pull ( iobuf, sizeof ( *ethhdr ) );
 
 	/* Hand off to network-layer protocol */
-	return net_rx ( pkb, netdev, ethhdr->h_protocol, ethhdr->h_source );
+	return net_rx ( iobuf, netdev, ethhdr->h_protocol, ethhdr->h_source );
 }
 
 /**

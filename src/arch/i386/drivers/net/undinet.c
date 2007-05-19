@@ -22,7 +22,7 @@
 #include <pic8259.h>
 #include <biosint.h>
 #include <pnpbios.h>
-#include <gpxe/pkbuff.h>
+#include <gpxe/iobuf.h>
 #include <gpxe/netdevice.h>
 #include <gpxe/if_ether.h>
 #include <gpxe/ethernet.h>
@@ -315,11 +315,11 @@ static int undinet_isr_triggered ( void ) {
  */
 
 /** Maximum length of a packet transmitted via the UNDI API */
-#define UNDI_PKB_LEN 1514
+#define UNDI_IOB_LEN 1514
 
-/** UNDI packet buffer */
-static char __data16_array ( undinet_pkb, [UNDI_PKB_LEN] );
-#define undinet_pkb __use_data16 ( undinet_pkb )
+/** UNDI I/O buffer */
+static char __data16_array ( undinet_iob, [UNDI_IOB_LEN] );
+#define undinet_iob __use_data16 ( undinet_iob )
 
 /** UNDI transmit buffer descriptor */
 static struct s_PXENV_UNDI_TBD __data16 ( undinet_tbd );
@@ -329,20 +329,20 @@ static struct s_PXENV_UNDI_TBD __data16 ( undinet_tbd );
  * Transmit packet
  *
  * @v netdev		Network device
- * @v pkb		Packet buffer
+ * @v iobuf		I/O buffer
  * @ret rc		Return status code
  */
 static int undinet_transmit ( struct net_device *netdev,
-			      struct pk_buff *pkb ) {
+			      struct io_buffer *iobuf ) {
 	struct undi_nic *undinic = netdev->priv;
 	struct s_PXENV_UNDI_TRANSMIT undi_transmit;
-	size_t len = pkb_len ( pkb );
+	size_t len = iob_len ( iobuf );
 	int rc;
 
-	/* Copy packet to UNDI packet buffer */
-	if ( len > sizeof ( undinet_pkb ) )
-		len = sizeof ( undinet_pkb );
-	memcpy ( &undinet_pkb, pkb->data, len );
+	/* Copy packet to UNDI I/O buffer */
+	if ( len > sizeof ( undinet_iob ) )
+		len = sizeof ( undinet_iob );
+	memcpy ( &undinet_iob, iobuf->data, len );
 
 	/* Create PXENV_UNDI_TRANSMIT data structure */
 	memset ( &undi_transmit, 0, sizeof ( undi_transmit ) );
@@ -357,7 +357,7 @@ static int undinet_transmit ( struct net_device *netdev,
 	undinet_tbd.ImmedLength = len;
 	undinet_tbd.Xmit.segment = rm_ds;
 	undinet_tbd.Xmit.offset 
-		= ( ( unsigned ) & __from_data16 ( undinet_pkb ) );
+		= ( ( unsigned ) & __from_data16 ( undinet_iob ) );
 
 	/* Issue PXE API call */
 	if ( ( rc = undinet_call ( undinic, PXENV_UNDI_TRANSMIT,
@@ -365,8 +365,8 @@ static int undinet_transmit ( struct net_device *netdev,
 				   sizeof ( undi_transmit ) ) ) != 0 )
 		goto done;
 
-	/* Free packet buffer */
-	netdev_tx_complete ( netdev, pkb );
+	/* Free I/O buffer */
+	netdev_tx_complete ( netdev, iobuf );
 
  done:
 	return rc;
@@ -397,7 +397,7 @@ static int undinet_transmit ( struct net_device *netdev,
 static void undinet_poll ( struct net_device *netdev, unsigned int rx_quota ) {
 	struct undi_nic *undinic = netdev->priv;
 	struct s_PXENV_UNDI_ISR undi_isr;
-	struct pk_buff *pkb = NULL;
+	struct io_buffer *iobuf = NULL;
 	size_t len;
 	size_t frag_len;
 	int rc;
@@ -448,26 +448,26 @@ static void undinet_poll ( struct net_device *netdev, unsigned int rx_quota ) {
 			/* Packet fragment received */
 			len = undi_isr.FrameLength;
 			frag_len = undi_isr.BufferLength;
-			if ( ! pkb )
-				pkb = alloc_pkb ( len );
-			if ( ! pkb ) {
+			if ( ! iobuf )
+				iobuf = alloc_iob ( len );
+			if ( ! iobuf ) {
 				DBGC ( undinic, "UNDINIC %p could not "
 				       "allocate %zd bytes for RX buffer\n",
 				       undinic, len );
 				/* Fragment will be dropped */
 				goto done;
 			}
-			if ( frag_len > pkb_tailroom ( pkb ) ) {
+			if ( frag_len > iob_tailroom ( iobuf ) ) {
 				DBGC ( undinic, "UNDINIC %p fragment too "
 				       "large\n", undinic );
-				frag_len = pkb_tailroom ( pkb );
+				frag_len = iob_tailroom ( iobuf );
 			}
-			copy_from_real ( pkb_put ( pkb, frag_len ),
+			copy_from_real ( iob_put ( iobuf, frag_len ),
 					 undi_isr.Frame.segment,
 					 undi_isr.Frame.offset, frag_len );
-			if ( pkb_len ( pkb ) == len ) {
-				netdev_rx ( netdev, pkb );
-				pkb = NULL;
+			if ( iob_len ( iobuf ) == len ) {
+				netdev_rx ( netdev, iobuf );
+				iobuf = NULL;
 				--rx_quota;
 			}
 			break;
@@ -486,10 +486,10 @@ static void undinet_poll ( struct net_device *netdev, unsigned int rx_quota ) {
 	}
 
  done:
-	if ( pkb ) {
+	if ( iobuf ) {
 		DBGC ( undinic, "UNDINIC %p returned incomplete packet\n",
 		       undinic );
-		netdev_rx ( netdev, pkb );
+		netdev_rx ( netdev, iobuf );
 	}
 }
 

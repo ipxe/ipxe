@@ -206,10 +206,10 @@ struct tcp_mss_option {
 /** Smallest port number on which a TCP connection can listen */
 #define TCP_MIN_PORT 1
 
-/* Some PKB constants */
+/* Some IOB constants */
 #define MAX_HDR_LEN	100
-#define MAX_PKB_LEN	1500
-#define MIN_PKB_LEN	MAX_HDR_LEN + 100 /* To account for padding by LL */
+#define MAX_IOB_LEN	1500
+#define MIN_IOB_LEN	MAX_HDR_LEN + 100 /* To account for padding by LL */
 
 /**
  * Maxmimum advertised TCP window size

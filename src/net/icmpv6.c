@@ -5,7 +5,7 @@
 #include <gpxe/in.h>
 #include <gpxe/ip6.h>
 #include <gpxe/if_ether.h>
-#include <gpxe/pkbuff.h>
+#include <gpxe/iobuf.h>
 #include <gpxe/ndp.h>
 #include <gpxe/icmp6.h>
 #include <gpxe/tcpip.h>
@@ -31,9 +31,9 @@ int icmp6_send_solicit ( struct net_device *netdev, struct in6_addr *src __unuse
 	} st_dest;
 	struct ll_protocol *ll_protocol = netdev->ll_protocol;
 	struct neighbour_solicit *nsolicit;
-	struct pk_buff *pkb = alloc_pkb ( sizeof ( *nsolicit ) + MIN_PKB_LEN );
-	pkb_reserve ( pkb, MAX_HDR_LEN );
-	nsolicit = pkb_put ( pkb, sizeof ( *nsolicit ) );
+	struct io_buffer *iobuf = alloc_iob ( sizeof ( *nsolicit ) + MIN_IOB_LEN );
+	iob_reserve ( iobuf, MAX_HDR_LEN );
+	nsolicit = iob_put ( iobuf, sizeof ( *nsolicit ) );
 
 	/* Fill up the headers */
 	memset ( nsolicit, 0, sizeof ( *nsolicit ) );
@@ -60,25 +60,25 @@ int icmp6_send_solicit ( struct net_device *netdev, struct in6_addr *src __unuse
 	st_dest.sin6.sin6_addr.in6_u.u6_addr8[13] = 0xff;
 	
 	/* Send packet over IP6 */
-	return tcpip_tx ( pkb, &icmp6_protocol, &st_dest.st,
+	return tcpip_tx ( iobuf, &icmp6_protocol, &st_dest.st,
 			  NULL, &nsolicit->csum );
 }
 
 /**
  * Process ICMP6 headers
  *
- * @v pkb	Packet buffer
+ * @v iobuf	I/O buffer
  * @v st_src	Source address
  * @v st_dest	Destination address
  */
-static int icmp6_rx ( struct pk_buff *pkb, struct sockaddr_tcpip *st_src,
+static int icmp6_rx ( struct io_buffer *iobuf, struct sockaddr_tcpip *st_src,
 		      struct sockaddr_tcpip *st_dest ) {
-	struct icmp6_header *icmp6hdr = pkb->data;
+	struct icmp6_header *icmp6hdr = iobuf->data;
 
 	/* Sanity check */
-	if ( pkb_len ( pkb ) < sizeof ( *icmp6hdr ) ) {
-		DBG ( "Packet too short (%d bytes)\n", pkb_len ( pkb ) );
-		free_pkb ( pkb );
+	if ( iob_len ( iobuf ) < sizeof ( *icmp6hdr ) ) {
+		DBG ( "Packet too short (%d bytes)\n", iob_len ( iobuf ) );
+		free_iob ( iobuf );
 		return -EINVAL;
 	}
 
@@ -87,7 +87,7 @@ static int icmp6_rx ( struct pk_buff *pkb, struct sockaddr_tcpip *st_src,
 	/* Process the ICMP header */
 	switch ( icmp6hdr->type ) {
 	case ICMP6_NADVERT:
-		return ndp_process_advert ( pkb, st_src, st_dest );
+		return ndp_process_advert ( iobuf, st_src, st_dest );
 	}
 	return -ENOSYS;
 }
@@ -97,9 +97,9 @@ void icmp6_test_nadvert (struct net_device *netdev, struct sockaddr_in6 *server_
 
 		struct sockaddr_in6 server;
 		memcpy ( &server, server_p, sizeof ( server ) );
-                struct pk_buff *rxpkb = alloc_pkb ( 500 );
-                pkb_reserve ( rxpkb, MAX_HDR_LEN );
-                struct neighbour_advert *nadvert = pkb_put ( rxpkb, sizeof ( *nadvert ) );
+                struct io_buffer *rxiobuf = alloc_iob ( 500 );
+                iob_reserve ( rxiobuf, MAX_HDR_LEN );
+                struct neighbour_advert *nadvert = iob_put ( rxiobuf, sizeof ( *nadvert ) );
                 nadvert->type = 136;
                 nadvert->code = 0;
                 nadvert->flags = ICMP6_FLAGS_SOLICITED;
@@ -108,15 +108,15 @@ void icmp6_test_nadvert (struct net_device *netdev, struct sockaddr_in6 *server_
                 nadvert->opt_type = 2;
                 nadvert->opt_len = 1;
                 memcpy ( nadvert->opt_ll_addr, ll_addr, 6 );
-                struct ip6_header *ip6hdr = pkb_push ( rxpkb, sizeof ( *ip6hdr ) );
+                struct ip6_header *ip6hdr = iob_push ( rxiobuf, sizeof ( *ip6hdr ) );
                 ip6hdr->ver_traffic_class_flow_label = htonl ( 0x60000000 );
 		ip6hdr->hop_limit = 255;
 		ip6hdr->nxt_hdr = 58;
 		ip6hdr->payload_len = htons ( sizeof ( *nadvert ) );
                 ip6hdr->src = server.sin6_addr;
                 ip6hdr->dest = server.sin6_addr;
-		hex_dump ( rxpkb->data, pkb_len ( rxpkb ) );
-                net_rx ( rxpkb, netdev, htons ( ETH_P_IPV6 ), ll_addr );
+		hex_dump ( rxiobuf->data, iob_len ( rxiobuf ) );
+                net_rx ( rxiobuf, netdev, htons ( ETH_P_IPV6 ), ll_addr );
 }
 #endif
 

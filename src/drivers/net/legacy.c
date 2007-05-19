@@ -4,7 +4,7 @@
 #include <gpxe/if_ether.h>
 #include <gpxe/netdevice.h>
 #include <gpxe/ethernet.h>
-#include <gpxe/pkbuff.h>
+#include <gpxe/iobuf.h>
 #include <nic.h>
 
 /*
@@ -21,38 +21,38 @@ struct nic nic;
 
 static int legacy_registered = 0;
 
-static int legacy_transmit ( struct net_device *netdev, struct pk_buff *pkb ) {
+static int legacy_transmit ( struct net_device *netdev, struct io_buffer *iobuf ) {
 	struct nic *nic = netdev->priv;
-	struct ethhdr *ethhdr = pkb->data;
+	struct ethhdr *ethhdr = iobuf->data;
 
-	DBG ( "Transmitting %d bytes\n", pkb_len ( pkb ) );
-	pkb_pad ( pkb, ETH_ZLEN );
-	pkb_pull ( pkb, sizeof ( *ethhdr ) );
+	DBG ( "Transmitting %d bytes\n", iob_len ( iobuf ) );
+	iob_pad ( iobuf, ETH_ZLEN );
+	iob_pull ( iobuf, sizeof ( *ethhdr ) );
 	nic->nic_op->transmit ( nic, ( const char * ) ethhdr->h_dest,
 				ntohs ( ethhdr->h_protocol ),
-				pkb_len ( pkb ), pkb->data );
-	netdev_tx_complete ( netdev, pkb );
+				iob_len ( iobuf ), iobuf->data );
+	netdev_tx_complete ( netdev, iobuf );
 	return 0;
 }
 
 static void legacy_poll ( struct net_device *netdev, unsigned int rx_quota ) {
 	struct nic *nic = netdev->priv;
-	struct pk_buff *pkb;
+	struct io_buffer *iobuf;
 
 	if ( ! rx_quota )
 		return;
 
-	pkb = alloc_pkb ( ETH_FRAME_LEN );
-	if ( ! pkb )
+	iobuf = alloc_iob ( ETH_FRAME_LEN );
+	if ( ! iobuf )
 		return;
 
-	nic->packet = pkb->data;
+	nic->packet = iobuf->data;
 	if ( nic->nic_op->poll ( nic, 1 ) ) {
 		DBG ( "Received %d bytes\n", nic->packetlen );
-		pkb_put ( pkb, nic->packetlen );
-		netdev_rx ( netdev, pkb );
+		iob_put ( iobuf, nic->packetlen );
+		netdev_rx ( netdev, iobuf );
 	} else {
-		free_pkb ( pkb );
+		free_iob ( iobuf );
 	}
 }
 

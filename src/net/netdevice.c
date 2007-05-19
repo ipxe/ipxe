@@ -23,7 +23,7 @@
 #include <string.h>
 #include <errno.h>
 #include <gpxe/if_ether.h>
-#include <gpxe/pkbuff.h>
+#include <gpxe/iobuf.h>
 #include <gpxe/tables.h>
 #include <gpxe/process.h>
 #include <gpxe/init.h>
@@ -49,34 +49,34 @@ struct list_head net_devices = LIST_HEAD_INIT ( net_devices );
  * Transmit raw packet via network device
  *
  * @v netdev		Network device
- * @v pkb		Packet buffer
+ * @v iobuf		I/O buffer
  * @ret rc		Return status code
  *
  * Transmits the packet via the specified network device.  This
- * function takes ownership of the packet buffer.
+ * function takes ownership of the I/O buffer.
  */
-int netdev_tx ( struct net_device *netdev, struct pk_buff *pkb ) {
+int netdev_tx ( struct net_device *netdev, struct io_buffer *iobuf ) {
 	int rc;
 
 	DBGC ( netdev, "NETDEV %p transmitting %p (%p+%zx)\n",
-	       netdev, pkb, pkb->data, pkb_len ( pkb ) );
+	       netdev, iobuf, iobuf->data, iob_len ( iobuf ) );
 
-	list_add_tail ( &pkb->list, &netdev->tx_queue );
+	list_add_tail ( &iobuf->list, &netdev->tx_queue );
 
 	if ( ! ( netdev->state & NETDEV_OPEN ) ) {
 		rc = -ENETUNREACH;
 		goto err;
 	}
 		
-	if ( ( rc = netdev->transmit ( netdev, pkb ) ) != 0 )
+	if ( ( rc = netdev->transmit ( netdev, iobuf ) ) != 0 )
 		goto err;
 
 	return 0;
 
  err:
 	DBGC ( netdev, "NETDEV %p transmission %p failed: %s\n",
-	       netdev, pkb, strerror ( rc ) );
-	netdev_tx_complete ( netdev, pkb );
+	       netdev, iobuf, strerror ( rc ) );
+	netdev_tx_complete ( netdev, iobuf );
 	return rc;
 }
 
@@ -84,19 +84,19 @@ int netdev_tx ( struct net_device *netdev, struct pk_buff *pkb ) {
  * Complete network transmission
  *
  * @v netdev		Network device
- * @v pkb		Packet buffer
+ * @v iobuf		I/O buffer
  *
  * The packet must currently be in the network device's TX queue.
  */
-void netdev_tx_complete ( struct net_device *netdev, struct pk_buff *pkb ) {
-	DBGC ( netdev, "NETDEV %p transmission %p complete\n", netdev, pkb );
+void netdev_tx_complete ( struct net_device *netdev, struct io_buffer *iobuf ) {
+	DBGC ( netdev, "NETDEV %p transmission %p complete\n", netdev, iobuf );
 
 	/* Catch data corruption as early as possible */
-	assert ( pkb->list.next != NULL );
-	assert ( pkb->list.prev != NULL );
+	assert ( iobuf->list.next != NULL );
+	assert ( iobuf->list.prev != NULL );
 
-	list_del ( &pkb->list );
-	free_pkb ( pkb );
+	list_del ( &iobuf->list );
+	free_iob ( iobuf );
 }
 
 /**
@@ -107,10 +107,10 @@ void netdev_tx_complete ( struct net_device *netdev, struct pk_buff *pkb ) {
  * Completes the oldest outstanding packet in the TX queue.
  */
 void netdev_tx_complete_next ( struct net_device *netdev ) {
-	struct pk_buff *pkb;
+	struct io_buffer *iobuf;
 
-	list_for_each_entry ( pkb, &netdev->tx_queue, list ) {
-		netdev_tx_complete ( netdev, pkb );
+	list_for_each_entry ( iobuf, &netdev->tx_queue, list ) {
+		netdev_tx_complete ( netdev, iobuf );
 		return;
 	}
 }
@@ -119,15 +119,15 @@ void netdev_tx_complete_next ( struct net_device *netdev ) {
  * Add packet to receive queue
  *
  * @v netdev		Network device
- * @v pkb		Packet buffer
+ * @v iobuf		I/O buffer
  *
  * The packet is added to the network device's RX queue.  This
- * function takes ownership of the packet buffer.
+ * function takes ownership of the I/O buffer.
  */
-void netdev_rx ( struct net_device *netdev, struct pk_buff *pkb ) {
+void netdev_rx ( struct net_device *netdev, struct io_buffer *iobuf ) {
 	DBGC ( netdev, "NETDEV %p received %p (%p+%zx)\n",
-	       netdev, pkb, pkb->data, pkb_len ( pkb ) );
-	list_add_tail ( &pkb->list, &netdev->rx_queue );
+	       netdev, iobuf, iobuf->data, iob_len ( iobuf ) );
+	list_add_tail ( &iobuf->list, &netdev->rx_queue );
 }
 
 /**
@@ -153,17 +153,17 @@ int netdev_poll ( struct net_device *netdev, unsigned int rx_quota ) {
  * Remove packet from device's receive queue
  *
  * @v netdev		Network device
- * @ret pkb		Packet buffer, or NULL
+ * @ret iobuf		I/O buffer, or NULL
  *
  * Removes the first packet from the device's RX queue and returns it.
  * Ownership of the packet is transferred to the caller.
  */
-struct pk_buff * netdev_rx_dequeue ( struct net_device *netdev ) {
-	struct pk_buff *pkb;
+struct io_buffer * netdev_rx_dequeue ( struct net_device *netdev ) {
+	struct io_buffer *iobuf;
 
-	list_for_each_entry ( pkb, &netdev->rx_queue, list ) {
-		list_del ( &pkb->list );
-		return pkb;
+	list_for_each_entry ( iobuf, &netdev->rx_queue, list ) {
+		list_del ( &iobuf->list );
+		return iobuf;
 	}
 	return NULL;
 }
@@ -247,7 +247,7 @@ int netdev_open ( struct net_device *netdev ) {
  * @v netdev		Network device
  */
 void netdev_close ( struct net_device *netdev ) {
-	struct pk_buff *pkb;
+	struct io_buffer *iobuf;
 
 	/* Do nothing if device is already closed */
 	if ( ! ( netdev->state & NETDEV_OPEN ) )
@@ -264,10 +264,10 @@ void netdev_close ( struct net_device *netdev ) {
 	}
 
 	/* Discard any packets in the RX queue */
-	while ( ( pkb = netdev_rx_dequeue ( netdev ) ) ) {
+	while ( ( iobuf = netdev_rx_dequeue ( netdev ) ) ) {
 		DBGC ( netdev, "NETDEV %p discarding received %p\n",
-		       netdev, pkb );
-		free_pkb ( pkb );
+		       netdev, iobuf );
+		free_iob ( iobuf );
 	}
 
 	/* Mark as closed */
@@ -341,31 +341,31 @@ struct net_device * find_pci_netdev ( unsigned int busdevfn ) {
 /**
  * Transmit network-layer packet
  *
- * @v pkb		Packet buffer
+ * @v iobuf		I/O buffer
  * @v netdev		Network device
  * @v net_protocol	Network-layer protocol
  * @v ll_dest		Destination link-layer address
  * @ret rc		Return status code
  *
- * Prepends link-layer headers to the packet buffer and transmits the
+ * Prepends link-layer headers to the I/O buffer and transmits the
  * packet via the specified network device.  This function takes
- * ownership of the packet buffer.
+ * ownership of the I/O buffer.
  */
-int net_tx ( struct pk_buff *pkb, struct net_device *netdev,
+int net_tx ( struct io_buffer *iobuf, struct net_device *netdev,
 	     struct net_protocol *net_protocol, const void *ll_dest ) {
-	return netdev->ll_protocol->tx ( pkb, netdev, net_protocol, ll_dest );
+	return netdev->ll_protocol->tx ( iobuf, netdev, net_protocol, ll_dest );
 }
 
 /**
  * Process received network-layer packet
  *
- * @v pkb		Packet buffer
+ * @v iobuf		I/O buffer
  * @v netdev		Network device
  * @v net_proto		Network-layer protocol, in network-byte order
  * @v ll_source		Source link-layer address
  * @ret rc		Return status code
  */
-int net_rx ( struct pk_buff *pkb, struct net_device *netdev,
+int net_rx ( struct io_buffer *iobuf, struct net_device *netdev,
 	     uint16_t net_proto, const void *ll_source ) {
 	struct net_protocol *net_protocol;
 
@@ -373,10 +373,10 @@ int net_rx ( struct pk_buff *pkb, struct net_device *netdev,
 	for ( net_protocol = net_protocols ; net_protocol < net_protocols_end ;
 	      net_protocol++ ) {
 		if ( net_protocol->net_proto == net_proto ) {
-			return net_protocol->rx ( pkb, netdev, ll_source );
+			return net_protocol->rx ( iobuf, netdev, ll_source );
 		}
 	}
-	free_pkb ( pkb );
+	free_iob ( iobuf );
 	return 0;
 }
 
@@ -390,7 +390,7 @@ int net_rx ( struct pk_buff *pkb, struct net_device *netdev,
  */
 static void net_step ( struct process *process ) {
 	struct net_device *netdev;
-	struct pk_buff *pkb;
+	struct io_buffer *iobuf;
 
 	/* Poll and process each network device */
 	list_for_each_entry ( netdev, &net_devices, list ) {
@@ -404,10 +404,10 @@ static void net_step ( struct process *process ) {
 		 * that assumes that we can receive packets from the
 		 * NIC faster than they arrive.
 		 */
-		if ( ( pkb = netdev_rx_dequeue ( netdev ) ) ) {
+		if ( ( iobuf = netdev_rx_dequeue ( netdev ) ) ) {
 			DBGC ( netdev, "NETDEV %p processing %p\n",
-			       netdev, pkb );
-			netdev->ll_protocol->rx ( pkb, netdev );
+			       netdev, iobuf );
+			netdev->ll_protocol->rx ( iobuf, netdev );
 		}
 	}
 

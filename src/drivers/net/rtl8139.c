@@ -76,7 +76,7 @@
 #include <gpxe/pci.h>
 #include <gpxe/if_ether.h>
 #include <gpxe/ethernet.h>
-#include <gpxe/pkbuff.h>
+#include <gpxe/iobuf.h>
 #include <gpxe/netdevice.h>
 #include <gpxe/spi_bit.h>
 #include <gpxe/threewire.h>
@@ -86,7 +86,7 @@
 
 struct rtl8139_tx {
 	unsigned int next;
-	struct pk_buff *pkb[TX_RING_SIZE];
+	struct io_buffer *iobuf[TX_RING_SIZE];
 };
 
 struct rtl8139_rx {
@@ -363,28 +363,28 @@ static void rtl_close ( struct net_device *netdev ) {
  * Transmit packet
  *
  * @v netdev	Network device
- * @v pkb	Packet buffer
+ * @v iobuf	I/O buffer
  * @ret rc	Return status code
  */
-static int rtl_transmit ( struct net_device *netdev, struct pk_buff *pkb ) {
+static int rtl_transmit ( struct net_device *netdev, struct io_buffer *iobuf ) {
 	struct rtl8139_nic *rtl = netdev->priv;
 
 	/* Check for space in TX ring */
-	if ( rtl->tx.pkb[rtl->tx.next] != NULL ) {
+	if ( rtl->tx.iobuf[rtl->tx.next] != NULL ) {
 		printf ( "TX overflow\n" );
 		return -ENOBUFS;
 	}
 
 	/* Pad and align packet */
-	pkb_pad ( pkb, ETH_ZLEN );
+	iob_pad ( iobuf, ETH_ZLEN );
 
 	/* Add to TX ring */
 	DBG ( "TX id %d at %lx+%x\n", rtl->tx.next,
-	      virt_to_bus ( pkb->data ), pkb_len ( pkb ) );
-	rtl->tx.pkb[rtl->tx.next] = pkb;
-	outl ( virt_to_bus ( pkb->data ),
+	      virt_to_bus ( iobuf->data ), iob_len ( iobuf ) );
+	rtl->tx.iobuf[rtl->tx.next] = iobuf;
+	outl ( virt_to_bus ( iobuf->data ),
 	       rtl->ioaddr + TxAddr0 + 4 * rtl->tx.next );
-	outl ( ( ( ( TX_FIFO_THRESH & 0x7e0 ) << 11 ) | pkb_len ( pkb ) ),
+	outl ( ( ( ( TX_FIFO_THRESH & 0x7e0 ) << 11 ) | iob_len ( iobuf ) ),
 	       rtl->ioaddr + TxStatus0 + 4 * rtl->tx.next );
 	rtl->tx.next = ( rtl->tx.next + 1 ) % TX_RING_SIZE;
 
@@ -403,7 +403,7 @@ static void rtl_poll ( struct net_device *netdev, unsigned int rx_quota ) {
 	unsigned int tsad;
 	unsigned int rx_status;
 	unsigned int rx_len;
-	struct pk_buff *rx_pkb;
+	struct io_buffer *rx_iob;
 	int wrapped_len;
 	int i;
 
@@ -416,10 +416,10 @@ static void rtl_poll ( struct net_device *netdev, unsigned int rx_quota ) {
 	/* Handle TX completions */
 	tsad = inw ( rtl->ioaddr + TxSummary );
 	for ( i = 0 ; i < TX_RING_SIZE ; i++ ) {
-		if ( ( rtl->tx.pkb[i] != NULL ) && ( tsad & ( 1 << i ) ) ) {
+		if ( ( rtl->tx.iobuf[i] != NULL ) && ( tsad & ( 1 << i ) ) ) {
 			DBG ( "TX id %d complete\n", i );
-			netdev_tx_complete ( netdev, rtl->tx.pkb[i] );
-			rtl->tx.pkb[i] = NULL;
+			netdev_tx_complete ( netdev, rtl->tx.iobuf[i] );
+			rtl->tx.iobuf[i] = NULL;
 		}
 	}
 
@@ -433,8 +433,8 @@ static void rtl_poll ( struct net_device *netdev, unsigned int rx_quota ) {
 			DBG ( "RX packet at offset %x+%x\n", rtl->rx.offset,
 			      rx_len );
 
-			rx_pkb = alloc_pkb ( rx_len );
-			if ( ! rx_pkb ) {
+			rx_iob = alloc_iob ( rx_len );
+			if ( ! rx_iob ) {
 				/* Leave packet for next call to poll() */
 				break;
 			}
@@ -444,13 +444,13 @@ static void rtl_poll ( struct net_device *netdev, unsigned int rx_quota ) {
 			if ( wrapped_len < 0 )
 				wrapped_len = 0;
 
-			memcpy ( pkb_put ( rx_pkb, rx_len - wrapped_len ),
+			memcpy ( iob_put ( rx_iob, rx_len - wrapped_len ),
 				 rtl->rx.ring + rtl->rx.offset + 4,
 				 rx_len - wrapped_len );
-			memcpy ( pkb_put ( rx_pkb, wrapped_len ),
+			memcpy ( iob_put ( rx_iob, wrapped_len ),
 				 rtl->rx.ring, wrapped_len );
 
-			netdev_rx ( netdev, rx_pkb );
+			netdev_rx ( netdev, rx_iob );
 			rx_quota--;
 		} else {
 			DBG ( "RX bad packet (status %#04x len %d)\n",

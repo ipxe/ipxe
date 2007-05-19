@@ -22,7 +22,7 @@
 #include <errno.h>
 #include <gpxe/if_ether.h>
 #include <gpxe/if_arp.h>
-#include <gpxe/pkbuff.h>
+#include <gpxe/iobuf.h>
 #include <gpxe/netdevice.h>
 #include <gpxe/arp.h>
 
@@ -119,7 +119,7 @@ int arp_resolve ( struct net_device *netdev, struct net_protocol *net_protocol,
 		  void *dest_ll_addr ) {
 	struct ll_protocol *ll_protocol = netdev->ll_protocol;
 	const struct arp_entry *arp;
-	struct pk_buff *pkb;
+	struct io_buffer *iobuf;
 	struct arphdr *arphdr;
 	int rc;
 
@@ -136,30 +136,30 @@ int arp_resolve ( struct net_device *netdev, struct net_protocol *net_protocol,
 	      net_protocol->ntoa ( dest_net_addr ) );
 
 	/* Allocate ARP packet */
-	pkb = alloc_pkb ( MAX_LL_HEADER_LEN + sizeof ( *arphdr ) +
+	iobuf = alloc_iob ( MAX_LL_HEADER_LEN + sizeof ( *arphdr ) +
 			  2 * ( MAX_LL_ADDR_LEN + MAX_NET_ADDR_LEN ) );
-	if ( ! pkb )
+	if ( ! iobuf )
 		return -ENOMEM;
-	pkb_reserve ( pkb, MAX_LL_HEADER_LEN );
+	iob_reserve ( iobuf, MAX_LL_HEADER_LEN );
 
 	/* Build up ARP request */
-	arphdr = pkb_put ( pkb, sizeof ( *arphdr ) );
+	arphdr = iob_put ( iobuf, sizeof ( *arphdr ) );
 	arphdr->ar_hrd = ll_protocol->ll_proto;
 	arphdr->ar_hln = ll_protocol->ll_addr_len;
 	arphdr->ar_pro = net_protocol->net_proto;
 	arphdr->ar_pln = net_protocol->net_addr_len;
 	arphdr->ar_op = htons ( ARPOP_REQUEST );
-	memcpy ( pkb_put ( pkb, ll_protocol->ll_addr_len ),
+	memcpy ( iob_put ( iobuf, ll_protocol->ll_addr_len ),
 		 netdev->ll_addr, ll_protocol->ll_addr_len );
-	memcpy ( pkb_put ( pkb, net_protocol->net_addr_len ),
+	memcpy ( iob_put ( iobuf, net_protocol->net_addr_len ),
 		 source_net_addr, net_protocol->net_addr_len );
-	memset ( pkb_put ( pkb, ll_protocol->ll_addr_len ),
+	memset ( iob_put ( iobuf, ll_protocol->ll_addr_len ),
 		 0, ll_protocol->ll_addr_len );
-	memcpy ( pkb_put ( pkb, net_protocol->net_addr_len ),
+	memcpy ( iob_put ( iobuf, net_protocol->net_addr_len ),
 		 dest_net_addr, net_protocol->net_addr_len );
 
 	/* Transmit ARP request */
-	if ( ( rc = net_tx ( pkb, netdev, &arp_protocol, 
+	if ( ( rc = net_tx ( iobuf, netdev, &arp_protocol, 
 			     ll_protocol->ll_broadcast ) ) != 0 )
 		return rc;
 
@@ -188,7 +188,7 @@ static struct arp_net_protocol * arp_find_protocol ( uint16_t net_proto ) {
 /**
  * Process incoming ARP packets
  *
- * @v pkb		Packet buffer
+ * @v iobuf		I/O buffer
  * @v netdev		Network device
  * @v ll_source		Link-layer source address
  * @ret rc		Return status code
@@ -199,9 +199,9 @@ static struct arp_net_protocol * arp_find_protocol ( uint16_t net_proto ) {
  * avoiding the need for extraneous ARP requests; read the RFC for
  * details.
  */
-static int arp_rx ( struct pk_buff *pkb, struct net_device *netdev,
+static int arp_rx ( struct io_buffer *iobuf, struct net_device *netdev,
 		    const void *ll_source __unused ) {
-	struct arphdr *arphdr = pkb->data;
+	struct arphdr *arphdr = iobuf->data;
 	struct arp_net_protocol *arp_net_protocol;
 	struct net_protocol *net_protocol;
 	struct ll_protocol *ll_protocol;
@@ -265,11 +265,11 @@ static int arp_rx ( struct pk_buff *pkb, struct net_device *netdev,
 	memcpy ( arp_sender_ha ( arphdr ), netdev->ll_addr, arphdr->ar_hln );
 
 	/* Send reply */
-	net_tx ( pkb, netdev, &arp_protocol, arp_target_ha (arphdr ) );
-	pkb = NULL;
+	net_tx ( iobuf, netdev, &arp_protocol, arp_target_ha (arphdr ) );
+	iobuf = NULL;
 
  done:
-	free_pkb ( pkb );
+	free_iob ( iobuf );
 	return 0;
 }
 
