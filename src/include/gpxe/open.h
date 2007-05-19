@@ -63,10 +63,12 @@ struct socket_opener {
 	/** Open socket
 	 *
 	 * @v xfer		Data transfer interface
-	 * @v sa		Socket address
+	 * @v peer		Peer socket address
+	 * @v local		Local socket address, or NULL
 	 * @ret rc		Return status code
 	 */
-	int ( * open ) ( struct xfer_interface *xfer, struct sockaddr *sa );
+	int ( * open ) ( struct xfer_interface *xfer, struct sockaddr *peer,
+			 struct sockaddr *local );
 };
 
 /** Register a socket opener */
@@ -75,7 +77,8 @@ struct socket_opener {
 extern int xfer_open_uri ( struct xfer_interface *xfer,
 			   const char *uri_string );
 extern int xfer_open_socket ( struct xfer_interface *xfer,
-			      int domain, int type, struct sockaddr *sa );
+			      int domain, int type, struct sockaddr *peer,
+			      struct sockaddr *local );
 extern int xfer_vopen ( struct xfer_interface *xfer, int type, va_list args );
 extern int xfer_open ( struct xfer_interface *xfer, int type, ... );
 

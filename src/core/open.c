@@ -77,9 +77,13 @@ int xfer_open_uri ( struct xfer_interface *xfer, const char *uri_string ) {
  * @v xfer		Data transfer interface
  * @v domain		Communication domain (e.g. PF_INET)
  * @v type		Communication semantics (e.g. SOCK_STREAM)
+ * @v peer		Peer socket address
+ * @v local		Local socket address, or NULL
+ * @ret rc		Return status code
  */
 int xfer_open_socket ( struct xfer_interface *xfer,
-		       int domain, int type, struct sockaddr *sa ) {
+		       int domain, int type, struct sockaddr *peer,
+		       struct sockaddr *local ) {
 	struct socket_opener *opener;
 
 	DBGC ( xfer, "XFER %p opening (%s,%s) socket\n", xfer,
@@ -88,7 +92,7 @@ int xfer_open_socket ( struct xfer_interface *xfer,
 	for ( opener = socket_openers; opener < socket_openers_end; opener++ ){
 		if ( ( opener->domain == domain ) &&
 		     ( opener->type == type ) ) {
-			return opener->open ( xfer, sa );
+			return opener->open ( xfer, peer, local );
 		}
 	}
 
@@ -115,9 +119,10 @@ int xfer_vopen ( struct xfer_interface *xfer, int type, va_list args ) {
 	case LOCATION_SOCKET: {
 		int domain = va_arg ( args, int );
 		int type = va_arg ( args, int );
-		struct sockaddr *sa = va_arg ( args, struct sockaddr * );
+		struct sockaddr *peer = va_arg ( args, struct sockaddr * );
+		struct sockaddr *local = va_arg ( args, struct sockaddr * );
 
-		return xfer_open_socket ( xfer, domain, type, sa ); }
+		return xfer_open_socket ( xfer, domain, type, peer, local ); }
 	default:
 		DBGC ( xfer, "XFER %p attempted to open unsupported location "
 		       "type %d\n", xfer, type );
