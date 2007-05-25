@@ -78,6 +78,7 @@ static void posix_file_free ( struct refcnt *refcnt ) {
 	struct io_buffer *tmp;
 
 	list_for_each_entry_safe ( iobuf, tmp, &file->data, list ) {
+		list_del ( &iobuf->list );
 		free_iob ( iobuf );
 	}
 	free ( file );
@@ -279,8 +280,10 @@ ssize_t read_user ( int fd, userptr_t buffer, off_t offset, size_t max_len ) {
 			copy_to_user ( buffer, offset, iobuf->data,
 				       frag_len );
 			iob_pull ( iobuf, frag_len );
-			if ( ! iob_len ( iobuf ) )
+			if ( ! iob_len ( iobuf ) ) {
+				list_del ( &iobuf-> list );
 				free_iob ( iobuf );
+			}
 			file->pos += frag_len;
 			len += frag_len;
 			offset += frag_len;
