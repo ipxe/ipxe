@@ -253,8 +253,6 @@ struct tcp_mss_option {
  */
 #define TCP_MSL ( 2 * 60 * TICKS_PER_SEC )
 
-extern int tcp_open ( struct stream_application *app );
-
 extern struct tcpip_protocol tcp_protocol;
 
 #endif /* _GPXE_TCP_H */
