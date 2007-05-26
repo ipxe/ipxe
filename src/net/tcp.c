@@ -11,6 +11,7 @@
 #include <gpxe/refcnt.h>
 #include <gpxe/xfer.h>
 #include <gpxe/open.h>
+#include <gpxe/uri.h>
 #include <gpxe/tcpip.h>
 #include <gpxe/tcp.h>
 
@@ -962,15 +963,28 @@ static struct xfer_interface_operations tcp_xfer_operations = {
  ***************************************************************************
  */
 
-#warning "Placeholder URI opener"
+/** TCP socket opener */
+struct socket_opener tcp_socket_opener __socket_opener = {
+	.semantics	= SOCK_STREAM,
+	.family		= AF_INET,
+	.open		= tcp_open,
+};
+
+/**
+ * Open TCP URI
+ *
+ * @v xfer		Data transfer interface
+ * @v uri		URI
+ * @ret rc		Return status code
+ */
 static int tcp_open_uri ( struct xfer_interface *xfer, struct uri *uri ) {
-	struct sockaddr_in peer;
+	struct sockaddr_tcpip peer;
 
 	memset ( &peer, 0, sizeof ( peer ) );
-	peer.sin_family = AF_INET;
-	peer.sin_addr.s_addr = htonl ( 0x0afefe02 );
-	peer.sin_port = htons ( 12345 );
-	return tcp_open ( xfer, &peer, NULL );
+	peer.st_port = htons ( uri_port ( uri, 0 ) );
+	return xfer_open_named_socket ( xfer, SOCK_STREAM,
+					( struct sockaddr * ) &peer,
+					uri->host, NULL );
 }
 
 /** TCP URI opener */
@@ -979,9 +993,3 @@ struct uri_opener tcp_uri_opener __uri_opener = {
 	.open		= tcp_open_uri,
 };
 
-/** TCP socket opener */
-struct socket_opener tcp_socket_opener __socket_opener = {
-	.domain		= PF_INET,
-	.type		= SOCK_STREAM,
-	.open		= tcp_open,
-};
