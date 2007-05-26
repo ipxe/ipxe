@@ -26,7 +26,9 @@ enum {
 	 *
 	 * Parameter list for open() is:
 	 *
-	 * 
+	 * int semantics;
+	 * struct sockaddr *peer;
+	 * struct sockaddr *local;
 	 */
 	LOCATION_SOCKET,
 };
@@ -56,10 +58,10 @@ struct uri_opener {
 
 /** A socket opener */
 struct socket_opener {
-	/** Communication domain (e.g. PF_INET) */
-	int domain;
 	/** Communication semantics (e.g. SOCK_STREAM) */
-	int type;
+	int semantics;
+	/** Address family (e.g. AF_INET) */
+	int family;
 	/** Open socket
 	 *
 	 * @v xfer		Data transfer interface
@@ -76,9 +78,11 @@ struct socket_opener {
 
 extern int xfer_open_uri ( struct xfer_interface *xfer,
 			   const char *uri_string );
-extern int xfer_open_socket ( struct xfer_interface *xfer,
-			      int domain, int type, struct sockaddr *peer,
-			      struct sockaddr *local );
+extern int xfer_open_named_socket ( struct xfer_interface *xfer,
+				    int semantics, struct sockaddr *peer,
+				    const char *name, struct sockaddr *local );
+extern int xfer_open_socket ( struct xfer_interface *xfer, int semantics,
+			      struct sockaddr *peer, struct sockaddr *local );
 extern int xfer_vopen ( struct xfer_interface *xfer, int type, va_list args );
 extern int xfer_open ( struct xfer_interface *xfer, int type, ... );
 
