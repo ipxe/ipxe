@@ -210,7 +210,9 @@ static int tcp_open ( struct xfer_interface *xfer, struct sockaddr *peer,
 	DBGC ( tcp, "TCP %p allocated\n", tcp );
 	memset ( tcp, 0, sizeof ( *tcp ) );
 	xfer_init ( &tcp->xfer, &tcp_xfer_operations, &tcp->refcnt );
-	tcp->tcp_state = tcp->prev_tcp_state = TCP_CLOSED;
+	tcp->prev_tcp_state = TCP_CLOSED;
+	tcp->tcp_state = TCP_STATE_SENT ( TCP_SYN );
+	tcp_dump_state ( tcp );
 	tcp->snd_seq = random();
 	INIT_LIST_HEAD ( &tcp->queue );
 	tcp->timer.expired = tcp_expired;
@@ -220,6 +222,9 @@ static int tcp_open ( struct xfer_interface *xfer, struct sockaddr *peer,
 	bind_port = ( st_local ? st_local->st_port : 0 );
 	if ( ( rc = tcp_bind ( tcp, bind_port ) ) != 0 )
 		goto err;
+
+	/* Start timer to initiate SYN */
+	start_timer ( &tcp->timer );
 
 	/* Attach parent interface, transfer reference to connection
 	 * list and return
@@ -359,6 +364,10 @@ static int tcp_xmit ( struct tcp_connection *tcp, int force_send ) {
 	size_t seq_len;
 	size_t window;
 	int rc;
+
+	/* If retransmission timer is already running, do nothing */
+	if ( timer_running ( &tcp->timer ) )
+		return 0;
 
 	/* Calculate both the actual (payload) and sequence space
 	 * lengths that we wish to transmit.
@@ -870,19 +879,6 @@ struct tcpip_protocol tcp_protocol __tcpip_protocol = {
  */
 
 /**
- * Ensure TCP connection has started
- *
- * @v tcp		TCP connection
- */
-static void tcp_ensure_started ( struct tcp_connection *tcp ) {
-	if ( ! ( tcp->tcp_state & TCP_STATE_SENT ( TCP_SYN ) ) ) {
-		tcp->tcp_state = TCP_SYN_SENT;
-		tcp_dump_state ( tcp );
-		tcp_xmit ( tcp, 0 );
-	}
-}
-
-/**
  * Close interface
  *
  * @v xfer		Data transfer interface
@@ -900,27 +896,6 @@ static void tcp_xfer_close ( struct xfer_interface *xfer, int rc ) {
 }
 
 /**
- * Request data
- *
- * @v xfer		Data transfer interface
- * @v offset		Offset to new position
- * @v whence		Basis for new position
- * @v len		Length of requested data
- * @ret rc		Return status code
- */
-static int tcp_xfer_request ( struct xfer_interface *xfer,
-			      off_t offset __unused, int whence __unused,
-			      size_t len __unused ) {
-	struct tcp_connection *tcp =
-		container_of ( xfer, struct tcp_connection, xfer );
-
-	/* Ensure connection has been started */
-	tcp_ensure_started ( tcp );
-
-	return 0;
-}
-
-/**
  * Seek to position
  *
  * @v xfer		Data transfer interface
@@ -932,9 +907,6 @@ static int tcp_xfer_seek ( struct xfer_interface *xfer, off_t offset,
 			   int whence ) {
 	struct tcp_connection *tcp =
 		container_of ( xfer, struct tcp_connection, xfer );
-
-	/* Ensure connection has been started */
-	tcp_ensure_started ( tcp );
 
 	/* TCP doesn't support seeking to arbitrary positions */
 	if ( ( whence != SEEK_CUR ) || ( offset != 0 ) )
@@ -963,9 +935,6 @@ static int tcp_xfer_deliver_iob ( struct xfer_interface *xfer,
 	struct tcp_connection *tcp =
 		container_of ( xfer, struct tcp_connection, xfer );
 
-	/* Ensure connection has been started */
-	tcp_ensure_started ( tcp );
-
 	/* Enqueue packet */
 	list_add_tail ( &iobuf->list, &tcp->queue );
 
@@ -979,7 +948,7 @@ static int tcp_xfer_deliver_iob ( struct xfer_interface *xfer,
 static struct xfer_interface_operations tcp_xfer_operations = {
 	.close		= tcp_xfer_close,
 	.vredirect	= ignore_xfer_vredirect,
-	.request	= tcp_xfer_request,
+	.request	= ignore_xfer_request,
 	.seek		= tcp_xfer_seek,
 	.alloc_iob	= default_xfer_alloc_iob,
 	.deliver_iob	= tcp_xfer_deliver_iob,
