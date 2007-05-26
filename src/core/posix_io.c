@@ -191,6 +191,7 @@ static int posix_find_free_fd ( void ) {
 		if ( ! posix_fd_to_file ( fd ) )
 			return fd;
 	}
+	DBG ( "POSIX could not find free file descriptor\n" );
 	return -ENFILE;
 }
 
@@ -226,13 +227,11 @@ int open ( const char *uri_string ) {
 	if ( ( rc = xfer_open_uri ( &file->xfer, uri_string ) ) != 0 )
 		goto err;
 
-	/* Request data */
-	if ( ( rc = xfer_request_all ( &file->xfer ) ) != 0 )
-		goto err;
-
 	/* Wait for open to succeed or fail */
 	while ( list_empty ( &file->data ) ) {
 		step();
+		if ( file->rc == 0 )
+			break;
 		if ( file->rc != -EINPROGRESS ) {
 			rc = file->rc;
 			goto err;
@@ -241,6 +240,7 @@ int open ( const char *uri_string ) {
 
 	/* Add to list of open files.  List takes reference ownership. */
 	list_add ( &file->list, &posix_files );
+	DBG ( "POSIX opened %s as file %d\n", uri_string, fd );
 	return fd;
 
  err:

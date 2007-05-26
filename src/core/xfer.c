@@ -35,6 +35,8 @@
 void xfer_close ( struct xfer_interface *xfer, int rc ) {
 	struct xfer_interface *dest = xfer_get_dest ( xfer );
 
+	DBGC ( xfer, "XFER %p->%p close\n", xfer, dest );
+
 	dest->op->close ( dest, rc );
 	xfer_unplug ( xfer );
 	xfer_put ( dest );
@@ -52,7 +54,14 @@ int xfer_vredirect ( struct xfer_interface *xfer, int type, va_list args ) {
 	struct xfer_interface *dest = xfer_get_dest ( xfer );
 	int rc;
 
+	DBGC ( xfer, "XFER %p->%p redirect\n", xfer, dest );
+
 	rc = dest->op->vredirect ( dest, type, args );
+
+	if ( rc != 0 ) {
+		DBGC ( xfer, "XFER %p<-%p redirect: %s\n", xfer, dest,
+		       strerror ( rc ) );
+	}
 	xfer_put ( dest );
 	return rc;
 }
@@ -89,19 +98,17 @@ int xfer_request ( struct xfer_interface *xfer, off_t offset, int whence,
 	struct xfer_interface *dest = xfer_get_dest ( xfer );
 	int rc;
 
+	DBGC ( xfer, "XFER %p->%p request %s+%ld %zd\n", xfer, dest,
+	       whence_text ( whence ), offset, len );
+
 	rc = dest->op->request ( dest, offset, whence, len );
+
+	if ( rc != 0 ) {
+		DBGC ( xfer, "XFER %p<-%p request: %s\n", xfer, dest,
+		       strerror ( rc ) );
+	}
 	xfer_put ( dest );
 	return rc;
-}
-
-/**
- * Request all data
- *
- * @v xfer		Data transfer interface
- * @ret rc		Return status code
- */
-int xfer_request_all ( struct xfer_interface *xfer ) {
-	return xfer_request ( xfer, 0, SEEK_SET, ~( ( size_t ) 0 ) );
 }
 
 /**
@@ -116,9 +123,31 @@ int xfer_seek ( struct xfer_interface *xfer, off_t offset, int whence ) {
 	struct xfer_interface *dest = xfer_get_dest ( xfer );
 	int rc;
 
+	DBGC ( xfer, "XFER %p->%p seek %s+%ld\n", xfer, dest,
+	       whence_text ( whence ), offset );
+
 	rc = dest->op->seek ( dest, offset, whence );
+
+	if ( rc != 0 ) {
+		DBGC ( xfer, "XFER %p<-%p seek: %s\n", xfer, dest,
+		       strerror ( rc ) );
+	}
 	xfer_put ( dest );
 	return rc;
+}
+
+/**
+ * Test to see if interface is ready to accept data
+ *
+ * @v xfer		Data transfer interface
+ * @ret rc		Return status code
+ *
+ * This test is optional; the data transfer interface may wish that it
+ * does not yet wish to accept data, but cannot prevent attempts to
+ * deliver data to it.
+ */
+int xfer_ready ( struct xfer_interface *xfer ) {
+	return xfer_seek ( xfer, 0, SEEK_CUR );
 }
 
 /**
@@ -132,7 +161,13 @@ struct io_buffer * xfer_alloc_iob ( struct xfer_interface *xfer, size_t len ) {
 	struct xfer_interface *dest = xfer_get_dest ( xfer );
 	struct io_buffer *iobuf;
 
+	DBGC ( xfer, "XFER %p->%p alloc_iob %zd\n", xfer, dest, len );
+
 	iobuf = dest->op->alloc_iob ( dest, len );
+
+	if ( ! iobuf ) {
+		DBGC ( xfer, "XFER %p<-%p alloc_iob failed\n", xfer, dest );
+	}
 	xfer_put ( dest );
 	return iobuf;
 }
@@ -148,7 +183,15 @@ int xfer_deliver_iob ( struct xfer_interface *xfer, struct io_buffer *iobuf ) {
 	struct xfer_interface *dest = xfer_get_dest ( xfer );
 	int rc;
 
+	DBGC ( xfer, "XFER %p->%p deliver_iob %zd\n", xfer, dest,
+	       iob_len ( iobuf ) );
+
 	rc = dest->op->deliver_iob ( dest, iobuf );
+
+	if ( rc != 0 ) {
+		DBGC ( xfer, "XFER %p<-%p deliver_iob: %s\n", xfer, dest,
+		       strerror ( rc ) );
+	}
 	xfer_put ( dest );
 	return rc;
 }
@@ -165,7 +208,15 @@ int xfer_deliver_raw ( struct xfer_interface *xfer,
 	struct xfer_interface *dest = xfer_get_dest ( xfer );
 	int rc;
 
+	DBGC ( xfer, "XFER %p->%p deliver_raw %p+%zd\n", xfer, dest,
+	       data, len );
+
 	rc = dest->op->deliver_raw ( dest, data, len );
+
+	if ( rc != 0 ) {
+		DBGC ( xfer, "XFER %p<-%p deliver_raw: %s\n", xfer, dest,
+		       strerror ( rc ) );
+	}
 	xfer_put ( dest );
 	return rc;
 }
