@@ -64,7 +64,7 @@ static LIST_HEAD ( timers );
  * be stopped and the timer's callback function will be called.
  */
 void start_timer ( struct retry_timer *timer ) {
-	if ( ! timer->start )
+	if ( ! timer_running ( timer ) )
 		list_add ( &timer->list, &timers );
 	timer->start = currticks();
 	if ( timer->timeout < MIN_TIMEOUT )
@@ -86,7 +86,7 @@ void stop_timer ( struct retry_timer *timer ) {
 	unsigned long runtime;
 
 	/* If timer was already stopped, do nothing */
-	if ( ! timer->start )
+	if ( ! timer_running ( timer ) )
 		return;
 
 	list_del ( &timer->list );
@@ -153,7 +153,7 @@ static void timer_expired ( struct retry_timer *timer ) {
  *
  * @v process		Retry timer process
  */
-static void retry_step ( struct process *process ) {
+static void retry_step ( struct process *process __unused ) {
 	struct retry_timer *timer;
 	struct retry_timer *tmp;
 	unsigned long now = currticks();
@@ -164,8 +164,6 @@ static void retry_step ( struct process *process ) {
 		if ( used >= timer->timeout )
 			timer_expired ( timer );
 	}
-
-	schedule ( process );
 }
 
 /** Retry timer process */
@@ -175,7 +173,7 @@ static struct process retry_process = {
 
 /** Initialise the retry timer module */
 static void init_retry ( void ) {
-	schedule ( &retry_process );
+	process_add ( &retry_process );
 }
 
 INIT_FN ( INIT_PROCESS, init_retry, NULL, NULL );

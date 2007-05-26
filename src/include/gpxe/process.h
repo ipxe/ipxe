@@ -8,6 +8,7 @@
  */
 
 #include <gpxe/list.h>
+#include <gpxe/refcnt.h>
 
 /** A process */
 struct process {
@@ -19,14 +20,46 @@ struct process {
 	 * This method should execute a single step of the process.
 	 * Returning from this method is isomorphic to yielding the
 	 * CPU to another process.
-	 *
-	 * If the process wishes to be executed again, it must re-add
-	 * itself to the run queue using schedule().
 	 */
 	void ( * step ) ( struct process *process );
+	/** Reference counter
+	 *
+	 * If this interface is not part of a reference-counted
+	 * object, this field may be NULL.
+	 */
+	struct refcnt *refcnt;
 };
 
-extern void schedule ( struct process *process );
+extern void process_add ( struct process *process );
+extern void process_del ( struct process *process );
 extern void step ( void );
+
+/**
+ * Initialise process without adding to process list
+ *
+ * @v process		Process
+ * @v step		Process' step() method
+ */
+static inline __attribute__ (( always_inline )) void
+process_init_stopped ( struct process *process,
+		       void ( * step ) ( struct process *process ),
+		       struct refcnt *refcnt ) {
+	process->step = step;
+	process->refcnt = refcnt;
+}
+
+/**
+ * Initialise process and add to process list
+ *
+ * @v process		Process
+ * @v step		Process' step() method
+ */
+static inline __attribute__ (( always_inline )) void
+process_init ( struct process *process,
+	       void ( * step ) ( struct process *process ),
+	       struct refcnt *refcnt ) {
+	process_init_stopped ( process, step, refcnt );
+	process_add ( process );
+}
 
 #endif /* _GPXE_PROCESS_H */
