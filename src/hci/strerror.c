@@ -120,4 +120,5 @@ struct errortab common_errors[] __errortab = {
 	{ ENOENT, "File not found" },
 	{ ENETUNREACH, "Network unreachable" },
 	{ ETIMEDOUT, "Connection timed out" },
+	{ EPIPE, "Broken pipe" },
 };
