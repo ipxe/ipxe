@@ -21,6 +21,9 @@
 #include <string.h>
 #include <errno.h>
 #include <gpxe/in.h>
+#include <gpxe/xfer.h>
+#include <gpxe/open.h>
+#include <gpxe/process.h>
 #include <gpxe/resolv.h>
 
 /** @file
@@ -29,7 +32,124 @@
  *
  */
 
-static struct async_operations resolv_async_operations;
+/***************************************************************************
+ *
+ * Name resolution interfaces
+ *
+ ***************************************************************************
+ */
+
+/**
+ * Name resolution completed
+ *
+ * @v resolv		Name resolution interface
+ * @v sa		Completed socket address (if successful)
+ * @v rc		Final status code
+ */
+void resolv_done ( struct resolv_interface *resolv, struct sockaddr *sa,
+		   int rc ) {
+	struct resolv_interface *dest = resolv_get_dest ( resolv );
+
+	dest->op->done ( dest, sa, rc );
+	resolv_unplug ( resolv );
+	resolv_put ( dest );
+}
+
+/**
+ * Ignore name resolution done() event
+ *
+ * @v resolv		Name resolution interface
+ * @v sa		Completed socket address (if successful)
+ * @v rc		Final status code
+ */
+void ignore_resolv_done ( struct resolv_interface *resolv __unused,
+			  struct sockaddr *sa __unused, int rc __unused ) {
+	/* Do nothing */
+}
+
+/** Null name resolution interface operations */
+struct resolv_interface_operations null_resolv_ops = {
+	.done		= ignore_resolv_done,
+};
+
+/** Null name resolution interface */
+struct resolv_interface null_resolv = {
+	.intf = {
+		.dest = &null_resolv.intf,
+		.refcnt = NULL,
+	},
+	.op = &null_resolv_ops,
+};
+
+/***************************************************************************
+ *
+ * Numeric name resolver
+ *
+ ***************************************************************************
+ */
+
+/** A numeric name resolver */
+struct numeric_resolv {
+	/** Reference counter */
+	struct refcnt refcnt;
+	/** Name resolution interface */
+	struct resolv_interface resolv;
+	/** Process */
+	struct process process;
+	/** Completed socket address */
+	struct sockaddr sa;
+	/** Overall status code */
+	int rc;
+};
+
+static void numeric_step ( struct process *process ) {
+	struct numeric_resolv *numeric =
+		container_of ( process, struct numeric_resolv, process );
+	
+	resolv_done ( &numeric->resolv, &numeric->sa, numeric->rc );
+	process_del ( process );
+}
+
+static int numeric_resolv ( struct resolv_interface *resolv,
+			    const char *name, struct sockaddr *sa ) {
+	struct numeric_resolv *numeric;
+	struct sockaddr_in *sin;
+
+	/* Allocate and initialise structure */
+	numeric = malloc ( sizeof ( *numeric ) );
+	if ( ! numeric )
+		return -ENOMEM;
+	memset ( numeric, 0, sizeof ( *numeric ) );
+	resolv_init ( &numeric->resolv, &null_resolv_ops, &numeric->refcnt );
+	process_init ( &numeric->process, numeric_step, &numeric->refcnt );
+	memcpy ( &numeric->sa, sa, sizeof ( numeric->sa ) );
+
+	DBGC ( numeric, "NUMERIC %p attempting to resolve \"%s\"\n",
+	       numeric, name );
+
+	/* Attempt to resolve name */
+	sin = ( ( struct sockaddr_in * ) &numeric->sa );
+	sin->sin_family = AF_INET;
+	if ( inet_aton ( name, &sin->sin_addr ) == 0 )
+		numeric->rc = -EINVAL;
+
+	/* Attach to parent interface, mortalise self, and return */
+	resolv_plug_plug ( &numeric->resolv, resolv );
+	ref_put ( &numeric->refcnt );
+	return 0;
+}
+
+struct resolver numeric_resolver __resolver ( RESOLV_NUMERIC ) = {
+	.name = "NUMERIC",
+	.resolv = numeric_resolv,
+};
+
+/***************************************************************************
+ *
+ * Name resolution multiplexer
+ *
+ ***************************************************************************
+ */
 
 /** Registered name resolvers */
 static struct resolver resolvers[0]
@@ -37,104 +157,262 @@ static struct resolver resolvers[0]
 static struct resolver resolvers_end[0]
 	__table_end ( struct resolver, resolvers );
 
+/** A name resolution multiplexer */
+struct resolv_mux {
+	/** Reference counter */
+	struct refcnt refcnt;
+	/** Parent name resolution interface */
+	struct resolv_interface parent;
+
+	/** Child name resolution interface */
+	struct resolv_interface child;
+	/** Current child resolver */
+	struct resolver *resolver;
+
+	/** Socket address to complete */
+	struct sockaddr sa;
+	/** Name to be resolved
+	 *
+	 * Must be at end of structure
+	 */
+	char name[0];
+};
+
+/**
+ * Try current child name resolver
+ *
+ * @v mux		Name resolution multiplexer
+ * @ret rc		Return status code
+ */
+static int resolv_mux_try ( struct resolv_mux *mux ) {
+	struct resolver *resolver = mux->resolver;
+	int rc;
+
+	DBGC ( mux, "RESOLV %p trying method %s\n", mux, resolver->name );
+
+	if ( ( rc = resolver->resolv ( &mux->child, mux->name,
+				       &mux->sa ) ) != 0 ) {
+		DBGC ( mux, "RESOLV %p could not use method %s: %s\n",
+		       mux, resolver->name, strerror ( rc ) );
+		return rc;
+	}
+
+	return 0;
+}
+
+/**
+ * Handle done() event from child name resolver
+ *
+ * @v resolv		Child name resolution interface
+ * @v sa		Completed socket address (if successful)
+ * @v rc		Final status code
+ */
+static void resolv_mux_done ( struct resolv_interface *resolv,
+			      struct sockaddr *sa, int rc ) {
+	struct resolv_mux *mux =
+		container_of ( resolv, struct resolv_mux, child );
+
+	/* Unplug child */
+	resolv_unplug ( &mux->child );
+
+	/* If this resolution succeeded, stop now */
+	if ( rc == 0 ) {
+		DBGC ( mux, "RESOLV %p succeeded using method %s\n",
+		       mux, mux->resolver->name );
+		goto finished;
+	}
+
+	/* Attempt next child resolver, if possible */
+	mux->resolver++;
+	if ( mux->resolver >= resolvers_end ) {
+		DBGC ( mux, "RESOLV %p failed to resolve name\n", mux );
+		goto finished;
+	}
+	if ( ( rc = resolv_mux_try ( mux ) ) != 0 )
+		goto finished;
+
+	/* Next resolver is now running */
+	return;
+	
+ finished:
+	resolv_done ( &mux->parent, sa, rc );
+}
+
+/** Name resolution multiplexer operations */
+static struct resolv_interface_operations resolv_mux_child_ops = {
+	.done		= resolv_mux_done,
+};
+
 /**
  * Start name resolution
  *
- * @v name		Host name to resolve
- * @v sa		Socket address to fill in
- * @v parent		Parent asynchronous operation
+ * @v resolv		Name resolution interface
+ * @v name		Name to resolve
+ * @v sa		Socket address to complete
  * @ret rc		Return status code
  */
-int resolv ( const char *name, struct sockaddr *sa, struct async *parent ) {
-	struct resolution *resolution;
-	struct resolver *resolver;
-	struct sockaddr_in *sin = ( struct sockaddr_in * ) sa;
-	struct in_addr in;
-	int rc = -ENXIO;
+int resolv ( struct resolv_interface *resolv, const char *name,
+	     struct sockaddr *sa ) {
+	struct resolv_mux *mux;
+	size_t name_len = ( strlen ( name ) + 1 );
+	int rc;
 
-	/* Allocate and populate resolution structure */
-	resolution = malloc ( sizeof ( *resolution ) );
-	if ( ! resolution )
+	/* Allocate and initialise structure */
+	mux = malloc ( sizeof ( *mux ) + name_len );
+	if ( ! mux )
 		return -ENOMEM;
-	memset ( resolution, 0, sizeof ( *resolution ) );
-	async_init ( &resolution->async, &resolv_async_operations, parent );
+	memset ( mux, 0, sizeof ( *mux ) );
+	resolv_init ( &mux->parent, &null_resolv_ops, &mux->refcnt );
+	resolv_init ( &mux->child, &resolv_mux_child_ops, &mux->refcnt );
+	mux->resolver = resolvers;
+	memcpy ( &mux->sa, sa, sizeof ( mux->sa ) );
+	memcpy ( mux->name, name, name_len );
 
-	/* Check for a dotted quad IP address first */
-	if ( inet_aton ( name, &in ) != 0 ) {
-		DBGC ( resolution, "RESOLV %p saw valid IP address %s\n",
-		       resolution, name );
-		sin->sin_family = AF_INET;
-		sin->sin_addr = in;
-		async_done ( &resolution->async, 0 );
-		return 0;
-	}
+	DBGC ( mux, "RESOLV %p attempting to resolve \"%s\"\n", mux, name );
 
-	/* Start up all resolvers */
-	for ( resolver = resolvers ; resolver < resolvers_end ; resolver++ ) {
-		if ( ( rc = resolver->resolv ( name, sa,
-					       &resolution->async ) ) != 0 ) {
-			DBGC ( resolution, "RESOLV %p could not start %s: "
-			       "%s\n", resolution, resolver->name,
-			       strerror ( rc ) );
-			/* Continue to try other resolvers */
-			continue;
-		}
-		(resolution->pending)++;
-	}
-	if ( ! resolution->pending )
+	/* Start first resolver in chain.  There will always be at
+	 * least one resolver (the numeric resolver), so no need to
+	 * check for the zero-resolvers-available case.
+	 */
+	if ( ( rc = resolv_mux_try ( mux ) ) != 0 )
 		goto err;
 
+	/* Attach parent interface, mortalise self, and return */
+	resolv_plug_plug ( &mux->parent, resolv );
+	ref_put ( &mux->refcnt );
 	return 0;
 
  err:
-	async_uninit ( &resolution->async );
-	free ( resolution );
-	return rc;
+	ref_put ( &mux->refcnt );
+	return rc;	
 }
 
-/**
- * Handle child name resolution completion
+/***************************************************************************
  *
- * @v async		Name resolution asynchronous operation
- * @v signal		SIGCHLD
+ * Named socket opening
+ *
+ ***************************************************************************
  */
-static void resolv_sigchld ( struct async *async,
-			     enum signal signal __unused ) {
-	struct resolution *resolution =
-		container_of ( async, struct resolution, async );
+
+/** A named socket */
+struct named_socket {
+	/** Reference counter */
+	struct refcnt refcnt;
+	/** Data transfer interface */
+	struct xfer_interface xfer;
+	/** Name resolution interface */
+	struct resolv_interface resolv;
+	/** Communication semantics (e.g. SOCK_STREAM) */
+	int semantics;
+	/** Stored local socket address, if applicable */
+	struct sockaddr local;
+	/** Stored local socket address exists */
+	int have_local;
+};
+
+/**
+ * Handle seek() event
+ *
+ * @v xfer		Data transfer interface
+ * @v offset		Offset to new position
+ * @v whence		Basis for new position
+ * @ret rc		Return status code
+ */
+static int resolv_xfer_seek ( struct xfer_interface *xfer __unused,
+			      off_t offset __unused, int whence __unused ) {
+	/* Never ready to accept data */
+	return -EAGAIN;
+}
+
+/** Named socket opener data transfer interface operations */
+static struct xfer_interface_operations named_xfer_ops = {
+	.close		= ignore_xfer_close,
+	.vredirect	= ignore_xfer_vredirect,
+	.request	= ignore_xfer_request,
+	.seek		= resolv_xfer_seek,
+	.alloc_iob	= default_xfer_alloc_iob,
+	.deliver_iob	= xfer_deliver_as_raw,
+	.deliver_raw	= ignore_xfer_deliver_raw,
+};
+
+/**
+ * Handle done() event
+ *
+ * @v resolv		Name resolution interface
+ * @v sa		Completed socket address (if successful)
+ * @v rc		Final status code
+ */
+static void named_resolv_done ( struct resolv_interface *resolv,
+				struct sockaddr *sa, int rc ) {
+	struct named_socket *named =
+		container_of ( resolv, struct named_socket, resolv );
+
+	/* Unplug resolver and nullify data transfer interface */
+	resolv_unplug ( &named->resolv );
+	xfer_nullify ( &named->xfer );
+
+	/* Redirect if name resolution was successful */
+	if ( rc == 0 ) {
+		rc = xfer_redirect ( &named->xfer, LOCATION_SOCKET,
+				     named->semantics, sa,
+				     ( named->have_local ?
+				       &named->local : NULL ) );
+	}
+
+	/* Close data transfer interface if redirection failed */
+	if ( rc != 0 )
+		xfer_close ( &named->xfer, rc );
+
+	/* Unplug data transfer interface */
+	xfer_unplug ( &named->xfer );
+}
+
+/** Named socket opener name resolution interface operations */
+static struct resolv_interface_operations named_resolv_ops = {
+	.done		= named_resolv_done,
+};
+
+/**
+ * Open named socket
+ *
+ * @v semantics		Communication semantics (e.g. SOCK_STREAM)
+ * @v peer		Peer socket address to complete
+ * @v name		Name to resolve
+ * @v local		Local socket address, or NULL
+ * @ret rc		Return status code
+ */
+int xfer_open_named_socket ( struct xfer_interface *xfer, int semantics,
+			     struct sockaddr *peer, const char *name,
+			     struct sockaddr *local ) {
+	struct named_socket *named;
 	int rc;
 
-	/* Reap the child */
-	async_wait ( async, &rc, 1 );
+	/* Allocate and initialise structure */
+	named = malloc ( sizeof ( *named ) );
+	if ( ! named )
+		return -ENOMEM;
+	memset ( named, 0, sizeof ( *named ) );
+	xfer_init ( &named->xfer, &named_xfer_ops, &named->refcnt );
+	resolv_init ( &named->resolv, &named_resolv_ops, &named->refcnt );
+	named->semantics = semantics;
+	if ( local ) {
+		memcpy ( &named->local, local, sizeof ( named->local ) );
+		named->have_local = 1;
+	}
 
-	/* If this child succeeded, kill all the others.  They should
-	 * immediately die (invoking resolv_sigchld() again, which
-	 * won't do anything because the exit status is non-zero and
-	 * the pending count won't reach zero until this instance
-	 * completes).
-	 */
-	if ( rc == 0 )
-		async_signal_children ( async, SIGKILL );
+	DBGC ( named, "RESOLV %p opening named socket \"%s\"\n",
+	       named, name );
 
-	/* When we have no children left, exit */
-	if ( --(resolution->pending) == 0 )
-		async_done ( async, rc );
+	/* Start name resolution */
+	if ( ( rc = resolv ( &named->resolv, name, peer ) ) != 0 )
+		goto err;
+
+	/* Attach parent interface, mortalise self, and return */
+	xfer_plug_plug ( &named->xfer, xfer );
+	ref_put ( &named->refcnt );
+	return 0;
+
+ err:
+	ref_put ( &named->refcnt );
+	return rc;
 }
-
-/**
- * Free name resolution structure
- *
- * @v async		Asynchronous operation
- */
-static void resolv_reap ( struct async *async ) {
-	free ( container_of ( async, struct resolution, async ) );
-}
-
-/** Name resolution asynchronous operations */
-static struct async_operations resolv_async_operations = {
-	.reap = resolv_reap,
-	.signal = {
-		[SIGKILL] = async_signal_children,
-		[SIGCHLD] = resolv_sigchld,
-	},
-};

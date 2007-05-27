@@ -486,7 +486,7 @@ int dns_resolv ( const char *name, struct sockaddr *sa,
 }
 
 /** DNS name resolver */
-struct resolver dns_resolver __resolver = {
+struct resolver dns_resolver __resolver ( RESOLV_NORMAL ) = {
 	.name = "DNS",
 	.resolv = dns_resolv,
 };
