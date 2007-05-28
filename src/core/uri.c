@@ -35,7 +35,7 @@
  *
  * Splits a URI into its component parts.  The return URI structure is
  * dynamically allocated and must eventually be freed by calling
- * free_uri().
+ * uri_put().
  */
 struct uri * parse_uri ( const char *uri_string ) {
 	struct uri *uri;

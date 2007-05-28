@@ -46,9 +46,6 @@ struct uri_opener {
 	 * @v xfer		Data transfer interface
 	 * @v uri		URI
 	 * @ret rc		Return status code
-	 *
-	 * This method takes ownership of the URI structure, and is
-	 * responsible for eventually calling free_uri().
 	 */
 	int ( * open ) ( struct xfer_interface *xfer, struct uri *uri );
 };

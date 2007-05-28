@@ -52,6 +52,7 @@ static struct socket_opener socket_openers_end[0]
 int xfer_open_uri ( struct xfer_interface *xfer, const char *uri_string ) {
 	struct uri *uri;
 	struct uri_opener *opener;
+	int rc = -ENOTSUP;
 
 	DBGC ( xfer, "XFER %p opening URI %s\n", xfer, uri_string );
 
@@ -61,14 +62,16 @@ int xfer_open_uri ( struct xfer_interface *xfer, const char *uri_string ) {
 
 	for ( opener = uri_openers ; opener < uri_openers_end ; opener++ ) {
 		if ( strcmp ( uri->scheme, opener->scheme ) == 0 ) {
-			return opener->open ( xfer, uri );
+			rc = opener->open ( xfer, uri );
+			goto done;
 		}
 	}
 
 	DBGC ( xfer, "XFER %p attempted to open unsupported URI scheme "
 	       "\"%s\"\n", xfer, uri->scheme );
-	free_uri ( uri );
-	return -ENOTSUP;
+ done:
+	uri_put ( uri );
+	return rc;
 }
 
 /**

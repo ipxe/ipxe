@@ -121,7 +121,7 @@ int start_download ( const char *uri_string, struct async *parent,
  err:
 	async_uninit ( &download->async );
 	ufree ( download->buffer.addr );
-	free_uri ( download->uri );
+	uri_put ( download->uri );
 	free ( download );
 	return rc;
 }
@@ -150,7 +150,7 @@ static void download_sigchld ( struct async *async,
 		/* Discard the buffer */
 		ufree ( download->buffer.addr );
 	}
-	free_uri ( download->uri );
+	uri_put ( download->uri );
 	download->uri = NULL;
 
 	/* Terminate ourselves */
