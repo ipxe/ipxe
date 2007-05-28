@@ -1,15 +1,16 @@
-#include <stddef.h>
+#include <stdint.h>
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
 #include <assert.h>
 #include <errno.h>
 #include <byteswap.h>
-#include <gpxe/async.h>
-#include <gpxe/buffer.h>
+#include <gpxe/socket.h>
+#include <gpxe/tcpip.h>
+#include <gpxe/in.h>
+#include <gpxe/xfer.h>
+#include <gpxe/open.h>
 #include <gpxe/uri.h>
-#include <gpxe/download.h>
-#include <gpxe/tcp.h>
 #include <gpxe/ftp.h>
 
 /** @file
@@ -18,13 +19,94 @@
  *
  */
 
+/**
+ * FTP states
+ *
+ * These @b must be sequential, i.e. a successful FTP session must
+ * pass through each of these states in order.
+ */
+enum ftp_state {
+	FTP_CONNECT = 0,
+	FTP_USER,
+	FTP_PASS,
+	FTP_TYPE,
+	FTP_PASV,
+	FTP_RETR,
+	FTP_QUIT,
+	FTP_DONE,
+};
+
+/**
+ * An FTP request
+ *
+ */
+struct ftp_request {
+	/** Reference counter */
+	struct refcnt refcnt;
+	/** Data transfer interface */
+	struct xfer_interface xfer;
+
+	/** URI being fetched */
+	struct uri *uri;
+	/** FTP control channel interface */
+	struct xfer_interface control;
+	/** FTP data channel interface */
+	struct xfer_interface data;
+
+	/** Current state */
+	enum ftp_state state;
+	/** Buffer to be filled with data received via the control channel */
+	char *recvbuf;
+	/** Remaining size of recvbuf */
+	size_t recvsize;
+	/** FTP status code, as text */
+	char status_text[5];
+	/** Passive-mode parameters, as text */
+	char passive_text[24]; /* "aaa,bbb,ccc,ddd,eee,fff" */
+};
+
+/**
+ * Free FTP request
+ *
+ * @v refcnt		Reference counter
+ */
+static void ftp_free ( struct refcnt *refcnt ) {
+	struct ftp_request *ftp =
+		container_of ( refcnt, struct ftp_request, refcnt );
+
+	DBGC ( ftp, "FTP %p freed\n", ftp );
+
+	uri_put ( ftp->uri );
+	free ( ftp );
+}
+
+/**
+ * Mark FTP operation as complete
+ *
+ * @v ftp		FTP request
+ * @v rc		Return status code
+ */
+static void ftp_done ( struct ftp_request *ftp, int rc ) {
+
+	DBGC ( ftp, "FTP %p completed (%s)\n", ftp, strerror ( rc ) );
+
+	/* Close all data transfer interfaces */
+	xfer_nullify ( &ftp->xfer );
+	xfer_close ( &ftp->xfer, rc );
+	xfer_nullify ( &ftp->control );
+	xfer_close ( &ftp->control, rc );
+	xfer_nullify ( &ftp->data );
+	xfer_close ( &ftp->data, rc );
+}
+
 /*****************************************************************************
  *
  * FTP control channel
  *
  */
 
-/** FTP control channel strings
+/**
+ * FTP control channel strings
  *
  * These are used as printf() format strings.  Since only one of them
  * (RETR) takes an argument, we always supply that argument to the
@@ -42,32 +124,23 @@ static const char * ftp_strings[] = {
 };
 
 /**
- * Get FTP request from control stream application
+ * Handle control channel being closed
  *
- * @v app		Stream application
- * @ret ftp		FTP request
- */
-static inline struct ftp_request *
-stream_to_ftp ( struct stream_application *app ) {
-	return container_of ( app, struct ftp_request, stream );
-}
-
-/**
- * Mark FTP operation as complete
+ * @v control		FTP control channel interface
+ * @v rc		Reason for close
  *
- * @v ftp		FTP request
- * @v rc		Return status code
+ * When the control channel is closed, the data channel must also be
+ * closed, if it is currently open.
  */
-static void ftp_done ( struct ftp_request *ftp, int rc ) {
+static void ftp_control_close ( struct xfer_interface *control, int rc ) {
+	struct ftp_request *ftp =
+		container_of ( control, struct ftp_request, control );
 
-	DBGC ( ftp, "FTP %p completed with status %d\n", ftp, rc );
+	DBGC ( ftp, "FTP %p control connection closed: %s\n",
+	       ftp, strerror ( rc ) );
 
-	/* Close both stream connections */
-	stream_close ( &ftp->stream );
-	stream_close ( &ftp->stream_data );
-
-	/* Mark asynchronous operation as complete */
-	async_done ( &ftp->async, rc );
+	/* Complete FTP operation */
+	ftp_done ( ftp, rc );
 }
 
 /**
@@ -102,8 +175,13 @@ static void ftp_parse_value ( char **text, uint8_t *value, size_t len ) {
  */
 static void ftp_reply ( struct ftp_request *ftp ) {
 	char status_major = ftp->status_text[0];
+	char separator = ftp->status_text[3];
 
 	DBGC ( ftp, "FTP %p received status %s\n", ftp, ftp->status_text );
+
+	/* Ignore malformed lines */
+	if ( separator != ' ' )
+		return;
 
 	/* Ignore "intermediate" responses (1xx codes) */
 	if ( status_major == '1' )
@@ -133,15 +211,9 @@ static void ftp_reply ( struct ftp_request *ftp ) {
 				  sizeof ( sa.sin.sin_addr ) );
 		ftp_parse_value ( &ptr, ( uint8_t * ) &sa.sin.sin_port,
 				  sizeof ( sa.sin.sin_port ) );
-		if ( ( rc = tcp_open ( &ftp->stream_data ) ) != 0 ) {
+		if ( ( rc = xfer_open_socket ( &ftp->data, SOCK_STREAM,
+					       &sa.sa, NULL ) ) != 0 ) {
 			DBGC ( ftp, "FTP %p could not open data connection\n",
-			       ftp );
-			ftp_done ( ftp, rc );
-			return;
-		}
-		if ( ( rc = stream_connect ( &ftp->stream_data,
-					     &sa.sa ) ) != 0 ){
-			DBGC ( ftp, "FTP %p could not make data connection\n",
 			       ftp );
 			ftp_done ( ftp, rc );
 			return;
@@ -151,29 +223,30 @@ static void ftp_reply ( struct ftp_request *ftp ) {
 	/* Move to next state */
 	if ( ftp->state < FTP_DONE )
 		ftp->state++;
-	ftp->already_sent = 0;
 
+	/* Send control string */
 	if ( ftp->state < FTP_DONE ) {
 		DBGC ( ftp, "FTP %p sending ", ftp );
 		DBGC ( ftp, ftp_strings[ftp->state], ftp->uri->path );
+		xfer_printf ( &ftp->control, ftp_strings[ftp->state],
+			      ftp->uri->path );
 	}
-
-	return;
 }
 
 /**
  * Handle new data arriving on FTP control channel
  *
- * @v app		Stream application
+ * @v control		FTP control channel interface
  * @v data		New data
  * @v len		Length of new data
  *
  * Data is collected until a complete line is received, at which point
  * its information is passed to ftp_reply().
  */
-static void ftp_newdata ( struct stream_application *app,
-			  void *data, size_t len ) {
-	struct ftp_request *ftp = stream_to_ftp ( app );
+static int ftp_control_deliver_raw ( struct xfer_interface *control,
+				     const void *data, size_t len ) {
+	struct ftp_request *ftp =
+		container_of ( control, struct ftp_request, control );
 	char *recvbuf = ftp->recvbuf;
 	size_t recvsize = ftp->recvsize;
 	char c;
@@ -215,62 +288,19 @@ static void ftp_newdata ( struct stream_application *app,
 	/* Store for next invocation */
 	ftp->recvbuf = recvbuf;
 	ftp->recvsize = recvsize;
-}
 
-/**
- * Handle acknowledgement of data sent on FTP control channel
- *
- * @v app		Stream application
- */
-static void ftp_acked ( struct stream_application *app, size_t len ) {
-	struct ftp_request *ftp = stream_to_ftp ( app );
-	
-	/* Mark off ACKed portion of the currently-transmitted data */
-	ftp->already_sent += len;
-}
-
-/**
- * Construct data to send on FTP control channel
- *
- * @v app		Stream application
- * @v buf		Temporary data buffer
- * @v len		Length of temporary data buffer
- */
-static void ftp_senddata ( struct stream_application *app,
-			   void *buf, size_t len ) {
-	struct ftp_request *ftp = stream_to_ftp ( app );
-
-	/* Send the as-yet-unACKed portion of the string for the
-	 * current state.
-	 */
-	len = snprintf ( buf, len, ftp_strings[ftp->state], ftp->uri->path );
-	stream_send ( app, buf + ftp->already_sent, len - ftp->already_sent );
-}
-
-/**
- * Handle control channel being closed
- *
- * @v app		Stream application
- *
- * When the control channel is closed, the data channel must also be
- * closed, if it is currently open.
- */
-static void ftp_closed ( struct stream_application *app, int rc ) {
-	struct ftp_request *ftp = stream_to_ftp ( app );
-
-	DBGC ( ftp, "FTP %p control connection closed: %s\n",
-	       ftp, strerror ( rc ) );
-
-	/* Complete FTP operation */
-	ftp_done ( ftp, rc );
+	return 0;
 }
 
 /** FTP control channel operations */
-static struct stream_application_operations ftp_stream_operations = {
-	.closed		= ftp_closed,
-	.acked		= ftp_acked,
-	.newdata	= ftp_newdata,
-	.senddata	= ftp_senddata,
+static struct xfer_interface_operations ftp_control_operations = {
+	.close		= ftp_control_close,
+	.vredirect	= xfer_vopen,
+	.request	= ignore_xfer_request,
+	.seek		= ignore_xfer_seek,
+	.alloc_iob	= default_xfer_alloc_iob,
+	.deliver_iob	= xfer_deliver_as_raw,
+	.deliver_raw	= ftp_control_deliver_raw,
 };
 
 /*****************************************************************************
@@ -280,20 +310,10 @@ static struct stream_application_operations ftp_stream_operations = {
  */
 
 /**
- * Get FTP request from data stream application
+ * Handle FTP data channel being closed
  *
- * @v app		Stream application
- * @ret ftp		FTP request
- */
-static inline struct ftp_request *
-stream_to_ftp_data ( struct stream_application *app ) {
-	return container_of ( app, struct ftp_request, stream_data );
-}
-
-/**
- * Handle data channel being closed
- *
- * @v app		Stream application
+ * @v data		FTP data channel interface
+ * @v rc		Reason for closure
  *
  * When the data channel is closed, the control channel should be left
  * alone; the server will send a completion message via the control
@@ -301,8 +321,9 @@ stream_to_ftp_data ( struct stream_application *app ) {
  *
  * If the data channel is closed due to an error, we abort the request.
  */
-static void ftp_data_closed ( struct stream_application *app, int rc ) {
-	struct ftp_request *ftp = stream_to_ftp_data ( app );
+static void ftp_data_closed ( struct xfer_interface *data, int rc ) {
+	struct ftp_request *ftp =
+		container_of ( data, struct ftp_request, data );
 
 	DBGC ( ftp, "FTP %p data connection closed: %s\n",
 	       ftp, strerror ( rc ) );
@@ -313,121 +334,132 @@ static void ftp_data_closed ( struct stream_application *app, int rc ) {
 }
 
 /**
- * Handle new data arriving on the FTP data channel
+ * Handle data delivery via FTP data channel
  *
- * @v app		Stream application
- * @v data		New data
- * @v len		Length of new data
+ * @v xfer		FTP data channel interface
+ * @v iobuf		I/O buffer
+ * @ret rc		Return status code
  */
-static void ftp_data_newdata ( struct stream_application *app,
-			       void *data, size_t len ) {
-	struct ftp_request *ftp = stream_to_ftp_data ( app );
+static int ftp_data_deliver_iob ( struct xfer_interface *data,
+				  struct io_buffer *iobuf ) {
+	struct ftp_request *ftp =
+		container_of ( data, struct ftp_request, data );
 	int rc;
 
-	/* Fill data buffer */
-	if ( ( rc = fill_buffer ( ftp->buffer, data,
-				  ftp->buffer->fill, len ) ) != 0 ){
-		DBGC ( ftp, "FTP %p failed to fill data buffer: %s\n",
+	if ( ( rc = xfer_deliver_iob ( &ftp->xfer, iobuf ) ) != 0 ) {
+		DBGC ( ftp, "FTP %p failed to deliver data: %s\n",
 		       ftp, strerror ( rc ) );
-		ftp_done ( ftp, rc );
-		return;
+		return rc;
 	}
+
+	return 0;
 }
 
 /** FTP data channel operations */
-static struct stream_application_operations ftp_data_stream_operations = {
-	.closed		= ftp_data_closed,
-	.newdata	= ftp_data_newdata,
+static struct xfer_interface_operations ftp_data_operations = {
+	.close		= ftp_data_closed,
+	.vredirect	= xfer_vopen,
+	.request	= ignore_xfer_request,
+	.seek		= ignore_xfer_seek,
+	.alloc_iob	= default_xfer_alloc_iob,
+	.deliver_iob	= ftp_data_deliver_iob,
+	.deliver_raw	= xfer_deliver_as_iob,
 };
 
 /*****************************************************************************
  *
- * API
+ * Data transfer interface
  *
  */
 
 /**
- * Reap asynchronous operation
+ * Close FTP data transfer interface
  *
- * @v async		Asynchronous operation
+ * @v xfer		FTP data transfer interface
+ * @v rc		Reason for close
  */
-static void ftp_reap ( struct async *async ) {
+static void ftp_xfer_closed ( struct xfer_interface *xfer, int rc ) {
 	struct ftp_request *ftp =
-		container_of ( async, struct ftp_request, async );
+		container_of ( xfer, struct ftp_request, xfer );
 
-	free ( ftp );
+	DBGC ( ftp, "FTP %p data transfer interface closed: %s\n",
+	       ftp, strerror ( rc ) );
+	
+	ftp_done ( ftp, rc );
 }
 
-/** FTP asynchronous operations */
-static struct async_operations ftp_async_operations = {
-	.reap = ftp_reap,
+/** FTP data transfer interface operations */
+static struct xfer_interface_operations ftp_xfer_operations = {
+	.close		= ftp_xfer_closed,
+	.vredirect	= ignore_xfer_vredirect,
+	.request	= ignore_xfer_request,
+	.seek		= ignore_xfer_seek,
+	.alloc_iob	= default_xfer_alloc_iob,
+	.deliver_iob	= xfer_deliver_as_raw,
+	.deliver_raw	= ignore_xfer_deliver_raw,
 };
+
+/*****************************************************************************
+ *
+ * URI opener
+ *
+ */
 
 /**
  * Initiate an FTP connection
  *
+ * @v xfer		Data transfer interface
  * @v uri		Uniform Resource Identifier
- * @v buffer		Buffer into which to download file
- * @v parent		Parent asynchronous operation
  * @ret rc		Return status code
  */
-int ftp_get ( struct uri *uri, struct buffer *buffer, struct async *parent ) {
-	struct ftp_request *ftp = NULL;
+static int ftp_open ( struct xfer_interface *xfer, struct uri *uri ) {
+	struct ftp_request *ftp;
+	struct sockaddr_tcpip server;
 	int rc;
 
 	/* Sanity checks */
-	if ( ! uri->path ) {
-		rc = -EINVAL;
-		goto err;
-	}
+	if ( ! uri->path )
+		return -EINVAL;
+	if ( ! uri->host )
+		return -EINVAL;
 
-	/* Allocate and populate FTP structure */
+	/* Allocate and populate structure */
 	ftp = malloc ( sizeof ( *ftp ) );
-	if ( ! ftp ) {
-		rc = -ENOMEM;
-		goto err;
-	}
+	if ( ! ftp )
+		return -ENOMEM;
 	memset ( ftp, 0, sizeof ( *ftp ) );
-	ftp->uri = uri;
-	ftp->buffer = buffer;
-	ftp->state = FTP_CONNECT;
-	ftp->already_sent = 0;
+	ftp->refcnt.free = ftp_free;
+	xfer_init ( &ftp->xfer, &ftp_xfer_operations, &ftp->refcnt );
+	ftp->uri = uri_get ( uri );
+	xfer_init ( &ftp->control, &ftp_control_operations, &ftp->refcnt );
+	xfer_init ( &ftp->data, &ftp_data_operations, &ftp->refcnt );
 	ftp->recvbuf = ftp->status_text;
 	ftp->recvsize = sizeof ( ftp->status_text ) - 1;
-	ftp->stream.op = &ftp_stream_operations;
-	ftp->stream_data.op = &ftp_data_stream_operations;
-
-#warning "Quick name resolution hack"
-	union {
-		struct sockaddr sa;
-		struct sockaddr_in sin;
-	} server;
-	server.sin.sin_port = htons ( FTP_PORT );
-	server.sin.sin_family = AF_INET;
-	if ( inet_aton ( uri->host, &server.sin.sin_addr ) == 0 ) {
-		rc = -EINVAL;
-		goto err;
-	}
 
 	DBGC ( ftp, "FTP %p fetching %s\n", ftp, ftp->uri->path );
 
-	if ( ( rc = tcp_open ( &ftp->stream ) ) != 0 )
-		goto err;
-	if ( ( rc = stream_connect ( &ftp->stream, &server.sa ) ) != 0 )
+	/* Open control connection */
+	memset ( &server, 0, sizeof ( server ) );
+	server.st_port = htons ( uri_port ( uri, FTP_PORT ) );
+	if ( ( rc = xfer_open_named_socket ( &ftp->control, SOCK_STREAM,
+					     ( struct sockaddr * ) &server,
+					     uri->host, NULL ) ) != 0 )
 		goto err;
 
-	async_init ( &ftp->async, &ftp_async_operations, parent );
+	/* Attach to parent interface, mortalise self, and return */
+	xfer_plug_plug ( &ftp->xfer, xfer );
+	ref_put ( &ftp->refcnt );
 	return 0;
 
  err:
 	DBGC ( ftp, "FTP %p could not create request: %s\n", 
 	       ftp, strerror ( rc ) );
-	free ( ftp );
+	ref_put ( &ftp->refcnt );
 	return rc;
 }
 
-/** HTTP download protocol */
-struct download_protocol ftp_download_protocol __download_protocol = {
-	.name = "ftp",
-	.start_download = ftp_get,
+/** FTP URI opener */
+struct uri_opener ftp_uri_opener __uri_opener = {
+	.scheme	= "ftp",
+	.open	= ftp_open,
 };
