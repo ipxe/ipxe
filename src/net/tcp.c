@@ -277,6 +277,7 @@ static void tcp_close ( struct tcp_connection *tcp, int rc ) {
 		stop_timer ( &tcp->timer );
 		list_del ( &tcp->list );
 		ref_put ( &tcp->refcnt );
+		DBGC ( tcp, "TCP %p connection deleted\n", tcp );
 		return;
 	}
 
@@ -979,6 +980,10 @@ struct socket_opener tcp_socket_opener __socket_opener = {
  */
 static int tcp_open_uri ( struct xfer_interface *xfer, struct uri *uri ) {
 	struct sockaddr_tcpip peer;
+
+	/* Sanity check */
+	if ( ! uri->host )
+		return -EINVAL;
 
 	memset ( &peer, 0, sizeof ( peer ) );
 	peer.st_port = htons ( uri_port ( uri, 0 ) );
