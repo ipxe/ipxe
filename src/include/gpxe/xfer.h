@@ -143,6 +143,10 @@ extern int xfer_deliver_iob ( struct xfer_interface *xfer,
 			      struct io_buffer *iobuf );
 extern int xfer_deliver_raw ( struct xfer_interface *xfer,
 			      const void *data, size_t len );
+extern int xfer_vprintf ( struct xfer_interface *xfer,
+			  const char *format, va_list args );
+extern int xfer_printf ( struct xfer_interface *xfer,
+			 const char *format, ... );
 
 extern void ignore_xfer_close ( struct xfer_interface *xfer, int rc );
 extern int ignore_xfer_vredirect ( struct xfer_interface *xfer,

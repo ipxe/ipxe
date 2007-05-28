@@ -17,6 +17,7 @@
  */
 
 #include <string.h>
+#include <stdio.h>
 #include <errno.h>
 #include <gpxe/xfer.h>
 
@@ -218,6 +219,46 @@ int xfer_deliver_raw ( struct xfer_interface *xfer,
 		       strerror ( rc ) );
 	}
 	xfer_put ( dest );
+	return rc;
+}
+
+/**
+ * Deliver formatted string
+ *
+ * @v xfer		Data transfer interface
+ * @v format		Format string
+ * @v args		Arguments corresponding to the format string
+ * @ret rc		Return status code
+ */
+int xfer_vprintf ( struct xfer_interface *xfer, const char *format,
+		   va_list args ) {
+	size_t len;
+	va_list args_tmp;
+
+	va_copy ( args_tmp, args );
+	len = vsnprintf ( NULL, 0, format, args );
+	{
+		char buf[len + 1];
+		vsnprintf ( buf, sizeof ( buf ), format, args_tmp );
+		return xfer_deliver_raw ( xfer, buf, len );
+	}
+}
+
+/**
+ * Deliver formatted string
+ *
+ * @v xfer		Data transfer interface
+ * @v format		Format string
+ * @v ...		Arguments corresponding to the format string
+ * @ret rc		Return status code
+ */
+int xfer_printf ( struct xfer_interface *xfer, const char *format, ... ) {
+	va_list args;
+	int rc;
+
+	va_start ( args, format );
+	rc = xfer_vprintf ( xfer, format, args );
+	va_end ( args );
 	return rc;
 }
 
