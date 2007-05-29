@@ -454,6 +454,7 @@ static int ftp_open ( struct xfer_interface *xfer, struct uri *uri ) {
  err:
 	DBGC ( ftp, "FTP %p could not create request: %s\n", 
 	       ftp, strerror ( rc ) );
+	ftp_done ( ftp, rc );
 	ref_put ( &ftp->refcnt );
 	return rc;
 }
