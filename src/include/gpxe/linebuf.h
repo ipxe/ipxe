@@ -21,8 +21,8 @@ struct line_buffer {
 };
 
 extern char * buffered_line ( struct line_buffer *linebuf );
-extern int line_buffer ( struct line_buffer *linebuf,
-			 const char **data, size_t *len );
+extern ssize_t line_buffer ( struct line_buffer *linebuf,
+			     const char *data, size_t len );
 extern void empty_line_buffer ( struct line_buffer *linebuf );
 
 #endif /* _GPXE_LINEBUF_H */

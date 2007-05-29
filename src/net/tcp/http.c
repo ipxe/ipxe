@@ -23,7 +23,7 @@
  *
  */
 
-#include <stddef.h>
+#include <stdint.h>
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
@@ -31,52 +31,99 @@
 #include <byteswap.h>
 #include <errno.h>
 #include <assert.h>
-#include <gpxe/async.h>
 #include <gpxe/uri.h>
-#include <gpxe/buffer.h>
-#include <gpxe/download.h>
-#include <gpxe/resolv.h>
-#include <gpxe/tcp.h>
+#include <gpxe/refcnt.h>
+#include <gpxe/iobuf.h>
+#include <gpxe/xfer.h>
+#include <gpxe/open.h>
+#include <gpxe/socket.h>
+#include <gpxe/tcpip.h>
+#include <gpxe/process.h>
+#include <gpxe/linebuf.h>
 #include <gpxe/tls.h>
 #include <gpxe/http.h>
 
-static struct async_operations http_async_operations;
+/** HTTP receive state */
+enum http_rx_state {
+	HTTP_RX_RESPONSE = 0,
+	HTTP_RX_HEADER,
+	HTTP_RX_DATA,
+	HTTP_RX_DEAD,
+};
 
-static inline struct http_request *
-stream_to_http ( struct stream_application *app ) {
-	return container_of ( app, struct http_request, stream );
-}
+/**
+ * An HTTP request
+ *
+ */
+struct http_request {
+	/** Reference count */
+	struct refcnt refcnt;
+	/** Data transfer interface */
+	struct xfer_interface xfer;
+
+	/** URI being fetched */
+	struct uri *uri;
+	/** Transport layer interface */
+	struct xfer_interface socket;
+
+	/** TX process */
+	struct process process;
+
+	/** HTTP response code */
+	unsigned int response;
+	/** HTTP Content-Length */
+	size_t content_length;
+	/** Received length */
+	size_t rx_len;
+	/** RX state */
+	enum http_rx_state rx_state;
+	/** Line buffer for received header lines */
+	struct line_buffer linebuf;
+};
+
+/**
+ * Free HTTP request
+ *
+ * @v refcnt		Reference counter
+ */
+static void http_free ( struct refcnt *refcnt ) {
+	struct http_request *http =
+		container_of ( refcnt, struct http_request, refcnt );
+
+	uri_put ( http->uri );
+	empty_line_buffer ( &http->linebuf );
+	free ( http );
+};
 
 /**
  * Mark HTTP request as complete
  *
  * @v http		HTTP request
  * @v rc		Return status code
- *
  */
 static void http_done ( struct http_request *http, int rc ) {
 
-	/* Close stream connection */
-	stream_close ( &http->stream );
-
 	/* Prevent further processing of any current packet */
 	http->rx_state = HTTP_RX_DEAD;
-
-	/* Free up any dynamically allocated storage */
-	empty_line_buffer ( &http->linebuf );
 
 	/* If we had a Content-Length, and the received content length
 	 * isn't correct, flag an error
 	 */
 	if ( http->content_length &&
-	     ( http->content_length != http->buffer->fill ) ) {
+	     ( http->content_length != http->rx_len ) ) {
 		DBGC ( http, "HTTP %p incorrect length %zd, should be %zd\n",
-		       http, http->buffer->fill, http->content_length );
+		       http, http->rx_len, http->content_length );
 		rc = -EIO;
 	}
 
-	/* Mark async operation as complete */
-	async_done ( &http->async, rc );
+	/* Remove process */
+	process_del ( &http->process );
+
+	/* Close all data transfer interfaces */
+	xfer_nullify ( &http->socket );
+	xfer_close ( &http->socket, rc );
+	xfer_nullify ( &http->xfer );
+	xfer_close ( &http->xfer, rc );
 }
 
 /**
@@ -103,33 +150,29 @@ static int http_response_to_rc ( unsigned int response ) {
  *
  * @v http		HTTP request
  * @v response		HTTP response
+ * @ret rc		Return status code
  */
-static void http_rx_response ( struct http_request *http, char *response ) {
+static int http_rx_response ( struct http_request *http, char *response ) {
 	char *spc;
-	int rc = -EIO;
+	int rc;
 
 	DBGC ( http, "HTTP %p response \"%s\"\n", http, response );
 
 	/* Check response starts with "HTTP/" */
 	if ( strncmp ( response, "HTTP/", 5 ) != 0 )
-		goto err;
+		return -EIO;
 
 	/* Locate and check response code */
 	spc = strchr ( response, ' ' );
 	if ( ! spc )
-		goto err;
+		return -EIO;
 	http->response = strtoul ( spc, NULL, 10 );
 	if ( ( rc = http_response_to_rc ( http->response ) ) != 0 )
-		goto err;
+		return rc;
 
 	/* Move to received headers */
 	http->rx_state = HTTP_RX_HEADER;
-	return;
-
- err:
-	DBGC ( http, "HTTP %p bad response\n", http );
-	http_done ( http, rc );
-	return;
+	return 0;
 }
 
 /**
@@ -142,7 +185,6 @@ static void http_rx_response ( struct http_request *http, char *response ) {
 static int http_rx_content_length ( struct http_request *http,
 				    const char *value ) {
 	char *endp;
-	int rc;
 
 	http->content_length = strtoul ( value, &endp, 10 );
 	if ( *endp != '\0' ) {
@@ -151,22 +193,14 @@ static int http_rx_content_length ( struct http_request *http,
 		return -EIO;
 	}
 
-	/* Try to presize the receive buffer */
-	if ( ( rc = expand_buffer ( http->buffer,
-				    http->content_length ) ) != 0 ) {
-		/* May as well abandon the download now; it will fail */
-		DBGC ( http, "HTTP %p could not presize buffer: %s\n",
-		       http, strerror ( rc ) );
-		return rc;
-	}
+	/* Use seek() to notify recipient of filesize */
+	xfer_seek ( &http->xfer, http->content_length, SEEK_SET );
+	xfer_seek ( &http->xfer, 0, SEEK_SET );
 
 	return 0;
 }
 
-/**
- * An HTTP header handler
- *
- */
+/** An HTTP header handler */
 struct http_header_handler {
 	/** Name (e.g. "Content-Length") */
 	const char *header;
@@ -195,27 +229,30 @@ struct http_header_handler http_header_handlers[] = {
  *
  * @v http		HTTP request
  * @v header		HTTP header
+ * @ret rc		Return status code
  */
-static void http_rx_header ( struct http_request *http, char *header ) {
+static int http_rx_header ( struct http_request *http, char *header ) {
 	struct http_header_handler *handler;
 	char *separator;
 	char *value;
-	int rc = -EIO;
+	int rc;
 
 	/* An empty header line marks the transition to the data phase */
 	if ( ! header[0] ) {
 		DBGC ( http, "HTTP %p start of data\n", http );
 		empty_line_buffer ( &http->linebuf );
 		http->rx_state = HTTP_RX_DATA;
-		return;
+		return 0;
 	}
 
 	DBGC ( http, "HTTP %p header \"%s\"\n", http, header );
 
 	/* Split header at the ": " */
 	separator = strstr ( header, ": " );
-	if ( ! separator )
-		goto err;
+	if ( ! separator ) {
+		DBGC ( http, "HTTP %p malformed header\n", http );
+		return -EIO;
+	}
 	*separator = '\0';
 	value = ( separator + 2 );
 
@@ -223,265 +260,265 @@ static void http_rx_header ( struct http_request *http, char *header ) {
 	for ( handler = http_header_handlers ; handler->header ; handler++ ) {
 		if ( strcasecmp ( header, handler->header ) == 0 ) {
 			if ( ( rc = handler->rx ( http, value ) ) != 0 )
-				goto err;
+				return rc;
 			break;
 		}
 	}
-	return;
-
- err:
-	DBGC ( http, "HTTP %p bad header\n", http );
-	http_done ( http, rc );
-	return;
+	return 0;
 }
+
+/** An HTTP line-based data handler */
+struct http_line_handler {
+	/** Handle line
+	 *
+	 * @v http	HTTP request
+	 * @v line	Line to handle
+	 * @ret rc	Return status code
+	 */
+	int ( * rx ) ( struct http_request *http, char *line );
+};
+
+/** List of HTTP line-based data handlers */
+struct http_line_handler http_line_handlers[] = {
+	[HTTP_RX_RESPONSE]	= { .rx = http_rx_response },
+	[HTTP_RX_HEADER]	= { .rx = http_rx_header },
+};
 
 /**
  * Handle new data arriving via HTTP connection in the data phase
  *
  * @v http		HTTP request
- * @v data		New data
- * @v len		Length of new data
+ * @v iobuf		I/O buffer
+ * @ret rc		Return status code
  */
-static void http_rx_data ( struct http_request *http,
-			   const char *data, size_t len ) {
+static int http_rx_data ( struct http_request *http,
+			  struct io_buffer *iobuf ) {
 	int rc;
 
-	/* Fill data buffer */
-	if ( ( rc = fill_buffer ( http->buffer, data,
-				  http->buffer->fill, len ) ) != 0 ) {
-		DBGC ( http, "HTTP %p failed to fill data buffer: %s\n",
-		       http, strerror ( rc ) );
-		http_done ( http, rc );
-		return;
-	}
+	/* Update received length */
+	http->rx_len += iob_len ( iobuf );
 
-	/* Update progress */
-	http->async.completed = http->buffer->fill;
-	http->async.total = http->content_length;
+	/* Hand off data buffer */
+	if ( ( rc = xfer_deliver_iob ( &http->xfer, iobuf ) ) != 0 )
+		return rc;
 
 	/* If we have reached the content-length, stop now */
 	if ( http->content_length &&
-	     ( http->buffer->fill >= http->content_length ) ) {
+	     ( http->rx_len >= http->content_length ) ) {
 		http_done ( http, 0 );
 	}
+
+	return 0;
 }
 
 /**
  * Handle new data arriving via HTTP connection
  *
- * @v http		HTTP request
- * @v data		New data
- * @v len		Length of new data
+ * @v socket		Transport layer interface
+ * @v iobuf		I/O buffer
+ * @ret rc		Return status code
  */
-static void http_newdata ( struct stream_application *app,
-			   void *data, size_t len ) {
-	struct http_request *http = stream_to_http ( app );
-	const char *buf = data;
+static int http_socket_deliver_iob ( struct xfer_interface *socket,
+				     struct io_buffer *iobuf ) {
+	struct http_request *http =
+		container_of ( socket, struct http_request, socket );
+	struct http_line_handler *lh;
 	char *line;
-	int rc;
+	ssize_t len;
+	int rc = 0;
 
-	while ( len ) {
-		if ( http->rx_state == HTTP_RX_DEAD ) {
+	while ( iob_len ( iobuf ) ) {
+		switch ( http->rx_state ) {
+		case HTTP_RX_DEAD:
 			/* Do no further processing */
-			return;
-		} else if ( http->rx_state == HTTP_RX_DATA ) {
+			goto done;
+		case HTTP_RX_DATA:
 			/* Once we're into the data phase, just fill
 			 * the data buffer
 			 */
-			http_rx_data ( http, buf, len );
-			return;
-		} else {
+			rc = http_rx_data ( http, iobuf );
+			iobuf = NULL;
+			goto done;
+		case HTTP_RX_RESPONSE:
+		case HTTP_RX_HEADER:
 			/* In the other phases, buffer and process a
 			 * line at a time
 			 */
-			if ( ( rc = line_buffer ( &http->linebuf, &buf,
-						  &len ) ) != 0 ) {
+			len = line_buffer ( &http->linebuf, iobuf->data,
+					    iob_len ( iobuf ) );
+			if ( len < 0 ) {
 				DBGC ( http, "HTTP %p could not buffer line: "
 				       "%s\n", http, strerror ( rc ) );
-				http_done ( http, rc );
-				return;
+				goto done;
 			}
-			if ( ( line = buffered_line ( &http->linebuf ) ) ) {
-				switch ( http->rx_state ) {
-				case HTTP_RX_RESPONSE:
-					http_rx_response ( http, line );
-					break;
-				case HTTP_RX_HEADER:
-					http_rx_header ( http, line );
-					break;
-				default:
-					assert ( 0 );
-					break;
-				}
+			iob_pull ( iobuf, len );
+			line = buffered_line ( &http->linebuf );
+			if ( line ) {
+				lh = &http_line_handlers[http->rx_state];
+				if ( ( rc = lh->rx ( http, line ) ) != 0 )
+					goto done;
 			}
+			break;
+		default:
+			assert ( 0 );
+			break;
+		}
+	}
+
+ done:
+	if ( rc )
+		http_done ( http, rc );
+	free_iob ( iobuf );
+	return rc;
+}
+
+/**
+ * HTTP process
+ *
+ * @v process		Process
+ */
+static void http_step ( struct process *process ) {
+	struct http_request *http =
+		container_of ( process, struct http_request, process );
+	const char *path = http->uri->path;
+	const char *host = http->uri->host;
+	const char *query = http->uri->query;
+	int rc;
+
+	if ( xfer_ready ( &http->socket ) == 0 ) {
+		process_del ( &http->process );
+		if ( ( rc = xfer_printf ( &http->socket,
+					  "GET %s%s%s HTTP/1.1\r\n"
+					  "User-Agent: gPXE/" VERSION "\r\n"
+					  "Host: %s\r\n"
+					  "\r\n",
+					  ( path ? path : "/" ),
+					  ( query ? "?" : "" ),
+					  ( query ? query : "" ),
+					  host ) ) != 0 ) {
+			http_done ( http, rc );
 		}
 	}
 }
 
 /**
- * Send HTTP data
- *
- * @v app		Stream application
- * @v buf		Temporary data buffer
- * @v len		Length of temporary data buffer
- */
-static void http_senddata ( struct stream_application *app,
-			    void *buf, size_t len ) {
-	struct http_request *http = stream_to_http ( app );
-	const char *path = http->uri->path;
-	const char *host = http->uri->host;
-	const char *query = http->uri->query;
-
-	len = snprintf ( buf, len,
-			 "GET %s%s%s HTTP/1.1\r\n"
-			 "User-Agent: gPXE/" VERSION "\r\n"
-			 "Host: %s\r\n"
-			 "\r\n",
-			 ( path ? path : "/" ),
-			 ( query ? "?" : "" ),
-			 ( query ? query : "" ),
-			 host );
-
-	stream_send ( app, ( buf + http->tx_offset ),
-		      ( len - http->tx_offset ) );
-}
-
-/**
- * HTTP data acknowledged
- *
- * @v app		Stream application
- * @v len		Length of acknowledged data
- */
-static void http_acked ( struct stream_application *app, size_t len ) {
-	struct http_request *http = stream_to_http ( app );
-
-	http->tx_offset += len;
-}
-
-/**
  * HTTP connection closed by network stack
  *
- * @v app		Stream application
+ * @v socket		Transport layer interface
+ * @v rc		Reason for close
  */
-static void http_closed ( struct stream_application *app, int rc ) {
-	struct http_request *http = stream_to_http ( app );
+static void http_socket_close ( struct xfer_interface *socket, int rc ) {
+	struct http_request *http =
+		container_of ( socket, struct http_request, socket );
 
-	DBGC ( http, "HTTP %p connection closed: %s\n",
+	DBGC ( http, "HTTP %p socket closed: %s\n",
 	       http, strerror ( rc ) );
 	
 	http_done ( http, rc );
 }
 
-/** HTTP stream operations */
-static struct stream_application_operations http_stream_operations = {
-	.closed		= http_closed,
-	.acked		= http_acked,
-	.newdata	= http_newdata,
-	.senddata	= http_senddata,
+/** HTTP socket operations */
+static struct xfer_interface_operations http_socket_operations = {
+	.close		= http_socket_close,
+	.vredirect	= xfer_vopen,
+	.request	= ignore_xfer_request,
+	.seek		= ignore_xfer_seek,
+	.alloc_iob	= default_xfer_alloc_iob,
+	.deliver_iob	= http_socket_deliver_iob,
+	.deliver_raw	= xfer_deliver_as_iob,
 };
 
 /**
- * Initiate a HTTP connection
+ * Close HTTP data transfer interface
  *
+ * @v xfer		Data transfer interface
+ * @v rc		Reason for close
+ */
+static void http_xfer_close ( struct xfer_interface *xfer, int rc ) {
+	struct http_request *http =
+		container_of ( xfer, struct http_request, xfer );
+
+	DBGC ( http, "HTTP %p interface closed: %s\n",
+	       http, strerror ( rc ) );
+
+	http_done ( http, rc );
+}
+
+/** HTTP data transfer interface operations */
+static struct xfer_interface_operations http_xfer_operations = {
+	.close		= http_xfer_close,
+	.vredirect	= ignore_xfer_vredirect,
+	.request	= ignore_xfer_request,
+	.seek		= ignore_xfer_seek,
+	.alloc_iob	= default_xfer_alloc_iob,
+	.deliver_iob	= xfer_deliver_as_raw,
+	.deliver_raw	= ignore_xfer_deliver_raw,
+};
+
+/**
+ * Initiate an HTTP connection
+ *
+ * @v xfer		Data transfer interface
  * @v uri		Uniform Resource Identifier
- * @v buffer		Buffer into which to download file
- * @v parent		Parent asynchronous operation
  * @ret rc		Return status code
  */
-int http_get ( struct uri *uri, struct buffer *buffer, struct async *parent ) {
-	struct http_request *http = NULL;
-	struct sockaddr_tcpip *st;
+int http_open ( struct xfer_interface *xfer, struct uri *uri ) {
+	struct http_request *http;
+	struct sockaddr_tcpip server;
 	int rc;
+
+	/* Sanity checks */
+	if ( ! uri->host )
+		return -EINVAL;
 
 	/* Allocate and populate HTTP structure */
 	http = malloc ( sizeof ( *http ) );
 	if ( ! http )
 		return -ENOMEM;
 	memset ( http, 0, sizeof ( *http ) );
-	http->uri = uri;
-	http->buffer = buffer;
-	async_init ( &http->async, &http_async_operations, parent );
-	http->stream.op = &http_stream_operations;
-	st = ( struct sockaddr_tcpip * ) &http->server;
-	st->st_port = htons ( uri_port ( http->uri, HTTP_PORT ) );
+	http->refcnt.free = http_free;
+	xfer_init ( &http->xfer, &http_xfer_operations, &http->refcnt );
+       	http->uri = uri_get ( uri );
+	xfer_init ( &http->socket, &http_socket_operations, &http->refcnt );
+	process_init ( &http->process, http_step, &http->refcnt );
 
-	/* Open TCP connection */
-	if ( ( rc = tcp_open ( &http->stream ) ) != 0 )
+	/* Open socket */
+	memset ( &server, 0, sizeof ( server ) );
+	server.st_port = htons ( uri_port ( http->uri, HTTP_PORT ) );
+	if ( ( rc = xfer_open_named_socket ( &http->socket, SOCK_STREAM,
+					     ( struct sockaddr * ) &server,
+					     uri->host, NULL ) ) != 0 )
 		goto err;
+
+#if 0
 	if ( strcmp ( http->uri->scheme, "https" ) == 0 ) {
 		st->st_port = htons ( uri_port ( http->uri, HTTPS_PORT ) );
 		if ( ( rc = add_tls ( &http->stream ) ) != 0 )
 			goto err;
 	}
+#endif
 
-	/* Start name resolution.  The download proper will start when
-	 * name resolution completes.
-	 */
-	if ( ( rc = resolv ( uri->host, &http->server, &http->async ) ) != 0 )
-		goto err;
-
+	/* Attach to parent interface, mortalise self, and return */
+	xfer_plug_plug ( &http->xfer, xfer );
+	ref_put ( &http->refcnt );
 	return 0;
 
  err:
 	DBGC ( http, "HTTP %p could not create request: %s\n", 
 	       http, strerror ( rc ) );
-	async_uninit ( &http->async );
-	free ( http );
+	http_done ( http, rc );
+	ref_put ( &http->refcnt );
 	return rc;
 }
 
-/**
- * Handle name resolution completion
- *
- * @v async		HTTP asynchronous operation
- * @v signal		SIGCHLD
- */
-static void http_sigchld ( struct async *async, enum signal signal __unused ) {
-	struct http_request *http =
-		container_of ( async, struct http_request, async );
-	int rc;
-
-	/* If name resolution failed, abort now */
-	async_wait ( async, &rc, 1 );
-	if ( rc != 0 ) {
-		http_done ( http, rc );
-		return;
-	}
-
-	/* Otherwise, start the HTTP connection */
-	if ( ( rc = stream_connect ( &http->stream, &http->server ) ) != 0 ) {
-		DBGC ( http, "HTTP %p could not connect stream: %s\n",
-		       http, strerror ( rc ) );
-		http_done ( http, rc );
-		return;
-	}
-}
-
-/**
- * Free HTTP connection
- *
- * @v async		Asynchronous operation
- */
-static void http_reap ( struct async *async ) {
-	free ( container_of ( async, struct http_request, async ) );
-}
-
-/** HTTP asynchronous operations */
-static struct async_operations http_async_operations = {
-	.reap = http_reap,
-	.signal = {
-		[SIGCHLD] = http_sigchld,
-	},
+/** HTTP URI opener */
+struct uri_opener http_uri_opener __uri_opener = {
+	.scheme	= "http",
+	.open	= http_open,
 };
 
-/** HTTP download protocol */
-struct download_protocol http_download_protocol __download_protocol = {
-	.name = "http",
-	.start_download = http_get,
-};
-
-/** HTTPS download protocol */
-struct download_protocol https_download_protocol __download_protocol = {
-	.name = "https",
-	.start_download = http_get,
+/** HTTPS URI opener */
+struct uri_opener https_uri_opener __uri_opener = {
+	.scheme	= "https",
+	.open	= http_open,
 };

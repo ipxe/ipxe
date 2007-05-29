@@ -57,23 +57,20 @@ void empty_line_buffer ( struct line_buffer *linebuf ) {
  * @v linebuf			Line buffer
  * @v data			New data to add
  * @v len			Length of new data to add
- * @ret rc			Return status code
- * 
- * If line_buffer() returns >0, then an end of line has been reached
- * and the buffered-up line can be obtained from buffered_line().
- * Carriage returns and newlines will have been stripped, and the line
- * will be NUL-terminated.  This buffered line is valid only until the
- * next call to line_buffer() (or to empty_line_buffer()).
+ * @ret len			Consumed length, or negative error number
  *
- * @c data and @c len will be updated to reflect the data consumed by
- * line_buffer().
+ * After calling line_buffer(), use buffered_line() to determine
+ * whether or not a complete line is available.  Carriage returns and
+ * newlines will have been stripped, and the line will be
+ * NUL-terminated.  This buffered line is valid only until the next
+ * call to line_buffer() (or to empty_line_buffer()).
  *
  * Note that line buffers use dynamically allocated storage; you
  * should call empty_line_buffer() before freeing a @c struct @c
  * line_buffer.
  */
-int line_buffer ( struct line_buffer *linebuf,
-		  const char **data, size_t *len ) {
+ssize_t line_buffer ( struct line_buffer *linebuf,
+		      const char *data, size_t len ) {
 	const char *eol;
 	size_t consume;
 	size_t new_len;
@@ -84,10 +81,10 @@ int line_buffer ( struct line_buffer *linebuf,
 		empty_line_buffer ( linebuf );
 
 	/* Search for line terminator */
-	if ( ( eol = memchr ( *data, '\n', *len ) ) ) {
-		consume = ( eol - *data + 1 );
+	if ( ( eol = memchr ( data, '\n', len ) ) ) {
+		consume = ( eol - data + 1 );
 	} else {
-		consume = *len;
+		consume = len;
 	}
 
 	/* Reallocate data buffer and copy in new data */
@@ -95,14 +92,10 @@ int line_buffer ( struct line_buffer *linebuf,
 	new_data = realloc ( linebuf->data, ( new_len + 1 ) );
 	if ( ! new_data )
 		return -ENOMEM;
-	memcpy ( ( new_data + linebuf->len ), *data, consume );
+	memcpy ( ( new_data + linebuf->len ), data, consume );
 	new_data[new_len] = '\0';
 	linebuf->data = new_data;
 	linebuf->len = new_len;
-
-	/* Update data and len */
-	*data += consume;
-	*len -= consume;
 
 	/* If we have reached end of line, trim the line and mark as ready */
 	if ( eol ) {
@@ -112,5 +105,5 @@ int line_buffer ( struct line_buffer *linebuf,
 		linebuf->ready = 1;
 	}
 
-	return 0;
+	return consume;
 }
