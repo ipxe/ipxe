@@ -339,6 +339,45 @@ int snprintf ( char *buf, size_t size, const char *fmt, ... ) {
 }
 
 /**
+ * Version of vsnprintf() that accepts a signed buffer size
+ *
+ * @v buf		Buffer into which to write the string
+ * @v size		Size of buffer
+ * @v fmt		Format string
+ * @v args		Arguments corresponding to the format string
+ * @ret len		Length of formatted string
+ */
+int vssnprintf ( char *buf, ssize_t ssize, const char *fmt, va_list args ) {
+
+	/* Treat negative buffer size as zero buffer size */
+	if ( ssize < 0 )
+		ssize = 0;
+
+	/* Hand off to vsnprintf */
+	return vsnprintf ( buf, ssize, fmt, args );
+}
+
+/**
+ * Version of vsnprintf() that accepts a signed buffer size
+ *
+ * @v buf		Buffer into which to write the string
+ * @v size		Size of buffer
+ * @v fmt		Format string
+ * @v ...		Arguments corresponding to the format string
+ * @ret len		Length of formatted string
+ */
+int ssnprintf ( char *buf, ssize_t ssize, const char *fmt, ... ) {
+	va_list args;
+	int len;
+
+	/* Hand off to vssnprintf */
+	va_start ( args, fmt );
+	len = vssnprintf ( buf, ssize, fmt, args );
+	va_end ( args );
+	return len;
+}
+
+/**
  * Write character to console
  *
  * @v ctx		Context
