@@ -10,9 +10,14 @@ printf ( const char *fmt, ... );
 extern int __attribute__ (( format ( printf, 3, 4 ) ))
 snprintf ( char *buf, size_t size, const char *fmt, ... );
 
+extern int __attribute__ (( format ( printf, 2, 3 ) ))
+asprintf ( char **strp, const char *fmt, ... );
+
 extern int vprintf ( const char *fmt, va_list args );
 
 extern int vsnprintf ( char *buf, size_t size, const char *fmt, va_list args );
+
+extern int vasprintf ( char **strp, const char *fmt, va_list args );
 
 /**
  * Write a formatted string to a buffer
