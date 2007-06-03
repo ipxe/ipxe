@@ -38,3 +38,25 @@ char * basename ( char *path ) {
 	basename = strrchr ( path, '/' );
 	return ( basename ? ( basename + 1 ) : path );
 }
+
+/**
+ * Return directory name from path
+ *
+ * @v path		Full path
+ * @ret dirname		Directory name
+ *
+ * Note that this function may modify its argument.
+ */
+char * dirname ( char *path ) {
+	char *separator;
+
+	separator = strrchr ( path, '/' );
+	if ( separator == path ) {
+		return "/";
+	} else if ( separator ) {
+		*separator = 0;
+		return path;
+	} else {
+		return ".";
+	}
+}
