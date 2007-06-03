@@ -125,6 +125,12 @@ uri_put ( struct uri *uri ) {
 }
 
 extern struct uri * parse_uri ( const char *uri_string );
-unsigned int uri_port ( struct uri *uri, unsigned int default_port );
+extern unsigned int uri_port ( struct uri *uri, unsigned int default_port );
+extern int unparse_uri ( char *buf, size_t size, struct uri *uri );
+extern struct uri * uri_dup ( struct uri *uri );
+extern char * resolve_path ( const char *base_path,
+			     const char *relative_path );
+extern struct uri * resolve_uri ( struct uri *base_uri,
+				  struct uri *relative_uri );
 
 #endif /* _GPXE_URI_H */

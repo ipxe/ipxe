@@ -25,7 +25,35 @@
 #include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
+#include <libgen.h>
+#include <gpxe/vsprintf.h>
 #include <gpxe/uri.h>
+
+/**
+ * Dump URI for debugging
+ *
+ * @v uri		URI
+ */
+static void dump_uri ( struct uri *uri ) {
+	if ( uri->scheme )
+		DBG ( " scheme \"%s\"", uri->scheme );
+	if ( uri->opaque )
+		DBG ( " opaque \"%s\"", uri->opaque );
+	if ( uri->user )
+		DBG ( " user \"%s\"", uri->user );
+	if ( uri->password )
+		DBG ( " password \"%s\"", uri->password );
+	if ( uri->host )
+		DBG ( " host \"%s\"", uri->host );
+	if ( uri->port )
+		DBG ( " port \"%s\"", uri->port );
+	if ( uri->path )
+		DBG ( " path \"%s\"", uri->path );
+	if ( uri->query )
+		DBG ( " query \"%s\"", uri->query );
+	if ( uri->fragment )
+		DBG ( " fragment \"%s\"", uri->fragment );
+}
 
 /**
  * Parse URI
@@ -136,25 +164,8 @@ struct uri * parse_uri ( const char *uri_string ) {
 	}
 
  done:
-	DBG ( "URI \"%s\" split into", raw );
-	if ( uri->scheme )
-		DBG ( " scheme \"%s\"", uri->scheme );
-	if ( uri->opaque )
-		DBG ( " opaque \"%s\"", uri->opaque );
-	if ( uri->user )
-		DBG ( " user \"%s\"", uri->user );
-	if ( uri->password )
-		DBG ( " password \"%s\"", uri->password );
-	if ( uri->host )
-		DBG ( " host \"%s\"", uri->host );
-	if ( uri->port )
-		DBG ( " port \"%s\"", uri->port );
-	if ( uri->path )
-		DBG ( " path \"%s\"", uri->path );
-	if ( uri->query )
-		DBG ( " query \"%s\"", uri->query );
-	if ( uri->fragment )
-		DBG ( " fragment \"%s\"", uri->fragment );
+	DBG ( "URI \"%s\" split into", uri_string );
+	dump_uri ( uri );
 	DBG ( "\n" );
 
 	return uri;
@@ -169,4 +180,194 @@ struct uri * parse_uri ( const char *uri_string ) {
  */
 unsigned int uri_port ( struct uri *uri, unsigned int default_port ) {
 	return ( uri->port ? strtoul ( uri->port, NULL, 0 ) : default_port );
+}
+
+/**
+ * Unparse URI
+ *
+ * @v buf		Buffer to fill with URI string
+ * @v size		Size of buffer
+ * @v uri		URI to write into buffer
+ * @ret len		Length of URI string
+ */
+int unparse_uri ( char *buf, size_t size, struct uri *uri ) {
+	int used = 0;
+
+	DBG ( "URI unparsing" );
+	dump_uri ( uri );
+	DBG ( "\n" );
+
+	/* Special-case opaque URIs */
+	if ( uri->opaque ) {
+		return ssnprintf ( ( buf + used ), ( size - used ),
+				   "%s:%s", uri->scheme, uri->opaque );
+	}
+
+	/* scheme:// */
+	if ( uri->scheme ) {
+		used += ssnprintf ( ( buf + used ), ( size - used ),
+				    "%s://", uri->scheme );
+	}
+
+	/* [user[:password]@]host[:port] */
+	if ( uri->host ) {
+		if ( uri->user ) {
+			used += ssnprintf ( ( buf + used ), ( size - used ),
+					    "%s", uri->user );
+			if ( uri->password ) {
+				used += ssnprintf ( ( buf + used ),
+						    ( size - used ),
+						    ":%s", uri->password );
+			}
+			used += ssnprintf ( ( buf + used ), ( size - used ),
+					    "@" );
+		}
+		used += ssnprintf ( ( buf + used ), ( size - used ), "%s",
+				    uri->host );
+		if ( uri->port ) {
+			used += ssnprintf ( ( buf + used ), ( size - used ),
+					    ":%s", uri->port );
+		}
+	}
+
+	/* /path */
+	if ( uri->path ) {
+		used += ssnprintf ( ( buf + used ), ( size - used ),
+				    "%s", uri->path );
+	}
+
+	/* ?query */
+	if ( uri->query ) {
+		used += ssnprintf ( ( buf + used ), ( size - used ),
+				    "?%s", uri->query );
+	}
+
+	/* #fragment */
+	if ( uri->fragment ) {
+		used += ssnprintf ( ( buf + used ), ( size - used ),
+				    "#%s", uri->fragment );
+	}
+
+	return used;
+}
+
+/**
+ * Duplicate URI
+ *
+ * @v uri		URI
+ * @ret uri		Duplicate URI
+ *
+ * Creates a modifiable copy of a URI.
+ */
+struct uri * uri_dup ( struct uri *uri ) {
+	size_t len = ( unparse_uri ( NULL, 0, uri ) + 1 );
+	char buf[len];
+
+	unparse_uri ( buf, len, uri );
+	return parse_uri ( buf );
+}
+
+/**
+ * Resolve base+relative path
+ *
+ * @v base_uri		Base path
+ * @v relative_uri	Relative path
+ * @ret resolved_uri	Resolved path
+ *
+ * Takes a base path (e.g. "/var/lib/tftpboot/vmlinuz" and a relative
+ * path (e.g. "initrd.gz") and produces a new path
+ * (e.g. "/var/lib/tftpboot/initrd.gz").  Note that any non-directory
+ * portion of the base path will automatically be stripped; this
+ * matches the semantics used when resolving the path component of
+ * URIs.
+ */
+char * resolve_path ( const char *base_path,
+		      const char *relative_path ) {
+	size_t base_len = ( strlen ( base_path ) + 1 );
+	char base_path_copy[base_len];
+	char *base_tmp = base_path_copy;
+	char *resolved;
+
+	/* If relative path is absolute, just re-use it */
+	if ( relative_path[0] == '/' )
+		return strdup ( relative_path );
+
+	/* Create modifiable copy of path for dirname() */
+	memcpy ( base_tmp, base_path, base_len );
+	base_tmp = dirname ( base_tmp );
+
+	/* Process "./" and "../" elements */
+	while ( *relative_path == '.' ) {
+		relative_path++;
+		if ( *relative_path == 0 ) {
+			/* Do nothing */
+		} else if ( *relative_path == '/' ) {
+			relative_path++;
+		} else if ( *relative_path == '.' ) {
+			relative_path++;
+			if ( *relative_path == 0 ) {
+				base_tmp = dirname ( base_tmp );
+			} else if ( *relative_path == '/' ) {
+				base_tmp = dirname ( base_tmp );
+				relative_path++;
+			} else {
+				relative_path -= 2;
+				break;
+			}
+		} else {
+			relative_path--;
+			break;
+		}
+	}
+
+	/* Create and return new path */
+	if ( asprintf ( &resolved, "%s%s%s", base_tmp,
+			( ( base_tmp[ strlen ( base_tmp ) - 1 ] == '/' ) ?
+			  "" : "/" ), relative_path ) < 0 )
+		return NULL;
+
+	return resolved;
+}
+
+/**
+ * Resolve base+relative URI
+ *
+ * @v base_uri		Base URI
+ * @v relative_uri	Relative URI
+ * @ret resolved_uri	Resolved URI
+ *
+ * Takes a base URI (e.g. "http://etherboot.org/kernels/vmlinuz" and a
+ * relative URI (e.g. "../initrds/initrd.gz") and produces a new URI
+ * (e.g. "http://etherboot.org/initrds/initrd.gz").
+ */
+struct uri * resolve_uri ( struct uri *base_uri,
+			   struct uri *relative_uri ) {
+	struct uri tmp_uri;
+	char *tmp_path = NULL;
+	struct uri *new_uri;
+
+	/* If relative URI is absolute, just re-use it */
+	if ( uri_is_absolute ( relative_uri ) )
+		return uri_get ( relative_uri );
+
+	/* Mangle URI */
+	memcpy ( &tmp_uri, base_uri, sizeof ( tmp_uri ) );
+	if ( relative_uri->path ) {
+		tmp_path = resolve_path ( ( base_uri->path ?
+					    base_uri->path : "/" ),
+					  relative_uri->path );
+		tmp_uri.path = tmp_path;
+		tmp_uri.query = relative_uri->query;
+		tmp_uri.fragment = relative_uri->fragment;
+	} else if ( relative_uri->query ) {
+		tmp_uri.query = relative_uri->query;
+		tmp_uri.fragment = relative_uri->fragment;
+	} else if ( relative_uri->fragment ) {
+		tmp_uri.fragment = relative_uri->fragment;
+	}
+
+	/* Create demangled URI */
+	new_uri = uri_dup ( &tmp_uri );
+	free ( tmp_path );
+	return new_uri;
 }
