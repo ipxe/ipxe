@@ -240,6 +240,7 @@ int xfer_vprintf ( struct xfer_interface *xfer, const char *format,
 	{
 		char buf[len + 1];
 		vsnprintf ( buf, sizeof ( buf ), format, args_tmp );
+		va_end ( args_tmp );
 		return xfer_deliver_raw ( xfer, buf, len );
 	}
 }
