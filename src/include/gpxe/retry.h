@@ -37,4 +37,15 @@ struct retry_timer {
 extern void start_timer ( struct retry_timer *timer );
 extern void stop_timer ( struct retry_timer *timer );
 
+/**
+ * Test to see if timer is currently running
+ *
+ * @v timer		Retry timer
+ * @ret running		Non-zero if timer is running
+ */
+static inline __attribute__ (( always_inline )) unsigned long
+timer_running ( struct retry_timer *timer ) {
+	return ( timer->start );
+}
+
 #endif /* _GPXE_RETRY_H */

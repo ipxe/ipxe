@@ -23,6 +23,7 @@
 #include <errno.h>
 #include <assert.h>
 #include <byteswap.h>
+#include <gpxe/vsprintf.h>
 #include <gpxe/scsi.h>
 #include <gpxe/process.h>
 #include <gpxe/uaccess.h>
@@ -347,32 +348,6 @@ static void iscsi_tx_data_out ( struct iscsi_session *iscsi,
  * iSCSI login
  *
  */
-
-/**
- * Version of snprintf() that accepts a signed buffer size
- *
- * @v buf		Buffer into which to write the string
- * @v size		Size of buffer
- * @v fmt		Format string
- * @v args		Arguments corresponding to the format string
- * @ret len		Length of formatted string
- *
- * This is a utility function for iscsi_build_login_request_strings().
- */
-static int ssnprintf ( char *buf, ssize_t ssize, const char *fmt, ... ) {
-	va_list args;
-	int len;
-
-	/* Treat negative buffer size as zero buffer size */
-	if ( ssize < 0 )
-		ssize = 0;
-
-	/* Hand off to vsnprintf */
-	va_start ( args, fmt );
-	len = vsnprintf ( buf, ssize, fmt, args );
-	va_end ( args );
-	return len;
-}
 
 /**
  * Build iSCSI login request strings

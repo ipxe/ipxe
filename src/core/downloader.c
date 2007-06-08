@@ -115,19 +115,6 @@ static int downloader_ensure_size ( struct downloader *downloader,
  */
 
 /**
- * Handle start() event received via job control interface
- *
- * @v job		Downloader job control interface
- */
-static void downloader_job_start ( struct job_interface *job ) {
-	struct downloader *downloader = 
-		container_of ( job, struct downloader, job );
-
-	/* Start data transfer */
-	xfer_request_all ( &downloader->xfer );
-}
-
-/**
  * Handle kill() event received via job control interface
  *
  * @v job		Downloader job control interface
@@ -142,7 +129,7 @@ static void downloader_job_kill ( struct job_interface *job ) {
 
 /** Downloader job control interface operations */
 static struct job_interface_operations downloader_job_operations = {
-	.start		= downloader_job_start,
+	.start		= ignore_job_start,
 	.done		= ignore_job_done,
 	.kill		= downloader_job_kill,
 	.progress	= ignore_job_progress,

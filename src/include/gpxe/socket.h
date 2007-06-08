@@ -8,31 +8,7 @@
  */
 
 /**
- * @defgroup commdomains Communication domains
- *
- * @{
- */
-#define PF_INET		1	/**< IPv4 Internet protocols */
-#define PF_INET6	2	/**< IPv6 Internet protocols */
-/** @} */
-
-/**
- * Name communication domain
- *
- * @v domain		Communication domain (e.g. PF_INET)
- * @ret name		Name of communication domain
- */
-static inline __attribute__ (( always_inline )) const char *
-socket_domain_name ( int domain ) {
-	switch ( domain ) {
-	case PF_INET:		return "PF_INET";
-	case PF_INET6:		return "PF_INET6";
-	default:		return "PF_UNKNOWN";
-	}
-}
-
-/**
- * @defgroup commtypes Communication types
+ * @defgroup commtypes Communication semantics
  *
  * @{
  */
@@ -41,14 +17,14 @@ socket_domain_name ( int domain ) {
 /** @} */
 
 /**
- * Name communication type
+ * Name communication semantics
  *
- * @v type		Communication type (e.g. SOCK_STREAM)
- * @ret name		Name of communication type
+ * @v semantics		Communication semantics (e.g. SOCK_STREAM)
+ * @ret name		Name of communication semantics
  */
 static inline __attribute__ (( always_inline )) const char *
-socket_type_name ( int type ) {
-	switch ( type ) {
+socket_semantics_name ( int semantics ) {
+	switch ( semantics ) {
 	case SOCK_STREAM:	return "SOCK_STREAM";
 	case SOCK_DGRAM:	return "SOCK_DGRAM";
 	default:		return "SOCK_UNKNOWN";
@@ -63,6 +39,21 @@ socket_type_name ( int type ) {
 #define AF_INET		1	/**< IPv4 Internet addresses */
 #define AF_INET6	2	/**< IPv6 Internet addresses */
 /** @} */
+
+/**
+ * Name address family
+ *
+ * @v family		Address family (e.g. AF_INET)
+ * @ret name		Name of address family
+ */
+static inline __attribute__ (( always_inline )) const char *
+socket_family_name ( int family ) {
+	switch ( family ) {
+	case AF_INET:		return "AF_INET";
+	case AF_INET6:		return "AF_INET6";
+	default:		return "AF_UNKNOWN";
+	}
+}
 
 /** A socket address family */
 typedef uint16_t sa_family_t;

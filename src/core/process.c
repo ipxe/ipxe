@@ -31,25 +31,43 @@
 static LIST_HEAD ( run_queue );
 
 /**
- * Add process to run queue
+ * Add process to process list
  *
  * @v process		Process
  */
-void schedule ( struct process *process ) {
+void process_add ( struct process *process ) {
+	ref_get ( process->refcnt );
 	list_add_tail ( &process->list, &run_queue );
+}
+
+/**
+ * Remove process from process list
+ *
+ * @v process		Process
+ *
+ * It is safe to call process_del() multiple times; further calls will
+ * have no effect.
+ */
+void process_del ( struct process *process ) {
+	if ( ! list_empty ( &process->list ) ) {
+		list_del ( &process->list );
+		INIT_LIST_HEAD ( &process->list );
+		ref_put ( process->refcnt );
+	}
 }
 
 /**
  * Single-step a single process
  *
- * This removes the first process from the run queue and executes a
- * single step of that process.
+ * This executes a single step of the first process in the run queue,
+ * and moves the process to the end of the run queue.
  */
 void step ( void ) {
 	struct process *process;
 
 	list_for_each_entry ( process, &run_queue, list ) {
 		list_del ( &process->list );
+		list_add_tail ( &process->list, &run_queue );
 		process->step ( process );
 		break;
 	}

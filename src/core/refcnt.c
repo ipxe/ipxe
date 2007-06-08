@@ -39,8 +39,8 @@ void ref_get ( struct refcnt *refcnt ) {
 
 	refcnt->refcnt++;
 
-	DBGC ( refcnt, "REFCNT %p incremented to %d\n",
-	       refcnt, refcnt->refcnt );
+	DBGC2 ( refcnt, "REFCNT %p incremented to %d\n",
+		refcnt, refcnt->refcnt );
 }
 
 /**
@@ -59,8 +59,8 @@ void ref_put ( struct refcnt *refcnt ) {
 		return;
 
 	refcnt->refcnt--;
-	DBGC ( refcnt, "REFCNT %p decremented to %d\n",
-	       refcnt, refcnt->refcnt );
+	DBGC2 ( refcnt, "REFCNT %p decremented to %d\n",
+		refcnt, refcnt->refcnt );
 
 	if ( refcnt->refcnt >= 0 )
 		return;

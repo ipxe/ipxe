@@ -388,7 +388,7 @@ int net_rx ( struct io_buffer *iobuf, struct net_device *netdev,
  * This polls all interfaces for received packets, and processes
  * packets from the RX queue.
  */
-static void net_step ( struct process *process ) {
+static void net_step ( struct process *process __unused ) {
 	struct net_device *netdev;
 	struct io_buffer *iobuf;
 
@@ -410,9 +410,6 @@ static void net_step ( struct process *process ) {
 			netdev->ll_protocol->rx ( iobuf, netdev );
 		}
 	}
-
-	/* Re-schedule ourself */
-	schedule ( process );
 }
 
 /** Networking stack process */
@@ -422,7 +419,7 @@ static struct process net_process = {
 
 /** Initialise the networking stack process */
 static void init_net ( void ) {
-	schedule ( &net_process );
+	process_add ( &net_process );
 }
 
 INIT_FN ( INIT_PROCESS, init_net, NULL, NULL );

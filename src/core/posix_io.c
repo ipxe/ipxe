@@ -78,6 +78,7 @@ static void posix_file_free ( struct refcnt *refcnt ) {
 	struct io_buffer *tmp;
 
 	list_for_each_entry_safe ( iobuf, tmp, &file->data, list ) {
+		list_del ( &iobuf->list );
 		free_iob ( iobuf );
 	}
 	free ( file );
@@ -190,6 +191,7 @@ static int posix_find_free_fd ( void ) {
 		if ( ! posix_fd_to_file ( fd ) )
 			return fd;
 	}
+	DBG ( "POSIX could not find free file descriptor\n" );
 	return -ENFILE;
 }
 
@@ -225,13 +227,11 @@ int open ( const char *uri_string ) {
 	if ( ( rc = xfer_open_uri ( &file->xfer, uri_string ) ) != 0 )
 		goto err;
 
-	/* Request data */
-	if ( ( rc = xfer_request_all ( &file->xfer ) ) != 0 )
-		goto err;
-
 	/* Wait for open to succeed or fail */
 	while ( list_empty ( &file->data ) ) {
 		step();
+		if ( file->rc == 0 )
+			break;
 		if ( file->rc != -EINPROGRESS ) {
 			rc = file->rc;
 			goto err;
@@ -240,6 +240,7 @@ int open ( const char *uri_string ) {
 
 	/* Add to list of open files.  List takes reference ownership. */
 	list_add ( &file->list, &posix_files );
+	DBG ( "POSIX opened %s as file %d\n", uri_string, fd );
 	return fd;
 
  err:
@@ -279,8 +280,10 @@ ssize_t read_user ( int fd, userptr_t buffer, off_t offset, size_t max_len ) {
 			copy_to_user ( buffer, offset, iobuf->data,
 				       frag_len );
 			iob_pull ( iobuf, frag_len );
-			if ( ! iob_len ( iobuf ) )
+			if ( ! iob_len ( iobuf ) ) {
+				list_del ( &iobuf-> list );
 				free_iob ( iobuf );
+			}
 			file->pos += frag_len;
 			len += frag_len;
 			offset += frag_len;

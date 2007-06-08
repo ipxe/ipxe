@@ -52,6 +52,7 @@ static struct socket_opener socket_openers_end[0]
 int xfer_open_uri ( struct xfer_interface *xfer, const char *uri_string ) {
 	struct uri *uri;
 	struct uri_opener *opener;
+	int rc = -ENOTSUP;
 
 	DBGC ( xfer, "XFER %p opening URI %s\n", xfer, uri_string );
 
@@ -61,44 +62,45 @@ int xfer_open_uri ( struct xfer_interface *xfer, const char *uri_string ) {
 
 	for ( opener = uri_openers ; opener < uri_openers_end ; opener++ ) {
 		if ( strcmp ( uri->scheme, opener->scheme ) == 0 ) {
-			return opener->open ( xfer, uri );
+			rc = opener->open ( xfer, uri );
+			goto done;
 		}
 	}
 
 	DBGC ( xfer, "XFER %p attempted to open unsupported URI scheme "
 	       "\"%s\"\n", xfer, uri->scheme );
-	free_uri ( uri );
-	return -ENOTSUP;
+ done:
+	uri_put ( uri );
+	return rc;
 }
 
 /**
  * Open socket
  *
  * @v xfer		Data transfer interface
- * @v domain		Communication domain (e.g. PF_INET)
- * @v type		Communication semantics (e.g. SOCK_STREAM)
+ * @v semantics		Communication semantics (e.g. SOCK_STREAM)
  * @v peer		Peer socket address
  * @v local		Local socket address, or NULL
  * @ret rc		Return status code
  */
-int xfer_open_socket ( struct xfer_interface *xfer,
-		       int domain, int type, struct sockaddr *peer,
-		       struct sockaddr *local ) {
+int xfer_open_socket ( struct xfer_interface *xfer, int semantics,
+		       struct sockaddr *peer, struct sockaddr *local ) {
 	struct socket_opener *opener;
 
 	DBGC ( xfer, "XFER %p opening (%s,%s) socket\n", xfer,
-	       socket_domain_name ( domain ), socket_type_name ( type ) );
+	       socket_semantics_name ( semantics ),
+	       socket_family_name ( peer->sa_family ) );
 
 	for ( opener = socket_openers; opener < socket_openers_end; opener++ ){
-		if ( ( opener->domain == domain ) &&
-		     ( opener->type == type ) ) {
+		if ( ( opener->semantics == semantics ) &&
+		     ( opener->family == peer->sa_family ) ) {
 			return opener->open ( xfer, peer, local );
 		}
 	}
 
 	DBGC ( xfer, "XFER %p attempted to open unsupported socket type "
-	       "(%s,%s)\n", xfer, socket_domain_name ( domain ),
-	       socket_type_name ( type ) );
+	       "(%s,%s)\n", xfer, socket_semantics_name ( semantics ),
+	       socket_family_name ( peer->sa_family ) );
 	return -ENOTSUP;
 }
 
@@ -117,12 +119,11 @@ int xfer_vopen ( struct xfer_interface *xfer, int type, va_list args ) {
 
 		return xfer_open_uri ( xfer, uri_string ); }
 	case LOCATION_SOCKET: {
-		int domain = va_arg ( args, int );
-		int type = va_arg ( args, int );
+		int semantics = va_arg ( args, int );
 		struct sockaddr *peer = va_arg ( args, struct sockaddr * );
 		struct sockaddr *local = va_arg ( args, struct sockaddr * );
 
-		return xfer_open_socket ( xfer, domain, type, peer, local ); }
+		return xfer_open_socket ( xfer, semantics, peer, local ); }
 	default:
 		DBGC ( xfer, "XFER %p attempted to open unsupported location "
 		       "type %d\n", xfer, type );

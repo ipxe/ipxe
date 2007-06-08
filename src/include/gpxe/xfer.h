@@ -112,6 +112,20 @@ enum seek_whence {
 	SEEK_CUR,
 };
 
+/**
+ * Describe seek basis
+ *
+ * @v whence		Basis for new position
+ */
+static inline __attribute__ (( always_inline )) const char *
+whence_text ( int whence ) {
+	switch ( whence ) {
+	case SEEK_SET:	return "SET";
+	case SEEK_CUR:	return "CUR";
+	default:	return "INVALID";
+	}
+}
+
 extern struct xfer_interface null_xfer;
 extern struct xfer_interface_operations null_xfer_ops;
 
@@ -121,14 +135,18 @@ extern int xfer_vredirect ( struct xfer_interface *xfer, int type,
 extern int xfer_redirect ( struct xfer_interface *xfer, int type, ... );
 extern int xfer_request ( struct xfer_interface *xfer, off_t offset,
 			  int whence, size_t len );
-extern int xfer_request_all ( struct xfer_interface *xfer );
 extern int xfer_seek ( struct xfer_interface *xfer, off_t offset, int whence );
+extern int xfer_ready ( struct xfer_interface *xfer );
 extern struct io_buffer * xfer_alloc_iob ( struct xfer_interface *xfer,
 					   size_t len );
 extern int xfer_deliver_iob ( struct xfer_interface *xfer,
 			      struct io_buffer *iobuf );
 extern int xfer_deliver_raw ( struct xfer_interface *xfer,
 			      const void *data, size_t len );
+extern int xfer_vprintf ( struct xfer_interface *xfer,
+			  const char *format, va_list args );
+extern int xfer_printf ( struct xfer_interface *xfer,
+			 const char *format, ... );
 
 extern void ignore_xfer_close ( struct xfer_interface *xfer, int rc );
 extern int ignore_xfer_vredirect ( struct xfer_interface *xfer,
