@@ -9,7 +9,7 @@
    
       Sicom Systems: http://www.sicompos.com/
    
-   Author: Marty Connor (mdc@thinguin.org)	   
+   Author: Marty Connor (mdc@etherboot.org)	   
    Adapted from a Linux driver which was written by Donald Becker
    
    This software may be used and distributed according to the terms
