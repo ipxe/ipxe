@@ -23,6 +23,7 @@
 #include <errno.h>
 #include <assert.h>
 #include <gpxe/list.h>
+#include <gpxe/umalloc.h>
 #include <gpxe/image.h>
 
 /** @file
@@ -41,6 +42,35 @@ static struct image_type image_types_end[0]
 	__table_end ( struct image_type, image_types );
 
 /**
+ * Free executable/loadable image
+ *
+ * @v refcnt		Reference counter
+ */
+static void free_image ( struct refcnt *refcnt ) {
+	struct image *image = container_of ( refcnt, struct image, refcnt );
+
+	ufree ( image->data );
+	free ( image );
+	DBGC ( image, "IMAGE %p freed\n", image );
+}
+
+/**
+ * Allocate executable/loadable image
+ *
+ * @ret image		Executable/loadable image
+ */
+struct image * alloc_image ( void ) {
+	struct image *image;
+
+	image = malloc ( sizeof ( *image ) );
+	if ( image ) {
+		memset ( image, 0, sizeof ( *image ) );
+		image->refcnt.free = free_image;
+	}
+	return image;
+}
+
+/**
  * Register executable/loadable image
  *
  * @v image		Executable/loadable image
@@ -56,6 +86,7 @@ int register_image ( struct image *image ) {
 	}
 
 	/* Add to image list */
+	image_get ( image );
 	list_add_tail ( &image->list, &images );
 	DBGC ( image, "IMAGE %p at [%lx,%lx) registered as %s\n",
 	       image, user_to_phys ( image->data, 0 ),
@@ -71,6 +102,7 @@ int register_image ( struct image *image ) {
  */
 void unregister_image ( struct image *image ) {
 	list_del ( &image->list );
+	image_put ( image );
 	DBGC ( image, "IMAGE %p unregistered\n", image );
 }
 
