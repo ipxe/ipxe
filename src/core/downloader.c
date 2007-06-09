@@ -17,6 +17,7 @@
  */
 
 #include <stdlib.h>
+#include <stdarg.h>
 #include <errno.h>
 #include <gpxe/xfer.h>
 #include <gpxe/open.h>
@@ -243,19 +244,21 @@ static struct xfer_interface_operations downloader_xfer_operations = {
  * Instantiate a downloader
  *
  * @v job		Job control interface
- * @v uri_string	URI string
  * @v image		Image to fill with downloaded file
  * @v register_image	Image registration routine
+ * @v type		Location type to pass to xfer_open()
+ * @v ...		Remaining arguments to pass to xfer_open()
  * @ret rc		Return status code
  *
  * Instantiates a downloader object to download the specified URI into
  * the specified image object.  If the download is successful, the
  * image registration routine @c register_image() will be called.
  */
-int create_downloader ( struct job_interface *job, const char *uri_string,
-			struct image *image,
-			int ( * register_image ) ( struct image *image ) ) {
+int create_downloader ( struct job_interface *job, struct image *image,
+			int ( * register_image ) ( struct image *image ),
+			int type, ... ) {
 	struct downloader *downloader;
+	va_list args;
 	int rc;
 
 	/* Allocate and initialise structure */
@@ -270,19 +273,21 @@ int create_downloader ( struct job_interface *job, const char *uri_string,
 		    &downloader->refcnt );
 	downloader->image = image_get ( image );
 	downloader->register_image = register_image;
+	va_start ( args, type );
 
 	/* Instantiate child objects and attach to our interfaces */
-	if ( ( rc = xfer_open ( &downloader->xfer, LOCATION_URI,
-				uri_string ) ) != 0 )
+	if ( ( rc = xfer_vopen ( &downloader->xfer, type, args ) ) != 0 )
 		goto err;
 
 	/* Attach parent interface, mortalise self, and return */
 	job_plug_plug ( &downloader->job, job );
 	ref_put ( &downloader->refcnt );
+	va_end ( args );
 	return 0;
 
  err:
 	downloader_finished ( downloader, rc );
 	ref_put ( &downloader->refcnt );
+	va_end ( args );
 	return rc;
 }
