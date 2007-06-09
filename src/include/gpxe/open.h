@@ -15,13 +15,20 @@ struct sockaddr;
 
 /** Location types */
 enum {
+	/** Location is a URI
+	 *
+	 * Parameter list for open() is:
+	 *
+	 * struct uri *uri;
+	 */
+	LOCATION_URI = 1,
 	/** Location is a URI string
 	 *
 	 * Parameter list for open() is:
 	 *
 	 * const char *uri_string;
 	 */
-	LOCATION_URI = 1,
+	LOCATION_URI_STRING,
 	/** Location is a socket
 	 *
 	 * Parameter list for open() is:
@@ -73,8 +80,9 @@ struct socket_opener {
 /** Register a socket opener */
 #define __socket_opener __table ( struct socket_opener, socket_openers, 01 )
 
-extern int xfer_open_uri ( struct xfer_interface *xfer,
-			   const char *uri_string );
+extern int xfer_open_uri ( struct xfer_interface *xfer, struct uri *uri );
+extern int xfer_open_uri_string ( struct xfer_interface *xfer,
+				  const char *uri_string );
 extern int xfer_open_named_socket ( struct xfer_interface *xfer,
 				    int semantics, struct sockaddr *peer,
 				    const char *name, struct sockaddr *local );

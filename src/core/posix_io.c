@@ -224,7 +224,7 @@ int open ( const char *uri_string ) {
 	INIT_LIST_HEAD ( &file->data );
 
 	/* Open URI on data transfer interface */
-	if ( ( rc = xfer_open_uri ( &file->xfer, uri_string ) ) != 0 )
+	if ( ( rc = xfer_open_uri_string ( &file->xfer, uri_string ) ) != 0 )
 		goto err;
 
 	/* Wait for open to succeed or fail */

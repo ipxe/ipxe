@@ -46,13 +46,33 @@ static struct socket_opener socket_openers_end[0]
  * Open URI
  *
  * @v xfer		Data transfer interface
+ * @v uri		URI
+ * @ret rc		Return status code
+ */
+int xfer_open_uri ( struct xfer_interface *xfer, struct uri *uri ) {
+	struct uri_opener *opener;
+
+	for ( opener = uri_openers ; opener < uri_openers_end ; opener++ ) {
+		if ( strcmp ( uri->scheme, opener->scheme ) == 0 )
+			return opener->open ( xfer, uri );
+	}
+
+	DBGC ( xfer, "XFER %p attempted to open unsupported URI scheme "
+	       "\"%s\"\n", xfer, uri->scheme );
+	return -ENOTSUP;
+}
+
+/**
+ * Open URI string
+ *
+ * @v xfer		Data transfer interface
  * @v uri_string	URI string (e.g. "http://etherboot.org/kernel")
  * @ret rc		Return status code
  */
-int xfer_open_uri ( struct xfer_interface *xfer, const char *uri_string ) {
+int xfer_open_uri_string ( struct xfer_interface *xfer,
+			   const char *uri_string ) {
 	struct uri *uri;
-	struct uri_opener *opener;
-	int rc = -ENOTSUP;
+	int rc;
 
 	DBGC ( xfer, "XFER %p opening URI %s\n", xfer, uri_string );
 
@@ -60,16 +80,8 @@ int xfer_open_uri ( struct xfer_interface *xfer, const char *uri_string ) {
 	if ( ! uri )
 		return -ENOMEM;
 
-	for ( opener = uri_openers ; opener < uri_openers_end ; opener++ ) {
-		if ( strcmp ( uri->scheme, opener->scheme ) == 0 ) {
-			rc = opener->open ( xfer, uri );
-			goto done;
-		}
-	}
+	rc = xfer_open_uri ( xfer, uri );
 
-	DBGC ( xfer, "XFER %p attempted to open unsupported URI scheme "
-	       "\"%s\"\n", xfer, uri->scheme );
- done:
 	uri_put ( uri );
 	return rc;
 }
@@ -114,10 +126,12 @@ int xfer_open_socket ( struct xfer_interface *xfer, int semantics,
  */
 int xfer_vopen ( struct xfer_interface *xfer, int type, va_list args ) {
 	switch ( type ) {
-	case LOCATION_URI: {
+	case LOCATION_URI_STRING: {
 		const char *uri_string = va_arg ( args, const char * );
 
-		return xfer_open_uri ( xfer, uri_string ); }
+		return xfer_open_uri_string ( xfer, uri_string ); }
+	case LOCATION_URI:
+		
 	case LOCATION_SOCKET: {
 		int semantics = va_arg ( args, int );
 		struct sockaddr *peer = va_arg ( args, struct sockaddr * );
