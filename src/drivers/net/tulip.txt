@@ -42,12 +42,13 @@ will help the next person who hacks the code or needs to support some
 tulip clone card, or wishes to add functionality.
 
 Anyway, please test this if you can on your tulip based card, and let
-me (mdc@thinguin.org) and the netboot list (netboot@baghira.han.de)
-know how things go.  I also would appreciate code review by people who
-program.  I'm a strong believer in "another set of eyes".
+me (mdc@etherboot.org) and the Etherboot-Discuss list
+(etherboot-discuss@lists.sourceforge.net) know how things go.  I also
+would appreciate code review by people who program.  I'm a strong
+believer in "another set of eyes".
 
 Regards,
 
 Marty Connor
-mdc@thinguin.org
-http://www.thinguin.org/
+mdc@etherboot.org
+http://www.etherboot.org/
