@@ -3,7 +3,7 @@
 /*
   Tulip and clone Etherboot Driver
 
-  By Marty Connor (mdc@thinguin.org)
+  By Marty Connor (mdc@etherboot.org)
   Copyright (C) 2001 Entity Cyber, Inc.
 
   This software may be used and distributed according to the terms

@@ -52,7 +52,7 @@
      Rx ring contents by dumping the 2K FIFO contents right where we wanted to
      get the next packet.  Oh well, what fun.
 
-  18 Jan 2000   mdc@thinguin.org (Marty Connor)
+  18 Jan 2000   mdc@etherboot.org (Marty Connor)
      Drastically simplified error handling.  Basically, if any error
      in transmission or reception occurs, the card is reset.
      Also, pointed all transmit descriptors to the same buffer to

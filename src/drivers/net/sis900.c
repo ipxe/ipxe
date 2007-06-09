@@ -6,7 +6,7 @@
 
    Revision:	1.0	March 1, 2001
    
-   Author: Marty Connor (mdc@thinguin.org)
+   Author: Marty Connor (mdc@etherboot.org)
 
    Adapted from a Linux driver which was written by Donald Becker
    and modified by Ollie Lho and Chin-Shan Li of SiS Corporation.
