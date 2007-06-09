@@ -107,20 +107,6 @@ void unregister_image ( struct image *image ) {
 }
 
 /**
- * Move image to start of list of registered images
- *
- * @v image		Executable/loadable image
- *
- * Move the image to the start of the image list.  This makes it
- * easier to keep track of which of the images marked as loaded is
- * likely to still be valid.
- */
-void promote_image ( struct image *image ) {
-	list_del ( &image->list );
-	list_add ( &image->list, &images );
-}
-
-/**
  * Find image by name
  *
  * @v name		Image name

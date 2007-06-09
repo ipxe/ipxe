@@ -44,6 +44,13 @@ static int script_exec ( struct image *image ) {
 	char *eol;
 	int rc;
 
+	/* Temporarily de-register image, so that a "boot" command
+	 * doesn't throw us into an execution loop.  Hold a reference
+	 * to avoid the image's being freed.
+	 */
+	image_get ( image );
+	unregister_image ( image );
+
 	while ( offset < image->len ) {
 	
 		/* Read up to cmdbuf bytes from script into buffer */
@@ -60,7 +67,8 @@ static int script_exec ( struct image *image ) {
 		if ( ! eol ) {
 			DBG ( "Script line too long (max %d bytes)\n",
 			      sizeof ( cmdbuf ) );
-			return -ENOEXEC;
+			rc = -ENOEXEC;
+			goto done;
 		}
 
 		/* Mark end of line and execute command */
@@ -69,14 +77,19 @@ static int script_exec ( struct image *image ) {
 		if ( ( rc = system ( cmdbuf ) ) != 0 ) {
 			DBG ( "Command \"%s\" exited with status %d\n",
 			      cmdbuf, rc );
-			return rc;
+			goto done;
 		}
 		
 		/* Move to next line */
 		offset += ( ( eol - cmdbuf ) + 1 );
 	}
 
-	return 0;
+	rc = 0;
+ done:
+	/* Re-register image and return */
+	register_image ( image );
+	image_put ( image );
+	return rc;
 }
 
 /**

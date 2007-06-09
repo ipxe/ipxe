@@ -89,7 +89,8 @@ int imgload ( struct image *image ) {
 		return rc;
 
 	/* If we succeed, move the image to the start of the list */
-	promote_image ( image );
+#warning "No longer exists"
+	//	promote_image ( image );
 
 	return 0;
 }
