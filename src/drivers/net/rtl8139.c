@@ -372,6 +372,7 @@ static int rtl_transmit ( struct net_device *netdev, struct io_buffer *iobuf ) {
 	/* Check for space in TX ring */
 	if ( rtl->tx.iobuf[rtl->tx.next] != NULL ) {
 		printf ( "TX overflow\n" );
+		free_iob ( iobuf );
 		return -ENOBUFS;
 	}
 
