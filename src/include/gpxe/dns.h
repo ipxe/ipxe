@@ -9,8 +9,6 @@
 
 #include <stdint.h>
 #include <gpxe/in.h>
-#include <gpxe/async.h>
-#include <gpxe/retry.h>
 
 /*
  * Constants
@@ -89,29 +87,6 @@ union dns_rr_info {
 	struct dns_rr_info_cname cname;
 };
 
-/** A DNS request */
-struct dns_request {
-	/** Socket address to fill in with resolved address */
-	struct sockaddr *sa;
-
-	/** Current query packet */
-	struct dns_query query;
-	/** Length of current query packet */
-	struct dns_query_info *qinfo;
-	/** Recursion counter */
-	unsigned int recursion;
-
-	/** Asynchronous operation */
-	struct async async;
-	/** UDP connection */
-	struct udp_connection udp;
-	/** Retry timer */
-	struct retry_timer timer;
-};
-
-extern struct in_addr nameserver;
-
-extern int dns_resolv ( const char *name, struct sockaddr *sa,
-			struct async *parent );
+extern struct sockaddr_tcpip nameserver;
 
 #endif /* _GPXE_DNS_H */

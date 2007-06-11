@@ -153,6 +153,13 @@ struct resolver {
 #define __resolver( resolv_order ) \
 	__table ( struct resolver, resolvers, resolv_order )
 
+extern void resolv_done ( struct resolv_interface *resolv,
+			  struct sockaddr *sa, int rc );
+extern void ignore_resolv_done ( struct resolv_interface *resolv,
+			  struct sockaddr *sa, int rc );
+extern struct resolv_interface_operations null_resolv_ops;
+struct resolv_interface null_resolv;
+
 extern int resolv ( struct resolv_interface *resolv, const char *name,
 		    struct sockaddr *sa );
 

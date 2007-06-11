@@ -24,9 +24,12 @@
 #include <string.h>
 #include <errno.h>
 #include <byteswap.h>
-#include <gpxe/async.h>
-#include <gpxe/udp.h>
+#include <gpxe/refcnt.h>
+#include <gpxe/xfer.h>
+#include <gpxe/open.h>
 #include <gpxe/resolv.h>
+#include <gpxe/retry.h>
+#include <gpxe/tcpip.h>
 #include <gpxe/dns.h>
 
 /** @file
@@ -35,8 +38,54 @@
  *
  */
 
-/* The DNS server */
-struct in_addr nameserver = { INADDR_NONE };
+/** The DNS server */
+struct sockaddr_tcpip nameserver = {
+	.st_port = htons ( DNS_PORT ),
+};
+
+/** A DNS request */
+struct dns_request {
+	/** Reference counter */
+	struct refcnt refcnt;
+	/** Name resolution interface */
+	struct resolv_interface resolv;
+	/** Data transfer interface */
+	struct xfer_interface socket;
+	/** Retry timer */
+	struct retry_timer timer;
+
+	/** Socket address to fill in with resolved address */
+	struct sockaddr sa;
+	/** Current query packet */
+	struct dns_query query;
+	/** Location of query info structure within current packet
+	 *
+	 * The query info structure is located immediately after the
+	 * compressed name.
+	 */
+	struct dns_query_info *qinfo;
+	/** Recursion counter */
+	unsigned int recursion;
+};
+
+/**
+ * Mark DNS request as complete
+ *
+ * @v dns		DNS request
+ * @v rc		Return status code
+ */
+static void dns_done ( struct dns_request *dns, int rc ) {
+
+	/* Stop the retry timer */
+	stop_timer ( &dns->timer );
+
+	/* Close data transfer interface */
+	xfer_nullify ( &dns->socket );
+	xfer_close ( &dns->socket, rc );
+
+	/* Mark name resolution as complete */
+	resolv_done ( &dns->resolv, &dns->sa, rc );
+}
 
 /**
  * Compare DNS reply name against the query name from the original request
@@ -47,7 +96,8 @@ struct in_addr nameserver = { INADDR_NONE };
  * @ret	zero		Names match
  * @ret non-zero	Names do not match
  */
-static int dns_name_cmp ( struct dns_request *dns, struct dns_header *reply, 
+static int dns_name_cmp ( struct dns_request *dns,
+			  const struct dns_header *reply, 
 			  const char *rname ) {
 	const char *qname = dns->query.payload;
 	int i;
@@ -101,7 +151,7 @@ static const char * dns_skip_name ( const char *name ) {
  * @ret rr		DNS RR, or NULL if not found
  */
 static union dns_rr_info * dns_find_rr ( struct dns_request *dns,
-					 struct dns_header *reply ) {
+					 const struct dns_header *reply ) {
 	int i, cmp;
 	const char *p = ( ( char * ) reply ) + sizeof ( struct dns_header );
 	union dns_rr_info *rr_info;
@@ -179,7 +229,7 @@ static inline char * dns_unmake_name ( char *name ) {
  * @v buf		Buffer into which to decompress DNS name
  * @ret next		Byte following decompressed DNS name
  */
-static char * dns_decompress_name ( struct dns_header *reply,
+static char * dns_decompress_name ( const struct dns_header *reply,
 				    const char *name, char *buf ) {
 	int i, len;
 
@@ -199,30 +249,13 @@ static char * dns_decompress_name ( struct dns_header *reply,
 }
 
 /**
- * Mark DNS request as complete
- *
- * @v dns		DNS request
- * @v rc		Return status code
- */
-static void dns_done ( struct dns_request *dns, int rc ) {
-
-	/* Stop the retry timer */
-	stop_timer ( &dns->timer );
-
-	/* Close UDP connection */
-	udp_close ( &dns->udp );
-
-	/* Mark async operation as complete */
-	async_done ( &dns->async, rc );
-}
-
-/**
  * Send next packet in DNS request
  *
  * @v dns		DNS request
  */
-static void dns_send_packet ( struct dns_request *dns ) {
+static int dns_send_packet ( struct dns_request *dns ) {
 	static unsigned int qid = 0;
+	size_t qlen;
 
 	/* Increment query ID */
 	dns->query.dns.id = htons ( ++qid );
@@ -233,9 +266,9 @@ static void dns_send_packet ( struct dns_request *dns ) {
 	start_timer ( &dns->timer );
 
 	/* Send the data */
-	udp_send ( &dns->udp, &dns->query,
-		   ( ( ( void * ) dns->qinfo ) - ( ( void * ) &dns->query )
-		     + sizeof ( dns->qinfo ) ) );
+	qlen = ( ( ( void * ) dns->qinfo ) - ( ( void * ) &dns->query )
+		 + sizeof ( dns->qinfo ) );
+	return xfer_deliver_raw ( &dns->socket, &dns->query, qlen );
 }
 
 /**
@@ -258,18 +291,16 @@ static void dns_timer_expired ( struct retry_timer *timer, int fail ) {
 /**
  * Receive new data
  *
- * @v udp		UDP connection
- * @v data		Received data
- * @v len		Length of received data
- * @v st_src		Partially-filled source address
- * @v st_dest		Partially-filled destination address
+ * @v socket		UDP socket
+ * @v data		DNS reply
+ * @v len		Length of DNS reply
+ * @ret rc		Return status code
  */
-static int dns_newdata ( struct udp_connection *conn, void *data, size_t len,
-			 struct sockaddr_tcpip *st_src __unused,
-			 struct sockaddr_tcpip *st_dest __unused ) {
+static int dns_xfer_deliver_raw ( struct xfer_interface *socket,
+				  const void *data, size_t len ) {
 	struct dns_request *dns =
-		container_of ( conn, struct dns_request, udp );
-	struct dns_header *reply = data;
+		container_of ( socket, struct dns_request, socket );
+	const struct dns_header *reply = data;
 	union dns_rr_info *rr_info;
 	struct sockaddr_in *sin;
 	unsigned int qtype = dns->qinfo->qtype;
@@ -311,7 +342,7 @@ static int dns_newdata ( struct udp_connection *conn, void *data, size_t len,
 			/* Found the target A record */
 			DBGC ( dns, "DNS %p found address %s\n",
 			       dns, inet_ntoa ( rr_info->a.in_addr ) );
-			sin = ( struct sockaddr_in * ) dns->sa;
+			sin = ( struct sockaddr_in * ) &dns->sa;
 			sin->sin_family = AF_INET;
 			sin->sin_addr = rr_info->a.in_addr;
 
@@ -380,71 +411,62 @@ static int dns_newdata ( struct udp_connection *conn, void *data, size_t len,
 	}
 }
 
-/** DNS UDP operations */
-struct udp_operations dns_udp_operations = {
-	.newdata = dns_newdata,
-};
-
 /**
- * Reap asynchronous operation
+ * Receive new data
  *
- * @v async		Asynchronous operation
+ * @v socket		UDP socket
+ * @v rc		Reason for close
  */
-static void dns_reap ( struct async *async ) {
+static void dns_xfer_close ( struct xfer_interface *socket, int rc ) {
 	struct dns_request *dns =
-		container_of ( async, struct dns_request, async );
+		container_of ( socket, struct dns_request, socket );
 
-	free ( dns );
+	if ( ! rc )
+		rc = -ECONNABORTED;
+
+	dns_done ( dns, rc );
 }
 
-/**
- * Handle SIGKILL
- *
- * @v async		Asynchronous operation
- */
-static void dns_sigkill ( struct async *async, enum signal signal __unused ) {
-	struct dns_request *dns =
-		container_of ( async, struct dns_request, async );
-
-	dns_done ( dns, -ECANCELED );
-}
-
-/** DNS asynchronous operations */
-static struct async_operations dns_async_operations = {
-	.reap = dns_reap,
-	.signal = {
-		[SIGKILL] = dns_sigkill,
-	},
+/** DNS socket operations */
+static struct xfer_interface_operations dns_socket_operations = {
+	.close		= dns_xfer_close,
+	.vredirect	= xfer_vopen,
+	.request	= ignore_xfer_request,
+	.seek		= ignore_xfer_seek,
+	.alloc_iob	= default_xfer_alloc_iob,
+	.deliver_iob	= xfer_deliver_as_raw,
+	.deliver_raw	= dns_xfer_deliver_raw,
 };
 
 /**
  * Resolve name using DNS
  *
- * @v name		Host name to resolve
+ * @v resolv		Name resolution interface
+ * @v name		Name to resolve
  * @v sa		Socket address to fill in
- * @v parent		Parent asynchronous operation
  * @ret rc		Return status code
  */
-int dns_resolv ( const char *name, struct sockaddr *sa,
-		 struct async *parent ) {
+static int dns_resolv ( struct resolv_interface *resolv,
+			const char *name, struct sockaddr *sa ) {
 	struct dns_request *dns;
-	union {
-		struct sockaddr_tcpip st;
-		struct sockaddr_in sin;
-	} server;
 	int rc;
+
+	/* Fail immediately if no DNS servers */
+	if ( ! nameserver.st_family ) {
+		DBG ( "DNS not attempting to resolve \"%s\": "
+		      "no DNS servers\n", name );
+		return -ENXIO;
+	}
 
 	/* Allocate DNS structure */
 	dns = malloc ( sizeof ( *dns ) );
-	if ( ! dns ) {
-		rc = -ENOMEM;
-		goto err;
-	}
+	if ( ! dns )
+		return -ENOMEM;
 	memset ( dns, 0, sizeof ( *dns ) );
-	dns->sa = sa;
+	resolv_init ( &dns->resolv, &null_resolv_ops, &dns->refcnt );
+	xfer_init ( &dns->socket, &dns_socket_operations, &dns->refcnt );
 	dns->timer.expired = dns_timer_expired;
-	dns->udp.udp_op = &dns_udp_operations;
-	async_init ( &dns->async, &dns_async_operations, parent );
+	memcpy ( &dns->sa, sa, sizeof ( dns->sa ) );
 
 	/* Create query */
 	dns->query.dns.flags = htons ( DNS_FLAG_QUERY | DNS_FLAG_OPCODE_QUERY |
@@ -454,34 +476,25 @@ int dns_resolv ( const char *name, struct sockaddr *sa,
 	dns->qinfo->qtype = htons ( DNS_TYPE_A );
 	dns->qinfo->qclass = htons ( DNS_CLASS_IN );
 
-	/* Identify nameserver */
-	memset ( &server, 0, sizeof ( server ) );
-	server.sin.sin_family = AF_INET;
-	server.sin.sin_port = htons ( DNS_PORT );
-	server.sin.sin_addr = nameserver;
-	if ( server.sin.sin_addr.s_addr == INADDR_NONE ) {
-		DBGC ( dns, "DNS %p no name servers\n", dns );
-		rc = -ENXIO;
+	/* Open UDP connection */
+	if ( ( rc = xfer_open_socket ( &dns->socket, SOCK_DGRAM,
+				       ( struct sockaddr * ) &nameserver,
+				       NULL ) ) != 0 ) {
+		DBGC ( dns, "DNS %p could not open socket: %s\n",
+		       dns, strerror ( rc ) );
 		goto err;
 	}
-
-	/* Open UDP connection */
-	DBGC ( dns, "DNS %p using nameserver %s\n", dns, 
-	       inet_ntoa ( server.sin.sin_addr ) );
-	udp_connect ( &dns->udp, &server.st );
-	if ( ( rc = udp_open ( &dns->udp, 0 ) ) != 0 )
-		goto err;
 
 	/* Send first DNS packet */
 	dns_send_packet ( dns );
 
+	/* Attach parent interface, mortalise self, and return */
+	resolv_plug_plug ( &dns->resolv, resolv );
+	ref_put ( &dns->refcnt );
 	return 0;	
 
  err:
-	DBGC ( dns, "DNS %p could not create request: %s\n", 
-	       dns, strerror ( rc ) );
-	async_uninit ( &dns->async );
-	free ( dns );
+	ref_put ( &dns->refcnt );
 	return rc;
 }
 
