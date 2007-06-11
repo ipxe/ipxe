@@ -23,7 +23,7 @@ extern unsigned long strtoul ( const char *p, char **endp, int base );
 extern void * malloc ( size_t size );
 extern void * realloc ( void *old_ptr, size_t new_size );
 extern void free ( void *ptr );
-extern void * _calloc ( size_t len );
+extern void * zalloc ( size_t len );
 
 /**
  * Allocate cleared memory
@@ -35,11 +35,11 @@ extern void * _calloc ( size_t len );
  * Allocate memory as per malloc(), and zero it.
  *
  * This is implemented as a static inline, with the body of the
- * function in _calloc(), since in most cases @c nmemb will be 1 and
+ * function in zalloc(), since in most cases @c nmemb will be 1 and
  * doing the multiply is just wasteful.
  */
 static inline void * calloc ( size_t nmemb, size_t size ) {
-	return _calloc ( nmemb * size );
+	return zalloc ( nmemb * size );
 }
 
 /*****************************************************************************

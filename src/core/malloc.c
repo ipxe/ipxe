@@ -311,8 +311,11 @@ void free ( void *ptr ) {
  * @ret ptr		Allocated memory
  *
  * Allocate memory as per malloc(), and zero it.
+ *
+ * This function name is non-standard, but pretty intuitive.
+ * zalloc(size) is always equivalent to calloc(1,size)
  */
-void * _calloc ( size_t size ) {
+void * zalloc ( size_t size ) {
 	void *data;
 
 	data = malloc ( size );
