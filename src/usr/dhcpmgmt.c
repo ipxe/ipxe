@@ -35,7 +35,7 @@
  */
 
 /* Avoid dragging in dns.o */
-struct in_addr nameserver;
+struct sockaddr_tcpip nameserver;
 
 /* Avoid dragging in syslog.o */
 struct in_addr syslogserver;
@@ -52,6 +52,7 @@ int dhcp ( struct net_device *netdev ) {
 	struct in_addr address = { 0 };
 	struct in_addr netmask = { 0 };
 	struct in_addr gateway = { INADDR_NONE };
+	struct sockaddr_in *sin_nameserver;
 	struct async async;
 	int rc;
 
@@ -98,8 +99,10 @@ int dhcp ( struct net_device *netdev ) {
 	}
 
 	/* Retrieve other DHCP options that we care about */
+	sin_nameserver = ( struct sockaddr_in * ) &nameserver;
+	sin_nameserver->sin_family = AF_INET;
 	find_dhcp_ipv4_option ( dhcp_options, DHCP_DNS_SERVERS,
-				&nameserver );
+				&sin_nameserver->sin_addr );
 	find_dhcp_ipv4_option ( dhcp_options, DHCP_LOG_SERVERS,
 				&syslogserver );
 
