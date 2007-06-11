@@ -35,6 +35,8 @@
  * @v uri		URI
  */
 static void dump_uri ( struct uri *uri ) {
+	if ( ! uri )
+		return;
 	if ( uri->scheme )
 		DBG ( " scheme \"%s\"", uri->scheme );
 	if ( uri->opaque )
@@ -174,12 +176,14 @@ struct uri * parse_uri ( const char *uri_string ) {
 /**
  * Get port from URI
  *
- * @v uri		URI
+ * @v uri		URI, or NULL
  * @v default_port	Default port to use if none specified in URI
  * @ret port		Port
  */
 unsigned int uri_port ( struct uri *uri, unsigned int default_port ) {
-	return ( uri->port ? strtoul ( uri->port, NULL, 0 ) : default_port );
+	if ( ( ! uri ) || ( ! uri->port ) )
+		return default_port;
+	return ( strtoul ( uri->port, NULL, 0 ) );
 }
 
 /**
@@ -187,7 +191,7 @@ unsigned int uri_port ( struct uri *uri, unsigned int default_port ) {
  *
  * @v buf		Buffer to fill with URI string
  * @v size		Size of buffer
- * @v uri		URI to write into buffer
+ * @v uri		URI to write into buffer, or NULL
  * @ret len		Length of URI string
  */
 int unparse_uri ( char *buf, size_t size, struct uri *uri ) {
@@ -196,6 +200,13 @@ int unparse_uri ( char *buf, size_t size, struct uri *uri ) {
 	DBG ( "URI unparsing" );
 	dump_uri ( uri );
 	DBG ( "\n" );
+
+	/* Special-case NULL URI */
+	if ( ! uri ) {
+		if ( size )
+			buf[0] = '\0';
+		return 0;
+	}
 
 	/* Special-case opaque URIs */
 	if ( uri->opaque ) {
@@ -332,7 +343,7 @@ char * resolve_path ( const char *base_path,
 /**
  * Resolve base+relative URI
  *
- * @v base_uri		Base URI
+ * @v base_uri		Base URI, or NULL
  * @v relative_uri	Relative URI
  * @ret resolved_uri	Resolved URI
  *
@@ -347,7 +358,7 @@ struct uri * resolve_uri ( struct uri *base_uri,
 	struct uri *new_uri;
 
 	/* If relative URI is absolute, just re-use it */
-	if ( uri_is_absolute ( relative_uri ) )
+	if ( uri_is_absolute ( relative_uri ) || ( ! base_uri ) )
 		return uri_get ( relative_uri );
 
 	/* Mangle URI */
