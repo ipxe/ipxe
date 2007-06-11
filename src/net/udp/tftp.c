@@ -24,9 +24,11 @@
 #include <byteswap.h>
 #include <errno.h>
 #include <assert.h>
-#include <gpxe/async.h>
-#include <gpxe/tftp.h>
+#include <gpxe/refcnt.h>
+#include <gpxe/xfer.h>
+#include <gpxe/open.h>
 #include <gpxe/uri.h>
+#include <gpxe/tftp.h>
 
 /** @file
  *
@@ -34,18 +36,223 @@
  *
  */
 
-/** A TFTP option */
-struct tftp_option {
-	/** Option name */
-	const char *name;
-	/** Option processor
+/**
+ * A TFTP request
+ *
+ * This data structure holds the state for an ongoing TFTP transfer.
+ */
+struct tftp_request {
+	/** Reference count */
+	struct refcnt refcnt;
+	/** Data transfer interface */
+	struct xfer_interface xfer;
+
+	/** URI being fetched */
+	struct uri *uri;
+	/** Transport layer interface */
+	struct xfer_interface socket;
+
+	/** Data block size
 	 *
-	 * @v tftp	TFTP connection
-	 * @v value	Option value
-	 * @ret rc	Return status code
+	 * This is the "blksize" option negotiated with the TFTP
+	 * server.  (If the TFTP server does not support TFTP options,
+	 * this will default to 512).
 	 */
-	int ( * process ) ( struct tftp_session *tftp, const char *value );
+	unsigned int blksize;
+	/** File size
+	 *
+	 * This is the value returned in the "tsize" option from the
+	 * TFTP server.  If the TFTP server does not support the
+	 * "tsize" option, this value will be zero.
+	 */
+	unsigned long tsize;
+
+	/** Request state
+	 *
+	 * This is the block number to be used in the next ACK sent
+	 * back to the server, i.e. the number of the last received
+	 * data block.  The value zero indicates that the last
+	 * received block was an OACK (i.e. that the next ACK will
+	 * contain a block number of zero), and any value less than
+	 * zero indicates that the connection has not yet been opened
+	 * (i.e. that no blocks have yet been received).
+	 */
+	int state;
+	/** Peer address
+	 *
+	 * The peer address is determined by the first response
+	 * received to the TFTP RRQ.
+	 */
+	struct sockaddr_tcpip peer;
+	/** Retransmission timer */
+	struct retry_timer timer;
 };
+
+/**
+ * Free TFTP request
+ *
+ * @v refcnt		Reference counter
+ */
+static void tftp_free ( struct refcnt *refcnt ) {
+	struct tftp_request *tftp =
+		container_of ( refcnt, struct tftp_request, refcnt );
+
+	uri_put ( tftp->uri );
+	free ( tftp );
+}
+
+/**
+ * Mark TFTP request as complete
+ *
+ * @v tftp		TFTP connection
+ * @v rc		Return status code
+ */
+static void tftp_done ( struct tftp_request *tftp, int rc ) {
+
+	/* Stop the retry timer */
+	stop_timer ( &tftp->timer );
+
+	/* Close all data transfer interfaces */
+	xfer_nullify ( &tftp->socket );
+	xfer_close ( &tftp->socket, rc );
+	xfer_nullify ( &tftp->xfer );
+	xfer_close ( &tftp->xfer, rc );
+}
+
+/**
+ * TFTP requested blocksize
+ *
+ * This is treated as a global configuration parameter.
+ */
+static unsigned int tftp_request_blksize = TFTP_MAX_BLKSIZE;
+
+/**
+ * Set TFTP request blocksize
+ *
+ * @v blksize		Requested block size
+ */
+void tftp_set_request_blksize ( unsigned int blksize ) {
+	if ( blksize < TFTP_DEFAULT_BLKSIZE )
+		blksize = TFTP_DEFAULT_BLKSIZE;
+	tftp_request_blksize = blksize;
+}
+
+/**
+ * Transmit RRQ
+ *
+ * @v tftp		TFTP connection
+ * @ret rc		Return status code
+ */
+static int tftp_send_rrq ( struct tftp_request *tftp ) {
+	struct tftp_rrq *rrq;
+	const char *path = tftp->uri->path;
+	size_t len = ( sizeof ( *rrq ) + strlen ( path ) + 1 /* NUL */
+		       + 5 + 1 /* "octet" + NUL */
+		       + 7 + 1 + 5 + 1 /* "blksize" + NUL + ddddd + NUL */
+		       + 5 + 1 + 1 + 1 /* "tsize" + NUL + "0" + NUL */ );
+	struct io_buffer *iobuf;
+
+	DBGC ( tftp, "TFTP %p requesting \"%s\"\n", tftp, path );
+
+	/* Allocate buffer */
+	iobuf = xfer_alloc_iob ( &tftp->socket, len );
+	if ( ! iobuf )
+		return -ENOMEM;
+
+	/* Build request */
+	rrq = iob_put ( iobuf, sizeof ( *rrq ) );
+	rrq->opcode = htons ( TFTP_RRQ );
+	iob_put ( iobuf,
+		  snprintf ( iobuf->data, iob_tailroom ( iobuf ),
+			     "%s%coctet%cblksize%c%d%ctsize%c0", path, 0,
+			     0, 0, tftp_request_blksize, 0, 0 ) + 1 );
+
+	/* RRQ always goes to the address specified in the initial
+	 * xfer_open() call
+	 */
+	return xfer_deliver_iob ( &tftp->socket, iobuf );
+}
+
+/**
+ * Transmit ACK
+ *
+ * @v tftp		TFTP connection
+ * @ret rc		Return status code
+ */
+static int tftp_send_ack ( struct tftp_request *tftp ) {
+	struct tftp_ack *ack;
+	struct io_buffer *iobuf;
+	struct xfer_metadata meta = {
+		.dest = ( struct sockaddr * ) &tftp->peer,
+	};
+
+	/* Allocate buffer */
+	iobuf = xfer_alloc_iob ( &tftp->socket, sizeof ( *ack ) );
+	if ( ! iobuf )
+		return -ENOMEM;
+
+	/* Build ACK */
+	ack = iob_put ( iobuf, sizeof ( *ack ) );
+	ack->opcode = htons ( TFTP_ACK );
+	ack->block = htons ( tftp->state );
+
+	/* ACK always goes to the peer recorded from the RRQ response */
+	return xfer_deliver_iob_meta ( &tftp->socket, iobuf, &meta );
+}
+
+/**
+ * Transmit data
+ *
+ * @v tftp		TFTP connection
+ * @ret rc		Return status code
+ */
+static int tftp_send_packet ( struct tftp_request *tftp ) {
+
+	/* Start retransmission timer */
+	start_timer ( &tftp->timer );
+
+	/* Send RRQ or ACK as appropriate */
+	if ( tftp->state < 0 ) {
+		return tftp_send_rrq ( tftp );
+	} else {
+		return tftp_send_ack ( tftp );
+	}
+}
+
+/**
+ * Handle TFTP retransmission timer expiry
+ *
+ * @v timer		Retry timer
+ * @v fail		Failure indicator
+ */
+static void tftp_timer_expired ( struct retry_timer *timer, int fail ) {
+	struct tftp_request *tftp =
+		container_of ( timer, struct tftp_request, timer );
+
+	if ( fail ) {
+		tftp_done ( tftp, -ETIMEDOUT );
+	} else {
+		tftp_send_packet ( tftp );
+	}
+}
+
+/**
+ * Mark TFTP block as received
+ *
+ * @v tftp		TFTP connection
+ * @v block		Block number
+ */
+static void tftp_received ( struct tftp_request *tftp, unsigned int block ) {
+
+	/* Stop the retry timer */
+	stop_timer ( &tftp->timer );
+
+	/* Update state to indicate which block we're now waiting for */
+	tftp->state = block;
+
+	/* Send next packet */
+	tftp_send_packet ( tftp );
+}
 
 /**
  * Process TFTP "blksize" option
@@ -54,7 +261,7 @@ struct tftp_option {
  * @v value		Option value
  * @ret rc		Return status code
  */
-static int tftp_process_blksize ( struct tftp_session *tftp,
+static int tftp_process_blksize ( struct tftp_request *tftp,
 				  const char *value ) {
 	char *end;
 
@@ -76,7 +283,7 @@ static int tftp_process_blksize ( struct tftp_session *tftp,
  * @v value		Option value
  * @ret rc		Return status code
  */
-static int tftp_process_tsize ( struct tftp_session *tftp,
+static int tftp_process_tsize ( struct tftp_request *tftp,
 				const char *value ) {
 	char *end;
 
@@ -88,8 +295,25 @@ static int tftp_process_tsize ( struct tftp_session *tftp,
 	}
 	DBGC ( tftp, "TFTP %p tsize=%ld\n", tftp, tftp->tsize );
 
+	/* Notify recipient of file size */
+	xfer_seek ( &tftp->xfer, tftp->tsize, SEEK_SET );
+	xfer_seek ( &tftp->xfer, 0, SEEK_SET );
+
 	return 0;
 }
+
+/** A TFTP option */
+struct tftp_option {
+	/** Option name */
+	const char *name;
+	/** Option processor
+	 *
+	 * @v tftp	TFTP connection
+	 * @v value	Option value
+	 * @ret rc	Return status code
+	 */
+	int ( * process ) ( struct tftp_request *tftp, const char *value );
+};
 
 /** Recognised TFTP options */
 static struct tftp_option tftp_options[] = {
@@ -106,7 +330,7 @@ static struct tftp_option tftp_options[] = {
  * @v value		Option value
  * @ret rc		Return status code
  */
-static int tftp_process_option ( struct tftp_session *tftp,
+static int tftp_process_option ( struct tftp_request *tftp,
 				 const char *name, const char *value ) {
 	struct tftp_option *option;
 
@@ -121,110 +345,6 @@ static int tftp_process_option ( struct tftp_session *tftp,
 	return -EINVAL;
 }
 
-/** Translation between TFTP errors and internal error numbers */
-static const uint8_t tftp_errors[] = {
-	[TFTP_ERR_FILE_NOT_FOUND]	= PXENV_STATUS_TFTP_FILE_NOT_FOUND,
-	[TFTP_ERR_ACCESS_DENIED]	= PXENV_STATUS_TFTP_ACCESS_VIOLATION,
-	[TFTP_ERR_ILLEGAL_OP]		= PXENV_STATUS_TFTP_UNKNOWN_OPCODE,
-};
-
-/**
- * Mark TFTP session as complete
- *
- * @v tftp		TFTP connection
- * @v rc		Return status code
- */
-static void tftp_done ( struct tftp_session *tftp, int rc ) {
-
-	/* Stop the retry timer */
-	stop_timer ( &tftp->timer );
-
-	/* Close UDP connection */
-	udp_close ( &tftp->udp );
-
-	/* Mark async operation as complete */
-	async_done ( &tftp->async, rc );
-}
-
-/**
- * Send next packet in TFTP session
- *
- * @v tftp		TFTP connection
- */
-static void tftp_send_packet ( struct tftp_session *tftp ) {
-	start_timer ( &tftp->timer );
-	udp_senddata ( &tftp->udp );
-}
-
-/**
- * Handle TFTP retransmission timer expiry
- *
- * @v timer		Retry timer
- * @v fail		Failure indicator
- */
-static void tftp_timer_expired ( struct retry_timer *timer, int fail ) {
-	struct tftp_session *tftp =
-		container_of ( timer, struct tftp_session, timer );
-
-	if ( fail ) {
-		tftp_done ( tftp, -ETIMEDOUT );
-	} else {
-		tftp_send_packet ( tftp );
-	}
-}
-
-/**
- * Mark TFTP block as received
- *
- * @v tftp		TFTP connection
- * @v block		Block number
- */
-static void tftp_received ( struct tftp_session *tftp, unsigned int block ) {
-
-	/* Stop the retry timer */
-	stop_timer ( &tftp->timer );
-
-	/* Update state to indicate which block we're now waiting for */
-	tftp->state = block;
-
-	/* Send next packet */
-	tftp_send_packet ( tftp );
-}
-
-/**
- * Transmit RRQ
- *
- * @v tftp		TFTP connection
- * @v buf		Temporary data buffer
- * @v len		Length of temporary data buffer
- * @ret rc		Return status code
- */
-static int tftp_send_rrq ( struct tftp_session *tftp, void *buf, size_t len ) {
-	struct tftp_rrq *rrq = buf;
-	void *data;
-	void *end;
-
-	DBGC ( tftp, "TFTP %p requesting \"%s\"\n", tftp, tftp->uri->path );
-
-	data = rrq->data;
-	end = ( buf + len );
-	if ( data > end )
-		goto overflow;
-	data += ( snprintf ( data, ( end - data ),
-			     "%s%coctet%cblksize%c%d%ctsize%c0",
-			     tftp->uri->path, 0, 0, 0,
-			     tftp->request_blksize, 0, 0 ) + 1 );
-	if ( data > end )
-		goto overflow;
-	rrq->opcode = htons ( TFTP_RRQ );
-
-	return udp_send ( &tftp->udp, buf, ( data - buf ) );
-
- overflow:
-	DBGC ( tftp, "TFTP %p RRQ out of space\n", tftp );
-	return -ENOBUFS;
-}
-
 /**
  * Receive OACK
  *
@@ -233,7 +353,7 @@ static int tftp_send_rrq ( struct tftp_session *tftp, void *buf, size_t len ) {
  * @v len		Length of temporary data buffer
  * @ret rc		Return status code
  */
-static int tftp_rx_oack ( struct tftp_session *tftp, void *buf, size_t len ) {
+static int tftp_rx_oack ( struct tftp_request *tftp, void *buf, size_t len ) {
 	struct tftp_oack *oack = buf;
 	char *end = buf + len;
 	char *name;
@@ -276,31 +396,34 @@ static int tftp_rx_oack ( struct tftp_session *tftp, void *buf, size_t len ) {
  * Receive DATA
  *
  * @v tftp		TFTP connection
- * @v buf		Temporary data buffer
- * @v len		Length of temporary data buffer
+ * @v iobuf		I/O buffer
  * @ret rc		Return status code
+ *
+ * Takes ownership of I/O buffer.
  */
-static int tftp_rx_data ( struct tftp_session *tftp, void *buf, size_t len ) {
-	struct tftp_data *data = buf;
+static int tftp_rx_data ( struct tftp_request *tftp,
+			  struct io_buffer *iobuf ) {
+	struct tftp_data *data = iobuf->data;
 	unsigned int block;
-	size_t data_offset;
 	size_t data_len;
 	int rc;
 
 	/* Sanity check */
-	if ( len < sizeof ( *data ) ) {
+	if ( iob_len ( iobuf ) < sizeof ( *data ) ) {
 		DBGC ( tftp, "TFTP %p received underlength DATA packet "
-		       "length %d\n", tftp, len );
+		       "length %d\n", tftp, iob_len ( iobuf ) );
+		free_iob ( iobuf );
 		return -EINVAL;
 	}
 
-	/* Fill data buffer */
+	/* Extract data */
 	block = ntohs ( data->block );
-	data_offset = ( ( block - 1 ) * tftp->blksize );
-	data_len = ( len - offsetof ( typeof ( *data ), data ) );
-	if ( ( rc = fill_buffer ( tftp->buffer, data->data, data_offset,
-				  data_len ) ) != 0 ) {
-		DBGC ( tftp, "TFTP %p could not fill data buffer: %s\n",
+	iob_pull ( iobuf, sizeof ( *data ) );
+	data_len = iob_len ( iobuf );
+
+	/* Deliver data */
+	if ( ( rc = xfer_deliver_iob ( &tftp->xfer, iobuf ) ) != 0 ) {
+		DBGC ( tftp, "TFTP %p could not deliver data: %s\n",
 		       tftp, strerror ( rc ) );
 		tftp_done ( tftp, rc );
 		return rc;
@@ -316,21 +439,12 @@ static int tftp_rx_data ( struct tftp_session *tftp, void *buf, size_t len ) {
 	return 0;
 }
 
-/**
- * Transmit ACK
- *
- * @v tftp		TFTP connection
- * @v buf		Temporary data buffer
- * @v len		Length of temporary data buffer
- * @ret rc		Return status code
- */
-static int tftp_send_ack ( struct tftp_session *tftp ) {
-	struct tftp_ack ack;
-
-	ack.opcode = htons ( TFTP_ACK );
-	ack.block = htons ( tftp->state );
-	return udp_send ( &tftp->udp, &ack, sizeof ( ack ) );
-}
+/** Translation between TFTP errors and internal error numbers */
+static const uint8_t tftp_errors[] = {
+	[TFTP_ERR_FILE_NOT_FOUND]	= PXENV_STATUS_TFTP_FILE_NOT_FOUND,
+	[TFTP_ERR_ACCESS_DENIED]	= PXENV_STATUS_TFTP_ACCESS_VIOLATION,
+	[TFTP_ERR_ILLEGAL_OP]		= PXENV_STATUS_TFTP_UNKNOWN_OPCODE,
+};
 
 /**
  * Receive ERROR
@@ -340,7 +454,7 @@ static int tftp_send_ack ( struct tftp_session *tftp ) {
  * @v len		Length of temporary data buffer
  * @ret rc		Return status code
  */
-static int tftp_rx_error ( struct tftp_session *tftp, void *buf, size_t len ) {
+static int tftp_rx_error ( struct tftp_request *tftp, void *buf, size_t len ) {
 	struct tftp_error *error = buf;
 	unsigned int err;
 	int rc = 0;
@@ -362,30 +476,10 @@ static int tftp_rx_error ( struct tftp_session *tftp, void *buf, size_t len ) {
 	if ( ! rc )
 		rc = -PXENV_STATUS_TFTP_CANNOT_OPEN_CONNECTION;
 
-	/* Close TFTP session */
+	/* Close TFTP request */
 	tftp_done ( tftp, rc );
 
 	return 0;
-}
-
-/**
- * Transmit data
- *
- * @v conn		UDP connection
- * @v buf		Temporary data buffer
- * @v len		Length of temporary data buffer
- * @ret rc		Return status code
- */
-static int tftp_senddata ( struct udp_connection *conn,
-			   void *buf, size_t len ) {
-	struct tftp_session *tftp = 
-		container_of ( conn, struct tftp_session, udp );
-
-	if ( tftp->state < 0 ) {
-		return tftp_send_rrq ( tftp, buf, len );
-	} else {
-		return tftp_send_ack ( tftp );
-	}
 }
 
 /**
@@ -397,141 +491,179 @@ static int tftp_senddata ( struct udp_connection *conn,
  * @v st_src		Partially-filled source address
  * @v st_dest		Partially-filled destination address
  */
-static int tftp_newdata ( struct udp_connection *conn, void *data, size_t len,
-			  struct sockaddr_tcpip *st_src __unused,
-			  struct sockaddr_tcpip *st_dest __unused ) {
-	struct tftp_session *tftp = 
-		container_of ( conn, struct tftp_session, udp );
-	struct tftp_common *common = data;
+static int tftp_socket_deliver_iob ( struct xfer_interface *socket,
+				     struct io_buffer *iobuf,
+				     struct xfer_metadata *meta ) {
+	struct tftp_request *tftp =
+		container_of ( socket, struct tftp_request, socket );
+	struct sockaddr_tcpip *st_src;
+	struct tftp_common *common = iobuf->data;
+	size_t len = iob_len ( iobuf );
+	int rc = -EINVAL;
 	
+	/* Sanity checks */
 	if ( len < sizeof ( *common ) ) {
 		DBGC ( tftp, "TFTP %p received underlength packet length %d\n",
 		       tftp, len );
-		return -EINVAL;
+		goto done;
+	}
+	if ( ! meta ) {
+		DBGC ( tftp, "TFTP %p received packet without metadata\n",
+		       tftp );
+		goto done;
+	}
+	if ( ! meta->src ) {
+		DBGC ( tftp, "TFTP %p received packet without source port\n",
+		       tftp );
+		goto done;
 	}
 
 	/* Filter by TID.  Set TID on first response received */
-	if ( tftp->tid ) {
-		if ( tftp->tid != st_src->st_port ) {
-			DBGC ( tftp, "TFTP %p received packet from wrong port "
-			       "(got %d, wanted %d)\n", tftp,
-			       ntohs ( st_src->st_port ), ntohs ( tftp->tid ));
-			return -EINVAL;
-		}
-	} else {
-		tftp->tid = st_src->st_port;
+	st_src = ( struct sockaddr_tcpip * ) meta->src;
+	if ( tftp->state < 0 ) {
+		memcpy ( &tftp->peer, st_src, sizeof ( tftp->peer ) );
 		DBGC ( tftp, "TFTP %p using remote port %d\n", tftp,
-		       ntohs ( tftp->tid ) );
-		udp_connect_port ( &tftp->udp, tftp->tid );
-	}
-
-	/* Filter by source address */
-	if ( memcmp ( st_src, udp_peer ( &tftp->udp ),
-		      sizeof ( *st_src ) ) != 0 ) {
-		DBGC ( tftp, "TFTP %p received packet from foreign source\n",
-		       tftp );
-		return -EINVAL;
+		       ntohs ( tftp->peer.st_port ) );
+	} else if ( memcmp ( &tftp->peer, st_src,
+			     sizeof ( tftp->peer ) ) != 0 ) {
+		DBGC ( tftp, "TFTP %p received packet from wrong source (got "
+		       "%d, wanted %d)\n", tftp, ntohs ( st_src->st_port ),
+		       ntohs ( tftp->peer.st_port ) );
+		goto done;
 	}
 
 	switch ( common->opcode ) {
 	case htons ( TFTP_OACK ):
-		return tftp_rx_oack ( tftp, data, len );
+		rc = tftp_rx_oack ( tftp, iobuf->data, len );
+		break;
 	case htons ( TFTP_DATA ):
-		return tftp_rx_data ( tftp, data, len );
+		rc = tftp_rx_data ( tftp, iobuf );
+		iobuf = NULL;
+		break;
 	case htons ( TFTP_ERROR ):
-		return tftp_rx_error ( tftp, data, len );
+		rc = tftp_rx_error ( tftp, iobuf->data, len );
+		break;
 	default:
-		DBGC ( tftp, "TFTP %p received strange packet type %d\n", tftp,
-		       ntohs ( common->opcode ) );
-		return -EINVAL;
+		DBGC ( tftp, "TFTP %p received strange packet type %d\n",
+		       tftp, ntohs ( common->opcode ) );
+		break;
 	};
-}
 
-/** TFTP UDP operations */
-static struct udp_operations tftp_udp_operations = {
-	.senddata = tftp_senddata,
-	.newdata = tftp_newdata,
-};
+ done:
+	free_iob ( iobuf );
+	return rc;
+}
 
 /**
- * Reap asynchronous operation
+ * TFTP connection closed by network stack
  *
- * @v async		Asynchronous operation
+ * @v socket		Transport layer interface
+ * @v rc		Reason for close
  */
-static void tftp_reap ( struct async *async ) {
-	struct tftp_session *tftp =
-		container_of ( async, struct tftp_session, async );
+static void tftp_socket_close ( struct xfer_interface *socket, int rc ) {
+	struct tftp_request *tftp =
+		container_of ( socket, struct tftp_request, socket );
 
-	free ( tftp );
+	DBGC ( tftp, "TFTP %p socket closed: %s\n",
+	       tftp, strerror ( rc ) );
+
+	tftp_done ( tftp, rc );
 }
 
-/** TFTP asynchronous operations */
-static struct async_operations tftp_async_operations = {
-	.reap = tftp_reap,
+/** TFTP socket operations */
+static struct xfer_interface_operations tftp_socket_operations = {
+	.close		= tftp_socket_close,
+	.vredirect	= xfer_vopen,
+	.request	= ignore_xfer_request,
+	.seek		= ignore_xfer_seek,
+	.alloc_iob	= default_xfer_alloc_iob,
+	.deliver_iob	= tftp_socket_deliver_iob,
+	.deliver_raw	= xfer_deliver_as_iob,
+};
+ 
+/**
+ * Close TFTP data transfer interface
+ *
+ * @v xfer		Data transfer interface
+ * @v rc		Reason for close
+ */
+static void tftp_xfer_close ( struct xfer_interface *xfer, int rc ) {
+	struct tftp_request *tftp =
+		container_of ( xfer, struct tftp_request, xfer );
+
+	DBGC ( tftp, "TFTP %p interface closed: %s\n",
+	       tftp, strerror ( rc ) );
+
+	tftp_done ( tftp, rc );
+}
+
+/** TFTP data transfer interface operations */
+static struct xfer_interface_operations tftp_xfer_operations = {
+	.close		= tftp_xfer_close,
+	.vredirect	= ignore_xfer_vredirect,
+	.request	= ignore_xfer_request,
+	.seek		= ignore_xfer_seek,
+	.alloc_iob	= default_xfer_alloc_iob,
+	.deliver_iob	= xfer_deliver_as_raw,
+	.deliver_raw	= ignore_xfer_deliver_raw,
 };
 
 /**
  * Initiate TFTP download
  *
+ * @v xfer		Data transfer interface
  * @v uri		Uniform Resource Identifier
- * @v buffer		Buffer into which to download file
- * @v parent		Parent asynchronous operation
  * @ret rc		Return status code
  */
-int tftp_get ( struct uri *uri, struct buffer *buffer, struct async *parent ) {
-	struct tftp_session *tftp = NULL;
+int tftp_open ( struct xfer_interface *xfer, struct uri *uri ) {
+	struct tftp_request *tftp;
+	struct sockaddr_tcpip server;
 	int rc;
 
 	/* Sanity checks */
-	if ( ! uri->path ) {
-		rc = -EINVAL;
-		goto err;
-	}
+	if ( ! uri->host )
+		return -EINVAL;
+	if ( ! uri->path )
+		return -EINVAL;
 
 	/* Allocate and populate TFTP structure */
 	tftp = malloc ( sizeof ( *tftp ) );
-	if ( ! tftp ) {
-		rc = -ENOMEM;
-		goto err;
-	}
+	if ( ! tftp )
+		return -ENOMEM;
 	memset ( tftp, 0, sizeof ( *tftp ) );
-	tftp->uri = uri;
-	tftp->buffer = buffer;
-	if ( ! tftp->request_blksize )
-		tftp->request_blksize = TFTP_MAX_BLKSIZE;
-	tftp->blksize = TFTP_DEFAULT_BLKSIZE;
+	tftp->refcnt.free = tftp_free;
+	xfer_init ( &tftp->xfer, &tftp_xfer_operations, &tftp->refcnt );
+	tftp->uri = uri_get ( uri );
+	xfer_init ( &tftp->socket, &tftp_socket_operations, &tftp->refcnt );
 	tftp->state = -1;
-	tftp->udp.udp_op = &tftp_udp_operations;
 	tftp->timer.expired = tftp_timer_expired;
 
-
-#warning "Quick name resolution hack"
-	union {
-		struct sockaddr_tcpip st;
-		struct sockaddr_in sin;
-	} server;
-	server.sin.sin_port = htons ( TFTP_PORT );
-	server.sin.sin_family = AF_INET;
-	if ( inet_aton ( uri->host, &server.sin.sin_addr ) == 0 ) {
-		rc = -EINVAL;
-		goto err;
-	}
-	udp_connect ( &tftp->udp, &server.st );
-
-
-	/* Open UDP connection */
-	if ( ( rc = udp_open ( &tftp->udp, 0 ) ) != 0 )
+	/* Open socket */
+	memset ( &server, 0, sizeof ( server ) );
+	server.st_port = htons ( uri_port ( tftp->uri, TFTP_PORT ) );
+	if ( ( rc = xfer_open_named_socket ( &tftp->socket, SOCK_DGRAM,
+					     ( struct sockaddr * ) &server,
+					     uri->host, NULL ) ) != 0 )
 		goto err;
 
-	/* Transmit initial RRQ */
-	tftp_send_packet ( tftp );
+	/* Start timer to initiate RRQ */
+	start_timer ( &tftp->timer );
 
-	async_init ( &tftp->async, &tftp_async_operations, parent );
+	/* Attach to parent interface, mortalise self, and return */
+	xfer_plug_plug ( &tftp->xfer, xfer );
+	ref_put ( &tftp->refcnt );
 	return 0;
 
  err:
-	DBGC ( tftp, "TFTP %p could not create session: %s\n",
+	DBGC ( tftp, "TFTP %p could not create request: %s\n",
 	       tftp, strerror ( rc ) );
-	free ( tftp );
+	tftp_done ( tftp, rc );
+	ref_put ( &tftp->refcnt );
 	return rc;
 }
+
+/** TFTP URI opener */
+struct uri_opener tftp_uri_opener __uri_opener = {
+	.scheme	= "tftp",
+	.open	= tftp_open,
+};

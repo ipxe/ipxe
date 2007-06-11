@@ -78,71 +78,8 @@ union tftp_any {
 	struct tftp_ack		ack;
 	struct tftp_error	error;
 	struct tftp_oack	oack;
-};	
-
-/**
- * A TFTP session
- *
- * This data structure holds the state for an ongoing TFTP transfer.
- */
-struct tftp_session {
-	/** URI being fetched */
-	struct uri *uri;
-	/** Data buffer to fill */
-	struct buffer *buffer;
-	/** Asynchronous operation */
-	struct async async;
-
-	/** Requested data block size
-	 *
-	 * This is the "blksize" option requested from the TFTP
-	 * server.  It may or may not be honoured.
-	 */
-	unsigned int request_blksize;
-
-	/** Data block size
-	 *
-	 * This is the "blksize" option negotiated with the TFTP
-	 * server.  (If the TFTP server does not support TFTP options,
-	 * this will default to 512).
-	 */
-	unsigned int blksize;
-	/** File size
-	 *
-	 * This is the value returned in the "tsize" option from the
-	 * TFTP server.  If the TFTP server does not support the
-	 * "tsize" option, this value will be zero.
-	 */
-	unsigned long tsize;
-
-	/**
-	 * Transfer ID
-	 *
-	 * This is the transfer ID allocated by the server, used as
-	 * the server UDP port for all packets except the initial read
-	 * request.
-	 */
-	uint16_t tid;
-	/** Session state
-	 *
-	 * This is the block number to be used in the next ACK sent
-	 * back to the server, i.e. the number of the last received
-	 * data block.  The value zero indicates that the last
-	 * received block was an OACK (i.e. that the next ACK will
-	 * contain a block number of zero), and any value less than
-	 * zero indicates that the connection has not yet been opened
-	 * (i.e. that no blocks have yet been received).
-	 */
-	int state;
-	/** UDP connection */
-	struct udp_connection udp;
-	/** Retransmission timer */
-	struct retry_timer timer;
 };
 
-/* Function prototypes */
-
-extern int tftp_get ( struct uri *uri, struct buffer *buffer,
-		      struct async *parent );
+extern void tftp_set_request_blksize ( unsigned int blksize );
 
 #endif /* _GPXE_TFTP_H */

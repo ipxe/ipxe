@@ -71,10 +71,11 @@ static void pxe_tftp_build_uri ( char uri_string[PXE_URI_LEN],
 		port = htons ( TFTP_PORT );
 	if ( ! blksize )
 		blksize = TFTP_MAX_BLKSIZE;
-	snprintf ( uri_string, sizeof ( uri_string ),
-		   "tftp://%s:%d%s%s?blksize=%d", inet_ntoa ( address ),
-		   ntohs ( port ), ( ( filename[0] == '/' ) ? "" : "/" ),
-		   filename, blksize );
+	tftp_set_request_blksize ( blksize );
+
+	snprintf ( uri_string, sizeof ( uri_string ), "tftp://%s:%d%s%s",
+		   inet_ntoa ( address ), ntohs ( port ),
+		   ( ( filename[0] == '/' ) ? "" : "/" ), filename );
 }
 
 /**
