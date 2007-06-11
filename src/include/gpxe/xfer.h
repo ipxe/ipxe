@@ -13,6 +13,7 @@
 #include <gpxe/iobuf.h>
 
 struct xfer_interface;
+struct xfer_metadata;
 
 /** Data transfer interface operations */
 struct xfer_interface_operations {
@@ -63,10 +64,11 @@ struct xfer_interface_operations {
 	 */
 	struct io_buffer * ( * alloc_iob ) ( struct xfer_interface *xfer,
 					     size_t len );
-	/** Deliver datagram as I/O buffer
+	/** Deliver datagram as I/O buffer with metadata
 	 *
 	 * @v xfer		Data transfer interface
 	 * @v iobuf		Datagram I/O buffer
+	 * @v meta		Data transfer metadata, or NULL
 	 * @ret rc		Return status code
 	 *
 	 * A data transfer interface that wishes to support only raw
@@ -78,7 +80,8 @@ struct xfer_interface_operations {
 	 * fatal error.
 	 */
 	int ( * deliver_iob ) ( struct xfer_interface *xfer,
-				struct io_buffer *iobuf );
+				struct io_buffer *iobuf,
+				struct xfer_metadata *meta );
 	/** Deliver datagram as raw data
 	 *
 	 * @v xfer		Data transfer interface
@@ -104,6 +107,14 @@ struct xfer_interface {
 	struct interface intf;
 	/** Operations for received messages */
 	struct xfer_interface_operations *op;
+};
+
+/** Data transfer metadata */
+struct xfer_metadata {
+	/** Source socket address, or NULL */
+	struct sockaddr *src;
+	/** Destination socket address, or NULL */
+	struct sockaddr *dest;
 };
 
 /** Basis positions for seek() events */
@@ -141,6 +152,9 @@ extern struct io_buffer * xfer_alloc_iob ( struct xfer_interface *xfer,
 					   size_t len );
 extern int xfer_deliver_iob ( struct xfer_interface *xfer,
 			      struct io_buffer *iobuf );
+extern int xfer_deliver_iob_meta ( struct xfer_interface *xfer,
+				   struct io_buffer *iobuf,
+				   struct xfer_metadata *meta );
 extern int xfer_deliver_raw ( struct xfer_interface *xfer,
 			      const void *data, size_t len );
 extern int xfer_vprintf ( struct xfer_interface *xfer,
@@ -158,7 +172,8 @@ extern int ignore_xfer_seek ( struct xfer_interface *xfer, off_t offset,
 extern struct io_buffer * default_xfer_alloc_iob ( struct xfer_interface *xfer,
 						   size_t len );
 extern int xfer_deliver_as_raw ( struct xfer_interface *xfer,
-				 struct io_buffer *iobuf );
+				 struct io_buffer *iobuf,
+				 struct xfer_metadata *meta );
 extern int xfer_deliver_as_iob ( struct xfer_interface *xfer,
 				 const void *data, size_t len );
 extern int ignore_xfer_deliver_raw ( struct xfer_interface *xfer,

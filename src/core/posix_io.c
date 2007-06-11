@@ -141,10 +141,13 @@ static int posix_file_xfer_seek ( struct xfer_interface *xfer, off_t offset,
  *
  * @v xfer		POSIX file data transfer interface
  * @v iobuf		I/O buffer
+ * @v meta		Data transfer metadata, or NULL
  * @ret rc		Return status code
  */
-static int posix_file_xfer_deliver_iob ( struct xfer_interface *xfer,
-					 struct io_buffer *iobuf ) {
+static int
+posix_file_xfer_deliver_iob ( struct xfer_interface *xfer,
+			      struct io_buffer *iobuf,
+			      struct xfer_metadata *meta __unused ) {
 	struct posix_file *file =
 		container_of ( xfer, struct posix_file, xfer );
 

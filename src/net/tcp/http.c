@@ -316,10 +316,12 @@ static int http_rx_data ( struct http_request *http,
  *
  * @v socket		Transport layer interface
  * @v iobuf		I/O buffer
+ * @v meta		Data transfer metadata, or NULL
  * @ret rc		Return status code
  */
 static int http_socket_deliver_iob ( struct xfer_interface *socket,
-				     struct io_buffer *iobuf ) {
+				     struct io_buffer *iobuf,
+				     struct xfer_metadata *meta __unused ) {
 	struct http_request *http =
 		container_of ( socket, struct http_request, socket );
 	struct http_line_handler *lh;

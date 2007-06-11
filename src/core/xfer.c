@@ -174,20 +174,23 @@ struct io_buffer * xfer_alloc_iob ( struct xfer_interface *xfer, size_t len ) {
 }
 
 /**
- * Deliver datagram
+ * Deliver datagram as I/O buffer with metadata
  *
  * @v xfer		Data transfer interface
  * @v iobuf		Datagram I/O buffer
+ * @v meta		Data transfer metadata, or NULL
  * @ret rc		Return status code
  */
-int xfer_deliver_iob ( struct xfer_interface *xfer, struct io_buffer *iobuf ) {
+int xfer_deliver_iob_meta ( struct xfer_interface *xfer,
+			    struct io_buffer *iobuf,
+			    struct xfer_metadata *meta ) {
 	struct xfer_interface *dest = xfer_get_dest ( xfer );
 	int rc;
 
 	DBGC ( xfer, "XFER %p->%p deliver_iob %zd\n", xfer, dest,
 	       iob_len ( iobuf ) );
 
-	rc = dest->op->deliver_iob ( dest, iobuf );
+	rc = dest->op->deliver_iob ( dest, iobuf, meta );
 
 	if ( rc != 0 ) {
 		DBGC ( xfer, "XFER %p<-%p deliver_iob: %s\n", xfer, dest,
@@ -195,6 +198,18 @@ int xfer_deliver_iob ( struct xfer_interface *xfer, struct io_buffer *iobuf ) {
 	}
 	xfer_put ( dest );
 	return rc;
+}
+
+/**
+ * Deliver datagram as I/O buffer with metadata
+ *
+ * @v xfer		Data transfer interface
+ * @v iobuf		Datagram I/O buffer
+ * @ret rc		Return status code
+ */
+int xfer_deliver_iob ( struct xfer_interface *xfer,
+		       struct io_buffer *iobuf ) {
+	return xfer_deliver_iob_meta ( xfer, iobuf, NULL );
 }
 
 /**
@@ -341,13 +356,15 @@ default_xfer_alloc_iob ( struct xfer_interface *xfer __unused, size_t len ) {
  *
  * @v xfer		Data transfer interface
  * @v iobuf		Datagram I/O buffer
+ * @v meta		Data transfer metadata
  * @ret rc		Return status code
  *
  * This function is intended to be used as the deliver() method for
  * data transfer interfaces that prefer to handle raw data.
  */
 int xfer_deliver_as_raw ( struct xfer_interface *xfer,
-			  struct io_buffer *iobuf ) {
+			  struct io_buffer *iobuf,
+			  struct xfer_metadata *meta __unused ) {
 	int rc;
 
 	rc = xfer->op->deliver_raw ( xfer, iobuf->data, iob_len ( iobuf ) );
@@ -375,7 +392,7 @@ int xfer_deliver_as_iob ( struct xfer_interface *xfer,
 		return -ENOMEM;
 
 	memcpy ( iob_put ( iobuf, len ), data, len );
-	return xfer->op->deliver_iob ( xfer, iobuf );
+	return xfer->op->deliver_iob ( xfer, iobuf, NULL );
 }
 
 /**

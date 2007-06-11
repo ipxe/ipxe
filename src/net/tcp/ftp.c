@@ -338,10 +338,12 @@ static void ftp_data_closed ( struct xfer_interface *data, int rc ) {
  *
  * @v xfer		FTP data channel interface
  * @v iobuf		I/O buffer
+ * @v meta		Data transfer metadata, or NULL
  * @ret rc		Return status code
  */
 static int ftp_data_deliver_iob ( struct xfer_interface *data,
-				  struct io_buffer *iobuf ) {
+				  struct io_buffer *iobuf,
+				  struct xfer_metadata *meta __unused ) {
 	struct ftp_request *ftp =
 		container_of ( data, struct ftp_request, data );
 	int rc;
