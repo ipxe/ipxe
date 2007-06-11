@@ -28,6 +28,8 @@
 #include <gpxe/xfer.h>
 #include <gpxe/open.h>
 #include <gpxe/uri.h>
+#include <gpxe/tcpip.h>
+#include <gpxe/retry.h>
 #include <gpxe/tftp.h>
 
 /** @file

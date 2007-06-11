@@ -8,10 +8,6 @@
  */
 
 #include <stdint.h>
-#include <gpxe/udp.h>
-#include <gpxe/async.h>
-#include <gpxe/retry.h>
-#include <gpxe/buffer.h>
 
 #define TFTP_PORT	       69 /**< Default TFTP server port */
 #define	TFTP_DEFAULT_BLKSIZE  512 /**< Default TFTP data block size */
