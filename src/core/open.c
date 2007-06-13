@@ -48,18 +48,33 @@ static struct socket_opener socket_openers_end[0]
  * @v xfer		Data transfer interface
  * @v uri		URI
  * @ret rc		Return status code
+ *
+ * The URI will be regarded as being relative to the current working
+ * URI (see churi()).
  */
 int xfer_open_uri ( struct xfer_interface *xfer, struct uri *uri ) {
 	struct uri_opener *opener;
+	struct uri *resolved_uri;
+	int rc = -ENOTSUP;
 
+	/* Resolve URI */
+	resolved_uri = resolve_uri ( cwuri, uri );
+	if ( ! resolved_uri )
+		return -ENOMEM;
+
+	/* Find opener which supports this URI scheme */
 	for ( opener = uri_openers ; opener < uri_openers_end ; opener++ ) {
-		if ( strcmp ( uri->scheme, opener->scheme ) == 0 )
-			return opener->open ( xfer, uri );
+		if ( strcmp ( resolved_uri->scheme, opener->scheme ) == 0 ) {
+			rc = opener->open ( xfer, resolved_uri );
+			goto done;
+		}
 	}
-
 	DBGC ( xfer, "XFER %p attempted to open unsupported URI scheme "
-	       "\"%s\"\n", xfer, uri->scheme );
-	return -ENOTSUP;
+	       "\"%s\"\n", xfer, resolved_uri->scheme );
+
+ done:
+	uri_put ( resolved_uri );
+	return rc;
 }
 
 /**
@@ -68,6 +83,9 @@ int xfer_open_uri ( struct xfer_interface *xfer, struct uri *uri ) {
  * @v xfer		Data transfer interface
  * @v uri_string	URI string (e.g. "http://etherboot.org/kernel")
  * @ret rc		Return status code
+ *
+ * The URI will be regarded as being relative to the current working
+ * URI (see churi()).
  */
 int xfer_open_uri_string ( struct xfer_interface *xfer,
 			   const char *uri_string ) {
