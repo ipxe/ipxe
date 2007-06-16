@@ -1,6 +1,7 @@
 /* -*- Mode:C; c-basic-offset:4; -*- */
 
 /* 
+	NEEDS to change to match GPXE specs
    natsemi.c: An Etherboot driver for the NatSemi DP8381x series.
 
    Copyright (C) 2001 Entity Cyber, Inc.
