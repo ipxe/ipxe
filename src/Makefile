@@ -21,6 +21,12 @@ ifndef ARCH
 ARCH		:= $(shell uname -m | sed -e s,i[3456789]86,i386,)
 endif
 
+# handle x86_64 like i386, but set -m32 option for 32bit code only
+ifeq ($(ARCH),x86_64)
+ARCH		:= i386
+CFLAGS		+= -m32
+endif
+
 # Drag in architecture-specific Config
 #
 MAKEDEPS	+= arch/$(ARCH)/Config
