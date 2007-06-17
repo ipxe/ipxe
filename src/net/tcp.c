@@ -205,11 +205,10 @@ static int tcp_open ( struct xfer_interface *xfer, struct sockaddr *peer,
 	int rc;
 
 	/* Allocate and initialise structure */
-	tcp = malloc ( sizeof ( *tcp ) );
+	tcp = zalloc ( sizeof ( *tcp ) );
 	if ( ! tcp )
 		return -ENOMEM;
 	DBGC ( tcp, "TCP %p allocated\n", tcp );
-	memset ( tcp, 0, sizeof ( *tcp ) );
 	xfer_init ( &tcp->xfer, &tcp_xfer_operations, &tcp->refcnt );
 	tcp->prev_tcp_state = TCP_CLOSED;
 	tcp->tcp_state = TCP_STATE_SENT ( TCP_SYN );
