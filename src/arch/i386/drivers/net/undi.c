@@ -72,10 +72,9 @@ static int undipci_probe ( struct pci_device *pci,
 		return -ENOTTY;
 
 	/* Allocate UNDI device structure */
-	undi = malloc ( sizeof ( *undi ) );
+	undi = zalloc ( sizeof ( *undi ) );
 	if ( ! undi )
 		return -ENOMEM;
-	memset ( undi, 0, sizeof ( *undi ) );
 	pci_set_drvdata ( pci, undi );
 
 	/* Find/create our pixie */
