@@ -77,13 +77,12 @@ struct uri * parse_uri ( const char *uri_string ) {
 
 	/* Allocate space for URI struct and a copy of the string */
 	raw_len = ( strlen ( uri_string ) + 1 /* NUL */ );
-	uri = malloc ( sizeof ( *uri ) + raw_len );
+	uri = zalloc ( sizeof ( *uri ) + raw_len );
 	if ( ! uri )
 		return NULL;
 	raw = ( ( ( char * ) uri ) + sizeof ( *uri ) );
 
 	/* Zero URI struct and copy in the raw string */
-	memset ( uri, 0, sizeof ( *uri ) );
 	memcpy ( raw, uri_string, raw_len );
 
 	/* Start by chopping off the fragment, if it exists */
