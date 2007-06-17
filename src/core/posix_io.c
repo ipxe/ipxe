@@ -215,10 +215,9 @@ int open ( const char *uri_string ) {
 		return fd;
 
 	/* Allocate and initialise structure */
-	file = malloc ( sizeof ( *file ) );
+	file = zalloc ( sizeof ( *file ) );
 	if ( ! file )
 		return -ENOMEM;
-	memset ( file, 0, sizeof ( *file ) );
 	file->refcnt.free = posix_file_free;
 	file->fd = fd;
 	file->rc = -EINPROGRESS;
