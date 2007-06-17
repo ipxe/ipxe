@@ -132,13 +132,12 @@ static int undirom_probe ( unsigned int rom_segment ) {
 	rom_len = ( romheader.ROMLength * 512 );
 
 	/* Allocate memory for UNDI ROM */
-	undirom = malloc ( sizeof ( *undirom ) );
+	undirom = zalloc ( sizeof ( *undirom ) );
 	if ( ! undirom ) {
 		DBG ( "Could not allocate UNDI ROM structure\n" );
 		rc = -ENOMEM;
 		goto err;
 	}
-	memset ( undirom, 0, sizeof ( *undirom ) );
 	DBGC ( undirom, "UNDIROM %p trying expansion ROM at %04x:0000 "
 	       "(%zdkB)\n", undirom, rom_segment, ( rom_len / 1024 ) );
 	undirom->rom_segment = rom_segment;
