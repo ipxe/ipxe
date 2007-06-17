@@ -653,12 +653,11 @@ static int isapnpbus_probe ( struct root_device *rootdev ) {
 
 			/* Allocate struct isapnp_device */
 			if ( ! isapnp )
-				isapnp = malloc ( sizeof ( *isapnp ) );
+				isapnp = zalloc ( sizeof ( *isapnp ) );
 			if ( ! isapnp ) {
 				rc = -ENOMEM;
 				goto err;
 			}
-			memset ( isapnp, 0, sizeof ( *isapnp ) );
 			isapnp->csn = csn;
 			isapnp->logdev = logdev;
 
