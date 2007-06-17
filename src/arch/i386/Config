@@ -136,6 +136,9 @@ ifneq ($(GCC_MINORVERSION),4)
 CFLAGS+=	-march=i386
 endif
 
+# this is almost always a win. the kernel uses it, too.
+CFLAGS+= -mpreferred-stack-boundary=2
+
 LDFLAGS+=	-N
 
 ifeq "$(shell uname -s)" "FreeBSD"
