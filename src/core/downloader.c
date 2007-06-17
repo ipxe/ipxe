@@ -261,10 +261,9 @@ int create_downloader ( struct job_interface *job, struct image *image,
 	int rc;
 
 	/* Allocate and initialise structure */
-	downloader = malloc ( sizeof ( *downloader ) );
+	downloader = zalloc ( sizeof ( *downloader ) );
 	if ( ! downloader )
 		return -ENOMEM;
-	memset ( downloader, 0, sizeof ( *downloader ) );
 	downloader->refcnt.free = downloader_free;
 	job_init ( &downloader->job, &downloader_job_operations,
 		   &downloader->refcnt );
