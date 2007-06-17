@@ -106,12 +106,11 @@ static int eisabus_probe ( struct root_device *rootdev ) {
 	for ( slot = EISA_MIN_SLOT ; slot <= EISA_MAX_SLOT ; slot++ ) {
 		/* Allocate struct eisa_device */
 		if ( ! eisa )
-			eisa = malloc ( sizeof ( *eisa ) );
+			eisa = zalloc ( sizeof ( *eisa ) );
 		if ( ! eisa ) {
 			rc = -ENOMEM;
 			goto err;
 		}
-		memset ( eisa, 0, sizeof ( *eisa ) );
 		eisa->slot = slot;
 		eisa->ioaddr = EISA_SLOT_BASE ( eisa->slot );
 
