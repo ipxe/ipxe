@@ -245,12 +245,11 @@ static int pcibus_probe ( struct root_device *rootdev ) {
 
 			/* Allocate struct pci_device */
 			if ( ! pci )
-				pci = malloc ( sizeof ( *pci ) );
+				pci = zalloc ( sizeof ( *pci ) );
 			if ( ! pci ) {
 				rc = -ENOMEM;
 				goto err;
 			}
-			memset ( pci, 0, sizeof ( *pci ) );
 			pci->bus = bus;
 			pci->devfn = devfn;
 			
