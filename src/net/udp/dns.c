@@ -460,10 +460,9 @@ static int dns_resolv ( struct resolv_interface *resolv,
 	}
 
 	/* Allocate DNS structure */
-	dns = malloc ( sizeof ( *dns ) );
+	dns = zalloc ( sizeof ( *dns ) );
 	if ( ! dns )
 		return -ENOMEM;
-	memset ( dns, 0, sizeof ( *dns ) );
 	resolv_init ( &dns->resolv, &null_resolv_ops, &dns->refcnt );
 	xfer_init ( &dns->socket, &dns_socket_operations, &dns->refcnt );
 	dns->timer.expired = dns_timer_expired;
