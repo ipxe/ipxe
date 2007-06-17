@@ -116,10 +116,9 @@ static int numeric_resolv ( struct resolv_interface *resolv,
 	struct sockaddr_in *sin;
 
 	/* Allocate and initialise structure */
-	numeric = malloc ( sizeof ( *numeric ) );
+	numeric = zalloc ( sizeof ( *numeric ) );
 	if ( ! numeric )
 		return -ENOMEM;
-	memset ( numeric, 0, sizeof ( *numeric ) );
 	resolv_init ( &numeric->resolv, &null_resolv_ops, &numeric->refcnt );
 	process_init ( &numeric->process, numeric_step, &numeric->refcnt );
 	memcpy ( &numeric->sa, sa, sizeof ( numeric->sa ) );
@@ -258,10 +257,9 @@ int resolv ( struct resolv_interface *resolv, const char *name,
 	int rc;
 
 	/* Allocate and initialise structure */
-	mux = malloc ( sizeof ( *mux ) + name_len );
+	mux = zalloc ( sizeof ( *mux ) + name_len );
 	if ( ! mux )
 		return -ENOMEM;
-	memset ( mux, 0, sizeof ( *mux ) );
 	resolv_init ( &mux->parent, &null_resolv_ops, &mux->refcnt );
 	resolv_init ( &mux->child, &resolv_mux_child_ops, &mux->refcnt );
 	mux->resolver = resolvers;
@@ -388,10 +386,9 @@ int xfer_open_named_socket ( struct xfer_interface *xfer, int semantics,
 	int rc;
 
 	/* Allocate and initialise structure */
-	named = malloc ( sizeof ( *named ) );
+	named = zalloc ( sizeof ( *named ) );
 	if ( ! named )
 		return -ENOMEM;
-	memset ( named, 0, sizeof ( *named ) );
 	xfer_init ( &named->xfer, &named_xfer_ops, &named->refcnt );
 	resolv_init ( &named->resolv, &named_resolv_ops, &named->refcnt );
 	named->semantics = semantics;
