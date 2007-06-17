@@ -426,10 +426,9 @@ static int ftp_open ( struct xfer_interface *xfer, struct uri *uri ) {
 		return -EINVAL;
 
 	/* Allocate and populate structure */
-	ftp = malloc ( sizeof ( *ftp ) );
+	ftp = zalloc ( sizeof ( *ftp ) );
 	if ( ! ftp )
 		return -ENOMEM;
-	memset ( ftp, 0, sizeof ( *ftp ) );
 	ftp->refcnt.free = ftp_free;
 	xfer_init ( &ftp->xfer, &ftp_xfer_operations, &ftp->refcnt );
 	ftp->uri = uri_get ( uri );
