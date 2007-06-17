@@ -635,10 +635,9 @@ int tftp_open ( struct xfer_interface *xfer, struct uri *uri ) {
 		return -EINVAL;
 
 	/* Allocate and populate TFTP structure */
-	tftp = malloc ( sizeof ( *tftp ) );
+	tftp = zalloc ( sizeof ( *tftp ) );
 	if ( ! tftp )
 		return -ENOMEM;
-	memset ( tftp, 0, sizeof ( *tftp ) );
 	tftp->refcnt.free = tftp_free;
 	xfer_init ( &tftp->xfer, &tftp_xfer_operations, &tftp->refcnt );
 	tftp->uri = uri_get ( uri );
