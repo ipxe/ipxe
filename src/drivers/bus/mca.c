@@ -90,12 +90,11 @@ static int mcabus_probe ( struct root_device *rootdev ) {
 	for ( slot = 0 ; slot <= MCA_MAX_SLOT_NR ; slot++ ) {
 		/* Allocate struct mca_device */
 		if ( ! mca )
-			mca = malloc ( sizeof ( *mca ) );
+			mca = zalloc ( sizeof ( *mca ) );
 		if ( ! mca ) {
 			rc = -ENOMEM;
 			goto err;
 		}
-		memset ( mca, 0, sizeof ( *mca ) );
 		mca->slot = slot;
 
 		/* Make sure motherboard setup is off */
