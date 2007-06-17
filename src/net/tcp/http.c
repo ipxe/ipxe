@@ -475,10 +475,9 @@ int http_open ( struct xfer_interface *xfer, struct uri *uri ) {
 		return -EINVAL;
 
 	/* Allocate and populate HTTP structure */
-	http = malloc ( sizeof ( *http ) );
+	http = zalloc ( sizeof ( *http ) );
 	if ( ! http )
 		return -ENOMEM;
-	memset ( http, 0, sizeof ( *http ) );
 	http->refcnt.free = http_free;
 	xfer_init ( &http->xfer, &http_xfer_operations, &http->refcnt );
        	http->uri = uri_get ( uri );
