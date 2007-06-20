@@ -34,8 +34,6 @@
 struct pxe_udp_connection {
 	/** Data transfer interface to UDP stack */
 	struct xfer_interface xfer;
-	/** "Connection is open" flag */
-	int open;
 	/** Local address */
 	struct sockaddr_in local;
 	/** Current PXENV_UDP_READ parameter block */
@@ -169,21 +167,19 @@ static struct pxe_udp_connection pxe_udp = {
  *
  */
 PXENV_EXIT_t pxenv_udp_open ( struct s_PXENV_UDP_OPEN *pxenv_udp_open ) {
+	int rc;
 
 	DBG ( "PXENV_UDP_OPEN" );
-
-	/* Check connection is not already open */
-	if ( pxe_udp.open ) {
-		pxenv_udp_open->Status = PXENV_STATUS_UDP_OPEN;
-		return PXENV_EXIT_FAILURE;
-	}
 
 	/* Record source IP address */
 	pxe_udp.local.sin_addr.s_addr = pxenv_udp_open->src_ip;
 
 	/* Open promiscuous UDP connection */
-	udp_open_promisc ( &pxe_udp.xfer );
-	pxe_udp.open = 1;
+	xfer_close ( &pxe_udp.xfer, 0 );
+	if ( ( rc = udp_open_promisc ( &pxe_udp.xfer ) ) != 0 ) {
+		pxenv_udp_open->Status = PXENV_STATUS ( rc );
+		return PXENV_EXIT_FAILURE;
+	}
 
 	pxenv_udp_open->Status = PXENV_STATUS_SUCCESS;
 	return PXENV_EXIT_SUCCESS;
@@ -213,15 +209,8 @@ PXENV_EXIT_t pxenv_udp_open ( struct s_PXENV_UDP_OPEN *pxenv_udp_open ) {
 PXENV_EXIT_t pxenv_udp_close ( struct s_PXENV_UDP_CLOSE *pxenv_udp_close ) {
 	DBG ( "PXENV_UDP_CLOSE" );
 
-	/* Check connection is open */
-	if ( ! pxe_udp.open ) {
-		pxenv_udp_close->Status = PXENV_STATUS_UDP_CLOSED;
-		return PXENV_EXIT_SUCCESS; /* Well, it *is* closed */
-	}
-
 	/* Close UDP connection */
-	udp_close_promisc ( &pxe_udp.xfer );
-	pxe_udp.open = 0;
+	xfer_close ( &pxe_udp.xfer, 0 );
 
 	pxenv_udp_close->Status = PXENV_STATUS_SUCCESS;
 	return PXENV_EXIT_SUCCESS;
@@ -280,12 +269,6 @@ PXENV_EXIT_t pxenv_udp_write ( struct s_PXENV_UDP_WRITE *pxenv_udp_write ) {
 	int rc;
 
 	DBG ( "PXENV_UDP_WRITE" );
-
-	/* Check connection is open */
-	if ( ! pxe_udp.open ) {
-		pxenv_udp_write->Status = PXENV_STATUS_UDP_CLOSED;
-		return PXENV_EXIT_FAILURE;
-	}
 
 	/* Construct destination socket address */
 	memset ( &dest, 0, sizeof ( dest ) );
@@ -382,12 +365,6 @@ PXENV_EXIT_t pxenv_udp_read ( struct s_PXENV_UDP_READ *pxenv_udp_read ) {
 	uint16_t d_port = pxenv_udp_read->d_port;
 
 	DBG ( "PXENV_UDP_READ" );
-
-	/* Check connection is open */
-	if ( ! pxe_udp.open ) {
-		pxenv_udp_read->Status = PXENV_STATUS_UDP_CLOSED;
-		return PXENV_EXIT_FAILURE;
-	}
 
 	/* Try receiving a packet */
 	pxe_udp.pxenv_udp_read = pxenv_udp_read;
