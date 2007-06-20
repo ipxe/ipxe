@@ -122,7 +122,7 @@ enum ChipCmdBits {
     RxOn      = 0x04,
     TxOff     = 0x02, 
     TxOn      = 0x01
-}
+};
 
 
 /* Bits in the RxMode register. */
@@ -163,7 +163,7 @@ enum desc_status_bits {
 static uint32_t SavedClkRun;	
 
 
-
+/* TODO
 static const uint8_t rtl_ee_bits[] = {
 	[SPI_BIT_SCLK]	= EE_SK,
 	[SPI_BIT_MOSI]	= EE_DI,
@@ -199,7 +199,7 @@ static struct bit_basher_operations rtl_basher_ops = {
 	.read = rtl_spi_read_bit,
 	.write = rtl_spi_write_bit,
 };
-
+*/
 /** Portion of EEPROM available for non-volatile stored options
  *
  * We use offset 0x40 (i.e. address 0x20), length 0x40.  This block is
@@ -216,16 +216,17 @@ static struct nvo_fragment rtl_nvo_fragments[] = {
  *
  * @v NAT		NATSEMI NIC
  */
+/* TODO
  void rtl_init_eeprom ( struct natsemi_nic *rtl ) {
 	int ee9356;
 	int vpd;
 
-	/* Initialise three-wire bus */
+	// Initialise three-wire bus 
 	rtl->spibit.basher.op = &rtl_basher_ops;
 	rtl->spibit.bus.mode = SPI_MODE_THREEWIRE;
 	init_spi_bit_basher ( &rtl->spibit );
 
-	/* Detect EEPROM type and initialise three-wire device */
+	//Detect EEPROM type and initialise three-wire device 
 	ee9356 = ( inw ( rtl->ioaddr + RxConfig ) & Eeprom9356 );
 	if ( ee9356 ) {
 		DBG ( "EEPROM is an AT93C56\n" );
@@ -236,7 +237,7 @@ static struct nvo_fragment rtl_nvo_fragments[] = {
 	}
 	rtl->eeprom.bus = &rtl->spibit.bus;
 
-	/* Initialise space for non-volatile options, if available */
+	// Initialise space for non-volatile options, if available 
 	vpd = ( inw ( rtl->ioaddr + Config1 ) & VPDEnable );
 	if ( vpd ) {
 		DBG ( "EEPROM in use for VPD; cannot use for options\n" );
@@ -245,7 +246,7 @@ static struct nvo_fragment rtl_nvo_fragments[] = {
 		rtl->nvo.fragments = rtl_nvo_fragments;
 	}
 }
-
+*/
 /**
  * Reset NIC
  *
@@ -253,11 +254,11 @@ static struct nvo_fragment rtl_nvo_fragments[] = {
  *
  * Issues a hardware reset and waits for the reset to complete.
  */
-static void nat_reset ( struct nat_nic *nat ) {
+static void nat_reset ( struct natsemi_nic *nat ) {
 
 	int i;
 	/* Reset chip */
-	outb ( ChipReset, nat->ioaddr + ChipCmd );
+	outl ( ChipReset, nat->ioaddr + ChipCmd );
 	mdelay ( 10 );
 	nat->tx_dirty=0;
 	nat->tx_cur=0;
@@ -287,6 +288,7 @@ static int nat_open ( struct net_device *netdev ) {
 	struct natsemi_nic *nat = netdev->priv;
 	//struct io_buffer *iobuf;
 	int i;
+	uint32_t tx_config,rx_config;
 	
 	/* Disable PME:
         * The PME bit is initialized from the EEPROM contents.
@@ -337,11 +339,11 @@ static int nat_open ( struct net_device *netdev ) {
 
 	 /* load Receive Descriptor Register */
 	outl(virt_to_bus(&nat->rx[0]), nat->ioaddr + RxRingPtr);
-	DBG("Natsemi Rx descriptor loaded with: %X\n",inl(nat->ioaddr+RingPtr));		
+	DBG("Natsemi Rx descriptor loaded with: %X\n",(unsigned int)inl(nat->ioaddr+RxRingPtr));		
 
 	/* setup Tx ring */
 	outl(virt_to_bus(&nat->tx[0]),nat->ioaddr+TxRingPtr);
-	DBG("Natsemi Tx descriptor loaded with: %X\n",inl(nat->ioaddr+TxRingPtr));
+	DBG("Natsemi Tx descriptor loaded with: %X\n",(unsigned int)inl(nat->ioaddr+TxRingPtr));
 
 	/* Enables RX */
 	outl(RxFilterEnable|AcceptBroadcast|AcceptAllMulticast|AcceptMyPhys, nat->ioaddr+RxFilterAddr);
@@ -375,6 +377,8 @@ static int nat_open ( struct net_device *netdev ) {
  */
 static void nat_close ( struct net_device *netdev ) {
 	struct natsemi_nic *nat = netdev->priv;
+	int i;
+
 
 	/* Reset the hardware to disable everything in one go */
 	nat_reset ( nat );
@@ -394,7 +398,7 @@ static void nat_close ( struct net_device *netdev ) {
  * @v iobuf	I/O buffer
  * @ret rc	Return status code
  */
-static int natsemi_transmit ( struct net_device *netdev, struct io_buffer *iobuf ) {
+static int nat_transmit ( struct net_device *netdev, struct io_buffer *iobuf ) {
 	struct natsemi_nic *nat = netdev->priv;
 
        /* check for space in TX ring */
@@ -432,7 +436,7 @@ static int natsemi_transmit ( struct net_device *netdev, struct io_buffer *iobuf
  */
 static void nat_poll ( struct net_device *netdev, unsigned int rx_quota ) {
 	struct natsemi_nic *nat = netdev->priv;
-	unsigned int status;
+	uint32_t status;
 	unsigned int rx_status;
 	unsigned int rx_len;
 	struct io_buffer *rx_iob;
@@ -442,21 +446,20 @@ static void nat_poll ( struct net_device *netdev, unsigned int rx_quota ) {
 	/* check the status of packets given to card for transmission */	
 	for ( i = 0 ; i < TX_RING_SIZE ; i++ ) 
 	{
-		status=bus_to_virt(nat->tx[nat->tx_dirty].cmdsts);
+		status=(uint32_t)bus_to_virt(nat->tx[nat->tx_dirty].cmdsts);
 		/* check if current packet has been transmitted or not */
-		if(status & own) 
+		if(status & OWN) 
 			break;
 		/* Check if any errors in transmission */
 		if (! (status & DescPktOK))
 		{
 			printf("Error in sending Packet with data: %s\n and status:%X\n",
-					bus_to_virt(nat->tx[nat->tx_dirty].bufptr),
-					status);
+					(char *)bus_to_virt(nat->tx[nat->tx_dirty].bufptr),(unsigned int)status);
 		}
 		else
 		{
 			DBG("Success in transmitting Packet with data: %s",
-					bus_to_virt(nat->tx[nat->tx_dirty].bufptr));
+				(char *)bus_to_virt(nat->tx[nat->tx_dirty].bufptr));
 		}
 		/* setting cmdsts zero, indicating that it can be reused */
 		nat->tx[nat->tx_dirty].cmdsts=0;
@@ -464,7 +467,7 @@ static void nat_poll ( struct net_device *netdev, unsigned int rx_quota ) {
 	}
 			
 	
-	rx_status=bus_to_virt(nat->rx[nat->rx_cur].cmdsts); 
+	rx_status=(unsigned int)bus_to_virt(nat->rx[nat->rx_cur].cmdsts); 
 	/* Handle received packets */
 	while (rx_quota && (rx_status & OWN))
 	{
@@ -473,8 +476,8 @@ static void nat_poll ( struct net_device *netdev, unsigned int rx_quota ) {
 		/*check for the corrupt packet */
 		if((rx_status & (DescMore|DescPktOK|RxTooLong)) != DescPktOK)
 		{
-			 printf("natsemi_poll: Corrupted packet received, 
-					 buffer status = %X\n",rx_status);
+			 printf("natsemi_poll: Corrupted packet received, "
+					"buffer status = %X\n",rx_status);
 		}
 		else
 		{
@@ -483,7 +486,7 @@ static void nat_poll ( struct net_device *netdev, unsigned int rx_quota ) {
 				/* leave packet for next call to poll*/
 				return;
 			memcpy(iob_put(rx_iob,rx_len),
-					nat->rx[nat->rx_cur].bufptr,rxlen);
+					nat->rx[nat->rx_cur].bufptr,rx_len);
 			/* add to the receive queue. */
 			netdev_rx(netdev,rx_iob);
 			rx_quota--;
@@ -494,7 +497,7 @@ static void nat_poll ( struct net_device *netdev, unsigned int rx_quota ) {
 
 
 	 /* re-enable the potentially idle receive state machine */
-	    outl(RxOn, ioaddr + ChipCmd);	
+	    outl(RxOn, nat->ioaddr + ChipCmd);	
 }				
 
 
@@ -548,14 +551,14 @@ static int nat_probe ( struct pci_device *pci,
 
         advertising = inl(nat->ioaddr + 0x80 + (4<<2)) & 0xffff; 
         {
-	   	uint32_t chip_config = inl(ioaddr + ChipConfig);
+	   	uint32_t chip_config = inl(nat->ioaddr + ChipConfig);
 		DBG("%s: Transceiver default autoneg. %s 10 %s %s duplex.\n",
 	      	pci->driver_name,
 	        chip_config & 0x2000 ? "enabled, advertise" : "disabled, force",
 	        chip_config & 0x4000 ? "0" : "",
 	        chip_config & 0x8000 ? "full" : "half");
     	}
-	DBG("%s: Transceiver status %hX advertising %hX\n",pci->driver_name, (int)inl(nat->ioaddr + 0x84), advertising);
+	DBG("%s: Transceiver status %hX advertising %hX\n",pci->driver_name, (int)inl(nat->ioaddr + 0x84),(unsigned int) advertising);
 
 
 
