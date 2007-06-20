@@ -9,6 +9,7 @@
 
 #include <stdint.h>
 #include <assert.h>
+#include <errno.h>
 #include <gpxe/list.h>
 
 /**
@@ -159,6 +160,24 @@ static inline size_t iob_headroom ( struct io_buffer *iobuf ) {
  */
 static inline size_t iob_tailroom ( struct io_buffer *iobuf ) {
 	return ( iobuf->end - iobuf->tail );
+}
+
+/**
+ * Ensure I/O buffer has sufficient headroom
+ *
+ * @v iobuf	I/O buffer
+ * @v len	Required headroom
+ *
+ * This function currently only checks for the required headroom; it
+ * does not reallocate the I/O buffer if required.  If we ever have a
+ * code path that requires this functionality, it's a fairly trivial
+ * change to make.
+ */
+static inline __attribute__ (( always_inline )) int
+iob_ensure_headroom ( struct io_buffer *iobuf, size_t len ) {
+	if ( iob_headroom ( iobuf ) >= len )
+		return 0;
+	return -ENOBUFS;
 }
 
 extern struct io_buffer * alloc_iob ( size_t len );
