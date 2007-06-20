@@ -36,9 +36,15 @@ struct natsemi_rx {
 
 struct natsemi_nic {
 	unsigned short ioaddr;
-	unsigned short tx_next;
+	unsigned short tx_cur;
+	unsigned short tx_dirty;
+	unsigned short rx_cur;
 	struct natsemi_tx tx[TX_RING_SIZE];
 	struct natsemi_rx rx[NUM_RX_DESC];
+	/* need to add iobuf as we cannot free iobuf->data in close without this 
+	 * alternatively substracting sizeof(head) and sizeof(list_head) can also 
+	 * give the same.*/
+	struct io_buffer *iobuf[NUM_RX_DESC];
 	struct spi_bit_basher spibit;
 	struct spi_device eeprom;
 	struct nvo_block nvo;
@@ -54,7 +60,9 @@ struct natsemi_nic {
 #define RX_BUF_LEN    8192   /*buffer size should be multiple of 32 */ 
 #define RX_BUF_PAD 4
 #define RX_BUF_SIZE 1536
-
+#define OWN       0x80000000
+#define DSIZE     0x00000FFF
+#define CRC_SIZE  4
 
 /* NATSEMI: Offsets to the device registers.
    Unlike software-only systems, device drivers interact with complex hardware.
@@ -208,12 +216,12 @@ static struct nvo_fragment rtl_nvo_fragments[] = {
  *
  * @v NAT		NATSEMI NIC
  */
- void nat_init_eeprom ( struct natsemi_nic *nat ) {
+ void rtl_init_eeprom ( struct natsemi_nic *rtl ) {
 	int ee9356;
 	int vpd;
 
 	/* Initialise three-wire bus */
-	nat->spibit.basher.op = &rtl_basher_ops;
+	rtl->spibit.basher.op = &rtl_basher_ops;
 	rtl->spibit.bus.mode = SPI_MODE_THREEWIRE;
 	init_spi_bit_basher ( &rtl->spibit );
 
@@ -241,17 +249,29 @@ static struct nvo_fragment rtl_nvo_fragments[] = {
 /**
  * Reset NIC
  *
- * @v rtl		NATSEMI NIC
+ * @v		NATSEMI NIC
  *
  * Issues a hardware reset and waits for the reset to complete.
  */
 static void nat_reset ( struct nat_nic *nat ) {
 
+	int i;
 	/* Reset chip */
 	outb ( ChipReset, nat->ioaddr + ChipCmd );
 	mdelay ( 10 );
-	memset ( &nat->tx, 0, sizeof ( nat->tx ) );
-	nat->rx.offset = 0;
+	nat->tx_dirty=0;
+	nat->tx_cur=0;
+	for(i=0;i<TX_RING_SIZE;i++)
+	{
+		nat->tx[i].link=0;
+		nat->tx[i].cmdsts=0;
+		nat->tx[i].bufptr=0;
+	}
+	nat->rx_cur = 0;
+	outl(virt_to_bus(&nat->tx[0]),nat->ioaddr+TxRingPtr);
+	outl(virt_to_bus(&nat->rx[0]), nat->ioaddr + RxRingPtr);
+
+	outl(TxOff|RxOff, nat->ioaddr + ChipCmd);
 
 	/* Restore PME enable bit */
 	outl(SavedClkRun, nat->ioaddr + ClkRun);
@@ -265,7 +285,7 @@ static void nat_reset ( struct nat_nic *nat ) {
  */
 static int nat_open ( struct net_device *netdev ) {
 	struct natsemi_nic *nat = netdev->priv;
-	struct io_buffer *iobuf;
+	//struct io_buffer *iobuf;
 	int i;
 	
 	/* Disable PME:
@@ -285,22 +305,38 @@ static int nat_open ( struct net_device *netdev ) {
 	 for ( i = 0 ; i < ETH_ALEN ; i++ )
 		outb ( netdev->ll_addr[i], rtl->ioaddr + MAC0 + i );
         */
-	/* Set up RX ring */
 
+
+	/*Set up the Tx Ring */
+	nat->tx_cur=0;
+	nat->tx_dirty=0;
+	for (i=0;i<TX_RING_SIZE;i++)
+	{
+		nat->tx[i].link   = virt_to_bus((i+1 < TX_RING_SIZE) ? &nat->tx[i+1] : &nat->tx[0]);
+		nat->tx[i].cmdsts = 0;
+		nat->tx[i].bufptr = 0;
+	}
+
+
+
+
+
+	/* Set up RX ring */
+	nat->rx_cur=0;
 	for (i=0;i<NUM_RX_DESC;i++)
 	{
 
-		iobuf = alloc_iob ( RX_BUF_SIZE );
-		if (!iobuf)
+		nat->iobuf[i] = alloc_iob ( RX_BUF_SIZE );
+		if (!nat->iobuf[i])
 		       return -ENOMEM;	
 		nat->rx[i].link   = virt_to_bus((i+1 < NUM_RX_DESC) ? &nat->rx[i+1] : &nat->rx[0]);
-		nat->rx[i].cmdsts = (u32) RX_BUF_SIZE;
-		nat->rx[i].bufptr = virt_to_bus(iobuf->data);
+		nat->rx[i].cmdsts = (uint32_t) RX_BUF_SIZE;
+		nat->rx[i].bufptr = virt_to_bus(nat->iobuf[i]->data);
 	}
 
 
 	 /* load Receive Descriptor Register */
-	outl(virt_to_bus(&nat->rx[0]), ioaddr + RxRingPtr);
+	outl(virt_to_bus(&nat->rx[0]), nat->ioaddr + RxRingPtr);
 	DBG("Natsemi Rx descriptor loaded with: %X\n",inl(nat->ioaddr+RingPtr));		
 
 	/* setup Tx ring */
@@ -325,8 +361,8 @@ static int nat_open ( struct net_device *netdev ) {
 
 
 
-	/*start the receiver and transmitter */
-        outl(RxOn|TxOn, nat->ioaddr + ChipCmd);
+	/*start the receiver  */
+        outl(RxOn, nat->ioaddr + ChipCmd);
 
 
 	return 0;
@@ -337,15 +373,18 @@ static int nat_open ( struct net_device *netdev ) {
  *
  * @v netdev		Net device
  */
-static void rtl_close ( struct net_device *netdev ) {
-	struct rtl8139_nic *rtl = netdev->priv;
+static void nat_close ( struct net_device *netdev ) {
+	struct natsemi_nic *nat = netdev->priv;
 
 	/* Reset the hardware to disable everything in one go */
-	rtl_reset ( rtl );
+	nat_reset ( nat );
 
 	/* Free RX ring */
-	free ( rtl->rx.ring );
-	rtl->rx.ring = NULL;
+	for (i=0;i<NUM_RX_DESC;i++)
+	{
+		
+		free_iob( nat->iobuf[i] );
+	}
 }
 
 /** 
@@ -358,24 +397,29 @@ static void rtl_close ( struct net_device *netdev ) {
 static int natsemi_transmit ( struct net_device *netdev, struct io_buffer *iobuf ) {
 	struct natsemi_nic *nat = netdev->priv;
 
-	/* Check for space in TX ring */
-	if ( nat->tx.iobuf[nat->tx.next] != NULL ) {
+       /* check for space in TX ring */
+
+	if (nat->tx[nat->tx_cur].cmdsts !=0)
+	{
 		printf ( "TX overflow\n" );
 		return -ENOBUFS;
 	}
+
 
 	/* Pad and align packet */
 	iob_pad ( iobuf, ETH_ZLEN );
 
 	/* Add to TX ring */
-	DBG ( "TX id %d at %lx+%x\n", rtl->tx.next,
+	DBG ( "TX id %d at %lx+%x\n", nat->tx_cur,
 	      virt_to_bus ( iobuf->data ), iob_len ( iobuf ) );
-	rtl->tx.iobuf[rtl->tx.next] = iobuf;
-	outl ( virt_to_bus ( iobuf->data ),
-	       rtl->ioaddr + TxAddr0 + 4 * rtl->tx.next );
-	outl ( ( ( ( TX_FIFO_THRESH & 0x7e0 ) << 11 ) | iob_len ( iobuf ) ),
-	       rtl->ioaddr + TxStatus0 + 4 * rtl->tx.next );
-	rtl->tx.next = ( rtl->tx.next + 1 ) % TX_RING_SIZE;
+
+	nat->tx[nat->tx_cur].bufptr = virt_to_bus(iobuf->data);
+	nat->tx[nat->tx_cur].cmdsts= (uint32_t) iob_len(iobuf)|OWN;
+
+	nat->tx_cur=(nat->tx_cur+1) % TX_RING_SIZE;
+
+	/*start the transmitter  */
+        outl(TxOn, nat->ioaddr + ChipCmd);
 
 	return 0;
 }
@@ -386,98 +430,77 @@ static int natsemi_transmit ( struct net_device *netdev, struct io_buffer *iobuf
  * @v netdev	Network device
  * @v rx_quota	Maximum number of packets to receive
  */
-static void rtl_poll ( struct net_device *netdev, unsigned int rx_quota ) {
-	struct rtl8139_nic *rtl = netdev->priv;
+static void nat_poll ( struct net_device *netdev, unsigned int rx_quota ) {
+	struct natsemi_nic *nat = netdev->priv;
 	unsigned int status;
-	unsigned int tsad;
 	unsigned int rx_status;
 	unsigned int rx_len;
 	struct io_buffer *rx_iob;
-	int wrapped_len;
 	int i;
 
-	/* Acknowledge interrupts */
-	status = inw ( rtl->ioaddr + IntrStatus );
-	if ( ! status )
-		return;
-	outw ( status, rtl->ioaddr + IntrStatus );
-
-	/* Handle TX completions */
-	tsad = inw ( rtl->ioaddr + TxSummary );
-	for ( i = 0 ; i < TX_RING_SIZE ; i++ ) {
-		if ( ( rtl->tx.iobuf[i] != NULL ) && ( tsad & ( 1 << i ) ) ) {
-			DBG ( "TX id %d complete\n", i );
-			netdev_tx_complete ( netdev, rtl->tx.iobuf[i] );
-			rtl->tx.iobuf[i] = NULL;
+	
+	/* check the status of packets given to card for transmission */	
+	for ( i = 0 ; i < TX_RING_SIZE ; i++ ) 
+	{
+		status=bus_to_virt(nat->tx[nat->tx_dirty].cmdsts);
+		/* check if current packet has been transmitted or not */
+		if(status & own) 
+			break;
+		/* Check if any errors in transmission */
+		if (! (status & DescPktOK))
+		{
+			printf("Error in sending Packet with data: %s\n and status:%X\n",
+					bus_to_virt(nat->tx[nat->tx_dirty].bufptr),
+					status);
 		}
+		else
+		{
+			DBG("Success in transmitting Packet with data: %s",
+					bus_to_virt(nat->tx[nat->tx_dirty].bufptr));
+		}
+		/* setting cmdsts zero, indicating that it can be reused */
+		nat->tx[nat->tx_dirty].cmdsts=0;
+		nat->tx_dirty=(nat->tx_dirty +1) % TX_RING_SIZE;
 	}
-
+			
+	
+	rx_status=bus_to_virt(nat->rx[nat->rx_cur].cmdsts); 
 	/* Handle received packets */
-	while ( rx_quota && ! ( inw ( rtl->ioaddr + ChipCmd ) & RxBufEmpty ) ){
-		rx_status = * ( ( uint16_t * )
-				( rtl->rx.ring + rtl->rx.offset ) );
-		rx_len = * ( ( uint16_t * )
-			     ( rtl->rx.ring + rtl->rx.offset + 2 ) );
-		if ( rx_status & RxOK ) {
-			DBG ( "RX packet at offset %x+%x\n", rtl->rx.offset,
-			      rx_len );
+	while (rx_quota && (rx_status & OWN))
+	{
+		rx_len= (rx_status & DSIZE) - CRC_SIZE;
 
-			rx_iob = alloc_iob ( rx_len );
-			if ( ! rx_iob ) {
-				/* Leave packet for next call to poll() */
-				break;
-			}
-
-			wrapped_len = ( ( rtl->rx.offset + 4 + rx_len )
-					- RX_BUF_LEN );
-			if ( wrapped_len < 0 )
-				wrapped_len = 0;
-
-			memcpy ( iob_put ( rx_iob, rx_len - wrapped_len ),
-				 rtl->rx.ring + rtl->rx.offset + 4,
-				 rx_len - wrapped_len );
-			memcpy ( iob_put ( rx_iob, wrapped_len ),
-				 rtl->rx.ring, wrapped_len );
-
-			netdev_rx ( netdev, rx_iob );
-			rx_quota--;
-		} else {
-			DBG ( "RX bad packet (status %#04x len %d)\n",
-			      rx_status, rx_len );
+		/*check for the corrupt packet */
+		if((rx_status & (DescMore|DescPktOK|RxTooLong)) != DescPktOK)
+		{
+			 printf("natsemi_poll: Corrupted packet received, 
+					 buffer status = %X\n",rx_status);
 		}
-		rtl->rx.offset = ( ( ( rtl->rx.offset + 4 + rx_len + 3 ) & ~3 )
-				   % RX_BUF_LEN );
-		outw ( rtl->rx.offset - 16, rtl->ioaddr + RxBufPtr );
+		else
+		{
+			rx_iob = alloc_iob(rx_len);
+			if(!rx_iob) 
+				/* leave packet for next call to poll*/
+				return;
+			memcpy(iob_put(rx_iob,rx_len),
+					nat->rx[nat->rx_cur].bufptr,rxlen);
+			/* add to the receive queue. */
+			netdev_rx(netdev,rx_iob);
+			rx_quota--;
+		}
+		nat->rx[nat->rx_cur].cmdsts = RX_BUF_SIZE;
+		nat->rx_cur=(nat->rx_cur+1) % NUM_RX_DESC;
 	}
-}
 
-#if 0
-static void rtl_irq(struct nic *nic, irq_action_t action)
-{
-	unsigned int mask;
-	/* Bit of a guess as to which interrupts we should allow */
-	unsigned int interested = ROK | RER | RXOVW | FOVW | SERR;
 
-	switch ( action ) {
-	case DISABLE :
-	case ENABLE :
-		mask = inw(rtl->ioaddr + IntrMask);
-		mask = mask & ~interested;
-		if ( action == ENABLE ) mask = mask | interested;
-		outw(mask, rtl->ioaddr + IntrMask);
-		break;
-	case FORCE :
-		/* Apparently writing a 1 to this read-only bit of a
-		 * read-only and otherwise unrelated register will
-		 * force an interrupt.  If you ever want to see how
-		 * not to write a datasheet, read the one for the
-		 * RTL8139...
-		 */
-		outb(EROK, rtl->ioaddr + RxEarlyStatus);
-		break;
-	}
-}
-#endif
+	 /* re-enable the potentially idle receive state machine */
+	    outl(RxOn, ioaddr + ChipCmd);	
+}				
+
+
+
+
+
 
 /**
  * Probe PCI device
@@ -492,6 +515,7 @@ static int nat_probe ( struct pci_device *pci,
 	struct natsemi_nic *nat = NULL;
 	int registered_netdev = 0;
 	int rc;
+	uint32_t advertising;
 
 	/* Fix up PCI device */
 	adjust_pci_device ( pci );
@@ -517,6 +541,26 @@ static int nat_probe ( struct pci_device *pci,
 	
 	*/
 	
+
+	/* mdio routine of etherboot-5.4.0 natsemi driver has been removed and 
+	 * statement to read from MII transceiver control section is used directly
+	 */
+
+        advertising = inl(nat->ioaddr + 0x80 + (4<<2)) & 0xffff; 
+        {
+	   	uint32_t chip_config = inl(ioaddr + ChipConfig);
+		DBG("%s: Transceiver default autoneg. %s 10 %s %s duplex.\n",
+	      	pci->driver_name,
+	        chip_config & 0x2000 ? "enabled, advertise" : "disabled, force",
+	        chip_config & 0x4000 ? "0" : "",
+	        chip_config & 0x8000 ? "full" : "half");
+    	}
+	DBG("%s: Transceiver status %hX advertising %hX\n",pci->driver_name, (int)inl(nat->ioaddr + 0x84), advertising);
+
+
+
+
+
 	/* Point to NIC specific routines */
 	netdev->open	 = nat_open;
 	netdev->close	 = nat_close;
@@ -542,7 +586,7 @@ static int nat_probe ( struct pci_device *pci,
  err:
 	/* Disable NIC */
 	if ( nat )
-		nat_reset ( rtl );
+		nat_reset ( nat );
 	if ( registered_netdev )
 		unregister_netdev ( netdev );
 	/* Free net device */
@@ -555,37 +599,26 @@ static int nat_probe ( struct pci_device *pci,
  *
  * @v pci	PCI device
  */
-static void rtl_remove ( struct pci_device *pci ) {
+static void nat_remove ( struct pci_device *pci ) {
 	struct net_device *netdev = pci_get_drvdata ( pci );
-	struct rtl8139_nic *rtl = netdev->priv;
-
+	struct natsemi_nic *nat = netdev->priv;
+/* TODO 
 	if ( rtl->nvo.nvs )
 		nvo_unregister ( &rtl->nvo );
+		*/
 	unregister_netdev ( netdev );
-	rtl_reset ( rtl );
+	nat_reset ( nat );
 	free_netdev ( netdev );
 }
 
-static struct pci_device_id rtl8139_nics[] = {
-PCI_ROM(0x10ec, 0x8129, "rtl8129",       "Realtek 8129"),
-PCI_ROM(0x10ec, 0x8139, "rtl8139",       "Realtek 8139"),
-PCI_ROM(0x10ec, 0x8138, "rtl8139b",      "Realtek 8139B"),
-PCI_ROM(0x1186, 0x1300, "dfe538",        "DFE530TX+/DFE538TX"),
-PCI_ROM(0x1113, 0x1211, "smc1211-1",     "SMC EZ10/100"),
-PCI_ROM(0x1112, 0x1211, "smc1211",       "SMC EZ10/100"),
-PCI_ROM(0x1500, 0x1360, "delta8139",     "Delta Electronics 8139"),
-PCI_ROM(0x4033, 0x1360, "addtron8139",   "Addtron Technology 8139"),
-PCI_ROM(0x1186, 0x1340, "dfe690txd",     "D-Link DFE690TXD"),
-PCI_ROM(0x13d1, 0xab06, "fe2000vx",      "AboCom FE2000VX"),
-PCI_ROM(0x1259, 0xa117, "allied8139",    "Allied Telesyn 8139"),
-PCI_ROM(0x14ea, 0xab06, "fnw3603tx",     "Planex FNW-3603-TX"),
-PCI_ROM(0x14ea, 0xab07, "fnw3800tx",     "Planex FNW-3800-TX"),
-PCI_ROM(0xffff, 0x8139, "clone-rtl8139", "Cloned 8139"),
+static struct pci_device_id natsemi_nics[] = {
+	PCI_ROM(0x100b, 0x0020, "dp83815", "DP83815"),
+
 };
 
-struct pci_driver rtl8139_driver __pci_driver = {
-	.ids = rtl8139_nics,
-	.id_count = ( sizeof ( rtl8139_nics ) / sizeof ( rtl8139_nics[0] ) ),
-	.probe = rtl_probe,
-	.remove = rtl_remove,
+struct pci_driver natsemi_driver __pci_driver = {
+	.ids = natsemi_nics,
+	.id_count = ( sizeof ( natsemi_nics ) / sizeof ( natsemi_nics[0] ) ),
+	.probe = nat_probe,
+	.remove = nat_remove,
 };
