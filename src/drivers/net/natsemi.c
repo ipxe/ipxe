@@ -446,7 +446,8 @@ static void nat_poll ( struct net_device *netdev, unsigned int rx_quota ) {
 	/* check the status of packets given to card for transmission */	
 	for ( i = 0 ; i < TX_RING_SIZE ; i++ ) 
 	{
-		status=(uint32_t)bus_to_virt(nat->tx[nat->tx_dirty].cmdsts);
+		//status=(uint32_t)bus_to_virt(nat->tx[nat->tx_dirty].cmdsts);
+		status=(uint32_t)nat->tx[nat->tx_dirty].cmdsts;
 		/* check if current packet has been transmitted or not */
 		if(status & OWN) 
 			break;
@@ -454,12 +455,12 @@ static void nat_poll ( struct net_device *netdev, unsigned int rx_quota ) {
 		if (! (status & DescPktOK))
 		{
 			printf("Error in sending Packet with data: %s\n and status:%X\n",
-					(char *)bus_to_virt(nat->tx[nat->tx_dirty].bufptr),(unsigned int)status);
+					(char *)nat->tx[nat->tx_dirty].bufptr,(unsigned int)status);
 		}
 		else
 		{
 			DBG("Success in transmitting Packet with data: %s",
-				(char *)bus_to_virt(nat->tx[nat->tx_dirty].bufptr));
+				(char *)nat->tx[nat->tx_dirty].bufptr);
 		}
 		/* setting cmdsts zero, indicating that it can be reused */
 		nat->tx[nat->tx_dirty].cmdsts=0;
@@ -467,7 +468,8 @@ static void nat_poll ( struct net_device *netdev, unsigned int rx_quota ) {
 	}
 			
 	
-	rx_status=(unsigned int)bus_to_virt(nat->rx[nat->rx_cur].cmdsts); 
+	//rx_status=(unsigned int)bus_to_virt(nat->rx[nat->rx_cur].cmdsts); 
+	rx_status=(unsigned int)nat->rx[nat->rx_cur].cmdsts; 
 	/* Handle received packets */
 	while (rx_quota && (rx_status & OWN))
 	{
@@ -477,7 +479,8 @@ static void nat_poll ( struct net_device *netdev, unsigned int rx_quota ) {
 		if((rx_status & (DescMore|DescPktOK|RxTooLong)) != DescPktOK)
 		{
 			 printf("natsemi_poll: Corrupted packet received, "
-					"buffer status = %X\n",rx_status);
+					"buffer status = %X ^ %X \n",rx_status,
+					(unsigned int) nat->rx[nat->rx_cur].cmdsts);
 		}
 		else
 		{
@@ -493,6 +496,8 @@ static void nat_poll ( struct net_device *netdev, unsigned int rx_quota ) {
 		}
 		nat->rx[nat->rx_cur].cmdsts = RX_BUF_SIZE;
 		nat->rx_cur=(nat->rx_cur+1) % NUM_RX_DESC;
+		//rx_status=(unsigned int)bus_to_virt(nat->rx[nat->rx_cur].cmdsts); 
+		rx_status=(unsigned int)nat->rx[nat->rx_cur].cmdsts; 
 	}
 
 
