@@ -149,64 +149,62 @@ enum desc_status_bits {
 
 
 
-/*  EEPROM access */
-#define EE_M1		0x80	/* Mode select bit 1 */
-#define EE_M0		0x40	/* Mode select bit 0 */
+/*  EEPROM access , values are devices specific*/
+//#define EE_M1		0x80	/* Mode select bit 1 */
+//#define EE_M0		0x40	/* Mode select bit 0 */
 #define EE_CS		0x08	/* EEPROM chip select */
 #define EE_SK		0x04	/* EEPROM shift clock */
-#define EE_DI		0x02	/* Data in */
-#define EE_DO		0x01	/* Data out */
+#define EE_DI		0x01	/* Data in */
+#define EE_DO		0x02	/* Data out */
 
 /* Offsets within EEPROM (these are word offsets) */
 #define EE_MAC 7
-
+#define EE_REG  EECtrl
 static uint32_t SavedClkRun;	
 
 
-/* TODO
-static const uint8_t rtl_ee_bits[] = {
+static const uint8_t nat_ee_bits[] = {
 	[SPI_BIT_SCLK]	= EE_SK,
 	[SPI_BIT_MOSI]	= EE_DI,
 	[SPI_BIT_MISO]	= EE_DO,
-	[SPI_BIT_SS(0)]	= ( EE_CS | EE_M1 ),
+	[SPI_BIT_SS(0)]	= EE_CS,
 };
 
-static int rtl_spi_read_bit ( struct bit_basher *basher,
+static int nat_spi_read_bit ( struct bit_basher *basher,
 			      unsigned int bit_id ) {
-	struct rtl8139_nic *rtl = container_of ( basher, struct rtl8139_nic,
+	struct natsemi_nic *nat = container_of ( basher, struct natsemi_nic,
 						 spibit.basher );
-	uint8_t mask = rtl_ee_bits[bit_id];
+	uint8_t mask = nat_ee_bits[bit_id];
 	uint8_t eereg;
 
-	eereg = inb ( rtl->ioaddr + Cfg9346 );
+	eereg = inb ( nat->ioaddr + EE_REG);
 	return ( eereg & mask );
 }
 
-static void rtl_spi_write_bit ( struct bit_basher *basher,
+static void nat_spi_write_bit ( struct bit_basher *basher,
 				unsigned int bit_id, unsigned long data ) {
-	struct rtl8139_nic *rtl = container_of ( basher, struct rtl8139_nic,
+	struct natsemi_nic *nat = container_of ( basher, struct natsemi_nic,
 						 spibit.basher );
-	uint8_t mask = rtl_ee_bits[bit_id];
+	uint8_t mask = nat_ee_bits[bit_id];
 	uint8_t eereg;
 
-	eereg = inb ( rtl->ioaddr + Cfg9346 );
+	eereg = inb ( nat->ioaddr + EE_REG );
 	eereg &= ~mask;
 	eereg |= ( data & mask );
-	outb ( eereg, rtl->ioaddr + Cfg9346 );
+	outb ( eereg, nat->ioaddr + EE_REG);
 }
 
-static struct bit_basher_operations rtl_basher_ops = {
-	.read = rtl_spi_read_bit,
-	.write = rtl_spi_write_bit,
+static struct bit_basher_operations nat_basher_ops = {
+	.read = nat_spi_read_bit,
+	.write = nat_spi_write_bit,
 };
-*/
 /** Portion of EEPROM available for non-volatile stored options
  *
  * We use offset 0x40 (i.e. address 0x20), length 0x40.  This block is
  * marked as VPD in the rtl8139 datasheets, so we use it only if we
  * detect that the card is not supporting VPD.
  */
-static struct nvo_fragment rtl_nvo_fragments[] = {
+static struct nvo_fragment nat_nvo_fragments[] = {
 	{ 0x20, 0x40 },
 	{ 0, 0 }
 };
@@ -216,37 +214,29 @@ static struct nvo_fragment rtl_nvo_fragments[] = {
  *
  * @v NAT		NATSEMI NIC
  */
-/* TODO
- void rtl_init_eeprom ( struct natsemi_nic *rtl ) {
+ void nat_init_eeprom ( struct natsemi_nic *nat ) {
 	int ee9356;
 	int vpd;
 
 	// Initialise three-wire bus 
-	rtl->spibit.basher.op = &rtl_basher_ops;
-	rtl->spibit.bus.mode = SPI_MODE_THREEWIRE;
-	init_spi_bit_basher ( &rtl->spibit );
+	nat->spibit.basher.op = &nat_basher_ops;
+	nat->spibit.bus.mode = SPI_MODE_THREEWIRE;
+	init_spi_bit_basher ( &nat->spibit );
 
-	//Detect EEPROM type and initialise three-wire device 
-	ee9356 = ( inw ( rtl->ioaddr + RxConfig ) & Eeprom9356 );
-	if ( ee9356 ) {
-		DBG ( "EEPROM is an AT93C56\n" );
-		init_at93c56 ( &rtl->eeprom, 16 );
-	} else {
-		DBG ( "EEPROM is an AT93C46\n" );
-		init_at93c46 ( &rtl->eeprom, 16 );
-	}
-	rtl->eeprom.bus = &rtl->spibit.bus;
+	DBG ( "EEPROM is an AT93C46\n" );
+	init_at93c46 ( &nat->eeprom, 16 );
+	nat->eeprom.bus = &nat->spibit.bus;
 
 	// Initialise space for non-volatile options, if available 
-	vpd = ( inw ( rtl->ioaddr + Config1 ) & VPDEnable );
-	if ( vpd ) {
-		DBG ( "EEPROM in use for VPD; cannot use for options\n" );
-	} else {
-		rtl->nvo.nvs = &rtl->eeprom.nvs;
-		rtl->nvo.fragments = rtl_nvo_fragments;
-	}
+	//vpd = ( inw ( rtl->ioaddr + Config1 ) & VPDEnable );
+	//if ( vpd ) {
+	//	DBG ( "EEPROM in use for VPD; cannot use for options\n" );
+	//} else {
+//		nat->nvo.nvs = &nat->eeprom.nvs;
+//		nat->nvo.fragments = nat_nvo_fragments;
+//	}
 }
-*/
+
 /**
  * Reset NIC
  *
@@ -303,10 +293,14 @@ static int nat_open ( struct net_device *netdev ) {
 
 
 	/* Program the MAC address TODO enable this comment */
-	/*
-	 for ( i = 0 ; i < ETH_ALEN ; i++ )
-		outb ( netdev->ll_addr[i], rtl->ioaddr + MAC0 + i );
-        */
+	
+	 for ( i = 0 ; i < ETH_ALEN ; i+=2 )
+	 {
+		outl(i,nat->ioaddr+RxFilterAddr);
+		outw ( netdev->ll_addr[i] + (netdev->ll_addr[i+1]<<8), nat->ioaddr +RxFilterData);
+		DBG("MAC address %d octet :%X %X\n",i,netdev->ll_addr[i],netdev->ll_addr[i+1]);
+	}
+       
 
 
 	/*Set up the Tx Ring */
@@ -542,12 +536,16 @@ static int nat_probe ( struct pci_device *pci,
 
 	/* Reset the NIC, set up EEPROM access and read MAC address */
 	nat_reset ( nat );
-	/* commenitng two line below. Have to be included in final natsemi.c TODO*/
-	/*
-	nat_init_eeprom ( rtl );
+	nat_init_eeprom ( nat );
 	nvs_read ( &nat->eeprom.nvs, EE_MAC, netdev->ll_addr, ETH_ALEN );
-	
-	*/
+	uint8_t  eetest[12];	
+	int i;
+	nvs_read ( &nat->eeprom.nvs, 6, eetest,8 );
+	for (i=0;i<8;i++)
+	{
+		printf("%d word : %X\n",i,eetest[i]);
+	}
+		
 	
 
 	/* mdio routine of etherboot-5.4.0 natsemi driver has been removed and 
