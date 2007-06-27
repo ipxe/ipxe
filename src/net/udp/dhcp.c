@@ -17,12 +17,16 @@
  */
 
 #include <string.h>
+#include <stdlib.h>
 #include <errno.h>
 #include <assert.h>
 #include <byteswap.h>
 #include <gpxe/if_ether.h>
 #include <gpxe/netdevice.h>
-#include <gpxe/udp.h>
+#include <gpxe/xfer.h>
+#include <gpxe/open.h>
+#include <gpxe/job.h>
+#include <gpxe/retry.h>
 #include <gpxe/dhcp.h>
 
 /** @file
@@ -387,7 +391,6 @@ static void merge_dhcp_field ( struct dhcp_option_block *options,
 /**
  * Parse DHCP packet and construct DHCP options block
  *
- * @v dhcp		DHCP session
  * @v dhcphdr		DHCP packet
  * @v len		Length of DHCP packet
  * @ret options		DHCP options block, or NULL
@@ -407,8 +410,7 @@ static void merge_dhcp_field ( struct dhcp_option_block *options,
  * options block; it is the responsibility of the caller to eventually
  * free this memory.
  */
-static struct dhcp_option_block * dhcp_parse ( struct dhcp_session *dhcp,
-					       struct dhcphdr *dhcphdr,
+static struct dhcp_option_block * dhcp_parse ( const struct dhcphdr *dhcphdr,
 					       size_t len ) {
 	struct dhcp_option_block *options;
 	size_t options_len;
@@ -443,8 +445,8 @@ static struct dhcp_option_block * dhcp_parse ( struct dhcp_session *dhcp,
 	/* Allocate empty options block of required size */
 	options = alloc_dhcp_options ( options_len );
 	if ( ! options ) {
-		DBGC ( dhcp, "DHCP %p could not allocate %d-byte option "
-		       "block\n", dhcp, options_len );
+		DBG ( "DHCP could not allocate %d-byte option block\n",
+		      options_len );
 		return NULL;
 	}
 	
@@ -488,12 +490,45 @@ static struct dhcp_option_block * dhcp_parse ( struct dhcp_session *dhcp,
  *
  */
 
-static inline struct dhcp_session *
-udp_to_dhcp ( struct udp_connection *conn ) {
-	return container_of ( conn, struct dhcp_session, udp );
-}
+/** A DHCP session */
+struct dhcp_session {
+	/** Reference counter */
+	struct refcnt refcnt;
+	/** Job control interface */
+	struct job_interface job;
+	/** Data transfer interface */
+	struct xfer_interface xfer;
 
-#if 0
+	/** Network device being configured */
+	struct net_device *netdev;
+	/** Option block registration routine */
+	int ( * register_options ) ( struct dhcp_option_block *options );
+
+	/** State of the session
+	 *
+	 * This is a value for the @c DHCP_MESSAGE_TYPE option
+	 * (e.g. @c DHCPDISCOVER).
+	 */
+	int state;
+	/** Options obtained from server */
+	struct dhcp_option_block *options;
+	/** Retransmission timer */
+	struct retry_timer timer;
+};
+
+/**
+ * Free DHCP session
+ *
+ * @v refcnt		Reference counter
+ */
+static void dhcp_free ( struct refcnt *refcnt ) {
+	struct dhcp_session *dhcp =
+		container_of ( refcnt, struct dhcp_session, refcnt );
+
+	netdev_put ( dhcp->netdev );
+	dhcpopt_put ( dhcp->options );
+	free ( dhcp );
+}
 
 /**
  * Mark DHCP session as complete
@@ -501,50 +536,38 @@ udp_to_dhcp ( struct udp_connection *conn ) {
  * @v dhcp		DHCP session
  * @v rc		Return status code
  */
-static void dhcp_done ( struct dhcp_session *dhcp, int rc ) {
+static void dhcp_finished ( struct dhcp_session *dhcp, int rc ) {
 
-	/* Free up options if we failed */
-	if ( rc != 0 ) {
-		if ( dhcp->options ) {
-			free_dhcp_options ( dhcp->options );
-			dhcp->options = NULL;
-		}
-	}
+	/* Block futher incoming messages */
+	job_nullify ( &dhcp->job );
+	xfer_nullify ( &dhcp->xfer );
 
 	/* Stop retry timer */
 	stop_timer ( &dhcp->timer );
 
-	/* Close UDP connection */
-	udp_close ( &dhcp->udp );
-
-	/* Mark async operation as complete */
-	async_done ( &dhcp->async, rc );
+	/* Free resources and close interfaces */
+	xfer_close ( &dhcp->xfer, rc );
+	job_done ( &dhcp->job, rc );
 }
 
-/** Address for transmitting DHCP requests */
-static union {
-	struct sockaddr_tcpip st;
-	struct sockaddr_in sin;
-} sa_dhcp_server = {
-	.sin = {
-		.sin_family = AF_INET,
-		.sin_addr.s_addr = INADDR_BROADCAST,
-		.sin_port = htons ( BOOTPS_PORT ),
-	},
-};
+/****************************************************************************
+ *
+ * Data transfer interface
+ *
+ */
 
 /**
  * Transmit DHCP request
  *
- * @v conn		UDP connection
- * @v buf		Temporary data buffer
- * @v len		Length of temporary data buffer
+ * @v dhcp		DHCP session
  * @ret rc		Return status code
  */
-static int dhcp_senddata ( struct udp_connection *conn,
-			   void *buf, size_t len ) {
-	struct dhcp_session *dhcp = udp_to_dhcp ( conn );
+static int dhcp_send_request ( struct dhcp_session *dhcp ) {
+	struct xfer_metadata meta = {
+		.netdev = dhcp->netdev,
+	};
 	struct dhcp_packet dhcppkt;
+	struct io_buffer *iobuf;
 	int rc;
 	
 	DBGC ( dhcp, "DHCP %p transmitting %s\n",
@@ -553,12 +576,23 @@ static int dhcp_senddata ( struct udp_connection *conn,
 	assert ( ( dhcp->state == DHCPDISCOVER ) ||
 		 ( dhcp->state == DHCPREQUEST ) );
 
+	/* Start retry timer.  Do this first so that failures to
+	 * transmit will be retried.
+	 */
+	start_timer ( &dhcp->timer );
+
+	/* Allocate buffer for packet */
+	iobuf = xfer_alloc_iob ( &dhcp->xfer, DHCP_MIN_LEN );
+	if ( ! iobuf )
+		return -ENOMEM;
+
 	/* Create DHCP packet in temporary buffer */
-	if ( ( rc = create_dhcp_packet ( dhcp->netdev, dhcp->state, buf, len,
+	if ( ( rc = create_dhcp_packet ( dhcp->netdev, dhcp->state,
+					 iobuf->data, iob_tailroom ( iobuf ),
 					 &dhcppkt ) ) != 0 ) {
 		DBGC ( dhcp, "DHCP %p could not create DHCP packet: %s\n",
 		       dhcp, strerror ( rc ) );
-		return rc;
+		goto done;
 	}
 
 	/* Copy in options common to all requests */
@@ -566,7 +600,7 @@ static int dhcp_senddata ( struct udp_connection *conn,
 					       &dhcp_request_options ) ) != 0){
 		DBGC ( dhcp, "DHCP %p could not set common DHCP options: %s\n",
 		       dhcp, strerror ( rc ) );
-		return rc;
+		goto done;
 	}
 
 	/* Copy any required options from previous server repsonse */
@@ -576,36 +610,30 @@ static int dhcp_senddata ( struct udp_connection *conn,
 					    DHCP_SERVER_IDENTIFIER ) ) != 0 ) {
 			DBGC ( dhcp, "DHCP %p could not set server identifier "
 			       "option: %s\n", dhcp, strerror ( rc ) );
-			return rc;
+			goto done;
 		}
 		if ( ( rc = copy_dhcp_packet_option ( &dhcppkt, dhcp->options,
 					    DHCP_EB_YIADDR,
 					    DHCP_REQUESTED_ADDRESS ) ) != 0 ) {
 			DBGC ( dhcp, "DHCP %p could not set requested address "
 			       "option: %s\n", dhcp, strerror ( rc ) );
-			return rc;
+			goto done;
 		}
 	}
 
 	/* Transmit the packet */
-	if ( ( rc = udp_sendto_via ( conn, &sa_dhcp_server.st, dhcp->netdev,
-				     dhcppkt.dhcphdr, dhcppkt.len ) ) != 0 ) {
+	iob_put ( iobuf, dhcppkt.len );
+	rc = xfer_deliver_iob_meta ( &dhcp->xfer, iobuf, &meta );
+	iobuf = NULL;
+	if ( rc != 0 ) {
 		DBGC ( dhcp, "DHCP %p could not transmit UDP packet: %s\n",
 		       dhcp, strerror ( rc ) );
-		return rc;
+		goto done;
 	}
 
-	return 0;
-}
-
-/**
- * Transmit DHCP request
- *
- * @v dhcp		DHCP session
- */
-static void dhcp_send_request ( struct dhcp_session *dhcp ) {
-	start_timer ( &dhcp->timer );
-	udp_senddata ( &dhcp->udp );
+ done:
+	free_iob ( iobuf );
+	return rc;
 }
 
 /**
@@ -619,7 +647,7 @@ static void dhcp_timer_expired ( struct retry_timer *timer, int fail ) {
 		container_of ( timer, struct dhcp_session, timer );
 
 	if ( fail ) {
-		dhcp_done ( dhcp, -ETIMEDOUT );
+		dhcp_finished ( dhcp, -ETIMEDOUT );
 	} else {
 		dhcp_send_request ( dhcp );
 	}
@@ -628,17 +656,17 @@ static void dhcp_timer_expired ( struct retry_timer *timer, int fail ) {
 /**
  * Receive new data
  *
- * @v udp		UDP connection
+ * @v xfer 		Data transfer interface
+ * @v iobuf		I/O buffer
  * @v data		Received data
  * @v len		Length of received data
- * @v st_src		Partially-filled source address
- * @v st_dest		Partially-filled destination address
+ * @ret rc		Return status code
  */
-static int dhcp_newdata ( struct udp_connection *conn, void *data, size_t len,
-			  struct sockaddr_tcpip *st_src __unused,
-			  struct sockaddr_tcpip *st_dest __unused ) {
-	struct dhcp_session *dhcp = udp_to_dhcp ( conn );
-	struct dhcphdr *dhcphdr = data;
+static int dhcp_deliver_raw ( struct xfer_interface *xfer,
+			      const void *data, size_t len ) {
+	struct dhcp_session *dhcp =
+		container_of ( xfer, struct dhcp_session, xfer );
+	const struct dhcphdr *dhcphdr = data;
 	struct dhcp_option_block *options;
 	unsigned int msgtype;
 
@@ -651,7 +679,7 @@ static int dhcp_newdata ( struct udp_connection *conn, void *data, size_t len,
 	};
 
 	/* Parse packet and create options structure */
-	options = dhcp_parse ( dhcp, dhcphdr, len );
+	options = dhcp_parse ( dhcphdr, len );
 	if ( ! options ) {
 		DBGC ( dhcp, "DHCP %p could not parse DHCP packet\n", dhcp );
 		return -EINVAL;
@@ -682,58 +710,120 @@ static int dhcp_newdata ( struct udp_connection *conn, void *data, size_t len,
 	/* Stop timer and update stored options */
 	stop_timer ( &dhcp->timer );
 	if ( dhcp->options )
-		free_dhcp_options ( dhcp->options );
+		dhcpopt_put ( dhcp->options );
 	dhcp->options = options;
 
 	/* Transmit next packet, or terminate session */
 	if ( dhcp->state < DHCPACK ) {
 		dhcp_send_request ( dhcp );
 	} else {
-		dhcp_done ( dhcp, 0 );
+		dhcp->register_options ( dhcp->options );
+		dhcp_finished ( dhcp, 0 );
 	}
 	return 0;
 
  out_discard:
-	free_dhcp_options ( options );
+	dhcpopt_put ( options );
 	return 0;
 }
 
-/** DHCP UDP operations */
-static struct udp_operations dhcp_udp_operations = {
-	.senddata	= dhcp_senddata,
-	.newdata	= dhcp_newdata,
+/** DHCP data transfer interface operations */
+static struct xfer_interface_operations dhcp_xfer_operations = {
+	.close		= ignore_xfer_close,
+	.vredirect	= xfer_vopen,
+	.request	= ignore_xfer_request,
+	.seek		= ignore_xfer_seek,
+	.deliver_iob	= xfer_deliver_as_raw,
+	.deliver_raw	= dhcp_deliver_raw,
 };
 
-/**
- * Initiate DHCP on a network interface
+/****************************************************************************
  *
- * @v dhcp		DHCP session
- * @v parent		Parent asynchronous operation
- * @ret rc		Return status code
+ * Job control interface
  *
- * If the DHCP operation completes successfully, the
- * dhcp_session::options field will be filled in with the resulting
- * options block.  The caller takes responsibility for eventually
- * calling free_dhcp_options().
  */
-int start_dhcp ( struct dhcp_session *dhcp, struct async *parent ) {
-	int rc;
 
-	/* Initialise DHCP session */
-	dhcp->udp.udp_op = &dhcp_udp_operations;
-	dhcp->timer.expired = dhcp_timer_expired;
-	dhcp->state = DHCPDISCOVER;
+/**
+ * Handle kill() event received via job control interface
+ *
+ * @v job		DHCP job control interface
+ */
+static void dhcp_job_kill ( struct job_interface *job ) {
+	struct dhcp_session *dhcp =
+		container_of ( job, struct dhcp_session, job );
 
-	/* Bind to local port */
-	if ( ( rc = udp_open ( &dhcp->udp, htons ( BOOTPC_PORT ) ) ) != 0 )
-		return rc;
-
-	/* Proof of concept: just send a single DHCPDISCOVER */
-	dhcp_send_request ( dhcp );
-
-	async_init ( &dhcp->async, &default_async_operations, parent );
-	return 0;
+	/* Terminate DHCP session */
+	dhcp_finished ( dhcp, -ECANCELED );
 }
 
+/** DHCP job control interface operations */
+static struct job_interface_operations dhcp_job_operations = {
+	.start		= ignore_job_start,
+	.done		= ignore_job_done,
+	.kill		= dhcp_job_kill,
+	.progress	= ignore_job_progress,
+};
 
-#endif
+/****************************************************************************
+ *
+ * Instantiator
+ *
+ */
+
+/**
+ * Start DHCP on a network device
+ *
+ * @v job		Job control interface
+ * @v netdev		Network device
+ * @v register_options	DHCP option block registration routine
+ * @ret rc		Return status code
+ *
+ * Starts DHCP on the specified network device.  If successful, the @c
+ * register_options() routine will be called with the acquired
+ * options.
+ */
+int start_dhcp ( struct job_interface *job, struct net_device *netdev,
+		 int ( * register_options ) ( struct dhcp_option_block * ) ) {
+	static struct sockaddr_in server = {
+		.sin_family = AF_INET,
+		.sin_addr.s_addr = INADDR_BROADCAST,
+		.sin_port = htons ( BOOTPS_PORT ),
+	};
+	static struct sockaddr_in client = {
+		.sin_family = AF_INET,
+		.sin_port = htons ( BOOTPC_PORT ),
+	};
+	struct dhcp_session *dhcp;
+	int rc;
+
+	/* Allocate and initialise structure */
+	dhcp = malloc ( sizeof ( *dhcp ) );
+	if ( ! dhcp )
+		return -ENOMEM;
+	memset ( dhcp, 0, sizeof ( *dhcp ) );
+	dhcp->refcnt.free = dhcp_free;
+	job_init ( &dhcp->job, &dhcp_job_operations, &dhcp->refcnt );
+	xfer_init ( &dhcp->xfer, &dhcp_xfer_operations, &dhcp->refcnt );
+	dhcp->netdev = netdev_get ( netdev );
+	dhcp->register_options = register_options;
+	dhcp->timer.expired = dhcp_timer_expired;
+
+	/* Instantiate child objects and attach to our interfaces */
+	if ( ( rc = xfer_open_socket ( &dhcp->xfer, SOCK_DGRAM,
+				       ( struct sockaddr * ) &server,
+				       ( struct sockaddr * ) &client ) ) != 0 )
+		goto err;
+
+	/* Start timer to initiate initial DHCPREQUEST */
+	start_timer ( &dhcp->timer );
+
+	/* Attach parent interface, mortalise self, and return */
+	job_plug_plug ( &dhcp->job, job );
+	ref_put ( &dhcp->refcnt );
+	return 0;
+
+ err:
+	dhcp_finished ( dhcp, rc );
+	ref_put ( &dhcp->refcnt );
+	return rc;
+}

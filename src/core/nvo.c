@@ -194,7 +194,7 @@ int nvo_register ( struct nvo_block *nvo ) {
 	return 0;
 	
  err:
-	free_dhcp_options ( nvo->options );
+	dhcpopt_put ( nvo->options );
 	nvo->options = NULL;
 	return rc;
 }
@@ -208,7 +208,7 @@ void nvo_unregister ( struct nvo_block *nvo ) {
 
 	if ( nvo->options ) {
 		unregister_dhcp_options ( nvo->options );
-		free_dhcp_options ( nvo->options );
+		dhcpopt_put ( nvo->options );
 		nvo->options = NULL;
 	}
 

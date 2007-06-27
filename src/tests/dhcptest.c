@@ -261,7 +261,7 @@ int test_dhcp ( struct net_device *netdev ) {
  out:
 	/* Unregister and free DHCP options */
 	unregister_dhcp_options ( dhcp.options );
-	free_dhcp_options ( dhcp.options );
+	dhcpopt_put ( dhcp.options );
  out_no_options:
  out_no_del_ipv4:
 	return rc;

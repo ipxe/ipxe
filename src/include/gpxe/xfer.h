@@ -115,6 +115,8 @@ struct xfer_metadata {
 	struct sockaddr *src;
 	/** Destination socket address, or NULL */
 	struct sockaddr *dest;
+	/** Network device, or NULL */
+	struct net_device *netdev;
 };
 
 /** Basis positions for seek() events */

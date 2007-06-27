@@ -280,6 +280,7 @@ void register_dhcp_options ( struct dhcp_option_block *options ) {
 		if ( options->priority > existing->priority )
 			break;
 	}
+	dhcpopt_get ( options );
 	list_add_tail ( &options->list, &existing->list );
 }
 
@@ -290,6 +291,7 @@ void register_dhcp_options ( struct dhcp_option_block *options ) {
  */
 void unregister_dhcp_options ( struct dhcp_option_block *options ) {
 	list_del ( &options->list );
+	dhcpopt_put ( options );
 }
 
 /**
@@ -335,15 +337,6 @@ struct dhcp_option_block * alloc_dhcp_options ( size_t max_len ) {
 				    max_len );
 	}
 	return options;
-}
-
-/**
- * Free DHCP options block
- *
- * @v options		DHCP option block
- */
-void free_dhcp_options ( struct dhcp_option_block *options ) {
-	free ( options );
 }
 
 /**

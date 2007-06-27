@@ -18,6 +18,7 @@
 
 #include <string.h>
 #include <stdio.h>
+#include <errno.h>
 #include <byteswap.h>
 #include <gpxe/in.h>
 #include <gpxe/ip.h>
@@ -33,6 +34,12 @@
  * DHCP management
  *
  */
+
+int dhcp ( struct net_device *netdev ) {
+	return -ENOTSUP;
+}
+
+#if 0
 
 /* Avoid dragging in dns.o */
 struct sockaddr_tcpip nameserver;
@@ -63,7 +70,7 @@ int dhcp ( struct net_device *netdev ) {
 	/* Free up any previously-acquired options */
 	if ( dhcp_options ) {
 		unregister_dhcp_options ( dhcp_options );
-		free_dhcp_options ( dhcp_options );
+		dhcpopt_put ( dhcp_options );
 		dhcp_options = NULL;
 	}
 
@@ -108,3 +115,5 @@ int dhcp ( struct net_device *netdev ) {
 
 	return 0;
 }
+
+#endif

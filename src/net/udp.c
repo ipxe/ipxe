@@ -183,16 +183,15 @@ static void udp_close ( struct udp_connection *udp, int rc ) {
  * @v iobuf		I/O buffer
  * @v src_port		Source port, or 0 to use default
  * @v dest		Destination address, or NULL to use default
+ * @v netdev		Network device, or NULL to use default
  * @ret rc		Return status code
  */
 static int udp_tx ( struct udp_connection *udp, struct io_buffer *iobuf,
-		    unsigned int src_port, struct sockaddr_tcpip *dest ) {
+		    unsigned int src_port, struct sockaddr_tcpip *dest,
+		    struct net_device *netdev ) {
        	struct udp_header *udphdr;
-	struct net_device *netdev = NULL;
 	size_t len;
 	int rc;
-
-#warning "netdev?"
 
 	/* Check we can accommodate the header */
 	if ( ( rc = iob_ensure_headroom ( iobuf, UDP_MAX_HLEN ) ) != 0 ) {
@@ -394,6 +393,7 @@ static int udp_xfer_deliver_iob ( struct xfer_interface *xfer,
 		container_of ( xfer, struct udp_connection, xfer );
 	struct sockaddr_tcpip *src;
 	struct sockaddr_tcpip *dest = NULL;
+	struct net_device *netdev = NULL;
 	unsigned int src_port = 0;
 
 	/* Apply xfer metadata */
@@ -402,10 +402,11 @@ static int udp_xfer_deliver_iob ( struct xfer_interface *xfer,
 		if ( src )
 			src_port = src->st_port;
 		dest = ( struct sockaddr_tcpip * ) meta->dest;
+		netdev = meta->netdev;
 	}
 
 	/* Transmit data, if possible */
-	udp_tx ( udp, iobuf, src_port, dest );
+	udp_tx ( udp, iobuf, src_port, dest, netdev );
 
 	return 0;
 }

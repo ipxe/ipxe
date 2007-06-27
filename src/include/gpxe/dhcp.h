@@ -10,9 +10,10 @@
 #include <stdint.h>
 #include <gpxe/list.h>
 #include <gpxe/in.h>
-#include <gpxe/udp.h>
-#include <gpxe/async.h>
-#include <gpxe/retry.h>
+#include <gpxe/refcnt.h>
+
+struct net_device;
+struct job_interface;
 
 /** BOOTP/DHCP server port */
 #define BOOTPS_PORT 67
@@ -312,6 +313,8 @@ struct dhcp_option {
 
 /** A DHCP options block */
 struct dhcp_option_block {
+	/** Reference counter */
+	struct refcnt refcnt;
 	/** List of option blocks */
 	struct list_head list;
 	/** Option block raw data */
@@ -413,6 +416,13 @@ struct dhcphdr {
 /** DHCP magic cookie */
 #define DHCP_MAGIC_COOKIE 0x63825363UL
 
+/** DHCP minimum packet length
+ *
+ * This is the mandated minimum packet length that a DHCP participant
+ * must be prepared to receive.
+ */
+#define DHCP_MIN_LEN 552
+
 /** DHCP packet option block fill order
  *
  * This is the order in which option blocks are filled when
@@ -448,30 +458,27 @@ struct dhcp_packet {
 	struct dhcp_option_block options[NUM_OPT_BLOCKS];
 };
 
-struct udp_connection {};
+/**
+ * Get reference to DHCP options block
+ *
+ * @v options		DHCP options block
+ * @ret options		DHCP options block
+ */
+static inline __attribute__ (( always_inline )) struct dhcp_option_block *
+dhcpopt_get ( struct dhcp_option_block *options ) {
+	ref_get ( &options->refcnt );
+	return options;
+}
 
-/** A DHCP session */
-struct dhcp_session {
-	/** UDP connection for this session */
-	struct udp_connection udp;
-
-	/** Network device being configured */
-	struct net_device *netdev;
-
-	/** Options obtained from server */
-	struct dhcp_option_block *options;
-
-	/** State of the session
-	 *
-	 * This is a value for the @c DHCP_MESSAGE_TYPE option
-	 * (e.g. @c DHCPDISCOVER).
-	 */
-	int state;
-	/** Asynchronous operation for this DHCP session */
-	struct async async;
-	/** Retransmission timer */
-	struct retry_timer timer;
-};
+/**
+ * Drop reference to DHCP options block
+ *
+ * @v options		DHCP options block
+ */
+static inline __attribute__ (( always_inline )) void
+dhcpopt_put ( struct dhcp_option_block *options ) {
+	ref_put ( &options->refcnt );
+}
 
 extern unsigned long dhcp_num_option ( struct dhcp_option *option );
 extern void dhcp_ipv4_option ( struct dhcp_option *option,
@@ -485,7 +492,6 @@ extern void unregister_dhcp_options ( struct dhcp_option_block *options );
 extern void init_dhcp_options ( struct dhcp_option_block *options,
 				void *data, size_t max_len );
 extern struct dhcp_option_block * alloc_dhcp_options ( size_t max_len );
-extern void free_dhcp_options ( struct dhcp_option_block *options );
 extern struct dhcp_option *
 set_dhcp_option ( struct dhcp_option_block *options, unsigned int tag,
 		  const void *data, size_t len );
@@ -506,6 +512,7 @@ extern int create_dhcp_packet ( struct net_device *netdev, uint8_t msgtype,
 				struct dhcp_packet *dhcppkt );
 extern int copy_dhcp_packet_options ( struct dhcp_packet *dhcppkt,
 				      struct dhcp_option_block *options );
-extern int start_dhcp ( struct dhcp_session *dhcp, struct async *parent );
+extern int start_dhcp ( struct job_interface *job, struct net_device *netdev,
+			int (*register_options) ( struct dhcp_option_block * ));
 
 #endif /* _GPXE_DHCP_H */
