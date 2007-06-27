@@ -10,7 +10,7 @@
 #include <stdint.h>
 #include <gpxe/list.h>
 #include <gpxe/tables.h>
-#include <gpxe/hotplug.h>
+#include <gpxe/refcnt.h>
 
 struct io_buffer;
 struct net_device;
@@ -137,14 +137,14 @@ struct ll_protocol {
  * not just an Ethernet device.
  */
 struct net_device {
+	/** Reference counter */
+	struct refcnt refcnt;
 	/** List of network devices */
 	struct list_head list;
 	/** Name of this network device */
 	char name[8];
 	/** Underlying hardware device */
 	struct device *dev;
-	/** List of persistent reference holders */
-	struct list_head references;
 
 	/** Open network device
 	 *
@@ -251,6 +251,28 @@ static inline int have_netdevs ( void ) {
 	return ( ! list_empty ( &net_devices ) );
 }
 
+/**
+ * Get reference to network device
+ *
+ * @v netdev		Network device
+ * @ret netdev		Network device
+ */
+static inline __attribute__ (( always_inline )) struct net_device *
+netdev_get ( struct net_device *netdev ) {
+	ref_get ( &netdev->refcnt );
+	return netdev;
+}
+
+/**
+ * Drop reference to network device
+ *
+ * @v netdev		Network device
+ */
+static inline __attribute__ (( always_inline )) void
+netdev_put ( struct net_device *netdev ) {
+	ref_put ( &netdev->refcnt );
+}
+
 extern int netdev_tx ( struct net_device *netdev, struct io_buffer *iobuf );
 void netdev_tx_complete ( struct net_device *netdev, struct io_buffer *iobuf );
 void netdev_tx_complete_next ( struct net_device *netdev );
@@ -262,7 +284,6 @@ extern int register_netdev ( struct net_device *netdev );
 extern int netdev_open ( struct net_device *netdev );
 extern void netdev_close ( struct net_device *netdev );
 extern void unregister_netdev ( struct net_device *netdev );
-extern void free_netdev ( struct net_device *netdev );
 struct net_device * find_netdev ( const char *name );
 struct net_device * find_pci_netdev ( unsigned int busdevfn );
 

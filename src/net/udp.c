@@ -140,7 +140,7 @@ static int udp_open_common ( struct xfer_interface *xfer,
  * @ret rc		Return status code
  */
 int udp_open ( struct xfer_interface *xfer, struct sockaddr *peer,
-		      struct sockaddr *local ) {
+	       struct sockaddr *local ) {
 	return udp_open_common ( xfer, peer, local, 0 );
 }
 

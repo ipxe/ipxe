@@ -30,8 +30,6 @@ struct list_head ipv4_miniroutes = LIST_HEAD_INIT ( ipv4_miniroutes );
 /** List of fragment reassembly buffers */
 static LIST_HEAD ( frag_buffers );
 
-static void ipv4_forget_netdev ( struct reference *ref );
-
 /**
  * Add IPv4 minirouting table entry
  *
@@ -61,7 +59,7 @@ static struct ipv4_miniroute * add_ipv4_miniroute ( struct net_device *netdev,
 	}
 
 	/* Record routing information */
-	miniroute->netdev = netdev;
+	miniroute->netdev = netdev_get ( netdev );
 	miniroute->address = address;
 	miniroute->netmask = netmask;
 	miniroute->gateway = gateway;
@@ -74,10 +72,6 @@ static struct ipv4_miniroute * add_ipv4_miniroute ( struct net_device *netdev,
 	} else {
 		list_add ( &miniroute->list, &ipv4_miniroutes );
 	}
-
-	/* Record reference to net_device */
-	miniroute->netdev_ref.forget = ipv4_forget_netdev;
-	ref_add ( &miniroute->netdev_ref, &netdev->references );
 
 	return miniroute;
 }
@@ -95,21 +89,9 @@ static void del_ipv4_miniroute ( struct ipv4_miniroute *miniroute ) {
 		DBG ( "gw %s ", inet_ntoa ( miniroute->gateway ) );
 	DBG ( "via %s\n", miniroute->netdev->name );
 
-	ref_del ( &miniroute->netdev_ref );
+	netdev_put ( miniroute->netdev );
 	list_del ( &miniroute->list );
 	free ( miniroute );
-}
-
-/**
- * Forget reference to net_device
- *
- * @v ref		Persistent reference
- */
-static void ipv4_forget_netdev ( struct reference *ref ) {
-	struct ipv4_miniroute *miniroute
-		= container_of ( ref, struct ipv4_miniroute, netdev_ref );
-
-	del_ipv4_miniroute ( miniroute );
 }
 
 /**

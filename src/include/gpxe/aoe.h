@@ -13,7 +13,6 @@
 #include <gpxe/retry.h>
 #include <gpxe/async.h>
 #include <gpxe/ata.h>
-#include <gpxe/hotplug.h>
 
 /** An AoE ATA command */
 struct aoecmd {
@@ -87,8 +86,6 @@ struct aoe_session {
 
 	/** Network device */
 	struct net_device *netdev;
-	/** Reference to network device */
-	struct reference netdev_ref;
 
 	/** Major number */
 	uint16_t major;

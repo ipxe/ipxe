@@ -116,6 +116,19 @@ void netdev_tx_complete_next ( struct net_device *netdev ) {
 }
 
 /**
+ * Flush device's transmit queue
+ *
+ * @v netdev		Network device
+ */
+static void netdev_tx_flush ( struct net_device *netdev ) {
+
+	/* Discard any packets in the TX queue */
+	while ( ! list_empty ( &netdev->tx_queue ) ) {
+		netdev_tx_complete_next ( netdev );
+	}
+}
+
+/**
  * Add packet to receive queue
  *
  * @v netdev		Network device
@@ -169,6 +182,36 @@ struct io_buffer * netdev_rx_dequeue ( struct net_device *netdev ) {
 }
 
 /**
+ * Flush device's receive queue
+ *
+ * @v netdev		Network device
+ */
+static void netdev_rx_flush ( struct net_device *netdev ) {
+	struct io_buffer *iobuf;
+
+	/* Discard any packets in the RX queue */
+	while ( ( iobuf = netdev_rx_dequeue ( netdev ) ) ) {
+		DBGC ( netdev, "NETDEV %p discarding received %p\n",
+		       netdev, iobuf );
+		free_iob ( iobuf );
+	}
+}
+
+/**
+ * Free network device
+ *
+ * @v refcnt		Network device reference counter
+ */
+static void free_netdev ( struct refcnt *refcnt ) {
+	struct net_device *netdev =
+		container_of ( refcnt, struct net_device, refcnt );
+	
+	netdev_tx_flush ( netdev );
+	netdev_rx_flush ( netdev );
+	free ( netdev );
+}
+
+/**
  * Allocate network device
  *
  * @v priv_size		Size of private data area (net_device::priv)
@@ -184,7 +227,7 @@ struct net_device * alloc_netdev ( size_t priv_size ) {
 	netdev = malloc ( total_len );
 	if ( netdev ) {
 		memset ( netdev, 0, total_len );
-		INIT_LIST_HEAD ( &netdev->references );
+		netdev->refcnt.free = free_netdev;
 		INIT_LIST_HEAD ( &netdev->tx_queue );
 		INIT_LIST_HEAD ( &netdev->rx_queue );
 		netdev->priv = ( ( ( void * ) netdev ) + sizeof ( *netdev ) );
@@ -209,6 +252,7 @@ int register_netdev ( struct net_device *netdev ) {
 		   ifindex++ );
 
 	/* Add to device list */
+	netdev_get ( netdev );
 	list_add_tail ( &netdev->list, &net_devices );
 	DBGC ( netdev, "NETDEV %p registered as %s (phys %s hwaddr %s)\n",
 	       netdev, netdev->name, netdev->dev->name,
@@ -247,7 +291,6 @@ int netdev_open ( struct net_device *netdev ) {
  * @v netdev		Network device
  */
 void netdev_close ( struct net_device *netdev ) {
-	struct io_buffer *iobuf;
 
 	/* Do nothing if device is already closed */
 	if ( ! ( netdev->state & NETDEV_OPEN ) )
@@ -258,17 +301,9 @@ void netdev_close ( struct net_device *netdev ) {
 	/* Close the device */
 	netdev->close ( netdev );
 
-	/* Discard any packets in the TX queue */
-	while ( ! list_empty ( &netdev->tx_queue ) ) {
-		netdev_tx_complete_next ( netdev );
-	}
-
-	/* Discard any packets in the RX queue */
-	while ( ( iobuf = netdev_rx_dequeue ( netdev ) ) ) {
-		DBGC ( netdev, "NETDEV %p discarding received %p\n",
-		       netdev, iobuf );
-		free_iob ( iobuf );
-	}
+	/* Flush TX and RX queues */
+	netdev_tx_flush ( netdev );
+	netdev_rx_flush ( netdev );
 
 	/* Mark as closed */
 	netdev->state &= ~NETDEV_OPEN;
@@ -286,21 +321,10 @@ void unregister_netdev ( struct net_device *netdev ) {
 	/* Ensure device is closed */
 	netdev_close ( netdev );
 
-	/* Kill off any persistent references to this device */
-	forget_references ( &netdev->references );
-
 	/* Remove from device list */
 	list_del ( &netdev->list );
+	netdev_put ( netdev );
 	DBGC ( netdev, "NETDEV %p unregistered\n", netdev );
-}
-
-/**
- * Free network device
- *
- * @v netdev		Network device
- */
-void free_netdev ( struct net_device *netdev ) {
-	free ( netdev );
 }
 
 /**

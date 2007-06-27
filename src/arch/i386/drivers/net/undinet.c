@@ -675,7 +675,7 @@ int undinet_probe ( struct undi_device *undi ) {
 	undinet_call ( undinic, PXENV_STOP_UNDI, &stop_undi,
 		       sizeof ( stop_undi ) );
  err_start_undi:
-	free_netdev ( netdev );
+	netdev_put ( netdev );
 	undi_set_drvdata ( undi, NULL );
 	return rc;
 }
@@ -710,7 +710,7 @@ void undinet_remove ( struct undi_device *undi ) {
 	undi->flags &= ~UNDI_FL_STARTED;
 
 	/* Free network device */
-	free_netdev ( netdev );
+	netdev_put ( netdev );
 
 	DBGC ( undinic, "UNDINIC %p removed\n", undinic );
 }

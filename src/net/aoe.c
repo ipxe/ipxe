@@ -266,19 +266,6 @@ struct net_protocol aoe_protocol __net_protocol = {
 };
 
 /**
- * Forget reference to net_device
- *
- * @v ref		Persistent reference
- */
-static void aoe_forget_netdev ( struct reference *ref ) {
-	struct aoe_session *aoe
-		= container_of ( ref, struct aoe_session, netdev_ref );
-
-	aoe->netdev = NULL;
-	ref_del ( &aoe->netdev_ref );
-}
-
-/**
  * Open AoE session
  *
  * @v aoe		AoE session
@@ -288,8 +275,6 @@ void aoe_open ( struct aoe_session *aoe ) {
 		 sizeof ( aoe->target ) );
 	aoe->tag = AOE_TAG_MAGIC;
 	aoe->timer.expired = aoe_timer_expired;
-	aoe->netdev_ref.forget = aoe_forget_netdev;
-	ref_add ( &aoe->netdev_ref, &aoe->netdev->references );
 	list_add ( &aoe->list, &aoe_sessions );
 }
 
@@ -299,8 +284,6 @@ void aoe_open ( struct aoe_session *aoe ) {
  * @v aoe		AoE session
  */
 void aoe_close ( struct aoe_session *aoe ) {
-	if ( aoe->netdev )
-		ref_del ( &aoe->netdev_ref );
 	list_del ( &aoe->list );
 }
 

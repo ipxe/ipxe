@@ -206,7 +206,7 @@ static void pnic_remove ( struct pci_device *pci ) {
 
 	unregister_netdev ( netdev );
 	pnic_command ( pnic, PNIC_CMD_RESET, NULL, 0, NULL, 0, NULL );
-	free_netdev ( netdev );
+	netdev_put ( netdev );
 }
 
 /**************************************************************************
@@ -220,20 +220,18 @@ static int pnic_probe ( struct pci_device *pci,
 	uint16_t status;
 	int rc;
 
-	/* Fix up PCI device */
-	adjust_pci_device ( pci );
-	
 	/* Allocate net device */
 	netdev = alloc_etherdev ( sizeof ( *pnic ) );
-	if ( ! netdev ) {
-		rc = -ENOMEM;
-		goto err;
-	}
+	if ( ! netdev )
+		return -ENOMEM;
 	pnic = netdev->priv;
 	pci_set_drvdata ( pci, netdev );
 	netdev->dev = &pci->dev;
 	pnic->ioaddr = pci->ioaddr;
 
+	/* Fix up PCI device */
+	adjust_pci_device ( pci );
+	
 	/* API version check */
 	status = pnic_command_quiet ( pnic, PNIC_CMD_API_VER, NULL, 0,
 				      &api_version,
@@ -264,7 +262,7 @@ static int pnic_probe ( struct pci_device *pci,
 
  err:
 	/* Free net device */
-	free_netdev ( netdev );
+	netdev_put ( netdev );
 	return rc;
 }
 

@@ -501,24 +501,21 @@ static void rtl_irq(struct nic *nic, irq_action_t action)
 static int rtl_probe ( struct pci_device *pci,
 		       const struct pci_device_id *id __unused ) {
 	struct net_device *netdev;
-	struct rtl8139_nic *rtl = NULL;
-	int registered_netdev = 0;
+	struct rtl8139_nic *rtl;
 	int rc;
-
-	/* Fix up PCI device */
-	adjust_pci_device ( pci );
 
 	/* Allocate net device */
 	netdev = alloc_etherdev ( sizeof ( *rtl ) );
-	if ( ! netdev ) {
-		rc = -ENOMEM;
-		goto err;
-	}
+	if ( ! netdev )
+		return -ENOMEM;
 	rtl = netdev->priv;
 	pci_set_drvdata ( pci, netdev );
 	netdev->dev = &pci->dev;
 	memset ( rtl, 0, sizeof ( *rtl ) );
 	rtl->ioaddr = pci->ioaddr;
+
+	/* Fix up PCI device */
+	adjust_pci_device ( pci );
 
 	/* Reset the NIC, set up EEPROM access and read MAC address */
 	rtl_reset ( rtl );
@@ -533,25 +530,21 @@ static int rtl_probe ( struct pci_device *pci,
 
 	/* Register network device */
 	if ( ( rc = register_netdev ( netdev ) ) != 0 )
-		goto err;
-	registered_netdev = 1;
+		goto err_register_netdev;
 
 	/* Register non-volatile storage */
 	if ( rtl->nvo.nvs ) {
 		if ( ( rc = nvo_register ( &rtl->nvo ) ) != 0 )
-			goto err;
+			goto err_register_nvo;
 	}
 
 	return 0;
 
- err:
-	/* Disable NIC */
-	if ( rtl )
-		rtl_reset ( rtl );
-	if ( registered_netdev )
-		unregister_netdev ( netdev );
-	/* Free net device */
-	free_netdev ( netdev );
+ err_register_nvo:
+	unregister_netdev ( netdev );
+ err_register_netdev:
+	rtl_reset ( rtl );
+	netdev_put ( netdev );
 	return rc;
 }
 
@@ -568,7 +561,7 @@ static void rtl_remove ( struct pci_device *pci ) {
 		nvo_unregister ( &rtl->nvo );
 	unregister_netdev ( netdev );
 	rtl_reset ( rtl );
-	free_netdev ( netdev );
+	netdev_put ( netdev );
 }
 
 static struct pci_device_id rtl8139_nics[] = {

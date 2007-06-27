@@ -90,13 +90,13 @@ int legacy_probe ( void *hwdev,
 	nic.node_addr = netdev->ll_addr;
 
 	if ( ! probe ( &nic, hwdev ) ) {
-		free_netdev ( netdev );
+		netdev_put ( netdev );
 		return -ENODEV;
 	}
 
 	if ( ( rc = register_netdev ( netdev ) ) != 0 ) {
 		disable ( &nic, hwdev );
-		free_netdev ( netdev );
+		netdev_put ( netdev );
 		return rc;
 	}
 
@@ -116,7 +116,7 @@ void legacy_remove ( void *hwdev,
 
 	unregister_netdev ( netdev );
 	disable ( nic, hwdev );
-	free_netdev ( netdev );
+	netdev_put ( netdev );
 	legacy_registered = 0;
 }
 

@@ -9,7 +9,6 @@
 
 #include <ip.h>
 #include <gpxe/retry.h>
-#include <gpxe/hotplug.h>
 
 /* IP constants */
 
@@ -44,8 +43,6 @@ struct ipv4_miniroute {
 
 	/** Network device */
 	struct net_device *netdev;
-	/** Reference to network device */
-	struct reference netdev_ref;
 
 	/** IPv4 address */
 	struct in_addr address;

@@ -493,6 +493,8 @@ udp_to_dhcp ( struct udp_connection *conn ) {
 	return container_of ( conn, struct dhcp_session, udp );
 }
 
+#if 0
+
 /**
  * Mark DHCP session as complete
  *
@@ -514,9 +516,6 @@ static void dhcp_done ( struct dhcp_session *dhcp, int rc ) {
 
 	/* Close UDP connection */
 	udp_close ( &dhcp->udp );
-
-	/* Release reference on net device */
-	ref_del ( &dhcp->netdev_ref );
 
 	/* Mark async operation as complete */
 	async_done ( &dhcp->async, rc );
@@ -706,19 +705,6 @@ static struct udp_operations dhcp_udp_operations = {
 };
 
 /**
- * Forget reference to net_device
- *
- * @v ref		Persistent reference
- */
-static void dhcp_forget_netdev ( struct reference *ref ) {
-	struct dhcp_session *dhcp
-		= container_of ( ref, struct dhcp_session, netdev_ref );
-
-	/* Kill DHCP session immediately */
-	dhcp_done ( dhcp, -ENETUNREACH );
-}
-
-/**
  * Initiate DHCP on a network interface
  *
  * @v dhcp		DHCP session
@@ -742,13 +728,12 @@ int start_dhcp ( struct dhcp_session *dhcp, struct async *parent ) {
 	if ( ( rc = udp_open ( &dhcp->udp, htons ( BOOTPC_PORT ) ) ) != 0 )
 		return rc;
 
-	/* Add persistent reference to net device */
-	dhcp->netdev_ref.forget = dhcp_forget_netdev;
-	ref_add ( &dhcp->netdev_ref, &dhcp->netdev->references );
-
 	/* Proof of concept: just send a single DHCPDISCOVER */
 	dhcp_send_request ( dhcp );
 
 	async_init ( &dhcp->async, &default_async_operations, parent );
 	return 0;
 }
+
+
+#endif

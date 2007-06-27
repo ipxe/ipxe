@@ -32,8 +32,6 @@ struct ipv6_miniroute {
 
 	/* Network device */
 	struct net_device *netdev;
-	/** Reference to network device */
-	struct reference netdev_ref;
 
 	/* Destination prefix */
 	struct in6_addr prefix;
@@ -47,8 +45,6 @@ struct ipv6_miniroute {
 
 /** List of IPv6 miniroutes */
 static LIST_HEAD ( miniroutes );
-
-static void ipv6_forget_netdev ( struct reference *ref );
 
 /**
  * Add IPv6 minirouting table entry
@@ -69,7 +65,7 @@ static struct ipv6_miniroute * add_ipv6_miniroute ( struct net_device *netdev,
 	miniroute = malloc ( sizeof ( *miniroute ) );
 	if ( miniroute ) {
 		/* Record routing information */
-		miniroute->netdev = netdev;
+		miniroute->netdev = netdev_get ( netdev );
 		miniroute->prefix = prefix;
 		miniroute->prefix_len = prefix_len;
 		miniroute->address = address;
@@ -81,10 +77,6 @@ static struct ipv6_miniroute * add_ipv6_miniroute ( struct net_device *netdev,
 		} else {
 			list_add ( &miniroute->list, &miniroutes );
 		}
-
-		/* Record reference to net_device */
-		miniroute->netdev_ref.forget = ipv6_forget_netdev;
-		ref_add ( &miniroute->netdev_ref, &netdev->references );
 	}
 
 	return miniroute;
@@ -96,21 +88,9 @@ static struct ipv6_miniroute * add_ipv6_miniroute ( struct net_device *netdev,
  * @v miniroute		Routing table entry
  */
 static void del_ipv6_miniroute ( struct ipv6_miniroute *miniroute ) {
-	ref_del ( &miniroute->netdev_ref );
+	netdev_put ( miniroute->netdev );
 	list_del ( &miniroute->list );
 	free ( miniroute );
-}
-
-/**
- * Forget reference to net_device
- *
- * @v ref		Persistent reference
- */
-static void ipv6_forget_netdev ( struct reference *ref ) {
-	struct ipv6_miniroute *miniroute
-		= container_of ( ref, struct ipv6_miniroute, netdev_ref );
-
-	del_ipv6_miniroute ( miniroute );
 }
 
 /**
