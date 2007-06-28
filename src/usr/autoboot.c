@@ -99,19 +99,27 @@ void netboot ( struct net_device *netdev ) {
 		return;
 	}
 	printf ( "Booting \"%s\"\n", filename );
-	if ( ( rc = imgfetch ( filename, NULL, &image ) ) != 0 ) {
+	image = alloc_image();
+	if ( ! image ) {
+		printf ( "Out of memory\n" );
+		return;
+	}
+	if ( ( rc = imgfetch ( image, filename, 0 ) ) != 0 ) {
 		printf ( "Could not retrieve %s: %s\n",
 			 filename, strerror ( rc ) );
+		image_put ( image );
 		return;
 	}
 	if ( ( rc = imgload ( image ) ) != 0 ) {
 		printf ( "Could not load %s: %s\n", image->name,
 			 strerror ( rc ) );
+		image_put ( image );
 		return;
 	}
 	if ( ( rc = imgexec ( image ) ) != 0 ) {
 		printf ( "Could not execute %s: %s\n", image->name,
 			 strerror ( rc ) );
+		image_put ( image );
 		return;
 	}
 }

@@ -72,19 +72,20 @@ static void imgfetch_core_syntax ( char **argv, int load ) {
 /**
  * The "imgfetch"/"module"/"kernel" command body
  *
+ * @v image_type	Image type to assign (or NULL)
+ * @v load		Image will be automatically loaded after fetching
  * @v argc		Argument count
  * @v argv		Argument list
- * @v load		Image will be automatically loaded after fetching
- * @ret image		Fetched image
  * @ret rc		Return status code
  */
-static int imgfetch_core_exec ( int argc, char **argv, int load,
-				struct image **image ) {
+static int imgfetch_core_exec ( struct image_type *image_type, int load,
+				int argc, char **argv ) {
 	static struct option longopts[] = {
 		{ "help", 0, NULL, 'h' },
 		{ "name", required_argument, NULL, 'n' },
 		{ NULL, 0, NULL, 0 },
 	};
+	struct image *image;
 	const char *name = NULL;
 	char *filename;
 	int c;
@@ -116,15 +117,33 @@ static int imgfetch_core_exec ( int argc, char **argv, int load,
 	if ( ! name )
 		name = basename ( filename );
 
+	/* Allocate image */
+	image = alloc_image();
+	if ( ! image ) {
+		printf ( "%s\n", strerror ( -ENOMEM ) );
+		return -ENOMEM;
+	}
+
+	/* Fill in image name */
+	if ( name )
+		strncpy ( image->name, name, ( sizeof ( image->name ) - 1 ) );
+
+	/* Set image type (if specified) */
+	image->type = image_type;
+
+	/* Fill in command line */
+	imgfill_cmdline ( image, ( argc - optind ), &argv[optind] );
+
+	printf ( "name = %s, filename = %s\n", name, filename );
+	
 	/* Fetch the image */
-	if ( ( rc = imgfetch ( filename, name, image ) ) != 0 ) {
+	if ( ( rc = imgfetch ( image, filename, load ) ) != 0 ) {
 		printf ( "Could not fetch %s: %s\n", name, strerror ( rc ) );
+		image_put ( image );
 		return rc;
 	}
 
-	/* Fill in command line */
-	imgfill_cmdline ( *image, ( argc - optind ), &argv[optind] );
-
+	image_put ( image );
 	return 0;
 }
 
@@ -136,11 +155,10 @@ static int imgfetch_core_exec ( int argc, char **argv, int load,
  * @ret rc		Exit code
  */
 static int imgfetch_exec ( int argc, char **argv ) {
-	struct image *image;
 	int rc;
 
-	if ( ( rc = imgfetch_core_exec ( argc, argv, 0, &image ) ) != 0 )
-		return 1;
+	if ( ( rc = imgfetch_core_exec ( NULL, 0, argc, argv ) ) != 0 )
+		return rc;
 
 	return 0;
 }
@@ -153,18 +171,10 @@ static int imgfetch_exec ( int argc, char **argv ) {
  * @ret rc		Exit code
  */
 static int kernel_exec ( int argc, char **argv ) {
-	struct image *image;
 	int rc;
 
-	if ( ( rc = imgfetch_core_exec ( argc, argv, 1, &image ) ) != 0 )
-		return 1;
-
-	/* Load image */
-	if ( ( rc = imgload ( image ) ) != 0 ) {
-		printf ( "Could not load %s: %s\n", image->name,
-			 strerror ( rc ) );
-		return 1;
-	}
+	if ( ( rc = imgfetch_core_exec ( NULL, 1, argc, argv ) ) != 0 )
+		return rc;
 
 	return 0;
 }
@@ -177,14 +187,11 @@ static int kernel_exec ( int argc, char **argv ) {
  * @ret rc		Exit code
  */
 static int initrd_exec ( int argc, char **argv ) {
-	struct image *image;
 	int rc;
 
-	if ( ( rc = imgfetch_core_exec ( argc, argv, 0, &image ) ) != 0 )
-		return 1;
-
-	/* Mark image as an intird */
-	image->type = &initrd_image_type;
+	if ( ( rc = imgfetch_core_exec ( &initrd_image_type, 0,
+					 argc, argv ) ) != 0 )
+		return rc;
 
 	return 0;
 }
@@ -246,7 +253,7 @@ static int imgload_exec ( int argc, char **argv ) {
 	}
 	if ( ( rc = imgload ( image ) ) != 0 ) {
 		printf ( "Could not load %s: %s\n", name, strerror ( rc ) );
-		return 1;
+		return rc;
 	}
 
 	return 0;

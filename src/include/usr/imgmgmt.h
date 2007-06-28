@@ -9,8 +9,7 @@
 
 struct image;
 
-extern int imgfetch ( const char *filename, const char *name,
-		      struct image **new_image );
+extern int imgfetch ( struct image *image, const char *filename, int load );
 extern int imgload ( struct image *image );
 extern int imgexec ( struct image *image );
 extern struct image * imgautoselect ( void );

@@ -113,6 +113,7 @@ extern struct list_head images;
 #define for_each_image( image ) \
 	list_for_each_entry ( (image), &images, list )
 
+extern struct image * alloc_image ( void );
 extern int register_image ( struct image *image );
 extern void unregister_image ( struct image *image );
 extern void promote_image ( struct image *image );

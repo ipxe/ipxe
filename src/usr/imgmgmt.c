@@ -21,8 +21,9 @@
 #include <stdio.h>
 #include <errno.h>
 #include <gpxe/image.h>
-#include <gpxe/umalloc.h>
-#include <gpxe/download.h>
+#include <gpxe/downloader.h>
+#include <gpxe/monojob.h>
+#include <gpxe/open.h>
 #include <usr/imgmgmt.h>
 
 /** @file
@@ -30,6 +31,18 @@
  * Image management
  *
  */
+
+static int imgfetch_autoload ( struct image *image ) {
+	int rc;
+
+	if ( ( rc = register_image ( image ) ) != 0 )
+		return rc;
+
+	if ( ( rc = image_autoload ( image ) ) != 0 )
+		return rc;
+
+	return 0;
+}
 
 /**
  * Fetch an image
@@ -39,39 +52,18 @@
  * @ret new_image	Newly created image
  * @ret rc		Return status code
  */
-int imgfetch ( const char *uri_string, const char *name,
-	       struct image **new_image ) {
-	struct image *image;
-	struct async async;
+int imgfetch ( struct image *image, const char *uri_string, int load ) {
 	int rc;
 
-	/* Allocate new image */
-	image = malloc ( sizeof ( *image ) );
-	if ( ! image )
-		return -ENOMEM;
-	memset ( image, 0, sizeof ( *image ) );
+	printf ( "uri_string = %s\n", uri_string );
 
-	/* Fill in image name */
-	if ( name )
-		strncpy ( image->name, name, ( sizeof ( image->name ) - 1 ) );
+	if ( ( rc = create_downloader ( &monojob, image, 
+					( load ? imgfetch_autoload :
+					  register_image ),
+					LOCATION_URI_STRING,
+					uri_string ) ) == 0 )
+		rc = monojob_wait();
 
-	/* Download the file */
-	if ( ( rc = async_block_progress ( &async,
-					   start_download ( uri_string, &async,
-							    &image->data,
-							    &image->len )))!=0)
-		goto err;
-
-	/* Register the image */
-	if ( ( rc = register_image ( image ) ) != 0 )
-		goto err;
-
-	*new_image = image;
-	return 0;
-
- err:
-	ufree ( image->data );
-	free ( image );
 	return rc;
 }
 
@@ -87,10 +79,6 @@ int imgload ( struct image *image ) {
 	/* Try to load image */
 	if ( ( rc = image_autoload ( image ) ) != 0 )
 		return rc;
-
-	/* If we succeed, move the image to the start of the list */
-#warning "No longer exists"
-	//	promote_image ( image );
 
 	return 0;
 }
@@ -144,6 +132,4 @@ void imgstat ( struct image *image ) {
  */
 void imgfree ( struct image *image ) {
 	unregister_image ( image );
-	ufree ( image->data );
-	free ( image );
 }
