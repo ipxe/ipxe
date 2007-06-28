@@ -134,8 +134,6 @@ static int imgfetch_core_exec ( struct image_type *image_type, int load,
 	/* Fill in command line */
 	imgfill_cmdline ( image, ( argc - optind ), &argv[optind] );
 
-	printf ( "name = %s, filename = %s\n", name, filename );
-	
 	/* Fetch the image */
 	if ( ( rc = imgfetch ( image, filename, load ) ) != 0 ) {
 		printf ( "Could not fetch %s: %s\n", name, strerror ( rc ) );

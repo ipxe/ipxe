@@ -55,8 +55,6 @@ static int imgfetch_autoload ( struct image *image ) {
 int imgfetch ( struct image *image, const char *uri_string, int load ) {
 	int rc;
 
-	printf ( "uri_string = %s\n", uri_string );
-
 	if ( ( rc = create_downloader ( &monojob, image, 
 					( load ? imgfetch_autoload :
 					  register_image ),
