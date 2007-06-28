@@ -165,7 +165,7 @@ static int tftp_send_rrq ( struct tftp_request *tftp ) {
 	rrq = iob_put ( iobuf, sizeof ( *rrq ) );
 	rrq->opcode = htons ( TFTP_RRQ );
 	iob_put ( iobuf,
-		  snprintf ( iobuf->data, iob_tailroom ( iobuf ),
+		  snprintf ( rrq->data, iob_tailroom ( iobuf ),
 			     "%s%coctet%cblksize%c%d%ctsize%c0", path, 0,
 			     0, 0, tftp_request_blksize, 0, 0 ) + 1 );
 
