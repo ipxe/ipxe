@@ -33,11 +33,6 @@ struct job_interface;
 
 /** Job control interface operations */
 struct job_interface_operations {
-	/** Start job
-	 *
-	 * @v job		Job control interface
-	 */
-	void ( * start ) ( struct job_interface *job );
 	/** Job completed
 	 *
 	 * @v job		Job control interface
@@ -71,7 +66,6 @@ extern struct job_interface_operations null_job_ops;
 
 extern void job_done ( struct job_interface *job, int rc );
 
-extern void ignore_job_start ( struct job_interface *job );
 extern void ignore_job_done ( struct job_interface *job, int rc );
 extern void ignore_job_kill ( struct job_interface *job );
 extern void ignore_job_progress ( struct job_interface *job,

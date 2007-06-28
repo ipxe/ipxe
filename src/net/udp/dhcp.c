@@ -758,7 +758,6 @@ static void dhcp_job_kill ( struct job_interface *job ) {
 
 /** DHCP job control interface operations */
 static struct job_interface_operations dhcp_job_operations = {
-	.start		= ignore_job_start,
 	.done		= ignore_job_done,
 	.kill		= dhcp_job_kill,
 	.progress	= ignore_job_progress,

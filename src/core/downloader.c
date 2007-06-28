@@ -130,7 +130,6 @@ static void downloader_job_kill ( struct job_interface *job ) {
 
 /** Downloader job control interface operations */
 static struct job_interface_operations downloader_job_operations = {
-	.start		= ignore_job_start,
 	.done		= ignore_job_done,
 	.kill		= downloader_job_kill,
 	.progress	= ignore_job_progress,

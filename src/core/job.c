@@ -43,10 +43,6 @@ void job_done ( struct job_interface *job, int rc ) {
  *
  */
 
-void ignore_job_start ( struct job_interface *job __unused ) {
-	/* Nothing to do */
-}
-
 void ignore_job_done ( struct job_interface *job __unused, int rc __unused ) {
 	/* Nothing to do */
 }
@@ -62,7 +58,6 @@ void ignore_job_progress ( struct job_interface *job __unused,
 
 /** Null job control interface operations */
 struct job_interface_operations null_job_ops = {
-	.start		= ignore_job_start,
 	.done		= ignore_job_done,
 	.kill		= ignore_job_kill,
 	.progress	= ignore_job_progress,
