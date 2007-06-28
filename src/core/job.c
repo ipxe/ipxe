@@ -34,6 +34,14 @@ void job_done ( struct job_interface *job, int rc ) {
 	job_put ( dest );
 }
 
+void job_kill ( struct job_interface *job ) {
+	struct job_interface *dest = job_get_dest ( job );
+
+	dest->op->kill ( dest );
+	job_unplug ( job );
+	job_put ( dest );
+}
+
 /****************************************************************************
  *
  * Helper methods
