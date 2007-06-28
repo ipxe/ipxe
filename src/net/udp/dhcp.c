@@ -27,6 +27,8 @@
 #include <gpxe/open.h>
 #include <gpxe/job.h>
 #include <gpxe/retry.h>
+#include <gpxe/tcpip.h>
+#include <gpxe/ip.h>
 #include <gpxe/dhcp.h>
 
 /** @file
@@ -502,7 +504,8 @@ struct dhcp_session {
 	/** Network device being configured */
 	struct net_device *netdev;
 	/** Option block registration routine */
-	int ( * register_options ) ( struct dhcp_option_block *options );
+	int ( * register_options ) ( struct net_device *netdev,
+				     struct dhcp_option_block *options );
 
 	/** State of the session
 	 *
@@ -717,7 +720,7 @@ static int dhcp_deliver_raw ( struct xfer_interface *xfer,
 	if ( dhcp->state < DHCPACK ) {
 		dhcp_send_request ( dhcp );
 	} else {
-		dhcp->register_options ( dhcp->options );
+		dhcp->register_options ( dhcp->netdev, dhcp->options );
 		dhcp_finished ( dhcp, 0 );
 	}
 	return 0;
@@ -782,7 +785,8 @@ static struct job_interface_operations dhcp_job_operations = {
  * options.
  */
 int start_dhcp ( struct job_interface *job, struct net_device *netdev,
-		 int ( * register_options ) ( struct dhcp_option_block * ) ) {
+		 int ( * register_options ) ( struct net_device *netdev,
+					      struct dhcp_option_block * ) ) {
 	static struct sockaddr_in server = {
 		.sin_family = AF_INET,
 		.sin_addr.s_addr = INADDR_BROADCAST,
@@ -826,4 +830,58 @@ int start_dhcp ( struct job_interface *job, struct net_device *netdev,
 	dhcp_finished ( dhcp, rc );
 	ref_put ( &dhcp->refcnt );
 	return rc;
+}
+
+/****************************************************************************
+ *
+ * Network device configurator
+ *
+ */
+
+/* Avoid dragging in dns.o */
+struct sockaddr_tcpip nameserver;
+
+/* Avoid dragging in syslog.o */
+struct in_addr syslogserver;
+
+/**
+ * Configure network device from DHCP options
+ *
+ * @v netdev		Network device
+ * @v options		DHCP options block
+ * @ret rc		Return status code
+ */
+int dhcp_configure_netdev ( struct net_device *netdev,
+			    struct dhcp_option_block *options ) {
+	struct in_addr address = { 0 };
+	struct in_addr netmask = { 0 };
+	struct in_addr gateway = { INADDR_NONE };
+	struct sockaddr_in *sin_nameserver;
+	int rc;
+
+	/* Clear any existing routing table entry */
+	del_ipv4_address ( netdev );
+
+	/* Retrieve IP address configuration */
+	find_dhcp_ipv4_option ( options, DHCP_EB_YIADDR, &address );
+	find_dhcp_ipv4_option ( options, DHCP_SUBNET_MASK, &netmask );
+	find_dhcp_ipv4_option ( options, DHCP_ROUTERS, &gateway );
+
+	/* Set up new IP address configuration */
+	if ( ( rc = add_ipv4_address ( netdev, address, netmask,
+				       gateway ) ) != 0 ) {
+		DBG ( "Could not configure %s with DHCP results: %s\n",
+		      netdev->name, strerror ( rc ) );
+		return rc;
+	}
+
+	/* Retrieve other DHCP options that we care about */
+	sin_nameserver = ( struct sockaddr_in * ) &nameserver;
+	sin_nameserver->sin_family = AF_INET;
+	find_dhcp_ipv4_option ( options, DHCP_DNS_SERVERS,
+				&sin_nameserver->sin_addr );
+	find_dhcp_ipv4_option ( options, DHCP_LOG_SERVERS,
+				&syslogserver );
+
+	return 0;
 }

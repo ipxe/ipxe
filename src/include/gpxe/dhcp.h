@@ -513,6 +513,9 @@ extern int create_dhcp_packet ( struct net_device *netdev, uint8_t msgtype,
 extern int copy_dhcp_packet_options ( struct dhcp_packet *dhcppkt,
 				      struct dhcp_option_block *options );
 extern int start_dhcp ( struct job_interface *job, struct net_device *netdev,
-			int (*register_options) ( struct dhcp_option_block * ));
+			int (*register_options) ( struct net_device *,
+						  struct dhcp_option_block * ));
+extern int dhcp_configure_netdev ( struct net_device *netdev,
+				   struct dhcp_option_block *options );
 
 #endif /* _GPXE_DHCP_H */
