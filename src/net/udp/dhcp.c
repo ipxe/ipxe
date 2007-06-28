@@ -18,6 +18,7 @@
 
 #include <string.h>
 #include <stdlib.h>
+#include <stdio.h>
 #include <errno.h>
 #include <assert.h>
 #include <byteswap.h>
@@ -29,6 +30,7 @@
 #include <gpxe/retry.h>
 #include <gpxe/tcpip.h>
 #include <gpxe/ip.h>
+#include <gpxe/uri.h>
 #include <gpxe/dhcp.h>
 
 /** @file
@@ -857,6 +859,9 @@ int dhcp_configure_netdev ( struct net_device *netdev,
 	struct in_addr netmask = { 0 };
 	struct in_addr gateway = { INADDR_NONE };
 	struct sockaddr_in *sin_nameserver;
+	struct in_addr tftp_server;
+	struct uri *uri;
+	char uri_string[32];
 	int rc;
 
 	/* Clear any existing routing table entry */
@@ -882,6 +887,16 @@ int dhcp_configure_netdev ( struct net_device *netdev,
 				&sin_nameserver->sin_addr );
 	find_dhcp_ipv4_option ( options, DHCP_LOG_SERVERS,
 				&syslogserver );
+
+	/* Set current working URI based on TFTP server */
+	find_dhcp_ipv4_option ( options, DHCP_EB_SIADDR, &tftp_server );
+	snprintf ( uri_string, sizeof ( uri_string ),
+		   "tftp://%s/", inet_ntoa ( tftp_server ) );
+	uri = parse_uri ( uri_string );
+	if ( ! uri )
+		return -ENOMEM;
+	churi ( uri );
+	uri_put ( uri );
 
 	return 0;
 }
