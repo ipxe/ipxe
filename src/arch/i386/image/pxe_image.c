@@ -63,7 +63,8 @@ static int pxe_exec ( struct image *image __unused ) {
 	__asm__ __volatile__ ( REAL_CODE ( "pushw %%cx\n\t"
 					   "pushw %%ax\n\t"
 					   "movw %%cx, %%es\n\t"
-					   "lcall $0, $0x7c00\n\t" )
+					   "lcall $0, $0x7c00\n\t"
+					   "addw $4, %%sp\n\t" )
 			       : "=a" ( rc ), "=b" ( discard_b ),
 			         "=c" ( discard_c )
 			       :  "a" ( & __from_text16 ( ppxe ) ),
