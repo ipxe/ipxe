@@ -19,13 +19,10 @@
 #include <string.h>
 #include <stdio.h>
 #include <errno.h>
-#include <byteswap.h>
-#include <gpxe/in.h>
-#include <gpxe/ip.h>
-#include <gpxe/dhcp.h>
-#include <gpxe/async.h>
 #include <gpxe/netdevice.h>
-#include <gpxe/dns.h>
+#include <gpxe/dhcp.h>
+#include <gpxe/monojob.h>
+#include <gpxe/process.h>
 #include <usr/ifmgmt.h>
 #include <usr/dhcpmgmt.h>
 
@@ -35,85 +32,39 @@
  *
  */
 
-int dhcp ( struct net_device *netdev ) {
-	return -ENOTSUP;
+static struct dhcp_option_block *dhcp_options = NULL;
+
+static int dhcp_success ( struct net_device *netdev,
+			  struct dhcp_option_block *options ) {
+	dhcp_options = dhcpopt_get ( options );
+	register_dhcp_options ( options );
+	return dhcp_configure_netdev ( netdev, options );
 }
 
-#if 0
-
-/* Avoid dragging in dns.o */
-struct sockaddr_tcpip nameserver;
-
-/* Avoid dragging in syslog.o */
-struct in_addr syslogserver;
-
-/**
- * Configure network device via DHCP
- *
- * @v netdev		Network device
- * @ret rc		Return status code
- */
 int dhcp ( struct net_device *netdev ) {
-	static struct dhcp_option_block *dhcp_options = NULL;
-	struct dhcp_session dhcp;
-	struct in_addr address = { 0 };
-	struct in_addr netmask = { 0 };
-	struct in_addr gateway = { INADDR_NONE };
-	struct sockaddr_in *sin_nameserver;
-	struct async async;
 	int rc;
 
 	/* Check we can open the interface first */
 	if ( ( rc = ifopen ( netdev ) ) != 0 )
 		return rc;
 
-	/* Free up any previously-acquired options */
+	/* Unregister any previously acquired options */
 	if ( dhcp_options ) {
 		unregister_dhcp_options ( dhcp_options );
 		dhcpopt_put ( dhcp_options );
 		dhcp_options = NULL;
 	}
 
-	/* Clear any existing routing table entry */
-	del_ipv4_address ( netdev );
-
-	/* Issue DHCP request */
+	/* Perform DHCP */
 	printf ( "DHCP (%s %s)...", netdev->name, netdev_hwaddr ( netdev ) );
-	memset ( &dhcp, 0, sizeof ( dhcp ) );
-	dhcp.netdev = netdev;
-	if ( ( rc = async_block ( &async,
-				  start_dhcp ( &dhcp, &async ) ) ) != 0 ) {
+	if ( ( rc = start_dhcp ( &monojob, netdev, dhcp_success ) ) == 0 )
+		rc = monojob_wait();
+
+	if ( rc == 0 ) {
+		printf ( "done\n" );
+	} else {
 		printf ( "failed (%s)\n", strerror ( rc ) );
-		return rc;
-	}
-	printf ( "done\n" );
-
-	/* Store and register options */
-	dhcp_options = dhcp.options;
-	register_dhcp_options ( dhcp_options );
-
-	/* Retrieve IP address configuration */
-	find_dhcp_ipv4_option ( dhcp_options, DHCP_EB_YIADDR, &address );
-	find_dhcp_ipv4_option ( dhcp_options, DHCP_SUBNET_MASK, &netmask );
-	find_dhcp_ipv4_option ( dhcp_options, DHCP_ROUTERS, &gateway );
-
-	/* Set up new IP address configuration */
-	if ( ( rc = add_ipv4_address ( netdev, address, netmask,
-				       gateway ) ) != 0 ) {
-		printf ( "Could not configure %s with DHCP results: %s\n",
-			 netdev->name, strerror ( rc ) );
-		return rc;
 	}
 
-	/* Retrieve other DHCP options that we care about */
-	sin_nameserver = ( struct sockaddr_in * ) &nameserver;
-	sin_nameserver->sin_family = AF_INET;
-	find_dhcp_ipv4_option ( dhcp_options, DHCP_DNS_SERVERS,
-				&sin_nameserver->sin_addr );
-	find_dhcp_ipv4_option ( dhcp_options, DHCP_LOG_SERVERS,
-				&syslogserver );
-
-	return 0;
+	return rc;
 }
-
-#endif
