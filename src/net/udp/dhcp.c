@@ -806,6 +806,7 @@ int start_dhcp ( struct job_interface *job, struct net_device *netdev,
 	dhcp->netdev = netdev_get ( netdev );
 	dhcp->register_options = register_options;
 	dhcp->timer.expired = dhcp_timer_expired;
+	dhcp->state = DHCPDISCOVER;
 
 	/* Instantiate child objects and attach to our interfaces */
 	if ( ( rc = xfer_open_socket ( &dhcp->xfer, SOCK_DGRAM,
