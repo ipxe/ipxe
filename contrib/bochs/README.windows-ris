@@ -1,0 +1,23 @@
+Debugging Windows Remote Installation Services (RIS) can be
+problematic.  Here are some assorted notes on the process:
+
+
+Getting hold of the files
+=========================
+
+Add/Remove Windows Components -> Remote Installation Services
+
+Files will be placed in \windows\system32\reminst.  Copy them out to a
+TFTP server.  Configure DHCP to hand out startrom.com.
+
+
+Getting past the "Press F12" message
+====================================
+
+Passing F12 through to the guest machine is difficult.  It's easier to
+patch the startrom.com binary to accept a different key.  Open
+startrom.com in a hex editor, search for the hex string
+6681fb00860000, and replace it with 6681fb66210000.  startrom.com will
+now accept the "F" key instead of "F12".
+
+
