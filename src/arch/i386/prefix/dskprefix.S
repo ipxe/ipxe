@@ -31,6 +31,10 @@
 
 	jmp	$BOOTSEG, $go		/* reload cs:ip to match relocation addr */
 go: 
+	xorw	%ax,%ax			/* put stack at 0000:7c00 */
+	movw	%ax,%ss
+	movw	$0x7c00,%sp
+
 	movw	$0x2000-12, %di		/* 0x2000 is arbitrary value >= length */
 					/* of bootsect + room for stack + 12 for */
 					/* saved disk parm block */
@@ -38,8 +42,6 @@ go:
 	movw	$BOOTSEG, %ax
 	movw	%ax,%ds
 	movw	%ax,%es
-	movw	%ax,%ss			/* put stack at BOOTSEG:0x4000-12. */
-	movw	%di,%sp
 
 /* Many BIOS's default disk parameter tables will not recognize multi-sector
  * reads beyond the maximum sector number specified in the default diskette
@@ -50,7 +52,7 @@ go:
  * will set the maximum sector count to 36 - the most we will encounter on an
  * ED 2.88.  High doesn't hurt.	Low does.
  *
- * Segments are as follows: ds=es=ss=cs - BOOTSEG
+ * Segments are as follows: ds=es=cs - BOOTSEG
  */
 
 	xorw	%cx,%cx
