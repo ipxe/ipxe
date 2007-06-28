@@ -139,6 +139,10 @@ exec_vector:
 
 	call	install
 
+	/* Set up real-mode stack */
+	movw	%bx, %ss
+	movw	$_estack16, %sp
+
 	/* Jump to .text16 segment */
 	pushw	%ax
 	pushw	$1f
