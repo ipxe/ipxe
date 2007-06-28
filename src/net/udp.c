@@ -436,6 +436,8 @@ struct socket_opener udp_socket_opener __socket_opener = {
 	.open		= udp_open,
 };
 
+char UDP_SOCK_DGRAM[1];
+
 /**
  * Open UDP URI
  *

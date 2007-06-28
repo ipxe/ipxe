@@ -973,6 +973,8 @@ struct socket_opener tcp_socket_opener __socket_opener = {
 	.open		= tcp_open,
 };
 
+char TCP_SOCK_STREAM[1];
+
 /**
  * Open TCP URI
  *

@@ -12,8 +12,15 @@
  *
  * @{
  */
-#define SOCK_STREAM	1	/**< Connection-based, reliable streams */
-#define SOCK_DGRAM	2	/**< Connectionless, unreliable streams */
+
+/** Connection-based, reliable streams */
+#define SOCK_STREAM	( ( int ) TCP_SOCK_STREAM )
+extern char TCP_SOCK_STREAM[];
+
+/** Connectionless, unreliable streams */
+#define SOCK_DGRAM	( ( int ) UDP_SOCK_DGRAM )
+extern char UDP_SOCK_DGRAM[];
+
 /** @} */
 
 /**
@@ -24,10 +31,13 @@
  */
 static inline __attribute__ (( always_inline )) const char *
 socket_semantics_name ( int semantics ) {
-	switch ( semantics ) {
-	case SOCK_STREAM:	return "SOCK_STREAM";
-	case SOCK_DGRAM:	return "SOCK_DGRAM";
-	default:		return "SOCK_UNKNOWN";
+	/* Cannot use a switch() because of the {TCP_UDP}_SOCK_XXX hack */
+	if ( semantics == SOCK_STREAM ) {
+		return "SOCK_STREAM";
+	} else if ( semantics == SOCK_DGRAM ) {
+		return "SOCK_DGRAM";
+	} else {
+		return "SOCK_UNKNOWN";
 	}
 }
 
