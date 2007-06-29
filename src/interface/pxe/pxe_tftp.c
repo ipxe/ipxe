@@ -56,8 +56,10 @@ static unsigned int pxe_single_blkidx;
  * @v port		Server port (in network byte order)
  * @v filename		File name
  * @v blksize		Requested block size, or 0
+ *
+ * The URI string buffer must be at least @c PXE_URI_LEN bytes long.
  */
-static void pxe_tftp_build_uri ( char uri_string[PXE_URI_LEN],
+static void pxe_tftp_build_uri ( char *uri_string,
 				 uint32_t ipaddress, unsigned int port,
 				 const unsigned char *filename,
 				 int blksize ) {
@@ -73,7 +75,7 @@ static void pxe_tftp_build_uri ( char uri_string[PXE_URI_LEN],
 		blksize = TFTP_MAX_BLKSIZE;
 	tftp_set_request_blksize ( blksize );
 
-	snprintf ( uri_string, sizeof ( uri_string ), "tftp://%s:%d%s%s",
+	snprintf ( uri_string, PXE_URI_LEN, "tftp://%s:%d%s%s",
 		   inet_ntoa ( address ), ntohs ( port ),
 		   ( ( filename[0] == '/' ) ? "" : "/" ), filename );
 }
@@ -371,6 +373,9 @@ PXENV_EXIT_t pxenv_tftp_read_file ( struct s_PXENV_TFTP_READ_FILE
 			     tftp_read_file->TFTPSrvPort,
 			     tftp_read_file->FileName, 0 );
 	DBG ( " %s", uri_string );
+
+	DBG ( " to %08lx+%lx", tftp_read_file->Buffer,
+	      tftp_read_file->BufferSize );
 
 	/* Open URI */
 	fd = open ( uri_string );

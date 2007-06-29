@@ -28,6 +28,7 @@
 #include <stdlib.h>
 #include <gpxe/uaccess.h>
 #include <gpxe/dhcp.h>
+#include <dhcp_basemem.h>
 #include "pxe.h"
 #include "pxe_callbacks.h"
 
@@ -85,11 +86,13 @@ PXENV_EXIT_t pxenv_get_cached_info ( struct s_PXENV_GET_CACHED_INFO
 	 * sources of options.
 	 */
 	if ( get_cached_info->BufferLimit == 0 ) {
-		DBG ( " without an external buffer.  Aargh." );
-		goto err;
+		get_cached_info->Buffer.segment = rm_ds;
+		get_cached_info->Buffer.offset =
+			( unsigned int ) ( & __from_data16 ( dhcp_basemem ) );
+		get_cached_info->BufferLimit = sizeof ( dhcp_basemem );
 	}
 
-	DBG ( " to %04x:%04x+%x\n", get_cached_info->Buffer.segment,
+	DBG ( " to %04x:%04x+%x", get_cached_info->Buffer.segment,
 	      get_cached_info->Buffer.offset, get_cached_info->BufferLimit );
 
 	/* Allocate space for temporary copy */
@@ -121,6 +124,7 @@ PXENV_EXIT_t pxenv_get_cached_info ( struct s_PXENV_GET_CACHED_INFO
 	/* Copy packet to client buffer */
 	buffer = real_to_user ( get_cached_info->Buffer.segment,
 				get_cached_info->Buffer.offset );
+	len = dhcppkt.len;
 	copy_to_user ( buffer, 0, data, len );
 	get_cached_info->BufferSize = len;
 
