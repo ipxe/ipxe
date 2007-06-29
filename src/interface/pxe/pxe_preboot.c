@@ -82,21 +82,22 @@ PXENV_EXIT_t pxenv_get_cached_info ( struct s_PXENV_GET_CACHED_INFO
 
 	DBG ( "PXENV_GET_CACHED_INFO %d", get_cached_info->PacketType );
 
+	DBG ( " to %04x:%04x+%x", get_cached_info->Buffer.segment,
+	      get_cached_info->Buffer.offset, get_cached_info->BufferSize );
+
 	/* This is really, really awkward to support with our multiple
 	 * sources of options.
 	 */
-	if ( get_cached_info->BufferLimit == 0 ) {
+	len = get_cached_info->BufferSize;
+	if ( len == 0 ) {
+		len = sizeof ( dhcp_basemem );
 		get_cached_info->Buffer.segment = rm_ds;
 		get_cached_info->Buffer.offset =
 			( unsigned int ) ( & __from_data16 ( dhcp_basemem ) );
-		get_cached_info->BufferLimit = sizeof ( dhcp_basemem );
+		get_cached_info->BufferLimit = len;
 	}
 
-	DBG ( " to %04x:%04x+%x", get_cached_info->Buffer.segment,
-	      get_cached_info->Buffer.offset, get_cached_info->BufferLimit );
-
 	/* Allocate space for temporary copy */
-	len = get_cached_info->BufferLimit;
 	data = malloc ( len );
 	if ( ! data ) {
 		DBG ( " out of memory" );
