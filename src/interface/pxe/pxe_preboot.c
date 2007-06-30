@@ -32,6 +32,15 @@
 #include "pxe.h"
 #include "pxe_call.h"
 
+/** Filename used for last TFTP request
+ *
+ * This is a bug-for-bug compatibility hack needed in order to work
+ * with Microsoft Remote Installation Services (RIS).  The filename
+ * used in a call to PXENV_RESTART_TFTP must be returned as the DHCP
+ * filename in subsequent calls to PXENV_GET_CACHED_INFO.
+ */
+static char *pxe_ris_filename = NULL;
+
 /**
  * UNLOAD BASE CODE STACK
  *
@@ -122,6 +131,12 @@ PXENV_EXIT_t pxenv_get_cached_info ( struct s_PXENV_GET_CACHED_INFO
 		goto err;
 	}
 
+	/* Overwrite filename to work around Microsoft RIS bug */
+	if ( pxe_ris_filename ) {
+		strncpy ( dhcppkt.dhcphdr->file, pxe_ris_filename,
+			  sizeof ( dhcppkt.dhcphdr->file ) );
+	}
+
 	/* Copy packet to client buffer */
 	buffer = real_to_user ( get_cached_info->Buffer.segment,
 				get_cached_info->Buffer.offset );
@@ -149,6 +164,14 @@ PXENV_EXIT_t pxenv_restart_tftp ( struct s_PXENV_TFTP_READ_FILE
 	PXENV_EXIT_t tftp_exit;
 
 	DBG ( "PXENV_RESTART_TFTP " );
+
+	/* Work around Microsoft RIS bug */
+	free ( pxe_ris_filename );
+	pxe_ris_filename = strdup ( ( char * ) restart_tftp->FileName );
+	if ( ! pxe_ris_filename ) {
+		restart_tftp->Status = PXENV_STATUS_OUT_OF_RESOURCES;
+		return PXENV_EXIT_FAILURE;
+	}
 
 	/* Words cannot describe the complete mismatch between the PXE
 	 * specification and any possible version of reality...

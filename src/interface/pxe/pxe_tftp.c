@@ -65,9 +65,6 @@ static void pxe_tftp_build_uri ( char *uri_string,
 				 int blksize ) {
 	struct in_addr address;
 
-	/* This is a fix to make Microsoft Remote Install Services work (RIS) */
-#warning "Overwrite DHCP filename"
-
 	address.s_addr = ipaddress;
 	if ( ! port )
 		port = htons ( TFTP_PORT );
