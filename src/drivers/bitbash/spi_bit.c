@@ -96,13 +96,18 @@ static void spi_bit_transfer ( struct spi_bit_basher *spibit,
 
 	DBG ( "Transferring %d bits in mode %x\n", len, bus->mode );
 
+<<<<<<< HEAD:src/drivers/bitbash/spi_bit.c
 	for ( step = 0 ; step < ( len * 2 ) ; step++ ) {
 		/* Calculate byte offset and byte mask */
 		bit_offset = ( ( endianness == SPI_BIT_BIG_ENDIAN ) ?
 			       ( len - ( step / 2 ) - 1 ) : ( step / 2 ) );
 		byte_offset = ( bit_offset / 8 );
 		byte_mask = ( 1 << ( bit_offset % 8 ) );
-
+=======
+>>>>>>> debugging natsemi.c:src/drivers/bitbash/spi_bit.c
+<<<<<<< HEAD:src/drivers/bitbash/spi_bit.c
+=======
+>>>>>>> debugging natsemi.c:src/drivers/bitbash/spi_bit.c
 		/* Shift data in or out */
 		if ( sclk == cpha ) {
 			const uint8_t *byte;

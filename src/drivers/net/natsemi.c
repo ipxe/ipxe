@@ -205,7 +205,7 @@ static struct bit_basher_operations nat_basher_ops = {
  * detect that the card is not supporting VPD.
  */
 static struct nvo_fragment nat_nvo_fragments[] = {
-	{ 0x20, 0x40 },
+	{ 0x0f, 0x40 },
 	{ 0, 0 }
 };
 
@@ -232,8 +232,8 @@ static struct nvo_fragment nat_nvo_fragments[] = {
 	//if ( vpd ) {
 	//	DBG ( "EEPROM in use for VPD; cannot use for options\n" );
 	//} else {
-//		nat->nvo.nvs = &nat->eeprom.nvs;
-//		nat->nvo.fragments = nat_nvo_fragments;
+		nat->nvo.nvs = &nat->eeprom.nvs;
+		nat->nvo.fragments = nat_nvo_fragments;
 //	}
 }
 
@@ -293,12 +293,22 @@ static int nat_open ( struct net_device *netdev ) {
 
 
 	/* Program the MAC address TODO enable this comment */
-	
+	 uint8_t last=0;
+	 uint8_t last1=0;
 	 for ( i = 0 ; i < ETH_ALEN ; i+=2 )
 	 {
+	//	DBG("MAC address %d octet :%X %X\n",i,netdev->ll_addr[i],netdev->ll_addr[i+1]);
+	//	DBG("LAst = %d last1 = %d\n",last,last1);
 		outl(i,nat->ioaddr+RxFilterAddr);
+		last1=netdev->ll_addr[i]>>7;
+	 	netdev->ll_addr[i]=netdev->ll_addr[i]<<1|last;
+		last=(netdev->ll_addr[i+1]>>7);
+		netdev->ll_addr[i+1]=(netdev->ll_addr[i+1]<<1)+last1;
+
 		outw ( netdev->ll_addr[i] + (netdev->ll_addr[i+1]<<8), nat->ioaddr +RxFilterData);
-		DBG("MAC address %d octet :%X %X\n",i,netdev->ll_addr[i],netdev->ll_addr[i+1]);
+		//outw ( (fullbyte>>8)+(fullbyte<<8), nat->ioaddr +RxFilterData);
+	//	DBG("MAC address %d octet :%X %X\n",i,netdev->ll_addr[i],netdev->ll_addr[i+1]);
+	//	DBG("LAst = %d last1 = %d\n",last,last1);
 	}
        
 
@@ -403,17 +413,20 @@ static int nat_transmit ( struct net_device *netdev, struct io_buffer *iobuf ) {
 		return -ENOBUFS;
 	}
 
+	//DBG_HD(iobuf->data,iob_len(iobuf));
 
 	/* Pad and align packet */
 	iob_pad ( iobuf, ETH_ZLEN );
 
 	/* Add to TX ring */
 	DBG ( "TX id %d at %lx+%x\n", nat->tx_cur,
-	      virt_to_bus ( iobuf->data ), iob_len ( iobuf ) );
+	      virt_to_bus ( &iobuf->data ), iob_len ( iobuf ) );
 
 	nat->tx[nat->tx_cur].bufptr = virt_to_bus(iobuf->data);
 	nat->tx[nat->tx_cur].cmdsts= (uint32_t) iob_len(iobuf)|OWN;
 
+
+	//DBG_HD(bus_to_virt(nat->tx[nat->tx_cur].bufptr), iob_len(iobuf) );
 	nat->tx_cur=(nat->tx_cur+1) % TX_RING_SIZE;
 
 	/*start the transmitter  */
@@ -430,40 +443,46 @@ static int nat_transmit ( struct net_device *netdev, struct io_buffer *iobuf ) {
  */
 static void nat_poll ( struct net_device *netdev, unsigned int rx_quota ) {
 	struct natsemi_nic *nat = netdev->priv;
-	uint32_t status;
+	unsigned int status;
 	unsigned int rx_status;
 	unsigned int rx_len;
 	struct io_buffer *rx_iob;
 	int i;
-
 	
 	/* check the status of packets given to card for transmission */	
-	for ( i = 0 ; i < TX_RING_SIZE ; i++ ) 
+	i=nat->tx_dirty;
+	while(i!=nat->tx_cur)
 	{
 		//status=(uint32_t)bus_to_virt(nat->tx[nat->tx_dirty].cmdsts);
-		status=(uint32_t)nat->tx[nat->tx_dirty].cmdsts;
+		status=nat->tx[nat->tx_dirty].cmdsts;
+		DBG("value of tx_dirty = %d tx_cur=%d status=%X\n",
+			nat->tx_dirty,nat->tx_cur,status);
+		
 		/* check if current packet has been transmitted or not */
 		if(status & OWN) 
 			break;
 		/* Check if any errors in transmission */
 		if (! (status & DescPktOK))
 		{
-			printf("Error in sending Packet with data: %s\n and status:%X\n",
-					(char *)nat->tx[nat->tx_dirty].bufptr,(unsigned int)status);
+			printf("Error in sending Packet status:%X\n",
+					(unsigned int)status);
 		}
 		else
 		{
-			DBG("Success in transmitting Packet with data: %s",
-				(char *)nat->tx[nat->tx_dirty].bufptr);
+			DBG("Success in transmitting Packet with data\n");
+		//	DBG_HD(&nat->tx[nat->tx_dirty].bufptr,130);
 		}
 		/* setting cmdsts zero, indicating that it can be reused */
 		nat->tx[nat->tx_dirty].cmdsts=0;
 		nat->tx_dirty=(nat->tx_dirty +1) % TX_RING_SIZE;
+		i=(i+1) % TX_RING_SIZE;
+
 	}
 			
 	
 	//rx_status=(unsigned int)bus_to_virt(nat->rx[nat->rx_cur].cmdsts); 
 	rx_status=(unsigned int)nat->rx[nat->rx_cur].cmdsts; 
+	//DBG ("Receiver Status = %x\n",rx_status);
 	/* Handle received packets */
 	while (rx_quota && (rx_status & OWN))
 	{
@@ -483,7 +502,10 @@ static void nat_poll ( struct net_device *netdev, unsigned int rx_quota ) {
 				/* leave packet for next call to poll*/
 				return;
 			memcpy(iob_put(rx_iob,rx_len),
-					nat->rx[nat->rx_cur].bufptr,rx_len);
+					bus_to_virt(nat->rx[nat->rx_cur].bufptr),rx_len);
+			//DBG_HD(bus_to_virt(nat->rx[nat->rx_cur].bufptr),rx_len);
+
+			DBG("received packet");
 			/* add to the receive queue. */
 			netdev_rx(netdev,rx_iob);
 			rx_quota--;
@@ -538,14 +560,10 @@ static int nat_probe ( struct pci_device *pci,
 	nat_reset ( nat );
 	nat_init_eeprom ( nat );
 	nvs_read ( &nat->eeprom.nvs, EE_MAC, netdev->ll_addr, ETH_ALEN );
-	uint8_t  eetest[12];	
+	uint8_t  eetest[128];	
 	int i;
-	nvs_read ( &nat->eeprom.nvs, 6, eetest,8 );
-	for (i=0;i<8;i++)
-	{
-		printf("%d word : %X\n",i,eetest[i]);
-	}
-		
+	nvs_read ( &nat->eeprom.nvs, 0, eetest,128 );
+	//	DBG_HD(&eetest,128);
 	
 
 	/* mdio routine of etherboot-5.4.0 natsemi driver has been removed and 
@@ -580,12 +598,12 @@ static int nat_probe ( struct pci_device *pci,
 
 	/* Register non-volatile storagei
 	 * uncomment lines below in final version*/
-	/*
-	 if ( rtl->nvo.nvs ) {
-		if ( ( rc = nvo_register ( &rtl->nvo ) ) != 0 )
+	
+	 if ( nat->nvo.nvs ) {
+		if ( ( rc = nvo_register ( &nat->nvo ) ) != 0 )
 			goto err;
 	}
-	*/
+	
 
 	return 0;
 
