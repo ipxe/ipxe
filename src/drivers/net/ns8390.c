@@ -26,7 +26,7 @@ SMC8416 PIO support added by Andrew Bettison (andrewb@zip.com.au) on 4/3/02
 **************************************************************************/
 
 #warning "ns8390.c is a horrendous mess and needs to be tidied up"
-#if 0
+#if 1
 
 
 #include "etherboot.h"
@@ -607,16 +607,23 @@ static void ns8390_irq(struct nic *nic __unused, irq_action_t action __unused)
   }
 }
 
+static struct nic_operations ns8390_operations;
+static struct nic_operations ns8390_operations = {
+	.connect	= dummy_connect,
+	.poll		= ns8390_poll,
+	.transmit	= ns8390_transmit,
+	.irq		= ns8390_irq,
+};
+
 /**************************************************************************
 ETH_PROBE - Look for an adapter
 **************************************************************************/
 #ifdef	INCLUDE_NS8390
-static int eth_probe (struct dev *dev, struct pci_device *pci)
+static int eth_probe (struct nic *nic, struct pci_device *pci)
 #else
 static int eth_probe (struct dev *dev, unsigned short *probe_addrs __unused)
 #endif
 {
-	struct nic *nic = (struct nic *)dev;
 	int i;
 #ifdef INCLUDE_NS8390
 	unsigned short pci_probe_addrs[] = { pci->ioaddr, 0 };
@@ -938,14 +945,6 @@ static int eth_probe (struct dev *dev, unsigned short *probe_addrs __unused)
         if (eth_vendor != VENDOR_3COM)
 		eth_rmem = eth_bmem;
 	ns8390_reset(nic);
-static struct nic_operations ns8390_operations;
-static struct nic_operations ns8390_operations = {
-	.connect	= dummy_connect,
-	.poll		= ns8390_poll,
-	.transmit	= ns8390_transmit,
-	.irq		= ns8390_irq,
-	.disable	= ns8390_disable,
-};
 	nic->nic_op	= &ns8390_operations;
 
         /* Based on PnP ISA map */
@@ -1010,9 +1009,10 @@ PCI_ROM(0x10bd, 0x0e34, "surecom-ne34", "Surecom NE34"),
 PCI_ROM(0x1106, 0x0926, "via86c926",    "Via 86c926"),
 };
 
-PCI_DRIVER ( nepci_driver, "NE2000/PCI", nepci_nics, PCI_NO_CLASS );
+PCI_DRIVER ( nepci_driver, nepci_nics, PCI_NO_CLASS );
 
-BOOT_DRIVER ( "NE2000/PCI", nepci_probe );
+DRIVER ( "NE2000/PCI", nic_driver, pci_driver, nepci_driver,
+	 nepci_probe, ns8390_disable );
 
 #endif /* INCLUDE_NS8390 */
 
