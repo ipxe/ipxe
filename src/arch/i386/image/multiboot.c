@@ -199,7 +199,7 @@ static struct multiboot_info __data16 ( mbinfo );
 #define mbinfo __use_data16 ( mbinfo )
 
 /** The multiboot bootloader name */
-static const char * __data16 ( mb_bootloader_name ) = "gPXE " VERSION;
+static char __data16_array ( mb_bootloader_name, [] ) = "gPXE " VERSION;
 #define mb_bootloader_name __use_data16 ( mb_bootloader_name )
 
 /** The multiboot memory map */
