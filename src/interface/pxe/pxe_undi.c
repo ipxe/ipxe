@@ -22,6 +22,13 @@
  * Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
  */
 
+#include <stdint.h>
+#include <string.h>
+#include <gpxe/netdevice.h>
+#include <gpxe/device.h>
+#include <gpxe/pci.h>
+#include <gpxe/isapnp.h>
+#include <gpxe/if_ether.h>
 #include "pxe.h"
 
 /* PXENV_UNDI_STARTUP
@@ -236,24 +243,49 @@ pxenv_undi_set_packet_filter ( struct s_PXENV_UNDI_SET_PACKET_FILTER
  */
 PXENV_EXIT_t pxenv_undi_get_information ( struct s_PXENV_UNDI_GET_INFORMATION
 					  *undi_get_information ) {
+	struct device *dev = pxe_netdev->dev;
+	struct ll_protocol *ll_protocol = pxe_netdev->ll_protocol;
+	unsigned int ioaddr;
+	unsigned int irqno;
+
 	DBG ( "PXENV_UNDI_GET_INFORMATION" );
 
-#if 0
-	undi_get_information->BaseIo = nic.ioaddr;
-	undi_get_information->IntNumber = nic.irqno;
+	switch ( dev->desc.bus_type ) {
+	case BUS_TYPE_PCI: {
+		struct pci_device *pci =
+			container_of ( dev, struct pci_device, dev );
+
+		ioaddr = pci->ioaddr;
+		irqno = pci->irq;
+		break; }
+	case BUS_TYPE_ISAPNP: {
+		struct isapnp_device *isapnp =
+			container_of ( dev, struct isapnp_device, dev );
+
+		ioaddr = isapnp->ioaddr;
+		irqno = isapnp->irqno;
+		break; }
+	default:
+		undi_get_information->Status = PXENV_STATUS_FAILURE;
+		return PXENV_EXIT_FAILURE;
+	}
+
+	undi_get_information->BaseIo = ioaddr;
+	undi_get_information->IntNumber = irqno;
 	/* Cheat: assume all cards can cope with this */
 	undi_get_information->MaxTranUnit = ETH_MAX_MTU;
-	/* Cheat: we only ever have Ethernet cards */
-	undi_get_information->HwType = ETHER_TYPE;
-	undi_get_information->HwAddrLen = ETH_ALEN;
+	undi_get_information->HwType = ntohs ( ll_protocol->ll_proto );
+	undi_get_information->HwAddrLen = ll_protocol->ll_addr_len;
 	/* Cheat: assume card is always configured with its permanent
 	 * node address.  This is a valid assumption within Etherboot
 	 * at the time of writing.
 	 */
-	memcpy ( &undi_get_information->CurrentNodeAddress, nic.node_addr,
-		 ETH_ALEN );
-	memcpy ( &undi_get_information->PermNodeAddress, nic.node_addr,
-		 ETH_ALEN );
+	memcpy ( &undi_get_information->CurrentNodeAddress,
+		 pxe_netdev->ll_addr,
+		 sizeof ( undi_get_information->CurrentNodeAddress ) );
+	memcpy ( &undi_get_information->PermNodeAddress,
+		 pxe_netdev->ll_addr,
+		 sizeof ( undi_get_information->PermNodeAddress ) );
 	undi_get_information->ROMAddress = 0;
 		/* nic.rom_info->rom_segment; */
 	/* We only provide the ability to receive or transmit a single
@@ -261,7 +293,6 @@ PXENV_EXIT_t pxenv_undi_get_information ( struct s_PXENV_UNDI_GET_INFORMATION
 	 */
 	undi_get_information->RxBufCt = 1;
 	undi_get_information->TxBufCt = 1;
-#endif
 
 	undi_get_information->Status = PXENV_STATUS_SUCCESS;
 	return PXENV_EXIT_SUCCESS;
@@ -341,50 +372,52 @@ pxenv_undi_get_mcast_address ( struct s_PXENV_UNDI_GET_MCAST_ADDRESS
  */
 PXENV_EXIT_t pxenv_undi_get_nic_type ( struct s_PXENV_UNDI_GET_NIC_TYPE
 				       *undi_get_nic_type ) {
+	struct device *dev = pxe_netdev->dev;
+
 	DBG ( "PXENV_UNDI_GET_NIC_TYPE" );
 
-#warning "device probing mechanism has changed completely"
-#if 0
-	struct dev *dev = &dev;	
-	if ( dev->to_probe == PROBE_PCI ) {
-		struct pci_device *pci = &dev->state.pci.dev;
+	memset ( &undi_get_nic_type->info, 0,
+		 sizeof ( undi_get_nic_type->info ) );
+
+	switch ( dev->desc.bus_type ) {
+	case BUS_TYPE_PCI: {
+		struct pci_device *pci =
+			container_of ( dev, struct pci_device, dev );
+		struct pci_nic_info *info = &undi_get_nic_type->info.pci;
 
 		undi_get_nic_type->NicType = PCI_NIC;
-		undi_get_nic_type->info.pci.Vendor_ID = pci->vendor;
-		undi_get_nic_type->info.pci.Dev_ID = pci->dev_id;
-		undi_get_nic_type->info.pci.Base_Class = pci->class >> 8;
-		undi_get_nic_type->info.pci.Sub_Class = pci->class & 0xff;
-		undi_get_nic_type->info.pci.BusDevFunc =
-			( pci->bus << 8 ) | pci->devfn;
-		/* Cheat: these fields are probably unnecessary, and
-		 * would require adding extra code to pci.c.
+		info->Vendor_ID = pci->vendor;
+		info->Dev_ID = pci->device;
+		info->Base_Class = PCI_BASE_CLASS ( pci->class );
+		info->Sub_Class = PCI_SUB_CLASS ( pci->class );
+		info->Prog_Intf = PCI_PROG_INTF ( pci->class );
+		info->BusDevFunc = PCI_BUSDEVFN ( pci->bus, pci->devfn );
+		/* Cheat: remaining fields are probably unnecessary,
+		 * and would require adding extra code to pci.c.
 		 */
-		undi_get_nic_type->info.pci.Prog_Intf = 0;
-		undi_get_nic_type->info.pci.Rev = 0;
 		undi_get_nic_type->info.pci.SubVendor_ID = 0xffff;
 		undi_get_nic_type->info.pci.SubDevice_ID = 0xffff;
-	} else if ( dev->to_probe == PROBE_ISA ) {
-		/* const struct isa_driver *isa = dev->state.isa.driver; */
+		break; }
+	case BUS_TYPE_ISAPNP: {
+		struct isapnp_device *isapnp =
+			container_of ( dev, struct isapnp_device, dev );
+		struct pnp_nic_info *info = &undi_get_nic_type->info.pnp;
 
 		undi_get_nic_type->NicType = PnP_NIC;
-		/* Don't think anything fills these fields in, and
-		 * probably no-one will ever be interested in them.
+		info->EISA_Dev_ID = ( ( isapnp->vendor_id << 16 ) |
+				      isapnp->prod_id );
+		info->CardSelNum = isapnp->csn;
+		/* Cheat: remaining fields are probably unnecessary,
+		 * and would require adding extra code to isapnp.c.
 		 */
-		undi_get_nic_type->info.pnp.EISA_Dev_ID = 0;
-		undi_get_nic_type->info.pnp.Base_Class = 0;
-		undi_get_nic_type->info.pnp.Sub_Class = 0;
-		undi_get_nic_type->info.pnp.Prog_Intf = 0;
-		undi_get_nic_type->info.pnp.CardSelNum = 0;
-	} else {
-		/* PXESPEC: There doesn't seem to be an "unknown type"
-		 * defined.
-		 */
-		undi_get_nic_type->NicType = 0;
+		break; }
+	default:
+		undi_get_nic_type->Status = PXENV_STATUS_FAILURE;
+		return PXENV_EXIT_FAILURE;
 	}
+
 	undi_get_nic_type->Status = PXENV_STATUS_SUCCESS;
 	return PXENV_EXIT_SUCCESS;
-
-#endif
 }
 
 /* PXENV_UNDI_GET_IFACE_INFO

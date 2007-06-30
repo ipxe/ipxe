@@ -312,7 +312,9 @@ struct pci_driver {
 #define PCI_FUNC( devfn )		( (devfn) & 0x07 )
 #define PCI_BUSDEVFN( bus, devfn )	( ( (bus) << 8 ) | (devfn) )
 
-#define PCI_BASE_CLASS( class )	( (class) >> 16 )
+#define PCI_BASE_CLASS( class )		( (class) >> 16 )
+#define PCI_SUB_CLASS( class )		( ( (class) >> 8 ) & 0xff )
+#define PCI_PROG_INTF( class )		( (class) & 0xff )
 
 /*
  * PCI_ROM is used to build up entries in a struct pci_id array.  It
