@@ -387,12 +387,12 @@ struct dhcphdr {
 	 *
 	 * This field may be overridden and contain DHCP options
 	 */
-	uint8_t sname[64];
+	char sname[64];
 	/** Boot file name (null terminated)
 	 *
 	 * This field may be overridden and contain DHCP options
 	 */
-	uint8_t file[128];
+	char file[128];
 	/** DHCP magic cookie
 	 *
 	 * Must have the value @c DHCP_MAGIC_COOKIE.
@@ -423,20 +423,6 @@ struct dhcphdr {
  */
 #define DHCP_MIN_LEN 552
 
-/** DHCP packet option block fill order
- *
- * This is the order in which option blocks are filled when
- * reassembling a DHCP packet.  We fill the smallest field ("sname")
- * first, to maximise the chances of being able to fit large options
- * within fields which are large enough to contain them.
- */
-enum dhcp_packet_option_block_fill_order {
-	OPTS_SNAME = 0,
-	OPTS_FILE,
-	OPTS_MAIN,
-	NUM_OPT_BLOCKS
-};
-
 /**
  * A DHCP packet
  *
@@ -448,14 +434,8 @@ struct dhcp_packet {
 	size_t max_len;
 	/** Used length of the DHCP packet buffer */
 	size_t len;
-	/** DHCP option blocks within a DHCP packet
-	 *
-	 * A DHCP packet contains three fields which can be used to
-	 * contain options: the actual "options" field plus the "file"
-	 * and "sname" fields (which can be overloaded to contain
-	 * options).
-	 */
-	struct dhcp_option_block options[NUM_OPT_BLOCKS];
+	/** DHCP options */
+	struct dhcp_option_block options;
 };
 
 /**

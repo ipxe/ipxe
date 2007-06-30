@@ -138,7 +138,7 @@ static int set_dhcp_packet_option ( struct dhcp_packet *dhcppkt,
 				    unsigned int tag, const void *data,
 				    size_t len ) {
 	struct dhcphdr *dhcphdr = dhcppkt->dhcphdr;
-	struct dhcp_option_block *options = dhcppkt->options;
+	struct dhcp_option_block *options = &dhcppkt->options;
 	struct dhcp_option *option = NULL;
 
 	/* Special-case the magic options */
@@ -152,31 +152,23 @@ static int set_dhcp_packet_option ( struct dhcp_packet *dhcppkt,
 	case DHCP_EB_SIADDR:
 		memcpy ( &dhcphdr->siaddr, data, sizeof ( dhcphdr->siaddr ) );
 		return 0;
-	case DHCP_MESSAGE_TYPE:
-	case DHCP_REQUESTED_ADDRESS:
-	case DHCP_PARAMETER_REQUEST_LIST:
-		/* These options have to be within the main options
-		 * block.  This doesn't seem to be required by the
-		 * RFCs, but at least ISC dhcpd refuses to recognise
-		 * them otherwise.
-		 */
-		options = &dhcppkt->options[OPTS_MAIN];
-		break;
+	case DHCP_TFTP_SERVER_NAME:
+		strncpy ( dhcphdr->sname, data, sizeof ( dhcphdr->sname ) );
+		return 0;
+	case DHCP_BOOTFILE_NAME:
+		strncpy ( dhcphdr->file, data, sizeof ( dhcphdr->file ) );
+		return 0;
 	default:
 		/* Continue processing as normal */
 		break;
 	}
 		
-	/* Set option in first available options block */
-	for ( ; options < &dhcppkt->options[NUM_OPT_BLOCKS] ; options++ ) {
-		option = set_dhcp_option ( options, tag, data, len );
-		if ( option )
-			break;
-	}
+	/* Set option */
+	option = set_dhcp_option ( options, tag, data, len );
 
 	/* Update DHCP packet length */
 	dhcppkt->len = ( offsetof ( typeof ( *dhcppkt->dhcphdr ), options )
-			 + dhcppkt->options[OPTS_MAIN].len );
+			 + dhcppkt->options.len );
 
 	return ( option ? 0 : -ENOSPC );
 }
@@ -296,8 +288,6 @@ int create_dhcp_packet ( struct net_device *netdev, uint8_t msgtype,
 			 void *data, size_t max_len,
 			 struct dhcp_packet *dhcppkt ) {
 	struct dhcphdr *dhcphdr = data;
-	static const uint8_t overloading = ( DHCP_OPTION_OVERLOAD_FILE |
-					     DHCP_OPTION_OVERLOAD_SNAME );
 	int rc;
 
 	/* Sanity check */
@@ -316,20 +306,10 @@ int create_dhcp_packet ( struct net_device *netdev, uint8_t msgtype,
 	/* Initialise DHCP packet structure */
 	dhcppkt->dhcphdr = dhcphdr;
 	dhcppkt->max_len = max_len;
-	init_dhcp_options ( &dhcppkt->options[OPTS_MAIN], dhcphdr->options,
+	init_dhcp_options ( &dhcppkt->options, dhcphdr->options,
 			    ( max_len -
 			      offsetof ( typeof ( *dhcphdr ), options ) ) );
-	init_dhcp_options ( &dhcppkt->options[OPTS_FILE], dhcphdr->file,
-			    sizeof ( dhcphdr->file ) );
-	init_dhcp_options ( &dhcppkt->options[OPTS_SNAME], dhcphdr->sname,
-			    sizeof ( dhcphdr->sname ) );
 	
-	/* Set DHCP_OPTION_OVERLOAD option within the main options block */
-	if ( set_dhcp_option ( &dhcppkt->options[OPTS_MAIN],
-			       DHCP_OPTION_OVERLOAD, &overloading,
-			       sizeof ( overloading ) ) == NULL )
-		return -ENOSPC;
-
 	/* Set DHCP_MESSAGE_TYPE option */
 	if ( ( rc = set_dhcp_packet_option ( dhcppkt, DHCP_MESSAGE_TYPE,
 					     &msgtype,

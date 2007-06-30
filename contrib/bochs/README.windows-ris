@@ -21,3 +21,11 @@ startrom.com in a hex editor, search for the hex string
 now accept the "F" key instead of "F12".
 
 
+
+DHCP filename
+=============
+
+Must use Windows backslash separator e.g. 'filename
+"OSChooser\\i386\\startrom.com";', otherwise startrom.com fails to
+correctly identify the path to NTLDR.
+
