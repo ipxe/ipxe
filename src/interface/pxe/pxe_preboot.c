@@ -30,7 +30,7 @@
 #include <gpxe/dhcp.h>
 #include <dhcp_basemem.h>
 #include "pxe.h"
-#include "pxe_callbacks.h"
+#include "pxe_call.h"
 
 /**
  * UNLOAD BASE CODE STACK
@@ -146,22 +146,21 @@ PXENV_EXIT_t pxenv_get_cached_info ( struct s_PXENV_GET_CACHED_INFO
  */
 PXENV_EXIT_t pxenv_restart_tftp ( struct s_PXENV_TFTP_READ_FILE
 				  *restart_tftp ) {
-	DBG ( "PXENV_RESTART_TFTP" );
+	PXENV_EXIT_t tftp_exit;
 
-#if 0
+	DBG ( "PXENV_RESTART_TFTP " );
+
 	/* Words cannot describe the complete mismatch between the PXE
 	 * specification and any possible version of reality...
 	 */
-	restart_tftp->Buffer = PXE_LOAD_ADDRESS; /* Fixed by spec, apparently */
-	restart_tftp->BufferSize = get_free_base_memory() - PXE_LOAD_ADDRESS; /* Near enough */
-	DBG ( "(" );
-	tftp_exit = pxe_api_call ( PXENV_TFTP_READ_FILE, (union u_PXENV_ANY*)restart_tftp );
-	DBG ( ")" );
-	if ( tftp_exit != PXENV_EXIT_SUCCESS ) return tftp_exit;
+	restart_tftp->Buffer = PXE_LOAD_PHYS; /* Fixed by spec, apparently */
+	restart_tftp->BufferSize = ( 0xa0000 - PXE_LOAD_PHYS ); /* Near enough */
+	tftp_exit = pxenv_tftp_read_file ( restart_tftp );
+	if ( tftp_exit != PXENV_EXIT_SUCCESS )
+		return tftp_exit;
 
 	/* Fire up the new NBP */
-	restart_tftp->Status = xstartpxe();
-#endif
+	restart_tftp->Status = pxe_start_nbp();
 
 	/* Not sure what "SUCCESS" actually means, since we can only
 	 * return if the new NBP failed to boot...

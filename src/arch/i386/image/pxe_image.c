@@ -30,12 +30,6 @@
 #include <gpxe/segment.h>
 #include <gpxe/netdevice.h>
 
-/** PXE load address segment */
-#define PXE_LOAD_SEGMENT 0
-
-/** PXE load address offset */
-#define PXE_LOAD_OFFSET 0x7c00
-
 struct image_type pxe_image_type __image_type ( PROBE_PXE );
 
 /**
@@ -46,8 +40,6 @@ struct image_type pxe_image_type __image_type ( PROBE_PXE );
  */
 static int pxe_exec ( struct image *image __unused ) {
 	struct net_device *netdev;
-	int discard_b, discard_c;
-	uint16_t rc;
 
 	/* Ensure that PXE stack is ready to use */
 	pxe_init_structures();
@@ -59,20 +51,7 @@ static int pxe_exec ( struct image *image __unused ) {
 		break;
 	}
 
-	/* Far call to PXE NBP */
-	__asm__ __volatile__ ( REAL_CODE ( "pushw %%cx\n\t"
-					   "pushw %%ax\n\t"
-					   "movw %%cx, %%es\n\t"
-					   "lcall $0, $0x7c00\n\t"
-					   "addw $4, %%sp\n\t" )
-			       : "=a" ( rc ), "=b" ( discard_b ),
-			         "=c" ( discard_c )
-			       :  "a" ( & __from_text16 ( ppxe ) ),
-			          "b" ( & __from_text16 ( pxenv ) ),
-			          "c" ( rm_cs )
-			       : "edx", "esi", "edi", "ebp", "memory" );
-
-	return rc;
+	return pxe_start_nbp();
 }
 
 /**
