@@ -23,10 +23,11 @@ static int legacy_registered = 0;
 
 static int legacy_transmit ( struct net_device *netdev, struct io_buffer *iobuf ) {
 	struct nic *nic = netdev->priv;
-	struct ethhdr *ethhdr = iobuf->data;
+	struct ethhdr *ethhdr;
 
 	DBG ( "Transmitting %d bytes\n", iob_len ( iobuf ) );
 	iob_pad ( iobuf, ETH_ZLEN );
+	ethhdr = iobuf->data;
 	iob_pull ( iobuf, sizeof ( *ethhdr ) );
 	nic->nic_op->transmit ( nic, ( const char * ) ethhdr->h_dest,
 				ntohs ( ethhdr->h_protocol ),
