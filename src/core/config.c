@@ -184,6 +184,9 @@ REQUIRE_OBJECT ( dhcp_cmd );
  * Drag in miscellaneous objects
  *
  */
-#ifdef	NULL_TRAP
+#ifdef NULL_TRAP
 REQUIRE_OBJECT ( nulltrap );
+#endif
+#ifdef DUMP_GDBSYM
+REQUIRE_OBJECT ( gdbsym );
 #endif

@@ -36,8 +36,9 @@ struct init_fn {
 
 /* Use double digits to avoid problems with "10" < "9" on alphabetic sort */
 #define	INIT_CONSOLE	02
-#define	INIT_CPU	03
-#define	INIT_TIMERS	04
+#define	INIT_GDBSYM	03
+#define	INIT_CPU	04
+#define	INIT_TIMERS	05
 #define	INIT_LOADBUF	08
 #define	INIT_PCMCIA	09
 #define	INIT_RPC	11

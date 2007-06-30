@@ -143,5 +143,6 @@
 #undef	BUILD_ID		/* Include a custom build ID string,
 				 * e.g "test-foo" */
 #undef	NULL_TRAP		/* Attempt to catch NULL function calls */
+#define DUMP_GDBSYM		/* Dump GDB symbol table information */
 
 /* @END general.h */
