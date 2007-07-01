@@ -153,10 +153,16 @@ static int set_dhcp_packet_option ( struct dhcp_packet *dhcppkt,
 		memcpy ( &dhcphdr->siaddr, data, sizeof ( dhcphdr->siaddr ) );
 		return 0;
 	case DHCP_TFTP_SERVER_NAME:
-		strncpy ( dhcphdr->sname, data, sizeof ( dhcphdr->sname ) );
+		memset ( dhcphdr->sname, 0, sizeof ( dhcphdr->sname ) );
+		if ( len > sizeof ( dhcphdr->sname ) )
+			len = sizeof ( dhcphdr->sname );
+		memcpy ( dhcphdr->sname, data, len );
 		return 0;
 	case DHCP_BOOTFILE_NAME:
-		strncpy ( dhcphdr->file, data, sizeof ( dhcphdr->file ) );
+		memset ( dhcphdr->file, 0, sizeof ( dhcphdr->file ) );
+		if ( len > sizeof ( dhcphdr->file ) )
+			len = sizeof ( dhcphdr->file );
+		memcpy ( dhcphdr->file, data, len );
 		return 0;
 	default:
 		/* Continue processing as normal */
