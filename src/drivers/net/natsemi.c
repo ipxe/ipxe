@@ -45,6 +45,9 @@ struct natsemi_nic {
 	 * alternatively substracting sizeof(head) and sizeof(list_head) can also 
 	 * give the same.*/
 	struct io_buffer *iobuf[NUM_RX_DESC];
+	/*netdev_tx_complete needs pointer to the iobuf of the data so as to free 
+	  it form the memory.*/
+	struct io_buffer *tx_iobuf[TX_RING_SIZE];
 	struct spi_bit_basher spibit;
 	struct spi_device eeprom;
 	struct nvo_block nvo;
@@ -415,6 +418,8 @@ static int nat_transmit ( struct net_device *netdev, struct io_buffer *iobuf ) {
 	}
 
 	//DBG_HD(iobuf->data,iob_len(iobuf));
+	/* to be used in netdev_tx_complete*/
+	nat->tx_iobuf[nat->tx_cur]=iobuf;
 
 	/* Pad and align packet */
 	iob_pad ( iobuf, ETH_ZLEN );
@@ -473,6 +478,7 @@ static void nat_poll ( struct net_device *netdev, unsigned int rx_quota ) {
 			DBG("Success in transmitting Packet with data\n");
 		//	DBG_HD(&nat->tx[nat->tx_dirty].bufptr,130);
 		}
+		netdev_tx_complete(netdev,nat->tx_iobuf[nat->tx_dirty]);
 		/* setting cmdsts zero, indicating that it can be reused */
 		nat->tx[nat->tx_dirty].cmdsts=0;
 		nat->tx_dirty=(nat->tx_dirty +1) % TX_RING_SIZE;
