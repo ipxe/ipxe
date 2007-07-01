@@ -111,6 +111,9 @@ static void tftp_free ( struct refcnt *refcnt ) {
  */
 static void tftp_done ( struct tftp_request *tftp, int rc ) {
 
+	DBGC ( tftp, "TFTP %p finished with status %d (%s)\n",
+	       tftp, rc, strerror ( rc ) );
+
 	/* Stop the retry timer */
 	stop_timer ( &tftp->timer );
 
@@ -187,6 +190,9 @@ static int tftp_send_ack ( struct tftp_request *tftp ) {
 	struct xfer_metadata meta = {
 		.dest = ( struct sockaddr * ) &tftp->peer,
 	};
+
+	DBGC2 ( tftp, "TFTP %p sending ACK for block %d\n",
+		tftp, tftp->state );
 
 	/* Allocate buffer */
 	iobuf = xfer_alloc_iob ( &tftp->socket, sizeof ( *ack ) );
