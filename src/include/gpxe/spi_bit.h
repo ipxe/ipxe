@@ -16,6 +16,15 @@ struct spi_bit_basher {
 	struct spi_bus bus;
 	/** Bit-bashing interface */
 	struct bit_basher basher;
+	/** Endianness of data
+	 *
+	 * SPI commands and addresses are always big-endian (i.e. MSB
+	 * transmitted first on the wire), but some cards
+	 * (e.g. natsemi) choose to regard the data stored in the
+	 * EEPROM as little-endian (i.e. LSB transmitted first on the
+	 * wire).
+	 */
+	int endianness;
 };
 
 /** Bit indices used for SPI bit-bashing interface */
@@ -40,6 +49,12 @@ enum {
 
 /** Delay between SCLK transitions */
 #define SPI_BIT_UDELAY 1
+
+/** SPI bit basher treats data as big-endian */
+#define SPI_BIT_BIG_ENDIAN 0
+
+/** SPI bit basher treats data as little-endian */
+#define SPI_BIT_LITTLE_ENDIAN 1
 
 extern void init_spi_bit_basher ( struct spi_bit_basher *spibit );
 

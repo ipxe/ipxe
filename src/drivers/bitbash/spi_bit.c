@@ -73,6 +73,7 @@ static void spi_bit_set_slave_select ( struct spi_bit_basher *spibit,
  * @v data_out		TX data buffer (or NULL)
  * @v data_in		RX data buffer (or NULL)
  * @v len		Length of transfer (in @b bits)
+ * @v endianness	Endianness of this data transfer
  *
  * This issues @c len clock cycles on the SPI bus, shifting out data
  * from the @c data_out buffer to the MOSI line and shifting in data
@@ -82,31 +83,34 @@ static void spi_bit_set_slave_select ( struct spi_bit_basher *spibit,
  */
 static void spi_bit_transfer ( struct spi_bit_basher *spibit,
 			       const void *data_out, void *data_in,
-			       unsigned int len ) {
+			       unsigned int len, int endianness ) {
 	struct spi_bus *bus = &spibit->bus;
 	struct bit_basher *basher = &spibit->basher;
 	unsigned int sclk = ( ( bus->mode & SPI_MODE_CPOL ) ? 1 : 0 );
 	unsigned int cpha = ( ( bus->mode & SPI_MODE_CPHA ) ? 1 : 0 );
-	unsigned int offset;
-	unsigned int mask;
+	unsigned int bit_offset;
+	unsigned int byte_offset;
+	unsigned int byte_mask;
 	unsigned int bit;
-	int step;
+	unsigned int step;
 
 	DBG ( "Transferring %d bits in mode %x\n", len, bus->mode );
 
-	for ( step = ( ( len * 2 ) - 1 ) ; step >= 0 ; step-- ) {
-		/* Calculate byte offset within data and bit mask */
-		offset = ( step / 16 );
-		mask = ( 1 << ( ( step % 16 ) / 2 ) );
-		
+	for ( step = 0 ; step < ( len * 2 ) ; step++ ) {
+		/* Calculate byte offset and byte mask */
+		bit_offset = ( ( endianness == SPI_BIT_BIG_ENDIAN ) ?
+			       ( len - ( step / 2 ) - 1 ) : ( step / 2 ) );
+		byte_offset = ( bit_offset / 8 );
+		byte_mask = ( 1 << ( bit_offset % 8 ) );
+
 		/* Shift data in or out */
 		if ( sclk == cpha ) {
 			const uint8_t *byte;
 
 			/* Shift data out */
 			if ( data_out ) {
-				byte = ( data_out + offset );
-				bit = ( *byte & mask );
+				byte = ( data_out + byte_offset );
+				bit = ( *byte & byte_mask );
 			} else {
 				bit = 0;
 			}
@@ -117,9 +121,9 @@ static void spi_bit_transfer ( struct spi_bit_basher *spibit,
 			/* Shift data in */
 			bit = read_bit ( basher, SPI_BIT_MISO );
 			if ( data_in ) {
-				byte = ( data_in + offset );
-				*byte &= ~mask;
-				*byte |= ( bit & mask );
+				byte = ( data_in + byte_offset );
+				*byte &= ~byte_mask;
+				*byte |= ( bit & byte_mask );
 			}
 		}
 
@@ -155,17 +159,20 @@ static int spi_bit_rw ( struct spi_bus *bus, struct spi_device *device,
 	/* Transmit command */
 	assert ( device->command_len <= ( 8 * sizeof ( tmp ) ) );
 	tmp = cpu_to_le32 ( command );
-	spi_bit_transfer ( spibit, &tmp, NULL, device->command_len );
+	spi_bit_transfer ( spibit, &tmp, NULL, device->command_len,
+			   SPI_BIT_BIG_ENDIAN );
 
 	/* Transmit address, if present */
 	if ( address >= 0 ) {
 		assert ( device->address_len <= ( 8 * sizeof ( tmp ) ) );
 		tmp = cpu_to_le32 ( address );
-		spi_bit_transfer ( spibit, &tmp, NULL, device->address_len );
+		spi_bit_transfer ( spibit, &tmp, NULL, device->address_len,
+				   SPI_BIT_BIG_ENDIAN );
 	}
 
 	/* Transmit/receive data */
-	spi_bit_transfer ( spibit, data_out, data_in, ( len * 8 ) );
+	spi_bit_transfer ( spibit, data_out, data_in, ( len * 8 ),
+			   spibit->endianness );
 
 	/* Deassert chip select on specified slave */
 	spi_bit_set_slave_select ( spibit, device->slave, DESELECT_SLAVE );
