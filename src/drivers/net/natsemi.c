@@ -221,6 +221,7 @@ static struct nvo_fragment nat_nvo_fragments[] = {
 	// Initialise three-wire bus 
 	nat->spibit.basher.op = &nat_basher_ops;
 	nat->spibit.bus.mode = SPI_MODE_THREEWIRE;
+	nat->spibit.endianness = SPI_BIT_LITTLE_ENDIAN;
 	init_spi_bit_basher ( &nat->spibit );
 
 	DBG ( "EEPROM is an AT93C46\n" );
