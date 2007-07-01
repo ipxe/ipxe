@@ -614,7 +614,7 @@ static int nat_probe ( struct pci_device *pci,
 	if ( registered_netdev )
 		unregister_netdev ( netdev );
 	/* Free net device */
-	free_netdev ( netdev );
+	netdev_put ( netdev );
 	return rc;
 }
 
@@ -632,7 +632,7 @@ static void nat_remove ( struct pci_device *pci ) {
 		*/
 	unregister_netdev ( netdev );
 	nat_reset ( nat );
-	free_netdev ( netdev );
+	netdev_put ( netdev );
 }
 
 static struct pci_device_id natsemi_nics[] = {
