@@ -35,7 +35,6 @@
 #include <gpxe/ip.h>
 #include <gpxe/arp.h>
 #include <gpxe/rarp.h>
-#include <gpxe/shutdown.h>
 #include "pxe.h"
 
 /**
@@ -284,7 +283,7 @@ pxenv_undi_set_station_address ( struct s_PXENV_UNDI_SET_STATION_ADDRESS
 		 &undi_set_station_address->StationAddress,
 		 pxe_netdev->ll_protocol->ll_addr_len );
 
-	undi_set_station_address = PXENV_STATUS_SUCCESS;
+	undi_set_station_address->Status = PXENV_STATUS_SUCCESS;
 	return PXENV_EXIT_SUCCESS;
 }
 
@@ -559,12 +558,11 @@ PXENV_EXIT_t pxenv_undi_isr ( struct s_PXENV_UNDI_ISR *undi_isr ) {
 		DBG ( " RECEIVE %zd", len );
 		if ( len > sizeof ( basemem_packet ) ) {
 			/* Should never happen */
-			undi_isr->FuncFlag = PXENV_UNDI_ISR_OUT_DONE;
-			undi_isr->Status = PXENV_STATUS_OUT_OF_RESOURCES;
-			return PXENV_EXIT_FAILURE;
+			len = sizeof ( basemem_packet );
 		}
 		memcpy ( basemem_packet, iobuf->data, len );
 
+		/* Fill in UNDI_ISR structure */
 		undi_isr->FuncFlag = PXENV_UNDI_ISR_OUT_RECEIVE;
 		undi_isr->BufferLength = len;
 		undi_isr->FrameLength = len;
@@ -576,6 +574,9 @@ PXENV_EXIT_t pxenv_undi_isr ( struct s_PXENV_UNDI_ISR *undi_isr ) {
 		/* Probably ought to fill in packet type */
 		undi_isr->ProtType = P_UNKNOWN;
 		undi_isr->PktType = XMT_DESTADDR;
+
+		/* Free packet */
+		free_iob ( iobuf );
 		break;
 	default :
 		DBG ( " INVALID(%04x)", undi_isr->FuncFlag );
