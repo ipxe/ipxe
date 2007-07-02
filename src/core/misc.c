@@ -2,9 +2,10 @@
 MISC Support Routines
 **************************************************************************/
 
-#include "etherboot.h"
-#include "console.h"
+#include <etherboot.h>
+#include <console.h>
 #include <stdlib.h>
+#include <stdio.h>
 
 /**************************************************************************
 IPCHKSUM - Checksum IP Header

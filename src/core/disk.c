@@ -1,5 +1,5 @@
-#include "etherboot.h"
-#include "disk.h"
+#include <etherboot.h>
+#include <disk.h>
 
 #warning "disk.c is currently broken"
 #if 0

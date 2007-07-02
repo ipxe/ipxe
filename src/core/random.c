@@ -5,6 +5,7 @@
  */
 
 #include <stdlib.h>
+#include <etherboot.h>
 
 static int32_t rnd_seed = 0;
 

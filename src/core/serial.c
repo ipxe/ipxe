@@ -213,7 +213,7 @@ static void serial_init ( void ) {
 		/* rx buffer reg
 		 * throw away (unconditionally the first time)
 		 */
-		uart_readb(UART_BASE + UART_RBR);
+	        (void) uart_readb(UART_BASE + UART_RBR);
 		/* line status reg */
 		status = uart_readb(UART_BASE + UART_LSR);
 	} while(status & UART_LSR_DR);

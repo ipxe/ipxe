@@ -1,3 +1,5 @@
+#if 0
+
 /*
  * Procedures for drawing on the screen early on in the boot process.
  *
@@ -5037,3 +5039,5 @@ static const unsigned char vga_font[cmapsz] BTDATA = {
 	0x00, /* 00000000 */
 #endif
 };
+
+#endif

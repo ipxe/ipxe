@@ -1,3 +1,5 @@
+#if 0
+
 /*
  *	pcmcia.c
  *
@@ -23,12 +25,13 @@
  *	at some point. If there's anything obvious or better, not-so-obvious,
  *	please contact me by e-mail: anselm (AT) hoffmeister (DOT) be   *THANKS*
  */
-#include "pcmcia.h"
-#include "i82365.h"
+#include <stdio.h>
+#include <pcmcia.h>
+#include <i82365.h>
 #define CODE_STATUS "alpha"
 #define	CODE_VERSION "0.1.3"
-#include "pcmcia-opts.h"
-#include "console.h"
+#include <pcmcia-opts.h>
+#include <console.h>
 #include <gpxe/init.h>
 
 int	sockets; /* AHTODO: Phase this out! */
@@ -118,7 +121,7 @@ static void pcmcia_init_all(void) {
 				printf ( "]\nHighest config available is %d\n", uc[2*(ui+3)] );
 				m = uc[2*(ui+2)];
 				pccsock[i].configoffset = 0;
-				for ( j = 0; j <= m & 3; ++j ) {
+				for ( j = 0; j <= (m & 3); ++j ) {
 					pccsock[i].configoffset += uc[2*(ui+4+j)] << (8*j);
 				}
 				pccsock[i].rmask0 = 0;
@@ -262,3 +265,5 @@ static void	pcmcia_shutdown_all(void) {
 }
 
 INIT_FN ( INIT_PCMCIA, pcmcia_init_all, NULL, pcmcia_shutdown_all );
+
+#endif
