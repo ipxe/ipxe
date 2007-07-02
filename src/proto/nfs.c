@@ -49,7 +49,7 @@ static void rpc_printerror(struct rpc_t *rpc)
 	    rpc->u.reply.astatus) {
 		/* rpc_printerror() is called for any RPC related error,
 		 * suppress output if no low level RPC error happened.  */
-		DBG("RPC error: (%d,%d,%d)\n", ntohl(rpc->u.reply.rstatus),
+		DBG("RPC error: (%ld,%ld,%ld)\n", ntohl(rpc->u.reply.rstatus),
 		    ntohl(rpc->u.reply.verifier),
 		    ntohl(rpc->u.reply.astatus));
 	}
@@ -503,14 +503,14 @@ static int nfs ( char *url __unused, struct sockaddr_in *server,
 	mount_server.sin_addr = nfs_server.sin_addr = server->sin_addr;
 	mount_server.sin_port = rpc_lookup(server, PROG_MOUNT, 1, sport);
 	if ( ! mount_server.sin_port ) {
-		DBG ( "Cannot get mount port from %!:%d\n",
-		      server->sin_addr.s_addr, server->sin_port );
+		DBG ( "Cannot get mount port from %s:%d\n",
+		      inet_ntoa ( server->sin_addr ), server->sin_port );
 		return 0;
 	}
 	nfs_server.sin_port = rpc_lookup(server, PROG_NFS, 2, sport);
 	if ( ! mount_server.sin_port ) {
-		DBG ( "Cannot get nfs port from %!:%d\n",
-		      server->sin_addr.s_addr, server->sin_port );
+		DBG ( "Cannot get nfs port from %s:%d\n",
+		      inet_ntoa ( server->sin_addr ), server->sin_port );
 		return 0;
 	}
 

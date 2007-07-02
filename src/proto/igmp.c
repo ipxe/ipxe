@@ -3,11 +3,11 @@
  *
  */
 
-#include "ip.h"
-#include "igmp.h"
-#include "background.h"
-#include "nic.h"
-#include "etherboot.h"
+#include <ip.h>
+#include <igmp.h>
+#include <background.h>
+#include <nic.h>
+#include <etherboot.h>
 
 static unsigned long last_igmpv1 = 0;
 static struct igmptable_t igmptable[MAX_IGMP];
@@ -50,8 +50,7 @@ static void send_igmp_reports ( unsigned long now ) {
 		igmp.igmp.chksum = ipchksum ( &igmp.igmp,
 					      sizeof ( igmp.igmp ) );
 		ip_transmit ( sizeof ( igmp ), &igmp );
-		DBG ( "IGMP sent report to %@\n",
-		      igmp.igmp.group.s_addr );
+		DBG ( "IGMP sent report to %s\n", inet_ntoa ( igmp.igmp.group ) );
 		/* Don't send another igmp report until asked */
 		igmptable[i].time = 0;
 	}
@@ -84,7 +83,7 @@ static void process_igmp ( unsigned long now, unsigned short ptype __unused,
 			interval = ( igmp->response_time * TICKS_PER_SEC ) /10;
 		}
 		
-		DBG ( "IGMP received query for %@\n", igmp->group.s_addr );
+		DBG ( "IGMP received query for %s\n", inet_ntoa ( igmp->group ) );
 		for ( i = 0 ; i < MAX_IGMP ; i++ ) {
 			uint32_t group = igmptable[i].group.s_addr;
 			if ( ( group == 0 ) ||
@@ -101,7 +100,8 @@ static void process_igmp ( unsigned long now, unsigned short ptype __unused,
 	if ( ( ( igmp->type == IGMPv1_REPORT ) ||
 	       ( igmp->type == IGMPv2_REPORT ) ) &&
 	     ( ip->dest.s_addr == igmp->group.s_addr ) ) {
-		DBG ( "IGMP received report for %@\n", igmp->group.s_addr);
+	        DBG ( "IGMP received report for %s\n", 
+		      inet_ntoa ( igmp->group ) );
 		for ( i = 0 ; i < MAX_IGMP ; i++ ) {
 			if ( ( igmptable[i].group.s_addr ==
 			       igmp->group.s_addr ) &&
@@ -142,7 +142,7 @@ void leave_group ( int slot ) {
 		igmp.igmp.group.s_addr = igmptable[slot].group.s_addr;
 		igmp.igmp.chksum = ipchksum ( &igmp.igmp, sizeof ( igmp ) );
 		ip_transmit ( sizeof ( igmp ), &igmp );
-		DBG ( "IGMP left group %@\n", igmp.igmp.group.s_addr );
+		DBG ( "IGMP left group %s\n", inet_ntoa ( igmp.igmp.group ) );
 	}
 	memset ( &igmptable[slot], 0, sizeof ( igmptable[0] ) );
 }
