@@ -3,7 +3,7 @@
 #include <realmode.h>
 #include <gateA20.h>
 #include <memsizes.h>
-#include <dhcp_basemem.h>
+#include <basemem_packet.h>
 #include <gpxe/uaccess.h>
 #include <gpxe/segment.h>
 #include <gpxe/shutdown.h>
@@ -321,7 +321,7 @@ static int nbi_boot16 ( struct image *image, struct imgheader *imgheader ) {
 		  "=b" ( discard_b )
 		: "D" ( imgheader->execaddr.segoff ),
 		  "S" ( imgheader->location ),
-		  "b" ( __from_data16 ( dhcp_basemem ) )
+		  "b" ( __from_data16 ( basemem_packet ) )
 		: "ecx", "edx", "ebp" );
 
 	gateA20_set();
@@ -356,7 +356,7 @@ static int nbi_boot32 ( struct image *image, struct imgheader *imgheader ) {
 		: "D" ( imgheader->execaddr.linear ),
 		  "S" ( ( imgheader->location.segment << 4 ) +
 			imgheader->location.offset ),
-		  "b" ( virt_to_phys ( dhcp_basemem ) ),
+		  "b" ( virt_to_phys ( basemem_packet ) ),
 		  "a" ( virt_to_phys ( &loaderinfo ) )
 		: "ecx", "edx", "ebp", "memory" );
 
@@ -397,8 +397,8 @@ static int nbi_prepare_dhcp ( struct image *image ) {
 		return -ENODEV;
 	}
 
-	if ( ( rc = create_dhcp_packet ( boot_netdev, DHCPACK,
-					 dhcp_basemem, sizeof ( dhcp_basemem ),
+	if ( ( rc = create_dhcp_packet ( boot_netdev, DHCPACK, basemem_packet,
+					 sizeof ( basemem_packet ),
 					 &dhcppkt ) ) != 0 ) {
 		DBGC ( image, "NBI %p failed to build DHCP packet\n", image );
 		return rc;

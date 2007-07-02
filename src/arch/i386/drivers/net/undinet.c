@@ -22,6 +22,7 @@
 #include <pic8259.h>
 #include <biosint.h>
 #include <pnpbios.h>
+#include <basemem_packet.h>
 #include <gpxe/iobuf.h>
 #include <gpxe/netdevice.h>
 #include <gpxe/if_ether.h>
@@ -314,13 +315,6 @@ static int undinet_isr_triggered ( void ) {
  *****************************************************************************
  */
 
-/** Maximum length of a packet transmitted via the UNDI API */
-#define UNDI_IOB_LEN 1514
-
-/** UNDI I/O buffer */
-static char __data16_array ( undinet_iob, [UNDI_IOB_LEN] );
-#define undinet_iob __use_data16 ( undinet_iob )
-
 /** UNDI transmit buffer descriptor */
 static struct s_PXENV_UNDI_TBD __data16 ( undinet_tbd );
 #define undinet_tbd __use_data16 ( undinet_tbd )
@@ -340,9 +334,9 @@ static int undinet_transmit ( struct net_device *netdev,
 	int rc;
 
 	/* Copy packet to UNDI I/O buffer */
-	if ( len > sizeof ( undinet_iob ) )
-		len = sizeof ( undinet_iob );
-	memcpy ( &undinet_iob, iobuf->data, len );
+	if ( len > sizeof ( basemem_packet ) )
+		len = sizeof ( basemem_packet );
+	memcpy ( &basemem_packet, iobuf->data, len );
 
 	/* Create PXENV_UNDI_TRANSMIT data structure */
 	memset ( &undi_transmit, 0, sizeof ( undi_transmit ) );
@@ -357,7 +351,7 @@ static int undinet_transmit ( struct net_device *netdev,
 	undinet_tbd.ImmedLength = len;
 	undinet_tbd.Xmit.segment = rm_ds;
 	undinet_tbd.Xmit.offset 
-		= ( ( unsigned ) & __from_data16 ( undinet_iob ) );
+		= ( ( unsigned ) & __from_data16 ( basemem_packet ) );
 
 	/* Issue PXE API call */
 	if ( ( rc = undinet_call ( undinic, PXENV_UNDI_TRANSMIT,

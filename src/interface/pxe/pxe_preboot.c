@@ -28,7 +28,7 @@
 #include <stdlib.h>
 #include <gpxe/uaccess.h>
 #include <gpxe/dhcp.h>
-#include <dhcp_basemem.h>
+#include <basemem_packet.h>
 #include "pxe.h"
 #include "pxe_call.h"
 
@@ -99,10 +99,10 @@ PXENV_EXIT_t pxenv_get_cached_info ( struct s_PXENV_GET_CACHED_INFO
 	 */
 	len = get_cached_info->BufferSize;
 	if ( len == 0 ) {
-		len = sizeof ( dhcp_basemem );
+		len = sizeof ( basemem_packet );
 		get_cached_info->Buffer.segment = rm_ds;
 		get_cached_info->Buffer.offset =
-			( unsigned int ) ( & __from_data16 ( dhcp_basemem ) );
+			( unsigned int ) ( & __from_data16 ( basemem_packet ) );
 		get_cached_info->BufferLimit = len;
 	}
 
