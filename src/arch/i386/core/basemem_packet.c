@@ -19,11 +19,12 @@
 /**
  * @file
  *
- * DHCP parameter block provided to external programs in base memory
+ * Packet buffer in base memory.  Used by various components which
+ * need to pass packets to and from external real-mode code.
  *
  */
 
-#include <dhcp_basemem.h>
+#include <basemem_packet.h>
 
-#undef dhcp_basemem
-char __data16_array ( dhcp_basemem, [DHCP_BASEMEM_LEN] );
+#undef basemem_packet
+char __data16_array ( basemem_packet, [BASEMEM_PACKET_LEN] );

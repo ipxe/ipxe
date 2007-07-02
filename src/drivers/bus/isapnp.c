@@ -705,6 +705,8 @@ static int isapnpbus_probe ( struct root_device *rootdev ) {
 			isapnp->dev.desc.bus_type = BUS_TYPE_ISAPNP;
 			isapnp->dev.desc.vendor = isapnp->vendor_id;
 			isapnp->dev.desc.device = isapnp->prod_id;
+			isapnp->dev.desc.ioaddr = isapnp->ioaddr;
+			isapnp->dev.desc.irq = isapnp->irqno;
 			isapnp->dev.parent = &rootdev->dev;
 			list_add ( &isapnp->dev.siblings,
 				   &rootdev->dev.children );

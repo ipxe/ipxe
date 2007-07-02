@@ -286,6 +286,9 @@ static int pcibus_probe ( struct root_device *rootdev ) {
 			pci->dev.desc.location = PCI_BUSDEVFN (bus, devfn);
 			pci->dev.desc.vendor = pci->vendor;
 			pci->dev.desc.device = pci->device;
+			pci->dev.desc.class = pci->class;
+			pci->dev.desc.ioaddr = pci->ioaddr;
+			pci->dev.desc.irq = pci->irq;
 			pci->dev.parent = &rootdev->dev;
 			list_add ( &pci->dev.siblings, &rootdev->dev.children);
 			INIT_LIST_HEAD ( &pci->dev.children );

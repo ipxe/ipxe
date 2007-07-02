@@ -108,6 +108,7 @@ struct ll_protocol ethernet_protocol __ll_protocol = {
 	.name		= "Ethernet",
 	.ll_proto	= htons ( ARPHRD_ETHER ),
 	.ll_addr_len	= ETH_ALEN,
+	.ll_header_len	= ETH_HLEN,
 	.ll_broadcast	= eth_broadcast,
 	.tx		= eth_tx,
 	.rx		= eth_rx,
