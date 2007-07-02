@@ -95,8 +95,12 @@ void netdev_tx_complete ( struct net_device *netdev, struct io_buffer *iobuf ) {
 	assert ( iobuf->list.next != NULL );
 	assert ( iobuf->list.prev != NULL );
 
+	/* Dequeue and free I/O buffer */
 	list_del ( &iobuf->list );
 	free_iob ( iobuf );
+
+	/* Update statistics counter */
+	netdev->stats.tx_count++;
 }
 
 /**
@@ -140,7 +144,12 @@ static void netdev_tx_flush ( struct net_device *netdev ) {
 void netdev_rx ( struct net_device *netdev, struct io_buffer *iobuf ) {
 	DBGC ( netdev, "NETDEV %p received %p (%p+%zx)\n",
 	       netdev, iobuf, iobuf->data, iob_len ( iobuf ) );
+
+	/* Enqueue packet */
 	list_add_tail ( &iobuf->list, &netdev->rx_queue );
+
+	/* Update statistics counter */
+	netdev->stats.rx_count++;
 }
 
 /**

@@ -129,6 +129,17 @@ struct ll_protocol {
 };
 
 /**
+ * Network device statistics
+ *
+ */
+struct net_device_stats {
+	/** Count of successfully completed transmissions */
+	unsigned int tx_count;
+	/** Count of successfully received packets */
+	unsigned int rx_count;
+};
+
+/**
  * A network device
  *
  * This structure represents a piece of networking hardware.  It has
@@ -215,6 +226,8 @@ struct net_device {
 	struct list_head tx_queue;
 	/** RX packet queue */
 	struct list_head rx_queue;
+	/** Device statistics */
+	struct net_device_stats stats;
 
 	/** Driver private data */
 	void *priv;

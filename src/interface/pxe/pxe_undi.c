@@ -343,28 +343,33 @@ PXENV_EXIT_t pxenv_undi_get_information ( struct s_PXENV_UNDI_GET_INFORMATION
 
 /* PXENV_UNDI_GET_STATISTICS
  *
- * Status: won't implement (would require driver API changes for no
- * real benefit)
+ * Status: working
  */
 PXENV_EXIT_t pxenv_undi_get_statistics ( struct s_PXENV_UNDI_GET_STATISTICS
 					 *undi_get_statistics ) {
 	DBG ( "PXENV_UNDI_GET_STATISTICS" );
 
-	undi_get_statistics->Status = PXENV_STATUS_UNSUPPORTED;
-	return PXENV_EXIT_FAILURE;
+	undi_get_statistics->XmtGoodFrames = pxe_netdev->stats.tx_count;
+	undi_get_statistics->RcvGoodFrames = pxe_netdev->stats.rx_count;
+	undi_get_statistics->RcvCRCErrors = 0;
+	undi_get_statistics->RcvResourceErrors = 0;
+
+	undi_get_statistics->Status = PXENV_STATUS_SUCCESS;
+	return PXENV_EXIT_SUCCESS;
 }
 
 /* PXENV_UNDI_CLEAR_STATISTICS
  *
- * Status: won't implement (would require driver API changes for no
- * real benefit)
+ * Status: working
  */
 PXENV_EXIT_t pxenv_undi_clear_statistics ( struct s_PXENV_UNDI_CLEAR_STATISTICS
 					   *undi_clear_statistics ) {
 	DBG ( "PXENV_UNDI_CLEAR_STATISTICS" );
 
-	undi_clear_statistics->Status = PXENV_STATUS_UNSUPPORTED;
-	return PXENV_EXIT_FAILURE;
+	memset ( &pxe_netdev->stats, 0, sizeof ( pxe_netdev->stats ) );
+
+	undi_clear_statistics->Status = PXENV_STATUS_SUCCESS;
+	return PXENV_EXIT_SUCCESS;
 }
 
 /* PXENV_UNDI_INITIATE_DIAGS
