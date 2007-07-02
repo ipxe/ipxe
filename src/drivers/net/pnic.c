@@ -41,7 +41,7 @@ struct pnic {
  */
 
 static uint16_t pnic_command_quiet ( struct pnic *pnic, uint16_t command,
-				     void *input, uint16_t input_length,
+				     const void *input, uint16_t input_length,
 				     void *output, uint16_t output_max_length,
 				     uint16_t *output_length ) {
 	uint16_t status;
@@ -82,7 +82,7 @@ static uint16_t pnic_command_quiet ( struct pnic *pnic, uint16_t command,
 }
 
 static uint16_t pnic_command ( struct pnic *pnic, uint16_t command,
-			       void *input, uint16_t input_length,
+			       const void *input, uint16_t input_length,
 			       void *output, uint16_t output_max_length,
 			       uint16_t *output_length ) {
 	uint16_t status = pnic_command_quiet ( pnic, command,
@@ -186,15 +186,27 @@ static void pnic_irq ( struct net_device *netdev, irq_action_t action ) {
 /**************************************************************************
 OPEN - Open network device
 ***************************************************************************/
-static int pnic_open ( struct net_device *netdev __unused ) {
+static int pnic_open ( struct net_device *netdev ) {
+	struct pnic *pnic = netdev->priv;
+	static const uint8_t enable = 1;
+
+	/* Enable interrupts */
+	pnic_command ( pnic, PNIC_CMD_MASK_IRQ, &enable,
+		       sizeof ( enable ), NULL, 0, NULL );
+	
 	return 0;
 }
 
 /**************************************************************************
 CLOSE - Close network device
 ***************************************************************************/
-static void pnic_close ( struct net_device *netdev __unused ) {
-	/* Nothing to do */
+static void pnic_close ( struct net_device *netdev ) {
+	struct pnic *pnic = netdev->priv;
+	static const uint8_t disable = 0;
+
+	/* Disable interrupts */
+	pnic_command ( pnic, PNIC_CMD_MASK_IRQ, &disable,
+		       sizeof ( disable ), NULL, 0, NULL );
 }
 
 /**************************************************************************
