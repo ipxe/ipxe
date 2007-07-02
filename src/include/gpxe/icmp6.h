@@ -32,7 +32,7 @@ struct neighbour_solicit {
 	/* "Compulsory" options */
 	uint8_t opt_type;
 	uint8_t opt_len;
-#warning hack alert
+  /* FIXME:  hack alert */
 	uint8_t opt_ll_addr[6];
 };
 
@@ -45,7 +45,7 @@ struct neighbour_advert {
 	struct in6_addr target;
 	uint8_t opt_type;
 	uint8_t opt_len;
-#warning hack alert
+  /* FIXME:  hack alert */
 	uint8_t opt_ll_addr[6];
 };
 
