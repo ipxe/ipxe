@@ -281,8 +281,7 @@ static int arp_rx ( struct io_buffer *iobuf, struct net_device *netdev,
  *
  * This operation is meaningless for the ARP protocol.
  */
-static const char *
-arp_ntoa ( const void *net_addr __attribute__ (( unused )) ) {
+static const char * arp_ntoa ( const void *net_addr __unused ) {
 	return "<ARP>";
 }
 

@@ -23,12 +23,18 @@
  */
 
 #include <stdint.h>
+#include <stdio.h>
 #include <string.h>
 #include <byteswap.h>
+#include <basemem_packet.h>
 #include <gpxe/netdevice.h>
+#include <gpxe/iobuf.h>
 #include <gpxe/device.h>
 #include <gpxe/pci.h>
 #include <gpxe/if_ether.h>
+#include <gpxe/ip.h>
+#include <gpxe/arp.h>
+#include <gpxe/rarp.h>
 #include <gpxe/shutdown.h>
 #include "pxe.h"
 
@@ -128,61 +134,76 @@ PXENV_EXIT_t pxenv_undi_close ( struct s_PXENV_UNDI_CLOSE *undi_close ) {
  */
 PXENV_EXIT_t pxenv_undi_transmit ( struct s_PXENV_UNDI_TRANSMIT
 				   *undi_transmit ) {
-	struct s_PXENV_UNDI_TBD *tbd;
-	const char *dest;
-	unsigned int type;
-	unsigned int length;
-	const char *data;
+	struct s_PXENV_UNDI_TBD tbd;
+	struct DataBlk *datablk;
+	struct io_buffer *iobuf;
+	struct net_protocol *net_protocol;
+	char destaddr[MAX_LL_ADDR_LEN];
+	const void *ll_dest;
+	size_t len;
+	unsigned int i;
+	int rc;
 
 	DBG ( "PXENV_UNDI_TRANSMIT" );
 
-#if 0
-	/* We support only the "immediate" portion of the TBD.  Who
-	 * knows what Intel's "engineers" were smoking when they came
-	 * up with the array of transmit data blocks...
-	 */
-	tbd = SEGOFF16_TO_PTR ( undi_transmit->TBD );
-	if ( tbd->DataBlkCount > 0 ) {
-		undi_transmit->Status = PXENV_STATUS_UNDI_INVALID_PARAMETER;
-		return PXENV_EXIT_FAILURE;
-	}
-	data = SEGOFF16_TO_PTR ( tbd->Xmit );
-	length = tbd->ImmedLength;
-
-	/* If destination is broadcast, we need to supply the MAC address */
-	if ( undi_transmit->XmitFlag == XMT_BROADCAST ) {
-		dest = broadcast_mac;
-	} else {
-		dest = SEGOFF16_TO_PTR ( undi_transmit->DestAddr );
-	}
-
-	/* We can't properly support P_UNKNOWN without rewriting all
-	 * the driver transmit() methods, so we cheat: if P_UNKNOWN is
-	 * specified we rip the destination address and type out of
-	 * the pre-assembled packet, then skip over the header.
-	 */
+	/* Identify network-layer protocol */
 	switch ( undi_transmit->Protocol ) {
-	case P_IP:	type = ETH_P_IP;	break;
-	case P_ARP:	type = ETH_P_ARP;	break;
-	case P_RARP:	type = ETH_P_RARP;	break;
-	case P_UNKNOWN:
-		media_header = (media_header_t*)data;
-		dest = media_header->dest;
-		type = ntohs ( media_header->nstype );
-		data += ETH_HLEN;
-		length -= ETH_HLEN;
-		break;
+	case P_IP:	net_protocol = &ipv4_protocol;	break;
+	case P_ARP:	net_protocol = &arp_protocol;	break;
+	case P_RARP:	net_protocol = &rarp_protocol;	break;
+	case P_UNKNOWN:	net_protocol = NULL;		break;
 	default:
 		undi_transmit->Status = PXENV_STATUS_UNDI_INVALID_PARAMETER;
 		return PXENV_EXIT_FAILURE;
 	}
 
-	/* Send the packet */
-	eth_transmit ( dest, type, length, data );
-#endif
-	
-	undi_transmit->Status = PXENV_STATUS_SUCCESS;
-	return PXENV_EXIT_SUCCESS;
+	/* Calculate total packet length */
+	copy_from_real ( &tbd, undi_transmit->TBD.segment,
+			 undi_transmit->TBD.offset, sizeof ( tbd ) );
+	len = tbd.ImmedLength;
+	for ( i = 0 ; i < tbd.DataBlkCount ; i++ ) {
+		datablk = &tbd.DataBlock[i];
+		len += datablk->TDDataLen;
+	}
+
+	/* Allocate and fill I/O buffer */
+	iobuf = alloc_iob ( len );
+	if ( ! iobuf ) {
+		undi_transmit->Status = PXENV_STATUS_OUT_OF_RESOURCES;
+		return PXENV_EXIT_FAILURE;
+	}
+	copy_from_real ( iob_put ( iobuf, tbd.ImmedLength ), tbd.Xmit.segment,
+			 tbd.Xmit.offset, tbd.ImmedLength );
+	for ( i = 0 ; i < tbd.DataBlkCount ; i++ ) {
+		datablk = &tbd.DataBlock[i];
+		copy_from_real ( iob_put ( iobuf, datablk->TDDataLen ),
+				 datablk->TDDataPtr.segment,
+				 datablk->TDDataPtr.offset,
+				 datablk->TDDataLen );
+	}
+
+	/* Transmit packet */
+	if ( net_protocol == NULL ) {
+		/* Link-layer header already present */
+		rc = netdev_tx ( pxe_netdev, iobuf );
+	} else {
+		/* Calculate destination address */
+		if ( undi_transmit->XmitFlag == XMT_DESTADDR ) {
+			copy_from_real ( destaddr,
+					 undi_transmit->DestAddr.segment,
+					 undi_transmit->DestAddr.offset,
+					 pxe_netdev->ll_protocol->ll_addr_len );
+			ll_dest = destaddr;
+		} else {
+			ll_dest = pxe_netdev->ll_protocol->ll_broadcast;
+		}
+		rc = net_tx ( iobuf, pxe_netdev, net_protocol, ll_dest );
+	}
+
+#warning "TX completion?"
+
+	undi_transmit->Status = PXENV_STATUS ( rc );
+	return ( ( rc == 0 ) ? PXENV_EXIT_SUCCESS : PXENV_EXIT_FAILURE );
 }
 
 /* PXENV_UNDI_SET_MCAST_ADDRESS
@@ -405,16 +426,15 @@ PXENV_EXIT_t pxenv_undi_get_iface_info ( struct s_PXENV_UNDI_GET_IFACE_INFO
 					 *undi_get_iface_info ) {
 	DBG ( "PXENV_UNDI_GET_IFACE_INFO" );
 
-#if 0
 	/* Just hand back some info, doesn't really matter what it is.
 	 * Most PXE stacks seem to take this approach.
 	 */
-	sprintf ( undi_get_iface_info->IfaceType, "Etherboot" );
+	snprintf ( ( char * ) undi_get_iface_info->IfaceType,
+		   sizeof ( undi_get_iface_info->IfaceType ), "Etherboot" );
 	undi_get_iface_info->LinkSpeed = 10000000; /* 10 Mbps */
 	undi_get_iface_info->ServiceFlags = 0;
 	memset ( undi_get_iface_info->Reserved, 0,
 		 sizeof(undi_get_iface_info->Reserved) );
-#endif
 
 	undi_get_iface_info->Status = PXENV_STATUS_SUCCESS;
 	return PXENV_EXIT_SUCCESS;
@@ -437,18 +457,11 @@ PXENV_EXIT_t pxenv_undi_get_state ( struct s_PXENV_UNDI_GET_STATE
  * Status: working
  */
 PXENV_EXIT_t pxenv_undi_isr ( struct s_PXENV_UNDI_ISR *undi_isr ) {
+	struct io_buffer *iobuf;
+	size_t len;
+
 	DBG ( "PXENV_UNDI_ISR" );
 
-#if 0
-	/* We can't call ENSURE_READY, because this could be being
-	 * called as part of an interrupt service routine.  Instead,
-	 * we should simply die if we're not READY.
-	 */
-	if ( ( pxe_stack == NULL ) || ( pxe_stack->state < READY ) ) {
-		undi_isr->Status = PXENV_STATUS_UNDI_INVALID_STATE;
-		return PXENV_EXIT_FAILURE;
-	}
-	
 	/* Just in case some idiot actually looks at these fields when
 	 * we weren't meant to fill them in...
 	 */
@@ -460,18 +473,14 @@ PXENV_EXIT_t pxenv_undi_isr ( struct s_PXENV_UNDI_ISR *undi_isr ) {
 
 	switch ( undi_isr->FuncFlag ) {
 	case PXENV_UNDI_ISR_IN_START :
-		/* Is there a packet waiting?  If so, disable
-		 * interrupts on the NIC and return "it's ours".  Do
-		 * *not* necessarily acknowledge the interrupt; this
-		 * can happen later when eth_poll(1) is called.  As
-		 * long as the interrupt is masked off so that it
-		 * doesn't immediately retrigger the 8259A then all
-		 * should be well.
-		 */
 		DBG ( " START" );
-		if ( eth_poll ( 0 ) ) {
+
+		/* Call poll().  This should acknowledge the device
+		 * interrupt and queue up any received packet.
+		 */
+		if ( netdev_poll ( pxe_netdev, -1U ) ) {
+			/* Packet waiting in queue */
 			DBG ( " OURS" );
-			eth_irq ( DISABLE );
 			undi_isr->FuncFlag = PXENV_UNDI_ISR_OUT_OURS;
 		} else {
 			DBG ( " NOT_OURS" );
@@ -479,62 +488,48 @@ PXENV_EXIT_t pxenv_undi_isr ( struct s_PXENV_UNDI_ISR *undi_isr ) {
 		}
 		break;
 	case PXENV_UNDI_ISR_IN_PROCESS :
-		/* Call poll(), return packet.  If no packet, return "done".
-		 */
-		DBG ( " PROCESS" );
-		if ( eth_poll ( 1 ) ) {
-			DBG ( " RECEIVE %d", nic.packetlen );
-			if ( nic.packetlen > sizeof(pxe_stack->packet) ) {
-				/* Should never happen */
-				undi_isr->FuncFlag = PXENV_UNDI_ISR_OUT_DONE;
-				undi_isr->Status =
-					PXENV_STATUS_OUT_OF_RESOURCES;
-				return PXENV_EXIT_FAILURE;
-			}
-			undi_isr->FuncFlag = PXENV_UNDI_ISR_OUT_RECEIVE;
-			undi_isr->BufferLength = nic.packetlen;
-			undi_isr->FrameLength = nic.packetlen;
-			undi_isr->FrameHeaderLength = ETH_HLEN;
-			memcpy ( pxe_stack->packet, nic.packet, nic.packetlen);
-			PTR_TO_SEGOFF16 ( pxe_stack->packet, undi_isr->Frame );
-			switch ( ntohs(media_header->nstype) ) {
-			case ETH_P_IP:	undi_isr->ProtType = P_IP;	break;
-			case ETH_P_ARP:	undi_isr->ProtType = P_ARP;	break;
-			case ETH_P_RARP: undi_isr->ProtType = P_RARP;	break;
-			default :	undi_isr->ProtType = P_UNKNOWN;
-			}
-			if ( memcmp ( media_header->dest, broadcast_mac,
-				      sizeof(broadcast_mac) ) ) {
-				undi_isr->PktType = XMT_BROADCAST;
-			} else {
-				undi_isr->PktType = XMT_DESTADDR;
-			}
-			break;
-		} else {
-			/* No break - fall through to IN_GET_NEXT */
-		}
 	case PXENV_UNDI_ISR_IN_GET_NEXT :
-		/* We only ever return one frame at a time */
-		DBG ( " GET_NEXT DONE" );
-		/* Re-enable interrupts */
-		eth_irq ( ENABLE );
-		/* Force an interrupt if there's a packet still
-		 * waiting, since we only handle one packet per
-		 * interrupt.
-		 */
-		if ( eth_poll ( 0 ) ) {
-			DBG ( " (RETRIGGER)" );
-			eth_irq ( FORCE );
+		DBG ( " PROCESS/GET_NEXT" );
+		
+		/* Remove first packet from netdev RX queue */
+		iobuf = netdev_rx_dequeue ( pxe_netdev );
+		if ( ! iobuf ) {
+			/* No more packets remaining */
+			undi_isr->FuncFlag = PXENV_UNDI_ISR_OUT_DONE;
+			break;
 		}
-		undi_isr->FuncFlag = PXENV_UNDI_ISR_OUT_DONE;
+
+		/* Copy packet to base memory buffer */
+		len = iob_len ( iobuf );
+		DBG ( " RECEIVE %zd", len );
+		if ( len > sizeof ( basemem_packet ) ) {
+			/* Should never happen */
+			undi_isr->FuncFlag = PXENV_UNDI_ISR_OUT_DONE;
+			undi_isr->Status = PXENV_STATUS_OUT_OF_RESOURCES;
+			return PXENV_EXIT_FAILURE;
+		}
+		memcpy ( basemem_packet, iobuf->data, len );
+
+		undi_isr->FuncFlag = PXENV_UNDI_ISR_OUT_RECEIVE;
+		undi_isr->BufferLength = len;
+		undi_isr->FrameLength = len;
+		undi_isr->FrameHeaderLength =
+			pxe_netdev->ll_protocol->ll_header_len;
+		undi_isr->Frame.segment = rm_ds;
+		undi_isr->Frame.offset =
+			( ( unsigned ) & __from_data16 ( basemem_packet ) );
+		/* Probably ought to fill in packet type */
+		undi_isr->ProtType = P_UNKNOWN;
+		undi_isr->PktType = XMT_DESTADDR;
 		break;
 	default :
+		DBG ( " INVALID(%04x)", undi_isr->FuncFlag );
+
 		/* Should never happen */
 		undi_isr->FuncFlag = PXENV_UNDI_ISR_OUT_DONE;
 		undi_isr->Status = PXENV_STATUS_UNDI_INVALID_PARAMETER;
 		return PXENV_EXIT_FAILURE;
 	}
-#endif
 
 	undi_isr->Status = PXENV_STATUS_SUCCESS;
 	return PXENV_EXIT_SUCCESS;

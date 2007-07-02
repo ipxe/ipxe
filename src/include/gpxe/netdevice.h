@@ -122,6 +122,8 @@ struct ll_protocol {
 	uint16_t ll_proto;
 	/** Link-layer address length */
 	uint8_t ll_addr_len;
+	/** Link-layer header length */
+	uint8_t ll_header_len;
 	/** Link-layer broadcast address */
 	const uint8_t *ll_broadcast;
 };

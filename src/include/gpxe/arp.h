@@ -30,6 +30,8 @@ struct arp_net_protocol {
 #define __arp_net_protocol \
 	__table ( struct arp_net_protocol, arp_net_protocols, 01 )
 
+extern struct net_protocol arp_protocol;
+
 extern int arp_resolve ( struct net_device *netdev,
 			 struct net_protocol *net_protocol,
 			 const void *dest_net_addr,
