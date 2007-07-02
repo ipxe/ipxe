@@ -29,6 +29,7 @@
 #include <gpxe/pci.h>
 #include <gpxe/isapnp.h>
 #include <gpxe/if_ether.h>
+#include <gpxe/shutdown.h>
 #include "pxe.h"
 
 /* PXENV_UNDI_STARTUP
@@ -84,6 +85,8 @@ PXENV_EXIT_t pxenv_undi_reset_adapter ( struct s_PXENV_UNDI_RESET
 PXENV_EXIT_t pxenv_undi_shutdown ( struct s_PXENV_UNDI_SHUTDOWN
 				   *undi_shutdown ) {
 	DBG ( "PXENV_UNDI_SHUTDOWN" );
+
+	shutdown();
 
 	undi_shutdown->Status = PXENV_STATUS_SUCCESS;
 	return PXENV_EXIT_SUCCESS;
