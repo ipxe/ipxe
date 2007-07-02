@@ -27,6 +27,12 @@ struct device_description {
 	unsigned int vendor;
 	/** Device ID */
 	unsigned int device;
+	/** Device class */
+	unsigned long class;
+	/** I/O address */
+	unsigned long ioaddr;
+	/** IRQ */
+	unsigned int irq;
 };
 
 /** PCI bus type */

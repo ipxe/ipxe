@@ -24,10 +24,10 @@
 
 #include <stdint.h>
 #include <string.h>
+#include <byteswap.h>
 #include <gpxe/netdevice.h>
 #include <gpxe/device.h>
 #include <gpxe/pci.h>
-#include <gpxe/isapnp.h>
 #include <gpxe/if_ether.h>
 #include <gpxe/shutdown.h>
 #include "pxe.h"
@@ -200,30 +200,30 @@ pxenv_undi_set_mcast_address ( struct s_PXENV_UNDI_SET_MCAST_ADDRESS
 
 /* PXENV_UNDI_SET_STATION_ADDRESS
  *
- * Status: working (deliberately incomplete)
+ * Status: working
  */
 PXENV_EXIT_t 
 pxenv_undi_set_station_address ( struct s_PXENV_UNDI_SET_STATION_ADDRESS
 				 *undi_set_station_address ) {
+
 	DBG ( "PXENV_UNDI_SET_STATION_ADDRESS" );
 
-#if 0
-	/* We don't offer a facility to set the MAC address; this
-	 * would require adding extra code to all the Etherboot
-	 * drivers, for very little benefit.  If we're setting it to
-	 * the current value anyway then return success, otherwise
-	 * return UNSUPPORTED.
+	/* If adapter is open, the change will have no effect; return
+	 * an error
 	 */
-	if ( memcmp ( nic.node_addr,
-		      &undi_set_station_address->StationAddress,
-		      ETH_ALEN ) == 0 ) {
-		undi_set_station_address->Status = PXENV_STATUS_SUCCESS;
-		return PXENV_EXIT_SUCCESS;
+	if ( pxe_netdev->state & NETDEV_OPEN ) {
+		undi_set_station_address->Status =
+			PXENV_STATUS_UNDI_INVALID_STATE;
+		return PXENV_EXIT_FAILURE;
 	}
-#endif
 
-	undi_set_station_address->Status = PXENV_STATUS_UNSUPPORTED;
-	return PXENV_EXIT_FAILURE;
+	/* Update MAC address */
+	memcpy ( pxe_netdev->ll_addr,
+		 &undi_set_station_address->StationAddress,
+		 pxe_netdev->ll_protocol->ll_addr_len );
+
+	undi_set_station_address = PXENV_STATUS_SUCCESS;
+	return PXENV_EXIT_SUCCESS;
 }
 
 /* PXENV_UNDI_SET_PACKET_FILTER
@@ -248,33 +248,11 @@ PXENV_EXIT_t pxenv_undi_get_information ( struct s_PXENV_UNDI_GET_INFORMATION
 					  *undi_get_information ) {
 	struct device *dev = pxe_netdev->dev;
 	struct ll_protocol *ll_protocol = pxe_netdev->ll_protocol;
-	unsigned int ioaddr;
-	unsigned int irqno;
 
 	DBG ( "PXENV_UNDI_GET_INFORMATION" );
 
-	switch ( dev->desc.bus_type ) {
-	case BUS_TYPE_PCI: {
-		struct pci_device *pci =
-			container_of ( dev, struct pci_device, dev );
-
-		ioaddr = pci->ioaddr;
-		irqno = pci->irq;
-		break; }
-	case BUS_TYPE_ISAPNP: {
-		struct isapnp_device *isapnp =
-			container_of ( dev, struct isapnp_device, dev );
-
-		ioaddr = isapnp->ioaddr;
-		irqno = isapnp->irqno;
-		break; }
-	default:
-		undi_get_information->Status = PXENV_STATUS_FAILURE;
-		return PXENV_EXIT_FAILURE;
-	}
-
-	undi_get_information->BaseIo = ioaddr;
-	undi_get_information->IntNumber = irqno;
+	undi_get_information->BaseIo = dev->desc.ioaddr;
+	undi_get_information->IntNumber = dev->desc.irq;
 	/* Cheat: assume all cards can cope with this */
 	undi_get_information->MaxTranUnit = ETH_MAX_MTU;
 	undi_get_information->HwType = ntohs ( ll_protocol->ll_proto );
@@ -384,17 +362,15 @@ PXENV_EXIT_t pxenv_undi_get_nic_type ( struct s_PXENV_UNDI_GET_NIC_TYPE
 
 	switch ( dev->desc.bus_type ) {
 	case BUS_TYPE_PCI: {
-		struct pci_device *pci =
-			container_of ( dev, struct pci_device, dev );
 		struct pci_nic_info *info = &undi_get_nic_type->info.pci;
 
 		undi_get_nic_type->NicType = PCI_NIC;
-		info->Vendor_ID = pci->vendor;
-		info->Dev_ID = pci->device;
-		info->Base_Class = PCI_BASE_CLASS ( pci->class );
-		info->Sub_Class = PCI_SUB_CLASS ( pci->class );
-		info->Prog_Intf = PCI_PROG_INTF ( pci->class );
-		info->BusDevFunc = PCI_BUSDEVFN ( pci->bus, pci->devfn );
+		info->Vendor_ID = dev->desc.vendor;
+		info->Dev_ID = dev->desc.device;
+		info->Base_Class = PCI_BASE_CLASS ( dev->desc.class );
+		info->Sub_Class = PCI_SUB_CLASS ( dev->desc.class );
+		info->Prog_Intf = PCI_PROG_INTF ( dev->desc.class );
+		info->BusDevFunc = dev->desc.location;
 		/* Cheat: remaining fields are probably unnecessary,
 		 * and would require adding extra code to pci.c.
 		 */
@@ -402,14 +378,12 @@ PXENV_EXIT_t pxenv_undi_get_nic_type ( struct s_PXENV_UNDI_GET_NIC_TYPE
 		undi_get_nic_type->info.pci.SubDevice_ID = 0xffff;
 		break; }
 	case BUS_TYPE_ISAPNP: {
-		struct isapnp_device *isapnp =
-			container_of ( dev, struct isapnp_device, dev );
 		struct pnp_nic_info *info = &undi_get_nic_type->info.pnp;
 
 		undi_get_nic_type->NicType = PnP_NIC;
-		info->EISA_Dev_ID = ( ( isapnp->vendor_id << 16 ) |
-				      isapnp->prod_id );
-		info->CardSelNum = isapnp->csn;
+		info->EISA_Dev_ID = ( ( dev->desc.vendor << 16 ) |
+				      dev->desc.device );
+		info->CardSelNum = dev->desc.location;
 		/* Cheat: remaining fields are probably unnecessary,
 		 * and would require adding extra code to isapnp.c.
 		 */

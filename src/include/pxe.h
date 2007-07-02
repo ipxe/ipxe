@@ -137,4 +137,6 @@ struct pcir_header {
 
 extern struct net_device *pxe_netdev;
 
+extern void pxe_set_netdev ( struct net_device *netdev );
+
 #endif /* PXE_H */

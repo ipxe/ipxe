@@ -40,6 +40,7 @@ struct image_type pxe_image_type __image_type ( PROBE_PXE );
  */
 static int pxe_exec ( struct image *image __unused ) {
 	struct net_device *netdev;
+	int rc;
 
 	/* Ensure that PXE stack is ready to use */
 	pxe_init_structures();
@@ -47,11 +48,18 @@ static int pxe_exec ( struct image *image __unused ) {
 
 	/* Arbitrarily pick the first open network device to use for PXE */
 	for_each_netdev ( netdev ) {
-		pxe_netdev = netdev;
+		pxe_set_netdev ( netdev );
 		break;
 	}
 
-	return pxe_start_nbp();
+	/* Start PXE NBP */
+	rc = pxe_start_nbp();
+
+	/* Deactivate PXE */
+	pxe_set_netdev ( NULL );
+	pxe_unhook_int1a();
+
+	return rc;
 }
 
 /**

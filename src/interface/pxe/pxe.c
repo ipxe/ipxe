@@ -22,11 +22,23 @@
  * Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
  */
 
-#include "dev.h"
+#include <gpxe/netdevice.h>
 #include "pxe.h"
 
-#warning "pxe_netdev should hold a persistent reference to the net device"
 struct net_device *pxe_netdev = NULL;
+
+/**
+ * Set network device as current PXE network device
+ *
+ * @v netdev		Network device, or NULL
+ */
+void pxe_set_netdev ( struct net_device *netdev ) {
+	if ( pxe_netdev )
+		netdev_put ( pxe_netdev );
+	pxe_netdev = NULL;
+	if ( netdev )
+		pxe_netdev = netdev_get ( netdev );
+}
 
 #if 0
 
