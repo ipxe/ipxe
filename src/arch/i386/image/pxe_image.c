@@ -38,7 +38,7 @@ struct image_type pxe_image_type __image_type ( PROBE_PXE );
  * @v image		PXE image
  * @ret rc		Return status code
  */
-static int pxe_exec ( struct image *image __unused ) {
+static int pxe_exec ( struct image *image ) {
 	struct net_device *netdev;
 	int rc;
 
@@ -50,6 +50,13 @@ static int pxe_exec ( struct image *image __unused ) {
 	for_each_netdev ( netdev ) {
 		pxe_set_netdev ( netdev );
 		break;
+	}
+
+	/* Many things will break if pxe_netdev is NULL */
+	if ( ! pxe_netdev ) {
+		DBGC ( image, "IMAGE %p could not locate PXE net device\n",
+		       image );
+		return -ENODEV;
 	}
 
 	/* Start PXE NBP */
@@ -80,8 +87,8 @@ int pxe_load ( struct image *image ) {
 
 	/* Verify and prepare segment */
 	if ( ( rc = prep_segment ( buffer, filesz, memsz ) ) != 0 ) {
-		DBG ( "PXE image could not prepare segment: %s\n",
-		      strerror ( rc ) );
+		DBGC ( image, "IMAGE %p could not prepare segment: %s\n",
+		       image, strerror ( rc ) );
 		return rc;
 	}
 
