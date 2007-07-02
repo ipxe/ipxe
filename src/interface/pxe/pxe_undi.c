@@ -49,6 +49,24 @@
  */
 static int undi_tx_count = 0;
 
+/**
+ * Open PXE network device
+ *
+ * @ret rc		Return status code
+ */
+static int pxe_netdev_open ( void ) {
+	return netdev_open ( pxe_netdev );
+}
+
+/**
+ * Close PXE network device
+ *
+ */
+static void pxe_netdev_close ( void ) {
+	netdev_close ( pxe_netdev );
+	undi_tx_count = 0;
+}
+
 /* PXENV_UNDI_STARTUP
  *
  * Status: working
@@ -67,7 +85,7 @@ PXENV_EXIT_t pxenv_undi_startup ( struct s_PXENV_UNDI_STARTUP *undi_startup ) {
 PXENV_EXIT_t pxenv_undi_cleanup ( struct s_PXENV_UNDI_CLEANUP *undi_cleanup ) {
 	DBG ( "PXENV_UNDI_CLEANUP" );
 
-	netdev_close ( pxe_netdev );
+	pxe_netdev_close();
 
 	undi_cleanup->Status = PXENV_STATUS_SUCCESS;
 	return PXENV_EXIT_SUCCESS;
@@ -95,9 +113,8 @@ PXENV_EXIT_t pxenv_undi_reset_adapter ( struct s_PXENV_UNDI_RESET
 
 	DBG ( "PXENV_UNDI_RESET_ADAPTER" );
 
-	netdev_close ( pxe_netdev );
-	undi_tx_count = 0;
-	if ( ( rc = netdev_open ( pxe_netdev ) ) != 0 ) {
+	pxe_netdev_close();
+	if ( ( rc = pxe_netdev_open() ) != 0 ) {
 		undi_reset_adapter->Status = PXENV_STATUS ( rc );
 		return PXENV_EXIT_FAILURE;
 	}
@@ -114,7 +131,7 @@ PXENV_EXIT_t pxenv_undi_shutdown ( struct s_PXENV_UNDI_SHUTDOWN
 				   *undi_shutdown ) {
 	DBG ( "PXENV_UNDI_SHUTDOWN" );
 
-	shutdown();
+	pxe_netdev_close();
 
 	undi_shutdown->Status = PXENV_STATUS_SUCCESS;
 	return PXENV_EXIT_SUCCESS;
@@ -129,7 +146,7 @@ PXENV_EXIT_t pxenv_undi_open ( struct s_PXENV_UNDI_OPEN *undi_open ) {
 
 	DBG ( "PXENV_UNDI_OPEN" );
 
-	if ( ( rc = netdev_open ( pxe_netdev ) ) != 0 ) {
+	if ( ( rc = pxe_netdev_open() ) != 0 ) {
 		undi_open->Status = PXENV_STATUS ( rc );
 		return PXENV_EXIT_FAILURE;
 	}
@@ -145,8 +162,7 @@ PXENV_EXIT_t pxenv_undi_open ( struct s_PXENV_UNDI_OPEN *undi_open ) {
 PXENV_EXIT_t pxenv_undi_close ( struct s_PXENV_UNDI_CLOSE *undi_close ) {
 	DBG ( "PXENV_UNDI_CLOSE" );
 
-	netdev_close ( pxe_netdev );
-	undi_tx_count = 0;
+	pxe_netdev_close();
 
 	undi_close->Status = PXENV_STATUS_SUCCESS;
 	return PXENV_EXIT_SUCCESS;
