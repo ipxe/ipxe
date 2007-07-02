@@ -72,7 +72,7 @@ int icmp6_send_solicit ( struct net_device *netdev, struct in6_addr *src __unuse
  * @v st_dest	Destination address
  */
 static int icmp6_rx ( struct io_buffer *iobuf, struct sockaddr_tcpip *st_src,
-		      struct sockaddr_tcpip *st_dest ) {
+		      struct sockaddr_tcpip *st_dest, __unused uint16_t pshdr_csum ) {
 	struct icmp6_header *icmp6hdr = iobuf->data;
 
 	/* Sanity check */
