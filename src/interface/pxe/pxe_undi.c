@@ -38,6 +38,17 @@
 #include <gpxe/shutdown.h>
 #include "pxe.h"
 
+/**
+ * Count of outstanding transmitted packets
+ *
+ * This is incremented each time PXENV_UNDI_TRANSMIT is called, and
+ * decremented each time that PXENV_UNDI_ISR is called with the TX
+ * queue empty, stopping when the count reaches zero.  This allows us
+ * to provide a pessimistic approximation of TX completion events to
+ * the PXE NBP simply by monitoring the netdev's TX queue.
+ */
+static int undi_tx_count = 0;
+
 /* PXENV_UNDI_STARTUP
  *
  * Status: working
@@ -55,6 +66,8 @@ PXENV_EXIT_t pxenv_undi_startup ( struct s_PXENV_UNDI_STARTUP *undi_startup ) {
  */
 PXENV_EXIT_t pxenv_undi_cleanup ( struct s_PXENV_UNDI_CLEANUP *undi_cleanup ) {
 	DBG ( "PXENV_UNDI_CLEANUP" );
+
+	netdev_close ( pxe_netdev );
 
 	undi_cleanup->Status = PXENV_STATUS_SUCCESS;
 	return PXENV_EXIT_SUCCESS;
@@ -78,7 +91,16 @@ PXENV_EXIT_t pxenv_undi_initialize ( struct s_PXENV_UNDI_INITIALIZE
  */
 PXENV_EXIT_t pxenv_undi_reset_adapter ( struct s_PXENV_UNDI_RESET
 					*undi_reset_adapter ) {
+	int rc;
+
 	DBG ( "PXENV_UNDI_RESET_ADAPTER" );
+
+	netdev_close ( pxe_netdev );
+	undi_tx_count = 0;
+	if ( ( rc = netdev_open ( pxe_netdev ) ) != 0 ) {
+		undi_reset_adapter->Status = PXENV_STATUS ( rc );
+		return PXENV_EXIT_FAILURE;
+	}
 
 	undi_reset_adapter->Status = PXENV_STATUS_SUCCESS;
 	return PXENV_EXIT_SUCCESS;
@@ -103,15 +125,14 @@ PXENV_EXIT_t pxenv_undi_shutdown ( struct s_PXENV_UNDI_SHUTDOWN
  * Status: working
  */
 PXENV_EXIT_t pxenv_undi_open ( struct s_PXENV_UNDI_OPEN *undi_open ) {
+	int rc;
+
 	DBG ( "PXENV_UNDI_OPEN" );
 
-#if 0
-	/* PXESPEC: This is where we choose to enable interrupts.
-	 * Can't actually find where we're meant to in the PXE spec,
-	 * but this should work.
-	 */
-	eth_irq ( ENABLE );
-#endif
+	if ( ( rc = netdev_open ( pxe_netdev ) ) != 0 ) {
+		undi_open->Status = PXENV_STATUS ( rc );
+		return PXENV_EXIT_FAILURE;
+	}
 
 	undi_open->Status = PXENV_STATUS_SUCCESS;
 	return PXENV_EXIT_SUCCESS;
@@ -123,6 +144,9 @@ PXENV_EXIT_t pxenv_undi_open ( struct s_PXENV_UNDI_OPEN *undi_open ) {
  */
 PXENV_EXIT_t pxenv_undi_close ( struct s_PXENV_UNDI_CLOSE *undi_close ) {
 	DBG ( "PXENV_UNDI_CLOSE" );
+
+	netdev_close ( pxe_netdev );
+	undi_tx_count = 0;
 
 	undi_close->Status = PXENV_STATUS_SUCCESS;
 	return PXENV_EXIT_SUCCESS;
@@ -200,7 +224,8 @@ PXENV_EXIT_t pxenv_undi_transmit ( struct s_PXENV_UNDI_TRANSMIT
 		rc = net_tx ( iobuf, pxe_netdev, net_protocol, ll_dest );
 	}
 
-#warning "TX completion?"
+	/* Flag transmission as in-progress */
+	undi_tx_count++;
 
 	undi_transmit->Status = PXENV_STATUS ( rc );
 	return ( ( rc == 0 ) ? PXENV_EXIT_SUCCESS : PXENV_EXIT_FAILURE );
@@ -490,7 +515,16 @@ PXENV_EXIT_t pxenv_undi_isr ( struct s_PXENV_UNDI_ISR *undi_isr ) {
 	case PXENV_UNDI_ISR_IN_PROCESS :
 	case PXENV_UNDI_ISR_IN_GET_NEXT :
 		DBG ( " PROCESS/GET_NEXT" );
-		
+
+		/* If we have not yet marked a TX as complete, and the
+		 * netdev TX queue is empty, report the TX completion.
+		 */
+		if ( undi_tx_count && list_empty ( &pxe_netdev->tx_queue ) ) {
+			undi_tx_count--;
+			undi_isr->FuncFlag = PXENV_UNDI_ISR_OUT_TRANSMIT;
+			break;
+		}
+
 		/* Remove first packet from netdev RX queue */
 		iobuf = netdev_rx_dequeue ( pxe_netdev );
 		if ( ! iobuf ) {
