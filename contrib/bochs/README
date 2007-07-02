@@ -27,7 +27,7 @@ To get bochs running is fairly simple:
       pushd bochs
       ./configure --enable-all-optimisations --enable-pci --enable-pnic \
                   --enable-debugger --enable-magic-breakpoints \
-		  --enable-disasm --enable-show-ips
+		  --enable-disasm --enable-show-ips --enable-ne2000
       popd
 
 4.  Build bochs:

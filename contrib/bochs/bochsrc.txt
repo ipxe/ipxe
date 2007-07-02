@@ -145,6 +145,7 @@ megs: 32
 #optromimage3: file=optionalrom.bin, address=0xd2000
 #optromimage4: file=optionalrom.bin, address=0xd3000
 optromimage1: file=../../src/bin/pnic.rom, address=0xd0000
+#optromimage1: file=../../src/bin/rtl8029.rom, address=0xd0000
 
 #optramimage1: file=/path/file1.img, address=0x0010000
 #optramimage2: file=/path/file2.img, address=0x0020000
@@ -631,6 +632,7 @@ private_colormap: enabled=0
 # ne2k: ioaddr=0x240, irq=9, mac=b0:c4:20:00:00:01, ethmod=vde, ethdev="/tmp/vde.ctl"
 # ne2k: ioaddr=0x240, irq=9, mac=b0:c4:20:00:00:01, ethmod=vnet, ethdev="c:/temp"
 pnic: mac=fe:fd:00:00:00:01, ethmod=tuntap, ethdev=/dev/net/tun:tap0
+#ne2k: ioaddr=0x240, irq=9, mac=fe:fd:00:00:00:01, ethmod=tuntap, ethdev=/dev/net/tun:tap0
 
 #=======================================================================
 # KEYBOARD_MAPPING:
@@ -684,6 +686,7 @@ user_shortcut: keys=ctrl-alt-del
 #   i440fxsupport: enabled=1, slot1=pcivga, slot2=ne2k
 #=======================================================================
 i440fxsupport: enabled=1, slot1=pcipnic
+#i440fxsupport: enabled=1, slot1=ne2k
 
 #=======================================================================
 # USB1:
