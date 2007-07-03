@@ -529,7 +529,7 @@ static int isapnp_try_isolate ( void ) {
  *
  */
 static void isapnp_isolate ( void ) {
-	for ( isapnp_read_port = ISAPNP_READ_PORT_MIN ;
+	for ( isapnp_read_port = ISAPNP_READ_PORT_START ;
 	      isapnp_read_port <= ISAPNP_READ_PORT_MAX ;
 	      isapnp_read_port += ISAPNP_READ_PORT_STEP ) {
 		/* Avoid problematic locations such as the NE2000

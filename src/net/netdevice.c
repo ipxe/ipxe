@@ -356,15 +356,17 @@ struct net_device * find_netdev ( const char *name ) {
 /**
  * Get network device by PCI bus:dev.fn address
  *
- * @v busdevfn		PCI bus:dev.fn address
+ * @v bus_type		Bus type
+ * @v location		Bus location
  * @ret netdev		Network device, or NULL
  */
-struct net_device * find_pci_netdev ( unsigned int busdevfn ) {
+struct net_device * find_netdev_by_location ( unsigned int bus_type,
+					      unsigned int location ) {
 	struct net_device *netdev;
 
 	list_for_each_entry ( netdev, &net_devices, list ) {
-		if ( ( netdev->dev->desc.bus_type == BUS_TYPE_PCI ) &&
-		     ( netdev->dev->desc.location == busdevfn ) )
+		if ( ( netdev->dev->desc.bus_type == bus_type ) &&
+		     ( netdev->dev->desc.location == location ) )
 			return netdev;
 	}
 

@@ -289,8 +289,9 @@ netdev_put ( struct net_device *netdev ) {
 }
 
 extern int netdev_tx ( struct net_device *netdev, struct io_buffer *iobuf );
-void netdev_tx_complete ( struct net_device *netdev, struct io_buffer *iobuf );
-void netdev_tx_complete_next ( struct net_device *netdev );
+extern void netdev_tx_complete ( struct net_device *netdev,
+				 struct io_buffer *iobuf );
+extern void netdev_tx_complete_next ( struct net_device *netdev );
 extern void netdev_rx ( struct net_device *netdev, struct io_buffer *iobuf );
 extern int netdev_poll ( struct net_device *netdev, unsigned int rx_quota );
 extern struct io_buffer * netdev_rx_dequeue ( struct net_device *netdev );
@@ -299,9 +300,9 @@ extern int register_netdev ( struct net_device *netdev );
 extern int netdev_open ( struct net_device *netdev );
 extern void netdev_close ( struct net_device *netdev );
 extern void unregister_netdev ( struct net_device *netdev );
-struct net_device * find_netdev ( const char *name );
-struct net_device * find_pci_netdev ( unsigned int busdevfn );
-
+extern struct net_device * find_netdev ( const char *name );
+extern struct net_device * find_netdev_by_location ( unsigned int bus_type,
+						     unsigned int location );
 extern int net_tx ( struct io_buffer *iobuf, struct net_device *netdev,
 		    struct net_protocol *net_protocol, const void *ll_dest );
 extern int net_rx ( struct io_buffer *iobuf, struct net_device *netdev,
