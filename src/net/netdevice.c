@@ -448,13 +448,6 @@ static void net_step ( struct process *process __unused ) {
 }
 
 /** Networking stack process */
-static struct process net_process = {
+struct process net_process __permanent_process = {
 	.step = net_step,
 };
-
-/** Initialise the networking stack process */
-static void init_net ( void ) {
-	process_add ( &net_process );
-}
-
-INIT_FN ( INIT_PROCESS, init_net, NULL, NULL );
