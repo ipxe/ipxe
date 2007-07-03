@@ -302,6 +302,12 @@ static struct nvo_fragment rtl_nvo_fragments[] = {
  */
 static void rtl_reset ( struct rtl8139_nic *rtl ) {
 
+	/* Disable interrupts.  May not be necessary, but datasheet
+	 * doesn't say that the reset command also resets the
+	 * interrupt mask.
+	 */
+	outw ( 0, rtl->ioaddr + IntrMask );
+
 	/* Reset chip */
 	outb ( CmdReset, rtl->ioaddr + ChipCmd );
 	mdelay ( 10 );
@@ -339,6 +345,9 @@ static int rtl_open ( struct net_device *netdev ) {
 	outl ( 0xffffffffUL, rtl->ioaddr + MAR0 + 4 );
 	outl ( ( ( TX_DMA_BURST << 8 ) | ( TX_IPG << 24 ) ),
 	       rtl->ioaddr + TxConfig );
+
+	/* Enable interrupts */
+	outw ( ( ROK | RER | TOK | TER ), rtl->ioaddr + IntrMask );
 
 	return 0;
 }
