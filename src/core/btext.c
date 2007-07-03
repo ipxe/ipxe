@@ -417,7 +417,7 @@ struct console_driver btext_console __console_driver = {
 	.disabled = 1,
 };
 
-INIT_FN ( INIT_CONSOLE, btext_init, NULL, NULL );
+INIT_FN ( INIT_CONSOLE, btext_init, NULL );
 
 
 //come from linux/drivers/video/font-8x16.c

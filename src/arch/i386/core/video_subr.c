@@ -99,4 +99,4 @@ struct console_driver vga_console __console_driver = {
 	.disabled = 1,
 };
 
-INIT_FN ( INIT_CONSOLE, video_init, NULL, NULL );
+INIT_FN ( INIT_CONSOLE, video_init, NULL );

@@ -191,4 +191,4 @@ int timer2_running(void)
 
 #endif /* RTC_CURRTICKS */
 
-INIT_FN ( INIT_TIMERS, setup_timers, NULL, NULL );
+INIT_FN ( INIT_TIMERS, setup_timers, NULL );

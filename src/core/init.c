@@ -23,15 +23,6 @@ void call_init_fns ( void ) {
 	}
 }
 
-void call_reset_fns ( void ) {
-	struct init_fn *init_fn;
-
-	for ( init_fn = init_fns; init_fn < init_fns_end ; init_fn++ ) {
-		if ( init_fn->reset )
-			init_fn->reset ();
-	}
-}
-
 void call_exit_fns ( void ) {
 	struct init_fn *init_fn;
 

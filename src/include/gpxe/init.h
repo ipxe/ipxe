@@ -30,7 +30,6 @@
 
 struct init_fn {
 	void ( *init ) ( void );
-	void ( *reset ) ( void );
 	void ( *exit ) ( void );
 };
 
@@ -44,18 +43,16 @@ struct init_fn {
 #define	INIT_RPC	11
 
 /* Macro for creating an initialisation function table entry */
-#define INIT_FN( init_order, init_func, reset_func, exit_func )	\
+#define INIT_FN( init_order, init_func, exit_func )	\
 	struct init_fn PREFIX_OBJECT(init_fn__)			\
 	    __table ( struct init_fn, init_fn, init_order ) = {	\
 		.init = init_func,				\
-		.reset = reset_func,				\
 		.exit = exit_func,				\
 	};
 
 /* Function prototypes */
 
 void call_init_fns ( void );
-void call_reset_fns ( void );
 void call_exit_fns ( void );
 
 #endif /* _GPXE_INIT_H */

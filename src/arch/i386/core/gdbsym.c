@@ -28,4 +28,4 @@ static void gdb_symbol_line ( void ) {
 	getkey();
 }
 
-INIT_FN ( INIT_GDBSYM, gdb_symbol_line, NULL, NULL );
+INIT_FN ( INIT_GDBSYM, gdb_symbol_line, NULL );

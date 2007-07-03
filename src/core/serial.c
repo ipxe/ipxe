@@ -250,5 +250,5 @@ struct console_driver serial_console __console_driver = {
 	.disabled = 1,
 };
 
-INIT_FN ( INIT_CONSOLE, serial_init, NULL, serial_fini );
+INIT_FN ( INIT_CONSOLE, serial_init, serial_fini );
 

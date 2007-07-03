@@ -608,7 +608,7 @@ nfssymlink:
 	return 1;
 }
 
-INIT_FN ( INIT_RPC, rpc_init, nfs_reset, nfs_reset );
+INIT_FN ( INIT_RPC, rpc_init, nfs_reset );
 
 struct protocol nfs_protocol __protocol = {
 	.name = "nfs",
