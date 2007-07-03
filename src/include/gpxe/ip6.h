@@ -24,7 +24,7 @@
 #define MIN_IOB_LEN	MAX_HDR_LEN + 100 /* To account for padding by LL */
 
 #define IP6_EQUAL( in6_addr1, in6_addr2 ) \
-        ( strncmp ( ( char* ) &( in6_addr1 ), ( char* ) &( in6_addr2 ),\
+        ( memcmp ( ( char* ) &( in6_addr1 ), ( char* ) &( in6_addr2 ),\
 	sizeof ( struct in6_addr ) ) == 0 )
 
 #define IS_UNSPECIFIED( addr ) \

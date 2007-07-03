@@ -204,7 +204,7 @@ static int ipv6_tx ( struct io_buffer *iobuf,
 	 */
 	next_hop = dest->sin6_addr;
 	list_for_each_entry ( miniroute, &miniroutes, list ) {
-		if ( ( strncmp ( &ip6hdr->dest, &miniroute->prefix,
+		if ( ( memcmp ( &ip6hdr->dest, &miniroute->prefix,
 					miniroute->prefix_len ) == 0 ) ||
 		     ( IP6_EQUAL ( miniroute->gateway, ip6_none ) ) ) {
 			netdev = miniroute->netdev;
@@ -295,8 +295,8 @@ static int ipv6_process_nxt_hdr ( struct io_buffer *iobuf, uint8_t nxt_hdr,
  * This function processes a IPv6 packet
  */
 static int ipv6_rx ( struct io_buffer *iobuf,
-		     struct net_device *netdev,
-		     const void *ll_source ) {
+		     __unused struct net_device *netdev,
+		     __unused const void *ll_source ) {
 
 	struct ip6_header *ip6hdr = iobuf->data;
 	union {
@@ -316,7 +316,7 @@ static int ipv6_rx ( struct io_buffer *iobuf,
 	ipv6_dump ( ip6hdr );
 
 	/* Check header version */
-	if ( ip6hdr->ver_traffic_class_flow_label & 0xf0000000 != 0x60000000 ) {
+	if ( ( ip6hdr->ver_traffic_class_flow_label & 0xf0000000 ) != 0x60000000 ) {
 		DBG ( "Invalid protocol version\n" );
 		goto drop;
 	}
