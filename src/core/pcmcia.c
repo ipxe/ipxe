@@ -264,6 +264,4 @@ static void	pcmcia_shutdown_all(void) {
 	printf("Shutdown of PCMCIA subsystem completed");
 }
 
-INIT_FN ( INIT_PCMCIA, pcmcia_init_all, pcmcia_shutdown_all );
-
 #endif
