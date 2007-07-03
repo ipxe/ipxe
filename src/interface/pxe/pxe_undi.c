@@ -480,7 +480,7 @@ PXENV_EXIT_t pxenv_undi_get_iface_info ( struct s_PXENV_UNDI_GET_IFACE_INFO
 	 * Most PXE stacks seem to take this approach.
 	 */
 	snprintf ( ( char * ) undi_get_iface_info->IfaceType,
-		   sizeof ( undi_get_iface_info->IfaceType ), "Etherboot" );
+		   sizeof ( undi_get_iface_info->IfaceType ), "gPXE" );
 	undi_get_iface_info->LinkSpeed = 10000000; /* 10 Mbps */
 	undi_get_iface_info->ServiceFlags = 0;
 	memset ( undi_get_iface_info->Reserved, 0,
