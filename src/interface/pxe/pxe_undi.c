@@ -394,18 +394,15 @@ PXENV_EXIT_t pxenv_undi_initiate_diags ( struct s_PXENV_UNDI_INITIATE_DIAGS
 
 /* PXENV_UNDI_FORCE_INTERRUPT
  *
- * Status: working
+ * Status: won't implement (would require driver API changes for no
+ * perceptible benefit)
  */
 PXENV_EXIT_t pxenv_undi_force_interrupt ( struct s_PXENV_UNDI_FORCE_INTERRUPT
 					  *undi_force_interrupt ) {
 	DBG ( "PXENV_UNDI_FORCE_INTERRUPT" );
 
-#if 0
-	eth_irq ( FORCE );
-#endif
-
-	undi_force_interrupt->Status = PXENV_STATUS_SUCCESS;
-	return PXENV_EXIT_SUCCESS;
+	undi_force_interrupt->Status = PXENV_STATUS_UNSUPPORTED;
+	return PXENV_EXIT_FAILURE;
 }
 
 /* PXENV_UNDI_GET_MCAST_ADDRESS
