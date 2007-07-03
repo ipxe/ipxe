@@ -200,6 +200,14 @@ enum desc_status_bits {
     RxTooLong = 0x00400000
 };
 
+/*Bits in Interrupt Mask register */
+
+enum Intr_mask_register_bits {
+    RxOk       = 0x001,
+    RxErr      = 0x004,
+    TxOk       = 0x040,
+    TxErr      = 0x100 
+};	
 
 
 /*  EEPROM access , values are devices specific*/
@@ -407,6 +415,12 @@ static int nat_open ( struct net_device *netdev ) {
 	/*start the receiver  */
         outl(RxOn, nat->ioaddr + ChipCmd);
 
+	/*enable interrupts*/
+	outl((RxOk|RxErr|TxOk|TxErr),nat->ioaddr + IntrMask); 
+	outl(1,nat->ioaddr +IntrEnable);
+
+
+
 
 	return 0;
 }
@@ -430,6 +444,8 @@ static void nat_close ( struct net_device *netdev ) {
 		
 		free_iob( nat->iobuf[i] );
 	}
+	/* disable interrupts */
+	outl(0,nat->ioaddr +IntrEnable);
 }
 
 /** 
