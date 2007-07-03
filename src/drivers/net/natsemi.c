@@ -1,7 +1,66 @@
-/* natsemi.c - gPXE driver for the NatSemi DP8381x series. 
+/* natsemi.c - gPXE driver for the NatSemi DP8381x series. */
+
+/*
+
  
+   natsemi.c: An Etherboot driver for the NatSemi DP8381x series.
+
+   Copyright (C) 2001 Entity Cyber, Inc.
+   
+   This development of this Etherboot driver was funded by 
+   
+      Sicom Systems: http://www.sicompos.com/
+   
+   Author: Marty Connor (mdc@thinguin.org)	   
+   Adapted from a Linux driver which was written by Donald Becker
+   
+   This software may be used and distributed according to the terms
+   of the GNU Public License (GPL), incorporated herein by reference.
+   
+   Original Copyright Notice:
+   
+   Written/copyright 1999-2001 by Donald Becker.
+   
+   This software may be used and distributed according to the terms of
+   the GNU General Public License (GPL), incorporated herein by reference.
+   Drivers based on or derived from this code fall under the GPL and must
+   retain the authorship, copyright and license notice.  This file is not
+   a complete program and may only be used when the entire operating
+   system is licensed under the GPL.  License for under other terms may be
+   available.  Contact the original author for details.
+   
+   The original author may be reached as becker@scyld.com, or at
+   Scyld Computing Corporation
+   410 Severn Ave., Suite 210
+   Annapolis MD 21403
+   
+   Support information and updates available at
+   http://www.scyld.com/network/netsemi.html
+   
+   References:
+   
+   http://www.scyld.com/expert/100mbps.html
+   http://www.scyld.com/expert/NWay.html
+   Datasheet is available from:
+   http://www.national.com/pf/DP/DP83815.html
 
 */
+
+/* Revision History */
+
+/*
+  02 JUL 2007 Udayan Kumar	 1.2 ported the driver from etherboot to gPXE API
+		      	      	 Added a circular buffer for transmit and receive.
+		                 transmit routine will not wait for transmission to finish
+			         poll routine deals with it.
+
+  13 Dec 2003 timlegge 		1.1 Enabled Multicast Support
+  29 May 2001  mdc     		1.0
+     Initial Release.  		Tested with Netgear FA311 and FA312 boards
+*/
+ 
+
+
 
 #include <stdint.h>
 #include <stdlib.h>
@@ -21,6 +80,10 @@
 
 #define TX_RING_SIZE 4
 #define NUM_RX_DESC  4
+#define RX_BUF_SIZE 1536
+#define OWN       0x80000000
+#define DSIZE     0x00000FFF
+#define CRC_SIZE  4
 
 struct natsemi_tx {
 	uint32_t link;
@@ -46,26 +109,13 @@ struct natsemi_nic {
 	 * give the same.*/
 	struct io_buffer *iobuf[NUM_RX_DESC];
 	/*netdev_tx_complete needs pointer to the iobuf of the data so as to free 
-	  it form the memory.*/
+	  it from the memory.*/
 	struct io_buffer *tx_iobuf[TX_RING_SIZE];
 	struct spi_bit_basher spibit;
 	struct spi_device eeprom;
 	struct nvo_block nvo;
 };
 
-/* Tuning Parameters */
-#define TX_FIFO_THRESH	256	/* In bytes, rounded down to 32 byte units. */
-#define RX_FIFO_THRESH	4	/* Rx buffer level before first PCI xfer.  */
-#define RX_DMA_BURST	4	/* Maximum PCI burst, '4' is 256 bytes */
-#define TX_DMA_BURST	4	/* Calculate as 16<<val. */
-#define TX_IPG		3	/* This is the only valid value */
-//#define RX_BUF_LEN_IDX	0	/*  */
-#define RX_BUF_LEN    8192   /*buffer size should be multiple of 32 */ 
-#define RX_BUF_PAD 4
-#define RX_BUF_SIZE 1536
-#define OWN       0x80000000
-#define DSIZE     0x00000FFF
-#define CRC_SIZE  4
 
 /* NATSEMI: Offsets to the device registers.
    Unlike software-only systems, device drivers interact with complex hardware.
@@ -153,8 +203,6 @@ enum desc_status_bits {
 
 
 /*  EEPROM access , values are devices specific*/
-//#define EE_M1		0x80	/* Mode select bit 1 */
-//#define EE_M0		0x40	/* Mode select bit 0 */
 #define EE_CS		0x08	/* EEPROM chip select */
 #define EE_SK		0x04	/* EEPROM shift clock */
 #define EE_DI		0x01	/* Data in */
@@ -208,7 +256,7 @@ static struct bit_basher_operations nat_basher_ops = {
  * detect that the card is not supporting VPD.
  */
 static struct nvo_fragment nat_nvo_fragments[] = {
-	{ 0x0f, 0x40 },
+	{ 0x0c, 0x40 },
 	{ 0, 0 }
 };
 
@@ -218,8 +266,6 @@ static struct nvo_fragment nat_nvo_fragments[] = {
  * @v NAT		NATSEMI NIC
  */
  void nat_init_eeprom ( struct natsemi_nic *nat ) {
-	int ee9356;
-	int vpd;
 
 	// Initialise three-wire bus 
 	nat->spibit.basher.op = &nat_basher_ops;
@@ -227,18 +273,12 @@ static struct nvo_fragment nat_nvo_fragments[] = {
 	nat->spibit.endianness = SPI_BIT_LITTLE_ENDIAN;
 	init_spi_bit_basher ( &nat->spibit );
 
-	DBG ( "EEPROM is an AT93C46\n" );
+	/*natsemi DP 83815 only supports at93c46 */
 	init_at93c46 ( &nat->eeprom, 16 );
 	nat->eeprom.bus = &nat->spibit.bus;
 
-	// Initialise space for non-volatile options, if available 
-	//vpd = ( inw ( rtl->ioaddr + Config1 ) & VPDEnable );
-	//if ( vpd ) {
-	//	DBG ( "EEPROM in use for VPD; cannot use for options\n" );
-	//} else {
 		nat->nvo.nvs = &nat->eeprom.nvs;
 		nat->nvo.fragments = nat_nvo_fragments;
-//	}
 }
 
 /**
@@ -280,7 +320,6 @@ static void nat_reset ( struct natsemi_nic *nat ) {
  */
 static int nat_open ( struct net_device *netdev ) {
 	struct natsemi_nic *nat = netdev->priv;
-	//struct io_buffer *iobuf;
 	int i;
 	uint32_t tx_config,rx_config;
 	
@@ -296,13 +335,10 @@ static int nat_open ( struct net_device *netdev ) {
 		
 
 
-	/* Program the MAC address TODO enable this comment */
 	 uint8_t last=0;
 	 uint8_t last1=0;
 	 for ( i = 0 ; i < ETH_ALEN ; i+=2 )
 	 {
-	//	DBG("MAC address %d octet :%X %X\n",i,netdev->ll_addr[i],netdev->ll_addr[i+1]);
-	//	DBG("LAst = %d last1 = %d\n",last,last1);
 		outl(i,nat->ioaddr+RxFilterAddr);
 		last1=netdev->ll_addr[i]>>7;
 	 	netdev->ll_addr[i]=netdev->ll_addr[i]<<1|last;
@@ -310,9 +346,6 @@ static int nat_open ( struct net_device *netdev ) {
 		netdev->ll_addr[i+1]=(netdev->ll_addr[i+1]<<1)+last1;
 
 		outw ( netdev->ll_addr[i] + (netdev->ll_addr[i+1]<<8), nat->ioaddr +RxFilterData);
-		//outw ( (fullbyte>>8)+(fullbyte<<8), nat->ioaddr +RxFilterData);
-	//	DBG("MAC address %d octet :%X %X\n",i,netdev->ll_addr[i],netdev->ll_addr[i+1]);
-	//	DBG("LAst = %d last1 = %d\n",last,last1);
 	}
        
 
@@ -417,7 +450,6 @@ static int nat_transmit ( struct net_device *netdev, struct io_buffer *iobuf ) {
 		return -ENOBUFS;
 	}
 
-	//DBG_HD(iobuf->data,iob_len(iobuf));
 	/* to be used in netdev_tx_complete*/
 	nat->tx_iobuf[nat->tx_cur]=iobuf;
 
@@ -432,7 +464,6 @@ static int nat_transmit ( struct net_device *netdev, struct io_buffer *iobuf ) {
 	nat->tx[nat->tx_cur].cmdsts= (uint32_t) iob_len(iobuf)|OWN;
 
 
-	//DBG_HD(bus_to_virt(nat->tx[nat->tx_cur].bufptr), iob_len(iobuf) );
 	nat->tx_cur=(nat->tx_cur+1) % TX_RING_SIZE;
 
 	/*start the transmitter  */
@@ -459,7 +490,6 @@ static void nat_poll ( struct net_device *netdev, unsigned int rx_quota ) {
 	i=nat->tx_dirty;
 	while(i!=nat->tx_cur)
 	{
-		//status=(uint32_t)bus_to_virt(nat->tx[nat->tx_dirty].cmdsts);
 		status=nat->tx[nat->tx_dirty].cmdsts;
 		DBG("value of tx_dirty = %d tx_cur=%d status=%X\n",
 			nat->tx_dirty,nat->tx_cur,status);
@@ -487,9 +517,7 @@ static void nat_poll ( struct net_device *netdev, unsigned int rx_quota ) {
 	}
 			
 	
-	//rx_status=(unsigned int)bus_to_virt(nat->rx[nat->rx_cur].cmdsts); 
 	rx_status=(unsigned int)nat->rx[nat->rx_cur].cmdsts; 
-	//DBG ("Receiver Status = %x\n",rx_status);
 	/* Handle received packets */
 	while (rx_quota && (rx_status & OWN))
 	{
@@ -510,16 +538,14 @@ static void nat_poll ( struct net_device *netdev, unsigned int rx_quota ) {
 				return;
 			memcpy(iob_put(rx_iob,rx_len),
 					bus_to_virt(nat->rx[nat->rx_cur].bufptr),rx_len);
-			//DBG_HD(bus_to_virt(nat->rx[nat->rx_cur].bufptr),rx_len);
 
-			DBG("received packet");
+			DBG("received packet\n");
 			/* add to the receive queue. */
 			netdev_rx(netdev,rx_iob);
 			rx_quota--;
 		}
 		nat->rx[nat->rx_cur].cmdsts = RX_BUF_SIZE;
 		nat->rx_cur=(nat->rx_cur+1) % NUM_RX_DESC;
-		//rx_status=(unsigned int)bus_to_virt(nat->rx[nat->rx_cur].cmdsts); 
 		rx_status=(unsigned int)nat->rx[nat->rx_cur].cmdsts; 
 	}
 
@@ -568,9 +594,7 @@ static int nat_probe ( struct pci_device *pci,
 	nat_init_eeprom ( nat );
 	nvs_read ( &nat->eeprom.nvs, EE_MAC, netdev->ll_addr, ETH_ALEN );
 	uint8_t  eetest[128];	
-	int i;
 	nvs_read ( &nat->eeprom.nvs, 0, eetest,128 );
-	//	DBG_HD(&eetest,128);
 	
 
 	/* mdio routine of etherboot-5.4.0 natsemi driver has been removed and 
@@ -633,10 +657,10 @@ static int nat_probe ( struct pci_device *pci,
 static void nat_remove ( struct pci_device *pci ) {
 	struct net_device *netdev = pci_get_drvdata ( pci );
 	struct natsemi_nic *nat = netdev->priv;
-/* TODO 
-	if ( rtl->nvo.nvs )
-		nvo_unregister ( &rtl->nvo );
-		*/
+ 
+	if ( nat->nvo.nvs )
+		nvo_unregister ( &nat->nvo );
+		
 	unregister_netdev ( netdev );
 	nat_reset ( nat );
 	netdev_put ( netdev );
