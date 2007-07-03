@@ -48,6 +48,21 @@
  */
 static int undi_tx_count = 0;
 
+struct net_device *pxe_netdev = NULL;
+
+/**
+ * Set network device as current PXE network device
+ *
+ * @v netdev		Network device, or NULL
+ */
+void pxe_set_netdev ( struct net_device *netdev ) {
+	if ( pxe_netdev )
+		netdev_put ( pxe_netdev );
+	pxe_netdev = NULL;
+	if ( netdev )
+		pxe_netdev = netdev_get ( netdev );
+}
+
 /**
  * Open PXE network device
  *
