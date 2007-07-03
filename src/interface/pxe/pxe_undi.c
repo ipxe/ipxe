@@ -179,6 +179,7 @@ PXENV_EXIT_t pxenv_undi_transmit ( struct s_PXENV_UNDI_TRANSMIT
 	struct net_protocol *net_protocol;
 	char destaddr[MAX_LL_ADDR_LEN];
 	const void *ll_dest;
+	size_t ll_hlen = pxe_netdev->ll_protocol->ll_header_len;
 	size_t len;
 	unsigned int i;
 	int rc;
@@ -190,27 +191,34 @@ PXENV_EXIT_t pxenv_undi_transmit ( struct s_PXENV_UNDI_TRANSMIT
 	case P_IP:	net_protocol = &ipv4_protocol;	break;
 	case P_ARP:	net_protocol = &arp_protocol;	break;
 	case P_RARP:	net_protocol = &rarp_protocol;	break;
-	case P_UNKNOWN:	net_protocol = NULL;		break;
+	case P_UNKNOWN:
+		net_protocol = NULL;
+		ll_hlen = 0;
+		break;
 	default:
 		undi_transmit->Status = PXENV_STATUS_UNDI_INVALID_PARAMETER;
 		return PXENV_EXIT_FAILURE;
 	}
+	DBG ( " %s", ( net_protocol ? net_protocol->name : "UNKNOWN" ) );
 
 	/* Calculate total packet length */
 	copy_from_real ( &tbd, undi_transmit->TBD.segment,
 			 undi_transmit->TBD.offset, sizeof ( tbd ) );
 	len = tbd.ImmedLength;
+	DBG ( " %zd", tbd.ImmedLength );
 	for ( i = 0 ; i < tbd.DataBlkCount ; i++ ) {
 		datablk = &tbd.DataBlock[i];
 		len += datablk->TDDataLen;
+		DBG ( "+%zd", datablk->TDDataLen );
 	}
 
 	/* Allocate and fill I/O buffer */
-	iobuf = alloc_iob ( len );
+	iobuf = alloc_iob ( ll_hlen + len );
 	if ( ! iobuf ) {
 		undi_transmit->Status = PXENV_STATUS_OUT_OF_RESOURCES;
 		return PXENV_EXIT_FAILURE;
 	}
+	iob_reserve ( iobuf, ll_hlen );
 	copy_from_real ( iob_put ( iobuf, tbd.ImmedLength ), tbd.Xmit.segment,
 			 tbd.Xmit.offset, tbd.ImmedLength );
 	for ( i = 0 ; i < tbd.DataBlkCount ; i++ ) {
