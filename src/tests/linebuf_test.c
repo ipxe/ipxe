@@ -14,16 +14,19 @@ void linebuf_test ( void ) {
 	struct line_buffer linebuf;
 	const char *data = data1;
 	size_t len = ( sizeof ( data1 ) - 1 /* be mean; strip the NUL */ );
+	ssize_t frag_len;
 	char *line;
-	int rc;
 
 	memset ( &linebuf, 0, sizeof ( linebuf ) );
 	while ( len ) {
-		if ( ( rc = line_buffer ( &linebuf, &data, &len ) ) != 0 ) {
+		frag_len = line_buffer ( &linebuf, data, len );
+		if ( frag_len < 0 ) {
 			printf ( "line_buffer() failed: %s\n",
-				 strerror ( rc ) );
+				 strerror ( frag_len ) );
 			return;
 		}
+		data += frag_len;
+		len -= frag_len;
 		if ( ( line = buffered_line ( &linebuf ) ) )
 			printf ( "\"%s\"\n", line );
 	}
