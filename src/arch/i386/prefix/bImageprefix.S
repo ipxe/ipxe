@@ -436,7 +436,7 @@ a20_done:
 	orb	$CR0_PE, %al
 	movl	%eax, %cr0
 
-	DATA32 ljmp %ds:(code32 - setup_code)
+	DATA32 ljmp *%ds:(code32 - setup_code)
 code32:
 	.long	0x100000
 	.word	__BOOT_CS, 0

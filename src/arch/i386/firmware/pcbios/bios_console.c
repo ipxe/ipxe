@@ -233,7 +233,7 @@ static const char * scancode_to_ansi_seq ( unsigned int scancode ) {
 static int bios_getchar ( void ) {
 	uint16_t keypress;
 	unsigned int character;
-	char *ansi_seq;
+	const char *ansi_seq;
 
 	/* If we are mid-sequence, pass out the next byte */
 	if ( ( character = *ansi_input ) ) {

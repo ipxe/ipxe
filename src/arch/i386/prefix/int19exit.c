@@ -25,7 +25,7 @@
  * @bug Not yet implemented
  *
  */
-void exit_via_int19 ( struct i386_all_regs *ix86 ) {
+void exit_via_int19 ( __unused struct i386_all_regs *ix86 ) {
 	bochsbp();
 	/* Placeholder */
 }
