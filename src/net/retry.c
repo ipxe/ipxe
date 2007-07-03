@@ -167,13 +167,6 @@ static void retry_step ( struct process *process __unused ) {
 }
 
 /** Retry timer process */
-static struct process retry_process = {
+struct process retry_process __permanent_process = {
 	.step = retry_step,
 };
-
-/** Initialise the retry timer module */
-static void init_retry ( void ) {
-	process_add ( &retry_process );
-}
-
-INIT_FN ( INIT_PROCESS, init_retry, NULL, NULL );

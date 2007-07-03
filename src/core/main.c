@@ -16,6 +16,7 @@ Literature dealing with the network protocols:
 
 #include <gpxe/heap.h>
 #include <gpxe/init.h>
+#include <gpxe/process.h>
 #include <gpxe/device.h>
 #include <gpxe/shell.h>
 #include <gpxe/shell_banner.h>
@@ -29,8 +30,10 @@ Literature dealing with the network protocols:
  * Call this function only once, before doing (almost) anything else.
  */
 static void startup ( void ) {
-	hide_etherboot();
 	init_heap();
+	init_processes();
+
+	hide_etherboot();
 	call_init_fns();
 	probe_devices();
 }

@@ -30,6 +30,12 @@
 /** Process run queue */
 static LIST_HEAD ( run_queue );
 
+/** Registered permanent processes */
+static struct process processes[0]
+	__table_start ( struct process, processes );
+static struct process processes_end[0]
+	__table_end ( struct process, processes );
+
 /**
  * Add process to process list
  *
@@ -70,5 +76,17 @@ void step ( void ) {
 		list_add_tail ( &process->list, &run_queue );
 		process->step ( process );
 		break;
+	}
+}
+
+/**
+ * Initialise processes
+ *
+ */
+void init_processes ( void ) {
+	struct process *process;
+
+	for ( process = processes ; process < processes_end ; process++ ) {
+		process_add ( process );
 	}
 }

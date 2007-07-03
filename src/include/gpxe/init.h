@@ -42,7 +42,6 @@ struct init_fn {
 #define	INIT_LOADBUF	08
 #define	INIT_PCMCIA	09
 #define	INIT_RPC	11
-#define INIT_PROCESS	12
 
 /* Macro for creating an initialisation function table entry */
 #define INIT_FN( init_order, init_func, reset_func, exit_func )	\
