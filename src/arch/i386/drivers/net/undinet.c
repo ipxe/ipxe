@@ -333,6 +333,16 @@ static int undinet_transmit ( struct net_device *netdev,
 	size_t len = iob_len ( iobuf );
 	int rc;
 
+	/* Technically, we ought to make sure that the previous
+	 * transmission has completed before we re-use the buffer.
+	 * However, this would break a gPXE-running-over-Etherboot
+	 * setup, since Etherboot fails to generate TX completions.
+	 * In practice this won't be a problem, since our TX datapath
+	 * has a very low packet volume and we can get away with
+	 * assuming that a TX will be complete by the time we want to
+	 * transmit the next packet.
+	 */
+
 	/* Copy packet to UNDI I/O buffer */
 	if ( len > sizeof ( basemem_packet ) )
 		len = sizeof ( basemem_packet );
