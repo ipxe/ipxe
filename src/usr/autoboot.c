@@ -44,34 +44,6 @@ static struct net_device * find_boot_netdev ( void ) {
 }
 
 /**
- * Get the next network device to try
- *
- * @ret netdev		'Next' network device
- *
- * This function will cycle through all registered network devices in
- * order, returning NULL.
- *
- * This function should be safe against registration/deregistration of
- * net devices between calls to next_netdev().
- */
-static struct net_device * next_netdev ( void ) {
-	static struct net_device *last_netdev = NULL;
-	struct net_device *netdev;
-
-	for_each_netdev ( netdev ) {
-		if ( ! last_netdev ) {
-			last_netdev = netdev;
-			return netdev;
-		}
-		if ( last_netdev == netdev )
-			last_netdev = NULL;
-	}
-
-	last_netdev = NULL;
-	return NULL;
-}
-
-/**
  * Boot from a network device
  *
  * @v netdev		Network device

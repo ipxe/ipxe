@@ -33,7 +33,7 @@ static void video_init(void)
 {
 	static int inited=0;
 
-	vidmem = (unsigned char *)phys_to_virt(VIDBUFFER);
+	vidmem = (char *)phys_to_virt(VIDBUFFER);
 
 	if (!inited) {
 		video_line = 0;
