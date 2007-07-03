@@ -32,7 +32,7 @@ static unsigned long rpc_id;
 /**************************************************************************
 RPC_INIT - set up the ID counter to something fairly random
 **************************************************************************/
-static void rpc_init(void)
+void rpc_init(void)
 {
 	unsigned long t;
 
@@ -607,8 +607,6 @@ nfssymlink:
 	/* len == 0 means that all the file has been read */
 	return 1;
 }
-
-INIT_FN ( INIT_RPC, rpc_init, nfs_reset );
 
 struct protocol nfs_protocol __protocol = {
 	.name = "nfs",

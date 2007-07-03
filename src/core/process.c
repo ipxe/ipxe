@@ -17,6 +17,7 @@
  */
 
 #include <gpxe/list.h>
+#include <gpxe/init.h>
 #include <gpxe/process.h>
 
 /** @file
@@ -83,10 +84,15 @@ void step ( void ) {
  * Initialise processes
  *
  */
-void init_processes ( void ) {
+static void init_processes ( void ) {
 	struct process *process;
 
 	for ( process = processes ; process < processes_end ; process++ ) {
 		process_add ( process );
 	}
 }
+
+/** Process initialiser */
+struct init_fn process_init_fn __init_fn ( INIT_NORMAL ) = {
+	.initialise = init_processes,
+};

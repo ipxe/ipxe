@@ -22,6 +22,7 @@
 #include <strings.h>
 #include <io.h>
 #include <gpxe/list.h>
+#include <gpxe/init.h>
 #include <gpxe/malloc.h>
 
 /** @file
@@ -71,6 +72,16 @@ static LIST_HEAD ( free_blocks );
 
 /** Total amount of free memory */
 size_t freemem;
+
+/**
+ * Heap size
+ *
+ * Currently fixed at 128kB.
+ */
+#define HEAP_SIZE ( 128 * 1024 )
+
+/** The heap itself */
+static char heap[HEAP_SIZE] __attribute__ (( aligned ( __alignof__(void *) )));
 
 /**
  * Allocate a memory block
@@ -341,6 +352,19 @@ void mpopulate ( void *start, size_t len ) {
 	 */
 	free_memblock ( start, ( len & ~( MIN_MEMBLOCK_SIZE - 1 ) ) );
 }
+
+/**
+ * Initialise the heap
+ *
+ */
+static void init_heap ( void ) {
+	mpopulate ( heap, sizeof ( heap ) );
+}
+
+/** Memory allocator initialisation function */
+struct init_fn heap_init_fn __init_fn ( INIT_EARLY ) = {
+	.initialise = init_heap,
+};
 
 #if 0
 #include <stdio.h>

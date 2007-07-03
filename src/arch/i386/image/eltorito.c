@@ -33,7 +33,7 @@
 #include <gpxe/image.h>
 #include <gpxe/segment.h>
 #include <gpxe/ramdisk.h>
-#include <gpxe/shutdown.h>
+#include <gpxe/init.h>
 
 #define ISO9660_BLKSIZE 2048
 #define ELTORITO_VOL_DESC_OFFSET ( 17 * ISO9660_BLKSIZE )

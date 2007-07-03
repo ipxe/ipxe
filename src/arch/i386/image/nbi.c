@@ -6,7 +6,7 @@
 #include <basemem_packet.h>
 #include <gpxe/uaccess.h>
 #include <gpxe/segment.h>
-#include <gpxe/shutdown.h>
+#include <gpxe/init.h>
 #include <gpxe/netdevice.h>
 #include <gpxe/dhcp.h>
 #include <gpxe/image.h>

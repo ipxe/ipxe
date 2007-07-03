@@ -28,4 +28,6 @@ static void gdb_symbol_line ( void ) {
 	getkey();
 }
 
-INIT_FN ( INIT_GDBSYM, gdb_symbol_line, NULL );
+struct startup_fn gdb_startup_fn __startup_fn ( STARTUP_NORMAL ) = {
+	.startup = gdb_symbol_line,
+};

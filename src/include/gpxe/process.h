@@ -34,7 +34,6 @@ struct process {
 extern void process_add ( struct process *process );
 extern void process_del ( struct process *process );
 extern void step ( void );
-extern void init_processes ( void );
 
 /**
  * Initialise process without adding to process list

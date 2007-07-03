@@ -225,7 +225,7 @@ static void serial_init ( void ) {
 /*
  * void serial_fini(void);
  *	Cleanup our use of the serial port, in particular flush the
- *	output buffer so we don't accidentially loose characters.
+ *	output buffer so we don't accidentially lose characters.
  */
 static void serial_fini ( void ) {
 	int i, status;
@@ -250,5 +250,19 @@ struct console_driver serial_console __console_driver = {
 	.disabled = 1,
 };
 
-INIT_FN ( INIT_CONSOLE, serial_init, serial_fini );
+/** Serial console startup function */
+struct startup_fn serial_startup_fn __startup_fn ( STARTUP_NORMAL ) = {
+	.startup = serial_init,
+	.shutdown = serial_fini,
+};
 
+/**
+ * Serial console initialisation function
+ *
+ * Initialise console early on so that it is available to capture
+ * early debug messages.  It is safe to call serial_init() multiple
+ * times.
+ */
+struct init_fn serial_init_fn __init_fn ( INIT_EARLY ) = {
+	.initialise = serial_init,
+};

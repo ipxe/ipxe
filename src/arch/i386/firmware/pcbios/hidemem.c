@@ -18,6 +18,7 @@
 #include <realmode.h>
 #include <biosint.h>
 #include <basemem.h>
+#include <gpxe/init.h>
 #include <gpxe/hidemem.h>
 
 /** Alignment for hidden memory regions */
@@ -110,7 +111,7 @@ void hide_basemem ( void ) {
  * Installs an INT 15 handler to edit Etherboot out of the memory map
  * returned by the BIOS.
  */
-void hide_etherboot ( void ) {
+static void hide_etherboot ( void ) {
 
 	/* Initialise the hidden regions */
 	hide_text();
@@ -127,7 +128,7 @@ void hide_etherboot ( void ) {
  * Uninstalls the INT 15 handler installed by hide_etherboot(), if
  * possible.
  */
-void unhide_etherboot ( void ) {
+static void unhide_etherboot ( void ) {
 
 	/* If we have more than one hooked interrupt at this point, it
 	 * means that some other vector is still hooked, in which case
@@ -147,3 +148,9 @@ void unhide_etherboot ( void ) {
 	unhook_bios_interrupt ( 0x15, ( unsigned int ) int15,
 				&int15_vector );
 }
+
+/** Hide Etherboot startup function */
+struct startup_fn hide_etherboot_startup_fn __startup_fn ( EARLY_STARTUP ) = {
+	.startup = hide_etherboot,
+	.shutdown = unhide_etherboot,
+};

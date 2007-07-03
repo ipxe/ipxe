@@ -31,6 +31,7 @@
 #include <gpxe/device.h>
 #include <gpxe/netdevice.h>
 #include <gpxe/isapnp.h>
+#include <gpxe/init.h>
 #include <basemem_packet.h>
 #include "pxe.h"
 #include "pxe_call.h"
@@ -53,26 +54,6 @@ static char *pxe_ris_filename = NULL;
  */
 PXENV_EXIT_t pxenv_unload_stack ( struct s_PXENV_UNLOAD_STACK *unload_stack ) {
 	DBG ( "PXENV_UNLOAD_STACK" );
-
-#if 0
-	/* We need to call cleanup() at some point.  The network card
-	 * has already been disabled by ENSURE_CAN_UNLOAD(), but for
-	 * the sake of completeness we should call the console_fini()
-	 * etc. that are part of cleanup().
-	 *
-	 * There seems to be a lack of consensus on which is the final
-	 * PXE API call to make, but it's a fairly safe bet that all
-	 * the potential shutdown sequences will include a call to
-	 * PXENV_UNLOAD_STACK at some point, so we may as well do it
-	 * here.
-	 */
-	cleanup();
-
-	if ( ! success ) {
-		unload_stack->Status = PXENV_STATUS_KEEP_ALL;
-		return PXENV_EXIT_FAILURE;
-	}
-#endif
 
 	unload_stack->Status = PXENV_STATUS_SUCCESS;
 	return PXENV_EXIT_SUCCESS;
@@ -209,6 +190,9 @@ PXENV_EXIT_t pxenv_start_undi ( struct s_PXENV_START_UNDI *start_undi ) {
 	DBG ( "PXENV_START_UNDI %04x:%04x:%04x",
 	      start_undi->AX, start_undi->BX, start_undi->DX );
 
+	/* Probe for devices, etc. */
+	startup();
+
 	/* Determine bus type and location */
 	isapnp_read_port = start_undi->DX;
 	isapnp_csn = start_undi->BX;
@@ -252,12 +236,14 @@ PXENV_EXIT_t pxenv_start_undi ( struct s_PXENV_START_UNDI *start_undi ) {
 PXENV_EXIT_t pxenv_stop_undi ( struct s_PXENV_STOP_UNDI *stop_undi ) {
 	DBG ( "PXENV_STOP_UNDI" );
 
-#if 0
-	if ( ! ensure_pxe_state(CAN_UNLOAD) ) {
-		stop_undi->Status = PXENV_STATUS_KEEP_UNDI;
-		return PXENV_EXIT_FAILURE;
-	}
-#endif
+	/* Unhook INT 1A */
+	pxe_unhook_int1a();
+
+	/* Clear PXE net device */
+	pxe_set_netdev ( NULL );
+
+	/* Prepare for unload */
+	shutdown();
 
 	stop_undi->Status = PXENV_STATUS_SUCCESS;
 	return PXENV_EXIT_SUCCESS;

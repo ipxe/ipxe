@@ -32,7 +32,7 @@
 #include <gpxe/segment.h>
 #include <gpxe/memmap.h>
 #include <gpxe/elf.h>
-#include <gpxe/shutdown.h>
+#include <gpxe/init.h>
 
 struct image_type multiboot_image_type __image_type ( PROBE_MULTIBOOT );
 

@@ -191,4 +191,6 @@ int timer2_running(void)
 
 #endif /* RTC_CURRTICKS */
 
-INIT_FN ( INIT_TIMERS, setup_timers, NULL );
+struct init_fn timer_init_fn __init_fn ( INIT_NORMAL ) = {
+	.initialise = setup_timers,
+};

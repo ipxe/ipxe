@@ -85,6 +85,4 @@ void cpu_setup(void)
 	identify_cpu(&cpu_info);
 }
 
-INIT_FN ( INIT_CPU, cpu_setup, NULL );
-
 #endif /* CONFIG_X86_64 */

@@ -1,5 +1,5 @@
 /**************************************************************************
-Etherboot -  Network Bootstrap Program
+gPXE -  Network Bootstrap Program
 
 Literature dealing with the network protocols:
 	ARP - RFC826
@@ -14,41 +14,10 @@ Literature dealing with the network protocols:
 
 **************************************************************************/
 
-#include <gpxe/heap.h>
 #include <gpxe/init.h>
-#include <gpxe/process.h>
-#include <gpxe/device.h>
 #include <gpxe/shell.h>
 #include <gpxe/shell_banner.h>
-#include <gpxe/shutdown.h>
-#include <gpxe/hidemem.h>
 #include <usr/autoboot.h>
-
-/**
- * Start up Etherboot
- *
- * Call this function only once, before doing (almost) anything else.
- */
-static void startup ( void ) {
-	init_heap();
-	init_processes();
-
-	hide_etherboot();
-	call_init_fns();
-	probe_devices();
-}
-
-/**
- * Shut down Etherboot
- *
- * Call this function only once, before either exiting main() or
- * starting up a non-returnable image.
- */
-void shutdown ( void ) {
-	remove_devices();
-	call_exit_fns();
-	unhide_etherboot();
-}
 
 /**
  * Main entry point
@@ -57,6 +26,7 @@ void shutdown ( void ) {
  */
 int main ( void ) {
 
+	initialise();
 	startup();
 
 	/* Try autobooting if we're not going straight to the shell */

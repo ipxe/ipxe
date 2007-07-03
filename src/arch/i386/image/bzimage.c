@@ -34,7 +34,7 @@
 #include <gpxe/image.h>
 #include <gpxe/segment.h>
 #include <gpxe/memmap.h>
-#include <gpxe/shutdown.h>
+#include <gpxe/init.h>
 #include <gpxe/initrd.h>
 
 struct image_type bzimage_image_type __image_type ( PROBE_NORMAL );

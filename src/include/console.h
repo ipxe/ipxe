@@ -21,19 +21,19 @@
  * Must be made part of the console drivers table by using
  * #__console_driver.
  *
- * @note Consoles that cannot be used before their INIT_FN() has
- * completed should set #disabled=1 initially.  This allows other
- * console devices to still be used to print out early debugging
- * messages.
+ * @note Consoles that cannot be used before their initialisation
+ * function has completed should set #disabled=1 initially.  This
+ * allows other console devices to still be used to print out early
+ * debugging messages.
  *
  */
 struct console_driver {
 	/** Console is disabled.
 	 *
 	 * The console's putchar(), putline(), getchar() and iskey()
-	 * methods will not be called while #disabled==1. Typically the
-	 * console's initialisation functions (called via INIT_FN())
-	 * will set #disabled=0 upon completion.
+	 * methods will not be called while #disabled==1. Typically
+	 * the console's initialisation functions will set #disabled=0
+	 * upon completion.
 	 *
 	 */
 	int disabled;
