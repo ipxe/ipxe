@@ -16,7 +16,7 @@ struct ramdisk {
 	userptr_t data;
 };
 
-int init_ramdisk ( struct ramdisk *ramdisk, userptr_t data, size_t len,
-		   unsigned int blksize );
+extern int init_ramdisk ( struct ramdisk *ramdisk, userptr_t data, size_t len,
+			  unsigned int blksize );
 
 #endif /* _GPXE_RAMDISK_H */
