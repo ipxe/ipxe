@@ -57,12 +57,17 @@ static void legacy_poll ( struct net_device *netdev, unsigned int rx_quota ) {
 	}
 }
 
-static int legacy_open ( struct net_device *netdev __unused ) {
+static int legacy_open ( struct net_device *netdev ) {
+	struct nic *nic = netdev->priv;
+
+	nic->nic_op->irq ( nic, ENABLE );
 	return 0;
 }
 
-static void legacy_close ( struct net_device *netdev __unused ) {
-	/* Nothing to do */
+static void legacy_close ( struct net_device *netdev ) {
+	struct nic *nic = netdev->priv;
+
+	nic->nic_op->irq ( nic, DISABLE );
 }
 
 int legacy_probe ( void *hwdev,
