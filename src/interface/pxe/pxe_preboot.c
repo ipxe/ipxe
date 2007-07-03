@@ -45,6 +45,9 @@
  */
 static char *pxe_ris_filename = NULL;
 
+/* Avoid dragging in isapnp.o unnecessarily */
+uint16_t isapnp_read_port;
+
 /**
  * UNLOAD BASE CODE STACK
  *
@@ -180,9 +183,6 @@ PXENV_EXIT_t pxenv_restart_tftp ( struct s_PXENV_TFTP_READ_FILE
  * Status: working
  */
 PXENV_EXIT_t pxenv_start_undi ( struct s_PXENV_START_UNDI *start_undi ) {
-	unsigned int isapnp_read_port;
-	unsigned int isapnp_csn;
-	unsigned int pci_busdevfn;
 	unsigned int bus_type;
 	unsigned int location;
 	struct net_device *netdev;
@@ -190,25 +190,24 @@ PXENV_EXIT_t pxenv_start_undi ( struct s_PXENV_START_UNDI *start_undi ) {
 	DBG ( "PXENV_START_UNDI %04x:%04x:%04x",
 	      start_undi->AX, start_undi->BX, start_undi->DX );
 
-	/* Probe for devices, etc. */
-	startup();
-
-	/* Determine bus type and location */
-	isapnp_read_port = start_undi->DX;
-	isapnp_csn = start_undi->BX;
-	pci_busdevfn = start_undi->AX;
-
-	/* Use a heuristic to decide whether we are PCI or ISAPnP */
-	if ( ( isapnp_read_port >= ISAPNP_READ_PORT_MIN ) &&
-	     ( isapnp_read_port <= ISAPNP_READ_PORT_MAX ) &&
-	     ( isapnp_csn >= ISAPNP_CSN_MIN ) &&
-	     ( isapnp_csn <= ISAPNP_CSN_MAX ) ) {
+	/* Determine bus type and location.  Use a heuristic to decide
+	 * whether we are PCI or ISAPnP
+	 */
+	if ( ( start_undi->DX >= ISAPNP_READ_PORT_MIN ) &&
+	     ( start_undi->DX <= ISAPNP_READ_PORT_MAX ) &&
+	     ( start_undi->BX >= ISAPNP_CSN_MIN ) &&
+	     ( start_undi->BX <= ISAPNP_CSN_MAX ) ) {
 		bus_type = BUS_TYPE_ISAPNP;
-		location = isapnp_csn;
+		location = start_undi->BX;
+		/* Record ISAPnP read port for use by isapnp.c */
+		isapnp_read_port = start_undi->DX;
 	} else {
 		bus_type = BUS_TYPE_PCI;
-		location = pci_busdevfn;
+		location = start_undi->AX;
 	}
+
+	/* Probe for devices, etc. */
+	startup();
 
 	/* Look for a matching net device */
 	netdev = find_netdev_by_location ( bus_type, location );

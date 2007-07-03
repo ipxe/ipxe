@@ -299,6 +299,31 @@ void pxe_api_call ( struct i386_all_regs *ix86 ) {
 }
 
 /**
+ * Dispatch PXE loader call
+ *
+ * @v es:di		Address of PXE parameter block
+ * @ret ax		PXE exit code
+ */
+void pxe_loader_call ( struct i386_all_regs *ix86 ) {
+	userptr_t uparams = real_to_user ( ix86->segs.es, ix86->regs.di );
+	struct s_UNDI_LOADER params;
+	PXENV_EXIT_t ret;
+
+	/* Copy parameter block from caller */
+	copy_from_user ( &params, uparams, 0, sizeof ( params ) );
+
+	/* Set default status in case child routine fails to do so */
+	params.Status = PXENV_STATUS_FAILURE;
+
+	/* Call UNDI loader */
+	ret = undi_loader ( &params );
+
+	/* Copy modified parameter block back to caller and return */
+	copy_to_user ( uparams, 0, &params, sizeof ( params ) );
+	ix86->regs.ax = ret;
+}
+
+/**
  * Hook INT 1A for PXE
  *
  */
