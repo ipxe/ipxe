@@ -5,6 +5,7 @@
 #include <gpxe/netdevice.h>
 #include <gpxe/iscsi.h>
 #include <gpxe/ibft.h>
+#include <gpxe/tcpip.h>
 #include <int13.h>
 
 static struct iscsi_device test_iscsidev;
