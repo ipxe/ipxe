@@ -45,7 +45,19 @@ struct undi_nic {
 	unsigned int irq;
 	/** Currently processing ISR */
 	int isr_processing;
+	/** Bug workarounds */
+	int hacks;
 };
+
+/**
+ * @defgroup undi_hacks UNDI workarounds
+ * @{
+ */
+
+/** Work around Etherboot 5.4 bugs */
+#define UNDI_HACK_EB54		0x0001
+
+/** @} */
 
 static void undinet_close ( struct net_device *netdev );
 
@@ -245,6 +257,9 @@ static struct segoff prev_handler[ IRQ_MAX + 1 ];
 static volatile uint8_t __text16 ( trigger_count ) = 0;
 #define trigger_count __use_text16 ( trigger_count )
 
+/** Last observed trigger count */
+static unsigned int last_trigger_count = 0;
+
 /**
  * Hook UNDI interrupt service routine
  *
@@ -292,7 +307,6 @@ static void undinet_unhook_isr ( unsigned int irq ) {
  * @ret triggered	ISR has been triggered since last check
  */
 static int undinet_isr_triggered ( void ) {
-	static unsigned int last_trigger_count = 0;
 	unsigned int this_trigger_count;
 
 	/* Read trigger_count.  Do this only once; it is volatile */
@@ -332,6 +346,16 @@ static int undinet_transmit ( struct net_device *netdev,
 	struct s_PXENV_UNDI_TRANSMIT undi_transmit;
 	size_t len = iob_len ( iobuf );
 	int rc;
+
+	/* Technically, we ought to make sure that the previous
+	 * transmission has completed before we re-use the buffer.
+	 * However, many PXE stacks (including at least some Intel PXE
+	 * stacks and Etherboot 5.4) fail to generate TX completions.
+	 * In practice this won't be a problem, since our TX datapath
+	 * has a very low packet volume and we can get away with
+	 * assuming that a TX will be complete by the time we want to
+	 * transmit the next packet.
+	 */
 
 	/* Copy packet to UNDI I/O buffer */
 	if ( len > sizeof ( basemem_packet ) )
@@ -460,9 +484,15 @@ static void undinet_poll ( struct net_device *netdev, unsigned int rx_quota ) {
 					 undi_isr.Frame.segment,
 					 undi_isr.Frame.offset, frag_len );
 			if ( iob_len ( iobuf ) == len ) {
+				/* Whole packet received; deliver it */
 				netdev_rx ( netdev, iobuf );
 				iobuf = NULL;
 				--rx_quota;
+				/* Etherboot 5.4 fails to return all packets
+				 * under mild load; pretend it retriggered.
+				 */
+				if ( undinic->hacks & UNDI_HACK_EB54 )
+					--last_trigger_count;
 			}
 			break;
 		case PXENV_UNDI_ISR_OUT_DONE:
@@ -582,6 +612,7 @@ int undinet_probe ( struct undi_device *undi ) {
 	struct s_PXENV_UNDI_STARTUP undi_startup;
 	struct s_PXENV_UNDI_INITIALIZE undi_initialize;
 	struct s_PXENV_UNDI_GET_INFORMATION undi_info;
+	struct s_PXENV_UNDI_GET_IFACE_INFO undi_iface;
 	struct s_PXENV_UNDI_SHUTDOWN undi_shutdown;
 	struct s_PXENV_UNDI_CLEANUP undi_cleanup;
 	struct s_PXENV_STOP_UNDI stop_undi;
@@ -639,6 +670,21 @@ int undinet_probe ( struct undi_device *undi ) {
 	DBGC ( undinic, "UNDINIC %p is %s on IRQ %d\n",
 	       undinic, eth_ntoa ( netdev->ll_addr ), undinic->irq );
 
+	/* Get interface information */
+	memset ( &undi_iface, 0, sizeof ( undi_iface ) );
+	if ( ( rc = undinet_call ( undinic, PXENV_UNDI_GET_IFACE_INFO,
+				   &undi_iface,
+				   sizeof ( undi_iface ) ) ) != 0 )
+		goto err_undi_get_iface_info;
+	DBGC ( undinic, "UNDINIC %p has type %s and link speed %ld\n",
+	       undinic, undi_iface.IfaceType, undi_iface.LinkSpeed );
+	if ( strncmp ( ( ( char * ) undi_iface.IfaceType ), "Etherboot",
+		       sizeof ( undi_iface.IfaceType ) ) == 0 ) {
+		DBGC ( undinic, "UNDINIC %p Etherboot 5.4 workaround enabled\n",
+		       undinic );
+		undinic->hacks |= UNDI_HACK_EB54;
+	}
+
 	/* Point to NIC specific routines */
 	netdev->open	 = undinet_open;
 	netdev->close	 = undinet_close;
@@ -653,6 +699,7 @@ int undinet_probe ( struct undi_device *undi ) {
 	return 0;
 
  err_register:
+ err_undi_get_iface_info:
  err_bad_irq:
  err_undi_get_information:
  err_undi_initialize:

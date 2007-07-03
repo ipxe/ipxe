@@ -394,18 +394,15 @@ PXENV_EXIT_t pxenv_undi_initiate_diags ( struct s_PXENV_UNDI_INITIATE_DIAGS
 
 /* PXENV_UNDI_FORCE_INTERRUPT
  *
- * Status: working
+ * Status: won't implement (would require driver API changes for no
+ * perceptible benefit)
  */
 PXENV_EXIT_t pxenv_undi_force_interrupt ( struct s_PXENV_UNDI_FORCE_INTERRUPT
 					  *undi_force_interrupt ) {
 	DBG ( "PXENV_UNDI_FORCE_INTERRUPT" );
 
-#if 0
-	eth_irq ( FORCE );
-#endif
-
-	undi_force_interrupt->Status = PXENV_STATUS_SUCCESS;
-	return PXENV_EXIT_SUCCESS;
+	undi_force_interrupt->Status = PXENV_STATUS_UNSUPPORTED;
+	return PXENV_EXIT_FAILURE;
 }
 
 /* PXENV_UNDI_GET_MCAST_ADDRESS
@@ -483,7 +480,7 @@ PXENV_EXIT_t pxenv_undi_get_iface_info ( struct s_PXENV_UNDI_GET_IFACE_INFO
 	 * Most PXE stacks seem to take this approach.
 	 */
 	snprintf ( ( char * ) undi_get_iface_info->IfaceType,
-		   sizeof ( undi_get_iface_info->IfaceType ), "Etherboot" );
+		   sizeof ( undi_get_iface_info->IfaceType ), "gPXE" );
 	undi_get_iface_info->LinkSpeed = 10000000; /* 10 Mbps */
 	undi_get_iface_info->ServiceFlags = 0;
 	memset ( undi_get_iface_info->Reserved, 0,

@@ -380,8 +380,7 @@ static int rtl_transmit ( struct net_device *netdev, struct io_buffer *iobuf ) {
 
 	/* Check for space in TX ring */
 	if ( rtl->tx.iobuf[rtl->tx.next] != NULL ) {
-		printf ( "TX overflow\n" );
-		free_iob ( iobuf );
+		DBG ( "TX overflow\n" );
 		return -ENOBUFS;
 	}
 
@@ -471,34 +470,6 @@ static void rtl_poll ( struct net_device *netdev, unsigned int rx_quota ) {
 		outw ( rtl->rx.offset - 16, rtl->ioaddr + RxBufPtr );
 	}
 }
-
-#if 0
-static void rtl_irq(struct nic *nic, irq_action_t action)
-{
-	unsigned int mask;
-	/* Bit of a guess as to which interrupts we should allow */
-	unsigned int interested = ROK | RER | RXOVW | FOVW | SERR;
-
-	switch ( action ) {
-	case DISABLE :
-	case ENABLE :
-		mask = inw(rtl->ioaddr + IntrMask);
-		mask = mask & ~interested;
-		if ( action == ENABLE ) mask = mask | interested;
-		outw(mask, rtl->ioaddr + IntrMask);
-		break;
-	case FORCE :
-		/* Apparently writing a 1 to this read-only bit of a
-		 * read-only and otherwise unrelated register will
-		 * force an interrupt.  If you ever want to see how
-		 * not to write a datasheet, read the one for the
-		 * RTL8139...
-		 */
-		outb(EROK, rtl->ioaddr + RxEarlyStatus);
-		break;
-	}
-}
-#endif
 
 /**
  * Probe PCI device

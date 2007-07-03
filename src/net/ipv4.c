@@ -141,12 +141,20 @@ void del_ipv4_address ( struct net_device *netdev ) {
  * @v dest		Final destination address
  * @ret dest		Next hop destination address
  * @ret miniroute	Routing table entry to use, or NULL if no route
+ *
+ * If the route requires use of a gateway, the next hop destination
+ * address will be overwritten with the gateway address.
  */
 static struct ipv4_miniroute * ipv4_route ( struct in_addr *dest ) {
 	struct ipv4_miniroute *miniroute;
 	int local;
 	int has_gw;
 
+	/* Never attempt to route the broadcast address */
+	if ( dest->s_addr == INADDR_BROADCAST )
+		return NULL;
+
+	/* Find first usable route in routing table */
 	list_for_each_entry ( miniroute, &ipv4_miniroutes, list ) {
 		local = ( ( ( dest->s_addr ^ miniroute->address.s_addr )
 			    & miniroute->netmask.s_addr ) == 0 );

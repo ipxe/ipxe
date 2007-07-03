@@ -49,7 +49,8 @@
 /* Port addresses */
 #define ISAPNP_ADDRESS		0x279
 #define ISAPNP_WRITE_DATA	0xa79
-#define ISAPNP_READ_PORT_MIN	0x213	/* ISAPnP spec says 0x203, but
+#define ISAPNP_READ_PORT_MIN	0x203
+#define ISAPNP_READ_PORT_START	0x213	/* ISAPnP spec says 0x203, but
 					 * Linux ISAPnP starts at
 					 * 0x213 with no explanatory
 					 * comment.  0x203 probably
@@ -62,6 +63,10 @@
 					 * it makes no sense to use
 					 * any value less than 16.
 					 */
+
+/* Card select numbers */
+#define ISAPNP_CSN_MIN		0x01
+#define ISAPNP_CSN_MAX		0x0f
 
 /* Registers */
 #define ISAPNP_READPORT			0x00

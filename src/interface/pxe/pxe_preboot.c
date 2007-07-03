@@ -28,6 +28,9 @@
 #include <stdlib.h>
 #include <gpxe/uaccess.h>
 #include <gpxe/dhcp.h>
+#include <gpxe/device.h>
+#include <gpxe/netdevice.h>
+#include <gpxe/isapnp.h>
 #include <basemem_packet.h>
 #include "pxe.h"
 #include "pxe_call.h"
@@ -196,41 +199,47 @@ PXENV_EXIT_t pxenv_restart_tftp ( struct s_PXENV_TFTP_READ_FILE
  * Status: working
  */
 PXENV_EXIT_t pxenv_start_undi ( struct s_PXENV_START_UNDI *start_undi ) {
+	unsigned int isapnp_read_port;
+	unsigned int isapnp_csn;
+	unsigned int pci_busdevfn;
+	unsigned int bus_type;
+	unsigned int location;
+	struct net_device *netdev;
 
-	DBG ( "PXENV_START_UNDI" );
+	DBG ( "PXENV_START_UNDI %04x:%04x:%04x",
+	      start_undi->AX, start_undi->BX, start_undi->DX );
 
-#if 0
-	/* Record PCI bus & devfn passed by caller, so we know which
-	 * NIC they want to use.
-	 *
-	 * If they don't match our already-existing NIC structure, set
-	 * values to ensure that the specified NIC is used at the next
-	 * call to pxe_intialise_nic().
-	 */
-	bus = ( start_undi->AX >> 8 ) & 0xff;
-	devfn = start_undi->AX & 0xff;
+	/* Determine bus type and location */
+	isapnp_read_port = start_undi->DX;
+	isapnp_csn = start_undi->BX;
+	pci_busdevfn = start_undi->AX;
 
-#warning "device probing mechanism has completely changed"
-#if 0
-	if ( ( pci->dev.driver == NULL ) ||
-	     ( pci->dev.bus != bus ) || ( pci->dev.devfn != devfn ) ) {
-		/* This is quite a bit of a hack and relies on
-		 * knowledge of the internal operation of Etherboot's
-		 * probe mechanism.
-		 */
-		DBG ( " set PCI %hhx:%hhx.%hhx",
-		      bus, PCI_SLOT(devfn), PCI_FUNC(devfn) );
-		dev->type = BOOT_NIC;
-		dev->to_probe = PROBE_PCI;
-		memset ( &dev->state, 0, sizeof(dev->state) );
-		pci->advance = 1;
-		pci->dev.use_specified = 1;
-		pci->dev.bus = bus;
-		pci->dev.devfn = devfn;
+	/* Use a heuristic to decide whether we are PCI or ISAPnP */
+	if ( ( isapnp_read_port >= ISAPNP_READ_PORT_MIN ) &&
+	     ( isapnp_read_port <= ISAPNP_READ_PORT_MAX ) &&
+	     ( isapnp_csn >= ISAPNP_CSN_MIN ) &&
+	     ( isapnp_csn <= ISAPNP_CSN_MAX ) ) {
+		bus_type = BUS_TYPE_ISAPNP;
+		location = isapnp_csn;
+	} else {
+		bus_type = BUS_TYPE_PCI;
+		location = pci_busdevfn;
 	}
-#endif
 
-#endif
+	/* Look for a matching net device */
+	netdev = find_netdev_by_location ( bus_type, location );
+	if ( ! netdev ) {
+		DBG ( " no net device found" );
+		start_undi->Status = PXENV_STATUS_UNDI_CANNOT_INITIALIZE_NIC;
+		return PXENV_EXIT_FAILURE;
+	}
+	DBG ( " using netdev %s", netdev->name );
+
+	/* Save as PXE net device */
+	pxe_set_netdev ( netdev );
+
+	/* Hook INT 1A */
+	pxe_hook_int1a();
 
 	start_undi->Status = PXENV_STATUS_SUCCESS;
 	return PXENV_EXIT_SUCCESS;
