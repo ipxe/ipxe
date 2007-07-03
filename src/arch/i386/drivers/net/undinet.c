@@ -335,8 +335,8 @@ static int undinet_transmit ( struct net_device *netdev,
 
 	/* Technically, we ought to make sure that the previous
 	 * transmission has completed before we re-use the buffer.
-	 * However, this would break a gPXE-running-over-Etherboot
-	 * setup, since Etherboot fails to generate TX completions.
+	 * However, many PXE stacks (including at least some Intel PXE
+	 * stacks and Etherboot 5.4) fail to generate TX completions.
 	 * In practice this won't be a problem, since our TX datapath
 	 * has a very low packet volume and we can get away with
 	 * assuming that a TX will be complete by the time we want to
