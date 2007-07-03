@@ -46,11 +46,6 @@
  * is known and all cards have been allocated CSNs, there's nothing to
  * be gained by re-scanning for cards.
  *
- * However, we shouldn't make scanning the ISAPnP bus an INIT_FN(),
- * because even ISAPnP probing can still screw up other devices on the
- * ISA bus.  We therefore probe only when we are first asked to find
- * an ISAPnP device.
- *
  * External code (e.g. the ISAPnP ROM prefix) may already know the
  * read port address, in which case it can store it in
  * #isapnp_read_port.  Note that setting the read port address in this
