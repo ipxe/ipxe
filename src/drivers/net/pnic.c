@@ -161,29 +161,6 @@ static int pnic_transmit ( struct net_device *netdev, struct io_buffer *iobuf ) 
 }
 
 /**************************************************************************
-IRQ - Handle card interrupt status
-***************************************************************************/
-#if 0
-static void pnic_irq ( struct net_device *netdev, irq_action_t action ) {
-	struct pnic *pnic = netdev->priv;
-	uint8_t enabled;
-
-	switch ( action ) {
-	case DISABLE :
-	case ENABLE :
-		enabled = ( action == ENABLE ? 1 : 0 );
-		pnic_command ( pnic, PNIC_CMD_MASK_IRQ,
-			       &enabled, sizeof ( enabled ), NULL, 0, NULL );
-		break;
-	case FORCE :
-		pnic_command ( pnic, PNIC_CMD_FORCE_IRQ,
-			       NULL, 0, NULL, 0, NULL );
-		break;
-	}
-}
-#endif
-
-/**************************************************************************
 OPEN - Open network device
 ***************************************************************************/
 static int pnic_open ( struct net_device *netdev ) {
