@@ -349,6 +349,7 @@ static int http_socket_deliver_iob ( struct xfer_interface *socket,
 			len = line_buffer ( &http->linebuf, iobuf->data,
 					    iob_len ( iobuf ) );
 			if ( len < 0 ) {
+				rc = len;
 				DBGC ( http, "HTTP %p could not buffer line: "
 				       "%s\n", http, strerror ( rc ) );
 				goto done;
