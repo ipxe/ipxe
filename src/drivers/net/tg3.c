@@ -1505,7 +1505,7 @@ static int tg3_abort_hw(struct tg3 *tp)
 	}
 	if (i >= MAX_WAIT_CNT) {
 		printf("tg3_abort_hw timed out TX_MODE_ENABLE will not clear MAC_TX_MODE=%x\n",
-			tr32(MAC_TX_MODE));
+		       (unsigned int) tr32(MAC_TX_MODE));
 		return -ENODEV;
 	}
 
