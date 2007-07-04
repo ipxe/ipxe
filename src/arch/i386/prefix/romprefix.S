@@ -167,6 +167,34 @@ exec_message:
  * Called by an external program to load our PXE stack.
  */
 undiloader:
+	/* Save registers */
+	pushl	%edi
+	pushw	%es
+	pushw	%bx
+	/* UNDI loader parameter structure address into %es:%di */
+	movw	%sp, %bx
+	movw	%ss:12(%bx), %di
+	movw	%ss:14(%bx), %es
+	/* Install to specified real-mode addresses */
+	pushw	%di
+	movw	%es:12(%di), %bx
+	movw	%es:14(%di), %ax
+	call	install_prealloc
+	popw	%di
+	/* Call UNDI loader C code */
+	pushl	$pxe_loader_call
+	pushw	%cs
+	pushw	$1f
+	pushw	%ax
+	pushw	$prot_call
+	lret
+1:	popw	%bx	/* discard */
+	popw	%bx	/* discard */
+	/* Restore registers and return */
+	popw	%bx
+	popw	%es
+	popl	%edi
+	lret
 	.size undiloader, . - undiloader
 				
 /* Utility function: print string
