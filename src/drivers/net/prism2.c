@@ -13,8 +13,8 @@ $Id$
  * your option) any later version.
  */
 
-#include "etherboot.h"
-#include "nic.h"
+#include <etherboot.h>
+#include <nic.h>
 #include <gpxe/pci.h>
 #include <gpxe/ethernet.h>
 
@@ -67,6 +67,11 @@ static const char hardcoded_ssid[] = "";
 #define __le32_to_cpu(x) (x)
 #define __cpu_to_le16(x) (x)
 #define __cpu_to_le32(x) (x)
+
+#define hfa384x2host_16(n)	(__le16_to_cpu((UINT16)(n)))
+#define hfa384x2host_32(n)	(__le32_to_cpu((UINT32)(n)))
+#define host2hfa384x_16(n)	(__cpu_to_le16((UINT16)(n)))
+#define host2hfa384x_32(n)	(__cpu_to_le32((UINT32)(n)))
 
 /*
  * PLX9052 PCI register offsets
@@ -135,19 +140,19 @@ static hfa384x_t hw_global = {
 
 typedef struct wlan_llc
 {
-  UINT8   dsap                            __WLAN_ATTRIB_PACK__;
-  UINT8   ssap                            __WLAN_ATTRIB_PACK__;
-  UINT8   ctl                             __WLAN_ATTRIB_PACK__;
-} __WLAN_ATTRIB_PACK__ wlan_llc_t;
+  UINT8   dsap;
+  UINT8   ssap;
+  UINT8   ctl;
+}  wlan_llc_t;
 
 static const wlan_llc_t wlan_llc_snap = { 0xaa, 0xaa, 0x03 }; /* LLC header indicating SNAP (?) */
 
 #define WLAN_IEEE_OUI_LEN 3
 typedef struct wlan_snap
 {
-  UINT8   oui[WLAN_IEEE_OUI_LEN]          __WLAN_ATTRIB_PACK__;
-  UINT16  type                            __WLAN_ATTRIB_PACK__;
-} __WLAN_ATTRIB_PACK__ wlan_snap_t;
+  UINT8   oui[WLAN_IEEE_OUI_LEN];
+  UINT16  type;
+} wlan_snap_t;
 
 typedef struct wlan_80211hdr
 {

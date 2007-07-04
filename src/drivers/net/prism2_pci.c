@@ -15,7 +15,7 @@ $Id$
  */
 
 #include <gpxe/pci.h>
-#include "nic.h"
+#include <nic.h>
 
 #define WLAN_HOSTIF WLAN_PCI
 #include "prism2.c"
