@@ -150,7 +150,7 @@ static void unhide_etherboot ( void ) {
 }
 
 /** Hide Etherboot startup function */
-struct startup_fn hide_etherboot_startup_fn __startup_fn ( EARLY_STARTUP ) = {
+struct startup_fn hide_etherboot_startup_fn __startup_fn ( STARTUP_EARLY ) = {
 	.startup = hide_etherboot,
 	.shutdown = unhide_etherboot,
 };
