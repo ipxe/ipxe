@@ -445,7 +445,7 @@ static void nat_close ( struct net_device *netdev ) {
 		free_iob( nat->iobuf[i] );
 	}
 	/* disable interrupts */
-	outl(0,nat->ioaddr +IntrEnable);
+	outl(0,nat->ioaddr + IntrMask) ;
 }
 
 /** 
@@ -498,11 +498,21 @@ static void nat_poll ( struct net_device *netdev, unsigned int rx_quota ) {
 	struct natsemi_nic *nat = netdev->priv;
 	unsigned int status;
 	unsigned int rx_status;
+	unsigned int intr_status;
 	unsigned int rx_len;
 	struct io_buffer *rx_iob;
 	int i;
 	
+	outl(1,nat->ioaddr +IntrEnable);
+	/* read the interrupt register */
+	intr_status=inl(nat->ioaddr+IntrStatus);
+	if(!intr_status)
+	goto end;
+
 	/* check the status of packets given to card for transmission */	
+	DBG("Intr status %X\n",intr_status);
+
+
 	i=nat->tx_dirty;
 	while(i!=nat->tx_cur)
 	{
@@ -551,7 +561,7 @@ static void nat_poll ( struct net_device *netdev, unsigned int rx_quota ) {
 			rx_iob = alloc_iob(rx_len);
 			if(!rx_iob) 
 				/* leave packet for next call to poll*/
-				return;
+				goto end;
 			memcpy(iob_put(rx_iob,rx_len),
 					bus_to_virt(nat->rx[nat->rx_cur].bufptr),rx_len);
 
@@ -565,9 +575,11 @@ static void nat_poll ( struct net_device *netdev, unsigned int rx_quota ) {
 		rx_status=(unsigned int)nat->rx[nat->rx_cur].cmdsts; 
 	}
 
+end:
 
 	 /* re-enable the potentially idle receive state machine */
-	    outl(RxOn, nat->ioaddr + ChipCmd);	
+	outl(RxOn, nat->ioaddr + ChipCmd);	
+	outl(1,nat->ioaddr +IntrEnable);
 }				
 
 
