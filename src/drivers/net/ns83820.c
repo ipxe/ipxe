@@ -631,9 +631,10 @@ static void ns83820_run_bist(struct nic *nic __unused, const char *name,
 	}
 
 	if (status & fail)
-		printf("%s failed! (0x%hX & 0x%hX)\n", name, status, fail);
+	  printf("%s failed! (0x%hX & 0x%hX)\n", name, (unsigned int) status, 
+		 (unsigned int) fail);
 	else if (timed_out)
-		printf("run_bist %s timed out! (%hX)\n", name, status);
+		printf("run_bist %s timed out! (%hX)\n", name, (unsigned int) status);
 	dprintf(("done %s in %d loops\n", name, loops));
 }
 

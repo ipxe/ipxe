@@ -22,12 +22,14 @@
 #include "bnx2.h"
 #include "bnx2_fw.h"
 
+#if 0
 /* Dummy defines for error handling */
 #define EBUSY  1
 #define ENODEV 2
 #define EINVAL 3
 #define ENOMEM 4
 #define EIO    5
+#endif
 
 /* The bnx2 seems to be picky about the alignment of the receive buffers
  * and possibly the status block.
@@ -1165,7 +1167,7 @@ bnx2_fw_sync(struct bnx2 *bp, u32 msg_data, int silent)
 	/* If we timed out, inform the firmware that this is the case. */
 	if ((val & BNX2_FW_MSG_ACK) != (msg_data & BNX2_DRV_MSG_SEQ)) {
 		if (!silent)
-			printf("fw sync timeout, reset code = %x\n", msg_data);
+		  printf("fw sync timeout, reset code = %x\n", (unsigned int) msg_data);
 
 		msg_data &= ~BNX2_DRV_MSG_CODE;
 		msg_data |= BNX2_DRV_MSG_CODE_FW_TIMEOUT;
@@ -2033,7 +2035,7 @@ static void
 bnx2_init_rx_ring(struct bnx2 *bp)
 {
 	struct rx_bd *rxbd;
-	int i;
+	unsigned int i;
 	u16 prod, ring_prod;
 	u32 val;
 
@@ -2066,7 +2068,7 @@ bnx2_init_rx_ring(struct bnx2 *bp)
 	val = bp->rx_desc_mapping & 0xffffffff;
 	CTX_WR(bp, GET_CID_ADDR(RX_CID), BNX2_L2CTX_NX_BDHADDR_LO, val);
 
-	for (i = 0; i < bp->rx_ring_size; i++) {
+	for (i = 0; (int) i < bp->rx_ring_size; i++) {
 		rxbd = &bp->rx_desc_ring[RX_RING_IDX(ring_prod)];
 		rxbd->rx_bd_haddr_hi = 0;
 		rxbd->rx_bd_haddr_lo = virt_to_bus(&bnx2_bss.rx_buf[ring_prod][0]);
@@ -2635,8 +2637,8 @@ bnx2_probe(struct nic *nic, struct pci_device *pdev)
 	memcpy(nic->node_addr, bp->mac_addr, ETH_ALEN);
 	printf("Ethernet addr: %s\n", eth_ntoa( nic->node_addr ) );
 	printf("Broadcom NetXtreme II (%c%d) PCI%s %s %dMHz\n",
-		((CHIP_ID(bp) & 0xf000) >> 12) + 'A',
-		((CHIP_ID(bp) & 0x0ff0) >> 4),
+	        (int) ((CHIP_ID(bp) & 0xf000) >> 12) + 'A',
+	        (int) ((CHIP_ID(bp) & 0x0ff0) >> 4),
 		((bp->flags & PCIX_FLAG) ? "-X" : ""),
 		((bp->flags & PCI_32BIT_FLAG) ? "32-bit" : "64-bit"),
 		bp->bus_speed_mhz);

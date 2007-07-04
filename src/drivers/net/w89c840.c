@@ -408,7 +408,7 @@ static int w89c840_poll(struct nic *nic, int retrieve)
                 if ((status & 0xffff) != 0x7fff) {
                     printf("winbond-840 : Oversized Ethernet frame spanned "
                            "multiple buffers, entry %d status %X !\n",
-                           w840private.cur_rx, status);
+                           w840private.cur_rx, (unsigned int) status);
                 }
             } else if (status & 0x8000) {
                 /* There was a fatal error. */
@@ -568,7 +568,8 @@ static void w89c840_transmit(
 
     /* Transmit timed out... */
 
-    printf("winbond-840 : transmission TIMEOUT : status %X\n", w840private.tx_ring[entry].status);
+    printf("winbond-840 : transmission TIMEOUT : status %X\n", 
+	   (unsigned int) w840private.tx_ring[entry].status);
 
     return;
 }

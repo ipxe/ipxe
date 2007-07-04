@@ -449,11 +449,11 @@ static void ns8390_transmit(
 		/* Programmed I/O */
 		unsigned short type;
 		type = (t >> 8) | (t << 8);
-		eth_pio_write(d, eth_tx_start<<8, ETH_ALEN);
+		eth_pio_write( (unsigned char *) d, eth_tx_start<<8, ETH_ALEN);
 		eth_pio_write(nic->node_addr, (eth_tx_start<<8)+ETH_ALEN, ETH_ALEN);
 		/* bcc generates worse code without (const+const) below */
 		eth_pio_write((unsigned char *)&type, (eth_tx_start<<8)+(ETH_ALEN+ETH_ALEN), 2);
-		eth_pio_write(p, (eth_tx_start<<8)+ETH_HLEN, s);
+		eth_pio_write( (unsigned char *) p, (eth_tx_start<<8)+ETH_HLEN, s);
 		s += ETH_HLEN;
 		if (s < ETH_ZLEN) s = ETH_ZLEN;
 	}
@@ -533,7 +533,7 @@ static int ns8390_poll(struct nic *nic, int retrieve)
 #endif
 	pktoff = next << 8;
 	if (eth_flags & FLAG_PIO)
-		eth_pio_read(pktoff, (char *)&pkthdr, 4);
+		eth_pio_read(pktoff, (unsigned char *)&pkthdr, 4);
 	else
 		memcpy(&pkthdr, bus_to_virt(eth_rmem + pktoff), 4);
 	pktoff += sizeof(pkthdr);
@@ -876,9 +876,10 @@ static int eth_probe (struct dev *dev, unsigned short *probe_addrs __unused)
 	******************************************************************/
 	unsigned char c;
 	if (eth_vendor == VENDOR_NONE) {
-		char romdata[16], testbuf[32];
+		unsigned char romdata[16];
+		unsigned char testbuf[32];
 		int idx;
-		static char test[] = "NE*000 memory";
+		static unsigned char test[] = "NE*000 memory";
 		static unsigned short base[] = {
 #ifdef	NE_SCAN
 			NE_SCAN,
@@ -896,7 +897,7 @@ static int eth_probe (struct dev *dev, unsigned short *probe_addrs __unused)
 			eth_rx_start = 32 + D8390_TXBUF_SIZE;
 			c = inb(eth_asic_base + NE_RESET);
 			outb(c, eth_asic_base + NE_RESET);
-			inb(0x84);
+			(void) inb(0x84);
 			outb(D8390_COMMAND_STP |
 				D8390_COMMAND_RD2, eth_nic_base + D8390_P0_COMMAND);
 			outb(D8390_RCR_MON, eth_nic_base + D8390_P0_RCR);
@@ -907,7 +908,7 @@ static int eth_probe (struct dev *dev, unsigned short *probe_addrs __unused)
 			eth_flags |= FLAG_16BIT;	/* force 16-bit mode */
 #endif
 
-			eth_pio_write(test, 8192, sizeof(test));
+			eth_pio_write( (unsigned char *) test, 8192, sizeof(test));
 			eth_pio_read(8192, testbuf, sizeof(test));
 			if (!memcmp(test, testbuf, sizeof(test)))
 				break;
@@ -919,7 +920,7 @@ static int eth_probe (struct dev *dev, unsigned short *probe_addrs __unused)
 				D8390_DCR_FT1 | D8390_DCR_LS, eth_nic_base + D8390_P0_DCR);
 			outb(MEM_16384, eth_nic_base + D8390_P0_PSTART);
 			outb(MEM_32768, eth_nic_base + D8390_P0_PSTOP);
-			eth_pio_write(test, 16384, sizeof(test));
+			eth_pio_write( (unsigned char *) test, 16384, sizeof(test));
 			eth_pio_read(16384, testbuf, sizeof(test));
 			if (!memcmp(testbuf, test, sizeof(test)))
 				break;

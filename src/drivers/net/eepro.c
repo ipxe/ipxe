@@ -265,11 +265,12 @@ static unsigned eeprom_reg = EEPROM_REG_PRO;
 #define eepro_full_reset(ioaddr)	outb(RESET_CMD, ioaddr); udelay(255);
 
 /* do a nice reset */
-#define eepro_sel_reset(ioaddr) 	{ \
-					outb(SEL_RESET_CMD, ioaddr); \
-					SLOW_DOWN; \
-					SLOW_DOWN; \
-					}
+#define eepro_sel_reset(ioaddr) \
+  do {  \
+    outb ( SEL_RESET_CMD, ioaddr ); \
+    (void) SLOW_DOWN; \
+    (void) SLOW_DOWN; \
+  } while (0)
 
 /* clear all interrupts */
 #define	eepro_clear_int(ioaddr)	outb(ALL_MASK, ioaddr + STATUS_REG)
@@ -332,7 +333,7 @@ static void eepro_reset(struct nic *nic)
 	/* Intialise XMT */
 	outw((XMT_LOWER_LIMIT << 8), nic->ioaddr + xmt_bar);
 	eepro_sel_reset(nic->ioaddr);
-	tx_start = tx_end = (XMT_LOWER_LIMIT << 8);
+	tx_start = tx_end = (unsigned int) (XMT_LOWER_LIMIT << 8);
 	tx_last = 0;
 	eepro_en_rx(nic->ioaddr);
 }

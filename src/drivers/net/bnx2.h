@@ -4091,7 +4091,7 @@ struct flash_spec {
 	u32 page_size;
 	u32 addr_mask;
 	u32 total_size;
-	u8  *name;
+	char  *name;
 };
 
 struct bnx2 {

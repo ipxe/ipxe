@@ -787,7 +787,7 @@ static int pcnet32_probe ( struct nic *nic, struct pci_device *pci ) {
 		ltint = 1;
 	}
 
-	DBG ( "%s at %hX,", chipname, ioaddr );
+	DBG ( "%s at %hX,", chipname, (unsigned int) ioaddr );
 
 	/* read PROM address */
 	for (i = 0; i < 6; i++)
@@ -799,7 +799,7 @@ static int pcnet32_probe ( struct nic *nic, struct pci_device *pci ) {
 	}
 
 	/* Print out some hardware info */
-	DBG ( "%s: IO Addr 0x%hX, MAC Addr %s\n ", chipname, ioaddr,
+	DBG ( "%s: IO Addr 0x%hX, MAC Addr %s\n ", chipname, (unsigned int) ioaddr,
 	      eth_ntoa ( nic->node_addr ) );
 
 	/* Set to pci bus master */

@@ -751,7 +751,8 @@ sis900_init_rxd(struct nic *nic __unused)
         rxd[i].bufptr = virt_to_bus(&rxb[i*RX_BUF_SIZE]);
         if (sis900_debug > 0)
             printf("sis900_init_rxd: rxd[%d]=%p link=%X cmdsts=%X bufptr=%X\n", 
-                   i, &rxd[i], rxd[i].link, rxd[i].cmdsts, rxd[i].bufptr);
+                   i, &rxd[i], (unsigned int) rxd[i].link, (unsigned int) rxd[i].cmdsts,
+		   (unsigned int) rxd[i].bufptr);
     }
 
     /* load Receive Descriptor Register */
@@ -1146,12 +1147,14 @@ sis900_transmit(struct nic  *nic,
         /* wait */ ;
 
     if (currticks() >= to) {
-        printf("sis900_transmit: TX Timeout! Tx status %X.\n", tx_status);
+        printf("sis900_transmit: TX Timeout! Tx status %X.\n", 
+	       (unsigned int) tx_status);
     }
     
     if (tx_status & (ABORT | UNDERRUN | OWCOLL)) {
         /* packet unsuccessfully transmited */
-        printf("sis900_transmit: Transmit error, Tx status %X.\n", tx_status);
+        printf("sis900_transmit: Transmit error, Tx status %X.\n", 
+	       (unsigned int) tx_status);
     }
     /* Disable interrupts by clearing the interrupt mask. */
     outl(0, ioaddr + imr);
@@ -1179,14 +1182,15 @@ sis900_poll(struct nic *nic, int retrieve)
     int retstat = 0;
 
     if (sis900_debug > 2)
-        printf("sis900_poll: cur_rx:%d, status:%X\n", cur_rx, rx_status);
+        printf("sis900_poll: cur_rx:%d, status:%X\n", cur_rx, 
+	       (unsigned int) rx_status);
 
     if (!(rx_status & OWN))
         return retstat;
 
     if (sis900_debug > 1)
         printf("sis900_poll: got a packet: cur_rx:%d, status:%X\n",
-               cur_rx, rx_status);
+               cur_rx, (unsigned int) rx_status);
 
     if ( ! retrieve ) return 1;
     
@@ -1195,7 +1199,7 @@ sis900_poll(struct nic *nic, int retrieve)
     if (rx_status & (ABORT|OVERRUN|TOOLONG|RUNT|RXISERR|CRCERR|FAERR)) {
         /* corrupted packet received */
         printf("sis900_poll: Corrupted packet received, buffer status = %X\n",
-               rx_status);
+               (unsigned int) rx_status);
         retstat = 0;
     } else {
         /* give packet to higher level routine */

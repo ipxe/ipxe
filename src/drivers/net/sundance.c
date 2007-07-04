@@ -611,7 +611,7 @@ static int sundance_probe ( struct nic *nic, struct pci_device *pci ) {
 	DBG ( "Device revision id: %hx\n", sdc->pci_rev_id );
 
 	/* Print out some hardware info */
-	DBG ( "%s: %s at ioaddr %hX, ", pci->driver_name, nic->node_addr, BASE);
+	DBG ( "%s: %s at ioaddr %hX, ", pci->driver_name, nic->node_addr, (unsigned int) BASE);
 
 	sdc->mii_preamble_required = 0;
 	if (1) {

@@ -1,5 +1,6 @@
-#warning "depca.c almost certainly won't work"
+#warning "depca.c almost certainly won't work."
 
+#if 0
 /* Not fixed for relocation yet. Probably won't work relocated above 16MB */
 #ifdef ALLMULTI
 #error multicast support is not yet implemented
@@ -791,3 +792,5 @@ DRIVER ( "depce", nic_driver, isa_driver, depca_driver,
 	 depca_probe, depca_disable );
 
 ISA_ROM ( "depca", "Digital DE100 and DE200" );
+
+#endif

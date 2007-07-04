@@ -70,7 +70,7 @@ static void TLan_PhyPowerDown(struct nic *nic);
 static void TLan_PhyPowerUp(struct nic *nic);
 
 
-static void TLan_SetMac(struct nic *nic __unused, int areg, char *mac);
+static void TLan_SetMac(struct nic *nic __unused, int areg, unsigned char *mac);
 
 static void TLan_PhyReset(struct nic *nic);
 static void TLan_PhyStartLink(struct nic *nic);
@@ -515,7 +515,7 @@ static int tlan_poll(struct nic *nic, int retrieve)
 
 	nic->packetlen = framesize;
 
-	DBG ( ".%d.", framesize ); 
+	DBG ( ".%d.", (unsigned int) framesize ); 
      
 	memcpy(nic->packet, rxb +
 	       (priv->cur_rx * TLAN_MAX_FRAME_SIZE), nic->packetlen);
@@ -591,7 +591,7 @@ static void tlan_transmit(struct nic *nic, const char *d,	/* Destination */
 
 	if (tail_list->cStat != TLAN_CSTAT_UNUSED) {
 		printf("TRANSMIT: %s is busy (Head=%p Tail=%x)\n",
-		       priv->nic_name, priv->txList, priv->txTail);
+		       priv->nic_name, priv->txList, (unsigned int) priv->txTail);
 		tx_ring[entry].cStat = TLAN_CSTAT_UNUSED;
 //		priv->txBusyCount++;
 		return;
@@ -1300,7 +1300,7 @@ void TLan_MiiWriteReg(struct nic *nic __unused, u16 phy, u16 reg, u16 val)
 *
 **************************************************************/
 
-void TLan_SetMac(struct nic *nic __unused, int areg, char *mac)
+void TLan_SetMac(struct nic *nic __unused, int areg, unsigned char *mac)
 {
 	int i;
 
@@ -1361,8 +1361,8 @@ void TLan_PhyDetect(struct nic *nic)
 		TLan_MiiReadReg(nic, phy, MII_GEN_ID_LO, &lo);
 		if ((control != 0xFFFF) || (hi != 0xFFFF)
 		    || (lo != 0xFFFF)) {
-			printf("PHY found at %hX %hX %hX %hX\n", phy,
-			       control, hi, lo);
+			printf("PHY found at %hX %hX %hX %hX\n", 
+			       (unsigned int) phy, control, hi, lo);
 			if ((priv->phy[1] == TLAN_PHY_NONE)
 			    && (phy != TLAN_PHY_MAX_ADDR)) {
 				priv->phy[1] = phy;

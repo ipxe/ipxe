@@ -534,7 +534,7 @@ static int mtd_poll(struct nic *nic, __unused int retrieve)
     if (rx_status & ErrorSummary)
     { /* there was a fatal error */
         printf( "%s: Receive error, Rx status %8.8x, Error(s) %s%s%s\n",
-                mtdx.nic_name, rx_status ,
+                mtdx.nic_name, (unsigned int) rx_status,
                 (rx_status & (LONG | RUNT)) ? "length_error ":"",
                 (rx_status & RXER) ? "frame_error ":"",
                 (rx_status & CRC) ? "crc_error ":"" );
@@ -550,7 +550,7 @@ static int mtd_poll(struct nic *nic, __unused int retrieve)
         short pkt_len = ((rx_status & FLNGMASK) >> FLNGShift) - 4;
 
         DBG ( " netdev_rx() normal Rx pkt length %d"
- 	      " status %x.\n", pkt_len, rx_status );
+ 	      " status %x.\n", pkt_len, (unsigned int) rx_status );
 
         nic->packetlen = pkt_len;
         memcpy(nic->packet, mtdx.cur_rx->skbuff, pkt_len);
@@ -619,7 +619,7 @@ static void mtd_transmit(
         DBG ( "TX Time Out" );
     } else if( tx_status & (CSL | LC | EC | UDF | HF)){
         printf( "Transmit error: %8.8x %s %s %s %s %s\n",
-                tx_status,
+                (unsigned int) tx_status,
                 tx_status & EC ? "abort" : "",
                 tx_status & CSL ? "carrier" : "",
                 tx_status & LC ? "late" : "",

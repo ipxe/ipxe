@@ -74,12 +74,22 @@ static u32 ioaddr;
 
 
 #ifdef RTL8169_DEBUG
+
+#if 0
 #define assert(expr) \
                if(!(expr)) { printk( "Assertion failed! %s,%s,%s,line=%d\n", #expr,__FILE__,__FUNCTION__,__LINE__); }
+#endif
+
 #define DBG_PRINTF( fmt, args...)   printk("r8169: " fmt, ## args);
+
 #else
+
+#if 0
 #define assert(expr) do {} while (0)
+#endif
+
 #define DBG_PRINTF( fmt, args...)   ;
+
 #endif				// end of #ifdef RTL8169_DEBUG
 
 /* media options 
@@ -904,7 +914,7 @@ static int r8169_probe ( struct nic *nic, struct pci_device *pci ) {
 
 	/* Print out some hardware info */
 	DBG ( "%s: %s at IOAddr %#hX, ", pci->driver_name, eth_ntoa ( nic->node_addr ),
-	       ioaddr );
+	      (unsigned int) ioaddr );
 
 	/* Config PHY */
 	rtl8169_hw_PHY_config(nic);

@@ -1022,7 +1022,7 @@ static u16 phy_read_1bit(unsigned long ioaddr)
 
 static void dmfe_parse_srom(struct nic *nic)
 {
-	char *srom = db->srom;
+	unsigned char *srom = db->srom;
 	int dmfe_mode, tmp_reg;
 
 	/* Init CR15 */

@@ -890,10 +890,10 @@ MIIDelay (void)
     int i;
     for (i = 0; i < 0x7fff; i++)
     {
-	inb (0x61);
-	inb (0x61);
-	inb (0x61);
-	inb (0x61);
+        ( void ) inb (0x61);
+        ( void ) inb (0x61);
+        ( void ) inb (0x61);
+        ( void ) inb (0x61);
     }
 }
 

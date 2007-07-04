@@ -1317,14 +1317,14 @@ static int tulip_probe ( struct nic *nic, struct pci_device *pci ) {
 
     if (inl(ioaddr + CSR5) == 0xFFFFFFFF) {
         printf("%s: The Tulip chip at %X is not functioning.\n",
-               tp->nic_name, ioaddr);
+               tp->nic_name, (unsigned int) ioaddr);
         return 0;
     }
    
     pci_read_config_byte(pci, PCI_REVISION, &chip_rev);
 
     printf("%s: [chip: %s] rev %d at %hX\n", tp->nic_name,
-           tulip_tbl[chip_idx].chip_name, chip_rev, ioaddr);
+           tulip_tbl[chip_idx].chip_name, chip_rev, (unsigned int) ioaddr);
     printf("%s: Vendor=%hX  Device=%hX", tp->nic_name, tp->vendor_id, tp->dev_id);
 
     if (chip_idx == DC21041  &&  inl(ioaddr + CSR9) & 0x8000) {
@@ -1404,7 +1404,8 @@ static int tulip_probe ( struct nic *nic, struct pci_device *pci ) {
     for (i = 0; i < ETH_ALEN; i++)
         last_phys_addr[i] = nic->node_addr[i];
 
-    DBG ( "%s: %s at ioaddr %hX\n", tp->nic_name, eth_ntoa ( nic->node_addr ), ioaddr );
+    DBG ( "%s: %s at ioaddr %hX\n", tp->nic_name, eth_ntoa ( nic->node_addr ), 
+	  (unsigned int) ioaddr );
 
     tp->chip_id = chip_idx;
     tp->revision = chip_rev;

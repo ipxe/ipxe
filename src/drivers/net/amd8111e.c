@@ -135,7 +135,6 @@ static void amd8111e_restart(struct amd8111e_priv *lp);
 static void amd8111e_init_hw_default(struct amd8111e_priv *lp)
 {
 	unsigned int reg_val;
-	unsigned int logic_filter[2] = {0,};
 	void *mmio = lp->mmio;
 
         /* stop the chip */
@@ -198,7 +197,8 @@ static void amd8111e_init_hw_default(struct amd8111e_priv *lp)
 	writew(MIB_CLEAR, mmio + MIB_ADDR);
 
 	/* Clear LARF */
-	amd8111e_writeq(*(u64*)logic_filter, mmio + LADRF);
+	writel( 0, mmio + LADRF);
+	writel( 0, mmio + LADRF + 4);
 
 	/* SRAM_SIZE register */
 	reg_val = readl(mmio + SRAM_SIZE);
@@ -342,7 +342,7 @@ static void amd8111e_probe_ext_phy(struct amd8111e_priv *lp)
 
 	if (lp->ext_phy_id)
 		printf("Found MII PHY ID 0x%08x at address 0x%02x\n",
-			lp->ext_phy_id, lp->ext_phy_addr);
+		       (unsigned int) lp->ext_phy_id, lp->ext_phy_addr);
 	else
 		printf("Couldn't detect MII PHY, assuming address 0x01\n");
 }
