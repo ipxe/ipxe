@@ -331,8 +331,7 @@ extern void adjust_pci_device ( struct pci_device *pci );
 extern unsigned long pci_bar_start ( struct pci_device *pci,
 				     unsigned int reg );
 extern int pci_find_capability ( struct pci_device *pci, int capability );
-extern __attribute__ (( deprecated )) unsigned long
-pci_bar_size ( struct pci_device *pci, unsigned int reg );
+extern unsigned long pci_bar_size ( struct pci_device *pci, unsigned int reg );
 
 /**
  * Set PCI driver-private data
