@@ -503,7 +503,7 @@ static void nat_poll ( struct net_device *netdev, unsigned int rx_quota ) {
 	struct io_buffer *rx_iob;
 	int i;
 	
-	outl(1,nat->ioaddr +IntrEnable);
+	//outl(1,nat->ioaddr +IntrEnable);
 	/* read the interrupt register */
 	intr_status=inl(nat->ioaddr+IntrStatus);
 	if(!intr_status)
@@ -579,7 +579,7 @@ end:
 
 	 /* re-enable the potentially idle receive state machine */
 	outl(RxOn, nat->ioaddr + ChipCmd);	
-	outl(1,nat->ioaddr +IntrEnable);
+//	outl(1,nat->ioaddr +IntrEnable);
 }				
 
 
