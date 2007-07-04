@@ -1,6 +1,7 @@
 #ifndef	ETHERBOOT_IO_H
 #define ETHERBOOT_IO_H
 
+#include <stdint.h>
 #include "virtaddr.h"
 
 /* virt_to_bus converts an addresss inside of etherboot [_start, _end]
@@ -71,13 +72,13 @@ static inline void iounmap(void *virt_addr __unused)
  * differently. On the x86 architecture, we just read/write the
  * memory location directly.
  */
-#define readb(addr) (*(volatile unsigned char *) (addr))
-#define readw(addr) (*(volatile unsigned short *) (addr))
-#define readl(addr) (*(volatile unsigned int *) (addr))
+#define readb(addr) (*(volatile uint8_t *) (addr))
+#define readw(addr) (*(volatile uint16_t *) (addr))
+#define readl(addr) (*(volatile uint32_t *) (addr))
 
-#define writeb(b,addr) ((*(volatile unsigned char *) (addr)) = (b))
-#define writew(b,addr) ((*(volatile unsigned short *) (addr)) = (b))
-#define writel(b,addr) ((*(volatile unsigned int *) (addr)) = (b))
+#define writeb(b,addr) ((*(volatile uint8_t *) (addr)) = (b))
+#define writew(b,addr) ((*(volatile uint16_t *) (addr)) = (b))
+#define writel(b,addr) ((*(volatile uint32_t *) (addr)) = (b))
 
 #define memcpy_fromio(a,b,c)	memcpy((a),(void *)(b),(c))
 #define memcpy_toio(a,b,c)	memcpy((void *)(a),(b),(c))
