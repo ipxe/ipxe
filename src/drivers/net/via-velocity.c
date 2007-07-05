@@ -356,7 +356,7 @@ static void velocity_get_options(struct velocity_opt *opts, int index,
 	velocity_set_bool_opt(&opts->flags, ValPktLen[index],
 			      VAL_PKT_LEN_DEF, VELOCITY_FLAGS_VAL_PKT_LEN,
 			      "ValPktLen", devname);
-	velocity_set_int_opt((int *) &opts->spd_dpx, speed_duplex[index],
+	velocity_set_int_opt((void *) &opts->spd_dpx, speed_duplex[index],
 			     MED_LNK_MIN, MED_LNK_MAX, MED_LNK_DEF,
 			     "Media link mode", devname);
 	velocity_set_int_opt((int *) &opts->wol_opts, wol_opts[index],
@@ -472,8 +472,7 @@ extern void hex_dump(const char *data, const unsigned int len);
 /**************************************************************************
 POLL - Wait for a frame
 ***************************************************************************/
-//EB53 static int velocity_poll(struct nic *nic, int retrieve)
-static int  velocity_poll(struct nic *nic __unused)
+static int velocity_poll(struct nic *nic, int retrieve)
 {
 	/* Work out whether or not there's an ethernet packet ready to
 	 * read.  Return 0 if not.
@@ -485,6 +484,8 @@ static int  velocity_poll(struct nic *nic __unused)
 	if (rd->rdesc0.owner == OWNED_BY_NIC)
 		return 0;
 	rmb();
+
+	if ( ! retrieve ) return 1;
 
 	/*
 	 *      Don't drop CE or RL error frame although RXOK is off
@@ -666,9 +667,8 @@ static struct nic_operations velocity_operations = {
 /**************************************************************************
 PROBE - Look for an adapter, this routine's visible to the outside
 ***************************************************************************/
-static int velocity_probe(struct pci_device *dev, struct pci_device *pci)
+static int velocity_probe( struct nic *nic, struct pci_device *pci)
 {
-	struct nic *nic = (struct nic *) dev;
 	int ret, i;
 	struct mac_regs *regs;
 
@@ -705,9 +705,10 @@ static int velocity_probe(struct pci_device *dev, struct pci_device *pci)
 	for (i = 0; i < 6; i++)
 		nic->node_addr[i] = readb(&regs->PAR[i]);
 
-	DBG ( "%s: %s at ioaddr %#hX\n", pci->driver_name, eth_ntoa ( nic->node_addr ), BASE );
+	DBG ( "%s: %s at ioaddr %#hX\n", pci->driver_name, eth_ntoa ( nic->node_addr ),
+	      (unsigned int) BASE );
 
-	velocity_get_options(&vptr->options, 0, pci->driver_name);
+	velocity_get_options(&vptr->options, 0, (char *) pci->driver_name);
 
 	/* 
 	 *      Mask out the options cannot be set to the chip
@@ -768,7 +769,7 @@ static void velocity_init_info(struct pci_device *pdev,
 
 	printf
 	    ("chip_id: 0x%hX, io_size: %d, num_txq %d, multicast_limit: %d\n",
-	     vptr->chip_id, vptr->io_size, vptr->num_txq,
+	     vptr->chip_id, (unsigned int) vptr->io_size, vptr->num_txq,
 	     vptr->multicast_limit);
 	printf("Name: %s\n", info->name);
 
@@ -1148,14 +1149,16 @@ static int velocity_init_rings(struct velocity_info *vptr)
 
 
 	for (idx = 0; idx < RX_DESC_DEF; idx++) {
-		*((u32 *) & (vptr->rd_ring[idx].rdesc0)) = 0;
+		vptr->rd_ring[idx].rdesc0.RSR = 0;
+		vptr->rd_ring[idx].rdesc0.len = 0;
+		vptr->rd_ring[idx].rdesc0.reserved = 0;
+		vptr->rd_ring[idx].rdesc0.owner = 0;
 		vptr->rd_ring[idx].len = cpu_to_le32(vptr->rx_buf_sz);
 		vptr->rd_ring[idx].inten = 1;
 		vptr->rd_ring[idx].pa_low =
 		    virt_to_bus(vptr->rxb + (RX_DESC_DEF * idx));
 		vptr->rd_ring[idx].pa_high = 0;
 		vptr->rd_ring[idx].rdesc0.owner = OWNED_BY_NIC;
-
 	}
 
 /*	for (i = 0; idx < TX_DESC_DEF; idx++ ) {

@@ -1,4 +1,3 @@
-#define EB54 1
 /*
  * Copyright (c) 1996, 2003 VIA Networking Technologies, Inc.
  * All rights reserved.
@@ -27,14 +26,6 @@
 
 #include "timer.h"
 
-#ifndef EB54
-typedef unsigned char u8;
-typedef signed char s8;
-typedef unsigned short u16;
-typedef signed short s16;
-typedef unsigned int u32;
-typedef signed int s32;
-#endif
 #ifndef VELOCITY_H
 #define VELOCITY_H
 
@@ -1630,9 +1621,12 @@ struct velocity_context {
     ((int) ((w) & (x)));})
 
 #define MII_GET_PHY_ID(p) ({\
-    u32 id;\
-    velocity_mii_read((p),MII_REG_PHYID2,(u16 *) &id);\
-    velocity_mii_read((p),MII_REG_PHYID1,((u16 *) &id)+1);\
+    u32 id;  \
+    u16 id2; \
+    u16 id1; \
+    velocity_mii_read((p),MII_REG_PHYID2, &id2);\
+    velocity_mii_read((p),MII_REG_PHYID1, &id1);\
+    id = ( ( (u32)id2 ) << 16 ) | id1;		\
     (id);})
 
 #ifdef LINUX
