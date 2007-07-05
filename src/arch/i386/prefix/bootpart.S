@@ -44,7 +44,7 @@ find_active_partition:
 	jc	1f
 	cmpw	$0xaa55, %bx
 	jne	1f
-	movw	$read_lba, read_sector
+	movw	$read_lba, read_sectors
 1:	
 	/* Read and process root partition table */
 	xorb	%dh, %dh
@@ -55,17 +55,26 @@ find_active_partition:
 
 	/* Print failure message */
 	movw	$10f, %si
-	movw	$(20f-10f), %cx
-1:	movw	$0x0007, %bx
-	movb	$0x0e, %ah
-	lodsb
-	int	$0x10
-	loop	1b
+	jmp	boot_error
+10:	.asciz	"Could not locate active partition\r\n"
 
-	/* Boot next device */
+/*
+ * Print failure message and boot next device
+ *
+ * Parameters:
+ *   %si	: Failure string
+ */
+boot_error:
+	cld
+	movw	$0x0007, %bx
+	movb	$0x0e, %ah
+1:	lodsb
+	testb	%al, %al
+	je	99f
+	int	$0x10
+	jmp	1b
+99:	/* Boot next device */
 	int	$0x18
-10:	.ascii	"Could not locate active partition\r\n"
-20:	
 
 /*
  * Process partition table
@@ -149,7 +158,7 @@ process_partition:
 read_boot_sector:
 	pushw	%ax
 	movw	$1, %ax
-	call	*read_sector
+	call	*read_sectors
 	jc	99f
 	cmpw	$0xaa55, %es:(510)
 	je	99f
@@ -158,7 +167,7 @@ read_boot_sector:
 	ret
 	
 /*
- * Read single sector to %es:0000 and verify 0x55aa signature
+ * Read sectors to %es:0000
  *
  * Parameters:
  *   %dl	: BIOS drive number
@@ -171,7 +180,7 @@ read_boot_sector:
  * Returns:
  *   CF set on error
  */
-read_sector:	.word	read_chs
+read_sectors:	.word	read_chs
 
 read_chs:
 	/* Read sectors using C/H/S address */
