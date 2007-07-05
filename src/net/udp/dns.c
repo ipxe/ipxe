@@ -30,6 +30,7 @@
 #include <gpxe/resolv.h>
 #include <gpxe/retry.h>
 #include <gpxe/tcpip.h>
+#include <gpxe/dhcp.h>
 #include <gpxe/dns.h>
 
 /** @file
@@ -502,4 +503,26 @@ static int dns_resolv ( struct resolv_interface *resolv,
 struct resolver dns_resolver __resolver ( RESOLV_NORMAL ) = {
 	.name = "DNS",
 	.resolv = dns_resolv,
+};
+
+/**
+ * Apply DHCP nameserver option
+ *
+ * @v tag		DHCP option tag
+ * @v option		DHCP option
+ */
+static int apply_dhcp_nameserver ( unsigned int tag __unused,
+				   struct dhcp_option *option ) {
+	struct sockaddr_in *sin_nameserver;
+
+	sin_nameserver = ( struct sockaddr_in * ) &nameserver;
+	sin_nameserver->sin_family = AF_INET;
+	dhcp_ipv4_option ( option, &sin_nameserver->sin_addr );
+	return 0;
+}
+
+/** DHCP nameserver applicator */
+struct dhcp_option_applicator dhcp_nameserver_applicator __dhcp_applicator = {
+	.tag = DHCP_DNS_SERVERS,
+	.apply = apply_dhcp_nameserver,
 };

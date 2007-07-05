@@ -30,7 +30,6 @@
 #include <gpxe/retry.h>
 #include <gpxe/tcpip.h>
 #include <gpxe/ip.h>
-#include <gpxe/uri.h>
 #include <gpxe/dhcp.h>
 
 /** @file
@@ -826,12 +825,6 @@ int start_dhcp ( struct job_interface *job, struct net_device *netdev,
  *
  */
 
-/* Avoid dragging in dns.o */
-struct sockaddr_tcpip nameserver;
-
-/* Avoid dragging in syslog.o */
-struct in_addr syslogserver;
-
 /**
  * Configure network device from DHCP options
  *
@@ -844,10 +837,6 @@ int dhcp_configure_netdev ( struct net_device *netdev,
 	struct in_addr address = { 0 };
 	struct in_addr netmask = { 0 };
 	struct in_addr gateway = { INADDR_NONE };
-	struct sockaddr_in *sin_nameserver;
-	struct in_addr tftp_server;
-	struct uri *uri;
-	char uri_string[32];
 	int rc;
 
 	/* Clear any existing routing table entry */
@@ -866,23 +855,12 @@ int dhcp_configure_netdev ( struct net_device *netdev,
 		return rc;
 	}
 
-	/* Retrieve other DHCP options that we care about */
-	sin_nameserver = ( struct sockaddr_in * ) &nameserver;
-	sin_nameserver->sin_family = AF_INET;
-	find_dhcp_ipv4_option ( options, DHCP_DNS_SERVERS,
-				&sin_nameserver->sin_addr );
-	find_dhcp_ipv4_option ( options, DHCP_LOG_SERVERS,
-				&syslogserver );
-
-	/* Set current working URI based on TFTP server */
-	find_dhcp_ipv4_option ( options, DHCP_EB_SIADDR, &tftp_server );
-	snprintf ( uri_string, sizeof ( uri_string ),
-		   "tftp://%s/", inet_ntoa ( tftp_server ) );
-	uri = parse_uri ( uri_string );
-	if ( ! uri )
-		return -ENOMEM;
-	churi ( uri );
-	uri_put ( uri );
+	/* Apply other DHCP options */
+	if ( ( rc = apply_dhcp_options ( options ) ) != 0 ) {
+		DBG ( "Could not apply %s DHCP result options: %s\n",
+		      netdev->name, strerror ( rc ) );
+		return rc;
+	}
 
 	return 0;
 }

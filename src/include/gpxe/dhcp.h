@@ -11,6 +11,7 @@
 #include <gpxe/list.h>
 #include <gpxe/in.h>
 #include <gpxe/refcnt.h>
+#include <gpxe/tables.h>
 
 struct net_device;
 struct job_interface;
@@ -438,6 +439,23 @@ struct dhcp_packet {
 	struct dhcp_option_block options;
 };
 
+/** A DHCP option applicator */
+struct dhcp_option_applicator {
+	/** DHCP option tag */
+	unsigned int tag;
+	/** Applicator
+	 *
+	 * @v tag	DHCP option tag
+	 * @v option	DHCP option
+	 * @ret rc	Return status code
+	 */
+	int ( * apply ) ( unsigned int tag, struct dhcp_option *option );
+};
+
+/** Declare a DHCP option applicator */
+#define __dhcp_applicator \
+	__table ( struct dhcp_option_applicator, dhcp_appicators, 01 )
+
 /**
  * Get reference to DHCP options block
  *
@@ -485,6 +503,7 @@ extern void find_global_dhcp_ipv4_option ( unsigned int tag,
 					   struct in_addr *inp );
 extern void delete_dhcp_option ( struct dhcp_option_block *options,
 				 unsigned int tag );
+extern int apply_dhcp_options ( struct dhcp_option_block *options );
 
 extern struct dhcp_option_block dhcp_request_options;
 extern int create_dhcp_packet ( struct net_device *netdev, uint8_t msgtype,
