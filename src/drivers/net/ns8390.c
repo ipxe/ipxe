@@ -25,7 +25,7 @@ SMC8416 PIO support added by Andrew Bettison (andrewb@zip.com.au) on 4/3/02
 
 **************************************************************************/
 
-#warning "ns8390.c is a horrendous mess and needs to be tidied up"
+#warning "ns8390.c: FIXME: split ISA and PCI, clean up"
 #if 1
 
 
