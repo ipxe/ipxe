@@ -20,6 +20,7 @@ find_active_partition:
 	movw	$STACK_SEG, %ax
 	movw	%ax, %ss
 	movw	$STACK_SIZE, %sp
+
 	/* Relocate self to EXEC_SEG */
 	pushw	$BOOT_SEG
 	popw	%ds
@@ -34,12 +35,24 @@ find_active_partition:
 	popw	%es
 	pushw	%cs
 	popw	%ds
+
+	/* Check for LBA extensions */
+	movb	$0x41, %ah
+	movw	$0x55aa, %bx
+	stc
+	int	$0x13
+	jc	1f
+	cmpw	$0xaa55, %bx
+	jne	1f
+	movw	$read_lba, read_sector
+1:	
 	/* Read and process root partition table */
 	xorb	%dh, %dh
 	movw	$0x0001, %cx
 	xorl	%esi, %esi
 	xorl	%edi, %edi
 	call	process_table
+
 	/* Print failure message */
 	movw	$10f, %si
 	movw	$(20f-10f), %cx
@@ -48,6 +61,7 @@ find_active_partition:
 	lodsb
 	int	$0x10
 	loop	1b
+
 	/* Boot next device */
 	int	$0x18
 10:	.ascii	"Could not locate active partition\r\n"
@@ -69,10 +83,10 @@ find_active_partition:
  */
 process_table:
 	pushal
-	movw	$446, %bx
-1:	call	read_sector
+	call	read_boot_sector
 	jc	99f
-	call	process_partition
+	movw	$446, %bx
+1:	call	process_partition
 	addw	$16, %bx
 	cmpw	$510, %bx
 	jne	1b
@@ -102,7 +116,7 @@ process_partition:
 	/* Check active flag */
 	testb	$0x80, %es:(%bx)
 	jz	1f
-	call	read_sector
+	call	read_boot_sector
 	jc	99f
 	jmp	*%bp
 1:	/* Check for extended partition */
@@ -115,10 +129,12 @@ process_partition:
 	jne	99f
 2:	call	process_table
 99:	popal
+	/* Reload original partition table */
+	call	read_boot_sector
 	ret
 
 /*
- * Read single sector to 0000:7c00 and verify 0x55aa signature
+ * Read single sector to %es:0000 and verify 0x55aa signature
  *
  * Parameters:
  *   %dl	: BIOS drive number
@@ -130,32 +146,56 @@ process_partition:
  * Returns:
  *   CF set on error
  */
-read_sector:
-	pushal
-	/* Check for LBA extensions */
-	call	check_lba
-	jnc	read_lba
-read_chs:
-	/* Read sector using C/H/S address */
-	movw	$0x0201, %ax
-	xorw	%bx, %bx
-	stc
-	int	$0x13
-	sti
-	jmp	99f
-read_lba:
-	/* Read sector using LBA address */
-	movb	$0x42, %ah
-	movl	%esi, (lba_desc + 12)
-	movl	%edi, (lba_desc + 8)
-	movw	$lba_desc, %si
-	int	$0x13
-99:	/* Check for 55aa signature */
+read_boot_sector:
+	pushw	%ax
+	movw	$1, %ax
+	call	*read_sector
 	jc	99f
 	cmpw	$0xaa55, %es:(510)
 	je	99f
+	stc	
+99:	popw	%ax
+	ret
+	
+/*
+ * Read single sector to %es:0000 and verify 0x55aa signature
+ *
+ * Parameters:
+ *   %dl	: BIOS drive number
+ *   %dh	: Head
+ *   %cl	: Sector (bits 0-5), high two bits of cylinder (bits 6-7)
+ *   %ch	: Low eight bits of cylinder
+ *   %esi:%edi	: LBA address
+ *   %ax	: Number of sectors (max 127)
+ *
+ * Returns:
+ *   CF set on error
+ */
+read_sector:	.word	read_chs
+
+read_chs:
+	/* Read sectors using C/H/S address */
+	pushal
+	xorw	%bx, %bx
+	movb	$0x02, %ah
 	stc
-99:	popal
+	int	$0x13
+	sti
+	popal
+	ret
+
+read_lba:
+	/* Read sectors using LBA address */
+	pushal
+	movw	%ax, (lba_desc + 2)
+	pushw	%es
+	popw	(lba_desc + 6)
+	movl	%edi, (lba_desc + 8)
+	movl	%esi, (lba_desc + 12)
+	movw	$lba_desc, %si
+	movb	$0x42, %ah
+	int	$0x13
+	popal
 	ret
 
 lba_desc:
@@ -163,27 +203,5 @@ lba_desc:
 	.byte	0
 	.word	1
 	.word	0x0000
-	.word	0x07c0
+	.word	0x0000
 	.long	0, 0
-
-/*
- * Check for LBA extensions
- *	
- * Parameters:
- *   %dl	: BIOS drive number
- *
- * Returns:
- *   CF clear if LBA extensions supported
- */
-check_lba:
-	pushal
-	movb	$0x41, %ah
-	movw	$0x55aa, %bx
-	stc
-	int	$0x13
-	jc	99f
-	cmpw	$0xaa55, %bx
-	je	99f
-	stc
-99:	popal
-	ret
