@@ -63,6 +63,7 @@
 
 
 #include <stdint.h>
+#include <pic8259.h>
 #include <stdlib.h>
 #include <stdio.h>
 #include <io.h>
@@ -616,6 +617,15 @@ static int nat_probe ( struct pci_device *pci,
 	netdev->dev = &pci->dev;
 	memset ( nat, 0, sizeof ( *nat ) );
 	nat->ioaddr = pci->ioaddr;
+
+	/* getting the IRQ vector */
+	unsigned long vector_phys = IRQ_INT ( pci->irq ) * 4;
+	DBG_HDA ( vector_phys, phys_to_virt ( vector_phys ), 4 );
+	DBG_HD ( phys_to_virt ( 0xfaea5 ), 64 );
+	DBG (" PIC state %X\n", irq_enabled(pci->irq));
+	DBG (" IRQ Number %X\n",pci->irq);
+
+
 
 	/* Reset the NIC, set up EEPROM access and read MAC address */
 	nat_reset ( nat );
