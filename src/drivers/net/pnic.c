@@ -128,13 +128,14 @@ static void pnic_poll ( struct net_device *netdev, unsigned int rx_quota ) {
 			break;
 		iobuf = alloc_iob ( ETH_FRAME_LEN );
 		if ( ! iobuf ) {
-			printf ( "could not allocate buffer\n" );
+			DBG ( "could not allocate buffer\n" );
+			netdev_rx_err ( netdev, NULL, -ENOMEM );
 			break;
 		}
 		if ( pnic_command ( pnic, PNIC_CMD_RECV, NULL, 0,
 				    iobuf->data, ETH_FRAME_LEN, &length )
 		     != PNIC_STATUS_OK ) {
-			free_iob ( iobuf );
+			netdev_rx_err ( netdev, iobuf, -EIO );
 			break;
 		}
 		iob_put ( iobuf, length );

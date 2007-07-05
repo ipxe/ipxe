@@ -444,6 +444,7 @@ static void rtl_poll ( struct net_device *netdev, unsigned int rx_quota ) {
 
 			rx_iob = alloc_iob ( rx_len );
 			if ( ! rx_iob ) {
+				netdev_rx_err ( netdev, NULL, -ENOMEM );
 				/* Leave packet for next call to poll() */
 				break;
 			}
@@ -464,6 +465,7 @@ static void rtl_poll ( struct net_device *netdev, unsigned int rx_quota ) {
 		} else {
 			DBG ( "RX bad packet (status %#04x len %d)\n",
 			      rx_status, rx_len );
+			netdev_rx_err ( netdev, NULL, -EINVAL );
 		}
 		rtl->rx.offset = ( ( ( rtl->rx.offset + 4 + rx_len + 3 ) & ~3 )
 				   % RX_BUF_LEN );
