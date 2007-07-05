@@ -98,6 +98,10 @@ MEDIA			+= com
 
 MEDIA			+= exe
 
+# Special target for building Master Boot Record binary
+$(BIN)/mbr.bin : $(BIN)/mbr.o
+	$(OBJCOPY) -O binary $< $@
+
 # Some suffixes (e.g. %.zfd0) are generated directly from other
 # finished files (e.g. %.zdsk), rather than having their own prefix.
 
@@ -116,6 +120,13 @@ NON_AUTO_MEDIA		+= iso
 NON_AUTO_MEDIA		+= liso
 %liso:	%lilo util/genliso
 	bash util/genliso $@ $<
+
+# rule to make a USB disk image
+$(BIN)/usbdisk.bin : $(BIN)/usbdisk.o
+	$(OBJCOPY) -O binary $< $@
+
+%usb: $(BIN)/usbdisk.bin %hd
+	cat $^ > $@
 
 # Add NON_AUTO_MEDIA to the media list, so that they show up in the
 # output of "make"
