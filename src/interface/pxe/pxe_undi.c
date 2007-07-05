@@ -371,10 +371,10 @@ PXENV_EXIT_t pxenv_undi_get_statistics ( struct s_PXENV_UNDI_GET_STATISTICS
 					 *undi_get_statistics ) {
 	DBG ( "PXENV_UNDI_GET_STATISTICS" );
 
-	undi_get_statistics->XmtGoodFrames = pxe_netdev->stats.tx_count;
-	undi_get_statistics->RcvGoodFrames = pxe_netdev->stats.rx_count;
-	undi_get_statistics->RcvCRCErrors = 0;
-	undi_get_statistics->RcvResourceErrors = 0;
+	undi_get_statistics->XmtGoodFrames = pxe_netdev->stats.tx_ok;
+	undi_get_statistics->RcvGoodFrames = pxe_netdev->stats.rx_ok;
+	undi_get_statistics->RcvCRCErrors = pxe_netdev->stats.rx_err;
+	undi_get_statistics->RcvResourceErrors = pxe_netdev->stats.rx_err;
 
 	undi_get_statistics->Status = PXENV_STATUS_SUCCESS;
 	return PXENV_EXIT_SUCCESS;

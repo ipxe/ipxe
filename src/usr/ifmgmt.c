@@ -61,8 +61,9 @@ void ifclose ( struct net_device *netdev ) {
  * @v netdev		Network device
  */
 void ifstat ( struct net_device *netdev ) {
-	printf ( "%s: %s on %s (%s) TX:%d RX:%d\n",
+	printf ( "%s: %s on %s (%s) TX:%d TXE:%d RX:%d RXE:%d\n",
 		 netdev->name, netdev_hwaddr ( netdev ), netdev->dev->name,
 		 ( ( netdev->state & NETDEV_OPEN ) ? "open" : "closed" ),
-		 netdev->stats.tx_count, netdev->stats.rx_count );
+		 netdev->stats.tx_ok, netdev->stats.tx_err,
+		 netdev->stats.rx_ok, netdev->stats.rx_err );
 }

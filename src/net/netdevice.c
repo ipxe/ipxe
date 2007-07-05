@@ -74,9 +74,7 @@ int netdev_tx ( struct net_device *netdev, struct io_buffer *iobuf ) {
 	return 0;
 
  err:
-	DBGC ( netdev, "NETDEV %p transmission %p failed: %s\n",
-	       netdev, iobuf, strerror ( rc ) );
-	netdev_tx_complete ( netdev, iobuf );
+	netdev_tx_complete_err ( netdev, iobuf, rc );
 	return rc;
 }
 
@@ -85,11 +83,23 @@ int netdev_tx ( struct net_device *netdev, struct io_buffer *iobuf ) {
  *
  * @v netdev		Network device
  * @v iobuf		I/O buffer
+ * @v rc		Packet status code
  *
  * The packet must currently be in the network device's TX queue.
  */
-void netdev_tx_complete ( struct net_device *netdev, struct io_buffer *iobuf ) {
-	DBGC ( netdev, "NETDEV %p transmission %p complete\n", netdev, iobuf );
+void netdev_tx_complete_err ( struct net_device *netdev,
+			      struct io_buffer *iobuf, int rc ) {
+
+	/* Update statistics counter */
+	if ( rc == 0 ) {
+		netdev->stats.tx_ok++;
+		DBGC ( netdev, "NETDEV %p transmission %p complete\n",
+		       netdev, iobuf );
+	} else {
+		netdev->stats.tx_err++;
+		DBGC ( netdev, "NETDEV %p transmission %p failed: %s\n",
+		       netdev, iobuf, strerror ( rc ) );
+	}
 
 	/* Catch data corruption as early as possible */
 	assert ( iobuf->list.next != NULL );
@@ -98,23 +108,21 @@ void netdev_tx_complete ( struct net_device *netdev, struct io_buffer *iobuf ) {
 	/* Dequeue and free I/O buffer */
 	list_del ( &iobuf->list );
 	free_iob ( iobuf );
-
-	/* Update statistics counter */
-	netdev->stats.tx_count++;
 }
 
 /**
  * Complete network transmission
  *
  * @v netdev		Network device
+ * @v rc		Packet status code
  *
  * Completes the oldest outstanding packet in the TX queue.
  */
-void netdev_tx_complete_next ( struct net_device *netdev ) {
+void netdev_tx_complete_next_err ( struct net_device *netdev, int rc ) {
 	struct io_buffer *iobuf;
 
 	list_for_each_entry ( iobuf, &netdev->tx_queue, list ) {
-		netdev_tx_complete ( netdev, iobuf );
+		netdev_tx_complete_err ( netdev, iobuf, rc );
 		return;
 	}
 }
@@ -128,7 +136,7 @@ static void netdev_tx_flush ( struct net_device *netdev ) {
 
 	/* Discard any packets in the TX queue */
 	while ( ! list_empty ( &netdev->tx_queue ) ) {
-		netdev_tx_complete_next ( netdev );
+		netdev_tx_complete_next_err ( netdev, -ECANCELED );
 	}
 }
 
@@ -136,12 +144,13 @@ static void netdev_tx_flush ( struct net_device *netdev ) {
  * Add packet to receive queue
  *
  * @v netdev		Network device
- * @v iobuf		I/O buffer
+ * @v iobuf		I/O buffer, or NULL
  *
  * The packet is added to the network device's RX queue.  This
  * function takes ownership of the I/O buffer.
  */
 void netdev_rx ( struct net_device *netdev, struct io_buffer *iobuf ) {
+
 	DBGC ( netdev, "NETDEV %p received %p (%p+%zx)\n",
 	       netdev, iobuf, iobuf->data, iob_len ( iobuf ) );
 
@@ -149,7 +158,32 @@ void netdev_rx ( struct net_device *netdev, struct io_buffer *iobuf ) {
 	list_add_tail ( &iobuf->list, &netdev->rx_queue );
 
 	/* Update statistics counter */
-	netdev->stats.rx_count++;
+	netdev->stats.rx_ok++;
+}
+
+/**
+ * Discard received packet
+ *
+ * @v netdev		Network device
+ * @v iobuf		I/O buffer, or NULL
+ * @v rc		Packet status code
+ *
+ * The packet is discarded and an RX error is recorded.  This function
+ * takes ownership of the I/O buffer.  @c iobuf may be NULL if, for
+ * example, the net device wishes to report an error due to being
+ * unable to allocate an I/O buffer.
+ */
+void netdev_rx_err ( struct net_device *netdev,
+		     struct io_buffer *iobuf, int rc ) {
+
+	DBGC ( netdev, "NETDEV %p failed to receive %p: %s\n",
+	       netdev, iobuf, strerror ( rc ) );
+
+	/* Discard packet */
+	free_iob ( iobuf );
+
+	/* Update statistics counter */
+	netdev->stats.rx_err++;
 }
 
 /**
@@ -200,9 +234,7 @@ static void netdev_rx_flush ( struct net_device *netdev ) {
 
 	/* Discard any packets in the RX queue */
 	while ( ( iobuf = netdev_rx_dequeue ( netdev ) ) ) {
-		DBGC ( netdev, "NETDEV %p discarding received %p\n",
-		       netdev, iobuf );
-		free_iob ( iobuf );
+		netdev_rx_err ( netdev, iobuf, -ECANCELED );
 	}
 }
 

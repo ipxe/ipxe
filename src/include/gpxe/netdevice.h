@@ -134,9 +134,13 @@ struct ll_protocol {
  */
 struct net_device_stats {
 	/** Count of successfully completed transmissions */
-	unsigned int tx_count;
+	unsigned int tx_ok;
+	/** Count of transmission errors */
+	unsigned int tx_err;
 	/** Count of successfully received packets */
-	unsigned int rx_count;
+	unsigned int rx_ok;
+	/** Count of reception errors */
+	unsigned int rx_err;
 };
 
 /**
@@ -189,7 +193,8 @@ struct net_device {
 	 * owned by the net device's TX queue, and the net device must
 	 * eventually call netdev_tx_complete() to free the buffer.
 	 * If this method returns failure, the I/O buffer is
-	 * immediately released.
+	 * immediately released; the failure is interpreted as
+	 * "failure to enqueue buffer".
 	 *
 	 * This method is guaranteed to be called only when the device
 	 * is open.
@@ -289,10 +294,12 @@ netdev_put ( struct net_device *netdev ) {
 }
 
 extern int netdev_tx ( struct net_device *netdev, struct io_buffer *iobuf );
-extern void netdev_tx_complete ( struct net_device *netdev,
-				 struct io_buffer *iobuf );
-extern void netdev_tx_complete_next ( struct net_device *netdev );
+extern void netdev_tx_complete_err ( struct net_device *netdev,
+				 struct io_buffer *iobuf, int rc );
+extern void netdev_tx_complete_next_err ( struct net_device *netdev, int rc );
 extern void netdev_rx ( struct net_device *netdev, struct io_buffer *iobuf );
+extern void netdev_rx_err ( struct net_device *netdev,
+			    struct io_buffer *iobuf, int rc );
 extern int netdev_poll ( struct net_device *netdev, unsigned int rx_quota );
 extern struct io_buffer * netdev_rx_dequeue ( struct net_device *netdev );
 extern struct net_device * alloc_netdev ( size_t priv_size );
@@ -307,5 +314,29 @@ extern int net_tx ( struct io_buffer *iobuf, struct net_device *netdev,
 		    struct net_protocol *net_protocol, const void *ll_dest );
 extern int net_rx ( struct io_buffer *iobuf, struct net_device *netdev,
 		    uint16_t net_proto, const void *ll_source );
+
+/**
+ * Complete network transmission
+ *
+ * @v netdev		Network device
+ * @v iobuf		I/O buffer
+ *
+ * The packet must currently be in the network device's TX queue.
+ */
+static inline void netdev_tx_complete ( struct net_device *netdev,
+					struct io_buffer *iobuf ) {
+	netdev_tx_complete_err ( netdev, iobuf, 0 );
+}
+
+/**
+ * Complete network transmission
+ *
+ * @v netdev		Network device
+ *
+ * Completes the oldest outstanding packet in the TX queue.
+ */
+static inline void netdev_tx_complete_next ( struct net_device *netdev ) {
+	netdev_tx_complete_next_err ( netdev, 0 );
+}
 
 #endif /* _GPXE_NETDEVICE_H */
