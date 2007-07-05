@@ -12,12 +12,12 @@
 
 /* IP constants */
 
-#define IP_VER		0x40
-#define IP_MASK_VER	0xf0
-#define IP_MASK_HLEN 	0x0f
-#define IP_MASK_OFFSET	0x1fff
-#define IP_MASK_DONOTFRAG	0x4000
-#define IP_MASK_MOREFRAGS	0x2000
+#define IP_VER			0x40U
+#define IP_MASK_VER		0xf0U
+#define IP_MASK_HLEN 		0x0fU
+#define IP_MASK_OFFSET		0x1fffU
+#define IP_MASK_DONOTFRAG	0x4000U
+#define IP_MASK_MOREFRAGS	0x2000U
 #define IP_PSHLEN 	12
 
 /* IP header defaults */
