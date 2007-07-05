@@ -23,8 +23,11 @@
  *
  */
 
+#include <limits.h>
+#include <errno.h>
 #include <gpxe/uaccess.h>
 #include <gpxe/hidemem.h>
+#include <gpxe/memmap.h>
 #include <gpxe/umalloc.h>
 
 /** Alignment of external allocated memory */
@@ -36,9 +39,6 @@
 /** Start of Etherboot text, as defined by the linker */
 extern char _text[];
 
-/** Top of allocatable memory */
-#define TOP ( virt_to_user ( _text ) )
-
 /** An external memory block */
 struct external_memory {
 	/** Size of this memory block (excluding this header) */
@@ -47,11 +47,63 @@ struct external_memory {
 	int used;
 };
 
-/** Current lowest allocated block
+/** Top of heap */
+static userptr_t top = UNULL;
+
+/** Bottom of heap (current lowest allocated block) */
+static userptr_t bottom = UNULL;
+
+/**
+ * Initialise external heap
  *
- * A value of UNULL indicates that no blocks are currently allocated.
+ * @ret rc		Return status code
  */
-userptr_t bottom = UNULL;
+static int init_eheap ( void ) {
+	struct memory_map memmap;
+	unsigned long heap_size = 0;
+	unsigned int i;
+
+	DBG ( "Allocating external heap\n" );
+
+	get_memmap ( &memmap );
+	for ( i = 0 ; i < memmap.count ; i++ ) {
+		struct memory_region *region = &memmap.regions[i];
+		unsigned long r_start, r_end;
+		unsigned long r_size;
+
+		DBG ( "Considering [%llx,%llx)\n", region->start, region->end);
+
+		/* Truncate block to 4GB */
+		if ( region->start > UINT_MAX ) {
+			DBG ( "...starts after 4GB\n" );
+			continue;
+		}
+		r_start = region->start;
+		if ( region->end > UINT_MAX ) {
+			DBG ( "...end truncated to 4GB\n" );
+			r_end = 0; /* =4GB, given the wraparound */
+		} else {
+			r_end = region->end;
+		}
+
+		/* Use largest block */
+		r_size = ( r_end - r_start );
+		if ( r_size > heap_size ) {
+			DBG ( "...new best block found\n" );
+			top = bottom = phys_to_user ( r_end );
+			heap_size = r_size;
+		}
+	}
+
+	if ( ! top ) {
+		DBG ( "No external heap available\n" );
+		return -ENOMEM;
+	}
+
+	DBG ( "External heap grows downwards from %lx\n",
+	      user_to_phys ( top, 0 ) );
+	return 0;
+}
 
 /**
  * Collect free blocks
@@ -61,7 +113,7 @@ static void ecollect_free ( void ) {
 	struct external_memory extmem;
 
 	/* Walk the free list and collect empty blocks */
-	while ( bottom != TOP ) {
+	while ( bottom != top ) {
 		copy_from_user ( &extmem, bottom, -sizeof ( extmem ),
 				 sizeof ( extmem ) );
 		if ( extmem.used )
@@ -87,10 +139,13 @@ userptr_t urealloc ( userptr_t ptr, size_t new_size ) {
 	struct external_memory extmem;
 	userptr_t new = ptr;
 	size_t align;
+	int rc;
 
 	/* Initialise external memory allocator if necessary */
-	if ( ! bottom  )
-		bottom = TOP;
+	if ( ! top  ) {
+		if ( ( rc = init_eheap() ) != 0 )
+			return rc;
+	}
 
 	/* Get block properties into extmem */
 	if ( ptr && ( ptr != UNOWHERE ) ) {
@@ -140,7 +195,7 @@ userptr_t urealloc ( userptr_t ptr, size_t new_size ) {
 	/* Collect any free blocks and update hidden memory region */
 	ecollect_free();
 	hide_region ( EXTMEM, user_to_phys ( bottom, -sizeof ( extmem ) ),
-		      user_to_phys ( TOP, 0 ) );
+		      user_to_phys ( top, 0 ) );
 
 	return ( new_size ? new : UNOWHERE );
 }
