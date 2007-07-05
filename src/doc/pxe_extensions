@@ -1,0 +1,151 @@
+FILE OPEN
+
+Op-Code:	PXENV_FILE_OPEN (00e0h)
+
+Input:		Far pointer to a t_PXENV_FILE_OPEN parameter structure
+		that has been initialised by the caller.
+
+Output:		PXENV_EXIT_SUCCESS or PXENV_EXIT_FAILURE must be
+		returned in AX.  The status field in the parameter
+		structure must be set to one of the values represented
+		by the PXENV_STATUS_xxx constants.
+
+Description:	Opens a file specified by a URL for reading.  Multiple
+		files may be opened and used concurrently.
+
+
+typedef struct s_PXENV_FILE_OPEN {
+	PXENV_STATUS Status;
+	UINT16 FileHandle;
+	UINT32 Reserved;
+	UINT8 FileName[256];
+} t_PXENV_FILE_OPEN;
+
+
+Set before calling API service:
+
+FileName:	URL of file to be opened.  Null terminated.
+
+Reserved:	Must be zero.
+
+
+Returned from API service:
+
+FileHandle:	Handle for use in subsequent PXE FILE API calls.
+
+Status:		See PXENV_STATUS_xxx constants.
+
+
+
+
+FILE CLOSE
+
+Op-Code:	PXENV_FILE_CLOSE (00e1h)
+
+Input:		Far pointer to a t_PXENV_FILE_CLOSE parameter structure
+		that has been initialised by the caller.
+
+Output:		PXENV_EXIT_SUCCESS or PXENV_EXIT_FAILURE must be
+		returned in AX.  The status field in the parameter
+		structure must be set to one of the values represented
+		by the PXENV_STATUS_xxx constants.
+
+Description:	Closes a previously opened file.
+
+
+typedef struct s_PXENV_FILE_CLOSE {
+	PXENV_STATUS Status;
+	UINT16 FileHandle;
+} t_PXENV_FILE_CLOSE;
+
+
+Set before calling API service:
+
+FileHandle:	Handle obtained when file was opened.
+
+
+Returned from API service:
+
+Status:		See PXENV_STATUS_xxx constants.
+
+
+
+
+FILE SELECT
+
+Op-Code:	PXENV_FILE_SELECT (00e2h)
+
+Input:		Far pointer to a t_PXENV_FILE_SELECT parameter structure
+		that has been initialised by the caller.
+
+Output:		PXENV_EXIT_SUCCESS or PXENV_EXIT_FAILURE must be
+		returned in AX.  The status field in the parameter
+		structure must be set to one of the values represented
+		by the PXENV_STATUS_xxx constants.
+
+Description:	Check a previously opened file's readiness for I/O.
+
+
+typedef struct s_PXENV_FILE_SELECT {
+	PXENV_STATUS Status;
+	UINT16 FileHandle;
+	UINT16 Ready;
+#define RDY_READ 0x0001
+} t_PXENV_FILE_SELECT;
+
+
+Set before calling API service:
+
+FileHandle:	Handle obtained when file was opened.
+
+
+Returned from API service:
+
+Ready:		Indication of readiness.  This can be zero, or more,
+		of the RDY_xxx constants.  Multiple values are
+		arithmetically or-ed together.
+
+Status:		See PXENV_STATUS_xxx constants.
+
+
+
+
+FILE READ
+
+Op-Code:	PXENV_FILE_READ (00e3h)
+
+Input:		Far pointer to a t_PXENV_FILE_READ parameter structure
+		that has been initialised by the caller.
+
+Output:		PXENV_EXIT_SUCCESS or PXENV_EXIT_FAILURE must be
+		returned in AX.  The status field in the parameter
+		structure must be set to one of the values represented
+		by the PXENV_STATUS_xxx constants.
+
+Description:	Read from a previously opened file.
+
+
+typedef struct s_PXENV_FILE_READ {
+	PXENV_STATUS Status;
+	UINT16 FileHandle;
+	UINT16 BufferSize;
+	SEGOFF16 Buffer;
+} t_PXENV_FILE_READ;
+
+
+Set before calling API service:
+
+FileHandle:	Handle obtained when file was opened.
+
+BufferSize:	Maximum number of data bytes that can be copied into
+		Buffer.
+
+Buffer:		Segment:Offset address of data buffer.
+
+
+Returned from API service:
+
+BufferSize:	Number of bytes written to the data buffer.  End of
+		file if this is zero.
+
+Status:		See PXENV_STATUS_xxx constants.
