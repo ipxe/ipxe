@@ -162,7 +162,7 @@ NON_AUTO_SRCS	+= drivers/net/prism2.c
 # "-p 0x1234,0x5678" string to set the PCI IDs.
 #
 FINALISE_rom	= $(MAKEROM) $(MAKEROM_FLAGS) $(TGT_MAKEROM_FLAGS) \
-		  -i$(IDENT) $@
+		  -i$(IDENT) -s 0 $@
 
 # Some ROMs require specific flags to be passed to makerom.pl
 #
