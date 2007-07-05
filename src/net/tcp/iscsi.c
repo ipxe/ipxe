@@ -36,6 +36,9 @@
  *
  */
 
+#warning "Update to use data-xfer interface"
+extern int tcp_open ( struct stream_application *stream );
+
 static void iscsi_start_tx ( struct iscsi_session *iscsi );
 static void iscsi_start_data_out ( struct iscsi_session *iscsi,
 				   unsigned int datasn );
