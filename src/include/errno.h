@@ -202,7 +202,7 @@
 #define EALREADY			     ( PXENV_STATUS_UDP_OPEN | 0x0700 )
 
 /** Bad file descriptor */
-#define EBADF				   ( PXENV_STATUS_UDP_CLOSED | 0x0800 )
+#define EBADF				  ( PXENV_STATUS_TFTP_CLOSED | 0x0800 )
 
 /** Bad message */
 #define EBADMSG				      ( PXENV_STATUS_FAILURE | 0x0900 )
