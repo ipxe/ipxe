@@ -111,6 +111,12 @@ NON_AUTO_MEDIA		+= fd0
 	dd if=$< bs=512 conv=sync of=/dev/fd0
 	sync
 
+# rule to create padded disk images
+NON_AUTO_MEDIA		+= pdsk
+%pdsk : %dsk
+	cp $< $@
+	$(PERL) ./util/dskpad.pl $@
+
 # rule to make a non-emulation ISO boot image
 NON_AUTO_MEDIA		+= iso
 %iso:	%lkrn util/geniso
@@ -125,6 +131,7 @@ NON_AUTO_MEDIA		+= liso
 $(BIN)/usbdisk.bin : $(BIN)/usbdisk.o
 	$(OBJCOPY) -O binary $< $@
 
+NON_AUTO_MEDIA		+= usb
 %usb: $(BIN)/usbdisk.bin %hd
 	cat $^ > $@
 
