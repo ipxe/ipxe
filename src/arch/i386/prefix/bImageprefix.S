@@ -91,7 +91,7 @@ _prefix:
 
 /* 
 	This is a minimal boot sector.	If anyone tries to execute it (e.g., if
-	a .lilo file is dd'ed to a floppy), print an error message. 
+	a .lkrn file is dd'ed to a floppy), print an error message. 
 */
 
 bootsector: 
