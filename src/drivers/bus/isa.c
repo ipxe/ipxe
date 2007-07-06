@@ -105,11 +105,12 @@ static int isabus_probe ( struct root_device *rootdev ) {
 		      ioidx <= ISA_IOIDX_MAX ( driver ) ; ioidx++ ) {
 			/* Allocate struct isa_device */
 			if ( ! isa )
-				isa = zalloc ( sizeof ( *isa ) );
+				isa = malloc ( sizeof ( *isa ) );
 			if ( ! isa ) {
 				rc = -ENOMEM;
 				goto err;
 			}
+			memset ( isa, 0, sizeof ( *isa ) );
 			isa->driver = driver;
 			isa->ioaddr = ISA_IOADDR ( driver, ioidx );
 
