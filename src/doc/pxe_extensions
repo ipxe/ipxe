@@ -17,8 +17,8 @@ Description:	Opens a file specified by a URL for reading.  Multiple
 typedef struct s_PXENV_FILE_OPEN {
 	PXENV_STATUS Status;
 	UINT16 FileHandle;
+	SEGOFF16 FileName;
 	UINT32 Reserved;
-	UINT8 FileName[256];
 } t_PXENV_FILE_OPEN;
 
 
@@ -122,6 +122,12 @@ Output:		PXENV_EXIT_SUCCESS or PXENV_EXIT_FAILURE must be
 		structure must be set to one of the values represented
 		by the PXENV_STATUS_xxx constants.
 
+		This API function is non-blocking.  PXENV_EXIT_SUCCESS
+		and PXENV_STATUS_SUCCESS is returned if a data block
+		has been transferred into the caller's buffer.
+		PXENV_EXIT_FAILURE and PXENV_STATUS_FAILURE is
+		returned if no data is available to transfer.
+
 Description:	Read from a previously opened file.
 
 
@@ -147,5 +153,41 @@ Returned from API service:
 
 BufferSize:	Number of bytes written to the data buffer.  End of
 		file if this is zero.
+
+Status:		See PXENV_STATUS_xxx constants.
+
+
+
+
+GET FILE SIZE
+
+Op-Code:	PXENV_GET_FILE_SIZE (00e4h)
+
+Input:		Far pointer to a t_PXENV_GET_FILE_SIZE parameter
+		structure that has been initialised by the caller.
+
+Output:		PXENV_EXIT_SUCCESS or PXENV_EXIT_FAILURE must be
+		returned in AX.  The status field in the parameter
+		structure must be set to one of the values represented
+		by the PXENV_STATUS_xxx constants.
+
+Description:	Determine size of a previously opened file.
+
+
+typedef struct s_PXENV_GET_FILE_SIZE {
+	PXENV_STATUS Status;
+	UINT16 FileHandle;
+	UINT32 FileSize;
+} t_PXENV_GET_FILE_SIZE;
+
+
+Set before calling API service:
+
+FileHandle:	Handle obtained when file was opened.
+
+
+Returned from API service:
+
+FileSize:	Size of the file in bytes.
 
 Status:		See PXENV_STATUS_xxx constants.
