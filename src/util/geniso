@@ -2,14 +2,14 @@
 #
 # Generate a isolinux ISO boot image
 #
-# geniso foo.iso foo.zlilo
+# geniso foo.iso foo.lkrn
 #
-# the ISO image is the first argument so that a list of .zlilo images
+# the ISO image is the first argument so that a list of .lkrn images
 # to include can be specified
 #
 case $# in
 0|1)
-	echo Usage: $0 foo.iso foo.zlilo ...
+	echo Usage: $0 foo.iso foo.lkrn ...
 	exit 1
 	;;
 esac
@@ -40,8 +40,8 @@ do
 		continue
 	fi
 	b=$(basename $f)
-	g=${b%.zlilo}
-	g=${g//[^a-z0-9]}.zli
+	g=${b%.lkrn}
+	g=${g//[^a-z0-9]}.krn
 	case "$first" in
 	"")
 		echo DEFAULT $g

@@ -68,9 +68,9 @@ MEDIA			+= lmelfd
 OBJS_lmelfdprefix	= lmelfdprefix zlmelfdprefix
 CFLAGS_zlmelfdprefix	= $(CFLAGS_ZPREFIX)
 
-MEDIA			+= lilo
-OBJS_liloprefix		= liloprefix zliloprefix
-CFLAGS_zliloprefix	= $(CFLAGS_ZPREFIX)
+MEDIA			+= lkrn
+OBJS_lkrnprefix		= lkrnprefix zlkrnprefix
+CFLAGS_zlkrnprefix	= $(CFLAGS_ZPREFIX)
 
 MEDIA			+= bImage
 OBJS_bImageprefix	= bImageprefix zbImageprefix
@@ -119,12 +119,12 @@ NON_AUTO_MEDIA		+= pdsk
 
 # rule to make a non-emulation ISO boot image
 NON_AUTO_MEDIA		+= iso
-%iso:	%lilo util/geniso
+%iso:	%lkrn util/geniso
 	ISOLINUX_BIN=$(ISOLINUX_BIN) bash util/geniso $@ $<
 
 # rule to make a floppy emulation ISO boot image
 NON_AUTO_MEDIA		+= liso
-%liso:	%lilo util/genliso
+%liso:	%lkrn util/genliso
 	bash util/genliso $@ $<
 
 # rule to make a USB disk image
