@@ -855,12 +855,5 @@ int dhcp_configure_netdev ( struct net_device *netdev,
 		return rc;
 	}
 
-	/* Apply other DHCP options */
-	if ( ( rc = apply_dhcp_options ( options ) ) != 0 ) {
-		DBG ( "Could not apply %s DHCP result options: %s\n",
-		      netdev->name, strerror ( rc ) );
-		return rc;
-	}
-
 	return 0;
 }

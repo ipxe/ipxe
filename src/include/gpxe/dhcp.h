@@ -504,6 +504,7 @@ extern void find_global_dhcp_ipv4_option ( unsigned int tag,
 extern void delete_dhcp_option ( struct dhcp_option_block *options,
 				 unsigned int tag );
 extern int apply_dhcp_options ( struct dhcp_option_block *options );
+extern int apply_global_dhcp_options ( void );
 
 extern struct dhcp_option_block dhcp_request_options;
 extern int create_dhcp_packet ( struct net_device *netdev, uint8_t msgtype,

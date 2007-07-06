@@ -289,6 +289,9 @@ void register_dhcp_options ( struct dhcp_option_block *options ) {
 	}
 	dhcpopt_get ( options );
 	list_add_tail ( &options->list, &existing->list );
+
+	/* Apply all registered DHCP options */
+	apply_global_dhcp_options();
 }
 
 /**
@@ -608,4 +611,13 @@ int apply_dhcp_options ( struct dhcp_option_block *options ) {
 	}
 
 	return 0;
+}
+
+/**
+ * Apply global DHCP options
+ *
+ * @ret rc		Return status code
+ */
+int apply_global_dhcp_options ( void ) {
+	return apply_dhcp_options ( NULL );
 }
