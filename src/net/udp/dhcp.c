@@ -787,10 +787,9 @@ int start_dhcp ( struct job_interface *job, struct net_device *netdev,
 	int rc;
 
 	/* Allocate and initialise structure */
-	dhcp = malloc ( sizeof ( *dhcp ) );
+	dhcp = zalloc ( sizeof ( *dhcp ) );
 	if ( ! dhcp )
 		return -ENOMEM;
-	memset ( dhcp, 0, sizeof ( *dhcp ) );
 	dhcp->refcnt.free = dhcp_free;
 	job_init ( &dhcp->job, &dhcp_job_operations, &dhcp->refcnt );
 	xfer_init ( &dhcp->xfer, &dhcp_xfer_operations, &dhcp->refcnt );
