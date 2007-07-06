@@ -62,9 +62,8 @@ static void free_image ( struct refcnt *refcnt ) {
 struct image * alloc_image ( void ) {
 	struct image *image;
 
-	image = malloc ( sizeof ( *image ) );
+	image = zalloc ( sizeof ( *image ) );
 	if ( image ) {
-		memset ( image, 0, sizeof ( *image ) );
 		image->refcnt.free = free_image;
 	}
 	return image;
