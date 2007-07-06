@@ -104,11 +104,10 @@ static int udp_open_common ( struct xfer_interface *xfer,
 	int rc;
 
 	/* Allocate and initialise structure */
-	udp = malloc ( sizeof ( *udp ) );
+	udp = zalloc ( sizeof ( *udp ) );
 	if ( ! udp )
 		return -ENOMEM;
 	DBGC ( udp, "UDP %p allocated\n", udp );
-	memset ( udp, 0, sizeof ( *udp ) );
 	xfer_init ( &udp->xfer, &udp_xfer_operations, &udp->refcnt );
 	memcpy ( &udp->peer, st_peer, sizeof ( udp->peer ) );
 
