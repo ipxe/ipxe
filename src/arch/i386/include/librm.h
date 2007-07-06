@@ -194,6 +194,18 @@ memset_user ( userptr_t buffer, off_t offset, int c, size_t len ) {
 }
 
 /**
+ * Find length of NUL-terminated string in user buffer
+ *
+ * @v buffer		User buffer
+ * @v offset		Offset within buffer
+ * @ret len		Length of string (excluding NUL)
+ */
+static inline __attribute__ (( always_inline )) size_t
+strlen_user ( userptr_t buffer, off_t offset ) {
+	return strlen ( ( void * ) buffer + offset );
+}
+
+/**
  * Convert virtual address to user buffer
  *
  * @v virtual		Virtual address
