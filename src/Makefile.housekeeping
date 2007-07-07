@@ -430,6 +430,8 @@ SYMTAB	= $(BIN)/symtab
 $(SYMTAB) : $(BLIB)
 	$(NM) -o -S $< > $@
 
+CLEANUP	+= $(BIN)/symtab
+
 symcheck : $(SYMTAB)
 	$(SYMCHECK) $<
 
