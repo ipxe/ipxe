@@ -237,7 +237,6 @@ TGT_MAKEROM_FLAGS = $(strip $(MAKEROM_FLAGS_$(TGT_ROM_NAME)) \
 # the target.
 #
 COMMA		:= ,
-SPACE		:= $(subst x, ,x)
 DEBUG_LIST	= $(subst $(COMMA), ,$(DEBUG))
 DEBUG_OBJ_LEVEL	= $(firstword $(word 2,$(subst :, ,$(1))) 1)
 DEBUG_OBJ_BASE	= $(word 1,$(subst :, ,$(1))).dbg$(call DEBUG_OBJ_LEVEL,$(1))
@@ -246,8 +245,6 @@ DEBUG_ORIG_OBJ	= $(BIN)/$(word 1,$(subst :, ,$(1))).o
 DEBUG_OBJS	= $(foreach D,$(DEBUG_LIST),$(call DEBUG_OBJ,$(D)))
 DEBUG_ORIG_OBJS	= $(foreach D,$(DEBUG_LIST),$(call DEBUG_ORIG_OBJ,$(D)))
 BLIB_OBJS	= $(DEBUG_OBJS) $(filter-out $(DEBUG_ORIG_OBJS),$(BOBJS))
-BLIB_TAG_ELEM	= $(foreach D,$(DEBUG_LIST),$(call DEBUG_OBJ_BASE,$(D)))
-BLIB_TAG	= $(subst $(SPACE),-,$(strip blib $(sort $(BLIB_TAG_ELEM))))
 
 # Print out all derived information for a given target.
 #
@@ -271,12 +268,24 @@ $(BIN)/%.info :
 	@echo
 	@echo 'Debugging objects    : $(DEBUG_OBJS)'
 	@echo 'Replaced objects     : $(DEBUG_ORIG_OBJS)'
-	@echo 'Build library tag    : $(BLIB_TAG)'
+
+# List of objects included in the last build of blib.  This is needed
+# in order to correctly rebuild blib whenever the list of objects
+# changes.
+#
+BLIB_LIST	= $(BIN)/.blib.list
+ifneq ($(shell cat $(BLIB_LIST)),$(BLIB_OBJS))
+$(shell echo "$(BLIB_OBJS)" > $(BLIB_LIST))
+endif
+
+$(BLIB_LIST) :
+
+VERYCLEANUP	+= $(BLIB_LIST)
 
 # Library of all objects
 #
-BLIB		= $(BIN)/$(BLIB_TAG).a
-$(BLIB) : $(BLIB_OBJS) $(MAKEDEPS)
+BLIB		= $(BIN)/blib.a
+$(BLIB) : $(BLIB_OBJS) $(BLIB_LIST) $(MAKEDEPS)
 	$(Q)$(RM) $(BLIB)
 	$(QM)echo "  [AR] $@"
 	$(Q)$(AR) r $@ $(BLIB_OBJS)
@@ -420,8 +429,6 @@ CLEANUP	+= TAGS*
 SYMTAB	= $(BIN)/symtab
 $(SYMTAB) : $(BLIB)
 	$(NM) -o -S $< > $@
-
-CLEANUP += $(BIN)/symtab
 
 symcheck : $(SYMTAB)
 	$(SYMCHECK) $<
