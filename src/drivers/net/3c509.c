@@ -347,11 +347,12 @@ static int t509bus_probe ( struct root_device *rootdev ) {
 	for ( tag = 1 ; tag <= t509_max_tag ; tag++ ) {
 		/* Allocate struct t509_device */
 		if ( ! t509 )
-			t509 = zalloc ( sizeof ( *t509 ) );
+			t509 = malloc ( sizeof ( *t509 ) );
 		if ( ! t509 ) {
 			rc = -ENOMEM;
 			goto err;
 		}
+		memset ( t509, 0, sizeof ( *t509 ) );
 		t509->tag = tag;
 
 		/* Send the ID sequence */
