@@ -128,41 +128,8 @@ struct ll_protocol {
 	const uint8_t *ll_broadcast;
 };
 
-/**
- * Network device statistics
- *
- */
-struct net_device_stats {
-	/** Count of successfully completed transmissions */
-	unsigned int tx_ok;
-	/** Count of transmission errors */
-	unsigned int tx_err;
-	/** Count of successfully received packets */
-	unsigned int rx_ok;
-	/** Count of reception errors */
-	unsigned int rx_err;
-};
-
-/**
- * A network device
- *
- * This structure represents a piece of networking hardware.  It has
- * properties such as a link-layer address and methods for
- * transmitting and receiving raw packets.
- *
- * Note that this structure must represent a generic network device,
- * not just an Ethernet device.
- */
-struct net_device {
-	/** Reference counter */
-	struct refcnt refcnt;
-	/** List of network devices */
-	struct list_head list;
-	/** Name of this network device */
-	char name[8];
-	/** Underlying hardware device */
-	struct device *dev;
-
+/** Network device operations */
+struct net_device_operations {
 	/** Open network device
 	 *
 	 * @v netdev	Network device
@@ -199,20 +166,62 @@ struct net_device {
 	 * This method is guaranteed to be called only when the device
 	 * is open.
 	 */
-	int ( * transmit ) ( struct net_device *netdev, struct io_buffer *iobuf );
-	/** Poll for received packet
+	int ( * transmit ) ( struct net_device *netdev,
+			     struct io_buffer *iobuf );
+	/** Poll for completed and received packets
 	 *
 	 * @v netdev	Network device
-	 * @v rx_quota	Maximum number of packets to receive
 	 *
-	 * This method should cause the hardware to check for received
-	 * packets.  Any received packets should be delivered via
-	 * netdev_rx(), up to a maximum of @c rx_quota packets.
+	 * This method should cause the hardware to check for
+	 * completed transmissions and received packets.  Any received
+	 * packets should be delivered via netdev_rx().
 	 *
 	 * This method is guaranteed to be called only when the device
 	 * is open.
 	 */
-	void ( * poll ) ( struct net_device *netdev, unsigned int rx_quota );
+	void ( * poll ) ( struct net_device *netdev );
+	/** Enable or disable interrupts
+	 *
+	 * @v netdev	Network device
+	 * @v enable	Interrupts should be enabled
+	 */
+	void ( * irq ) ( struct net_device *netdev, int enable );
+};
+
+/** Network device statistics */
+struct net_device_stats {
+	/** Count of successfully completed transmissions */
+	unsigned int tx_ok;
+	/** Count of transmission errors */
+	unsigned int tx_err;
+	/** Count of successfully received packets */
+	unsigned int rx_ok;
+	/** Count of reception errors */
+	unsigned int rx_err;
+};
+
+/**
+ * A network device
+ *
+ * This structure represents a piece of networking hardware.  It has
+ * properties such as a link-layer address and methods for
+ * transmitting and receiving raw packets.
+ *
+ * Note that this structure must represent a generic network device,
+ * not just an Ethernet device.
+ */
+struct net_device {
+	/** Reference counter */
+	struct refcnt refcnt;
+	/** List of network devices */
+	struct list_head list;
+	/** Name of this network device */
+	char name[8];
+	/** Underlying hardware device */
+	struct device *dev;
+
+	/** Network device operations */
+	struct net_device_operations *op;
 
 	/** Link-layer protocol */
 	struct ll_protocol *ll_protocol;
@@ -248,6 +257,30 @@ struct net_device {
 #define __net_protocol __table ( struct net_protocol, net_protocols, 01 )
 
 extern struct list_head net_devices;
+extern struct net_device_operations null_netdev_operations;
+
+/**
+ * Initialise a network device
+ *
+ * @v netdev		Network device
+ * @v op		Network device operations
+ */
+static inline void netdev_init ( struct net_device *netdev,
+				 struct net_device_operations *op ) {
+	netdev->op = op;
+}
+
+/**
+ * Stop using a network device
+ *
+ * @v netdev		Network device
+ *
+ * Drivers should call this method immediately before the final call
+ * to netdev_put().
+ */
+static inline void netdev_nullify ( struct net_device *netdev ) {
+	netdev->op = &null_netdev_operations;
+}
 
 /**
  * Get printable network device hardware address
@@ -300,13 +333,14 @@ extern void netdev_tx_complete_next_err ( struct net_device *netdev, int rc );
 extern void netdev_rx ( struct net_device *netdev, struct io_buffer *iobuf );
 extern void netdev_rx_err ( struct net_device *netdev,
 			    struct io_buffer *iobuf, int rc );
-extern int netdev_poll ( struct net_device *netdev, unsigned int rx_quota );
+extern void netdev_poll ( struct net_device *netdev );
 extern struct io_buffer * netdev_rx_dequeue ( struct net_device *netdev );
 extern struct net_device * alloc_netdev ( size_t priv_size );
 extern int register_netdev ( struct net_device *netdev );
 extern int netdev_open ( struct net_device *netdev );
 extern void netdev_close ( struct net_device *netdev );
 extern void unregister_netdev ( struct net_device *netdev );
+extern void netdev_irq ( struct net_device *netdev, int enable );
 extern struct net_device * find_netdev ( const char *name );
 extern struct net_device * find_netdev_by_location ( unsigned int bus_type,
 						     unsigned int location );

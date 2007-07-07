@@ -112,35 +112,34 @@ static int pnic_api_check ( uint16_t api_version ) {
 /**************************************************************************
 POLL - Wait for a frame
 ***************************************************************************/
-static void pnic_poll ( struct net_device *netdev, unsigned int rx_quota ) {
+static void pnic_poll ( struct net_device *netdev ) {
 	struct pnic *pnic = netdev->priv;
 	struct io_buffer *iobuf;
 	uint16_t length;
 	uint16_t qlen;
 
 	/* Fetch all available packets */
-	while ( rx_quota ) {
+	while ( 1 ) {
 		if ( pnic_command ( pnic, PNIC_CMD_RECV_QLEN, NULL, 0,
 				    &qlen, sizeof ( qlen ), NULL )
 		     != PNIC_STATUS_OK )
-			break;
+			return;
 		if ( qlen == 0 )
-			break;
+			return;
 		iobuf = alloc_iob ( ETH_FRAME_LEN );
 		if ( ! iobuf ) {
 			DBG ( "could not allocate buffer\n" );
 			netdev_rx_err ( netdev, NULL, -ENOMEM );
-			break;
+			return;
 		}
 		if ( pnic_command ( pnic, PNIC_CMD_RECV, NULL, 0,
 				    iobuf->data, ETH_FRAME_LEN, &length )
 		     != PNIC_STATUS_OK ) {
 			netdev_rx_err ( netdev, iobuf, -EIO );
-			break;
+			return;
 		}
 		iob_put ( iobuf, length );
 		netdev_rx ( netdev, iobuf );
-		--rx_quota;
 	}
 }
 
@@ -164,28 +163,39 @@ static int pnic_transmit ( struct net_device *netdev, struct io_buffer *iobuf ) 
 /**************************************************************************
 OPEN - Open network device
 ***************************************************************************/
-static int pnic_open ( struct net_device *netdev ) {
-	struct pnic *pnic = netdev->priv;
-	static const uint8_t enable = 1;
-
-	/* Enable interrupts */
-	pnic_command ( pnic, PNIC_CMD_MASK_IRQ, &enable,
-		       sizeof ( enable ), NULL, 0, NULL );
-	
+static int pnic_open ( struct net_device *netdev __unused ) {
+	/* Nothing to do */
 	return 0;
 }
 
 /**************************************************************************
 CLOSE - Close network device
 ***************************************************************************/
-static void pnic_close ( struct net_device *netdev ) {
-	struct pnic *pnic = netdev->priv;
-	static const uint8_t disable = 0;
-
-	/* Disable interrupts */
-	pnic_command ( pnic, PNIC_CMD_MASK_IRQ, &disable,
-		       sizeof ( disable ), NULL, 0, NULL );
+static void pnic_close ( struct net_device *netdev __unused ) {
+	/* Nothing to do */
 }
+
+/**************************************************************************
+IRQ - Enable/disable interrupts
+***************************************************************************/
+static void pnic_irq ( struct net_device *netdev, int enable ) {
+	struct pnic *pnic = netdev->priv;
+	uint8_t mask = ( enable ? 1 : 0 );
+	
+	pnic_command ( pnic, PNIC_CMD_MASK_IRQ, &mask, sizeof ( mask ),
+		       NULL, 0, NULL );
+}
+
+/**************************************************************************
+OPERATIONS TABLE
+***************************************************************************/
+static struct net_device_operations pnic_operations = {
+	.open		= pnic_open,
+	.close		= pnic_close,
+	.transmit	= pnic_transmit,
+	.poll		= pnic_poll,
+	.irq   		= pnic_irq,
+};
 
 /**************************************************************************
 DISABLE - Turn off ethernet interface
@@ -196,6 +206,7 @@ static void pnic_remove ( struct pci_device *pci ) {
 
 	unregister_netdev ( netdev );
 	pnic_command ( pnic, PNIC_CMD_RESET, NULL, 0, NULL, 0, NULL );
+	netdev_nullify ( netdev );
 	netdev_put ( netdev );
 }
 
@@ -214,6 +225,7 @@ static int pnic_probe ( struct pci_device *pci,
 	netdev = alloc_etherdev ( sizeof ( *pnic ) );
 	if ( ! netdev )
 		return -ENOMEM;
+	netdev_init ( netdev, &pnic_operations );
 	pnic = netdev->priv;
 	pci_set_drvdata ( pci, netdev );
 	netdev->dev = &pci->dev;
@@ -238,12 +250,6 @@ static int pnic_probe ( struct pci_device *pci,
 	status = pnic_command ( pnic, PNIC_CMD_READ_MAC, NULL, 0,
 				netdev->ll_addr, ETH_ALEN, NULL );
 
-	/* Point to NIC specific routines */
-	netdev->open	 = pnic_open;
-	netdev->close	 = pnic_close;
-	netdev->poll	 = pnic_poll;
-	netdev->transmit = pnic_transmit;
-
 	/* Register network device */
 	if ( ( rc = register_netdev ( netdev ) ) != 0 )
 		goto err;
@@ -252,6 +258,7 @@ static int pnic_probe ( struct pci_device *pci,
 
  err:
 	/* Free net device */
+	netdev_nullify ( netdev );
 	netdev_put ( netdev );
 	return rc;
 }

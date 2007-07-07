@@ -36,12 +36,9 @@ static int legacy_transmit ( struct net_device *netdev, struct io_buffer *iobuf 
 	return 0;
 }
 
-static void legacy_poll ( struct net_device *netdev, unsigned int rx_quota ) {
+static void legacy_poll ( struct net_device *netdev ) {
 	struct nic *nic = netdev->priv;
 	struct io_buffer *iobuf;
-
-	if ( ! rx_quota )
-		return;
 
 	iobuf = alloc_iob ( ETH_FRAME_LEN );
 	if ( ! iobuf )
@@ -57,18 +54,28 @@ static void legacy_poll ( struct net_device *netdev, unsigned int rx_quota ) {
 	}
 }
 
-static int legacy_open ( struct net_device *netdev ) {
-	struct nic *nic = netdev->priv;
-
-	nic->nic_op->irq ( nic, ENABLE );
+static int legacy_open ( struct net_device *netdev __unused ) {
+	/* Nothing to do */
 	return 0;
 }
 
-static void legacy_close ( struct net_device *netdev ) {
+static void legacy_close ( struct net_device *netdev __unused ) {
+	/* Nothing to do */
+}
+
+static void legacy_irq ( struct net_device *netdev __unused, int enable ) {
 	struct nic *nic = netdev->priv;
 
-	nic->nic_op->irq ( nic, DISABLE );
+	nic->nic_op->irq ( nic, ( enable ? ENABLE : DISABLE ) );
 }
+
+static struct net_device_operations legacy_operations = {
+	.open		= legacy_open,
+	.close		= legacy_close,
+	.transmit	= legacy_transmit,
+	.poll		= legacy_poll,
+	.irq   		= legacy_irq,
+};
 
 int legacy_probe ( void *hwdev,
 		   void ( * set_drvdata ) ( void *hwdev, void *priv ),
@@ -84,27 +91,21 @@ int legacy_probe ( void *hwdev,
 	netdev = alloc_etherdev ( 0 );
 	if ( ! netdev )
 		return -ENOMEM;
+	netdev_init ( netdev, &legacy_operations );
 	netdev->priv = &nic;
 	memset ( &nic, 0, sizeof ( nic ) );
 	set_drvdata ( hwdev, netdev );
 	netdev->dev = dev;
 
-	netdev->open = legacy_open;
-	netdev->close = legacy_close;
-	netdev->transmit = legacy_transmit;
-	netdev->poll = legacy_poll;
 	nic.node_addr = netdev->ll_addr;
 
 	if ( ! probe ( &nic, hwdev ) ) {
-		netdev_put ( netdev );
-		return -ENODEV;
+		rc = -ENODEV;
+		goto err_probe;
 	}
 
-	if ( ( rc = register_netdev ( netdev ) ) != 0 ) {
-		disable ( &nic, hwdev );
-		netdev_put ( netdev );
-		return rc;
-	}
+	if ( ( rc = register_netdev ( netdev ) ) != 0 )
+		goto err_register;
 
 	/* Do not remove this message */
 	printf ( "WARNING: Using legacy NIC wrapper on %s\n",
@@ -112,6 +113,13 @@ int legacy_probe ( void *hwdev,
 
 	legacy_registered = 1;
 	return 0;
+
+ err_register:
+	disable ( &nic, hwdev );
+ err_probe:
+	netdev_nullify ( netdev );
+	netdev_put ( netdev );
+	return rc;
 }
 
 void legacy_remove ( void *hwdev,
@@ -122,6 +130,7 @@ void legacy_remove ( void *hwdev,
 
 	unregister_netdev ( netdev );
 	disable ( nic, hwdev );
+	netdev_nullify ( netdev );
 	netdev_put ( netdev );
 	legacy_registered = 0;
 }

@@ -68,7 +68,7 @@ int netdev_tx ( struct net_device *netdev, struct io_buffer *iobuf ) {
 		goto err;
 	}
 		
-	if ( ( rc = netdev->transmit ( netdev, iobuf ) ) != 0 )
+	if ( ( rc = netdev->op->transmit ( netdev, iobuf ) ) != 0 )
 		goto err;
 
 	return 0;
@@ -187,22 +187,18 @@ void netdev_rx_err ( struct net_device *netdev,
 }
 
 /**
- * Poll for packet on network device
+ * Poll for completed and received packets on network device
  *
  * @v netdev		Network device
- * @v rx_quota		Maximum number of packets to receive
- * @ret True		There are packets present in the receive queue
- * @ret False		There are no packets present in the receive queue
  *
- * Polls the network device for received packets.  Any received
- * packets will be added to the RX packet queue via netdev_rx().
+ * Polls the network device for completed transmissions and received
+ * packets.  Any received packets will be added to the RX packet queue
+ * via netdev_rx().
  */
-int netdev_poll ( struct net_device *netdev, unsigned int rx_quota ) {
+void netdev_poll ( struct net_device *netdev ) {
 
 	if ( netdev->state & NETDEV_OPEN )
-		netdev->poll ( netdev, rx_quota );
-
-	return ( ! list_empty ( &netdev->rx_queue ) );
+		netdev->op->poll ( netdev );
 }
 
 /**
@@ -317,7 +313,7 @@ int netdev_open ( struct net_device *netdev ) {
 	DBGC ( netdev, "NETDEV %p opening\n", netdev );
 
 	/* Open the device */
-	if ( ( rc = netdev->open ( netdev ) ) != 0 )
+	if ( ( rc = netdev->op->open ( netdev ) ) != 0 )
 		return rc;
 
 	/* Mark as opened */
@@ -339,7 +335,7 @@ void netdev_close ( struct net_device *netdev ) {
 	DBGC ( netdev, "NETDEV %p closing\n", netdev );
 
 	/* Close the device */
-	netdev->close ( netdev );
+	netdev->op->close ( netdev );
 
 	/* Flush TX and RX queues */
 	netdev_tx_flush ( netdev );
@@ -365,6 +361,15 @@ void unregister_netdev ( struct net_device *netdev ) {
 	list_del ( &netdev->list );
 	netdev_put ( netdev );
 	DBGC ( netdev, "NETDEV %p unregistered\n", netdev );
+}
+
+/** Enable or disable interrupts
+ *
+ * @v netdev		Network device
+ * @v enable		Interrupts should be enabled
+ */
+void netdev_irq ( struct net_device *netdev, int enable ) {
+	netdev->op->irq ( netdev, enable );
 }
 
 /**
@@ -462,7 +467,7 @@ static void net_step ( struct process *process __unused ) {
 	list_for_each_entry ( netdev, &net_devices, list ) {
 
 		/* Poll for new packets */
-		netdev_poll ( netdev, -1U );
+		netdev_poll ( netdev );
 
 		/* Process at most one received packet.  Give priority
 		 * to getting packets out of the NIC over processing

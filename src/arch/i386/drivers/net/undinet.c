@@ -394,7 +394,6 @@ static int undinet_transmit ( struct net_device *netdev,
  * Poll for received packets
  *
  * @v netdev		Network device
- * @v rx_quota		Maximum number of packets to receive
  *
  * Fun, fun, fun.  UNDI drivers don't use polling; they use
  * interrupts.  We therefore cheat and pretend that an interrupt has
@@ -412,7 +411,7 @@ static int undinet_transmit ( struct net_device *netdev,
  * of installing a genuine interrupt service routine and dealing with
  * the wonderful 8259 Programmable Interrupt Controller.  Joy.
  */
-static void undinet_poll ( struct net_device *netdev, unsigned int rx_quota ) {
+static void undinet_poll ( struct net_device *netdev ) {
 	struct undi_nic *undinic = netdev->priv;
 	struct s_PXENV_UNDI_ISR undi_isr;
 	struct io_buffer *iobuf = NULL;
@@ -454,7 +453,7 @@ static void undinet_poll ( struct net_device *netdev, unsigned int rx_quota ) {
 	}
 
 	/* Run through the ISR loop */
-	while ( rx_quota ) {
+	while ( 1 ) {
 		if ( ( rc = undinet_call ( undinic, PXENV_UNDI_ISR, &undi_isr,
 					   sizeof ( undi_isr ) ) ) != 0 )
 			break;
@@ -487,7 +486,6 @@ static void undinet_poll ( struct net_device *netdev, unsigned int rx_quota ) {
 				/* Whole packet received; deliver it */
 				netdev_rx ( netdev, iobuf );
 				iobuf = NULL;
-				--rx_quota;
 				/* Etherboot 5.4 fails to return all packets
 				 * under mild load; pretend it retriggered.
 				 */
@@ -600,6 +598,29 @@ static void undinet_close ( struct net_device *netdev ) {
 }
 
 /**
+ * Enable/disable interrupts
+ *
+ * @v netdev		Net device
+ * @v enable		Interrupts should be enabled
+ */
+static void undinet_irq ( struct net_device *netdev, int enable ) {
+	struct undi_nic *undinic = netdev->priv;
+
+	/* Cannot support interrupts yet */
+	DBGC ( undinic, "UNDINIC %p cannot %s interrupts\n",
+	       undinic, ( enable ? "enable" : "disable" ) );
+}
+
+/** UNDI network device operations */
+static struct net_device_operations undinet_operations = {
+	.open		= undinet_open,
+	.close		= undinet_close,
+	.transmit	= undinet_transmit,
+	.poll		= undinet_poll,
+	.irq   		= undinet_irq,
+};
+
+/**
  * Probe UNDI device
  *
  * @v undi		UNDI device
@@ -622,6 +643,7 @@ int undinet_probe ( struct undi_device *undi ) {
 	netdev = alloc_etherdev ( sizeof ( *undinic ) );
 	if ( ! netdev )
 		return -ENOMEM;
+	netdev_init ( netdev, &undinet_operations );
 	undinic = netdev->priv;
 	undi_set_drvdata ( undi, netdev );
 	netdev->dev = &undi->dev;
@@ -685,12 +707,6 @@ int undinet_probe ( struct undi_device *undi ) {
 		undinic->hacks |= UNDI_HACK_EB54;
 	}
 
-	/* Point to NIC specific routines */
-	netdev->open	 = undinet_open;
-	netdev->close	 = undinet_close;
-	netdev->transmit = undinet_transmit;
-	netdev->poll	 = undinet_poll;
-
 	/* Register network device */
 	if ( ( rc = register_netdev ( netdev ) ) != 0 )
 		goto err_register;
@@ -716,6 +732,7 @@ int undinet_probe ( struct undi_device *undi ) {
 	undinet_call ( undinic, PXENV_STOP_UNDI, &stop_undi,
 		       sizeof ( stop_undi ) );
  err_start_undi:
+	netdev_nullify ( netdev );
 	netdev_put ( netdev );
 	undi_set_drvdata ( undi, NULL );
 	return rc;
@@ -751,6 +768,7 @@ void undinet_remove ( struct undi_device *undi ) {
 	undi->flags &= ~UNDI_FL_STARTED;
 
 	/* Free network device */
+	netdev_nullify ( netdev );
 	netdev_put ( netdev );
 
 	DBGC ( undinic, "UNDINIC %p removed\n", undinic );

@@ -69,7 +69,13 @@ void pxe_set_netdev ( struct net_device *netdev ) {
  * @ret rc		Return status code
  */
 static int pxe_netdev_open ( void ) {
-	return netdev_open ( pxe_netdev );
+	int rc;
+
+	if ( ( rc = netdev_open ( pxe_netdev ) ) != 0 )
+		return rc;
+
+	netdev_irq ( pxe_netdev, 1 );
+	return 0;
 }
 
 /**
@@ -77,6 +83,7 @@ static int pxe_netdev_open ( void ) {
  *
  */
 static void pxe_netdev_close ( void ) {
+	netdev_irq ( pxe_netdev, 0 );
 	netdev_close ( pxe_netdev );
 	undi_tx_count = 0;
 }
@@ -543,14 +550,13 @@ PXENV_EXIT_t pxenv_undi_isr ( struct s_PXENV_UNDI_ISR *undi_isr ) {
 		/* Call poll().  This should acknowledge the device
 		 * interrupt and queue up any received packet.
 		 */
-		if ( netdev_poll ( pxe_netdev, -1U ) ) {
-			/* Packet waiting in queue */
-			DBG ( " OURS" );
-			undi_isr->FuncFlag = PXENV_UNDI_ISR_OUT_OURS;
-		} else {
-			DBG ( " NOT_OURS" );
-			undi_isr->FuncFlag = PXENV_UNDI_ISR_OUT_NOT_OURS;
-		}
+		netdev_poll ( pxe_netdev );
+
+		/* Disable interrupts to avoid interrupt storm */
+		netdev_irq ( pxe_netdev, 0 );
+
+		/* Always say it was ours for the sake of simplicity */
+		undi_isr->FuncFlag = PXENV_UNDI_ISR_OUT_OURS;
 		break;
 	case PXENV_UNDI_ISR_IN_PROCESS :
 	case PXENV_UNDI_ISR_IN_GET_NEXT :
@@ -570,6 +576,8 @@ PXENV_EXIT_t pxenv_undi_isr ( struct s_PXENV_UNDI_ISR *undi_isr ) {
 		if ( ! iobuf ) {
 			/* No more packets remaining */
 			undi_isr->FuncFlag = PXENV_UNDI_ISR_OUT_DONE;
+			/* Re-enable interrupts */
+			netdev_irq ( pxe_netdev, 1 );
 			break;
 		}
 

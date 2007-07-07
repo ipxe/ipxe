@@ -302,12 +302,6 @@ static struct nvo_fragment rtl_nvo_fragments[] = {
  */
 static void rtl_reset ( struct rtl8139_nic *rtl ) {
 
-	/* Disable interrupts.  May not be necessary, but datasheet
-	 * doesn't say that the reset command also resets the
-	 * interrupt mask.
-	 */
-	outw ( 0, rtl->ioaddr + IntrMask );
-
 	/* Reset chip */
 	outb ( CmdReset, rtl->ioaddr + ChipCmd );
 	mdelay ( 10 );
@@ -345,9 +339,6 @@ static int rtl_open ( struct net_device *netdev ) {
 	outl ( 0xffffffffUL, rtl->ioaddr + MAR0 + 4 );
 	outl ( ( ( TX_DMA_BURST << 8 ) | ( TX_IPG << 24 ) ),
 	       rtl->ioaddr + TxConfig );
-
-	/* Enable interrupts */
-	outw ( ( ROK | RER | TOK | TER ), rtl->ioaddr + IntrMask );
 
 	return 0;
 }
@@ -400,13 +391,12 @@ static int rtl_transmit ( struct net_device *netdev, struct io_buffer *iobuf ) {
 	return 0;
 }
 
-/** 
+/**
  * Poll for received packets
  *
  * @v netdev	Network device
- * @v rx_quota	Maximum number of packets to receive
  */
-static void rtl_poll ( struct net_device *netdev, unsigned int rx_quota ) {
+static void rtl_poll ( struct net_device *netdev ) {
 	struct rtl8139_nic *rtl = netdev->priv;
 	unsigned int status;
 	unsigned int tsad;
@@ -433,7 +423,7 @@ static void rtl_poll ( struct net_device *netdev, unsigned int rx_quota ) {
 	}
 
 	/* Handle received packets */
-	while ( rx_quota && ! ( inw ( rtl->ioaddr + ChipCmd ) & RxBufEmpty ) ){
+	while ( ! ( inw ( rtl->ioaddr + ChipCmd ) & RxBufEmpty ) ) {
 		rx_status = * ( ( uint16_t * )
 				( rtl->rx.ring + rtl->rx.offset ) );
 		rx_len = * ( ( uint16_t * )
@@ -461,7 +451,6 @@ static void rtl_poll ( struct net_device *netdev, unsigned int rx_quota ) {
 				 rtl->rx.ring, wrapped_len );
 
 			netdev_rx ( netdev, rx_iob );
-			rx_quota--;
 		} else {
 			DBG ( "RX bad packet (status %#04x len %d)\n",
 			      rx_status, rx_len );
@@ -472,6 +461,28 @@ static void rtl_poll ( struct net_device *netdev, unsigned int rx_quota ) {
 		outw ( rtl->rx.offset - 16, rtl->ioaddr + RxBufPtr );
 	}
 }
+
+/**
+ * Enable/disable interrupts
+ *
+ * @v netdev	Network device
+ * @v enable	Interrupts should be enabled
+ */
+static void rtl_irq ( struct net_device *netdev, int enable ) {
+	struct rtl8139_nic *rtl = netdev->priv;
+	
+	outw ( ( enable ? ( ROK | RER | TOK | TER ) : 0 ),
+	       rtl->ioaddr + IntrMask );
+}
+
+/** RTL8139 net device operations */
+static struct net_device_operations rtl_operations = {
+	.open		= rtl_open,
+	.close		= rtl_close,
+	.transmit	= rtl_transmit,
+	.poll		= rtl_poll,
+	.irq		= rtl_irq,
+};
 
 /**
  * Probe PCI device
@@ -490,6 +501,7 @@ static int rtl_probe ( struct pci_device *pci,
 	netdev = alloc_etherdev ( sizeof ( *rtl ) );
 	if ( ! netdev )
 		return -ENOMEM;
+	netdev_init ( netdev, &rtl_operations );
 	rtl = netdev->priv;
 	pci_set_drvdata ( pci, netdev );
 	netdev->dev = &pci->dev;
@@ -504,12 +516,6 @@ static int rtl_probe ( struct pci_device *pci,
 	rtl_init_eeprom ( rtl );
 	nvs_read ( &rtl->eeprom.nvs, EE_MAC, netdev->ll_addr, ETH_ALEN );
 	
-	/* Point to NIC specific routines */
-	netdev->open	 = rtl_open;
-	netdev->close	 = rtl_close;
-	netdev->transmit = rtl_transmit;
-	netdev->poll	 = rtl_poll;
-
 	/* Register network device */
 	if ( ( rc = register_netdev ( netdev ) ) != 0 )
 		goto err_register_netdev;
@@ -526,6 +532,7 @@ static int rtl_probe ( struct pci_device *pci,
 	unregister_netdev ( netdev );
  err_register_netdev:
 	rtl_reset ( rtl );
+	netdev_nullify ( netdev );
 	netdev_put ( netdev );
 	return rc;
 }
@@ -543,6 +550,7 @@ static void rtl_remove ( struct pci_device *pci ) {
 		nvo_unregister ( &rtl->nvo );
 	unregister_netdev ( netdev );
 	rtl_reset ( rtl );
+	netdev_nullify ( netdev );
 	netdev_put ( netdev );
 }
 
