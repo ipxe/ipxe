@@ -721,7 +721,6 @@ static int dhcp_deliver_raw ( struct xfer_interface *xfer,
 static struct xfer_interface_operations dhcp_xfer_operations = {
 	.close		= ignore_xfer_close,
 	.vredirect	= xfer_vopen,
-	.request	= ignore_xfer_request,
 	.seek		= ignore_xfer_seek,
 	.deliver_iob	= xfer_deliver_as_raw,
 	.deliver_raw	= dhcp_deliver_raw,

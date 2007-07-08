@@ -326,7 +326,6 @@ static int resolv_xfer_seek ( struct xfer_interface *xfer __unused,
 static struct xfer_interface_operations named_xfer_ops = {
 	.close		= ignore_xfer_close,
 	.vredirect	= ignore_xfer_vredirect,
-	.request	= ignore_xfer_request,
 	.seek		= resolv_xfer_seek,
 	.alloc_iob	= default_xfer_alloc_iob,
 	.deliver_iob	= xfer_deliver_as_raw,

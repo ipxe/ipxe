@@ -103,7 +103,6 @@ static int pxe_udp_deliver_iob ( struct xfer_interface *xfer,
 static struct xfer_interface_operations pxe_udp_xfer_operations = {
 	.close		= ignore_xfer_close,
 	.vredirect	= ignore_xfer_vredirect,
-	.request	= ignore_xfer_request,
 	.seek		= ignore_xfer_seek,
 	.alloc_iob	= default_xfer_alloc_iob,
 	.deliver_iob	= pxe_udp_deliver_iob,

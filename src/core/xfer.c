@@ -86,33 +86,6 @@ int xfer_redirect ( struct xfer_interface *xfer, int type, ... ) {
 }
 
 /**
- * Request data
- *
- * @v xfer		Data transfer interface
- * @v offset		Offset to new position
- * @v whence		Basis for new position
- * @v len		Length of requested data
- * @ret rc		Return status code
- */
-int xfer_request ( struct xfer_interface *xfer, off_t offset, int whence,
-		   size_t len ) {
-	struct xfer_interface *dest = xfer_get_dest ( xfer );
-	int rc;
-
-	DBGC ( xfer, "XFER %p->%p request %s+%ld %zd\n", xfer, dest,
-	       whence_text ( whence ), offset, len );
-
-	rc = dest->op->request ( dest, offset, whence, len );
-
-	if ( rc != 0 ) {
-		DBGC ( xfer, "XFER %p<-%p request: %s\n", xfer, dest,
-		       strerror ( rc ) );
-	}
-	xfer_put ( dest );
-	return rc;
-}
-
-/**
  * Seek to position
  *
  * @v xfer		Data transfer interface
@@ -312,21 +285,6 @@ int ignore_xfer_vredirect ( struct xfer_interface *xfer __unused,
 }
 
 /**
- * Ignore request() event
- *
- * @v xfer		Data transfer interface
- * @v offset		Offset to new position
- * @v whence		Basis for new position
- * @v len		Length of requested data
- * @ret rc		Return status code
- */
-int ignore_xfer_request ( struct xfer_interface *xfer __unused,
-			  off_t offset __unused, int whence __unused, 
-			  size_t len __unused ) {
-	return 0;
-}
-
-/**
  * Ignore seek() event
  *
  * @v xfer		Data transfer interface
@@ -415,7 +373,6 @@ int ignore_xfer_deliver_raw ( struct xfer_interface *xfer,
 struct xfer_interface_operations null_xfer_ops = {
 	.close		= ignore_xfer_close,
 	.vredirect	= ignore_xfer_vredirect,
-	.request	= ignore_xfer_request,
 	.seek		= ignore_xfer_seek,
 	.alloc_iob	= default_xfer_alloc_iob,
 	.deliver_iob	= xfer_deliver_as_raw,

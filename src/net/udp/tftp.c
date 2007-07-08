@@ -582,7 +582,6 @@ static void tftp_socket_close ( struct xfer_interface *socket, int rc ) {
 static struct xfer_interface_operations tftp_socket_operations = {
 	.close		= tftp_socket_close,
 	.vredirect	= xfer_vopen,
-	.request	= ignore_xfer_request,
 	.seek		= ignore_xfer_seek,
 	.alloc_iob	= default_xfer_alloc_iob,
 	.deliver_iob	= tftp_socket_deliver_iob,
@@ -609,7 +608,6 @@ static void tftp_xfer_close ( struct xfer_interface *xfer, int rc ) {
 static struct xfer_interface_operations tftp_xfer_operations = {
 	.close		= tftp_xfer_close,
 	.vredirect	= ignore_xfer_vredirect,
-	.request	= ignore_xfer_request,
 	.seek		= ignore_xfer_seek,
 	.alloc_iob	= default_xfer_alloc_iob,
 	.deliver_iob	= xfer_deliver_as_raw,

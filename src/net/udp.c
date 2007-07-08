@@ -414,7 +414,6 @@ static int udp_xfer_deliver_iob ( struct xfer_interface *xfer,
 static struct xfer_interface_operations udp_xfer_operations = {
 	.close		= udp_xfer_close,
 	.vredirect	= ignore_xfer_vredirect,
-	.request	= ignore_xfer_request,
 	.seek		= ignore_xfer_seek,
 	.alloc_iob	= udp_alloc_iob,
 	.deliver_iob	= udp_xfer_deliver_iob,

@@ -36,7 +36,6 @@ static void hw_xfer_close ( struct xfer_interface *xfer, int rc ) {
 static struct xfer_interface_operations hw_xfer_operations = {
 	.close		= hw_xfer_close,
 	.vredirect	= ignore_xfer_vredirect,
-	.request	= ignore_xfer_request,
 	.seek		= ignore_xfer_seek,
 	.deliver_iob	= xfer_deliver_as_raw,
 	.deliver_raw	= ignore_xfer_deliver_raw,
