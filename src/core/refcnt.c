@@ -29,18 +29,18 @@
  * Increment reference count
  *
  * @v refcnt		Reference counter, or NULL
+ * @ret refcnt		Reference counter
  *
  * If @c refcnt is NULL, no action is taken.
  */
-void ref_get ( struct refcnt *refcnt ) {
+struct refcnt * ref_get ( struct refcnt *refcnt ) {
 
-	if ( ! refcnt )
-		return;
-
-	refcnt->refcnt++;
-
-	DBGC2 ( refcnt, "REFCNT %p incremented to %d\n",
-		refcnt, refcnt->refcnt );
+	if ( refcnt ) {
+		refcnt->refcnt++;
+		DBGC2 ( refcnt, "REFCNT %p incremented to %d\n",
+			refcnt, refcnt->refcnt );
+	}
+	return refcnt;
 }
 
 /**

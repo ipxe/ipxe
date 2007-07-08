@@ -38,7 +38,7 @@ struct refcnt {
 	void ( * free ) ( struct refcnt *refcnt );
 };
 
-extern void ref_get ( struct refcnt *refcnt );
+extern struct refcnt * ref_get ( struct refcnt *refcnt );
 extern void ref_put ( struct refcnt *refcnt );
 
 #endif /* _GPXE_REFCNT_H */
