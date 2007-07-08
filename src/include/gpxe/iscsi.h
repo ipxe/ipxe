@@ -8,10 +8,11 @@
  */
 
 #include <stdint.h>
-#include <gpxe/stream.h>
-#include <gpxe/async.h>
 #include <gpxe/scsi.h>
 #include <gpxe/chap.h>
+#include <gpxe/refcnt.h>
+#include <gpxe/xfer.h>
+#include <gpxe/process.h>
 
 /** Default iSCSI port */
 #define ISCSI_PORT 3260
@@ -486,21 +487,25 @@ enum iscsi_rx_state {
 
 /** An iSCSI session */
 struct iscsi_session {
+	/** Reference counter */
+	struct refcnt refcnt;
+
+	/** Transport-layer socket */
+	struct xfer_interface socket;
+
 	/** Initiator IQN */
-	const char *initiator_iqn;
+	char *initiator_iqn;
 	/** Target address */
-	struct sockaddr target;
+	char *target_address;
 	/** Target IQN */
-	const char *target_iqn;
+	char *target_iqn;
 	/** Logical Unit Number (LUN) */
 	uint64_t lun;
 	/** Username */
-	const char *username;
+	char *username;
 	/** Password */
-	const char *password;
+	char *password;
 
-	/** Stream application for this session */
-	struct stream_application stream;
 	/** Session status
 	 *
 	 * This is the bitwise-OR of zero or more ISCSI_STATUS_XXX
@@ -569,10 +574,8 @@ struct iscsi_session {
 	union iscsi_bhs tx_bhs;
 	/** State of the TX engine */
 	enum iscsi_tx_state tx_state;
-	/** Byte offset within the current TX state */
-	size_t tx_offset;
-	/** Length of the current TX state */
-	size_t tx_len;
+	/** TX process */
+	struct process process;
 
 	/** Basic header segment for current RX PDU */
 	union iscsi_bhs rx_bhs;
@@ -590,8 +593,6 @@ struct iscsi_session {
 	 * Set to NULL when command is complete.
 	 */
 	struct scsi_command *command;
-	/** Asynchronous operation for the current iSCSI operation */
-	struct async async;
 	/** Instant return code
 	 *
 	 * Set to a non-zero value if all requests should return
@@ -636,21 +637,5 @@ struct iscsi_session {
 
 /** Maximum number of retries at connecting */
 #define ISCSI_MAX_RETRIES 2
-
-extern int iscsi_issue ( struct iscsi_session *iscsi,
-			 struct scsi_command *command,
-			 struct async *parent );
-extern void iscsi_shutdown ( struct iscsi_session *iscsi );
-
-/** An iSCSI device */
-struct iscsi_device {
-	/** SCSI device interface */
-	struct scsi_device scsi;
-	/** iSCSI protocol instance */
-	struct iscsi_session iscsi;
-};
-
-extern int init_iscsidev ( struct iscsi_device *iscsidev );
-extern void fini_iscsidev ( struct iscsi_device *iscsidev );
 
 #endif /* _GPXE_ISCSI_H */

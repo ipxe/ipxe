@@ -24,10 +24,13 @@
 #include <assert.h>
 #include <byteswap.h>
 #include <gpxe/vsprintf.h>
+#include <gpxe/socket.h>
+#include <gpxe/xfer.h>
+#include <gpxe/open.h>
 #include <gpxe/scsi.h>
 #include <gpxe/process.h>
 #include <gpxe/uaccess.h>
-#include <gpxe/tcp.h>
+#include <gpxe/tcpip.h>
 #include <gpxe/iscsi.h>
 
 /** @file
@@ -36,42 +39,10 @@
  *
  */
 
-#warning "Update to use data-xfer interface"
-extern int tcp_open ( struct stream_application *stream );
-
 static void iscsi_start_tx ( struct iscsi_session *iscsi );
+static void iscsi_start_login ( struct iscsi_session *iscsi );
 static void iscsi_start_data_out ( struct iscsi_session *iscsi,
 				   unsigned int datasn );
-
-/**
- * Receive PDU data into buffer
- *
- * @v iscsi		iSCSI session
- * @v data		Data to receive
- * @v len		Length of data
- * @ret rc		Return status code
- *
- * This can be used when the RX PDU type handler wishes to buffer up
- * all received data and process the PDU as a single unit.  The caller
- * is repsonsible for calling iscsi_rx_buffered_data_done() after
- * processing the data.
- */
-static int iscsi_rx_buffered_data ( struct iscsi_session *iscsi,
-				    const void *data, size_t len ) {
-
-	/* Allocate buffer on first call */
-	if ( ! iscsi->rx_buffer ) {
-		iscsi->rx_buffer = malloc ( iscsi->rx_len );
-		if ( ! iscsi->rx_buffer )
-			return -ENOMEM;
-	}
-
-	/* Copy data to buffer */
-	assert ( ( iscsi->rx_offset + len ) <= iscsi->rx_len );
-	memcpy ( ( iscsi->rx_buffer + iscsi->rx_offset ), data, len );
-
-	return 0;
-}
 
 /**
  * Finish receiving PDU data into buffer
@@ -84,14 +55,76 @@ static void iscsi_rx_buffered_data_done ( struct iscsi_session *iscsi ) {
 }
 
 /**
- * Close iSCSI connection
+ * Free iSCSI session
+ *
+ * @v refcnt		Reference counter
+ */
+static void iscsi_free ( struct refcnt *refcnt ) {
+	struct iscsi_session *iscsi =
+		container_of ( refcnt, struct iscsi_session, refcnt );
+
+	free ( iscsi->initiator_iqn );
+	free ( iscsi->target_address );
+	free ( iscsi->target_iqn );
+	free ( iscsi->username );
+	free ( iscsi->password );
+	chap_finish ( &iscsi->chap );
+	iscsi_rx_buffered_data_done ( iscsi );
+	free ( iscsi );
+}
+
+/**
+ * Open iSCSI transport-layer connection
  *
  * @v iscsi		iSCSI session
+ * @ret rc		Return status code
  */
-static void iscsi_close ( struct iscsi_session *iscsi ) {
+static int iscsi_open_connection ( struct iscsi_session *iscsi ) {
+	struct sockaddr_tcpip target;
+	int rc;
 
-	/* Close stream connection */
-	stream_close ( &iscsi->stream );
+	assert ( iscsi->tx_state == ISCSI_TX_IDLE );
+	assert ( iscsi->rx_state == ISCSI_RX_BHS );
+	assert ( iscsi->rx_offset == 0 );
+
+	/* Open socket */
+	memset ( &target, 0, sizeof ( target ) );
+	target.st_port = htons ( ISCSI_PORT );
+	if ( ( rc = xfer_open_named_socket ( &iscsi->socket, SOCK_STREAM,
+					     ( struct sockaddr * ) &target,
+					     iscsi->target_address,
+					     NULL ) ) != 0 ) {
+		DBGC ( iscsi, "iSCSI %p could not open socket: %s\n",
+		       iscsi, strerror ( rc ) );
+		return rc;
+	}
+
+	/* Enter security negotiation phase */
+	iscsi->status = ( ISCSI_STATUS_SECURITY_NEGOTIATION_PHASE |
+			  ISCSI_STATUS_STRINGS_SECURITY );
+
+	/* Assign fresh initiator task tag */
+	iscsi->itt++;
+
+	/* Initiate login */
+	iscsi_start_login ( iscsi );
+
+	return 0;
+}
+
+/**
+ * Close iSCSI transport-layer connection
+ *
+ * @v iscsi		iSCSI session
+ * @v rc		Reason for close
+ *
+ * Closes the transport-layer connection and resets the session state
+ * ready to attempt a fresh login.
+ */
+static void iscsi_close_connection ( struct iscsi_session *iscsi, int rc ) {
+
+	/* Close all data transfer interfaces */
+	xfer_close ( &iscsi->socket, rc );
 
 	/* Clear connection status */
 	iscsi->status = 0;
@@ -100,25 +133,25 @@ static void iscsi_close ( struct iscsi_session *iscsi ) {
 	iscsi->tx_state = ISCSI_TX_IDLE;
 	iscsi->rx_state = ISCSI_RX_BHS;
 
-	/* Free any dynamically allocated memory */
+	/* Free any temporary dynamically allocated memory */
 	chap_finish ( &iscsi->chap );
 	iscsi_rx_buffered_data_done ( iscsi );
 }
 
 /**
- * Mark iSCSI operation as complete
+ * Mark iSCSI SCSI operation as complete
  *
  * @v iscsi		iSCSI session
  * @v rc		Return status code
  *
- * Note that iscsi_done() will not close the connection, and must
+ * Note that iscsi_scsi_done() will not close the connection, and must
  * therefore be called only when the internal state machines are in an
  * appropriate state, otherwise bad things may happen on the next call
- * to iscsi_issue().  The general rule is to call iscsi_done() only at
- * the end of receiving a PDU; at this point the TX and RX engines
- * should both be idle.
+ * to iscsi_issue().  The general rule is to call iscsi_scsi_done()
+ * only at the end of receiving a PDU; at this point the TX and RX
+ * engines should both be idle.
  */
-static void iscsi_done ( struct iscsi_session *iscsi, int rc ) {
+static void iscsi_scsi_done ( struct iscsi_session *iscsi, int rc ) {
 
 	assert ( iscsi->tx_state == ISCSI_TX_IDLE );
 
@@ -181,10 +214,11 @@ static void iscsi_start_command ( struct iscsi_session *iscsi ) {
  * @v data		Received data
  * @v len		Length of received data
  * @v remaining		Data remaining after this data
- * 
+ * @ret rc		Return status code
  */
-static void iscsi_rx_scsi_response ( struct iscsi_session *iscsi, void *data,
-				     size_t len, size_t remaining ) {
+static int iscsi_rx_scsi_response ( struct iscsi_session *iscsi,
+				    const void *data, size_t len,
+				    size_t remaining ) {
 	struct iscsi_bhs_scsi_response *response
 		= &iscsi->rx_bhs.scsi_response;
 	int sense_offset;
@@ -198,17 +232,18 @@ static void iscsi_rx_scsi_response ( struct iscsi_session *iscsi, void *data,
 
 	/* Wait for whole SCSI response to arrive */
 	if ( remaining )
-		return;
+		return 0;
 	
 	/* Record SCSI status code */
 	iscsi->command->status = response->status;
 
-	/* Mark as completed, with error if applicable */
-	if ( response->response == ISCSI_RESPONSE_COMMAND_COMPLETE ) {
-		iscsi_done ( iscsi, 0 );
-	} else {
-		iscsi_done ( iscsi, -EIO );
-	}
+	/* Check for errors */
+	if ( response->response != ISCSI_RESPONSE_COMMAND_COMPLETE )
+		return -EIO;
+
+	/* Mark as completed */
+	iscsi_scsi_done ( iscsi, 0 );
+	return 0;
 }
 
 /**
@@ -218,10 +253,11 @@ static void iscsi_rx_scsi_response ( struct iscsi_session *iscsi, void *data,
  * @v data		Received data
  * @v len		Length of received data
  * @v remaining		Data remaining after this data
- * 
+ * @ret rc		Return status code
  */
-static void iscsi_rx_data_in ( struct iscsi_session *iscsi, void *data,
-			       size_t len, size_t remaining __unused ) {
+static int iscsi_rx_data_in ( struct iscsi_session *iscsi,
+			      const void *data, size_t len,
+			      size_t remaining __unused ) {
 	struct iscsi_bhs_data_in *data_in = &iscsi->rx_bhs.data_in;
 	unsigned long offset;
 
@@ -240,8 +276,10 @@ static void iscsi_rx_data_in ( struct iscsi_session *iscsi, void *data,
 	if ( ( offset + len ) == iscsi->command->data_in_len ) {
 		assert ( data_in->flags & ISCSI_FLAG_FINAL );
 		assert ( remaining == 0 );
-		iscsi_done ( iscsi, 0 );
+		iscsi_scsi_done ( iscsi, 0 );
 	}
+
+	return 0;
 }
 
 /**
@@ -251,10 +289,11 @@ static void iscsi_rx_data_in ( struct iscsi_session *iscsi, void *data,
  * @v data		Received data
  * @v len		Length of received data
  * @v remaining		Data remaining after this data
- * 
+ * @ret rc		Return status code
  */
-static void iscsi_rx_r2t ( struct iscsi_session *iscsi, void *data __unused,
-			   size_t len __unused, size_t remaining __unused ) {
+static int iscsi_rx_r2t ( struct iscsi_session *iscsi,
+			  const void *data __unused, size_t len __unused,
+			  size_t remaining __unused ) {
 	struct iscsi_bhs_r2t *r2t = &iscsi->rx_bhs.r2t;
 
 	/* Record transfer parameters and trigger first data-out */
@@ -262,6 +301,8 @@ static void iscsi_rx_r2t ( struct iscsi_session *iscsi, void *data __unused,
 	iscsi->transfer_offset = ntohl ( r2t->offset );
 	iscsi->transfer_len = ntohl ( r2t->len );
 	iscsi_start_data_out ( iscsi, 0 );
+
+	return 0;
 }
 
 /**
@@ -323,27 +364,29 @@ static void iscsi_data_out_done ( struct iscsi_session *iscsi ) {
  * Send iSCSI data-out data segment
  *
  * @v iscsi		iSCSI session
- * @v buf		Temporary data buffer
- * @v len		Length of temporary data buffer
+ * @ret rc		Return status code
  */
-static void iscsi_tx_data_out ( struct iscsi_session *iscsi,
-				void *buf, size_t len ) {
+static int iscsi_tx_data_out ( struct iscsi_session *iscsi ) {
 	struct iscsi_bhs_data_out *data_out = &iscsi->tx_bhs.data_out;
+	struct io_buffer *iobuf;
 	unsigned long offset;
-	unsigned long remaining;
+	size_t len;
 
-	offset = ( iscsi->transfer_offset + ntohl ( data_out->offset ) +
-		   iscsi->tx_offset );
-	remaining = ( iscsi->tx_len - iscsi->tx_offset );
+	offset = ntohl ( data_out->offset );
+	len = ISCSI_DATA_LEN ( data_out->lengths );
+
 	assert ( iscsi->command != NULL );
 	assert ( iscsi->command->data_out );
-	assert ( ( offset + remaining ) <= iscsi->command->data_out_len );
-	
-	if ( remaining < len )
-		len = remaining;
-	copy_from_user ( buf, iscsi->command->data_out, offset, len );
+	assert ( ( offset + len ) <= iscsi->command->data_out_len );
 
-	stream_send ( &iscsi->stream, buf, len );
+	iobuf = xfer_alloc_iob ( &iscsi->socket, len );
+	if ( ! iobuf )
+		return -ENOMEM;
+	
+	copy_from_user ( iob_put ( iobuf, len ),
+			 iscsi->command->data_out, offset, len );
+
+	return xfer_deliver_iob ( &iscsi->socket, iobuf );
 }
 
 /****************************************************************************
@@ -478,16 +521,22 @@ static void iscsi_login_request_done ( struct iscsi_session *iscsi ) {
  * Transmit data segment of an iSCSI login request PDU
  *
  * @v iscsi		iSCSI session
- * @v buf		Temporary data buffer
- * @v len		Length of temporary data buffer
+ * @ret rc		Return status code
  *
  * For login requests, the data segment consists of the login strings.
  */
-static void iscsi_tx_login_request ( struct iscsi_session *iscsi,
-				     void *buf, size_t len ) {
-	len = iscsi_build_login_request_strings ( iscsi, buf, len );
-	stream_send ( &iscsi->stream, buf + iscsi->tx_offset,
-		   len - iscsi->tx_offset );
+static int iscsi_tx_login_request ( struct iscsi_session *iscsi ) {
+	struct iscsi_bhs_login_request *request = &iscsi->tx_bhs.login_request;
+	struct io_buffer *iobuf;
+	size_t len;
+
+	len = ISCSI_DATA_LEN ( request->lengths );
+	iobuf = xfer_alloc_iob ( &iscsi->socket, len );
+	if ( ! iobuf )
+		return -ENOMEM;
+	iob_put ( iobuf, len );
+	iscsi_build_login_request_strings ( iscsi, iobuf->data, len );
+	return xfer_deliver_iob ( &iscsi->socket, iobuf );
 }
 
 /**
@@ -495,20 +544,19 @@ static void iscsi_tx_login_request ( struct iscsi_session *iscsi,
  *
  * @v iscsi		iSCSI session
  * @v value		TargetAddress value
+ * @ret rc		Return status code
  */
-static void iscsi_handle_targetaddress_value ( struct iscsi_session *iscsi,
-					       const char *value ) {
-	struct in_addr address;
-	struct sockaddr_in *sin = ( struct sockaddr_in * ) &iscsi->target;
-
-	if ( inet_aton ( value, &address ) == 0 ) {
-		DBGC ( iscsi, "iSCSI %p received invalid TargetAddress "
-		       "\"%s\"\n", iscsi, value );
-		return;
-	}
+static int iscsi_handle_targetaddress_value ( struct iscsi_session *iscsi,
+					      const char *value ) {
 
 	DBGC ( iscsi, "iSCSI %p will redirect to %s\n", iscsi, value );
-	sin->sin_addr = address;
+
+	/* Replace target address */
+	free ( iscsi->target_address );
+	iscsi->target_address = strdup ( value );
+	if ( ! iscsi->target_address )
+		return -ENOMEM;
+	return 0;
 }
 
 /**
@@ -516,9 +564,10 @@ static void iscsi_handle_targetaddress_value ( struct iscsi_session *iscsi,
  *
  * @v iscsi		iSCSI session
  * @v value		AuthMethod value
+ * @ret rc		Return status code
  */
-static void iscsi_handle_authmethod_value ( struct iscsi_session *iscsi,
-					    const char *value ) {
+static int iscsi_handle_authmethod_value ( struct iscsi_session *iscsi,
+					   const char *value ) {
 
 	/* If server requests CHAP, send the CHAP_A string */
 	if ( strcmp ( value, "CHAP" ) == 0 ) {
@@ -526,6 +575,7 @@ static void iscsi_handle_authmethod_value ( struct iscsi_session *iscsi,
 		       iscsi );
 		iscsi->status |= ISCSI_STATUS_STRINGS_CHAP_ALGORITHM;
 	}
+	return 0;
 }
 
 /**
@@ -533,9 +583,10 @@ static void iscsi_handle_authmethod_value ( struct iscsi_session *iscsi,
  *
  * @v iscsi		iSCSI session
  * @v value		CHAP_A value
+ * @ret rc		Return status code
  */
-static void iscsi_handle_chap_a_value ( struct iscsi_session *iscsi,
-					const char *value ) {
+static int iscsi_handle_chap_a_value ( struct iscsi_session *iscsi,
+				       const char *value ) {
 	int rc;
 
 	/* We only ever offer "5" (i.e. MD5) as an algorithm, so if
@@ -545,15 +596,17 @@ static void iscsi_handle_chap_a_value ( struct iscsi_session *iscsi,
 	if ( strcmp ( value, "5" ) != 0 ) {
 		DBGC ( iscsi, "iSCSI %p got invalid CHAP algorithm \"%s\"\n",
 		       iscsi, value );
+		return -EPROTO;
 	}
 
 	/* Prepare for CHAP with MD5 */
 	if ( ( rc = chap_init ( &iscsi->chap, &md5_algorithm ) ) != 0 ) {
 		DBGC ( iscsi, "iSCSI %p could not initialise CHAP: %s\n",
 		       iscsi, strerror ( rc ) );
-		iscsi_close ( iscsi );
-		iscsi_done ( iscsi, rc );
+		return rc;
 	}
+
+	return 0;
 }
 
 /**
@@ -561,9 +614,10 @@ static void iscsi_handle_chap_a_value ( struct iscsi_session *iscsi,
  *
  * @v iscsi		iSCSI session
  * @v value		CHAP_I value
+ * @ret rc		Return status code
  */
-static void iscsi_handle_chap_i_value ( struct iscsi_session *iscsi,
-					const char *value ) {
+static int iscsi_handle_chap_i_value ( struct iscsi_session *iscsi,
+				       const char *value ) {
 	unsigned int identifier;
 	char *endp;
 
@@ -572,6 +626,7 @@ static void iscsi_handle_chap_i_value ( struct iscsi_session *iscsi,
 	if ( *endp != '\0' ) {
 		DBGC ( iscsi, "iSCSI %p saw invalid CHAP identifier \"%s\"\n",
 		       iscsi, value );
+		return -EPROTO;
 	}
 
 	/* Identifier and secret are the first two components of the
@@ -582,6 +637,8 @@ static void iscsi_handle_chap_i_value ( struct iscsi_session *iscsi,
 		chap_update ( &iscsi->chap, iscsi->password,
 			      strlen ( iscsi->password ) );
 	}
+
+	return 0;
 }
 
 /**
@@ -589,9 +646,10 @@ static void iscsi_handle_chap_i_value ( struct iscsi_session *iscsi,
  *
  * @v iscsi		iSCSI session
  * @v value		CHAP_C value
+ * @ret rc		Return status code
  */
-static void iscsi_handle_chap_c_value ( struct iscsi_session *iscsi,
-					const char *value ) {
+static int iscsi_handle_chap_c_value ( struct iscsi_session *iscsi,
+				       const char *value ) {
 	char buf[3];
 	char *endp;
 	uint8_t byte;
@@ -611,6 +669,7 @@ static void iscsi_handle_chap_c_value ( struct iscsi_session *iscsi,
 		if ( *endp != '\0' ) {
 			DBGC ( iscsi, "iSCSI %p saw invalid CHAP challenge "
 			       "byte \"%s\"\n", iscsi, buf );
+			return -EPROTO;
 		}
 		chap_update ( &iscsi->chap, &byte, sizeof ( byte ) );
 	}
@@ -619,6 +678,8 @@ static void iscsi_handle_chap_c_value ( struct iscsi_session *iscsi,
 	DBGC ( iscsi, "iSCSI %p sending CHAP response\n", iscsi );
 	chap_respond ( &iscsi->chap );
 	iscsi->status |= ISCSI_STATUS_STRINGS_CHAP_RESPONSE;
+
+	return 0;
 }
 
 /** An iSCSI text string that we want to handle */
@@ -633,9 +694,9 @@ struct iscsi_string_type {
 	 *
 	 * @v iscsi		iSCSI session
 	 * @v value		iSCSI string value
+	 * @ret rc		Return status code
 	 */
-	void ( * handle_value ) ( struct iscsi_session *iscsi,
-				  const char *value );
+	int ( * handle ) ( struct iscsi_session *iscsi, const char *value );
 };
 
 /** iSCSI text strings that we want to handle */
@@ -653,22 +714,29 @@ struct iscsi_string_type iscsi_string_types[] = {
  *
  * @v iscsi		iSCSI session
  * @v string		iSCSI string (in "key=value" format)
+ * @ret rc		Return status code
  */
-static void iscsi_handle_string ( struct iscsi_session *iscsi,
-				  const char *string ) {
+static int iscsi_handle_string ( struct iscsi_session *iscsi,
+				 const char *string ) {
 	struct iscsi_string_type *type;
 	size_t key_len;
+	int rc;
 
 	for ( type = iscsi_string_types ; type->key ; type++ ) {
 		key_len = strlen ( type->key );
-		if ( strncmp ( string, type->key, key_len ) == 0 ) {
-			DBGC ( iscsi, "iSCSI %p handling %s\n",
-			       iscsi, string );
-			type->handle_value ( iscsi, ( string + key_len ) );
-			return;
+		if ( strncmp ( string, type->key, key_len ) != 0 )
+			continue;
+		DBGC ( iscsi, "iSCSI %p handling %s\n", iscsi, string );
+		if ( ( rc = type->handle ( iscsi,
+					   ( string + key_len ) ) ) != 0 ) {
+			DBGC ( iscsi, "iSCSI %p could not handle %s: %s\n",
+			       iscsi, string, strerror ( rc ) );
+			return rc;
 		}
+		return 0;
 	}
 	DBGC ( iscsi, "iSCSI %p ignoring %s\n", iscsi, string );
+	return 0;
 }
 
 /**
@@ -677,10 +745,12 @@ static void iscsi_handle_string ( struct iscsi_session *iscsi,
  * @v iscsi		iSCSI session
  * @v string		iSCSI string buffer
  * @v len		Length of string buffer
+ * @ret rc		Return status code
  */
-static void iscsi_handle_strings ( struct iscsi_session *iscsi,
-				   const char *strings, size_t len ) {
+static int iscsi_handle_strings ( struct iscsi_session *iscsi,
+				  const char *strings, size_t len ) {
 	size_t string_len;
+	int rc;
 
 	/* Handle each string in turn, taking care not to overrun the
 	 * data buffer in case of badly-terminated data.
@@ -689,10 +759,42 @@ static void iscsi_handle_strings ( struct iscsi_session *iscsi,
 		string_len = ( strnlen ( strings, len ) + 1 );
 		if ( string_len > len )
 			break;
-		iscsi_handle_string ( iscsi, strings );
+		if ( ( rc = iscsi_handle_string ( iscsi, strings ) ) != 0 )
+			return rc;
 		strings += string_len;
 		len -= string_len;
 	}
+	return 0;
+}
+
+/**
+ * Receive PDU data into buffer
+ *
+ * @v iscsi		iSCSI session
+ * @v data		Data to receive
+ * @v len		Length of data
+ * @ret rc		Return status code
+ *
+ * This can be used when the RX PDU type handler wishes to buffer up
+ * all received data and process the PDU as a single unit.  The caller
+ * is repsonsible for calling iscsi_rx_buffered_data_done() after
+ * processing the data.
+ */
+static int iscsi_rx_buffered_data ( struct iscsi_session *iscsi,
+				    const void *data, size_t len ) {
+
+	/* Allocate buffer on first call */
+	if ( ! iscsi->rx_buffer ) {
+		iscsi->rx_buffer = malloc ( iscsi->rx_len );
+		if ( ! iscsi->rx_buffer )
+			return -ENOMEM;
+	}
+
+	/* Copy data to buffer */
+	assert ( ( iscsi->rx_offset + len ) <= iscsi->rx_len );
+	memcpy ( ( iscsi->rx_buffer + iscsi->rx_offset ), data, len );
+
+	return 0;
 }
 
 /**
@@ -702,10 +804,11 @@ static void iscsi_handle_strings ( struct iscsi_session *iscsi,
  * @v data		Received data
  * @v len		Length of received data
  * @v remaining		Data remaining after this data
- * 
+ * @ret rc		Return status code
  */
-static void iscsi_rx_login_response ( struct iscsi_session *iscsi, void *data,
-				      size_t len, size_t remaining ) {
+static int iscsi_rx_login_response ( struct iscsi_session *iscsi,
+				     const void *data, size_t len,
+				     size_t remaining ) {
 	struct iscsi_bhs_login_response *response
 		= &iscsi->rx_bhs.login_response;
 	int rc;
@@ -714,35 +817,27 @@ static void iscsi_rx_login_response ( struct iscsi_session *iscsi, void *data,
 	if ( ( rc = iscsi_rx_buffered_data ( iscsi, data, len ) ) != 0 ) {
 		DBGC ( iscsi, "iSCSI %p could not buffer login response: %s\n",
 		       iscsi, strerror ( rc ) );
-		iscsi_close ( iscsi );
-		iscsi_done ( iscsi, rc );
-		return;
+		return rc;
 	}
 	if ( remaining )
-		return;
+		return 0;
 
 	/* Process string data and discard string buffer */
-	iscsi_handle_strings ( iscsi, iscsi->rx_buffer, iscsi->rx_len );
+	if ( ( rc = iscsi_handle_strings ( iscsi, iscsi->rx_buffer,
+					   iscsi->rx_len ) ) != 0 )
+		return rc;
 	iscsi_rx_buffered_data_done ( iscsi );
 
 	/* Check for login redirection */
 	if ( response->status_class == ISCSI_STATUS_REDIRECT ) {
 		DBGC ( iscsi, "iSCSI %p redirecting to new server\n", iscsi );
-		iscsi_close ( iscsi );
-		if ( ( rc = tcp_open ( &iscsi->stream ) ) != 0 ) {
-			DBGC ( iscsi, "iSCSI %p could not open stream: %s\n ",
+		iscsi_close_connection ( iscsi, 0 );
+		if ( ( rc = iscsi_open_connection ( iscsi ) ) != 0 ) {
+			DBGC ( iscsi, "iSCSI %p could not redirect: %s\n ",
 			       iscsi, strerror ( rc ) );
-			iscsi_done ( iscsi, rc );
-			return;
+			return rc;
 		}
-		if ( ( rc = stream_connect ( &iscsi->stream,
-					     &iscsi->target ) != 0 ) != 0 ) {
-			DBGC ( iscsi, "iSCSI %p could not connect: %s\n ",
-			       iscsi, strerror ( rc ) );
-			iscsi_done ( iscsi, rc );
-			return;
-		}
-		return;
+		return 0;
 	}
 
 	/* Check for fatal errors */
@@ -750,9 +845,7 @@ static void iscsi_rx_login_response ( struct iscsi_session *iscsi, void *data,
 		DBGC ( iscsi, "iSCSI login failure: class %02x detail %02x\n",
 		       response->status_class, response->status_detail );
 		iscsi->instant_rc = -EPERM;
-		iscsi_close ( iscsi );
-		iscsi_done ( iscsi, -EPERM );
-		return;
+		return -EPERM;
 	}
 
 	/* Handle login transitions */
@@ -769,9 +862,7 @@ static void iscsi_rx_login_response ( struct iscsi_session *iscsi, void *data,
 		default:
 			DBGC ( iscsi, "iSCSI %p got invalid response flags "
 			       "%02x\n", iscsi, response->flags );
-			iscsi_close ( iscsi );
-			iscsi_done ( iscsi, -EIO );
-			return;
+			return -EIO;
 		}
 	}
 
@@ -781,7 +872,7 @@ static void iscsi_rx_login_response ( struct iscsi_session *iscsi, void *data,
 	if ( ( iscsi->status & ISCSI_STATUS_PHASE_MASK ) !=
 	     ISCSI_STATUS_FULL_FEATURE_PHASE ) {
 		iscsi_start_login ( iscsi );
-		return;
+		return 0;
 	}
 
 	/* Reset retry count */
@@ -792,18 +883,15 @@ static void iscsi_rx_login_response ( struct iscsi_session *iscsi, void *data,
 	
 	/* Send the actual SCSI command */
 	iscsi_start_command ( iscsi );
+
+	return 0;
 }
 
 /****************************************************************************
  *
- * iSCSI to stream interface
+ * iSCSI to socket interface
  *
  */
-
-static inline struct iscsi_session *
-stream_to_iscsi ( struct stream_application *app ) {
-	return container_of ( app, struct iscsi_session, stream );
-}
 
 /**
  * Start up a new TX PDU
@@ -821,34 +909,61 @@ static void iscsi_start_tx ( struct iscsi_session *iscsi ) {
 
 	/* Flag TX engine to start transmitting */
 	iscsi->tx_state = ISCSI_TX_BHS;
-	iscsi->tx_offset = 0;
+}
+
+/**
+ * Transmit basic header segment of an iSCSI PDU
+ *
+ * @v iscsi		iSCSI session
+ * @ret rc		Return status code
+ */
+static int iscsi_tx_bhs ( struct iscsi_session *iscsi ) {
+	return xfer_deliver_raw ( &iscsi->socket,  &iscsi->tx_bhs,
+				  sizeof ( iscsi->tx_bhs ) );
 }
 
 /**
  * Transmit data segment of an iSCSI PDU
  *
  * @v iscsi		iSCSI session
- * @v buf		Temporary data buffer
- * @v len		Length of temporary data buffer
+ * @ret rc		Return status code
  * 
  * Handle transmission of part of a PDU data segment.  iscsi::tx_bhs
  * will be valid when this is called.
  */
-static void iscsi_tx_data ( struct iscsi_session *iscsi,
-			    void *buf, size_t len ) {
+static int iscsi_tx_data ( struct iscsi_session *iscsi ) {
 	struct iscsi_bhs_common *common = &iscsi->tx_bhs.common;
 
 	switch ( common->opcode & ISCSI_OPCODE_MASK ) {
 	case ISCSI_OPCODE_DATA_OUT:
-		iscsi_tx_data_out ( iscsi, buf, len );
-		break;
+		return iscsi_tx_data_out ( iscsi );
 	case ISCSI_OPCODE_LOGIN_REQUEST:
-		iscsi_tx_login_request ( iscsi, buf, len );
-		break;
+		return iscsi_tx_login_request ( iscsi );
 	default:
 		assert ( 0 );
-		break;
+		return -EINVAL;
 	}
+}
+
+/**
+ * Transmit data padding of an iSCSI PDU
+ *
+ * @v iscsi		iSCSI session
+ * @ret rc		Return status code
+ * 
+ * Handle transmission of any data padding in a PDU data segment.
+ * iscsi::tx_bhs will be valid when this is called.
+ */
+static int iscsi_tx_data_padding ( struct iscsi_session *iscsi ) {
+	static const char pad[] = { '\0', '\0', '\0' };
+	struct iscsi_bhs_common *common = &iscsi->tx_bhs.common;
+	size_t pad_len;
+	
+	pad_len = ISCSI_DATA_PAD_LEN ( common->lengths );
+	if ( ! pad_len )
+		return 0;
+
+	return xfer_deliver_raw ( &iscsi->socket, pad, pad_len );
 }
 
 /**
@@ -875,62 +990,6 @@ static void iscsi_tx_done ( struct iscsi_session *iscsi ) {
 }
 
 /**
- * Handle stream ACKs
- *
- * @v iscsi		iSCSI session
- * 
- * Updates iscsi->tx_offset and, if applicable, transitions to the
- * next TX state.
- */
-static void iscsi_acked ( struct stream_application *app, size_t len ) {
-	struct iscsi_session *iscsi = stream_to_iscsi ( app );
-	struct iscsi_bhs_common *common = &iscsi->tx_bhs.common;
-	enum iscsi_tx_state next_state;
-	
-	iscsi->tx_offset += len;
-	while ( 1 ) {
-		switch ( iscsi->tx_state ) {
-		case ISCSI_TX_BHS:
-			iscsi->tx_len = sizeof ( iscsi->tx_bhs );
-			next_state = ISCSI_TX_AHS;
-			break;
-		case ISCSI_TX_AHS:
-			iscsi->tx_len = 4 * ISCSI_AHS_LEN ( common->lengths );
-			next_state = ISCSI_TX_DATA;
-			break;
-		case ISCSI_TX_DATA:
-			iscsi->tx_len = ISCSI_DATA_LEN ( common->lengths );
-			next_state = ISCSI_TX_DATA_PADDING;
-			break;
-		case ISCSI_TX_DATA_PADDING:
-			iscsi->tx_len = ISCSI_DATA_PAD_LEN ( common->lengths );
-			next_state = ISCSI_TX_IDLE;
-			break;
-		case ISCSI_TX_IDLE:
-			return;
-		default:
-			assert ( 0 );
-			return;
-		}
-		assert ( iscsi->tx_offset <= iscsi->tx_len );
-
-		/* If the whole of the current portion has not yet
-		 * been acked, stay in this state for now.
-		 */
-		if ( iscsi->tx_offset != iscsi->tx_len )
-			return;
-
-		/* Move to next state.  Call iscsi_tx_done() when PDU
-		 * transmission is complete.
-		 */
-		iscsi->tx_state = next_state;
-		iscsi->tx_offset = 0;
-		if ( next_state == ISCSI_TX_IDLE )
-			iscsi_tx_done ( iscsi );
-	}
-}
-
-/**
  * Transmit iSCSI PDU
  *
  * @v iscsi		iSCSI session
@@ -939,95 +998,42 @@ static void iscsi_acked ( struct stream_application *app, size_t len ) {
  * 
  * Constructs data to be sent for the current TX state
  */
-static void iscsi_senddata ( struct stream_application *app,
-			     void *buf, size_t len ) {
-	struct iscsi_session *iscsi = stream_to_iscsi ( app );
-	struct iscsi_bhs_common *common = &iscsi->tx_bhs.common;
-	static const char pad[] = { '\0', '\0', '\0' };
+static void iscsi_tx_step ( struct process *process ) {
+	struct iscsi_session *iscsi =
+		container_of ( process, struct iscsi_session, process );
+	int rc = 0;
+
+	if ( xfer_window ( &iscsi->socket ) == 0 )
+		return;
 
 	switch ( iscsi->tx_state ) {
 	case ISCSI_TX_IDLE:
 		/* Nothing to send */
 		break;
 	case ISCSI_TX_BHS:
-		stream_send ( app, &iscsi->tx_bhs.bytes[iscsi->tx_offset],
-			   ( sizeof ( iscsi->tx_bhs ) - iscsi->tx_offset ) );
+		if ( ( rc = iscsi_tx_bhs ( iscsi ) ) != 0 )
+			break;
+		iscsi->tx_state = ISCSI_TX_AHS;
 		break;
 	case ISCSI_TX_AHS:
 		/* We don't yet have an AHS transmission mechanism */
-		assert ( 0 );
+		iscsi->tx_state = ISCSI_TX_DATA;
 		break;
 	case ISCSI_TX_DATA:
-		iscsi_tx_data ( iscsi, buf, len );
+		if ( ( rc = iscsi_tx_data ( iscsi ) ) != 0 )
+			break;
+		iscsi->tx_state = ISCSI_TX_DATA_PADDING;
 		break;
 	case ISCSI_TX_DATA_PADDING:
-		stream_send ( app, pad, ( ISCSI_DATA_PAD_LEN( common->lengths )
-					  - iscsi->tx_offset ) );
+		if ( ( rc = iscsi_tx_data_padding ( iscsi ) ) != 0 )
+			break;
+		iscsi->tx_state = ISCSI_TX_IDLE;
+		iscsi_tx_done ( iscsi );
 		break;
 	default:
 		assert ( 0 );
 		break;
 	}
-}
-
-/**
- * Receive data segment of an iSCSI PDU
- *
- * @v iscsi		iSCSI session
- * @v data		Received data
- * @v len		Length of received data
- * @v remaining		Data remaining after this data
- *
- * Handle processing of part of a PDU data segment.  iscsi::rx_bhs
- * will be valid when this is called.
- */
-static void iscsi_rx_data ( struct iscsi_session *iscsi, void *data,
-			    size_t len, size_t remaining ) {
-	struct iscsi_bhs_common_response *response
-		= &iscsi->rx_bhs.common_response;
-
-	/* Update cmdsn and statsn */
-	iscsi->cmdsn = ntohl ( response->expcmdsn );
-	iscsi->statsn = ntohl ( response->statsn );
-
-	switch ( response->opcode & ISCSI_OPCODE_MASK ) {
-	case ISCSI_OPCODE_LOGIN_RESPONSE:
-		iscsi_rx_login_response ( iscsi, data, len, remaining );
-		break;
-	case ISCSI_OPCODE_SCSI_RESPONSE:
-		iscsi_rx_scsi_response ( iscsi, data, len, remaining );
-		break;
-	case ISCSI_OPCODE_DATA_IN:
-		iscsi_rx_data_in ( iscsi, data, len, remaining );
-		break;
-	case ISCSI_OPCODE_R2T:
-		iscsi_rx_r2t ( iscsi, data, len, remaining );
-		break;
-	default:
-		if ( remaining )
-			return;
-		DBGC ( iscsi, "iSCSI %p unknown opcode %02x\n", iscsi,
-		       response->opcode );
-		iscsi_close ( iscsi );
-		iscsi_done ( iscsi, -EOPNOTSUPP );
-		break;
-	}
-}
-
-/**
- * Discard portion of an iSCSI PDU.
- *
- * @v iscsi		iSCSI session
- * @v data		Received data
- * @v len		Length of received data
- * @v remaining		Data remaining after this data
- *
- * This discards data from a portion of a received PDU.
- */
-static void iscsi_rx_discard ( struct iscsi_session *iscsi __unused,
-			       void *data __unused, size_t len __unused,
-			       size_t remaining __unused ) {
-	/* Do nothing */
 }
 
 /**
@@ -1037,26 +1043,86 @@ static void iscsi_rx_discard ( struct iscsi_session *iscsi __unused,
  * @v data		Received data
  * @v len		Length of received data
  * @v remaining		Data remaining after this data
+ * @ret rc		Return status code
  *
  * This fills in iscsi::rx_bhs with the data from the BHS portion of
  * the received PDU.
  */
-static void iscsi_rx_bhs ( struct iscsi_session *iscsi, void *data,
-			   size_t len, size_t remaining __unused ) {
+static int iscsi_rx_bhs ( struct iscsi_session *iscsi, const void *data,
+			  size_t len, size_t remaining __unused ) {
 	memcpy ( &iscsi->rx_bhs.bytes[iscsi->rx_offset], data, len );
 	if ( ( iscsi->rx_offset + len ) >= sizeof ( iscsi->rx_bhs ) ) {
 		DBGC ( iscsi, "iSCSI %p received PDU opcode %#x len %#lx\n",
 		       iscsi, iscsi->rx_bhs.common.opcode,
 		       ISCSI_DATA_LEN ( iscsi->rx_bhs.common.lengths ) );
 	}
+	return 0;
+}
+
+/**
+ * Discard portion of an iSCSI PDU.
+ *
+ * @v iscsi		iSCSI session
+ * @v data		Received data
+ * @v len		Length of received data
+ * @v remaining		Data remaining after this data
+ * @ret rc		Return status code
+ *
+ * This discards data from a portion of a received PDU.
+ */
+static int iscsi_rx_discard ( struct iscsi_session *iscsi __unused,
+			      const void *data __unused, size_t len __unused,
+			      size_t remaining __unused ) {
+	/* Do nothing */
+	return 0;
+}
+
+/**
+ * Receive data segment of an iSCSI PDU
+ *
+ * @v iscsi		iSCSI session
+ * @v data		Received data
+ * @v len		Length of received data
+ * @v remaining		Data remaining after this data
+ * @ret rc		Return status code
+ *
+ * Handle processing of part of a PDU data segment.  iscsi::rx_bhs
+ * will be valid when this is called.
+ */
+static int iscsi_rx_data ( struct iscsi_session *iscsi, const void *data,
+			   size_t len, size_t remaining ) {
+	struct iscsi_bhs_common_response *response
+		= &iscsi->rx_bhs.common_response;
+
+	/* Update cmdsn and statsn */
+	iscsi->cmdsn = ntohl ( response->expcmdsn );
+	iscsi->statsn = ntohl ( response->statsn );
+
+	switch ( response->opcode & ISCSI_OPCODE_MASK ) {
+	case ISCSI_OPCODE_LOGIN_RESPONSE:
+		return iscsi_rx_login_response ( iscsi, data, len, remaining );
+	case ISCSI_OPCODE_SCSI_RESPONSE:
+		return iscsi_rx_scsi_response ( iscsi, data, len, remaining );
+	case ISCSI_OPCODE_DATA_IN:
+		return iscsi_rx_data_in ( iscsi, data, len, remaining );
+	case ISCSI_OPCODE_R2T:
+		return iscsi_rx_r2t ( iscsi, data, len, remaining );
+	default:
+		if ( remaining )
+			return 0;
+		DBGC ( iscsi, "iSCSI %p unknown opcode %02x\n", iscsi,
+		       response->opcode );
+		return -EOPNOTSUPP;
+	}
 }
 
 /**
  * Receive new data
  *
- * @v stream		Stream application
+ * @v socket		Transport layer interface
  * @v data		Received data
  * @v len		Length of received data
+ * @ret rc		Return status code
  *
  * This handles received PDUs.  The receive strategy is to fill in
  * iscsi::rx_bhs with the contents of the BHS portion of the PDU,
@@ -1065,15 +1131,17 @@ static void iscsi_rx_bhs ( struct iscsi_session *iscsi, void *data,
  * always has a full copy of the BHS available, even for portions of
  * the data in different packets to the BHS.
  */
-static void iscsi_newdata ( struct stream_application *app, void *data,
-			    size_t len ) {
-	struct iscsi_session *iscsi = stream_to_iscsi ( app );
+static int iscsi_socket_deliver_raw ( struct xfer_interface *socket,
+				      const void *data, size_t len ) {
+	struct iscsi_session *iscsi =
+		container_of ( socket, struct iscsi_session, socket );
 	struct iscsi_bhs_common *common = &iscsi->rx_bhs.common;
-	void ( *process ) ( struct iscsi_session *iscsi, void *data,
-			    size_t len, size_t remaining );
+	int ( *process ) ( struct iscsi_session *iscsi, const void *data,
+			   size_t len, size_t remaining );
 	enum iscsi_rx_state next_state;
 	size_t frag_len;
 	size_t remaining;
+	int rc;
 
 	while ( 1 ) {
 		switch ( iscsi->rx_state ) {
@@ -1099,14 +1167,21 @@ static void iscsi_newdata ( struct stream_application *app, void *data,
 			break;
 		default:
 			assert ( 0 );
-			return;
+			return -EINVAL;
 		}
 
 		frag_len = iscsi->rx_len - iscsi->rx_offset;
 		if ( frag_len > len )
 			frag_len = len;
 		remaining = iscsi->rx_len - iscsi->rx_offset - frag_len;
-		process ( iscsi, data, frag_len, remaining );
+		if ( ( rc = process ( iscsi, data, frag_len,
+				      remaining ) ) != 0 ) {
+			DBGC ( iscsi, "iSCSI %p could not process received "
+			       "data: %s\n", iscsi, strerror ( rc ) );
+			iscsi_close_connection ( iscsi, rc );
+			iscsi_scsi_done ( iscsi, rc );
+			return rc;
+		}
 
 		iscsi->rx_offset += frag_len;
 		data += frag_len;
@@ -1116,85 +1191,58 @@ static void iscsi_newdata ( struct stream_application *app, void *data,
 		 * received, stay in this state for now.
 		 */
 		if ( iscsi->rx_offset != iscsi->rx_len )
-			return;
+			return 0;
 
 		iscsi->rx_state = next_state;
 		iscsi->rx_offset = 0;
 	}
+
+	return 0;
 }
 
 /**
  * Handle stream connection closure
  *
- * @v app		Stream application
- * @v status		Error code, if any
+ * @v socket		Transport layer interface
+ * @v rc		Reason for close
  *
  */
-static void iscsi_closed ( struct stream_application *app, int status ) {
-	struct iscsi_session *iscsi = stream_to_iscsi ( app );
-	int rc;
+static void iscsi_socket_close ( struct xfer_interface *socket, int rc ) {
+	struct iscsi_session *iscsi =
+		container_of ( socket, struct iscsi_session, socket );
 
 	/* Even a graceful close counts as an error for iSCSI */
-	if ( ! status )
-		status = -ECONNRESET;
+	if ( ! rc )
+		rc = -ECONNRESET;
 
 	/* Close session cleanly */
-	iscsi_close ( iscsi );
+	iscsi_close_connection ( iscsi, rc );
 
 	/* Retry connection if within the retry limit, otherwise fail */
 	if ( ++iscsi->retry_count <= ISCSI_MAX_RETRIES ) {
 		DBGC ( iscsi, "iSCSI %p retrying connection (retry #%d)\n",
 		       iscsi, iscsi->retry_count );
-		if ( ( rc = tcp_open ( app ) ) != 0 ) {
-			DBGC ( iscsi, "iSCSI %p could not open stream: %s\n ",
+		if ( ( rc = iscsi_open_connection ( iscsi ) ) != 0 ) {
+			DBGC ( iscsi, "iSCSI %p could not reconnect: %s\n",
 			       iscsi, strerror ( rc ) );
-			iscsi_done ( iscsi, rc );
-			return;
-		}
-		if ( ( rc = stream_connect ( app, &iscsi->target ) ) != 0 ){
-			DBGC ( iscsi, "iSCSI %p could not connect: %s\n",
-			       iscsi, strerror ( rc ) );
-			iscsi_done ( iscsi, rc );
-			return;
+			iscsi_scsi_done ( iscsi, rc );
 		}
 	} else {
 		DBGC ( iscsi, "iSCSI %p retry count exceeded\n", iscsi );
-		iscsi->instant_rc = status;
-		iscsi_done ( iscsi, status );
-		return;
+		iscsi->instant_rc = rc;
+		iscsi_scsi_done ( iscsi, rc );
 	}
 }
 
-/**
- * Handle stream connection opening
- *
- * @v app		Stream application
- *
- */
-static void iscsi_connected ( struct stream_application *app ) {
-	struct iscsi_session *iscsi = stream_to_iscsi ( app );
-
-	assert ( iscsi->rx_state == ISCSI_RX_BHS );
-	assert ( iscsi->rx_offset == 0 );
-
-	/* Enter security negotiation phase */
-	iscsi->status = ( ISCSI_STATUS_SECURITY_NEGOTIATION_PHASE |
-			  ISCSI_STATUS_STRINGS_SECURITY );
-
-	/* Assign fresh initiator task tag */
-	iscsi->itt++;
-
-	/* Start logging in */
-	iscsi_start_login ( iscsi );
-}
-
-/** iSCSI stream operations */
-static struct stream_application_operations iscsi_stream_operations = {
-	.closed		= iscsi_closed,
-	.connected	= iscsi_connected,
-	.acked		= iscsi_acked,
-	.newdata	= iscsi_newdata,
-	.senddata	= iscsi_senddata,
+/** iSCSI socket operations */
+static struct xfer_interface_operations iscsi_socket_operations = {
+	.close		= iscsi_socket_close,
+	.vredirect	= xfer_vopen,
+	.seek		= ignore_xfer_seek,
+	.window		= unlimited_xfer_window,
+	.alloc_iob	= default_xfer_alloc_iob,
+	.deliver_iob	= xfer_deliver_as_raw,
+	.deliver_raw	= iscsi_socket_deliver_raw,
 };
 
 /**
@@ -1246,5 +1294,6 @@ int iscsi_issue ( struct iscsi_session *iscsi, struct scsi_command *command,
  * @ret aop		Asynchronous operation
  */
 void iscsi_shutdown ( struct iscsi_session *iscsi ) {
-	iscsi_close ( iscsi );
+	iscsi_close_connection ( iscsi, 0 );
+	ref_put ( &iscsi->refcnt );
 }
