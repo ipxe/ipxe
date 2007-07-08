@@ -50,13 +50,13 @@
 
 /*
   02 JUL 2007 Udayan Kumar	 1.2 ported the driver from etherboot to gPXE API
-		      	      	 Added a circular buffer for transmit and receive.
-		                 transmit routine will not wait for transmission to finish
-			         poll routine deals with it.
+		      	      	     Added a circular buffer for transmit and receive.
+		                     transmit routine will not wait for transmission to finish.
+			             poll routine deals with it.
 
-  13 Dec 2003 timlegge 		1.1 Enabled Multicast Support
-  29 May 2001  mdc     		1.0
-     Initial Release.  		Tested with Netgear FA311 and FA312 boards
+  13 Dec 2003 timlegge 	         1.1 Enabled Multicast Support
+  29 May 2001  mdc     		 1.0
+     Initial Release.  		 Tested with Netgear FA311 and FA312 boards
 */
  
 
@@ -119,7 +119,6 @@ struct natsemi_nic {
 	struct nvo_block nvo;
 };
 
-
 /* NATSEMI: Offsets to the device registers.
  * Unlike software-only systems, device drivers interact with complex hardware.
  * It's not useful to define symbolic names for every register bit in the
@@ -154,8 +153,8 @@ enum register_offsets {
     PhyStatus    = 0xC0, 
     MIntrCtrl    = 0xC4, 
     MIntrStatus  = 0xC8,
-
-    /* These are from the spec, around page 78... on a separate table. */
+    /* These are from the spec, around page 78... on a separate table. 
+     */
     PGSEL        = 0xCC, 
     PMDCSR       = 0xE4, 
     TSTDAT       = 0xFC, 
@@ -166,10 +165,8 @@ enum register_offsets {
 	    
 };
 
-
-
-
-/* Bit in ChipCmd. */
+/* Bit in ChipCmd.
+ */
 enum ChipCmdBits {
     ChipReset = 0x100, 
     RxReset   = 0x20, 
@@ -180,8 +177,8 @@ enum ChipCmdBits {
     TxOn      = 0x01
 };
 
-
-/* Bits in the RxMode register. */
+/* Bits in the RxMode register.
+ */
 enum rx_mode_bits {
     AcceptErr          = 0x20,
     AcceptRunt         = 0x10,
@@ -193,7 +190,8 @@ enum rx_mode_bits {
     RxFilterEnable     = 0x80000000
 };
 
-/* Bits in network_desc.status */
+/* Bits in network_desc.status
+ */
 enum desc_status_bits {
     DescOwn   = 0x80000000, 
     DescMore  = 0x40000000, 
@@ -203,8 +201,8 @@ enum desc_status_bits {
     RxTooLong = 0x00400000
 };
 
-/*Bits in Interrupt Mask register */
-
+/*Bits in Interrupt Mask register
+ */
 enum Intr_mask_register_bits {
     RxOk       = 0x001,
     RxErr      = 0x004,
@@ -212,18 +210,18 @@ enum Intr_mask_register_bits {
     TxErr      = 0x100 
 };	
 
-
-/*  EEPROM access , values are devices specific*/
+/*  EEPROM access , values are devices specific
+ */
 #define EE_CS		0x08	/* EEPROM chip select */
 #define EE_SK		0x04	/* EEPROM shift clock */
 #define EE_DI		0x01	/* Data in */
 #define EE_DO		0x02	/* Data out */
 
-/* Offsets within EEPROM (these are word offsets) */
+/* Offsets within EEPROM (these are word offsets)
+ */
 #define EE_MAC 7
 #define EE_REG  EECtrl
 static uint32_t SavedClkRun;	
-
 
 static const uint8_t nat_ee_bits[] = {
 	[SPI_BIT_SCLK]	= EE_SK,
@@ -277,13 +275,15 @@ static struct nvo_fragment nat_nvo_fragments[] = {
  */
  void nat_init_eeprom ( struct natsemi_nic *nat ) {
 
-	/* Initialise three-wire bus  */
+	/* Initialise three-wire bus 
+	 */
 	nat->spibit.basher.op = &nat_basher_ops;
 	nat->spibit.bus.mode = SPI_MODE_THREEWIRE;
 	nat->spibit.endianness = SPI_BIT_LITTLE_ENDIAN;
 	init_spi_bit_basher ( &nat->spibit );
 
-	/*natsemi DP 83815 only supports at93c46 */
+	/*natsemi DP 83815 only supports at93c46
+	 */
 	init_at93c46 ( &nat->eeprom, 16 );
 	nat->eeprom.bus = &nat->spibit.bus;
 
@@ -301,7 +301,8 @@ static struct nvo_fragment nat_nvo_fragments[] = {
 static void nat_reset ( struct natsemi_nic *nat ) {
 
 	int i;
-	/* Reset chip */
+	/* Reset chip
+	 */
 	outl ( ChipReset, nat->ioaddr + ChipCmd );
 	mdelay ( 10 );
 	nat->tx_dirty=0;
@@ -317,7 +318,8 @@ static void nat_reset ( struct natsemi_nic *nat ) {
 
 	outl(TxOff|RxOff, nat->ioaddr + ChipCmd);
 
-	/* Restore PME enable bit */
+	/* Restore PME enable bit
+	 */
 	outl(SavedClkRun, nat->ioaddr + ClkRun);
 }
 
@@ -342,13 +344,16 @@ static int nat_open ( struct net_device *netdev ) {
         SavedClkRun = inl(nat->ioaddr + ClkRun);
         outl(SavedClkRun & ~0x100, nat->ioaddr + ClkRun);
 
-	/* Setting up Mac address in the NIC */
+	/* Setting up Mac address in the NIC
+	 */
 	for ( i = 0 ; i < ETH_ALEN ; i+=2 ) {
 		outl(i,nat->ioaddr+RxFilterAddr);
-		outw ( netdev->ll_addr[i] + (netdev->ll_addr[i+1]<<8), nat->ioaddr +RxFilterData);
+		outw ( netdev->ll_addr[i] + (netdev->ll_addr[i+1]<<8),
+			 nat->ioaddr +RxFilterData);
 	}
 
-	/*Set up the Tx Ring */
+	/*Set up the Tx Ring
+	 */
 	nat->tx_cur=0;
 	nat->tx_dirty=0;
 	for (i=0;i<TX_RING_SIZE;i++) {
@@ -357,7 +362,8 @@ static int nat_open ( struct net_device *netdev ) {
 		nat->tx[i].bufptr = 0;
 	}
 
-	/* Set up RX ring */
+	/* Set up RX ring
+	 */
 	nat->rx_cur=0;
 	for (i=0;i<NUM_RX_DESC;i++) {
 
@@ -369,16 +375,22 @@ static int nat_open ( struct net_device *netdev ) {
 		nat->rx[i].bufptr = virt_to_bus(nat->iobuf[i]->data);
 	}
 
-	/* load Receive Descriptor Register */
+	/* load Receive Descriptor Register
+	 */
 	outl(virt_to_bus(&nat->rx[0]), nat->ioaddr + RxRingPtr);
-	DBG("Natsemi Rx descriptor loaded with: %X\n",(unsigned int)inl(nat->ioaddr+RxRingPtr));		
+	DBG("Natsemi Rx descriptor loaded with: %X\n",
+		(unsigned int)inl(nat->ioaddr+RxRingPtr));		
 
-	/* setup Tx ring */
+	/* setup Tx ring
+	 */
 	outl(virt_to_bus(&nat->tx[0]),nat->ioaddr+TxRingPtr);
-	DBG("Natsemi Tx descriptor loaded with: %X\n",(unsigned int)inl(nat->ioaddr+TxRingPtr));
+	DBG("Natsemi Tx descriptor loaded with: %X\n",
+		(unsigned int)inl(nat->ioaddr+TxRingPtr));
 
-	/* Enables RX */
-	outl(RxFilterEnable|AcceptBroadcast|AcceptAllMulticast|AcceptMyPhys, nat->ioaddr+RxFilterAddr);
+	/* Enables RX
+	 */
+	outl(RxFilterEnable|AcceptBroadcast|AcceptAllMulticast|AcceptMyPhys,
+		 nat->ioaddr+RxFilterAddr);
 
 	/* Initialize other registers. 
 	 * Configure the PCI bus bursts and FIFO thresholds. 
@@ -394,10 +406,12 @@ static int nat_open ( struct net_device *netdev ) {
 	outl(tx_config, nat->ioaddr + TxConfig);
 	outl(rx_config, nat->ioaddr + RxConfig);
 
-	/*start the receiver  */
+	/*start the receiver 
+	 */
         outl(RxOn, nat->ioaddr + ChipCmd);
 
-	/*enable interrupts*/
+	/*enable interrupts
+	 */
 	outl((RxOk|RxErr|TxOk|TxErr),nat->ioaddr + IntrMask); 
 	//outl(1,nat->ioaddr +IntrEnable);
 
@@ -414,15 +428,18 @@ static void nat_close ( struct net_device *netdev ) {
 	int i;
 
 
-	/* Reset the hardware to disable everything in one go */
+	/* Reset the hardware to disable everything in one go
+	 */
 	nat_reset ( nat );
 
-	/* Free RX ring */
+	/* Free RX ring
+	 */
 	for (i=0;i<NUM_RX_DESC;i++) {
 		
 		free_iob( nat->iobuf[i] );
 	}
-	/* disable interrupts */
+	/* disable interrupts
+	 */
 	//outl(0,nat->ioaddr + IntrMask) ;
 }
 
@@ -436,28 +453,34 @@ static void nat_close ( struct net_device *netdev ) {
 static int nat_transmit ( struct net_device *netdev, struct io_buffer *iobuf ) {
 	struct natsemi_nic *nat = netdev->priv;
 
-        /* check for space in TX ring */
+        /* check for space in TX ring
+	 */
 	if (nat->tx[nat->tx_cur].cmdsts !=0) {
 		DBG( "TX overflow\n" );
 		return -ENOBUFS;
 	}
 
-	/* to be used in netdev_tx_complete*/
+	/* to be used in netdev_tx_complete
+	 */
 	nat->tx_iobuf[nat->tx_cur]=iobuf;
 
-	/* Pad and align packet */
-	iob_pad ( iobuf, ETH_ZLEN );
+	/* Pad and align packet has been ignored because its not required here
+	 * iob_pad ( iobuf, ETH_ZLEN ); can be used to achieve it
+	 */
 
-	/* Add to TX ring */
+	/* Add to TX ring
+	 */
 	DBG ( "TX id %d at %lx+%x\n", nat->tx_cur,
 	      virt_to_bus ( &iobuf->data ), iob_len ( iobuf ) );
 
 	nat->tx[nat->tx_cur].bufptr = virt_to_bus(iobuf->data);
 	nat->tx[nat->tx_cur].cmdsts= iob_len(iobuf)|OWN;
-	/* increment the circular buffer pointer to the next buffer location */
+	/* increment the circular buffer pointer to the next buffer location
+	 */
 	nat->tx_cur=(nat->tx_cur+1) % TX_RING_SIZE;
 
-	/*start the transmitter  */
+	/*start the transmitter 
+	 */
         outl(TxOn, nat->ioaddr + ChipCmd);
 
 	return 0;
@@ -479,12 +502,14 @@ static void nat_poll ( struct net_device *netdev, unsigned int rx_quota ) {
 	int i;
 	
 	//outl(1,nat->ioaddr +IntrEnable);
-	/* read the interrupt register */
+	/* read the interrupt register
+	 */
 	intr_status=inl(nat->ioaddr+IntrStatus);
 	if(!intr_status)
 	goto end;
 
-	/* check the status of packets given to card for transmission */	
+	/* check the status of packets given to card for transmission
+	 */	
 	DBG("Intr status %X\n",intr_status);
 
 	i=nat->tx_dirty;
@@ -493,10 +518,12 @@ static void nat_poll ( struct net_device *netdev, unsigned int rx_quota ) {
 		DBG("value of tx_dirty = %d tx_cur=%d status=%X\n",
 			nat->tx_dirty,nat->tx_cur,status);
 		
-		/* check if current packet has been transmitted or not */
+		/* check if current packet has been transmitted or not
+		 */
 		if(status & OWN) 
 			break;
-		/* Check if any errors in transmission */
+		/* Check if any errors in transmission
+		 */
 		if (! (status & DescPktOK)) {
 			DBG("Error in sending Packet status:%X\n",
 					(unsigned int)status);
@@ -505,17 +532,20 @@ static void nat_poll ( struct net_device *netdev, unsigned int rx_quota ) {
 			DBG("Success in transmitting Packet\n");
 			netdev_tx_complete(netdev,nat->tx_iobuf[nat->tx_dirty]);
 		}
-		/* setting cmdsts zero, indicating that it can be reused */
+		/* setting cmdsts zero, indicating that it can be reused 
+		 */
 		nat->tx[nat->tx_dirty].cmdsts=0;
 		nat->tx_dirty=(nat->tx_dirty +1) % TX_RING_SIZE;
 		i=(i+1) % TX_RING_SIZE;
 	}
 	
-	/* Handle received packets */
+	/* Handle received packets 
+	 */
 	rx_status=(unsigned int)nat->rx[nat->rx_cur].cmdsts; 
 	while (rx_quota && (rx_status & OWN)) {
 		rx_len= (rx_status & DSIZE) - CRC_SIZE;
-		/*check for the corrupt packet */
+		/*check for the corrupt packet 
+		 */
 		if((rx_status & (DescMore|DescPktOK|RxTooLong)) != DescPktOK) {
 			 DBG("natsemi_poll: Corrupted packet received, "
 					"buffer status = %X ^ %X \n",rx_status,
@@ -524,12 +554,14 @@ static void nat_poll ( struct net_device *netdev, unsigned int rx_quota ) {
 		} else 	{
 			rx_iob = alloc_iob(rx_len);
 			if(!rx_iob) 
-				/* leave packet for next call to poll*/
+				/* leave packet for next call to poll
+				 */
 				goto end;
 			memcpy(iob_put(rx_iob,rx_len),
 					nat->iobuf[nat->rx_cur]->data,rx_len);
 			DBG("received packet\n");
-			/* add to the receive queue. */
+			/* add to the receive queue. 
+			 */
 			netdev_rx(netdev,rx_iob);
 			rx_quota--;
 		}
@@ -540,7 +572,8 @@ static void nat_poll ( struct net_device *netdev, unsigned int rx_quota ) {
 
 end:
 
-	/* re-enable the potentially idle receive state machine */
+	/* re-enable the potentially idle receive state machine 
+	 */
 	outl(RxOn, nat->ioaddr + ChipCmd);	
 //	outl(1,nat->ioaddr +IntrEnable);
 }				
@@ -570,7 +603,8 @@ static int nat_probe ( struct pci_device *pci,
 	uint8_t last=0;
 	uint8_t last1=0;
 
-	/* Allocate net device */
+	/* Allocate net device 
+	 */
 	netdev = alloc_etherdev ( sizeof ( *nat ) );
 	if ( ! netdev ) 
 		return -ENOMEM;
@@ -581,10 +615,12 @@ static int nat_probe ( struct pci_device *pci,
 	memset ( nat, 0, sizeof ( *nat ) );
 	nat->ioaddr = pci->ioaddr;
 
-	/* Fix up PCI device */
+	/* Fix up PCI device
+	 */
 	adjust_pci_device ( pci );
 
-	/* Reset the NIC, set up EEPROM access and read MAC address */
+	/* Reset the NIC, set up EEPROM access and read MAC address
+	 */
 	nat_reset ( nat );
 	nat_init_eeprom ( nat );
 	nvs_read ( &nat->eeprom.nvs, EE_MAC, ll_addr_encoded, ETH_ALEN );
@@ -598,24 +634,14 @@ static int nat_probe ( struct pci_device *pci,
 		last=(ll_addr_encoded[i+1]>>7);
 		netdev->ll_addr[i+1]=(ll_addr_encoded[i+1]<<1)+last1;
 	}
-	/* TODO remove the block below */
-	DBG("Contents of the EEPROM\n");
-	uint8_t eetest[108];
-	nvs_read(&nat->eeprom.nvs,0,eetest,108);
-	DBG_HD(&eetest,108);
 
-	/* Point to NIC specific routines */
-	/*
-	netdev->open	 = nat_open;
-	netdev->close	 = nat_close;
-	netdev->transmit = nat_transmit;
-	netdev->poll	 = nat_poll;
-	*/
-	/* Register network device */
+	/* Register network device
+	 */
 	if ( ( rc = register_netdev ( netdev ) ) != 0 )
 		goto err_register_netdev;
 
-	/* Register non-volatile storage */
+	/* Register non-volatile storage 
+	 */
 	if ( nat->nvo.nvs ) {
 		if ( ( rc = nvo_register ( &nat->nvo ) ) != 0 )
 			goto err_register_nvo;
@@ -627,9 +653,11 @@ static int nat_probe ( struct pci_device *pci,
 err_register_nvo:
 	unregister_netdev ( netdev );
 err_register_netdev:
-	/* Disable NIC */
+	/* Disable NIC
+	 */
 	nat_reset ( nat );
-	/* Free net device */
+	/* Free net device
+	 */
 	netdev_put ( netdev );
 	return rc;
 }
