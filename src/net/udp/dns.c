@@ -517,6 +517,10 @@ static int apply_dhcp_nameserver ( unsigned int tag __unused,
 	sin_nameserver = ( struct sockaddr_in * ) &nameserver;
 	sin_nameserver->sin_family = AF_INET;
 	dhcp_ipv4_option ( option, &sin_nameserver->sin_addr );
+
+	DBG ( "DNS using nameserver %s\n",
+	      inet_ntoa ( sin_nameserver->sin_addr ) );
+
 	return 0;
 }
 
