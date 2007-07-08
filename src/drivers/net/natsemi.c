@@ -49,7 +49,8 @@
 /* Revision History */
 
 /*
-  02 JUL 2007 Udayan Kumar	 1.2 ported the driver from etherboot to gPXE API
+  02 JUL 2007 Udayan Kumar	 1.2 ported the driver from etherboot to gPXE API.
+				     Fully rewritten,adapting the old driver.
 		      	      	     Added a circular buffer for transmit and receive.
 		                     transmit routine will not wait for transmission to finish.
 			             poll routine deals with it.
@@ -366,10 +367,9 @@ static int nat_open ( struct net_device *netdev ) {
 	 */
 	nat->rx_cur=0;
 	for (i=0;i<NUM_RX_DESC;i++) {
-
 		nat->iobuf[i] = alloc_iob ( RX_BUF_SIZE );
 		if (!nat->iobuf[i])
-		       return -ENOMEM;	
+			goto memory_alloc_err;
 		nat->rx[i].link   = virt_to_bus((i+1 < NUM_RX_DESC) ? &nat->rx[i+1] : &nat->rx[0]);
 		nat->rx[i].cmdsts = (uint32_t) RX_BUF_SIZE;
 		nat->rx[i].bufptr = virt_to_bus(nat->iobuf[i]->data);
@@ -414,8 +414,18 @@ static int nat_open ( struct net_device *netdev ) {
 	 */
 	outl((RxOk|RxErr|TxOk|TxErr),nat->ioaddr + IntrMask); 
 	//outl(1,nat->ioaddr +IntrEnable);
-
 	return 0;
+		       
+memory_alloc_err:
+	/* this block frees the previously allocated buffers
+	 * if memory for all the buffers is not available
+	 */
+	i=0;
+	while(nat->rx[i].cmdsts == (uint32_t) RX_BUF_SIZE) {
+		free_iob(nat->iobuf[i]);
+		i++;
+	}
+	return -ENOMEM;	
 }
 
 /**
@@ -426,8 +436,6 @@ static int nat_open ( struct net_device *netdev ) {
 static void nat_close ( struct net_device *netdev ) {
 	struct natsemi_nic *nat = netdev->priv;
 	int i;
-
-
 	/* Reset the hardware to disable everything in one go
 	 */
 	nat_reset ( nat );
@@ -464,7 +472,7 @@ static int nat_transmit ( struct net_device *netdev, struct io_buffer *iobuf ) {
 	 */
 	nat->tx_iobuf[nat->tx_cur]=iobuf;
 
-	/* Pad and align packet has been ignored because its not required here
+	/* Pad and align packet has not been used because its not required here
 	 * iob_pad ( iobuf, ETH_ZLEN ); can be used to achieve it
 	 */
 
@@ -569,9 +577,7 @@ static void nat_poll ( struct net_device *netdev, unsigned int rx_quota ) {
 		nat->rx_cur=(nat->rx_cur+1) % NUM_RX_DESC;
 		rx_status=nat->rx[nat->rx_cur].cmdsts; 
 	}
-
 end:
-
 	/* re-enable the potentially idle receive state machine 
 	 */
 	outl(RxOn, nat->ioaddr + ChipCmd);	
@@ -646,8 +652,6 @@ static int nat_probe ( struct pci_device *pci,
 		if ( ( rc = nvo_register ( &nat->nvo ) ) != 0 )
 			goto err_register_nvo;
 	}
-	
-
 	return 0;
 
 err_register_nvo:
@@ -681,7 +685,6 @@ static void nat_remove ( struct pci_device *pci ) {
 
 static struct pci_device_id natsemi_nics[] = {
 	PCI_ROM(0x100b, 0x0020, "dp83815", "DP83815"),
-
 };
 
 struct pci_driver natsemi_driver __pci_driver = {
