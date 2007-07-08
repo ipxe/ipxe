@@ -302,6 +302,27 @@ static void tcp_close ( struct tcp_connection *tcp, int rc ) {
  */
 
 /**
+ * Calculate transmission window
+ *
+ * @v tcp		TCP connection
+ * @ret len		Maximum length that can be sent in a single packet
+ */
+static size_t tcp_xmit_win ( struct tcp_connection *tcp ) {
+	size_t len;
+
+	/* Not ready if we're not in a suitable connection state */
+	if ( ! TCP_CAN_SEND_DATA ( tcp->tcp_state ) )
+		return 0;
+
+	/* Length is the minimum of the receiver's window and the path MTU */
+	len = tcp->snd_win;
+	if ( len > TCP_PATH_MTU )
+		len = TCP_PATH_MTU;
+
+	return len;
+}
+
+/**
  * Process TCP transmit queue
  *
  * @v tcp		TCP connection
@@ -363,8 +384,8 @@ static int tcp_xmit ( struct tcp_connection *tcp, int force_send ) {
 	unsigned int flags;
 	size_t len = 0;
 	size_t seq_len;
-	size_t app_window;
-	size_t window;
+	size_t app_win;
+	size_t rcv_win;
 	int rc;
 
 	/* If retransmission timer is already running, do nothing */
@@ -375,7 +396,8 @@ static int tcp_xmit ( struct tcp_connection *tcp, int force_send ) {
 	 * lengths that we wish to transmit.
 	 */
 	if ( TCP_CAN_SEND_DATA ( tcp->tcp_state ) ) {
-		len = tcp_process_queue ( tcp, tcp->snd_win, NULL, 0 );
+		len = tcp_process_queue ( tcp, tcp_xmit_win ( tcp ),
+					  NULL, 0 );
 	}
 	seq_len = len;
 	flags = TCP_FLAGS_SENDING ( tcp->tcp_state );
@@ -410,13 +432,13 @@ static int tcp_xmit ( struct tcp_connection *tcp, int force_send ) {
 	tcp_process_queue ( tcp, len, iobuf, 0 );
 
 	/* Estimate window size */
-	window = ( ( freemem * 3 ) / 4 );
-	if ( window > TCP_MAX_WINDOW_SIZE )
-		window = TCP_MAX_WINDOW_SIZE;
-	app_window = xfer_window ( &tcp->xfer );
-	if ( window > app_window )
-		window = app_window;
-	window &= ~0x03; /* Keep everything dword-aligned */
+	rcv_win = ( ( freemem * 3 ) / 4 );
+	if ( rcv_win > TCP_MAX_WINDOW_SIZE )
+		rcv_win = TCP_MAX_WINDOW_SIZE;
+	app_win = xfer_window ( &tcp->xfer );
+	if ( rcv_win > app_win )
+		rcv_win = app_win;
+	rcv_win &= ~0x03; /* Keep everything dword-aligned */
 
 	/* Fill up the TCP header */
 	payload = iobuf->data;
@@ -434,7 +456,7 @@ static int tcp_xmit ( struct tcp_connection *tcp, int force_send ) {
 	tcphdr->ack = htonl ( tcp->rcv_ack );
 	tcphdr->hlen = ( ( payload - iobuf->data ) << 2 );
 	tcphdr->flags = flags;
-	tcphdr->win = htons ( window );
+	tcphdr->win = htons ( rcv_win );
 	tcphdr->csum = tcpip_chksum ( iobuf->data, iob_len ( iobuf ) );
 
 	/* Dump header */
@@ -910,10 +932,6 @@ static size_t tcp_xfer_window ( struct xfer_interface *xfer ) {
 	struct tcp_connection *tcp =
 		container_of ( xfer, struct tcp_connection, xfer );
 
-	/* Not ready if we're not in a suitable connection state */
-	if ( ! TCP_CAN_SEND_DATA ( tcp->tcp_state ) )
-		return 0;
-
 	/* Not ready if data queue is non-empty.  This imposes a limit
 	 * of only one unACKed packet in the TX queue at any time; we
 	 * do this to conserve memory usage.
@@ -922,7 +940,7 @@ static size_t tcp_xfer_window ( struct xfer_interface *xfer ) {
 		return 0;
 
 	/* Return TCP window length */
-	return tcp->snd_win;
+	return tcp_xmit_win ( tcp );
 }
 
 /**

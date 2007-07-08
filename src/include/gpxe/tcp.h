@@ -238,6 +238,14 @@ struct tcp_mss_option {
 #define TCP_MAX_WINDOW_SIZE	( 65536 - 4 )
 
 /**
+ * Path MTU
+ *
+ * We really ought to implement Path MTU discovery.  Until we do,
+ * anything with a path MTU greater than this may fail.
+ */
+#define TCP_PATH_MTU 1460
+
+/**
  * Advertised TCP MSS
  *
  * We currently hardcode this to a reasonable value and hope that the
