@@ -639,4 +639,7 @@ struct iscsi_session {
 /** Maximum number of retries at connecting */
 #define ISCSI_MAX_RETRIES 2
 
+extern int iscsi_attach ( struct scsi_device *scsi, const char *root_path );
+extern void iscsi_detach ( struct scsi_device *scsi );
+
 #endif /* _GPXE_ISCSI_H */

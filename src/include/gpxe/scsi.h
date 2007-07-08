@@ -4,6 +4,7 @@
 #include <stdint.h>
 #include <gpxe/blockdev.h>
 #include <gpxe/uaccess.h>
+#include <gpxe/refcnt.h>
 
 /** @file
  *
@@ -229,7 +230,7 @@ struct scsi_command {
 	 * Must be zero if @c data_in is NULL
 	 */
 	size_t data_in_len;
-	/** SCSI statua code */
+	/** SCSI status code */
 	uint8_t status;
 	/** SCSI sense response code */
 	uint8_t sense_response;
@@ -260,6 +261,8 @@ struct scsi_device {
 	 */
 	int ( * command ) ( struct scsi_device *scsi,
 			    struct scsi_command *command );
+	/** Backing device */
+	struct refcnt *backend;
 };
 
 extern int init_scsidev ( struct scsi_device *scsi );

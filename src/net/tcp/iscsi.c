@@ -1261,21 +1261,21 @@ static struct xfer_interface_operations iscsi_socket_operations = {
 
 /****************************************************************************
  *
- * iSCSI to SCSI interface
+ * iSCSI command issuing
  *
  */
 
 /**
  * Issue SCSI command
  *
- * @v scsi		SCSI interface
+ * @v scsi		SCSI device
  * @v command		SCSI command
  * @ret rc		Return status code
  */
-static int iscsi_scsi_issue ( struct scsi_interface *scsi,
-			      struct scsi_command *command ) {
+static int iscsi_command ( struct scsi_device *scsi,
+			   struct scsi_command *command ) {
 	struct iscsi_session *iscsi =
-		container_of ( scsi, struct iscsi_session, scsi );
+		container_of ( scsi->backend, struct iscsi_session, refcnt );
 	int rc;
 
 	/* Record SCSI command */
@@ -1306,25 +1306,26 @@ static int iscsi_scsi_issue ( struct scsi_interface *scsi,
 	return rc;
 }
 
-/**
- * Detach SCSI interface
- *
- * @v scsi		SCSI interface
- * @v rc		Reason for close
- */
-static void iscsi_scsi_detach ( struct scsi_interface *scsi, int rc ) {
-	struct iscsi_session *iscsi =
-		container_of ( scsi, struct iscsi_session, scsi );
-
-	iscsi_close_connection ( iscsi, rc );
-	process_del ( &iscsi->process );
+static int iscsi_detached_command ( struct scsi_device *scsi __unused,
+				    struct scsi_command *command __unused ) {
+	return -ENODEV;
 }
 
-/** iSCSI SCSI operations */
-struct scsi_operations iscsi_scsi_operations = {
-	.detach		= iscsi_scsi_detach,
-	.issue		= iscsi_scsi_issue,
-};
+/**
+ * Shut down iSCSI interface
+ *
+ * @v scsi		SCSI device
+ */
+void iscsi_detach ( struct scsi_device *scsi ) {
+	struct iscsi_session *iscsi =
+		container_of ( scsi->backend, struct iscsi_session, refcnt );
+
+	iscsi_close_connection ( iscsi, 0 );
+	process_del ( &iscsi->process );
+	scsi->command = iscsi_detached_command;
+	ref_put ( scsi->backend );
+	scsi->backend = NULL;
+}
 
 /****************************************************************************
  *
@@ -1430,11 +1431,11 @@ static int iscsi_parse_root_path ( struct iscsi_session *iscsi,
 /**
  * Attach iSCSI interface
  *
- * @v scsi		SCSI interface
+ * @v scsi		SCSI device
  * @v root_path		iSCSI root path (as per RFC4173)
  * @ret rc		Return status code
  */
-int iscsi_attach ( struct scsi_interface *scsi, const char *root_path ) {
+int iscsi_attach ( struct scsi_device *scsi, const char *root_path ) {
 	struct iscsi_session *iscsi;
 	int rc;
 
@@ -1442,6 +1443,7 @@ int iscsi_attach ( struct scsi_interface *scsi, const char *root_path ) {
 	iscsi = zalloc ( sizeof ( *iscsi ) );
 	if ( ! iscsi )
 		return -ENOMEM;
+	iscsi->refcnt.free = iscsi_free;
 	xfer_init ( &iscsi->socket, &iscsi_socket_operations, &iscsi->refcnt );
 	process_init ( &iscsi->process, iscsi_tx_step, &iscsi->refcnt );
 
@@ -1464,7 +1466,9 @@ int iscsi_attach ( struct scsi_interface *scsi, const char *root_path ) {
 	}
 
 	/* Attach parent interface, mortalise self, and return */
-	scsi_plug_plug ( &iscsi->scsi, scsi );
+	scsi->backend = ref_get ( &iscsi->refcnt );
+	scsi->command = iscsi_command;
+	scsi->lun = iscsi->lun;
 	ref_put ( &iscsi->refcnt );
 	return 0;
 	

@@ -44,56 +44,96 @@ static struct net_device * find_boot_netdev ( void ) {
 }
 
 /**
- * Boot from a network device
+ * Boot using filename
  *
- * @v netdev		Network device
+ * @v filename		Boot filename
+ * @ret rc		Return status code
  */
-void netboot ( struct net_device *netdev ) {
-	char filename[256];
+static int boot_filename ( const char *filename ) {
 	struct image *image;
 	int rc;
 
-	/* Open device and display device status */
-	if ( ( rc = ifopen ( netdev ) ) != 0 )
-		return;
-	ifstat ( netdev );
-
-	/* Configure device via DHCP */
-	if ( ( rc = dhcp ( netdev ) ) != 0 )
-		return;
-	route();
-
-	/* Try to download and boot whatever we are given as a filename */
-	dhcp_snprintf ( filename, sizeof ( filename ),
-			find_global_dhcp_option ( DHCP_BOOTFILE_NAME ) );
-	if ( ! filename[0] ) {
-		printf ( "No boot filename\n" );
-		return;
-	}
-	printf ( "Booting \"%s\"\n", filename );
 	image = alloc_image();
 	if ( ! image ) {
 		printf ( "Out of memory\n" );
-		return;
+		return -ENOMEM;
 	}
 	if ( ( rc = imgfetch ( image, filename, 0 ) ) != 0 ) {
 		printf ( "Could not retrieve %s: %s\n",
 			 filename, strerror ( rc ) );
 		image_put ( image );
-		return;
+		return rc;
 	}
 	if ( ( rc = imgload ( image ) ) != 0 ) {
 		printf ( "Could not load %s: %s\n", image->name,
 			 strerror ( rc ) );
 		image_put ( image );
-		return;
+		return rc;
 	}
 	if ( ( rc = imgexec ( image ) ) != 0 ) {
 		printf ( "Could not execute %s: %s\n", image->name,
 			 strerror ( rc ) );
 		image_put ( image );
-		return;
+		return rc;
 	}
+
+	return 0;
+}
+
+/**
+ * Boot using root path
+ *
+ * @v root_path		Root path
+ * @ret rc		Return status code
+ */
+static int boot_root_path ( const char *root_path ) {
+	int rc;
+
+	/* Quick hack */
+	if ( ( rc = iscsiboot ( root_path ) ) != 0 )
+		return rc;
+
+	return 0;
+}
+
+/**
+ * Boot from a network device
+ *
+ * @v netdev		Network device
+ * @ret rc		Return status code
+ */
+int netboot ( struct net_device *netdev ) {
+	char buf[256];
+	int rc;
+
+	/* Open device and display device status */
+	if ( ( rc = ifopen ( netdev ) ) != 0 )
+		return rc;
+	ifstat ( netdev );
+
+	/* Configure device via DHCP */
+	if ( ( rc = dhcp ( netdev ) ) != 0 )
+		return rc;
+	route();
+
+	/* Try to download and boot whatever we are given as a filename */
+	dhcp_snprintf ( buf, sizeof ( buf ),
+			find_global_dhcp_option ( DHCP_BOOTFILE_NAME ) );
+	if ( buf[0] ) {
+		printf ( "Booting from filename \"%s\"\n", buf );
+		return boot_filename ( buf );
+	}
+	
+	/* No filename; try the root path */
+	dhcp_snprintf ( buf, sizeof ( buf ),
+			find_global_dhcp_option ( DHCP_ROOT_PATH ) );
+	if ( buf[0] ) {
+		printf ( "Booting from root path \"%s\"\n", buf );
+		return boot_root_path ( buf );
+	}
+
+	printf ( "No filename or root path specified\n" );
+	return -ENOENT;
 }
 
 /**
