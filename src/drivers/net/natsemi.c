@@ -642,7 +642,6 @@ static int nat_probe ( struct pci_device *pci,
 	nat_reset ( nat );
 	nat_init_eeprom ( nat );
 	nvs_read ( &nat->eeprom.nvs, EE_MAC, ll_addr_encoded, ETH_ALEN );
-	
 	/* decoding the MAC address read from NVS 
 	 * and save it in netdev->ll_addr
          */
