@@ -371,7 +371,7 @@ static int nat_open ( struct net_device *netdev ) {
 		if (!nat->iobuf[i])
 			goto memory_alloc_err;
 		nat->rx[i].link   = virt_to_bus((i+1 < NUM_RX_DESC) ? &nat->rx[i+1] : &nat->rx[0]);
-		nat->rx[i].cmdsts = (uint32_t) RX_BUF_SIZE;
+		nat->rx[i].cmdsts = RX_BUF_SIZE;
 		nat->rx[i].bufptr = virt_to_bus(nat->iobuf[i]->data);
 	}
 
@@ -410,10 +410,8 @@ static int nat_open ( struct net_device *netdev ) {
 	 */
         outl(RxOn, nat->ioaddr + ChipCmd);
 
-	/*enable interrupts
+	/* mask the interrupts. note interrupt is not enabled here
 	 */
-	outl((RxOk|RxErr|TxOk|TxErr),nat->ioaddr + IntrMask); 
-	//outl(1,nat->ioaddr +IntrEnable);
 	return 0;
 		       
 memory_alloc_err:
@@ -421,7 +419,7 @@ memory_alloc_err:
 	 * if memory for all the buffers is not available
 	 */
 	i=0;
-	while(nat->rx[i].cmdsts == (uint32_t) RX_BUF_SIZE) {
+	while(nat->rx[i].cmdsts == RX_BUF_SIZE) {
 		free_iob(nat->iobuf[i]);
 		i++;
 	}
@@ -446,9 +444,6 @@ static void nat_close ( struct net_device *netdev ) {
 		
 		free_iob( nat->iobuf[i] );
 	}
-	/* disable interrupts
-	 */
-	//outl(0,nat->ioaddr + IntrMask) ;
 }
 
 /** 
@@ -509,7 +504,6 @@ static void nat_poll ( struct net_device *netdev, unsigned int rx_quota ) {
 	struct io_buffer *rx_iob;
 	int i;
 	
-	//outl(1,nat->ioaddr +IntrEnable);
 	/* read the interrupt register
 	 */
 	intr_status=inl(nat->ioaddr+IntrStatus);
@@ -581,15 +575,33 @@ end:
 	/* re-enable the potentially idle receive state machine 
 	 */
 	outl(RxOn, nat->ioaddr + ChipCmd);	
-//	outl(1,nat->ioaddr +IntrEnable);
 }				
 
-/** RTL8139 net device operations */
+/**
+ * Enable/disable interrupts
+ *
+ * @v netdev    Network device
+ * @v enable    Interrupts should be enabled
+ */
+static void nat_irq ( struct net_device *netdev, int enable ) {
+        struct natsemi_nic *nat= netdev->priv;
+
+	outl((enable?(RxOk|RxErr|TxOk|TxErr):0),
+		nat->ioaddr + IntrMask); 
+	outl((enable ? 1:0),nat->ioaddr +IntrEnable);
+}
+
+
+
+
+
+/** natsemi net device operations */
 static struct net_device_operations nat_operations = {
         .open           = nat_open,
         .close          = nat_close,
         .transmit       = nat_transmit,
         .poll           = nat_poll,
+	.irq		= nat_irq,
 };
 
 /*
@@ -634,11 +646,10 @@ static int nat_probe ( struct pci_device *pci,
 	/* decoding the MAC address read from NVS 
 	 * and save it in netdev->ll_addr
          */
-	for ( i = 0 ; i < ETH_ALEN ; i+=2 ) {
+	for ( i = 0 ; i < ETH_ALEN ; i++) {
 		last1=ll_addr_encoded[i]>>7;
 	 	netdev->ll_addr[i]=ll_addr_encoded[i]<<1|last;
-		last=(ll_addr_encoded[i+1]>>7);
-		netdev->ll_addr[i+1]=(ll_addr_encoded[i+1]<<1)+last1;
+		last=last1;
 	}
 
 	/* Register network device
@@ -646,16 +657,8 @@ static int nat_probe ( struct pci_device *pci,
 	if ( ( rc = register_netdev ( netdev ) ) != 0 )
 		goto err_register_netdev;
 
-	/* Register non-volatile storage 
-	 */
-	if ( nat->nvo.nvs ) {
-		if ( ( rc = nvo_register ( &nat->nvo ) ) != 0 )
-			goto err_register_nvo;
-	}
 	return 0;
 
-err_register_nvo:
-	unregister_netdev ( netdev );
 err_register_netdev:
 	/* Disable NIC
 	 */
