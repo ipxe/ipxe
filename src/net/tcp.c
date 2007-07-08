@@ -363,6 +363,7 @@ static int tcp_xmit ( struct tcp_connection *tcp, int force_send ) {
 	unsigned int flags;
 	size_t len = 0;
 	size_t seq_len;
+	size_t app_window;
 	size_t window;
 	int rc;
 
@@ -412,6 +413,9 @@ static int tcp_xmit ( struct tcp_connection *tcp, int force_send ) {
 	window = ( ( freemem * 3 ) / 4 );
 	if ( window > TCP_MAX_WINDOW_SIZE )
 		window = TCP_MAX_WINDOW_SIZE;
+	app_window = xfer_window ( &tcp->xfer );
+	if ( window > app_window )
+		window = app_window;
 	window &= ~0x03; /* Keep everything dword-aligned */
 
 	/* Fill up the TCP header */
