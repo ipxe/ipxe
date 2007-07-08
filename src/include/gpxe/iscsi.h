@@ -589,6 +589,11 @@ struct iscsi_session {
 	 * Set to NULL when command is complete.
 	 */
 	struct scsi_command *command;
+	/** SCSI command return code
+	 *
+	 * Set to -EINPROGRESS while command is processing.
+	 */
+	int rc;
 	/** Instant return code
 	 *
 	 * Set to a non-zero value if all requests should return

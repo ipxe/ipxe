@@ -165,11 +165,8 @@ static void iscsi_scsi_done ( struct iscsi_session *iscsi, int rc ) {
 
 	assert ( iscsi->tx_state == ISCSI_TX_IDLE );
 
-	/* Clear current SCSI command */
 	iscsi->command = NULL;
-
-	/* Mark asynchronous operation as complete */
-	async_done ( &iscsi->async, rc );
+	iscsi->rc = rc;
 }
 
 /****************************************************************************
@@ -1281,20 +1278,32 @@ static int iscsi_scsi_issue ( struct scsi_interface *scsi,
 		container_of ( scsi, struct iscsi_session, scsi );
 	int rc;
 
+	/* Record SCSI command */
+	iscsi->command = command;
 
 	/* Abort immediately if we have a recorded permanent failure */
-	if ( iscsi->instant_rc )
-		return iscsi->instant_rc;
+	if ( iscsi->instant_rc ) {
+		rc = iscsi->instant_rc;
+		goto done;
+	}
 
 	/* Issue command or open connection as appropriate */
 	if ( iscsi->status ) {
 		iscsi_start_command ( iscsi );
 	} else {
 		if ( ( rc = iscsi_open_connection ( iscsi ) ) != 0 )
-			return rc;
+			goto done;
 	}
 
-	return 0;
+	/* Wait for command to complete */
+	iscsi->rc = -EINPROGRESS;
+	while ( iscsi->rc == -EINPROGRESS )
+		step();
+	rc = iscsi->rc;
+
+ done:
+	iscsi->command = NULL;
+	return rc;
 }
 
 /**
@@ -1310,6 +1319,12 @@ static void iscsi_scsi_detach ( struct scsi_interface *scsi, int rc ) {
 	iscsi_close_connection ( iscsi, rc );
 	process_del ( &iscsi->process );
 }
+
+/** iSCSI SCSI operations */
+struct scsi_operations iscsi_scsi_operations = {
+	.detach		= iscsi_scsi_detach,
+	.issue		= iscsi_scsi_issue,
+};
 
 /****************************************************************************
  *
