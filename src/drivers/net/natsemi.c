@@ -106,11 +106,13 @@ struct natsemi_nic {
 	unsigned short rx_cur;
 	struct natsemi_tx tx[TX_RING_SIZE];
 	struct natsemi_rx rx[NUM_RX_DESC];
+
 	/* need to add iobuf as we cannot free iobuf->data in close without this 
 	 * alternatively substracting sizeof(head) and sizeof(list_head) can also 
 	 * give the same.
 	 */
 	struct io_buffer *iobuf[NUM_RX_DESC];
+
 	/* netdev_tx_complete needs pointer to the iobuf of the data so as to free 
 	 * it from the memory.
 	 */
@@ -154,6 +156,7 @@ enum register_offsets {
     PhyStatus    = 0xC0, 
     MIntrCtrl    = 0xC4, 
     MIntrStatus  = 0xC8,
+
     /* These are from the spec, around page 78... on a separate table. 
      */
     PGSEL        = 0xCC, 
@@ -238,7 +241,7 @@ static int nat_spi_read_bit ( struct bit_basher *basher,
 	uint8_t mask = nat_ee_bits[bit_id];
 	uint8_t eereg;
 
-	eereg = inb ( nat->ioaddr + EE_REG);
+	eereg = inb ( nat->ioaddr + EE_REG );
 	return ( eereg & mask );
 }
 
@@ -252,7 +255,7 @@ static void nat_spi_write_bit ( struct bit_basher *basher,
 	eereg = inb ( nat->ioaddr + EE_REG );
 	eereg &= ~mask;
 	eereg |= ( data & mask );
-	outb ( eereg, nat->ioaddr + EE_REG);
+	outb ( eereg, nat->ioaddr + EE_REG );
 }
 
 static struct bit_basher_operations nat_basher_ops = {
@@ -302,26 +305,27 @@ static struct nvo_fragment nat_nvo_fragments[] = {
 static void nat_reset ( struct natsemi_nic *nat ) {
 
 	int i;
+
 	/* Reset chip
 	 */
 	outl ( ChipReset, nat->ioaddr + ChipCmd );
 	mdelay ( 10 );
-	nat->tx_dirty=0;
-	nat->tx_cur=0;
-	for(i=0;i<TX_RING_SIZE;i++) {
-		nat->tx[i].link=0;
-		nat->tx[i].cmdsts=0;
-		nat->tx[i].bufptr=0;
+	nat->tx_dirty = 0;
+	nat->tx_cur = 0;
+	for ( i = 0 ; i < TX_RING_SIZE ; i++ ) {
+		nat->tx[i].link = 0;
+		nat->tx[i].cmdsts = 0;
+		nat->tx[i].bufptr = 0;
 	}
 	nat->rx_cur = 0;
-	outl(virt_to_bus(&nat->tx[0]),nat->ioaddr+TxRingPtr);
-	outl(virt_to_bus(&nat->rx[0]), nat->ioaddr + RxRingPtr);
+	outl ( virt_to_bus( &nat->tx[0] ),nat->ioaddr + TxRingPtr );
+	outl ( virt_to_bus( &nat->rx[0] ),nat->ioaddr + RxRingPtr );
 
-	outl(TxOff|RxOff, nat->ioaddr + ChipCmd);
+	outl ( TxOff|RxOff, nat->ioaddr + ChipCmd );
 
 	/* Restore PME enable bit
 	 */
-	outl(SavedClkRun, nat->ioaddr + ClkRun);
+	outl ( SavedClkRun, nat->ioaddr + ClkRun );
 }
 
 /*
@@ -342,85 +346,86 @@ static int nat_open ( struct net_device *netdev ) {
          * With PME set the chip will scan incoming packets but
          * nothing will be written to memory. 
          */
-        SavedClkRun = inl(nat->ioaddr + ClkRun);
-        outl(SavedClkRun & ~0x100, nat->ioaddr + ClkRun);
+        SavedClkRun = inl ( nat->ioaddr + ClkRun );
+        outl ( SavedClkRun & ~0x100, nat->ioaddr + ClkRun );
 
 	/* Setting up Mac address in the NIC
 	 */
 	for ( i = 0 ; i < ETH_ALEN ; i+=2 ) {
-		outl(i,nat->ioaddr+RxFilterAddr);
-		outw ( netdev->ll_addr[i] + (netdev->ll_addr[i+1]<<8),
-			 nat->ioaddr +RxFilterData);
+		outl ( i,nat->ioaddr + RxFilterAddr );
+		outw ( netdev->ll_addr[i] + ( netdev->ll_addr[i + 1] << 8 ),
+		       nat->ioaddr + RxFilterData );
 	}
 
 	/*Set up the Tx Ring
 	 */
-	nat->tx_cur=0;
-	nat->tx_dirty=0;
-	for (i=0;i<TX_RING_SIZE;i++) {
-		nat->tx[i].link   = virt_to_bus((i+1 < TX_RING_SIZE) ? &nat->tx[i+1] : &nat->tx[0]);
+	nat->tx_cur = 0;
+	nat->tx_dirty = 0;
+	for ( i = 0 ; i < TX_RING_SIZE ; i++ ) {
+		nat->tx[i].link   = virt_to_bus ( ( i + 1 < TX_RING_SIZE ) ? &nat->tx[i + 1] : &nat->tx[0] );
 		nat->tx[i].cmdsts = 0;
 		nat->tx[i].bufptr = 0;
 	}
 
 	/* Set up RX ring
 	 */
-	nat->rx_cur=0;
-	for (i=0;i<NUM_RX_DESC;i++) {
+	nat->rx_cur = 0;
+	for ( i = 0 ; i < NUM_RX_DESC ; i++ ) {
 		nat->iobuf[i] = alloc_iob ( RX_BUF_SIZE );
-		if (!nat->iobuf[i])
+		if ( !nat->iobuf[i] )
 			goto memory_alloc_err;
-		nat->rx[i].link   = virt_to_bus((i+1 < NUM_RX_DESC) ? &nat->rx[i+1] : &nat->rx[0]);
+		nat->rx[i].link   = virt_to_bus ( ( i + 1 < NUM_RX_DESC ) ? &nat->rx[i + 1] : &nat->rx[0] );
 		nat->rx[i].cmdsts = RX_BUF_SIZE;
-		nat->rx[i].bufptr = virt_to_bus(nat->iobuf[i]->data);
+		nat->rx[i].bufptr = virt_to_bus ( nat->iobuf[i]->data );
 	}
 
 	/* load Receive Descriptor Register
 	 */
-	outl(virt_to_bus(&nat->rx[0]), nat->ioaddr + RxRingPtr);
-	DBG("Natsemi Rx descriptor loaded with: %X\n",
-		(unsigned int)inl(nat->ioaddr+RxRingPtr));		
+	outl ( virt_to_bus ( &nat->rx[0] ), nat->ioaddr + RxRingPtr );
+	DBG ( "Natsemi Rx descriptor loaded with: %X\n",
+		(unsigned int) inl ( nat->ioaddr + RxRingPtr ) );		
 
 	/* setup Tx ring
 	 */
-	outl(virt_to_bus(&nat->tx[0]),nat->ioaddr+TxRingPtr);
-	DBG("Natsemi Tx descriptor loaded with: %X\n",
-		(unsigned int)inl(nat->ioaddr+TxRingPtr));
+	outl ( virt_to_bus ( &nat->tx[0] ),nat->ioaddr + TxRingPtr );
+	DBG ( "Natsemi Tx descriptor loaded with: %X\n",
+		(unsigned int)inl ( nat->ioaddr + TxRingPtr ) );
 
 	/* Enables RX
 	 */
-	outl(RxFilterEnable|AcceptBroadcast|AcceptAllMulticast|AcceptMyPhys,
-		 nat->ioaddr+RxFilterAddr);
+	outl ( RxFilterEnable|AcceptBroadcast|AcceptAllMulticast|AcceptMyPhys,
+		 nat->ioaddr + RxFilterAddr );
 
 	/* Initialize other registers. 
 	 * Configure the PCI bus bursts and FIFO thresholds. 
 	 * Configure for standard, in-spec Ethernet. 
 	 */
-	if (inl(nat->ioaddr + ChipConfig) & 0x20000000) {	/* Full duplex */
+	if ( inl ( nat->ioaddr + ChipConfig ) & 0x20000000 ) {	/* Full duplex */
 		tx_config = 0xD0801002;
 		rx_config = 0x10000020;
 	} else {
 		tx_config = 0x10801002;
 		rx_config = 0x0020;
 	}
-	outl(tx_config, nat->ioaddr + TxConfig);
-	outl(rx_config, nat->ioaddr + RxConfig);
+	outl ( tx_config, nat->ioaddr + TxConfig );
+	outl ( rx_config, nat->ioaddr + RxConfig );
 
 	/*start the receiver 
 	 */
-        outl(RxOn, nat->ioaddr + ChipCmd);
+        outl ( RxOn, nat->ioaddr + ChipCmd );
 
 	/* mask the interrupts. note interrupt is not enabled here
 	 */
 	return 0;
 		       
 memory_alloc_err:
+
 	/* this block frees the previously allocated buffers
 	 * if memory for all the buffers is not available
 	 */
-	i=0;
-	while(nat->rx[i].cmdsts == RX_BUF_SIZE) {
-		free_iob(nat->iobuf[i]);
+	i = 0;
+	while ( nat->rx[i].cmdsts == RX_BUF_SIZE ) {
+		free_iob ( nat->iobuf[i] );
 		i++;
 	}
 	return -ENOMEM;	
@@ -434,15 +439,16 @@ memory_alloc_err:
 static void nat_close ( struct net_device *netdev ) {
 	struct natsemi_nic *nat = netdev->priv;
 	int i;
+
 	/* Reset the hardware to disable everything in one go
 	 */
 	nat_reset ( nat );
 
 	/* Free RX ring
 	 */
-	for (i=0;i<NUM_RX_DESC;i++) {
+	for ( i = 0; i < NUM_RX_DESC ; i++ ) {
 		
-		free_iob( nat->iobuf[i] );
+		free_iob ( nat->iobuf[i] );
 	}
 }
 
@@ -458,14 +464,14 @@ static int nat_transmit ( struct net_device *netdev, struct io_buffer *iobuf ) {
 
         /* check for space in TX ring
 	 */
-	if (nat->tx[nat->tx_cur].cmdsts !=0) {
-		DBG( "TX overflow\n" );
+	if ( nat->tx[nat->tx_cur].cmdsts != 0 ) {
+		DBG ( "TX overflow\n" );
 		return -ENOBUFS;
 	}
 
 	/* to be used in netdev_tx_complete
 	 */
-	nat->tx_iobuf[nat->tx_cur]=iobuf;
+	nat->tx_iobuf[nat->tx_cur] = iobuf;
 
 	/* Pad and align packet has not been used because its not required here
 	 * iob_pad ( iobuf, ETH_ZLEN ); can be used to achieve it
@@ -473,18 +479,19 @@ static int nat_transmit ( struct net_device *netdev, struct io_buffer *iobuf ) {
 
 	/* Add to TX ring
 	 */
-	DBG ( "TX id %d at %lx+%x\n", nat->tx_cur,
+	DBG ( "TX id %d at %lx + %x\n", nat->tx_cur,
 	      virt_to_bus ( &iobuf->data ), iob_len ( iobuf ) );
 
-	nat->tx[nat->tx_cur].bufptr = virt_to_bus(iobuf->data);
-	nat->tx[nat->tx_cur].cmdsts= iob_len(iobuf)|OWN;
+	nat->tx[nat->tx_cur].bufptr = virt_to_bus ( iobuf->data );
+	nat->tx[nat->tx_cur].cmdsts = iob_len ( iobuf ) | OWN;
+
 	/* increment the circular buffer pointer to the next buffer location
 	 */
-	nat->tx_cur=(nat->tx_cur+1) % TX_RING_SIZE;
+	nat->tx_cur = ( nat->tx_cur + 1 ) % TX_RING_SIZE;
 
 	/*start the transmitter 
 	 */
-        outl(TxOn, nat->ioaddr + ChipCmd);
+        outl ( TxOn, nat->ioaddr + ChipCmd );
 
 	return 0;
 }
@@ -506,74 +513,80 @@ static void nat_poll ( struct net_device *netdev) {
 	
 	/* read the interrupt register
 	 */
-	intr_status=inl(nat->ioaddr+IntrStatus);
-	if(!intr_status)
-	goto end;
+	intr_status = inl ( nat->ioaddr + IntrStatus );
+	if ( !intr_status )
+		goto end;
 
 	/* check the status of packets given to card for transmission
 	 */	
-	DBG("Intr status %X\n",intr_status);
+	DBG ( "Intr status %X\n",intr_status );
 
-	i=nat->tx_dirty;
-	while(i!=nat->tx_cur) {
-		status=nat->tx[nat->tx_dirty].cmdsts;
-		DBG("value of tx_dirty = %d tx_cur=%d status=%X\n",
-			nat->tx_dirty,nat->tx_cur,status);
+	i = nat->tx_dirty;
+	while ( i!= nat->tx_cur ) {
+		status = nat->tx[nat->tx_dirty].cmdsts;
+		DBG ( "value of tx_dirty = %d tx_cur=%d status=%X\n",
+			nat->tx_dirty,nat->tx_cur,status );
 		
 		/* check if current packet has been transmitted or not
 		 */
-		if(status & OWN) 
+		if ( status & OWN ) 
 			break;
+
 		/* Check if any errors in transmission
 		 */
-		if (! (status & DescPktOK)) {
-			DBG("Error in sending Packet status:%X\n",
-					(unsigned int)status);
-			netdev_tx_complete_err(netdev,nat->tx_iobuf[nat->tx_dirty],-EINVAL);
+		if (! ( status & DescPktOK ) ) {
+			DBG ( "Error in sending Packet status:%X\n",
+					(unsigned int) status );
+			netdev_tx_complete_err ( netdev,nat->tx_iobuf[nat->tx_dirty],-EINVAL );
 		} else {
-			DBG("Success in transmitting Packet\n");
-			netdev_tx_complete(netdev,nat->tx_iobuf[nat->tx_dirty]);
+			DBG ( "Success in transmitting Packet\n" );
+			netdev_tx_complete ( netdev,nat->tx_iobuf[nat->tx_dirty] );
 		}
+
 		/* setting cmdsts zero, indicating that it can be reused 
 		 */
-		nat->tx[nat->tx_dirty].cmdsts=0;
-		nat->tx_dirty=(nat->tx_dirty +1) % TX_RING_SIZE;
-		i=(i+1) % TX_RING_SIZE;
+		nat->tx[nat->tx_dirty].cmdsts = 0;
+		nat->tx_dirty = ( nat->tx_dirty + 1 ) % TX_RING_SIZE;
+		i = ( i + 1 ) % TX_RING_SIZE;
 	}
 	
 	/* Handle received packets 
 	 */
-	rx_status=(unsigned int)nat->rx[nat->rx_cur].cmdsts; 
-	while ((rx_status & OWN)) {
-		rx_len= (rx_status & DSIZE) - CRC_SIZE;
+	rx_status = (unsigned int) nat->rx[nat->rx_cur].cmdsts; 
+	while ( ( rx_status & OWN ) ) {
+		rx_len = ( rx_status & DSIZE ) - CRC_SIZE;
+
 		/*check for the corrupt packet 
 		 */
-		if((rx_status & (DescMore|DescPktOK|RxTooLong)) != DescPktOK) {
-			 DBG("natsemi_poll: Corrupted packet received, "
+		if ( ( rx_status & ( DescMore|DescPktOK|RxTooLong ) ) != DescPktOK) {
+			 DBG ( "natsemi_poll: Corrupted packet received, "
 					"buffer status = %X ^ %X \n",rx_status,
-					(unsigned int) nat->rx[nat->rx_cur].cmdsts);
-			 netdev_rx_err(netdev,NULL,-EINVAL);
+					(unsigned int) nat->rx[nat->rx_cur].cmdsts );
+			 netdev_rx_err ( netdev,NULL,-EINVAL );
 		} else 	{
-			rx_iob = alloc_iob(rx_len);
-			if(!rx_iob) 
+			rx_iob = alloc_iob ( rx_len );
+
+			if ( !rx_iob ) 
 				/* leave packet for next call to poll
 				 */
 				goto end;
-			memcpy(iob_put(rx_iob,rx_len),
-					nat->iobuf[nat->rx_cur]->data,rx_len);
-			DBG("received packet\n");
+			memcpy ( iob_put ( rx_iob,rx_len ),
+					nat->iobuf[nat->rx_cur]->data,rx_len );
+			DBG ( "received packet\n" );
+
 			/* add to the receive queue. 
 			 */
-			netdev_rx(netdev,rx_iob);
+			netdev_rx ( netdev,rx_iob );
 		}
 		nat->rx[nat->rx_cur].cmdsts = RX_BUF_SIZE;
-		nat->rx_cur=(nat->rx_cur+1) % NUM_RX_DESC;
-		rx_status=nat->rx[nat->rx_cur].cmdsts; 
+		nat->rx_cur = ( nat->rx_cur + 1 ) % NUM_RX_DESC;
+		rx_status = nat->rx[nat->rx_cur].cmdsts; 
 	}
 end:
+
 	/* re-enable the potentially idle receive state machine 
 	 */
-	outl(RxOn, nat->ioaddr + ChipCmd);	
+	outl ( RxOn, nat->ioaddr + ChipCmd );	
 }				
 
 /**
@@ -583,11 +596,11 @@ end:
  * @v enable    Interrupts should be enabled
  */
 static void nat_irq ( struct net_device *netdev, int enable ) {
-        struct natsemi_nic *nat= netdev->priv;
+        struct natsemi_nic *nat = netdev->priv;
 
-	outl((enable?(RxOk|RxErr|TxOk|TxErr):0),
+	outl ( ( enable ? ( RxOk|RxErr|TxOk|TxErr ) :0 ),
 		nat->ioaddr + IntrMask); 
-	outl((enable ? 1:0),nat->ioaddr +IntrEnable);
+	outl ( ( enable ? 1:0 ),nat->ioaddr + IntrEnable );
 }
 
 
@@ -617,8 +630,8 @@ static int nat_probe ( struct pci_device *pci,
 	int rc;
 	int i;
 	uint8_t ll_addr_encoded[MAX_LL_ADDR_LEN];
-	uint8_t last=0;
-	uint8_t last1=0;
+	uint8_t last = 0;
+	uint8_t last1 = 0;
 	uint8_t prev_bytes[2];
 
 	/* Allocate net device 
@@ -626,7 +639,7 @@ static int nat_probe ( struct pci_device *pci,
 	netdev = alloc_etherdev ( sizeof ( *nat ) );
 	if ( ! netdev ) 
 		return -ENOMEM;
-	netdev_init(netdev,&nat_operations);
+	netdev_init ( netdev,&nat_operations );
 	nat = netdev->priv;
 	pci_set_drvdata ( pci, netdev );
 	netdev->dev = &pci->dev;
@@ -641,16 +654,17 @@ static int nat_probe ( struct pci_device *pci,
 	 */
 	nat_reset ( nat );
 	nat_init_eeprom ( nat );
-	nvs_read ( &nat->eeprom.nvs, EE_MAC-1, prev_bytes, 1);
+	nvs_read ( &nat->eeprom.nvs, EE_MAC-1, prev_bytes, 1 );
 	nvs_read ( &nat->eeprom.nvs, EE_MAC, ll_addr_encoded, ETH_ALEN );
+
 	/* decoding the MAC address read from NVS 
 	 * and save it in netdev->ll_addr
          */
-	last=prev_bytes[1]>>7;
-	for ( i = 0 ; i < ETH_ALEN ; i++) {
-		last1=ll_addr_encoded[i]>>7;
-	 	netdev->ll_addr[i]=ll_addr_encoded[i]<<1|last;
-		last=last1;
+	last = prev_bytes[1] >> 7;
+	for ( i = 0 ; i < ETH_ALEN ; i++ ) {
+		last1 = ll_addr_encoded[i] >> 7;
+	 	netdev->ll_addr[i] = ll_addr_encoded[i] << 1 | last;
+		last = last1;
 	}
 
 	/* Register network device
@@ -661,9 +675,11 @@ static int nat_probe ( struct pci_device *pci,
 	return 0;
 
 err_register_netdev:
+
 	/* Disable NIC
 	 */
 	nat_reset ( nat );
+
 	/* Free net device
 	 */
 	netdev_put ( netdev );
