@@ -1360,6 +1360,10 @@ static int iscsi_parse_lun ( struct iscsi_session *iscsi,
 	} lun;
 	int i;
 
+	/* Empty LUN; assume LUN 0 */
+	if ( ! *lun_string )
+		return 0;
+
 	for ( i = 0 ; i < 4 ; i++ ) {
 		lun.u16[i] = strtoul ( p, &p, 16 );
 		if ( *p != '-' )
@@ -1382,48 +1386,43 @@ static int iscsi_parse_lun ( struct iscsi_session *iscsi,
  */
 static int iscsi_parse_root_path ( struct iscsi_session *iscsi,
 				   const char *root_path ) {
-	const char *p = root_path;
-	char *fragment;
-	size_t len;
-	enum iscsi_root_path_component i;
+	char rp_copy[ strlen ( root_path ) + 1 ];
+	char *rp_comp[NUM_RP_COMPONENTS];
+	char *rp = rp_copy;
+	int i = 0;
 	int rc;
 
-	for ( i = 0 ; i < NUM_RP_COMPONENTS ; i++ ) {
-		len = strcspn ( p, ":" );
-		fragment = strndup ( p, len );
-		if ( ! fragment ) {
-			DBGC ( iscsi, "iSCSI %p could not duplicate root "
-			       "path component at %s\n", iscsi, p );
-			return -ENOMEM;
-		}
-		switch ( i ) {
-		case RP_SERVERNAME:
-			iscsi->target_address = fragment;
+	/* Split root path into component parts */
+	strcpy ( rp_copy, root_path );
+	while ( 1 ) {
+		rp_comp[i++] = rp;
+		if ( i == NUM_RP_COMPONENTS )
 			break;
-		case RP_PORT:
-			iscsi->target_port = strtoul ( fragment, NULL, 10 );
-			if ( ! iscsi->target_port )
-				iscsi->target_port = ISCSI_PORT;
-			free ( fragment );
-			break;
-		case RP_LUN:
-			rc = iscsi_parse_lun ( iscsi, fragment );
-			free ( fragment );
-			if ( rc != 0 ) {
-				DBGC ( iscsi, "iSCSI %p invalid LUN %s\n",
-				       iscsi, fragment );
-				return rc;
+		for ( ; *rp != ':' ; rp++ ) {
+			if ( ! *rp ) {
+				DBGC ( iscsi, "iSCSI %p root path \"%s\" "
+				       "too short\n", iscsi, root_path );
+				return -EINVAL;
 			}
-			break;
-		case RP_TARGETNAME:
-			iscsi->target_iqn = fragment;
-			break;
-		default:
-			free ( fragment );
-			break;
 		}
-		p += len;
+		*(rp++) = '\0';
 	}
+
+	/* Use root path components to configure iSCSI session */
+	iscsi->target_address = strdup ( rp_comp[RP_SERVERNAME] );
+	if ( ! iscsi->target_address )
+		return -ENOMEM;
+	iscsi->target_port = strtoul ( rp_comp[RP_PORT], NULL, 10 );
+	if ( ! iscsi->target_port )
+		iscsi->target_port = ISCSI_PORT;
+	if ( ( rc = iscsi_parse_lun ( iscsi, rp_comp[RP_LUN] ) ) != 0 ) {
+		DBGC ( iscsi, "iSCSI %p invalid LUN \"%s\"\n",
+		       iscsi, rp_comp[RP_LUN] );
+		return rc;
+	}
+	iscsi->target_iqn = strdup ( rp_comp[RP_TARGETNAME] );
+	if ( ! iscsi->target_iqn )
+		return -ENOMEM;
 
 	return 0;
 }
