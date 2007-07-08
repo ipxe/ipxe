@@ -495,7 +495,7 @@ static int nat_transmit ( struct net_device *netdev, struct io_buffer *iobuf ) {
  * @v netdev	Network device
  * @v rx_quota	Maximum number of packets to receive
  */
-static void nat_poll ( struct net_device *netdev, unsigned int rx_quota ) {
+static void nat_poll ( struct net_device *netdev) {
 	struct natsemi_nic *nat = netdev->priv;
 	unsigned int status;
 	unsigned int rx_status;
@@ -544,7 +544,7 @@ static void nat_poll ( struct net_device *netdev, unsigned int rx_quota ) {
 	/* Handle received packets 
 	 */
 	rx_status=(unsigned int)nat->rx[nat->rx_cur].cmdsts; 
-	while (rx_quota && (rx_status & OWN)) {
+	while ((rx_status & OWN)) {
 		rx_len= (rx_status & DSIZE) - CRC_SIZE;
 		/*check for the corrupt packet 
 		 */
@@ -565,7 +565,6 @@ static void nat_poll ( struct net_device *netdev, unsigned int rx_quota ) {
 			/* add to the receive queue. 
 			 */
 			netdev_rx(netdev,rx_iob);
-			rx_quota--;
 		}
 		nat->rx[nat->rx_cur].cmdsts = RX_BUF_SIZE;
 		nat->rx_cur=(nat->rx_cur+1) % NUM_RX_DESC;
@@ -620,6 +619,7 @@ static int nat_probe ( struct pci_device *pci,
 	uint8_t ll_addr_encoded[MAX_LL_ADDR_LEN];
 	uint8_t last=0;
 	uint8_t last1=0;
+	uint8_t prev_bytes[2];
 
 	/* Allocate net device 
 	 */
@@ -641,10 +641,12 @@ static int nat_probe ( struct pci_device *pci,
 	 */
 	nat_reset ( nat );
 	nat_init_eeprom ( nat );
+	nvs_read ( &nat->eeprom.nvs, EE_MAC-1, prev_bytes, 1);
 	nvs_read ( &nat->eeprom.nvs, EE_MAC, ll_addr_encoded, ETH_ALEN );
 	/* decoding the MAC address read from NVS 
 	 * and save it in netdev->ll_addr
          */
+	last=prev_bytes[1]>>7;
 	for ( i = 0 ; i < ETH_ALEN ; i++) {
 		last1=ll_addr_encoded[i]>>7;
 	 	netdev->ll_addr[i]=ll_addr_encoded[i]<<1|last;
