@@ -30,6 +30,7 @@ char * strrchr(const char * s, int c);
 size_t strlen(const char * s);
 size_t strnlen(const char * s, size_t count);
 size_t strspn(const char *s, const char *accept);
+size_t strcspn(const char *s, const char *reject);
 char * strpbrk(const char * cs,const char * ct);
 char * strtok(char * s,const char * ct);
 char * strsep(char **s, const char *ct);
@@ -41,6 +42,7 @@ void * memscan(void * addr, int c, size_t size);
 char * strstr(const char * s1,const char * s2);
 void * memchr(const void *s, int c, size_t n);
 char * strdup(const char *s);
+char * strndup(const char *s, size_t n);
 
 extern const char * strerror ( int errno );
 

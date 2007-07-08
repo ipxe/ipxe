@@ -279,6 +279,31 @@ size_t strspn(const char *s, const char *accept)
 }
 #endif
 
+#ifndef __HAVE_ARCH_STRCSPN
+/**
+ * strcspn - Calculate the length of the initial substring of @s which only
+ * 	contain letters not in @reject
+ * @s: The string to be searched
+ * @accept: The string to search for
+ */
+size_t strcspn(const char *s, const char *reject)
+{
+	const char *p;
+	const char *r;
+	size_t count = 0;
+
+	for (p = s; *p != '\0'; ++p) {
+		for (r = reject; *r != '\0'; ++r) {
+			if (*p == *r)
+				return count;
+		}
+		++count;
+	}
+
+	return count;
+}
+#endif
+
 #ifndef __HAVE_ARCH_STRPBRK
 /**
  * strpbrk - Find the first occurrence of a set of characters
@@ -541,9 +566,21 @@ void * memchr(const void *s, int c, size_t n)
 
 #endif
 
-char * strdup(const char *s) {
-	char *new = malloc(strlen(s)+1);
-	if (new)
-		strcpy(new,s);
+char * strndup(const char *s, size_t n)
+{
+	size_t len = strlen(s);
+	char *new;
+
+	if (len>n)
+		len = n;
+	new = malloc(len+1);
+	if (new) {
+		new[len] = '\0';
+		memcpy(new,s,len);
+	}
 	return new;
+}
+
+char * strdup(const char *s) {
+	return strndup(s, ~((size_t)0));
 }
