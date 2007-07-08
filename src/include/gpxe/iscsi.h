@@ -493,18 +493,14 @@ struct iscsi_session {
 	/** Transport-layer socket */
 	struct xfer_interface socket;
 
-	/** Initiator IQN */
-	char *initiator_iqn;
 	/** Target address */
 	char *target_address;
+	/** Target port */
+	unsigned int target_port;
 	/** Target IQN */
 	char *target_iqn;
 	/** Logical Unit Number (LUN) */
 	uint64_t lun;
-	/** Username */
-	char *username;
-	/** Password */
-	char *password;
 
 	/** Session status
 	 *

@@ -31,6 +31,7 @@
 #include <gpxe/process.h>
 #include <gpxe/uaccess.h>
 #include <gpxe/tcpip.h>
+#include <gpxe/dhcp.h>
 #include <gpxe/iscsi.h>
 
 /** @file
@@ -38,6 +39,18 @@
  * iSCSI protocol
  *
  */
+
+/** iSCSI initiator name (explicitly specified) */
+char *iscsi_initiator_iqn;
+
+/** Default iSCSI initiator name (constructed from hostname) */
+char *iscsi_default_initiator_iqn;
+
+/** iSCSI username */
+char *iscsi_username;
+
+/** iSCSI password */
+char *iscsi_password;
 
 static void iscsi_start_tx ( struct iscsi_session *iscsi );
 static void iscsi_start_login ( struct iscsi_session *iscsi );
@@ -63,11 +76,8 @@ static void iscsi_free ( struct refcnt *refcnt ) {
 	struct iscsi_session *iscsi =
 		container_of ( refcnt, struct iscsi_session, refcnt );
 
-	free ( iscsi->initiator_iqn );
 	free ( iscsi->target_address );
 	free ( iscsi->target_iqn );
-	free ( iscsi->username );
-	free ( iscsi->password );
 	chap_finish ( &iscsi->chap );
 	iscsi_rx_buffered_data_done ( iscsi );
 	free ( iscsi );
@@ -89,7 +99,7 @@ static int iscsi_open_connection ( struct iscsi_session *iscsi ) {
 
 	/* Open socket */
 	memset ( &target, 0, sizeof ( target ) );
-	target.st_port = htons ( ISCSI_PORT );
+	target.st_port = htons ( iscsi->target_port );
 	if ( ( rc = xfer_open_named_socket ( &iscsi->socket, SOCK_STREAM,
 					     ( struct sockaddr * ) &target,
 					     iscsi->target_address,
@@ -428,16 +438,22 @@ static int iscsi_tx_data_out ( struct iscsi_session *iscsi ) {
  */
 static int iscsi_build_login_request_strings ( struct iscsi_session *iscsi,
 					       void *data, size_t len ) {
+	char *initiator_iqn;
 	unsigned int used = 0;
 	unsigned int i;
 
 	if ( iscsi->status & ISCSI_STATUS_STRINGS_SECURITY ) {
+		initiator_iqn = iscsi_initiator_iqn;
+		if ( ! initiator_iqn )
+			initiator_iqn = iscsi_default_initiator_iqn;
+		if ( ! initiator_iqn )
+			initiator_iqn = "iqn.2000-09.org.etherboot:UNKNOWN";
 		used += ssnprintf ( data + used, len - used,
 				    "InitiatorName=%s%c"
 				    "TargetName=%s%c"
 				    "SessionType=Normal%c"
 				    "AuthMethod=CHAP,None%c",
-				    iscsi->initiator_iqn, 0,
+				    initiator_iqn, 0,
 				    iscsi->target_iqn, 0, 0, 0 );
 	}
 
@@ -446,10 +462,10 @@ static int iscsi_build_login_request_strings ( struct iscsi_session *iscsi,
 	}
 	
 	if ( ( iscsi->status & ISCSI_STATUS_STRINGS_CHAP_RESPONSE ) &&
-	     iscsi->username ) {
+	     iscsi_username ) {
 		used += ssnprintf ( data + used, len - used,
 				    "CHAP_N=%s%cCHAP_R=0x",
-				    iscsi->username, 0 );
+				    iscsi_username, 0 );
 		for ( i = 0 ; i < iscsi->chap.response_len ; i++ ) {
 			used += ssnprintf ( data + used, len - used, "%02x",
 					    iscsi->chap.response[i] );
@@ -633,9 +649,9 @@ static int iscsi_handle_chap_i_value ( struct iscsi_session *iscsi,
 	 * challenge.
 	 */
 	chap_set_identifier ( &iscsi->chap, identifier );
-	if ( iscsi->password ) {
-		chap_update ( &iscsi->chap, iscsi->password,
-			      strlen ( iscsi->password ) );
+	if ( iscsi_password ) {
+		chap_update ( &iscsi->chap, iscsi_password,
+			      strlen ( iscsi_password ) );
 	}
 
 	return 0;
@@ -1245,55 +1261,275 @@ static struct xfer_interface_operations iscsi_socket_operations = {
 	.deliver_raw	= iscsi_socket_deliver_raw,
 };
 
-/**
- * Issue SCSI command via iSCSI session
+
+/****************************************************************************
  *
- * @v iscsi		iSCSI session
+ * iSCSI to SCSI interface
+ *
+ */
+
+/**
+ * Issue SCSI command
+ *
+ * @v scsi		SCSI interface
  * @v command		SCSI command
- * @v parent		Parent asynchronous operation
  * @ret rc		Return status code
  */
-int iscsi_issue ( struct iscsi_session *iscsi, struct scsi_command *command,
-		  struct async *parent ) {
+static int iscsi_scsi_issue ( struct scsi_interface *scsi,
+			      struct scsi_command *command ) {
+	struct iscsi_session *iscsi =
+		container_of ( scsi, struct iscsi_session, scsi );
 	int rc;
 
-	assert ( iscsi->command == NULL );
-	iscsi->command = command;
 
-	if ( iscsi->instant_rc ) {
-		/* Abort immediately rather than retrying */
+	/* Abort immediately if we have a recorded permanent failure */
+	if ( iscsi->instant_rc )
 		return iscsi->instant_rc;
-	} else if ( iscsi->status ) {
-		/* Session already open: issue command */
+
+	/* Issue command or open connection as appropriate */
+	if ( iscsi->status ) {
 		iscsi_start_command ( iscsi );
-		stream_kick ( &iscsi->stream );
 	} else {
-		/* Session not open: initiate login */
-		iscsi->stream.op = &iscsi_stream_operations;
-		if ( ( rc = tcp_open ( &iscsi->stream ) ) != 0 ) {
-			DBGC ( iscsi, "iSCSI %p could not open stream: %s\n ",
-			       iscsi, strerror ( rc ) );
+		if ( ( rc = iscsi_open_connection ( iscsi ) ) != 0 )
 			return rc;
-		}
-		if ( ( rc = stream_connect ( &iscsi->stream,
-					     &iscsi->target ) ) != 0 ) {
-			DBGC ( iscsi, "iSCSI %p could not connect: %s\n",
-			       iscsi, strerror ( rc ) );
-			return rc;
-		}
 	}
 
-	async_init ( &iscsi->async, &default_async_operations, parent );
 	return 0;
 }
 
 /**
- * Close down iSCSI session
+ * Detach SCSI interface
+ *
+ * @v scsi		SCSI interface
+ * @v rc		Reason for close
+ */
+static void iscsi_scsi_detach ( struct scsi_interface *scsi, int rc ) {
+	struct iscsi_session *iscsi =
+		container_of ( scsi, struct iscsi_session, scsi );
+
+	iscsi_close_connection ( iscsi, rc );
+	process_del ( &iscsi->process );
+}
+
+/****************************************************************************
+ *
+ * Instantiator
+ *
+ */
+
+/** iSCSI root path components (as per RFC4173) */
+enum iscsi_root_path_component {
+	RP_LITERAL = 0,
+	RP_SERVERNAME,
+	RP_PROTOCOL,
+	RP_PORT,
+	RP_LUN,
+	RP_TARGETNAME,
+	NUM_RP_COMPONENTS
+};
+
+/**
+ * Parse iSCSI LUN
  *
  * @v iscsi		iSCSI session
- * @ret aop		Asynchronous operation
+ * @v lun_string	LUN string representation (as per RFC4173)
+ * @ret rc		Return status code
  */
-void iscsi_shutdown ( struct iscsi_session *iscsi ) {
-	iscsi_close_connection ( iscsi, 0 );
-	ref_put ( &iscsi->refcnt );
+static int iscsi_parse_lun ( struct iscsi_session *iscsi,
+			     const char *lun_string ) {
+	char *p = ( char * ) lun_string;
+	union {
+		uint64_t u64;
+		uint16_t u16[4];
+	} lun;
+	int i;
+
+	for ( i = 0 ; i < 4 ; i++ ) {
+		lun.u16[i] = strtoul ( p, &p, 16 );
+		if ( *p != '-' )
+			return -EINVAL;
+		p++;
+	}
+	if ( *p )
+		return -EINVAL;
+
+	iscsi->lun = lun.u64;
+	return 0;
 }
+
+/**
+ * Parse iSCSI root path
+ *
+ * @v iscsi		iSCSI session
+ * @v root_path		iSCSI root path (as per RFC4173)
+ * @ret rc		Return status code
+ */
+static int iscsi_parse_root_path ( struct iscsi_session *iscsi,
+				   const char *root_path ) {
+	const char *p = root_path;
+	char *fragment;
+	size_t len;
+	enum iscsi_root_path_component i;
+	int rc;
+
+	for ( i = 0 ; i < NUM_RP_COMPONENTS ; i++ ) {
+		len = strcspn ( p, ":" );
+		fragment = strndup ( p, len );
+		if ( ! fragment ) {
+			DBGC ( iscsi, "iSCSI %p could not duplicate root "
+			       "path component at %s\n", iscsi, p );
+			return -ENOMEM;
+		}
+		switch ( i ) {
+		case RP_SERVERNAME:
+			iscsi->target_address = fragment;
+			break;
+		case RP_PORT:
+			iscsi->target_port = strtoul ( fragment, NULL, 10 );
+			if ( ! iscsi->target_port )
+				iscsi->target_port = ISCSI_PORT;
+			free ( fragment );
+			break;
+		case RP_LUN:
+			rc = iscsi_parse_lun ( iscsi, fragment );
+			free ( fragment );
+			if ( rc != 0 ) {
+				DBGC ( iscsi, "iSCSI %p invalid LUN %s\n",
+				       iscsi, fragment );
+				return rc;
+			}
+			break;
+		case RP_TARGETNAME:
+			iscsi->target_iqn = fragment;
+			break;
+		default:
+			free ( fragment );
+			break;
+		}
+		p += len;
+	}
+
+	return 0;
+}
+
+/**
+ * Attach iSCSI interface
+ *
+ * @v scsi		SCSI interface
+ * @v root_path		iSCSI root path (as per RFC4173)
+ * @ret rc		Return status code
+ */
+int iscsi_attach ( struct scsi_interface *scsi, const char *root_path ) {
+	struct iscsi_session *iscsi;
+	int rc;
+
+	/* Allocate and initialise structure */
+	iscsi = zalloc ( sizeof ( *iscsi ) );
+	if ( ! iscsi )
+		return -ENOMEM;
+	xfer_init ( &iscsi->socket, &iscsi_socket_operations, &iscsi->refcnt );
+	process_init ( &iscsi->process, iscsi_tx_step, &iscsi->refcnt );
+
+	/* Parse root path */
+	if ( ( rc = iscsi_parse_root_path ( iscsi, root_path ) ) != 0 )
+		goto err;
+
+	/* Sanity checks */
+	if ( ! iscsi->target_address ) {
+		DBGC ( iscsi, "iSCSI %p does not yet support discovery\n",
+		       iscsi );
+		rc = -ENOTSUP;
+		goto err;
+	}
+	if ( ! iscsi->target_iqn ) {
+		DBGC ( iscsi, "iSCSI %p no target address supplied in %s\n",
+		       iscsi, root_path );
+		rc = -EINVAL;
+		goto err;
+	}
+
+	/* Attach parent interface, mortalise self, and return */
+	scsi_plug_plug ( &iscsi->scsi, scsi );
+	ref_put ( &iscsi->refcnt );
+	return 0;
+	
+ err:
+	ref_put ( &iscsi->refcnt );
+	return rc;
+}
+
+/****************************************************************************
+ *
+ * DHCP option applicators
+ *
+ */
+
+/**
+ * Apply DHCP iSCSI option
+ *
+ * @v tag		DHCP option tag
+ * @v option		DHCP option
+ * @ret rc		Return status code
+ */
+static int apply_dhcp_iscsi_string ( unsigned int tag,
+				     struct dhcp_option *option ) {
+	char *prefix = "";
+	size_t prefix_len;
+	size_t len;
+	char **string;
+	char *p;
+
+	/* Identify string and prefix */
+	switch ( tag ) {
+	case DHCP_ISCSI_INITIATOR_IQN:
+		string = &iscsi_initiator_iqn;
+		break;
+	case DHCP_EB_USERNAME:
+		string = &iscsi_username;
+		break;
+	case DHCP_EB_PASSWORD:
+		string = &iscsi_password;
+		break;
+	case DHCP_HOST_NAME:
+		string = &iscsi_default_initiator_iqn;
+		prefix = "iqn.2000-09.org.etherboot:";
+		break;
+	default:
+		assert ( 0 );
+		return -EINVAL;
+	}
+
+	/* Free old string */
+	free ( *string );
+	*string = NULL;
+
+	/* Allocate and fill new string */
+	prefix_len = strlen ( prefix );
+	len = ( prefix_len + option->len + 1 );
+	p = *string = malloc ( len );
+	if ( ! p )
+		return -ENOMEM;
+	strcpy ( p, prefix );
+	dhcp_snprintf ( ( p + prefix_len ), ( len - prefix_len ), option );
+	return 0;
+}
+
+/** DHCP iSCSI option applicators */
+struct dhcp_option_applicator dhcp_iscsi_applicators[] __dhcp_applicator = {
+	{
+		.tag = DHCP_ISCSI_INITIATOR_IQN,
+		.apply = apply_dhcp_iscsi_string,
+	},
+	{
+		.tag = DHCP_EB_USERNAME,
+		.apply = apply_dhcp_iscsi_string,
+	},
+	{
+		.tag = DHCP_EB_PASSWORD,
+		.apply = apply_dhcp_iscsi_string,
+	},
+	{
+		.tag = DHCP_HOST_NAME,
+		.apply = apply_dhcp_iscsi_string,
+	},
+};
