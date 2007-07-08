@@ -925,6 +925,16 @@ static void iscsi_start_tx ( struct iscsi_session *iscsi ) {
 }
 
 /**
+ * Transmit nothing
+ *
+ * @v iscsi		iSCSI session
+ * @ret rc		Return status code
+ */
+static int iscsi_tx_nothing ( struct iscsi_session *iscsi __unused ) {
+	return 0;
+}
+
+/**
  * Transmit basic header segment of an iSCSI PDU
  *
  * @v iscsi		iSCSI session
@@ -953,8 +963,8 @@ static int iscsi_tx_data ( struct iscsi_session *iscsi ) {
 	case ISCSI_OPCODE_LOGIN_REQUEST:
 		return iscsi_tx_login_request ( iscsi );
 	default:
-		assert ( 0 );
-		return -EINVAL;
+		/* Nothing to send in other states */
+		return 0;
 	}
 }
 
@@ -1014,38 +1024,60 @@ static void iscsi_tx_done ( struct iscsi_session *iscsi ) {
 static void iscsi_tx_step ( struct process *process ) {
 	struct iscsi_session *iscsi =
 		container_of ( process, struct iscsi_session, process );
-	int rc = 0;
+	struct iscsi_bhs_common *common = &iscsi->tx_bhs.common;
+	int ( * tx ) ( struct iscsi_session *iscsi );
+	enum iscsi_tx_state next_state;
+	size_t tx_len;
+	int rc;
 
-	if ( xfer_window ( &iscsi->socket ) == 0 )
-		return;
+	/* Select fragment to transmit */
+	while ( 1 ) {
+		switch ( iscsi->tx_state ) {
+		case ISCSI_TX_IDLE:
+			/* Stop processing */
+			return;
+		case ISCSI_TX_BHS:
+			tx = iscsi_tx_bhs;
+			tx_len = sizeof ( iscsi->tx_bhs );
+			next_state = ISCSI_TX_AHS;
+			break;
+		case ISCSI_TX_AHS:
+			tx = iscsi_tx_nothing;
+			tx_len = 0;
+			next_state = ISCSI_TX_DATA;
+			break;
+		case ISCSI_TX_DATA:
+			tx = iscsi_tx_data;
+			tx_len = ISCSI_DATA_LEN ( common->lengths );
+			next_state = ISCSI_TX_DATA_PADDING;
+			break;
+		case ISCSI_TX_DATA_PADDING:
+			tx = iscsi_tx_data_padding;
+			tx_len = ISCSI_DATA_PAD_LEN ( common->lengths );
+			next_state = ISCSI_TX_IDLE;
+			break;
+		default:
+			assert ( 0 );
+			return;
+		}
 
-	switch ( iscsi->tx_state ) {
-	case ISCSI_TX_IDLE:
-		/* Nothing to send */
-		break;
-	case ISCSI_TX_BHS:
-		if ( ( rc = iscsi_tx_bhs ( iscsi ) ) != 0 )
-			break;
-		iscsi->tx_state = ISCSI_TX_AHS;
-		break;
-	case ISCSI_TX_AHS:
-		/* We don't yet have an AHS transmission mechanism */
-		iscsi->tx_state = ISCSI_TX_DATA;
-		break;
-	case ISCSI_TX_DATA:
-		if ( ( rc = iscsi_tx_data ( iscsi ) ) != 0 )
-			break;
-		iscsi->tx_state = ISCSI_TX_DATA_PADDING;
-		break;
-	case ISCSI_TX_DATA_PADDING:
-		if ( ( rc = iscsi_tx_data_padding ( iscsi ) ) != 0 )
-			break;
-		iscsi->tx_state = ISCSI_TX_IDLE;
-		iscsi_tx_done ( iscsi );
-		break;
-	default:
-		assert ( 0 );
-		break;
+		/* Check for window availability, if needed */
+		if ( tx_len && ( xfer_window ( &iscsi->socket ) == 0 ) ) {
+			/* Cannot transmit at this point; stop processing */
+			return;
+		}
+
+		/* Transmit data */
+		if ( ( rc = tx ( iscsi ) ) != 0 ) {
+			DBGC ( iscsi, "iSCSI %p could not transmit: %s\n",
+			       iscsi, strerror ( rc ) );
+			return;
+		}
+
+		/* Move to next state */
+		iscsi->tx_state = next_state;
+		if ( next_state == ISCSI_TX_IDLE )
+			iscsi_tx_done ( iscsi );
 	}
 }
 
@@ -1149,8 +1181,8 @@ static int iscsi_socket_deliver_raw ( struct xfer_interface *socket,
 	struct iscsi_session *iscsi =
 		container_of ( socket, struct iscsi_session, socket );
 	struct iscsi_bhs_common *common = &iscsi->rx_bhs.common;
-	int ( *process ) ( struct iscsi_session *iscsi, const void *data,
-			   size_t len, size_t remaining );
+	int ( * rx ) ( struct iscsi_session *iscsi, const void *data,
+		       size_t len, size_t remaining );
 	enum iscsi_rx_state next_state;
 	size_t frag_len;
 	size_t remaining;
@@ -1159,22 +1191,22 @@ static int iscsi_socket_deliver_raw ( struct xfer_interface *socket,
 	while ( 1 ) {
 		switch ( iscsi->rx_state ) {
 		case ISCSI_RX_BHS:
-			process = iscsi_rx_bhs;
+			rx = iscsi_rx_bhs;
 			iscsi->rx_len = sizeof ( iscsi->rx_bhs );
 			next_state = ISCSI_RX_AHS;			
 			break;
 		case ISCSI_RX_AHS:
-			process = iscsi_rx_discard;
+			rx = iscsi_rx_discard;
 			iscsi->rx_len = 4 * ISCSI_AHS_LEN ( common->lengths );
 			next_state = ISCSI_RX_DATA;
 			break;
 		case ISCSI_RX_DATA:
-			process = iscsi_rx_data;
+			rx = iscsi_rx_data;
 			iscsi->rx_len = ISCSI_DATA_LEN ( common->lengths );
 			next_state = ISCSI_RX_DATA_PADDING;
 			break;
 		case ISCSI_RX_DATA_PADDING:
-			process = iscsi_rx_discard;
+			rx = iscsi_rx_discard;
 			iscsi->rx_len = ISCSI_DATA_PAD_LEN ( common->lengths );
 			next_state = ISCSI_RX_BHS;
 			break;
@@ -1187,8 +1219,7 @@ static int iscsi_socket_deliver_raw ( struct xfer_interface *socket,
 		if ( frag_len > len )
 			frag_len = len;
 		remaining = iscsi->rx_len - iscsi->rx_offset - frag_len;
-		if ( ( rc = process ( iscsi, data, frag_len,
-				      remaining ) ) != 0 ) {
+		if ( ( rc = rx ( iscsi, data, frag_len, remaining ) ) != 0 ) {
 			DBGC ( iscsi, "iSCSI %p could not process received "
 			       "data: %s\n", iscsi, strerror ( rc ) );
 			iscsi_close_connection ( iscsi, rc );
@@ -1320,6 +1351,7 @@ void iscsi_detach ( struct scsi_device *scsi ) {
 	struct iscsi_session *iscsi =
 		container_of ( scsi->backend, struct iscsi_session, refcnt );
 
+	xfer_nullify ( &iscsi->socket );
 	iscsi_close_connection ( iscsi, 0 );
 	process_del ( &iscsi->process );
 	scsi->command = iscsi_detached_command;
