@@ -104,6 +104,7 @@ static struct xfer_interface_operations pxe_udp_xfer_operations = {
 	.close		= ignore_xfer_close,
 	.vredirect	= ignore_xfer_vredirect,
 	.seek		= ignore_xfer_seek,
+	.window		= unlimited_xfer_window,
 	.alloc_iob	= default_xfer_alloc_iob,
 	.deliver_iob	= pxe_udp_deliver_iob,
 	.deliver_raw	= xfer_deliver_as_iob,

@@ -160,6 +160,7 @@ static struct xfer_interface_operations posix_file_xfer_operations = {
 	.close		= posix_file_xfer_close,
 	.vredirect	= xfer_vopen,
 	.seek		= posix_file_xfer_seek,
+	.window		= unlimited_xfer_window,
 	.alloc_iob	= default_xfer_alloc_iob,
 	.deliver_iob	= posix_file_xfer_deliver_iob,
 	.deliver_raw	= xfer_deliver_as_iob,

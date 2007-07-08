@@ -37,6 +37,7 @@ static struct xfer_interface_operations hw_xfer_operations = {
 	.close		= hw_xfer_close,
 	.vredirect	= ignore_xfer_vredirect,
 	.seek		= ignore_xfer_seek,
+	.window		= unlimited_xfer_window,
 	.deliver_iob	= xfer_deliver_as_raw,
 	.deliver_raw	= ignore_xfer_deliver_raw,
 };
@@ -45,7 +46,7 @@ static void hw_step ( struct process *process ) {
 	struct hw *hw = container_of ( process, struct hw, process );
 	int rc;
 
-	if ( xfer_ready ( &hw->xfer ) == 0 ) {
+	if ( xfer_window ( &hw->xfer ) ) {
 		rc = xfer_deliver_raw ( &hw->xfer, hw_msg, sizeof ( hw_msg ) );
 		hw_finished ( hw, rc );
 	}

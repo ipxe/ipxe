@@ -722,6 +722,7 @@ static struct xfer_interface_operations dhcp_xfer_operations = {
 	.close		= ignore_xfer_close,
 	.vredirect	= xfer_vopen,
 	.seek		= ignore_xfer_seek,
+	.window		= unlimited_xfer_window,
 	.deliver_iob	= xfer_deliver_as_raw,
 	.deliver_raw	= dhcp_deliver_raw,
 };

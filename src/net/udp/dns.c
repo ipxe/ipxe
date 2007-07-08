@@ -433,6 +433,7 @@ static struct xfer_interface_operations dns_socket_operations = {
 	.close		= dns_xfer_close,
 	.vredirect	= xfer_vopen,
 	.seek		= ignore_xfer_seek,
+	.window		= unlimited_xfer_window,
 	.alloc_iob	= default_xfer_alloc_iob,
 	.deliver_iob	= xfer_deliver_as_raw,
 	.deliver_raw	= dns_xfer_deliver_raw,

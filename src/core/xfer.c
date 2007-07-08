@@ -111,6 +111,22 @@ int xfer_seek ( struct xfer_interface *xfer, off_t offset, int whence ) {
 }
 
 /**
+ * Check flow control window
+ *
+ * @v xfer		Data transfer interface
+ * @ret len		Length of window
+ */
+size_t xfer_window ( struct xfer_interface *xfer ) {
+	struct xfer_interface *dest = xfer_get_dest ( xfer );
+	size_t len;
+
+	len = dest->op->window ( dest );
+
+	xfer_put ( dest );
+	return len;
+}
+
+/**
  * Test to see if interface is ready to accept data
  *
  * @v xfer		Data transfer interface
@@ -298,6 +314,32 @@ int ignore_xfer_seek ( struct xfer_interface *xfer __unused,
 }
 
 /**
+ * Unlimited flow control window
+ *
+ * @v xfer		Data transfer interface
+ * @ret len		Length of window
+ *
+ * This handler indicates that the interface is always ready to accept
+ * data.
+ */
+size_t unlimited_xfer_window ( struct xfer_interface *xfer __unused ) {
+	return ~( ( size_t ) 0 );
+}
+
+/**
+ * No flow control window
+ *
+ * @v xfer		Data transfer interface
+ * @ret len		Length of window
+ *
+ * This handler indicates that the interface is never ready to accept
+ * data.
+ */
+size_t no_xfer_window ( struct xfer_interface *xfer __unused ) {
+	return 0;
+}
+
+/**
  * Allocate I/O buffer
  *
  * @v xfer		Data transfer interface
@@ -374,6 +416,7 @@ struct xfer_interface_operations null_xfer_ops = {
 	.close		= ignore_xfer_close,
 	.vredirect	= ignore_xfer_vredirect,
 	.seek		= ignore_xfer_seek,
+	.window		= unlimited_xfer_window,
 	.alloc_iob	= default_xfer_alloc_iob,
 	.deliver_iob	= xfer_deliver_as_raw,
 	.deliver_raw	= ignore_xfer_deliver_raw,

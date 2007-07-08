@@ -308,25 +308,12 @@ struct named_socket {
 	int have_local;
 };
 
-/**
- * Handle seek() event
- *
- * @v xfer		Data transfer interface
- * @v offset		Offset to new position
- * @v whence		Basis for new position
- * @ret rc		Return status code
- */
-static int resolv_xfer_seek ( struct xfer_interface *xfer __unused,
-			      off_t offset __unused, int whence __unused ) {
-	/* Never ready to accept data */
-	return -EAGAIN;
-}
-
 /** Named socket opener data transfer interface operations */
 static struct xfer_interface_operations named_xfer_ops = {
 	.close		= ignore_xfer_close,
 	.vredirect	= ignore_xfer_vredirect,
-	.seek		= resolv_xfer_seek,
+	.seek		= ignore_xfer_seek,
+	.window		= no_xfer_window,
 	.alloc_iob	= default_xfer_alloc_iob,
 	.deliver_iob	= xfer_deliver_as_raw,
 	.deliver_raw	= ignore_xfer_deliver_raw,

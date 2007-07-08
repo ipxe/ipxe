@@ -388,7 +388,7 @@ static void http_step ( struct process *process ) {
 	const char *query = http->uri->query;
 	int rc;
 
-	if ( xfer_ready ( &http->socket ) == 0 ) {
+	if ( xfer_window ( &http->socket ) ) {
 		process_del ( &http->process );
 		if ( ( rc = xfer_printf ( &http->socket,
 					  "GET %s%s%s HTTP/1.1\r\n"
@@ -425,6 +425,7 @@ static struct xfer_interface_operations http_socket_operations = {
 	.close		= http_socket_close,
 	.vredirect	= xfer_vopen,
 	.seek		= ignore_xfer_seek,
+	.window		= unlimited_xfer_window,
 	.alloc_iob	= default_xfer_alloc_iob,
 	.deliver_iob	= http_socket_deliver_iob,
 	.deliver_raw	= xfer_deliver_as_iob,
@@ -451,6 +452,7 @@ static struct xfer_interface_operations http_xfer_operations = {
 	.close		= http_xfer_close,
 	.vredirect	= ignore_xfer_vredirect,
 	.seek		= ignore_xfer_seek,
+	.window		= unlimited_xfer_window,
 	.alloc_iob	= default_xfer_alloc_iob,
 	.deliver_iob	= xfer_deliver_as_raw,
 	.deliver_raw	= ignore_xfer_deliver_raw,

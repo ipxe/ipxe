@@ -897,31 +897,28 @@ static void tcp_xfer_close ( struct xfer_interface *xfer, int rc ) {
 }
 
 /**
- * Seek to position
+ * Check flow control window
  *
  * @v xfer		Data transfer interface
- * @v offset		Offset to new position
- * @v whence		Basis for new position
- * @ret rc		Return status code
+ * @ret len		Length of window
  */
-static int tcp_xfer_seek ( struct xfer_interface *xfer, off_t offset,
-			   int whence ) {
+static size_t tcp_xfer_window ( struct xfer_interface *xfer ) {
 	struct tcp_connection *tcp =
 		container_of ( xfer, struct tcp_connection, xfer );
 
-	/* TCP doesn't support seeking to arbitrary positions */
-	if ( ( whence != SEEK_CUR ) || ( offset != 0 ) )
-		return -EINVAL;
-
 	/* Not ready if we're not in a suitable connection state */
 	if ( ! TCP_CAN_SEND_DATA ( tcp->tcp_state ) )
-		return -EAGAIN;
+		return 0;
 
-	/* Not ready if data queue is non-empty */
+	/* Not ready if data queue is non-empty.  This imposes a limit
+	 * of only one unACKed packet in the TX queue at any time; we
+	 * do this to conserve memory usage.
+	 */
 	if ( ! list_empty ( &tcp->queue ) )
-		return -EAGAIN;
+		return 0;
 
-	return 0;
+	/* Return TCP window length */
+	return tcp->snd_win;
 }
 
 /**
@@ -951,7 +948,8 @@ static int tcp_xfer_deliver_iob ( struct xfer_interface *xfer,
 static struct xfer_interface_operations tcp_xfer_operations = {
 	.close		= tcp_xfer_close,
 	.vredirect	= ignore_xfer_vredirect,
-	.seek		= tcp_xfer_seek,
+	.seek		= ignore_xfer_seek,
+	.window		= tcp_xfer_window,
 	.alloc_iob	= default_xfer_alloc_iob,
 	.deliver_iob	= tcp_xfer_deliver_iob,
 	.deliver_raw	= xfer_deliver_as_iob,
