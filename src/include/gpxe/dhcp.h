@@ -454,7 +454,7 @@ struct dhcp_option_applicator {
 
 /** Declare a DHCP option applicator */
 #define __dhcp_applicator \
-	__table ( struct dhcp_option_applicator, dhcp_appicators, 01 )
+	__table ( struct dhcp_option_applicator, dhcp_applicators, 01 )
 
 /**
  * Get reference to DHCP options block
