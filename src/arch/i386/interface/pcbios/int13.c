@@ -355,12 +355,18 @@ static int int13_cdrom_status_terminate ( struct int13_drive *drive,
  */
 static void int13 ( struct i386_all_regs *ix86 ) {
 	int command = ix86->regs.ah;
+	unsigned int bios_drive = ix86->regs.dl;
+	unsigned int original_bios_drive = bios_drive;
 	struct int13_drive *drive;
 	int status;
 
 	list_for_each_entry ( drive, &drives, list ) {
-		if ( drive->drive != ix86->regs.dl )
+		if ( drive->drive > bios_drive )
 			continue;
+		if ( drive->drive < bios_drive ) {
+			original_bios_drive--;
+			continue;
+		}
 		
 		DBG ( "INT 13,%04x (%02x): ", ix86->regs.ax, drive->drive );
 
@@ -421,6 +427,13 @@ static void int13 ( struct i386_all_regs *ix86 ) {
 
 		break;
 	}
+
+	/* Remap BIOS drive */
+	if ( bios_drive != original_bios_drive ) {
+		DBG ( "INT 13,%04x (%02x) remapped to (%02x)\n",
+		      ix86->regs.ax, bios_drive, original_bios_drive );
+	}
+	ix86->regs.dl = original_bios_drive;
 }
 
 /**
@@ -434,19 +447,42 @@ static void hook_int13 ( void ) {
 	 */
 	__asm__  __volatile__ (
 	       TEXT16_CODE ( "\nint13_wrapper:\n\t"
-			     "orb $0, %%al\n\t" /* clear OF */
+			     /* Preserve %ax and %dx for future reference */
+			     "pushw %%bp\n\t"
+			     "movw %%sp, %%bp\n\t"			     
+			     "pushw %%ax\n\t"
+			     "pushw %%dx\n\t"
+			     /* Clear OF, set CF, call int13() */
+			     "orb $0, %%al\n\t" 
 			     "stc\n\t"
-			     "pushl %0\n\t" /* call int13() */
+			     "pushl %0\n\t"
 			     "pushw %%cs\n\t"
 			     "call prot_call\n\t"
-			     "jo 1f\n\t" /* chain if OF not set */
+			     /* Chain if OF not set */
+			     "jo 1f\n\t"
 			     "pushfw\n\t"
 			     "lcall *%%cs:int13_vector\n\t"
 			     "\n1:\n\t"
-			     "call 2f\n\t" /* return with flags intact */
-			     "lret $2\n\t"
+			     /* Overwrite flags for iret */
+			     "pushfw\n\t"
+			     "popw 6(%%bp)\n\t"
+			     /* Restore %dl (except for %ah=0x08 or 0x15) */
+			     "cmpb $0x08, -1(%%bp)\n\t"
+
+			     "jne 7f\n\t"
+			     "movb $2, %%dl\n\t"
+			     "jmp 2f\n\t"
+			     "\n7:\n\t"
+
+			     "je 2f\n\t"
+			     "cmpb $0x15, -1(%%bp)\n\t"
+			     "je 2f\n\t"
+			     "movb -4(%%bp), %%dl\n\t"
 			     "\n2:\n\t"
-			     "ret $4\n\t" ) : : "i" ( int13 ) );
+			     /* Return */
+			     "movw %%bp, %%sp\n\t"
+			     "popw %%bp\n\t"
+			     "iret\n\t" ) : : "i" ( int13 ) );
 
 	hook_bios_interrupt ( 0x13, ( unsigned int ) int13_wrapper,
 			      &int13_vector );
@@ -541,6 +577,9 @@ void register_int13_drive ( struct int13_drive *drive ) {
 		drive->drive = ( num_drives | 0x80 );
 	if ( num_drives <= ( drive->drive & 0x7f ) )
 		num_drives = ( ( drive->drive & 0x7f ) + 1 );
+
+	num_drives = 2;
+
 	put_real ( num_drives, BDA_SEG, BDA_NUM_DRIVES );
 
 	DBG ( "Registered INT13 drive %02x with C/H/S geometry %d/%d/%d\n",
