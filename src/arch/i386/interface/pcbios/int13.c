@@ -466,23 +466,28 @@ static void hook_int13 ( void ) {
 			     /* Overwrite flags for iret */
 			     "pushfw\n\t"
 			     "popw 6(%%bp)\n\t"
-			     /* Restore %dl (except for %ah=0x08 or 0x15) */
-			     "cmpb $0x08, -1(%%bp)\n\t"
-
-			     "jne 7f\n\t"
-			     "movb $2, %%dl\n\t"
-			     "jmp 2f\n\t"
-			     "\n7:\n\t"
-
-			     "je 2f\n\t"
+			     /* Fix up %dl:
+			      *
+			      * INT 13,15 : do nothing
+			      * INT 13,08 : load with number of drives
+			      * all others: restore original value
+			      */
 			     "cmpb $0x15, -1(%%bp)\n\t"
 			     "je 2f\n\t"
 			     "movb -4(%%bp), %%dl\n\t"
-			     "\n2:\n\t"
+			     "cmpb $0x08, -1(%%bp)\n\t"
+			     "jne 2f\n\t"
+			     "pushw %%ds\n\t"
+			     "pushw %1\n\t"
+			     "popw %%ds\n\t"
+			     "movb %c2, %%dl\n\t"
+			     "popw %%ds\n\t"
 			     /* Return */
+			     "\n2:\n\t"
 			     "movw %%bp, %%sp\n\t"
 			     "popw %%bp\n\t"
-			     "iret\n\t" ) : : "i" ( int13 ) );
+			     "iret\n\t" )
+	       : : "i" ( int13 ), "i" ( BDA_SEG ), "i" ( BDA_NUM_DRIVES ) );
 
 	hook_bios_interrupt ( 0x13, ( unsigned int ) int13_wrapper,
 			      &int13_vector );
