@@ -409,9 +409,10 @@ static void int13 ( struct i386_all_regs *ix86 ) {
 
 		/* Negative status indicates an error */
 		if ( status < 0 ) {
-			ix86->flags |= CF;
 			status = -status;
 			DBG ( "INT13 failed with status %x\n", status );
+		} else {
+			ix86->flags &= ~CF;
 		}
 		ix86->regs.ah = status;
 
@@ -433,7 +434,8 @@ static void hook_int13 ( void ) {
 	 */
 	__asm__  __volatile__ (
 	       TEXT16_CODE ( "\nint13_wrapper:\n\t"
-			     "orb $0, %%al\n\t" /* clear CF and OF */
+			     "orb $0, %%al\n\t" /* clear OF */
+			     "stc\n\t"
 			     "pushl %0\n\t" /* call int13() */
 			     "pushw %%cs\n\t"
 			     "call prot_call\n\t"
