@@ -11,7 +11,6 @@
 
 #include "latch.h"
 #include <gpxe/tcpip.h>
-#include <gpxe/stream.h>
 
 /**
  * A TCP header
