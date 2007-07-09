@@ -713,7 +713,7 @@ struct iscsi_string_type {
 };
 
 /** iSCSI text strings that we want to handle */
-struct iscsi_string_type iscsi_string_types[] = {
+static struct iscsi_string_type iscsi_string_types[] = {
 	{ "TargetAddress=", iscsi_handle_targetaddress_value },
 	{ "AuthMethod=", iscsi_handle_authmethod_value },
 	{ "CHAP_A=", iscsi_handle_chap_a_value },
