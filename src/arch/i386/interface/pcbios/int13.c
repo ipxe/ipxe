@@ -580,11 +580,9 @@ void register_int13_drive ( struct int13_drive *drive ) {
 	get_real ( num_drives, BDA_SEG, BDA_NUM_DRIVES );
 	if ( ! drive->drive )
 		drive->drive = ( num_drives | 0x80 );
+	num_drives++;
 	if ( num_drives <= ( drive->drive & 0x7f ) )
 		num_drives = ( ( drive->drive & 0x7f ) + 1 );
-
-	num_drives = 2;
-
 	put_real ( num_drives, BDA_SEG, BDA_NUM_DRIVES );
 
 	DBG ( "Registered INT13 drive %02x with C/H/S geometry %d/%d/%d\n",
@@ -611,6 +609,10 @@ void register_int13_drive ( struct int13_drive *drive ) {
 void unregister_int13_drive ( struct int13_drive *drive ) {
 	/* Remove from list of emulated drives */
 	list_del ( &drive->list );
+
+	/* Should adjust BIOS drive count, but it's difficult to do so
+	 * reliably.
+	 */
 
 	DBG ( "Unregistered INT13 drive %02x\n", drive->drive );
 
