@@ -127,20 +127,6 @@ size_t xfer_window ( struct xfer_interface *xfer ) {
 }
 
 /**
- * Test to see if interface is ready to accept data
- *
- * @v xfer		Data transfer interface
- * @ret rc		Return status code
- *
- * This test is optional; the data transfer interface may wish that it
- * does not yet wish to accept data, but cannot prevent attempts to
- * deliver data to it.
- */
-int xfer_ready ( struct xfer_interface *xfer ) {
-	return xfer_seek ( xfer, 0, SEEK_CUR );
-}
-
-/**
  * Allocate I/O buffer
  *
  * @v xfer		Data transfer interface
