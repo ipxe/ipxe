@@ -263,7 +263,7 @@ static struct nvo_fragment rtl_nvo_fragments[] = {
  *
  * @v rtl		RTL8139 NIC
  */
- void rtl_init_eeprom ( struct rtl8139_nic *rtl ) {
+static void rtl_init_eeprom ( struct rtl8139_nic *rtl ) {
 	int ee9356;
 	int vpd;
 
