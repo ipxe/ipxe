@@ -26,6 +26,7 @@
 #include <usr/route.h>
 #include <usr/dhcpmgmt.h>
 #include <usr/imgmgmt.h>
+#include <usr/iscsiboot.h>
 #include <usr/autoboot.h>
 
 /** @file

@@ -4,6 +4,7 @@
 #include <gpxe/iscsi.h>
 #include <gpxe/dhcp.h>
 #include <int13.h>
+#include <usr/iscsiboot.h>
 
 int iscsiboot ( const char *root_path ) {
 	struct scsi_device scsi;
