@@ -169,6 +169,15 @@ enum register_offsets {
 	    
 };
 
+/* the values for the 'magic' registers above (PGSEL=1) */
+#define PMDCSR_VAL	0x189c	/* enable preferred adaptation circuitry */
+#define TSTDAT_VAL	0x0
+#define DSPCFG_VAL	0x5040
+#define SDCFG_VAL	0x008c	/* set voltage thresholds for Signal Detect */
+#define DSPCFG_LOCK	0x20	/* coefficient lock bit in DSPCFG */
+#define DSPCFG_COEF	0x1000	/* see coefficient (in TSTDAT) bit in DSPCFG */
+#define TSTDAT_FIXED	0xe8	/* magic number for bad coefficients */
+
 /* Bit in ChipCmd.
  */
 enum ChipCmdBits {
@@ -180,6 +189,20 @@ enum ChipCmdBits {
     TxOff     = 0x02, 
     TxOn      = 0x01
 };
+
+enum ChipConfig_bits {
+	CfgPhyDis		= 0x200,
+	CfgPhyRst		= 0x400,
+	CfgExtPhy		= 0x1000,
+	CfgAnegEnable		= 0x2000,
+	CfgAneg100		= 0x4000,
+	CfgAnegFull		= 0x8000,
+	CfgAnegDone		= 0x8000000,
+	CfgFullDuplex		= 0x20000000,
+	CfgSpeed100		= 0x40000000,
+	CfgLink			= 0x80000000,
+};
+
 
 /* Bits in the RxMode register.
  */
@@ -328,6 +351,41 @@ static void nat_reset ( struct natsemi_nic *nat ) {
 	outl ( SavedClkRun, nat->ioaddr + ClkRun );
 }
 
+static void do_cable_magic ( struct net_device *netdev ) {
+	struct natsemi_nic *nat = netdev->priv;
+	uint16_t data;
+	/*
+	 * 100 MBit links with short cables can trip an issue with the chip.
+	 * The problem manifests as lots of CRC errors and/or flickering
+	 * activity LED while idle.  This process is based on instructions
+	 * from engineers at National.
+	 */
+	if (inl(nat->ioaddr + ChipConfig) & CfgSpeed100) {
+
+		outw(1, nat->ioaddr + PGSEL);
+		/*
+		 * coefficient visibility should already be enabled via
+		 * DSPCFG | 0x1000
+		 */
+		data = inw(nat->ioaddr + TSTDAT) & 0xff;
+		/*
+		 * the value must be negative, and within certain values
+		 * (these values all come from National)
+		 */
+		if (!(data & 0x80) || ((data >= 0xd8) && (data <= 0xff))) {
+
+			/* the bug has been triggered - fix the coefficient */
+			outw(TSTDAT_FIXED, nat->ioaddr + TSTDAT);
+			/* lock the value */
+			data = inw(nat->ioaddr + DSPCFG);
+			//np->dspcfg = data | DSPCFG_LOCK;
+			outw(data | DSPCFG_LOCK , nat->ioaddr + DSPCFG);
+		}
+		outw(0, nat->ioaddr + PGSEL);
+	}
+
+}
+
 /*
  * Open NIC
  *
@@ -401,13 +459,13 @@ static int nat_open ( struct net_device *netdev ) {
 	 * Configure for standard, in-spec Ethernet. 
 	 */
 	if ( inl ( nat->ioaddr + ChipConfig ) & 0x20000000 ) {	/* Full duplex */
-		tx_config = 0xD0801002|0xC0000000;
-		DBG("Full duplex\n");
-		rx_config = 0x10000020|0x10000000;;
+		tx_config = 0xD0801002 | 0xC0000000;
+		DBG ( "Full duplex\n" );
+		rx_config = 0x10000020 | 0x10000000;
 	} else {
-		tx_config = 0x10801002& ~0xC0000000;;
-		DBG("Half duplex\n");
-		rx_config = 0x0020& ~0x10000000;;;
+		tx_config = 0x10801002 & ~0xC0000000;
+		DBG ( "Half duplex\n" );
+		rx_config = 0x0020 & ~0x10000000;
 	}
 	outl ( tx_config, nat->ioaddr + TxConfig );
 	outl ( rx_config, nat->ioaddr + RxConfig );
@@ -415,6 +473,12 @@ static int nat_open ( struct net_device *netdev ) {
 	/*start the receiver 
 	 */
         outl ( RxOn, nat->ioaddr + ChipCmd );
+	
+	/* lines 1586 linux-natsemi.c uses cable magic 
+	 * testing this feature is required or not
+	 */
+	do_cable_magic ( netdev ); 
+	
 
 	/* mask the interrupts. note interrupt is not enabled here
 	 */
