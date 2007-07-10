@@ -466,6 +466,7 @@ static void init_phy_fixup(struct net_device *netdev) {
 	   stick.
 	*/
 	uint32_t srr = inl(nat->ioaddr + SiliconRev);
+	DBG ( "Natsemi : silicon revision %#04x.\n",(unsigned int)srr);
 	int NATSEMI_HW_TIMEOUT = 400;
 	for (i=0;i<NATSEMI_HW_TIMEOUT;i++) {
 
@@ -787,7 +788,7 @@ static void nat_poll ( struct net_device *netdev) {
 		 */
 		if ( ( rx_status & ( DescMore|DescPktOK|RxTooLong ) ) != DescPktOK) {
 			 DBG ( "natsemi_poll: Corrupted packet received, "
-					"buffer status = %X ^ %X \n",rx_status,
+					"buffer status = %X \n",
 					(unsigned int) nat->rx[nat->rx_cur].cmdsts );
 			 netdev_rx_err ( netdev,NULL,-EINVAL );
 		} else 	{
