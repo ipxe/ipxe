@@ -401,11 +401,13 @@ static int nat_open ( struct net_device *netdev ) {
 	 * Configure for standard, in-spec Ethernet. 
 	 */
 	if ( inl ( nat->ioaddr + ChipConfig ) & 0x20000000 ) {	/* Full duplex */
-		tx_config = 0xD0801002;
-		rx_config = 0x10000020;
+		tx_config = 0xD0801002|0xC0000000;
+		DBG("Full duplex\n");
+		rx_config = 0x10000020|0x10000000;;
 	} else {
-		tx_config = 0x10801002;
-		rx_config = 0x0020;
+		tx_config = 0x10801002& ~0xC0000000;;
+		DBG("Half duplex\n");
+		rx_config = 0x0020& ~0x10000000;;;
 	}
 	outl ( tx_config, nat->ioaddr + TxConfig );
 	outl ( rx_config, nat->ioaddr + RxConfig );
