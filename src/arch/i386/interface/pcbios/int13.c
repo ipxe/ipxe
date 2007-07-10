@@ -646,6 +646,7 @@ int int13_boot ( unsigned int drive ) {
 					   "pushw $0\n\t"
 					   "popw %%es\n\t"
 					   "stc\n\t"
+					   "sti\n\t"
 					   "int $0x13\n\t"
 					   "sti\n\t" /* BIOS bugs */
 					   "jc 1f\n\t"
