@@ -23,14 +23,17 @@ undiisr:
 	pushw	%es
 	pusha
 
+	/* Set up our segment registers */
+	movw	%cs:rm_ds, %ax
+	movw	%ax, %ds
+
 	/* Check that we have an UNDI entry point */
 	cmpw	$0, undinet_entry_point
 	je	chain
 	
 	/* Issue UNDI API call */
-	movw	%cs:rm_ds, %ax
-	movw	%ax, %ds
-	movw	%ax, %es
+	pushw	%ds
+	popw	%es
 	movw	$undinet_params, %di
 	movw	$PXENV_UNDI_ISR, %bx
 	movw	$PXENV_UNDI_ISR_IN_START, funcflag
@@ -38,13 +41,15 @@ undiisr:
 	pushw	%di
 	pushw	%bx
 	lcall	*undinet_entry_point
+	cli	/* Just in case */
 	addw	$6, %sp
 	cmpw	$PXENV_UNDI_ISR_OUT_OURS, funcflag
-	jne	chain
+	jne	eoi
 	
-ack:	/* Record interrupt occurence */
+trig:	/* Record interrupt occurence */
 	incb	undiisr_trigger_count
-	/* Send EOI */
+
+eoi:	/* Send EOI */
 	movb	$ICR_EOI_NON_SPECIFIC, %al
 	cmpb	$IRQ_PIC_CUTOFF, undiisr_irq
 	jb	1f
