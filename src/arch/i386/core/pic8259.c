@@ -46,11 +46,11 @@ static inline void send_nonspecific_eoi ( unsigned int irq ) {
  */
 static inline void send_specific_eoi ( unsigned int irq ) {
 	DBG ( "Sending specific EOI for IRQ %d\n", irq );
-	outb ( ( ICR_EOI_SPECIFIC | ICR_VALUE ( irq ) ), ICR_REG ( irq ) );
 	if ( irq >= IRQ_PIC_CUTOFF ) {
 		outb ( ( ICR_EOI_SPECIFIC | ICR_VALUE ( CHAINED_IRQ ) ),
 		       ICR_REG ( CHAINED_IRQ ) );
 	}
+	outb ( ( ICR_EOI_SPECIFIC | ICR_VALUE ( irq ) ), ICR_REG ( irq ) );
 }
 
 /**
