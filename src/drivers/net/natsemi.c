@@ -631,6 +631,9 @@ static int nat_open ( struct net_device *netdev ) {
 	outl ( tx_config, nat->ioaddr + TxConfig );
 	outl ( rx_config, nat->ioaddr + RxConfig );
 
+	DBG ( "Tx config register = %x Rx config register =  %x\n", 
+               (unsigned int) inl ( nat->ioaddr + TxConfig),
+	       (unsigned int) inl ( nat->ioaddr + RxConfig) );
 	/*start the receiver 
 	 */
         outl ( RxOn, nat->ioaddr + ChipCmd );
@@ -640,6 +643,7 @@ static int nat_open ( struct net_device *netdev ) {
 	 */
 	do_cable_magic ( netdev ); 
 	init_phy_fixup ( netdev );
+	
 	
 
 	/* mask the interrupts. note interrupt is not enabled here
@@ -783,6 +787,8 @@ static void nat_poll ( struct net_device *netdev) {
 	rx_status = (unsigned int) nat->rx[nat->rx_cur].cmdsts; 
 	while ( ( rx_status & OWN ) ) {
 		rx_len = ( rx_status & DSIZE ) - CRC_SIZE;
+		DBG ( " Status of received packet = %X , Lenght of Packet = %X\n",
+		      	rx_status,rx_len );
 
 		/*check for the corrupt packet 
 		 */
