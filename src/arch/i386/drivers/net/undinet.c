@@ -146,7 +146,7 @@ static union u_PXENV_ANY __data16 ( undinet_params );
  * Used as the indirection vector for all UNDI API calls.  Resides in
  * base memory.
  */
-static SEGOFF16_t __data16 ( undinet_entry_point );
+SEGOFF16_t __data16 ( undinet_entry_point );
 #define undinet_entry_point __use_data16 ( undinet_entry_point )
 
 /**
@@ -245,17 +245,21 @@ static int undinet_call ( struct undi_nic *undinic, unsigned int function,
 /**
  * UNDI interrupt service routine
  *
- * The UNDI ISR simply increments a counter (@c trigger_count) and
- * exits.
+ * The UNDI ISR increments a counter (@c trigger_count) and exits.
  */
-extern void undinet_isr ( void );
+extern void undiisr ( void );
 
-/** Dummy chain vector */
-static struct segoff prev_handler[ IRQ_MAX + 1 ];
+/** IRQ number */
+uint8_t __data16 ( undiisr_irq );
+#define undiisr_irq __use_data16 ( undiisr_irq )
+
+/** IRQ chain vector */
+struct segoff __data16 ( undiisr_next_handler );
+#define undiisr_next_handler __use_data16 ( undiisr_next_handler )
 
 /** IRQ trigger count */
-static volatile uint8_t __text16 ( trigger_count ) = 0;
-#define trigger_count __use_text16 ( trigger_count )
+volatile uint8_t __data16 ( undiisr_trigger_count ) = 0;
+#define undiisr_trigger_count __use_data16 ( undiisr_trigger_count )
 
 /** Last observed trigger count */
 static unsigned int last_trigger_count = 0;
@@ -275,16 +279,12 @@ static unsigned int last_trigger_count = 0;
 static void undinet_hook_isr ( unsigned int irq ) {
 
 	assert ( irq <= IRQ_MAX );
+	assert ( undiisr_irq == 0 );
 
-	__asm__ __volatile__ ( TEXT16_CODE ( "\nundinet_isr:\n\t"
-					     "incb %%cs:%c0\n\t"
-					     "iret\n\t" )
-			       : : "p" ( & __from_text16 ( trigger_count ) ) );
-
+	undiisr_irq = irq;
 	hook_bios_interrupt ( IRQ_INT ( irq ),
-			      ( ( unsigned int ) undinet_isr ),
-			      &prev_handler[irq] );
-
+			      ( ( unsigned int ) undiisr ),
+			      &undiisr_next_handler );
 }
 
 /**
@@ -297,8 +297,9 @@ static void undinet_unhook_isr ( unsigned int irq ) {
 	assert ( irq <= IRQ_MAX );
 
 	unhook_bios_interrupt ( IRQ_INT ( irq ),
-				( ( unsigned int ) undinet_isr ),
-				&prev_handler[irq] );
+				( ( unsigned int ) undiisr ),
+				&undiisr_next_handler );
+	undiisr_irq = 0;
 }
 
 /**
@@ -310,7 +311,7 @@ static int undinet_isr_triggered ( void ) {
 	unsigned int this_trigger_count;
 
 	/* Read trigger_count.  Do this only once; it is volatile */
-	this_trigger_count = trigger_count;
+	this_trigger_count = undiisr_trigger_count;
 
 	if ( this_trigger_count == last_trigger_count ) {
 		/* Not triggered */
@@ -424,6 +425,7 @@ static void undinet_poll ( struct net_device *netdev ) {
 		if ( ! undinet_isr_triggered() )
 			return;
 
+#if 0
 		/* See if this was our interrupt */
 		memset ( &undi_isr, 0, sizeof ( undi_isr ) );
 		undi_isr.FuncFlag = PXENV_UNDI_ISR_IN_START;
@@ -443,6 +445,7 @@ static void undinet_poll ( struct net_device *netdev ) {
 		/* If this wasn't our interrupt, exit now */
 		if ( undi_isr.FuncFlag != PXENV_UNDI_ISR_OUT_OURS )
 			return;
+#endif
 		
 		/* Start ISR processing */
 		undinic->isr_processing = 1;
