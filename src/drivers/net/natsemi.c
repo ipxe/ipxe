@@ -79,6 +79,7 @@
 #include <gpxe/spi_bit.h>
 #include <gpxe/threewire.h>
 #include <gpxe/nvo.h>
+#include <mii.h>
 
 #define TX_RING_SIZE 4
 #define NUM_RX_DESC  4
@@ -121,6 +122,28 @@ struct natsemi_nic {
 	struct spi_device eeprom;
 	struct nvo_block nvo;
 };
+
+
+/*
+ * Support for fibre connections on Am79C874:
+ * This phy needs a special setup when connected to a fibre cable.
+ * http://www.amd.com/files/connectivitysolutions/networking/archivednetworking/22235.pdf
+ */
+#define PHYID_AM79C874	0x0022561b
+
+enum {
+	MII_MCTRL	= 0x15,		/* mode control register */
+	MII_FX_SEL	= 0x0001,	/* 100BASE-FX (fiber) */
+	MII_EN_SCRM	= 0x0004,	/* enable scrambler (tp) */
+};
+
+
+
+/* values we might find in the silicon revision register */
+#define SRR_DP83815_C	0x0302
+#define SRR_DP83815_D	0x0403
+#define SRR_DP83816_A4	0x0504
+#define SRR_DP83816_A5	0x0505
 
 /* NATSEMI: Offsets to the device registers.
  * Unlike software-only systems, device drivers interact with complex hardware.
@@ -351,6 +374,143 @@ static void nat_reset ( struct natsemi_nic *nat ) {
 	outl ( SavedClkRun, nat->ioaddr + ClkRun );
 }
 
+
+static int mdio_read(struct net_device *netdev, int reg) {
+	struct natsemi_nic *nat = netdev->priv;
+
+	/* The 83815 series has two ports:
+	 * - an internal transceiver
+	 * - an external mii bus
+	 */
+		return inw(nat->ioaddr+BasicControl+(reg<<2));
+}
+
+static void mdio_write(struct net_device *netdev, int reg, u16 data) {
+	struct natsemi_nic *nat = netdev->priv;
+
+	/* The 83815 series has an internal transceiver; handle separately */
+		writew(data, nat->ioaddr+BasicControl+(reg<<2));
+}
+
+static void init_phy_fixup(struct net_device *netdev) {
+	struct natsemi_nic *nat = netdev->priv;
+	int i;
+	u32 cfg;
+	u16 tmp;
+	uint16_t advertising;
+	int mii;
+
+	/* restore stuff lost when power was out */
+	tmp = mdio_read(netdev, MII_BMCR);
+	advertising= mdio_read(netdev, MII_ADVERTISE);
+//	if (np->autoneg == AUTONEG_ENABLE) {
+		/* renegotiate if something changed */
+		if ((tmp & BMCR_ANENABLE) == 0
+		 || advertising != mdio_read(netdev, MII_ADVERTISE))
+		{
+			/* turn on autonegotiation and force negotiation */
+			tmp |= (BMCR_ANENABLE | BMCR_ANRESTART);
+			mdio_write(netdev, MII_ADVERTISE, advertising);
+		}
+//	} else {
+		/* turn off auto negotiation, set speed and duplexity */
+//		tmp &= ~(BMCR_ANENABLE | BMCR_SPEED100 | BMCR_FULLDPLX);
+//		if (np->speed == SPEED_100)
+///			tmp |= BMCR_SPEED100;
+//		if (np->duplex == DUPLEX_FULL)
+//			tmp |= BMCR_FULLDPLX;
+		/*
+		 * Note: there is no good way to inform the link partner
+		 * that our capabilities changed. The user has to unplug
+		 * and replug the network cable after some changes, e.g.
+		 * after switching from 10HD, autoneg off to 100 HD,
+		 * autoneg off.
+		 */
+//	}
+	mdio_write(netdev, MII_BMCR, tmp);
+	inl(nat->ioaddr + ChipConfig);
+	udelay(1);
+
+	/* find out what phy this is */
+	mii = (mdio_read(netdev, MII_PHYSID1) << 16)
+				+ mdio_read(netdev, MII_PHYSID2);
+
+	/* handle external phys here */
+	switch (mii) {
+	case PHYID_AM79C874:
+		/* phy specific configuration for fibre/tp operation */
+		tmp = mdio_read(netdev, MII_MCTRL);
+		tmp &= ~(MII_FX_SEL | MII_EN_SCRM);
+		//if (dev->if_port == PORT_FIBRE)
+		//	tmp |= MII_FX_SEL;
+		//else
+			tmp |= MII_EN_SCRM;
+		mdio_write(netdev, MII_MCTRL, tmp);
+		break;
+	default:
+		break;
+	}
+	cfg = inl(nat->ioaddr + ChipConfig);
+	if (cfg & CfgExtPhy)
+		return;
+
+	/* On page 78 of the spec, they recommend some settings for "optimum
+	   performance" to be done in sequence.  These settings optimize some
+	   of the 100Mbit autodetection circuitry.  They say we only want to
+	   do this for rev C of the chip, but engineers at NSC (Bradley
+	   Kennedy) recommends always setting them.  If you don't, you get
+	   errors on some autonegotiations that make the device unusable.
+
+	   It seems that the DSP needs a few usec to reinitialize after
+	   the start of the phy. Just retry writing these values until they
+	   stick.
+	*/
+	uint32_t srr = inl(nat->ioaddr + SiliconRev);
+	int NATSEMI_HW_TIMEOUT = 400;
+	for (i=0;i<NATSEMI_HW_TIMEOUT;i++) {
+
+		int dspcfg,dspcfg_1;
+		outw(1, nat->ioaddr + PGSEL);
+		outw(PMDCSR_VAL, nat->ioaddr + PMDCSR);
+		outw(TSTDAT_VAL, nat->ioaddr + TSTDAT);
+		dspcfg = (srr <= SRR_DP83815_C)?
+			DSPCFG_VAL : (DSPCFG_COEF | readw(nat->ioaddr + DSPCFG));
+		outw(dspcfg, nat->ioaddr + DSPCFG);
+		outw(SDCFG_VAL, nat->ioaddr + SDCFG);
+		outw(0, nat->ioaddr + PGSEL);
+		inl(nat->ioaddr + ChipConfig);
+		udelay(10);
+
+		outw(1, nat->ioaddr + PGSEL);
+		dspcfg_1 = readw(nat->ioaddr + DSPCFG);
+		outw(0, nat->ioaddr + PGSEL);
+		if (dspcfg == dspcfg_1)
+			break;
+	}
+
+		if (i==NATSEMI_HW_TIMEOUT) {
+			DBG ( "Natsemi: DSPCFG mismatch after retrying for"
+			      " %d usec.\n", i*10);
+		} else {
+			DBG ( "NATSEMI: DSPCFG accepted after %d usec.\n",
+			      i*10);
+		}
+	/*
+	 * Enable PHY Specific event based interrupts.  Link state change
+	 * and Auto-Negotiation Completion are among the affected.
+	 * Read the intr status to clear it (needed for wake events).
+	 */
+	inw(nat->ioaddr + MIntrStatus);
+	//MICRIntEn = 0x2
+	outw(0x2, nat->ioaddr + MIntrCtrl);
+}
+
+
+/* 
+ * Patch up for fixing CRC errors.
+ * adapted from linux natsemi driver
+ *
+ */
 static void do_cable_magic ( struct net_device *netdev ) {
 	struct natsemi_nic *nat = netdev->priv;
 	uint16_t data;
@@ -478,6 +638,7 @@ static int nat_open ( struct net_device *netdev ) {
 	 * testing this feature is required or not
 	 */
 	do_cable_magic ( netdev ); 
+	init_phy_fixup ( netdev );
 	
 
 	/* mask the interrupts. note interrupt is not enabled here
