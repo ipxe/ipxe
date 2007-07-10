@@ -418,6 +418,7 @@ static void undinet_poll ( struct net_device *netdev ) {
 	struct io_buffer *iobuf = NULL;
 	size_t len;
 	size_t frag_len;
+	size_t max_frag_len;
 	int rc;
 
 	if ( ! undinic->isr_processing ) {
@@ -446,6 +447,14 @@ static void undinet_poll ( struct net_device *netdev ) {
 			/* Packet fragment received */
 			len = undi_isr.FrameLength;
 			frag_len = undi_isr.BufferLength;
+			if ( ( len == 0 ) || ( len < frag_len ) ) {
+				/* Don't laugh.  VMWare does it. */
+				DBGC ( undinic, "UNDINIC %p reported insane "
+				       "fragment (%zd of %zd bytes)\n",
+				       undinic, frag_len, len );
+				netdev_rx_err ( netdev, NULL, -EINVAL );
+				break;
+			}
 			if ( ! iobuf )
 				iobuf = alloc_iob ( len );
 			if ( ! iobuf ) {
@@ -456,10 +465,13 @@ static void undinet_poll ( struct net_device *netdev ) {
 				netdev_rx_err ( netdev, NULL, -ENOMEM );
 				goto done;
 			}
-			if ( frag_len > iob_tailroom ( iobuf ) ) {
-				DBGC ( undinic, "UNDINIC %p fragment too "
-				       "large\n", undinic );
-				frag_len = iob_tailroom ( iobuf );
+			max_frag_len = iob_tailroom ( iobuf );
+			if ( frag_len > max_frag_len ) {
+				DBGC ( undinic, "UNDINIC %p fragment too big "
+				       "(%zd+%zd does not fit into %zd)\n",
+				       undinic, iob_len ( iobuf ), frag_len,
+				       ( iob_len ( iobuf ) + max_frag_len ) );
+				frag_len = max_frag_len;
 			}
 			copy_from_real ( iob_put ( iobuf, frag_len ),
 					 undi_isr.Frame.segment,
@@ -473,6 +485,8 @@ static void undinet_poll ( struct net_device *netdev ) {
 				 */
 				if ( undinic->hacks & UNDI_HACK_EB54 )
 					--last_trigger_count;
+				/** HACK: effective RX quota of 1 */
+				goto done;
 			}
 			break;
 		case PXENV_UNDI_ISR_OUT_DONE:
@@ -491,8 +505,9 @@ static void undinet_poll ( struct net_device *netdev ) {
 
  done:
 	if ( iobuf ) {
-		DBGC ( undinic, "UNDINIC %p returned incomplete packet\n",
-		       undinic );
+		DBGC ( undinic, "UNDINIC %p returned incomplete packet "
+		       "(%zd of %zd)\n", undinic, iob_len ( iobuf ),
+		       ( iob_len ( iobuf ) + iob_tailroom ( iobuf ) ) );
 		netdev_rx_err ( netdev, iobuf, -EINVAL );
 	}
 }
