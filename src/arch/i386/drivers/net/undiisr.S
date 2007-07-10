@@ -22,6 +22,10 @@ undiisr:
 	pushw	%ds
 	pushw	%es
 	pusha
+
+	/* Check that we have an UNDI entry point */
+	cmpw	$0, undinet_entry_point
+	je	chain
 	
 	/* Issue UNDI API call */
 	movw	%cs:rm_ds, %ax

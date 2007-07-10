@@ -39,8 +39,6 @@
 
 /** An UNDI NIC */
 struct undi_nic {
-	/** Entry point */
-	SEGOFF16_t entry;
 	/** Assigned IRQ number */
 	unsigned int irq;
 	/** Currently processing ISR */
@@ -167,7 +165,6 @@ static int undinet_call ( struct undi_nic *undinic, unsigned int function,
 	/* Copy parameter block and entry point */
 	assert ( params_len <= sizeof ( undinet_params ) );
 	memcpy ( &undinet_params, params, params_len );
-	undinet_entry_point = undinic->entry;
 
 	/* Call real-mode entry point.  This calling convention will
 	 * work with both the !PXE and the PXENV+ entry points.
@@ -222,7 +219,8 @@ static int undinet_call ( struct undi_nic *undinic, unsigned int function,
 		DBGC ( undinic, "UNDINIC %p parameters at %04x:%04x length "
 		       "%#02x, entry point at %04x:%04x\n", undinic,
 		       rm_params.segment, rm_params.offset, params_len,
-		       undinic->entry.segment, undinic->entry.offset );
+		       undinet_entry_point.segment,
+		       undinet_entry_point.offset );
 		DBGC ( undinic, "UNDINIC %p parameters provided:\n", undinic );
 		DBGC_HDA ( undinic, rm_params, params, params_len );
 		DBGC ( undinic, "UNDINIC %p parameters returned:\n", undinic );
@@ -268,13 +266,6 @@ static unsigned int last_trigger_count = 0;
  * Hook UNDI interrupt service routine
  *
  * @v irq		IRQ number
- *
- * The UNDI ISR specifically does @b not chain to the previous
- * interrupt handler.  BIOSes seem to install somewhat perverse
- * default interrupt handlers; some do nothing other than an iret (and
- * so will cause a screaming interrupt if there really is another
- * interrupting device) and some disable the interrupt at the PIC (and
- * so will bring our own interrupts to a shuddering halt).
  */
 static void undinet_hook_isr ( unsigned int irq ) {
 
@@ -411,6 +402,15 @@ static int undinet_transmit ( struct net_device *netdev,
  * so instead of doing it the easy way we have to go to all the hassle
  * of installing a genuine interrupt service routine and dealing with
  * the wonderful 8259 Programmable Interrupt Controller.  Joy.
+ *
+ * Addendum (10/07/07).  When doing things such as iSCSI boot, in
+ * which we have to co-operate with a running OS, we can't get away
+ * with the "ISR-just-increments-a-counter-and-returns" trick at all,
+ * because it involves tying up the PIC for far too long, and other
+ * interrupt-dependent components (e.g. local disks) start breaking.
+ * We therefore implement a "proper" ISR which calls PXENV_UNDI_ISR
+ * from within interrupt context in order to deassert the device
+ * interrupt, and sends EOI if applicable.
  */
 static void undinet_poll ( struct net_device *netdev ) {
 	struct undi_nic *undinic = netdev->priv;
@@ -425,28 +425,6 @@ static void undinet_poll ( struct net_device *netdev ) {
 		if ( ! undinet_isr_triggered() )
 			return;
 
-#if 0
-		/* See if this was our interrupt */
-		memset ( &undi_isr, 0, sizeof ( undi_isr ) );
-		undi_isr.FuncFlag = PXENV_UNDI_ISR_IN_START;
-		if ( ( rc = undinet_call ( undinic, PXENV_UNDI_ISR, &undi_isr,
-					   sizeof ( undi_isr ) ) ) != 0 )
-			return;
-
-		/* Send EOI to the PIC.  In an ideal world, we'd do
-		 * this only for interrupts which the UNDI stack
-		 * reports as "ours".  However, since we don't (can't)
-		 * chain to the previous interrupt handler, we have to
-		 * acknowledge all interrupts.  See undinet_hook_isr()
-		 * for more background.
-		 */
-		send_eoi ( undinic->irq );
-
-		/* If this wasn't our interrupt, exit now */
-		if ( undi_isr.FuncFlag != PXENV_UNDI_ISR_OUT_OURS )
-			return;
-#endif
-		
 		/* Start ISR processing */
 		undinic->isr_processing = 1;
 		undi_isr.FuncFlag = PXENV_UNDI_ISR_IN_PROCESS;
@@ -651,7 +629,7 @@ int undinet_probe ( struct undi_device *undi ) {
 	undi_set_drvdata ( undi, netdev );
 	netdev->dev = &undi->dev;
 	memset ( undinic, 0, sizeof ( *undinic ) );
-	undinic->entry = undi->entry;
+	undinet_entry_point = undi->entry;
 	DBGC ( undinic, "UNDINIC %p using UNDI %p\n", undinic, undi );
 
 	/* Hook in UNDI stack */
@@ -769,6 +747,9 @@ void undinet_remove ( struct undi_device *undi ) {
 	undinet_call ( undinic, PXENV_STOP_UNDI, &stop_undi,
 		       sizeof ( stop_undi ) );
 	undi->flags &= ~UNDI_FL_STARTED;
+
+	/* Clear entry point */
+	memset ( &undinet_entry_point, 0, sizeof ( undinet_entry_point ) );
 
 	/* Free network device */
 	netdev_nullify ( netdev );
