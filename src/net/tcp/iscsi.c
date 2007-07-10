@@ -142,6 +142,7 @@ static void iscsi_close_connection ( struct iscsi_session *iscsi, int rc ) {
 	/* Reset TX and RX state machines */
 	iscsi->tx_state = ISCSI_TX_IDLE;
 	iscsi->rx_state = ISCSI_RX_BHS;
+	iscsi->rx_offset = 0;
 
 	/* Free any temporary dynamically allocated memory */
 	chap_finish ( &iscsi->chap );
