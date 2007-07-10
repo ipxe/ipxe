@@ -50,8 +50,8 @@ void resolv_done ( struct resolv_interface *resolv, struct sockaddr *sa,
 		   int rc ) {
 	struct resolv_interface *dest = resolv_get_dest ( resolv );
 
-	dest->op->done ( dest, sa, rc );
 	resolv_unplug ( resolv );
+	dest->op->done ( dest, sa, rc );
 	resolv_put ( dest );
 }
 

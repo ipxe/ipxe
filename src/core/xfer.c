@@ -38,8 +38,8 @@ void xfer_close ( struct xfer_interface *xfer, int rc ) {
 
 	DBGC ( xfer, "XFER %p->%p close\n", xfer, dest );
 
-	dest->op->close ( dest, rc );
 	xfer_unplug ( xfer );
+	dest->op->close ( dest, rc );
 	xfer_put ( dest );
 }
 
