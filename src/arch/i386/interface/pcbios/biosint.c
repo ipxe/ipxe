@@ -51,6 +51,12 @@ void hook_bios_interrupt ( unsigned int interrupt, unsigned int handler,
 			 sizeof ( *chain_vector ) );
 	DBG ( "...chaining to %04x:%04x\n",
 	      chain_vector->segment, chain_vector->offset );
+	if ( DBG_LOG ) {
+		char code[64];
+		copy_from_real ( code, chain_vector->segment,
+				 chain_vector->offset, sizeof ( code ) );
+		DBG_HDA ( *chain_vector, code, sizeof ( code ) );
+	}
 
 	copy_to_real ( 0, ( interrupt * 4 ), &vector, sizeof ( vector ) );
 	hooked_bios_interrupts++;
