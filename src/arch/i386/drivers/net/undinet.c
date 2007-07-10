@@ -453,6 +453,7 @@ static void undinet_poll ( struct net_device *netdev ) {
 				       "allocate %zd bytes for RX buffer\n",
 				       undinic, len );
 				/* Fragment will be dropped */
+				netdev_rx_err ( netdev, NULL, -ENOMEM );
 				goto done;
 			}
 			if ( frag_len > iob_tailroom ( iobuf ) ) {
@@ -492,7 +493,7 @@ static void undinet_poll ( struct net_device *netdev ) {
 	if ( iobuf ) {
 		DBGC ( undinic, "UNDINIC %p returned incomplete packet\n",
 		       undinic );
-		netdev_rx ( netdev, iobuf );
+		netdev_rx_err ( netdev, iobuf, -EINVAL );
 	}
 }
 
