@@ -596,6 +596,8 @@ static int nat_open ( struct net_device *netdev ) {
 		nat->rx[i].link   = virt_to_bus ( ( i + 1 < NUM_RX_DESC ) ? &nat->rx[i + 1] : &nat->rx[0] );
 		nat->rx[i].cmdsts = RX_BUF_SIZE;
 		nat->rx[i].bufptr = virt_to_bus ( nat->iobuf[i]->data );
+	//	DBG ( " Address of iobuf [%d] = %x and iobuf->data = %x \n", i, 
+	//	        nat->iobuf[i],nat->iobuf[i]->data);
 	}
 
 	/* load Receive Descriptor Register
@@ -793,10 +795,11 @@ static void nat_poll ( struct net_device *netdev) {
 		/*check for the corrupt packet 
 		 */
 		if ( ( rx_status & ( DescMore|DescPktOK|RxTooLong ) ) != DescPktOK) {
-			 DBG ( "natsemi_poll: Corrupted packet received, "
-					"buffer status = %X \n",
-					(unsigned int) nat->rx[nat->rx_cur].cmdsts );
-			 netdev_rx_err ( netdev,NULL,-EINVAL );
+			DBG ( "natsemi_poll: Corrupted packet received, "
+				"buffer status = %X \n",
+				(unsigned int) nat->rx[nat->rx_cur].cmdsts );
+			//DBG_HD ( nat->iobuf[nat->rx_cur]->data,rx_len);
+			netdev_rx_err ( netdev,NULL,-EINVAL );
 		} else 	{
 			rx_iob = alloc_iob ( rx_len );
 
@@ -807,6 +810,7 @@ static void nat_poll ( struct net_device *netdev) {
 			memcpy ( iob_put ( rx_iob,rx_len ),
 					nat->iobuf[nat->rx_cur]->data,rx_len );
 			DBG ( "received packet\n" );
+			//DBG_HD ( nat->iobuf[nat->rx_cur]->data,30);
 
 			/* add to the receive queue. 
 			 */
