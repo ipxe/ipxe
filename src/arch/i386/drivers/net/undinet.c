@@ -485,8 +485,6 @@ static void undinet_poll ( struct net_device *netdev ) {
 				 */
 				if ( undinic->hacks & UNDI_HACK_EB54 )
 					--last_trigger_count;
-				/** HACK: effective RX quota of 1 */
-				goto done;
 			}
 			break;
 		case PXENV_UNDI_ISR_OUT_DONE:
@@ -494,7 +492,7 @@ static void undinet_poll ( struct net_device *netdev ) {
 			undinic->isr_processing = 0;
 			goto done;
 		default:
-			/* Should never happen */
+			/* Should never happen.  VMWare does it routinely. */
 			DBGC ( undinic, "UNDINIC %p ISR returned invalid "
 			       "FuncFlag %04x\n", undinic, undi_isr.FuncFlag );
 			undinic->isr_processing = 0;
