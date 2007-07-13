@@ -689,7 +689,7 @@ static int tcp_rx_data ( struct tcp_connection *tcp, uint32_t seq,
 	size_t len;
 	int rc;
 
-	/* Ignore duplicate data */
+	/* Ignore duplicate or out-of-order data */
 	already_rcvd = ( tcp->rcv_ack - seq );
 	len = iob_len ( iobuf );
 	if ( already_rcvd >= len ) {
@@ -697,6 +697,7 @@ static int tcp_rx_data ( struct tcp_connection *tcp, uint32_t seq,
 		return 0;
 	}
 	iob_pull ( iobuf, already_rcvd );
+	len -= already_rcvd;
 
 	/* Deliver data to application */
 	if ( ( rc = xfer_deliver_iob ( &tcp->xfer, iobuf ) ) != 0 )
@@ -716,7 +717,7 @@ static int tcp_rx_data ( struct tcp_connection *tcp, uint32_t seq,
  */
 static int tcp_rx_fin ( struct tcp_connection *tcp, uint32_t seq ) {
 
-	/* Ignore duplicate FIN */
+	/* Ignore duplicate or out-of-order FIN */
 	if ( ( tcp->rcv_ack - seq ) > 0 )
 		return 0;
 
