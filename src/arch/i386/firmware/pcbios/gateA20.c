@@ -1,3 +1,4 @@
+#include <stdio.h>
 #include "realmode.h"
 #include "timer.h"
 #include "latch.h"
@@ -41,6 +42,35 @@ static void empty_8042 ( void ) {
 }
 #endif	/* IBM_L40 */
 
+/**
+ * Fast test to see if gate A20 is already set
+ *
+ * @ret set		Gate A20 is set
+ */
+static int gateA20_is_set ( void ) {
+	static uint32_t test_pattern = 0xdeadbeef;
+	physaddr_t test_pattern_phys = virt_to_phys ( &test_pattern );
+	physaddr_t verify_pattern_phys = ( test_pattern_phys ^ 0x100000 );
+	userptr_t verify_pattern_user = phys_to_user ( verify_pattern_phys );
+	uint32_t verify_pattern;
+
+	/* Check for difference */
+	copy_from_user ( &verify_pattern, verify_pattern_user, 0,
+			 sizeof ( verify_pattern ) );
+	if ( verify_pattern != test_pattern )
+		return 1;
+
+	/* Invert pattern and retest, just to be sure */
+	test_pattern ^= 0xffffffff;
+	copy_from_user ( &verify_pattern, verify_pattern_user, 0,
+			 sizeof ( verify_pattern ) );
+	if ( verify_pattern != test_pattern )
+		return 1;
+
+	/* Pattern matched both times; gate A20 is not set */
+	return 0;
+}
+
 /*
  * Gate A20 for high memory
  *
@@ -52,35 +82,41 @@ static void empty_8042 ( void ) {
 void gateA20_set ( void ) {
 	static char reentry_guard = 0;
 	unsigned int discard_a;
-	unsigned int flags;
 
+	/* Avoid potential infinite recursion */
 	if ( reentry_guard )
 		return;
 	reentry_guard = 1;
 
-	__asm__ __volatile__ ( REAL_CODE ( "sti\n\t"
-					   "stc\n\t"
-					   "int $0x15\n\t"
-					   "pushfw\n\t"
-					   "popw %w0\n\t"
-					   "cli\n\t" )
-			       : "=r" ( flags ), "=a" ( discard_a )
+	/* Fast check to see if gate A20 is already enabled */
+	if ( gateA20_is_set() )
+		goto out;
+
+	/* Try INT 15 method first */
+	__asm__ __volatile__ ( REAL_CODE ( "int $0x15" )
+			       : "=a" ( discard_a )
 			       : "a" ( Enable_A20 ) );
-
-
-	if ( flags & CF ) {
-		/* INT 15 method failed, try alternatives */
+	if ( gateA20_is_set() )
+		goto out;
+	
+	/* INT 15 method failed, try alternatives */
 #ifdef	IBM_L40
-		outb(0x2, 0x92);
+	outb(0x2, 0x92);
 #else	/* IBM_L40 */
-		empty_8042();
-		outb(KC_CMD_WOUT, K_CMD);
-		empty_8042();
-		outb(KB_SET_A20, K_RDWR);
-		empty_8042();
+	empty_8042();
+	outb(KC_CMD_WOUT, K_CMD);
+	empty_8042();
+	outb(KB_SET_A20, K_RDWR);
+	empty_8042();
 #endif	/* IBM_L40 */
-	}
+	if ( gateA20_is_set() )
+		goto out;
 
+	/* Better to die now than corrupt memory later */
+	printf ( "FATAL: Gate A20 stuck\n" );
+	while ( 1 ) {}
+
+ out:
 	reentry_guard = 0;
 }
 
