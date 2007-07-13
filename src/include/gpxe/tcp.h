@@ -27,17 +27,58 @@ struct tcp_header {
 	uint16_t urg;		/* Urgent pointer */
 };
 
-/**
- * TCP MSS option
+/** @defgroup tcpopts TCP options
+ * @{
  */
+
+/** End of TCP options list */
+#define TCP_OPTION_END 0
+
+/** TCP option pad */
+#define TCP_OPTION_NOP 1
+
+/** Generic TCP option */
+struct tcp_option {
+	uint8_t kind;
+	uint8_t length;
+} __attribute__ (( packed ));
+
+/** TCP MSS option */
 struct tcp_mss_option {
 	uint8_t kind;
 	uint8_t length;
 	uint16_t mss;
-};
+} __attribute__ (( packed ));
 
 /** Code for the TCP MSS option */
 #define TCP_OPTION_MSS 2
+
+/** TCP timestamp option */
+struct tcp_timestamp_option {
+	uint8_t kind;
+	uint8_t length;
+	uint32_t tsval;
+	uint32_t tsecr;
+} __attribute__ (( packed ));
+
+/** Padded TCP timestamp option (used for sending) */
+struct tcp_timestamp_padded_option {
+	uint8_t nop[2];
+	struct tcp_timestamp_option tsopt;
+} __attribute__ (( packed ));
+
+/** Code for the TCP timestamp option */
+#define TCP_OPTION_TS 8
+
+/** Parsed TCP options */
+struct tcp_options {
+	/** MSS option, if present */
+	const struct tcp_mss_option *mssopt;
+	/** Timestampe option, if present */
+	const struct tcp_timestamp_option *tsopt;
+};
+
+/** @} */
 
 /*
  * TCP flags

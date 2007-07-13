@@ -65,6 +65,13 @@ struct tcp_connection {
 	 * Equivalent to RCV.NXT in RFC 793 terminology.
 	 */
 	uint32_t rcv_ack;
+	/** Most recent received timestamp
+	 *
+	 * Equivalent to TS.Recent in RFC 1323 terminology.
+	 */
+	uint32_t ts_recent;
+	/** Timestamps enabled */
+	int timestamps;
 
 	/** Transmit queue */
 	struct list_head queue;
@@ -381,6 +388,7 @@ static int tcp_xmit ( struct tcp_connection *tcp, int force_send ) {
 	struct io_buffer *iobuf;
 	struct tcp_header *tcphdr;
 	struct tcp_mss_option *mssopt;
+	struct tcp_timestamp_padded_option *tsopt;
 	void *payload;
 	unsigned int flags;
 	size_t len = 0;
@@ -448,6 +456,14 @@ static int tcp_xmit ( struct tcp_connection *tcp, int force_send ) {
 		mssopt->kind = TCP_OPTION_MSS;
 		mssopt->length = sizeof ( *mssopt );
 		mssopt->mss = htons ( TCP_MSS );
+	}
+	if ( ( flags & TCP_SYN ) || tcp->timestamps ) {
+		tsopt = iob_push ( iobuf, sizeof ( *tsopt ) );
+		memset ( tsopt->nop, TCP_OPTION_NOP, sizeof ( tsopt->nop ) );
+		tsopt->tsopt.kind = TCP_OPTION_TS;
+		tsopt->tsopt.length = sizeof ( tsopt->tsopt );
+		tsopt->tsopt.tsval = ntohl ( currticks() );
+		tsopt->tsopt.tsecr = ntohl ( tcp->ts_recent );
 	}
 	tcphdr = iob_push ( iobuf, sizeof ( *tcphdr ) );
 	memset ( tcphdr, 0, sizeof ( *tcphdr ) );
@@ -595,17 +611,62 @@ static struct tcp_connection * tcp_demux ( unsigned int local_port ) {
 }
 
 /**
+ * Parse TCP received options
+ *
+ * @v tcp		TCP connection
+ * @v data		Raw options data
+ * @v len		Raw options length
+ * @v options		Options structure to fill in
+ */
+static void tcp_rx_opts ( struct tcp_connection *tcp, const void *data,
+			  size_t len, struct tcp_options *options ) {
+	const void *end = ( data + len );
+	const struct tcp_option *option;
+	unsigned int kind;
+
+	memset ( options, 0, sizeof ( *options ) );
+	while ( data < end ) {
+		option = data;
+		kind = option->kind;
+		if ( kind == TCP_OPTION_END )
+			return;
+		if ( kind == TCP_OPTION_NOP ) {
+			data++;
+			continue;
+		}
+		switch ( kind ) {
+		case TCP_OPTION_MSS:
+			options->mssopt = data;
+			break;
+		case TCP_OPTION_TS:
+			options->tsopt = data;
+			break;
+		default:
+			DBGC ( tcp, "TCP %p received unknown option %d\n",
+			       tcp, kind );
+			break;
+		}
+		data += option->length;
+	}
+}
+
+/**
  * Handle TCP received SYN
  *
  * @v tcp		TCP connection
  * @v seq		SEQ value (in host-endian order)
+ * @v options		TCP options
  * @ret rc		Return status code
  */
-static int tcp_rx_syn ( struct tcp_connection *tcp, uint32_t seq ) {
+static int tcp_rx_syn ( struct tcp_connection *tcp, uint32_t seq,
+			struct tcp_options *options ) {
 
 	/* Synchronise sequence numbers on first SYN */
-	if ( ! ( tcp->tcp_state & TCP_STATE_RCVD ( TCP_SYN ) ) )
+	if ( ! ( tcp->tcp_state & TCP_STATE_RCVD ( TCP_SYN ) ) ) {
 		tcp->rcv_ack = seq;
+		if ( options->tsopt )
+			tcp->timestamps = 1;
+	}
 
 	/* Ignore duplicate SYN */
 	if ( ( tcp->rcv_ack - seq ) > 0 )
@@ -776,6 +837,7 @@ static int tcp_rx ( struct io_buffer *iobuf,
 		    uint16_t pshdr_csum ) {
 	struct tcp_header *tcphdr = iobuf->data;
 	struct tcp_connection *tcp;
+	struct tcp_options options;
 	unsigned int hlen;
 	uint16_t csum;
 	uint32_t start_seq;
@@ -820,6 +882,8 @@ static int tcp_rx ( struct io_buffer *iobuf,
 	ack = ntohl ( tcphdr->ack );
 	win = ntohs ( tcphdr->win );
 	flags = tcphdr->flags;
+	tcp_rx_opts ( tcp, ( ( ( void * ) tcphdr ) + sizeof ( *tcphdr ) ),
+		      ( hlen - sizeof ( *tcphdr ) ), &options );
 	iob_pull ( iobuf, hlen );
 	len = iob_len ( iobuf );
 
@@ -849,7 +913,7 @@ static int tcp_rx ( struct io_buffer *iobuf,
 
 	/* Handle SYN, if present */
 	if ( flags & TCP_SYN ) {
-		tcp_rx_syn ( tcp, seq );
+		tcp_rx_syn ( tcp, seq, &options );
 		seq++;
 	}
 
@@ -868,6 +932,10 @@ static int tcp_rx ( struct io_buffer *iobuf,
 		tcp_rx_fin ( tcp, seq );
 		seq++;
 	}
+
+	/* Update timestamp, if present and applicable */
+	if ( ( seq == tcp->rcv_ack ) && options.tsopt )
+		tcp->ts_recent = ntohl ( options.tsopt->tsval );
 
 	/* Dump out any state change as a result of the received packet */
 	tcp_dump_state ( tcp );
