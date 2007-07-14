@@ -22,25 +22,27 @@
 					   enable data line
 					   disable clock line */
 
+#define SCP_A		0x92		/* System Control Port A */
+
+#define A20_MAX_RETRIES	32
+
 enum { Disable_A20 = 0x2400, Enable_A20 = 0x2401, Query_A20_Status = 0x2402,
 	Query_A20_Support = 0x2403 };
 
-#define CF ( 1 << 0 )
-
-#ifndef IBM_L40
+/**
+ * Drain keyboard controller
+ */
 static void empty_8042 ( void ) {
 	unsigned long time;
 
 	time = currticks() + TICKS_PER_SEC;	/* max wait of 1 second */
-	while ( ( inb ( K_CMD ) & K_IBUF_FUL ) &&
+	while ( ( inb ( K_CMD ) & ( K_IBUF_FUL | K_OBUF_FUL ) ) &&
 		currticks() < time ) {
-		/* Do nothing.  In particular, do *not* read from
-		 * K_RDWR, because that will drain the keyboard buffer
-		 * and lose keypresses.
-		 */
+		SLOW_DOWN_IO;
+		( void ) inb ( K_RDWR );
+		SLOW_DOWN_IO;
 	}
 }
-#endif	/* IBM_L40 */
 
 /**
  * Fast test to see if gate A20 is already set
@@ -82,6 +84,8 @@ static int gateA20_is_set ( void ) {
 void gateA20_set ( void ) {
 	static char reentry_guard = 0;
 	unsigned int discard_a;
+	unsigned int scp_a;
+	int retries = 0;
 
 	/* Avoid potential infinite recursion */
 	if ( reentry_guard )
@@ -92,31 +96,49 @@ void gateA20_set ( void ) {
 	if ( gateA20_is_set() )
 		goto out;
 
-	/* Try INT 15 method first */
-	__asm__ __volatile__ ( REAL_CODE ( "int $0x15" )
-			       : "=a" ( discard_a )
-			       : "a" ( Enable_A20 ) );
-	if ( gateA20_is_set() )
-		goto out;
-	
-	/* INT 15 method failed, try alternatives */
-#ifdef	IBM_L40
-	outb(0x2, 0x92);
-#else	/* IBM_L40 */
-	empty_8042();
-	outb(KC_CMD_WOUT, K_CMD);
-	empty_8042();
-	outb(KB_SET_A20, K_RDWR);
-	empty_8042();
-#endif	/* IBM_L40 */
-	if ( gateA20_is_set() )
-		goto out;
+	for ( ; retries < A20_MAX_RETRIES ; retries++ ) {
+
+		/* Try INT 15 method first */
+		__asm__ __volatile__ ( REAL_CODE ( "int $0x15" )
+				       : "=a" ( discard_a )
+				       : "a" ( Enable_A20 ) );
+		if ( gateA20_is_set() ) {
+			DBG ( "Enabled gate A20 using BIOS\n" );
+			goto out;
+		}
+
+		/* Try keyboard controller method */
+		empty_8042();
+		outb ( KC_CMD_WOUT, K_CMD );
+		empty_8042();
+		outb ( KB_SET_A20, K_RDWR );
+		empty_8042();
+		if ( gateA20_is_set() ) {
+			DBG ( "Enabled gate A20 using keyboard controller\n" );
+			goto out;
+		}
+
+		/* Try "Fast gate A20" method */
+		scp_a = inb ( SCP_A );
+		scp_a &= ~0x01; /* Avoid triggering a reset */
+		scp_a |= 0x02; /* Enable A20 */
+		SLOW_DOWN_IO;
+		outb ( scp_a, SCP_A );
+		SLOW_DOWN_IO;
+		if ( gateA20_is_set() ) {
+			DBG ( "Enabled gate A20 using Fast Gate A20\n" );
+			goto out;
+		}
+	}
 
 	/* Better to die now than corrupt memory later */
 	printf ( "FATAL: Gate A20 stuck\n" );
 	while ( 1 ) {}
 
  out:
+	if ( retries )
+		DBG ( "%d attempts were required to enable A20\n",
+		      ( retries + 1 ) );
 	reentry_guard = 0;
 }
 

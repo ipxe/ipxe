@@ -62,15 +62,6 @@
 #			Some systems do not have timer2 implemented.
 #			If you have a RTC this will allow you to roughly calibrate
 #			it using outb instructions.
-#	-DIBM_L40
-#			This option uses the 0x92 method of controlling
-#			A20 instead of the traditional method of using the
-#			keyboard controller. An explanation of A20 is here:
-#			http://www.win.tue.nl/~aeb/linux/kbd/A20.html
-#			This occurs on MCA, EISA and some embedded boards,
-#			and sometimes with the Fast Gate A20 option on some
-#			BIOSes.
-#			Enable this only if you are sure of what you are doing.
 #
 #	Extended cpu options
 
