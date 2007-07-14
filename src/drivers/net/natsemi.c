@@ -286,7 +286,7 @@ static void natsemi_reset (struct net_device *netdev)
 		udelay(5);
         }
         if (i == NATSEMI_HW_TIMEOUT) {
-	  	printf ("natsemi_reset: reset did not complete in %d usec.\n", i*5);
+	  	DBG ("natsemi_reset: reset did not complete in %d usec.\n", i*5);
         }
 
         /* restore CFG */
