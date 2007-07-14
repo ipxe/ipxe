@@ -189,6 +189,14 @@ int strncmp(const char * cs,const char * ct,size_t count)
 }
 #endif
 
+#ifndef __HAVE_ARCH_STRCASECMP
+int strcasecmp(const char *a, const char *b)
+{
+	while (*a && *b && (*a & ~0x20) == (*b & ~0x20)) {a++; b++; }
+	return((*a & ~0x20) - (*b & ~0x20));
+}
+#endif
+
 #ifndef __HAVE_ARCH_STRCHR
 /**
  * strchr - Find the first occurrence of a character in a string

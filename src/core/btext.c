@@ -9,7 +9,6 @@
  *   move to Etherboot by LYH
  */
 
-#include "etherboot.h"
 #include "console.h"
 #include <gpxe/init.h>
 #include <gpxe/pci.h>

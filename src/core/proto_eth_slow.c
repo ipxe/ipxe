@@ -1,7 +1,6 @@
 /* Copyright 2004 Linux Networx */
 #ifdef PROTO_LACP
 #if 0
-#include "etherboot.h"
 #include "nic.h"
 #include "timer.h"
 #endif

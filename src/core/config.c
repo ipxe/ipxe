@@ -5,10 +5,6 @@
  * your option) any later version.
  */
 
-#include "etherboot.h"
-#include "dev.h"
-#include "console.h"
-
 #include "config/general.h"
 
 /*

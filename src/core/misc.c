@@ -2,59 +2,10 @@
 MISC Support Routines
 **************************************************************************/
 
-#include <etherboot.h>
-#include <console.h>
 #include <stdlib.h>
-#include <stdio.h>
-
-/**************************************************************************
-IPCHKSUM - Checksum IP Header
-**************************************************************************/
-uint16_t ipchksum(const void *data, unsigned long length)
-{
-	unsigned long sum;
-	unsigned long i;
-	const uint8_t *ptr;
-
-	/* In the most straight forward way possible,
-	 * compute an ip style checksum.
-	 */
-	sum = 0;
-	ptr = data;
-	for(i = 0; i < length; i++) {
-		unsigned long value;
-		value = ptr[i];
-		if (i & 1) {
-			value <<= 8;
-		}
-		/* Add the new value */
-		sum += value;
-		/* Wrap around the carry */
-		if (sum > 0xFFFF) {
-			sum = (sum + (sum >> 16)) & 0xFFFF;
-		}
-	}
-	return (~cpu_to_le16(sum)) & 0xFFFF;
-}
-
-uint16_t add_ipchksums(unsigned long offset, uint16_t sum, uint16_t new)
-{
-	unsigned long checksum;
-	sum = ~sum & 0xFFFF;
-	new = ~new & 0xFFFF;
-	if (offset & 1) {
-		/* byte swap the sum if it came from an odd offset 
-		 * since the computation is endian independant this
-		 * works.
-		 */
-		new = bswap_16(new);
-	}
-	checksum = sum + new;
-	if (checksum > 0xFFFF) {
-		checksum -= 0xFFFF;
-	}
-	return (~checksum) & 0xFFFF;
-}
+#include <byteswap.h>
+#include <latch.h>
+#include <gpxe/in.h>
 
 /**************************************************************************
 SLEEP
@@ -66,24 +17,6 @@ unsigned int sleep(unsigned int secs)
 	for (tmo = currticks()+secs*TICKS_PER_SEC; currticks() < tmo; ) {
 	}
 	return 0;
-}
-
-/**************************************************************************
-INTERRUPTIBLE SLEEP
-**************************************************************************/
-void interruptible_sleep(int secs)
-{
-	printf("<sleep>\n");
-	sleep(secs);
-}
-
-/**************************************************************************
-STRCASECMP (not entirely correct, but this will do for our purposes)
-**************************************************************************/
-int strcasecmp(const char *a, const char *b)
-{
-	while (*a && *b && (*a & ~0x20) == (*b & ~0x20)) {a++; b++; }
-	return((*a & ~0x20) - (*b & ~0x20));
 }
 
 /**************************************************************************

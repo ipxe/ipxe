@@ -5,9 +5,8 @@
 
 #include <ip.h>
 #include <igmp.h>
-#include <background.h>
-#include <nic.h>
-#include <etherboot.h>
+
+#if 0
 
 static unsigned long last_igmpv1 = 0;
 static struct igmptable_t igmptable[MAX_IGMP];
@@ -164,3 +163,5 @@ void join_group ( int slot, unsigned long group ) {
 		igmptable[slot].time = currticks();
 	}
 }
+
+#endif

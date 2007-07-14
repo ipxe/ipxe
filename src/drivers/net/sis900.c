@@ -44,7 +44,6 @@
 /* Includes */
 
 #include "etherboot.h"
-#include "dev.h"
 #include <gpxe/pci.h>
 #include "nic.h"
 #include "timer.h"
@@ -250,22 +249,19 @@ static int sis96x_get_mac_addr(struct pci_device * pci_dev __unused, struct nic 
 
 static int sis630e_get_mac_addr(struct pci_device * pci_dev __unused, struct nic *nic)
 {
+#if 0
 	u8 reg;
 	int i;
-#if 0
 	struct bus_loc bus_loc;
-#endif
 	union {
 	    struct bus_dev bus_dev;
 	    struct pci_device isa_bridge;
 	} u;
 
-#if 0
 	/* find PCI to ISA bridge */
 	memset(&bus_loc, 0, sizeof(bus_loc));
 	if ( ! find_by_driver ( &bus_loc, &u.bus_dev, &sis_bridge_driver, 0 ) )
 	    return 0;
-#endif
 
 	pci_read_config_byte(&u.isa_bridge, 0x48, &reg);
 	pci_write_config_byte(&u.isa_bridge, 0x48, reg | 0x40);
@@ -278,6 +274,11 @@ static int sis630e_get_mac_addr(struct pci_device * pci_dev __unused, struct nic
 	pci_write_config_byte(&u.isa_bridge, 0x48, reg & ~0x40);
 
 	return 1;
+#endif
+
+	/* Does not work with current bus/device model */
+	memset ( nic->node_addr, 0, sizeof ( nic->node_addr ) );
+	return 0;
 }
 
 /**

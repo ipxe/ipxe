@@ -1,6 +1,4 @@
-#include "etherboot.h"
-#include "proto.h"
-#include "nic.h"
+#if 0
 
 /*
  * IMPORTANT
@@ -539,3 +537,5 @@ struct protocol slam_protocol __protocol = {
 	.default_port = SLAM_PORT,
 	.load = url_slam,
 };
+
+#endif

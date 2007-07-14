@@ -1,8 +1,7 @@
-#include "etherboot.h"
+#if 0
+
 #include <gpxe/init.h>
-#include "proto.h"
 #include <gpxe/in.h>
-#include "nic.h"
 
 /* NOTE: the NFS code is heavily inspired by the NetBSD netboot code (read:
  * large portions are copied verbatim) as distributed in OSKit 0.97.  A few
@@ -613,3 +612,5 @@ struct protocol nfs_protocol __protocol = {
 	.default_port = SUNRPC_PORT,
 	.load = nfs,
 };
+
+#endif

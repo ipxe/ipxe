@@ -7,7 +7,6 @@
  * your option) any later version.
  */
 
-#include	"etherboot.h"
 #include	"timer.h"
 
 /* Machine Independant timer helper functions */

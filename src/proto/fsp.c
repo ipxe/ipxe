@@ -33,8 +33,6 @@
     \*********************************************************************/
 
 #ifdef DOWNLOAD_PROTO_FSP
-#include "etherboot.h"
-#include "nic.h"
 
 #define FSP_PORT 21
 
