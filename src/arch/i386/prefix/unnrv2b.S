@@ -109,6 +109,7 @@ decompress:
 	cld
 	xor	%xBP, %xBP
 	dec	%xBP		/* last_m_off = -1 */
+	add	$4, %xSI	/* Skip "file length" field */
 	jmp	dcl1_n2b
 	
 decompr_literals_n2b:
