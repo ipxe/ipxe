@@ -128,7 +128,7 @@ loop1_n2b:
 	shl	$8, %xAX	
 	movb	(%xSI), %al	/* m_off = (m_off - 3)*256 + src[ilen++] */
 	inc	%xSI
-	not	%xAX	
+	xor	$-1, %xAX
 	jz	decompr_end_n2b	/* if (m_off == 0xffffffff) goto decomp_end_n2b */
 	mov	%xAX, %xBP	/* last_m_off = m_off ?*/
 decompr_ebpeax_n2b:
