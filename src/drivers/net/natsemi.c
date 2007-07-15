@@ -1,6 +1,8 @@
-/* -*- Mode:C; c-basic-offset:4; -*- */
-
 /* 
+   natsemi.c - gPXE driver for the NatSemi DP8381x series. 
+ 
+   Based on:
+
    natsemi.c: An Etherboot driver for the NatSemi DP8381x series.
 
    Copyright (C) 2001 Entity Cyber, Inc.
@@ -9,7 +11,7 @@
    
       Sicom Systems: http://www.sicompos.com/
    
-   Author: Marty Connor (mdc@etherboot.org)	   
+   Author: Marty Connor <mdc@etherboot.org>
    Adapted from a Linux driver which was written by Donald Becker
    
    This software may be used and distributed according to the terms
@@ -47,735 +49,555 @@
 /* Revision History */
 
 /*
-  13 Dec 2003 timlegge 1.1 Enabled Multicast Support
-  29 May 2001  mdc     1.0
-     Initial Release.  Tested with Netgear FA311 and FA312 boards
-*/
-/* Includes */
+  02 Jul 2007  Udayan Kumar	 1.2 ported the driver from etherboot to gPXE API.
+				     Fully rewritten,adapting the old driver.
+		      	      	     Added a circular buffer for transmit and receive.
+		                     transmit routine will not wait for transmission to finish.
+			             poll routine deals with it.
+  13 Dec 2003  Tim Legge         1.1 Enabled Multicast Support
+  29 May 2001  Marty Connor	 1.0 Initial Release. Tested with Netgear FA311 and FA312 boards
+*/
 
-#include "etherboot.h"
-#include "nic.h"
-#include "pcibios.h"
+#include <stdint.h>
+#include <stdlib.h>
+#include <stdio.h>
+#include <io.h>
+#include <errno.h>
+#include <timer.h>
+#include <byteswap.h>
 #include <gpxe/pci.h>
+#include <gpxe/if_ether.h>
 #include <gpxe/ethernet.h>
-
-/* defines */
-
-#define OWN       0x80000000
-#define DSIZE     0x00000FFF
-#define CRC_SIZE  4
-
-/* Time in ticks before concluding the transmitter is hung. */
-#define TX_TIMEOUT       (4*TICKS_PER_SEC)
-
-#define TX_BUF_SIZE    1536
-#define RX_BUF_SIZE    1536
-
-#define NUM_RX_DESC    4              /* Number of Rx descriptor registers. */
-
-/* helpful macroes if on a big_endian machine for changing byte order.
-   not strictly needed on Intel */
-#define get_unaligned(ptr) (*(ptr))
-#define put_unaligned(val, ptr) ((void)( *(ptr) = (val) ))
-#define get_u16(ptr) (*(u16 *)(ptr))
-#define virt_to_le32desc(addr)  virt_to_bus(addr)
-
-enum pcistuff {
-    PCI_USES_IO     = 0x01,
-    PCI_USES_MEM    = 0x02,
-    PCI_USES_MASTER = 0x04,
-    PCI_ADDR0       = 0x08,
-    PCI_ADDR1       = 0x10,
-};
-
-/* MMIO operations required */
-#define PCI_IOTYPE (PCI_USES_MASTER | PCI_USES_MEM | PCI_ADDR1)
-
-/* Offsets to the device registers.
-   Unlike software-only systems, device drivers interact with complex hardware.
-   It's not useful to define symbolic names for every register bit in the
-   device.
-*/
-enum register_offsets {
-    ChipCmd      = 0x00, 
-    ChipConfig   = 0x04, 
-    EECtrl       = 0x08, 
-    PCIBusCfg    = 0x0C,
-    IntrStatus   = 0x10, 
-    IntrMask     = 0x14, 
-    IntrEnable   = 0x18,
-    TxRingPtr    = 0x20, 
-    TxConfig     = 0x24,
-    RxRingPtr    = 0x30,
-    RxConfig     = 0x34, 
-    ClkRun       = 0x3C,
-    WOLCmd       = 0x40, 
-    PauseCmd     = 0x44,
-    RxFilterAddr = 0x48, 
-    RxFilterData = 0x4C,
-    BootRomAddr  = 0x50, 
-    BootRomData  = 0x54, 
-    SiliconRev   = 0x58, 
-    StatsCtrl    = 0x5C,
-    StatsData    = 0x60, 
-    RxPktErrs    = 0x60, 
-    RxMissed     = 0x68, 
-    RxCRCErrs    = 0x64,
-    PCIPM        = 0x44,
-    PhyStatus    = 0xC0, 
-    MIntrCtrl    = 0xC4, 
-    MIntrStatus  = 0xC8,
-
-    /* These are from the spec, around page 78... on a separate table. */
-    PGSEL        = 0xCC, 
-    PMDCSR       = 0xE4, 
-    TSTDAT       = 0xFC, 
-    DSPCFG       = 0xF4, 
-    SDCFG        = 0x8C
-};
-
-/* Bit in ChipCmd. */
-enum ChipCmdBits {
-    ChipReset = 0x100, 
-    RxReset   = 0x20, 
-    TxReset   = 0x10, 
-    RxOff     = 0x08, 
-    RxOn      = 0x04,
-    TxOff     = 0x02, 
-    TxOn      = 0x01
-};
-
-/* Bits in the RxMode register. */
-enum rx_mode_bits {
-    AcceptErr          = 0x20,
-    AcceptRunt         = 0x10,
-    AcceptBroadcast    = 0xC0000000,
-    AcceptMulticast    = 0x00200000, 
-    AcceptAllMulticast = 0x20000000,
-    AcceptAllPhys      = 0x10000000, 
-    AcceptMyPhys       = 0x08000000,
-    RxFilterEnable     = 0x80000000
-};
-
-typedef struct _BufferDesc {
-    u32              link;
-    volatile u32     cmdsts;
-    u32              bufptr;
-    u32				 software_use;
-} BufferDesc;
-
-/* Bits in network_desc.status */
-enum desc_status_bits {
-    DescOwn   = 0x80000000, 
-    DescMore  = 0x40000000, 
-    DescIntr  = 0x20000000,
-    DescNoCRC = 0x10000000,
-    DescPktOK = 0x08000000, 
-    RxTooLong = 0x00400000
-};
-
-/* Globals */
-
-static struct nic_operations natsemi_operations;
-
-static int natsemi_debug = 1;			/* 1 normal messages, 0 quiet .. 7 verbose. */
-
-const char *nic_name;
-
-static u32 SavedClkRun;
-
-
-static unsigned short vendor, dev_id;
-static unsigned long ioaddr;
-
-static unsigned int cur_rx;
-
-static unsigned int advertising;
-
-static unsigned int rx_config;
-static unsigned int tx_config;
-
-/* Note: transmit and receive buffers and descriptors must be 
-   longword aligned 
-*/
-
-struct {
-    BufferDesc txd              __attribute__ ((aligned(4)));
-    BufferDesc rxd[NUM_RX_DESC] __attribute__ ((aligned(4)));
-    unsigned char txb[TX_BUF_SIZE] __attribute__ ((aligned(4)));
-    unsigned char rxb[NUM_RX_DESC * RX_BUF_SIZE] __attribute__ ((aligned(4)));
-} natsemi_bufs __shared;
-#define txd natsemi_bufs.txd
-#define rxd natsemi_bufs.rxd
-#define txb natsemi_bufs.txb
-#define rxb natsemi_bufs.rxb
-
-/* Function Prototypes */
-
-static int natsemi_probe(struct nic *nic,struct pci_device *pci);
-static int eeprom_read(long addr, int location);
-static int mdio_read(int phy_id, int location);
-static void natsemi_init(struct nic *nic);
-static void natsemi_reset(struct nic *nic);
-static void natsemi_init_rxfilter(struct nic *nic);
-static void natsemi_init_txd(struct nic *nic);
-static void natsemi_init_rxd(struct nic *nic);
-static void natsemi_set_rx_mode(struct nic *nic);
-static void natsemi_check_duplex(struct nic *nic);
-static void natsemi_transmit(struct nic *nic, const char *d, unsigned int t, unsigned int s, const char *p);
-static int  natsemi_poll(struct nic *nic, int retrieve);
-static void natsemi_disable(struct nic *nic);
-static void natsemi_irq(struct nic *nic, irq_action_t action);
-
-/* 
- * Function: natsemi_probe
- *
- * Description: Retrieves the MAC address of the card, and sets up some
- * globals required by other routines,  and initializes the NIC, making it
- * ready to send and receive packets.
- *
- * Side effects:
- *            leaves the ioaddress of the natsemi chip in the variable ioaddr.
- *            leaves the natsemi initialized, and ready to recieve packets.
- *
- * Returns:   struct nic *:          pointer to NIC data structure
- */
-
-static int
-natsemi_probe ( struct nic *nic, struct pci_device *pci ) {
-
-    int i;
-    int prev_eedata;
-    uint32_t tmp;
-
-    if (pci->ioaddr == 0)
-        return 0;
-
-    adjust_pci_device(pci);
-
-    /* initialize some commonly used globals */
-	
-    nic->irqno  = 0;
-    pci_fill_nic ( nic, pci );
-    nic->ioaddr = pci->ioaddr;
-
-    ioaddr     = pci->ioaddr;
-    vendor     = pci->vendor;
-    dev_id     = pci->device;
-    nic_name   = pci->driver_name;
-
-    /* natsemi has a non-standard PM control register
-     * in PCI config space.  Some boards apparently need
-     * to be brought to D0 in this manner.
-     */
-    pci_read_config_dword ( pci, PCIPM, &tmp );
-    if (tmp & (0x03|0x100)) {
-	/* D0 state, disable PME assertion */
-	u32 newtmp = tmp & ~(0x03|0x100);
-	pci_write_config_dword(pci, PCIPM, newtmp);
-    }
-
-    /* get MAC address */
-
-    prev_eedata = eeprom_read(ioaddr, 6);
-    for (i = 0; i < 3; i++) {
-	int eedata = eeprom_read(ioaddr, i + 7);
-	nic->node_addr[i*2] = (eedata << 1) + (prev_eedata >> 15);
-	nic->node_addr[i*2+1] = eedata >> 7;
-	prev_eedata = eedata;
-    }
-
-    DBG ( "\nnatsemi_probe: MAC addr %s at ioaddr %4.4lx\n",
-	  eth_ntoa ( nic->node_addr ), ioaddr);
-    DBG ( "natsemi_probe: Vendor:%#hX Device:%#hX\n", vendor, dev_id );
-    
-    /* Reset the chip to erase any previous misconfiguration. */
-    outl(ChipReset, ioaddr + ChipCmd);
-
-    advertising = mdio_read(1, 4);
-    {
-	u32 chip_config = inl(ioaddr + ChipConfig);
-	printf("%s: Transceiver default autoneg. %s "
-	       "10%s %s duplex.\n",
-	       nic_name,
-	       chip_config & 0x2000 ? "enabled, advertise" : "disabled, force",
-	       chip_config & 0x4000 ? "0" : "",
-	       chip_config & 0x8000 ? "full" : "half");
-    }
-    printf("%s: Transceiver status %hX advertising %hX\n",
-	   nic_name, (int)inl(ioaddr + 0x84), advertising);
-
-    /* Disable PME:
-     * The PME bit is initialized from the EEPROM contents.
-     * PCI cards probably have PME disabled, but motherboard
-     * implementations may have PME set to enable WakeOnLan. 
-     * With PME set the chip will scan incoming packets but
-     * nothing will be written to memory. */
-    SavedClkRun = inl(ioaddr + ClkRun);
-    outl(SavedClkRun & ~0x100, ioaddr + ClkRun);
-
-    /* initialize device */
-    natsemi_init(nic);
-    nic->nic_op	= &natsemi_operations;
-
-    return 1;
-}
-
-/* Read the EEPROM and MII Management Data I/O (MDIO) interfaces.
-   The EEPROM code is for the common 93c06/46 EEPROMs with 6 bit addresses. 
-*/
-
-/* Delay between EEPROM clock transitions.
-   No extra delay is needed with 33Mhz PCI, but future 66Mhz access may need
-   a delay. */
-#define eeprom_delay(ee_addr)	inl(ee_addr)
-
-enum EEPROM_Ctrl_Bits {
-    EE_ShiftClk   = 0x04, 
-    EE_DataIn     = 0x01, 
-    EE_ChipSelect = 0x08, 
-    EE_DataOut    = 0x02
-};
-
-#define EE_Write0 (EE_ChipSelect)
-#define EE_Write1 (EE_ChipSelect | EE_DataIn)
-
-/* The EEPROM commands include the alway-set leading bit. */
-enum EEPROM_Cmds {
-    EE_WriteCmd=(5 << 6), EE_ReadCmd=(6 << 6), EE_EraseCmd=(7 << 6),
-};
-
-static int eeprom_read(long addr, int location)
-{
-    int i;
-    int retval = 0;
-    int ee_addr = addr + EECtrl;
-    int read_cmd = location | EE_ReadCmd;
-    outl(EE_Write0, ee_addr);
-
-    /* Shift the read command bits out. */
-    for (i = 10; i >= 0; i--) {
-	short dataval = (read_cmd & (1 << i)) ? EE_Write1 : EE_Write0;
-	outl(dataval, ee_addr);
-	eeprom_delay(ee_addr);
-	outl(dataval | EE_ShiftClk, ee_addr);
-	eeprom_delay(ee_addr);
-    }
-    outl(EE_ChipSelect, ee_addr);
-    eeprom_delay(ee_addr);
-
-    for (i = 0; i < 16; i++) {
-	outl(EE_ChipSelect | EE_ShiftClk, ee_addr);
-	eeprom_delay(ee_addr);
-	retval |= (inl(ee_addr) & EE_DataOut) ? 1 << i : 0;
-	outl(EE_ChipSelect, ee_addr);
-	eeprom_delay(ee_addr);
-    }
-
-    /* Terminate the EEPROM access. */
-    outl(EE_Write0, ee_addr);
-    outl(0, ee_addr);
-
-    return retval;
-}
-
-/*  MII transceiver control section.
-	The 83815 series has an internal transceiver, and we present the
-	management registers as if they were MII connected. */
-
-static int mdio_read(int phy_id, int location)
-{
-    if (phy_id == 1 && location < 32)
-	return inl(ioaddr + 0x80 + (location<<2)) & 0xffff;
-    else
-	return 0xffff;
-}
-
-/* Function: natsemi_init
- *
- * Description: resets the ethernet controller chip and configures
- *    registers and data structures required for sending and receiving packets.
- *    
- * Arguments: struct nic *nic:          NIC data structure
- *
- * returns:   void.
- */
-
-static void
-natsemi_init(struct nic *nic)
-{
-    natsemi_reset(nic);
-		
-    /* Disable PME:
-     * The PME bit is initialized from the EEPROM contents.
-     * PCI cards probably have PME disabled, but motherboard
-     * implementations may have PME set to enable WakeOnLan. 
-     * With PME set the chip will scan incoming packets but
-     * nothing will be written to memory. */
-    outl(SavedClkRun & ~0x100, ioaddr + ClkRun);
-
-    natsemi_init_rxfilter(nic);
-
-    natsemi_init_txd(nic);
-    natsemi_init_rxd(nic);
-
-    /* Initialize other registers. */
-    /* Configure the PCI bus bursts and FIFO thresholds. */
-    /* Configure for standard, in-spec Ethernet. */
-    if (inl(ioaddr + ChipConfig) & 0x20000000) {	/* Full duplex */
-	tx_config = 0xD0801002;
-	rx_config = 0x10000020;
-    } else {
-	tx_config = 0x10801002;
-	rx_config = 0x0020;
-    }
-    outl(tx_config, ioaddr + TxConfig);
-    outl(rx_config, ioaddr + RxConfig);
-
-    natsemi_check_duplex(nic);
-    natsemi_set_rx_mode(nic);
-
-    outl(RxOn, ioaddr + ChipCmd);
-}
-
-/* 
- * Function: natsemi_reset
- *
- * Description: soft resets the controller chip
- *
- * Arguments: struct nic *nic:          NIC data structure
- *
- * Returns:   void.
- */
-static void 
-natsemi_reset(struct nic *nic __unused)
-{
-    outl(ChipReset, ioaddr + ChipCmd);
-	
-    /* On page 78 of the spec, they recommend some settings for "optimum
-       performance" to be done in sequence.  These settings optimize some
-       of the 100Mbit autodetection circuitry.  Also, we only want to do
-       this for rev C of the chip.
-    */
-    if (inl(ioaddr + SiliconRev) == 0x302) {
-	outw(0x0001, ioaddr + PGSEL);
-	outw(0x189C, ioaddr + PMDCSR);
-	outw(0x0000, ioaddr + TSTDAT);
-	outw(0x5040, ioaddr + DSPCFG);
-	outw(0x008C, ioaddr + SDCFG);
-    }
-    /* Disable interrupts using the mask. */
-    outl(0, ioaddr + IntrMask);
-    outl(0, ioaddr + IntrEnable);
-}
-
-/* Function: natsemi_init_rxfilter
- *
- * Description: sets receive filter address to our MAC address
- *
- * Arguments: struct nic *nic:          NIC data structure
- *
- * returns:   void.
- */
-
-static void
-natsemi_init_rxfilter(struct nic *nic)
-{
-    int i;
-
-    for (i = 0; i < ETH_ALEN; i += 2) {
-	outl(i, ioaddr + RxFilterAddr);
-	outw(nic->node_addr[i] + (nic->node_addr[i+1] << 8), ioaddr + RxFilterData);
-    }
-}
-
-/* 
- * Function: natsemi_init_txd
- *
- * Description: initializes the Tx descriptor
- *
- * Arguments: struct nic *nic:          NIC data structure
- *
- * returns:   void.
- */
-
-static void
-natsemi_init_txd(struct nic *nic __unused)
-{
-    txd.link   = (u32) 0;
-    txd.cmdsts = (u32) 0;
-    txd.bufptr = virt_to_bus(&txb[0]);
-
-    /* load Transmit Descriptor Register */
-    outl(virt_to_bus(&txd), ioaddr + TxRingPtr); 
-    if (natsemi_debug > 1)
-        printf("natsemi_init_txd: TX descriptor register loaded with: %lx\n", 
-               inl(ioaddr + TxRingPtr));
-}
-
-/* Function: natsemi_init_rxd
- *
- * Description: initializes the Rx descriptor ring
- *    
- * Arguments: struct nic *nic:          NIC data structure
- *
- * Returns:   void.
- */
+#include <gpxe/iobuf.h>
+#include <gpxe/netdevice.h>
+#include <gpxe/spi_bit.h>
+#include <gpxe/threewire.h>
+#include <gpxe/nvo.h>
+#include "natsemi.h"
+
+/*  Function Prototypes: */
  
-static void 
-natsemi_init_rxd(struct nic *nic __unused) 
-{ 
-    int i;
+static int natsemi_spi_read_bit ( struct bit_basher *, unsigned int );
+static void natsemi_spi_write_bit ( struct bit_basher *,unsigned int, unsigned long ); 
+static void natsemi_init_eeprom ( struct natsemi_private * ); 
+static int natsemi_probe (struct pci_device *pci, const struct pci_device_id *id);
+static void natsemi_reset (struct net_device *netdev);
+static int natsemi_open (struct net_device *netdev);
+static int natsemi_transmit (struct net_device *netdev, struct io_buffer *iobuf);
+static void natsemi_poll (struct net_device *netdev);
+static void natsemi_close (struct net_device *netdev);
+static void natsemi_irq (struct net_device *netdev, int enable);
+static void natsemi_remove (struct pci_device *pci);
 
-    cur_rx = 0; 
-
-    /* init RX descriptor */
-    for (i = 0; i < NUM_RX_DESC; i++) {
-        rxd[i].link   = virt_to_bus((i+1 < NUM_RX_DESC) ? &rxd[i+1] : &rxd[0]);
-        rxd[i].cmdsts = (u32) RX_BUF_SIZE;
-        rxd[i].bufptr = virt_to_bus(&rxb[i*RX_BUF_SIZE]);
-        if (natsemi_debug > 1)
-            printf("natsemi_init_rxd: rxd[%d]=%p link=%X cmdsts=%X bufptr=%4.4x\n", 
-                   i, &rxd[i], (unsigned int) rxd[i].link, (unsigned int) rxd[i].cmdsts, 
-		   (unsigned int) rxd[i].bufptr);
-    }
-
-    /* load Receive Descriptor Register */
-    outl(virt_to_bus(&rxd[0]), ioaddr + RxRingPtr);
-
-    if (natsemi_debug > 1)
-        printf("natsemi_init_rxd: RX descriptor register loaded with: %lx\n", 
-               inl(ioaddr + RxRingPtr));
-}
-
-/* Function: natsemi_set_rx_mode
- *
- * Description: 
- *    sets the receive mode to accept all broadcast packets and packets
- *    with our MAC address, and reject all multicast packets.      
- *    
- * Arguments: struct nic *nic:          NIC data structure
- *
- * Returns:   void.
- */
-
-static void natsemi_set_rx_mode(struct nic *nic __unused)
-{
-    u32 rx_mode = RxFilterEnable | AcceptBroadcast |
-	    AcceptAllMulticast | AcceptMyPhys;
-	
-    outl(rx_mode, ioaddr + RxFilterAddr);
-}
-
-static void natsemi_check_duplex(struct nic *nic __unused)
-{
-    int duplex = inl(ioaddr + ChipConfig) & 0x20000000 ? 1 : 0;
-	
-    if (natsemi_debug)
-	printf("%s: Setting %s-duplex based on negotiated link"
-	       " capability.\n", nic_name,
-	       duplex ? "full" : "half");
-    if (duplex) {
-	rx_config |= 0x10000000;
-	tx_config |= 0xC0000000;
-    } else {
-	rx_config &= ~0x10000000;
-	tx_config &= ~0xC0000000;
-    }
-    outl(tx_config, ioaddr + TxConfig);
-    outl(rx_config, ioaddr + RxConfig);
-}
-
-/* Function: natsemi_transmit
- *
- * Description: transmits a packet and waits for completion or timeout.
- *
- * Arguments: char d[6]:          destination ethernet address.
- *            unsigned short t:   ethernet protocol type.
- *            unsigned short s:   size of the data-part of the packet.
- *            char *p:            the data for the packet.
- *    
- * Returns:   void.
- */
-
-static void
-natsemi_transmit(struct nic  *nic,
-		 const char  *d,     /* Destination */
-		 unsigned int t,     /* Type */
-		 unsigned int s,     /* size */
-		 const char  *p)     /* Packet */
-{
-    u32 to, nstype;
-    volatile u32 tx_status;
-    
-    /* Stop the transmitter */
-    outl(TxOff, ioaddr + ChipCmd);
-
-    /* load Transmit Descriptor Register */
-    outl(virt_to_bus(&txd), ioaddr + TxRingPtr);
-    if (natsemi_debug > 1)
-        printf("natsemi_transmit: TX descriptor register loaded with: %lx\n", 
-               inl(ioaddr + TxRingPtr));
-
-    memcpy(txb, d, ETH_ALEN);
-    memcpy(txb + ETH_ALEN, nic->node_addr, ETH_ALEN);
-    nstype = htons(t);
-    memcpy(txb + 2 * ETH_ALEN, (char*)&nstype, 2);
-    memcpy(txb + ETH_HLEN, p, s);
-
-    s += ETH_HLEN;
-    s &= DSIZE;
-
-    if (natsemi_debug > 1)
-        printf("natsemi_transmit: sending %d bytes ethtype %hX\n", (int) s, t);
-
-    /* pad to minimum packet size */
-    while (s < ETH_ZLEN)  
-        txb[s++] = '\0';
-
-    /* set the transmit buffer descriptor and enable Transmit State Machine */
-    txd.bufptr = virt_to_bus(&txb[0]);
-    txd.cmdsts = (u32) OWN | s;
-
-    /* restart the transmitter */
-    outl(TxOn, ioaddr + ChipCmd);
-
-    if (natsemi_debug > 1)
-        printf("natsemi_transmit: Queued Tx packet size %d.\n", (int) s);
-
-    to = currticks() + TX_TIMEOUT;
-
-    while (((tx_status=txd.cmdsts) & OWN) && (currticks() < to))
-        /* wait */ ;
-
-    if (currticks() >= to) {
-        printf("natsemi_transmit: TX Timeout! Tx status %X.\n", (unsigned int) tx_status);
-    }
-
-    if (!(tx_status & 0x08000000)) {
-	printf("natsemi_transmit: Transmit error, Tx status %X.\n", (unsigned int) tx_status);
-    }
-}
-
-/* Function: natsemi_poll
- *
- * Description: checks for a received packet and returns it if found.
- *
- * Arguments: struct nic *nic:          NIC data structure
- *
- * Returns:   1 if    packet was received.
- *            0 if no packet was received.
- *
- * Side effects:
- *            Returns (copies) the packet to the array nic->packet.
- *            Returns the length of the packet in nic->packetlen.
- */
-
-static int
-natsemi_poll(struct nic *nic, int retrieve)
-{
-    u32 rx_status = rxd[cur_rx].cmdsts;
-    int retstat = 0;
-
-    if (natsemi_debug > 2)
-        printf("natsemi_poll: cur_rx:%d, status:%X\n", cur_rx, (unsigned int) rx_status);
-
-    if (!(rx_status & OWN))
-        return retstat;
-
-    if ( ! retrieve ) return 1;
-
-    if (natsemi_debug > 1)
-        printf("natsemi_poll: got a packet: cur_rx:%d, status:%X\n",
-               cur_rx, (unsigned int) rx_status);
-
-    nic->packetlen = (rx_status & DSIZE) - CRC_SIZE;
-
-    if ((rx_status & (DescMore|DescPktOK|RxTooLong)) != DescPktOK) {
-        /* corrupted packet received */
-        printf("natsemi_poll: Corrupted packet received, buffer status = %X\n",
-               (unsigned int) rx_status);
-        retstat = 0;
-    } else {
-        /* give packet to higher level routine */
-        memcpy(nic->packet, (rxb + cur_rx*RX_BUF_SIZE), nic->packetlen);
-        retstat = 1;
-    }
-
-    /* return the descriptor and buffer to receive ring */
-    rxd[cur_rx].cmdsts = RX_BUF_SIZE;
-    rxd[cur_rx].bufptr = virt_to_bus(&rxb[cur_rx*RX_BUF_SIZE]);
-        
-    if (++cur_rx == NUM_RX_DESC)
-        cur_rx = 0;
-
-    /* re-enable the potentially idle receive state machine */
-    outl(RxOn, ioaddr + ChipCmd);
-
-    return retstat;
-}
-
-/* Function: natsemi_disable
- *
- * Description: Turns off interrupts and stops Tx and Rx engines
- *    
- * Arguments: struct nic *nic:          NIC data structure
- *
- * Returns:   void.
- */
-
-static void
-natsemi_disable ( struct nic *nic ) {
-
-    natsemi_init(nic);
-
-    /* Disable interrupts using the mask. */
-    outl(0, ioaddr + IntrMask);
-    outl(0, ioaddr + IntrEnable);
-
-    /* Stop the chip's Tx and Rx processes. */
-    outl(RxOff | TxOff, ioaddr + ChipCmd);
-	
-    /* Restore PME enable bit */
-    outl(SavedClkRun, ioaddr + ClkRun);
-}
-
-/* Function: natsemi_irq
- *
- * Description: Enable, Disable, or Force interrupts
- *    
- * Arguments: struct nic *nic:          NIC data structure
- *            irq_action_t action:      requested action to perform
- *
- * Returns:   void.
- */
-
-static void 
-natsemi_irq(struct nic *nic __unused, irq_action_t action __unused)
-{
-  switch ( action ) {
-  case DISABLE :
-    break;
-  case ENABLE :
-    break;
-  case FORCE :
-    break;
-  }
-}
-
-static struct nic_operations natsemi_operations = {
-	.connect	= dummy_connect,
-	.poll		= natsemi_poll,
-	.transmit	= natsemi_transmit,
+/** natsemi net device operations */
+static struct net_device_operations natsemi_operations = {
+        .open           = natsemi_open,
+        .close          = natsemi_close,
+        .transmit       = natsemi_transmit,
+        .poll           = natsemi_poll,
 	.irq		= natsemi_irq,
-
 };
+
+static int natsemi_spi_read_bit ( struct bit_basher *basher,
+			      unsigned int bit_id ) {
+	struct natsemi_private *np = container_of ( basher, struct natsemi_private,
+						 spibit.basher );
+	uint8_t mask = natsemi_ee_bits[bit_id];
+	uint8_t eereg;
+
+	eereg = inb ( np->ioaddr + EE_REG );
+	return ( eereg & mask );
+}
+
+static void natsemi_spi_write_bit ( struct bit_basher *basher,
+				unsigned int bit_id, unsigned long data ) {
+	struct natsemi_private *np = container_of ( basher, struct natsemi_private,
+						 spibit.basher );
+	uint8_t mask = natsemi_ee_bits[bit_id];
+	uint8_t eereg;
+
+	eereg = inb ( np->ioaddr + EE_REG );
+	eereg &= ~mask;
+	eereg |= ( data & mask );
+	outb ( eereg, np->ioaddr + EE_REG );
+}
+
+static struct bit_basher_operations natsemi_basher_ops = {
+	.read = natsemi_spi_read_bit,
+	.write = natsemi_spi_write_bit,
+};
+
+/* It looks that this portion of EEPROM can be used for 
+ * non-volatile stored options. Data sheet does not talk about this region.
+ * Currently it is not working. But with some efforts it can.
+ */
+static struct nvo_fragment natsemi_nvo_fragments[] = {
+	{ 0x0c, 0x68 },
+	{ 0, 0 }
+};
+
+/*
+ * Set up for EEPROM access
+ *
+ * @v NAT		NATSEMI NIC
+ */
+static void natsemi_init_eeprom ( struct natsemi_private *np ) {
+
+	/* Initialise three-wire bus 
+	 */
+	np->spibit.basher.op = &natsemi_basher_ops;
+	np->spibit.bus.mode = SPI_MODE_THREEWIRE;
+	np->spibit.endianness = SPI_BIT_LITTLE_ENDIAN;
+	init_spi_bit_basher ( &np->spibit );
+
+	/*natsemi DP 83815 only supports at93c46
+	 */
+	init_at93c46 ( &np->eeprom, 16 );
+	np->eeprom.bus = &np->spibit.bus;
+	np->nvo.nvs = &np->eeprom.nvs;
+	np->nvo.fragments = natsemi_nvo_fragments;
+}
+
+/**
+ * Probe PCI device
+ *
+ * @v pci	PCI device
+ * @v id	PCI ID
+ * @ret rc	Return status code
+ */
+static int natsemi_probe (struct pci_device *pci,
+		       const struct pci_device_id *id __unused) {
+	struct net_device *netdev;
+	struct natsemi_private *np = NULL;
+	uint8_t ll_addr_encoded[MAX_LL_ADDR_LEN];
+	uint8_t last=0,last1=0;
+	uint8_t prev_bytes[2];
+	int i;
+	int rc;
+
+	/* Allocate net device 
+	 */
+	netdev = alloc_etherdev (sizeof (*np));
+	if (! netdev) 
+		return -ENOMEM;
+
+	netdev_init (netdev, &natsemi_operations);
+	np = netdev->priv;
+	pci_set_drvdata (pci, netdev);
+	netdev->dev = &pci->dev;
+	memset (np, 0, sizeof (*np));
+	np->ioaddr = pci->ioaddr;
+
+	adjust_pci_device (pci);
+
+	natsemi_reset (netdev);
+	natsemi_init_eeprom ( np );
+	nvs_read ( &np->eeprom.nvs, EE_MAC-1, prev_bytes, 1 );
+	nvs_read ( &np->eeprom.nvs, EE_MAC, ll_addr_encoded, ETH_ALEN );
+
+	/* decoding the MAC address read from NVS 
+	 * and save it in netdev->ll_addr
+         */
+	last = prev_bytes[1] >> 7;
+	for ( i = 0 ; i < ETH_ALEN ; i++ ) {
+		last1 = ll_addr_encoded[i] >> 7;
+	 	netdev->ll_addr[i] = ll_addr_encoded[i] << 1 | last;
+		last = last1;
+	}
+
+	if ((rc = register_netdev (netdev)) != 0)
+		goto err_register_netdev;
+
+	return 0;
+
+err_register_netdev:
+
+	natsemi_reset (netdev);
+	netdev_put (netdev);
+	return rc;
+}
+
+/**
+ * Remove PCI device
+ *
+ * @v pci	PCI device
+ */
+static void natsemi_remove (struct pci_device *pci) {
+	struct net_device *netdev = pci_get_drvdata (pci);
+ 
+	unregister_netdev (netdev);
+	natsemi_reset (netdev);
+	netdev_put (netdev);
+}
+
+/**
+ * Reset NIC
+ *
+ * @v		NATSEMI NIC
+ *
+ * Issues a hardware reset and waits for the reset to complete.
+ */
+static void natsemi_reset (struct net_device *netdev) 
+{
+	struct natsemi_private *np = netdev->priv;
+	int i;
+        u32 cfg;
+        u32 wcsr;
+        u32 rfcr;
+        u16 pmatch[3];
+        u16 sopass[3];
+
+	natsemi_irq (netdev, 0);
+
+        /*
+         * Resetting the chip causes some registers to be lost.
+         * Natsemi suggests NOT reloading the EEPROM while live, so instead
+         * we save the state that would have been loaded from EEPROM
+         * on a normal power-up (see the spec EEPROM map).
+         */
+
+        /* CFG */
+        cfg = inl (np->ioaddr + ChipConfig) & CFG_RESET_SAVE;
+
+        /* WCSR */
+        wcsr = inl (np->ioaddr + WOLCmd) & WCSR_RESET_SAVE;
+
+        /* RFCR */
+        rfcr = readl (np->ioaddr + RxFilterAddr) & RFCR_RESET_SAVE;
+
+        /* PMATCH */
+        for (i = 0; i < 3; i++) {
+		outl(i*2, np->ioaddr + RxFilterAddr);
+		pmatch[i] = inw(np->ioaddr + RxFilterData);
+        }
+
+        /* SOPAS */
+        for (i = 0; i < 3; i++) {
+	  	outl(0xa+(i*2), np->ioaddr + RxFilterAddr);
+		sopass[i] = inw(np->ioaddr + RxFilterData);
+        }
+
+        /* now whack the chip */
+        outl(ChipReset, np->ioaddr + ChipCmd);
+        for (i=0; i<NATSEMI_HW_TIMEOUT; i++) {
+		if (! (inl (np->ioaddr + ChipCmd) & ChipReset))
+		       break;
+		udelay(5);
+        }
+        if (i == NATSEMI_HW_TIMEOUT) {
+	  	DBG ("natsemi_reset: reset did not complete in %d usec.\n", i*5);
+        }
+
+        /* restore CFG */
+        cfg |= inl(np->ioaddr + ChipConfig) & ~CFG_RESET_SAVE;
+	cfg &= ~(CfgExtPhy | CfgPhyDis);
+        outl (cfg, np->ioaddr + ChipConfig);
+
+        /* restore WCSR */
+        wcsr |= inl (np->ioaddr + WOLCmd) & ~WCSR_RESET_SAVE;
+        outl (wcsr, np->ioaddr + WOLCmd);
+
+        /* read RFCR */
+        rfcr |= inl (np->ioaddr + RxFilterAddr) & ~RFCR_RESET_SAVE;
+
+        /* restore PMATCH */
+        for (i = 0; i < 3; i++) {
+	  	outl (i*2, np->ioaddr + RxFilterAddr);
+		outw (pmatch[i], np->ioaddr + RxFilterData);
+        }
+        for (i = 0; i < 3; i++) {
+		outl (0xa+(i*2), np->ioaddr + RxFilterAddr);
+		outw (sopass[i], np->ioaddr + RxFilterData);
+        }
+        /* restore RFCR */
+        outl (rfcr, np->ioaddr + RxFilterAddr);
+}
+
+/**
+ * Open NIC
+ *
+ * @v netdev		Net device
+ * @ret rc		Return status code
+ */
+static int natsemi_open (struct net_device *netdev)
+{
+	struct natsemi_private *np = netdev->priv;
+	uint32_t tx_config, rx_config;
+	int i;
+	
+	/* Disable PME:
+         * The PME bit is initialized from the EEPROM contents.
+         * PCI cards probably have PME disabled, but motherboard
+         * implementations may have PME set to enable WakeOnLan. 
+         * With PME set the chip will scan incoming packets but
+         * nothing will be written to memory. 
+         */
+        SavedClkRun = inl (np->ioaddr + ClkRun);
+        outl (SavedClkRun & ~0x100, np->ioaddr + ClkRun);
+
+	/* Set MAC address in NIC
+	 */
+	for (i = 0 ; i < ETH_ALEN ; i+=2) {
+		outl (i, np->ioaddr + RxFilterAddr);
+		outw (netdev->ll_addr[i] + (netdev->ll_addr[i + 1] << 8),
+		       np->ioaddr + RxFilterData);
+	}
+
+	/* Setup Tx Ring 
+	 */
+	np->tx_cur = 0;
+	np->tx_dirty = 0;
+	for (i = 0 ; i < TX_RING_SIZE ; i++) {
+		np->tx[i].link   = virt_to_bus ((i + 1 < TX_RING_SIZE) ? &np->tx[i + 1] : &np->tx[0]);
+		np->tx[i].cmdsts = 0;
+		np->tx[i].bufptr = 0;
+	}
+	outl (virt_to_bus (&np->tx[0]),np->ioaddr + TxRingPtr);
+
+	DBG ("Natsemi Tx descriptor loaded with: %#08lx\n",
+	     inl (np->ioaddr + TxRingPtr));
+
+	/* Setup RX ring
+	 */
+	np->rx_cur = 0;
+	for (i = 0 ; i < NUM_RX_DESC ; i++) {
+		np->iobuf[i] = alloc_iob (RX_BUF_SIZE);
+		if (! np->iobuf[i])
+			goto memory_alloc_err;
+		np->rx[i].link   = virt_to_bus ((i + 1 < NUM_RX_DESC) 
+						? &np->rx[i + 1] : &np->rx[0]);
+		np->rx[i].cmdsts = RX_BUF_SIZE;
+		np->rx[i].bufptr = virt_to_bus (np->iobuf[i]->data);
+		DBG (" Address of iobuf [%d] = %p and iobuf->data = %p \n", i, 
+		      &np->iobuf[i],  &np->iobuf[i]->data);
+	}
+	outl (virt_to_bus (&np->rx[0]), np->ioaddr + RxRingPtr);
+
+	DBG ("Natsemi Rx descriptor loaded with: %#08lx\n",
+	      inl (np->ioaddr + RxRingPtr));		
+
+	/* Setup RX Filter 
+	 */
+	outl (RxFilterEnable | AcceptBroadcast | AcceptAllMulticast | AcceptMyPhys,
+	      np->ioaddr + RxFilterAddr);
+
+	/* Initialize other registers. 
+	 * Configure the PCI bus bursts and FIFO thresholds. 
+	 * Configure for standard, in-spec Ethernet. 
+	 */
+	if (inl (np->ioaddr + ChipConfig) & 0x20000000) {	/* Full duplex */
+		DBG ("Full duplex\n");
+		tx_config = 0xD0801002 |  0xC0000000;
+		rx_config = 0x10000020 |  0x10000000;
+	} else {
+		DBG ("Half duplex\n");
+		tx_config = 0x10801002 & ~0xC0000000;
+		rx_config = 0x00000020 & ~0x10000000;
+	}
+	outl (tx_config, np->ioaddr + TxConfig);
+	outl (rx_config, np->ioaddr + RxConfig);
+
+	DBG ("Tx config register = %#08lx Rx config register = %#08lx\n", 
+               inl (np->ioaddr + TxConfig),
+	       inl (np->ioaddr + RxConfig));
+
+	/*Set the Interrupt Mask register
+	 */
+	outl((RxOk|RxErr|TxOk|TxErr),np->ioaddr + IntrMask);
+	/*start the receiver 
+	 */
+        outl (RxOn, np->ioaddr + ChipCmd);
+	
+	return 0;
+		       
+memory_alloc_err:
+
+	/* Frees any allocated buffers when memory
+	 * for all buffers requested is not available
+	 */
+	i = 0;
+	while (np->rx[i].cmdsts == RX_BUF_SIZE) {
+		free_iob (np->iobuf[i]);
+		i++;
+	}
+	return -ENOMEM;	
+}
+
+/**
+ * Close NIC
+ *
+ * @v netdev		Net device
+ */
+static void natsemi_close (struct net_device *netdev) 
+{
+	struct natsemi_private *np = netdev->priv;
+	int i;
+
+	natsemi_reset (netdev);
+
+	for (i = 0; i < NUM_RX_DESC ; i++) {
+		free_iob (np->iobuf[i]);
+	}
+}
+
+/** 
+ * Transmit packet
+ *
+ * @v netdev	Network device
+ * @v iobuf	I/O buffer
+ * @ret rc	Return status code
+ */
+static int natsemi_transmit (struct net_device *netdev, struct io_buffer *iobuf)
+{
+	struct natsemi_private *np = netdev->priv;
+
+	if (np->tx[np->tx_cur].cmdsts != 0) {
+		DBG ("TX overflow\n");
+		return -ENOBUFS;
+	}
+
+	/* Used by netdev_tx_complete ()
+	 */
+	np->tx_iobuf[np->tx_cur] = iobuf;
+
+	/* Pad and align packet has not been used because its not required 
+	 * by the hardware.
+	 * 	iob_pad (iobuf, ETH_ZLEN); 
+	 * can be used to achieve it, if required
+	 */
+
+	/* Add the packet to TX ring
+	 */
+	np->tx[np->tx_cur].bufptr = virt_to_bus (iobuf->data);
+	np->tx[np->tx_cur].cmdsts = iob_len (iobuf) | OWN;
+
+	DBG ("TX id %d at %#08lx + %#08x\n", np->tx_cur,
+	     virt_to_bus (&iobuf->data), iob_len (iobuf));
+
+	/* increment the circular buffer pointer to the next buffer location
+	 */
+	np->tx_cur = (np->tx_cur + 1) % TX_RING_SIZE;
+
+	/*start the transmitter 
+	 */
+        outl (TxOn, np->ioaddr + ChipCmd);
+
+	return 0;
+}
+
+/** 
+ * Poll for received packets
+ *
+ * @v netdev	Network device
+ */
+static void natsemi_poll (struct net_device *netdev)
+{
+	struct natsemi_private *np = netdev->priv;
+	unsigned int tx_status;
+	unsigned int rx_status;
+	unsigned int intr_status;
+	unsigned int rx_len;
+	struct io_buffer *rx_iob;
+	int i;
+	
+	/* read the interrupt register
+	 */
+	intr_status = inl (np->ioaddr + IntrStatus);
+
+	if (!intr_status)
+		goto end;
+
+        DBG ("natsemi_poll: intr_status = %#08x\n", intr_status);
+
+	/* Check status of transmitted packets
+	 */
+	i = np->tx_dirty;
+	while (i != np->tx_cur) {
+	  	tx_status = np->tx[np->tx_dirty].cmdsts;
+
+		DBG ("tx_dirty = %d tx_cur=%d tx_status=%#08x\n",
+		     np->tx_dirty, np->tx_cur, tx_status);
+		
+		if (tx_status & OWN) 
+			break;
+
+		if (! (tx_status & DescPktOK)) {
+			netdev_tx_complete_err (netdev,np->tx_iobuf[np->tx_dirty],-EINVAL);
+			DBG ("Error transmitting packet, tx_status: %#08x\n",
+			     tx_status);
+		} else {
+			netdev_tx_complete (netdev, np->tx_iobuf[np->tx_dirty]);
+			DBG ("Success transmitting packet\n");
+		}
+
+		np->tx[np->tx_dirty].cmdsts = 0;
+		np->tx_dirty = (np->tx_dirty + 1) % TX_RING_SIZE;
+		i = (i + 1) % TX_RING_SIZE;
+	}
+	
+	/* Process received packets 
+	 */
+	rx_status = (unsigned int) np->rx[np->rx_cur].cmdsts; 
+	while ((rx_status & OWN)) {
+		rx_len = (rx_status & DSIZE) - CRC_SIZE;
+
+                DBG ("Received packet, rx_curr = %d, rx_status = %#08x, rx_len = %d\n",
+                     np->rx_cur, rx_status, rx_len);
+                
+		if ((rx_status & (DescMore | DescPktOK | RxTooLong)) != DescPktOK) {
+			netdev_rx_err (netdev, NULL, -EINVAL);
+
+			DBG ("natsemi_poll: Corrupted packet received!"
+			     " Status = %#08lx\n",
+			      np->rx[np->rx_cur].cmdsts);
+
+		} else 	{
+
+
+			/* If unable allocate space for this packet,
+			 *  try again next poll
+			 */
+			rx_iob = alloc_iob (rx_len);
+			if (! rx_iob) 
+				goto end;
+			memcpy (iob_put (rx_iob, rx_len), 
+				np->iobuf[np->rx_cur]->data, rx_len);
+			/* Add this packet to the receive queue. 
+			 */
+			netdev_rx (netdev, rx_iob);
+		}
+		np->rx[np->rx_cur].cmdsts = RX_BUF_SIZE;
+		np->rx_cur = (np->rx_cur + 1) % NUM_RX_DESC;
+		rx_status = np->rx[np->rx_cur].cmdsts; 
+	}
+end:
+	/* re-enable the potentially idle receive state machine 
+	 */
+	outl (RxOn, np->ioaddr + ChipCmd);	
+}				
+
+/**
+ * Enable/disable interrupts
+ *
+ * @v netdev    Network device
+ * @v enable    Non-zero for enable, zero for disable
+ */
+static void natsemi_irq (struct net_device *netdev, int enable)
+{
+        struct natsemi_private *np = netdev->priv;
+
+	outl ((enable ? (RxOk | RxErr | TxOk|TxErr) : 0),
+	      np->ioaddr + IntrMask); 
+	outl ((enable ? 1 : 0), np->ioaddr + IntrEnable);
+}
 
 static struct pci_device_id natsemi_nics[] = {
-PCI_ROM(0x100b, 0x0020, "dp83815", "DP83815"),
+	PCI_ROM(0x100b, 0x0020, "dp83815", "DP83815"),
 };
 
-PCI_DRIVER ( natsemi_driver, natsemi_nics, PCI_NO_CLASS );
-
-DRIVER ( "NATSEMI", nic_driver, pci_driver, natsemi_driver,
-	 natsemi_probe, natsemi_disable );
+struct pci_driver natsemi_driver __pci_driver = {
+	.ids = natsemi_nics,
+	.id_count = (sizeof (natsemi_nics) / sizeof (natsemi_nics[0])),
+	.probe = natsemi_probe,
+	.remove = natsemi_remove,
+};
