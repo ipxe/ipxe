@@ -215,6 +215,8 @@ SECTIONS {
 
     _load_size		    = . - _load_addr;
 
+    _payload_offset	    = _text16_load_offset;
+
     /*
      * Alignment checks.  ALIGN() can only operate on the location
      * counter, so we set the location counter to each value we want

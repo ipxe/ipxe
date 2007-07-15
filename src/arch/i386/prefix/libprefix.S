@@ -49,14 +49,14 @@
  * Install block to specified address
  *
  * Parameters:
- *   %esi : byte offset within loaded image (must be a multiple of 16)
+ *   %esi : start offset within loaded image (must be a multiple of 16)
  *   %es:edi : destination address
  *   %ecx : length of (decompressed) data
  *   %edx : total length of block (including any uninitialised data portion)
  * Returns:
- *   none
+ *   %esi : end offset within image (rounded up to next multiple of 16)
  * Corrupts:
- *   %esi, %edi, %ecx, %edx
+ *   %edi, %ecx, %edx
  ****************************************************************************
  */
 	.section ".prefix.lib"
@@ -65,6 +65,8 @@ install_block:
 	/* Preserve registers */
 	pushw	%ds
 	pushl	%eax
+	pushl	%ebx
+	movl	%esi, %ebx
 	
 	/* Starting segment => %ds */
 	movw	%cs, %ax
@@ -87,7 +89,13 @@ install_block:
 	xorb	%al, %al
 	rep addr32 stosb
 
+	/* Adjust %esi */
+	addl	%ebx, %esi
+	addl	$0xf, %esi
+	andl	$~0xf, %esi
+
 	/* Restore registers */
+	popl	%ebx
 	popl	%eax
 	popw	%ds
 	ret
@@ -144,8 +152,9 @@ alloc_basemem:
  * Parameters: 
  *   %ax : .text16 segment address
  *   %bx : .data16 segment address
+ *   %esi : start offset within loaded image (must be a multiple of 16)
  * Returns:
- *   none
+ *   %esi : end offset within image (rounded up to next multiple of 16)
  * Corrupts:
  *   none
  ****************************************************************************
@@ -155,7 +164,6 @@ alloc_basemem:
 install_basemem:
 	/* Preserve registers */
 	pushw	%es
-	pushl	%esi
 	pushl	%edi
 	pushl	%ecx
 	pushl	%edx
@@ -163,7 +171,6 @@ install_basemem:
 	/* Install .text16 */
 	movw	%ax, %es
 	xorl	%edi, %edi
-	movl	$_text16_load_offset, %esi
 	movl	$_text16_size, %ecx
 	movl	%ecx, %edx
 	call	install_block
@@ -171,7 +178,6 @@ install_basemem:
 	/* Install .data16 */
 	movw	%bx, %es
 	xorl	%edi, %edi	
-	movl	$_data16_load_offset, %esi
 	movl	$_data16_progbits_size, %ecx
 	movl	$_data16_size, %edx
 	call	install_block
@@ -180,7 +186,6 @@ install_basemem:
 	popl	%edx
 	popl	%ecx
 	popl	%edi
-	popl	%esi
 	popw	%es
 	ret
 	.size install_basemem, . - install_basemem
@@ -191,9 +196,10 @@ install_basemem:
  * Install .text and .data into high memory
  *
  * Parameters:
+ *   %esi : start offset within loaded image (must be a multiple of 16)
  *   %es:edi : address in high memory
  * Returns:
- *   none
+ *   %esi : end offset within image (rounded up to next multiple of 16)
  * Corrupts:
  *   none
  ****************************************************************************
@@ -205,13 +211,11 @@ install_basemem:
 	.code16
 install_highmem:
 	/* Preserve registers */
-	pushl	%esi
 	pushl	%edi
 	pushl	%ecx
 	pushl	%edx
 		
 	/* Install .text and .data to specified address */
-	movl	$_textdata_load_offset, %esi
 	movl	$_textdata_progbits_size, %ecx
 	movl	$_textdata_size, %edx
 	call	install_block
@@ -220,7 +224,6 @@ install_highmem:
 	popl	%edx
 	popl	%ecx
 	popl	%edi
-	popl	%esi
 	ret
 	.size install_highmem, . - install_highmem
 	
@@ -343,7 +346,10 @@ install:
 	.size install, . - install
 	.globl install_prealloc
 install_prealloc:
+	/* Save registers */
+	pushl	%esi
 	/* Install .text16 and .data16 */
+	movl	$_payload_offset, %esi
 	call	install_basemem
 
 #ifdef KEEP_IT_REAL
@@ -358,14 +364,13 @@ install_prealloc:
 	pushfw
 	pushw	%ds
 	pushw	%es
-	pushl	%esi
 	pushl	%ecx
 	cli
 
 	/* Load up %ds and %es, and set up vectors for far calls to .text16 */
 	movw	%bx, %ds
-	xorw	%si, %si
-	movw	%si, %es
+	xorw	%cx, %cx
+	movw	%cx, %es
 	movw	%ax, (init_librm_vector+2)
 	movw	%ax, (prot_call_vector+2)
 	
@@ -401,11 +406,11 @@ install_prealloc:
 
 	/* Restore registers and interrupt status */
 	popl	%ecx
-	popl	%esi
 	popw	%es
 	popw	%ds
 	popfw
 #endif
+	popl	%esi
 	ret
 	.size install_prealloc, . - install_prealloc
 
