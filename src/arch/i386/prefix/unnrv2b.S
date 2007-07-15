@@ -21,15 +21,15 @@
  */
 
 /****************************************************************************
- * This file provides the decompress_block() and decompress_block16()
- * functions which can be called in order to decompress an image
- * compressed with the nrv2b utility in src/util.
+ * This file provides the decompress() and decompress16() functions
+ * which can be called in order to decompress an image compressed with
+ * the nrv2b utility in src/util.
  *
  * These functions are designed to be called by the prefix.  They are
  * position-independent code.
  *
  * The same basic assembly code is used to compile both
- * decompress_block() and decompress_block16().
+ * decompress() and decompress16().
  ****************************************************************************
  */
 
@@ -39,57 +39,58 @@
 
 #ifdef CODE16
 /****************************************************************************
- * decompress_block16 (real-mode near call, position independent)
+ * decompress16 (real-mode near call, position independent)
+ *
+ * Decompress data in 16-bit mode
  *
  * Parameters (passed via registers):
- *   %ds:%si - Pointer to compressed input data
- *   %es:%di - Pointer to output buffer
+ *   %ds:%esi - Start of compressed input data
+ *   %es:%edi - Start of output buffer
  * Returns:
- *   All registers are preserved
+ *   %ds:%esi - End of compressed input data
+ *   %es:%edi - End of decompressed output data
+ *   All other registers are preserved
  *
- * NOTE: The compressed data size must be in the range [1,65533-%si]
+ * NOTE: It would be possible to build a smaller version of the
+ * decompression code for -DKEEP_IT_REAL by using
+ *    #define REG(x) x
+ * to use 16-bit registers where possible.  This would impose limits
+ * that the compressed data size must be in the range [1,65533-%si]
  * and the uncompressed data size must be in the range [1,65536-%di]
  * (where %si and %di are the input values for those registers).  Note
  * particularly that the lower limit is 1, not 0, and that the upper
  * limit on the input (compressed) data really is 65533, since the
  * algorithm may read up to three bytes beyond the end of the input
  * data, since it reads dwords.
- *
- * Although splitting up the data into (almost) 64kB chunks for
- * compression is awkward and worsens the compression ratio, it has
- * little to no practical effect since our image size is currently
- * <64kB for all single drivers.  Having a decompression routine that
- * can run in real-mode avoids the need to duplicate RM-to-PM
- * transition code from librm (or have part of librm kept
- * uncompressed, which is itself awkward) and means that we don't need
- * to set up the PM stack until we hit the setup routine itself.
  ****************************************************************************
  */
 
-#define REG(x) x
+#define REG(x) e ## x
 
 	.code16
-	.globl	decompress_block16
-decompress_block16:
+	.globl	decompress16
+decompress16:
 	
 #else /* CODE16 */
 
 /****************************************************************************
- * decompress_block (32-bit protected-mode near call, position independent)
+ * decompress (32-bit protected-mode near call, position independent)
  *
  * Parameters (passed via registers):
- *   %ds:%esi - Pointer to compressed input data
- *   %es:%edi - Pointer to output buffer
+ *   %ds:%esi - Start of compressed input data
+ *   %es:%edi - Start of output buffer
  * Returns:
- *   All registers are preserved
+ *   %ds:%esi - End of compressed input data
+ *   %es:%edi - End of decompressed output data
+ *   All other registers are preserved
  ****************************************************************************
  */
 
 #define REG(x) e ## x
 	
 	.code32
-	.globl	decompress_block
-decompress_block:
+	.globl	decompress
+decompress:
 
 #endif /* CODE16 */
 
@@ -100,7 +101,10 @@ decompress_block:
 #define xDI	REG(di)
 
 	/* Save registers */
-	pushal
+	push	%xAX
+	pushl	%ebx
+	push	%xCX
+	push	%xBP
 	/* Do the decompression */
 	cld
 	xor	%xBP, %xBP
@@ -169,5 +173,8 @@ getbit32:
 
 decompr_end_n2b:
 	/* Restore registers and return */
-	popal
+	pop	%xBP
+	pop	%xCX
+	popl	%ebx
+	pop	%xAX
 	ret
