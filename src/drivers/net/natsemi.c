@@ -59,7 +59,6 @@
 */
 
 #include <stdint.h>
-#include <pic8259.h>
 #include <stdlib.h>
 #include <stdio.h>
 #include <io.h>
@@ -80,7 +79,7 @@
  
 static int natsemi_spi_read_bit ( struct bit_basher *, unsigned int );
 static void natsemi_spi_write_bit ( struct bit_basher *,unsigned int, unsigned long ); 
-void natsemi_init_eeprom ( struct natsemi_private * ); 
+static void natsemi_init_eeprom ( struct natsemi_private * ); 
 static int natsemi_probe (struct pci_device *pci, const struct pci_device_id *id);
 static void natsemi_reset (struct net_device *netdev);
 static int natsemi_open (struct net_device *netdev);
@@ -142,7 +141,7 @@ static struct nvo_fragment natsemi_nvo_fragments[] = {
  *
  * @v NAT		NATSEMI NIC
  */
- void natsemi_init_eeprom ( struct natsemi_private *np ) {
+static void natsemi_init_eeprom ( struct natsemi_private *np ) {
 
 	/* Initialise three-wire bus 
 	 */
@@ -355,8 +354,8 @@ static int natsemi_open (struct net_device *netdev)
 	}
 	outl (virt_to_bus (&np->tx[0]),np->ioaddr + TxRingPtr);
 
-	DBG ("Natsemi Tx descriptor loaded with: %#08x\n",
-	     (unsigned int) inl (np->ioaddr + TxRingPtr));
+	DBG ("Natsemi Tx descriptor loaded with: %#08lx\n",
+	     inl (np->ioaddr + TxRingPtr));
 
 	/* Setup RX ring
 	 */
@@ -369,13 +368,13 @@ static int natsemi_open (struct net_device *netdev)
 						? &np->rx[i + 1] : &np->rx[0]);
 		np->rx[i].cmdsts = RX_BUF_SIZE;
 		np->rx[i].bufptr = virt_to_bus (np->iobuf[i]->data);
-		DBG (" Address of iobuf [%d] = %#08x and iobuf->data = %#08x \n", i, 
-		     (unsigned int) &np->iobuf[i], (unsigned int) &np->iobuf[i]->data);
+		DBG (" Address of iobuf [%d] = %p and iobuf->data = %p \n", i, 
+		      &np->iobuf[i],  &np->iobuf[i]->data);
 	}
 	outl (virt_to_bus (&np->rx[0]), np->ioaddr + RxRingPtr);
 
-	DBG ("Natsemi Rx descriptor loaded with: %#08x\n",
-	     (unsigned int) inl (np->ioaddr + RxRingPtr));		
+	DBG ("Natsemi Rx descriptor loaded with: %#08lx\n",
+	      inl (np->ioaddr + RxRingPtr));		
 
 	/* Setup RX Filter 
 	 */
@@ -398,9 +397,9 @@ static int natsemi_open (struct net_device *netdev)
 	outl (tx_config, np->ioaddr + TxConfig);
 	outl (rx_config, np->ioaddr + RxConfig);
 
-	DBG ("Tx config register = %#08x Rx config register = %#08x\n", 
-               (unsigned int) inl (np->ioaddr + TxConfig),
-	       (unsigned int) inl (np->ioaddr + RxConfig));
+	DBG ("Tx config register = %#08lx Rx config register = %#08lx\n", 
+               inl (np->ioaddr + TxConfig),
+	       inl (np->ioaddr + RxConfig));
 
 	/*Set the Interrupt Mask register
 	 */
@@ -472,8 +471,8 @@ static int natsemi_transmit (struct net_device *netdev, struct io_buffer *iobuf)
 	np->tx[np->tx_cur].bufptr = virt_to_bus (iobuf->data);
 	np->tx[np->tx_cur].cmdsts = iob_len (iobuf) | OWN;
 
-	DBG ("TX id %d at %#08x + %#08x\n", np->tx_cur,
-	     (unsigned int) virt_to_bus (&iobuf->data), iob_len (iobuf));
+	DBG ("TX id %d at %#08lx + %#08x\n", np->tx_cur,
+	     virt_to_bus (&iobuf->data), iob_len (iobuf));
 
 	/* increment the circular buffer pointer to the next buffer location
 	 */
@@ -525,7 +524,7 @@ static void natsemi_poll (struct net_device *netdev)
 		if (! (tx_status & DescPktOK)) {
 			netdev_tx_complete_err (netdev,np->tx_iobuf[np->tx_dirty],-EINVAL);
 			DBG ("Error transmitting packet, tx_status: %#08x\n",
-			     (unsigned int) tx_status);
+			     tx_status);
 		} else {
 			netdev_tx_complete (netdev, np->tx_iobuf[np->tx_dirty]);
 			DBG ("Success transmitting packet\n");
@@ -549,13 +548,11 @@ static void natsemi_poll (struct net_device *netdev)
 			netdev_rx_err (netdev, NULL, -EINVAL);
 
 			DBG ("natsemi_poll: Corrupted packet received!"
-			     " Status = %#08x\n",
-			     (unsigned int) np->rx[np->rx_cur].cmdsts);
-			//DBG_HD (np->iobuf[np->rx_cur]->data, 30);
+			     " Status = %#08lx\n",
+			      np->rx[np->rx_cur].cmdsts);
 
 		} else 	{
 
-			//DBG_HD (np->iobuf[np->rx_cur]->data, 30);
 
 			/* If unable allocate space for this packet,
 			 *  try again next poll
