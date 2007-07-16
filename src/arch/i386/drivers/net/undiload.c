@@ -36,11 +36,11 @@
  */
 
 /** Parameter block for calling UNDI loader */
-static struct s_UNDI_LOADER __data16 ( undi_loader );
+static struct s_UNDI_LOADER __bss16 ( undi_loader );
 #define undi_loader __use_data16 ( undi_loader )
 
 /** UNDI loader entry point */
-static SEGOFF16_t __data16 ( undi_loader_entry );
+static SEGOFF16_t __bss16 ( undi_loader_entry );
 #define undi_loader_entry __use_data16 ( undi_loader_entry )
 
 /**

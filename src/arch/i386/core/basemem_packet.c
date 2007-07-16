@@ -27,4 +27,4 @@
 #include <basemem_packet.h>
 
 #undef basemem_packet
-char __data16_array ( basemem_packet, [BASEMEM_PACKET_LEN] );
+char __bss16_array ( basemem_packet, [BASEMEM_PACKET_LEN] );

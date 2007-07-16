@@ -136,7 +136,7 @@ undinet_function_name ( unsigned int function ) {
  * Used as the paramter block for all UNDI API calls.  Resides in base
  * memory.
  */
-static union u_PXENV_ANY __data16 ( undinet_params );
+static union u_PXENV_ANY __bss16 ( undinet_params );
 #define undinet_params __use_data16 ( undinet_params )
 
 /** UNDI entry point
@@ -144,7 +144,7 @@ static union u_PXENV_ANY __data16 ( undinet_params );
  * Used as the indirection vector for all UNDI API calls.  Resides in
  * base memory.
  */
-SEGOFF16_t __data16 ( undinet_entry_point );
+SEGOFF16_t __bss16 ( undinet_entry_point );
 #define undinet_entry_point __use_data16 ( undinet_entry_point )
 
 /**

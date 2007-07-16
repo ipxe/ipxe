@@ -49,7 +49,7 @@ struct e820_entry {
 #define E820_TYPE_NVS		4 /**< ACPI NVS memory */
 
 /** Buffer for INT 15,e820 calls */
-static struct e820_entry __data16 ( e820buf );
+static struct e820_entry __bss16 ( e820buf );
 #define e820buf __use_data16 ( e820buf )
 
 /**

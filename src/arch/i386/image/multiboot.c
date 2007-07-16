@@ -195,7 +195,7 @@ multiboot_build_module_list ( struct image *image,
  * along with the other structures belonging to the Multiboot
  * information table.
  */
-static struct multiboot_info __data16 ( mbinfo );
+static struct multiboot_info __bss16 ( mbinfo );
 #define mbinfo __use_data16 ( mbinfo )
 
 /** The multiboot bootloader name */
@@ -204,11 +204,11 @@ static char __data16_array ( mb_bootloader_name, [] ) = "gPXE " VERSION;
 
 /** The multiboot memory map */
 static struct multiboot_memory_map
-	__data16_array ( mbmemmap, [MAX_MEMORY_REGIONS] );
+	__bss16_array ( mbmemmap, [MAX_MEMORY_REGIONS] );
 #define mbmemmap __use_data16 ( mbmemmap )
 
 /** The multiboot module list */
-static struct multiboot_module __data16_array ( mbmodules, [MAX_MODULES] );
+static struct multiboot_module __bss16_array ( mbmodules, [MAX_MODULES] );
 #define mbmodules __use_data16 ( mbmodules )
 
 /**
