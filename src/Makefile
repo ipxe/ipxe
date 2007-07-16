@@ -35,7 +35,7 @@ include arch/$(ARCH)/Config
 # If invoked with no build target, print out a helpfully suggestive
 # message.
 #
-noargs :
+noargs : blib
 	@echo '===================================================='
 	@echo
 	@echo ' *** WARNING: THE INSTRUCTIONS BELOW DO NOT FULLY WORK YET !!!  ***'
