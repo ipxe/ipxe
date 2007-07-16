@@ -307,6 +307,12 @@ $(BIN)/%.tmp : $(BLIB) $(MAKEDEPS) $(LDSCRIPT)
 $(BIN)/%.map : $(BIN)/%.tmp
 	@less $(BIN)/$*.tmp.map
 
+# Build raw binary file from intermediate object file
+#
+$(BIN)/%.bin : $(BIN)/%.tmp
+	$(QM)echo "  [BIN] $@"
+	$(Q)$(OBJCOPY) -O binary $< $@
+
 # Build bochs symbol table
 $(BIN)/%.bxs : $(BIN)/%.tmp
 	$(NM) $< | cut -d" " -f1,3 > $@
@@ -350,9 +356,10 @@ define media_template
 	@$(MKDIR) -p $(dir $(2))
 	@$(RM) $(2)
 	@$(TOUCH) $(2)
-	@echo -e '$$(BIN)/%$(1) : $$(BIN)/%$(1).tmp' \
-		  '\n\t$$(OBJCOPY) -O binary $$< $$@' \
-		  '\n\t$$(FINALISE_$(1))' \
+	@echo -e '$$(BIN)/%$(1) : $$(BIN)/%$(1).bin' \
+		  '\n\t$$(QM)echo "  [FINISH] $$@"' \
+		  '\n\t$$(Q)$$(CP) $$< $$@' \
+		  '\n\t$$(Q)$$(FINALISE_$(1))' \
 		> $(2)
 
 endef

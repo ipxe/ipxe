@@ -73,6 +73,7 @@ CPP		?= gcc -E -Wp,-Wall
 RM		?= rm -f
 TOUCH		?= touch
 MKDIR		?= mkdir
+CP		?= cp
 PERL		?= /usr/bin/perl
 CC		?= $(CROSS_COMPILE)gcc
 AS		?= $(CROSS_COMPILE)as
