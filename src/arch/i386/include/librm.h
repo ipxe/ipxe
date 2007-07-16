@@ -27,6 +27,14 @@ extern char *text16;
 	__attribute__ (( section ( ".data16" ) ))			\
 	_data16_ ## variable array __asm__ ( #variable )
 
+#define __bss16( variable )						\
+	__attribute__ (( section ( ".bss16" ) ))			\
+	_data16_ ## variable __asm__ ( #variable )
+
+#define __bss16_array( variable, array )				\
+	__attribute__ (( section ( ".bss16" ) ))			\
+	_data16_ ## variable array __asm__ ( #variable )
+
 #define __text16( variable )						\
 	__attribute__ (( section ( ".text16.data" ) ))			\
 	_text16_ ## variable __asm__ ( #variable )

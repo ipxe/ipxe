@@ -130,7 +130,7 @@ endif
 # this is almost always a win. the kernel uses it, too.
 CFLAGS+= -mpreferred-stack-boundary=2
 
-LDFLAGS+=	-N
+LDFLAGS+=	-N --no-check-sections
 
 ifeq "$(shell uname -s)" "FreeBSD"
 CFLAGS+=	-DIMAGE_FREEBSD -DELF_IMAGE -DAOUT_IMAGE
