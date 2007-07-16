@@ -55,13 +55,13 @@ noargs : blib
 	@echo
 	@echo 'For example, '
 	@echo
-	@echo '    make allzroms '
+	@echo '    make allroms '
 	@echo
-	@echo 'will generate all possible .zrom (rom burnable) images, and'
+	@echo 'will generate all possible .rom (rom burnable) images, and'
 	@echo
-	@echo '    make allzdsks'
+	@echo '    make alldsks'
 	@echo
-	@echo 'will generate all possible .zdsk (bootable floppy) images, or'
+	@echo 'will generate all possible .dsk (bootable floppy) images, or'
 	@echo
 	@echo '===================================================='
 	@exit 1

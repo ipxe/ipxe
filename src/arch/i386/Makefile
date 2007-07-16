@@ -36,74 +36,27 @@ LDSCRIPT		= arch/i386/scripts/i386.lds
 
 # Media types.
 # 
-# It's ugly that we have to define these repetitive combinations by
-# hand.  Unforunately, $(eval ...) is available only in make >= 3.80,
-# and using an external Makefile fragment doesn't work because
-# OBJS_xxx need to be defined *before* the external Makefile fragments
-# for the source files are generated...
-
-CFLAGS_ZPREFIX		= -DCOMPRESS
-
 MEDIA			+= rom
-OBJS_romprefix		= romprefix zromprefix
-CFLAGS_zromprefix	= $(CFLAGS_ZPREFIX)
-
 MEDIA			+= pxe
-OBJS_pxeprefix		= pxeprefix zpxeprefix
-CFLAGS_zpxeprefix	= $(CFLAGS_ZPREFIX)
-
 MEDIA			+= elf
-OBJS_elfprefix		= elfprefix zelfprefix
-CFLAGS_zelfprefix	= $(CFLAGS_ZPREFIX)
-
 MEDIA			+= elfd
-OBJS_elfdprefix		= elfdprefix zelfdprefix
-CFLAGS_zelfdprefix	= $(CFLAGS_ZPREFIX)
-
 MEDIA			+= lmelf
-OBJS_lmelfprefix	= lmelfprefix zlmelfprefix
-CFLAGS_zlmelfprefix	= $(CFLAGS_ZPREFIX)
-
 MEDIA			+= lmelfd
-OBJS_lmelfdprefix	= lmelfdprefix zlmelfdprefix
-CFLAGS_zlmelfdprefix	= $(CFLAGS_ZPREFIX)
-
 MEDIA			+= lkrn
-OBJS_lkrnprefix		= lkrnprefix zlkrnprefix
-CFLAGS_zlkrnprefix	= $(CFLAGS_ZPREFIX)
-
 MEDIA			+= bImage
-OBJS_bImageprefix	= bImageprefix zbImageprefix
-CFLAGS_zbImageprefix	= $(CFLAGS_ZPREFIX)
-
 MEDIA			+= dsk
-OBJS_dskprefix		= dskprefix zdskprefix
-CFLAGS_zdskprefix	= $(CFLAGS_ZPREFIX)
-
 MEDIA			+= nbi
-OBJS_nbiprefix		= nbiprefix znbiprefix
-CFLAGS_znbiprefix	= $(CFLAGS_ZPREFIX)
-
 MEDIA			+= hd
-OBJS_hdprefix		= hdprefix zhdprefix
-CFLAGS_zhdprefix	= $(CFLAGS_ZPREFIX)
-
 MEDIA			+= raw
-OBJS_rawprefix		= rawprefix zrawprefix
-CFLAGS_zrawprefix	= $(CFLAGS_ZPREFIX)
-
-# These media cannot handle compressed payloads
-
 MEDIA			+= com
-
 MEDIA			+= exe
 
 # Special target for building Master Boot Record binary
 $(BIN)/mbr.bin : $(BIN)/mbr.o
 	$(OBJCOPY) -O binary $< $@
 
-# Some suffixes (e.g. %.zfd0) are generated directly from other
-# finished files (e.g. %.zdsk), rather than having their own prefix.
+# Some suffixes (e.g. %.fd0) are generated directly from other
+# finished files (e.g. %.dsk), rather than having their own prefix.
 
 # rule to write disk images to /dev/fd0
 NON_AUTO_MEDIA		+= fd0
