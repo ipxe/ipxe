@@ -37,6 +37,9 @@
  */
 #define HIGHMEM_LOADPOINT ( 4 << 20 )
 
+/* Image compression enabled */
+#define COMPRESS 1
+
 #define CR0_PE 1
 
 	.arch i386
@@ -81,7 +84,11 @@ install_block:
 	
 	/* Do the copy */
 	cld
-	rep addr32 movsb /* or "call decompress16" */
+#if COMPRESS
+	call	decompress16
+#else
+	call	nodecompress16
+#endif
 
 	/* Zero remaining space */
 	movl	%eax, %edi

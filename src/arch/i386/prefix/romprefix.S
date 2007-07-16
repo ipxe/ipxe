@@ -14,7 +14,7 @@
 	.org	0x00
 romheader:
 	.word	0xAA55			/* BIOS extension signature */
-	.byte	_rom_size		/* Size in 512-byte blocks */
+romheader_size:	.byte	_rom_size	/* Size in 512-byte blocks */
 	jmp	init_vector		/* Initialisation vector */
 	.org	0x16
 	.word	undiheader
@@ -34,7 +34,7 @@ pciheader:
 	.byte	0x02			/* Device Base Type code */
 	.byte	0x00			/* Device Sub-Type code */
 	.byte	0x00			/* Device Interface Type code */
-	.word	_rom_size		/* Image length same as offset 02h */
+pciheader_size:	.word	_rom_size	/* Image length same as offset 02h */
 	.word	0x0001			/* revision level of code/data */
 	.byte	0x00			/* code type */
 	.byte	0x80			/* Flags (last PCI data structure) */
@@ -215,3 +215,15 @@ print_message:
 	popw	%ax
 	ret
 	.size print_message, . - print_message
+
+
+	/* Data update information for the compressor */
+	.section ".zinfo.fixup", "a"
+	.ascii	"SUBB"
+	.long	romheader_size
+	.long	512
+	.long	0
+	.ascii	"SUBW"
+	.long	pciheader_size
+	.long	512
+	.long	0

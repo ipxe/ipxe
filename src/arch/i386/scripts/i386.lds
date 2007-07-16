@@ -165,6 +165,24 @@ SECTIONS {
     _end = .;
 
     /*
+     * Compressor information block
+     */
+
+    _zinfo_link_addr = 0;
+    . = _zinfo_link_addr;
+    _zinfo = .;
+
+    .zinfo : AT ( _zinfo_load_offset + __zinfo ) {
+	__zinfo = .;
+	_entry = .;
+	*(.zinfo)
+	*(.zinfo.*)
+	_ezinfo_progbits = .;
+    }
+    
+    _ezinfo = .;
+
+    /*
      * Dispose of the comment and note sections to make the link map
      * easier to read
      */
@@ -214,6 +232,13 @@ SECTIONS {
     .			    = _textdata_load_addr + _textdata_progbits_size;
 
     _load_size		    = . - _load_addr;
+
+    .			   -= _zinfo_link_addr;
+    _zinfo_load_offset	    = ALIGN ( _max_align );
+    _zinfo_load_addr	    = _zinfo_link_addr + _zinfo_load_offset;
+    _zinfo_size		    = _ezinfo - _zinfo;
+    _zinfo_progbits_size    = _ezinfo_progbits - _zinfo;
+    .			    = _zinfo_load_addr + _zinfo_progbits_size;
 
     _payload_offset	    = _text16_load_offset;
 

@@ -90,6 +90,7 @@ MKCONFIG	?= $(PERL) ./util/mkconfig.pl
 SYMCHECK	?= $(PERL) ./util/symcheck.pl
 SORTOBJDUMP	?= $(PERL) ./util/sortobjdump.pl
 NRV2B		?= ./util/nrv2b
+ZBIN		?= ./util/zbin
 DOXYGEN		?= doxygen
 
 # Location to place generated files

@@ -307,11 +307,23 @@ $(BIN)/%.tmp : $(BLIB) $(MAKEDEPS) $(LDSCRIPT)
 $(BIN)/%.map : $(BIN)/%.tmp
 	@less $(BIN)/$*.tmp.map
 
+# Extract compression information from intermediate object file
+#
+$(BIN)/%.zinfo : $(BIN)/%.tmp
+	$(QM)echo "  [ZINFO] $@"
+	$(Q)$(OBJCOPY) -O binary -j .zinfo $< $@
+
 # Build raw binary file from intermediate object file
 #
 $(BIN)/%.bin : $(BIN)/%.tmp
 	$(QM)echo "  [BIN] $@"
-	$(Q)$(OBJCOPY) -O binary $< $@
+	$(Q)$(OBJCOPY) -O binary -R .zinfo $< $@
+
+# Compress raw binary file
+#
+$(BIN)/%.zbin : $(BIN)/%.bin $(BIN)/%.zinfo $(ZBIN)
+	$(QM)echo "  [ZBIN] $@"
+	$(Q)$(ZBIN) $(BIN)/$*.bin $(BIN)/$*.zinfo > $@
 
 # Build bochs symbol table
 $(BIN)/%.bxs : $(BIN)/%.tmp
@@ -356,7 +368,7 @@ define media_template
 	@$(MKDIR) -p $(dir $(2))
 	@$(RM) $(2)
 	@$(TOUCH) $(2)
-	@echo -e '$$(BIN)/%$(1) : $$(BIN)/%$(1).bin' \
+	@echo -e '$$(BIN)/%$(1) : $$(BIN)/%$(1).zbin' \
 		  '\n\t$$(QM)echo "  [FINISH] $$@"' \
 		  '\n\t$$(Q)$$(CP) $$< $$@' \
 		  '\n\t$$(Q)$$(FINALISE_$(1))' \
@@ -383,12 +395,18 @@ include $(MEDIA_DEPS)
 allroms allzroms : all%s : $(foreach ROM,$(ROMS),$(BIN)/$(ROM).%)
 all%s : $(foreach DRIVER,$(DRIVERS),$(BIN)/$(DRIVER).%)
 
-# The compressor utility
+# The compression utilities
 #
 $(NRV2B) : util/nrv2b.c $(MAKEDEPS)
-	$(HOST_CC) -O2 -DENCODE -DDECODE -DMAIN -DVERBOSE -DNDEBUG \
+	$(QM)echo "  [HOSTCC] $@"
+	$(Q)$(HOST_CC) -O2 -DENCODE -DDECODE -DMAIN -DVERBOSE -DNDEBUG \
 		       -DBITSIZE=32 -DENDIAN=0 -o $@ $<
 CLEANUP	+= $(NRV2B)
+
+$(ZBIN) : util/zbin.c util/nrv2b.c $(MAKEDEPS)
+	$(QM)echo "  [HOSTCC] $@"
+	$(Q)$(HOST_CC) -O2 -o $@ $<
+CLEANUP += $(ZBIN)
 
 # Auto-incrementing build serial number.  Append "bs" to your list of
 # build targets to get a serial number printed at the end of the

@@ -35,7 +35,7 @@
 
 	.text
 	.arch i386
-	.section ".prefix", "ax", @progbits
+	.section ".prefix.lib", "ax", @progbits
 
 #ifdef CODE16
 /****************************************************************************
@@ -54,6 +54,7 @@
  * NOTE: It would be possible to build a smaller version of the
  * decompression code for -DKEEP_IT_REAL by using
  *    #define REG(x) x
+ *    #define MOVSB movsb
  * to use 16-bit registers where possible.  This would impose limits
  * that the compressed data size must be in the range [1,65533-%si]
  * and the uncompressed data size must be in the range [1,65536-%di]
@@ -66,6 +67,7 @@
  */
 
 #define REG(x) e ## x
+#define MOVSB addr32 movsb
 
 	.code16
 	.globl	decompress16
@@ -109,11 +111,10 @@ decompress:
 	cld
 	xor	%xBP, %xBP
 	dec	%xBP		/* last_m_off = -1 */
-	add	$4, %xSI	/* Skip "file length" field */
 	jmp	dcl1_n2b
 	
 decompr_literals_n2b:
-	movsb
+	MOVSB
 decompr_loop_n2b:
 	addl	%ebx, %ebx
 	jnz	dcl2_n2b
@@ -157,7 +158,7 @@ decompr_got_mlen_n2b:
 	push	%xSI
 	lea	(%xBP,%xDI), %xSI	/* m_pos = dst + olen + -m_off  */
 	rep
-	es movsb		/* dst[olen++] = *m_pos++ while(m_len > 0) */
+	es MOVSB		/* dst[olen++] = *m_pos++ while(m_len > 0) */
 	pop	%xSI
 	jmp	decompr_loop_n2b
 
@@ -179,3 +180,23 @@ decompr_end_n2b:
 	popl	%ebx
 	pop	%xAX
 	ret
+
+
+	/* File split information for the compressor */
+	.section ".zinfo", "a"
+	.ascii	"COPY"
+	.long	_prefix_load_offset
+	.long	_prefix_progbits_size
+	.long	_max_align
+	.ascii	"PACK"
+	.long	_text16_load_offset
+	.long	_text16_progbits_size
+	.long	_max_align
+	.ascii	"PACK"
+	.long	_data16_load_offset
+	.long	_data16_progbits_size
+	.long	_max_align
+	.ascii	"PACK"
+	.long	_textdata_load_offset
+	.long	_textdata_progbits_size
+	.long	_max_align
