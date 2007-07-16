@@ -97,7 +97,7 @@
 # @/OptionDescription@
 
 # BIOS select don't change unless you know what you are doing
-CFLAGS+=	-DPCBIOS
+# CFLAGS+=	-DPCBIOS
 
 # Compile in k8/hammer support
 # CFLAGS+=	-DCONFIG_X86_64
