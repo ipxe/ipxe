@@ -59,7 +59,7 @@ load_image:
 	ljmp	$BOOT_SEG, $start_image
 
 load_length:
-	.long	_rom_size
+	.long	_load_size_sect
 max_sector:
 	.byte	0
 max_head:

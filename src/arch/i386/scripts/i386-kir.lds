@@ -192,5 +192,5 @@ SECTIONS {
     _text16_size_pgh	= ( ( _text16_size + 15 ) / 16 );
     _data16_size_pgh	= ( ( _data16_size + 15 ) / 16 );
     _load_size_pgh	= ( ( _load_size + 15 ) / 16 );
-    _rom_size		= ( ( _load_size + 511 ) / 512 );
+    _load_size_sect	= ( ( _load_size + 511 ) / 512 );
 }
