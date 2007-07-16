@@ -32,9 +32,20 @@ segment_header:
 	.byte	0
 	.byte	0x04		/* Last segment */
 	.long	0x00007e00
-	.long	_load_size - 512
-	.long	_load_size - 512
+imglen:	.long	_load_size - 512
+memlen:	.long	_load_size - 512
 	.size	segment_header, . - segment_header
+
+	.section ".zinfo.fixup", "a"	/* Compressor fixup information */
+	.ascii	"SUBL"
+	.long	imglen
+	.long	1
+	.long	0
+	.ascii	"SUBL"
+	.long	memlen
+	.long	1
+	.long	0
+	.previous
 
 /*****************************************************************************
  * NBI entry point

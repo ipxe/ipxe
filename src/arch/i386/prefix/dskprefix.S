@@ -1,10 +1,7 @@
 /* NOTE: this boot sector contains instructions that need at least an 80186.
  * Yes, as86 has a bug somewhere in the valid instruction set checks.
  *
- * SYS_SIZE is the number of clicks (16 bytes) to be loaded.
  */
-.globl	SYSSIZE
-.equ	SYSSIZE, _load_size_pgh
 
 /*	floppyload.S Copyright (C) 1991, 1992 Linus Torvalds
  *	modified by Drew Eckhardt
@@ -147,6 +144,14 @@ got_sectors:
 	/* Jump to loaded copy */
 	ljmp	$SYSSEG, $start_runtime
 
+endseg:	.word SYSSEG + _load_size_pgh
+	.section ".zinfo.fixup", "a"	/* Compressor fixup information */
+	.ascii	"SUBW"
+	.long	endseg
+	.long	16
+	.long	0
+	.previous
+
 /* This routine loads the system at address SYSSEG<<4, making sure no 64kB
  * boundaries are crossed. We try to load it as fast as possible, loading whole
  * tracks whenever we can.
@@ -165,7 +170,7 @@ rp_read:
 	movb	$4, %cl
 	shrw	%cl,%dx			/* bx is always divisible by 16 */
 	addw	%dx,%ax
-	cmpw	$SYSSEG+SYSSIZE, %ax	/* have we loaded all yet? */
+	cmpw	endseg, %ax	/* have we loaded all yet? */
 	jb	ok1_read
 	ret
 ok1_read: 

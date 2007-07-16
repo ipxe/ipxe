@@ -269,6 +269,12 @@ SECTIONS {
      */
     _text16_size_pgh	= ( ( _text16_size + 15 ) / 16 );
     _data16_size_pgh	= ( ( _data16_size + 15 ) / 16 );
+
+    /*
+     * Load sizes in paragraphs and sectors.  Note that wherever the
+     * _load_size variables are used, there must be a corresponding
+     * .zinfo.fixup section.
+     */
     _load_size_pgh	= ( ( _load_size + 15 ) / 16 );
     _load_size_sect	= ( ( _load_size + 511 ) / 512 );
 }

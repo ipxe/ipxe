@@ -58,12 +58,20 @@ load_image:
 	ja	1b
 	ljmp	$BOOT_SEG, $start_image
 
-load_length:
-	.long	_load_size_sect
 max_sector:
 	.byte	0
 max_head:
 	.byte	0
+load_length:
+	.long	_load_size_sect
+	
+	.section ".zinfo.fixup", "a"	/* Compressor fixup information */
+	.ascii	"SUBL"
+	.long	load_length
+	.long	512
+	.long	0
+	.previous
+
 
 load_failed:
 	movw	$10f, %si

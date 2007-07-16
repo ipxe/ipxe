@@ -105,6 +105,14 @@ boot_flag:
 
 
 	.org	512
+
+	.section ".zinfo.fixup", "a"	/* Compressor fixup information */
+	.ascii	"SUBW"
+	.long	syssize
+	.long	16
+	.long	0
+	.previous
+	
 /*
 	We're now at the beginning of the second sector of the image -
 	where the setup code goes.

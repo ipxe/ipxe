@@ -23,6 +23,13 @@ romheader_size:	.byte _load_size_sect	/* Size in 512-byte blocks */
 	.org	0x1a
 	.word	pnpheader
 	.size romheader, . - romheader
+	
+	.section ".zinfo.fixup", "a"	/* Compressor fixup information */
+	.ascii	"SUBB"
+	.long	romheader_size
+	.long	512
+	.long	0
+	.previous
 
 pciheader:
 	.ascii	"PCIR"			/* Signature */
@@ -41,6 +48,13 @@ pciheader_size:	.word _load_size_sect	/* Image length same as offset 02h */
 	.word	0x0000			/* reserved */
 	.equ pciheader_len, . - pciheader
 	.size pciheader, . - pciheader
+	
+	.section ".zinfo.fixup", "a"	/* Compressor fixup information */
+	.ascii	"SUBW"
+	.long	pciheader_size
+	.long	512
+	.long	0
+	.previous
 
 pnpheader:
 	.ascii	"$PnP"			/* Signature */
@@ -124,7 +138,7 @@ notpnp_message:
 	.size notpnp_message, . - notpnp_message
 
 /* Boot execution vector
- *
+ *pciheader_size
  * Called by the PnP BIOS when it wants to boot us, or via the hooked
  * INT 19 if we detected a non-PnP BIOS.
  */	
@@ -215,15 +229,3 @@ print_message:
 	popw	%ax
 	ret
 	.size print_message, . - print_message
-
-
-	/* Data update information for the compressor */
-	.section ".zinfo.fixup", "a"
-	.ascii	"SUBB"
-	.long	romheader_size
-	.long	512
-	.long	0
-	.ascii	"SUBW"
-	.long	pciheader_size
-	.long	512
-	.long	0
