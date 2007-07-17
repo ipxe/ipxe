@@ -87,7 +87,7 @@ install_block:
 #if COMPRESS
 	call	decompress16
 #else
-	call	nodecompress16
+	rep addr32 movsb
 #endif
 
 	/* Zero remaining space */
@@ -438,3 +438,31 @@ prot_call_vector:
 	.word 0
 	.size prot_call_vector, . - prot_call_vector
 #endif
+
+
+	/* File split information for the compressor */
+#if COMPRESS
+	.section ".zinfo", "a"
+	.ascii	"COPY"
+	.long	_prefix_load_offset
+	.long	_prefix_progbits_size
+	.long	_max_align
+	.ascii	"PACK"
+	.long	_text16_load_offset
+	.long	_text16_progbits_size
+	.long	_max_align
+	.ascii	"PACK"
+	.long	_data16_load_offset
+	.long	_data16_progbits_size
+	.long	_max_align
+	.ascii	"PACK"
+	.long	_textdata_load_offset
+	.long	_textdata_progbits_size
+	.long	_max_align
+#else /* COMPRESS */
+	.section ".zinfo", "a"
+	.ascii	"COPY"
+	.long	_prefix_load_offset
+	.long	_load_size
+	.long	_max_align
+#endif /* COMPRESS */

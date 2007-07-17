@@ -180,23 +180,3 @@ decompr_end_n2b:
 	popl	%ebx
 	pop	%xAX
 	ret
-
-
-	/* File split information for the compressor */
-	.section ".zinfo", "a"
-	.ascii	"COPY"
-	.long	_prefix_load_offset
-	.long	_prefix_progbits_size
-	.long	_max_align
-	.ascii	"PACK"
-	.long	_text16_load_offset
-	.long	_text16_progbits_size
-	.long	_max_align
-	.ascii	"PACK"
-	.long	_data16_load_offset
-	.long	_data16_progbits_size
-	.long	_max_align
-	.ascii	"PACK"
-	.long	_textdata_load_offset
-	.long	_textdata_progbits_size
-	.long	_max_align
