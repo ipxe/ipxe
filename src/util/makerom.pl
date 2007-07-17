@@ -68,7 +68,7 @@ sub pcipnpheaders ($$) {
 		$pci_hdr_offset = $pnp_hdr_offset = 0;
 	} else {
 		printf "PCI header at %#x and PnP header at %#x\n",
-			$pci_hdr_offset, $pnp_hdr_offset;
+			$pci_hdr_offset, $pnp_hdr_offset if $opts{'v'};
 	}
 	if ($pci_hdr_offset > 0) {
 		my ($pci_vendor_id, $pci_device_id);
@@ -112,7 +112,7 @@ sub undiheaders ($) {
 		or substr($$romref, $undi_hdr_offset, 4) ne 'UNDI') {
 		$undi_hdr_offset = 0;
 	} else {
-		printf "UNDI header at %#x\n", $undi_hdr_offset;
+		printf "UNDI header at %#x\n", $undi_hdr_offset if $opts{'v'};
 	}
 	if ($undi_hdr_offset > 0) {
 		substr($$romref, $undi_hdr_offset+UNDI_CHKSUM_OFF, 1) = "\x00";
