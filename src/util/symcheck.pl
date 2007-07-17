@@ -97,7 +97,7 @@ while ( ( my $object, my $symbols ) = each %$symtab ) {
       } else {
 	$category = "provides";
       }
-      $globals->{$symbol}->{$category}->{$object} = $info->{section};
+      $globals->{$symbol}->{$category}->{$object} = 1;
     }
   }
 }
@@ -110,6 +110,13 @@ while ( ( my $symbol, my $info ) = each %$globals ) {
   my @requires = keys %{$info->{requires}};
   my @shares = keys %{$info->{shares}};
 
+  if ( ( @provides == 0 ) && ( @shares == 1 ) ) {
+    # A symbol "shared" by just a single file is actually being
+    # provided by that file; it just doesn't have an initialiser.
+    @provides = @shares;
+    @shares = ();
+  }
+
   if ( ( @requires > 0 ) && ( @provides == 0 ) && ( @shares == 0 ) ) {
     # No object provides this symbol, but some objects require it.
     $problems->{$_}->{nonexistent}->{$symbol} = 1 foreach @requires;
@@ -120,7 +127,7 @@ while ( ( my $symbol, my $info ) = each %$globals ) {
     foreach my $provide ( @provides ) {
       if ( $provide eq "LINKER" ) {
 	# Linker-provided symbols are exempt from this check.
-      } elsif ( $info->{provides}->{$provide} =~ /^\.tbl\./ ) {
+      } elsif ( $symtab->{$provide}->{$symbol}->{section} =~ /^\.tbl\./ ) {
 	# Linker tables are exempt from this check.
       } else {
 	$problems->{$provide}->{unused}->{$symbol} = 1;
