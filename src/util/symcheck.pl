@@ -70,6 +70,18 @@ foreach my $link_sym qw ( __prefix _prefix _prefix_load_offset
   };
 }
 
+# Add symbols that we know will be used by the debug system
+#
+foreach my $debug_sym qw ( dbg_autocolourise dbg_decolourise
+			   dbg_hex_dump_da ) {
+  $symtab->{DEBUG}->{$debug_sym} = {
+    global	=> 1,
+    section	=> undef,
+    value	=> 0,
+    size	=> 0,
+  };
+}
+
 # Build up requires, provides and shares symbol tables for global
 # symbols
 #
