@@ -7,18 +7,34 @@ use constant WARNING_SIZE => 512;
 
 my $symtab = {};
 
-# Scan output of "nm -o -S bin/blib.a" and build up symbol table
+# Scan output of "objdump -w -t bin/blib.a" and build up symbol table
 #
+my $object;
 while ( <> ) {
   chomp;
-  ( my $object, undef, my $value, undef, my $size, my $type, my $symbol )
-      = /^.*?:(.*?\.o):((\S+)(\s+(\S+))?)?\s+(\S)\s+(\S+)$/;
-  $symtab->{$object}->{$symbol} = {
-    global	=> ( $type eq uc $type ),
-    type	=> ( $type ),
-    value	=> ( $value ? hex ( $value ) : 0 ),
-    size	=> ( $size ? hex ( $size ) : 0 ),
-  };
+  if ( /^In archive/ ) {
+    # Do nothing
+  } elsif ( /^$/ ) {
+    # Do nothing
+  } elsif ( /^(\S+\.o):\s+file format/ ) {
+    $object = $1;
+  } elsif ( /^SYMBOL TABLE:/ ) {
+    # Do nothing
+  } elsif ( /^([0-9a-fA-F]+)\s(l|g|\s)......\s(\S+)\s+([0-9a-fA-F]+)\s+(\S+)$/ ) {
+    my $value = $1;
+    my $scope = $2;
+    my $section = $3;
+    my $size = $4;
+    my $symbol = $5;
+    $symtab->{$object}->{$symbol} = {
+      global	=> ( $scope ne "l" ),
+      section	=> ( $section eq "*UND*" ? undef : $section ),
+      value	=> ( $value ? hex ( $value ) : 0 ),
+      size	=> ( $size ? hex ( $size ) : 0 ),
+    };
+  } else {
+    die "Unrecognized line \"$_\"";
+  }
 }
 
 # Add symbols that we know will be generated or required by the linker
@@ -29,16 +45,26 @@ foreach my $object ( keys %$symtab ) {
   $obj_symbol =~ s/\W/_/g;
   $symtab->{LINKER}->{$obj_symbol} = {
     global	=> 1,
-    type	=> 'U',
+    section	=> undef,
     value	=> 0,
     size	=> 0,
   };
 }
-foreach my $link_sym qw ( _prefix _eprefix _decompress _edecompress _text
-			  _etext _data _edata _bss _ebss _end ) {
+foreach my $link_sym qw ( __prefix _prefix _prefix_load_offset
+			  _prefix_size _prefix_progbits_size _prefix_size_pgh
+			  __text16 _text16 _text16_load_offset
+			  _text16_size _text16_progbits_size _text16_size_pgh
+			  __data16 _data16 _data16_load_offset
+			  _data16_size _data16_progbits_size _data16_size_pgh
+			  __text _text __data _data _textdata_load_offset
+			  _textdata_size _textdata_progbits_size
+			  __rodata __bss _end
+			  _payload_offset _max_align
+			  _load_size _load_size_pgh _load_size_sect
+			  pci_vendor_id pci_device_id ) {
   $symtab->{LINKER}->{$link_sym} = {
     global	=> 1,
-    type       	=> 'A',
+    section	=> '*ABS*',
     value	=> 0,
     size	=> 0,
   };
@@ -51,9 +77,15 @@ my $globals = {};
 while ( ( my $object, my $symbols ) = each %$symtab ) {
   while ( ( my $symbol, my $info ) = each %$symbols ) {
     if ( $info->{global} ) {
-      my $category = ( ( $info->{type} eq 'U' ? "requires" :
-			 ( $info->{type} eq 'C' ? "shares" : "provides" ) ) );
-      $globals->{$symbol}->{$category}->{$object} = 1;
+      my $category;
+      if ( ! defined $info->{section} ) {
+	$category = "requires";
+      } elsif ( $info->{section} eq "*COM*" ) {
+	$category = "shares";
+      } else {
+	$category = "provides";
+      }
+      $globals->{$symbol}->{$category}->{$object} = $info->{section};
     }
   }
 }
@@ -66,36 +98,27 @@ while ( ( my $symbol, my $info ) = each %$globals ) {
   my @requires = keys %{$info->{requires}};
   my @shares = keys %{$info->{shares}};
 
-  if ( ( @provides == 0 ) && ( @shares == 1 ) ) {
-    # A symbol "shared" by just a single file is actually being
-    # provided by that file; it just doesn't have an initialiser.
-    @provides = @shares;
-    @shares = ();
-  }
-
-  if ( ( @requires > 0 ) && ( @provides == 0 ) ) {
+  if ( ( @requires > 0 ) && ( @provides == 0 ) && ( @shares == 0 ) ) {
     # No object provides this symbol, but some objects require it.
     $problems->{$_}->{nonexistent}->{$symbol} = 1 foreach @requires;
   }
 
   if ( ( @requires == 0 ) && ( @provides > 0 ) ) {
     # No object requires this symbol, but some objects provide it.
-    $problems->{$_}->{unused}->{$symbol} = 1 foreach @provides;
-  }
-
-  if ( ( @shares > 0 ) && ( @requires > 0 ) ) {
-    # A shared symbol is being referenced from another object
-    $problems->{$_}->{shared}->{$symbol} = 1 foreach @requires;
+    foreach my $provide ( @provides ) {
+      if ( $provide eq "LINKER" ) {
+	# Linker-provided symbols are exempt from this check.
+      } elsif ( $info->{provides}->{$provide} =~ /^\.tbl\./ ) {
+	# Linker tables are exempt from this check.
+      } else {
+	$problems->{$provide}->{unused}->{$symbol} = 1;
+      }
+    }
   }
 
   if ( ( @shares > 0 ) && ( @provides > 0 ) ) {
     # A shared symbol is being initialised by an object
     $problems->{$_}->{shared}->{$symbol} = 1 foreach @provides;
-  }
-
-  if ( ( @shares > 0 ) && ! ( $symbol =~ /^_shared_/ ) ) {
-    # A shared symbol is not declared via __shared
-    $problems->{$_}->{shared}->{$symbol} = 1 foreach @shares;
   }
 
   if ( @provides > 1 ) {
@@ -110,7 +133,8 @@ while ( ( my $symbol, my $info ) = each %$globals ) {
 while ( ( my $object, my $symbols ) = each %$symtab ) {
   while ( ( my $symbol, my $info ) = each %$symbols ) {
     if ( ( ! $info->{global} ) &&
-	 ( ! ( $info->{type} =~ /^(t|r)$/ ) ) &&
+	 ( ( defined $info->{section} ) &&
+	   ! ( $info->{section} =~ /^(\.text|\.rodata)/ ) ) &&
 	 ( $info->{size} >= WARNING_SIZE ) ) {
       $problems->{$object}->{large}->{$symbol} = 1;
     }

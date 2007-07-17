@@ -454,7 +454,7 @@ CLEANUP	+= TAGS*
 #
 SYMTAB	= $(BIN)/symtab
 $(SYMTAB) : $(BLIB)
-	$(NM) -o -S $< > $@
+	$(OBJDUMP) -w -t $< > $@
 
 CLEANUP	+= $(BIN)/symtab
 
