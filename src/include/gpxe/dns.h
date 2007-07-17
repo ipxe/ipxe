@@ -87,6 +87,4 @@ union dns_rr_info {
 	struct dns_rr_info_cname cname;
 };
 
-extern struct sockaddr_tcpip nameserver;
-
 #endif /* _GPXE_DNS_H */

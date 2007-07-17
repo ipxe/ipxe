@@ -40,7 +40,7 @@
  */
 
 /** The DNS server */
-struct sockaddr_tcpip nameserver = {
+static struct sockaddr_tcpip nameserver = {
 	.st_port = htons ( DNS_PORT ),
 };
 
