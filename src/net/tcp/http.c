@@ -216,7 +216,7 @@ struct http_header_handler {
 };
 
 /** List of HTTP header handlers */
-struct http_header_handler http_header_handlers[] = {
+static struct http_header_handler http_header_handlers[] = {
 	{
 		.header = "Content-Length",
 		.rx = http_rx_content_length,
@@ -279,7 +279,7 @@ struct http_line_handler {
 };
 
 /** List of HTTP line-based data handlers */
-struct http_line_handler http_line_handlers[] = {
+static struct http_line_handler http_line_handlers[] = {
 	[HTTP_RX_RESPONSE]	= { .rx = http_rx_response },
 	[HTTP_RX_HEADER]	= { .rx = http_rx_header },
 };
