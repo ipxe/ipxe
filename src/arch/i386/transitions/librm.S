@@ -472,6 +472,9 @@ real_call:
 	call	*rc_function
 	pushal
 
+	/* For sanity's sake, clear the direction flag as soon as possible */
+	cld
+
 	/* Switch to protected mode and move register dump back to PM stack */
 	movl	$RC_OFFSET_RETADDR, %ecx
 	pushl	$1f
