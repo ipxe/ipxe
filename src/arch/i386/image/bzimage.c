@@ -327,7 +327,8 @@ static int bzimage_load_header ( struct image *image,
 	copy_from_user ( bzhdr, image->data, BZI_HDR_OFFSET,
 			 sizeof ( *bzhdr ) );
 	if ( bzhdr->header != BZI_SIGNATURE ) {
-		DBGC ( image, "bzImage %p bad signature\n", image );
+		DBGC ( image, "bzImage %p bad signature %08lx\n",
+		       image, bzhdr->header );
 		return -ENOEXEC;
 	}
 
