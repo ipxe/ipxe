@@ -277,7 +277,7 @@ gdt_end:
  * Sets limits on the data segments %ds and %es.
  *
  * Parameters:
- *   %cx : segment type (FLAT_DS for 4GB or REAL_DS for 64kB)
+ *   %dx : segment type (FLAT_DS for 4GB or REAL_DS for 64kB)
  ****************************************************************************
  */
 
@@ -309,8 +309,8 @@ set_real_mode_limits:
 	movl	%eax, %cr0
 
 	/* Set flat segment limits */
-	movw	%cx, %ds
-	movw	%cx, %es
+	movw	%dx, %ds
+	movw	%dx, %es
 
 	/* Switch back to real mode */
 	movl	%cr0, %eax
@@ -355,6 +355,7 @@ install:
 install_prealloc:
 	/* Save registers */
 	pushl	%esi
+	pushw	%dx
 	/* Install .text16 and .data16 */
 	movl	$_payload_offset, %esi
 	call	install_basemem
@@ -385,7 +386,7 @@ install_prealloc:
 	 * prior to reading the E820 memory map and relocating
 	 * properly.
 	 */
-	movw	$FLAT_DS, %cx
+	movw	$FLAT_DS, %dx
 	call	set_real_mode_limits
 	movl	$HIGHMEM_LOADPOINT, %edi
 	call	install_highmem
@@ -400,7 +401,7 @@ install_prealloc:
 	addw	$4, %sp
 
 	/* Move code to new location, set up new protected-mode GDT */
-	movw	$FLAT_DS, %cx
+	movw	$FLAT_DS, %dx
 	call	set_real_mode_limits
 	pushl	%edi
 	es rep addr32 movsb
@@ -408,7 +409,7 @@ install_prealloc:
 	lcall	*init_librm_vector
 
 	/* Restore real-mode segment limits */
-	movw	$REAL_DS, %cx
+	movw	$REAL_DS, %dx
 	call	set_real_mode_limits
 
 	/* Restore registers and interrupt status */
@@ -417,6 +418,7 @@ install_prealloc:
 	popw	%ds
 	popfw
 #endif
+	popw	%dx
 	popl	%esi
 	ret
 	.size install_prealloc, . - install_prealloc
