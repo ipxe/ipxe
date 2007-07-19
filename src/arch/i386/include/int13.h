@@ -203,6 +203,34 @@ struct int13_disk_parameters {
 
 /** @} */ 
 
+/** Bootable CD-ROM specification packet */
+struct int13_cdrom_specification {
+	/** Size of packet in bytes */
+	uint8_t size;
+	/** Boot media type */
+	uint8_t media_type;
+	/** Drive number */
+	uint8_t drive;
+	/** CD-ROM controller number */
+	uint8_t controller;
+	/** LBA of disk image to emulate */
+	uint32_t lba;
+	/** Device specification */
+	uint16_t device;
+	/** Segment of 3K buffer for caching CD-ROM reads */
+	uint16_t cache_segment;
+	/** Load segment for initial boot image */
+	uint16_t load_segment;
+	/** Number of 512-byte sectors to load */
+	uint16_t load_sectors;
+	/** Low 8 bits of cylinder number */
+	uint8_t cyl;
+	/** Sector number, plus high 2 bits of cylinder number */
+	uint8_t cyl_sector;
+	/** Head number */
+	uint8_t head;
+} __attribute__ (( packed ));
+
 /** A C/H/S address within a partition table entry */
 struct partition_chs {
 	/** Head number */

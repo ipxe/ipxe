@@ -317,15 +317,6 @@ static int int13_get_extended_parameters ( struct int13_drive *drive,
 	return 0;
 }
 
-struct int13_cdrom_specification {
-	/** Size of packet in bytes */
-	uint8_t size;
-	/** Boot media type */
-	uint8_t media_type;
-	/** Drive number */
-	uint8_t drive;
-};
-
 /**
  * INT 13, 4b - Get CD-ROM status / terminate emulation
  *
@@ -336,6 +327,9 @@ struct int13_cdrom_specification {
 static int int13_cdrom_status_terminate ( struct int13_drive *drive,
 					  struct i386_all_regs *ix86 ) {
 	struct int13_cdrom_specification specification;
+	unsigned int max_cylinder = drive->cylinders - 1;
+	unsigned int max_head = drive->heads - 1;
+	unsigned int max_sector = drive->sectors_per_track; /* sic */
 
 	DBG ( "Get CD-ROM emulation parameters to %04x:%04x\n",
 	      ix86->segs.ds, ix86->regs.di );
@@ -343,6 +337,12 @@ static int int13_cdrom_status_terminate ( struct int13_drive *drive,
 	memset ( &specification, 0, sizeof ( specification ) );
 	specification.size = sizeof ( specification );
 	specification.drive = drive->drive;
+	specification.cyl = ( max_cylinder & 0xff );
+	specification.cyl_sector = ( ( ( max_cylinder >> 8 ) << 6 ) |
+				     max_sector );
+	specification.head = max_head;
+
+	DBG_HD ( &specification, sizeof ( specification ) );
 
 	copy_to_real ( ix86->segs.ds, ix86->regs.si, &specification,
 		       sizeof ( specification ) );
