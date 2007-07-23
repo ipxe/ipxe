@@ -29,7 +29,7 @@
  *
  */
 
-#warning "Temporary hack"
+/* FIXME: "Temporary hack" */
 struct nvo_block *ugly_nvo_hack = NULL;
 
 /**
