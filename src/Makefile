@@ -14,6 +14,10 @@ NON_AUTO_MEDIA	:=
 MAKEDEPS	+= Config
 include Config
 
+# Location to place generated files
+#
+BIN		:= bin
+
 # If no architecture is specified in Config or on the command-line,
 # use that of the build machine.
 #
@@ -35,7 +39,7 @@ include arch/$(ARCH)/Config
 # If invoked with no build target, print out a helpfully suggestive
 # message.
 #
-noargs : blib
+noargs : blib $(BIN)/NIC
 	@echo '===================================================='
 	@echo
 	@echo ' *** WARNING: THE INSTRUCTIONS BELOW DO NOT FULLY WORK YET !!!  ***'
@@ -92,10 +96,6 @@ SORTOBJDUMP	?= $(PERL) ./util/sortobjdump.pl
 NRV2B		?= ./util/nrv2b
 ZBIN		?= ./util/zbin
 DOXYGEN		?= doxygen
-
-# Location to place generated files
-#
-BIN		?= bin
 
 # Common flags
 #
