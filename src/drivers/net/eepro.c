@@ -32,6 +32,7 @@ has 34 pins, the top row of 2 are not used.
  */
 
 #include "etherboot.h"
+#include <errno.h>
 #include "nic.h"
 #include <gpxe/isa.h>
 #include "timer.h"

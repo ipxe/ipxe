@@ -15,6 +15,7 @@
 
 #include "etherboot.h"
 #include "nic.h"
+#include <errno.h>
 #include <gpxe/pci.h>
 #include <gpxe/ethernet.h>
 #include "timer.h"

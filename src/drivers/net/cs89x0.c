@@ -66,6 +66,7 @@
 
   */
 
+#include <errno.h>
 #include <gpxe/ethernet.h>
 #include "etherboot.h"
 #include "nic.h"

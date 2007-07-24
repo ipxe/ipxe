@@ -7,6 +7,7 @@
 #include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
+#include <errno.h>
 #include <io.h>
 #include <timer.h>
 #include <gpxe/device.h>

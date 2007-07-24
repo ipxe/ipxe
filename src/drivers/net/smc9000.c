@@ -36,6 +36,7 @@
 #endif
 
 #include <gpxe/ethernet.h>
+#include <errno.h>
 #include "etherboot.h"
 #include "nic.h"
 #include <gpxe/isa.h>
