@@ -1,4 +1,4 @@
-#warning "depca.c: FIXME: fix relocation"
+/* #warning "depca.c: FIXME: fix relocation" */
 
 #if 0
 /* Not fixed for relocation yet. Probably won't work relocated above 16MB */
