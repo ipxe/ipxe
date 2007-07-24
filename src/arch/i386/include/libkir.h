@@ -13,6 +13,8 @@
 /* Access to variables in .data16 and .text16 in a way compatible with librm */
 #define __data16( variable ) variable
 #define __data16_array( variable, array ) variable array
+#define __bss16( variable ) variable
+#define __bss16_array( variable, array ) variable array
 #define __text16( variable ) variable
 #define __text16_array( variable,array ) variable array
 #define __use_data16( variable ) variable
@@ -38,34 +40,41 @@ static inline __attribute__ (( always_inline )) unsigned int _rm_ds ( void ) {
 
 /* Copy to/from base memory */
 
-static inline void copy_to_real_libkir ( uint16_t dest_seg, uint16_t dest_off,
+static inline void copy_to_real_libkir ( unsigned int dest_seg,
+					 unsigned int dest_off,
 					 const void *src, size_t n ) {
-	__asm__ __volatile__ ( "movw %4, %%es\n\t"
-			       "cld\n\t"
+	unsigned int discard_D, discard_S, discard_c;
+
+	__asm__ __volatile__ ( "pushw %%es\n\t"
+			       "movw %3, %%es\n\t"
 			       "rep movsb\n\t"
-			       "pushw %%ds\n\t" /* restore %es */
 			       "popw %%es\n\t"
-			       : "=S" ( src ), "=D" ( dest_off ),
-			         "=c" ( n ) /* clobbered */
-			       : "S" ( src ), "r" ( dest_seg ),
-			         "D" ( dest_off ), "c" ( n )
+			       : "=D" ( discard_D ), "=S" ( discard_S ),
+			         "=c" ( discard_c )
+			       : "r" ( dest_seg ), "D" ( dest_off ),
+			         "S" ( src ),
+			         "c" ( n )
 			       : "memory" );
 }
 
 static inline void copy_from_real_libkir ( void *dest,
-					   uint16_t src_seg, uint16_t src_off,
+					   unsigned int src_seg,
+					   unsigned int src_off,
 					   size_t n ) {
-	__asm__ __volatile__ ( "movw %%ax, %%ds\n\t"
-			       "cld\n\t"
+	unsigned int discard_D, discard_S, discard_c;
+
+	__asm__ __volatile__ ( "pushw %%ds\n\t"
+			       "movw %4, %%ds\n\t"
 			       "rep movsb\n\t"
-			       "pushw %%es\n\t" /* restore %ds */
 			       "popw %%ds\n\t"
-			       : "=S" ( src_off ), "=D" ( dest ),
-			         "=c" ( n ) /* clobbered */
-			       : "a" ( src_seg ), "S" ( src_off ),
-			         "D" ( dest ), "c" ( n )
+			       : "=D" ( discard_D ), "=S" ( discard_S ),
+			         "=c" ( discard_c )
+			       : "D" ( dest ),
+			         "r" ( src_seg ), "S" ( src_off ),
+			         "c" ( n )
 			       : "memory" );
 }
+
 #define copy_to_real copy_to_real_libkir
 #define copy_from_real copy_from_real_libkir
 
@@ -203,15 +212,6 @@ static inline __attribute__ (( always_inline )) userptr_t
 virt_to_user ( void * virtual ) {
 	return real_to_user ( rm_ds, ( intptr_t ) virtual );
 }
-
-/* Place/remove parameter on real-mode stack in a way that's
- * compatible with libkir
- */
-#define BASEMEM_PARAMETER_INIT_LIBKIR( param ) \
-	( ( uint16_t ) ( ( uint32_t ) & ( param ) ) )
-#define BASEMEM_PARAMETER_DONE_LIBKIR( param )
-#define BASEMEM_PARAMETER_INIT BASEMEM_PARAMETER_INIT_LIBKIR
-#define BASEMEM_PARAMETER_DONE BASEMEM_PARAMETER_DONE_LIBKIR
 
 /* TEXT16_CODE: declare a fragment of code that resides in .text16 */
 #define TEXT16_CODE( asm_code_str )			\

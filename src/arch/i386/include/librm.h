@@ -263,20 +263,6 @@ user_to_phys ( userptr_t buffer, off_t offset ) {
 	return virt_to_phys ( ( void * ) buffer + offset );
 }
 
-/* Copy to/from real-mode stack */
-extern uint16_t copy_to_rm_stack ( void *data, size_t size );
-extern void remove_from_rm_stack ( void *data, size_t size );
-
-/* Place/remove parameter on real-mode stack in a way that's
- * compatible with libkir
- */
-#define BASEMEM_PARAMETER_INIT_LIBRM( param ) \
-	copy_to_rm_stack ( & ( param ), sizeof ( param ) )
-#define BASEMEM_PARAMETER_DONE_LIBRM( param ) \
-	remove_from_rm_stack ( & ( param ), sizeof ( param ) )
-#define BASEMEM_PARAMETER_INIT BASEMEM_PARAMETER_INIT_LIBRM
-#define BASEMEM_PARAMETER_DONE BASEMEM_PARAMETER_DONE_LIBRM
-
 /* TEXT16_CODE: declare a fragment of code that resides in .text16 */
 #define TEXT16_CODE( asm_code_str )			\
 	".section \".text16\", \"ax\", @progbits\n\t"	\
