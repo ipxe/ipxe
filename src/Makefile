@@ -101,7 +101,7 @@ DOXYGEN		?= doxygen
 #
 CFLAGS		+= -I include -I arch/$(ARCH)/include -I . -DARCH=$(ARCH)
 CFLAGS		+= -Os -ffreestanding
-CFLAGS		+= -Wall -W
+CFLAGS		+= -Wall -W -Werror
 CFLAGS		+= -g
 CFLAGS		+= $(EXTRA_CFLAGS)
 ASFLAGS		+= $(EXTRA_ASFLAGS)
