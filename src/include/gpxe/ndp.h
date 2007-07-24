@@ -1,6 +1,5 @@
 #include <stdint.h>
 #include <byteswap.h>
-#include <errno.h>
 #include <string.h>
 #include <gpxe/icmp6.h>
 #include <gpxe/ip6.h>

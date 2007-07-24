@@ -395,7 +395,6 @@ static int tcp_xmit ( struct tcp_connection *tcp, int force_send ) {
 	size_t seq_len;
 	size_t app_win;
 	size_t rcv_win;
-	int rc;
 
 	/* If retransmission timer is already running, do nothing */
 	if ( timer_running ( &tcp->timer ) )
@@ -485,25 +484,8 @@ static int tcp_xmit ( struct tcp_connection *tcp, int force_send ) {
 	DBGC ( tcp, "\n" );
 
 	/* Transmit packet */
-	rc = tcpip_tx ( iobuf, &tcp_protocol, &tcp->peer, NULL, &tcphdr->csum );
-
-	/* If we got -ENETUNREACH, kill the connection immediately
-	 * because there is no point retrying.  This isn't strictly
-	 * necessary (since we will eventually time out anyway), but
-	 * it avoids irritating needless delays.  Don't do this for
-	 * RST packets transmitted on connection abort, to avoid a
-	 * potential infinite loop.
-	 */
-	if ( ( ! ( tcp->tcp_state & TCP_STATE_SENT ( TCP_RST ) ) ) &&
-	     ( rc == -ENETUNREACH ) ) {
-		DBGC ( tcp, "TCP %p aborting after TX failed: %s\n",
-		       tcp, strerror ( rc ) );
-		tcp->tcp_state = TCP_CLOSED;
-		tcp_dump_state ( tcp );
-		tcp_close ( tcp, rc );
-	}
-
-	return rc;
+	return tcpip_tx ( iobuf, &tcp_protocol, &tcp->peer, NULL,
+			  &tcphdr->csum );
 }
 
 /**

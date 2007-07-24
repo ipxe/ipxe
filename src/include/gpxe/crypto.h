@@ -9,7 +9,6 @@
 
 #include <stdint.h>
 #include <stddef.h>
-#include <errno.h>
 
 /** A cryptographic algorithm */
 struct crypto_algorithm {
@@ -101,30 +100,17 @@ static inline int cipher_setkey ( struct crypto_algorithm *crypto,
 	return crypto->setkey ( ctx, key, keylen );
 }
 
-static inline int cipher_encrypt ( struct crypto_algorithm *crypto,
-				   void *ctx, const void *src, void *dst,
-				   size_t len ) {
-	if ( ( len & ( crypto->blocksize - 1 ) ) ) {
-		return -EINVAL;
-	}
-	crypto->encode ( ctx, src, dst, len );
-	return 0;
-}
-
-static inline int cipher_decrypt ( struct crypto_algorithm *crypto,
-				   void *ctx, const void *src, void *dst,
-				   size_t len ) {
-	if ( ( len & ( crypto->blocksize - 1 ) ) ) {
-		return -EINVAL;
-	}
-	crypto->decode ( ctx, src, dst, len );
-	return 0;
-}
-
 static inline int is_stream_cipher ( struct crypto_algorithm *crypto ) {
 	return ( crypto->blocksize == 1 );
 }
 
 extern struct crypto_algorithm crypto_null;
+
+extern int cipher_encrypt ( struct crypto_algorithm *crypto,
+			    void *ctx, const void *src, void *dst,
+			    size_t len );
+extern int cipher_decrypt ( struct crypto_algorithm *crypto,
+			    void *ctx, const void *src, void *dst,
+			    size_t len );
 
 #endif /* _GPXE_CRYPTO_H */

@@ -267,6 +267,9 @@ extern void dbg_hex_dump_da ( unsigned long dispaddr,
 #define NDEBUG
 #endif
 
+/** Select file identifier for errno.h (if used) */
+#define ERRFILE PREFIX_OBJECT ( ERRFILE_ )
+
 /** Declare a data structure as packed. */
 #define PACKED __attribute__ (( packed ))
 

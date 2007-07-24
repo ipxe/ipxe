@@ -1,5 +1,6 @@
 #include "crypto/axtls/crypto.h"
 #include <string.h>
+#include <errno.h>
 #include <gpxe/crypto.h>
 #include <gpxe/aes.h>
 

@@ -17,6 +17,7 @@
  */
 
 #include <stdint.h>
+#include <errno.h>
 #include <gpxe/malloc.h>
 #include <gpxe/iobuf.h>
 
@@ -72,3 +73,22 @@ void free_iob ( struct io_buffer *iobuf ) {
 			   ( iobuf->end - iobuf->head ) + sizeof ( *iobuf ) );
 	}
 }
+
+/**
+ * Ensure I/O buffer has sufficient headroom
+ *
+ * @v iobuf	I/O buffer
+ * @v len	Required headroom
+ *
+ * This function currently only checks for the required headroom; it
+ * does not reallocate the I/O buffer if required.  If we ever have a
+ * code path that requires this functionality, it's a fairly trivial
+ * change to make.
+ */
+int iob_ensure_headroom ( struct io_buffer *iobuf, size_t len ) {
+
+	if ( iob_headroom ( iobuf ) >= len )
+		return 0;
+	return -ENOBUFS;
+}
+

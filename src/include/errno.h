@@ -7,35 +7,53 @@
  *
  * Return status codes as used within gPXE are designed to allow for
  * maximum visibility into the source of an error even in an end-user
- * build with no debugging.  They are constructed in three parts: a
- * PXE error code, a POSIX error code, and a gPXE-specific error code.
+ * build with no debugging.  They are constructed as follows:
  *
- * The low byte is the closest equivalent PXE error code
+ * Bits 7-0 : PXE error code
+ *
+ * This is the closest equivalent PXE error code
  * (e.g. PXENV_STATUS_OUT_OF_RESOURCES), and is the only part of the
  * error that will be returned via the PXE API, since PXE has
  * predefined error codes.
  *
- * The next byte is the closest equivalent POSIX error code
- * (e.g. ENOMEM).
+ * Bits 12-8 : Per-file disambiguator
  *
- * The remaining bytes are the gPXE-specific error code, which allow
- * us to disambiguate between errors which should have the same POSIX
- * error code but which mean very different things to the user
- * (e.g. ENOENT due to a DNS name not existing versus ENOENT due to
- * a web server returning HTTP/404 Not Found).
+ * When the same error number can be generated from multiple points
+ * within a file, this field can be used to identify the unique
+ * instance.
+ *
+ * Bits 23-13 : File identifier
+ *
+ * This is a unique identifier for the file generating the error
+ * (e.g. ERRFILE_tcp for tcp.c).
+ *
+ * Bits 30-24 : POSIX error code
+ *
+ * This is the closest equivalent POSIX error code (e.g. ENOMEM).
+ *
+ * Bit 31 : Reserved
+ *
+ * Errors are usually return as negative error numbers (e.g. -EINVAL);
+ * bit 31 is therefore unusable.
+ *
  *
  * The convention within the code is that errors are negative and
- * expressed as the bitwise OR of a POSIX error code and (optionally)
- * a gPXE error code, as in
+ * expressed using the POSIX error code and (optionally) a per-file
+ * disambiguator, e.g.
  *
- *     return -( ENOENT | NO_SUCH_FILE );
+ *     return -EINVAL;
  *
- * The POSIX error code is #defined to include the closest matching
- * PXE error code (which, in most cases, is just
- * PXENV_STATUS_FAILURE), so we don't need to litter the codebase with
- * PXEisms.
+ * or
  *
- * Functions that wish to return failure should be declared as
+ *     #define ETCP_BAD_CHECKSUM EUNIQ_02
+ *     return -( EINVAL | ETCP_BAD_CHECKSUM )
+ *
+ * By various bits of preprocessor magic, the PXE error code and file
+ * identifier are already incorporated into the definition of the
+ * POSIX error code, which keeps the code relatively clean.
+ *
+ *
+ * Functions that wish to return failures should be declared as
  * returning an integer @c rc "Return status code".  A return value of
  * zero indicates success, a non-zero value indicates failure.  The
  * return value can be passed directly to strerror() in order to
@@ -50,6 +68,20 @@
  * be directly propagated upward to the calling function.
  *
  */
+
+/* Get definitions for file identifiers */
+#include <gpxe/errfile.h>
+
+/* If we do not have a valid file identifier, generate a compiler
+ * warning upon usage of any error codes.  (Don't just use a #warning,
+ * because some files include errno.h but don't ever actually use any
+ * error codes.)
+ */
+#if ! ERRFILE
+extern char missing_errfile_declaration[] __attribute__ (( deprecated ));
+#undef ERRFILE
+#define ERRFILE ( 0 * ( ( int ) missing_errfile_declaration ) )
+#endif
 
 /** Derive PXENV_STATUS code from gPXE error number */
 #define PXENV_STATUS( rc ) ( (-(rc)) & 0x00ff )
@@ -178,261 +210,296 @@
  */
 
 /** Operation completed successfully */
-#define ENOERR				      ( PXENV_STATUS_SUCCESS | 0x0000 )
+#define ENOERR			( ERRFILE | PXENV_STATUS_SUCCESS | 0x00000000 )
 
 /** Arg list too long */
-#define E2BIG				     ( PXENV_STATUS_BAD_FUNC | 0x0100 )
+#define E2BIG		       ( ERRFILE | PXENV_STATUS_BAD_FUNC | 0x01000000 )
 
 /** Permission denied */
-#define EACCES			( PXENV_STATUS_TFTP_ACCESS_VIOLATION | 0x0200 )
+#define EACCES	  ( ERRFILE | PXENV_STATUS_TFTP_ACCESS_VIOLATION | 0x02000000 )
 
 /** Address in use */
-#define EADDRINUSE			     ( PXENV_STATUS_UDP_OPEN | 0x0300 )
+#define EADDRINUSE	       ( ERRFILE | PXENV_STATUS_UDP_OPEN | 0x03000000 )
 
 /** Address not available */
-#define EADDRNOTAVAIL			     ( PXENV_STATUS_UDP_OPEN | 0x0400 )
+#define EADDRNOTAVAIL	       ( ERRFILE | PXENV_STATUS_UDP_OPEN | 0x04000000 )
 
 /** Address family not supported */
-#define EAFNOSUPPORT			  ( PXENV_STATUS_UNSUPPORTED | 0x0500 )
+#define EAFNOSUPPORT	    ( ERRFILE | PXENV_STATUS_UNSUPPORTED | 0x05000000 )
 
 /** Resource temporarily unavailable */
-#define EAGAIN				      ( PXENV_STATUS_FAILURE | 0x0600 )
+#define EAGAIN			( ERRFILE | PXENV_STATUS_FAILURE | 0x06000000 )
 
 /** Connection already in progress */
-#define EALREADY			     ( PXENV_STATUS_UDP_OPEN | 0x0700 )
+#define EALREADY	       ( ERRFILE | PXENV_STATUS_UDP_OPEN | 0x07000000 )
 
 /** Bad file descriptor */
-#define EBADF				  ( PXENV_STATUS_TFTP_CLOSED | 0x0800 )
+#define EBADF		    ( ERRFILE | PXENV_STATUS_TFTP_CLOSED | 0x08000000 )
 
 /** Bad message */
-#define EBADMSG				      ( PXENV_STATUS_FAILURE | 0x0900 )
+#define EBADMSG			( ERRFILE | PXENV_STATUS_FAILURE | 0x09000000 )
 
 /** Resource busy */
-#define EBUSY			     ( PXENV_STATUS_OUT_OF_RESOURCES | 0x0a00 )
+#define EBUSY	       ( ERRFILE | PXENV_STATUS_OUT_OF_RESOURCES | 0x0a000000 )
 
 /** Operation canceled */
-#define ECANCELED	   ( PXENV_STATUS_BINL_CANCELED_BY_KEYSTROKE | 0x0b00 )
+#define ECANCELED \
+	     ( ERRFILE | PXENV_STATUS_BINL_CANCELED_BY_KEYSTROKE | 0x0b000000 )
 
 /** No child processes */
-#define ECHILD			  ( PXENV_STATUS_TFTP_FILE_NOT_FOUND | 0x0c00 )
+#define ECHILD	    ( ERRFILE | PXENV_STATUS_TFTP_FILE_NOT_FOUND | 0x0c000000 )
 
 /** Connection aborted */
-#define ECONNABORTED ( PXENV_STATUS_TFTP_CANNOT_READ_FROM_CONNECTION | 0x0d00 )
+#define ECONNABORTED \
+       ( ERRFILE | PXENV_STATUS_TFTP_CANNOT_READ_FROM_CONNECTION | 0x0d000000 )
 
 /** Connection refused */
-#define ECONNREFUSED	  ( PXENV_STATUS_TFTP_CANNOT_OPEN_CONNECTION | 0x0e00 )
+#define ECONNREFUSED \
+	    ( ERRFILE | PXENV_STATUS_TFTP_CANNOT_OPEN_CONNECTION | 0x0e000000 )
 
 /** Connection reset */
-#define ECONNRESET   ( PXENV_STATUS_TFTP_CANNOT_READ_FROM_CONNECTION | 0x0f00 )
+#define ECONNRESET \
+       ( ERRFILE | PXENV_STATUS_TFTP_CANNOT_READ_FROM_CONNECTION | 0x0f000000 )
 
 /** Resource deadlock avoided */
-#define EDEADLK				      ( PXENV_STATUS_FAILURE | 0x1000 )
+#define EDEADLK			( ERRFILE | PXENV_STATUS_FAILURE | 0x10000000 )
 
 /** Destination address required */
-#define EDESTADDRREQ			     ( PXENV_STATUS_BAD_FUNC | 0x1100 )
+#define EDESTADDRREQ	       ( ERRFILE | PXENV_STATUS_BAD_FUNC | 0x11000000 )
 
 /** Domain error */
-#define EDOM				      ( PXENV_STATUS_FAILURE | 0x1200 )
+#define EDOM			( ERRFILE | PXENV_STATUS_FAILURE | 0x12000000 )
 
 /** Reserved */
-#define EDQUOT				      ( PXENV_STATUS_FAILURE | 0x1300 )
+#define EDQUOT			( ERRFILE | PXENV_STATUS_FAILURE | 0x13000000 )
 
 /** File exists */
-#define EEXIST				      ( PXENV_STATUS_FAILURE | 0x1400 )
+#define EEXIST			( ERRFILE | PXENV_STATUS_FAILURE | 0x14000000 )
 
 /** Bad address */
-#define EFAULT				( PXENV_STATUS_MCOPY_PROBLEM | 0x1500 )
+#define EFAULT		  ( ERRFILE | PXENV_STATUS_MCOPY_PROBLEM | 0x15000000 )
 
 /** File too large */
-#define EFBIG				( PXENV_STATUS_MCOPY_PROBLEM | 0x1600 )
+#define EFBIG		  ( ERRFILE | PXENV_STATUS_MCOPY_PROBLEM | 0x16000000 )
 
 /** Host is unreachable */
-#define EHOSTUNREACH			  ( PXENV_STATUS_ARP_TIMEOUT | 0x1700 )
+#define EHOSTUNREACH	    ( ERRFILE | PXENV_STATUS_ARP_TIMEOUT | 0x17000000 )
 
 /** Identifier removed */
-#define EIDRM				      ( PXENV_STATUS_FAILURE | 0x1800 )
+#define EIDRM			( ERRFILE | PXENV_STATUS_FAILURE | 0x18000000 )
 
 /** Illegal byte sequence */
-#define EILSEQ				      ( PXENV_STATUS_FAILURE | 0x1900 )
+#define EILSEQ			( ERRFILE | PXENV_STATUS_FAILURE | 0x19000000 )
 
 /** Operation in progress */
-#define EINPROGRESS			      ( PXENV_STATUS_FAILURE | 0x1a00 )
+#define EINPROGRESS		( ERRFILE | PXENV_STATUS_FAILURE | 0x1a000000 )
 
 /** Interrupted function call */
-#define EINTR				      ( PXENV_STATUS_FAILURE | 0x1b00 )
+#define EINTR			( ERRFILE | PXENV_STATUS_FAILURE | 0x1b000000 )
 
 /** Invalid argument */
-#define EINVAL				     ( PXENV_STATUS_BAD_FUNC | 0x1c00 )
+#define EINVAL		       ( ERRFILE | PXENV_STATUS_BAD_FUNC | 0x1c000000 )
 
 /** Input/output error */
-#define EIO	     ( PXENV_STATUS_TFTP_CANNOT_READ_FROM_CONNECTION | 0x1d00 )
+#define EIO \
+       ( ERRFILE | PXENV_STATUS_TFTP_CANNOT_READ_FROM_CONNECTION | 0x1d000000 )
 
 /** Socket is connected */
-#define EISCONN				     ( PXENV_STATUS_UDP_OPEN | 0x1e00 )
+#define EISCONN		       ( ERRFILE | PXENV_STATUS_UDP_OPEN | 0x1e000000 )
 
 /** Is a directory */
-#define EISDIR				      ( PXENV_STATUS_FAILURE | 0x1f00 )
+#define EISDIR			( ERRFILE | PXENV_STATUS_FAILURE | 0x1f000000 )
 
 /** Too many levels of symbolic links */
-#define ELOOP				      ( PXENV_STATUS_FAILURE | 0x2000 )
+#define ELOOP			( ERRFILE | PXENV_STATUS_FAILURE | 0x20000000 )
 
 /** Too many open files */
-#define EMFILE			     ( PXENV_STATUS_OUT_OF_RESOURCES | 0x2100 )
+#define EMFILE	       ( ERRFILE | PXENV_STATUS_OUT_OF_RESOURCES | 0x21000000 )
 
 /** Too many links */
-#define EMLINK				      ( PXENV_STATUS_FAILURE | 0x2200 )
+#define EMLINK			( ERRFILE | PXENV_STATUS_FAILURE | 0x22000000 )
 
 /** Inappropriate message buffer length */
-#define EMSGSIZE			     ( PXENV_STATUS_BAD_FUNC | 0x2300 )
+#define EMSGSIZE	       ( ERRFILE | PXENV_STATUS_BAD_FUNC | 0x23000000 )
 
 /** Reserved */
-#define EMULTIHOP			      ( PXENV_STATUS_FAILURE | 0x2400 )
+#define EMULTIHOP		( ERRFILE | PXENV_STATUS_FAILURE | 0x24000000 )
 
 /** Filename too long */
-#define ENAMETOOLONG			      ( PXENV_STATUS_FAILURE | 0x2500 )
+#define ENAMETOOLONG		( ERRFILE | PXENV_STATUS_FAILURE | 0x25000000 )
 
 /** Network is down */
-#define ENETDOWN			  ( PXENV_STATUS_ARP_TIMEOUT | 0x2600 )
+#define ENETDOWN	    ( ERRFILE | PXENV_STATUS_ARP_TIMEOUT | 0x26000000 )
 
 /** Connection aborted by network */
-#define ENETRESET			      ( PXENV_STATUS_FAILURE | 0x2700 )
+#define ENETRESET		( ERRFILE | PXENV_STATUS_FAILURE | 0x27000000 )
 
 /** Network unreachable */
-#define ENETUNREACH			  ( PXENV_STATUS_ARP_TIMEOUT | 0x2800 )
+#define ENETUNREACH	    ( ERRFILE | PXENV_STATUS_ARP_TIMEOUT | 0x28000000 )
 
 /** Too many open files in system */
-#define ENFILE			     ( PXENV_STATUS_OUT_OF_RESOURCES | 0x2900 )
+#define ENFILE	       ( ERRFILE | PXENV_STATUS_OUT_OF_RESOURCES | 0x29000000 )
 
 /** No buffer space available */
-#define ENOBUFS			     ( PXENV_STATUS_OUT_OF_RESOURCES | 0x2a00 )
+#define ENOBUFS	       ( ERRFILE | PXENV_STATUS_OUT_OF_RESOURCES | 0x2a000000 )
 
 /** No message is available on the STREAM head read queue */
-#define ENODATA				      ( PXENV_STATUS_FAILURE | 0x2b00 )
+#define ENODATA			( ERRFILE | PXENV_STATUS_FAILURE | 0x2b000000 )
 
 /** No such device */
-#define ENODEV			  ( PXENV_STATUS_TFTP_FILE_NOT_FOUND | 0x2c00 )
+#define ENODEV	    ( ERRFILE | PXENV_STATUS_TFTP_FILE_NOT_FOUND | 0x2c000000 )
 
 /** No such file or directory */
-#define ENOENT			  ( PXENV_STATUS_TFTP_FILE_NOT_FOUND | 0x2d00 )
+#define ENOENT	    ( ERRFILE | PXENV_STATUS_TFTP_FILE_NOT_FOUND | 0x2d000000 )
 
 /** Exec format error */
-#define ENOEXEC				      ( PXENV_STATUS_FAILURE | 0x2e00 )
+#define ENOEXEC			( ERRFILE | PXENV_STATUS_FAILURE | 0x2e000000 )
 
 /** No locks available */
-#define ENOLCK				      ( PXENV_STATUS_FAILURE | 0x2f00 )
+#define ENOLCK			( ERRFILE | PXENV_STATUS_FAILURE | 0x2f000000 )
 
 /** Reserved */
-#define ENOLINK				      ( PXENV_STATUS_FAILURE | 0x3000 )
+#define ENOLINK			( ERRFILE | PXENV_STATUS_FAILURE | 0x30000000 )
 
 /** Not enough space */
-#define ENOMEM			     ( PXENV_STATUS_OUT_OF_RESOURCES | 0x3100 )
+#define ENOMEM	       ( ERRFILE | PXENV_STATUS_OUT_OF_RESOURCES | 0x31000000 )
 
 /** No message of the desired type */
-#define ENOMSG				      ( PXENV_STATUS_FAILURE | 0x3200 )
+#define ENOMSG			( ERRFILE | PXENV_STATUS_FAILURE | 0x32000000 )
 
 /** Protocol not available */
-#define ENOPROTOOPT			  ( PXENV_STATUS_UNSUPPORTED | 0x3300 )
+#define ENOPROTOOPT	    ( ERRFILE | PXENV_STATUS_UNSUPPORTED | 0x33000000 )
 
 /** No space left on device */
-#define ENOSPC			     ( PXENV_STATUS_OUT_OF_RESOURCES | 0x3400 )
+#define ENOSPC	       ( ERRFILE | PXENV_STATUS_OUT_OF_RESOURCES | 0x34000000 )
 
 /** No STREAM resources */
-#define ENOSR			     ( PXENV_STATUS_OUT_OF_RESOURCES | 0x3500 )
+#define ENOSR	       ( ERRFILE | PXENV_STATUS_OUT_OF_RESOURCES | 0x35000000 )
 
 /** Not a STREAM */
-#define ENOSTR				      ( PXENV_STATUS_FAILURE | 0x3600 )
+#define ENOSTR			( ERRFILE | PXENV_STATUS_FAILURE | 0x36000000 )
 
 /** Function not implemented */
-#define ENOSYS				  ( PXENV_STATUS_UNSUPPORTED | 0x3700 )
+#define ENOSYS		    ( ERRFILE | PXENV_STATUS_UNSUPPORTED | 0x37000000 )
 
 /** The socket is not connected */
-#define ENOTCONN			      ( PXENV_STATUS_FAILURE | 0x3800 )
+#define ENOTCONN		( ERRFILE | PXENV_STATUS_FAILURE | 0x38000000 )
 
 /** Not a directory */
-#define ENOTDIR				      ( PXENV_STATUS_FAILURE | 0x3900 )
+#define ENOTDIR			( ERRFILE | PXENV_STATUS_FAILURE | 0x39000000 )
 
 /** Directory not empty */
-#define ENOTEMPTY			      ( PXENV_STATUS_FAILURE | 0x3a00 )
+#define ENOTEMPTY		( ERRFILE | PXENV_STATUS_FAILURE | 0x3a000000 )
 
 /** Not a socket */
-#define ENOTSOCK			      ( PXENV_STATUS_FAILURE | 0x3b00 )
+#define ENOTSOCK		( ERRFILE | PXENV_STATUS_FAILURE | 0x3b000000 )
 
 /** Not supported */
-#define ENOTSUP				  ( PXENV_STATUS_UNSUPPORTED | 0x3c00 )
+#define ENOTSUP		    ( ERRFILE | PXENV_STATUS_UNSUPPORTED | 0x3c000000 )
 
 /** Inappropriate I/O control operation */
-#define ENOTTY				      ( PXENV_STATUS_FAILURE | 0x3d00 )
+#define ENOTTY			( ERRFILE | PXENV_STATUS_FAILURE | 0x3d000000 )
 
 /** No such device or address */
-#define ENXIO			  ( PXENV_STATUS_TFTP_FILE_NOT_FOUND | 0x3e00 )
+#define ENXIO	    ( ERRFILE | PXENV_STATUS_TFTP_FILE_NOT_FOUND | 0x3e000000 )
 
 /** Operation not supported on socket */
-#define EOPNOTSUPP			  ( PXENV_STATUS_UNSUPPORTED | 0x3f00 )
+#define EOPNOTSUPP	    ( ERRFILE | PXENV_STATUS_UNSUPPORTED | 0x3f000000 )
 
 /** Value too large to be stored in data type */
-#define EOVERFLOW			      ( PXENV_STATUS_FAILURE | 0x4000 )
+#define EOVERFLOW		( ERRFILE | PXENV_STATUS_FAILURE | 0x40000000 )
 
 /** Operation not permitted */
-#define EPERM			( PXENV_STATUS_TFTP_ACCESS_VIOLATION | 0x4100 )
+#define EPERM	  ( ERRFILE | PXENV_STATUS_TFTP_ACCESS_VIOLATION | 0x41000000 )
 
 /** Broken pipe */
-#define EPIPE				      ( PXENV_STATUS_FAILURE | 0x4200 )
+#define EPIPE			( ERRFILE | PXENV_STATUS_FAILURE | 0x42000000 )
 
 /** Protocol error */
-#define EPROTO				      ( PXENV_STATUS_FAILURE | 0x4300 )
+#define EPROTO			( ERRFILE | PXENV_STATUS_FAILURE | 0x43000000 )
 
 /** Protocol not supported */
-#define EPROTONOSUPPORT			  ( PXENV_STATUS_UNSUPPORTED | 0x4400 )
+#define EPROTONOSUPPORT	    ( ERRFILE | PXENV_STATUS_UNSUPPORTED | 0x44000000 )
 
 /** Protocol wrong type for socket */
-#define EPROTOTYPE			      ( PXENV_STATUS_FAILURE | 0x4500 )
+#define EPROTOTYPE		( ERRFILE | PXENV_STATUS_FAILURE | 0x45000000 )
 
 /** Result too large */
-#define ERANGE				      ( PXENV_STATUS_FAILURE | 0x4600 )
+#define ERANGE			( ERRFILE | PXENV_STATUS_FAILURE | 0x46000000 )
 
 /** Read-only file system */
-#define EROFS				      ( PXENV_STATUS_FAILURE | 0x4700 )
+#define EROFS			( ERRFILE | PXENV_STATUS_FAILURE | 0x47000000 )
 
 /** Invalid seek */
-#define ESPIPE				      ( PXENV_STATUS_FAILURE | 0x4800 )
+#define ESPIPE			( ERRFILE | PXENV_STATUS_FAILURE | 0x48000000 )
 
 /** No such process */
-#define ESRCH			  ( PXENV_STATUS_TFTP_FILE_NOT_FOUND | 0x4900 )
+#define ESRCH	    ( ERRFILE | PXENV_STATUS_TFTP_FILE_NOT_FOUND | 0x49000000 )
 
 /** Stale file handle */
-#define ESTALE				      ( PXENV_STATUS_FAILURE | 0x4a00 )
+#define ESTALE			( ERRFILE | PXENV_STATUS_FAILURE | 0x4a000000 )
 
 /** STREAM ioctl() timeout */
-#define ETIME				      ( PXENV_STATUS_FAILURE | 0x4b00 )
+#define ETIME			( ERRFILE | PXENV_STATUS_FAILURE | 0x4b000000 )
 
 /** Operation timed out */
-#define ETIMEDOUT		    ( PXENV_STATUS_TFTP_READ_TIMEOUT | 0x4c00 )
+#define ETIMEDOUT     ( ERRFILE | PXENV_STATUS_TFTP_READ_TIMEOUT | 0x4c000000 )
 
 /** Text file busy */
-#define ETXTBSY				      ( PXENV_STATUS_FAILURE | 0x4d00 )
+#define ETXTBSY			( ERRFILE | PXENV_STATUS_FAILURE | 0x4d000000 )
 
 /** Operation would block */
-#define EWOULDBLOCK			      ( PXENV_STATUS_FAILURE | 0x4e00 )
+#define EWOULDBLOCK		( ERRFILE | PXENV_STATUS_FAILURE | 0x4e000000 )
 
 /** Improper link */
-#define EXDEV				      ( PXENV_STATUS_FAILURE | 0x4f00 )
+#define EXDEV			( ERRFILE | PXENV_STATUS_FAILURE | 0x4f000000 )
 
 /** @} */
 
 /**
- * @defgroup gpxeerrors gPXE-specific error codes
+ * @defgroup euniq Per-file error disambiguators
  *
- * The names, meanings, and values of these error codes are defined by
- * this file.  A gPXE-specific error code should be defined only where
- * the POSIX error code does not identify the error with sufficient
- * specificity.  For example, ENOMEM probably encapsulates everything
- * that needs to be known about the error (we've run out of heap
- * space), while EACCES does not (did the server refuse the
- * connection, or did we decide that the server failed to provide a
- * valid SSL/TLS certificate?).
+ * Files which use the same error number multiple times should
+ * probably define their own error subspace using these
+ * disambiguators.  For example:
+ *
+ *     #define ETCP_HEADER_TOO_SHORT	EUNIQ_01
+ *     #define ETCP_BAD_CHECKSUM	EUNIQ_02
  *
  * @{
  */
+
+#define EUNIQ_01	0x00000100
+#define EUNIQ_02	0x00000200
+#define EUNIQ_03	0x00000300
+#define EUNIQ_04	0x00000400
+#define EUNIQ_05	0x00000500
+#define EUNIQ_06	0x00000600
+#define EUNIQ_07	0x00000700
+#define EUNIQ_08	0x00000800
+#define EUNIQ_09	0x00000900
+#define EUNIQ_0A	0x00000a00
+#define EUNIQ_0B	0x00000b00
+#define EUNIQ_0C	0x00000c00
+#define EUNIQ_0D	0x00000d00
+#define EUNIQ_0E	0x00000e00
+#define EUNIQ_0F	0x00000f00
+#define EUNIQ_10	0x00001000
+#define EUNIQ_11	0x00001100
+#define EUNIQ_12	0x00001200
+#define EUNIQ_13	0x00001300
+#define EUNIQ_14	0x00001400
+#define EUNIQ_15	0x00001500
+#define EUNIQ_16	0x00001600
+#define EUNIQ_17	0x00001700
+#define EUNIQ_18	0x00001800
+#define EUNIQ_19	0x00001900
+#define EUNIQ_1A	0x00001a00
+#define EUNIQ_1B	0x00001b00
+#define EUNIQ_1C	0x00001c00
+#define EUNIQ_1D	0x00001d00
+#define EUNIQ_1E	0x00001e00
+#define EUNIQ_1F	0x00001f00
 
 /** @} */
 

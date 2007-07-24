@@ -60,15 +60,7 @@ static struct errortab * find_closest_error ( int errno ) {
 	/* Second, try masking off the gPXE-specific bit and seeing if
 	 * we have an entry for the generic POSIX error message.
 	 */
-	if ( ( errortab = find_error ( errno, 0x0000ffff ) ) != NULL )
-		return errortab;
-
-	/* Lastly, try masking off the POSIX bits and seeing if we
-	 * have a match just based on the PXENV component.  This
-	 * allows us to report errors from underlying PXE stacks.
-	 */
-	if ( ( errortab = find_error ( ( errno & 0x000000ff ),
-				       0xffff00ff ) ) != NULL )
+	if ( ( errortab = find_error ( errno, 0x4f0000ff ) ) != NULL )
 		return errortab;
 
 	return NULL;
@@ -109,6 +101,10 @@ const char * strerror ( int errno ) {
 	return errbuf;
 }
 
+/* Do not include ERRFILE portion in the numbers in the error table */
+#undef ERRFILE
+#define ERRFILE 0
+
 /** The most common errors */
 struct errortab common_errors[] __errortab = {
 	{ 0, "No error" },
@@ -121,4 +117,5 @@ struct errortab common_errors[] __errortab = {
 	{ ENETUNREACH, "Network unreachable" },
 	{ ETIMEDOUT, "Connection timed out" },
 	{ EPIPE, "Broken pipe" },
+	{ ECANCELED, "Operation cancelled" },
 };

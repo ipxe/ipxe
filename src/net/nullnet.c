@@ -17,6 +17,7 @@
  */
 
 #include <stdint.h>
+#include <errno.h>
 #include <gpxe/iobuf.h>
 #include <gpxe/netdevice.h>
 

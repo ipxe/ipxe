@@ -1,0 +1,121 @@
+#ifndef _GPXE_ERRFILE_H
+#define _GPXE_ERRFILE_H
+
+/** @file
+ *
+ * Error file identifiers
+ *
+ */
+
+#include <bits/errfile.h>
+
+/**
+ * @defgroup errfilecat Error file identifier categories
+ *
+ * @{
+ */
+
+#define ERRFILE_CORE		0x00002000	/**< Core code */
+#define ERRFILE_DRIVER		0x00004000	/**< Driver code */
+#define ERRFILE_NET		0x00006000	/**< Networking code */
+#define ERRFILE_IMAGE		0x00008000	/**< Image code */
+#define ERRFILE_OTHER		0x0000e000	/**< Any other code */
+
+/** @} */
+
+/** Flag for architecture-dependent error files */
+#define ERRFILE_ARCH		0x00800000
+
+/**
+ * @defgroup errfile Error file identifiers
+ *
+ * These values are automatically incorporated into the definitions
+ * for error numbers such as EINVAL.
+ *
+ * @{
+ */
+
+#define ERRFILE_asprintf	       ( ERRFILE_CORE | 0x00000000 )
+#define ERRFILE_downloader	       ( ERRFILE_CORE | 0x00010000 )
+#define ERRFILE_exec		       ( ERRFILE_CORE | 0x00020000 )
+#define ERRFILE_hw		       ( ERRFILE_CORE | 0x00030000 )
+#define ERRFILE_iobuf		       ( ERRFILE_CORE | 0x00040000 )
+#define ERRFILE_job		       ( ERRFILE_CORE | 0x00050000 )
+#define ERRFILE_linebuf		       ( ERRFILE_CORE | 0x00060000 )
+#define ERRFILE_monojob		       ( ERRFILE_CORE | 0x00070000 )
+#define ERRFILE_nvo		       ( ERRFILE_CORE | 0x00080000 )
+#define ERRFILE_open		       ( ERRFILE_CORE | 0x00090000 )
+#define ERRFILE_posix_io	       ( ERRFILE_CORE | 0x000a0000 )
+#define ERRFILE_resolv		       ( ERRFILE_CORE | 0x000b0000 )
+#define ERRFILE_settings	       ( ERRFILE_CORE | 0x000c0000 )
+#define ERRFILE_vsprintf	       ( ERRFILE_CORE | 0x000d0000 )
+#define ERRFILE_xfer		       ( ERRFILE_CORE | 0x000e0000 )
+
+#define ERRFILE_eisa		     ( ERRFILE_DRIVER | 0x00000000 )
+#define ERRFILE_isa		     ( ERRFILE_DRIVER | 0x00010000 )
+#define ERRFILE_isapnp		     ( ERRFILE_DRIVER | 0x00020000 )
+#define ERRFILE_mca		     ( ERRFILE_DRIVER | 0x00030000 )
+#define ERRFILE_pci		     ( ERRFILE_DRIVER | 0x00040000 )
+
+#define ERRFILE_nvs		     ( ERRFILE_DRIVER | 0x00100000 )
+#define ERRFILE_spi		     ( ERRFILE_DRIVER | 0x00110000 )
+#define ERRFILE_i2c_bit		     ( ERRFILE_DRIVER | 0x00120000 )
+#define ERRFILE_spi_bit		     ( ERRFILE_DRIVER | 0x00130000 )
+
+#define ERRFILE_3c509		     ( ERRFILE_DRIVER | 0x00200000 )
+#define ERRFILE_bnx2		     ( ERRFILE_DRIVER | 0x00210000 )
+#define ERRFILE_cs89x0		     ( ERRFILE_DRIVER | 0x00220000 )
+#define ERRFILE_eepro		     ( ERRFILE_DRIVER | 0x00230000 )
+#define ERRFILE_etherfabric	     ( ERRFILE_DRIVER | 0x00240000 )
+#define ERRFILE_legacy		     ( ERRFILE_DRIVER | 0x00250000 )
+#define ERRFILE_natsemi		     ( ERRFILE_DRIVER | 0x00260000 )
+#define ERRFILE_pnic		     ( ERRFILE_DRIVER | 0x00270000 )
+#define ERRFILE_prism2_pci	     ( ERRFILE_DRIVER | 0x00280000 )
+#define ERRFILE_prism2_plx	     ( ERRFILE_DRIVER | 0x00290000 )
+#define ERRFILE_rtl8139		     ( ERRFILE_DRIVER | 0x002a0000 )
+#define ERRFILE_smc9000		     ( ERRFILE_DRIVER | 0x002b0000 )
+#define ERRFILE_tg3		     ( ERRFILE_DRIVER | 0x002c0000 )
+
+#define ERRFILE_scsi		     ( ERRFILE_DRIVER | 0x00700000 )
+
+#define ERRFILE_aoe			( ERRFILE_NET | 0x00000000 )
+#define ERRFILE_arp			( ERRFILE_NET | 0x00010000 )
+#define ERRFILE_dhcpopts		( ERRFILE_NET | 0x00020000 )
+#define ERRFILE_ethernet		( ERRFILE_NET | 0x00030000 )
+#define ERRFILE_icmpv6			( ERRFILE_NET | 0x00040000 )
+#define ERRFILE_ipv4			( ERRFILE_NET | 0x00050000 )
+#define ERRFILE_ipv6			( ERRFILE_NET | 0x00060000 )
+#define ERRFILE_ndp			( ERRFILE_NET | 0x00070000 )
+#define ERRFILE_netdevice		( ERRFILE_NET | 0x00080000 )
+#define ERRFILE_nullnet			( ERRFILE_NET | 0x00090000 )
+#define ERRFILE_tcp			( ERRFILE_NET | 0x000a0000 )
+#define ERRFILE_ftp			( ERRFILE_NET | 0x000b0000 )
+#define ERRFILE_http			( ERRFILE_NET | 0x000c0000 )
+#define ERRFILE_iscsi			( ERRFILE_NET | 0x000d0000 )
+#define ERRFILE_tcpip			( ERRFILE_NET | 0x000e0000 )
+#define ERRFILE_udp			( ERRFILE_NET | 0x000f0000 )
+#define ERRFILE_dhcp			( ERRFILE_NET | 0x00100000 )
+#define ERRFILE_dns			( ERRFILE_NET | 0x00110000 )
+#define ERRFILE_tftp			( ERRFILE_NET | 0x00120000 )
+
+#define ERRFILE_image		      ( ERRFILE_IMAGE | 0x00000000 )
+#define ERRFILE_elf		      ( ERRFILE_IMAGE | 0x00010000 )
+#define ERRFILE_script		      ( ERRFILE_IMAGE | 0x00020000 )
+#define ERRFILE_segment		      ( ERRFILE_IMAGE | 0x00030000 )
+
+#define ERRFILE_asn1		      ( ERRFILE_OTHER | 0x00000000 )
+#define ERRFILE_chap		      ( ERRFILE_OTHER | 0x00010000 )
+#define ERRFILE_aoeboot		      ( ERRFILE_OTHER | 0x00020000 )
+#define ERRFILE_autoboot	      ( ERRFILE_OTHER | 0x00030000 )
+#define ERRFILE_dhcpmgmt	      ( ERRFILE_OTHER | 0x00040000 )
+#define ERRFILE_imgmgmt		      ( ERRFILE_OTHER | 0x00050000 )
+#define ERRFILE_pxe_tftp	      ( ERRFILE_OTHER | 0x00060000 )
+#define ERRFILE_pxe_udp		      ( ERRFILE_OTHER | 0x00070000 )
+#define ERRFILE_axtls_aes	      ( ERRFILE_OTHER | 0x00080000 )
+#define ERRFILE_cipher		      ( ERRFILE_OTHER | 0x00090000 )
+#define ERRFILE_image_cmd	      ( ERRFILE_OTHER | 0x000a0000 )
+#define ERRFILE_uri_test	      ( ERRFILE_OTHER | 0x000b0000 )
+
+/** @} */
+
+#endif /* _GPXE_ERRFILE_H */

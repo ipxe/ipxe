@@ -24,6 +24,7 @@
 
 #include <stdlib.h>
 #include <stdio.h>
+#include <errno.h>
 #include <byteswap.h>
 #include <gpxe/uaccess.h>
 #include <gpxe/in.h>

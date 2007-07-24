@@ -7,7 +7,6 @@
  *
  */
 
-#include <errno.h>
 #include <gpxe/tables.h>
 
 struct errortab {
