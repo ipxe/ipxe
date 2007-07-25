@@ -390,7 +390,7 @@ static void int13 ( struct i386_all_regs *ix86 ) {
 		/* Set OF to indicate to wrapper not to chain this call */
 		ix86->flags |= OF;
 
-		break;
+		return;
 	}
 
 	/* Remap BIOS drive */
