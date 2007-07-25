@@ -872,8 +872,9 @@ sis900_read_mode(struct nic *nic __unused, int phy_addr, int *speed, int *duplex
     u16 phy_id0, phy_id1;
         
     /* STSOUT register is Latched on Transition, read operation updates it */
-    while (i++ < 2)
+    do {
         status = sis900_mdio_read(phy_addr, MII_STSOUT);
+    } while (i++ < 2);
 
     *speed = HW_SPEED_10_MBPS;
     *duplex = FDX_CAPABLE_HALF_SELECTED;
