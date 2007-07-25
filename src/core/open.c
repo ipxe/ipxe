@@ -148,8 +148,10 @@ int xfer_vopen ( struct xfer_interface *xfer, int type, va_list args ) {
 		const char *uri_string = va_arg ( args, const char * );
 
 		return xfer_open_uri_string ( xfer, uri_string ); }
-	case LOCATION_URI:
-		
+	case LOCATION_URI: {
+		struct uri *uri = va_arg ( args, struct uri * );
+
+		return xfer_open_uri ( xfer, uri ); }
 	case LOCATION_SOCKET: {
 		int semantics = va_arg ( args, int );
 		struct sockaddr *peer = va_arg ( args, struct sockaddr * );
