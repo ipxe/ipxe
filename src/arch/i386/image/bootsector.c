@@ -80,6 +80,7 @@ int call_bootsector ( unsigned int segment, unsigned int offset,
 					   /* Jump to boot sector */
 					   "pushw %%bx\n\t"
 					   "pushw %%di\n\t"
+					   "sti\n\t"
 					   "lret\n\t"
 					   /* Preserved variables */
 					   "\nsaved_ss: .word 0\n\t"
