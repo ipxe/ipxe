@@ -41,16 +41,16 @@
  */
 
 /** iSCSI initiator name (explicitly specified) */
-char *iscsi_initiator_iqn;
+static char *iscsi_explicit_initiator_iqn;
 
 /** Default iSCSI initiator name (constructed from hostname) */
-char *iscsi_default_initiator_iqn;
+static char *iscsi_default_initiator_iqn;
 
 /** iSCSI username */
-char *iscsi_username;
+static char *iscsi_username;
 
 /** iSCSI password */
-char *iscsi_password;
+static char *iscsi_password;
 
 static void iscsi_start_tx ( struct iscsi_session *iscsi );
 static void iscsi_start_login ( struct iscsi_session *iscsi );
@@ -78,6 +78,8 @@ static void iscsi_free ( struct refcnt *refcnt ) {
 
 	free ( iscsi->target_address );
 	free ( iscsi->target_iqn );
+	free ( iscsi->username );
+	free ( iscsi->password );
 	chap_finish ( &iscsi->chap );
 	iscsi_rx_buffered_data_done ( iscsi );
 	free ( iscsi );
@@ -436,22 +438,16 @@ static int iscsi_tx_data_out ( struct iscsi_session *iscsi ) {
  */
 static int iscsi_build_login_request_strings ( struct iscsi_session *iscsi,
 					       void *data, size_t len ) {
-	char *initiator_iqn;
 	unsigned int used = 0;
 	unsigned int i;
 
 	if ( iscsi->status & ISCSI_STATUS_STRINGS_SECURITY ) {
-		initiator_iqn = iscsi_initiator_iqn;
-		if ( ! initiator_iqn )
-			initiator_iqn = iscsi_default_initiator_iqn;
-		if ( ! initiator_iqn )
-			initiator_iqn = "iqn.2000-09.org.etherboot:UNKNOWN";
 		used += ssnprintf ( data + used, len - used,
 				    "InitiatorName=%s%c"
 				    "TargetName=%s%c"
 				    "SessionType=Normal%c"
 				    "AuthMethod=CHAP,None%c",
-				    initiator_iqn, 0,
+				    iscsi_initiator_iqn(), 0,
 				    iscsi->target_iqn, 0, 0, 0 );
 	}
 
@@ -460,10 +456,10 @@ static int iscsi_build_login_request_strings ( struct iscsi_session *iscsi,
 	}
 	
 	if ( ( iscsi->status & ISCSI_STATUS_STRINGS_CHAP_RESPONSE ) &&
-	     iscsi_username ) {
+	     iscsi->username ) {
 		used += ssnprintf ( data + used, len - used,
 				    "CHAP_N=%s%cCHAP_R=0x",
-				    iscsi_username, 0 );
+				    iscsi->username, 0 );
 		for ( i = 0 ; i < iscsi->chap.response_len ; i++ ) {
 			used += ssnprintf ( data + used, len - used, "%02x",
 					    iscsi->chap.response[i] );
@@ -647,9 +643,9 @@ static int iscsi_handle_chap_i_value ( struct iscsi_session *iscsi,
 	 * challenge.
 	 */
 	chap_set_identifier ( &iscsi->chap, identifier );
-	if ( iscsi_password ) {
-		chap_update ( &iscsi->chap, iscsi_password,
-			      strlen ( iscsi_password ) );
+	if ( iscsi->password ) {
+		chap_update ( &iscsi->chap, iscsi->password,
+			      strlen ( iscsi->password ) );
 	}
 
 	return 0;
@@ -1279,10 +1275,43 @@ static void iscsi_socket_close ( struct xfer_interface *socket, int rc ) {
 	}
 }
 
+/**
+ * Handle redirection event
+ *
+ * @v socket		Transport layer interface
+ * @v type		Location type
+ * @v args		Remaining arguments depend upon location type
+ * @ret rc		Return status code
+ */
+static int iscsi_vredirect ( struct xfer_interface *socket, int type,
+			     va_list args ) {
+	struct iscsi_session *iscsi =
+		container_of ( socket, struct iscsi_session, socket );
+	va_list tmp;
+	struct sockaddr *peer;
+
+	/* Intercept redirects to a LOCATION_SOCKET and record the IP
+	 * address for the iBFT.  This is a bit of a hack, but avoids
+	 * inventing an ioctl()-style call to retrieve the socket
+	 * address from a data-xfer interface.
+	 */
+	if ( type == LOCATION_SOCKET ) {
+		va_copy ( tmp, args );
+		( void ) va_arg ( tmp, int ); /* Discard "semantics" */
+		peer = va_arg ( tmp, struct sockaddr * );
+		memcpy ( &iscsi->target_sockaddr, peer,
+			 sizeof ( iscsi->target_sockaddr ) );
+		va_end ( tmp );
+	}
+
+	return xfer_vopen ( socket, type, args );
+}
+			     
+
 /** iSCSI socket operations */
 static struct xfer_interface_operations iscsi_socket_operations = {
 	.close		= iscsi_socket_close,
-	.vredirect	= xfer_vopen,
+	.vredirect	= iscsi_vredirect,
 	.seek		= ignore_xfer_seek,
 	.window		= unlimited_xfer_window,
 	.alloc_iob	= default_xfer_alloc_iob,
@@ -1461,6 +1490,32 @@ static int iscsi_parse_root_path ( struct iscsi_session *iscsi,
 }
 
 /**
+ * Set iSCSI authentication details
+ *
+ * @v iscsi		iSCSI session
+ * @v username		Username, if any
+ * @v password		Password, if any
+ * @ret rc		Return status code
+ */
+static int iscsi_set_auth ( struct iscsi_session *iscsi,
+			    const char *username, const char *password ) {
+
+	if ( username ) {
+		iscsi->username = strdup ( username );
+		if ( ! iscsi->username )
+			return -ENOMEM;
+	}
+
+	if ( password ) {
+		iscsi->password = strdup ( password );
+		if ( ! iscsi->password )
+			return -ENOMEM;
+	}
+
+	return 0;
+}
+
+/**
  * Attach iSCSI interface
  *
  * @v scsi		SCSI device
@@ -1481,6 +1536,10 @@ int iscsi_attach ( struct scsi_device *scsi, const char *root_path ) {
 
 	/* Parse root path */
 	if ( ( rc = iscsi_parse_root_path ( iscsi, root_path ) ) != 0 )
+		goto err;
+	/* Set fields not specified by root path */
+	if ( ( rc = iscsi_set_auth ( iscsi, iscsi_username,
+				     iscsi_password ) ) != 0 )
 		goto err;
 
 	/* Sanity checks */
@@ -1533,7 +1592,7 @@ static int apply_dhcp_iscsi_string ( unsigned int tag,
 	/* Identify string and prefix */
 	switch ( tag ) {
 	case DHCP_ISCSI_INITIATOR_IQN:
-		string = &iscsi_initiator_iqn;
+		string = &iscsi_explicit_initiator_iqn;
 		break;
 	case DHCP_EB_USERNAME:
 		string = &iscsi_username;
@@ -1584,3 +1643,24 @@ struct dhcp_option_applicator dhcp_iscsi_applicators[] __dhcp_applicator = {
 		.apply = apply_dhcp_iscsi_string,
 	},
 };
+
+/****************************************************************************
+ *
+ * Initiator name
+ *
+ */
+
+/**
+ * Get iSCSI initiator IQN
+ *
+ * @v iscsi		iSCSI session
+ * @ret rc		Return status code
+ */
+const char * iscsi_initiator_iqn ( void ) {
+
+	if ( iscsi_explicit_initiator_iqn )
+		return iscsi_explicit_initiator_iqn;
+	if ( iscsi_default_initiator_iqn )
+		return iscsi_default_initiator_iqn;
+	return "iqn.2000-09.org.etherboot:UNKNOWN";
+}

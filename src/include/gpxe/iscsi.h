@@ -8,6 +8,7 @@
  */
 
 #include <stdint.h>
+#include <gpxe/socket.h>
 #include <gpxe/scsi.h>
 #include <gpxe/chap.h>
 #include <gpxe/refcnt.h>
@@ -501,6 +502,8 @@ struct iscsi_session {
 	char *target_iqn;
 	/** Logical Unit Number (LUN) */
 	uint64_t lun;
+	/** Target socket address (recorded only for iBFT) */
+	struct sockaddr target_sockaddr;
 
 	/** Session status
 	 *
@@ -514,6 +517,11 @@ struct iscsi_session {
 	 * Reset upon a successful connection.
 	 */
 	int retry_count;
+
+	/** Username (if any) */
+	char *username;
+	/** Password (if any) */
+	char *password;
 	/** CHAP challenge/response */
 	struct chap_challenge chap;
 
@@ -641,5 +649,6 @@ struct iscsi_session {
 
 extern int iscsi_attach ( struct scsi_device *scsi, const char *root_path );
 extern void iscsi_detach ( struct scsi_device *scsi );
+extern const char * iscsi_initiator_iqn ( void );
 
 #endif /* _GPXE_ISCSI_H */
