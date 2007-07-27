@@ -30,6 +30,7 @@ int has_key ( int kc __unused ) {
 	return TRUE;
 }
 
+static
 int _wgetc ( WINDOW *win ) {
 	int timer, c;
 
