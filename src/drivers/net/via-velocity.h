@@ -1204,7 +1204,7 @@ struct velocity_info_tbl {
 	u32 flags;
 };
 
-struct velocity_info_tbl *info;
+static struct velocity_info_tbl *info;
 
 #define mac_hw_mibs_init(regs) {\
 	BYTE_REG_BITS_ON(MIBCR_MIBFRZ,&((regs)->MIBCR));\
