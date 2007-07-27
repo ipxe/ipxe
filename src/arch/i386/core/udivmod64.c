@@ -294,7 +294,7 @@ static void udivmod64 ( const struct uint64 *x,
  * @ret r		Remainder
  * @ret q		Quotient
  */
-UDItype __udivmoddi4 ( UDItype x, UDItype d, UDItype *r ) {
+static UDItype __udivmoddi4 ( UDItype x, UDItype d, UDItype *r ) {
 	UDItype q;
 	UDItype *_x = &x;
 	UDItype *_d = &d;
