@@ -360,7 +360,7 @@ static int multiboot_load_elf ( struct image *image ) {
  * @v image		Multiboot file
  * @ret rc		Return status code
  */
-int multiboot_load ( struct image *image ) {
+static int multiboot_load ( struct image *image ) {
 	struct multiboot_header_info hdr;
 	int rc;
 
