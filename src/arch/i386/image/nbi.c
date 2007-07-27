@@ -244,7 +244,7 @@ static int nbi_process_segments ( struct image *image,
  * @v image		NBI image
  * @ret rc		Return status code
  */
-int nbi_load ( struct image *image ) {
+static int nbi_load ( struct image *image ) {
 	struct imgheader imgheader;
 	int rc;
 
