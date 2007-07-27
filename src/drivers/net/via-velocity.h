@@ -1768,7 +1768,7 @@ struct velocity_opt {
 #define TX_DESC_MAX     256
 #define TX_DESC_DEF     TX_DESC_MIN
 
-struct velocity_info {
+static struct velocity_info {
 //      struct list_head list;
 
 	struct pci_device *pdev;
