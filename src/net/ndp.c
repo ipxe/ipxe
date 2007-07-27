@@ -65,8 +65,9 @@ ndp_find_entry ( struct in6_addr *in6 ) {
  * @v ll_addr	Link-layer address
  * @v state	State of the entry - one of the NDP_STATE_XXX values
  */
-void add_ndp_entry ( struct net_device *netdev, struct in6_addr *in6,
-		     void *ll_addr, int state ) {
+static void 
+add_ndp_entry ( struct net_device *netdev, struct in6_addr *in6,
+		void *ll_addr, int state ) {
 	struct ndp_entry *ndp;
 	ndp = &ndp_table[next_new_ndp_entry++ % NUM_NDP_ENTRIES];
 
