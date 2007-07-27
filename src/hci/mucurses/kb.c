@@ -16,7 +16,7 @@ int m_delay; /*
 		0   : non-blocking read
 		> 0 : timed blocking read
 	     */
-bool m_echo;
+static bool m_echo;
 bool m_cbreak;
 
 #if 0
