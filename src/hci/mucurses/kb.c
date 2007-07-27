@@ -19,6 +19,7 @@ int m_delay; /*
 bool m_echo;
 bool m_cbreak;
 
+#if 0
 /**
  * Check KEY_ code supported status
  *
@@ -28,7 +29,8 @@ bool m_cbreak;
  */
 int has_key ( int kc __unused ) {
 	return TRUE;
-}
+} 
+#endif
 
 static
 int _wgetc ( WINDOW *win ) {
