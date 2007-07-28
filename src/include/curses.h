@@ -566,6 +566,10 @@ static inline bool has_colors ( void ) {
 	return TRUE;
 }
 
+static inline int has_key ( int kc __unused ) {
+	return TRUE;
+}
+
 static inline int hline ( chtype ch, int n ) {
 	return whline ( stdscr, ch, n );
 }
