@@ -42,7 +42,7 @@ int inet_aton ( const char *cp, struct in_addr *inp ) {
 	return 0;
 }
 
-static int isspace ( int c ) {
+int isspace ( int c ) {
 	switch ( c ) {
 	case ' ':
 	case '\f':
