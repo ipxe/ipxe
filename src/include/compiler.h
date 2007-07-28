@@ -276,6 +276,9 @@ extern void dbg_hex_dump_da ( unsigned long dispaddr,
 /** Declare a variable or data structure as unused. */
 #define __unused __attribute__ (( unused ))
 
+/** Apply standard C calling conventions */
+#define __cdecl __attribute__ (( cdecl , regparm(0) ))
+
 /**
  * Declare a function as used.
  *

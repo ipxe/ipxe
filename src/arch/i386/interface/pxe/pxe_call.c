@@ -112,7 +112,7 @@ static PXENV_EXIT_t pxenv_unknown ( struct s_PXENV_UNKNOWN *pxenv_unknown ) {
  * @v es:di		Address of PXE parameter block
  * @ret ax		PXE exit code
  */
-void pxe_api_call ( struct i386_all_regs *ix86 ) {
+__cdecl void pxe_api_call ( struct i386_all_regs *ix86 ) {
 	int opcode = ix86->regs.bx;
 	userptr_t parameters = real_to_user ( ix86->segs.es, ix86->regs.di );
 	size_t param_len;
@@ -304,7 +304,7 @@ void pxe_api_call ( struct i386_all_regs *ix86 ) {
  * @v es:di		Address of PXE parameter block
  * @ret ax		PXE exit code
  */
-void pxe_loader_call ( struct i386_all_regs *ix86 ) {
+__cdecl void pxe_loader_call ( struct i386_all_regs *ix86 ) {
 	userptr_t uparams = real_to_user ( ix86->segs.es, ix86->regs.di );
 	struct s_UNDI_LOADER params;
 	PXENV_EXIT_t ret;

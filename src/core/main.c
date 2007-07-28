@@ -24,7 +24,7 @@ Literature dealing with the network protocols:
  *
  * @ret rc		Return status code
  */
-int main ( void ) {
+__cdecl int main ( void ) {
 
 	initialise();
 	startup();
