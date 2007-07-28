@@ -465,7 +465,7 @@ static struct xfer_interface_operations http_xfer_operations = {
  * @v uri		Uniform Resource Identifier
  * @ret rc		Return status code
  */
-int http_open ( struct xfer_interface *xfer, struct uri *uri ) {
+static int http_open ( struct xfer_interface *xfer, struct uri *uri ) {
 	struct http_request *http;
 	struct sockaddr_tcpip server;
 	int rc;

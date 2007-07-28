@@ -54,7 +54,7 @@ static u32 __md5step f4(u32 b, u32 c, u32 d)
 	return ( c ^ ( b | ~d ) );
 }
 
-struct md5_step md5_steps[4] = {
+static struct md5_step md5_steps[4] = {
 	{
 		.f = f1,
 		.coefficient = 1,

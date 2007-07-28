@@ -103,7 +103,7 @@ static int boot_root_path ( const char *root_path ) {
  * @v netdev		Network device
  * @ret rc		Return status code
  */
-int netboot ( struct net_device *netdev ) {
+static int netboot ( struct net_device *netdev ) {
 	char buf[256];
 	int rc;
 

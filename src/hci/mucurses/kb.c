@@ -19,18 +19,7 @@ int m_delay; /*
 bool m_echo;
 bool m_cbreak;
 
-/**
- * Check KEY_ code supported status
- *
- * @v kc	keycode value to check
- * @ret TRUE	KEY_* supported
- * @ret FALSE	KEY_* unsupported
- */
-int has_key ( int kc __unused ) {
-	return TRUE;
-}
-
-int _wgetc ( WINDOW *win ) {
+static int _wgetc ( WINDOW *win ) {
 	int timer, c;
 
 	if ( win == NULL )

@@ -54,7 +54,9 @@ void AES_set_key(AES_CTX *ctx, const uint8_t *key,
 void AES_cbc_encrypt(AES_CTX *ctx, const uint8_t *msg, 
         uint8_t *out, int length);
 void AES_cbc_decrypt(AES_CTX *ks, const uint8_t *in, uint8_t *out, int length);
+#if 0 /** currently unused function **/
 void AES_convert_key(AES_CTX *ctx);
+#endif
 
 /**************************************************************************
  * RC4 declarations 

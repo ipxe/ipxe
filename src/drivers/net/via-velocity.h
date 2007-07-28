@@ -1204,7 +1204,7 @@ struct velocity_info_tbl {
 	u32 flags;
 };
 
-struct velocity_info_tbl *info;
+static struct velocity_info_tbl *info;
 
 #define mac_hw_mibs_init(regs) {\
 	BYTE_REG_BITS_ON(MIBCR_MIBFRZ,&((regs)->MIBCR));\
@@ -1768,7 +1768,7 @@ struct velocity_opt {
 #define TX_DESC_MAX     256
 #define TX_DESC_DEF     TX_DESC_MIN
 
-struct velocity_info {
+static struct velocity_info {
 //      struct list_head list;
 
 	struct pci_device *pdev;

@@ -400,7 +400,7 @@ static void rtl8169_hw_PHY_config(struct nic *nic __unused);
 //      20-16   5-bit GMII/MII register address
 //      15-0    16-bit GMII/MII register data
 //=================================================================
-void RTL8169_WRITE_GMII_REG(unsigned long ioaddr, int RegAddr, int value)
+static void RTL8169_WRITE_GMII_REG(unsigned long ioaddr, int RegAddr, int value)
 {
 	int i;
 
@@ -418,7 +418,7 @@ void RTL8169_WRITE_GMII_REG(unsigned long ioaddr, int RegAddr, int value)
 }
 
 //=================================================================
-int RTL8169_READ_GMII_REG(unsigned long ioaddr, int RegAddr)
+static int RTL8169_READ_GMII_REG(unsigned long ioaddr, int RegAddr)
 {
 	int i, value = -1;
 

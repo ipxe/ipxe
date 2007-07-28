@@ -43,7 +43,7 @@ static struct bss {
 	struct statistics_block stats_blk;
 } bnx2_bss;
 
-struct bnx2 bnx2;
+static struct bnx2 bnx2;
 
 static struct flash_spec flash_table[] =
 {

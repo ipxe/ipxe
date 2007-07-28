@@ -364,7 +364,7 @@ struct ring_desc {
 #endif
 
 /* Private Storage for the NIC */
-struct ns83820_private {
+static struct ns83820_private {
 	u8 *base;
 	int up;
 	long idle;

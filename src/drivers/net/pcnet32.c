@@ -67,7 +67,7 @@ static struct nic_operations pcnet32_operations;
 
 /* End Etherboot Specific */
 
-int cards_found /* __initdata */ ;
+static int cards_found = 0 /* __initdata */ ;
 
 #ifdef REMOVE
 /* FIXME: Remove these they are probably pointless */
