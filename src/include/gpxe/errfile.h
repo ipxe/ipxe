@@ -116,6 +116,7 @@
 #define ERRFILE_image_cmd	      ( ERRFILE_OTHER | 0x000a0000 )
 #define ERRFILE_uri_test	      ( ERRFILE_OTHER | 0x000b0000 )
 #define ERRFILE_ibft		      ( ERRFILE_OTHER | 0x000c0000 )
+#define ERRFILE_tls		      ( ERRFILE_OTHER | 0x000d0000 )
 
 /** @} */
 
