@@ -19,6 +19,7 @@
 #include <stddef.h>
 #include <string.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <errno.h>
 #include <assert.h>
 #include <byteswap.h>
@@ -29,7 +30,7 @@
 #include <gpxe/uaccess.h>
 #include <gpxe/ata.h>
 #include <gpxe/netdevice.h>
-#include <gpxe/async.h>
+#include <gpxe/process.h>
 #include <gpxe/aoe.h>
 
 /** @file
@@ -43,6 +44,14 @@ struct net_protocol aoe_protocol;
 /** List of all AoE sessions */
 static LIST_HEAD ( aoe_sessions );
 
+static void aoe_free ( struct refcnt *refcnt ) {
+	struct aoe_session *aoe =
+		container_of ( refcnt, struct aoe_session, refcnt );
+
+	netdev_put ( aoe->netdev );
+	free ( aoe );
+}
+
 /**
  * Mark current AoE command complete
  *
@@ -55,8 +64,8 @@ static void aoe_done ( struct aoe_session *aoe, int rc ) {
 	aoe->command->cb.cmd_stat = aoe->status;
 	aoe->command = NULL;
 
-	/* Mark async operation as complete */
-	async_done ( &aoe->async, rc );
+	/* Mark operation as complete */
+	aoe->rc = rc;
 }
 
 /**
@@ -266,45 +275,98 @@ struct net_protocol aoe_protocol __net_protocol = {
 };
 
 /**
- * Open AoE session
- *
- * @v aoe		AoE session
- */
-void aoe_open ( struct aoe_session *aoe ) {
-	memcpy ( aoe->target, ethernet_protocol.ll_broadcast,
-		 sizeof ( aoe->target ) );
-	aoe->tag = AOE_TAG_MAGIC;
-	aoe->timer.expired = aoe_timer_expired;
-	list_add ( &aoe->list, &aoe_sessions );
-}
-
-/**
- * Close AoE session
- *
- * @v aoe		AoE session
- */
-void aoe_close ( struct aoe_session *aoe ) {
-	list_del ( &aoe->list );
-}
-
-/**
  * Issue ATA command via an open AoE session
  *
- * @v aoe		AoE session
+ * @v ata		ATA device
  * @v command		ATA command
- * @v parent		Parent asynchronous operation
  * @ret rc		Return status code
- *
- * Only one command may be issued concurrently per session.  This call
- * is non-blocking; use async_wait() to wait for the command to
- * complete.
  */
-int aoe_issue ( struct aoe_session *aoe, struct ata_command *command,
-		struct async *parent ) {
+static int aoe_command ( struct ata_device *ata,
+			 struct ata_command *command ) {
+	struct aoe_session *aoe =
+		container_of ( ata->backend, struct aoe_session, refcnt );
+	int rc;
+
 	aoe->command = command;
 	aoe->status = 0;
 	aoe->command_offset = 0;
 	aoe_send_command ( aoe );
-	async_init ( &aoe->async, &default_async_operations, parent );
+
+	aoe->rc = -EINPROGRESS;
+	while ( aoe->rc == -EINPROGRESS )
+		step();
+	rc = aoe->rc;
+
+	return rc;
+}
+
+static int aoe_detached_command ( struct ata_device *ata __unused,
+				  struct ata_command *command __unused ) {
+	return -ENODEV;
+}
+
+void aoe_detach ( struct ata_device *ata ) {
+	struct aoe_session *aoe =
+		container_of ( ata->backend, struct aoe_session, refcnt );
+
+	stop_timer ( &aoe->timer );
+	ata->command = aoe_detached_command;
+	list_del ( &aoe->list );
+	ref_put ( ata->backend );
+	ata->backend = NULL;
+}
+
+static int aoe_parse_root_path ( struct aoe_session *aoe,
+				 const char *root_path ) {
+	char *ptr;
+
+	if ( strncmp ( root_path, "aoe:", 4 ) != 0 )
+		return -EINVAL;
+	ptr = ( ( char * ) root_path + 4 );
+
+	if ( *ptr++ != 'e' )
+		return -EINVAL;
+
+	aoe->major = strtoul ( ptr, &ptr, 10 );
+	if ( *ptr++ != '.' )
+		return -EINVAL;
+
+	aoe->minor = strtoul ( ptr, &ptr, 10 );
+	if ( *ptr )
+		return -EINVAL;
+
 	return 0;
+}
+
+int aoe_attach ( struct ata_device *ata, struct net_device *netdev,
+		 const char *root_path ) {
+	struct aoe_session *aoe;
+	int rc;
+
+	/* Allocate and initialise structure */
+	aoe = zalloc ( sizeof ( *aoe ) );
+	if ( ! aoe )
+		return -ENOMEM;
+	aoe->refcnt.free = aoe_free;
+	aoe->netdev = netdev_get ( netdev );
+	memcpy ( aoe->target, ethernet_protocol.ll_broadcast,
+		 sizeof ( aoe->target ) );
+	aoe->tag = AOE_TAG_MAGIC;
+	aoe->timer.expired = aoe_timer_expired;
+
+	/* Parse root path */
+	if ( ( rc = aoe_parse_root_path ( aoe, root_path ) ) != 0 )
+		goto err;
+
+	/* Attach parent interface, transfer reference to connection
+	 * list, and return
+	 */
+	ata->backend = ref_get ( &aoe->refcnt );
+	ata->command = aoe_command;
+	list_add ( &aoe->list, &aoe_sessions );
+	return 0;
+
+ err:
+	ref_put ( &aoe->refcnt );
+	return rc;
 }

@@ -27,6 +27,7 @@
 #include <usr/dhcpmgmt.h>
 #include <usr/imgmgmt.h>
 #include <usr/iscsiboot.h>
+#include <usr/aoeboot.h>
 #include <usr/autoboot.h>
 
 /** @file
@@ -88,13 +89,15 @@ static int boot_filename ( const char *filename ) {
  * @ret rc		Return status code
  */
 static int boot_root_path ( const char *root_path ) {
-	int rc;
 
 	/* Quick hack */
-	if ( ( rc = iscsiboot ( root_path ) ) != 0 )
-		return rc;
+	if ( strncmp ( root_path, "iscsi:", 6 ) == 0 ) {
+		return iscsiboot ( root_path );
+	} else if ( strncmp ( root_path, "aoe:", 4 ) == 0 ) {
+		return aoeboot ( root_path );
+	}
 
-	return 0;
+	return -ENOTSUP;
 }
 
 /**

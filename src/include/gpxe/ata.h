@@ -4,6 +4,7 @@
 #include <stdint.h>
 #include <gpxe/blockdev.h>
 #include <gpxe/uaccess.h>
+#include <gpxe/refcnt.h>
 
 /** @file
  *
@@ -195,6 +196,8 @@ struct ata_device {
 	 */
 	int ( * command ) ( struct ata_device *ata,
 			    struct ata_command *command );
+	/** Backing device */
+	struct refcnt *backend;
 };
 
 extern int init_atadev ( struct ata_device *ata );

@@ -81,6 +81,9 @@ struct aoehdr {
 
 /** An AoE session */
 struct aoe_session {
+	/** Reference counter */
+	struct refcnt refcnt;
+
 	/** List of all AoE sessions */
 	struct list_head list;
 
@@ -103,8 +106,8 @@ struct aoe_session {
 	unsigned int status;
 	/** Byte offset within command's data buffer */
 	unsigned int command_offset;
-	/** Asynchronous operation for this command */
-	struct async async;
+	/** Return status code for command */
+	int rc;
 
 	/** Retransmission timer */
 	struct retry_timer timer;
@@ -116,20 +119,8 @@ struct aoe_session {
 /** Maximum number of sectors per packet */
 #define AOE_MAX_COUNT 2
 
-extern void aoe_open ( struct aoe_session *aoe );
-extern void aoe_close ( struct aoe_session *aoe );
-extern int aoe_issue ( struct aoe_session *aoe,
-		       struct ata_command *command,
-		       struct async *parent );
-
-/** An AoE device */
-struct aoe_device {
-	/** ATA device interface */
-	struct ata_device ata;
-	/** AoE protocol instance */
-	struct aoe_session aoe;
-};
-
-extern int init_aoedev ( struct aoe_device *aoedev );
+extern void aoe_detach ( struct ata_device *ata );
+extern int aoe_attach ( struct ata_device *ata, struct net_device *netdev,
+			const char *root_path );
 
 #endif /* _GPXE_AOE_H */
