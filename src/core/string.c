@@ -424,12 +424,7 @@ void * memset(void * s,int c,size_t count)
  */
 char * bcopy(const char * src, char * dest, int count)
 {
-	char *tmp = dest;
-
-	while (count--)
-		*tmp++ = *src++;
-
-	return dest;
+	return memmove(dest,src,count);
 }
 #endif
 
