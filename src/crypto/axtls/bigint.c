@@ -473,7 +473,7 @@ bigint *bi_divide(BI_CTX *ctx, bigint *u, bigint *v, int is_mod)
 /*
  * Perform an integer divide on a bigint.
  */
-static bigint *bi_int_divide(BI_CTX *ctx, bigint *biR, comp denom)
+static bigint *bi_int_divide(BI_CTX *ctx __unused, bigint *biR, comp denom)
 {
     int i = biR->size - 1;
     long_comp r = 0;
