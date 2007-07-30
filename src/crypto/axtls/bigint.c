@@ -77,23 +77,14 @@ static void check(const bigint *bi);
  */
 BI_CTX *bi_initialize(void)
 {
+    /* calloc() sets everything to zero */
     BI_CTX *ctx = (BI_CTX *)calloc(1, sizeof(BI_CTX));
-
-    ctx->active_list = NULL;
-    ctx->active_count = 0;
-    ctx->free_list = NULL;
-    ctx->free_count = 0;
-    ctx->mod_offset = 0;
-#ifdef CONFIG_BIGINT_MONTGOMERY
-    ctx->use_classical = 0;
-#endif
-
+   
     /* the radix */
     ctx->bi_radix = alloc(ctx, 2); 
     ctx->bi_radix->comps[0] = 0;
     ctx->bi_radix->comps[1] = 1;
     bi_permanent(ctx->bi_radix);
-
     return ctx;
 }
 
@@ -285,7 +276,7 @@ bigint *bi_add(BI_CTX *ctx, bigint *bia, bigint *bib)
  * @param bia [in]  A bigint.
  * @param bib [in]  Another bigint.
  * @param is_negative [out] If defined, indicates that the result was negative.
- * is_negative may be NULL.
+ * is_negative may be null.
  * @return The result of the subtraction. The result is always positive.
  */
 bigint *bi_subtract(BI_CTX *ctx, 
@@ -482,7 +473,7 @@ bigint *bi_divide(BI_CTX *ctx, bigint *u, bigint *v, int is_mod)
 /*
  * Perform an integer divide on a bigint.
  */
-static bigint *bi_int_divide(__unused BI_CTX *ctx, bigint *biR, comp denom)
+static bigint *bi_int_divide(BI_CTX *ctx, bigint *biR, comp denom)
 {
     int i = biR->size - 1;
     long_comp r = 0;
@@ -781,7 +772,9 @@ void bi_free_mod(BI_CTX *ctx, int mod_offset)
  */
 static bigint *regular_multiply(BI_CTX *ctx, bigint *bia, bigint *bib)
 {
-    int i, j, i_plus_j, n = bia->size, t = bib->size;
+    int i, j, i_plus_j;
+    int n = bia->size; 
+    int t = bib->size;
     bigint *biR = alloc(ctx, n + t);
     comp *sr = biR->comps;
     comp *sa = bia->comps;
@@ -1059,7 +1052,7 @@ static bigint *alloc(BI_CTX *ctx, int size)
 #ifdef CONFIG_SSL_FULL_MODE
             printf("alloc: refs was not 0\n");
 #endif
-            abort();
+            abort();    /* create a stack trace from a core dump */
         }
 
         more_comps(biR, size);
@@ -1220,7 +1213,7 @@ static bigint *comp_mod(bigint *bi, int mod)
 /*
  * Barrett reduction has no need for some parts of the product, so ignore bits
  * of the multiply. This routine gives Barrett its big performance
- * improvements over classical/Montgomery reduction methods. 
+ * improvements over Classical/Montgomery reduction methods. 
  */
 static bigint *partial_multiply(BI_CTX *ctx, bigint *bia, bigint *bib, 
         int inner_partial, int outer_partial)
@@ -1293,10 +1286,10 @@ static bigint *partial_multiply(BI_CTX *ctx, bigint *bia, bigint *bib,
 }
 
 /**
- * @brief Perform a single barrett reduction.
+ * @brief Perform a single Barrett reduction.
  * @param ctx [in]  The bigint session context.
  * @param bi [in]  A bigint.
- * @return The result of the barrett reduction.
+ * @return The result of the Barrett reduction.
  */
 bigint *bi_barrett(BI_CTX *ctx, bigint *bi)
 {
@@ -1308,7 +1301,7 @@ bigint *bi_barrett(BI_CTX *ctx, bigint *bi)
     check(bi);
     check(bim);
 
-    /* use classical method instead  - Barrett cannot help here */
+    /* use Classical method instead  - Barrett cannot help here */
     if (bi->size > k*2)
     {
         return bi_mod(ctx, bi);
@@ -1397,9 +1390,7 @@ bigint *bi_mod_power(BI_CTX *ctx, bigint *bi, bigint *biexp)
 
 #ifdef CONFIG_BIGINT_SLIDING_WINDOW
     for (j = i; j > 32; j /= 5) /* work out an optimum size */
-    {
         window_size++;
-    }
 
     /* work out the slide constants */
     precompute_slide_window(ctx, window_size, bi);
@@ -1420,15 +1411,11 @@ bigint *bi_mod_power(BI_CTX *ctx, bigint *bi, bigint *biexp)
             int part_exp = 0;
 
             if (l < 0)  /* LSB of exponent will always be 1 */
-            {
                 l = 0;
-            }
             else
             {
                 while (exp_bit_is_one(biexp, l) == 0)
-                {
                     l++;    /* go back up */
-                }
             }
 
             /* build up the section of the exponent */

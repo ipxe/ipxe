@@ -238,9 +238,6 @@ void AES_set_key(AES_CTX *ctx, const uint8_t *key,
     memcpy(ctx->iv, iv, 16);
 }
 
-#if 0
-/** currently unused function **/
-
 /**
  * Change a key for decryption.
  */
@@ -259,7 +256,6 @@ void AES_convert_key(AES_CTX *ctx)
         *k++ =w;
     }
 }
-#endif
 
 /**
  * Encrypt a byte sequence (with a block size 16) using the AES cipher.
