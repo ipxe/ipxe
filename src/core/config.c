@@ -87,6 +87,9 @@ REQUIRE_OBJECT ( nfs );
 #ifdef DOWNLOAD_PROTO_HTTP
 REQUIRE_OBJECT ( http );
 #endif
+#ifdef DOWNLOAD_PROTO_HTTPS
+REQUIRE_OBJECT ( https );
+#endif
 #ifdef DOWNLOAD_PROTO_FTP
 REQUIRE_OBJECT ( ftp );
 #endif

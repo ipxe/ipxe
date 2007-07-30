@@ -40,7 +40,6 @@
 #include <gpxe/tcpip.h>
 #include <gpxe/process.h>
 #include <gpxe/linebuf.h>
-#include <gpxe/tls.h>
 #include <gpxe/http.h>
 
 /** HTTP receive state */
@@ -459,13 +458,18 @@ static struct xfer_interface_operations http_xfer_operations = {
 };
 
 /**
- * Initiate an HTTP connection
+ * Initiate an HTTP connection, with optional filter
  *
  * @v xfer		Data transfer interface
  * @v uri		Uniform Resource Identifier
+ * @v default_port	Default port number
+ * @v filter		Filter to apply to socket, or NULL
  * @ret rc		Return status code
  */
-static int http_open ( struct xfer_interface *xfer, struct uri *uri ) {
+int http_open_filter ( struct xfer_interface *xfer, struct uri *uri,
+		       unsigned int default_port,
+		       int ( * filter ) ( struct xfer_interface *xfer,
+					  struct xfer_interface **next ) ) {
 	struct http_request *http;
 	struct sockaddr_tcpip server;
 	struct xfer_interface *socket;
@@ -487,11 +491,10 @@ static int http_open ( struct xfer_interface *xfer, struct uri *uri ) {
 
 	/* Open socket */
 	memset ( &server, 0, sizeof ( server ) );
-	server.st_port = htons ( uri_port ( http->uri, HTTP_PORT ) );
+	server.st_port = htons ( uri_port ( http->uri, default_port ) );
 	socket = &http->socket;
-	if ( strcmp ( http->uri->scheme, "https" ) == 0 ) {
-		server.st_port = htons ( uri_port ( http->uri, HTTPS_PORT ) );
-		if ( ( rc = add_tls ( socket, &socket ) ) != 0 )
+	if ( filter ) {
+		if ( ( rc = filter ( socket, &socket ) ) != 0 )
 			goto err;
 	}
 	if ( ( rc = xfer_open_named_socket ( socket, SOCK_STREAM,
@@ -512,14 +515,19 @@ static int http_open ( struct xfer_interface *xfer, struct uri *uri ) {
 	return rc;
 }
 
+/**
+ * Initiate an HTTP connection
+ *
+ * @v xfer		Data transfer interface
+ * @v uri		Uniform Resource Identifier
+ * @ret rc		Return status code
+ */
+static int http_open ( struct xfer_interface *xfer, struct uri *uri ) {
+	return http_open_filter ( xfer, uri, HTTP_PORT, NULL );
+}
+
 /** HTTP URI opener */
 struct uri_opener http_uri_opener __uri_opener = {
 	.scheme	= "http",
-	.open	= http_open,
-};
-
-/** HTTPS URI opener */
-struct uri_opener https_uri_opener __uri_opener = {
-	.scheme	= "https",
 	.open	= http_open,
 };
