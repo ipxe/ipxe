@@ -498,16 +498,14 @@ static int tls_change_cipher ( struct tls_session *tls,
 			       struct tls_cipherspec *pending,
 			       struct tls_cipherspec *active ) {
 
-	/* FIXME: Why is this disabled? */
-#if 0
 	/* Sanity check */
-	if ( ( pending->pubkey == &crypto_null ) ||
+	if ( /* FIXME (when pubkey is not hard-coded to RSA):
+	      * ( pending->pubkey == &crypto_null ) || */
 	     ( pending->cipher == &crypto_null ) ||
 	     ( pending->digest == &crypto_null ) ) {
 		DBGC ( tls, "TLS %p refusing to use null cipher\n", tls );
 		return -ENOTSUP;
 	}
-#endif
 
 	tls_clear_cipher ( tls, active );
 	memswap ( active, pending, sizeof ( *active ) );
