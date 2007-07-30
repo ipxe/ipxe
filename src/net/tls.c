@@ -97,7 +97,7 @@ static void tls_close ( struct tls_session *tls, int rc ) {
  * @v len		Length of buffer
  */
 static void tls_generate_random ( void *data, size_t len ) {
-#warning "Placeholder"
+	/* FIXME: Some real random data source would be nice... */
 	memset ( data, 0x01, len );
 }
 
@@ -345,7 +345,7 @@ static int tls_generate_keys ( struct tls_session *tls ) {
 		return rc;
 	}
 
-#warning "AES needs to be fixed to not require this"
+	/* FIXME: AES needs to be fixed to not require this */
 	AES_convert_key ( rx_cipherspec->cipher_ctx );
 
 	DBGC ( tls, "TLS %p RX key:\n", tls );
@@ -498,7 +498,7 @@ static int tls_change_cipher ( struct tls_session *tls,
 			       struct tls_cipherspec *pending,
 			       struct tls_cipherspec *active ) {
 
-#warning "Why is this disabled?"
+	/* FIXME: Why is this disabled? */
 #if 0
 	/* Sanity check */
 	if ( ( pending->pubkey == &crypto_null ) ||
@@ -622,7 +622,7 @@ static int tls_send_client_hello ( struct tls_session *tls ) {
  * @ret rc		Return status code
  */
 static int tls_send_client_key_exchange ( struct tls_session *tls ) {
-#warning "Hack alert"
+	/* FIXME: Hack alert */
 	RSA_CTX *rsa_ctx;
 	RSA_pub_key_new ( &rsa_ctx, tls->rsa_mod, tls->rsa_mod_len,
 			  tls->rsa_pub_exp, tls->rsa_pub_exp_len );
@@ -639,7 +639,7 @@ static int tls_send_client_key_exchange ( struct tls_session *tls ) {
 	key_xchg.encrypted_pre_master_secret_len
 		= htons ( sizeof ( key_xchg.encrypted_pre_master_secret ) );
 
-#warning "Hack alert"
+	/* FIXME: Hack alert */
 	DBGC ( tls, "RSA encrypting plaintext, modulus, exponent:\n" );
 	DBGC_HD ( tls, &tls->pre_master_secret,
 		  sizeof ( tls->pre_master_secret ) );
@@ -838,6 +838,9 @@ static int tls_new_certificate ( struct tls_session *tls,
 	uint8_t *cert = certificate->asn1_start;
 	int offset = 0;
 
+	/* FIXME */
+	(void) len;
+
 	if (asn1_next_obj(cert, &offset, ASN1_SEQUENCE) < 0 ||
 	    asn1_next_obj(cert, &offset, ASN1_SEQUENCE) < 0 ||
             asn1_skip_obj(cert, &offset, ASN1_EXPLICIT_TAG) ||
@@ -919,7 +922,7 @@ static int tls_new_server_hello_done ( struct tls_session *tls,
 static int tls_new_finished ( struct tls_session *tls,
 			      void *data, size_t len ) {
 
-#warning "Handle this properly"
+	/* FIXME: Handle this properly */
 	tls->tx_state = TLS_TX_DATA;
 	( void ) data;
 	( void ) len;
@@ -1091,7 +1094,7 @@ static void * tls_assemble_block ( struct tls_session *tls,
 	void *mac;
 	void *padding;
 
-#warning "TLSv1.1 has an explicit IV"
+	/* FIXME: TLSv1.1 has an explicit IV */
 	iv_len = 0;
 
 	/* Calculate block-ciphered struct length */
@@ -1289,7 +1292,7 @@ static int tls_split_block ( struct tls_session *tls,
 	}
 	iv_len = tls->rx_cipherspec.cipher->blocksize;
 
-#warning "TLSv1.1 uses an explicit IV"
+	/* FIXME: TLSv1.1 uses an explicit IV */
 	iv_len = 0;
 
 	mac_len = tls->rx_cipherspec.digest->digestsize;
