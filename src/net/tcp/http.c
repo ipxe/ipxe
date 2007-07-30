@@ -468,6 +468,7 @@ static struct xfer_interface_operations http_xfer_operations = {
 static int http_open ( struct xfer_interface *xfer, struct uri *uri ) {
 	struct http_request *http;
 	struct sockaddr_tcpip server;
+	struct xfer_interface *socket;
 	int rc;
 
 	/* Sanity checks */
@@ -487,18 +488,16 @@ static int http_open ( struct xfer_interface *xfer, struct uri *uri ) {
 	/* Open socket */
 	memset ( &server, 0, sizeof ( server ) );
 	server.st_port = htons ( uri_port ( http->uri, HTTP_PORT ) );
-	if ( ( rc = xfer_open_named_socket ( &http->socket, SOCK_STREAM,
+	socket = &http->socket;
+	if ( strcmp ( http->uri->scheme, "https" ) == 0 ) {
+		server.st_port = htons ( uri_port ( http->uri, HTTPS_PORT ) );
+		if ( ( rc = add_tls ( socket, &socket ) ) != 0 )
+			goto err;
+	}
+	if ( ( rc = xfer_open_named_socket ( socket, SOCK_STREAM,
 					     ( struct sockaddr * ) &server,
 					     uri->host, NULL ) ) != 0 )
 		goto err;
-
-#if 0
-	if ( strcmp ( http->uri->scheme, "https" ) == 0 ) {
-		st->st_port = htons ( uri_port ( http->uri, HTTPS_PORT ) );
-		if ( ( rc = add_tls ( &http->stream ) ) != 0 )
-			goto err;
-	}
-#endif
 
 	/* Attach to parent interface, mortalise self, and return */
 	xfer_plug_plug ( &http->xfer, xfer );
