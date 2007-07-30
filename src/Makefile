@@ -145,6 +145,7 @@ DEBUG_TARGETS	+= dbg%.o c s
 
 # SRCDIRS lists all directories containing source files.
 #
+SRCDIRS		+= libgcc
 SRCDIRS		+= core
 SRCDIRS		+= proto
 SRCDIRS		+= net net/tcp net/udp

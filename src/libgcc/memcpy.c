@@ -1,7 +1,5 @@
 /** @file
  *
- * gcc implicit functions
- *
  * gcc sometimes likes to insert implicit calls to memcpy().
  * Unfortunately, there doesn't seem to be any way to prevent it from
  * doing this, or to force it to use the optimised memcpy() as seen by
