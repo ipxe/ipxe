@@ -1,6 +1,7 @@
 #include <stdint.h>
 #include <string.h>
 #include <stdio.h>
+#include <byteswap.h>
 #include <gpxe/aoe.h>
 #include <gpxe/ata.h>
 #include <gpxe/netdevice.h>
@@ -77,7 +78,7 @@ int aoeboot ( const char *root_path ) {
 		 sizeof ( boot_info.client ) );
 	memcpy ( boot_info.server, aoe->target,
 		 sizeof ( boot_info.server ) );
-	boot_info.shelf = aoe->major;
+	boot_info.shelf = htons ( aoe->major );
 	boot_info.slot = aoe->minor;
 	copy_to_real ( 0x40, 0xf0, &boot_info, sizeof ( boot_info ) );
 
