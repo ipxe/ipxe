@@ -19,10 +19,7 @@ struct net_protocol ipv6_protocol;
 
 /* Unspecified IP6 address */
 static struct in6_addr ip6_none = {
-        .in6_u.u6_addr32[0] = 0,
-        .in6_u.u6_addr32[1] = 0,
-        .in6_u.u6_addr32[2] = 0,
-        .in6_u.u6_addr32[3] = 0,
+        .in6_u.u6_addr32 = { 0,0,0,0 }
 };
 
 /** An IPv6 routing table entry */
