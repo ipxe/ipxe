@@ -168,6 +168,19 @@ struct job_interface;
  */
 #define DHCP_EB_SIADDR DHCP_ENCAP_OPT ( DHCP_EB_ENCAP, 3 )
 
+/** Network device descriptor
+ *
+ * Byte 0 is the bus type ID; remaining bytes depend on the bus type.
+ *
+ * PCI devices:
+ * Byte 0 : 1 (PCI)
+ * Byte 1 : PCI vendor ID MSB
+ * Byte 2 : PCI vendor ID LSB
+ * Byte 3 : PCI device ID MSB
+ * Byte 4 : PCI device ID LSB
+ */
+#define DHCP_EB_BUS_ID DHCP_ENCAP_OPT ( DHCP_EB_ENCAP, 0xb1 )
+
 /** BIOS drive number
  *
  * This is the drive number for a drive emulated via INT 13.  0x80 is

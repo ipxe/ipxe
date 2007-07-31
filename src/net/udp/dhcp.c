@@ -24,6 +24,7 @@
 #include <byteswap.h>
 #include <gpxe/if_ether.h>
 #include <gpxe/netdevice.h>
+#include <gpxe/device.h>
 #include <gpxe/xfer.h>
 #include <gpxe/open.h>
 #include <gpxe/job.h>
@@ -480,6 +481,16 @@ static struct dhcp_option_block * dhcp_parse ( const struct dhcphdr *dhcphdr,
  *
  */
 
+/** DHCP network device descriptor */
+struct dhcp_netdev_desc {
+	/** Bus type ID */
+	uint8_t type;
+	/** Vendor ID */
+	uint16_t vendor;
+	/** Device ID */
+	uint16_t device;
+} __attribute__ (( packed ));
+
 /**
  * Create DHCP request
  *
@@ -495,6 +506,8 @@ int create_dhcp_request ( struct net_device *netdev, int msgtype,
 			  struct dhcp_option_block *options,
 			  void *data, size_t max_len,
 			  struct dhcp_packet *dhcppkt ) {
+	struct device_description *desc = &netdev->dev->desc;
+	struct dhcp_netdev_desc dhcp_desc;
 	int rc;
 
 	/* Create DHCP packet */
@@ -529,6 +542,18 @@ int create_dhcp_request ( struct net_device *netdev, int msgtype,
 			      "option: %s\n", strerror ( rc ) );
 			return rc;
 		}
+	}
+
+	/* Add options to identify the network device */
+	dhcp_desc.type = desc->bus_type;
+	dhcp_desc.vendor = htons ( desc->vendor );
+	dhcp_desc.device = htons ( desc->device );
+	if ( ( rc = set_dhcp_packet_option ( dhcppkt, DHCP_EB_BUS_ID,
+					     &dhcp_desc,
+					     sizeof ( dhcp_desc ) ) ) != 0 ) {
+		DBG ( "DHCP could not set bus ID option: %s\n",
+		      strerror ( rc ) );
+		return rc;
 	}
 
 	return 0;
