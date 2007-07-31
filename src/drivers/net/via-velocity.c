@@ -259,7 +259,7 @@ static struct velocity_info_tbl chip_info_table[] = {
  */
 
 static void velocity_set_int_opt(int *opt, int val, int min, int max,
-				 int def, char *name, char *devname)
+				 int def, char *name, const char *devname)
 {
 	if (val == -1) {
 		printf("%s: set value of parameter %s to %d\n",
@@ -292,7 +292,7 @@ static void velocity_set_int_opt(int *opt, int val, int min, int max,
  */
 
 static void velocity_set_bool_opt(u32 * opt, int val, int def, u32 flag,
-				  char *name, char *devname)
+				  char *name, const char *devname)
 {
 	(*opt) &= (~flag);
 	if (val == -1) {
@@ -322,7 +322,7 @@ static void velocity_set_bool_opt(u32 * opt, int val, int def, u32 flag,
  */
 
 static void velocity_get_options(struct velocity_opt *opts, int index,
-				 char *devname)
+				 const char *devname)
 {
 
 	/* FIXME Do the options need to be configurable */
@@ -708,7 +708,7 @@ static int velocity_probe( struct nic *nic, struct pci_device *pci)
 	DBG ( "%s: %s at ioaddr %#hX\n", pci->driver_name, eth_ntoa ( nic->node_addr ),
 	      (unsigned int) BASE );
 
-	velocity_get_options(&vptr->options, 0, (char *) pci->driver_name);
+	velocity_get_options(&vptr->options, 0, pci->driver_name);
 
 	/* 
 	 *      Mask out the options cannot be set to the chip
