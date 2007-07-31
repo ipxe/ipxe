@@ -397,14 +397,11 @@ static int nbi_prepare_dhcp ( struct image *image ) {
 		return -ENODEV;
 	}
 
-	if ( ( rc = create_dhcp_packet ( boot_netdev, DHCPACK, basemem_packet,
-					 sizeof ( basemem_packet ),
-					 &dhcppkt ) ) != 0 ) {
+	if ( ( rc = create_dhcp_response ( boot_netdev, DHCPACK, NULL,
+					   basemem_packet,
+					   sizeof ( basemem_packet ),
+					   &dhcppkt ) ) != 0 ) {
 		DBGC ( image, "NBI %p failed to build DHCP packet\n", image );
-		return rc;
-	}
-	if ( ( rc = copy_dhcp_packet_options ( &dhcppkt, NULL ) ) != 0 ) {
-		DBGC ( image, "NBI %p failed to copy DHCP options\n", image );
 		return rc;
 	}
 

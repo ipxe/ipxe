@@ -503,15 +503,19 @@ extern void find_global_dhcp_ipv4_option ( unsigned int tag,
 					   struct in_addr *inp );
 extern void delete_dhcp_option ( struct dhcp_option_block *options,
 				 unsigned int tag );
+
 extern int apply_dhcp_options ( struct dhcp_option_block *options );
 extern int apply_global_dhcp_options ( void );
 
-extern struct dhcp_option_block dhcp_request_options;
-extern int create_dhcp_packet ( struct net_device *netdev, uint8_t msgtype,
-				void *data, size_t max_len,
-				struct dhcp_packet *dhcppkt );
-extern int copy_dhcp_packet_options ( struct dhcp_packet *dhcppkt,
-				      struct dhcp_option_block *options );
+extern int create_dhcp_request ( struct net_device *netdev, int msgtype,
+				 struct dhcp_option_block *options,
+				 void *data, size_t max_len,
+				 struct dhcp_packet *dhcppkt );
+extern int create_dhcp_response ( struct net_device *netdev, int msgtype,
+				  struct dhcp_option_block *options,
+				  void *data, size_t max_len,
+				  struct dhcp_packet *dhcppkt );
+
 extern int start_dhcp ( struct job_interface *job, struct net_device *netdev,
 			int (*register_options) ( struct net_device *,
 						  struct dhcp_option_block * ));

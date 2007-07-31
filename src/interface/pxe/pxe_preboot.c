@@ -69,10 +69,12 @@ PXENV_EXIT_t pxenv_unload_stack ( struct s_PXENV_UNLOAD_STACK *unload_stack ) {
 PXENV_EXIT_t pxenv_get_cached_info ( struct s_PXENV_GET_CACHED_INFO
 				     *get_cached_info ) {
 	struct dhcp_packet dhcppkt;
+	int ( * dhcp_packet_creator ) ( struct net_device *, int,
+					struct dhcp_option_block *, void *,
+					size_t, struct dhcp_packet * );
+	unsigned int msgtype;
 	void *data = NULL;
 	size_t len;
-	int msgtype;
-	struct dhcp_option_block *options;
 	userptr_t buffer;
 	int rc;
 
@@ -102,19 +104,15 @@ PXENV_EXIT_t pxenv_get_cached_info ( struct s_PXENV_GET_CACHED_INFO
 
 	/* Construct DHCP packet */
 	if ( get_cached_info->PacketType == PXENV_PACKET_TYPE_DHCP_DISCOVER ) {
+		dhcp_packet_creator = create_dhcp_request;
 		msgtype = DHCPDISCOVER;
-		options = &dhcp_request_options;
 	} else {
+		dhcp_packet_creator = create_dhcp_response;
 		msgtype = DHCPACK;
-		options = NULL;
 	}
-	if ( ( rc = create_dhcp_packet ( pxe_netdev, msgtype, data, len,
-					 &dhcppkt ) ) != 0 ) {
+	if ( ( rc = dhcp_packet_creator ( pxe_netdev, msgtype, NULL,
+					  data, len, &dhcppkt ) ) != 0 ) {
 		DBG ( " failed to build packet" );
-		goto err;
-	}
-	if ( ( rc = copy_dhcp_packet_options ( &dhcppkt, options ) ) != 0 ) {
-		DBG ( " failed to copy options" );
 		goto err;
 	}
 
