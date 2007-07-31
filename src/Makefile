@@ -29,6 +29,8 @@ endif
 ifeq ($(ARCH),x86_64)
 ARCH		:= i386
 CFLAGS		+= -m32
+ASFLAGS         += --32
+LDFLAGS         += -m elf_i386
 endif
 
 # Drag in architecture-specific Config
