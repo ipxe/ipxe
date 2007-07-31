@@ -6,6 +6,7 @@
 #include <gpxe/ata.h>
 #include <gpxe/netdevice.h>
 #include <gpxe/dhcp.h>
+#include <gpxe/abft.h>
 #include <int13.h>
 #include <usr/aoeboot.h>
 
@@ -81,6 +82,8 @@ int aoeboot ( const char *root_path ) {
 	boot_info.shelf = htons ( aoe->major );
 	boot_info.slot = aoe->minor;
 	copy_to_real ( 0x40, 0xf0, &boot_info, sizeof ( boot_info ) );
+
+	abft_fill_data ( aoe );
 
 	drive.drive = find_global_dhcp_num_option ( DHCP_EB_BIOS_DRIVE );
 	drive.blockdev = &ata.blockdev;
