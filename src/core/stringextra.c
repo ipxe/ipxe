@@ -258,7 +258,7 @@ char * bcopy(const char * src, char * dest, int count)
  * returns the address of the first occurrence of @c, or 1 byte past
  * the area if @c is not found
  */
-void * memscan(void * addr, int c, size_t size)
+void * memscan(const void * addr, int c, size_t size)
 {
 	unsigned char * p = (unsigned char *) addr;
 
