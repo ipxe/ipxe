@@ -17,32 +17,32 @@
 #include <stddef.h>
 #include <bits/string.h>
 
-int strnicmp(const char *s1, const char *s2, size_t len);
+int __pure strnicmp(const char *s1, const char *s2, size_t len);
 char * strcpy(char * dest,const char *src);
 char * strncpy(char * dest,const char *src,size_t count);
 char * strcat(char * dest, const char * src);
 char * strncat(char *dest, const char *src, size_t count);
-int __attribute__ (( pure )) strcmp(const char * cs,const char * ct);
-int __attribute__ (( pure )) strncmp(const char * cs,const char * ct,
+int __pure strcmp(const char * cs,const char * ct);
+int __pure strncmp(const char * cs,const char * ct,
 				     size_t count);
-char * strchr(const char * s, int c);
-char * strrchr(const char * s, int c);
-size_t strlen(const char * s);
-size_t strnlen(const char * s, size_t count);
-size_t strspn(const char *s, const char *accept);
-size_t strcspn(const char *s, const char *reject);
-char * strpbrk(const char * cs,const char * ct);
+char * __pure strchr(const char * s, int c);
+char * __pure strrchr(const char * s, int c);
+size_t __pure strlen(const char * s);
+size_t __pure strnlen(const char * s, size_t count);
+size_t __pure strspn(const char *s, const char *accept);
+size_t __pure strcspn(const char *s, const char *reject);
+char * __pure strpbrk(const char * cs,const char * ct);
 char * strtok(char * s,const char * ct);
 char * strsep(char **s, const char *ct);
 void * memset(void * s,int c,size_t count);
 void * memmove(void * dest,const void *src,size_t count);
-int __attribute__ (( pure )) memcmp(const void * cs,const void * ct,
+int __pure memcmp(const void * cs,const void * ct,
 				    size_t count);
-void * memscan(void * addr, int c, size_t size);
-char * strstr(const char * s1,const char * s2);
-void * memchr(const void *s, int c, size_t n);
-char * strdup(const char *s);
-char * strndup(const char *s, size_t n);
+void * __pure memscan(const void * addr, int c, size_t size);
+char * __pure strstr(const char * s1,const char * s2);
+void * __pure memchr(const void *s, int c, size_t n);
+char * __pure strdup(const char *s);
+char * __pure strndup(const char *s, size_t n);
 
 extern const char * strerror ( int errno );
 
