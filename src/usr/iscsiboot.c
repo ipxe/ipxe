@@ -3,8 +3,26 @@
 #include <stdio.h>
 #include <gpxe/iscsi.h>
 #include <gpxe/dhcp.h>
+#include <gpxe/netdevice.h>
+#include <gpxe/ibft.h>
 #include <int13.h>
 #include <usr/iscsiboot.h>
+
+/**
+ * Guess boot network device
+ *
+ * @ret netdev		Boot network device
+ */
+static struct net_device * guess_boot_netdev ( void ) {
+	struct net_device *boot_netdev;
+
+	/* Just use the first network device */
+	for_each_netdev ( boot_netdev ) {
+		return boot_netdev;
+	}
+
+	return NULL;
+}
 
 int iscsiboot ( const char *root_path ) {
 	struct scsi_device scsi;
@@ -29,6 +47,12 @@ int iscsiboot ( const char *root_path ) {
 
 	drive.drive = find_global_dhcp_num_option ( DHCP_EB_BIOS_DRIVE );
 	drive.blockdev = &scsi.blockdev;
+
+	/* FIXME: ugly, ugly hack */
+	struct net_device *netdev = guess_boot_netdev();
+	struct iscsi_session *iscsi =
+		container_of ( scsi.backend, struct iscsi_session, refcnt );
+	ibft_fill_data ( netdev, iscsi );
 
 	register_int13_drive ( &drive );
 	printf ( "Registered as BIOS drive %#02x\n", drive.drive );

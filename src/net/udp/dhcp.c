@@ -24,6 +24,7 @@
 #include <byteswap.h>
 #include <gpxe/if_ether.h>
 #include <gpxe/netdevice.h>
+#include <gpxe/device.h>
 #include <gpxe/xfer.h>
 #include <gpxe/open.h>
 #include <gpxe/job.h>
@@ -108,7 +109,7 @@ static uint32_t dhcp_xid ( struct net_device *netdev ) {
 }
 
 /** Options common to all DHCP requests */
-struct dhcp_option_block dhcp_request_options = {
+static struct dhcp_option_block dhcp_request_options = {
 	.data = dhcp_request_options_data,
 	.max_len = sizeof ( dhcp_request_options_data ),
 	.len = sizeof ( dhcp_request_options_data ),
@@ -270,8 +271,8 @@ static int copy_dhcp_packet_encap_options ( struct dhcp_packet *dhcppkt,
  * @c options may specify a single options block, or be left as NULL
  * in order to copy options from all registered options blocks.
  */
-int copy_dhcp_packet_options ( struct dhcp_packet *dhcppkt,
-			       struct dhcp_option_block *options ) {
+static int copy_dhcp_packet_options ( struct dhcp_packet *dhcppkt,
+				      struct dhcp_option_block *options ) {
 	return copy_dhcp_packet_encap_options ( dhcppkt, options, 0 );
 }
 
@@ -289,9 +290,10 @@ int copy_dhcp_packet_options ( struct dhcp_packet *dhcppkt,
  * dhcp_packet structure that can be passed to
  * set_dhcp_packet_option() or copy_dhcp_packet_options().
  */
-int create_dhcp_packet ( struct net_device *netdev, uint8_t msgtype,
-			 void *data, size_t max_len,
-			 struct dhcp_packet *dhcppkt ) {
+static int create_dhcp_packet ( struct net_device *netdev,
+				unsigned int msgtype,
+				void *data, size_t max_len,
+				struct dhcp_packet *dhcppkt ) {
 	struct dhcphdr *dhcphdr = data;
 	int rc;
 
@@ -475,6 +477,121 @@ static struct dhcp_option_block * dhcp_parse ( const struct dhcphdr *dhcphdr,
 
 /****************************************************************************
  *
+ * Whole-packet construction
+ *
+ */
+
+/** DHCP network device descriptor */
+struct dhcp_netdev_desc {
+	/** Bus type ID */
+	uint8_t type;
+	/** Vendor ID */
+	uint16_t vendor;
+	/** Device ID */
+	uint16_t device;
+} __attribute__ (( packed ));
+
+/**
+ * Create DHCP request
+ *
+ * @v netdev		Network device
+ * @v msgtype		DHCP message type
+ * @v options		DHCP server response options, or NULL
+ * @v data		Buffer for DHCP packet
+ * @v max_len		Size of DHCP packet buffer
+ * @v dhcppkt		DHCP packet structure to fill in
+ * @ret rc		Return status code
+ */
+int create_dhcp_request ( struct net_device *netdev, int msgtype,
+			  struct dhcp_option_block *options,
+			  void *data, size_t max_len,
+			  struct dhcp_packet *dhcppkt ) {
+	struct device_description *desc = &netdev->dev->desc;
+	struct dhcp_netdev_desc dhcp_desc;
+	int rc;
+
+	/* Create DHCP packet */
+	if ( ( rc = create_dhcp_packet ( netdev, msgtype, data, max_len,
+					 dhcppkt ) ) != 0 ) {
+		DBG ( "DHCP could not create DHCP packet: %s\n",
+		      strerror ( rc ) );
+		return rc;
+	}
+
+	/* Copy in options common to all requests */
+	if ( ( rc = copy_dhcp_packet_options ( dhcppkt,
+					       &dhcp_request_options )) !=0 ){
+		DBG ( "DHCP could not set common DHCP options: %s\n",
+		      strerror ( rc ) );
+		return rc;
+	}
+
+	/* Copy any required options from previous server repsonse */
+	if ( options ) {
+		if ( ( rc = copy_dhcp_packet_option ( dhcppkt, options,
+					  DHCP_SERVER_IDENTIFIER,
+					  DHCP_SERVER_IDENTIFIER ) ) != 0 ) {
+			DBG ( "DHCP could not set server identifier "
+			      "option: %s\n", strerror ( rc ) );
+			return rc;
+		}
+		if ( ( rc = copy_dhcp_packet_option ( dhcppkt, options,
+					  DHCP_EB_YIADDR,
+					  DHCP_REQUESTED_ADDRESS ) ) != 0 ) {
+			DBG ( "DHCP could not set requested address "
+			      "option: %s\n", strerror ( rc ) );
+			return rc;
+		}
+	}
+
+	/* Add options to identify the network device */
+	dhcp_desc.type = desc->bus_type;
+	dhcp_desc.vendor = htons ( desc->vendor );
+	dhcp_desc.device = htons ( desc->device );
+	if ( ( rc = set_dhcp_packet_option ( dhcppkt, DHCP_EB_BUS_ID,
+					     &dhcp_desc,
+					     sizeof ( dhcp_desc ) ) ) != 0 ) {
+		DBG ( "DHCP could not set bus ID option: %s\n",
+		      strerror ( rc ) );
+		return rc;
+	}
+
+	return 0;
+}
+
+/**
+ * Create DHCP response
+ *
+ * @v netdev		Network device
+ * @v msgtype		DHCP message type
+ * @v options		DHCP options, or NULL
+ * @v data		Buffer for DHCP packet
+ * @v max_len		Size of DHCP packet buffer
+ * @v dhcppkt		DHCP packet structure to fill in
+ * @ret rc		Return status code
+ */
+int create_dhcp_response ( struct net_device *netdev, int msgtype,
+			   struct dhcp_option_block *options,
+			   void *data, size_t max_len,
+			   struct dhcp_packet *dhcppkt ) {
+	int rc;
+
+	/* Create packet and copy in options */
+	if ( ( rc = create_dhcp_packet ( netdev, msgtype, data, max_len,
+					 dhcppkt ) ) != 0 ) {
+		DBG ( " failed to build packet" );
+		return rc;
+	}
+	if ( ( rc = copy_dhcp_packet_options ( dhcppkt, options ) ) != 0 ) {
+		DBG ( " failed to copy options" );
+		return rc;
+	}
+
+	return 0;
+}
+
+/****************************************************************************
+ *
  * DHCP to UDP interface
  *
  */
@@ -556,8 +673,8 @@ static int dhcp_send_request ( struct dhcp_session *dhcp ) {
 	struct xfer_metadata meta = {
 		.netdev = dhcp->netdev,
 	};
-	struct dhcp_packet dhcppkt;
 	struct io_buffer *iobuf;
+	struct dhcp_packet dhcppkt;
 	int rc;
 	
 	DBGC ( dhcp, "DHCP %p transmitting %s\n",
@@ -577,38 +694,13 @@ static int dhcp_send_request ( struct dhcp_session *dhcp ) {
 		return -ENOMEM;
 
 	/* Create DHCP packet in temporary buffer */
-	if ( ( rc = create_dhcp_packet ( dhcp->netdev, dhcp->state,
-					 iobuf->data, iob_tailroom ( iobuf ),
-					 &dhcppkt ) ) != 0 ) {
-		DBGC ( dhcp, "DHCP %p could not create DHCP packet: %s\n",
+	if ( ( rc = create_dhcp_request ( dhcp->netdev, dhcp->state,
+					  dhcp->options, iobuf->data,
+					  iob_tailroom ( iobuf ),
+					  &dhcppkt ) ) != 0 ) {
+		DBGC ( dhcp, "DHCP %p could not construct DHCP request: %s\n",
 		       dhcp, strerror ( rc ) );
 		goto done;
-	}
-
-	/* Copy in options common to all requests */
-	if ( ( rc = copy_dhcp_packet_options ( &dhcppkt,
-					       &dhcp_request_options ) ) != 0){
-		DBGC ( dhcp, "DHCP %p could not set common DHCP options: %s\n",
-		       dhcp, strerror ( rc ) );
-		goto done;
-	}
-
-	/* Copy any required options from previous server repsonse */
-	if ( dhcp->options ) {
-		if ( ( rc = copy_dhcp_packet_option ( &dhcppkt, dhcp->options,
-					    DHCP_SERVER_IDENTIFIER,
-					    DHCP_SERVER_IDENTIFIER ) ) != 0 ) {
-			DBGC ( dhcp, "DHCP %p could not set server identifier "
-			       "option: %s\n", dhcp, strerror ( rc ) );
-			goto done;
-		}
-		if ( ( rc = copy_dhcp_packet_option ( &dhcppkt, dhcp->options,
-					    DHCP_EB_YIADDR,
-					    DHCP_REQUESTED_ADDRESS ) ) != 0 ) {
-			DBGC ( dhcp, "DHCP %p could not set requested address "
-			       "option: %s\n", dhcp, strerror ( rc ) );
-			goto done;
-		}
 	}
 
 	/* Transmit the packet */

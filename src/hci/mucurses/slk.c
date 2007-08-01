@@ -50,7 +50,7 @@ struct _softlabelkeys {
 	short saved_pair;
 };
 
-struct _softlabelkeys *slks;
+static struct _softlabelkeys *slks;
 
 /*
   I either need to break the primitives here, or write a collection of

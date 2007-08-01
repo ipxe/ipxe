@@ -423,8 +423,14 @@ static void undinet_poll ( struct net_device *netdev ) {
 
 	if ( ! undinic->isr_processing ) {
 		/* Do nothing unless ISR has been triggered */
-		if ( ! undinet_isr_triggered() )
+		if ( ! undinet_isr_triggered() ) {
+			/* Allow interrupt to occur */
+			__asm__ __volatile__ ( REAL_CODE ( "sti\n\t"
+							   "nop\n\t"
+							   "nop\n\t"
+							   "cli\n\t" ) : : );
 			return;
+		}
 
 		/* Start ISR processing */
 		undinic->isr_processing = 1;

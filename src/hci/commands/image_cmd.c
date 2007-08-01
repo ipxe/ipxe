@@ -45,7 +45,8 @@
  * @v nargs		Argument count
  * @v args		Argument list
  */
-void imgfill_cmdline ( struct image *image, unsigned int nargs, char **args ) {
+static void imgfill_cmdline ( struct image *image, unsigned int nargs, 
+                              char **args ) {
 	size_t used = 0;
 
 	image->cmdline[0] = '\0';

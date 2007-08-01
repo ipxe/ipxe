@@ -153,6 +153,10 @@ static int spi_bit_rw ( struct spi_bus *bus, struct spi_device *device,
 		= container_of ( bus, struct spi_bit_basher, bus );
 	uint32_t tmp;
 
+	/* Set clock line to idle state */
+	write_bit ( &spibit->basher, SPI_BIT_SCLK, 
+		    ( bus->mode & SPI_MODE_CPOL ) );
+
 	/* Assert chip select on specified slave */
 	spi_bit_set_slave_select ( spibit, device->slave, SELECT_SLAVE );
 

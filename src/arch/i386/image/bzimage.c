@@ -33,7 +33,6 @@
 #include <gpxe/uaccess.h>
 #include <gpxe/image.h>
 #include <gpxe/segment.h>
-#include <gpxe/memmap.h>
 #include <gpxe/init.h>
 #include <gpxe/initrd.h>
 
@@ -168,58 +167,78 @@ static int bzimage_set_cmdline ( struct image *image,
 }
 
 /**
- * Load initrd, if any
+ * Load initrds, if any
  *
  * @v image		bzImage image
  * @v exec_ctx		Execution context
  * @ret rc		Return status code
  */
 static int bzimage_load_initrd ( struct image *image,
-				 struct bzimage_exec_context *exec_ctx,
-				 struct image *initrd ) {
-	physaddr_t start = user_to_phys ( initrd->data, 0 );
+				 struct bzimage_exec_context *exec_ctx ) {
+	struct image *initrd;
+	size_t initrd_len;
+	size_t total_len = 0;
+	size_t offset = 0;
+	physaddr_t start;
 	int rc;
 
-	DBGC ( image, "bzImage %p loading initrd %p (%s)\n",
-	       image, initrd, initrd->name );
-	
-	/* Find a suitable start address */
-	if ( ( start + initrd->len ) <= exec_ctx->mem_limit ) {
-		/* Just use initrd in situ */
-		DBGC ( image, "bzImage %p using initrd as [%lx,%lx)\n",
-		       image, start, ( start + initrd->len ) );
-	} else {
-		for ( ; ; start -= 0x100000 ) {
-			/* Check that we're not going to overwrite the
-			 * kernel itself.  This check isn't totally
-			 * accurate, but errs on the side of caution.
-			 */
-			if ( start <= ( BZI_LOAD_HIGH_ADDR + image->len ) ) {
-				DBGC ( image, "bzImage %p could not find a "
-				       "location for initrd\n", image );
-				return -ENOBUFS;
-			}
-			/* Check that we are within the kernel's range */
-			if ( ( start + initrd->len ) > exec_ctx->mem_limit )
-				continue;
-			/* Prepare and verify segment */
-			if ( ( rc = prep_segment ( phys_to_user ( start ),
-						   initrd->len,
-						   initrd->len ) ) != 0 )
-				continue;
-			/* Copy to segment */
-			DBGC ( image, "bzImage %p relocating initrd to "
-			       "[%lx,%lx)\n", image, start,
-			       ( start + initrd->len ) );
-			memcpy_user ( phys_to_user ( start ), 0,
-				      initrd->data, 0, initrd->len );
-			break;
-		}
+	/* Add up length of all initrd images */
+	for_each_image ( initrd ) {
+		if ( initrd->type != &initrd_image_type )
+			continue;
+		initrd_len = ( ( initrd->len + 0x0f ) & ~0x0f );
+		total_len += initrd_len;
 	}
+
+	/* Give up if no initrd images found */
+	if ( ! total_len )
+		return 0;
+
+	/* Find a suitable start address.  Try 1MB boundaries,
+	 * starting from the downloaded kernel image itself and
+	 * working downwards until we hit an available region.
+	 */
+	for ( start = ( user_to_phys ( image->data, 0 ) & ~0xfffff ) ; ;
+	      start -= 0x100000 ) {
+		/* Check that we're not going to overwrite the
+		 * kernel itself.  This check isn't totally
+		 * accurate, but errs on the side of caution.
+		 */
+		if ( start <= ( BZI_LOAD_HIGH_ADDR + image->len ) ) {
+			DBGC ( image, "bzImage %p could not find a location "
+			       "for initrd\n", image );
+			return -ENOBUFS;
+		}
+		/* Check that we are within the kernel's range */
+		if ( ( start + total_len ) > exec_ctx->mem_limit )
+			continue;
+		/* Prepare and verify segment */
+		if ( ( rc = prep_segment ( phys_to_user ( start ), 0,
+					   total_len ) ) != 0 )
+			continue;
+		/* Use this address */
+		break;
+	}
+
+	/* Construct initrd */
+	DBGC ( image, "bzImage %p constructing initrd at [%lx,%lx)\n",
+	       image, start, ( start + total_len ) );
+	for_each_image ( initrd ) {
+		if ( initrd->type != &initrd_image_type )
+			continue;
+		initrd_len = ( ( initrd->len + 0x0f ) & ~0x0f );
+		DBGC ( image, "bzImage %p has initrd %p at [%lx,%lx)\n",
+		       image, initrd, ( start + offset ),
+		       ( start + offset + initrd->len ) );
+		memcpy_user ( phys_to_user ( start ), offset,
+			      initrd->data, 0, initrd->len );
+		offset += initrd_len;
+	}
+	assert ( offset == total_len );
 
 	/* Record initrd location */
 	exec_ctx->ramdisk_image = start;
-	exec_ctx->ramdisk_size = initrd->len;
+	exec_ctx->ramdisk_size = total_len;
 
 	return 0;
 }
@@ -234,7 +253,6 @@ static int bzimage_exec ( struct image *image ) {
 	struct bzimage_exec_context exec_ctx;
 	struct bzimage_header bzhdr;
 	const char *cmdline = ( image->cmdline ? image->cmdline : "" );
-	struct image *initrd;
 	int rc;
 
 	/* Initialise context */
@@ -262,15 +280,9 @@ static int bzimage_exec ( struct image *image ) {
 	if ( ( rc = bzimage_set_cmdline ( image, &exec_ctx, cmdline ) ) != 0 )
 		return rc;
 
-	/* Load an initrd, if one exists */
-	for_each_image ( initrd ) {
-		if ( initrd->type == &initrd_image_type ) {
-			if ( ( rc = bzimage_load_initrd ( image, &exec_ctx,
-							  initrd ) ) != 0 )
-				return rc;
-			break;
-		}
-	}
+	/* Load any initrds */
+	if ( ( rc = bzimage_load_initrd ( image, &exec_ctx ) ) != 0 )
+		return rc;
 
 	/* Update and store kernel header */
 	bzhdr.vid_mode = exec_ctx.vid_mode;

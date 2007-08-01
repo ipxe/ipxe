@@ -28,7 +28,7 @@
 #include "crypto.h"
 
 #ifdef CONFIG_BIGINT_CRT
-static bigint *bi_crt(RSA_CTX *rsa, bigint *bi);
+static bigint *bi_crt(const RSA_CTX *rsa, bigint *bi);
 #endif
 
 void RSA_priv_key_new(RSA_CTX **ctx, 
@@ -72,7 +72,7 @@ void RSA_pub_key_new(RSA_CTX **ctx,
 {
     RSA_CTX *rsa_ctx;
     BI_CTX *bi_ctx = bi_initialize();
-    *ctx = (RSA_CTX *)calloc(1, sizeof(RSA_CTX));   /* reset to all 0 */
+    *ctx = (RSA_CTX *)calloc(1, sizeof(RSA_CTX));
     rsa_ctx = *ctx;
     rsa_ctx->bi_ctx = bi_ctx;
     rsa_ctx->num_octets = (mod_len & 0xFFF0);
@@ -126,8 +126,8 @@ void RSA_free(RSA_CTX *rsa_ctx)
  * @return  The number of bytes that were originally encrypted. -1 on error.
  * @see http://www.rsasecurity.com/rsalabs/node.asp?id=2125
  */
-int RSA_decrypt(RSA_CTX *ctx, const uint8_t *in_data, uint8_t *out_data,
-        int is_decryption)
+int RSA_decrypt(const RSA_CTX *ctx, const uint8_t *in_data, 
+                            uint8_t *out_data, int is_decryption)
 {
     int byte_size = ctx->num_octets;
     uint8_t *block;
@@ -155,10 +155,9 @@ int RSA_decrypt(RSA_CTX *ctx, const uint8_t *in_data, uint8_t *out_data,
     if (is_decryption == 0) /* PKCS1.5 signing pads with "0xff"s */
     {
         while (block[i++] == 0xff && i < byte_size);
+
         if (block[i-2] != 0xff)
-        {
             i = byte_size;     /*ensure size is 0 */   
-        }
     }
     else                    /* PKCS1.5 encryption padding is random */
 #endif
@@ -169,9 +168,7 @@ int RSA_decrypt(RSA_CTX *ctx, const uint8_t *in_data, uint8_t *out_data,
 
     /* get only the bit we want */
     if (size > 0)
-    {
         memcpy(out_data, &block[i], size);
-    }
     
     free(block);
     return size ? size : -1;
@@ -180,7 +177,7 @@ int RSA_decrypt(RSA_CTX *ctx, const uint8_t *in_data, uint8_t *out_data,
 /**
  * Performs m = c^d mod n
  */
-bigint *RSA_private(RSA_CTX *c, bigint *bi_msg)
+bigint *RSA_private(const RSA_CTX *c, bigint *bi_msg)
 {
 #ifdef CONFIG_BIGINT_CRT
     return bi_crt(c, bi_msg);
@@ -197,7 +194,7 @@ bigint *RSA_private(RSA_CTX *c, bigint *bi_msg)
  * This should really be in bigint.c (and was at one stage), but needs 
  * access to the RSA_CTX context...
  */
-static bigint *bi_crt(RSA_CTX *rsa, bigint *bi)
+static bigint *bi_crt(const RSA_CTX *rsa, bigint *bi)
 {
     BI_CTX *ctx = rsa->bi_ctx;
     bigint *m1, *m2, *h;
@@ -245,7 +242,7 @@ void RSA_print(const RSA_CTX *rsa_ctx)
 /**
  * Performs c = m^e mod n
  */
-bigint *RSA_public(RSA_CTX *c, bigint *bi_msg)
+bigint *RSA_public(const RSA_CTX * c, bigint *bi_msg)
 {
     c->bi_ctx->mod_offset = BIGINT_M_OFFSET;
     return bi_mod_power(c->bi_ctx, bi_msg, c->e);
@@ -255,7 +252,7 @@ bigint *RSA_public(RSA_CTX *c, bigint *bi_msg)
  * Use PKCS1.5 for encryption/signing.
  * see http://www.rsasecurity.com/rsalabs/node.asp?id=2125
  */
-int RSA_encrypt(RSA_CTX *ctx, const uint8_t *in_data, uint16_t in_len, 
+int RSA_encrypt(const RSA_CTX *ctx, const uint8_t *in_data, uint16_t in_len, 
         uint8_t *out_data, int is_signing)
 {
     int byte_size = ctx->num_octets;
@@ -273,10 +270,7 @@ int RSA_encrypt(RSA_CTX *ctx, const uint8_t *in_data, uint16_t in_len,
     else /* randomize the encryption padding with non-zero bytes */   
     {
         out_data[1] = 2;
-        memset(&out_data[2], 0x01, num_pads_needed);
-#if 0
         get_random_NZ(num_pads_needed, &out_data[2]);
-#endif
     }
 
     out_data[2+num_pads_needed] = 0;
@@ -291,17 +285,18 @@ int RSA_encrypt(RSA_CTX *ctx, const uint8_t *in_data, uint16_t in_len,
 }
 
 #if 0
-
 /**
  * Take a signature and decrypt it.
  */
 bigint *RSA_sign_verify(BI_CTX *ctx, const uint8_t *sig, int sig_len,
         bigint *modulus, bigint *pub_exp)
 {
-    uint8_t *block = (uint8_t *)malloc(sig_len);
+    uint8_t *block;
     int i, size;
     bigint *decrypted_bi, *dat_bi;
     bigint *bir = NULL;
+
+    block = (uint8_t *)malloc(sig_len);
 
     /* decrypt */
     dat_bi = bi_import(ctx, sig, sig_len);
@@ -332,7 +327,6 @@ bigint *RSA_sign_verify(BI_CTX *ctx, const uint8_t *sig, int sig_len,
     free(block);
     return bir;
 }
-
 #endif
 
 #endif  /* CONFIG_SSL_CERT_VERIFICATION */

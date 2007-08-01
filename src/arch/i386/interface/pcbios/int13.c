@@ -321,7 +321,7 @@ static int int13_get_extended_parameters ( struct int13_drive *drive,
  * INT 13 handler
  *
  */
-static void int13 ( struct i386_all_regs *ix86 ) {
+static __cdecl void int13 ( struct i386_all_regs *ix86 ) {
 	int command = ix86->regs.ah;
 	unsigned int bios_drive = ix86->regs.dl;
 	unsigned int original_bios_drive = bios_drive;

@@ -124,7 +124,12 @@ void hmac_sha1(const uint8_t *msg, int length, const uint8_t *key,
 void RNG_initialize(const uint8_t *seed_buf, int size);
 void RNG_terminate(void);
 void get_random(int num_rand_bytes, uint8_t *rand_data);
-void get_random_NZ(int num_rand_bytes, uint8_t *rand_data);
+//void get_random_NZ(int num_rand_bytes, uint8_t *rand_data);
+
+#include <string.h>
+static inline void get_random_NZ(int num_rand_bytes, uint8_t *rand_data) {
+	memset ( rand_data, 0x01, num_rand_bytes );
+}
 
 /**************************************************************************
  * RSA declarations 
@@ -163,15 +168,15 @@ void RSA_pub_key_new(RSA_CTX **rsa_ctx,
         const uint8_t *modulus, int mod_len,
         const uint8_t *pub_exp, int pub_len);
 void RSA_free(RSA_CTX *ctx);
-int RSA_decrypt(RSA_CTX *ctx, const uint8_t *in_data, uint8_t *out_data,
+int RSA_decrypt(const RSA_CTX *ctx, const uint8_t *in_data, uint8_t *out_data,
         int is_decryption);
-bigint *RSA_private(RSA_CTX *c, bigint *bi_msg);
+bigint *RSA_private(const RSA_CTX *c, bigint *bi_msg);
 #ifdef CONFIG_SSL_CERT_VERIFICATION
 bigint *RSA_raw_sign_verify(RSA_CTX *c, bigint *bi_msg);
 bigint *RSA_sign_verify(BI_CTX *ctx, const uint8_t *sig, int sig_len,
         bigint *modulus, bigint *pub_exp);
-bigint *RSA_public(RSA_CTX *c, bigint *bi_msg);
-int RSA_encrypt(RSA_CTX *ctx, const uint8_t *in_data, uint16_t in_len, 
+bigint *RSA_public(const RSA_CTX *c, bigint *bi_msg);
+int RSA_encrypt(const RSA_CTX *ctx, const uint8_t *in_data, uint16_t in_len, 
         uint8_t *out_data, int is_signing);
 void RSA_print(const RSA_CTX *ctx);
 #endif

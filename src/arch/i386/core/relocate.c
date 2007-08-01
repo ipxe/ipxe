@@ -39,7 +39,7 @@ extern char _end[];
  * address space, and returns the physical address of the new location
  * to the prefix in %edi.
  */
-void relocate ( struct i386_all_regs *ix86 ) {
+__cdecl void relocate ( struct i386_all_regs *ix86 ) {
 	struct memory_map memmap;
 	unsigned long start, end, size, padded_size;
 	unsigned long new_start, new_end;

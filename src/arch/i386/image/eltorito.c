@@ -298,7 +298,7 @@ static int eltorito_load_disk ( struct image *image,
  * @v image		El Torito file
  * @ret rc		Return status code
  */
-int eltorito_load ( struct image *image ) {
+static int eltorito_load ( struct image *image ) {
 	struct eltorito_boot_entry boot_entry;
 	unsigned long bootcat_offset;
 	int rc;

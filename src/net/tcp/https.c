@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2006 Michael Brown <mbrown@fensystems.co.uk>.
+ * Copyright (C) 2007 Michael Brown <mbrown@fensystems.co.uk>.
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License as
@@ -16,40 +16,31 @@
  * Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
  */
 
-#include <stddef.h>
-#include <gpxe/async.h>
-#include <gpxe/aoe.h>
-
-/** @file
+/**
+ * @file
  *
- * AoE ATA device
+ * Secure Hyper Text Transfer Protocol (HTTPS)
  *
  */
 
+#include <stddef.h>
+#include <gpxe/open.h>
+#include <gpxe/tls.h>
+#include <gpxe/http.h>
+
 /**
- * Issue ATA command via AoE device
+ * Initiate an HTTPS connection
  *
- * @v ata		ATA device
- * @v command		ATA command
+ * @v xfer		Data transfer interface
+ * @v uri		Uniform Resource Identifier
  * @ret rc		Return status code
  */
-static int aoe_command ( struct ata_device *ata,
-			 struct ata_command *command ) {
-	struct aoe_device *aoedev
-		= container_of ( ata, struct aoe_device, ata );
-	struct async async;
-
-	return async_block ( &async, aoe_issue ( &aoedev->aoe, command,
-						 &async ) );
+static int https_open ( struct xfer_interface *xfer, struct uri *uri ) {
+	return http_open_filter ( xfer, uri, HTTPS_PORT, add_tls );
 }
 
-/**
- * Initialise AoE device
- *
- * @v aoedev		AoE device
- */
-int init_aoedev ( struct aoe_device *aoedev ) {
-	aoedev->ata.command = aoe_command;
-	aoe_open ( &aoedev->aoe );
-	return init_atadev ( &aoedev->ata );
-}
+/** HTTPS URI opener */
+struct uri_opener https_uri_opener __uri_opener = {
+	.scheme	= "https",
+	.open	= https_open,
+};

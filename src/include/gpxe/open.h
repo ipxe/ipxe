@@ -7,6 +7,7 @@
  *
  */
 
+#include <stdarg.h>
 #include <gpxe/tables.h>
 
 struct xfer_interface;

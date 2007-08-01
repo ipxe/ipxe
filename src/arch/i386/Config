@@ -130,6 +130,18 @@ endif
 # this is almost always a win. the kernel uses it, too.
 CFLAGS+= -mpreferred-stack-boundary=2
 
+# use regparm for all functions - C functions called from assembly (or
+# vice versa) need __cdecl now
+CFLAGS+= -mregparm=3
+
+# use -mrtd (same __cdecl requirements as above)
+CFLAGS+= -mrtd
+
+# this is the logical complement to -mregparm=3. 
+# it doesn't currently buy us anything, but if anything ever tries
+# to return small structures, let's be prepared
+CFLAGS+= -freg-struct-return
+
 LDFLAGS+=	-N --no-check-sections
 
 ifeq "$(shell uname -s)" "FreeBSD"

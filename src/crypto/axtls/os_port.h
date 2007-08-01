@@ -27,9 +27,6 @@ static inline void close ( int fd __unused ) {
 }
 
 typedef void FILE;
-#define SEEK_SET 0
-#define SEEK_CUR 0
-#define SEEK_END 0
 
 static inline FILE * fopen ( const char *filename __unused,
 			     const char *mode __unused ) {
