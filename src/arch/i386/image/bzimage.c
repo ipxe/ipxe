@@ -35,6 +35,7 @@
 #include <gpxe/segment.h>
 #include <gpxe/init.h>
 #include <gpxe/initrd.h>
+#include <gpxe/cpio.h>
 
 struct image_type bzimage_image_type __image_type ( PROBE_NORMAL );
 
@@ -167,27 +168,79 @@ static int bzimage_set_cmdline ( struct image *image,
 }
 
 /**
+ * Load initrd
+ *
+ * @v image		bzImage image
+ * @v initrd		initrd image
+ * @v address		Address at which to load, or UNULL
+ * @ret len		Length of loaded image, rounded up to 4 bytes
+ */
+static size_t bzimage_load_initrd ( struct image *image,
+				    struct image *initrd,
+				    userptr_t address ) {
+	char *filename = initrd->cmdline;
+	struct cpio_header cpio;
+        size_t offset = 0;
+
+	/* Ignore images which aren't initrds */
+	if ( initrd->type != &initrd_image_type )
+		return 0;
+
+	/* Create cpio header before non-prebuilt images */
+	if ( filename[0] ) {
+		size_t name_len = ( strlen ( filename ) + 1 );
+
+		DBGC ( image, "bzImage %p inserting initrd %p as %s\n",
+		       image, initrd, filename );
+		memset ( &cpio, '0', sizeof ( cpio ) );
+		memcpy ( cpio.c_magic, CPIO_MAGIC, sizeof ( cpio.c_magic ) );
+		cpio_set_field ( cpio.c_mode, 0100644 );
+		cpio_set_field ( cpio.c_nlink, 1 );
+		cpio_set_field ( cpio.c_filesize, initrd->len );
+		cpio_set_field ( cpio.c_namesize, name_len );
+		if ( address ) {
+			copy_to_user ( address, offset, &cpio,
+				       sizeof ( cpio ) );
+		}
+		offset += sizeof ( cpio );
+		if ( address ) {
+			copy_to_user ( address, offset, filename,
+				       name_len );
+		}
+		offset += name_len;
+		offset = ( ( offset + 0x03 ) & ~0x03 );
+	}
+
+	/* Copy in initrd image body */
+	if ( address ) {
+		DBGC ( image, "bzImage %p has initrd %p at [%lx,%lx)\n",
+		       image, initrd, address, ( address + offset ) );
+		memcpy_user ( address, offset, initrd->data, 0,
+			      initrd->len );
+	}
+	offset += initrd->len;
+
+	offset = ( ( offset + 0x03 ) & ~0x03 );
+	return offset;
+}
+
+/**
  * Load initrds, if any
  *
  * @v image		bzImage image
  * @v exec_ctx		Execution context
  * @ret rc		Return status code
  */
-static int bzimage_load_initrd ( struct image *image,
-				 struct bzimage_exec_context *exec_ctx ) {
+static int bzimage_load_initrds ( struct image *image,
+				  struct bzimage_exec_context *exec_ctx ) {
 	struct image *initrd;
-	size_t initrd_len;
 	size_t total_len = 0;
-	size_t offset = 0;
-	physaddr_t start;
+	physaddr_t address;
 	int rc;
 
 	/* Add up length of all initrd images */
 	for_each_image ( initrd ) {
-		if ( initrd->type != &initrd_image_type )
-			continue;
-		initrd_len = ( ( initrd->len + 0x0f ) & ~0x0f );
-		total_len += initrd_len;
+		total_len += bzimage_load_initrd ( image, initrd, UNULL );
 	}
 
 	/* Give up if no initrd images found */
@@ -198,47 +251,39 @@ static int bzimage_load_initrd ( struct image *image,
 	 * starting from the downloaded kernel image itself and
 	 * working downwards until we hit an available region.
 	 */
-	for ( start = ( user_to_phys ( image->data, 0 ) & ~0xfffff ) ; ;
-	      start -= 0x100000 ) {
+	for ( address = ( user_to_phys ( image->data, 0 ) & ~0xfffff ) ; ;
+	      address -= 0x100000 ) {
 		/* Check that we're not going to overwrite the
 		 * kernel itself.  This check isn't totally
 		 * accurate, but errs on the side of caution.
 		 */
-		if ( start <= ( BZI_LOAD_HIGH_ADDR + image->len ) ) {
+		if ( address <= ( BZI_LOAD_HIGH_ADDR + image->len ) ) {
 			DBGC ( image, "bzImage %p could not find a location "
 			       "for initrd\n", image );
 			return -ENOBUFS;
 		}
 		/* Check that we are within the kernel's range */
-		if ( ( start + total_len ) > exec_ctx->mem_limit )
+		if ( ( address + total_len ) > exec_ctx->mem_limit )
 			continue;
 		/* Prepare and verify segment */
-		if ( ( rc = prep_segment ( phys_to_user ( start ), 0,
+		if ( ( rc = prep_segment ( phys_to_user ( address ), 0,
 					   total_len ) ) != 0 )
 			continue;
 		/* Use this address */
 		break;
 	}
 
+	/* Record initrd location */
+	exec_ctx->ramdisk_image = address;
+	exec_ctx->ramdisk_size = total_len;
+
 	/* Construct initrd */
 	DBGC ( image, "bzImage %p constructing initrd at [%lx,%lx)\n",
-	       image, start, ( start + total_len ) );
+	       image, address, ( address + total_len ) );
 	for_each_image ( initrd ) {
-		if ( initrd->type != &initrd_image_type )
-			continue;
-		initrd_len = ( ( initrd->len + 0x0f ) & ~0x0f );
-		DBGC ( image, "bzImage %p has initrd %p at [%lx,%lx)\n",
-		       image, initrd, ( start + offset ),
-		       ( start + offset + initrd->len ) );
-		memcpy_user ( phys_to_user ( start ), offset,
-			      initrd->data, 0, initrd->len );
-		offset += initrd_len;
+		address += bzimage_load_initrd ( image, initrd,
+						 phys_to_user ( address ) );
 	}
-	assert ( offset == total_len );
-
-	/* Record initrd location */
-	exec_ctx->ramdisk_image = start;
-	exec_ctx->ramdisk_size = total_len;
 
 	return 0;
 }
@@ -281,7 +326,7 @@ static int bzimage_exec ( struct image *image ) {
 		return rc;
 
 	/* Load any initrds */
-	if ( ( rc = bzimage_load_initrd ( image, &exec_ctx ) ) != 0 )
+	if ( ( rc = bzimage_load_initrds ( image, &exec_ctx ) ) != 0 )
 		return rc;
 
 	/* Update and store kernel header */
