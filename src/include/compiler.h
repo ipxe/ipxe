@@ -292,6 +292,13 @@ extern void dbg_hex_dump_da ( unsigned long dispaddr,
 #define __const __attribute__ (( const ))
 
 /**
+ * Declare a function's pointer parameters as non-null - i.e. force
+ * compiler to check pointers at compile time and enable possible
+ * optimizations based on that fact
+ */
+#define __nonnull __attribute__ (( nonnull ))
+
+/**
  * Declare a function as used.
  *
  * Necessary only if the function is called only from assembler code.
