@@ -186,10 +186,11 @@ static int bzimage_load_initrd ( struct image *image,
 	for_each_image ( initrd ) {
 		if ( initrd->type != &initrd_image_type )
 			continue;
-		initrd_len = ( ( image->len + 0x0f ) & ~0x0f );
+		initrd_len = ( ( initrd->len + 0x0f ) & ~0x0f );
 		total_len += initrd_len;
 	}
 
+	/* Give up if no initrd images found */
 	if ( ! total_len )
 		return 0;
 
@@ -225,7 +226,7 @@ static int bzimage_load_initrd ( struct image *image,
 	for_each_image ( initrd ) {
 		if ( initrd->type != &initrd_image_type )
 			continue;
-		initrd_len = ( ( image->len + 0x0f ) & ~0x0f );
+		initrd_len = ( ( initrd->len + 0x0f ) & ~0x0f );
 		DBGC ( image, "bzImage %p has initrd %p at [%lx,%lx)\n",
 		       image, initrd, ( start + offset ),
 		       ( start + offset + initrd->len ) );
