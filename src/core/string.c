@@ -333,6 +333,21 @@ void * memchr(const void *s, int c, size_t n)
 
 #endif
 
+char * strndup(const char *s, size_t n)
+{
+        size_t len = strlen(s);
+        char *new;
+
+        if (len>n)
+                len = n;
+        new = malloc(len+1);
+        if (new) {
+                new[len] = '\0';
+                memcpy(new,s,len);
+        }
+        return new;
+}
+
 char * strdup(const char *s) {
 	return strndup(s, ~((size_t)0));
 }
