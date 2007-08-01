@@ -122,10 +122,6 @@ CFLAGS+=	-malign-jumps=1 -malign-loops=1 -malign-functions=1
 else
 CFLAGS+=	-falign-jumps=1 -falign-loops=1 -falign-functions=1
 endif
-GCC_MINORVERSION = $(word 2, $(GCC_VERSION))
-ifneq ($(GCC_MINORVERSION),4)
-CFLAGS+=	-march=i386
-endif
 
 # this is almost always a win. the kernel uses it, too.
 CFLAGS+= -mpreferred-stack-boundary=2
