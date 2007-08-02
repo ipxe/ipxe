@@ -33,10 +33,9 @@ struct uri *cwuri = NULL;
 /**
  * Change working URI
  *
- * @v uri		New working URI
+ * @v uri		New working URI, or NULL
  */
 void churi ( struct uri *uri ) {
-	if ( cwuri )
-		uri_put ( cwuri );
+	uri_put ( cwuri );
 	cwuri = uri_get ( uri );
 }

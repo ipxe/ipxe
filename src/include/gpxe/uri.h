@@ -105,8 +105,8 @@ static inline int uri_has_relative_path ( struct uri *uri ) {
 /**
  * Increment URI reference count
  *
- * @v uri		URI
- * @ret uri		URI
+ * @v uri		URI, or NULL
+ * @ret uri		URI as passed in
  */
 static inline __attribute__ (( always_inline )) struct uri *
 uri_get ( struct uri *uri ) {
