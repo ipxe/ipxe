@@ -167,7 +167,8 @@ static int imgfetch_core_exec ( struct image_type *image_type,
 		return -EINVAL;
 	}
 	if ( ( rc = imgfetch ( image, filename, image_register ) ) != 0 ) {
-		printf ( "Could not fetch %s: %s\n", name, strerror ( rc ) );
+		printf ( "Could not fetch %s: %s\n",
+			 filename, strerror ( rc ) );
 		image_put ( image );
 		return rc;
 	}

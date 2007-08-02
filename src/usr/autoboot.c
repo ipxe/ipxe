@@ -62,7 +62,7 @@ static int boot_filename ( const char *filename ) {
 	}
 	if ( ( rc = imgfetch ( image, filename,
 			       register_and_autoexec_image ) ) != 0 ) {
-		printf ( "Could not retrieve %s: %s\n",
+		printf ( "Could not boot %s: %s\n",
 			 filename, strerror ( rc ) );
 		image_put ( image );
 		return rc;
