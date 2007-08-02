@@ -58,6 +58,7 @@ static int script_exec ( struct image *image ) {
 		len = sizeof ( cmdbuf );
 		if ( len > remaining )
 			len = remaining;
+		memset ( cmdbuf, 0, sizeof ( cmdbuf ) );
 		copy_from_user ( cmdbuf, image->data, offset, len );
 
 		/* Find end of line */
@@ -75,8 +76,8 @@ static int script_exec ( struct image *image ) {
 		*eol = '\0';
 		DBG ( "$ %s\n", cmdbuf );
 		if ( ( rc = system ( cmdbuf ) ) != 0 ) {
-			DBG ( "Command \"%s\" exited with status %d\n",
-			      cmdbuf, rc );
+			DBG ( "Command \"%s\" failed: %s\n",
+			      cmdbuf, strerror ( rc ) );
 			goto done;
 		}
 		
