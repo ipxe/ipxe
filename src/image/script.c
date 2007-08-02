@@ -27,6 +27,7 @@
 #include <stdlib.h>
 #include <errno.h>
 #include <gpxe/image.h>
+#include <gpxe/uri.h>
 
 struct image_type script_image_type __image_type ( PROBE_NORMAL );
 
@@ -37,6 +38,7 @@ struct image_type script_image_type __image_type ( PROBE_NORMAL );
  * @ret rc		Return status code
  */
 static int script_exec ( struct image *image ) {
+	struct uri *old_cwuri;
 	char cmdbuf[256];
 	size_t offset = 0;
 	size_t remaining;
@@ -50,6 +52,10 @@ static int script_exec ( struct image *image ) {
 	 */
 	image_get ( image );
 	unregister_image ( image );
+
+	/* Switch current working directory to be that of the script itself */
+	old_cwuri = uri_get ( cwuri );
+	churi ( image->uri );
 
 	while ( offset < image->len ) {
 	
@@ -87,7 +93,9 @@ static int script_exec ( struct image *image ) {
 
 	rc = 0;
  done:
-	/* Re-register image and return */
+	/* Reset current working directory, re-register image and return */
+	churi ( old_cwuri );
+	uri_put ( old_cwuri );
 	register_image ( image );
 	image_put ( image );
 	return rc;
