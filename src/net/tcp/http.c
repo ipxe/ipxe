@@ -43,7 +43,7 @@
 #include <gpxe/features.h>
 #include <gpxe/http.h>
 
-FEATURE ( "HTTP", DHCP_EB_FEATURE_HTTP, 1 );
+FEATURE ( FEATURE_PROTOCOL, "HTTP", DHCP_EB_FEATURE_HTTP, 1 );
 
 /** HTTP receive state */
 enum http_rx_state {

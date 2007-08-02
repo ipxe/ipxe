@@ -29,7 +29,7 @@
 #include <gpxe/http.h>
 #include <gpxe/features.h>
 
-FEATURE ( "HTTPS", DHCP_EB_FEATURE_HTTPS, 1 );
+FEATURE ( FEATURE_PROTOCOL, "HTTPS", DHCP_EB_FEATURE_HTTPS, 1 );
 
 /**
  * Initiate an HTTPS connection

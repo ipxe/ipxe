@@ -30,6 +30,7 @@
 #include <gpxe/uri.h>
 #include <gpxe/tcpip.h>
 #include <gpxe/retry.h>
+#include <gpxe/features.h>
 #include <gpxe/tftp.h>
 
 /** @file
@@ -37,6 +38,8 @@
  * TFTP protocol
  *
  */
+
+FEATURE ( FEATURE_PROTOCOL, "TFTP", DHCP_EB_FEATURE_TFTP, 1 );
 
 /**
  * A TFTP request

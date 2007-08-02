@@ -36,6 +36,9 @@
 #include <gpxe/init.h>
 #include <gpxe/initrd.h>
 #include <gpxe/cpio.h>
+#include <gpxe/features.h>
+
+FEATURE ( FEATURE_IMAGE, "bzImage", DHCP_EB_FEATURE_BZIMAGE, 1 );
 
 struct image_type bzimage_image_type __image_type ( PROBE_NORMAL );
 

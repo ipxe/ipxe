@@ -34,8 +34,8 @@
 #define BOLD	"\033[1m"
 #define CYAN	"\033[36m"
 
-static char * features[0] __table_start ( char *, features );
-static char * features_end[0] __table_end ( char *, features );
+static struct feature features[0] __table_start ( struct feature, features );
+static struct feature features_end[0] __table_end ( struct feature, features );
 
 /**
  * Print shell banner and prompt for shell entry
@@ -44,7 +44,7 @@ static char * features_end[0] __table_end ( char *, features );
  */
 int shell_banner ( void ) {
 	unsigned long timeout = ( currticks() + BANNER_TIMEOUT );
-	char **feature;
+	struct feature *feature;
 	int key;
 	int enter_shell = 0;
 
@@ -54,7 +54,7 @@ int shell_banner ( void ) {
 		 CYAN "http://etherboot.org" NORMAL "\n"
 		 "Features:" );
 	for ( feature = features ; feature < features_end ; feature++ ) {
-		printf ( " %s", *feature );
+		printf ( " %s", feature->name );
 	}
 	printf ( "\nPress Ctrl-B for the gPXE command line..." );
 

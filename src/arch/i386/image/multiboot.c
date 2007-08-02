@@ -33,6 +33,9 @@
 #include <gpxe/memmap.h>
 #include <gpxe/elf.h>
 #include <gpxe/init.h>
+#include <gpxe/features.h>
+
+FEATURE ( FEATURE_IMAGE, "Multiboot", DHCP_EB_FEATURE_MULTIBOOT, 1 );
 
 struct image_type multiboot_image_type __image_type ( PROBE_MULTIBOOT );
 

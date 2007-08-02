@@ -40,7 +40,7 @@
  *
  */
 
-FEATURE ( "AoE", DHCP_EB_FEATURE_AOE, 1 );
+FEATURE ( FEATURE_PROTOCOL, "AoE", DHCP_EB_FEATURE_AOE, 1 );
 
 struct net_protocol aoe_protocol;
 

@@ -29,6 +29,9 @@
 #include <gpxe/image.h>
 #include <gpxe/segment.h>
 #include <gpxe/netdevice.h>
+#include <gpxe/features.h>
+
+FEATURE ( FEATURE_IMAGE, "PXE", DHCP_EB_FEATURE_PXE, 1 );
 
 struct image_type pxe_image_type __image_type ( PROBE_PXE );
 

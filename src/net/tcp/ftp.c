@@ -11,6 +11,7 @@
 #include <gpxe/xfer.h>
 #include <gpxe/open.h>
 #include <gpxe/uri.h>
+#include <gpxe/features.h>
 #include <gpxe/ftp.h>
 
 /** @file
@@ -18,6 +19,8 @@
  * File transfer protocol
  *
  */
+
+FEATURE ( FEATURE_PROTOCOL, "FTP", DHCP_EB_FEATURE_FTP, 1 );
 
 /**
  * FTP states

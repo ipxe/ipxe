@@ -31,6 +31,7 @@
 #include <gpxe/retry.h>
 #include <gpxe/tcpip.h>
 #include <gpxe/dhcp.h>
+#include <gpxe/features.h>
 #include <gpxe/dns.h>
 
 /** @file
@@ -38,6 +39,8 @@
  * DNS protocol
  *
  */
+
+FEATURE ( FEATURE_PROTOCOL, "DNS", DHCP_EB_FEATURE_DNS, 1 );
 
 /** The DNS server */
 static struct sockaddr_tcpip nameserver = {

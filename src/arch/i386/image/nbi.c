@@ -10,6 +10,7 @@
 #include <gpxe/netdevice.h>
 #include <gpxe/dhcp.h>
 #include <gpxe/image.h>
+#include <gpxe/features.h>
 
 /** @file
  *
@@ -25,6 +26,8 @@
  * x86 architecture, use PXE.
  *
  */
+
+FEATURE ( FEATURE_IMAGE, "NBI", DHCP_EB_FEATURE_NBI, 1 );
 
 struct image_type nbi_image_type __image_type ( PROBE_NORMAL );
 
