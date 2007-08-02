@@ -40,7 +40,10 @@
 #include <gpxe/tcpip.h>
 #include <gpxe/process.h>
 #include <gpxe/linebuf.h>
+#include <gpxe/features.h>
 #include <gpxe/http.h>
+
+FEATURE ( "HTTP", DHCP_EB_FEATURE_HTTP, 1 );
 
 /** HTTP receive state */
 enum http_rx_state {

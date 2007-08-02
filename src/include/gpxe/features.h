@@ -29,19 +29,25 @@
 /** AoE */
 #define DHCP_EB_FEATURE_AOE 0x12
 
+/** HTTP */
+#define DHCP_EB_FEATURE_HTTP 0x13
+
+/** HTTPS */
+#define DHCP_EB_FEATURE_HTTPS 0x14
+
 /** @} */
 
 /** Declare a feature code for DHCP */
 #define __dhcp_feature __table ( uint8_t, dhcp_features, 01 )
 
 /** Construct a DHCP feature table entry */
-#define DHCP_FEATURE( feature_opt ) \
-	_DHCP_FEATURE ( OBJECT, feature_opt )
-#define _DHCP_FEATURE( _name, feature_opt ) \
-	__DHCP_FEATURE ( _name, feature_opt )
-#define __DHCP_FEATURE( _name, feature_opt )			\
+#define DHCP_FEATURE( feature_opt, version ) \
+	_DHCP_FEATURE ( OBJECT, feature_opt, version )
+#define _DHCP_FEATURE( _name, feature_opt, version ) \
+	__DHCP_FEATURE ( _name, feature_opt, version )
+#define __DHCP_FEATURE( _name, feature_opt, version )		\
 	uint8_t __dhcp_feature_ ## _name [] __dhcp_feature = {	\
-		feature_opt, DHCP_BYTE ( 1 )			\
+		feature_opt, DHCP_BYTE ( version )		\
 	};
 
 /** Declare a named feature */
@@ -56,8 +62,8 @@
 	char * __feature_ ## _name __feature_name = text;
 
 /** Declare a feature */
-#define FEATURE( text, feature_opt )				\
+#define FEATURE( text, feature_opt, version )			\
 	FEATURE_NAME ( text );					\
-	DHCP_FEATURE ( feature_opt );
+	DHCP_FEATURE ( feature_opt, version );
 
 #endif /* _GPXE_FEATURES_H */

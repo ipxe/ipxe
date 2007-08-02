@@ -41,7 +41,7 @@
  *
  */
 
-FEATURE ( "iSCSI", DHCP_EB_FEATURE_ISCSI );
+FEATURE ( "iSCSI", DHCP_EB_FEATURE_ISCSI, 1 );
 
 /** iSCSI initiator name (explicitly specified) */
 static char *iscsi_explicit_initiator_iqn;
