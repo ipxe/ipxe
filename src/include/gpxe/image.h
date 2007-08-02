@@ -13,25 +13,26 @@
 #include <gpxe/uaccess.h>
 #include <gpxe/refcnt.h>
 
+struct uri;
 struct image_type;
-
-/** Maximum length of a command line */
-#define CMDLINE_MAX 128
 
 /** An executable or loadable image */
 struct image {
 	/** Reference count */
 	struct refcnt refcnt;
 
-	/** Name */
-	char name[16];
 	/** List of registered images */
 	struct list_head list;
+
+	/** URI of image */
+	struct uri *uri;
+	/** Name */
+	char name[16];
 	/** Flags */
 	unsigned int flags;
 
 	/** Command line to pass to image */
-	char cmdline[CMDLINE_MAX];
+	char *cmdline;
 	/** Raw file image */
 	userptr_t data;
 	/** Length of raw file image */
@@ -114,6 +115,8 @@ extern struct list_head images;
 	list_for_each_entry ( (image), &images, list )
 
 extern struct image * alloc_image ( void );
+extern int image_set_uri ( struct image *image, struct uri *uri );
+extern int image_set_cmdline ( struct image *image, const char *cmdline );
 extern int register_image ( struct image *image );
 extern void unregister_image ( struct image *image );
 extern void promote_image ( struct image *image );
@@ -121,6 +124,8 @@ struct image * find_image ( const char *name );
 extern int image_load ( struct image *image );
 extern int image_autoload ( struct image *image );
 extern int image_exec ( struct image *image );
+extern int register_and_autoload_image ( struct image *image );
+extern int register_and_autoexec_image ( struct image *image );
 
 /**
  * Increment reference count on an image
@@ -140,6 +145,18 @@ static inline struct image * image_get ( struct image *image ) {
  */
 static inline void image_put ( struct image *image ) {
 	ref_put ( &image->refcnt );
+}
+
+/**
+ * Set image name
+ *
+ * @v image		Image
+ * @v name		New image name
+ * @ret rc		Return status code
+ */
+static inline int image_set_name ( struct image *image, const char *name ) {
+	strncpy ( image->name, name, ( sizeof ( image->name ) - 1 ) );
+	return 0;
 }
 
 #endif /* _GPXE_IMAGE_H */

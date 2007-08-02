@@ -22,8 +22,10 @@
 #include <stdio.h>
 #include <errno.h>
 #include <assert.h>
+#include <libgen.h>
 #include <gpxe/list.h>
 #include <gpxe/umalloc.h>
+#include <gpxe/uri.h>
 #include <gpxe/image.h>
 
 /** @file
@@ -49,6 +51,7 @@ static struct image_type image_types_end[0]
 static void free_image ( struct refcnt *refcnt ) {
 	struct image *image = container_of ( refcnt, struct image, refcnt );
 
+	uri_put ( image->uri );
 	ufree ( image->data );
 	free ( image );
 	DBGC ( image, "IMAGE %p freed\n", image );
@@ -67,6 +70,45 @@ struct image * alloc_image ( void ) {
 		image->refcnt.free = free_image;
 	}
 	return image;
+}
+
+/**
+ * Set image URI
+ *
+ * @v image		Image
+ * @v URI		New image URI
+ * @ret rc		Return status code
+ *
+ * If no name is set, the name will be updated to the base name of the
+ * URI path (if any).
+ */
+int image_set_uri ( struct image *image, struct uri *uri ) {
+	const char *path = uri->path;
+
+	/* Replace URI reference */
+	uri_put ( image->uri );
+	image->uri = uri_get ( uri );
+
+	/* Set name if none already specified */
+	if ( path && ( ! image->name[0] ) )
+		image_set_name ( image, basename ( ( char * ) path ) );
+
+	return 0;
+}
+
+/**
+ * Set image command line
+ *
+ * @v image		Image
+ * @v cmdline		New image command line
+ * @ret rc		Return status code
+ */
+int image_set_cmdline ( struct image *image, const char *cmdline ) {
+	free ( image->cmdline );
+	image->cmdline = strdup ( cmdline );
+	if ( ! image->cmdline )
+		return -ENOMEM;
+	return 0;
 }
 
 /**
@@ -218,5 +260,41 @@ int image_exec ( struct image *image ) {
 	}
 
 	/* Well, some formats might return... */
+	return 0;
+}
+
+/**
+ * Register and autoload an image
+ *
+ * @v image		Image
+ * @ret rc		Return status code
+ */
+int register_and_autoload_image ( struct image *image ) {
+	int rc;
+
+	if ( ( rc = register_image ( image ) ) != 0 )
+		return rc;
+
+	if ( ( rc = image_autoload ( image ) ) != 0 )
+		return rc;
+
+	return 0;
+}
+
+/**
+ * Register and autoexec an image
+ *
+ * @v image		Image
+ * @ret rc		Return status code
+ */
+int register_and_autoexec_image ( struct image *image ) {
+	int rc;
+
+	if ( ( rc = register_and_autoload_image ( image ) ) != 0 )
+		return rc;
+
+	if ( ( rc = image_exec ( image ) ) != 0 )
+		return rc;
+
 	return 0;
 }

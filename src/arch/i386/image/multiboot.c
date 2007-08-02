@@ -135,6 +135,7 @@ multiboot_build_module_list ( struct image *image,
 	unsigned int insert;
 	physaddr_t start;
 	physaddr_t end;
+	char *cmdline;
 	unsigned int i;
 
 	/* Add each image as a multiboot module */
@@ -169,7 +170,9 @@ multiboot_build_module_list ( struct image *image,
 				  ( ( count - insert ) * sizeof ( *module ) ));
 			module->mod_start = start;
 			module->mod_end = end;
-			module->string = virt_to_phys ( module_image->cmdline);
+			cmdline = ( module_image->cmdline ?
+				    module_image->cmdline : "" );
+			module->string = virt_to_phys ( cmdline );
 			module->reserved = 0;
 			
 			/* We promise to page-align modules */
@@ -222,6 +225,7 @@ static struct multiboot_module __bss16_array ( mbmodules, [MAX_MODULES] );
  */
 static int multiboot_exec ( struct image *image ) {
 	physaddr_t entry = image->priv.phys;
+	char *cmdline;
 
 	/* Populate multiboot information structure */
 	memset ( &mbinfo, 0, sizeof ( mbinfo ) );
@@ -229,7 +233,8 @@ static int multiboot_exec ( struct image *image ) {
 			 MBI_FLAG_CMDLINE | MBI_FLAG_MODS );
 	multiboot_build_memmap ( image, &mbinfo, mbmemmap,
 				 ( sizeof(mbmemmap) / sizeof(mbmemmap[0]) ) );
-	mbinfo.cmdline = virt_to_phys ( image->cmdline );
+	cmdline = ( image->cmdline ? image->cmdline : "" );
+	mbinfo.cmdline = virt_to_phys ( cmdline );
 	mbinfo.mods_count = multiboot_build_module_list ( image, mbmodules,
 				( sizeof(mbmodules) / sizeof(mbmodules[0]) ) );
 	mbinfo.mods_addr = virt_to_phys ( mbmodules );

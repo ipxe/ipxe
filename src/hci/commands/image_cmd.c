@@ -33,10 +33,11 @@
  *
  */
 
-/**
- * Print image description
- *
- */
+enum image_action {
+	IMG_FETCH = 0,
+	IMG_LOAD,
+	IMG_EXEC,
+};
 
 /**
  * Fill in image command line
@@ -44,17 +45,20 @@
  * @v image		Image
  * @v nargs		Argument count
  * @v args		Argument list
+ * @ret rc		Return status code
  */
-static void imgfill_cmdline ( struct image *image, unsigned int nargs, 
-                              char **args ) {
+static int imgfill_cmdline ( struct image *image, unsigned int nargs, 
+			     char **args ) {
+	char buf[256];
 	size_t used = 0;
 
-	image->cmdline[0] = '\0';
-	while ( ( used < sizeof ( image->cmdline ) ) && nargs-- ) {
-		used += snprintf ( &image->cmdline[used],
-				   ( sizeof ( image->cmdline ) - used ),
-				   "%s%s", ( used ? " " : "" ), *(args++) );
+	memset ( buf, 0, sizeof ( buf ) );
+	while ( ( used < sizeof ( buf ) ) && nargs-- ) {
+		used += snprintf ( &buf[used], ( sizeof ( buf ) - used ),
+				   " %s", *(args++) );
 	}
+
+	return image_set_cmdline ( image, &buf[1] );
 }
 
 /**
@@ -62,12 +66,18 @@ static void imgfill_cmdline ( struct image *image, unsigned int nargs,
  *
  * @v argv		Argument list
  */
-static void imgfetch_core_syntax ( char **argv, int load ) {
+static void imgfetch_core_syntax ( char **argv, enum image_action action ) {
+	static const char *actions[] = {
+		[IMG_FETCH]	= "Fetch",
+		[IMG_LOAD]	= "Fetch and load",
+		[IMG_EXEC]	= "Fetch and execute",
+	};
+
 	printf ( "Usage:\n"
 		 "  %s [-n|--name <name>] filename [arguments...]\n"
 		 "\n"
 		 "%s executable/loadable image\n",
-		 argv[0], ( load ? "Fetch and load" : "Fetch" ) );
+		 argv[0], actions[action] );
 }
 
 /**
@@ -79,7 +89,8 @@ static void imgfetch_core_syntax ( char **argv, int load ) {
  * @v argv		Argument list
  * @ret rc		Return status code
  */
-static int imgfetch_core_exec ( struct image_type *image_type, int load,
+static int imgfetch_core_exec ( struct image_type *image_type,
+				enum image_action action,
 				int argc, char **argv ) {
 	static struct option longopts[] = {
 		{ "help", 0, NULL, 'h' },
@@ -89,6 +100,7 @@ static int imgfetch_core_exec ( struct image_type *image_type, int load,
 	struct image *image;
 	const char *name = NULL;
 	char *filename;
+	int ( * image_register ) ( struct image *image );
 	int c;
 	int rc;
 
@@ -104,14 +116,14 @@ static int imgfetch_core_exec ( struct image_type *image_type, int load,
 			/* Display help text */
 		default:
 			/* Unrecognised/invalid option */
-			imgfetch_core_syntax ( argv, load );
+			imgfetch_core_syntax ( argv, action );
 			return -EINVAL;
 		}
 	}
 
 	/* Need at least a filename remaining after the options */
 	if ( optind == argc ) {
-		imgfetch_core_syntax ( argv, load );
+		imgfetch_core_syntax ( argv, action );
 		return -EINVAL;
 	}
 	filename = argv[optind++];
@@ -126,17 +138,35 @@ static int imgfetch_core_exec ( struct image_type *image_type, int load,
 	}
 
 	/* Fill in image name */
-	if ( name )
-		strncpy ( image->name, name, ( sizeof ( image->name ) - 1 ) );
+	if ( name ) {
+		if ( ( rc = image_set_name ( image, name ) ) != 0 )
+			return rc;
+	}
 
 	/* Set image type (if specified) */
 	image->type = image_type;
 
 	/* Fill in command line */
-	imgfill_cmdline ( image, ( argc - optind ), &argv[optind] );
+	if ( ( rc = imgfill_cmdline ( image, ( argc - optind ),
+				      &argv[optind] ) ) != 0 )
+		return rc;
 
 	/* Fetch the image */
-	if ( ( rc = imgfetch ( image, filename, load ) ) != 0 ) {
+	switch ( action ) {
+	case IMG_FETCH:
+		image_register = register_image;
+		break;
+	case IMG_LOAD:
+		image_register = register_and_autoload_image;
+		break;
+	case IMG_EXEC:
+		image_register = register_and_autoexec_image;
+		break;
+	default:
+		assert ( 0 );
+		return -EINVAL;
+	}
+	if ( ( rc = imgfetch ( image, filename, image_register ) ) != 0 ) {
 		printf ( "Could not fetch %s: %s\n", name, strerror ( rc ) );
 		image_put ( image );
 		return rc;
@@ -156,7 +186,8 @@ static int imgfetch_core_exec ( struct image_type *image_type, int load,
 static int imgfetch_exec ( int argc, char **argv ) {
 	int rc;
 
-	if ( ( rc = imgfetch_core_exec ( NULL, 0, argc, argv ) ) != 0 )
+	if ( ( rc = imgfetch_core_exec ( NULL, IMG_FETCH,
+					 argc, argv ) ) != 0 )
 		return rc;
 
 	return 0;
@@ -172,7 +203,7 @@ static int imgfetch_exec ( int argc, char **argv ) {
 static int kernel_exec ( int argc, char **argv ) {
 	int rc;
 
-	if ( ( rc = imgfetch_core_exec ( NULL, 1, argc, argv ) ) != 0 )
+	if ( ( rc = imgfetch_core_exec ( NULL, IMG_LOAD, argc, argv ) ) != 0 )
 		return rc;
 
 	return 0;
@@ -188,7 +219,7 @@ static int kernel_exec ( int argc, char **argv ) {
 static int initrd_exec ( int argc, char **argv ) {
 	int rc;
 
-	if ( ( rc = imgfetch_core_exec ( &initrd_image_type, 0,
+	if ( ( rc = imgfetch_core_exec ( &initrd_image_type, IMG_FETCH,
 					 argc, argv ) ) != 0 )
 		return rc;
 
@@ -286,6 +317,7 @@ static int imgargs_exec ( int argc, char **argv ) {
 	struct image *image;
 	const char *name;
 	int c;
+	int rc;
 
 	/* Parse options */
 	while ( ( c = getopt_long ( argc, argv, "h", longopts, NULL ) ) >= 0 ){
@@ -312,7 +344,10 @@ static int imgargs_exec ( int argc, char **argv ) {
 		printf ( "No such image: %s\n", name );
 		return 1;
 	}
-	imgfill_cmdline ( image, ( argc - optind ), &argv[optind] );
+	if ( ( rc = imgfill_cmdline ( image, ( argc - optind ),
+				      &argv[optind] ) ) != 0 )
+		return rc;
+
 
 	return 0;
 }

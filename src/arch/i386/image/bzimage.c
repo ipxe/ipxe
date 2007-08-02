@@ -190,7 +190,7 @@ static size_t bzimage_load_initrd ( struct image *image,
 		return 0;
 
 	/* Create cpio header before non-prebuilt images */
-	if ( filename[0] ) {
+	if ( filename && filename[0] ) {
 		size_t name_len = ( strlen ( filename ) + 1 );
 
 		DBGC ( image, "bzImage %p inserting initrd %p as %s\n",

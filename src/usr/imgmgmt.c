@@ -24,6 +24,7 @@
 #include <gpxe/downloader.h>
 #include <gpxe/monojob.h>
 #include <gpxe/open.h>
+#include <gpxe/uri.h>
 #include <usr/imgmgmt.h>
 
 /** @file
@@ -32,36 +33,29 @@
  *
  */
 
-static int imgfetch_autoload ( struct image *image ) {
-	int rc;
-
-	if ( ( rc = register_image ( image ) ) != 0 )
-		return rc;
-
-	if ( ( rc = image_autoload ( image ) ) != 0 )
-		return rc;
-
-	return 0;
-}
-
 /**
  * Fetch an image
  *
  * @v uri_string	URI as a string (e.g. "http://www.nowhere.com/vmlinuz")
  * @v name		Name for image, or NULL
- * @ret new_image	Newly created image
+ * @v register_image	Image registration routine
  * @ret rc		Return status code
  */
-int imgfetch ( struct image *image, const char *uri_string, int load ) {
+int imgfetch ( struct image *image, const char *uri_string,
+	       int ( * image_register ) ( struct image *image ) ) {
+	struct uri *uri;
 	int rc;
 
-	if ( ( rc = create_downloader ( &monojob, image, 
-					( load ? imgfetch_autoload :
-					  register_image ),
-					LOCATION_URI_STRING,
-					uri_string ) ) == 0 )
+	if ( ! ( uri = parse_uri ( uri_string ) ) )
+		return -ENOMEM;
+
+	image_set_uri ( image, uri );
+
+	if ( ( rc = create_downloader ( &monojob, image, image_register,
+					LOCATION_URI, uri ) ) == 0 )
 		rc = monojob_wait();
 
+	uri_put ( uri );
 	return rc;
 }
 
@@ -118,7 +112,7 @@ void imgstat ( struct image *image ) {
 		printf ( " [%s]", image->type->name );
 	if ( image->flags & IMAGE_LOADED )
 		printf ( " [LOADED]" );
-	if ( image->cmdline[0] )
+	if ( image->cmdline )
 		printf ( " \"%s\"", image->cmdline );
 	printf ( "\n" );
 }

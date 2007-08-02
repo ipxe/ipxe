@@ -60,25 +60,15 @@ static int boot_filename ( const char *filename ) {
 		printf ( "Out of memory\n" );
 		return -ENOMEM;
 	}
-	if ( ( rc = imgfetch ( image, filename, 0 ) ) != 0 ) {
+	if ( ( rc = imgfetch ( image, filename,
+			       register_and_autoexec_image ) ) != 0 ) {
 		printf ( "Could not retrieve %s: %s\n",
 			 filename, strerror ( rc ) );
 		image_put ( image );
 		return rc;
 	}
-	if ( ( rc = imgload ( image ) ) != 0 ) {
-		printf ( "Could not load %s: %s\n", image->name,
-			 strerror ( rc ) );
-		image_put ( image );
-		return rc;
-	}
-	if ( ( rc = imgexec ( image ) ) != 0 ) {
-		printf ( "Could not execute %s: %s\n", image->name,
-			 strerror ( rc ) );
-		image_put ( image );
-		return rc;
-	}
 
+	image_put ( image );
 	return 0;
 }
 

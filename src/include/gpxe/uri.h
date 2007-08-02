@@ -94,7 +94,7 @@ static inline int uri_has_absolute_path ( struct uri *uri ) {
  * @v uri			URI
  * @ret has_relative_path	URI has a relative path
  *
- * An relative path begins with something other than a '/'.  Note that
+ * A relative path begins with something other than a '/'.  Note that
  * this is a separate concept from a relative URI.  Note also that a
  * URI may not have a path at all.
  */
@@ -117,7 +117,7 @@ uri_get ( struct uri *uri ) {
 /**
  * Decrement URI reference count
  *
- * @v uri		URI
+ * @v uri		URI, or NULL
  */
 static inline __attribute__ (( always_inline )) void
 uri_put ( struct uri *uri ) {
