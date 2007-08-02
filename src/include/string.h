@@ -41,8 +41,8 @@ int __pure memcmp(const void * cs,const void * ct,
 void * __pure memscan(const void * addr, int c, size_t size) __nonnull;
 char * __pure strstr(const char * s1,const char * s2) __nonnull;
 void * __pure memchr(const void *s, int c, size_t n) __nonnull;
-char * __pure strdup(const char *s) __nonnull;
-char * __pure strndup(const char *s, size_t n) __nonnull;
+char * strdup(const char *s) __nonnull;
+char * strndup(const char *s, size_t n) __nonnull;
 
 extern const char * strerror ( int errno );
 
