@@ -168,6 +168,11 @@ struct job_interface;
  */
 #define DHCP_EB_SIADDR DHCP_ENCAP_OPT ( DHCP_EB_ENCAP, 3 )
 
+/*
+ * Tags in the range 0x10-0x7f are reserved for feature markers
+ *
+ */
+
 /** Network device descriptor
  *
  * Byte 0 is the bus type ID; remaining bytes depend on the bus type.

@@ -31,6 +31,7 @@
 #include <gpxe/ata.h>
 #include <gpxe/netdevice.h>
 #include <gpxe/process.h>
+#include <gpxe/features.h>
 #include <gpxe/aoe.h>
 
 /** @file
@@ -38,6 +39,8 @@
  * AoE protocol
  *
  */
+
+FEATURE ( "AoE", DHCP_EB_FEATURE_AOE );
 
 struct net_protocol aoe_protocol;
 

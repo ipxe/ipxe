@@ -32,6 +32,7 @@
 #include <gpxe/uaccess.h>
 #include <gpxe/tcpip.h>
 #include <gpxe/dhcp.h>
+#include <gpxe/features.h>
 #include <gpxe/iscsi.h>
 
 /** @file
@@ -39,6 +40,8 @@
  * iSCSI protocol
  *
  */
+
+FEATURE ( "iSCSI", DHCP_EB_FEATURE_ISCSI );
 
 /** iSCSI initiator name (explicitly specified) */
 static char *iscsi_explicit_initiator_iqn;

@@ -70,6 +70,10 @@ static uint8_t dhcp_request_options_data[] = {
 	DHCP_END
 };
 
+/** DHCP feature codes */
+static uint8_t dhcp_features[0] __table_start ( uint8_t, dhcp_features );
+static uint8_t dhcp_features_end[0] __table_end ( uint8_t, dhcp_features );
+
 /**
  * Name a DHCP packet type
  *
@@ -508,6 +512,7 @@ int create_dhcp_request ( struct net_device *netdev, int msgtype,
 			  struct dhcp_packet *dhcppkt ) {
 	struct device_description *desc = &netdev->dev->desc;
 	struct dhcp_netdev_desc dhcp_desc;
+	size_t dhcp_features_len;
 	int rc;
 
 	/* Create DHCP packet */
@@ -542,6 +547,16 @@ int create_dhcp_request ( struct net_device *netdev, int msgtype,
 			      "option: %s\n", strerror ( rc ) );
 			return rc;
 		}
+	}
+
+	/* Add options to identify the feature list */
+	dhcp_features_len = ( dhcp_features_end - dhcp_features );
+	if ( ( rc = set_dhcp_packet_option ( dhcppkt, DHCP_EB_ENCAP,
+					     dhcp_features,
+					     dhcp_features_len ) ) != 0 ) {
+		DBG ( "DHCP could not set features list option: %s\n",
+		      strerror ( rc ) );
+		return rc;
 	}
 
 	/* Add options to identify the network device */
