@@ -56,15 +56,9 @@ int dhcp ( struct net_device *netdev ) {
 	}
 
 	/* Perform DHCP */
-	printf ( "DHCP (%s %s)...", netdev->name, netdev_hwaddr ( netdev ) );
+	printf ( "DHCP (%s %s)", netdev->name, netdev_hwaddr ( netdev ) );
 	if ( ( rc = start_dhcp ( &monojob, netdev, dhcp_success ) ) == 0 )
-		rc = monojob_wait();
-
-	if ( rc == 0 ) {
-		printf ( "done\n" );
-	} else {
-		printf ( "failed (%s)\n", strerror ( rc ) );
-	}
+		rc = monojob_wait ( "" );
 
 	return rc;
 }

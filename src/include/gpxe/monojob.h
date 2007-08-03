@@ -10,6 +10,6 @@
 struct job_interface;
 
 extern struct job_interface monojob;
-extern int monojob_wait ( void );
+extern int monojob_wait ( const char *string );
 
 #endif /* _GPXE_MONOJOB_H */
