@@ -60,12 +60,6 @@ struct posix_file {
 /** List of open files */
 static LIST_HEAD ( posix_files );
 
-/** Minimum file descriptor that will ever be allocated */
-#define POSIX_FD_MIN ( 1 )
-
-/** Maximum file descriptor that will ever be allocated */
-#define POSIX_FD_MAX ( 255 )
-
 /**
  * Free open file
  *
@@ -252,53 +246,83 @@ int open ( const char *uri_string ) {
 }
 
 /**
+ * Check file descriptors for readiness
+ *
+ * @v readfds		File descriptors to check
+ * @v wait		Wait until data is ready
+ * @ret nready		Number of ready file descriptors
+ */
+int select ( fd_set *readfds, int wait ) {
+	struct posix_file *file;
+	int fd;
+
+	do {
+		for ( fd = POSIX_FD_MIN ; fd <= POSIX_FD_MAX ; fd++ ) {
+			if ( ! FD_ISSET ( fd, readfds ) )
+				continue;
+			file = posix_fd_to_file ( fd );
+			if ( ! file )
+				return -EBADF;
+			if ( ( list_empty ( &file->data ) ) &&
+			     ( file->rc != -EINPROGRESS ) )
+				continue;
+			/* Data is available or status has changed */
+			FD_ZERO ( readfds );
+			FD_SET ( fd, readfds );
+			return 1;
+		}
+		step();
+	} while ( wait );
+
+	return 0;
+}
+
+/**
  * Read data from file
  *
  * @v buffer		Data buffer
  * @v offset		Starting offset within data buffer
  * @v len		Maximum length to read
  * @ret len		Actual length read, or negative error number
+ *
+ * This call is non-blocking; if no data is available to read then
+ * -EWOULDBLOCK will be returned.
  */
 ssize_t read_user ( int fd, userptr_t buffer, off_t offset, size_t max_len ) {
 	struct posix_file *file;
 	struct io_buffer *iobuf;
-	size_t frag_len;
-	ssize_t len = 0;
+	size_t len;
 
 	/* Identify file */
 	file = posix_fd_to_file ( fd );
 	if ( ! file )
 		return -EBADF;
 
-	while ( 1 ) {
-		/* Try to fetch more data if none available */
-		if ( list_empty ( &file->data ) )
-			step();
-		/* Dequeue at most one received I/O buffer into user buffer */
-		list_for_each_entry ( iobuf, &file->data, list ) {
-			frag_len = iob_len ( iobuf );
-			if ( frag_len > max_len )
-				frag_len = max_len;
-			copy_to_user ( buffer, offset, iobuf->data,
-				       frag_len );
-			iob_pull ( iobuf, frag_len );
-			if ( ! iob_len ( iobuf ) ) {
-				list_del ( &iobuf-> list );
-				free_iob ( iobuf );
-			}
-			file->pos += frag_len;
-			len += frag_len;
-			offset += frag_len;
-			max_len -= frag_len;
-			break;
+	/* Try to fetch more data if none available */
+	if ( list_empty ( &file->data ) )
+		step();
+
+	/* Dequeue at most one received I/O buffer into user buffer */
+	list_for_each_entry ( iobuf, &file->data, list ) {
+		len = iob_len ( iobuf );
+		if ( len > max_len )
+			len = max_len;
+		copy_to_user ( buffer, offset, iobuf->data, len );
+		iob_pull ( iobuf, len );
+		if ( ! iob_len ( iobuf ) ) {
+			list_del ( &iobuf->list );
+			free_iob ( iobuf );
 		}
-		/* If buffer is full, return */
-		if ( ! max_len )
-			return len;
-		/* If file has completed, return */
-		if ( file->rc != -EINPROGRESS )
-			return ( file->rc ? file->rc : len );
+		file->pos += len;
+		return len;
 	}
+
+	/* If file has completed, return (after returning all data) */
+	if ( file->rc != -EINPROGRESS )
+		return file->rc;
+
+	/* No data ready and file still in progress; return -WOULDBLOCK */
+	return -EWOULDBLOCK;
 }
 
 /**
