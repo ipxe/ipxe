@@ -91,6 +91,11 @@ union pxenv_call {
 			( struct s_PXENV_UNDI_GET_IFACE_INFO * );
 	PXENV_EXIT_t ( * undi_get_state ) ( struct s_PXENV_UNDI_GET_STATE * );
 	PXENV_EXIT_t ( * undi_isr ) ( struct s_PXENV_UNDI_ISR * );
+	PXENV_EXIT_t ( * file_open ) ( struct s_PXENV_FILE_OPEN * );
+	PXENV_EXIT_t ( * file_close ) ( struct s_PXENV_FILE_CLOSE * );
+	PXENV_EXIT_t ( * file_select ) ( struct s_PXENV_FILE_SELECT * );
+	PXENV_EXIT_t ( * file_read ) ( struct s_PXENV_FILE_READ * );
+	PXENV_EXIT_t ( * get_file_size ) ( struct s_PXENV_GET_FILE_SIZE * );
 };
 
 /**
@@ -268,6 +273,26 @@ __cdecl void pxe_api_call ( struct i386_all_regs *ix86 ) {
 	case PXENV_UNDI_ISR:
 		pxenv_call.undi_isr = pxenv_undi_isr;
 		param_len = sizeof ( pxenv_any.undi_isr );
+		break;
+	case PXENV_FILE_OPEN:
+		pxenv_call.file_open = pxenv_file_open;
+		param_len = sizeof ( pxenv_any.file_open );
+		break;
+	case PXENV_FILE_CLOSE:
+		pxenv_call.file_close = pxenv_file_close;
+		param_len = sizeof ( pxenv_any.file_close );
+		break;
+	case PXENV_FILE_SELECT:
+		pxenv_call.file_select = pxenv_file_select;
+		param_len = sizeof ( pxenv_any.file_select );
+		break;
+	case PXENV_FILE_READ:
+		pxenv_call.file_read = pxenv_file_read;
+		param_len = sizeof ( pxenv_any.file_read );
+		break;
+	case PXENV_GET_FILE_SIZE:
+		pxenv_call.get_file_size = pxenv_get_file_size;
+		param_len = sizeof ( pxenv_any.get_file_size );
 		break;
 	default:
 		DBG ( "PXENV_UNKNOWN_%hx", opcode );
