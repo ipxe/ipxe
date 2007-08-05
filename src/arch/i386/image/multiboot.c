@@ -23,6 +23,7 @@
  *
  */
 
+#include <stdio.h>
 #include <errno.h>
 #include <assert.h>
 #include <realmode.h>
@@ -51,6 +52,16 @@ struct image_type multiboot_image_type __image_type ( PROBE_MULTIBOOT );
  */
 #define MAX_MODULES 8
 
+/**
+ * Maximum combined length of command lines
+ *
+ * Again; sorry.  Some broken OSes zero out any non-base memory that
+ * isn't part of the loaded module set, so we can't just use
+ * virt_to_phys(cmdline) to point to the command lines, even though
+ * this would comply with the Multiboot spec.
+ */
+#define MB_MAX_CMDLINE 512
+
 /** Multiboot flags that we support */
 #define MB_SUPPORTED_FLAGS ( MB_FLAG_PGALIGN | MB_FLAG_MEMMAP | \
 			     MB_FLAG_VIDMODE | MB_FLAG_RAW )
@@ -76,6 +87,13 @@ struct multiboot_header_info {
 	/** Offset of header within the multiboot image */
 	size_t offset;
 };
+
+/** Multiboot module command lines */
+static char __bss16_array ( mb_cmdlines, [MB_MAX_CMDLINE] );
+#define mb_cmdlines __use_data16 ( mb_cmdlines )
+
+/** Offset within module command lines */
+static unsigned int mb_cmdline_offset;
 
 /**
  * Build multiboot memory map
@@ -119,6 +137,32 @@ static void multiboot_build_memmap ( struct image *image,
 }
 
 /**
+ * Add command line in base memory
+ *
+ * @v cmdline		Command line
+ * @ret physaddr	Physical address of command line
+ */
+physaddr_t multiboot_add_cmdline ( const char *cmdline ) {
+	char *mb_cmdline;
+
+	if ( ! cmdline )
+		cmdline = "";
+
+	/* Copy command line to base memory buffer */
+	mb_cmdline = ( mb_cmdlines + mb_cmdline_offset );
+	mb_cmdline_offset +=
+		( snprintf ( mb_cmdline,
+			     ( sizeof ( mb_cmdlines ) - mb_cmdline_offset ),
+			     "%s", cmdline ) + 1 );
+
+	/* Truncate to terminating NUL in buffer if necessary */
+	if ( mb_cmdline_offset > sizeof ( mb_cmdlines ) )
+		mb_cmdline_offset = ( sizeof ( mb_cmdlines ) - 1 );
+
+	return virt_to_phys ( mb_cmdline );
+}
+
+/**
  * Build multiboot module list
  *
  * @v image		Multiboot image
@@ -135,7 +179,6 @@ multiboot_build_module_list ( struct image *image,
 	unsigned int insert;
 	physaddr_t start;
 	physaddr_t end;
-	char *cmdline;
 	unsigned int i;
 
 	/* Add each image as a multiboot module */
@@ -151,44 +194,35 @@ multiboot_build_module_list ( struct image *image,
 		if ( module_image == image )
 			continue;
 
-		/* If we don't have a data structure to populate, just count */
-		if ( modules ) {
-			
-			/* At least some OSes expect the multiboot
-			 * modules to be in ascending order, so we
-			 * have to support it.
-			 */
-			start = user_to_phys ( module_image->data, 0 );
-			end = user_to_phys ( module_image->data,
-					     module_image->len );
-			for ( insert = 0 ; insert < count ; insert++ ) {
-				if ( start < modules[insert].mod_start )
-					break;
-			}
-			module = &modules[insert];
-			memmove ( ( module + 1 ), module,
-				  ( ( count - insert ) * sizeof ( *module ) ));
-			module->mod_start = start;
-			module->mod_end = end;
-			cmdline = ( module_image->cmdline ?
-				    module_image->cmdline : "" );
-			module->string = virt_to_phys ( cmdline );
-			module->reserved = 0;
-			
-			/* We promise to page-align modules */
-			assert ( ( module->mod_start & 0xfff ) == 0 );
+		/* At least some OSes expect the multiboot modules to
+		 * be in ascending order, so we have to support it.
+		 */
+		start = user_to_phys ( module_image->data, 0 );
+		end = user_to_phys ( module_image->data, module_image->len );
+		for ( insert = 0 ; insert < count ; insert++ ) {
+			if ( start < modules[insert].mod_start )
+				break;
 		}
+		module = &modules[insert];
+		memmove ( ( module + 1 ), module,
+			  ( ( count - insert ) * sizeof ( *module ) ) );
+		module->mod_start = start;
+		module->mod_end = end;
+		module->string =
+			multiboot_add_cmdline ( module_image->cmdline );
+		module->reserved = 0;
+		
+		/* We promise to page-align modules */
+		assert ( ( module->mod_start & 0xfff ) == 0 );
 
 		count++;
 	}
 
 	/* Dump module configuration */
-	if ( modules ) {
-		for ( i = 0 ; i < count ; i++ ) {
-			DBGC ( image, "MULTIBOOT %p module %d is [%lx,%lx)\n",
-			       image, i, modules[i].mod_start,
-			       modules[i].mod_end );
-		}
+	for ( i = 0 ; i < count ; i++ ) {
+		DBGC ( image, "MULTIBOOT %p module %d is [%lx,%lx)\n",
+		       image, i, modules[i].mod_start,
+		       modules[i].mod_end );
 	}
 
 	return count;
@@ -225,7 +259,6 @@ static struct multiboot_module __bss16_array ( mbmodules, [MAX_MODULES] );
  */
 static int multiboot_exec ( struct image *image ) {
 	physaddr_t entry = image->priv.phys;
-	char *cmdline;
 
 	/* Populate multiboot information structure */
 	memset ( &mbinfo, 0, sizeof ( mbinfo ) );
@@ -233,8 +266,8 @@ static int multiboot_exec ( struct image *image ) {
 			 MBI_FLAG_CMDLINE | MBI_FLAG_MODS );
 	multiboot_build_memmap ( image, &mbinfo, mbmemmap,
 				 ( sizeof(mbmemmap) / sizeof(mbmemmap[0]) ) );
-	cmdline = ( image->cmdline ? image->cmdline : "" );
-	mbinfo.cmdline = virt_to_phys ( cmdline );
+	mb_cmdline_offset = 0;
+	mbinfo.cmdline = multiboot_add_cmdline ( image->cmdline );
 	mbinfo.mods_count = multiboot_build_module_list ( image, mbmodules,
 				( sizeof(mbmodules) / sizeof(mbmodules[0]) ) );
 	mbinfo.mods_addr = virt_to_phys ( mbmodules );

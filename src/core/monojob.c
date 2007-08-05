@@ -16,6 +16,8 @@
  * Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
  */
 
+#include <string.h>
+#include <stdio.h>
 #include <errno.h>
 #include <gpxe/process.h>
 #include <console.h>
@@ -54,11 +56,14 @@ struct job_interface monojob = {
 /**
  * Wait for single foreground job to complete
  *
+ * @v string		Job description to display
  * @ret rc		Job final status code
  */
-int monojob_wait ( void ) {
+int monojob_wait ( const char *string ) {
 	int key;
+	int rc;
 
+	printf ( "%s... ", string );
 	monojob_rc = -EINPROGRESS;
 	while ( monojob_rc == -EINPROGRESS ) {
 		step();
@@ -67,12 +72,20 @@ int monojob_wait ( void ) {
 			switch ( key ) {
 			case CTRL_C:
 				job_kill ( &monojob );
-				return -ECANCELED;
-				break;
+				rc = -ECANCELED;
+				goto done;
 			default:
 				break;
 			}
 		}
 	}
-	return monojob_rc;
+	rc = monojob_rc;
+
+done:
+	if ( rc ) {
+		printf ( "%s\n", strerror ( rc ) );
+	} else {
+		printf ( "ok\n" );
+	}
+	return rc;
 }

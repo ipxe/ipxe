@@ -62,12 +62,22 @@ struct command exit_command __command = {
 /** "help" command body */
 static int help_exec ( int argc __unused, char **argv __unused ) {
 	struct command *command;
+	unsigned int hpos = 0;
 
 	printf ( "\nAvailable commands:\n\n" );
 	for ( command = commands ; command < commands_end ; command++ ) {
-		printf ( "  %s\n", command->name );
+		hpos += printf ( "  %s", command->name );
+		if ( hpos > ( 16 * 4 ) ) {
+			printf ( "\n" );
+			hpos = 0;
+		} else {
+			while ( hpos % 16 ) {
+				printf ( " " );
+				hpos++;
+			}
+		}
 	}
-	printf ( "\nType \"<command> --help\" for further information\n\n" );
+	printf ( "\n\nType \"<command> --help\" for further information\n\n" );
 	return 0;
 }
 

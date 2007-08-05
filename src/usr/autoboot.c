@@ -61,15 +61,20 @@ static int boot_filename ( const char *filename ) {
 		return -ENOMEM;
 	}
 	if ( ( rc = imgfetch ( image, filename,
-			       register_and_autoexec_image ) ) != 0 ) {
+			       register_and_autoload_image ) ) != 0 ) {
+		printf ( "Could not load %s: %s\n",
+			 filename, strerror ( rc ) );
+		goto done;
+	}
+	if ( ( rc = imgexec ( image ) ) != 0 ) {
 		printf ( "Could not boot %s: %s\n",
 			 filename, strerror ( rc ) );
-		image_put ( image );
-		return rc;
+		goto done;
 	}
 
+ done:
 	image_put ( image );
-	return 0;
+	return rc;
 }
 
 /**

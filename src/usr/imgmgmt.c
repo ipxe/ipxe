@@ -53,7 +53,7 @@ int imgfetch ( struct image *image, const char *uri_string,
 
 	if ( ( rc = create_downloader ( &monojob, image, image_register,
 					LOCATION_URI, uri ) ) == 0 )
-		rc = monojob_wait();
+		rc = monojob_wait ( uri_string );
 
 	uri_put ( uri );
 	return rc;
