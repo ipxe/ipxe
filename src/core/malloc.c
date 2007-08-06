@@ -95,7 +95,6 @@ static char heap[HEAP_SIZE] __attribute__ (( aligned ( __alignof__(void *) )));
  *
  * @c align must be a power of two.  @c size may not be zero.
  */
-__attribute__ ((malloc))
 void * alloc_memblock ( size_t size, size_t align ) {
 	struct memory_block *block;
 	size_t align_mask;
@@ -249,7 +248,6 @@ void free_memblock ( void *ptr, size_t size ) {
  * Calling realloc() with a new size of zero is a valid way to free a
  * memory block.
  */
-__attribute__ ((malloc))
 void * realloc ( void *old_ptr, size_t new_size ) {
 	struct autosized_block *old_block;
 	struct autosized_block *new_block;
@@ -299,7 +297,6 @@ void * realloc ( void *old_ptr, size_t new_size ) {
  * Allocates memory with no particular alignment requirement.  @c ptr
  * will be aligned to at least a multiple of sizeof(void*).
  */
-__attribute__ ((malloc))
 void * malloc ( size_t size ) {
 	return realloc ( NULL, size );
 }
@@ -329,7 +326,6 @@ void free ( void *ptr ) {
  * This function name is non-standard, but pretty intuitive.
  * zalloc(size) is always equivalent to calloc(1,size)
  */
-__attribute__ ((malloc))
 void * zalloc ( size_t size ) {
 	void *data;
 

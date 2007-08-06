@@ -135,7 +135,6 @@ static void ecollect_free ( void ) {
  * Calling realloc() with a new size of zero is a valid way to free a
  * memory block.
  */
-__attribute__ ((malloc))
 userptr_t urealloc ( userptr_t ptr, size_t new_size ) {
 	struct external_memory extmem;
 	userptr_t new = ptr;
@@ -209,7 +208,6 @@ userptr_t urealloc ( userptr_t ptr, size_t new_size ) {
  *
  * Memory is guaranteed to be aligned to a page boundary.
  */
-__attribute__ ((malloc))
 userptr_t umalloc ( size_t size ) {
 	return urealloc ( UNULL, size );
 }
