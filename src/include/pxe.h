@@ -58,6 +58,11 @@ union u_PXENV_ANY {
 	struct s_PXENV_UNDI_GET_IFACE_INFO	undi_get_iface_info;
 	struct s_PXENV_UNDI_GET_STATE		undi_get_state;
 	struct s_PXENV_UNDI_ISR			undi_isr;
+	struct s_PXENV_FILE_OPEN		file_open;
+	struct s_PXENV_FILE_CLOSE		file_close;
+	struct s_PXENV_FILE_SELECT		file_select;
+	struct s_PXENV_FILE_READ		file_read;
+	struct s_PXENV_GET_FILE_SIZE		get_file_size;
 };
 
 typedef union u_PXENV_ANY PXENV_ANY_t;

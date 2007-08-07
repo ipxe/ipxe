@@ -1555,6 +1555,137 @@ extern PXENV_EXIT_t pxenv_undi_isr ( struct s_PXENV_UNDI_ISR *undi_isr );
 
 /** @} */ /* pxe_undi_api */
 
+/** @defgroup pxe_file_api PXE FILE API
+ *
+ * POSIX-like file operations
+ *
+ * @{
+ */
+
+/** @defgroup pxenv_file_open PXENV_FILE_OPEN
+ *
+ * FILE OPEN
+ *
+ * @{
+ */
+
+/** PXE API function code for pxenv_file_open() */
+#define PXENV_FILE_OPEN			0x00e0
+
+/** Parameter block for pxenv_file_open() */
+struct s_PXENV_FILE_OPEN {
+	PXENV_STATUS_t Status;		/**< PXE status code */
+	UINT16_t FileHandle;		/**< File handle */
+	SEGOFF16_t FileName;		/**< File URL */
+	UINT32_t Reserved;		/**< Reserved */
+} PACKED;
+
+typedef struct s_PXENV_FILE_OPEN PXENV_FILE_OPEN_t;
+
+extern PXENV_EXIT_t pxenv_file_open ( struct s_PXENV_FILE_OPEN *file_open );
+
+/** @} */ /* pxenv_file_open */
+
+/** @defgroup pxenv_file_close PXENV_FILE_CLOSE
+ *
+ * FILE CLOSE
+ *
+ * @{
+ */
+
+/** PXE API function code for pxenv_file_close() */
+#define PXENV_FILE_CLOSE		0x00e1
+
+/** Parameter block for pxenv_file_close() */
+struct s_PXENV_FILE_CLOSE {
+	PXENV_STATUS_t Status;		/**< PXE status code */
+	UINT16_t FileHandle;		/**< File handle */
+} PACKED;
+
+typedef struct s_PXENV_FILE_CLOSE PXENV_FILE_CLOSE_t;
+
+extern PXENV_EXIT_t pxenv_file_close ( struct s_PXENV_FILE_CLOSE
+				       *file_close );
+
+/** @} */ /* pxenv_file_close */
+
+/** @defgroup pxenv_file_select PXENV_FILE_SELECT
+ *
+ * FILE SELECT
+ *
+ * @{
+ */
+
+/** PXE API function code for pxenv_file_select() */
+#define PXENV_FILE_SELECT		0x00e2
+
+/** File is ready for reading */
+#define RDY_READ			0x0001
+
+/** Parameter block for pxenv_file_select() */
+struct s_PXENV_FILE_SELECT {
+	PXENV_STATUS_t Status;		/**< PXE status code */
+	UINT16_t FileHandle;		/**< File handle */
+	UINT16_t Ready;			/**< Indication of readiness */
+} PACKED;
+
+typedef struct s_PXENV_FILE_SELECT PXENV_FILE_SELECT_t;
+
+extern PXENV_EXIT_t pxenv_file_select ( struct s_PXENV_FILE_SELECT
+					*file_select );
+
+/** @} */ /* pxenv_file_select */
+
+/** @defgroup pxenv_file_read PXENV_FILE_READ
+ *
+ * FILE READ
+ *
+ * @{
+ */
+
+/** PXE API function code for pxenv_file_read() */
+#define PXENV_FILE_READ		0x00e3
+
+/** Parameter block for pxenv_file_read() */
+struct s_PXENV_FILE_READ {
+	PXENV_STATUS_t Status;		/**< PXE status code */
+	UINT16_t FileHandle;		/**< File handle */
+	UINT16_t BufferSize;		/**< Data buffer size */
+	SEGOFF16_t Buffer;		/**< Data buffer */
+} PACKED;
+
+typedef struct s_PXENV_FILE_READ PXENV_FILE_READ_t;
+
+extern PXENV_EXIT_t pxenv_file_read ( struct s_PXENV_FILE_READ *file_read );
+
+/** @} */ /* pxenv_file_read */
+
+/** @defgroup pxenv_get_file_size PXENV_GET_FILE_SIZE
+ *
+ * GET FILE SIZE
+ *
+ * @{
+ */
+
+/** PXE API function code for pxenv_get_file_size() */
+#define PXENV_GET_FILE_SIZE		0x00e4
+
+/** Parameter block for pxenv_get_file_size() */
+struct s_PXENV_GET_FILE_SIZE {
+	PXENV_STATUS_t Status;		/**< PXE status code */
+	UINT16_t FileHandle;		/**< File handle */
+	UINT32_t FileSize;		/**< File size */
+} PACKED;
+
+typedef struct s_PXENV_GET_FILE_SIZE PXENV_GET_FILE_SIZE_t;
+
+extern PXENV_EXIT_t pxenv_get_file_size ( struct s_PXENV_GET_FILE_SIZE
+					  *get_file_size );
+
+/** @} */ /* pxenv_get_file_size */
+
+/** @} */ /* pxe_file_api */
+
 /** @defgroup pxe_loader_api PXE Loader API
  *
  * The UNDI ROM loader API

@@ -79,6 +79,37 @@ static void pxe_tftp_build_uri ( char *uri_string,
 }
 
 /**
+ * Read as much as possible from file
+ *
+ * @v fd				File descriptor
+ * @v buffer				Data buffer
+ * @v max_len				Maximum length to read
+ * @ret len				Actual length read, or negative error
+ */
+static ssize_t pxe_tftp_read_all ( int fd, userptr_t buffer,
+				   size_t max_len ) {
+	fd_set fdset;
+	off_t offset = 0;
+	int ready;
+	ssize_t len;
+
+	do {
+		FD_ZERO ( &fdset );
+		FD_SET ( fd, &fdset );
+		ready = select ( &fdset, 1 );
+		if ( ready < 0 )
+			return ready;
+		len = read_user ( fd, buffer, offset, max_len );
+		if ( len < 0 )
+			return len;
+		offset += len;
+	        max_len -= len;
+	} while ( max_len && len );
+
+	return offset;
+}
+
+/**
  * TFTP OPEN
  *
  * @v tftp_open				Pointer to a struct s_PXENV_TFTP_OPEN
@@ -251,11 +282,12 @@ PXENV_EXIT_t pxenv_tftp_read ( struct s_PXENV_TFTP_READ *tftp_read ) {
 
 	buffer = real_to_user ( tftp_read->Buffer.segment,
 				tftp_read->Buffer.offset );
-	len = read_user ( pxe_single_fd, buffer, 0, pxe_single_blksize );
+	len = pxe_tftp_read_all ( pxe_single_fd, buffer, pxe_single_blksize );
 	if ( len < 0 ) {
 		tftp_read->Status = PXENV_STATUS ( len );
 		return PXENV_EXIT_FAILURE;
 	}
+
 	tftp_read->BufferSize = len;
 	tftp_read->PacketNumber = ++pxe_single_blkidx;
 
@@ -359,10 +391,8 @@ PXENV_EXIT_t pxenv_tftp_read_file ( struct s_PXENV_TFTP_READ_FILE
 	char uri_string[PXE_URI_LEN];
 	int fd;
 	userptr_t buffer;
-	size_t max_len;
-	ssize_t frag_len;
-	size_t len = 0;
-	int rc = -ENOBUFS;
+	ssize_t len;
+	int rc = 0;
 
 	DBG ( "PXENV_TFTP_READ_FILE" );
 
@@ -384,16 +414,9 @@ PXENV_EXIT_t pxenv_tftp_read_file ( struct s_PXENV_TFTP_READ_FILE
 
 	/* Read file */
 	buffer = phys_to_user ( tftp_read_file->Buffer );
-	max_len = tftp_read_file->BufferSize;
-	while ( max_len ) {
-		frag_len = read_user ( fd, buffer, len, max_len );
-		if ( frag_len <= 0 ) {
-			rc = frag_len;
-			break;
-		}
-		len += frag_len;
-		max_len -= frag_len;
-	}
+	len = pxe_tftp_read_all ( fd, buffer, tftp_read_file->BufferSize );
+	if ( len < 0 )
+		rc = len;
 
 	close ( fd );
 	tftp_read_file->BufferSize = len;
