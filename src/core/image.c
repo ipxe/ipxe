@@ -237,6 +237,7 @@ int image_autoload ( struct image *image ) {
  * @ret rc		Return status code
  */
 int image_exec ( struct image *image ) {
+	struct uri *old_cwuri;
 	int rc;
 
 	/* Image must be loaded first */
@@ -252,15 +253,23 @@ int image_exec ( struct image *image ) {
 	if ( ! image->type->exec )
 		return -ENOEXEC;
 
+	/* Switch current working directory to be that of the image itself */
+	old_cwuri = uri_get ( cwuri );
+	churi ( image->uri );
+
 	/* Try executing the image */
 	if ( ( rc = image->type->exec ( image ) ) != 0 ) {
 		DBGC ( image, "IMAGE %p could not execute: %s\n",
 		       image, strerror ( rc ) );
-		return rc;
+		goto done;
 	}
 
-	/* Well, some formats might return... */
-	return 0;
+ done:
+	/* Reset current working directory */
+	churi ( old_cwuri );
+	uri_put ( old_cwuri );
+
+	return rc;
 }
 
 /**
