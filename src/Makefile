@@ -41,36 +41,28 @@ include arch/$(ARCH)/Config
 # If invoked with no build target, print out a helpfully suggestive
 # message.
 #
-noargs : blib $(BIN)/NIC
-	@echo '===================================================='
+noargs : blib $(BIN)/NIC $(BIN)/gpxe.dsk $(BIN)/gpxe.iso $(BIN)/gpxe.usb
+	@echo '==========================================================='
 	@echo
-	@echo ' *** WARNING: THE INSTRUCTIONS BELOW DO NOT FULLY WORK YET !!!  ***'
-	@echo ' ***                    PLEASE STAY TUNED                       ***' 
+	@echo 'To create a bootable floppy, type'
+	@echo '    cat $(BIN)/gpxe.dsk > /dev/fd0'
+	@echo 'where /dev/fd0 is your floppy drive.  This will erase any'
+	@echo 'data already on the disk.'
 	@echo
-	@echo 'No target specified. To specify a target, do: '
+	@echo 'To create a bootable USB key, type'
+	@echo '    cat $(BIN)/gpxe.usb > /dev/sdX'
+	@echo 'where /dev/sdX is your USB key, and is *not* a real hard'
+	@echo 'disk on your system.  This will erase any data already on'
+	@echo 'the USB key.'
 	@echo
-	@echo '    make bin/<rom-name>.<output-format> '
+	@echo 'To create a bootable CD-ROM, burn the ISO image '
+	@echo '$(BIN)/gpxe.iso to a blank CD-ROM.'
 	@echo
-	@echo 'where <output-format> is one of {$(MEDIA) }'
+	@echo 'These images contain drivers for all supported cards.  You'
+	@echo 'can build more customised images, and ROM images, using'
+	@echo '    make bin/<rom-name>.<output-format>'
 	@echo
-	@echo 'or: '
-	@echo
-	@echo '    make all<output-format>s'
-	@echo
-	@echo 'to generate all possible images of format <output-format>'
-	@echo
-	@echo 'For example, '
-	@echo
-	@echo '    make allroms '
-	@echo
-	@echo 'will generate all possible .rom (rom burnable) images, and'
-	@echo
-	@echo '    make alldsks'
-	@echo
-	@echo 'will generate all possible .dsk (bootable floppy) images, or'
-	@echo
-	@echo '===================================================='
-	@exit 1
+	@echo '==========================================================='
 
 # Locations of utilities
 #
