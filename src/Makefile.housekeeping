@@ -180,7 +180,7 @@ CLEANUP		+= $(BIN)/NIC
 # TGT_ROM_NAME : the ROM name (e.g. "dfe538")
 # TGT_MEDIA    : the media type (e.g. "rom")
 #
-DRIVERS_etherboot = $(DRIVERS)
+DRIVERS_gpxe	= $(DRIVERS)
 CARD_DRIVER	= $(firstword $(DRIVER_$(1)) $(1))
 TGT_ELEMENTS	= $(subst --, ,$(firstword $(subst ., ,$(notdir $@))))
 TGT_PREFIX	= $(word 2,$(subst ., ,$(notdir $@)))
