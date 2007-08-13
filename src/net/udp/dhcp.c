@@ -912,7 +912,7 @@ int start_dhcp ( struct job_interface *job, struct net_device *netdev,
 		goto err;
 
 	/* Start timer to initiate initial DHCPREQUEST */
-	start_timer ( &dhcp->timer );
+	start_timer_nodelay ( &dhcp->timer );
 
 	/* Attach parent interface, mortalise self, and return */
 	job_plug_plug ( &dhcp->job, job );

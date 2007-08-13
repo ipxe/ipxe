@@ -657,7 +657,7 @@ int tftp_open ( struct xfer_interface *xfer, struct uri *uri ) {
 		goto err;
 
 	/* Start timer to initiate RRQ */
-	start_timer ( &tftp->timer );
+	start_timer_nodelay ( &tftp->timer );
 
 	/* Attach to parent interface, mortalise self, and return */
 	xfer_plug_plug ( &tftp->xfer, xfer );
