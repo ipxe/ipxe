@@ -232,7 +232,7 @@ static int tcp_open ( struct xfer_interface *xfer, struct sockaddr *peer,
 		goto err;
 
 	/* Start timer to initiate SYN */
-	start_timer ( &tcp->timer );
+	start_timer_nodelay ( &tcp->timer );
 
 	/* Attach parent interface, transfer reference to connection
 	 * list and return

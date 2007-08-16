@@ -35,6 +35,7 @@ struct retry_timer {
 };
 
 extern void start_timer ( struct retry_timer *timer );
+extern void start_timer_nodelay ( struct retry_timer *timer );
 extern void stop_timer ( struct retry_timer *timer );
 
 /**

@@ -74,6 +74,18 @@ void start_timer ( struct retry_timer *timer ) {
 }
 
 /**
+ * Start timer with no delay
+ *
+ * @v timer		Retry timer
+ *
+ * This starts the timer running with a zero timeout value.
+ */
+void start_timer_nodelay ( struct retry_timer *timer ) {
+	start_timer ( timer );
+	timer->timeout = 0;
+}
+
+/**
  * Stop timer
  *
  * @v timer		Retry timer
