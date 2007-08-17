@@ -158,7 +158,7 @@ static int join_mc_group(__u32 * qkey_p, __u16 * mlid_p, __u8 join)
 		eprintf("");
 		return -1;
 	}
-	tprintf("allocated snd_wqe=0x%lx", snd_wqe);
+	tprintf("allocated snd_wqe=%p", snd_wqe);
 
 	mad = get_send_wqe_buf(snd_wqe, 0);
 	memset(mad, 0, 256);

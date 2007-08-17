@@ -897,7 +897,7 @@ static int ipoib_read_packet(__u16 * prot_p, void *data, unsigned int *size_p,
 
 	new_size = ib_cqe.count - GRH_SIZE;
 	buf = get_rcv_wqe_buf(ib_cqe.wqe, 1);
-	tprintf("buf=%lx", buf);
+	tprintf("buf=%p", buf);
 	rc = ipoib_handle_rcv(buf, &out_buf, &new_size, is_bcast_p);
 	if (rc) {
 		eprintf("");
@@ -944,7 +944,7 @@ static int ipoib_init(struct pci_device *pci)
 	ipoib_data.ipoib_qpn = ib_get_qpn(qph);
 
 	if(print_info)
-		printf("local ipoib qpn=0x%x\n", ipoib_data.ipoib_qpn);
+		printf("local ipoib qpn=0x%lx\n", ipoib_data.ipoib_qpn);
 
 	ipoib_data.bcast_av = ib_data.bcast_av;
 	ipoib_data.port_gid_raw = ib_data.port_gid.raw;

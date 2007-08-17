@@ -21,7 +21,7 @@
 
 #include "mt23108.h"
 #include "ib_driver.h"
-#include "pci.h"
+#include <gpxe/pci.h>
 
 struct device_buffers_st {
 	union recv_wqe_u mads_qp_rcv_queue[NUM_MADS_RCV_WQES]
@@ -203,7 +203,7 @@ static int ib_device_init(struct pci_device *dev)
 		eprintf("");
 		return -1;
 	}
-	tprintf("uar_base (pa:va) = 0x%lx 0x%lx",
+	tprintf("uar_base (pa:va) = 0x%lx %p",
 		tavor_pci_dev.dev.bar[2] + UAR_IDX * 0x1000, tavor_pci_dev.uar);
 
 	tprintf("");
@@ -225,7 +225,7 @@ static int init_dev_data(void)
 
 	dev_buffers_p = bus_to_virt(tmp);
 	memreg_size = (__u32) (&memreg_size) - (__u32) dev_buffers_p;
-	tprintf("src_buf=0x%lx, dev_buffers_p=0x%lx, memreg_size=0x%x", src_buf,
+	tprintf("src_buf=%p, dev_buffers_p=%p, memreg_size=0x%lx", src_buf,
 		dev_buffers_p, memreg_size);
 
 	return 0;
@@ -551,9 +551,9 @@ static int setup_hca(__u8 port, void **eq_p)
 		tprintf("fw_rev_major=%d", qfw.fw_rev_major);
 		tprintf("fw_rev_minor=%d", qfw.fw_rev_minor);
 		tprintf("fw_rev_subminor=%d", qfw.fw_rev_subminor);
-		tprintf("error_buf_start_h=0x%x", qfw.error_buf_start_h);
-		tprintf("error_buf_start_l=0x%x", qfw.error_buf_start_l);
-		tprintf("error_buf_size=%d", qfw.error_buf_size);
+		tprintf("error_buf_start_h=0x%lx", qfw.error_buf_start_h);
+		tprintf("error_buf_start_l=0x%lx", qfw.error_buf_start_l);
+		tprintf("error_buf_size=%ld", qfw.error_buf_size);
 	}
 
 	if (qfw.error_buf_start_h) {
@@ -944,7 +944,7 @@ static int post_send_req(void *qph, void *wqeh, __u8 num_gather)
 	__u32 *psrc, *pdst;
 	__u32 nds;
 
-	tprintf("snd_wqe=0x%lx, virt_to_bus(snd_wqe)=0x%lx", snd_wqe,
+	tprintf("snd_wqe=%p, virt_to_bus(snd_wqe)=0x%lx", snd_wqe,
 		virt_to_bus(snd_wqe));
 
 	memset(&dbell, 0, sizeof dbell);
@@ -1068,7 +1068,7 @@ static int create_ipoib_qp(void **qp_pp,
 		/* update data */
 		qp->rcv_wq[i].wqe_cont.qp = qp;
 		qp->rcv_bufs[i] = ib_buffers.ipoib_rcv_buf[i];
-		tprintf("rcv_buf=%lx", qp->rcv_bufs[i]);
+		tprintf("rcv_buf=%p", qp->rcv_bufs[i]);
 	}
 
 	/* init send queue WQEs list */
@@ -1401,7 +1401,7 @@ static int ib_poll_cq(void *cqh, struct ib_cqe_st *ib_cqe_p, u8 * num_cqes)
 		eprintf("syndrome=0x%lx",
 			EX_FLD(cqe.error_cqe, tavorprm_completion_with_error_st,
 			       syndrome));
-		eprintf("wqe_addr=0x%lx", wqe_p);
+		eprintf("wqe_addr=%p", wqe_p);
 		eprintf("wqe_size=0x%lx",
 			EX_FLD(cqe.error_cqe, tavorprm_completion_with_error_st,
 			       wqe_size));
@@ -1530,7 +1530,7 @@ static struct recv_wqe_st *alloc_rcv_wqe(struct udqp_st *qp)
 	wqe->mpointer[1].lkey = dev_ib_data.mkey;
 	wqe->mpointer[1].byte_count = qp->rcv_buf_sz;
 
-	tprintf("rcv_buf=%lx\n", qp->rcv_bufs[new_entry]);
+	tprintf("rcv_buf=%p\n", qp->rcv_bufs[new_entry]);
 
 	/* we do it only on the data segment since the control
 	   segment is always owned by HW */
@@ -1657,7 +1657,7 @@ static int poll_eq(struct ib_eqe_st *ib_eqe_p, __u8 * num_eqes)
 	struct eq_st *eq = &dev_ib_data.eq;
 
 	ptr = (__u32 *) (&(eq->eq_buf[eq->cons_idx]));
-	tprintf("cons)idx=%d, addr(eqe)=%x, val=0x%x", eq->cons_idx, virt_to_bus(ptr), ptr[7]);
+	tprintf("cons)idx=%ld, addr(eqe)=%lx, val=0x%lx", eq->cons_idx, virt_to_bus(ptr), ptr[7]);
 	owner = (ptr[7] & 0x80000000) ? OWNER_HW : OWNER_SW;
 	if (owner == OWNER_SW) {
         tprintf("got eqe");

@@ -106,7 +106,7 @@ static void hd(void *where, int n)
 	int i;
 
 	while (n > 0) {
-		printf("%X ", where);
+		printf("%p ", where);
 		for (i = 0; i < ((n > 16) ? 16 : n); i++)
 			printf(" %hhX", ((char *)where)[i]);
 		printf("\n");

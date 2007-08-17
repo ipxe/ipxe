@@ -542,7 +542,10 @@ static int cmd_mgid_hash(__u8 * gid, __u16 * mgid_hash_p)
 {
 	int rc;
 	command_fields_t cmd_desc;
-	__u16 result[2];
+	union {
+		__u32 u32;
+		__u16 u16[2];
+	} result;
 
 	memset(&cmd_desc, 0, sizeof cmd_desc);
 
@@ -554,9 +557,9 @@ static int cmd_mgid_hash(__u8 * gid, __u16 * mgid_hash_p)
 
 	rc = cmd_invoke(&cmd_desc);
 	if (!rc) {
-		rc = gw_read_cr(HCR_BASE + 16, (__u32 *) result);
+		rc = gw_read_cr(HCR_BASE + 16, &result.u32);
 		if (!rc) {
-			*mgid_hash_p = result[0];
+			*mgid_hash_p = result.u16[0];
 		}
 	}
 

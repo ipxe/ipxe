@@ -21,7 +21,7 @@
 
 #include "mt25218.h"
 #include "ib_driver.h"
-#include "pci.h"
+#include <gpxe/pci.h>
 
 #define MOD_INC(counter, max_count) (counter) = ((counter)+1) & ((max_count) - 1)
 
@@ -159,7 +159,7 @@ static int ib_device_init(struct pci_device *dev)
 		eprintf("");
 		return -1;
 	}
-	tprintf("uar_base (pa:va) = 0x%lx 0x%lx",
+	tprintf("uar_base (pa:va) = 0x%lx %p",
 		memfree_pci_dev.dev.bar[2] + UAR_IDX * 0x1000,
 		memfree_pci_dev.uar);
 
@@ -183,12 +183,12 @@ static int init_dev_data(void)
 
 	dev_buffers_p = bus_to_virt(tmp);
 	memreg_size = (__u32) (&memreg_size) - (__u32) dev_buffers_p;
-	tprintf("src_buf=0x%lx, dev_buffers_p=0x%lx, memreg_size=0x%x", src_buf,
+	tprintf("src_buf=%p, dev_buffers_p=%p, memreg_size=0x%lx", src_buf,
 		dev_buffers_p, memreg_size);
 
-	tprintf("inprm: va=0x%lx, pa=0x%lx", dev_buffers_p->inprm_buf,
+	tprintf("inprm: va=%p, pa=0x%lx", dev_buffers_p->inprm_buf,
 		virt_to_bus(dev_buffers_p->inprm_buf));
-	tprintf("outprm: va=0x%lx, pa=0x%lx", dev_buffers_p->outprm_buf,
+	tprintf("outprm: va=%p, pa=0x%lx", dev_buffers_p->outprm_buf,
 		virt_to_bus(dev_buffers_p->outprm_buf));
 
 	phys_mem.base =
@@ -665,9 +665,9 @@ static int setup_hca(__u8 port, void **eq_p)
 		tprintf("fw_rev_major=%d", qfw.fw_rev_major);
 		tprintf("fw_rev_minor=%d", qfw.fw_rev_minor);
 		tprintf("fw_rev_subminor=%d", qfw.fw_rev_subminor);
-		tprintf("error_buf_start_h=0x%x", qfw.error_buf_start_h);
-		tprintf("error_buf_start_l=0x%x", qfw.error_buf_start_l);
-		tprintf("error_buf_size=%d", qfw.error_buf_size);
+		tprintf("error_buf_start_h=0x%lx", qfw.error_buf_start_h);
+		tprintf("error_buf_start_l=0x%lx", qfw.error_buf_start_l);
+		tprintf("error_buf_size=%ld", qfw.error_buf_size);
 	}
 
 
@@ -840,7 +840,7 @@ static int setup_hca(__u8 port, void **eq_p)
 	uar_context_pa = phys_mem.base + phys_mem.offset +
 	    dev_ib_data.uar_idx * 4096;
 	uar_context_va = phys_to_virt(uar_context_pa);
-	tprintf("uar_context: va=0x%lx, pa=0x%lx", uar_context_va,
+	tprintf("uar_context: va=%p, pa=0x%lx", uar_context_va,
 		uar_context_pa);
 	dev_ib_data.uar_context_base = uar_context_va;
 
@@ -859,7 +859,7 @@ static int setup_hca(__u8 port, void **eq_p)
 	phys_mem.offset += (1 << (map_obj.vpm_arr[0].log2_size + 12));
 
 	init_hca.log_max_uars = log_max_uars;
-	tprintf("inprm: va=0x%lx, pa=0x%lx", inprm, virt_to_bus(inprm));
+	tprintf("inprm: va=%p, pa=0x%lx", inprm, virt_to_bus(inprm));
 	prep_init_hca_buf(&init_hca, inprm);
 	rc = cmd_init_hca(inprm, MT_STRUCT_SIZE(arbelprm_init_hca_st));
 	if (rc) {
@@ -1720,7 +1720,7 @@ static int ib_poll_cq(void *cqh, struct ib_cqe_st *ib_cqe_p, u8 * num_cqes)
 		eprintf("vendor_syndrome=0x%lx",
 			EX_FLD(cqe.error_cqe, arbelprm_completion_with_error_st,
 			       vendor_code));
-		eprintf("wqe_addr=0x%lx", wqe_p);
+		eprintf("wqe_addr=%p", wqe_p);
 		eprintf("myqpn=0x%lx",
 			EX_FLD(cqe.error_cqe, arbelprm_completion_with_error_st,
 			       myqpn));
