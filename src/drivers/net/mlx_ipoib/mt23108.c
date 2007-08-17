@@ -15,9 +15,9 @@ Skeleton NIC driver for Etherboot
 /* to get the interface to the body of the program */
 #include "nic.h"
 /* to get the PCI support functions, if this is a PCI NIC */
-#include <gpxe/pci.h>
+#include "pci.h"
 /* to get the ISA support functions, if this is an ISA NIC */
-#include <gpxe/isa.h>
+#include "isa.h"
 
 #include "mt_version.c"
 #include "mt23108_imp.c"
@@ -235,7 +235,7 @@ static struct pci_id tavor_nics[] = {
 	PCI_ROM(0x15b3, 0x6278, "MT25208", "MT25208 HCA driver"),
 };
 
-struct pci_driver tavor_driver __pci_driver = {
+static struct pci_driver tavor_driver __pci_driver = {
 	.type = NIC_DRIVER,
 	.name = "MT23108/MT25208",
 	.probe = tavor_probe,

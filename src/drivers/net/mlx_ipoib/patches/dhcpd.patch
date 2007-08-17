@@ -1,17 +1,7 @@
-diff -ru ../../orig/dhcp-3.0.4b2/common/options.c ./common/options.c
---- ../../orig/dhcp-3.0.4b2/common/options.c	2005-11-02 01:19:03.000000000 +0200
-+++ ./common/options.c	2005-12-06 14:38:17.000000000 +0200
-@@ -537,6 +537,7 @@
- 	priority_list [priority_len++] = DHO_DHCP_LEASE_TIME;
- 	priority_list [priority_len++] = DHO_DHCP_MESSAGE;
- 	priority_list [priority_len++] = DHO_DHCP_REQUESTED_ADDRESS;
-+	priority_list [priority_len++] = DHO_DHCP_CLIENT_IDENTIFIER;
- 	priority_list [priority_len++] = DHO_FQDN;
- 
- 	if (prl && prl -> len > 0) {
-diff -ru ../../orig/dhcp-3.0.4b2/includes/site.h ./includes/site.h
---- ../../orig/dhcp-3.0.4b2/includes/site.h	2002-03-12 20:33:39.000000000 +0200
-+++ ./includes/site.h	2005-12-06 14:36:55.000000000 +0200
+Index: dhcp-3.0.4b3/includes/site.h
+===================================================================
+--- dhcp-3.0.4b3.orig/includes/site.h	2002-03-12 20:33:39.000000000 +0200
++++ dhcp-3.0.4b3/includes/site.h	2006-03-15 12:50:00.000000000 +0200
 @@ -135,7 +135,7 @@
     the aforementioned problems do not matter to you, or if no other
     API is supported for your system, you may want to go with it. */

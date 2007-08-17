@@ -21,7 +21,7 @@
 
 #include "mt23108.h"
 #include "ib_driver.h"
-#include <gpxe/pci.h>
+#include "pci.h"
 
 struct device_buffers_st {
 	union recv_wqe_u mads_qp_rcv_queue[NUM_MADS_RCV_WQES]
@@ -797,6 +797,20 @@ static int setup_hca(__u8 port, void **eq_p)
 
       exit:
 	return ret;
+}
+
+
+static int unset_hca(void)
+{
+	int rc = 0;
+
+	if (!fw_fatal) {
+		rc = cmd_sys_dis();
+		if (rc)
+			eprintf("");
+	}
+
+	return rc;
 }
 
 static void *get_inprm_buf(void)

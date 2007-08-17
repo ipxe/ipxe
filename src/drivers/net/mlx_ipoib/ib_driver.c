@@ -248,12 +248,10 @@ static int ib_driver_close(int fw_fatal)
 		ret = 1;
 	}
 
-	if (!fw_fatal) {
-		rc = cmd_sys_dis();
-		if (rc) {
-			eprintf("");
-			ret = 1;
-		}
+	rc = unset_hca();
+	if (rc) {
+		eprintf("");
+		ret = 1;
 	}
 
 	return ret;

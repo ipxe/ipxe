@@ -21,7 +21,7 @@
 
 #include "mt25218.h"
 #include "ib_driver.h"
-#include <gpxe/pci.h>
+#include "pci.h"
 
 #define MOD_INC(counter, max_count) (counter) = ((counter)+1) & ((max_count) - 1)
 
@@ -88,6 +88,10 @@ static struct phys_mem_desc_st phys_mem;
 static struct dev_pci_struct memfree_pci_dev;
 static struct device_buffers_st *dev_buffers_p;
 static struct device_ib_data_st dev_ib_data;
+
+
+
+struct map_icm_st icm_map_obj;
 
 static int gw_write_cr(__u32 addr, __u32 data)
 {
@@ -850,6 +854,8 @@ static int setup_hca(__u8 port, void **eq_p)
 		eprintf("");
 		goto undo_map_fa;
 	}
+	icm_map_obj = map_obj;
+
 	phys_mem.offset += (1 << (map_obj.vpm_arr[0].log2_size + 12));
 
 	init_hca.log_max_uars = log_max_uars;
@@ -975,6 +981,30 @@ static int setup_hca(__u8 port, void **eq_p)
 		eprintf("");
 
       exit:
+	return ret;
+}
+
+
+static int unset_hca(void)
+{
+	int rc, ret = 0;
+
+	rc = cmd_unmap_icm(&icm_map_obj);
+	if (rc)
+		eprintf("");
+	ret |= rc;
+
+
+	rc = cmd_unmap_icm_aux();
+	if (rc)
+		eprintf("");
+	ret |= rc;
+
+	rc = cmd_unmap_fa();
+	if (rc)
+		eprintf("");
+	ret |= rc;
+
 	return ret;
 }
 

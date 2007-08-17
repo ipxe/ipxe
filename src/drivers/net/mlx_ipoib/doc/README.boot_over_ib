@@ -92,13 +92,11 @@ files with .mlx extension also available from Mellanox's web site.
 
 6. Preparing the DHCP Server
 -----------------------------
-DHCP messages over IP Over IB are transmitted as broadcasts. In order to 
-distinguish between messages belonging to a certain DHCP session, the messages 
-must carry the client identifier option (see ietf documentation	referred to 
-above). As of November 2005, ISC DHCP servers do not support this feature. 
-They are expected to support this at the end of 2005. In order to work this 
-out, the appropriate patch must be applied (see patches directory). It has 
-been tested on version isc-dhcpd-V3.0.4b2.
+The DHCP server may need to be modified in order to work on IPOIB. Some
+distributuions alreay support this (Some SUSE distributuions) while others
+do not. If the pre-installed server does not support IPOIB, the user can download
+the sources from ISC http://www.isc.org/ and apply the appropriate patch in
+the patches directory.
 
 The DHCP server must run on a machine which supports IP Over IB. The Mellanox 
 IBGD package (gen1 or gen2) can be used to provide this.
@@ -171,6 +169,14 @@ PXE_IB_PORT.
 
 14. Installing a package from Mellanox
 --------------------------------------
+The package comes as a compressed file with extension .bz2 or .gz. Follow 
+these steps:
+1. Create a directory
+2. cd to this directory
+3. tar jxf <package file name>  for .bz2 files or
+   tar zxf <package file name>  for .gz files
+
+The binaries can be found under src/bin
 When using a package obtained from Mellanox Technologies' web site, the
 directory src/bin will contain the driver binary files. The files have a .bin
 extension and are equivalent to the same files with .zrom extension.

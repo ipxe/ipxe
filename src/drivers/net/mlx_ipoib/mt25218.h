@@ -26,7 +26,9 @@
 #define MEMFREE_CMD_RUN_FW			0xff6
 #define MEMFREE_CMD_SET_ICM_SIZE	0xffd
 #define MEMFREE_CMD_MAP_ICM_AUX		0xffc
+#define MEMFREE_CMD_UNMAP_ICM_AUX		0xffb
 #define MEMFREE_CMD_MAP_ICM			0xffa
+#define MEMFREE_CMD_UNMAP_ICM			0xff9
 #define MEMFREE_CMD_QUERY_DEV_LIM   0x003
 
 /*

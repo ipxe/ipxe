@@ -23,14 +23,6 @@
 #include "mt25218.h"
 
 /*
- *  cmd_sys_dis
- */
-static int cmd_sys_dis(void)
-{
-	return 0;
-}
-
-/*
  *  cmd_write_mgm
  */
 static int cmd_write_mgm(void *mg, __u16 index)
@@ -325,6 +317,24 @@ static int cmd_map_icm_aux(struct map_icm_st *map_icm_aux_p)
 	return rc;
 }
 
+
+/*
+ *  cmd_unmap_icm_aux
+ */
+static int cmd_unmap_icm_aux(void)
+{
+	int rc;
+	command_fields_t cmd_desc;
+
+	memset(&cmd_desc, 0, sizeof cmd_desc);
+
+	cmd_desc.opcode = MEMFREE_CMD_UNMAP_ICM_AUX;
+
+	rc = cmd_invoke(&cmd_desc);
+
+	return rc;
+}
+
 /*
  *  cmd_map_icm
  */
@@ -365,6 +375,31 @@ static int cmd_map_icm(struct map_icm_st *map_icm_p)
 		INS_FLD(map_icm_p->vpm_arr[i].log2_size, off,
 			arbelprm_virtual_physical_mapping_st, log2size);
 	}
+
+	rc = cmd_invoke(&cmd_desc);
+
+	return rc;
+}
+
+
+
+/*
+ *  cmd_unmap_icm
+ */
+static int cmd_unmap_icm(struct map_icm_st *map_icm_p)
+{
+	int rc;
+	command_fields_t cmd_desc;
+	__u32 iprm[2];
+
+	memset(&cmd_desc, 0, sizeof cmd_desc);
+
+	cmd_desc.opcode = MEMFREE_CMD_UNMAP_ICM;
+	iprm[0] = map_icm_p->vpm_arr[0].va_h;
+	iprm[1] = map_icm_p->vpm_arr[0].va_l;
+	cmd_desc.in_param = iprm;
+	cmd_desc.in_trans = TRANS_IMMEDIATE;
+	cmd_desc.input_modifier = 1 << map_icm_p->vpm_arr[0].log2_size;
 
 	rc = cmd_invoke(&cmd_desc);
 
