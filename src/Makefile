@@ -164,6 +164,11 @@ SRCDIRS		+= usr
 NON_AUTO_SRCS	+= core/elf_loader.c
 NON_AUTO_SRCS	+= drivers/net/prism2.c
 
+SRCS		+= drivers/net/mlx_ipoib/mt25218.c
+SRCS		+= drivers/net/mlx_ipoib/mt23108.c
+CFLAGS_mt25218	= -Wno-error
+CFLAGS_mt23108	= -Wno-error
+
 # Rules for finalising files.  TGT_MAKEROM_FLAGS is defined as part of
 # the automatic build system and varies by target; it includes the
 # "-p 0x1234,0x5678" string to set the PCI IDs.

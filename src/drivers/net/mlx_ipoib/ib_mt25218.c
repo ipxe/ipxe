@@ -174,6 +174,8 @@ static inline unsigned long lalign(unsigned long buf, unsigned long align)
 			       (~(((unsigned long)align) - 1)));
 }
 
+#include <gpxe/umalloc.h>
+
 static int init_dev_data(void)
 {
 	unsigned long tmp;
@@ -191,9 +193,13 @@ static int init_dev_data(void)
 	tprintf("outprm: va=%p, pa=0x%lx", dev_buffers_p->outprm_buf,
 		virt_to_bus(dev_buffers_p->outprm_buf));
 
-	phys_mem.base =
-	    (virt_to_phys(_text) - reserve_size) & (~(reserve_size - 1));
-
+	userptr_t lotsofmem = umalloc ( reserve_size * 2 );
+	if ( ! lotsofmem ) {
+		printf ( "Could not allocate large memblock\n" );
+		return -1;
+	}
+	phys_mem.base = ( ( user_to_phys ( lotsofmem, 0 ) + reserve_size ) &
+			  ~( reserve_size - 1 ) );
 	phys_mem.offset = 0;
 
 	return 0;

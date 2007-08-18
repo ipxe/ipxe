@@ -148,7 +148,7 @@ static void tavor_transmit(struct nic *nic, const char *dest,	/* Destination */
 /**************************************************************************
 DISABLE - Turn off ethernet interface
 ***************************************************************************/
-static void tavor_disable(struct dev *dev)
+static void tavor_disable(struct nic *nic)
 {
 	/* put the card in its initial state */
 	/* This function serves 3 purposes.
@@ -160,18 +160,24 @@ static void tavor_disable(struct dev *dev)
 	 * This allows etherboot to reinitialize the interface
 	 *  if something is something goes wrong.
 	 */
-	if (dev || 1) {		// ????
+	if (nic || 1) {		// ????
 		disable_imp();
 	}
 }
+
+static struct nic_operations tavor_operations = {
+	.connect	= dummy_connect,
+	.poll		= tavor_poll,
+	.transmit	= tavor_transmit,
+	.irq		= tavor_irq,
+};
 
 /**************************************************************************
 PROBE - Look for an adapter, this routine's visible to the outside
 ***************************************************************************/
 
-static int tavor_probe(struct dev *dev, struct pci_device *pci)
+static int tavor_probe(struct nic *nic, struct pci_device *pci)
 {
-	struct nic *nic = (struct nic *)dev;
 	int rc;
 	unsigned char user_request;
 
@@ -215,10 +221,7 @@ static int tavor_probe(struct dev *dev, struct pci_device *pci)
 		nic->ioaddr = pci->ioaddr & ~3;
 		nic->irqno = pci->irq;
 		/* point to NIC specific routines */
-		dev->disable = tavor_disable;
-		nic->poll = tavor_poll;
-		nic->transmit = tavor_transmit;
-		nic->irq = tavor_irq;
+		nic->nic_op = &tavor_operations;
 
 		return 1;
 	}
@@ -226,16 +229,12 @@ static int tavor_probe(struct dev *dev, struct pci_device *pci)
 	return 0;
 }
 
-static struct pci_id tavor_nics[] = {
+static struct pci_device_id tavor_nics[] = {
 	PCI_ROM(0x15b3, 0x5a44, "MT23108", "MT23108 HCA driver"),
 	PCI_ROM(0x15b3, 0x6278, "MT25208", "MT25208 HCA driver"),
 };
 
-static struct pci_driver tavor_driver __pci_driver = {
-	.type = NIC_DRIVER,
-	.name = "MT23108/MT25208",
-	.probe = tavor_probe,
-	.ids = tavor_nics,
-	.id_count = sizeof(tavor_nics) / sizeof(tavor_nics[0]),
-	.class = 0,
-};
+PCI_DRIVER ( tavor_driver, tavor_nics, PCI_NO_CLASS );
+
+DRIVER ( "MT23108/MT25208", nic_driver, pci_driver, tavor_driver,
+	 tavor_probe, tavor_disable );

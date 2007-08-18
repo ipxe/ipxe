@@ -148,7 +148,7 @@ static void mt25218_transmit(struct nic *nic, const char *dest,	/* Destination *
 /**************************************************************************
 DISABLE - Turn off ethernet interface
 ***************************************************************************/
-static void mt25218_disable(struct dev *dev)
+static void mt25218_disable(struct nic *nic)
 {
 	/* put the card in its initial state */
 	/* This function serves 3 purposes.
@@ -160,18 +160,24 @@ static void mt25218_disable(struct dev *dev)
 	 * This allows etherboot to reinitialize the interface
 	 *  if something is something goes wrong.
 	 */
-	if (dev || 1) {		// ????
+	if (nic || 1) {		// ????
 		disable_imp();
 	}
 }
+
+static struct nic_operations mt25218_operations = {
+	.connect	= dummy_connect,
+	.poll		= mt25218_poll,
+	.transmit	= mt25218_transmit,
+	.irq		= mt25218_irq,
+};
 
 /**************************************************************************
 PROBE - Look for an adapter, this routine's visible to the outside
 ***************************************************************************/
 
-static int mt25218_probe(struct dev *dev, struct pci_device *pci)
+static int mt25218_probe(struct nic *nic, struct pci_device *pci)
 {
-	struct nic *nic = (struct nic *)dev;
 	int rc;
 	unsigned char user_request;
 
@@ -215,10 +221,7 @@ static int mt25218_probe(struct dev *dev, struct pci_device *pci)
 		nic->ioaddr = pci->ioaddr & ~3;
 		nic->irqno = pci->irq;
 		/* point to NIC specific routines */
-		dev->disable = mt25218_disable;
-		nic->poll = mt25218_poll;
-		nic->transmit = mt25218_transmit;
-		nic->irq = mt25218_irq;
+		nic->nic_op = &mt25218_operations;
 
 		return 1;
 	}
@@ -226,16 +229,12 @@ static int mt25218_probe(struct dev *dev, struct pci_device *pci)
 	return 0;
 }
 
-static struct pci_id mt25218_nics[] = {
+static struct pci_device_id mt25218_nics[] = {
 	PCI_ROM(0x15b3, 0x6282, "MT25218", "MT25218 HCA driver"),
 	PCI_ROM(0x15b3, 0x6274, "MT25204", "MT25204 HCA driver"),
 };
 
-static struct pci_driver mt25218_driver __pci_driver = {
-	.type = NIC_DRIVER,
-	.name = "MT25218",
-	.probe = mt25218_probe,
-	.ids = mt25218_nics,
-	.id_count = sizeof(mt25218_nics) / sizeof(mt25218_nics[0]),
-	.class = 0,
-};
+PCI_DRIVER ( mt25218_driver, mt25218_nics, PCI_NO_CLASS );
+
+DRIVER ( "MT25218", nic_driver, pci_driver, mt25218_driver,
+	 mt25218_probe, mt25218_disable );

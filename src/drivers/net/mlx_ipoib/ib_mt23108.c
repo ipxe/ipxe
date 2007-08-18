@@ -92,7 +92,12 @@ static int find_mlx_bridge(__u8 hca_bus, __u8 * br_bus_p, __u8 * br_devfn_p)
 	for (bus = 0; bus < 256; ++bus) {
 		for (dev = 0; dev < 32; ++dev) {
 			devfn = (dev << 3);
-			rc = pcibios_read_config_word(bus, devfn, PCI_VENDOR_ID,
+
+			struct pci_device tmp;
+			tmp.bus = bus;
+			tmp.devfn = devfn;
+
+			rc = pcibios_read_config_word(&tmp, PCI_VENDOR_ID,
 						      &vendor);
 			if (rc)
 				return rc;
@@ -100,7 +105,7 @@ static int find_mlx_bridge(__u8 hca_bus, __u8 * br_bus_p, __u8 * br_devfn_p)
 			if (vendor != MELLANOX_VENDOR_ID)
 				continue;
 
-			rc = pcibios_read_config_word(bus, devfn, PCI_DEVICE_ID,
+			rc = pcibios_read_config_word(&tmp, PCI_DEVICE_ID,
 						      &dev_id);
 			if (rc)
 				return rc;
@@ -108,7 +113,7 @@ static int find_mlx_bridge(__u8 hca_bus, __u8 * br_bus_p, __u8 * br_devfn_p)
 			if (dev_id != TAVOR_BRIDGE_DEVICE_ID)
 				continue;
 
-			rc = pcibios_read_config_byte(bus, devfn,
+			rc = pcibios_read_config_byte(&tmp,
 						      PCI_SECONDARY_BUS,
 						      &sec_bus);
 			if (rc)
@@ -161,7 +166,7 @@ static int ib_device_init(struct pci_device *dev)
 	tavor_pci_dev.dev.dev = dev;
 
 	tprintf("");
-	if (dev->dev_id == TAVOR_DEVICE_ID) {
+	if (dev->device == TAVOR_DEVICE_ID) {
 
 		rc = find_mlx_bridge(dev->bus, &br_bus, &br_devfn);
 		if (rc) {
@@ -175,7 +180,12 @@ static int ib_device_init(struct pci_device *dev)
 		tprintf("bus=%d devfn=0x%x", br_bus, br_devfn);
 		/* save config space */
 		for (i = 0; i < 64; ++i) {
-			rc = pcibios_read_config_dword(br_bus, br_devfn, i << 2,
+
+			struct pci_device tmp;
+			tmp.bus = br_bus;
+			tmp.devfn = br_devfn;
+
+			rc = pcibios_read_config_dword(&tmp, i << 2,
 						       &tavor_pci_dev.br.
 						       dev_config_space[i]);
 			if (rc) {
@@ -236,10 +246,14 @@ static int restore_config(void)
 	int i;
 	int rc;
 
-	if (tavor_pci_dev.dev.dev->dev_id == TAVOR_DEVICE_ID) {
+	if (tavor_pci_dev.dev.dev->device == TAVOR_DEVICE_ID) {
 		for (i = 0; i < 64; ++i) {
-			rc = pcibios_write_config_dword(tavor_pci_dev.br.bus,
-							tavor_pci_dev.br.devfn,
+
+			struct pci_device tmp;
+			tmp.bus = tavor_pci_dev.br.bus;
+			tmp.devfn = tavor_pci_dev.br.devfn;
+
+			rc = pcibios_write_config_dword(&tmp,
 							i << 2,
 							tavor_pci_dev.br.
 							dev_config_space[i]);
