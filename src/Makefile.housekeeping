@@ -39,6 +39,14 @@ version :
 	@$(TOUCH) $@
 VERYCLEANUP	+= .toolcheck
 
+# Check for correct syntax for echo -e
+#
+ifeq ($(shell echo '\0101'),A)
+ECHO_E = echo
+else
+ECHO_E = echo -e
+endif
+
 # Build verbosity
 #
 ifeq ($(V),1)
@@ -121,7 +129,7 @@ define obj_template
 	@$(CPP) $(CFLAGS) $(CFLAGS_$(3)) $(CFLAGS_$(4)) -DOBJECT=$(4) \
 		-Wno-error -M $(1) -MT "$(4)_DEPS" -MG -MP | \
 		sed 's/_DEPS\s*:/_DEPS =/' >> $(2)
-	@echo -e '\n$$(BIN)/$(4).o : $(1) $$(MAKEDEPS) $$($(4)_DEPS)' \
+	@$(ECHO_E) '\n$$(BIN)/$(4).o : $(1) $$(MAKEDEPS) $$($(4)_DEPS)' \
 		 '\n\t$$(QM)echo "  [BUILD] $$@"\n' \
 		 '\n\t$$(RULE_$(3))\n' \
 		 '\nBOBJS += $$(BIN)/$(4).o\n' \
@@ -368,7 +376,7 @@ define media_template
 	@$(MKDIR) -p $(dir $(2))
 	@$(RM) $(2)
 	@$(TOUCH) $(2)
-	@echo -e '$$(BIN)/%$(1) : $$(BIN)/%$(1).zbin' \
+	@$(ECHO_E) '$$(BIN)/%$(1) : $$(BIN)/%$(1).zbin' \
 		  '\n\t$$(QM)echo "  [FINISH] $$@"' \
 		  '\n\t$$(Q)$$(CP) $$< $$@' \
 		  '\n\t$$(Q)$$(FINALISE_$(1))' \
