@@ -311,6 +311,11 @@ extern void dbg_hex_dump_da ( unsigned long dispaddr,
  */
 #define __shared __asm__ ( "_shared_bss" )
 
+/**
+ * Optimisation barrier
+ */
+#define barrier() __asm__ __volatile__ ( "" : : : "memory" )
+
 #endif /* ASSEMBLY */
 
 #endif /* COMPILER_H */
