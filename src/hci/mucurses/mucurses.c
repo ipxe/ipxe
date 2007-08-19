@@ -8,6 +8,14 @@
  *
  */
 
+static void _wupdcurs ( WINDOW *win ) __nonnull;
+void _wputch ( WINDOW *win, chtype ch, int wrap ) __nonnull;
+void _wputc ( WINDOW *win, char c, int wrap ) __nonnull;
+void _wcursback ( WINDOW *win ) __nonnull;
+void _wputchstr ( WINDOW *win, const chtype *chstr, int wrap, int n ) __nonnull;
+void _wputstr ( WINDOW *win, const char *str, int wrap, int n ) __nonnull;
+int wmove ( WINDOW *win, int y, int x ) __nonnull;
+
 WINDOW _stdscr = {
 	.attrs = A_DEFAULT,
 	.ori_y = 0,
