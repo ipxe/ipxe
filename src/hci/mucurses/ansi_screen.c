@@ -2,6 +2,11 @@
 #include <curses.h>
 #include <console.h>
 
+static void ansiscr_reset(struct _curses_screen *scr) __nonnull;
+static void ansiscr_movetoyx(struct _curses_screen *scr,
+                               unsigned int y, unsigned int x) __nonnull;
+static void ansiscr_putc(struct _curses_screen *scr, chtype c) __nonnull;
+
 unsigned short _COLS = 80;
 unsigned short _LINES = 24;
 
