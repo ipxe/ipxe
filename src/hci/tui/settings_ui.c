@@ -36,7 +36,6 @@
 #include <gpxe/nvo.h>
 extern struct nvo_block *ugly_nvo_hack;
 
-
 /* Colour pairs */
 #define CPAIR_NORMAL	1
 #define CPAIR_SELECT	2
@@ -87,6 +86,24 @@ static struct config_setting config_settings[0]
 static struct config_setting config_settings_end[0]
 	__table_end ( struct config_setting, config_settings );
 #define NUM_SETTINGS ( ( unsigned ) ( config_settings_end - config_settings ) )
+
+static void load_setting ( struct setting_widget *widget ) __nonnull;
+static int save_setting ( struct setting_widget *widget ) __nonnull;
+static void init_setting ( struct setting_widget *widget,
+                           struct config_context *context,
+                           struct config_setting *setting,
+                           unsigned int row, unsigned int col ) __nonnull;
+static void draw_setting ( struct setting_widget *widget ) __nonnull;
+static int edit_setting ( struct setting_widget *widget, int key ) __nonnull;
+static void init_setting_index ( struct setting_widget *widget,
+                                 struct config_context *context,
+                                 unsigned int index ) __nonnull;
+static void vmsg ( unsigned int row, const char *fmt, va_list args ) __nonnull;
+static void msg ( unsigned int row, const char *fmt, ... ) __nonnull;
+static void valert ( const char *fmt, va_list args ) __nonnull;
+static void alert ( const char *fmt, ... ) __nonnull;
+static void draw_info_row ( struct config_setting *setting ) __nonnull;
+static int main_loop ( struct config_context *context ) __nonnull;
 
 /**
  * Load setting widget value from configuration context
