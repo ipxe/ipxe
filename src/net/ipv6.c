@@ -55,11 +55,10 @@ static LIST_HEAD ( miniroutes );
  * @v gateway		Gateway address (or ::0 for no gateway)
  * @ret miniroute	Routing table entry, or NULL
  */
-static struct ipv6_miniroute * add_ipv6_miniroute ( struct net_device *netdev,
-						    struct in6_addr prefix,
-						    int prefix_len,
-						    struct in6_addr address,
-						    struct in6_addr gateway ) {
+static struct ipv6_miniroute * __malloc 
+add_ipv6_miniroute ( struct net_device *netdev, struct in6_addr prefix,
+		     int prefix_len, struct in6_addr address,
+		     struct in6_addr gateway ) {
 	struct ipv6_miniroute *miniroute;
 	
 	miniroute = malloc ( sizeof ( *miniroute ) );
