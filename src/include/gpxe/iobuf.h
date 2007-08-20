@@ -161,7 +161,7 @@ static inline size_t iob_tailroom ( struct io_buffer *iobuf ) {
 	return ( iobuf->end - iobuf->tail );
 }
 
-extern struct io_buffer * alloc_iob ( size_t len );
+extern struct io_buffer * __malloc alloc_iob ( size_t len );
 extern void free_iob ( struct io_buffer *iobuf );
 extern void iob_pad ( struct io_buffer *iobuf, size_t min_len );
 extern int iob_ensure_headroom ( struct io_buffer *iobuf, size_t len );
