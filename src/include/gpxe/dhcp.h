@@ -502,7 +502,7 @@ extern void register_dhcp_options ( struct dhcp_option_block *options );
 extern void unregister_dhcp_options ( struct dhcp_option_block *options );
 extern void init_dhcp_options ( struct dhcp_option_block *options,
 				void *data, size_t max_len );
-extern struct dhcp_option_block * alloc_dhcp_options ( size_t max_len );
+extern struct dhcp_option_block * __malloc alloc_dhcp_options ( size_t max_len );
 extern struct dhcp_option *
 set_dhcp_option ( struct dhcp_option_block *options, unsigned int tag,
 		  const void *data, size_t len );
