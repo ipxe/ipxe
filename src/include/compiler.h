@@ -299,6 +299,12 @@ extern void dbg_hex_dump_da ( unsigned long dispaddr,
 #define __nonnull __attribute__ (( nonnull ))
 
 /**
+ * Declare a pointer returned by a function as a unique memory address
+ * as returned by malloc-type functions.
+ */
+#define __malloc __attribute__ (( malloc ))
+
+/**
  * Declare a function as used.
  *
  * Necessary only if the function is called only from assembler code.
