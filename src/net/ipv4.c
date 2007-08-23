@@ -39,10 +39,9 @@ static LIST_HEAD ( frag_buffers );
  * @v gateway		Gateway address (or @c INADDR_NONE for no gateway)
  * @ret miniroute	Routing table entry, or NULL
  */
-static struct ipv4_miniroute * add_ipv4_miniroute ( struct net_device *netdev,
-						    struct in_addr address,
-						    struct in_addr netmask,
-						    struct in_addr gateway ) {
+static struct ipv4_miniroute * __malloc
+add_ipv4_miniroute ( struct net_device *netdev, struct in_addr address,
+		     struct in_addr netmask, struct in_addr gateway ) {
 	struct ipv4_miniroute *miniroute;
 
 	DBG ( "IPv4 add %s", inet_ntoa ( address ) );

@@ -280,6 +280,31 @@ extern void dbg_hex_dump_da ( unsigned long dispaddr,
 #define __cdecl __attribute__ (( cdecl , regparm(0) ))
 
 /**
+ * Declare a function as pure - i.e. without side effects
+ */
+#define __pure __attribute__ (( pure ))
+
+/**
+ * Declare a function as const - i.e. it does not access global memory
+ * (including dereferencing pointers passed to it) at all.
+ * Must also not call any non-const functions.
+ */
+#define __const __attribute__ (( const ))
+
+/**
+ * Declare a function's pointer parameters as non-null - i.e. force
+ * compiler to check pointers at compile time and enable possible
+ * optimizations based on that fact
+ */
+#define __nonnull __attribute__ (( nonnull ))
+
+/**
+ * Declare a pointer returned by a function as a unique memory address
+ * as returned by malloc-type functions.
+ */
+#define __malloc __attribute__ (( malloc ))
+
+/**
  * Declare a function as used.
  *
  * Necessary only if the function is called only from assembler code.

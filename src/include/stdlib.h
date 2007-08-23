@@ -20,10 +20,10 @@ extern unsigned long strtoul ( const char *p, char **endp, int base );
  ****************************************************************************
  */
 
-extern void * malloc ( size_t size );
+extern void * __malloc malloc ( size_t size );
 extern void * realloc ( void *old_ptr, size_t new_size );
 extern void free ( void *ptr );
-extern void * zalloc ( size_t len );
+extern void * __malloc zalloc ( size_t len );
 
 /**
  * Allocate cleared memory
@@ -38,7 +38,7 @@ extern void * zalloc ( size_t len );
  * function in zalloc(), since in most cases @c nmemb will be 1 and
  * doing the multiply is just wasteful.
  */
-static inline void * calloc ( size_t nmemb, size_t size ) {
+static inline void * __malloc calloc ( size_t nmemb, size_t size ) {
 	return zalloc ( nmemb * size );
 }
 
