@@ -7,6 +7,6 @@
  *
  */
 
-extern char * readline ( const char *prompt ) __nonnull;
+extern char * __malloc readline ( const char *prompt );
 
 #endif /* _READLINE_H */

@@ -1044,7 +1044,7 @@ static void tls_hmac ( struct tls_session *tls __unused,
  * @ret plaintext_len	Length of plaintext record
  * @ret plaintext	Allocated plaintext record
  */
-static void * tls_assemble_stream ( struct tls_session *tls,
+static void * __malloc tls_assemble_stream ( struct tls_session *tls,
 				    const void *data, size_t len,
 				    void *digest, size_t *plaintext_len ) {
 	size_t mac_len = tls->tx_cipherspec.digest->digestsize;
