@@ -19,7 +19,7 @@
 
 extern size_t freemem;
 
-extern void * alloc_memblock ( size_t size, size_t align );
+extern void * __malloc alloc_memblock ( size_t size, size_t align );
 extern void free_memblock ( void *ptr, size_t size );
 extern void mpopulate ( void *start, size_t len );
 extern void mdumpfree ( void );
@@ -35,7 +35,7 @@ extern void mdumpfree ( void );
  *
  * @c align must be a power of two.  @c size may not be zero.
  */
-static inline void * malloc_dma ( size_t size, size_t phys_align ) {
+static inline void * __malloc malloc_dma ( size_t size, size_t phys_align ) {
 	return alloc_memblock ( size, phys_align );
 }
 

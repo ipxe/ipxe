@@ -543,8 +543,9 @@ void register_int13_drive ( struct int13_drive *drive ) {
 
 	/* Assign drive number if none specified, update BIOS drive count */
 	get_real ( num_drives, BDA_SEG, BDA_NUM_DRIVES );
-	if ( ! drive->drive )
-		drive->drive = ( num_drives | 0x80 );
+	if ( ( drive->drive & 0xff ) == 0xff )
+		drive->drive = num_drives;
+	drive->drive |= 0x80;
 	num_drives++;
 	if ( num_drives <= ( drive->drive & 0x7f ) )
 		num_drives = ( ( drive->drive & 0x7f ) + 1 );

@@ -58,7 +58,7 @@
 
 static bigint *bi_int_multiply(BI_CTX *ctx, bigint *bi, comp i);
 static bigint *bi_int_divide(BI_CTX *ctx, bigint *biR, comp denom);
-static bigint *alloc(BI_CTX *ctx, int size);
+static bigint __malloc *alloc(BI_CTX *ctx, int size);
 static bigint *trim(bigint *bi);
 static void more_comps(bigint *bi, int n);
 #if defined(CONFIG_BIGINT_KARATSUBA) || defined(CONFIG_BIGINT_BARRETT) || \
