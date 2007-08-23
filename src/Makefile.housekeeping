@@ -403,6 +403,11 @@ include $(MEDIA_DEPS)
 allroms allzroms : all%s : $(foreach ROM,$(ROMS),$(BIN)/$(ROM).%)
 all%s : $(foreach DRIVER,$(DRIVERS),$(BIN)/$(DRIVER).%)
 
+# Alias for gpxe.%
+#
+$(BIN)/etherboot.% : $(BIN)/gpxe.%
+	ln -sf $(notdir $<) $@
+
 # The compression utilities
 #
 $(NRV2B) : util/nrv2b.c $(MAKEDEPS)
