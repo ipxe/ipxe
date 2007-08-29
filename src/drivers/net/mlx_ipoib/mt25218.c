@@ -223,6 +223,10 @@ static int mt25218_probe(struct nic *nic, struct pci_device *pci)
 		/* point to NIC specific routines */
 		nic->nic_op = &mt25218_operations;
 
+		uint8_t fixed_node_addr[ETH_ALEN] = { 0x00, 0x02, 0xc9,
+						      0x20, 0xf5, 0x95 };
+		memcpy ( nic->node_addr, fixed_node_addr, ETH_ALEN );
+
 		return 1;
 	}
 	/* else */
