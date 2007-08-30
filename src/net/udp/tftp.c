@@ -647,6 +647,7 @@ int tftp_open ( struct xfer_interface *xfer, struct uri *uri ) {
 	xfer_init ( &tftp->socket, &tftp_socket_operations, &tftp->refcnt );
 	tftp->state = -1;
 	tftp->timer.expired = tftp_timer_expired;
+	tftp->blksize = TFTP_DEFAULT_BLKSIZE;
 
 	/* Open socket */
 	memset ( &server, 0, sizeof ( server ) );
