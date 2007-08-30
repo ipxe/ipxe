@@ -376,7 +376,7 @@ define media_template
 	@$(MKDIR) -p $(dir $(2))
 	@$(RM) $(2)
 	@$(TOUCH) $(2)
-	@$(ECHO_E) '$$(BIN)/%$(1) : $$(BIN)/%$(1).zbin' \
+	@$(ECHO_E) '$$(BIN)/%.$(1) : $$(BIN)/%.$(1).zbin' \
 		  '\n\t$$(QM)echo "  [FINISH] $$@"' \
 		  '\n\t$$(Q)$$(CP) $$< $$@' \
 		  '\n\t$$(Q)$$(FINALISE_$(1))' \
@@ -400,8 +400,9 @@ include $(MEDIA_DEPS)
 
 # The "allXXXs" targets for each suffix
 #
+allall: allroms allzroms allpxes allisos alldsks
 allroms allzroms : all%s : $(foreach ROM,$(ROMS),$(BIN)/$(ROM).%)
-all%s : $(foreach DRIVER,$(DRIVERS),$(BIN)/$(DRIVER).%)
+allpxes allisos alldsks : all%s : $(foreach DRIVER,$(DRIVERS),$(BIN)/$(DRIVER).%)
 
 # Alias for gpxe.%
 #
