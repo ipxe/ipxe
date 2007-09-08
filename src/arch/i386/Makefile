@@ -38,6 +38,7 @@ LDSCRIPT		= arch/i386/scripts/i386.lds
 # 
 MEDIA			+= rom
 MEDIA			+= pxe
+MEDIA			+= kpxe
 MEDIA			+= elf
 MEDIA			+= elfd
 MEDIA			+= lmelf
