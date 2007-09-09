@@ -415,7 +415,7 @@ static int tftp_rx_oack ( struct tftp_request *tftp, void *buf, size_t len ) {
 static int tftp_rx_data ( struct tftp_request *tftp,
 			  struct io_buffer *iobuf ) {
 	struct tftp_data *data = iobuf->data;
-	unsigned int block;
+	int block;
 	size_t data_len;
 	int rc;
 
@@ -431,6 +431,14 @@ static int tftp_rx_data ( struct tftp_request *tftp,
 	block = ntohs ( data->block );
 	iob_pull ( iobuf, sizeof ( *data ) );
 	data_len = iob_len ( iobuf );
+
+	/* Check for correct block */
+	if ( block != ( tftp->state + 1 ) ) {
+		DBGC ( tftp, "TFTP %p received out-of-order block %d "
+		       "(expecting %d)\n", tftp, block, ( tftp->state + 1 ) );
+		free_iob ( iobuf );
+		return 0;
+	}
 
 	/* Deliver data */
 	if ( ( rc = xfer_deliver_iob ( &tftp->xfer, iobuf ) ) != 0 ) {

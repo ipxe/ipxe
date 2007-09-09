@@ -42,30 +42,31 @@ include arch/$(ARCH)/Config
 # message.
 #
 noargs : blib $(BIN)/NIC $(BIN)/gpxe.dsk $(BIN)/gpxe.iso $(BIN)/gpxe.usb
-	@echo '==========================================================='
-	@echo
-	@echo 'To create a bootable floppy, type'
-	@echo '    cat $(BIN)/gpxe.dsk > /dev/fd0'
-	@echo 'where /dev/fd0 is your floppy drive.  This will erase any'
-	@echo 'data already on the disk.'
-	@echo
-	@echo 'To create a bootable USB key, type'
-	@echo '    cat $(BIN)/gpxe.usb > /dev/sdX'
-	@echo 'where /dev/sdX is your USB key, and is *not* a real hard'
-	@echo 'disk on your system.  This will erase any data already on'
-	@echo 'the USB key.'
-	@echo
-	@echo 'To create a bootable CD-ROM, burn the ISO image '
-	@echo '$(BIN)/gpxe.iso to a blank CD-ROM.'
-	@echo
-	@echo 'These images contain drivers for all supported cards.  You'
-	@echo 'can build more customised images, and ROM images, using'
-	@echo '    make bin/<rom-name>.<output-format>'
-	@echo
-	@echo '==========================================================='
+	@$(ECHO) '==========================================================='
+	@$(ECHO)
+	@$(ECHO) 'To create a bootable floppy, type'
+	@$(ECHO) '    cat $(BIN)/gpxe.dsk > /dev/fd0'
+	@$(ECHO) 'where /dev/fd0 is your floppy drive.  This will erase any'
+	@$(ECHO) 'data already on the disk.'
+	@$(ECHO)
+	@$(ECHO) 'To create a bootable USB key, type'
+	@$(ECHO) '    cat $(BIN)/gpxe.usb > /dev/sdX'
+	@$(ECHO) 'where /dev/sdX is your USB key, and is *not* a real hard'
+	@$(ECHO) 'disk on your system.  This will erase any data already on'
+	@$(ECHO) 'the USB key.'
+	@$(ECHO)
+	@$(ECHO) 'To create a bootable CD-ROM, burn the ISO image '
+	@$(ECHO) '$(BIN)/gpxe.iso to a blank CD-ROM.'
+	@$(ECHO)
+	@$(ECHO) 'These images contain drivers for all supported cards.  You'
+	@$(ECHO) 'can build more customised images, and ROM images, using'
+	@$(ECHO) '    make bin/<rom-name>.<output-format>'
+	@$(ECHO)
+	@$(ECHO) '==========================================================='
 
 # Locations of utilities
 #
+ECHO		?= /bin/echo -e
 HOST_CC		?= gcc
 CPP		?= gcc -E -Wp,-Wall
 RM		?= rm -f
@@ -120,7 +121,7 @@ OBJECT		= $(firstword $(subst ., ,$(@F)))
 #
 OBJ_CFLAGS	= $(CFLAGS_$(OBJECT)) -DOBJECT=$(subst -,_,$(OBJECT))
 $(BIN)/%.flags :
-	@echo $(OBJ_CFLAGS)
+	@$(ECHO) $(OBJ_CFLAGS)
 
 # Rules for specific object types.
 #
