@@ -103,6 +103,7 @@ static struct mii_chip_info {
 } mii_chip_table[] = {
     {"SiS 900 Internal MII PHY", 0x001d, 0x8000, sis900_read_mode},
     {"SiS 7014 Physical Layer Solution", 0x0016, 0xf830,sis900_read_mode},
+    {"SiS 900 on Foxconn 661 7MI", 0x0143, 0xBC70, sis900_read_mode},
     {"AMD 79C901 10BASE-T PHY",  0x0000, 0x6B70, amd79c901_read_mode},
     {"AMD 79C901 HomePNA PHY",   0x0000, 0x6B90, amd79c901_read_mode},
     {"ICS 1893 Integrated PHYceiver"   , 0x0015, 0xf440,ics1893_read_mode},

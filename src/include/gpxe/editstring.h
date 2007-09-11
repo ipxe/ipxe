@@ -26,6 +26,6 @@ struct edit_string {
 	unsigned int mod_end;
 };
 
-extern int edit_string ( struct edit_string *string, int key );
+extern int edit_string ( struct edit_string *string, int key ) __nonnull;
 
 #endif /* _GPXE_EDITSTRING_H */

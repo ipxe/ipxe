@@ -28,8 +28,10 @@ struct edit_box {
 
 extern void init_editbox ( struct edit_box *box, char *buf, size_t len,
 			   WINDOW *win, unsigned int row, unsigned int col,
-			   unsigned int width );
-extern void draw_editbox ( struct edit_box *box );
+			   unsigned int width ) 
+			   __attribute__ (( nonnull (1, 2) ));
+extern void draw_editbox ( struct edit_box *box ) __nonnull;
+static inline int __pure edit_editbox ( struct edit_box *box, int key ) __nonnull;
 
 /**
  * Edit text box widget

@@ -27,6 +27,15 @@
  *
  */
 
+static void insert_delete ( struct edit_string *string, size_t delete_len,
+                            const char *insert_text ) 
+			    __attribute__ (( nonnull (1) ));
+static void insert_character ( struct edit_string *string,
+                               unsigned int character ) __nonnull;
+static void delete_character ( struct edit_string *string ) __nonnull;
+static void backspace ( struct edit_string *string ) __nonnull;
+static void kill_eol ( struct edit_string *string ) __nonnull;
+
 /**
  * Insert and/or delete text within an editable string
  *

@@ -32,6 +32,8 @@
 
 #define READLINE_MAX 256
 
+static void sync_console ( struct edit_string *string ) __nonnull;
+
 /**
  * Synchronise console with edited string
  *
