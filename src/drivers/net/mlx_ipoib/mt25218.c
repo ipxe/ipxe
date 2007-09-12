@@ -10,6 +10,15 @@ Skeleton NIC driver for Etherboot
  * your option) any later version.
  */
 
+#include <errno.h>
+#include <gpxe/pci.h>
+#include <gpxe/iobuf.h>
+#include <gpxe/netdevice.h>
+#include <gpxe/infiniband.h>
+
+struct mlx_nic {
+};
+
 /* to get some global routines like printf */
 #include "etherboot.h"
 /* to get the interface to the body of the program */
@@ -145,6 +154,131 @@ static void mt25218_transmit(struct nic *nic, const char *dest,	/* Destination *
 	}
 }
 
+/**
+ * Open network device
+ *
+ * @v netdev		Network device
+ * @ret rc		Return status code
+ */
+static int mlx_open ( struct net_device *netdev ) {
+	return 0;
+}
+
+/**
+ * Close network device
+ *
+ * @v netdev		Network device
+ */
+static void mlx_close ( struct net_device *netdev ) {
+}
+
+#warning "Broadcast address?"
+static uint8_t ib_broadcast[IB_ALEN] = { 0xff, };
+
+
+/**
+ * Transmit packet
+ *
+ * @v netdev		Network device
+ * @v iobuf		I/O buffer
+ * @ret rc		Return status code
+ */
+static int mlx_transmit ( struct net_device *netdev,
+			  struct io_buffer *iobuf ) {
+	struct ibhdr *ibhdr = iobuf->data;
+
+	DBG ( "Sending packet:\n" );
+	//	DBG_HD ( iobuf->data, iob_len ( iobuf ) );
+
+	DBG ( "Peer:\n" );
+	DBG_HD ( &ibhdr->peer[0], IB_ALEN );
+	DBG ( "Bcast:\n" );
+	DBG_HD ( &ib_broadcast[0], IB_ALEN );
+
+	iob_pull ( iobuf, sizeof ( *ibhdr ) );	
+
+	if ( memcmp ( ibhdr->peer, ib_broadcast, IB_ALEN ) == 0 ) {
+		printf ( "Sending broadcast packet\n" );
+		return send_bcast_packet ( ibhdr->proto, iobuf->data,
+					   iob_len ( iobuf ) );
+	} else {
+		printf ( "Sending unicast packet\n" );
+		return send_ucast_packet ( ibhdr->peer, ibhdr->proto,
+					   iobuf->data, iob_len ( iobuf ) );
+	}
+}
+
+/**
+ * Poll for completed and received packets
+ *
+ * @v netdev		Network device
+ */
+static void mlx_poll ( struct net_device *netdev ) {
+	struct ib_cqe_st ib_cqe;
+	uint8_t num_cqes;
+	unsigned int len;
+	struct io_buffer *iobuf;
+	void *buf;
+	int rc;
+
+	if ( ( rc = poll_error_buf() ) != 0 ) {
+		DBG ( "poll_error_buf() failed: %s\n", strerror ( rc ) );
+		return;
+	}
+
+	if ( ( rc = drain_eq() ) != 0 ) {
+		DBG ( "drain_eq() failed: %s\n", strerror ( rc ) );
+		return;
+	}
+
+	if ( ( rc = ib_poll_cq ( ipoib_data.rcv_cqh, &ib_cqe,
+				 &num_cqes ) ) != 0 ) {
+		DBG ( "ib_poll_cq() failed: %s\n", strerror ( rc ) );
+		return;
+	}
+
+	if ( ! num_cqes )
+		return;
+
+	if ( ib_cqe.is_error ) {
+		DBG ( "cqe error\n" );
+		free_wqe ( ib_cqe.wqe );
+		return;
+	}
+
+	len = ib_cqe.count;
+	iobuf = alloc_iob ( len );
+	if ( ! iobuf ) {
+		DBG ( "out of memory\n" );
+		free_wqe ( ib_cqe.wqe );
+		return;
+	}
+	memcpy ( iob_put ( iobuf, len ), buf, len );
+	DBG ( "Received packet:\n" );
+	DBG_HD ( iobuf->data, iob_len ( iobuf ) );
+
+	netdev_rx ( netdev, iobuf );
+
+	free_wqe ( ib_cqe.wqe );
+}
+
+/**
+ * Enable or disable interrupts
+ *
+ * @v netdev		Network device
+ * @v enable		Interrupts should be enabled
+ */
+static void mlx_irq ( struct net_device *netdev, int enable ) {
+}
+
+static struct net_device_operations mlx_operations = {
+	.open		= mlx_open,
+	.close		= mlx_close,
+	.transmit	= mlx_transmit,
+	.poll		= mlx_poll,
+	.irq		= mlx_irq,
+};
+
 /**************************************************************************
 DISABLE - Turn off ethernet interface
 ***************************************************************************/
@@ -163,6 +297,21 @@ static void mt25218_disable(struct nic *nic)
 	if (nic || 1) {		// ????
 		disable_imp();
 	}
+}
+
+/**
+ * Remove PCI device
+ *
+ * @v pci		PCI device
+ */
+static void mlx_remove ( struct pci_device *pci ) {
+	struct net_device *netdev = pci_get_drvdata ( pci );
+	struct mlx_nic *mlx = netdev->priv;
+
+	unregister_netdev ( netdev );
+	ipoib_close(0);
+	netdev_nullify ( netdev );
+	netdev_put ( netdev );
 }
 
 static struct nic_operations mt25218_operations = {
@@ -233,12 +382,59 @@ static int mt25218_probe(struct nic *nic, struct pci_device *pci)
 	return 0;
 }
 
-static struct pci_device_id mt25218_nics[] = {
+/**
+ * Probe PCI device
+ *
+ * @v pci		PCI device
+ * @v id		PCI ID
+ * @ret rc		Return status code
+ */
+static int mlx_probe ( struct pci_device *pci,
+		       const struct pci_device_id *id __unused ) {
+	struct net_device *netdev;
+	struct mlx_nic *mlx;
+	int rc;
+
+	/* Allocate net device */
+	netdev = alloc_ibdev ( sizeof ( *mlx ) );
+	if ( ! netdev )
+		return -ENOMEM;
+	netdev_init ( netdev, &mlx_operations );
+	mlx = netdev->priv;
+	pci_set_drvdata ( pci, netdev );
+	netdev->dev = &pci->dev;
+	memset ( mlx, 0, sizeof ( *mlx ) );
+
+	/* Fix up PCI device */
+	adjust_pci_device ( pci );
+
+	/* Initialise hardware */
+	if ( ( rc = ipoib_init ( pci ) ) != 0 )
+		goto err_ipoib_init;
+	memcpy ( netdev->ll_addr, ipoib_data.port_gid_raw, IB_ALEN );
+
+	/* Register network device */
+	if ( ( rc = register_netdev ( netdev ) ) != 0 )
+		goto err_register_netdev;
+
+	return 0;
+
+ err_register_netdev:
+ err_ipoib_init:
+	ipoib_close(0);
+	netdev_nullify ( netdev );
+	netdev_put ( netdev );
+	return rc;
+}
+
+static struct pci_device_id mlx_nics[] = {
 	PCI_ROM(0x15b3, 0x6282, "MT25218", "MT25218 HCA driver"),
 	PCI_ROM(0x15b3, 0x6274, "MT25204", "MT25204 HCA driver"),
 };
 
-PCI_DRIVER ( mt25218_driver, mt25218_nics, PCI_NO_CLASS );
-
-DRIVER ( "MT25218", nic_driver, pci_driver, mt25218_driver,
-	 mt25218_probe, mt25218_disable );
+struct pci_driver mlx_driver __pci_driver = {
+	.ids = mlx_nics,
+	.id_count = ( sizeof ( mlx_nics ) / sizeof ( mlx_nics[0] ) ),
+	.probe = mlx_probe,
+	.remove = mlx_remove,
+};
