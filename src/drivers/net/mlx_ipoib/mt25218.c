@@ -187,23 +187,16 @@ static int mlx_transmit ( struct net_device *netdev,
 			  struct io_buffer *iobuf ) {
 	struct ibhdr *ibhdr = iobuf->data;
 
-	DBG ( "Sending packet:\n" );
-	//	DBG_HD ( iobuf->data, iob_len ( iobuf ) );
-
-	DBG ( "Peer:\n" );
-	DBG_HD ( &ibhdr->peer[0], IB_ALEN );
-	DBG ( "Bcast:\n" );
-	DBG_HD ( &ib_broadcast[0], IB_ALEN );
-
 	iob_pull ( iobuf, sizeof ( *ibhdr ) );	
 
 	if ( memcmp ( ibhdr->peer, ib_broadcast, IB_ALEN ) == 0 ) {
 		printf ( "Sending broadcast packet\n" );
-		return send_bcast_packet ( ibhdr->proto, iobuf->data,
-					   iob_len ( iobuf ) );
+		return send_bcast_packet ( ntohs ( ibhdr->proto ),
+					   iobuf->data, iob_len ( iobuf ) );
 	} else {
 		printf ( "Sending unicast packet\n" );
-		return send_ucast_packet ( ibhdr->peer, ibhdr->proto,
+		return send_ucast_packet ( ibhdr->peer,
+					   ntohs ( ibhdr->proto ),
 					   iobuf->data, iob_len ( iobuf ) );
 	}
 }
