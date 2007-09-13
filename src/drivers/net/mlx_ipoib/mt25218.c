@@ -246,7 +246,13 @@ static void mlx_poll ( struct net_device *netdev ) {
 		free_wqe ( ib_cqe.wqe );
 		return;
 	}
+	buf = get_rcv_wqe_buf(ib_cqe.wqe, 1);
 	memcpy ( iob_put ( iobuf, len ), buf, len );
+	DBG ( "Received packet header:\n" );
+	struct recv_wqe_st *rcv_wqe = ib_cqe.wqe;
+	DBG_HD ( get_rcv_wqe_buf(ib_cqe.wqe, 0),
+		 be32_to_cpu(rcv_wqe->mpointer[0].byte_count) );
+		 
 	DBG ( "Received packet:\n" );
 	DBG_HD ( iobuf->data, iob_len ( iobuf ) );
 
