@@ -326,6 +326,17 @@ netdev_put ( struct net_device *netdev ) {
 	ref_put ( &netdev->refcnt );
 }
 
+/**
+ * Get driver private area for this network device
+ *
+ * @v netdev		Network device
+ * @ret priv		Driver private area for this network device
+ */
+static inline __attribute__ (( always_inline )) void *
+netdev_priv ( struct net_device *netdev ) {
+        return netdev->priv;
+}
+
 extern int netdev_tx ( struct net_device *netdev, struct io_buffer *iobuf );
 extern void netdev_tx_complete_err ( struct net_device *netdev,
 				 struct io_buffer *iobuf, int rc );
