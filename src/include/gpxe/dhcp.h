@@ -432,6 +432,13 @@ struct dhcphdr {
 /** Opcode for a reply from server to client */
 #define BOOTP_REPLY 2
 
+/** BOOTP reply must be broadcast
+ *
+ * Clients that cannot accept unicast BOOTP replies must set this
+ * flag.
+ */
+#define BOOTP_FL_BROADCAST 0x8000
+
 /** DHCP magic cookie */
 #define DHCP_MAGIC_COOKIE 0x63825363UL
 

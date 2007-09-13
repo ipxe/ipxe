@@ -298,6 +298,7 @@ static int create_dhcp_packet ( struct net_device *netdev, uint8_t msgtype,
 				void *data, size_t max_len,
 				struct dhcp_packet *dhcppkt ) {
 	struct dhcphdr *dhcphdr = data;
+	unsigned int hlen;
 	int rc;
 
 	/* Sanity check */
@@ -309,9 +310,17 @@ static int create_dhcp_packet ( struct net_device *netdev, uint8_t msgtype,
 	dhcphdr->xid = dhcp_xid ( netdev );
 	dhcphdr->magic = htonl ( DHCP_MAGIC_COOKIE );
 	dhcphdr->htype = ntohs ( netdev->ll_protocol->ll_proto );
-	dhcphdr->hlen = netdev->ll_protocol->ll_addr_len;
-	memcpy ( dhcphdr->chaddr, netdev->ll_addr, dhcphdr->hlen );
 	dhcphdr->op = dhcp_op[msgtype];
+	/* If hardware length exceeds the chaddr field length, don't
+	 * use the chaddr field.  This is as per RFC4390.
+	 */
+	hlen = netdev->ll_protocol->ll_addr_len;
+	if ( hlen > sizeof ( dhcphdr->chaddr ) ) {
+		hlen = 0;
+		dhcphdr->flags = htons ( BOOTP_FL_BROADCAST );
+	}
+	dhcphdr->hlen = hlen;
+	memcpy ( dhcphdr->chaddr, netdev->ll_addr, hlen );
 
 	/* Initialise DHCP packet structure */
 	dhcppkt->dhcphdr = dhcphdr;
@@ -494,6 +503,14 @@ struct dhcp_netdev_desc {
 	uint16_t device;
 } __attribute__ (( packed ));
 
+/** DHCP client identifier */
+struct dhcp_client_id {
+	/** Link-layer protocol */
+	uint8_t ll_proto;
+	/** Link-layer address */
+	uint8_t ll_addr[MAX_LL_ADDR_LEN];
+} __attribute__ (( packed ));
+
 /**
  * Create DHCP request
  *
@@ -511,7 +528,9 @@ int create_dhcp_request ( struct net_device *netdev, int msgtype,
 			  struct dhcp_packet *dhcppkt ) {
 	struct device_description *desc = &netdev->dev->desc;
 	struct dhcp_netdev_desc dhcp_desc;
+	struct dhcp_client_id client_id;
 	size_t dhcp_features_len;
+	size_t ll_addr_len;
 	int rc;
 
 	/* Create DHCP packet */
@@ -566,6 +585,21 @@ int create_dhcp_request ( struct net_device *netdev, int msgtype,
 					     &dhcp_desc,
 					     sizeof ( dhcp_desc ) ) ) != 0 ) {
 		DBG ( "DHCP could not set bus ID option: %s\n",
+		      strerror ( rc ) );
+		return rc;
+	}
+
+	/* Add DHCP client identifier.  Required for Infiniband, and
+	 * doesn't hurt other link layers.
+	 */
+	client_id.ll_proto = netdev->ll_protocol->ll_proto;
+	ll_addr_len = netdev->ll_protocol->ll_addr_len;
+	assert ( ll_addr_len <= sizeof ( client_id.ll_addr ) );
+	memcpy ( client_id.ll_addr, netdev->ll_addr, ll_addr_len );
+	if ( ( rc = set_dhcp_packet_option ( dhcppkt, DHCP_CLIENT_ID,
+					     &client_id,
+					     ( ll_addr_len + 1 ) ) ) != 0 ) {
+		DBG ( "DHCP could not set client ID: %s\n",
 		      strerror ( rc ) );
 		return rc;
 	}
