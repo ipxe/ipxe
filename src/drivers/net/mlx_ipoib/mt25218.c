@@ -52,6 +52,7 @@ int prompt_key(int secs, unsigned char *ch_p)
 	return 0;
 }
 
+#if 0
 /**************************************************************************
 IRQ - handle interrupts
 ***************************************************************************/
@@ -153,6 +154,7 @@ static void mt25218_transmit(struct nic *nic, const char *dest,	/* Destination *
 			eprintf("tranmit error");
 	}
 }
+#endif
 
 /**
  * Open network device
@@ -161,6 +163,9 @@ static void mt25218_transmit(struct nic *nic, const char *dest,	/* Destination *
  * @ret rc		Return status code
  */
 static int mlx_open ( struct net_device *netdev ) {
+
+	( void ) netdev;
+
 	return 0;
 }
 
@@ -170,6 +175,9 @@ static int mlx_open ( struct net_device *netdev ) {
  * @v netdev		Network device
  */
 static void mlx_close ( struct net_device *netdev ) {
+
+	( void ) netdev;
+
 }
 
 #warning "Broadcast address?"
@@ -187,6 +195,8 @@ static int mlx_transmit ( struct net_device *netdev,
 			  struct io_buffer *iobuf ) {
 	struct ibhdr *ibhdr = iobuf->data;
 
+	( void ) netdev;
+
 	iob_pull ( iobuf, sizeof ( *ibhdr ) );	
 
 	if ( memcmp ( ibhdr->peer, ib_broadcast, IB_ALEN ) == 0 ) {
@@ -202,16 +212,94 @@ static int mlx_transmit ( struct net_device *netdev,
 }
 
 /**
+ * Handle TX completion
+ *
+ * @v netdev		Network device
+ * @v cqe		Completion queue entry
+ */
+static void mlx_tx_complete ( struct net_device *netdev,
+			      struct ib_cqe_st *cqe ) {
+	netdev_tx_complete_next_err ( netdev,
+				      ( cqe->is_error ? -EIO : 0 ) );
+}
+
+/**
+ * Handle RX completion
+ *
+ * @v netdev		Network device
+ * @v cqe		Completion queue entry
+ */
+static void mlx_rx_complete ( struct net_device *netdev,
+			      struct ib_cqe_st *cqe ) {
+	unsigned int len;
+	struct io_buffer *iobuf;
+	void *buf;
+
+	/* Check for errors */
+	if ( cqe->is_error ) {
+		netdev_rx_err ( netdev, NULL, -EIO );
+		return;
+	}
+
+	/* Allocate I/O buffer */
+	len = cqe->count;
+	iobuf = alloc_iob ( len );
+	if ( ! iobuf ) {
+		netdev_rx_err ( netdev, NULL, -ENOMEM );
+		return;
+	}
+	buf = get_rcv_wqe_buf ( cqe->wqe, 1 );
+	memcpy ( iob_put ( iobuf, len ), buf, len );
+	//	DBG ( "Received packet header:\n" );
+	//	struct recv_wqe_st *rcv_wqe = ib_cqe.wqe;
+	//	DBG_HD ( get_rcv_wqe_buf(ib_cqe.wqe, 0),
+	//		 be32_to_cpu(rcv_wqe->mpointer[0].byte_count) );
+	//	DBG ( "Received packet:\n" );
+	//	DBG_HD ( iobuf->data, iob_len ( iobuf ) );
+	netdev_rx ( netdev, iobuf );
+}
+
+/**
+ * Poll completion queue
+ *
+ * @v netdev		Network device
+ * @v cq		Completion queue
+ */
+static void mlx_poll_cq ( struct net_device *netdev, cq_t cq ) {
+	struct mlx_nic *mlx = netdev->priv;
+	struct ib_cqe_st cqe;
+	uint8_t num_cqes;
+
+	while ( 1 ) {
+		/* Poll for single completion queue entry */
+		ib_poll_cq ( cq, &cqe, &num_cqes );
+
+		/* Return if no entries in the queue */
+		if ( ! num_cqes )
+			return;
+
+		DBGC ( mlx, "MLX %p cpl in %p: err %x send %x "
+		       "wqe %p count %lx\n", mlx, cq, cqe.is_error,
+		       cqe.is_send, cqe.wqe, cqe.count );
+
+		/* Handle TX/RX completion */
+		if ( cqe.is_send ) {
+			mlx_tx_complete ( netdev, &cqe );
+		} else {
+			mlx_rx_complete ( netdev, &cqe );
+		}
+		
+		/* Free associated work queue entry */
+		free_wqe ( cqe.wqe );
+	}
+}
+
+/**
  * Poll for completed and received packets
  *
  * @v netdev		Network device
  */
 static void mlx_poll ( struct net_device *netdev ) {
-	struct ib_cqe_st ib_cqe;
-	uint8_t num_cqes;
-	unsigned int len;
-	struct io_buffer *iobuf;
-	void *buf;
 	int rc;
 
 	if ( ( rc = poll_error_buf() ) != 0 ) {
@@ -224,41 +312,7 @@ static void mlx_poll ( struct net_device *netdev ) {
 		return;
 	}
 
-	if ( ( rc = ib_poll_cq ( ipoib_data.rcv_cqh, &ib_cqe,
-				 &num_cqes ) ) != 0 ) {
-		DBG ( "ib_poll_cq() failed: %s\n", strerror ( rc ) );
-		return;
-	}
-
-	if ( ! num_cqes )
-		return;
-
-	if ( ib_cqe.is_error ) {
-		DBG ( "cqe error\n" );
-		free_wqe ( ib_cqe.wqe );
-		return;
-	}
-
-	len = ib_cqe.count;
-	iobuf = alloc_iob ( len );
-	if ( ! iobuf ) {
-		DBG ( "out of memory\n" );
-		free_wqe ( ib_cqe.wqe );
-		return;
-	}
-	buf = get_rcv_wqe_buf(ib_cqe.wqe, 1);
-	memcpy ( iob_put ( iobuf, len ), buf, len );
-	//	DBG ( "Received packet header:\n" );
-	//	struct recv_wqe_st *rcv_wqe = ib_cqe.wqe;
-	//	DBG_HD ( get_rcv_wqe_buf(ib_cqe.wqe, 0),
-	//		 be32_to_cpu(rcv_wqe->mpointer[0].byte_count) );
-		 
-	//	DBG ( "Received packet:\n" );
-	//	DBG_HD ( iobuf->data, iob_len ( iobuf ) );
-
-	netdev_rx ( netdev, iobuf );
-
-	free_wqe ( ib_cqe.wqe );
+	mlx_poll_cq ( netdev, ipoib_data.rcv_cqh );
 }
 
 /**
@@ -268,6 +322,10 @@ static void mlx_poll ( struct net_device *netdev ) {
  * @v enable		Interrupts should be enabled
  */
 static void mlx_irq ( struct net_device *netdev, int enable ) {
+
+	( void ) netdev;
+	( void ) enable;
+
 }
 
 static struct net_device_operations mlx_operations = {
@@ -278,6 +336,7 @@ static struct net_device_operations mlx_operations = {
 	.irq		= mlx_irq,
 };
 
+#if 0
 /**************************************************************************
 DISABLE - Turn off ethernet interface
 ***************************************************************************/
@@ -297,6 +356,7 @@ static void mt25218_disable(struct nic *nic)
 		disable_imp();
 	}
 }
+#endif
 
 /**
  * Remove PCI device
@@ -305,7 +365,6 @@ static void mt25218_disable(struct nic *nic)
  */
 static void mlx_remove ( struct pci_device *pci ) {
 	struct net_device *netdev = pci_get_drvdata ( pci );
-	struct mlx_nic *mlx = netdev->priv;
 
 	unregister_netdev ( netdev );
 	ipoib_close(0);
@@ -313,6 +372,7 @@ static void mlx_remove ( struct pci_device *pci ) {
 	netdev_put ( netdev );
 }
 
+#if 0
 static struct nic_operations mt25218_operations = {
 	.connect	= dummy_connect,
 	.poll		= mt25218_poll,
@@ -380,6 +440,7 @@ static int mt25218_probe(struct nic *nic, struct pci_device *pci)
 	/* else */
 	return 0;
 }
+#endif
 
 /**
  * Probe PCI device

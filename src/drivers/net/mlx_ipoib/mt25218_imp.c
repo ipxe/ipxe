@@ -45,6 +45,7 @@ static void be_to_cpu_buf(void *buf, int size)
 #include "ib_driver.c"
 #include "ipoib.c"
 
+#if 0
 static int probe_imp(struct pci_device *pci, struct nic *nic)
 {
 	int rc;
@@ -232,3 +233,4 @@ fatal_handling:
 	return -1; 
 	
 }
+#endif
