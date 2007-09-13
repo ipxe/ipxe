@@ -1587,12 +1587,14 @@ static void prep_send_wqe_buf(void *qph,
 	}
 	snd_wqe->mpointer[0].byte_count = cpu_to_be32(len);
 
+#if 0
 	DBG ( "prep_send_wqe_buf()\n" );
 	DBG ( "snd_wqe:\n" );
 	DBG_HD ( snd_wqe, sizeof ( *snd_wqe ) );
 	DBG ( "packet:\n" );
 	DBG_HD ( bus_to_virt(be32_to_cpu(snd_wqe->mpointer[0].local_addr_l)),
 		 len );
+#endif
 }
 
 static void *alloc_ud_av(void)

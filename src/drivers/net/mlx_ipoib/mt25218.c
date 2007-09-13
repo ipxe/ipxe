@@ -248,13 +248,13 @@ static void mlx_poll ( struct net_device *netdev ) {
 	}
 	buf = get_rcv_wqe_buf(ib_cqe.wqe, 1);
 	memcpy ( iob_put ( iobuf, len ), buf, len );
-	DBG ( "Received packet header:\n" );
-	struct recv_wqe_st *rcv_wqe = ib_cqe.wqe;
-	DBG_HD ( get_rcv_wqe_buf(ib_cqe.wqe, 0),
-		 be32_to_cpu(rcv_wqe->mpointer[0].byte_count) );
+	//	DBG ( "Received packet header:\n" );
+	//	struct recv_wqe_st *rcv_wqe = ib_cqe.wqe;
+	//	DBG_HD ( get_rcv_wqe_buf(ib_cqe.wqe, 0),
+	//		 be32_to_cpu(rcv_wqe->mpointer[0].byte_count) );
 		 
-	DBG ( "Received packet:\n" );
-	DBG_HD ( iobuf->data, iob_len ( iobuf ) );
+	//	DBG ( "Received packet:\n" );
+	//	DBG_HD ( iobuf->data, iob_len ( iobuf ) );
 
 	netdev_rx ( netdev, iobuf );
 
@@ -392,6 +392,7 @@ static int mlx_probe ( struct pci_device *pci,
 		       const struct pci_device_id *id __unused ) {
 	struct net_device *netdev;
 	struct mlx_nic *mlx;
+	struct ib_mac *mac;
 	int rc;
 
 	/* Allocate net device */
@@ -410,7 +411,9 @@ static int mlx_probe ( struct pci_device *pci,
 	/* Initialise hardware */
 	if ( ( rc = ipoib_init ( pci ) ) != 0 )
 		goto err_ipoib_init;
-	memcpy ( netdev->ll_addr, ipoib_data.port_gid_raw, IB_ALEN );
+	mac = ( ( struct ib_mac * ) netdev->ll_addr );
+	mac->qpn = htonl ( ipoib_data.ipoib_qpn );
+	memcpy ( &mac->gid, ipoib_data.port_gid_raw, sizeof ( mac->gid ) );
 
 	/* Register network device */
 	if ( ( rc = register_netdev ( netdev ) ) != 0 )

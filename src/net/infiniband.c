@@ -70,6 +70,17 @@ static int ib_tx ( struct io_buffer *iobuf, struct net_device *netdev,
  * network-layer protocol.
  */
 static int ib_rx ( struct io_buffer *iobuf, struct net_device *netdev ) {
+
+	struct {
+		uint16_t proto;
+		uint16_t reserved;
+	} * header = iobuf->data;
+
+	iob_pull ( iobuf, sizeof ( *header ) );
+	return net_rx ( iobuf, netdev, header->proto, NULL );
+
+
+
 	struct ibhdr *ibhdr = iobuf->data;
 
 	/* Sanity check */
