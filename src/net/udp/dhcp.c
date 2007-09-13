@@ -294,8 +294,7 @@ static int copy_dhcp_packet_options ( struct dhcp_packet *dhcppkt,
  * dhcp_packet structure that can be passed to
  * set_dhcp_packet_option() or copy_dhcp_packet_options().
  */
-static int create_dhcp_packet ( struct net_device *netdev,
-				unsigned int msgtype,
+static int create_dhcp_packet ( struct net_device *netdev, uint8_t msgtype,
 				void *data, size_t max_len,
 				struct dhcp_packet *dhcppkt ) {
 	struct dhcphdr *dhcphdr = data;
