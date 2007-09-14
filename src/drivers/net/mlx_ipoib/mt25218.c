@@ -21,7 +21,6 @@ Skeleton NIC driver for Etherboot
 /* to get the interface to the body of the program */
 #include "nic.h"
 
-#include "mt_version.c"
 #include "mt25218_imp.c"
 
 struct mlx_nic {
@@ -34,133 +33,6 @@ struct mlx_nic {
 	/** Receive completion queue */
 	cq_t rcv_cqh;
 };
-
-int prompt_key(int secs, unsigned char *ch_p)
-{
-	unsigned long tmo;
-	unsigned char ch;
-
-	for (tmo = currticks() + secs * TICKS_PER_SEC; currticks() < tmo;) {
-		if (iskey()) {
-			ch = getchar();
-			/* toupper does not work ... */
-			if (ch == 'v')
-				ch = 'V';
-			if (ch == 'i')
-				ch = 'I';
-			if ((ch=='V') || (ch=='I')) {
-				*ch_p = ch;
-				return 1;
-			}
-		}
-	}
-
-	return 0;
-}
-
-#if 0
-/**************************************************************************
-IRQ - handle interrupts
-***************************************************************************/
-static void mt25218_irq(struct nic *nic, irq_action_t action)
-{
-	/* This routine is somewhat optional.  Etherboot itself
-	 * doesn't use interrupts, but they are required under some
-	 * circumstances when we're acting as a PXE stack.
-	 *
-	 * If you don't implement this routine, the only effect will
-	 * be that your driver cannot be used via Etherboot's UNDI
-	 * API.  This won't affect programs that use only the UDP
-	 * portion of the PXE API, such as pxelinux.
-	 */
-
-	if (0) {
-		nic = NULL;
-	}
-	switch (action) {
-	case DISABLE:
-	case ENABLE:
-		/* Set receive interrupt enabled/disabled state */
-		/*
-		   outb ( action == ENABLE ? IntrMaskEnabled : IntrMaskDisabled,
-		   nic->ioaddr + IntrMaskRegister );
-		 */
-		break;
-	case FORCE:
-		/* Force NIC to generate a receive interrupt */
-		/*
-		   outb ( ForceInterrupt, nic->ioaddr + IntrForceRegister );
-		 */
-		break;
-	}
-}
-
-/**************************************************************************
-POLL - Wait for a frame
-***************************************************************************/
-static int mt25218_poll(struct nic *nic, int retrieve)
-{
-	/* Work out whether or not there's an ethernet packet ready to
-	 * read.  Return 0 if not.
-	 */
-	/* 
-	   if ( ! <packet_ready> ) return 0;
-	 */
-
-	/* retrieve==0 indicates that we are just checking for the
-	 * presence of a packet but don't want to read it just yet.
-	 */
-	/*
-	   if ( ! retrieve ) return 1;
-	 */
-
-	/* Copy data to nic->packet.  Data should include the
-	 * link-layer header (dest MAC, source MAC, type).
-	 * Store length of data in nic->packetlen.
-	 * Return true to indicate a packet has been read.
-	 */
-	/* 
-	   nic->packetlen = <packet_length>;
-	   memcpy ( nic->packet, <packet_data>, <packet_length> );
-	   return 1;
-	 */
-	unsigned int size;
-	int rc;
-	rc = poll_imp(nic, retrieve, &size);
-	if (rc) {
-		return 0;
-	}
-
-	if (size == 0) {
-		return 0;
-	}
-
-	nic->packetlen = size;
-
-	return 1;
-}
-
-/**************************************************************************
-TRANSMIT - Transmit a frame
-***************************************************************************/
-static void mt25218_transmit(struct nic *nic, const char *dest,	/* Destination */
-			     unsigned int type,	/* Type */
-			     unsigned int size,	/* size */
-			     const char *packet)
-{				/* Packet */
-	int rc;
-
-	/* Transmit packet to dest MAC address.  You will need to
-	 * construct the link-layer header (dest MAC, source MAC,
-	 * type).
-	 */
-	if (nic) {
-		rc = transmit_imp(dest, type, packet, size);
-		if (rc)
-			eprintf("tranmit error");
-	}
-}
-#endif
 
 /**
  * Open network device
@@ -219,23 +91,6 @@ static int mlx_transmit ( struct net_device *netdev,
 	}
 
 	return 0;
-
-#if 0
-	( void ) netdev;
-
-	iob_pull ( iobuf, sizeof ( *ibhdr ) );	
-
-	if ( memcmp ( ibhdr->peer, ib_broadcast, IB_ALEN ) == 0 ) {
-		printf ( "Sending broadcast packet\n" );
-		return send_bcast_packet ( ntohs ( ibhdr->proto ),
-					   iobuf->data, iob_len ( iobuf ) );
-	} else {
-		printf ( "Sending unicast packet\n" );
-		return send_ucast_packet ( ibhdr->peer,
-					   ntohs ( ibhdr->proto ),
-					   iobuf->data, iob_len ( iobuf ) );
-	}
-#endif
 }
 
 /**
@@ -275,14 +130,12 @@ static void mlx_rx_complete ( struct net_device *netdev,
 		netdev_rx_err ( netdev, NULL, -ENOMEM );
 		return;
 	}
+
+	/* Fill I/O buffer */
 	buf = get_rcv_wqe_buf ( ib_cqe->wqe, 1 );
 	memcpy ( iob_put ( iobuf, len ), buf, len );
-	//	DBG ( "Received packet header:\n" );
-	//	struct recv_wqe_st *rcv_wqe = ib_cqe.wqe;
-	//	DBG_HD ( get_rcv_wqe_buf(ib_cqe.wqe, 0),
-	//		 be32_to_cpu(rcv_wqe->mpointer[0].byte_count) );
-	//	DBG ( "Received packet:\n" );
-	//	DBG_HD ( iobuf->data, iob_len ( iobuf ) );
+
+	/* Hand off to network stack */
 	netdev_rx ( netdev, iobuf );
 }
 
@@ -335,11 +188,15 @@ static void mlx_poll ( struct net_device *netdev ) {
 		return;
 	}
 
+	/* Drain event queue.  We can ignore events, since we're going
+	 * to just poll all completion queues anyway.
+	 */
 	if ( ( rc = drain_eq() ) != 0 ) {
 		DBG ( "drain_eq() failed: %s\n", strerror ( rc ) );
 		return;
 	}
 
+	/* Poll completion queues */
 	mlx_poll_cq ( netdev, mlx->snd_cqh, mlx_tx_complete );
 	mlx_poll_cq ( netdev, mlx->rcv_cqh, mlx_rx_complete );
 }
@@ -365,28 +222,6 @@ static struct net_device_operations mlx_operations = {
 	.irq		= mlx_irq,
 };
 
-#if 0
-/**************************************************************************
-DISABLE - Turn off ethernet interface
-***************************************************************************/
-static void mt25218_disable(struct nic *nic)
-{
-	/* put the card in its initial state */
-	/* This function serves 3 purposes.
-	 * This disables DMA and interrupts so we don't receive
-	 *  unexpected packets or interrupts from the card after
-	 *  etherboot has finished. 
-	 * This frees resources so etherboot may use
-	 *  this driver on another interface
-	 * This allows etherboot to reinitialize the interface
-	 *  if something is something goes wrong.
-	 */
-	if (nic || 1) {		// ????
-		disable_imp();
-	}
-}
-#endif
-
 /**
  * Remove PCI device
  *
@@ -400,76 +235,6 @@ static void mlx_remove ( struct pci_device *pci ) {
 	netdev_nullify ( netdev );
 	netdev_put ( netdev );
 }
-
-#if 0
-static struct nic_operations mt25218_operations = {
-	.connect	= dummy_connect,
-	.poll		= mt25218_poll,
-	.transmit	= mt25218_transmit,
-	.irq		= mt25218_irq,
-};
-
-/**************************************************************************
-PROBE - Look for an adapter, this routine's visible to the outside
-***************************************************************************/
-
-static int mt25218_probe(struct nic *nic, struct pci_device *pci)
-{
-	int rc;
-	unsigned char user_request;
-
-	if (pci->vendor != MELLANOX_VENDOR_ID) {
-		eprintf("");
-		return 0;
-	}
-
-	printf("\n");
-	printf("Mellanox Technologies LTD - Boot over IB implementaion\n");
-	printf("Build version = %s\n\n", build_revision);
-
-	verbose_messages = 0;
-        print_info = 0;
-	printf("Press within 3 seconds:\n");
-	printf("V - to increase verbosity\n");
-	printf("I - to print information\n");
-	if (prompt_key(3, &user_request)) {
-		if (user_request == 'V') {
-			printf("User selected verbose messages\n");
-			verbose_messages = 1;
-		}
-		else if (user_request == 'I') {
-			printf("User selected to print information\n");
-			print_info = 1;
-		}
-	}
-	printf("\n");
-
-	adjust_pci_device(pci);
-
-	nic->priv_data = NULL;
-	rc = probe_imp(pci, nic);
-
-	/* give the user a chance to look at the info */
-	if (print_info)
-		sleep(5);
-
-	if (!rc) {
-		/* store NIC parameters */
-		nic->ioaddr = pci->ioaddr & ~3;
-		nic->irqno = pci->irq;
-		/* point to NIC specific routines */
-		nic->nic_op = &mt25218_operations;
-
-		uint8_t fixed_node_addr[ETH_ALEN] = { 0x00, 0x02, 0xc9,
-						      0x20, 0xf5, 0x95 };
-		memcpy ( nic->node_addr, fixed_node_addr, ETH_ALEN );
-
-		return 1;
-	}
-	/* else */
-	return 0;
-}
-#endif
 
 /**
  * Probe PCI device
@@ -525,8 +290,8 @@ static int mlx_probe ( struct pci_device *pci,
 }
 
 static struct pci_device_id mlx_nics[] = {
-	PCI_ROM(0x15b3, 0x6282, "MT25218", "MT25218 HCA driver"),
-	PCI_ROM(0x15b3, 0x6274, "MT25204", "MT25204 HCA driver"),
+	PCI_ROM ( 0x15b3, 0x6282, "MT25218", "MT25218 HCA driver" ),
+	PCI_ROM ( 0x15b3, 0x6274, "MT25204", "MT25204 HCA driver" ),
 };
 
 struct pci_driver mlx_driver __pci_driver = {
