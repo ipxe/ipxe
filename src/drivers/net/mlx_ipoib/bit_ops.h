@@ -81,6 +81,14 @@ struct addr_64_st {
 #define MT_EXTRACT_ARRAY32(A,O,S) MT_EXTRACT32(((__u32*)A)[O >> 5],(O & MASK32(5)),S)
 
 /*
+ * MT_EXTRACT_ARRAY32_BE macro is similar to EXTRACT but works on an array of (__u32),
+ * thus offset may be larger than 32 (but not size).
+ *
+ * (added by mcb30)
+ */
+#define MT_EXTRACT_ARRAY32_BE(A,O,S) MT_EXTRACT32(be32_to_cpu(((__u32*)A)[O >> 5]),(O & MASK32(5)),S)
+
+/*
  * MT_INSERT_ARRAY32 macro is similar to INSERT but works on an array of (__u32),
  * thus offset may be larger than 32 (but not size).
  */
@@ -89,6 +97,8 @@ struct addr_64_st {
 #define INS_FLD(src, a, st, fld) MT_INSERT_ARRAY32(a, src, MT_BIT_OFFSET(st, fld), MT_BIT_SIZE(st, fld))
 
 #define EX_FLD(a, st, fld) MT_EXTRACT_ARRAY32(a, MT_BIT_OFFSET(st, fld), MT_BIT_SIZE(st, fld))
+
+#define EX_FLD_BE(a, st, fld) MT_EXTRACT_ARRAY32_BE(a, MT_BIT_OFFSET(st, fld), MT_BIT_SIZE(st, fld))
 
 /* return the address of the dword holding the field 
 
