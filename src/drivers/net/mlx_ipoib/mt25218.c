@@ -23,6 +23,22 @@ Skeleton NIC driver for Etherboot
 
 #include "mt25218_imp.c"
 
+struct arbel_send_work_queue {
+	/** Doorbell number */
+	unsigned int doorbell_idx;
+	/** Work queue entries */
+	struct ud_send_wqe_st *wqe;
+};
+
+struct arbel {
+	/** User Access Region */
+	unsigned long uar;
+	/** Doorbell records */
+	union db_record_st *db_rec;
+};
+
+
+
 struct mlx_nic {
 	/** Queue pair handle */
 	udqp_t ipoib_qph;
@@ -224,44 +240,31 @@ static struct net_device_operations mlx_operations = {
 };
 
 
-struct mlx_send_work_queue {
-	/** Doorbell number */
-	unsigned int doorbell_idx;
-	/** Work queue entries */
-	struct ud_send_wqe_st *wqe;
-};
 
-struct mlx {
-	/** User Access Region */
-	unsigned long uar;
-	/** Doorbell records */
-	union db_record_st *db_rec;
-};
-
-static struct ib_gid mlx_no_gid = {
+static struct ib_gid arbel_no_gid = {
 	{ 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2 }
 };
 
-static void mlx_ring_doorbell ( struct mlx *mlx, void *db_reg,
-				unsigned int offset ) {
+static void arbel_ring_doorbell ( struct arbel *arbel, void *db_reg,
+				  unsigned int offset ) {
 	uint32_t *db_reg_dword = db_reg;
 
 	barrier();
-	writel ( db_reg_dword[0], ( mlx->uar + offset + 0 ) );
+	writel ( db_reg_dword[0], ( arbel->uar + offset + 0 ) );
 	barrier();
-	writel ( db_reg_dword[1], ( mlx->uar + offset + 4 ) );
+	writel ( db_reg_dword[1], ( arbel->uar + offset + 4 ) );
 }
 
-static int mlx_post_send ( struct ib_device *ibdev, struct io_buffer *iobuf,
-			   struct ib_address_vector *av,
-			   struct ib_queue_pair *qp ) {
-	struct mlx *mlx = ibdev->priv;
+static int arbel_post_send ( struct ib_device *ibdev, struct io_buffer *iobuf,
+			     struct ib_address_vector *av,
+			     struct ib_queue_pair *qp ) {
+	struct arbel *arbel = ibdev->priv;
 	struct ib_work_queue *wq = &qp->send;
-	struct mlx_send_work_queue *mlx_wq = wq->priv;
+	struct arbel_send_work_queue *arbel_wq = wq->priv;
 	unsigned int wqe_idx_mask = ( wq->num_wqes - 1 );
 	unsigned int prev_wqe_idx;
-	struct ud_send_wqe_st *prev_wqe;
 	unsigned int wqe_idx;
+	struct ud_send_wqe_st *prev_wqe;
 	struct ud_send_wqe_st *wqe;
 	struct ib_gid *gid;
 	size_t nds;
@@ -272,11 +275,11 @@ static int mlx_post_send ( struct ib_device *ibdev, struct io_buffer *iobuf,
 	prev_wqe_idx = wq->posted;
 	wqe_idx = ( prev_wqe_idx + 1 );
 	if ( wq->iobuf[wqe_idx & wqe_idx_mask] ) {
-		DBGC ( mlx, "MLX %p send queue full", mlx );
+		DBGC ( arbel, "ARBEL %p send queue full", arbel );
 		return -ENOBUFS;
 	}
-	prev_wqe = &mlx_wq->wqe[prev_wqe_idx & wqe_idx_mask];
-	wqe = &mlx_wq->wqe[wqe_idx & wqe_idx_mask];
+	prev_wqe = &arbel_wq->wqe[prev_wqe_idx & wqe_idx_mask];
+	wqe = &arbel_wq->wqe[wqe_idx & wqe_idx_mask];
 
 	/* Construct work queue entry */
 	memset ( &wqe->next.control, 0,
@@ -296,7 +299,7 @@ static int mlx_post_send ( struct ib_device *ibdev, struct io_buffer *iobuf,
 			 msg, 3 );
 	MLX_POPULATE_1 ( &wqe->udseg, arbelprm_ud_address_vector_st, 3,
 			 sl, av->sl );
-	gid = ( av->gid_present ? &av->gid : &mlx_no_gid );
+	gid = ( av->gid_present ? &av->gid : &arbel_no_gid );
 	memcpy ( ( ( ( void * ) &wqe->udseg ) + 16 ),
 		 gid, sizeof ( *gid ) );
 	MLX_POPULATE_1 ( &wqe->udseg, arbelprm_wqe_segment_ud_st, 8,
@@ -318,7 +321,7 @@ static int mlx_post_send ( struct ib_device *ibdev, struct io_buffer *iobuf,
 			 always1, 1 );
 
 	/* Update doorbell record */
-	db_rec = &mlx->db_rec[mlx_wq->doorbell_idx];
+	db_rec = &arbel->db_rec[arbel_wq->doorbell_idx];
 	MLX_POPULATE_1 ( db_rec, arbelprm_qp_db_record_st, 0, 
 			 counter, ( wqe_idx & 0xffff ) );
 	barrier();
@@ -332,7 +335,7 @@ static int mlx_post_send ( struct ib_device *ibdev, struct io_buffer *iobuf,
 	MLX_POPULATE_2 ( &db_reg, arbelprm_send_doorbell_st, 1,
 			 nds, nds,
 			 qpn, qp->qpn );
-	mlx_ring_doorbell ( mlx, &db_reg, POST_SND_OFFSET );
+	arbel_ring_doorbell ( arbel, &db_reg, POST_SND_OFFSET );
 
 	/* Update work queue's posted index */
 	wq->posted = wqe_idx;
@@ -340,8 +343,8 @@ static int mlx_post_send ( struct ib_device *ibdev, struct io_buffer *iobuf,
 	return 0;
 }
 
-static struct ib_device_operations mlx_ib_operations = {
-	.post_send	= mlx_post_send,
+static struct ib_device_operations arbel_ib_operations = {
+	.post_send	= arbel_post_send,
 };
 
 /**
@@ -349,7 +352,7 @@ static struct ib_device_operations mlx_ib_operations = {
  *
  * @v pci		PCI device
  */
-static void mlx_remove ( struct pci_device *pci ) {
+static void arbel_remove ( struct pci_device *pci ) {
 	struct net_device *netdev = pci_get_drvdata ( pci );
 
 	unregister_netdev ( netdev );
@@ -365,8 +368,8 @@ static void mlx_remove ( struct pci_device *pci ) {
  * @v id		PCI ID
  * @ret rc		Return status code
  */
-static int mlx_probe ( struct pci_device *pci,
-		       const struct pci_device_id *id __unused ) {
+static int arbel_probe ( struct pci_device *pci,
+			 const struct pci_device_id *id __unused ) {
 	struct net_device *netdev;
 	struct mlx_nic *mlx;
 	struct ib_mac *mac;
@@ -411,14 +414,14 @@ static int mlx_probe ( struct pci_device *pci,
 	return rc;
 }
 
-static struct pci_device_id mlx_nics[] = {
+static struct pci_device_id arbel_nics[] = {
 	PCI_ROM ( 0x15b3, 0x6282, "MT25218", "MT25218 HCA driver" ),
 	PCI_ROM ( 0x15b3, 0x6274, "MT25204", "MT25204 HCA driver" ),
 };
 
-struct pci_driver mlx_driver __pci_driver = {
-	.ids = mlx_nics,
-	.id_count = ( sizeof ( mlx_nics ) / sizeof ( mlx_nics[0] ) ),
-	.probe = mlx_probe,
-	.remove = mlx_remove,
+struct pci_driver arbel_driver __pci_driver = {
+	.ids = arbel_nics,
+	.id_count = ( sizeof ( arbel_nics ) / sizeof ( arbel_nics[0] ) ),
+	.probe = arbel_probe,
+	.remove = arbel_remove,
 };
