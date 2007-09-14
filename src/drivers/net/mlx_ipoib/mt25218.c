@@ -27,7 +27,6 @@ struct mlx_nic {
 #include "mt_version.c"
 #include "mt25218_imp.c"
 
-/* NIC specific static variables go here */
 
 int prompt_key(int secs, unsigned char *ch_p)
 {
@@ -265,12 +264,31 @@ static void mlx_rx_complete ( struct net_device *netdev,
  * @v netdev		Network device
  * @v cq		Completion queue
  */
-static void mlx_poll_cq ( struct net_device *netdev, cq_t cq ) {
+static void mlx_poll_cq ( struct net_device *netdev,
+			  struct cq_st *cq ) {
 	struct mlx_nic *mlx = netdev->priv;
 	struct ib_cqe_st cqe;
 	uint8_t num_cqes;
 
 	while ( 1 ) {
+
+		unsigned long cons_idx;
+		union cqe_st *temp;
+
+		cons_idx = ( cq->cons_counter & ( cq->num_cqes - 1 ) );
+		temp = &cq->cq_buf[cons_idx];
+		if ( EX_FLD_BE ( temp, arbelprm_completion_queue_entry_st,
+				 owner ) == 0 ) {
+			DBG ( "software owned\n" );
+			DBGC_HD ( mlx, temp, sizeof ( *temp ) );
+			DBG ( "my_qpn=%lx, g=%ld, s=%ld, op=%02lx, cnt=%lx\n",
+			      EX_FLD_BE ( temp, arbelprm_completion_queue_entry_st, my_qpn ),
+			      EX_FLD_BE ( temp, arbelprm_completion_queue_entry_st, g ),
+			      EX_FLD_BE ( temp, arbelprm_completion_queue_entry_st, s ),
+			      EX_FLD_BE ( temp, arbelprm_completion_queue_entry_st, opcode ),
+			      EX_FLD_BE ( temp, arbelprm_completion_queue_entry_st, byte_cnt ) );
+		}
+
 		/* Poll for single completion queue entry */
 		ib_poll_cq ( cq, &cqe, &num_cqes );
 
@@ -312,6 +330,7 @@ static void mlx_poll ( struct net_device *netdev ) {
 		return;
 	}
 
+	//	mlx_poll_cq ( netdev, ipoib_data.snd_cqh );
 	mlx_poll_cq ( netdev, ipoib_data.rcv_cqh );
 }
 
