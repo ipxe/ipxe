@@ -342,6 +342,24 @@ struct cq_dbell_st {
 	__u8 raw[MT_STRUCT_SIZE(arbelprm_cq_cmd_doorbell_st)];
 } __attribute__ ((packed));
 
+struct qp_db_record_st {
+	__u8 raw[MT_STRUCT_SIZE(arbelprm_qp_db_record_st)];
+} __attribute__ ((packed));
+
+struct cq_arm_db_record_st {
+	__u8 raw[MT_STRUCT_SIZE(arbelprm_cq_arm_db_record_st)];
+} __attribute__ ((packed));
+
+struct cq_ci_db_record_st {
+	__u8 raw[MT_STRUCT_SIZE(arbelprm_cq_ci_db_record_st)];
+} __attribute__ ((packed));
+
+union db_record_st {
+	struct qp_db_record_st qp;
+	struct cq_arm_db_record_st cq_arm;
+	struct cq_ci_db_record_st cq_ci;
+} __attribute__ ((packed));
+
 struct mad_ifc_inprm_st {
 	union mad_u mad;
 } __attribute__ ((packed));

@@ -61,6 +61,9 @@ struct ibhdr {
 	uint16_t reserved;
 } __attribute__ (( packed ));
 
+
+
+
 /** An Infiniband Work Queue */
 struct ib_work_queue {
 	/** Number of work queue entries */
@@ -70,10 +73,7 @@ struct ib_work_queue {
 	 * This is the index of the most recently posted entry.
 	 */
 	unsigned int posted;
-	/** Driver-private data
-	 *
-	 * Typically used to hold the address of the work queue.
-	 */
+	/** Driver private data */
 	void *priv;
 	/** I/O buffers assigned to work queue */
 	struct io_buffer *iobuf[0];
@@ -87,12 +87,29 @@ struct ib_queue_pair {
 	struct ib_work_queue send;
 	/** Receive queue */
 	struct ib_work_queue recv;
+	/** Driver private data */
+	void *priv;
 };
 
 /** An Infiniband Address Vector */
 struct ib_address_vector {
-	
+	/** Destination Queue Pair */
+	unsigned int dest_qp;
+	/** Queue key */
+	unsigned int qkey;
+	/** Destination Local ID */
+	unsigned int dlid;
+	/** Rate */
+	unsigned int rate;
+	/** Service level */
+	unsigned int sl;
+	/** GID is present */
+	unsigned int gid_present;
+	/** GID */
+	struct ib_gid gid;
 };
+
+struct ib_device;
 
 /**
  * Infiniband device operations
@@ -119,7 +136,11 @@ struct ib_device_operations {
 			      struct ib_queue_pair *qp );
 };
 
-
+/** An Infiniband device */
+struct ib_device {	
+	/** Driver private data */
+	void *priv;
+};
 
 
 
