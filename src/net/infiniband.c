@@ -50,11 +50,11 @@ static int ib_tx ( struct io_buffer *iobuf, struct net_device *netdev,
 		   struct net_protocol *net_protocol, const void *ll_dest ) {
 	struct ibhdr *ibhdr = iob_push ( iobuf, sizeof ( *ibhdr ) );
 
-
 	/* Build Infiniband header */
-	memcpy ( ibhdr->peer, ll_dest, IB_ALEN );
 	ibhdr->proto = net_protocol->net_proto;
 	ibhdr->reserved = 0;
+
+	( void ) ll_dest;
 
 	/* Hand off to network device */
 	return netdev_tx ( netdev, iobuf );
@@ -70,17 +70,6 @@ static int ib_tx ( struct io_buffer *iobuf, struct net_device *netdev,
  * network-layer protocol.
  */
 static int ib_rx ( struct io_buffer *iobuf, struct net_device *netdev ) {
-
-	struct {
-		uint16_t proto;
-		uint16_t reserved;
-	} * header = iobuf->data;
-
-	iob_pull ( iobuf, sizeof ( *header ) );
-	return net_rx ( iobuf, netdev, header->proto, NULL );
-
-
-
 	struct ibhdr *ibhdr = iobuf->data;
 
 	/* Sanity check */
@@ -95,7 +84,7 @@ static int ib_rx ( struct io_buffer *iobuf, struct net_device *netdev ) {
 	iob_pull ( iobuf, sizeof ( *ibhdr ) );
 
 	/* Hand off to network-layer protocol */
-	return net_rx ( iobuf, netdev, ibhdr->proto, ibhdr->peer );
+	return net_rx ( iobuf, netdev, ibhdr->proto, NULL );
 }
 
 /**

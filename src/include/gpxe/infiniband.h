@@ -10,10 +10,6 @@
 #include <stdint.h>
 #include <gpxe/netdevice.h>
 
-/** Infiniband hardware address length */
-#define IB_ALEN 20
-#define IB_HLEN 24
-
 /** An Infiniband Global Identifier */
 struct ib_gid {
 	uint8_t bytes[16];
@@ -40,6 +36,9 @@ struct ib_global_route_header {
 	struct ib_gid dgid;
 } __attribute__ (( packed ));
 
+/** Infiniband MAC address length */
+#define IB_ALEN 20
+
 /** An Infiniband MAC address */
 struct ib_mac {
 	/** Queue pair number
@@ -51,15 +50,11 @@ struct ib_mac {
 	struct ib_gid gid;
 } __attribute__ (( packed ));
 
-/** An Infiniband header
- *
- * This data structure doesn't represent the on-wire format, but does
- * contain all the information required by the driver to construct the
- * packet.
- */
+/** Infiniband link-layer header length */
+#define IB_HLEN 4
+
+/** An Infiniband link-layer header */
 struct ibhdr {
-	/** Peer address */
-	uint8_t peer[IB_ALEN];
 	/** Network-layer protocol */
 	uint16_t proto;
 	/** Reserved, must be zero */

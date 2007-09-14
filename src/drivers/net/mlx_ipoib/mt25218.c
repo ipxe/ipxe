@@ -16,9 +16,6 @@ Skeleton NIC driver for Etherboot
 #include <gpxe/netdevice.h>
 #include <gpxe/infiniband.h>
 
-struct mlx_nic {
-};
-
 /* to get some global routines like printf */
 #include "etherboot.h"
 /* to get the interface to the body of the program */
@@ -27,6 +24,16 @@ struct mlx_nic {
 #include "mt_version.c"
 #include "mt25218_imp.c"
 
+struct mlx_nic {
+	/** Queue pair handle */
+	udqp_t ipoib_qph;
+	/** Broadcast Address Vector */
+	ud_av_t bcast_av;
+	/** Send completion queue */
+	cq_t snd_cqh;
+	/** Receive completion queue */
+	cq_t rcv_cqh;
+};
 
 int prompt_key(int secs, unsigned char *ch_p)
 {
@@ -192,8 +199,28 @@ static uint8_t ib_broadcast[IB_ALEN] = { 0xff, };
  */
 static int mlx_transmit ( struct net_device *netdev,
 			  struct io_buffer *iobuf ) {
-	struct ibhdr *ibhdr = iobuf->data;
+	struct mlx_nic *mlx = netdev->priv;
+	ud_send_wqe_t snd_wqe;
+	int rc;
 
+	snd_wqe = alloc_send_wqe ( mlx->ipoib_qph );
+	if ( ! snd_wqe ) {
+		DBGC ( mlx, "MLX %p out of TX WQEs\n", mlx );
+		return -ENOBUFS;
+	}
+
+	prep_send_wqe_buf ( mlx->ipoib_qph, mlx->bcast_av, snd_wqe,
+			    iobuf->data, 0, iob_len ( iobuf ), 0 );
+	if ( ( rc = post_send_req ( mlx->ipoib_qph, snd_wqe, 1 ) ) != 0 ) {
+		DBGC ( mlx, "MLX %p could not post TX WQE %p: %s\n",
+		       mlx, snd_wqe, strerror ( rc ) );
+		free_wqe ( snd_wqe );
+		return rc;
+	}
+
+	return 0;
+
+#if 0
 	( void ) netdev;
 
 	iob_pull ( iobuf, sizeof ( *ibhdr ) );	
@@ -208,46 +235,47 @@ static int mlx_transmit ( struct net_device *netdev,
 					   ntohs ( ibhdr->proto ),
 					   iobuf->data, iob_len ( iobuf ) );
 	}
+#endif
 }
 
 /**
  * Handle TX completion
  *
  * @v netdev		Network device
- * @v cqe		Completion queue entry
+ * @v ib_cqe		Completion queue entry
  */
 static void mlx_tx_complete ( struct net_device *netdev,
-			      struct ib_cqe_st *cqe ) {
+			      struct ib_cqe_st *ib_cqe ) {
 	netdev_tx_complete_next_err ( netdev,
-				      ( cqe->is_error ? -EIO : 0 ) );
+				      ( ib_cqe->is_error ? -EIO : 0 ) );
 }
 
 /**
  * Handle RX completion
  *
  * @v netdev		Network device
- * @v cqe		Completion queue entry
+ * @v ib_cqe		Completion queue entry
  */
 static void mlx_rx_complete ( struct net_device *netdev,
-			      struct ib_cqe_st *cqe ) {
+			      struct ib_cqe_st *ib_cqe ) {
 	unsigned int len;
 	struct io_buffer *iobuf;
 	void *buf;
 
 	/* Check for errors */
-	if ( cqe->is_error ) {
+	if ( ib_cqe->is_error ) {
 		netdev_rx_err ( netdev, NULL, -EIO );
 		return;
 	}
 
 	/* Allocate I/O buffer */
-	len = cqe->count;
+	len = ( ib_cqe->count - GRH_SIZE );
 	iobuf = alloc_iob ( len );
 	if ( ! iobuf ) {
 		netdev_rx_err ( netdev, NULL, -ENOMEM );
 		return;
 	}
-	buf = get_rcv_wqe_buf ( cqe->wqe, 1 );
+	buf = get_rcv_wqe_buf ( ib_cqe->wqe, 1 );
 	memcpy ( iob_put ( iobuf, len ), buf, len );
 	//	DBG ( "Received packet header:\n" );
 	//	struct recv_wqe_st *rcv_wqe = ib_cqe.wqe;
@@ -263,52 +291,33 @@ static void mlx_rx_complete ( struct net_device *netdev,
  *
  * @v netdev		Network device
  * @v cq		Completion queue
+ * @v handler		Completion handler
  */
-static void mlx_poll_cq ( struct net_device *netdev,
-			  struct cq_st *cq ) {
+static void mlx_poll_cq ( struct net_device *netdev, cq_t cq,
+			  void ( * handler ) ( struct net_device *netdev,
+					       struct ib_cqe_st *ib_cqe ) ) {
 	struct mlx_nic *mlx = netdev->priv;
-	struct ib_cqe_st cqe;
+	struct ib_cqe_st ib_cqe;
 	uint8_t num_cqes;
 
 	while ( 1 ) {
 
-		unsigned long cons_idx;
-		union cqe_st *temp;
-
-		cons_idx = ( cq->cons_counter & ( cq->num_cqes - 1 ) );
-		temp = &cq->cq_buf[cons_idx];
-		if ( EX_FLD_BE ( temp, arbelprm_completion_queue_entry_st,
-				 owner ) == 0 ) {
-			DBG ( "software owned\n" );
-			DBGC_HD ( mlx, temp, sizeof ( *temp ) );
-			DBG ( "my_qpn=%lx, g=%ld, s=%ld, op=%02lx, cnt=%lx\n",
-			      EX_FLD_BE ( temp, arbelprm_completion_queue_entry_st, my_qpn ),
-			      EX_FLD_BE ( temp, arbelprm_completion_queue_entry_st, g ),
-			      EX_FLD_BE ( temp, arbelprm_completion_queue_entry_st, s ),
-			      EX_FLD_BE ( temp, arbelprm_completion_queue_entry_st, opcode ),
-			      EX_FLD_BE ( temp, arbelprm_completion_queue_entry_st, byte_cnt ) );
-		}
-
 		/* Poll for single completion queue entry */
-		ib_poll_cq ( cq, &cqe, &num_cqes );
+		ib_poll_cq ( cq, &ib_cqe, &num_cqes );
 
 		/* Return if no entries in the queue */
 		if ( ! num_cqes )
 			return;
 
 		DBGC ( mlx, "MLX %p cpl in %p: err %x send %x "
-		       "wqe %p count %lx\n", mlx, cq, cqe.is_error,
-		       cqe.is_send, cqe.wqe, cqe.count );
+		       "wqe %p count %lx\n", mlx, cq, ib_cqe.is_error,
+		       ib_cqe.is_send, ib_cqe.wqe, ib_cqe.count );
 
 		/* Handle TX/RX completion */
-		if ( cqe.is_send ) {
-			mlx_tx_complete ( netdev, &cqe );
-		} else {
-			mlx_rx_complete ( netdev, &cqe );
-		}
-		
+		handler ( netdev, &ib_cqe );
+
 		/* Free associated work queue entry */
-		free_wqe ( cqe.wqe );
+		free_wqe ( ib_cqe.wqe );
 	}
 }
 
@@ -318,6 +327,7 @@ static void mlx_poll_cq ( struct net_device *netdev,
  * @v netdev		Network device
  */
 static void mlx_poll ( struct net_device *netdev ) {
+	struct mlx_nic *mlx = netdev->priv;
 	int rc;
 
 	if ( ( rc = poll_error_buf() ) != 0 ) {
@@ -330,8 +340,8 @@ static void mlx_poll ( struct net_device *netdev ) {
 		return;
 	}
 
-	//	mlx_poll_cq ( netdev, ipoib_data.snd_cqh );
-	mlx_poll_cq ( netdev, ipoib_data.rcv_cqh );
+	mlx_poll_cq ( netdev, mlx->snd_cqh, mlx_tx_complete );
+	mlx_poll_cq ( netdev, mlx->rcv_cqh, mlx_rx_complete );
 }
 
 /**
@@ -386,7 +396,7 @@ static void mlx_remove ( struct pci_device *pci ) {
 	struct net_device *netdev = pci_get_drvdata ( pci );
 
 	unregister_netdev ( netdev );
-	ipoib_close(0);
+	ib_driver_close ( 0 );
 	netdev_nullify ( netdev );
 	netdev_put ( netdev );
 }
@@ -473,6 +483,7 @@ static int mlx_probe ( struct pci_device *pci,
 	struct net_device *netdev;
 	struct mlx_nic *mlx;
 	struct ib_mac *mac;
+	udqp_t qph;
 	int rc;
 
 	/* Allocate net device */
@@ -489,11 +500,15 @@ static int mlx_probe ( struct pci_device *pci,
 	adjust_pci_device ( pci );
 
 	/* Initialise hardware */
-	if ( ( rc = ipoib_init ( pci ) ) != 0 )
+	if ( ( rc = ib_driver_init ( pci, &qph ) ) != 0 )
 		goto err_ipoib_init;
+	mlx->ipoib_qph = qph;
+	mlx->bcast_av = ib_data.bcast_av;
+	mlx->snd_cqh = ib_data.ipoib_snd_cq;
+	mlx->rcv_cqh = ib_data.ipoib_rcv_cq;
 	mac = ( ( struct ib_mac * ) netdev->ll_addr );
-	mac->qpn = htonl ( ipoib_data.ipoib_qpn );
-	memcpy ( &mac->gid, ipoib_data.port_gid_raw, sizeof ( mac->gid ) );
+	mac->qpn = htonl ( ib_get_qpn ( mlx->ipoib_qph ) );
+	memcpy ( &mac->gid, ib_data.port_gid.raw, sizeof ( mac->gid ) );
 
 	/* Register network device */
 	if ( ( rc = register_netdev ( netdev ) ) != 0 )
@@ -503,7 +518,7 @@ static int mlx_probe ( struct pci_device *pci,
 
  err_register_netdev:
  err_ipoib_init:
-	ipoib_close(0);
+	ib_driver_close ( 0 );
 	netdev_nullify ( netdev );
 	netdev_put ( netdev );
 	return rc;
