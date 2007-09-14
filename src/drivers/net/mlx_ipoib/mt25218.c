@@ -72,6 +72,7 @@ static uint8_t ib_broadcast[IB_ALEN] = { 0xff, };
 static int mlx_transmit ( struct net_device *netdev,
 			  struct io_buffer *iobuf ) {
 	struct mlx_nic *mlx = netdev->priv;
+	ud_av_t av = iobuf->data;
 	ud_send_wqe_t snd_wqe;
 	int rc;
 
@@ -220,6 +221,143 @@ static struct net_device_operations mlx_operations = {
 	.transmit	= mlx_transmit,
 	.poll		= mlx_poll,
 	.irq		= mlx_irq,
+};
+
+
+
+int ib_alloc_wqe ( struct ib_work_queue *wq, struct io_buffer *iobuf ) {
+	unsigned int wqe_idx;
+	unsigned int new_write_ptr;
+
+	/* Allocate queue entry */
+	wqe_idx = new_write_ptr = wq->write_ptr;
+	if ( wq->iobuf[wqe_idx] )
+		return -ENOBUFS;
+	wq->iobuf[wqe_idx] = iobuf;
+
+	/* Update write pointer */
+	new_write_ptr++;
+	new_write_ptr &= ( wq->num_wqes - 1 );
+	wq->write_ptr = new_write_ptr;
+
+	return wqe_idx;
+}
+
+static inline void ib_free_wqe ( struct ib_work_queue *wq, int wqe_idx ) {
+	assert ( wq->iobuf[wqe_idx] != NULL );
+	wq->iobuf[wqe_idx] = NULL;
+}
+
+static int mlx_post_send ( struct ib_device *ibdev, struct io_buffer *iobuf,
+			   struct ib_address_vector *av,
+			   struct ib_queue_pair *qp ) {
+	struct mlx *mlx = ibdev->priv;
+	struct ib_work_queue *wq = &qp->send;
+	struct mlx_work_queue *mlx_wq = wq->priv;
+	unsigned int wqe_idx_mask = ( wq->num_wqes - 1 );
+	unsigned int prev_wqe_idx;
+	struct ud_send_wqe_st *prev_wqe;
+	unsigned int wqe_idx;
+	struct ud_send_wqe_st *wqe;
+	struct ib_gid *gid;
+	size_t nds;
+	struct send_doorbell_st doorbell;
+
+	/* Allocate work queue entry */
+	prev_wqe_idx = wq->posted;
+	wqe_idx = ( prev_wqe_index + 1 );
+	if ( wq->iobuf[wqe_idx & wqe_idx_mask] ) {
+		DBGC ( mlx, "MLX %p send queue full", mlx );
+		return -ENOBUFS;
+	}
+	prev_wqe = &mlx_wq->wqe[prev_wqe_idx & wqe_idx_mask];
+	wqe = &mlx_wq->wqe[wqe_idx & wqe_idx_mask];
+
+	/* Construct work queue entry */
+	memset ( &wqe->next.control, 0,
+		 sizeof ( wqe->next.control ) );
+	MLX_POPULATE_1 ( &wqe->next.control,
+			 arbelprm_wqe_segment_ctrl_send_st, 0,
+			 always1, 1 );
+	memset ( &wqe->udseg, 0, sizeof ( wqe->udseg ) );
+	MLX_POPULATE_2 ( &wqe->udseg, arbelprm_ud_address_vector_st, 0,
+			 pd, GLOBAL_PD,
+			 port_number, mlx->port );
+	MLX_POPULATE_2 ( &wqe->udseg, arbelprm_ud_address_vector_st, 1,
+			 rlid, av->remote_lid,
+			 g, av->gid_present );
+	MLX_POPULATE_2 ( &wqe->udseg, arbelprm_ud_address_vector_st, 2,
+			 max_stat_rate, ( ( av->rate >= 3 ) ? 0 : 1 ),
+			 msg, 3 );
+	MLX_POPULATE_1 ( &wqe->udseg, arbelprm_ud_address_vector_st, 3,
+			 sl, av->sl );
+	gid = ( av->gid_present ? av->gid : &ib_no_gid );
+	memcpy ( ( ( ( void * ) &wqe->udseg ) + 16 ),
+		 gid, sizeof ( *gid ) );
+	MLX_POPULATE_1 ( &wqe->udseg, arbelprm_wqe_segment_ud_st, 8,
+			 destination_qp, av->dest_qp );
+	MLX_POPULATE_1 ( &wqe->udseg, arbelprm_wqe_segment_ud_st, 9,
+			 q_key, av->qkey );
+	wqe->mpointer[0].local_addr_l =
+		cpu_to_be32 ( virt_to_bus ( iobuf->data ) );
+	wqe->mpointer[0].byte_count = cpu_to_be32 ( iob_len ( iobuf ) );
+
+	/* Update previous work queue entry's "next" field */
+	nds = ( offsetof ( typeof ( *wqe ), mpointer ) +
+		sizeof ( wqe->mpointer[0] ) );
+	MLX_MODIFY_1 ( &prev_wqe->next.next, arbelprm_wqe_segment_next_st, 0,
+		       nopcode, XDEV_NOPCODE_SEND );
+	MLX_POPULATE_3 ( &prev_wqe->next.next, arbelprm_wqe_segment_next_st, 1,
+			 nds, nds,
+			 f, 1,
+			 always1, 1 );
+
+	/* Ring doorbell */
+
+	doorbell index is a property of the queue pair
+
+
+	MLX_POPULATE_1 ( mlx_wq->send_uar_context, arbelprm_qp_db_record_st, 0, 
+			 counter, ( wqe_idx & 0xffff ) );
+	memset ( &doorbell, 0, sizeof ( doorbell ) );
+	MLX_POPULATE_4 ( &doorbell, arbelprm_send_doorbell_st, 0,
+			 nopcode, XDEV_NOPCODE_SEND,
+			 f, 1,
+			 wqe_counter, ( prev_wqe_idx & 0xffff ),
+			 wqe_cnt, 1 );
+	MLX_POPULATE_2 ( &doorbell, arbelprm_send_doorbell_st, 1,
+			 nds, nds,
+			 qpn, qp->qpn );
+	barrier();
+
+	wq->posted = wqe_idx;
+
+
+	struct mlx_nic *mlx = netdev->priv;
+	ud_av_t av = iobuf->data;
+	ud_send_wqe_t snd_wqe;
+	int rc;
+
+	snd_wqe = alloc_send_wqe ( mlx->ipoib_qph );
+	if ( ! snd_wqe ) {
+		DBGC ( mlx, "MLX %p out of TX WQEs\n", mlx );
+		return -ENOBUFS;
+	}
+
+	prep_send_wqe_buf ( mlx->ipoib_qph, mlx->bcast_av, snd_wqe,
+			    iobuf->data, 0, iob_len ( iobuf ), 0 );
+	if ( ( rc = post_send_req ( mlx->ipoib_qph, snd_wqe, 1 ) ) != 0 ) {
+		DBGC ( mlx, "MLX %p could not post TX WQE %p: %s\n",
+		       mlx, snd_wqe, strerror ( rc ) );
+		free_wqe ( snd_wqe );
+		return rc;
+	}
+
+
+}
+
+static struct ib_device_operations mlx_ib_operations = {
+	.post_send	= mlx_post_send,
 };
 
 /**
