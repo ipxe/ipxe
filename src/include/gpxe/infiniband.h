@@ -113,6 +113,8 @@ struct ib_completion_queue {
 
 /** An Infiniband completion */
 struct ib_completion {
+	/** Completion is for send queue */
+	int is_send;
 	/** Length */
 	size_t len;
 };

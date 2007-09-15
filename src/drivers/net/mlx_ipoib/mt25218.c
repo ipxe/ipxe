@@ -37,14 +37,14 @@ struct arbel_completion_queue {
 	/** Doorbell record number */
 	unsigned int doorbell_idx;
 	/** Completion queue entries */
-	union cqe_st *cqe;
+	union arbelprm_completion_entry *cqe;
 };
 
 struct arbel {
 	/** User Access Region */
 	void *uar;
 	/** Doorbell records */
-	union db_record_st *db_rec;
+	union arbelprm_doorbell_record *db_rec;
 };
 
 
@@ -157,9 +157,9 @@ static int mlx_transmit_direct ( struct net_device *netdev,
 	struct ib_address_vector av = {
 		.dest_qp = bcast_av->dest_qp,
 		.qkey = bcast_av->qkey,
-		.dlid = MLX_EXTRACT ( bav, rlid ),
-		.rate = ( MLX_EXTRACT ( bav, max_stat_rate ) ? 1 : 4 ),
-		.sl = MLX_EXTRACT ( bav, sl ),
+		.dlid = MLX_GET ( bav, rlid ),
+		.rate = ( MLX_GET ( bav, max_stat_rate ) ? 1 : 4 ),
+		.sl = MLX_GET ( bav, sl ),
 		.gid_present = 1,
 	};
 	memcpy ( &av.gid, ( ( void * ) bav ) + 16, 16 );
@@ -318,18 +318,18 @@ static struct ib_gid arbel_no_gid = {
  * @v db_reg		Doorbell register structure
  * @v offset		Address of doorbell
  */
-static void arbel_ring_doorbell ( struct arbel *arbel, void *db_reg,
+static void arbel_ring_doorbell ( struct arbel *arbel,
+				  union arbelprm_doorbell_register *db_reg,
 				  unsigned int offset ) {
-	uint32_t *db_reg_dword = db_reg;
 
 	DBG ( "arbel_ring_doorbell %08lx:%08lx to %lx\n",
-	      db_reg_dword[0], db_reg_dword[1],
+	      db_reg->dword[0], db_reg->dword[1],
 	      virt_to_phys ( arbel->uar + offset ) );
 
 	barrier();
-	writel ( db_reg_dword[0], ( arbel->uar + offset + 0 ) );
+	writel ( db_reg->dword[0], ( arbel->uar + offset + 0 ) );
 	barrier();
-	writel ( db_reg_dword[1], ( arbel->uar + offset + 4 ) );
+	writel ( db_reg->dword[1], ( arbel->uar + offset + 4 ) );
 }
 
 /**
@@ -347,15 +347,16 @@ static int arbel_post_send ( struct ib_device *ibdev, struct io_buffer *iobuf,
 	struct arbel *arbel = ibdev->priv;
 	struct ib_work_queue *wq = &qp->send;
 	struct arbel_send_work_queue *arbel_wq = wq->priv;
-	unsigned int wqe_idx_mask = ( wq->num_wqes - 1 );
-	struct ud_send_wqe_st *prev_wqe;
-	struct ud_send_wqe_st *wqe;
+	struct arbelprm_ud_send_wqe *prev_wqe;
+	struct arbelprm_ud_send_wqe *wqe;
+	union arbelprm_doorbell_record *db_rec;
+	union arbelprm_doorbell_register db_reg;
 	struct ib_gid *gid;
+	unsigned int wqe_idx_mask;
 	size_t nds;
-	union db_record_st *db_rec;
-	struct send_doorbell_st db_reg;
 
 	/* Allocate work queue entry */
+	wqe_idx_mask = ( wq->num_wqes - 1 );
 	if ( wq->iobufs[wq->next_idx & wqe_idx_mask] ) {
 		DBGC ( arbel, "ARBEL %p send queue full", arbel );
 		return -ENOBUFS;
@@ -365,69 +366,61 @@ static int arbel_post_send ( struct ib_device *ibdev, struct io_buffer *iobuf,
 	wqe = &arbel_wq->wqe_u[wq->next_idx & wqe_idx_mask].wqe_cont.wqe;
 
 	/* Construct work queue entry */
-	MLX_POPULATE_1 ( &wqe->next.next, arbelprm_wqe_segment_next_st, 1,
-			 always1, 1 );
-	memset ( &wqe->next.control, 0,
-		 sizeof ( wqe->next.control ) );
-	MLX_POPULATE_1 ( &wqe->next.control,
-			 arbelprm_wqe_segment_ctrl_send_st, 0,
-			 always1, 1 );
-	memset ( &wqe->udseg, 0, sizeof ( wqe->udseg ) );
-	MLX_POPULATE_2 ( &wqe->udseg, arbelprm_ud_address_vector_st, 0,
-			 pd, GLOBAL_PD,
-			 port_number, PXE_IB_PORT );
-	MLX_POPULATE_2 ( &wqe->udseg, arbelprm_ud_address_vector_st, 1,
-			 rlid, av->dlid,
-			 g, av->gid_present );
-	MLX_POPULATE_2 ( &wqe->udseg, arbelprm_ud_address_vector_st, 2,
-			 max_stat_rate, ( ( av->rate >= 3 ) ? 0 : 1 ),
-			 msg, 3 );
-	MLX_POPULATE_1 ( &wqe->udseg, arbelprm_ud_address_vector_st, 3,
-			 sl, av->sl );
+	MLX_FILL_1 ( &wqe->next, 1, always1, 1 );
+	memset ( &wqe->ctrl, 0, sizeof ( wqe->ctrl ) );
+	MLX_FILL_1 ( &wqe->ctrl, 0, always1, 1 );
+	memset ( &wqe->ud, 0, sizeof ( wqe->ud ) );
+	MLX_FILL_2 ( &wqe->ud, 0,
+		     ud_address_vector.pd, GLOBAL_PD,
+		     ud_address_vector.port_number, PXE_IB_PORT );
+	MLX_FILL_2 ( &wqe->ud, 1,
+		     ud_address_vector.rlid, av->dlid,
+		     ud_address_vector.g, av->gid_present );
+	MLX_FILL_2 ( &wqe->ud, 2,
+		     ud_address_vector.max_stat_rate,
+			 ( ( av->rate >= 3 ) ? 0 : 1 ),
+		     ud_address_vector.msg, 3 );
+	MLX_FILL_1 ( &wqe->ud, 3, ud_address_vector.sl, av->sl );
 	gid = ( av->gid_present ? &av->gid : &arbel_no_gid );
-	memcpy ( ( ( ( void * ) &wqe->udseg ) + 16 ),
-		 gid, sizeof ( *gid ) );
-	MLX_POPULATE_1 ( &wqe->udseg, arbelprm_wqe_segment_ud_st, 8,
-			 destination_qp, av->dest_qp );
-	MLX_POPULATE_1 ( &wqe->udseg, arbelprm_wqe_segment_ud_st, 9,
-			 q_key, av->qkey );
-	wqe->mpointer[0].local_addr_l =
-		cpu_to_be32 ( virt_to_bus ( iobuf->data ) );
-	wqe->mpointer[0].byte_count = cpu_to_be32 ( iob_len ( iobuf ) );
+	memcpy ( &wqe->ud.u.dwords[4], gid, sizeof ( *gid ) );
+	MLX_FILL_1 ( &wqe->ud, 8, destination_qp, av->dest_qp );
+	MLX_FILL_1 ( &wqe->ud, 9, q_key, av->qkey );
+	MLX_FILL_1 ( &wqe->data[0], 3,
+		     local_address_l, virt_to_bus ( iobuf->data ) );
+	MLX_FILL_1 ( &wqe->data[0], 0, byte_count, iob_len ( iobuf ) );
 
 	DBG ( "Work queue entry:\n" );
 	DBG_HD ( wqe, sizeof ( *wqe ) );
 
 	/* Update previous work queue entry's "next" field */
-	nds = ( ( offsetof ( typeof ( *wqe ), mpointer ) +
-		  sizeof ( wqe->mpointer[0] ) ) >> 4 );
-	MLX_MODIFY ( &prev_wqe->next.next, arbelprm_wqe_segment_next_st, 0,
-		     nopcode, XDEV_NOPCODE_SEND );
-	MLX_POPULATE_3 ( &prev_wqe->next.next, arbelprm_wqe_segment_next_st, 1,
-			 nds, nds,
-			 f, 1,
-			 always1, 1 );
+	nds = ( ( offsetof ( typeof ( *wqe ), data ) +
+		  sizeof ( wqe->data[0] ) ) >> 4 );
+	MLX_SET ( &prev_wqe->next, nopcode, XDEV_NOPCODE_SEND );
+	MLX_FILL_3 ( &prev_wqe->next, 1,
+		     nds, nds,
+		     f, 1,
+		     always1, 1 );
 
 	DBG ( "Previous work queue entry's next field:\n" );
-	DBG_HD ( &prev_wqe->next.next, sizeof ( prev_wqe->next.next ) );
+	DBG_HD ( &prev_wqe->next, sizeof ( prev_wqe->next ) );
 
 	/* Update doorbell record */
 	db_rec = &arbel->db_rec[arbel_wq->doorbell_idx];
-	MLX_POPULATE_1 ( db_rec, arbelprm_qp_db_record_st, 0, 
-			 counter, ( ( wq->next_idx + 1 ) & 0xffff ) );
+	MLX_FILL_1 ( &db_rec->qp, 0,
+		     counter, ( ( wq->next_idx + 1 ) & 0xffff ) );
 	barrier();
 	DBG ( "Doorbell record:\n" );
 	DBG_HD ( db_rec, 8 );
 
 	/* Ring doorbell register */
-	MLX_POPULATE_4 ( &db_reg, arbelprm_send_doorbell_st, 0,
-			 nopcode, XDEV_NOPCODE_SEND,
-			 f, 1,
-			 wqe_counter, ( wq->next_idx & 0xffff ),
-			 wqe_cnt, 1 );
-	MLX_POPULATE_2 ( &db_reg, arbelprm_send_doorbell_st, 1,
-			 nds, nds,
-			 qpn, qp->qpn );
+	MLX_FILL_4 ( &db_reg.send, 0,
+		     nopcode, XDEV_NOPCODE_SEND,
+		     f, 1,
+		     wqe_counter, ( wq->next_idx & 0xffff ),
+		     wqe_cnt, 1 );
+	MLX_FILL_2 ( &db_reg.send, 1,
+		     nds, nds,
+		     qpn, qp->qpn );
 	arbel_ring_doorbell ( arbel, &db_reg, POST_SND_OFFSET );
 
 	/* Update work queue's index */
@@ -437,13 +430,12 @@ static int arbel_post_send ( struct ib_device *ibdev, struct io_buffer *iobuf,
 }
 
 static void arbel_parse_completion ( struct arbel *arbel,
-				     union cqe_st *cqe,
+				     union arbelprm_completion_entry *cqe,
 				     struct ib_completion *completion ) {
 	memset ( completion, 0, sizeof ( *completion ) );
-	is_send = MLX_EXTRACT ( cqe, arbelprm_completion_queue_entry_st, s );					
-	completion->len =
-		MLX_EXTRACT ( cqe, arbelprm_completion_queue_entry_st,
-			      byte_cnt );}
+	completion->is_send = MLX_GET ( &cqe->normal, s );
+	completion->len = MLX_GET ( &cqe->normal, byte_cnt );
+}
 
 /**
  * Poll completion queue
@@ -459,8 +451,8 @@ static void arbel_poll_cq ( struct ib_device *ibdev,
 	struct arbel *arbel = ibdev->priv;
 	struct arbel_completion_queue *arbel_cq = cq->priv;
 	unsigned int cqe_idx_mask = ( cq->num_cqes - 1 );
-	union db_record_st *db_rec = &arbel->db_rec[arbel_cq->doorbell_idx];
-	union cqe_st *cqe;
+	union arbelprm_doorbell_record *db_rec;
+	union arbelprm_completion_entry *cqe;
 	struct ib_completion completion;
 	struct io_buffer *iobuf;
 	int is_send;
@@ -468,8 +460,7 @@ static void arbel_poll_cq ( struct ib_device *ibdev,
 	while ( 1 ) {
 		/* Look for completion entry */
 		cqe = &arbel_cq->cqe[cq->next_idx & cqe_idx_mask];
-		if ( MLX_EXTRACT ( cqe, arbelprm_completion_queue_entry_st,
-				   owner ) != 0 ) {
+		if ( MLX_GET ( &cqe->normal, owner ) != 0 ) {
 			/* Entry still owned by hardware; end of poll */
 			break;
 		}
@@ -484,14 +475,14 @@ static void arbel_poll_cq ( struct ib_device *ibdev,
 							      iobuf );
 
 		/* Return ownership to hardware */
-		MLX_POPULATE_1 ( cqe, arbelprm_completion_queue_entry_st, 7,
-				 owner, 1 );
+		MLX_FILL_1 ( &cqe->normal, 7, owner, 1 );
 		barrier();
 		/* Update completion queue's index */
 		cq->next_idx++;
 		/* Update doorbell record */
-		MLX_POPULATE_1 ( db_rec, arbelprm_cq_ci_db_record_st, 0,
-				 counter, ( cq->next_idx & 0xffffffffUL ) );
+		db_rec = &arbel->db_rec[arbel_cq->doorbell_idx];
+		MLX_FILL_1 ( &db_rec->cq_ci, 0,
+			     counter, ( cq->next_idx & 0xffffffffUL ) );
 	}
 }
 
