@@ -1,7 +1,7 @@
 #ifndef ETHERBOOT_BITS_BYTESWAP_H
 #define ETHERBOOT_BITS_BYTESWAP_H
 
-static inline __attribute__ ((always_inline)) uint16_t
+static inline __attribute__ ((always_inline, const)) uint16_t
 __i386_bswap_16(uint16_t x)
 {
 	__asm__("xchgb %b0,%h0\n\t"
@@ -10,7 +10,7 @@ __i386_bswap_16(uint16_t x)
 	return x;
 }
 
-static inline __attribute__ ((always_inline)) uint32_t
+static inline __attribute__ ((always_inline, const)) uint32_t
 __i386_bswap_32(uint32_t x)
 {
 	__asm__("xchgb %b0,%h0\n\t"
@@ -21,7 +21,7 @@ __i386_bswap_32(uint32_t x)
 	return x;
 }
 
-static inline __attribute__ ((always_inline)) uint64_t
+static inline __attribute__ ((always_inline, const)) uint64_t
 __i386_bswap_64(uint64_t x)
 {
 	union {
