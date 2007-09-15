@@ -64,9 +64,19 @@ struct ibhdr {
 
 
 struct ib_device;
+struct ib_queue_pair;
+struct ib_completion_queue;
 
 /** An Infiniband Work Queue */
 struct ib_work_queue {
+	/** Containing queue pair */
+	struct ib_queue_pair *qp;
+	/** "Is a send queue" flag */
+	int is_send;
+	/** Associated completion queue */
+	struct ib_completion_queue *cq;
+	/** List of work queues on this completion queue */
+	struct list_head list;
 	/** Number of work queue entries */
 	unsigned int num_wqes;
 	/** Next work queue entry index
@@ -85,8 +95,6 @@ struct ib_work_queue {
 
 /** An Infiniband Queue Pair */
 struct ib_queue_pair {
-	/** List of queue pairs sharing a completion queue */
-	struct list_head list;
 	/** Queue Pair Number */
 	unsigned long qpn;
 	/** Send queue */
@@ -113,8 +121,8 @@ struct ib_completion_queue {
 	 * array index.
 	 */
 	unsigned long next_idx;
-	/** List of associated queue pairs */
-	struct list_head queue_pairs;
+	/** List of work queues completing to this queue */
+	struct list_head work_queues;
 	/** Device private data */
 	void *dev_priv;
 };
@@ -183,6 +191,22 @@ struct ib_device_operations {
 			      struct ib_queue_pair *qp,
 			      struct ib_address_vector *av,
 			      struct io_buffer *iobuf );
+	/**
+	 * Post receive work queue entry
+	 *
+	 * @v ibdev		Infiniband device
+	 * @v qp		Queue pair
+	 * @v iobuf		I/O buffer
+	 * @ret rc		Return status code
+	 *
+	 * If this method returns success, the I/O buffer remains
+	 * owned by the queue pair.  If this method returns failure,
+	 * the I/O buffer is immediately released; the failure is
+	 * interpreted as "failure to enqueue buffer".
+	 */
+	int ( * post_recv ) ( struct ib_device *ibdev,
+			      struct ib_queue_pair *qp,
+			      struct io_buffer *iobuf );
 	/** Poll completion queue
 	 *
 	 * @v ibdev		Infiniband device
@@ -205,8 +229,8 @@ struct ib_device {
 };
 
 
-extern struct ib_queue_pair * ib_find_qp ( struct list_head *list,
-					   unsigned long qpn );
+extern struct ib_work_queue * ib_find_wq ( struct ib_completion_queue *cq,
+					   unsigned long qpn, int is_send );
 
 
 

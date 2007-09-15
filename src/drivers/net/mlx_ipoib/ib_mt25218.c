@@ -1311,7 +1311,7 @@ static int create_ipoib_qp(void **qp_pp,
 	qp->rcv_buf_sz = IPOIB_RCV_BUF_SZ;
 
 	qp->max_recv_wqes = NUM_IPOIB_RCV_WQES;
-	qp->recv_wqe_cur_free = NUM_IPOIB_RCV_WQES;
+	qp->recv_wqe_cur_free = 0; //NUM_IPOIB_RCV_WQES;
 
 	qp->rcv_uar_context =
 	    dev_ib_data.uar_context_base + 8 * IPOIB_RCV_QP_DB_IDX;

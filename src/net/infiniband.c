@@ -34,19 +34,20 @@
  */
 
 /**
- * Find queue pair from a list
+ * Find work queue belonging to completion queue
  *
- * @v list		List of queue pairs
+ * @v cq		Completion queue
  * @v qpn		Queue pair number
- * @ret qp		Queue pair, or NULL if not found
+ * @v is_send		Find send work queue (rather than receive)
+ * @ret wq		Work queue, or NULL if not found
  */
-struct ib_queue_pair * ib_find_qp ( struct list_head *list,
-				    unsigned long qpn ) {
-	struct ib_queue_pair *qp;
+struct ib_work_queue * ib_find_wq ( struct ib_completion_queue *cq,
+				    unsigned long qpn, int is_send ) {
+	struct ib_work_queue *wq;
 
-	list_for_each_entry ( qp, list, list ) {
-		if ( qp->qpn == qpn )
-			return qp;
+	list_for_each_entry ( wq, &cq->work_queues, list ) {
+		if ( ( wq->qp->qpn == qpn ) && ( wq->is_send == is_send ) )
+			return wq;
 	}
 	return NULL;
 }
