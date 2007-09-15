@@ -141,9 +141,25 @@ struct addr_64_st {
 #define MLX_BIT_OFFSET( _structure, _field )				   \
 	offsetof ( struct _structure, _field )
 
+/** Dword offset of a field within a pseudo_bit_t structure */
+#define MLX_DWORD_OFFSET( _structure, _field )				   \
+	( MLX_BIT_OFFSET ( _structure, _field ) / 32 )
+
+/** Dword bit offset of a field within a pseudo_bit_t structure
+ *
+ * Yes, using mod-32 would work, but would lose the check for the
+ * error of specifying a mismatched field name and dword index.
+ */
+#define MLX_DWORD_BIT_OFFSET( _structure, _index, _field )		   \
+	( MLX_BIT_OFFSET ( _structure, _field ) - ( 32 * (_index) ) )
+
 /** Bit width of a field within a pseudo_bit_t structure */
 #define MLX_BIT_WIDTH( _structure, _field )				   \
 	sizeof ( ( ( struct _structure * ) NULL )->_field )
+
+/** Bit mask for a field within a pseudo_bit_t structure */
+#define MLX_BIT_MASK( _structure, _field )				   \
+	( ( 1 << MLX_BIT_WIDTH ( _structure, _field ) ) - 1 )
 
 /*
  * Assemble native-endian dword from named fields and values
@@ -151,8 +167,7 @@ struct addr_64_st {
  */
 
 #define MLX_ASSEMBLE_1( _structure, _index, _field, _value )		   \
-	( (_value) <<							   \
-	  ( MLX_BIT_OFFSET ( _structure, _field ) - ( 32 * (_index) ) ) )
+	( (_value) << MLX_DWORD_BIT_OFFSET ( _structure, _index, _field ) )
 
 #define MLX_ASSEMBLE_2( _structure, _index, _field, _value, ... )	   \
 	( MLX_ASSEMBLE_1 ( _structure, _index, _field, _value ) |	   \
@@ -172,9 +187,8 @@ struct addr_64_st {
  */
 
 #define MLX_MASK_1( _structure, _index, _field )			   \
-	MLX_ASSEMBLE_1 ( _structure, _index, _field,			   \
-			 ( ( 1 << MLX_BIT_WIDTH ( _structure,		   \
-						  _field ) ) - 1 ) )
+	( MLX_BIT_MASK ( _structure, _field ) <<			   \
+	  MLX_DWORD_BIT_OFFSET ( _structure, _index, _field ) )
 
 #define MLX_MASK_2( _structure, _index, _field, ... )			   \
 	( MLX_MASK_1 ( _structure, _index, _field ) |			   \
@@ -230,5 +244,22 @@ struct addr_64_st {
 					    _field, _value );		   \
 		*__ptr = cpu_to_be32 ( __value );			   \
 	} while ( 0 )
+
+/*
+ * Extract value of named field
+ *
+ */
+
+#define MLX_EXTRACT( _base, _structure, _field )			   \
+	( {								   \
+		unsigned int __index = 					   \
+			MLX_DWORD_OFFSET ( _structure, _field );	   \
+		uint32_t *__ptr = ( ( (uint32_t *) (_base) ) + __index );  \
+		uint32_t __value = be32_to_cpu ( *__ptr );		   \
+		__value >>= MLX_DWORD_BIT_OFFSET ( _structure, __index,	   \
+						   _field );		   \
+		__value &= MLX_BIT_MASK ( _structure, _field );		   \
+		__value;						   \
+	} )
 
 #endif				/* __bit_ops_h__ */

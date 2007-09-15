@@ -27,12 +27,13 @@ struct arbel_send_work_queue {
 	/** Doorbell number */
 	unsigned int doorbell_idx;
 	/** Work queue entries */
-	struct ud_send_wqe_st *wqe;
+	//	struct ud_send_wqe_st *wqe;
+	union ud_send_wqe_u *wqe_u;
 };
 
 struct arbel {
 	/** User Access Region */
-	unsigned long uar;
+	void *uar;
 	/** Doorbell records */
 	union db_record_st *db_rec;
 };
@@ -88,7 +89,6 @@ static uint8_t ib_broadcast[IB_ALEN] = { 0xff, };
 static int mlx_transmit ( struct net_device *netdev,
 			  struct io_buffer *iobuf ) {
 	struct mlx_nic *mlx = netdev->priv;
-	ud_av_t av = iobuf->data;
 	ud_send_wqe_t snd_wqe;
 	int rc;
 
@@ -109,6 +109,58 @@ static int mlx_transmit ( struct net_device *netdev,
 
 	return 0;
 }
+
+static int arbel_post_send ( struct ib_device *ibdev, struct io_buffer *iobuf,
+			     struct ib_address_vector *av,
+			     struct ib_queue_pair *qp );
+
+static struct io_buffer *tx_ring[NUM_IPOIB_SND_WQES];
+static int tx_posted = 0;
+
+static int mlx_transmit_direct ( struct net_device *netdev,
+				 struct io_buffer *iobuf ) {
+	struct mlx_nic *mlx = netdev->priv;
+	int rc;
+
+	struct arbel arbel = {
+		.uar = memfree_pci_dev.uar,
+		.db_rec = dev_ib_data.uar_context_base,
+	};
+	struct arbel_send_work_queue arbel_send_queue = {
+		.doorbell_idx = IPOIB_SND_QP_DB_IDX,
+		.wqe_u = ( (struct udqp_st *) ipoib_data.ipoib_qph )->snd_wq,
+	};
+	struct ib_device ibdev = {
+		.priv = &arbel,
+	};
+	struct ib_queue_pair qp = {
+		.qpn = ib_get_qpn ( mlx->ipoib_qph ),
+		.send = {
+			.num_wqes = NUM_IPOIB_SND_WQES,
+			.posted = tx_posted,
+			.iobufs = tx_ring,
+			.priv = &arbel_send_queue,
+		},
+	};
+	struct ud_av_st *bcast_av = mlx->bcast_av;
+	struct address_vector_st *bav = &bcast_av->av;
+	struct ib_address_vector av = {
+		.dest_qp = bcast_av->dest_qp,
+		.qkey = bcast_av->qkey,
+		.dlid = MLX_EXTRACT ( bav, arbelprm_ud_address_vector_st, rlid ),
+		.rate = ( MLX_EXTRACT ( bav, arbelprm_ud_address_vector_st, max_stat_rate ) ? 1 : 4 ),
+		.sl = MLX_EXTRACT ( bav, arbelprm_ud_address_vector_st, sl ),
+		.gid_present = 1,
+	};
+	memcpy ( &av.gid, ( ( void * ) bav ) + 16, 16 );
+
+	rc = arbel_post_send ( &ibdev, iobuf, &av, &qp );
+
+	tx_posted = qp.send.posted;
+
+	return rc;
+}
+
 
 /**
  * Handle TX completion
@@ -234,7 +286,7 @@ static void mlx_irq ( struct net_device *netdev, int enable ) {
 static struct net_device_operations mlx_operations = {
 	.open		= mlx_open,
 	.close		= mlx_close,
-	.transmit	= mlx_transmit,
+	.transmit	= mlx_transmit_direct,
 	.poll		= mlx_poll,
 	.irq		= mlx_irq,
 };
@@ -274,12 +326,13 @@ static int arbel_post_send ( struct ib_device *ibdev, struct io_buffer *iobuf,
 	/* Allocate work queue entry */
 	prev_wqe_idx = wq->posted;
 	wqe_idx = ( prev_wqe_idx + 1 );
-	if ( wq->iobuf[wqe_idx & wqe_idx_mask] ) {
+	if ( wq->iobufs[wqe_idx & wqe_idx_mask] ) {
 		DBGC ( arbel, "ARBEL %p send queue full", arbel );
 		return -ENOBUFS;
 	}
-	prev_wqe = &arbel_wq->wqe[prev_wqe_idx & wqe_idx_mask];
-	wqe = &arbel_wq->wqe[wqe_idx & wqe_idx_mask];
+	wq->iobufs[wqe_idx & wqe_idx_mask] = iobuf;
+	prev_wqe = &arbel_wq->wqe_u[prev_wqe_idx & wqe_idx_mask].wqe_cont.wqe;
+	wqe = &arbel_wq->wqe_u[wqe_idx & wqe_idx_mask].wqe_cont.wqe;
 
 	/* Construct work queue entry */
 	memset ( &wqe->next.control, 0,

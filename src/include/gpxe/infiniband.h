@@ -73,10 +73,10 @@ struct ib_work_queue {
 	 * This is the index of the most recently posted entry.
 	 */
 	unsigned int posted;
+	/** I/O buffers assigned to work queue */
+	struct io_buffer **iobufs;
 	/** Driver private data */
 	void *priv;
-	/** I/O buffers assigned to work queue */
-	struct io_buffer *iobuf[0];
 };
 
 /** An Infiniband Queue Pair */
