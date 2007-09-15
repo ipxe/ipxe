@@ -25,28 +25,6 @@ Skeleton NIC driver for Etherboot
 
 #include "arbel.h"
 
-struct arbel_send_work_queue {
-	/** Doorbell record number */
-	unsigned int doorbell_idx;
-	/** Work queue entries */
-	//	struct ud_send_wqe_st *wqe;
-	union ud_send_wqe_u *wqe_u;
-};
-
-struct arbel_completion_queue {
-	/** Doorbell record number */
-	unsigned int doorbell_idx;
-	/** Completion queue entries */
-	union arbelprm_completion_entry *cqe;
-};
-
-struct arbel {
-	/** User Access Region */
-	void *uar;
-	/** Doorbell records */
-	union arbelprm_doorbell_record *db_rec;
-};
-
 
 
 struct mlx_nic {
@@ -119,9 +97,10 @@ static int mlx_transmit ( struct net_device *netdev,
 	return 0;
 }
 
-static int arbel_post_send ( struct ib_device *ibdev, struct io_buffer *iobuf,
+static int arbel_post_send ( struct ib_device *ibdev,
+			     struct ib_queue_pair *qp,
 			     struct ib_address_vector *av,
-			     struct ib_queue_pair *qp );
+			     struct io_buffer *iobuf );
 
 static struct io_buffer *tx_ring[NUM_IPOIB_SND_WQES];
 static int next_tx_idx = 0;
@@ -137,10 +116,10 @@ static int mlx_transmit_direct ( struct net_device *netdev,
 	};
 	struct arbel_send_work_queue arbel_send_queue = {
 		.doorbell_idx = IPOIB_SND_QP_DB_IDX,
-		.wqe_u = ( (struct udqp_st *) mlx->ipoib_qph )->snd_wq,
+		.wqe = ( (struct udqp_st *) mlx->ipoib_qph )->snd_wq,
 	};
 	struct ib_device ibdev = {
-		.priv = &arbel,
+		.dev_priv = &arbel,
 	};
 	struct ib_queue_pair qp = {
 		.qpn = ib_get_qpn ( mlx->ipoib_qph ),
@@ -148,7 +127,7 @@ static int mlx_transmit_direct ( struct net_device *netdev,
 			.num_wqes = NUM_IPOIB_SND_WQES,
 			.next_idx = next_tx_idx,
 			.iobufs = tx_ring,
-			.priv = &arbel_send_queue,
+			.dev_priv = &arbel_send_queue,
 		},
 	};
 	struct ud_av_st *bcast_av = mlx->bcast_av;
@@ -164,13 +143,82 @@ static int mlx_transmit_direct ( struct net_device *netdev,
 	};
 	memcpy ( &av.gid, ( ( void * ) bav ) + 16, 16 );
 
-	rc = arbel_post_send ( &ibdev, iobuf, &av, &qp );
+	rc = arbel_post_send ( &ibdev, &qp, &av, iobuf );
 
 	next_tx_idx = qp.send.next_idx;
 
 	return rc;
 }
 
+
+static void arbel_poll_cq ( struct ib_device *ibdev,
+			    struct ib_completion_queue *cq,
+			    ib_completer_t complete_send,
+			    ib_completer_t complete_recv );
+
+static void temp_complete_send ( struct ib_device *ibdev __unused,
+				 struct ib_queue_pair *qp,
+				 struct ib_completion *completion,
+				 struct io_buffer *iobuf ) {
+	struct net_device *netdev = qp->priv;
+
+	DBG ( "Wahey! TX completion\n" );
+	netdev_tx_complete_err ( netdev, iobuf,
+				 ( completion->syndrome ? -EIO : 0 ) );
+}
+
+static void temp_complete_recv ( struct ib_device *ibdev __unused,
+				 struct ib_queue_pair *qp __unused,
+				 struct ib_completion *completion __unused,
+				 struct io_buffer *iobuf __unused ) {
+	DBG ( "AARGH! recv completion\n" );
+}
+
+static int next_cq_idx = 0;
+
+static void mlx_poll_cq_direct ( struct net_device *netdev ) {
+	struct mlx_nic *mlx = netdev->priv;
+
+	struct arbel arbel = {
+		.uar = memfree_pci_dev.uar,
+		.db_rec = dev_ib_data.uar_context_base,
+	};
+	struct arbel_send_work_queue arbel_send_queue = {
+		.doorbell_idx = IPOIB_SND_QP_DB_IDX,
+		.wqe = ( ( struct udqp_st * ) mlx->ipoib_qph )->snd_wq,
+	};
+	struct ib_device ibdev = {
+		.dev_priv = &arbel,
+	};
+	struct ib_queue_pair qp = {
+		.qpn = ib_get_qpn ( mlx->ipoib_qph ),
+		.send = {
+			.num_wqes = NUM_IPOIB_SND_WQES,
+			.next_idx = next_tx_idx,
+			.iobufs = tx_ring,
+			.dev_priv = &arbel_send_queue,
+		},
+		.priv = netdev,
+	};
+	struct arbel_completion_queue arbel_cq = {
+		.doorbell_idx = IPOIB_SND_CQ_CI_DB_IDX,
+		.cqe = ( ( struct cq_st * ) mlx->snd_cqh )->cq_buf,
+	};
+	struct ib_completion_queue cq = {
+		.cqn = 1234,
+		.num_cqes = NUM_IPOIB_SND_CQES,
+		.next_idx = next_cq_idx, 
+		.dev_priv = &arbel_cq,
+	};
+
+	INIT_LIST_HEAD ( &cq.queue_pairs );
+	INIT_LIST_HEAD ( &qp.list );
+	list_add ( &qp.list, &cq.queue_pairs );
+
+	arbel_poll_cq ( &ibdev, &cq, temp_complete_send, temp_complete_recv );
+
+	next_cq_idx = cq.next_idx;
+}
 
 /**
  * Handle TX completion
@@ -276,7 +324,11 @@ static void mlx_poll ( struct net_device *netdev ) {
 	}
 
 	/* Poll completion queues */
+#if 0
 	mlx_poll_cq ( netdev, mlx->snd_cqh, mlx_tx_complete );
+#else
+	mlx_poll_cq_direct ( netdev );
+#endif
 	mlx_poll_cq ( netdev, mlx->rcv_cqh, mlx_rx_complete );
 }
 
@@ -336,17 +388,18 @@ static void arbel_ring_doorbell ( struct arbel *arbel,
  * Post send work queue entry
  *
  * @v ibdev		Infiniband device
- * @v iobuf		I/O buffer
- * @v av		Address vector
  * @v qp		Queue pair
+ * @v av		Address vector
+ * @v iobuf		I/O buffer
  * @ret rc		Return status code
  */
-static int arbel_post_send ( struct ib_device *ibdev, struct io_buffer *iobuf,
+static int arbel_post_send ( struct ib_device *ibdev,
+			     struct ib_queue_pair *qp,
 			     struct ib_address_vector *av,
-			     struct ib_queue_pair *qp ) {
-	struct arbel *arbel = ibdev->priv;
+			     struct io_buffer *iobuf ) {
+	struct arbel *arbel = ibdev->dev_priv;
 	struct ib_work_queue *wq = &qp->send;
-	struct arbel_send_work_queue *arbel_wq = wq->priv;
+	struct arbel_send_work_queue *arbel_send_wq = wq->dev_priv;
 	struct arbelprm_ud_send_wqe *prev_wqe;
 	struct arbelprm_ud_send_wqe *wqe;
 	union arbelprm_doorbell_record *db_rec;
@@ -358,12 +411,12 @@ static int arbel_post_send ( struct ib_device *ibdev, struct io_buffer *iobuf,
 	/* Allocate work queue entry */
 	wqe_idx_mask = ( wq->num_wqes - 1 );
 	if ( wq->iobufs[wq->next_idx & wqe_idx_mask] ) {
-		DBGC ( arbel, "ARBEL %p send queue full", arbel );
+		DBGC ( arbel, "Arbel %p send queue full", arbel );
 		return -ENOBUFS;
 	}
 	wq->iobufs[wq->next_idx & wqe_idx_mask] = iobuf;
-	prev_wqe = &arbel_wq->wqe_u[(wq->next_idx - 1) & wqe_idx_mask].wqe_cont.wqe;
-	wqe = &arbel_wq->wqe_u[wq->next_idx & wqe_idx_mask].wqe_cont.wqe;
+	prev_wqe = &arbel_send_wq->wqe[(wq->next_idx - 1) & wqe_idx_mask].ud;
+	wqe = &arbel_send_wq->wqe[wq->next_idx & wqe_idx_mask].ud;
 
 	/* Construct work queue entry */
 	MLX_FILL_1 ( &wqe->next, 1, always1, 1 );
@@ -395,7 +448,7 @@ static int arbel_post_send ( struct ib_device *ibdev, struct io_buffer *iobuf,
 	/* Update previous work queue entry's "next" field */
 	nds = ( ( offsetof ( typeof ( *wqe ), data ) +
 		  sizeof ( wqe->data[0] ) ) >> 4 );
-	MLX_SET ( &prev_wqe->next, nopcode, XDEV_NOPCODE_SEND );
+	MLX_SET ( &prev_wqe->next, nopcode, ARBEL_OPCODE_SEND );
 	MLX_FILL_3 ( &prev_wqe->next, 1,
 		     nds, nds,
 		     f, 1,
@@ -405,7 +458,7 @@ static int arbel_post_send ( struct ib_device *ibdev, struct io_buffer *iobuf,
 	DBG_HD ( &prev_wqe->next, sizeof ( prev_wqe->next ) );
 
 	/* Update doorbell record */
-	db_rec = &arbel->db_rec[arbel_wq->doorbell_idx];
+	db_rec = &arbel->db_rec[arbel_send_wq->doorbell_idx];
 	MLX_FILL_1 ( &db_rec->qp, 0,
 		     counter, ( ( wq->next_idx + 1 ) & 0xffff ) );
 	barrier();
@@ -414,7 +467,7 @@ static int arbel_post_send ( struct ib_device *ibdev, struct io_buffer *iobuf,
 
 	/* Ring doorbell register */
 	MLX_FILL_4 ( &db_reg.send, 0,
-		     nopcode, XDEV_NOPCODE_SEND,
+		     nopcode, ARBEL_OPCODE_SEND,
 		     f, 1,
 		     wqe_counter, ( wq->next_idx & 0xffff ),
 		     wqe_cnt, 1 );
@@ -429,50 +482,126 @@ static int arbel_post_send ( struct ib_device *ibdev, struct io_buffer *iobuf,
 	return 0;
 }
 
-static void arbel_parse_completion ( struct arbel *arbel,
-				     union arbelprm_completion_entry *cqe,
-				     struct ib_completion *completion ) {
-	memset ( completion, 0, sizeof ( *completion ) );
-	completion->is_send = MLX_GET ( &cqe->normal, s );
-	completion->len = MLX_GET ( &cqe->normal, byte_cnt );
-}
+/**
+ * Handle completion
+ *
+ * @v ibdev		Infiniband device
+ * @v cq		Completion queue
+ * @v cqe		Hardware completion queue entry
+ * @v complete_send	Send completion handler
+ * @v complete_recv	Receive completion handler
+ * @ret rc		Return status code
+ */
+static int arbel_complete ( struct ib_device *ibdev,
+			    struct ib_completion_queue *cq,
+			    union arbelprm_completion_entry *cqe,
+			    ib_completer_t complete_send,
+			    ib_completer_t complete_recv ) {
+	struct arbel *arbel = ibdev->dev_priv;
+	struct ib_completion completion;
+	struct ib_queue_pair *qp;
+	struct ib_work_queue *wq;
+	struct io_buffer *iobuf;
+	struct arbel_send_work_queue *arbel_send_wq;
+	struct arbel_recv_work_queue *arbel_recv_wq;
+	ib_completer_t complete;
+	unsigned int opcode;
+	unsigned long qpn;
+	unsigned int is_send;
+	unsigned long wqe_adr;
+	unsigned int wqe_idx;
+	int rc = 0;
+
+	/* Parse completion */
+	memset ( &completion, 0, sizeof ( completion ) );
+	completion.len = MLX_GET ( &cqe->normal, byte_cnt );
+	qpn = MLX_GET ( &cqe->normal, my_qpn );
+	is_send = MLX_GET ( &cqe->normal, s );
+	wqe_adr = ( MLX_GET ( &cqe->normal, wqe_adr ) << 6 );
+	opcode = MLX_GET ( &cqe->normal, opcode );
+	if ( opcode >= ARBEL_OPCODE_RECV_ERROR ) {
+		/* "s" field is not valid for error opcodes */
+		is_send = ( opcode == ARBEL_OPCODE_SEND_ERROR );
+		completion.syndrome = MLX_GET ( &cqe->error, syndrome );
+		DBGC ( arbel, "Arbel %p CPN %lx syndrome %x vendor %lx\n",
+		       arbel, cq->cqn, completion.syndrome,
+		       MLX_GET ( &cqe->error, vendor_code ) );
+		rc = -EIO;
+		/* Don't return immediately; propagate error to completer */
+	}
+
+	/* Identify queue pair */
+	qp = ib_find_qp ( &cq->queue_pairs, qpn );
+	if ( ! qp ) {
+		DBGC ( arbel, "Arbel %p CQN %lx unknown QPN %lx\n",
+		       arbel, cq->cqn, qpn );
+		return -EIO;
+	}
+
+	/* Identify work queue entry index */
+	if ( is_send ) {
+		wq = &qp->send;
+		arbel_send_wq = wq->dev_priv;
+		wqe_idx = ( ( wqe_adr - virt_to_bus ( arbel_send_wq->wqe ) ) /
+			    sizeof ( arbel_send_wq->wqe[0] ) );
+	} else {
+		wq = &qp->recv;
+		arbel_recv_wq = wq->dev_priv;
+		wqe_idx = ( ( wqe_adr - virt_to_bus ( arbel_recv_wq->wqe ) ) /
+			    sizeof ( arbel_recv_wq->wqe[0] ) );
+	}
+
+	/* Identify I/O buffer */
+	iobuf = wq->iobufs[wqe_idx];
+	if ( ! iobuf ) {
+		DBGC ( arbel, "Arbel %p CQN %lx QPN %lx empty WQE %x\n",
+		       arbel, cq->cqn, qpn, wqe_idx );
+		return -EIO;
+	}
+	wq->iobufs[wqe_idx] = NULL;
+
+	/* Pass off to caller's completion handler */
+	complete = ( is_send ? complete_send : complete_recv );
+	complete ( ibdev, qp, &completion, iobuf );
+
+	return rc;
+}			     
 
 /**
  * Poll completion queue
  *
  * @v ibdev		Infiniband device
  * @v cq		Completion queue
- * @v complete		Completion handler
+ * @v complete_send	Send completion handler
+ * @v complete_recv	Receive completion handler
  */
 static void arbel_poll_cq ( struct ib_device *ibdev,
 			    struct ib_completion_queue *cq,
 			    ib_completer_t complete_send,
 			    ib_completer_t complete_recv ) {
-	struct arbel *arbel = ibdev->priv;
-	struct arbel_completion_queue *arbel_cq = cq->priv;
-	unsigned int cqe_idx_mask = ( cq->num_cqes - 1 );
+	struct arbel *arbel = ibdev->dev_priv;
+	struct arbel_completion_queue *arbel_cq = cq->dev_priv;
 	union arbelprm_doorbell_record *db_rec;
 	union arbelprm_completion_entry *cqe;
-	struct ib_completion completion;
-	struct io_buffer *iobuf;
-	int is_send;
+	unsigned int cqe_idx_mask;
+	int rc;
 
 	while ( 1 ) {
 		/* Look for completion entry */
+		cqe_idx_mask = ( cq->num_cqes - 1 );
 		cqe = &arbel_cq->cqe[cq->next_idx & cqe_idx_mask];
 		if ( MLX_GET ( &cqe->normal, owner ) != 0 ) {
 			/* Entry still owned by hardware; end of poll */
 			break;
 		}
 
-		/* Parse completion */
-
-		
-		
 		/* Handle completion */
-		( is_send ? complete_send : complete_recv ) ( ibdev,
-							      &completion,
-							      iobuf );
+		if ( ( rc = arbel_complete ( ibdev, cq, cqe, complete_send,
+					     complete_recv ) ) != 0 ) {
+			DBGC ( arbel, "Arbel %p failed to complete: %s\n",
+			       arbel, strerror ( rc ) );
+			DBGC_HD ( arbel, cqe, sizeof ( *cqe ) );
+		}
 
 		/* Return ownership to hardware */
 		MLX_FILL_1 ( &cqe->normal, 7, owner, 1 );

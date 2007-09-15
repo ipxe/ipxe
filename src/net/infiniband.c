@@ -33,6 +33,26 @@
  *
  */
 
+/**
+ * Find queue pair from a list
+ *
+ * @v list		List of queue pairs
+ * @v qpn		Queue pair number
+ * @ret qp		Queue pair, or NULL if not found
+ */
+struct ib_queue_pair * ib_find_qp ( struct list_head *list,
+				    unsigned long qpn ) {
+	struct ib_queue_pair *qp;
+
+	list_for_each_entry ( qp, list, list ) {
+		if ( qp->qpn == qpn )
+			return qp;
+	}
+	return NULL;
+}
+
+
+
 /** Infiniband broadcast MAC address */
 static uint8_t ib_broadcast[IB_ALEN] = { 0xff, };
 

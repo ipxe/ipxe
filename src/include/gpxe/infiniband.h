@@ -79,24 +79,30 @@ struct ib_work_queue {
 	unsigned long next_idx;
 	/** I/O buffers assigned to work queue */
 	struct io_buffer **iobufs;
-	/** Driver private data */
-	void *priv;
+	/** Device private data */
+	void *dev_priv;
 };
 
 /** An Infiniband Queue Pair */
 struct ib_queue_pair {
+	/** List of queue pairs sharing a completion queue */
+	struct list_head list;
 	/** Queue Pair Number */
-	uint32_t qpn;
+	unsigned long qpn;
 	/** Send queue */
 	struct ib_work_queue send;
 	/** Receive queue */
 	struct ib_work_queue recv;
-	/** Driver private data */
+	/** Queue owner private data */
 	void *priv;
+	/** Device private data */
+	void *dev_priv;
 };
 
 /** An Infiniband Completion Queue */
 struct ib_completion_queue {
+	/** Completion queue number */
+	unsigned long cqn;
 	/** Number of completion queue entries */
 	unsigned int num_cqes;
 	/** Next completion queue entry index
@@ -107,14 +113,19 @@ struct ib_completion_queue {
 	 * array index.
 	 */
 	unsigned long next_idx;
-	/** Driver private data */
-	void *priv;
+	/** List of associated queue pairs */
+	struct list_head queue_pairs;
+	/** Device private data */
+	void *dev_priv;
 };
 
 /** An Infiniband completion */
 struct ib_completion {
-	/** Completion is for send queue */
-	int is_send;
+	/** Syndrome
+	 *
+	 * If non-zero, then the completion is in error.
+	 */
+	unsigned int syndrome;
 	/** Length */
 	size_t len;
 };
@@ -122,10 +133,12 @@ struct ib_completion {
 /** An Infiniband completion handler
  *
  * @v ibdev		Infiniband device
+ * @v qp		Queue pair
  * @v completion	Completion
  * @v iobuf		I/O buffer
  */
 typedef void ( * ib_completer_t ) ( struct ib_device *ibdev,
+				    struct ib_queue_pair *qp,
 				    struct ib_completion *completion,
 				    struct io_buffer *iobuf );
 
@@ -156,9 +169,9 @@ struct ib_device_operations {
 	/** Post send work queue entry
 	 *
 	 * @v ibdev		Infiniband device
-	 * @v iobuf		I/O buffer
-	 * @v av		Address vector
 	 * @v qp		Queue pair
+	 * @v av		Address vector
+	 * @v iobuf		I/O buffer
 	 * @ret rc		Return status code
 	 *
 	 * If this method returns success, the I/O buffer remains
@@ -167,9 +180,9 @@ struct ib_device_operations {
 	 * interpreted as "failure to enqueue buffer".
 	 */
 	int ( * post_send ) ( struct ib_device *ibdev,
-			      struct io_buffer *iobuf,
+			      struct ib_queue_pair *qp,
 			      struct ib_address_vector *av,
-			      struct ib_queue_pair *qp );
+			      struct io_buffer *iobuf );
 	/** Poll completion queue
 	 *
 	 * @v ibdev		Infiniband device
@@ -187,10 +200,13 @@ struct ib_device_operations {
 
 /** An Infiniband device */
 struct ib_device {	
-	/** Driver private data */
-	void *priv;
+	/** Device private data */
+	void *dev_priv;
 };
 
+
+extern struct ib_queue_pair * ib_find_qp ( struct list_head *list,
+					   unsigned long qpn );
 
 
 
