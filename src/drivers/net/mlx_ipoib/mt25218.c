@@ -124,41 +124,6 @@ static void mlx_close ( struct net_device *netdev ) {
 
 }
 
-#warning "Broadcast address?"
-static uint8_t ib_broadcast[IB_ALEN] = { 0xff, };
-
-
-/**
- * Transmit packet
- *
- * @v netdev		Network device
- * @v iobuf		I/O buffer
- * @ret rc		Return status code
- */
-static int mlx_transmit ( struct net_device *netdev,
-			  struct io_buffer *iobuf ) {
-	struct mlx_nic *mlx = netdev->priv;
-	ud_send_wqe_t snd_wqe;
-	int rc;
-
-	snd_wqe = alloc_send_wqe ( mlx->ipoib_qph );
-	if ( ! snd_wqe ) {
-		DBGC ( mlx, "MLX %p out of TX WQEs\n", mlx );
-		return -ENOBUFS;
-	}
-
-	prep_send_wqe_buf ( mlx->ipoib_qph, mlx->bcast_av, snd_wqe,
-			    iobuf->data, 0, iob_len ( iobuf ), 0 );
-	if ( ( rc = post_send_req ( mlx->ipoib_qph, snd_wqe, 1 ) ) != 0 ) {
-		DBGC ( mlx, "MLX %p could not post TX WQE %p: %s\n",
-		       mlx, snd_wqe, strerror ( rc ) );
-		free_wqe ( snd_wqe );
-		return rc;
-	}
-
-	return 0;
-}
-
 static int arbel_post_send ( struct ib_device *ibdev,
 			     struct ib_queue_pair *qp,
 			     struct ib_address_vector *av,
@@ -187,53 +152,6 @@ static int mlx_transmit_direct ( struct net_device *netdev,
 	return rc;
 }
 
-
-/**
- * Handle TX completion
- *
- * @v netdev		Network device
- * @v ib_cqe		Completion queue entry
- */
-static void mlx_tx_complete ( struct net_device *netdev,
-			      struct ib_cqe_st *ib_cqe ) {
-	netdev_tx_complete_next_err ( netdev,
-				      ( ib_cqe->is_error ? -EIO : 0 ) );
-}
-
-/**
- * Handle RX completion
- *
- * @v netdev		Network device
- * @v ib_cqe		Completion queue entry
- */
-static void mlx_rx_complete ( struct net_device *netdev,
-			      struct ib_cqe_st *ib_cqe ) {
-	unsigned int len;
-	struct io_buffer *iobuf;
-	void *buf;
-
-	/* Check for errors */
-	if ( ib_cqe->is_error ) {
-		netdev_rx_err ( netdev, NULL, -EIO );
-		return;
-	}
-
-	/* Allocate I/O buffer */
-	len = ( ib_cqe->count - GRH_SIZE );
-	iobuf = alloc_iob ( len );
-	if ( ! iobuf ) {
-		netdev_rx_err ( netdev, NULL, -ENOMEM );
-		return;
-	}
-
-	/* Fill I/O buffer */
-	buf = get_rcv_wqe_buf ( ib_cqe->wqe, 1 );
-	memcpy ( iob_put ( iobuf, len ), buf, len );
-
-	/* Hand off to network stack */
-	netdev_rx ( netdev, iobuf );
-}
-
 static void arbel_poll_cq ( struct ib_device *ibdev,
 			    struct ib_completion_queue *cq,
 			    ib_completer_t complete_send,
@@ -258,8 +176,6 @@ static void temp_complete_recv ( struct ib_device *ibdev __unused,
 	struct mlx_nic *mlx = netdev->priv;
 
 	DBG ( "Yay! RX completion on %p len %zx:\n", iobuf, completion->len );
-	//	DBG_HD ( iobuf, sizeof ( *iobuf ) );
-	//	DBG_HD ( iobuf->data, 256 );
 	if ( completion->syndrome ) {
 		netdev_rx_err ( netdev, iobuf, -EIO );
 	} else {
@@ -270,43 +186,6 @@ static void temp_complete_recv ( struct ib_device *ibdev __unused,
 
 	mlx->rx_fill--;
 }
-
-#if 0
-/**
- * Poll completion queue
- *
- * @v netdev		Network device
- * @v cq		Completion queue
- * @v handler		Completion handler
- */
-static void mlx_poll_cq ( struct net_device *netdev, cq_t cq,
-			  void ( * handler ) ( struct net_device *netdev,
-					       struct ib_cqe_st *ib_cqe ) ) {
-	struct mlx_nic *mlx = netdev->priv;
-	struct ib_cqe_st ib_cqe;
-	uint8_t num_cqes;
-
-	while ( 1 ) {
-
-		/* Poll for single completion queue entry */
-		ib_poll_cq ( cq, &ib_cqe, &num_cqes );
-
-		/* Return if no entries in the queue */
-		if ( ! num_cqes )
-			return;
-
-		DBGC ( mlx, "MLX %p cpl in %p: err %x send %x "
-		       "wqe %p count %lx\n", mlx, cq, ib_cqe.is_error,
-		       ib_cqe.is_send, ib_cqe.wqe, ib_cqe.count );
-
-		/* Handle TX/RX completion */
-		handler ( netdev, &ib_cqe );
-
-		/* Free associated work queue entry */
-		free_wqe ( ib_cqe.wqe );
-	}
-}
-#endif
 
 static int arbel_post_recv ( struct ib_device *ibdev,
 			     struct ib_queue_pair *qp,
@@ -322,8 +201,6 @@ static void mlx_refill_rx ( struct net_device *netdev ) {
 		if ( ! iobuf )
 			break;
 		DBG ( "Posting RX buffer %p:\n", iobuf );
-		//		memset ( iobuf->data, 0xaa, 256 );
-		//		DBG_HD ( iobuf, sizeof ( *iobuf ) );
 		if ( ( rc = arbel_post_recv ( &static_ibdev, &static_ipoib_qp,
 					      iobuf ) ) != 0 ) {
 			free_iob ( iobuf );
