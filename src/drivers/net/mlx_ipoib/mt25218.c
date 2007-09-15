@@ -38,6 +38,37 @@ struct mlx_nic {
 	cq_t rcv_cqh;
 };
 
+
+static struct io_buffer *static_ipoib_tx_ring[NUM_IPOIB_SND_WQES];
+
+static struct arbel static_arbel;
+static struct arbel_send_work_queue static_arbel_ipoib_send_wq = {
+	.doorbell_idx = IPOIB_SND_QP_DB_IDX,
+};
+static struct arbel_completion_queue static_arbel_ipoib_send_cq = {
+	.doorbell_idx = IPOIB_SND_CQ_CI_DB_IDX,
+};
+
+static struct ib_device static_ibdev = {
+	.dev_priv = &static_arbel,
+};
+static struct ib_queue_pair static_ipoib_qp = {
+	.send = {
+		.num_wqes = NUM_IPOIB_SND_WQES,
+		.iobufs = static_ipoib_tx_ring,
+		.dev_priv = &static_arbel_ipoib_send_wq,
+	},
+	.list = LIST_HEAD_INIT ( static_ipoib_qp.list ),
+};
+static struct ib_completion_queue static_ipoib_send_cq = {
+	.cqn = 1234, /* Only used for debug messages */
+	.num_cqes = NUM_IPOIB_SND_CQES,
+	.dev_priv = &static_arbel_ipoib_send_cq,
+	.queue_pairs = LIST_HEAD_INIT ( static_ipoib_send_cq.queue_pairs ),
+};
+
+
+
 /**
  * Open network device
  *
@@ -110,6 +141,7 @@ static int mlx_transmit_direct ( struct net_device *netdev,
 	struct mlx_nic *mlx = netdev->priv;
 	int rc;
 
+#if 0
 	struct arbel arbel = {
 		.uar = memfree_pci_dev.uar,
 		.db_rec = dev_ib_data.uar_context_base,
@@ -130,6 +162,7 @@ static int mlx_transmit_direct ( struct net_device *netdev,
 			.dev_priv = &arbel_send_queue,
 		},
 	};
+#endif
 	struct ud_av_st *bcast_av = mlx->bcast_av;
 	struct arbelprm_ud_address_vector *bav =
 		( struct arbelprm_ud_address_vector * ) &bcast_av->av;
@@ -143,9 +176,13 @@ static int mlx_transmit_direct ( struct net_device *netdev,
 	};
 	memcpy ( &av.gid, ( ( void * ) bav ) + 16, 16 );
 
+#if 0
 	rc = arbel_post_send ( &ibdev, &qp, &av, iobuf );
 
 	next_tx_idx = qp.send.next_idx;
+#endif
+	rc = arbel_post_send ( &static_ibdev, &static_ipoib_qp, &av, iobuf );
+
 
 	return rc;
 }
@@ -179,6 +216,7 @@ static int next_cq_idx = 0;
 static void mlx_poll_cq_direct ( struct net_device *netdev ) {
 	struct mlx_nic *mlx = netdev->priv;
 
+#if 0
 	struct arbel arbel = {
 		.uar = memfree_pci_dev.uar,
 		.db_rec = dev_ib_data.uar_context_base,
@@ -218,6 +256,10 @@ static void mlx_poll_cq_direct ( struct net_device *netdev ) {
 	arbel_poll_cq ( &ibdev, &cq, temp_complete_send, temp_complete_recv );
 
 	next_cq_idx = cq.next_idx;
+#endif
+
+	arbel_poll_cq ( &static_ibdev, &static_ipoib_send_cq,
+			temp_complete_send, temp_complete_recv );
 }
 
 /**
@@ -673,6 +715,18 @@ static int arbel_probe ( struct pci_device *pci,
 	mac = ( ( struct ib_mac * ) netdev->ll_addr );
 	mac->qpn = htonl ( ib_get_qpn ( mlx->ipoib_qph ) );
 	memcpy ( &mac->gid, ib_data.port_gid.raw, sizeof ( mac->gid ) );
+
+	/* Hack up IB structures */
+	static_arbel.uar = memfree_pci_dev.uar;
+	static_arbel.db_rec = dev_ib_data.uar_context_base;
+	static_arbel_ipoib_send_wq.wqe =
+		( ( struct udqp_st * ) qph )->snd_wq;
+	static_arbel_ipoib_send_cq.cqe =
+		( ( struct cq_st * ) ib_data.ipoib_snd_cq )->cq_buf;
+	static_ipoib_qp.qpn = ib_get_qpn ( qph );
+	static_ipoib_qp.priv = netdev;
+	list_add ( &static_ipoib_qp.list,
+		   &static_ipoib_send_cq.queue_pairs );
 
 	/* Register network device */
 	if ( ( rc = register_netdev ( netdev ) ) != 0 )
