@@ -333,9 +333,11 @@ static void prep_sw2hw_mpt_buf(void *buf, __u32 mkey)
 	INS_FLD(1, buf, arbelprm_mpt_st, r_w);
 	INS_FLD(mkey, buf, arbelprm_mpt_st, mem_key);
 	INS_FLD(GLOBAL_PD, buf, arbelprm_mpt_st, pd);
-	INS_FLD(virt_to_bus(dev_buffers_p), buf, arbelprm_mpt_st,
-		start_address_l);
-	INS_FLD(memreg_size, buf, arbelprm_mpt_st, reg_wnd_len_l);
+	//	INS_FLD(virt_to_bus(dev_buffers_p), buf, arbelprm_mpt_st,
+	//		start_address_l);
+	//	INS_FLD(memreg_size, buf, arbelprm_mpt_st, reg_wnd_len_l);
+	INS_FLD(0xffffffffUL, buf, arbelprm_mpt_st, reg_wnd_len_l);
+	INS_FLD(0xffffffffUL, buf, arbelprm_mpt_st, reg_wnd_len_h);
 }
 
 static void prep_sw2hw_eq_buf(void *buf, struct eqe_t *eq_buf)

@@ -366,11 +366,11 @@ static int arbel_post_send ( struct ib_device *ibdev, struct io_buffer *iobuf,
 	MLX_POPULATE_1 ( &wqe->udseg, arbelprm_wqe_segment_ud_st, 9,
 			 q_key, av->qkey );
 
-	//	wqe->mpointer[0].local_addr_l =
-	//	cpu_to_be32 ( virt_to_bus ( iobuf->data ) );
+	wqe->mpointer[0].local_addr_l =
+		cpu_to_be32 ( virt_to_bus ( iobuf->data ) );
 
-	memcpy ( bus_to_virt ( be32_to_cpu ( wqe->mpointer[0].local_addr_l ) ),
-		 iobuf->data, iob_len ( iobuf ) );
+	//	memcpy ( bus_to_virt ( be32_to_cpu ( wqe->mpointer[0].local_addr_l ) ),
+	//		 iobuf->data, iob_len ( iobuf ) );
 
 
 	wqe->mpointer[0].byte_count = cpu_to_be32 ( iob_len ( iobuf ) );
