@@ -63,6 +63,7 @@ struct ibhdr {
 
 
 
+struct ib_device;
 
 /** An Infiniband Work Queue */
 struct ib_work_queue {
@@ -71,9 +72,11 @@ struct ib_work_queue {
 	/** Next work queue entry index
 	 *
 	 * This is the index of the next entry to be filled (i.e. the
-	 * first empty entry).
+	 * first empty entry).  This value is not bounded by num_wqes;
+	 * users must logical-AND with (num_wqes-1) to generate an
+	 * array index.
 	 */
-	unsigned int next_idx;
+	unsigned long next_idx;
 	/** I/O buffers assigned to work queue */
 	struct io_buffer **iobufs;
 	/** Driver private data */
@@ -91,6 +94,38 @@ struct ib_queue_pair {
 	/** Driver private data */
 	void *priv;
 };
+
+/** An Infiniband Completion Queue */
+struct ib_completion_queue {
+	/** Number of completion queue entries */
+	unsigned int num_cqes;
+	/** Next completion queue entry index
+	 *
+	 * This is the index of the next entry to be filled (i.e. the
+	 * first empty entry).  This value is not bounded by num_wqes;
+	 * users must logical-AND with (num_wqes-1) to generate an
+	 * array index.
+	 */
+	unsigned long next_idx;
+	/** Driver private data */
+	void *priv;
+};
+
+/** An Infiniband completion */
+struct ib_completion {
+	/** Length */
+	size_t len;
+};
+
+/** An Infiniband completion handler
+ *
+ * @v ibdev		Infiniband device
+ * @v completion	Completion
+ * @v iobuf		I/O buffer
+ */
+typedef void ( * ib_completer_t ) ( struct ib_device *ibdev,
+				    struct ib_completion *completion,
+				    struct io_buffer *iobuf );
 
 /** An Infiniband Address Vector */
 struct ib_address_vector {
@@ -110,15 +145,13 @@ struct ib_address_vector {
 	struct ib_gid gid;
 };
 
-struct ib_device;
-
 /**
  * Infiniband device operations
  *
  * These represent a subset of the Infiniband Verbs.
  */
 struct ib_device_operations {
-	/** Post Send work queue entry
+	/** Post send work queue entry
 	 *
 	 * @v ibdev		Infiniband device
 	 * @v iobuf		I/O buffer
@@ -135,6 +168,19 @@ struct ib_device_operations {
 			      struct io_buffer *iobuf,
 			      struct ib_address_vector *av,
 			      struct ib_queue_pair *qp );
+	/** Poll completion queue
+	 *
+	 * @v ibdev		Infiniband device
+	 * @v cq		Completion queue
+	 * @v complete_send	Send completion handler
+	 * @v complete_recv	Receive completion handler
+	 *
+	 * The completion handler takes ownership of the I/O buffer.
+	 */
+	void ( * poll_cq ) ( struct ib_device *ibdev,
+			     struct ib_completion_queue *cq,
+			     ib_completer_t complete_send,
+			     ib_completer_t complete_recv );
 };
 
 /** An Infiniband device */
