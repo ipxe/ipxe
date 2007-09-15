@@ -68,11 +68,12 @@ struct ibhdr {
 struct ib_work_queue {
 	/** Number of work queue entries */
 	unsigned int num_wqes;
-	/** Posted index
+	/** Next work queue entry index
 	 *
-	 * This is the index of the most recently posted entry.
+	 * This is the index of the next entry to be filled (i.e. the
+	 * first empty entry).
 	 */
-	unsigned int posted;
+	unsigned int next_idx;
 	/** I/O buffers assigned to work queue */
 	struct io_buffer **iobufs;
 	/** Driver private data */

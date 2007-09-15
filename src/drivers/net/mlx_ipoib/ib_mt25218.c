@@ -1122,9 +1122,14 @@ static int post_send_req(void *qph, void *wqeh, __u8 num_gather)
 	struct send_doorbell_st dbell;
 	__u32 nds;
 
+	DBG ( "Work queue entry:\n" );
+	DBG_HD ( snd_wqe, sizeof ( *snd_wqe ) );
+
 	qp->post_send_counter++;
 
 	WRITE_WORD_VOL(qp->send_uar_context, 2, htons(qp->post_send_counter));
+	DBG ( "Doorbell record:\n" );
+	DBG_HD ( qp->send_uar_context, 8 );
 
 	memset(&dbell, 0, sizeof dbell);
 	INS_FLD(XDEV_NOPCODE_SEND, &dbell, arbelprm_send_doorbell_st, nopcode);
@@ -1148,6 +1153,10 @@ static int post_send_req(void *qph, void *wqeh, __u8 num_gather)
 		INS_FLD_TO_BE(XDEV_NOPCODE_SEND,
 			      &qp->last_posted_snd_wqe->next.next,
 			      arbelprm_wqe_segment_next_st, nopcode);
+
+		DBG ( "Previous work queue entry's next field:\n" );
+		DBG_HD ( &qp->last_posted_snd_wqe->next.next,
+			 sizeof ( qp->last_posted_snd_wqe->next.next ) );
 	}
 
 	rc = cmd_post_doorbell(&dbell, POST_SND_OFFSET);
@@ -1965,6 +1974,9 @@ static void dev_post_dbell(void *dbell, __u32 offset)
 	address = (unsigned long)(memfree_pci_dev.uar) + offset;
 	tprintf("va=0x%lx pa=0x%lx", address,
 		virt_to_bus((const void *)address));
+	DBG ( "dev_post_dbell %08lx:%08lx to %lx\n",
+	      htonl ( ptr[0] ), htonl ( ptr[1] ),
+	      virt_to_phys ( memfree_pci_dev.uar + offset ) );
 	writel(htonl(ptr[0]), memfree_pci_dev.uar + offset);
 	barrier();
 	address += 4;
