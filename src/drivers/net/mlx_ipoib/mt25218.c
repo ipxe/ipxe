@@ -52,57 +52,54 @@ static struct io_buffer *static_ipoib_tx_ring[NUM_IPOIB_SND_WQES];
 static struct io_buffer *static_ipoib_rx_ring[NUM_IPOIB_RCV_WQES];
 
 static struct arbel static_arbel;
-static struct arbel_send_work_queue static_arbel_ipoib_send_wq = {
-	.doorbell_idx = IPOIB_SND_QP_DB_IDX,
-};
-static struct arbel_send_work_queue static_arbel_ipoib_recv_wq = {
-	.doorbell_idx = IPOIB_RCV_QP_DB_IDX,
-};
-static struct arbel_completion_queue static_arbel_ipoib_send_cq = {
-	.doorbell_idx = IPOIB_SND_CQ_CI_DB_IDX,
-};
-static struct arbel_completion_queue static_arbel_ipoib_recv_cq = {
-	.doorbell_idx = IPOIB_RCV_CQ_CI_DB_IDX,
-};
+static struct arbel_completion_queue static_ipoib_send_cq;
+static struct arbel_completion_queue static_ipoib_recv_cq;
 
-static struct ib_completion_queue static_ipoib_send_cq;
-static struct ib_completion_queue static_ipoib_recv_cq;
-static struct ib_device static_ibdev = {
-	.dev_priv = &static_arbel,
-};
-static struct ib_queue_pair static_ipoib_qp = {
+static struct arbel_queue_pair static_ipoib_qp = {
+	.qp = {
+		.send = {
+			.qp = &static_ipoib_qp.qp,
+			.is_send = 1,
+			.cq = &static_ipoib_send_cq.cq,
+			.num_wqes = NUM_IPOIB_SND_WQES,
+			.iobufs = static_ipoib_tx_ring,
+			.list = LIST_HEAD_INIT (static_ipoib_qp.qp.send.list),
+		},
+		.recv = {
+			.qp = &static_ipoib_qp.qp,
+			.is_send = 0,
+			.cq = &static_ipoib_recv_cq.cq,
+			.num_wqes = NUM_IPOIB_RCV_WQES,
+			.iobufs = static_ipoib_rx_ring,
+			.list = LIST_HEAD_INIT (static_ipoib_qp.qp.recv.list),
+		},
+	},
 	.send = {
-		.qp = &static_ipoib_qp,
-		.is_send = 1,
-		.cq = &static_ipoib_send_cq,
-		.num_wqes = NUM_IPOIB_SND_WQES,
-		.iobufs = static_ipoib_tx_ring,
-		.dev_priv = &static_arbel_ipoib_send_wq,
-		.list = LIST_HEAD_INIT ( static_ipoib_qp.send.list ),
+		.doorbell_idx = IPOIB_SND_QP_DB_IDX,
 	},
 	.recv = {
-		.qp = &static_ipoib_qp,
-		.is_send = 0,
-		.cq = &static_ipoib_recv_cq,
-		.num_wqes = NUM_IPOIB_RCV_WQES,
-		.iobufs = static_ipoib_rx_ring,
-		.dev_priv = &static_arbel_ipoib_recv_wq,
-		.list = LIST_HEAD_INIT ( static_ipoib_qp.recv.list ),
+		.doorbell_idx = IPOIB_RCV_QP_DB_IDX,
 	},
 };
-static struct ib_completion_queue static_ipoib_send_cq = {
-	.cqn = 1234, /* Only used for debug messages */
-	.num_cqes = NUM_IPOIB_SND_CQES,
-	.dev_priv = &static_arbel_ipoib_send_cq,
-	.work_queues = LIST_HEAD_INIT ( static_ipoib_send_cq.work_queues ),
+static struct arbel_completion_queue static_ipoib_send_cq = {
+	.cq = {
+		.cqn = 1234, /* Only used for debug messages */
+		.num_cqes = NUM_IPOIB_SND_CQES,
+		.work_queues = LIST_HEAD_INIT (static_ipoib_send_cq.cq.work_queues),
+	},
+	.doorbell_idx = IPOIB_SND_CQ_CI_DB_IDX,
 };
-static struct ib_completion_queue static_ipoib_recv_cq = {
-	.cqn = 2345, /* Only used for debug messages */
-	.num_cqes = NUM_IPOIB_RCV_CQES,
-	.dev_priv = &static_arbel_ipoib_recv_cq,
-	.work_queues = LIST_HEAD_INIT ( static_ipoib_recv_cq.work_queues ),
+static struct arbel_completion_queue static_ipoib_recv_cq = {
+	.cq = {
+		.cqn = 2345, /* Only used for debug messages */
+		.num_cqes = NUM_IPOIB_RCV_CQES,
+		.work_queues = LIST_HEAD_INIT (static_ipoib_recv_cq.cq.work_queues),
+	},
+	.doorbell_idx = IPOIB_RCV_CQ_CI_DB_IDX,
 };
-
+static struct ib_device static_ibdev = {
+	.priv = &static_arbel,
+};
 
 
 /**
@@ -152,7 +149,7 @@ static int mlx_transmit_direct ( struct net_device *netdev,
 	};
 	memcpy ( &av.gid, ( ( void * ) bav ) + 16, 16 );
 
-	rc = arbel_post_send ( &static_ibdev, &static_ipoib_qp, &av, iobuf );
+	rc = arbel_post_send ( &static_ibdev, &static_ipoib_qp.qp, &av, iobuf );
 
 	return rc;
 }
@@ -206,7 +203,8 @@ static void mlx_refill_rx ( struct net_device *netdev ) {
 		if ( ! iobuf )
 			break;
 		DBG ( "Posting RX buffer %p:\n", iobuf );
-		if ( ( rc = arbel_post_recv ( &static_ibdev, &static_ipoib_qp,
+		if ( ( rc = arbel_post_recv ( &static_ibdev,
+					      &static_ipoib_qp.qp,
 					      iobuf ) ) != 0 ) {
 			free_iob ( iobuf );
 			break;
@@ -238,9 +236,9 @@ static void mlx_poll ( struct net_device *netdev ) {
 	}
 
 	/* Poll completion queues */
-	arbel_poll_cq ( &static_ibdev, &static_ipoib_send_cq,
+	arbel_poll_cq ( &static_ibdev, &static_ipoib_send_cq.cq,
 			temp_complete_send, temp_complete_recv );
-	arbel_poll_cq ( &static_ibdev, &static_ipoib_recv_cq,
+	arbel_poll_cq ( &static_ibdev, &static_ipoib_recv_cq.cq,
 			temp_complete_send, temp_complete_recv );
 	//	mlx_poll_cq ( netdev, mlx->rcv_cqh, mlx_rx_complete );
 
@@ -383,13 +381,30 @@ static int arbel_cmd ( struct arbel *arbel, unsigned long command,
 	return 0;
 }
 
-static int arbel_cmd_query_dev_lim ( struct arbel *arbel,
-				     struct arbelprm_query_dev_lim *out ) {
+static inline int
+arbel_cmd_query_dev_lim ( struct arbel *arbel,
+			  struct arbelprm_query_dev_lim *dev_lim ) {
 	return arbel_cmd ( arbel,
 			   ARBEL_HCR_OUT_CMD ( ARBEL_HCR_QUERY_DEV_LIM, 
-					       1, sizeof ( *out ) ),
-			   0, NULL, 0, out );
+					       1, sizeof ( *dev_lim ) ),
+			   0, NULL, 0, dev_lim );
 }
+
+static inline int
+arbel_cmd_sw2hw_cq ( struct arbel *arbel, unsigned long cqn,
+		     const struct arbelprm_completion_queue_context *cqctx ) {
+	return arbel_cmd ( arbel,
+			   ARBEL_HCR_IN_CMD ( ARBEL_HCR_SW2HW_CQ,
+					      1, sizeof ( *cqctx ) ),
+			   0, cqctx, cqn, NULL );
+}
+
+/***************************************************************************
+ *
+ * Completion queue operations
+ *
+ ***************************************************************************
+ */
 
 /**
  * Create completion queue
@@ -397,12 +412,31 @@ static int arbel_cmd_query_dev_lim ( struct arbel *arbel,
  * @v ibdev		Infiniband device
  * @v 
  */
-static int arbel_create_cq ( struct ib_device *ibdev ) {
-	struct arbelprm_completion_queue_context *cqctx;
+static int arbel_create_cq ( struct ib_device *ibdev,
+			     struct ib_completion_queue **new_cq ) {
+	struct arbel *arbel = ibdev->priv;
+	struct arbelprm_completion_queue_context cqctx;
+	struct ib_completion_queue *cq;
 
+	cq = zalloc ( sizeof ( *cq ) );
+	if ( ! cq )
+		return -ENOMEM;
 
+	
+
+	memset ( &cqctx, 0, sizeof ( cqctx ) );
+	
+
+	return arbel_cmd_sw2hw_cq ( arbel, 0, &cqctx );
 }
 
+
+/***************************************************************************
+ *
+ * Work request operations
+ *
+ ***************************************************************************
+ */
 
 /**
  * Ring doorbell register in UAR
@@ -438,9 +472,11 @@ static int arbel_post_send ( struct ib_device *ibdev,
 			     struct ib_queue_pair *qp,
 			     struct ib_address_vector *av,
 			     struct io_buffer *iobuf ) {
-	struct arbel *arbel = ibdev->dev_priv;
+	struct arbel *arbel = ibdev->priv;
+	struct arbel_queue_pair *arbel_qp
+		= container_of ( qp, struct arbel_queue_pair, qp );
 	struct ib_work_queue *wq = &qp->send;
-	struct arbel_send_work_queue *arbel_send_wq = wq->dev_priv;
+	struct arbel_send_work_queue *arbel_send_wq = &arbel_qp->send;
 	struct arbelprm_ud_send_wqe *prev_wqe;
 	struct arbelprm_ud_send_wqe *wqe;
 	union arbelprm_doorbell_record *db_rec;
@@ -526,9 +562,11 @@ static int arbel_post_send ( struct ib_device *ibdev,
 static int arbel_post_recv ( struct ib_device *ibdev,
 			     struct ib_queue_pair *qp,
 			     struct io_buffer *iobuf ) {
-	struct arbel *arbel = ibdev->dev_priv;
+	struct arbel *arbel = ibdev->priv;
+	struct arbel_queue_pair *arbel_qp
+		= container_of ( qp, struct arbel_queue_pair, qp );
 	struct ib_work_queue *wq = &qp->recv;
-	struct arbel_recv_work_queue *arbel_recv_wq = wq->dev_priv;
+	struct arbel_recv_work_queue *arbel_recv_wq = &arbel_qp->recv;
 	struct arbelprm_recv_wqe *wqe;
 	union arbelprm_doorbell_record *db_rec;
 	unsigned int wqe_idx_mask;
@@ -575,12 +613,14 @@ static int arbel_complete ( struct ib_device *ibdev,
 			    union arbelprm_completion_entry *cqe,
 			    ib_completer_t complete_send,
 			    ib_completer_t complete_recv ) {
-	struct arbel *arbel = ibdev->dev_priv;
+	struct arbel *arbel = ibdev->priv;
 	struct ib_completion completion;
 	struct ib_work_queue *wq;
-	struct io_buffer *iobuf;
+	struct ib_queue_pair *qp;
+	struct arbel_queue_pair *arbel_qp;
 	struct arbel_send_work_queue *arbel_send_wq;
 	struct arbel_recv_work_queue *arbel_recv_wq;
+	struct io_buffer *iobuf;
 	ib_completer_t complete;
 	unsigned int opcode;
 	unsigned long qpn;
@@ -614,14 +654,16 @@ static int arbel_complete ( struct ib_device *ibdev,
 		       arbel, cq->cqn, ( is_send ? "send" : "recv" ), qpn );
 		return -EIO;
 	}
+	qp = wq->qp;
+	arbel_qp = container_of ( qp, struct arbel_queue_pair, qp );
 
 	/* Identify work queue entry index */
 	if ( is_send ) {
-		arbel_send_wq = wq->dev_priv;
+		arbel_send_wq = &arbel_qp->send;
 		wqe_idx = ( ( wqe_adr - virt_to_bus ( arbel_send_wq->wqe ) ) /
 			    sizeof ( arbel_send_wq->wqe[0] ) );
 	} else {
-		arbel_recv_wq = wq->dev_priv;
+		arbel_recv_wq = &arbel_qp->recv;
 		wqe_idx = ( ( wqe_adr - virt_to_bus ( arbel_recv_wq->wqe ) ) /
 			    sizeof ( arbel_recv_wq->wqe[0] ) );
 	}
@@ -637,7 +679,7 @@ static int arbel_complete ( struct ib_device *ibdev,
 
 	/* Pass off to caller's completion handler */
 	complete = ( is_send ? complete_send : complete_recv );
-	complete ( ibdev, wq->qp, &completion, iobuf );
+	complete ( ibdev, qp, &completion, iobuf );
 
 	return rc;
 }			     
@@ -654,8 +696,9 @@ static void arbel_poll_cq ( struct ib_device *ibdev,
 			    struct ib_completion_queue *cq,
 			    ib_completer_t complete_send,
 			    ib_completer_t complete_recv ) {
-	struct arbel *arbel = ibdev->dev_priv;
-	struct arbel_completion_queue *arbel_cq = cq->dev_priv;
+	struct arbel *arbel = ibdev->priv;
+	struct arbel_completion_queue *arbel_cq
+		= container_of ( cq, struct arbel_completion_queue, cq );
 	union arbelprm_doorbell_record *db_rec;
 	union arbelprm_completion_entry *cqe;
 	unsigned int cqe_idx_mask;
@@ -757,20 +800,20 @@ static int arbel_probe ( struct pci_device *pci,
 	static_arbel.uar = memfree_pci_dev.uar;
 	static_arbel.db_rec = dev_ib_data.uar_context_base;
 	static_arbel.reserved_lkey = dev_ib_data.mkey;
-	static_arbel_ipoib_send_wq.wqe =
+	static_ipoib_qp.send.wqe =
 		( ( struct udqp_st * ) qph )->snd_wq;
-	static_arbel_ipoib_recv_wq.wqe =
+	static_ipoib_qp.recv.wqe =
 		( ( struct udqp_st * ) qph )->rcv_wq;
-	static_arbel_ipoib_send_cq.cqe =
+	static_ipoib_send_cq.cqe =
 		( ( struct cq_st * ) ib_data.ipoib_snd_cq )->cq_buf;
-	static_arbel_ipoib_recv_cq.cqe =
+	static_ipoib_recv_cq.cqe =
 		( ( struct cq_st * ) ib_data.ipoib_rcv_cq )->cq_buf;
-	static_ipoib_qp.qpn = ib_get_qpn ( qph );
-	static_ipoib_qp.priv = netdev;
-	list_add ( &static_ipoib_qp.send.list,
-		   &static_ipoib_send_cq.work_queues );
-	list_add ( &static_ipoib_qp.recv.list,
-		   &static_ipoib_recv_cq.work_queues );
+	static_ipoib_qp.qp.qpn = ib_get_qpn ( qph );
+	static_ipoib_qp.qp.priv = netdev;
+	list_add ( &static_ipoib_qp.qp.send.list,
+		   &static_ipoib_send_cq.cq.work_queues );
+	list_add ( &static_ipoib_qp.qp.recv.list,
+		   &static_ipoib_recv_cq.cq.work_queues );
 
 	struct arbelprm_query_dev_lim dev_lim;
 	memset ( &dev_lim, 0xaa, sizeof ( dev_lim ) );

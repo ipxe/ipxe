@@ -119,8 +119,20 @@ struct arbel_recv_work_queue {
 	union arbel_recv_wqe *wqe;
 };
 
+/** An Arbel queue pair */
+struct arbel_queue_pair {
+	/** Infiniband queue pair */
+	struct ib_queue_pair qp;
+	/** Send work queue */
+	struct arbel_send_work_queue send;
+	/** Receive work queue */
+	struct arbel_recv_work_queue recv;
+};
+
 /** An Arbel completion queue */
 struct arbel_completion_queue {
+	/** Infiniband completion queue */
+	struct ib_completion_queue cq;
 	/** Doorbell record number */
 	unsigned int doorbell_idx;
 	/** Completion queue entries */
@@ -154,6 +166,7 @@ struct arbel {
  */
 
 #define ARBEL_HCR_QUERY_DEV_LIM		0x0003
+#define ARBEL_HCR_SW2HW_CQ		0x0016
 
 #define ARBEL_HCR_BASE			0x80680
 #define ARBEL_HCR_REG(x)		( ARBEL_HCR_BASE + 4 * (x) )

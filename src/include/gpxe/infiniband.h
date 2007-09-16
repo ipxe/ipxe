@@ -89,8 +89,6 @@ struct ib_work_queue {
 	unsigned long next_idx;
 	/** I/O buffers assigned to work queue */
 	struct io_buffer **iobufs;
-	/** Device private data */
-	void *dev_priv;
 };
 
 /** An Infiniband Queue Pair */
@@ -103,8 +101,6 @@ struct ib_queue_pair {
 	struct ib_work_queue recv;
 	/** Queue owner private data */
 	void *priv;
-	/** Device private data */
-	void *dev_priv;
 };
 
 /** An Infiniband Completion Queue */
@@ -123,8 +119,6 @@ struct ib_completion_queue {
 	unsigned long next_idx;
 	/** List of work queues completing to this queue */
 	struct list_head work_queues;
-	/** Device private data */
-	void *dev_priv;
 };
 
 /** An Infiniband completion */
@@ -224,8 +218,8 @@ struct ib_device_operations {
 
 /** An Infiniband device */
 struct ib_device {	
-	/** Device private data */
-	void *dev_priv;
+	/** Driver private data */
+	void *priv;
 };
 
 
