@@ -17,11 +17,13 @@
  */
 
 #include <stdint.h>
+#include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
 #include <byteswap.h>
 #include <errno.h>
 #include <assert.h>
+#include <gpxe/list.h>
 #include <gpxe/if_arp.h>
 #include <gpxe/netdevice.h>
 #include <gpxe/iobuf.h>
@@ -32,6 +34,55 @@
  * Infiniband protocol
  *
  */
+
+/**
+ * Create completion queue
+ *
+ * @v ibdev		Infiniband device
+ * @v num_cqes		Number of completion queue entries
+ * @ret cq		New completion queue
+ */
+struct ib_completion_queue * ib_create_cq ( struct ib_device *ibdev,
+					    unsigned int num_cqes ) {
+	struct ib_completion_queue *cq;
+	int rc;
+
+	DBGC ( ibdev, "IBDEV %p creating completion queue\n", ibdev );
+
+	/* Allocate and initialise data structure */
+	cq = zalloc ( sizeof ( *cq ) );
+	if ( ! cq )
+		return NULL;
+	cq->num_cqes = num_cqes;
+	INIT_LIST_HEAD ( &cq->work_queues );
+
+	/* Perform device-specific initialisation and get CQN */
+	if ( ( rc = ibdev->op->create_cq ( ibdev, cq ) ) != 0 ) {
+		DBGC ( ibdev, "IBDEV %p could not initialise CQ: %s\n",
+		       ibdev, strerror ( rc ) );
+		free ( cq );
+		return NULL;
+	}
+
+	DBGC ( ibdev, "IBDEV %p created completion queue %#lx\n",
+	       ibdev, cq->cqn );
+	return cq;
+}
+
+/**
+ * Destroy completion queue
+ *
+ * @v ibdev		Infiniband device
+ * @v cq		Completion queue
+ */
+void ib_destroy_cq ( struct ib_device *ibdev,
+		     struct ib_completion_queue *cq ) {
+	DBGC ( ibdev, "IBDEV %p destroying completion queue %#lx\n",
+	       ibdev, cq->cqn );
+	assert ( list_empty ( &cq->work_queues ) );
+	ibdev->op->destroy_cq ( ibdev, cq );
+	free ( cq );
+}
 
 /**
  * Find work queue belonging to completion queue

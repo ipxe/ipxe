@@ -107,6 +107,8 @@ struct arbel_dev_limits {
 	unsigned long reserved_uars;
 	/** Number of reserved CQs */
 	unsigned long reserved_cqs;
+	/** Number of reserved QPs */
+	unsigned long reserved_qps;
 };
 
 /** Alignment of Arbel send work queue entries */
@@ -143,6 +145,15 @@ struct arbel_recv_work_queue {
 	union arbel_recv_wqe *wqe;
 };
 
+/** Maximum number of allocatable queue pairs
+ *
+ * This is a policy decision, not a device limit.
+ */
+#define ARBEL_MAX_QPS		8
+
+/** Base queue pair number */
+#define ARBEL_QPN_BASE 0x550000
+
 /** An Arbel queue pair */
 struct arbel_queue_pair {
 	/** Infiniband queue pair */
@@ -161,10 +172,10 @@ struct arbel_queue_pair {
 
 /** An Arbel completion queue */
 struct arbel_completion_queue {
-	/** Infiniband completion queue */
-	struct ib_completion_queue cq;
-	/** Doorbell record number */
-	unsigned int doorbell_idx;
+	/** Consumer counter doorbell record number */
+	unsigned int ci_doorbell_idx;
+	/** Arm queue doorbell record number */
+	unsigned int arm_doorbell_idx;
 	/** Completion queue entries */
 	union arbelprm_completion_entry *cqe;
 };
@@ -200,6 +211,8 @@ struct arbel {
 
 	/** Completion queue in-use bitmask */
 	arbel_bitmask_t cq_inuse[ ARBEL_BITMASK_SIZE ( ARBEL_MAX_CQS ) ];
+	/** Queue pair in-use bitmask */
+	arbel_bitmask_t qp_inuse[ ARBEL_BITMASK_SIZE ( ARBEL_MAX_QPS ) ];
 	
 	/** Device limits */
 	struct arbel_dev_limits limits;
@@ -301,7 +314,7 @@ arbel_recv_doorbell_idx ( unsigned int qpn_offset ) {
 }
 
 /**
- * Get commpletion queue consumer counter doorbell index
+ * Get completion queue consumer counter doorbell index
  *
  * @v cqn_offset	Completion queue number offset
  * @ret doorbell_idx	Doorbell index

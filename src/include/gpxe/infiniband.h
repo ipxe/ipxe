@@ -89,6 +89,8 @@ struct ib_work_queue {
 	unsigned long next_idx;
 	/** I/O buffers assigned to work queue */
 	struct io_buffer **iobufs;
+	/** Device private data */
+	void *dev_priv;
 };
 
 /** An Infiniband Queue Pair */
@@ -99,8 +101,10 @@ struct ib_queue_pair {
 	struct ib_work_queue send;
 	/** Receive queue */
 	struct ib_work_queue recv;
+	/** Device private data */
+	void *dev_priv;
 	/** Queue owner private data */
-	void *priv;
+	void *owner_priv;
 };
 
 /** An Infiniband Completion Queue */
@@ -119,6 +123,8 @@ struct ib_completion_queue {
 	unsigned long next_idx;
 	/** List of work queues completing to this queue */
 	struct list_head work_queues;
+	/** Device private data */
+	void *dev_priv;
 };
 
 /** An Infiniband completion */
@@ -172,13 +178,11 @@ struct ib_device_operations {
 	 * Create completion queue
 	 *
 	 * @v ibdev		Infiniband device
-	 * @v log2_num_cqes	Log2 of the number of completion queue entries
-	 * @ret new_cq		New completion queue
+	 * @v cq		Completion queue
 	 * @ret rc		Return status code
 	 */
 	int ( * create_cq ) ( struct ib_device *ibdev,
-			      unsigned int log2_num_cqes,
-			      struct ib_completion_queue **new_cq );
+			      struct ib_completion_queue *cq );
 	/**
 	 * Destroy completion queue
 	 *
@@ -237,8 +241,10 @@ struct ib_device_operations {
 
 /** An Infiniband device */
 struct ib_device {	
-	/** Driver private data */
-	void *priv;
+	/** Infiniband operations */
+	struct ib_device_operations *op;
+	/** Device private data */
+	void *dev_priv;
 };
 
 
