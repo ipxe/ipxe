@@ -29,6 +29,10 @@
 #define ARBEL_HCR_QUERY_DEV_LIM		0x0003
 #define ARBEL_HCR_SW2HW_CQ		0x0016
 #define ARBEL_HCR_HW2SW_CQ		0x0017
+#define ARBEL_HCR_RST2INIT_QPEE		0x0019
+#define ARBEL_HCR_INIT2RTR_QPEE		0x001a
+#define ARBEL_HCR_RTR2RTS_QPEE		0x001b
+#define ARBEL_HCR_2RST_QPEE		0x0021
 
 /*
  * Wrapper structures for hardware datatypes
@@ -43,6 +47,7 @@ struct MLX_DECLARE_STRUCT ( arbelprm_cq_ci_db_record );
 struct MLX_DECLARE_STRUCT ( arbelprm_hca_command_register );
 struct MLX_DECLARE_STRUCT ( arbelprm_qp_db_record );
 struct MLX_DECLARE_STRUCT ( arbelprm_query_dev_lim );
+struct MLX_DECLARE_STRUCT ( arbelprm_queue_pair_ee_context_entry );
 struct MLX_DECLARE_STRUCT ( arbelprm_recv_wqe_segment_next );
 struct MLX_DECLARE_STRUCT ( arbelprm_send_doorbell );
 struct MLX_DECLARE_STRUCT ( arbelprm_ud_address_vector );
@@ -126,6 +131,8 @@ struct arbel_send_work_queue {
 	unsigned int doorbell_idx;
 	/** Work queue entries */
 	union arbel_send_wqe *wqe;
+	/** Size of work queue */
+	size_t wqe_size;
 };
 
 /** Alignment of Arbel receive work queue entries */
@@ -143,6 +150,8 @@ struct arbel_recv_work_queue {
 	unsigned int doorbell_idx;
 	/** Work queue entries */
 	union arbel_recv_wqe *wqe;
+	/** Size of work queue */
+	size_t wqe_size;
 };
 
 /** Maximum number of allocatable queue pairs
@@ -156,8 +165,6 @@ struct arbel_recv_work_queue {
 
 /** An Arbel queue pair */
 struct arbel_queue_pair {
-	/** Infiniband queue pair */
-	struct ib_queue_pair qp;
 	/** Send work queue */
 	struct arbel_send_work_queue send;
 	/** Receive work queue */
@@ -178,6 +185,8 @@ struct arbel_completion_queue {
 	unsigned int arm_doorbell_idx;
 	/** Completion queue entries */
 	union arbelprm_completion_entry *cqe;
+	/** Size of completion queue */
+	size_t cqe_size;
 };
 
 /** An Arbel resource bitmask */

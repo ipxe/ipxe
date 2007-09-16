@@ -58,8 +58,8 @@ struct ib_completion_queue * ib_create_cq ( struct ib_device *ibdev,
 
 	/* Perform device-specific initialisation and get CQN */
 	if ( ( rc = ibdev->op->create_cq ( ibdev, cq ) ) != 0 ) {
-		DBGC ( ibdev, "IBDEV %p could not initialise CQ: %s\n",
-		       ibdev, strerror ( rc ) );
+		DBGC ( ibdev, "IBDEV %p could not initialise completion "
+		       "queue: %s\n", ibdev, strerror ( rc ) );
 		free ( cq );
 		return NULL;
 	}
@@ -83,6 +83,74 @@ void ib_destroy_cq ( struct ib_device *ibdev,
 	ibdev->op->destroy_cq ( ibdev, cq );
 	free ( cq );
 }
+
+/**
+ * Create queue pair
+ *
+ * @v ibdev		Infiniband device
+ * @v num_send_wqes	Number of send work queue entries
+ * @v send_cq		Send completion queue
+ * @v num_recv_wqes	Number of receive work queue entries
+ * @v recv_cq		Receive completion queue
+ * @ret qp		Queue pair
+ */
+struct ib_queue_pair * ib_create_qp ( struct ib_device *ibdev,
+				      unsigned int num_send_wqes,
+				      struct ib_completion_queue *send_cq,
+				      unsigned int num_recv_wqes,
+				      struct ib_completion_queue *recv_cq ) {
+	struct ib_queue_pair *qp;
+	int rc;
+
+	DBGC ( ibdev, "IBDEV %p creating queue pair\n", ibdev );
+
+	/* Allocate and initialise data structure */
+	qp = zalloc ( sizeof ( *qp ) +
+		      ( num_send_wqes * sizeof ( qp->send.iobufs[0] ) ) +
+		      ( num_recv_wqes * sizeof ( qp->recv.iobufs[0] ) ) );
+	if ( ! qp )
+		return NULL;
+	qp->send.qp = qp;
+	qp->send.is_send = 1;
+	qp->send.cq = send_cq;
+	list_add ( &qp->send.list, &send_cq->work_queues );
+	qp->send.num_wqes = num_send_wqes;
+	qp->send.iobufs = ( ( ( void * ) qp ) + sizeof ( *qp ) );
+	qp->recv.qp = qp;
+	qp->recv.cq = recv_cq;
+	list_add ( &qp->recv.list, &recv_cq->work_queues );
+	qp->recv.num_wqes = num_recv_wqes;
+	qp->recv.iobufs = ( ( ( void * ) qp ) + sizeof ( *qp ) +
+			    ( num_send_wqes * sizeof ( qp->send.iobufs[0] ) ));
+
+	/* Perform device-specific initialisation and get QPN */
+	if ( ( rc = ibdev->op->create_qp ( ibdev, qp ) ) != 0 ) {
+		DBGC ( ibdev, "IBDEV %p could not initialise queue pair: "
+		       "%s\n", ibdev, strerror ( rc ) );
+		free ( qp );
+		return NULL;
+	}
+
+	DBGC ( ibdev, "IBDEV %p created queue pair %#lx\n",
+	       ibdev, qp->qpn );
+	return qp;
+}
+
+/**
+ * Destroy queue pair
+ *
+ * @v ibdev		Infiniband device
+ * @v qp		Queue pair
+ */
+void ib_destroy_qp ( struct ib_device *ibdev,
+		     struct ib_queue_pair *qp ) {
+	DBGC ( ibdev, "IBDEV %p destroying queue pair %#lx\n",
+	       ibdev, qp->qpn );
+	ibdev->op->destroy_qp ( ibdev, qp );
+	free ( qp );
+}
+
+
 
 /**
  * Find work queue belonging to completion queue

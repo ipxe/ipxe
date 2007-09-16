@@ -464,6 +464,40 @@ arbel_cmd_hw2sw_cq ( struct arbel *arbel, unsigned long cqn ) {
 			   1, NULL, cqn, NULL );
 }
 
+static inline int
+arbel_cmd_rst2init_qpee ( struct arbel *arbel, unsigned long qpn,
+			  struct arbelprm_queue_pair_ee_context_entry *ctx ) {
+	return arbel_cmd ( arbel,
+			   ARBEL_HCR_IN_CMD ( ARBEL_HCR_RST2INIT_QPEE,
+					      1, sizeof ( *ctx ) ),
+			   0, ctx, qpn, NULL );
+}
+
+static inline int
+arbel_cmd_init2rtr_qpee ( struct arbel *arbel, unsigned long qpn,
+			  struct arbelprm_queue_pair_ee_context_entry *ctx ) {
+	return arbel_cmd ( arbel,
+			   ARBEL_HCR_IN_CMD ( ARBEL_HCR_INIT2RTR_QPEE,
+					      1, sizeof ( *ctx ) ),
+			   0, ctx, qpn, NULL );
+}
+
+static inline int
+arbel_cmd_rtr2rts_qpee ( struct arbel *arbel, unsigned long qpn,
+			 struct arbelprm_queue_pair_ee_context_entry *ctx ) {
+	return arbel_cmd ( arbel,
+			   ARBEL_HCR_IN_CMD ( ARBEL_HCR_RTR2RTS_QPEE,
+					      1, sizeof ( *ctx ) ),
+			   0, ctx, qpn, NULL );
+}
+
+static inline int
+arbel_cmd_2rst_qpee ( struct arbel *arbel, unsigned long qpn ) {
+	return arbel_cmd ( arbel,
+			   ARBEL_HCR_VOID_CMD ( ARBEL_HCR_2RST_QPEE ),
+			   0x03, NULL, qpn, NULL );
+}
+
 /***************************************************************************
  *
  * Completion queue operations
@@ -486,7 +520,6 @@ static int arbel_create_cq ( struct ib_device *ibdev,
 	struct arbelprm_cq_ci_db_record *ci_db_rec;
 	struct arbelprm_cq_arm_db_record *arm_db_rec;
 	int cqn_offset;
-	size_t cqe_size;
 	unsigned int i;
 	int rc;
 
@@ -509,13 +542,14 @@ static int arbel_create_cq ( struct ib_device *ibdev,
 	arbel_cq->arm_doorbell_idx = arbel_cq_arm_doorbell_idx ( cqn_offset );
 
 	/* Allocate completion queue itself */
-	cqe_size = ( cq->num_cqes * sizeof ( arbel_cq->cqe[0] ) );
-	arbel_cq->cqe = malloc_dma ( cqe_size, sizeof ( arbel_cq->cqe[0] ) );
+	arbel_cq->cqe_size = ( cq->num_cqes * sizeof ( arbel_cq->cqe[0] ) );
+	arbel_cq->cqe = malloc_dma ( arbel_cq->cqe_size,
+				     sizeof ( arbel_cq->cqe[0] ) );
 	if ( ! arbel_cq->cqe ) {
 		rc = -ENOMEM;
 		goto err_cqe;
 	}
-	memset ( arbel_cq->cqe, 0, cqe_size );
+	memset ( arbel_cq->cqe, 0, arbel_cq->cqe_size );
 	for ( i = 0 ; i < cq->num_cqes ; i++ ) {
 		MLX_FILL_1 ( &arbel_cq->cqe[i].normal, 7, owner, 1 );
 	}
@@ -538,11 +572,9 @@ static int arbel_create_cq ( struct ib_device *ibdev,
 	MLX_FILL_1 ( &cqctx, 0, st, 0xa /* "Event fired" */ );
 	MLX_FILL_1 ( &cqctx, 2, start_address_l,
 		     virt_to_bus ( arbel_cq->cqe ) );
-#if 0
 	MLX_FILL_2 ( &cqctx, 3,
 		     usr_page, arbel->limits.reserved_uars,
-		     log_cq_size, log2_num_cqes );
-#endif
+		     log_cq_size, ( fls ( cq->num_cqes ) - 1 ) );
 	MLX_FILL_1 ( &cqctx, 5, c_eqn, arbel->eqn );
 	MLX_FILL_1 ( &cqctx, 6, pd, ARBEL_GLOBAL_PD );
 	MLX_FILL_1 ( &cqctx, 7, l_key, arbel->reserved_lkey );
@@ -554,16 +586,16 @@ static int arbel_create_cq ( struct ib_device *ibdev,
 	if ( ( rc = arbel_cmd_sw2hw_cq ( arbel, cq->cqn, &cqctx ) ) != 0 ) {
 		DBGC ( arbel, "Arbel %p SW2HW_CQ failed: %s\n",
 		       arbel, strerror ( rc ) );
-		goto err_sw2hw;
+		goto err_sw2hw_cq;
 	}
 
 	cq->dev_priv = arbel_cq;
 	return 0;
 
- err_sw2hw:
+ err_sw2hw_cq:
 	MLX_FILL_1 ( ci_db_rec, 1, res, ARBEL_UAR_RES_NONE );
 	MLX_FILL_1 ( arm_db_rec, 1, res, ARBEL_UAR_RES_NONE );
-	free_dma ( arbel_cq->cqe, cqe_size );
+	free_dma ( arbel_cq->cqe, arbel_cq->cqe_size );
  err_cqe:
 	free ( arbel_cq );
  err_arbel_cq:
@@ -585,35 +617,31 @@ static void arbel_destroy_cq ( struct ib_device *ibdev,
 	struct arbelprm_cq_ci_db_record *ci_db_rec;
 	struct arbelprm_cq_arm_db_record *arm_db_rec;
 	int cqn_offset;
-	size_t cqe_size;
-	unsigned int ci_doorbell_idx;
-	unsigned int arm_doorbell_idx;
 	int rc;
-
-	assert ( list_empty ( &cq->work_queues ) );
 
 	/* Take ownership back from hardware */
 	if ( ( rc = arbel_cmd_hw2sw_cq ( arbel, cq->cqn ) ) != 0 ) {
-		DBGC ( arbel, "Arbel %p FATAL HW2SW_CQ failed: %s\n",
-		       arbel, strerror ( rc ) );
+		DBGC ( arbel, "Arbel %p FATAL HW2SW_CQ failed on CQN %#lx: "
+		       "%s\n", arbel, cq->cqn, strerror ( rc ) );
 		/* Leak memory and return; at least we avoid corruption */
 		return;
 	}
 
 	/* Clear doorbell records */
-	cqn_offset = ( cq->cqn - arbel->limits.reserved_cqs );
-	ci_doorbell_idx = arbel_cq_ci_doorbell_idx ( cqn_offset );
-	arm_doorbell_idx = arbel_cq_arm_doorbell_idx ( cqn_offset );
-	ci_db_rec = &arbel->db_rec[ci_doorbell_idx].cq_ci;
-	arm_db_rec = &arbel->db_rec[arm_doorbell_idx].cq_arm;
+	ci_db_rec = &arbel->db_rec[arbel_cq->ci_doorbell_idx].cq_ci;
+	arm_db_rec = &arbel->db_rec[arbel_cq->arm_doorbell_idx].cq_arm;
 	MLX_FILL_1 ( ci_db_rec, 1, res, ARBEL_UAR_RES_NONE );
 	MLX_FILL_1 ( arm_db_rec, 1, res, ARBEL_UAR_RES_NONE );
 
 	/* Free memory */
-	cqe_size = ( cq->num_cqes * sizeof ( arbel_cq->cqe[0] ) );
-	free_dma ( arbel_cq->cqe, cqe_size );
+	free_dma ( arbel_cq->cqe, arbel_cq->cqe_size );
 	free ( arbel_cq );
+
+	/* Mark queue number as free */
+	cqn_offset = ( cq->cqn - arbel->limits.reserved_cqs );
 	arbel_free_qn_offset ( arbel->cq_inuse, cqn_offset );
+
+	cq->dev_priv = NULL;
 }
 
 /***************************************************************************
@@ -623,22 +651,50 @@ static void arbel_destroy_cq ( struct ib_device *ibdev,
  ***************************************************************************
  */
 
+static int arbel_create_send_wq ( struct arbel_send_work_queue *arbel_send_wq,
+				  unsigned int num_wqes ) {
+
+	arbel_send_wq->wqe_size = ( num_wqes *
+				    sizeof ( arbel_send_wq->wqe[0] ) );
+	arbel_send_wq->wqe = malloc_dma ( arbel_send_wq->wqe_size,
+					  sizeof ( arbel_send_wq->wqe[0] ) );
+	if ( ! arbel_send_wq->wqe )
+		return -ENOMEM;
+
+	// initialise (prelink?)
+}
+
+static int arbel_create_recv_wq ( struct arbel_recv_work_queue *arbel_recv_wq,
+				  unsigned int num_wqes ) {
+
+	arbel_recv_wq->wqe_size = ( num_wqes *
+				    sizeof ( arbel_recv_wq->wqe[0] ) );
+	arbel_recv_wq->wqe = malloc_dma ( arbel_recv_wq->wqe_size,
+					  sizeof ( arbel_recv_wq->wqe[0] ) );
+	if ( ! arbel_recv_wq->wqe )
+		return -ENOMEM;
+
+	// initialise (prelink?)
+}
+
+
+
+
+/**
+ * Create queue pair
+ *
+ * @v ibdev		Infiniband device
+ * @v qp		Queue pair
+ * @ret rc		Return status code
+ */
 static int arbel_create_qp ( struct ib_device *ibdev,
-			     unsigned int log2_num_send_wqes,
-			     struct ib_completion_queue *send_cq,
-			     unsigned int log2_num_recv_wqes,
-			     struct ib_completion_queue *recv_cq,
-			     struct ib_queue_pair **new_qp ) {
+			     struct ib_queue_pair *qp ) {
 	struct arbel *arbel = ibdev->dev_priv;
 	struct arbel_queue_pair *arbel_qp;
+	struct arbelprm_queue_pair_ee_context_entry qpctx;
 	struct arbelprm_qp_db_record *send_db_rec;
 	struct arbelprm_qp_db_record *recv_db_rec;
 	int qpn_offset;
-	unsigned int qpn;
-	unsigned int num_send_wqes;
-	unsigned int num_recv_wqes;
-	unsigned int send_doorbell_idx;
-	unsigned int recv_doorbell_idx;
 	int rc;
 
 	/* Find a free queue pair number */
@@ -648,19 +704,115 @@ static int arbel_create_qp ( struct ib_device *ibdev,
 		rc = qpn_offset;
 		goto err_qpn_offset;
 	}
-	qpn = ( ARBEL_QPN_BASE + arbel->limits.reserved_qps + qpn_offset );
-	send_doorbell_idx = arbel_send_doorbell_idx ( qpn_offset );
-	recv_doorbell_idx = arbel_recv_doorbell_idx ( qpn_offset );
+	qp->qpn = ( ARBEL_QPN_BASE + arbel->limits.reserved_qps + qpn_offset );
 
 	/* Allocate control structures */
-	num_send_wqes = ( 1 << log2_num_send_wqes );
-	num_recv_wqes = ( 1 << log2_num_recv_wqes );
 	arbel_qp = zalloc ( sizeof ( *arbel_qp ) );
+	if ( ! arbel_qp ) {
+		rc = -ENOMEM;
+		goto err_arbel_qp;
+	}
+	arbel_qp->send.doorbell_idx = arbel_send_doorbell_idx ( qpn_offset );
+	arbel_qp->recv.doorbell_idx = arbel_recv_doorbell_idx ( qpn_offset );
 
+	/* Create send and receive work queues */
+	if ( ( rc = arbel_create_send_wq ( &arbel_qp->send,
+					   qp->send.num_wqes ) ) != 0 )
+		goto err_create_send_wq;
+	if ( ( rc = arbel_create_recv_wq ( &arbel_qp->recv,
+					   qp->recv.num_wqes ) ) != 0 )
+		goto err_create_recv_wq;
+
+	/* Initialise doorbell records */
+	send_db_rec = &arbel->db_rec[arbel_qp->send.doorbell_idx].qp;
+	MLX_FILL_1 ( send_db_rec, 0, counter, 0 );
+	MLX_FILL_2 ( send_db_rec, 1,
+		     res, ARBEL_UAR_RES_SQ,
+		     qp_number, qp->qpn );
+	recv_db_rec = &arbel->db_rec[arbel_qp->recv.doorbell_idx].qp;
+	MLX_FILL_1 ( recv_db_rec, 0, counter, 0 );
+	MLX_FILL_2 ( recv_db_rec, 1,
+		     res, ARBEL_UAR_RES_RQ,
+		     qp_number, qp->qpn );
+
+	/* Hand queue over to hardware */
+	memset ( &qpctx, 0, sizeof ( qpctx ) );
+	// ...  fill in context
+	if ( ( rc = arbel_cmd_rst2init_qpee ( arbel, qp->qpn, &qpctx )) != 0 ){
+		DBGC ( arbel, "Arbel %p RST2INIT_QPEE failed: %s\n",
+		       arbel, strerror ( rc ) );
+		goto err_rst2init_qpee;
+	}
+	if ( ( rc = arbel_cmd_init2rtr_qpee ( arbel, qp->qpn, &qpctx )) != 0 ){
+		DBGC ( arbel, "Arbel %p INIT2RTR_QPEE failed: %s\n",
+		       arbel, strerror ( rc ) );
+		goto err_init2rtr_qpee;
+	}
+	if ( ( rc = arbel_cmd_rtr2rts_qpee ( arbel, qp->qpn, &qpctx ) ) != 0 ){
+		DBGC ( arbel, "Arbel %p RTR2RTS_QPEE failed: %s\n",
+		       arbel, strerror ( rc ) );
+		goto err_rtr2rts_qpee;
+	}
+
+	qp->dev_priv = arbel_qp;
 	return 0;
 
+ err_rtr2rts_qpee:
+ err_init2rtr_qpee:
+	arbel_cmd_2rst_qpee ( arbel, qp->qpn );
+ err_rst2init_qpee:
+	MLX_FILL_1 ( send_db_rec, 1, res, ARBEL_UAR_RES_NONE );
+	MLX_FILL_1 ( recv_db_rec, 1, res, ARBEL_UAR_RES_NONE );
+	free_dma ( arbel_qp->recv.wqe, arbel_qp->recv.wqe_size );
+ err_create_recv_wq:
+	free_dma ( arbel_qp->send.wqe, arbel_qp->send.wqe_size );
+ err_create_send_wq:
+	free ( arbel_qp );
+ err_arbel_qp:
+	arbel_free_qn_offset ( arbel->qp_inuse, qpn_offset );
  err_qpn_offset:
 	return rc;
+}
+
+/**
+ * Destroy queue pair
+ *
+ * @v ibdev		Infiniband device
+ * @v qp		Queue pair
+ */
+static void arbel_destroy_qp ( struct ib_device *ibdev,
+			       struct ib_queue_pair *qp ) {
+	struct arbel *arbel = ibdev->dev_priv;
+	struct arbel_queue_pair *arbel_qp = qp->dev_priv;
+	struct arbelprm_qp_db_record *send_db_rec;
+	struct arbelprm_qp_db_record *recv_db_rec;
+	int qpn_offset;
+	int rc;
+
+	/* Take ownership back from hardware */
+	if ( ( rc = arbel_cmd_2rst_qpee ( arbel, qp->qpn ) ) != 0 ) {
+		DBGC ( arbel, "Arbel %p FATAL 2RST_QPEE failed on QPN %#lx: "
+		       "%s\n", arbel, qp->qpn, strerror ( rc ) );
+		/* Leak memory and return; at least we avoid corruption */
+		return;
+	}
+
+	/* Clear doorbell records */
+	send_db_rec = &arbel->db_rec[arbel_qp->send.doorbell_idx].qp;
+	recv_db_rec = &arbel->db_rec[arbel_qp->recv.doorbell_idx].qp;
+	MLX_FILL_1 ( send_db_rec, 1, res, ARBEL_UAR_RES_NONE );
+	MLX_FILL_1 ( recv_db_rec, 1, res, ARBEL_UAR_RES_NONE );
+
+	/* Free memory */
+	free_dma ( arbel_qp->send.wqe, arbel_qp->send.wqe_size );
+	free_dma ( arbel_qp->recv.wqe, arbel_qp->recv.wqe_size );
+	free ( arbel_qp );
+
+	/* Mark queue number as free */
+	qpn_offset = ( qp->qpn - ARBEL_QPN_BASE - arbel->limits.reserved_qps );
+	arbel_free_qn_offset ( arbel->qp_inuse, qpn_offset );
+
+	qp->dev_priv = NULL;
 }
 
 /***************************************************************************
@@ -966,6 +1118,8 @@ static void arbel_poll_cq ( struct ib_device *ibdev,
 static struct ib_device_operations arbel_ib_operations = {
 	.create_cq	= arbel_create_cq,
 	.destroy_cq	= arbel_destroy_cq,
+	.create_qp	= arbel_create_qp,
+	.destroy_qp	= arbel_destroy_qp,
 	.post_send	= arbel_post_send,
 	.post_recv	= arbel_post_recv,
 	.poll_cq	= arbel_poll_cq,
@@ -1048,6 +1202,7 @@ static int arbel_probe ( struct pci_device *pci,
 		   &static_ipoib_send_cq.work_queues );
 	list_add ( &static_ipoib_qp.recv.list,
 		   &static_ipoib_recv_cq.work_queues );
+	static_ibdev.op = &arbel_ib_operations;
 
 	/* Get device limits */
 	if ( ( rc = arbel_cmd_query_dev_lim ( arbel, &dev_lim ) ) != 0 ) {

@@ -174,8 +174,7 @@ struct ib_address_vector {
  * These represent a subset of the Infiniband Verbs.
  */
 struct ib_device_operations {
-	/**
-	 * Create completion queue
+	/** Create completion queue
 	 *
 	 * @v ibdev		Infiniband device
 	 * @v cq		Completion queue
@@ -183,14 +182,28 @@ struct ib_device_operations {
 	 */
 	int ( * create_cq ) ( struct ib_device *ibdev,
 			      struct ib_completion_queue *cq );
-	/**
-	 * Destroy completion queue
+	/** Destroy completion queue
 	 *
 	 * @v ibdev		Infiniband device
 	 * @v cq		Completion queue
 	 */
 	void ( * destroy_cq ) ( struct ib_device *ibdev,
 				struct ib_completion_queue *cq );
+	/** Create queue pair
+	 *
+	 * @v ibdev		Infiniband device
+	 * @v qp		Queue pair
+	 * @ret rc		Return status code
+	 */
+	int ( * create_qp ) ( struct ib_device *ibdev,
+			      struct ib_queue_pair *qp );
+	/** Destroy queue pair
+	 *
+	 * @v ibdev		Infiniband device
+	 * @v qp		Queue pair
+	 */
+	void ( * destroy_qp ) ( struct ib_device *ibdev,
+				struct ib_queue_pair *qp );
 	/** Post send work queue entry
 	 *
 	 * @v ibdev		Infiniband device
@@ -247,7 +260,16 @@ struct ib_device {
 	void *dev_priv;
 };
 
-
+extern struct ib_completion_queue * ib_create_cq ( struct ib_device *ibdev,
+						   unsigned int num_cqes );
+extern void ib_destroy_cq ( struct ib_device *ibdev,
+			    struct ib_completion_queue *cq );
+extern struct ib_queue_pair *
+ib_create_qp ( struct ib_device *ibdev, unsigned int num_send_wqes,
+	       struct ib_completion_queue *send_cq, unsigned int num_recv_wqes,
+	       struct ib_completion_queue *recv_cq );
+extern void ib_destroy_qp ( struct ib_device *ibdev,
+			    struct ib_queue_pair *qp );
 extern struct ib_work_queue * ib_find_wq ( struct ib_completion_queue *cq,
 					   unsigned long qpn, int is_send );
 
