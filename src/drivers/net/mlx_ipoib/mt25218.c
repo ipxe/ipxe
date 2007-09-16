@@ -26,6 +26,11 @@ Skeleton NIC driver for Etherboot
 #include "arbel.h"
 
 
+static const struct ib_gid arbel_no_gid = {
+	{ 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2 }
+};
+
+
 #define MLX_RX_MAX_FILL NUM_IPOIB_RCV_WQES
 
 struct mlx_nic {
@@ -263,11 +268,121 @@ static struct net_device_operations mlx_operations = {
 	.irq		= mlx_irq,
 };
 
+/**
+ * Wait for Arbel command completion
+ *
+ * @v arbel		Arbel device
+ * @ret rc		Return status code
+ */
+static int arbel_command_wait ( struct arbel *arbel,
+				struct arbelprm_hca_command_register *hcr ) {
+	unsigned int wait;
+
+	for ( wait = ARBEL_HCR_MAX_WAIT_MS ; wait ; wait-- ) {
+		hcr->u.dwords[6] =
+			readl ( arbel->config + ARBEL_HCR_REG ( 6 ) );
+		if ( MLX_GET ( hcr, go ) == 0 )
+			return 0;
+		mdelay ( 1 );
+	}
+	return -EBUSY;
+}
+
+/**
+ * Issue HCA command
+ *
+ * @v arbel		Arbel device
+ * @v op_fl		Opcode (plus implied flags)
+ * @v op_mod		Opcode modifier (0 if no modifier applicable)
+ * @v in_param		Input parameter
+ * @v in_param_len	Input parameter length
+ * @v in_mod		Input modifier (0 if no modifier applicable)
+ * @v out_param		Output parameter
+ * @ret rc		Return status code
+ */
+static int arbel_command ( struct arbel *arbel, unsigned int op_fl,
+			   unsigned int op_mod, const void *in_param,
+			   size_t in_param_len, unsigned int in_mod,
+			   void *out_param, size_t out_param_len ) {
+	struct arbelprm_hca_command_register hcr;
+	unsigned int status;
+	unsigned int i;
+	int rc;
+
+	/* Check that HCR is free */
+	if ( ( rc = arbel_command_wait ( arbel, &hcr ) ) != 0 ) {
+		DBGC ( arbel, "Arbel %p command interface locked\n", arbel );
+		return rc;
+	}
+
+	/* Prepare HCR */
+	memset ( &hcr, 0, sizeof ( hcr ) );
+	if ( op_fl & ARBEL_HCR_IN_IMMEDIATE ) {
+		memcpy ( &hcr.u.dwords[0], in_param, 8 );
+	} else if ( op_fl & ARBEL_HCR_IN_MAILBOX ) {
+		memcpy ( arbel->mailbox_in, in_param, in_param_len );
+		MLX_FILL_1 ( &hcr, 1, in_param_l,
+			     virt_to_bus ( arbel->mailbox_in ) );
+	}
+	MLX_FILL_1 ( &hcr, 2, input_modifier, in_mod );
+	if ( op_fl & ARBEL_HCR_OUT_MAILBOX ) {
+		MLX_FILL_1 ( &hcr, 4, out_param_l,
+			     virt_to_bus ( arbel->mailbox_out ) );
+	}
+	MLX_FILL_3 ( &hcr, 6,
+		     opcode, ( op_fl & ARBEL_HCR_OPCODE_MASK ),
+		     opcode_modifier, op_mod,
+		     go, 1 );
+
+	/* Issue command */
+	for ( i = 0 ; i < ( sizeof ( hcr ) / sizeof ( hcr.u.dwords[0] ) ) ;
+	      i++ ) {
+		writel ( hcr.u.dwords[i],
+			 arbel->config + ARBEL_HCR_REG ( i ) );
+		barrier();
+	}
+
+	/* Wait for command completion */
+	if ( ( rc = arbel_command_wait ( arbel, &hcr ) ) != 0 ) {
+		DBGC ( arbel, "Arbel %p timed out waiting for command:\n",
+		       arbel );
+		DBGC_HD ( arbel, &hcr, sizeof ( hcr ) );
+		return rc;
+	}
+
+	/* Check command status */
+	status = MLX_GET ( &hcr, status );
+	if ( status != 0 ) {
+		DBGC ( arbel, "Arbel %p command failed with status %02x:\n",
+		       arbel, status );
+		DBGC_HD ( arbel, &hcr, sizeof ( hcr ) );
+		return -EIO;
+	}
+
+	/* Read output parameters, if any */
+	hcr.u.dwords[3] = readl ( arbel->config + ARBEL_HCR_REG ( 3 ) );
+	hcr.u.dwords[4] = readl ( arbel->config + ARBEL_HCR_REG ( 4 ) );
+	if ( op_fl & ARBEL_HCR_OUT_IMMEDIATE ) {
+		memcpy ( out_param, &hcr.u.dwords[3], 8 );
+	} else if ( op_fl & ARBEL_HCR_OUT_MAILBOX ) {
+		memcpy ( out_param, arbel->mailbox_out, out_param_len );
+	}
+
+	return 0;
+}
+
+/**
+ * Create completion queue
+ *
+ * @v ibdev		Infiniband device
+ * @v 
+ */
+static int arbel_create_cq ( struct ib_device *ibdev ) {
+	struct arbelprm_completion_queue_context *cqctx;
 
 
-static struct ib_gid arbel_no_gid = {
-	{ 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2 }
-};
+}
+
 
 /**
  * Ring doorbell register in UAR
@@ -310,7 +425,7 @@ static int arbel_post_send ( struct ib_device *ibdev,
 	struct arbelprm_ud_send_wqe *wqe;
 	union arbelprm_doorbell_record *db_rec;
 	union arbelprm_doorbell_register db_reg;
-	struct ib_gid *gid;
+	const struct ib_gid *gid;
 	unsigned int wqe_idx_mask;
 	size_t nds;
 
@@ -616,6 +731,9 @@ static int arbel_probe ( struct pci_device *pci,
 	memcpy ( &mac->gid, ib_data.port_gid.raw, sizeof ( mac->gid ) );
 
 	/* Hack up IB structures */
+	static_arbel.config = memfree_pci_dev.cr_space;
+	static_arbel.mailbox_in = dev_buffers_p->inprm_buf;
+	static_arbel.mailbox_out = dev_buffers_p->outprm_buf;
 	static_arbel.uar = memfree_pci_dev.uar;
 	static_arbel.db_rec = dev_ib_data.uar_context_base;
 	static_arbel.reserved_lkey = dev_ib_data.mkey;
@@ -633,6 +751,16 @@ static int arbel_probe ( struct pci_device *pci,
 		   &static_ipoib_send_cq.work_queues );
 	list_add ( &static_ipoib_qp.recv.list,
 		   &static_ipoib_recv_cq.work_queues );
+
+	uint8_t buf[512];
+	memset ( buf, 0xaa, sizeof ( buf ) );
+	if ( ( rc = arbel_command ( &static_arbel,
+				    ( 0x03 | ARBEL_HCR_OUT_MAILBOX ), 0,
+				    NULL, 0, 0, buf, 256 ) ) != 0 ) {
+		DBG ( "QUERY_DEV_LIM failed: %s\n", strerror ( rc ) );
+	}
+	DBG ( "Device limits:\n ");
+	DBG_HD ( &buf[0], sizeof ( buf ) );
 
 	/* Register network device */
 	if ( ( rc = register_netdev ( netdev ) ) != 0 )

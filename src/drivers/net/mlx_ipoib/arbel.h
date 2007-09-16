@@ -17,13 +17,33 @@
 #define ARBEL_OPCODE_SEND_ERROR		0xff
 
 /*
+ * HCA commands
+ *
+ */
+
+#define ARBEL_HCR_BASE			0x80680
+#define ARBEL_HCR_REG(x)		( ARBEL_HCR_BASE + 4 * (x) )
+#define ARBEL_HCR_MAX_WAIT_MS		2000
+
+#define ARBEL_HCR_OPCODE_MASK		0x0000ffffUL
+#define ARBEL_HCR_IN_IMMEDIATE		0x00010000UL
+#define ARBEL_HCR_IN_MAILBOX		0x00020000UL
+#define ARBEL_HCR_OUT_IMMEDIATE		0x00040000UL
+#define ARBEL_HCR_OUT_MAILBOX		0x00080000UL
+
+#define ARBEL_HCR_OP_SW2HW_CQ		( 0x0016 | ARBEL_HCR_IN_MAILBOX )
+#define ARBEL_HCR_OP_NOP		( 0x0031 )
+
+/*
  * Wrapper structures for hardware datatypes
  *
  */
 
+struct MLX_DECLARE_STRUCT ( arbelprm_completion_queue_context );
 struct MLX_DECLARE_STRUCT ( arbelprm_completion_queue_entry );
 struct MLX_DECLARE_STRUCT ( arbelprm_completion_with_error );
 struct MLX_DECLARE_STRUCT ( arbelprm_cq_ci_db_record );
+struct MLX_DECLARE_STRUCT ( arbelprm_hca_command_register );
 struct MLX_DECLARE_STRUCT ( arbelprm_qp_db_record );
 struct MLX_DECLARE_STRUCT ( arbelprm_recv_wqe_segment_next );
 struct MLX_DECLARE_STRUCT ( arbelprm_send_doorbell );
@@ -126,6 +146,13 @@ struct arbel_completion_queue {
 
 /** An Arbel device */
 struct arbel {
+	/** Configuration registers */
+	void *config;
+	/** Command input mailbox */
+	void *mailbox_in;
+	/** Command output mailbox */
+	void *mailbox_out;
+
 	/** User Access Region */
 	void *uar;
 	/** Doorbell records */
