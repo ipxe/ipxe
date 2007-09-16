@@ -17,24 +17,6 @@
 #define ARBEL_OPCODE_SEND_ERROR		0xff
 
 /*
- * HCA commands
- *
- */
-
-#define ARBEL_HCR_BASE			0x80680
-#define ARBEL_HCR_REG(x)		( ARBEL_HCR_BASE + 4 * (x) )
-#define ARBEL_HCR_MAX_WAIT_MS		2000
-
-#define ARBEL_HCR_OPCODE_MASK		0x0000ffffUL
-#define ARBEL_HCR_IN_IMMEDIATE		0x00010000UL
-#define ARBEL_HCR_IN_MAILBOX		0x00020000UL
-#define ARBEL_HCR_OUT_IMMEDIATE		0x00040000UL
-#define ARBEL_HCR_OUT_MAILBOX		0x00080000UL
-
-#define ARBEL_HCR_OP_SW2HW_CQ		( 0x0016 | ARBEL_HCR_IN_MAILBOX )
-#define ARBEL_HCR_OP_NOP		( 0x0031 )
-
-/*
  * Wrapper structures for hardware datatypes
  *
  */
@@ -45,6 +27,7 @@ struct MLX_DECLARE_STRUCT ( arbelprm_completion_with_error );
 struct MLX_DECLARE_STRUCT ( arbelprm_cq_ci_db_record );
 struct MLX_DECLARE_STRUCT ( arbelprm_hca_command_register );
 struct MLX_DECLARE_STRUCT ( arbelprm_qp_db_record );
+struct MLX_DECLARE_STRUCT ( arbelprm_query_dev_lim );
 struct MLX_DECLARE_STRUCT ( arbelprm_recv_wqe_segment_next );
 struct MLX_DECLARE_STRUCT ( arbelprm_send_doorbell );
 struct MLX_DECLARE_STRUCT ( arbelprm_ud_address_vector );
@@ -164,5 +147,47 @@ struct arbel {
 	unsigned long reserved_lkey;
 	
 };
+
+/*
+ * HCA commands
+ *
+ */
+
+#define ARBEL_HCR_QUERY_DEV_LIM		0x0003
+
+#define ARBEL_HCR_BASE			0x80680
+#define ARBEL_HCR_REG(x)		( ARBEL_HCR_BASE + 4 * (x) )
+#define ARBEL_HCR_MAX_WAIT_MS		2000
+
+/* HCA command is split into
+ *
+ * bits  11:0	Opcode
+ * bit     12	Input uses mailbox
+ * bit     13	Output uses mailbox
+ * bits 22:14	Input parameter length (in dwords)
+ * bits 31:23	Output parameter length (in dwords)
+ *
+ * Encoding the information in this way allows us to cut out several
+ * parameters to the arbel_command() call.
+ */
+#define ARBEL_HCR_IN_MBOX		0x00001000UL
+#define ARBEL_HCR_OUT_MBOX		0x00002000UL
+#define ARBEL_HCR_OPCODE( _command )	( (_command) & 0xfff )
+#define ARBEL_HCR_IN_LEN( _command )	( ( (_command) >> 12 ) & 0x7fc )
+#define ARBEL_HCR_OUT_LEN( _command )	( ( (_command) >> 21 ) & 0x7fc )
+
+/** Build HCR command from component parts */
+#define ARBEL_HCR_CMD( _opcode, _in_mbox, _in_len, _out_mbox, _out_len )     \
+	( (_opcode) |							     \
+	  ( (_in_mbox) ? ARBEL_HCR_IN_MBOX : 0 ) |			     \
+	  ( ( (_in_len) / 4 ) << 14 ) |					     \
+	  ( (_out_mbox) ? ARBEL_HCR_OUT_MBOX : 0 ) |			     \
+	  ( ( (_out_len) / 4 ) << 23 ) )
+
+#define ARBEL_HCR_IN_CMD( _opcode, _in_mbox, _in_len )			     \
+	ARBEL_HCR_CMD ( _opcode, _in_mbox, _in_len, 0, 0 )
+
+#define ARBEL_HCR_OUT_CMD( _opcode, _out_mbox, _out_len )		     \
+	ARBEL_HCR_CMD ( _opcode, 0, 0, _out_mbox, _out_len )
 
 #endif /* _ARBEL_H */

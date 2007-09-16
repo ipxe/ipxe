@@ -268,14 +268,21 @@ static struct net_device_operations mlx_operations = {
 	.irq		= mlx_irq,
 };
 
+/***************************************************************************
+ *
+ * HCA commands
+ *
+ ***************************************************************************
+ */
+
 /**
  * Wait for Arbel command completion
  *
  * @v arbel		Arbel device
  * @ret rc		Return status code
  */
-static int arbel_command_wait ( struct arbel *arbel,
-				struct arbelprm_hca_command_register *hcr ) {
+static int arbel_cmd_wait ( struct arbel *arbel,
+			    struct arbelprm_hca_command_register *hcr ) {
 	unsigned int wait;
 
 	for ( wait = ARBEL_HCR_MAX_WAIT_MS ; wait ; wait-- ) {
@@ -292,45 +299,54 @@ static int arbel_command_wait ( struct arbel *arbel,
  * Issue HCA command
  *
  * @v arbel		Arbel device
- * @v op_fl		Opcode (plus implied flags)
+ * @v command		Command opcode, flags and input/output lengths
  * @v op_mod		Opcode modifier (0 if no modifier applicable)
- * @v in_param		Input parameter
- * @v in_param_len	Input parameter length
+ * @v in		Input parameters
  * @v in_mod		Input modifier (0 if no modifier applicable)
- * @v out_param		Output parameter
+ * @v out		Output parameters
  * @ret rc		Return status code
  */
-static int arbel_command ( struct arbel *arbel, unsigned int op_fl,
-			   unsigned int op_mod, const void *in_param,
-			   size_t in_param_len, unsigned int in_mod,
-			   void *out_param, size_t out_param_len ) {
+static int arbel_cmd ( struct arbel *arbel, unsigned long command,
+		       unsigned int op_mod, const void *in,
+		       unsigned int in_mod, void *out ) {
 	struct arbelprm_hca_command_register hcr;
+	unsigned int opcode = ARBEL_HCR_OPCODE ( command );
+	size_t in_len = ARBEL_HCR_IN_LEN ( command );
+	size_t out_len = ARBEL_HCR_OUT_LEN ( command );
+	void *in_buffer;
+	void *out_buffer;
 	unsigned int status;
 	unsigned int i;
 	int rc;
 
+	DBGC ( arbel, "Arbel %p command %02x in %zx%s out %zx%s\n",
+	       arbel, opcode, in_len,
+	       ( ( command & ARBEL_HCR_IN_MBOX ) ? "(mbox)" : "" ), out_len,
+	       ( ( command & ARBEL_HCR_OUT_MBOX ) ? "(mbox)" : "" ) );
+
 	/* Check that HCR is free */
-	if ( ( rc = arbel_command_wait ( arbel, &hcr ) ) != 0 ) {
+	if ( ( rc = arbel_cmd_wait ( arbel, &hcr ) ) != 0 ) {
 		DBGC ( arbel, "Arbel %p command interface locked\n", arbel );
 		return rc;
 	}
 
 	/* Prepare HCR */
 	memset ( &hcr, 0, sizeof ( hcr ) );
-	if ( op_fl & ARBEL_HCR_IN_IMMEDIATE ) {
-		memcpy ( &hcr.u.dwords[0], in_param, 8 );
-	} else if ( op_fl & ARBEL_HCR_IN_MAILBOX ) {
-		memcpy ( arbel->mailbox_in, in_param, in_param_len );
-		MLX_FILL_1 ( &hcr, 1, in_param_l,
-			     virt_to_bus ( arbel->mailbox_in ) );
+	in_buffer = &hcr.u.dwords[0];
+	if ( in_len && ( command & ARBEL_HCR_IN_MBOX ) ) {
+		in_buffer = arbel->mailbox_in;
+		MLX_FILL_1 ( &hcr, 1, in_param_l, virt_to_bus ( in_buffer ) );
 	}
+	memcpy ( in_buffer, in, in_len );
 	MLX_FILL_1 ( &hcr, 2, input_modifier, in_mod );
-	if ( op_fl & ARBEL_HCR_OUT_MAILBOX ) {
+	out_buffer = &hcr.u.dwords[3];
+	if ( out_len && ( command & ARBEL_HCR_OUT_MBOX ) ) {
+		out_buffer = arbel->mailbox_out;
 		MLX_FILL_1 ( &hcr, 4, out_param_l,
-			     virt_to_bus ( arbel->mailbox_out ) );
+			     virt_to_bus ( out_buffer ) );
 	}
 	MLX_FILL_3 ( &hcr, 6,
-		     opcode, ( op_fl & ARBEL_HCR_OPCODE_MASK ),
+		     opcode, opcode,
 		     opcode_modifier, op_mod,
 		     go, 1 );
 
@@ -343,7 +359,7 @@ static int arbel_command ( struct arbel *arbel, unsigned int op_fl,
 	}
 
 	/* Wait for command completion */
-	if ( ( rc = arbel_command_wait ( arbel, &hcr ) ) != 0 ) {
+	if ( ( rc = arbel_cmd_wait ( arbel, &hcr ) ) != 0 ) {
 		DBGC ( arbel, "Arbel %p timed out waiting for command:\n",
 		       arbel );
 		DBGC_HD ( arbel, &hcr, sizeof ( hcr ) );
@@ -362,13 +378,17 @@ static int arbel_command ( struct arbel *arbel, unsigned int op_fl,
 	/* Read output parameters, if any */
 	hcr.u.dwords[3] = readl ( arbel->config + ARBEL_HCR_REG ( 3 ) );
 	hcr.u.dwords[4] = readl ( arbel->config + ARBEL_HCR_REG ( 4 ) );
-	if ( op_fl & ARBEL_HCR_OUT_IMMEDIATE ) {
-		memcpy ( out_param, &hcr.u.dwords[3], 8 );
-	} else if ( op_fl & ARBEL_HCR_OUT_MAILBOX ) {
-		memcpy ( out_param, arbel->mailbox_out, out_param_len );
-	}
+	memcpy ( out, out_buffer, out_len );
 
 	return 0;
+}
+
+static int arbel_cmd_query_dev_lim ( struct arbel *arbel,
+				     struct arbelprm_query_dev_lim *out ) {
+	return arbel_cmd ( arbel,
+			   ARBEL_HCR_OUT_CMD ( ARBEL_HCR_QUERY_DEV_LIM, 
+					       1, sizeof ( *out ) ),
+			   0, NULL, 0, out );
 }
 
 /**
@@ -752,15 +772,14 @@ static int arbel_probe ( struct pci_device *pci,
 	list_add ( &static_ipoib_qp.recv.list,
 		   &static_ipoib_recv_cq.work_queues );
 
-	uint8_t buf[512];
-	memset ( buf, 0xaa, sizeof ( buf ) );
-	if ( ( rc = arbel_command ( &static_arbel,
-				    ( 0x03 | ARBEL_HCR_OUT_MAILBOX ), 0,
-				    NULL, 0, 0, buf, 256 ) ) != 0 ) {
+	struct arbelprm_query_dev_lim dev_lim;
+	memset ( &dev_lim, 0xaa, sizeof ( dev_lim ) );
+	if ( ( rc = arbel_cmd_query_dev_lim ( &static_arbel,
+					      &dev_lim ) ) != 0 ) {
 		DBG ( "QUERY_DEV_LIM failed: %s\n", strerror ( rc ) );
 	}
 	DBG ( "Device limits:\n ");
-	DBG_HD ( &buf[0], sizeof ( buf ) );
+	DBG_HD ( &dev_lim, sizeof ( dev_lim ) );
 
 	/* Register network device */
 	if ( ( rc = register_netdev ( netdev ) ) != 0 )
