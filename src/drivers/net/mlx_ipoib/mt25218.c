@@ -455,26 +455,37 @@ arbel_cmd_sw2hw_cq ( struct arbel *arbel, unsigned long cqn,
  * Create completion queue
  *
  * @v ibdev		Infiniband device
- * @v 
+ * @v log2_num_cqes	Log2 of the number of completion queue entries
+ * @ret new_cq		New completion queue
+ * @ret rc		Return status code
  */
-static int arbel_create_cq ( struct ib_device *ibdev, unsigned int num_cqes,
+static int arbel_create_cq ( struct ib_device *ibdev,
+			     unsigned int log2_num_cqes,
 			     struct ib_completion_queue **new_cq ) {
 	struct arbel *arbel = ibdev->priv;
 	struct arbel_completion_queue *arbel_cq;
 	struct arbelprm_completion_queue_context cqctx;
+	struct arbelprm_cq_ci_db_record *ci_db_rec;
+	struct arbelprm_cq_arm_db_record *arm_db_rec;
 	int cqn_offset;
 	unsigned int cqn;
+	unsigned int num_cqes;
 	size_t cqe_size;
+	unsigned int ci_doorbell_idx;
+	unsigned int arm_doorbell_idx;
 	unsigned int i;
 	int rc;
 
 	/* Find a free completion queue number */
 	cqn_offset = arbel_alloc_qn_offset ( arbel->cq_inuse, ARBEL_MAX_CQS );
 	if ( cqn_offset < 0 ) {
+		DBGC ( arbel, "Arbel %p out of completion queues\n", arbel );
 		rc = cqn_offset;
 		goto err_cqn_offset;
 	}
 	cqn = ( arbel->limits.reserved_cqs + cqn_offset );
+	ci_doorbell_idx = arbel_cq_ci_doorbell_idx ( cqn_offset );
+	arm_doorbell_idx = arbel_cq_arm_doorbell_idx ( cqn_offset );
 
 	/* Allocate control structures */
 	arbel_cq = zalloc ( sizeof ( *arbel_cq ) );
@@ -485,9 +496,10 @@ static int arbel_create_cq ( struct ib_device *ibdev, unsigned int num_cqes,
 	arbel_cq->cq.cqn = cqn;
 	arbel_cq->cq.num_cqes = num_cqes;
 	INIT_LIST_HEAD ( &arbel_cq->cq.work_queues );
-	arbel_cq->doorbell_idx = arbel_cq_ci_doorbell_idx ( cqn_offset );
+	arbel_cq->doorbell_idx = ci_doorbell_idx;
 
 	/* Allocate completion queue itself */
+	num_cqes = ( 1 << log2_num_cqes );
 	cqe_size = ( num_cqes * sizeof ( arbel_cq->cqe[0] ) );
 	arbel_cq->cqe = malloc_dma ( cqe_size, sizeof ( arbel_cq->cqe[0] ) );
 	if ( ! arbel_cq->cqe ) {
@@ -501,28 +513,43 @@ static int arbel_create_cq ( struct ib_device *ibdev, unsigned int num_cqes,
 	barrier();
 
 	/* Initialise doorbell records */
-	// ...
+	ci_db_rec = &arbel->db_rec[ci_doorbell_idx].cq_ci;
+	MLX_FILL_1 ( ci_db_rec, 0, counter, 0 );
+	MLX_FILL_2 ( ci_db_rec, 1,
+		     res, ARBEL_UAR_RES_CQ_CI,
+		     cq_number, cqn );
+	arm_db_rec = &arbel->db_rec[arm_doorbell_idx].cq_arm;
+	MLX_FILL_1 ( arm_db_rec, 0, counter, 0 );
+	MLX_FILL_2 ( arm_db_rec, 1,
+		     res, ARBEL_UAR_RES_CQ_ARM,
+		     cq_number, cqn );
 
 	/* Hand queue over to hardware */
 	memset ( &cqctx, 0, sizeof ( cqctx ) );
 	MLX_FILL_1 ( &cqctx, 0, st, 0xa /* "Event fired" */ );
 	MLX_FILL_1 ( &cqctx, 2, start_address_l,
 		     virt_to_bus ( arbel_cq->cqe ) );
-	///	....
-
+	MLX_FILL_2 ( &cqctx, 3,
+		     usr_page, arbel->limits.reserved_uars,
+		     log_cq_size, log2_num_cqes );
+	MLX_FILL_1 ( &cqctx, 5, c_eqn, arbel->eqn );
+	MLX_FILL_1 ( &cqctx, 6, pd, ARBEL_GLOBAL_PD );
+	MLX_FILL_1 ( &cqctx, 7, l_key, arbel->reserved_lkey );
+	MLX_FILL_1 ( &cqctx, 12, cqn, cqn );
+	MLX_FILL_1 ( &cqctx, 13, cq_ci_db_record, ci_doorbell_idx );
+	MLX_FILL_1 ( &cqctx, 14, cq_state_db_record, arm_doorbell_idx );
 	if ( ( rc = arbel_cmd_sw2hw_cq ( arbel, cqn, &cqctx ) ) != 0 ) {
-		// ...
+		DBGC ( arbel, "Arbel %p SW2HW_CQ failed: %s\n",
+		       arbel, strerror ( rc ) );
+		goto err_sw2hw;
 	}
 
-
-	// completion queue number
-	// doorbell index
-
 	*new_cq = &arbel_cq->cq;
-
-
 	return 0;
 
+ err_sw2hw:
+	memset ( ci_db_rec, 0, sizeof ( *ci_db_rec ) );
+	memset ( arm_db_rec, 0, sizeof ( *arm_db_rec ) );
  err_cqe:
 	free ( arbel_cq );
  err_arbel_cq:
@@ -580,7 +607,7 @@ static int arbel_post_send ( struct ib_device *ibdev,
 	struct arbel_send_work_queue *arbel_send_wq = &arbel_qp->send;
 	struct arbelprm_ud_send_wqe *prev_wqe;
 	struct arbelprm_ud_send_wqe *wqe;
-	union arbelprm_doorbell_record *db_rec;
+	struct arbelprm_qp_db_record *qp_db_rec;
 	union arbelprm_doorbell_register db_reg;
 	const struct ib_gid *gid;
 	unsigned int wqe_idx_mask;
@@ -602,7 +629,7 @@ static int arbel_post_send ( struct ib_device *ibdev,
 	MLX_FILL_1 ( &wqe->ctrl, 0, always1, 1 );
 	memset ( &wqe->ud, 0, sizeof ( wqe->ud ) );
 	MLX_FILL_2 ( &wqe->ud, 0,
-		     ud_address_vector.pd, GLOBAL_PD,
+		     ud_address_vector.pd, ARBEL_GLOBAL_PD,
 		     ud_address_vector.port_number, PXE_IB_PORT );
 	MLX_FILL_2 ( &wqe->ud, 1,
 		     ud_address_vector.rlid, av->dlid,
@@ -631,8 +658,8 @@ static int arbel_post_send ( struct ib_device *ibdev,
 
 	/* Update doorbell record */
 	barrier();
-	db_rec = &arbel->db_rec[arbel_send_wq->doorbell_idx];
-	MLX_FILL_1 ( &db_rec->qp, 0,
+	qp_db_rec = &arbel->db_rec[arbel_send_wq->doorbell_idx].qp;
+	MLX_FILL_1 ( qp_db_rec, 0,
 		     counter, ( ( wq->next_idx + 1 ) & 0xffff ) );
 
 	/* Ring doorbell register */
@@ -800,7 +827,7 @@ static void arbel_poll_cq ( struct ib_device *ibdev,
 	struct arbel *arbel = ibdev->priv;
 	struct arbel_completion_queue *arbel_cq
 		= container_of ( cq, struct arbel_completion_queue, cq );
-	union arbelprm_doorbell_record *db_rec;
+	struct arbelprm_cq_ci_db_record *ci_db_rec;
 	union arbelprm_completion_entry *cqe;
 	unsigned int cqe_idx_mask;
 	int rc;
@@ -828,8 +855,8 @@ static void arbel_poll_cq ( struct ib_device *ibdev,
 		/* Update completion queue's index */
 		cq->next_idx++;
 		/* Update doorbell record */
-		db_rec = &arbel->db_rec[arbel_cq->doorbell_idx];
-		MLX_FILL_1 ( &db_rec->cq_ci, 0,
+		ci_db_rec = &arbel->db_rec[arbel_cq->doorbell_idx].cq_ci;
+		MLX_FILL_1 ( ci_db_rec, 0,
 			     counter, ( cq->next_idx & 0xffffffffUL ) );
 	}
 }
@@ -897,12 +924,13 @@ static int arbel_probe ( struct pci_device *pci,
 	memcpy ( &mac->gid, ib_data.port_gid.raw, sizeof ( mac->gid ) );
 
 	/* Hack up IB structures */
-	static_arbel.config = memfree_pci_dev.cr_space;
-	static_arbel.mailbox_in = dev_buffers_p->inprm_buf;
-	static_arbel.mailbox_out = dev_buffers_p->outprm_buf;
-	static_arbel.uar = memfree_pci_dev.uar;
-	static_arbel.db_rec = dev_ib_data.uar_context_base;
-	static_arbel.reserved_lkey = dev_ib_data.mkey;
+	arbel->config = memfree_pci_dev.cr_space;
+	arbel->mailbox_in = dev_buffers_p->inprm_buf;
+	arbel->mailbox_out = dev_buffers_p->outprm_buf;
+	arbel->uar = memfree_pci_dev.uar;
+	arbel->db_rec = dev_ib_data.uar_context_base;
+	arbel->reserved_lkey = dev_ib_data.mkey;
+	arbel->eqn = dev_ib_data.eq.eqn;
 	static_ipoib_qp.send.wqe =
 		( ( struct udqp_st * ) qph )->snd_wq;
 	static_ipoib_qp.recv.wqe =
@@ -924,6 +952,7 @@ static int arbel_probe ( struct pci_device *pci,
 		       arbel, strerror ( rc ) );
 		goto err_query_dev_lim;
 	}
+	arbel->limits.reserved_uars = MLX_GET ( &dev_lim, num_rsvd_uars );
 	arbel->limits.reserved_cqs =
 		( 1 << MLX_GET ( &dev_lim, log2_rsvd_cqs ) );
 	DBG ( "Device limits:\n ");

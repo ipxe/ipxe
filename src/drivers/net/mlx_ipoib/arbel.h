@@ -12,9 +12,22 @@
  *
  */
 
+/* UAR context table (UCE) resource types */
+#define ARBEL_UAR_RES_NONE		0x00
+#define ARBEL_UAR_RES_CQ_CI		0x01
+#define ARBEL_UAR_RES_CQ_ARM		0x02
+#define ARBEL_UAR_RES_SQ		0x03
+#define ARBEL_UAR_RES_RQ		0x04
+#define ARBEL_UAR_RES_GROUP_SEP		0x07
+
+/* Work queue entry and completion queue entry opcodes */
 #define ARBEL_OPCODE_SEND		0x0a
 #define ARBEL_OPCODE_RECV_ERROR		0xfe
 #define ARBEL_OPCODE_SEND_ERROR		0xff
+
+/* HCA command register opcodes */
+#define ARBEL_HCR_QUERY_DEV_LIM		0x0003
+#define ARBEL_HCR_SW2HW_CQ		0x0016
 
 /*
  * Wrapper structures for hardware datatypes
@@ -24,6 +37,7 @@
 struct MLX_DECLARE_STRUCT ( arbelprm_completion_queue_context );
 struct MLX_DECLARE_STRUCT ( arbelprm_completion_queue_entry );
 struct MLX_DECLARE_STRUCT ( arbelprm_completion_with_error );
+struct MLX_DECLARE_STRUCT ( arbelprm_cq_arm_db_record );
 struct MLX_DECLARE_STRUCT ( arbelprm_cq_ci_db_record );
 struct MLX_DECLARE_STRUCT ( arbelprm_hca_command_register );
 struct MLX_DECLARE_STRUCT ( arbelprm_qp_db_record );
@@ -71,6 +85,7 @@ union arbelprm_completion_entry {
 } __attribute__ (( packed ));
 
 union arbelprm_doorbell_record {
+	struct arbelprm_cq_arm_db_record cq_arm;
 	struct arbelprm_cq_ci_db_record cq_ci;
 	struct arbelprm_qp_db_record qp;
 } __attribute__ (( packed ));
@@ -87,6 +102,8 @@ union arbelprm_doorbell_register {
 
 /** Arbel device limits */
 struct arbel_dev_limits {
+	/** Number of reserver UARs */
+	unsigned long reserved_uars;
 	/** Number of reserved CQs */
 	unsigned long reserved_cqs;
 };
@@ -177,6 +194,8 @@ struct arbel {
 	 * Used to get unrestricted memory access.
 	 */
 	unsigned long reserved_lkey;
+	/** Event queue number */
+	unsigned long eqn;
 
 	/** Completion queue in-use bitmask */
 	arbel_bitmask_t cq_inuse[ ARBEL_BITMASK_SIZE ( ARBEL_MAX_CQS ) ];
@@ -185,13 +204,13 @@ struct arbel {
 	struct arbel_dev_limits limits;
 };
 
+/** Global protection domain */
+#define ARBEL_GLOBAL_PD			0x123456
+
 /*
  * HCA commands
  *
  */
-
-#define ARBEL_HCR_QUERY_DEV_LIM		0x0003
-#define ARBEL_HCR_SW2HW_CQ		0x0016
 
 #define ARBEL_HCR_BASE			0x80680
 #define ARBEL_HCR_REG(x)		( ARBEL_HCR_BASE + 4 * (x) )
@@ -251,7 +270,7 @@ struct arbel {
  * @ret doorbell_idx	Doorbell index
  */
 static inline unsigned int
-arbel_arm_cq_doorbell_idx ( unsigned int cqn_offset ) {
+arbel_cq_arm_doorbell_idx ( unsigned int cqn_offset ) {
 	return cqn_offset;
 }
 
