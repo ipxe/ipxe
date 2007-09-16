@@ -35,10 +35,12 @@
 #define ARBEL_HCR_2RST_QPEE		0x0021
 
 /* Service types */
-#define ARBEL_ST_UD			0x01
+#define ARBEL_ST_UD			0x03
 
 /* MTUs */
 #define ARBEL_MTU_2048			0x04
+
+#define ARBEL_INVALID_LKEY		0x00000100UL
 
 /*
  * Wrapper structures for hardware datatypes

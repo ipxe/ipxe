@@ -336,6 +336,8 @@ static void prep_sw2hw_mpt_buf(void *buf, __u32 mkey)
 	//	INS_FLD(virt_to_bus(dev_buffers_p), buf, arbelprm_mpt_st,
 	//		start_address_l);
 	//	INS_FLD(memreg_size, buf, arbelprm_mpt_st, reg_wnd_len_l);
+	INS_FLD(0, buf, arbelprm_mpt_st, start_address_l);
+	INS_FLD(0, buf, arbelprm_mpt_st, start_address_h);
 	INS_FLD(0xffffffffUL, buf, arbelprm_mpt_st, reg_wnd_len_l);
 	INS_FLD(0xffffffffUL, buf, arbelprm_mpt_st, reg_wnd_len_h);
 }
@@ -1179,6 +1181,8 @@ static int create_mads_qp(void **qp_pp, void **snd_cq_pp, void **rcv_cq_pp)
 	__u8 nds;
 	void *ptr;
 
+	DBG ( "*** Creating MADS queue pair ***\n" );
+
 	qp = &dev_ib_data.mads_qp;
 
 	/* set the pointer to the receive WQEs buffer */
@@ -1289,6 +1293,8 @@ static int create_mads_qp(void **qp_pp, void **snd_cq_pp, void **rcv_cq_pp)
 		*rcv_cq_pp = &qp->rcv_cq;
 	}
 
+	DBG ( "*** Created MADS queue pair ***\n" );
+
 	return rc;
 }
 
@@ -1301,6 +1307,8 @@ static int create_ipoib_qp(void **qp_pp,
 	__u32 bus_addr;
 	__u8 nds;
 	void *ptr;
+
+	DBG ( "*** Creating IPoIB queue pair ***\n" );
 
 	qp = &dev_ib_data.ipoib_qp;
 
@@ -1407,6 +1415,8 @@ static int create_ipoib_qp(void **qp_pp,
 		*rcv_cq_pp = &qp->rcv_cq;
 	}
 
+	DBG ( "*** Created IPoIB queue pair ***\n" );
+
 	return rc;
 }
 
@@ -1427,6 +1437,8 @@ static int create_udqp(struct udqp_st *qp)
 	qp->snd_cq.ci_db_ctx_pointer =
 	    dev_ib_data.uar_context_base + 8 * qp->snd_cq.ci_db_ctx_idx;
 
+	DBG ( "* Creating send CQ *\n" );
+
 	/* create send CQ */
 	init_cq_buf(qp->snd_cq.cq_buf, qp->snd_cq.num_cqes);
 	qp->snd_cq.cons_counter = 0;
@@ -1442,6 +1454,8 @@ static int create_udqp(struct udqp_st *qp)
 		eprintf("");
 		goto exit;
 	}
+
+	DBG ( "* Creating receive CQ *\n" );
 
 	/* create receive CQ */
 	init_cq_buf(qp->rcv_cq.cq_buf, qp->rcv_cq.num_cqes);
@@ -1459,6 +1473,8 @@ static int create_udqp(struct udqp_st *qp)
 		eprintf("");
 		goto undo_snd_cq;
 	}
+
+	DBG ( "* Creating QP *\n" );
 
 	prep_rst2init_qpee_buf(inprm,
 			       qp->snd_cq.cqn,

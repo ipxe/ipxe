@@ -62,6 +62,8 @@ static int wait_logic_link_up(__u8 port)
 	return 0;
 }
 
+unsigned long ipoib_qkey;
+
 static int ib_driver_init(struct pci_device *pci, udqp_t * ipoib_qph_p)
 {
 	int rc;
@@ -147,6 +149,9 @@ static int ib_driver_init(struct pci_device *pci, udqp_t * ipoib_qph_p)
 			qkey, mlid);
 	}
 
+	ipoib_qkey = qkey;
+
+#if 0
 	rc = create_ipoib_qp(&ib_data.ipoib_qp,
 			     &ib_data.ipoib_snd_cq,
 			     &ib_data.ipoib_rcv_cq, qkey);
@@ -166,6 +171,7 @@ static int ib_driver_init(struct pci_device *pci, udqp_t * ipoib_qph_p)
 	} else {
 		tprintf("add_qp_to_mcast_group() success");
 	}
+#endif
 
 	/* create a broadcast group ud AV */
 	av = alloc_ud_av();
@@ -177,6 +183,19 @@ static int ib_driver_init(struct pci_device *pci, udqp_t * ipoib_qph_p)
 	modify_av_params(av, mlid, 1, 0, 0, &ib_data.bcast_gid, BCAST_QPN);
 	tprintf("modify_av_params() success");
 	ib_data.bcast_av = av;
+
+#if ! CREATE_OWN
+	rc = create_ipoib_qp(&ib_data.ipoib_qp,
+			     &ib_data.ipoib_snd_cq,
+			     &ib_data.ipoib_rcv_cq, qkey);
+	if (rc) {
+		eprintf("");
+		return rc;
+	}
+
+	tprintf("create_ipoib_qp() success");
+	*ipoib_qph_p = ib_data.ipoib_qp;
+#endif
 
 	do {
 		rc = poll_eq(&ib_eqe, &num_eqe);

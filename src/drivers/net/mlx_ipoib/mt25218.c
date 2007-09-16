@@ -22,6 +22,8 @@ Skeleton NIC driver for Etherboot
 /* to get the interface to the body of the program */
 #include "nic.h"
 
+#define CREATE_OWN 1
+
 #include "mt25218_imp.c"
 
 #include "arbel.h"
@@ -35,17 +37,25 @@ static const struct ib_gid arbel_no_gid = {
 #define MLX_RX_MAX_FILL NUM_IPOIB_RCV_WQES
 
 struct mlx_nic {
+#if ! CREATE_OWN
 	/** Queue pair handle */
 	udqp_t ipoib_qph;
-	/** Broadcast Address Vector */
-	ud_av_t bcast_av;
 	/** Send completion queue */
 	cq_t snd_cqh;
 	/** Receive completion queue */
 	cq_t rcv_cqh;
+#endif
+	/** Broadcast Address Vector */
+	ud_av_t bcast_av;
 
 	/** RX fill level */
 	unsigned int rx_fill;
+
+#if CREATE_OWN
+	struct ib_completion_queue *own_send_cq;
+	struct ib_completion_queue *own_recv_cq;
+	struct ib_queue_pair *own_qp;
+#endif
 };
 
 
@@ -53,6 +63,8 @@ static struct io_buffer *static_ipoib_tx_ring[NUM_IPOIB_SND_WQES];
 static struct io_buffer *static_ipoib_rx_ring[NUM_IPOIB_RCV_WQES];
 
 static struct arbel static_arbel;
+
+#if ! CREATE_OWN
 
 static struct arbel_completion_queue static_arbel_ipoib_send_cq = {
 	.ci_doorbell_idx = IPOIB_SND_CQ_CI_DB_IDX,
@@ -103,6 +115,8 @@ static struct ib_queue_pair static_ipoib_qp = {
 	},
 	.dev_priv = &static_arbel_ipoib_qp,
 };
+
+#endif
 
 
 static struct ib_device static_ibdev = {
@@ -157,7 +171,13 @@ static int mlx_transmit_direct ( struct net_device *netdev,
 	};
 	memcpy ( &av.gid, ( ( void * ) bav ) + 16, 16 );
 
-	rc = arbel_post_send ( &static_ibdev, &static_ipoib_qp, &av, iobuf );
+	rc = arbel_post_send ( &static_ibdev,
+#if CREATE_OWN
+			       mlx->own_qp,
+#else
+			       &static_ipoib_qp,
+#endif
+			       &av, iobuf );
 
 	return rc;
 }
@@ -212,7 +232,11 @@ static void mlx_refill_rx ( struct net_device *netdev ) {
 			break;
 		DBG ( "Posting RX buffer %p:\n", iobuf );
 		if ( ( rc = arbel_post_recv ( &static_ibdev,
+#if CREATE_OWN
+					      mlx->own_qp,
+#else
 					      &static_ipoib_qp,
+#endif
 					      iobuf ) ) != 0 ) {
 			free_iob ( iobuf );
 			break;
@@ -244,9 +268,19 @@ static void mlx_poll ( struct net_device *netdev ) {
 	}
 
 	/* Poll completion queues */
-	arbel_poll_cq ( &static_ibdev, &static_ipoib_send_cq,
+	arbel_poll_cq ( &static_ibdev,
+#if CREATE_OWN
+			mlx->own_send_cq,
+#else
+			&static_ipoib_send_cq,
+#endif
 			temp_complete_send, temp_complete_recv );
-	arbel_poll_cq ( &static_ibdev, &static_ipoib_recv_cq,
+	arbel_poll_cq ( &static_ibdev,
+#if CREATE_OWN
+			mlx->own_recv_cq,
+#else
+			&static_ipoib_recv_cq,
+#endif
 			temp_complete_send, temp_complete_recv );
 
 	mlx_refill_rx ( netdev );
@@ -406,6 +440,15 @@ static int arbel_cmd ( struct arbel *arbel, unsigned long command,
 		     opcode_modifier, op_mod,
 		     go, 1 );
 
+	DBG_HD ( &hcr, sizeof ( hcr ) );
+	if ( in_len ) {
+		size_t dump_len = in_len;
+		if ( dump_len > 256 )
+			dump_len = 256;
+		DBG ( "Input:\n" );
+		DBG_HD ( in, dump_len );
+	}
+
 	/* Issue command */
 	for ( i = 0 ; i < ( sizeof ( hcr ) / sizeof ( hcr.u.dwords[0] ) ) ;
 	      i++ ) {
@@ -435,6 +478,14 @@ static int arbel_cmd ( struct arbel *arbel, unsigned long command,
 	hcr.u.dwords[3] = readl ( arbel->config + ARBEL_HCR_REG ( 3 ) );
 	hcr.u.dwords[4] = readl ( arbel->config + ARBEL_HCR_REG ( 4 ) );
 	memcpy ( out, out_buffer, out_len );
+
+	if ( out_len ) {
+		size_t dump_len = out_len;
+		if ( dump_len > 256 )
+			dump_len = 256;
+		DBG ( "Output:\n" );
+		DBG_HD ( out, dump_len );
+	}
 
 	return 0;
 }
@@ -698,7 +749,9 @@ static int arbel_create_recv_wq ( struct arbel_recv_work_queue *arbel_recv_wq,
 	struct arbelprm_recv_wqe *wqe;
 	struct arbelprm_recv_wqe *next_wqe;
 	unsigned int wqe_idx_mask;
+	size_t nds;
 	unsigned int i;
+	unsigned int j;
 
 	/* Allocate work queue */
 	arbel_recv_wq->wqe_size = ( num_wqes *
@@ -711,11 +764,19 @@ static int arbel_create_recv_wq ( struct arbel_recv_work_queue *arbel_recv_wq,
 
 	/* Link work queue entries */
 	wqe_idx_mask = ( num_wqes - 1 );
+	nds = ( ( offsetof ( typeof ( *wqe ), data ) +
+		  sizeof ( wqe->data[0] ) ) >> 4 );
 	for ( i = 0 ; i < num_wqes ; i++ ) {
 		wqe = &arbel_recv_wq->wqe[i].recv;
 		next_wqe = &arbel_recv_wq->wqe[( i + 1 ) & wqe_idx_mask].recv;
 		MLX_FILL_1 ( &wqe->next, 0, nda_31_6,
 			     ( virt_to_bus ( next_wqe ) >> 6 ) );
+		MLX_FILL_1 ( &wqe->next, 1, nds, ( sizeof ( *wqe ) / 16 ) );
+		for ( j = 0 ; ( ( ( void * ) &wqe->data[j] ) <
+				( ( void * ) ( wqe + 1 ) ) ) ; j++ ) {
+			MLX_FILL_1 ( &wqe->data[j], 1,
+				     l_key, ARBEL_INVALID_LKEY );
+		}
 	}
 	
 	return 0;
@@ -787,10 +848,10 @@ static int arbel_create_qp ( struct ib_device *ibdev,
 		     qpc_eec_data.msg_max, 11 /* 2^11 = 2048 */,
 		     qpc_eec_data.log_rq_size, fls ( qp->recv.num_wqes - 1 ),
 		     qpc_eec_data.log_rq_stride,
-		     ( fls ( sizeof ( arbel_qp->send.wqe[0] ) - 1 ) - 4 ),
+		     ( fls ( sizeof ( arbel_qp->recv.wqe[0] ) - 1 ) - 4 ),
 		     qpc_eec_data.log_sq_size, fls ( qp->send.num_wqes - 1 ),
 		     qpc_eec_data.log_sq_stride,
-		     ( fls ( sizeof ( arbel_qp->recv.wqe[0] ) - 1 ) - 4 ) );
+		     ( fls ( sizeof ( arbel_qp->send.wqe[0] ) - 1 ) - 4 ) );
 	MLX_FILL_1 ( &qpctx, 5,
 		     qpc_eec_data.usr_page, arbel->limits.reserved_uars );
 	MLX_FILL_1 ( &qpctx, 10, qpc_eec_data.primary_address_path.port_number,
@@ -976,6 +1037,7 @@ static int arbel_post_send ( struct ib_device *ibdev,
 	MLX_FILL_1 ( &wqe->ud, 8, destination_qp, av->dest_qp );
 	MLX_FILL_1 ( &wqe->ud, 9, q_key, av->qkey );
 	MLX_FILL_1 ( &wqe->data[0], 0, byte_count, iob_len ( iobuf ) );
+	MLX_FILL_1 ( &wqe->data[0], 1, l_key, arbel->reserved_lkey );
 	MLX_FILL_1 ( &wqe->data[0], 3,
 		     local_address_l, virt_to_bus ( iobuf->data ) );
 
@@ -1249,6 +1311,7 @@ static int arbel_probe ( struct pci_device *pci,
 	/* Initialise hardware */
 	if ( ( rc = ib_driver_init ( pci, &qph ) ) != 0 )
 		goto err_ipoib_init;
+#if ! CREATE_OWN
 	mlx->ipoib_qph = qph;
 	mlx->bcast_av = ib_data.bcast_av;
 	mlx->snd_cqh = ib_data.ipoib_snd_cq;
@@ -1256,6 +1319,7 @@ static int arbel_probe ( struct pci_device *pci,
 	mac = ( ( struct ib_mac * ) netdev->ll_addr );
 	mac->qpn = htonl ( ib_get_qpn ( mlx->ipoib_qph ) );
 	memcpy ( &mac->gid, ib_data.port_gid.raw, sizeof ( mac->gid ) );
+#endif
 
 	/* Hack up IB structures */
 	arbel->config = memfree_pci_dev.cr_space;
@@ -1265,6 +1329,7 @@ static int arbel_probe ( struct pci_device *pci,
 	arbel->db_rec = dev_ib_data.uar_context_base;
 	arbel->reserved_lkey = dev_ib_data.mkey;
 	arbel->eqn = dev_ib_data.eq.eqn;
+#if ! CREATE_OWN
 	static_arbel_ipoib_qp.send.wqe =
 		( ( struct udqp_st * ) qph )->snd_wq;
 	static_arbel_ipoib_qp.recv.wqe =
@@ -1279,6 +1344,7 @@ static int arbel_probe ( struct pci_device *pci,
 		   &static_ipoib_send_cq.work_queues );
 	list_add ( &static_ipoib_qp.recv.list,
 		   &static_ipoib_recv_cq.work_queues );
+#endif
 	static_ibdev.op = &arbel_ib_operations;
 
 	/* Get device limits */
@@ -1293,12 +1359,40 @@ static int arbel_probe ( struct pci_device *pci,
 	arbel->limits.reserved_qps =
 		( 1 << MLX_GET ( &dev_lim, log2_rsvd_qps ) );
 
+#if CREATE_OWN
+	struct ib_device *ibdev = &static_ibdev;
+	mlx->own_send_cq = ib_create_cq ( ibdev, 32 );
+	if ( ! mlx->own_send_cq ) {
+		DBG ( "Could not create send CQ\n" );
+		return -EIO;
+	}
+	mlx->own_recv_cq = ib_create_cq ( ibdev, 32 );
+	if ( ! mlx->own_recv_cq ) {
+		DBG ( "Could not create send CQ\n" );
+		return -EIO;
+	}
+	mlx->own_qp = ib_create_qp ( ibdev, NUM_IPOIB_SND_WQES,
+				     mlx->own_send_cq, NUM_IPOIB_RCV_WQES,
+				     mlx->own_recv_cq, ipoib_qkey );
+	if ( ! mlx->own_qp ) {
+		DBG ( "Could not create QP\n" );
+		return -EIO;
+	}
+	mlx->own_qp->owner_priv = netdev;
+
+	mac = ( ( struct ib_mac * ) netdev->ll_addr );
+	mac->qpn = htonl ( mlx->own_qp->qpn );
+	memcpy ( &mac->gid, ib_data.port_gid.raw, sizeof ( mac->gid ) );	
+#endif
+
+#if 0
 	DBG ( "MADS SND CQN = %#lx\n", dev_ib_data.mads_qp.snd_cq.cqn );
 	struct ib_completion_queue *test_cq;
 	test_cq = ib_create_cq ( &static_ibdev, 32 );
 	if ( test_cq ) {
 		DBG ( "Woot: create_cq() passed!\n" );
 	}
+#endif
 
 	/* Register network device */
 	if ( ( rc = register_netdev ( netdev ) ) != 0 )
