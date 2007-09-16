@@ -85,6 +85,12 @@ union arbelprm_doorbell_register {
  *
  */
 
+/** Arbel device limits */
+struct arbel_dev_limits {
+	/** Number of reserved CQs */
+	unsigned long reserved_cqs;
+};
+
 /** Alignment of Arbel send work queue entries */
 #define ARBEL_SEND_WQE_ALIGN 128
 
@@ -129,6 +135,12 @@ struct arbel_queue_pair {
 	struct arbel_recv_work_queue recv;
 };
 
+/** Maximum number of allocatable completion queues
+ *
+ * This is a policy decision, not a device limit.
+ */
+#define ARBEL_MAX_CQS		8
+
 /** An Arbel completion queue */
 struct arbel_completion_queue {
 	/** Infiniband completion queue */
@@ -138,6 +150,14 @@ struct arbel_completion_queue {
 	/** Completion queue entries */
 	union arbelprm_completion_entry *cqe;
 };
+
+/** An Arbel resource bitmask */
+typedef uint32_t arbel_bitmask_t;
+
+/** Size of an Arbel resource bitmask */
+#define ARBEL_BITMASK_SIZE(max_entries)					     \
+	( ( (max_entries) + ( 8 * sizeof ( arbel_bitmask_t ) ) - 1 ) /	     \
+	  ( 8 * sizeof ( arbel_bitmask_t ) ) )
 
 /** An Arbel device */
 struct arbel {
@@ -157,7 +177,12 @@ struct arbel {
 	 * Used to get unrestricted memory access.
 	 */
 	unsigned long reserved_lkey;
+
+	/** Completion queue in-use bitmask */
+	arbel_bitmask_t cq_inuse[ ARBEL_BITMASK_SIZE ( ARBEL_MAX_CQS ) ];
 	
+	/** Device limits */
+	struct arbel_dev_limits limits;
 };
 
 /*
@@ -202,5 +227,65 @@ struct arbel {
 
 #define ARBEL_HCR_OUT_CMD( _opcode, _out_mbox, _out_len )		     \
 	ARBEL_HCR_CMD ( _opcode, 0, 0, _out_mbox, _out_len )
+
+/*
+ * Doorbell record allocation
+ *
+ * The doorbell record map looks like:
+ *
+ *    ARBEL_MAX_CQS * Arm completion queue doorbell
+ *    ARBEL_MAX_QPS * Send work request doorbell
+ *    Group separator
+ *    ...(empty space)...
+ *    ARBEL_MAX_QPS * Receive work request doorbell
+ *    ARBEL_MAX_CQS * Completion queue consumer counter update doorbell
+ */
+
+#define ARBEL_MAX_DOORBELL_RECORDS 512
+#define ARBEL_GROUP_SEPARATOR_DOORBELL ( ARBEL_MAX_CQS + ARBEL_MAX_QPS )
+
+/**
+ * Get arm completion queue doorbell index
+ *
+ * @v cqn_offset	Completion queue number offset
+ * @ret doorbell_idx	Doorbell index
+ */
+static inline unsigned int
+arbel_arm_cq_doorbell_idx ( unsigned int cqn_offset ) {
+	return cqn_offset;
+}
+
+/**
+ * Get send work request doorbell index
+ *
+ * @v qpn_offset	Queue pair number offset
+ * @ret doorbell_idx	Doorbell index
+ */
+static inline unsigned int
+arbel_send_doorbell_idx ( unsigned int qpn_offset ) {
+	return ( ARBEL_MAX_CQS + qpn_offset );
+}
+
+/**
+ * Get receive work request doorbell index
+ *
+ * @v qpn_offset	Queue pair number offset
+ * @ret doorbell_idx	Doorbell index
+ */
+static inline unsigned int
+arbel_recv_doorbell_idx ( unsigned int qpn_offset ) {
+	return ( ARBEL_MAX_DOORBELL_RECORDS - ARBEL_MAX_CQS - qpn_offset - 1 );
+}
+
+/**
+ * Get commpletion queue consumer counter doorbell index
+ *
+ * @v cqn_offset	Completion queue number offset
+ * @ret doorbell_idx	Doorbell index
+ */
+static inline unsigned int
+arbel_cq_ci_doorbell_idx ( unsigned int cqn_offset ) {
+	return ( ARBEL_MAX_DOORBELL_RECORDS - cqn_offset - 1 );
+}
 
 #endif /* _ARBEL_H */

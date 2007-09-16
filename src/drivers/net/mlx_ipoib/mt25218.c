@@ -12,6 +12,7 @@ Skeleton NIC driver for Etherboot
 
 #include <errno.h>
 #include <gpxe/pci.h>
+#include <gpxe/malloc.h>
 #include <gpxe/iobuf.h>
 #include <gpxe/netdevice.h>
 #include <gpxe/infiniband.h>
@@ -266,6 +267,50 @@ static struct net_device_operations mlx_operations = {
 	.irq		= mlx_irq,
 };
 
+
+
+
+/**
+ * Allocate queue number
+ *
+ * @v q_inuse		Queue usage bitmask
+ * @v max_inuse		Maximum number of in-use queues
+ * @ret qn_offset	Free queue number offset, or negative error
+ */
+static int arbel_alloc_qn_offset ( arbel_bitmask_t *q_inuse,
+				   unsigned int max_inuse ) {
+	unsigned int qn_offset = 0;
+	arbel_bitmask_t mask = 1;
+
+	while ( qn_offset < max_inuse ) {
+		if ( ( mask & *q_inuse ) == 0 ) {
+			*q_inuse |= mask;
+			return qn_offset;
+		}
+		qn_offset++;
+		mask <<= 1;
+		if ( ! mask ) {
+			mask = 1;
+			q_inuse++;
+		}
+	}
+	return -ENFILE;
+}
+
+/**
+ * Free queue number
+ *
+ * @v q_inuse		Queue usage bitmask
+ * @v qn_offset		Queue number offset
+ */
+static void arbel_free_qn_offset ( arbel_bitmask_t *q_inuse, int qn_offset ) {
+	arbel_bitmask_t mask;
+
+	mask = ( 1 << ( qn_offset % ( 8 * sizeof ( mask ) ) ) );
+	q_inuse += ( qn_offset / ( 8 * sizeof ( mask ) ) );
+	*q_inuse &= ~mask;
+}
+
 /***************************************************************************
  *
  * HCA commands
@@ -412,22 +457,78 @@ arbel_cmd_sw2hw_cq ( struct arbel *arbel, unsigned long cqn,
  * @v ibdev		Infiniband device
  * @v 
  */
-static int arbel_create_cq ( struct ib_device *ibdev,
+static int arbel_create_cq ( struct ib_device *ibdev, unsigned int num_cqes,
 			     struct ib_completion_queue **new_cq ) {
 	struct arbel *arbel = ibdev->priv;
+	struct arbel_completion_queue *arbel_cq;
 	struct arbelprm_completion_queue_context cqctx;
-	struct ib_completion_queue *cq;
+	int cqn_offset;
+	unsigned int cqn;
+	size_t cqe_size;
+	unsigned int i;
+	int rc;
 
-	cq = zalloc ( sizeof ( *cq ) );
-	if ( ! cq )
-		return -ENOMEM;
+	/* Find a free completion queue number */
+	cqn_offset = arbel_alloc_qn_offset ( arbel->cq_inuse, ARBEL_MAX_CQS );
+	if ( cqn_offset < 0 ) {
+		rc = cqn_offset;
+		goto err_cqn_offset;
+	}
+	cqn = ( arbel->limits.reserved_cqs + cqn_offset );
 
-	
+	/* Allocate control structures */
+	arbel_cq = zalloc ( sizeof ( *arbel_cq ) );
+	if ( ! arbel_cq ) {
+		rc = -ENOMEM;
+		goto err_arbel_cq;
+	}
+	arbel_cq->cq.cqn = cqn;
+	arbel_cq->cq.num_cqes = num_cqes;
+	INIT_LIST_HEAD ( &arbel_cq->cq.work_queues );
+	arbel_cq->doorbell_idx = arbel_cq_ci_doorbell_idx ( cqn_offset );
 
+	/* Allocate completion queue itself */
+	cqe_size = ( num_cqes * sizeof ( arbel_cq->cqe[0] ) );
+	arbel_cq->cqe = malloc_dma ( cqe_size, sizeof ( arbel_cq->cqe[0] ) );
+	if ( ! arbel_cq->cqe ) {
+		rc = -ENOMEM;
+		goto err_cqe;
+	}
+	memset ( arbel_cq->cqe, 0, cqe_size );
+	for ( i = 0 ; i < num_cqes ; i++ ) {
+		MLX_FILL_1 ( &arbel_cq->cqe[i].normal, 7, owner, 1 );
+	}
+	barrier();
+
+	/* Initialise doorbell records */
+	// ...
+
+	/* Hand queue over to hardware */
 	memset ( &cqctx, 0, sizeof ( cqctx ) );
-	
+	MLX_FILL_1 ( &cqctx, 0, st, 0xa /* "Event fired" */ );
+	MLX_FILL_1 ( &cqctx, 2, start_address_l,
+		     virt_to_bus ( arbel_cq->cqe ) );
+	///	....
 
-	return arbel_cmd_sw2hw_cq ( arbel, 0, &cqctx );
+	if ( ( rc = arbel_cmd_sw2hw_cq ( arbel, cqn, &cqctx ) ) != 0 ) {
+		// ...
+	}
+
+
+	// completion queue number
+	// doorbell index
+
+	*new_cq = &arbel_cq->cq;
+
+
+	return 0;
+
+ err_cqe:
+	free ( arbel_cq );
+ err_arbel_cq:
+	arbel_free_qn_offset ( arbel->cq_inuse, cqn_offset );
+ err_cqn_offset:
+	return rc;
 }
 
 
@@ -764,6 +865,8 @@ static void arbel_remove ( struct pci_device *pci ) {
 static int arbel_probe ( struct pci_device *pci,
 			 const struct pci_device_id *id __unused ) {
 	struct net_device *netdev;
+	struct arbelprm_query_dev_lim dev_lim;
+	struct arbel *arbel = &static_arbel;
 	struct mlx_nic *mlx;
 	struct ib_mac *mac;
 	udqp_t qph;
@@ -815,12 +918,14 @@ static int arbel_probe ( struct pci_device *pci,
 	list_add ( &static_ipoib_qp.qp.recv.list,
 		   &static_ipoib_recv_cq.cq.work_queues );
 
-	struct arbelprm_query_dev_lim dev_lim;
-	memset ( &dev_lim, 0xaa, sizeof ( dev_lim ) );
-	if ( ( rc = arbel_cmd_query_dev_lim ( &static_arbel,
-					      &dev_lim ) ) != 0 ) {
-		DBG ( "QUERY_DEV_LIM failed: %s\n", strerror ( rc ) );
+	/* Get device limits */
+	if ( ( rc = arbel_cmd_query_dev_lim ( arbel, &dev_lim ) ) != 0 ) {
+		DBGC ( arbel, "Arbel %p could not get device limits: %s\n",
+		       arbel, strerror ( rc ) );
+		goto err_query_dev_lim;
 	}
+	arbel->limits.reserved_cqs =
+		( 1 << MLX_GET ( &dev_lim, log2_rsvd_cqs ) );
 	DBG ( "Device limits:\n ");
 	DBG_HD ( &dev_lim, sizeof ( dev_lim ) );
 
@@ -830,6 +935,7 @@ static int arbel_probe ( struct pci_device *pci,
 
 	return 0;
 
+ err_query_dev_lim:
  err_register_netdev:
  err_ipoib_init:
 	ib_driver_close ( 0 );
