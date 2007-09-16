@@ -252,6 +252,27 @@ struct ib_device_operations {
 			     struct ib_completion_queue *cq,
 			     ib_completer_t complete_send,
 			     ib_completer_t complete_recv );
+	/**
+	 * Attach to multicast group
+	 *
+	 * @v ibdev		Infiniband device
+	 * @v qp		Queue pair
+	 * @v gid		Multicast GID
+	 * @ret rc		Return status code
+	 */
+	int ( * mcast_attach ) ( struct ib_device *ibdev,
+				 struct ib_queue_pair *qp,
+				 struct ib_gid *gid );
+	/**
+	 * Detach from multicast group
+	 *
+	 * @v ibdev		Infiniband device
+	 * @v qp		Queue pair
+	 * @v gid		Multicast GID
+	 */
+	void ( * mcast_detach ) ( struct ib_device *ibdev,
+				  struct ib_queue_pair *qp,
+				  struct ib_gid *gid );
 };
 
 /** An Infiniband device */
@@ -275,6 +296,32 @@ extern void ib_destroy_qp ( struct ib_device *ibdev,
 extern struct ib_work_queue * ib_find_wq ( struct ib_completion_queue *cq,
 					   unsigned long qpn, int is_send );
 
+/**
+ * Attach to multicast group
+ *
+ * @v ibdev		Infiniband device
+ * @v qp		Queue pair
+ * @v gid		Multicast GID
+ * @ret rc		Return status code
+ */
+static inline __attribute__ (( always_inline )) int
+ib_mcast_attach ( struct ib_device *ibdev, struct ib_queue_pair *qp,
+		  struct ib_gid *gid ) {
+	return ibdev->op->mcast_attach ( ibdev, qp, gid );
+}
+
+/**
+ * Detach from multicast group
+ *
+ * @v ibdev		Infiniband device
+ * @v qp		Queue pair
+ * @v gid		Multicast GID
+ */
+static inline __attribute__ (( always_inline )) void
+ib_mcast_detach ( struct ib_device *ibdev, struct ib_queue_pair *qp,
+		  struct ib_gid *gid ) {
+	ibdev->op->mcast_detach ( ibdev, qp, gid );
+}
 
 
 extern struct ll_protocol infiniband_protocol;

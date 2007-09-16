@@ -549,6 +549,34 @@ arbel_cmd_2rst_qpee ( struct arbel *arbel, unsigned long qpn ) {
 			   0x03, NULL, qpn, NULL );
 }
 
+static inline int
+arbel_cmd_read_mgm ( struct arbel *arbel, unsigned int index,
+		     struct arbelprm_mgm_entry *mgm ) {
+	return arbel_cmd ( arbel,
+			   ARBEL_HCR_OUT_CMD ( ARBEL_HCR_READ_MGM,
+					       1, sizeof ( *mgm ) ),
+			   0, NULL, index, mgm );
+}
+
+static inline int
+arbel_cmd_write_mgm ( struct arbel *arbel, unsigned int index,
+		      const struct arbelprm_mgm_entry *mgm ) {
+	return arbel_cmd ( arbel,
+			   ARBEL_HCR_IN_CMD ( ARBEL_HCR_WRITE_MGM,
+					      1, sizeof ( *mgm ) ),
+			   0, mgm, index, NULL );
+}
+
+static inline int
+arbel_cmd_mgid_hash ( struct arbel *arbel, const struct ib_gid *gid,
+		      struct arbelprm_mgm_hash *hash ) {
+	return arbel_cmd ( arbel,
+			   ARBEL_HCR_INOUT_CMD ( ARBEL_HCR_MGID_HASH,
+						 1, sizeof ( *gid ),
+						 0, sizeof ( *hash ) ),
+			   0, gid, 0, hash );
+}
+
 /***************************************************************************
  *
  * Completion queue operations
@@ -1253,6 +1281,104 @@ static void arbel_poll_cq ( struct ib_device *ibdev,
 	}
 }
 
+/***************************************************************************
+ *
+ * Multicast group operations
+ *
+ ***************************************************************************
+ */
+
+/**
+ * Attach to multicast group
+ *
+ * @v ibdev		Infiniband device
+ * @v qp		Queue pair
+ * @v gid		Multicast GID
+ * @ret rc		Return status code
+ */
+static int arbel_mcast_attach ( struct ib_device *ibdev,
+				struct ib_queue_pair *qp,
+				struct ib_gid *gid ) {
+	struct arbel *arbel = ibdev->dev_priv;
+	struct arbelprm_mgm_hash hash;
+	struct arbelprm_mgm_entry mgm;
+	unsigned int index;
+	int rc;
+
+	/* Generate hash table index */
+	if ( ( rc = arbel_cmd_mgid_hash ( arbel, gid, &hash ) ) != 0 ) {
+		DBGC ( arbel, "Arbel %p could not hash GID: %s\n",
+		       arbel, strerror ( rc ) );
+		return rc;
+	}
+	index = MLX_GET ( &hash, hash );
+
+	/* Check for existing hash table entry */
+	if ( ( rc = arbel_cmd_read_mgm ( arbel, index, &mgm ) ) != 0 ) {
+		DBGC ( arbel, "Arbel %p could not read MGM %#x: %s\n",
+		       arbel, index, strerror ( rc ) );
+		return rc;
+	}
+	if ( MLX_GET ( &mgm, mgmqp_0.qi ) != 0 ) {
+		/* FIXME: this implementation allows only a single QP
+		 * per multicast group, and doesn't handle hash
+		 * collisions.  Sufficient for IPoIB but may need to
+		 * be extended in future.
+		 */
+		DBGC ( arbel, "Arbel %p MGID index %#x already in use\n",
+		       arbel, index );
+		return -EBUSY;
+	}
+
+	/* Update hash table entry */
+	MLX_FILL_2 ( &mgm, 8,
+		     mgmqp_0.qpn_i, qp->qpn,
+		     mgmqp_0.qi, 1 );
+	memcpy ( &mgm.u.dwords[4], gid, sizeof ( *gid ) );
+	if ( ( rc = arbel_cmd_write_mgm ( arbel, index, &mgm ) ) != 0 ) {
+		DBGC ( arbel, "Arbel %p could not write MGM %#x: %s\n",
+		       arbel, index, strerror ( rc ) );
+		return rc;
+	}
+
+	return 0;
+}
+
+/**
+ * Detach from multicast group
+ *
+ * @v ibdev		Infiniband device
+ * @v qp		Queue pair
+ * @v gid		Multicast GID
+ */
+static void arbel_mcast_detach ( struct ib_device *ibdev,
+				 struct ib_queue_pair *qp __unused,
+				 struct ib_gid *gid ) {
+	struct arbel *arbel = ibdev->dev_priv;
+	struct arbelprm_mgm_hash hash;
+	struct arbelprm_mgm_entry mgm;
+	unsigned int index;
+	int rc;
+
+	/* Generate hash table index */
+	if ( ( rc = arbel_cmd_mgid_hash ( arbel, gid, &hash ) ) != 0 ) {
+		DBGC ( arbel, "Arbel %p could not hash GID: %s\n",
+		       arbel, strerror ( rc ) );
+		return;
+	}
+	index = MLX_GET ( &hash, hash );
+
+	/* Clear hash table entry */
+	memset ( &mgm, 0, sizeof ( mgm ) );
+	if ( ( rc = arbel_cmd_write_mgm ( arbel, index, &mgm ) ) != 0 ) {
+		DBGC ( arbel, "Arbel %p could not write MGM %#x: %s\n",
+		       arbel, index, strerror ( rc ) );
+		return;
+	}
+}
+
+
+
 /** Arbel Infiniband operations */
 static struct ib_device_operations arbel_ib_operations = {
 	.create_cq	= arbel_create_cq,
@@ -1262,6 +1388,8 @@ static struct ib_device_operations arbel_ib_operations = {
 	.post_send	= arbel_post_send,
 	.post_recv	= arbel_post_recv,
 	.poll_cq	= arbel_poll_cq,
+	.mcast_attach	= arbel_mcast_attach,
+	.mcast_detach	= arbel_mcast_detach,
 };
 
 /**
@@ -1379,6 +1507,14 @@ static int arbel_probe ( struct pci_device *pci,
 		return -EIO;
 	}
 	mlx->own_qp->owner_priv = netdev;
+	struct ib_gid *bcast_gid = ( struct ib_gid * ) &ib_data.bcast_gid;
+	if ( ( rc = ib_mcast_attach ( ibdev, mlx->own_qp,
+				      bcast_gid ) ) != 0 ) {
+		DBG ( "Could not attach to broadcast GID: %s\n",
+		      strerror ( rc ) );
+		return rc;
+	}
+				      
 
 	mac = ( ( struct ib_mac * ) netdev->ll_addr );
 	mac->qpn = htonl ( mlx->own_qp->qpn );
