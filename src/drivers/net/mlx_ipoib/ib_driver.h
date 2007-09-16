@@ -51,7 +51,7 @@
 enum {
 	MADS_QPN_SN,
 	IPOIB_QPN_SN,
-	MAX_APP_QPS
+	MAX_APP_QPS = 8
 };
 
 enum {
@@ -59,7 +59,7 @@ enum {
 	MADS_RCV_CQN_SN,
 	IPOIB_SND_CQN_SN,
 	IPOIB_RCV_CQN_SN,
-	MAX_APP_CQS
+	MAX_APP_CQS = 8
 };
 
 enum {
