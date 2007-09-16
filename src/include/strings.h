@@ -40,17 +40,13 @@ __constant_flsl ( unsigned long x ) {
 	return r;
 }
 
-#define __constant_fls(x) __constant_flsl(x)
-
 /* We don't actually have these functions yet */
-extern int __fls ( int x );
 extern int __flsl ( long x );
 
 #define flsl( x ) \
 	( __builtin_constant_p ( x ) ? __constant_flsl ( x ) : __flsl ( x ) )
 
-#define fls( x ) \
-	( __builtin_constant_p ( x ) ? __constant_fls ( x ) : __fls ( x ) )
+#define fls( x ) flsl ( x )
 
 extern int strcasecmp ( const char *s1, const char *s2 );
 
