@@ -1,10 +1,11 @@
 #include <strings.h>
 
 int __flsl ( long x ) {
-	int r = 0;
+	unsigned long value = x;
+	int ls = 0;
 
-	for ( r = 0 ; x ; r++ ) {
-		x >>= 1;
+	for ( ls = 0 ; value ; ls++ ) {
+		value >>= 1;
 	}
-	return r;
+	return ls;
 }
