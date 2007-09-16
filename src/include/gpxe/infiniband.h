@@ -97,6 +97,8 @@ struct ib_work_queue {
 struct ib_queue_pair {
 	/** Queue Pair Number */
 	unsigned long qpn;
+	/** Queue key */
+	unsigned long qkey;
 	/** Send queue */
 	struct ib_work_queue send;
 	/** Receive queue */
@@ -267,7 +269,7 @@ extern void ib_destroy_cq ( struct ib_device *ibdev,
 extern struct ib_queue_pair *
 ib_create_qp ( struct ib_device *ibdev, unsigned int num_send_wqes,
 	       struct ib_completion_queue *send_cq, unsigned int num_recv_wqes,
-	       struct ib_completion_queue *recv_cq );
+	       struct ib_completion_queue *recv_cq, unsigned long qkey );
 extern void ib_destroy_qp ( struct ib_device *ibdev,
 			    struct ib_queue_pair *qp );
 extern struct ib_work_queue * ib_find_wq ( struct ib_completion_queue *cq,

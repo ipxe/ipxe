@@ -466,7 +466,7 @@ arbel_cmd_hw2sw_cq ( struct arbel *arbel, unsigned long cqn ) {
 
 static inline int
 arbel_cmd_rst2init_qpee ( struct arbel *arbel, unsigned long qpn,
-			  struct arbelprm_queue_pair_ee_context_entry *ctx ) {
+			  const struct arbelprm_qp_ee_state_transitions *ctx ){
 	return arbel_cmd ( arbel,
 			   ARBEL_HCR_IN_CMD ( ARBEL_HCR_RST2INIT_QPEE,
 					      1, sizeof ( *ctx ) ),
@@ -475,7 +475,7 @@ arbel_cmd_rst2init_qpee ( struct arbel *arbel, unsigned long qpn,
 
 static inline int
 arbel_cmd_init2rtr_qpee ( struct arbel *arbel, unsigned long qpn,
-			  struct arbelprm_queue_pair_ee_context_entry *ctx ) {
+			  const struct arbelprm_qp_ee_state_transitions *ctx ){
 	return arbel_cmd ( arbel,
 			   ARBEL_HCR_IN_CMD ( ARBEL_HCR_INIT2RTR_QPEE,
 					      1, sizeof ( *ctx ) ),
@@ -484,7 +484,7 @@ arbel_cmd_init2rtr_qpee ( struct arbel *arbel, unsigned long qpn,
 
 static inline int
 arbel_cmd_rtr2rts_qpee ( struct arbel *arbel, unsigned long qpn,
-			 struct arbelprm_queue_pair_ee_context_entry *ctx ) {
+			 const struct arbelprm_qp_ee_state_transitions *ctx ) {
 	return arbel_cmd ( arbel,
 			   ARBEL_HCR_IN_CMD ( ARBEL_HCR_RTR2RTS_QPEE,
 					      1, sizeof ( *ctx ) ),
@@ -574,7 +574,7 @@ static int arbel_create_cq ( struct ib_device *ibdev,
 		     virt_to_bus ( arbel_cq->cqe ) );
 	MLX_FILL_2 ( &cqctx, 3,
 		     usr_page, arbel->limits.reserved_uars,
-		     log_cq_size, ( fls ( cq->num_cqes ) - 1 ) );
+		     log_cq_size, fls ( cq->num_cqes - 1 ) );
 	MLX_FILL_1 ( &cqctx, 5, c_eqn, arbel->eqn );
 	MLX_FILL_1 ( &cqctx, 6, pd, ARBEL_GLOBAL_PD );
 	MLX_FILL_1 ( &cqctx, 7, l_key, arbel->reserved_lkey );
@@ -651,34 +651,75 @@ static void arbel_destroy_cq ( struct ib_device *ibdev,
  ***************************************************************************
  */
 
+/**
+ * Create send work queue
+ *
+ * @v arbel_send_wq	Send work queue
+ * @v num_wqes		Number of work queue entries
+ * @ret rc		Return status code
+ */
 static int arbel_create_send_wq ( struct arbel_send_work_queue *arbel_send_wq,
 				  unsigned int num_wqes ) {
+	struct arbelprm_ud_send_wqe *wqe;
+	struct arbelprm_ud_send_wqe *next_wqe;
+	unsigned int wqe_idx_mask;
+	unsigned int i;
 
+	/* Allocate work queue */
 	arbel_send_wq->wqe_size = ( num_wqes *
 				    sizeof ( arbel_send_wq->wqe[0] ) );
 	arbel_send_wq->wqe = malloc_dma ( arbel_send_wq->wqe_size,
 					  sizeof ( arbel_send_wq->wqe[0] ) );
 	if ( ! arbel_send_wq->wqe )
 		return -ENOMEM;
+	memset ( arbel_send_wq->wqe, 0, arbel_send_wq->wqe_size );
 
-	// initialise (prelink?)
+	/* Link work queue entries */
+	wqe_idx_mask = ( num_wqes - 1 );
+	for ( i = 0 ; i < num_wqes ; i++ ) {
+		wqe = &arbel_send_wq->wqe[i].ud;
+		next_wqe = &arbel_send_wq->wqe[ ( i + 1 ) & wqe_idx_mask ].ud;
+		MLX_FILL_1 ( &wqe->next, 0, nda_31_6,
+			     ( virt_to_bus ( next_wqe ) >> 6 ) );
+	}
+	
+	return 0;
 }
 
+/**
+ * Create receive work queue
+ *
+ * @v arbel_recv_wq	Receive work queue
+ * @v num_wqes		Number of work queue entries
+ * @ret rc		Return status code
+ */
 static int arbel_create_recv_wq ( struct arbel_recv_work_queue *arbel_recv_wq,
 				  unsigned int num_wqes ) {
+	struct arbelprm_recv_wqe *wqe;
+	struct arbelprm_recv_wqe *next_wqe;
+	unsigned int wqe_idx_mask;
+	unsigned int i;
 
+	/* Allocate work queue */
 	arbel_recv_wq->wqe_size = ( num_wqes *
 				    sizeof ( arbel_recv_wq->wqe[0] ) );
 	arbel_recv_wq->wqe = malloc_dma ( arbel_recv_wq->wqe_size,
 					  sizeof ( arbel_recv_wq->wqe[0] ) );
 	if ( ! arbel_recv_wq->wqe )
 		return -ENOMEM;
+	memset ( arbel_recv_wq->wqe, 0, arbel_recv_wq->wqe_size );
 
-	// initialise (prelink?)
+	/* Link work queue entries */
+	wqe_idx_mask = ( num_wqes - 1 );
+	for ( i = 0 ; i < num_wqes ; i++ ) {
+		wqe = &arbel_recv_wq->wqe[i].recv;
+		next_wqe = &arbel_recv_wq->wqe[( i + 1 ) & wqe_idx_mask].recv;
+		MLX_FILL_1 ( &wqe->next, 0, nda_31_6,
+			     ( virt_to_bus ( next_wqe ) >> 6 ) );
+	}
+	
+	return 0;
 }
-
-
-
 
 /**
  * Create queue pair
@@ -691,7 +732,7 @@ static int arbel_create_qp ( struct ib_device *ibdev,
 			     struct ib_queue_pair *qp ) {
 	struct arbel *arbel = ibdev->dev_priv;
 	struct arbel_queue_pair *arbel_qp;
-	struct arbelprm_queue_pair_ee_context_entry qpctx;
+	struct arbelprm_qp_ee_state_transitions qpctx;
 	struct arbelprm_qp_db_record *send_db_rec;
 	struct arbelprm_qp_db_record *recv_db_rec;
 	int qpn_offset;
@@ -737,17 +778,53 @@ static int arbel_create_qp ( struct ib_device *ibdev,
 
 	/* Hand queue over to hardware */
 	memset ( &qpctx, 0, sizeof ( qpctx ) );
-	// ...  fill in context
+	MLX_FILL_3 ( &qpctx, 2,
+		     qpc_eec_data.de, 1,
+		     qpc_eec_data.pm_state, 0x03 /* Always 0x03 for UD */,
+		     qpc_eec_data.st, ARBEL_ST_UD );
+	MLX_FILL_6 ( &qpctx, 4,
+		     qpc_eec_data.mtu, ARBEL_MTU_2048,
+		     qpc_eec_data.msg_max, 11 /* 2^11 = 2048 */,
+		     qpc_eec_data.log_rq_size, fls ( qp->recv.num_wqes - 1 ),
+		     qpc_eec_data.log_rq_stride,
+		     ( fls ( sizeof ( arbel_qp->send.wqe[0] ) - 1 ) - 4 ),
+		     qpc_eec_data.log_sq_size, fls ( qp->send.num_wqes - 1 ),
+		     qpc_eec_data.log_sq_stride,
+		     ( fls ( sizeof ( arbel_qp->recv.wqe[0] ) - 1 ) - 4 ) );
+	MLX_FILL_1 ( &qpctx, 5,
+		     qpc_eec_data.usr_page, arbel->limits.reserved_uars );
+	MLX_FILL_1 ( &qpctx, 10, qpc_eec_data.primary_address_path.port_number,
+		     PXE_IB_PORT );
+	MLX_FILL_1 ( &qpctx, 27, qpc_eec_data.pd, ARBEL_GLOBAL_PD );
+	MLX_FILL_1 ( &qpctx, 29, qpc_eec_data.wqe_lkey, arbel->reserved_lkey );
+	MLX_FILL_1 ( &qpctx, 30, qpc_eec_data.ssc, 1 );
+	MLX_FILL_1 ( &qpctx, 33, qpc_eec_data.cqn_snd, qp->send.cq->cqn );
+	MLX_FILL_1 ( &qpctx, 34, qpc_eec_data.snd_wqe_base_adr_l,
+		     ( virt_to_bus ( arbel_qp->send.wqe ) >> 6 ) );
+	MLX_FILL_1 ( &qpctx, 35, qpc_eec_data.snd_db_record_index,
+		     arbel_qp->send.doorbell_idx );
+	MLX_FILL_1 ( &qpctx, 38, qpc_eec_data.rsc, 1 );
+	MLX_FILL_1 ( &qpctx, 41, qpc_eec_data.cqn_rcv, qp->recv.cq->cqn );
+	MLX_FILL_1 ( &qpctx, 42, qpc_eec_data.rcv_wqe_base_adr_l,
+		     ( virt_to_bus ( arbel_qp->recv.wqe ) >> 6 ) );
+	MLX_FILL_1 ( &qpctx, 43, qpc_eec_data.rcv_db_record_index,
+		     arbel_qp->recv.doorbell_idx );
+	MLX_FILL_1 ( &qpctx, 44, qpc_eec_data.q_key, qp->qkey );
 	if ( ( rc = arbel_cmd_rst2init_qpee ( arbel, qp->qpn, &qpctx )) != 0 ){
 		DBGC ( arbel, "Arbel %p RST2INIT_QPEE failed: %s\n",
 		       arbel, strerror ( rc ) );
 		goto err_rst2init_qpee;
 	}
+	memset ( &qpctx, 0, sizeof ( qpctx ) );
+	MLX_FILL_2 ( &qpctx, 4,
+		     qpc_eec_data.mtu, ARBEL_MTU_2048,
+		     qpc_eec_data.msg_max, 11 /* 2^11 = 2048 */ );
 	if ( ( rc = arbel_cmd_init2rtr_qpee ( arbel, qp->qpn, &qpctx )) != 0 ){
 		DBGC ( arbel, "Arbel %p INIT2RTR_QPEE failed: %s\n",
 		       arbel, strerror ( rc ) );
 		goto err_init2rtr_qpee;
 	}
+	memset ( &qpctx, 0, sizeof ( qpctx ) );
 	if ( ( rc = arbel_cmd_rtr2rts_qpee ( arbel, qp->qpn, &qpctx ) ) != 0 ){
 		DBGC ( arbel, "Arbel %p RTR2RTS_QPEE failed: %s\n",
 		       arbel, strerror ( rc ) );
@@ -1215,8 +1292,13 @@ static int arbel_probe ( struct pci_device *pci,
 		( 1 << MLX_GET ( &dev_lim, log2_rsvd_cqs ) );
 	arbel->limits.reserved_qps =
 		( 1 << MLX_GET ( &dev_lim, log2_rsvd_qps ) );
-	DBG ( "Device limits:\n ");
-	DBG_HD ( &dev_lim, sizeof ( dev_lim ) );
+
+	DBG ( "MADS SND CQN = %#lx\n", dev_ib_data.mads_qp.snd_cq.cqn );
+	struct ib_completion_queue *test_cq;
+	test_cq = ib_create_cq ( &static_ibdev, 32 );
+	if ( test_cq ) {
+		DBG ( "Woot: create_cq() passed!\n" );
+	}
 
 	/* Register network device */
 	if ( ( rc = register_netdev ( netdev ) ) != 0 )

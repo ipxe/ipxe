@@ -92,13 +92,15 @@ void ib_destroy_cq ( struct ib_device *ibdev,
  * @v send_cq		Send completion queue
  * @v num_recv_wqes	Number of receive work queue entries
  * @v recv_cq		Receive completion queue
+ * @v qkey		Queue key
  * @ret qp		Queue pair
  */
 struct ib_queue_pair * ib_create_qp ( struct ib_device *ibdev,
 				      unsigned int num_send_wqes,
 				      struct ib_completion_queue *send_cq,
 				      unsigned int num_recv_wqes,
-				      struct ib_completion_queue *recv_cq ) {
+				      struct ib_completion_queue *recv_cq,
+				      unsigned long qkey ) {
 	struct ib_queue_pair *qp;
 	int rc;
 
@@ -110,6 +112,7 @@ struct ib_queue_pair * ib_create_qp ( struct ib_device *ibdev,
 		      ( num_recv_wqes * sizeof ( qp->recv.iobufs[0] ) ) );
 	if ( ! qp )
 		return NULL;
+	qp->qkey = qkey;
 	qp->send.qp = qp;
 	qp->send.is_send = 1;
 	qp->send.cq = send_cq;

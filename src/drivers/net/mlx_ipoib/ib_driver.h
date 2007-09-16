@@ -55,7 +55,7 @@ enum {
 };
 
 enum {
-	MADS_SND_CQN_SN,
+	MADS_SND_CQN_SN = 4,
 	MADS_RCV_CQN_SN,
 	IPOIB_SND_CQN_SN,
 	IPOIB_RCV_CQN_SN,

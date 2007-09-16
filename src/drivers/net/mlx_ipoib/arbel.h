@@ -34,6 +34,12 @@
 #define ARBEL_HCR_RTR2RTS_QPEE		0x001b
 #define ARBEL_HCR_2RST_QPEE		0x0021
 
+/* Service types */
+#define ARBEL_ST_UD			0x01
+
+/* MTUs */
+#define ARBEL_MTU_2048			0x04
+
 /*
  * Wrapper structures for hardware datatypes
  *
@@ -46,6 +52,7 @@ struct MLX_DECLARE_STRUCT ( arbelprm_cq_arm_db_record );
 struct MLX_DECLARE_STRUCT ( arbelprm_cq_ci_db_record );
 struct MLX_DECLARE_STRUCT ( arbelprm_hca_command_register );
 struct MLX_DECLARE_STRUCT ( arbelprm_qp_db_record );
+struct MLX_DECLARE_STRUCT ( arbelprm_qp_ee_state_transitions );
 struct MLX_DECLARE_STRUCT ( arbelprm_query_dev_lim );
 struct MLX_DECLARE_STRUCT ( arbelprm_queue_pair_ee_context_entry );
 struct MLX_DECLARE_STRUCT ( arbelprm_recv_wqe_segment_next );
