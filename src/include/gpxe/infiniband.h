@@ -168,6 +168,25 @@ struct ib_address_vector {
  * These represent a subset of the Infiniband Verbs.
  */
 struct ib_device_operations {
+	/**
+	 * Create completion queue
+	 *
+	 * @v ibdev		Infiniband device
+	 * @v log2_num_cqes	Log2 of the number of completion queue entries
+	 * @ret new_cq		New completion queue
+	 * @ret rc		Return status code
+	 */
+	int ( * create_cq ) ( struct ib_device *ibdev,
+			      unsigned int log2_num_cqes,
+			      struct ib_completion_queue **new_cq );
+	/**
+	 * Destroy completion queue
+	 *
+	 * @v ibdev		Infiniband device
+	 * @v cq		Completion queue
+	 */
+	void ( * destroy_cq ) ( struct ib_device *ibdev,
+				struct ib_completion_queue *cq );
 	/** Post send work queue entry
 	 *
 	 * @v ibdev		Infiniband device

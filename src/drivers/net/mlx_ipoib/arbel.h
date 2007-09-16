@@ -28,6 +28,7 @@
 /* HCA command register opcodes */
 #define ARBEL_HCR_QUERY_DEV_LIM		0x0003
 #define ARBEL_HCR_SW2HW_CQ		0x0016
+#define ARBEL_HCR_HW2SW_CQ		0x0017
 
 /*
  * Wrapper structures for hardware datatypes
@@ -246,6 +247,9 @@ struct arbel {
 
 #define ARBEL_HCR_OUT_CMD( _opcode, _out_mbox, _out_len )		     \
 	ARBEL_HCR_CMD ( _opcode, 0, 0, _out_mbox, _out_len )
+
+#define ARBEL_HCR_VOID_CMD( _opcode )					     \
+	ARBEL_HCR_CMD ( _opcode, 0, 0, 0, 0 )
 
 /*
  * Doorbell record allocation
