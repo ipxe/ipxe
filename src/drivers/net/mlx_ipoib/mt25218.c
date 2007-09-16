@@ -1311,9 +1311,9 @@ static int arbel_probe ( struct pci_device *pci,
 	/* Initialise hardware */
 	if ( ( rc = ib_driver_init ( pci, &qph ) ) != 0 )
 		goto err_ipoib_init;
+	mlx->bcast_av = ib_data.bcast_av;
 #if ! CREATE_OWN
 	mlx->ipoib_qph = qph;
-	mlx->bcast_av = ib_data.bcast_av;
 	mlx->snd_cqh = ib_data.ipoib_snd_cq;
 	mlx->rcv_cqh = ib_data.ipoib_rcv_cq;
 	mac = ( ( struct ib_mac * ) netdev->ll_addr );
