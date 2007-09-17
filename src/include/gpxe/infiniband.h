@@ -468,11 +468,19 @@ struct ib_mad_port_info {
 	uint8_t link_speed_enabled__link_speed_active;
 } __attribute__ (( packed ));
 
+struct ib_mad_pkey_table {
+	struct ib_mad_hdr mad_hdr;
+	uint32_t mkey[2];
+	uint32_t reserved[8];
+	uint16_t pkey[16][2];
+} __attribute__ (( packed ));
+
 union ib_mad {
 	struct ib_mad_hdr mad_hdr;
 	struct ib_mad_data data;
 	struct ib_mad_guid_info guid_info;
 	struct ib_mad_port_info port_info;
+	struct ib_mad_pkey_table pkey_table;
 } __attribute__ (( packed ));
 
 #endif /* _GPXE_INFINIBAND_H */

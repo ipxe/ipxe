@@ -1206,21 +1206,69 @@ static int arbel_get_guid_info ( struct arbel *arbel,
 	return 0;
 }
 
-static int arbel_get_port_gid ( struct arbel *arbel, struct ib_gid *gid ) {
-	struct ib_mad_port_info port_info;
-	struct ib_mad_guid_info guid_info;
+static int arbel_get_pkey_table ( struct arbel *arbel,
+				  struct ib_mad_pkey_table *pkey_table ) {
+	union arbelprm_mad mad;
+	struct ib_mad_hdr *hdr = &mad.mad.mad_hdr;
 	int rc;
 
-	if ( ( rc = arbel_get_port_info ( arbel, &port_info ) ) != 0 )
+	memset ( &mad, 0, sizeof ( mad ) );
+	hdr->mgmt_class = IB_MGMT_CLASS_SUBN_LID_ROUTED;
+	hdr->class_version = 1;
+	hdr->method = IB_MGMT_METHOD_GET;
+	hdr->attr_id = htons ( IB_SMP_ATTR_PKEY_TABLE );
+	if ( ( rc = arbel_mad_ifc ( arbel, &mad ) ) != 0 ) {
+		DBGC ( arbel, "Arbel %p could not get pkey table: %s\n",
+		       arbel, strerror ( rc ) );
 		return rc;
-	if ( ( rc = arbel_get_guid_info ( arbel, &guid_info ) ) != 0 )
-		return rc;
-	memcpy ( &gid->bytes[0], port_info.gid_prefix, 8 );
-	memcpy ( &gid->bytes[8], guid_info.gid_local, 8 );
+	}
+	memcpy ( pkey_table, &mad.mad.pkey_table, sizeof ( *pkey_table ) );
 	return 0;
 }
 
+static int arbel_get_port_gid ( struct arbel *arbel,
+				struct ib_gid *port_gid ) {
+	union {
+		/* This union exists just to save stack space */
+		struct ib_mad_port_info port_info;
+		struct ib_mad_guid_info guid_info;
+	} u;
+	int rc;
 
+	/* Port info gives us the first half of the port GID */
+	if ( ( rc = arbel_get_port_info ( arbel, &u.port_info ) ) != 0 )
+		return rc;
+	memcpy ( &port_gid->bytes[0], u.port_info.gid_prefix, 8 );
+
+	/* GUID info gives us the second half of the port GID */
+	if ( ( rc = arbel_get_guid_info ( arbel, &u.guid_info ) ) != 0 )
+		return rc;
+	memcpy ( &port_gid->bytes[8], u.guid_info.gid_local, 8 );
+
+	return 0;
+}
+
+static int arbel_get_broadcast_gid ( struct arbel *arbel,
+				     struct ib_gid *broadcast_gid ) {
+	static const struct ib_gid ipv4_broadcast_gid = {
+		{ 0xff, 0x12, 0x40, 0x1b, 0x00, 0x00, 0x00, 0x00,
+		  0x00, 0x00, 0x00, 0x00, 0xff, 0xff, 0xff, 0xff }
+	};
+	struct ib_mad_pkey_table pkey_table;
+	int rc;
+
+	/* Start with the IPv4 broadcast GID */
+	memcpy ( broadcast_gid, &ipv4_broadcast_gid,
+		 sizeof ( *broadcast_gid ) );
+
+	/* Add partition key */
+	if ( ( rc = arbel_get_pkey_table ( arbel, &pkey_table ) ) != 0 )
+		return rc;
+	memcpy ( &broadcast_gid->bytes[4], &pkey_table.pkey[0][0],
+		 sizeof ( pkey_table.pkey[0][0] ) );
+
+	return 0;
+}
 
 /**
  * Probe PCI device
@@ -1282,6 +1330,14 @@ static int arbel_probe ( struct pci_device *pci,
 		goto err_get_port_gid;
 	}
 
+	/* Get broadcast GID */
+	if ( ( rc = arbel_get_broadcast_gid ( arbel,
+					      &ibdev->broadcast_gid ) ) != 0 ){
+		DBGC ( arbel, "Arbel %p could not determine broadcast GID: "
+		       "%s\n", arbel, strerror ( rc ) );
+		goto err_get_broadcast_gid;
+	}
+
 	struct ud_av_st *bcast_av = ib_data.bcast_av;
 	struct arbelprm_ud_address_vector *bav =
 		( struct arbelprm_ud_address_vector * ) &bcast_av->av;
@@ -1294,8 +1350,6 @@ static int arbel_probe ( struct pci_device *pci,
 	av->gid_present = 1;
 	memcpy ( &av->gid, ( ( void * ) bav ) + 16, 16 );
 
-	memcpy ( &ibdev->broadcast_gid, &ib_data.bcast_gid, 16 );
-
 	/* Add IPoIB device */
 	if ( ( rc = ipoib_probe ( ibdev ) ) != 0 ) {
 		DBGC ( arbel, "Arbel %p could not add IPoIB device: %s\n",
@@ -1306,6 +1360,7 @@ static int arbel_probe ( struct pci_device *pci,
 	return 0;
 
  err_ipoib_probe:
+ err_get_broadcast_gid:
  err_get_port_gid:
  err_query_dev_lim:
 	ib_driver_close ( 0 );
