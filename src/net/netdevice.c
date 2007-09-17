@@ -476,8 +476,9 @@ static void net_step ( struct process *process __unused ) {
 		 * NIC faster than they arrive.
 		 */
 		if ( ( iobuf = netdev_rx_dequeue ( netdev ) ) ) {
-			DBGC ( netdev, "NETDEV %p processing %p\n",
-			       netdev, iobuf );
+			DBGC ( netdev, "NETDEV %p processing %p (%p+%zx)\n",
+			       netdev, iobuf, iobuf->data,
+			       iob_len ( iobuf ) );
 			netdev->ll_protocol->rx ( iobuf, netdev );
 		}
 	}
