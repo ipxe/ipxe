@@ -11,10 +11,13 @@
 #include <gpxe/device.h>
 
 /** Subnet administrator QPN */
-#define IB_SA_QPN	1
+#define IB_SA_QPN 1
+
+/** Broadcast QPN */
+#define IB_BROADCAST_QPN 0xffffffUL
 
 /** Subnet administrator queue key */
-#define IB_GLOBAL_QKEY	0x80010000UL
+#define IB_GLOBAL_QKEY 0x80010000UL
 
 /** An Infiniband Global Identifier */
 struct ib_gid {
@@ -466,7 +469,7 @@ struct ib_mad_hdr {
 	uint8_t method;
 	uint16_t status;
 	uint16_t class_specific;
-	uint64_t tid;
+	uint32_t tid[2];
 	uint16_t attr_id;
 	uint16_t resv;
 	uint32_t attr_mod;
@@ -569,6 +572,7 @@ union ib_mad {
 	struct ib_mad_port_info port_info;
 	struct ib_mad_pkey_table pkey_table;
 	struct ib_mad_path_record path_record;
+	struct ib_mad_mc_member_record mc_member_record;
 } __attribute__ (( packed ));
 
 #endif /* _GPXE_INFINIBAND_H */

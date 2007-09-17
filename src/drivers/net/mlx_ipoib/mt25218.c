@@ -975,6 +975,7 @@ static int arbel_complete ( struct ib_device *ibdev,
  */
 static void arbel_drain_eq ( struct arbel *arbel ) {
 #warning "drain the event queue"
+	drain_eq();
 }
 
 /**
