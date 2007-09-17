@@ -101,6 +101,8 @@
 #define ERRFILE_via_rhine	     ( ERRFILE_DRIVER | 0x00440000 )
 #define ERRFILE_via_velocity	     ( ERRFILE_DRIVER | 0x00450000 )
 #define ERRFILE_w89c840		     ( ERRFILE_DRIVER | 0x00460000 )
+#define ERRFILE_ipoib		     ( ERRFILE_DRIVER | 0x00470000 )
+#define ERRFILE_mt25218		     ( ERRFILE_DRIVER | 0x00480000 )
 
 #define ERRFILE_scsi		     ( ERRFILE_DRIVER | 0x00700000 )
 

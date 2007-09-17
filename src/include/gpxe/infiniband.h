@@ -8,7 +8,43 @@
  */
 
 #include <stdint.h>
-#include <gpxe/netdevice.h>
+#include <gpxe/device.h>
+
+
+
+#if 0
+/** Infiniband MAC address length */
+#define IB_ALEN 20
+
+/** An Infiniband MAC address */
+struct ib_mac {
+	/** Queue pair number
+	 *
+	 * MSB must be zero; QPNs are only 24-bit.
+	 */
+	uint32_t qpn;
+	/** Port GID */
+	struct ib_gid gid;
+} __attribute__ (( packed ));
+
+/** Infiniband link-layer header length */
+#define IB_HLEN 4
+
+/** An Infiniband link-layer header */
+struct ibhdr {
+	/** Network-layer protocol */
+	uint16_t proto;
+	/** Reserved, must be zero */
+	uint16_t reserved;
+} __attribute__ (( packed ));
+#endif
+
+
+
+
+
+
+
 
 /** An Infiniband Global Identifier */
 struct ib_gid {
@@ -35,33 +71,6 @@ struct ib_global_route_header {
 	/** Destiniation GID */
 	struct ib_gid dgid;
 } __attribute__ (( packed ));
-
-/** Infiniband MAC address length */
-#define IB_ALEN 20
-
-/** An Infiniband MAC address */
-struct ib_mac {
-	/** Queue pair number
-	 *
-	 * MSB must be zero; QPNs are only 24-bit.
-	 */
-	uint32_t qpn;
-	/** Port GID */
-	struct ib_gid gid;
-} __attribute__ (( packed ));
-
-/** Infiniband link-layer header length */
-#define IB_HLEN 4
-
-/** An Infiniband link-layer header */
-struct ibhdr {
-	/** Network-layer protocol */
-	uint16_t proto;
-	/** Reserved, must be zero */
-	uint16_t reserved;
-} __attribute__ (( packed ));
-
-
 
 struct ib_device;
 struct ib_queue_pair;
@@ -223,8 +232,7 @@ struct ib_device_operations {
 			      struct ib_queue_pair *qp,
 			      struct ib_address_vector *av,
 			      struct io_buffer *iobuf );
-	/**
-	 * Post receive work queue entry
+	/** Post receive work queue entry
 	 *
 	 * @v ibdev		Infiniband device
 	 * @v qp		Queue pair
@@ -252,8 +260,7 @@ struct ib_device_operations {
 			     struct ib_completion_queue *cq,
 			     ib_completer_t complete_send,
 			     ib_completer_t complete_recv );
-	/**
-	 * Attach to multicast group
+	/** Attach to multicast group
 	 *
 	 * @v ibdev		Infiniband device
 	 * @v qp		Queue pair
@@ -263,8 +270,7 @@ struct ib_device_operations {
 	int ( * mcast_attach ) ( struct ib_device *ibdev,
 				 struct ib_queue_pair *qp,
 				 struct ib_gid *gid );
-	/**
-	 * Detach from multicast group
+	/** Detach from multicast group
 	 *
 	 * @v ibdev		Infiniband device
 	 * @v qp		Queue pair
@@ -276,13 +282,19 @@ struct ib_device_operations {
 };
 
 /** An Infiniband device */
-struct ib_device {	
+struct ib_device {
 	/** Port GID */
 	struct ib_gid port_gid;
+	/** Broadcast GID */
+	struct ib_gid broadcast_gid;	
+	/** Underlying device */
+	struct device *dev;
 	/** Infiniband operations */
 	struct ib_device_operations *op;
 	/** Device private data */
 	void *dev_priv;
+	/** Owner private data */
+	void *owner_priv;
 };
 
 extern struct ib_completion_queue * ib_create_cq ( struct ib_device *ibdev,
@@ -297,6 +309,52 @@ extern void ib_destroy_qp ( struct ib_device *ibdev,
 			    struct ib_queue_pair *qp );
 extern struct ib_work_queue * ib_find_wq ( struct ib_completion_queue *cq,
 					   unsigned long qpn, int is_send );
+extern struct ib_device * alloc_ibdev ( size_t priv_size );
+extern void free_ibdev ( struct ib_device *ibdev );
+
+/**
+ * Post send work queue entry
+ *
+ * @v ibdev		Infiniband device
+ * @v qp		Queue pair
+ * @v av		Address vector
+ * @v iobuf		I/O buffer
+ * @ret rc		Return status code
+ */
+static inline __attribute__ (( always_inline )) int
+ib_post_send ( struct ib_device *ibdev, struct ib_queue_pair *qp,
+	       struct ib_address_vector *av, struct io_buffer *iobuf ) {
+	return ibdev->op->post_send ( ibdev, qp, av, iobuf );
+}
+
+/**
+ * Post receive work queue entry
+ *
+ * @v ibdev		Infiniband device
+ * @v qp		Queue pair
+ * @v iobuf		I/O buffer
+ * @ret rc		Return status code
+ */
+static inline __attribute__ (( always_inline )) int
+ib_post_recv ( struct ib_device *ibdev, struct ib_queue_pair *qp,
+	       struct io_buffer *iobuf ) {
+	return ibdev->op->post_recv ( ibdev, qp, iobuf );
+}
+
+/**
+ * Poll completion queue
+ *
+ * @v ibdev		Infiniband device
+ * @v cq		Completion queue
+ * @v complete_send	Send completion handler
+ * @v complete_recv	Receive completion handler
+ */
+static inline __attribute__ (( always_inline )) void
+ib_poll_cq ( struct ib_device *ibdev, struct ib_completion_queue *cq,
+	     ib_completer_t complete_send, ib_completer_t complete_recv ) {
+	ibdev->op->poll_cq ( ibdev, cq, complete_send, complete_recv );
+}
+
 
 /**
  * Attach to multicast group
@@ -323,6 +381,27 @@ static inline __attribute__ (( always_inline )) void
 ib_mcast_detach ( struct ib_device *ibdev, struct ib_queue_pair *qp,
 		  struct ib_gid *gid ) {
 	ibdev->op->mcast_detach ( ibdev, qp, gid );
+}
+
+/**
+ * Set Infiniband owner-private data
+ *
+ * @v pci		Infiniband device
+ * @v priv		Private data
+ */
+static inline void ib_set_ownerdata ( struct ib_device *ibdev,
+				      void *owner_priv ) {
+	ibdev->owner_priv = owner_priv;
+}
+
+/**
+ * Get Infiniband owner-private data
+ *
+ * @v pci		Infiniband device
+ * @ret priv		Private data
+ */
+static inline void * ib_get_ownerdata ( struct ib_device *ibdev ) {
+	return ibdev->owner_priv;
 }
 
 /*****************************************************************************
@@ -435,9 +514,7 @@ union ib_mad {
 
 
 
-
-
-
+#if 0
 
 extern struct ll_protocol infiniband_protocol;
 
@@ -458,5 +535,7 @@ static inline struct net_device * alloc_ibdev ( size_t priv_size ) {
 	}
 	return netdev;
 }
+
+#endif
 
 #endif /* _GPXE_INFINIBAND_H */

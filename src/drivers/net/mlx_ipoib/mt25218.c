@@ -16,6 +16,7 @@ Skeleton NIC driver for Etherboot
 #include <gpxe/iobuf.h>
 #include <gpxe/netdevice.h>
 #include <gpxe/infiniband.h>
+#include <gpxe/ipoib.h>
 
 /* to get some global routines like printf */
 #include "etherboot.h"
@@ -29,10 +30,17 @@ Skeleton NIC driver for Etherboot
 #include "arbel.h"
 
 
+struct ib_address_vector hack_ipoib_bcast_av;
+
+
+
+
 static const struct ib_gid arbel_no_gid = {
 	{ 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2 }
 };
 
+
+#if 0
 
 #define MLX_RX_MAX_FILL NUM_IPOIB_RCV_WQES
 
@@ -275,6 +283,7 @@ static void mlx_poll ( struct net_device *netdev ) {
 			&static_ipoib_send_cq,
 #endif
 			temp_complete_send, temp_complete_recv );
+#if 0
 	arbel_poll_cq ( &static_ibdev,
 #if CREATE_OWN
 			mlx->own_recv_cq,
@@ -282,6 +291,7 @@ static void mlx_poll ( struct net_device *netdev ) {
 			&static_ipoib_recv_cq,
 #endif
 			temp_complete_send, temp_complete_recv );
+#endif
 
 	mlx_refill_rx ( netdev );
 }
@@ -307,6 +317,8 @@ static struct net_device_operations mlx_operations = {
 	.irq		= mlx_irq,
 };
 
+
+#endif /* 0 */
 
 
 
@@ -1488,6 +1500,8 @@ static int arbel_get_port_gid ( struct arbel *arbel, struct ib_gid *gid ) {
 
 
 
+#if 0
+
 /**
  * Probe PCI device
  *
@@ -1576,14 +1590,17 @@ static int arbel_probe ( struct pci_device *pci,
 		DBG ( "Could not create send CQ\n" );
 		return -EIO;
 	}
+#if 0
 	mlx->own_recv_cq = ib_create_cq ( ibdev, 32 );
 	if ( ! mlx->own_recv_cq ) {
 		DBG ( "Could not create send CQ\n" );
 		return -EIO;
 	}
+#endif
 	mlx->own_qp = ib_create_qp ( ibdev, NUM_IPOIB_SND_WQES,
 				     mlx->own_send_cq, NUM_IPOIB_RCV_WQES,
-				     mlx->own_recv_cq, ipoib_qkey );
+				     //mlx->own_recv_cq, ipoib_qkey );
+				     mlx->own_send_cq, ipoib_qkey );
 	if ( ! mlx->own_qp ) {
 		DBG ( "Could not create QP\n" );
 		return -EIO;
@@ -1621,6 +1638,22 @@ static int arbel_probe ( struct pci_device *pci,
 	}
 #endif
 
+	ibdev->dev = &pci->dev;
+
+
+	struct ud_av_st *bcast_av = mlx->bcast_av;
+	struct arbelprm_ud_address_vector *bav =
+		( struct arbelprm_ud_address_vector * ) &bcast_av->av;
+	struct ib_address_vector *av = &hack_ipoib_bcast_av;
+	av->dest_qp = bcast_av->dest_qp;
+	av->qkey = bcast_av->qkey;
+	av->dlid = MLX_GET ( bav, rlid );
+	av->rate = ( MLX_GET ( bav, max_stat_rate ) ? 1 : 4 );
+	av->sl = MLX_GET ( bav, sl );
+	av->gid_present = 1;
+	memcpy ( &av->gid, ( ( void * ) bav ) + 16, 16 );
+
+
 	/* Register network device */
 	if ( ( rc = register_netdev ( netdev ) ) != 0 )
 		goto err_register_netdev;
@@ -1648,6 +1681,114 @@ static void arbel_remove ( struct pci_device *pci ) {
 	ib_driver_close ( 0 );
 	netdev_nullify ( netdev );
 	netdev_put ( netdev );
+}
+
+#endif /* 0 */
+
+
+
+/**
+ * Probe PCI device
+ *
+ * @v pci		PCI device
+ * @v id		PCI ID
+ * @ret rc		Return status code
+ */
+static int arbel_probe ( struct pci_device *pci,
+			 const struct pci_device_id *id __unused ) {
+	struct ib_device *ibdev;
+	struct arbelprm_query_dev_lim dev_lim;
+	struct arbel *arbel;
+	udqp_t qph;
+	int rc;
+
+	/* Allocate Infiniband device */
+	ibdev = alloc_ibdev ( sizeof ( *arbel ) );
+	if ( ! ibdev )
+		return -ENOMEM;
+	ibdev->op = &arbel_ib_operations;
+	pci_set_drvdata ( pci, ibdev );
+	ibdev->dev = &pci->dev;
+	arbel = ibdev->dev_priv;
+	memset ( arbel, 0, sizeof ( *arbel ) );
+
+	/* Fix up PCI device */
+	adjust_pci_device ( pci );
+
+	/* Initialise hardware */
+	if ( ( rc = ib_driver_init ( pci, &qph ) ) != 0 )
+		goto err_ib_driver_init;
+
+	/* Hack up IB structures */
+	arbel->config = memfree_pci_dev.cr_space;
+	arbel->mailbox_in = dev_buffers_p->inprm_buf;
+	arbel->mailbox_out = dev_buffers_p->outprm_buf;
+	arbel->uar = memfree_pci_dev.uar;
+	arbel->db_rec = dev_ib_data.uar_context_base;
+	arbel->reserved_lkey = dev_ib_data.mkey;
+	arbel->eqn = dev_ib_data.eq.eqn;
+
+	/* Get device limits */
+	if ( ( rc = arbel_cmd_query_dev_lim ( arbel, &dev_lim ) ) != 0 ) {
+		DBGC ( arbel, "Arbel %p could not get device limits: %s\n",
+		       arbel, strerror ( rc ) );
+		goto err_query_dev_lim;
+	}
+	arbel->limits.reserved_uars = MLX_GET ( &dev_lim, num_rsvd_uars );
+	arbel->limits.reserved_cqs =
+		( 1 << MLX_GET ( &dev_lim, log2_rsvd_cqs ) );
+	arbel->limits.reserved_qps =
+		( 1 << MLX_GET ( &dev_lim, log2_rsvd_qps ) );
+
+	/* Get port GID */
+	if ( ( rc = arbel_get_port_gid ( arbel, &ibdev->port_gid ) ) != 0 ) {
+		DBGC ( arbel, "Arbel %p could not determine port GID: %s\n",
+		       arbel, strerror ( rc ) );
+		goto err_get_port_gid;
+	}
+
+	struct ud_av_st *bcast_av = ib_data.bcast_av;
+	struct arbelprm_ud_address_vector *bav =
+		( struct arbelprm_ud_address_vector * ) &bcast_av->av;
+	struct ib_address_vector *av = &hack_ipoib_bcast_av;
+	av->dest_qp = bcast_av->dest_qp;
+	av->qkey = bcast_av->qkey;
+	av->dlid = MLX_GET ( bav, rlid );
+	av->rate = ( MLX_GET ( bav, max_stat_rate ) ? 1 : 4 );
+	av->sl = MLX_GET ( bav, sl );
+	av->gid_present = 1;
+	memcpy ( &av->gid, ( ( void * ) bav ) + 16, 16 );
+
+	memcpy ( &ibdev->broadcast_gid, &ib_data.bcast_gid, 16 );
+
+	/* Add IPoIB device */
+	if ( ( rc = ipoib_probe ( ibdev ) ) != 0 ) {
+		DBGC ( arbel, "Arbel %p could not add IPoIB device: %s\n",
+		       arbel, strerror ( rc ) );
+		goto err_ipoib_probe;
+	}
+
+	return 0;
+
+ err_ipoib_probe:
+ err_get_port_gid:
+ err_query_dev_lim:
+	ib_driver_close ( 0 );
+ err_ib_driver_init:
+	free_ibdev ( ibdev );
+	return rc;
+}
+
+/**
+ * Remove PCI device
+ *
+ * @v pci		PCI device
+ */
+static void arbel_remove ( struct pci_device *pci ) {
+	struct ib_device *ibdev = pci_get_drvdata ( pci );
+
+	ipoib_remove ( ibdev );
+	ib_driver_close ( 0 );
 }
 
 static struct pci_device_id arbel_nics[] = {

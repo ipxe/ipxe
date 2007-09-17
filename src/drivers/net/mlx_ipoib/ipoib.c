@@ -879,7 +879,7 @@ static int ipoib_read_packet(__u16 * prot_p, void *data, unsigned int *size_p,
 	void *buf, *out_buf;
 	__u16 prot_type;
 
-	rc = ib_poll_cq(ipoib_data.rcv_cqh, &ib_cqe, &num_cqes);
+	rc = ib_poll_cqx(ipoib_data.rcv_cqh, &ib_cqe, &num_cqes);
 	if (rc) {
 		return rc;
 	}

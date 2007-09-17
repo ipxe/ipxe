@@ -63,6 +63,7 @@ static int wait_logic_link_up(__u8 port)
 }
 
 unsigned long ipoib_qkey;
+unsigned long hack_ipoib_qkey;
 
 static int ib_driver_init(struct pci_device *pci, udqp_t * ipoib_qph_p)
 {
@@ -149,7 +150,7 @@ static int ib_driver_init(struct pci_device *pci, udqp_t * ipoib_qph_p)
 			qkey, mlid);
 	}
 
-	ipoib_qkey = qkey;
+	hack_ipoib_qkey = ipoib_qkey = qkey;
 
 #if 0
 	rc = create_ipoib_qp(&ib_data.ipoib_qp,
@@ -285,7 +286,7 @@ static int poll_cqe_tout(cq_t cqh, __u16 tout, void **wqe, int *good_p)
 
 	end = currticks() + tout;
 	do {
-		rc = ib_poll_cq(cqh, &ib_cqe, &num_cqes);
+		rc = ib_poll_cqx(cqh, &ib_cqe, &num_cqes);
 		if (rc)
 			return rc;
 

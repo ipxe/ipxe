@@ -1730,7 +1730,7 @@ static void dev2ib_cqe(struct ib_cqe_st *ib_cqe_p, union cqe_st *cqe_p)
 		   byte_cnt);
 }
 
-static int ib_poll_cq(void *cqh, struct ib_cqe_st *ib_cqe_p, u8 * num_cqes)
+static int ib_poll_cqx(void *cqh, struct ib_cqe_st *ib_cqe_p, u8 * num_cqes)
 {
 	int rc;
 	union cqe_st cqe;

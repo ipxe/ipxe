@@ -153,8 +153,6 @@ void ib_destroy_qp ( struct ib_device *ibdev,
 	free ( qp );
 }
 
-
-
 /**
  * Find work queue belonging to completion queue
  *
@@ -174,7 +172,35 @@ struct ib_work_queue * ib_find_wq ( struct ib_completion_queue *cq,
 	return NULL;
 }
 
+/**
+ * Allocate Infiniband device
+ *
+ * @v priv_size		Size of private data area
+ * @ret ibdev		Infiniband device, or NULL
+ */
+struct ib_device * alloc_ibdev ( size_t priv_size ) {
+	struct ib_device *ibdev;
+	size_t total_len;
 
+	total_len = ( sizeof ( *ibdev ) + priv_size );
+	ibdev = zalloc ( total_len );
+	if ( ibdev ) {
+		ibdev->dev_priv = ( ( ( void * ) ibdev ) + sizeof ( *ibdev ) );
+	}
+	return ibdev;
+}
+
+/**
+ * Free Infiniband device
+ *
+ * @v ibdev		Infiniband device
+ */
+void free_ibdev ( struct ib_device *ibdev ) {
+	free ( ibdev );
+}
+
+
+#if 0
 
 /** Infiniband broadcast MAC address */
 static uint8_t ib_broadcast[IB_ALEN] = { 0xff, };
@@ -259,3 +285,5 @@ struct ll_protocol infiniband_protocol __ll_protocol = {
 	.rx		= ib_rx,
 	.ntoa		= ib_ntoa,
 };
+
+#endif
