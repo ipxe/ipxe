@@ -1251,25 +1251,13 @@ static int arbel_get_sm_lid ( struct arbel *arbel,
 	return 0;
 }
 
-static int arbel_get_broadcast_gid ( struct arbel *arbel,
-				     struct ib_gid *broadcast_gid ) {
-	static const struct ib_gid ipv4_broadcast_gid = {
-		{ { 0xff, 0x12, 0x40, 0x1b, 0x00, 0x00, 0x00, 0x00,
-		    0x00, 0x00, 0x00, 0x00, 0xff, 0xff, 0xff, 0xff } }
-	};
+static int arbel_get_pkey ( struct arbel *arbel, unsigned long *pkey ) {
 	struct ib_mad_pkey_table pkey_table;
 	int rc;
 
-	/* Start with the IPv4 broadcast GID */
-	memcpy ( broadcast_gid, &ipv4_broadcast_gid,
-		 sizeof ( *broadcast_gid ) );
-
-	/* Add partition key */
 	if ( ( rc = arbel_get_pkey_table ( arbel, &pkey_table ) ) != 0 )
 		return rc;
-	memcpy ( &broadcast_gid->u.bytes[4], &pkey_table.pkey[0][0],
-		 sizeof ( pkey_table.pkey[0][0] ) );
-
+	*pkey = ntohs ( pkey_table.pkey[0][0] );
 	return 0;
 }
 
@@ -1340,12 +1328,11 @@ static int arbel_probe ( struct pci_device *pci,
 		goto err_get_port_gid;
 	}
 
-	/* Get broadcast GID */
-	if ( ( rc = arbel_get_broadcast_gid ( arbel,
-					      &ibdev->broadcast_gid ) ) != 0 ){
-		DBGC ( arbel, "Arbel %p could not determine broadcast GID: "
+	/* Get partition key */
+	if ( ( rc = arbel_get_pkey ( arbel, &ibdev->pkey ) ) != 0 ) {
+		DBGC ( arbel, "Arbel %p could not determine partition key: "
 		       "%s\n", arbel, strerror ( rc ) );
-		goto err_get_broadcast_gid;
+		goto err_get_pkey;
 	}
 
 	struct ud_av_st *bcast_av = ib_data.bcast_av;
@@ -1370,7 +1357,7 @@ static int arbel_probe ( struct pci_device *pci,
 	return 0;
 
  err_ipoib_probe:
- err_get_broadcast_gid:
+ err_get_pkey:
  err_get_port_gid:
  err_get_sm_lid:
  err_query_dev_lim:

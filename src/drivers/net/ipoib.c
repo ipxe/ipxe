@@ -84,6 +84,8 @@ struct ipoib_device {
 	struct ipoib_queue_set data;
 	/** Data queue set */
 	struct ipoib_queue_set meta;
+	/** Broadcast GID */
+	struct ib_gid broadcast_gid;
 };
 
 /**
@@ -111,6 +113,15 @@ static struct ipoib_cached_path ipoib_path_cache[IPOIB_NUM_CACHED_PATHS];
 
 /** Oldest IPoIB path cache entry index */
 static unsigned int ipoib_path_cache_idx = 0;
+
+/** IPoIB metadata TID */
+static uint32_t ipoib_meta_tid = 0;
+
+/** IPv4 broadcast GID */
+static const struct ib_gid ipv4_broadcast_gid = {
+	{ { 0xff, 0x12, 0x40, 0x1b, 0x00, 0x00, 0x00, 0x00,
+	    0x00, 0x00, 0x00, 0x00, 0xff, 0xff, 0xff, 0xff } }
+};
 
 /****************************************************************************
  *
@@ -319,7 +330,6 @@ static int ipoib_get_path_record ( struct ipoib_device *ipoib,
 	struct io_buffer *iobuf;
 	struct ib_mad_path_record *path_record;
 	struct ib_address_vector av;
- 	static uint32_t tid = 0;
 	int rc;
 
 	/* Allocate I/O buffer */
@@ -336,12 +346,71 @@ static int ipoib_get_path_record ( struct ipoib_device *ipoib,
 	path_record->mad_hdr.class_version = 2;
 	path_record->mad_hdr.method = IB_MGMT_METHOD_GET;
 	path_record->mad_hdr.attr_id = htons ( IB_SA_ATTR_PATH_REC );
-	path_record->mad_hdr.tid = tid++;
+	path_record->mad_hdr.tid = ipoib_meta_tid++;
 	path_record->sa_hdr.comp_mask[1] =
 		htonl ( IB_SA_PATH_REC_DGID | IB_SA_PATH_REC_SGID );
 	memcpy ( &path_record->dgid, gid, sizeof ( path_record->dgid ) );
 	memcpy ( &path_record->sgid, &ibdev->port_gid,
 		 sizeof ( path_record->sgid ) );
+
+	/* Construct address vector */
+	memset ( &av, 0, sizeof ( av ) );
+	av.dlid = ibdev->sm_lid;
+	av.dest_qp = IB_SA_QPN;
+	av.qkey = IB_GLOBAL_QKEY;
+
+	/* Post send request */
+	if ( ( rc = ib_post_send ( ibdev, ipoib->meta.qp, &av,
+				   iobuf ) ) != 0 ) {
+		DBGC ( ipoib, "IPoIB %p could not send get path record: %s\n",
+		       ipoib, strerror ( rc ) );
+		free_iob ( iobuf );
+		return rc;
+	}
+
+	return 0;
+}
+
+/**
+ * Transmit multicast group membership request
+ *
+ * @v ipoib		IPoIB device
+ * @v gid		Multicast GID
+ * @v join		Join (rather than leave) group
+ * @ret rc		Return status code
+ */
+static int ipoib_mc_member_record ( struct ipoib_device *ipoib,
+				    struct ib_gid *gid, int join ) {
+	struct ib_device *ibdev = ipoib->ibdev;
+	struct io_buffer *iobuf;
+	struct ib_mad_mc_member_record *mc_member_record;
+	struct ib_address_vector av;
+	int rc;
+
+	/* Allocate I/O buffer */
+	iobuf = alloc_iob ( sizeof ( *mc_member_record ) );
+	if ( ! iobuf )
+		return -ENOMEM;
+	iob_put ( iobuf, sizeof ( *mc_member_record ) );
+	mc_member_record = iobuf->data;
+	memset ( mc_member_record, 0, sizeof ( *mc_member_record ) );
+
+	/* Construct path record request */
+	mc_member_record->mad_hdr.base_version = IB_MGMT_BASE_VERSION;
+	mc_member_record->mad_hdr.mgmt_class = IB_MGMT_CLASS_SUBN_ADM;
+	mc_member_record->mad_hdr.class_version = 2;
+	mc_member_record->mad_hdr.method = 
+		( join ? IB_MGMT_METHOD_SET : IB_MGMT_METHOD_DELETE );
+	mc_member_record->mad_hdr.attr_id = htons ( IB_SA_ATTR_MC_MEMBER_REC );
+	mc_member_record->mad_hdr.tid = ipoib_meta_tid++;
+	mc_member_record->sa_hdr.comp_mask[1] =
+		htonl ( IB_SA_MCMEMBER_REC_MGID | IB_SA_MCMEMBER_REC_PORT_GID |
+			IB_SA_MCMEMBER_REC_JOIN_STATE );
+	mc_member_record->scope__join_state = 1;
+	memcpy ( &mc_member_record->mgid, gid,
+		 sizeof ( mc_member_record->mgid ) );
+	memcpy ( &mc_member_record->port_gid, &ibdev->port_gid,
+		 sizeof ( mc_member_record->port_gid ) );
 
 	/* Construct address vector */
 	memset ( &av, 0, sizeof ( av ) );
@@ -591,7 +660,7 @@ static int ipoib_open ( struct net_device *netdev ) {
 
 	/* Attach to broadcast multicast GID */
 	if ( ( rc = ib_mcast_attach ( ibdev, ipoib->data.qp,
-				      &ibdev->broadcast_gid ) ) != 0 ) {
+				      &ipoib->broadcast_gid ) ) != 0 ) {
 		DBG ( "Could not attach to broadcast GID: %s\n",
 		      strerror ( rc ) );
 		return rc;
@@ -629,6 +698,27 @@ static struct net_device_operations ipoib_operations = {
 };
 
 /**
+ * Join IPoIB broadcast group
+ *
+ * @v ipoib		IPoIB device
+ * @ret rc		Return status code
+ */
+int ipoib_join_broadcast_group ( struct ipoib_device *ipoib ) {
+	int rc;
+
+	/* Send join request */
+	if ( ( rc = ipoib_mc_member_record ( ipoib, &ipoib->broadcast_gid,
+					     1 ) ) != 0 ) {
+		DBGC ( ipoib, "IPoIB %p could not send broadcast join: %s\n",
+		       ipoib, strerror ( rc ) );
+		return rc;
+	}
+
+
+	return 0;
+}
+
+/**
  * Probe IPoIB device
  *
  * @v ibdev		Infiniband device
@@ -652,6 +742,11 @@ int ipoib_probe ( struct ib_device *ibdev ) {
 	ipoib->netdev = netdev;
 	ipoib->ibdev = ibdev;
 
+	/* Calculate broadcast GID */
+	memcpy ( &ipoib->broadcast_gid, &ipv4_broadcast_gid,
+		 sizeof ( ipoib->broadcast_gid ) );
+	ipoib->broadcast_gid.u.words[2] = htons ( ibdev->pkey );
+
 	/* Allocate metadata queue set */
 	if ( ( rc = ipoib_create_qset ( ipoib, &ipoib->meta,
 					IPOIB_META_NUM_CQES,
@@ -662,6 +757,8 @@ int ipoib_probe ( struct ib_device *ibdev ) {
 		       ipoib, strerror ( rc ) );
 		goto err_create_meta_qset;
 	}
+
+
 
 	/* Allocate data queue set */
 	if ( ( rc = ipoib_create_qset ( ipoib, &ipoib->data,

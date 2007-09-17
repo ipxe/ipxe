@@ -20,6 +20,7 @@
 struct ib_gid {
 	union {
 		uint8_t bytes[16];
+		uint16_t words[8];
 		uint32_t dwords[4];
 	} u;
 };
@@ -258,10 +259,10 @@ struct ib_device_operations {
 struct ib_device {
 	/** Port GID */
 	struct ib_gid port_gid;
-	/** Broadcast GID */
-	struct ib_gid broadcast_gid;
 	/** Subnet manager LID */
 	unsigned long sm_lid;
+	/** Partition key */
+	unsigned int pkey;
 	/** Underlying device */
 	struct device *dev;
 	/** Infiniband operations */
@@ -539,6 +540,26 @@ struct ib_mad_path_record {
 	uint8_t rate_selector__rate;
 	uint32_t preference__packet_lifetime__packet_lifetime_selector;
 	uint32_t reserved2[35];
+} __attribute__ (( packed ));
+
+struct ib_mad_mc_member_record {
+	struct ib_mad_hdr mad_hdr;
+	struct ib_rmpp_hdr rmpp_hdr;
+	struct ib_sa_hdr sa_hdr;
+	struct ib_gid mgid;
+	struct ib_gid port_gid;
+	uint32_t qkey;
+	uint16_t mlid;
+	uint8_t mtu_selector__mtu;
+	uint8_t tclass;
+	uint16_t pkey;
+	uint8_t rate_selector__rate;
+	uint8_t packet_lifetime_selector__packet_lifetime;
+	uint32_t sl__flow_label__hop_limit;
+	uint8_t scope__join_state;
+	uint8_t proxy_join__reserved;
+	uint16_t reserved0;
+	uint32_t reserved1[37];
 } __attribute__ (( packed ));
 
 union ib_mad {
