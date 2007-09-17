@@ -12,6 +12,13 @@
  *
  */
 
+/* PCI BARs */
+#define ARBEL_PCI_CONFIG_BAR		PCI_BASE_ADDRESS_0
+#define ARBEL_PCI_CONFIG_BAR_SIZE	0x100000
+#define ARBEL_PCI_UAR_BAR		PCI_BASE_ADDRESS_2
+#define ARBEL_PCI_UAR_IDX		1
+#define ARBEL_PCI_UAR_SIZE		0x1000
+
 /* UAR context table (UCE) resource types */
 #define ARBEL_UAR_RES_NONE		0x00
 #define ARBEL_UAR_RES_CQ_CI		0x01
@@ -27,6 +34,7 @@
 
 /* HCA command register opcodes */
 #define ARBEL_HCR_QUERY_DEV_LIM		0x0003
+#define ARBEL_HCR_QUERY_FW		0x0004
 #define ARBEL_HCR_SW2HW_CQ		0x0016
 #define ARBEL_HCR_HW2SW_CQ		0x0017
 #define ARBEL_HCR_RST2INIT_QPEE		0x0019
@@ -74,6 +82,7 @@ struct MLX_DECLARE_STRUCT ( arbelprm_mgm_hash );
 struct MLX_DECLARE_STRUCT ( arbelprm_qp_db_record );
 struct MLX_DECLARE_STRUCT ( arbelprm_qp_ee_state_transitions );
 struct MLX_DECLARE_STRUCT ( arbelprm_query_dev_lim );
+struct MLX_DECLARE_STRUCT ( arbelprm_query_fw );
 struct MLX_DECLARE_STRUCT ( arbelprm_queue_pair_ee_context_entry );
 struct MLX_DECLARE_STRUCT ( arbelprm_recv_wqe_segment_next );
 struct MLX_DECLARE_STRUCT ( arbelprm_send_doorbell );
@@ -270,6 +279,8 @@ struct arbel {
 #define ARBEL_HCR_BASE			0x80680
 #define ARBEL_HCR_REG(x)		( ARBEL_HCR_BASE + 4 * (x) )
 #define ARBEL_HCR_MAX_WAIT_MS		2000
+#define ARBEL_MBOX_ALIGN		4096
+#define ARBEL_MBOX_SIZE			512
 
 /* HCA command is split into
  *

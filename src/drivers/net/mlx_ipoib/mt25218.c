@@ -133,6 +133,9 @@ static int arbel_cmd ( struct arbel *arbel, unsigned long command,
 	unsigned int i;
 	int rc;
 
+	assert ( in_len <= ARBEL_MBOX_SIZE );
+	assert ( out_len <= ARBEL_MBOX_SIZE );
+
 	DBGC2 ( arbel, "Arbel %p command %02x in %zx%s out %zx%s\n",
 		arbel, opcode, in_len,
 		( ( command & ARBEL_HCR_IN_MBOX ) ? "(mbox)" : "" ), out_len,
@@ -210,9 +213,17 @@ static inline int
 arbel_cmd_query_dev_lim ( struct arbel *arbel,
 			  struct arbelprm_query_dev_lim *dev_lim ) {
 	return arbel_cmd ( arbel,
-			   ARBEL_HCR_OUT_CMD ( ARBEL_HCR_QUERY_DEV_LIM, 
+			   ARBEL_HCR_OUT_CMD ( ARBEL_HCR_QUERY_DEV_LIM,
 					       1, sizeof ( *dev_lim ) ),
 			   0, NULL, 0, dev_lim );
+}
+
+static inline int
+arbel_cmd_query_fw ( struct arbel *arbel, struct arbelprm_query_fw *fw ) {
+	return arbel_cmd ( arbel,
+			   ARBEL_HCR_OUT_CMD ( ARBEL_HCR_QUERY_FW, 
+					       1, sizeof ( *fw ) ),
+			   0, NULL, 0, fw );
 }
 
 static inline int
@@ -1300,6 +1311,7 @@ static int arbel_get_pkey ( struct arbel *arbel, unsigned int *pkey ) {
 static int arbel_probe ( struct pci_device *pci,
 			 const struct pci_device_id *id __unused ) {
 	struct ib_device *ibdev;
+	struct arbelprm_query_fw fw;
 	struct arbelprm_query_dev_lim dev_lim;
 	struct arbel *arbel;
 	udqp_t qph;
@@ -1307,26 +1319,59 @@ static int arbel_probe ( struct pci_device *pci,
 
 	/* Allocate Infiniband device */
 	ibdev = alloc_ibdev ( sizeof ( *arbel ) );
-	if ( ! ibdev )
-		return -ENOMEM;
+	if ( ! ibdev ) {
+		rc = -ENOMEM;
+		goto err_ibdev;
+	}
 	ibdev->op = &arbel_ib_operations;
 	pci_set_drvdata ( pci, ibdev );
 	ibdev->dev = &pci->dev;
 	arbel = ibdev->dev_priv;
 	memset ( arbel, 0, sizeof ( *arbel ) );
 
+	/* Allocate space for mailboxes */
+	arbel->mailbox_in = malloc_dma ( ARBEL_MBOX_SIZE, ARBEL_MBOX_ALIGN );
+	if ( ! arbel->mailbox_in ) {
+		rc = -ENOMEM;
+		goto err_mailbox_in;
+	}
+	arbel->mailbox_out = malloc_dma ( ARBEL_MBOX_SIZE, ARBEL_MBOX_ALIGN );
+	if ( ! arbel->mailbox_out ) {
+		rc = -ENOMEM;
+		goto err_mailbox_out;
+	}
+
 	/* Fix up PCI device */
 	adjust_pci_device ( pci );
+
+	/* Get PCI BARs */
+	arbel->config = ioremap ( pci_bar_start ( pci, ARBEL_PCI_CONFIG_BAR ),
+				  ARBEL_PCI_CONFIG_BAR_SIZE );
+	arbel->uar = ioremap ( ( pci_bar_start ( pci, ARBEL_PCI_UAR_BAR ) +
+				 ARBEL_PCI_UAR_IDX * ARBEL_PCI_UAR_SIZE ),
+			       ARBEL_PCI_UAR_SIZE );
+
+	/* Initialise firmware */
+	if ( ( rc = arbel_cmd_query_fw ( arbel, &fw ) ) != 0 ) {
+		DBGC ( arbel, "Arbel %p could not query firmware: %s\n",
+		       arbel, strerror ( rc ) );
+		goto err_query_fw;
+	}
+	DBGC ( arbel, "Arbel %p firmware version %ld.%ld.%ld\n", arbel,
+	       MLX_GET ( &fw, fw_rev_major ), MLX_GET ( &fw, fw_rev_minor ),
+	       MLX_GET ( &fw, fw_rev_subminor ) );
 
 	/* Initialise hardware */
 	if ( ( rc = ib_driver_init ( pci, &qph ) ) != 0 )
 		goto err_ib_driver_init;
 
 	/* Hack up IB structures */
+#if 0
 	arbel->config = memfree_pci_dev.cr_space;
+	arbel->uar = memfree_pci_dev.uar;
 	arbel->mailbox_in = dev_buffers_p->inprm_buf;
 	arbel->mailbox_out = dev_buffers_p->outprm_buf;
-	arbel->uar = memfree_pci_dev.uar;
+#endif
 	arbel->db_rec = dev_ib_data.uar_context_base;
 	arbel->reserved_lkey = dev_ib_data.mkey;
 	arbel->eqn = dev_ib_data.eq.eqn;
@@ -1380,7 +1425,13 @@ static int arbel_probe ( struct pci_device *pci,
  err_query_dev_lim:
 	ib_driver_close ( 0 );
  err_ib_driver_init:
+ err_query_fw:
+	free_dma ( arbel->mailbox_out, ARBEL_MBOX_SIZE );
+ err_mailbox_out:
+	free_dma ( arbel->mailbox_in, ARBEL_MBOX_SIZE );
+ err_mailbox_in:
 	free_ibdev ( ibdev );
+ err_ibdev:
 	return rc;
 }
 
@@ -1391,9 +1442,13 @@ static int arbel_probe ( struct pci_device *pci,
  */
 static void arbel_remove ( struct pci_device *pci ) {
 	struct ib_device *ibdev = pci_get_drvdata ( pci );
+	struct arbel *arbel = ibdev->dev_priv;
 
 	ipoib_remove ( ibdev );
 	ib_driver_close ( 0 );
+	free_dma ( arbel->mailbox_out, ARBEL_MBOX_SIZE );
+	free_dma ( arbel->mailbox_in, ARBEL_MBOX_SIZE );
+	free_ibdev ( ibdev );
 }
 
 static struct pci_device_id arbel_nics[] = {
