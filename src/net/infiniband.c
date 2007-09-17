@@ -64,8 +64,8 @@ struct ib_completion_queue * ib_create_cq ( struct ib_device *ibdev,
 		return NULL;
 	}
 
-	DBGC ( ibdev, "IBDEV %p created completion queue %#lx\n",
-	       ibdev, cq->cqn );
+	DBGC ( ibdev, "IBDEV %p created %d-entry completion queue %p (%p) "
+	       "with CQN %#lx\n", ibdev, num_cqes, cq, cq->dev_priv, cq->cqn );
 	return cq;
 }
 
@@ -102,14 +102,16 @@ struct ib_queue_pair * ib_create_qp ( struct ib_device *ibdev,
 				      struct ib_completion_queue *recv_cq,
 				      unsigned long qkey ) {
 	struct ib_queue_pair *qp;
+	size_t total_size;
 	int rc;
 
 	DBGC ( ibdev, "IBDEV %p creating queue pair\n", ibdev );
 
 	/* Allocate and initialise data structure */
-	qp = zalloc ( sizeof ( *qp ) +
-		      ( num_send_wqes * sizeof ( qp->send.iobufs[0] ) ) +
-		      ( num_recv_wqes * sizeof ( qp->recv.iobufs[0] ) ) );
+	total_size = ( sizeof ( *qp ) +
+		       ( num_send_wqes * sizeof ( qp->send.iobufs[0] ) ) +
+		       ( num_recv_wqes * sizeof ( qp->recv.iobufs[0] ) ) );
+	qp = zalloc ( total_size );
 	if ( ! qp )
 		return NULL;
 	qp->qkey = qkey;
@@ -134,8 +136,14 @@ struct ib_queue_pair * ib_create_qp ( struct ib_device *ibdev,
 		return NULL;
 	}
 
-	DBGC ( ibdev, "IBDEV %p created queue pair %#lx\n",
-	       ibdev, qp->qpn );
+	DBGC ( ibdev, "IBDEV %p created queue pair %p (%p) with QPN %#lx\n",
+	       ibdev, qp, qp->dev_priv, qp->qpn );
+	DBGC ( ibdev, "IBDEV %p QPN %#lx has %d send entries at [%p,%p)\n",
+	       ibdev, qp->qpn, num_send_wqes, qp->send.iobufs,
+	       qp->recv.iobufs );
+	DBGC ( ibdev, "IBDEV %p QPN %#lx has %d receive entries at [%p,%p)\n",
+	       ibdev, qp->qpn, num_send_wqes, qp->recv.iobufs,
+	       ( ( ( void * ) qp ) + total_size ) );
 	return qp;
 }
 

@@ -398,6 +398,9 @@ static int arbel_create_cq ( struct ib_device *ibdev,
 		goto err_sw2hw_cq;
 	}
 
+	DBGC ( arbel, "Arbel %p CQN %#lx ring at [%p,%p)\n",
+	       arbel, cq->cqn, arbel_cq->cqe,
+	       ( ( ( void * ) arbel_cq->cqe ) + arbel_cq->cqe_size ) );
 	cq->dev_priv = arbel_cq;
 	return 0;
 
@@ -650,6 +653,12 @@ static int arbel_create_qp ( struct ib_device *ibdev,
 		goto err_rtr2rts_qpee;
 	}
 
+	DBGC ( arbel, "Arbel %p QPN %#lx send ring at [%p,%p)\n",
+	       arbel, qp->qpn, arbel_qp->send.wqe,
+	       ( ( (void *) arbel_qp->send.wqe ) + arbel_qp->send.wqe_size ) );
+	DBGC ( arbel, "Arbel %p QPN %#lx receive ring at [%p,%p)\n",
+	       arbel, qp->qpn, arbel_qp->recv.wqe,
+	       ( ( (void *) arbel_qp->recv.wqe ) + arbel_qp->recv.wqe_size ) );
 	qp->dev_priv = arbel_qp;
 	return 0;
 
@@ -904,6 +913,7 @@ static int arbel_complete ( struct ib_device *ibdev,
 	struct arbel_queue_pair *arbel_qp;
 	struct arbel_send_work_queue *arbel_send_wq;
 	struct arbel_recv_work_queue *arbel_recv_wq;
+	struct arbelprm_recv_wqe *recv_wqe;
 	struct io_buffer *iobuf;
 	ib_completer_t complete;
 	unsigned int opcode;
@@ -915,7 +925,6 @@ static int arbel_complete ( struct ib_device *ibdev,
 
 	/* Parse completion */
 	memset ( &completion, 0, sizeof ( completion ) );
-	completion.len = MLX_GET ( &cqe->normal, byte_cnt );
 	qpn = MLX_GET ( &cqe->normal, my_qpn );
 	is_send = MLX_GET ( &cqe->normal, s );
 	wqe_adr = ( MLX_GET ( &cqe->normal, wqe_adr ) << 6 );
@@ -946,10 +955,12 @@ static int arbel_complete ( struct ib_device *ibdev,
 		arbel_send_wq = &arbel_qp->send;
 		wqe_idx = ( ( wqe_adr - virt_to_bus ( arbel_send_wq->wqe ) ) /
 			    sizeof ( arbel_send_wq->wqe[0] ) );
+		assert ( wqe_idx < qp->send.num_wqes );
 	} else {
 		arbel_recv_wq = &arbel_qp->recv;
 		wqe_idx = ( ( wqe_adr - virt_to_bus ( arbel_recv_wq->wqe ) ) /
 			    sizeof ( arbel_recv_wq->wqe[0] ) );
+		assert ( wqe_idx < qp->recv.num_wqes );
 	}
 
 	/* Identify I/O buffer */
@@ -960,6 +971,27 @@ static int arbel_complete ( struct ib_device *ibdev,
 		return -EIO;
 	}
 	wq->iobufs[wqe_idx] = NULL;
+
+	/* Fill in length for received packets */
+	if ( ! is_send ) {
+		completion.len = MLX_GET ( &cqe->normal, byte_cnt );
+		recv_wqe = &arbel_recv_wq->wqe[wqe_idx].recv;
+		assert ( MLX_GET ( &recv_wqe->data[0], local_address_l ) ==
+			 virt_to_bus ( iobuf->data ) );
+		assert ( MLX_GET ( &recv_wqe->data[0], byte_count ) ==
+			 iob_tailroom ( iobuf ) );
+		DBG ( "CPQ %lx QPN %lx WQE %x\n", cq->cqn, qp->qpn, wqe_idx );
+		//		DBG_HD ( iobuf, sizeof ( *iobuf ) );
+		MLX_FILL_1 ( &recv_wqe->data[0], 0, byte_count, 0 );
+		MLX_FILL_1 ( &recv_wqe->data[0], 1,
+			     l_key, ARBEL_INVALID_LKEY );
+		if ( completion.len > iob_tailroom ( iobuf ) ) {
+			DBGC ( arbel, "Arbel %p CQN %lx QPN %lx IDX %x "
+			       "overlength received packet length %zd\n",
+			       arbel, cq->cqn, qpn, wqe_idx, completion.len );
+			return -EIO;
+		}
+	}
 
 	/* Pass off to caller's completion handler */
 	complete = ( is_send ? complete_send : complete_recv );
@@ -1252,7 +1284,7 @@ static int arbel_get_sm_lid ( struct arbel *arbel,
 	return 0;
 }
 
-static int arbel_get_pkey ( struct arbel *arbel, unsigned long *pkey ) {
+static int arbel_get_pkey ( struct arbel *arbel, unsigned int *pkey ) {
 	struct ib_mad_pkey_table pkey_table;
 	int rc;
 

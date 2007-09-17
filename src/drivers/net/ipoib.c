@@ -47,22 +47,22 @@ extern struct ib_address_vector hack_ipoib_bcast_av;
 #define IPOIB_MTU 2048
 
 /** Number of IPoIB data send work queue entries */
-#define IPOIB_DATA_NUM_SEND_WQES 4
+#define IPOIB_DATA_NUM_SEND_WQES 2
 
 /** Number of IPoIB data receive work queue entries */
-#define IPOIB_DATA_NUM_RECV_WQES 4
+#define IPOIB_DATA_NUM_RECV_WQES 2
 
 /** Number of IPoIB data completion entries */
-#define IPOIB_DATA_NUM_CQES 8
+#define IPOIB_DATA_NUM_CQES 32
 
 /** Number of IPoIB metadata send work queue entries */
-#define IPOIB_META_NUM_SEND_WQES 4
+#define IPOIB_META_NUM_SEND_WQES 2
 
 /** Number of IPoIB metadata receive work queue entries */
-#define IPOIB_META_NUM_RECV_WQES 4
+#define IPOIB_META_NUM_RECV_WQES 2
 
 /** Number of IPoIB metadata completion entries */
-#define IPOIB_META_NUM_CQES 8
+#define IPOIB_META_NUM_CQES 32
 
 /** An IPoIB queue set */
 struct ipoib_queue_set {
@@ -205,6 +205,14 @@ static int ipoib_rx ( struct io_buffer *iobuf, struct net_device *netdev ) {
 	}
 
 	/* Strip off IPoIB header */
+	int len = iob_len ( iobuf );
+	DBG ( "WTF iob_len = %zd\n", len );
+	if ( len < 0 ) {
+		DBG_HD ( iobuf, sizeof ( *iobuf ) );
+		DBG ( "locking\n" );
+		while ( 1 ) {}
+	}
+
 	iob_pull ( iobuf, sizeof ( *ipoib_hdr ) );
 
 	/* Hand off to network-layer protocol */
@@ -492,7 +500,7 @@ static int ipoib_transmit ( struct net_device *netdev,
 			/* No path entry - get path record */
 			rc = ipoib_get_path_record ( ipoib,
 						     &ipoib_pshdr->peer.gid );
-			free_iob ( iobuf );
+			netdev_tx_complete ( netdev, iobuf );
 			return rc;
 		}
 		av.dest_qp = ntohl ( ipoib_pshdr->peer.qpn );
