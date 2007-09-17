@@ -30,11 +30,6 @@ Skeleton NIC driver for Etherboot
 #include "arbel.h"
 
 
-struct ib_address_vector hack_ipoib_bcast_av;
-
-
-
-
 
 
 
@@ -980,8 +975,6 @@ static int arbel_complete ( struct ib_device *ibdev,
 			 virt_to_bus ( iobuf->data ) );
 		assert ( MLX_GET ( &recv_wqe->data[0], byte_count ) ==
 			 iob_tailroom ( iobuf ) );
-		DBG ( "CPQ %lx QPN %lx WQE %x\n", cq->cqn, qp->qpn, wqe_idx );
-		//		DBG_HD ( iobuf, sizeof ( *iobuf ) );
 		MLX_FILL_1 ( &recv_wqe->data[0], 0, byte_count, 0 );
 		MLX_FILL_1 ( &recv_wqe->data[0], 1,
 			     l_key, ARBEL_INVALID_LKEY );
@@ -1367,18 +1360,6 @@ static int arbel_probe ( struct pci_device *pci,
 		       "%s\n", arbel, strerror ( rc ) );
 		goto err_get_pkey;
 	}
-
-	struct ud_av_st *bcast_av = ib_data.bcast_av;
-	struct arbelprm_ud_address_vector *bav =
-		( struct arbelprm_ud_address_vector * ) &bcast_av->av;
-	struct ib_address_vector *av = &hack_ipoib_bcast_av;
-	av->dest_qp = bcast_av->dest_qp;
-	av->qkey = bcast_av->qkey;
-	av->dlid = MLX_GET ( bav, rlid );
-	av->rate = ( MLX_GET ( bav, max_stat_rate ) ? 1 : 4 );
-	av->sl = MLX_GET ( bav, sl );
-	av->gid_present = 1;
-	memcpy ( &av->gid, ( ( void * ) bav ) + 16, 16 );
 
 	/* Add IPoIB device */
 	if ( ( rc = ipoib_probe ( ibdev ) ) != 0 ) {

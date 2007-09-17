@@ -41,10 +41,10 @@
 #define IPOIB_DATA_NUM_SEND_WQES 2
 
 /** Number of IPoIB data receive work queue entries */
-#define IPOIB_DATA_NUM_RECV_WQES 2
+#define IPOIB_DATA_NUM_RECV_WQES 4
 
 /** Number of IPoIB data completion entries */
-#define IPOIB_DATA_NUM_CQES 32
+#define IPOIB_DATA_NUM_CQES 8
 
 /** Number of IPoIB metadata send work queue entries */
 #define IPOIB_META_NUM_SEND_WQES 2
@@ -53,7 +53,7 @@
 #define IPOIB_META_NUM_RECV_WQES 2
 
 /** Number of IPoIB metadata completion entries */
-#define IPOIB_META_NUM_CQES 32
+#define IPOIB_META_NUM_CQES 8
 
 /** An IPoIB queue set */
 struct ipoib_queue_set {
