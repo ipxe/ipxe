@@ -322,16 +322,6 @@ static int ipoib_get_path_record ( struct ipoib_device *ipoib,
  	static uint32_t tid = 0;
 	int rc;
 
-	int get_path_record(struct ib_gid *dgid, uint16_t *dlid_p,
-			    uint8_t *sl_p, uint8_t *rate_p);
-	uint16_t tmp_dlid;
-	uint8_t tmp_sl;
-	uint8_t tmp_rate;
-	get_path_record ( gid, &tmp_dlid, &tmp_sl, &tmp_rate );
-	DBG ( "get_path_record() gives dlid = %04x, sl = %02x, rate = %02x\n",
-	      tmp_dlid, tmp_sl, tmp_rate );
-
-
 	/* Allocate I/O buffer */
 	iobuf = alloc_iob ( sizeof ( *path_record ) );
 	if ( ! iobuf )
@@ -513,10 +503,6 @@ static void ipoib_meta_complete_recv ( struct ib_device *ibdev __unused,
 		/* Update path cache */
 		iob_put ( iobuf, completion->len );
 		iob_pull ( iobuf, sizeof ( struct ib_global_route_header ) );
-
-		DBG ( "Metadata RX:\n" );
-		DBG_HD ( iobuf->data, iob_len ( iobuf ) );
-
 		path_record = iobuf->data;
 		path = &ipoib_path_cache[ipoib_path_cache_idx];
 		memcpy ( &path->gid, &path_record->dgid,
@@ -716,8 +702,11 @@ int ipoib_probe ( struct ib_device *ibdev ) {
  */
 void ipoib_remove ( struct ib_device *ibdev ) {
 	struct net_device *netdev = ib_get_ownerdata ( ibdev );
+	struct ipoib_device *ipoib = netdev->priv;
 
 	unregister_netdev ( netdev );
+	ipoib_destroy_qset ( ipoib, &ipoib->data );
+	ipoib_destroy_qset ( ipoib, &ipoib->meta );
 	netdev_nullify ( netdev );
 	netdev_put ( netdev );
 }

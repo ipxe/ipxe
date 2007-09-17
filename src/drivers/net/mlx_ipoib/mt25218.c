@@ -138,10 +138,10 @@ static int arbel_cmd ( struct arbel *arbel, unsigned long command,
 	unsigned int i;
 	int rc;
 
-	DBGC ( arbel, "Arbel %p command %02x in %zx%s out %zx%s\n",
-	       arbel, opcode, in_len,
-	       ( ( command & ARBEL_HCR_IN_MBOX ) ? "(mbox)" : "" ), out_len,
-	       ( ( command & ARBEL_HCR_OUT_MBOX ) ? "(mbox)" : "" ) );
+	DBGC2 ( arbel, "Arbel %p command %02x in %zx%s out %zx%s\n",
+		arbel, opcode, in_len,
+		( ( command & ARBEL_HCR_IN_MBOX ) ? "(mbox)" : "" ), out_len,
+		( ( command & ARBEL_HCR_OUT_MBOX ) ? "(mbox)" : "" ) );
 
 	/* Check that HCR is free */
 	if ( ( rc = arbel_cmd_wait ( arbel, &hcr ) ) != 0 ) {
@@ -168,14 +168,10 @@ static int arbel_cmd ( struct arbel *arbel, unsigned long command,
 		     opcode, opcode,
 		     opcode_modifier, op_mod,
 		     go, 1 );
-
-	DBG_HD ( &hcr, sizeof ( hcr ) );
+	DBGC2_HD ( arbel, &hcr, sizeof ( hcr ) );
 	if ( in_len ) {
-		size_t dump_len = in_len;
-		if ( dump_len > 256 )
-			dump_len = 256;
-		//		DBG ( "Input:\n" );
-		//		DBG_HD ( in, dump_len );
+		DBGC2 ( arbel, "Input:\n" );
+		DBGC2_HD ( arbel, in, ( ( in_len < 256 ) ? in_len : 256 ) );
 	}
 
 	/* Issue command */
@@ -207,13 +203,9 @@ static int arbel_cmd ( struct arbel *arbel, unsigned long command,
 	hcr.u.dwords[3] = readl ( arbel->config + ARBEL_HCR_REG ( 3 ) );
 	hcr.u.dwords[4] = readl ( arbel->config + ARBEL_HCR_REG ( 4 ) );
 	memcpy ( out, out_buffer, out_len );
-
 	if ( out_len ) {
-		size_t dump_len = out_len;
-		if ( dump_len > 256 )
-			dump_len = 256;
-		//		DBG ( "Output:\n" );
-		//		DBG_HD ( out, dump_len );
+		DBGC2 ( arbel, "Output:\n" );
+		DBGC2_HD ( arbel, out, ( ( out_len < 256 ) ? out_len : 256 ) );
 	}
 
 	return 0;
@@ -737,9 +729,9 @@ static void arbel_ring_doorbell ( struct arbel *arbel,
 				  union arbelprm_doorbell_register *db_reg,
 				  unsigned int offset ) {
 
-	DBG ( "arbel_ring_doorbell %08lx:%08lx to %lx\n",
-	      db_reg->dword[0], db_reg->dword[1],
-	      virt_to_phys ( arbel->uar + offset ) );
+	DBGC2 ( arbel, "Arbel %p ringing doorbell %08lx:%08lx at %lx\n",
+		arbel, db_reg->dword[0], db_reg->dword[1],
+		virt_to_phys ( arbel->uar + offset ) );
 
 	barrier();
 	writel ( db_reg->dword[0], ( arbel->uar + offset + 0 ) );
