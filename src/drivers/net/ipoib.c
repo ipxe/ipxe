@@ -34,15 +34,6 @@
  * IP over Infiniband
  */
 
-
-
-
-
-extern unsigned long hack_ipoib_qkey;
-extern struct ib_address_vector hack_ipoib_bcast_av;
-
-
-
 /** IPoIB MTU */
 #define IPOIB_MTU 2048
 
@@ -205,14 +196,6 @@ static int ipoib_rx ( struct io_buffer *iobuf, struct net_device *netdev ) {
 	}
 
 	/* Strip off IPoIB header */
-	int len = iob_len ( iobuf );
-	DBG ( "WTF iob_len = %zd\n", len );
-	if ( len < 0 ) {
-		DBG_HD ( iobuf, sizeof ( *iobuf ) );
-		DBG ( "locking\n" );
-		while ( 1 ) {}
-	}
-
 	iob_pull ( iobuf, sizeof ( *ipoib_hdr ) );
 
 	/* Hand off to network-layer protocol */
@@ -487,9 +470,6 @@ static int ipoib_transmit ( struct net_device *netdev,
 	av.gid_present = 1;
 	if ( ipoib_pshdr->peer.qpn == htonl ( IPOIB_BROADCAST_QPN ) ) {
 		/* Broadcast address */
-#if 0
-		memcpy ( &av, &hack_ipoib_bcast_av, sizeof ( av ) );
-#endif
 		av.dest_qp = IB_BROADCAST_QPN;
 		av.dlid = ipoib->broadcast_lid;
 		gid = &ipoib->broadcast_gid;
@@ -798,7 +778,7 @@ static void ipoib_close ( struct net_device *netdev ) {
 	struct ib_device *ibdev = ipoib->ibdev;
 
 	/* Detach from broadcast multicast GID */
-	ib_mcast_detach ( ibdev, ipoib->data.qp, &ipoib_broadcast.gid );
+	ib_mcast_detach ( ibdev, ipoib->data.qp, &ipoib->broadcast_gid );
 
 	/* FIXME: should probably flush the receive ring */
 }
@@ -892,10 +872,6 @@ int ipoib_probe ( struct ib_device *ibdev ) {
 		       ipoib, strerror ( rc ) );
 		goto err_create_meta_qset;
 	}
-
-#if 0
-	ipoib->data_qkey = hack_ipoib_qkey;
-#endif
 
 	/* Join broadcast group */
 	if ( ( rc = ipoib_join_broadcast_group ( ipoib ) ) != 0 ) {
