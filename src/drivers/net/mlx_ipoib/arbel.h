@@ -7,6 +7,9 @@
  *
  */
 
+#include <stdint.h>
+#include <gpxe/uaccess.h>
+
 /*
  * Hardware constants
  *
@@ -45,6 +48,9 @@
 #define ARBEL_HCR_READ_MGM		0x0025
 #define ARBEL_HCR_WRITE_MGM		0x0026
 #define ARBEL_HCR_MGID_HASH		0x0027
+#define ARBEL_HCR_RUN_FW		0x0ff6
+#define ARBEL_HCR_UNMAP_FA		0x0ffe
+#define ARBEL_HCR_MAP_FA		0x0fff
 
 /* Service types */
 #define ARBEL_ST_UD			0x03
@@ -87,6 +93,7 @@ struct MLX_DECLARE_STRUCT ( arbelprm_queue_pair_ee_context_entry );
 struct MLX_DECLARE_STRUCT ( arbelprm_recv_wqe_segment_next );
 struct MLX_DECLARE_STRUCT ( arbelprm_send_doorbell );
 struct MLX_DECLARE_STRUCT ( arbelprm_ud_address_vector );
+struct MLX_DECLARE_STRUCT ( arbelprm_virtual_physical_mapping );
 struct MLX_DECLARE_STRUCT ( arbelprm_wqe_segment_ctrl_send );
 struct MLX_DECLARE_STRUCT ( arbelprm_wqe_segment_data_ptr );
 struct MLX_DECLARE_STRUCT ( arbelprm_wqe_segment_next );
@@ -240,15 +247,19 @@ typedef uint32_t arbel_bitmask_t;
 
 /** An Arbel device */
 struct arbel {
-	/** Configuration registers */
+	/** PCI configuration registers */
 	void *config;
+	/** PCI user Access Region */
+	void *uar;
+
 	/** Command input mailbox */
 	void *mailbox_in;
 	/** Command output mailbox */
 	void *mailbox_out;
 
-	/** User Access Region */
-	void *uar;
+	/** Firmware area in external memory */
+	userptr_t firmware_area;
+
 	/** Doorbell records */
 	union arbelprm_doorbell_record *db_rec;
 	/** Reserved LKey

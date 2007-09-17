@@ -315,6 +315,29 @@ arbel_cmd_mgid_hash ( struct arbel *arbel, const struct ib_gid *gid,
 			   0, gid, 0, hash );
 }
 
+static inline int
+arbel_cmd_run_fw ( struct arbel *arbel ) {
+	return arbel_cmd ( arbel,
+			   ARBEL_HCR_VOID_CMD ( ARBEL_HCR_RUN_FW ),
+			   0, NULL, 0, NULL );
+}
+
+static inline int
+arbel_cmd_unmap_fa ( struct arbel *arbel ) {
+	return arbel_cmd ( arbel,
+			   ARBEL_HCR_VOID_CMD ( ARBEL_HCR_UNMAP_FA ),
+			   0, NULL, 0, NULL );
+}
+
+static inline int
+arbel_cmd_map_fa ( struct arbel *arbel,
+		   const struct arbelprm_virtual_physical_mapping *map_fa ) {
+	return arbel_cmd ( arbel,
+			   ARBEL_HCR_IN_CMD ( ARBEL_HCR_MAP_FA,
+					      1, sizeof ( *map_fa ) ),
+			   0, map_fa, 1, NULL );
+}
+
 /***************************************************************************
  *
  * Completion queue operations
@@ -958,15 +981,15 @@ static int arbel_complete ( struct ib_device *ibdev,
 	}
 	qp = wq->qp;
 	arbel_qp = qp->dev_priv;
+	arbel_send_wq = &arbel_qp->send;
+	arbel_recv_wq = &arbel_qp->recv;
 
 	/* Identify work queue entry index */
 	if ( is_send ) {
-		arbel_send_wq = &arbel_qp->send;
 		wqe_idx = ( ( wqe_adr - virt_to_bus ( arbel_send_wq->wqe ) ) /
 			    sizeof ( arbel_send_wq->wqe[0] ) );
 		assert ( wqe_idx < qp->send.num_wqes );
 	} else {
-		arbel_recv_wq = &arbel_qp->recv;
 		wqe_idx = ( ( wqe_adr - virt_to_bus ( arbel_recv_wq->wqe ) ) /
 			    sizeof ( arbel_recv_wq->wqe[0] ) );
 		assert ( wqe_idx < qp->recv.num_wqes );
@@ -1177,6 +1200,12 @@ static struct ib_device_operations arbel_ib_operations = {
 	.mcast_detach	= arbel_mcast_detach,
 };
 
+/***************************************************************************
+ *
+ * MAD IFC operations
+ *
+ ***************************************************************************
+ */
 
 static int arbel_mad_ifc ( struct arbel *arbel,
 			   union arbelprm_mad *mad ) {
@@ -1301,6 +1330,102 @@ static int arbel_get_pkey ( struct arbel *arbel, unsigned int *pkey ) {
 	return 0;
 }
 
+/***************************************************************************
+ *
+ * Firmware control
+ *
+ ***************************************************************************
+ */
+
+/**
+ * Start firmware running
+ *
+ * @v arbel		Arbel device
+ * @ret rc		Return status code
+ */
+static int arbel_start_firmware ( struct arbel *arbel ) {
+	struct arbelprm_query_fw fw;
+	struct arbelprm_virtual_physical_mapping map_fa;
+	unsigned int fw_pages;
+	unsigned int log2_fw_pages;
+	size_t fw_size;
+	physaddr_t fw_base;
+	int rc;
+
+	/* Get firmware parameters */
+	if ( ( rc = arbel_cmd_query_fw ( arbel, &fw ) ) != 0 ) {
+		DBGC ( arbel, "Arbel %p could not query firmware: %s\n",
+		       arbel, strerror ( rc ) );
+		goto err_query_fw;
+	}
+	DBGC ( arbel, "Arbel %p firmware version %ld.%ld.%ld\n", arbel,
+	       MLX_GET ( &fw, fw_rev_major ), MLX_GET ( &fw, fw_rev_minor ),
+	       MLX_GET ( &fw, fw_rev_subminor ) );
+	fw_pages = MLX_GET ( &fw, fw_pages );
+	log2_fw_pages = fls ( fw_pages - 1 );
+	fw_pages = ( 1 << log2_fw_pages );
+	DBGC ( arbel, "Arbel %p requires %d kB for firmware\n",
+	       arbel, ( fw_pages * 4 ) );
+
+	/* Allocate firmware pages and map firmware area */
+	fw_size = ( fw_pages * 4096 );
+	arbel->firmware_area = umalloc ( fw_size );
+	if ( ! arbel->firmware_area ) {
+		rc = -ENOMEM;
+		goto err_alloc_fa;
+	}
+	fw_base = ( user_to_phys ( arbel->firmware_area, fw_size ) &
+		    ~( fw_size - 1 ) );
+	DBGC ( arbel, "Arbel %p firmware area at physical [%lx,%lx)\n",
+	       arbel, fw_base, ( fw_base + fw_size ) );
+	memset ( &map_fa, 0, sizeof ( map_fa ) );
+	MLX_FILL_2 ( &map_fa, 3,
+		     log2size, log2_fw_pages,
+		     pa_l, ( fw_base >> 12 ) );
+	if ( ( rc = arbel_cmd_map_fa ( arbel, &map_fa ) ) != 0 ) {
+		DBGC ( arbel, "Arbel %p could not map firmware: %s\n",
+		       arbel, strerror ( rc ) );
+		goto err_map_fa;
+	}
+
+	/* Start firmware */
+	if ( ( rc = arbel_cmd_run_fw ( arbel ) ) != 0 ) {
+		DBGC ( arbel, "Arbel %p could not run firmware: %s\n",
+		       arbel, strerror ( rc ) );
+		goto err_run_fw;
+	}
+
+	DBGC ( arbel, "Arbel %p firmware started\n", arbel );
+	return 0;
+
+ err_run_fw:
+	arbel_cmd_unmap_fa ( arbel );
+ err_map_fa:
+	ufree ( arbel->firmware_area );
+	arbel->firmware_area = UNULL;
+ err_alloc_fa:
+ err_query_fw:
+	return rc;
+}
+
+/**
+ * Stop firmware running
+ *
+ * @v arbel		Arbel device
+ */
+static void arbel_stop_firmware ( struct arbel *arbel ) {
+	int rc;
+
+	if ( ( rc = arbel_cmd_unmap_fa ( arbel ) ) != 0 ) {
+		DBGC ( arbel, "Arbel %p FATAL could not stop firmware: %s\n",
+		       arbel, strerror ( rc ) );
+		/* Leak memory and return; at least we avoid corruption */
+		return;
+	}
+	ufree ( arbel->firmware_area );
+	arbel->firmware_area = UNULL;
+}
+
 /**
  * Probe PCI device
  *
@@ -1311,7 +1436,6 @@ static int arbel_get_pkey ( struct arbel *arbel, unsigned int *pkey ) {
 static int arbel_probe ( struct pci_device *pci,
 			 const struct pci_device_id *id __unused ) {
 	struct ib_device *ibdev;
-	struct arbelprm_query_fw fw;
 	struct arbelprm_query_dev_lim dev_lim;
 	struct arbel *arbel;
 	udqp_t qph;
@@ -1329,6 +1453,16 @@ static int arbel_probe ( struct pci_device *pci,
 	arbel = ibdev->dev_priv;
 	memset ( arbel, 0, sizeof ( *arbel ) );
 
+	/* Fix up PCI device */
+	adjust_pci_device ( pci );
+
+	/* Get PCI BARs */
+	arbel->config = ioremap ( pci_bar_start ( pci, ARBEL_PCI_CONFIG_BAR ),
+				  ARBEL_PCI_CONFIG_BAR_SIZE );
+	arbel->uar = ioremap ( ( pci_bar_start ( pci, ARBEL_PCI_UAR_BAR ) +
+				 ARBEL_PCI_UAR_IDX * ARBEL_PCI_UAR_SIZE ),
+			       ARBEL_PCI_UAR_SIZE );
+
 	/* Allocate space for mailboxes */
 	arbel->mailbox_in = malloc_dma ( ARBEL_MBOX_SIZE, ARBEL_MBOX_ALIGN );
 	if ( ! arbel->mailbox_in ) {
@@ -1341,25 +1475,12 @@ static int arbel_probe ( struct pci_device *pci,
 		goto err_mailbox_out;
 	}
 
-	/* Fix up PCI device */
-	adjust_pci_device ( pci );
+	/* Start firmware */
+	if ( ( rc = arbel_start_firmware ( arbel ) ) != 0 )
+		goto err_start_firmware;
 
-	/* Get PCI BARs */
-	arbel->config = ioremap ( pci_bar_start ( pci, ARBEL_PCI_CONFIG_BAR ),
-				  ARBEL_PCI_CONFIG_BAR_SIZE );
-	arbel->uar = ioremap ( ( pci_bar_start ( pci, ARBEL_PCI_UAR_BAR ) +
-				 ARBEL_PCI_UAR_IDX * ARBEL_PCI_UAR_SIZE ),
-			       ARBEL_PCI_UAR_SIZE );
 
-	/* Initialise firmware */
-	if ( ( rc = arbel_cmd_query_fw ( arbel, &fw ) ) != 0 ) {
-		DBGC ( arbel, "Arbel %p could not query firmware: %s\n",
-		       arbel, strerror ( rc ) );
-		goto err_query_fw;
-	}
-	DBGC ( arbel, "Arbel %p firmware version %ld.%ld.%ld\n", arbel,
-	       MLX_GET ( &fw, fw_rev_major ), MLX_GET ( &fw, fw_rev_minor ),
-	       MLX_GET ( &fw, fw_rev_subminor ) );
+	while ( 1 ) {}
 
 	/* Initialise hardware */
 	if ( ( rc = ib_driver_init ( pci, &qph ) ) != 0 )
@@ -1425,7 +1546,9 @@ static int arbel_probe ( struct pci_device *pci,
  err_query_dev_lim:
 	ib_driver_close ( 0 );
  err_ib_driver_init:
- err_query_fw:
+
+	arbel_stop_firmware ( arbel );
+ err_start_firmware:
 	free_dma ( arbel->mailbox_out, ARBEL_MBOX_SIZE );
  err_mailbox_out:
 	free_dma ( arbel->mailbox_in, ARBEL_MBOX_SIZE );
@@ -1446,6 +1569,7 @@ static void arbel_remove ( struct pci_device *pci ) {
 
 	ipoib_remove ( ibdev );
 	ib_driver_close ( 0 );
+	arbel_stop_firmware ( arbel );
 	free_dma ( arbel->mailbox_out, ARBEL_MBOX_SIZE );
 	free_dma ( arbel->mailbox_in, ARBEL_MBOX_SIZE );
 	free_ibdev ( ibdev );
