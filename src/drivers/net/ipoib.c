@@ -45,19 +45,36 @@ extern struct ib_address_vector hack_ipoib_bcast_av;
 #define IPOIB_MTU 2048
 
 /** Number of IPoIB send work queue entries */
-#define IPOIB_NUM_SEND_WQES 8
+#define IPOIB_DATA_NUM_SEND_WQES 4
 
 /** Number of IPoIB receive work queue entries */
-#define IPOIB_NUM_RECV_WQES 8
+#define IPOIB_DATA_NUM_RECV_WQES 8
 
 /** Number of IPoIB completion entries */
-#define IPOIB_NUM_CQES 8
+#define IPOIB_DATA_NUM_CQES 8
 
-struct ipoib_device {
-	struct ib_device *ibdev;
+/** An IPoIB queue set */
+struct ipoib_queue_set {
+	/** Completion queue */
 	struct ib_completion_queue *cq;
+	/** Queue pair */
 	struct ib_queue_pair *qp;
-	unsigned int rx_fill;
+	/** Receive work queue fill level */
+	unsigned int recv_fill;
+	/** Receive work queue maximum fill level */
+	unsigned int recv_max_fill;
+};
+
+/** An IPoIB device */
+struct ipoib_device {
+	/** Network device */
+	struct net_device *netdev;
+	/** Underlying Infiniband device */
+	struct ib_device *ibdev;
+	/** Data queue set */
+	struct ipoib_queue_set data;
+	/** Data queue set */
+	struct ipoib_queue_set meta;
 };
 
 /****************************************************************************
@@ -165,6 +182,69 @@ struct ll_protocol ipoib_protocol __ll_protocol = {
  */
 
 /**
+ * Destroy queue set
+ *
+ * @v ipoib		IPoIB device
+ * @v qset		Queue set
+ */
+static void ipoib_destroy_qset ( struct ipoib_device *ipoib,
+				 struct ipoib_queue_set *qset ) {
+	struct ib_device *ibdev = ipoib->ibdev;
+
+	if ( qset->qp )
+		ib_destroy_qp ( ibdev, qset->qp );
+	if ( qset->cq )
+		ib_destroy_cq ( ibdev, qset->cq );
+	memset ( qset, 0, sizeof ( *qset ) );
+}
+
+/**
+ * Create queue set
+ *
+ * @v ipoib		IPoIB device
+ * @v qset		Queue set
+ * @ret rc		Return status code
+ */
+static int ipoib_create_qset ( struct ipoib_device *ipoib,
+			       struct ipoib_queue_set *qset,
+			       unsigned int num_cqes,
+			       unsigned int num_send_wqes,
+			       unsigned int num_recv_wqes,
+			       unsigned long qkey ) {
+	struct ib_device *ibdev = ipoib->ibdev;
+	int rc;
+
+	/* Store queue parameters */
+	qset->recv_max_fill = num_recv_wqes;
+
+	/* Allocate completion queue */
+	qset->cq = ib_create_cq ( ibdev, num_cqes );
+	if ( ! qset->cq ) {
+		DBGC ( ipoib, "IPoIB %p could not allocate completion queue\n",
+		       ipoib );
+		rc = -ENOMEM;
+		goto err;
+	}
+
+	/* Allocate queue pair */
+	qset->qp = ib_create_qp ( ibdev, num_send_wqes, qset->cq,
+				  num_recv_wqes, qset->cq, qkey );
+	if ( ! qset->qp ) {
+		DBGC ( ipoib, "IPoIB %p could not allocate queue pair\n",
+		       ipoib );
+		rc = -ENOMEM;
+		goto err;
+	}
+	qset->qp->owner_priv = ipoib->netdev;
+
+	return 0;
+
+ err:
+	ipoib_destroy_qset ( ipoib, qset );
+	return rc;
+}
+
+/**
  * Transmit packet via IPoIB network device
  *
  * @v netdev		Network device
@@ -183,7 +263,7 @@ static int ipoib_transmit ( struct net_device *netdev,
 	}
 
 	iob_pull ( iobuf, ( sizeof ( *ipoib_pshdr ) ) );
-	return ib_post_send ( ibdev, ipoib->qp,
+	return ib_post_send ( ibdev, ipoib->data.qp,
 			      &hack_ipoib_bcast_av, iobuf );
 }
 
@@ -195,10 +275,10 @@ static int ipoib_transmit ( struct net_device *netdev,
  * @v completion	Completion
  * @v iobuf		I/O buffer
  */
-static void ipoib_complete_send ( struct ib_device *ibdev __unused,
-				  struct ib_queue_pair *qp,
-				  struct ib_completion *completion,
-				  struct io_buffer *iobuf ) {
+static void ipoib_data_complete_send ( struct ib_device *ibdev __unused,
+				       struct ib_queue_pair *qp,
+				       struct ib_completion *completion,
+				       struct io_buffer *iobuf ) {
 	struct net_device *netdev = qp->owner_priv;
 
 	netdev_tx_complete_err ( netdev, iobuf,
@@ -213,10 +293,10 @@ static void ipoib_complete_send ( struct ib_device *ibdev __unused,
  * @v completion	Completion
  * @v iobuf		I/O buffer
  */
-static void ipoib_complete_recv ( struct ib_device *ibdev __unused,
-				  struct ib_queue_pair *qp,
-				  struct ib_completion *completion,
-				  struct io_buffer *iobuf ) {
+static void ipoib_data_complete_recv ( struct ib_device *ibdev __unused,
+				       struct ib_queue_pair *qp,
+				       struct ib_completion *completion,
+				       struct io_buffer *iobuf ) {
 	struct net_device *netdev = qp->owner_priv;
 	struct ipoib_device *ipoib = netdev->priv;
 	struct ib_global_route_header *grh = iobuf->data;
@@ -232,7 +312,7 @@ static void ipoib_complete_recv ( struct ib_device *ibdev __unused,
 		netdev_rx ( netdev, iobuf );
 	}
 
-	ipoib->rx_fill--;
+	ipoib->data.recv_fill--;
 }
 
 /**
@@ -240,21 +320,21 @@ static void ipoib_complete_recv ( struct ib_device *ibdev __unused,
  *
  * @v ipoib		IPoIB device
  */
-static void ipoib_refill_recv ( struct ipoib_device *ipoib ) {
+static void ipoib_refill_recv ( struct ipoib_device *ipoib,
+				struct ipoib_queue_set *qset ) {
 	struct ib_device *ibdev = ipoib->ibdev;
 	struct io_buffer *iobuf;
 	int rc;
 
-	while ( ipoib->rx_fill < IPOIB_NUM_RECV_WQES ) {
+	while ( qset->recv_fill < qset->recv_max_fill ) {
 		iobuf = alloc_iob ( IPOIB_MTU );
 		if ( ! iobuf )
 			break;
-		if ( ( rc = ib_post_recv ( ibdev, ipoib->qp,
-					   iobuf ) ) != 0 ) {
+		if ( ( rc = ib_post_recv ( ibdev, qset->qp, iobuf ) ) != 0 ) {
 			free_iob ( iobuf );
 			break;
 		}
-		ipoib->rx_fill++;
+		qset->recv_fill++;
 	}
 }
 
@@ -267,9 +347,9 @@ static void ipoib_poll ( struct net_device *netdev ) {
 	struct ipoib_device *ipoib = netdev->priv;
 	struct ib_device *ibdev = ipoib->ibdev;
 
-	ib_poll_cq ( ibdev, ipoib->cq, ipoib_complete_send,
-		     ipoib_complete_recv );
-	ipoib_refill_recv ( ipoib );
+	ib_poll_cq ( ibdev, ipoib->data.cq, ipoib_data_complete_send,
+		     ipoib_data_complete_recv );
+	ipoib_refill_recv ( ipoib, &ipoib->data );
 }
 
 /**
@@ -295,7 +375,7 @@ static int ipoib_open ( struct net_device *netdev ) {
 	int rc;
 
 	/* Attach to broadcast multicast GID */
-	if ( ( rc = ib_mcast_attach ( ibdev, ipoib->qp,
+	if ( ( rc = ib_mcast_attach ( ibdev, ipoib->data.qp,
 				      &ibdev->broadcast_gid ) ) != 0 ) {
 		DBG ( "Could not attach to broadcast GID: %s\n",
 		      strerror ( rc ) );
@@ -303,7 +383,7 @@ static int ipoib_open ( struct net_device *netdev ) {
 	}
 
 	/* Fill receive ring */
-	ipoib_refill_recv ( ipoib );
+	ipoib_refill_recv ( ipoib, &ipoib->data );
 
 	return 0;
 }
@@ -318,7 +398,7 @@ static void ipoib_close ( struct net_device *netdev ) {
 	struct ib_device *ibdev = ipoib->ibdev;
 
 	/* Detach from broadcast multicast GID */
-	ib_mcast_detach ( ibdev, ipoib->qp, &ipoib_broadcast.gid );
+	ib_mcast_detach ( ibdev, ipoib->data.qp, &ipoib_broadcast.gid );
 
 	/* FIXME: should probably flush the receive ring */
 }
@@ -353,32 +433,23 @@ int ipoib_probe ( struct ib_device *ibdev ) {
 	ib_set_ownerdata ( ibdev, netdev );
 	netdev->dev = ibdev->dev;
 	memset ( ipoib, 0, sizeof ( *ipoib ) );
+	ipoib->netdev = netdev;
 	ipoib->ibdev = ibdev;
 
-	/* Allocate completion queue */
-	ipoib->cq = ib_create_cq ( ibdev, IPOIB_NUM_CQES );
-	if ( ! ipoib->cq ) {
-		DBGC ( ipoib, "IPoIB %p could not allocate completion queue\n",
-		       ipoib );
-		rc = -ENOMEM;
-		goto err_create_cq;
+	/* Allocate data queue set */
+	if ( ( rc = ipoib_create_qset ( ipoib, &ipoib->data,
+					IPOIB_DATA_NUM_CQES,
+					IPOIB_DATA_NUM_SEND_WQES,
+					IPOIB_DATA_NUM_RECV_WQES,
+					hack_ipoib_qkey ) ) != 0 ) {
+		DBGC ( ipoib, "IPoIB %p could not allocate data QP: %s\n",
+		       ipoib, strerror ( rc ) );
+		goto err_create_data_qset;
 	}
-
-	/* Allocate queue pair */
-	ipoib->qp = ib_create_qp ( ibdev, IPOIB_NUM_SEND_WQES,
-				   ipoib->cq, IPOIB_NUM_RECV_WQES,
-				   ipoib->cq, hack_ipoib_qkey );
-	if ( ! ipoib->qp ) {
-		DBGC ( ipoib, "IPoIB %p could not allocate queue pair\n",
-		       ipoib );
-		rc = -ENOMEM;
-		goto err_create_qp;
-	}
-	ipoib->qp->owner_priv = netdev;
 
 	/* Construct MAC address */
 	mac = ( ( struct ipoib_mac * ) netdev->ll_addr );
-	mac->qpn = htonl ( ipoib->qp->qpn );
+	mac->qpn = htonl ( ipoib->data.qp->qpn );
 	memcpy ( &mac->gid, &ibdev->port_gid, sizeof ( mac->gid ) );
 
 	/* Register network device */
@@ -388,10 +459,8 @@ int ipoib_probe ( struct ib_device *ibdev ) {
 	return 0;
 
  err_register_netdev:
-	ib_destroy_qp ( ibdev, ipoib->qp );
- err_create_qp:
-	ib_destroy_cq ( ibdev, ipoib->cq );
- err_create_cq:
+	ipoib_destroy_qset ( ipoib, &ipoib->data );
+ err_create_data_qset:
 	netdev_nullify ( netdev );
 	netdev_put ( netdev );
 	return rc;

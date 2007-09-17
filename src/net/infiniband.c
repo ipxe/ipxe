@@ -150,6 +150,8 @@ void ib_destroy_qp ( struct ib_device *ibdev,
 	DBGC ( ibdev, "IBDEV %p destroying queue pair %#lx\n",
 	       ibdev, qp->qpn );
 	ibdev->op->destroy_qp ( ibdev, qp );
+	list_del ( &qp->send.list );
+	list_del ( &qp->recv.list );
 	free ( qp );
 }
 
@@ -198,92 +200,3 @@ struct ib_device * alloc_ibdev ( size_t priv_size ) {
 void free_ibdev ( struct ib_device *ibdev ) {
 	free ( ibdev );
 }
-
-
-#if 0
-
-/** Infiniband broadcast MAC address */
-static uint8_t ib_broadcast[IB_ALEN] = { 0xff, };
-
-/**
- * Transmit Infiniband packet
- *
- * @v iobuf		I/O buffer
- * @v netdev		Network device
- * @v net_protocol	Network-layer protocol
- * @v ll_dest		Link-layer destination address
- *
- * Prepends the Infiniband link-layer header and transmits the packet.
- */
-static int ib_tx ( struct io_buffer *iobuf, struct net_device *netdev,
-		   struct net_protocol *net_protocol, const void *ll_dest ) {
-	struct ibhdr *ibhdr = iob_push ( iobuf, sizeof ( *ibhdr ) );
-
-	/* Build Infiniband header */
-	ibhdr->proto = net_protocol->net_proto;
-	ibhdr->reserved = 0;
-
-	( void ) ll_dest;
-
-	/* Hand off to network device */
-	return netdev_tx ( netdev, iobuf );
-}
-
-/**
- * Process received Infiniband packet
- *
- * @v iobuf	I/O buffer
- * @v netdev	Network device
- *
- * Strips off the Infiniband link-layer header and passes up to the
- * network-layer protocol.
- */
-static int ib_rx ( struct io_buffer *iobuf, struct net_device *netdev ) {
-	struct ibhdr *ibhdr = iobuf->data;
-
-	/* Sanity check */
-	if ( iob_len ( iobuf ) < sizeof ( *ibhdr ) ) {
-		DBG ( "Infiniband packet too short (%d bytes)\n",
-		      iob_len ( iobuf ) );
-		free_iob ( iobuf );
-		return -EINVAL;
-	}
-
-	/* Strip off Infiniband header */
-	iob_pull ( iobuf, sizeof ( *ibhdr ) );
-
-	/* Hand off to network-layer protocol */
-	return net_rx ( iobuf, netdev, ibhdr->proto, NULL );
-}
-
-/**
- * Transcribe Infiniband address
- *
- * @v ll_addr	Link-layer address
- * @ret string	Link-layer address in human-readable format
- */
-const char * ib_ntoa ( const void *ll_addr ) {
-	static char buf[61];
-	const uint8_t *ib_addr = ll_addr;
-	unsigned int i;
-	char *p = buf;
-
-	for ( i = 0 ; i < IB_ALEN ; i++ ) {
-		p += sprintf ( p, ":%02x", ib_addr[i] );
-	}
-	return ( buf + 1 );
-}
-
-/** Infiniband protocol */
-struct ll_protocol infiniband_protocol __ll_protocol = {
-	.name		= "Infiniband",
-	.ll_proto	= htons ( ARPHRD_INFINIBAND ),
-	.ll_addr_len	= IB_ALEN,
-	.ll_header_len	= IB_HLEN,
-	.ll_broadcast	= ib_broadcast,
-	.tx		= ib_tx,
-	.rx		= ib_rx,
-	.ntoa		= ib_ntoa,
-};
-
-#endif
