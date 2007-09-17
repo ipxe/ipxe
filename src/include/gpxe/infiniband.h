@@ -10,6 +10,12 @@
 #include <stdint.h>
 #include <gpxe/device.h>
 
+/** Subnet administrator QPN */
+#define IB_SA_QPN	1
+
+/** Subnet administrator queue key */
+#define IB_SA_QKEY	0x80010000UL
+
 /** An Infiniband Global Identifier */
 struct ib_gid {
 	uint8_t bytes[16];
@@ -250,7 +256,9 @@ struct ib_device {
 	/** Port GID */
 	struct ib_gid port_gid;
 	/** Broadcast GID */
-	struct ib_gid broadcast_gid;	
+	struct ib_gid broadcast_gid;
+	/** Subnet manager LID */
+	unsigned long sm_lid;
 	/** Underlying device */
 	struct device *dev;
 	/** Infiniband operations */
@@ -422,6 +430,31 @@ static inline void * ib_get_ownerdata ( struct ib_device *ibdev ) {
 #define IB_SMP_ATTR_LED_INFO			0x0031
 #define IB_SMP_ATTR_VENDOR_MASK			0xFF00
 
+#define IB_SA_ATTR_MC_MEMBER_REC		0x38
+#define IB_SA_ATTR_PATH_REC			0x35
+
+#define IB_SA_MCMEMBER_REC_MGID			(1<<0)
+#define IB_SA_MCMEMBER_REC_PORT_GID		(1<<1)
+#define IB_SA_MCMEMBER_REC_QKEY			(1<<2)
+#define IB_SA_MCMEMBER_REC_MLID			(1<<3)
+#define IB_SA_MCMEMBER_REC_MTU_SELECTOR		(1<<4)
+#define IB_SA_MCMEMBER_REC_MTU			(1<<5)
+#define IB_SA_MCMEMBER_REC_TRAFFIC_CLASS	(1<<6)
+#define IB_SA_MCMEMBER_REC_PKEY			(1<<7)
+#define IB_SA_MCMEMBER_REC_RATE_SELECTOR	(1<<8)
+#define IB_SA_MCMEMBER_REC_RATE			(1<<9)
+#define IB_SA_MCMEMBER_REC_PACKET_LIFE_TIME_SELECTOR	(1<<10)
+#define IB_SA_MCMEMBER_REC_PACKET_LIFE_TIME	(1<<11)
+#define IB_SA_MCMEMBER_REC_SL			(1<<12)
+#define IB_SA_MCMEMBER_REC_FLOW_LABEL		(1<<13)
+#define IB_SA_MCMEMBER_REC_HOP_LIMIT		(1<<14)
+#define IB_SA_MCMEMBER_REC_SCOPE		(1<<15)
+#define IB_SA_MCMEMBER_REC_JOIN_STATE		(1<<16)
+#define IB_SA_MCMEMBER_REC_PROXY_JOIN		(1<<17)
+
+#define IB_SA_PATH_REC_DGID			(1<<2)
+#define IB_SA_PATH_REC_SGID			(1<<3)
+
 struct ib_mad_hdr {
 	uint8_t base_version;
 	uint8_t mgmt_class;
@@ -433,6 +466,17 @@ struct ib_mad_hdr {
 	uint16_t attr_id;
 	uint16_t resv;
 	uint32_t attr_mod;
+} __attribute__ (( packed ));
+
+struct ib_sa_hdr {
+	uint32_t sm_key[2];
+	uint16_t reserved;
+	uint16_t attrib_offset;
+	uint32_t comp_mask[2];
+} __attribute__ (( packed ));
+
+struct ib_rmpp_hdr {
+	uint32_t raw[3];
 } __attribute__ (( packed ));
 
 struct ib_mad_data {
@@ -475,12 +519,29 @@ struct ib_mad_pkey_table {
 	uint16_t pkey[16][2];
 } __attribute__ (( packed ));
 
+struct ib_mad_path_record {
+	struct ib_mad_hdr mad_hdr;
+	struct ib_rmpp_hdr rmpp_hdr;
+	struct ib_sa_hdr sa_hdr;
+	uint32_t reserved0[2];
+	struct ib_gid dgid;
+	struct ib_gid sgid;
+	uint16_t dlid;
+	uint16_t slid;
+	uint32_t hop_limit__flow_label__raw_traffic;
+	uint32_t pkey__numb_path__reversible__tclass;
+	uint32_t rate__rate_selector__mtu__mtu_selector__sl__reserved;
+	uint32_t preference__packet_lifetime__packet_lifetime_selector;
+	uint32_t reserved1[35];
+} __attribute__ (( packed ));
+
 union ib_mad {
 	struct ib_mad_hdr mad_hdr;
 	struct ib_mad_data data;
 	struct ib_mad_guid_info guid_info;
 	struct ib_mad_port_info port_info;
 	struct ib_mad_pkey_table pkey_table;
+	struct ib_mad_path_record path_record;
 } __attribute__ (( packed ));
 
 #endif /* _GPXE_INFINIBAND_H */

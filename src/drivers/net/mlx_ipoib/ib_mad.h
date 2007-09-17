@@ -104,7 +104,7 @@ union mad_u {
 	struct ib_mad_st mad;
 } __attribute__ ((packed));
 
-static int get_path_record(union ib_gid_u *dgid, __u16 * dlid_p, __u8 * sl_p,
+int get_path_record(union ib_gid_u *dgid, __u16 * dlid_p, __u8 * sl_p,
 			   __u8 * rate_p);
 
 #endif				/* __ib_mad_h__ */

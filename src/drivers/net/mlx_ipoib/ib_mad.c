@@ -264,7 +264,7 @@ static int join_mc_group(__u32 * qkey_p, __u16 * mlid_p, __u8 join)
 	return is_good ? 0 : -1;
 }
 
-static int get_path_record(union ib_gid_u *dgid, __u16 * dlid_p, u8 * sl_p,
+int get_path_record(union ib_gid_u *dgid, __u16 * dlid_p, u8 * sl_p,
 			   u8 * rate_p)
 {
 	struct path_record_mad_st *mad, *rcv_mad;
@@ -320,6 +320,9 @@ static int get_path_record(union ib_gid_u *dgid, __u16 * dlid_p, u8 * sl_p,
 
 	cpu_to_be_buf(mad, sizeof *mad);
 	memcpy(mad->path_record.sgid.raw, ib_data.port_gid.raw, 16);
+
+	DBG ( "data:\n" );
+	DBG_HD ( mad, sizeof ( *mad ) );
 
 	rc = post_send_req(qp, snd_wqe, 1);
 	if (rc) {

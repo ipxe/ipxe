@@ -174,8 +174,8 @@ static int arbel_cmd ( struct arbel *arbel, unsigned long command,
 		size_t dump_len = in_len;
 		if ( dump_len > 256 )
 			dump_len = 256;
-		DBG ( "Input:\n" );
-		DBG_HD ( in, dump_len );
+		//		DBG ( "Input:\n" );
+		//		DBG_HD ( in, dump_len );
 	}
 
 	/* Issue command */
@@ -212,8 +212,8 @@ static int arbel_cmd ( struct arbel *arbel, unsigned long command,
 		size_t dump_len = out_len;
 		if ( dump_len > 256 )
 			dump_len = 256;
-		DBG ( "Output:\n" );
-		DBG_HD ( out, dump_len );
+		//		DBG ( "Output:\n" );
+		//		DBG_HD ( out, dump_len );
 	}
 
 	return 0;
@@ -749,7 +749,7 @@ static void arbel_ring_doorbell ( struct arbel *arbel,
 
 /** GID used for GID-less send work queue entries */
 static const struct ib_gid arbel_no_gid = {
-	{ 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2 }
+	{ 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2, 0, 0, 0 }
 };
 
 /**
@@ -805,6 +805,14 @@ static int arbel_post_send ( struct ib_device *ibdev,
 	MLX_FILL_1 ( &wqe->ud, 3, ud_address_vector.sl, av->sl );
 	gid = ( av->gid_present ? &av->gid : &arbel_no_gid );
 	memcpy ( &wqe->ud.u.dwords[4], gid, sizeof ( *gid ) );
+	
+	if ( ! av->gid_present ) {
+		DBG ( "no_gid:\n" );
+		DBG_HD ( &arbel_no_gid, sizeof ( arbel_no_gid ) );
+		DBG ( "gid:\n" );
+		DBG_HD ( &wqe->ud.u.dwords[4], 16 );
+	}
+	
 	MLX_FILL_1 ( &wqe->ud, 8, destination_qp, av->dest_qp );
 	MLX_FILL_1 ( &wqe->ud, 9, q_key, av->qkey );
 	MLX_FILL_1 ( &wqe->data[0], 0, byte_count, iob_len ( iobuf ) );
@@ -820,6 +828,11 @@ static int arbel_post_send ( struct ib_device *ibdev,
 		     nds, nds,
 		     f, 1,
 		     always1, 1 );
+
+
+	DBG ( "arbel_post_send()\n" );
+	DBG_HD ( wqe, sizeof ( *wqe ) );
+
 
 	/* Update doorbell record */
 	barrier();
@@ -1248,6 +1261,17 @@ static int arbel_get_port_gid ( struct arbel *arbel,
 	return 0;
 }
 
+static int arbel_get_sm_lid ( struct arbel *arbel,
+			      unsigned long *sm_lid ) {
+	struct ib_mad_port_info port_info;
+	int rc;
+
+	if ( ( rc = arbel_get_port_info ( arbel, &port_info ) ) != 0 )
+		return rc;
+	*sm_lid = ntohs ( port_info.mastersm_lid );
+	return 0;
+}
+
 static int arbel_get_broadcast_gid ( struct arbel *arbel,
 				     struct ib_gid *broadcast_gid ) {
 	static const struct ib_gid ipv4_broadcast_gid = {
@@ -1323,6 +1347,13 @@ static int arbel_probe ( struct pci_device *pci,
 	arbel->limits.reserved_qps =
 		( 1 << MLX_GET ( &dev_lim, log2_rsvd_qps ) );
 
+	/* Get subnet manager LID */
+	if ( ( rc = arbel_get_sm_lid ( arbel, &ibdev->sm_lid ) ) != 0 ) {
+		DBGC ( arbel, "Arbel %p could not determine subnet manager "
+		       "LID: %s\n", arbel, strerror ( rc ) );
+		goto err_get_sm_lid;
+	}
+
 	/* Get port GID */
 	if ( ( rc = arbel_get_port_gid ( arbel, &ibdev->port_gid ) ) != 0 ) {
 		DBGC ( arbel, "Arbel %p could not determine port GID: %s\n",
@@ -1362,6 +1393,7 @@ static int arbel_probe ( struct pci_device *pci,
  err_ipoib_probe:
  err_get_broadcast_gid:
  err_get_port_gid:
+ err_get_sm_lid:
  err_query_dev_lim:
 	ib_driver_close ( 0 );
  err_ib_driver_init:
