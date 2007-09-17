@@ -274,6 +274,7 @@ static int ipoib_get_path_record ( struct ipoib_device *ipoib,
  	static uint32_t tid = 0;
 	int rc;
 
+#if 0
 	DBG ( "get_path_record():\n" );
 	int get_path_record(struct ib_gid *dgid, uint16_t *dlid_p,
 			    uint8_t *sl_p, uint8_t *rate_p);
@@ -283,6 +284,7 @@ static int ipoib_get_path_record ( struct ipoib_device *ipoib,
 	get_path_record ( gid, &tmp_dlid, &tmp_sl, &tmp_rate );
 
 	DBG ( "ipoib_get_path_record():\n" );
+#endif
 
 	/* Allocate I/O buffer */
 	iobuf = alloc_iob ( sizeof ( *path_record ) );
@@ -305,7 +307,7 @@ static int ipoib_get_path_record ( struct ipoib_device *ipoib,
 	memcpy ( &path_record->sgid, &ibdev->port_gid,
 		 sizeof ( path_record->sgid ) );
 
-	DBG_HD ( path_record, sizeof ( *path_record ) );
+	//	DBG_HD ( path_record, sizeof ( *path_record ) );
 
 	/* Construct address vector */
 	memset ( &av, 0, sizeof ( av ) );
@@ -421,9 +423,6 @@ static void ipoib_meta_complete_send ( struct ib_device *ibdev __unused,
 	struct net_device *netdev = qp->owner_priv;
 	struct ipoib_device *ipoib = netdev->priv;
 
-	DBG ( "Woohoo! METADATA TX completion\n" );
-
-
 	if ( completion->syndrome ) {
 		DBGC ( ipoib, "IPoIB %p metadata TX completion error %x\n",
 		       ipoib, completion->syndrome );
@@ -446,7 +445,7 @@ static void ipoib_meta_complete_recv ( struct ib_device *ibdev __unused,
 	struct net_device *netdev = qp->owner_priv;
 	struct ipoib_device *ipoib = netdev->priv;
 
-	DBG ( "***************** META TX!!!!!! ********\n" );
+	DBG ( "***************** META RX!!!!!! ********\n" );
 
 	if ( completion->syndrome ) {
 		DBGC ( ipoib, "IPoIB %p metadata RX completion error %x\n",

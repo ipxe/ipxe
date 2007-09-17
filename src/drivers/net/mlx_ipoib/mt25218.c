@@ -805,14 +805,6 @@ static int arbel_post_send ( struct ib_device *ibdev,
 	MLX_FILL_1 ( &wqe->ud, 3, ud_address_vector.sl, av->sl );
 	gid = ( av->gid_present ? &av->gid : &arbel_no_gid );
 	memcpy ( &wqe->ud.u.dwords[4], gid, sizeof ( *gid ) );
-	
-	if ( ! av->gid_present ) {
-		DBG ( "no_gid:\n" );
-		DBG_HD ( &arbel_no_gid, sizeof ( arbel_no_gid ) );
-		DBG ( "gid:\n" );
-		DBG_HD ( &wqe->ud.u.dwords[4], 16 );
-	}
-	
 	MLX_FILL_1 ( &wqe->ud, 8, destination_qp, av->dest_qp );
 	MLX_FILL_1 ( &wqe->ud, 9, q_key, av->qkey );
 	MLX_FILL_1 ( &wqe->data[0], 0, byte_count, iob_len ( iobuf ) );
@@ -828,11 +820,6 @@ static int arbel_post_send ( struct ib_device *ibdev,
 		     nds, nds,
 		     f, 1,
 		     always1, 1 );
-
-
-	DBG ( "arbel_post_send()\n" );
-	DBG_HD ( wqe, sizeof ( *wqe ) );
-
 
 	/* Update doorbell record */
 	barrier();
