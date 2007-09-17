@@ -1330,6 +1330,40 @@ static int arbel_get_pkey ( struct arbel *arbel, unsigned int *pkey ) {
 	return 0;
 }
 
+/**
+ * Get MAD parameters
+ *
+ * @v arbel		Arbel device
+ * @ret rc		Return status code
+ */
+static int arbel_get_mad_params ( struct ib_device *ibdev ) {
+	struct arbel *arbel = ibdev->dev_priv;
+	int rc;
+
+	/* Get subnet manager LID */
+	if ( ( rc = arbel_get_sm_lid ( arbel, &ibdev->sm_lid ) ) != 0 ) {
+		DBGC ( arbel, "Arbel %p could not determine subnet manager "
+		       "LID: %s\n", arbel, strerror ( rc ) );
+		return rc;
+	}
+
+	/* Get port GID */
+	if ( ( rc = arbel_get_port_gid ( arbel, &ibdev->port_gid ) ) != 0 ) {
+		DBGC ( arbel, "Arbel %p could not determine port GID: %s\n",
+		       arbel, strerror ( rc ) );
+		return rc;
+	}
+
+	/* Get partition key */
+	if ( ( rc = arbel_get_pkey ( arbel, &ibdev->pkey ) ) != 0 ) {
+		DBGC ( arbel, "Arbel %p could not determine partition key: "
+		       "%s\n", arbel, strerror ( rc ) );
+		return rc;
+	}
+
+	return 0;
+}
+
 /***************************************************************************
  *
  * Firmware control
@@ -1426,6 +1460,62 @@ static void arbel_stop_firmware ( struct arbel *arbel ) {
 	arbel->firmware_area = UNULL;
 }
 
+/***************************************************************************
+ *
+ * Infinihost Context Memory management
+ *
+ ***************************************************************************
+ */
+
+/**
+ * Get device limits
+ *
+ * @v arbel		Arbel device
+ * @ret rc		Return status code
+ */
+static int arbel_get_limits ( struct arbel *arbel ) {
+	struct arbelprm_query_dev_lim dev_lim;
+	int rc;
+
+	if ( ( rc = arbel_cmd_query_dev_lim ( arbel, &dev_lim ) ) != 0 ) {
+		DBGC ( arbel, "Arbel %p could not get device limits: %s\n",
+		       arbel, strerror ( rc ) );
+		return rc;
+	}
+
+	arbel->limits.reserved_qps =
+		( 1 << MLX_GET ( &dev_lim, log2_rsvd_qps ) );
+	arbel->limits.reserved_ees =
+		( 1 << MLX_GET ( &dev_lim, log2_rsvd_ees ) );
+	arbel->limits.reserved_mtts =
+		( 1 << MLX_GET ( &dev_lim, log2_rsvd_mtts ) );
+	arbel->limits.reserved_cqs =
+		( 1 << MLX_GET ( &dev_lim, log2_rsvd_cqs ) );
+	arbel->limits.reserved_srqs =
+		( 1 << MLX_GET ( &dev_lim, log2_rsvd_srqs ) );
+	arbel->limits.reserved_uars = MLX_GET ( &dev_lim, num_rsvd_uars );
+
+	return 0;
+}
+
+/**
+ * Allocate ICM areas
+ *
+ * @v arbel		Arbel device
+ * @ret rc		Return status code
+ */
+static int arbel_alloc_icm ( struct arbel *arbel ) {
+	
+	return 0;
+}
+
+/***************************************************************************
+ *
+ * PCI interface
+ *
+ ***************************************************************************
+ */
+
 /**
  * Probe PCI device
  *
@@ -1436,9 +1526,7 @@ static void arbel_stop_firmware ( struct arbel *arbel ) {
 static int arbel_probe ( struct pci_device *pci,
 			 const struct pci_device_id *id __unused ) {
 	struct ib_device *ibdev;
-	struct arbelprm_query_dev_lim dev_lim;
 	struct arbel *arbel;
-	udqp_t qph;
 	int rc;
 
 	/* Allocate Infiniband device */
@@ -1479,15 +1567,19 @@ static int arbel_probe ( struct pci_device *pci,
 	if ( ( rc = arbel_start_firmware ( arbel ) ) != 0 )
 		goto err_start_firmware;
 
+	/* Get device limits */
+	if ( ( rc = arbel_get_limits ( arbel ) ) != 0 )
+		goto err_get_limits;
 
 	while ( 1 ) {}
 
+#if 0
 	/* Initialise hardware */
 	if ( ( rc = ib_driver_init ( pci, &qph ) ) != 0 )
 		goto err_ib_driver_init;
 
 	/* Hack up IB structures */
-#if 0
+
 	arbel->config = memfree_pci_dev.cr_space;
 	arbel->uar = memfree_pci_dev.uar;
 	arbel->mailbox_in = dev_buffers_p->inprm_buf;
@@ -1497,38 +1589,11 @@ static int arbel_probe ( struct pci_device *pci,
 	arbel->reserved_lkey = dev_ib_data.mkey;
 	arbel->eqn = dev_ib_data.eq.eqn;
 
-	/* Get device limits */
-	if ( ( rc = arbel_cmd_query_dev_lim ( arbel, &dev_lim ) ) != 0 ) {
-		DBGC ( arbel, "Arbel %p could not get device limits: %s\n",
-		       arbel, strerror ( rc ) );
-		goto err_query_dev_lim;
-	}
-	arbel->limits.reserved_uars = MLX_GET ( &dev_lim, num_rsvd_uars );
-	arbel->limits.reserved_cqs =
-		( 1 << MLX_GET ( &dev_lim, log2_rsvd_cqs ) );
-	arbel->limits.reserved_qps =
-		( 1 << MLX_GET ( &dev_lim, log2_rsvd_qps ) );
 
-	/* Get subnet manager LID */
-	if ( ( rc = arbel_get_sm_lid ( arbel, &ibdev->sm_lid ) ) != 0 ) {
-		DBGC ( arbel, "Arbel %p could not determine subnet manager "
-		       "LID: %s\n", arbel, strerror ( rc ) );
-		goto err_get_sm_lid;
-	}
+	/* Get MAD parameters */
+	if ( ( rc = arbel_get_mad_params ( ibdev ) ) != 0 )
+		goto err_get_mad_params;
 
-	/* Get port GID */
-	if ( ( rc = arbel_get_port_gid ( arbel, &ibdev->port_gid ) ) != 0 ) {
-		DBGC ( arbel, "Arbel %p could not determine port GID: %s\n",
-		       arbel, strerror ( rc ) );
-		goto err_get_port_gid;
-	}
-
-	/* Get partition key */
-	if ( ( rc = arbel_get_pkey ( arbel, &ibdev->pkey ) ) != 0 ) {
-		DBGC ( arbel, "Arbel %p could not determine partition key: "
-		       "%s\n", arbel, strerror ( rc ) );
-		goto err_get_pkey;
-	}
 
 	/* Add IPoIB device */
 	if ( ( rc = ipoib_probe ( ibdev ) ) != 0 ) {
@@ -1540,13 +1605,12 @@ static int arbel_probe ( struct pci_device *pci,
 	return 0;
 
  err_ipoib_probe:
- err_get_pkey:
- err_get_port_gid:
- err_get_sm_lid:
- err_query_dev_lim:
+ err_get_mad_params:
 	ib_driver_close ( 0 );
  err_ib_driver_init:
 
+
+ err_get_limits:
 	arbel_stop_firmware ( arbel );
  err_start_firmware:
 	free_dma ( arbel->mailbox_out, ARBEL_MBOX_SIZE );
@@ -1567,6 +1631,8 @@ static void arbel_remove ( struct pci_device *pci ) {
 	struct ib_device *ibdev = pci_get_drvdata ( pci );
 	struct arbel *arbel = ibdev->dev_priv;
 
+
+#warning "check error sequence for probe()"
 	ipoib_remove ( ibdev );
 	ib_driver_close ( 0 );
 	arbel_stop_firmware ( arbel );

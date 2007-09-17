@@ -156,12 +156,20 @@ union arbelprm_mad {
 
 /** Arbel device limits */
 struct arbel_dev_limits {
-	/** Number of reserver UARs */
-	unsigned long reserved_uars;
-	/** Number of reserved CQs */
-	unsigned long reserved_cqs;
 	/** Number of reserved QPs */
-	unsigned long reserved_qps;
+	unsigned int reserved_qps;
+	/** Number of reserved EEs */
+	unsigned int reserved_ees;
+	/** Number of reserved MPTs */
+	unsigned int reserved_mpts;
+	/** Number of reserved MTTs */
+	unsigned int reserved_mtts;
+	/** Number of reserved CQs */
+	unsigned int reserved_cqs;
+	/** Number of reserved SRQs */
+	unsigned int reserved_srqs;
+	/** Number of reserver UARs */
+	unsigned int reserved_uars;
 };
 
 /** Alignment of Arbel send work queue entries */
