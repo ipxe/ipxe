@@ -225,10 +225,12 @@ arbel_cmd_sw2hw_cq ( struct arbel *arbel, unsigned long cqn,
 }
 
 static inline int
-arbel_cmd_hw2sw_cq ( struct arbel *arbel, unsigned long cqn ) {
+arbel_cmd_hw2sw_cq ( struct arbel *arbel, unsigned long cqn,
+		     struct arbelprm_completion_queue_context *cqctx) {
 	return arbel_cmd ( arbel,
-			   ARBEL_HCR_VOID_CMD ( ARBEL_HCR_HW2SW_CQ ),
-			   1, NULL, cqn, NULL );
+			   ARBEL_HCR_OUT_CMD ( ARBEL_HCR_HW2SW_CQ,
+					       1, sizeof ( *cqctx ) ),
+			   0, NULL, cqn, cqctx );
 }
 
 static inline int
@@ -421,13 +423,14 @@ static void arbel_destroy_cq ( struct ib_device *ibdev,
 			       struct ib_completion_queue *cq ) {
 	struct arbel *arbel = ibdev->dev_priv;
 	struct arbel_completion_queue *arbel_cq = cq->dev_priv;
+	struct arbelprm_completion_queue_context cqctx;
 	struct arbelprm_cq_ci_db_record *ci_db_rec;
 	struct arbelprm_cq_arm_db_record *arm_db_rec;
 	int cqn_offset;
 	int rc;
 
 	/* Take ownership back from hardware */
-	if ( ( rc = arbel_cmd_hw2sw_cq ( arbel, cq->cqn ) ) != 0 ) {
+	if ( ( rc = arbel_cmd_hw2sw_cq ( arbel, cq->cqn, &cqctx ) ) != 0 ) {
 		DBGC ( arbel, "Arbel %p FATAL HW2SW_CQ failed on CQN %#lx: "
 		       "%s\n", arbel, cq->cqn, strerror ( rc ) );
 		/* Leak memory and return; at least we avoid corruption */
