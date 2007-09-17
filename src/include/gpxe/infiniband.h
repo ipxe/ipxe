@@ -14,11 +14,14 @@
 #define IB_SA_QPN	1
 
 /** Subnet administrator queue key */
-#define IB_SA_QKEY	0x80010000UL
+#define IB_GLOBAL_QKEY	0x80010000UL
 
 /** An Infiniband Global Identifier */
 struct ib_gid {
-	uint8_t bytes[16];
+	union {
+		uint8_t bytes[16];
+		uint32_t dwords[4];
+	} u;
 };
 
 /** An Infiniband Global Route Header */
@@ -136,7 +139,7 @@ struct ib_address_vector {
 	/** Destination Queue Pair */
 	unsigned int dest_qp;
 	/** Queue key */
-	unsigned int qkey;
+	unsigned long qkey;
 	/** Destination Local ID */
 	unsigned int dlid;
 	/** Rate */
@@ -530,9 +533,12 @@ struct ib_mad_path_record {
 	uint16_t slid;
 	uint32_t hop_limit__flow_label__raw_traffic;
 	uint32_t pkey__numb_path__reversible__tclass;
-	uint32_t rate__rate_selector__mtu__mtu_selector__sl__reserved;
+	uint8_t reserved1;
+	uint8_t reserved__sl;
+	uint8_t mtu_selector__mtu;
+	uint8_t rate_selector__rate;
 	uint32_t preference__packet_lifetime__packet_lifetime_selector;
-	uint32_t reserved1[35];
+	uint32_t reserved2[35];
 } __attribute__ (( packed ));
 
 union ib_mad {

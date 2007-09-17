@@ -749,7 +749,7 @@ static void arbel_ring_doorbell ( struct arbel *arbel,
 
 /** GID used for GID-less send work queue entries */
 static const struct ib_gid arbel_no_gid = {
-	{ 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2, 0, 0, 0 }
+	{ { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2, 0, 0, 0 } }
 };
 
 /**
@@ -1238,12 +1238,12 @@ static int arbel_get_port_gid ( struct arbel *arbel,
 	/* Port info gives us the first half of the port GID */
 	if ( ( rc = arbel_get_port_info ( arbel, &u.port_info ) ) != 0 )
 		return rc;
-	memcpy ( &port_gid->bytes[0], u.port_info.gid_prefix, 8 );
-
+	memcpy ( &port_gid->u.bytes[0], u.port_info.gid_prefix, 8 );
+	
 	/* GUID info gives us the second half of the port GID */
 	if ( ( rc = arbel_get_guid_info ( arbel, &u.guid_info ) ) != 0 )
 		return rc;
-	memcpy ( &port_gid->bytes[8], u.guid_info.gid_local, 8 );
+	memcpy ( &port_gid->u.bytes[8], u.guid_info.gid_local, 8 );
 
 	return 0;
 }
@@ -1262,8 +1262,8 @@ static int arbel_get_sm_lid ( struct arbel *arbel,
 static int arbel_get_broadcast_gid ( struct arbel *arbel,
 				     struct ib_gid *broadcast_gid ) {
 	static const struct ib_gid ipv4_broadcast_gid = {
-		{ 0xff, 0x12, 0x40, 0x1b, 0x00, 0x00, 0x00, 0x00,
-		  0x00, 0x00, 0x00, 0x00, 0xff, 0xff, 0xff, 0xff }
+		{ { 0xff, 0x12, 0x40, 0x1b, 0x00, 0x00, 0x00, 0x00,
+		    0x00, 0x00, 0x00, 0x00, 0xff, 0xff, 0xff, 0xff } }
 	};
 	struct ib_mad_pkey_table pkey_table;
 	int rc;
@@ -1275,7 +1275,7 @@ static int arbel_get_broadcast_gid ( struct arbel *arbel,
 	/* Add partition key */
 	if ( ( rc = arbel_get_pkey_table ( arbel, &pkey_table ) ) != 0 )
 		return rc;
-	memcpy ( &broadcast_gid->bytes[4], &pkey_table.pkey[0][0],
+	memcpy ( &broadcast_gid->u.bytes[4], &pkey_table.pkey[0][0],
 		 sizeof ( pkey_table.pkey[0][0] ) );
 
 	return 0;

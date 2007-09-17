@@ -86,6 +86,32 @@ struct ipoib_device {
 	struct ipoib_queue_set meta;
 };
 
+/**
+ * IPoIB path cache entry
+ *
+ * This serves a similar role to the ARP cache for Ethernet.  (ARP
+ * *is* used on IPoIB; we have two caches to maintain.)
+ */
+struct ipoib_cached_path {
+	/** Destination GID */
+	struct ib_gid gid;
+	/** Destination LID */
+	unsigned int dlid;
+	/** Service level */
+	unsigned int sl;
+	/** Rate */
+	unsigned int rate;
+};
+
+/** Number of IPoIB path cache entries */
+#define IPOIB_NUM_CACHED_PATHS 2
+
+/** IPoIB path cache */
+static struct ipoib_cached_path ipoib_path_cache[IPOIB_NUM_CACHED_PATHS];
+
+/** Oldest IPoIB path cache entry index */
+static unsigned int ipoib_path_cache_idx = 0;
+
 /****************************************************************************
  *
  * IPoIB link layer
@@ -165,15 +191,15 @@ static int ipoib_rx ( struct io_buffer *iobuf, struct net_device *netdev ) {
  * @ret string	Link-layer address in human-readable format
  */
 const char * ipoib_ntoa ( const void *ll_addr ) {
-	static char buf[61];
-	const uint8_t *ipoib_addr = ll_addr;
-	unsigned int i;
-	char *p = buf;
+	static char buf[45];
+	const struct ipoib_mac *mac = ll_addr;
 
-	for ( i = 0 ; i < IPOIB_ALEN ; i++ ) {
-		p += sprintf ( p, ":%02x", ipoib_addr[i] );
-	}
-	return ( buf + 1 );
+	snprintf ( buf, sizeof ( buf ), "%08lx:%08lx:%08lx:%08lx:%08lx",
+		   htonl ( mac->qpn ), htonl ( mac->gid.u.dwords[0] ),
+		   htonl ( mac->gid.u.dwords[1] ),
+		   htonl ( mac->gid.u.dwords[2] ),
+		   htonl ( mac->gid.u.dwords[3] ) );
+	return buf;
 }
 
 /** IPoIB protocol */
@@ -259,6 +285,28 @@ static int ipoib_create_qset ( struct ipoib_device *ipoib,
 }
 
 /**
+ * Find path cache entry by GID
+ *
+ * @v gid		GID
+ * @ret entry		Path cache entry, or NULL
+ */
+static struct ipoib_cached_path *
+ipoib_find_cached_path ( struct ib_gid *gid ) {
+	struct ipoib_cached_path *path;
+	unsigned int i;
+
+	for ( i = 0 ; i < IPOIB_NUM_CACHED_PATHS ; i++ ) {
+		path = &ipoib_path_cache[i];
+		if ( memcmp ( &path->gid, gid, sizeof ( *gid ) ) == 0 )
+			return path;
+	}
+	DBG ( "IPoIB %08lx:%08lx:%08lx:%08lx cache miss\n",
+	      htonl ( gid->u.dwords[0] ), htonl ( gid->u.dwords[1] ),
+	      htonl ( gid->u.dwords[2] ), htonl ( gid->u.dwords[3] ) );
+	return NULL;
+}
+
+/**
  * Transmit path record request
  *
  * @v ipoib		IPoIB device
@@ -274,17 +322,15 @@ static int ipoib_get_path_record ( struct ipoib_device *ipoib,
  	static uint32_t tid = 0;
 	int rc;
 
-#if 0
-	DBG ( "get_path_record():\n" );
 	int get_path_record(struct ib_gid *dgid, uint16_t *dlid_p,
 			    uint8_t *sl_p, uint8_t *rate_p);
 	uint16_t tmp_dlid;
 	uint8_t tmp_sl;
 	uint8_t tmp_rate;
 	get_path_record ( gid, &tmp_dlid, &tmp_sl, &tmp_rate );
+	DBG ( "get_path_record() gives dlid = %04x, sl = %02x, rate = %02x\n",
+	      tmp_dlid, tmp_sl, tmp_rate );
 
-	DBG ( "ipoib_get_path_record():\n" );
-#endif
 
 	/* Allocate I/O buffer */
 	iobuf = alloc_iob ( sizeof ( *path_record ) );
@@ -307,13 +353,11 @@ static int ipoib_get_path_record ( struct ipoib_device *ipoib,
 	memcpy ( &path_record->sgid, &ibdev->port_gid,
 		 sizeof ( path_record->sgid ) );
 
-	//	DBG_HD ( path_record, sizeof ( *path_record ) );
-
 	/* Construct address vector */
 	memset ( &av, 0, sizeof ( av ) );
 	av.dlid = ibdev->sm_lid;
 	av.dest_qp = IB_SA_QPN;
-	av.qkey = IB_SA_QKEY;
+	av.qkey = IB_GLOBAL_QKEY;
 
 	/* Post send request */
 	if ( ( rc = ib_post_send ( ibdev, ipoib->meta.qp, &av,
@@ -339,6 +383,8 @@ static int ipoib_transmit ( struct net_device *netdev,
 	struct ipoib_device *ipoib = netdev->priv;
 	struct ib_device *ibdev = ipoib->ibdev;
 	struct ipoib_pseudo_hdr *ipoib_pshdr = iobuf->data;
+	struct ib_address_vector av;
+	struct ipoib_cached_path *path;
 	int rc;
 
 	if ( iob_len ( iobuf ) < sizeof ( *ipoib_pshdr ) ) {
@@ -346,18 +392,32 @@ static int ipoib_transmit ( struct net_device *netdev,
 		return -EINVAL;
 	}
 
-	DBG ( "TX pseudo-header:\n" );
-	DBG_HD ( ipoib_pshdr, sizeof ( *ipoib_pshdr ) );
-	if ( ipoib_pshdr->peer.qpn != htonl ( IPOIB_BROADCAST_QPN ) ) {
-		DBG ( "Get path record\n" );
-		rc = ipoib_get_path_record ( ipoib, &ipoib_pshdr->peer.gid );
-		free_iob ( iobuf );
-		return 0;
+	/* Construct address vector */
+	memset ( &av, 0, sizeof ( av ) );
+	if ( ipoib_pshdr->peer.qpn == htonl ( IPOIB_BROADCAST_QPN ) ) {
+		/* Broadcast address */
+		memcpy ( &av, &hack_ipoib_bcast_av, sizeof ( av ) );
+	} else {
+		/* Unicast - look in path cache */
+		path = ipoib_find_cached_path ( &ipoib_pshdr->peer.gid );
+		if ( ! path ) {
+			/* No path entry - get path record */
+			rc = ipoib_get_path_record ( ipoib,
+						     &ipoib_pshdr->peer.gid );
+			free_iob ( iobuf );
+			return rc;
+		}
+		av.dest_qp = ntohl ( ipoib_pshdr->peer.qpn );
+		av.qkey = IB_GLOBAL_QKEY;
+		av.dlid = path->dlid;
+		av.rate = path->rate;
+		av.sl = path->sl;
+		av.gid_present = 1;
+		memcpy ( &av.gid, &ipoib_pshdr->peer.gid, sizeof ( av.gid ) );
 	}
 
 	iob_pull ( iobuf, ( sizeof ( *ipoib_pshdr ) ) );
-	return ib_post_send ( ibdev, ipoib->data.qp,
-			      &hack_ipoib_bcast_av, iobuf );
+	return ib_post_send ( ibdev, ipoib->data.qp, &av, iobuf );
 }
 
 /**
@@ -392,14 +452,13 @@ static void ipoib_data_complete_recv ( struct ib_device *ibdev __unused,
 				       struct io_buffer *iobuf ) {
 	struct net_device *netdev = qp->owner_priv;
 	struct ipoib_device *ipoib = netdev->priv;
-	struct ib_global_route_header *grh = iobuf->data;
 	struct ipoib_pseudo_hdr *ipoib_pshdr;
 
 	if ( completion->syndrome ) {
 		netdev_rx_err ( netdev, iobuf, -EIO );
 	} else {
 		iob_put ( iobuf, completion->len );
-		iob_pull ( iobuf, ( sizeof ( *grh ) -
+		iob_pull ( iobuf, ( sizeof ( struct ib_global_route_header ) -
 				    sizeof ( *ipoib_pshdr ) ) );
 		/* FIXME: fill in a MAC address for the sake of AoE! */
 		netdev_rx ( netdev, iobuf );
@@ -444,16 +503,38 @@ static void ipoib_meta_complete_recv ( struct ib_device *ibdev __unused,
 				       struct io_buffer *iobuf ) {
 	struct net_device *netdev = qp->owner_priv;
 	struct ipoib_device *ipoib = netdev->priv;
-
-	DBG ( "***************** META RX!!!!!! ********\n" );
+	struct ib_mad_path_record *path_record;
+	struct ipoib_cached_path *path;
 
 	if ( completion->syndrome ) {
 		DBGC ( ipoib, "IPoIB %p metadata RX completion error %x\n",
 		       ipoib, completion->syndrome );
 	} else {
+		/* Update path cache */
 		iob_put ( iobuf, completion->len );
+		iob_pull ( iobuf, sizeof ( struct ib_global_route_header ) );
+
 		DBG ( "Metadata RX:\n" );
 		DBG_HD ( iobuf->data, iob_len ( iobuf ) );
+
+		path_record = iobuf->data;
+		path = &ipoib_path_cache[ipoib_path_cache_idx];
+		memcpy ( &path->gid, &path_record->dgid,
+			 sizeof ( path->gid ) );
+		path->dlid = ntohs ( path_record->dlid );
+		path->sl = ( path_record->reserved__sl & 0x0f );
+		path->rate = ( path_record->rate_selector__rate & 0x3f );
+		DBG ( "IPoIB %08lx:%08lx:%08lx:%08lx dlid %x sl %x rate %x\n",
+		      htonl ( path->gid.u.dwords[0] ),
+		      htonl ( path->gid.u.dwords[1] ),
+		      htonl ( path->gid.u.dwords[2] ),
+		      htonl ( path->gid.u.dwords[3] ),
+		      path->dlid, path->sl, path->rate );
+
+		/* Update path cache index */
+		ipoib_path_cache_idx++;
+		if ( ipoib_path_cache_idx == IPOIB_NUM_CACHED_PATHS )
+			ipoib_path_cache_idx = 0;
 	}
 
 	ipoib->meta.recv_fill--;
@@ -590,7 +671,7 @@ int ipoib_probe ( struct ib_device *ibdev ) {
 					IPOIB_META_NUM_CQES,
 					IPOIB_META_NUM_SEND_WQES,
 					IPOIB_META_NUM_RECV_WQES,
-					IB_SA_QKEY ) ) != 0 ) {
+					IB_GLOBAL_QKEY ) ) != 0 ) {
 		DBGC ( ipoib, "IPoIB %p could not allocate metadata QP: %s\n",
 		       ipoib, strerror ( rc ) );
 		goto err_create_meta_qset;
