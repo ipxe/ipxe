@@ -33,6 +33,7 @@
 #define ARBEL_HCR_INIT2RTR_QPEE		0x001a
 #define ARBEL_HCR_RTR2RTS_QPEE		0x001b
 #define ARBEL_HCR_2RST_QPEE		0x0021
+#define ARBEL_HCR_MAD_IFC		0x0024
 #define ARBEL_HCR_READ_MGM		0x0025
 #define ARBEL_HCR_WRITE_MGM		0x0026
 #define ARBEL_HCR_MGID_HASH		0x0027
@@ -67,6 +68,7 @@ struct MLX_DECLARE_STRUCT ( arbelprm_completion_with_error );
 struct MLX_DECLARE_STRUCT ( arbelprm_cq_arm_db_record );
 struct MLX_DECLARE_STRUCT ( arbelprm_cq_ci_db_record );
 struct MLX_DECLARE_STRUCT ( arbelprm_hca_command_register );
+struct MLX_DECLARE_STRUCT ( arbelprm_mad_ifc );
 struct MLX_DECLARE_STRUCT ( arbelprm_mgm_entry );
 struct MLX_DECLARE_STRUCT ( arbelprm_mgm_hash );
 struct MLX_DECLARE_STRUCT ( arbelprm_qp_db_record );
@@ -124,6 +126,11 @@ union arbelprm_doorbell_record {
 union arbelprm_doorbell_register {
 	struct arbelprm_send_doorbell send;
 	uint32_t dword[2];
+} __attribute__ (( packed ));
+
+union arbelprm_mad {
+	struct arbelprm_mad_ifc ifc;
+	union ib_mad mad;
 } __attribute__ (( packed ));
 
 /*

@@ -277,6 +277,8 @@ struct ib_device_operations {
 
 /** An Infiniband device */
 struct ib_device {	
+	/** Port GID */
+	struct ib_gid port_gid;
 	/** Infiniband operations */
 	struct ib_device_operations *op;
 	/** Device private data */
@@ -322,6 +324,119 @@ ib_mcast_detach ( struct ib_device *ibdev, struct ib_queue_pair *qp,
 		  struct ib_gid *gid ) {
 	ibdev->op->mcast_detach ( ibdev, qp, gid );
 }
+
+/*****************************************************************************
+ *
+ * Management datagrams
+ *
+ * Portions Copyright (c) 2004 Mellanox Technologies Ltd.  All rights
+ * reserved.
+ *
+ */
+
+/* Management base version */
+#define IB_MGMT_BASE_VERSION			1
+
+/* Management classes */
+#define IB_MGMT_CLASS_SUBN_LID_ROUTED		0x01
+#define IB_MGMT_CLASS_SUBN_DIRECTED_ROUTE	0x81
+#define IB_MGMT_CLASS_SUBN_ADM			0x03
+#define IB_MGMT_CLASS_PERF_MGMT			0x04
+#define IB_MGMT_CLASS_BM			0x05
+#define IB_MGMT_CLASS_DEVICE_MGMT		0x06
+#define IB_MGMT_CLASS_CM			0x07
+#define IB_MGMT_CLASS_SNMP			0x08
+#define IB_MGMT_CLASS_VENDOR_RANGE2_START	0x30
+#define IB_MGMT_CLASS_VENDOR_RANGE2_END		0x4F
+
+/* Management methods */
+#define IB_MGMT_METHOD_GET			0x01
+#define IB_MGMT_METHOD_SET			0x02
+#define IB_MGMT_METHOD_GET_RESP			0x81
+#define IB_MGMT_METHOD_SEND			0x03
+#define IB_MGMT_METHOD_TRAP			0x05
+#define IB_MGMT_METHOD_REPORT			0x06
+#define IB_MGMT_METHOD_REPORT_RESP		0x86
+#define IB_MGMT_METHOD_TRAP_REPRESS		0x07
+#define IB_MGMT_METHOD_DELETE			0x15
+#define IB_MGMT_METHOD_RESP			0x80
+
+/* Subnet management attributes */
+#define IB_SMP_ATTR_NOTICE			0x0002
+#define IB_SMP_ATTR_NODE_DESC			0x0010
+#define IB_SMP_ATTR_NODE_INFO			0x0011
+#define IB_SMP_ATTR_SWITCH_INFO			0x0012
+#define IB_SMP_ATTR_GUID_INFO			0x0014
+#define IB_SMP_ATTR_PORT_INFO			0x0015
+#define IB_SMP_ATTR_PKEY_TABLE			0x0016
+#define IB_SMP_ATTR_SL_TO_VL_TABLE		0x0017
+#define IB_SMP_ATTR_VL_ARB_TABLE		0x0018
+#define IB_SMP_ATTR_LINEAR_FORWARD_TABLE	0x0019
+#define IB_SMP_ATTR_RANDOM_FORWARD_TABLE	0x001A
+#define IB_SMP_ATTR_MCAST_FORWARD_TABLE		0x001B
+#define IB_SMP_ATTR_SM_INFO			0x0020
+#define IB_SMP_ATTR_VENDOR_DIAG			0x0030
+#define IB_SMP_ATTR_LED_INFO			0x0031
+#define IB_SMP_ATTR_VENDOR_MASK			0xFF00
+
+struct ib_mad_hdr {
+	uint8_t base_version;
+	uint8_t mgmt_class;
+	uint8_t class_version;
+	uint8_t method;
+	uint16_t status;
+	uint16_t class_specific;
+	uint64_t tid;
+	uint16_t attr_id;
+	uint16_t resv;
+	uint32_t attr_mod;
+} __attribute__ (( packed ));
+
+struct ib_mad_data {
+	struct ib_mad_hdr mad_hdr;
+	uint8_t data[232];
+} __attribute__ (( packed ));
+
+struct ib_mad_guid_info {
+	struct ib_mad_hdr mad_hdr;
+	uint32_t mkey[2];
+	uint32_t reserved[8];
+	uint8_t gid_local[8];
+} __attribute__ (( packed ));
+
+struct ib_mad_port_info {
+	struct ib_mad_hdr mad_hdr;
+	uint32_t mkey[2];
+	uint32_t reserved[8];
+	uint32_t mkey2[2];
+	uint8_t gid_prefix[8];
+	uint16_t lid;
+	uint16_t mastersm_lid;
+	uint32_t cap_mask;
+	uint16_t diag_code;
+	uint16_t mkey_lease_period;
+	uint8_t local_port_num;
+	uint8_t link_width_enabled;
+	uint8_t link_width_supported;
+	uint8_t link_width_active;
+	uint8_t port_state__link_speed_supported;
+	uint8_t link_down_def_state__port_phys_state;
+	uint8_t lmc__r1__mkey_prot_bits;
+	uint8_t link_speed_enabled__link_speed_active;
+} __attribute__ (( packed ));
+
+union ib_mad {
+	struct ib_mad_hdr mad_hdr;
+	struct ib_mad_data data;
+	struct ib_mad_guid_info guid_info;
+	struct ib_mad_port_info port_info;
+} __attribute__ (( packed ));
+
+
+
+
+
+
 
 
 extern struct ll_protocol infiniband_protocol;

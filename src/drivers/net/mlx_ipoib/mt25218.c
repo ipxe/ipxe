@@ -550,6 +550,15 @@ arbel_cmd_2rst_qpee ( struct arbel *arbel, unsigned long qpn ) {
 }
 
 static inline int
+arbel_cmd_mad_ifc ( struct arbel *arbel, union arbelprm_mad *mad ) {
+	return arbel_cmd ( arbel,
+			   ARBEL_HCR_INOUT_CMD ( ARBEL_HCR_MAD_IFC,
+						 1, sizeof ( *mad ),
+						 1, sizeof ( *mad ) ),
+			   0x03, mad, PXE_IB_PORT, mad );
+}
+
+static inline int
 arbel_cmd_read_mgm ( struct arbel *arbel, unsigned int index,
 		     struct arbelprm_mgm_entry *mgm ) {
 	return arbel_cmd ( arbel,
@@ -1234,6 +1243,15 @@ static int arbel_complete ( struct ib_device *ibdev,
 }			     
 
 /**
+ * Drain event queue
+ *
+ * @v arbel		Arbel device
+ */
+static void arbel_drain_eq ( struct arbel *arbel ) {
+#warning "drain the event queue"
+}
+
+/**
  * Poll completion queue
  *
  * @v ibdev		Infiniband device
@@ -1251,6 +1269,9 @@ static void arbel_poll_cq ( struct ib_device *ibdev,
 	union arbelprm_completion_entry *cqe;
 	unsigned int cqe_idx_mask;
 	int rc;
+
+	/* Drain the event queue */
+	arbel_drain_eq ( arbel );
 
 	while ( 1 ) {
 		/* Look for completion entry */
@@ -1377,8 +1398,6 @@ static void arbel_mcast_detach ( struct ib_device *ibdev,
 	}
 }
 
-
-
 /** Arbel Infiniband operations */
 static struct ib_device_operations arbel_ib_operations = {
 	.create_cq	= arbel_create_cq,
@@ -1392,19 +1411,82 @@ static struct ib_device_operations arbel_ib_operations = {
 	.mcast_detach	= arbel_mcast_detach,
 };
 
-/**
- * Remove PCI device
- *
- * @v pci		PCI device
- */
-static void arbel_remove ( struct pci_device *pci ) {
-	struct net_device *netdev = pci_get_drvdata ( pci );
 
-	unregister_netdev ( netdev );
-	ib_driver_close ( 0 );
-	netdev_nullify ( netdev );
-	netdev_put ( netdev );
+static int arbel_mad_ifc ( struct arbel *arbel,
+			   union arbelprm_mad *mad ) {
+	struct ib_mad_hdr *hdr = &mad->mad.mad_hdr;
+	int rc;
+
+	hdr->base_version = IB_MGMT_BASE_VERSION;
+	if ( ( rc = arbel_cmd_mad_ifc ( arbel, mad ) ) != 0 ) {
+		DBGC ( arbel, "Arbel %p could not issue MAD IFC: %s\n",
+		       arbel, strerror ( rc ) );
+		return rc;
+	}
+	if ( hdr->status != 0 ) {
+		DBGC ( arbel, "Arbel %p MAD IFC status %04x\n",
+		       arbel, ntohs ( hdr->status ) );
+		return -EIO;
+	}
+	return 0;
 }
+
+static int arbel_get_port_info ( struct arbel *arbel,
+				 struct ib_mad_port_info *port_info ) {
+	union arbelprm_mad mad;
+	struct ib_mad_hdr *hdr = &mad.mad.mad_hdr;
+	int rc;
+
+	memset ( &mad, 0, sizeof ( mad ) );
+	hdr->mgmt_class = IB_MGMT_CLASS_SUBN_LID_ROUTED;
+	hdr->class_version = 1;
+	hdr->method = IB_MGMT_METHOD_GET;
+	hdr->attr_id = htons ( IB_SMP_ATTR_PORT_INFO );
+	hdr->attr_mod = htonl ( PXE_IB_PORT );
+	if ( ( rc = arbel_mad_ifc ( arbel, &mad ) ) != 0 ) {
+		DBGC ( arbel, "Arbel %p could not get port info: %s\n",
+		       arbel, strerror ( rc ) );
+		return rc;
+	}
+	memcpy ( port_info, &mad.mad.port_info, sizeof ( *port_info ) );
+	return 0;
+}
+
+static int arbel_get_guid_info ( struct arbel *arbel,
+				 struct ib_mad_guid_info *guid_info ) {
+	union arbelprm_mad mad;
+	struct ib_mad_hdr *hdr = &mad.mad.mad_hdr;
+	int rc;
+
+	memset ( &mad, 0, sizeof ( mad ) );
+	hdr->mgmt_class = IB_MGMT_CLASS_SUBN_LID_ROUTED;
+	hdr->class_version = 1;
+	hdr->method = IB_MGMT_METHOD_GET;
+	hdr->attr_id = htons ( IB_SMP_ATTR_GUID_INFO );
+	if ( ( rc = arbel_mad_ifc ( arbel, &mad ) ) != 0 ) {
+		DBGC ( arbel, "Arbel %p could not get GUID info: %s\n",
+		       arbel, strerror ( rc ) );
+		return rc;
+	}
+	memcpy ( guid_info, &mad.mad.guid_info, sizeof ( *guid_info ) );
+	return 0;
+}
+
+static int arbel_get_port_gid ( struct arbel *arbel, struct ib_gid *gid ) {
+	struct ib_mad_port_info port_info;
+	struct ib_mad_guid_info guid_info;
+	int rc;
+
+	if ( ( rc = arbel_get_port_info ( arbel, &port_info ) ) != 0 )
+		return rc;
+	if ( ( rc = arbel_get_guid_info ( arbel, &guid_info ) ) != 0 )
+		return rc;
+	memcpy ( &gid->bytes[0], port_info.gid_prefix, 8 );
+	memcpy ( &gid->bytes[8], guid_info.gid_local, 8 );
+	return 0;
+}
+
+
 
 /**
  * Probe PCI device
@@ -1514,11 +1596,20 @@ static int arbel_probe ( struct pci_device *pci,
 		      strerror ( rc ) );
 		return rc;
 	}
-				      
+
+	if ( ( rc = arbel_get_port_gid ( arbel, &ibdev->port_gid ) ) != 0 ) {
+		DBGC ( arbel, "Arbel %p could not determine port GID: %s\n",
+		       arbel, strerror ( rc ) );
+		return rc;
+	}
+
+	DBG ( "Port GID:\n" );
+	DBG_HD ( &ibdev->port_gid, sizeof ( ibdev->port_gid ) );
+		
 
 	mac = ( ( struct ib_mac * ) netdev->ll_addr );
 	mac->qpn = htonl ( mlx->own_qp->qpn );
-	memcpy ( &mac->gid, ib_data.port_gid.raw, sizeof ( mac->gid ) );	
+	memcpy ( &mac->gid, &ibdev->port_gid, sizeof ( mac->gid ) );	
 #endif
 
 #if 0
@@ -1543,6 +1634,20 @@ static int arbel_probe ( struct pci_device *pci,
 	netdev_nullify ( netdev );
 	netdev_put ( netdev );
 	return rc;
+}
+
+/**
+ * Remove PCI device
+ *
+ * @v pci		PCI device
+ */
+static void arbel_remove ( struct pci_device *pci ) {
+	struct net_device *netdev = pci_get_drvdata ( pci );
+
+	unregister_netdev ( netdev );
+	ib_driver_close ( 0 );
+	netdev_nullify ( netdev );
+	netdev_put ( netdev );
 }
 
 static struct pci_device_id arbel_nics[] = {
