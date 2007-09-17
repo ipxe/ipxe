@@ -10,6 +10,7 @@
  */
 
 #include <stddef.h>
+#include <assert.h>
 
 /*
  * Simple doubly linked list implementation.
@@ -62,6 +63,11 @@ static inline void __list_add ( struct list_head *new,
 static inline void list_add ( struct list_head *new, struct list_head *head ) {
 	__list_add ( new, head, head->next );
 }
+#define list_add( new, head ) do {			\
+	assert ( (head)->next->prev == (head) );	\
+	assert ( (head)->prev->next == (head) );	\
+	list_add ( (new), (head) );			\
+	} while ( 0 )
 
 /**
  * Add a new entry to the tail of a list
@@ -76,6 +82,11 @@ static inline void list_add_tail ( struct list_head *new,
 				   struct list_head *head ) {
 	__list_add ( new, head->prev, head );
 }
+#define list_add_tail( new, head ) do {			\
+	assert ( (head)->next->prev == (head) );	\
+	assert ( (head)->prev->next == (head) );	\
+	list_add_tail ( (new), (head) );		\
+	} while ( 0 )
 
 /*
  * Delete a list entry by making the prev/next entries
@@ -101,6 +112,13 @@ static inline void __list_del ( struct list_head * prev,
 static inline void list_del ( struct list_head *entry ) {
 	__list_del ( entry->prev, entry->next );
 }
+#define list_del( entry ) do {				\
+	assert ( (entry)->prev != NULL );		\
+	assert ( (entry)->next != NULL );		\
+	assert ( (entry)->next->prev == (entry) );	\
+	assert ( (entry)->prev->next == (entry) );	\
+	list_del ( (entry) );				\
+	} while ( 0 )
 
 /**
  * Test whether a list is empty

@@ -67,9 +67,13 @@ struct io_buffer {
 static inline void * iob_reserve ( struct io_buffer *iobuf, size_t len ) {
 	iobuf->data += len;
 	iobuf->tail += len;
-	assert ( iobuf->tail <= iobuf->end );
 	return iobuf->data;
 }
+#define iob_reserve( iobuf, len ) ( {			\
+	void *__result;					\
+	__result = iob_reserve ( (iobuf), (len) );	\
+	assert ( (iobuf)->tail <= (iobuf)->end );	\
+	__result; } )
 
 /**
  * Add data to start of I/O buffer
@@ -80,9 +84,13 @@ static inline void * iob_reserve ( struct io_buffer *iobuf, size_t len ) {
  */
 static inline void * iob_push ( struct io_buffer *iobuf, size_t len ) {
 	iobuf->data -= len;
-	assert ( iobuf->data >= iobuf->head );
 	return iobuf->data;
 }
+#define iob_push( iobuf, len ) ( {			\
+	void *__result;					\
+	__result = iob_push ( (iobuf), (len) );		\
+	assert ( (iobuf)->data >= (iobuf)->head );	\
+	__result; } )
 
 /**
  * Remove data from start of I/O buffer
@@ -96,6 +104,11 @@ static inline void * iob_pull ( struct io_buffer *iobuf, size_t len ) {
 	assert ( iobuf->data <= iobuf->tail );
 	return iobuf->data;
 }
+#define iob_pull( iobuf, len ) ( {			\
+	void *__result;					\
+	__result = iob_pull ( (iobuf), (len) );		\
+	assert ( (iobuf)->data <= (iobuf)->tail );	\
+	__result; } )
 
 /**
  * Add data to end of I/O buffer
@@ -107,9 +120,13 @@ static inline void * iob_pull ( struct io_buffer *iobuf, size_t len ) {
 static inline void * iob_put ( struct io_buffer *iobuf, size_t len ) {
 	void *old_tail = iobuf->tail;
 	iobuf->tail += len;
-	assert ( iobuf->tail <= iobuf->end );
 	return old_tail;
 }
+#define iob_put( iobuf, len ) ( {			\
+	void *__result;					\
+	__result = iob_put ( (iobuf), (len) );		\
+	assert ( (iobuf)->tail <= (iobuf)->end );	\
+	__result; } )
 
 /**
  * Remove data from end of I/O buffer
@@ -119,8 +136,11 @@ static inline void * iob_put ( struct io_buffer *iobuf, size_t len ) {
  */
 static inline void iob_unput ( struct io_buffer *iobuf, size_t len ) {
 	iobuf->tail -= len;
-	assert ( iobuf->tail >= iobuf->data );
 }
+#define iob_unput( iobuf, len ) do {			\
+	iob_unput ( (iobuf), (len) );			\
+	assert ( (iobuf)->tail >= (iobuf)->data );	\
+	} while ( 0 )
 
 /**
  * Empty an I/O buffer
