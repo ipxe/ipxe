@@ -30,9 +30,8 @@ Skeleton NIC driver for Etherboot
 #include "arbel.h"
 
 
-
-
-
+/* Port to use */
+#define PXE_IB_PORT 1
 
 /***************************************************************************
  *
@@ -243,12 +242,44 @@ arbel_cmd_close_hca ( struct arbel *arbel ) {
 }
 
 static inline int
+arbel_cmd_init_ib ( struct arbel *arbel, unsigned int port,
+		    const struct arbelprm_init_ib *init_ib ) {
+	return arbel_cmd ( arbel,
+			   ARBEL_HCR_IN_CMD ( ARBEL_HCR_INIT_IB,
+					      1, sizeof ( *init_ib ) ),
+			   0, init_ib, port, NULL );
+}
+
+static inline int
+arbel_cmd_close_ib ( struct arbel *arbel, unsigned int port ) {
+	return arbel_cmd ( arbel,
+			   ARBEL_HCR_VOID_CMD ( ARBEL_HCR_CLOSE_IB ),
+			   0, NULL, port, NULL );
+}
+
+static inline int
 arbel_cmd_sw2hw_mpt ( struct arbel *arbel, unsigned int index,
 		      const struct arbelprm_mpt *mpt ) {
 	return arbel_cmd ( arbel,
 			   ARBEL_HCR_IN_CMD ( ARBEL_HCR_SW2HW_MPT,
 					      1, sizeof ( *mpt ) ),
 			   0, mpt, index, NULL );
+}
+
+static inline int
+arbel_cmd_sw2hw_eq ( struct arbel *arbel, unsigned int index,
+		     const struct arbelprm_eqc *eqc ) {
+	return arbel_cmd ( arbel,
+			   ARBEL_HCR_IN_CMD ( ARBEL_HCR_SW2HW_EQ,
+					      1, sizeof ( *eqc ) ),
+			   0, eqc, index, NULL );
+}
+
+static inline int
+arbel_cmd_hw2sw_eq ( struct arbel *arbel, unsigned int index ) {
+	return arbel_cmd ( arbel,
+			   ARBEL_HCR_VOID_CMD ( ARBEL_HCR_HW2SW_EQ ),
+			   1, NULL, index, NULL );
 }
 
 static inline int
@@ -423,16 +454,6 @@ arbel_cmd_map_fa ( struct arbel *arbel,
 
 /***************************************************************************
  *
- * Event queue operations
- *
- ***************************************************************************
- */
-
-static int arbel_create_eq ( struct arbel *arbel ) {
-}
-
-/***************************************************************************
- *
  * Completion queue operations
  *
  ***************************************************************************
@@ -508,7 +529,7 @@ static int arbel_create_cq ( struct ib_device *ibdev,
 	MLX_FILL_2 ( &cqctx, 3,
 		     usr_page, arbel->limits.reserved_uars,
 		     log_cq_size, fls ( cq->num_cqes - 1 ) );
-	MLX_FILL_1 ( &cqctx, 5, c_eqn, arbel->eqn );
+	MLX_FILL_1 ( &cqctx, 5, c_eqn, ARBEL_NO_EQ );
 	MLX_FILL_1 ( &cqctx, 6, pd, ARBEL_GLOBAL_PD );
 	MLX_FILL_1 ( &cqctx, 7, l_key, arbel->reserved_lkey );
 	MLX_FILL_1 ( &cqctx, 12, cqn, cq->cqn );
@@ -1424,6 +1445,38 @@ static int arbel_get_pkey ( struct arbel *arbel, unsigned int *pkey ) {
 }
 
 /**
+ * Wait for link up
+ *
+ * @v arbel		Arbel device
+ * @ret rc		Return status code
+ *
+ * This function shouldn't really exist.  Unfortunately, IB links take
+ * a long time to come up, and we can't get various key parameters
+ * e.g. our own IPoIB MAC address without information from the subnet
+ * manager).  We should eventually make link-up an asynchronous event.
+ */
+static int arbel_wait_for_link ( struct arbel *arbel ) {
+	struct ib_mad_port_info port_info;
+	unsigned int retries;
+	int rc;
+
+	printf ( "Waiting for Infiniband link-up..." );
+	for ( retries = 20 ; retries ; retries-- ) {
+		if ( ( rc = arbel_get_port_info ( arbel, &port_info ) ) != 0 )
+			continue;
+		if ( ( ( port_info.port_state__link_speed_supported ) & 0xf )
+		     == 4 ) {
+			printf ( "ok\n" );
+			return 0;
+		}
+		printf ( "." );
+		sleep ( 1 );
+	}
+	printf ( "failed\n" );
+	return -ENODEV;
+};
+
+/**
  * Get MAD parameters
  *
  * @v arbel		Arbel device
@@ -1821,6 +1874,54 @@ static void arbel_free_icm ( struct arbel *arbel ) {
 
 /***************************************************************************
  *
+ * Infiniband link-layer operations
+ *
+ ***************************************************************************
+ */
+
+/**
+ * Initialise Infiniband link
+ *
+ * @v arbel		Arbel device
+ * @ret rc		Return status code
+ */
+static int arbel_init_ib ( struct arbel *arbel ) {
+	struct arbelprm_init_ib init_ib;
+	int rc;
+
+	memset ( &init_ib, 0, sizeof ( init_ib ) );
+	MLX_FILL_3 ( &init_ib, 0,
+		     mtu_cap, ARBEL_MTU_2048,
+		     port_width_cap, 3,
+		     vl_cap, 1 );
+	MLX_FILL_1 ( &init_ib, 2, max_pkey, 64 );
+	if ( ( rc = arbel_cmd_init_ib ( arbel, PXE_IB_PORT,
+					&init_ib ) ) != 0 ) {
+		DBGC ( arbel, "Arbel %p could not intialise IB: %s\n",
+		       arbel, strerror ( rc ) );
+		return rc;
+	}
+
+	return 0;
+}
+
+/**
+ * Close Infiniband link
+ *
+ * @v arbel		Arbel device
+ */
+static void arbel_close_ib ( struct arbel *arbel ) {
+	int rc;
+
+	if ( ( rc = arbel_cmd_close_ib ( arbel, PXE_IB_PORT ) ) != 0 ) {
+		DBGC ( arbel, "Arbel %p could not close IB: %s\n",
+		       arbel, strerror ( rc ) );
+		/* Nothing we can do about this */
+	}
+}
+
+/***************************************************************************
+ *
  * PCI interface
  *
  ***************************************************************************
@@ -1933,6 +2034,16 @@ static int arbel_probe ( struct pci_device *pci,
 	if ( ( rc = arbel_alloc_icm ( arbel, &init_hca ) ) != 0 )
 		goto err_alloc_icm;
 
+	
+	unsigned long uar_offset = ( arbel->limits.reserved_uars * 4096 );
+	arbel->db_rec = phys_to_virt ( user_to_phys ( arbel->icm,
+						      uar_offset ) );
+	memset ( arbel->db_rec, 0, 4096 );
+	union arbelprm_doorbell_record *db_rec;
+	db_rec = &arbel->db_rec[ARBEL_GROUP_SEPARATOR_DOORBELL];
+	MLX_FILL_1 ( &db_rec->qp, 1, res, ARBEL_UAR_RES_GROUP_SEP );
+
+
 	/* Initialise HCA */
 	MLX_FILL_1 ( &init_hca, 74, uar_parameters.log_max_uars, 1 );
 	if ( ( rc = arbel_cmd_init_hca ( arbel, &init_hca ) ) != 0 ) {
@@ -1945,7 +2056,14 @@ static int arbel_probe ( struct pci_device *pci,
 	if ( ( rc = arbel_setup_mpt ( arbel ) ) != 0 )
 		goto err_setup_mpt;
 
-		     
+	/* Bring up IB layer */
+	if ( ( rc = arbel_init_ib ( arbel ) ) != 0 )
+		goto err_init_ib;
+
+	/* Wait for link */
+	if ( ( rc = arbel_wait_for_link ( arbel ) ) != 0 )
+		goto err_wait_for_link;
+	
 #endif
 
 
@@ -1957,16 +2075,23 @@ static int arbel_probe ( struct pci_device *pci,
 	arbel->mailbox_in = dev_buffers_p->inprm_buf;
 	arbel->mailbox_out = dev_buffers_p->outprm_buf;
 #endif
-#if ! SELF_INIT
+#if SELF_INIT
+#else
 	arbel->reserved_lkey = dev_ib_data.mkey;
-#endif
 	arbel->db_rec = dev_ib_data.uar_context_base;
-	arbel->eqn = dev_ib_data.eq.eqn;
+#endif
+	//	arbel->eqn = dev_ib_data.eq.eqn;
 
 
 	/* Get MAD parameters */
 	if ( ( rc = arbel_get_mad_params ( ibdev ) ) != 0 )
 		goto err_get_mad_params;
+
+	DBGC ( arbel, "Arbel %p port GID is %08lx:%08lx:%08lx:%08lx\n", arbel,
+	       htonl ( ibdev->port_gid.u.dwords[0] ),
+	       htonl ( ibdev->port_gid.u.dwords[1] ),
+	       htonl ( ibdev->port_gid.u.dwords[2] ),
+	       htonl ( ibdev->port_gid.u.dwords[3] ) );
 
 	/* Add IPoIB device */
 	if ( ( rc = ipoib_probe ( ibdev ) ) != 0 ) {
@@ -1982,6 +2107,9 @@ static int arbel_probe ( struct pci_device *pci,
 	ib_driver_close ( 0 );
  err_ib_driver_init:
 
+ err_wait_for_link:
+	arbel_close_ib ( arbel );
+ err_init_ib:
  err_setup_mpt:
 	arbel_cmd_close_hca ( arbel );
  err_init_hca:

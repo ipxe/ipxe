@@ -40,7 +40,12 @@
 #define ARBEL_HCR_QUERY_FW		0x0004
 #define ARBEL_HCR_INIT_HCA		0x0007
 #define ARBEL_HCR_CLOSE_HCA		0x0008
+#define ARBEL_HCR_INIT_IB		0x0009
+#define ARBEL_HCR_CLOSE_IB		0x000a
 #define ARBEL_HCR_SW2HW_MPT		0x000d
+#define ARBEL_HCR_MAP_EQ		0x0012
+#define ARBEL_HCR_SW2HW_EQ		0x0013
+#define ARBEL_HCR_HW2SW_EQ		0x0014
 #define ARBEL_HCR_SW2HW_CQ		0x0016
 #define ARBEL_HCR_HW2SW_CQ		0x0017
 #define ARBEL_HCR_RST2INIT_QPEE		0x0019
@@ -67,6 +72,8 @@
 
 /* MTUs */
 #define ARBEL_MTU_2048			0x04
+
+#define ARBEL_NO_EQ			64
 
 #define ARBEL_INVALID_LKEY		0x00000100UL
 
@@ -98,8 +105,10 @@ struct MLX_DECLARE_STRUCT ( arbelprm_completion_queue_entry );
 struct MLX_DECLARE_STRUCT ( arbelprm_completion_with_error );
 struct MLX_DECLARE_STRUCT ( arbelprm_cq_arm_db_record );
 struct MLX_DECLARE_STRUCT ( arbelprm_cq_ci_db_record );
+struct MLX_DECLARE_STRUCT ( arbelprm_eqc );
 struct MLX_DECLARE_STRUCT ( arbelprm_hca_command_register );
 struct MLX_DECLARE_STRUCT ( arbelprm_init_hca );
+struct MLX_DECLARE_STRUCT ( arbelprm_init_ib );
 struct MLX_DECLARE_STRUCT ( arbelprm_mad_ifc );
 struct MLX_DECLARE_STRUCT ( arbelprm_mgm_entry );
 struct MLX_DECLARE_STRUCT ( arbelprm_mgm_hash );
@@ -321,8 +330,6 @@ struct arbel {
 	 * Used to get unrestricted memory access.
 	 */
 	unsigned long reserved_lkey;
-	/** Event queue number */
-	unsigned long eqn;
 
 	/** Completion queue in-use bitmask */
 	arbel_bitmask_t cq_inuse[ ARBEL_BITMASK_SIZE ( ARBEL_MAX_CQS ) ];
