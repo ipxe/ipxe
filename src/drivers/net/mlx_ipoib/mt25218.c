@@ -332,6 +332,49 @@ arbel_cmd_run_fw ( struct arbel *arbel ) {
 }
 
 static inline int
+arbel_cmd_unmap_icm ( struct arbel *arbel, unsigned int page_count ) {
+	return arbel_cmd ( arbel,
+			   ARBEL_HCR_VOID_CMD ( ARBEL_HCR_UNMAP_ICM ),
+			   0, NULL, page_count, NULL );
+}
+
+static inline int
+arbel_cmd_map_icm ( struct arbel *arbel,
+		    const struct arbelprm_virtual_physical_mapping *map ) {
+	return arbel_cmd ( arbel,
+			   ARBEL_HCR_IN_CMD ( ARBEL_HCR_MAP_ICM,
+					      1, sizeof ( *map ) ),
+			   0, map, 1, NULL );
+}
+
+static inline int
+arbel_cmd_unmap_icm_aux ( struct arbel *arbel ) {
+	return arbel_cmd ( arbel,
+			   ARBEL_HCR_VOID_CMD ( ARBEL_HCR_UNMAP_ICM_AUX ),
+			   0, NULL, 0, NULL );
+}
+
+static inline int
+arbel_cmd_map_icm_aux ( struct arbel *arbel,
+			const struct arbelprm_virtual_physical_mapping *map ) {
+	return arbel_cmd ( arbel,
+			   ARBEL_HCR_IN_CMD ( ARBEL_HCR_MAP_ICM_AUX,
+					      1, sizeof ( *map ) ),
+			   0, map, 1, NULL );
+}
+
+static inline int
+arbel_cmd_set_icm_size ( struct arbel *arbel,
+			 const struct arbelprm_scalar_parameter *icm_size,
+			 struct arbelprm_scalar_parameter *icm_aux_size ) {
+	return arbel_cmd ( arbel,
+			   ARBEL_HCR_INOUT_CMD ( ARBEL_HCR_SET_ICM_SIZE,
+						 0, sizeof ( *icm_size ),
+						 0, sizeof ( *icm_aux_size ) ),
+			   0, icm_size, 0, icm_aux_size );
+}
+
+static inline int
 arbel_cmd_unmap_fa ( struct arbel *arbel ) {
 	return arbel_cmd ( arbel,
 			   ARBEL_HCR_VOID_CMD ( ARBEL_HCR_UNMAP_FA ),
@@ -340,11 +383,11 @@ arbel_cmd_unmap_fa ( struct arbel *arbel ) {
 
 static inline int
 arbel_cmd_map_fa ( struct arbel *arbel,
-		   const struct arbelprm_virtual_physical_mapping *map_fa ) {
+		   const struct arbelprm_virtual_physical_mapping *map ) {
 	return arbel_cmd ( arbel,
 			   ARBEL_HCR_IN_CMD ( ARBEL_HCR_MAP_FA,
-					      1, sizeof ( *map_fa ) ),
-			   0, map_fa, 1, NULL );
+					      1, sizeof ( *map ) ),
+			   0, map, 1, NULL );
 }
 
 /***************************************************************************
@@ -1536,23 +1579,28 @@ static size_t icm_usage ( unsigned int log_num_entries, size_t entry_size ) {
 }
 
 /**
- * Partition ICM
+ * Allocate ICM
  *
  * @v arbel		Arbel device
+ * @v init_hca		INIT_HCA structure to fill in
  * @ret rc		Return status code
  */
-static int arbel_alloc_icm ( struct arbel *arbel ) {
-	struct arbelprm_init_hca init_hca;
+static int arbel_alloc_icm ( struct arbel *arbel,
+			     struct arbelprm_init_hca *init_hca ) {
+	struct arbelprm_scalar_parameter icm_size;
+	struct arbelprm_scalar_parameter icm_aux_size;
+	struct arbelprm_virtual_physical_mapping map_icm_aux;
+	struct arbelprm_virtual_physical_mapping map_icm;
 	size_t icm_offset = 0;
 	unsigned int log_num_qps, log_num_srqs, log_num_ees, log_num_cqs;
 	unsigned int log_num_mtts, log_num_mpts, log_num_rdbs, log_num_eqs;
+	int rc;
 
-	memset ( &init_hca, 0, sizeof ( init_hca ) );
 	icm_offset = ( ( arbel->limits.reserved_uars + 1 ) << 12 );
 
 	/* Queue pair contexts */
 	log_num_qps = fls ( arbel->limits.reserved_qps + ARBEL_MAX_QPS - 1 );
-	MLX_FILL_2 ( &init_hca, 13,
+	MLX_FILL_2 ( init_hca, 13,
 		     qpc_eec_cqc_eqc_rdb_parameters.qpc_base_addr_l,
 		     ( icm_offset >> 7 ),
 		     qpc_eec_cqc_eqc_rdb_parameters.log_num_of_qp,
@@ -1560,14 +1608,14 @@ static int arbel_alloc_icm ( struct arbel *arbel ) {
 	icm_offset += icm_usage ( log_num_qps, arbel->limits.qpc_entry_size );
 
 	/* Extended queue pair contexts */
-	MLX_FILL_1 ( &init_hca, 25,
+	MLX_FILL_1 ( init_hca, 25,
 		     qpc_eec_cqc_eqc_rdb_parameters.eqpc_base_addr_l,
 		     icm_offset );
 	icm_offset += icm_usage ( log_num_qps, arbel->limits.eqpc_entry_size );
 
 	/* Shared receive queue contexts */
 	log_num_srqs = fls ( arbel->limits.reserved_srqs - 1 );
-	MLX_FILL_2 ( &init_hca, 19,
+	MLX_FILL_2 ( init_hca, 19,
 		     qpc_eec_cqc_eqc_rdb_parameters.srqc_base_addr_l,
 		     ( icm_offset >> 5 ),
 		     qpc_eec_cqc_eqc_rdb_parameters.log_num_of_srq,
@@ -1576,7 +1624,7 @@ static int arbel_alloc_icm ( struct arbel *arbel ) {
 
 	/* End-to-end contexts */
 	log_num_ees = fls ( arbel->limits.reserved_ees - 1 );
-	MLX_FILL_2 ( &init_hca, 17,
+	MLX_FILL_2 ( init_hca, 17,
 		     qpc_eec_cqc_eqc_rdb_parameters.eec_base_addr_l,
 		     ( icm_offset >> 7 ),
 		     qpc_eec_cqc_eqc_rdb_parameters.log_num_of_ee,
@@ -1584,14 +1632,14 @@ static int arbel_alloc_icm ( struct arbel *arbel ) {
 	icm_offset += icm_usage ( log_num_ees, arbel->limits.eec_entry_size );
 
 	/* Extended end-to-end contexts */
-	MLX_FILL_1 ( &init_hca, 29,
+	MLX_FILL_1 ( init_hca, 29,
 		     qpc_eec_cqc_eqc_rdb_parameters.eeec_base_addr_l,
 		     icm_offset );
 	icm_offset += icm_usage ( log_num_ees, arbel->limits.eeec_entry_size );
 
 	/* Completion queue contexts */
 	log_num_cqs = fls ( arbel->limits.reserved_cqs + ARBEL_MAX_CQS - 1 );
-	MLX_FILL_2 ( &init_hca, 21,
+	MLX_FILL_2 ( init_hca, 21,
 		     qpc_eec_cqc_eqc_rdb_parameters.cqc_base_addr_l,
 		     ( icm_offset >> 6 ),
 		     qpc_eec_cqc_eqc_rdb_parameters.log_num_of_cq,
@@ -1600,28 +1648,28 @@ static int arbel_alloc_icm ( struct arbel *arbel ) {
 
 	/* Memory translation table */
 	log_num_mtts = fls ( arbel->limits.reserved_mtts - 1 );
-	MLX_FILL_1 ( &init_hca, 65,
+	MLX_FILL_1 ( init_hca, 65,
 		     tpt_parameters.mtt_base_addr_l, icm_offset );
 	icm_offset += icm_usage ( log_num_mtts, arbel->limits.mtt_entry_size );
 
 	/* Memory protection table */
 	log_num_mpts = fls ( arbel->limits.reserved_mrws - 1 );
-	MLX_FILL_1 ( &init_hca, 61,
+	MLX_FILL_1 ( init_hca, 61,
 		     tpt_parameters.mpt_base_adr_l, icm_offset );
-	MLX_FILL_1 ( &init_hca, 62,
+	MLX_FILL_1 ( init_hca, 62,
 		     tpt_parameters.log_mpt_sz, log_num_mpts );
 	icm_offset += icm_usage ( log_num_mpts, arbel->limits.mpt_entry_size );
 
 	/* RDMA something or other */
 	log_num_rdbs = fls ( arbel->limits.reserved_rdbs - 1 );
-	MLX_FILL_1 ( &init_hca, 37,
+	MLX_FILL_1 ( init_hca, 37,
 		     qpc_eec_cqc_eqc_rdb_parameters.rdb_base_addr_l,
 		     icm_offset );
 	icm_offset += icm_usage ( log_num_rdbs, 32 );
 
 	/* Event queue contexts */
 	log_num_eqs = 6;
-	MLX_FILL_2 ( &init_hca, 33,
+	MLX_FILL_2 ( init_hca, 33,
 		     qpc_eec_cqc_eqc_rdb_parameters.eqc_base_addr_l,
 		     ( icm_offset >> 6 ),
 		     qpc_eec_cqc_eqc_rdb_parameters.log_num_eq,
@@ -1629,18 +1677,87 @@ static int arbel_alloc_icm ( struct arbel *arbel ) {
 	icm_offset += ( ( 1 << log_num_eqs ) * arbel->limits.eqc_entry_size );
 
 	/* Multicast table */
-	MLX_FILL_1 ( &init_hca, 49,
+	MLX_FILL_1 ( init_hca, 49,
 		     multicast_parameters.mc_base_addr_l, icm_offset );
-	MLX_FILL_1 ( &init_hca, 52,
+	MLX_FILL_1 ( init_hca, 52,
 		     multicast_parameters.log_mc_table_entry_sz,
 		     fls ( sizeof ( struct arbelprm_mgm_entry ) - 1 ) );
-	MLX_FILL_1 ( &init_hca, 53,
+	MLX_FILL_1 ( init_hca, 53,
 		     multicast_parameters.mc_table_hash_sz, 8 );
-	MLX_FILL_1 ( &init_hca, 54,
+	MLX_FILL_1 ( init_hca, 54,
 		     multicast_parameters.log_mc_table_sz, 3 );
 	icm_offset += ( 8 * sizeof ( struct arbelprm_mgm_entry ) );
 
+	arbel->icm_len = icm_offset;
+	arbel->icm_len = ( ( arbel->icm_len + 4095 ) & ~4095 );
+
+	/* Get ICM auxiliary area size */
+	memset ( &icm_size, 0, sizeof ( icm_size ) );
+	MLX_FILL_1 ( &icm_size, 1, value, arbel->icm_len );
+	if ( ( rc = arbel_cmd_set_icm_size ( arbel, &icm_size,
+					     &icm_aux_size ) ) != 0 ) {
+		DBGC ( arbel, "Arbel %p could not set ICM size: %s\n",
+		       arbel, strerror ( rc ) );
+		goto err_set_icm_size;
+	}
+	arbel->icm_aux_len = MLX_GET ( &icm_aux_size, value );
+
+	/* Allocate ICM data and auxiliary area */
+	arbel->icm_aux_len = ( ( arbel->icm_aux_len + 4095 ) & ~4095 );
+	DBGC ( arbel, "Arbel %p requires %zd kB ICM and %zd kB AUX ICM\n",
+	       arbel, ( arbel->icm_len / 1024 ),
+	       ( arbel->icm_aux_len / 1024 ) );
+	arbel->icm = umalloc ( arbel->icm_len + arbel->icm_aux_len );
+	if ( ! arbel->icm ) {
+		rc = -ENOMEM;
+		goto err_alloc;
+	}
+
+	/* Map ICM auxiliary area */
+	memset ( &map_icm_aux, 0, sizeof ( map_icm_aux ) );
+	MLX_FILL_2 ( &map_icm_aux, 3,
+		     log2size, fls ( ( arbel->icm_aux_len / 4096 ) - 1 ),
+		     pa_l, user_to_phys ( arbel->icm, arbel->icm_len ) );
+	if ( ( rc = arbel_cmd_map_icm_aux ( arbel, &map_icm_aux ) ) != 0 ) {
+		DBGC ( arbel, "Arbel %p could not map AUX ICM: %s\n",
+		       arbel, strerror ( rc ) );
+		goto err_map_icm_aux;
+	}
+
+	/* MAP ICM area */
+	memset ( &map_icm, 0, sizeof ( map_icm ) );
+	MLX_FILL_2 ( &map_icm, 3,
+		     log2size, fls ( ( arbel->icm_len / 4096 ) - 1 ),
+		     pa_l, user_to_phys ( arbel->icm, 0 ) );
+	if ( ( rc = arbel_cmd_map_icm ( arbel, &map_icm ) ) != 0 ) {
+		DBGC ( arbel, "Arbel %p could not map ICM: %s\n",
+		       arbel, strerror ( rc ) );
+		goto err_map_icm;
+	}
+
 	return 0;
+
+	arbel_cmd_unmap_icm ( arbel, ( arbel->icm_len / 4096 ) );
+ err_map_icm:
+	arbel_cmd_unmap_icm_aux ( arbel );
+ err_map_icm_aux:
+	ufree ( arbel->icm );
+	arbel->icm = UNULL;
+ err_alloc:
+ err_set_icm_size:
+	return rc;
+}
+
+/**
+ * Free ICM
+ *
+ * @v arbel		Arbel device
+ */
+static void arbel_free_icm ( struct arbel *arbel ) {
+	arbel_cmd_unmap_icm ( arbel, ( arbel->icm_len / 4096 ) );
+	arbel_cmd_unmap_icm_aux ( arbel );
+	ufree ( arbel->icm );
+	arbel->icm = UNULL;
 }
 
 /***************************************************************************
@@ -1661,6 +1778,7 @@ static int arbel_probe ( struct pci_device *pci,
 			 const struct pci_device_id *id __unused ) {
 	struct ib_device *ibdev;
 	struct arbel *arbel;
+	struct arbelprm_init_hca init_hca;
 	int rc;
 
 	/* Allocate Infiniband device */
@@ -1697,23 +1815,41 @@ static int arbel_probe ( struct pci_device *pci,
 		goto err_mailbox_out;
 	}
 
+#define SELF_INIT 0
+
+#if SELF_INIT
 	/* Start firmware */
 	if ( ( rc = arbel_start_firmware ( arbel ) ) != 0 )
 		goto err_start_firmware;
+#else
+	/* Initialise hardware */
+	udqp_t qph;
+	if ( ( rc = ib_driver_init ( pci, &qph ) ) != 0 )
+		goto err_ib_driver_init;
+#endif
 
 	/* Get device limits */
 	if ( ( rc = arbel_get_limits ( arbel ) ) != 0 )
 		goto err_get_limits;
 
-	while ( 1 ) {}
+#if SELF_INIT
+	/* Allocate ICM */
+	memset ( &init_hca, 0, sizeof ( init_hca ) );
+	if ( ( rc = arbel_alloc_icm ( arbel, &init_hca ) ) != 0 )
+		goto err_alloc_icm;
 
-#if 0
-	/* Initialise hardware */
-	if ( ( rc = ib_driver_init ( pci, &qph ) ) != 0 )
-		goto err_ib_driver_init;
+	/* Initialise HCA */
+	if ( ( rc = arbel_cmd_init_hca ( arbel, &init_hca ) ) != 0 ) {
+		DBGC ( arbel, "Arbel %p could not initialise HCA: %s\n",
+		       arbel, strerror ( rc ) );
+		goto err_init_hca;
+	}
+#endif
+
+
 
 	/* Hack up IB structures */
-
+#if 0
 	arbel->config = memfree_pci_dev.cr_space;
 	arbel->uar = memfree_pci_dev.uar;
 	arbel->mailbox_in = dev_buffers_p->inprm_buf;
@@ -1727,7 +1863,6 @@ static int arbel_probe ( struct pci_device *pci,
 	/* Get MAD parameters */
 	if ( ( rc = arbel_get_mad_params ( ibdev ) ) != 0 )
 		goto err_get_mad_params;
-
 
 	/* Add IPoIB device */
 	if ( ( rc = ipoib_probe ( ibdev ) ) != 0 ) {
@@ -1743,7 +1878,10 @@ static int arbel_probe ( struct pci_device *pci,
 	ib_driver_close ( 0 );
  err_ib_driver_init:
 
-
+	
+ err_init_hca:
+	arbel_free_icm ( arbel );
+ err_alloc_icm:
  err_get_limits:
 	arbel_stop_firmware ( arbel );
  err_start_firmware:

@@ -50,6 +50,11 @@
 #define ARBEL_HCR_WRITE_MGM		0x0026
 #define ARBEL_HCR_MGID_HASH		0x0027
 #define ARBEL_HCR_RUN_FW		0x0ff6
+#define ARBEL_HCR_UNMAP_ICM		0x0ff9
+#define ARBEL_HCR_MAP_ICM		0x0ffa
+#define ARBEL_HCR_UNMAP_ICM_AUX		0x0ffb
+#define ARBEL_HCR_MAP_ICM_AUX		0x0ffc
+#define ARBEL_HCR_SET_ICM_SIZE		0x0ffd
 #define ARBEL_HCR_UNMAP_FA		0x0ffe
 #define ARBEL_HCR_MAP_FA		0x0fff
 
@@ -70,7 +75,13 @@ struct arbelprm_mgm_hash_st {
 /* -------------- */
 	pseudo_bit_t hash[0x00010];
 	pseudo_bit_t reserved1[0x00010];
-};
+} __attribute__ (( packed ));
+
+struct arbelprm_scalar_parameter_st {
+	pseudo_bit_t reserved0[0x00020];
+/* -------------- */
+	pseudo_bit_t value[0x00020];
+} __attribute__ (( packed ));
 
 /*
  * Wrapper structures for hardware datatypes
@@ -93,6 +104,7 @@ struct MLX_DECLARE_STRUCT ( arbelprm_query_dev_lim );
 struct MLX_DECLARE_STRUCT ( arbelprm_query_fw );
 struct MLX_DECLARE_STRUCT ( arbelprm_queue_pair_ee_context_entry );
 struct MLX_DECLARE_STRUCT ( arbelprm_recv_wqe_segment_next );
+struct MLX_DECLARE_STRUCT ( arbelprm_scalar_parameter );
 struct MLX_DECLARE_STRUCT ( arbelprm_send_doorbell );
 struct MLX_DECLARE_STRUCT ( arbelprm_ud_address_vector );
 struct MLX_DECLARE_STRUCT ( arbelprm_virtual_physical_mapping );
@@ -289,6 +301,12 @@ struct arbel {
 
 	/** Firmware area in external memory */
 	userptr_t firmware_area;
+	/** ICM size */
+	size_t icm_len;
+	/** ICM AUX size */
+	size_t icm_aux_len;
+	/** ICM area */
+	userptr_t icm;
 
 	/** Doorbell records */
 	union arbelprm_doorbell_record *db_rec;
