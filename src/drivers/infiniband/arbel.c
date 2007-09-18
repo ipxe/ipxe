@@ -1692,6 +1692,7 @@ static int arbel_alloc_icm ( struct arbel *arbel,
 	struct arbelprm_scalar_parameter icm_aux_size;
 	struct arbelprm_virtual_physical_mapping map_icm_aux;
 	struct arbelprm_virtual_physical_mapping map_icm;
+	union arbelprm_doorbell_record *db_rec;
 	size_t icm_offset = 0;
 	unsigned int log_num_qps, log_num_srqs, log_num_ees, log_num_cqs;
 	unsigned int log_num_mtts, log_num_mpts, log_num_rdbs, log_num_eqs;
@@ -1847,6 +1848,14 @@ static int arbel_alloc_icm ( struct arbel *arbel,
 		       arbel, strerror ( rc ) );
 		goto err_map_icm;
 	}
+
+	/* Initialise UAR context */
+	arbel->db_rec = phys_to_virt ( user_to_phys ( arbel->icm, 0 ) +
+				       ( arbel->limits.reserved_uars *
+					 ARBEL_PAGE_SIZE ) );
+	memset ( arbel->db_rec, 0, ARBEL_PAGE_SIZE );
+	db_rec = &arbel->db_rec[ARBEL_GROUP_SEPARATOR_DOORBELL];
+	MLX_FILL_1 ( &db_rec->qp, 1, res, ARBEL_UAR_RES_GROUP_SEP );
 
 	return 0;
 
@@ -2025,16 +2034,6 @@ static int arbel_probe ( struct pci_device *pci,
 	memset ( &init_hca, 0, sizeof ( init_hca ) );
 	if ( ( rc = arbel_alloc_icm ( arbel, &init_hca ) ) != 0 )
 		goto err_alloc_icm;
-
-	
-	unsigned long uar_offset = ( arbel->limits.reserved_uars * 4096 );
-	arbel->db_rec = phys_to_virt ( user_to_phys ( arbel->icm,
-						      uar_offset ) );
-	memset ( arbel->db_rec, 0, 4096 );
-	union arbelprm_doorbell_record *db_rec;
-	db_rec = &arbel->db_rec[ARBEL_GROUP_SEPARATOR_DOORBELL];
-	MLX_FILL_1 ( &db_rec->qp, 1, res, ARBEL_UAR_RES_GROUP_SEP );
-
 
 	/* Initialise HCA */
 	MLX_FILL_1 ( &init_hca, 74, uar_parameters.log_max_uars, 1 );
