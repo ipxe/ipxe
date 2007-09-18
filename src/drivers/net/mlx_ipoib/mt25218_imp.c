@@ -45,7 +45,6 @@ static void be_to_cpu_buf(void *buf, int size)
 #include "ib_driver.c"
 #include "ipoib.c"
 
-#if 0
 static int probe_imp(struct pci_device *pci, struct nic *nic)
 {
 	int rc;
@@ -92,12 +91,10 @@ static int transmit_imp(const char *dest,	/* Destination */
 	rc = ipoib_send_packet(dest, type, packet, size);
 	if (rc) {
 		printf("*** ERROR IN SEND FLOW ***\n");
-#if 0
 		printf("restarting Etherboot\n");
 		sleep(1);
 		longjmp(restart_etherboot, -1);
 		/* we should not be here ... */
-#endif
 		return -1; 
 	}
 
@@ -109,7 +106,7 @@ static void hd(void *where, int n)
 	int i;
 
 	while (n > 0) {
-		printf("%p ", where);
+		printf("%X ", where);
 		for (i = 0; i < ((n > 16) ? 16 : n); i++)
 			printf(" %hhX", ((char *)where)[i]);
 		printf("\n");
@@ -224,13 +221,10 @@ static int poll_imp(struct nic *nic, int retrieve, unsigned int *size_p)
 	return 0;
 
 fatal_handling:
-#if 0
 	printf("restarting Etherboot\n");
 	sleep(1);
 	longjmp(restart_etherboot, -1);
 	/* we should not be here ... */
-#endif
 	return -1; 
 	
 }
-#endif

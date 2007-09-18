@@ -49,17 +49,17 @@
 #define QPN_BASE 0x550000
 
 enum {
+	MADS_QPN_SN,
 	IPOIB_QPN_SN,
-	MADS_QPN_SN = 4,
-	MAX_APP_QPS = 8
+	MAX_APP_QPS
 };
 
 enum {
+	MADS_SND_CQN_SN,
+	MADS_RCV_CQN_SN,
 	IPOIB_SND_CQN_SN,
 	IPOIB_RCV_CQN_SN,
-	MADS_SND_CQN_SN = 4,
-	MADS_RCV_CQN_SN,
-	MAX_APP_CQS = 8
+	MAX_APP_CQS
 };
 
 enum {
@@ -153,7 +153,7 @@ static int gw_read_cr(__u32 addr, __u32 * result);
 static int gw_write_cr(__u32 addr, __u32 data);
 static ud_av_t alloc_ud_av(void);
 static void free_ud_av(ud_av_t av);
-static int ib_poll_cqx(cq_t cq, struct ib_cqe_st *ib_cqe_p, __u8 * num_cqes);
+static int ib_poll_cq(cq_t cq, struct ib_cqe_st *ib_cqe_p, __u8 * num_cqes);
 static int add_qp_to_mcast_group(union ib_gid_u mcast_gid, __u8 add);
 static int clear_interrupt(void);
 static int poll_cqe_tout(cq_t cqh, __u16 tout, void **wqe, int *good_p);

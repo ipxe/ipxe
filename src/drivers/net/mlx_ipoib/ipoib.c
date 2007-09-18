@@ -357,12 +357,52 @@ static void modify_dhcp_resp(void *buf, __u16 size)
 	modify_udp_csum(buf, size);
 }
 
+static void get_my_client_id(__u8 * my_client_id)
+{
+
+	my_client_id[0] = 0;
+	qpn2buf(ipoib_data.ipoib_qpn, my_client_id + 1);
+	memcpy(my_client_id + 4, ipoib_data.port_gid_raw, 16);
+}
+
+static const __u8 *get_client_id(const void *buf, int len)
+{
+	const __u8 *ptr;
+	int delta;
+
+	if (len < 268)
+		return NULL;
+
+	/* pointer to just after magic cookie */
+	ptr = (const __u8 *)buf + 268;
+
+	/* find last client identifier option */
+	do {
+		if (ptr[0] == 255) {
+			/* found end of options list */
+			return NULL;
+		}
+
+		if (ptr[0] == 0x3d) {
+			/* client identifer option */
+			return ptr + 3;
+		}
+
+		delta = ptr[1] + 2;
+		ptr += delta;
+		len -= delta;
+	} while (len > 0);
+
+	return NULL;
+}
+
 static int handle_ipv4_packet(void *buf, void **out_buf_p,
 			      unsigned int *new_size_p, int *is_bcast_p)
 {
 	void *new_buf;
 	__u16 new_size;
 	__u8 msg_type;
+	__u8 my_client_id[20];
 
 	new_buf = (void *)(((__u8 *) buf) + 4);
 	new_size = (*new_size_p) - 4;
@@ -371,6 +411,7 @@ static int handle_ipv4_packet(void *buf, void **out_buf_p,
 
 	if (get_ip_protocl(new_buf) == IP_PROT_UDP) {
 		__u16 udp_dst_port;
+		const __u8 *client_id;
 
 		udp_dst_port = get_udp_dst_port(new_buf);
 
@@ -378,6 +419,22 @@ static int handle_ipv4_packet(void *buf, void **out_buf_p,
 			/* filter dhcp requests */
 			*out_buf_p = 0;
 			return 0;
+		}
+
+		if (udp_dst_port == 68) {
+			get_my_client_id(my_client_id);
+
+			/* packet client id */
+			client_id = get_client_id(new_buf, new_size);
+			if (!client_id) {
+				*out_buf_p = 0;
+				return 0;
+			}
+
+			if (memcmp(client_id, my_client_id, 20)) {
+				*out_buf_p = 0;
+				return 0;
+			}
 		}
 	}
 
@@ -458,9 +515,8 @@ static int ipoib_handle_rcv(void *buf, void **out_buf_p,
 		rc = handle_ipv4_packet(buf, out_buf_p, new_size_p, is_bcast_p);
 		return rc;
 	}
-	tprintf("prot=0x%x", prot_type);
-    *out_buf_p = NULL;
-	return 0;
+	eprintf("prot=0x%x", prot_type);
+	return -1;
 }
 
 static int is_null_mac(const __u8 * mac)
@@ -879,7 +935,7 @@ static int ipoib_read_packet(__u16 * prot_p, void *data, unsigned int *size_p,
 	void *buf, *out_buf;
 	__u16 prot_type;
 
-	rc = ib_poll_cqx(ipoib_data.rcv_cqh, &ib_cqe, &num_cqes);
+	rc = ib_poll_cq(ipoib_data.rcv_cqh, &ib_cqe, &num_cqes);
 	if (rc) {
 		return rc;
 	}
@@ -897,7 +953,7 @@ static int ipoib_read_packet(__u16 * prot_p, void *data, unsigned int *size_p,
 
 	new_size = ib_cqe.count - GRH_SIZE;
 	buf = get_rcv_wqe_buf(ib_cqe.wqe, 1);
-	tprintf("buf=%p", buf);
+	tprintf("buf=%lx", buf);
 	rc = ipoib_handle_rcv(buf, &out_buf, &new_size, is_bcast_p);
 	if (rc) {
 		eprintf("");
@@ -944,7 +1000,7 @@ static int ipoib_init(struct pci_device *pci)
 	ipoib_data.ipoib_qpn = ib_get_qpn(qph);
 
 	if(print_info)
-		printf("local ipoib qpn=0x%lx\n", ipoib_data.ipoib_qpn);
+		printf("local ipoib qpn=0x%x\n", ipoib_data.ipoib_qpn);
 
 	ipoib_data.bcast_av = ib_data.bcast_av;
 	ipoib_data.port_gid_raw = ib_data.port_gid.raw;

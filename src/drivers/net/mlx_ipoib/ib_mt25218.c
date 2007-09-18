@@ -89,10 +89,6 @@ static struct dev_pci_struct memfree_pci_dev;
 static struct device_buffers_st *dev_buffers_p;
 static struct device_ib_data_st dev_ib_data;
 
-
-
-struct map_icm_st icm_map_obj;
-
 static int gw_write_cr(__u32 addr, __u32 data)
 {
 	writel(htonl(data), memfree_pci_dev.cr_space + addr);
@@ -159,7 +155,7 @@ static int ib_device_init(struct pci_device *dev)
 		eprintf("");
 		return -1;
 	}
-	tprintf("uar_base (pa:va) = 0x%lx %p",
+	tprintf("uar_base (pa:va) = 0x%lx 0x%lx",
 		memfree_pci_dev.dev.bar[2] + UAR_IDX * 0x1000,
 		memfree_pci_dev.uar);
 
@@ -174,8 +170,6 @@ static inline unsigned long lalign(unsigned long buf, unsigned long align)
 			       (~(((unsigned long)align) - 1)));
 }
 
-#include <gpxe/umalloc.h>
-
 static int init_dev_data(void)
 {
 	unsigned long tmp;
@@ -185,21 +179,17 @@ static int init_dev_data(void)
 
 	dev_buffers_p = bus_to_virt(tmp);
 	memreg_size = (__u32) (&memreg_size) - (__u32) dev_buffers_p;
-	tprintf("src_buf=%p, dev_buffers_p=%p, memreg_size=0x%lx", src_buf,
+	tprintf("src_buf=0x%lx, dev_buffers_p=0x%lx, memreg_size=0x%x", src_buf,
 		dev_buffers_p, memreg_size);
 
-	tprintf("inprm: va=%p, pa=0x%lx", dev_buffers_p->inprm_buf,
+	tprintf("inprm: va=0x%lx, pa=0x%lx", dev_buffers_p->inprm_buf,
 		virt_to_bus(dev_buffers_p->inprm_buf));
-	tprintf("outprm: va=%p, pa=0x%lx", dev_buffers_p->outprm_buf,
+	tprintf("outprm: va=0x%lx, pa=0x%lx", dev_buffers_p->outprm_buf,
 		virt_to_bus(dev_buffers_p->outprm_buf));
 
-	userptr_t lotsofmem = umalloc ( reserve_size * 2 );
-	if ( ! lotsofmem ) {
-		printf ( "Could not allocate large memblock\n" );
-		return -1;
-	}
-	phys_mem.base = ( ( user_to_phys ( lotsofmem, 0 ) + reserve_size ) &
-			  ~( reserve_size - 1 ) );
+	phys_mem.base =
+	    (virt_to_phys(_text) - reserve_size) & (~(reserve_size - 1));
+
 	phys_mem.offset = 0;
 
 	return 0;
@@ -333,13 +323,9 @@ static void prep_sw2hw_mpt_buf(void *buf, __u32 mkey)
 	INS_FLD(1, buf, arbelprm_mpt_st, r_w);
 	INS_FLD(mkey, buf, arbelprm_mpt_st, mem_key);
 	INS_FLD(GLOBAL_PD, buf, arbelprm_mpt_st, pd);
-	//	INS_FLD(virt_to_bus(dev_buffers_p), buf, arbelprm_mpt_st,
-	//		start_address_l);
-	//	INS_FLD(memreg_size, buf, arbelprm_mpt_st, reg_wnd_len_l);
-	INS_FLD(0, buf, arbelprm_mpt_st, start_address_l);
-	INS_FLD(0, buf, arbelprm_mpt_st, start_address_h);
-	INS_FLD(0xffffffffUL, buf, arbelprm_mpt_st, reg_wnd_len_l);
-	INS_FLD(0xffffffffUL, buf, arbelprm_mpt_st, reg_wnd_len_h);
+	INS_FLD(virt_to_bus(dev_buffers_p), buf, arbelprm_mpt_st,
+		start_address_l);
+	INS_FLD(memreg_size, buf, arbelprm_mpt_st, reg_wnd_len_l);
 }
 
 static void prep_sw2hw_eq_buf(void *buf, struct eqe_t *eq_buf)
@@ -675,9 +661,9 @@ static int setup_hca(__u8 port, void **eq_p)
 		tprintf("fw_rev_major=%d", qfw.fw_rev_major);
 		tprintf("fw_rev_minor=%d", qfw.fw_rev_minor);
 		tprintf("fw_rev_subminor=%d", qfw.fw_rev_subminor);
-		tprintf("error_buf_start_h=0x%lx", qfw.error_buf_start_h);
-		tprintf("error_buf_start_l=0x%lx", qfw.error_buf_start_l);
-		tprintf("error_buf_size=%ld", qfw.error_buf_size);
+		tprintf("error_buf_start_h=0x%x", qfw.error_buf_start_h);
+		tprintf("error_buf_start_l=0x%x", qfw.error_buf_start_l);
+		tprintf("error_buf_size=%d", qfw.error_buf_size);
 	}
 
 
@@ -758,20 +744,17 @@ static int setup_hca(__u8 port, void **eq_p)
 	tmp = get_req_icm_pages(dev_lim.log2_rsvd_qps,
 				MAX_APP_QPS,
 				dev_lim.qpc_entry_sz, &log2_entries);
-	DBG ( "qpc_base_addr_l = %lx\n", icm_start );
 	init_hca.qpc_base_addr_l = icm_start;
 	init_hca.log_num_of_qp = log2_entries;
 	icm_start += (tmp << 12);
 	icm_size += (tmp << 12);
 
-	DBG ( "eqpc_base_addr_l = %lx\n", icm_start );
 	init_hca.eqpc_base_addr_l = icm_start;
 	icm_start += (tmp << 12);
 	icm_size += (tmp << 12);
 
 	tmp = get_req_icm_pages(dev_lim.log2_rsvd_srqs,
 				0, dev_lim.srq_entry_sz, &log2_entries);
-	DBG ( "srqc_base_addr_l = %lx\n", icm_start );
 	init_hca.srqc_base_addr_l = icm_start;
 	init_hca.log_num_of_srq = log2_entries;
 	icm_start += (tmp << 12);
@@ -779,18 +762,15 @@ static int setup_hca(__u8 port, void **eq_p)
 
 	tmp = get_req_icm_pages(dev_lim.log2_rsvd_ees,
 				0, dev_lim.eec_entry_sz, &log2_entries);
-	DBG ( "eec_base_addr_l = %lx\n", icm_start );
 	init_hca.eec_base_addr_l = icm_start;
 	init_hca.log_num_of_ee = log2_entries;
 	icm_start += (tmp << 12);
 	icm_size += (tmp << 12);
 
-	DBG ( "eeec_base_addr_l = %lx\n", icm_start );
 	init_hca.eeec_base_addr_l = icm_start;
 	icm_start += (tmp << 12);
 	icm_size += (tmp << 12);
 
-	DBG ( "cqc_base_addr_l = %lx\n", icm_start );
 	tmp = get_req_icm_pages(dev_lim.log2_rsvd_cqs,
 				MAX_APP_CQS,
 				dev_lim.cqc_entry_sz, &log2_entries);
@@ -801,35 +781,29 @@ static int setup_hca(__u8 port, void **eq_p)
 
 	tmp = get_req_icm_pages(dev_lim.log2_rsvd_mtts,
 				0, dev_lim.mtt_entry_sz, &log2_entries);
-	DBG ( "mtt_base_addr_l = %lx\n", icm_start );
 	init_hca.mtt_base_addr_l = icm_start;
 	icm_start += (tmp << 12);
 	icm_size += (tmp << 12);
 
 	tmp = get_req_icm_pages(dev_lim.log2_rsvd_mrws,
 				1, dev_lim.mpt_entry_sz, &log2_entries);
-	DBG ( "mpt_base_addr_l = %lx\n", icm_start );
 	init_hca.mpt_base_addr_l = icm_start;
 	init_hca.log_mpt_sz = log2_entries;
-	DBG ( "log2_entries for mpt = %ld\n", log2_entries );
 	icm_start += (tmp << 12);
 	icm_size += (tmp << 12);
 
 	tmp = get_req_icm_pages(dev_lim.log2_rsvd_rdbs, 1, 32,	/* size of rdb entry */
 				&log2_entries);
-	DBG ( "rdb_base_addr_l = %lx\n", icm_start );
 	init_hca.rdb_base_addr_l = icm_start;
 	icm_start += (tmp << 12);
 	icm_size += (tmp << 12);
 
-	DBG ( "eqc_base_addr_l = %lx\n", icm_start );
 	init_hca.eqc_base_addr_l = icm_start;
 	init_hca.log_num_of_eq = LOG2_EQS;
 	tmp = dev_lim.eqc_entry_sz * (1 << LOG2_EQS);
 	icm_start += tmp;
 	icm_size += tmp;
 
-	DBG ( "mc_base_addr_l = %lx\n", icm_start );
 	init_hca.mc_base_addr_l = icm_start;
 	init_hca.log_mc_table_entry_sz =
 	    my_log2(MT_STRUCT_SIZE(arbelprm_mgm_entry_st));
@@ -839,8 +813,6 @@ static int setup_hca(__u8 port, void **eq_p)
 	    (MT_STRUCT_SIZE(arbelprm_mgm_entry_st) * init_hca.mc_table_hash_sz);
 	icm_start +=
 	    (MT_STRUCT_SIZE(arbelprm_mgm_entry_st) * init_hca.mc_table_hash_sz);
-
-	DBG ( "icm_size = %lx\n", icm_size );
 
 	rc = cmd_set_icm_size(icm_size, &aux_pages);
 	if (rc) {
@@ -864,7 +836,7 @@ static int setup_hca(__u8 port, void **eq_p)
 	uar_context_pa = phys_mem.base + phys_mem.offset +
 	    dev_ib_data.uar_idx * 4096;
 	uar_context_va = phys_to_virt(uar_context_pa);
-	tprintf("uar_context: va=%p, pa=0x%lx", uar_context_va,
+	tprintf("uar_context: va=0x%lx, pa=0x%lx", uar_context_va,
 		uar_context_pa);
 	dev_ib_data.uar_context_base = uar_context_va;
 
@@ -878,12 +850,10 @@ static int setup_hca(__u8 port, void **eq_p)
 		eprintf("");
 		goto undo_map_fa;
 	}
-	icm_map_obj = map_obj;
-
 	phys_mem.offset += (1 << (map_obj.vpm_arr[0].log2_size + 12));
 
 	init_hca.log_max_uars = log_max_uars;
-	tprintf("inprm: va=%p, pa=0x%lx", inprm, virt_to_bus(inprm));
+	tprintf("inprm: va=0x%lx, pa=0x%lx", inprm, virt_to_bus(inprm));
 	prep_init_hca_buf(&init_hca, inprm);
 	rc = cmd_init_hca(inprm, MT_STRUCT_SIZE(arbelprm_init_hca_st));
 	if (rc) {
@@ -1008,30 +978,6 @@ static int setup_hca(__u8 port, void **eq_p)
 	return ret;
 }
 
-
-static int unset_hca(void)
-{
-	int rc, ret = 0;
-
-	rc = cmd_unmap_icm(&icm_map_obj);
-	if (rc)
-		eprintf("");
-	ret |= rc;
-
-
-	rc = cmd_unmap_icm_aux();
-	if (rc)
-		eprintf("");
-	ret |= rc;
-
-	rc = cmd_unmap_fa();
-	if (rc)
-		eprintf("");
-	ret |= rc;
-
-	return ret;
-}
-
 static void *get_inprm_buf(void)
 {
 	return dev_buffers_p->inprm_buf;
@@ -1140,14 +1086,9 @@ static int post_send_req(void *qph, void *wqeh, __u8 num_gather)
 	struct send_doorbell_st dbell;
 	__u32 nds;
 
-	DBG ( "Work queue entry:\n" );
-	DBG_HD ( snd_wqe, sizeof ( *snd_wqe ) );
-
 	qp->post_send_counter++;
 
 	WRITE_WORD_VOL(qp->send_uar_context, 2, htons(qp->post_send_counter));
-	DBG ( "Doorbell record:\n" );
-	DBG_HD ( qp->send_uar_context, 8 );
 
 	memset(&dbell, 0, sizeof dbell);
 	INS_FLD(XDEV_NOPCODE_SEND, &dbell, arbelprm_send_doorbell_st, nopcode);
@@ -1171,10 +1112,6 @@ static int post_send_req(void *qph, void *wqeh, __u8 num_gather)
 		INS_FLD_TO_BE(XDEV_NOPCODE_SEND,
 			      &qp->last_posted_snd_wqe->next.next,
 			      arbelprm_wqe_segment_next_st, nopcode);
-
-		DBG ( "Previous work queue entry's next field:\n" );
-		DBG_HD ( &qp->last_posted_snd_wqe->next.next,
-			 sizeof ( qp->last_posted_snd_wqe->next.next ) );
 	}
 
 	rc = cmd_post_doorbell(&dbell, POST_SND_OFFSET);
@@ -1194,8 +1131,6 @@ static int create_mads_qp(void **qp_pp, void **snd_cq_pp, void **rcv_cq_pp)
 	__u32 bus_addr;
 	__u8 nds;
 	void *ptr;
-
-	DBG ( "*** Creating MADS queue pair ***\n" );
 
 	qp = &dev_ib_data.mads_qp;
 
@@ -1307,8 +1242,6 @@ static int create_mads_qp(void **qp_pp, void **snd_cq_pp, void **rcv_cq_pp)
 		*rcv_cq_pp = &qp->rcv_cq;
 	}
 
-	DBG ( "*** Created MADS queue pair ***\n" );
-
 	return rc;
 }
 
@@ -1322,8 +1255,6 @@ static int create_ipoib_qp(void **qp_pp,
 	__u8 nds;
 	void *ptr;
 
-	DBG ( "*** Creating IPoIB queue pair ***\n" );
-
 	qp = &dev_ib_data.ipoib_qp;
 
 	/* set the pointer to the receive WQEs buffer */
@@ -1333,7 +1264,7 @@ static int create_ipoib_qp(void **qp_pp,
 	qp->rcv_buf_sz = IPOIB_RCV_BUF_SZ;
 
 	qp->max_recv_wqes = NUM_IPOIB_RCV_WQES;
-	qp->recv_wqe_cur_free = 0; //NUM_IPOIB_RCV_WQES;
+	qp->recv_wqe_cur_free = NUM_IPOIB_RCV_WQES;
 
 	qp->rcv_uar_context =
 	    dev_ib_data.uar_context_base + 8 * IPOIB_RCV_QP_DB_IDX;
@@ -1429,8 +1360,6 @@ static int create_ipoib_qp(void **qp_pp,
 		*rcv_cq_pp = &qp->rcv_cq;
 	}
 
-	DBG ( "*** Created IPoIB queue pair ***\n" );
-
 	return rc;
 }
 
@@ -1451,8 +1380,6 @@ static int create_udqp(struct udqp_st *qp)
 	qp->snd_cq.ci_db_ctx_pointer =
 	    dev_ib_data.uar_context_base + 8 * qp->snd_cq.ci_db_ctx_idx;
 
-	DBG ( "* Creating send CQ *\n" );
-
 	/* create send CQ */
 	init_cq_buf(qp->snd_cq.cq_buf, qp->snd_cq.num_cqes);
 	qp->snd_cq.cons_counter = 0;
@@ -1468,8 +1395,6 @@ static int create_udqp(struct udqp_st *qp)
 		eprintf("");
 		goto exit;
 	}
-
-	DBG ( "* Creating receive CQ *\n" );
 
 	/* create receive CQ */
 	init_cq_buf(qp->rcv_cq.cq_buf, qp->rcv_cq.num_cqes);
@@ -1487,8 +1412,6 @@ static int create_udqp(struct udqp_st *qp)
 		eprintf("");
 		goto undo_snd_cq;
 	}
-
-	DBG ( "* Creating QP *\n" );
 
 	prep_rst2init_qpee_buf(inprm,
 			       qp->snd_cq.cqn,
@@ -1627,15 +1550,6 @@ static void prep_send_wqe_buf(void *qph,
 		len += offset;
 	}
 	snd_wqe->mpointer[0].byte_count = cpu_to_be32(len);
-
-#if 0
-	DBG ( "prep_send_wqe_buf()\n" );
-	DBG ( "snd_wqe:\n" );
-	DBG_HD ( snd_wqe, sizeof ( *snd_wqe ) );
-	DBG ( "packet:\n" );
-	DBG_HD ( bus_to_virt(be32_to_cpu(snd_wqe->mpointer[0].local_addr_l)),
-		 len );
-#endif
 }
 
 static void *alloc_ud_av(void)
@@ -1744,7 +1658,7 @@ static void dev2ib_cqe(struct ib_cqe_st *ib_cqe_p, union cqe_st *cqe_p)
 		   byte_cnt);
 }
 
-static int ib_poll_cqx(void *cqh, struct ib_cqe_st *ib_cqe_p, u8 * num_cqes)
+static int ib_poll_cq(void *cqh, struct ib_cqe_st *ib_cqe_p, u8 * num_cqes)
 {
 	int rc;
 	union cqe_st cqe;
@@ -1776,7 +1690,7 @@ static int ib_poll_cqx(void *cqh, struct ib_cqe_st *ib_cqe_p, u8 * num_cqes)
 		eprintf("vendor_syndrome=0x%lx",
 			EX_FLD(cqe.error_cqe, arbelprm_completion_with_error_st,
 			       vendor_code));
-		eprintf("wqe_addr=%p", wqe_p);
+		eprintf("wqe_addr=0x%lx", wqe_p);
 		eprintf("myqpn=0x%lx",
 			EX_FLD(cqe.error_cqe, arbelprm_completion_with_error_st,
 			       myqpn));
@@ -2006,9 +1920,6 @@ static void dev_post_dbell(void *dbell, __u32 offset)
 	address = (unsigned long)(memfree_pci_dev.uar) + offset;
 	tprintf("va=0x%lx pa=0x%lx", address,
 		virt_to_bus((const void *)address));
-	DBG ( "dev_post_dbell %08lx:%08lx to %lx\n",
-	      htonl ( ptr[0] ), htonl ( ptr[1] ),
-	      virt_to_phys ( memfree_pci_dev.uar + offset ) );
 	writel(htonl(ptr[0]), memfree_pci_dev.uar + offset);
 	barrier();
 	address += 4;

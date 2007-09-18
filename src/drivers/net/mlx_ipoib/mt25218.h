@@ -26,9 +26,7 @@
 #define MEMFREE_CMD_RUN_FW			0xff6
 #define MEMFREE_CMD_SET_ICM_SIZE	0xffd
 #define MEMFREE_CMD_MAP_ICM_AUX		0xffc
-#define MEMFREE_CMD_UNMAP_ICM_AUX		0xffb
 #define MEMFREE_CMD_MAP_ICM			0xffa
-#define MEMFREE_CMD_UNMAP_ICM			0xff9
 #define MEMFREE_CMD_QUERY_DEV_LIM   0x003
 
 /*
@@ -146,24 +144,24 @@
 
 /* uar context indexes */
 enum {
-	MADS_SND_CQ_ARM_DB_IDX = MADS_SND_CQN_SN,
-	MADS_RCV_CQ_ARM_DB_IDX = MADS_RCV_CQN_SN,
-	IPOIB_SND_CQ_ARM_DB_IDX = IPOIB_SND_CQN_SN,
-	IPOIB_RCV_CQ_ARM_DB_IDX = IPOIB_RCV_CQN_SN,
-	MADS_SND_QP_DB_IDX = ( MAX_APP_CQS + MADS_QPN_SN ),
-	IPOIB_SND_QP_DB_IDX = ( MAX_APP_CQS + IPOIB_QPN_SN ),
-	GROUP_SEP_IDX = ( MAX_APP_CQS + MAX_APP_QPS ),
-	//	START_UNMAPPED_DB_IDX,
+	MADS_RCV_CQ_ARM_DB_IDX,
+	MADS_SND_CQ_ARM_DB_IDX,
+	IPOIB_RCV_CQ_ARM_DB_IDX,
+	IPOIB_SND_CQ_ARM_DB_IDX,
+	MADS_SND_QP_DB_IDX,
+	IPOIB_SND_QP_DB_IDX,
+	GROUP_SEP_IDX,
+	START_UNMAPPED_DB_IDX,
 	/* --------------------------
 	   unmapped doorbell records
 	   -------------------------- */
-	//	END_UNMAPPED_DB_IDX,
-	IPOIB_RCV_QP_DB_IDX = ( 512 - MAX_APP_CQS - IPOIB_QPN_SN - 1 ),
-	MADS_RCV_QP_DB_IDX = ( 512 - MAX_APP_CQS - MADS_QPN_SN - 1 ),
-	IPOIB_RCV_CQ_CI_DB_IDX = ( 512 - IPOIB_RCV_CQN_SN - 1 ),
-	IPOIB_SND_CQ_CI_DB_IDX = ( 512 - IPOIB_SND_CQN_SN - 1 ),
-	MADS_RCV_CQ_CI_DB_IDX = ( 512 - MADS_RCV_CQN_SN - 1 ),
-	MADS_SND_CQ_CI_DB_IDX = ( 512 - MADS_SND_CQN_SN - 1 ),
+	END_UNMAPPED_DB_IDX = 505,
+	MADS_RCV_QP_DB_IDX = 506,
+	IPOIB_RCV_QP_DB_IDX = 507,
+	MADS_RCV_CQ_CI_DB_IDX = 508,
+	MADS_SND_CQ_CI_DB_IDX = 509,
+	IPOIB_RCV_CQ_CI_DB_IDX = 510,
+	IPOIB_SND_CQ_CI_DB_IDX = 511
 };
 
 /* uar resources types */
@@ -340,24 +338,6 @@ struct qp_ee_state_tarnisition_st {
 
 struct cq_dbell_st {
 	__u8 raw[MT_STRUCT_SIZE(arbelprm_cq_cmd_doorbell_st)];
-} __attribute__ ((packed));
-
-struct qp_db_record_st {
-	__u8 raw[MT_STRUCT_SIZE(arbelprm_qp_db_record_st)];
-} __attribute__ ((packed));
-
-struct cq_arm_db_record_st {
-	__u8 raw[MT_STRUCT_SIZE(arbelprm_cq_arm_db_record_st)];
-} __attribute__ ((packed));
-
-struct cq_ci_db_record_st {
-	__u8 raw[MT_STRUCT_SIZE(arbelprm_cq_ci_db_record_st)];
-} __attribute__ ((packed));
-
-union db_record_st {
-	struct qp_db_record_st qp;
-	struct cq_arm_db_record_st cq_arm;
-	struct cq_ci_db_record_st cq_ci;
 } __attribute__ ((packed));
 
 struct mad_ifc_inprm_st {

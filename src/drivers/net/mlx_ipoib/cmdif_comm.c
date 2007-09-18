@@ -112,8 +112,6 @@ static XHH_cmd_status_t cmd_invoke(command_fields_t * cmd_prms)
 	__u32 hcr[7], data;
 	__u8 status;
 
-	DBG ( "Executing command:\n" );
-		
 	/* check if go bit is free */
 	ret = cmdif_is_free(&is_free);
 	if (ret) {
@@ -130,15 +128,6 @@ static XHH_cmd_status_t cmd_invoke(command_fields_t * cmd_prms)
 	__asm__ __volatile__("":::"memory");
 	edit_hcr(cmd_prms, hcr);
 	__asm__ __volatile__("":::"memory");
-
-	DBG_HD ( &hcr[0], sizeof ( hcr ) ); 
-	if ( cmd_prms->in_trans == TRANS_MAILBOX ) {
-		size_t size = ( 4 * cmd_prms->in_param_size );
-		if ( size > 512 )
-			size = 512;
-		DBG2 ( "Input mailbox:\n" );
-		DBG2_HD ( &cmd_prms->in_param[0], size );
-	}
 
 	for (i = 0; i < 7; ++i) {
 		ret = gw_write_cr(HCR_BASE + i * 4, hcr[i]);
@@ -170,14 +159,6 @@ static XHH_cmd_status_t cmd_invoke(command_fields_t * cmd_prms)
 		return status;
 	}
 
-	if ( cmd_prms->out_trans == TRANS_MAILBOX ) {
-		size_t size = ( 4 * cmd_prms->out_param_size );
-		if ( size > 512 )
-			size = 512;
-		DBG2 ( "Output mailbox:\n" );
-		DBG2_HD ( &cmd_prms->out_param[0], size );
-	}
-
 	if (cmd_prms->out_trans == TRANS_MAILBOX)
 		be_to_cpu_buf(cmd_prms->out_param, cmd_prms->out_param_size);
 	else if (cmd_prms->out_trans == TRANS_IMMEDIATE) {
@@ -186,8 +167,6 @@ static XHH_cmd_status_t cmd_invoke(command_fields_t * cmd_prms)
 		if (gw_read_cr(HCR_OFFSET_OUTPRM_L, &cmd_prms->out_param[1]))
 			return -1;
 	}
-
-	DBG ( "Command executed successfully\n" );
 
 	return 0;
 }
@@ -563,10 +542,7 @@ static int cmd_mgid_hash(__u8 * gid, __u16 * mgid_hash_p)
 {
 	int rc;
 	command_fields_t cmd_desc;
-	union {
-		__u32 u32;
-		__u16 u16[2];
-	} result;
+	__u16 result[2];
 
 	memset(&cmd_desc, 0, sizeof cmd_desc);
 
@@ -578,9 +554,9 @@ static int cmd_mgid_hash(__u8 * gid, __u16 * mgid_hash_p)
 
 	rc = cmd_invoke(&cmd_desc);
 	if (!rc) {
-		rc = gw_read_cr(HCR_BASE + 16, &result.u32);
+		rc = gw_read_cr(HCR_BASE + 16, (__u32 *) result);
 		if (!rc) {
-			*mgid_hash_p = result.u16[0];
+			*mgid_hash_p = result[0];
 		}
 	}
 
