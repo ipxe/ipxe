@@ -1894,6 +1894,7 @@ static int arbel_init_ib ( struct arbel *arbel ) {
 		     mtu_cap, ARBEL_MTU_2048,
 		     port_width_cap, 3,
 		     vl_cap, 1 );
+	MLX_FILL_1 ( &init_ib, 1, max_gid, 1 );
 	MLX_FILL_1 ( &init_ib, 2, max_pkey, 64 );
 	if ( ( rc = arbel_cmd_init_ib ( arbel, PXE_IB_PORT,
 					&init_ib ) ) != 0 ) {
