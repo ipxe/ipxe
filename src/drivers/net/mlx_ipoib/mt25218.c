@@ -236,6 +236,22 @@ arbel_cmd_init_hca ( struct arbel *arbel,
 }
 
 static inline int
+arbel_cmd_close_hca ( struct arbel *arbel ) {
+	return arbel_cmd ( arbel,
+			   ARBEL_HCR_VOID_CMD ( ARBEL_HCR_CLOSE_HCA ),
+			   0, NULL, 0, NULL );
+}
+
+static inline int
+arbel_cmd_sw2hw_mpt ( struct arbel *arbel, unsigned int index,
+		      const struct arbelprm_mpt *mpt ) {
+	return arbel_cmd ( arbel,
+			   ARBEL_HCR_IN_CMD ( ARBEL_HCR_SW2HW_MPT,
+					      1, sizeof ( *mpt ) ),
+			   0, mpt, index, NULL );
+}
+
+static inline int
 arbel_cmd_sw2hw_cq ( struct arbel *arbel, unsigned long cqn,
 		     const struct arbelprm_completion_queue_context *cqctx ) {
 	return arbel_cmd ( arbel,
@@ -403,6 +419,16 @@ arbel_cmd_map_fa ( struct arbel *arbel,
 			   ARBEL_HCR_IN_CMD ( ARBEL_HCR_MAP_FA,
 					      1, sizeof ( *map ) ),
 			   0, map, 1, NULL );
+}
+
+/***************************************************************************
+ *
+ * Event queue operations
+ *
+ ***************************************************************************
+ */
+
+static int arbel_create_eq ( struct arbel *arbel ) {
 }
 
 /***************************************************************************
@@ -1801,6 +1827,42 @@ static void arbel_free_icm ( struct arbel *arbel ) {
  */
 
 /**
+ * Set up memory protection table
+ *
+ * @v arbel		Arbel device
+ * @ret rc		Return status code
+ */
+static int arbel_setup_mpt ( struct arbel *arbel ) {
+	struct arbelprm_mpt mpt;
+	uint32_t key;
+	int rc;
+
+	/* Derive key */
+	key = ( arbel->limits.reserved_mrws | ARBEL_MKEY_PREFIX );
+	arbel->reserved_lkey = ( ( key << 8 ) | ( key >> 24 ) );
+
+	/* Initialise memory protection table */
+	memset ( &mpt, 0, sizeof ( mpt ) );
+	MLX_FILL_4 ( &mpt, 0,
+		     r_w, 1,
+		     pa, 1,
+		     lr, 1,
+		     lw, 1 );
+	MLX_FILL_1 ( &mpt, 2, mem_key, key );
+	MLX_FILL_1 ( &mpt, 3, pd, ARBEL_GLOBAL_PD );
+	MLX_FILL_1 ( &mpt, 6, reg_wnd_len_h, 0xffffffffUL );
+	MLX_FILL_1 ( &mpt, 7, reg_wnd_len_l, 0xffffffffUL );
+	if ( ( rc = arbel_cmd_sw2hw_mpt ( arbel, arbel->limits.reserved_mrws,
+					  &mpt ) ) != 0 ) {
+		DBGC ( arbel, "Arbel %p could not set up MPT: %s\n",
+		       arbel, strerror ( rc ) );
+		return rc;
+	}
+
+	return 0;
+}
+	
+/**
  * Probe PCI device
  *
  * @v pci		PCI device
@@ -1878,6 +1940,12 @@ static int arbel_probe ( struct pci_device *pci,
 		       arbel, strerror ( rc ) );
 		goto err_init_hca;
 	}
+
+	/* Set up memory protection */
+	if ( ( rc = arbel_setup_mpt ( arbel ) ) != 0 )
+		goto err_setup_mpt;
+
+		     
 #endif
 
 
@@ -1889,8 +1957,10 @@ static int arbel_probe ( struct pci_device *pci,
 	arbel->mailbox_in = dev_buffers_p->inprm_buf;
 	arbel->mailbox_out = dev_buffers_p->outprm_buf;
 #endif
-	arbel->db_rec = dev_ib_data.uar_context_base;
+#if ! SELF_INIT
 	arbel->reserved_lkey = dev_ib_data.mkey;
+#endif
+	arbel->db_rec = dev_ib_data.uar_context_base;
 	arbel->eqn = dev_ib_data.eq.eqn;
 
 
@@ -1912,7 +1982,8 @@ static int arbel_probe ( struct pci_device *pci,
 	ib_driver_close ( 0 );
  err_ib_driver_init:
 
-	
+ err_setup_mpt:
+	arbel_cmd_close_hca ( arbel );
  err_init_hca:
 	arbel_free_icm ( arbel );
  err_alloc_icm:

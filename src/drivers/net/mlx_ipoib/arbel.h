@@ -39,6 +39,8 @@
 #define ARBEL_HCR_QUERY_DEV_LIM		0x0003
 #define ARBEL_HCR_QUERY_FW		0x0004
 #define ARBEL_HCR_INIT_HCA		0x0007
+#define ARBEL_HCR_CLOSE_HCA		0x0008
+#define ARBEL_HCR_SW2HW_MPT		0x000d
 #define ARBEL_HCR_SW2HW_CQ		0x0016
 #define ARBEL_HCR_HW2SW_CQ		0x0017
 #define ARBEL_HCR_RST2INIT_QPEE		0x0019
@@ -101,6 +103,7 @@ struct MLX_DECLARE_STRUCT ( arbelprm_init_hca );
 struct MLX_DECLARE_STRUCT ( arbelprm_mad_ifc );
 struct MLX_DECLARE_STRUCT ( arbelprm_mgm_entry );
 struct MLX_DECLARE_STRUCT ( arbelprm_mgm_hash );
+struct MLX_DECLARE_STRUCT ( arbelprm_mpt );
 struct MLX_DECLARE_STRUCT ( arbelprm_qp_db_record );
 struct MLX_DECLARE_STRUCT ( arbelprm_qp_ee_state_transitions );
 struct MLX_DECLARE_STRUCT ( arbelprm_query_dev_lim );
@@ -332,6 +335,9 @@ struct arbel {
 
 /** Global protection domain */
 #define ARBEL_GLOBAL_PD			0x123456
+
+/** Memory key prefix */
+#define ARBEL_MKEY_PREFIX		0x77000000UL
 
 /*
  * HCA commands
