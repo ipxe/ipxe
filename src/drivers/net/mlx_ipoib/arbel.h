@@ -38,6 +38,7 @@
 /* HCA command register opcodes */
 #define ARBEL_HCR_QUERY_DEV_LIM		0x0003
 #define ARBEL_HCR_QUERY_FW		0x0004
+#define ARBEL_HCR_INIT_HCA		0x0007
 #define ARBEL_HCR_SW2HW_CQ		0x0016
 #define ARBEL_HCR_HW2SW_CQ		0x0017
 #define ARBEL_HCR_RST2INIT_QPEE		0x0019
@@ -82,6 +83,7 @@ struct MLX_DECLARE_STRUCT ( arbelprm_completion_with_error );
 struct MLX_DECLARE_STRUCT ( arbelprm_cq_arm_db_record );
 struct MLX_DECLARE_STRUCT ( arbelprm_cq_ci_db_record );
 struct MLX_DECLARE_STRUCT ( arbelprm_hca_command_register );
+struct MLX_DECLARE_STRUCT ( arbelprm_init_hca );
 struct MLX_DECLARE_STRUCT ( arbelprm_mad_ifc );
 struct MLX_DECLARE_STRUCT ( arbelprm_mgm_entry );
 struct MLX_DECLARE_STRUCT ( arbelprm_mgm_hash );
@@ -160,8 +162,6 @@ struct arbel_dev_limits {
 	unsigned int reserved_qps;
 	/** Number of reserved EEs */
 	unsigned int reserved_ees;
-	/** Number of reserved MPTs */
-	unsigned int reserved_mpts;
 	/** Number of reserved MTTs */
 	unsigned int reserved_mtts;
 	/** Number of reserved CQs */

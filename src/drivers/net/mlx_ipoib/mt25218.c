@@ -227,6 +227,15 @@ arbel_cmd_query_fw ( struct arbel *arbel, struct arbelprm_query_fw *fw ) {
 }
 
 static inline int
+arbel_cmd_init_hca ( struct arbel *arbel,
+		     const struct arbelprm_init_hca *init_hca ) {
+	return arbel_cmd ( arbel,
+			   ARBEL_HCR_IN_CMD ( ARBEL_HCR_INIT_HCA,
+					      1, sizeof ( *init_hca ) ),
+			   0, init_hca, 0, NULL );
+}
+
+static inline int
 arbel_cmd_sw2hw_cq ( struct arbel *arbel, unsigned long cqn,
 		     const struct arbelprm_completion_queue_context *cqctx ) {
 	return arbel_cmd ( arbel,
@@ -1499,13 +1508,116 @@ static int arbel_get_limits ( struct arbel *arbel ) {
 }
 
 /**
- * Allocate ICM areas
+ * Get ICM usage
+ *
+ * @v log_num_entries	Log2 of the number of entries
+ * @v entry_size	Entry size
+ * @ret usage		Usage size in ICM
+ */
+static size_t icm_usage ( unsigned int log_num_entries, size_t entry_size ) {
+	size_t usage;
+
+	usage = ( ( 1 << log_num_entries ) * entry_size );
+	usage = ( ( usage + 4095 ) & ~4095 );
+	return usage;
+}
+
+/**
+ * Partition ICM
  *
  * @v arbel		Arbel device
  * @ret rc		Return status code
  */
 static int arbel_alloc_icm ( struct arbel *arbel ) {
-	
+	struct arbelprm_init_hca init_hca;
+	size_t icm_offset = 0;
+	unsigned int log_num_qps, log_num_srqs, log_num_ees, log_num_cqs;
+	unsigned int log_num_mtts, log_num_mpts, log_num_rdbs, log_num_eqs;
+
+	memset ( &init_hca, 0, sizeof ( init_hca ) );
+	icm_offset = ( ( arbel->limits.reserved_uars + 1 ) << 12 );
+
+	/* Queue pair contexts */
+	log_num_qps = fls ( arbel->limits.reserved_qps + ARBEL_MAX_QPS - 1 );
+	MLX_FILL_2 ( &init_hca, 13,
+		     qpc_eec_cqc_eqc_rdb_parameters.qpc_base_addr_l,
+		     ( icm_offset >> 7 ),
+		     qpc_eec_cqc_eqc_rdb_parameters.log_num_of_qp,
+		     log_num_qps );
+	icm_offset += icm_usage ( log_num_qps, arbel->limits.qpc_entry_size );
+
+	/* Extended queue pair contexts */
+	MLX_FILL_1 ( &init_hca, 25,
+		     qpc_eec_cqc_eqc_rdb_parameters.eqpc_base_addr_l,
+		     icm_offset );
+	icm_offset += icm_usage ( log_num_qps, arbel->limits.eqpc_entry_size );
+
+	/* Shared receive queue contexts */
+	log_num_srqs = fls ( arbel->limits.reserved_srqs - 1 );
+	MLX_FILL_2 ( &init_hca, 19,
+		     qpc_eec_cqc_eqc_rdb_parameters.srqc_base_addr_l,
+		     ( icm_offset >> 5 ),
+		     qpc_eec_cqc_eqc_rdb_parameters.log_num_of_srq,
+		     log_num_srqs );
+	icm_offset += icm_usage ( log_num_srqs, arbel->limits.srqc_entry_size );
+
+	/* End-to-end contexts */
+	log_num_ees = fls ( arbel->limits.reserved_ees - 1 );
+	MLX_FILL_2 ( &init_hca, 17,
+		     qpc_eec_cqc_eqc_rdb_parameters.eec_base_addr_l,
+		     ( icm_offset >> 7 ),
+		     qpc_eec_cqc_eqc_rdb_parameters.log_num_of_ee,
+		     log_num_ees );
+	icm_offset += icm_usage ( log_num_ees, arbel->limits.eec_entry_size );
+
+	/* Extended end-to-end contexts */
+	MLX_FILL_1 ( &init_hca, 29,
+		     qpc_eec_cqc_eqc_rdb_parameters.eeec_base_addr_l,
+		     icm_offset );
+	icm_offset += icm_usage ( log_num_ees, arbel->limits.eeec_entry_size );
+
+	/* Completion queue contexts */
+	log_num_cqs = fls ( arbel->limits.reserved_cqs + ARBEL_MAX_CQS - 1 );
+	MLX_FILL_2 ( &init_hca, 21,
+		     qpc_eec_cqc_eqc_rdb_parameters.cqc_base_addr_l,
+		     ( icm_offset >> 6 ),
+		     qpc_eec_cqc_eqc_rdb_parameters.log_num_of_cq,
+		     log_num_cqs );
+	icm_offset += icm_usage ( log_num_cqs, arbel->limits.cqc_entry_size );
+
+	/* Memory translation table */
+	log_num_mtts = fls ( arbel->limits.reserved_mtts - 1 );
+	MLX_FILL_1 ( &init_hca, 65,
+		     tpt_parameters.mtt_base_addr_l, icm_offset );
+	icm_offset += icm_usage ( log_num_mtts, arbel->limits.mtt_entry_size );
+
+	/* Memory protection table */
+	log_num_mpts = fls ( arbel->limits.reserved_mrws - 1 );
+	MLX_FILL_1 ( &init_hca, 61,
+		     tpt_parameters.mpt_base_adr_l, icm_offset );
+	MLX_FILL_1 ( &init_hca, 62,
+		     tpt_parameters.log_mpt_sz, log_num_mpts );
+	icm_offset += icm_usage ( log_num_mpts, arbel->limits.mpt_entry_size );
+
+	/* RDMA something or other */
+	log_num_rdbs = fls ( arbel->limits.reserved_rdbs - 1 );
+	MLX_FILL_1 ( &init_hca, 37,
+		     qpc_eec_cqc_eqc_rdb_parameters.rdb_base_addr_l,
+		     icm_offset );
+	icm_offset += icm_usage ( log_num_rdbs, 32 );
+
+	/* Event queue contexts */
+	log_num_eqs = 6;
+	MLX_FILL_2 ( &init_hca, 33,
+		     qpc_eec_cqc_eqc_rdb_parameters.eqc_base_addr_l,
+		     ( icm_offset >> 6 ),
+		     qpc_eec_cqc_eqc_rdb_parameters.log_num_eq,
+		     log_num_eqs );
+	icm_offset += ( ( 1 << log_num_eqs ) * arbel->limits.eqc_entry_size );
+
+	/* Multicast table */
+
+
 	return 0;
 }
 
