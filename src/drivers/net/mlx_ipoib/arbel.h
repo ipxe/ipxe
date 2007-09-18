@@ -160,15 +160,37 @@ union arbelprm_mad {
 struct arbel_dev_limits {
 	/** Number of reserved QPs */
 	unsigned int reserved_qps;
-	/** Number of reserved EEs */
-	unsigned int reserved_ees;
-	/** Number of reserved MTTs */
-	unsigned int reserved_mtts;
-	/** Number of reserved CQs */
-	unsigned int reserved_cqs;
+	/** QP context entry size */
+	size_t qpc_entry_size;
+	/** Extended QP context entry size */
+	size_t eqpc_entry_size;
 	/** Number of reserved SRQs */
 	unsigned int reserved_srqs;
-	/** Number of reserver UARs */
+	/** SRQ context entry size */
+	size_t srqc_entry_size;
+	/** Number of reserved EEs */
+	unsigned int reserved_ees;
+	/** EE context entry size */
+	size_t eec_entry_size;
+	/** Extended EE context entry size */
+	size_t eeec_entry_size;
+	/** Number of reserved CQs */
+	unsigned int reserved_cqs;
+	/** CQ context entry size */
+	size_t cqc_entry_size;
+	/** Number of reserved MTTs */
+	unsigned int reserved_mtts;
+	/** MTT entry size */
+	size_t mtt_entry_size;
+	/** Number of reserved MRWs */
+	unsigned int reserved_mrws;
+	/** MPT entry size */
+	size_t mpt_entry_size;
+	/** Number of reserved RDBs */
+	unsigned int reserved_rdbs;
+	/** EQ context entry size */
+	size_t eqc_entry_size;
+	/** Number of reserved UARs */
 	unsigned int reserved_uars;
 };
 

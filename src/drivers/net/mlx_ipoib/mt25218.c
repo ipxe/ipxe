@@ -1494,14 +1494,27 @@ static int arbel_get_limits ( struct arbel *arbel ) {
 
 	arbel->limits.reserved_qps =
 		( 1 << MLX_GET ( &dev_lim, log2_rsvd_qps ) );
-	arbel->limits.reserved_ees =
-		( 1 << MLX_GET ( &dev_lim, log2_rsvd_ees ) );
-	arbel->limits.reserved_mtts =
-		( 1 << MLX_GET ( &dev_lim, log2_rsvd_mtts ) );
-	arbel->limits.reserved_cqs =
-		( 1 << MLX_GET ( &dev_lim, log2_rsvd_cqs ) );
+	arbel->limits.qpc_entry_size = MLX_GET ( &dev_lim, qpc_entry_sz );
+	arbel->limits.eqpc_entry_size = MLX_GET ( &dev_lim, eqpc_entry_sz );
 	arbel->limits.reserved_srqs =
 		( 1 << MLX_GET ( &dev_lim, log2_rsvd_srqs ) );
+	arbel->limits.srqc_entry_size = MLX_GET ( &dev_lim, srq_entry_sz );
+	arbel->limits.reserved_ees =
+		( 1 << MLX_GET ( &dev_lim, log2_rsvd_ees ) );
+	arbel->limits.eec_entry_size = MLX_GET ( &dev_lim, eec_entry_sz );
+	arbel->limits.eeec_entry_size = MLX_GET ( &dev_lim, eeec_entry_sz );
+	arbel->limits.reserved_cqs =
+		( 1 << MLX_GET ( &dev_lim, log2_rsvd_cqs ) );
+	arbel->limits.cqc_entry_size = MLX_GET ( &dev_lim, cqc_entry_sz );
+	arbel->limits.reserved_mtts =
+		( 1 << MLX_GET ( &dev_lim, log2_rsvd_mtts ) );
+	arbel->limits.mtt_entry_size = MLX_GET ( &dev_lim, mtt_entry_sz );
+	arbel->limits.reserved_mrws =
+		( 1 << MLX_GET ( &dev_lim, log2_rsvd_mrws ) );
+	arbel->limits.mpt_entry_size = MLX_GET ( &dev_lim, mpt_entry_sz );
+	arbel->limits.reserved_rdbs =
+		( 1 << MLX_GET ( &dev_lim, log2_rsvd_rdbs ) );
+	arbel->limits.eqc_entry_size = MLX_GET ( &dev_lim, eqc_entry_sz );
 	arbel->limits.reserved_uars = MLX_GET ( &dev_lim, num_rsvd_uars );
 
 	return 0;
@@ -1616,7 +1629,16 @@ static int arbel_alloc_icm ( struct arbel *arbel ) {
 	icm_offset += ( ( 1 << log_num_eqs ) * arbel->limits.eqc_entry_size );
 
 	/* Multicast table */
-
+	MLX_FILL_1 ( &init_hca, 49,
+		     multicast_parameters.mc_base_addr_l, icm_offset );
+	MLX_FILL_1 ( &init_hca, 52,
+		     multicast_parameters.log_mc_table_entry_sz,
+		     fls ( sizeof ( struct arbelprm_mgm_entry ) - 1 ) );
+	MLX_FILL_1 ( &init_hca, 53,
+		     multicast_parameters.mc_table_hash_sz, 8 );
+	MLX_FILL_1 ( &init_hca, 54,
+		     multicast_parameters.log_mc_table_sz, 3 );
+	icm_offset += ( 8 * sizeof ( struct arbelprm_mgm_entry ) );
 
 	return 0;
 }
