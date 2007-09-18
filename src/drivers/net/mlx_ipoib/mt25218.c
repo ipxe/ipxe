@@ -169,7 +169,7 @@ static int arbel_cmd ( struct arbel *arbel, unsigned long command,
 	DBGC2_HD ( arbel, &hcr, sizeof ( hcr ) );
 	if ( in_len ) {
 		DBGC2 ( arbel, "Input:\n" );
-		DBGC2_HD ( arbel, in, ( ( in_len < 256 ) ? in_len : 256 ) );
+		DBGC2_HD ( arbel, in, ( ( in_len < 512 ) ? in_len : 512 ) );
 	}
 
 	/* Issue command */
@@ -203,7 +203,7 @@ static int arbel_cmd ( struct arbel *arbel, unsigned long command,
 	memcpy ( out, out_buffer, out_len );
 	if ( out_len ) {
 		DBGC2 ( arbel, "Output:\n" );
-		DBGC2_HD ( arbel, out, ( ( out_len < 256 ) ? out_len : 256 ) );
+		DBGC2_HD ( arbel, out, ( ( out_len < 512 ) ? out_len : 512 ) );
 	}
 
 	return 0;
@@ -1682,7 +1682,7 @@ static int arbel_alloc_icm ( struct arbel *arbel,
 	icm_offset += icm_usage ( log_num_mtts, arbel->limits.mtt_entry_size );
 
 	/* Memory protection table */
-	log_num_mpts = fls ( arbel->limits.reserved_mrws - 1 );
+	log_num_mpts = fls ( arbel->limits.reserved_mrws + 1 - 1 );
 	MLX_FILL_1 ( init_hca, 61,
 		     tpt_parameters.mpt_base_adr_l, icm_offset );
 	MLX_FILL_1 ( init_hca, 62,
@@ -1872,6 +1872,7 @@ static int arbel_probe ( struct pci_device *pci,
 		goto err_alloc_icm;
 
 	/* Initialise HCA */
+	MLX_FILL_1 ( &init_hca, 74, uar_parameters.log_max_uars, 1 );
 	if ( ( rc = arbel_cmd_init_hca ( arbel, &init_hca ) ) != 0 ) {
 		DBGC ( arbel, "Arbel %p could not initialise HCA: %s\n",
 		       arbel, strerror ( rc ) );

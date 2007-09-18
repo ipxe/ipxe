@@ -811,6 +811,7 @@ static int setup_hca(__u8 port, void **eq_p)
 	DBG ( "mpt_base_addr_l = %lx\n", icm_start );
 	init_hca.mpt_base_addr_l = icm_start;
 	init_hca.log_mpt_sz = log2_entries;
+	DBG ( "log2_entries for mpt = %d\n", log2_entries );
 	icm_start += (tmp << 12);
 	icm_size += (tmp << 12);
 
