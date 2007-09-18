@@ -50,6 +50,8 @@
 #define ARBEL_HCR_WRITE_MGM		0x0026
 #define ARBEL_HCR_MGID_HASH		0x0027
 #define ARBEL_HCR_RUN_FW		0x0ff6
+#define ARBEL_HCR_DISABLE_LAM		0x0ff7
+#define ARBEL_HCR_ENABLE_LAM		0x0ff8
 #define ARBEL_HCR_UNMAP_ICM		0x0ff9
 #define ARBEL_HCR_MAP_ICM		0x0ffa
 #define ARBEL_HCR_UNMAP_ICM_AUX		0x0ffb
@@ -88,6 +90,7 @@ struct arbelprm_scalar_parameter_st {
  *
  */
 
+struct MLX_DECLARE_STRUCT ( arbelprm_access_lam );
 struct MLX_DECLARE_STRUCT ( arbelprm_completion_queue_context );
 struct MLX_DECLARE_STRUCT ( arbelprm_completion_queue_entry );
 struct MLX_DECLARE_STRUCT ( arbelprm_completion_with_error );

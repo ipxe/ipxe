@@ -134,12 +134,10 @@ static XHH_cmd_status_t cmd_invoke(command_fields_t * cmd_prms)
 	DBG_HD ( &hcr[0], sizeof ( hcr ) ); 
 	if ( cmd_prms->in_trans == TRANS_MAILBOX ) {
 		size_t size = ( 4 * cmd_prms->in_param_size );
-		if ( size > 256 )
-			size = 256;
-#if ! CREATE_OWN
-		DBG ( "Input mailbox:\n" );
-		DBG_HD ( &cmd_prms->in_param[0], size );
-#endif
+		if ( size > 512 )
+			size = 512;
+		DBG2 ( "Input mailbox:\n" );
+		DBG2_HD ( &cmd_prms->in_param[0], size );
 	}
 
 	for (i = 0; i < 7; ++i) {
@@ -172,6 +170,14 @@ static XHH_cmd_status_t cmd_invoke(command_fields_t * cmd_prms)
 		return status;
 	}
 
+	if ( cmd_prms->out_trans == TRANS_MAILBOX ) {
+		size_t size = ( 4 * cmd_prms->out_param_size );
+		if ( size > 512 )
+			size = 512;
+		DBG2 ( "Output mailbox:\n" );
+		DBG2_HD ( &cmd_prms->out_param[0], size );
+	}
+
 	if (cmd_prms->out_trans == TRANS_MAILBOX)
 		be_to_cpu_buf(cmd_prms->out_param, cmd_prms->out_param_size);
 	else if (cmd_prms->out_trans == TRANS_IMMEDIATE) {
@@ -181,15 +187,6 @@ static XHH_cmd_status_t cmd_invoke(command_fields_t * cmd_prms)
 			return -1;
 	}
 
-	if ( cmd_prms->out_trans == TRANS_MAILBOX ) {
-		size_t size = ( 4 * cmd_prms->out_param_size );
-		if ( size > 256 )
-			size = 256;
-#if ! CREATE_OWN
-		DBG ( "Output mailbox:\n" );
-		DBG_HD ( &cmd_prms->out_param[0], size );
-#endif
-	}
 	DBG ( "Command executed successfully\n" );
 
 	return 0;

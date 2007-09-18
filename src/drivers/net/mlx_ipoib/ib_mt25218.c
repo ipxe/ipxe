@@ -758,17 +758,20 @@ static int setup_hca(__u8 port, void **eq_p)
 	tmp = get_req_icm_pages(dev_lim.log2_rsvd_qps,
 				MAX_APP_QPS,
 				dev_lim.qpc_entry_sz, &log2_entries);
+	DBG ( "qpc_base_addr_l = %lx\n", icm_start );
 	init_hca.qpc_base_addr_l = icm_start;
 	init_hca.log_num_of_qp = log2_entries;
 	icm_start += (tmp << 12);
 	icm_size += (tmp << 12);
 
+	DBG ( "eqpc_base_addr_l = %lx\n", icm_start );
 	init_hca.eqpc_base_addr_l = icm_start;
 	icm_start += (tmp << 12);
 	icm_size += (tmp << 12);
 
 	tmp = get_req_icm_pages(dev_lim.log2_rsvd_srqs,
 				0, dev_lim.srq_entry_sz, &log2_entries);
+	DBG ( "srqc_base_addr_l = %lx\n", icm_start );
 	init_hca.srqc_base_addr_l = icm_start;
 	init_hca.log_num_of_srq = log2_entries;
 	icm_start += (tmp << 12);
@@ -776,15 +779,18 @@ static int setup_hca(__u8 port, void **eq_p)
 
 	tmp = get_req_icm_pages(dev_lim.log2_rsvd_ees,
 				0, dev_lim.eec_entry_sz, &log2_entries);
+	DBG ( "eec_base_addr_l = %lx\n", icm_start );
 	init_hca.eec_base_addr_l = icm_start;
 	init_hca.log_num_of_ee = log2_entries;
 	icm_start += (tmp << 12);
 	icm_size += (tmp << 12);
 
+	DBG ( "eeec_base_addr_l = %lx\n", icm_start );
 	init_hca.eeec_base_addr_l = icm_start;
 	icm_start += (tmp << 12);
 	icm_size += (tmp << 12);
 
+	DBG ( "cqc_base_addr_l = %lx\n", icm_start );
 	tmp = get_req_icm_pages(dev_lim.log2_rsvd_cqs,
 				MAX_APP_CQS,
 				dev_lim.cqc_entry_sz, &log2_entries);
@@ -795,12 +801,14 @@ static int setup_hca(__u8 port, void **eq_p)
 
 	tmp = get_req_icm_pages(dev_lim.log2_rsvd_mtts,
 				0, dev_lim.mtt_entry_sz, &log2_entries);
+	DBG ( "mtt_base_addr_l = %lx\n", icm_start );
 	init_hca.mtt_base_addr_l = icm_start;
 	icm_start += (tmp << 12);
 	icm_size += (tmp << 12);
 
 	tmp = get_req_icm_pages(dev_lim.log2_rsvd_mrws,
 				1, dev_lim.mpt_entry_sz, &log2_entries);
+	DBG ( "mpt_base_addr_l = %lx\n", icm_start );
 	init_hca.mpt_base_addr_l = icm_start;
 	init_hca.log_mpt_sz = log2_entries;
 	icm_start += (tmp << 12);
@@ -808,16 +816,19 @@ static int setup_hca(__u8 port, void **eq_p)
 
 	tmp = get_req_icm_pages(dev_lim.log2_rsvd_rdbs, 1, 32,	/* size of rdb entry */
 				&log2_entries);
+	DBG ( "rdb_base_addr_l = %lx\n", icm_start );
 	init_hca.rdb_base_addr_l = icm_start;
 	icm_start += (tmp << 12);
 	icm_size += (tmp << 12);
 
+	DBG ( "eqc_base_addr_l = %lx\n", icm_start );
 	init_hca.eqc_base_addr_l = icm_start;
 	init_hca.log_num_of_eq = LOG2_EQS;
 	tmp = dev_lim.eqc_entry_sz * (1 << LOG2_EQS);
 	icm_start += tmp;
 	icm_size += tmp;
 
+	DBG ( "mc_base_addr_l = %lx\n", icm_start );
 	init_hca.mc_base_addr_l = icm_start;
 	init_hca.log_mc_table_entry_sz =
 	    my_log2(MT_STRUCT_SIZE(arbelprm_mgm_entry_st));
@@ -827,6 +838,8 @@ static int setup_hca(__u8 port, void **eq_p)
 	    (MT_STRUCT_SIZE(arbelprm_mgm_entry_st) * init_hca.mc_table_hash_sz);
 	icm_start +=
 	    (MT_STRUCT_SIZE(arbelprm_mgm_entry_st) * init_hca.mc_table_hash_sz);
+
+	DBG ( "icm_size = %lx\n", icm_size );
 
 	rc = cmd_set_icm_size(icm_size, &aux_pages);
 	if (rc) {
