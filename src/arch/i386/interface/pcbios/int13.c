@@ -23,6 +23,7 @@
 #include <assert.h>
 #include <gpxe/list.h>
 #include <gpxe/blockdev.h>
+#include <gpxe/memmap.h>
 #include <realmode.h>
 #include <bios.h>
 #include <biosint.h>
@@ -601,6 +602,7 @@ void unregister_int13_drive ( struct int13_drive *drive ) {
  * Note that this function can never return success, by definition.
  */
 int int13_boot ( unsigned int drive ) {
+	struct memory_map memmap;
 	int status, signature;
 	int discard_c, discard_d;
 	int rc;
@@ -633,6 +635,13 @@ int int13_boot ( unsigned int drive ) {
 		      cpu_to_be16 ( signature ) );
 		return -ENOEXEC;
 	}
+
+	/* Dump out memory map prior to boot, if memmap debugging is
+	 * enabled.  Not required for program flow, but we have so
+	 * many problems that turn out to be memory-map related that
+	 * it's worth doing.
+	 */
+	get_memmap ( &memmap );
 
 	/* Jump to boot sector */
 	if ( ( rc = call_bootsector ( 0x0, 0x7c00, drive ) ) != 0 ) {
