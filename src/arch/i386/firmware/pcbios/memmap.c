@@ -74,16 +74,19 @@ static unsigned int extmemsize_e801 ( void ) {
 				 "=d" ( confmem_16m_plus_64k )
 			       : "a" ( 0xe801 ) );
 
-	if ( flags & CF )
+	if ( flags & CF ) {
+		DBG ( "INT 15,e801 failed with CF set\n" );
 		return 0;
+	}
 
 	if ( ! ( extmem_1m_to_16m_k | extmem_16m_plus_64k ) ) {
+		DBG ( "INT 15,e801 extmem=0, using confmem\n" );
 		extmem_1m_to_16m_k = confmem_1m_to_16m_k;
 		extmem_16m_plus_64k = confmem_16m_plus_64k;
 	}
 
 	extmem = ( extmem_1m_to_16m_k + ( extmem_16m_plus_64k * 64 ) );
-	DBG ( "Extended memory size %d+64*%d=%d kB\n",
+	DBG ( "INT 15,e801 extended memory size %d+64*%d=%d kB\n",
 	      extmem_1m_to_16m_k, extmem_16m_plus_64k, extmem );
 	return extmem;
 }
@@ -100,7 +103,7 @@ static unsigned int extmemsize_88 ( void ) {
 	__asm__ __volatile__ ( REAL_CODE ( "int $0x15" )
 			       : "=a" ( extmem ) : "a" ( 0x8800 ) );
 
-	DBG ( "Extended memory size %d kB\n", extmem );
+	DBG ( "INT 15,88 extended memory size %d kB\n", extmem );
 	return extmem;
 }
 
@@ -149,14 +152,19 @@ static int meme820 ( struct memory_map *memmap ) {
 					 "d" ( SMAP )
 				       : "memory" );
 
-		if ( smap != SMAP )
+		if ( smap != SMAP ) {
+			DBG ( "INT 15,e820 failed SMAP signature check\n" );
 			return -ENOTSUP;
+		}
 
-		if ( flags & CF )
+		if ( flags & CF ) {
+			DBG ( "INT 15,e820 terminated on CF set\n" );
 			break;
+		}
 
-		DBG ( "E820 region [%llx,%llx) type %d\n", e820buf.start,
-		      ( e820buf.start + e820buf.len ), ( int ) e820buf.type );
+		DBG ( "INT 15,e820 region [%llx,%llx) type %d\n",
+		      e820buf.start, ( e820buf.start + e820buf.len ),
+		      ( int ) e820buf.type );
 		if ( e820buf.type != E820_TYPE_RAM )
 			continue;
 
@@ -164,9 +172,18 @@ static int meme820 ( struct memory_map *memmap ) {
 		region->end = e820buf.start + e820buf.len;
 		region++;
 		memmap->count++;
-	} while ( ( next != 0 ) && 
-		  ( memmap->count < ( sizeof ( memmap->regions ) /
-				      sizeof ( memmap->regions[0] ) ) ) );
+
+		if ( memmap->count >= ( sizeof ( memmap->regions ) /
+					sizeof ( memmap->regions[0] ) ) ) {
+			DBG ( "INT 15,e820 too many regions returned\n" );
+			/* Not a fatal error; what we've got so far at
+			 * least represents valid regions of memory,
+			 * even if we couldn't get them all.
+			 */
+			break;
+		}
+	} while ( next != 0 );
+
 	return 0;
 }
 
@@ -179,18 +196,24 @@ void get_memmap ( struct memory_map *memmap ) {
 	unsigned int basemem, extmem;
 	int rc;
 
+	DBG ( "Fetching system memory map\n" );
+
 	/* Clear memory map */
 	memset ( memmap, 0, sizeof ( *memmap ) );
 
 	/* Get base and extended memory sizes */
 	basemem = basememsize();
+	DBG ( "FBMS base memory size %d kB\n", basemem );
 	extmem = extmemsize();
 	
 	/* Try INT 15,e820 first */
-	if ( ( rc = meme820 ( memmap ) ) == 0 )
+	if ( ( rc = meme820 ( memmap ) ) == 0 ) {
+		DBG ( "Obtained system memory map via INT 15,e820\n" );
 		return;
+	}
 
 	/* Fall back to constructing a map from basemem and extmem sizes */
+	DBG ( "INT 15,e820 failed; constructing map\n" );
 	memmap->regions[0].end = ( basemem * 1024 );
 	memmap->regions[1].start = 0x100000;
 	memmap->regions[1].end = 0x100000 + ( extmem * 1024 );
