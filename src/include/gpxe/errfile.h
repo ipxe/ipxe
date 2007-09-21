@@ -101,8 +101,10 @@
 #define ERRFILE_via_rhine	     ( ERRFILE_DRIVER | 0x00440000 )
 #define ERRFILE_via_velocity	     ( ERRFILE_DRIVER | 0x00450000 )
 #define ERRFILE_w89c840		     ( ERRFILE_DRIVER | 0x00460000 )
+#define ERRFILE_ipoib		     ( ERRFILE_DRIVER | 0x00470000 )
 
 #define ERRFILE_scsi		     ( ERRFILE_DRIVER | 0x00700000 )
+#define ERRFILE_arbel		     ( ERRFILE_DRIVER | 0x00710000 )
 
 #define ERRFILE_aoe			( ERRFILE_NET | 0x00000000 )
 #define ERRFILE_arp			( ERRFILE_NET | 0x00010000 )
@@ -123,6 +125,7 @@
 #define ERRFILE_dhcp			( ERRFILE_NET | 0x00100000 )
 #define ERRFILE_dns			( ERRFILE_NET | 0x00110000 )
 #define ERRFILE_tftp			( ERRFILE_NET | 0x00120000 )
+#define ERRFILE_infiniband		( ERRFILE_NET | 0x00130000 )
 
 #define ERRFILE_image		      ( ERRFILE_IMAGE | 0x00000000 )
 #define ERRFILE_elf		      ( ERRFILE_IMAGE | 0x00010000 )
