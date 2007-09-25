@@ -162,7 +162,7 @@ pm_call:
 	movl	%eax, %cr0
 
 	/* Restore registers and flags */
-	lret
+	lret	/* will ljmp to 99f */
 99:	popw	%ss
 	popw	%ds
 	popw	%es
@@ -298,16 +298,17 @@ alloc_basemem:
 /****************************************************************************
  * install_basemem (real-mode near call)
  *
- * Install .text16 and .data16 into base memory
+ * Install source block into base memory
  *
- * Parameters: 
- *   %ax : .text16 segment address
- *   %bx : .data16 segment address
+ * Parameters:
  *   %esi : source physical address (must be a multiple of 16)
+ *   %es : destination segment address
+ *   %cx : length of (decompressed) data
+ *   %dx : total length of block (including any uninitialised data portion)
  * Returns:
  *   %esi : next source physical address (will be a multiple of 16)
  * Corrupts:
- *   none
+ *   %edi, %ecx, %edx
  ****************************************************************************
  */
 	.section ".prefix.lib"
@@ -315,42 +316,24 @@ alloc_basemem:
 install_basemem:
 	/* Preserve registers */
 	pushw	%ds
-	pushw	%es
-	pushl	%edi
-	pushl	%ecx
-	pushl	%edx
 
-	/* Install .text16 */
+	/* Preserve original %esi */
 	pushl	%esi
+
+	/* Install to specified address */
 	shrl	$4, %esi
 	movw	%si, %ds
 	xorw	%si, %si
-	movw	%ax, %es
 	xorl	%edi, %edi
-	movl	$_text16_size, %ecx
-	movl	%ecx, %edx
+	movzwl	%cx, %ecx
+	movzwl	%dx, %edx
 	call	install_block
-	popl	%ecx
-	addl	%ecx, %esi
 
-	/* Install .data16 */
-	pushl	%esi
-	shrl	$4, %esi
-	movw	%si, %ds
-	xorw	%si, %si
-	movw	%bx, %es
-	xorl	%edi, %edi
-	movl	$_data16_progbits_size, %ecx
-	movl	$_data16_size, %edx
-	call	install_block
+	/* Fix up %esi for return */
 	popl	%ecx
 	addl	%ecx, %esi
 
 	/* Restore registers */
-	popl	%edx
-	popl	%ecx
-	popl	%edi
-	popw	%es
 	popw	%ds
 	ret
 	.size install_basemem, . - install_basemem
@@ -358,15 +341,17 @@ install_basemem:
 /****************************************************************************
  * install_highmem (real-mode near call)
  *
- * Install .text and .data into high memory
+ * Install source block into high memory
  *
  * Parameters:
  *   %esi : source physical address (must be a multiple of 16)
  *   %edi : destination physical address
+ *   %ecx : length of (decompressed) data
+ *   %edx : total length of block (including any uninitialised data portion)
  * Returns:
  *   %esi : next source physical address (will be a multiple of 16)
  * Corrupts:
- *   none
+ *   %edi, %ecx, %edx
  ****************************************************************************
  */
 
@@ -377,20 +362,12 @@ install_basemem:
 install_highmem:
 	/* Preserve registers */
 	pushw	%ax
-	pushl	%edi
-	pushl	%ecx
-	pushl	%edx
 
-	/* Install .text and .data to specified address */
-	movl	$_textdata_progbits_size, %ecx
-	movl	$_textdata_size, %edx
+	/* Install to specified address */
 	movw	$install_block, %ax
 	call	pm_call
 
 	/* Restore registers */
-	popl	%edx
-	popl	%ecx
-	popl	%edi
 	popw	%ax
 	ret
 	.size install_highmem, . - install_highmem
@@ -425,7 +402,10 @@ install:
 install_prealloc:
 	/* Save registers */
 	pushw	%ds
+	pushw	%es
 	pushl	%esi
+	pushl	%ecx
+	pushl	%edx
 
 	/* Sanity: clear the direction flag asap */
 	cld
@@ -436,7 +416,16 @@ install_prealloc:
 	shll	$4, %esi
 	addl	$_payload_offset, %esi
 
-	/* Install .text16 and .data16 */
+	/* Install .text16 */
+	movw	%ax, %es
+	movw	$_text16_size, %cx
+	movw	%cx, %dx
+	call	install_basemem
+
+	/* Install .data16 */
+	movw	%bx, %es
+	movw	$_data16_progbits_size, %cx
+	movw	$_data16_size, %dx
 	call	install_basemem
 
 	/* Set up %ds for access to .data16 */
@@ -447,16 +436,16 @@ install_prealloc:
 	movw	%ax, (init_libkir_vector+2)
 	lcall	*init_libkir_vector
 #else
-	/* Save registers */
-	pushl	%edi
-	pushl	%ecx
-
 	/* Install .text and .data to temporary area in high memory,
 	 * prior to reading the E820 memory map and relocating
 	 * properly.
 	 */
 	movl	$HIGHMEM_LOADPOINT, %edi
+	movl	$_textdata_progbits_size, %ecx
+	movl	$_textdata_size, %edx
+	pushl	%edi
 	call	install_highmem
+	popl	%edi
 
 	/* Initialise librm at current location */
 	movw	%ax, (init_librm_vector+2)
@@ -469,7 +458,7 @@ install_prealloc:
 	movw	%ax, (prot_call_vector+2)
 	pushl	$relocate
 	lcall	*prot_call_vector
-	addw	$4, %sp
+	popl	%edx /* discard */
 
 	/* Copy code to new location */
 	pushl	%edi
@@ -482,11 +471,12 @@ install_prealloc:
 	/* Initialise librm at new location */
 	lcall	*init_librm_vector
 
-	/* Restore registers */
-	popl	%ecx
-	popl	%edi
 #endif
+	/* Restore registers */
+	popl	%edx
+	popl	%ecx
 	popl	%esi
+	popw	%es
 	popw	%ds
 	ret
 	.size install_prealloc, . - install_prealloc
