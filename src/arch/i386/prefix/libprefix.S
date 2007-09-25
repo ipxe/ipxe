@@ -47,17 +47,181 @@
 	.section ".data16", "aw", @progbits
 
 /****************************************************************************
- * install_block (real-mode near call)
+ * pm_call (real-mode near call)
+ *
+ * Call routine in 16-bit protected mode for access to extended memory
+ *
+ * Parameters:
+ *   %ax : address of routine to call in 16-bit protected mode
+ * Returns:
+ *   none
+ * Corrupts:
+ *   %ax
+ *
+ * The specified routine is called in 16-bit protected mode, with:
+ *
+ *   %cs : 16-bit code segment with base matching real-mode %cs
+ *   %ss : 16-bit data segment with base matching real-mode %ss
+ *   %ds,%es,%fs,%gs : 32-bit data segment with zero base and 4GB limit
+ *
+ ****************************************************************************
+ */
+
+#ifndef KEEP_IT_REAL
+
+	/* GDT for protected-mode calls */
+	.section ".data16"
+	.align 16
+gdt:
+gdt_limit:		.word gdt_length - 1
+gdt_base:		.long 0
+			.word 0 /* padding */
+pm_cs:		/* 16-bit protected-mode code segment */
+	.equ    PM_CS, pm_cs - gdt
+	.word   0xffff, 0
+	.byte   0, 0x9b, 0x00, 0
+pm_ss:		/* 16-bit protected-mode stack segment */
+	.equ    PM_SS, pm_ss - gdt
+	.word   0xffff, 0
+	.byte   0, 0x93, 0x00, 0
+pm_ds:		/* 32-bit protected-mode flat data segment */
+	.equ    PM_DS, pm_ds - gdt
+	.word   0xffff, 0
+	.byte   0, 0x93, 0xcf, 0
+gdt_end:
+	.equ	gdt_length, . - gdt
+	.size	gdt, . - gdt
+
+	.section ".data16"
+	.align 16
+pm_saved_gdt:	
+	.long	0, 0
+	.size	pm_saved_gdt, . - pm_saved_gdt
+
+	.section ".prefix.lib"
+	.code16
+pm_call:
+	/* Preserve registers, flags, GDT, and RM return point */
+	pushfl
+	sgdt	pm_saved_gdt
+	pushw	%gs
+	pushw	%fs
+	pushw	%es
+	pushw	%ds
+	pushw	%ss
+	pushw	%cs
+	pushw	$99f
+
+	/* Set up GDT bases */
+	pushl	%eax
+	pushw	%bx
+	xorl	%eax, %eax
+	movw	%ds, %ax
+	shll	$4, %eax
+	addl	$gdt, %eax
+	movl	%eax, gdt_base
+	movw	%cs, %ax
+	movw	$pm_cs, %bx
+	call	set_seg_base
+	movw	%ss, %ax
+	movw	$pm_ss, %bx
+	call	set_seg_base
+	popw	%bx
+	popl	%eax
+
+	/* Switch CPU to protected mode and load up segment registers */
+	pushl	%eax
+	cli
+	lgdt	gdt
+	movl	%cr0, %eax
+	orb	$CR0_PE, %al
+	movl	%eax, %cr0
+	ljmp	$PM_CS, $1f
+1:	movw	$PM_SS, %ax
+	movw	%ax, %ss
+	movw	$PM_DS, %ax
+	movw	%ax, %ds
+	movw	%ax, %es
+	movw	%ax, %fs
+	movw	%ax, %gs
+	popl	%eax
+
+	/* Call PM routine */
+	call	*%ax
+
+	/* Set real-mode segment limits on %ds, %es, %fs and %gs */
+	movw	%ss, %ax
+	movw	%ax, %ds
+	movw	%ax, %es
+	movw	%ax, %fs
+	movw	%ax, %gs
+
+	/* Return CPU to real mode */
+	movl	%cr0, %eax
+	andb	$0!CR0_PE, %al
+	movl	%eax, %cr0
+
+	/* Restore registers and flags */
+	lret
+99:	popw	%ss
+	popw	%ds
+	popw	%es
+	popw	%fs
+	popw	%gs
+	lgdt	pm_saved_gdt
+	popfl
+
+	ret
+	.size pm_call, . - pm_call
+
+set_seg_base:
+	rolw	$4, %ax
+	movw	%ax, 2(%bx)
+	andw	$0xfff0, 2(%bx)
+	movb	%al, 4(%bx)
+	andb	$0x0f, 4(%bx)
+	ret
+	.size set_seg_base, . - set_seg_base
+
+#endif /* KEEP_IT_REAL */
+
+/****************************************************************************
+ * copy_bytes (real-mode or 16-bit protected-mode near call)
+ *
+ * Copy bytes
+ *
+ * Parameters:
+ *   %ds:esi : source address
+ *   %es:edi : destination address
+ *   %ecx : length
+ * Returns:
+ *   %ds:esi : next source address
+ *   %ds:esi : next destination address
+ * Corrupts:
+ *   None
+ ****************************************************************************
+ */
+	.section ".prefix.lib"
+	.code16
+copy_bytes:
+	pushl %ecx
+	rep addr32 movsb
+	popl %ecx
+	ret
+	.size copy_bytes, . - copy_bytes
+
+/****************************************************************************
+ * install_block (real-mode or 16-bit protected-mode near call)
  *
  * Install block to specified address
  *
  * Parameters:
- *   %esi : start offset within loaded image (must be a multiple of 16)
+ *   %ds:esi : source address (must be a multiple of 16)
  *   %es:edi : destination address
  *   %ecx : length of (decompressed) data
  *   %edx : total length of block (including any uninitialised data portion)
  * Returns:
- *   %esi : end offset within image (rounded up to next multiple of 16)
+ *   %ds:esi : next source address (will be a multiple of 16)
  * Corrupts:
  *   %edi, %ecx, %edx
  ****************************************************************************
@@ -65,46 +229,26 @@
 	.section ".prefix.lib"
 	.code16
 install_block:
-	/* Preserve registers */
-	pushw	%ds
-	pushl	%eax
-	pushl	%ebx
-	movl	%esi, %ebx
-	
-	/* Starting segment => %ds */
-	movw	%cs, %ax
-	shrl	$4, %esi
-	addw	%si, %ax
-	movw	%ax, %ds
-	xorl	%esi, %esi
-
-	/* Calculate start and length of uninitialised data portion */
-	addr32 leal	(%edi,%ecx), %eax
-	subl	%ecx, %edx
-	
-	/* Do the copy */
-	cld
 #if COMPRESS
+	/* Decompress source to destination */
 	call	decompress16
 #else
-	rep addr32 movsb
+	/* Copy source to destination */
+	call	copy_bytes
 #endif
 
-	/* Zero remaining space */
-	movl	%eax, %edi
-	movl	%edx, %ecx
-	xorb	%al, %al
+	/* Zero .bss portion */
+	negl	%ecx
+	addl	%edx, %ecx
+	pushw	%ax
+	xorw	%ax, %ax
 	rep addr32 stosb
+	popw	%ax
 
-	/* Adjust %esi */
-	addl	%ebx, %esi
+	/* Round up %esi to start of next source block */
 	addl	$0xf, %esi
 	andl	$~0xf, %esi
 
-	/* Restore registers */
-	popl	%ebx
-	popl	%eax
-	popw	%ds
 	ret
 	.size install_block, . - install_block
 	
@@ -159,9 +303,9 @@ alloc_basemem:
  * Parameters: 
  *   %ax : .text16 segment address
  *   %bx : .data16 segment address
- *   %esi : start offset within loaded image (must be a multiple of 16)
+ *   %esi : source physical address (must be a multiple of 16)
  * Returns:
- *   %esi : end offset within image (rounded up to next multiple of 16)
+ *   %esi : next source physical address (will be a multiple of 16)
  * Corrupts:
  *   none
  ****************************************************************************
@@ -170,43 +314,57 @@ alloc_basemem:
 	.code16
 install_basemem:
 	/* Preserve registers */
+	pushw	%ds
 	pushw	%es
 	pushl	%edi
 	pushl	%ecx
 	pushl	%edx
 
 	/* Install .text16 */
+	pushl	%esi
+	shrl	$4, %esi
+	movw	%si, %ds
+	xorw	%si, %si
 	movw	%ax, %es
 	xorl	%edi, %edi
 	movl	$_text16_size, %ecx
 	movl	%ecx, %edx
 	call	install_block
+	popl	%ecx
+	addl	%ecx, %esi
 
 	/* Install .data16 */
+	pushl	%esi
+	shrl	$4, %esi
+	movw	%si, %ds
+	xorw	%si, %si
 	movw	%bx, %es
-	xorl	%edi, %edi	
+	xorl	%edi, %edi
 	movl	$_data16_progbits_size, %ecx
 	movl	$_data16_size, %edx
 	call	install_block
+	popl	%ecx
+	addl	%ecx, %esi
 
 	/* Restore registers */
 	popl	%edx
 	popl	%ecx
 	popl	%edi
 	popw	%es
+	popw	%ds
 	ret
 	.size install_basemem, . - install_basemem
 
 /****************************************************************************
- * install_highmem (flat real-mode near call)
+ * install_highmem (real-mode near call)
  *
  * Install .text and .data into high memory
  *
  * Parameters:
- *   %esi : start offset within loaded image (must be a multiple of 16)
- *   %es:edi : address in high memory
+ *   %esi : source physical address (must be a multiple of 16)
+ *   %edi : destination physical address
  * Returns:
- *   %esi : end offset within image (rounded up to next multiple of 16)
+ *   %esi : next source physical address (will be a multiple of 16)
  * Corrupts:
  *   none
  ****************************************************************************
@@ -218,112 +376,24 @@ install_basemem:
 	.code16
 install_highmem:
 	/* Preserve registers */
+	pushw	%ax
 	pushl	%edi
 	pushl	%ecx
 	pushl	%edx
-		
+
 	/* Install .text and .data to specified address */
 	movl	$_textdata_progbits_size, %ecx
 	movl	$_textdata_size, %edx
-	call	install_block
+	movw	$install_block, %ax
+	call	pm_call
 
-	/* Restore registers and interrupt status */
+	/* Restore registers */
 	popl	%edx
 	popl	%ecx
 	popl	%edi
+	popw	%ax
 	ret
 	.size install_highmem, . - install_highmem
-	
-#endif /* KEEP_IT_REAL */
-	
-/****************************************************************************
- * GDT for flat real mode
- *
- * We only ever use this GDT to set segment limits; the bases are
- * unused.  Also, we only change data segments, so we don't need to
- * worry about the code or stack segments.  This makes everything much
- * simpler.
- ****************************************************************************
- */
-	
-#ifndef KEEP_IT_REAL
-	
-	.section ".prefix.lib"
-	.align 16
-gdt:
-gdt_limit:		.word gdt_length - 1
-gdt_base:		.long 0
-			.word 0 /* padding */
-
-flat_ds:	/* Flat real mode data segment */
-	.equ	FLAT_DS, flat_ds - gdt
-	.word	0xffff, 0
-	.byte	0, 0x93, 0xcf, 0
-
-real_ds:	/* Normal real mode data segment */
-	.equ	REAL_DS, real_ds - gdt
-	.word	0xffff, 0
-	.byte	0, 0x93, 0x00, 0
-
-gdt_end:
-	.equ	gdt_length, gdt_end - gdt
-	.size gdt, . - gdt
-	
-#endif /* KEEP_IT_REAL */
-
-/****************************************************************************
- * set_real_mode_limits (real-mode near call)
- *
- * Sets limits on the data segments %ds and %es.
- *
- * Parameters:
- *   %dx : segment type (FLAT_DS for 4GB or REAL_DS for 64kB)
- ****************************************************************************
- */
-
-#ifndef KEEP_IT_REAL
-	
-	.section ".prefix.lib"
-	.code16
-set_real_mode_limits:
-	/* Preserve real-mode segment values and temporary registers */
-	pushw	%es
-	pushw	%ds
-	pushw	%bp
-	pushl	%eax
-
-	/* Set GDT base and load GDT */
-	xorl	%eax, %eax
-	movw	%cs, %ax
-	shll	$4, %eax
-	addl	$gdt, %eax
-	pushl	%eax
-	pushw	%cs:gdt_limit
-	movw	%sp, %bp
-	lgdt	(%bp)
-	addw	$6, %sp
-
-	/* Switch to protected mode */
-	movl	%cr0, %eax
-	orb	$CR0_PE, %al
-	movl	%eax, %cr0
-
-	/* Set flat segment limits */
-	movw	%dx, %ds
-	movw	%dx, %es
-
-	/* Switch back to real mode */
-	movl	%cr0, %eax
-	andb	$0!CR0_PE, %al
-	movl	%eax, %cr0
-
-	/* Restore real-mode segment values and temporary registers */
-	popl	%eax
-	popw	%bp
-	popw	%ds
-	popw	%es
-	ret
-	.size set_real_mode_limits, . - set_real_mode_limits
 	
 #endif /* KEEP_IT_REAL */
 	
@@ -354,72 +424,70 @@ install:
 	.globl install_prealloc
 install_prealloc:
 	/* Save registers */
+	pushw	%ds
 	pushl	%esi
-	pushw	%dx
+
+	/* Sanity: clear the direction flag asap */
+	cld
+
+	/* Calculate physical address of payload (i.e. first source) */
+	xorl	%esi, %esi
+	movw	%cs, %si
+	shll	$4, %esi
+	addl	$_payload_offset, %esi
+
 	/* Install .text16 and .data16 */
-	movl	$_payload_offset, %esi
 	call	install_basemem
 
-#ifdef KEEP_IT_REAL
-	/* Preserve %ds, call init_libkir, restore registers */
-	pushw	%ds
+	/* Set up %ds for access to .data16 */
 	movw	%bx, %ds
+
+#ifdef KEEP_IT_REAL
+	/* Initialise libkir */
 	movw	%ax, (init_libkir_vector+2)
 	lcall	*init_libkir_vector
-	popw	%ds
 #else
-	/* Preserve registers and interrupt status, and disable interrupts */
-	pushfw
-	pushw	%ds
-	pushw	%es
+	/* Save registers */
+	pushl	%edi
 	pushl	%ecx
-	cli
 
-	/* Load up %ds and %es, and set up vectors for far calls to .text16 */
-	movw	%bx, %ds
-	xorw	%cx, %cx
-	movw	%cx, %es
-	movw	%ax, (init_librm_vector+2)
-	movw	%ax, (prot_call_vector+2)
-	
 	/* Install .text and .data to temporary area in high memory,
 	 * prior to reading the E820 memory map and relocating
 	 * properly.
 	 */
-	movw	$FLAT_DS, %dx
-	call	set_real_mode_limits
 	movl	$HIGHMEM_LOADPOINT, %edi
 	call	install_highmem
 
-	/* Set up initial protected-mode GDT, call relocate().
+	/* Initialise librm at current location */
+	movw	%ax, (init_librm_vector+2)
+	lcall	*init_librm_vector
+
+	/* Call relocate() to determine target address for relocation.
 	 * relocate() will return with %esi, %edi and %ecx set up
 	 * ready for the copy to the new location.
 	 */
-	lcall	*init_librm_vector
+	movw	%ax, (prot_call_vector+2)
 	pushl	$relocate
 	lcall	*prot_call_vector
 	addw	$4, %sp
 
-	/* Move code to new location, set up new protected-mode GDT */
-	movw	$FLAT_DS, %dx
-	call	set_real_mode_limits
+	/* Copy code to new location */
 	pushl	%edi
-	es rep addr32 movsb
+	pushw	%ax
+	movw	$copy_bytes, %ax
+	call	pm_call
+	popw	%ax
 	popl	%edi
+
+	/* Initialise librm at new location */
 	lcall	*init_librm_vector
 
-	/* Restore real-mode segment limits */
-	movw	$REAL_DS, %dx
-	call	set_real_mode_limits
-
-	/* Restore registers and interrupt status */
+	/* Restore registers */
 	popl	%ecx
-	popw	%es
-	popw	%ds
-	popfw
+	popl	%edi
 #endif
-	popw	%dx
 	popl	%esi
+	popw	%ds
 	ret
 	.size install_prealloc, . - install_prealloc
 
