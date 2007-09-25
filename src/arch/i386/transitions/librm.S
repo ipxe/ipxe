@@ -215,9 +215,9 @@ real_to_prot:
 	movl	pm_esp, %esp
 
 	/* Record real-mode %ss:sp (after removal of data) */
-	movl	%ebp, rm_ss
+	movw	%bp, rm_ss
 	addl	%ecx, %edx
-	movl	%edx, rm_sp
+	movw	%dx, rm_sp
 
 	/* Move data from RM stack to PM stack */
 	subl	%ecx, %esp
@@ -258,8 +258,8 @@ prot_to_real:
 	addl	$4, %ecx
 	
 	/* Real-mode %ss:sp => %ebp:edx and virtual address => %edi */
-	movl	rm_ss, %ebp
-	movl	rm_sp, %edx
+	movzwl	rm_ss, %ebp
+	movzwl	rm_sp, %edx
 	subl	%ecx, %edx
 	movl	%ebp, %eax
 	shll	$4, %eax
@@ -413,7 +413,7 @@ prot_call:
 	popal
 	/* popal skips %esp.  We therefore want to do "movl -20(%sp),
 	 * %esp", but -20(%sp) is not a valid 80386 expression.
-	 * Fortunately, pot_to_real() zeroes the high word of %esp, so
+	 * Fortunately, prot_to_real() zeroes the high word of %esp, so
 	 * we can just use -20(%esp) instead.
 	 */
 	addr32 movl -20(%esp), %esp
@@ -531,8 +531,8 @@ rc_function:	.word 0, 0
  ****************************************************************************
  */
 	.section ".data"
-rm_sp:	.long 0
-rm_ss:	.long 0
+rm_sp:	.word 0
+rm_ss:	.word 0
 pm_esp:	.long _estack
 
 /****************************************************************************
