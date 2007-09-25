@@ -186,9 +186,14 @@ real_to_prot:
 	pushl	_data16
 	addw	$16, %cx /* %ecx must be less than 64kB anyway */
 	
-	/* Real-mode %ss:%sp => %bp:%esi */
+	/* Real-mode %ss:%sp => %ebp:%edx and virtual address => %esi */
+	xorl	%ebp, %ebp
 	movw	%ss, %bp
-	movzwl	%sp, %esi
+	movzwl	%sp, %edx
+	movl	%ebp, %eax
+	shll	$4, %eax
+	leal	(%eax,%edx), %esi
+	subl	_virt_offset, %esi
 
 	/* Switch to protected mode */
 	cli
@@ -200,23 +205,24 @@ real_to_prot:
 	.section ".text"
 	.code32
 1:
-	/* Set up protected-mode data segments */
+	/* Set up protected-mode data segments and stack pointer */
 	movw	$VIRTUAL_DS, %ax
 	movw	%ax, %ds
 	movw	%ax, %es
 	movw	%ax, %fs
 	movw	%ax, %gs
-
-	/* Move data from RM stack to PM stack and set up PM stack */
-	movl	pm_esp, %esp
-	subl	%ecx, %esp
-	movl	%esp, %edi
-	rep ss movsb
 	movw	%ax, %ss
+	movl	pm_esp, %esp
 
 	/* Record real-mode %ss:sp (after removal of data) */
-	movw	%bp, rm_ss
-	movw	%si, rm_sp
+	movl	%ebp, rm_ss
+	addl	%ecx, %edx
+	movl	%edx, rm_sp
+
+	/* Move data from RM stack to PM stack */
+	subl	%ecx, %esp
+	movl	%esp, %edi
+	rep movsb
 
 	/* Publish virt_offset, text16 and data16 for PM code to use */
 	popl	data16
@@ -251,16 +257,16 @@ prot_to_real:
 	/* Add return address to data to be moved to RM stack */
 	addl	$4, %ecx
 	
-	/* Real-mode %ss:sp => %ebp:edx */
-	movzwl	rm_ss, %ebp
-	movzwl	rm_sp, %edx
+	/* Real-mode %ss:sp => %ebp:edx and virtual address => %edi */
+	movl	rm_ss, %ebp
+	movl	rm_sp, %edx
 	subl	%ecx, %edx
-	
-	/* Move data from PM stack to RM stack */
 	movl	%ebp, %eax
 	shll	$4, %eax
 	leal	(%eax,%edx), %edi
 	subl	virt_offset, %edi
+	
+	/* Move data from PM stack to RM stack */
 	movl	%esp, %esi
 	rep movsb
 	
@@ -285,16 +291,14 @@ prot_to_real:
 	ljmp	*p2r_jump_vector
 p2r_jump_target:
 
-	/* Set up real-mode stack */
-	movw	%bp, %ss
-	movl	%edx, %esp
-	
-	/* Set up real-mode data segments */
+	/* Set up real-mode data segments and stack pointer */
 	movw	%cs:rm_ds, %ax
 	movw	%ax, %ds
 	movw	%ax, %es
 	movw	%ax, %fs
 	movw	%ax, %gs
+	movw	%bp, %ss
+	movl	%edx, %esp
 
 	/* Return to real-mode address */
 	data32 ret
@@ -398,9 +402,7 @@ prot_call:
 	.section ".text16"
 	.code16
 1:	
-	/* Reload GDT, restore registers and flags and return.  Note
-	 * that %esp is restored manually, since popal discards it.
-	 */
+	/* Reload GDT, restore registers and flags and return */
 	movw	%sp, %bp
 	lgdt	(%bp)
 	addw	$12, %sp /* also skip %cs and %ss */
@@ -409,11 +411,12 @@ prot_call:
 	popw	%fs
 	popw	%gs
 	popal
-	addr32 movl -20(%esp), %esp /* -20(%sp) is not a valid 80386
-				     * expression.  -20(%esp) is safe
-				     * because prot_to_real zeroes the
-				     * high word of %esp, and interrupts
-				     * are still disabled at this point. */
+	/* popal skips %esp.  We therefore want to do "movl -20(%sp),
+	 * %esp", but -20(%sp) is not a valid 80386 expression.
+	 * Fortunately, pot_to_real() zeroes the high word of %esp, so
+	 * we can just use -20(%esp) instead.
+	 */
+	addr32 movl -20(%esp), %esp
 	popfl
 	lret
 
@@ -528,8 +531,8 @@ rc_function:	.word 0, 0
  ****************************************************************************
  */
 	.section ".data"
-rm_sp:	.word 0
-rm_ss:	.word 0
+rm_sp:	.long 0
+rm_ss:	.long 0
 pm_esp:	.long _estack
 
 /****************************************************************************
