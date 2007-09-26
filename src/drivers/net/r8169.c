@@ -48,6 +48,7 @@
 #include "nic.h"
 #include <gpxe/pci.h>
 #include <gpxe/ethernet.h>
+#include <gpxe/malloc.h>
 #include "timer.h"
 
 #define drv_version "v1.6"
@@ -335,11 +336,11 @@ struct {
 	unsigned char txb[NUM_TX_DESC * RX_BUF_SIZE];
 	struct RxDesc rx_ring[NUM_RX_DESC] __align_256;
 	unsigned char rxb[NUM_RX_DESC * RX_BUF_SIZE];
-} r8169_bufs __shared;
-#define tx_ring r8169_bufs.tx_ring
-#define rx_ring r8169_bufs.rx_ring
-#define txb r8169_bufs.txb
-#define rxb r8169_bufs.rxb
+} *r8169_bufs;
+#define tx_ring r8169_bufs->tx_ring
+#define rx_ring r8169_bufs->rx_ring
+#define txb r8169_bufs->txb
+#define rxb r8169_bufs->rxb
 
 static struct rtl8169_private {
 	void *mmio_addr;	/* memory map physical address */
@@ -880,6 +881,15 @@ static int r8169_probe ( struct nic *nic, struct pci_device *pci ) {
 	board_idx++;
 
 	printed_version = 1;
+
+	/* Quick and very dirty hack to get r8169 driver working
+	 * again, pre-rewrite
+	 */
+	if ( ! r8169_bufs )
+		r8169_bufs = malloc_dma ( sizeof ( *r8169_bufs ), 256 );
+	if ( ! r8169_bufs )
+		return 0;
+	memset ( r8169_bufs, 0, sizeof ( *r8169_bufs ) );
 
 	/* point to private storage */
 	tpc = &tpx;
