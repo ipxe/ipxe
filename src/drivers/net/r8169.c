@@ -73,25 +73,6 @@ static u32 ioaddr;
 #define RTL8169_USE_IO
 
 
-#ifdef RTL8169_DEBUG
-
-#if 0
-#define assert(expr) \
-               if(!(expr)) { printk( "Assertion failed! %s,%s,%s,line=%d\n", #expr,__FILE__,__FUNCTION__,__LINE__); }
-#endif
-
-#define DBG_PRINTF( fmt, args...)   printk("r8169: " fmt, ## args);
-
-#else
-
-#if 0
-#define assert(expr) do {} while (0)
-#endif
-
-#define DBG_PRINTF( fmt, args...)   ;
-
-#endif				// end of #ifdef RTL8169_DEBUG
-
 /* media options 
         _10_Half = 0x01,
         _10_Full = 0x02,
@@ -759,11 +740,11 @@ static void rtl8169_hw_start(struct nic *nic)
 	if (tpc->mcfg == MCFG_METHOD_2 || tpc->mcfg == MCFG_METHOD_3) {
 		RTL_W16(CPlusCmd,
 			(RTL_R16(CPlusCmd) | (1 << 14) | (1 << 3)));
-		DBG_PRINTF
+		DBG
 		    ("Set MAC Reg C+CR Offset 0xE0: bit-3 and bit-14\n");
 	} else {
 		RTL_W16(CPlusCmd, (RTL_R16(CPlusCmd) | (1 << 3)));
-		DBG_PRINTF("Set MAC Reg C+CR Offset 0xE0: bit-3.\n");
+		DBG("Set MAC Reg C+CR Offset 0xE0: bit-3.\n");
 	}
 
 	{
@@ -919,18 +900,18 @@ static int r8169_probe ( struct nic *nic, struct pci_device *pci ) {
 	/* Config PHY */
 	rtl8169_hw_PHY_config(nic);
 
-	DBG_PRINTF("Set MAC Reg C+CR Offset 0x82h = 0x01h\n");
+	DBG("Set MAC Reg C+CR Offset 0x82h = 0x01h\n");
 	RTL_W8(0x82, 0x01);
 
 	if (tpc->mcfg < MCFG_METHOD_3) {
-		DBG_PRINTF("Set PCI Latency=0x40\n");
+		DBG("Set PCI Latency=0x40\n");
 		pci_write_config_byte(pci, PCI_LATENCY_TIMER, 0x40);
 	}
 
 	if (tpc->mcfg == MCFG_METHOD_2) {
-		DBG_PRINTF("Set MAC Reg C+CR Offset 0x82h = 0x01h\n");
+		DBG("Set MAC Reg C+CR Offset 0x82h = 0x01h\n");
 		RTL_W8(0x82, 0x01);
-		DBG_PRINTF("Set PHY Reg 0x0bh = 0x00h\n");
+		DBG("Set PHY Reg 0x0bh = 0x00h\n");
 		RTL8169_WRITE_GMII_REG(ioaddr, 0x0b, 0x0000);	//w 0x0b 15 0 0
 	}
 
@@ -1049,7 +1030,7 @@ static void rtl8169_hw_PHY_reset(struct nic *nic __unused)
         struct rtl8169_private *priv = dev->priv;
         unsigned long ioaddr = priv->ioaddr;
 
-        DBG_PRINTF("%s: Reset RTL8169s PHY\n", dev->name);
+        DBG("%s: Reset RTL8169s PHY\n", dev->name);
 
         val = ( RTL8169_READ_GMII_REG( ioaddr, 0 ) | 0x8000 ) & 0xffff;
         RTL8169_WRITE_GMII_REG( ioaddr, 0, val );
@@ -1074,7 +1055,7 @@ static void rtl8169_hw_PHY_reset(struct nic *nic __unused)
 static void rtl8169_hw_PHY_config(struct nic *nic __unused)
 {
 
-	DBG_PRINTF("priv->mcfg=%d, priv->pcfg=%d\n", tpc->mcfg, tpc->pcfg);
+	DBG("priv->mcfg=%d, priv->pcfg=%d\n", tpc->mcfg, tpc->pcfg);
 
 	if (tpc->mcfg == MCFG_METHOD_4) {
 /*
@@ -1175,7 +1156,7 @@ static void rtl8169_hw_PHY_config(struct nic *nic __unused)
 		RTL8169_WRITE_GMII_REG((unsigned long) ioaddr, 0x0B,
 				       0x0000);
 	} else {
-		DBG_PRINTF("tpc->mcfg=%d. Discard hw PHY config.\n",
+		DBG("tpc->mcfg=%d. Discard hw PHY config.\n",
 			  tpc->mcfg);
 	}
 }
