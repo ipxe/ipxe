@@ -141,6 +141,7 @@ static int bzimage_parse_cmdline ( struct image *image,
 			       "terminator '%c'\n", image, *mem );
 			break;
 		}
+		exec_ctx->mem_limit -= 1;
 	}
 
 	return 0;
@@ -266,7 +267,7 @@ static int bzimage_load_initrds ( struct image *image,
 			return -ENOBUFS;
 		}
 		/* Check that we are within the kernel's range */
-		if ( ( address + total_len ) > exec_ctx->mem_limit )
+		if ( ( address + total_len - 1 ) > exec_ctx->mem_limit )
 			continue;
 		/* Prepare and verify segment */
 		if ( ( rc = prep_segment ( phys_to_user ( address ), 0,
@@ -315,9 +316,9 @@ static int bzimage_exec ( struct image *image ) {
 		( bzhdr.heap_end_ptr + 0x200 );
 	exec_ctx.vid_mode = bzhdr.vid_mode;
 	if ( bzhdr.version >= 0x0203 ) {
-		exec_ctx.mem_limit = ( bzhdr.initrd_addr_max + 1 );
+		exec_ctx.mem_limit = bzhdr.initrd_addr_max;
 	} else {
-		exec_ctx.mem_limit = ( BZI_INITRD_MAX + 1 );
+		exec_ctx.mem_limit = BZI_INITRD_MAX;
 	}
 
 	/* Parse command line for bootloader parameters */
