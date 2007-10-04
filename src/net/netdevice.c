@@ -424,6 +424,14 @@ struct net_device * find_netdev_by_location ( unsigned int bus_type,
  */
 int net_tx ( struct io_buffer *iobuf, struct net_device *netdev,
 	     struct net_protocol *net_protocol, const void *ll_dest ) {
+
+	/* Force a poll on the netdevice to (potentially) clear any
+	 * backed-up TX completions.  This is needed on some network
+	 * devices to avoid excessive losses due to small TX ring
+	 * sizes.
+	 */
+	netdev_poll ( netdev );
+
 	return netdev->ll_protocol->tx ( iobuf, netdev, net_protocol, ll_dest );
 }
 
