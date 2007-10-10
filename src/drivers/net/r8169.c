@@ -858,6 +858,7 @@ static struct pci_device_id r8169_nics[] = {
 	PCI_ROM(0x10ec, 0x8169, "r8169", "RealTek RTL8169 Gigabit Ethernet"),
         PCI_ROM(0x16ec, 0x0116, "usr-r8169", "US Robotics RTL8169 Gigabit Ethernet"),
         PCI_ROM(0x1186, 0x4300, "dlink-r8169", "D-Link RTL8169 Gigabit Ethernet"),
+	PCI_ROM(0x1737, 0x1032, "linksys-r8169", "Linksys RTL8169 Gigabit Ethernet"),
 };
 
 PCI_DRIVER ( r8169_driver, r8169_nics, PCI_NO_CLASS );
