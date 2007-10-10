@@ -361,26 +361,33 @@ int15_e820:
 	pushl	%edx	
 	call	split_e820
 	pushfw
-	/* Skip empty region checking if we've reached the end of the
-	 * map or hit an error, to avoid a potential endless loop.
-	 */
-	jc	1f
-	testl	%ebx, %ebx
-	jz	1f
-	/* Check for an empty region */
+	/* If we've hit an error, exit immediately */
+	jc	99f
+	/* If region is non-empty, return this region */
 	pushl	%eax
 	movl	%es:8(%di), %eax
 	orl	%es:12(%di), %eax
 	popl	%eax
-	jnz	1f
-	/* Strip empty regions out of the returned map */
+	jnz	99f
+	/* Region is empty.  If this is not the end of the map,
+	 * skip over this region.
+	 */
+	testl	%ebx, %ebx
+	jz	1f
 	popfw
 	popl	%edx
 	popl	%ecx
 	popl	%eax
 	jmp	int15_e820
-	/* Restore flags from original INT 15,e820 call and return */
-1:	popfw
+1:	/* Region is empty and this is the end of the map.  Return
+	 * with CF set to avoid placing an empty region at the end of
+	 * the map.
+	 */
+	popfw
+	stc
+	pushfw
+99:	/* Restore flags from original INT 15,e820 call and return */
+	popfw
 	addr32 leal	12(%esp), %esp /* avoid changing flags */
 	lret	$2
 	.size int15_e820, . - int15_e820
