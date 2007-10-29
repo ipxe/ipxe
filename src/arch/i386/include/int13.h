@@ -114,7 +114,7 @@ struct int13_disk_address {
 	uint64_t lba;
 	/** Data buffer (EDD-3.0 only) */
 	uint64_t buffer_phys;
-};
+} __attribute__ (( packed ));
 
 /** INT 13 disk parameters */
 struct int13_disk_parameters {
@@ -133,7 +133,7 @@ struct int13_disk_parameters {
 	/** Bytes per sector */
 	uint16_t sector_size;
 	
-};
+} __attribute__ (( packed ));
 
 /**
  * @defgroup int13types INT 13 disk types
