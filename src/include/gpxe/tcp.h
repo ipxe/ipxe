@@ -275,7 +275,8 @@ struct tcp_options {
  * actually use 65536, we use a window size of (65536-4) to ensure
  * that payloads remain dword-aligned.
  */
-#define TCP_MAX_WINDOW_SIZE	( 65536 - 4 )
+//#define TCP_MAX_WINDOW_SIZE	( 65536 - 4 )
+#define TCP_MAX_WINDOW_SIZE	4096
 
 /**
  * Path MTU
