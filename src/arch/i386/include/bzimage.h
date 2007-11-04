@@ -117,6 +117,8 @@ struct bzimage_cmdline {
 /** bzImage command line present magic marker value */
 #define BZI_CMDLINE_MAGIC 0xa33f
 
+/** Assumed size of real-mode portion (including .bss) */
+#define BZI_ASSUMED_RM_SIZE 0x8000
 
 /** Amount of stack space to provide */
 #define BZI_STACK_SIZE 0x1000

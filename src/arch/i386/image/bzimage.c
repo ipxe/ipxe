@@ -343,6 +343,11 @@ static int bzimage_exec ( struct image *image ) {
 	/* Prepare for exiting */
 	shutdown();
 
+	DBGC ( image, "bzImage %p jumping to RM kernel at %04x:0000 "
+	       "(stack %04x:%04x)\n", image,
+	       ( exec_ctx.rm_kernel_seg + 0x20 ),
+	       exec_ctx.rm_kernel_seg, exec_ctx.rm_heap );
+
 	/* Jump to the kernel */
 	__asm__ __volatile__ ( REAL_CODE ( "movw %w0, %%ds\n\t"
 					   "movw %w0, %%es\n\t"
@@ -403,8 +408,9 @@ static int bzimage_load_header ( struct image *image,
 	/* Calculate load address and size of real-mode portion */
 	load_ctx->rm_kernel_seg = 0x1000; /* place RM kernel at 1000:0000 */
 	load_ctx->rm_kernel = real_to_user ( load_ctx->rm_kernel_seg, 0 );
-	load_ctx->rm_filesz = load_ctx->rm_memsz =
+	load_ctx->rm_filesz =
 		( ( bzhdr->setup_sects ? bzhdr->setup_sects : 4 ) + 1 ) << 9;
+	load_ctx->rm_memsz = BZI_ASSUMED_RM_SIZE;
 	if ( load_ctx->rm_filesz > image->len ) {
 		DBGC ( image, "bzImage %p too short for %zd byte of setup\n",
 		       image, load_ctx->rm_filesz );
