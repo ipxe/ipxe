@@ -421,8 +421,8 @@ static int iscsi_tx_data_out ( struct iscsi_session *iscsi ) {
  *     MaxConnections is irrelevant; we make only one connection anyway
  *     InitialR2T=Yes [1]
  *     ImmediateData is irrelevant; we never send immediate data
- *     MaxRecvDataSegmentLength=8192 (default; we don't care)
- *     MaxBurstLength=262144 (default; we don't care)
+ *     MaxRecvDataSegmentLength=8192 (default; we don't care) [3]
+ *     MaxBurstLength=262144 (default; we don't care) [3]
  *     FirstBurstLength=262144 (default; we don't care)
  *     DefaultTime2Wait=0 [2]
  *     DefaultTime2Retain=0 [2]
@@ -438,6 +438,11 @@ static int iscsi_tx_data_out ( struct iscsi_session *iscsi ) {
  * [2] These ensure that we can safely start a new task once we have
  * reconnected after a failure, without having to manually tidy up
  * after the old one.
+ *
+ * [3] We are quite happy to use the RFC-defined default values for
+ * these parameters, but some targets (notably OpenSolaris)
+ * incorrectly assume a default value of zero, so we explicitly
+ * specify the default values.
  */
 static int iscsi_build_login_request_strings ( struct iscsi_session *iscsi,
 					       void *data, size_t len ) {
@@ -475,13 +480,15 @@ static int iscsi_build_login_request_strings ( struct iscsi_session *iscsi,
 				    "HeaderDigest=None%c"
 				    "DataDigest=None%c"
 				    "InitialR2T=Yes%c"
+				    "MaxRecvDataSegmentLength=8192%c"
+				    "MaxBurstLength=262144%c"
 				    "DefaultTime2Wait=0%c"
 				    "DefaultTime2Retain=0%c"
 				    "MaxOutstandingR2T=1%c"
 				    "DataPDUInOrder=Yes%c"
 				    "DataSequenceInOrder=Yes%c"
 				    "ErrorRecoveryLevel=0%c",
-				    0, 0, 0, 0, 0, 0, 0, 0, 0 );
+				    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 );
 	}
 
 	return used;
