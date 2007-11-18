@@ -182,8 +182,6 @@ enum MIntrCtrl_bits {
   MICRIntEn               = 0x2,
 };
 
-static uint32_t SavedClkRun;	
-
 /* CFG bits [13:16] [18:23] */
 #define CFG_RESET_SAVE 0xfde000
 /* WCSR bits [0:4] [9:10] */
