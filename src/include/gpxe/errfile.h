@@ -85,7 +85,6 @@
 #define ERRFILE_davicom		     ( ERRFILE_DRIVER | 0x00340000 )
 #define ERRFILE_depca		     ( ERRFILE_DRIVER | 0x00350000 )
 #define ERRFILE_dmfe		     ( ERRFILE_DRIVER | 0x00360000 )
-#define ERRFILE_e1000		     ( ERRFILE_DRIVER | 0x00370000 )
 #define ERRFILE_eepro100	     ( ERRFILE_DRIVER | 0x00380000 )
 #define ERRFILE_epic100		     ( ERRFILE_DRIVER | 0x00390000 )
 #define ERRFILE_forcedeth	     ( ERRFILE_DRIVER | 0x003a0000 )
@@ -102,7 +101,7 @@
 #define ERRFILE_via_velocity	     ( ERRFILE_DRIVER | 0x00450000 )
 #define ERRFILE_w89c840		     ( ERRFILE_DRIVER | 0x00460000 )
 #define ERRFILE_ipoib		     ( ERRFILE_DRIVER | 0x00470000 )
-#define ERRFILE_e1000_main	     ( ERRFILE_DRIVER | 0x00480000 )
+#define ERRFILE_e1000		     ( ERRFILE_DRIVER | 0x00480000 )
 #define ERRFILE_e1000_hw	     ( ERRFILE_DRIVER | 0x00490000 )
 
 #define ERRFILE_scsi		     ( ERRFILE_DRIVER | 0x00700000 )
