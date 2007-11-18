@@ -154,6 +154,7 @@ SRCDIRS		+= drivers/ata
 SRCDIRS		+= drivers/nvs
 SRCDIRS		+= drivers/bitbash
 SRCDIRS		+= drivers/infiniband
+SRCDIRS		+= drivers/e1000
 SRCDIRS		+= interface/pxe
 SRCDIRS		+= tests
 SRCDIRS		+= crypto crypto/axtls crypto/matrixssl
