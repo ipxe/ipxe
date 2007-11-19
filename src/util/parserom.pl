@@ -32,8 +32,8 @@ sub rom {
   print "DRIVER_$image = $driver_name\n";
   print "ROM_TYPE_$image = $type\n";
   print "ROM_DESCRIPTION_$image = \"$desc\"\n";
-  print "PCI_VENDOR_$image = $vendor\n" if $vendor;
-  print "PCI_DEVICE_$image = $device\n" if $device;
+  print "PCI_VENDOR_$image = 0x$vendor\n" if $vendor;
+  print "PCI_DEVICE_$image = 0x$device\n" if $device;
   print "ROMS += $image\n";
   print "ROMS_$driver_name += $image\n";
 }
@@ -42,13 +42,14 @@ while ( <DRV> ) {
   next unless /(PCI|ISA)_ROM\s*\(/;
 
   if ( /^\s*PCI_ROM\s*\(
-         \s*(0x[0-9A-Fa-f]{4})\s*, # PCI vendor
-         \s*(0x[0-9A-Fa-f]{4})\s*, # PCI device
+         \s*0x([0-9A-Fa-f]{4})\s*, # PCI vendor
+         \s*0x([0-9A-Fa-f]{4})\s*, # PCI device
          \s*\"([^\"]*)\"\s*,	   # Image
          \s*\"([^\"]*)\"\s*	   # Description
        \)/x ) {
     ( my $vendor, my $device, my $image, my $desc ) = ( lc $1, lc $2, $3, $4 );
     rom ( "pci", $image, $desc, $vendor, $device );
+    rom ( "pci", lc "pci_${vendor}_${device}", $desc, $vendor, $device );
   } elsif ( /^\s*ISA_ROM\s*\(
 	      \s*\"([^\"]*)\"\s*,  # Image
 	      \s*\"([^\"]*)\"\s*   # Description
