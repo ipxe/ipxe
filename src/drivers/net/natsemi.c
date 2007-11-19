@@ -332,8 +332,7 @@ static int natsemi_open (struct net_device *netdev)
          * With PME set the chip will scan incoming packets but
          * nothing will be written to memory. 
          */
-        SavedClkRun = inl (np->ioaddr + ClkRun);
-        outl (SavedClkRun & ~0x100, np->ioaddr + ClkRun);
+        outl (inl (np->ioaddr + ClkRun) & ~0x100, np->ioaddr + ClkRun);
 
 	/* Set MAC address in NIC
 	 */
