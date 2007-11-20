@@ -82,7 +82,7 @@ mfgstr:
 	.asciz	"http://etherboot.org"
 	.size mfgstr, . - mfgstr
 prodstr:
-	.asciz	"Etherboot"
+	.asciz	"gPXE"
 	.size prodstr, . - prodstr
 	
 undiheader:
@@ -131,10 +131,10 @@ notpnp:
 	.size init_vector, . - init_vector
 
 ispnp_message:
-	.asciz	"Etherboot detected PnP BIOS\r\n"
+	.asciz	"gPXE detected PnP BIOS\r\n"
 	.size ispnp_message, . - ispnp_message
 notpnp_message:
-	.asciz	"Etherboot detected non-PnP BIOS\r\n"
+	.asciz	"gPXE detected non-PnP BIOS\r\n"
 	.size notpnp_message, . - notpnp_message
 
 /* Boot execution vector
@@ -173,7 +173,7 @@ exec_vector:
 	.previous
 
 exec_message:
-	.asciz	"Etherboot starting boot\r\n"
+	.asciz	"gPXE starting boot\r\n"
 	.size exec_message, . - exec_message
 
 /* UNDI loader
