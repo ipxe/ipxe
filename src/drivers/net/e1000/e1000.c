@@ -28,71 +28,6 @@
 
 #include "e1000.h"
 
-static struct pci_device_id e1000_nics[] = {
-	PCI_ROM(0x8086, 0x1000, "e1000-0x1000", "E1000-0x1000"),
-	PCI_ROM(0x8086, 0x1001, "e1000-0x1001", "E1000-0x1001"),
-	PCI_ROM(0x8086, 0x1004, "e1000-0x1004", "E1000-0x1004"),
-	PCI_ROM(0x8086, 0x1008, "e1000-0x1008", "E1000-0x1008"),
-	PCI_ROM(0x8086, 0x1009, "e1000-0x1009", "E1000-0x1009"),
-	PCI_ROM(0x8086, 0x100C, "e1000-0x100C", "E1000-0x100C"),
-	PCI_ROM(0x8086, 0x100D, "e1000-0x100D", "E1000-0x100D"),
-	PCI_ROM(0x8086, 0x100E, "e1000-0x100E", "E1000-0x100E"),
-	PCI_ROM(0x8086, 0x100F, "e1000-0x100F", "E1000-0x100F"),
-	PCI_ROM(0x8086, 0x1010, "e1000-0x1010", "E1000-0x1010"),
-	PCI_ROM(0x8086, 0x1011, "e1000-0x1011", "E1000-0x1011"),
-	PCI_ROM(0x8086, 0x1012, "e1000-0x1012", "E1000-0x1012"),
-	PCI_ROM(0x8086, 0x1013, "e1000-0x1013", "E1000-0x1013"),
-	PCI_ROM(0x8086, 0x1014, "e1000-0x1014", "E1000-0x1014"),
-	PCI_ROM(0x8086, 0x1015, "e1000-0x1015", "E1000-0x1015"),
-	PCI_ROM(0x8086, 0x1016, "e1000-0x1016", "E1000-0x1016"),
-	PCI_ROM(0x8086, 0x1017, "e1000-0x1017", "E1000-0x1017"),
-	PCI_ROM(0x8086, 0x1018, "e1000-0x1018", "E1000-0x1018"),
-	PCI_ROM(0x8086, 0x1019, "e1000-0x1019", "E1000-0x1019"),
-	PCI_ROM(0x8086, 0x101A, "e1000-0x101A", "E1000-0x101A"),
-	PCI_ROM(0x8086, 0x101D, "e1000-0x101D", "E1000-0x101D"),
-	PCI_ROM(0x8086, 0x101E, "e1000-0x101E", "E1000-0x101E"),
-	PCI_ROM(0x8086, 0x1026, "e1000-0x1026", "E1000-0x1026"),
-	PCI_ROM(0x8086, 0x1027, "e1000-0x1027", "E1000-0x1027"),
-	PCI_ROM(0x8086, 0x1028, "e1000-0x1028", "E1000-0x1028"),
-	PCI_ROM(0x8086, 0x1049, "e1000-0x1049", "E1000-0x1049"),
-	PCI_ROM(0x8086, 0x104A, "e1000-0x104A", "E1000-0x104A"),
-	PCI_ROM(0x8086, 0x104B, "e1000-0x104B", "E1000-0x104B"),
-	PCI_ROM(0x8086, 0x104C, "e1000-0x104C", "E1000-0x104C"),
-	PCI_ROM(0x8086, 0x104D, "e1000-0x104D", "E1000-0x104D"),
-	PCI_ROM(0x8086, 0x105E, "e1000-0x105E", "E1000-0x105E"),
-	PCI_ROM(0x8086, 0x105F, "e1000-0x105F", "E1000-0x105F"),
-	PCI_ROM(0x8086, 0x1060, "e1000-0x1060", "E1000-0x1060"),
-	PCI_ROM(0x8086, 0x1075, "e1000-0x1075", "E1000-0x1075"),
-	PCI_ROM(0x8086, 0x1076, "e1000-0x1076", "E1000-0x1076"),
-	PCI_ROM(0x8086, 0x1077, "e1000-0x1077", "E1000-0x1077"),
-	PCI_ROM(0x8086, 0x1078, "e1000-0x1078", "E1000-0x1078"),
-	PCI_ROM(0x8086, 0x1079, "e1000-0x1079", "E1000-0x1079"),
-	PCI_ROM(0x8086, 0x107A, "e1000-0x107A", "E1000-0x107A"),
-	PCI_ROM(0x8086, 0x107B, "e1000-0x107B", "E1000-0x107B"),
-	PCI_ROM(0x8086, 0x107C, "e1000-0x107C", "E1000-0x107C"),
-	PCI_ROM(0x8086, 0x107D, "e1000-0x107D", "E1000-0x107D"),
-	PCI_ROM(0x8086, 0x107E, "e1000-0x107E", "E1000-0x107E"),
-	PCI_ROM(0x8086, 0x107F, "e1000-0x107F", "E1000-0x107F"),
-	PCI_ROM(0x8086, 0x108A, "e1000-0x108A", "E1000-0x108A"),
-	PCI_ROM(0x8086, 0x108B, "e1000-0x108B", "E1000-0x108B"),
-	PCI_ROM(0x8086, 0x108C, "e1000-0x108C", "E1000-0x108C"),
-	PCI_ROM(0x8086, 0x1096, "e1000-0x1096", "E1000-0x1096"),
-	PCI_ROM(0x8086, 0x1098, "e1000-0x1098", "E1000-0x1098"),
-	PCI_ROM(0x8086, 0x1099, "e1000-0x1099", "E1000-0x1099"),
-	PCI_ROM(0x8086, 0x109A, "e1000-0x109A", "E1000-0x109A"),
-	PCI_ROM(0x8086, 0x10A4, "e1000-0x10A4", "E1000-0x10A4"),
-	PCI_ROM(0x8086, 0x10A5, "e1000-0x10A5", "E1000-0x10A5"),
-	PCI_ROM(0x8086, 0x10B5, "e1000-0x10B5", "E1000-0x10B5"),
-	PCI_ROM(0x8086, 0x10B9, "e1000-0x10B9", "E1000-0x10B9"),
-	PCI_ROM(0x8086, 0x10BA, "e1000-0x10BA", "E1000-0x10BA"),
-	PCI_ROM(0x8086, 0x10BB, "e1000-0x10BB", "E1000-0x10BB"),
-	PCI_ROM(0x8086, 0x10BC, "e1000-0x10BC", "E1000-0x10BC"),
-	PCI_ROM(0x8086, 0x10C4, "e1000-0x10C4", "E1000-0x10C4"),
-	PCI_ROM(0x8086, 0x10C5, "e1000-0x10C5", "E1000-0x10C5"),
-	PCI_ROM(0x8086, 0x10D9, "e1000-0x10D9", "E1000-0x10D9"),
-	PCI_ROM(0x8086, 0x10DA, "e1000-0x10DA", "E1000-0x10DA"),
-};
-
 /**
  * e1000_get_hw_control - get control of the h/w from f/w
  * @adapter: address of board private structure
@@ -131,84 +66,6 @@ e1000_get_hw_control(struct e1000_adapter *adapter)
 	}
 }
 
-#if 0
-/**
- * e1000_power_up_phy - restore link in case the phy was powered down
- * @adapter: address of board private structure
- *
- * The phy may be powered down to save power and turn off link when the
- * driver is unloaded and wake on lan is not enabled (among others)
- * *** this routine MUST be followed by a call to e1000_reset ***
- *
- **/
-static void
-e1000_power_up_phy ( struct e1000_adapter *adapter )
-{
-	DBG ( "e1000_power_up_phy\n" );
-
-	uint16_t mii_reg = 0;
-
-	/* Just clear the power down bit to wake the phy back up */
-	if (adapter->hw.media_type == e1000_media_type_copper) {
-		/* according to the manual, the phy will retain its
-		 * settings across a power-down/up cycle */
-		e1000_read_phy_reg(&adapter->hw, PHY_CTRL, &mii_reg);
-		mii_reg &= ~MII_CR_POWER_DOWN;
-		e1000_write_phy_reg(&adapter->hw, PHY_CTRL, mii_reg);
-	}
-}
-
-static void
-e1000_power_down_phy ( struct e1000_adapter *adapter )
-{
-	DBG ( "e1000_power_down_phy\n" );
-	
-	/* Power down the PHY so no link is implied when interface is down *
-	 * The PHY cannot be powered down if any of the following is TRUE *
-	 * (a) WoL is enabled
-	 * (b) AMT is active
-	 * (c) SoL/IDER session is active */
-	if (!adapter->wol && adapter->hw.mac_type >= e1000_82540 &&
-	   adapter->hw.media_type == e1000_media_type_copper) {
-		uint16_t mii_reg = 0;
-
-		switch (adapter->hw.mac_type) {
-		case e1000_82540:
-		case e1000_82545:
-		case e1000_82545_rev_3:
-		case e1000_82546:
-		case e1000_82546_rev_3:
-		case e1000_82541:
-		case e1000_82541_rev_2:
-		case e1000_82547:
-		case e1000_82547_rev_2:
-			if (E1000_READ_REG(&adapter->hw, MANC) &
-			    E1000_MANC_SMBUS_EN)
-				goto out;
-			break;
-		case e1000_82571:
-		case e1000_82572:
-		case e1000_82573:
-		case e1000_80003es2lan:
-		case e1000_ich8lan:
-			if (e1000_check_mng_mode(&adapter->hw) ||
-			    e1000_check_phy_reset_block(&adapter->hw))
-				goto out;
-			break;
-		default:
-			goto out;
-		}
-		e1000_read_phy_reg(&adapter->hw, PHY_CTRL, &mii_reg);
-		mii_reg |= MII_CR_POWER_DOWN;
-		e1000_write_phy_reg(&adapter->hw, PHY_CTRL, mii_reg);
-		mdelay(1);
-	}
-out:
-	return;
-}
-
-#endif
-
 /**
  * e1000_irq_enable - Enable default interrupt generation settings
  * @adapter: board private structure
@@ -216,8 +73,8 @@ out:
 static void
 e1000_irq_enable ( struct e1000_adapter *adapter )
 {
-	E1000_WRITE_REG ( &adapter->hw, IMS, E1000_IMS_RXT0 |
-			  E1000_IMS_RXSEQ );
+	E1000_WRITE_REG ( &adapter->hw, IMS, E1000_IMS_RXDMT0 |
+			                     E1000_IMS_RXSEQ );
 	E1000_WRITE_FLUSH ( &adapter->hw );
 }
 
@@ -239,7 +96,7 @@ e1000_irq_disable ( struct e1000_adapter *adapter )
 static void
 e1000_irq_force ( struct e1000_adapter *adapter )
 {
-	E1000_WRITE_REG ( &adapter->hw, ICS, E1000_ICS_RXT0 );
+	E1000_WRITE_REG ( &adapter->hw, ICS, E1000_ICS_RXDMT0 );
 	E1000_WRITE_FLUSH ( &adapter->hw );
 }
 
@@ -292,9 +149,7 @@ e1000_sw_init ( struct e1000_adapter *adapter )
 	case e1000_82547:
 	case e1000_82541_rev_2:
 	case e1000_82547_rev_2:
-#if 0
 		hw->phy_init_script = 1;
-#endif
 		break;
 	}
 
@@ -344,19 +199,15 @@ e1000_setup_tx_resources ( struct e1000_adapter *adapter )
 	 */
 
         adapter->tx_base = 
-        	malloc_dma ( sizeof ( *adapter->tx_base ) * NUM_TX_DESC,
-        		     sizeof ( *adapter->tx_base ) * NUM_TX_DESC );
+        	malloc_dma ( adapter->tx_ring_size, adapter->tx_ring_size );
         		             		     
        	if ( ! adapter->tx_base ) {
        		return -ENOMEM;
 	}
 	
-	memset ( adapter->tx_base, 0, sizeof ( *adapter->tx_base ) * NUM_TX_DESC );
+	memset ( adapter->tx_base, 0, adapter->tx_ring_size );
 	
 	DBG ( "adapter->tx_base = %#08lx\n", virt_to_bus ( adapter->tx_base ) );
-
-  	DBG ( "sizeof ( *adapter->tx_base ) == %d bytes\n", 
-  	       sizeof ( *adapter->tx_base ) );
 
 	return 0;
 }
@@ -366,8 +217,7 @@ e1000_free_tx_resources ( struct e1000_adapter *adapter )
 {
 	DBG ( "e1000_free_tx_resources\n" );
 
-        free_dma ( adapter->tx_base, 
-                   sizeof ( *adapter->tx_base ) * NUM_TX_DESC );
+        free_dma ( adapter->tx_base, adapter->tx_ring_size );
 }
 
 /**
@@ -391,10 +241,10 @@ e1000_configure_tx ( struct e1000_adapter *adapter )
 
 	E1000_WRITE_REG ( hw, TDBAH, 0 );
 	E1000_WRITE_REG ( hw, TDBAL, virt_to_bus ( adapter->tx_base ) );
-	E1000_WRITE_REG ( hw, TDLEN, sizeof ( *adapter->tx_base ) * NUM_TX_DESC );
+	E1000_WRITE_REG ( hw, TDLEN, adapter->tx_ring_size );
 			  
-        DBG ( "TDBAL: %#08lx\n", virt_to_bus ( adapter->tx_base ) );
-        DBG ( "TDLEN: %d\n", sizeof ( *adapter->tx_base ) * NUM_TX_DESC );
+        DBG ( "TDBAL: %#08lx\n",  E1000_READ_REG ( hw, TDBAL ) );
+        DBG ( "TDLEN: %ld\n",     E1000_READ_REG ( hw, TDLEN ) );
 
 	/* Setup the HW Tx Head and Tail descriptor pointers */
 	E1000_WRITE_REG ( hw, TDH, 0 );
@@ -441,7 +291,7 @@ e1000_configure_tx ( struct e1000_adapter *adapter )
 
 	/* Program the Transmit Control Register */
 
-	tctl = E1000_READ_REG(hw, TCTL);
+	tctl = E1000_READ_REG ( hw, TCTL );
 	tctl &= ~E1000_TCTL_CT;
 	tctl |= E1000_TCTL_PSP | E1000_TCTL_RTLC |
 		(E1000_COLLISION_THRESHOLD << E1000_CT_SHIFT);
@@ -511,13 +361,12 @@ e1000_setup_rx_resources ( struct e1000_adapter *adapter )
 	 */
 
         adapter->rx_base = 
-        	malloc_dma ( sizeof ( *adapter->rx_base ) * NUM_RX_DESC,
-        		     sizeof ( *adapter->rx_base ) * NUM_RX_DESC );
+        	malloc_dma ( adapter->rx_ring_size, adapter->rx_ring_size );
         		     
        	if ( ! adapter->rx_base ) {
        		return -ENOMEM;
 	}
-	memset ( adapter->rx_base, 0, sizeof ( *adapter->rx_base ) * NUM_RX_DESC );
+	memset ( adapter->rx_base, 0, adapter->rx_ring_size );
 
 	for ( i = 0; i < NUM_RX_DESC; i++ ) {
 	
@@ -551,8 +400,7 @@ e1000_free_rx_resources ( struct e1000_adapter *adapter )
 	
 	DBG ( "e1000_free_rx_resources\n" );
 
-        free_dma ( adapter->rx_base, 
-                   sizeof ( *adapter->rx_base ) * NUM_RX_DESC );
+        free_dma ( adapter->rx_base, adapter->rx_ring_size );
 
 	for ( i = 0; i < NUM_RX_DESC; i++ ) {
 		free_iob ( adapter->rx_iobuf[i] );
@@ -571,56 +419,35 @@ e1000_configure_rx ( struct e1000_adapter *adapter )
 	struct e1000_hw *hw = &adapter->hw;
 	uint32_t rctl;
 
-#if 0
-	uint32_t ctrl_ext;
-#endif
-
 	DBG ( "e1000_configure_rx\n" );
 
 	/* disable receives while setting up the descriptors */
 	rctl = E1000_READ_REG ( hw, RCTL );
 	E1000_WRITE_REG ( hw, RCTL, rctl & ~E1000_RCTL_EN );
 
-	/* set the Receive Delay Timer Register */
-	E1000_WRITE_REG ( hw, RDTR, adapter->rx_int_delay );
-	E1000_WRITE_REG ( hw, RADV, adapter->rx_abs_int_delay );
-
-#if 0
-	if (hw->mac_type >= e1000_82540) {
-		E1000_WRITE_REG(hw, RADV, adapter->rx_abs_int_delay);
-		if (adapter->itr_setting != 0)
-			E1000_WRITE_REG(hw, ITR,
-				1000000000 / (adapter->itr * 256));
-	}
-
-	if (hw->mac_type >= e1000_82571) {
-		ctrl_ext = E1000_READ_REG(hw, CTRL_EXT);
-		/* Reset delay timers after every interrupt */
-		ctrl_ext |= E1000_CTRL_EXT_INT_TIMER_CLR;
-		E1000_WRITE_REG(hw, CTRL_EXT, ctrl_ext);
-		E1000_WRITE_FLUSH(hw);
-	}
-#endif
+	adapter->rx_tail = 0;
 
 	/* Setup the HW Rx Head and Tail Descriptor Pointers and
 	 * the Base and Length of the Rx Descriptor Ring */	 
 
-	adapter->rx_tail = 0;
-
-	E1000_WRITE_REG ( hw, RDBAH, 0 );
 	E1000_WRITE_REG ( hw, RDBAL, virt_to_bus ( adapter->rx_base ) );
-	E1000_WRITE_REG ( hw, RDLEN, sizeof ( *adapter->rx_base ) *
-			  NUM_RX_DESC );
+	E1000_WRITE_REG ( hw, RDBAH, 0 );
+	E1000_WRITE_REG ( hw, RDLEN, adapter->rx_ring_size );
 
-	E1000_WRITE_REG ( hw, RDH, 0);
-	E1000_WRITE_REG ( hw, RDT, 0);
+	E1000_WRITE_REG ( hw, RDH, 0 );
+	E1000_WRITE_REG ( hw, RDT, NUM_TX_DESC );
 	
-	E1000_WRITE_REG ( hw, RCTL,  E1000_RCTL_EN | E1000_RCTL_BAM | 
-		  	  E1000_RCTL_SZ_2048 | E1000_RCTL_MPE);
+	/* Enable Receives */
+	rctl = ( E1000_RCTL_EN | E1000_RCTL_BAM | E1000_RCTL_SZ_2048 |
+		 E1000_RCTL_MPE 
+		);
+
+	E1000_WRITE_REG ( hw, RCTL, rctl );
 	E1000_WRITE_FLUSH ( hw );
 
-	/* Enable Receives */
-	E1000_WRITE_REG ( hw, RCTL, rctl );
+        DBG ( "RDBAL: %#08lx\n",  E1000_READ_REG ( hw, RDBAL ) );
+        DBG ( "RDLEN: %ld\n",     E1000_READ_REG ( hw, RDLEN ) );
+        DBG ( "RCTL:  %#08lx\n",  E1000_READ_REG ( hw, RCTL ) );
 }
 
 /**
@@ -744,9 +571,19 @@ static void
 e1000_close ( struct net_device *netdev )
 {
 	struct e1000_adapter *adapter = netdev_priv ( netdev );
+	uint32_t rctl;
+	uint32_t icr;
 
 	DBG ( "e1000_close\n" );
 	
+	/* disable receives */
+	rctl = E1000_READ_REG ( &adapter->hw, RCTL );
+	E1000_WRITE_REG ( &adapter->hw, RCTL, rctl & ~E1000_RCTL_EN );
+	E1000_WRITE_FLUSH ( &adapter->hw );
+
+	/* Acknowledge interrupts */
+	icr = E1000_READ_REG ( &adapter->hw, ICR );
+
 	e1000_irq_disable ( adapter );
 
 	e1000_reset_hw ( &adapter->hw );
@@ -846,7 +683,7 @@ e1000_poll ( struct net_device *netdev )
 	DBG ( "e1000_poll\n" );
 #endif
 
-	/* Acknowledge interrupt. */
+	/* Acknowledge interrupts */
 	icr = E1000_READ_REG ( hw, ICR );
 	if ( ! icr )
 		return;
@@ -867,7 +704,7 @@ e1000_poll ( struct net_device *netdev )
 		      virt_to_bus ( tx_curr_desc ), tx_status );
 #endif
 
-		/* if the packet at tx_head is not owned by hardware */
+		/* if the packet at tx_head is not owned by hardware it is for us */
 		if ( ! ( tx_status & E1000_TXD_STAT_DD ) )
 			break;
 		
@@ -895,9 +732,9 @@ e1000_poll ( struct net_device *netdev )
 	
 	/* Process received packets 
 	 */
-	while ( TRUE ) {
+	while ( 1 ) {
 	
-		i = adapter->rx_tail;
+		i = adapter->rx_tail;;
 		
 		rx_curr_desc = ( void * )  ( adapter->rx_base ) + 
 			          ( i * sizeof ( *adapter->rx_base ) ); 
@@ -943,9 +780,9 @@ e1000_poll ( struct net_device *netdev )
 
 		rx_curr_desc->buffer_addr = virt_to_bus ( adapter->rx_iobuf[adapter->rx_tail]->data );
 
-		adapter->rx_tail = ( adapter->rx_tail + 1 ) % NUM_RX_DESC;
-
 		E1000_WRITE_REG ( hw, RDT, adapter->rx_tail );
+
+		adapter->rx_tail = ( adapter->rx_tail + 1 ) % NUM_RX_DESC;
 	}
 }				
 
@@ -1023,6 +860,9 @@ e1000_probe ( struct pci_device *pdev,
 	adapter->netdev     = netdev;
 	adapter->pdev       = pdev;
 	adapter->hw.back    = adapter;
+
+	adapter->tx_ring_size = sizeof ( *adapter->tx_base ) * NUM_TX_DESC;
+	adapter->rx_ring_size = sizeof ( *adapter->rx_base ) * NUM_RX_DESC;
 
 	mmio_start = pci_bar_start ( pdev, PCI_BASE_ADDRESS_0 );
 	mmio_len   = pci_bar_size  ( pdev, PCI_BASE_ADDRESS_0 );
@@ -1149,8 +989,9 @@ e1000_remove ( struct pci_device *pdev )
 	
 	DBG ( "e1000_remove\n" );
 
-	e1000_reset_hw ( &adapter->hw );
 	unregister_netdev ( netdev );
+	e1000_reset_hw ( &adapter->hw );
+	netdev_nullify ( netdev );
 	netdev_put ( netdev );
 }
 
@@ -1187,6 +1028,8 @@ e1000_open ( struct net_device *netdev )
 
 	e1000_configure_rx ( adapter );
 	
+        DBG ( "RXDCTL: %#08lx\n",  E1000_READ_REG ( &adapter->hw, RXDCTL ) );
+
 	e1000_irq_enable ( adapter );
 
 	return 0;
@@ -1198,13 +1041,6 @@ err_setup_tx:
 
 	return err;
 }
-
-struct pci_driver e1000_driver __pci_driver = {
-	.ids = e1000_nics,
-	.id_count = (sizeof (e1000_nics) / sizeof (e1000_nics[0])),
-	.probe = e1000_probe,
-	.remove = e1000_remove,
-};
 
 /** e1000 net device operations */
 static struct net_device_operations e1000_operations = {
@@ -1232,29 +1068,36 @@ e1000_read_pcie_cap_reg(struct e1000_hw *hw, uint32_t reg, uint16_t *value)
 }
 
 void
-e1000_pci_clear_mwi ( struct e1000_hw *hw __unused )
-{
-}
-
-void
-e1000_pci_set_mwi ( struct e1000_hw *hw __unused )
-{
-}
-
-void
-e1000_read_pci_cfg(struct e1000_hw *hw, uint32_t reg, uint16_t *value)
+e1000_pci_clear_mwi ( struct e1000_hw *hw )
 {
 	struct e1000_adapter *adapter = hw->back;
 
-	pci_read_config_word(adapter->pdev, reg, value);
+	pci_write_config_word ( adapter->pdev, PCI_COMMAND,
+			        hw->pci_cmd_word & ~PCI_COMMAND_INVALIDATE );
 }
 
 void
-e1000_write_pci_cfg(struct e1000_hw *hw, uint32_t reg, uint16_t *value)
+e1000_pci_set_mwi ( struct e1000_hw *hw )
 {
 	struct e1000_adapter *adapter = hw->back;
 
-	pci_write_config_word(adapter->pdev, reg, *value);
+	pci_write_config_word ( adapter->pdev, PCI_COMMAND, hw->pci_cmd_word );
+}
+
+void
+e1000_read_pci_cfg ( struct e1000_hw *hw, uint32_t reg, uint16_t *value )
+{
+	struct e1000_adapter *adapter = hw->back;
+
+	pci_read_config_word ( adapter->pdev, reg, value );
+}
+
+void
+e1000_write_pci_cfg ( struct e1000_hw *hw, uint32_t reg, uint16_t *value )
+{
+	struct e1000_adapter *adapter = hw->back;
+
+	pci_write_config_word ( adapter->pdev, reg, *value );
 }
 
 void
@@ -1262,6 +1105,78 @@ e1000_io_write ( struct e1000_hw *hw  __unused, unsigned long port, uint32_t val
 {
 	outl ( value, port );
 }
+
+static struct pci_device_id e1000_nics[] = {
+	PCI_ROM(0x8086, 0x1000, "e1000-0x1000", "E1000-0x1000"),
+	PCI_ROM(0x8086, 0x1001, "e1000-0x1001", "E1000-0x1001"),
+	PCI_ROM(0x8086, 0x1004, "e1000-0x1004", "E1000-0x1004"),
+	PCI_ROM(0x8086, 0x1008, "e1000-0x1008", "E1000-0x1008"),
+	PCI_ROM(0x8086, 0x1009, "e1000-0x1009", "E1000-0x1009"),
+	PCI_ROM(0x8086, 0x100C, "e1000-0x100C", "E1000-0x100C"),
+	PCI_ROM(0x8086, 0x100D, "e1000-0x100D", "E1000-0x100D"),
+	PCI_ROM(0x8086, 0x100E, "e1000-0x100E", "E1000-0x100E"),
+	PCI_ROM(0x8086, 0x100F, "e1000-0x100F", "E1000-0x100F"),
+	PCI_ROM(0x8086, 0x1010, "e1000-0x1010", "E1000-0x1010"),
+	PCI_ROM(0x8086, 0x1011, "e1000-0x1011", "E1000-0x1011"),
+	PCI_ROM(0x8086, 0x1012, "e1000-0x1012", "E1000-0x1012"),
+	PCI_ROM(0x8086, 0x1013, "e1000-0x1013", "E1000-0x1013"),
+	PCI_ROM(0x8086, 0x1014, "e1000-0x1014", "E1000-0x1014"),
+	PCI_ROM(0x8086, 0x1015, "e1000-0x1015", "E1000-0x1015"),
+	PCI_ROM(0x8086, 0x1016, "e1000-0x1016", "E1000-0x1016"),
+	PCI_ROM(0x8086, 0x1017, "e1000-0x1017", "E1000-0x1017"),
+	PCI_ROM(0x8086, 0x1018, "e1000-0x1018", "E1000-0x1018"),
+	PCI_ROM(0x8086, 0x1019, "e1000-0x1019", "E1000-0x1019"),
+	PCI_ROM(0x8086, 0x101A, "e1000-0x101A", "E1000-0x101A"),
+	PCI_ROM(0x8086, 0x101D, "e1000-0x101D", "E1000-0x101D"),
+	PCI_ROM(0x8086, 0x101E, "e1000-0x101E", "E1000-0x101E"),
+	PCI_ROM(0x8086, 0x1026, "e1000-0x1026", "E1000-0x1026"),
+	PCI_ROM(0x8086, 0x1027, "e1000-0x1027", "E1000-0x1027"),
+	PCI_ROM(0x8086, 0x1028, "e1000-0x1028", "E1000-0x1028"),
+	PCI_ROM(0x8086, 0x1049, "e1000-0x1049", "E1000-0x1049"),
+	PCI_ROM(0x8086, 0x104A, "e1000-0x104A", "E1000-0x104A"),
+	PCI_ROM(0x8086, 0x104B, "e1000-0x104B", "E1000-0x104B"),
+	PCI_ROM(0x8086, 0x104C, "e1000-0x104C", "E1000-0x104C"),
+	PCI_ROM(0x8086, 0x104D, "e1000-0x104D", "E1000-0x104D"),
+	PCI_ROM(0x8086, 0x105E, "e1000-0x105E", "E1000-0x105E"),
+	PCI_ROM(0x8086, 0x105F, "e1000-0x105F", "E1000-0x105F"),
+	PCI_ROM(0x8086, 0x1060, "e1000-0x1060", "E1000-0x1060"),
+	PCI_ROM(0x8086, 0x1075, "e1000-0x1075", "E1000-0x1075"),
+	PCI_ROM(0x8086, 0x1076, "e1000-0x1076", "E1000-0x1076"),
+	PCI_ROM(0x8086, 0x1077, "e1000-0x1077", "E1000-0x1077"),
+	PCI_ROM(0x8086, 0x1078, "e1000-0x1078", "E1000-0x1078"),
+	PCI_ROM(0x8086, 0x1079, "e1000-0x1079", "E1000-0x1079"),
+	PCI_ROM(0x8086, 0x107A, "e1000-0x107A", "E1000-0x107A"),
+	PCI_ROM(0x8086, 0x107B, "e1000-0x107B", "E1000-0x107B"),
+	PCI_ROM(0x8086, 0x107C, "e1000-0x107C", "E1000-0x107C"),
+	PCI_ROM(0x8086, 0x107D, "e1000-0x107D", "E1000-0x107D"),
+	PCI_ROM(0x8086, 0x107E, "e1000-0x107E", "E1000-0x107E"),
+	PCI_ROM(0x8086, 0x107F, "e1000-0x107F", "E1000-0x107F"),
+	PCI_ROM(0x8086, 0x108A, "e1000-0x108A", "E1000-0x108A"),
+	PCI_ROM(0x8086, 0x108B, "e1000-0x108B", "E1000-0x108B"),
+	PCI_ROM(0x8086, 0x108C, "e1000-0x108C", "E1000-0x108C"),
+	PCI_ROM(0x8086, 0x1096, "e1000-0x1096", "E1000-0x1096"),
+	PCI_ROM(0x8086, 0x1098, "e1000-0x1098", "E1000-0x1098"),
+	PCI_ROM(0x8086, 0x1099, "e1000-0x1099", "E1000-0x1099"),
+	PCI_ROM(0x8086, 0x109A, "e1000-0x109A", "E1000-0x109A"),
+	PCI_ROM(0x8086, 0x10A4, "e1000-0x10A4", "E1000-0x10A4"),
+	PCI_ROM(0x8086, 0x10A5, "e1000-0x10A5", "E1000-0x10A5"),
+	PCI_ROM(0x8086, 0x10B5, "e1000-0x10B5", "E1000-0x10B5"),
+	PCI_ROM(0x8086, 0x10B9, "e1000-0x10B9", "E1000-0x10B9"),
+	PCI_ROM(0x8086, 0x10BA, "e1000-0x10BA", "E1000-0x10BA"),
+	PCI_ROM(0x8086, 0x10BB, "e1000-0x10BB", "E1000-0x10BB"),
+	PCI_ROM(0x8086, 0x10BC, "e1000-0x10BC", "E1000-0x10BC"),
+	PCI_ROM(0x8086, 0x10C4, "e1000-0x10C4", "E1000-0x10C4"),
+	PCI_ROM(0x8086, 0x10C5, "e1000-0x10C5", "E1000-0x10C5"),
+	PCI_ROM(0x8086, 0x10D9, "e1000-0x10D9", "E1000-0x10D9"),
+	PCI_ROM(0x8086, 0x10DA, "e1000-0x10DA", "E1000-0x10DA"),
+};
+
+struct pci_driver e1000_driver __pci_driver = {
+	.ids = e1000_nics,
+	.id_count = (sizeof (e1000_nics) / sizeof (e1000_nics[0])),
+	.probe = e1000_probe,
+	.remove = e1000_remove,
+};
 
 /*
  * Local variables:

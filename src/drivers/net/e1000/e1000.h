@@ -261,6 +261,9 @@ struct e1000_adapter {
 	struct e1000_tx_desc *tx_base;
 	struct e1000_rx_desc *rx_base;
 	
+	uint32_t tx_ring_size;
+	uint32_t rx_ring_size;
+
 	uint32_t tx_head;
 	uint32_t tx_tail;
 	uint32_t tx_fill_ctr;
