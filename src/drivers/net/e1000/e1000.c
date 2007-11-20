@@ -267,10 +267,16 @@ e1000_sw_init ( struct e1000_adapter *adapter )
 	/* Disable Flow Control */
 	hw->fc = E1000_FC_NONE;
 
-	adapter->rx_buffer_len =  E1000_RXBUFFER_2048;
+	adapter->eeprom_wol = 0;
+	adapter->wol = adapter->eeprom_wol;
+	adapter->en_mng_pt  = 0;
+	adapter->rx_int_delay = 0;
+	adapter->rx_abs_int_delay = 0;
+
+	adapter->rx_buffer_len =  1600;
 	adapter->rx_ps_bsize0 = E1000_RXBUFFER_128;
-	hw->max_frame_size =  E1000_RXBUFFER_2048;
-	hw->min_frame_size = 64;
+	hw->max_frame_size =  1600;
+	hw->min_frame_size = ETH_ZLEN;
 
 	/* identify the MAC */
 
@@ -294,7 +300,10 @@ e1000_sw_init ( struct e1000_adapter *adapter )
 
 	e1000_set_media_type ( hw );
 
-	hw->wait_autoneg_complete = FALSE;
+	hw->autoneg = TRUE;
+	hw->autoneg_advertised = AUTONEG_ADVERTISE_SPEED_DEFAULT;
+	hw->wait_autoneg_complete = TRUE;
+
 	hw->tbi_compatibility_en = TRUE;
 	hw->adaptive_ifs = TRUE;
 
@@ -512,7 +521,7 @@ e1000_setup_rx_resources ( struct e1000_adapter *adapter )
 
 	for ( i = 0; i < NUM_RX_DESC; i++ ) {
 	
-		adapter->rx_iobuf[i] = alloc_iob ( E1000_RXBUFFER_2048 );
+		adapter->rx_iobuf[i] = alloc_iob ( 1600 );
 		
 		/* If unable to allocate all iobufs, free any that
 		 * were successfully allocated, and return an error 
@@ -1014,13 +1023,7 @@ e1000_probe ( struct pci_device *pdev,
 	adapter->netdev     = netdev;
 	adapter->pdev       = pdev;
 	adapter->hw.back    = adapter;
-	adapter->eeprom_wol = 0;
-	adapter->wol = adapter->eeprom_wol;
-#if 0	
-	adapter->en_mng_pt  = 0;
-	adapter->rx_int_delay = 0;
-	adapter->rx_abs_int_delay = 0;
-#endif
+
 	mmio_start = pci_bar_start ( pdev, PCI_BASE_ADDRESS_0 );
 	mmio_len   = pci_bar_size  ( pdev, PCI_BASE_ADDRESS_0 );
 
@@ -1169,8 +1172,8 @@ e1000_open ( struct net_device *netdev )
 	/* allocate transmit descriptors */
 	err = e1000_setup_tx_resources ( adapter );
 	if (err) {
-		goto err_setup_tx;
 		DBG ( "Error setting up TX resources!\n" );
+		goto err_setup_tx;
 	}
 
 	/* allocate receive descriptors */
@@ -1186,7 +1189,7 @@ e1000_open ( struct net_device *netdev )
 	
 	e1000_irq_enable ( adapter );
 
-	return E1000_SUCCESS;
+	return 0;
 
 err_setup_rx:
 	e1000_free_tx_resources ( adapter );
