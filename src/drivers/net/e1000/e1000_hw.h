@@ -598,7 +598,7 @@ struct e1000_rx_desc {
     uint8_t status;      /* Descriptor status */
     uint8_t errors;      /* Descriptor Errors */
     uint16_t special;
-};
+} __attribute__ (( packed )) ;
 
 /* Receive Descriptor - Extended */
 union e1000_rx_desc_extended {
@@ -729,7 +729,7 @@ struct e1000_tx_desc {
             uint16_t special;
         } fields;
     } upper;
-};
+}  __attribute__ (( packed )) ;
 
 /* Transmit Descriptor bit definitions */
 #define E1000_TXD_DTYP_D     0x00100000 /* Data Descriptor */

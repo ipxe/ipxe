@@ -255,21 +255,16 @@ struct e1000_adapter {
 #define NUM_TX_DESC	8
 #define NUM_RX_DESC	8
 
-	char *tx_desc_ring;
-	char *rx_desc_ring;
-
 	struct io_buffer *tx_iobuf[NUM_TX_DESC];
 	struct io_buffer *rx_iobuf[NUM_RX_DESC];
 
-	struct e1000_tx_desc *tx_desc[NUM_TX_DESC];
-	struct e1000_rx_desc *rx_desc[NUM_RX_DESC];
-	
 	struct e1000_tx_desc *tx_base;
 	struct e1000_rx_desc *rx_base;
-
+	
 	uint32_t tx_head;
 	uint32_t tx_tail;
 	uint32_t tx_fill_ctr;
+	
 	uint32_t rx_tail;
 
 	uint32_t ioaddr;

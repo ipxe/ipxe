@@ -93,33 +93,45 @@ static struct pci_device_id e1000_nics[] = {
 	PCI_ROM(0x8086, 0x10DA, "e1000-0x10DA", "E1000-0x10DA"),
 };
 
+/**
+ * e1000_get_hw_control - get control of the h/w from f/w
+ * @adapter: address of board private structure
+ *
+ * e1000_get_hw_control sets {CTRL_EXT|FWSM}:DRV_LOAD bit.
+ * For ASF and Pass Through versions of f/w this means that
+ * the driver is loaded. For AMT version (only with 82573)
+ * of the f/w this means that the network i/f is open.
+ *
+ **/
 static void
-e1000_init_manageability ( struct e1000_adapter *adapter )
+e1000_get_hw_control(struct e1000_adapter *adapter)
 {
-	DBG ( "e1000_init_manageability\n" );
+	uint32_t ctrl_ext;
+	uint32_t swsm;
+	
+	DBG ( "e1000_get_hw_control\n" );
 
-	if (adapter->en_mng_pt) {
-		uint32_t manc = E1000_READ_REG(&adapter->hw, MANC);
-
-		/* disable hardware interception of ARP */
-		manc &= ~(E1000_MANC_ARP_EN);
-
-		/* enable receiving management packets to the host */
-		/* this will probably generate destination unreachable messages
-		 * from the host OS, but the packets will be handled on SMBUS */
-		if (adapter->hw.has_manc2h) {
-			uint32_t manc2h = E1000_READ_REG(&adapter->hw, MANC2H);
-
-			manc |= E1000_MANC_EN_MNG2HOST;
-			manc2h |= E1000_MNG2HOST_PORT_623;
-			manc2h |= E1000_MNG2HOST_PORT_664;
-			E1000_WRITE_REG(&adapter->hw, MANC2H, manc2h);
-		}
-
-		E1000_WRITE_REG(&adapter->hw, MANC, manc);
+	/* Let firmware know the driver has taken over */
+	switch (adapter->hw.mac_type) {
+	case e1000_82573:
+		swsm = E1000_READ_REG(&adapter->hw, SWSM);
+		E1000_WRITE_REG(&adapter->hw, SWSM,
+				swsm | E1000_SWSM_DRV_LOAD);
+		break;
+	case e1000_82571:
+	case e1000_82572:
+	case e1000_80003es2lan:
+	case e1000_ich8lan:
+		ctrl_ext = E1000_READ_REG(&adapter->hw, CTRL_EXT);
+		E1000_WRITE_REG(&adapter->hw, CTRL_EXT,
+				ctrl_ext | E1000_CTRL_EXT_DRV_LOAD);
+		break;
+	default:
+		break;
 	}
 }
 
+#if 0
 /**
  * e1000_power_up_phy - restore link in case the phy was powered down
  * @adapter: address of board private structure
@@ -195,6 +207,42 @@ out:
 	return;
 }
 
+#endif
+
+/**
+ * e1000_irq_enable - Enable default interrupt generation settings
+ * @adapter: board private structure
+ **/
+static void
+e1000_irq_enable ( struct e1000_adapter *adapter )
+{
+	E1000_WRITE_REG ( &adapter->hw, IMS, E1000_IMS_RXT0 |
+			  E1000_IMS_RXSEQ );
+	E1000_WRITE_FLUSH ( &adapter->hw );
+}
+
+/**
+ * e1000_irq_disable - Mask off interrupt generation on the NIC
+ * @adapter: board private structure
+ **/
+static void
+e1000_irq_disable ( struct e1000_adapter *adapter )
+{
+	E1000_WRITE_REG ( &adapter->hw, IMC, ~0 );
+	E1000_WRITE_FLUSH ( &adapter->hw );
+}
+
+/**
+ * e1000_irq_force - trigger interrupt
+ * @adapter: board private structure
+ **/
+static void
+e1000_irq_force ( struct e1000_adapter *adapter )
+{
+	E1000_WRITE_REG ( &adapter->hw, ICS, E1000_ICS_RXT0 );
+	E1000_WRITE_FLUSH ( &adapter->hw );
+}
+
 /**
  * e1000_sw_init - Initialize general software structures (struct e1000_adapter)
  * @adapter: board private structure to initialize
@@ -208,53 +256,60 @@ e1000_sw_init ( struct e1000_adapter *adapter )
 {
 	struct e1000_hw *hw = &adapter->hw;
 	struct pci_device *pdev = adapter->pdev;
-	
-	DBG ( "e1000_sw_init\n" );
 
 	/* PCI config space info */
+
 	hw->vendor_id = pdev->vendor;
 	hw->device_id = pdev->device;
 
-	pci_read_config_word(pdev, PCI_COMMAND, &hw->pci_cmd_word);
+	pci_read_config_word ( pdev, PCI_COMMAND, &hw->pci_cmd_word );
 
-	adapter->rx_buffer_len = 2048;
+	/* Disable Flow Control */
+	hw->fc = E1000_FC_NONE;
+
+	adapter->rx_buffer_len =  E1000_RXBUFFER_2048;
+	adapter->rx_ps_bsize0 = E1000_RXBUFFER_128;
+	hw->max_frame_size =  E1000_RXBUFFER_2048;
+	hw->min_frame_size = 64;
 
 	/* identify the MAC */
 
 	if ( e1000_set_mac_type ( hw ) ) {
 		DBG ( "Unknown MAC Type\n" );
-		return -EINVAL;
+		return -EIO;
 	}
 
-	switch (hw->mac_type) {
+	switch ( hw->mac_type ) {
 	default:
 		break;
 	case e1000_82541:
 	case e1000_82547:
 	case e1000_82541_rev_2:
 	case e1000_82547_rev_2:
+#if 0
 		hw->phy_init_script = 1;
+#endif
 		break;
 	}
 
-	e1000_set_media_type(hw);
+	e1000_set_media_type ( hw );
 
-	hw->wait_autoneg_complete = TRUE;
+	hw->wait_autoneg_complete = FALSE;
 	hw->tbi_compatibility_en = TRUE;
 	hw->adaptive_ifs = TRUE;
 
 	/* Copper options */
 
-	if (hw->media_type == e1000_media_type_copper) {
+	if ( hw->media_type == e1000_media_type_copper ) {
 		hw->mdix = AUTO_ALL_MODES;
 		hw->disable_polarity_correction = FALSE;
 		hw->master_slave = E1000_MASTER_SLAVE;
 	}
 
-	adapter->num_tx_queues = 1;
-	adapter->num_rx_queues = 1;
+	/* Explicitly disable IRQ since the NIC can be in any state. */
+	e1000_irq_disable ( adapter );
 
-	return E1000_SUCCESS;
+	return 0;
 }
 
 /**
@@ -267,8 +322,6 @@ e1000_sw_init ( struct e1000_adapter *adapter )
 static int
 e1000_setup_tx_resources ( struct e1000_adapter *adapter )
 {
-	int i;
-	
 	DBG ( "e1000_setup_tx_resources\n" );
 	
 	/* Allocate transmit descriptor ring memory.
@@ -281,21 +334,20 @@ e1000_setup_tx_resources ( struct e1000_adapter *adapter )
 	   cross 64K bytes.
 	 */
 
-        adapter->tx_desc_ring = 
-        	malloc_dma ( sizeof ( struct e1000_tx_desc ) * NUM_TX_DESC,
-        		     sizeof ( struct e1000_tx_desc ) * NUM_TX_DESC );
-        		     
-       	if ( ! adapter->tx_desc_ring ) {
+        adapter->tx_base = 
+        	malloc_dma ( sizeof ( *adapter->tx_base ) * NUM_TX_DESC,
+        		     sizeof ( *adapter->tx_base ) * NUM_TX_DESC );
+        		             		     
+       	if ( ! adapter->tx_base ) {
        		return -ENOMEM;
 	}
+	
+	memset ( adapter->tx_base, 0, sizeof ( *adapter->tx_base ) * NUM_TX_DESC );
+	
+	DBG ( "adapter->tx_base = %#08lx\n", virt_to_bus ( adapter->tx_base ) );
 
-	memset ( adapter->tx_desc_ring, 0, sizeof ( struct e1000_tx_desc ) *
-		 NUM_TX_DESC );
-
-	for ( i = 0; i < NUM_TX_DESC; i++ ) {
-		adapter->tx_desc[i] = (void *) adapter->tx_desc_ring + 
-			( i * sizeof ( struct e1000_tx_desc ) );
-	}
+  	DBG ( "sizeof ( *adapter->tx_base ) == %d bytes\n", 
+  	       sizeof ( *adapter->tx_base ) );
 
 	return 0;
 }
@@ -305,73 +357,8 @@ e1000_free_tx_resources ( struct e1000_adapter *adapter )
 {
 	DBG ( "e1000_free_tx_resources\n" );
 
-        free_dma ( adapter->tx_desc_ring, 
-                   sizeof ( struct e1000_tx_desc ) * NUM_TX_DESC );
-}
-
-/**
- * e1000_setup_rx_resources - allocate Rx resources (Descriptors)
- * @adapter: board private structure
- * @rxdr:    rx descriptor ring (for a specific queue) to setup
- *
- * Returns 0 on success, negative on failure
- **/
-static int
-e1000_setup_rx_resources ( struct e1000_adapter *adapter )
-{
-	int i, j;
-	
-	DBG ( "e1000_setup_rx_resources\n" );
-	
-	/* Allocate receive descriptor ring memory.
-	   It must not cross a 64K boundary because of hardware errata
-	 */
-
-        adapter->rx_desc_ring = 
-        	malloc_dma ( sizeof ( struct e1000_rx_desc ) * NUM_RX_DESC,
-        		     sizeof ( struct e1000_rx_desc ) * NUM_RX_DESC );
-        		     
-       	if ( ! adapter->rx_desc_ring ) {
-       		return -ENOMEM;
-	}
-
-	memset ( adapter->rx_desc_ring, 0, sizeof (struct e1000_rx_desc) * NUM_RX_DESC );
-
-	for ( i = 0; i < NUM_RX_DESC; i++ ) {
-	
-		adapter->rx_iobuf[i] = alloc_iob ( E1000_RXBUFFER_2048 );
-		
-		/* If unable to allocate all iobufs, free any that
-		 * were successfully allocated, and return an error 
-		 */
-		if ( ! adapter->rx_iobuf[i] ) {
-			for ( j = 0; j < i; j++ ) {
-				free_iob ( adapter->rx_iobuf[j] );
-			}
-			return -ENOMEM;
-		}
-		
-		adapter->rx_desc[i] = (void *) adapter->rx_desc_ring + 
-			( i * sizeof ( struct e1000_rx_desc ) );
-			
-		adapter->rx_desc[i]->buffer_addr = virt_to_bus ( adapter->rx_iobuf[i]->data );		
-	}	
-	return 0;
-}
-
-static void
-e1000_free_rx_resources ( struct e1000_adapter *adapter )
-{
-	int i;
-	
-	DBG ( "e1000_free_rx_resources\n" );
-
-        free_dma ( adapter->rx_desc_ring, 
-                   sizeof ( struct e1000_rx_desc ) * NUM_RX_DESC );
-
-	for ( i = 0; i < NUM_RX_DESC; i++ ) {
-		free_iob ( adapter->rx_iobuf[i] );
-	}
+        free_dma ( adapter->tx_base, 
+                   sizeof ( *adapter->tx_base ) * NUM_TX_DESC );
 }
 
 /**
@@ -384,15 +371,21 @@ static void
 e1000_configure_tx ( struct e1000_adapter *adapter )
 {
 	struct e1000_hw *hw = &adapter->hw;
-	uint32_t tctl, tipg, tarc;
+	uint32_t tctl;
+
+#if 0
+	uint32 tipg, tarc;
 	uint32_t ipgr1, ipgr2;
+#endif
 	
 	DBG ( "e1000_configure_tx\n" );
 
 	E1000_WRITE_REG ( hw, TDBAH, 0 );
 	E1000_WRITE_REG ( hw, TDBAL, virt_to_bus ( adapter->tx_base ) );
-	E1000_WRITE_REG ( hw, TDLEN, sizeof ( struct e1000_tx_desc ) *
-			  NUM_TX_DESC );
+	E1000_WRITE_REG ( hw, TDLEN, sizeof ( *adapter->tx_base ) * NUM_TX_DESC );
+			  
+        DBG ( "TDBAL: %#08lx\n", virt_to_bus ( adapter->tx_base ) );
+        DBG ( "TDLEN: %d\n", sizeof ( *adapter->tx_base ) * NUM_TX_DESC );
 
 	/* Setup the HW Tx Head and Tail descriptor pointers */
 	E1000_WRITE_REG ( hw, TDH, 0 );
@@ -402,6 +395,7 @@ e1000_configure_tx ( struct e1000_adapter *adapter )
 	adapter->tx_tail = 0;
 	adapter->tx_fill_ctr = 0;
 	
+#if 0
 	/* Set the default values for the Tx Inter Packet Gap timer */
 	if (adapter->hw.mac_type <= e1000_82547_rev_2 &&
 	    (hw->media_type == e1000_media_type_fiber ||
@@ -457,9 +451,15 @@ e1000_configure_tx ( struct e1000_adapter *adapter )
 		tarc |= 1;
 		E1000_WRITE_REG(hw, TARC1, tarc);
 	}
+#endif
 
-	e1000_config_collision_dist(hw);
+	e1000_config_collision_dist ( hw );
 
+	tctl = E1000_TCTL_PSP | E1000_TCTL_EN |
+		(E1000_COLLISION_THRESHOLD << E1000_CT_SHIFT) | 
+		(E1000_HDX_COLLISION_DISTANCE << E1000_COLD_SHIFT);
+
+#if 0
 	/* Setup Transmit Descriptor Settings for eop descriptor */
 	adapter->txd_cmd = E1000_TXD_CMD_EOP | E1000_TXD_CMD_IFCS;
 
@@ -477,41 +477,77 @@ e1000_configure_tx ( struct e1000_adapter *adapter )
 	if (hw->mac_type == e1000_82544 &&
 	    hw->bus_type == e1000_bus_type_pcix)
 		adapter->pcix_82544 = 1;
+#endif
 
 	E1000_WRITE_REG ( hw, TCTL, tctl );
 }
 
 /**
- * e1000_setup_rctl - configure the receive control registers
- * @adapter: Board private structure
+ * e1000_setup_rx_resources - allocate Rx resources (Descriptors)
+ * @adapter: board private structure
+ * @rxdr:    rx descriptor ring (for a specific queue) to setup
+ *
+ * Returns 0 on success, negative on failure
  **/
-static void
-e1000_setup_rctl ( struct e1000_adapter *adapter )
+static int
+e1000_setup_rx_resources ( struct e1000_adapter *adapter )
 {
-	uint32_t rctl;
+	int i, j;
+	struct e1000_rx_desc *rx_curr_desc;
 	
-	DBG ( "e1000_setup_rctl\n" );
+	DBG ( "e1000_setup_rx_resources\n" );
+	
+	/* Allocate receive descriptor ring memory.
+	   It must not cross a 64K boundary because of hardware errata
+	 */
 
-	rctl = E1000_READ_REG ( &adapter->hw, RCTL );
+        adapter->rx_base = 
+        	malloc_dma ( sizeof ( *adapter->rx_base ) * NUM_RX_DESC,
+        		     sizeof ( *adapter->rx_base ) * NUM_RX_DESC );
+        		     
+       	if ( ! adapter->rx_base ) {
+       		return -ENOMEM;
+	}
+	memset ( adapter->rx_base, 0, sizeof ( *adapter->rx_base ) * NUM_RX_DESC );
 
-	rctl &= ~( 3 << E1000_RCTL_MO_SHIFT );
+	for ( i = 0; i < NUM_RX_DESC; i++ ) {
+	
+		adapter->rx_iobuf[i] = alloc_iob ( E1000_RXBUFFER_2048 );
+		
+		/* If unable to allocate all iobufs, free any that
+		 * were successfully allocated, and return an error 
+		 */
+		if ( ! adapter->rx_iobuf[i] ) {
+			for ( j = 0; j < i; j++ ) {
+				free_iob ( adapter->rx_iobuf[j] );
+			}
+			return -ENOMEM;
+		}
 
-	rctl |= E1000_RCTL_EN | E1000_RCTL_BAM |
-		E1000_RCTL_LBM_NO | E1000_RCTL_RDMTS_HALF |
-		( adapter->hw.mc_filter_type << E1000_RCTL_MO_SHIFT );
+		rx_curr_desc = ( void * ) ( adapter->rx_base ) + 
+					  ( i * sizeof ( *adapter->rx_base ) ); 
+			
+		rx_curr_desc->buffer_addr = virt_to_bus ( adapter->rx_iobuf[i]->data );	
+		DBG ( "i = %d  rx_curr_desc->buffer_addr = %#16llx\n", 
+		      i, rx_curr_desc->buffer_addr );
+		
+	}	
+	return 0;
+}
 
-	if ( adapter->hw.tbi_compatibility_on == 1 )
-		rctl |= E1000_RCTL_SBP;
-	else
-		rctl &= ~E1000_RCTL_SBP;
+static void
+e1000_free_rx_resources ( struct e1000_adapter *adapter )
+{
+	int i;
+	
+	DBG ( "e1000_free_rx_resources\n" );
 
-	rctl &= ~E1000_RCTL_LPE;
+        free_dma ( adapter->rx_base, 
+                   sizeof ( *adapter->rx_base ) * NUM_RX_DESC );
 
-	/* Setup buffer sizes */
-	rctl |= E1000_RCTL_SZ_2048;
-	rctl &= ~E1000_RCTL_BSEX;
-
-	E1000_WRITE_REG ( &adapter->hw, RCTL, rctl );
+	for ( i = 0; i < NUM_RX_DESC; i++ ) {
+		free_iob ( adapter->rx_iobuf[i] );
+	}
 }
 
 /**
@@ -524,17 +560,23 @@ static void
 e1000_configure_rx ( struct e1000_adapter *adapter )
 {
 	struct e1000_hw *hw = &adapter->hw;
-	uint32_t rctl, ctrl_ext;
+	uint32_t rctl;
+
+#if 0
+	uint32_t ctrl_ext;
+#endif
 
 	DBG ( "e1000_configure_rx\n" );
 
 	/* disable receives while setting up the descriptors */
-	rctl = E1000_READ_REG(hw, RCTL);
+	rctl = E1000_READ_REG ( hw, RCTL );
 	E1000_WRITE_REG ( hw, RCTL, rctl & ~E1000_RCTL_EN );
 
 	/* set the Receive Delay Timer Register */
-	E1000_WRITE_REG( hw, RDTR, adapter->rx_int_delay );
+	E1000_WRITE_REG ( hw, RDTR, adapter->rx_int_delay );
+	E1000_WRITE_REG ( hw, RADV, adapter->rx_abs_int_delay );
 
+#if 0
 	if (hw->mac_type >= e1000_82540) {
 		E1000_WRITE_REG(hw, RADV, adapter->rx_abs_int_delay);
 		if (adapter->itr_setting != 0)
@@ -549,6 +591,7 @@ e1000_configure_rx ( struct e1000_adapter *adapter )
 		E1000_WRITE_REG(hw, CTRL_EXT, ctrl_ext);
 		E1000_WRITE_FLUSH(hw);
 	}
+#endif
 
 	/* Setup the HW Rx Head and Tail Descriptor Pointers and
 	 * the Base and Length of the Rx Descriptor Ring */	 
@@ -557,30 +600,18 @@ e1000_configure_rx ( struct e1000_adapter *adapter )
 
 	E1000_WRITE_REG ( hw, RDBAH, 0 );
 	E1000_WRITE_REG ( hw, RDBAL, virt_to_bus ( adapter->rx_base ) );
-	E1000_WRITE_REG ( hw, RDLEN, sizeof ( struct e1000_tx_desc ) *
-			  NUM_TX_DESC );
+	E1000_WRITE_REG ( hw, RDLEN, sizeof ( *adapter->rx_base ) *
+			  NUM_RX_DESC );
 
 	E1000_WRITE_REG ( hw, RDH, 0);
 	E1000_WRITE_REG ( hw, RDT, 0);
+	
+	E1000_WRITE_REG ( hw, RCTL,  E1000_RCTL_EN | E1000_RCTL_BAM | 
+		  	  E1000_RCTL_SZ_2048 | E1000_RCTL_MPE);
+	E1000_WRITE_FLUSH ( hw );
 
 	/* Enable Receives */
-
 	E1000_WRITE_REG ( hw, RCTL, rctl );
-}
-
-/**
- * e1000_configure - configure the hardware for RX and TX
- * @adapter = private board structure
- **/
-static void e1000_configure ( struct e1000_adapter *adapter )
-{
-	DBG ( "e1000_configure\n" );
-
-	e1000_configure_tx ( adapter );
-
-	e1000_setup_rctl ( adapter );
-
-	e1000_configure_rx ( adapter );
 }
 
 /**
@@ -593,7 +624,7 @@ e1000_reset ( struct e1000_adapter *adapter )
 {
 	uint32_t pba = 0;
 	uint16_t fc_high_water_mark = E1000_FC_HIGH_DIFF;
-	
+
 	DBG ( "e1000_reset\n" );
 
 	switch (adapter->hw.mac_type) {
@@ -631,8 +662,8 @@ e1000_reset ( struct e1000_adapter *adapter )
 		break;
 	}
 
-	E1000_WRITE_REG(&adapter->hw, PBA, pba);
-
+	E1000_WRITE_REG ( &adapter->hw, PBA, pba );
+	
 	/* flow control settings */
 	/* Set the FC high water mark to 90% of the FIFO size.
 	 * Required to clear last 3 LSB */
@@ -652,13 +683,14 @@ e1000_reset ( struct e1000_adapter *adapter )
 		adapter->hw.fc_pause_time = E1000_FC_PAUSE_TIME;
 	adapter->hw.fc_send_xon = 1;
 	adapter->hw.fc = adapter->hw.original_fc;
-
 	/* Allow time for pending master requests to run */
-	e1000_reset_hw(&adapter->hw);
-	if (adapter->hw.mac_type >= e1000_82544)
-		E1000_WRITE_REG(&adapter->hw, WUC, 0);
 
-	if (e1000_init_hw(&adapter->hw))
+	e1000_reset_hw ( &adapter->hw );
+
+	if ( adapter->hw.mac_type >= e1000_82544 )
+		E1000_WRITE_REG ( &adapter->hw, WUC, 0 );
+
+	if ( e1000_init_hw ( &adapter->hw ) )
 		DBG ( "Hardware Error\n" );
 
 	/* if (adapter->hwflags & HWFLAGS_PHY_PWR_BIT) { */
@@ -674,7 +706,7 @@ e1000_reset ( struct e1000_adapter *adapter )
 		E1000_WRITE_REG(&adapter->hw, CTRL, ctrl);
 	}
 
-	e1000_phy_get_info(&adapter->hw, &adapter->phy_info);
+	e1000_phy_get_info ( &adapter->hw, &adapter->phy_info );
 
 	if (!adapter->smart_power_down &&
 	    (adapter->hw.mac_type == e1000_82571 ||
@@ -689,7 +721,6 @@ e1000_reset ( struct e1000_adapter *adapter )
 		e1000_write_phy_reg(&adapter->hw, IGP02E1000_PHY_POWER_MGMT,
 		                    phy_data);
 	}
-
 }
 
 /** Functions that implement the gPXE driver API **/
@@ -703,12 +734,13 @@ e1000_reset ( struct e1000_adapter *adapter )
 static void
 e1000_close ( struct net_device *netdev )
 {
-	struct e1000_adapter *adapter = netdev_priv( netdev );
+	struct e1000_adapter *adapter = netdev_priv ( netdev );
 
 	DBG ( "e1000_close\n" );
+	
+	e1000_irq_disable ( adapter );
 
-	e1000_reset ( adapter );
-	e1000_power_down_phy ( adapter );
+	e1000_reset_hw ( &adapter->hw );
 
 	e1000_free_tx_resources ( adapter );
 	e1000_free_rx_resources ( adapter );
@@ -727,6 +759,8 @@ e1000_transmit ( struct net_device *netdev, struct io_buffer *iobuf )
 {
 	struct e1000_adapter *adapter = netdev_priv( netdev );
 	struct e1000_hw *hw = &adapter->hw;
+	uint32_t tx_curr = adapter->tx_tail;
+	struct e1000_tx_desc *tx_curr_desc;
 
 	DBG ("e1000_transmit\n");
 	
@@ -738,28 +772,42 @@ e1000_transmit ( struct net_device *netdev, struct io_buffer *iobuf )
 	/* Save pointer to iobuf we have been given to transmit,
 	   netdev_tx_complete() will need it later
 	 */
-	adapter->tx_iobuf[adapter->tx_tail] = iobuf;
+	adapter->tx_iobuf[tx_curr] = iobuf;
+
+	tx_curr_desc = ( void * ) ( adapter->tx_base ) + 
+		       ( tx_curr * sizeof ( *adapter->tx_base ) ); 
+
+	DBG ( "tx_curr_desc = %#08lx\n", virt_to_bus ( tx_curr_desc ) );
+	DBG ( "tx_curr_desc + 16 = %#08lx\n", virt_to_bus ( tx_curr_desc ) + 16 );
+	DBG ( "iobuf->data = %#08lx\n", virt_to_bus ( iobuf->data ) );
 
 	/* Add the packet to TX ring
 	 */
-	adapter->tx_desc[adapter->tx_tail]->buffer_addr = 
+ 	tx_curr_desc->buffer_addr = 
 		virt_to_bus ( iobuf->data );
-	adapter->tx_desc[adapter->tx_tail]->lower.data = 
-		E1000_TXD_CMD_RPS  | E1000_TXD_CMD_RS | E1000_TXD_CMD_EOP |
+	tx_curr_desc->lower.data = 
+		E1000_TXD_CMD_RPS  | E1000_TXD_CMD_EOP |
 		E1000_TXD_CMD_IFCS | iob_len ( iobuf );
-	adapter->tx_desc[adapter->tx_tail]->upper.data = 0;
+	tx_curr_desc->upper.data = 0;
 	
-	DBG ( "TX fill: %ld tail: %ld addr: %#08lx len: %d\n", adapter->tx_fill_ctr, 
-	      adapter->tx_tail, virt_to_bus ( iobuf->data ), iob_len ( iobuf ) );
-
+	DBG ( "TX fill: %ld tx_curr: %ld addr: %#08lx len: %d\n", adapter->tx_fill_ctr, 
+	      tx_curr, virt_to_bus ( iobuf->data ), iob_len ( iobuf ) );
+	      
 	/* Point to next free descriptor */
 	adapter->tx_tail = ( adapter->tx_tail + 1 ) % NUM_TX_DESC;
-
 	adapter->tx_fill_ctr++;
 
 	/* Write new tail to NIC, making packet available for transmit
 	 */
-	E1000_WRITE_REG ( hw, TDT, adapter->tx_tail ) ;
+	E1000_WRITE_REG ( hw, TDT, adapter->tx_tail );
+
+#if 0	
+	while ( ! ( tx_curr_desc->upper.data & E1000_TXD_STAT_DD ) ) {
+		udelay ( 10 );	/* give the nic a chance to write to the register */
+	}
+
+	DBG ( "Leaving XMIT\n" );
+#endif
 
 	return 0;
 }
@@ -781,7 +829,8 @@ e1000_poll ( struct net_device *netdev )
 	uint32_t rx_len;
 	uint32_t rx_err;
 	struct io_buffer *rx_iob;
-
+	struct e1000_tx_desc *tx_curr_desc;
+	struct e1000_rx_desc *rx_curr_desc;
 	uint32_t i;
 	
 #if 0
@@ -790,25 +839,30 @@ e1000_poll ( struct net_device *netdev )
 
 	/* Acknowledge interrupt. */
 	icr = E1000_READ_REG ( hw, ICR );
-
-#if 0
+	if ( ! icr )
+		return;
+		
         DBG ( "e1000_poll: intr_status = %#08lx\n", icr );
-#endif
 
 	/* Check status of transmitted packets
 	 */
 	while ( ( i = adapter->tx_head ) != adapter->tx_tail ) {
-	
-		//tx_status = adapter->tx_desc[i]->upper.fields.status;
-		tx_status = adapter->tx_desc[i]->upper.data;
+			
+		tx_curr_desc = ( void * )  ( adapter->tx_base ) + 
+					   ( i * sizeof ( *adapter->tx_base ) ); 
+					    		
+		tx_status = tx_curr_desc->upper.data;
 
-		DBG ( "e1000_poll: tx_status = %#08lx\n", tx_status );
+#if 0
+		DBG ( "tx_curr_desc = %#08lx status = %#08lx\n",
+		      virt_to_bus ( tx_curr_desc ), tx_status );
+#endif
 
 		/* if the packet at tx_head is not owned by hardware */
 		if ( ! ( tx_status & E1000_TXD_STAT_DD ) )
 			break;
 		
-		DBG ( "got packet. tx_head: %ld tx_tail: %ld tx_status: %#08lx\n",
+		DBG ( "Sent packet. tx_head: %ld tx_tail: %ld tx_status: %#08lx\n",
 	    	      adapter->tx_head, adapter->tx_tail, tx_status );
 
 		if ( tx_status & ( E1000_TXD_STAT_EC | E1000_TXD_STAT_LC | 
@@ -825,30 +879,40 @@ e1000_poll ( struct net_device *netdev )
 		/* Decrement count of used descriptors, clear this descriptor 
 		 */
 		adapter->tx_fill_ctr--;
-		memset ( &adapter->tx_desc[i], 0, sizeof ( struct e1000_tx_desc ) );
+		memset ( tx_curr_desc, 0, sizeof ( *tx_curr_desc ) );
 		
 		adapter->tx_head = ( adapter->tx_head + 1 ) % NUM_TX_DESC;		
 	}
 	
 	/* Process received packets 
 	 */
-	while ( ( rx_status = adapter->rx_desc[adapter->rx_tail]->status ) & E1000_RXD_STAT_DD ) {
+	while ( TRUE ) {
 	
 		i = adapter->rx_tail;
 		
-		rx_len = adapter->rx_desc[i]->length;
+		rx_curr_desc = ( void * )  ( adapter->rx_base ) + 
+			          ( i * sizeof ( *adapter->rx_base ) ); 
+		rx_status = rx_curr_desc->status;
+		
+		// DBG ( "Before DD Check RX_status: %#08lx\n", rx_status );
+	
+		if ( ! ( rx_status & E1000_RXD_STAT_DD ) )
+			break;
+
+		DBG ( "RCTL = %#08lx\n", E1000_READ_REG ( &adapter->hw, RCTL ) );
+	
+		rx_len = rx_curr_desc->length;
 
                 DBG ( "Received packet, rx_tail: %ld rx_status: %#08lx rx_len: %ld\n",
                       i, rx_status, rx_len );
                 
-                rx_err = adapter->rx_desc[adapter->rx_tail]->errors;
+                rx_err = rx_curr_desc->errors;
                 
 		if ( rx_err & E1000_RXD_ERR_FRAME_ERR_MASK ) {
 		
 			netdev_rx_err ( netdev, NULL, -EINVAL );
 			DBG ( "e1000_poll: Corrupted packet received!"
 			      " rx_err: %#08lx\n", rx_err );
-			      
 		} else 	{
 		
 			/* If unable allocate space for this packet,
@@ -866,12 +930,18 @@ e1000_poll ( struct net_device *netdev )
 			netdev_rx ( netdev, rx_iob );
 		}
 
+		memset ( rx_curr_desc, 0, sizeof ( *rx_curr_desc ) );
+
+		rx_curr_desc->buffer_addr = virt_to_bus ( adapter->rx_iobuf[adapter->rx_tail]->data );
+
 		adapter->rx_tail = ( adapter->rx_tail + 1 ) % NUM_RX_DESC;
+
+		E1000_WRITE_REG ( hw, RDT, adapter->rx_tail );
 	}
 }				
 
 /**
- * e1000_irq - Enable, Disable, or Force interrupts
+ * e1000_irq - enable or Disable interrupts
  *
  * @v adapter   e1000 adapter
  * @v action    requested interrupt action
@@ -885,17 +955,13 @@ e1000_irq ( struct net_device *netdev, int enable )
 	
 	switch ( enable ) {
 	case 0 :
-		E1000_WRITE_REG ( &adapter->hw, IMC, ~0 );
-		E1000_WRITE_FLUSH ( &adapter->hw );
+		e1000_irq_enable ( adapter );
 		break;
 	case 1 :
-		E1000_WRITE_REG ( &adapter->hw, IMS,
-				E1000_IMS_RXT0 | E1000_IMS_RXSEQ );
-		E1000_WRITE_FLUSH ( &adapter->hw );
+		e1000_irq_disable ( adapter );
 		break;
-	/* FIXME: Etherboot has a "FORCE" action, does gPXE? */
 	case 2 :
-		E1000_WRITE_REG ( &adapter->hw, ICS, E1000_ICS_RXT0 );
+		e1000_irq_force ( adapter );
 		break;
 	}
 }
@@ -921,52 +987,57 @@ e1000_probe ( struct pci_device *pdev,
 	unsigned long flash_start, flash_len;
 
 	DBG ( "e1000_probe\n" );
-
+	
 	err = -ENOMEM;
 
-	/* Allocate net device (also allocates memory for netdev->priv
-	   and makes netdev-priv point to it 
-	 */
+	/* Allocate net device ( also allocates memory for netdev->priv
+	   and makes netdev-priv point to it ) */
 	netdev = alloc_etherdev ( sizeof ( struct e1000_adapter ) );
 	if ( ! netdev ) 
 		goto err_alloc_etherdev;
-
-        pci_set_drvdata ( pdev, netdev );
-
+		
+	/* Associate e1000-specific network operations operations with
+	 * generic network device layer */
+	netdev_init ( netdev, &e1000_operations );
+	
+	/* Associate this network device with given PCI device */
+	pci_set_drvdata ( pdev, netdev );
+	netdev->dev = &pdev->dev;
+	
+	/* Initialize driver private storage */		
 	adapter = netdev_priv ( netdev );
-        memset ( adapter, 0, ( sizeof ( struct e1000_adapter ) ) );
-
-	/* Enable PCI device associated with this NIC device */
-	adjust_pci_device ( pdev );
-
-	adapter->ioaddr = pdev->ioaddr;
-        adapter->irqno = pdev->irq;
-	adapter->netdev = netdev;
-	adapter->pdev = pdev;
-	adapter->hw.back = adapter;
-
+        memset ( adapter, 0, ( sizeof ( *adapter ) ) );
+	
+        adapter->hw.io_base = pdev->ioaddr;
+	adapter->ioaddr     = pdev->ioaddr;
+        adapter->irqno      = pdev->irq;
+	adapter->netdev     = netdev;
+	adapter->pdev       = pdev;
+	adapter->hw.back    = adapter;
+	adapter->eeprom_wol = 0;
+	adapter->wol = adapter->eeprom_wol;
+#if 0	
+	adapter->en_mng_pt  = 0;
+	adapter->rx_int_delay = 0;
+	adapter->rx_abs_int_delay = 0;
+#endif
 	mmio_start = pci_bar_start ( pdev, PCI_BASE_ADDRESS_0 );
 	mmio_len   = pci_bar_size  ( pdev, PCI_BASE_ADDRESS_0 );
+
+	DBG ( "mmio_start: %#08lx\n", mmio_start );
+	DBG ( "mmio_len: %#08lx\n", mmio_len );
+	
+	/* Fix up PCI device */
+	adjust_pci_device ( pdev );
 
 	err = -EIO;
 
 	adapter->hw.hw_addr = ioremap ( mmio_start, mmio_len );
+	
+	DBG ( "adapter->hw.hw_addr: %p\n", adapter->hw.hw_addr );
+	
 	if ( ! adapter->hw.hw_addr )
 		goto err_ioremap;
-
-	for ( i = BAR_1; i <= BAR_5; i++ ) {
-		if ( pci_bar_size ( pdev, i ) == 0 )
-			continue;
-		if ( pci_find_capability ( pdev, i ) & IORESOURCE_IO ) {
-			adapter->hw.io_base = pci_bar_start ( pdev, i );
-			break;
-		}
-	}
-
-	/* Associate e1000-specific network operations operations with
-	 * generic network device layer 
-	 */
-	netdev_init ( netdev, &e1000_operations );
 
 	/* setup the private structure */
 	if ( ( err = e1000_sw_init ( adapter ) ) )
@@ -994,7 +1065,11 @@ e1000_probe ( struct pci_device *pdev,
 	/* before reading the EEPROM, reset the controller to
 	 * put the device in a known good starting state 
 	 */
-	e1000_reset_hw ( &adapter->hw );
+	err = e1000_reset_hw ( &adapter->hw );
+	if ( err < 0 ) {
+		DBG ( "Hardware Initialization Failed\n" );
+		goto err_reset;
+	}
 
 	/* make sure the EEPROM is good */
 	if ( e1000_validate_eeprom_checksum( &adapter->hw ) < 0 ) {
@@ -1008,16 +1083,40 @@ e1000_probe ( struct pci_device *pdev,
 
         memcpy ( netdev->ll_addr, adapter->hw.mac_addr, ETH_ALEN );
 
+	/* print bus type/speed/width info */
+	{
+	struct e1000_hw *hw = &adapter->hw;
+	DBG ( "(PCI%s:%s:%s) ",
+	      ((hw->bus_type == e1000_bus_type_pcix) ? "-X" :
+	       (hw->bus_type == e1000_bus_type_pci_express ? " Express":"")),
+	      ((hw->bus_speed == e1000_bus_speed_2500) ? "2.5Gb/s" :
+	       (hw->bus_speed == e1000_bus_speed_133) ? "133MHz" :
+	       (hw->bus_speed == e1000_bus_speed_120) ? "120MHz" :
+	       (hw->bus_speed == e1000_bus_speed_100) ? "100MHz" :
+	       (hw->bus_speed == e1000_bus_speed_66) ? "66MHz" : "33MHz"),
+  	      ((hw->bus_width == e1000_bus_width_64) ? "64-bit" :
+  	       (hw->bus_width == e1000_bus_width_pciex_4) ? "Width x4" :
+	       (hw->bus_width == e1000_bus_width_pciex_1) ? "Width x1" :
+	       "32-bit"));
+	}
+	for (i = 0; i < 6; i++)
+		DBG ("%02x%s", netdev->ll_addr[i], i == 5 ? "\n" : ":");
+        
 	/* reset the hardware with the new settings */
 	e1000_reset ( adapter );
+	
+	e1000_get_hw_control ( adapter );
 
 	if ( ( err = register_netdev ( netdev ) ) != 0)
 		goto err_register;
+		
+	DBG ( "e1000_probe succeeded!\n" );	
 
 	/* No errors, return success */
 	return 0;
 
 /* Error return paths */
+err_reset:
 err_register:
 err_eeprom:
 	if ( ! e1000_check_phy_reset_block ( &adapter->hw ) )
@@ -1069,20 +1168,23 @@ e1000_open ( struct net_device *netdev )
 
 	/* allocate transmit descriptors */
 	err = e1000_setup_tx_resources ( adapter );
-	if (err)
+	if (err) {
 		goto err_setup_tx;
+		DBG ( "Error setting up TX resources!\n" );
+	}
 
 	/* allocate receive descriptors */
 	err = e1000_setup_rx_resources ( adapter );
-	if (err)
+	if (err) {
+		DBG ( "Error setting up RX resources!\n" );
 		goto err_setup_rx;
+	}
 
-	e1000_power_up_phy ( adapter );
+	e1000_configure_tx ( adapter );
 
-	/* disable firmware control */
-	e1000_init_manageability ( adapter );
-
-	e1000_configure ( adapter );
+	e1000_configure_rx ( adapter );
+	
+	e1000_irq_enable ( adapter );
 
 	return E1000_SUCCESS;
 
