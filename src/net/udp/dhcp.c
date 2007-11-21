@@ -693,10 +693,14 @@ struct dhcp_session {
 	 * (e.g. @c DHCPDISCOVER).
 	 */
 	int state;
-	/** Options obtained from server */
+	/** Options obtained from DHCP server */
 	struct dhcp_option_block *options;
+	/** Options obtained from ProxyDHCP server */
+	struct dhcp_option_block *proxy_options;
 	/** Retransmission timer */
 	struct retry_timer timer;
+	/** Session start time (in ticks) */
+	unsigned long start;
 };
 
 /**
@@ -710,6 +714,7 @@ static void dhcp_free ( struct refcnt *refcnt ) {
 
 	netdev_put ( dhcp->netdev );
 	dhcpopt_put ( dhcp->options );
+	dhcpopt_put ( dhcp->proxy_options );
 	free ( dhcp );
 }
 
@@ -826,7 +831,10 @@ static int dhcp_deliver_raw ( struct xfer_interface *xfer,
 		container_of ( xfer, struct dhcp_session, xfer );
 	const struct dhcphdr *dhcphdr = data;
 	struct dhcp_option_block *options;
+	struct dhcp_option_block **store_options;
+	int is_proxy;
 	unsigned int msgtype;
+	unsigned long elapsed;
 
 	/* Check for matching transaction ID */
 	if ( dhcphdr->xid != dhcp_xid ( dhcp->netdev ) ) {
@@ -843,41 +851,61 @@ static int dhcp_deliver_raw ( struct xfer_interface *xfer,
 		return -EINVAL;
 	}
 
-	/* Determine message type */
+	/* Determine and verify message type */
+	is_proxy = ( dhcphdr->yiaddr.s_addr == 0 );
 	msgtype = find_dhcp_num_option ( options, DHCP_MESSAGE_TYPE );
-	DBGC ( dhcp, "DHCP %p received %s\n",
-	       dhcp, dhcp_msgtype_name ( msgtype ) );
-
-	/* Handle DHCP reply */
-	switch ( dhcp->state ) {
-	case DHCPDISCOVER:
-		if ( msgtype != DHCPOFFER )
-			goto out_discard;
-		dhcp->state = DHCPREQUEST;
-		break;
-	case DHCPREQUEST:
-		if ( msgtype != DHCPACK )
-			goto out_discard;
-		dhcp->state = DHCPACK;
-		break;
-	default:
-		assert ( 0 );
+	DBGC ( dhcp, "DHCP %p received %s%s\n", dhcp,
+	       ( is_proxy ? "Proxy" : "" ), dhcp_msgtype_name ( msgtype ) );
+	if ( ( ( dhcp->state != DHCPDISCOVER ) || ( msgtype != DHCPOFFER ) ) &&
+	     ( ( dhcp->state != DHCPREQUEST ) || ( msgtype != DHCPACK ) ) ) {
+		DBGC ( dhcp, "DHCP %p discarding %s while in %s state\n",
+		       dhcp, dhcp_msgtype_name ( msgtype ),
+		       dhcp_msgtype_name ( dhcp->state ) );
 		goto out_discard;
 	}
 
-	/* Stop timer and update stored options */
-	stop_timer ( &dhcp->timer );
-	if ( dhcp->options )
-		dhcpopt_put ( dhcp->options );
-	dhcp->options = options;
-
-	/* Transmit next packet, or terminate session */
-	if ( dhcp->state < DHCPACK ) {
-		dhcp_send_request ( dhcp );
+	/* Update stored standard/ProxyDHCP options, if the new
+	 * options have equal or higher priority than the
+	 * currently-stored options.
+	 */
+	store_options = ( is_proxy ? &dhcp->proxy_options : &dhcp->options );
+	if ( ( ! *store_options ) || 
+	     ( find_dhcp_num_option ( options, DHCP_EB_PRIORITY ) >=
+	       find_dhcp_num_option ( *store_options, DHCP_EB_PRIORITY ) ) ) {
+		dhcpopt_put ( *store_options );
+		*store_options = options;
 	} else {
+		dhcpopt_put ( options );
+	}
+
+	/* Handle DHCP response */
+	switch ( dhcp->state ) {
+	case DHCPDISCOVER:
+		/* If we have received a valid standard DHCP response
+		 * (i.e. one with an IP address), and we have allowed
+		 * sufficient time for ProxyDHCP reponses, then
+		 * transition to making the DHCPREQUEST.
+		 */
+		elapsed = ( currticks() - dhcp->start );
+		if ( dhcp->options &&
+		     ( elapsed > PROXYDHCP_WAIT_TIME ) ) {
+			stop_timer ( &dhcp->timer );
+			dhcp->state = DHCPREQUEST;
+			dhcp_send_request ( dhcp );
+		}
+		break;
+	case DHCPREQUEST:
+		/* DHCP finished; register options and exit */
+		if ( dhcp->proxy_options )
+			dhcp->register_options ( dhcp->netdev,
+						 dhcp->proxy_options );
 		dhcp->register_options ( dhcp->netdev, dhcp->options );
 		dhcp_finished ( dhcp, 0 );
+		break;
+	default:
+		assert ( 0 );
 	}
+
 	return 0;
 
  out_discard:
@@ -965,6 +993,7 @@ int start_dhcp ( struct job_interface *job, struct net_device *netdev,
 	dhcp->register_options = register_options;
 	dhcp->timer.expired = dhcp_timer_expired;
 	dhcp->state = DHCPDISCOVER;
+	dhcp->start = currticks();
 
 	/* Instantiate child objects and attach to our interfaces */
 	if ( ( rc = xfer_open_socket ( &dhcp->xfer, SOCK_DGRAM,

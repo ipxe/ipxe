@@ -12,6 +12,7 @@
 #include <gpxe/in.h>
 #include <gpxe/refcnt.h>
 #include <gpxe/tables.h>
+#include <latch.h>
 
 struct net_device;
 struct job_interface;
@@ -505,12 +506,15 @@ dhcpopt_get ( struct dhcp_option_block *options ) {
 /**
  * Drop reference to DHCP options block
  *
- * @v options		DHCP options block
+ * @v options		DHCP options block, or NULL
  */
 static inline __attribute__ (( always_inline )) void
 dhcpopt_put ( struct dhcp_option_block *options ) {
 	ref_put ( &options->refcnt );
 }
+
+/** Maximum time that we will wait for ProxyDHCP offers */
+#define PROXYDHCP_WAIT_TIME ( TICKS_PER_SEC * 2 )
 
 extern struct list_head dhcp_option_blocks;
 
