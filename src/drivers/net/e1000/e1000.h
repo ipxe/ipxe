@@ -78,6 +78,9 @@ struct e1000_adapter;
 
 #define E1000_FC_PAUSE_TIME 0x0680 /* 858 usec */
 
+/* this is the size past which hardware will drop packets when setting LPE=0 */
+#define MAXIMUM_ETHERNET_VLAN_SIZE 1522
+
 /* How many Tx Descriptors do we need to call netif_wake_queue ? */
 #define E1000_TX_QUEUE_WAKE	16
 /* How many Rx Buffers do we bundle into one write to the hardware ? */

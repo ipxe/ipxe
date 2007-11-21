@@ -130,10 +130,11 @@ e1000_sw_init ( struct e1000_adapter *adapter )
 	adapter->rx_int_delay = 0;
 	adapter->rx_abs_int_delay = 0;
 
-	adapter->rx_buffer_len =  1600;
-	adapter->rx_ps_bsize0 = E1000_RXBUFFER_128;
-	hw->max_frame_size =  1600;
-	hw->min_frame_size = ETH_ZLEN;
+        adapter->rx_buffer_len = MAXIMUM_ETHERNET_VLAN_SIZE;
+        adapter->rx_ps_bsize0 = E1000_RXBUFFER_128;
+        hw->max_frame_size = MAXIMUM_ETHERNET_VLAN_SIZE +
+		ENET_HEADER_SIZE + ETHERNET_FCS_SIZE;
+        hw->min_frame_size = MINIMUM_ETHERNET_FRAME_SIZE;
 
 	/* identify the MAC */
 
@@ -170,7 +171,6 @@ e1000_sw_init ( struct e1000_adapter *adapter )
 		hw->master_slave = E1000_MASTER_SLAVE;
 	}
 
-	/* Explicitly disable IRQ since the NIC can be in any state. */
 	e1000_irq_disable ( adapter );
 
 	return 0;
@@ -370,7 +370,7 @@ e1000_setup_rx_resources ( struct e1000_adapter *adapter )
 
 	for ( i = 0; i < NUM_RX_DESC; i++ ) {
 	
-		adapter->rx_iobuf[i] = alloc_iob ( 1600 );
+		adapter->rx_iobuf[i] = alloc_iob ( MAXIMUM_ETHERNET_VLAN_SIZE );
 		
 		/* If unable to allocate all iobufs, free any that
 		 * were successfully allocated, and return an error 
@@ -386,6 +386,7 @@ e1000_setup_rx_resources ( struct e1000_adapter *adapter )
 					  ( i * sizeof ( *adapter->rx_base ) ); 
 			
 		rx_curr_desc->buffer_addr = virt_to_bus ( adapter->rx_iobuf[i]->data );	
+
 		DBG ( "i = %d  rx_curr_desc->buffer_addr = %#16llx\n", 
 		      i, rx_curr_desc->buffer_addr );
 		
@@ -571,22 +572,23 @@ static void
 e1000_close ( struct net_device *netdev )
 {
 	struct e1000_adapter *adapter = netdev_priv ( netdev );
+	struct e1000_hw *hw = &adapter->hw;
 	uint32_t rctl;
 	uint32_t icr;
 
 	DBG ( "e1000_close\n" );
 	
-	/* disable receives */
-	rctl = E1000_READ_REG ( &adapter->hw, RCTL );
-	E1000_WRITE_REG ( &adapter->hw, RCTL, rctl & ~E1000_RCTL_EN );
-	E1000_WRITE_FLUSH ( &adapter->hw );
-
 	/* Acknowledge interrupts */
-	icr = E1000_READ_REG ( &adapter->hw, ICR );
+	icr = E1000_READ_REG ( hw, ICR );
 
 	e1000_irq_disable ( adapter );
 
-	e1000_reset_hw ( &adapter->hw );
+	/* disable receives */
+	rctl = E1000_READ_REG ( hw, RCTL );
+	E1000_WRITE_REG ( hw, RCTL, rctl & ~E1000_RCTL_EN );
+	E1000_WRITE_FLUSH ( hw );
+
+	e1000_reset_hw ( hw );
 
 	e1000_free_tx_resources ( adapter );
 	e1000_free_rx_resources ( adapter );
@@ -678,6 +680,7 @@ e1000_poll ( struct net_device *netdev )
 	struct e1000_tx_desc *tx_curr_desc;
 	struct e1000_rx_desc *rx_curr_desc;
 	uint32_t i;
+	uint64_t tmp_buffer_addr;
 	
 #if 0
 	DBG ( "e1000_poll\n" );
@@ -776,9 +779,9 @@ e1000_poll ( struct net_device *netdev )
 			netdev_rx ( netdev, rx_iob );
 		}
 
+		tmp_buffer_addr = rx_curr_desc->buffer_addr;
 		memset ( rx_curr_desc, 0, sizeof ( *rx_curr_desc ) );
-
-		rx_curr_desc->buffer_addr = virt_to_bus ( adapter->rx_iobuf[adapter->rx_tail]->data );
+		rx_curr_desc->buffer_addr = tmp_buffer_addr;
 
 		E1000_WRITE_REG ( hw, RDT, adapter->rx_tail );
 
@@ -876,7 +879,6 @@ e1000_probe ( struct pci_device *pdev,
 	err = -EIO;
 
 	adapter->hw.hw_addr = ioremap ( mmio_start, mmio_len );
-	
 	DBG ( "adapter->hw.hw_addr: %p\n", adapter->hw.hw_addr );
 	
 	if ( ! adapter->hw.hw_addr )
@@ -989,6 +991,11 @@ e1000_remove ( struct pci_device *pdev )
 	
 	DBG ( "e1000_remove\n" );
 
+	if ( adapter->hw.flash_address )
+		iounmap ( adapter->hw.flash_address );
+	if  ( adapter->hw.hw_addr )
+		iounmap ( adapter->hw.hw_addr );
+
 	unregister_netdev ( netdev );
 	e1000_reset_hw ( &adapter->hw );
 	netdev_nullify ( netdev );
@@ -1030,8 +1037,6 @@ e1000_open ( struct net_device *netdev )
 	
         DBG ( "RXDCTL: %#08lx\n",  E1000_READ_REG ( &adapter->hw, RXDCTL ) );
 
-	e1000_irq_enable ( adapter );
-
 	return 0;
 
 err_setup_rx:
@@ -1064,7 +1069,7 @@ e1000_read_pcie_cap_reg(struct e1000_hw *hw, uint32_t reg, uint16_t *value)
 
     pci_read_config_word(adapter->pdev, cap_offset + reg, value);
 
-    return E1000_SUCCESS;
+    return 0;
 }
 
 void
