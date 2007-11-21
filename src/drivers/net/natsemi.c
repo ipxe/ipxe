@@ -227,6 +227,7 @@ static void natsemi_remove (struct pci_device *pci) {
  
 	unregister_netdev (netdev);
 	natsemi_reset (netdev);
+	netdev_nullify ( netdev );
 	netdev_put (netdev);
 }
 
