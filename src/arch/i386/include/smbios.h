@@ -32,6 +32,8 @@ struct smbios_system_information {
 	uint8_t serial;
 	/** UUID */
 	uint8_t uuid[16];
+	/** Wake-up type */
+	uint8_t wakeup;
 } __attribute__ (( packed ));
 
 /** SMBIOS system information structure type */

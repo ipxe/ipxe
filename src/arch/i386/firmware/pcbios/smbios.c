@@ -21,6 +21,7 @@
 #include <stdio.h>
 #include <errno.h>
 #include <gpxe/uaccess.h>
+#include <gpxe/uuid.h>
 #include <realmode.h>
 #include <pnpbios.h>
 #include <smbios.h>
@@ -301,34 +302,22 @@ int find_smbios_string ( struct smbios_strings *strings, unsigned int index,
 }
 
 /**
- * Find SMBIOS serial number
+ * Get UUID from SMBIOS
  *
+ * @v uuid		UUID to fill in
+ * @ret rc		Return status code
  */
-int dump_smbios_info ( void ) {
+int smbios_get_uuid ( union uuid *uuid ) {
 	struct smbios_system_information sysinfo;
-	struct smbios_strings strings;
-	char buf[64];
 	int rc;
 
 	if ( ( rc = find_smbios_structure ( SMBIOS_TYPE_SYSTEM_INFORMATION,
 					    &sysinfo, sizeof ( sysinfo ),
-					    &strings ) ) != 0 )
+					    NULL ) ) != 0 )
 		return rc;
 
-	DBG_HD ( &sysinfo, sizeof ( sysinfo ) );
-
-	if ( ( rc = find_smbios_string ( &strings, sysinfo.manufacturer,
-					 buf, sizeof ( buf ) ) ) != 0 )
-		return rc;
-	DBG ( "Manufacturer: \"%s\"\n", buf );
-
-	if ( ( rc = find_smbios_string ( &strings, sysinfo.product,
-					 buf, sizeof ( buf ) ) ) != 0 )
-		return rc;
-	DBG ( "Product: \"%s\"\n", buf );
-
-	DBG ( "UUID:\n" );
-	DBG_HD ( &sysinfo.uuid, sizeof ( sysinfo.uuid ) );
+	memcpy ( uuid, sysinfo.uuid, sizeof ( *uuid ) );
+	DBG ( "SMBIOS found UUID %s\n", uuid_ntoa ( uuid ) );
 
 	return 0;
 }
