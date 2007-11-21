@@ -46,5 +46,6 @@ extern int find_smbios_structure ( unsigned int type,
 extern int find_smbios_string ( struct smbios_strings *strings,
 				unsigned int index,
 				char *buffer, size_t length );
+extern int smbios_get_uuid ( union uuid *uuid );
 
 #endif /* _SMBIOS_H */

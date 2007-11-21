@@ -135,6 +135,9 @@ struct job_interface;
  */
 #define DHCP_BOOTFILE_NAME 67
 
+/** UUID client identifier */
+#define DHCP_CLIENT_UUID 97
+
 /** Etherboot-specific encapsulated options
  *
  * This encapsulated options field is used to contain all options

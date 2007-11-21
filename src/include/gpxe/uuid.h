@@ -8,6 +8,9 @@
 
 #include <stdint.h>
 
+union uuid;
+#include <bits/uuid.h>
+
 /** A universally unique ID */
 union uuid {
 	/** Canonical form (00000000-0000-0000-0000-000000000000) */

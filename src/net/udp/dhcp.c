@@ -31,6 +31,7 @@
 #include <gpxe/retry.h>
 #include <gpxe/tcpip.h>
 #include <gpxe/ip.h>
+#include <gpxe/uuid.h>
 #include <gpxe/dhcp.h>
 
 /** @file
@@ -529,6 +530,7 @@ int create_dhcp_request ( struct net_device *netdev, int msgtype,
 	struct device_description *desc = &netdev->dev->desc;
 	struct dhcp_netdev_desc dhcp_desc;
 	struct dhcp_client_id client_id;
+	union uuid uuid;
 	size_t dhcp_features_len;
 	size_t ll_addr_len;
 	int rc;
@@ -602,6 +604,17 @@ int create_dhcp_request ( struct net_device *netdev, int msgtype,
 		DBG ( "DHCP could not set client ID: %s\n",
 		      strerror ( rc ) );
 		return rc;
+	}
+
+	/* Add client UUID, if we have one.  Required for PXE. */
+	if ( ( rc = get_uuid ( &uuid ) ) == 0 ) {
+		if ( ( rc = set_dhcp_packet_option ( dhcppkt,
+						     DHCP_CLIENT_UUID, &uuid,
+						     sizeof ( uuid ) ) ) !=0){
+			DBG ( "DHCP could not set client UUID: %s\n",
+			      strerror ( rc ) );
+			return rc;
+		}
 	}
 
 	return 0;
