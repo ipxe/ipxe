@@ -32,27 +32,30 @@
  *
  */
 
-static struct dhcp_option_block *dhcp_options = NULL;
-
 static int dhcp_success ( struct net_device *netdev,
 			  struct dhcp_option_block *options ) {
-	dhcp_options = dhcpopt_get ( options );
+	DBGC ( options, "DHCP client registering options %p\n", options );
 	register_dhcp_options ( options );
 	return dhcp_configure_netdev ( netdev, options );
 }
 
 int dhcp ( struct net_device *netdev ) {
+	struct dhcp_option_block *options;
+	struct dhcp_option_block *tmp;
 	int rc;
 
 	/* Check we can open the interface first */
 	if ( ( rc = ifopen ( netdev ) ) != 0 )
 		return rc;
 
-	/* Unregister any previously acquired options */
-	if ( dhcp_options ) {
-		unregister_dhcp_options ( dhcp_options );
-		dhcpopt_put ( dhcp_options );
-		dhcp_options = NULL;
+	/* Unregister any option blocks acquired via DHCP */
+	list_for_each_entry_safe ( options, tmp, &dhcp_option_blocks, list ) {
+		/* Skip static option blocks (e.g. from NVS) */
+		if ( find_dhcp_option ( options, DHCP_MESSAGE_TYPE ) ) {
+			DBGC ( options, "DHCP client unregistering options "
+			       "%p\n", options );
+			unregister_dhcp_options ( options );
+		}
 	}
 
 	/* Perform DHCP */

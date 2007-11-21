@@ -1006,13 +1006,17 @@ int dhcp_configure_netdev ( struct net_device *netdev,
 	struct in_addr gateway = { INADDR_NONE };
 	int rc;
 
-	/* Clear any existing routing table entry */
-	del_ipv4_address ( netdev );
-
 	/* Retrieve IP address configuration */
 	find_dhcp_ipv4_option ( options, DHCP_EB_YIADDR, &address );
 	find_dhcp_ipv4_option ( options, DHCP_SUBNET_MASK, &netmask );
 	find_dhcp_ipv4_option ( options, DHCP_ROUTERS, &gateway );
+
+	/* Do nothing unless we have at least an IP address to use */
+	if ( ! address.s_addr )
+		return 0;
+
+	/* Clear any existing routing table entry */
+	del_ipv4_address ( netdev );
 
 	/* Set up new IP address configuration */
 	if ( ( rc = add_ipv4_address ( netdev, address, netmask,

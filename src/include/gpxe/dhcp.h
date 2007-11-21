@@ -512,6 +512,8 @@ dhcpopt_put ( struct dhcp_option_block *options ) {
 	ref_put ( &options->refcnt );
 }
 
+extern struct list_head dhcp_option_blocks;
+
 extern unsigned long dhcp_num_option ( struct dhcp_option *option );
 extern void dhcp_ipv4_option ( struct dhcp_option *option,
 			       struct in_addr *inp );

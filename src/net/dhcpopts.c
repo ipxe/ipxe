@@ -35,7 +35,7 @@
  */
 
 /** List of registered DHCP option blocks */
-static LIST_HEAD ( option_blocks );
+LIST_HEAD ( dhcp_option_blocks );
 
 /** Registered DHCP option applicators */
 static struct dhcp_option_applicator dhcp_option_applicators[0]
@@ -259,7 +259,7 @@ struct dhcp_option * find_dhcp_option ( struct dhcp_option_block *options,
 	if ( options ) {
 		return find_dhcp_option_with_encap ( options, tag, NULL );
 	} else {
-		list_for_each_entry ( options, &option_blocks, list ) {
+		list_for_each_entry ( options, &dhcp_option_blocks, list ) {
 			if ( ( option = find_dhcp_option ( options, tag ) ) )
 				return option;
 		}
@@ -283,7 +283,7 @@ void register_dhcp_options ( struct dhcp_option_block *options ) {
 	      options, options->priority );
 
 	/* Insert after any existing blocks which have a higher priority */
-	list_for_each_entry ( existing, &option_blocks, list ) {
+	list_for_each_entry ( existing, &dhcp_option_blocks, list ) {
 		if ( options->priority > existing->priority )
 			break;
 	}
