@@ -183,6 +183,13 @@ struct job_interface;
  *
  */
 
+/** Ignore ProxyDHCP
+ *
+ * If set to a non-zero value, gPXE will not wait for ProxyDHCP offers
+ * and will ignore any ProxyDHCP offers that it receives.
+ */
+#define DHCP_EB_NO_PROXYDHCP DHCP_ENCAP_OPT ( DHCP_EB_ENCAP, 0xb0 )
+
 /** Network device descriptor
  *
  * Byte 0 is the bus type ID; remaining bytes depend on the bus type.
@@ -514,7 +521,7 @@ dhcpopt_put ( struct dhcp_option_block *options ) {
 }
 
 /** Maximum time that we will wait for ProxyDHCP offers */
-#define PROXYDHCP_WAIT_TIME ( TICKS_PER_SEC * 2 )
+#define PROXYDHCP_WAIT_TIME ( TICKS_PER_SEC * 1 )
 
 extern struct list_head dhcp_option_blocks;
 

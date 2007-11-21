@@ -832,9 +832,10 @@ static int dhcp_deliver_raw ( struct xfer_interface *xfer,
 	const struct dhcphdr *dhcphdr = data;
 	struct dhcp_option_block *options;
 	struct dhcp_option_block **store_options;
-	int is_proxy;
 	unsigned int msgtype;
 	unsigned long elapsed;
+	int is_proxy;
+	int ignore_proxy;
 
 	/* Check for matching transaction ID */
 	if ( dhcphdr->xid != dhcp_xid ( dhcp->netdev ) ) {
@@ -878,17 +879,22 @@ static int dhcp_deliver_raw ( struct xfer_interface *xfer,
 		dhcpopt_put ( options );
 	}
 
+	/* If we don't yet have a standard DHCP response (i.e. one
+	 * with an IP address), then just leave the timer running.
+	 */
+	if ( ! dhcp->options )
+		goto out;
+
 	/* Handle DHCP response */
+	ignore_proxy = find_dhcp_num_option ( dhcp->options,
+					      DHCP_EB_NO_PROXYDHCP );
 	switch ( dhcp->state ) {
 	case DHCPDISCOVER:
-		/* If we have received a valid standard DHCP response
-		 * (i.e. one with an IP address), and we have allowed
-		 * sufficient time for ProxyDHCP reponses, then
-		 * transition to making the DHCPREQUEST.
+		/* If we have allowed sufficient time for ProxyDHCP
+		 * reponses, then transition to making the DHCPREQUEST.
 		 */
 		elapsed = ( currticks() - dhcp->start );
-		if ( dhcp->options &&
-		     ( elapsed > PROXYDHCP_WAIT_TIME ) ) {
+		if ( ignore_proxy || ( elapsed > PROXYDHCP_WAIT_TIME ) ) {
 			stop_timer ( &dhcp->timer );
 			dhcp->state = DHCPREQUEST;
 			dhcp_send_request ( dhcp );
@@ -896,9 +902,10 @@ static int dhcp_deliver_raw ( struct xfer_interface *xfer,
 		break;
 	case DHCPREQUEST:
 		/* DHCP finished; register options and exit */
-		if ( dhcp->proxy_options )
+		if ( dhcp->proxy_options && ( ! ignore_proxy ) ) {
 			dhcp->register_options ( dhcp->netdev,
 						 dhcp->proxy_options );
+		}
 		dhcp->register_options ( dhcp->netdev, dhcp->options );
 		dhcp_finished ( dhcp, 0 );
 		break;
@@ -906,6 +913,7 @@ static int dhcp_deliver_raw ( struct xfer_interface *xfer,
 		assert ( 0 );
 	}
 
+ out:
 	return 0;
 
  out_discard:
