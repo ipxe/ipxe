@@ -147,6 +147,7 @@ SRCDIRS		+= net net/tcp net/udp
 SRCDIRS		+= image
 SRCDIRS		+= drivers/bus
 SRCDIRS		+= drivers/net
+SRCDIRS		+= drivers/net/e1000
 SRCDIRS		+= drivers/block
 SRCDIRS		+= drivers/scsi
 SRCDIRS		+= drivers/ata
