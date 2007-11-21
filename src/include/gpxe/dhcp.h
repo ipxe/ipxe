@@ -135,6 +135,12 @@ struct job_interface;
  */
 #define DHCP_BOOTFILE_NAME 67
 
+/** Client system architecture */
+#define DHCP_CLIENT_ARCHITECTURE 93
+
+/** Client network device interface */
+#define DHCP_CLIENT_NDI 94
+
 /** UUID client identifier */
 #define DHCP_CLIENT_UUID 97
 

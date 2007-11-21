@@ -61,13 +61,17 @@ static const uint8_t dhcp_op[] = {
 static uint8_t dhcp_request_options_data[] = {
 	DHCP_MAX_MESSAGE_SIZE, DHCP_WORD ( ETH_MAX_MTU ),
 	DHCP_VENDOR_CLASS_ID,
-	DHCP_STRING (  'E', 't', 'h', 'e', 'r', 'b', 'o', 'o', 't' ),
+	DHCP_STRING (  'P', 'X', 'E', 'C', 'l', 'i', 'e', 'n', 't', ':',
+		       'A', 'r', 'c', 'h', ':', '0', '0', '0', '0', '0', ':',
+		       'U', 'N', 'D', 'I', ':', '0', '0', '2', '0', '0', '1' ),
+	DHCP_CLIENT_ARCHITECTURE, DHCP_WORD ( 0 ),
+	DHCP_CLIENT_NDI, DHCP_OPTION ( 1 /* UNDI */ , 2, 1 /* v2.1 */ ),
 	DHCP_PARAMETER_REQUEST_LIST,
-	DHCP_OPTION ( DHCP_SUBNET_MASK, DHCP_ROUTERS, DHCP_DNS_SERVERS, DHCP_LOG_SERVERS,
-		      DHCP_HOST_NAME, DHCP_DOMAIN_NAME, DHCP_ROOT_PATH,
-		      DHCP_VENDOR_ENCAP, DHCP_TFTP_SERVER_NAME,
-		      DHCP_BOOTFILE_NAME, DHCP_EB_ENCAP,
-		      DHCP_ISCSI_INITIATOR_IQN ),
+	DHCP_OPTION ( DHCP_SUBNET_MASK, DHCP_ROUTERS, DHCP_DNS_SERVERS,
+		      DHCP_LOG_SERVERS, DHCP_HOST_NAME, DHCP_DOMAIN_NAME,
+		      DHCP_ROOT_PATH, DHCP_VENDOR_ENCAP, DHCP_VENDOR_CLASS_ID,
+		      DHCP_TFTP_SERVER_NAME, DHCP_BOOTFILE_NAME,
+		      DHCP_EB_ENCAP, DHCP_ISCSI_INITIATOR_IQN ),
 	DHCP_END
 };
 
@@ -512,6 +516,16 @@ struct dhcp_client_id {
 	uint8_t ll_addr[MAX_LL_ADDR_LEN];
 } __attribute__ (( packed ));
 
+/** DHCP client UUID */
+struct dhcp_client_uuid {
+	/** Identifier type */
+	uint8_t type;
+	/** UUID */
+	union uuid uuid;
+} __attribute__ (( packed ));
+
+#define DHCP_CLIENT_UUID_TYPE 0
+
 /**
  * Create DHCP request
  *
@@ -530,7 +544,7 @@ int create_dhcp_request ( struct net_device *netdev, int msgtype,
 	struct device_description *desc = &netdev->dev->desc;
 	struct dhcp_netdev_desc dhcp_desc;
 	struct dhcp_client_id client_id;
-	union uuid uuid;
+	struct dhcp_client_uuid client_uuid;
 	size_t dhcp_features_len;
 	size_t ll_addr_len;
 	int rc;
@@ -607,10 +621,11 @@ int create_dhcp_request ( struct net_device *netdev, int msgtype,
 	}
 
 	/* Add client UUID, if we have one.  Required for PXE. */
-	if ( ( rc = get_uuid ( &uuid ) ) == 0 ) {
+	client_uuid.type = DHCP_CLIENT_UUID_TYPE;
+	if ( ( rc = get_uuid ( &client_uuid.uuid ) ) == 0 ) {
 		if ( ( rc = set_dhcp_packet_option ( dhcppkt,
-						     DHCP_CLIENT_UUID, &uuid,
-						     sizeof ( uuid ) ) ) !=0){
+					   DHCP_CLIENT_UUID, &client_uuid,
+					   sizeof ( client_uuid ) ) ) != 0 ) {
 			DBG ( "DHCP could not set client UUID: %s\n",
 			      strerror ( rc ) );
 			return rc;
