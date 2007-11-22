@@ -83,8 +83,33 @@ PXENV_EXIT_t pxenv_get_cached_info ( struct s_PXENV_GET_CACHED_INFO
 	DBG ( " to %04x:%04x+%x", get_cached_info->Buffer.segment,
 	      get_cached_info->Buffer.offset, get_cached_info->BufferSize );
 
-	/* This is really, really awkward to support with our multiple
-	 * sources of options.
+	/* The case in which the caller doesn't supply a buffer is
+	 * really awkward to support given that we have multiple
+	 * sources of options, and that we don't actually store the
+	 * DHCP packets.  (We may not even have performed DHCP; we may
+	 * have obtained all configuration from non-volatile stored
+	 * options or from the command line.)  We provide the caller
+	 * with our base-memory temporary packet buffer and construct
+	 * the packet in there.
+	 *
+	 * To add to the fun, Intel decided at some point in the
+	 * evolution of the PXE specification to add the BufferLimit
+	 * field, which we are meant to fill in with the length of our
+	 * packet buffer, so that the caller can safely modify the
+	 * boot server reply packet stored therein.  However, this
+	 * field was not present in earlier versions of the PXE spec,
+	 * and there is at least one PXE NBP (Altiris) which allocates
+	 * only exactly enough space for this earlier, shorter version
+	 * of the structure.  If we actually fill in the BufferLimit
+	 * field, we therefore risk trashing random areas of the
+	 * caller's memory.  If we *don't* fill it in, then the caller
+	 * is at liberty to assume that whatever random value happened
+	 * to be in that location represents the length of the buffer
+	 * we've just passed back to it.
+	 *
+	 * Since older PXE stacks won't fill this field in anyway,
+	 * it's probably safe to assume that no callers actually rely
+	 * on it, so we choose to not fill it in.
 	 */
 	len = get_cached_info->BufferSize;
 	if ( len == 0 ) {
@@ -92,7 +117,9 @@ PXENV_EXIT_t pxenv_get_cached_info ( struct s_PXENV_GET_CACHED_INFO
 		get_cached_info->Buffer.segment = rm_ds;
 		get_cached_info->Buffer.offset =
 			( unsigned int ) ( & __from_data16 ( basemem_packet ) );
-		get_cached_info->BufferLimit = len;
+		DBG ( " using %04x:%04x+'%x'", get_cached_info->Buffer.segment,
+		      get_cached_info->Buffer.offset,
+		      get_cached_info->BufferLimit );
 	}
 
 	/* Allocate space for temporary copy */
@@ -118,6 +145,7 @@ PXENV_EXIT_t pxenv_get_cached_info ( struct s_PXENV_GET_CACHED_INFO
 
 	/* Overwrite filename to work around Microsoft RIS bug */
 	if ( pxe_ris_filename ) {
+		DBG ( " applying RIS hack" );
 		strncpy ( dhcppkt.dhcphdr->file, pxe_ris_filename,
 			  sizeof ( dhcppkt.dhcphdr->file ) );
 	}
@@ -126,6 +154,7 @@ PXENV_EXIT_t pxenv_get_cached_info ( struct s_PXENV_GET_CACHED_INFO
 	buffer = real_to_user ( get_cached_info->Buffer.segment,
 				get_cached_info->Buffer.offset );
 	len = dhcppkt.len;
+	DBG ( " length %x", len );
 	copy_to_user ( buffer, 0, data, len );
 	get_cached_info->BufferSize = len;
 
