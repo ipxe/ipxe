@@ -433,6 +433,8 @@ static int tftp_rx_data ( struct tftp_request *tftp,
 	data_len = iob_len ( iobuf );
 
 	/* Check for correct block */
+	if ( ( tftp->state == -1 ) && ( block == 1 ) )
+		tftp->state = 0;
 	if ( block != ( tftp->state + 1 ) ) {
 		DBGC ( tftp, "TFTP %p received out-of-order block %d "
 		       "(expecting %d)\n", tftp, block, ( tftp->state + 1 ) );
