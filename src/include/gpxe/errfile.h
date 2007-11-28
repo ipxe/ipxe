@@ -50,6 +50,7 @@
 #define ERRFILE_settings	       ( ERRFILE_CORE | 0x000c0000 )
 #define ERRFILE_vsprintf	       ( ERRFILE_CORE | 0x000d0000 )
 #define ERRFILE_xfer		       ( ERRFILE_CORE | 0x000e0000 )
+#define ERRFILE_bitmap		       ( ERRFILE_CORE | 0x000f0000 )
 
 #define ERRFILE_eisa		     ( ERRFILE_DRIVER | 0x00000000 )
 #define ERRFILE_isa		     ( ERRFILE_DRIVER | 0x00010000 )

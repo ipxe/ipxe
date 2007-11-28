@@ -31,6 +31,7 @@
 #include <gpxe/tcpip.h>
 #include <gpxe/retry.h>
 #include <gpxe/features.h>
+#include <gpxe/bitmap.h>
 #include <gpxe/tftp.h>
 
 /** @file
@@ -56,6 +57,8 @@ struct tftp_request {
 	struct uri *uri;
 	/** Transport layer interface */
 	struct xfer_interface socket;
+	/** Multicast transport layer interface */
+	struct xfer_interface mc_socket;
 
 	/** Data block size
 	 *
@@ -71,24 +74,38 @@ struct tftp_request {
 	 * "tsize" option, this value will be zero.
 	 */
 	unsigned long tsize;
-
-	/** Request state
+	/** Multicast address
 	 *
-	 * This is the block number to be used in the next ACK sent
-	 * back to the server, i.e. the number of the last received
-	 * data block.  The value zero indicates that the last
-	 * received block was an OACK (i.e. that the next ACK will
-	 * contain a block number of zero), and any value less than
-	 * zero indicates that the connection has not yet been opened
-	 * (i.e. that no blocks have yet been received).
+	 * This is the destination address for multicast data
+	 * transmissions.
 	 */
-	int state;
+	struct sockaddr_tcpip multicast;
+	/** Master client
+	 *
+	 * True if this is the client responsible for sending ACKs.
+	 */
+	int master;
+	
 	/** Peer address
 	 *
 	 * The peer address is determined by the first response
 	 * received to the TFTP RRQ.
 	 */
 	struct sockaddr_tcpip peer;
+	/** Block bitmap */
+	struct bitmap bitmap;
+	/** Maximum known length
+	 *
+	 * We don't always know the file length in advance.  In
+	 * particular, if the TFTP server doesn't support the tsize
+	 * option, or we are using MTFTP, then we don't know the file
+	 * length until we see the end-of-file block (which, in the
+	 * case of MTFTP, may not be the last block we see).
+	 *
+	 * This value is updated whenever we obtain information about
+	 * the file length.
+	 */
+	size_t filesize;
 	/** Retransmission timer */
 	struct retry_timer timer;
 };
@@ -103,6 +120,7 @@ static void tftp_free ( struct refcnt *refcnt ) {
 		container_of ( refcnt, struct tftp_request, refcnt );
 
 	uri_put ( tftp->uri );
+	bitmap_free ( &tftp->bitmap );
 	free ( tftp );
 }
 
@@ -123,8 +141,46 @@ static void tftp_done ( struct tftp_request *tftp, int rc ) {
 	/* Close all data transfer interfaces */
 	xfer_nullify ( &tftp->socket );
 	xfer_close ( &tftp->socket, rc );
+	xfer_nullify ( &tftp->mc_socket );
+	xfer_close ( &tftp->mc_socket, rc );
 	xfer_nullify ( &tftp->xfer );
 	xfer_close ( &tftp->xfer, rc );
+}
+
+/**
+ * Presize TFTP receive buffers and block bitmap
+ *
+ * @v tftp		TFTP connection
+ * @v filesize		Known minimum file size
+ * @ret rc		Return status code
+ */
+static int tftp_presize ( struct tftp_request *tftp, size_t filesize ) {
+	unsigned int num_blocks;
+	int rc;
+
+	/* Do nothing if we are already large enough */
+	if ( filesize <= tftp->filesize )
+		return 0;
+
+	/* Record filesize */
+	tftp->filesize = filesize;
+
+	/* Notify recipient of file size */
+	xfer_seek ( &tftp->xfer, filesize, SEEK_SET );
+	xfer_seek ( &tftp->xfer, 0, SEEK_SET );
+
+	/* Calculate expected number of blocks.  Note that files whose
+	 * length is an exact multiple of the blocksize will have a
+	 * trailing zero-length block, which must be included.
+	 */
+	num_blocks = ( ( filesize / tftp->blksize ) + 1 );
+	if ( ( rc = bitmap_resize ( &tftp->bitmap, num_blocks ) ) != 0 ) {
+		DBGC ( tftp, "TFTP %p could not resize bitmap to %d blocks: "
+		       "%s\n", tftp, num_blocks, strerror ( rc ) );
+		return rc;
+	}
+
+	return 0;
 }
 
 /**
@@ -157,7 +213,8 @@ static int tftp_send_rrq ( struct tftp_request *tftp ) {
 	size_t len = ( sizeof ( *rrq ) + strlen ( path ) + 1 /* NUL */
 		       + 5 + 1 /* "octet" + NUL */
 		       + 7 + 1 + 5 + 1 /* "blksize" + NUL + ddddd + NUL */
-		       + 5 + 1 + 1 + 1 /* "tsize" + NUL + "0" + NUL */ );
+		       + 5 + 1 + 1 + 1 /* "tsize" + NUL + "0" + NUL */ 
+		       + 9 + 1 + 1 /* "multicast" + NUL + NUL */ );
 	struct io_buffer *iobuf;
 
 	DBGC ( tftp, "TFTP %p requesting \"%s\"\n", tftp, path );
@@ -172,8 +229,9 @@ static int tftp_send_rrq ( struct tftp_request *tftp ) {
 	rrq->opcode = htons ( TFTP_RRQ );
 	iob_put ( iobuf,
 		  snprintf ( rrq->data, iob_tailroom ( iobuf ),
-			     "%s%coctet%cblksize%c%d%ctsize%c0", path, 0,
-			     0, 0, tftp_request_blksize, 0, 0 ) + 1 );
+			     "%s%coctet%cblksize%c%d%ctsize%c0%cmulticast%c",
+			     path, 0, 0, 0, tftp_request_blksize, 0,
+			     0, 0, 0 ) + 1 );
 
 	/* RRQ always goes to the address specified in the initial
 	 * xfer_open() call
@@ -193,9 +251,11 @@ static int tftp_send_ack ( struct tftp_request *tftp ) {
 	struct xfer_metadata meta = {
 		.dest = ( struct sockaddr * ) &tftp->peer,
 	};
+	unsigned int block;
 
-	DBGC2 ( tftp, "TFTP %p sending ACK for block %d\n",
-		tftp, tftp->state );
+	/* Determine next required block number */
+	block = bitmap_first_gap ( &tftp->bitmap );
+	DBGC2 ( tftp, "TFTP %p sending ACK for block %d\n", tftp, block );
 
 	/* Allocate buffer */
 	iobuf = xfer_alloc_iob ( &tftp->socket, sizeof ( *ack ) );
@@ -205,28 +265,34 @@ static int tftp_send_ack ( struct tftp_request *tftp ) {
 	/* Build ACK */
 	ack = iob_put ( iobuf, sizeof ( *ack ) );
 	ack->opcode = htons ( TFTP_ACK );
-	ack->block = htons ( tftp->state );
+	ack->block = htons ( block );
 
 	/* ACK always goes to the peer recorded from the RRQ response */
 	return xfer_deliver_iob_meta ( &tftp->socket, iobuf, &meta );
 }
 
 /**
- * Transmit data
+ * Transmit next relevant packet
  *
  * @v tftp		TFTP connection
  * @ret rc		Return status code
  */
 static int tftp_send_packet ( struct tftp_request *tftp ) {
 
-	/* Start retransmission timer */
+	/* Update retransmission timer */
+	stop_timer ( &tftp->timer );
 	start_timer ( &tftp->timer );
 
-	/* Send RRQ or ACK as appropriate */
-	if ( tftp->state < 0 ) {
-		return tftp_send_rrq ( tftp );
+	/* If we are the master client, send RRQ or ACK as appropriate */
+	if ( tftp->master ) {
+		if ( ! tftp->peer.st_family ) {
+			return tftp_send_rrq ( tftp );
+		} else {
+			return tftp_send_ack ( tftp );
+		}
 	} else {
-		return tftp_send_ack ( tftp );
+		/* Do nothing when not the master client */
+		return 0;
 	}
 }
 
@@ -245,24 +311,6 @@ static void tftp_timer_expired ( struct retry_timer *timer, int fail ) {
 	} else {
 		tftp_send_packet ( tftp );
 	}
-}
-
-/**
- * Mark TFTP block as received
- *
- * @v tftp		TFTP connection
- * @v block		Block number
- */
-static void tftp_received ( struct tftp_request *tftp, unsigned int block ) {
-
-	/* Stop the retry timer */
-	stop_timer ( &tftp->timer );
-
-	/* Update state to indicate which block we're now waiting for */
-	tftp->state = block;
-
-	/* Send next packet */
-	tftp_send_packet ( tftp );
 }
 
 /**
@@ -306,9 +354,86 @@ static int tftp_process_tsize ( struct tftp_request *tftp,
 	}
 	DBGC ( tftp, "TFTP %p tsize=%ld\n", tftp, tftp->tsize );
 
-	/* Notify recipient of file size */
-	xfer_seek ( &tftp->xfer, tftp->tsize, SEEK_SET );
-	xfer_seek ( &tftp->xfer, 0, SEEK_SET );
+	return 0;
+}
+
+/**
+ * Process TFTP "multicast" option
+ *
+ * @v tftp		TFTP connection
+ * @v value		Option value
+ * @ret rc		Return status code
+ */
+static int tftp_process_multicast ( struct tftp_request *tftp,
+				    const char *value ) {
+	struct sockaddr_in *sin = ( struct sockaddr_in * ) &tftp->multicast;
+	char buf[ strlen ( value ) + 1 ];
+	char *addr;
+	char *port;
+	char *port_end;
+	char *mc;
+	char *mc_end;
+	struct sockaddr *mc_peer;
+	struct sockaddr *mc_local;
+	int rc;
+
+	/* Split value into "addr,port,mc" fields */
+	memcpy ( buf, value, sizeof ( buf ) );
+	addr = buf;
+	port = strchr ( addr, ',' );
+	if ( ! port ) {
+		DBGC ( tftp, "TFTP %p multicast missing port,mc\n", tftp );
+		return -EINVAL;
+	}
+	*(port++) = '\0';
+	mc = strchr ( port, ',' );
+	if ( ! mc ) {
+		DBGC ( tftp, "TFTP %p multicast missing mc\n", tftp );
+		return -EINVAL;
+	}
+	*(mc++) = '\0';
+
+	/* Parse parameters */
+	if ( *addr ) {
+		if ( inet_aton ( addr, &sin->sin_addr ) == 0 ) {
+			DBGC ( tftp, "TFTP %p multicast invalid IP address "
+			       "%s\n", tftp, addr );
+			return -EINVAL;
+		}
+		DBGC ( tftp, "TFTP %p multicast IP address %s\n",
+		       tftp, inet_ntoa ( sin->sin_addr ) );
+	}
+	if ( *port ) {
+		sin->sin_port = htons ( strtoul ( port, &port_end, 0 ) );
+		if ( *port_end ) {
+			DBGC ( tftp, "TFTP %p multicast invalid port %s\n",
+			       tftp, port );
+			return -EINVAL;
+		}
+		DBGC ( tftp, "TFTP %p multicast port %d\n",
+		       tftp, ntohs ( sin->sin_port ) );
+	}
+	tftp->master = strtoul ( mc, &mc_end, 0 );
+	if ( *mc_end ) {
+		DBGC ( tftp, "TFTP %p multicast invalid mc %s\n", tftp, mc );
+		return -EINVAL;
+	}
+	DBGC ( tftp, "TFTP %p is%s the master client\n",
+	       tftp, ( tftp->master ? "" : " not" ) );
+
+	/* Open multicast socket, if new address specified */
+	if ( *addr || *port ) {
+		xfer_close ( &tftp->mc_socket, 0 );
+		mc_peer = ( ( struct sockaddr * ) &tftp->peer );
+		mc_local = ( ( struct sockaddr * ) &tftp->multicast );
+		mc_local->sa_family = mc_peer->sa_family;
+		if ( ( rc = xfer_open_socket ( &tftp->mc_socket, SOCK_DGRAM,
+					       mc_peer, mc_local ) ) != 0 ) {
+			DBGC ( tftp, "TFTP %p could not open multicast "
+			       "socket: %s\n", tftp, strerror ( rc ) );
+			return rc;
+		}
+	}
 
 	return 0;
 }
@@ -330,6 +455,7 @@ struct tftp_option {
 static struct tftp_option tftp_options[] = {
 	{ "blksize", tftp_process_blksize },
 	{ "tsize", tftp_process_tsize },
+	{ "multicast", tftp_process_multicast },
 	{ NULL, NULL }
 };
 
@@ -353,7 +479,8 @@ static int tftp_process_option ( struct tftp_request *tftp,
 	DBGC ( tftp, "TFTP %p received unknown option \"%s\" = \"%s\"\n",
 	       tftp, name, value );
 
-	return -EINVAL;
+	/* Unknown options should be silently ignored */
+	return 0;
 }
 
 /**
@@ -375,12 +502,14 @@ static int tftp_rx_oack ( struct tftp_request *tftp, void *buf, size_t len ) {
 	if ( len < sizeof ( *oack ) ) {
 		DBGC ( tftp, "TFTP %p received underlength OACK packet "
 		       "length %d\n", tftp, len );
-		return -EINVAL;
+		rc = -EINVAL;
+		goto done;
 	}
 	if ( end[-1] != '\0' ) {
 		DBGC ( tftp, "TFTP %p received OACK missing final NUL\n",
 		       tftp );
-		return -EINVAL;
+		rc = -EINVAL;
+		goto done;
 	}
 
 	/* Process each option in turn */
@@ -390,17 +519,27 @@ static int tftp_rx_oack ( struct tftp_request *tftp, void *buf, size_t len ) {
 		if ( value == end ) {
 			DBGC ( tftp, "TFTP %p received OACK missing value "
 			       "for option \"%s\"\n", tftp, name );
-			return -EINVAL;
+			rc = -EINVAL;
+			goto done;
 		}
 		if ( ( rc = tftp_process_option ( tftp, name, value ) ) != 0 )
-			return rc;
+			goto done;
 		name = ( value + strlen ( value ) + 1 );
 	}
 
-	/* Mark as received block 0 (the OACK) */
-	tftp_received ( tftp, 0 );
+	/* Process tsize information, if available */
+	if ( tftp->tsize ) {
+		if ( ( rc = tftp_presize ( tftp, tftp->tsize ) ) != 0 )
+			goto done;
+	}
 
-	return 0;
+	/* Request next data block */
+	tftp_send_packet ( tftp );
+
+ done:
+	if ( rc )
+		tftp_done ( tftp, rc );
+	return rc;
 }
 
 /**
@@ -416,6 +555,7 @@ static int tftp_rx_data ( struct tftp_request *tftp,
 			  struct io_buffer *iobuf ) {
 	struct tftp_data *data = iobuf->data;
 	int block;
+	off_t offset;
 	size_t data_len;
 	int rc;
 
@@ -423,41 +563,51 @@ static int tftp_rx_data ( struct tftp_request *tftp,
 	if ( iob_len ( iobuf ) < sizeof ( *data ) ) {
 		DBGC ( tftp, "TFTP %p received underlength DATA packet "
 		       "length %d\n", tftp, iob_len ( iobuf ) );
-		free_iob ( iobuf );
-		return -EINVAL;
+		rc = -EINVAL;
+		goto done;
 	}
 
 	/* Extract data */
-	block = ntohs ( data->block );
+	block = ( ntohs ( data->block ) - 1 );
+	offset = ( block * tftp->blksize );
 	iob_pull ( iobuf, sizeof ( *data ) );
 	data_len = iob_len ( iobuf );
-
-	/* Check for correct block */
-	if ( ( tftp->state == -1 ) && ( block == 1 ) )
-		tftp->state = 0;
-	if ( block != ( tftp->state + 1 ) ) {
-		DBGC ( tftp, "TFTP %p received out-of-order block %d "
-		       "(expecting %d)\n", tftp, block, ( tftp->state + 1 ) );
-		free_iob ( iobuf );
-		return 0;
+	if ( data_len > tftp->blksize ) {
+		DBGC ( tftp, "TFTP %p received overlength DATA packet "
+		       "length %d\n", tftp, data_len );
+		rc = -EINVAL;
+		goto done;
 	}
 
 	/* Deliver data */
-	if ( ( rc = xfer_deliver_iob ( &tftp->xfer, iobuf ) ) != 0 ) {
+	xfer_seek ( &tftp->xfer, offset, SEEK_SET );
+	rc = xfer_deliver_iob ( &tftp->xfer, iobuf );
+	iobuf = NULL;
+	if ( rc != 0 ) {
 		DBGC ( tftp, "TFTP %p could not deliver data: %s\n",
 		       tftp, strerror ( rc ) );
-		tftp_done ( tftp, rc );
-		return rc;
+		goto done;
 	}
 
-	/* Mark block as received */
-	tftp_received ( tftp, block );
+	/* Ensure block bitmap is ready */
+	if ( ( rc = tftp_presize ( tftp, ( offset + data_len ) ) ) != 0 )
+		goto done;
 
-	/* Finish when final block received */
-	if ( data_len < tftp->blksize )
+	/* Mark block as received */
+	bitmap_set ( &tftp->bitmap, block );
+
+	/* Acknowledge block */
+	tftp_send_packet ( tftp );
+
+	/* If all blocks have been received, finish. */
+	if ( bitmap_full ( &tftp->bitmap ) )
 		tftp_done ( tftp, 0 );
 
-	return 0;
+ done:
+	free_iob ( iobuf );
+	if ( rc )
+		tftp_done ( tftp, rc );
+	return rc;
 }
 
 /** Translation between TFTP errors and internal error numbers */
@@ -506,17 +656,14 @@ static int tftp_rx_error ( struct tftp_request *tftp, void *buf, size_t len ) {
 /**
  * Receive new data
  *
- * @v udp		UDP connection
- * @v data		Received data
- * @v len		Length of received data
- * @v st_src		Partially-filled source address
- * @v st_dest		Partially-filled destination address
+ * @v tftp		TFTP connection
+ * @v iobuf		I/O buffer
+ * @v meta		Transfer metadata, or NULL
+ * @ret rc		Return status code
  */
-static int tftp_socket_deliver_iob ( struct xfer_interface *socket,
-				     struct io_buffer *iobuf,
-				     struct xfer_metadata *meta ) {
-	struct tftp_request *tftp =
-		container_of ( socket, struct tftp_request, socket );
+static int tftp_rx ( struct tftp_request *tftp,
+		     struct io_buffer *iobuf,
+		     struct xfer_metadata *meta ) {
 	struct sockaddr_tcpip *st_src;
 	struct tftp_common *common = iobuf->data;
 	size_t len = iob_len ( iobuf );
@@ -541,7 +688,7 @@ static int tftp_socket_deliver_iob ( struct xfer_interface *socket,
 
 	/* Filter by TID.  Set TID on first response received */
 	st_src = ( struct sockaddr_tcpip * ) meta->src;
-	if ( tftp->state < 0 ) {
+	if ( ! tftp->peer.st_family ) {
 		memcpy ( &tftp->peer, st_src, sizeof ( tftp->peer ) );
 		DBGC ( tftp, "TFTP %p using remote port %d\n", tftp,
 		       ntohs ( tftp->peer.st_port ) );
@@ -576,6 +723,23 @@ static int tftp_socket_deliver_iob ( struct xfer_interface *socket,
 }
 
 /**
+ * Receive new data via socket
+ *
+ * @v socket		Transport layer interface
+ * @v iobuf		I/O buffer
+ * @v meta		Transfer metadata, or NULL
+ * @ret rc		Return status code
+ */
+static int tftp_socket_deliver_iob ( struct xfer_interface *socket,
+				     struct io_buffer *iobuf,
+				     struct xfer_metadata *meta ) {
+	struct tftp_request *tftp =
+		container_of ( socket, struct tftp_request, socket );
+
+	return tftp_rx ( tftp, iobuf, meta );
+}
+
+/**
  * TFTP connection closed by network stack
  *
  * @v socket		Transport layer interface
@@ -587,6 +751,10 @@ static void tftp_socket_close ( struct xfer_interface *socket, int rc ) {
 
 	DBGC ( tftp, "TFTP %p socket closed: %s\n",
 	       tftp, strerror ( rc ) );
+
+	/* Any close counts as an error */
+	if ( ! rc )
+		rc = -ECONNRESET;
 
 	tftp_done ( tftp, rc );
 }
@@ -601,7 +769,55 @@ static struct xfer_interface_operations tftp_socket_operations = {
 	.deliver_iob	= tftp_socket_deliver_iob,
 	.deliver_raw	= xfer_deliver_as_iob,
 };
+
+/**
+ * Receive new data via multicast socket
+ *
+ * @v mc_socket		Multicast transport layer interface
+ * @v iobuf		I/O buffer
+ * @v meta		Transfer metadata, or NULL
+ * @ret rc		Return status code
+ */
+static int tftp_mc_socket_deliver_iob ( struct xfer_interface *mc_socket,
+					struct io_buffer *iobuf,
+					struct xfer_metadata *meta ) {
+	struct tftp_request *tftp =
+		container_of ( mc_socket, struct tftp_request, mc_socket );
+
+	return tftp_rx ( tftp, iobuf, meta );
+}
+
+/**
+ * TFTP multicast connection closed by network stack
+ *
+ * @v socket		Multicast transport layer interface
+ * @v rc		Reason for close
+ */
+static void tftp_mc_socket_close ( struct xfer_interface *mc_socket,
+				   int rc ) {
+	struct tftp_request *tftp =
+		container_of ( mc_socket, struct tftp_request, mc_socket );
+
+	DBGC ( tftp, "TFTP %p multicast socket closed: %s\n",
+	       tftp, strerror ( rc ) );
+
+	/* The multicast socket may be closed when we receive a new
+	 * OACK and open/reopen the socket; we should not call
+	 * tftp_done() at this point.
+	 */
+}
  
+/** TFTP multicast socket operations */
+static struct xfer_interface_operations tftp_mc_socket_operations = {
+	.close		= tftp_mc_socket_close,
+	.vredirect	= xfer_vopen,
+	.seek		= ignore_xfer_seek,
+	.window		= unlimited_xfer_window,
+	.alloc_iob	= default_xfer_alloc_iob,
+	.deliver_iob	= tftp_mc_socket_deliver_iob,
+	.deliver_raw	= xfer_deliver_as_iob,
+};
+
 /**
  * Close TFTP data transfer interface
  *
@@ -655,8 +871,10 @@ int tftp_open ( struct xfer_interface *xfer, struct uri *uri ) {
 	xfer_init ( &tftp->xfer, &tftp_xfer_operations, &tftp->refcnt );
 	tftp->uri = uri_get ( uri );
 	xfer_init ( &tftp->socket, &tftp_socket_operations, &tftp->refcnt );
+	xfer_init ( &tftp->mc_socket, &tftp_mc_socket_operations,
+		    &tftp->refcnt );
 	tftp->blksize = TFTP_DEFAULT_BLKSIZE;
-	tftp->state = -1;
+	tftp->master = 1;
 	tftp->timer.expired = tftp_timer_expired;
 
 	/* Open socket */
