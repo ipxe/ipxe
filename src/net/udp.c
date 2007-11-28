@@ -89,7 +89,7 @@ static int udp_bind ( struct udp_connection *udp, unsigned int port ) {
  * Open a UDP connection
  *
  * @v xfer		Data transfer interface
- * @v peer		Peer socket address
+ * @v peer		Peer socket address, or NULL
  * @v local		Local socket address, or NULL
  * @v promisc		Socket is promiscuous
  * @ret rc		Return status code
@@ -109,7 +109,8 @@ static int udp_open_common ( struct xfer_interface *xfer,
 		return -ENOMEM;
 	DBGC ( udp, "UDP %p allocated\n", udp );
 	xfer_init ( &udp->xfer, &udp_xfer_operations, &udp->refcnt );
-	memcpy ( &udp->peer, st_peer, sizeof ( udp->peer ) );
+	if ( st_peer )
+		memcpy ( &udp->peer, st_peer, sizeof ( udp->peer ) );
 
 	/* Bind to local port */
 	if ( ! promisc ) {
