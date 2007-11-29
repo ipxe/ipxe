@@ -41,14 +41,16 @@ int bitmap_resize ( struct bitmap *bitmap, unsigned int new_length ) {
 	old_num_blocks = BITMAP_INDEX ( bitmap->length + BITMAP_BLKSIZE - 1 );
 	new_num_blocks = BITMAP_INDEX ( new_length + BITMAP_BLKSIZE - 1 );
 
-	new_size = ( new_num_blocks * sizeof ( bitmap->blocks[0] ) );
-	new_blocks = realloc ( bitmap->blocks, new_size );
-	if ( ! new_blocks ) {
-		DBGC ( bitmap, "Bitmap %p could not resize to %d bits\n",
-		       bitmap, new_length );
-		return -ENOMEM;
+	if ( old_num_blocks != new_num_blocks ) {
+		new_size = ( new_num_blocks * sizeof ( bitmap->blocks[0] ) );
+		new_blocks = realloc ( bitmap->blocks, new_size );
+		if ( ! new_blocks ) {
+			DBGC ( bitmap, "Bitmap %p could not resize to %d "
+			       "bits\n", bitmap, new_length );
+			return -ENOMEM;
+		}
+		bitmap->blocks = new_blocks;
 	}
-	bitmap->blocks = new_blocks;
 	bitmap->length = new_length;
 
 	while ( old_num_blocks < new_num_blocks ) {
