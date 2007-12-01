@@ -18,10 +18,13 @@
  */
 
 #define	CONSOLE_FIRMWARE	/* Default BIOS console */
-#undef	CONSOLE_SERIAL		/* Serial port */
+#define	CONSOLE_SERIAL		/* Serial port */
 #undef	CONSOLE_DIRECT_VGA	/* Direct access to VGA card */
 #undef	CONSOLE_BTEXT		/* Who knows what this does? */
 #undef	CONSOLE_PC_KBD		/* Direct access to PC keyboard */
+
+#define TIMER_BIOS
+#define TIMER_RTDSC
 
 /* @END general.h */
 

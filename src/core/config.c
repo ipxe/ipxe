@@ -75,6 +75,17 @@ REQUIRE_OBJECT ( syslog );
 #endif
 
 /*
+ * Timers
+ */
+
+#ifdef TIMER_BIOS
+REQUIRE_OBJECT ( timer_bios );
+#endif
+
+#ifdef TIMER_RTDSC
+REQUIRE_OBJECT ( timer_rtdsc );
+#endif
+/*
  * Drag in all requested protocols
  *
  */
