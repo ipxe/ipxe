@@ -1,3 +1,18 @@
+/*
+ * gPXE driver for Intel eepro1000 ethernet cards
+ *
+ * Written by Marty Connor
+ *
+ * Copyright Entity Cyber, Inc. 2007
+ *
+ * This software may be used and distributed according to the terms of
+ * the GNU General Public License (GPL), incorporated herein by
+ * reference.  Drivers based on or derived from this code fall under
+ * the GPL and must retain the authorship, copyright and license
+ * notice.
+ *
+ */
+
 /*******************************************************************************
 
   Intel PRO/1000 Linux driver
@@ -30,7 +45,8 @@
 
 /**
  * e1000_get_hw_control - get control of the h/w from f/w
- * @adapter: address of board private structure
+ *
+ * @v adapter	e1000 private structure
  *
  * e1000_get_hw_control sets {CTRL_EXT|FWSM}:DRV_LOAD bit.
  * For ASF and Pass Through versions of f/w this means that
@@ -39,7 +55,7 @@
  *
  **/
 static void
-e1000_get_hw_control(struct e1000_adapter *adapter)
+e1000_get_hw_control ( struct e1000_adapter *adapter )
 {
 	uint32_t ctrl_ext;
 	uint32_t swsm;
@@ -68,7 +84,8 @@ e1000_get_hw_control(struct e1000_adapter *adapter)
 
 /**
  * e1000_irq_enable - Enable default interrupt generation settings
- * @adapter: board private structure
+ *
+ * @v adapter	e1000 private structure
  **/
 static void
 e1000_irq_enable ( struct e1000_adapter *adapter )
@@ -80,7 +97,8 @@ e1000_irq_enable ( struct e1000_adapter *adapter )
 
 /**
  * e1000_irq_disable - Mask off interrupt generation on the NIC
- * @adapter: board private structure
+ *
+ * @v adapter	e1000 private structure
  **/
 static void
 e1000_irq_disable ( struct e1000_adapter *adapter )
@@ -91,7 +109,8 @@ e1000_irq_disable ( struct e1000_adapter *adapter )
 
 /**
  * e1000_irq_force - trigger interrupt
- * @adapter: board private structure
+ *
+ * @v adapter	e1000 private structure
  **/
 static void
 e1000_irq_force ( struct e1000_adapter *adapter )
@@ -102,7 +121,8 @@ e1000_irq_force ( struct e1000_adapter *adapter )
 
 /**
  * e1000_sw_init - Initialize general software structures (struct e1000_adapter)
- * @adapter: board private structure to initialize
+ *
+ * @v adapter	e1000 private structure
  *
  * e1000_sw_init initializes the Adapter private data structure.
  * Fields are initialized based on PCI device information and
@@ -178,10 +198,10 @@ e1000_sw_init ( struct e1000_adapter *adapter )
 
 /**
  * e1000_setup_tx_resources - allocate Tx resources (Descriptors)
- * @adapter: board private structure
- * @txdr:    tx descriptor ring (for a specific queue) to setup
  *
- * Return 0 on success, negative on failure
+ * @v adapter	e1000 private structure
+ *
+ * @ret rc       Returns 0 on success, negative on failure
  **/
 static int
 e1000_setup_tx_resources ( struct e1000_adapter *adapter )
@@ -232,11 +252,6 @@ e1000_configure_tx ( struct e1000_adapter *adapter )
 	struct e1000_hw *hw = &adapter->hw;
 	uint32_t tctl;
 
-#if 0
-	uint32 tipg, tarc;
-	uint32_t ipgr1, ipgr2;
-#endif
-	
 	DBG ( "e1000_configure_tx\n" );
 
 	E1000_WRITE_REG ( hw, TDBAH, 0 );
@@ -253,100 +268,24 @@ e1000_configure_tx ( struct e1000_adapter *adapter )
 	adapter->tx_head = 0;
 	adapter->tx_tail = 0;
 	adapter->tx_fill_ctr = 0;
-	
-#if 0
-	/* Set the default values for the Tx Inter Packet Gap timer */
-	if (adapter->hw.mac_type <= e1000_82547_rev_2 &&
-	    (hw->media_type == e1000_media_type_fiber ||
-	     hw->media_type == e1000_media_type_internal_serdes))
-		tipg = DEFAULT_82543_TIPG_IPGT_FIBER;
-	else
-		tipg = DEFAULT_82543_TIPG_IPGT_COPPER;
 
-	switch (hw->mac_type) {
-	case e1000_82542_rev2_0:
-	case e1000_82542_rev2_1:
-		tipg = DEFAULT_82542_TIPG_IPGT;
-		ipgr1 = DEFAULT_82542_TIPG_IPGR1;
-		ipgr2 = DEFAULT_82542_TIPG_IPGR2;
-		break;
-	case e1000_80003es2lan:
-		ipgr1 = DEFAULT_82543_TIPG_IPGR1;
-		ipgr2 = DEFAULT_80003ES2LAN_TIPG_IPGR2;
-		break;
-	default:
-		ipgr1 = DEFAULT_82543_TIPG_IPGR1;
-		ipgr2 = DEFAULT_82543_TIPG_IPGR2;
-		break;
-	}
-	tipg |= ipgr1 << E1000_TIPG_IPGR1_SHIFT;
-	tipg |= ipgr2 << E1000_TIPG_IPGR2_SHIFT;
-	E1000_WRITE_REG ( hw, TIPG, tipg );
-
-	/* Set the Tx Interrupt Delay register */
-
-	E1000_WRITE_REG (hw, TIDV, adapter->tx_int_delay);
-	if (hw->mac_type >= e1000_82540)
-		E1000_WRITE_REG(hw, TADV, adapter->tx_abs_int_delay);
-
-	/* Program the Transmit Control Register */
-
-	tctl = E1000_READ_REG ( hw, TCTL );
-	tctl &= ~E1000_TCTL_CT;
-	tctl |= E1000_TCTL_PSP | E1000_TCTL_RTLC |
-		(E1000_COLLISION_THRESHOLD << E1000_CT_SHIFT);
-
-	if (hw->mac_type == e1000_82571 || hw->mac_type == e1000_82572) {
-		tarc = E1000_READ_REG(hw, TARC0);
-		/* set the speed mode bit, we'll clear it if we're not at
-		 * gigabit link later */
-		tarc |= (1 << 21);
-		E1000_WRITE_REG(hw, TARC0, tarc);
-	} else if (hw->mac_type == e1000_80003es2lan) {
-		tarc = E1000_READ_REG(hw, TARC0);
-		tarc |= 1;
-		E1000_WRITE_REG(hw, TARC0, tarc);
-		tarc = E1000_READ_REG(hw, TARC1);
-		tarc |= 1;
-		E1000_WRITE_REG(hw, TARC1, tarc);
-	}
-#endif
-
-	e1000_config_collision_dist ( hw );
-
+	/* Setup Transmit Descriptor Settings for eop descriptor */
 	tctl = E1000_TCTL_PSP | E1000_TCTL_EN |
 		(E1000_COLLISION_THRESHOLD << E1000_CT_SHIFT) | 
 		(E1000_HDX_COLLISION_DISTANCE << E1000_COLD_SHIFT);
 
-#if 0
-	/* Setup Transmit Descriptor Settings for eop descriptor */
-	adapter->txd_cmd = E1000_TXD_CMD_EOP | E1000_TXD_CMD_IFCS;
-
-	/* only set IDE if we are delaying interrupts using the timers */
-	if (adapter->tx_int_delay)
-		adapter->txd_cmd |= E1000_TXD_CMD_IDE;
-
-	if (hw->mac_type < e1000_82543)
-		adapter->txd_cmd |= E1000_TXD_CMD_RPS;
-	else
-		adapter->txd_cmd |= E1000_TXD_CMD_RS;
-
-	/* Cache if we're 82544 running in PCI-X because we'll
-	 * need this to apply a workaround later in the send path. */
-	if (hw->mac_type == e1000_82544 &&
-	    hw->bus_type == e1000_bus_type_pcix)
-		adapter->pcix_82544 = 1;
-#endif
+	e1000_config_collision_dist ( hw );
 
 	E1000_WRITE_REG ( hw, TCTL, tctl );
+        E1000_WRITE_FLUSH ( hw );
 }
 
 /**
  * e1000_setup_rx_resources - allocate Rx resources (Descriptors)
- * @adapter: board private structure
- * @rxdr:    rx descriptor ring (for a specific queue) to setup
  *
- * Returns 0 on success, negative on failure
+ * @v adapter	e1000 private structure
+ *
+ * @ret rc       Returns 0 on success, negative on failure
  **/
 static int
 e1000_setup_rx_resources ( struct e1000_adapter *adapter )
@@ -600,7 +539,7 @@ e1000_close ( struct net_device *netdev )
  * @v netdev	Network device
  * @v iobuf	I/O buffer
  *
- * @ret rc	Return status code
+ * @ret rc       Returns 0 on success, negative on failure
  */
 static int
 e1000_transmit ( struct net_device *netdev, struct io_buffer *iobuf )
@@ -649,14 +588,6 @@ e1000_transmit ( struct net_device *netdev, struct io_buffer *iobuf )
 	 */
 	E1000_WRITE_REG ( hw, TDT, adapter->tx_tail );
 
-#if 0	
-	while ( ! ( tx_curr_desc->upper.data & E1000_TXD_STAT_DD ) ) {
-		udelay ( 10 );	/* give the nic a chance to write to the register */
-	}
-
-	DBG ( "Leaving XMIT\n" );
-#endif
-
 	return 0;
 }
 
@@ -682,9 +613,7 @@ e1000_poll ( struct net_device *netdev )
 	uint32_t i;
 	uint64_t tmp_buffer_addr;
 	
-#if 0
-	DBG ( "e1000_poll\n" );
-#endif
+	DBGP ( "e1000_poll\n" );
 
 	/* Acknowledge interrupts */
 	icr = E1000_READ_REG ( hw, ICR );
@@ -701,11 +630,6 @@ e1000_poll ( struct net_device *netdev )
 					   ( i * sizeof ( *adapter->tx_base ) ); 
 					    		
 		tx_status = tx_curr_desc->upper.data;
-
-#if 0
-		DBG ( "tx_curr_desc = %#08lx status = %#08lx\n",
-		      virt_to_bus ( tx_curr_desc ), tx_status );
-#endif
 
 		/* if the packet at tx_head is not owned by hardware it is for us */
 		if ( ! ( tx_status & E1000_TXD_STAT_DD ) )
@@ -743,7 +667,7 @@ e1000_poll ( struct net_device *netdev )
 			          ( i * sizeof ( *adapter->rx_base ) ); 
 		rx_status = rx_curr_desc->status;
 		
-		// DBG ( "Before DD Check RX_status: %#08lx\n", rx_status );
+		DBG2 ( "Before DD Check RX_status: %#08lx\n", rx_status );
 	
 		if ( ! ( rx_status & E1000_RXD_STAT_DD ) )
 			break;
@@ -1019,14 +943,14 @@ e1000_open ( struct net_device *netdev )
 
 	/* allocate transmit descriptors */
 	err = e1000_setup_tx_resources ( adapter );
-	if (err) {
+	if ( err ) {
 		DBG ( "Error setting up TX resources!\n" );
 		goto err_setup_tx;
 	}
 
 	/* allocate receive descriptors */
 	err = e1000_setup_rx_resources ( adapter );
-	if (err) {
+	if ( err ) {
 		DBG ( "Error setting up RX resources!\n" );
 		goto err_setup_rx;
 	}
@@ -1112,68 +1036,68 @@ e1000_io_write ( struct e1000_hw *hw  __unused, unsigned long port, uint32_t val
 }
 
 static struct pci_device_id e1000_nics[] = {
-	PCI_ROM(0x8086, 0x1000, "e1000-0x1000", "E1000-0x1000"),
-	PCI_ROM(0x8086, 0x1001, "e1000-0x1001", "E1000-0x1001"),
-	PCI_ROM(0x8086, 0x1004, "e1000-0x1004", "E1000-0x1004"),
-	PCI_ROM(0x8086, 0x1008, "e1000-0x1008", "E1000-0x1008"),
-	PCI_ROM(0x8086, 0x1009, "e1000-0x1009", "E1000-0x1009"),
-	PCI_ROM(0x8086, 0x100C, "e1000-0x100C", "E1000-0x100C"),
-	PCI_ROM(0x8086, 0x100D, "e1000-0x100D", "E1000-0x100D"),
-	PCI_ROM(0x8086, 0x100E, "e1000-0x100E", "E1000-0x100E"),
-	PCI_ROM(0x8086, 0x100F, "e1000-0x100F", "E1000-0x100F"),
-	PCI_ROM(0x8086, 0x1010, "e1000-0x1010", "E1000-0x1010"),
-	PCI_ROM(0x8086, 0x1011, "e1000-0x1011", "E1000-0x1011"),
-	PCI_ROM(0x8086, 0x1012, "e1000-0x1012", "E1000-0x1012"),
-	PCI_ROM(0x8086, 0x1013, "e1000-0x1013", "E1000-0x1013"),
-	PCI_ROM(0x8086, 0x1014, "e1000-0x1014", "E1000-0x1014"),
-	PCI_ROM(0x8086, 0x1015, "e1000-0x1015", "E1000-0x1015"),
-	PCI_ROM(0x8086, 0x1016, "e1000-0x1016", "E1000-0x1016"),
-	PCI_ROM(0x8086, 0x1017, "e1000-0x1017", "E1000-0x1017"),
-	PCI_ROM(0x8086, 0x1018, "e1000-0x1018", "E1000-0x1018"),
-	PCI_ROM(0x8086, 0x1019, "e1000-0x1019", "E1000-0x1019"),
-	PCI_ROM(0x8086, 0x101A, "e1000-0x101A", "E1000-0x101A"),
-	PCI_ROM(0x8086, 0x101D, "e1000-0x101D", "E1000-0x101D"),
-	PCI_ROM(0x8086, 0x101E, "e1000-0x101E", "E1000-0x101E"),
-	PCI_ROM(0x8086, 0x1026, "e1000-0x1026", "E1000-0x1026"),
-	PCI_ROM(0x8086, 0x1027, "e1000-0x1027", "E1000-0x1027"),
-	PCI_ROM(0x8086, 0x1028, "e1000-0x1028", "E1000-0x1028"),
-	PCI_ROM(0x8086, 0x1049, "e1000-0x1049", "E1000-0x1049"),
-	PCI_ROM(0x8086, 0x104A, "e1000-0x104A", "E1000-0x104A"),
-	PCI_ROM(0x8086, 0x104B, "e1000-0x104B", "E1000-0x104B"),
-	PCI_ROM(0x8086, 0x104C, "e1000-0x104C", "E1000-0x104C"),
-	PCI_ROM(0x8086, 0x104D, "e1000-0x104D", "E1000-0x104D"),
-	PCI_ROM(0x8086, 0x105E, "e1000-0x105E", "E1000-0x105E"),
-	PCI_ROM(0x8086, 0x105F, "e1000-0x105F", "E1000-0x105F"),
-	PCI_ROM(0x8086, 0x1060, "e1000-0x1060", "E1000-0x1060"),
-	PCI_ROM(0x8086, 0x1075, "e1000-0x1075", "E1000-0x1075"),
-	PCI_ROM(0x8086, 0x1076, "e1000-0x1076", "E1000-0x1076"),
-	PCI_ROM(0x8086, 0x1077, "e1000-0x1077", "E1000-0x1077"),
-	PCI_ROM(0x8086, 0x1078, "e1000-0x1078", "E1000-0x1078"),
-	PCI_ROM(0x8086, 0x1079, "e1000-0x1079", "E1000-0x1079"),
-	PCI_ROM(0x8086, 0x107A, "e1000-0x107A", "E1000-0x107A"),
-	PCI_ROM(0x8086, 0x107B, "e1000-0x107B", "E1000-0x107B"),
-	PCI_ROM(0x8086, 0x107C, "e1000-0x107C", "E1000-0x107C"),
-	PCI_ROM(0x8086, 0x107D, "e1000-0x107D", "E1000-0x107D"),
-	PCI_ROM(0x8086, 0x107E, "e1000-0x107E", "E1000-0x107E"),
-	PCI_ROM(0x8086, 0x107F, "e1000-0x107F", "E1000-0x107F"),
-	PCI_ROM(0x8086, 0x108A, "e1000-0x108A", "E1000-0x108A"),
-	PCI_ROM(0x8086, 0x108B, "e1000-0x108B", "E1000-0x108B"),
-	PCI_ROM(0x8086, 0x108C, "e1000-0x108C", "E1000-0x108C"),
-	PCI_ROM(0x8086, 0x1096, "e1000-0x1096", "E1000-0x1096"),
-	PCI_ROM(0x8086, 0x1098, "e1000-0x1098", "E1000-0x1098"),
-	PCI_ROM(0x8086, 0x1099, "e1000-0x1099", "E1000-0x1099"),
-	PCI_ROM(0x8086, 0x109A, "e1000-0x109A", "E1000-0x109A"),
-	PCI_ROM(0x8086, 0x10A4, "e1000-0x10A4", "E1000-0x10A4"),
-	PCI_ROM(0x8086, 0x10A5, "e1000-0x10A5", "E1000-0x10A5"),
-	PCI_ROM(0x8086, 0x10B5, "e1000-0x10B5", "E1000-0x10B5"),
-	PCI_ROM(0x8086, 0x10B9, "e1000-0x10B9", "E1000-0x10B9"),
-	PCI_ROM(0x8086, 0x10BA, "e1000-0x10BA", "E1000-0x10BA"),
-	PCI_ROM(0x8086, 0x10BB, "e1000-0x10BB", "E1000-0x10BB"),
-	PCI_ROM(0x8086, 0x10BC, "e1000-0x10BC", "E1000-0x10BC"),
-	PCI_ROM(0x8086, 0x10C4, "e1000-0x10C4", "E1000-0x10C4"),
-	PCI_ROM(0x8086, 0x10C5, "e1000-0x10C5", "E1000-0x10C5"),
-	PCI_ROM(0x8086, 0x10D9, "e1000-0x10D9", "E1000-0x10D9"),
-	PCI_ROM(0x8086, 0x10DA, "e1000-0x10DA", "E1000-0x10DA"),
+	PCI_ROM(0x8086, 0x1000, "e1000-0x1000", "e1000-0x1000"),
+	PCI_ROM(0x8086, 0x1001, "e1000-0x1001", "e1000-0x1001"),
+	PCI_ROM(0x8086, 0x1004, "e1000-0x1004", "e1000-0x1004"),
+	PCI_ROM(0x8086, 0x1008, "e1000-0x1008", "e1000-0x1008"),
+	PCI_ROM(0x8086, 0x1009, "e1000-0x1009", "e1000-0x1009"),
+	PCI_ROM(0x8086, 0x100c, "e1000-0x100c", "e1000-0x100c"),
+	PCI_ROM(0x8086, 0x100d, "e1000-0x100d", "e1000-0x100d"),
+	PCI_ROM(0x8086, 0x100e, "e1000-0x100e", "e1000-0x100e"),
+	PCI_ROM(0x8086, 0x100f, "e1000-0x100f", "e1000-0x100f"),
+	PCI_ROM(0x8086, 0x1010, "e1000-0x1010", "e1000-0x1010"),
+	PCI_ROM(0x8086, 0x1011, "e1000-0x1011", "e1000-0x1011"),
+	PCI_ROM(0x8086, 0x1012, "e1000-0x1012", "e1000-0x1012"),
+	PCI_ROM(0x8086, 0x1013, "e1000-0x1013", "e1000-0x1013"),
+	PCI_ROM(0x8086, 0x1014, "e1000-0x1014", "e1000-0x1014"),
+	PCI_ROM(0x8086, 0x1015, "e1000-0x1015", "e1000-0x1015"),
+	PCI_ROM(0x8086, 0x1016, "e1000-0x1016", "e1000-0x1016"),
+	PCI_ROM(0x8086, 0x1017, "e1000-0x1017", "e1000-0x1017"),
+	PCI_ROM(0x8086, 0x1018, "e1000-0x1018", "e1000-0x1018"),
+	PCI_ROM(0x8086, 0x1019, "e1000-0x1019", "e1000-0x1019"),
+	PCI_ROM(0x8086, 0x101a, "e1000-0x101a", "e1000-0x101a"),
+	PCI_ROM(0x8086, 0x101d, "e1000-0x101d", "e1000-0x101d"),
+	PCI_ROM(0x8086, 0x101e, "e1000-0x101e", "e1000-0x101e"),
+	PCI_ROM(0x8086, 0x1026, "e1000-0x1026", "e1000-0x1026"),
+	PCI_ROM(0x8086, 0x1027, "e1000-0x1027", "e1000-0x1027"),
+	PCI_ROM(0x8086, 0x1028, "e1000-0x1028", "e1000-0x1028"),
+	PCI_ROM(0x8086, 0x1049, "e1000-0x1049", "e1000-0x1049"),
+	PCI_ROM(0x8086, 0x104a, "e1000-0x104a", "e1000-0x104a"),
+	PCI_ROM(0x8086, 0x104b, "e1000-0x104b", "e1000-0x104b"),
+	PCI_ROM(0x8086, 0x104c, "e1000-0x104c", "e1000-0x104c"),
+	PCI_ROM(0x8086, 0x104d, "e1000-0x104d", "e1000-0x104d"),
+	PCI_ROM(0x8086, 0x105e, "e1000-0x105e", "e1000-0x105e"),
+	PCI_ROM(0x8086, 0x105f, "e1000-0x105f", "e1000-0x105f"),
+	PCI_ROM(0x8086, 0x1060, "e1000-0x1060", "e1000-0x1060"),
+	PCI_ROM(0x8086, 0x1075, "e1000-0x1075", "e1000-0x1075"),
+	PCI_ROM(0x8086, 0x1076, "e1000-0x1076", "e1000-0x1076"),
+	PCI_ROM(0x8086, 0x1077, "e1000-0x1077", "e1000-0x1077"),
+	PCI_ROM(0x8086, 0x1078, "e1000-0x1078", "e1000-0x1078"),
+	PCI_ROM(0x8086, 0x1079, "e1000-0x1079", "e1000-0x1079"),
+	PCI_ROM(0x8086, 0x107a, "e1000-0x107a", "e1000-0x107a"),
+	PCI_ROM(0x8086, 0x107b, "e1000-0x107b", "e1000-0x107b"),
+	PCI_ROM(0x8086, 0x107c, "e1000-0x107c", "e1000-0x107c"),
+	PCI_ROM(0x8086, 0x107d, "e1000-0x107d", "e1000-0x107d"),
+	PCI_ROM(0x8086, 0x107e, "e1000-0x107e", "e1000-0x107e"),
+	PCI_ROM(0x8086, 0x107f, "e1000-0x107f", "e1000-0x107f"),
+	PCI_ROM(0x8086, 0x108a, "e1000-0x108a", "e1000-0x108a"),
+	PCI_ROM(0x8086, 0x108b, "e1000-0x108b", "e1000-0x108b"),
+	PCI_ROM(0x8086, 0x108c, "e1000-0x108c", "e1000-0x108c"),
+	PCI_ROM(0x8086, 0x1096, "e1000-0x1096", "e1000-0x1096"),
+	PCI_ROM(0x8086, 0x1098, "e1000-0x1098", "e1000-0x1098"),
+	PCI_ROM(0x8086, 0x1099, "e1000-0x1099", "e1000-0x1099"),
+	PCI_ROM(0x8086, 0x109a, "e1000-0x109a", "e1000-0x109a"),
+	PCI_ROM(0x8086, 0x10a4, "e1000-0x10a4", "e1000-0x10a4"),
+	PCI_ROM(0x8086, 0x10a5, "e1000-0x10a5", "e1000-0x10a5"),
+	PCI_ROM(0x8086, 0x10b5, "e1000-0x10b5", "e1000-0x10b5"),
+	PCI_ROM(0x8086, 0x10b9, "e1000-0x10b9", "e1000-0x10b9"),
+	PCI_ROM(0x8086, 0x10ba, "e1000-0x10ba", "e1000-0x10ba"),
+	PCI_ROM(0x8086, 0x10bb, "e1000-0x10bb", "e1000-0x10bb"),
+	PCI_ROM(0x8086, 0x10bc, "e1000-0x10bc", "e1000-0x10bc"),
+	PCI_ROM(0x8086, 0x10c4, "e1000-0x10c4", "e1000-0x10c4"),
+	PCI_ROM(0x8086, 0x10c5, "e1000-0x10c5", "e1000-0x10c5"),
+	PCI_ROM(0x8086, 0x10d9, "e1000-0x10d9", "e1000-0x10d9"),
+	PCI_ROM(0x8086, 0x10da, "e1000-0x10da", "e1000-0x10da"),
 };
 
 struct pci_driver e1000_driver __pci_driver = {
