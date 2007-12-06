@@ -116,7 +116,7 @@ int check_region ( void *region, size_t len ) {
 
 	}
 	if ( in_corruption != 0 ) {
-		printf ( "to offset %#x (end of region)\n", len-1 );
+		printf ( "to offset %#zx (end of region)\n", len-1 );
 	}
 	return corrupted;
 }
