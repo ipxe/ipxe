@@ -80,7 +80,7 @@ static int spi_wait ( struct spi_device *device ) {
  * @ret rc		Return status code
  */
 int spi_read ( struct nvs_device *nvs, unsigned int address,
-	       void *data, unsigned int len ) {
+	       void *data, size_t len ) {
 	struct spi_device *device = nvs_to_spi ( nvs );
 	struct spi_bus *bus = device->bus;
 	unsigned int command = spi_command ( SPI_READ, address,
@@ -107,7 +107,7 @@ int spi_read ( struct nvs_device *nvs, unsigned int address,
  * @ret rc		Return status code
  */
 int spi_write ( struct nvs_device *nvs, unsigned int address,
-		const void *data, unsigned int len ) {
+		const void *data, size_t len ) {
 	struct spi_device *device = nvs_to_spi ( nvs );
 	struct spi_bus *bus = device->bus;
 	unsigned int command = spi_command ( SPI_WRITE, address,
