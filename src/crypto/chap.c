@@ -55,7 +55,7 @@ int chap_init ( struct chap_challenge *chap,
 	state_len = ( digest->ctxsize + digest->digestsize );
 	state = malloc ( state_len );
 	if ( ! state ) {
-		DBG ( "CHAP %p could not allocate %d bytes for state\n",
+		DBG ( "CHAP %p could not allocate %zd bytes for state\n",
 		      chap, state_len );
 		return -ENOMEM;
 	}

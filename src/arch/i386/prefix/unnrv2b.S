@@ -54,7 +54,6 @@
  * NOTE: It would be possible to build a smaller version of the
  * decompression code for -DKEEP_IT_REAL by using
  *    #define REG(x) x
- *    #define MOVSB movsb
  * to use 16-bit registers where possible.  This would impose limits
  * that the compressed data size must be in the range [1,65533-%si]
  * and the uncompressed data size must be in the range [1,65536-%di]
@@ -67,7 +66,7 @@
  */
 
 #define REG(x) e ## x
-#define MOVSB addr32 movsb
+#define ADDR32 addr32
 
 	.code16
 	.globl	decompress16
@@ -89,6 +88,7 @@ decompress16:
  */
 
 #define REG(x) e ## x
+#define ADDR32
 	
 	.code32
 	.globl	decompress
@@ -114,7 +114,7 @@ decompress:
 	jmp	dcl1_n2b
 	
 decompr_literals_n2b:
-	MOVSB
+	ADDR32 movsb
 decompr_loop_n2b:
 	addl	%ebx, %ebx
 	jnz	dcl2_n2b
@@ -132,7 +132,7 @@ loop1_n2b:
 	sub	$3, %xAX
 	jb	decompr_ebpeax_n2b	/* if (m_off == 2) goto decompr_ebpeax_n2b ? */
 	shl	$8, %xAX	
-	movb	(%xSI), %al	/* m_off = (m_off - 3)*256 + src[ilen++] */
+	ADDR32 movb (%xSI), %al	/* m_off = (m_off - 3)*256 + src[ilen++] */
 	inc	%xSI
 	xor	$-1, %xAX
 	jz	decompr_end_n2b	/* if (m_off == 0xffffffff) goto decomp_end_n2b */
@@ -156,9 +156,9 @@ decompr_got_mlen_n2b:
 	cmp	$-0xd00, %xBP
 	adc	$1, %xCX	/* m_len = m_len + 1 + (last_m_off > 0xd00) */
 	push	%xSI
-	lea	(%xBP,%xDI), %xSI	/* m_pos = dst + olen + -m_off  */
+	ADDR32 lea (%xBP,%xDI), %xSI	/* m_pos = dst + olen + -m_off  */
 	rep
-	es MOVSB		/* dst[olen++] = *m_pos++ while(m_len > 0) */
+	es ADDR32 movsb		/* dst[olen++] = *m_pos++ while(m_len > 0) */
 	pop	%xSI
 	jmp	decompr_loop_n2b
 
@@ -167,7 +167,7 @@ getbit1:
 	addl	%ebx, %ebx
 	jnz	1f
 getbit32:
-	movl	(%xSI), %ebx
+	ADDR32 movl (%xSI), %ebx
 	sub	$-4, %xSI	/* sets carry flag */
 	adcl	%ebx, %ebx
 1:

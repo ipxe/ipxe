@@ -344,7 +344,7 @@ static int bzimage_exec ( struct image *image ) {
 	shutdown();
 
 	DBGC ( image, "bzImage %p jumping to RM kernel at %04x:0000 "
-	       "(stack %04x:%04x)\n", image,
+	       "(stack %04x:%04zx)\n", image,
 	       ( exec_ctx.rm_kernel_seg + 0x20 ),
 	       exec_ctx.rm_kernel_seg, exec_ctx.rm_heap );
 

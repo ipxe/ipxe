@@ -43,7 +43,7 @@ int threewire_read ( struct nvs_device *nvs, unsigned int address,
 
 	assert ( bus->mode == SPI_MODE_THREEWIRE );
 
-	DBG ( "3wire %p reading %d bytes at %04x\n", device, len, address );
+	DBG ( "3wire %p reading %zd bytes at %04x\n", device, len, address );
 
 	return bus->rw ( bus, device, THREEWIRE_READ, address,
 			 NULL, data, len );
@@ -66,7 +66,7 @@ int threewire_write ( struct nvs_device *nvs, unsigned int address,
 
 	assert ( bus->mode == SPI_MODE_THREEWIRE );
 
-	DBG ( "3wire %p writing %d bytes at %04x\n", device, len, address );
+	DBG ( "3wire %p writing %zd bytes at %04x\n", device, len, address );
 
 	/* Enable device for writing */
 	if ( ( rc = bus->rw ( bus, device, THREEWIRE_EWEN,

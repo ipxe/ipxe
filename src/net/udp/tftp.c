@@ -496,12 +496,12 @@ static int tftp_rx_oack ( struct tftp_request *tftp, void *buf, size_t len ) {
 	char *end = buf + len;
 	char *name;
 	char *value;
-	int rc;
+	int rc = 0;
 
 	/* Sanity check */
 	if ( len < sizeof ( *oack ) ) {
 		DBGC ( tftp, "TFTP %p received underlength OACK packet "
-		       "length %d\n", tftp, len );
+		       "length %zd\n", tftp, len );
 		rc = -EINVAL;
 		goto done;
 	}
@@ -562,7 +562,7 @@ static int tftp_rx_data ( struct tftp_request *tftp,
 	/* Sanity check */
 	if ( iob_len ( iobuf ) < sizeof ( *data ) ) {
 		DBGC ( tftp, "TFTP %p received underlength DATA packet "
-		       "length %d\n", tftp, iob_len ( iobuf ) );
+		       "length %zd\n", tftp, iob_len ( iobuf ) );
 		rc = -EINVAL;
 		goto done;
 	}
@@ -574,7 +574,7 @@ static int tftp_rx_data ( struct tftp_request *tftp,
 	data_len = iob_len ( iobuf );
 	if ( data_len > tftp->blksize ) {
 		DBGC ( tftp, "TFTP %p received overlength DATA packet "
-		       "length %d\n", tftp, data_len );
+		       "length %zd\n", tftp, data_len );
 		rc = -EINVAL;
 		goto done;
 	}
@@ -633,7 +633,7 @@ static int tftp_rx_error ( struct tftp_request *tftp, void *buf, size_t len ) {
 	/* Sanity check */
 	if ( len < sizeof ( *error ) ) {
 		DBGC ( tftp, "TFTP %p received underlength ERROR packet "
-		       "length %d\n", tftp, len );
+		       "length %zd\n", tftp, len );
 		return -EINVAL;
 	}
 
@@ -671,8 +671,8 @@ static int tftp_rx ( struct tftp_request *tftp,
 	
 	/* Sanity checks */
 	if ( len < sizeof ( *common ) ) {
-		DBGC ( tftp, "TFTP %p received underlength packet length %d\n",
-		       tftp, len );
+		DBGC ( tftp, "TFTP %p received underlength packet length "
+		       "%zd\n", tftp, len );
 		goto done;
 	}
 	if ( ! meta ) {

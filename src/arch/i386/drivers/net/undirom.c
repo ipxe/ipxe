@@ -70,7 +70,7 @@ static int undirom_parse_pxeromid ( struct undi_rom *undirom,
 	undirom->data_size = undi_rom_id.DataSize;
 
 	DBGC ( undirom, "UNDIROM %p has UNDI loader at %04x:%04x "
-	       "(code %04x data %04x)\n", undirom,
+	       "(code %04zx data %04zx)\n", undirom,
 	       undirom->loader_entry.segment, undirom->loader_entry.offset,
 	       undirom->code_size, undirom->data_size );
 	return 0;

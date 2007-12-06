@@ -87,7 +87,7 @@ int spi_read ( struct nvs_device *nvs, unsigned int address,
 					     device->munge_address );
 	int rc;
 
-	DBG ( "SPI %p reading %d bytes from %#04x\n", device, len, address );
+	DBG ( "SPI %p reading %zd bytes from %#04x\n", device, len, address );
 	if ( ( rc = bus->rw ( bus, device, command, address,
 			      NULL, data, len ) ) != 0 ) {
 		DBG ( "SPI %p failed to read data from device\n", device );
@@ -114,7 +114,7 @@ int spi_write ( struct nvs_device *nvs, unsigned int address,
 					     device->munge_address );
 	int rc;
 
-	DBG ( "SPI %p writing %d bytes to %#04x\n", device, len, address );
+	DBG ( "SPI %p writing %zd bytes to %#04x\n", device, len, address );
 
 	if ( ( rc = bus->rw ( bus, device, SPI_WREN, -1,
 			      NULL, NULL, 0 ) ) != 0 ) {

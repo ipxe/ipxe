@@ -192,7 +192,7 @@ real_to_prot:
 	movzwl	%sp, %edx
 	movl	%ebp, %eax
 	shll	$4, %eax
-	leal	(%eax,%edx), %esi
+	addr32 leal (%eax,%edx), %esi
 	subl	_virt_offset, %esi
 
 	/* Switch to protected mode */

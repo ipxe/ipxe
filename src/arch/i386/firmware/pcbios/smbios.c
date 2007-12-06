@@ -220,7 +220,7 @@ int find_smbios_structure ( unsigned int type, void *structure,
 		strings_offset = ( offset + header.length );
 		if ( strings_offset > smbios->length ) {
 			DBG ( "SMBIOS structure at offset %zx with length "
-			      "%zx extends beyond SMBIOS\n", offset,
+			      "%x extends beyond SMBIOS\n", offset,
 			      header.length );
 			return -ENOENT;
 		}
@@ -236,7 +236,7 @@ int find_smbios_structure ( unsigned int type, void *structure,
 		strings->length = ( terminator_offset - strings_offset );
 
 		DBG ( "SMBIOS structure at offset %zx has type %d, "
-		      "length %zx, strings length %zx\n",
+		      "length %x, strings length %zx\n",
 		      offset, header.type, header.length, strings->length );
 
 		/* If this is the structure we want, return */

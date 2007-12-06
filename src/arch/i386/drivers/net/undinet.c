@@ -217,7 +217,7 @@ static int undinet_call ( struct undi_nic *undinic, unsigned int function,
 		DBGC ( undinic, "UNDINIC %p %s failed: %s\n", undinic,
 		       undinet_function_name ( function ), strerror ( rc ) );
 		DBGC ( undinic, "UNDINIC %p parameters at %04x:%04x length "
-		       "%#02x, entry point at %04x:%04x\n", undinic,
+		       "%#02zx, entry point at %04x:%04x\n", undinic,
 		       rm_params.segment, rm_params.offset, params_len,
 		       undinet_entry_point.segment,
 		       undinet_entry_point.offset );

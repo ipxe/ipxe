@@ -227,11 +227,11 @@ PXENV_EXIT_t pxenv_undi_transmit ( struct s_PXENV_UNDI_TRANSMIT
 	copy_from_real ( &tbd, undi_transmit->TBD.segment,
 			 undi_transmit->TBD.offset, sizeof ( tbd ) );
 	len = tbd.ImmedLength;
-	DBG ( " %zd", tbd.ImmedLength );
+	DBG ( " %d", tbd.ImmedLength );
 	for ( i = 0 ; i < tbd.DataBlkCount ; i++ ) {
 		datablk = &tbd.DataBlock[i];
 		len += datablk->TDDataLen;
-		DBG ( "+%zd", datablk->TDDataLen );
+		DBG ( "+%d", datablk->TDDataLen );
 	}
 
 	/* Allocate and fill I/O buffer */

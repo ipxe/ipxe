@@ -75,8 +75,8 @@ static int asn1_start_object ( struct asn1_cursor *cursor,
 		len_len = 1;
 	}
 	if ( cursor->len < len_len ) {
-		DBGC ( cursor, "ASN1 %p bad length field length %d (max %d)\n",
-		       cursor, len_len, cursor->len );
+		DBGC ( cursor, "ASN1 %p bad length field length %d (max "
+		       "%zd)\n", cursor, len_len, cursor->len );
 		goto notfound;
 	}
 
@@ -88,7 +88,7 @@ static int asn1_start_object ( struct asn1_cursor *cursor,
 		cursor->len--;
 	}
 	if ( cursor->len < len ) {
-		DBGC ( cursor, "ASN1 %p bad length %d (max %d)\n",
+		DBGC ( cursor, "ASN1 %p bad length %d (max %zd)\n",
 		       cursor, len, cursor->len );
 		goto notfound;
 	}

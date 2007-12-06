@@ -233,7 +233,7 @@ static int nbi_process_segments ( struct image *image,
 	} while ( ! NBI_LAST_SEGHEADER ( sh.flags ) );
 
 	if ( offset != image->len ) {
-		DBGC ( image, "NBI %p length wrong (file %d, metadata %d)\n",
+		DBGC ( image, "NBI %p length wrong (file %zd, metadata %zd)\n",
 		       image, image->len, offset );
 		return -ENOEXEC;
 	}
