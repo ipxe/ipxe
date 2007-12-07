@@ -81,7 +81,7 @@ add_ndp_entry ( struct net_device *netdev, struct in6_addr *in6,
 	}
 	ndp->state = state;
 	DBG ( "New neighbour cache entry (%d): IP6 %s => %s %s\n",
-	      ( ndp - ndp_table ) / sizeof ( *ndp ),
+	      ( ndp - ndp_table ),
 	      inet6_ntoa ( ndp->in6 ), netdev->ll_protocol->name,
 	      netdev->ll_protocol->ntoa ( ndp->ll_addr ) );
 }
@@ -119,7 +119,7 @@ int ndp_resolve ( struct net_device *netdev, struct in6_addr *dest,
 	/* Check if the entry was already created */
 	if ( ndp ) {
 		DBG ( "Awaiting neighbour advertisement (cache entry %d)\n",
-		      ( ( ndp - ndp_table ) / sizeof ( *ndp ) ) );
+		      ( ndp - ndp_table ) );
 		/* For test */
 //		ndp->state = NDP_STATE_REACHABLE;
 //		memcpy ( ndp->ll_addr, netdev->ll_addr, 6 );
@@ -155,7 +155,7 @@ int ndp_process_advert ( struct io_buffer *iobuf, struct sockaddr_tcpip *st_src 
 
 	/* Sanity check */
 	if ( iob_len ( iobuf ) < sizeof ( *nadvert ) ) {
-		DBG ( "Packet too short (%d bytes)\n", iob_len ( iobuf ) );
+		DBG ( "Packet too short (%zd bytes)\n", iob_len ( iobuf ) );
 		return -EINVAL;
 	}
 

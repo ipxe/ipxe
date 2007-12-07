@@ -557,7 +557,7 @@ static int tcp_xmit_reset ( struct tcp_connection *tcp,
 	tcphdr->csum = tcpip_chksum ( iobuf->data, iob_len ( iobuf ) );
 
 	/* Dump header */
-	DBGC ( tcp, "TCP %p TX %d->%d %08lx..%08lx           %08lx %4zd",
+	DBGC ( tcp, "TCP %p TX %d->%d %08lx..%08lx           %08lx %4d",
 	       tcp, ntohs ( tcphdr->src ), ntohs ( tcphdr->dest ),
 	       ntohl ( tcphdr->seq ), ( ntohl ( tcphdr->seq ) ),
 	       ntohl ( tcphdr->ack ), 0 );
@@ -820,7 +820,7 @@ static int tcp_rx ( struct io_buffer *iobuf,
 	struct tcp_header *tcphdr = iobuf->data;
 	struct tcp_connection *tcp;
 	struct tcp_options options;
-	unsigned int hlen;
+	size_t hlen;
 	uint16_t csum;
 	uint32_t start_seq;
 	uint32_t seq;
@@ -832,20 +832,20 @@ static int tcp_rx ( struct io_buffer *iobuf,
 
 	/* Sanity check packet */
 	if ( iob_len ( iobuf ) < sizeof ( *tcphdr ) ) {
-		DBG ( "TCP packet too short at %d bytes (min %d bytes)\n",
+		DBG ( "TCP packet too short at %zd bytes (min %zd bytes)\n",
 		      iob_len ( iobuf ), sizeof ( *tcphdr ) );
 		rc = -EINVAL;
 		goto discard;
 	}
 	hlen = ( ( tcphdr->hlen & TCP_MASK_HLEN ) / 16 ) * 4;
 	if ( hlen < sizeof ( *tcphdr ) ) {
-		DBG ( "TCP header too short at %d bytes (min %d bytes)\n",
+		DBG ( "TCP header too short at %zd bytes (min %zd bytes)\n",
 		      hlen, sizeof ( *tcphdr ) );
 		rc = -EINVAL;
 		goto discard;
 	}
 	if ( hlen > iob_len ( iobuf ) ) {
-		DBG ( "TCP header too long at %d bytes (max %d bytes)\n",
+		DBG ( "TCP header too long at %zd bytes (max %zd bytes)\n",
 		      hlen, iob_len ( iobuf ) );
 		rc = -EINVAL;
 		goto discard;

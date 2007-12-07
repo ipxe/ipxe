@@ -453,7 +453,7 @@ static struct dhcp_option_block * dhcp_parse ( const struct dhcphdr *dhcphdr,
 	/* Allocate empty options block of required size */
 	options = alloc_dhcp_options ( options_len );
 	if ( ! options ) {
-		DBG ( "DHCP could not allocate %d-byte option block\n",
+		DBG ( "DHCP could not allocate %zd-byte option block\n",
 		      options_len );
 		return NULL;
 	}

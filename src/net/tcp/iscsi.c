@@ -213,7 +213,7 @@ static void iscsi_start_command ( struct iscsi_session *iscsi ) {
 	command->cmdsn = htonl ( iscsi->cmdsn );
 	command->expstatsn = htonl ( iscsi->statsn + 1 );
 	memcpy ( &command->cdb, &iscsi->command->cdb, sizeof ( command->cdb ));
-	DBGC ( iscsi, "iSCSI %p start " SCSI_CDB_FORMAT " %s %#x\n",
+	DBGC ( iscsi, "iSCSI %p start " SCSI_CDB_FORMAT " %s %#zx\n",
 	       iscsi, SCSI_CDB_DATA ( command->cdb ),
 	       ( iscsi->command->data_in ? "in" : "out" ),
 	       ( iscsi->command->data_in ?

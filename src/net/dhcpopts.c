@@ -426,11 +426,11 @@ struct dhcp_option * set_dhcp_option ( struct dhcp_option_block *options,
 	option = find_dhcp_option_with_encap ( options, tag, &encapsulator );
 	if ( option ) {
 		old_len = dhcp_option_len ( option );
-		DBG ( "Resizing DHCP option %s from length %d to %d in block "
+		DBG ( "Resizing DHCP option %s from length %d to %zd in block "
 		      "%p\n", dhcp_tag_name (tag), option->len, len, options );
 	} else {
 		old_len = 0;
-		DBG ( "Creating DHCP option %s (length %d) in block %p\n",
+		DBG ( "Creating DHCP option %s (length %zd) in block %p\n",
 		      dhcp_tag_name ( tag ), len, options );
 	}
 	

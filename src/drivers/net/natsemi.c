@@ -471,7 +471,7 @@ static int natsemi_transmit (struct net_device *netdev, struct io_buffer *iobuf)
 	np->tx[np->tx_cur].bufptr = virt_to_bus (iobuf->data);
 	np->tx[np->tx_cur].cmdsts = iob_len (iobuf) | OWN;
 
-	DBG ("TX id %d at %#08lx + %#08x\n", np->tx_cur,
+	DBG ("TX id %d at %#08lx + %#08zx\n", np->tx_cur,
 	     virt_to_bus (&iobuf->data), iob_len (iobuf));
 
 	/* increment the circular buffer pointer to the next buffer location

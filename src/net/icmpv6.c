@@ -77,7 +77,7 @@ static int icmp6_rx ( struct io_buffer *iobuf, struct sockaddr_tcpip *st_src,
 
 	/* Sanity check */
 	if ( iob_len ( iobuf ) < sizeof ( *icmp6hdr ) ) {
-		DBG ( "Packet too short (%d bytes)\n", iob_len ( iobuf ) );
+		DBG ( "Packet too short (%zd bytes)\n", iob_len ( iobuf ) );
 		free_iob ( iobuf );
 		return -EINVAL;
 	}

@@ -577,7 +577,7 @@ e1000_transmit ( struct net_device *netdev, struct io_buffer *iobuf )
 		E1000_TXD_CMD_IFCS | iob_len ( iobuf );
 	tx_curr_desc->upper.data = 0;
 	
-	DBG ( "TX fill: %ld tx_curr: %ld addr: %#08lx len: %d\n", adapter->tx_fill_ctr, 
+	DBG ( "TX fill: %ld tx_curr: %ld addr: %#08lx len: %zd\n", adapter->tx_fill_ctr, 
 	      tx_curr, virt_to_bus ( iobuf->data ), iob_len ( iobuf ) );
 	      
 	/* Point to next free descriptor */

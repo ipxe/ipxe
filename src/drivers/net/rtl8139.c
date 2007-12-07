@@ -379,7 +379,7 @@ static int rtl_transmit ( struct net_device *netdev, struct io_buffer *iobuf ) {
 	iob_pad ( iobuf, ETH_ZLEN );
 
 	/* Add to TX ring */
-	DBG ( "TX id %d at %lx+%x\n", rtl->tx.next,
+	DBG ( "TX id %d at %lx+%zx\n", rtl->tx.next,
 	      virt_to_bus ( iobuf->data ), iob_len ( iobuf ) );
 	rtl->tx.iobuf[rtl->tx.next] = iobuf;
 	outl ( virt_to_bus ( iobuf->data ),

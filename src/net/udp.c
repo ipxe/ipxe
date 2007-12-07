@@ -215,7 +215,7 @@ static int udp_tx ( struct udp_connection *udp, struct io_buffer *iobuf,
 	udphdr->chksum = tcpip_chksum ( udphdr, len );
 
 	/* Dump debugging information */
-	DBGC ( udp, "UDP %p TX %d->%d len %zd\n", udp,
+	DBGC ( udp, "UDP %p TX %d->%d len %d\n", udp,
 	       ntohs ( udphdr->src ), ntohs ( udphdr->dest ),
 	       ntohs ( udphdr->len ) );
 
@@ -268,7 +268,7 @@ static int udp_rx ( struct io_buffer *iobuf, struct sockaddr_tcpip *st_src,
 
 	/* Sanity check packet */
 	if ( iob_len ( iobuf ) < sizeof ( *udphdr ) ) {
-		DBG ( "UDP packet too short at %d bytes (min %d bytes)\n",
+		DBG ( "UDP packet too short at %zd bytes (min %zd bytes)\n",
 		      iob_len ( iobuf ), sizeof ( *udphdr ) );
 		
 		rc = -EINVAL;
@@ -276,14 +276,14 @@ static int udp_rx ( struct io_buffer *iobuf, struct sockaddr_tcpip *st_src,
 	}
 	ulen = ntohs ( udphdr->len );
 	if ( ulen < sizeof ( *udphdr ) ) {
-		DBG ( "UDP length too short at %d bytes "
-		      "(header is %d bytes)\n", ulen, sizeof ( *udphdr ) );
+		DBG ( "UDP length too short at %zd bytes "
+		      "(header is %zd bytes)\n", ulen, sizeof ( *udphdr ) );
 		rc = -EINVAL;
 		goto done;
 	}
 	if ( ulen > iob_len ( iobuf ) ) {
-		DBG ( "UDP length too long at %d bytes (packet is %d bytes)\n",
-		      ulen, iob_len ( iobuf ) );
+		DBG ( "UDP length too long at %zd bytes (packet is %zd "
+		      "bytes)\n", ulen, iob_len ( iobuf ) );
 		rc = -EINVAL;
 		goto done;
 	}
@@ -370,7 +370,7 @@ static struct io_buffer * udp_alloc_iob ( struct xfer_interface *xfer,
 
 	iobuf = alloc_iob ( UDP_MAX_HLEN + len );
 	if ( ! iobuf ) {
-		DBGC ( udp, "UDP %p cannot allocate buffer of length %d\n",
+		DBGC ( udp, "UDP %p cannot allocate buffer of length %zd\n",
 		       udp, len );
 		return NULL;
 	}

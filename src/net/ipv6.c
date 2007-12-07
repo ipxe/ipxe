@@ -302,7 +302,7 @@ static int ipv6_rx ( struct io_buffer *iobuf,
 
 	/* Sanity check */
 	if ( iob_len ( iobuf ) < sizeof ( *ip6hdr ) ) {
-		DBG ( "Packet too short (%d bytes)\n", iob_len ( iobuf ) );
+		DBG ( "Packet too short (%zd bytes)\n", iob_len ( iobuf ) );
 		goto drop;
 	}
 

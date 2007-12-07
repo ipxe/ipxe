@@ -25,7 +25,7 @@ static int legacy_transmit ( struct net_device *netdev, struct io_buffer *iobuf 
 	struct nic *nic = netdev->priv;
 	struct ethhdr *ethhdr;
 
-	DBG ( "Transmitting %d bytes\n", iob_len ( iobuf ) );
+	DBG ( "Transmitting %zd bytes\n", iob_len ( iobuf ) );
 	iob_pad ( iobuf, ETH_ZLEN );
 	ethhdr = iobuf->data;
 	iob_pull ( iobuf, sizeof ( *ethhdr ) );

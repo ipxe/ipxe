@@ -74,7 +74,7 @@ static int eth_rx ( struct io_buffer *iobuf, struct net_device *netdev ) {
 
 	/* Sanity check */
 	if ( iob_len ( iobuf ) < sizeof ( *ethhdr ) ) {
-		DBG ( "Ethernet packet too short (%d bytes)\n",
+		DBG ( "Ethernet packet too short (%zd bytes)\n",
 		      iob_len ( iobuf ) );
 		free_iob ( iobuf );
 		return -EINVAL;

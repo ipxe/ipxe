@@ -66,7 +66,7 @@ static int script_exec ( struct image *image ) {
 		if ( ! eol )
 			eol = memchr ( cmdbuf, '\0', sizeof ( cmdbuf ) );
 		if ( ! eol ) {
-			DBG ( "Script line too long (max %d bytes)\n",
+			DBG ( "Script line too long (max %zd bytes)\n",
 			      sizeof ( cmdbuf ) );
 			rc = -ENOEXEC;
 			goto done;

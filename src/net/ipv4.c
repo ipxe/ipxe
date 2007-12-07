@@ -435,7 +435,7 @@ static int ipv4_rx ( struct io_buffer *iobuf, struct net_device *netdev __unused
 
 	/* Sanity check the IPv4 header */
 	if ( iob_len ( iobuf ) < sizeof ( *iphdr ) ) {
-		DBG ( "IPv4 packet too short at %d bytes (min %d bytes)\n",
+		DBG ( "IPv4 packet too short at %zd bytes (min %zd bytes)\n",
 		      iob_len ( iobuf ), sizeof ( *iphdr ) );
 		goto err;
 	}
@@ -445,13 +445,13 @@ static int ipv4_rx ( struct io_buffer *iobuf, struct net_device *netdev __unused
 	}
 	hdrlen = ( ( iphdr->verhdrlen & IP_MASK_HLEN ) * 4 );
 	if ( hdrlen < sizeof ( *iphdr ) ) {
-		DBG ( "IPv4 header too short at %d bytes (min %d bytes)\n",
+		DBG ( "IPv4 header too short at %zd bytes (min %zd bytes)\n",
 		      hdrlen, sizeof ( *iphdr ) );
 		goto err;
 	}
 	if ( hdrlen > iob_len ( iobuf ) ) {
-		DBG ( "IPv4 header too long at %d bytes "
-		      "(packet is %d bytes)\n", hdrlen, iob_len ( iobuf ) );
+		DBG ( "IPv4 header too long at %zd bytes "
+		      "(packet is %zd bytes)\n", hdrlen, iob_len ( iobuf ) );
 		goto err;
 	}
 	if ( ( csum = tcpip_chksum ( iphdr, hdrlen ) ) != 0 ) {
@@ -461,13 +461,13 @@ static int ipv4_rx ( struct io_buffer *iobuf, struct net_device *netdev __unused
 	}
 	len = ntohs ( iphdr->len );
 	if ( len < hdrlen ) {
-		DBG ( "IPv4 length too short at %d bytes "
-		      "(header is %d bytes)\n", len, hdrlen );
+		DBG ( "IPv4 length too short at %zd bytes "
+		      "(header is %zd bytes)\n", len, hdrlen );
 		goto err;
 	}
 	if ( len > iob_len ( iobuf ) ) {
-		DBG ( "IPv4 length too long at %d bytes "
-		      "(packet is %d bytes)\n", len, iob_len ( iobuf ) );
+		DBG ( "IPv4 length too long at %zd bytes "
+		      "(packet is %zd bytes)\n", len, iob_len ( iobuf ) );
 		goto err;
 	}
 

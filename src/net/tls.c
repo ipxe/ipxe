@@ -452,7 +452,7 @@ static int tls_select_cipher ( struct tls_session *tls,
 	struct crypto_algorithm *pubkey = &crypto_null;
 	struct crypto_algorithm *cipher = &crypto_null;
 	struct crypto_algorithm *digest = &crypto_null;
-	size_t key_len = 0;
+	unsigned int key_len = 0;
 	int rc;
 
 	switch ( cipher_suite ) {
