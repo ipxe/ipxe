@@ -264,7 +264,7 @@ int select ( fd_set *readfds, int wait ) {
 			if ( ! file )
 				return -EBADF;
 			if ( ( list_empty ( &file->data ) ) &&
-			     ( file->rc != -EINPROGRESS ) )
+			     ( file->rc == -EINPROGRESS ) )
 				continue;
 			/* Data is available or status has changed */
 			FD_ZERO ( readfds );
