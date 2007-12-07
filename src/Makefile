@@ -9,6 +9,18 @@ ROMS		:=
 MEDIA		:=
 NON_AUTO_MEDIA	:=
 
+# Find a usable "echo -e".
+#
+ifeq ($(shell echo '\0101'),A)
+ECHO		:= echo
+else ifeq ($(shell echo -e '\0101'),A)
+ECHO		:= echo -e
+else ifeq ($(shell /bin/echo '\0101'),A)
+ECHO		:= /bin/echo
+else ifeq ($(shell /bin/echo -e '\0101'),A)
+ECHO		:= /bin/echo -e
+endif
+
 # Grab the central Config file.
 #
 MAKEDEPS	+= Config
@@ -66,7 +78,6 @@ noargs : blib $(BIN)/NIC $(BIN)/gpxe.dsk $(BIN)/gpxe.iso $(BIN)/gpxe.usb
 
 # Locations of utilities
 #
-ECHO		?= /bin/echo -e
 HOST_CC		?= gcc
 CPP		?= gcc -E -Wp,-Wall
 RM		?= rm -f

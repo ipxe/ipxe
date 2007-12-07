@@ -7,6 +7,11 @@
 #
 CLEANUP	:= $(BIN)/*.* # *.* to avoid catching the "CVS" directory
 
+# Show what we're using for "echo -e"
+#
+echo :
+	@$(ECHO) Using "$(ECHO)" to echo
+
 # Version number calculations 
 #
 VERSION_MAJOR	= 0
