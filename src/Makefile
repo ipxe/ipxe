@@ -73,6 +73,7 @@ TOUCH		?= touch
 MKDIR		?= mkdir
 CP		?= cp
 ECHO		?= echo
+PRINTF		?= printf
 PERL		?= /usr/bin/perl
 CC		?= $(CROSS_COMPILE)gcc
 AS		?= $(CROSS_COMPILE)as
