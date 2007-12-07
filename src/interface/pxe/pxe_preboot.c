@@ -168,15 +168,14 @@ PXENV_EXIT_t pxenv_get_cached_info ( struct s_PXENV_GET_CACHED_INFO
 		      get_cached_info->BufferLimit );
 	} else {
 		/* Copy packet to client buffer */
-		if ( len < sizeof ( cached_info[idx] ) ) {
-			DBG ( " buffer too short" );
-			goto err;
-		}
+		if ( len > sizeof ( cached_info[idx] ) )
+			len = sizeof ( cached_info[idx] );
+		if ( len < sizeof ( cached_info[idx] ) )
+			DBG ( " buffer may be too short" );
 		buffer = real_to_user ( get_cached_info->Buffer.segment,
 					get_cached_info->Buffer.offset );
-		copy_to_user ( buffer, 0, &cached_info[idx],
-			       sizeof ( cached_info[idx] ) );
-		get_cached_info->BufferSize = sizeof ( cached_info[idx] );
+		copy_to_user ( buffer, 0, &cached_info[idx], len );
+		get_cached_info->BufferSize = len;
 	}
 
 	get_cached_info->Status = PXENV_STATUS_SUCCESS;
