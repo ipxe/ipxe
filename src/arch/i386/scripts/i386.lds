@@ -15,15 +15,6 @@ SECTIONS {
      * addresses, but may have individual link addresses depending on
      * the memory model being used.
      *
-     * The linker symbols _{prefix,textdata}_link_addr, load_addr, and
-     * _max_align may be specified explicitly.  If not specified, they
-     * will default to:
-     *
-     *   _prefix_link_addr	= 0
-     *   _textdata_link_addr	= 0
-     *   _load_addr		= 0
-     *   _max_align		= 16
-     * 
      * We guarantee alignment of virtual addresses to any alignment
      * specified by the constituent object files (e.g. via
      * __attribute__((aligned(x)))).  Load addresses are guaranteed
@@ -43,7 +34,7 @@ SECTIONS {
      * The prefix
      */
 
-    _prefix_link_addr = DEFINED ( _prefix_link_addr ) ? _prefix_link_addr : 0;
+    _prefix_link_addr = 0;
     . = _prefix_link_addr;
     _prefix = .;
 
@@ -112,8 +103,7 @@ SECTIONS {
      * The 32-bit sections
      */
 
-    _textdata_link_addr = ( DEFINED ( _textdata_link_addr ) ?
-			    _textdata_link_addr : 0 );
+    _textdata_link_addr = 0;
     . = _textdata_link_addr;
     _textdata = .;
 
@@ -198,8 +188,8 @@ SECTIONS {
      * location counter.
      */
 
-    _max_align		    = DEFINED ( _max_align ) ? _max_align : 16;
-    _load_addr		    = DEFINED ( _load_addr ) ? _load_addr : 0;
+    _max_align		    = 16;
+    _load_addr		    = 0;
 
     .			    = _load_addr;
 
