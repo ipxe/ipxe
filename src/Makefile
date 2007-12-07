@@ -9,16 +9,22 @@ ROMS		:=
 MEDIA		:=
 NON_AUTO_MEDIA	:=
 
-# Find a usable "echo -e".
+# Find a usable "echo -e" substitute.
 #
-ifeq ($(shell echo '\0101'),A)
+ifeq ($(shell echo '\101'),A)
+ECHO		?= echo
+endif
+ifeq ($(shell echo -e '\101'),A)
+ECHO		?= echo -e
+endif
+ifeq ($(shell /bin/echo '\101'),A)
+ECHO		?= /bin/echo
+endif
+ifeq ($(shell /bin/echo -e '\101'),A)
+ECHO		?= /bin/echo -e
+endif
+ifndef ECHO
 ECHO		:= echo
-else ifeq ($(shell echo -e '\0101'),A)
-ECHO		:= echo -e
-else ifeq ($(shell /bin/echo '\0101'),A)
-ECHO		:= /bin/echo
-else ifeq ($(shell /bin/echo -e '\0101'),A)
-ECHO		:= /bin/echo -e
 endif
 
 # Grab the central Config file.
