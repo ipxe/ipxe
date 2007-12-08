@@ -7,11 +7,6 @@
 #
 CLEANUP	:= $(BIN)/*.* # *.* to avoid catching the "CVS" directory
 
-# Show what we're using for "echo -e"
-#
-echo :
-	@$(ECHO) Using "$(ECHO)" to echo
-
 # Version number calculations 
 #
 VERSION_MAJOR	= 0
@@ -43,6 +38,32 @@ version :
 	fi
 	@$(TOUCH) $@
 VERYCLEANUP	+= .toolcheck
+
+# Find a usable "echo -e" substitute.
+#
+TAB 		:= $(shell printf "\t")
+ifeq ($(shell echo '\t'),$(TAB))
+ECHO_E		?= echo
+endif
+ifeq ($(shell echo -e '\t'),$(TAB))
+ECHO_E		?= echo -e
+endif
+ifeq ($(shell /bin/echo '\t'),$(TAB))
+ECHO_E		?= /bin/echo
+endif
+ifeq ($(shell /bin/echo -e '\t'),$(TAB))
+ECHO_E		?= /bin/echo -e
+endif
+.echocheck :
+ifdef ECHO_E
+	$(TOUCH) $@
+else
+	@echo "No usable \"echo -e\" substitute found"
+	@exit 1
+endif
+VERYCLEANUP	+= .echocheck
+echo :
+	@$(ECHO) "Using \"$(ECHO_E)\" for \"echo -e\""
 
 # Build verbosity
 #
@@ -126,7 +147,7 @@ define obj_template
 	@$(CPP) $(CFLAGS) $(CFLAGS_$(3)) $(CFLAGS_$(4)) -DOBJECT=$(4) \
 		-Wno-error -M $(1) -MT "$(4)_DEPS" -MG -MP | \
 		sed 's/_DEPS\s*:/_DEPS =/' >> $(2)
-	@$(ECHO) '\n$$(BIN)/$(4).o : $(1) $$(MAKEDEPS) $$($(4)_DEPS)' \
+	@$(ECHO_E) '\n$$(BIN)/$(4).o : $(1) $$(MAKEDEPS) $$($(4)_DEPS)' \
 		 '\n\t$$(QM)$(ECHO) "  [BUILD] $$@"\n' \
 		 '\n\t$$(RULE_$(3))\n' \
 		 '\nBOBJS += $$(BIN)/$(4).o\n' \
@@ -373,7 +394,7 @@ define media_template
 	@$(MKDIR) -p $(dir $(2))
 	@$(RM) $(2)
 	@$(TOUCH) $(2)
-	@$(ECHO) '$$(BIN)/%.$(1) : $$(BIN)/%.$(1).zbin' \
+	@$(ECHO_E) '$$(BIN)/%.$(1) : $$(BIN)/%.$(1).zbin' \
 		  '\n\t$$(QM)$(ECHO) "  [FINISH] $$@"' \
 		  '\n\t$$(Q)$$(CP) $$< $$@' \
 		  '\n\t$$(Q)$$(FINALISE_$(1))' \

@@ -1,6 +1,6 @@
 # Initialise variables that get added to throughout the various Makefiles
 #
-MAKEDEPS	:= Makefile .toolcheck
+MAKEDEPS	:= Makefile .toolcheck .echocheck
 SRCDIRS		:=
 SRCS		:=
 NON_AUTO_SRCS	:=
@@ -8,24 +8,6 @@ DRIVERS		:=
 ROMS		:=
 MEDIA		:=
 NON_AUTO_MEDIA	:=
-
-# Find a usable "echo -e" substitute.
-#
-ifeq ($(shell echo '\101'),A)
-ECHO		?= echo
-endif
-ifeq ($(shell echo -e '\101'),A)
-ECHO		?= echo -e
-endif
-ifeq ($(shell /bin/echo '\101'),A)
-ECHO		?= /bin/echo
-endif
-ifeq ($(shell /bin/echo -e '\101'),A)
-ECHO		?= /bin/echo -e
-endif
-ifndef ECHO
-ECHO		:= echo
-endif
 
 # Grab the central Config file.
 #
@@ -90,6 +72,7 @@ RM		?= rm -f
 TOUCH		?= touch
 MKDIR		?= mkdir
 CP		?= cp
+ECHO		?= echo
 PERL		?= /usr/bin/perl
 CC		?= $(CROSS_COMPILE)gcc
 AS		?= $(CROSS_COMPILE)as
