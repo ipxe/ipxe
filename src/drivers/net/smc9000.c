@@ -841,7 +841,6 @@ static int smc9000_probe ( struct nic *nic, struct isa_device *isa ) {
    int              i;
 
    nic->irqno  = 0;
-   isa_fill_nic ( nic, isa );
    nic->ioaddr = isa->ioaddr;
 
    /*
@@ -947,6 +946,8 @@ ISA_ROM ( "smc9000", "SMC9000" );
 
 /*
  * Local variables:
- *  c-basic-offset: 3
+ *  c-basic-offset: 8
+ *  c-indent-level: 8
+ *  tab-width: 8
  * End:
  */

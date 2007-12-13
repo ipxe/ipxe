@@ -837,7 +837,6 @@ static int ns83820_probe ( struct nic *nic, struct pci_device *pci ) {
 		return 0;
 
 	nic->irqno  = 0;
-	pci_fill_nic ( nic, pci );
 	nic->ioaddr = pci->ioaddr & ~3;
 
 	/* disable interrupts */
@@ -1003,3 +1002,11 @@ static int ns83820_probe ( struct nic *nic, struct pci_device *pci ) {
 
 DRIVER ( "NS83820/PCI", nic_driver, pci_driver, ns83820_driver,
 	 ns83820_probe, ns83820_disable );
+
+/*
+ * Local variables:
+ *  c-basic-offset: 8
+ *  c-indent-level: 8
+ *  tab-width: 8
+ * End:
+ */

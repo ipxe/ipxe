@@ -23,7 +23,6 @@
 static int t529_probe ( struct nic *nic, struct mca_device *mca ) {
 
 	/* Retrieve NIC parameters from MCA device parameters */
-	mca_fill_nic ( nic, mca );
 	nic->ioaddr = ( ( mca->pos[4] & 0xfc ) | 0x02 ) << 8;
 	nic->irqno = mca->pos[5] & 0x0f;
 	printf ( "3c529 board found on MCA at %#hx IRQ %d -",
@@ -51,3 +50,11 @@ DRIVER ( "3c529", nic_driver, mca_driver, t529_driver,
 	 t529_probe, t529_disable );
 
 ISA_ROM( "3c529", "3c529 == MCA 3c509" );
+
+/*
+ * Local variables:
+ *  c-basic-offset: 8
+ *  c-indent-level: 8
+ *  tab-width: 8
+ * End:
+ */

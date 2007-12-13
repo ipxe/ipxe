@@ -344,8 +344,8 @@ static int sis900_probe ( struct nic *nic, struct pci_device *pci ) {
         return 0;
 
     nic->irqno  = 0;
-    pci_fill_nic ( nic, pci );
     nic->ioaddr = pci->ioaddr;
+
     ioaddr  = pci->ioaddr;
     vendor  = pci->vendor;
     dev_id  = pci->device;
@@ -1287,3 +1287,11 @@ PCI_DRIVER ( sis900_driver, sis900_nics, PCI_NO_CLASS );
 
 DRIVER ( "SIS900", nic_driver, pci_driver, sis900_driver,
 	 sis900_probe, sis900_disable );
+
+/*
+ * Local variables:
+ *  c-basic-offset: 8
+ *  c-indent-level: 8
+ *  tab-width: 8
+ * End:
+ */

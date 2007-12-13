@@ -562,7 +562,6 @@ static int eepro_probe ( struct nic *nic, struct isa_device *isa ) {
 	const char *name;
 
 	nic->irqno  = 0;
-	isa_fill_nic ( nic, isa );
 	nic->ioaddr = isa->ioaddr;
 
 	station_addr.saddr[2] = read_eeprom(nic->ioaddr,2);
@@ -627,3 +626,11 @@ DRIVER ( "eepro", nic_driver, isa_driver, eepro_driver,
 	 eepro_probe, eepro_disable );
 
 ISA_ROM ( "eepro", "Intel Etherexpress Pro/10" );
+
+/*
+ * Local variables:
+ *  c-basic-offset: 8
+ *  c-indent-level: 8
+ *  tab-width: 8
+ * End:
+ */

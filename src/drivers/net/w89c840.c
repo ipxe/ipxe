@@ -630,9 +630,8 @@ static int w89c840_probe ( struct nic *nic, struct pci_device *p ) {
     if (p->ioaddr == 0)
         return 0;
 
-    pci_fill_nic ( nic, p );
+    nic->ioaddr = p->ioaddr;
     nic->irqno  = 0;
-
 
 #if defined(W89C840_DEBUG)
     printf("winbond-840: PCI bus %hhX device function %hhX: I/O address: %hX\n", p->bus, p->devfn, ioaddr);
@@ -954,3 +953,11 @@ static void init_ring(void)
 
 DRIVER ( "W89C840F", nic_driver, pci_driver, w89c840_driver,
 	 w89c840_probe, w89c840_disable );
+
+/*
+ * Local variables:
+ *  c-basic-offset: 8
+ *  c-indent-level: 8
+ *  tab-width: 8
+ * End:
+ */

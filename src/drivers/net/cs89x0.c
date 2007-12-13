@@ -477,14 +477,12 @@ static int cs89x0_probe_addr ( isa_probe_addr_t ioaddr ) {
 	return 1;
 }
 
-static int cs89x0_probe ( struct nic *nic, struct isa_device *isa ) {
+static int cs89x0_probe ( struct nic *nic, struct isa_device *isa __unused ) {
 	int      i, result = -1;
 	unsigned rev_type = 0, isa_cnf, cs_revision;
 	unsigned short eeprom_buff[CHKSUM_LEN];
 
-	isa_fill_nic ( nic, isa );
 	nic->ioaddr &= ~1; /* LSB = 1 indicates a more aggressive probe */
-
 	eth_nic_base = nic->ioaddr;
 
 	/* get the chip type */
@@ -552,6 +550,8 @@ static int cs89x0_probe ( struct nic *nic, struct isa_device *isa ) {
 			else printf("\ncs: BUG: isa_config is %d\n", i); }
 		eth_irqno = i; }
 	
+        nic->irqno = eth_irqno;
+
 	/* Retrieve and print the ethernet address. */
 	for (i=0; i<ETH_ALEN; i++) {
 		nic->node_addr[i] = ((unsigned char *)eeprom_buff)[i];
@@ -712,6 +712,7 @@ ISA_ROM ( "cs89x0", "Crystal Semiconductor CS89x0" );
 /*
  * Local variables:
  *  c-basic-offset: 8
+ *  c-indent-level: 8
+ *  tab-width: 8
  * End:
  */
-

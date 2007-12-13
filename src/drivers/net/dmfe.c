@@ -496,7 +496,6 @@ static int dmfe_probe ( struct nic *nic, struct pci_device *pci ) {
 	dmfe_reset(nic);
 
 	nic->irqno  = 0;
-	pci_fill_nic ( nic, pci );
 	nic->ioaddr = pci->ioaddr;
 
 	/* point to NIC specific routines */
@@ -1216,3 +1215,11 @@ PCI_DRIVER ( dmfe_driver, dmfe_nics, PCI_NO_CLASS );
 
 DRIVER ( "DMFE/PCI", nic_driver, pci_driver, dmfe_driver,
 	 dmfe_probe, dmfe_disable );
+
+/*
+ * Local variables:
+ *  c-basic-offset: 8
+ *  c-indent-level: 8
+ *  tab-width: 8
+ * End:
+ */

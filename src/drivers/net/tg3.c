@@ -3242,8 +3242,8 @@ static int tg3_probe ( struct nic *nic, struct pci_device *pdev ) {
 
 	adjust_pci_device(pdev);
 
-	pci_fill_nic ( nic, pdev );
 	nic->irqno  = 0;
+        nic->ioaddr = pdev->ioaddr;
 
 	/* Find power-management capability. */
 	pm_cap = pci_find_capability(pdev, PCI_CAP_ID_PM);
@@ -3390,3 +3390,11 @@ PCI_DRIVER ( tg3_driver, tg3_nics, PCI_NO_CLASS );
 
 DRIVER ( "TG3", nic_driver, pci_driver, tg3_driver,
 	 tg3_probe, tg3_disable );
+
+/*
+ * Local variables:
+ *  c-basic-offset: 8
+ *  c-indent-level: 8
+ *  tab-width: 8
+ * End:
+ */

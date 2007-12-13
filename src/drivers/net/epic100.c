@@ -120,8 +120,8 @@ epic100_probe ( struct nic *nic, struct pci_device *pci ) {
        Epic cards in slot order. */
 
     ioaddr = pci->ioaddr;
+
     nic->irqno  = 0;
-    pci_fill_nic ( nic, pci );
     nic->ioaddr = pci->ioaddr & ~3;
 
     /* compute all used static epic100 registers address */
@@ -525,3 +525,11 @@ PCI_DRIVER ( epic100_driver, epic100_nics, PCI_NO_CLASS );
 
 DRIVER ( "EPIC100", nic_driver, pci_driver, epic100_driver,
 	 epic100_probe, epic100_disable );
+
+/*
+ * Local variables:
+ *  c-basic-offset: 8
+ *  c-indent-level: 8
+ *  tab-width: 8
+ * End:
+ */

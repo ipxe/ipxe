@@ -614,8 +614,6 @@ static int t515_probe ( struct nic *nic, struct isapnp_device *isapnp ) {
 
 	/* Direct copy from Beckers 3c515.c removing any ISAPNP sections */
 
-	isapnp_fill_nic ( nic, isapnp );
-
 	nic->ioaddr = isapnp->ioaddr;
 	nic->irqno = isapnp->irqno;
 	activate_isapnp_device ( isapnp );

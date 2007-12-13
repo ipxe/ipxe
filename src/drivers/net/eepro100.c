@@ -599,7 +599,7 @@ static void eepro100_disable ( struct nic *nic __unused ) {
  *            leaves the 82557 initialized, and ready to recieve packets.
  */
 
-static int eepro100_probe ( struct nic *nic, struct pci_device *p ) {
+static int eepro100_probe ( struct nic *nic, struct pci_device *pci ) {
 
 	unsigned short sum = 0;
 	int i;
@@ -611,10 +611,14 @@ static int eepro100_probe ( struct nic *nic, struct pci_device *p ) {
 	   be careful not to access beyond this array */
 	unsigned short eeprom[16];
 
-	if (p->ioaddr == 0)
+	if (pci->ioaddr == 0)
 		return 0;
-	pci_fill_nic ( nic, p );
-	adjust_pci_device(p);
+
+	adjust_pci_device(pci);
+
+        nic->ioaddr = pci->ioaddr;
+        nic->irqno = pci->irq;
+
 	ioaddr = nic->ioaddr;
 
 	if ((do_eeprom_cmd(EE_READ_CMD << 24, 27) & 0xffe0000)
@@ -834,3 +838,11 @@ PCI_DRIVER ( eepro100_driver, eepro100_nics, PCI_NO_CLASS );
 
 DRIVER ( "EEPRO100", nic_driver, pci_driver, eepro100_driver,
 	 eepro100_probe, eepro100_disable );
+
+/*
+ * Local variables:
+ *  c-basic-offset: 8
+ *  c-indent-level: 8
+ *  tab-width: 8
+ * End:
+ */

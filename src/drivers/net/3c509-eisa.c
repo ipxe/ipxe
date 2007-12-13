@@ -15,9 +15,11 @@
  */
 static int el3_eisa_probe ( struct nic *nic, struct eisa_device *eisa ) {
 	
-	enable_eisa_device ( eisa );
-	eisa_fill_nic ( nic, eisa );
 
+        nic->ioaddr = eisa->ioaddr;
+        nic->irqno = 0;
+        enable_eisa_device ( eisa );
+        
 	/* Hand off to generic t5x9 probe routine */
 	return t5x9_probe ( nic, ISA_PROD_ID ( PROD_ID ), ISA_PROD_ID_MASK );
 }
@@ -37,3 +39,11 @@ DRIVER ( "3c509 (EISA)", nic_driver, eisa_driver, el3_eisa_driver,
 	 el3_eisa_probe, el3_eisa_disable );
 
 ISA_ROM ( "3c509-eisa","3c509 (EISA)" );
+
+/*
+ * Local variables:
+ *  c-basic-offset: 8
+ *  c-indent-level: 8
+ *  tab-width: 8
+ * End:
+ */

@@ -966,14 +966,18 @@ rhine_probe ( struct nic *nic, struct pci_device *pci ) {
 
     if (!pci->ioaddr)
 	return 0;
+
     rhine_probe1 (nic, pci, pci->ioaddr, pci->device, -1);
 
     adjust_pci_device ( pci );
+
     rhine_reset (nic);
+
     nic->nic_op	= &rhine_operations;
-    pci_fill_nic ( nic, pci );
+
     nic->irqno	  = pci->irq;
     nic->ioaddr   = tp->ioaddr;
+
     return 1;
 }
 
@@ -1426,3 +1430,11 @@ DRIVER ( "VIA 86C100", nic_driver, pci_driver, rhine_driver,
 	 rhine_probe, rhine_disable );
 
 /* EOF via-rhine.c */
+
+/*
+ * Local variables:
+ *  c-basic-offset: 8
+ *  c-indent-level: 8
+ *  tab-width: 8
+ * End:
+ */

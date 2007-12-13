@@ -681,7 +681,6 @@ static int pcnet32_probe ( struct nic *nic, struct pci_device *pci ) {
 	       pci->driver_name, pci->vendor, pci->device);
 
 	nic->irqno  = 0;
-	pci_fill_nic ( nic, pci );
 	nic->ioaddr = pci->ioaddr & ~3;
 
 	/* reset the chip */
@@ -1017,3 +1016,11 @@ PCI_DRIVER ( pcnet32_driver, pcnet32_nics, PCI_NO_CLASS );
 
 DRIVER ( "PCNET32/PCI", nic_driver, pci_driver, pcnet32_driver,
 	 pcnet32_probe, pcnet32_disable );
+
+/*
+ * Local variables:
+ *  c-basic-offset: 8
+ *  c-indent-level: 8
+ *  tab-width: 8
+ * End:
+ */
