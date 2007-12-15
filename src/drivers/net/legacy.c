@@ -98,11 +98,19 @@ int legacy_probe ( void *hwdev,
 	netdev->dev = dev;
 
 	nic.node_addr = netdev->ll_addr;
+	nic.irqno = dev->desc.irq;
 
 	if ( ! probe ( &nic, hwdev ) ) {
 		rc = -ENODEV;
 		goto err_probe;
 	}
+
+	/* Overwrite the IRQ number.  Some legacy devices set
+	 * nic->irqno to 0 in the probe routine to indicate that they
+	 * don't support interrupts; doing this allows the timer
+	 * interrupt to be used instead.
+	 */
+	dev->desc.irq = nic.irqno;
 
 	if ( ( rc = register_netdev ( netdev ) ) != 0 )
 		goto err_register;
