@@ -269,35 +269,4 @@ static inline void * legacy_isa_get_drvdata ( void *hwdev ) {
 				       _name ## _disable );		  \
 	}
 
-static inline void pci_fill_nic ( struct nic *nic, struct pci_device *pci ) {
-	nic->ioaddr = pci->ioaddr;
-	nic->irqno = pci->irq;
-}
-
-static inline void isapnp_fill_nic ( struct nic *nic,
-				     struct isapnp_device *isapnp ) {
-	nic->ioaddr = isapnp->ioaddr;
-	nic->irqno = isapnp->irqno;
-}
-
-static inline void eisa_fill_nic ( struct nic *nic,
-				   struct eisa_device *eisa ) {
-	nic->ioaddr = eisa->ioaddr;
-	nic->irqno = 0;
-}
-
-static inline void mca_fill_nic ( struct nic *nic,
-				  struct mca_device *mca __unused ) {
-	/* ioaddr and irqno must be read in a device-dependent way
-	 * from the POS registers
-	 */
-	nic->ioaddr = 0;
-	nic->irqno = 0;
-}
-
-static inline void isa_fill_nic ( struct nic *nic, struct isa_device *isa ) {
-	nic->ioaddr = isa->ioaddr;
-	nic->irqno = 0;
-}
-
 #endif	/* NIC_H */
