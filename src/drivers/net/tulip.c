@@ -1243,7 +1243,6 @@ static int tulip_probe ( struct nic *nic, struct pci_device *pci ) {
         return 0;
 
     ioaddr         = pci->ioaddr;
-    pci_fill_nic ( nic, pci );
     nic->ioaddr    = pci->ioaddr & ~3;
     nic->irqno     = 0;
 
@@ -2088,3 +2087,11 @@ PCI_DRIVER ( tulip_driver, tulip_nics, PCI_NO_CLASS );
 
 DRIVER ( "Tulip", nic_driver, pci_driver, tulip_driver,
 	 tulip_probe, tulip_disable );
+
+/*
+ * Local variables:
+ *  c-basic-offset: 8
+ *  c-indent-level: 8
+ *  tab-width: 8
+ * End:
+ */

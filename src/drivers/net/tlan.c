@@ -784,7 +784,6 @@ static int tlan_probe ( struct nic *nic, struct pci_device *pci ) {
 		return 0;
 
 	nic->irqno  = 0;
-	pci_fill_nic ( nic, pci );
 	nic->ioaddr = pci->ioaddr;
 
 	BASE = pci->ioaddr;
@@ -1712,3 +1711,11 @@ PCI_DRIVER ( tlan_driver, tlan_nics, PCI_NO_CLASS );
 
 DRIVER ( "TLAN/PCI", nic_driver, pci_driver, tlan_driver,
 	 tlan_probe, tlan_disable );
+
+/*
+ * Local variables:
+ *  c-basic-offset: 8
+ *  c-indent-level: 8
+ *  tab-width: 8
+ * End:
+ */

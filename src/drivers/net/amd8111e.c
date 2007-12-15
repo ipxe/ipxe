@@ -653,7 +653,8 @@ static int amd8111e_probe(struct nic *nic, struct pci_device *pdev)
 	struct amd8111e_priv *lp = &amd8111e;
 	unsigned long mmio_start, mmio_len;
 
-	pci_fill_nic ( nic, pdev );
+        nic->ioaddr = pdev->ioaddr;
+        nic->irqno  = pdev->irq;
 	
 	mmio_start = pci_bar_start(pdev, PCI_BASE_ADDRESS_0);
 	mmio_len = pci_bar_size(pdev, PCI_BASE_ADDRESS_0);
@@ -681,3 +682,11 @@ PCI_DRIVER ( amd8111e_driver, amd8111e_nics, PCI_NO_CLASS );
 
 DRIVER ( "AMD8111E", nic_driver, pci_driver, amd8111e_driver,
 	 amd8111e_probe, amd8111e_disable );
+
+/*
+ * Local variables:
+ *  c-basic-offset: 8
+ *  c-indent-level: 8
+ *  tab-width: 8
+ * End:
+ */

@@ -479,7 +479,6 @@ static int t595_probe ( struct nic *nic, struct pci_device *pci ) {
 	eth_nic_base = pci->ioaddr;
 
 	nic->irqno  = 0;
-	pci_fill_nic ( nic, pci );
 	nic->ioaddr = pci->ioaddr;
 
 	GO_WINDOW(0);
@@ -547,6 +546,7 @@ DRIVER ( "3C595", nic_driver, pci_driver, t595_driver,
 /*
  * Local variables:
  *  c-basic-offset: 8
+ *  c-indent-level: 8
+ *  tab-width: 8
  * End:
  */
-

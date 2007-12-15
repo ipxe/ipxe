@@ -1018,11 +1018,12 @@ DRIVER ( "NE2000/PCI", nic_driver, pci_driver, nepci_driver,
 
 #endif /* INCLUDE_NS8390 */
 
+#endif
+
 /*
  * Local variables:
  *  c-basic-offset: 8
+ *  c-indent-level: 8
+ *  tab-width: 8
  * End:
  */
-
-
-#endif

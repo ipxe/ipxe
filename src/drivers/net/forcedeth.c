@@ -1248,7 +1248,8 @@ static int forcedeth_probe ( struct nic *nic, struct pci_device *pci ) {
 	printf("forcedeth.c: Found %s, vendor=0x%hX, device=0x%hX\n",
 	       pci->driver_name, pci->vendor, pci->device);
 
-	pci_fill_nic ( nic, pci );
+        nic->ioaddr = pci->ioaddr;
+        nic->irqno = 0;
 
 	/* point to private storage */
 	np = &npx;
@@ -1426,3 +1427,11 @@ PCI_DRIVER ( forcedeth_driver, forcedeth_nics, PCI_NO_CLASS );
 
 DRIVER ( "forcedeth", nic_driver, pci_driver, forcedeth_driver,
 	 forcedeth_probe, forcedeth_disable );
+
+/*
+ * Local variables:
+ *  c-basic-offset: 8
+ *  c-indent-level: 8
+ *  tab-width: 8
+ * End:
+ */

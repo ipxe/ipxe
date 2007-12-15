@@ -713,8 +713,6 @@ static int a3c90x_probe ( struct nic *nic, struct pci_device *pci ) {
 
     adjust_pci_device(pci);
 
-    pci_fill_nic ( nic, pci );
-
     nic->ioaddr = pci->ioaddr;
     nic->irqno = 0;
 
@@ -1016,3 +1014,11 @@ PCI_DRIVER ( a3c90x_driver, a3c90x_nics, PCI_NO_CLASS );
 
 DRIVER ( "3C90X", nic_driver, pci_driver, a3c90x_driver,
 	 a3c90x_probe, a3c90x_disable );
+
+/*
+ * Local variables:
+ *  c-basic-offset: 8
+ *  c-indent-level: 8
+ *  tab-width: 8
+ * End:
+ */

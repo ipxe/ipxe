@@ -728,8 +728,8 @@ static int sundance_probe ( struct nic *nic, struct pci_device *pci ) {
 
 	/* point to NIC specific routines */
 	nic->nic_op	= &sundance_operations;
-	pci_fill_nic ( nic, pci );
-	nic->irqno = pci->irq;
+
+	nic->irqno  = pci->irq;
 	nic->ioaddr = BASE;
 
 	return 1;
@@ -876,3 +876,11 @@ PCI_DRIVER ( sundance_driver, sundance_nics, PCI_NO_CLASS );
 
 DRIVER ( "SUNDANCE/PCI", nic_driver, pci_driver, sundance_driver,
 	 sundance_probe, sundance_disable );
+
+/*
+ * Local variables:
+ *  c-basic-offset: 8
+ *  c-indent-level: 8
+ *  tab-width: 8
+ * End:
+ */

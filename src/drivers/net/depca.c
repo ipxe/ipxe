@@ -742,7 +742,6 @@ static int depca_probe ( struct nic *nic, struct isa_device *isa ) {
 	long	sum, chksum;
 
 	nic->irqno    = 0;
-	isa_fill_nic ( nic, isa );
 	nic->ioaddr   = isa->ioaddr;
 
 	for (i = 0, j = 0, sum = 0; j < 3; j++) {
@@ -794,3 +793,11 @@ DRIVER ( "depce", nic_driver, isa_driver, depca_driver,
 ISA_ROM ( "depca", "Digital DE100 and DE200" );
 
 #endif
+
+/*
+ * Local variables:
+ *  c-basic-offset: 8
+ *  c-indent-level: 8
+ *  tab-width: 8
+ * End:
+ */

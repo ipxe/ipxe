@@ -666,7 +666,8 @@ static int davicom_probe ( struct nic *nic, struct pci_device *pci ) {
   dev_id  = pci->device;
   ioaddr  = pci->ioaddr;
 
-  pci_fill_nic ( nic, pci );
+  nic->ioaddr = pci->ioaddr;
+  nic->irqno = 0;
 
   /* wakeup chip */
   pci_write_config_dword(pci, 0x40, 0x00000000);
@@ -714,3 +715,11 @@ PCI_DRIVER ( davicom_driver, davicom_nics, PCI_NO_CLASS );
 
 DRIVER ( "DAVICOM", nic_driver, pci_driver, davicom_driver,
 	 davicom_probe, davicom_disable );
+
+/*
+ * Local variables:
+ *  c-basic-offset: 8
+ *  c-indent-level: 8
+ *  tab-width: 8
+ * End:
+ */

@@ -1024,13 +1024,14 @@ static int r8169_probe ( struct nic *nic, struct pci_device *pci ) {
 	}
 
 	r8169_reset(nic);
-	/* point to NIC specific routines */
-	nic->nic_op	= &r8169_operations;
-	pci_fill_nic ( nic, pci );
-	nic->irqno = pci->irq;
-	nic->ioaddr = ioaddr;
-	return 1;
 
+	/* point to NIC specific routines */
+	nic->nic_op = &r8169_operations;
+
+	nic->irqno  = pci->irq;
+	nic->ioaddr = ioaddr;
+
+	return 1;
 }
 
 //======================================================================================================
@@ -1174,3 +1175,11 @@ static void rtl8169_hw_PHY_config(struct nic *nic __unused)
 
 DRIVER ( "r8169/PCI", nic_driver, pci_driver, r8169_driver,
 	 r8169_probe, r8169_disable );
+
+/*
+ * Local variables:
+ *  c-basic-offset: 8
+ *  c-indent-level: 8
+ *  tab-width: 8
+ * End:
+ */

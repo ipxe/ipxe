@@ -728,10 +728,10 @@ e1000_irq ( struct net_device *netdev, int enable )
 	
 	switch ( enable ) {
 	case 0 :
-		e1000_irq_enable ( adapter );
+		e1000_irq_disable ( adapter );
 		break;
 	case 1 :
-		e1000_irq_disable ( adapter );
+		e1000_irq_enable ( adapter );
 		break;
 	case 2 :
 		e1000_irq_force ( adapter );

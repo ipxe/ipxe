@@ -81,12 +81,10 @@ static int prism2_find_plx ( hfa384x_t *hw, struct pci_device *p )
 static int prism2_plx_probe ( struct nic *nic, struct pci_device *pci ) {
   hfa384x_t *hw = &hw_global;
   
-  pci_fill_nic ( nic, pci );
-
   /* Find and intialise PLX Prism2 card */
   if ( ! prism2_find_plx ( hw, pci ) ) return 0;
   nic->ioaddr = hw->iobase;
-
+  nic->irqno  = 0;
   return prism2_probe ( nic, hw );
 }
 
@@ -114,3 +112,10 @@ PCI_DRIVER ( prism2_plx_driver, prism2_plx_nics, PCI_NO_CLASS );
 DRIVER ( "Prism2/PLX", nic_driver, pci_driver, prism2_plx_driver,
 	 prism2_plx_probe, prism2_plx_disable );
 
+/*
+ * Local variables:
+ *  c-basic-offset: 8
+ *  c-indent-level: 8
+ *  tab-width: 8
+ * End:
+ */

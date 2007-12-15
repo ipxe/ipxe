@@ -24,12 +24,13 @@ static int prism2_pci_probe ( struct nic *nic, struct pci_device *pci ) {
   hfa384x_t *hw = &hw_global;
   uint32_t membase = 0; /* Prism2.5 Memory Base */
 
-  pci_fill_nic ( nic, pci );
   pci_read_config_dword( pci, PRISM2_PCI_MEM_BASE, &membase);
   membase &= PCI_BASE_ADDRESS_MEM_MASK;
   hw->membase = (uint32_t) phys_to_virt(membase);
   printf ( "Prism2.5 has registers at %#lx\n", hw->membase );
+
   nic->ioaddr = hw->membase;
+  nic->irqno = 0;
 
   return prism2_probe ( nic, hw );
 }
@@ -49,3 +50,10 @@ PCI_DRIVER ( prism2_pci_driver, prism2_pci_nics, PCI_NO_CLASS );
 DRIVER ( "Prism2/PCI", nic_driver, pci_driver, prism2_pci_driver,
 	 prism2_pci_probe, prism2_pci_disable );
 
+/*
+ * Local variables:
+ *  c-basic-offset: 8
+ *  c-indent-level: 8
+ *  tab-width: 8
+ * End:
+ */
