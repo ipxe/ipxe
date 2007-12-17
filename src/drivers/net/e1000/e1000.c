@@ -365,7 +365,7 @@ e1000_configure_rx ( struct e1000_adapter *adapter )
 	rctl = E1000_READ_REG ( hw, RCTL );
 	E1000_WRITE_REG ( hw, RCTL, rctl & ~E1000_RCTL_EN );
 
-	adapter->rx_tail = 0;
+	adapter->rx_curr = 0;
 
 	/* Setup the HW Rx Head and Tail Descriptor Pointers and
 	 * the Base and Length of the Rx Descriptor Ring */	 
@@ -375,7 +375,7 @@ e1000_configure_rx ( struct e1000_adapter *adapter )
 	E1000_WRITE_REG ( hw, RDLEN, adapter->rx_ring_size );
 
 	E1000_WRITE_REG ( hw, RDH, 0 );
-	E1000_WRITE_REG ( hw, RDT, NUM_TX_DESC );
+	E1000_WRITE_REG ( hw, RDT, NUM_RX_DESC - 1 );
 	
 	/* Enable Receives */
 	rctl = ( E1000_RCTL_EN | E1000_RCTL_BAM | E1000_RCTL_SZ_2048 |
@@ -661,7 +661,7 @@ e1000_poll ( struct net_device *netdev )
 	 */
 	while ( 1 ) {
 	
-		i = adapter->rx_tail;;
+		i = adapter->rx_curr;
 		
 		rx_curr_desc = ( void * )  ( adapter->rx_base ) + 
 			          ( i * sizeof ( *adapter->rx_base ) ); 
@@ -676,7 +676,7 @@ e1000_poll ( struct net_device *netdev )
 	
 		rx_len = rx_curr_desc->length;
 
-                DBG ( "Received packet, rx_tail: %ld rx_status: %#08lx rx_len: %ld\n",
+                DBG ( "Received packet, rx_curr: %ld  rx_status: %#08lx  rx_len: %ld\n",
                       i, rx_status, rx_len );
                 
                 rx_err = rx_curr_desc->errors;
@@ -707,9 +707,9 @@ e1000_poll ( struct net_device *netdev )
 		memset ( rx_curr_desc, 0, sizeof ( *rx_curr_desc ) );
 		rx_curr_desc->buffer_addr = tmp_buffer_addr;
 
-		E1000_WRITE_REG ( hw, RDT, adapter->rx_tail );
+		E1000_WRITE_REG ( hw, RDT, adapter->rx_curr );
 
-		adapter->rx_tail = ( adapter->rx_tail + 1 ) % NUM_RX_DESC;
+		adapter->rx_curr = ( adapter->rx_curr + 1 ) % NUM_RX_DESC;
 	}
 }				
 

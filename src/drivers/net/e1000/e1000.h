@@ -271,7 +271,7 @@ struct e1000_adapter {
 	uint32_t tx_tail;
 	uint32_t tx_fill_ctr;
 	
-	uint32_t rx_tail;
+	uint32_t rx_curr;
 
 	uint32_t ioaddr;
 	uint32_t irqno;
