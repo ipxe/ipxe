@@ -34,6 +34,8 @@
  * v2.01    5-26-2003 NN Fixed driver alignment issue which
  *                  caused system lockups if driver structures
  *                  not 8-byte aligned.
+ * v2.02   11-28-2007 GSt Got polling working again by replacing
+ * 			"for(i=0;i<40000;i++);" with "mdelay(1);"
  *
  */
 
@@ -613,7 +615,7 @@ a3c90x_transmit(struct nic *nic __unused, const char *d, unsigned int t,
 static int
 a3c90x_poll(struct nic *nic, int retrieve)
     {
-    int i, errcode;
+    int errcode;
 
     if (!(inw(INF_3C90X.IOAddr + regCommandIntStatus_w)&0x0010))
 	{
@@ -637,9 +639,9 @@ a3c90x_poll(struct nic *nic, int retrieve)
          INF_3C90X.IOAddr + regUpListPtr_l);
 
     /** Wait for upload completion (upComplete(15) or upError (14)) **/
-    for(i=0;i<40000;i++);
+    mdelay(1);
     while((INF_3C90X.ReceiveUPD.UpPktStatus & ((1<<14) | (1<<15))) == 0)
-	for(i=0;i<40000;i++);
+    	mdelay(1);
 
     /** Check for Error (else we have good packet) **/
     if (INF_3C90X.ReceiveUPD.UpPktStatus & (1<<14))
@@ -779,7 +781,7 @@ static int a3c90x_probe ( struct nic *nic, struct pci_device *pci ) {
 	}
 
     /** Print identification message **/
-    printf("\n\n3C90X Driver 2.00 "
+    printf("\n\n3C90X Driver 2.02 "
            "Copyright 1999 LightSys Technology Services, Inc.\n"
            "Portions Copyright 1999 Steve Smith\n");
     printf("Provided with ABSOLUTELY NO WARRANTY.\n");
