@@ -29,6 +29,8 @@
 #define TFTP_ERR_UNKNOWN_USER	7 /**< No such user */
 #define TFTP_ERR_BAD_OPTS	8 /**< Option negotiation failed */
 
+#define MTFTP_PORT	     1759 /**< Default MTFTP server port */
+
 /** A TFTP read request (RRQ) packet */
 struct tftp_rrq {
 	uint16_t opcode;

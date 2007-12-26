@@ -74,24 +74,23 @@ struct tftp_request {
 	 * "tsize" option, this value will be zero.
 	 */
 	unsigned long tsize;
-	/** Multicast address
-	 *
-	 * This is the destination address for multicast data
-	 * transmissions.
-	 */
-	struct sockaddr_tcpip multicast;
-	/** Master client
-	 *
-	 * True if this is the client responsible for sending ACKs.
-	 */
-	int master;
 	
+	/** Server port
+	 *
+	 * This is the port to which RRQ packets are sent.
+	 */
+	unsigned int port;
 	/** Peer address
 	 *
 	 * The peer address is determined by the first response
 	 * received to the TFTP RRQ.
 	 */
 	struct sockaddr_tcpip peer;
+	/** Request flags */
+	unsigned int flags;
+	/** MTFTP timeout count */
+	unsigned int mtftp_timeouts;
+
 	/** Block bitmap */
 	struct bitmap bitmap;
 	/** Maximum known length
@@ -109,6 +108,21 @@ struct tftp_request {
 	/** Retransmission timer */
 	struct retry_timer timer;
 };
+
+/** TFTP request flags */
+enum {
+	/** Send ACK packets */
+	TFTP_FL_SEND_ACK = 0x0001,
+	/** Request blksize and tsize options */
+	TFTP_FL_RRQ_SIZES = 0x0002,
+	/** Request multicast option */
+	TFTP_FL_RRQ_MULTICAST = 0x0004,
+	/** Perform MTFTP recovery on timeout */
+	TFTP_FL_MTFTP_RECOVERY = 0x0008,
+};
+
+/** Maximum number of MTFTP open requests before falling back to TFTP */
+#define MTFTP_MAX_TIMEOUTS 3
 
 /**
  * Free TFTP request
@@ -145,6 +159,67 @@ static void tftp_done ( struct tftp_request *tftp, int rc ) {
 	xfer_close ( &tftp->mc_socket, rc );
 	xfer_nullify ( &tftp->xfer );
 	xfer_close ( &tftp->xfer, rc );
+}
+
+/**
+ * Reopen TFTP socket
+ *
+ * @v tftp		TFTP connection
+ * @ret rc		Return status code
+ */
+static int tftp_reopen ( struct tftp_request *tftp ) {
+	struct sockaddr_tcpip server;
+	int rc;
+
+	/* Close socket */
+	xfer_close ( &tftp->socket, 0 );
+
+	/* Disable ACK sending. */
+	tftp->flags &= ~TFTP_FL_SEND_ACK;
+
+	/* Reset peer address */
+	memset ( &tftp->peer, 0, sizeof ( tftp->peer ) );
+
+	/* Open socket */
+	memset ( &server, 0, sizeof ( server ) );
+	server.st_port = htons ( tftp->port );
+	if ( ( rc = xfer_open_named_socket ( &tftp->socket, SOCK_DGRAM,
+					     ( struct sockaddr * ) &server,
+					     tftp->uri->host, NULL ) ) != 0 ) {
+		DBGC ( tftp, "TFTP %p could not open socket: %s\n",
+		       tftp, strerror ( rc ) );
+		return rc;
+	}
+
+	return 0;
+}
+
+/**
+ * Reopen TFTP multicast socket
+ *
+ * @v tftp		TFTP connection
+ * @v local		Local socket address
+ * @ret rc		Return status code
+ */
+static int tftp_reopen_mc ( struct tftp_request *tftp,
+			    struct sockaddr *local ) {
+	int rc;
+
+	/* Close multicast socket */
+	xfer_close ( &tftp->mc_socket, 0 );
+
+	/* Open multicast socket.  We never send via this socket, so
+	 * use the local address as the peer address (since the peer
+	 * address cannot be NULL).
+	 */
+	if ( ( rc = xfer_open_socket ( &tftp->mc_socket, SOCK_DGRAM,
+				       local, local ) ) != 0 ) {
+		DBGC ( tftp, "TFTP %p could not open multicast "
+		       "socket: %s\n", tftp, strerror ( rc ) );
+		return rc;
+	}
+
+	return 0;
 }
 
 /**
@@ -202,6 +277,35 @@ void tftp_set_request_blksize ( unsigned int blksize ) {
 }
 
 /**
+ * MTFTP multicast receive address
+ *
+ * This is treated as a global configuration parameter.
+ */
+static struct sockaddr_in tftp_mtftp_socket = {
+	.sin_family = AF_INET,
+	.sin_addr.s_addr = htonl ( 0xefff0101 ),
+	.sin_port = htons ( 3001 ),
+};
+
+/**
+ * Set MTFTP multicast address
+ *
+ * @v address		Multicast IPv4 address
+ */
+void tftp_set_mtftp_address ( struct in_addr address ) {
+	tftp_mtftp_socket.sin_addr = address;
+}
+
+/**
+ * Set MTFTP multicast port
+ *
+ * @v port		Multicast port
+ */
+void tftp_set_mtftp_port ( unsigned int port ) {
+	tftp_mtftp_socket.sin_port = htons ( port );
+}
+
+/**
  * Transmit RRQ
  *
  * @v tftp		TFTP connection
@@ -227,11 +331,19 @@ static int tftp_send_rrq ( struct tftp_request *tftp ) {
 	/* Build request */
 	rrq = iob_put ( iobuf, sizeof ( *rrq ) );
 	rrq->opcode = htons ( TFTP_RRQ );
-	iob_put ( iobuf,
-		  snprintf ( rrq->data, iob_tailroom ( iobuf ),
-			     "%s%coctet%cblksize%c%d%ctsize%c0%cmulticast%c",
-			     path, 0, 0, 0, tftp_request_blksize, 0,
-			     0, 0, 0 ) + 1 );
+	iob_put ( iobuf, snprintf ( iobuf->tail, iob_tailroom ( iobuf ),
+				    "%s%coctet", path, 0 ) + 1 );
+	if ( tftp->flags & TFTP_FL_RRQ_SIZES ) {
+		iob_put ( iobuf, snprintf ( iobuf->tail,
+					    iob_tailroom ( iobuf ),
+					    "blksize%c%d%ctsize%c0", 0,
+					    tftp_request_blksize, 0, 0 ) + 1 );
+	}
+	if ( tftp->flags & TFTP_FL_RRQ_MULTICAST ) {
+		iob_put ( iobuf, snprintf ( iobuf->tail,
+					    iob_tailroom ( iobuf ),
+					    "multicast%c", 0 ) + 1 );
+	}
 
 	/* RRQ always goes to the address specified in the initial
 	 * xfer_open() call
@@ -283,16 +395,15 @@ static int tftp_send_packet ( struct tftp_request *tftp ) {
 	stop_timer ( &tftp->timer );
 	start_timer ( &tftp->timer );
 
-	/* If we are the master client, send RRQ or ACK as appropriate */
-	if ( tftp->master ) {
-		if ( ! tftp->peer.st_family ) {
-			return tftp_send_rrq ( tftp );
-		} else {
-			return tftp_send_ack ( tftp );
-		}
+	/* Send RRQ or ACK as appropriate */
+	if ( ! tftp->peer.st_family ) {
+		return tftp_send_rrq ( tftp );
 	} else {
-		/* Do nothing when not the master client */
-		return 0;
+		if ( tftp->flags & TFTP_FL_SEND_ACK ) {
+			return tftp_send_ack ( tftp );
+		} else {
+			return 0;
+		}
 	}
 }
 
@@ -305,12 +416,61 @@ static int tftp_send_packet ( struct tftp_request *tftp ) {
 static void tftp_timer_expired ( struct retry_timer *timer, int fail ) {
 	struct tftp_request *tftp =
 		container_of ( timer, struct tftp_request, timer );
+	int rc;
 
-	if ( fail ) {
-		tftp_done ( tftp, -ETIMEDOUT );
+	/* If we are doing MTFTP, attempt the various recovery strategies */
+	if ( tftp->flags & TFTP_FL_MTFTP_RECOVERY ) {
+		if ( tftp->peer.st_family ) {
+			/* If we have received any response from the server,
+			 * try resending the RRQ to restart the download.
+			 */
+			DBGC ( tftp, "TFTP %p attempting reopen\n", tftp );
+			if ( ( rc = tftp_reopen ( tftp ) ) != 0 )
+				goto err;
+		} else {
+			/* Fall back to plain TFTP after several attempts */
+			tftp->mtftp_timeouts++;
+			DBGC ( tftp, "TFTP %p timeout %d waiting for MTFTP "
+			       "open\n", tftp, tftp->mtftp_timeouts );
+
+			if ( tftp->mtftp_timeouts > MTFTP_MAX_TIMEOUTS ) {
+				DBGC ( tftp, "TFTP %p falling back to plain "
+				       "TFTP\n", tftp );
+				tftp->flags = TFTP_FL_RRQ_SIZES;
+
+				/* Close multicast socket */
+				xfer_close ( &tftp->mc_socket, 0 );
+
+				/* Reset retry timer */
+				start_timer_nodelay ( &tftp->timer );
+
+				/* The blocksize may change: discard
+				 * the block bitmap
+				 */
+				bitmap_free ( &tftp->bitmap );
+				memset ( &tftp->bitmap, 0,
+					 sizeof ( tftp->bitmap ) );
+
+				/* Reopen on standard TFTP port */
+				tftp->port = TFTP_PORT;
+				if ( ( rc = tftp_reopen ( tftp ) ) != 0 )
+					goto err;
+			}
+		}
 	} else {
-		tftp_send_packet ( tftp );
+		/* Not doing MTFTP (or have fallen back to plain
+		 * TFTP); fail as per normal.
+		 */
+		if ( fail ) {
+			rc = -ETIMEDOUT;
+			goto err;
+		}
 	}
+	tftp_send_packet ( tftp );
+	return;
+
+ err:
+	tftp_done ( tftp, rc );
 }
 
 /**
@@ -366,15 +526,16 @@ static int tftp_process_tsize ( struct tftp_request *tftp,
  */
 static int tftp_process_multicast ( struct tftp_request *tftp,
 				    const char *value ) {
-	struct sockaddr_in *sin = ( struct sockaddr_in * ) &tftp->multicast;
+	union {
+		struct sockaddr sa;
+		struct sockaddr_in sin;
+	} socket;
 	char buf[ strlen ( value ) + 1 ];
 	char *addr;
 	char *port;
 	char *port_end;
 	char *mc;
 	char *mc_end;
-	struct sockaddr *mc_peer;
-	struct sockaddr *mc_local;
 	int rc;
 
 	/* Split value into "addr,port,mc" fields */
@@ -394,45 +555,33 @@ static int tftp_process_multicast ( struct tftp_request *tftp,
 	*(mc++) = '\0';
 
 	/* Parse parameters */
-	if ( *addr ) {
-		if ( inet_aton ( addr, &sin->sin_addr ) == 0 ) {
+	if ( strtoul ( mc, &mc_end, 0 ) == 0 )
+		tftp->flags &= ~TFTP_FL_SEND_ACK;
+	if ( *mc_end ) {
+		DBGC ( tftp, "TFTP %p multicast invalid mc %s\n", tftp, mc );
+		return -EINVAL;
+	}
+	DBGC ( tftp, "TFTP %p is%s the master client\n",
+	       tftp, ( ( tftp->flags & TFTP_FL_SEND_ACK ) ? "" : " not" ) );
+	if ( *addr && *port ) {
+		socket.sin.sin_family = AF_INET;
+		if ( inet_aton ( addr, &socket.sin.sin_addr ) == 0 ) {
 			DBGC ( tftp, "TFTP %p multicast invalid IP address "
 			       "%s\n", tftp, addr );
 			return -EINVAL;
 		}
 		DBGC ( tftp, "TFTP %p multicast IP address %s\n",
-		       tftp, inet_ntoa ( sin->sin_addr ) );
-	}
-	if ( *port ) {
-		sin->sin_port = htons ( strtoul ( port, &port_end, 0 ) );
+		       tftp, inet_ntoa ( socket.sin.sin_addr ) );
+		socket.sin.sin_port = htons ( strtoul ( port, &port_end, 0 ) );
 		if ( *port_end ) {
 			DBGC ( tftp, "TFTP %p multicast invalid port %s\n",
 			       tftp, port );
 			return -EINVAL;
 		}
 		DBGC ( tftp, "TFTP %p multicast port %d\n",
-		       tftp, ntohs ( sin->sin_port ) );
-	}
-	tftp->master = strtoul ( mc, &mc_end, 0 );
-	if ( *mc_end ) {
-		DBGC ( tftp, "TFTP %p multicast invalid mc %s\n", tftp, mc );
-		return -EINVAL;
-	}
-	DBGC ( tftp, "TFTP %p is%s the master client\n",
-	       tftp, ( tftp->master ? "" : " not" ) );
-
-	/* Open multicast socket, if new address specified */
-	if ( *addr || *port ) {
-		xfer_close ( &tftp->mc_socket, 0 );
-		mc_peer = ( ( struct sockaddr * ) &tftp->peer );
-		mc_local = ( ( struct sockaddr * ) &tftp->multicast );
-		mc_local->sa_family = mc_peer->sa_family;
-		if ( ( rc = xfer_open_socket ( &tftp->mc_socket, SOCK_DGRAM,
-					       mc_peer, mc_local ) ) != 0 ) {
-			DBGC ( tftp, "TFTP %p could not open multicast "
-			       "socket: %s\n", tftp, strerror ( rc ) );
+		       tftp, ntohs ( socket.sin.sin_port ) );
+		if ( ( rc = tftp_reopen_mc ( tftp, &socket.sa ) ) != 0 )
 			return rc;
-		}
 	}
 
 	return 0;
@@ -611,10 +760,10 @@ static int tftp_rx_data ( struct tftp_request *tftp,
 }
 
 /** Translation between TFTP errors and internal error numbers */
-static const uint8_t tftp_errors[] = {
-	[TFTP_ERR_FILE_NOT_FOUND]	= PXENV_STATUS_TFTP_FILE_NOT_FOUND,
-	[TFTP_ERR_ACCESS_DENIED]	= PXENV_STATUS_TFTP_ACCESS_VIOLATION,
-	[TFTP_ERR_ILLEGAL_OP]		= PXENV_STATUS_TFTP_UNKNOWN_OPCODE,
+static const int tftp_errors[] = {
+	[TFTP_ERR_FILE_NOT_FOUND]	= ENOENT,
+	[TFTP_ERR_ACCESS_DENIED]	= EACCES,
+	[TFTP_ERR_ILLEGAL_OP]		= ENOTSUP,
 };
 
 /**
@@ -645,7 +794,7 @@ static int tftp_rx_error ( struct tftp_request *tftp, void *buf, size_t len ) {
 	if ( err < ( sizeof ( tftp_errors ) / sizeof ( tftp_errors[0] ) ) )
 		rc = -tftp_errors[err];
 	if ( ! rc )
-		rc = -PXENV_STATUS_TFTP_CANNOT_OPEN_CONNECTION;
+		rc = -ENOTSUP;
 
 	/* Close TFTP request */
 	tftp_done ( tftp, rc );
@@ -736,32 +885,29 @@ static int tftp_socket_deliver_iob ( struct xfer_interface *socket,
 	struct tftp_request *tftp =
 		container_of ( socket, struct tftp_request, socket );
 
+	/* Enable sending ACKs when we receive a unicast packet.  This
+	 * covers three cases:
+	 *
+	 * 1. Standard TFTP; we should always send ACKs, and will
+	 *    always receive a unicast packet before we need to send the
+	 *    first ACK.
+	 *
+	 * 2. RFC2090 multicast TFTP; the only unicast packets we will
+         *    receive are the OACKs; enable sending ACKs here (before
+         *    processing the OACK) and disable it when processing the
+         *    multicast option if we are not the master client.
+	 *
+	 * 3. MTFTP; receiving a unicast datagram indicates that we
+	 *    are the "master client" and should send ACKs.
+	 */
+	tftp->flags |= TFTP_FL_SEND_ACK;
+
 	return tftp_rx ( tftp, iobuf, meta );
-}
-
-/**
- * TFTP connection closed by network stack
- *
- * @v socket		Transport layer interface
- * @v rc		Reason for close
- */
-static void tftp_socket_close ( struct xfer_interface *socket, int rc ) {
-	struct tftp_request *tftp =
-		container_of ( socket, struct tftp_request, socket );
-
-	DBGC ( tftp, "TFTP %p socket closed: %s\n",
-	       tftp, strerror ( rc ) );
-
-	/* Any close counts as an error */
-	if ( ! rc )
-		rc = -ECONNRESET;
-
-	tftp_done ( tftp, rc );
 }
 
 /** TFTP socket operations */
 static struct xfer_interface_operations tftp_socket_operations = {
-	.close		= tftp_socket_close,
+	.close		= ignore_xfer_close,
 	.vredirect	= xfer_vopen,
 	.seek		= ignore_xfer_seek,
 	.window		= unlimited_xfer_window,
@@ -787,29 +933,9 @@ static int tftp_mc_socket_deliver_iob ( struct xfer_interface *mc_socket,
 	return tftp_rx ( tftp, iobuf, meta );
 }
 
-/**
- * TFTP multicast connection closed by network stack
- *
- * @v socket		Multicast transport layer interface
- * @v rc		Reason for close
- */
-static void tftp_mc_socket_close ( struct xfer_interface *mc_socket,
-				   int rc ) {
-	struct tftp_request *tftp =
-		container_of ( mc_socket, struct tftp_request, mc_socket );
-
-	DBGC ( tftp, "TFTP %p multicast socket closed: %s\n",
-	       tftp, strerror ( rc ) );
-
-	/* The multicast socket may be closed when we receive a new
-	 * OACK and open/reopen the socket; we should not call
-	 * tftp_done() at this point.
-	 */
-}
- 
 /** TFTP multicast socket operations */
 static struct xfer_interface_operations tftp_mc_socket_operations = {
-	.close		= tftp_mc_socket_close,
+	.close		= ignore_xfer_close,
 	.vredirect	= xfer_vopen,
 	.seek		= ignore_xfer_seek,
 	.window		= unlimited_xfer_window,
@@ -846,15 +972,17 @@ static struct xfer_interface_operations tftp_xfer_operations = {
 };
 
 /**
- * Initiate TFTP download
+ * Initiate TFTP/TFTM/MTFTP download
  *
  * @v xfer		Data transfer interface
  * @v uri		Uniform Resource Identifier
  * @ret rc		Return status code
  */
-int tftp_open ( struct xfer_interface *xfer, struct uri *uri ) {
+static int tftp_core_open ( struct xfer_interface *xfer, struct uri *uri,
+			    unsigned int default_port,
+			    struct sockaddr *multicast,
+			    unsigned int flags ) {
 	struct tftp_request *tftp;
-	struct sockaddr_tcpip server;
 	int rc;
 
 	/* Sanity checks */
@@ -874,16 +1002,19 @@ int tftp_open ( struct xfer_interface *xfer, struct uri *uri ) {
 	xfer_init ( &tftp->mc_socket, &tftp_mc_socket_operations,
 		    &tftp->refcnt );
 	tftp->blksize = TFTP_DEFAULT_BLKSIZE;
-	tftp->master = 1;
+	tftp->flags = flags;
 	tftp->timer.expired = tftp_timer_expired;
 
 	/* Open socket */
-	memset ( &server, 0, sizeof ( server ) );
-	server.st_port = htons ( uri_port ( tftp->uri, TFTP_PORT ) );
-	if ( ( rc = xfer_open_named_socket ( &tftp->socket, SOCK_DGRAM,
-					     ( struct sockaddr * ) &server,
-					     uri->host, NULL ) ) != 0 )
+	tftp->port = uri_port ( tftp->uri, default_port );
+	if ( ( rc = tftp_reopen ( tftp ) ) != 0 )
 		goto err;
+
+	/* Open multicast socket */
+	if ( multicast ) {
+		if ( ( rc = tftp_reopen_mc ( tftp, multicast ) ) != 0 )
+			goto err;
+	}
 
 	/* Start timer to initiate RRQ */
 	start_timer_nodelay ( &tftp->timer );
@@ -901,8 +1032,60 @@ int tftp_open ( struct xfer_interface *xfer, struct uri *uri ) {
 	return rc;
 }
 
+/**
+ * Initiate TFTP download
+ *
+ * @v xfer		Data transfer interface
+ * @v uri		Uniform Resource Identifier
+ * @ret rc		Return status code
+ */
+static int tftp_open ( struct xfer_interface *xfer, struct uri *uri ) {
+	return tftp_core_open ( xfer, uri, TFTP_PORT, NULL,
+				TFTP_FL_RRQ_SIZES );
+
+}
+
 /** TFTP URI opener */
 struct uri_opener tftp_uri_opener __uri_opener = {
 	.scheme	= "tftp",
 	.open	= tftp_open,
+};
+
+/**
+ * Initiate TFTM download
+ *
+ * @v xfer		Data transfer interface
+ * @v uri		Uniform Resource Identifier
+ * @ret rc		Return status code
+ */
+static int tftm_open ( struct xfer_interface *xfer, struct uri *uri ) {
+	return tftp_core_open ( xfer, uri, TFTP_PORT, NULL,
+				( TFTP_FL_RRQ_SIZES |
+				  TFTP_FL_RRQ_MULTICAST ) );
+
+}
+
+/** TFTM URI opener */
+struct uri_opener tftm_uri_opener __uri_opener = {
+	.scheme	= "tftm",
+	.open	= tftm_open,
+};
+
+/**
+ * Initiate MTFTP download
+ *
+ * @v xfer		Data transfer interface
+ * @v uri		Uniform Resource Identifier
+ * @ret rc		Return status code
+ */
+static int mtftp_open ( struct xfer_interface *xfer, struct uri *uri ) {
+	return tftp_core_open ( xfer, uri, MTFTP_PORT,
+				( struct sockaddr * ) &tftp_mtftp_socket,
+				TFTP_FL_MTFTP_RECOVERY );
+}
+
+/** MTFTP URI opener */
+struct uri_opener mtftp_uri_opener __uri_opener = {
+	.scheme	= "mtftp",
+	.open	= mtftp_open,
 };
