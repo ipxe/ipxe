@@ -356,6 +356,9 @@ $(BIN)/%.tmp : $(BLIB) $(MAKEDEPS) $(LDSCRIPT)
 		-Map $(BIN)/$*.tmp.map
 	$(Q)$(OBJDUMP) -ht $@ | $(SORTOBJDUMP) >> $(BIN)/$*.tmp.map
 
+# Keep intermediate object file (useful for debugging)
+.PRECIOUS : $(BIN)/%.tmp
+
 # Show a linker map for the specified target
 #
 $(BIN)/%.map : $(BIN)/%.tmp
