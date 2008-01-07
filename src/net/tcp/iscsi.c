@@ -684,7 +684,7 @@ static int iscsi_handle_chap_c_value ( struct iscsi_session *iscsi,
 	/* Process challenge an octet at a time */
 	for ( ; ( value[0] && value[1] ) ; value += 2 ) {
 		memcpy ( buf, value, 2 );
-		buf[3] = 0;
+		buf[2] = 0;
 		byte = strtoul ( buf, &endp, 16 );
 		if ( *endp != '\0' ) {
 			DBGC ( iscsi, "iSCSI %p saw invalid CHAP challenge "
