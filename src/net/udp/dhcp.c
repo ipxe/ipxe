@@ -368,11 +368,11 @@ static size_t dhcp_field_len ( const void *data, size_t max_len ) {
  * @v max_len		Field length
  * @v tag		DHCP option tag, or 0
  *
- * If @c tag is non-zero, the field will be treated as a
- * NUL-terminated string representing the value of the specified DHCP
- * option.  If @c tag is zero, the field will be treated as a block of
- * DHCP options, and simply appended to the existing options in the
- * option block.
+ * If @c tag is non-zero (and the field is not empty), the field will
+ * be treated as a NUL-terminated string representing the value of the
+ * specified DHCP option.  If @c tag is zero, the field will be
+ * treated as a block of DHCP options, and simply appended to the
+ * existing options in the option block.
  *
  * The caller must ensure that there is enough space in the options
  * block to perform the merge.
@@ -385,7 +385,9 @@ static void merge_dhcp_field ( struct dhcp_option_block *options,
 	struct dhcp_option *end;
 
 	if ( tag ) {
-		set_dhcp_option ( options, tag, data, strlen ( data ) );
+		len = strlen ( data );
+		if ( len )
+			set_dhcp_option ( options, tag, data, len );
 	} else {
 		len = dhcp_field_len ( data, max_len );
 		dest = ( options->data + options->len - 1 );
