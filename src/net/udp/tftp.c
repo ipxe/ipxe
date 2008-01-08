@@ -554,6 +554,7 @@ static int tftp_rx_oack ( struct tftp_request *tftp, void *buf, size_t len ) {
 static int tftp_rx_data ( struct tftp_request *tftp,
 			  struct io_buffer *iobuf ) {
 	struct tftp_data *data = iobuf->data;
+	struct xfer_metadata meta;
 	int block;
 	off_t offset;
 	size_t data_len;
@@ -580,8 +581,10 @@ static int tftp_rx_data ( struct tftp_request *tftp,
 	}
 
 	/* Deliver data */
-	xfer_seek ( &tftp->xfer, offset, SEEK_SET );
-	rc = xfer_deliver_iob ( &tftp->xfer, iobuf );
+	memset ( &meta, 0, sizeof ( meta ) );
+	meta.whence = SEEK_SET;
+	meta.offset = offset;
+	rc = xfer_deliver_iob_meta ( &tftp->xfer, iobuf, &meta );
 	iobuf = NULL;
 	if ( rc != 0 ) {
 		DBGC ( tftp, "TFTP %p could not deliver data: %s\n",
@@ -763,7 +766,6 @@ static void tftp_socket_close ( struct xfer_interface *socket, int rc ) {
 static struct xfer_interface_operations tftp_socket_operations = {
 	.close		= tftp_socket_close,
 	.vredirect	= xfer_vopen,
-	.seek		= ignore_xfer_seek,
 	.window		= unlimited_xfer_window,
 	.alloc_iob	= default_xfer_alloc_iob,
 	.deliver_iob	= tftp_socket_deliver_iob,
@@ -811,7 +813,6 @@ static void tftp_mc_socket_close ( struct xfer_interface *mc_socket,
 static struct xfer_interface_operations tftp_mc_socket_operations = {
 	.close		= tftp_mc_socket_close,
 	.vredirect	= xfer_vopen,
-	.seek		= ignore_xfer_seek,
 	.window		= unlimited_xfer_window,
 	.alloc_iob	= default_xfer_alloc_iob,
 	.deliver_iob	= tftp_mc_socket_deliver_iob,
@@ -838,7 +839,6 @@ static void tftp_xfer_close ( struct xfer_interface *xfer, int rc ) {
 static struct xfer_interface_operations tftp_xfer_operations = {
 	.close		= tftp_xfer_close,
 	.vredirect	= ignore_xfer_vredirect,
-	.seek		= ignore_xfer_seek,
 	.window		= unlimited_xfer_window,
 	.alloc_iob	= default_xfer_alloc_iob,
 	.deliver_iob	= xfer_deliver_as_raw,

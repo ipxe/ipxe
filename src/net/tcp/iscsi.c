@@ -1322,7 +1322,6 @@ static int iscsi_vredirect ( struct xfer_interface *socket, int type,
 static struct xfer_interface_operations iscsi_socket_operations = {
 	.close		= iscsi_socket_close,
 	.vredirect	= iscsi_vredirect,
-	.seek		= ignore_xfer_seek,
 	.window		= unlimited_xfer_window,
 	.alloc_iob	= default_xfer_alloc_iob,
 	.deliver_iob	= xfer_deliver_as_raw,

@@ -86,31 +86,6 @@ int xfer_redirect ( struct xfer_interface *xfer, int type, ... ) {
 }
 
 /**
- * Seek to position
- *
- * @v xfer		Data transfer interface
- * @v offset		Offset to new position
- * @v whence		Basis for new position
- * @ret rc		Return status code
- */
-int xfer_seek ( struct xfer_interface *xfer, off_t offset, int whence ) {
-	struct xfer_interface *dest = xfer_get_dest ( xfer );
-	int rc;
-
-	DBGC ( xfer, "XFER %p->%p seek %s+%ld\n", xfer, dest,
-	       whence_text ( whence ), offset );
-
-	rc = dest->op->seek ( dest, offset, whence );
-
-	if ( rc != 0 ) {
-		DBGC ( xfer, "XFER %p<-%p seek: %s\n", xfer, dest,
-		       strerror ( rc ) );
-	}
-	xfer_put ( dest );
-	return rc;
-}
-
-/**
  * Check flow control window
  *
  * @v xfer		Data transfer interface
@@ -153,7 +128,7 @@ struct io_buffer * xfer_alloc_iob ( struct xfer_interface *xfer, size_t len ) {
  *
  * @v xfer		Data transfer interface
  * @v iobuf		Datagram I/O buffer
- * @v meta		Data transfer metadata, or NULL
+ * @v meta		Data transfer metadata
  * @ret rc		Return status code
  */
 int xfer_deliver_iob_meta ( struct xfer_interface *xfer,
@@ -184,7 +159,8 @@ int xfer_deliver_iob_meta ( struct xfer_interface *xfer,
  */
 int xfer_deliver_iob ( struct xfer_interface *xfer,
 		       struct io_buffer *iobuf ) {
-	return xfer_deliver_iob_meta ( xfer, iobuf, NULL );
+	static struct xfer_metadata dummy_metadata;
+	return xfer_deliver_iob_meta ( xfer, iobuf, &dummy_metadata );
 }
 
 /**
@@ -253,6 +229,31 @@ int xfer_printf ( struct xfer_interface *xfer, const char *format, ... ) {
 	return rc;
 }
 
+/**
+ * Seek to position
+ *
+ * @v xfer		Data transfer interface
+ * @v offset		Offset to new position
+ * @v whence		Basis for new position
+ * @ret rc		Return status code
+ */
+int xfer_seek ( struct xfer_interface *xfer, off_t offset, int whence ) {
+	struct io_buffer *iobuf;
+	struct xfer_metadata meta = {
+		.offset = offset,
+		.whence = whence,
+	};
+
+	DBGC ( xfer, "XFER %p seek %s+%ld\n", xfer,
+	       whence_text ( whence ), offset );
+
+	/* Allocate and send a zero-length data buffer */
+	iobuf = xfer_alloc_iob ( xfer, 0 );
+	if ( ! iobuf )
+		return -ENOMEM;
+	return xfer_deliver_iob_meta ( xfer, iobuf, &meta );
+}
+
 /****************************************************************************
  *
  * Helper methods
@@ -283,19 +284,6 @@ void ignore_xfer_close ( struct xfer_interface *xfer __unused,
  */
 int ignore_xfer_vredirect ( struct xfer_interface *xfer __unused,
 			    int type __unused, va_list args __unused ) {
-	return 0;
-}
-
-/**
- * Ignore seek() event
- *
- * @v xfer		Data transfer interface
- * @v offset		Offset to new position
- * @v whence		Basis for new position
- * @ret rc		Return status code
- */
-int ignore_xfer_seek ( struct xfer_interface *xfer __unused,
-		       off_t offset __unused, int whence __unused ) {
 	return 0;
 }
 
@@ -401,7 +389,6 @@ int ignore_xfer_deliver_raw ( struct xfer_interface *xfer,
 struct xfer_interface_operations null_xfer_ops = {
 	.close		= ignore_xfer_close,
 	.vredirect	= ignore_xfer_vredirect,
-	.seek		= ignore_xfer_seek,
 	.window		= unlimited_xfer_window,
 	.alloc_iob	= default_xfer_alloc_iob,
 	.deliver_iob	= xfer_deliver_as_raw,

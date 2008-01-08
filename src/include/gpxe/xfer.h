@@ -32,17 +32,6 @@ struct xfer_interface_operations {
 	 */
 	int ( * vredirect ) ( struct xfer_interface *xfer, int type,
 			      va_list args );
-	/** Seek to position
-	 *
-	 * @v xfer		Data transfer interface
-	 * @v offset		Offset to new position
-	 * @v whence		Basis for new position
-	 * @ret rc		Return status code
-	 *
-	 * @c whence must be one of @c SEEK_SET or @c SEEK_CUR.
-	 */
-	int ( * seek ) ( struct xfer_interface *xfer, off_t offset,
-			 int whence );
 	/** Check flow control window
 	 *
 	 * @v xfer		Data transfer interface
@@ -71,7 +60,7 @@ struct xfer_interface_operations {
 	 *
 	 * @v xfer		Data transfer interface
 	 * @v iobuf		Datagram I/O buffer
-	 * @v meta		Data transfer metadata, or NULL
+	 * @v meta		Data transfer metadata
 	 * @ret rc		Return status code
 	 *
 	 * A data transfer interface that wishes to support only raw
@@ -104,20 +93,27 @@ struct xfer_interface {
 	struct xfer_interface_operations *op;
 };
 
+/** Basis positions for seek() events */
+enum seek_whence {
+	SEEK_CUR = 0,
+	SEEK_SET,
+};
+
 /** Data transfer metadata */
 struct xfer_metadata {
+	/** Position of data within stream */
+	off_t offset;
+	/** Basis for data position
+	 *
+	 * Must be one of @c SEEK_CUR or @c SEEK_SET.
+	 */
+	int whence;
 	/** Source socket address, or NULL */
 	struct sockaddr *src;
 	/** Destination socket address, or NULL */
 	struct sockaddr *dest;
 	/** Network device, or NULL */
 	struct net_device *netdev;
-};
-
-/** Basis positions for seek() events */
-enum seek_whence {
-	SEEK_SET = 0,
-	SEEK_CUR,
 };
 
 /**
@@ -128,8 +124,8 @@ enum seek_whence {
 static inline __attribute__ (( always_inline )) const char *
 whence_text ( int whence ) {
 	switch ( whence ) {
-	case SEEK_SET:	return "SET";
 	case SEEK_CUR:	return "CUR";
+	case SEEK_SET:	return "SET";
 	default:	return "INVALID";
 	}
 }
@@ -141,7 +137,6 @@ extern void xfer_close ( struct xfer_interface *xfer, int rc );
 extern int xfer_vredirect ( struct xfer_interface *xfer, int type,
 			    va_list args );
 extern int xfer_redirect ( struct xfer_interface *xfer, int type, ... );
-extern int xfer_seek ( struct xfer_interface *xfer, off_t offset, int whence );
 extern size_t xfer_window ( struct xfer_interface *xfer );
 extern struct io_buffer * xfer_alloc_iob ( struct xfer_interface *xfer,
 					   size_t len );
@@ -156,12 +151,11 @@ extern int xfer_vprintf ( struct xfer_interface *xfer,
 			  const char *format, va_list args );
 extern int xfer_printf ( struct xfer_interface *xfer,
 			 const char *format, ... );
+extern int xfer_seek ( struct xfer_interface *xfer, off_t offset, int whence );
 
 extern void ignore_xfer_close ( struct xfer_interface *xfer, int rc );
 extern int ignore_xfer_vredirect ( struct xfer_interface *xfer,
 				   int type, va_list args );
-extern int ignore_xfer_seek ( struct xfer_interface *xfer, off_t offset,
-			      int whence );
 extern size_t unlimited_xfer_window ( struct xfer_interface *xfer );
 extern size_t no_xfer_window ( struct xfer_interface *xfer );
 extern struct io_buffer * default_xfer_alloc_iob ( struct xfer_interface *xfer,

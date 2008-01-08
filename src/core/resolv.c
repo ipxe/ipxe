@@ -312,7 +312,6 @@ struct named_socket {
 static struct xfer_interface_operations named_xfer_ops = {
 	.close		= ignore_xfer_close,
 	.vredirect	= ignore_xfer_vredirect,
-	.seek		= ignore_xfer_seek,
 	.window		= no_xfer_window,
 	.alloc_iob	= default_xfer_alloc_iob,
 	.deliver_iob	= xfer_deliver_as_raw,

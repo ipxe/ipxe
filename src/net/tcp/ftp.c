@@ -299,7 +299,6 @@ static int ftp_control_deliver_raw ( struct xfer_interface *control,
 static struct xfer_interface_operations ftp_control_operations = {
 	.close		= ftp_control_close,
 	.vredirect	= xfer_vopen,
-	.seek		= ignore_xfer_seek,
 	.window		= unlimited_xfer_window,
 	.alloc_iob	= default_xfer_alloc_iob,
 	.deliver_iob	= xfer_deliver_as_raw,
@@ -364,7 +363,6 @@ static int ftp_data_deliver_iob ( struct xfer_interface *data,
 static struct xfer_interface_operations ftp_data_operations = {
 	.close		= ftp_data_closed,
 	.vredirect	= xfer_vopen,
-	.seek		= ignore_xfer_seek,
 	.window		= unlimited_xfer_window,
 	.alloc_iob	= default_xfer_alloc_iob,
 	.deliver_iob	= ftp_data_deliver_iob,
@@ -397,7 +395,6 @@ static void ftp_xfer_closed ( struct xfer_interface *xfer, int rc ) {
 static struct xfer_interface_operations ftp_xfer_operations = {
 	.close		= ftp_xfer_closed,
 	.vredirect	= ignore_xfer_vredirect,
-	.seek		= ignore_xfer_seek,
 	.window		= unlimited_xfer_window,
 	.alloc_iob	= default_xfer_alloc_iob,
 	.deliver_iob	= xfer_deliver_as_raw,

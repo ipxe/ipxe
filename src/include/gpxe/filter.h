@@ -41,8 +41,6 @@ filter_other_half ( struct xfer_interface *xfer ) {
 extern void filter_close ( struct xfer_interface *xfer, int rc );
 extern int filter_vredirect ( struct xfer_interface *xfer, int type,
 			      va_list args );
-extern int filter_seek ( struct xfer_interface *xfer, off_t offset,
-			 int whence );
 extern size_t filter_window ( struct xfer_interface *xfer );
 extern struct io_buffer * filter_alloc_iob ( struct xfer_interface *xfer,
 					     size_t len );
