@@ -101,6 +101,10 @@ CFLAGS		+= $(EXTRA_CFLAGS)
 ASFLAGS		+= $(EXTRA_ASFLAGS)
 LDFLAGS		+= $(EXTRA_LDFLAGS)
 
+# Embedded image, if present
+#
+EMBEDDED_IMAGE	?= /dev/null
+
 ifneq ($(NO_WERROR),1)
 CFLAGS		+= -Werror
 endif

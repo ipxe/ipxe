@@ -214,6 +214,14 @@ drivers :
 roms :
 	@$(ECHO) $(ROMS)
 
+# Embedded binary
+$(BIN)/embedimg.bin: $(EMBEDDED_IMAGE)
+	$(QM)$(ECHO) "  [COPY] $@"
+	$(Q)$(CP) -f $(EMBEDDED_IMAGE) $@
+
+$(BIN)/embed.o: $(BIN)/embedimg.bin
+CFLAGS_embed = -DEMBEDIMG=\"$(BIN)/embedimg.bin\"
+
 # Generate the NIC file from the parsed source files.  The NIC file is
 # only for rom-o-matic.
 #
