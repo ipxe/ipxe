@@ -402,10 +402,4 @@ struct xfer_interface_operations null_xfer_ops = {
  * connected when unplugged.  It will never generate messages, and
  * will silently absorb all received messages.
  */
-struct xfer_interface null_xfer = {
-	.intf = {
-		.dest = &null_xfer.intf,
-		.refcnt = NULL,
-	},
-	.op = &null_xfer_ops,
-};
+struct xfer_interface null_xfer = XFER_INIT ( &null_xfer_ops );

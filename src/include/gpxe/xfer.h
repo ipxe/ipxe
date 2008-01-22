@@ -184,6 +184,19 @@ static inline void xfer_init ( struct xfer_interface *xfer,
 }
 
 /**
+ * Initialise a static data transfer interface
+ *
+ * @v operations		Data transfer interface operations
+ */
+#define XFER_INIT( operations ) {			\
+		.intf = {				\
+			.dest = &null_xfer.intf,	\
+			.refcnt = NULL,			\
+		},					\
+		.op = operations,			\
+	}
+
+/**
  * Get data transfer interface from generic object communication interface
  *
  * @v intf		Generic object communication interface
