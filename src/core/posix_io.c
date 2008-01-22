@@ -104,38 +104,11 @@ static void posix_file_xfer_close ( struct xfer_interface *xfer, int rc ) {
 }
 
 /**
- * Handle seek() event
- *
- * @v xfer		POSIX file data transfer interface
- * @v pos		New position
- * @ret rc		Return status code
- */
-static int posix_file_xfer_seek ( struct xfer_interface *xfer, off_t offset,
-				  int whence ) {
-	struct posix_file *file =
-		container_of ( xfer, struct posix_file, xfer );
-
-	switch ( whence ) {
-	case SEEK_SET:
-		file->pos = offset;
-		break;
-	case SEEK_CUR:
-		file->pos += offset;
-		break;
-	}
-
-	if ( file->filesize < file->pos )
-		file->filesize = file->pos;
-
-	return 0;
-}
-
-/**
  * Handle deliver_iob() event
  *
  * @v xfer		POSIX file data transfer interface
  * @v iobuf		I/O buffer
- * @v meta		Data transfer metadata, or NULL
+ * @v meta		Data transfer metadata
  * @ret rc		Return status code
  */
 static int
@@ -145,6 +118,13 @@ posix_file_xfer_deliver_iob ( struct xfer_interface *xfer,
 	struct posix_file *file =
 		container_of ( xfer, struct posix_file, xfer );
 
+	/* Keep track of file position solely for the filesize */
+	if ( meta->whence != SEEK_CUR )
+		file->pos = 0;
+	file->pos += meta->offset;
+	if ( file->filesize < file->pos )
+		file->filesize = file->pos;
+
 	list_add_tail ( &iobuf->list, &file->data );
 	return 0;
 }
@@ -153,7 +133,6 @@ posix_file_xfer_deliver_iob ( struct xfer_interface *xfer,
 static struct xfer_interface_operations posix_file_xfer_operations = {
 	.close		= posix_file_xfer_close,
 	.vredirect	= xfer_vopen,
-	.seek		= posix_file_xfer_seek,
 	.window		= unlimited_xfer_window,
 	.alloc_iob	= default_xfer_alloc_iob,
 	.deliver_iob	= posix_file_xfer_deliver_iob,

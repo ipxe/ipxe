@@ -96,6 +96,9 @@ static int downloader_ensure_size ( struct downloader *downloader,
 	if ( len <= downloader->image->len )
 		return 0;
 
+	DBGC ( downloader, "Downloader %p extending to %zd bytes\n",
+	       downloader, len );
+
 	/* Extend buffer */
 	new_buffer = urealloc ( downloader->image->data, len );
 	if ( ! new_buffer ) {
@@ -142,67 +145,43 @@ static struct job_interface_operations downloader_job_operations = {
  */
 
 /**
- * Handle seek() event received via data transfer interface
- *
- * @v xfer		Downloader data transfer interface
- * @v pos		New position
- * @ret rc		Return status code
- */
-static int downloader_xfer_seek ( struct xfer_interface *xfer, off_t offset,
-				  int whence ) {
-	struct downloader *downloader =
-		container_of ( xfer, struct downloader, xfer );
-	off_t new_pos;
-	int rc;
-
-	/* Calculate new buffer position */
-	switch ( whence ) {
-	case SEEK_SET:
-		new_pos = offset;
-		break;
-	case SEEK_CUR:
-		new_pos = ( downloader->pos + offset );
-		break;
-	default:
-		assert ( 0 );
-		return -EINVAL;
-	}
-
-	/* Ensure that we have enough buffer space for this buffer position */
-	if ( ( rc = downloader_ensure_size ( downloader, new_pos ) ) != 0 )
-		return rc;
-	downloader->pos = new_pos;
-
-	return 0;
-}
-
-/**
  * Handle deliver_raw() event received via data transfer interface
  *
  * @v xfer		Downloader data transfer interface
- * @v data		Data buffer
- * @v len		Length of data buffer
+ * @v iobuf		Datagram I/O buffer
+ * @v meta		Data transfer metadata
  * @ret rc		Return status code
  */
-static int downloader_xfer_deliver_raw ( struct xfer_interface *xfer,
-					 const void *data, size_t len ) {
+static int downloader_xfer_deliver_iob ( struct xfer_interface *xfer,
+					 struct io_buffer *iobuf,
+					 struct xfer_metadata *meta ) {
 	struct downloader *downloader =
 		container_of ( xfer, struct downloader, xfer );
+	size_t len;
 	size_t max;
 	int rc;
 
+	/* Calculate new buffer position */
+	if ( meta->whence != SEEK_CUR )
+		downloader->pos = 0;
+	downloader->pos += meta->offset;
+
 	/* Ensure that we have enough buffer space for this data */
+	len = iob_len ( iobuf );
 	max = ( downloader->pos + len );
 	if ( ( rc = downloader_ensure_size ( downloader, max ) ) != 0 )
-		return rc;
+		goto done;
 
 	/* Copy data to buffer */
-	copy_to_user ( downloader->image->data, downloader->pos, data, len );
+	copy_to_user ( downloader->image->data, downloader->pos,
+		       iobuf->data, len );
 
 	/* Update current buffer position */
 	downloader->pos += len;
 
-	return 0;
+ done:
+	free_iob ( iobuf );
+	return rc;
 }
 
 /**
@@ -227,10 +206,10 @@ static void downloader_xfer_close ( struct xfer_interface *xfer, int rc ) {
 static struct xfer_interface_operations downloader_xfer_operations = {
 	.close		= downloader_xfer_close,
 	.vredirect	= xfer_vopen,
-	.seek		= downloader_xfer_seek,
 	.window		= unlimited_xfer_window,
-	.deliver_iob	= xfer_deliver_as_raw,
-	.deliver_raw	= downloader_xfer_deliver_raw,
+	.alloc_iob	= default_xfer_alloc_iob,
+	.deliver_iob	= downloader_xfer_deliver_iob,
+	.deliver_raw	= xfer_deliver_as_iob,
 };
 
 /****************************************************************************

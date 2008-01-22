@@ -1022,7 +1022,6 @@ static int tcp_xfer_deliver_iob ( struct xfer_interface *xfer,
 static struct xfer_interface_operations tcp_xfer_operations = {
 	.close		= tcp_xfer_close,
 	.vredirect	= ignore_xfer_vredirect,
-	.seek		= ignore_xfer_seek,
 	.window		= tcp_xfer_window,
 	.alloc_iob	= default_xfer_alloc_iob,
 	.deliver_iob	= tcp_xfer_deliver_iob,

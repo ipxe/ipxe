@@ -44,12 +44,6 @@ int filter_vredirect ( struct xfer_interface *xfer, int type,
 	return xfer_vredirect ( other, type, args );
 }
 
-int filter_seek ( struct xfer_interface *xfer, off_t offset, int whence ) {
-	struct xfer_interface *other = filter_other_half ( xfer );
-
-	return xfer_seek ( other, offset, whence );
-}
-
 size_t filter_window ( struct xfer_interface *xfer ) {
 	struct xfer_interface *other = filter_other_half ( xfer );
 

@@ -1,3 +1,7 @@
+# Location to place generated files
+#
+BIN		:= bin
+
 # Initialise variables that get added to throughout the various Makefiles
 #
 MAKEDEPS	:= Makefile .toolcheck .echocheck
@@ -9,34 +13,34 @@ ROMS		:=
 MEDIA		:=
 NON_AUTO_MEDIA	:=
 
-# Grab the central Config file.
+# Locations of utilities
 #
-MAKEDEPS	+= Config
-include Config
-
-# Location to place generated files
-#
-BIN		:= bin
-
-# If no architecture is specified in Config or on the command-line,
-# use that of the build machine.
-#
-ifndef ARCH
-ARCH		:= $(shell uname -m | sed -e s,i[3456789]86,i386,)
-endif
-
-# handle x86_64 like i386, but set -m32 option for 32bit code only
-ifeq ($(ARCH),x86_64)
-ARCH		:= i386
-CFLAGS		+= -m32
-ASFLAGS         += --32
-LDFLAGS         += -m elf_i386
-endif
-
-# Drag in architecture-specific Config
-#
-MAKEDEPS	+= arch/$(ARCH)/Config
-include arch/$(ARCH)/Config
+HOST_CC		:= gcc
+RM		:= rm -f
+TOUCH		:= touch
+MKDIR		:= mkdir
+CP		:= cp
+ECHO		:= echo
+PRINTF		:= printf
+PERL		:= /usr/bin/perl
+CC		:= $(CROSS_COMPILE)gcc
+CPP		:= $(CROSS_COMPILE)gcc -E -Wp,-Wall
+AS		:= $(CROSS_COMPILE)as
+LD		:= $(CROSS_COMPILE)ld
+SIZE		:= $(CROSS_COMPILE)size
+AR		:= $(CROSS_COMPILE)ar
+RANLIB		:= $(CROSS_COMPILE)ranlib
+OBJCOPY		:= $(CROSS_COMPILE)objcopy
+NM		:= $(CROSS_COMPILE)nm
+OBJDUMP		:= $(CROSS_COMPILE)objdump
+PARSEROM	:= $(PERL) ./util/parserom.pl
+MAKEROM		:= $(PERL) ./util/makerom.pl
+MKCONFIG	:= $(PERL) ./util/mkconfig.pl
+SYMCHECK	:= $(PERL) ./util/symcheck.pl
+SORTOBJDUMP	:= $(PERL) ./util/sortobjdump.pl
+NRV2B		:= ./util/nrv2b
+ZBIN		:= ./util/zbin
+DOXYGEN		:= doxygen
 
 # If invoked with no build target, print out a helpfully suggestive
 # message.
@@ -64,34 +68,28 @@ noargs : blib $(BIN)/NIC $(BIN)/gpxe.dsk $(BIN)/gpxe.iso $(BIN)/gpxe.usb
 	@$(ECHO)
 	@$(ECHO) '==========================================================='
 
-# Locations of utilities
+# Grab the central Config file.
 #
-HOST_CC		?= gcc
-CPP		?= gcc -E -Wp,-Wall
-RM		?= rm -f
-TOUCH		?= touch
-MKDIR		?= mkdir
-CP		?= cp
-ECHO		?= echo
-PRINTF		?= printf
-PERL		?= /usr/bin/perl
-CC		?= $(CROSS_COMPILE)gcc
-AS		?= $(CROSS_COMPILE)as
-LD		?= $(CROSS_COMPILE)ld
-SIZE		?= $(CROSS_COMPILE)size
-AR		?= $(CROSS_COMPILE)ar
-RANLIB		?= $(CROSS_COMPILE)ranlib
-OBJCOPY		?= $(CROSS_COMPILE)objcopy
-NM		?= $(CROSS_COMPILE)nm
-OBJDUMP		?= $(CROSS_COMPILE)objdump
-PARSEROM	?= $(PERL) ./util/parserom.pl
-MAKEROM		?= $(PERL) ./util/makerom.pl
-MKCONFIG	?= $(PERL) ./util/mkconfig.pl
-SYMCHECK	?= $(PERL) ./util/symcheck.pl
-SORTOBJDUMP	?= $(PERL) ./util/sortobjdump.pl
-NRV2B		?= ./util/nrv2b
-ZBIN		?= ./util/zbin
-DOXYGEN		?= doxygen
+MAKEDEPS	+= Config
+include Config
+
+# If no architecture is specified in Config or on the command-line,
+# use that of the build machine.
+#
+ARCH		?= $(shell uname -m | sed -e s,i[3456789]86,i386,)
+
+# handle x86_64 like i386, but set -m32 option for 32bit code only
+ifeq ($(ARCH),x86_64)
+ARCH		:= i386
+CFLAGS		+= -m32
+ASFLAGS         += --32
+LDFLAGS         += -m elf_i386
+endif
+
+# Drag in architecture-specific Config
+#
+MAKEDEPS	+= arch/$(ARCH)/Config
+include arch/$(ARCH)/Config
 
 # Common flags
 #
@@ -102,6 +100,10 @@ CFLAGS		+= -g
 CFLAGS		+= $(EXTRA_CFLAGS)
 ASFLAGS		+= $(EXTRA_ASFLAGS)
 LDFLAGS		+= $(EXTRA_LDFLAGS)
+
+# Embedded image, if present
+#
+EMBEDDED_IMAGE	?= /dev/null
 
 ifneq ($(NO_WERROR),1)
 CFLAGS		+= -Werror

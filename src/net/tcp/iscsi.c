@@ -684,7 +684,7 @@ static int iscsi_handle_chap_c_value ( struct iscsi_session *iscsi,
 	/* Process challenge an octet at a time */
 	for ( ; ( value[0] && value[1] ) ; value += 2 ) {
 		memcpy ( buf, value, 2 );
-		buf[3] = 0;
+		buf[2] = 0;
 		byte = strtoul ( buf, &endp, 16 );
 		if ( *endp != '\0' ) {
 			DBGC ( iscsi, "iSCSI %p saw invalid CHAP challenge "
@@ -1322,7 +1322,6 @@ static int iscsi_vredirect ( struct xfer_interface *socket, int type,
 static struct xfer_interface_operations iscsi_socket_operations = {
 	.close		= iscsi_socket_close,
 	.vredirect	= iscsi_vredirect,
-	.seek		= ignore_xfer_seek,
 	.window		= unlimited_xfer_window,
 	.alloc_iob	= default_xfer_alloc_iob,
 	.deliver_iob	= xfer_deliver_as_raw,
