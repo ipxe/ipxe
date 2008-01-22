@@ -111,13 +111,7 @@ static struct xfer_interface_operations pxe_udp_xfer_operations = {
 
 /** The PXE UDP connection */
 static struct pxe_udp_connection pxe_udp = {
-	.xfer = {
-		.intf = {
-			.dest = &null_xfer.intf,
-			.refcnt = NULL,
-		},
-		.op = &pxe_udp_xfer_operations,
-	},
+	.xfer = XFER_INIT ( &pxe_udp_xfer_operations ),
 	.local = {
 		.sin_family = AF_INET,
 	},
