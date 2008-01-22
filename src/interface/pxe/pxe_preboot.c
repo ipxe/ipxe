@@ -69,6 +69,24 @@ static union pxe_cached_info __bss16_array ( cached_info, [NUM_CACHED_INFOS] );
 #define cached_info __use_data16 ( cached_info )
 
 /**
+ * Set PXE cached TFTP filename
+ *
+ * @v filename		TFTP filename
+ *
+ * This is a bug-for-bug compatibility hack needed in order to work
+ * with Microsoft Remote Installation Services (RIS).  The filename
+ * used in a call to PXENV_RESTART_TFTP or PXENV_TFTP_READ_FILE must
+ * be returned as the DHCP filename in subsequent calls to
+ * PXENV_GET_CACHED_INFO.
+ */
+void pxe_set_cached_filename ( const unsigned char *filename ) {
+	memcpy ( cached_info[CACHED_INFO_DHCPACK].dhcphdr.file, filename,
+		 sizeof ( cached_info[CACHED_INFO_DHCPACK].dhcphdr.file ) );
+	memcpy ( cached_info[CACHED_INFO_BINL].dhcphdr.file, filename,
+		 sizeof ( cached_info[CACHED_INFO_BINL].dhcphdr.file ) );
+}
+
+/**
  * UNLOAD BASE CODE STACK
  *
  * @v None				-
@@ -196,18 +214,8 @@ PXENV_EXIT_t pxenv_restart_tftp ( struct s_PXENV_TFTP_READ_FILE
 
 	DBG ( "PXENV_RESTART_TFTP " );
 
-	/* This is a bug-for-bug compatibility hack needed in order to
-	 * work with Microsoft Remote Installation Services (RIS).
-	 * The filename used in a call to PXENV_RESTART_TFTP must be
-	 * returned as the DHCP filename in subsequent calls to
-	 * PXENV_GET_CACHED_INFO.
-	 */
-	memcpy ( cached_info[CACHED_INFO_DHCPACK].dhcphdr.file,
-		 restart_tftp->FileName,
-		 sizeof ( cached_info[CACHED_INFO_DHCPACK].dhcphdr.file ) );
-	memcpy ( cached_info[CACHED_INFO_BINL].dhcphdr.file,
-		 restart_tftp->FileName,
-		 sizeof ( cached_info[CACHED_INFO_BINL].dhcphdr.file ) );
+	/* Intel bug-for-bug hack */
+	pxe_set_cached_filename ( restart_tftp->FileName );
 
 	/* Words cannot describe the complete mismatch between the PXE
 	 * specification and any possible version of reality...
