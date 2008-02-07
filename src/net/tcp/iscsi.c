@@ -270,7 +270,7 @@ static int iscsi_rx_scsi_response ( struct iscsi_session *iscsi,
  */
 static int iscsi_rx_data_in ( struct iscsi_session *iscsi,
 			      const void *data, size_t len,
-			      size_t remaining __unused ) {
+			      size_t remaining ) {
 	struct iscsi_bhs_data_in *data_in = &iscsi->rx_bhs.data_in;
 	unsigned long offset;
 
@@ -281,14 +281,16 @@ static int iscsi_rx_data_in ( struct iscsi_session *iscsi,
 	assert ( ( offset + len ) <= iscsi->command->data_in_len );
 	copy_to_user ( iscsi->command->data_in, offset, data, len );
 
-	/* Record SCSI status, if present */
-	if ( data_in->flags & ISCSI_DATA_FLAG_STATUS )
-		iscsi->command->status = data_in->status;
+	/* Wait for whole SCSI response to arrive */
+	if ( remaining )
+		return 0;
 
-	/* If this is the end, flag as complete */
-	if ( ( offset + len ) == iscsi->command->data_in_len ) {
+	/* Mark as completed if status is present */
+	if ( data_in->flags & ISCSI_DATA_FLAG_STATUS ) {
+		assert ( ( offset + len ) == iscsi->command->data_in_len );
 		assert ( data_in->flags & ISCSI_FLAG_FINAL );
-		assert ( remaining == 0 );
+		iscsi->command->status = data_in->status;
+		/* iSCSI cannot return an error status via a data-in */
 		iscsi_scsi_done ( iscsi, 0 );
 	}
 
@@ -568,6 +570,7 @@ static int iscsi_tx_login_request ( struct iscsi_session *iscsi ) {
  */
 static int iscsi_handle_targetaddress_value ( struct iscsi_session *iscsi,
 					      const char *value ) {
+	char *separator;
 
 	DBGC ( iscsi, "iSCSI %p will redirect to %s\n", iscsi, value );
 
@@ -576,6 +579,15 @@ static int iscsi_handle_targetaddress_value ( struct iscsi_session *iscsi,
 	iscsi->target_address = strdup ( value );
 	if ( ! iscsi->target_address )
 		return -ENOMEM;
+
+	/* Replace target port */
+	iscsi->target_port = htons ( ISCSI_PORT );
+	separator = strchr ( iscsi->target_address, ':' );
+	if ( separator ) {
+		*separator = '\0';
+		iscsi->target_port = strtoul ( ( separator + 1 ), NULL, 0 );
+	}
+
 	return 0;
 }
 
