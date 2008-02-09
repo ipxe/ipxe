@@ -21,7 +21,9 @@ undiisr:
 	/* Preserve registers */
 	pushw	%ds
 	pushw	%es
-	pusha
+	pushw	%fs
+	pushw	%gs
+	pushal
 
 	/* Set up our segment registers */
 	movw	%cs:rm_ds, %ax
@@ -32,8 +34,7 @@ undiisr:
 	je	chain
 	
 	/* Issue UNDI API call */
-	pushw	%ds
-	popw	%es
+	movw	%ax, %es
 	movw	$undinet_params, %di
 	movw	$PXENV_UNDI_ISR, %bx
 	movw	$PXENV_UNDI_ISR_IN_START, funcflag
@@ -62,7 +63,9 @@ chain:	/* Chain to next handler */
 	lcall	*undiisr_next_handler
 	
 exit:	/* Restore registers and return */
-	popa
+	popal
+	popw	%gs
+	popw	%fs
 	popw	%es
 	popw	%ds
 	iret
