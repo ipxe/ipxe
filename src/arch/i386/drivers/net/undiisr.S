@@ -23,6 +23,7 @@ undiisr:
 	pushw	%es
 	pushw	%fs
 	pushw	%gs
+	pushfl
 	pushal
 
 	/* Set up our segment registers */
@@ -64,6 +65,7 @@ chain:	/* Chain to next handler */
 	
 exit:	/* Restore registers and return */
 	popal
+	popfl
 	popw	%gs
 	popw	%fs
 	popw	%es
