@@ -29,14 +29,11 @@ __cdecl int main ( void ) {
 	initialise();
 	startup();
 
-	/* Try autobooting if we're not going straight to the shell */
-	if ( ! shell_banner() ) {
+	if ( shell_banner() )
+		shell();
+	else
 		autoboot();
-	}
 	
-	/* Autobooting failed or the user wanted the shell */
-	shell();
-
 	shutdown();
 
 	return 0;
