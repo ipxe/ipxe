@@ -700,6 +700,10 @@ run_etherboot:
 	/* Install Etherboot */
 	call	install
 
+	/* Set up real-mode stack */
+	movw	%bx, %ss
+	movw	$_estack16, %sp
+
 #ifdef PXELOADER_KEEP_UNDI
 	/* Copy our undi_device structure to the preloaded_undi variable */
 	movw	%bx, %es
