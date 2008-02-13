@@ -64,7 +64,10 @@ chain:	/* Chain to next handler */
 	lcall	*undiisr_next_handler
 	
 exit:	/* Restore registers and return */
+	cli
 	popal
+	movzwl	%sp, %esp
+	addr32	movl -20(%esp), %esp	/* %esp isn't restored by popal */
 	popfl
 	popw	%gs
 	popw	%fs
