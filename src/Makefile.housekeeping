@@ -593,7 +593,7 @@ tarball : ../VERSION
 	$(RM) -r /tmp/$(USER)/gpxe-$(VERSION)
 	mkdir -p /tmp/$(USER)/gpxe-$(VERSION)
 	cp -rP .. /tmp/$(USER)/gpxe-$(VERSION)
-	( cd /tmp/$(USER)/gpxe-$(VERSION)/src ; $(RM) -r bin/deps; $(MAKE) clean ; $(MAKE) veryclean )
+	( cd /tmp/$(USER)/gpxe-$(VERSION)/src ; $(MAKE) veryclean ; $(RM) -r bin/deps )
 	( cd /tmp/$(USER); tar cf /tmp/$(USER)/gpxe-$(VERSION).tar --exclude ".git*" --exclude "#*" \
 	  --exclude "*~" gpxe-$(VERSION) )
 	bzip2 -9 < /tmp/$(USER)/gpxe-$(VERSION).tar > /tmp/$(USER)/gpxe-$(VERSION).tar.bz2
