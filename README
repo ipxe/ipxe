@@ -1,0 +1,53 @@
+gPXE README File
+
+gPXE is an implementation of the PXE specification for network
+booting, with extensions to allow additional features such as booting
+via HTTP, iSCSI, and AoE.  
+
+In generally, gPXE is compatible with the industry-standard PXE
+specification, and also supports Etherboot .nbi file loading and some
+additional protocols and features.
+
+For more detailed information about gPXE, please visit our project
+website at: http://etherboot.org/
+
+BUILDING gPXE IMAGE FROM SOURCE
+
+If you don't want to install development tools, and have access to the
+Web, you can get gPXE and Etherboot ROM images made on demand from
+http://rom-o-matic.net/
+
+If you would like to compile gPXE images from source, here are some tips.
+
+We normally compile gPXE images on x86, 32-bit Linux machines. It is
+possible to also use x86-64 machines. We use gcc compiler options to
+create 32-bit output.
+
+It is important to have the necessary software  packages installed.  A gcc-based
+toolchain is required.
+
+The following packages (at least) are required:
+
+  - a gcc tool chain (gcc 3.x or gcc 4.x)
+  - binutils
+  - perl
+  - syslinux
+  - mtools
+  
+To test your environment, cd to the "src" directory and type:
+
+   make
+
+You should see a lot of output, and when it stops, the "bin" directory
+should be populated with gPXE images and object files.
+
+To learn more about what to build and how to use gPXE, please visit our
+project website at http://etherboot.org/ , particularly the "howto" section.
+
+CONTACTING US
+
+Pointers to our project mailing lists are on http://etherboot.org/
+
+Real-time help is often available on IRC on the #etherboot channel of
+irc.freenode.net.
+
