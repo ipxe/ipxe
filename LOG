@@ -1,18 +1,12 @@
 gPXE LOG file
 
-Started 2007-03-02 by Marty Connor
++ Development for gPXE was moved from SourceForge CVS to a git
+  repository on git.etherboot.org in the first half of the year 2007.
 
-Version 0.5.0 (began as Etherboot 5.4 cvs)
++ The gitweb interface for gPXE is available at:
 
-+ Michael Brown rewrote large portions of Etherboot, changing to a
-  more kernel-like object-oriented architecture, and generalizing
-  interfaces.
+    http://git.etherboot.org/?p=gpxe.git
 
-+ Nikhil Rao as an intern during the 2006 Google Summer of Code added
-  improved IPv4 and new IPv6 support to Etherboot to facilitate TCP
-  protocols such as http.
-
-+ 
-
-Release as gPXE 0.5.xxx
++ The gitweb interface largely obsoletes the LOG file that used to be
+  distributed with Etherboot.
 
