@@ -1,7 +1,0 @@
-gPXE 0.5.1
-
-gPXE is an implementation of the PXE specification with extensions to
-allow additional features such as booting via HTTP, iSCSI, and AoE.
-In generally, it is compatible with the PXE specification, and also
-supports Etherboot .nbi file loading.
-
