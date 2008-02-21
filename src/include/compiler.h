@@ -144,6 +144,8 @@ extern void dbg_hex_dump_da ( unsigned long dispaddr,
 #define DBG_EXTRA	( DBGLVL & DBGLVL_EXTRA )
 #define DBGLVL_PROFILE	4
 #define DBG_PROFILE	( DBGLVL & DBGLVL_PROFILE )
+#define DBGLVL_IO	8
+#define DBG_IO		( DBGLVL & DBGLVL_IO )
 
 /**
  * Print debugging message if we are at a certain debug level
@@ -261,6 +263,15 @@ extern void dbg_hex_dump_da ( unsigned long dispaddr,
 #define DBGCP( ... )		DBGC_IF		( PROFILE, __VA_ARGS__ )
 #define DBGCP_HDA( ... )	DBGC_HDA_IF	( PROFILE, __VA_ARGS__ )
 #define DBGCP_HD( ... )		DBGC_HD_IF	( PROFILE, __VA_ARGS__ )
+
+/* Versions of the DBGxxx_IF() macros that imply DBGxxx_IF( IO, ... )*/
+
+#define DBGIO( ... )		DBG_IF		( IO, __VA_ARGS__ )
+#define DBGIO_HDA( ... )	DBG_HDA_IF	( IO, __VA_ARGS__ )
+#define DBGIO_HD( ... )		DBG_HD_IF	( IO, __VA_ARGS__ )
+#define DBGCIO( ... )		DBGC_IF		( IO, __VA_ARGS__ )
+#define DBGCIO_HDA( ... )	DBGC_HDA_IF	( IO, __VA_ARGS__ )
+#define DBGCIO_HD( ... )	DBGC_HD_IF	( IO, __VA_ARGS__ )
 
 
 #if DEBUG_SYMBOL == 0

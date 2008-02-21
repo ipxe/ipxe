@@ -72,13 +72,46 @@ static inline void iounmap(void *virt_addr __unused)
  * differently. On the x86 architecture, we just read/write the
  * memory location directly.
  */
-#define readb(addr) (*(volatile uint8_t *) (addr))
-#define readw(addr) (*(volatile uint16_t *) (addr))
-#define readl(addr) (*(volatile uint32_t *) (addr))
+static inline __attribute__ (( always_inline )) unsigned long
+_readb ( volatile uint8_t *addr ) {
+	unsigned long data = *addr;
+	DBGIO ( "[%08lx] => %02lx\n", virt_to_phys ( addr ), data );
+	return data;
+}
+static inline __attribute__ (( always_inline )) unsigned long
+_readw ( volatile uint16_t *addr ) {
+	unsigned long data = *addr;
+	DBGIO ( "[%08lx] => %04lx\n", virt_to_phys ( addr ), data );
+	return data;
+}
+static inline __attribute__ (( always_inline )) unsigned long
+_readl ( volatile uint32_t *addr ) {
+	unsigned long data = *addr;
+	DBGIO ( "[%08lx] => %08lx\n", virt_to_phys ( addr ), data );
+	return data;
+}
+#define readb( addr ) _readb ( ( volatile uint8_t * ) (addr) )
+#define readw( addr ) _readw ( ( volatile uint16_t * ) (addr) )
+#define readl( addr ) _readl ( ( volatile uint32_t * ) (addr) )
 
-#define writeb(b,addr) ((*(volatile uint8_t *) (addr)) = (b))
-#define writew(b,addr) ((*(volatile uint16_t *) (addr)) = (b))
-#define writel(b,addr) ((*(volatile uint32_t *) (addr)) = (b))
+static inline __attribute__ (( always_inline )) void
+_writeb ( unsigned long data, volatile uint8_t *addr ) {
+	DBGIO ( "[%08lx] <= %02lx\n", virt_to_phys ( addr ), data );
+	*addr = data;
+}
+static inline __attribute__ (( always_inline )) void
+_writew ( unsigned long data, volatile uint16_t *addr ) {
+	DBGIO ( "[%08lx] <= %04lx\n", virt_to_phys ( addr ), data );
+	*addr = data;
+}
+static inline __attribute__ (( always_inline )) void
+_writel ( unsigned long data, volatile uint32_t *addr ) {
+	DBGIO ( "[%08lx] <= %08lx\n", virt_to_phys ( addr ), data );
+	*addr = data;
+}
+#define writeb( b, addr ) _writeb ( (b), ( volatile uint8_t * ) (addr) )
+#define writew( b, addr ) _writew ( (b), ( volatile uint16_t * ) (addr) )
+#define writel( b, addr ) _writel ( (b), ( volatile uint32_t * ) (addr) )
 
 #define memcpy_fromio(a,b,c)	memcpy((a),(void *)(b),(c))
 #define memcpy_toio(a,b,c)	memcpy((void *)(a),(b),(c))
