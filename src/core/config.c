@@ -125,9 +125,6 @@ REQUIRE_OBJECT ( elf64 );
 #ifdef IMAGE_ELF
 REQUIRE_OBJECT ( elf );
 #endif
-#ifdef IMAGE_ELF
-REQUIRE_OBJECT ( coff );
-#endif
 #ifdef IMAGE_FREEBSD
 REQUIRE_OBJECT ( freebsd );
 #endif
