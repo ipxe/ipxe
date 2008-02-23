@@ -132,6 +132,8 @@ struct ib_queue_pair * ib_create_qp ( struct ib_device *ibdev,
 	if ( ( rc = ibdev->op->create_qp ( ibdev, qp ) ) != 0 ) {
 		DBGC ( ibdev, "IBDEV %p could not initialise queue pair: "
 		       "%s\n", ibdev, strerror ( rc ) );
+		list_del ( &qp->send.list );
+		list_del ( &qp->recv.list );
 		free ( qp );
 		return NULL;
 	}
