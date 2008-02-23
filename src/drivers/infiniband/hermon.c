@@ -1,8 +1,6 @@
 /*
- * Copyright (C) 2007 Michael Brown <mbrown@fensystems.co.uk>.
- *
- * Based in part upon the original driver by Mellanox Technologies
- * Ltd.  Portions may be Copyright (c) Mellanox Technologies Ltd.
+ * Copyright (C) 2008 Michael Brown <mbrown@fensystems.co.uk>.
+ * Copyright (C) 2008 Mellanox Technologies Ltd.
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License as
