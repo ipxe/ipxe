@@ -144,7 +144,7 @@ struct ib_queue_pair * ib_create_qp ( struct ib_device *ibdev,
 	       ibdev, qp->qpn, num_send_wqes, qp->send.iobufs,
 	       qp->recv.iobufs );
 	DBGC ( ibdev, "IBDEV %p QPN %#lx has %d receive entries at [%p,%p)\n",
-	       ibdev, qp->qpn, num_send_wqes, qp->recv.iobufs,
+	       ibdev, qp->qpn, num_recv_wqes, qp->recv.iobufs,
 	       ( ( ( void * ) qp ) + total_size ) );
 	return qp;
 }
