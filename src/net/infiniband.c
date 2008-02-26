@@ -20,6 +20,7 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
+#include <unistd.h>
 #include <byteswap.h>
 #include <errno.h>
 #include <assert.h>
@@ -27,6 +28,7 @@
 #include <gpxe/if_arp.h>
 #include <gpxe/netdevice.h>
 #include <gpxe/iobuf.h>
+#include <gpxe/ipoib.h>
 #include <gpxe/infiniband.h>
 
 /** @file
@@ -184,6 +186,177 @@ struct ib_work_queue * ib_find_wq ( struct ib_completion_queue *cq,
 	return NULL;
 }
 
+/***************************************************************************
+ *
+ * Management datagram operations
+ *
+ ***************************************************************************
+ */
+
+/**
+ * Get port information
+ *
+ * @v ibdev		Infiniband device
+ * @v port_info		Port information datagram to fill in
+ * @ret rc		Return status code
+ */
+static int ib_get_port_info ( struct ib_device *ibdev,
+			      struct ib_mad_port_info *port_info ) {
+	struct ib_mad_hdr *hdr = &port_info->mad_hdr;
+	int rc;
+
+	/* Construct MAD */
+	memset ( port_info, 0, sizeof ( *port_info ) );
+	hdr->base_version = IB_MGMT_BASE_VERSION;
+	hdr->mgmt_class = IB_MGMT_CLASS_SUBN_LID_ROUTED;
+	hdr->class_version = 1;
+	hdr->method = IB_MGMT_METHOD_GET;
+	hdr->attr_id = htons ( IB_SMP_ATTR_PORT_INFO );
+	hdr->attr_mod = htonl ( ibdev->port );
+
+	if ( ( rc = ib_mad ( ibdev, hdr, sizeof ( *port_info ) ) ) != 0 ) {
+		DBGC ( ibdev, "IBDEV %p could not get port info: %s\n",
+		       ibdev, strerror ( rc ) );
+		return rc;
+	}
+	return 0;
+}
+
+/**
+ * Get GUID information
+ *
+ * @v ibdev		Infiniband device
+ * @v guid_info		GUID information datagram to fill in
+ * @ret rc		Return status code
+ */
+static int ib_get_guid_info ( struct ib_device *ibdev,
+			      struct ib_mad_guid_info *guid_info ) {
+	struct ib_mad_hdr *hdr = &guid_info->mad_hdr;
+	int rc;
+
+	/* Construct MAD */
+	memset ( guid_info, 0, sizeof ( *guid_info ) );
+	hdr->base_version = IB_MGMT_BASE_VERSION;
+	hdr->mgmt_class = IB_MGMT_CLASS_SUBN_LID_ROUTED;
+	hdr->class_version = 1;
+	hdr->method = IB_MGMT_METHOD_GET;
+	hdr->attr_id = htons ( IB_SMP_ATTR_GUID_INFO );
+
+	if ( ( rc = ib_mad ( ibdev, hdr, sizeof ( *guid_info ) ) ) != 0 ) {
+		DBGC ( ibdev, "IBDEV %p could not get GUID info: %s\n",
+		       ibdev, strerror ( rc ) );
+		return rc;
+	}
+	return 0;
+}
+
+/**
+ * Get partition key table
+ *
+ * @v ibdev		Infiniband device
+ * @v guid_info		Partition key table datagram to fill in
+ * @ret rc		Return status code
+ */
+static int ib_get_pkey_table ( struct ib_device *ibdev,
+			       struct ib_mad_pkey_table *pkey_table ) {
+	struct ib_mad_hdr *hdr = &pkey_table->mad_hdr;
+	int rc;
+
+	/* Construct MAD */
+	memset ( pkey_table, 0, sizeof ( *pkey_table ) );
+	hdr->base_version = IB_MGMT_BASE_VERSION;
+	hdr->mgmt_class = IB_MGMT_CLASS_SUBN_LID_ROUTED;
+	hdr->class_version = 1;
+	hdr->method = IB_MGMT_METHOD_GET;
+	hdr->attr_id = htons ( IB_SMP_ATTR_PKEY_TABLE );
+
+	if ( ( rc = ib_mad ( ibdev, hdr, sizeof ( *pkey_table ) ) ) != 0 ) {
+		DBGC ( ibdev, "IBDEV %p could not get pkey table: %s\n",
+		       ibdev, strerror ( rc ) );
+		return rc;
+	}
+	return 0;
+}
+
+/**
+ * Wait for link up
+ *
+ * @v ibdev		Infiniband device
+ * @ret rc		Return status code
+ *
+ * This function shouldn't really exist.  Unfortunately, IB links take
+ * a long time to come up, and we can't get various key parameters
+ * e.g. our own IPoIB MAC address without information from the subnet
+ * manager).  We should eventually make link-up an asynchronous event.
+ */
+static int ib_wait_for_link ( struct ib_device *ibdev ) {
+	struct ib_mad_port_info port_info;
+	unsigned int retries;
+	int rc;
+
+	printf ( "Waiting for Infiniband link-up..." );
+	for ( retries = 20 ; retries ; retries-- ) {
+		if ( ( rc = ib_get_port_info ( ibdev, &port_info ) ) != 0 )
+			continue;
+		if ( ( ( port_info.port_state__link_speed_supported ) & 0xf )
+		     == 4 ) {
+			printf ( "ok\n" );
+			return 0;
+		}
+		printf ( "." );
+		sleep ( 1 );
+	}
+	printf ( "failed\n" );
+	return -ENODEV;
+};
+
+/**
+ * Get MAD parameters
+ *
+ * @v ibdev		Infiniband device
+ * @ret rc		Return status code
+ */
+static int ib_get_mad_params ( struct ib_device *ibdev ) {
+	union {
+		/* This union exists just to save stack space */
+		struct ib_mad_port_info port_info;
+		struct ib_mad_guid_info guid_info;
+		struct ib_mad_pkey_table pkey_table;
+	} u;
+	int rc;
+
+	/* Port info gives us the first half of the port GID and the SM LID */
+	if ( ( rc = ib_get_port_info ( ibdev, &u.port_info ) ) != 0 )
+		return rc;
+	memcpy ( &ibdev->port_gid.u.bytes[0], u.port_info.gid_prefix, 8 );
+	ibdev->sm_lid = ntohs ( u.port_info.mastersm_lid );
+
+	/* GUID info gives us the second half of the port GID */
+	if ( ( rc = ib_get_guid_info ( ibdev, &u.guid_info ) ) != 0 )
+		return rc;
+	memcpy ( &ibdev->port_gid.u.bytes[8], u.guid_info.gid_local, 8 );
+
+	/* Get partition key */
+	if ( ( rc = ib_get_pkey_table ( ibdev, &u.pkey_table ) ) != 0 )
+		return rc;
+	ibdev->pkey = ntohs ( u.pkey_table.pkey[0][0] );
+
+	DBGC ( ibdev, "IBDEV %p port GID is %08lx:%08lx:%08lx:%08lx\n",
+	       ibdev, htonl ( ibdev->port_gid.u.dwords[0] ),
+	       htonl ( ibdev->port_gid.u.dwords[1] ),
+	       htonl ( ibdev->port_gid.u.dwords[2] ),
+	       htonl ( ibdev->port_gid.u.dwords[3] ) );
+
+	return 0;
+}
+
+/***************************************************************************
+ *
+ * Infiniband device creation/destruction
+ *
+ ***************************************************************************
+ */
+
 /**
  * Allocate Infiniband device
  *
@@ -203,6 +376,54 @@ struct ib_device * alloc_ibdev ( size_t priv_size ) {
 }
 
 /**
+ * Register Infiniband device
+ *
+ * @v ibdev		Infiniband device
+ * @ret rc		Return status code
+ */
+int register_ibdev ( struct ib_device *ibdev ) {
+	int rc;
+
+	/* Open link */
+	if ( ( rc = ib_open ( ibdev ) ) != 0 )
+		goto err_open;
+
+	/* Wait for link */
+	if ( ( rc = ib_wait_for_link ( ibdev ) ) != 0 )
+		goto err_wait_for_link;
+
+	/* Get MAD parameters */
+	if ( ( rc = ib_get_mad_params ( ibdev ) ) != 0 )
+		goto err_get_mad_params;
+
+	/* Add IPoIB device */
+	if ( ( rc = ipoib_probe ( ibdev ) ) != 0 ) {
+		DBGC ( ibdev, "IBDEV %p could not add IPoIB device: %s\n",
+		       ibdev, strerror ( rc ) );
+		goto err_ipoib_probe;
+	}
+
+	return 0;
+
+ err_ipoib_probe:
+ err_get_mad_params:
+ err_wait_for_link:
+	ib_close ( ibdev );
+ err_open:
+	return rc;
+}
+
+/**
+ * Unregister Infiniband device
+ *
+ * @v ibdev		Infiniband device
+ */
+void unregister_ibdev ( struct ib_device *ibdev ) {
+	ipoib_remove ( ibdev );
+	ib_close ( ibdev );
+}
+
+/**
  * Free Infiniband device
  *
  * @v ibdev		Infiniband device
@@ -210,3 +431,4 @@ struct ib_device * alloc_ibdev ( size_t priv_size ) {
 void free_ibdev ( struct ib_device *ibdev ) {
 	free ( ibdev );
 }
+

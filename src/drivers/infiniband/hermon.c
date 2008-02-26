@@ -32,7 +32,6 @@
 #include <gpxe/iobuf.h>
 #include <gpxe/netdevice.h>
 #include <gpxe/infiniband.h>
-#include <gpxe/ipoib.h>
 #include "hermon.h"
 
 /**
@@ -390,12 +389,13 @@ hermon_cmd_2rst_qp ( struct hermon *hermon, unsigned long qpn ) {
 }
 
 static inline int
-hermon_cmd_mad_ifc ( struct hermon *hermon, union hermonprm_mad *mad ) {
+hermon_cmd_mad_ifc ( struct hermon *hermon, unsigned int port,
+		     union hermonprm_mad *mad ) {
 	return hermon_cmd ( hermon,
 			    HERMON_HCR_INOUT_CMD ( HERMON_HCR_MAD_IFC,
 						   1, sizeof ( *mad ),
 						   1, sizeof ( *mad ) ),
-			    0x03, mad, PXE_IB_PORT, mad );
+			    0x03, mad, port, mad );
 }
 
 static inline int
@@ -785,7 +785,7 @@ static int hermon_create_qp ( struct ib_device *ibdev,
 		goto err_alloc_mtt;
 	}
 
-	/* Hand queue over to hardware */
+	/* Transition queue to INIT state */
 	memset ( &qpctx, 0, sizeof ( qpctx ) );
 	MLX_FILL_2 ( &qpctx, 2,
 		     qpc_eec_data.pm_state, 0x03 /* Always 0x03 for UD */,
@@ -817,6 +817,7 @@ static int hermon_create_qp ( struct ib_device *ibdev,
 		goto err_rst2init_qp;
 	}
 
+	/* Transition queue to RTR state */
 	memset ( &qpctx, 0, sizeof ( qpctx ) );
 	MLX_FILL_2 ( &qpctx, 4,
 		     qpc_eec_data.mtu, HERMON_MTU_2048,
@@ -824,7 +825,7 @@ static int hermon_create_qp ( struct ib_device *ibdev,
 	MLX_FILL_1 ( &qpctx, 16,
 		     qpc_eec_data.primary_address_path.sched_queue,
 		     ( 0x83 /* default policy */ |
-		       ( ( PXE_IB_PORT - 1 ) << 6 ) ) );
+		       ( ( ibdev->port - 1 ) << 6 ) ) );
 	if ( ( rc = hermon_cmd_init2rtr_qp ( hermon, qp->qpn,
 					     &qpctx ) ) != 0 ) {
 		DBGC ( hermon, "Hermon %p INIT2RTR_QP failed: %s\n",
@@ -949,7 +950,7 @@ static int hermon_post_send ( struct ib_device *ibdev,
 	MLX_FILL_1 ( &wqe->ctrl, 2, c, 0x03 /* generate completion */ );
 	MLX_FILL_2 ( &wqe->ud, 0,
 		     ud_address_vector.pd, HERMON_GLOBAL_PD,
-		     ud_address_vector.port_number, PXE_IB_PORT );
+		     ud_address_vector.port_number, ibdev->port );
 	MLX_FILL_2 ( &wqe->ud, 1,
 		     ud_address_vector.rlid, av->dlid,
 		     ud_address_vector.g, av->gid_present );
@@ -1164,6 +1165,58 @@ static void hermon_poll_cq ( struct ib_device *ibdev,
 
 /***************************************************************************
  *
+ * Infiniband link-layer operations
+ *
+ ***************************************************************************
+ */
+
+/**
+ * Initialise Infiniband link
+ *
+ * @v ibdev		Infiniband device
+ * @ret rc		Return status code
+ */
+static int hermon_open ( struct ib_device *ibdev ) {
+	struct hermon *hermon = ibdev->dev_priv;
+	struct hermonprm_init_port init_port;
+	int rc;
+
+	memset ( &init_port, 0, sizeof ( init_port ) );
+	MLX_FILL_2 ( &init_port, 0,
+		     port_width_cap, 3,
+		     vl_cap, 1 );
+	MLX_FILL_2 ( &init_port, 1,
+		     mtu, HERMON_MTU_2048,
+		     max_gid, 1 );
+	MLX_FILL_1 ( &init_port, 2, max_pkey, 64 );
+	if ( ( rc = hermon_cmd_init_port ( hermon, ibdev->port,
+					   &init_port ) ) != 0 ) {
+		DBGC ( hermon, "Hermon %p could not intialise port: %s\n",
+		       hermon, strerror ( rc ) );
+		return rc;
+	}
+
+	return 0;
+}
+
+/**
+ * Close Infiniband link
+ *
+ * @v ibdev		Infiniband device
+ */
+static void hermon_close ( struct ib_device *ibdev ) {
+	struct hermon *hermon = ibdev->dev_priv;
+	int rc;
+
+	if ( ( rc = hermon_cmd_close_port ( hermon, ibdev->port ) ) != 0 ) {
+		DBGC ( hermon, "Hermon %p could not close port: %s\n",
+		       hermon, strerror ( rc ) );
+		/* Nothing we can do about this */
+	}
+}
+
+/***************************************************************************
+ *
  * Multicast group operations
  *
  ***************************************************************************
@@ -1257,6 +1310,51 @@ static void hermon_mcast_detach ( struct ib_device *ibdev,
 	}
 }
 
+/***************************************************************************
+ *
+ * MAD operations
+ *
+ ***************************************************************************
+ */
+
+/**
+ * Issue management datagram
+ *
+ * @v ibdev		Infiniband device
+ * @v mad		Management datagram
+ * @v len		Length of management datagram
+ * @ret rc		Return status code
+ */
+static int hermon_mad ( struct ib_device *ibdev, struct ib_mad_hdr *mad,
+			size_t len ) {
+	struct hermon *hermon = ibdev->dev_priv;
+	union hermonprm_mad mad_ifc;
+	int rc;
+
+	/* Copy in request packet */
+	memset ( &mad_ifc, 0, sizeof ( mad_ifc ) );
+	assert ( len <= sizeof ( mad_ifc.mad ) );
+	memcpy ( &mad_ifc.mad, mad, len );
+
+	/* Issue MAD */
+	if ( ( rc = hermon_cmd_mad_ifc ( hermon, ibdev->port,
+					 &mad_ifc ) ) != 0 ) {
+		DBGC ( hermon, "Hermon %p could not issue MAD IFC: %s\n",
+		       hermon, strerror ( rc ) );
+		return rc;
+	}
+
+	/* Copy out reply packet */
+	memcpy ( mad, &mad_ifc.mad, len );
+
+	if ( mad->status != 0 ) {
+		DBGC ( hermon, "Hermon %p MAD IFC status %04x\n",
+		       hermon, ntohs ( mad->status ) );
+		return -EIO;
+	}
+	return 0;
+}
+
 /** Hermon Infiniband operations */
 static struct ib_device_operations hermon_ib_operations = {
 	.create_cq	= hermon_create_cq,
@@ -1266,206 +1364,12 @@ static struct ib_device_operations hermon_ib_operations = {
 	.post_send	= hermon_post_send,
 	.post_recv	= hermon_post_recv,
 	.poll_cq	= hermon_poll_cq,
+	.open		= hermon_open,
+	.close		= hermon_close,
 	.mcast_attach	= hermon_mcast_attach,
 	.mcast_detach	= hermon_mcast_detach,
+	.mad		= hermon_mad,
 };
-
-/***************************************************************************
- *
- * MAD IFC operations
- *
- ***************************************************************************
- */
-
-static int hermon_mad_ifc ( struct hermon *hermon,
-			    union hermonprm_mad *mad ) {
-	struct ib_mad_hdr *hdr = &mad->mad.mad_hdr;
-	int rc;
-
-	hdr->base_version = IB_MGMT_BASE_VERSION;
-	if ( ( rc = hermon_cmd_mad_ifc ( hermon, mad ) ) != 0 ) {
-		DBGC ( hermon, "Hermon %p could not issue MAD IFC: %s\n",
-		       hermon, strerror ( rc ) );
-		return rc;
-	}
-	if ( hdr->status != 0 ) {
-		DBGC ( hermon, "Hermon %p MAD IFC status %04x\n",
-		       hermon, ntohs ( hdr->status ) );
-		return -EIO;
-	}
-	return 0;
-}
-
-static int hermon_get_port_info ( struct hermon *hermon,
-				  struct ib_mad_port_info *port_info ) {
-	union hermonprm_mad mad;
-	struct ib_mad_hdr *hdr = &mad.mad.mad_hdr;
-	int rc;
-
-	memset ( &mad, 0, sizeof ( mad ) );
-	hdr->mgmt_class = IB_MGMT_CLASS_SUBN_LID_ROUTED;
-	hdr->class_version = 1;
-	hdr->method = IB_MGMT_METHOD_GET;
-	hdr->attr_id = htons ( IB_SMP_ATTR_PORT_INFO );
-	hdr->attr_mod = htonl ( PXE_IB_PORT );
-	if ( ( rc = hermon_mad_ifc ( hermon, &mad ) ) != 0 ) {
-		DBGC ( hermon, "Hermon %p could not get port info: %s\n",
-		       hermon, strerror ( rc ) );
-		return rc;
-	}
-	memcpy ( port_info, &mad.mad.port_info, sizeof ( *port_info ) );
-	return 0;
-}
-
-static int hermon_get_guid_info ( struct hermon *hermon,
-				  struct ib_mad_guid_info *guid_info ) {
-	union hermonprm_mad mad;
-	struct ib_mad_hdr *hdr = &mad.mad.mad_hdr;
-	int rc;
-
-	memset ( &mad, 0, sizeof ( mad ) );
-	hdr->mgmt_class = IB_MGMT_CLASS_SUBN_LID_ROUTED;
-	hdr->class_version = 1;
-	hdr->method = IB_MGMT_METHOD_GET;
-	hdr->attr_id = htons ( IB_SMP_ATTR_GUID_INFO );
-	if ( ( rc = hermon_mad_ifc ( hermon, &mad ) ) != 0 ) {
-		DBGC ( hermon, "Hermon %p could not get GUID info: %s\n",
-		       hermon, strerror ( rc ) );
-		return rc;
-	}
-	memcpy ( guid_info, &mad.mad.guid_info, sizeof ( *guid_info ) );
-	return 0;
-}
-
-static int hermon_get_pkey_table ( struct hermon *hermon,
-				   struct ib_mad_pkey_table *pkey_table ) {
-	union hermonprm_mad mad;
-	struct ib_mad_hdr *hdr = &mad.mad.mad_hdr;
-	int rc;
-
-	memset ( &mad, 0, sizeof ( mad ) );
-	hdr->mgmt_class = IB_MGMT_CLASS_SUBN_LID_ROUTED;
-	hdr->class_version = 1;
-	hdr->method = IB_MGMT_METHOD_GET;
-	hdr->attr_id = htons ( IB_SMP_ATTR_PKEY_TABLE );
-	if ( ( rc = hermon_mad_ifc ( hermon, &mad ) ) != 0 ) {
-		DBGC ( hermon, "Hermon %p could not get pkey table: %s\n",
-		       hermon, strerror ( rc ) );
-		return rc;
-	}
-	memcpy ( pkey_table, &mad.mad.pkey_table, sizeof ( *pkey_table ) );
-	return 0;
-}
-
-static int hermon_get_port_gid ( struct hermon *hermon,
-				 struct ib_gid *port_gid ) {
-	union {
-		/* This union exists just to save stack space */
-		struct ib_mad_port_info port_info;
-		struct ib_mad_guid_info guid_info;
-	} u;
-	int rc;
-
-	/* Port info gives us the first half of the port GID */
-	if ( ( rc = hermon_get_port_info ( hermon, &u.port_info ) ) != 0 )
-		return rc;
-	memcpy ( &port_gid->u.bytes[0], u.port_info.gid_prefix, 8 );
-
-	/* GUID info gives us the second half of the port GID */
-	if ( ( rc = hermon_get_guid_info ( hermon, &u.guid_info ) ) != 0 )
-		return rc;
-	memcpy ( &port_gid->u.bytes[8], u.guid_info.gid_local, 8 );
-
-	return 0;
-}
-
-static int hermon_get_sm_lid ( struct hermon *hermon,
-			       unsigned long *sm_lid ) {
-	struct ib_mad_port_info port_info;
-	int rc;
-
-	if ( ( rc = hermon_get_port_info ( hermon, &port_info ) ) != 0 )
-		return rc;
-	*sm_lid = ntohs ( port_info.mastersm_lid );
-	return 0;
-}
-
-static int hermon_get_pkey ( struct hermon *hermon, unsigned int *pkey ) {
-	struct ib_mad_pkey_table pkey_table;
-	int rc;
-
-	if ( ( rc = hermon_get_pkey_table ( hermon, &pkey_table ) ) != 0 )
-		return rc;
-	*pkey = ntohs ( pkey_table.pkey[0][0] );
-	return 0;
-}
-
-/**
- * Wait for link up
- *
- * @v hermon		Hermon device
- * @ret rc		Return status code
- *
- * This function shouldn't really exist.  Unfortunately, IB links take
- * a long time to come up, and we can't get various key parameters
- * e.g. our own IPoIB MAC address without information from the subnet
- * manager).  We should eventually make link-up an asynchronous event.
- */
-static int hermon_wait_for_link ( struct hermon *hermon ) {
-	struct ib_mad_port_info port_info;
-	unsigned int retries;
-	int rc;
-
-	printf ( "Waiting for Infiniband link-up..." );
-	for ( retries = 20 ; retries ; retries-- ) {
-		if ( ( rc = hermon_get_port_info ( hermon,
-						   &port_info ) ) != 0 )
-			continue;
-		if ( ( ( port_info.port_state__link_speed_supported ) & 0xf )
-		     == 4 ) {
-			printf ( "ok\n" );
-			return 0;
-		}
-		printf ( "." );
-		sleep ( 1 );
-	}
-	printf ( "failed\n" );
-	return -ENODEV;
-};
-
-/**
- * Get MAD parameters
- *
- * @v hermon		Hermon device
- * @ret rc		Return status code
- */
-static int hermon_get_mad_params ( struct ib_device *ibdev ) {
-	struct hermon *hermon = ibdev->dev_priv;
-	int rc;
-
-	/* Get subnet manager LID */
-	if ( ( rc = hermon_get_sm_lid ( hermon, &ibdev->sm_lid ) ) != 0 ) {
-		DBGC ( hermon, "Hermon %p could not determine subnet manager "
-		       "LID: %s\n", hermon, strerror ( rc ) );
-		return rc;
-	}
-
-	/* Get port GID */
-	if ( ( rc = hermon_get_port_gid ( hermon, &ibdev->port_gid ) ) != 0 ) {
-		DBGC ( hermon, "Hermon %p could not determine port GID: %s\n",
-		       hermon, strerror ( rc ) );
-		return rc;
-	}
-
-	/* Get partition key */
-	if ( ( rc = hermon_get_pkey ( hermon, &ibdev->pkey ) ) != 0 ) {
-		DBGC ( hermon, "Hermon %p could not determine partition key: "
-		       "%s\n", hermon, strerror ( rc ) );
-		return rc;
-	}
-
-	return 0;
-}
 
 /***************************************************************************
  *
@@ -1916,56 +1820,6 @@ static void hermon_free_icm ( struct hermon *hermon ) {
 
 /***************************************************************************
  *
- * Infiniband link-layer operations
- *
- ***************************************************************************
- */
-
-/**
- * Initialise Infiniband link
- *
- * @v hermon		Hermon device
- * @ret rc		Return status code
- */
-static int hermon_init_port ( struct hermon *hermon ) {
-	struct hermonprm_init_port init_port;
-	int rc;
-
-	memset ( &init_port, 0, sizeof ( init_port ) );
-	MLX_FILL_2 ( &init_port, 0,
-		     port_width_cap, 3,
-		     vl_cap, 1 );
-	MLX_FILL_2 ( &init_port, 1,
-		     mtu, HERMON_MTU_2048,
-		     max_gid, 1 );
-	MLX_FILL_1 ( &init_port, 2, max_pkey, 64 );
-	if ( ( rc = hermon_cmd_init_port ( hermon, PXE_IB_PORT,
-					   &init_port ) ) != 0 ) {
-		DBGC ( hermon, "Hermon %p could not intialise port: %s\n",
-		       hermon, strerror ( rc ) );
-		return rc;
-	}
-
-	return 0;
-}
-
-/**
- * Close Infiniband link
- *
- * @v hermon		Hermon device
- */
-static void hermon_close_port ( struct hermon *hermon ) {
-	int rc;
-
-	if ( ( rc = hermon_cmd_close_port ( hermon, PXE_IB_PORT ) ) != 0 ) {
-		DBGC ( hermon, "Hermon %p could not close port: %s\n",
-		       hermon, strerror ( rc ) );
-		/* Nothing we can do about this */
-	}
-}
-
-/***************************************************************************
- *
  * PCI interface
  *
  ***************************************************************************
@@ -2030,6 +1884,7 @@ static int hermon_probe ( struct pci_device *pci,
 	ibdev->op = &hermon_ib_operations;
 	pci_set_drvdata ( pci, ibdev );
 	ibdev->dev = &pci->dev;
+	ibdev->port = PXE_IB_PORT;
 	hermon = ibdev->dev_priv;
 	memset ( hermon, 0, sizeof ( *hermon ) );
 
@@ -2084,38 +1939,16 @@ static int hermon_probe ( struct pci_device *pci,
 	if ( ( rc = hermon_setup_mpt ( hermon ) ) != 0 )
 		goto err_setup_mpt;
 
-	/* Bring up IB layer */
-	if ( ( rc = hermon_init_port ( hermon ) ) != 0 )
-		goto err_init_port;
-
-	/* Wait for link */
-	if ( ( rc = hermon_wait_for_link ( hermon ) ) != 0 )
-		goto err_wait_for_link;
-
-	/* Get MAD parameters */
-	if ( ( rc = hermon_get_mad_params ( ibdev ) ) != 0 )
-		goto err_get_mad_params;
-
-	DBGC ( hermon, "Hermon %p port GID is %08lx:%08lx:%08lx:%08lx\n",
-	       hermon, htonl ( ibdev->port_gid.u.dwords[0] ),
-	       htonl ( ibdev->port_gid.u.dwords[1] ),
-	       htonl ( ibdev->port_gid.u.dwords[2] ),
-	       htonl ( ibdev->port_gid.u.dwords[3] ) );
-
-	/* Add IPoIB device */
-	if ( ( rc = ipoib_probe ( ibdev ) ) != 0 ) {
-		DBGC ( hermon, "Hermon %p could not add IPoIB device: %s\n",
+	/* Register Infiniband device */
+	if ( ( rc = register_ibdev ( ibdev ) ) != 0 ) {
+		DBGC ( hermon, "Hermon %p could not register IB device: %s\n",
 		       hermon, strerror ( rc ) );
-		goto err_ipoib_probe;
+		goto err_register_ibdev;
 	}
 
 	return 0;
 
- err_ipoib_probe:
- err_get_mad_params:
- err_wait_for_link:
-	hermon_close_port ( hermon );
- err_init_port:
+ err_register_ibdev:
  err_setup_mpt:
 	hermon_cmd_close_hca ( hermon );
  err_init_hca:
@@ -2142,8 +1975,7 @@ static void hermon_remove ( struct pci_device *pci ) {
 	struct ib_device *ibdev = pci_get_drvdata ( pci );
 	struct hermon *hermon = ibdev->dev_priv;
 
-	ipoib_remove ( ibdev );
-	hermon_close_port ( hermon );
+	unregister_ibdev ( ibdev );
 	hermon_cmd_close_hca ( hermon );
 	hermon_free_icm ( hermon );
 	hermon_stop_firmware ( hermon );

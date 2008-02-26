@@ -34,7 +34,6 @@
 #include <gpxe/iobuf.h>
 #include <gpxe/netdevice.h>
 #include <gpxe/infiniband.h>
-#include <gpxe/ipoib.h>
 #include "arbel.h"
 
 /**
@@ -349,12 +348,13 @@ arbel_cmd_2rst_qpee ( struct arbel *arbel, unsigned long qpn ) {
 }
 
 static inline int
-arbel_cmd_mad_ifc ( struct arbel *arbel, union arbelprm_mad *mad ) {
+arbel_cmd_mad_ifc ( struct arbel *arbel, unsigned int port,
+		    union arbelprm_mad *mad ) {
 	return arbel_cmd ( arbel,
 			   ARBEL_HCR_INOUT_CMD ( ARBEL_HCR_MAD_IFC,
 						 1, sizeof ( *mad ),
 						 1, sizeof ( *mad ) ),
-			   0x03, mad, PXE_IB_PORT, mad );
+			   0x03, mad, port, mad );
 }
 
 static inline int
@@ -776,7 +776,7 @@ static int arbel_create_qp ( struct ib_device *ibdev,
 	MLX_FILL_1 ( &qpctx, 5,
 		     qpc_eec_data.usr_page, arbel->limits.reserved_uars );
 	MLX_FILL_1 ( &qpctx, 10, qpc_eec_data.primary_address_path.port_number,
-		     PXE_IB_PORT );
+		     ibdev->port );
 	MLX_FILL_1 ( &qpctx, 27, qpc_eec_data.pd, ARBEL_GLOBAL_PD );
 	MLX_FILL_1 ( &qpctx, 29, qpc_eec_data.wqe_lkey, arbel->reserved_lkey );
 	MLX_FILL_1 ( &qpctx, 30, qpc_eec_data.ssc, 1 );
@@ -955,7 +955,7 @@ static int arbel_post_send ( struct ib_device *ibdev,
 	memset ( &wqe->ud, 0, sizeof ( wqe->ud ) );
 	MLX_FILL_2 ( &wqe->ud, 0,
 		     ud_address_vector.pd, ARBEL_GLOBAL_PD,
-		     ud_address_vector.port_number, PXE_IB_PORT );
+		     ud_address_vector.port_number, ibdev->port );
 	MLX_FILL_2 ( &wqe->ud, 1,
 		     ud_address_vector.rlid, av->dlid,
 		     ud_address_vector.g, av->gid_present );
@@ -1208,6 +1208,57 @@ static void arbel_poll_cq ( struct ib_device *ibdev,
 
 /***************************************************************************
  *
+ * Infiniband link-layer operations
+ *
+ ***************************************************************************
+ */
+
+/**
+ * Initialise Infiniband link
+ *
+ * @v ibdev		Infiniband device
+ * @ret rc		Return status code
+ */
+static int arbel_open ( struct ib_device *ibdev ) {
+	struct arbel *arbel = ibdev->dev_priv;
+	struct arbelprm_init_ib init_ib;
+	int rc;
+
+	memset ( &init_ib, 0, sizeof ( init_ib ) );
+	MLX_FILL_3 ( &init_ib, 0,
+		     mtu_cap, ARBEL_MTU_2048,
+		     port_width_cap, 3,
+		     vl_cap, 1 );
+	MLX_FILL_1 ( &init_ib, 1, max_gid, 1 );
+	MLX_FILL_1 ( &init_ib, 2, max_pkey, 64 );
+	if ( ( rc = arbel_cmd_init_ib ( arbel, ibdev->port,
+					&init_ib ) ) != 0 ) {
+		DBGC ( arbel, "Arbel %p could not intialise IB: %s\n",
+		       arbel, strerror ( rc ) );
+		return rc;
+	}
+
+	return 0;
+}
+
+/**
+ * Close Infiniband link
+ *
+ * @v ibdev		Infiniband device
+ */
+static void arbel_close ( struct ib_device *ibdev ) {
+	struct arbel *arbel = ibdev->dev_priv;
+	int rc;
+
+	if ( ( rc = arbel_cmd_close_ib ( arbel, ibdev->port ) ) != 0 ) {
+		DBGC ( arbel, "Arbel %p could not close IB: %s\n",
+		       arbel, strerror ( rc ) );
+		/* Nothing we can do about this */
+	}
+}
+
+/***************************************************************************
+ *
  * Multicast group operations
  *
  ***************************************************************************
@@ -1302,6 +1353,51 @@ static void arbel_mcast_detach ( struct ib_device *ibdev,
 	}
 }
 
+/***************************************************************************
+ *
+ * MAD operations
+ *
+ ***************************************************************************
+ */
+
+/**
+ * Issue management datagram
+ *
+ * @v ibdev		Infiniband device
+ * @v mad		Management datagram
+ * @v len		Length of management datagram
+ * @ret rc		Return status code
+ */
+static int arbel_mad ( struct ib_device *ibdev, struct ib_mad_hdr *mad,
+		       size_t len ) {
+	struct arbel *arbel = ibdev->dev_priv;
+	union arbelprm_mad mad_ifc;
+	int rc;
+
+	/* Copy in request packet */
+	memset ( &mad_ifc, 0, sizeof ( mad_ifc ) );
+	assert ( len <= sizeof ( mad_ifc.mad ) );
+	memcpy ( &mad_ifc.mad, mad, len );
+
+	/* Issue MAD */
+	if ( ( rc = arbel_cmd_mad_ifc ( arbel, ibdev->port,
+					&mad_ifc ) ) != 0 ) {
+		DBGC ( arbel, "Arbel %p could not issue MAD IFC: %s\n",
+		       arbel, strerror ( rc ) );
+		return rc;
+	}
+
+	/* Copy out reply packet */
+	memcpy ( mad, &mad_ifc.mad, len );
+
+	if ( mad->status != 0 ) {
+		DBGC ( arbel, "Arbel %p MAD IFC status %04x\n",
+		       arbel, ntohs ( mad->status ) );
+		return -EIO;
+	}
+	return 0;
+}
+
 /** Arbel Infiniband operations */
 static struct ib_device_operations arbel_ib_operations = {
 	.create_cq	= arbel_create_cq,
@@ -1311,205 +1407,12 @@ static struct ib_device_operations arbel_ib_operations = {
 	.post_send	= arbel_post_send,
 	.post_recv	= arbel_post_recv,
 	.poll_cq	= arbel_poll_cq,
+	.open		= arbel_open,
+	.close		= arbel_close,
 	.mcast_attach	= arbel_mcast_attach,
 	.mcast_detach	= arbel_mcast_detach,
+	.mad		= arbel_mad,
 };
-
-/***************************************************************************
- *
- * MAD IFC operations
- *
- ***************************************************************************
- */
-
-static int arbel_mad_ifc ( struct arbel *arbel,
-			   union arbelprm_mad *mad ) {
-	struct ib_mad_hdr *hdr = &mad->mad.mad_hdr;
-	int rc;
-
-	hdr->base_version = IB_MGMT_BASE_VERSION;
-	if ( ( rc = arbel_cmd_mad_ifc ( arbel, mad ) ) != 0 ) {
-		DBGC ( arbel, "Arbel %p could not issue MAD IFC: %s\n",
-		       arbel, strerror ( rc ) );
-		return rc;
-	}
-	if ( hdr->status != 0 ) {
-		DBGC ( arbel, "Arbel %p MAD IFC status %04x\n",
-		       arbel, ntohs ( hdr->status ) );
-		return -EIO;
-	}
-	return 0;
-}
-
-static int arbel_get_port_info ( struct arbel *arbel,
-				 struct ib_mad_port_info *port_info ) {
-	union arbelprm_mad mad;
-	struct ib_mad_hdr *hdr = &mad.mad.mad_hdr;
-	int rc;
-
-	memset ( &mad, 0, sizeof ( mad ) );
-	hdr->mgmt_class = IB_MGMT_CLASS_SUBN_LID_ROUTED;
-	hdr->class_version = 1;
-	hdr->method = IB_MGMT_METHOD_GET;
-	hdr->attr_id = htons ( IB_SMP_ATTR_PORT_INFO );
-	hdr->attr_mod = htonl ( PXE_IB_PORT );
-	if ( ( rc = arbel_mad_ifc ( arbel, &mad ) ) != 0 ) {
-		DBGC ( arbel, "Arbel %p could not get port info: %s\n",
-		       arbel, strerror ( rc ) );
-		return rc;
-	}
-	memcpy ( port_info, &mad.mad.port_info, sizeof ( *port_info ) );
-	return 0;
-}
-
-static int arbel_get_guid_info ( struct arbel *arbel,
-				 struct ib_mad_guid_info *guid_info ) {
-	union arbelprm_mad mad;
-	struct ib_mad_hdr *hdr = &mad.mad.mad_hdr;
-	int rc;
-
-	memset ( &mad, 0, sizeof ( mad ) );
-	hdr->mgmt_class = IB_MGMT_CLASS_SUBN_LID_ROUTED;
-	hdr->class_version = 1;
-	hdr->method = IB_MGMT_METHOD_GET;
-	hdr->attr_id = htons ( IB_SMP_ATTR_GUID_INFO );
-	if ( ( rc = arbel_mad_ifc ( arbel, &mad ) ) != 0 ) {
-		DBGC ( arbel, "Arbel %p could not get GUID info: %s\n",
-		       arbel, strerror ( rc ) );
-		return rc;
-	}
-	memcpy ( guid_info, &mad.mad.guid_info, sizeof ( *guid_info ) );
-	return 0;
-}
-
-static int arbel_get_pkey_table ( struct arbel *arbel,
-				  struct ib_mad_pkey_table *pkey_table ) {
-	union arbelprm_mad mad;
-	struct ib_mad_hdr *hdr = &mad.mad.mad_hdr;
-	int rc;
-
-	memset ( &mad, 0, sizeof ( mad ) );
-	hdr->mgmt_class = IB_MGMT_CLASS_SUBN_LID_ROUTED;
-	hdr->class_version = 1;
-	hdr->method = IB_MGMT_METHOD_GET;
-	hdr->attr_id = htons ( IB_SMP_ATTR_PKEY_TABLE );
-	if ( ( rc = arbel_mad_ifc ( arbel, &mad ) ) != 0 ) {
-		DBGC ( arbel, "Arbel %p could not get pkey table: %s\n",
-		       arbel, strerror ( rc ) );
-		return rc;
-	}
-	memcpy ( pkey_table, &mad.mad.pkey_table, sizeof ( *pkey_table ) );
-	return 0;
-}
-
-static int arbel_get_port_gid ( struct arbel *arbel,
-				struct ib_gid *port_gid ) {
-	union {
-		/* This union exists just to save stack space */
-		struct ib_mad_port_info port_info;
-		struct ib_mad_guid_info guid_info;
-	} u;
-	int rc;
-
-	/* Port info gives us the first half of the port GID */
-	if ( ( rc = arbel_get_port_info ( arbel, &u.port_info ) ) != 0 )
-		return rc;
-	memcpy ( &port_gid->u.bytes[0], u.port_info.gid_prefix, 8 );
-	
-	/* GUID info gives us the second half of the port GID */
-	if ( ( rc = arbel_get_guid_info ( arbel, &u.guid_info ) ) != 0 )
-		return rc;
-	memcpy ( &port_gid->u.bytes[8], u.guid_info.gid_local, 8 );
-
-	return 0;
-}
-
-static int arbel_get_sm_lid ( struct arbel *arbel,
-			      unsigned long *sm_lid ) {
-	struct ib_mad_port_info port_info;
-	int rc;
-
-	if ( ( rc = arbel_get_port_info ( arbel, &port_info ) ) != 0 )
-		return rc;
-	*sm_lid = ntohs ( port_info.mastersm_lid );
-	return 0;
-}
-
-static int arbel_get_pkey ( struct arbel *arbel, unsigned int *pkey ) {
-	struct ib_mad_pkey_table pkey_table;
-	int rc;
-
-	if ( ( rc = arbel_get_pkey_table ( arbel, &pkey_table ) ) != 0 )
-		return rc;
-	*pkey = ntohs ( pkey_table.pkey[0][0] );
-	return 0;
-}
-
-/**
- * Wait for link up
- *
- * @v arbel		Arbel device
- * @ret rc		Return status code
- *
- * This function shouldn't really exist.  Unfortunately, IB links take
- * a long time to come up, and we can't get various key parameters
- * e.g. our own IPoIB MAC address without information from the subnet
- * manager).  We should eventually make link-up an asynchronous event.
- */
-static int arbel_wait_for_link ( struct arbel *arbel ) {
-	struct ib_mad_port_info port_info;
-	unsigned int retries;
-	int rc;
-
-	printf ( "Waiting for Infiniband link-up..." );
-	for ( retries = 20 ; retries ; retries-- ) {
-		if ( ( rc = arbel_get_port_info ( arbel, &port_info ) ) != 0 )
-			continue;
-		if ( ( ( port_info.port_state__link_speed_supported ) & 0xf )
-		     == 4 ) {
-			printf ( "ok\n" );
-			return 0;
-		}
-		printf ( "." );
-		sleep ( 1 );
-	}
-	printf ( "failed\n" );
-	return -ENODEV;
-};
-
-/**
- * Get MAD parameters
- *
- * @v arbel		Arbel device
- * @ret rc		Return status code
- */
-static int arbel_get_mad_params ( struct ib_device *ibdev ) {
-	struct arbel *arbel = ibdev->dev_priv;
-	int rc;
-
-	/* Get subnet manager LID */
-	if ( ( rc = arbel_get_sm_lid ( arbel, &ibdev->sm_lid ) ) != 0 ) {
-		DBGC ( arbel, "Arbel %p could not determine subnet manager "
-		       "LID: %s\n", arbel, strerror ( rc ) );
-		return rc;
-	}
-
-	/* Get port GID */
-	if ( ( rc = arbel_get_port_gid ( arbel, &ibdev->port_gid ) ) != 0 ) {
-		DBGC ( arbel, "Arbel %p could not determine port GID: %s\n",
-		       arbel, strerror ( rc ) );
-		return rc;
-	}
-
-	/* Get partition key */
-	if ( ( rc = arbel_get_pkey ( arbel, &ibdev->pkey ) ) != 0 ) {
-		DBGC ( arbel, "Arbel %p could not determine partition key: "
-		       "%s\n", arbel, strerror ( rc ) );
-		return rc;
-	}
-
-	return 0;
-}
 
 /***************************************************************************
  *
@@ -1884,55 +1787,6 @@ static void arbel_free_icm ( struct arbel *arbel ) {
 
 /***************************************************************************
  *
- * Infiniband link-layer operations
- *
- ***************************************************************************
- */
-
-/**
- * Initialise Infiniband link
- *
- * @v arbel		Arbel device
- * @ret rc		Return status code
- */
-static int arbel_init_ib ( struct arbel *arbel ) {
-	struct arbelprm_init_ib init_ib;
-	int rc;
-
-	memset ( &init_ib, 0, sizeof ( init_ib ) );
-	MLX_FILL_3 ( &init_ib, 0,
-		     mtu_cap, ARBEL_MTU_2048,
-		     port_width_cap, 3,
-		     vl_cap, 1 );
-	MLX_FILL_1 ( &init_ib, 1, max_gid, 1 );
-	MLX_FILL_1 ( &init_ib, 2, max_pkey, 64 );
-	if ( ( rc = arbel_cmd_init_ib ( arbel, PXE_IB_PORT,
-					&init_ib ) ) != 0 ) {
-		DBGC ( arbel, "Arbel %p could not intialise IB: %s\n",
-		       arbel, strerror ( rc ) );
-		return rc;
-	}
-
-	return 0;
-}
-
-/**
- * Close Infiniband link
- *
- * @v arbel		Arbel device
- */
-static void arbel_close_ib ( struct arbel *arbel ) {
-	int rc;
-
-	if ( ( rc = arbel_cmd_close_ib ( arbel, PXE_IB_PORT ) ) != 0 ) {
-		DBGC ( arbel, "Arbel %p could not close IB: %s\n",
-		       arbel, strerror ( rc ) );
-		/* Nothing we can do about this */
-	}
-}
-
-/***************************************************************************
- *
  * PCI interface
  *
  ***************************************************************************
@@ -1997,6 +1851,7 @@ static int arbel_probe ( struct pci_device *pci,
 	ibdev->op = &arbel_ib_operations;
 	pci_set_drvdata ( pci, ibdev );
 	ibdev->dev = &pci->dev;
+	ibdev->port = PXE_IB_PORT;
 	arbel = ibdev->dev_priv;
 	memset ( arbel, 0, sizeof ( *arbel ) );
 
@@ -2047,38 +1902,16 @@ static int arbel_probe ( struct pci_device *pci,
 	if ( ( rc = arbel_setup_mpt ( arbel ) ) != 0 )
 		goto err_setup_mpt;
 
-	/* Bring up IB layer */
-	if ( ( rc = arbel_init_ib ( arbel ) ) != 0 )
-		goto err_init_ib;
-
-	/* Wait for link */
-	if ( ( rc = arbel_wait_for_link ( arbel ) ) != 0 )
-		goto err_wait_for_link;
-
-	/* Get MAD parameters */
-	if ( ( rc = arbel_get_mad_params ( ibdev ) ) != 0 )
-		goto err_get_mad_params;
-
-	DBGC ( arbel, "Arbel %p port GID is %08lx:%08lx:%08lx:%08lx\n", arbel,
-	       htonl ( ibdev->port_gid.u.dwords[0] ),
-	       htonl ( ibdev->port_gid.u.dwords[1] ),
-	       htonl ( ibdev->port_gid.u.dwords[2] ),
-	       htonl ( ibdev->port_gid.u.dwords[3] ) );
-
-	/* Add IPoIB device */
-	if ( ( rc = ipoib_probe ( ibdev ) ) != 0 ) {
-		DBGC ( arbel, "Arbel %p could not add IPoIB device: %s\n",
+	/* Register Infiniband device */
+	if ( ( rc = register_ibdev ( ibdev ) ) != 0 ) {
+		DBGC ( arbel, "Arbel %p could not register IB device: %s\n",
 		       arbel, strerror ( rc ) );
-		goto err_ipoib_probe;
+		goto err_register_ibdev;
 	}
 
 	return 0;
 
- err_ipoib_probe:
- err_get_mad_params:
- err_wait_for_link:
-	arbel_close_ib ( arbel );
- err_init_ib:
+ err_register_ibdev:
  err_setup_mpt:
 	arbel_cmd_close_hca ( arbel );
  err_init_hca:
@@ -2105,8 +1938,7 @@ static void arbel_remove ( struct pci_device *pci ) {
 	struct ib_device *ibdev = pci_get_drvdata ( pci );
 	struct arbel *arbel = ibdev->dev_priv;
 
-	ipoib_remove ( ibdev );
-	arbel_close_ib ( arbel );
+	unregister_ibdev ( ibdev );
 	arbel_cmd_close_hca ( arbel );
 	arbel_free_icm ( arbel );
 	arbel_stop_firmware ( arbel );

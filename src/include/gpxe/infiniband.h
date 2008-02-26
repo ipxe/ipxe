@@ -156,6 +156,8 @@ struct ib_address_vector {
 	struct ib_gid gid;
 };
 
+struct ib_mad_hdr;
+
 /**
  * Infiniband device operations
  *
@@ -237,6 +239,19 @@ struct ib_device_operations {
 			     struct ib_completion_queue *cq,
 			     ib_completer_t complete_send,
 			     ib_completer_t complete_recv );
+	/**
+	 * Open port
+	 *
+	 * @v ibdev		Infiniband device
+	 * @ret rc		Return status code
+	 */
+	int ( * open ) ( struct ib_device *ibdev );
+	/**
+	 * Close port
+	 *
+	 * @v ibdev		Infiniband device
+	 */
+	void ( * close ) ( struct ib_device *ibdev );
 	/** Attach to multicast group
 	 *
 	 * @v ibdev		Infiniband device
@@ -256,20 +271,32 @@ struct ib_device_operations {
 	void ( * mcast_detach ) ( struct ib_device *ibdev,
 				  struct ib_queue_pair *qp,
 				  struct ib_gid *gid );
+	/**
+	 * Issue management datagram
+	 *
+	 * @v ibdev		Infiniband device
+	 * @v mad		Management datagram
+	 * @v len		Length of management datagram
+	 * @ret rc		Return status code
+	 */
+	int ( * mad ) ( struct ib_device *ibdev, struct ib_mad_hdr *mad,
+			size_t len );
 };
 
 /** An Infiniband device */
 struct ib_device {
+	/** Underlying device */
+	struct device *dev;
+	/** Infiniband operations */
+	struct ib_device_operations *op;
+	/** Port number */
+	unsigned int port;
 	/** Port GID */
 	struct ib_gid port_gid;
 	/** Subnet manager LID */
 	unsigned long sm_lid;
 	/** Partition key */
 	unsigned int pkey;
-	/** Underlying device */
-	struct device *dev;
-	/** Infiniband operations */
-	struct ib_device_operations *op;
 	/** Device private data */
 	void *dev_priv;
 	/** Owner private data */
@@ -289,6 +316,8 @@ extern void ib_destroy_qp ( struct ib_device *ibdev,
 extern struct ib_work_queue * ib_find_wq ( struct ib_completion_queue *cq,
 					   unsigned long qpn, int is_send );
 extern struct ib_device * alloc_ibdev ( size_t priv_size );
+extern int register_ibdev ( struct ib_device *ibdev );
+extern void unregister_ibdev ( struct ib_device *ibdev );
 extern void free_ibdev ( struct ib_device *ibdev );
 
 /**
@@ -334,6 +363,26 @@ ib_poll_cq ( struct ib_device *ibdev, struct ib_completion_queue *cq,
 	ibdev->op->poll_cq ( ibdev, cq, complete_send, complete_recv );
 }
 
+/**
+ * Open port
+ *
+ * @v ibdev		Infiniband device
+ * @ret rc		Return status code
+ */
+static inline __attribute__ (( always_inline )) int
+ib_open ( struct ib_device *ibdev ) {
+	return ibdev->op->open ( ibdev );
+}
+
+/**
+ * Close port
+ *
+ * @v ibdev		Infiniband device
+ */
+static inline __attribute__ (( always_inline )) void
+ib_close ( struct ib_device *ibdev ) {
+	ibdev->op->close ( ibdev );
+}
 
 /**
  * Attach to multicast group
@@ -363,13 +412,26 @@ ib_mcast_detach ( struct ib_device *ibdev, struct ib_queue_pair *qp,
 }
 
 /**
+ * Issue management datagram
+ *
+ * @v ibdev		Infiniband device
+ * @v mad		Management datagram
+ * @v len		Length of management datagram
+ * @ret rc		Return status code
+ */
+static inline __attribute__ (( always_inline )) int
+ib_mad ( struct ib_device *ibdev, struct ib_mad_hdr *mad, size_t len ) {
+	return ibdev->op->mad ( ibdev, mad, len );
+}
+
+/**
  * Set Infiniband owner-private data
  *
  * @v pci		Infiniband device
  * @v priv		Private data
  */
-static inline void ib_set_ownerdata ( struct ib_device *ibdev,
-				      void *owner_priv ) {
+static inline __attribute__ (( always_inline )) void
+ib_set_ownerdata ( struct ib_device *ibdev, void *owner_priv ) {
 	ibdev->owner_priv = owner_priv;
 }
 
@@ -379,7 +441,8 @@ static inline void ib_set_ownerdata ( struct ib_device *ibdev,
  * @v pci		Infiniband device
  * @ret priv		Private data
  */
-static inline void * ib_get_ownerdata ( struct ib_device *ibdev ) {
+static inline __attribute__ (( always_inline )) void *
+ib_get_ownerdata ( struct ib_device *ibdev ) {
 	return ibdev->owner_priv;
 }
 
