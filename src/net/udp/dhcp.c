@@ -610,7 +610,7 @@ int create_dhcp_request ( struct net_device *netdev, int msgtype,
 	/* Add DHCP client identifier.  Required for Infiniband, and
 	 * doesn't hurt other link layers.
 	 */
-	client_id.ll_proto = netdev->ll_protocol->ll_proto;
+	client_id.ll_proto = ntohs ( netdev->ll_protocol->ll_proto );
 	ll_addr_len = netdev->ll_protocol->ll_addr_len;
 	assert ( ll_addr_len <= sizeof ( client_id.ll_addr ) );
 	memcpy ( client_id.ll_addr, netdev->ll_addr, ll_addr_len );
