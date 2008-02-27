@@ -67,7 +67,8 @@ struct ib_completion_queue * ib_create_cq ( struct ib_device *ibdev,
 	}
 
 	DBGC ( ibdev, "IBDEV %p created %d-entry completion queue %p (%p) "
-	       "with CQN %#lx\n", ibdev, num_cqes, cq, cq->dev_priv, cq->cqn );
+	       "with CQN %#lx\n", ibdev, num_cqes, cq,
+	       ib_cq_get_drvdata ( cq ), cq->cqn );
 	return cq;
 }
 
@@ -141,7 +142,7 @@ struct ib_queue_pair * ib_create_qp ( struct ib_device *ibdev,
 	}
 
 	DBGC ( ibdev, "IBDEV %p created queue pair %p (%p) with QPN %#lx\n",
-	       ibdev, qp, qp->dev_priv, qp->qpn );
+	       ibdev, qp, ib_qp_get_drvdata ( qp ), qp->qpn );
 	DBGC ( ibdev, "IBDEV %p QPN %#lx has %d send entries at [%p,%p)\n",
 	       ibdev, qp->qpn, num_send_wqes, qp->send.iobufs,
 	       qp->recv.iobufs );
@@ -360,17 +361,19 @@ static int ib_get_mad_params ( struct ib_device *ibdev ) {
 /**
  * Allocate Infiniband device
  *
- * @v priv_size		Size of private data area
+ * @v priv_size		Size of driver private data area
  * @ret ibdev		Infiniband device, or NULL
  */
 struct ib_device * alloc_ibdev ( size_t priv_size ) {
 	struct ib_device *ibdev;
+	void *drv_priv;
 	size_t total_len;
 
 	total_len = ( sizeof ( *ibdev ) + priv_size );
 	ibdev = zalloc ( total_len );
 	if ( ibdev ) {
-		ibdev->dev_priv = ( ( ( void * ) ibdev ) + sizeof ( *ibdev ) );
+		drv_priv = ( ( ( void * ) ibdev ) + sizeof ( *ibdev ) );
+		ib_set_drvdata ( ibdev, drv_priv );
 	}
 	return ibdev;
 }

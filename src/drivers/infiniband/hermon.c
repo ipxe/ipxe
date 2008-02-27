@@ -41,9 +41,6 @@
  *
  */
 
-/* Port to use */
-#define PXE_IB_PORT 1
-
 /***************************************************************************
  *
  * Queue number allocation
@@ -599,7 +596,7 @@ static void hermon_free_mtt ( struct hermon *hermon,
  */
 static int hermon_create_cq ( struct ib_device *ibdev,
 			      struct ib_completion_queue *cq ) {
-	struct hermon *hermon = ibdev->dev_priv;
+	struct hermon *hermon = ib_get_drvdata ( ibdev );
 	struct hermon_completion_queue *hermon_cq;
 	struct hermonprm_completion_queue_context cqctx;
 	int cqn_offset;
@@ -665,7 +662,7 @@ static int hermon_create_cq ( struct ib_device *ibdev,
 	DBGC ( hermon, "Hermon %p CQN %#lx ring at [%p,%p)\n",
 	       hermon, cq->cqn, hermon_cq->cqe,
 	       ( ( ( void * ) hermon_cq->cqe ) + hermon_cq->cqe_size ) );
-	cq->dev_priv = hermon_cq;
+	ib_cq_set_drvdata ( cq, hermon_cq );
 	return 0;
 
  err_sw2hw_cq:
@@ -688,8 +685,8 @@ static int hermon_create_cq ( struct ib_device *ibdev,
  */
 static void hermon_destroy_cq ( struct ib_device *ibdev,
 				struct ib_completion_queue *cq ) {
-	struct hermon *hermon = ibdev->dev_priv;
-	struct hermon_completion_queue *hermon_cq = cq->dev_priv;
+	struct hermon *hermon = ib_get_drvdata ( ibdev );
+	struct hermon_completion_queue *hermon_cq = ib_cq_get_drvdata ( cq );
 	struct hermonprm_completion_queue_context cqctx;
 	int cqn_offset;
 	int rc;
@@ -713,7 +710,7 @@ static void hermon_destroy_cq ( struct ib_device *ibdev,
 	cqn_offset = ( cq->cqn - hermon->cap.reserved_cqs );
 	hermon_bitmask_free ( hermon->cq_inuse, cqn_offset, 1 );
 
-	cq->dev_priv = NULL;
+	ib_cq_set_drvdata ( cq, NULL );
 }
 
 /***************************************************************************
@@ -732,7 +729,7 @@ static void hermon_destroy_cq ( struct ib_device *ibdev,
  */
 static int hermon_create_qp ( struct ib_device *ibdev,
 			      struct ib_queue_pair *qp ) {
-	struct hermon *hermon = ibdev->dev_priv;
+	struct hermon *hermon = ib_get_drvdata ( ibdev );
 	struct hermon_queue_pair *hermon_qp;
 	struct hermonprm_qp_ee_state_transitions qpctx;
 	int qpn_offset;
@@ -845,7 +842,7 @@ static int hermon_create_qp ( struct ib_device *ibdev,
 	DBGC ( hermon, "Hermon %p QPN %#lx receive ring at [%p,%p)\n",
 	       hermon, qp->qpn, hermon_qp->recv.wqe,
 	       ( ((void *)hermon_qp->recv.wqe ) + hermon_qp->recv.wqe_size ) );
-	qp->dev_priv = hermon_qp;
+	ib_qp_set_drvdata ( qp, hermon_qp );
 	return 0;
 
  err_rtr2rts_qp:
@@ -871,8 +868,8 @@ static int hermon_create_qp ( struct ib_device *ibdev,
  */
 static void hermon_destroy_qp ( struct ib_device *ibdev,
 				struct ib_queue_pair *qp ) {
-	struct hermon *hermon = ibdev->dev_priv;
-	struct hermon_queue_pair *hermon_qp = qp->dev_priv;
+	struct hermon *hermon = ib_get_drvdata ( ibdev );
+	struct hermon_queue_pair *hermon_qp = ib_qp_get_drvdata ( qp );
 	int qpn_offset;
 	int rc;
 
@@ -896,7 +893,7 @@ static void hermon_destroy_qp ( struct ib_device *ibdev,
 		       hermon->cap.reserved_qps );
 	hermon_bitmask_free ( hermon->qp_inuse, qpn_offset, 1 );
 
-	qp->dev_priv = NULL;
+	ib_qp_set_drvdata ( qp, NULL );
 }
 
 /***************************************************************************
@@ -924,8 +921,8 @@ static int hermon_post_send ( struct ib_device *ibdev,
 			      struct ib_queue_pair *qp,
 			      struct ib_address_vector *av,
 			      struct io_buffer *iobuf ) {
-	struct hermon *hermon = ibdev->dev_priv;
-	struct hermon_queue_pair *hermon_qp = qp->dev_priv;
+	struct hermon *hermon = ib_get_drvdata ( ibdev );
+	struct hermon_queue_pair *hermon_qp = ib_qp_get_drvdata ( qp );
 	struct ib_work_queue *wq = &qp->send;
 	struct hermon_send_work_queue *hermon_send_wq = &hermon_qp->send;
 	struct hermonprm_ud_send_wqe *wqe;
@@ -1000,8 +997,8 @@ static int hermon_post_send ( struct ib_device *ibdev,
 static int hermon_post_recv ( struct ib_device *ibdev,
 			      struct ib_queue_pair *qp,
 			      struct io_buffer *iobuf ) {
-	struct hermon *hermon = ibdev->dev_priv;
-	struct hermon_queue_pair *hermon_qp = qp->dev_priv;
+	struct hermon *hermon = ib_get_drvdata ( ibdev );
+	struct hermon_queue_pair *hermon_qp = ib_qp_get_drvdata ( qp );
 	struct ib_work_queue *wq = &qp->recv;
 	struct hermon_recv_work_queue *hermon_recv_wq = &hermon_qp->recv;
 	struct hermonprm_recv_wqe *wqe;
@@ -1048,7 +1045,7 @@ static int hermon_complete ( struct ib_device *ibdev,
 			     union hermonprm_completion_entry *cqe,
 			     ib_completer_t complete_send,
 			     ib_completer_t complete_recv ) {
-	struct hermon *hermon = ibdev->dev_priv;
+	struct hermon *hermon = ib_get_drvdata ( ibdev );
 	struct ib_completion completion;
 	struct ib_work_queue *wq;
 	struct ib_queue_pair *qp;
@@ -1085,7 +1082,7 @@ static int hermon_complete ( struct ib_device *ibdev,
 		return -EIO;
 	}
 	qp = wq->qp;
-	hermon_qp = qp->dev_priv;
+	hermon_qp = ib_qp_get_drvdata ( qp );
 
 	/* Identify I/O buffer */
 	wqe_idx = ( MLX_GET ( &cqe->normal, wqe_counter ) &
@@ -1128,8 +1125,8 @@ static void hermon_poll_cq ( struct ib_device *ibdev,
 			     struct ib_completion_queue *cq,
 			     ib_completer_t complete_send,
 			     ib_completer_t complete_recv ) {
-	struct hermon *hermon = ibdev->dev_priv;
-	struct hermon_completion_queue *hermon_cq = cq->dev_priv;
+	struct hermon *hermon = ib_get_drvdata ( ibdev );
+	struct hermon_completion_queue *hermon_cq = ib_cq_get_drvdata ( cq );
 	union hermonprm_completion_entry *cqe;
 	unsigned int cqe_idx_mask;
 	int rc;
@@ -1177,7 +1174,7 @@ static void hermon_poll_cq ( struct ib_device *ibdev,
  * @ret rc		Return status code
  */
 static int hermon_open ( struct ib_device *ibdev ) {
-	struct hermon *hermon = ibdev->dev_priv;
+	struct hermon *hermon = ib_get_drvdata ( ibdev );
 	struct hermonprm_init_port init_port;
 	int rc;
 
@@ -1205,7 +1202,7 @@ static int hermon_open ( struct ib_device *ibdev ) {
  * @v ibdev		Infiniband device
  */
 static void hermon_close ( struct ib_device *ibdev ) {
-	struct hermon *hermon = ibdev->dev_priv;
+	struct hermon *hermon = ib_get_drvdata ( ibdev );
 	int rc;
 
 	if ( ( rc = hermon_cmd_close_port ( hermon, ibdev->port ) ) != 0 ) {
@@ -1233,7 +1230,7 @@ static void hermon_close ( struct ib_device *ibdev ) {
 static int hermon_mcast_attach ( struct ib_device *ibdev,
 				 struct ib_queue_pair *qp,
 				 struct ib_gid *gid ) {
-	struct hermon *hermon = ibdev->dev_priv;
+	struct hermon *hermon = ib_get_drvdata ( ibdev );
 	struct hermonprm_mgm_hash hash;
 	struct hermonprm_mcg_entry mcg;
 	unsigned int index;
@@ -1287,7 +1284,7 @@ static int hermon_mcast_attach ( struct ib_device *ibdev,
 static void hermon_mcast_detach ( struct ib_device *ibdev,
 				  struct ib_queue_pair *qp __unused,
 				  struct ib_gid *gid ) {
-	struct hermon *hermon = ibdev->dev_priv;
+	struct hermon *hermon = ib_get_drvdata ( ibdev );
 	struct hermonprm_mgm_hash hash;
 	struct hermonprm_mcg_entry mcg;
 	unsigned int index;
@@ -1327,7 +1324,7 @@ static void hermon_mcast_detach ( struct ib_device *ibdev,
  */
 static int hermon_mad ( struct ib_device *ibdev, struct ib_mad_hdr *mad,
 			size_t len ) {
-	struct hermon *hermon = ibdev->dev_priv;
+	struct hermon *hermon = ib_get_drvdata ( ibdev );
 	union hermonprm_mad mad_ifc;
 	int rc;
 
@@ -1870,23 +1867,33 @@ static int hermon_setup_mpt ( struct hermon *hermon ) {
  */
 static int hermon_probe ( struct pci_device *pci,
 			  const struct pci_device_id *id __unused ) {
-	struct ib_device *ibdev;
 	struct hermon *hermon;
+	struct ib_device *ibdev;
 	struct hermonprm_init_hca init_hca;
+	int i;
 	int rc;
 
-	/* Allocate Infiniband device */
-	ibdev = alloc_ibdev ( sizeof ( *hermon ) );
-	if ( ! ibdev ) {
+	/* Allocate Hermon device */
+	hermon = zalloc ( sizeof ( *hermon ) );
+	if ( ! hermon ) {
 		rc = -ENOMEM;
-		goto err_ibdev;
+		goto err_alloc_hermon;
 	}
-	ibdev->op = &hermon_ib_operations;
-	pci_set_drvdata ( pci, ibdev );
-	ibdev->dev = &pci->dev;
-	ibdev->port = PXE_IB_PORT;
-	hermon = ibdev->dev_priv;
-	memset ( hermon, 0, sizeof ( *hermon ) );
+	pci_set_drvdata ( pci, hermon );
+
+	/* Allocate Infiniband devices */
+	for ( i = 0 ; i < HERMON_NUM_PORTS ; i++ ) {
+	        ibdev = alloc_ibdev ( 0 );
+		if ( ! ibdev ) {
+			rc = -ENOMEM;
+			goto err_alloc_ibdev;
+		}
+		hermon->ibdev[i] = ibdev;
+		ibdev->op = &hermon_ib_operations;
+		ibdev->dev = &pci->dev;
+		ibdev->port = ( HERMON_PORT_BASE + i );
+		ib_set_drvdata ( ibdev, hermon );
+	}
 
 	/* Fix up PCI device */
 	adjust_pci_device ( pci );
@@ -1939,16 +1946,21 @@ static int hermon_probe ( struct pci_device *pci,
 	if ( ( rc = hermon_setup_mpt ( hermon ) ) != 0 )
 		goto err_setup_mpt;
 
-	/* Register Infiniband device */
-	if ( ( rc = register_ibdev ( ibdev ) ) != 0 ) {
-		DBGC ( hermon, "Hermon %p could not register IB device: %s\n",
-		       hermon, strerror ( rc ) );
-		goto err_register_ibdev;
+	/* Register Infiniband devices */
+	for ( i = 0 ; i < HERMON_NUM_PORTS ; i++ ) {
+		if ( ( rc = register_ibdev ( hermon->ibdev[i] ) ) != 0 ) {
+			DBGC ( hermon, "Hermon %p could not register IB "
+			       "device: %s\n", hermon, strerror ( rc ) );
+			goto err_register_ibdev;
+		}
 	}
 
 	return 0;
 
+	i = ( HERMON_NUM_PORTS - 1 );
  err_register_ibdev:
+	for ( ; i >= 0 ; i-- )
+		unregister_ibdev ( hermon->ibdev[i] );
  err_setup_mpt:
 	hermon_cmd_close_hca ( hermon );
  err_init_hca:
@@ -1961,8 +1973,12 @@ static int hermon_probe ( struct pci_device *pci,
  err_mailbox_out:
 	free_dma ( hermon->mailbox_in, HERMON_MBOX_SIZE );
  err_mailbox_in:
-	free_ibdev ( ibdev );
- err_ibdev:
+	i = ( HERMON_NUM_PORTS - 1 );
+ err_alloc_ibdev:
+	for ( ; i >= 0 ; i-- )
+		free_ibdev ( hermon->ibdev[i] );
+	free ( hermon );
+ err_alloc_hermon:
 	return rc;
 }
 
@@ -1972,17 +1988,20 @@ static int hermon_probe ( struct pci_device *pci,
  * @v pci		PCI device
  */
 static void hermon_remove ( struct pci_device *pci ) {
-	struct ib_device *ibdev = pci_get_drvdata ( pci );
-	struct hermon *hermon = ibdev->dev_priv;
+	struct hermon *hermon = pci_get_drvdata ( pci );
+	int i;
 
-	unregister_ibdev ( ibdev );
+	for ( i = ( HERMON_NUM_PORTS - 1 ) ; i >= 0 ; i-- )
+		unregister_ibdev ( hermon->ibdev[i] );
 	hermon_cmd_close_hca ( hermon );
 	hermon_free_icm ( hermon );
 	hermon_stop_firmware ( hermon );
 	hermon_stop_firmware ( hermon );
 	free_dma ( hermon->mailbox_out, HERMON_MBOX_SIZE );
 	free_dma ( hermon->mailbox_in, HERMON_MBOX_SIZE );
-	free_ibdev ( ibdev );
+	for ( i = ( HERMON_NUM_PORTS - 1 ) ; i >= 0 ; i-- )
+		free_ibdev ( hermon->ibdev[i] );
+	free ( hermon );
 }
 
 static struct pci_device_id hermon_nics[] = {

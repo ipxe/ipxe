@@ -75,8 +75,8 @@ struct ib_work_queue {
 	unsigned long next_idx;
 	/** I/O buffers assigned to work queue */
 	struct io_buffer **iobufs;
-	/** Device private data */
-	void *dev_priv;
+	/** Driver private data */
+	void *drv_priv;
 };
 
 /** An Infiniband Queue Pair */
@@ -89,8 +89,8 @@ struct ib_queue_pair {
 	struct ib_work_queue send;
 	/** Receive queue */
 	struct ib_work_queue recv;
-	/** Device private data */
-	void *dev_priv;
+	/** Driver private data */
+	void *drv_priv;
 	/** Queue owner private data */
 	void *owner_priv;
 };
@@ -111,8 +111,8 @@ struct ib_completion_queue {
 	unsigned long next_idx;
 	/** List of work queues completing to this queue */
 	struct list_head work_queues;
-	/** Device private data */
-	void *dev_priv;
+	/** Driver private data */
+	void *drv_priv;
 };
 
 /** An Infiniband completion */
@@ -297,8 +297,8 @@ struct ib_device {
 	unsigned long sm_lid;
 	/** Partition key */
 	unsigned int pkey;
-	/** Device private data */
-	void *dev_priv;
+	/** Driver private data */
+	void *drv_priv;
 	/** Owner private data */
 	void *owner_priv;
 };
@@ -425,20 +425,130 @@ ib_mad ( struct ib_device *ibdev, struct ib_mad_hdr *mad, size_t len ) {
 }
 
 /**
- * Set Infiniband owner-private data
+ * Set Infiniband work queue driver-private data
  *
- * @v pci		Infiniband device
+ * @v wq		Work queue
  * @v priv		Private data
  */
 static inline __attribute__ (( always_inline )) void
-ib_set_ownerdata ( struct ib_device *ibdev, void *owner_priv ) {
-	ibdev->owner_priv = owner_priv;
+ib_wq_set_drvdata ( struct ib_work_queue *wq, void *priv ) {
+	wq->drv_priv = priv;
 }
 
 /**
- * Get Infiniband owner-private data
+ * Get Infiniband work queue driver-private data
  *
- * @v pci		Infiniband device
+ * @v wq		Work queue
+ * @ret priv		Private data
+ */
+static inline __attribute__ (( always_inline )) void *
+ib_wq_get_drvdata ( struct ib_work_queue *wq ) {
+	return wq->drv_priv;
+}
+
+/**
+ * Set Infiniband queue pair driver-private data
+ *
+ * @v qp		Queue pair
+ * @v priv		Private data
+ */
+static inline __attribute__ (( always_inline )) void
+ib_qp_set_drvdata ( struct ib_queue_pair *qp, void *priv ) {
+	qp->drv_priv = priv;
+}
+
+/**
+ * Get Infiniband queue pair driver-private data
+ *
+ * @v qp		Queue pair
+ * @ret priv		Private data
+ */
+static inline __attribute__ (( always_inline )) void *
+ib_qp_get_drvdata ( struct ib_queue_pair *qp ) {
+	return qp->drv_priv;
+}
+
+/**
+ * Set Infiniband queue pair owner-private data
+ *
+ * @v qp		Queue pair
+ * @v priv		Private data
+ */
+static inline __attribute__ (( always_inline )) void
+ib_qp_set_ownerdata ( struct ib_queue_pair *qp, void *priv ) {
+	qp->owner_priv = priv;
+}
+
+/**
+ * Get Infiniband queue pair owner-private data
+ *
+ * @v qp		Queue pair
+ * @ret priv		Private data
+ */
+static inline __attribute__ (( always_inline )) void *
+ib_qp_get_ownerdata ( struct ib_queue_pair *qp ) {
+	return qp->owner_priv;
+}
+
+/**
+ * Set Infiniband completion queue driver-private data
+ *
+ * @v cq		Completion queue
+ * @v priv		Private data
+ */
+static inline __attribute__ (( always_inline )) void
+ib_cq_set_drvdata ( struct ib_completion_queue *cq, void *priv ) {
+	cq->drv_priv = priv;
+}
+
+/**
+ * Get Infiniband completion queue driver-private data
+ *
+ * @v cq		Completion queue
+ * @ret priv		Private data
+ */
+static inline __attribute__ (( always_inline )) void *
+ib_cq_get_drvdata ( struct ib_completion_queue *cq ) {
+	return cq->drv_priv;
+}
+
+/**
+ * Set Infiniband device driver-private data
+ *
+ * @v ibdev		Infiniband device
+ * @v priv		Private data
+ */
+static inline __attribute__ (( always_inline )) void
+ib_set_drvdata ( struct ib_device *ibdev, void *priv ) {
+	ibdev->drv_priv = priv;
+}
+
+/**
+ * Get Infiniband device driver-private data
+ *
+ * @v ibdev		Infiniband device
+ * @ret priv		Private data
+ */
+static inline __attribute__ (( always_inline )) void *
+ib_get_drvdata ( struct ib_device *ibdev ) {
+	return ibdev->drv_priv;
+}
+
+/**
+ * Set Infiniband device owner-private data
+ *
+ * @v ibdev		Infiniband device
+ * @v priv		Private data
+ */
+static inline __attribute__ (( always_inline )) void
+ib_set_ownerdata ( struct ib_device *ibdev, void *priv ) {
+	ibdev->owner_priv = priv;
+}
+
+/**
+ * Get Infiniband device owner-private data
+ *
+ * @v ibdev		Infiniband device
  * @ret priv		Private data
  */
 static inline __attribute__ (( always_inline )) void *

@@ -17,6 +17,10 @@
  *
  */
 
+/* Ports in existence */
+#define HERMON_NUM_PORTS		1
+#define HERMON_PORT_BASE		1
+
 /* PCI BARs */
 #define HERMON_PCI_CONFIG_BAR		PCI_BASE_ADDRESS_0
 #define HERMON_PCI_CONFIG_BAR_SIZE	0x100000
@@ -402,6 +406,9 @@ struct hermon {
 
 	/** Device capabilities */
 	struct hermon_dev_cap cap;
+
+	/** Infiniband devices */
+	struct ib_device *ibdev[HERMON_NUM_PORTS];
 };
 
 /** Global protection domain */

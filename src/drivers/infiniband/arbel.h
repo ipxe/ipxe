@@ -17,6 +17,10 @@
  *
  */
 
+/* Ports in existence */
+#define ARBEL_NUM_PORTS			1
+#define ARBEL_PORT_BASE			1
+
 /* PCI BARs */
 #define ARBEL_PCI_CONFIG_BAR		PCI_BASE_ADDRESS_0
 #define ARBEL_PCI_CONFIG_BAR_SIZE	0x100000
@@ -344,6 +348,9 @@ struct arbel {
 	
 	/** Device limits */
 	struct arbel_dev_limits limits;
+
+	/** Infiniband devices */
+	struct ib_device *ibdev[ARBEL_NUM_PORTS];
 };
 
 /** Global protection domain */

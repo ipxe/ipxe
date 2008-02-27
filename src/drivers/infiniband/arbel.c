@@ -43,9 +43,6 @@
  *
  */
 
-/* Port to use */
-#define PXE_IB_PORT 1
-
 /***************************************************************************
  *
  * Queue number allocation
@@ -482,7 +479,7 @@ arbel_cmd_map_fa ( struct arbel *arbel,
  */
 static int arbel_create_cq ( struct ib_device *ibdev,
 			     struct ib_completion_queue *cq ) {
-	struct arbel *arbel = ibdev->dev_priv;
+	struct arbel *arbel = ib_get_drvdata ( ibdev );
 	struct arbel_completion_queue *arbel_cq;
 	struct arbelprm_completion_queue_context cqctx;
 	struct arbelprm_cq_ci_db_record *ci_db_rec;
@@ -560,7 +557,7 @@ static int arbel_create_cq ( struct ib_device *ibdev,
 	DBGC ( arbel, "Arbel %p CQN %#lx ring at [%p,%p)\n",
 	       arbel, cq->cqn, arbel_cq->cqe,
 	       ( ( ( void * ) arbel_cq->cqe ) + arbel_cq->cqe_size ) );
-	cq->dev_priv = arbel_cq;
+	ib_cq_set_drvdata ( cq, arbel_cq );
 	return 0;
 
  err_sw2hw_cq:
@@ -583,8 +580,8 @@ static int arbel_create_cq ( struct ib_device *ibdev,
  */
 static void arbel_destroy_cq ( struct ib_device *ibdev,
 			       struct ib_completion_queue *cq ) {
-	struct arbel *arbel = ibdev->dev_priv;
-	struct arbel_completion_queue *arbel_cq = cq->dev_priv;
+	struct arbel *arbel = ib_get_drvdata ( ibdev );
+	struct arbel_completion_queue *arbel_cq = ib_cq_get_drvdata ( cq );
 	struct arbelprm_completion_queue_context cqctx;
 	struct arbelprm_cq_ci_db_record *ci_db_rec;
 	struct arbelprm_cq_arm_db_record *arm_db_rec;
@@ -613,7 +610,7 @@ static void arbel_destroy_cq ( struct ib_device *ibdev,
 	cqn_offset = ( cq->cqn - arbel->limits.reserved_cqs );
 	arbel_free_qn_offset ( arbel->cq_inuse, cqn_offset );
 
-	cq->dev_priv = NULL;
+	ib_cq_set_drvdata ( cq, NULL );
 }
 
 /***************************************************************************
@@ -712,7 +709,7 @@ static int arbel_create_recv_wq ( struct arbel_recv_work_queue *arbel_recv_wq,
  */
 static int arbel_create_qp ( struct ib_device *ibdev,
 			     struct ib_queue_pair *qp ) {
-	struct arbel *arbel = ibdev->dev_priv;
+	struct arbel *arbel = ib_get_drvdata ( ibdev );
 	struct arbel_queue_pair *arbel_qp;
 	struct arbelprm_qp_ee_state_transitions qpctx;
 	struct arbelprm_qp_db_record *send_db_rec;
@@ -819,7 +816,7 @@ static int arbel_create_qp ( struct ib_device *ibdev,
 	DBGC ( arbel, "Arbel %p QPN %#lx receive ring at [%p,%p)\n",
 	       arbel, qp->qpn, arbel_qp->recv.wqe,
 	       ( ( (void *) arbel_qp->recv.wqe ) + arbel_qp->recv.wqe_size ) );
-	qp->dev_priv = arbel_qp;
+	ib_qp_set_drvdata ( qp, arbel_qp );
 	return 0;
 
  err_rtr2rts_qpee:
@@ -847,8 +844,8 @@ static int arbel_create_qp ( struct ib_device *ibdev,
  */
 static void arbel_destroy_qp ( struct ib_device *ibdev,
 			       struct ib_queue_pair *qp ) {
-	struct arbel *arbel = ibdev->dev_priv;
-	struct arbel_queue_pair *arbel_qp = qp->dev_priv;
+	struct arbel *arbel = ib_get_drvdata ( ibdev );
+	struct arbel_queue_pair *arbel_qp = ib_qp_get_drvdata ( qp );
 	struct arbelprm_qp_db_record *send_db_rec;
 	struct arbelprm_qp_db_record *recv_db_rec;
 	int qpn_offset;
@@ -877,7 +874,7 @@ static void arbel_destroy_qp ( struct ib_device *ibdev,
 	qpn_offset = ( qp->qpn - ARBEL_QPN_BASE - arbel->limits.reserved_qps );
 	arbel_free_qn_offset ( arbel->qp_inuse, qpn_offset );
 
-	qp->dev_priv = NULL;
+	ib_qp_set_drvdata ( qp, NULL );
 }
 
 /***************************************************************************
@@ -926,8 +923,8 @@ static int arbel_post_send ( struct ib_device *ibdev,
 			     struct ib_queue_pair *qp,
 			     struct ib_address_vector *av,
 			     struct io_buffer *iobuf ) {
-	struct arbel *arbel = ibdev->dev_priv;
-	struct arbel_queue_pair *arbel_qp = qp->dev_priv;
+	struct arbel *arbel = ib_get_drvdata ( ibdev );
+	struct arbel_queue_pair *arbel_qp = ib_qp_get_drvdata ( qp );
 	struct ib_work_queue *wq = &qp->send;
 	struct arbel_send_work_queue *arbel_send_wq = &arbel_qp->send;
 	struct arbelprm_ud_send_wqe *prev_wqe;
@@ -1016,8 +1013,8 @@ static int arbel_post_send ( struct ib_device *ibdev,
 static int arbel_post_recv ( struct ib_device *ibdev,
 			     struct ib_queue_pair *qp,
 			     struct io_buffer *iobuf ) {
-	struct arbel *arbel = ibdev->dev_priv;
-	struct arbel_queue_pair *arbel_qp = qp->dev_priv;
+	struct arbel *arbel = ib_get_drvdata ( ibdev );
+	struct arbel_queue_pair *arbel_qp = ib_qp_get_drvdata ( qp );
 	struct ib_work_queue *wq = &qp->recv;
 	struct arbel_recv_work_queue *arbel_recv_wq = &arbel_qp->recv;
 	struct arbelprm_recv_wqe *wqe;
@@ -1066,7 +1063,7 @@ static int arbel_complete ( struct ib_device *ibdev,
 			    union arbelprm_completion_entry *cqe,
 			    ib_completer_t complete_send,
 			    ib_completer_t complete_recv ) {
-	struct arbel *arbel = ibdev->dev_priv;
+	struct arbel *arbel = ib_get_drvdata ( ibdev );
 	struct ib_completion completion;
 	struct ib_work_queue *wq;
 	struct ib_queue_pair *qp;
@@ -1108,7 +1105,7 @@ static int arbel_complete ( struct ib_device *ibdev,
 		return -EIO;
 	}
 	qp = wq->qp;
-	arbel_qp = qp->dev_priv;
+	arbel_qp = ib_qp_get_drvdata ( qp );
 	arbel_send_wq = &arbel_qp->send;
 	arbel_recv_wq = &arbel_qp->recv;
 
@@ -1170,8 +1167,8 @@ static void arbel_poll_cq ( struct ib_device *ibdev,
 			    struct ib_completion_queue *cq,
 			    ib_completer_t complete_send,
 			    ib_completer_t complete_recv ) {
-	struct arbel *arbel = ibdev->dev_priv;
-	struct arbel_completion_queue *arbel_cq = cq->dev_priv;
+	struct arbel *arbel = ib_get_drvdata ( ibdev );
+	struct arbel_completion_queue *arbel_cq = ib_cq_get_drvdata ( cq );
 	struct arbelprm_cq_ci_db_record *ci_db_rec;
 	union arbelprm_completion_entry *cqe;
 	unsigned int cqe_idx_mask;
@@ -1220,7 +1217,7 @@ static void arbel_poll_cq ( struct ib_device *ibdev,
  * @ret rc		Return status code
  */
 static int arbel_open ( struct ib_device *ibdev ) {
-	struct arbel *arbel = ibdev->dev_priv;
+	struct arbel *arbel = ib_get_drvdata ( ibdev );
 	struct arbelprm_init_ib init_ib;
 	int rc;
 
@@ -1247,7 +1244,7 @@ static int arbel_open ( struct ib_device *ibdev ) {
  * @v ibdev		Infiniband device
  */
 static void arbel_close ( struct ib_device *ibdev ) {
-	struct arbel *arbel = ibdev->dev_priv;
+	struct arbel *arbel = ib_get_drvdata ( ibdev );
 	int rc;
 
 	if ( ( rc = arbel_cmd_close_ib ( arbel, ibdev->port ) ) != 0 ) {
@@ -1275,7 +1272,7 @@ static void arbel_close ( struct ib_device *ibdev ) {
 static int arbel_mcast_attach ( struct ib_device *ibdev,
 				struct ib_queue_pair *qp,
 				struct ib_gid *gid ) {
-	struct arbel *arbel = ibdev->dev_priv;
+	struct arbel *arbel = ib_get_drvdata ( ibdev );
 	struct arbelprm_mgm_hash hash;
 	struct arbelprm_mgm_entry mgm;
 	unsigned int index;
@@ -1330,7 +1327,7 @@ static int arbel_mcast_attach ( struct ib_device *ibdev,
 static void arbel_mcast_detach ( struct ib_device *ibdev,
 				 struct ib_queue_pair *qp __unused,
 				 struct ib_gid *gid ) {
-	struct arbel *arbel = ibdev->dev_priv;
+	struct arbel *arbel = ib_get_drvdata ( ibdev );
 	struct arbelprm_mgm_hash hash;
 	struct arbelprm_mgm_entry mgm;
 	unsigned int index;
@@ -1370,7 +1367,7 @@ static void arbel_mcast_detach ( struct ib_device *ibdev,
  */
 static int arbel_mad ( struct ib_device *ibdev, struct ib_mad_hdr *mad,
 		       size_t len ) {
-	struct arbel *arbel = ibdev->dev_priv;
+	struct arbel *arbel = ib_get_drvdata ( ibdev );
 	union arbelprm_mad mad_ifc;
 	int rc;
 
@@ -1837,23 +1834,33 @@ static int arbel_setup_mpt ( struct arbel *arbel ) {
  */
 static int arbel_probe ( struct pci_device *pci,
 			 const struct pci_device_id *id __unused ) {
-	struct ib_device *ibdev;
 	struct arbel *arbel;
+	struct ib_device *ibdev;
 	struct arbelprm_init_hca init_hca;
+	int i;
 	int rc;
 
-	/* Allocate Infiniband device */
-	ibdev = alloc_ibdev ( sizeof ( *arbel ) );
-	if ( ! ibdev ) {
+	/* Allocate Arbel device */
+	arbel = zalloc ( sizeof ( *arbel ) );
+	if ( ! arbel ) {
 		rc = -ENOMEM;
-		goto err_ibdev;
+		goto err_alloc_arbel;
 	}
-	ibdev->op = &arbel_ib_operations;
-	pci_set_drvdata ( pci, ibdev );
-	ibdev->dev = &pci->dev;
-	ibdev->port = PXE_IB_PORT;
-	arbel = ibdev->dev_priv;
-	memset ( arbel, 0, sizeof ( *arbel ) );
+	pci_set_drvdata ( pci, arbel );
+
+	/* Allocate Infiniband devices */
+	for ( i = 0 ; i < ARBEL_NUM_PORTS ; i++ ) {
+		ibdev = alloc_ibdev ( 0 );
+		if ( ! ibdev ) {
+			rc = -ENOMEM;
+			goto err_alloc_ibdev;
+		}
+		arbel->ibdev[i] = ibdev;
+		ibdev->op = &arbel_ib_operations;
+		ibdev->dev = &pci->dev;
+		ibdev->port = ( ARBEL_PORT_BASE + i );
+		ib_set_drvdata ( ibdev, arbel );
+	}
 
 	/* Fix up PCI device */
 	adjust_pci_device ( pci );
@@ -1902,16 +1909,21 @@ static int arbel_probe ( struct pci_device *pci,
 	if ( ( rc = arbel_setup_mpt ( arbel ) ) != 0 )
 		goto err_setup_mpt;
 
-	/* Register Infiniband device */
-	if ( ( rc = register_ibdev ( ibdev ) ) != 0 ) {
-		DBGC ( arbel, "Arbel %p could not register IB device: %s\n",
-		       arbel, strerror ( rc ) );
-		goto err_register_ibdev;
+	/* Register Infiniband devices */
+	for ( i = 0 ; i < ARBEL_NUM_PORTS ; i++ ) {
+		if ( ( rc = register_ibdev ( arbel->ibdev[i] ) ) != 0 ) {
+			DBGC ( arbel, "Arbel %p could not register IB "
+			       "device: %s\n", arbel, strerror ( rc ) );
+			goto err_register_ibdev;
+		}
 	}
 
 	return 0;
 
+	i = ( ARBEL_NUM_PORTS - 1 );
  err_register_ibdev:
+	for ( ; i >= 0 ; i-- )
+		unregister_ibdev ( arbel->ibdev[i] );
  err_setup_mpt:
 	arbel_cmd_close_hca ( arbel );
  err_init_hca:
@@ -1924,8 +1936,12 @@ static int arbel_probe ( struct pci_device *pci,
  err_mailbox_out:
 	free_dma ( arbel->mailbox_in, ARBEL_MBOX_SIZE );
  err_mailbox_in:
-	free_ibdev ( ibdev );
- err_ibdev:
+	i = ( ARBEL_NUM_PORTS - 1 );
+ err_alloc_ibdev:
+	for ( ; i >= 0 ; i-- )
+		free_ibdev ( arbel->ibdev[i] );
+	free ( arbel );
+ err_alloc_arbel:
 	return rc;
 }
 
@@ -1935,17 +1951,20 @@ static int arbel_probe ( struct pci_device *pci,
  * @v pci		PCI device
  */
 static void arbel_remove ( struct pci_device *pci ) {
-	struct ib_device *ibdev = pci_get_drvdata ( pci );
-	struct arbel *arbel = ibdev->dev_priv;
+	struct arbel *arbel = pci_get_drvdata ( pci );
+	int i;
 
-	unregister_ibdev ( ibdev );
+	for ( i = ( ARBEL_NUM_PORTS - 1 ) ; i >= 0 ; i-- )
+		unregister_ibdev ( arbel->ibdev[i] );
 	arbel_cmd_close_hca ( arbel );
 	arbel_free_icm ( arbel );
 	arbel_stop_firmware ( arbel );
 	arbel_stop_firmware ( arbel );
 	free_dma ( arbel->mailbox_out, ARBEL_MBOX_SIZE );
 	free_dma ( arbel->mailbox_in, ARBEL_MBOX_SIZE );
-	free_ibdev ( ibdev );
+	for ( i = ( ARBEL_NUM_PORTS - 1 ) ; i >= 0 ; i-- )
+		free_ibdev ( arbel->ibdev[i] );
+	free ( arbel );
 }
 
 static struct pci_device_id arbel_nics[] = {

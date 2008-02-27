@@ -294,7 +294,7 @@ static int ipoib_create_qset ( struct ipoib_device *ipoib,
 		rc = -ENOMEM;
 		goto err;
 	}
-	qset->qp->owner_priv = ipoib->netdev;
+	ib_qp_set_ownerdata ( qset->qp, ipoib->netdev );
 
 	return 0;
 
@@ -506,7 +506,7 @@ static void ipoib_data_complete_send ( struct ib_device *ibdev __unused,
 				       struct ib_queue_pair *qp,
 				       struct ib_completion *completion,
 				       struct io_buffer *iobuf ) {
-	struct net_device *netdev = qp->owner_priv;
+	struct net_device *netdev = ib_qp_get_ownerdata ( qp );
 
 	netdev_tx_complete_err ( netdev, iobuf,
 				 ( completion->syndrome ? -EIO : 0 ) );
@@ -524,7 +524,7 @@ static void ipoib_data_complete_recv ( struct ib_device *ibdev __unused,
 				       struct ib_queue_pair *qp,
 				       struct ib_completion *completion,
 				       struct io_buffer *iobuf ) {
-	struct net_device *netdev = qp->owner_priv;
+	struct net_device *netdev = ib_qp_get_ownerdata ( qp );
 	struct ipoib_device *ipoib = netdev->priv;
 	struct ipoib_pseudo_hdr *ipoib_pshdr;
 
@@ -572,7 +572,7 @@ static void ipoib_meta_complete_send ( struct ib_device *ibdev __unused,
 				       struct ib_queue_pair *qp,
 				       struct ib_completion *completion,
 				       struct io_buffer *iobuf ) {
-	struct net_device *netdev = qp->owner_priv;
+	struct net_device *netdev = ib_qp_get_ownerdata ( qp );
 	struct ipoib_device *ipoib = netdev->priv;
 
 	if ( completion->syndrome ) {
@@ -640,7 +640,7 @@ static void ipoib_meta_complete_recv ( struct ib_device *ibdev __unused,
 				       struct ib_queue_pair *qp,
 				       struct ib_completion *completion,
 				       struct io_buffer *iobuf ) {
-	struct net_device *netdev = qp->owner_priv;
+	struct net_device *netdev = ib_qp_get_ownerdata ( qp );
 	struct ipoib_device *ipoib = netdev->priv;
 	union ib_mad *mad;
 
