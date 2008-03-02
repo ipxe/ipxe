@@ -23,9 +23,6 @@
 #undef	CONSOLE_BTEXT		/* Who knows what this does? */
 #undef	CONSOLE_PC_KBD		/* Direct access to PC keyboard */
 
-#define TIMER_BIOS
-#define TIMER_RDTSC
-
 /* @END general.h */
 
 /* @BEGIN serial.h
@@ -53,6 +50,16 @@
 #endif
 
 /* @END serial.h */
+
+/* @BEGIN general.h
+ *
+ * Timer configuration
+ *
+ */
+#define TIMER_BIOS		/* 18Hz BIOS timer */
+#define TIMER_RDTSC		/* CPU TimeStamp Counter timer */
+
+/* @END general.h */
 
 /* @BEGIN isa.h
  *
