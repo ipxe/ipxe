@@ -1,6 +1,7 @@
 
 #include <gpxe/init.h>
 #include <gpxe/timer.h>
+#include <errno.h>
 #include <stdio.h>
 #include <bits/cpu.h>
 #include <bits/timer2.h>
@@ -78,8 +79,8 @@ static int rtdsc_ts_init(void)
 		}
 	}
 
-	printf("RTDSC timer not available on this machine.\n");
-	return 1;
+	DBG("RTDSC timer not available on this machine.\n");
+	return -ENODEV;
 }
 
 struct timer rtdsc_ts __timer (01) = {

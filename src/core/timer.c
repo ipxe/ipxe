@@ -53,17 +53,13 @@ static void timer_init(void)
 	struct timer *ts;
 
 	for (ts = ts_table; ts < ts_table_end; ts++) {
-		if (ts->init && !ts->init()) {
+		if (ts->init && ts->init() >= 0) {
 			used_ts = ts;
 			break;
 		}
 	}
 
-	if (!used_ts) {
-		printf("No timer available. This should never happen. Expect gPXE to die soon.\n");
-		/* Panic */
-	}
-
+	assert(used_ts);
 }
 
 struct init_fn ts_init_fn __init_fn ( INIT_NORMAL ) = {
