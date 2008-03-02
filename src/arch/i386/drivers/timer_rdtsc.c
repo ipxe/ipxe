@@ -48,7 +48,7 @@ bad_ctc:
 }
 static uint32_t clocks_per_second = 0;
 
-static tick_t rtdsc_currticks(void)
+static tick_t rdtsc_currticks(void)
 {
 	uint32_t clocks_high, clocks_low;
 	uint32_t currticks;
@@ -64,7 +64,7 @@ static tick_t rtdsc_currticks(void)
 	return currticks;
 }
 
-static int rtdsc_ts_init(void)
+static int rdtsc_ts_init(void)
 {
 
 	struct cpuinfo_x86 cpu_info;
@@ -73,19 +73,19 @@ static int rtdsc_ts_init(void)
 	if (cpu_info.features & X86_FEATURE_TSC) {
 		clocks_per_second = calibrate_tsc();
 		if (clocks_per_second) {
-			DBG("RTDSC Ticksource installed. CPU running at %ld Mhz\n",
+			DBG("RDTSC ticksource installed. CPU running at %ld Mhz\n",
 				clocks_per_second/(1000*1000));
 			return 0;
 		}
 	}
 
-	DBG("RTDSC timer not available on this machine.\n");
+	DBG("RDTSC ticksource not available on this machine.\n");
 	return -ENODEV;
 }
 
-struct timer rtdsc_ts __timer (01) = {
-	.init = rtdsc_ts_init,
+struct timer rdtsc_ts __timer (01) = {
+	.init = rdtsc_ts_init,
 	.udelay = generic_currticks_udelay,
-	.currticks = rtdsc_currticks,
+	.currticks = rdtsc_currticks,
 };
 

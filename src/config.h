@@ -24,7 +24,7 @@
 #undef	CONSOLE_PC_KBD		/* Direct access to PC keyboard */
 
 #define TIMER_BIOS
-#define TIMER_RTDSC
+#define TIMER_RDTSC
 
 /* @END general.h */
 

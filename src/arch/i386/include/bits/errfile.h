@@ -26,7 +26,7 @@
 #define ERRFILE_undionly	 ( ERRFILE_ARCH | ERRFILE_NET | 0x00030000 )
 #define ERRFILE_undirom		 ( ERRFILE_ARCH | ERRFILE_NET | 0x00040000 )
 
-#define ERRFILE_timer_rtdsc    ( ERRFILE_ARCH | ERRFILE_DRIVER | 0x00000000 )
+#define ERRFILE_timer_rdtsc    ( ERRFILE_ARCH | ERRFILE_DRIVER | 0x00000000 )
 #define ERRFILE_timer_bios     ( ERRFILE_ARCH | ERRFILE_DRIVER | 0x00010000 )
 
 /** @} */
