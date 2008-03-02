@@ -40,7 +40,6 @@
 #include "etherboot.h"
 #include "nic.h"
 #include <gpxe/isa.h>
-#include "timer.h"
 #include "smc9000.h"
 
 # define _outb outb

@@ -61,7 +61,7 @@
 #include <stdio.h>
 #include <errno.h>
 #include <io.h>
-#include <timer.h>
+#include <unistd.h>
 #include <gpxe/isapnp.h>
 
 /**

@@ -18,7 +18,7 @@
 
 #include <stddef.h>
 #include <assert.h>
-#include <timer.h>
+#include <unistd.h>
 #include <gpxe/threewire.h>
 
 /** @file

@@ -24,7 +24,6 @@
 #include <gpxe/i2c.h>
 #include <gpxe/spi.h>
 #include <gpxe/nvo.h>
-#include "timer.h"
 #define dma_addr_t unsigned long
 #include "etherfabric.h"
 

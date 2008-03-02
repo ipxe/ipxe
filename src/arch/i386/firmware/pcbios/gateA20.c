@@ -1,8 +1,7 @@
 #include <stdio.h>
-#include "realmode.h"
-#include "timer.h"
-#include "latch.h"
-#include "bios.h"
+#include <realmode.h>
+#include <bios.h>
+#include <gpxe/timer.h>
 
 #define K_RDWR		0x60		/* keyboard data & cmds (read/write) */
 #define K_STATUS	0x64		/* keyboard status */

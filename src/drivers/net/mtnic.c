@@ -37,7 +37,7 @@
 #include <gpxe/umalloc.h>
 #include <bits/byteswap.h>
 #include <little_bswap.h>
-#include <timer.h>
+#include <unistd.h>
 #include <gpxe/pci.h>
 #include <gpxe/ethernet.h>
 #include <gpxe/netdevice.h>

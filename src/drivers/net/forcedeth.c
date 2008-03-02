@@ -51,7 +51,6 @@
 #include <gpxe/pci.h>
 /* Include timer support functions */
 #include <gpxe/ethernet.h>
-#include "timer.h"
 #include "mii.h"
 
 #define drv_version "v1.2"

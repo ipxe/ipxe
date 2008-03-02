@@ -33,6 +33,7 @@
 #include <gpxe/ip.h>
 #include <gpxe/uuid.h>
 #include <gpxe/dhcp.h>
+#include <gpxe/timer.h>
 
 /** @file
  *

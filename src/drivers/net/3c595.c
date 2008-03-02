@@ -30,7 +30,6 @@
 #include <gpxe/pci.h>
 #include <gpxe/ethernet.h>
 #include "3c595.h"
-#include "timer.h"
 
 static struct nic_operations t595_operations;
 

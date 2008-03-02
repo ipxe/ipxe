@@ -5,7 +5,7 @@
  */
 
 #include <stdlib.h>
-#include <latch.h>
+#include <gpxe/timer.h>
 
 static int32_t rnd_seed = 0;
 

@@ -15,7 +15,7 @@
 #include "console.h"
 #include <gpxe/init.h>
 #include "io.h"
-#include "timer.h"
+#include <unistd.h>
 #include "config/serial.h"
 
 /* Set default values if none specified */

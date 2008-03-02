@@ -20,7 +20,7 @@
 #include <stdint.h>
 #include <errno.h>
 #include <assert.h>
-#include <timer.h>
+#include <unistd.h>
 #include <gpxe/bitbash.h>
 #include <gpxe/i2c.h>
 

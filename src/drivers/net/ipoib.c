@@ -22,7 +22,6 @@
 #include <string.h>
 #include <byteswap.h>
 #include <errno.h>
-#include "timer.h"
 #include <gpxe/if_arp.h>
 #include <gpxe/iobuf.h>
 #include <gpxe/netdevice.h>

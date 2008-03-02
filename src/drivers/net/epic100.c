@@ -8,7 +8,6 @@
 #include <gpxe/pci.h>
 #include <gpxe/ethernet.h>
 #include "nic.h"
-#include "timer.h"
 #include "console.h"
 #include "epic100.h"
 
@@ -310,6 +309,7 @@ epic100_transmit(struct nic *nic, const char *destaddr, unsigned int type,
     unsigned short nstype;
     unsigned char *txp;
     int entry;
+    tick_t ct;
 
     /* Calculate the next Tx descriptor entry. */
     entry = cur_tx % TX_RING_SIZE;
@@ -339,18 +339,20 @@ epic100_transmit(struct nic *nic, const char *destaddr, unsigned int type,
      * set the base address with the "ownership"
      * bits last.
      */
-    
+   
     tx_ring[entry].buflength |= cpu_to_le32(len);
-    tx_ring[entry].status = cpu_to_le32(len << 16) | 
+    tx_ring[entry].status = cpu_to_le32(len << 16) |
 	    cpu_to_le32(TRING_OWN);	/* Pass ownership to the chip. */
 
     cur_tx++;
 
     /* Trigger an immediate transmit demand. */
-    outl(CR_QUEUE_TX, command); 
-    
-    load_timer2(10*TICKS_PER_MS);         /* timeout 10 ms for transmit */
-    while ((le32_to_cpu(tx_ring[entry].status) & (TRING_OWN)) && timer2_running())
+    outl(CR_QUEUE_TX, command);
+
+    ct = currticks();
+    /* timeout 10 ms for transmit */
+    while ((le32_to_cpu(tx_ring[entry].status) & (TRING_OWN)) &&
+		ct + 10*USECS_IN_MSEC < currticks())
 	/* Wait */;
 
     if ((le32_to_cpu(tx_ring[entry].status) & TRING_OWN) != 0)

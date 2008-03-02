@@ -71,7 +71,7 @@
 #include <stdio.h>
 #include <io.h>
 #include <errno.h>
-#include <timer.h>
+#include <unistd.h>
 #include <byteswap.h>
 #include <gpxe/pci.h>
 #include <gpxe/if_ether.h>

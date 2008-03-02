@@ -9,7 +9,6 @@
  *
  */
 
-#include "latch.h"
 #include <gpxe/tcpip.h>
 
 /**

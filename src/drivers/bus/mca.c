@@ -11,7 +11,6 @@
 #include <stdio.h>
 #include <errno.h>
 #include <io.h>
-#include <timer.h>
 #include <gpxe/mca.h>
 
 static struct mca_driver mca_drivers[0]

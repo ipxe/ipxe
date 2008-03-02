@@ -43,7 +43,6 @@
 #include "nic.h"
 #include <gpxe/pci.h>
 #include <gpxe/ethernet.h>
-#include "timer.h"
 
 static struct nic_operations a3c90x_operations;
 
@@ -498,6 +497,7 @@ a3c90x_transmit(struct nic *nic __unused, const char *d, unsigned int t,
 
     unsigned char status;
     unsigned i, retries;
+    tick_t ct;
 
     for (retries=0; retries < XMIT_RETRIES ; retries++)
 	{
@@ -540,9 +540,10 @@ a3c90x_transmit(struct nic *nic __unused, const char *d, unsigned int t,
 	    ;
 
 	/** Wait for NIC Transmit to Complete **/
-	load_timer2(10*TICKS_PER_MS);	/* Give it 10 ms */
+	ct = currticks();
+
 	while (!(inw(INF_3C90X.IOAddr + regCommandIntStatus_w)&0x0004) &&
-		timer2_running())
+		ct + 10*USECS_IN_MSEC < currticks());
 		;
 
 	if (!(inw(INF_3C90X.IOAddr + regCommandIntStatus_w)&0x0004))

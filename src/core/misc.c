@@ -4,8 +4,8 @@ MISC Support Routines
 
 #include <stdlib.h>
 #include <byteswap.h>
-#include <latch.h>
 #include <gpxe/in.h>
+#include <gpxe/timer.h>
 
 /**************************************************************************
 INET_ATON - Convert an ascii x.x.x.x to binary form

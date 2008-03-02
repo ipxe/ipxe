@@ -17,7 +17,7 @@
  */
 
 #include <stddef.h>
-#include <latch.h>
+#include <gpxe/timer.h>
 #include <gpxe/list.h>
 #include <gpxe/process.h>
 #include <gpxe/init.h>
