@@ -108,7 +108,7 @@ static int boot_filename ( const char *filename ) {
  * @v root_path		Root path
  * @ret rc		Return status code
  */
-static int boot_root_path ( const char *root_path ) {
+int boot_root_path ( const char *root_path ) {
 
 	/* Quick hack */
 	if ( strncmp ( root_path, "iscsi:", 6 ) == 0 ) {

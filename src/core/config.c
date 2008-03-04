@@ -175,6 +175,9 @@ REQUIRE_OBJECT ( image_cmd );
 #ifdef DHCP_CMD
 REQUIRE_OBJECT ( dhcp_cmd );
 #endif
+#ifdef SANBOOT_CMD
+REQUIRE_OBJECT ( sanboot_cmd );
+#endif
 
 /*
  * Drag in miscellaneous objects

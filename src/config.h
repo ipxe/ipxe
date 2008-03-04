@@ -125,6 +125,7 @@
 #define	ROUTE_CMD		/* Routing table management commands */
 #define IMAGE_CMD		/* Image management commands */
 #define DHCP_CMD		/* DHCP management commands */
+#define SANBOOT_CMD		/* SAN boot commands */
 
 /* @END general.h */ 
 
