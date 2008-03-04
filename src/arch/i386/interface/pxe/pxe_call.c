@@ -96,6 +96,7 @@ union pxenv_call {
 	PXENV_EXIT_t ( * file_select ) ( struct s_PXENV_FILE_SELECT * );
 	PXENV_EXIT_t ( * file_read ) ( struct s_PXENV_FILE_READ * );
 	PXENV_EXIT_t ( * get_file_size ) ( struct s_PXENV_GET_FILE_SIZE * );
+	PXENV_EXIT_t ( * file_exec ) ( struct s_PXENV_FILE_EXEC * );
 };
 
 /**
@@ -293,6 +294,10 @@ __cdecl void pxe_api_call ( struct i386_all_regs *ix86 ) {
 	case PXENV_GET_FILE_SIZE:
 		pxenv_call.get_file_size = pxenv_get_file_size;
 		param_len = sizeof ( pxenv_any.get_file_size );
+		break;
+	case PXENV_FILE_EXEC:
+		pxenv_call.file_exec = pxenv_file_exec;
+		param_len = sizeof ( pxenv_any.file_exec );
 		break;
 	default:
 		DBG ( "PXENV_UNKNOWN_%hx", opcode );

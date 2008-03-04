@@ -1684,6 +1684,28 @@ extern PXENV_EXIT_t pxenv_get_file_size ( struct s_PXENV_GET_FILE_SIZE
 
 /** @} */ /* pxenv_get_file_size */
 
+/** @defgroup pxenv_file_exec PXENV_FILE_EXEC
+ *
+ * FILE EXEC
+ *
+ * @{
+ */
+
+/** PXE API function code for pxenv_file_exec() */
+#define PXENV_FILE_EXEC			0x00e5
+
+/** Parameter block for pxenv_file_exec() */
+struct s_PXENV_FILE_EXEC {
+	PXENV_STATUS_t Status;		/**< PXE status code */
+	SEGOFF16_t Command;		/**< Command to execute */
+} PACKED;
+
+typedef struct s_PXENV_FILE_EXEC PXENV_FILE_EXEC_t;
+
+extern PXENV_EXIT_t pxenv_file_exec ( struct s_PXENV_FILE_EXEC *file_exec );
+
+/** @} */ /* pxenv_file_exec */
+
 /** @} */ /* pxe_file_api */
 
 /** @defgroup pxe_loader_api PXE Loader API

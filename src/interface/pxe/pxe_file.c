@@ -31,7 +31,7 @@
  * Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
  */
 
-FEATURE ( FEATURE_MISC, "PXEXT", DHCP_EB_FEATURE_PXE_EXT, 1 );
+FEATURE ( FEATURE_MISC, "PXEXT", DHCP_EB_FEATURE_PXE_EXT, 2 );
 
 /**
  * FILE OPEN
@@ -187,5 +187,43 @@ PXENV_EXIT_t pxenv_get_file_size ( struct s_PXENV_GET_FILE_SIZE
 
 	get_file_size->FileSize = filesize;
 	get_file_size->Status = PXENV_STATUS_SUCCESS;
+	return PXENV_EXIT_SUCCESS;
+}
+
+/**
+ * FILE EXEC
+ *
+ * @v file_exec				Pointer to a struct s_PXENV_FILE_EXEC
+ * @v s_PXENV_FILE_EXEC::Command	Command to execute
+ * @ret #PXENV_EXIT_SUCCESS		Command was executed successfully
+ * @ret #PXENV_EXIT_FAILURE		Command was not executed successfully
+ * @ret s_PXENV_FILE_EXEC::Status	PXE status code
+ *
+ */
+PXENV_EXIT_t pxenv_file_exec ( struct s_PXENV_FILE_EXEC *file_exec ) {
+	userptr_t command;
+	size_t command_len;
+	int rc;
+
+	DBG ( "PXENV_FILE_EXEC" );
+
+	/* Copy name from external program, and exec it */
+	command = real_to_user ( file_exec->Command.segment,
+				 file_exec->Command.offset );
+	command_len = strlen_user ( command, 0 );
+	{
+		char command_string[ command_len + 1 ];
+
+		copy_from_user ( command_string, command, 0,
+				 sizeof ( command_string ) );
+		DBG ( " %s", command_string );
+
+		if ( ( rc = system ( command_string ) ) != 0 ) {
+			file_exec->Status = PXENV_STATUS ( rc );
+			return PXENV_EXIT_FAILURE;
+		}
+	}
+
+	file_exec->Status = PXENV_STATUS_SUCCESS;
 	return PXENV_EXIT_SUCCESS;
 }
