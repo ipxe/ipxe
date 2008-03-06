@@ -3384,6 +3384,7 @@ PCI_ROM(0x173b, 0x03e8, "tg3-ac1000",      "Altima AC1000"),
 PCI_ROM(0x173b, 0x03e9, "tg3-ac1001",      "Altima AC1001"),
 PCI_ROM(0x173b, 0x03ea, "tg3-ac9100",      "Altima AC9100"),
 PCI_ROM(0x173b, 0x03eb, "tg3-ac1003",      "Altima AC1003"),
+PCI_ROM(0x0e11, 0x00ca, "tg3-hp",	   "HP Tigon 3"),
 };
 
 PCI_DRIVER ( tg3_driver, tg3_nics, PCI_NO_CLASS );
