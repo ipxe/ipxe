@@ -49,7 +49,7 @@ while ( <DRV> ) {
        \)/x ) {
     ( my $vendor, my $device, my $image, my $desc ) = ( lc $1, lc $2, $3, $4 );
     rom ( "pci", $image, $desc, $vendor, $device );
-    rom ( "pci", lc "pci_${vendor}_${device}", $desc, $vendor, $device );
+    rom ( "pci", lc "${vendor}${device}", $desc, $vendor, $device );
   } elsif ( /^\s*ISA_ROM\s*\(
 	      \s*\"([^\"]*)\"\s*,  # Image
 	      \s*\"([^\"]*)\"\s*   # Description
