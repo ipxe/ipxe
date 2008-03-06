@@ -14,54 +14,32 @@
 #define rdtscll(val) \
      __asm__ __volatile__ ("rdtsc" : "=A" (val))
 
-static unsigned long long calibrate_tsc(void)
+
+/* Measure how many clocks we get in one microsecond */
+static inline uint64_t calibrate_tsc(void)
 {
-	uint32_t startlow, starthigh;
-	uint32_t endlow, endhigh;
 
-	rdtsc(startlow,starthigh);
-	i386_timer2_udelay(USECS_IN_MSEC/2);
-	rdtsc(endlow,endhigh);
+	uint64_t rdtsc_start;
+	uint64_t rdtsc_end;
 
-	/* 64-bit subtract - gcc just messes up with long longs */
-	/* XXX ORLY? Check it. */
-	__asm__("subl %2,%0\n\t"
-		"sbbl %3,%1"
-		:"=a" (endlow), "=d" (endhigh)
-		:"g" (startlow), "g" (starthigh),
-		"0" (endlow), "1" (endhigh));
-
-	/* Error: ECPUTOOFAST */
-	if (endhigh)
-		goto bad_ctc;
-
-	endlow *= MSECS_IN_SEC*2;
-	return endlow;
-
-	/*
-	 * The CTC wasn't reliable: we got a hit on the very first read,
-	 * or the CPU was so fast/slow that the quotient wouldn't fit in
-	 * 32 bits..
-	 */
-bad_ctc:
-	return 0;
+	rdtscll(rdtsc_start);
+	i386_timer2_udelay(USECS_IN_MSEC);
+	rdtscll(rdtsc_end);
+	
+	return (rdtsc_end - rdtsc_start) / USECS_IN_MSEC;
 }
-static uint32_t clocks_per_second = 0;
 
+static uint32_t clocks_per_usec = 0;
+
+/* We measure time in microseconds. */
 static tick_t rdtsc_currticks(void)
 {
-	uint32_t clocks_high, clocks_low;
-	uint32_t currticks;
+	uint64_t clocks;
 
 	/* Read the Time Stamp Counter */
-	rdtsc(clocks_low, clocks_high);
+	rdtscll(clocks);
 
-	/* currticks = clocks / clocks_per_tick; */
-	__asm__("divl %1"
-		:"=a" (currticks)
-		:"r" (clocks_per_second/USECS_IN_SEC), "0" (clocks_low), "d" (clocks_high));
-
-	return currticks;
+	return clocks / clocks_per_usec;
 }
 
 static int rdtsc_ts_init(void)
@@ -71,10 +49,10 @@ static int rdtsc_ts_init(void)
 
 	get_cpuinfo(&cpu_info);
 	if (cpu_info.features & X86_FEATURE_TSC) {
-		clocks_per_second = calibrate_tsc();
-		if (clocks_per_second) {
+		clocks_per_usec= calibrate_tsc();
+		if (clocks_per_usec) {
 			DBG("RDTSC ticksource installed. CPU running at %ld Mhz\n",
-				clocks_per_second/(1000*1000));
+				clocks_per_usec);
 			return 0;
 		}
 	}
