@@ -17,6 +17,10 @@
  *
  */
 
+	.arch i386
+	.section ".prefix.lib", "awx", @progbits
+	.section ".data16", "aw", @progbits
+
 /**
  * High memory temporary load address
  *
@@ -27,24 +31,17 @@
  * We use the start of an even megabyte so that we don't have to worry
  * about the current state of the A20 line.
  *
- * We use 4MB rather than 2MB because there is at least one commercial
- * PXE ROM ("Broadcom UNDI, PXE-2.1 (build 082) v2.0.4") which stores
- * data required by the UNDI ROM loader (yes, the ROM loader; that's
- * the component which should be impossible to damage short of
- * screwing with the MMU) around the 2MB mark.  Sadly, this is not a
- * joke.
- *
+ * We use 4MB rather than 2MB because some PXE stack / PMM BIOS
+ * combinations are known to place data required by other UNDI ROMs
+ * loader around the 2MB mark.
  */
-#define HIGHMEM_LOADPOINT ( 4 << 20 )
+	.globl	HIGHMEM_LOADPOINT
+	.equ	HIGHMEM_LOADPOINT, ( 4 << 20 )
 
 /* Image compression enabled */
 #define COMPRESS 1
 
 #define CR0_PE 1
-
-	.arch i386
-	.section ".prefix.lib", "awx", @progbits
-	.section ".data16", "aw", @progbits
 
 /****************************************************************************
  * pm_call (real-mode near call)
@@ -223,12 +220,15 @@ copy_bytes:
  * Returns:
  *   %ds:esi : next source address (will be a multiple of 16)
  * Corrupts:
- *   %edi, %ecx, %edx
+ *   %ecx, %edx
  ****************************************************************************
  */
 	.section ".prefix.lib"
 	.code16
 install_block:
+	/* Preserve registers */
+	pushl	%edi
+	
 #if COMPRESS
 	/* Decompress source to destination */
 	call	decompress16
@@ -249,6 +249,8 @@ install_block:
 	addl	$0xf, %esi
 	andl	$~0xf, %esi
 
+	/* Restore registers and return */
+	popl	%edi
 	ret
 	.size install_block, . - install_block
 	
@@ -270,6 +272,7 @@ install_block:
  */
 	.section ".prefix.lib"
 	.code16
+	.globl	alloc_basemem
 alloc_basemem:
 	/* FBMS => %ax as segment address */
 	movw	$0x40, %ax
@@ -308,13 +311,14 @@ alloc_basemem:
  * Returns:
  *   %esi : next source physical address (will be a multiple of 16)
  * Corrupts:
- *   %edi, %ecx, %edx
+ *   %ecx, %edx
  ****************************************************************************
  */
 	.section ".prefix.lib"
 	.code16
 install_basemem:
 	/* Preserve registers */
+	pushl	%edi
 	pushw	%ds
 
 	/* Preserve original %esi */
@@ -335,6 +339,7 @@ install_basemem:
 
 	/* Restore registers */
 	popw	%ds
+	popl	%edi
 	ret
 	.size install_basemem, . - install_basemem
 
@@ -351,7 +356,7 @@ install_basemem:
  * Returns:
  *   %esi : next source physical address (will be a multiple of 16)
  * Corrupts:
- *   %edi, %ecx, %edx
+ *   %ecx, %edx
  ****************************************************************************
  */
 
@@ -376,17 +381,14 @@ install_highmem:
 	
 /****************************************************************************
  * install (real-mode near call)
- * install_prealloc (real-mode near call)
  *
  * Install all text and data segments.
  *
  * Parameters:
- *   %ax : .text16 segment address (install_prealloc only)
- *   %bx : .data16 segment address (install_prealloc only)
+ *   none
  * Returns:
- *   %ax : .text16 segment address
- *   %bx : .data16 segment address
- *   %edi : .text physical address (if applicable)
+ *   %ax  : .text16 segment address
+ *   %bx  : .data16 segment address
  * Corrupts:
  *   none
  ****************************************************************************
@@ -395,26 +397,55 @@ install_highmem:
 	.code16
 	.globl install
 install:
+	/* Preserve registers */
+	pushl	%esi
+	pushl	%edi
 	/* Allocate space for .text16 and .data16 */
 	call	alloc_basemem
+	/* Image source = %cs:0000 */
+	xorl	%esi, %esi
+	/* Image destination = HIGHMEM_LOADPOINT */
+	movl	$HIGHMEM_LOADPOINT, %edi
+	/* Install text and data segments */
+	call	install_prealloc
+	/* Restore registers and return */
+	popl	%edi
+	popl	%esi
+	ret
 	.size install, . - install
+
+/****************************************************************************
+ * install_prealloc (real-mode near call)
+ *
+ * Install all text and data segments.
+ *
+ * Parameters:
+ *   %ax  : .text16 segment address
+ *   %bx  : .data16 segment address
+ *   %esi : Image source physical address (or zero for %cs:0000)
+ *   %edi : Decompression temporary area physical address
+ * Corrupts:
+ *   none
+ ****************************************************************************
+ */
+	.section ".prefix.lib"
+	.code16
 	.globl install_prealloc
 install_prealloc:
 	/* Save registers */
+	pushal
 	pushw	%ds
 	pushw	%es
-	pushl	%esi
-	pushl	%ecx
-	pushl	%edx
 
 	/* Sanity: clear the direction flag asap */
 	cld
 
 	/* Calculate physical address of payload (i.e. first source) */
-	xorl	%esi, %esi
+	testl	%esi, %esi
+	jnz	1f
 	movw	%cs, %si
 	shll	$4, %esi
-	addl	$_payload_offset, %esi
+1:	addl	$_payload_offset, %esi
 
 	/* Install .text16 */
 	movw	%ax, %es
@@ -440,7 +471,6 @@ install_prealloc:
 	 * prior to reading the E820 memory map and relocating
 	 * properly.
 	 */
-	movl	$HIGHMEM_LOADPOINT, %edi
 	movl	$_textdata_progbits_size, %ecx
 	movl	$_textdata_size, %edx
 	pushl	%edi
@@ -473,11 +503,9 @@ install_prealloc:
 
 #endif
 	/* Restore registers */
-	popl	%edx
-	popl	%ecx
-	popl	%esi
 	popw	%es
 	popw	%ds
+	popal
 	ret
 	.size install_prealloc, . - install_prealloc
 

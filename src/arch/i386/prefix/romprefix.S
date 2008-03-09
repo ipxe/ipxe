@@ -6,6 +6,10 @@
  * table so using a noticeable amount of stack space is a no-no.
  */
 
+#define PNP_SIGNATURE ( '$' + ( 'P' << 8 ) + ( 'n' << 16 ) + ( 'P' << 24 ) )
+#define PMM_SIGNATURE ( '$' + ( 'P' << 8 ) + ( 'M' << 16 ) + ( 'M' << 24 ) )
+#define STACK_MAGIC ( 'L' + ( 'R' << 8 ) + ( 'E' << 16 ) + ( 'T' << 24 ) )
+
 	.text
 	.code16
 	.arch i386
@@ -15,7 +19,9 @@
 romheader:
 	.word	0xAA55			/* BIOS extension signature */
 romheader_size:	.byte _load_size_sect	/* Size in 512-byte blocks */
-	jmp	init_vector		/* Initialisation vector */
+	jmp	init			/* Initialisation vector */
+checksum:
+	.byte	0
 	.org	0x16
 	.word	undiheader
 	.org	0x18
@@ -72,7 +78,7 @@ pnpheader:
 	.byte	0x54			/* Device indicator */
 	.word	0x0000			/* Boot connection vector */
 	.word	0x0000			/* Disconnect vector */
-	.word	exec_vector		/* Boot execution vector */
+	.word	bev_entry		/* Boot execution vector */
 	.word	0x0000			/* Reserved */
 	.word	0x0000			/* Static resource information vector*/
 	.equ pnpheader_len, . - pnpheader
@@ -98,60 +104,180 @@ undiheader:
 	.equ undiheader_len, . - undiheader
 	.size undiheader, . - undiheader
 
-/* Initialisation vector
+/* Initialisation (called once during POST)
  *
  * Determine whether or not this is a PnP system via a signature
  * check.  If it is PnP, return to the PnP BIOS indicating that we are
  * a boot-capable device; the BIOS will call our boot execution vector
  * if it wants to boot us.  If it is not PnP, hook INT 19.
  */
-init_vector:
-	pushw	%si
-	cmpw	$'$'+'P'*256, %es:0(%di)
-	jne	notpnp
-	cmpw	$'n'+'P'*256, %es:2(%di)
-	jne	notpnp
-ispnp:
-	movw	$ispnp_message, %si
-	jmp	99f
-notpnp:
+init:
+	/* Preserve registers, clear direction flag, set %ds=%cs */
+	pushaw
 	pushw	%ds
-	pushw	$0
-	popw	%ds
+	pushw	%es
+	cld
 	pushw	%cs
-	pushw	$exec_vector
-	popl	( 0x19 * 4 )
 	popw	%ds
-	movw	$notpnp_message, %si
-99:
+	/* Print message as early as possible */
+	movw	$init_message, %si
 	call	print_message
-	movw	$0x20, %ax
-	popw	%si
-	lret
-	.size init_vector, . - init_vector
-
-ispnp_message:
-	.asciz	"gPXE detected PnP BIOS\r\n"
-	.size ispnp_message, . - ispnp_message
-notpnp_message:
-	.asciz	"gPXE detected non-PnP BIOS\r\n"
-	.size notpnp_message, . - notpnp_message
-
-/* Boot execution vector
- *pciheader_size
- * Called by the PnP BIOS when it wants to boot us, or via the hooked
- * INT 19 if we detected a non-PnP BIOS.
- */	
-exec_vector:
-	/* Obtain a reasonably-sized stack */
+	/* Check for PnP BIOS */
+	cmpl	$PNP_SIGNATURE, %es:0(%di)
+	je	ispnp
+notpnp:	/* Not PnP: hook INT19 */
 	xorw	%ax, %ax
-	movw	%ax, %ss
-	movw	$0x7c00, %sp
-	
+	movw	%ax, %es
+	pushw	%cs
+	pushw	$int19_entry
+	popl	%es:( 0x19 * 4 )
+	jmp	99f
+ispnp:	/* Is PnP: print PnP message */
+	movw	$init_message_pnp, %si
+	call	print_message
+	/* Check for PMM */
+	movw	$( 0xe000 - 1 ), %di
+pmm_scan:
+	incw	%di
+	jz	99f
+	movw	%di, %es
+	cmpl	$PMM_SIGNATURE, %es:0
+	jne	pmm_scan
+	xorw	%bx, %bx
+	xorw	%si, %si
+	movzbw	%es:5, %cx
+1:	es lodsb
+	addb	%al, %bl
+	loop	1b
+	jnz	pmm_scan
+	/* PMM found: print PMM message */
+	movw	$init_message_pmm, %si
+	call	print_message
+	/* Try to allocate 2MB block via PMM */
+	pushw	$0x0006		/* Aligned, extended memory */
+	pushl	$0xffffffff	/* No handle */
+	pushl	$( 0x00200000 / 16 ) /* 2MB in paragraphs */
+	pushw	$0x0000		/* pmmAllocate */
+	lcall	%es:*(7)
+	addw	$12, %sp
+	testw	%dx, %dx	/* %ax==0 even on success, since align=2MB */
+	jnz	gotpmm
+	movw	$init_message_pmm_failed, %si
+	call	print_message
+	jmp	99f
+gotpmm:	/* PMM allocation succeeded: copy ROM to PMM block */
+	pushal			/* PMM presence implies 1kB stack */
+	movw	%ax, %es	/* %ax=0 already - see above */
+	pushw	%dx
+	pushw	%ax
+	popl	%edi
+	movl	%edi, image_source
+	xorl	%esi, %esi
+	movzbl	romheader_size, %ecx
+	shll	$9, %ecx
+	addr32 rep movsb	/* PMM presence implies flat real mode */
+	movl	%edi, decompress_to
+	/* Shrink ROM and update checksum */
+	xorw	%bx, %bx
+	xorw	%si, %si
+	movb	$_prefix_size_sect, romheader_size
+	shlw	$9, %cx
+1:	lodsb
+	addb	%al, %bl
+	loop	1b
+	subb	%bl, checksum
+	popal
+99:
+	/* Print CRLF to terminate messages */
+	movw	$init_message_crlf, %si
+	call	print_message
+	/* Restore registers */
+	popw	%es
+	popw	%ds
+	popaw
+	/* Indicate boot capability to PnP BIOS, if present */
+	movw	$0x20, %ax
+	lret
+	.size init, . - init
+
+init_message:
+	.asciz	"gPXE (http://etherboot.org)"
+	.size	init_message, . - init_message
+init_message_pnp:
+	.asciz	" - PnP BIOS detected"
+	.size init_message_pnp, . - init_message_pnp
+init_message_pmm:
+	.asciz	", using PMM"
+	.size init_message_pmm, . - init_message_pmm
+init_message_pmm_failed:
+	.asciz	" (failed)"
+	.size init_message_pmm_failed, . - init_message_pmm_failed
+init_message_crlf:
+	.asciz	"\r\n"
+	.size	init_message_crlf, . - init_message_crlf
+
+/* ROM image location
+ *
+ * May be either within option ROM space, or within PMM-allocated block.
+ */
+image_source:
+	.long	0
+	.size	image_source, . - image_source
+/* Temporary decompression area
+ *
+ * May be either at HIGHMEM_LOADPOINT, or within PMM-allocated block.
+ */
+decompress_to:
+	.long	HIGHMEM_LOADPOINT
+	.size	decompress_to, . - decompress_to
+
+/* Boot Execution Vector entry point
+ *
+ * Called by the PnP BIOS when it wants to boot us.
+ */
+bev_entry:
+	pushw	%cs
+	call	exec
+	lret
+	.size	bev_entry, . - bev_entry
+
+/* INT19 entry point
+ *
+ * Called via the hooked INT 19 if we detected a non-PnP BIOS.
+ */
+int19_entry:
+	pushw	%cs
+	call	exec
+	/* No real way to return from INT19 */
+	int	$0x18
+	.size	int19_entry, . - int19_entry
+
+/* Execute as a boot device
+ *
+ */
+exec:	/* Set %ds = %cs */
+	pushw	%cs
+	popw	%ds
+
+	/* Print message as soon as possible */
 	movw	$exec_message, %si
 	call	print_message
 
-	call	install
+	/* Store magic word on BIOS stack and remember BIOS %ss:sp */
+	pushl	$STACK_MAGIC
+	movw	%ss, %dx
+	movw	%sp, %bp
+
+	/* Obtain a reasonably-sized temporary stack */
+	xorw	%ax, %ax
+	movw	%ax, %ss
+	movw	$0x7c00, %sp
+
+	/* Install gPXE */
+	movl	image_source, %esi
+	movl	decompress_to, %edi
+	call	alloc_basemem
+	call	install_prealloc
 
 	/* Set up real-mode stack */
 	movw	%bx, %ss
@@ -162,13 +288,23 @@ exec_vector:
 	pushw	$1f
 	lret
 	.section ".text16", "awx", @progbits
-1:
+1:	/* Call main() */
 	pushl	$main
 	pushw	%cs
 	call	prot_call
-	popl	%eax /* discard */
+	/* No need to clean up stack; we are about to reload %ss:sp */
+	
+	/* Restore BIOS stack */
+	movw	%dx, %ss
+	movw	%bp, %sp
 
-	/* Boot next device */
+	/* Check magic word on BIOS stack */
+	popl	%eax
+	cmpl	$STACK_MAGIC, %eax
+	jne	1f
+	/* BIOS stack OK: return to caller */
+	lret
+1:	/* BIOS stack corrupt: use INT 18 */
 	int	$0x18
 	.previous
 
@@ -182,6 +318,7 @@ exec_message:
  */
 undiloader:
 	/* Save registers */
+	pushl	%esi
 	pushl	%edi
 	pushw	%es
 	pushw	%bx
@@ -193,6 +330,8 @@ undiloader:
 	pushw	%di
 	movw	%es:12(%di), %bx
 	movw	%es:14(%di), %ax
+	movl	%cs:image_source, %esi
+	movl	%cs:decompress_to, %edi
 	call	install_prealloc
 	popw	%di
 	/* Call UNDI loader C code */
@@ -208,6 +347,7 @@ undiloader:
 	popw	%bx
 	popw	%es
 	popl	%edi
+	popl	%esi
 	lret
 	.size undiloader, . - undiloader
 				
@@ -218,7 +358,7 @@ print_message:
 	pushw	%bx
 	pushw	%bp
 	movw    $0x0007, %bx
-1:	cs lodsb
+1:	lodsb
 	testb	%al, %al
 	je	2f
 	movb    $0x0e, %ah              /* write char, tty mode */
