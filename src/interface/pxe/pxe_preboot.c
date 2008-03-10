@@ -51,8 +51,18 @@ enum pxe_cached_info_indices {
 /** A cached DHCP packet */
 union pxe_cached_info {
 	struct dhcphdr dhcphdr;
-	char raw[ETH_FRAME_LEN];
-};
+	/* This buffer must be *exactly* the size of a BOOTPLAYER_t
+	 * structure, otherwise WinPE will die horribly.  It takes the
+	 * size of *our* buffer and feeds it in to us as the size of
+	 * one of *its* buffers.  If our buffer is larger than it
+	 * expects, we therefore end up overwriting part of its data
+	 * segment, since it tells us to do so.  (D'oh!)
+	 *
+	 * Note that a BOOTPLAYER_t is not necessarily large enough to
+	 * hold a DHCP packet; this is a flaw in the PXE spec.
+	 */
+	BOOTPLAYER_t packet;
+} __attribute__ (( packed ));
 
 /* The case in which the caller doesn't supply a buffer is really
  * awkward to support given that we have multiple sources of options,
