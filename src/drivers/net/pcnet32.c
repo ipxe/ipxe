@@ -43,7 +43,6 @@
 #include "nic.h"
 #include <gpxe/pci.h>
 #include <gpxe/ethernet.h>
-#include "timer.h"
 #include "mii.h"
 
 /* void hex_dump(const char *data, const unsigned int len); */

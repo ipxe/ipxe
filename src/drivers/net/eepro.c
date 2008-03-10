@@ -35,7 +35,6 @@ has 34 pins, the top row of 2 are not used.
 #include <errno.h>
 #include "nic.h"
 #include <gpxe/isa.h>
-#include "timer.h"
 #include <gpxe/ethernet.h>
 
 /* Different 82595 chips */

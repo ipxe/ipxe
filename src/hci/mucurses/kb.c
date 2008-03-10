@@ -1,6 +1,6 @@
 #include <curses.h>
 #include <stddef.h>
-#include <timer.h>
+#include <unistd.h>
 #include "mucurses.h"
 
 /** @file

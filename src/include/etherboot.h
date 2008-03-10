@@ -12,8 +12,8 @@
 #include <stdio.h>
 #include <unistd.h>
 #include <strings.h>
-#include <latch.h>
 #include <console.h>
+#include <gpxe/timer.h>
 #include <gpxe/if_arp.h>
 #include <gpxe/if_ether.h>
 

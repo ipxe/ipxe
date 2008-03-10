@@ -51,6 +51,16 @@
 
 /* @END serial.h */
 
+/* @BEGIN general.h
+ *
+ * Timer configuration
+ *
+ */
+#define TIMER_BIOS		/* 18Hz BIOS timer */
+#define TIMER_RDTSC		/* CPU TimeStamp Counter timer */
+
+/* @END general.h */
+
 /* @BEGIN isa.h
  *
  * ISA probe address configuration

@@ -24,8 +24,6 @@
  *       Copyright (c) 2006 by Timothy Legge <tlegge@rogers.com>
  */
 
-#include "timer.h"
-
 #ifndef VELOCITY_H
 #define VELOCITY_H
 

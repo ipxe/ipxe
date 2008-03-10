@@ -62,7 +62,6 @@ static const char hardcoded_ssid[] = "";
  * quicker to convert code from the Linux Prism2 driver.
  */
 #include <errno.h>
-#include "timer.h"
 #define __le16_to_cpu(x) (x)
 #define __le32_to_cpu(x) (x)
 #define __cpu_to_le16(x) (x)

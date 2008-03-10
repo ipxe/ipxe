@@ -4,20 +4,8 @@ MISC Support Routines
 
 #include <stdlib.h>
 #include <byteswap.h>
-#include <latch.h>
 #include <gpxe/in.h>
-
-/**************************************************************************
-SLEEP
-**************************************************************************/
-unsigned int sleep(unsigned int secs)
-{
-	unsigned long tmo;
-
-	for (tmo = currticks()+secs*TICKS_PER_SEC; currticks() < tmo; ) {
-	}
-	return 0;
-}
+#include <gpxe/timer.h>
 
 /**************************************************************************
 INET_ATON - Convert an ascii x.x.x.x to binary form

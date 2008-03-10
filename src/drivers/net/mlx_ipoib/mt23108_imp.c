@@ -37,7 +37,6 @@ static void be_to_cpu_buf(void *buf, int size)
 	}
 }
 
-#include "timer.h"
 #include "cmdif_mt23108.c"
 #include "cmdif_comm.c"
 #include "ib_mt23108.c"

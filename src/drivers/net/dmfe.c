@@ -43,7 +43,6 @@
 /* to get the PCI support functions, if this is a PCI NIC */
 #include <gpxe/pci.h>
 #include <gpxe/ethernet.h>
-#include "timer.h"
 
 /* #define EDEBUG 1 */
 #ifdef EDEBUG

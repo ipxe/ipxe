@@ -42,7 +42,6 @@
 #include "nic.h"
 #include <gpxe/pci.h>
 #include <gpxe/ethernet.h>
-#include "timer.h"
 #include "tlan.h"
 
 #define drv_version "v1.4"

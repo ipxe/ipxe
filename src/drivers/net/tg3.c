@@ -17,7 +17,6 @@
 #include <errno.h>
 #include <gpxe/pci.h>
 #include <gpxe/ethernet.h>
-#include "timer.h"
 #include "string.h"
 #include "tg3.h"
 

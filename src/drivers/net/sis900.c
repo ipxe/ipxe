@@ -46,7 +46,6 @@
 #include "etherboot.h"
 #include <gpxe/pci.h>
 #include "nic.h"
-#include "timer.h"
 
 #include "sis900.h"
 

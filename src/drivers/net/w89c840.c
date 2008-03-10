@@ -81,7 +81,6 @@
 #include "nic.h"
 #include <gpxe/pci.h>
 #include <gpxe/ethernet.h>
-#include "timer.h"
 
 static const char *w89c840_version = "driver Version 0.94 - December 12, 2003";
 
@@ -113,7 +112,7 @@ static const char *w89c840_version = "driver Version 0.94 - December 12, 2003";
 
 /* Operational parameters that usually are not changed. */
 /* Time in jiffies before concluding the transmitter is hung. */
-#define TX_TIMEOUT  (10*TICKS_PER_MS)
+#define TX_TIMEOUT  (10*USECS_IN_MSEC)
 
 #define PKT_BUF_SZ  1536  /* Size of each temporary Rx buffer.*/
 
@@ -487,6 +486,7 @@ static void w89c840_transmit(
     /* send the packet to destination */
     unsigned entry;
     int transmit_status;
+    tick_t ct;
 
     /* Caution: the write order is important here, set the field
        with the "ownership" bits last. */
@@ -535,8 +535,7 @@ static void w89c840_transmit(
     /* Now wait for TX to complete. */
     transmit_status = w840private.tx_ring[entry].status;
 
-    load_timer2(TX_TIMEOUT);
-
+    ct = currticks();
     {
 #if defined W89C840_DEBUG
         u32 intr_stat = 0;
@@ -547,7 +546,7 @@ static void w89c840_transmit(
 	      decode_interrupt(intr_stat);
 #endif
 
-                while ( (transmit_status & DescOwn) && timer2_running()) {
+                while ( (transmit_status & DescOwn) && ct + TX_TIMEOUT < currticks()) {
 
                     transmit_status = w840private.tx_ring[entry].status;
                 }

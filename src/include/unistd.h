@@ -4,7 +4,7 @@
 #include <stddef.h>
 #include <stdarg.h>
 
-extern unsigned int sleep ( unsigned int seconds );
+unsigned int sleep ( unsigned int seconds );
 extern int execv ( const char *command, char * const argv[] );
 
 /**
@@ -21,5 +21,11 @@ extern int execv ( const char *command, char * const argv[] );
 		int rc = execv ( (command), argv );			\
 		rc;							\
 	} )
+
+void udelay(unsigned int usecs);
+void mdelay(unsigned int msecs);
+
+#define usleep(x) udelay(x)
+
 
 #endif /* _UNISTD_H */

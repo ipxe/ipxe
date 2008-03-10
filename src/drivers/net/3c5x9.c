@@ -28,7 +28,6 @@ $Id$
 #include "etherboot.h"
 #include "nic.h"
 #include <gpxe/isa.h>
-#include "timer.h"
 #include "3c509.h"
 
 static enum { none, bnc, utp } connector = none;	/* for 3C509 */

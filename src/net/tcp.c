@@ -4,7 +4,7 @@
 #include <assert.h>
 #include <errno.h>
 #include <byteswap.h>
-#include <timer.h>
+#include <gpxe/timer.h>
 #include <gpxe/iobuf.h>
 #include <gpxe/malloc.h>
 #include <gpxe/retry.h>

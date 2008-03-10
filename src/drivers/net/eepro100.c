@@ -107,7 +107,6 @@
 #include "nic.h"
 #include <gpxe/ethernet.h>
 #include <gpxe/pci.h>
-#include "timer.h"
 
 static int ioaddr;
 
@@ -408,6 +407,7 @@ static void eepro100_transmit(struct nic *nic, const char *d, unsigned int t, un
 	} hdr;
 	unsigned short status;
 	int s1, s2;
+	tick_t ct;
 
 	status = inw(ioaddr + SCBStatus);
 	/* Acknowledge all of the current interrupt sources ASAP. */
@@ -445,8 +445,10 @@ static void eepro100_transmit(struct nic *nic, const char *d, unsigned int t, un
 	wait_for_cmd_done(ioaddr + SCBCmd);
 
 	s1 = inw (ioaddr + SCBStatus);
-	load_timer2(10*TICKS_PER_MS);		/* timeout 10 ms for transmit */
-	while (!txfd.status && timer2_running())
+
+	ct = currticks();
+	/* timeout 10 ms for transmit */
+	while (!txfd.status && ct + 10*USECS_IN_MSEC)
 		/* Wait */;
 	s2 = inw (ioaddr + SCBStatus);
 
@@ -606,6 +608,7 @@ static int eepro100_probe ( struct nic *nic, struct pci_device *pci ) {
 	int read_cmd, ee_size;
 	int options;
 	int rx_mode;
+	tick_t ct;
 
 	/* we cache only the first few words of the EEPROM data
 	   be careful not to access beyond this array */
@@ -749,8 +752,8 @@ static int eepro100_probe ( struct nic *nic, struct pci_device *pci ) {
 
 	whereami ("started TX thingy (config, iasetup).");
 
-	load_timer2(10*TICKS_PER_MS);
-	while (!txfd.status && timer2_running())
+	ct = currticks();
+	while (!txfd.status && ct + 10*USECS_IN_MSEC < currticks())
 		/* Wait */;
 
 	/* Read the status register once to disgard stale data */

@@ -50,7 +50,6 @@
 #include "nic.h"
 #include <gpxe/isapnp.h>
 #include <gpxe/isa.h> /* for ISA_ROM */
-#include "timer.h"
 #include <gpxe/ethernet.h>
 
 static void t3c515_wait(unsigned int nticks)

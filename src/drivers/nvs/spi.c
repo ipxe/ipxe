@@ -18,7 +18,7 @@
 
 #include <stddef.h>
 #include <errno.h>
-#include <timer.h>
+#include <unistd.h>
 #include <gpxe/spi.h>
 
 /** @file

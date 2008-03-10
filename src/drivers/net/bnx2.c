@@ -18,7 +18,6 @@
 #include <errno.h>
 #include <gpxe/pci.h>
 #include <gpxe/ethernet.h>
-#include "timer.h"
 #include "string.h"
 #include "bnx2.h"
 #include "bnx2_fw.h"

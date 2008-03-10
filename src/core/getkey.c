@@ -17,9 +17,9 @@
  */
 
 #include <console.h>
-#include <latch.h>
 #include <gpxe/process.h>
 #include <gpxe/keys.h>
+#include <gpxe/timer.h>
 
 /** @file
  *

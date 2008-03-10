@@ -49,7 +49,6 @@
 #include <gpxe/pci.h>
 #include <gpxe/ethernet.h>
 #include <gpxe/malloc.h>
-#include "timer.h"
 
 #define drv_version "v1.6"
 #define drv_date "03-27-2004"

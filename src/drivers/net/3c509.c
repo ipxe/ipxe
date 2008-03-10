@@ -9,7 +9,7 @@
 #include <string.h>
 #include <errno.h>
 #include <io.h>
-#include <timer.h>
+#include <unistd.h>
 #include <gpxe/device.h>
 #include <gpxe/isa.h>
 #include "3c509.h"

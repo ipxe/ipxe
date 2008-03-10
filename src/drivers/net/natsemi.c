@@ -63,8 +63,8 @@
 #include <stdio.h>
 #include <io.h>
 #include <errno.h>
-#include <timer.h>
 #include <byteswap.h>
+#include <unistd.h>
 #include <gpxe/pci.h>
 #include <gpxe/if_ether.h>
 #include <gpxe/ethernet.h>

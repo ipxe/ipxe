@@ -46,7 +46,6 @@
 #include "nic.h"
 /* to get the PCI support functions, if this is a PCI NIC */
 #include <gpxe/pci.h>
-#include "timer.h"
 #include "mii.h"
 
 #define drv_version "v1.12"

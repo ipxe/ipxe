@@ -18,8 +18,8 @@
 
 #include <stdio.h>
 #include <console.h>
-#include <latch.h>
 #include <gpxe/features.h>
+#include <gpxe/timer.h>
 #include <gpxe/shell_banner.h>
 
 /** @file

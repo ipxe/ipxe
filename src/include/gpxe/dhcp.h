@@ -12,7 +12,6 @@
 #include <gpxe/in.h>
 #include <gpxe/refcnt.h>
 #include <gpxe/tables.h>
-#include <latch.h>
 
 struct net_device;
 struct job_interface;
