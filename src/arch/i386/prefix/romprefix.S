@@ -9,6 +9,7 @@
 #define PNP_SIGNATURE ( '$' + ( 'P' << 8 ) + ( 'n' << 16 ) + ( 'P' << 24 ) )
 #define PMM_SIGNATURE ( '$' + ( 'P' << 8 ) + ( 'M' << 16 ) + ( 'M' << 24 ) )
 #define STACK_MAGIC ( 'L' + ( 'R' << 8 ) + ( 'E' << 16 ) + ( 'T' << 24 ) )
+#define PNP_GET_BBS_VERSION 0x60
 
 	.text
 	.code16
@@ -123,23 +124,41 @@ init:
 	movw	$init_message, %si
 	call	print_message
 	/* Check for PnP BIOS */
+	testw	$0x0f, %di	/* PnP signature must be aligned - bochs    */
+	jnz	hook_int19	/* uses unalignment to indicate 'fake' PnP. */
 	cmpl	$PNP_SIGNATURE, %es:0(%di)
-	je	ispnp
-notpnp:	/* Not PnP: hook INT19 */
+	jne	hook_int19
+	/* Is PnP: print PnP message */
+	movw	$init_message_pnp, %si
+	call	print_message
+	xchgw	%bx, %bx
+	/* Check for BBS */
+	pushw	%es:0x1b(%di)	/* Real-mode data segment */
+	pushw	%ds		/* &(bbs_version) */
+	pushw	$bbs_version
+	pushw	$PNP_GET_BBS_VERSION
+	lcall	*%es:0xd(%di)
+	addw	$16, %sp
+	testw	%ax, %ax
+	jne	hook_int19
+	movw	$init_message_bbs, %si
+	call	print_message
+	jmp	hook_bbs
+	/* Not BBS-compliant - must hook INT 19 */
+hook_int19:
+	movw	$init_message_int19, %si
+	call	print_message
 	xorw	%ax, %ax
 	movw	%ax, %es
 	pushw	%cs
 	pushw	$int19_entry
 	popl	%es:( 0x19 * 4 )
-	jmp	99f
-ispnp:	/* Is PnP: print PnP message */
-	movw	$init_message_pnp, %si
-	call	print_message
+hook_bbs:
 	/* Check for PMM */
 	movw	$( 0xe000 - 1 ), %di
 pmm_scan:
 	incw	%di
-	jz	99f
+	jz	no_pmm
 	movw	%di, %es
 	cmpl	$PMM_SIGNATURE, %es:0
 	jne	pmm_scan
@@ -158,13 +177,13 @@ pmm_scan:
 	pushl	$0xffffffff	/* No handle */
 	pushl	$( 0x00200000 / 16 ) /* 2MB in paragraphs */
 	pushw	$0x0000		/* pmmAllocate */
-	lcall	%es:*(7)
+	lcall	*%es:7
 	addw	$12, %sp
 	testw	%dx, %dx	/* %ax==0 even on success, since align=2MB */
 	jnz	gotpmm
 	movw	$init_message_pmm_failed, %si
 	call	print_message
-	jmp	99f
+	jmp	no_pmm
 gotpmm:	/* PMM allocation succeeded: copy ROM to PMM block */
 	pushal			/* PMM presence implies 1kB stack */
 	movw	%ax, %es	/* %ax=0 already - see above */
@@ -188,10 +207,10 @@ gotpmm:	/* PMM allocation succeeded: copy ROM to PMM block */
 	loop	1b
 	subb	%bl, checksum
 	popal
-99:
+no_pmm:
 	/* Print CRLF to terminate messages */
-	movw	$init_message_crlf, %si
-	call	print_message
+	movw	$'\n', %ax
+	call	print_character
 	/* Restore registers */
 	popw	%es
 	popw	%ds
@@ -202,20 +221,23 @@ gotpmm:	/* PMM allocation succeeded: copy ROM to PMM block */
 	.size init, . - init
 
 init_message:
-	.asciz	"gPXE (http://etherboot.org)"
+	.asciz	"gPXE (http://etherboot.org) -"
 	.size	init_message, . - init_message
 init_message_pnp:
-	.asciz	" - PnP BIOS detected"
+	.asciz	" PnP"
 	.size init_message_pnp, . - init_message_pnp
+init_message_bbs:
+	.asciz	" BBS"
+	.size init_message_bbs, . - init_message_bbs
 init_message_pmm:
-	.asciz	", using PMM"
+	.asciz	" PMM"
 	.size init_message_pmm, . - init_message_pmm
 init_message_pmm_failed:
-	.asciz	" (failed)"
+	.asciz	"(failed)"
 	.size init_message_pmm_failed, . - init_message_pmm_failed
-init_message_crlf:
-	.asciz	"\n"
-	.size	init_message_crlf, . - init_message_crlf
+init_message_int19:
+	.asciz	" INT19"
+	.size init_message_int19, . - init_message_int19
 
 /* ROM image location
  *
@@ -224,6 +246,7 @@ init_message_crlf:
 image_source:
 	.long	0
 	.size	image_source, . - image_source
+
 /* Temporary decompression area
  *
  * May be either at HIGHMEM_LOADPOINT, or within PMM-allocated block.
@@ -231,6 +254,13 @@ image_source:
 decompress_to:
 	.long	HIGHMEM_LOADPOINT
 	.size	decompress_to, . - decompress_to
+
+/* BBS version
+ *
+ * Filled in by BBS BIOS.  We ignore the value.
+ */
+bbs_version:
+	.word	0
 
 /* Boot Execution Vector entry point
  *
