@@ -257,6 +257,8 @@ SECTIONS {
     /*
      * Values calculated to save code from doing it
      */
+    _prefix_size_pgh	= ( ( _prefix_size + 15 ) / 16 );
+    _prefix_size_sect	= ( ( _prefix_size + 511 ) / 512 );
     _text16_size_pgh	= ( ( _text16_size + 15 ) / 16 );
     _data16_size_pgh	= ( ( _data16_size + 15 ) / 16 );
 

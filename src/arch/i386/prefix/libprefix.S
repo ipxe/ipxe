@@ -17,6 +17,10 @@
  *
  */
 
+	.arch i386
+	.section ".prefix.lib", "awx", @progbits
+	.section ".data16", "aw", @progbits
+
 /**
  * High memory temporary load address
  *
@@ -27,24 +31,125 @@
  * We use the start of an even megabyte so that we don't have to worry
  * about the current state of the A20 line.
  *
- * We use 4MB rather than 2MB because there is at least one commercial
- * PXE ROM ("Broadcom UNDI, PXE-2.1 (build 082) v2.0.4") which stores
- * data required by the UNDI ROM loader (yes, the ROM loader; that's
- * the component which should be impossible to damage short of
- * screwing with the MMU) around the 2MB mark.  Sadly, this is not a
- * joke.
- *
+ * We use 4MB rather than 2MB because some PXE stack / PMM BIOS
+ * combinations are known to place data required by other UNDI ROMs
+ * loader around the 2MB mark.
  */
-#define HIGHMEM_LOADPOINT ( 4 << 20 )
+	.globl	HIGHMEM_LOADPOINT
+	.equ	HIGHMEM_LOADPOINT, ( 4 << 20 )
 
 /* Image compression enabled */
 #define COMPRESS 1
 
 #define CR0_PE 1
 
-	.arch i386
-	.section ".prefix.lib", "awx", @progbits
-	.section ".data16", "aw", @progbits
+/*****************************************************************************
+ * Utility function: print character (with LF -> LF,CR translation)
+ *
+ * Parameters:
+ *   %al : character to print
+ * Returns:
+ *   Nothing
+ * Corrupts:
+ *   %ax
+ *****************************************************************************
+ */
+	.section ".prefix.lib"
+	.code16
+	.globl	print_character
+print_character:
+	/* Preserve registers */
+	pushw	%bx
+	pushw	%bp
+	/* Print character */
+	movw	$0x0007, %bx		/* page 0, attribute 7 (normal) */
+	movb	$0x0e, %ah		/* write char, tty mode */
+	cmpb	$0x0a, %al		/* '\n'? */
+	jne	1f
+	int	$0x10
+	movb	$0x0d, %al
+1:	int	$0x10
+	/* Restore registers and return */
+	popw	%bp
+	popw	%bx
+	ret
+	.size	print_character, . - print_character
+
+/*****************************************************************************
+ * Utility function: print a NUL-terminated string
+ *
+ * Parameters:
+ *   %ds:si : string to print
+ * Returns:
+ *   %ds:si : character after terminating NUL
+ *****************************************************************************
+ */
+	.section ".prefix.lib"
+	.code16
+	.globl	print_message
+print_message:
+	/* Preserve registers */
+	pushw	%ax
+	/* Print string */
+1: 	lodsb
+	testb	%al, %al
+	je	2f
+	call	print_character
+	jmp	1b
+2:	/* Restore registers and return */
+	popw	%ax
+	ret
+	.size	print_message, . - print_message
+
+/*****************************************************************************
+ * Utility functions: print hex digit/byte/word/dword
+ *
+ * Parameters:
+ *   %al (low nibble) : digit to print
+ *   %al : byte to print
+ *   %ax : word to print
+ *   %eax : dword to print
+ * Returns:
+ *   Nothing
+ *****************************************************************************
+ */
+	.section ".prefix.lib"
+	.code16
+	.globl	print_hex_dword
+print_hex_dword:
+	rorl	$16, %eax
+	call	print_hex_word
+	rorl	$16, %eax
+	/* Fall through */
+	.size	print_hex_dword, . - print_hex_dword
+	.globl	print_hex_word
+print_hex_word:
+	xchgb	%al, %ah
+	call	print_hex_byte
+	xchgb	%al, %ah
+	/* Fall through */
+	.size	print_hex_word, . - print_hex_word
+	.globl	print_hex_byte
+print_hex_byte:
+	rorb	$4, %al
+	call	print_hex_nibble
+	rorb	$4, %al
+	/* Fall through */
+	.size	print_hex_byte, . - print_hex_byte
+	.globl	print_hex_nibble
+print_hex_nibble:
+	/* Preserve registers */
+	pushw	%ax
+	/* Print digit (technique by Norbert Juffa <norbert.juffa@amd.com> */
+	andb	$0x0f, %al
+	cmpb	$10, %al
+	sbbb	$0x69, %al
+	das
+	call	print_character
+	/* Restore registers and return */
+	popw	%ax
+	ret
+	.size	print_hex_nibble, . - print_hex_nibble
 
 /****************************************************************************
  * pm_call (real-mode near call)
@@ -70,13 +175,14 @@
 #ifndef KEEP_IT_REAL
 
 	/* GDT for protected-mode calls */
-	.section ".data16"
+	.section ".prefix.lib"
 	.align 16
+pm_call_vars:
 gdt:
 gdt_limit:		.word gdt_length - 1
 gdt_base:		.long 0
 			.word 0 /* padding */
-pm_cs:		/* 16-bit protected-mode code segment */
+pm_cs:		/* 16-bit protected-mode code segment */	
 	.equ    PM_CS, pm_cs - gdt
 	.word   0xffff, 0
 	.byte   0, 0x9b, 0x00, 0
@@ -92,18 +198,24 @@ gdt_end:
 	.equ	gdt_length, . - gdt
 	.size	gdt, . - gdt
 
-	.section ".data16"
+	.section ".prefix.lib"
 	.align 16
 pm_saved_gdt:	
 	.long	0, 0
 	.size	pm_saved_gdt, . - pm_saved_gdt
 
+	.equ	pm_call_vars_size, . - pm_call_vars
+#define PM_CALL_VAR(x) ( -pm_call_vars_size + ( (x) - pm_call_vars ) )
+
 	.section ".prefix.lib"
 	.code16
 pm_call:
-	/* Preserve registers, flags, GDT, and RM return point */
+	/* Preserve registers, flags, and RM return point */
+	pushw	%bp
+	movw	%sp, %bp
+	subw	$pm_call_vars_size, %sp
+	andw	$0xfff0, %sp
 	pushfl
-	sgdt	pm_saved_gdt
 	pushw	%gs
 	pushw	%fs
 	pushw	%es
@@ -112,27 +224,43 @@ pm_call:
 	pushw	%cs
 	pushw	$99f
 
+	/* Set up local variable block, and preserve GDT */
+	pushw	%cx
+	pushw	%si
+	pushw	%di
+	pushw	%ss
+	popw	%es
+	movw	$pm_call_vars, %si
+	leaw	PM_CALL_VAR(pm_call_vars)(%bp), %di
+	movw	$pm_call_vars_size, %cx
+	cs rep movsb
+	popw	%di
+	popw	%si
+	popw	%cx
+	sgdt	PM_CALL_VAR(pm_saved_gdt)(%bp)
+
 	/* Set up GDT bases */
 	pushl	%eax
-	pushw	%bx
+	pushl	%edi
 	xorl	%eax, %eax
-	movw	%ds, %ax
+	movw	%ss, %ax
 	shll	$4, %eax
-	addl	$gdt, %eax
-	movl	%eax, gdt_base
+	movzwl	%bp, %edi
+	leal	PM_CALL_VAR(gdt)(%eax, %edi), %eax
+	movl	%eax, PM_CALL_VAR(gdt_base)(%bp)
 	movw	%cs, %ax
-	movw	$pm_cs, %bx
+	movw	$PM_CALL_VAR(pm_cs), %di
 	call	set_seg_base
 	movw	%ss, %ax
-	movw	$pm_ss, %bx
+	movw	$PM_CALL_VAR(pm_ss), %di
 	call	set_seg_base
-	popw	%bx
+	popl	%edi
 	popl	%eax
 
 	/* Switch CPU to protected mode and load up segment registers */
 	pushl	%eax
 	cli
-	lgdt	gdt
+	lgdt	PM_CALL_VAR(gdt)(%bp)
 	movl	%cr0, %eax
 	orb	$CR0_PE, %al
 	movl	%eax, %cr0
@@ -168,18 +296,19 @@ pm_call:
 	popw	%es
 	popw	%fs
 	popw	%gs
-	lgdt	pm_saved_gdt
+	lgdt	PM_CALL_VAR(pm_saved_gdt)(%bp)
 	popfl
-
+	movw	%bp, %sp
+	popw	%bp
 	ret
 	.size pm_call, . - pm_call
 
 set_seg_base:
 	rolw	$4, %ax
-	movw	%ax, 2(%bx)
-	andw	$0xfff0, 2(%bx)
-	movb	%al, 4(%bx)
-	andb	$0x0f, 4(%bx)
+	movw	%ax, 2(%bp,%di)
+	andw	$0xfff0, 2(%bp,%di)
+	movb	%al, 4(%bp,%di)
+	andb	$0x0f, 4(%bp,%di)
 	ret
 	.size set_seg_base, . - set_seg_base
 
@@ -196,7 +325,7 @@ set_seg_base:
  *   %ecx : length
  * Returns:
  *   %ds:esi : next source address
- *   %ds:esi : next destination address
+ *   %es:edi : next destination address
  * Corrupts:
  *   None
  ****************************************************************************
@@ -211,24 +340,57 @@ copy_bytes:
 	.size copy_bytes, . - copy_bytes
 
 /****************************************************************************
- * install_block (real-mode or 16-bit protected-mode near call)
+ * install_block (real-mode near call)
  *
  * Install block to specified address
  *
  * Parameters:
- *   %ds:esi : source address (must be a multiple of 16)
- *   %es:edi : destination address
+ *   %esi : source physical address (must be a multiple of 16)
+ *   %edi : destination physical address (must be a multiple of 16)
  *   %ecx : length of (decompressed) data
  *   %edx : total length of block (including any uninitialised data portion)
  * Returns:
- *   %ds:esi : next source address (will be a multiple of 16)
+ *   %esi : next source physical address (will be a multiple of 16)
  * Corrupts:
- *   %edi, %ecx, %edx
+ *   none
  ****************************************************************************
  */
 	.section ".prefix.lib"
 	.code16
 install_block:
+	
+#ifdef KEEP_IT_REAL
+
+	/* Preserve registers */
+	pushw	%ds
+	pushw	%es
+	pushl	%ecx
+	pushl	%edi
+	
+	/* Convert %esi and %edi to segment registers */
+	shrl	$4, %esi
+	movw	%si, %ds
+	xorw	%si, %si
+	shrl	$4, %edi
+	movw	%di, %es
+	xorw	%di, %di
+
+#else /* KEEP_IT_REAL */
+
+	/* Call self in protected mode */
+	pushw	%ax
+	movw	$1f, %ax
+	call	pm_call
+	popw	%ax
+	ret
+1:
+	/* Preserve registers */
+	pushl	%ecx
+	pushl	%edi
+	
+#endif /* KEEP_IT_REAL */
+
+	
 #if COMPRESS
 	/* Decompress source to destination */
 	call	decompress16
@@ -248,6 +410,28 @@ install_block:
 	/* Round up %esi to start of next source block */
 	addl	$0xf, %esi
 	andl	$~0xf, %esi
+
+
+#ifdef KEEP_IT_REAL
+
+	/* Convert %ds:esi back to a physical address */
+	movzwl	%ds, %cx
+	shll	$4, %ecx
+	addl	%ecx, %esi
+
+	/* Restore registers */
+	popl	%edi
+	popl	%ecx
+	popw	%es
+	popw	%ds
+
+#else /* KEEP_IT_REAL */
+
+	/* Restore registers */
+	popl	%edi
+	popl	%ecx
+
+#endif
 
 	ret
 	.size install_block, . - install_block
@@ -270,6 +454,7 @@ install_block:
  */
 	.section ".prefix.lib"
 	.code16
+	.globl	alloc_basemem
 alloc_basemem:
 	/* FBMS => %ax as segment address */
 	movw	$0x40, %ax
@@ -296,97 +481,15 @@ alloc_basemem:
 	.size alloc_basemem, . - alloc_basemem
 
 /****************************************************************************
- * install_basemem (real-mode near call)
- *
- * Install source block into base memory
- *
- * Parameters:
- *   %esi : source physical address (must be a multiple of 16)
- *   %es : destination segment address
- *   %cx : length of (decompressed) data
- *   %dx : total length of block (including any uninitialised data portion)
- * Returns:
- *   %esi : next source physical address (will be a multiple of 16)
- * Corrupts:
- *   %edi, %ecx, %edx
- ****************************************************************************
- */
-	.section ".prefix.lib"
-	.code16
-install_basemem:
-	/* Preserve registers */
-	pushw	%ds
-
-	/* Preserve original %esi */
-	pushl	%esi
-
-	/* Install to specified address */
-	shrl	$4, %esi
-	movw	%si, %ds
-	xorw	%si, %si
-	xorl	%edi, %edi
-	movzwl	%cx, %ecx
-	movzwl	%dx, %edx
-	call	install_block
-
-	/* Fix up %esi for return */
-	popl	%ecx
-	addl	%ecx, %esi
-
-	/* Restore registers */
-	popw	%ds
-	ret
-	.size install_basemem, . - install_basemem
-
-/****************************************************************************
- * install_highmem (real-mode near call)
- *
- * Install source block into high memory
- *
- * Parameters:
- *   %esi : source physical address (must be a multiple of 16)
- *   %edi : destination physical address
- *   %ecx : length of (decompressed) data
- *   %edx : total length of block (including any uninitialised data portion)
- * Returns:
- *   %esi : next source physical address (will be a multiple of 16)
- * Corrupts:
- *   %edi, %ecx, %edx
- ****************************************************************************
- */
-
-#ifndef KEEP_IT_REAL
-
-	.section ".prefix.lib"
-	.code16
-install_highmem:
-	/* Preserve registers */
-	pushw	%ax
-
-	/* Install to specified address */
-	movw	$install_block, %ax
-	call	pm_call
-
-	/* Restore registers */
-	popw	%ax
-	ret
-	.size install_highmem, . - install_highmem
-	
-#endif /* KEEP_IT_REAL */
-	
-/****************************************************************************
  * install (real-mode near call)
- * install_prealloc (real-mode near call)
  *
  * Install all text and data segments.
  *
  * Parameters:
- *   %ax : .text16 segment address (install_prealloc only)
- *   %bx : .data16 segment address (install_prealloc only)
+ *   none
  * Returns:
- *   %ax : .text16 segment address
- *   %bx : .data16 segment address
- *   %edi : .text physical address (if applicable)
+ *   %ax  : .text16 segment address
+ *   %bx  : .data16 segment address
  * Corrupts:
  *   none
  ****************************************************************************
@@ -395,38 +498,69 @@ install_highmem:
 	.code16
 	.globl install
 install:
+	/* Preserve registers */
+	pushl	%esi
+	pushl	%edi
 	/* Allocate space for .text16 and .data16 */
 	call	alloc_basemem
+	/* Image source = %cs:0000 */
+	xorl	%esi, %esi
+	/* Image destination = HIGHMEM_LOADPOINT */
+	movl	$HIGHMEM_LOADPOINT, %edi
+	/* Install text and data segments */
+	call	install_prealloc
+	/* Restore registers and return */
+	popl	%edi
+	popl	%esi
+	ret
 	.size install, . - install
+
+/****************************************************************************
+ * install_prealloc (real-mode near call)
+ *
+ * Install all text and data segments.
+ *
+ * Parameters:
+ *   %ax  : .text16 segment address
+ *   %bx  : .data16 segment address
+ *   %esi : Image source physical address (or zero for %cs:0000)
+ *   %edi : Decompression temporary area physical address
+ * Corrupts:
+ *   none
+ ****************************************************************************
+ */
+	.section ".prefix.lib"
+	.code16
 	.globl install_prealloc
 install_prealloc:
 	/* Save registers */
+	pushal
 	pushw	%ds
 	pushw	%es
-	pushl	%esi
-	pushl	%ecx
-	pushl	%edx
 
 	/* Sanity: clear the direction flag asap */
 	cld
 
 	/* Calculate physical address of payload (i.e. first source) */
-	xorl	%esi, %esi
+	testl	%esi, %esi
+	jnz	1f
 	movw	%cs, %si
 	shll	$4, %esi
-	addl	$_payload_offset, %esi
+1:	addl	$_payload_offset, %esi
 
-	/* Install .text16 */
-	movw	%ax, %es
-	movw	$_text16_size, %cx
-	movw	%cx, %dx
-	call	install_basemem
-
-	/* Install .data16 */
-	movw	%bx, %es
-	movw	$_data16_progbits_size, %cx
-	movw	$_data16_size, %dx
-	call	install_basemem
+	/* Install .text16 and .data16 */
+	pushl	%edi
+	movzwl	%ax, %edi
+	shll	$4, %edi
+	movl	$_text16_size, %ecx
+	movl	%ecx, %edx
+	call	install_block		/* .text16 */
+	movzwl	%bx, %edi
+	shll	$4, %edi
+	movl	$_data16_progbits_size, %ecx
+	movl	$_data16_size, %edx
+	call	install_block		/* .data16 */
+	popl	%edi
 
 	/* Set up %ds for access to .data16 */
 	movw	%bx, %ds
@@ -440,12 +574,9 @@ install_prealloc:
 	 * prior to reading the E820 memory map and relocating
 	 * properly.
 	 */
-	movl	$HIGHMEM_LOADPOINT, %edi
 	movl	$_textdata_progbits_size, %ecx
 	movl	$_textdata_size, %edx
-	pushl	%edi
-	call	install_highmem
-	popl	%edi
+	call	install_block
 
 	/* Initialise librm at current location */
 	movw	%ax, (init_librm_vector+2)
@@ -473,11 +604,9 @@ install_prealloc:
 
 #endif
 	/* Restore registers */
-	popl	%edx
-	popl	%ecx
-	popl	%esi
 	popw	%es
 	popw	%ds
+	popal
 	ret
 	.size install_prealloc, . - install_prealloc
 
