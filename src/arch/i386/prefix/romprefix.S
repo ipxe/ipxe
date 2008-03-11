@@ -138,7 +138,7 @@ init:
 	pushw	$bbs_version
 	pushw	$PNP_GET_BBS_VERSION
 	lcall	*%es:0xd(%di)
-	addw	$16, %sp
+	addw	$8, %sp
 	testw	%ax, %ax
 	jne	hook_int19
 	movw	$init_message_bbs, %si
