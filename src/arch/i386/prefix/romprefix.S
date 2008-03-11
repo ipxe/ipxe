@@ -180,7 +180,8 @@ gotpmm:	/* PMM allocation succeeded: copy ROM to PMM block */
 	/* Shrink ROM and update checksum */
 	xorw	%bx, %bx
 	xorw	%si, %si
-	movb	$_prefix_size_sect, romheader_size
+	movw	$_prefix_size_sect, %cx
+	movb	%cl, romheader_size
 	shlw	$9, %cx
 1:	lodsb
 	addb	%al, %bl
@@ -213,7 +214,7 @@ init_message_pmm_failed:
 	.asciz	" (failed)"
 	.size init_message_pmm_failed, . - init_message_pmm_failed
 init_message_crlf:
-	.asciz	"\r\n"
+	.asciz	"\n"
 	.size	init_message_crlf, . - init_message_crlf
 
 /* ROM image location
@@ -309,7 +310,7 @@ exec:	/* Set %ds = %cs */
 	.previous
 
 exec_message:
-	.asciz	"gPXE starting boot\r\n"
+	.asciz	"gPXE starting boot\n"
 	.size exec_message, . - exec_message
 
 /* UNDI loader
@@ -350,22 +351,3 @@ undiloader:
 	popl	%esi
 	lret
 	.size undiloader, . - undiloader
-				
-/* Utility function: print string
- */
-print_message:
-	pushw	%ax
-	pushw	%bx
-	pushw	%bp
-	movw    $0x0007, %bx
-1:	lodsb
-	testb	%al, %al
-	je	2f
-	movb    $0x0e, %ah              /* write char, tty mode */
-	int     $0x10
-	jmp	1b
-2:	popw	%bp
-	popw	%bx
-	popw	%ax
-	ret
-	.size print_message, . - print_message

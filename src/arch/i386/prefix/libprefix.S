@@ -43,6 +43,114 @@
 
 #define CR0_PE 1
 
+/*****************************************************************************
+ * Utility function: print character (with LF -> LF,CR translation)
+ *
+ * Parameters:
+ *   %al : character to print
+ * Returns:
+ *   Nothing
+ * Corrupts:
+ *   %ax
+ *****************************************************************************
+ */
+	.section ".prefix.lib"
+	.code16
+	.globl	print_character
+print_character:
+	/* Preserve registers */
+	pushw	%bx
+	pushw	%bp
+	/* Print character */
+	movw	$0x0007, %bx		/* page 0, attribute 7 (normal) */
+	movb	$0x0e, %ah		/* write char, tty mode */
+	cmpb	$0x0a, %al		/* '\n'? */
+	jne	1f
+	int	$0x10
+	movb	$0x0d, %al
+1:	int	$0x10
+	/* Restore registers and return */
+	popw	%bp
+	popw	%bx
+	ret
+	.size	print_character, . - print_character
+
+/*****************************************************************************
+ * Utility function: print a NUL-terminated string
+ *
+ * Parameters:
+ *   %ds:si : string to print
+ * Returns:
+ *   %ds:si : character after terminating NUL
+ *****************************************************************************
+ */
+	.section ".prefix.lib"
+	.code16
+	.globl	print_message
+print_message:
+	/* Preserve registers */
+	pushw	%ax
+	/* Print string */
+1: 	lodsb
+	testb	%al, %al
+	je	2f
+	call	print_character
+	jmp	1b
+2:	/* Restore registers and return */
+	popw	%ax
+	ret
+	.size	print_message, . - print_message
+
+/*****************************************************************************
+ * Utility functions: print hex digit/byte/word/dword
+ *
+ * Parameters:
+ *   %al (low nibble) : digit to print
+ *   %al : byte to print
+ *   %ax : word to print
+ *   %eax : dword to print
+ * Returns:
+ *   Nothing
+ *****************************************************************************
+ */
+	.section ".prefix.lib"
+	.code16
+	.globl	print_hex_dword
+print_hex_dword:
+	rorl	$16, %eax
+	call	print_hex_word
+	rorl	$16, %eax
+	/* Fall through */
+	.size	print_hex_dword, . - print_hex_dword
+	.globl	print_hex_word
+print_hex_word:
+	xchgb	%al, %ah
+	call	print_hex_byte
+	xchgb	%al, %ah
+	/* Fall through */
+	.size	print_hex_word, . - print_hex_word
+	.globl	print_hex_byte
+print_hex_byte:
+	rorb	$4, %al
+	call	print_hex_nibble
+	rorb	$4, %al
+	/* Fall through */
+	.size	print_hex_byte, . - print_hex_byte
+	.globl	print_hex_nibble
+print_hex_nibble:
+	/* Preserve registers */
+	pushw	%ax
+	/* Print digit (technique by Norbert Juffa <norbert.juffa@amd.com> */
+	andb	$0x0f, %al
+	cmpb	$10, %al
+	sbbb	$0x69, %al
+	das
+	call	print_character
+	/* Restore registers and return */
+	popw	%ax
+	ret
+	.size	print_hex_nibble, . - print_hex_nibble
+
 /****************************************************************************
  * pm_call (real-mode near call)
  *
