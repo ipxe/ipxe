@@ -25,6 +25,7 @@
 #include <errno.h>
 #include <assert.h>
 #include <gpxe/in.h>
+#include <gpxe/vsprintf.h>
 #include <gpxe/settings.h>
 
 /** @file
@@ -44,6 +45,8 @@ static struct config_setting config_settings[0]
 	__table_start ( struct config_setting, config_settings );
 static struct config_setting config_settings_end[0]
 	__table_end ( struct config_setting, config_settings );
+
+struct config_setting_type config_setting_type_hex __config_setting_type;
 
 /**
  * Find configuration setting type
@@ -108,9 +111,16 @@ find_or_build_config_setting ( const char *name,
 	memset ( setting, 0, sizeof ( *setting ) );
 	setting->name = name;
 	setting->tag = strtoul ( name, &separator, 10 );
-	if ( *separator != '.' )
-		return NULL;
-	setting->type = find_config_setting_type ( separator + 1 );
+	switch ( *separator ) {
+	case '.' :
+		setting->type = find_config_setting_type ( separator + 1 );
+		break;
+	case '\0' :
+		setting->type = &config_setting_type_hex;
+		break;
+	default :
+		break;
+	}
 	if ( ! setting->type )
 		return NULL;
 	return setting;
@@ -340,9 +350,39 @@ static int set_int ( struct config_context *context,
  * @ret rc		Return status code
  */ 
 static int set_int8 ( struct config_context *context,
-			   struct config_setting *setting,
-			   const char *value ) {
+		      struct config_setting *setting,
+		      const char *value ) {
 	return set_int ( context, setting, value, 1 );
+}
+
+/**
+ * Set value of 16-bit integer setting
+ *
+ * @v context		Configuration context
+ * @v setting		Configuration setting
+ * @v value		Setting value (as a string)
+ * @v size		Size of integer (in bytes)
+ * @ret rc		Return status code
+ */ 
+static int set_int16 ( struct config_context *context,
+		       struct config_setting *setting,
+		       const char *value ) {
+	return set_int ( context, setting, value, 2 );
+}
+
+/**
+ * Set value of 32-bit integer setting
+ *
+ * @v context		Configuration context
+ * @v setting		Configuration setting
+ * @v value		Setting value (as a string)
+ * @v size		Size of integer (in bytes)
+ * @ret rc		Return status code
+ */ 
+static int set_int32 ( struct config_context *context,
+		       struct config_setting *setting,
+		       const char *value ) {
+	return set_int ( context, setting, value, 4 );
 }
 
 /** An 8-bit integer configuration setting */
@@ -351,6 +391,92 @@ struct config_setting_type config_setting_type_int8 __config_setting_type = {
 	.description = "8-bit integer",
 	.show = show_int,
 	.set = set_int8,
+};
+
+/** A 16-bit integer configuration setting */
+struct config_setting_type config_setting_type_int16 __config_setting_type = {
+	.name = "int16",
+	.description = "16-bit integer",
+	.show = show_int,
+	.set = set_int16,
+};
+
+/** A 32-bit integer configuration setting */
+struct config_setting_type config_setting_type_int32 __config_setting_type = {
+	.name = "int32",
+	.description = "32-bit integer",
+	.show = show_int,
+	.set = set_int32,
+};
+
+/**
+ * Set value of hex-string setting
+ *
+ * @v context		Configuration context
+ * @v setting		Configuration setting
+ * @v value		Setting value (as a string)
+ * @ret rc		Return status code
+ */ 
+static int set_hex ( struct config_context *context,
+		     struct config_setting *setting,
+		     const char *value ) {
+	struct dhcp_option *option;
+	char *ptr = ( char * ) value;
+	uint8_t bytes[ strlen ( value ) ]; /* cannot exceed strlen(value) */
+	unsigned int len = 0;
+
+	while ( 1 ) {
+		bytes[len++] = strtoul ( ptr, &ptr, 16 );
+		switch ( *ptr ) {
+		case '\0' :
+			option = set_dhcp_option ( context->options,
+						   setting->tag, bytes, len );
+			if ( ! option )
+				return -ENOSPC;
+			return 0;
+		case ':' :
+			ptr++;
+			break;
+		default :
+			return -EINVAL;
+		}
+	}
+}
+
+/**
+ * Show value of hex-string setting
+ *
+ * @v context		Configuration context
+ * @v setting		Configuration setting
+ * @v buf		Buffer to contain value
+ * @v len		Length of buffer
+ * @ret len		Length of formatted value, or negative error
+ */
+static int show_hex ( struct config_context *context,
+		      struct config_setting *setting,
+		      char *buf, size_t len ) {
+	struct dhcp_option *option;
+	int used = 0;
+	int i;
+
+	option = find_dhcp_option ( context->options, setting->tag );
+	if ( ! option )
+		return -ENODATA;
+
+	for ( i = 0 ; i < option->len ; i++ ) {
+		used += ssnprintf ( ( buf + used ), ( len - used ),
+				    "%s%02x", ( used ? ":" : "" ),
+				    option->data.bytes[i] );
+	}
+	return used;
+}
+
+/** A hex-string configuration setting */
+struct config_setting_type config_setting_type_hex __config_setting_type = {
+	.name = "hex",
+	.description = "Hex string",
+	.show = show_hex,
+	.set = set_hex,
 };
 
 /** Some basic setting definitions */
