@@ -2,6 +2,7 @@
 #define GPXE_TIMER_H
 
 #include <stddef.h>
+#include <gpxe/tables.h>
 
 typedef unsigned long tick_t;
 

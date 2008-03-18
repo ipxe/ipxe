@@ -20,7 +20,6 @@
 
 #include <stddef.h>
 #include <assert.h>
-#include <gpxe/init.h>
 #include <gpxe/timer.h>
 
 static struct timer ts_table[0]
@@ -28,44 +27,45 @@ static struct timer ts_table[0]
 static struct timer ts_table_end[0]
 	__table_end ( struct timer, timers );
 
-
-static struct timer *used_ts = NULL;
-
 /*
  * This function may be used in custom timer driver.
  *
  * This udelay implementation works well if you've got a
  * fast currticks().
  */
-void generic_currticks_udelay(unsigned int usecs)
-{
-	tick_t t;
-
-	t = currticks();
-	while (t + usecs > currticks())
-		; /* xxx: Relax the cpu some way. */
+void generic_currticks_udelay ( unsigned int usecs ) {
+	tick_t start;
+	tick_t elapsed;
+	
+	start = currticks();
+	do {
+		/* xxx: Relax the cpu some way. */
+		elapsed = ( currticks() - start );
+	} while ( elapsed < usecs );
 }
 
+/**
+ * Identify timer source
+ *
+ * @ret timer		Timer source
+ */
+static struct timer * timer ( void ) {
+	static struct timer *ts = NULL;
 
-static void timer_init(void)
-{
-	struct timer *ts;
+	/* If we have a timer, use it */
+	if ( ts )
+		return ts;
 
-	for (ts = ts_table; ts < ts_table_end; ts++) {
-		if ( ts->init() == 0 ) {
-			used_ts = ts;
-			return;
-		}
+	/* Scan for a usable timer */
+	for ( ts = ts_table ; ts < ts_table_end ; ts++ ) {
+		if ( ts->init() == 0 )
+			return ts;
 	}
 
 	/* No timer found; we cannot continue */
 	assert ( 0 );
 	while ( 1 ) {};
 }
-
-struct init_fn ts_init_fn __init_fn ( INIT_NORMAL ) = {
-	.initialise = timer_init,
-};
 
 /**
  * Read current time
@@ -74,9 +74,8 @@ struct init_fn ts_init_fn __init_fn ( INIT_NORMAL ) = {
  */
 tick_t currticks ( void ) {
 	tick_t ct;
-	assert(used_ts);
 
-	ct = used_ts->currticks();
+	ct = timer()->currticks();
 	DBG ( "currticks: %ld.%06ld seconds\n",
 	      ct / USECS_IN_SEC, ct % USECS_IN_SEC );
 
@@ -89,8 +88,7 @@ tick_t currticks ( void ) {
  * @v usecs	Time to delay, in microseconds
  */
 void udelay ( unsigned int usecs ) {
-	assert(used_ts);
-	used_ts->udelay ( usecs );
+	timer()->udelay ( usecs );
 }
 
 /**
