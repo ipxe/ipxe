@@ -87,49 +87,54 @@ static struct config_setting * find_config_setting ( const char *name ) {
  * Find or build configuration setting
  *
  * @v name		Name
- * @v tmp_setting	Temporary buffer for constructing a setting
- * @ret setting		Configuration setting, or NULL
+ * @v setting		Buffer to fill in with setting
+ * @ret rc		Return status code
  *
  * Find setting if it exists.  If it doesn't exist, but the name is of
  * the form "<num>:<type>" (e.g. "12:string"), then construct a
  * setting for that tag and data type, and return it.  The constructed
- * setting will be placed in the temporary buffer.
+ * setting will be placed in the buffer.
  */
-static struct config_setting *
-find_or_build_config_setting ( const char *name,
-			       struct config_setting *tmp_setting ) {
-	struct config_setting *setting;
-	char *separator;
+static int find_or_build_config_setting ( const char *name,
+					  struct config_setting *setting ) {
+	struct config_setting *known_setting;
+	char tmp_name[ strlen ( name ) + 1 ];
+	char *qualifier;
+	char *tmp;
 
-	/* Look in the list of registered settings first */
-	setting = find_config_setting ( name );
-	if ( setting )
-		return setting;
-
-	/* If name is of the form "<num>:<type>", try to construct a setting */
-	setting = tmp_setting;
+	/* Set defaults */
 	memset ( setting, 0, sizeof ( *setting ) );
 	setting->name = name;
-	for ( separator = ( char * ) name ; 1 ; separator++ ) {
-		setting->tag = ( ( setting->tag << 8 ) |
-				 strtoul ( separator, &separator, 0 ) );
-		if ( *separator != '.' )
-			break;
+	setting->type = &config_setting_type_hex;
+
+	/* Strip qualifier, if present */
+	memcpy ( tmp_name, name, sizeof ( tmp_name ) );
+	if ( ( qualifier = strchr ( tmp_name, ':' ) ) != NULL )
+		*(qualifier++) = 0;
+
+	/* If we recognise the name of the setting, use it */
+	if ( ( known_setting = find_config_setting ( tmp_name ) ) != NULL ) {
+		memcpy ( setting, known_setting, sizeof ( *setting ) );
+	} else {
+		/* Otherwise, try to interpret as a numerical setting */
+		for ( tmp = tmp_name ; 1 ; tmp++ ) {
+			setting->tag = ( ( setting->tag << 8 ) |
+					 strtoul ( tmp, &tmp, 0 ) );
+			if ( *tmp != '.' )
+				break;
+		}
+		if ( *tmp != 0 )
+			return -EINVAL;
 	}
 
-	switch ( *separator ) {
-	case ':' :
-		setting->type = find_config_setting_type ( separator + 1 );
-		break;
-	case '\0' :
-		setting->type = &config_setting_type_hex;
-		break;
-	default :
-		break;
+	/* Apply qualifier, if present */
+	if ( qualifier ) {
+		setting->type = find_config_setting_type ( qualifier );
+		if ( ! setting->type )
+			return -EINVAL;
 	}
-	if ( ! setting->type )
-		return NULL;
-	return setting;
+
+	return 0;
 }
 
 /**
@@ -143,13 +148,12 @@ find_or_build_config_setting ( const char *name,
  */
 int show_named_setting ( struct config_context *context, const char *name,
 			 char *buf, size_t len ) {
-	struct config_setting *setting;
-	struct config_setting tmp_setting;
+	struct config_setting setting;
+	int rc;
 
-	setting = find_or_build_config_setting ( name, &tmp_setting );
-	if ( ! setting )
-		return -ENOENT;
-	return show_setting ( context, setting, buf, len );
+	if ( ( rc = find_or_build_config_setting ( name, &setting ) ) != 0 )
+		return rc;
+	return show_setting ( context, &setting, buf, len );
 }
 
 /**
@@ -162,13 +166,12 @@ int show_named_setting ( struct config_context *context, const char *name,
  */
 int set_named_setting ( struct config_context *context, const char *name,
 			const char *value ) {
-	struct config_setting *setting;
-	struct config_setting tmp_setting;
+	struct config_setting setting;
+	int rc;
 
-	setting = find_or_build_config_setting ( name, &tmp_setting );
-	if ( ! setting )
-		return -ENOENT;
-	return setting->type->set ( context, setting, value );
+	if ( ( rc = find_or_build_config_setting ( name, &setting ) ) != 0 )
+		return rc;
+	return set_setting ( context, &setting, value );
 }
 
 /**
