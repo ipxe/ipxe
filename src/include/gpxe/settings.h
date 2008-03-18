@@ -48,7 +48,7 @@ struct config_setting_type {
 	 * @v setting		Configuration setting
 	 * @v buf		Buffer to contain value
 	 * @v len		Length of buffer
-	 * @ret rc		Return status code
+	 * @ret len		Length of formatted value, or negative error
 	 */
 	int ( * show ) ( struct config_context *context,
 			 struct config_setting *setting,
@@ -108,7 +108,7 @@ struct config_setting {
  * @v setting		Configuration setting
  * @v buf		Buffer to contain value
  * @v len		Length of buffer
- * @ret rc		Return status code
+ * @ret len		Length of formatted value, or negative error
  */
 static inline int show_setting ( struct config_context *context,
 				 struct config_setting *setting,

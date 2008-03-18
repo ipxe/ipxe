@@ -28,7 +28,7 @@ static int show_exec ( int argc, char **argv ) {
 
 	dummy_context.options = ugly_nvo_hack->options;
 	if ( ( rc = show_named_setting ( &dummy_context, argv[1], buf,
-					 sizeof ( buf ) ) ) != 0 ) {
+					 sizeof ( buf ) ) ) < 0 ) {
 		printf ( "Could not find \"%s\": %s\n",
 			 argv[1], strerror ( -rc ) );
 		return 1;

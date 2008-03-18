@@ -118,7 +118,7 @@ static void load_setting ( struct setting_widget *widget ) {
 
 	/* Read current setting value */
 	if ( show_setting ( widget->context, widget->setting,
-			    widget->value, sizeof ( widget->value ) ) != 0 ) {
+			    widget->value, sizeof ( widget->value ) ) < 0 ) {
 		widget->value[0] = '\0';
 	}	
 

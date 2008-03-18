@@ -123,7 +123,7 @@ find_or_build_config_setting ( const char *name,
  * @v name		Configuration setting name
  * @v buf		Buffer to contain value
  * @v len		Length of buffer
- * @ret rc		Return status code
+ * @ret len		Length of formatted value, or negative error
  */
 int show_named_setting ( struct config_context *context, const char *name,
 			 char *buf, size_t len ) {
@@ -180,7 +180,7 @@ int set_setting ( struct config_context *context,
  * @v setting		Configuration setting
  * @v buf		Buffer to contain value
  * @v len		Length of buffer
- * @ret rc		Return status code
+ * @ret len		Length of formatted value, or negative error
  */
 static int show_string ( struct config_context *context,
 			 struct config_setting *setting,
@@ -190,8 +190,7 @@ static int show_string ( struct config_context *context,
 	option = find_dhcp_option ( context->options, setting->tag );
 	if ( ! option )
 		return -ENODATA;
-	dhcp_snprintf ( buf, len, option );
-	return 0;
+	return dhcp_snprintf ( buf, len, option );
 }
 
 /**
@@ -229,7 +228,7 @@ struct config_setting_type config_setting_type_string __config_setting_type = {
  * @v setting		Configuration setting
  * @v buf		Buffer to contain value
  * @v len		Length of buffer
- * @ret rc		Return status code
+ * @ret len		Length of formatted value, or negative error
  */
 static int show_ipv4 ( struct config_context *context,
 		       struct config_setting *setting,
@@ -241,8 +240,7 @@ static int show_ipv4 ( struct config_context *context,
 	if ( ! option )
 		return -ENODATA;
 	dhcp_ipv4_option ( option, &ipv4 );
-	snprintf ( buf, len, inet_ntoa ( ipv4 ) );
-	return 0;
+	return snprintf ( buf, len, inet_ntoa ( ipv4 ) );
 }
 
 /**
@@ -283,7 +281,7 @@ struct config_setting_type config_setting_type_ipv4 __config_setting_type = {
  * @v setting		Configuration setting
  * @v buf		Buffer to contain value
  * @v len		Length of buffer
- * @ret rc		Return status code
+ * @ret len		Length of formatted value, or negative error
  */
 static int show_int ( struct config_context *context,
 		      struct config_setting *setting,
@@ -295,8 +293,7 @@ static int show_int ( struct config_context *context,
 	if ( ! option )
 		return -ENODATA;
 	num = dhcp_num_option ( option );
-	snprintf ( buf, len, "%ld", num );
-	return 0;
+	return snprintf ( buf, len, "%ld", num );
 }
 
 /**
