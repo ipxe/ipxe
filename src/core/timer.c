@@ -22,7 +22,6 @@
 #include <assert.h>
 #include <gpxe/init.h>
 #include <gpxe/timer.h>
-#include <stdio.h>
 
 static struct timer ts_table[0]
 	__table_start ( struct timer, timers );
@@ -53,48 +52,64 @@ static void timer_init(void)
 	struct timer *ts;
 
 	for (ts = ts_table; ts < ts_table_end; ts++) {
-		if (ts->init && ts->init() >= 0) {
+		if ( ts->init() == 0 ) {
 			used_ts = ts;
-			break;
+			return;
 		}
 	}
 
-	assert(used_ts);
+	/* No timer found; we cannot continue */
+	assert ( 0 );
+	while ( 1 ) {};
 }
 
 struct init_fn ts_init_fn __init_fn ( INIT_NORMAL ) = {
 	.initialise = timer_init,
 };
 
-/* Functions for public use. */
-
-tick_t currticks(void)
-{
+/**
+ * Read current time
+ *
+ * @ret ticks	Current time, in ticks
+ */
+tick_t currticks ( void ) {
 	tick_t ct;
 	assert(used_ts);
 
 	ct = used_ts->currticks();
-	DBG("currticks: %ld seconds and %06ld microseconds\n", ct/USECS_IN_SEC, ct%USECS_IN_SEC);
+	DBG ( "currticks: %ld.%06ld seconds\n",
+	      ct / USECS_IN_SEC, ct % USECS_IN_SEC );
 
 	return ct;
 }
 
-void udelay(unsigned int usecs)
-{
-	used_ts->udelay(usecs);
+/**
+ * Delay
+ *
+ * @v usecs	Time to delay, in microseconds
+ */
+void udelay ( unsigned int usecs ) {
+	assert(used_ts);
+	used_ts->udelay ( usecs );
 }
 
-void mdelay(unsigned int msecs)
-{
-	while(msecs--)
-		used_ts->udelay(USECS_IN_MSEC);
+/**
+ * Delay
+ *
+ * @v msecs	Time to delay, in milliseconds
+ */
+void mdelay ( unsigned int msecs ) {
+	while ( msecs-- )
+		udelay ( USECS_IN_MSEC );
 }
 
-unsigned int sleep(unsigned int secs)
-{
-	while (secs--)
-		mdelay(MSECS_IN_SEC);
-
+/**
+ * Delay
+ *
+ * @v secs	Time to delay, in seconds
+ */
+unsigned int sleep ( unsigned int secs ) {
+	while ( secs-- )
+		mdelay ( MSECS_IN_SEC );
 	return 0;
 }
-

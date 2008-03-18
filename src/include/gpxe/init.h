@@ -22,7 +22,8 @@ struct init_fn {
  */
 
 #define INIT_EARLY	01	/**< Early initialisation */
-#define INIT_NORMAL	02	/**< Normal initialisation */
+#define	INIT_CONSOLE	02	/**< Console initialisation */
+#define INIT_NORMAL	03	/**< Normal initialisation */
 
 /** @} */
 
@@ -53,14 +54,6 @@ struct startup_fn {
 #define STARTUP_NORMAL	02	/**< Normal startup */
 
 /** @} */
-
-/* Use double digits to avoid problems with "10" < "9" on alphabetic sort */
-#define	INIT_CONSOLE	02
-#define	INIT_GDBSYM	03
-#define	INIT_CPU	04
-#define	INIT_TIMERS	05
-#define	INIT_LOADBUF	08
-#define	INIT_PCMCIA	09
 
 extern void initialise ( void );
 extern void startup ( void );

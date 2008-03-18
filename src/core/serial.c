@@ -263,6 +263,6 @@ struct startup_fn serial_startup_fn __startup_fn ( STARTUP_NORMAL ) = {
  * early debug messages.  It is safe to call serial_init() multiple
  * times.
  */
-struct init_fn serial_init_fn __init_fn ( INIT_EARLY ) = {
+struct init_fn serial_init_fn __init_fn ( INIT_CONSOLE ) = {
 	.initialise = serial_init,
 };
