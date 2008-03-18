@@ -91,7 +91,7 @@ static struct config_setting * find_config_setting ( const char *name ) {
  * @ret setting		Configuration setting, or NULL
  *
  * Find setting if it exists.  If it doesn't exist, but the name is of
- * the form "<num>.<type>" (e.g. "12.string"), then construct a
+ * the form "<num>:<type>" (e.g. "12:string"), then construct a
  * setting for that tag and data type, and return it.  The constructed
  * setting will be placed in the temporary buffer.
  */
@@ -106,13 +106,19 @@ find_or_build_config_setting ( const char *name,
 	if ( setting )
 		return setting;
 
-	/* If name is of the form "<num>.<type>", try to construct a setting */
+	/* If name is of the form "<num>:<type>", try to construct a setting */
 	setting = tmp_setting;
 	memset ( setting, 0, sizeof ( *setting ) );
 	setting->name = name;
-	setting->tag = strtoul ( name, &separator, 10 );
+	for ( separator = ( char * ) name ; 1 ; separator++ ) {
+		setting->tag = ( ( setting->tag << 8 ) |
+				 strtoul ( separator, &separator, 0 ) );
+		if ( *separator != '.' )
+			break;
+	}
+
 	switch ( *separator ) {
-	case '.' :
+	case ':' :
 		setting->type = find_config_setting_type ( separator + 1 );
 		break;
 	case '\0' :
