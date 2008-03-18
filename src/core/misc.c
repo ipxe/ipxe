@@ -69,7 +69,7 @@ unsigned long strtoul ( const char *p, char **endp, int base ) {
 			charval = ( charval - 'a' + 10 );
 		} else if ( charval >= 'A' ) {
 			charval = ( charval - 'A' + 10 );
-		} else {
+		} else if ( charval <= '9' ) {
 			charval = ( charval - '0' );
 		}
 		if ( charval >= ( unsigned int ) base )
