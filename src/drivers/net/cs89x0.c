@@ -1,6 +1,25 @@
 #ifdef ALLMULTI
 #error multicast support is not yet implemented
 #endif
+
+/**
+   Per an email message from Russ Nelson <nelson@crynwr.com> on
+   18 March 2008 this file is now licensed under GPL Version 2.
+
+   From: Russ Nelson <nelson@crynwr.com>
+   Date: Tue, 18 Mar 2008 12:42:00 -0400
+   Subject: Re: [Etherboot-developers] cs89x0 driver in etherboot
+   -- quote from email 
+   As copyright holder, if I say it doesn't conflict with the GPL,
+   then it doesn't conflict with the GPL.
+
+   However, there's no point in causing people's brains to overheat,
+   so yes, I grant permission for the code to be relicensed under the
+   GPLv2.  Please make sure that this change in licensing makes its
+   way upstream.  -russ 
+   -- quote from email
+**/
+
 /* cs89x0.c: A Crystal Semiconductor CS89[02]0 driver for etherboot. */
 /*
   Permission is granted to distribute the enclosed cs89x0.[ch] driver
