@@ -1,3 +1,40 @@
-Here are two programs to send Wake-On-LAN packets to a dormant workstation
-using the WOL feature. Please contact the respective authors for any
-queries.
+From level42@sympatico.ca Tue Mar 18 04:35:31 2008
+Date: Mon, 17 Mar 2008 23:47:39 -0400
+From: Bill <level42@sympatico.ca>
+To: etherboot-developers@lists.sourceforge.net
+Subject: [Etherboot-developers] WOL Routine
+
+Attached is a WOL routine that can be used to wake a remote server from 
+gpxe.  I put wol.c in src/usr and wol.h in src/include/usr.  This is really 
+in improved replacement of that in contrib\wakeonlan\wakeserver.patch.  This 
+version will no longer work since the eth_transmit routine no longer works 
+with the newer driver arhitecture such as the e1000 driver.
+
+Please consider adding it to gpxe preferrably in the main src directory or 
+in the contrib directory.
+
+Thank you 
+
+
+    [ Part 2, Text/PLAIN (Name: "wol.c")  109 lines. ]
+    [ Unable to print this part. ]
+
+
+    [ Part 3, Text/PLAIN (Name: "wol.h")  12 lines. ]
+    [ Unable to print this part. ]
+
+
+    [ Part 4: "Attached Text" ]
+
+-------------------------------------------------------------------------
+This SF.net email is sponsored by: Microsoft
+Defy all challenges. Microsoft(R) Visual Studio 2008.
+http://clk.atdmt.com/MRT/go/vse0120000070mrt/direct/01/
+
+    [ Part 5: "Attached Text" ]
+
+_______________________________________________
+Etherboot-developers mailing list
+Etherboot-developers@lists.sourceforge.net
+https://lists.sourceforge.net/lists/listinfo/etherboot-developers
+
