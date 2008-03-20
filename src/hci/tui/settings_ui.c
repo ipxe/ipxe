@@ -33,9 +33,6 @@
  *
  */
 
-#include <gpxe/nvo.h>
-extern struct nvo_block *ugly_nvo_hack;
-
 /* Colour pairs */
 #define CPAIR_NORMAL	1
 #define CPAIR_SELECT	2
@@ -64,10 +61,10 @@ struct setting_row {
 
 /** A setting widget */
 struct setting_widget {
-	/** Configuration context */
-	struct config_context *context;
+	/** Settings block */
+	struct settings *settings;
 	/** Configuration setting */
-	struct config_setting *setting;
+	struct named_setting *setting;
 	/** Screen row */
 	unsigned int row;
 	/** Screen column */
@@ -81,32 +78,32 @@ struct setting_widget {
 };
 
 /** Registered configuration settings */
-static struct config_setting config_settings[0]
-	__table_start ( struct config_setting, config_settings );
-static struct config_setting config_settings_end[0]
-	__table_end ( struct config_setting, config_settings );
-#define NUM_SETTINGS ( ( unsigned ) ( config_settings_end - config_settings ) )
+static struct named_setting named_settings[0]
+	__table_start ( struct named_setting, named_settings );
+static struct named_setting named_settings_end[0]
+	__table_end ( struct named_setting, named_settings );
+#define NUM_SETTINGS ( ( unsigned ) ( named_settings_end - named_settings ) )
 
 static void load_setting ( struct setting_widget *widget ) __nonnull;
 static int save_setting ( struct setting_widget *widget ) __nonnull;
 static void init_setting ( struct setting_widget *widget,
-                           struct config_context *context,
-                           struct config_setting *setting,
+                           struct settings *settings,
+                           struct named_setting *setting,
                            unsigned int row, unsigned int col ) __nonnull;
 static void draw_setting ( struct setting_widget *widget ) __nonnull;
 static int edit_setting ( struct setting_widget *widget, int key ) __nonnull;
 static void init_setting_index ( struct setting_widget *widget,
-                                 struct config_context *context,
+                                 struct settings *settings,
                                  unsigned int index ) __nonnull;
 static void vmsg ( unsigned int row, const char *fmt, va_list args ) __nonnull;
 static void msg ( unsigned int row, const char *fmt, ... ) __nonnull;
 static void valert ( const char *fmt, va_list args ) __nonnull;
 static void alert ( const char *fmt, ... ) __nonnull;
-static void draw_info_row ( struct config_setting *setting ) __nonnull;
-static int main_loop ( struct config_context *context ) __nonnull;
+static void draw_info_row ( struct named_setting *setting ) __nonnull;
+static int main_loop ( struct settings *settings ) __nonnull;
 
 /**
- * Load setting widget value from configuration context
+ * Load setting widget value from configuration settings
  *
  * @v widget		Setting widget
  *
@@ -117,8 +114,9 @@ static void load_setting ( struct setting_widget *widget ) {
 	widget->editing = 0;
 
 	/* Read current setting value */
-	if ( show_setting ( widget->context, widget->setting,
-			    widget->value, sizeof ( widget->value ) ) < 0 ) {
+	if ( get_typed_setting ( widget->settings, widget->setting->tag,
+				 widget->setting->type, widget->value,
+				 sizeof ( widget->value ) ) < 0 ) {
 		widget->value[0] = '\0';
 	}	
 
@@ -130,31 +128,32 @@ static void load_setting ( struct setting_widget *widget ) {
 }
 
 /**
- * Save setting widget value back to configuration context
+ * Save setting widget value back to configuration settings
  *
  * @v widget		Setting widget
  */
 static int save_setting ( struct setting_widget *widget ) {
-	return set_setting ( widget->context, widget->setting, widget->value );
+	return set_typed_setting ( widget->settings, widget->setting->tag,
+				   widget->setting->type, widget->value );
 }
 
 /**
  * Initialise setting widget
  *
  * @v widget		Setting widget
- * @v context		Configuration context
+ * @v settings		Settings block
  * @v setting		Configuration setting
  * @v row		Screen row
  * @v col		Screen column
  */
 static void init_setting ( struct setting_widget *widget,
-			   struct config_context *context,
-			   struct config_setting *setting,
+			   struct settings *settings,
+			   struct named_setting *setting,
 			   unsigned int row, unsigned int col ) {
 
 	/* Initialise widget structure */
 	memset ( widget, 0, sizeof ( *widget ) );
-	widget->context = context;
+	widget->settings = settings;
 	widget->setting = setting;
 	widget->row = row;
 	widget->col = col;
@@ -219,13 +218,13 @@ static int edit_setting ( struct setting_widget *widget, int key ) {
  * Initialise setting widget by index
  *
  * @v widget		Setting widget
- * @v context		Configuration context
+ * @v settings		Settings block
  * @v index		Index of setting with settings list
  */
 static void init_setting_index ( struct setting_widget *widget,
-				 struct config_context *context,
+				 struct settings *settings,
 				 unsigned int index ) {
-	init_setting ( widget, context, &config_settings[index],
+	init_setting ( widget, settings, &named_settings[index],
 		       ( SETTINGS_LIST_ROW + index ), SETTINGS_LIST_COL );
 }
 
@@ -312,11 +311,10 @@ static void draw_title_row ( void ) {
  *
  * @v setting		Current configuration setting
  */
-static void draw_info_row ( struct config_setting *setting ) {
+static void draw_info_row ( struct named_setting *setting ) {
 	clearmsg ( INFO_ROW );
 	attron ( A_BOLD );
-	msg ( INFO_ROW, "%s (%s) - %s", setting->name,
-	      setting->type->description, setting->description );
+	msg ( INFO_ROW, "%s - %s", setting->name, setting->description );
 	attroff ( A_BOLD );
 }
 
@@ -333,11 +331,11 @@ static void draw_instruction_row ( int editing ) {
 		      "Ctrl-C - discard changes" );
 	} else {
 		msg ( INSTRUCTION_ROW,
-		      "Ctrl-S - save configuration" );
+		      "Ctrl-X - exit configuration utility" );
 	}
 }
 
-static int main_loop ( struct config_context *context ) {
+static int main_loop ( struct settings *settings ) {
 	struct setting_widget widget;
 	unsigned int current = 0;
 	unsigned int next;
@@ -349,7 +347,7 @@ static int main_loop ( struct config_context *context ) {
 	draw_title_row();
 	color_set ( CPAIR_NORMAL, NULL );
 	for ( i = ( NUM_SETTINGS - 1 ) ; i >= 0 ; i-- ) {
-		init_setting_index ( &widget, context, i );
+		init_setting_index ( &widget, settings, i );
 		draw_setting ( &widget );
 	}
 
@@ -394,19 +392,15 @@ static int main_loop ( struct config_context *context ) {
 				if ( next > 0 )
 					next--;
 				break;
-			case CTRL_S:
-				if ( ( rc = nvo_save ( ugly_nvo_hack ) ) != 0){
-					alert ( " Could not save options: %s ",
-						strerror ( rc ) );
-				}
-				return rc;
+			case CTRL_X:
+				return 0;
 			default:
 				edit_setting ( &widget, key );
 				break;
 			}	
 			if ( next != current ) {
 				draw_setting ( &widget );
-				init_setting_index ( &widget, context, next );
+				init_setting_index ( &widget, settings, next );
 				current = next;
 			}
 		}
@@ -414,7 +408,7 @@ static int main_loop ( struct config_context *context ) {
 	
 }
 
-int settings_ui ( struct config_context *context ) {
+int settings_ui ( struct settings *settings ) {
 	int rc;
 
 	initscr();
@@ -426,7 +420,7 @@ int settings_ui ( struct config_context *context ) {
 	color_set ( CPAIR_NORMAL, NULL );
 	erase();
 	
-	rc = main_loop ( context );
+	rc = main_loop ( settings );
 
 	endwin();
 

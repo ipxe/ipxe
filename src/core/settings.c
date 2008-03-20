@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2006 Michael Brown <mbrown@fensystems.co.uk>.
+ * Copyright (C) 2008 Michael Brown <mbrown@fensystems.co.uk>.
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License as
@@ -26,6 +26,7 @@
 #include <assert.h>
 #include <gpxe/in.h>
 #include <gpxe/vsprintf.h>
+#include <gpxe/dhcp.h>
 #include <gpxe/settings.h>
 
 /** @file
@@ -34,48 +35,284 @@
  *
  */
 
-/** Registered configuration setting types */
-static struct config_setting_type config_setting_types[0]
-	__table_start ( struct config_setting_type, config_setting_types );
-static struct config_setting_type config_setting_types_end[0]
-	__table_end ( struct config_setting_type, config_setting_types );
+/** Registered setting types */
+static struct setting_type setting_types[0]
+	__table_start ( struct setting_type, setting_types );
+static struct setting_type setting_types_end[0]
+	__table_end ( struct setting_type, setting_types );
 
-/** Registered configuration settings */
-static struct config_setting config_settings[0]
-	__table_start ( struct config_setting, config_settings );
-static struct config_setting config_settings_end[0]
-	__table_end ( struct config_setting, config_settings );
+/** Registered named settings */
+static struct named_setting named_settings[0]
+	__table_start ( struct named_setting, named_settings );
+static struct named_setting named_settings_end[0]
+	__table_end ( struct named_setting, named_settings );
 
-struct config_setting_type config_setting_type_hex __config_setting_type;
+struct setting_type setting_type_hex __setting_type;
 
 /**
- * Find configuration setting type
+ * Obtain printable version of a settings tag number
+ *
+ * @v tag		Settings tag number
+ * @ret name		String representation of the tag
+ */
+static inline char * setting_tag_name ( unsigned int tag ) {
+	static char name[8];
+
+	if ( DHCP_IS_ENCAP_OPT ( tag ) ) {
+		snprintf ( name, sizeof ( name ), "%d.%d",
+			   DHCP_ENCAPSULATOR ( tag ),
+			   DHCP_ENCAPSULATED ( tag ) );
+	} else {
+		snprintf ( name, sizeof ( name ), "%d", tag );
+	}
+	return name;
+}
+
+/******************************************************************************
+ *
+ * Registered settings blocks
+ *
+ ******************************************************************************
+ */
+
+/** List of all registered settings */
+static struct list_head all_settings = {
+	&interactive_settings.list, &interactive_settings.list
+};
+
+// Dummy routine just for testing
+static int dummy_set ( struct settings *settings, unsigned int tag,
+		       const void *data, size_t len ) {
+	DBGC ( settings, "Settings %p: set %s to:\n",
+	       settings, setting_tag_name ( tag ) );
+	DBGC_HD ( settings, data, len );
+	return 0;
+}
+
+// Dummy routine just for testing
+static int dummy_get ( struct settings *settings, unsigned int tag,
+		       void *data, size_t len ) {
+	unsigned int i;
+
+	DBGC ( settings, "Settings %p: get %s\n",
+	       settings, setting_tag_name ( tag ) );
+	for ( i = 0 ; i < len ; i++ )
+		*( ( ( uint8_t * ) data ) + i ) = i;
+	return ( len ? len : 8 );
+}
+
+struct settings_operations dummy_settings_operations = {
+	.set = dummy_set,
+	.get = dummy_get,
+};
+
+/** Interactively-edited settings */
+struct settings interactive_settings = {
+	.refcnt = NULL,
+	.name = "",
+	.list = { &all_settings, &all_settings },
+	.op = &dummy_settings_operations,
+};
+
+/**
+ * Find named settings block
  *
  * @v name		Name
- * @ret type		Configuration setting type, or NULL
+ * @ret settings	Settings block, or NULL
  */
-static struct config_setting_type *
-find_config_setting_type ( const char *name ) {
-	struct config_setting_type *type;
+struct settings * find_settings ( const char *name ) {
+	struct settings *settings;
 
-	for ( type = config_setting_types ; type < config_setting_types_end ;
-	      type++ ) {
-		if ( strcasecmp ( name, type->name ) == 0 )
-			return type;
+	list_for_each_entry ( settings, &all_settings, list ) {
+		if ( strcasecmp ( name, settings->name ) == 0 )
+			return settings;
 	}
 	return NULL;
 }
 
+/******************************************************************************
+ *
+ * Core settings routines
+ *
+ ******************************************************************************
+ */
+
 /**
- * Find configuration setting
+ * Get value of setting
+ *
+ * @v settings		Settings block, or NULL to search all blocks
+ * @v tag		Setting tag number
+ * @v data		Buffer to fill with setting data
+ * @v len		Length of buffer
+ * @ret len		Length of setting data, or negative error
+ *
+ * The actual length of the setting will be returned even if
+ * the buffer was too small.
+ */
+int get_setting ( struct settings *settings, unsigned int tag,
+		  void *data, size_t len ) {
+	int ret;
+
+	if ( settings ) {
+		return settings->op->get ( settings, tag, data, len );
+	} else {
+		list_for_each_entry ( settings, &all_settings, list ) {
+			if ( ( ret = settings->op->get ( settings, tag,
+							 data, len ) ) >= 0 )
+				return ret;
+		}
+		return -ENOENT;
+	}
+}
+
+/**
+ * Get length of setting
+ *
+ * @v settings		Settings block, or NULL to search all blocks
+ * @v tag		Setting tag number
+ * @ret len		Length of setting data, or negative error
+ *
+ * This function can also be used as an existence check for the
+ * setting.
+ */
+int get_setting_len ( struct settings *settings, unsigned int tag ) {
+	return get_setting ( settings, tag, NULL, 0 );
+}
+
+/**
+ * Get value of string setting
+ *
+ * @v settings		Settings block, or NULL to search all blocks
+ * @v tag		Setting tag number
+ * @v data		Buffer to fill with setting string data
+ * @v len		Length of buffer
+ * @ret len		Length of string setting, or negative error
+ *
+ * The resulting string is guaranteed to be correctly NUL-terminated.
+ * The returned length will be the length of the underlying setting
+ * data.
+ */
+int get_string_setting ( struct settings *settings, unsigned int tag,
+			 char *data, size_t len ) {
+	memset ( data, 0, len );
+	return get_setting ( settings, tag, data, ( len - 1 ) );
+}
+
+/**
+ * Get value of IPv4 address setting
+ *
+ * @v settings		Settings block, or NULL to search all blocks
+ * @v tag		Setting tag number
+ * @v inp		IPv4 address to fill in
+ * @ret len		Length of setting, or negative error
+ */
+int get_ipv4_setting ( struct settings *settings, unsigned int tag,
+		       struct in_addr *inp ) {
+	int len;
+
+	len = get_setting ( settings, tag, inp, sizeof ( *inp ) );
+	if ( len < 0 )
+		return len;
+	if ( len != sizeof ( *inp ) )
+		return -ERANGE;
+	return len;
+}
+
+/**
+ * Get value of signed integer setting
+ *
+ * @v settings		Settings block, or NULL to search all blocks
+ * @v tag		Setting tag number
+ * @v value		Integer value to fill in
+ * @ret len		Length of setting, or negative error
+ */
+int get_int_setting ( struct settings *settings, unsigned int tag,
+		      long *value ) {
+	union {
+		long value;
+		uint8_t u8[ sizeof ( long ) ];
+		int8_t s8[ sizeof ( long ) ];
+	} buf;
+	int len;
+	int i;
+
+	buf.value = 0;
+	len = get_setting ( settings, tag, &buf, sizeof ( buf ) );
+	if ( len < 0 )
+		return len;
+	if ( len > ( int ) sizeof ( buf ) )
+		return -ERANGE;
+
+	*value = ( ( buf.s8[0] >= 0 ) ? 0 : -1L );
+	for ( i = 0 ; i < len ; i++ ) {
+		*value = ( ( *value << 8 ) | buf.u8[i] );
+	}
+
+	return len;
+}
+
+/**
+ * Get value of unsigned integer setting
+ *
+ * @v settings		Settings block, or NULL to search all blocks
+ * @v tag		Setting tag number
+ * @v value		Integer value to fill in
+ * @ret len		Length of setting, or negative error
+ */
+int get_uint_setting ( struct settings *settings, unsigned int tag,
+		       unsigned long *value ) {
+	long svalue;
+	int len;
+
+	len = get_int_setting ( settings, tag, &svalue );
+	if ( len < 0 )
+		return len;
+
+	*value = ( svalue & ( -1UL >> ( sizeof ( long ) - len ) ) );
+
+	return len;
+}
+
+/******************************************************************************
+ *
+ * Named and typed setting routines
+ *
+ ******************************************************************************
+ */
+
+/**
+ * Set value of typed setting
+ *
+ * @v settings		Settings block
+ * @v tag		Setting tag number
+ * @v type		Settings type
+ * @v value		Formatted setting data, or NULL
+ * @ret rc		Return status code
+ */
+int set_typed_setting ( struct settings *settings,
+			unsigned int tag, struct setting_type *type,
+			const char *value ) {
+
+	/* NULL value implies deletion.  Avoid imposing the burden of
+	 * checking for NULL values on each typed setting's setf()
+	 * method.
+	 */
+	if ( ! value )
+		return delete_setting ( settings, tag );
+		
+	return type->setf ( settings, tag, value );
+}
+
+/**
+ * Find named setting
  *
  * @v name		Name
- * @ret setting		Configuration setting, or NULL
+ * @ret setting		Named setting, or NULL
  */
-static struct config_setting * find_config_setting ( const char *name ) {
-	struct config_setting *setting;
+static struct named_setting * find_named_setting ( const char *name ) {
+	struct named_setting *setting;
 
-	for ( setting = config_settings ; setting < config_settings_end ;
+	for ( setting = named_settings ; setting < named_settings_end ;
 	      setting++ ) {
 		if ( strcasecmp ( name, setting->name ) == 0 )
 			return setting;
@@ -84,352 +321,385 @@ static struct config_setting * find_config_setting ( const char *name ) {
 }
 
 /**
- * Find or build configuration setting
+ * Find setting type
  *
  * @v name		Name
- * @v setting		Buffer to fill in with setting
+ * @ret type		Setting type, or NULL
+ */
+static struct setting_type * find_setting_type ( const char *name ) {
+	struct setting_type *type;
+
+	for ( type = setting_types ; type < setting_types_end ; type++ ) {
+		if ( strcasecmp ( name, type->name ) == 0 )
+			return type;
+	}
+	return NULL;
+}
+
+/**
+ * Parse setting name
+ *
+ * @v name		Name of setting
+ * @ret settings	Settings block, or NULL
+ * @ret tag		Setting tag number
+ * @ret type		Setting type
  * @ret rc		Return status code
  *
- * Find setting if it exists.  If it doesn't exist, but the name is of
- * the form "<num>:<type>" (e.g. "12:string"), then construct a
- * setting for that tag and data type, and return it.  The constructed
- * setting will be placed in the buffer.
+ * Interprets a name of the form
+ * "[settings_name/]tag_name[:type_name]" and fills in the appropriate
+ * fields.
  */
-static int find_or_build_config_setting ( const char *name,
-					  struct config_setting *setting ) {
-	struct config_setting *known_setting;
+static int parse_setting_name ( const char *name, struct settings **settings,
+				unsigned int *tag,
+				struct setting_type **type ) {
 	char tmp_name[ strlen ( name ) + 1 ];
-	char *qualifier;
+	char *settings_name;
+	char *tag_name;
+	char *type_name;
+	struct named_setting *named_setting;
 	char *tmp;
 
 	/* Set defaults */
-	memset ( setting, 0, sizeof ( *setting ) );
-	setting->name = name;
-	setting->type = &config_setting_type_hex;
+	*settings = NULL;
+	*tag = 0;
+	*type = &setting_type_hex;
 
-	/* Strip qualifier, if present */
+	/* Split name into "[settings_name/]tag_name[:type_name]" */
 	memcpy ( tmp_name, name, sizeof ( tmp_name ) );
-	if ( ( qualifier = strchr ( tmp_name, ':' ) ) != NULL )
-		*(qualifier++) = 0;
-
-	/* If we recognise the name of the setting, use it */
-	if ( ( known_setting = find_config_setting ( tmp_name ) ) != NULL ) {
-		memcpy ( setting, known_setting, sizeof ( *setting ) );
+	if ( ( tag_name = strchr ( tmp_name, '/' ) ) != NULL ) {
+		*(tag_name++) = 0;
+		settings_name = tmp_name;
 	} else {
-		/* Otherwise, try to interpret as a numerical setting */
-		for ( tmp = tmp_name ; 1 ; tmp++ ) {
-			setting->tag = ( ( setting->tag << 8 ) |
-					 strtoul ( tmp, &tmp, 0 ) );
-			if ( *tmp != '.' )
-				break;
+		tag_name = tmp_name;
+		settings_name = NULL;
+	}
+	if ( ( type_name = strchr ( tag_name, ':' ) ) != NULL )
+		*(type_name++) = 0;
+
+	/* Identify settings block, if specified */
+	if ( settings_name ) {
+		*settings = find_settings ( settings_name );
+		if ( *settings == NULL ) {
+			DBG ( "Unrecognised settings block \"%s\" in \"%s\"\n",
+			      settings_name, name );
+			return -ENODEV;
 		}
-		if ( *tmp != 0 )
-			return -EINVAL;
 	}
 
-	/* Apply qualifier, if present */
-	if ( qualifier ) {
-		setting->type = find_config_setting_type ( qualifier );
-		if ( ! setting->type )
-			return -EINVAL;
+	/* Identify tag number */
+	if ( ( named_setting = find_named_setting ( tag_name ) ) != NULL ) {
+		*tag = named_setting->tag;
+		*type = named_setting->type;
+	} else {
+		/* Unrecognised name: try to interpret as a tag number */
+		tmp = tag_name;
+		while ( 1 ) {
+			*tag = ( ( *tag << 8 ) | strtoul ( tmp, &tmp, 0 ) );
+			if ( *tmp == 0 )
+				break;
+			if ( *tmp != '.' ) {
+				DBG ( "Invalid tag number \"%s\" in \"%s\"\n",
+				      tag_name, name );
+				return -ENOENT;
+			}
+			tmp++;
+		}
+	}
+
+	/* Identify setting type, if specified */
+	if ( type_name ) {
+		*type = find_setting_type ( type_name );
+		if ( *type == NULL ) {
+			DBG ( "Invalid setting type \"%s\" in \"%s\"\n",
+			      type_name, name );
+			return -ENOTSUP;
+		}
 	}
 
 	return 0;
 }
 
 /**
- * Show value of named setting
+ * Parse and set value of named setting
  *
- * @v context		Configuration context
- * @v name		Configuration setting name
- * @v buf		Buffer to contain value
+ * @v name		Name of setting
+ * @v value		Formatted setting data, or NULL
+ * @ret rc		Return status code
+ */
+int set_named_setting ( const char *name, const char *value ) {
+	struct settings *settings;
+	unsigned int tag;
+	struct setting_type *type;
+	int rc;
+
+	if ( ( rc = parse_setting_name ( name, &settings, &tag,
+					 &type ) ) != 0 )
+		return rc;
+	if ( settings == NULL )
+		return -ENODEV;
+	return set_typed_setting ( settings, tag, type, value );
+}
+
+/**
+ * Get and format value of named setting
+ *
+ * @v name		Name of setting
+ * @v buf		Buffer to contain formatted value
  * @v len		Length of buffer
  * @ret len		Length of formatted value, or negative error
  */
-int show_named_setting ( struct config_context *context, const char *name,
-			 char *buf, size_t len ) {
-	struct config_setting setting;
+int get_named_setting ( const char *name, char *buf, size_t len ) {
+	struct settings *settings;
+	unsigned int tag;
+	struct setting_type *type;
 	int rc;
 
-	if ( ( rc = find_or_build_config_setting ( name, &setting ) ) != 0 )
+	if ( ( rc = parse_setting_name ( name, &settings, &tag,
+					 &type ) ) != 0 )
 		return rc;
-	return show_setting ( context, &setting, buf, len );
+	return get_typed_setting ( settings, tag, type, buf, len );
 }
 
-/**
- * Set value of named setting
+/******************************************************************************
  *
- * @v context		Configuration context
- * @v name		Configuration setting name
- * @v value		Setting value (as a string)
+ * Setting types
+ *
+ ******************************************************************************
+ */
+
+/**
+ * Parse and set value of string setting
+ *
+ * @v settings		Settings block
+ * @v tag		Setting tag number
+ * @v value		Formatted setting data
  * @ret rc		Return status code
  */
-int set_named_setting ( struct config_context *context, const char *name,
-			const char *value ) {
-	struct config_setting setting;
-	int rc;
-
-	if ( ( rc = find_or_build_config_setting ( name, &setting ) ) != 0 )
-		return rc;
-	return set_setting ( context, &setting, value );
+static int setf_string ( struct settings *settings, unsigned int tag,
+			 const char *value ) {
+	return set_setting ( settings, tag, value, strlen ( value ) );
 }
 
 /**
- * Set value of setting
+ * Get and format value of string setting
  *
- * @v context		Configuration context
- * @v setting		Configuration setting
- * @v value		Setting value (as a string), or NULL
- * @ret rc		Return status code
- */
-int set_setting ( struct config_context *context,
-		  struct config_setting *setting,
-		  const char *value ) {
-	if ( ( ! value ) || ( ! *value ) ) {
-		/* Save putting deletion logic in each individual handler */
-		return clear_setting ( context, setting );
-	}
-	return setting->type->set ( context, setting, value );
-}
-
-/**
- * Show value of string setting
- *
- * @v context		Configuration context
- * @v setting		Configuration setting
- * @v buf		Buffer to contain value
+ * @v settings		Settings block, or NULL to search all blocks
+ * @v tag		Setting tag number
+ * @v buf		Buffer to contain formatted value
  * @v len		Length of buffer
  * @ret len		Length of formatted value, or negative error
  */
-static int show_string ( struct config_context *context,
-			 struct config_setting *setting,
+static int getf_string ( struct settings *settings, unsigned int tag,
 			 char *buf, size_t len ) {
-	struct dhcp_option *option;
-
-	option = find_dhcp_option ( context->options, setting->tag );
-	if ( ! option )
-		return -ENODATA;
-	return dhcp_snprintf ( buf, len, option );
+	return get_string_setting ( settings, tag, buf, len );
 }
 
-/**
- * Set value of string setting
- *
- * @v context		Configuration context
- * @v setting		Configuration setting
- * @v value		Setting value (as a string)
- * @ret rc		Return status code
- */ 
-static int set_string ( struct config_context *context,
-			struct config_setting *setting,
-			const char *value ) {
-	struct dhcp_option *option;
-
-	option = set_dhcp_option ( context->options, setting->tag,
-				   value, strlen ( value ) );
-	if ( ! option )
-		return -ENOSPC;
-	return 0;
-}
-
-/** A string configuration setting */
-struct config_setting_type config_setting_type_string __config_setting_type = {
+/** A string setting type */
+struct setting_type setting_type_string __setting_type = {
 	.name = "string",
-	.description = "Text string",
-	.show = show_string,
-	.set = set_string,
+	.setf = setf_string,
+	.getf = getf_string,
 };
 
 /**
- * Show value of IPv4 setting
+ * Parse and set value of IPv4 address setting
  *
- * @v context		Configuration context
- * @v setting		Configuration setting
- * @v buf		Buffer to contain value
+ * @v settings		Settings block
+ * @v tag		Setting tag number
+ * @v value		Formatted setting data
+ * @ret rc		Return status code
+ */
+static int setf_ipv4 ( struct settings *settings, unsigned int tag,
+		       const char *value ) {
+	struct in_addr ipv4;
+
+	if ( inet_aton ( value, &ipv4 ) == 0 )
+		return -EINVAL;
+	return set_setting ( settings, tag, &ipv4, sizeof ( ipv4 ) );
+}
+
+/**
+ * Get and format value of IPv4 address setting
+ *
+ * @v settings		Settings block, or NULL to search all blocks
+ * @v tag		Setting tag number
+ * @v buf		Buffer to contain formatted value
  * @v len		Length of buffer
  * @ret len		Length of formatted value, or negative error
  */
-static int show_ipv4 ( struct config_context *context,
-		       struct config_setting *setting,
+static int getf_ipv4 ( struct settings *settings, unsigned int tag,
 		       char *buf, size_t len ) {
-	struct dhcp_option *option;
 	struct in_addr ipv4;
+	int rc;
 
-	option = find_dhcp_option ( context->options, setting->tag );
-	if ( ! option )
-		return -ENODATA;
-	dhcp_ipv4_option ( option, &ipv4 );
+	if ( ( rc = get_ipv4_setting ( settings, tag, &ipv4 ) ) < 0 )
+		return rc;
 	return snprintf ( buf, len, inet_ntoa ( ipv4 ) );
 }
 
-/**
- * Set value of IPV4 setting
- *
- * @v context		Configuration context
- * @v setting		Configuration setting
- * @v value		Setting value (as a string)
- * @ret rc		Return status code
- */ 
-static int set_ipv4 ( struct config_context *context,
-		      struct config_setting *setting,
-		      const char *value ) {
-	struct dhcp_option *option;
-	struct in_addr ipv4;
-	
-	if ( inet_aton ( value, &ipv4 ) == 0 )
-		return -EINVAL;
-	option = set_dhcp_option ( context->options, setting->tag,
-				   &ipv4, sizeof ( ipv4 ) );
-	if ( ! option )
-		return -ENOSPC;
-	return 0;
-}
-
-/** An IPv4 configuration setting */
-struct config_setting_type config_setting_type_ipv4 __config_setting_type = {
+/** An IPv4 address setting type */
+struct setting_type setting_type_ipv4 __setting_type = {
 	.name = "ipv4",
-	.description = "IPv4 address",
-	.show = show_ipv4,
-	.set = set_ipv4,
+	.setf = setf_ipv4,
+	.getf = getf_ipv4,
 };
 
 /**
- * Show value of integer setting
+ * Parse and set value of integer setting
  *
- * @v context		Configuration context
- * @v setting		Configuration setting
- * @v buf		Buffer to contain value
- * @v len		Length of buffer
- * @ret len		Length of formatted value, or negative error
- */
-static int show_int ( struct config_context *context,
-		      struct config_setting *setting,
-		      char *buf, size_t len ) {
-	struct dhcp_option *option;
-	long num;
-
-	option = find_dhcp_option ( context->options, setting->tag );
-	if ( ! option )
-		return -ENODATA;
-	num = dhcp_num_option ( option );
-	return snprintf ( buf, len, "%ld", num );
-}
-
-/**
- * Set value of integer setting
- *
- * @v context		Configuration context
- * @v setting		Configuration setting
- * @v value		Setting value (as a string)
- * @v size		Size of integer (in bytes)
+ * @v settings		Settings block
+ * @v tag		Setting tag number
+ * @v value		Formatted setting data
+ * @v size		Integer size, in bytes
  * @ret rc		Return status code
- */ 
-static int set_int ( struct config_context *context,
-		     struct config_setting *setting,
-		     const char *value, unsigned int size ) {
-	struct dhcp_option *option;
+ */
+static int setf_int ( struct settings *settings, unsigned int tag,
+		      const char *value, unsigned int size ) {
 	union {
 		uint32_t num;
 		uint8_t bytes[4];
 	} u;
 	char *endp;
 
-	/* Parse number */
-	if ( ! *value )
-		return -EINVAL;
 	u.num = htonl ( strtoul ( value, &endp, 0 ) );
 	if ( *endp )
 		return -EINVAL;
-
-	/* Set option */
-	option = set_dhcp_option ( context->options, setting->tag,
-				   &u.bytes[ sizeof ( u ) - size ], size );
-	if ( ! option )
-		return -ENOSPC;
-	return 0;
+	return set_setting ( settings, tag, 
+			     &u.bytes[ sizeof ( u ) - size ], size );
 }
 
 /**
- * Set value of 8-bit integer setting
+ * Parse and set value of 8-bit integer setting
  *
- * @v context		Configuration context
- * @v setting		Configuration setting
- * @v value		Setting value (as a string)
- * @v size		Size of integer (in bytes)
+ * @v settings		Settings block
+ * @v tag		Setting tag number
+ * @v value		Formatted setting data
+ * @v size		Integer size, in bytes
  * @ret rc		Return status code
- */ 
-static int set_int8 ( struct config_context *context,
-		      struct config_setting *setting,
-		      const char *value ) {
-	return set_int ( context, setting, value, 1 );
-}
-
-/**
- * Set value of 16-bit integer setting
- *
- * @v context		Configuration context
- * @v setting		Configuration setting
- * @v value		Setting value (as a string)
- * @v size		Size of integer (in bytes)
- * @ret rc		Return status code
- */ 
-static int set_int16 ( struct config_context *context,
-		       struct config_setting *setting,
+ */
+static int setf_int8 ( struct settings *settings, unsigned int tag,
 		       const char *value ) {
-	return set_int ( context, setting, value, 2 );
+	return setf_int ( settings, tag, value, 1 );
 }
 
 /**
- * Set value of 32-bit integer setting
+ * Parse and set value of 16-bit integer setting
  *
- * @v context		Configuration context
- * @v setting		Configuration setting
- * @v value		Setting value (as a string)
- * @v size		Size of integer (in bytes)
+ * @v settings		Settings block
+ * @v tag		Setting tag number
+ * @v value		Formatted setting data
+ * @v size		Integer size, in bytes
  * @ret rc		Return status code
- */ 
-static int set_int32 ( struct config_context *context,
-		       struct config_setting *setting,
+ */
+static int setf_int16 ( struct settings *settings, unsigned int tag,
 		       const char *value ) {
-	return set_int ( context, setting, value, 4 );
+	return setf_int ( settings, tag, value, 2 );
 }
 
-/** An 8-bit integer configuration setting */
-struct config_setting_type config_setting_type_int8 __config_setting_type = {
+/**
+ * Parse and set value of 32-bit integer setting
+ *
+ * @v settings		Settings block
+ * @v tag		Setting tag number
+ * @v value		Formatted setting data
+ * @v size		Integer size, in bytes
+ * @ret rc		Return status code
+ */
+static int setf_int32 ( struct settings *settings, unsigned int tag,
+		       const char *value ) {
+	return setf_int ( settings, tag, value, 4 );
+}
+
+/**
+ * Get and format value of signed integer setting
+ *
+ * @v settings		Settings block, or NULL to search all blocks
+ * @v tag		Setting tag number
+ * @v buf		Buffer to contain formatted value
+ * @v len		Length of buffer
+ * @ret len		Length of formatted value, or negative error
+ */
+static int getf_int ( struct settings *settings, unsigned int tag,
+		      char *buf, size_t len ) {
+	long value;
+	int rc;
+
+	if ( ( rc = get_int_setting ( settings, tag, &value ) ) < 0 )
+		return rc;
+	return snprintf ( buf, len, "%ld", value );
+}
+
+/**
+ * Get and format value of unsigned integer setting
+ *
+ * @v settings		Settings block, or NULL to search all blocks
+ * @v tag		Setting tag number
+ * @v buf		Buffer to contain formatted value
+ * @v len		Length of buffer
+ * @ret len		Length of formatted value, or negative error
+ */
+static int getf_uint ( struct settings *settings, unsigned int tag,
+		       char *buf, size_t len ) {
+	unsigned long value;
+	int rc;
+
+	if ( ( rc = get_uint_setting ( settings, tag, &value ) ) < 0 )
+		return rc;
+	return snprintf ( buf, len, "%#lx", value );
+}
+
+/** A signed 8-bit integer setting type */
+struct setting_type setting_type_int8 __setting_type = {
 	.name = "int8",
-	.description = "8-bit integer",
-	.show = show_int,
-	.set = set_int8,
+	.setf = setf_int8,
+	.getf = getf_int,
 };
 
-/** A 16-bit integer configuration setting */
-struct config_setting_type config_setting_type_int16 __config_setting_type = {
+/** A signed 16-bit integer setting type */
+struct setting_type setting_type_int16 __setting_type = {
 	.name = "int16",
-	.description = "16-bit integer",
-	.show = show_int,
-	.set = set_int16,
+	.setf = setf_int16,
+	.getf = getf_int,
 };
 
-/** A 32-bit integer configuration setting */
-struct config_setting_type config_setting_type_int32 __config_setting_type = {
+/** A signed 32-bit integer setting type */
+struct setting_type setting_type_int32 __setting_type = {
 	.name = "int32",
-	.description = "32-bit integer",
-	.show = show_int,
-	.set = set_int32,
+	.setf = setf_int32,
+	.getf = getf_int,
+};
+
+/** An unsigned 8-bit integer setting type */
+struct setting_type setting_type_uint8 __setting_type = {
+	.name = "uint8",
+	.setf = setf_int8,
+	.getf = getf_uint,
+};
+
+/** An unsigned 16-bit integer setting type */
+struct setting_type setting_type_uint16 __setting_type = {
+	.name = "uint16",
+	.setf = setf_int16,
+	.getf = getf_uint,
+};
+
+/** An unsigned 32-bit integer setting type */
+struct setting_type setting_type_uint32 __setting_type = {
+	.name = "uint32",
+	.setf = setf_int32,
+	.getf = getf_uint,
 };
 
 /**
- * Set value of hex-string setting
+ * Parse and set value of hex string setting
  *
- * @v context		Configuration context
- * @v setting		Configuration setting
- * @v value		Setting value (as a string)
+ * @v settings		Settings block
+ * @v tag		Setting tag number
+ * @v value		Formatted setting data
  * @ret rc		Return status code
- */ 
-static int set_hex ( struct config_context *context,
-		     struct config_setting *setting,
-		     const char *value ) {
-	struct dhcp_option *option;
+ */
+static int setf_hex ( struct settings *settings, unsigned int tag,
+		      const char *value ) {
 	char *ptr = ( char * ) value;
 	uint8_t bytes[ strlen ( value ) ]; /* cannot exceed strlen(value) */
 	unsigned int len = 0;
@@ -438,11 +708,7 @@ static int set_hex ( struct config_context *context,
 		bytes[len++] = strtoul ( ptr, &ptr, 16 );
 		switch ( *ptr ) {
 		case '\0' :
-			option = set_dhcp_option ( context->options,
-						   setting->tag, bytes, len );
-			if ( ! option )
-				return -ENOSPC;
-			return 0;
+			return set_setting ( settings, tag, bytes, len );
 		case ':' :
 			ptr++;
 			break;
@@ -453,83 +719,122 @@ static int set_hex ( struct config_context *context,
 }
 
 /**
- * Show value of hex-string setting
+ * Get and format value of hex string setting
  *
- * @v context		Configuration context
- * @v setting		Configuration setting
- * @v buf		Buffer to contain value
+ * @v settings		Settings block, or NULL to search all blocks
+ * @v tag		Setting tag number
+ * @v buf		Buffer to contain formatted value
  * @v len		Length of buffer
  * @ret len		Length of formatted value, or negative error
  */
-static int show_hex ( struct config_context *context,
-		      struct config_setting *setting,
+static int getf_hex ( struct settings *settings, unsigned int tag,
 		      char *buf, size_t len ) {
-	struct dhcp_option *option;
+	int raw_len;
+	int check_len;
 	int used = 0;
 	int i;
 
-	option = find_dhcp_option ( context->options, setting->tag );
-	if ( ! option )
-		return -ENODATA;
+	raw_len = get_setting_len ( settings, tag );
+	if ( raw_len < 0 )
+		return raw_len;
 
-	for ( i = 0 ; i < option->len ; i++ ) {
-		used += ssnprintf ( ( buf + used ), ( len - used ),
-				    "%s%02x", ( used ? ":" : "" ),
-				    option->data.bytes[i] );
+	{
+		uint8_t raw[raw_len];
+
+		check_len = get_setting ( settings, tag, raw, sizeof ( raw ) );
+		assert ( check_len == raw_len );
+		
+		if ( len )
+			buf[0] = 0; /* Ensure that a terminating NUL exists */
+		for ( i = 0 ; i < raw_len ; i++ ) {
+			used += ssnprintf ( ( buf + used ), ( len - used ),
+					    "%s%02x", ( used ? ":" : "" ),
+					    raw[i] );
+		}
+		return used;
 	}
-	return used;
 }
 
-/** A hex-string configuration setting */
-struct config_setting_type config_setting_type_hex __config_setting_type = {
+/** A hex-string setting */
+struct setting_type setting_type_hex __setting_type = {
 	.name = "hex",
-	.description = "Hex string",
-	.show = show_hex,
-	.set = set_hex,
+	.setf = setf_hex,
+	.getf = getf_hex,
 };
 
+/******************************************************************************
+ *
+ * Named settings
+ *
+ ******************************************************************************
+ */
+
 /** Some basic setting definitions */
-struct config_setting basic_config_settings[] __config_setting = {
+struct named_setting basic_named_settings[] __named_setting = {
 	{
 		.name = "ip",
-		.description = "IP address of this machine (e.g. 192.168.0.1)",
+		.description = "IPv4 address of this interface",
 		.tag = DHCP_EB_YIADDR,
-		.type = &config_setting_type_ipv4,
+		.type = &setting_type_ipv4,
+	},
+	{
+		.name = "subnet-mask",
+		.description = "IPv4 subnet mask",
+		.tag = DHCP_SUBNET_MASK,
+		.type = &setting_type_ipv4,
+	},
+	{
+		.name = "routers",
+		.description = "Default gateway",
+		.tag = DHCP_ROUTERS,
+		.type = &setting_type_ipv4,
+	},
+	{
+		.name = "domain-name-servers",
+		.description = "DNS server",
+		.tag = DHCP_DNS_SERVERS,
+		.type = &setting_type_ipv4,
 	},
 	{
 		.name = "hostname",
 		.description = "Host name of this machine",
 		.tag = DHCP_HOST_NAME,
-		.type = &config_setting_type_string,
+		.type = &setting_type_string,
 	},
 	{
-		.name = "username",
-		.description = "User name for authentication to servers",
-		.tag = DHCP_EB_USERNAME,
-		.type = &config_setting_type_string,
-	},
-	{
-		.name = "password",
-		.description = "Password for authentication to servers",
-		.tag = DHCP_EB_PASSWORD,
-		.type = &config_setting_type_string,
+		.name = "filename",
+		.description = "Boot filename",
+		.tag = DHCP_BOOTFILE_NAME,
+		.type = &setting_type_string,
 	},
 	{
 		.name = "root-path",
 		.description = "NFS/iSCSI root path",
 		.tag = DHCP_ROOT_PATH,
-		.type = &config_setting_type_string,
+		.type = &setting_type_string,
+	},
+	{
+		.name = "username",
+		.description = "User name for authentication",
+		.tag = DHCP_EB_USERNAME,
+		.type = &setting_type_string,
+	},
+	{
+		.name = "password",
+		.description = "Password for authentication",
+		.tag = DHCP_EB_PASSWORD,
+		.type = &setting_type_string,
+	},
+	{
+		.name = "initiator-iqn",
+		.description = "iSCSI initiator name",
+		.tag = DHCP_ISCSI_INITIATOR_IQN,
+		.type = &setting_type_string,
 	},
 	{
 		.name = "priority",
 		.description = "Priority of these options",
 		.tag = DHCP_EB_PRIORITY,
-		.type = &config_setting_type_int8,
+		.type = &setting_type_int8,
 	},
-	{
-		.name = "initiator-iqn",
-		.description = "iSCSI qualified name of this machine",
-		.tag = DHCP_ISCSI_INITIATOR_IQN,
-		.type = &config_setting_type_string,
-	}
 };

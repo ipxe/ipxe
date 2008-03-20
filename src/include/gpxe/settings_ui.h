@@ -7,8 +7,8 @@
  *
  */
 
-struct config_context;
+struct settings;
 
-extern int settings_ui ( struct config_context *context ) __nonnull;
+extern int settings_ui ( struct settings *settings ) __nonnull;
 
 #endif /* _GPXE_SETTINGS_UI_H */
