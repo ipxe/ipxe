@@ -17,7 +17,7 @@ struct in_addr;
 
 /** Settings block operations */
 struct settings_operations {
-	/** Set value of setting
+	/** Store value of setting
 	 *
 	 * @v settings		Settings block
 	 * @v tag		Setting tag number

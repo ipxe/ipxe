@@ -11,6 +11,7 @@
 #include <gpxe/list.h>
 #include <gpxe/tables.h>
 #include <gpxe/refcnt.h>
+#include <gpxe/settings.h>
 
 struct io_buffer;
 struct net_device;
@@ -243,6 +244,9 @@ struct net_device {
 	/** Device statistics */
 	struct net_device_stats stats;
 
+	/** Configuration settings applicable to this device */
+	struct settings settings;
+
 	/** Driver private data */
 	void *priv;
 };
@@ -359,6 +363,8 @@ extern int net_tx ( struct io_buffer *iobuf, struct net_device *netdev,
 		    struct net_protocol *net_protocol, const void *ll_dest );
 extern int net_rx ( struct io_buffer *iobuf, struct net_device *netdev,
 		    uint16_t net_proto, const void *ll_source );
+
+extern struct settings_operations netdev_settings_operations;
 
 /**
  * Complete network transmission

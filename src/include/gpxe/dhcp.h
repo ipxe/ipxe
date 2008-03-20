@@ -177,6 +177,15 @@ struct job_interface;
  */
 #define DHCP_EB_SIADDR DHCP_ENCAP_OPT ( DHCP_EB_ENCAP, 3 )
 
+/** MAC address
+ *
+ * This option is used internally to contain the network device
+ * hardware address, in order to provide a consistent approach to
+ * storing and processing options.  It should never be present in a
+ * DHCP packet.
+ */
+#define DHCP_EB_MAC DHCP_ENCAP_OPT ( DHCP_EB_ENCAP, 4 )
+
 /*
  * Tags in the range 0x10-0x7f are reserved for feature markers
  *

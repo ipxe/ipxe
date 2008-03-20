@@ -129,6 +129,7 @@
 #define ERRFILE_dns			( ERRFILE_NET | 0x00110000 )
 #define ERRFILE_tftp			( ERRFILE_NET | 0x00120000 )
 #define ERRFILE_infiniband		( ERRFILE_NET | 0x00130000 )
+#define ERRFILE_netdev_settings		( ERRFILE_NET | 0x00140000 )
 
 #define ERRFILE_image		      ( ERRFILE_IMAGE | 0x00000000 )
 #define ERRFILE_elf		      ( ERRFILE_IMAGE | 0x00010000 )
