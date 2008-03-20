@@ -21,6 +21,7 @@
 #include <errno.h>
 #include <gpxe/netdevice.h>
 #include <gpxe/dhcp.h>
+#include <gpxe/settings.h>
 #include <gpxe/image.h>
 #include <gpxe/embedded.h>
 #include <usr/ifmgmt.h>
@@ -146,16 +147,14 @@ static int netboot ( struct net_device *netdev ) {
 		return rc;
 
 	/* Try to download and boot whatever we are given as a filename */
-	dhcp_snprintf ( buf, sizeof ( buf ),
-			find_global_dhcp_option ( DHCP_BOOTFILE_NAME ) );
+	fetch_string_setting ( NULL, DHCP_BOOTFILE_NAME, buf, sizeof ( buf ) );
 	if ( buf[0] ) {
 		printf ( "Booting from filename \"%s\"\n", buf );
 		return boot_filename ( buf );
 	}
 	
 	/* No filename; try the root path */
-	dhcp_snprintf ( buf, sizeof ( buf ),
-			find_global_dhcp_option ( DHCP_ROOT_PATH ) );
+	fetch_string_setting ( NULL, DHCP_ROOT_PATH, buf, sizeof ( buf ) );
 	if ( buf[0] ) {
 		printf ( "Booting from root path \"%s\"\n", buf );
 		return boot_root_path ( buf );

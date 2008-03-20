@@ -3,6 +3,7 @@
 #include <stdio.h>
 #include <gpxe/iscsi.h>
 #include <gpxe/dhcp.h>
+#include <gpxe/settings.h>
 #include <gpxe/netdevice.h>
 #include <gpxe/ibft.h>
 #include <int13.h>
@@ -45,7 +46,7 @@ int iscsiboot ( const char *root_path ) {
 		goto error_init;
 	}
 
-	drive.drive = find_global_dhcp_num_option ( DHCP_EB_BIOS_DRIVE );
+	drive.drive = fetch_uintz_setting ( NULL, DHCP_EB_BIOS_DRIVE );
 	drive.blockdev = &scsi.blockdev;
 
 	/* FIXME: ugly, ugly hack */

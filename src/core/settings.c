@@ -156,16 +156,14 @@ static void reprioritise_settings ( struct settings *settings ) {
 		return;
 
 	/* Read priority, if present */
-	priority = 0;
-	fetch_int_setting ( settings, DHCP_EB_PRIORITY, &priority );
+	priority = fetch_intz_setting ( settings, DHCP_EB_PRIORITY );
 
 	/* Remove from siblings list */
 	list_del ( &settings->siblings );
 
 	/* Reinsert after any existing blocks which have a higher priority */
 	list_for_each_entry ( tmp, &parent->children, siblings ) {
-		tmp_priority = 0;
-		fetch_int_setting ( tmp, DHCP_EB_PRIORITY, &tmp_priority );
+		tmp_priority = fetch_intz_setting ( tmp, DHCP_EB_PRIORITY );
 		if ( priority > tmp_priority )
 			break;
 	}
@@ -439,6 +437,35 @@ int fetch_uint_setting ( struct settings *settings, unsigned int tag,
 	*value = ( svalue & ( -1UL >> ( sizeof ( long ) - len ) ) );
 
 	return len;
+}
+
+/**
+ * Fetch value of signed integer setting, or zero
+ *
+ * @v settings		Settings block, or NULL to search all blocks
+ * @v tag		Setting tag number
+ * @ret value		Setting value, or zero
+ */
+long fetch_intz_setting ( struct settings *settings, unsigned int tag ) {
+	long value = 0;
+
+	fetch_int_setting ( settings, tag, &value );
+	return value;
+}
+
+/**
+ * Fetch value of unsigned integer setting, or zero
+ *
+ * @v settings		Settings block, or NULL to search all blocks
+ * @v tag		Setting tag number
+ * @ret value		Setting value, or zero
+ */
+unsigned long fetch_uintz_setting ( struct settings *settings,
+				    unsigned int tag ) {
+	unsigned long value = 0;
+
+	fetch_uint_setting ( settings, tag, &value );
+	return value;
 }
 
 /******************************************************************************

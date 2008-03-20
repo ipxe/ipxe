@@ -160,6 +160,9 @@ extern int fetch_int_setting ( struct settings *settings, unsigned int tag,
 			       long *value );
 extern int fetch_uint_setting ( struct settings *settings, unsigned int tag,
 				unsigned long *value );
+extern long fetch_intz_setting ( struct settings *settings, unsigned int tag );
+extern unsigned long fetch_uintz_setting ( struct settings *settings,
+					   unsigned int tag );
 extern struct settings * find_settings ( const char *name );
 extern int store_typed_setting ( struct settings *settings,
 				 unsigned int tag, struct setting_type *type,
