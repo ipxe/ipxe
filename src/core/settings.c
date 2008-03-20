@@ -37,15 +37,21 @@
 
 /** Registered setting types */
 static struct setting_type setting_types[0]
-__table_start ( struct setting_type, setting_types );
+	__table_start ( struct setting_type, setting_types );
 static struct setting_type setting_types_end[0]
-__table_end ( struct setting_type, setting_types );
+	__table_end ( struct setting_type, setting_types );
 
 /** Registered named settings */
 static struct named_setting named_settings[0]
-__table_start ( struct named_setting, named_settings );
+	__table_start ( struct named_setting, named_settings );
 static struct named_setting named_settings_end[0]
-__table_end ( struct named_setting, named_settings );
+	__table_end ( struct named_setting, named_settings );
+
+/** Registered settings applicators */
+static struct settings_applicator settings_applicators[0]
+	__table_start ( struct settings_applicator, settings_applicators );
+static struct settings_applicator settings_applicators_end[0]
+	__table_end ( struct settings_applicator, settings_applicators );
 
 /**
  * Obtain printable version of a settings tag number
@@ -94,10 +100,6 @@ int simple_settings_fetch ( struct settings *settings, unsigned int tag,
 	return ( len ? len : 8 );
 }
 
-// Dummy routine just for testing
-static void apply_settings ( void ) {
-}
-
 /** Simple settings operations */
 struct settings_operations simple_settings_operations = {
 	.store = simple_settings_store,
@@ -112,6 +114,66 @@ struct settings settings_root = {
 	.children = LIST_HEAD_INIT ( settings_root.children ),
 	.op = &simple_settings_operations,
 };
+
+/**
+ * Apply all settings
+ *
+ * @ret rc		Return status code
+ */
+static int apply_settings ( void ) {
+	struct settings_applicator *applicator;
+	int rc;
+
+	/* Call all settings applicators */
+	for ( applicator = settings_applicators ;
+	      applicator < settings_applicators_end ; applicator++ ) {
+		if ( ( rc = applicator->apply() ) != 0 ) {
+			DBG ( "Could not apply settings using applicator "
+			      "%p: %s\n", applicator, strerror ( rc ) );
+			return rc;
+		}
+	}
+
+	return 0;
+}
+
+/**
+ * Reprioritise settings
+ *
+ * @v settings		Settings block
+ *
+ * Reorders the settings block amongst its siblings according to its
+ * priority.
+ */
+static void reprioritise_settings ( struct settings *settings ) {
+	struct settings *parent = settings->parent;
+	long priority;
+	struct settings *tmp;
+	long tmp_priority;
+
+	/* Stop when we reach the top of the tree */
+	if ( ! parent )
+		return;
+
+	/* Read priority, if present */
+	priority = 0;
+	fetch_int_setting ( settings, DHCP_EB_PRIORITY, &priority );
+
+	/* Remove from siblings list */
+	list_del ( &settings->siblings );
+
+	/* Reinsert after any existing blocks which have a higher priority */
+	list_for_each_entry ( tmp, &parent->children, siblings ) {
+		tmp_priority = 0;
+		fetch_int_setting ( tmp, DHCP_EB_PRIORITY, &tmp_priority );
+		if ( priority > tmp_priority )
+			break;
+	}
+	list_add_tail ( &settings->siblings, &tmp->siblings );
+
+	/* Recurse up the tree */
+	reprioritise_settings ( parent );
+}
 
 /**
  * Register settings block
@@ -133,6 +195,9 @@ int register_settings ( struct settings *settings, struct settings *parent ) {
 	settings->parent = parent;
 	list_add_tail ( &settings->siblings, &parent->children );
 	DBGC ( settings, "Settings %p registered\n", settings );
+
+	/* Fix up settings priority */
+	reprioritise_settings ( settings );
 
 	/* Apply potentially-updated settings */
 	apply_settings();
@@ -205,6 +270,34 @@ struct settings * find_settings ( const char *name ) {
  *
  ******************************************************************************
  */
+
+/**
+ * Store value of setting
+ *
+ * @v settings		Settings block
+ * @v tag		Setting tag number
+ * @v data		Setting data, or NULL to clear setting
+ * @v len		Length of setting data
+ * @ret rc		Return status code
+ */
+int store_setting ( struct settings *settings, unsigned int tag,
+		    const void *data, size_t len ) {
+	int rc;
+
+	/* Store setting */
+	if ( ( rc = settings->op->store ( settings, tag, data, len ) ) != 0 )
+		return rc;
+
+	/* Reprioritise settings if necessary */
+	if ( tag == DHCP_EB_PRIORITY )
+		reprioritise_settings ( settings );
+
+	/* Apply potentially-updated setting */
+	if ( ( rc = apply_settings() ) != 0 )
+		return rc;
+
+	return 0;
+}
 
 /**
  * Fetch value of setting
@@ -288,7 +381,7 @@ int fetch_ipv4_setting ( struct settings *settings, unsigned int tag,
 	len = fetch_setting ( settings, tag, inp, sizeof ( *inp ) );
 	if ( len < 0 )
 		return len;
-	if ( len != sizeof ( *inp ) )
+	if ( len < ( int ) sizeof ( *inp ) )
 		return -ERANGE;
 	return len;
 }

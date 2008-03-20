@@ -30,7 +30,7 @@
 #include <gpxe/resolv.h>
 #include <gpxe/retry.h>
 #include <gpxe/tcpip.h>
-#include <gpxe/dhcp.h>
+#include <gpxe/settings.h>
 #include <gpxe/features.h>
 #include <gpxe/dns.h>
 
@@ -507,27 +507,26 @@ struct resolver dns_resolver __resolver ( RESOLV_NORMAL ) = {
 };
 
 /**
- * Apply DHCP nameserver option
+ * Apply nameserver setting
  *
- * @v tag		DHCP option tag
- * @v option		DHCP option
+ * @ret rc		Return status code
  */
-static int apply_dhcp_nameserver ( unsigned int tag __unused,
-				   struct dhcp_option *option ) {
-	struct sockaddr_in *sin_nameserver;
+static int apply_nameserver_setting ( void ) {
+	struct sockaddr_in *sin_nameserver =
+		( struct sockaddr_in * ) &nameserver;
+	int len;
 
-	sin_nameserver = ( struct sockaddr_in * ) &nameserver;
-	sin_nameserver->sin_family = AF_INET;
-	dhcp_ipv4_option ( option, &sin_nameserver->sin_addr );
-
-	DBG ( "DNS using nameserver %s\n",
-	      inet_ntoa ( sin_nameserver->sin_addr ) );
+	if ( ( len = fetch_ipv4_setting ( NULL, DHCP_DNS_SERVERS,
+					  &sin_nameserver->sin_addr ) ) >= 0 ){
+		sin_nameserver->sin_family = AF_INET;
+		DBG ( "DNS using nameserver %s\n",
+		      inet_ntoa ( sin_nameserver->sin_addr ) );
+	}
 
 	return 0;
 }
 
-/** DHCP nameserver applicator */
-struct dhcp_option_applicator dhcp_nameserver_applicator __dhcp_applicator = {
-	.tag = DHCP_DNS_SERVERS,
-	.apply = apply_dhcp_nameserver,
+/** Nameserver setting applicator */
+struct settings_applicator nameserver_applicator __settings_applicator = {
+	.apply = apply_nameserver_setting,
 };

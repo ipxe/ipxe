@@ -31,7 +31,7 @@
 #include <gpxe/process.h>
 #include <gpxe/uaccess.h>
 #include <gpxe/tcpip.h>
-#include <gpxe/dhcp.h>
+#include <gpxe/settings.h>
 #include <gpxe/features.h>
 #include <gpxe/iscsi.h>
 
@@ -1591,78 +1591,107 @@ int iscsi_attach ( struct scsi_device *scsi, const char *root_path ) {
 
 /****************************************************************************
  *
- * DHCP option applicators
+ * Settings applicators
  *
  */
 
-/**
- * Apply DHCP iSCSI option
- *
- * @v tag		DHCP option tag
- * @v option		DHCP option
- * @ret rc		Return status code
- */
-static int apply_dhcp_iscsi_string ( unsigned int tag,
-				     struct dhcp_option *option ) {
-	char *prefix = "";
-	size_t prefix_len;
-	size_t len;
+/** An iSCSI string setting */
+struct iscsi_string_setting {
+	/** Setting tag number */
+	unsigned int tag;
+	/** String to update */
 	char **string;
-	char *p;
+	/** String prefix */
+	const char *prefix;
+};
 
-	/* Identify string and prefix */
-	switch ( tag ) {
-	case DHCP_ISCSI_INITIATOR_IQN:
-		string = &iscsi_explicit_initiator_iqn;
-		break;
-	case DHCP_EB_USERNAME:
-		string = &iscsi_username;
-		break;
-	case DHCP_EB_PASSWORD:
-		string = &iscsi_password;
-		break;
-	case DHCP_HOST_NAME:
-		string = &iscsi_default_initiator_iqn;
-		prefix = "iqn.2000-09.org.etherboot:";
-		break;
-	default:
-		assert ( 0 );
-		return -EINVAL;
-	}
-
-	/* Free old string */
-	free ( *string );
-	*string = NULL;
-
-	/* Allocate and fill new string */
-	prefix_len = strlen ( prefix );
-	len = ( prefix_len + option->len + 1 );
-	p = *string = malloc ( len );
-	if ( ! p )
-		return -ENOMEM;
-	strcpy ( p, prefix );
-	dhcp_snprintf ( ( p + prefix_len ), ( len - prefix_len ), option );
-	return 0;
-}
-
-/** DHCP iSCSI option applicators */
-struct dhcp_option_applicator dhcp_iscsi_applicators[] __dhcp_applicator = {
+/** iSCSI string settings */
+static struct iscsi_string_setting iscsi_string_settings[] = {
 	{
 		.tag = DHCP_ISCSI_INITIATOR_IQN,
-		.apply = apply_dhcp_iscsi_string,
+		.string = &iscsi_explicit_initiator_iqn,
+		.prefix = "",
 	},
 	{
 		.tag = DHCP_EB_USERNAME,
-		.apply = apply_dhcp_iscsi_string,
+		.string = &iscsi_username,
+		.prefix = "",
 	},
 	{
 		.tag = DHCP_EB_PASSWORD,
-		.apply = apply_dhcp_iscsi_string,
+		.string = &iscsi_password,
+		.prefix = "",
 	},
 	{
 		.tag = DHCP_HOST_NAME,
-		.apply = apply_dhcp_iscsi_string,
+		.string = &iscsi_default_initiator_iqn,
+		.prefix = "iqn.2000-09.org.etherboot:",
 	},
+};
+
+/**
+ * Apply iSCSI setting
+ *
+ * @v setting		iSCSI string setting
+ * @ret rc		Return status code
+ */
+static int apply_iscsi_string_setting ( struct iscsi_string_setting *setting ){
+	size_t prefix_len;
+	int setting_len;
+	size_t len;
+	int check_len;
+	char *p;
+
+	/* Free old string */
+	free ( *setting->string );
+	*setting->string = NULL;
+
+	/* Allocate new string */
+	prefix_len = strlen ( setting->prefix );
+	setting_len = fetch_setting_len ( NULL, setting->tag );
+	if ( setting_len < 0 )
+		return setting_len;
+	len = ( prefix_len + setting_len + 1 );
+	p = *setting->string = malloc ( len );
+	if ( ! p )
+		return -ENOMEM;
+
+	/* Fill new string */
+	strcpy ( p, setting->prefix );
+	check_len = fetch_string_setting ( NULL, setting->tag,
+					   ( p + prefix_len ),
+					   ( len - prefix_len ) );
+	assert ( check_len == setting_len );
+
+	return 0;
+}
+
+/**
+ * Apply iSCSI settings
+ *
+ * @ret rc		Return status code
+ */
+static int apply_iscsi_settings ( void ) {
+	struct iscsi_string_setting *setting;
+	unsigned int i;
+	int rc;
+
+	for ( i = 0 ; i < ( sizeof ( iscsi_string_settings ) /
+			    sizeof ( iscsi_string_settings[0] ) ) ; i++ ) {
+		setting = &iscsi_string_settings[i];
+		if ( ( rc = apply_iscsi_string_setting ( setting ) ) != 0 ) {
+			DBG ( "iSCSI could not apply setting %d\n",
+			      setting->tag );
+			return rc;
+		}
+	}
+
+	return 0;
+}
+
+/** iSCSI settings applicator */
+struct settings_applicator iscsi_settings_applicator __settings_applicator = {
+	.apply = apply_iscsi_settings,
 };
 
 /****************************************************************************

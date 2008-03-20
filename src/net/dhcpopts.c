@@ -37,12 +37,6 @@
 /** List of registered DHCP option blocks */
 LIST_HEAD ( dhcp_option_blocks );
 
-/** Registered DHCP option applicators */
-static struct dhcp_option_applicator dhcp_option_applicators[0]
-	__table_start ( struct dhcp_option_applicator, dhcp_applicators );
-static struct dhcp_option_applicator dhcp_option_applicators_end[0]
-	__table_end ( struct dhcp_option_applicator, dhcp_applicators );
-
 /**
  * Obtain printable version of a DHCP option tag
  *
@@ -578,13 +572,9 @@ void delete_dhcp_option ( struct dhcp_option_block *options,
  * @ret rc		Return status code
  */
 int apply_dhcp_options ( struct dhcp_option_block *options ) {
-	struct dhcp_option_applicator *applicator;
-	struct dhcp_option *option;
 	struct in_addr tftp_server;
 	struct uri *uri;
 	char uri_string[32];
-	unsigned int tag;
-	int rc;
 
 	/* Set current working URI based on TFTP server */
 	find_dhcp_ipv4_option ( options, DHCP_EB_SIADDR, &tftp_server );
@@ -595,20 +585,6 @@ int apply_dhcp_options ( struct dhcp_option_block *options ) {
 		return -ENOMEM;
 	churi ( uri );
 	uri_put ( uri );
-
-	/* Call all registered DHCP option applicators */
-	for ( applicator = dhcp_option_applicators ;
-	      applicator < dhcp_option_applicators_end ; applicator++ ) {
-		tag = applicator->tag;
-		option = find_dhcp_option ( options, tag );
-		if ( ! option )
-			continue;
-		if ( ( rc = applicator->apply ( tag, option ) ) != 0 ) {
-			DBG ( "Could not apply DHCP option %s: %s\n",
-			      dhcp_tag_name ( tag ), strerror ( rc ) );
-			return rc;
-		}
-	}
 
 	return 0;
 }

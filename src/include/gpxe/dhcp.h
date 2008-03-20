@@ -489,23 +489,6 @@ struct dhcp_packet {
 	struct dhcp_option_block options;
 };
 
-/** A DHCP option applicator */
-struct dhcp_option_applicator {
-	/** DHCP option tag */
-	unsigned int tag;
-	/** Applicator
-	 *
-	 * @v tag	DHCP option tag
-	 * @v option	DHCP option
-	 * @ret rc	Return status code
-	 */
-	int ( * apply ) ( unsigned int tag, struct dhcp_option *option );
-};
-
-/** Declare a DHCP option applicator */
-#define __dhcp_applicator \
-	__table ( struct dhcp_option_applicator, dhcp_applicators, 01 )
-
 /**
  * Get reference to DHCP options block
  *

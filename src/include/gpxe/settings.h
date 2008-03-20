@@ -122,6 +122,22 @@ struct named_setting {
 /** Declare a configuration setting */
 #define	__named_setting __table ( struct named_setting, named_settings, 01 )
 
+/**
+ * A settings applicator
+ *
+ */
+struct settings_applicator {
+	/** Apply updated settings
+	 *
+	 * @ret rc		Return status code
+	 */
+	int ( * apply ) ( void );
+};
+
+/** Declare a settings applicator */
+#define __settings_applicator \
+	__table ( struct settings_applicator, settings_applicators, 01 )
+
 extern int simple_settings_store ( struct settings *settings, unsigned int tag,
 				   const void *data, size_t len );
 extern int simple_settings_fetch ( struct settings *settings, unsigned int tag,
@@ -131,6 +147,8 @@ extern struct settings_operations simple_settings_operations;
 extern int register_settings ( struct settings *settings,
 			       struct settings *parent );
 extern void unregister_settings ( struct settings *settings );
+extern int store_setting ( struct settings *settings, unsigned int tag,
+			   const void *data, size_t len );
 extern int fetch_setting ( struct settings *settings, unsigned int tag,
 			   void *data, size_t len );
 extern int fetch_setting_len ( struct settings *settings, unsigned int tag );
@@ -177,20 +195,6 @@ static inline void settings_init ( struct settings *settings,
 	settings->op = op;
 	settings->refcnt = refcnt;
 	settings->name = name;
-}
-
-/**
- * Store value of setting
- *
- * @v settings		Settings block
- * @v tag		Setting tag number
- * @v data		Setting data, or NULL to clear setting
- * @v len		Length of setting data
- * @ret rc		Return status code
- */
-static inline int store_setting ( struct settings *settings, unsigned int tag,
-				  const void *data, size_t len ) {
-	return settings->op->store ( settings, tag, data, len );
 }
 
 /**
