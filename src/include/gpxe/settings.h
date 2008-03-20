@@ -25,9 +25,9 @@ struct settings_operations {
 	 * @v len		Length of setting data
 	 * @ret rc		Return status code
 	 */
-	int ( * set ) ( struct settings *settings, unsigned int tag,
-			const void *data, size_t len );
-	/** Get value of setting
+	int ( * store ) ( struct settings *settings, unsigned int tag,
+			  const void *data, size_t len );
+	/** Fetch value of setting
 	 *
 	 * @v settings		Settings block
 	 * @v tag		Setting tag number
@@ -38,8 +38,8 @@ struct settings_operations {
 	 * The actual length of the setting will be returned even if
 	 * the buffer was too small.
 	 */
-	int ( * get ) ( struct settings *settings, unsigned int tag,
-			void *data, size_t len );
+	int ( * fetch ) ( struct settings *settings, unsigned int tag,
+			  void *data, size_t len );
 };
 
 /** A settings block */
@@ -47,9 +47,13 @@ struct settings {
 	/** Reference counter */
 	struct refcnt *refcnt;
 	/** Name */
-	char name[16];
-	/** List of all settings */
-	struct list_head list;
+	const char *name;
+	/** Parent settings block */
+	struct settings *parent;
+	/** Sibling settings blocks */
+	struct list_head siblings;
+	/** Child settings blocks */
+	struct list_head children;
 	/** Settings block operations */
 	struct settings_operations *op;
 };
@@ -73,9 +77,9 @@ struct setting_type {
 	 * @v value		Formatted setting data
 	 * @ret rc		Return status code
 	 */
-	int ( * setf ) ( struct settings *settings, unsigned int tag,
-			 const char *value );
-	/** Get and format value of setting
+	int ( * storef ) ( struct settings *settings, unsigned int tag,
+			   const char *value );
+	/** Fetch and format value of setting
 	 *
 	 * @v settings		Settings block, or NULL to search all blocks
 	 * @v tag		Setting tag number
@@ -83,8 +87,8 @@ struct setting_type {
 	 * @v len		Length of buffer
 	 * @ret len		Length of formatted value, or negative error
 	 */
-	int ( * getf ) ( struct settings *settings, unsigned int tag,
-			 char *buf, size_t len );
+	int ( * fetchf ) ( struct settings *settings, unsigned int tag,
+			   char *buf, size_t len );
 };
 
 /** Declare a configuration setting type */
@@ -100,9 +104,7 @@ struct setting_type {
 struct named_setting {
 	/** Name
 	 *
-	 * This is the human-readable name for the setting.  Where
-	 * possible, it should match the name used in dhcpd.conf (see
-	 * dhcp-options(5)).
+	 * This is the human-readable name for the setting.
 	 */
 	const char *name;
 	/** Description */
@@ -120,28 +122,65 @@ struct named_setting {
 /** Declare a configuration setting */
 #define	__named_setting __table ( struct named_setting, named_settings, 01 )
 
-extern struct settings interactive_settings;
+extern int simple_settings_store ( struct settings *settings, unsigned int tag,
+				   const void *data, size_t len );
+extern int simple_settings_fetch ( struct settings *settings, unsigned int tag,
+				   void *data, size_t len );
+extern struct settings_operations simple_settings_operations;
 
-extern int get_setting ( struct settings *settings, unsigned int tag,
-			 void *data, size_t len );
-extern int get_setting_len ( struct settings *settings, unsigned int tag );
-extern int get_string_setting ( struct settings *settings, unsigned int tag,
-				char *data, size_t len );
-extern int get_ipv4_setting ( struct settings *settings, unsigned int tag,
-			      struct in_addr *inp );
-extern int get_int_setting ( struct settings *settings, unsigned int tag,
-			     long *value );
-extern int get_uint_setting ( struct settings *settings, unsigned int tag,
-			      unsigned long *value );
+extern int register_settings ( struct settings *settings,
+			       struct settings *parent );
+extern void unregister_settings ( struct settings *settings );
+extern int fetch_setting ( struct settings *settings, unsigned int tag,
+			   void *data, size_t len );
+extern int fetch_setting_len ( struct settings *settings, unsigned int tag );
+extern int fetch_string_setting ( struct settings *settings, unsigned int tag,
+				  char *data, size_t len );
+extern int fetch_ipv4_setting ( struct settings *settings, unsigned int tag,
+				struct in_addr *inp );
+extern int fetch_int_setting ( struct settings *settings, unsigned int tag,
+			       long *value );
+extern int fetch_uint_setting ( struct settings *settings, unsigned int tag,
+				unsigned long *value );
 extern struct settings * find_settings ( const char *name );
-extern int set_typed_setting ( struct settings *settings,
-			       unsigned int tag, struct setting_type *type,
-			       const char *value );
-extern int set_named_setting ( const char *name, const char *value );
-extern int get_named_setting ( const char *name, char *buf, size_t len );
+extern int store_typed_setting ( struct settings *settings,
+				 unsigned int tag, struct setting_type *type,
+				 const char *value );
+extern int store_named_setting ( const char *name, const char *value );
+extern int fetch_named_setting ( const char *name, char *buf, size_t len );
+
+extern struct setting_type setting_type_ __setting_type;
+extern struct setting_type setting_type_string __setting_type;
+extern struct setting_type setting_type_ipv4 __setting_type;
+extern struct setting_type setting_type_int8 __setting_type;
+extern struct setting_type setting_type_int16 __setting_type;
+extern struct setting_type setting_type_int32 __setting_type;
+extern struct setting_type setting_type_uint8 __setting_type;
+extern struct setting_type setting_type_uint16 __setting_type;
+extern struct setting_type setting_type_uint32 __setting_type;
+extern struct setting_type setting_type_hex __setting_type;
 
 /**
- * Set value of setting
+ * Initialise a settings block
+ *
+ * @v settings		Settings block
+ * @v op		Settings block operations
+ * @v refcnt		Containing object reference counter, or NULL
+ * @v name		Settings block name
+ */
+static inline void settings_init ( struct settings *settings,
+				   struct settings_operations *op,
+				   struct refcnt *refcnt,
+				   const char *name ) {
+	INIT_LIST_HEAD ( &settings->siblings );
+	INIT_LIST_HEAD ( &settings->children );
+	settings->op = op;
+	settings->refcnt = refcnt;
+	settings->name = name;
+}
+
+/**
+ * Store value of setting
  *
  * @v settings		Settings block
  * @v tag		Setting tag number
@@ -149,9 +188,9 @@ extern int get_named_setting ( const char *name, char *buf, size_t len );
  * @v len		Length of setting data
  * @ret rc		Return status code
  */
-static inline int set_setting ( struct settings *settings, unsigned int tag,
-				const void *data, size_t len ) {
-	return settings->op->set ( settings, tag, data, len );
+static inline int store_setting ( struct settings *settings, unsigned int tag,
+				  const void *data, size_t len ) {
+	return settings->op->store ( settings, tag, data, len );
 }
 
 /**
@@ -163,11 +202,11 @@ static inline int set_setting ( struct settings *settings, unsigned int tag,
  */
 static inline int delete_setting ( struct settings *settings,
 				   unsigned int tag ) {
-	return set_setting ( settings, tag, NULL, 0 );
+	return store_setting ( settings, tag, NULL, 0 );
 }
 
 /**
- * Get and format value of setting
+ * Fetch and format value of setting
  *
  * @v settings		Settings block, or NULL to search all blocks
  * @v tag		Setting tag number
@@ -176,11 +215,11 @@ static inline int delete_setting ( struct settings *settings,
  * @v len		Length of buffer
  * @ret len		Length of formatted value, or negative error
  */
-static inline int get_typed_setting ( struct settings *settings,
-				      unsigned int tag,
-				      struct setting_type *type,
-				      char *buf, size_t len ) {
-	return type->getf ( settings, tag, buf, len );
+static inline int fetch_typed_setting ( struct settings *settings,
+					unsigned int tag,
+					struct setting_type *type,
+					char *buf, size_t len ) {
+	return type->fetchf ( settings, tag, buf, len );
 }
 
 /**
@@ -190,7 +229,7 @@ static inline int get_typed_setting ( struct settings *settings,
  * @ret rc		Return status code
  */
 static inline int delete_named_setting ( const char *name ) {
-	return set_named_setting ( name, NULL );
+	return store_named_setting ( name, NULL );
 }
 
 #endif /* _GPXE_SETTINGS_H */

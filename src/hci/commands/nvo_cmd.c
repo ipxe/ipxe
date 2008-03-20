@@ -16,7 +16,8 @@ static int show_exec ( int argc, char **argv ) {
 		return 1;
 	}
 
-	if ( ( rc = get_named_setting ( argv[1], buf, sizeof ( buf ) ) ) < 0 ){
+	if ( ( rc = fetch_named_setting ( argv[1], buf,
+					  sizeof ( buf ) ) ) < 0 ){
 		printf ( "Could not find \"%s\": %s\n",
 			 argv[1], strerror ( rc ) );
 		return 1;
@@ -34,7 +35,7 @@ static int set_exec ( int argc, char **argv ) {
 		return 1;
 	}
 
-	if ( ( rc = set_named_setting ( argv[1], argv[2] ) ) != 0 ) {
+	if ( ( rc = store_named_setting ( argv[1], argv[2] ) ) != 0 ) {
 		printf ( "Could not set \"%s\"=\"%s\": %s\n",
 			 argv[1], argv[2], strerror ( rc ) );
 		return 1;

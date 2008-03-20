@@ -114,9 +114,9 @@ static void load_setting ( struct setting_widget *widget ) {
 	widget->editing = 0;
 
 	/* Read current setting value */
-	if ( get_typed_setting ( widget->settings, widget->setting->tag,
-				 widget->setting->type, widget->value,
-				 sizeof ( widget->value ) ) < 0 ) {
+	if ( fetch_typed_setting ( widget->settings, widget->setting->tag,
+				   widget->setting->type, widget->value,
+				   sizeof ( widget->value ) ) < 0 ) {
 		widget->value[0] = '\0';
 	}	
 
@@ -133,8 +133,8 @@ static void load_setting ( struct setting_widget *widget ) {
  * @v widget		Setting widget
  */
 static int save_setting ( struct setting_widget *widget ) {
-	return set_typed_setting ( widget->settings, widget->setting->tag,
-				   widget->setting->type, widget->value );
+	return store_typed_setting ( widget->settings, widget->setting->tag,
+				     widget->setting->type, widget->value );
 }
 
 /**
