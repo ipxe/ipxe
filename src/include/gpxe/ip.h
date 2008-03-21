@@ -77,9 +77,4 @@ extern struct list_head ipv4_miniroutes;
 
 extern struct net_protocol ipv4_protocol;
 
-extern int add_ipv4_address ( struct net_device *netdev,
-			      struct in_addr address, struct in_addr netmask,
-			      struct in_addr gateway );
-extern void del_ipv4_address ( struct net_device *netdev );
-
 #endif /* _GPXE_IP_H */

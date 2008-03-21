@@ -12,6 +12,8 @@
 #include <gpxe/netdevice.h>
 #include <gpxe/ip.h>
 #include <gpxe/tcpip.h>
+#include <gpxe/dhcp.h>
+#include <gpxe/settings.h>
 
 /** @file
  *
@@ -94,45 +96,47 @@ static void del_ipv4_miniroute ( struct ipv4_miniroute *miniroute ) {
 }
 
 /**
- * Add IPv4 interface
+ * Create IPv4 routing table
  *
- * @v netdev	Network device
- * @v address	IPv4 address
- * @v netmask	Subnet mask
- * @v gateway	Gateway address (or @c INADDR_NONE for no gateway)
- * @ret rc	Return status code
- *
+ * @ret rc		Return status code
  */
-int add_ipv4_address ( struct net_device *netdev, struct in_addr address,
-		       struct in_addr netmask, struct in_addr gateway ) {
+static int ipv4_create_routes ( void ) {
 	struct ipv4_miniroute *miniroute;
+	struct ipv4_miniroute *tmp;
+	struct net_device *netdev;
+	struct settings *settings;
+	struct in_addr address = { 0 };
+	struct in_addr netmask = { 0 };
+	struct in_addr gateway = { INADDR_NONE };
 
-	/* Clear any existing address for this net device */
-	del_ipv4_address ( netdev );
+	/* Delete all existing routes */
+	list_for_each_entry_safe ( miniroute, tmp, &ipv4_miniroutes, list )
+		del_ipv4_miniroute ( miniroute );
 
-	/* Add new miniroute */
-	miniroute = add_ipv4_miniroute ( netdev, address, netmask, gateway );
-	if ( ! miniroute )
-		return -ENOMEM;
+	/* Create a route for each configured network device */
+	for_each_netdev ( netdev ) {
+		settings = netdev_settings ( netdev );
+		address.s_addr = 0;
+		fetch_ipv4_setting ( settings, DHCP_EB_YIADDR, &address );
+		netmask.s_addr = 0;
+		fetch_ipv4_setting ( settings, DHCP_SUBNET_MASK, &netmask );
+		gateway.s_addr = INADDR_NONE;
+		fetch_ipv4_setting ( settings, DHCP_ROUTERS, &gateway );
+		if ( address.s_addr ) {
+			miniroute = add_ipv4_miniroute ( netdev, address,
+							 netmask, gateway );
+			if ( ! miniroute )
+				return -ENOMEM;
+		}
+	}
 
 	return 0;
 }
 
-/**
- * Remove IPv4 interface
- *
- * @v netdev	Network device
- */
-void del_ipv4_address ( struct net_device *netdev ) {
-	struct ipv4_miniroute *miniroute;
-
-	list_for_each_entry ( miniroute, &ipv4_miniroutes, list ) {
-		if ( miniroute->netdev == netdev ) {
-			del_ipv4_miniroute ( miniroute );
-			break;
-		}
-	}
-}
+/** IPv4 settings applicator */
+struct settings_applicator ipv4_settings_applicator __settings_applicator = {
+	.apply = ipv4_create_routes,
+};
 
 /**
  * Perform IPv4 routing

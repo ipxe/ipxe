@@ -341,6 +341,17 @@ netdev_priv ( struct net_device *netdev ) {
         return netdev->priv;
 }
 
+/**
+ * Get per-netdevice configuration settings block
+ *
+ * @v netdev		Network device
+ * @ret settings	Settings block
+ */
+static inline __attribute__ (( always_inline )) struct settings *
+netdev_settings ( struct net_device *netdev ) {
+	return &netdev->settings;
+}
+
 extern int netdev_tx ( struct net_device *netdev, struct io_buffer *iobuf );
 extern void netdev_tx_complete_err ( struct net_device *netdev,
 				 struct io_buffer *iobuf, int rc );

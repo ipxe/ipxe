@@ -266,7 +266,7 @@ struct net_device * alloc_netdev ( size_t priv_size ) {
 		netdev->refcnt.free = free_netdev;
 		INIT_LIST_HEAD ( &netdev->tx_queue );
 		INIT_LIST_HEAD ( &netdev->rx_queue );
-		settings_init ( &netdev->settings,
+		settings_init ( netdev_settings ( netdev ),
 				&netdev_settings_operations, &netdev->refcnt,
 				netdev->name );
 		netdev->priv = ( ( ( void * ) netdev ) + sizeof ( *netdev ) );
@@ -292,7 +292,8 @@ int register_netdev ( struct net_device *netdev ) {
 		   ifindex++ );
 
 	/* Register per-netdev configuration settings */
-	if ( ( rc = register_settings ( &netdev->settings, NULL ) ) != 0 ) {
+	if ( ( rc = register_settings ( netdev_settings ( netdev ),
+					NULL ) ) != 0 ) {
 		DBGC ( netdev, "NETDEV %p could not register settings: %s\n",
 		       netdev, strerror ( rc ) );
 		return rc;
@@ -369,7 +370,7 @@ void unregister_netdev ( struct net_device *netdev ) {
 	netdev_close ( netdev );
 
 	/* Unregister per-netdev configuration settings */
-	unregister_settings ( &netdev->settings );
+	unregister_settings ( netdev_settings ( netdev ) );
 
 	/* Remove from device list */
 	list_del ( &netdev->list );

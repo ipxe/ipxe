@@ -557,7 +557,4 @@ extern int create_dhcp_response ( struct net_device *netdev, int msgtype,
 extern int start_dhcp ( struct job_interface *job, struct net_device *netdev,
 			int (*register_options) ( struct net_device *,
 						  struct dhcp_option_block * ));
-extern int dhcp_configure_netdev ( struct net_device *netdev,
-				   struct dhcp_option_block *options );
-
 #endif /* _GPXE_DHCP_H */

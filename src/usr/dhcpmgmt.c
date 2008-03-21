@@ -32,11 +32,11 @@
  *
  */
 
-static int dhcp_success ( struct net_device *netdev,
+static int dhcp_success ( struct net_device *netdev __unused,
 			  struct dhcp_option_block *options ) {
 	DBGC ( options, "DHCP client registering options %p\n", options );
 	register_dhcp_options ( options );
-	return dhcp_configure_netdev ( netdev, options );
+	return 0;
 }
 
 int dhcp ( struct net_device *netdev ) {
