@@ -542,9 +542,6 @@ extern void find_global_dhcp_ipv4_option ( unsigned int tag,
 extern void delete_dhcp_option ( struct dhcp_option_block *options,
 				 unsigned int tag );
 
-extern int apply_dhcp_options ( struct dhcp_option_block *options );
-extern int apply_global_dhcp_options ( void );
-
 extern int create_dhcp_request ( struct net_device *netdev, int msgtype,
 				 struct dhcp_option_block *options,
 				 void *data, size_t max_len,

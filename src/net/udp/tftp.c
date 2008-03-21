@@ -32,6 +32,9 @@
 #include <gpxe/retry.h>
 #include <gpxe/features.h>
 #include <gpxe/bitmap.h>
+#include <gpxe/settings.h>
+#include <gpxe/dhcp.h>
+#include <gpxe/uri.h>
 #include <gpxe/tftp.h>
 
 /** @file
@@ -1088,4 +1091,44 @@ static int mtftp_open ( struct xfer_interface *xfer, struct uri *uri ) {
 struct uri_opener mtftp_uri_opener __uri_opener = {
 	.scheme	= "mtftp",
 	.open	= mtftp_open,
+};
+
+/**
+ * Apply TFTP configuration settings
+ *
+ * @ret rc		Return status code
+ */
+static int tftp_apply_settings ( void ) {
+	static struct in_addr tftp_server = { 0 };
+	struct in_addr last_tftp_server;
+	char uri_string[32];
+	struct uri *uri;
+
+	/* Retrieve TFTP server setting */
+	last_tftp_server = tftp_server;
+	fetch_ipv4_setting ( NULL, DHCP_EB_SIADDR, &tftp_server );
+
+	/* If TFTP server setting has changed, set the current working
+	 * URI to match.  Do it only when the TFTP server has changed
+	 * to try to minimise surprises to the user, who probably
+	 * won't expect the CWURI to change just because they updated
+	 * an unrelated setting and triggered all the settings
+	 * applicators.
+	 */
+	if ( tftp_server.s_addr != last_tftp_server.s_addr ) {
+		snprintf ( uri_string, sizeof ( uri_string ),
+			   "tftp://%s/", inet_ntoa ( tftp_server ) );
+		uri = parse_uri ( uri_string );
+		if ( ! uri )
+			return -ENOMEM;
+		churi ( uri );
+		uri_put ( uri );
+	}
+
+	return 0;
+}
+
+/** TFTP settings applicator */
+struct settings_applicator tftp_settings_applicator __settings_applicator = {
+	.apply = tftp_apply_settings,
 };

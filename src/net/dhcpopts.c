@@ -284,8 +284,6 @@ void register_dhcp_options ( struct dhcp_option_block *options ) {
 	dhcpopt_get ( options );
 	list_add_tail ( &options->list, &existing->list );
 
-	/* Apply all registered DHCP options */
-	apply_global_dhcp_options();
 }
 
 /**
@@ -563,37 +561,4 @@ void find_global_dhcp_ipv4_option ( unsigned int tag, struct in_addr *inp ) {
 void delete_dhcp_option ( struct dhcp_option_block *options,
 			  unsigned int tag ) {
 	set_dhcp_option ( options, tag, NULL, 0 );
-}
-
-/**
- * Apply DHCP options
- *
- * @v options		DHCP options block, or NULL
- * @ret rc		Return status code
- */
-int apply_dhcp_options ( struct dhcp_option_block *options ) {
-	struct in_addr tftp_server;
-	struct uri *uri;
-	char uri_string[32];
-
-	/* Set current working URI based on TFTP server */
-	find_dhcp_ipv4_option ( options, DHCP_EB_SIADDR, &tftp_server );
-	snprintf ( uri_string, sizeof ( uri_string ),
-		   "tftp://%s/", inet_ntoa ( tftp_server ) );
-	uri = parse_uri ( uri_string );
-	if ( ! uri )
-		return -ENOMEM;
-	churi ( uri );
-	uri_put ( uri );
-
-	return 0;
-}
-
-/**
- * Apply global DHCP options
- *
- * @ret rc		Return status code
- */
-int apply_global_dhcp_options ( void ) {
-	return apply_dhcp_options ( NULL );
 }
