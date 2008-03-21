@@ -517,10 +517,6 @@ dhcpopt_put ( struct dhcp_option_block *options ) {
 extern struct list_head dhcp_option_blocks;
 
 extern unsigned long dhcp_num_option ( struct dhcp_option *option );
-extern void dhcp_ipv4_option ( struct dhcp_option *option,
-			       struct in_addr *inp );
-extern int dhcp_snprintf ( char *buf, size_t size,
-			   struct dhcp_option *option );
 extern struct dhcp_option *
 find_dhcp_option ( struct dhcp_option_block *options, unsigned int tag );
 extern void register_dhcp_options ( struct dhcp_option_block *options );
@@ -531,14 +527,8 @@ extern struct dhcp_option_block * __malloc alloc_dhcp_options ( size_t max_len )
 extern struct dhcp_option *
 set_dhcp_option ( struct dhcp_option_block *options, unsigned int tag,
 		  const void *data, size_t len );
-extern struct dhcp_option * find_global_dhcp_option ( unsigned int tag );
 extern unsigned long find_dhcp_num_option ( struct dhcp_option_block *options,
 					    unsigned int tag );
-extern unsigned long find_global_dhcp_num_option ( unsigned int tag );
-extern void find_dhcp_ipv4_option ( struct dhcp_option_block *options,
-				    unsigned int tag, struct in_addr *inp );
-extern void find_global_dhcp_ipv4_option ( unsigned int tag,
-					   struct in_addr *inp );
 extern void delete_dhcp_option ( struct dhcp_option_block *options,
 				 unsigned int tag );
 

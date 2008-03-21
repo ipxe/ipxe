@@ -88,55 +88,6 @@ unsigned long dhcp_num_option ( struct dhcp_option *option ) {
 }
 
 /**
- * Obtain value of an IPv4-address DHCP option
- *
- * @v option		DHCP option, or NULL
- * @v inp		IPv4 address to fill in
- *
- * Parses the IPv4 address value from a DHCP option, if present.  It
- * is permitted to call dhcp_ipv4_option() with @c option set to NULL;
- * in this case the address will be set to 0.0.0.0.
- */
-void dhcp_ipv4_option ( struct dhcp_option *option, struct in_addr *inp ) {
-	if ( option )
-		*inp = option->data.in;
-}
-
-/**
- * Print DHCP string option value into buffer
- *
- * @v buf		Buffer into which to write the string
- * @v size		Size of buffer
- * @v option		DHCP option, or NULL
- * @ret len		Length of formatted string
- *
- * DHCP option strings are stored without a NUL terminator.  This
- * function provides a convenient way to extract these DHCP strings
- * into standard C strings.  It is permitted to call dhcp_snprintf()
- * with @c option set to NULL; in this case the buffer will be filled
- * with an empty string.
- *
- * The usual snprintf() semantics apply with regard to buffer size,
- * return value when the buffer is too small, etc.
- */
-int dhcp_snprintf ( char *buf, size_t size, struct dhcp_option *option ) {
-	size_t len;
-	char *content = "";
-
-	if ( option ) {
-		/* Shrink buffer size so that it is only just large
-		 * enough to contain the option data.  snprintf() will
-		 * take care of everything else (inserting the NUL etc.)
-		 */
-		len = ( option->len + 1 );
-		if ( len < size )
-			size = len;
-		content = option->data.string;
-	}
-	return snprintf ( buf, size, "%s", content );
-}
-
-/**
  * Calculate length of a normal DHCP option
  *
  * @v option		DHCP option
@@ -462,19 +413,6 @@ struct dhcp_option * set_dhcp_option ( struct dhcp_option_block *options,
 }
 
 /**
- * Find DHCP option within all registered DHCP options blocks
- *
- * @v tag		DHCP option tag to search for
- * @ret option		DHCP option, or NULL if not found
- *
- * This function exists merely as a notational shorthand for
- * find_dhcp_option() with @c options set to NULL.
- */
-struct dhcp_option * find_global_dhcp_option ( unsigned int tag ) {
-	return find_dhcp_option ( NULL, tag );
-}
-
-/**
  * Find DHCP numerical option, and return its value
  *
  * @v options		DHCP options block
@@ -491,62 +429,6 @@ struct dhcp_option * find_global_dhcp_option ( unsigned int tag ) {
 unsigned long find_dhcp_num_option ( struct dhcp_option_block *options,
 				     unsigned int tag ) {
 	return dhcp_num_option ( find_dhcp_option ( options, tag ) );
-}
-
-/**
- * Find DHCP numerical option, and return its value
- *
- * @v tag		DHCP option tag to search for
- * @ret value		Numerical value of the option, or 0 if not found
- *
- * This function exists merely as a notational shorthand for a call to
- * find_global_dhcp_option() followed by a call to dhcp_num_option().
- * It is not possible to distinguish between the cases "option not
- * found" and "option has a value of zero" using this function; if
- * this matters to you then issue the two constituent calls directly
- * and check that find_global_dhcp_option() returns a non-NULL value.
- */
-unsigned long find_global_dhcp_num_option ( unsigned int tag ) {
-	return dhcp_num_option ( find_global_dhcp_option ( tag ) );
-}
-
-/**
- * Find DHCP IPv4-address option, and return its value
- *
- * @v options		DHCP options block
- * @v tag		DHCP option tag to search for
- * @v inp		IPv4 address to fill in
- * @ret value		Numerical value of the option, or 0 if not found
- *
- * This function exists merely as a notational shorthand for a call to
- * find_dhcp_option() followed by a call to dhcp_ipv4_option().  It is
- * not possible to distinguish between the cases "option not found"
- * and "option has a value of 0.0.0.0" using this function; if this
- * matters to you then issue the two constituent calls directly and
- * check that find_dhcp_option() returns a non-NULL value.
- */
-void find_dhcp_ipv4_option ( struct dhcp_option_block *options,
-			     unsigned int tag, struct in_addr *inp ) {
-	dhcp_ipv4_option ( find_dhcp_option ( options, tag ), inp );
-}
-
-/**
- * Find DHCP IPv4-address option, and return its value
- *
- * @v options		DHCP options block
- * @v tag		DHCP option tag to search for
- * @v inp		IPv4 address to fill in
- * @ret value		Numerical value of the option, or 0 if not found
- *
- * This function exists merely as a notational shorthand for a call to
- * find_dhcp_option() followed by a call to dhcp_ipv4_option().  It is
- * not possible to distinguish between the cases "option not found"
- * and "option has a value of 0.0.0.0" using this function; if this
- * matters to you then issue the two constituent calls directly and
- * check that find_dhcp_option() returns a non-NULL value.
- */
-void find_global_dhcp_ipv4_option ( unsigned int tag, struct in_addr *inp ) {
-	dhcp_ipv4_option ( find_global_dhcp_option ( tag ), inp );
 }
 
 /**
