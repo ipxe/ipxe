@@ -53,40 +53,42 @@
 #ifdef CONSOLE_FIRMWARE
 REQUIRE_OBJECT ( bios_console );
 #endif
-
 #ifdef CONSOLE_SERIAL
 REQUIRE_OBJECT ( serial );
 #endif
-
 #ifdef CONSOLE_DIRECT_VGA
 REQUIRE_OBJECT ( video_subr );
 #endif
-
 #ifdef CONSOLE_BTEXT
 REQUIRE_OBJECT ( btext );
 #endif
-
 #ifdef CONSOLE_PC_KBD
 REQUIRE_OBJECT ( pc_kbd );
 #endif
-
 #ifdef CONSOLE_SYSLOG
 REQUIRE_OBJECT ( syslog );
 #endif
 
 /*
- * Timers
+ * Drag in all requested timers
  */
-
 #ifdef TIMER_BIOS
 REQUIRE_OBJECT ( timer_bios );
 #endif
-
 #ifdef TIMER_RDTSC
 REQUIRE_OBJECT ( timer_rdtsc );
 #endif
+
 /*
- * Drag in all requested protocols
+ * Drag in all requested network protocols
+ *
+ */
+#ifdef NET_PROTO_IPV4
+REQUIRE_OBJECT ( ipv4 );
+#endif
+
+/*
+ * Drag in all requested download protocols
  *
  */
 #ifdef DOWNLOAD_PROTO_TFTP
@@ -112,13 +114,12 @@ REQUIRE_OBJECT ( slam );
 #endif
 
 /*
- * Drag in any required resolvers
+ * Drag in all requested resolvers
  *
  */
 #ifdef DNS_RESOLVER
 REQUIRE_OBJECT ( dns );
 #endif
-
 #ifdef NMB_RESOLVER
 REQUIRE_OBJECT ( nmb );
 #endif

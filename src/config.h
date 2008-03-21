@@ -76,6 +76,16 @@
 
 /* @BEGIN general.h
  *
+ * Network protocols
+ *
+ */
+
+#define	NET_PROTO_IPV4		/* IPv4 protocol */
+
+/* @END general.h */
+
+/* @BEGIN general.h
+ *
  * Download protocols
  *
  */
