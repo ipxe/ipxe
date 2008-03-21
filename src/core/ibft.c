@@ -130,9 +130,33 @@ static void ibft_set_ipaddr ( struct ibft_ipaddr *ipaddr, struct in_addr in ) {
  */
 static void ibft_set_ipaddr_option ( struct ibft_ipaddr *ipaddr,
 				     unsigned int tag ) {
-	struct in_addr in;
-	find_global_dhcp_ipv4_option ( tag, &in );
+	struct in_addr in = { 0 };
+	fetch_ipv4_setting ( NULL, tag, &in );
 	ibft_set_ipaddr ( ipaddr, in );
+}
+
+/**
+ * Allocate a string within iBFT
+ *
+ * @v strings		iBFT string block descriptor
+ * @v string		String field to fill in
+ * @v len		Length of string to allocate (excluding NUL)
+ * @ret rc		Return status code
+ */
+static int ibft_alloc_string ( struct ibft_string_block *strings,
+			       struct ibft_string *string, size_t len ) {
+	char *dest;
+	unsigned int remaining;
+
+	dest = ( ( ( char * ) strings->table ) + strings->offset );
+	remaining = ( strings->table->acpi.length - strings->offset );
+	if ( len >= remaining )
+		return -ENOMEM;
+
+	string->offset = strings->offset;
+	string->length = len;
+	strings->offset += ( len + 1 );
+	return 0;
 }
 
 /**
@@ -141,29 +165,19 @@ static void ibft_set_ipaddr_option ( struct ibft_ipaddr *ipaddr,
  * @v strings		iBFT string block descriptor
  * @v string		String field
  * @v data		String to fill in
- * @v len		Length of string to fill in
  * @ret rc		Return status code
  */
 static int ibft_set_string ( struct ibft_string_block *strings,
-			     struct ibft_string *string,
-			     const void *data, size_t len ) {
+			     struct ibft_string *string, const char *data ) {
+	size_t len = strlen ( data );
 	char *dest;
-	char *end;
-	unsigned int remaining;
+	int rc;
 
-	dest = ( ( ( char * ) strings->table ) + strings->offset );
-	end = ( ( ( char * ) strings->table ) + strings->table->acpi.length );
-	remaining = ( end - dest );
+	if ( ( rc = ibft_alloc_string ( strings, string, len ) ) != 0 )
+		return rc;
+	dest = ( ( ( char * ) strings->table ) + string->offset );
+	strcpy ( dest, data );
 
-	if ( len >= remaining )
-		return -ENOMEM;
-
-	memcpy ( dest, data, len );
-	dest[len] = '\0';
-
-	string->offset = strings->offset;
-	string->length = len;
-	strings->offset += ( len + 1 );
 	return 0;
 }
 
@@ -178,17 +192,22 @@ static int ibft_set_string ( struct ibft_string_block *strings,
 static int ibft_set_string_option ( struct ibft_string_block *strings,
 				    struct ibft_string *string,
 				    unsigned int tag ) {
-	struct dhcp_option *option;
+	int len;
+	char *dest;
+	int rc;
 
-	option = find_global_dhcp_option ( tag );
-	if ( ! option ) {
+	len = fetch_setting_len ( NULL, tag );
+	if ( len < 0 ) {
 		string->offset = 0;
 		string->length = 0;
 		return 0;
 	}
 
-	return ibft_set_string ( strings, string, option->data.string,
-				 option->len );
+	if ( ( rc = ibft_alloc_string ( strings, string, len ) ) != 0 )
+		return rc;
+	dest = ( ( ( char * ) strings->table ) + string->offset );
+	fetch_string_setting ( NULL, tag, dest, ( len + 1 ) );
+	return 0;
 }
 
 /**
@@ -202,7 +221,7 @@ static int ibft_set_string_option ( struct ibft_string_block *strings,
 static int ibft_fill_nic ( struct ibft_nic *nic,
 			   struct ibft_string_block *strings,
 			   struct net_device *netdev ) {
-	struct in_addr netmask_addr;
+	struct in_addr netmask_addr = { 0 };
 	unsigned int netmask_count = 0;
 	int rc;
 
@@ -215,7 +234,7 @@ static int ibft_fill_nic ( struct ibft_nic *nic,
 		return rc;
 
 	/* Derive subnet mask prefix from subnet mask */
-	find_global_dhcp_ipv4_option ( DHCP_SUBNET_MASK, &netmask_addr );
+	fetch_ipv4_setting ( NULL, DHCP_SUBNET_MASK, &netmask_addr );
 	while ( netmask_addr.s_addr ) {
 		if ( netmask_addr.s_addr & 0x1 )
 			netmask_count++;
@@ -244,8 +263,7 @@ static int ibft_fill_initiator ( struct ibft_initiator *initiator,
 	int rc;
 
 	if ( ( rc = ibft_set_string ( strings, &initiator->initiator_name,
-				      initiator_iqn,
-				      strlen ( initiator_iqn ) ) ) != 0)
+				      initiator_iqn ) ) != 0 )
 		return rc;
 
 	return 0;
@@ -270,19 +288,16 @@ static int ibft_fill_target ( struct ibft_target *target,
 	ibft_set_ipaddr ( &target->ip_address, sin_target->sin_addr );
 	target->socket = ntohs ( sin_target->sin_port );
 	if ( ( rc = ibft_set_string ( strings, &target->target_name,
-				      iscsi->target_iqn,
-				      strlen ( iscsi->target_iqn ) ) ) != 0 )
+				      iscsi->target_iqn ) ) != 0 )
 		return rc;
 	if ( iscsi->username ) {
 		if ( ( rc = ibft_set_string ( strings, &target->chap_name,
-					      iscsi->username,
-					      strlen ( iscsi->username ) ))!=0)
+					      iscsi->username ) ) != 0 )
 			return rc;
 	}
 	if ( iscsi->password ) {
 		if ( ( rc = ibft_set_string ( strings, &target->chap_secret,
-					      iscsi->password,
-					      strlen ( iscsi->password ) ))!=0)
+					      iscsi->password ) ) != 0 )
 			return rc;
 		target->chap_type = IBFT_CHAP_ONE_WAY;
 	}
