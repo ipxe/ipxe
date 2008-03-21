@@ -8,13 +8,15 @@
  */
 
 #include <stdint.h>
-#include <gpxe/list.h>
 #include <gpxe/in.h>
+#include <gpxe/list.h>
 #include <gpxe/refcnt.h>
 #include <gpxe/tables.h>
 
 struct net_device;
 struct job_interface;
+struct dhcp_packet;
+struct settings;
 
 /** BOOTP/DHCP server port */
 #define BOOTPS_PORT 67
@@ -294,7 +296,7 @@ struct job_interface;
 
 /** Construct a word-valued DHCP option */
 #define DHCP_WORD( value ) DHCP_OPTION ( ( ( (value) >> 8 ) & 0xff ),   \
-					 ( ( (value) >> 0  ) & 0xff ) )
+					 ( ( (value) >> 0 ) & 0xff ) )
 
 /** Construct a dword-valued DHCP option */
 #define DHCP_DWORD( value ) DHCP_OPTION ( ( ( (value) >> 24 ) & 0xff ), \
@@ -327,21 +329,8 @@ struct dhcp_option {
 	 * byte in length.
 	 */
 	uint8_t len;
-	/** Option data
-	 *
-	 * Interpretation of the content is entirely dependent upon
-	 * the tag.  For fields containing a multi-byte integer, the
-	 * field is defined to be in network-endian order (unless you
-	 * are Intel and feel like violating the spec for fun).
-	 */
-	union {
-		uint8_t byte;
-		uint16_t word;
-		uint32_t dword;
-		struct in_addr in;
-		uint8_t bytes[0];
-		char string[0];
-	} data;
+	/** Option data */
+	uint8_t data[0];
 } __attribute__ (( packed ));
 
 /**
@@ -354,27 +343,6 @@ struct dhcp_option {
 
 /** Maximum length for a single DHCP option */
 #define DHCP_MAX_LEN 0xff
-
-/** A DHCP options block */
-struct dhcp_option_block {
-	/** Reference counter */
-	struct refcnt refcnt;
-	/** List of option blocks */
-	struct list_head list;
-	/** Option block raw data */
-	void *data;
-	/** Option block length */
-	size_t len;
-	/** Option block maximum length */
-	size_t max_len;
-	/** Block priority
-	 *
-	 * This is determined at the time of the call to
-	 * register_options() by searching for the @c DHCP_EB_PRIORITY
-	 * option.
-	 */
-	signed int priority;
-};
 
 /**
  * A DHCP header
@@ -448,7 +416,7 @@ struct dhcphdr {
 	 * length (for the sake of sanity) is 1, to allow for a single
 	 * @c DHCP_END tag.
 	 */
-	uint8_t options[1];
+	uint8_t options[0];
 };
 
 /** Opcode for a request from client to server */
@@ -474,74 +442,17 @@ struct dhcphdr {
  */
 #define DHCP_MIN_LEN 552
 
-/**
- * A DHCP packet
- *
- */
-struct dhcp_packet {
-	/** The DHCP packet contents */
-	struct dhcphdr *dhcphdr;
-	/** Maximum length of the DHCP packet buffer */
-	size_t max_len;
-	/** Used length of the DHCP packet buffer */
-	size_t len;
-	/** DHCP options */
-	struct dhcp_option_block options;
-};
-
-/**
- * Get reference to DHCP options block
- *
- * @v options		DHCP options block
- * @ret options		DHCP options block
- */
-static inline __attribute__ (( always_inline )) struct dhcp_option_block *
-dhcpopt_get ( struct dhcp_option_block *options ) {
-	ref_get ( &options->refcnt );
-	return options;
-}
-
-/**
- * Drop reference to DHCP options block
- *
- * @v options		DHCP options block, or NULL
- */
-static inline __attribute__ (( always_inline )) void
-dhcpopt_put ( struct dhcp_option_block *options ) {
-	ref_put ( &options->refcnt );
-}
-
 /** Maximum time that we will wait for ProxyDHCP offers */
 #define PROXYDHCP_WAIT_TIME ( TICKS_PER_SEC * 1 )
 
-extern struct list_head dhcp_option_blocks;
+extern int create_dhcp_request ( struct dhcp_packet *dhcppkt,
+				 struct net_device *netdev, int msgtype,
+				 struct settings *offer_settings,
+				 void *data, size_t max_len );
+extern int create_dhcp_response ( struct dhcp_packet *dhcppkt,
+				  struct net_device *netdev, int msgtype,
+				  struct settings *settings,
+				  void *data, size_t max_len );
+extern int start_dhcp ( struct job_interface *job, struct net_device *netdev );
 
-extern unsigned long dhcp_num_option ( struct dhcp_option *option );
-extern struct dhcp_option *
-find_dhcp_option ( struct dhcp_option_block *options, unsigned int tag );
-extern void register_dhcp_options ( struct dhcp_option_block *options );
-extern void unregister_dhcp_options ( struct dhcp_option_block *options );
-extern void init_dhcp_options ( struct dhcp_option_block *options,
-				void *data, size_t max_len );
-extern struct dhcp_option_block * __malloc alloc_dhcp_options ( size_t max_len );
-extern struct dhcp_option *
-set_dhcp_option ( struct dhcp_option_block *options, unsigned int tag,
-		  const void *data, size_t len );
-extern unsigned long find_dhcp_num_option ( struct dhcp_option_block *options,
-					    unsigned int tag );
-extern void delete_dhcp_option ( struct dhcp_option_block *options,
-				 unsigned int tag );
-
-extern int create_dhcp_request ( struct net_device *netdev, int msgtype,
-				 struct dhcp_option_block *options,
-				 void *data, size_t max_len,
-				 struct dhcp_packet *dhcppkt );
-extern int create_dhcp_response ( struct net_device *netdev, int msgtype,
-				  struct dhcp_option_block *options,
-				  void *data, size_t max_len,
-				  struct dhcp_packet *dhcppkt );
-
-extern int start_dhcp ( struct job_interface *job, struct net_device *netdev,
-			int (*register_options) ( struct net_device *,
-						  struct dhcp_option_block * ));
 #endif /* _GPXE_DHCP_H */

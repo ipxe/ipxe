@@ -3008,9 +3008,9 @@ static int falcon_init_nic ( struct efab_nic *efab ) {
 
 	/* Register non-volatile storage */
 	if ( efab->has_eeprom ) {
-		efab->nvo.nvs = &efab->falcon_eeprom.nvs;
-		efab->nvo.fragments = falcon_eeprom_fragments;
-		if ( nvo_register ( &efab->nvo ) != 0 )
+		nvo_init ( &efab->nvo, &efab->falcon_eeprom.nvs,
+			   falcon_eeprom_fragments, NULL /* hack */ );
+		if ( register_nvo ( &efab->nvo, NULL /* hack */ ) != 0 )
 			return 0;
 	}
 

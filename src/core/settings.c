@@ -213,6 +213,7 @@ void unregister_settings ( struct settings *settings ) {
 	/* Remove from list of settings */
 	ref_put ( settings->refcnt );
 	ref_put ( settings->parent->refcnt );
+	settings->parent = NULL;
 	list_del ( &settings->siblings );
 	DBGC ( settings, "Settings %p unregistered\n", settings );
 
@@ -280,7 +281,12 @@ struct settings * find_settings ( const char *name ) {
  */
 int store_setting ( struct settings *settings, unsigned int tag,
 		    const void *data, size_t len ) {
+	struct settings *parent;
 	int rc;
+
+	/* Sanity check */
+	if ( ! settings )
+		return -ENODEV;
 
 	/* Store setting */
 	if ( ( rc = settings->op->store ( settings, tag, data, len ) ) != 0 )
@@ -290,9 +296,16 @@ int store_setting ( struct settings *settings, unsigned int tag,
 	if ( tag == DHCP_EB_PRIORITY )
 		reprioritise_settings ( settings );
 
-	/* Apply potentially-updated setting */
-	if ( ( rc = apply_settings() ) != 0 )
-		return rc;
+	/* If these settings are registered, apply potentially-updated
+	 * settings
+	 */
+	for ( parent = settings->parent ; parent ; parent = parent->parent ) {
+		if ( parent == &settings_root ) {
+			if ( ( rc = apply_settings() ) != 0 )
+				return rc;
+			break;
+		}
+	}
 
 	return 0;
 }
@@ -466,6 +479,88 @@ unsigned long fetch_uintz_setting ( struct settings *settings,
 
 	fetch_uint_setting ( settings, tag, &value );
 	return value;
+}
+
+/**
+ * Copy setting
+ *
+ * @v dest		Destination settings block
+ * @v dest_tag		Destination setting tag number
+ * @v source		Source settings block
+ * @v source_tag	Source setting tag number
+ * @ret rc		Return status code
+ */
+int copy_setting ( struct settings *dest, unsigned int dest_tag,
+		   struct settings *source, unsigned int source_tag ) {
+	int len;
+	int check_len;
+	int rc;
+
+	len = fetch_setting_len ( source, source_tag );
+	if ( len < 0 )
+		return len;
+
+	{
+		char buf[len];
+
+		check_len = fetch_setting ( source, source_tag, buf,
+					    sizeof ( buf ) );
+		assert ( check_len == len );
+
+		if ( ( rc = store_setting ( dest, dest_tag, buf,
+					    sizeof ( buf ) ) ) != 0 )
+			return rc;
+	}
+
+	return 0;
+}
+
+/**
+ * Copy settings
+ *
+ * @v dest		Destination settings block
+ * @v source		Source settings block
+ * @v encapsulator	Encapsulating setting tag number, or zero
+ * @ret rc		Return status code
+ */
+static int copy_encap_settings ( struct settings *dest,
+				 struct settings *source,
+				 unsigned int encapsulator ) {
+	unsigned int subtag;
+	unsigned int tag;
+	int rc;
+
+	for ( subtag = DHCP_MIN_OPTION; subtag <= DHCP_MAX_OPTION; subtag++ ) {
+		tag = DHCP_ENCAP_OPT ( encapsulator, subtag );
+		switch ( tag ) {
+		case DHCP_EB_ENCAP:
+		case DHCP_VENDOR_ENCAP:
+			/* Process encapsulated options field */
+			if ( ( rc = copy_encap_settings ( dest, source,
+							  tag ) ) != 0 )
+				return rc;
+			break;
+		default:
+			/* Copy option to reassembled packet */
+			if ( ( rc = copy_setting ( dest, tag, source,
+						   tag ) ) != 0 )
+				return rc;
+			break;
+		}
+	}
+
+	return 0;
+}
+
+/**
+ * Copy settings
+ *
+ * @v dest		Destination settings block
+ * @v source		Source settings block
+ * @ret rc		Return status code
+ */
+int copy_settings ( struct settings *dest, struct settings *source ) {
+	return copy_encap_settings ( dest, source, 0 );
 }
 
 /******************************************************************************

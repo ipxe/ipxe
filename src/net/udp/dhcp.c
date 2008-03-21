@@ -34,6 +34,10 @@
 #include <gpxe/uuid.h>
 #include <gpxe/dhcp.h>
 #include <gpxe/timer.h>
+#include <gpxe/settings.h>
+#include <gpxe/dhcp.h>
+#include <gpxe/dhcpopts.h>
+#include <gpxe/dhcppkt.h>
 
 /** @file
  *
@@ -41,7 +45,8 @@
  *
  */
 
-/** DHCP operation types
+/**
+ * DHCP operation types
  *
  * This table maps from DHCP message types (i.e. values of the @c
  * DHCP_MESSAGE_TYPE option) to values of the "op" field within a DHCP
@@ -74,6 +79,13 @@ static uint8_t dhcp_request_options_data[] = {
 		      DHCP_TFTP_SERVER_NAME, DHCP_BOOTFILE_NAME,
 		      DHCP_EB_ENCAP, DHCP_ISCSI_INITIATOR_IQN ),
 	DHCP_END
+};
+
+/** Options common to all DHCP requests */
+static struct dhcp_options dhcp_request_options = {
+	.data = dhcp_request_options_data,
+	.max_len = sizeof ( dhcp_request_options_data ),
+	.len = sizeof ( dhcp_request_options_data ),
 };
 
 /** DHCP feature codes */
@@ -118,197 +130,33 @@ static uint32_t dhcp_xid ( struct net_device *netdev ) {
 	return xid;
 }
 
-/** Options common to all DHCP requests */
-static struct dhcp_option_block dhcp_request_options = {
-	.data = dhcp_request_options_data,
-	.max_len = sizeof ( dhcp_request_options_data ),
-	.len = sizeof ( dhcp_request_options_data ),
-};
-
-/**
- * Set option within DHCP packet
- *
- * @v dhcppkt		DHCP packet
- * @v tag		DHCP option tag
- * @v data		New value for DHCP option
- * @v len		Length of value, in bytes
- * @ret rc		Return status code
- *
- * Sets the option within the first available options block within the
- * DHCP packet.  Option blocks are tried in the order specified by @c
- * dhcp_option_block_fill_order.
- *
- * The magic options @c DHCP_EB_YIADDR and @c DHCP_EB_SIADDR are
- * intercepted and inserted into the appropriate fixed fields within
- * the DHCP packet.  The option @c DHCP_OPTION_OVERLOAD is silently
- * ignored, since our DHCP packet assembly method relies on always
- * having option overloading in use.
- */
-static int set_dhcp_packet_option ( struct dhcp_packet *dhcppkt,
-				    unsigned int tag, const void *data,
-				    size_t len ) {
-	struct dhcphdr *dhcphdr = dhcppkt->dhcphdr;
-	struct dhcp_option_block *options = &dhcppkt->options;
-	struct dhcp_option *option = NULL;
-
-	/* Special-case the magic options */
-	switch ( tag ) {
-	case DHCP_OPTION_OVERLOAD:
-		/* Hard-coded in packets we create; always ignore */
-		return 0;
-	case DHCP_EB_YIADDR:
-		memcpy ( &dhcphdr->yiaddr, data, sizeof ( dhcphdr->yiaddr ) );
-		return 0;
-	case DHCP_EB_SIADDR:
-		memcpy ( &dhcphdr->siaddr, data, sizeof ( dhcphdr->siaddr ) );
-		return 0;
-	case DHCP_TFTP_SERVER_NAME:
-		memset ( dhcphdr->sname, 0, sizeof ( dhcphdr->sname ) );
-		if ( len > sizeof ( dhcphdr->sname ) )
-			len = sizeof ( dhcphdr->sname );
-		memcpy ( dhcphdr->sname, data, len );
-		return 0;
-	case DHCP_BOOTFILE_NAME:
-		memset ( dhcphdr->file, 0, sizeof ( dhcphdr->file ) );
-		if ( len > sizeof ( dhcphdr->file ) )
-			len = sizeof ( dhcphdr->file );
-		memcpy ( dhcphdr->file, data, len );
-		return 0;
-	default:
-		/* Continue processing as normal */
-		break;
-	}
-		
-	/* Set option */
-	option = set_dhcp_option ( options, tag, data, len );
-
-	/* Update DHCP packet length */
-	dhcppkt->len = ( offsetof ( typeof ( *dhcppkt->dhcphdr ), options )
-			 + dhcppkt->options.len );
-
-	return ( option ? 0 : -ENOSPC );
-}
-
-/**
- * Copy option into DHCP packet
- *
- * @v dhcppkt		DHCP packet
- * @v options		DHCP option block, or NULL
- * @v tag		DHCP option tag to search for
- * @v new_tag		DHCP option tag to use for copied option
- * @ret rc		Return status code
- *
- * Copies a single option, if present, from the DHCP options block
- * into a DHCP packet.  The tag for the option may be changed if
- * desired; this is required by other parts of the DHCP code.
- *
- * @c options may specify a single options block, or be left as NULL
- * in order to search for the option within all registered options
- * blocks.
- */
-static int copy_dhcp_packet_option ( struct dhcp_packet *dhcppkt,
-				     struct dhcp_option_block *options,
-				     unsigned int tag, unsigned int new_tag ) {
-	struct dhcp_option *option;
-	int rc;
-
-	option = find_dhcp_option ( options, tag );
-	if ( option ) {
-		if ( ( rc = set_dhcp_packet_option ( dhcppkt, new_tag,
-						     &option->data,
-						     option->len ) ) != 0 )
-			return rc;
-	}
-	return 0;
-}
-
-/**
- * Copy options into DHCP packet
- *
- * @v dhcppkt		DHCP packet
- * @v options		DHCP option block, or NULL
- * @v encapsulator	Encapsulating option, or zero
- * @ret rc		Return status code
- * 
- * Copies options with the specified encapsulator from DHCP options
- * blocks into a DHCP packet.  Most options are copied verbatim.
- * Recognised encapsulated options fields are handled as such.
- *
- * @c options may specify a single options block, or be left as NULL
- * in order to copy options from all registered options blocks.
- */
-static int copy_dhcp_packet_encap_options ( struct dhcp_packet *dhcppkt,
-					    struct dhcp_option_block *options,
-					    unsigned int encapsulator ) {
-	unsigned int subtag;
-	unsigned int tag;
-	int rc;
-
-	for ( subtag = DHCP_MIN_OPTION; subtag <= DHCP_MAX_OPTION; subtag++ ) {
-		tag = DHCP_ENCAP_OPT ( encapsulator, subtag );
-		switch ( tag ) {
-		case DHCP_EB_ENCAP:
-		case DHCP_VENDOR_ENCAP:
-			/* Process encapsulated options field */
-			if ( ( rc = copy_dhcp_packet_encap_options ( dhcppkt,
-								     options,
-								     tag)) !=0)
-				return rc;
-			break;
-		default:
-			/* Copy option to reassembled packet */
-			if ( ( rc = copy_dhcp_packet_option ( dhcppkt, options,
-							      tag, tag ) ) !=0)
-				return rc;
-			break;
-		};
-	}
-
-	return 0;
-}
-
-/**
- * Copy options into DHCP packet
- *
- * @v dhcppkt		DHCP packet
- * @v options		DHCP option block, or NULL
- * @ret rc		Return status code
- * 
- * Copies options from DHCP options blocks into a DHCP packet.  Most
- * options are copied verbatim.  Recognised encapsulated options
- * fields are handled as such.
- *
- * @c options may specify a single options block, or be left as NULL
- * in order to copy options from all registered options blocks.
- */
-static int copy_dhcp_packet_options ( struct dhcp_packet *dhcppkt,
-				      struct dhcp_option_block *options ) {
-	return copy_dhcp_packet_encap_options ( dhcppkt, options, 0 );
-}
-
 /**
  * Create a DHCP packet
  *
+ * @v dhcppkt		DHCP packet structure to fill in
  * @v netdev		Network device
  * @v msgtype		DHCP message type
+ * @v options		Initial options to include (or NULL)
  * @v data		Buffer for DHCP packet
  * @v max_len		Size of DHCP packet buffer
- * @v dhcppkt		DHCP packet structure to fill in
  * @ret rc		Return status code
  *
  * Creates a DHCP packet in the specified buffer, and fills out a @c
  * dhcp_packet structure that can be passed to
  * set_dhcp_packet_option() or copy_dhcp_packet_options().
  */
-static int create_dhcp_packet ( struct net_device *netdev, uint8_t msgtype,
-				void *data, size_t max_len,
-				struct dhcp_packet *dhcppkt ) {
+static int create_dhcp_packet ( struct dhcp_packet *dhcppkt,
+				struct net_device *netdev, uint8_t msgtype,
+				struct dhcp_options *options, 
+				void *data, size_t max_len ) {
 	struct dhcphdr *dhcphdr = data;
+	size_t options_len;
 	unsigned int hlen;
 	int rc;
 
 	/* Sanity check */
-	if ( max_len < sizeof ( *dhcphdr ) )
+	options_len = ( options ? options->len : 0 );
+	if ( max_len < ( sizeof ( *dhcphdr ) + options_len ) )
 		return -ENOSPC;
 
 	/* Initialise DHCP packet content */
@@ -327,179 +175,18 @@ static int create_dhcp_packet ( struct net_device *netdev, uint8_t msgtype,
 	}
 	dhcphdr->hlen = hlen;
 	memcpy ( dhcphdr->chaddr, netdev->ll_addr, hlen );
+	memcpy ( dhcphdr->options, options, options_len );
 
-	/* Initialise DHCP packet structure */
-	dhcppkt->dhcphdr = dhcphdr;
-	dhcppkt->max_len = max_len;
-	init_dhcp_options ( &dhcppkt->options, dhcphdr->options,
-			    ( max_len -
-			      offsetof ( typeof ( *dhcphdr ), options ) ) );
+	/* Initialise DHCP packet structure and settings interface */
+	dhcppkt_init ( dhcppkt, NULL, data, max_len );
 	
 	/* Set DHCP_MESSAGE_TYPE option */
-	if ( ( rc = set_dhcp_packet_option ( dhcppkt, DHCP_MESSAGE_TYPE,
-					     &msgtype,
-					     sizeof ( msgtype ) ) ) != 0 )
+	if ( ( rc = store_setting ( &dhcppkt->settings, DHCP_MESSAGE_TYPE,
+				    &msgtype, sizeof ( msgtype ) ) ) != 0 )
 		return rc;
 
 	return 0;
 }
-
-/**
- * Calculate used length of a field containing DHCP options
- *
- * @v data		Field containing DHCP options
- * @v max_len		Field length
- * @ret len		Used length (excluding the @c DHCP_END tag)
- */
-static size_t dhcp_field_len ( const void *data, size_t max_len ) {
-	struct dhcp_option_block options;
-	struct dhcp_option *end;
-
-	options.data = ( ( void * ) data );
-	options.len = max_len;
-	end = find_dhcp_option ( &options, DHCP_END );
-	return ( end ? ( ( ( void * ) end ) - data ) : 0 );
-}
-
-/**
- * Merge field containing DHCP options or string into DHCP options block
- *
- * @v options		DHCP option block
- * @v data		Field containing DHCP options
- * @v max_len		Field length
- * @v tag		DHCP option tag, or 0
- *
- * If @c tag is non-zero (and the field is not empty), the field will
- * be treated as a NUL-terminated string representing the value of the
- * specified DHCP option.  If @c tag is zero, the field will be
- * treated as a block of DHCP options, and simply appended to the
- * existing options in the option block.
- *
- * The caller must ensure that there is enough space in the options
- * block to perform the merge.
- */
-static void merge_dhcp_field ( struct dhcp_option_block *options,
-			       const void *data, size_t max_len,
-			       unsigned int tag ) {
-	size_t len;
-	void *dest;
-	struct dhcp_option *end;
-
-	if ( tag ) {
-		len = strlen ( data );
-		if ( len )
-			set_dhcp_option ( options, tag, data, len );
-	} else {
-		len = dhcp_field_len ( data, max_len );
-		dest = ( options->data + options->len - 1 );
-		memcpy ( dest, data, len );
-		options->len += len;
-		end = ( dest + len );
-		end->tag = DHCP_END;
-	}
-}
-
-/**
- * Parse DHCP packet and construct DHCP options block
- *
- * @v dhcphdr		DHCP packet
- * @v len		Length of DHCP packet
- * @ret options		DHCP options block, or NULL
- *
- * Parses a received DHCP packet and canonicalises its contents into a
- * single DHCP options block.  The "file" and "sname" fields are
- * converted into the corresponding DHCP options (@c
- * DHCP_BOOTFILE_NAME and @c DHCP_TFTP_SERVER_NAME respectively).  If
- * these fields are used for option overloading, their options are
- * merged in to the options block.
- *
- * The values of the "yiaddr" and "siaddr" fields will be stored
- * within the options block as the magic options @c DHCP_EB_YIADDR and
- * @c DHCP_EB_SIADDR.
- * 
- * Note that this call allocates new memory for the constructed DHCP
- * options block; it is the responsibility of the caller to eventually
- * free this memory.
- */
-static struct dhcp_option_block * dhcp_parse ( const struct dhcphdr *dhcphdr,
-					       size_t len ) {
-	struct dhcp_option_block *options;
-	size_t options_len;
-	unsigned int overloading;
-
-	/* Sanity check */
-	if ( len < sizeof ( *dhcphdr ) )
-		return NULL;
-
-	/* Calculate size of resulting concatenated option block:
-	 *
-	 *   The "options" field : length of the field minus the DHCP_END tag.
-	 *
-	 *   The "file" field : maximum length of the field minus the
-	 *   NUL terminator, plus a 2-byte DHCP header or, if used for
-	 *   option overloading, the length of the field minus the
-	 *   DHCP_END tag.
-	 *
-	 *   The "sname" field : as for the "file" field.
-	 *
-	 *   15 bytes for an encapsulated options field to contain the
-	 *   value of the "yiaddr" and "siaddr" fields
-	 *
-	 *   1 byte for a final terminating DHCP_END tag.
-	 */
-	options_len = ( ( len - offsetof ( typeof ( *dhcphdr ), options ) ) - 1
-			+ ( sizeof ( dhcphdr->file ) + 1 )
-			+ ( sizeof ( dhcphdr->sname ) + 1 )
-			+ 15 /* yiaddr and siaddr */
-			+ 1 /* DHCP_END tag */ );
-	
-	/* Allocate empty options block of required size */
-	options = alloc_dhcp_options ( options_len );
-	if ( ! options ) {
-		DBG ( "DHCP could not allocate %zd-byte option block\n",
-		      options_len );
-		return NULL;
-	}
-	
-	/* Merge in "options" field, if this is a DHCP packet */
-	if ( dhcphdr->magic == htonl ( DHCP_MAGIC_COOKIE ) ) {
-		merge_dhcp_field ( options, dhcphdr->options,
-				   ( len -
-				     offsetof ( typeof (*dhcphdr), options ) ),
-				   0 /* Always contains options */ );
-	}
-
-	/* Identify overloaded fields */
-	overloading = find_dhcp_num_option ( options, DHCP_OPTION_OVERLOAD );
-	
-	/* Merge in "file" and "sname" fields */
-	merge_dhcp_field ( options, dhcphdr->file, sizeof ( dhcphdr->file ),
-			   ( ( overloading & DHCP_OPTION_OVERLOAD_FILE ) ?
-			     0 : DHCP_BOOTFILE_NAME ) );
-	merge_dhcp_field ( options, dhcphdr->sname, sizeof ( dhcphdr->sname ),
-			   ( ( overloading & DHCP_OPTION_OVERLOAD_SNAME ) ?
-			     0 : DHCP_TFTP_SERVER_NAME ) );
-
-	/* Set magic options for "yiaddr" and "siaddr", if present */
-	if ( dhcphdr->yiaddr.s_addr ) {
-		set_dhcp_option ( options, DHCP_EB_YIADDR,
-				  &dhcphdr->yiaddr, sizeof (dhcphdr->yiaddr) );
-	}
-	if ( dhcphdr->siaddr.s_addr ) {
-		set_dhcp_option ( options, DHCP_EB_SIADDR,
-				  &dhcphdr->siaddr, sizeof (dhcphdr->siaddr) );
-	}
-	
-	assert ( options->len <= options->max_len );
-
-	return options;
-}
-
-/****************************************************************************
- *
- * Whole-packet construction
- *
- */
 
 /** DHCP network device descriptor */
 struct dhcp_netdev_desc {
@@ -532,18 +219,18 @@ struct dhcp_client_uuid {
 /**
  * Create DHCP request
  *
+ * @v dhcppkt		DHCP packet structure to fill in
  * @v netdev		Network device
  * @v msgtype		DHCP message type
- * @v options		DHCP server response options, or NULL
+ * @v offer_settings	Settings received in DHCPOFFER, or NULL
  * @v data		Buffer for DHCP packet
  * @v max_len		Size of DHCP packet buffer
- * @v dhcppkt		DHCP packet structure to fill in
  * @ret rc		Return status code
  */
-int create_dhcp_request ( struct net_device *netdev, int msgtype,
-			  struct dhcp_option_block *options,
-			  void *data, size_t max_len,
-			  struct dhcp_packet *dhcppkt ) {
+int create_dhcp_request ( struct dhcp_packet *dhcppkt,
+			  struct net_device *netdev, int msgtype,
+			  struct settings *offer_settings,
+			  void *data, size_t max_len ) {
 	struct device_description *desc = &netdev->dev->desc;
 	struct dhcp_netdev_desc dhcp_desc;
 	struct dhcp_client_id client_id;
@@ -553,33 +240,27 @@ int create_dhcp_request ( struct net_device *netdev, int msgtype,
 	int rc;
 
 	/* Create DHCP packet */
-	if ( ( rc = create_dhcp_packet ( netdev, msgtype, data, max_len,
-					 dhcppkt ) ) != 0 ) {
+	if ( ( rc = create_dhcp_packet ( dhcppkt, netdev, msgtype,
+					 &dhcp_request_options, data,
+					 max_len ) ) != 0 ) {
 		DBG ( "DHCP could not create DHCP packet: %s\n",
 		      strerror ( rc ) );
 		return rc;
 	}
 
-	/* Copy in options common to all requests */
-	if ( ( rc = copy_dhcp_packet_options ( dhcppkt,
-					       &dhcp_request_options )) !=0 ){
-		DBG ( "DHCP could not set common DHCP options: %s\n",
-		      strerror ( rc ) );
-		return rc;
-	}
-
 	/* Copy any required options from previous server repsonse */
-	if ( options ) {
-		if ( ( rc = copy_dhcp_packet_option ( dhcppkt, options,
-					  DHCP_SERVER_IDENTIFIER,
-					  DHCP_SERVER_IDENTIFIER ) ) != 0 ) {
+	if ( offer_settings ) {
+		if ( ( rc = copy_setting ( &dhcppkt->settings,
+					   DHCP_SERVER_IDENTIFIER,
+					   offer_settings,
+					   DHCP_SERVER_IDENTIFIER ) ) != 0 ) {
 			DBG ( "DHCP could not set server identifier "
 			      "option: %s\n", strerror ( rc ) );
 			return rc;
 		}
-		if ( ( rc = copy_dhcp_packet_option ( dhcppkt, options,
-					  DHCP_EB_YIADDR,
-					  DHCP_REQUESTED_ADDRESS ) ) != 0 ) {
+		if ( ( rc = copy_setting ( &dhcppkt->settings, DHCP_EB_YIADDR,
+					   offer_settings,
+					   DHCP_REQUESTED_ADDRESS ) ) != 0 ) {
 			DBG ( "DHCP could not set requested address "
 			      "option: %s\n", strerror ( rc ) );
 			return rc;
@@ -588,9 +269,8 @@ int create_dhcp_request ( struct net_device *netdev, int msgtype,
 
 	/* Add options to identify the feature list */
 	dhcp_features_len = ( dhcp_features_end - dhcp_features );
-	if ( ( rc = set_dhcp_packet_option ( dhcppkt, DHCP_EB_ENCAP,
-					     dhcp_features,
-					     dhcp_features_len ) ) != 0 ) {
+	if ( ( rc = store_setting ( &dhcppkt->settings, DHCP_EB_ENCAP,
+				    dhcp_features, dhcp_features_len ) ) !=0 ){
 		DBG ( "DHCP could not set features list option: %s\n",
 		      strerror ( rc ) );
 		return rc;
@@ -600,9 +280,8 @@ int create_dhcp_request ( struct net_device *netdev, int msgtype,
 	dhcp_desc.type = desc->bus_type;
 	dhcp_desc.vendor = htons ( desc->vendor );
 	dhcp_desc.device = htons ( desc->device );
-	if ( ( rc = set_dhcp_packet_option ( dhcppkt, DHCP_EB_BUS_ID,
-					     &dhcp_desc,
-					     sizeof ( dhcp_desc ) ) ) != 0 ) {
+	if ( ( rc = store_setting ( &dhcppkt->settings, DHCP_EB_BUS_ID,
+				    &dhcp_desc, sizeof ( dhcp_desc ) ) ) !=0 ){
 		DBG ( "DHCP could not set bus ID option: %s\n",
 		      strerror ( rc ) );
 		return rc;
@@ -615,9 +294,8 @@ int create_dhcp_request ( struct net_device *netdev, int msgtype,
 	ll_addr_len = netdev->ll_protocol->ll_addr_len;
 	assert ( ll_addr_len <= sizeof ( client_id.ll_addr ) );
 	memcpy ( client_id.ll_addr, netdev->ll_addr, ll_addr_len );
-	if ( ( rc = set_dhcp_packet_option ( dhcppkt, DHCP_CLIENT_ID,
-					     &client_id,
-					     ( ll_addr_len + 1 ) ) ) != 0 ) {
+	if ( ( rc = store_setting ( &dhcppkt->settings, DHCP_CLIENT_ID,
+				    &client_id, ( ll_addr_len + 1 ) ) ) != 0 ){
 		DBG ( "DHCP could not set client ID: %s\n",
 		      strerror ( rc ) );
 		return rc;
@@ -626,9 +304,9 @@ int create_dhcp_request ( struct net_device *netdev, int msgtype,
 	/* Add client UUID, if we have one.  Required for PXE. */
 	client_uuid.type = DHCP_CLIENT_UUID_TYPE;
 	if ( ( rc = get_uuid ( &client_uuid.uuid ) ) == 0 ) {
-		if ( ( rc = set_dhcp_packet_option ( dhcppkt,
-					   DHCP_CLIENT_UUID, &client_uuid,
-					   sizeof ( client_uuid ) ) ) != 0 ) {
+		if ( ( rc = store_setting ( &dhcppkt->settings,
+					    DHCP_CLIENT_UUID, &client_uuid,
+					    sizeof ( client_uuid ) ) ) != 0 ) {
 			DBG ( "DHCP could not set client UUID: %s\n",
 			      strerror ( rc ) );
 			return rc;
@@ -641,32 +319,84 @@ int create_dhcp_request ( struct net_device *netdev, int msgtype,
 /**
  * Create DHCP response
  *
+ * @v dhcppkt		DHCP packet structure to fill in
  * @v netdev		Network device
  * @v msgtype		DHCP message type
- * @v options		DHCP options, or NULL
+ * @v settings		Settings to include, or NULL
  * @v data		Buffer for DHCP packet
  * @v max_len		Size of DHCP packet buffer
- * @v dhcppkt		DHCP packet structure to fill in
  * @ret rc		Return status code
  */
-int create_dhcp_response ( struct net_device *netdev, int msgtype,
-			   struct dhcp_option_block *options,
-			   void *data, size_t max_len,
-			   struct dhcp_packet *dhcppkt ) {
+int create_dhcp_response ( struct dhcp_packet *dhcppkt,
+			   struct net_device *netdev, int msgtype,
+			   struct settings *settings,
+			   void *data, size_t max_len ) {
 	int rc;
 
 	/* Create packet and copy in options */
-	if ( ( rc = create_dhcp_packet ( netdev, msgtype, data, max_len,
-					 dhcppkt ) ) != 0 ) {
-		DBG ( " failed to build packet" );
+	if ( ( rc = create_dhcp_packet ( dhcppkt, netdev, msgtype, NULL,
+					 data, max_len ) ) != 0 )
 		return rc;
-	}
-	if ( ( rc = copy_dhcp_packet_options ( dhcppkt, options ) ) != 0 ) {
-		DBG ( " failed to copy options" );
+	if ( ( rc = copy_settings ( &dhcppkt->settings, settings ) ) != 0 )
 		return rc;
-	}
 
 	return 0;
+}
+
+/****************************************************************************
+ *
+ * DHCP packets contained in I/O buffers
+ *
+ */
+
+/** A DHCP packet contained in an I/O buffer */
+struct dhcp_iobuf_packet {
+	/** Reference counter */
+	struct refcnt refcnt;
+	/** DHCP packet */
+	struct dhcp_packet dhcppkt;
+	/** Containing I/O buffer */
+	struct io_buffer *iobuf;
+};
+
+/**
+ * Free DHCP packet contained in an I/O buffer
+ *
+ * @v refcnt		Reference counter
+ */
+static void dhcpiob_free ( struct refcnt *refcnt ) {
+	struct dhcp_iobuf_packet *dhcpiob =
+		container_of ( refcnt, struct dhcp_iobuf_packet, refcnt );
+
+	free_iob ( dhcpiob->iobuf );
+	free ( dhcpiob );
+}
+
+/**
+ * Create DHCP packet from I/O buffer
+ *
+ * @v iobuf		I/O buffer
+ * @ret dhcpiob		DHCP packet contained in I/O buffer
+ *
+ * This function takes ownership of the I/O buffer.  Future accesses
+ * must be via the @c dhcpiob data structure.
+ */
+static struct dhcp_iobuf_packet * dhcpiob_create ( struct io_buffer *iobuf ) {
+	struct dhcp_iobuf_packet *dhcpiob;
+
+	dhcpiob = zalloc ( sizeof ( *dhcpiob ) );
+	if ( dhcpiob ) {
+		dhcpiob->refcnt.free = dhcpiob_free;
+		dhcpiob->iobuf = iobuf;
+		dhcppkt_init ( &dhcpiob->dhcppkt, &dhcpiob->refcnt,
+			       iobuf->data, iob_len ( iobuf ) );
+	}
+	return dhcpiob;
+}
+
+static void dhcpiob_put ( struct dhcp_iobuf_packet *dhcpiob ) {
+	if ( dhcpiob )
+		ref_put ( &dhcpiob->refcnt );
 }
 
 /****************************************************************************
@@ -686,9 +416,6 @@ struct dhcp_session {
 
 	/** Network device being configured */
 	struct net_device *netdev;
-	/** Option block registration routine */
-	int ( * register_options ) ( struct net_device *netdev,
-				     struct dhcp_option_block *options );
 
 	/** State of the session
 	 *
@@ -696,10 +423,10 @@ struct dhcp_session {
 	 * (e.g. @c DHCPDISCOVER).
 	 */
 	int state;
-	/** Options obtained from DHCP server */
-	struct dhcp_option_block *options;
-	/** Options obtained from ProxyDHCP server */
-	struct dhcp_option_block *proxy_options;
+	/** Response obtained from DHCP server */
+	struct dhcp_iobuf_packet *response;
+	/** Response obtained from ProxyDHCP server */
+	struct dhcp_iobuf_packet *proxy_response;
 	/** Retransmission timer */
 	struct retry_timer timer;
 	/** Session start time (in ticks) */
@@ -716,8 +443,8 @@ static void dhcp_free ( struct refcnt *refcnt ) {
 		container_of ( refcnt, struct dhcp_session, refcnt );
 
 	netdev_put ( dhcp->netdev );
-	dhcpopt_put ( dhcp->options );
-	dhcpopt_put ( dhcp->proxy_options );
+	dhcpiob_put ( dhcp->response );
+	dhcpiob_put ( dhcp->proxy_response );
 	free ( dhcp );
 }
 
@@ -741,6 +468,31 @@ static void dhcp_finished ( struct dhcp_session *dhcp, int rc ) {
 	job_done ( &dhcp->job, rc );
 }
 
+/**
+ * Register options received via DHCP
+ *
+ * @v dhcp		DHCP session
+ * @ret rc		Return status code
+ */
+static int dhcp_register_settings ( struct dhcp_session *dhcp ) {
+	struct settings *settings;
+	struct settings *parent;
+	int rc;
+
+	if ( dhcp->proxy_response ) {
+		settings = &dhcp->proxy_response->dhcppkt.settings;
+		if ( ( rc = register_settings ( settings, NULL ) ) != 0 )
+			return rc;
+	}
+
+	settings = &dhcp->response->dhcppkt.settings;
+	parent = netdev_settings ( dhcp->netdev );
+	if ( ( rc = register_settings ( settings, parent ) ) != 0 )
+		return rc;
+
+	return 0;
+}
+
 /****************************************************************************
  *
  * Data transfer interface
@@ -757,6 +509,7 @@ static int dhcp_send_request ( struct dhcp_session *dhcp ) {
 	struct xfer_metadata meta = {
 		.netdev = dhcp->netdev,
 	};
+	struct settings *offer_settings = NULL;
 	struct io_buffer *iobuf;
 	struct dhcp_packet dhcppkt;
 	int rc;
@@ -778,10 +531,11 @@ static int dhcp_send_request ( struct dhcp_session *dhcp ) {
 		return -ENOMEM;
 
 	/* Create DHCP packet in temporary buffer */
-	if ( ( rc = create_dhcp_request ( dhcp->netdev, dhcp->state,
-					  dhcp->options, iobuf->data,
-					  iob_tailroom ( iobuf ),
-					  &dhcppkt ) ) != 0 ) {
+	if ( dhcp->response )
+		offer_settings = &dhcp->response->dhcppkt.settings;
+	if ( ( rc = create_dhcp_request ( &dhcppkt, dhcp->netdev, dhcp->state,
+					  offer_settings, iobuf->data,
+					  iob_tailroom ( iobuf ) ) ) != 0 ) {
 		DBGC ( dhcp, "DHCP %p could not construct DHCP request: %s\n",
 		       dhcp, strerror ( rc ) );
 		goto done;
@@ -828,36 +582,41 @@ static void dhcp_timer_expired ( struct retry_timer *timer, int fail ) {
  * @v len		Length of received data
  * @ret rc		Return status code
  */
-static int dhcp_deliver_raw ( struct xfer_interface *xfer,
-			      const void *data, size_t len ) {
+static int dhcp_deliver_iob ( struct xfer_interface *xfer,
+			      struct io_buffer *iobuf,
+			      struct xfer_metadata *meta __unused ) {
 	struct dhcp_session *dhcp =
 		container_of ( xfer, struct dhcp_session, xfer );
-	const struct dhcphdr *dhcphdr = data;
-	struct dhcp_option_block *options;
-	struct dhcp_option_block **store_options;
+	struct dhcp_iobuf_packet *response;
+	struct dhcp_iobuf_packet **store_response;
+	struct dhcphdr *dhcphdr;
+	struct settings *settings;
 	unsigned int msgtype;
 	unsigned long elapsed;
 	int is_proxy;
 	int ignore_proxy;
+	int rc;
+
+	/* Convert packet into a DHCP-packet-in-iobuf */
+	response = dhcpiob_create ( iobuf );
+	if ( ! response ) {
+		DBGC ( dhcp, "DHCP %p could not store DHCP packet\n", dhcp );
+		return -ENOMEM;
+	}
+	dhcphdr = response->dhcppkt.dhcphdr;
+	settings = &response->dhcppkt.settings;
 
 	/* Check for matching transaction ID */
 	if ( dhcphdr->xid != dhcp_xid ( dhcp->netdev ) ) {
 		DBGC ( dhcp, "DHCP %p wrong transaction ID (wanted %08lx, "
 			"got %08lx)\n", dhcp, ntohl ( dhcphdr->xid ),
 			ntohl ( dhcp_xid ( dhcp->netdev ) ) );
-		return 0;
-	};
-
-	/* Parse packet and create options structure */
-	options = dhcp_parse ( dhcphdr, len );
-	if ( ! options ) {
-		DBGC ( dhcp, "DHCP %p could not parse DHCP packet\n", dhcp );
-		return -EINVAL;
-	}
+		goto out_discard;
+	};	
 
 	/* Determine and verify message type */
 	is_proxy = ( dhcphdr->yiaddr.s_addr == 0 );
-	msgtype = find_dhcp_num_option ( options, DHCP_MESSAGE_TYPE );
+	msgtype = fetch_uintz_setting ( settings, DHCP_MESSAGE_TYPE );
 	DBGC ( dhcp, "DHCP %p received %s%s\n", dhcp,
 	       ( is_proxy ? "Proxy" : "" ), dhcp_msgtype_name ( msgtype ) );
 	if ( ( ( dhcp->state != DHCPDISCOVER ) || ( msgtype != DHCPOFFER ) ) &&
@@ -872,25 +631,26 @@ static int dhcp_deliver_raw ( struct xfer_interface *xfer,
 	 * options have equal or higher priority than the
 	 * currently-stored options.
 	 */
-	store_options = ( is_proxy ? &dhcp->proxy_options : &dhcp->options );
-	if ( ( ! *store_options ) || 
-	     ( find_dhcp_num_option ( options, DHCP_EB_PRIORITY ) >=
-	       find_dhcp_num_option ( *store_options, DHCP_EB_PRIORITY ) ) ) {
-		dhcpopt_put ( *store_options );
-		*store_options = options;
+	store_response = ( is_proxy ? &dhcp->proxy_response : &dhcp->response);
+	if ( ( ! *store_response ) || 
+	     ( fetch_uintz_setting ( settings, DHCP_EB_PRIORITY ) >=
+	       fetch_uintz_setting ( &(*store_response)->dhcppkt.settings,
+				     DHCP_EB_PRIORITY ) ) ) {
+		dhcpiob_put ( *store_response );
+		*store_response = response;
 	} else {
-		dhcpopt_put ( options );
+		dhcpiob_put ( response );
 	}
 
 	/* If we don't yet have a standard DHCP response (i.e. one
 	 * with an IP address), then just leave the timer running.
 	 */
-	if ( ! dhcp->options )
+	if ( ! dhcp->response )
 		goto out;
 
 	/* Handle DHCP response */
-	ignore_proxy = find_dhcp_num_option ( dhcp->options,
-					      DHCP_EB_NO_PROXYDHCP );
+	ignore_proxy = fetch_uintz_setting ( &dhcp->response->dhcppkt.settings,
+					     DHCP_EB_NO_PROXYDHCP );
 	switch ( dhcp->state ) {
 	case DHCPDISCOVER:
 		/* If we have allowed sufficient time for ProxyDHCP
@@ -905,11 +665,14 @@ static int dhcp_deliver_raw ( struct xfer_interface *xfer,
 		break;
 	case DHCPREQUEST:
 		/* DHCP finished; register options and exit */
-		if ( dhcp->proxy_options && ( ! ignore_proxy ) ) {
-			dhcp->register_options ( dhcp->netdev,
-						 dhcp->proxy_options );
+		if ( ignore_proxy && dhcp->proxy_response ) {
+			dhcpiob_put ( dhcp->proxy_response );
+			dhcp->proxy_response = NULL;
 		}
-		dhcp->register_options ( dhcp->netdev, dhcp->options );
+		if ( ( rc = dhcp_register_settings ( dhcp ) ) != 0 ) {
+			dhcp_finished ( dhcp, rc );
+			break;
+		}
 		dhcp_finished ( dhcp, 0 );
 		break;
 	default:
@@ -920,7 +683,7 @@ static int dhcp_deliver_raw ( struct xfer_interface *xfer,
 	return 0;
 
  out_discard:
-	dhcpopt_put ( options );
+	dhcpiob_put ( response );
 	return 0;
 }
 
@@ -930,8 +693,8 @@ static struct xfer_interface_operations dhcp_xfer_operations = {
 	.vredirect	= xfer_vopen,
 	.window		= unlimited_xfer_window,
 	.alloc_iob	= default_xfer_alloc_iob,
-	.deliver_iob	= xfer_deliver_as_raw,
-	.deliver_raw	= dhcp_deliver_raw,
+	.deliver_iob	= dhcp_deliver_iob,
+	.deliver_raw	= xfer_deliver_as_iob,
 };
 
 /****************************************************************************
@@ -978,9 +741,7 @@ static struct job_interface_operations dhcp_job_operations = {
  * register_options() routine will be called with the acquired
  * options.
  */
-int start_dhcp ( struct job_interface *job, struct net_device *netdev,
-		 int ( * register_options ) ( struct net_device *netdev,
-					      struct dhcp_option_block * ) ) {
+int start_dhcp ( struct job_interface *job, struct net_device *netdev ) {
 	static struct sockaddr_in server = {
 		.sin_family = AF_INET,
 		.sin_addr.s_addr = INADDR_BROADCAST,
@@ -1001,7 +762,6 @@ int start_dhcp ( struct job_interface *job, struct net_device *netdev,
 	job_init ( &dhcp->job, &dhcp_job_operations, &dhcp->refcnt );
 	xfer_init ( &dhcp->xfer, &dhcp_xfer_operations, &dhcp->refcnt );
 	dhcp->netdev = netdev_get ( netdev );
-	dhcp->register_options = register_options;
 	dhcp->timer.expired = dhcp_timer_expired;
 	dhcp->state = DHCPDISCOVER;
 	dhcp->start = currticks();

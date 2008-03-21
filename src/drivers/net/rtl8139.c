@@ -261,9 +261,10 @@ static struct nvo_fragment rtl_nvo_fragments[] = {
 /**
  * Set up for EEPROM access
  *
- * @v rtl		RTL8139 NIC
+ * @v netdev		Net device
  */
-static void rtl_init_eeprom ( struct rtl8139_nic *rtl ) {
+static void rtl_init_eeprom ( struct net_device *netdev ) {
+	struct rtl8139_nic *rtl = netdev->priv;
 	int ee9356;
 	int vpd;
 
@@ -288,19 +289,20 @@ static void rtl_init_eeprom ( struct rtl8139_nic *rtl ) {
 	if ( vpd ) {
 		DBG ( "EEPROM in use for VPD; cannot use for options\n" );
 	} else {
-		rtl->nvo.nvs = &rtl->eeprom.nvs;
-		rtl->nvo.fragments = rtl_nvo_fragments;
+		nvo_init ( &rtl->nvo, &rtl->eeprom.nvs, rtl_nvo_fragments,
+			   &netdev->refcnt );
 	}
 }
 
 /**
  * Reset NIC
  *
- * @v rtl		RTL8139 NIC
+ * @v netdev		Net device
  *
  * Issues a hardware reset and waits for the reset to complete.
  */
-static void rtl_reset ( struct rtl8139_nic *rtl ) {
+static void rtl_reset ( struct net_device *netdev ) {
+	struct rtl8139_nic *rtl = netdev->priv;
 
 	/* Reset chip */
 	outb ( CmdReset, rtl->ioaddr + ChipCmd );
@@ -352,7 +354,7 @@ static void rtl_close ( struct net_device *netdev ) {
 	struct rtl8139_nic *rtl = netdev->priv;
 
 	/* Reset the hardware to disable everything in one go */
-	rtl_reset ( rtl );
+	rtl_reset ( netdev );
 
 	/* Free RX ring */
 	free ( rtl->rx.ring );
@@ -366,7 +368,8 @@ static void rtl_close ( struct net_device *netdev ) {
  * @v iobuf	I/O buffer
  * @ret rc	Return status code
  */
-static int rtl_transmit ( struct net_device *netdev, struct io_buffer *iobuf ) {
+static int rtl_transmit ( struct net_device *netdev,
+			  struct io_buffer *iobuf ) {
 	struct rtl8139_nic *rtl = netdev->priv;
 
 	/* Check for space in TX ring */
@@ -512,8 +515,8 @@ static int rtl_probe ( struct pci_device *pci,
 	adjust_pci_device ( pci );
 
 	/* Reset the NIC, set up EEPROM access and read MAC address */
-	rtl_reset ( rtl );
-	rtl_init_eeprom ( rtl );
+	rtl_reset ( netdev );
+	rtl_init_eeprom ( netdev );
 	nvs_read ( &rtl->eeprom.nvs, EE_MAC, netdev->ll_addr, ETH_ALEN );
 	
 	/* Register network device */
@@ -522,7 +525,8 @@ static int rtl_probe ( struct pci_device *pci,
 
 	/* Register non-volatile storage */
 	if ( rtl->nvo.nvs ) {
-		if ( ( rc = nvo_register ( &rtl->nvo ) ) != 0 )
+		if ( ( rc = register_nvo ( &rtl->nvo,
+					   netdev_settings ( netdev ) ) ) != 0)
 			goto err_register_nvo;
 	}
 
@@ -531,7 +535,7 @@ static int rtl_probe ( struct pci_device *pci,
  err_register_nvo:
 	unregister_netdev ( netdev );
  err_register_netdev:
-	rtl_reset ( rtl );
+	rtl_reset ( netdev );
 	netdev_nullify ( netdev );
 	netdev_put ( netdev );
 	return rc;
@@ -547,9 +551,9 @@ static void rtl_remove ( struct pci_device *pci ) {
 	struct rtl8139_nic *rtl = netdev->priv;
 
 	if ( rtl->nvo.nvs )
-		nvo_unregister ( &rtl->nvo );
+		unregister_nvo ( &rtl->nvo );
 	unregister_netdev ( netdev );
-	rtl_reset ( rtl );
+	rtl_reset ( netdev );
 	netdev_nullify ( netdev );
 	netdev_put ( netdev );
 }

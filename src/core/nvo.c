@@ -17,6 +17,7 @@
  */
 
 #include <stdint.h>
+#include <stdlib.h>
 #include <string.h>
 #include <errno.h>
 #include <gpxe/dhcp.h>
@@ -29,9 +30,6 @@
  *
  */
 
-/* FIXME: "Temporary hack" */
-struct nvo_block *ugly_nvo_hack = NULL;
-
 /**
  * Calculate checksum over non-volatile stored options
  *
@@ -39,7 +37,7 @@ struct nvo_block *ugly_nvo_hack = NULL;
  * @ret sum		Checksum
  */
 static unsigned int nvo_checksum ( struct nvo_block *nvo ) {
-	uint8_t *data = nvo->options->data;
+	uint8_t *data = nvo->data;
 	uint8_t sum = 0;
 	unsigned int i;
 
@@ -56,22 +54,22 @@ static unsigned int nvo_checksum ( struct nvo_block *nvo ) {
  * @ret rc		Return status code
  */
 static int nvo_load ( struct nvo_block *nvo ) {
-	void *data = nvo->options->data;
-	struct nvo_fragment *fragment;
+	void *data = nvo->data;
+	struct nvo_fragment *frag;
 	int rc;
 
 	/* Read data a fragment at a time */
-	for ( fragment = nvo->fragments ; fragment->len ; fragment++ ) {
-		if ( ( rc = nvs_read ( nvo->nvs, fragment->address,
-				       data, fragment->len ) ) != 0 ) {
-			DBG ( "NVO %p could not read %zd bytes at %#04x\n",
-			      nvo, fragment->len, fragment->address );
+	for ( frag = nvo->fragments ; frag->len ; frag++ ) {
+		if ( ( rc = nvs_read ( nvo->nvs, frag->address, data,
+				       frag->len ) ) != 0 ) {
+			DBGC ( nvo, "NVO %p could not read %zd bytes at "
+			       "%#04x\n", nvo, frag->len, frag->address );
 			return rc;
 		}
-		data += fragment->len;
+		data += frag->len;
 	}
 
-	DBG ( "NVO %p loaded from non-volatile storage\n", nvo );
+	DBGC ( nvo, "NVO %p loaded from non-volatile storage\n", nvo );
 	return 0;
 }
 
@@ -81,27 +79,27 @@ static int nvo_load ( struct nvo_block *nvo ) {
  * @v nvo		Non-volatile options block
  * @ret rc		Return status code
  */
-int nvo_save ( struct nvo_block *nvo ) {
-	void *data = nvo->options->data;
-	uint8_t *checksum = ( data + nvo->total_len - 1 );
-	struct nvo_fragment *fragment;
+static int nvo_save ( struct nvo_block *nvo ) {
+	void *data = nvo->data;
+	uint8_t *checksum = data;
+	struct nvo_fragment *frag;
 	int rc;
 
 	/* Recalculate checksum */
 	*checksum -= nvo_checksum ( nvo );
 
 	/* Write data a fragment at a time */
-	for ( fragment = nvo->fragments ; fragment->len ; fragment++ ) {
-		if ( ( rc = nvs_write ( nvo->nvs, fragment->address,
-					data, fragment->len ) ) != 0 ) {
-			DBG ( "NVO %p could not write %zd bytes at %#04x\n",
-			      nvo, fragment->len, fragment->address );
+	for ( frag = nvo->fragments ; frag->len ; frag++ ) {
+		if ( ( rc = nvs_write ( nvo->nvs, frag->address, data,
+					frag->len ) ) != 0 ) {
+			DBGC ( nvo, "NVO %p could not write %zd bytes at "
+			       "%#04x\n", nvo, frag->len, frag->address );
 			return rc;
 		}
-		data += fragment->len;
+		data += frag->len;
 	}
 
-	DBG ( "NVO %p saved to non-volatile storage\n", nvo );
+	DBGC ( nvo, "NVO %p saved to non-volatile storage\n", nvo );
 	return 0;
 }
 
@@ -114,88 +112,138 @@ int nvo_save ( struct nvo_block *nvo ) {
  * options block.  If the data is not valid, it is replaced with an
  * empty options block.
  */
-static void nvo_init_dhcp ( struct nvo_block *nvo ) {
-	struct dhcp_option_block *options = nvo->options;
-	struct dhcp_option *option;
+static void nvo_init_dhcpopts ( struct nvo_block *nvo ) {
+	uint8_t *options_data;
+	size_t options_len;
 
 	/* Steal one byte for the checksum */
-	options->max_len = ( nvo->total_len - 1 );
+	options_data = ( nvo->data + 1 );
+	options_len = ( nvo->total_len - 1 );
 
-	/* Verify checksum over whole block */
-	if ( nvo_checksum ( nvo ) != 0 ) {
-		DBG ( "NVO %p has bad checksum %02x; assuming empty\n",
-		      nvo, nvo_checksum ( nvo ) );
-		goto empty;
+	/* If checksum fails, or options data starts with a zero,
+	 * assume the whole block is invalid.  This should capture the
+	 * case of random initial contents.
+	 */
+	if ( ( nvo_checksum ( nvo ) != 0 ) || ( options_data[0] == 0 ) ) {
+		DBGC ( nvo, "NVO %p has checksum %02x and initial byte %02x; "
+		       "assuming empty\n", nvo, nvo_checksum ( nvo ),
+		       options_data[0] );
+		memset ( nvo->data, 0, nvo->total_len );
 	}
 
-	/* Check that we don't just have a block full of zeroes */
-	option = options->data;
-	if ( option->tag == DHCP_PAD ) {
-		DBG ( "NVO %p has bad start; assuming empty\n", nvo );
-		goto empty;
-	}
-	
-	/* Search for the DHCP_END tag */
-	options->len = options->max_len;
-	option = find_dhcp_option ( options, DHCP_END );
-	if ( ! option ) {
-		DBG ( "NVO %p has no end tag; assuming empty\n", nvo );
-		goto empty;
+	dhcpopt_init ( &nvo->dhcpopts, options_data, options_len );
+}
+
+/**
+ * Store value of NVO setting
+ *
+ * @v settings		Settings block
+ * @v tag		Setting tag number
+ * @v data		Setting data, or NULL to clear setting
+ * @v len		Length of setting data
+ * @ret rc		Return status code
+ */
+static int nvo_store ( struct settings *settings, unsigned int tag,
+		       const void *data, size_t len ) {
+	struct nvo_block *nvo =
+		container_of ( settings, struct nvo_block, settings );
+	int rc;
+
+	/* Update stored options */
+	if ( ( rc = dhcpopt_store ( &nvo->dhcpopts, tag, data, len ) ) != 0 ) {
+		DBGC ( nvo, "NVO %p could not store %zd bytes: %s\n",
+		       nvo, len, strerror ( rc ) );
+		return rc;
 	}
 
-	/* Set correct length of DHCP options */
-	options->len = ( ( void * ) option - options->data + 1 );
-	DBG ( "NVO %p contains %zd bytes of options (maximum %zd)\n",
-	      nvo, options->len, options->max_len );
-	return;
+	/* Save updated options to NVS */
+	if ( ( rc = nvo_save ( nvo ) ) != 0 )
+		return rc;
 
- empty:
-	/* No options found; initialise an empty options block */
-	option = options->data;
-	option->tag = DHCP_END;
-	options->len = 1;
-	return;
+	return 0;
+}
+
+/**
+ * Fetch value of NVO setting
+ *
+ * @v settings		Settings block
+ * @v tag		Setting tag number
+ * @v data		Buffer to fill with setting data
+ * @v len		Length of buffer
+ * @ret len		Length of setting data, or negative error
+ *
+ * The actual length of the setting will be returned even if
+ * the buffer was too small.
+ */
+static int nvo_fetch ( struct settings *settings, unsigned int tag,
+		       void *data, size_t len ) {
+	struct nvo_block *nvo =
+		container_of ( settings, struct nvo_block, settings );
+
+	return dhcpopt_fetch ( &nvo->dhcpopts, tag, data, len );
+}
+
+/** NVO settings operations */
+static struct settings_operations nvo_settings_operations = {
+	.store = nvo_store,
+	.fetch = nvo_fetch,
+};
+
+/**
+ * Initialise non-volatile stored options
+ *
+ * @v nvo		Non-volatile options block
+ * @v nvs		Underlying non-volatile storage device
+ * @v fragments		List of option-containing fragments
+ * @v refcnt		Containing object reference counter, or NULL
+ */
+void nvo_init ( struct nvo_block *nvo, struct nvs_device *nvs,
+		struct nvo_fragment *fragments, struct refcnt *refcnt ) {
+	nvo->nvs = nvs;
+	nvo->fragments = fragments;
+	settings_init ( &nvo->settings, &nvo_settings_operations, refcnt,
+			"nvo" );
 }
 
 /**
  * Register non-volatile stored options
  *
  * @v nvo		Non-volatile options block
+ * @v parent		Parent settings block, or NULL
  * @ret rc		Return status code
  */
-int nvo_register ( struct nvo_block *nvo ) {
+int register_nvo ( struct nvo_block *nvo, struct settings *parent ) {
 	struct nvo_fragment *fragment = nvo->fragments;
 	int rc;
 
 	/* Calculate total length of all fragments */
-	nvo->total_len = 0;
-	for ( fragment = nvo->fragments ; fragment->len ; fragment++ ) {
+	for ( fragment = nvo->fragments ; fragment->len ; fragment++ )
 		nvo->total_len += fragment->len;
-	}
 
 	/* Allocate memory for options and read in from NVS */
-	nvo->options = alloc_dhcp_options ( nvo->total_len );
-	if ( ! nvo->options ) {
-		DBG ( "NVO %p could not allocate %zd bytes\n",
-		      nvo, nvo->total_len );
+	nvo->data = malloc ( nvo->total_len );
+	if ( ! nvo->data ) {
+		DBGC ( nvo, "NVO %p could not allocate %zd bytes\n",
+		       nvo, nvo->total_len );
 		rc = -ENOMEM;
-		goto err;
+		goto err_malloc;
 	}
 	if ( ( rc = nvo_load ( nvo ) ) != 0 )
-		goto err;
+		goto err_load;
 
 	/* Verify and register options */
-	nvo_init_dhcp ( nvo );
-	register_dhcp_options ( nvo->options );
+	nvo_init_dhcpopts ( nvo );
+	if ( ( rc = register_settings ( &nvo->settings, parent ) ) != 0 )
+		goto err_register;
 
-	ugly_nvo_hack = nvo;
-
-	DBG ( "NVO %p registered\n", nvo );
+	DBGC ( nvo, "NVO %p registered\n", nvo );
 	return 0;
 	
- err:
-	dhcpopt_put ( nvo->options );
-	nvo->options = NULL;
+ err_register:
+ err_load:
+	free ( nvo->data );
+	nvo->data = NULL;
+ err_malloc:
 	return rc;
 }
 
@@ -204,15 +252,9 @@ int nvo_register ( struct nvo_block *nvo ) {
  *
  * @v nvo		Non-volatile options block
  */
-void nvo_unregister ( struct nvo_block *nvo ) {
-
-	if ( nvo->options ) {
-		unregister_dhcp_options ( nvo->options );
-		dhcpopt_put ( nvo->options );
-		nvo->options = NULL;
-	}
-
-	DBG ( "NVO %p unregistered\n", nvo );
-
-	ugly_nvo_hack = NULL;
+void unregister_nvo ( struct nvo_block *nvo ) {
+	unregister_settings ( &nvo->settings );
+	free ( nvo->data );
+	nvo->data = NULL;
+	DBGC ( nvo, "NVO %p unregistered\n", nvo );
 }

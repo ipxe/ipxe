@@ -32,16 +32,8 @@
  *
  */
 
-static int dhcp_success ( struct net_device *netdev __unused,
-			  struct dhcp_option_block *options ) {
-	DBGC ( options, "DHCP client registering options %p\n", options );
-	register_dhcp_options ( options );
-	return 0;
-}
-
 int dhcp ( struct net_device *netdev ) {
-	struct dhcp_option_block *options;
-	struct dhcp_option_block *tmp;
+	struct settings *settings;
 	int rc;
 
 	/* Check we can open the interface first */
@@ -49,18 +41,13 @@ int dhcp ( struct net_device *netdev ) {
 		return rc;
 
 	/* Unregister any option blocks acquired via DHCP */
-	list_for_each_entry_safe ( options, tmp, &dhcp_option_blocks, list ) {
-		/* Skip static option blocks (e.g. from NVS) */
-		if ( find_dhcp_option ( options, DHCP_MESSAGE_TYPE ) ) {
-			DBGC ( options, "DHCP client unregistering options "
-			       "%p\n", options );
-			unregister_dhcp_options ( options );
-		}
-	}
+	settings = find_child_settings ( netdev_settings ( netdev ), "dhcp" );
+	if ( settings )
+		unregister_settings ( settings );
 
 	/* Perform DHCP */
 	printf ( "DHCP (%s %s)", netdev->name, netdev_hwaddr ( netdev ) );
-	if ( ( rc = start_dhcp ( &monojob, netdev, dhcp_success ) ) == 0 )
+	if ( ( rc = start_dhcp ( &monojob, netdev ) ) == 0 )
 		rc = monojob_wait ( "" );
 
 	return rc;

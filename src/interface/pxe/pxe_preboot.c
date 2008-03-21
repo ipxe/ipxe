@@ -28,6 +28,7 @@
 #include <stdlib.h>
 #include <gpxe/uaccess.h>
 #include <gpxe/dhcp.h>
+#include <gpxe/dhcppkt.h>
 #include <gpxe/device.h>
 #include <gpxe/netdevice.h>
 #include <gpxe/isapnp.h>
@@ -117,9 +118,10 @@ PXENV_EXIT_t pxenv_unload_stack ( struct s_PXENV_UNLOAD_STACK *unload_stack ) {
 PXENV_EXIT_t pxenv_get_cached_info ( struct s_PXENV_GET_CACHED_INFO
 				     *get_cached_info ) {
 	struct dhcp_packet dhcppkt;
-	int ( * dhcp_packet_creator ) ( struct net_device *, int,
-					struct dhcp_option_block *, void *,
-					size_t, struct dhcp_packet * );
+	int ( * dhcp_packet_creator ) ( struct dhcp_packet *dhcppkt,
+					struct net_device *netdev, int msgtype,
+					struct settings *settings,
+					void *data, size_t max_len );
 	unsigned int idx;
 	unsigned int msgtype;
 	size_t len;
@@ -149,10 +151,9 @@ PXENV_EXIT_t pxenv_get_cached_info ( struct s_PXENV_GET_CACHED_INFO
 			dhcp_packet_creator = create_dhcp_response;
 			msgtype = DHCPACK;
 		}
-		if ( ( rc = dhcp_packet_creator ( pxe_netdev, msgtype,
-						  NULL, &cached_info[idx],
-						  sizeof ( cached_info[idx] ),
-						  &dhcppkt ) ) != 0 ) {
+		if ( ( rc = dhcp_packet_creator ( &dhcppkt, pxe_netdev,
+				       msgtype, NULL, &cached_info[idx],
+				       sizeof ( cached_info[idx] ) ) ) != 0 ) {
 			DBG ( " failed to build packet" );
 			goto err;
 		}
