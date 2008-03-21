@@ -180,26 +180,36 @@ static int resize_dhcp_option ( struct dhcp_options *options,
 	void *end;
 
 	/* Check for sufficient space, and update length fields */
-	if ( new_len > DHCP_MAX_LEN )
+	if ( new_len > DHCP_MAX_LEN ) {
+		DBGC ( options, "DHCPOPT %p overlength option\n", options );
 		return -ENOSPC;
+	}
 	new_options_len = ( options->len + delta );
 	if ( new_options_len > options->max_len ) {
 		/* Reallocate options block if allowed to do so. */
 		if ( can_realloc ) {
 			new_data = realloc ( options->data, new_options_len );
-			if ( ! new_data )
+			if ( ! new_data ) {
+				DBGC ( options, "DHCPOPT %p could not "
+				       "reallocate to %zd bytes\n", options,
+				       new_options_len );
 				return -ENOMEM;
+			}
 			options->data = new_data;
 			options->max_len = new_options_len;
 		} else {
+			DBGC ( options, "DHCPOPT %p out of space\n", options );
 			return -ENOMEM;
 		}
 	}
 	if ( encap_offset >= 0 ) {
 		encapsulator = dhcp_option ( options, encap_offset );
 		new_encapsulator_len = ( encapsulator->len + delta );
-		if ( new_encapsulator_len > DHCP_MAX_LEN )
+		if ( new_encapsulator_len > DHCP_MAX_LEN ) {
+			DBGC ( options, "DHCPOPT %p overlength encapsulator\n",
+			       options );
 			return -ENOSPC;
+		}
 		encapsulator->len = new_encapsulator_len;
 	}
 	options->len = new_options_len;
@@ -253,7 +263,7 @@ static int set_dhcp_option ( struct dhcp_options *options, unsigned int tag,
 		       options, dhcp_tag_name ( tag ), old_len, new_len );
 	} else {
 		DBGC ( options, "DHCPOPT %p creating %s (length %zd)\n",
-		       options, dhcp_tag_name ( tag ), len );
+		       options, dhcp_tag_name ( tag ), new_len );
 	}
 
 	/* Ensure that encapsulator exists, if required */
@@ -353,7 +363,7 @@ int dhcpopt_fetch ( struct dhcp_options *options, unsigned int tag,
 		return offset;
 
 	option = dhcp_option ( options, offset );
-	option_len = dhcp_option_len ( option );
+	option_len = option->len;
 	if ( len > option_len )
 		len = option_len;
 	memcpy ( data, option->data, len );

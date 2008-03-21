@@ -1649,8 +1649,10 @@ static int apply_iscsi_string_setting ( struct iscsi_string_setting *setting ){
 	/* Allocate new string */
 	prefix_len = strlen ( setting->prefix );
 	setting_len = fetch_setting_len ( NULL, setting->tag );
-	if ( setting_len < 0 )
-		return setting_len;
+	if ( setting_len < 0 ) {
+		/* Missing settings are not errors; leave strings as NULL */
+		return 0;
+	}
 	len = ( prefix_len + setting_len + 1 );
 	p = *setting->string = malloc ( len );
 	if ( ! p )

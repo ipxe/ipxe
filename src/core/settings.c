@@ -91,13 +91,11 @@ int simple_settings_store ( struct settings *settings, unsigned int tag,
 // Dummy routine just for testing
 int simple_settings_fetch ( struct settings *settings, unsigned int tag,
 			    void *data, size_t len ) {
-	unsigned int i;
-
-	DBGC ( settings, "Settings %p: fetch %s\n",
-	       settings, setting_tag_name ( tag ) );
-	for ( i = 0 ; i < len ; i++ )
-		*( ( ( uint8_t * ) data ) + i ) = i;
-	return ( len ? len : 8 );
+	( void ) settings;
+	( void ) tag;
+	( void ) data;
+	( void ) len;
+	return -ENOENT;
 }
 
 /** Simple settings operations */
@@ -337,7 +335,7 @@ int fetch_setting ( struct settings *settings, unsigned int tag,
 
 	/* Recurse into each child block in turn */
 	list_for_each_entry ( child, &settings->children, siblings ) {
-		if ( ( ret = fetch_setting ( settings, tag, data, len ) ) >= 0)
+		if ( ( ret = fetch_setting ( child, tag, data, len ) ) >= 0)
 			return ret;
 	}
 

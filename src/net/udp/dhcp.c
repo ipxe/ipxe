@@ -175,7 +175,7 @@ static int create_dhcp_packet ( struct dhcp_packet *dhcppkt,
 	}
 	dhcphdr->hlen = hlen;
 	memcpy ( dhcphdr->chaddr, netdev->ll_addr, hlen );
-	memcpy ( dhcphdr->options, options, options_len );
+	memcpy ( dhcphdr->options, options->data, options_len );
 
 	/* Initialise DHCP packet structure and settings interface */
 	dhcppkt_init ( dhcppkt, NULL, data, max_len );
@@ -258,9 +258,10 @@ int create_dhcp_request ( struct dhcp_packet *dhcppkt,
 			      "option: %s\n", strerror ( rc ) );
 			return rc;
 		}
-		if ( ( rc = copy_setting ( &dhcppkt->settings, DHCP_EB_YIADDR,
+		if ( ( rc = copy_setting ( &dhcppkt->settings,
+					   DHCP_REQUESTED_ADDRESS,
 					   offer_settings,
-					   DHCP_REQUESTED_ADDRESS ) ) != 0 ) {
+					   DHCP_EB_YIADDR ) ) != 0 ) {
 			DBG ( "DHCP could not set requested address "
 			      "option: %s\n", strerror ( rc ) );
 			return rc;
