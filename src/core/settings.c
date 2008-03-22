@@ -299,7 +299,6 @@ struct settings * find_settings ( const char *name ) {
  */
 int store_setting ( struct settings *settings, unsigned int tag,
 		    const void *data, size_t len ) {
-	struct settings *parent;
 	int rc;
 
 	/* Sanity check */
@@ -317,8 +316,8 @@ int store_setting ( struct settings *settings, unsigned int tag,
 	/* If these settings are registered, apply potentially-updated
 	 * settings
 	 */
-	for ( parent = settings->parent ; parent ; parent = parent->parent ) {
-		if ( parent == &settings_root ) {
+	for ( ; settings ; settings = settings->parent ) {
+		if ( settings == &settings_root ) {
 			if ( ( rc = apply_settings() ) != 0 )
 				return rc;
 			break;
