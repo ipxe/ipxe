@@ -245,7 +245,7 @@ struct net_device {
 	struct net_device_stats stats;
 
 	/** Configuration settings applicable to this device */
-	struct settings settings;
+	struct simple_settings settings;
 
 	/** Driver private data */
 	void *priv;
@@ -349,7 +349,7 @@ netdev_priv ( struct net_device *netdev ) {
  */
 static inline __attribute__ (( always_inline )) struct settings *
 netdev_settings ( struct net_device *netdev ) {
-	return &netdev->settings;
+	return &netdev->settings.settings;
 }
 
 extern int netdev_tx ( struct net_device *netdev, struct io_buffer *iobuf );

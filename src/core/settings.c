@@ -79,23 +79,36 @@ static inline char * setting_tag_name ( unsigned int tag ) {
  ******************************************************************************
  */
 
-// Dummy routine just for testing
+/**
+ * Store value of simple setting
+ *
+ * @v options		DHCP option block
+ * @v tag		Setting tag number
+ * @v data		Setting data, or NULL to clear setting
+ * @v len		Length of setting data
+ * @ret rc		Return status code
+ */
 int simple_settings_store ( struct settings *settings, unsigned int tag,
 			    const void *data, size_t len ) {
-	DBGC ( settings, "Settings %p: store %s to:\n",
-	       settings, setting_tag_name ( tag ) );
-	DBGC_HD ( settings, data, len );
-	return 0;
+	struct simple_settings *simple =
+		container_of ( settings, struct simple_settings, settings );
+	return dhcpopt_extensible_store ( &simple->dhcpopts, tag, data, len );
 }
 
-// Dummy routine just for testing
+/**
+ * Fetch value of simple setting
+ *
+ * @v options		DHCP option block
+ * @v tag		Setting tag number
+ * @v data		Buffer to fill with setting data
+ * @v len		Length of buffer
+ * @ret len		Length of setting data, or negative error
+ */
 int simple_settings_fetch ( struct settings *settings, unsigned int tag,
 			    void *data, size_t len ) {
-	( void ) settings;
-	( void ) tag;
-	( void ) data;
-	( void ) len;
-	return -ENOENT;
+	struct simple_settings *simple =
+		container_of ( settings, struct simple_settings, settings );
+	return dhcpopt_fetch ( &simple->dhcpopts, tag, data, len );
 }
 
 /** Simple settings operations */
@@ -104,14 +117,21 @@ struct settings_operations simple_settings_operations = {
 	.fetch = simple_settings_fetch,
 };
 
-/** Root settings block */
-struct settings settings_root = {
-	.refcnt = NULL,
-	.name = "",
-	.siblings = LIST_HEAD_INIT ( settings_root.siblings ),
-	.children = LIST_HEAD_INIT ( settings_root.children ),
-	.op = &simple_settings_operations,
+/** Root simple settings block */
+struct simple_settings simple_settings_root = {
+	.settings = {
+		.refcnt = NULL,
+		.name = "",
+		.siblings =
+		     LIST_HEAD_INIT ( simple_settings_root.settings.siblings ),
+		.children =
+		     LIST_HEAD_INIT ( simple_settings_root.settings.children ),
+		.op = &simple_settings_operations,
+	},
 };
+
+/** Root settings block */
+#define settings_root simple_settings_root.settings
 
 /**
  * Apply all settings

@@ -11,6 +11,7 @@
 #include <gpxe/tables.h>
 #include <gpxe/list.h>
 #include <gpxe/refcnt.h>
+#include <gpxe/dhcpopts.h>
 
 struct settings;
 struct in_addr;
@@ -138,12 +139,23 @@ struct settings_applicator {
 #define __settings_applicator \
 	__table ( struct settings_applicator, settings_applicators, 01 )
 
+/**
+ * A simple settings block
+ *
+ */
+struct simple_settings {
+	/** Settings block */
+	struct settings settings;
+	/** DHCP options */
+	struct dhcp_options dhcpopts;
+};
+
+extern struct settings_operations simple_settings_operations;
+
 extern int simple_settings_store ( struct settings *settings, unsigned int tag,
 				   const void *data, size_t len );
 extern int simple_settings_fetch ( struct settings *settings, unsigned int tag,
 				   void *data, size_t len );
-extern struct settings_operations simple_settings_operations;
-
 extern int register_settings ( struct settings *settings,
 			       struct settings *parent );
 extern void unregister_settings ( struct settings *settings );
@@ -203,6 +215,20 @@ static inline void settings_init ( struct settings *settings,
 	settings->op = op;
 	settings->refcnt = refcnt;
 	settings->name = name;
+}
+
+/**
+ * Initialise a settings block
+ *
+ * @v simple		Simple settings block
+ * @v refcnt		Containing object reference counter, or NULL
+ * @v name		Settings block name
+ */
+static inline void simple_settings_init ( struct simple_settings *simple,
+					  struct refcnt *refcnt,
+					  const char *name ) {
+	settings_init ( &simple->settings, &simple_settings_operations,
+			refcnt, name );
 }
 
 /**

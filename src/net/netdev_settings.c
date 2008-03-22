@@ -39,8 +39,8 @@
  */
 static int netdev_store ( struct settings *settings, unsigned int tag,
 			  const void *data, size_t len ) {
-	struct net_device *netdev =
-		container_of ( settings, struct net_device, settings );
+	struct net_device *netdev = container_of ( settings, struct net_device,
+						   settings.settings );
 
 	switch ( tag ) {
 	case DHCP_EB_MAC:
@@ -64,8 +64,8 @@ static int netdev_store ( struct settings *settings, unsigned int tag,
  */
 static int netdev_fetch ( struct settings *settings, unsigned int tag,
 			  void *data, size_t len ) {
-	struct net_device *netdev =
-		container_of ( settings, struct net_device, settings );
+	struct net_device *netdev = container_of ( settings, struct net_device,
+						   settings.settings );
 
 	switch ( tag ) {
 	case DHCP_EB_MAC:
