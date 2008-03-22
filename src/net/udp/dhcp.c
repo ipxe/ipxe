@@ -160,6 +160,10 @@ static int create_dhcp_packet ( struct dhcp_packet *dhcppkt,
 		return -ENOSPC;
 
 	/* Initialise DHCP packet content */
+
+        /* FIXME: wrong place to fix this. */
+        memset ( dhcppkt, 0, sizeof ( *dhcppkt ) );
+
 	memset ( dhcphdr, 0, max_len );
 	dhcphdr->xid = dhcp_xid ( netdev );
 	dhcphdr->magic = htonl ( DHCP_MAGIC_COOKIE );
