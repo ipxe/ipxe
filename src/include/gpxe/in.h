@@ -18,7 +18,13 @@
 
 #define INADDR_BROADCAST 0xffffffff
 
-#define IN_MULTICAST(addr) ( ( (addr) & 0xf0000000 ) == 0xe0000000 )
+#define	IN_CLASSA(addr)		( ( (addr) & 0x80000000 ) == 0x00000000 )
+#define	IN_CLASSA_NET		0xff000000
+#define	IN_CLASSB(addr)		( ( (addr) & 0xc0000000 ) == 0x80000000 )
+#define	IN_CLASSB_NET		0xffff0000
+#define	IN_CLASSC(addr)		( ( (addr) & 0xe0000000 ) == 0xc0000000 )
+#define	IN_CLASSC_NET		0xffffff00
+#define IN_MULTICAST(addr)	( ( (addr) & 0xf0000000 ) == 0xe0000000 )
 
 /**
  * IP address structure

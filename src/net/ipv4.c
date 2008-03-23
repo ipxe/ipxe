@@ -116,18 +116,31 @@ static int ipv4_create_routes ( void ) {
 	/* Create a route for each configured network device */
 	for_each_netdev ( netdev ) {
 		settings = netdev_settings ( netdev );
+		/* Get IPv4 address */
 		address.s_addr = 0;
 		fetch_ipv4_setting ( settings, DHCP_EB_YIADDR, &address );
-		netmask.s_addr = 0;
+		if ( ! address.s_addr )
+			continue;
+		/* Calculate default netmask */
+		if ( IN_CLASSA ( ntohl ( address.s_addr ) ) ) {
+			netmask.s_addr = htonl ( IN_CLASSA_NET );
+		} else if ( IN_CLASSB ( ntohl ( address.s_addr ) ) ) {
+			netmask.s_addr = htonl ( IN_CLASSB_NET );
+		} else if ( IN_CLASSC ( ntohl ( address.s_addr ) ) ) {
+			netmask.s_addr = htonl ( IN_CLASSC_NET );
+		} else {
+			netmask.s_addr = 0;
+		}
+		/* Override with subnet mask, if present */
 		fetch_ipv4_setting ( settings, DHCP_SUBNET_MASK, &netmask );
+		/* Get default gateway, if present */
 		gateway.s_addr = INADDR_NONE;
 		fetch_ipv4_setting ( settings, DHCP_ROUTERS, &gateway );
-		if ( address.s_addr ) {
-			miniroute = add_ipv4_miniroute ( netdev, address,
-							 netmask, gateway );
-			if ( ! miniroute )
-				return -ENOMEM;
-		}
+		/* Configure route */
+		miniroute = add_ipv4_miniroute ( netdev, address,
+						 netmask, gateway );
+		if ( ! miniroute )
+			return -ENOMEM;
 	}
 
 	return 0;
