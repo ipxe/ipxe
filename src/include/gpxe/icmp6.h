@@ -7,7 +7,6 @@
  *
  */
 
-#include <ip.h>
 #include <gpxe/ip6.h>
 #include <gpxe/ndp.h>
 

@@ -7,8 +7,14 @@
  *
  */
 
-#include <ip.h>
+#include <stdint.h>
+#include <gpxe/in.h>
+#include <gpxe/list.h>
 #include <gpxe/retry.h>
+
+struct io_buffer;
+struct net_device;
+struct net_protocol;
 
 /* IP constants */
 
@@ -27,7 +33,21 @@
 #define IP_FRAG_IOB_SIZE	1500
 #define IP_FRAG_TIMEOUT		50
 
-/* IP4 pseudo header */
+/** An IPv4 packet header */
+struct iphdr {
+	uint8_t  verhdrlen;
+	uint8_t  service;
+	uint16_t len;
+	uint16_t ident;
+	uint16_t frags;
+	uint8_t  ttl;
+	uint8_t  protocol;
+	uint16_t chksum;
+	struct in_addr src;
+	struct in_addr dest;
+} __attribute__ (( packed ));
+
+/** An IPv4 pseudo header */
 struct ipv4_pseudo_header {
 	struct in_addr src;
 	struct in_addr dest;
@@ -67,11 +87,6 @@ struct frag_buffer {
 	/* List of fragment reassembly buffers */
 	struct list_head list;
 };
-
-struct io_buffer;
-struct net_device;
-struct net_protocol;
-struct tcpip_protocol;
 
 extern struct list_head ipv4_miniroutes;
 

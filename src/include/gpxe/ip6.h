@@ -7,7 +7,7 @@
  *
  */
 
-#include <ip.h>
+#include <stdint.h>
 #include <gpxe/in.h>
 
 /* IP6 constants */

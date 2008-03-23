@@ -3,10 +3,10 @@
  *
  */
 
+#if 0
+
 #include <ip.h>
 #include <igmp.h>
-
-#if 0
 
 static unsigned long last_igmpv1 = 0;
 static struct igmptable_t igmptable[MAX_IGMP];
