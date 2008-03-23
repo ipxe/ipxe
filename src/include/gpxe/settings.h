@@ -163,8 +163,6 @@ extern int store_setting ( struct settings *settings, unsigned int tag,
 			   const void *data, size_t len );
 extern int fetch_setting ( struct settings *settings, unsigned int tag,
 			   void *data, size_t len );
-extern int copy_setting ( struct settings *dest, unsigned int dest_tag,
-			  struct settings *source, unsigned int source_tag );
 extern int copy_settings ( struct settings *dest, struct settings *source );
 extern int fetch_setting_len ( struct settings *settings, unsigned int tag );
 extern int fetch_string_setting ( struct settings *settings, unsigned int tag,

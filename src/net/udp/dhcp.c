@@ -255,20 +255,34 @@ static int create_dhcp_request ( struct dhcp_packet *dhcppkt,
 
 	/* Copy any required options from previous server repsonse */
 	if ( dhcpoffer ) {
-		if ( ( rc = copy_setting ( &dhcppkt->settings,
-					   DHCP_SERVER_IDENTIFIER,
-					   &dhcpoffer->settings,
-					   DHCP_SERVER_IDENTIFIER ) ) != 0 ) {
-			DBG ( "DHCP could not set server identifier "
-			      "option: %s\n", strerror ( rc ) );
+		struct in_addr server_id;
+		struct in_addr requested_ip;
+
+		if ( ( rc = fetch_ipv4_setting ( &dhcpoffer->settings,
+						 DHCP_SERVER_IDENTIFIER,
+						 &server_id ) ) < 0 ) {
+			DBG ( "DHCP offer missing server identifier\n" );
+			return -EINVAL;
+		}
+		if ( ( rc = fetch_ipv4_setting ( &dhcpoffer->settings,
+						 DHCP_EB_YIADDR,
+						 &requested_ip ) ) < 0 ) {
+			DBG ( "DHCP offer missing IP address\n" );
+			return -EINVAL;
+		}
+		if ( ( rc = store_setting ( &dhcppkt->settings,
+					    DHCP_SERVER_IDENTIFIER, &server_id,
+					    sizeof ( server_id ) ) ) != 0 ) {
+			DBG ( "DHCP could not set server identifier: %s\n ",
+			      strerror ( rc ) );
 			return rc;
 		}
-		if ( ( rc = copy_setting ( &dhcppkt->settings,
-					   DHCP_REQUESTED_ADDRESS,
-					   &dhcpoffer->settings,
-					   DHCP_EB_YIADDR ) ) != 0 ) {
-			DBG ( "DHCP could not set requested address "
-			      "option: %s\n", strerror ( rc ) );
+		if ( ( rc = store_setting ( &dhcppkt->settings,
+					    DHCP_REQUESTED_ADDRESS,
+					    &requested_ip,
+					    sizeof ( requested_ip ) ) ) != 0 ){
+			DBG ( "DHCP could not set requested address: %s\n",
+			      strerror ( rc ) );
 			return rc;
 		}
 	}
@@ -335,8 +349,16 @@ static int create_dhcp_request ( struct dhcp_packet *dhcppkt,
 int create_dhcpdiscover ( struct net_device *netdev,
 			  void *data, size_t max_len ) {
 	struct dhcp_packet dhcppkt;
+	int rc;
 
-	return create_dhcp_request ( &dhcppkt, netdev, NULL, data, max_len );
+	if ( ( rc = create_dhcp_request ( &dhcppkt, netdev, NULL, data,
+					  max_len ) ) != 0 ) {
+		DBG ( "Could not create DHCPDISCOVER: %s\n",
+		      strerror ( rc ) );
+		return rc;
+	}
+
+	return 0;
 }
 
 /**
@@ -356,18 +378,26 @@ int create_dhcpack ( struct net_device *netdev,
 
 	/* Create base DHCPACK packet */
 	if ( ( rc = create_dhcp_packet ( &dhcppkt, netdev, DHCPACK, NULL,
-					 data, max_len ) ) != 0 )
+					 data, max_len ) ) != 0 ) {
+		DBG ( "Could not create DHCPACK: %s\n", strerror ( rc ) );
 		return rc;
+	}
 
 	/* Merge in globally-scoped settings, then netdev-specific
 	 * settings.  Do it in this order so that netdev-specific
 	 * settings take precedence regardless of stated priorities.
 	 */
-	if ( ( rc = copy_settings ( &dhcppkt.settings, NULL ) ) != 0 )
+	if ( ( rc = copy_settings ( &dhcppkt.settings, NULL ) ) != 0 ) {
+		DBG ( "Could not set DHCPACK global settings: %s\n",
+		      strerror ( rc ) );
 		return rc;
+	}
 	if ( ( rc = copy_settings ( &dhcppkt.settings,
-				    netdev_settings ( netdev ) ) ) != 0 )
+				    netdev_settings ( netdev ) ) ) != 0 ) {
+		DBG ( "Could not set DHCPACK netdev settings: %s\n",
+		      strerror ( rc ) );
 		return rc;
+	}
 
 	return 0;
 }
@@ -399,12 +429,18 @@ int create_proxydhcpack ( struct net_device *netdev,
 
 	/* Create base DHCPACK packet */
 	if ( ( rc = create_dhcp_packet ( &dhcppkt, netdev, DHCPACK, NULL,
-					 data, max_len ) ) != 0 )
+					 data, max_len ) ) != 0 ) {
+		DBG ( "Could not create ProxyDHCPACK: %s\n",
+		      strerror ( rc ) );
 		return rc;
+	}
 
 	/* Merge in ProxyDHCP options */
-	if ( ( rc = copy_settings ( &dhcppkt.settings, settings ) ) != 0 )
+	if ( ( rc = copy_settings ( &dhcppkt.settings, settings ) ) != 0 ) {
+		DBG ( "Could not set ProxyDHCPACK settings: %s\n",
+		      strerror ( rc ) );
 		return rc;
+	}
 
 	return 0;
 }

@@ -499,40 +499,6 @@ unsigned long fetch_uintz_setting ( struct settings *settings,
 }
 
 /**
- * Copy setting
- *
- * @v dest		Destination settings block
- * @v dest_tag		Destination setting tag number
- * @v source		Source settings block
- * @v source_tag	Source setting tag number
- * @ret rc		Return status code
- */
-int copy_setting ( struct settings *dest, unsigned int dest_tag,
-		   struct settings *source, unsigned int source_tag ) {
-	int len;
-	int check_len;
-	int rc;
-
-	len = fetch_setting_len ( source, source_tag );
-	if ( len < 0 )
-		return len;
-
-	{
-		char buf[len];
-
-		check_len = fetch_setting ( source, source_tag, buf,
-					    sizeof ( buf ) );
-		assert ( check_len == len );
-
-		if ( ( rc = store_setting ( dest, dest_tag, buf,
-					    sizeof ( buf ) ) ) != 0 )
-			return rc;
-	}
-
-	return 0;
-}
-
-/**
  * Copy settings
  *
  * @v dest		Destination settings block
@@ -545,6 +511,8 @@ static int copy_encap_settings ( struct settings *dest,
 				 unsigned int encapsulator ) {
 	unsigned int subtag;
 	unsigned int tag;
+	int len;
+	int check_len;
 	int rc;
 
 	for ( subtag = DHCP_MIN_OPTION; subtag <= DHCP_MAX_OPTION; subtag++ ) {
@@ -552,16 +520,26 @@ static int copy_encap_settings ( struct settings *dest,
 		switch ( tag ) {
 		case DHCP_EB_ENCAP:
 		case DHCP_VENDOR_ENCAP:
-			/* Process encapsulated options field */
+			/* Process encapsulated settings */
 			if ( ( rc = copy_encap_settings ( dest, source,
 							  tag ) ) != 0 )
 				return rc;
 			break;
 		default:
-			/* Copy option to reassembled packet */
-			if ( ( rc = copy_setting ( dest, tag, source,
-						   tag ) ) != 0 )
-				return rc;
+			/* Copy setting, if present */
+			len = fetch_setting_len ( source, tag );
+			if ( len < 0 )
+				break;
+			{
+				char buf[len];
+
+				check_len = fetch_setting ( source, tag, buf,
+							    sizeof ( buf ) );
+				assert ( check_len == len );
+				if ( ( rc = store_setting ( dest, tag, buf,
+							    sizeof(buf) )) !=0)
+					return rc;
+			}
 			break;
 		}
 	}
