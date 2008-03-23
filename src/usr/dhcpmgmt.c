@@ -33,17 +33,11 @@
  */
 
 int dhcp ( struct net_device *netdev ) {
-	struct settings *settings;
 	int rc;
 
 	/* Check we can open the interface first */
 	if ( ( rc = ifopen ( netdev ) ) != 0 )
 		return rc;
-
-	/* Unregister any option blocks acquired via DHCP */
-	settings = find_child_settings ( netdev_settings ( netdev ), "dhcp" );
-	if ( settings )
-		unregister_settings ( settings );
 
 	/* Perform DHCP */
 	printf ( "DHCP (%s %s)", netdev->name, netdev_hwaddr ( netdev ) );

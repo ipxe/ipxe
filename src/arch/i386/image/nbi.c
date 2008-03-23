@@ -390,7 +390,6 @@ static struct net_device * guess_boot_netdev ( void ) {
  * @ret rc		Return status code
  */
 static int nbi_prepare_dhcp ( struct image *image ) {
-	struct dhcp_packet dhcppkt;
 	struct net_device *boot_netdev;
 	int rc;
 
@@ -401,9 +400,8 @@ static int nbi_prepare_dhcp ( struct image *image ) {
 		return -ENODEV;
 	}
 
-	if ( ( rc = create_dhcp_response ( &dhcppkt, boot_netdev, DHCPACK,
-					   NULL, basemem_packet,
-					   sizeof ( basemem_packet ) ) ) != 0){
+	if ( ( rc = create_dhcpack ( boot_netdev, basemem_packet,
+				     sizeof ( basemem_packet ) ) ) != 0 ) {
 		DBGC ( image, "NBI %p failed to build DHCP packet\n", image );
 		return rc;
 	}

@@ -65,6 +65,26 @@ union pxe_cached_info {
 	BOOTPLAYER_t packet;
 } __attribute__ (( packed ));
 
+/** A PXE DHCP packet creator */
+struct pxe_dhcp_packet_creator {
+	/** Create DHCP packet
+	 *
+	 * @v netdev		Network device
+	 * @v data		Buffer for DHCP packet
+	 * @v max_len		Size of DHCP packet buffer
+	 * @ret rc		Return status code
+	 */
+	int ( * create ) ( struct net_device *netdev, void *data,
+			   size_t max_len );
+};
+
+/** PXE DHCP packet creators */
+static struct pxe_dhcp_packet_creator pxe_dhcp_packet_creators[] = {
+	[CACHED_INFO_DHCPDISCOVER] = { create_dhcpdiscover },
+	[CACHED_INFO_DHCPACK] = { create_dhcpack },
+	[CACHED_INFO_BINL] = { create_proxydhcpack },
+};
+
 /* The case in which the caller doesn't supply a buffer is really
  * awkward to support given that we have multiple sources of options,
  * and that we don't actually store the DHCP packets.  (We may not
@@ -117,13 +137,9 @@ PXENV_EXIT_t pxenv_unload_stack ( struct s_PXENV_UNLOAD_STACK *unload_stack ) {
  */
 PXENV_EXIT_t pxenv_get_cached_info ( struct s_PXENV_GET_CACHED_INFO
 				     *get_cached_info ) {
-	struct dhcp_packet dhcppkt;
-	int ( * dhcp_packet_creator ) ( struct dhcp_packet *dhcppkt,
-					struct net_device *netdev, int msgtype,
-					struct settings *settings,
-					void *data, size_t max_len );
+	struct pxe_dhcp_packet_creator *creator;
+	union pxe_cached_info *info;
 	unsigned int idx;
-	unsigned int msgtype;
 	size_t len;
 	userptr_t buffer;
 	int rc;
@@ -135,25 +151,18 @@ PXENV_EXIT_t pxenv_get_cached_info ( struct s_PXENV_GET_CACHED_INFO
 
 	/* Sanity check */
         idx = ( get_cached_info->PacketType - 1 );
-	if ( idx >= ( sizeof ( cached_info ) / sizeof ( cached_info[0] ) ) ) {
+	if ( idx >= NUM_CACHED_INFOS ) {
 		DBG ( " bad PacketType" );
 		goto err;
 	}
+	info = &cached_info[idx];
 
 	/* Construct cached version of packet, if not already constructed. */
-	if ( ! cached_info[idx].dhcphdr.op ) {
+	if ( ! info->dhcphdr.op ) {
 		/* Construct DHCP packet */
-		if ( get_cached_info->PacketType ==
-		     PXENV_PACKET_TYPE_DHCP_DISCOVER ) {
-			dhcp_packet_creator = create_dhcp_request;
-			msgtype = DHCPDISCOVER;
-		} else {
-			dhcp_packet_creator = create_dhcp_response;
-			msgtype = DHCPACK;
-		}
-		if ( ( rc = dhcp_packet_creator ( &dhcppkt, pxe_netdev,
-				       msgtype, NULL, &cached_info[idx],
-				       sizeof ( cached_info[idx] ) ) ) != 0 ) {
+		creator = &pxe_dhcp_packet_creators[idx];
+		if ( ( rc = creator->create ( pxe_netdev, info,
+					      sizeof ( *info ) ) ) != 0 ) {
 			DBG ( " failed to build packet" );
 			goto err;
 		}
@@ -188,8 +197,8 @@ PXENV_EXIT_t pxenv_get_cached_info ( struct s_PXENV_GET_CACHED_INFO
 		 */
 		get_cached_info->Buffer.segment = rm_ds;
 		get_cached_info->Buffer.offset =
-			( unsigned ) ( & __from_data16 ( cached_info[idx] ) );
-		get_cached_info->BufferSize = sizeof ( cached_info[idx] );
+			( unsigned ) ( __from_data16 ( info ) );
+		get_cached_info->BufferSize = sizeof ( *info );
 		DBG ( " returning %04x:%04x+%04x['%x']",
 		      get_cached_info->Buffer.segment,
 		      get_cached_info->Buffer.offset,
@@ -197,13 +206,13 @@ PXENV_EXIT_t pxenv_get_cached_info ( struct s_PXENV_GET_CACHED_INFO
 		      get_cached_info->BufferLimit );
 	} else {
 		/* Copy packet to client buffer */
-		if ( len > sizeof ( cached_info[idx] ) )
-			len = sizeof ( cached_info[idx] );
-		if ( len < sizeof ( cached_info[idx] ) )
+		if ( len > sizeof ( *info ) )
+			len = sizeof ( *info );
+		if ( len < sizeof ( *info ) )
 			DBG ( " buffer may be too short" );
 		buffer = real_to_user ( get_cached_info->Buffer.segment,
 					get_cached_info->Buffer.offset );
-		copy_to_user ( buffer, 0, &cached_info[idx], len );
+		copy_to_user ( buffer, 0, info, len );
 		get_cached_info->BufferSize = len;
 	}
 

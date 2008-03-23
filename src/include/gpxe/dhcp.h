@@ -445,14 +445,12 @@ struct dhcphdr {
 /** Maximum time that we will wait for ProxyDHCP offers */
 #define PROXYDHCP_WAIT_TIME ( TICKS_PER_SEC * 1 )
 
-extern int create_dhcp_request ( struct dhcp_packet *dhcppkt,
-				 struct net_device *netdev, int msgtype,
-				 struct settings *offer_settings,
+extern int create_dhcpdiscover ( struct net_device *netdev,
 				 void *data, size_t max_len );
-extern int create_dhcp_response ( struct dhcp_packet *dhcppkt,
-				  struct net_device *netdev, int msgtype,
-				  struct settings *settings,
-				  void *data, size_t max_len );
+extern int create_dhcpack ( struct net_device *netdev,
+			    void *data, size_t max_len );
+extern int create_proxydhcpack ( struct net_device *netdev,
+				 void *data, size_t max_len );
 extern int start_dhcp ( struct job_interface *job, struct net_device *netdev );
 
 #endif /* _GPXE_DHCP_H */
