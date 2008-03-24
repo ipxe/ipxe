@@ -1085,6 +1085,12 @@ struct named_setting basic_named_settings[] __named_setting = {
 		.type = &setting_type_string,
 	},
 	{
+		.name = "next-server",
+		.description = "TFTP server",
+		.tag = DHCP_EB_SIADDR,
+		.type = &setting_type_ipv4,
+	},
+	{
 		.name = "filename",
 		.description = "Boot filename",
 		.tag = DHCP_BOOTFILE_NAME,
