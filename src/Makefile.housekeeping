@@ -179,7 +179,7 @@ endef
 define obj_template
 
 	@$(CPP) $(CFLAGS) $(CFLAGS_$(3)) $(CFLAGS_$(4)) -DOBJECT=$(4) \
-		-Wno-error -M $(1) -MT "$(4)_DEPS" -MG -MP | \
+		-Wno-error -MM $(1) -MT "$(4)_DEPS" -MG -MP | \
 		sed 's/_DEPS\s*:/_DEPS =/' >> $(2)
 	@$(ECHO_E) '\n$$(BIN)/$(4).o : $(1) $$(MAKEDEPS) $$($(4)_DEPS)' \
 		 '\n\t$$(QM)$(ECHO) "  [BUILD] $$@"\n' \
