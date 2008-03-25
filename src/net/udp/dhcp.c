@@ -622,7 +622,7 @@ static int dhcp_send_request ( struct dhcp_session *dhcp ) {
 		.netdev = dhcp->netdev,
 	};
 	struct io_buffer *iobuf;
-	struct dhcp_packet *dhcpoffer;
+	struct dhcp_packet *dhcpoffer = NULL;
 	struct dhcp_packet dhcppkt;
 	int rc;
 	
@@ -643,7 +643,10 @@ static int dhcp_send_request ( struct dhcp_session *dhcp ) {
 		return -ENOMEM;
 
 	/* Create DHCP packet in temporary buffer */
-	dhcpoffer = ( dhcp->response ? &dhcp->response->dhcppkt : NULL );
+	if ( dhcp->state == DHCPREQUEST ) {
+		assert ( dhcp->response );
+		dhcpoffer = &dhcp->response->dhcppkt;
+	}
 	if ( ( rc = create_dhcp_request ( &dhcppkt, dhcp->netdev,
 					  dhcpoffer, iobuf->data,
 					  iob_tailroom ( iobuf ) ) ) != 0 ) {
