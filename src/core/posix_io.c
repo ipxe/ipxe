@@ -114,7 +114,7 @@ static void posix_file_xfer_close ( struct xfer_interface *xfer, int rc ) {
 static int
 posix_file_xfer_deliver_iob ( struct xfer_interface *xfer,
 			      struct io_buffer *iobuf,
-			      struct xfer_metadata *meta __unused ) {
+			      struct xfer_metadata *meta ) {
 	struct posix_file *file =
 		container_of ( xfer, struct posix_file, xfer );
 
@@ -125,7 +125,12 @@ posix_file_xfer_deliver_iob ( struct xfer_interface *xfer,
 	if ( file->filesize < file->pos )
 		file->filesize = file->pos;
 
-	list_add_tail ( &iobuf->list, &file->data );
+	if ( iob_len ( iobuf ) ) {
+		list_add_tail ( &iobuf->list, &file->data );
+	} else {
+		free_iob ( iobuf );
+	}
+
 	return 0;
 }
 
@@ -293,14 +298,15 @@ ssize_t read_user ( int fd, userptr_t buffer, off_t offset, size_t max_len ) {
 			free_iob ( iobuf );
 		}
 		file->pos += len;
-		if ( len )
-			return len;
-		break;
+		assert ( len != 0 );
+		return len;
 	}
 
 	/* If file has completed, return (after returning all data) */
-	if ( file->rc != -EINPROGRESS )
+	if ( file->rc != -EINPROGRESS ) {
+		assert ( list_empty ( &file->data ) );
 		return file->rc;
+	}
 
 	/* No data ready and file still in progress; return -WOULDBLOCK */
 	return -EWOULDBLOCK;
