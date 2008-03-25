@@ -130,9 +130,6 @@ static uint32_t dhcp_xid ( struct net_device *netdev ) {
 	return xid;
 }
 
-/** Settings block name used for ProxyDHCP responses */
-#define PROXYDHCP_SETTINGS_NAME "proxydhcp"
-
 /**
  * Create a DHCP packet
  *
@@ -180,12 +177,12 @@ int create_dhcp_packet ( struct dhcp_packet *dhcppkt,
 	memcpy ( dhcphdr->chaddr, netdev->ll_addr, hlen );
 	memcpy ( dhcphdr->options, options->data, options_len );
 
-	/* Initialise DHCP packet structure and settings interface */
+	/* Initialise DHCP packet structure */
 	memset ( dhcppkt, 0, sizeof ( *dhcppkt ) );
-	dhcppkt_init ( dhcppkt, NULL, data, max_len );
+	dhcppkt_init ( dhcppkt, data, max_len );
 	
 	/* Set DHCP_MESSAGE_TYPE option */
-	if ( ( rc = store_setting ( &dhcppkt->settings, DHCP_MESSAGE_TYPE,
+	if ( ( rc = dhcppkt_store ( dhcppkt, DHCP_MESSAGE_TYPE,
 				    &msgtype, sizeof ( msgtype ) ) ) != 0 )
 		return rc;
 
@@ -230,10 +227,10 @@ struct dhcp_client_uuid {
  * @v max_len		Size of DHCP packet buffer
  * @ret rc		Return status code
  */
-static int create_dhcp_request ( struct dhcp_packet *dhcppkt,
-				 struct net_device *netdev,
-				 struct dhcp_packet *dhcpoffer,
-				 void *data, size_t max_len ) {
+int create_dhcp_request ( struct dhcp_packet *dhcppkt,
+			  struct net_device *netdev,
+			  struct dhcp_packet *dhcpoffer,
+			  void *data, size_t max_len ) {
 	struct device_description *desc = &netdev->dev->desc;
 	struct dhcp_netdev_desc dhcp_desc;
 	struct dhcp_client_id client_id;
@@ -258,27 +255,26 @@ static int create_dhcp_request ( struct dhcp_packet *dhcppkt,
 		struct in_addr server_id;
 		struct in_addr requested_ip;
 
-		if ( ( rc = fetch_ipv4_setting ( &dhcpoffer->settings,
-						 DHCP_SERVER_IDENTIFIER,
-						 &server_id ) ) < 0 ) {
+		if ( dhcppkt_fetch ( dhcpoffer, DHCP_SERVER_IDENTIFIER,
+				     &server_id, sizeof ( server_id ) )
+		     != sizeof ( server_id ) ) {
 			DBG ( "DHCP offer missing server identifier\n" );
 			return -EINVAL;
 		}
-		if ( ( rc = fetch_ipv4_setting ( &dhcpoffer->settings,
-						 DHCP_EB_YIADDR,
-						 &requested_ip ) ) < 0 ) {
+		if ( dhcppkt_fetch ( dhcpoffer, DHCP_EB_YIADDR,
+				     &requested_ip, sizeof ( requested_ip ) )
+		     != sizeof ( requested_ip ) ) {
 			DBG ( "DHCP offer missing IP address\n" );
 			return -EINVAL;
 		}
-		if ( ( rc = store_setting ( &dhcppkt->settings,
-					    DHCP_SERVER_IDENTIFIER, &server_id,
+		if ( ( rc = dhcppkt_store ( dhcppkt, DHCP_SERVER_IDENTIFIER,
+					    &server_id,
 					    sizeof ( server_id ) ) ) != 0 ) {
 			DBG ( "DHCP could not set server identifier: %s\n ",
 			      strerror ( rc ) );
 			return rc;
 		}
-		if ( ( rc = store_setting ( &dhcppkt->settings,
-					    DHCP_REQUESTED_ADDRESS,
+		if ( ( rc = dhcppkt_store ( dhcppkt, DHCP_REQUESTED_ADDRESS,
 					    &requested_ip,
 					    sizeof ( requested_ip ) ) ) != 0 ){
 			DBG ( "DHCP could not set requested address: %s\n",
@@ -289,8 +285,8 @@ static int create_dhcp_request ( struct dhcp_packet *dhcppkt,
 
 	/* Add options to identify the feature list */
 	dhcp_features_len = ( dhcp_features_end - dhcp_features );
-	if ( ( rc = store_setting ( &dhcppkt->settings, DHCP_EB_ENCAP,
-				    dhcp_features, dhcp_features_len ) ) !=0 ){
+	if ( ( rc = dhcppkt_store ( dhcppkt, DHCP_EB_ENCAP, dhcp_features,
+				    dhcp_features_len ) ) != 0 ) {
 		DBG ( "DHCP could not set features list option: %s\n",
 		      strerror ( rc ) );
 		return rc;
@@ -300,8 +296,8 @@ static int create_dhcp_request ( struct dhcp_packet *dhcppkt,
 	dhcp_desc.type = desc->bus_type;
 	dhcp_desc.vendor = htons ( desc->vendor );
 	dhcp_desc.device = htons ( desc->device );
-	if ( ( rc = store_setting ( &dhcppkt->settings, DHCP_EB_BUS_ID,
-				    &dhcp_desc, sizeof ( dhcp_desc ) ) ) !=0 ){
+	if ( ( rc = dhcppkt_store ( dhcppkt, DHCP_EB_BUS_ID, &dhcp_desc,
+				    sizeof ( dhcp_desc ) ) ) != 0 ) {
 		DBG ( "DHCP could not set bus ID option: %s\n",
 		      strerror ( rc ) );
 		return rc;
@@ -314,8 +310,8 @@ static int create_dhcp_request ( struct dhcp_packet *dhcppkt,
 	ll_addr_len = netdev->ll_protocol->ll_addr_len;
 	assert ( ll_addr_len <= sizeof ( client_id.ll_addr ) );
 	memcpy ( client_id.ll_addr, netdev->ll_addr, ll_addr_len );
-	if ( ( rc = store_setting ( &dhcppkt->settings, DHCP_CLIENT_ID,
-				    &client_id, ( ll_addr_len + 1 ) ) ) != 0 ){
+	if ( ( rc = dhcppkt_store ( dhcppkt, DHCP_CLIENT_ID, &client_id,
+				    ( ll_addr_len + 1 ) ) ) != 0 ) {
 		DBG ( "DHCP could not set client ID: %s\n",
 		      strerror ( rc ) );
 		return rc;
@@ -324,8 +320,8 @@ static int create_dhcp_request ( struct dhcp_packet *dhcppkt,
 	/* Add client UUID, if we have one.  Required for PXE. */
 	client_uuid.type = DHCP_CLIENT_UUID_TYPE;
 	if ( ( rc = get_uuid ( &client_uuid.uuid ) ) == 0 ) {
-		if ( ( rc = store_setting ( &dhcppkt->settings,
-					    DHCP_CLIENT_UUID, &client_uuid,
+		if ( ( rc = dhcppkt_store ( dhcppkt, DHCP_CLIENT_UUID,
+					    &client_uuid,
 					    sizeof ( client_uuid ) ) ) != 0 ) {
 			DBG ( "DHCP could not set client UUID: %s\n",
 			      strerror ( rc ) );
@@ -336,169 +332,109 @@ static int create_dhcp_request ( struct dhcp_packet *dhcppkt,
 	return 0;
 }
 
-/**
- * Create DHCPDISCOVER packet
- *
- * @v netdev		Network device
- * @v data		Buffer for DHCP packet
- * @v max_len		Size of DHCP packet buffer
- * @ret rc		Return status code
- *
- * Used by external code.
- */
-int create_dhcpdiscover ( struct net_device *netdev,
-			  void *data, size_t max_len ) {
-	struct dhcp_packet dhcppkt;
-	int rc;
-
-	if ( ( rc = create_dhcp_request ( &dhcppkt, netdev, NULL, data,
-					  max_len ) ) != 0 ) {
-		DBG ( "Could not create DHCPDISCOVER: %s\n",
-		      strerror ( rc ) );
-		return rc;
-	}
-
-	return 0;
-}
-
-/**
- * Create DHCPACK packet
- *
- * @v netdev		Network device
- * @v data		Buffer for DHCP packet
- * @v max_len		Size of DHCP packet buffer
- * @ret rc		Return status code
- *
- * Used by external code.
- */
-int create_dhcpack ( struct net_device *netdev,
-		     void *data, size_t max_len ) {
-	struct dhcp_packet dhcppkt;
-	int rc;
-
-	/* Create base DHCPACK packet */
-	if ( ( rc = create_dhcp_packet ( &dhcppkt, netdev, DHCPACK, NULL,
-					 data, max_len ) ) != 0 ) {
-		DBG ( "Could not create DHCPACK: %s\n", strerror ( rc ) );
-		return rc;
-	}
-
-	/* Merge in globally-scoped settings, then netdev-specific
-	 * settings.  Do it in this order so that netdev-specific
-	 * settings take precedence regardless of stated priorities.
-	 */
-	if ( ( rc = copy_settings ( &dhcppkt.settings, NULL ) ) != 0 ) {
-		DBG ( "Could not set DHCPACK global settings: %s\n",
-		      strerror ( rc ) );
-		return rc;
-	}
-	if ( ( rc = copy_settings ( &dhcppkt.settings,
-				    netdev_settings ( netdev ) ) ) != 0 ) {
-		DBG ( "Could not set DHCPACK netdev settings: %s\n",
-		      strerror ( rc ) );
-		return rc;
-	}
-
-	return 0;
-}
-
-/**
- * Create ProxyDHCPACK packet
- *
- * @v netdev		Network device
- * @v data		Buffer for DHCP packet
- * @v max_len		Size of DHCP packet buffer
- * @ret rc		Return status code
- *
- * Used by external code.
- */
-int create_proxydhcpack ( struct net_device *netdev,
-			  void *data, size_t max_len ) {
-	struct dhcp_packet dhcppkt;
-	struct settings *settings;
-	int rc;
-
-	/* Identify ProxyDHCP settings */
-	settings = find_settings ( PROXYDHCP_SETTINGS_NAME );
-
-	/* No ProxyDHCP settings => return empty block */
-	if ( ! settings ) {
-		memset ( data, 0, max_len );
-		return 0;
-	}
-
-	/* Create base DHCPACK packet */
-	if ( ( rc = create_dhcp_packet ( &dhcppkt, netdev, DHCPACK, NULL,
-					 data, max_len ) ) != 0 ) {
-		DBG ( "Could not create ProxyDHCPACK: %s\n",
-		      strerror ( rc ) );
-		return rc;
-	}
-
-	/* Merge in ProxyDHCP options */
-	if ( ( rc = copy_settings ( &dhcppkt.settings, settings ) ) != 0 ) {
-		DBG ( "Could not set ProxyDHCPACK settings: %s\n",
-		      strerror ( rc ) );
-		return rc;
-	}
-
-	return 0;
-}
-
 /****************************************************************************
  *
- * DHCP packets contained in I/O buffers
+ * DHCP settings
  *
  */
 
-/** A DHCP packet contained in an I/O buffer */
-struct dhcp_iobuf_packet {
-	/** DHCP packet */
-	struct dhcp_packet dhcppkt;
+/** A DHCP settings block */
+struct dhcp_settings {
 	/** Reference counter */
 	struct refcnt refcnt;
 	/** Containing I/O buffer */
 	struct io_buffer *iobuf;
+	/** DHCP packet */
+	struct dhcp_packet dhcppkt;
+	/** Setting interface */
+	struct settings settings;
 };
 
 /**
- * Free DHCP packet contained in an I/O buffer
+ * Free DHCP settings block
  *
  * @v refcnt		Reference counter
  */
-static void dhcpiob_free ( struct refcnt *refcnt ) {
-	struct dhcp_iobuf_packet *dhcpiob =
-		container_of ( refcnt, struct dhcp_iobuf_packet, refcnt );
+static void dhcpset_free ( struct refcnt *refcnt ) {
+	struct dhcp_settings *dhcpset =
+		container_of ( refcnt, struct dhcp_settings, refcnt );
 
-	free_iob ( dhcpiob->iobuf );
-	free ( dhcpiob );
+	free_iob ( dhcpset->iobuf );
+	free ( dhcpset );
 }
 
 /**
- * Create DHCP packet from I/O buffer
+ * Decrement reference count on DHCP settings block
  *
- * @v iobuf		I/O buffer
- * @ret dhcpiob		DHCP packet contained in I/O buffer
- *
- * This function takes ownership of the I/O buffer.  Future accesses
- * must be via the @c dhcpiob data structure.
+ * @v dhcpset		DHCP settings block
  */
-static struct dhcp_iobuf_packet * dhcpiob_create ( struct io_buffer *iobuf ) {
-	struct dhcp_iobuf_packet *dhcpiob;
-
-	dhcpiob = zalloc ( sizeof ( *dhcpiob ) );
-	if ( dhcpiob ) {
-		dhcpiob->refcnt.free = dhcpiob_free;
-		dhcpiob->iobuf = iobuf;
-		dhcppkt_init ( &dhcpiob->dhcppkt, &dhcpiob->refcnt,
-			       iobuf->data, iob_len ( iobuf ) );
-	}
-	return dhcpiob;
+static inline void dhcpset_put ( struct dhcp_settings *dhcpset ) {
+	ref_put ( &dhcpset->refcnt );
 }
 
-static void dhcpiob_put ( struct dhcp_iobuf_packet *dhcpiob ) {
-	if ( dhcpiob )
-		ref_put ( &dhcpiob->refcnt );
+/**
+ * Store value of DHCP setting
+ *
+ * @v settings		Settings block
+ * @v setting		Setting to store
+ * @v data		Setting data, or NULL to clear setting
+ * @v len		Length of setting data
+ * @ret rc		Return status code
+ */
+static int dhcpset_store ( struct settings *settings, struct setting *setting,
+			   const void *data, size_t len ) {
+	struct dhcp_settings *dhcpset =
+		container_of ( settings, struct dhcp_settings, settings );
+
+	return dhcppkt_store ( &dhcpset->dhcppkt, setting->tag, data, len );
+}
+
+/**
+ * Fetch value of setting
+ *
+ * @v settings		Settings block, or NULL to search all blocks
+ * @v setting		Setting to fetch
+ * @v data		Buffer to fill with setting data
+ * @v len		Length of buffer
+ * @ret len		Length of setting data, or negative error
+ */
+static int dhcpset_fetch ( struct settings *settings, struct setting *setting,
+			   void *data, size_t len ) {
+	struct dhcp_settings *dhcpset =
+		container_of ( settings, struct dhcp_settings, settings );
+
+	return dhcppkt_fetch ( &dhcpset->dhcppkt, setting->tag, data, len );
+}
+
+/** DHCP settings operations */
+static struct settings_operations dhcpset_settings_operations = {
+	.store = dhcpset_store,
+	.fetch = dhcpset_fetch,
+};
+
+/**
+ * Create DHCP setting block from I/O buffer
+ *
+ * @v iobuf		I/O buffer
+ * @ret dhcpset		DHCP settings block
+ *
+ * This function takes ownership of the I/O buffer.  Future accesses
+ * must be via the @c dhcpset data structure.
+ */
+static struct dhcp_settings * dhcpset_create_iob ( struct io_buffer *iobuf ) {
+	struct dhcp_settings *dhcpset;
+
+	dhcpset = zalloc ( sizeof ( *dhcpset ) );
+	if ( dhcpset ) {
+		dhcpset->refcnt.free = dhcpset_free;
+		dhcpset->iobuf = iobuf;
+		dhcppkt_init ( &dhcpset->dhcppkt,
+			       iobuf->data, iob_len ( iobuf ) );
+		settings_init ( &dhcpset->settings,
+				&dhcpset_settings_operations, &dhcpset->refcnt,
+				DHCP_SETTINGS_NAME );
+	}
+	return dhcpset;
 }
 
 /****************************************************************************
@@ -526,9 +462,9 @@ struct dhcp_session {
 	 */
 	int state;
 	/** Response obtained from DHCP server */
-	struct dhcp_iobuf_packet *response;
+	struct dhcp_settings *response;
 	/** Response obtained from ProxyDHCP server */
-	struct dhcp_iobuf_packet *proxy_response;
+	struct dhcp_settings *proxy_response;
 	/** Retransmission timer */
 	struct retry_timer timer;
 	/** Session start time (in ticks) */
@@ -545,8 +481,8 @@ static void dhcp_free ( struct refcnt *refcnt ) {
 		container_of ( refcnt, struct dhcp_session, refcnt );
 
 	netdev_put ( dhcp->netdev );
-	dhcpiob_put ( dhcp->response );
-	dhcpiob_put ( dhcp->proxy_response );
+	dhcpset_put ( dhcp->response );
+	dhcpset_put ( dhcp->proxy_response );
 	free ( dhcp );
 }
 
@@ -584,7 +520,7 @@ static int dhcp_register_settings ( struct dhcp_session *dhcp ) {
 
 	/* Register ProxyDHCP settings, if present */
 	if ( dhcp->proxy_response ) {
-		settings = &dhcp->proxy_response->dhcppkt.settings;
+		settings = &dhcp->proxy_response->settings;
 		settings->name = PROXYDHCP_SETTINGS_NAME;
 		old_settings = find_settings ( settings->name );
 		if ( old_settings )
@@ -595,7 +531,7 @@ static int dhcp_register_settings ( struct dhcp_session *dhcp ) {
 
 	/* Register DHCP settings */
 	parent = netdev_settings ( dhcp->netdev );
-	settings = &dhcp->response->dhcppkt.settings;
+	settings = &dhcp->response->settings;
 	old_settings = find_child_settings ( parent, settings->name );
 	if ( old_settings )
 		unregister_settings ( old_settings );
@@ -701,24 +637,24 @@ static int dhcp_deliver_iob ( struct xfer_interface *xfer,
 			      struct xfer_metadata *meta __unused ) {
 	struct dhcp_session *dhcp =
 		container_of ( xfer, struct dhcp_session, xfer );
-	struct dhcp_iobuf_packet *response;
-	struct dhcp_iobuf_packet **store_response;
+	struct dhcp_settings *response;
+	struct dhcp_settings **store_response;
 	struct dhcphdr *dhcphdr;
-	struct settings *settings;
-	unsigned int msgtype;
+	uint8_t msgtype = 0;
+	uint8_t priority = 0;
+	uint8_t existing_priority = 0;
 	unsigned long elapsed;
 	int is_proxy;
-	int ignore_proxy;
+	uint8_t ignore_proxy = 0;
 	int rc;
 
 	/* Convert packet into a DHCP-packet-in-iobuf */
-	response = dhcpiob_create ( iobuf );
+	response = dhcpset_create_iob ( iobuf );
 	if ( ! response ) {
 		DBGC ( dhcp, "DHCP %p could not store DHCP packet\n", dhcp );
 		return -ENOMEM;
 	}
 	dhcphdr = response->dhcppkt.dhcphdr;
-	settings = &response->dhcppkt.settings;
 
 	/* Check for matching transaction ID */
 	if ( dhcphdr->xid != dhcp_xid ( dhcp->netdev ) ) {
@@ -730,7 +666,8 @@ static int dhcp_deliver_iob ( struct xfer_interface *xfer,
 
 	/* Determine and verify message type */
 	is_proxy = ( dhcphdr->yiaddr.s_addr == 0 );
-	msgtype = fetch_uintz_setting ( settings, DHCP_MESSAGE_TYPE );
+	dhcppkt_fetch ( &response->dhcppkt, DHCP_MESSAGE_TYPE, &msgtype,
+			sizeof ( msgtype ) );
 	DBGC ( dhcp, "DHCP %p received %s%s\n", dhcp,
 	       ( is_proxy ? "Proxy" : "" ), dhcp_msgtype_name ( msgtype ) );
 	if ( ( ( dhcp->state != DHCPDISCOVER ) || ( msgtype != DHCPOFFER ) ) &&
@@ -746,14 +683,18 @@ static int dhcp_deliver_iob ( struct xfer_interface *xfer,
 	 * currently-stored options.
 	 */
 	store_response = ( is_proxy ? &dhcp->proxy_response : &dhcp->response);
-	if ( ( ! *store_response ) || 
-	     ( fetch_uintz_setting ( settings, DHCP_EB_PRIORITY ) >=
-	       fetch_uintz_setting ( &(*store_response)->dhcppkt.settings,
-				     DHCP_EB_PRIORITY ) ) ) {
-		dhcpiob_put ( *store_response );
+	if ( *store_response ) {
+		dhcppkt_fetch ( &(*store_response)->dhcppkt, DHCP_EB_PRIORITY,
+				&existing_priority,
+				sizeof ( existing_priority ) );
+	}
+	dhcppkt_fetch ( &response->dhcppkt, DHCP_EB_PRIORITY, &priority,
+			sizeof ( priority ) );
+	if ( priority >= existing_priority ) {
+		dhcpset_put ( *store_response );
 		*store_response = response;
 	} else {
-		dhcpiob_put ( response );
+		dhcpset_put ( response );
 	}
 
 	/* If we don't yet have a standard DHCP response (i.e. one
@@ -763,8 +704,8 @@ static int dhcp_deliver_iob ( struct xfer_interface *xfer,
 		goto out;
 
 	/* Handle DHCP response */
-	ignore_proxy = fetch_uintz_setting ( &dhcp->response->dhcppkt.settings,
-					     DHCP_EB_NO_PROXYDHCP );
+	dhcppkt_fetch ( &dhcp->response->dhcppkt, DHCP_EB_NO_PROXYDHCP,
+			&ignore_proxy, sizeof ( ignore_proxy ) );
 	switch ( dhcp->state ) {
 	case DHCPDISCOVER:
 		/* If we have allowed sufficient time for ProxyDHCP
@@ -780,7 +721,7 @@ static int dhcp_deliver_iob ( struct xfer_interface *xfer,
 	case DHCPREQUEST:
 		/* DHCP finished; register options and exit */
 		if ( ignore_proxy && dhcp->proxy_response ) {
-			dhcpiob_put ( dhcp->proxy_response );
+			dhcpset_put ( dhcp->proxy_response );
 			dhcp->proxy_response = NULL;
 		}
 		if ( ( rc = dhcp_register_settings ( dhcp ) ) != 0 ) {
@@ -797,7 +738,7 @@ static int dhcp_deliver_iob ( struct xfer_interface *xfer,
 	return 0;
 
  out_discard:
-	dhcpiob_put ( response );
+	dhcpset_put ( response );
 	return 0;
 }
 

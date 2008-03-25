@@ -118,6 +118,11 @@ static int find_dhcp_option_with_encap ( struct dhcp_options *options,
 	ssize_t remaining = options->len;
 	unsigned int option_len;
 
+	/* Sanity check */
+	if ( tag == DHCP_PAD )
+		return -ENOENT;
+
+	/* Search for option */
 	while ( remaining ) {
 		/* Calculate length of this option.  Abort processing
 		 * if the length is malformed (i.e. takes us beyond
@@ -128,6 +133,9 @@ static int find_dhcp_option_with_encap ( struct dhcp_options *options,
 		remaining -= option_len;
 		if ( remaining < 0 )
 			break;
+		/* Check for explicit end marker */
+		if ( option->tag == DHCP_END )
+			break;
 		/* Check for matching tag */
 		if ( option->tag == tag ) {
 			DBGC ( options, "DHCPOPT %p found %s (length %d)\n",
@@ -135,9 +143,6 @@ static int find_dhcp_option_with_encap ( struct dhcp_options *options,
 			       option_len );
 			return offset;
 		}
-		/* Check for explicit end marker */
-		if ( option->tag == DHCP_END )
-			break;
 		/* Check for start of matching encapsulation block */
 		if ( DHCP_IS_ENCAP_OPT ( tag ) &&
 		     ( option->tag == DHCP_ENCAPSULATOR ( tag ) ) ) {
@@ -151,6 +156,7 @@ static int find_dhcp_option_with_encap ( struct dhcp_options *options,
 		}
 		offset += option_len;
 	}
+
 	return -ENOENT;
 }
 
@@ -254,6 +260,10 @@ static int set_dhcp_option ( struct dhcp_options *options, unsigned int tag,
 	size_t old_len = 0;
 	size_t new_len = ( len ? ( len + DHCP_OPTION_HEADER_LEN ) : 0 );
 	int rc;
+
+	/* Sanity check */
+	if ( tag == DHCP_PAD )
+		return -ENOTTY;
 
 	/* Find old instance of this option, if any */
 	offset = find_dhcp_option_with_encap ( options, tag, &encap_offset );

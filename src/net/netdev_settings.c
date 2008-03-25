@@ -28,28 +28,34 @@
  *
  */
 
+/** Network device named settings */
+struct setting mac_setting __setting = {
+	.name = "mac",
+	.description = "MAC address",
+	.type = &setting_type_hex,
+};
+
 /**
  * Store value of network device setting
  *
  * @v settings		Settings block
- * @v tag		Setting tag number
+ * @v setting		Setting to store
  * @v data		Setting data, or NULL to clear setting
  * @v len		Length of setting data
  * @ret rc		Return status code
  */
-static int netdev_store ( struct settings *settings, unsigned int tag,
+static int netdev_store ( struct settings *settings, struct setting *setting,
 			  const void *data, size_t len ) {
 	struct net_device *netdev = container_of ( settings, struct net_device,
 						   settings.settings );
 
-	switch ( tag ) {
-	case DHCP_EB_MAC:
+	if ( setting_cmp ( setting, &mac_setting ) == 0 ) {
 		if ( len != netdev->ll_protocol->ll_addr_len )
 			return -EINVAL;
 		memcpy ( netdev->ll_addr, data, len );
 		return 0;
-	default :
-		return simple_settings_store ( settings, tag, data, len );
+	} else {
+		return simple_settings_store ( settings, setting, data, len );
 	}
 }
 
@@ -57,24 +63,23 @@ static int netdev_store ( struct settings *settings, unsigned int tag,
  * Fetch value of network device setting
  *
  * @v settings		Settings block
- * @v tag		Setting tag number
+ * @v setting		Setting to fetch
  * @v data		Setting data, or NULL to clear setting
  * @v len		Length of setting data
  * @ret rc		Return status code
  */
-static int netdev_fetch ( struct settings *settings, unsigned int tag,
+static int netdev_fetch ( struct settings *settings, struct setting *setting,
 			  void *data, size_t len ) {
 	struct net_device *netdev = container_of ( settings, struct net_device,
 						   settings.settings );
 
-	switch ( tag ) {
-	case DHCP_EB_MAC:
+	if ( setting_cmp ( setting, &mac_setting ) == 0 ) {
 		if ( len > netdev->ll_protocol->ll_addr_len )
 			len = netdev->ll_protocol->ll_addr_len;
 		memcpy ( data, netdev->ll_addr, len );
 		return netdev->ll_protocol->ll_addr_len;
-	default :
-		return simple_settings_fetch ( settings, tag, data, len );
+	} else {
+		return simple_settings_fetch ( settings, setting, data, len );
 	}
 }
 
@@ -82,14 +87,4 @@ static int netdev_fetch ( struct settings *settings, unsigned int tag,
 struct settings_operations netdev_settings_operations = {
 	.store = netdev_store,
 	.fetch = netdev_fetch,
-};
-
-/** Network device named settings */
-struct named_setting netdev_named_settings[] __named_setting = {
-	{
-		.name = "mac",
-		.description = "MAC address",
-		.tag = DHCP_EB_MAC,
-		.type = &setting_type_hex,
-	},
 };

@@ -123,15 +123,16 @@ static void ibft_set_ipaddr ( struct ibft_ipaddr *ipaddr, struct in_addr in ) {
 }
 
 /**
- * Fill in an IP address within iBFT from DHCP option
+ * Fill in an IP address within iBFT from configuration setting
  *
  * @v ipaddr		IP address field
+ * @v setting		Configuration setting
  * @v tag		DHCP option tag
  */
 static void ibft_set_ipaddr_option ( struct ibft_ipaddr *ipaddr,
-				     unsigned int tag ) {
+				     struct setting *setting ) {
 	struct in_addr in = { 0 };
-	fetch_ipv4_setting ( NULL, tag, &in );
+	fetch_ipv4_setting ( NULL, setting, &in );
 	ibft_set_ipaddr ( ipaddr, in );
 }
 
@@ -182,21 +183,21 @@ static int ibft_set_string ( struct ibft_string_block *strings,
 }
 
 /**
- * Fill in a string field within iBFT from DHCP option
+ * Fill in a string field within iBFT from configuration setting
  *
  * @v strings		iBFT string block descriptor
  * @v string		String field
- * @v tag		DHCP option tag
+ * @v setting		Configuration setting
  * @ret rc		Return status code
  */
 static int ibft_set_string_option ( struct ibft_string_block *strings,
 				    struct ibft_string *string,
-				    unsigned int tag ) {
+				    struct setting *setting ) {
 	int len;
 	char *dest;
 	int rc;
 
-	len = fetch_setting_len ( NULL, tag );
+	len = fetch_setting_len ( NULL, setting );
 	if ( len < 0 ) {
 		string->offset = 0;
 		string->length = 0;
@@ -206,7 +207,7 @@ static int ibft_set_string_option ( struct ibft_string_block *strings,
 	if ( ( rc = ibft_alloc_string ( strings, string, len ) ) != 0 )
 		return rc;
 	dest = ( ( ( char * ) strings->table ) + string->offset );
-	fetch_string_setting ( NULL, tag, dest, ( len + 1 ) );
+	fetch_string_setting ( NULL, setting, dest, ( len + 1 ) );
 	return 0;
 }
 
@@ -226,15 +227,15 @@ static int ibft_fill_nic ( struct ibft_nic *nic,
 	int rc;
 
 	/* Extract values from DHCP configuration */
-	ibft_set_ipaddr_option ( &nic->ip_address, DHCP_EB_YIADDR );
-	ibft_set_ipaddr_option ( &nic->gateway, DHCP_ROUTERS );
-	ibft_set_ipaddr_option ( &nic->dns[0], DHCP_DNS_SERVERS );
+	ibft_set_ipaddr_option ( &nic->ip_address, &ip_setting );
+	ibft_set_ipaddr_option ( &nic->gateway, &gateway_setting );
+	ibft_set_ipaddr_option ( &nic->dns[0], &dns_setting );
 	if ( ( rc = ibft_set_string_option ( strings, &nic->hostname,
-					     DHCP_HOST_NAME ) ) != 0 )
+					     &hostname_setting ) ) != 0 )
 		return rc;
 
 	/* Derive subnet mask prefix from subnet mask */
-	fetch_ipv4_setting ( NULL, DHCP_SUBNET_MASK, &netmask_addr );
+	fetch_ipv4_setting ( NULL, &netmask_setting, &netmask_addr );
 	while ( netmask_addr.s_addr ) {
 		if ( netmask_addr.s_addr & 0x1 )
 			netmask_count++;

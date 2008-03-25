@@ -64,7 +64,7 @@ struct setting_widget {
 	/** Settings block */
 	struct settings *settings;
 	/** Configuration setting */
-	struct named_setting *setting;
+	struct setting *setting;
 	/** Screen row */
 	unsigned int row;
 	/** Screen column */
@@ -78,17 +78,17 @@ struct setting_widget {
 };
 
 /** Registered configuration settings */
-static struct named_setting named_settings[0]
-	__table_start ( struct named_setting, named_settings );
-static struct named_setting named_settings_end[0]
-	__table_end ( struct named_setting, named_settings );
-#define NUM_SETTINGS ( ( unsigned ) ( named_settings_end - named_settings ) )
+static struct setting all_settings[0]
+	__table_start ( struct setting, settings );
+static struct setting all_settings_end[0]
+	__table_end ( struct setting, settings );
+#define NUM_SETTINGS ( ( unsigned ) ( all_settings_end - all_settings ) )
 
 static void load_setting ( struct setting_widget *widget ) __nonnull;
 static int save_setting ( struct setting_widget *widget ) __nonnull;
 static void init_setting ( struct setting_widget *widget,
                            struct settings *settings,
-                           struct named_setting *setting,
+                           struct setting *setting,
                            unsigned int row, unsigned int col ) __nonnull;
 static void draw_setting ( struct setting_widget *widget ) __nonnull;
 static int edit_setting ( struct setting_widget *widget, int key ) __nonnull;
@@ -99,7 +99,7 @@ static void vmsg ( unsigned int row, const char *fmt, va_list args ) __nonnull;
 static void msg ( unsigned int row, const char *fmt, ... ) __nonnull;
 static void valert ( const char *fmt, va_list args ) __nonnull;
 static void alert ( const char *fmt, ... ) __nonnull;
-static void draw_info_row ( struct named_setting *setting ) __nonnull;
+static void draw_info_row ( struct setting *setting ) __nonnull;
 static int main_loop ( struct settings *settings ) __nonnull;
 
 /**
@@ -114,9 +114,8 @@ static void load_setting ( struct setting_widget *widget ) {
 	widget->editing = 0;
 
 	/* Read current setting value */
-	if ( fetch_typed_setting ( widget->settings, widget->setting->tag,
-				   widget->setting->type, widget->value,
-				   sizeof ( widget->value ) ) < 0 ) {
+	if ( fetchf_setting ( widget->settings, widget->setting,
+			      widget->value, sizeof ( widget->value ) ) < 0 ) {
 		widget->value[0] = '\0';
 	}	
 
@@ -133,8 +132,8 @@ static void load_setting ( struct setting_widget *widget ) {
  * @v widget		Setting widget
  */
 static int save_setting ( struct setting_widget *widget ) {
-	return store_typed_setting ( widget->settings, widget->setting->tag,
-				     widget->setting->type, widget->value );
+	return storef_setting ( widget->settings, widget->setting,
+				widget->value );
 }
 
 /**
@@ -148,7 +147,7 @@ static int save_setting ( struct setting_widget *widget ) {
  */
 static void init_setting ( struct setting_widget *widget,
 			   struct settings *settings,
-			   struct named_setting *setting,
+			   struct setting *setting,
 			   unsigned int row, unsigned int col ) {
 
 	/* Initialise widget structure */
@@ -224,7 +223,7 @@ static int edit_setting ( struct setting_widget *widget, int key ) {
 static void init_setting_index ( struct setting_widget *widget,
 				 struct settings *settings,
 				 unsigned int index ) {
-	init_setting ( widget, settings, &named_settings[index],
+	init_setting ( widget, settings, &all_settings[index],
 		       ( SETTINGS_LIST_ROW + index ), SETTINGS_LIST_COL );
 }
 
@@ -311,7 +310,7 @@ static void draw_title_row ( void ) {
  *
  * @v setting		Current configuration setting
  */
-static void draw_info_row ( struct named_setting *setting ) {
+static void draw_info_row ( struct setting *setting ) {
 	clearmsg ( INFO_ROW );
 	attron ( A_BOLD );
 	msg ( INFO_ROW, "%s - %s", setting->name, setting->description );

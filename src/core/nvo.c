@@ -138,19 +138,20 @@ static void nvo_init_dhcpopts ( struct nvo_block *nvo ) {
  * Store value of NVO setting
  *
  * @v settings		Settings block
- * @v tag		Setting tag number
+ * @v setting		Setting to store
  * @v data		Setting data, or NULL to clear setting
  * @v len		Length of setting data
  * @ret rc		Return status code
  */
-static int nvo_store ( struct settings *settings, unsigned int tag,
+static int nvo_store ( struct settings *settings, struct setting *setting,
 		       const void *data, size_t len ) {
 	struct nvo_block *nvo =
 		container_of ( settings, struct nvo_block, settings );
 	int rc;
 
 	/* Update stored options */
-	if ( ( rc = dhcpopt_store ( &nvo->dhcpopts, tag, data, len ) ) != 0 ) {
+	if ( ( rc = dhcpopt_store ( &nvo->dhcpopts, setting->tag,
+				    data, len ) ) != 0 ) {
 		DBGC ( nvo, "NVO %p could not store %zd bytes: %s\n",
 		       nvo, len, strerror ( rc ) );
 		return rc;
@@ -167,7 +168,7 @@ static int nvo_store ( struct settings *settings, unsigned int tag,
  * Fetch value of NVO setting
  *
  * @v settings		Settings block
- * @v tag		Setting tag number
+ * @v setting		Setting to fetch
  * @v data		Buffer to fill with setting data
  * @v len		Length of buffer
  * @ret len		Length of setting data, or negative error
@@ -175,12 +176,12 @@ static int nvo_store ( struct settings *settings, unsigned int tag,
  * The actual length of the setting will be returned even if
  * the buffer was too small.
  */
-static int nvo_fetch ( struct settings *settings, unsigned int tag,
+static int nvo_fetch ( struct settings *settings, struct setting *setting,
 		       void *data, size_t len ) {
 	struct nvo_block *nvo =
 		container_of ( settings, struct nvo_block, settings );
 
-	return dhcpopt_fetch ( &nvo->dhcpopts, tag, data, len );
+	return dhcpopt_fetch ( &nvo->dhcpopts, setting->tag, data, len );
 }
 
 /** NVO settings operations */

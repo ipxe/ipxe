@@ -35,42 +35,23 @@
  *
  */
 
+/** Registered settings */
+static struct setting settings[0]
+	__table_start ( struct setting, settings );
+static struct setting settings_end[0]
+	__table_end ( struct setting, settings );
+
 /** Registered setting types */
 static struct setting_type setting_types[0]
 	__table_start ( struct setting_type, setting_types );
 static struct setting_type setting_types_end[0]
 	__table_end ( struct setting_type, setting_types );
 
-/** Registered named settings */
-static struct named_setting named_settings[0]
-	__table_start ( struct named_setting, named_settings );
-static struct named_setting named_settings_end[0]
-	__table_end ( struct named_setting, named_settings );
-
 /** Registered settings applicators */
 static struct settings_applicator settings_applicators[0]
 	__table_start ( struct settings_applicator, settings_applicators );
 static struct settings_applicator settings_applicators_end[0]
 	__table_end ( struct settings_applicator, settings_applicators );
-
-/**
- * Obtain printable version of a settings tag number
- *
- * @v tag		Settings tag number
- * @ret name		String representation of the tag
- */
-static inline char * setting_tag_name ( unsigned int tag ) {
-	static char name[8];
-
-	if ( DHCP_IS_ENCAP_OPT ( tag ) ) {
-		snprintf ( name, sizeof ( name ), "%d.%d",
-			   DHCP_ENCAPSULATOR ( tag ),
-			   DHCP_ENCAPSULATED ( tag ) );
-	} else {
-		snprintf ( name, sizeof ( name ), "%d", tag );
-	}
-	return name;
-}
 
 /******************************************************************************
  *
@@ -83,32 +64,33 @@ static inline char * setting_tag_name ( unsigned int tag ) {
  * Store value of simple setting
  *
  * @v options		DHCP option block
- * @v tag		Setting tag number
+ * @v setting		Setting to store
  * @v data		Setting data, or NULL to clear setting
  * @v len		Length of setting data
  * @ret rc		Return status code
  */
-int simple_settings_store ( struct settings *settings, unsigned int tag,
+int simple_settings_store ( struct settings *settings, struct setting *setting,
 			    const void *data, size_t len ) {
 	struct simple_settings *simple =
 		container_of ( settings, struct simple_settings, settings );
-	return dhcpopt_extensible_store ( &simple->dhcpopts, tag, data, len );
+	return dhcpopt_extensible_store ( &simple->dhcpopts, setting->tag,
+					  data, len );
 }
 
 /**
  * Fetch value of simple setting
  *
  * @v options		DHCP option block
- * @v tag		Setting tag number
+ * @v setting		Setting to fetch
  * @v data		Buffer to fill with setting data
  * @v len		Length of buffer
  * @ret len		Length of setting data, or negative error
  */
-int simple_settings_fetch ( struct settings *settings, unsigned int tag,
+int simple_settings_fetch ( struct settings *settings, struct setting *setting,
 			    void *data, size_t len ) {
 	struct simple_settings *simple =
 		container_of ( settings, struct simple_settings, settings );
-	return dhcpopt_fetch ( &simple->dhcpopts, tag, data, len );
+	return dhcpopt_fetch ( &simple->dhcpopts, setting->tag, data, len );
 }
 
 /** Simple settings operations */
@@ -174,14 +156,14 @@ static void reprioritise_settings ( struct settings *settings ) {
 		return;
 
 	/* Read priority, if present */
-	priority = fetch_intz_setting ( settings, DHCP_EB_PRIORITY );
+	priority = fetch_intz_setting ( settings, &priority_setting );
 
 	/* Remove from siblings list */
 	list_del ( &settings->siblings );
 
 	/* Reinsert after any existing blocks which have a higher priority */
 	list_for_each_entry ( tmp, &parent->children, siblings ) {
-		tmp_priority = fetch_intz_setting ( tmp, DHCP_EB_PRIORITY );
+		tmp_priority = fetch_intz_setting ( tmp, &priority_setting );
 		if ( priority > tmp_priority )
 			break;
 	}
@@ -292,12 +274,12 @@ struct settings * find_settings ( const char *name ) {
  * Store value of setting
  *
  * @v settings		Settings block
- * @v tag		Setting tag number
+ * @v setting		Setting to store
  * @v data		Setting data, or NULL to clear setting
  * @v len		Length of setting data
  * @ret rc		Return status code
  */
-int store_setting ( struct settings *settings, unsigned int tag,
+int store_setting ( struct settings *settings, struct setting *setting,
 		    const void *data, size_t len ) {
 	int rc;
 
@@ -306,11 +288,12 @@ int store_setting ( struct settings *settings, unsigned int tag,
 		return -ENODEV;
 
 	/* Store setting */
-	if ( ( rc = settings->op->store ( settings, tag, data, len ) ) != 0 )
+	if ( ( rc = settings->op->store ( settings, setting,
+					  data, len ) ) != 0 )
 		return rc;
 
 	/* Reprioritise settings if necessary */
-	if ( tag == DHCP_EB_PRIORITY )
+	if ( setting_cmp ( setting, &priority_setting ) == 0 )
 		reprioritise_settings ( settings );
 
 	/* If these settings are registered, apply potentially-updated
@@ -331,7 +314,7 @@ int store_setting ( struct settings *settings, unsigned int tag,
  * Fetch value of setting
  *
  * @v settings		Settings block, or NULL to search all blocks
- * @v tag		Setting tag number
+ * @v setting		Setting to fetch
  * @v data		Buffer to fill with setting data
  * @v len		Length of buffer
  * @ret len		Length of setting data, or negative error
@@ -339,7 +322,7 @@ int store_setting ( struct settings *settings, unsigned int tag,
  * The actual length of the setting will be returned even if
  * the buffer was too small.
  */
-int fetch_setting ( struct settings *settings, unsigned int tag,
+int fetch_setting ( struct settings *settings, struct setting *setting,
 		    void *data, size_t len ) {
 	struct settings *child;
 	int ret;
@@ -349,12 +332,14 @@ int fetch_setting ( struct settings *settings, unsigned int tag,
 		settings = &settings_root;
 
 	/* Try this block first */
-	if ( ( ret = settings->op->fetch ( settings, tag, data, len ) ) >= 0)
+	if ( ( ret = settings->op->fetch ( settings, setting,
+					   data, len ) ) >= 0 )
 		return ret;
 
 	/* Recurse into each child block in turn */
 	list_for_each_entry ( child, &settings->children, siblings ) {
-		if ( ( ret = fetch_setting ( child, tag, data, len ) ) >= 0)
+		if ( ( ret = fetch_setting ( child, setting,
+					     data, len ) ) >= 0 )
 			return ret;
 	}
 
@@ -365,21 +350,21 @@ int fetch_setting ( struct settings *settings, unsigned int tag,
  * Fetch length of setting
  *
  * @v settings		Settings block, or NULL to search all blocks
- * @v tag		Setting tag number
+ * @v setting		Setting to fetch
  * @ret len		Length of setting data, or negative error
  *
  * This function can also be used as an existence check for the
  * setting.
  */
-int fetch_setting_len ( struct settings *settings, unsigned int tag ) {
-	return fetch_setting ( settings, tag, NULL, 0 );
+int fetch_setting_len ( struct settings *settings, struct setting *setting ) {
+	return fetch_setting ( settings, setting, NULL, 0 );
 }
 
 /**
  * Fetch value of string setting
  *
  * @v settings		Settings block, or NULL to search all blocks
- * @v tag		Setting tag number
+ * @v setting		Setting to fetch
  * @v data		Buffer to fill with setting string data
  * @v len		Length of buffer
  * @ret len		Length of string setting, or negative error
@@ -388,25 +373,25 @@ int fetch_setting_len ( struct settings *settings, unsigned int tag ) {
  * The returned length will be the length of the underlying setting
  * data.
  */
-int fetch_string_setting ( struct settings *settings, unsigned int tag,
+int fetch_string_setting ( struct settings *settings, struct setting *setting,
 			   char *data, size_t len ) {
 	memset ( data, 0, len );
-	return fetch_setting ( settings, tag, data, ( len - 1 ) );
+	return fetch_setting ( settings, setting, data, ( len - 1 ) );
 }
 
 /**
  * Fetch value of IPv4 address setting
  *
  * @v settings		Settings block, or NULL to search all blocks
- * @v tag		Setting tag number
+ * @v setting		Setting to fetch
  * @v inp		IPv4 address to fill in
  * @ret len		Length of setting, or negative error
  */
-int fetch_ipv4_setting ( struct settings *settings, unsigned int tag,
+int fetch_ipv4_setting ( struct settings *settings, struct setting *setting,
 			 struct in_addr *inp ) {
 	int len;
 
-	len = fetch_setting ( settings, tag, inp, sizeof ( *inp ) );
+	len = fetch_setting ( settings, setting, inp, sizeof ( *inp ) );
 	if ( len < 0 )
 		return len;
 	if ( len < ( int ) sizeof ( *inp ) )
@@ -418,11 +403,11 @@ int fetch_ipv4_setting ( struct settings *settings, unsigned int tag,
  * Fetch value of signed integer setting
  *
  * @v settings		Settings block, or NULL to search all blocks
- * @v tag		Setting tag number
+ * @v setting		Setting to fetch
  * @v value		Integer value to fill in
  * @ret len		Length of setting, or negative error
  */
-int fetch_int_setting ( struct settings *settings, unsigned int tag,
+int fetch_int_setting ( struct settings *settings, struct setting *setting,
 			long *value ) {
 	union {
 		long value;
@@ -433,7 +418,7 @@ int fetch_int_setting ( struct settings *settings, unsigned int tag,
 	int i;
 
 	buf.value = 0;
-	len = fetch_setting ( settings, tag, &buf, sizeof ( buf ) );
+	len = fetch_setting ( settings, setting, &buf, sizeof ( buf ) );
 	if ( len < 0 )
 		return len;
 	if ( len > ( int ) sizeof ( buf ) )
@@ -451,16 +436,16 @@ int fetch_int_setting ( struct settings *settings, unsigned int tag,
  * Fetch value of unsigned integer setting
  *
  * @v settings		Settings block, or NULL to search all blocks
- * @v tag		Setting tag number
+ * @v setting		Setting to fetch
  * @v value		Integer value to fill in
  * @ret len		Length of setting, or negative error
  */
-int fetch_uint_setting ( struct settings *settings, unsigned int tag,
+int fetch_uint_setting ( struct settings *settings, struct setting *setting,
 			 unsigned long *value ) {
 	long svalue;
 	int len;
 
-	len = fetch_int_setting ( settings, tag, &svalue );
+	len = fetch_int_setting ( settings, setting, &svalue );
 	if ( len < 0 )
 		return len;
 
@@ -473,13 +458,13 @@ int fetch_uint_setting ( struct settings *settings, unsigned int tag,
  * Fetch value of signed integer setting, or zero
  *
  * @v settings		Settings block, or NULL to search all blocks
- * @v tag		Setting tag number
+ * @v setting		Setting to fetch
  * @ret value		Setting value, or zero
  */
-long fetch_intz_setting ( struct settings *settings, unsigned int tag ) {
+long fetch_intz_setting ( struct settings *settings, struct setting *setting ){
 	long value = 0;
 
-	fetch_int_setting ( settings, tag, &value );
+	fetch_int_setting ( settings, setting, &value );
 	return value;
 }
 
@@ -487,80 +472,38 @@ long fetch_intz_setting ( struct settings *settings, unsigned int tag ) {
  * Fetch value of unsigned integer setting, or zero
  *
  * @v settings		Settings block, or NULL to search all blocks
- * @v tag		Setting tag number
+ * @v setting		Setting to fetch
  * @ret value		Setting value, or zero
  */
 unsigned long fetch_uintz_setting ( struct settings *settings,
-				    unsigned int tag ) {
+				    struct setting *setting ) {
 	unsigned long value = 0;
 
-	fetch_uint_setting ( settings, tag, &value );
+	fetch_uint_setting ( settings, setting, &value );
 	return value;
 }
 
 /**
- * Copy settings
+ * Compare two settings
  *
- * @v dest		Destination settings block
- * @v source		Source settings block
- * @v encapsulator	Encapsulating setting tag number, or zero
- * @ret rc		Return status code
+ * @v a			Setting to compare
+ * @v b			Setting to compare
+ * @ret 0		Settings are the same
+ * @ret non-zero	Settings are not the same
  */
-static int copy_encap_settings ( struct settings *dest,
-				 struct settings *source,
-				 unsigned int encapsulator ) {
-	unsigned int subtag;
-	unsigned int tag;
-	int len;
-	int check_len;
-	int rc;
+int setting_cmp ( struct setting *a, struct setting *b ) {
 
-	for ( subtag = DHCP_MIN_OPTION; subtag <= DHCP_MAX_OPTION; subtag++ ) {
-		tag = DHCP_ENCAP_OPT ( encapsulator, subtag );
-		switch ( tag ) {
-		case DHCP_EB_ENCAP:
-		case DHCP_VENDOR_ENCAP:
-			/* Process encapsulated settings */
-			if ( ( rc = copy_encap_settings ( dest, source,
-							  tag ) ) != 0 )
-				return rc;
-			break;
-		default:
-			/* Copy setting, if present */
-			len = fetch_setting_len ( source, tag );
-			if ( len < 0 )
-				break;
-			{
-				char buf[len];
+	/* If the settings have tags, compare them */
+	if ( a->tag && ( a->tag == b->tag ) )
+		return 0;
 
-				check_len = fetch_setting ( source, tag, buf,
-							    sizeof ( buf ) );
-				assert ( check_len == len );
-				if ( ( rc = store_setting ( dest, tag, buf,
-							    sizeof(buf) )) !=0)
-					return rc;
-			}
-			break;
-		}
-	}
-
-	return 0;
-}
-
-/**
- * Copy settings
- *
- * @v dest		Destination settings block
- * @v source		Source settings block
- * @ret rc		Return status code
- */
-int copy_settings ( struct settings *dest, struct settings *source ) {
-	return copy_encap_settings ( dest, source, 0 );
+	/* Otherwise, compare the names */
+	return strcmp ( a->name, b->name );
 }
 
 /******************************************************************************
  *
- * Named and typed setting routines
+ * Formatted setting routines
  *
  ******************************************************************************
  */
@@ -569,23 +512,22 @@ int copy_settings ( struct settings *dest, struct settings *source ) {
  * Store value of typed setting
  *
  * @v settings		Settings block
- * @v tag		Setting tag number
+ * @v setting		Setting to store
  * @v type		Settings type
  * @v value		Formatted setting data, or NULL
  * @ret rc		Return status code
  */
-int store_typed_setting ( struct settings *settings,
-			  unsigned int tag, struct setting_type *type,
-			  const char *value ) {
+int storef_setting ( struct settings *settings, struct setting *setting,
+		     const char *value ) {
 
 	/* NULL value implies deletion.  Avoid imposing the burden of
 	 * checking for NULL values on each typed setting's storef()
 	 * method.
 	 */
 	if ( ! value )
-		return delete_setting ( settings, tag );
+		return delete_setting ( settings, setting );
 		
-	return type->storef ( settings, tag, value );
+	return setting->type->storef ( settings, setting, value );
 }
 
 /**
@@ -594,11 +536,10 @@ int store_typed_setting ( struct settings *settings,
  * @v name		Name
  * @ret setting		Named setting, or NULL
  */
-static struct named_setting * find_named_setting ( const char *name ) {
-	struct named_setting *setting;
+static struct setting * find_setting ( const char *name ) {
+	struct setting *setting;
 
-	for ( setting = named_settings ; setting < named_settings_end ;
-	      setting++ ) {
+	for ( setting = settings ; setting < settings_end ; setting++ ) {
 		if ( strcmp ( name, setting->name ) == 0 )
 			return setting;
 	}
@@ -625,9 +566,8 @@ static struct setting_type * find_setting_type ( const char *name ) {
  * Parse setting name
  *
  * @v name		Name of setting
- * @ret settings	Settings block, or NULL
- * @ret tag		Setting tag number
- * @ret type		Setting type
+ * @v settings		Settings block to fill in
+ * @v setting		Setting to fill in
  * @ret rc		Return status code
  *
  * Interprets a name of the form
@@ -635,30 +575,29 @@ static struct setting_type * find_setting_type ( const char *name ) {
  * fields.
  */
 static int parse_setting_name ( const char *name, struct settings **settings,
-				unsigned int *tag,
-				struct setting_type **type ) {
+				struct setting *setting ) {
 	char tmp_name[ strlen ( name ) + 1 ];
 	char *settings_name;
-	char *tag_name;
+	char *setting_name;
 	char *type_name;
-	struct named_setting *named_setting;
+	struct setting *named_setting;
 	char *tmp;
 
 	/* Set defaults */
 	*settings = &settings_root;
-	*tag = 0;
-	*type = &setting_type_hex;
+	memset ( setting, 0, sizeof ( *setting ) );
+	setting->type = &setting_type_hex;
 
-	/* Split name into "[settings_name/]tag_name[:type_name]" */
+	/* Split name into "[settings_name/]setting_name[:type_name]" */
 	memcpy ( tmp_name, name, sizeof ( tmp_name ) );
-	if ( ( tag_name = strchr ( tmp_name, '/' ) ) != NULL ) {
-		*(tag_name++) = 0;
+	if ( ( setting_name = strchr ( tmp_name, '/' ) ) != NULL ) {
+		*(setting_name++) = 0;
 		settings_name = tmp_name;
 	} else {
-		tag_name = tmp_name;
+		setting_name = tmp_name;
 		settings_name = NULL;
 	}
-	if ( ( type_name = strchr ( tag_name, ':' ) ) != NULL )
+	if ( ( type_name = strchr ( setting_name, ':' ) ) != NULL )
 		*(type_name++) = 0;
 
 	/* Identify settings block, if specified */
@@ -672,19 +611,19 @@ static int parse_setting_name ( const char *name, struct settings **settings,
 	}
 
 	/* Identify tag number */
-	if ( ( named_setting = find_named_setting ( tag_name ) ) != NULL ) {
-		*tag = named_setting->tag;
-		*type = named_setting->type;
+	if ( ( named_setting = find_setting ( setting_name ) ) != NULL ) {
+		memcpy ( setting, named_setting, sizeof ( *setting ) );
 	} else {
 		/* Unrecognised name: try to interpret as a tag number */
-		tmp = tag_name;
+		tmp = setting_name;
 		while ( 1 ) {
-			*tag = ( ( *tag << 8 ) | strtoul ( tmp, &tmp, 0 ) );
+			setting->tag = ( ( setting->tag << 8 ) |
+					 strtoul ( tmp, &tmp, 0 ) );
 			if ( *tmp == 0 )
 				break;
 			if ( *tmp != '.' ) {
-				DBG ( "Invalid tag number \"%s\" in \"%s\"\n",
-				      tag_name, name );
+				DBG ( "Invalid setting \"%s\" in \"%s\"\n",
+				      setting_name, name );
 				return -ENOENT;
 			}
 			tmp++;
@@ -693,8 +632,8 @@ static int parse_setting_name ( const char *name, struct settings **settings,
 
 	/* Identify setting type, if specified */
 	if ( type_name ) {
-		*type = find_setting_type ( type_name );
-		if ( *type == NULL ) {
+		setting->type = find_setting_type ( type_name );
+		if ( setting->type == NULL ) {
 			DBG ( "Invalid setting type \"%s\" in \"%s\"\n",
 			      type_name, name );
 			return -ENOTSUP;
@@ -711,16 +650,14 @@ static int parse_setting_name ( const char *name, struct settings **settings,
  * @v value		Formatted setting data, or NULL
  * @ret rc		Return status code
  */
-int store_named_setting ( const char *name, const char *value ) {
+int storef_named_setting ( const char *name, const char *value ) {
 	struct settings *settings;
-	unsigned int tag;
-	struct setting_type *type;
+	struct setting setting;
 	int rc;
 
-	if ( ( rc = parse_setting_name ( name, &settings, &tag,
-					 &type ) ) != 0 )
+	if ( ( rc = parse_setting_name ( name, &settings, &setting ) ) != 0 )
 		return rc;
-	return store_typed_setting ( settings, tag, type, value );
+	return storef_setting ( settings, &setting, value );
 }
 
 /**
@@ -731,16 +668,14 @@ int store_named_setting ( const char *name, const char *value ) {
  * @v len		Length of buffer
  * @ret len		Length of formatted value, or negative error
  */
-int fetch_named_setting ( const char *name, char *buf, size_t len ) {
+int fetchf_named_setting ( const char *name, char *buf, size_t len ) {
 	struct settings *settings;
-	unsigned int tag;
-	struct setting_type *type;
+	struct setting setting;
 	int rc;
 
-	if ( ( rc = parse_setting_name ( name, &settings, &tag,
-					 &type ) ) != 0 )
+	if ( ( rc = parse_setting_name ( name, &settings, &setting ) ) != 0 )
 		return rc;
-	return fetch_typed_setting ( settings, tag, type, buf, len );
+	return fetchf_setting ( settings, &setting, buf, len );
 }
 
 /******************************************************************************
@@ -754,27 +689,27 @@ int fetch_named_setting ( const char *name, char *buf, size_t len ) {
  * Parse and store value of string setting
  *
  * @v settings		Settings block
- * @v tag		Setting tag number
+ * @v setting		Setting to store
  * @v value		Formatted setting data
  * @ret rc		Return status code
  */
-static int storef_string ( struct settings *settings, unsigned int tag,
+static int storef_string ( struct settings *settings, struct setting *setting,
 			   const char *value ) {
-	return store_setting ( settings, tag, value, strlen ( value ) );
+	return store_setting ( settings, setting, value, strlen ( value ) );
 }
 
 /**
  * Fetch and format value of string setting
  *
  * @v settings		Settings block, or NULL to search all blocks
- * @v tag		Setting tag number
+ * @v setting		Setting to fetch
  * @v buf		Buffer to contain formatted value
  * @v len		Length of buffer
  * @ret len		Length of formatted value, or negative error
  */
-static int fetchf_string ( struct settings *settings, unsigned int tag,
+static int fetchf_string ( struct settings *settings, struct setting *setting,
 			   char *buf, size_t len ) {
-	return fetch_string_setting ( settings, tag, buf, len );
+	return fetch_string_setting ( settings, setting, buf, len );
 }
 
 /** A string setting type */
@@ -788,34 +723,34 @@ struct setting_type setting_type_string __setting_type = {
  * Parse and store value of IPv4 address setting
  *
  * @v settings		Settings block
- * @v tag		Setting tag number
+ * @v setting		Setting to store
  * @v value		Formatted setting data
  * @ret rc		Return status code
  */
-static int storef_ipv4 ( struct settings *settings, unsigned int tag,
+static int storef_ipv4 ( struct settings *settings, struct setting *setting,
 			 const char *value ) {
 	struct in_addr ipv4;
 
 	if ( inet_aton ( value, &ipv4 ) == 0 )
 		return -EINVAL;
-	return store_setting ( settings, tag, &ipv4, sizeof ( ipv4 ) );
+	return store_setting ( settings, setting, &ipv4, sizeof ( ipv4 ) );
 }
 
 /**
  * Fetch and format value of IPv4 address setting
  *
  * @v settings		Settings block, or NULL to search all blocks
- * @v tag		Setting tag number
+ * @v setting		Setting to fetch
  * @v buf		Buffer to contain formatted value
  * @v len		Length of buffer
  * @ret len		Length of formatted value, or negative error
  */
-static int fetchf_ipv4 ( struct settings *settings, unsigned int tag,
+static int fetchf_ipv4 ( struct settings *settings, struct setting *setting,
 			 char *buf, size_t len ) {
 	struct in_addr ipv4;
 	int rc;
 
-	if ( ( rc = fetch_ipv4_setting ( settings, tag, &ipv4 ) ) < 0 )
+	if ( ( rc = fetch_ipv4_setting ( settings, setting, &ipv4 ) ) < 0 )
 		return rc;
 	return snprintf ( buf, len, inet_ntoa ( ipv4 ) );
 }
@@ -831,12 +766,12 @@ struct setting_type setting_type_ipv4 __setting_type = {
  * Parse and store value of integer setting
  *
  * @v settings		Settings block
- * @v tag		Setting tag number
+ * @v setting		Setting to store
  * @v value		Formatted setting data
  * @v size		Integer size, in bytes
  * @ret rc		Return status code
  */
-static int storef_int ( struct settings *settings, unsigned int tag,
+static int storef_int ( struct settings *settings, struct setting *setting,
 			const char *value, unsigned int size ) {
 	union {
 		uint32_t num;
@@ -847,7 +782,7 @@ static int storef_int ( struct settings *settings, unsigned int tag,
 	u.num = htonl ( strtoul ( value, &endp, 0 ) );
 	if ( *endp )
 		return -EINVAL;
-	return store_setting ( settings, tag, 
+	return store_setting ( settings, setting, 
 			       &u.bytes[ sizeof ( u ) - size ], size );
 }
 
@@ -855,59 +790,59 @@ static int storef_int ( struct settings *settings, unsigned int tag,
  * Parse and store value of 8-bit integer setting
  *
  * @v settings		Settings block
- * @v tag		Setting tag number
+ * @v setting		Setting to store
  * @v value		Formatted setting data
  * @v size		Integer size, in bytes
  * @ret rc		Return status code
  */
-static int storef_int8 ( struct settings *settings, unsigned int tag,
+static int storef_int8 ( struct settings *settings, struct setting *setting,
 			 const char *value ) {
-	return storef_int ( settings, tag, value, 1 );
+	return storef_int ( settings, setting, value, 1 );
 }
 
 /**
  * Parse and store value of 16-bit integer setting
  *
  * @v settings		Settings block
- * @v tag		Setting tag number
+ * @v setting		Setting to store
  * @v value		Formatted setting data
  * @v size		Integer size, in bytes
  * @ret rc		Return status code
  */
-static int storef_int16 ( struct settings *settings, unsigned int tag,
+static int storef_int16 ( struct settings *settings, struct setting *setting,
 			  const char *value ) {
-	return storef_int ( settings, tag, value, 2 );
+	return storef_int ( settings, setting, value, 2 );
 }
 
 /**
  * Parse and store value of 32-bit integer setting
  *
  * @v settings		Settings block
- * @v tag		Setting tag number
+ * @v setting		Setting to store
  * @v value		Formatted setting data
  * @v size		Integer size, in bytes
  * @ret rc		Return status code
  */
-static int storef_int32 ( struct settings *settings, unsigned int tag,
+static int storef_int32 ( struct settings *settings, struct setting *setting,
 			  const char *value ) {
-	return storef_int ( settings, tag, value, 4 );
+	return storef_int ( settings, setting, value, 4 );
 }
 
 /**
  * Fetch and format value of signed integer setting
  *
  * @v settings		Settings block, or NULL to search all blocks
- * @v tag		Setting tag number
+ * @v setting		Setting to fetch
  * @v buf		Buffer to contain formatted value
  * @v len		Length of buffer
  * @ret len		Length of formatted value, or negative error
  */
-static int fetchf_int ( struct settings *settings, unsigned int tag,
+static int fetchf_int ( struct settings *settings, struct setting *setting,
 			char *buf, size_t len ) {
 	long value;
 	int rc;
 
-	if ( ( rc = fetch_int_setting ( settings, tag, &value ) ) < 0 )
+	if ( ( rc = fetch_int_setting ( settings, setting, &value ) ) < 0 )
 		return rc;
 	return snprintf ( buf, len, "%ld", value );
 }
@@ -916,17 +851,17 @@ static int fetchf_int ( struct settings *settings, unsigned int tag,
  * Fetch and format value of unsigned integer setting
  *
  * @v settings		Settings block, or NULL to search all blocks
- * @v tag		Setting tag number
+ * @v setting		Setting to fetch
  * @v buf		Buffer to contain formatted value
  * @v len		Length of buffer
  * @ret len		Length of formatted value, or negative error
  */
-static int fetchf_uint ( struct settings *settings, unsigned int tag,
+static int fetchf_uint ( struct settings *settings, struct setting *setting,
 			 char *buf, size_t len ) {
 	unsigned long value;
 	int rc;
 
-	if ( ( rc = fetch_uint_setting ( settings, tag, &value ) ) < 0 )
+	if ( ( rc = fetch_uint_setting ( settings, setting, &value ) ) < 0 )
 		return rc;
 	return snprintf ( buf, len, "%#lx", value );
 }
@@ -977,11 +912,11 @@ struct setting_type setting_type_uint32 __setting_type = {
  * Parse and store value of hex string setting
  *
  * @v settings		Settings block
- * @v tag		Setting tag number
+ * @v setting		Setting to store
  * @v value		Formatted setting data
  * @ret rc		Return status code
  */
-static int storef_hex ( struct settings *settings, unsigned int tag,
+static int storef_hex ( struct settings *settings, struct setting *setting,
 			const char *value ) {
 	char *ptr = ( char * ) value;
 	uint8_t bytes[ strlen ( value ) ]; /* cannot exceed strlen(value) */
@@ -991,7 +926,7 @@ static int storef_hex ( struct settings *settings, unsigned int tag,
 		bytes[len++] = strtoul ( ptr, &ptr, 16 );
 		switch ( *ptr ) {
 		case '\0' :
-			return store_setting ( settings, tag, bytes, len );
+			return store_setting ( settings, setting, bytes, len );
 		case ':' :
 			ptr++;
 			break;
@@ -1005,26 +940,27 @@ static int storef_hex ( struct settings *settings, unsigned int tag,
  * Fetch and format value of hex string setting
  *
  * @v settings		Settings block, or NULL to search all blocks
- * @v tag		Setting tag number
+ * @v setting		Setting to fetch
  * @v buf		Buffer to contain formatted value
  * @v len		Length of buffer
  * @ret len		Length of formatted value, or negative error
  */
-static int fetchf_hex ( struct settings *settings, unsigned int tag,
+static int fetchf_hex ( struct settings *settings, struct setting *setting,
 			char *buf, size_t len ) {
 	int raw_len;
 	int check_len;
 	int used = 0;
 	int i;
 
-	raw_len = fetch_setting_len ( settings, tag );
+	raw_len = fetch_setting_len ( settings, setting );
 	if ( raw_len < 0 )
 		return raw_len;
 
 	{
 		uint8_t raw[raw_len];
 
-		check_len = fetch_setting ( settings, tag, raw, sizeof (raw) );
+		check_len = fetch_setting ( settings, setting, raw,
+					    sizeof ( raw ) );
 		assert ( check_len == raw_len );
 		
 		if ( len )
@@ -1047,83 +983,55 @@ struct setting_type setting_type_hex __setting_type = {
 
 /******************************************************************************
  *
- * Named settings
+ * Settings
  *
  ******************************************************************************
  */
 
-/** Some basic setting definitions */
-struct named_setting basic_named_settings[] __named_setting = {
-	{
-		.name = "ip",
-		.description = "IPv4 address",
-		.tag = DHCP_EB_YIADDR,
-		.type = &setting_type_ipv4,
-	},
-	{
-		.name = "netmask",
-		.description = "IPv4 subnet mask",
-		.tag = DHCP_SUBNET_MASK,
-		.type = &setting_type_ipv4,
-	},
-	{
-		.name = "gateway",
-		.description = "Default gateway",
-		.tag = DHCP_ROUTERS,
-		.type = &setting_type_ipv4,
-	},
-	{
-		.name = "dns",
-		.description = "DNS server",
-		.tag = DHCP_DNS_SERVERS,
-		.type = &setting_type_ipv4,
-	},
-	{
-		.name = "hostname",
-		.description = "Host name",
-		.tag = DHCP_HOST_NAME,
-		.type = &setting_type_string,
-	},
-	{
-		.name = "next-server",
-		.description = "TFTP server",
-		.tag = DHCP_EB_SIADDR,
-		.type = &setting_type_ipv4,
-	},
-	{
-		.name = "filename",
-		.description = "Boot filename",
-		.tag = DHCP_BOOTFILE_NAME,
-		.type = &setting_type_string,
-	},
-	{
-		.name = "root-path",
-		.description = "NFS/iSCSI root path",
-		.tag = DHCP_ROOT_PATH,
-		.type = &setting_type_string,
-	},
-	{
-		.name = "username",
-		.description = "User name",
-		.tag = DHCP_EB_USERNAME,
-		.type = &setting_type_string,
-	},
-	{
-		.name = "password",
-		.description = "Password",
-		.tag = DHCP_EB_PASSWORD,
-		.type = &setting_type_string,
-	},
-	{
-		.name = "initiator-iqn",
-		.description = "iSCSI initiator name",
-		.tag = DHCP_ISCSI_INITIATOR_IQN,
-		.type = &setting_type_string,
-	},
-	{
-		.name = "priority",
-		.description = "Priority of these settings",
-		.tag = DHCP_EB_PRIORITY,
-		.type = &setting_type_int8,
-	},
+/** Hostname setting */
+struct setting hostname_setting __setting = {
+	.name = "hostname",
+	.description = "Host name",
+	.tag = DHCP_HOST_NAME,
+	.type = &setting_type_string,
+};
+
+/** Filename setting */
+struct setting filename_setting __setting = {
+	.name = "filename",
+	.description = "Boot filename",
+	.tag = DHCP_BOOTFILE_NAME,
+	.type = &setting_type_string,
+};
+
+/** Root path setting */
+struct setting root_path_setting __setting = {
+	.name = "root-path",
+	.description = "NFS/iSCSI root path",
+	.tag = DHCP_ROOT_PATH,
+	.type = &setting_type_string,
+};
+
+/** Username setting */
+struct setting username_setting __setting = {
+	.name = "username",
+	.description = "User name",
+	.tag = DHCP_EB_USERNAME,
+	.type = &setting_type_string,
+};
+
+/** Password setting */
+struct setting password_setting __setting = {
+	.name = "password",
+	.description = "Password",
+	.tag = DHCP_EB_PASSWORD,
+	.type = &setting_type_string,
+};
+
+/** Priority setting */
+struct setting priority_setting __setting = {
+	.name = "priority",
+	.description = "Priority of these settings",
+	.tag = DHCP_EB_PRIORITY,
+	.type = &setting_type_int8,
 };

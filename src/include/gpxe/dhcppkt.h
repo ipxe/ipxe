@@ -9,15 +9,12 @@
 
 #include <gpxe/dhcp.h>
 #include <gpxe/dhcpopts.h>
-#include <gpxe/settings.h>
 
 /**
  * A DHCP packet
  *
  */
 struct dhcp_packet {
-	/** Settings block */
-	struct settings settings;
 	/** The DHCP packet contents */
 	struct dhcphdr *dhcphdr;
 	/** Maximum length of the DHCP packet buffer */
@@ -28,7 +25,11 @@ struct dhcp_packet {
 	struct dhcp_options options;
 };
 
-extern void dhcppkt_init ( struct dhcp_packet *dhcppkt, struct refcnt *refcnt,
+extern int dhcppkt_store ( struct dhcp_packet *dhcppkt, unsigned int tag,
+			   const void *data, size_t len );
+extern int dhcppkt_fetch ( struct dhcp_packet *dhcppkt, unsigned int tag,
+			   void *data, size_t len );
+extern void dhcppkt_init ( struct dhcp_packet *dhcppkt, 
 			   void *data, size_t len );
 
 #endif /* _GPXE_DHCPPKT_H */

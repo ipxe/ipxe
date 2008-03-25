@@ -15,8 +15,8 @@
 
 struct net_device;
 struct job_interface;
+struct dhcp_options;
 struct dhcp_packet;
-struct settings;
 
 /** BOOTP/DHCP server port */
 #define BOOTPS_PORT 67
@@ -178,15 +178,6 @@ struct settings;
  * processing options.  It should never be present in a DHCP packet.
  */
 #define DHCP_EB_SIADDR DHCP_ENCAP_OPT ( DHCP_EB_ENCAP, 3 )
-
-/** MAC address
- *
- * This option is used internally to contain the network device
- * hardware address, in order to provide a consistent approach to
- * storing and processing options.  It should never be present in a
- * DHCP packet.
- */
-#define DHCP_EB_MAC DHCP_ENCAP_OPT ( DHCP_EB_ENCAP, 4 )
 
 /*
  * Tags in the range 0x10-0x7f are reserved for feature markers
@@ -445,11 +436,19 @@ struct dhcphdr {
 /** Maximum time that we will wait for ProxyDHCP offers */
 #define PROXYDHCP_WAIT_TIME ( TICKS_PER_SEC * 1 )
 
-extern int create_dhcpdiscover ( struct net_device *netdev,
-				 void *data, size_t max_len );
-extern int create_dhcpack ( struct net_device *netdev,
-			    void *data, size_t max_len );
-extern int create_proxydhcpack ( struct net_device *netdev,
+/** Settings block name used for DHCP responses */
+#define DHCP_SETTINGS_NAME "dhcp"
+
+/** Settings block name used for ProxyDHCP responses */
+#define PROXYDHCP_SETTINGS_NAME "proxydhcp"
+
+extern int create_dhcp_packet ( struct dhcp_packet *dhcppkt,
+				struct net_device *netdev, uint8_t msgtype,
+				struct dhcp_options *options, 
+				void *data, size_t max_len );
+extern int create_dhcp_request ( struct dhcp_packet *dhcppkt,
+				 struct net_device *netdev,
+				 struct dhcp_packet *dhcpoffer,
 				 void *data, size_t max_len );
 extern int start_dhcp ( struct job_interface *job, struct net_device *netdev );
 

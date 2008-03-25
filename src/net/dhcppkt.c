@@ -92,20 +92,18 @@ find_dhcp_packet_field ( unsigned int tag ) {
 	}
 	return NULL;
 }
-				    
+
 /**
  * Store value of DHCP packet setting
  *
- * @v settings		Settings block
+ * @v dhcppkt		DHCP packet
  * @v tag		Setting tag number
  * @v data		Setting data, or NULL to clear setting
  * @v len		Length of setting data
  * @ret rc		Return status code
  */
-static int dhcppkt_store ( struct settings *settings, unsigned int tag,
-			   const void *data, size_t len ) {
-	struct dhcp_packet *dhcppkt =
-		container_of ( settings, struct dhcp_packet, settings );
+int dhcppkt_store ( struct dhcp_packet *dhcppkt, unsigned int tag,
+		    const void *data, size_t len ) {
 	struct dhcp_packet_field *field;
 	int rc;
 
@@ -131,16 +129,14 @@ static int dhcppkt_store ( struct settings *settings, unsigned int tag,
 /**
  * Fetch value of DHCP packet setting
  *
- * @v settings		Settings block
+ * @v dhcppkt		DHCP packet
  * @v tag		Setting tag number
  * @v data		Buffer to fill with setting data
  * @v len		Length of buffer
  * @ret len		Length of setting data, or negative error
  */
-static int dhcppkt_fetch ( struct settings *settings, unsigned int tag,
-			   void *data, size_t len ) {
-	struct dhcp_packet *dhcppkt =
-		container_of ( settings, struct dhcp_packet, settings );
+int dhcppkt_fetch ( struct dhcp_packet *dhcppkt, unsigned int tag,
+		    void *data, size_t len ) {
 	struct dhcp_packet_field *field;
 	
 	/* If this is a special field, return it */
@@ -156,31 +152,21 @@ static int dhcppkt_fetch ( struct settings *settings, unsigned int tag,
 	return dhcpopt_fetch ( &dhcppkt->options, tag, data, len );
 }
 
-/** DHCP settings operations */
-static struct settings_operations dhcppkt_settings_operations = {
-	.store = dhcppkt_store,
-	.fetch = dhcppkt_fetch,
-};
-
 /**
  * Initialise prepopulated DHCP packet
  *
  * @v dhcppkt		Uninitialised DHCP packet
- * @v refcnt		Reference counter of containing object, or NULL
  * @v data		Memory for DHCP packet data
  * @v max_len		Length of memory for DHCP packet data
  *
  * The memory content must already be filled with valid DHCP options.
  * A zeroed block counts as a block of valid DHCP options.
  */
-void dhcppkt_init ( struct dhcp_packet *dhcppkt, struct refcnt *refcnt,
-		    void *data, size_t len ) {
+void dhcppkt_init ( struct dhcp_packet *dhcppkt, void *data, size_t len ) {
 	dhcppkt->dhcphdr = data;
 	dhcppkt->max_len = len;
 	dhcpopt_init ( &dhcppkt->options, &dhcppkt->dhcphdr->options,
 		       ( len - offsetof ( struct dhcphdr, options ) ) );
 	dhcppkt->len = ( offsetof ( struct dhcphdr, options ) +
 			 dhcppkt->options.len );
-	settings_init ( &dhcppkt->settings, &dhcppkt_settings_operations,
-			refcnt, "dhcp" );
 }

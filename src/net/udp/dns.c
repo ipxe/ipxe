@@ -506,6 +506,21 @@ struct resolver dns_resolver __resolver ( RESOLV_NORMAL ) = {
 	.resolv = dns_resolv,
 };
 
+/******************************************************************************
+ *
+ * Settings
+ *
+ ******************************************************************************
+ */
+
+/** DNS server setting */
+struct setting dns_setting __setting = {
+	.name = "dns",
+	.description = "DNS server",
+	.tag = DHCP_DNS_SERVERS,
+	.type = &setting_type_ipv4,
+};
+
 /**
  * Apply nameserver setting
  *
@@ -516,7 +531,7 @@ static int apply_nameserver_setting ( void ) {
 		( struct sockaddr_in * ) &nameserver;
 	int len;
 
-	if ( ( len = fetch_ipv4_setting ( NULL, DHCP_DNS_SERVERS,
+	if ( ( len = fetch_ipv4_setting ( NULL, &dns_setting,
 					  &sin_nameserver->sin_addr ) ) >= 0 ){
 		sin_nameserver->sin_family = AF_INET;
 		DBG ( "DNS using nameserver %s\n",

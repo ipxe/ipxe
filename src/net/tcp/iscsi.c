@@ -1591,14 +1591,22 @@ int iscsi_attach ( struct scsi_device *scsi, const char *root_path ) {
 
 /****************************************************************************
  *
- * Settings applicators
+ * Settings
  *
  */
 
+/** iSCSI initiator IQN setting */
+struct setting initiator_iqn_setting __setting = {
+	.name = "initiator-iqn",
+	.description = "iSCSI initiator name",
+	.tag = DHCP_ISCSI_INITIATOR_IQN,
+	.type = &setting_type_string,
+};
+
 /** An iSCSI string setting */
 struct iscsi_string_setting {
-	/** Setting tag number */
-	unsigned int tag;
+	/** Setting */
+	struct setting *setting;
 	/** String to update */
 	char **string;
 	/** String prefix */
@@ -1608,22 +1616,22 @@ struct iscsi_string_setting {
 /** iSCSI string settings */
 static struct iscsi_string_setting iscsi_string_settings[] = {
 	{
-		.tag = DHCP_ISCSI_INITIATOR_IQN,
+		.setting = &initiator_iqn_setting,
 		.string = &iscsi_explicit_initiator_iqn,
 		.prefix = "",
 	},
 	{
-		.tag = DHCP_EB_USERNAME,
+		.setting = &username_setting,
 		.string = &iscsi_username,
 		.prefix = "",
 	},
 	{
-		.tag = DHCP_EB_PASSWORD,
+		.setting = &password_setting,
 		.string = &iscsi_password,
 		.prefix = "",
 	},
 	{
-		.tag = DHCP_HOST_NAME,
+		.setting = &hostname_setting,
 		.string = &iscsi_default_initiator_iqn,
 		.prefix = "iqn.2000-09.org.etherboot:",
 	},
@@ -1648,7 +1656,7 @@ static int apply_iscsi_string_setting ( struct iscsi_string_setting *setting ){
 
 	/* Allocate new string */
 	prefix_len = strlen ( setting->prefix );
-	setting_len = fetch_setting_len ( NULL, setting->tag );
+	setting_len = fetch_setting_len ( NULL, setting->setting );
 	if ( setting_len < 0 ) {
 		/* Missing settings are not errors; leave strings as NULL */
 		return 0;
@@ -1660,7 +1668,7 @@ static int apply_iscsi_string_setting ( struct iscsi_string_setting *setting ){
 
 	/* Fill new string */
 	strcpy ( p, setting->prefix );
-	check_len = fetch_string_setting ( NULL, setting->tag,
+	check_len = fetch_string_setting ( NULL, setting->setting,
 					   ( p + prefix_len ),
 					   ( len - prefix_len ) );
 	assert ( check_len == setting_len );
@@ -1682,8 +1690,8 @@ static int apply_iscsi_settings ( void ) {
 			    sizeof ( iscsi_string_settings[0] ) ) ; i++ ) {
 		setting = &iscsi_string_settings[i];
 		if ( ( rc = apply_iscsi_string_setting ( setting ) ) != 0 ) {
-			DBG ( "iSCSI could not apply setting %d\n",
-			      setting->tag );
+			DBG ( "iSCSI could not apply setting %s\n",
+			      setting->setting->name );
 			return rc;
 		}
 	}

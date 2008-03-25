@@ -96,62 +96,6 @@ static void del_ipv4_miniroute ( struct ipv4_miniroute *miniroute ) {
 }
 
 /**
- * Create IPv4 routing table
- *
- * @ret rc		Return status code
- */
-static int ipv4_create_routes ( void ) {
-	struct ipv4_miniroute *miniroute;
-	struct ipv4_miniroute *tmp;
-	struct net_device *netdev;
-	struct settings *settings;
-	struct in_addr address = { 0 };
-	struct in_addr netmask = { 0 };
-	struct in_addr gateway = { INADDR_NONE };
-
-	/* Delete all existing routes */
-	list_for_each_entry_safe ( miniroute, tmp, &ipv4_miniroutes, list )
-		del_ipv4_miniroute ( miniroute );
-
-	/* Create a route for each configured network device */
-	for_each_netdev ( netdev ) {
-		settings = netdev_settings ( netdev );
-		/* Get IPv4 address */
-		address.s_addr = 0;
-		fetch_ipv4_setting ( settings, DHCP_EB_YIADDR, &address );
-		if ( ! address.s_addr )
-			continue;
-		/* Calculate default netmask */
-		if ( IN_CLASSA ( ntohl ( address.s_addr ) ) ) {
-			netmask.s_addr = htonl ( IN_CLASSA_NET );
-		} else if ( IN_CLASSB ( ntohl ( address.s_addr ) ) ) {
-			netmask.s_addr = htonl ( IN_CLASSB_NET );
-		} else if ( IN_CLASSC ( ntohl ( address.s_addr ) ) ) {
-			netmask.s_addr = htonl ( IN_CLASSC_NET );
-		} else {
-			netmask.s_addr = 0;
-		}
-		/* Override with subnet mask, if present */
-		fetch_ipv4_setting ( settings, DHCP_SUBNET_MASK, &netmask );
-		/* Get default gateway, if present */
-		gateway.s_addr = INADDR_NONE;
-		fetch_ipv4_setting ( settings, DHCP_ROUTERS, &gateway );
-		/* Configure route */
-		miniroute = add_ipv4_miniroute ( netdev, address,
-						 netmask, gateway );
-		if ( ! miniroute )
-			return -ENOMEM;
-	}
-
-	return 0;
-}
-
-/** IPv4 settings applicator */
-struct settings_applicator ipv4_settings_applicator __settings_applicator = {
-	.apply = ipv4_create_routes,
-};
-
-/**
  * Perform IPv4 routing
  *
  * @v dest		Final destination address
@@ -599,4 +543,91 @@ struct tcpip_net_protocol ipv4_tcpip_protocol __tcpip_net_protocol = {
 struct arp_net_protocol ipv4_arp_protocol __arp_net_protocol = {
 	.net_protocol = &ipv4_protocol,
 	.check = ipv4_arp_check,
+};
+
+/******************************************************************************
+ *
+ * Settings
+ *
+ ******************************************************************************
+ */
+
+/** IPv4 address setting */
+struct setting ip_setting __setting = {
+	.name = "ip",
+	.description = "IPv4 address",
+	.tag = DHCP_EB_YIADDR,
+	.type = &setting_type_ipv4,
+};
+
+/** IPv4 subnet mask setting */
+struct setting netmask_setting __setting = {
+	.name = "netmask",
+	.description = "IPv4 subnet mask",
+	.tag = DHCP_SUBNET_MASK,
+	.type = &setting_type_ipv4,
+};
+
+/** Default gateway setting */
+struct setting gateway_setting __setting = {
+	.name = "gateway",
+	.description = "Default gateway",
+	.tag = DHCP_ROUTERS,
+	.type = &setting_type_ipv4,
+};
+
+/**
+ * Create IPv4 routing table based on configured settings
+ *
+ * @ret rc		Return status code
+ */
+static int ipv4_create_routes ( void ) {
+	struct ipv4_miniroute *miniroute;
+	struct ipv4_miniroute *tmp;
+	struct net_device *netdev;
+	struct settings *settings;
+	struct in_addr address = { 0 };
+	struct in_addr netmask = { 0 };
+	struct in_addr gateway = { INADDR_NONE };
+
+	/* Delete all existing routes */
+	list_for_each_entry_safe ( miniroute, tmp, &ipv4_miniroutes, list )
+		del_ipv4_miniroute ( miniroute );
+
+	/* Create a route for each configured network device */
+	for_each_netdev ( netdev ) {
+		settings = netdev_settings ( netdev );
+		/* Get IPv4 address */
+		address.s_addr = 0;
+		fetch_ipv4_setting ( settings, &ip_setting, &address );
+		if ( ! address.s_addr )
+			continue;
+		/* Calculate default netmask */
+		if ( IN_CLASSA ( ntohl ( address.s_addr ) ) ) {
+			netmask.s_addr = htonl ( IN_CLASSA_NET );
+		} else if ( IN_CLASSB ( ntohl ( address.s_addr ) ) ) {
+			netmask.s_addr = htonl ( IN_CLASSB_NET );
+		} else if ( IN_CLASSC ( ntohl ( address.s_addr ) ) ) {
+			netmask.s_addr = htonl ( IN_CLASSC_NET );
+		} else {
+			netmask.s_addr = 0;
+		}
+		/* Override with subnet mask, if present */
+		fetch_ipv4_setting ( settings, &netmask_setting, &netmask );
+		/* Get default gateway, if present */
+		gateway.s_addr = INADDR_NONE;
+		fetch_ipv4_setting ( settings, &gateway_setting, &gateway );
+		/* Configure route */
+		miniroute = add_ipv4_miniroute ( netdev, address,
+						 netmask, gateway );
+		if ( ! miniroute )
+			return -ENOMEM;
+	}
+
+	return 0;
+}
+
+/** IPv4 settings applicator */
+struct settings_applicator ipv4_settings_applicator __settings_applicator = {
+	.apply = ipv4_create_routes,
 };

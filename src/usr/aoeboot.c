@@ -5,7 +5,6 @@
 #include <gpxe/aoe.h>
 #include <gpxe/ata.h>
 #include <gpxe/netdevice.h>
-#include <gpxe/dhcp.h>
 #include <gpxe/settings.h>
 #include <gpxe/abft.h>
 #include <int13.h>
@@ -56,7 +55,6 @@ int aoeboot ( const char *root_path ) {
 		container_of ( ata.backend, struct aoe_session, refcnt );
 	abft_fill_data ( aoe );
 
-	drive.drive = fetch_uintz_setting ( NULL, DHCP_EB_BIOS_DRIVE );
 	drive.blockdev = &ata.blockdev;
 
 	register_int13_drive ( &drive );

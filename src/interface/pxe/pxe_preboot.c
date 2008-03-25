@@ -28,7 +28,7 @@
 #include <stdlib.h>
 #include <gpxe/uaccess.h>
 #include <gpxe/dhcp.h>
-#include <gpxe/dhcppkt.h>
+#include <gpxe/fakedhcp.h>
 #include <gpxe/device.h>
 #include <gpxe/netdevice.h>
 #include <gpxe/isapnp.h>
@@ -80,9 +80,9 @@ struct pxe_dhcp_packet_creator {
 
 /** PXE DHCP packet creators */
 static struct pxe_dhcp_packet_creator pxe_dhcp_packet_creators[] = {
-	[CACHED_INFO_DHCPDISCOVER] = { create_dhcpdiscover },
-	[CACHED_INFO_DHCPACK] = { create_dhcpack },
-	[CACHED_INFO_BINL] = { create_proxydhcpack },
+	[CACHED_INFO_DHCPDISCOVER] = { create_fakedhcpdiscover },
+	[CACHED_INFO_DHCPACK] = { create_fakedhcpack },
+	[CACHED_INFO_BINL] = { create_fakeproxydhcpack },
 };
 
 /* The case in which the caller doesn't supply a buffer is really

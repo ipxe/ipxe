@@ -1093,6 +1093,21 @@ struct uri_opener mtftp_uri_opener __uri_opener = {
 	.open	= mtftp_open,
 };
 
+/******************************************************************************
+ *
+ * Settings
+ *
+ ******************************************************************************
+ */
+
+/** TFTP server setting */
+struct setting next_server_setting __setting = {
+	.name = "next-server",
+	.description = "TFTP server",
+	.tag = DHCP_EB_SIADDR,
+	.type = &setting_type_ipv4,
+};
+
 /**
  * Apply TFTP configuration settings
  *
@@ -1106,7 +1121,7 @@ static int tftp_apply_settings ( void ) {
 
 	/* Retrieve TFTP server setting */
 	last_tftp_server = tftp_server;
-	fetch_ipv4_setting ( NULL, DHCP_EB_SIADDR, &tftp_server );
+	fetch_ipv4_setting ( NULL, &next_server_setting, &tftp_server );
 
 	/* If TFTP server setting has changed, set the current working
 	 * URI to match.  Do it only when the TFTP server has changed

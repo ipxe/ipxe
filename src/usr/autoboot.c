@@ -147,14 +147,14 @@ static int netboot ( struct net_device *netdev ) {
 		return rc;
 
 	/* Try to download and boot whatever we are given as a filename */
-	fetch_string_setting ( NULL, DHCP_BOOTFILE_NAME, buf, sizeof ( buf ) );
+	fetch_string_setting ( NULL, &filename_setting, buf, sizeof ( buf ) );
 	if ( buf[0] ) {
 		printf ( "Booting from filename \"%s\"\n", buf );
 		return boot_filename ( buf );
 	}
 	
 	/* No filename; try the root path */
-	fetch_string_setting ( NULL, DHCP_ROOT_PATH, buf, sizeof ( buf ) );
+	fetch_string_setting ( NULL, &root_path_setting, buf, sizeof ( buf ) );
 	if ( buf[0] ) {
 		printf ( "Booting from root path \"%s\"\n", buf );
 		return boot_root_path ( buf );

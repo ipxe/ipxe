@@ -8,8 +8,7 @@
 #include <gpxe/segment.h>
 #include <gpxe/init.h>
 #include <gpxe/netdevice.h>
-#include <gpxe/dhcp.h>
-#include <gpxe/dhcppkt.h>
+#include <gpxe/fakedhcp.h>
 #include <gpxe/image.h>
 #include <gpxe/features.h>
 
@@ -400,8 +399,8 @@ static int nbi_prepare_dhcp ( struct image *image ) {
 		return -ENODEV;
 	}
 
-	if ( ( rc = create_dhcpack ( boot_netdev, basemem_packet,
-				     sizeof ( basemem_packet ) ) ) != 0 ) {
+	if ( ( rc = create_fakedhcpack ( boot_netdev, basemem_packet,
+					 sizeof ( basemem_packet ) ) ) != 0 ) {
 		DBGC ( image, "NBI %p failed to build DHCP packet\n", image );
 		return rc;
 	}

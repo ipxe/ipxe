@@ -7,7 +7,7 @@
  *
  */
 
-#include <gpxe/dhcp.h>
+#include <stdint.h>
 
 /** A DHCP options block */
 struct dhcp_options {

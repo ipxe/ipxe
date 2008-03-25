@@ -16,22 +16,44 @@
 struct settings;
 struct in_addr;
 
+/** A setting */
+struct setting {
+	/** Name
+	 *
+	 * This is the human-readable name for the setting.
+	 */
+	const char *name;
+	/** Description */
+	const char *description;
+	/** Setting type
+	 *
+	 * This identifies the type of setting (e.g. string, IPv4
+	 * address, etc.).
+	 */
+	struct setting_type *type;
+	/** DHCP option number, if applicable */
+	unsigned int tag;
+};
+
+/** Declare a configuration setting */
+#define	__setting __table ( struct setting, settings, 01 )
+
 /** Settings block operations */
 struct settings_operations {
 	/** Store value of setting
 	 *
 	 * @v settings		Settings block
-	 * @v tag		Setting tag number
+	 * @v setting		Setting to store
 	 * @v data		Setting data, or NULL to clear setting
 	 * @v len		Length of setting data
 	 * @ret rc		Return status code
 	 */
-	int ( * store ) ( struct settings *settings, unsigned int tag,
+	int ( * store ) ( struct settings *settings, struct setting *setting,
 			  const void *data, size_t len );
 	/** Fetch value of setting
 	 *
 	 * @v settings		Settings block
-	 * @v tag		Setting tag number
+	 * @v setting		Setting to fetch
 	 * @v data		Buffer to fill with setting data
 	 * @v len		Length of buffer
 	 * @ret len		Length of setting data, or negative error
@@ -39,7 +61,7 @@ struct settings_operations {
 	 * The actual length of the setting will be returned even if
 	 * the buffer was too small.
 	 */
-	int ( * fetch ) ( struct settings *settings, unsigned int tag,
+	int ( * fetch ) ( struct settings *settings, struct setting *setting,
 			  void *data, size_t len );
 };
 
@@ -74,54 +96,27 @@ struct setting_type {
 	/** Parse and set value of setting
 	 *
 	 * @v settings		Settings block
-	 * @v tag		Setting tag number
+	 * @v setting		Setting to store
 	 * @v value		Formatted setting data
 	 * @ret rc		Return status code
 	 */
-	int ( * storef ) ( struct settings *settings, unsigned int tag,
+	int ( * storef ) ( struct settings *settings, struct setting *setting,
 			   const char *value );
 	/** Fetch and format value of setting
 	 *
-	 * @v settings		Settings block, or NULL to search all blocks
-	 * @v tag		Setting tag number
+	 * @v settings		Settings block
+	 * @v setting		Setting to fetch
 	 * @v buf		Buffer to contain formatted value
 	 * @v len		Length of buffer
 	 * @ret len		Length of formatted value, or negative error
 	 */
-	int ( * fetchf ) ( struct settings *settings, unsigned int tag,
+	int ( * fetchf ) ( struct settings *settings, struct setting *setting,
 			   char *buf, size_t len );
 };
 
 /** Declare a configuration setting type */
 #define	__setting_type \
 	__table ( struct setting_type, setting_types, 01 )
-
-/**
- * A named setting
- *
- * This represents a single setting (e.g. "hostname"), encapsulating
- * the information about the setting's tag number and type.
- */
-struct named_setting {
-	/** Name
-	 *
-	 * This is the human-readable name for the setting.
-	 */
-	const char *name;
-	/** Description */
-	const char *description;
-	/** Setting tag number */
-	unsigned int tag;
-	/** Setting type
-	 *
-	 * This identifies the type of setting (e.g. string, IPv4
-	 * address, etc.).
-	 */
-	struct setting_type *type;
-};
-
-/** Declare a configuration setting */
-#define	__named_setting __table ( struct named_setting, named_settings, 01 )
 
 /**
  * A settings applicator
@@ -151,41 +146,49 @@ struct simple_settings {
 };
 
 extern struct settings_operations simple_settings_operations;
-
-extern int simple_settings_store ( struct settings *settings, unsigned int tag,
+extern int simple_settings_store ( struct settings *settings,
+				   struct setting *setting,
 				   const void *data, size_t len );
-extern int simple_settings_fetch ( struct settings *settings, unsigned int tag,
+extern int simple_settings_fetch ( struct settings *settings,
+				   struct setting *setting,
 				   void *data, size_t len );
+
 extern int register_settings ( struct settings *settings,
 			       struct settings *parent );
 extern void unregister_settings ( struct settings *settings );
-extern int store_setting ( struct settings *settings, unsigned int tag,
+
+extern int store_setting ( struct settings *settings, struct setting *setting,
 			   const void *data, size_t len );
-extern int fetch_setting ( struct settings *settings, unsigned int tag,
+extern int fetch_setting ( struct settings *settings, struct setting *setting,
 			   void *data, size_t len );
-extern int copy_settings ( struct settings *dest, struct settings *source );
-extern int fetch_setting_len ( struct settings *settings, unsigned int tag );
-extern int fetch_string_setting ( struct settings *settings, unsigned int tag,
+extern int fetch_setting_len ( struct settings *settings,
+			       struct setting *setting );
+extern int fetch_string_setting ( struct settings *settings,
+				  struct setting *setting,
 				  char *data, size_t len );
-extern int fetch_ipv4_setting ( struct settings *settings, unsigned int tag,
-				struct in_addr *inp );
-extern int fetch_int_setting ( struct settings *settings, unsigned int tag,
-			       long *value );
-extern int fetch_uint_setting ( struct settings *settings, unsigned int tag,
+extern int fetch_ipv4_setting ( struct settings *settings,
+				struct setting *setting, struct in_addr *inp );
+extern int fetch_int_setting ( struct settings *settings,
+			       struct setting *setting, long *value );
+extern int fetch_uint_setting ( struct settings *settings,
+				struct setting *setting,
 				unsigned long *value );
-extern long fetch_intz_setting ( struct settings *settings, unsigned int tag );
+extern long fetch_intz_setting ( struct settings *settings,
+				 struct setting *setting );
 extern unsigned long fetch_uintz_setting ( struct settings *settings,
-					   unsigned int tag );
+					   struct setting *setting );
+extern int setting_cmp ( struct setting *a, struct setting *b );
+
 extern struct settings * find_child_settings ( struct settings *parent,
 					       const char *name );
 extern struct settings * find_settings ( const char *name );
-extern int store_typed_setting ( struct settings *settings,
-				 unsigned int tag, struct setting_type *type,
-				 const char *value );
-extern int store_named_setting ( const char *name, const char *value );
-extern int fetch_named_setting ( const char *name, char *buf, size_t len );
 
-extern struct setting_type setting_type_ __setting_type;
+extern int storef_setting ( struct settings *settings,
+			    struct setting *setting,
+			    const char *value );
+extern int storef_named_setting ( const char *name, const char *value );
+extern int fetchf_named_setting ( const char *name, char *buf, size_t len );
+
 extern struct setting_type setting_type_string __setting_type;
 extern struct setting_type setting_type_ipv4 __setting_type;
 extern struct setting_type setting_type_int8 __setting_type;
@@ -195,6 +198,18 @@ extern struct setting_type setting_type_uint8 __setting_type;
 extern struct setting_type setting_type_uint16 __setting_type;
 extern struct setting_type setting_type_uint32 __setting_type;
 extern struct setting_type setting_type_hex __setting_type;
+
+extern struct setting ip_setting __setting;
+extern struct setting netmask_setting __setting;
+extern struct setting gateway_setting __setting;
+extern struct setting dns_setting __setting;
+extern struct setting hostname_setting __setting;
+extern struct setting filename_setting __setting;
+extern struct setting root_path_setting __setting;
+extern struct setting username_setting __setting;
+extern struct setting password_setting __setting;
+extern struct setting priority_setting __setting;
+extern struct setting bios_drive_setting __setting;
 
 /**
  * Initialise a settings block
@@ -233,29 +248,28 @@ static inline void simple_settings_init ( struct simple_settings *simple,
  * Delete setting
  *
  * @v settings		Settings block
- * @v tag		Setting tag number
+ * @v setting		Setting to delete
  * @ret rc		Return status code
  */
 static inline int delete_setting ( struct settings *settings,
-				   unsigned int tag ) {
-	return store_setting ( settings, tag, NULL, 0 );
+				   struct setting *setting ) {
+	return store_setting ( settings, setting, NULL, 0 );
 }
 
 /**
  * Fetch and format value of setting
  *
  * @v settings		Settings block, or NULL to search all blocks
- * @v tag		Setting tag number
+ * @v setting		Setting to fetch
  * @v type		Settings type
  * @v buf		Buffer to contain formatted value
  * @v len		Length of buffer
  * @ret len		Length of formatted value, or negative error
  */
-static inline int fetch_typed_setting ( struct settings *settings,
-					unsigned int tag,
-					struct setting_type *type,
-					char *buf, size_t len ) {
-	return type->fetchf ( settings, tag, buf, len );
+static inline int fetchf_setting ( struct settings *settings,
+				   struct setting *setting,
+				   char *buf, size_t len ) {
+	return setting->type->fetchf ( settings, setting, buf, len );
 }
 
 /**
@@ -265,7 +279,7 @@ static inline int fetch_typed_setting ( struct settings *settings,
  * @ret rc		Return status code
  */
 static inline int delete_named_setting ( const char *name ) {
-	return store_named_setting ( name, NULL );
+	return storef_named_setting ( name, NULL );
 }
 
 #endif /* _GPXE_SETTINGS_H */
