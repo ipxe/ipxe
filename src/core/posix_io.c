@@ -293,7 +293,9 @@ ssize_t read_user ( int fd, userptr_t buffer, off_t offset, size_t max_len ) {
 			free_iob ( iobuf );
 		}
 		file->pos += len;
-		return len;
+		if ( len )
+			return len;
+		break;
 	}
 
 	/* If file has completed, return (after returning all data) */
