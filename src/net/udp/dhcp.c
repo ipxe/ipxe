@@ -342,26 +342,11 @@ int create_dhcp_request ( struct dhcp_packet *dhcppkt,
 struct dhcp_settings {
 	/** Reference counter */
 	struct refcnt refcnt;
-	/** Containing I/O buffer */
-	struct io_buffer *iobuf;
 	/** DHCP packet */
 	struct dhcp_packet dhcppkt;
 	/** Setting interface */
 	struct settings settings;
 };
-
-/**
- * Free DHCP settings block
- *
- * @v refcnt		Reference counter
- */
-static void dhcpset_free ( struct refcnt *refcnt ) {
-	struct dhcp_settings *dhcpset =
-		container_of ( refcnt, struct dhcp_settings, refcnt );
-
-	free_iob ( dhcpset->iobuf );
-	free ( dhcpset );
-}
 
 /**
  * Decrement reference count on DHCP settings block
@@ -413,23 +398,22 @@ static struct settings_operations dhcpset_settings_operations = {
 };
 
 /**
- * Create DHCP setting block from I/O buffer
+ * Create DHCP setting block
  *
- * @v iobuf		I/O buffer
+ * @v dhcphdr		DHCP packet
+ * @v len		Length of DHCP packet
  * @ret dhcpset		DHCP settings block
- *
- * This function takes ownership of the I/O buffer.  Future accesses
- * must be via the @c dhcpset data structure.
  */
-static struct dhcp_settings * dhcpset_create_iob ( struct io_buffer *iobuf ) {
+static struct dhcp_settings * dhcpset_create ( const struct dhcphdr *dhcphdr,
+					       size_t len ) {
 	struct dhcp_settings *dhcpset;
+	void *data;
 
-	dhcpset = zalloc ( sizeof ( *dhcpset ) );
+	dhcpset = zalloc ( sizeof ( *dhcpset ) + len );
 	if ( dhcpset ) {
-		dhcpset->refcnt.free = dhcpset_free;
-		dhcpset->iobuf = iobuf;
-		dhcppkt_init ( &dhcpset->dhcppkt,
-			       iobuf->data, iob_len ( iobuf ) );
+		data = ( ( ( void * ) dhcpset ) + sizeof ( *dhcpset ) );
+		memcpy ( data, dhcphdr, len );
+		dhcppkt_init ( &dhcpset->dhcppkt, data, len );
 		settings_init ( &dhcpset->settings,
 				&dhcpset_settings_operations, &dhcpset->refcnt,
 				DHCP_SETTINGS_NAME );
@@ -632,9 +616,8 @@ static void dhcp_timer_expired ( struct retry_timer *timer, int fail ) {
  * @v len		Length of received data
  * @ret rc		Return status code
  */
-static int dhcp_deliver_iob ( struct xfer_interface *xfer,
-			      struct io_buffer *iobuf,
-			      struct xfer_metadata *meta __unused ) {
+static int dhcp_deliver_raw ( struct xfer_interface *xfer,
+			      const void *data, size_t len ) {
 	struct dhcp_session *dhcp =
 		container_of ( xfer, struct dhcp_session, xfer );
 	struct dhcp_settings *response;
@@ -648,8 +631,8 @@ static int dhcp_deliver_iob ( struct xfer_interface *xfer,
 	uint8_t ignore_proxy = 0;
 	int rc;
 
-	/* Convert packet into a DHCP-packet-in-iobuf */
-	response = dhcpset_create_iob ( iobuf );
+	/* Convert packet into a DHCP settings block */
+	response = dhcpset_create ( data, len );
 	if ( ! response ) {
 		DBGC ( dhcp, "DHCP %p could not store DHCP packet\n", dhcp );
 		return -ENOMEM;
@@ -748,8 +731,8 @@ static struct xfer_interface_operations dhcp_xfer_operations = {
 	.vredirect	= xfer_vopen,
 	.window		= unlimited_xfer_window,
 	.alloc_iob	= default_xfer_alloc_iob,
-	.deliver_iob	= dhcp_deliver_iob,
-	.deliver_raw	= xfer_deliver_as_iob,
+	.deliver_iob	= xfer_deliver_as_raw,
+	.deliver_raw	= dhcp_deliver_raw,
 };
 
 /****************************************************************************
