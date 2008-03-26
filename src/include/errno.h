@@ -449,7 +449,7 @@ extern char missing_errfile_declaration[] __attribute__ (( deprecated ));
 #define ETXTBSY			( ERRFILE | PXENV_STATUS_FAILURE | 0x4d000000 )
 
 /** Operation would block (different from EAGAIN!) */
-#define EWOULDBLOCK		( ERRFILE | PXENV_STATUS_TFTP_OPEN | 0x4e000000 )
+#define EWOULDBLOCK	      ( ERRFILE | PXENV_STATUS_TFTP_OPEN | 0x4e000000 )
 
 /** Improper link */
 #define EXDEV			( ERRFILE | PXENV_STATUS_FAILURE | 0x4f000000 )
