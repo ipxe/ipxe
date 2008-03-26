@@ -18,7 +18,6 @@
 
 #include <stdio.h>
 #include <console.h>
-#include <gpxe/features.h>
 #include <gpxe/timer.h>
 #include <gpxe/shell_banner.h>
 
@@ -30,13 +29,6 @@
 
 #define BANNER_TIMEOUT ( 2 * TICKS_PER_SEC )
 
-#define NORMAL	"\033[0m"
-#define BOLD	"\033[1m"
-#define CYAN	"\033[36m"
-
-static struct feature features[0] __table_start ( struct feature, features );
-static struct feature features_end[0] __table_end ( struct feature, features );
-
 /**
  * Print shell banner and prompt for shell entry
  *
@@ -44,18 +36,9 @@ static struct feature features_end[0] __table_end ( struct feature, features );
  */
 int shell_banner ( void ) {
 	unsigned long timeout = ( currticks() + BANNER_TIMEOUT );
-	struct feature *feature;
-	int key;
 	int enter_shell = 0;
+	int key;
 
-	/* Print welcome banner */
-	printf ( NORMAL "\n\n\n" BOLD "gPXE " VERSION
-		 NORMAL " -- Open Source Boot Firmware -- "
-		 CYAN "http://etherboot.org" NORMAL "\n"
-		 "Features:" );
-	for ( feature = features ; feature < features_end ; feature++ ) {
-		printf ( " %s", feature->name );
-	}
 	printf ( "\nPress Ctrl-B for the gPXE command line..." );
 
 	/* Wait for key */
