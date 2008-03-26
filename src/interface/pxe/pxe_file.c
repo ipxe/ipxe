@@ -227,3 +227,38 @@ PXENV_EXIT_t pxenv_file_exec ( struct s_PXENV_FILE_EXEC *file_exec ) {
 	file_exec->Status = PXENV_STATUS_SUCCESS;
 	return PXENV_EXIT_SUCCESS;
 }
+
+/**
+ * FILE API CHECK
+ *
+ * @v file_exec				Pointer to a struct s_PXENV_FILE_API_CHECK
+ * @v s_PXENV_FILE_API_CHECK::Magic     Inbound magic number (0x91d447b2)
+ * @ret #PXENV_EXIT_SUCCESS		Command was executed successfully
+ * @ret #PXENV_EXIT_FAILURE		Command was not executed successfully
+ * @ret s_PXENV_FILE_API_CHECK::Status	PXE status code
+ * @ret s_PXENV_FILE_API_CHECK::Magic	Outbound magic number (0xe9c17b20)
+ * @ret s_PXENV_FILE_API_CHECK::Provider "gPXE" (0x45585067)
+ * @ret s_PXENV_FILE_API_CHECK::APIMask API function bitmask
+ * @ret s_PXENV_FILE_API_CHECK::Flags	Reserved
+ *
+ */
+PXENV_EXIT_t pxenv_file_api_check ( struct s_PXENV_FILE_API_CHECK *file_api_check ) {
+	DBG ( "PXENV_FILE_API_CHECK" );
+
+	if ( file_api_check->Magic != 0x91d447b2 ) {
+		file_api_check->Status = PXENV_STATUS_BAD_FUNC;
+		return PXENV_EXIT_FAILURE;
+	} else if ( file_api_check->Size <
+		    sizeof(struct s_PXENV_FILE_API_CHECK) ) {
+		file_api_check->Status = PXENV_STATUS_OUT_OF_RESOURCES;
+		return PXENV_EXIT_FAILURE;
+	} else {
+		file_api_check->Status   = PXENV_STATUS_SUCCESS;
+		file_api_check->Size     = sizeof(struct s_PXENV_FILE_API_CHECK);
+		file_api_check->Magic    = 0xe9c17b20;
+		file_api_check->Provider = 0x45585067; /* "gPXE" */
+		file_api_check->APIMask  = 0x0000007f; /* Functions e0-e6 */
+		file_api_check->Flags    = 0;	       /* None defined */
+		return PXENV_EXIT_SUCCESS;
+	}
+}

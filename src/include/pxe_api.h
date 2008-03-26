@@ -1706,6 +1706,32 @@ extern PXENV_EXIT_t pxenv_file_exec ( struct s_PXENV_FILE_EXEC *file_exec );
 
 /** @} */ /* pxenv_file_exec */
 
+/** @defgroup pxenv_file_api_check PXENV_FILE_API_CHECK
+ *
+ * FILE API CHECK
+ *
+ * @{
+ */
+
+/** PXE API function code for pxenv_file_api_check() */
+#define PXENV_FILE_API_CHECK		0x00e6
+
+/** Parameter block for pxenv_file_api_check() */
+struct s_PXENV_FILE_API_CHECK {
+	PXENV_STATUS_t Status;		/**< PXE status code */
+	UINT16_t Size;			/**< Size of structure  */
+	UINT32_t Magic;			/**< Magic number */
+	UINT32_t Provider;		/**< Implementation identifier */
+	UINT32_t APIMask;		/**< Supported API functions */
+	UINT32_t Flags;			/**< Reserved for the future */
+} PACKED;
+
+typedef struct s_PXENV_FILE_API_CHECK PXENV_FILE_API_CHECK_t;
+
+extern PXENV_EXIT_t pxenv_file_api_check ( struct s_PXENV_FILE_API_CHECK *file_api_check );
+
+/** @} */ /* pxenv_file_api_check */
+
 /** @} */ /* pxe_file_api */
 
 /** @defgroup pxe_loader_api PXE Loader API
