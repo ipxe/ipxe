@@ -233,6 +233,10 @@ struct settings * find_child_settings ( struct settings *parent,
 	struct settings *settings;
 	size_t len;
 
+	/* NULL parent => add to settings root */
+	if ( parent == NULL )
+		parent = &settings_root;
+
 	/* Look for a child whose name matches the initial component */
 	list_for_each_entry ( settings, &parent->children, siblings ) {
 		len = strlen ( settings->name );
