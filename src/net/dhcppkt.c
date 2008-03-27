@@ -32,6 +32,30 @@
  *
  */
 
+/**
+ * Calculate used length of an IPv4 field within a DHCP packet
+ *
+ * @v data		Field data
+ * @v len		Length of field
+ * @ret used		Used length of field
+ */
+static size_t used_len_ipv4 ( const void *data, size_t len __unused ) {
+	const struct in_addr *in = data;
+
+	return ( in->s_addr ? sizeof ( *in ) : 0 );
+}
+
+/**
+ * Calculate used length of a string field within a DHCP packet
+ *
+ * @v data		Field data
+ * @v len		Length of field
+ * @ret used		Used length of field
+ */
+static size_t used_len_string ( const void *data, size_t len ) {
+	return strnlen ( data, len );
+}
+
 /** A dedicated field within a DHCP packet */
 struct dhcp_packet_field {
 	/** Settings tag number */
@@ -40,25 +64,34 @@ struct dhcp_packet_field {
 	uint16_t offset;
 	/** Length of field */
 	uint16_t len;
+	/** Calculate used length of field
+	 *
+	 * @v data	Field data
+	 * @v len	Length of field
+	 * @ret used	Used length of field
+	 */
+	size_t ( * used_len ) ( const void *data, size_t len );
 };
 
 /** Declare a dedicated field within a DHCP packet
  *
  * @v _tag		Settings tag number
  * @v _field		Field name
+ * @v _used_len		Function to calculate used length of field
  */
-#define DHCP_PACKET_FIELD( _tag, _field ) {				\
+#define DHCP_PACKET_FIELD( _tag, _field, _used_len ) {			\
 		.tag = (_tag),						\
 		.offset = offsetof ( struct dhcphdr, _field ),		\
 		.len = sizeof ( ( ( struct dhcphdr * ) 0 )->_field ),	\
+		.used_len = _used_len,					\
 	}
 
 /** Dedicated fields within a DHCP packet */
 static struct dhcp_packet_field dhcp_packet_fields[] = {
-	DHCP_PACKET_FIELD ( DHCP_EB_YIADDR, yiaddr ),
-	DHCP_PACKET_FIELD ( DHCP_EB_SIADDR, siaddr ),
-	DHCP_PACKET_FIELD ( DHCP_TFTP_SERVER_NAME, sname ),
-	DHCP_PACKET_FIELD ( DHCP_BOOTFILE_NAME, file ),
+	DHCP_PACKET_FIELD ( DHCP_EB_YIADDR, yiaddr, used_len_ipv4 ),
+	DHCP_PACKET_FIELD ( DHCP_EB_SIADDR, siaddr, used_len_ipv4 ),
+	DHCP_PACKET_FIELD ( DHCP_TFTP_SERVER_NAME, sname, used_len_string ),
+	DHCP_PACKET_FIELD ( DHCP_BOOTFILE_NAME, file, used_len_string ),
 };
 
 /**
@@ -138,14 +171,19 @@ int dhcppkt_store ( struct dhcp_packet *dhcppkt, unsigned int tag,
 int dhcppkt_fetch ( struct dhcp_packet *dhcppkt, unsigned int tag,
 		    void *data, size_t len ) {
 	struct dhcp_packet_field *field;
+	void *field_data;
+	size_t field_len;
 	
 	/* If this is a special field, return it */
 	if ( ( field = find_dhcp_packet_field ( tag ) ) != NULL ) {
-		if ( len > field->len )
-			len = field->len;
-		memcpy ( data,
-			 dhcp_packet_field ( dhcppkt->dhcphdr, field ), len );
-		return field->len;
+		field_data = dhcp_packet_field ( dhcppkt->dhcphdr, field );
+		field_len = field->used_len ( field_data, field->len );
+		if ( ! field_len )
+			return -ENOENT;
+		if ( len > field_len )
+			len = field_len;
+		memcpy ( data, field_data, len );
+		return field_len;
 	}
 
 	/* Otherwise, use the generic options block */
