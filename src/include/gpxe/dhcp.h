@@ -24,6 +24,9 @@ struct dhcp_packet;
 /** BOOTP/DHCP client port */
 #define BOOTPC_PORT 68
 
+/** ProxyDHCP server port */
+#define PROXYDHCP_PORT 4011
+
 /** Construct a tag value for an encapsulated option
  *
  * This tag value can be passed to Etherboot functions when searching
@@ -433,7 +436,7 @@ struct dhcphdr {
  */
 #define DHCP_MIN_LEN 552
 
-/** Maximum time that we will wait for ProxyDHCP offers */
+/** Maximum time that we will wait for ProxyDHCP responses */
 #define PROXYDHCP_WAIT_TIME ( TICKS_PER_SEC * 1 )
 
 /** Settings block name used for DHCP responses */
@@ -442,12 +445,13 @@ struct dhcphdr {
 /** Settings block name used for ProxyDHCP responses */
 #define PROXYDHCP_SETTINGS_NAME "proxydhcp"
 
-extern int create_dhcp_packet ( struct dhcp_packet *dhcppkt,
+extern int dhcp_create_packet ( struct dhcp_packet *dhcppkt,
 				struct net_device *netdev, uint8_t msgtype,
 				struct dhcp_options *options, 
 				void *data, size_t max_len );
-extern int create_dhcp_request ( struct dhcp_packet *dhcppkt,
+extern int dhcp_create_request ( struct dhcp_packet *dhcppkt,
 				 struct net_device *netdev,
+				 struct in_addr ciaddr,
 				 struct dhcp_packet *dhcpoffer,
 				 void *data, size_t max_len );
 extern int start_dhcp ( struct job_interface *job, struct net_device *netdev );

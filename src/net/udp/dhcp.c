@@ -92,6 +92,34 @@ static struct dhcp_options dhcp_request_options = {
 static uint8_t dhcp_features[0] __table_start ( uint8_t, dhcp_features );
 static uint8_t dhcp_features_end[0] __table_end ( uint8_t, dhcp_features );
 
+/** DHCP network device descriptor */
+struct dhcp_netdev_desc {
+	/** Bus type ID */
+	uint8_t type;
+	/** Vendor ID */
+	uint16_t vendor;
+	/** Device ID */
+	uint16_t device;
+} __attribute__ (( packed ));
+
+/** DHCP client identifier */
+struct dhcp_client_id {
+	/** Link-layer protocol */
+	uint8_t ll_proto;
+	/** Link-layer address */
+	uint8_t ll_addr[MAX_LL_ADDR_LEN];
+} __attribute__ (( packed ));
+
+/** DHCP client UUID */
+struct dhcp_client_uuid {
+	/** Identifier type */
+	uint8_t type;
+	/** UUID */
+	union uuid uuid;
+} __attribute__ (( packed ));
+
+#define DHCP_CLIENT_UUID_TYPE 0
+
 /**
  * Name a DHCP packet type
  *
@@ -130,208 +158,6 @@ static uint32_t dhcp_xid ( struct net_device *netdev ) {
 	return xid;
 }
 
-/**
- * Create a DHCP packet
- *
- * @v dhcppkt		DHCP packet structure to fill in
- * @v netdev		Network device
- * @v msgtype		DHCP message type
- * @v options		Initial options to include (or NULL)
- * @v data		Buffer for DHCP packet
- * @v max_len		Size of DHCP packet buffer
- * @ret rc		Return status code
- *
- * Creates a DHCP packet in the specified buffer, and fills out a @c
- * dhcp_packet structure that can be passed to
- * set_dhcp_packet_option() or copy_dhcp_packet_options().
- */
-int create_dhcp_packet ( struct dhcp_packet *dhcppkt,
-			 struct net_device *netdev, uint8_t msgtype,
-			 struct dhcp_options *options, 
-			 void *data, size_t max_len ) {
-	struct dhcphdr *dhcphdr = data;
-	size_t options_len;
-	unsigned int hlen;
-	int rc;
-
-	/* Sanity check */
-	options_len = ( options ? options->len : 0 );
-	if ( max_len < ( sizeof ( *dhcphdr ) + options_len ) )
-		return -ENOSPC;
-
-	/* Initialise DHCP packet content */
-	memset ( dhcphdr, 0, max_len );
-	dhcphdr->xid = dhcp_xid ( netdev );
-	dhcphdr->magic = htonl ( DHCP_MAGIC_COOKIE );
-	dhcphdr->htype = ntohs ( netdev->ll_protocol->ll_proto );
-	dhcphdr->op = dhcp_op[msgtype];
-	/* If hardware length exceeds the chaddr field length, don't
-	 * use the chaddr field.  This is as per RFC4390.
-	 */
-	hlen = netdev->ll_protocol->ll_addr_len;
-	if ( hlen > sizeof ( dhcphdr->chaddr ) ) {
-		hlen = 0;
-		dhcphdr->flags = htons ( BOOTP_FL_BROADCAST );
-	}
-	dhcphdr->hlen = hlen;
-	memcpy ( dhcphdr->chaddr, netdev->ll_addr, hlen );
-	memcpy ( dhcphdr->options, options->data, options_len );
-
-	/* Initialise DHCP packet structure */
-	memset ( dhcppkt, 0, sizeof ( *dhcppkt ) );
-	dhcppkt_init ( dhcppkt, data, max_len );
-	
-	/* Set DHCP_MESSAGE_TYPE option */
-	if ( ( rc = dhcppkt_store ( dhcppkt, DHCP_MESSAGE_TYPE,
-				    &msgtype, sizeof ( msgtype ) ) ) != 0 )
-		return rc;
-
-	return 0;
-}
-
-/** DHCP network device descriptor */
-struct dhcp_netdev_desc {
-	/** Bus type ID */
-	uint8_t type;
-	/** Vendor ID */
-	uint16_t vendor;
-	/** Device ID */
-	uint16_t device;
-} __attribute__ (( packed ));
-
-/** DHCP client identifier */
-struct dhcp_client_id {
-	/** Link-layer protocol */
-	uint8_t ll_proto;
-	/** Link-layer address */
-	uint8_t ll_addr[MAX_LL_ADDR_LEN];
-} __attribute__ (( packed ));
-
-/** DHCP client UUID */
-struct dhcp_client_uuid {
-	/** Identifier type */
-	uint8_t type;
-	/** UUID */
-	union uuid uuid;
-} __attribute__ (( packed ));
-
-#define DHCP_CLIENT_UUID_TYPE 0
-
-/**
- * Create DHCP request packet
- *
- * @v dhcppkt		DHCP packet structure to fill in
- * @v netdev		Network device
- * @v dhcpoffer		DHCPOFFER packet received from server
- * @v data		Buffer for DHCP packet
- * @v max_len		Size of DHCP packet buffer
- * @ret rc		Return status code
- */
-int create_dhcp_request ( struct dhcp_packet *dhcppkt,
-			  struct net_device *netdev,
-			  struct dhcp_packet *dhcpoffer,
-			  void *data, size_t max_len ) {
-	struct device_description *desc = &netdev->dev->desc;
-	struct dhcp_netdev_desc dhcp_desc;
-	struct dhcp_client_id client_id;
-	struct dhcp_client_uuid client_uuid;
-	unsigned int msgtype;
-	size_t dhcp_features_len;
-	size_t ll_addr_len;
-	int rc;
-
-	/* Create DHCP packet */
-	msgtype = ( dhcpoffer ? DHCPREQUEST : DHCPDISCOVER );
-	if ( ( rc = create_dhcp_packet ( dhcppkt, netdev, msgtype,
-					 &dhcp_request_options, data,
-					 max_len ) ) != 0 ) {
-		DBG ( "DHCP could not create DHCP packet: %s\n",
-		      strerror ( rc ) );
-		return rc;
-	}
-
-	/* Copy any required options from previous server repsonse */
-	if ( dhcpoffer ) {
-		struct in_addr server_id;
-		struct in_addr requested_ip;
-
-		if ( dhcppkt_fetch ( dhcpoffer, DHCP_SERVER_IDENTIFIER,
-				     &server_id, sizeof ( server_id ) )
-		     != sizeof ( server_id ) ) {
-			DBG ( "DHCP offer missing server identifier\n" );
-			return -EINVAL;
-		}
-		if ( dhcppkt_fetch ( dhcpoffer, DHCP_EB_YIADDR,
-				     &requested_ip, sizeof ( requested_ip ) )
-		     != sizeof ( requested_ip ) ) {
-			DBG ( "DHCP offer missing IP address\n" );
-			return -EINVAL;
-		}
-		if ( ( rc = dhcppkt_store ( dhcppkt, DHCP_SERVER_IDENTIFIER,
-					    &server_id,
-					    sizeof ( server_id ) ) ) != 0 ) {
-			DBG ( "DHCP could not set server identifier: %s\n ",
-			      strerror ( rc ) );
-			return rc;
-		}
-		if ( ( rc = dhcppkt_store ( dhcppkt, DHCP_REQUESTED_ADDRESS,
-					    &requested_ip,
-					    sizeof ( requested_ip ) ) ) != 0 ){
-			DBG ( "DHCP could not set requested address: %s\n",
-			      strerror ( rc ) );
-			return rc;
-		}
-	}
-
-	/* Add options to identify the feature list */
-	dhcp_features_len = ( dhcp_features_end - dhcp_features );
-	if ( ( rc = dhcppkt_store ( dhcppkt, DHCP_EB_ENCAP, dhcp_features,
-				    dhcp_features_len ) ) != 0 ) {
-		DBG ( "DHCP could not set features list option: %s\n",
-		      strerror ( rc ) );
-		return rc;
-	}
-
-	/* Add options to identify the network device */
-	dhcp_desc.type = desc->bus_type;
-	dhcp_desc.vendor = htons ( desc->vendor );
-	dhcp_desc.device = htons ( desc->device );
-	if ( ( rc = dhcppkt_store ( dhcppkt, DHCP_EB_BUS_ID, &dhcp_desc,
-				    sizeof ( dhcp_desc ) ) ) != 0 ) {
-		DBG ( "DHCP could not set bus ID option: %s\n",
-		      strerror ( rc ) );
-		return rc;
-	}
-
-	/* Add DHCP client identifier.  Required for Infiniband, and
-	 * doesn't hurt other link layers.
-	 */
-	client_id.ll_proto = ntohs ( netdev->ll_protocol->ll_proto );
-	ll_addr_len = netdev->ll_protocol->ll_addr_len;
-	assert ( ll_addr_len <= sizeof ( client_id.ll_addr ) );
-	memcpy ( client_id.ll_addr, netdev->ll_addr, ll_addr_len );
-	if ( ( rc = dhcppkt_store ( dhcppkt, DHCP_CLIENT_ID, &client_id,
-				    ( ll_addr_len + 1 ) ) ) != 0 ) {
-		DBG ( "DHCP could not set client ID: %s\n",
-		      strerror ( rc ) );
-		return rc;
-	}
-
-	/* Add client UUID, if we have one.  Required for PXE. */
-	client_uuid.type = DHCP_CLIENT_UUID_TYPE;
-	if ( ( rc = get_uuid ( &client_uuid.uuid ) ) == 0 ) {
-		if ( ( rc = dhcppkt_store ( dhcppkt, DHCP_CLIENT_UUID,
-					    &client_uuid,
-					    sizeof ( client_uuid ) ) ) != 0 ) {
-			DBG ( "DHCP could not set client UUID: %s\n",
-			      strerror ( rc ) );
-			return rc;
-		}
-	}
-
-	return 0;
-}
-
 /****************************************************************************
  *
  * DHCP settings
@@ -349,11 +175,24 @@ struct dhcp_settings {
 };
 
 /**
+ * Increment reference count on DHCP settings block
+ *
+ * @v dhcpset		DHCP settings block
+ * @ret dhcpset		DHCP settings block
+ */
+static inline __attribute__ (( always_inline )) struct dhcp_settings *
+dhcpset_get ( struct dhcp_settings *dhcpset ) {
+	ref_get ( &dhcpset->refcnt );
+	return dhcpset;
+}
+
+/**
  * Decrement reference count on DHCP settings block
  *
  * @v dhcpset		DHCP settings block
  */
-static inline void dhcpset_put ( struct dhcp_settings *dhcpset ) {
+static inline __attribute__ (( always_inline )) void
+dhcpset_put ( struct dhcp_settings *dhcpset ) {
 	ref_put ( &dhcpset->refcnt );
 }
 
@@ -423,9 +262,34 @@ static struct dhcp_settings * dhcpset_create ( const struct dhcphdr *dhcphdr,
 
 /****************************************************************************
  *
- * DHCP to UDP interface
+ * DHCP session
  *
  */
+
+/** DHCP session states */
+enum dhcp_session_state {
+	/** Sending DHCPDISCOVERs, collecting DHCPOFFERs and ProxyDHCPOFFERs */
+	DHCP_STATE_DISCOVER = 0,
+	/** Sending DHCPREQUESTs, waiting for DHCPACK */
+	DHCP_STATE_REQUEST,
+	/** Sending ProxyDHCPREQUESTs, waiting for ProxyDHCPACK */
+	DHCP_STATE_PROXYREQUEST,
+};
+
+/**
+ * Name a DHCP session state
+ *
+ * @v state		DHCP session state
+ * @ret string		DHCP session state name
+ */
+static inline const char * dhcp_state_name ( enum dhcp_session_state state ) {
+	switch ( state ) {
+	case DHCP_STATE_DISCOVER:	return "DHCPDISCOVER";
+	case DHCP_STATE_REQUEST:	return "DHCPREQUEST";
+	case DHCP_STATE_PROXYREQUEST:	return "ProxyDHCPREQUEST";
+	default:			return "<invalid>";
+	}
+}
 
 /** A DHCP session */
 struct dhcp_session {
@@ -444,14 +308,14 @@ struct dhcp_session {
 	 * This is a value for the @c DHCP_MESSAGE_TYPE option
 	 * (e.g. @c DHCPDISCOVER).
 	 */
-	int state;
-	/** Response obtained from DHCP server */
-	struct dhcp_settings *response;
-	/** Response obtained from ProxyDHCP server */
-	struct dhcp_settings *proxy_response;
+	enum dhcp_session_state state;
+	/** DHCPOFFER obtained during DHCPDISCOVER */
+	struct dhcp_settings *dhcpoffer;
+	/** ProxyDHCPOFFER obtained during DHCPDISCOVER */
+	struct dhcp_settings *proxydhcpoffer;
 	/** Retransmission timer */
 	struct retry_timer timer;
-	/** Session start time (in ticks) */
+	/** Start time of the current state (in ticks) */
 	unsigned long start;
 };
 
@@ -465,8 +329,8 @@ static void dhcp_free ( struct refcnt *refcnt ) {
 		container_of ( refcnt, struct dhcp_session, refcnt );
 
 	netdev_put ( dhcp->netdev );
-	dhcpset_put ( dhcp->response );
-	dhcpset_put ( dhcp->proxy_response );
+	dhcpset_put ( dhcp->dhcpoffer );
+	dhcpset_put ( dhcp->proxydhcpoffer );
 	free ( dhcp );
 }
 
@@ -490,41 +354,6 @@ static void dhcp_finished ( struct dhcp_session *dhcp, int rc ) {
 	job_done ( &dhcp->job, rc );
 }
 
-/**
- * Register options received via DHCP
- *
- * @v dhcp		DHCP session
- * @ret rc		Return status code
- */
-static int dhcp_register_settings ( struct dhcp_session *dhcp ) {
-	struct settings *old_settings;
-	struct settings *settings;
-	struct settings *parent;
-	int rc;
-
-	/* Register ProxyDHCP settings, if present */
-	if ( dhcp->proxy_response ) {
-		settings = &dhcp->proxy_response->settings;
-		settings->name = PROXYDHCP_SETTINGS_NAME;
-		old_settings = find_settings ( settings->name );
-		if ( old_settings )
-			unregister_settings ( old_settings );
-		if ( ( rc = register_settings ( settings, NULL ) ) != 0 )
-			return rc;
-	}
-
-	/* Register DHCP settings */
-	parent = netdev_settings ( dhcp->netdev );
-	settings = &dhcp->response->settings;
-	old_settings = find_child_settings ( parent, settings->name );
-	if ( old_settings )
-		unregister_settings ( old_settings );
-	if ( ( rc = register_settings ( settings, parent ) ) != 0 )
-		return rc;
-
-	return 0;
-}
-
 /****************************************************************************
  *
  * Data transfer interface
@@ -532,30 +361,229 @@ static int dhcp_register_settings ( struct dhcp_session *dhcp ) {
  */
 
 /**
+ * Create a DHCP packet
+ *
+ * @v dhcppkt		DHCP packet structure to fill in
+ * @v netdev		Network device
+ * @v msgtype		DHCP message type
+ * @v options		Initial options to include (or NULL)
+ * @v data		Buffer for DHCP packet
+ * @v max_len		Size of DHCP packet buffer
+ * @ret rc		Return status code
+ *
+ * Creates a DHCP packet in the specified buffer, and fills out a @c
+ * dhcp_packet structure.
+ */
+int dhcp_create_packet ( struct dhcp_packet *dhcppkt,
+			 struct net_device *netdev, uint8_t msgtype,
+			 struct dhcp_options *options, 
+			 void *data, size_t max_len ) {
+	struct dhcphdr *dhcphdr = data;
+	size_t options_len;
+	unsigned int hlen;
+	int rc;
+
+	/* Sanity check */
+	options_len = ( options ? options->len : 0 );
+	if ( max_len < ( sizeof ( *dhcphdr ) + options_len ) )
+		return -ENOSPC;
+
+	/* Initialise DHCP packet content */
+	memset ( dhcphdr, 0, max_len );
+	dhcphdr->xid = dhcp_xid ( netdev );
+	dhcphdr->magic = htonl ( DHCP_MAGIC_COOKIE );
+	dhcphdr->htype = ntohs ( netdev->ll_protocol->ll_proto );
+	dhcphdr->op = dhcp_op[msgtype];
+	/* If hardware length exceeds the chaddr field length, don't
+	 * use the chaddr field.  This is as per RFC4390.
+	 */
+	hlen = netdev->ll_protocol->ll_addr_len;
+	if ( hlen > sizeof ( dhcphdr->chaddr ) ) {
+		hlen = 0;
+		dhcphdr->flags = htons ( BOOTP_FL_BROADCAST );
+	}
+	dhcphdr->hlen = hlen;
+	memcpy ( dhcphdr->chaddr, netdev->ll_addr, hlen );
+	memcpy ( dhcphdr->options, options->data, options_len );
+
+	/* Initialise DHCP packet structure */
+	memset ( dhcppkt, 0, sizeof ( *dhcppkt ) );
+	dhcppkt_init ( dhcppkt, data, max_len );
+	
+	/* Set DHCP_MESSAGE_TYPE option */
+	if ( ( rc = dhcppkt_store ( dhcppkt, DHCP_MESSAGE_TYPE,
+				    &msgtype, sizeof ( msgtype ) ) ) != 0 )
+		return rc;
+
+	return 0;
+}
+
+/**
+ * Create DHCP request packet
+ *
+ * @v dhcppkt		DHCP packet structure to fill in
+ * @v netdev		Network device
+ * @v ciaddr		Client IP address
+ * @v offer		DHCP offer, if applicable
+ * @v data		Buffer for DHCP packet
+ * @v max_len		Size of DHCP packet buffer
+ * @ret rc		Return status code
+ */
+int dhcp_create_request ( struct dhcp_packet *dhcppkt,
+			  struct net_device *netdev, struct in_addr ciaddr,
+			  struct dhcp_packet *offer,
+			  void *data, size_t max_len ) {
+	struct device_description *desc = &netdev->dev->desc;
+	struct dhcp_netdev_desc dhcp_desc;
+	struct dhcp_client_id client_id;
+	struct dhcp_client_uuid client_uuid;
+	unsigned int msgtype;
+	size_t dhcp_features_len;
+	size_t ll_addr_len;
+	int rc;
+
+	/* Create DHCP packet */
+	msgtype = ( offer ? DHCPREQUEST : DHCPDISCOVER );
+	if ( ( rc = dhcp_create_packet ( dhcppkt, netdev, msgtype,
+					 &dhcp_request_options, data,
+					 max_len ) ) != 0 ) {
+		DBG ( "DHCP could not create DHCP packet: %s\n",
+		      strerror ( rc ) );
+		return rc;
+	}
+
+	/* Set client IP address */
+	dhcppkt->dhcphdr->ciaddr = ciaddr;
+
+	/* Copy any required options from previous server repsonse */
+	if ( offer ) {
+		struct in_addr server = { 0 };
+		struct in_addr *ip = &offer->dhcphdr->yiaddr;
+
+		/* Copy server identifier, if present */
+		if ( ( dhcppkt_fetch ( offer, DHCP_SERVER_IDENTIFIER, &server,
+				       sizeof ( server ) ) >= 0 ) &&
+		     ( ( rc = dhcppkt_store ( dhcppkt, DHCP_SERVER_IDENTIFIER,
+					      &server,
+					      sizeof ( server ) ) ) != 0 ) ) {
+			DBG ( "DHCP could not set server ID: %s\n",
+			      strerror ( rc ) );
+			return rc;
+		}
+
+		/* Copy requested IP address, if present */
+		if ( ( ip->s_addr != 0 ) &&
+		     ( ( rc = dhcppkt_store ( dhcppkt, DHCP_REQUESTED_ADDRESS,
+					      ip, sizeof ( *ip ) ) ) != 0 ) ) {
+			DBG ( "DHCP could not set requested address: %s\n",
+			      strerror ( rc ) );
+			return rc;
+		}
+	}
+
+	/* Add options to identify the feature list */
+	dhcp_features_len = ( dhcp_features_end - dhcp_features );
+	if ( ( rc = dhcppkt_store ( dhcppkt, DHCP_EB_ENCAP, dhcp_features,
+				    dhcp_features_len ) ) != 0 ) {
+		DBG ( "DHCP could not set features list option: %s\n",
+		      strerror ( rc ) );
+		return rc;
+	}
+
+	/* Add options to identify the network device */
+	dhcp_desc.type = desc->bus_type;
+	dhcp_desc.vendor = htons ( desc->vendor );
+	dhcp_desc.device = htons ( desc->device );
+	if ( ( rc = dhcppkt_store ( dhcppkt, DHCP_EB_BUS_ID, &dhcp_desc,
+				    sizeof ( dhcp_desc ) ) ) != 0 ) {
+		DBG ( "DHCP could not set bus ID option: %s\n",
+		      strerror ( rc ) );
+		return rc;
+	}
+
+	/* Add DHCP client identifier.  Required for Infiniband, and
+	 * doesn't hurt other link layers.
+	 */
+	client_id.ll_proto = ntohs ( netdev->ll_protocol->ll_proto );
+	ll_addr_len = netdev->ll_protocol->ll_addr_len;
+	assert ( ll_addr_len <= sizeof ( client_id.ll_addr ) );
+	memcpy ( client_id.ll_addr, netdev->ll_addr, ll_addr_len );
+	if ( ( rc = dhcppkt_store ( dhcppkt, DHCP_CLIENT_ID, &client_id,
+				    ( ll_addr_len + 1 ) ) ) != 0 ) {
+		DBG ( "DHCP could not set client ID: %s\n",
+		      strerror ( rc ) );
+		return rc;
+	}
+
+	/* Add client UUID, if we have one.  Required for PXE. */
+	client_uuid.type = DHCP_CLIENT_UUID_TYPE;
+	if ( ( rc = get_uuid ( &client_uuid.uuid ) ) == 0 ) {
+		if ( ( rc = dhcppkt_store ( dhcppkt, DHCP_CLIENT_UUID,
+					    &client_uuid,
+					    sizeof ( client_uuid ) ) ) != 0 ) {
+			DBG ( "DHCP could not set client UUID: %s\n",
+			      strerror ( rc ) );
+			return rc;
+		}
+	}
+
+	return 0;
+}
+
+/**
  * Transmit DHCP request
  *
  * @v dhcp		DHCP session
  * @ret rc		Return status code
  */
-static int dhcp_send_request ( struct dhcp_session *dhcp ) {
+static int dhcp_tx ( struct dhcp_session *dhcp ) {
+	static struct sockaddr_in proxydhcp_server = {
+		.sin_family = AF_INET,
+		.sin_port = htons ( PROXYDHCP_PORT ),
+	};
 	struct xfer_metadata meta = {
 		.netdev = dhcp->netdev,
 	};
 	struct io_buffer *iobuf;
-	struct dhcp_packet *dhcpoffer = NULL;
 	struct dhcp_packet dhcppkt;
+	struct dhcp_packet *offer = NULL;
+	struct in_addr ciaddr = { 0 };
+	int check_len;
 	int rc;
-	
-	DBGC ( dhcp, "DHCP %p transmitting %s\n",
-	       dhcp, dhcp_msgtype_name ( dhcp->state ) );
-
-	assert ( ( dhcp->state == DHCPDISCOVER ) ||
-		 ( dhcp->state == DHCPREQUEST ) );
 
 	/* Start retry timer.  Do this first so that failures to
 	 * transmit will be retried.
 	 */
 	start_timer ( &dhcp->timer );
+
+	/* Determine packet contents based on current state */
+	switch ( dhcp->state ) {
+	case DHCP_STATE_DISCOVER:
+		DBGC ( dhcp, "DHCP %p transmitting DHCPDISCOVER\n", dhcp );
+		break;
+	case DHCP_STATE_REQUEST:
+		DBGC ( dhcp, "DHCP %p transmitting DHCPREQUEST\n", dhcp );
+		assert ( dhcp->dhcpoffer );
+		offer = &dhcp->dhcpoffer->dhcppkt;
+		break;
+	case DHCP_STATE_PROXYREQUEST:
+		DBGC ( dhcp, "DHCP %p transmitting ProxyDHCPREQUEST\n", dhcp );
+		assert ( dhcp->dhcpoffer );
+		assert ( dhcp->proxydhcpoffer );
+		offer = &dhcp->proxydhcpoffer->dhcppkt;
+		ciaddr = dhcp->dhcpoffer->dhcppkt.dhcphdr->yiaddr;
+		check_len = dhcppkt_fetch ( offer, DHCP_SERVER_IDENTIFIER,
+					    &proxydhcp_server.sin_addr,
+					    sizeof(proxydhcp_server.sin_addr));
+		meta.dest = ( struct sockaddr * ) &proxydhcp_server;
+		assert ( ciaddr.s_addr != 0 );
+		assert ( proxydhcp_server.sin_addr.s_addr != 0 );
+		assert ( check_len == sizeof ( proxydhcp_server.sin_addr ) );
+		break;
+	default:
+		assert ( 0 );
+		break;
+	}
 
 	/* Allocate buffer for packet */
 	iobuf = xfer_alloc_iob ( &dhcp->xfer, DHCP_MIN_LEN );
@@ -563,12 +591,8 @@ static int dhcp_send_request ( struct dhcp_session *dhcp ) {
 		return -ENOMEM;
 
 	/* Create DHCP packet in temporary buffer */
-	if ( dhcp->state == DHCPREQUEST ) {
-		assert ( dhcp->response );
-		dhcpoffer = &dhcp->response->dhcppkt;
-	}
-	if ( ( rc = create_dhcp_request ( &dhcppkt, dhcp->netdev,
-					  dhcpoffer, iobuf->data,
+	if ( ( rc = dhcp_create_request ( &dhcppkt, dhcp->netdev,
+					  ciaddr, offer, iobuf->data,
 					  iob_tailroom ( iobuf ) ) ) != 0 ) {
 		DBGC ( dhcp, "DHCP %p could not construct DHCP request: %s\n",
 		       dhcp, strerror ( rc ) );
@@ -591,27 +615,229 @@ static int dhcp_send_request ( struct dhcp_session *dhcp ) {
 }
 
 /**
- * Handle DHCP retry timer expiry
+ * Transition to new DHCP session state
  *
- * @v timer		DHCP retry timer
- * @v fail		Failure indicator
+ * @v dhcp		DHCP session
+ * @v state		New session state
  */
-static void dhcp_timer_expired ( struct retry_timer *timer, int fail ) {
-	struct dhcp_session *dhcp =
-		container_of ( timer, struct dhcp_session, timer );
+static void dhcp_set_state ( struct dhcp_session *dhcp,
+			     enum dhcp_session_state state ) {
+	DBGC ( dhcp, "DHCP %p entering %s state\n",
+	       dhcp, dhcp_state_name ( state ) );
+	dhcp->state = state;
+	dhcp->start = currticks();
+	start_timer_nodelay ( &dhcp->timer );
+}
 
-	if ( fail ) {
-		dhcp_finished ( dhcp, -ETIMEDOUT );
-	} else {
-		dhcp_send_request ( dhcp );
+/**
+ * Store received DHCPOFFER
+ *
+ * @v dhcp		DHCP session
+ * @v dhcpoffer		Received DHCPOFFER
+ * @v stored_dhcpoffer	Location to store DHCPOFFER
+ *
+ * The DHCPOFFER will be stored in place of the existing stored
+ * DHCPOFFER if its priority is equal to or greater than the stored
+ * DHCPOFFER.
+ */
+static void dhcp_store_dhcpoffer ( struct dhcp_session *dhcp,
+				   struct dhcp_settings *dhcpoffer,
+				   struct dhcp_settings **stored_dhcpoffer ) {
+	uint8_t stored_priority = 0;
+	uint8_t priority = 0;
+
+	/* Get priorities of the two DHCPOFFERs */
+	if ( *stored_dhcpoffer ) {
+		dhcppkt_fetch ( &(*stored_dhcpoffer)->dhcppkt,
+				DHCP_EB_PRIORITY, &stored_priority,
+				sizeof ( stored_priority ) );
 	}
+	dhcppkt_fetch ( &dhcpoffer->dhcppkt, DHCP_EB_PRIORITY, &priority,
+			sizeof ( priority ) );
+
+	/* Replace stored offer only if priority is equal or greater */
+	if ( priority >= stored_priority ) {
+		if ( *stored_dhcpoffer ) {
+			DBGC ( dhcp, "DHCP %p stored DHCPOFFER %p discarded\n",
+			       dhcp, *stored_dhcpoffer );
+		}
+		DBGC ( dhcp, "DHCP %p received DHCPOFFER %p stored\n",
+		       dhcp, dhcpoffer );
+		dhcpset_put ( *stored_dhcpoffer );
+		*stored_dhcpoffer = dhcpset_get ( dhcpoffer );
+	}
+}
+
+/**
+ * Handle received DHCPOFFER
+ *
+ * @v dhcp		DHCP session
+ * @v dhcpoffer		Received DHCPOFFER
+ */
+static void dhcp_rx_dhcpoffer ( struct dhcp_session *dhcp,
+				struct dhcp_settings *dhcpoffer ) {
+	char vci[9]; /* "PXEClient" */
+	int len;
+	uint8_t ignore_proxy = 0;
+	unsigned long elapsed;
+
+	/* Check for presence of DHCP server ID */
+	if ( dhcppkt_fetch ( &dhcpoffer->dhcppkt, DHCP_SERVER_IDENTIFIER,
+			     NULL, 0 ) != sizeof ( struct in_addr ) ) {
+		DBGC ( dhcp, "DHCP %p received DHCPOFFER %p missing server "
+		       "identifier\n", dhcp, dhcpoffer );
+		return;
+	}
+
+	/* If there is an IP address, it's a normal DHCPOFFER */
+	if ( dhcpoffer->dhcppkt.dhcphdr->yiaddr.s_addr != 0 ) {
+		DBGC ( dhcp, "DHCP %p received DHCPOFFER %p has IP address\n",
+		       dhcp, dhcpoffer );
+		dhcp_store_dhcpoffer ( dhcp, dhcpoffer, &dhcp->dhcpoffer );
+	}
+
+	/* If there is a "PXEClient" vendor class ID, it's a
+	 * ProxyDHCPOFFER.  Note that it could be both a normal
+	 * DHCPOFFER and a ProxyDHCPOFFER.
+	 */
+	len = dhcppkt_fetch ( &dhcpoffer->dhcppkt, DHCP_VENDOR_CLASS_ID,
+			      vci, sizeof ( vci ) );
+	if ( ( len >= ( int ) sizeof ( vci ) ) &&
+	     ( strncmp ( "PXEClient", vci, sizeof ( vci ) ) == 0 ) ) {
+		DBGC ( dhcp, "DHCP %p received DHCPOFFER %p is a "
+		       "ProxyDHCPOFFER\n", dhcp, dhcpoffer );
+		dhcp_store_dhcpoffer ( dhcp, dhcpoffer,
+				       &dhcp->proxydhcpoffer );
+	}
+
+	/* We can transition to making the DHCPREQUEST when we have a
+	 * valid DHCPOFFER, and either:
+	 *
+	 *  o  The DHCPOFFER instructs us to not wait for ProxyDHCP, or
+	 *  o  We have a valid ProxyDHCPOFFER, or
+         *  o  We have allowed sufficient time for ProxyDHCPOFFERs.
+	 */
+
+	/* If we don't yet have a DHCPOFFER, do nothing */
+	if ( ! dhcp->dhcpoffer )
+		return;
+
+	/* If the DHCPOFFER instructs us to ignore ProxyDHCP, discard
+	 * any ProxyDHCPOFFER
+	 */
+	dhcppkt_fetch ( &dhcp->dhcpoffer->dhcppkt, DHCP_EB_NO_PROXYDHCP,
+			&ignore_proxy, sizeof ( ignore_proxy ) );
+	if ( ignore_proxy && dhcp->proxydhcpoffer ) {
+		DBGC ( dhcp, "DHCP %p discarding ProxyDHCPOFFER\n", dhcp );
+		dhcpset_put ( dhcp->proxydhcpoffer );
+		dhcp->proxydhcpoffer = NULL;
+	}
+
+	/* If we can't yet transition to DHCPREQUEST, do nothing */
+	elapsed = ( currticks() - dhcp->start );
+	if ( ! ( ignore_proxy || dhcp->proxydhcpoffer ||
+		 ( elapsed > PROXYDHCP_WAIT_TIME ) ) )
+		return;
+
+	/* Transition to DHCPREQUEST */
+	dhcp_set_state ( dhcp, DHCP_STATE_REQUEST );
+}
+
+/**
+ * Store received DHCPACK
+ *
+ * @v dhcp		DHCP session
+ * @v dhcpack		Received DHCPACK
+ *
+ * The DHCPACK will be registered as a settings block.
+ */
+static int dhcp_store_dhcpack ( struct dhcp_session *dhcp,
+				struct dhcp_settings *dhcpack,
+				struct settings *parent ) {
+	struct settings *settings = &dhcpack->settings;
+	struct settings *old_settings;
+	int rc;
+
+	/* Unregister any old settings obtained via DHCP */
+	if ( ( old_settings = find_child_settings ( parent, settings->name ) ))
+		unregister_settings ( old_settings );
+
+	/* Register new settings */
+	if ( ( rc = register_settings ( settings, parent ) ) != 0 ) {
+		DBGC ( dhcp, "DHCP %p could not register settings: %s\n",
+		       dhcp, strerror ( rc ) );
+		dhcp_finished ( dhcp, rc ); /* This is a fatal error */
+		return rc;
+	}
+
+	return 0;
+}
+
+/**
+ * Handle received DHCPACK
+ *
+ * @v dhcp		DHCP session
+ * @v dhcpack		Received DHCPACK
+ */
+static void dhcp_rx_dhcpack ( struct dhcp_session *dhcp,
+			      struct dhcp_settings *dhcpack ) {
+	struct settings *parent;
+	struct in_addr offer_server_id = { 0 };
+	struct in_addr ack_server_id = { 0 };
+	int rc;
+
+	/* Verify server ID matches */
+	assert ( dhcp->dhcpoffer != NULL );
+	dhcppkt_fetch ( &dhcp->dhcpoffer->dhcppkt, DHCP_SERVER_IDENTIFIER,
+			&offer_server_id, sizeof ( offer_server_id ) );
+	dhcppkt_fetch ( &dhcpack->dhcppkt, DHCP_SERVER_IDENTIFIER,
+			&ack_server_id, sizeof ( ack_server_id ) );
+	if ( offer_server_id.s_addr != ack_server_id.s_addr ) {
+		DBGC ( dhcp, "DHCP %p ignoring DHCPACK with wrong server ID\n",
+		       dhcp );
+		return;
+	}
+
+	/* Register settings */
+	parent = netdev_settings ( dhcp->netdev );
+	if ( ( rc = dhcp_store_dhcpack ( dhcp, dhcpack, parent ) ) !=0 )
+		return;
+
+	/* If we have a ProxyDHCPOFFER, transition to PROXYDHCPREQUEST */
+	if ( dhcp->proxydhcpoffer ) {
+		dhcp_set_state ( dhcp, DHCP_STATE_PROXYREQUEST );
+		return;
+	}
+
+	/* Terminate DHCP */
+	dhcp_finished ( dhcp, 0 );
+}
+
+/**
+ * Handle received ProxyDHCPACK
+ *
+ * @v dhcp		DHCP session
+ * @v proxydhcpack	Received ProxyDHCPACK
+ */
+static void dhcp_rx_proxydhcpack ( struct dhcp_session *dhcp,
+				   struct dhcp_settings *proxydhcpack ) {
+	int rc;
+
+	/* Rename settings */
+	proxydhcpack->settings.name = PROXYDHCP_SETTINGS_NAME;
+
+	/* Register settings */
+	if ( ( rc = dhcp_store_dhcpack ( dhcp, proxydhcpack, NULL ) ) != 0 )
+		return;
+
+	/* Terminate DHCP */
+	dhcp_finished ( dhcp, 0 );
 }
 
 /**
  * Receive new data
  *
  * @v xfer 		Data transfer interface
- * @v iobuf		I/O buffer
  * @v data		Received data
  * @v len		Length of received data
  * @ret rc		Return status code
@@ -620,108 +846,52 @@ static int dhcp_deliver_raw ( struct xfer_interface *xfer,
 			      const void *data, size_t len ) {
 	struct dhcp_session *dhcp =
 		container_of ( xfer, struct dhcp_session, xfer );
-	struct dhcp_settings *response;
-	struct dhcp_settings **store_response;
+	struct dhcp_settings *dhcpset;
 	struct dhcphdr *dhcphdr;
 	uint8_t msgtype = 0;
-	uint8_t priority = 0;
-	uint8_t existing_priority = 0;
-	unsigned long elapsed;
-	int is_proxy;
-	uint8_t ignore_proxy = 0;
-	int rc;
 
 	/* Convert packet into a DHCP settings block */
-	response = dhcpset_create ( data, len );
-	if ( ! response ) {
+	dhcpset = dhcpset_create ( data, len );
+	if ( ! dhcpset ) {
 		DBGC ( dhcp, "DHCP %p could not store DHCP packet\n", dhcp );
 		return -ENOMEM;
 	}
-	dhcphdr = response->dhcppkt.dhcphdr;
+	dhcphdr = dhcpset->dhcppkt.dhcphdr;
+
+	/* Identify message type */
+	dhcppkt_fetch ( &dhcpset->dhcppkt, DHCP_MESSAGE_TYPE, &msgtype,
+			sizeof ( msgtype ) );
+	DBGC ( dhcp, "DHCP %p received %s %p\n",
+	       dhcp, dhcp_msgtype_name ( msgtype ), dhcpset );
 
 	/* Check for matching transaction ID */
 	if ( dhcphdr->xid != dhcp_xid ( dhcp->netdev ) ) {
-		DBGC ( dhcp, "DHCP %p wrong transaction ID (wanted %08lx, "
-			"got %08lx)\n", dhcp, ntohl ( dhcphdr->xid ),
-			ntohl ( dhcp_xid ( dhcp->netdev ) ) );
-		goto out_discard;
-	};	
-
-	/* Determine and verify message type */
-	is_proxy = ( dhcphdr->yiaddr.s_addr == 0 );
-	dhcppkt_fetch ( &response->dhcppkt, DHCP_MESSAGE_TYPE, &msgtype,
-			sizeof ( msgtype ) );
-	DBGC ( dhcp, "DHCP %p received %s%s\n", dhcp,
-	       ( is_proxy ? "Proxy" : "" ), dhcp_msgtype_name ( msgtype ) );
-	if ( ( ( dhcp->state != DHCPDISCOVER ) || ( msgtype != DHCPOFFER ) ) &&
-	     ( ( dhcp->state != DHCPREQUEST ) || ( msgtype != DHCPACK ) ) ) {
-		DBGC ( dhcp, "DHCP %p discarding %s while in %s state\n",
-		       dhcp, dhcp_msgtype_name ( msgtype ),
-		       dhcp_msgtype_name ( dhcp->state ) );
-		goto out_discard;
-	}
-
-	/* Update stored standard/ProxyDHCP options, if the new
-	 * options have equal or higher priority than the
-	 * currently-stored options.
-	 */
-	store_response = ( is_proxy ? &dhcp->proxy_response : &dhcp->response);
-	if ( *store_response ) {
-		dhcppkt_fetch ( &(*store_response)->dhcppkt, DHCP_EB_PRIORITY,
-				&existing_priority,
-				sizeof ( existing_priority ) );
-	}
-	dhcppkt_fetch ( &response->dhcppkt, DHCP_EB_PRIORITY, &priority,
-			sizeof ( priority ) );
-	if ( priority >= existing_priority ) {
-		dhcpset_put ( *store_response );
-		*store_response = response;
-	} else {
-		dhcpset_put ( response );
-	}
-
-	/* If we don't yet have a standard DHCP response (i.e. one
-	 * with an IP address), then just leave the timer running.
-	 */
-	if ( ! dhcp->response )
+		DBGC ( dhcp, "DHCP %p received %s %p has bad transaction ID\n",
+		       dhcp, dhcp_msgtype_name ( msgtype ), dhcpset );
 		goto out;
+	};
 
-	/* Handle DHCP response */
-	dhcppkt_fetch ( &dhcp->response->dhcppkt, DHCP_EB_NO_PROXYDHCP,
-			&ignore_proxy, sizeof ( ignore_proxy ) );
+	/* Handle packet based on current state */
 	switch ( dhcp->state ) {
-	case DHCPDISCOVER:
-		/* If we have allowed sufficient time for ProxyDHCP
-		 * reponses, then transition to making the DHCPREQUEST.
-		 */
-		elapsed = ( currticks() - dhcp->start );
-		if ( ignore_proxy || ( elapsed > PROXYDHCP_WAIT_TIME ) ) {
-			stop_timer ( &dhcp->timer );
-			dhcp->state = DHCPREQUEST;
-			dhcp_send_request ( dhcp );
-		}
+	case DHCP_STATE_DISCOVER:
+		if ( msgtype == DHCPOFFER )
+			dhcp_rx_dhcpoffer ( dhcp, dhcpset );
 		break;
-	case DHCPREQUEST:
-		/* DHCP finished; register options and exit */
-		if ( ignore_proxy && dhcp->proxy_response ) {
-			dhcpset_put ( dhcp->proxy_response );
-			dhcp->proxy_response = NULL;
-		}
-		if ( ( rc = dhcp_register_settings ( dhcp ) ) != 0 ) {
-			dhcp_finished ( dhcp, rc );
-			break;
-		}
-		dhcp_finished ( dhcp, 0 );
+	case DHCP_STATE_REQUEST:
+		if ( msgtype == DHCPACK )
+			dhcp_rx_dhcpack ( dhcp, dhcpset );
+		break;
+	case DHCP_STATE_PROXYREQUEST:
+		if ( msgtype == DHCPACK )
+			dhcp_rx_proxydhcpack ( dhcp, dhcpset );
 		break;
 	default:
 		assert ( 0 );
+		break;
 	}
 
  out:
-	return 0;
-
- out_discard:
-	dhcpset_put ( response );
+	dhcpset_put ( dhcpset );
 	return 0;
 }
 
@@ -734,6 +904,38 @@ static struct xfer_interface_operations dhcp_xfer_operations = {
 	.deliver_iob	= xfer_deliver_as_raw,
 	.deliver_raw	= dhcp_deliver_raw,
 };
+
+/**
+ * Handle DHCP retry timer expiry
+ *
+ * @v timer		DHCP retry timer
+ * @v fail		Failure indicator
+ */
+static void dhcp_timer_expired ( struct retry_timer *timer, int fail ) {
+	struct dhcp_session *dhcp =
+		container_of ( timer, struct dhcp_session, timer );
+	unsigned long elapsed = ( currticks() - dhcp->start );
+
+	/* If we have failed, terminate DHCP */
+	if ( fail ) {
+		dhcp_finished ( dhcp, -ETIMEDOUT );
+		return;
+	}
+
+	/* Give up waiting for ProxyDHCP before we reach the failure point */
+	if ( elapsed > PROXYDHCP_WAIT_TIME ) {
+		if ( dhcp->state == DHCP_STATE_DISCOVER ) {
+			dhcp_set_state ( dhcp, DHCP_STATE_REQUEST );
+			return;
+		} else if ( dhcp->state == DHCP_STATE_PROXYREQUEST ) {
+			dhcp_finished ( dhcp, 0 );
+			return;
+		}
+	}
+
+	/* Otherwise, retransmit current packet */
+	dhcp_tx ( dhcp );
+}
 
 /****************************************************************************
  *
@@ -801,7 +1003,6 @@ int start_dhcp ( struct job_interface *job, struct net_device *netdev ) {
 	xfer_init ( &dhcp->xfer, &dhcp_xfer_operations, &dhcp->refcnt );
 	dhcp->netdev = netdev_get ( netdev );
 	dhcp->timer.expired = dhcp_timer_expired;
-	dhcp->state = DHCPDISCOVER;
 	dhcp->start = currticks();
 
 	/* Instantiate child objects and attach to our interfaces */

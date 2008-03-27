@@ -108,9 +108,10 @@ static int copy_settings ( struct dhcp_packet *dest,
 int create_fakedhcpdiscover ( struct net_device *netdev,
 			      void *data, size_t max_len ) {
 	struct dhcp_packet dhcppkt;
+	struct in_addr ciaddr = { 0 };
 	int rc;
 
-	if ( ( rc = create_dhcp_request ( &dhcppkt, netdev, NULL, data,
+	if ( ( rc = dhcp_create_request ( &dhcppkt, netdev, ciaddr, NULL, data,
 					  max_len ) ) != 0 ) {
 		DBG ( "Could not create DHCPDISCOVER: %s\n",
 		      strerror ( rc ) );
@@ -136,7 +137,7 @@ int create_fakedhcpack ( struct net_device *netdev,
 	int rc;
 
 	/* Create base DHCPACK packet */
-	if ( ( rc = create_dhcp_packet ( &dhcppkt, netdev, DHCPACK, NULL,
+	if ( ( rc = dhcp_create_packet ( &dhcppkt, netdev, DHCPACK, NULL,
 					 data, max_len ) ) != 0 ) {
 		DBG ( "Could not create DHCPACK: %s\n", strerror ( rc ) );
 		return rc;
@@ -187,7 +188,7 @@ int create_fakeproxydhcpack ( struct net_device *netdev,
 	}
 
 	/* Create base DHCPACK packet */
-	if ( ( rc = create_dhcp_packet ( &dhcppkt, netdev, DHCPACK, NULL,
+	if ( ( rc = dhcp_create_packet ( &dhcppkt, netdev, DHCPACK, NULL,
 					 data, max_len ) ) != 0 ) {
 		DBG ( "Could not create ProxyDHCPACK: %s\n",
 		      strerror ( rc ) );
