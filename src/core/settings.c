@@ -27,6 +27,7 @@
 #include <gpxe/in.h>
 #include <gpxe/vsprintf.h>
 #include <gpxe/dhcp.h>
+#include <gpxe/uuid.h>
 #include <gpxe/settings.h>
 
 /** @file
@@ -488,6 +489,26 @@ unsigned long fetch_uintz_setting ( struct settings *settings,
 }
 
 /**
+ * Fetch value of UUID setting
+ *
+ * @v settings		Settings block, or NULL to search all blocks
+ * @v setting		Setting to fetch
+ * @v uuid		UUID to fill in
+ * @ret len		Length of setting, or negative error
+ */
+int fetch_uuid_setting ( struct settings *settings, struct setting *setting,
+			 union uuid *uuid ) {
+	int len;
+
+	len = fetch_setting ( settings, setting, uuid, sizeof ( *uuid ) );
+	if ( len < 0 )
+		return len;
+	if ( len != sizeof ( *uuid ) )
+		return -ERANGE;
+	return len;
+}
+
+/**
  * Compare two settings
  *
  * @v a			Setting to compare
@@ -752,11 +773,11 @@ static int storef_ipv4 ( struct settings *settings, struct setting *setting,
 static int fetchf_ipv4 ( struct settings *settings, struct setting *setting,
 			 char *buf, size_t len ) {
 	struct in_addr ipv4;
-	int rc;
+	int raw_len;
 
-	if ( ( rc = fetch_ipv4_setting ( settings, setting, &ipv4 ) ) < 0 )
-		return rc;
-	return snprintf ( buf, len, inet_ntoa ( ipv4 ) );
+	if ( ( raw_len = fetch_ipv4_setting ( settings, setting, &ipv4 ) ) < 0)
+		return raw_len;
+	return snprintf ( buf, len, "%s", inet_ntoa ( ipv4 ) );
 }
 
 /** An IPv4 address setting type */
@@ -983,6 +1004,46 @@ struct setting_type setting_type_hex __setting_type = {
 	.name = "hex",
 	.storef = storef_hex,
 	.fetchf = fetchf_hex,
+};
+
+/**
+ * Parse and store value of UUID setting
+ *
+ * @v settings		Settings block
+ * @v setting		Setting to store
+ * @v value		Formatted setting data
+ * @ret rc		Return status code
+ */
+static int storef_uuid ( struct settings *settings __unused,
+			 struct setting *setting __unused,
+			 const char *value __unused ) {
+	return -ENOTSUP;
+}
+
+/**
+ * Fetch and format value of UUID setting
+ *
+ * @v settings		Settings block, or NULL to search all blocks
+ * @v setting		Setting to fetch
+ * @v buf		Buffer to contain formatted value
+ * @v len		Length of buffer
+ * @ret len		Length of formatted value, or negative error
+ */
+static int fetchf_uuid ( struct settings *settings, struct setting *setting,
+			 char *buf, size_t len ) {
+	union uuid uuid;
+	int raw_len;
+
+	if ( ( raw_len = fetch_uuid_setting ( settings, setting, &uuid ) ) < 0)
+		return raw_len;
+	return snprintf ( buf, len, "%s", uuid_ntoa ( &uuid ) );
+}
+
+/** UUID setting type */
+struct setting_type setting_type_uuid __setting_type = {
+	.name = "uuid",
+	.storef = storef_uuid,
+	.fetchf = fetchf_uuid,
 };
 
 /******************************************************************************

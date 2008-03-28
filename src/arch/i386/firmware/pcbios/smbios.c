@@ -18,10 +18,9 @@
 
 #include <stdint.h>
 #include <string.h>
-#include <stdio.h>
 #include <errno.h>
+#include <assert.h>
 #include <gpxe/uaccess.h>
-#include <gpxe/uuid.h>
 #include <realmode.h>
 #include <pnpbios.h>
 #include <smbios.h>
@@ -51,7 +50,7 @@ struct smbios_entry {
 	/** Checksum */
 	uint8_t checksum;
 	/** Length */
-	uint8_t length;
+	uint8_t len;
 	/** Major version */
 	uint8_t major;
 	/** Minor version */
@@ -67,7 +66,7 @@ struct smbios_entry {
 	/** DMI checksum */
 	uint8_t dmi_checksum;
 	/** Structure table length */
-	uint16_t smbios_length;
+	uint16_t smbios_len;
 	/** Structure table address */
 	physaddr_t smbios_address;
 	/** Number of SMBIOS structures */
@@ -86,49 +85,37 @@ struct smbios {
 	/** Start of SMBIOS structures */
 	userptr_t address;
 	/** Length of SMBIOS structures */ 
-	size_t length;
+	size_t len;
 	/** Number of SMBIOS structures */
 	unsigned int count;
 };
 
-/**
- * SMBIOS strings descriptor
- *
- * This is returned as part of the search for an SMBIOS structure, and
- * contains the information needed for extracting the strings within
- * the "unformatted" portion of the structure.
- */
-struct smbios_strings {
-	/** Start of strings data */
-	userptr_t data;
-	/** Length of strings data */
-	size_t length;
+/** SMBIOS entry point descriptor */
+static struct smbios smbios = {
+	.address = UNULL,
 };
 
 /**
  * Find SMBIOS
  *
- * @ret smbios		SMBIOS entry point descriptor, or NULL if not found
+ * @ret rc		Return status code
  */
-static struct smbios * find_smbios ( void ) {
-	static struct smbios smbios = {
-		.address = UNULL,
-	};
+static int find_smbios ( void ) {
 	union {
 		struct smbios_entry entry;
 		uint8_t bytes[256]; /* 256 is maximum length possible */
 	} u;
-	unsigned int offset;
+	static unsigned int offset = 0;
 	size_t len;
 	unsigned int i;
 	uint8_t sum;
 
-	/* Return cached result if available */
+	/* Return cached result if avaiable */
 	if ( smbios.address != UNULL )
-		return &smbios;
+		return 0;
 
 	/* Try to find SMBIOS */
-	for ( offset = 0 ; offset < 0x10000 ; offset += 0x10 ) {
+	for ( ; offset < 0x10000 ; offset += 0x10 ) {
 
 		/* Read start of header and verify signature */
 		copy_from_real ( &u.entry, BIOS_SEG, offset,
@@ -137,7 +124,7 @@ static struct smbios * find_smbios ( void ) {
 			continue;
 
 		/* Read whole header and verify checksum */
-		len = u.entry.length;
+		len = u.entry.len;
 		copy_from_real ( &u.bytes, BIOS_SEG, offset, len );
 		for ( i = 0 , sum = 0 ; i < len ; i++ ) {
 			sum += u.bytes[i];
@@ -152,29 +139,27 @@ static struct smbios * find_smbios ( void ) {
 		DBG ( "Found SMBIOS entry point at %04x:%04x\n",
 		      BIOS_SEG, offset );
 		smbios.address = phys_to_user ( u.entry.smbios_address );
-		smbios.length = u.entry.smbios_length;
+		smbios.len = u.entry.smbios_len;
 		smbios.count = u.entry.smbios_count;
-		return &smbios;
+		return 0;
 	}
 
 	DBG ( "No SMBIOS found\n" );
-	return NULL;
+	return -ENODEV;
 }
 
 /**
  * Find SMBIOS strings terminator
  *
- * @v smbios		SMBIOS entry point descriptor
  * @v offset		Offset to start of strings
  * @ret offset		Offset to strings terminator, or 0 if not found
  */
-static size_t find_strings_terminator ( struct smbios *smbios,
-					size_t offset ) {
-	size_t max_offset = ( smbios->length - 2 );
+static size_t find_strings_terminator ( size_t offset ) {
+	size_t max_offset = ( smbios.len - 2 );
 	uint16_t nulnul;
 
 	for ( ; offset <= max_offset ; offset++ ) {
-		copy_from_user ( &nulnul, smbios->address, offset, 2 );
+		copy_from_user ( &nulnul, smbios.address, offset, 2 );
 		if ( nulnul == 0 )
 			return ( offset + 1 );
 	}
@@ -185,66 +170,52 @@ static size_t find_strings_terminator ( struct smbios *smbios,
  * Find specific structure type within SMBIOS
  *
  * @v type		Structure type to search for
- * @v structure		Buffer to fill in with structure
- * @v length		Length of buffer
- * @v strings		Strings descriptor to fill in, or NULL
+ * @v structure		SMBIOS structure descriptor to fill in
  * @ret rc		Return status code
  */
-int find_smbios_structure ( unsigned int type, void *structure,
-			    size_t length, struct smbios_strings *strings ) {
-	struct smbios *smbios;
-	struct smbios_header header;
-	struct smbios_strings temp_strings;
+int find_smbios_structure ( unsigned int type,
+			    struct smbios_structure *structure ) {
 	unsigned int count = 0;
 	size_t offset = 0;
 	size_t strings_offset;
 	size_t terminator_offset;
+	int rc;
 
-	/* Locate SMBIOS entry point */
-	if ( ! ( smbios = find_smbios() ) )
-		return -ENOENT;
-
-	/* Ensure that we have a usable strings descriptor buffer */
-	if ( ! strings )
-		strings = &temp_strings;
+	/* Find SMBIOS */
+	if ( ( rc = find_smbios() ) != 0 )
+		return rc;
 
 	/* Scan through list of structures */
-	while ( ( ( offset + sizeof ( header ) ) < smbios->length ) &&
-		( count < smbios->count ) ) {
+	while ( ( ( offset + sizeof ( structure->header ) ) < smbios.len )
+		&& ( count < smbios.count ) ) {
 
 		/* Read next SMBIOS structure header */
-		copy_from_user ( &header, smbios->address, offset,
-				 sizeof ( header ) );
+		copy_from_user ( &structure->header, smbios.address, offset,
+				 sizeof ( structure->header ) );
 
 		/* Determine start and extent of strings block */
-		strings_offset = ( offset + header.length );
-		if ( strings_offset > smbios->length ) {
+		strings_offset = ( offset + structure->header.len );
+		if ( strings_offset > smbios.len ) {
 			DBG ( "SMBIOS structure at offset %zx with length "
 			      "%x extends beyond SMBIOS\n", offset,
-			      header.length );
+			      structure->header.len );
 			return -ENOENT;
 		}
-		terminator_offset =
-			find_strings_terminator ( smbios, strings_offset );
+		terminator_offset = find_strings_terminator ( strings_offset );
 		if ( ! terminator_offset ) {
 			DBG ( "SMBIOS structure at offset %zx has "
 			      "unterminated strings section\n", offset );
 			return -ENOENT;
 		}
-		strings->data = userptr_add ( smbios->address,
-					      strings_offset );
-		strings->length = ( terminator_offset - strings_offset );
+		structure->strings_len = ( terminator_offset - strings_offset);
 
-		DBG ( "SMBIOS structure at offset %zx has type %d, "
-		      "length %x, strings length %zx\n",
-		      offset, header.type, header.length, strings->length );
+		DBG ( "SMBIOS structure at offset %zx has type %d, length %x, "
+		      "strings length %zx\n", offset, structure->header.type,
+		      structure->header.len, structure->strings_len );
 
 		/* If this is the structure we want, return */
-		if ( header.type == type ) {
-			if ( length > header.length )
-				length = header.length;
-			copy_from_user ( structure, smbios->address,
-					 offset, length );
+		if ( structure->header.type == type ) {
+			structure->offset = offset;
 			return 0;
 		}
 
@@ -258,66 +229,64 @@ int find_smbios_structure ( unsigned int type, void *structure,
 }
 
 /**
- * Find indexed string within SMBIOS structure
+ * Copy SMBIOS structure
  *
- * @v strings		SMBIOS strings descriptor
- * @v index		String index
- * @v buffer		Buffer for string
- * @v length		Length of string buffer
+ * @v structure		SMBIOS structure descriptor
+ * @v data		Buffer to hold SMBIOS structure
+ * @v len		Length of buffer
  * @ret rc		Return status code
  */
-int find_smbios_string ( struct smbios_strings *strings, unsigned int index,
-			 char *buffer, size_t length ) {
-	size_t offset = 0;
+int read_smbios_structure ( struct smbios_structure *structure,
+			    void *data, size_t len ) {
+
+	assert ( smbios.address != UNULL );
+
+	if ( len > structure->header.len )
+		len = structure->header.len;
+	copy_from_user ( data, smbios.address, structure->offset, len );
+	return 0;
+}
+
+/**
+ * Find indexed string within SMBIOS structure
+ *
+ * @v structure		SMBIOS structure descriptor
+ * @v index		String index
+ * @v data		Buffer for string
+ * @v len		Length of string buffer
+ * @ret rc		Length of string, or negative error
+ */
+int read_smbios_string ( struct smbios_structure *structure,
+			 unsigned int index, void *data, size_t len ) {
+	size_t strings_start = ( structure->offset + structure->header.len );
+	size_t strings_end = ( strings_start + structure->strings_len );
+	size_t offset;
 	size_t string_len;
 
-	/* Zero buffer.  This ensures that a valid NUL terminator is
-	 * always present (unless length==0).
-	 */
-	memset ( buffer, 0, length );
-	   
+	assert ( smbios.address != UNULL );
+
 	/* String numbers start at 1 (0 is used to indicate "no string") */
 	if ( ! index )
-		return 0;
+		return -ENOENT;
 
-	while ( offset < strings->length ) {
+	for ( offset = strings_start ; offset < strings_end ;
+	      offset += ( string_len + 1 ) ) {
 		/* Get string length.  This is known safe, since the
 		 * smbios_strings struct is constructed so as to
 		 * always end on a string boundary.
 		 */
-		string_len = strlen_user ( strings->data, offset );
+		string_len = strlen_user ( smbios.address,
+					   ( structure->offset + offset ) );
 		if ( --index == 0 ) {
 			/* Copy string, truncating as necessary. */
-			if ( string_len >= length )
-				string_len = ( length - 1 );
-			copy_from_user ( buffer, strings->data,
-					 offset, string_len );
-			return 0;
+			if ( len > string_len )
+				len = string_len;
+			copy_from_user ( data, smbios.address,
+					 ( structure->offset + offset ), len );
+			return string_len;
 		}
-		offset += ( string_len + 1 );
 	}
 
 	DBG ( "SMBIOS string index %d not found\n", index );
 	return -ENOENT;
-}
-
-/**
- * Get UUID from SMBIOS
- *
- * @v uuid		UUID to fill in
- * @ret rc		Return status code
- */
-int smbios_get_uuid ( union uuid *uuid ) {
-	struct smbios_system_information sysinfo;
-	int rc;
-
-	if ( ( rc = find_smbios_structure ( SMBIOS_TYPE_SYSTEM_INFORMATION,
-					    &sysinfo, sizeof ( sysinfo ),
-					    NULL ) ) != 0 )
-		return rc;
-
-	memcpy ( uuid, sysinfo.uuid, sizeof ( *uuid ) );
-	DBG ( "SMBIOS found UUID %s\n", uuid_ntoa ( uuid ) );
-
-	return 0;
 }

@@ -15,6 +15,7 @@
 
 struct settings;
 struct in_addr;
+union uuid;
 
 /** A setting */
 struct setting {
@@ -177,6 +178,8 @@ extern long fetch_intz_setting ( struct settings *settings,
 				 struct setting *setting );
 extern unsigned long fetch_uintz_setting ( struct settings *settings,
 					   struct setting *setting );
+extern int fetch_uuid_setting ( struct settings *settings,
+				struct setting *setting, union uuid *uuid );
 extern int setting_cmp ( struct setting *a, struct setting *b );
 
 extern struct settings * find_child_settings ( struct settings *parent,
@@ -198,6 +201,7 @@ extern struct setting_type setting_type_uint8 __setting_type;
 extern struct setting_type setting_type_uint16 __setting_type;
 extern struct setting_type setting_type_uint32 __setting_type;
 extern struct setting_type setting_type_hex __setting_type;
+extern struct setting_type setting_type_uuid __setting_type;
 
 extern struct setting ip_setting __setting;
 extern struct setting netmask_setting __setting;
@@ -210,6 +214,7 @@ extern struct setting username_setting __setting;
 extern struct setting password_setting __setting;
 extern struct setting priority_setting __setting;
 extern struct setting bios_drive_setting __setting;
+extern struct setting uuid_setting __setting;
 
 /**
  * Initialise a settings block

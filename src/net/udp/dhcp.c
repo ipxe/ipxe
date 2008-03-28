@@ -214,7 +214,7 @@ static int dhcpset_store ( struct settings *settings, struct setting *setting,
 }
 
 /**
- * Fetch value of setting
+ * Fetch value of DHCP setting
  *
  * @v settings		Settings block, or NULL to search all blocks
  * @v setting		Setting to fetch
@@ -517,7 +517,8 @@ int dhcp_create_request ( struct dhcp_packet *dhcppkt,
 
 	/* Add client UUID, if we have one.  Required for PXE. */
 	client_uuid.type = DHCP_CLIENT_UUID_TYPE;
-	if ( ( rc = get_uuid ( &client_uuid.uuid ) ) == 0 ) {
+	if ( ( rc = fetch_uuid_setting ( NULL, &uuid_setting,
+					 &client_uuid.uuid ) ) >= 0 ) {
 		if ( ( rc = dhcppkt_store ( dhcppkt, DHCP_CLIENT_UUID,
 					    &client_uuid,
 					    sizeof ( client_uuid ) ) ) != 0 ) {

@@ -13,10 +13,20 @@ struct smbios_header {
 	/** Type */
 	uint8_t type;
 	/** Length */
-	uint8_t length;
+	uint8_t len;
 	/** Handle */
 	uint16_t handle;
 } __attribute__ (( packed ));
+
+/** SMBIOS structure descriptor */
+struct smbios_structure {
+	/** Copy of SMBIOS structure header */
+	struct smbios_header header;
+	/** Offset of structure within SMBIOS */
+	size_t offset;
+	/** Length of strings section */
+	size_t strings_len;
+};
 
 /** SMBIOS system information structure */
 struct smbios_system_information {
@@ -39,13 +49,12 @@ struct smbios_system_information {
 /** SMBIOS system information structure type */
 #define SMBIOS_TYPE_SYSTEM_INFORMATION 1
 
-struct smbios_strings;
 extern int find_smbios_structure ( unsigned int type,
-				   void *structure, size_t length,
-				   struct smbios_strings *strings );
-extern int find_smbios_string ( struct smbios_strings *strings,
+				   struct smbios_structure *structure );
+extern int read_smbios_structure ( struct smbios_structure *structure,
+				   void *data, size_t len );
+extern int read_smbios_string ( struct smbios_structure *structure,
 				unsigned int index,
-				char *buffer, size_t length );
-extern int smbios_get_uuid ( union uuid *uuid );
+				void *data, size_t len );
 
 #endif /* _SMBIOS_H */
