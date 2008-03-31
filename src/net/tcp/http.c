@@ -393,7 +393,7 @@ static void http_step ( struct process *process ) {
 	if ( xfer_window ( &http->socket ) ) {
 		process_del ( &http->process );
 		if ( ( rc = xfer_printf ( &http->socket,
-					  "GET %s%s%s HTTP/1.1\r\n"
+					  "GET %s%s%s HTTP/1.0\r\n"
 					  "User-Agent: gPXE/" VERSION "\r\n"
 					  "Host: %s\r\n"
 					  "\r\n",
