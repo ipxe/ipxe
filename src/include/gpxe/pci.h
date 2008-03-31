@@ -30,7 +30,10 @@
 #define PCI_COMMAND_IO			0x1	/* Enable response in I/O space */
 #define PCI_COMMAND_MEM			0x2	/* Enable response in mem space */
 #define PCI_COMMAND_MASTER		0x4	/* Enable bus mastering */
+
+#define PCI_CACHE_LINE_SIZE		0x0c	/* 8 bits */
 #define PCI_LATENCY_TIMER		0x0d	/* 8 bits */
+
 #define PCI_COMMAND_SPECIAL		0x8	/* Enable response to special cycles */
 #define PCI_COMMAND_INVALIDATE		0x10	/* Use memory write and invalidate */
 #define  PCI_COMMAND_VGA_PALETTE 0x20	/* Enable palette snooping */
