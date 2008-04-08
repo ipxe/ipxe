@@ -84,6 +84,14 @@ int pxe_load ( struct image *image ) {
 	size_t memsz = image->len;
 	int rc;
 
+	/* Images too large to fit in base memory cannot be PXE
+	 * images.  We include this check to help prevent unrecognised
+	 * images from being marked as PXE images, since PXE images
+	 * have no signature we can check against.
+	 */
+	if ( filesz > ( 0xa0000 - 0x7c00 ) )
+		return -ENOEXEC;
+
 	/* There are no signature checks for PXE; we will accept anything */
 	if ( ! image->type )
 		image->type = &pxe_image_type;

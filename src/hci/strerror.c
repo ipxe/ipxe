@@ -118,4 +118,5 @@ struct errortab common_errors[] __errortab = {
 	{ ETIMEDOUT, "Connection timed out" },
 	{ EPIPE, "Broken pipe" },
 	{ ECANCELED, "Operation cancelled" },
+	{ ENOEXEC, "Not an executable image" },
 };
