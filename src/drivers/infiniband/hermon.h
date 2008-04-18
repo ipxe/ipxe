@@ -44,6 +44,7 @@
 #define HERMON_HCR_MAP_EQ		0x0012
 #define HERMON_HCR_SW2HW_EQ		0x0013
 #define HERMON_HCR_HW2SW_EQ		0x0014
+#define HERMON_HCR_QUERY_EQ		0x0015
 #define HERMON_HCR_SW2HW_CQ		0x0016
 #define HERMON_HCR_HW2SW_CQ		0x0017
 #define HERMON_HCR_RST2INIT_QP		0x0019
@@ -77,12 +78,13 @@
 #define HERMON_PAGE_SIZE		4096
 
 #define HERMON_DB_POST_SND_OFFSET	0x14
-#define HERMON_DB_EQ0_OFFSET		0x800
+#define HERMON_DB_EQ_OFFSET(_eqn)	\
+	( 0x800 + HERMON_PAGE_SIZE * ( (_eqn) / 4 ) + 0x08 * ( (_eqn) % 4 ) )
 
 #define HERMON_QP_OPT_PARAM_QKEY	0x00000020UL
 
-#define HERMON_MAP_EQ_MAP		( 0UL << 31 )
-#define HERMON_MAP_EQ_UNMAP		( 1UL << 31 )
+#define HERMON_MAP_EQ			( 0UL << 31 )
+#define HERMON_UNMAP_EQ			( 1UL << 31 )
 
 #define HERMON_EV_PORT_STATE_CHANGE	0x09
 
@@ -292,7 +294,7 @@ enum hermon_icm_map_regions {
  * Pages 0-127 are reserved for event queue doorbells only, so we use
  * page 128.
  */
-#define HERMON_UAR_PAGE		128
+#define HERMON_UAR_NON_EQ_PAGE	128
 
 /** Maximum number of allocatable MTT entries
  *
@@ -334,6 +336,8 @@ struct hermon_send_work_queue {
 	union hermon_send_wqe *wqe;
 	/** Size of work queue */
 	size_t wqe_size;
+	/** Doorbell register */
+	void *doorbell;
 };
 
 /** Alignment of Hermon receive work queue entries */
@@ -400,7 +404,7 @@ struct hermon_completion_queue {
  *
  * This is a policy decision, not a device limit.
  */
-#define HERMON_MAX_EQS		4
+#define HERMON_MAX_EQS		8
 
 /** A Hermon event queue */
 struct hermon_event_queue {
@@ -410,8 +414,12 @@ struct hermon_event_queue {
 	size_t eqe_size;
 	/** MTT descriptor */
 	struct hermon_mtt mtt;
+	/** Event queue number */
+	unsigned long eqn;
 	/** Next event queue entry index */
 	unsigned long next_idx;
+	/** Doorbell register */
+	void *doorbell;
 };
 
 /** Number of event queue entries

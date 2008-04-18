@@ -345,6 +345,15 @@ hermon_cmd_hw2sw_eq ( struct hermon *hermon, unsigned int index,
 }
 
 static inline int
+hermon_cmd_query_eq ( struct hermon *hermon, unsigned int index,
+		      struct hermonprm_eqc *eqctx ) {
+	return hermon_cmd ( hermon,
+			    HERMON_HCR_OUT_CMD ( HERMON_HCR_QUERY_EQ,
+						 1, sizeof ( *eqctx ) ),
+			    0, NULL, index, eqctx );
+}
+
+static inline int
 hermon_cmd_sw2hw_cq ( struct hermon *hermon, unsigned long cqn,
 		      const struct hermonprm_completion_queue_context *cqctx ){
 	return hermon_cmd ( hermon,
@@ -667,7 +676,7 @@ static int hermon_create_cq ( struct ib_device *ibdev,
 	MLX_FILL_1 ( &cqctx, 2,
 		     page_offset, ( hermon_cq->mtt.page_offset >> 5 ) );
 	MLX_FILL_2 ( &cqctx, 3,
-		     usr_page, HERMON_UAR_PAGE,
+		     usr_page, HERMON_UAR_NON_EQ_PAGE,
 		     log_cq_size, fls ( cq->num_cqes - 1 ) );
 	MLX_FILL_1 ( &cqctx, 7, mtt_base_addr_l,
 		     ( hermon_cq->mtt.mtt_base_addr >> 3 ) );
@@ -773,6 +782,11 @@ static int hermon_create_qp ( struct ib_device *ibdev,
 		goto err_hermon_qp;
 	}
 
+	/* Calculate doorbell address */
+	hermon_qp->send.doorbell =
+		( hermon->uar + HERMON_UAR_NON_EQ_PAGE * HERMON_PAGE_SIZE +
+		  HERMON_DB_POST_SND_OFFSET );
+
 	/* Allocate work queue buffer */
 	hermon_qp->send.num_wqes = ( qp->send.num_wqes /* headroom */ + 1 +
 				( 2048 / sizeof ( hermon_qp->send.wqe[0] ) ) );
@@ -817,7 +831,7 @@ static int hermon_create_qp ( struct ib_device *ibdev,
 		     qpc_eec_data.log_sq_stride,
 		     ( fls ( sizeof ( hermon_qp->send.wqe[0] ) - 1 ) - 4 ) );
 	MLX_FILL_1 ( &qpctx, 5,
-		     qpc_eec_data.usr_page, HERMON_UAR_PAGE );
+		     qpc_eec_data.usr_page, HERMON_UAR_NON_EQ_PAGE );
 	MLX_FILL_1 ( &qpctx, 33, qpc_eec_data.cqn_snd, qp->send.cq->cqn );
 	MLX_FILL_1 ( &qpctx, 38, qpc_eec_data.page_offset,
 		     ( hermon_qp->mtt.page_offset >> 6 ) );
@@ -1029,9 +1043,8 @@ static int hermon_post_send ( struct ib_device *ibdev,
 	/* Ring doorbell register */
 	MLX_FILL_1 ( &db_reg.send, 0, qn, qp->qpn );
 	DBGCP ( hermon, "Ringing doorbell %08lx with %08lx\n",
-		virt_to_phys ( hermon->uar + HERMON_DB_POST_SND_OFFSET ),
-		db_reg.dword[0] );
-	writel ( db_reg.dword[0], ( hermon->uar + HERMON_DB_POST_SND_OFFSET ));
+		virt_to_phys ( hermon_send_wq->doorbell ), db_reg.dword[0] );
+	writel ( db_reg.dword[0], ( hermon_send_wq->doorbell ) );
 
 	/* Update work queue's index */
 	wq->next_idx++;
@@ -1209,7 +1222,7 @@ static void hermon_poll_cq ( struct ib_device *ibdev,
 
 		/* Update doorbell record */
 		MLX_FILL_1 ( &hermon_cq->doorbell, 0, update_ci,
-			     ( cq->next_idx & 0xffffffUL ) );
+			     ( cq->next_idx & 0x00ffffffUL ) );
 	}
 }
 
@@ -1442,6 +1455,15 @@ static int hermon_create_eq ( struct hermon *hermon ) {
 	unsigned int i;
 	int rc;
 
+	/* Select event queue number */
+	hermon_eq->eqn = ( 4 * hermon->cap.reserved_uars );
+	if ( hermon_eq->eqn < hermon->cap.reserved_eqs )
+		hermon_eq->eqn = hermon->cap.reserved_eqs;
+
+	/* Calculate doorbell address */
+	hermon_eq->doorbell =
+		( hermon->uar + HERMON_DB_EQ_OFFSET ( hermon_eq->eqn ) );
+
 	/* Allocate event queue itself */
 	hermon_eq->eqe_size =
 		( HERMON_NUM_EQES * sizeof ( hermon_eq->eqe[0] ) );
@@ -1471,7 +1493,8 @@ static int hermon_create_eq ( struct hermon *hermon ) {
 	MLX_FILL_1 ( &eqctx, 3, log_eq_size, fls ( HERMON_NUM_EQES - 1 ) );
 	MLX_FILL_1 ( &eqctx, 7, mtt_base_addr_l,
 		     ( hermon_eq->mtt.mtt_base_addr >> 3 ) );
-	if ( ( rc = hermon_cmd_sw2hw_eq ( hermon, 0, &eqctx ) ) != 0 ) {
+	if ( ( rc = hermon_cmd_sw2hw_eq ( hermon, hermon_eq->eqn,
+					  &eqctx ) ) != 0 ) {
 		DBGC ( hermon, "Hermon %p SW2HW_EQ failed: %s\n",
 		       hermon, strerror ( rc ) );
 		goto err_sw2hw_eq;
@@ -1480,17 +1503,21 @@ static int hermon_create_eq ( struct hermon *hermon ) {
 	/* Map events to this event queue */
 	memset ( &mask, 0, sizeof ( mask ) );
 	MLX_FILL_1 ( &mask, 1, port_state_change, 1 );
-	if ( ( rc = hermon_cmd_map_eq ( hermon, ( HERMON_MAP_EQ_MAP | 0 ),
+	if ( ( rc = hermon_cmd_map_eq ( hermon,
+					( HERMON_MAP_EQ | hermon_eq->eqn ),
 					&mask ) ) != 0 ) {
 		DBGC ( hermon, "Hermon %p MAP_EQ failed: %s\n",
 		       hermon, strerror ( rc )  );
 		goto err_map_eq;
 	}
 
+	DBGC ( hermon, "Hermon %p EQN %#lx ring at [%p,%p])\n",
+	       hermon, hermon_eq->eqn, hermon_eq->eqe,
+	       ( ( ( void * ) hermon_eq->eqe ) + hermon_eq->eqe_size ) );
 	return 0;
 
  err_map_eq:
-	hermon_cmd_hw2sw_eq ( hermon, 0, &eqctx );
+	hermon_cmd_hw2sw_eq ( hermon, hermon_eq->eqn, &eqctx );
  err_sw2hw_eq:
 	hermon_free_mtt ( hermon, &hermon_eq->mtt );
  err_alloc_mtt:
@@ -1514,7 +1541,8 @@ static void hermon_destroy_eq ( struct hermon *hermon ) {
 	/* Unmap events from event queue */
 	memset ( &mask, 0, sizeof ( mask ) );
 	MLX_FILL_1 ( &mask, 1, port_state_change, 1 );
-	if ( ( rc = hermon_cmd_map_eq ( hermon, ( HERMON_MAP_EQ_UNMAP | 0 ),
+	if ( ( rc = hermon_cmd_map_eq ( hermon,
+					( HERMON_UNMAP_EQ | hermon_eq->eqn ),
 					&mask ) ) != 0 ) {
 		DBGC ( hermon, "Hermon %p FATAL MAP_EQ failed to unmap: %s\n",
 		       hermon, strerror ( rc ) );
@@ -1522,7 +1550,8 @@ static void hermon_destroy_eq ( struct hermon *hermon ) {
 	}
 
 	/* Take ownership back from hardware */
-	if ( ( rc = hermon_cmd_hw2sw_eq ( hermon, 0, &eqctx ) ) != 0 ) {
+	if ( ( rc = hermon_cmd_hw2sw_eq ( hermon, hermon_eq->eqn,
+					  &eqctx ) ) != 0 ) {
 		DBGC ( hermon, "Hermon %p FATAL HW2SW_EQ failed: %s\n",
 		       hermon, strerror ( rc ) );
 		/* Leak memory and return; at least we avoid corruption */
@@ -1578,6 +1607,7 @@ static void hermon_poll_eq ( struct hermon *hermon ) {
 	unsigned int event_type;
 
 	while ( 1 ) {
+		/* Look for event entry */
 		eqe_idx_mask = ( HERMON_NUM_EQES - 1 );
 		eqe = &hermon_eq->eqe[hermon_eq->next_idx & eqe_idx_mask];
 		if ( MLX_GET ( &eqe->generic, owner ) ^
@@ -1605,13 +1635,12 @@ static void hermon_poll_eq ( struct hermon *hermon ) {
 		hermon_eq->next_idx++;
 
 		/* Ring doorbell */
-		memset ( &db_reg, 0, sizeof ( db_reg ) );
-		MLX_FILL_1 ( &db_reg.event, 0, ci, hermon_eq->next_idx );
+		MLX_FILL_1 ( &db_reg.event, 0,
+			     ci, ( hermon_eq->next_idx & 0x00ffffffUL ) );
 		DBGCP ( hermon, "Ringing doorbell %08lx with %08lx\n",
-			virt_to_phys ( hermon->uar + HERMON_DB_EQ0_OFFSET ),
+			virt_to_phys ( hermon_eq->doorbell ),
 			db_reg.dword[0] );
-		writel ( db_reg.dword[0],
-			 ( hermon->uar + HERMON_DB_EQ0_OFFSET ) );
+		writel ( db_reg.dword[0], hermon_eq->doorbell );
 	}
 }
 
@@ -2161,9 +2190,8 @@ static int hermon_probe ( struct pci_device *pci,
 	/* Get PCI BARs */
 	hermon->config = ioremap ( pci_bar_start ( pci, HERMON_PCI_CONFIG_BAR),
 				   HERMON_PCI_CONFIG_BAR_SIZE );
-	hermon->uar = ioremap ( ( pci_bar_start ( pci, HERMON_PCI_UAR_BAR ) +
-				  HERMON_UAR_PAGE * HERMON_PAGE_SIZE ),
-				HERMON_PAGE_SIZE );
+	hermon->uar = ioremap ( pci_bar_start ( pci, HERMON_PCI_UAR_BAR ),
+				HERMON_UAR_NON_EQ_PAGE * HERMON_PAGE_SIZE );
 
 	/* Allocate space for mailboxes */
 	hermon->mailbox_in = malloc_dma ( HERMON_MBOX_SIZE,
