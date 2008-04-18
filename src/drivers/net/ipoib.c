@@ -80,10 +80,14 @@ struct ipoib_device {
 	struct ib_gid broadcast_gid;
 	/** Broadcast LID */
 	unsigned int broadcast_lid;
-	/** Joined to broadcast group */
-	int broadcast_joined;
 	/** Data queue key */
 	unsigned long data_qkey;
+	/** Attached to multicast group
+	 *
+	 * This flag indicates whether or not we have attached our
+	 * data queue pair to the broadcast multicast GID.
+	 */
+	int broadcast_attached;
 };
 
 /**
@@ -271,6 +275,10 @@ static int ipoib_create_qset ( struct ipoib_device *ipoib,
 			       unsigned long qkey ) {
 	struct ib_device *ibdev = ipoib->ibdev;
 	int rc;
+
+	/* Sanity check */
+	assert ( qset->cq == NULL );
+	assert ( qset->qp == NULL );
 
 	/* Store queue parameters */
 	qset->recv_max_fill = num_recv_wqes;
@@ -617,14 +625,24 @@ static void ipoib_recv_path_record ( struct ipoib_device *ipoib __unused,
  */
 static void ipoib_recv_mc_member_record ( struct ipoib_device *ipoib,
 			  struct ib_mad_mc_member_record *mc_member_record ) {
+	int joined;
+	int rc;
+
 	/* Record parameters */
-	ipoib->broadcast_joined =
-		( mc_member_record->scope__join_state & 0x0f );
+	joined = ( mc_member_record->scope__join_state & 0x0f );
 	ipoib->data_qkey = ntohl ( mc_member_record->qkey );
 	ipoib->broadcast_lid = ntohs ( mc_member_record->mlid );
 	DBGC ( ipoib, "IPoIB %p %s broadcast group: qkey %lx mlid %x\n",
-	       ipoib, ( ipoib->broadcast_joined ? "joined" : "left" ),
-	       ipoib->data_qkey, ipoib->broadcast_lid );
+	       ipoib, ( joined ? "joined" : "left" ), ipoib->data_qkey,
+	       ipoib->broadcast_lid );
+
+	/* Update data queue pair qkey */
+	if ( ( rc = ib_modify_qp ( ipoib->ibdev, ipoib->data.qp,
+				   IB_MODIFY_QKEY, ipoib->data_qkey ) ) != 0 ){
+		DBGC ( ipoib, "IPoIB %p could not update data qkey: %s\n",
+		       ipoib, strerror ( rc ) );
+		return;
+	}
 }
 
 /**
@@ -742,6 +760,56 @@ static void ipoib_irq ( struct net_device *netdev __unused,
 }
 
 /**
+ * Join IPv4 broadcast multicast group
+ *
+ * @v ipoib		IPoIB device
+ * @ret rc		Return status code
+ */
+static int ipoib_join_broadcast_group ( struct ipoib_device *ipoib ) {
+	int rc;
+
+	/* Sanity check */
+	if ( ! ipoib->data.qp )
+		return 0;
+
+	/* Attach data queue to broadcast multicast GID */
+	assert ( ipoib->broadcast_attached == 0 );
+	if ( ( rc = ib_mcast_attach ( ipoib->ibdev, ipoib->data.qp,
+				      &ipoib->broadcast_gid ) ) != 0 ){
+		DBGC ( ipoib, "IPoIB %p could not attach to broadcast GID: "
+		       "%s\n", ipoib, strerror ( rc ) );
+		return rc;
+	}
+	ipoib->broadcast_attached = 1;
+
+	/* Initiate broadcast group join */
+	if ( ( rc = ipoib_mc_member_record ( ipoib, &ipoib->broadcast_gid,
+					     1 ) ) != 0 ) {
+		DBGC ( ipoib, "IPoIB %p could not send broadcast join: %s\n",
+		       ipoib, strerror ( rc ) );
+		return rc;
+	}
+
+	return 0;
+}
+
+/**
+ * Leave IPv4 broadcast multicast group
+ *
+ * @v ipoib		IPoIB device
+ */
+static void ipoib_leave_broadcast_group ( struct ipoib_device *ipoib ) {
+
+	/* Detach data queue from broadcast multicast GID */
+	if ( ipoib->broadcast_attached ) {
+		assert ( ipoib->data.qp != NULL );
+		ib_mcast_detach ( ipoib->ibdev, ipoib->data.qp,
+				  &ipoib->broadcast_gid );
+		ipoib->broadcast_attached = 0;
+	}
+}
+
+/**
  * Open IPoIB network device
  *
  * @v netdev		Network device
@@ -749,22 +817,53 @@ static void ipoib_irq ( struct net_device *netdev __unused,
  */
 static int ipoib_open ( struct net_device *netdev ) {
 	struct ipoib_device *ipoib = netdev->priv;
-	struct ib_device *ibdev = ipoib->ibdev;
+	struct ipoib_mac *mac = ( ( struct ipoib_mac * ) netdev->ll_addr );
 	int rc;
 
-	/* Attach to broadcast multicast GID */
-	if ( ( rc = ib_mcast_attach ( ibdev, ipoib->data.qp,
-				      &ipoib->broadcast_gid ) ) != 0 ) {
-		DBG ( "Could not attach to broadcast GID: %s\n",
-		      strerror ( rc ) );
-		return rc;
+	/* Allocate metadata queue set */
+	if ( ( rc = ipoib_create_qset ( ipoib, &ipoib->meta,
+					IPOIB_META_NUM_CQES,
+					IPOIB_META_NUM_SEND_WQES,
+					IPOIB_META_NUM_RECV_WQES,
+					IB_GLOBAL_QKEY ) ) != 0 ) {
+		DBGC ( ipoib, "IPoIB %p could not allocate metadata QP: %s\n",
+		       ipoib, strerror ( rc ) );
+		goto err_create_meta_qset;
 	}
+
+	/* Allocate data queue set */
+	if ( ( rc = ipoib_create_qset ( ipoib, &ipoib->data,
+					IPOIB_DATA_NUM_CQES,
+					IPOIB_DATA_NUM_SEND_WQES,
+					IPOIB_DATA_NUM_RECV_WQES,
+					IB_GLOBAL_QKEY ) ) != 0 ) {
+		DBGC ( ipoib, "IPoIB %p could not allocate data QP: %s\n",
+		       ipoib, strerror ( rc ) );
+		goto err_create_data_qset;
+	}
+
+	/* Update MAC address with data QPN */
+	mac->qpn = htonl ( ipoib->data.qp->qpn );
 
 	/* Fill receive rings */
 	ipoib_refill_recv ( ipoib, &ipoib->meta );
 	ipoib_refill_recv ( ipoib, &ipoib->data );
 
+	/* Join broadcast group */
+	if ( ( rc = ipoib_join_broadcast_group ( ipoib ) ) != 0 ) {
+		DBGC ( ipoib, "IPoIB %p could not join broadcast group: %s\n",
+		       ipoib, strerror ( rc ) );
+		goto err_join_broadcast;
+	}
+
 	return 0;
+
+ err_join_broadcast:
+	ipoib_destroy_qset ( ipoib, &ipoib->data );
+ err_create_data_qset:
+	ipoib_destroy_qset ( ipoib, &ipoib->meta );
+ err_create_meta_qset:
+	return rc;
 }
 
 /**
@@ -774,12 +873,17 @@ static int ipoib_open ( struct net_device *netdev ) {
  */
 static void ipoib_close ( struct net_device *netdev ) {
 	struct ipoib_device *ipoib = netdev->priv;
-	struct ib_device *ibdev = ipoib->ibdev;
+	struct ipoib_mac *mac = ( ( struct ipoib_mac * ) netdev->ll_addr );
 
-	/* Detach from broadcast multicast GID */
-	ib_mcast_detach ( ibdev, ipoib->data.qp, &ipoib->broadcast_gid );
+	/* Leave broadcast group */
+	ipoib_leave_broadcast_group ( ipoib );
 
-	/* FIXME: should probably flush the receive ring */
+	/* Remove data QPN from MAC address */
+	mac->qpn = 0;
+
+	/* Tear down the queues */
+	ipoib_destroy_qset ( ipoib, &ipoib->data );
+	ipoib_destroy_qset ( ipoib, &ipoib->meta );
 }
 
 /** IPoIB network device operations */
@@ -792,44 +896,53 @@ static struct net_device_operations ipoib_operations = {
 };
 
 /**
- * Join IPoIB broadcast group
+ * Update IPoIB dynamic Infiniband parameters
  *
  * @v ipoib		IPoIB device
- * @ret rc		Return status code
+ *
+ * The Infiniband port GID and partition key will change at runtime,
+ * when the link is established (or lost).  The MAC address is based
+ * on the port GID, and the broadcast GID is based on the partition
+ * key.  This function recalculates these IPoIB device parameters.
  */
-static int ipoib_join_broadcast_group ( struct ipoib_device *ipoib ) {
+static void ipoib_set_ib_params ( struct ipoib_device *ipoib ) {
 	struct ib_device *ibdev = ipoib->ibdev;
-	unsigned int delay_ms;
+	struct ipoib_mac *mac;
+
+	/* Calculate GID portion of MAC address based on port GID */
+	mac = ( ( struct ipoib_mac * ) ipoib->netdev->ll_addr );
+	memcpy ( &mac->gid, &ibdev->port_gid, sizeof ( mac->gid ) );
+
+	/* Calculate broadcast GID based on partition key */
+	memcpy ( &ipoib->broadcast_gid, &ipv4_broadcast_gid,
+		 sizeof ( ipoib->broadcast_gid ) );
+	ipoib->broadcast_gid.u.words[2] = htons ( ibdev->pkey );
+}
+
+/**
+ * Handle link status change
+ *
+ * @v ibdev		Infiniband device
+ */
+void ipoib_link_state_changed ( struct ib_device *ibdev ) {
+	struct net_device *netdev = ib_get_ownerdata ( ibdev );
+	struct ipoib_device *ipoib = netdev->priv;
 	int rc;
 
-	/* Make sure we have some receive descriptors */
-	ipoib_refill_recv ( ipoib, &ipoib->meta );
+	/* Leave existing broadcast group */
+	ipoib_leave_broadcast_group ( ipoib );
 
-	/* Send join request */
-	if ( ( rc = ipoib_mc_member_record ( ipoib, &ipoib->broadcast_gid,
-					     1 ) ) != 0 ) {
-		DBGC ( ipoib, "IPoIB %p could not send broadcast join: %s\n",
-		       ipoib, strerror ( rc ) );
-		return rc;
-	}
-
-	/* Wait for join to complete.  Ideally we wouldn't delay for
-	 * this long, but we need the queue key before we can set up
-	 * the data queue pair, which we need before we can know the
-	 * MAC address.
+	/* Update MAC address and broadcast GID based on new port GID
+	 * and partition key.
 	 */
-	for ( delay_ms = IPOIB_JOIN_MAX_DELAY_MS ; delay_ms ; delay_ms-- ) {
-		mdelay ( 1 );
-		ib_poll_cq ( ibdev, ipoib->meta.cq, ipoib_meta_complete_send,
-			     ipoib_meta_complete_recv );
-		ipoib_refill_recv ( ipoib, &ipoib->meta );
-		if ( ipoib->broadcast_joined )
-			return 0;
-	}
-	DBGC ( ipoib, "IPoIB %p timed out waiting for broadcast join\n",
-	       ipoib );
+	ipoib_set_ib_params ( ipoib );
 
-	return -ETIMEDOUT;
+	/* Join new broadcast group */
+	if ( ( rc = ipoib_join_broadcast_group ( ipoib ) ) != 0 ) {
+		DBGC ( ipoib, "IPoIB %p could not rejoin broadcast group: "
+		       "%s\n", ipoib, strerror ( rc ) );
+		return;
+	}
 }
 
 /**
@@ -841,7 +954,6 @@ static int ipoib_join_broadcast_group ( struct ipoib_device *ipoib ) {
 int ipoib_probe ( struct ib_device *ibdev ) {
 	struct net_device *netdev;
 	struct ipoib_device *ipoib;
-	struct ipoib_mac *mac;
 	int rc;
 
 	/* Allocate network device */
@@ -856,44 +968,11 @@ int ipoib_probe ( struct ib_device *ibdev ) {
 	ipoib->netdev = netdev;
 	ipoib->ibdev = ibdev;
 
-	/* Calculate broadcast GID */
-	memcpy ( &ipoib->broadcast_gid, &ipv4_broadcast_gid,
-		 sizeof ( ipoib->broadcast_gid ) );
-	ipoib->broadcast_gid.u.words[2] = htons ( ibdev->pkey );
-
-	/* Allocate metadata queue set */
-	if ( ( rc = ipoib_create_qset ( ipoib, &ipoib->meta,
-					IPOIB_META_NUM_CQES,
-					IPOIB_META_NUM_SEND_WQES,
-					IPOIB_META_NUM_RECV_WQES,
-					IB_GLOBAL_QKEY ) ) != 0 ) {
-		DBGC ( ipoib, "IPoIB %p could not allocate metadata QP: %s\n",
-		       ipoib, strerror ( rc ) );
-		goto err_create_meta_qset;
-	}
-
-	/* Join broadcast group */
-	if ( ( rc = ipoib_join_broadcast_group ( ipoib ) ) != 0 ) {
-		DBGC ( ipoib, "IPoIB %p could not join broadcast group: %s\n",
-		       ipoib, strerror ( rc ) );
-		goto err_join_broadcast_group;
-	}
-
-	/* Allocate data queue set */
-	if ( ( rc = ipoib_create_qset ( ipoib, &ipoib->data,
-					IPOIB_DATA_NUM_CQES,
-					IPOIB_DATA_NUM_SEND_WQES,
-					IPOIB_DATA_NUM_RECV_WQES,
-					ipoib->data_qkey ) ) != 0 ) {
-		DBGC ( ipoib, "IPoIB %p could not allocate data QP: %s\n",
-		       ipoib, strerror ( rc ) );
-		goto err_create_data_qset;
-	}
-
-	/* Construct MAC address */
-	mac = ( ( struct ipoib_mac * ) netdev->ll_addr );
-	mac->qpn = htonl ( ipoib->data.qp->qpn );
-	memcpy ( &mac->gid, &ibdev->port_gid, sizeof ( mac->gid ) );
+	/* Calculate as much of the broadcast GID and the MAC address
+	 * as we can.  We won't know either of these in full until we
+	 * have link-up.
+	 */
+	ipoib_set_ib_params ( ipoib );
 
 	/* Register network device */
 	if ( ( rc = register_netdev ( netdev ) ) != 0 )
@@ -902,11 +981,6 @@ int ipoib_probe ( struct ib_device *ibdev ) {
 	return 0;
 
  err_register_netdev:
-	ipoib_destroy_qset ( ipoib, &ipoib->data );
- err_join_broadcast_group:
- err_create_data_qset:
-	ipoib_destroy_qset ( ipoib, &ipoib->meta );
- err_create_meta_qset:
 	netdev_nullify ( netdev );
 	netdev_put ( netdev );
 	return rc;
@@ -919,11 +993,8 @@ int ipoib_probe ( struct ib_device *ibdev ) {
  */
 void ipoib_remove ( struct ib_device *ibdev ) {
 	struct net_device *netdev = ib_get_ownerdata ( ibdev );
-	struct ipoib_device *ipoib = netdev->priv;
 
 	unregister_netdev ( netdev );
-	ipoib_destroy_qset ( ipoib, &ipoib->data );
-	ipoib_destroy_qset ( ipoib, &ipoib->meta );
 	netdev_nullify ( netdev );
 	netdev_put ( netdev );
 }

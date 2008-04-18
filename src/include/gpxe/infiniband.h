@@ -95,6 +95,11 @@ struct ib_queue_pair {
 	void *owner_priv;
 };
 
+/** Infiniband queue pair modification flags */
+enum ib_queue_pair_mods {
+	IB_MODIFY_QKEY = 0x0001,
+};
+
 /** An Infiniband Completion Queue */
 struct ib_completion_queue {
 	/** Completion queue number */
@@ -187,6 +192,16 @@ struct ib_device_operations {
 	 */
 	int ( * create_qp ) ( struct ib_device *ibdev,
 			      struct ib_queue_pair *qp );
+	/** Modify queue pair
+	 *
+	 * @v ibdev		Infiniband device
+	 * @v qp		Queue pair
+	 * @v mod_list		Modification list
+	 * @ret rc		Return status code
+	 */
+	int ( * modify_qp ) ( struct ib_device *ibdev,
+			      struct ib_queue_pair *qp,
+			      unsigned long mod_list );
 	/** Destroy queue pair
 	 *
 	 * @v ibdev		Infiniband device
@@ -291,6 +306,8 @@ struct ib_device {
 	struct ib_device_operations *op;
 	/** Port number */
 	unsigned int port;
+	/** Link state */
+	int link_up;
 	/** Port GID */
 	struct ib_gid port_gid;
 	/** Subnet manager LID */
@@ -311,6 +328,8 @@ extern struct ib_queue_pair *
 ib_create_qp ( struct ib_device *ibdev, unsigned int num_send_wqes,
 	       struct ib_completion_queue *send_cq, unsigned int num_recv_wqes,
 	       struct ib_completion_queue *recv_cq, unsigned long qkey );
+extern int ib_modify_qp ( struct ib_device *ibdev, struct ib_queue_pair *qp,
+			  unsigned long mod_list, unsigned long qkey );
 extern void ib_destroy_qp ( struct ib_device *ibdev,
 			    struct ib_queue_pair *qp );
 extern struct ib_work_queue * ib_find_wq ( struct ib_completion_queue *cq,
@@ -319,6 +338,7 @@ extern struct ib_device * alloc_ibdev ( size_t priv_size );
 extern int register_ibdev ( struct ib_device *ibdev );
 extern void unregister_ibdev ( struct ib_device *ibdev );
 extern void free_ibdev ( struct ib_device *ibdev );
+extern void ib_link_state_changed ( struct ib_device *ibdev );
 
 /**
  * Post send work queue entry

@@ -72,6 +72,7 @@ static inline struct net_device * alloc_ipoibdev ( size_t priv_size ) {
 	return netdev;
 }
 
+extern void ipoib_link_state_changed ( struct ib_device *ibdev );
 extern int ipoib_probe ( struct ib_device *ibdev );
 extern void ipoib_remove ( struct ib_device *ibdev );
 
