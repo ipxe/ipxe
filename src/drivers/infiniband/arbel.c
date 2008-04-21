@@ -836,6 +836,27 @@ static int arbel_create_qp ( struct ib_device *ibdev,
 }
 
 /**
+ * Modify queue pair
+ *
+ * @v ibdev		Infiniband device
+ * @v qp		Queue pair
+ * @v mod_list		Modification list
+ * @ret rc		Return status code
+ */
+static int arbel_modify_qp ( struct ib_device *ibdev,
+			     struct ib_queue_pair *qp,
+			     unsigned long mod_list ) {
+	struct arbel *arbel = ib_get_drvdata ( ibdev );
+
+	/* TODO */
+	( void ) arbel;
+	( void ) qp;
+	( void ) mod_list;
+
+	return -ENOTSUP;
+}
+
+/**
  * Destroy queue pair
  *
  * @v ibdev		Infiniband device
@@ -1204,6 +1225,25 @@ static void arbel_poll_cq ( struct ib_device *ibdev,
 
 /***************************************************************************
  *
+ * Event queues
+ *
+ ***************************************************************************
+ */
+
+/**
+ * Poll event queue
+ *
+ * @v ibdev		Infiniband device
+ */
+static void arbel_poll_eq ( struct ib_device *ibdev ) {
+	struct arbel *arbel = ib_get_drvdata ( ibdev );
+
+	/* TODO */
+	( void ) arbel;
+}
+
+/***************************************************************************
+ *
  * Infiniband link-layer operations
  *
  ***************************************************************************
@@ -1399,10 +1439,12 @@ static struct ib_device_operations arbel_ib_operations = {
 	.create_cq	= arbel_create_cq,
 	.destroy_cq	= arbel_destroy_cq,
 	.create_qp	= arbel_create_qp,
+	.modify_qp	= arbel_modify_qp,
 	.destroy_qp	= arbel_destroy_qp,
 	.post_send	= arbel_post_send,
 	.post_recv	= arbel_post_recv,
 	.poll_cq	= arbel_poll_cq,
+	.poll_eq	= arbel_poll_eq,
 	.open		= arbel_open,
 	.close		= arbel_close,
 	.mcast_attach	= arbel_mcast_attach,
@@ -1938,7 +1980,7 @@ static int arbel_probe ( struct pci_device *pci,
 	i = ( ARBEL_NUM_PORTS - 1 );
  err_alloc_ibdev:
 	for ( ; i >= 0 ; i-- )
-		free_ibdev ( arbel->ibdev[i] );
+		ibdev_put ( arbel->ibdev[i] );
 	free ( arbel );
  err_alloc_arbel:
 	return rc;
@@ -1962,7 +2004,7 @@ static void arbel_remove ( struct pci_device *pci ) {
 	free_dma ( arbel->mailbox_out, ARBEL_MBOX_SIZE );
 	free_dma ( arbel->mailbox_in, ARBEL_MBOX_SIZE );
 	for ( i = ( ARBEL_NUM_PORTS - 1 ) ; i >= 0 ; i-- )
-		free_ibdev ( arbel->ibdev[i] );
+		ibdev_put ( arbel->ibdev[i] );
 	free ( arbel );
 }
 

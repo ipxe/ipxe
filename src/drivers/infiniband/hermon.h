@@ -9,7 +9,6 @@
 
 #include <stdint.h>
 #include <gpxe/uaccess.h>
-#include <gpxe/process.h>
 #include "mlx_bitops.h"
 #include "MT25408_PRM.h"
 
@@ -465,8 +464,6 @@ struct hermon {
 
 	/** Event queue */
 	struct hermon_event_queue eq;
-	/** Event queue process */
-	struct process event_process;
 
 	/** Completion queue in-use bitmask */
 	hermon_bitmask_t cq_inuse[ HERMON_BITMASK_SIZE ( HERMON_MAX_CQS ) ];

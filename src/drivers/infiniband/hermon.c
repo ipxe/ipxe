@@ -30,7 +30,6 @@
 #include <gpxe/umalloc.h>
 #include <gpxe/iobuf.h>
 #include <gpxe/netdevice.h>
-#include <gpxe/process.h>
 #include <gpxe/infiniband.h>
 #include "hermon.h"
 
@@ -1228,6 +1227,216 @@ static void hermon_poll_cq ( struct ib_device *ibdev,
 
 /***************************************************************************
  *
+ * Event queues
+ *
+ ***************************************************************************
+ */
+
+/**
+ * Create event queue
+ *
+ * @v hermon		Hermon device
+ * @ret rc		Return status code
+ */
+static int hermon_create_eq ( struct hermon *hermon ) {
+	struct hermon_event_queue *hermon_eq = &hermon->eq;
+	struct hermonprm_eqc eqctx;
+	struct hermonprm_event_mask mask;
+	unsigned int i;
+	int rc;
+
+	/* Select event queue number */
+	hermon_eq->eqn = ( 4 * hermon->cap.reserved_uars );
+	if ( hermon_eq->eqn < hermon->cap.reserved_eqs )
+		hermon_eq->eqn = hermon->cap.reserved_eqs;
+
+	/* Calculate doorbell address */
+	hermon_eq->doorbell =
+		( hermon->uar + HERMON_DB_EQ_OFFSET ( hermon_eq->eqn ) );
+
+	/* Allocate event queue itself */
+	hermon_eq->eqe_size =
+		( HERMON_NUM_EQES * sizeof ( hermon_eq->eqe[0] ) );
+	hermon_eq->eqe = malloc_dma ( hermon_eq->eqe_size,
+				      sizeof ( hermon_eq->eqe[0] ) );
+	if ( ! hermon_eq->eqe ) {
+		rc = -ENOMEM;
+		goto err_eqe;
+	}
+	memset ( hermon_eq->eqe, 0, hermon_eq->eqe_size );
+	for ( i = 0 ; i < HERMON_NUM_EQES ; i++ ) {
+		MLX_FILL_1 ( &hermon_eq->eqe[i].generic, 7, owner, 1 );
+	}
+	barrier();
+
+	/* Allocate MTT entries */
+	if ( ( rc = hermon_alloc_mtt ( hermon, hermon_eq->eqe,
+				       hermon_eq->eqe_size,
+				       &hermon_eq->mtt ) ) != 0 )
+		goto err_alloc_mtt;
+
+	/* Hand queue over to hardware */
+	memset ( &eqctx, 0, sizeof ( eqctx ) );
+	MLX_FILL_1 ( &eqctx, 0, st, 0xa /* "Fired" */ );
+	MLX_FILL_1 ( &eqctx, 2,
+		     page_offset, ( hermon_eq->mtt.page_offset >> 5 ) );
+	MLX_FILL_1 ( &eqctx, 3, log_eq_size, fls ( HERMON_NUM_EQES - 1 ) );
+	MLX_FILL_1 ( &eqctx, 7, mtt_base_addr_l,
+		     ( hermon_eq->mtt.mtt_base_addr >> 3 ) );
+	if ( ( rc = hermon_cmd_sw2hw_eq ( hermon, hermon_eq->eqn,
+					  &eqctx ) ) != 0 ) {
+		DBGC ( hermon, "Hermon %p SW2HW_EQ failed: %s\n",
+		       hermon, strerror ( rc ) );
+		goto err_sw2hw_eq;
+	}
+
+	/* Map events to this event queue */
+	memset ( &mask, 0, sizeof ( mask ) );
+	MLX_FILL_1 ( &mask, 1, port_state_change, 1 );
+	if ( ( rc = hermon_cmd_map_eq ( hermon,
+					( HERMON_MAP_EQ | hermon_eq->eqn ),
+					&mask ) ) != 0 ) {
+		DBGC ( hermon, "Hermon %p MAP_EQ failed: %s\n",
+		       hermon, strerror ( rc )  );
+		goto err_map_eq;
+	}
+
+	DBGC ( hermon, "Hermon %p EQN %#lx ring at [%p,%p])\n",
+	       hermon, hermon_eq->eqn, hermon_eq->eqe,
+	       ( ( ( void * ) hermon_eq->eqe ) + hermon_eq->eqe_size ) );
+	return 0;
+
+ err_map_eq:
+	hermon_cmd_hw2sw_eq ( hermon, hermon_eq->eqn, &eqctx );
+ err_sw2hw_eq:
+	hermon_free_mtt ( hermon, &hermon_eq->mtt );
+ err_alloc_mtt:
+	free_dma ( hermon_eq->eqe, hermon_eq->eqe_size );
+ err_eqe:
+	memset ( hermon_eq, 0, sizeof ( *hermon_eq ) );
+	return rc;
+}
+
+/**
+ * Destroy event queue
+ *
+ * @v hermon		Hermon device
+ */
+static void hermon_destroy_eq ( struct hermon *hermon ) {
+	struct hermon_event_queue *hermon_eq = &hermon->eq;
+	struct hermonprm_eqc eqctx;
+	struct hermonprm_event_mask mask;
+	int rc;
+
+	/* Unmap events from event queue */
+	memset ( &mask, 0, sizeof ( mask ) );
+	MLX_FILL_1 ( &mask, 1, port_state_change, 1 );
+	if ( ( rc = hermon_cmd_map_eq ( hermon,
+					( HERMON_UNMAP_EQ | hermon_eq->eqn ),
+					&mask ) ) != 0 ) {
+		DBGC ( hermon, "Hermon %p FATAL MAP_EQ failed to unmap: %s\n",
+		       hermon, strerror ( rc ) );
+		/* Continue; HCA may die but system should survive */
+	}
+
+	/* Take ownership back from hardware */
+	if ( ( rc = hermon_cmd_hw2sw_eq ( hermon, hermon_eq->eqn,
+					  &eqctx ) ) != 0 ) {
+		DBGC ( hermon, "Hermon %p FATAL HW2SW_EQ failed: %s\n",
+		       hermon, strerror ( rc ) );
+		/* Leak memory and return; at least we avoid corruption */
+		return;
+	}
+
+	/* Free MTT entries */
+	hermon_free_mtt ( hermon, &hermon_eq->mtt );
+
+	/* Free memory */
+	free_dma ( hermon_eq->eqe, hermon_eq->eqe_size );
+	memset ( hermon_eq, 0, sizeof ( *hermon_eq ) );
+}
+
+/**
+ * Handle port state event
+ *
+ * @v hermon		Hermon device
+ * @v eqe		Port state change event queue entry
+ */
+static void hermon_event_port_state_change ( struct hermon *hermon,
+					     union hermonprm_event_entry *eqe){
+	unsigned int port;
+	int link_up;
+
+	/* Get port and link status */
+	port = ( MLX_GET ( &eqe->port_state_change, data.p ) - 1 );
+	link_up = ( MLX_GET ( &eqe->generic, event_sub_type ) & 0x04 );
+	DBGC ( hermon, "Hermon %p port %d link %s\n", hermon, ( port + 1 ),
+	       ( link_up ? "up" : "down" ) );
+
+	/* Sanity check */
+	if ( port >= HERMON_NUM_PORTS ) {
+		DBGC ( hermon, "Hermon %p port %d does not exist!\n",
+		       hermon, ( port + 1 ) );
+		return;
+	}
+
+	/* Notify Infiniband core of link state change */
+	ib_link_state_changed ( hermon->ibdev[port] );
+}
+
+/**
+ * Poll event queue
+ *
+ * @v ibdev		Infiniband device
+ */
+static void hermon_poll_eq ( struct ib_device *ibdev ) {
+	struct hermon *hermon = ib_get_drvdata ( ibdev );
+	struct hermon_event_queue *hermon_eq = &hermon->eq;
+	union hermonprm_event_entry *eqe;
+	union hermonprm_doorbell_register db_reg;
+	unsigned int eqe_idx_mask;
+	unsigned int event_type;
+
+	while ( 1 ) {
+		/* Look for event entry */
+		eqe_idx_mask = ( HERMON_NUM_EQES - 1 );
+		eqe = &hermon_eq->eqe[hermon_eq->next_idx & eqe_idx_mask];
+		if ( MLX_GET ( &eqe->generic, owner ) ^
+		     ( ( hermon_eq->next_idx & HERMON_NUM_EQES ) ? 1 : 0 ) ) {
+			/* Entry still owned by hardware; end of poll */
+			break;
+		}
+		DBGCP ( hermon, "Hermon %p event:\n", hermon );
+		DBGCP_HD ( hermon, eqe, sizeof ( *eqe ) );
+
+		/* Handle event */
+		event_type = MLX_GET ( &eqe->generic, event_type );
+		switch ( event_type ) {
+		case HERMON_EV_PORT_STATE_CHANGE:
+			hermon_event_port_state_change ( hermon, eqe );
+			break;
+		default:
+			DBGC ( hermon, "Hermon %p unrecognised event type "
+			       "%#x:\n", hermon, event_type );
+			DBGC_HD ( hermon, eqe, sizeof ( *eqe ) );
+			break;
+		}
+
+		/* Update event queue's index */
+		hermon_eq->next_idx++;
+
+		/* Ring doorbell */
+		MLX_FILL_1 ( &db_reg.event, 0,
+			     ci, ( hermon_eq->next_idx & 0x00ffffffUL ) );
+		DBGCP ( hermon, "Ringing doorbell %08lx with %08lx\n",
+			virt_to_phys ( hermon_eq->doorbell ),
+			db_reg.dword[0] );
+		writel ( db_reg.dword[0], hermon_eq->doorbell );
+	}
+}
+
+/***************************************************************************
+ *
  * Infiniband link-layer operations
  *
  ***************************************************************************
@@ -1428,233 +1637,13 @@ static struct ib_device_operations hermon_ib_operations = {
 	.post_send	= hermon_post_send,
 	.post_recv	= hermon_post_recv,
 	.poll_cq	= hermon_poll_cq,
+	.poll_eq	= hermon_poll_eq,
 	.open		= hermon_open,
 	.close		= hermon_close,
 	.mcast_attach	= hermon_mcast_attach,
 	.mcast_detach	= hermon_mcast_detach,
 	.mad		= hermon_mad,
 };
-
-/***************************************************************************
- *
- * Event queues
- *
- ***************************************************************************
- */
-
-/**
- * Create event queue
- *
- * @v hermon		Hermon device
- * @ret rc		Return status code
- */
-static int hermon_create_eq ( struct hermon *hermon ) {
-	struct hermon_event_queue *hermon_eq = &hermon->eq;
-	struct hermonprm_eqc eqctx;
-	struct hermonprm_event_mask mask;
-	unsigned int i;
-	int rc;
-
-	/* Select event queue number */
-	hermon_eq->eqn = ( 4 * hermon->cap.reserved_uars );
-	if ( hermon_eq->eqn < hermon->cap.reserved_eqs )
-		hermon_eq->eqn = hermon->cap.reserved_eqs;
-
-	/* Calculate doorbell address */
-	hermon_eq->doorbell =
-		( hermon->uar + HERMON_DB_EQ_OFFSET ( hermon_eq->eqn ) );
-
-	/* Allocate event queue itself */
-	hermon_eq->eqe_size =
-		( HERMON_NUM_EQES * sizeof ( hermon_eq->eqe[0] ) );
-	hermon_eq->eqe = malloc_dma ( hermon_eq->eqe_size,
-				      sizeof ( hermon_eq->eqe[0] ) );
-	if ( ! hermon_eq->eqe ) {
-		rc = -ENOMEM;
-		goto err_eqe;
-	}
-	memset ( hermon_eq->eqe, 0, hermon_eq->eqe_size );
-	for ( i = 0 ; i < HERMON_NUM_EQES ; i++ ) {
-		MLX_FILL_1 ( &hermon_eq->eqe[i].generic, 7, owner, 1 );
-	}
-	barrier();
-
-	/* Allocate MTT entries */
-	if ( ( rc = hermon_alloc_mtt ( hermon, hermon_eq->eqe,
-				       hermon_eq->eqe_size,
-				       &hermon_eq->mtt ) ) != 0 )
-		goto err_alloc_mtt;
-
-	/* Hand queue over to hardware */
-	memset ( &eqctx, 0, sizeof ( eqctx ) );
-	MLX_FILL_1 ( &eqctx, 0, st, 0xa /* "Fired" */ );
-	MLX_FILL_1 ( &eqctx, 2,
-		     page_offset, ( hermon_eq->mtt.page_offset >> 5 ) );
-	MLX_FILL_1 ( &eqctx, 3, log_eq_size, fls ( HERMON_NUM_EQES - 1 ) );
-	MLX_FILL_1 ( &eqctx, 7, mtt_base_addr_l,
-		     ( hermon_eq->mtt.mtt_base_addr >> 3 ) );
-	if ( ( rc = hermon_cmd_sw2hw_eq ( hermon, hermon_eq->eqn,
-					  &eqctx ) ) != 0 ) {
-		DBGC ( hermon, "Hermon %p SW2HW_EQ failed: %s\n",
-		       hermon, strerror ( rc ) );
-		goto err_sw2hw_eq;
-	}
-
-	/* Map events to this event queue */
-	memset ( &mask, 0, sizeof ( mask ) );
-	MLX_FILL_1 ( &mask, 1, port_state_change, 1 );
-	if ( ( rc = hermon_cmd_map_eq ( hermon,
-					( HERMON_MAP_EQ | hermon_eq->eqn ),
-					&mask ) ) != 0 ) {
-		DBGC ( hermon, "Hermon %p MAP_EQ failed: %s\n",
-		       hermon, strerror ( rc )  );
-		goto err_map_eq;
-	}
-
-	DBGC ( hermon, "Hermon %p EQN %#lx ring at [%p,%p])\n",
-	       hermon, hermon_eq->eqn, hermon_eq->eqe,
-	       ( ( ( void * ) hermon_eq->eqe ) + hermon_eq->eqe_size ) );
-	return 0;
-
- err_map_eq:
-	hermon_cmd_hw2sw_eq ( hermon, hermon_eq->eqn, &eqctx );
- err_sw2hw_eq:
-	hermon_free_mtt ( hermon, &hermon_eq->mtt );
- err_alloc_mtt:
-	free_dma ( hermon_eq->eqe, hermon_eq->eqe_size );
- err_eqe:
-	memset ( hermon_eq, 0, sizeof ( *hermon_eq ) );
-	return rc;
-}
-
-/**
- * Destroy event queue
- *
- * @v hermon		Hermon device
- */
-static void hermon_destroy_eq ( struct hermon *hermon ) {
-	struct hermon_event_queue *hermon_eq = &hermon->eq;
-	struct hermonprm_eqc eqctx;
-	struct hermonprm_event_mask mask;
-	int rc;
-
-	/* Unmap events from event queue */
-	memset ( &mask, 0, sizeof ( mask ) );
-	MLX_FILL_1 ( &mask, 1, port_state_change, 1 );
-	if ( ( rc = hermon_cmd_map_eq ( hermon,
-					( HERMON_UNMAP_EQ | hermon_eq->eqn ),
-					&mask ) ) != 0 ) {
-		DBGC ( hermon, "Hermon %p FATAL MAP_EQ failed to unmap: %s\n",
-		       hermon, strerror ( rc ) );
-		/* Continue; HCA may die but system should survive */
-	}
-
-	/* Take ownership back from hardware */
-	if ( ( rc = hermon_cmd_hw2sw_eq ( hermon, hermon_eq->eqn,
-					  &eqctx ) ) != 0 ) {
-		DBGC ( hermon, "Hermon %p FATAL HW2SW_EQ failed: %s\n",
-		       hermon, strerror ( rc ) );
-		/* Leak memory and return; at least we avoid corruption */
-		return;
-	}
-
-	/* Free MTT entries */
-	hermon_free_mtt ( hermon, &hermon_eq->mtt );
-
-	/* Free memory */
-	free_dma ( hermon_eq->eqe, hermon_eq->eqe_size );
-	memset ( hermon_eq, 0, sizeof ( *hermon_eq ) );
-}
-
-/**
- * Handle port state event
- *
- * @v hermon		Hermon device
- * @v eqe		Port state change event queue entry
- */
-static void hermon_event_port_state_change ( struct hermon *hermon,
-					     union hermonprm_event_entry *eqe){
-	unsigned int port;
-	int link_up;
-
-	/* Get port and link status */
-	port = ( MLX_GET ( &eqe->port_state_change, data.p ) - 1 );
-	link_up = ( MLX_GET ( &eqe->generic, event_sub_type ) & 0x04 );
-	DBGC ( hermon, "Hermon %p port %d link %s\n", hermon, ( port + 1 ),
-	       ( link_up ? "up" : "down" ) );
-
-	/* Sanity check */
-	if ( port >= HERMON_NUM_PORTS ) {
-		DBGC ( hermon, "Hermon %p port %d does not exist!\n",
-		       hermon, ( port + 1 ) );
-		return;
-	}
-
-	/* Notify Infiniband core of link state change */
-	ib_link_state_changed ( hermon->ibdev[port] );
-}
-
-/**
- * Poll event queue
- *
- * @v hermon		Hermon device
- */
-static void hermon_poll_eq ( struct hermon *hermon ) {
-	struct hermon_event_queue *hermon_eq = &hermon->eq;
-	union hermonprm_event_entry *eqe;
-	union hermonprm_doorbell_register db_reg;
-	unsigned int eqe_idx_mask;
-	unsigned int event_type;
-
-	while ( 1 ) {
-		/* Look for event entry */
-		eqe_idx_mask = ( HERMON_NUM_EQES - 1 );
-		eqe = &hermon_eq->eqe[hermon_eq->next_idx & eqe_idx_mask];
-		if ( MLX_GET ( &eqe->generic, owner ) ^
-		     ( ( hermon_eq->next_idx & HERMON_NUM_EQES ) ? 1 : 0 ) ) {
-			/* Entry still owned by hardware; end of poll */
-			break;
-		}
-		DBGCP ( hermon, "Hermon %p event:\n", hermon );
-		DBGCP_HD ( hermon, eqe, sizeof ( *eqe ) );
-
-		/* Handle event */
-		event_type = MLX_GET ( &eqe->generic, event_type );
-		switch ( event_type ) {
-		case HERMON_EV_PORT_STATE_CHANGE:
-			hermon_event_port_state_change ( hermon, eqe );
-			break;
-		default:
-			DBGC ( hermon, "Hermon %p unrecognised event type "
-			       "%#x:\n", hermon, event_type );
-			DBGC_HD ( hermon, eqe, sizeof ( *eqe ) );
-			break;
-		}
-
-		/* Update event queue's index */
-		hermon_eq->next_idx++;
-
-		/* Ring doorbell */
-		MLX_FILL_1 ( &db_reg.event, 0,
-			     ci, ( hermon_eq->next_idx & 0x00ffffffUL ) );
-		DBGCP ( hermon, "Ringing doorbell %08lx with %08lx\n",
-			virt_to_phys ( hermon_eq->doorbell ),
-			db_reg.dword[0] );
-		writel ( db_reg.dword[0], hermon_eq->doorbell );
-	}
-}
-
-/**
- * Event queue poll processor
- *
- * @v process		Hermon event queue process
- */
-static void hermon_step ( struct process *process ) {
-	struct hermon *hermon =
-		container_of ( process, struct hermon, event_process );
-
-	hermon_poll_eq ( hermon );
-}
 
 /***************************************************************************
  *
@@ -2168,7 +2157,6 @@ static int hermon_probe ( struct pci_device *pci,
 		goto err_alloc_hermon;
 	}
 	pci_set_drvdata ( pci, hermon );
-	process_init ( &hermon->event_process, hermon_step, NULL );
 
 	/* Allocate Infiniband devices */
 	for ( i = 0 ; i < HERMON_NUM_PORTS ; i++ ) {
@@ -2270,8 +2258,7 @@ static int hermon_probe ( struct pci_device *pci,
 	i = ( HERMON_NUM_PORTS - 1 );
  err_alloc_ibdev:
 	for ( ; i >= 0 ; i-- )
-		free_ibdev ( hermon->ibdev[i] );
-	process_del ( &hermon->event_process );
+		ibdev_put ( hermon->ibdev[i] );
 	free ( hermon );
  err_alloc_hermon:
 	return rc;
@@ -2296,8 +2283,7 @@ static void hermon_remove ( struct pci_device *pci ) {
 	free_dma ( hermon->mailbox_out, HERMON_MBOX_SIZE );
 	free_dma ( hermon->mailbox_in, HERMON_MBOX_SIZE );
 	for ( i = ( HERMON_NUM_PORTS - 1 ) ; i >= 0 ; i-- )
-		free_ibdev ( hermon->ibdev[i] );
-	process_del ( &hermon->event_process );
+		ibdev_put ( hermon->ibdev[i] );
 	free ( hermon );
 }
 

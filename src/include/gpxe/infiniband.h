@@ -8,6 +8,7 @@
  */
 
 #include <stdint.h>
+#include <gpxe/refcnt.h>
 #include <gpxe/device.h>
 
 /** Subnet administrator QPN */
@@ -255,6 +256,12 @@ struct ib_device_operations {
 			     ib_completer_t complete_send,
 			     ib_completer_t complete_recv );
 	/**
+	 * Poll event queue
+	 *
+	 * @v ibdev		Infiniband device
+	 */
+	void ( * poll_eq ) ( struct ib_device *ibdev );
+	/**
 	 * Open port
 	 *
 	 * @v ibdev		Infiniband device
@@ -300,6 +307,10 @@ struct ib_device_operations {
 
 /** An Infiniband device */
 struct ib_device {
+	/** Reference counter */
+	struct refcnt refcnt;
+	/** List of Infiniband devices */
+	struct list_head list;
 	/** Underlying device */
 	struct device *dev;
 	/** Infiniband operations */
@@ -337,7 +348,6 @@ extern struct ib_work_queue * ib_find_wq ( struct ib_completion_queue *cq,
 extern struct ib_device * alloc_ibdev ( size_t priv_size );
 extern int register_ibdev ( struct ib_device *ibdev );
 extern void unregister_ibdev ( struct ib_device *ibdev );
-extern void free_ibdev ( struct ib_device *ibdev );
 extern void ib_link_state_changed ( struct ib_device *ibdev );
 
 /**
@@ -442,6 +452,28 @@ ib_mcast_detach ( struct ib_device *ibdev, struct ib_queue_pair *qp,
 static inline __attribute__ (( always_inline )) int
 ib_mad ( struct ib_device *ibdev, struct ib_mad_hdr *mad, size_t len ) {
 	return ibdev->op->mad ( ibdev, mad, len );
+}
+
+/**
+ * Get reference to Infiniband device
+ *
+ * @v ibdev		Infiniband device
+ * @ret ibdev		Infiniband device
+ */
+static inline __attribute__ (( always_inline )) struct ib_device *
+ibdev_get ( struct ib_device *ibdev ) {
+	ref_get ( &ibdev->refcnt );
+	return ibdev;
+}
+
+/**
+ * Drop reference to Infiniband device
+ *
+ * @v ibdev		Infiniband device
+ */
+static inline __attribute__ (( always_inline )) void
+ibdev_put ( struct ib_device *ibdev ) {
+	ref_put ( &ibdev->refcnt );
 }
 
 /**

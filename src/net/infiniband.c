@@ -29,6 +29,7 @@
 #include <gpxe/netdevice.h>
 #include <gpxe/iobuf.h>
 #include <gpxe/ipoib.h>
+#include <gpxe/process.h>
 #include <gpxe/infiniband.h>
 
 /** @file
@@ -36,6 +37,9 @@
  * Infiniband protocol
  *
  */
+
+/** List of Infiniband devices */
+struct list_head ib_devices = LIST_HEAD_INIT ( ib_devices );
 
 /**
  * Create completion queue
@@ -351,6 +355,50 @@ static int ib_get_mad_params ( struct ib_device *ibdev ) {
 
 /***************************************************************************
  *
+ * Event queues
+ *
+ ***************************************************************************
+ */
+
+/**
+ * Handle Infiniband link state change
+ *
+ * @v ibdev		Infiniband device
+ */
+void ib_link_state_changed ( struct ib_device *ibdev ) {
+	int rc;
+
+	/* Update MAD parameters */
+	if ( ( rc = ib_get_mad_params ( ibdev ) ) != 0 ) {
+		DBGC ( ibdev, "IBDEV %p could not update MAD parameters: %s\n",
+		       ibdev, strerror ( rc ) );
+		return;
+	}
+
+	/* Notify IPoIB of link state change */
+	ipoib_link_state_changed ( ibdev );
+}
+
+/**
+ * Single-step the Infiniband event queue
+ *
+ * @v process		Infiniband event queue process
+ */
+static void ib_step ( struct process *process __unused ) {
+	struct ib_device *ibdev;
+
+	list_for_each_entry ( ibdev, &ib_devices, list ) {
+		ibdev->op->poll_eq ( ibdev );
+	}
+}
+
+/** Infiniband event queue process */
+struct process ib_process __permanent_process = {
+	.step = ib_step,
+};
+
+/***************************************************************************
+ *
  * Infiniband device creation/destruction
  *
  ***************************************************************************
@@ -385,6 +433,10 @@ struct ib_device * alloc_ibdev ( size_t priv_size ) {
 int register_ibdev ( struct ib_device *ibdev ) {
 	int rc;
 
+	/* Add to device list */
+	ibdev_get ( ibdev );
+	list_add_tail ( &ibdev->list, &ib_devices );
+
 	/* Open link */
 	if ( ( rc = ib_open ( ibdev ) ) != 0 )
 		goto err_open;
@@ -400,12 +452,16 @@ int register_ibdev ( struct ib_device *ibdev ) {
 		goto err_ipoib_probe;
 	}
 
+	DBGC ( ibdev, "IBDEV %p registered (phys %s)\n", ibdev,
+	       ibdev->dev->name );
 	return 0;
 
  err_ipoib_probe:
  err_get_mad_params:
 	ib_close ( ibdev );
  err_open:
+	list_del ( &ibdev->list );
+	ibdev_put ( ibdev );
 	return rc;
 }
 
@@ -415,34 +471,13 @@ int register_ibdev ( struct ib_device *ibdev ) {
  * @v ibdev		Infiniband device
  */
 void unregister_ibdev ( struct ib_device *ibdev ) {
+
+	/* Close device */
 	ipoib_remove ( ibdev );
 	ib_close ( ibdev );
-}
 
-/**
- * Free Infiniband device
- *
- * @v ibdev		Infiniband device
- */
-void free_ibdev ( struct ib_device *ibdev ) {
-	free ( ibdev );
-}
-
-/**
- * Handle Infiniband link state change
- *
- * @v ibdev		Infiniband device
- */
-void ib_link_state_changed ( struct ib_device *ibdev ) {
-	int rc;
-
-	/* Update MAD parameters */
-	if ( ( rc = ib_get_mad_params ( ibdev ) ) != 0 ) {
-		DBGC ( ibdev, "IBDEV %p could not update MAD parameters: %s\n",
-		       ibdev, strerror ( rc ) );
-		return;
-	}
-
-	/* Notify IPoIB of link state change */
-	ipoib_link_state_changed ( ibdev );
+	/* Remove from device list */
+	list_del ( &ibdev->list );
+	ibdev_put ( ibdev );
+	DBGC ( ibdev, "IBDEV %p unregistered\n", ibdev );
 }
