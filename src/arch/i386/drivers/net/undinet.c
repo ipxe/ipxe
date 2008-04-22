@@ -708,6 +708,9 @@ int undinet_probe ( struct undi_device *undi ) {
 		undinic->hacks |= UNDI_HACK_EB54;
 	}
 
+	/* Mark as link up; we don't handle link state */
+	netdev_link_up ( netdev );
+
 	/* Register network device */
 	if ( ( rc = register_netdev ( netdev ) ) != 0 )
 		goto err_register;

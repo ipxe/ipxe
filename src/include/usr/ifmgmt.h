@@ -12,5 +12,6 @@ struct net_device;
 extern int ifopen ( struct net_device *netdev );
 extern void ifclose ( struct net_device *netdev );
 extern void ifstat ( struct net_device *netdev );
+extern int iflinkwait ( struct net_device *netdev, unsigned int max_wait_ms );
 
 #endif /* _USR_IFMGMT_H */

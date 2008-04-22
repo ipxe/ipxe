@@ -471,6 +471,12 @@ static int ipoib_transmit ( struct net_device *netdev,
 	}
 	iob_pull ( iobuf, ( sizeof ( *ipoib_pshdr ) ) );
 
+	/* Attempting transmission while link is down will put the
+	 * queue pair into an error state, so don't try it.
+	 */
+	if ( ! ibdev->link_up )
+		return -ENETUNREACH;
+
 	/* Construct address vector */
 	memset ( &av, 0, sizeof ( av ) );
 	av.qkey = IB_GLOBAL_QKEY;
@@ -790,6 +796,10 @@ static int ipoib_join_broadcast_group ( struct ipoib_device *ipoib ) {
 		return rc;
 	}
 
+	/* We will set link up on the network device when we receive
+	 * the broadcast join response.
+	 */
+
 	return 0;
 }
 
@@ -907,16 +917,24 @@ static struct net_device_operations ipoib_operations = {
  */
 static void ipoib_set_ib_params ( struct ipoib_device *ipoib ) {
 	struct ib_device *ibdev = ipoib->ibdev;
+	struct net_device *netdev = ipoib->netdev;
 	struct ipoib_mac *mac;
 
 	/* Calculate GID portion of MAC address based on port GID */
-	mac = ( ( struct ipoib_mac * ) ipoib->netdev->ll_addr );
+	mac = ( ( struct ipoib_mac * ) netdev->ll_addr );
 	memcpy ( &mac->gid, &ibdev->port_gid, sizeof ( mac->gid ) );
 
 	/* Calculate broadcast GID based on partition key */
 	memcpy ( &ipoib->broadcast_gid, &ipv4_broadcast_gid,
 		 sizeof ( ipoib->broadcast_gid ) );
 	ipoib->broadcast_gid.u.words[2] = htons ( ibdev->pkey );
+
+	/* Set net device link state to reflect Infiniband link state */
+	if ( ibdev->link_up ) {
+		netdev_link_up ( netdev );
+	} else {
+		netdev_link_down ( netdev );
+	}
 }
 
 /**

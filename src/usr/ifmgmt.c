@@ -18,8 +18,11 @@
 
 #include <string.h>
 #include <stdio.h>
+#include <unistd.h>
+#include <errno.h>
 #include <gpxe/netdevice.h>
 #include <gpxe/device.h>
+#include <gpxe/process.h>
 #include <usr/ifmgmt.h>
 
 /** @file
@@ -61,9 +64,28 @@ void ifclose ( struct net_device *netdev ) {
  * @v netdev		Network device
  */
 void ifstat ( struct net_device *netdev ) {
-	printf ( "%s: %s on %s (%s) TX:%d TXE:%d RX:%d RXE:%d\n",
+	printf ( "%s: %s on %s (%s)\n"
+		 "  [Link:%s, TX:%d TXE:%d RX:%d RXE:%d]\n",
 		 netdev->name, netdev_hwaddr ( netdev ), netdev->dev->name,
 		 ( ( netdev->state & NETDEV_OPEN ) ? "open" : "closed" ),
+		 ( netdev_link_ok ( netdev ) ? "up" : "down" ),
 		 netdev->stats.tx_ok, netdev->stats.tx_err,
 		 netdev->stats.rx_ok, netdev->stats.rx_err );
+}
+
+/**
+ * Wait for link-up
+ *
+ * @v netdev		Network device
+ * @v max_wait_ms	Maximum time to wait, in ms
+ */
+int iflinkwait ( struct net_device *netdev, unsigned int max_wait_ms ) {
+	while ( 1 ) {
+		if ( netdev_link_ok ( netdev ) )
+			return 0;
+		if ( max_wait_ms-- == 0 )
+			return -ETIMEDOUT;
+		step();
+		mdelay ( 1 );
+	}
 }

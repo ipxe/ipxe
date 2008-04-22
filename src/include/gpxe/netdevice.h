@@ -254,6 +254,9 @@ struct net_device {
 /** Network device is open */
 #define NETDEV_OPEN 0x0001
 
+/** Network device has link */
+#define NETDEV_LINK_UP 0x0002
+
 /** Declare a link-layer protocol */
 #define __ll_protocol  __table ( struct ll_protocol, ll_protocols, 01 )
 
@@ -350,6 +353,37 @@ netdev_priv ( struct net_device *netdev ) {
 static inline __attribute__ (( always_inline )) struct settings *
 netdev_settings ( struct net_device *netdev ) {
 	return &netdev->settings.settings;
+}
+
+/**
+ * Mark network device as having link up
+ *
+ * @v netdev		Network device
+ */
+static inline __attribute__ (( always_inline )) void
+netdev_link_up ( struct net_device *netdev ) {
+	netdev->state |= NETDEV_LINK_UP;
+}
+
+/**
+ * Mark network device as having link down
+ *
+ * @v netdev		Network device
+ */
+static inline __attribute__ (( always_inline )) void
+netdev_link_down ( struct net_device *netdev ) {
+	netdev->state &= ~NETDEV_LINK_UP;
+}
+
+/**
+ * Check link state of network device
+ *
+ * @v netdev		Network device
+ * @ret link_up		Link is up
+ */
+static inline __attribute__ (( always_inline )) int
+netdev_link_ok ( struct net_device *netdev ) {
+	return ( netdev->state & NETDEV_LINK_UP );
 }
 
 extern int netdev_tx ( struct net_device *netdev, struct io_buffer *iobuf );

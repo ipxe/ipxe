@@ -205,6 +205,9 @@ static int natsemi_probe (struct pci_device *pci,
 		last = last1;
 	}
 
+	/* Mark as link up; we don't yet handle link state */
+	netdev_link_up ( netdev );
+
 	if ((rc = register_netdev (netdev)) != 0)
 		goto err_register_netdev;
 

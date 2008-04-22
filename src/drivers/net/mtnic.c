@@ -1731,6 +1731,9 @@ mtnic_probe(struct pci_device *pci,
                 mac = mac >> 8;
 	}
 
+	/* Mark as link up; we don't yet handle link state */
+	netdev_link_up ( dev );
+
 	if (register_netdev(dev)) {
 		eprintf("Netdev registration failed\n");
 		return MTNIC_ERROR;

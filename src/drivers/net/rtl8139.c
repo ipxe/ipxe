@@ -518,6 +518,9 @@ static int rtl_probe ( struct pci_device *pci,
 	rtl_reset ( netdev );
 	rtl_init_eeprom ( netdev );
 	nvs_read ( &rtl->eeprom.nvs, EE_MAC, netdev->ll_addr, ETH_ALEN );
+
+	/* Mark as link up; we don't yet handle link state */
+	netdev_link_up ( netdev );
 	
 	/* Register network device */
 	if ( ( rc = register_netdev ( netdev ) ) != 0 )

@@ -876,6 +876,9 @@ e1000_probe ( struct pci_device *pdev,
 	
 	e1000_get_hw_control ( adapter );
 
+	/* Mark as link up; we don't yet handle link state */
+	netdev_link_up ( netdev );
+
 	if ( ( err = register_netdev ( netdev ) ) != 0)
 		goto err_register;
 		

@@ -112,6 +112,9 @@ int legacy_probe ( void *hwdev,
 	 */
 	dev->desc.irq = nic.irqno;
 
+	/* Mark as link up; legacy devices don't handle link state */
+	netdev_link_up ( netdev );
+
 	if ( ( rc = register_netdev ( netdev ) ) != 0 )
 		goto err_register;
 
