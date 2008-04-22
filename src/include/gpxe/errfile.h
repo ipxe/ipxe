@@ -104,6 +104,7 @@
 #define ERRFILE_ipoib		     ( ERRFILE_DRIVER | 0x00470000 )
 #define ERRFILE_e1000		     ( ERRFILE_DRIVER | 0x00480000 )
 #define ERRFILE_e1000_hw	     ( ERRFILE_DRIVER | 0x00490000 )
+#define ERRFILE_mtnic		     ( ERRFILE_DRIVER | 0x004a0000 )
 
 #define ERRFILE_scsi		     ( ERRFILE_DRIVER | 0x00700000 )
 #define ERRFILE_arbel		     ( ERRFILE_DRIVER | 0x00710000 )

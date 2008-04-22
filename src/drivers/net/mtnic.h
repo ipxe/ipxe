@@ -57,19 +57,11 @@
 #define ROUND_TO_CHECK		0x400
 
 
-/*
-* Helper macros
-*/
-/* Print in case of an error */
-#define eprintf(fmt, a...) \
-		 printf("%s:%d: " fmt "\n", __func__, __LINE__,  ##a)
-
 #define XNOR(x,y)		(!(x) == !(y))
 #define dma_addr_t 		unsigned long
 #define PAGE_SIZE		4096
 #define PAGE_MASK		(PAGE_SIZE - 1)
 #define MTNIC_MAILBOX_SIZE	PAGE_SIZE
-#define MTNIC_ERROR 1
 
 
 

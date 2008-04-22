@@ -35,8 +35,7 @@
 #include <errno.h>
 #include <gpxe/malloc.h>
 #include <gpxe/umalloc.h>
-#include <bits/byteswap.h>
-#include <little_bswap.h>
+#include <byteswap.h>
 #include <unistd.h>
 #include <gpxe/pci.h>
 #include <gpxe/ethernet.h>
@@ -54,6 +53,10 @@
 */
 
 
+/* (mcb30) - The Mellanox driver used "1" as a universal error code;
+ * this at least makes it a valid error number.
+ */
+#define MTNIC_ERROR -EIO
 
 
 /** Set port number to use
@@ -108,12 +111,12 @@ mtnic_alloc_cmdif(struct mtnic_priv *priv)
 
 	priv->hcr = ioremap(bar + MTNIC_HCR_BASE, MTNIC_HCR_SIZE);
 	if (!priv->hcr) {
-		eprintf("Couldn't map command register.");
+		DBG("Couldn't map command register.");
 		return MTNIC_ERROR;
 	}
 	mtnic_alloc_aligned(PAGE_SIZE, (void *)&priv->cmd.buf, &priv->cmd.mapping, PAGE_SIZE);
 	if (!priv->cmd.buf) {
-		eprintf("Error in allocating buffer for command interface\n");
+		DBG("Error in allocating buffer for command interface\n");
 		return MTNIC_ERROR;
 	}
         return 0;
@@ -153,8 +156,8 @@ mtnic_alloc_iobuf(struct mtnic_priv *priv, struct mtnic_ring *ring,
 		ring->iobuf[index] = alloc_iob(size);
 		if (!&ring->iobuf[index]) {
 			if (ring->prod <= (ring->cons + 1)) {
-				eprintf("Error allocating Rx io "
-					"buffer number %lx", index);
+				DBG("Error allocating Rx io "
+				    "buffer number %lx", index);
 				/* In case of error freeing io buffer */
 				mtnic_free_io_buffers(ring);
 				return MTNIC_ERROR;
@@ -208,8 +211,8 @@ mtnic_alloc_ring(struct mtnic_priv *priv, struct mtnic_ring *ring,
 	err = mtnic_alloc_aligned(ring->buf_size, (void *)&ring->buf,
 			    &ring->dma, PAGE_SIZE);
         if (err) {
-		eprintf("Failed allocating descriptor ring sizeof %lx\n",
-			ring->buf_size);
+		DBG("Failed allocating descriptor ring sizeof %lx\n",
+		    ring->buf_size);
 		return MTNIC_ERROR;
 	}
         memset(ring->buf, 0, ring->buf_size);
@@ -225,7 +228,7 @@ mtnic_alloc_ring(struct mtnic_priv *priv, struct mtnic_ring *ring,
 		err = mtnic_alloc_aligned(sizeof(struct mtnic_cq_db_record),
 				    (void *)&ring->db, &ring->db_dma, 32);
 		if (err) {
-			eprintf("Failed allocating Rx ring doorbell record\n");
+			DBG("Failed allocating Rx ring doorbell record\n");
 			free(ring->buf);
 			return MTNIC_ERROR;
 		}
@@ -243,7 +246,7 @@ mtnic_alloc_ring(struct mtnic_priv *priv, struct mtnic_ring *ring,
 		/* Alloc IO_BUFFERS */
 		err = mtnic_alloc_iobuf(priv, ring, DEF_IOBUF_SIZE);
 		if (err) {
-			eprintf("ERROR Allocating io buffer");
+			DBG("ERROR Allocating io buffer");
 			free(ring->buf);
 			return MTNIC_ERROR;
 		}
@@ -260,11 +263,11 @@ mtnic_alloc_ring(struct mtnic_priv *priv, struct mtnic_ring *ring,
 
 		/* Map Tx+CQ doorbells */
 		DBG("Mapping TxCQ doorbell at offset:0x%lx\n",
-			priv->fw.txcq_db_offset);
+		    priv->fw.txcq_db_offset);
 		ring->txcq_db = ioremap(mtnic_pci_dev.dev.bar[2] +
 				priv->fw.txcq_db_offset, PAGE_SIZE);
 		if (!ring->txcq_db) {
-			eprintf("Couldn't map txcq doorbell, aborting...\n");
+			DBG("Couldn't map txcq doorbell, aborting...\n");
 			free(ring->buf);
 			return MTNIC_ERROR;
 		}
@@ -299,7 +302,7 @@ mtnic_alloc_cq(struct net_device *dev, int num, struct mtnic_cq *cq,
 	err = mtnic_alloc_aligned(sizeof(struct mtnic_cq_db_record),
 			    (void *)&cq->db, &cq->db_dma, 32);
 	if (err) {
-		eprintf("Failed allocating CQ doorbell record\n");
+		DBG("Failed allocating CQ doorbell record\n");
 		return MTNIC_ERROR;
 	}
 	memset(cq->db, 0, sizeof(struct mtnic_cq_db_record));
@@ -309,16 +312,16 @@ mtnic_alloc_cq(struct net_device *dev, int num, struct mtnic_cq *cq,
 	err = mtnic_alloc_aligned(cq->buf_size,
 			    (void *)&cq->buf, &cq->dma, PAGE_SIZE);
 	if (err) {
-		eprintf("Failed allocating CQ buffer\n");
+		DBG("Failed allocating CQ buffer\n");
 		free(cq->db);
 		return MTNIC_ERROR;
 	}
         memset(cq->buf, 0, cq->buf_size);
         DBG("Allocated CQ (addr:%p) - size:%lx buf:%p buf_size:%lx "
-		"dma:%lx db:%p db_dma:%lx\n"
-		"cqn offset:%lx \n", cq, cq->size, cq->buf,
-		cq->buf_size, cq->dma, cq->db,
-		cq->db_dma, offset_ind);
+	    "dma:%lx db:%p db_dma:%lx\n"
+	    "cqn offset:%lx \n", cq, cq->size, cq->buf,
+	    cq->buf_size, cq->dma, cq->db,
+	    cq->db_dma, offset_ind);
 
 
 	/* Set ownership of all CQEs to HW */
@@ -349,7 +352,7 @@ mtnic_alloc_resources(struct net_device *dev)
         err = mtnic_alloc_cq(dev, cq_ind, &priv->cq[cq_ind], 1 /* RX */,
 			     UNITS_BUFFER_SIZE, cq_offset + cq_ind);
 	if (err) {
-		eprintf("Failed allocating Rx CQ\n");
+		DBG("Failed allocating Rx CQ\n");
 		return MTNIC_ERROR;
 	}
 
@@ -357,7 +360,7 @@ mtnic_alloc_resources(struct net_device *dev)
 	err = mtnic_alloc_ring(priv, &priv->rx_ring, UNITS_BUFFER_SIZE,
 			       sizeof(struct mtnic_rx_desc), cq_ind, /* RX */1);
 	if (err) {
-		eprintf("Failed allocating Rx Ring\n");
+		DBG("Failed allocating Rx Ring\n");
 		goto cq0_error;
 	}
 
@@ -367,7 +370,7 @@ mtnic_alloc_resources(struct net_device *dev)
 	err = mtnic_alloc_cq(dev, cq_ind, &priv->cq[cq_ind], 0 /* TX */,
 			     UNITS_BUFFER_SIZE, cq_offset + cq_ind);
 	if (err) {
-		eprintf("Failed allocating Tx CQ\n");
+		DBG("Failed allocating Tx CQ\n");
 		goto rx_error;
 	}
 
@@ -375,7 +378,7 @@ mtnic_alloc_resources(struct net_device *dev)
 	err = mtnic_alloc_ring(priv, &priv->tx_ring, UNITS_BUFFER_SIZE,
 			       sizeof(struct mtnic_tx_desc), cq_ind, /* TX */ 0);
 	if (err) {
-		eprintf("Failed allocating Tx ring\n");
+		DBG("Failed allocating Tx ring\n");
 		goto cq1_error;
 	}
 
@@ -412,7 +415,7 @@ mtnic_alloc_eq(struct mtnic_priv *priv)
 	priv->eq_db = ioremap(mtnic_pci_dev.dev.bar[2] +
 			      priv->fw.eq_db_offset, sizeof(u32));
 	if (!priv->eq_db) {
-		eprintf("Couldn't map EQ doorbell, aborting...\n");
+		DBG("Couldn't map EQ doorbell, aborting...\n");
 		return MTNIC_ERROR;
 	}
 
@@ -422,7 +425,7 @@ mtnic_alloc_eq(struct mtnic_priv *priv)
         err = mtnic_alloc_aligned(priv->eq.buf_size, (void *)&priv->eq.buf,
 			    &priv->eq.dma, PAGE_SIZE);
 	if (err) {
-		eprintf("Failed allocating EQ buffer\n");
+		DBG("Failed allocating EQ buffer\n");
 		iounmap(priv->eq_db);
 		return MTNIC_ERROR;
 	}
@@ -470,7 +473,7 @@ cmdif_go_bit(struct mtnic_priv *priv)
 		}
 	}
 
-	eprintf("Invalid tbit after %d retries!\n", TBIT_RETRIES);
+	DBG("Invalid tbit after %d retries!\n", TBIT_RETRIES);
 	return 1; /* Return busy... */
 }
 
@@ -495,7 +498,7 @@ mtnic_cmd(struct mtnic_priv *priv, void *in_imm,
 	token++;
 
 	if (cmdif_go_bit(priv)) {
-		eprintf("GO BIT BUSY:%p.\n", hcr + 6);
+		DBG("GO BIT BUSY:%p.\n", hcr + 6);
 		err = MTNIC_ERROR;
 		goto out;
 	}
@@ -529,7 +532,7 @@ mtnic_cmd(struct mtnic_priv *priv, void *in_imm,
 	}
 
 	if (cmdif_go_bit(priv)) {
-		eprintf("Command opcode:0x%x token:0x%x TIMEOUT.\n", op, token);
+		DBG("Command opcode:0x%x token:0x%x TIMEOUT.\n", op, token);
 		err = MTNIC_ERROR;
 		goto out;
 	}
@@ -570,8 +573,8 @@ mtnic_map_cmd(struct mtnic_priv *priv, u16 op, struct mtnic_pages pages)
 	DBG("Mapping pages: size: %lx address: %p\n", pages.num, pages.buf);
 
 	if (addr & (PAGE_MASK)) {
-		eprintf("Got FW area not aligned to %d (%llx/%x)\n",
-			   PAGE_SIZE, (u64) addr, len);
+		DBG("Got FW area not aligned to %d (%llx/%x)\n",
+		    PAGE_SIZE, (u64) addr, len);
 		return MTNIC_ERROR;
 	}
 
@@ -687,7 +690,7 @@ mtnic_HEART_BEAT(struct mtnic_priv *priv, u32 *link_state)
 	if (!err) {
 		flags = be32_to_cpu(heart_beat.flags);
 		if (flags & MTNIC_BC_MASK(MTNIC_MASK_HEAR_BEAT_INT_ERROR)) {
-			eprintf("Internal error detected\n");
+			DBG("Internal error detected\n");
 			return MTNIC_ERROR;
 		}
 		*link_state = flags &
@@ -746,9 +749,9 @@ mtnic_CONFIG_CQ(struct mtnic_priv *priv, int port,
 	config_cq->db_record_addr_l = cpu_to_be32(cq->db_dma);
         config_cq->page_address[1] = cpu_to_be32(cq->dma);
 	DBG("config cq address: %lx dma_address: %lx"
-		"offset: %d size %d index: %d "
-		, config_cq->page_address[1],cq->dma,
-		config_cq->offset, config_cq->size, config_cq->cq );
+	    "offset: %d size %d index: %d "
+	    , config_cq->page_address[1],cq->dma,
+	    config_cq->offset, config_cq->size, config_cq->cq );
 
 	return mtnic_cmd(priv, NULL, NULL, port + 1,
 			       MTNIC_IF_CMD_CONFIG_CQ);
@@ -798,8 +801,8 @@ mtnic_CONFIG_EQ(struct mtnic_priv *priv)
 	struct mtnic_if_config_eq_in_mbox *eq = priv->cmd.buf;
 
 	if (priv->eq.dma & (PAGE_MASK)) {
-		eprintf("misalligned eq buffer:%lx\n",
-			priv->eq.dma);
+		DBG("misalligned eq buffer:%lx\n",
+		    priv->eq.dma);
 		return MTNIC_ERROR;
         }
 
@@ -897,7 +900,7 @@ mtnic_QUERY_CAP(struct mtnic_priv *priv, u8 index, u8 mod, u64 *result)
 	*((u32*)result + 1) = be32_to_cpu(*out_imm);
 
 	DBG("Called Query cap with index:0x%x mod:%d result:0x%llx"
-		  " error:%d\n", index, mod, *result, err);
+	    " error:%d\n", index, mod, *result, err);
 	return err;
 }
 
@@ -1028,7 +1031,7 @@ mtnic_init_pci(struct pci_device *dev)
 					   &mtnic_pci_dev.dev.
 					   dev_config_space[i]);
 		if (err) {
-			eprintf("Can not save configuration space");
+			DBG("Can not save configuration space");
 			return err;
 		}
 	}
@@ -1056,7 +1059,7 @@ int mtnic_init_card(struct net_device *dev)
         /* Alloc command interface */
 	err = mtnic_alloc_cmdif(priv);
 	if (err) {
-		eprintf("Failed to init command interface, aborting.\n");
+		DBG("Failed to init command interface, aborting.\n");
 		return MTNIC_ERROR;
 	}
 
@@ -1067,7 +1070,7 @@ int mtnic_init_card(struct net_device *dev)
 	 */
 	err = mtnic_QUERY_FW(priv);
 	if (err) {
-		eprintf("QUERY_FW command failed, aborting.\n");
+		DBG("QUERY_FW command failed, aborting.\n");
 		goto cmd_error;
 	}
 
@@ -1076,7 +1079,7 @@ int mtnic_init_card(struct net_device *dev)
 	/* Allocate memory for FW and start it */
 	err = mtnic_map_cmd(priv, MTNIC_IF_CMD_MAP_FW, priv->fw.fw_pages);
 	if (err) {
-		eprintf("Eror In MAP_FW\n");
+		DBG("Eror In MAP_FW\n");
 		if (priv->fw.fw_pages.buf)
 			free(priv->fw.fw_pages.buf);
 		goto cmd_error;
@@ -1085,12 +1088,12 @@ int mtnic_init_card(struct net_device *dev)
 	/* Run firmware */
 	err = mtnic_cmd(priv, NULL, NULL, 0, MTNIC_IF_CMD_RUN_FW);
 	if (err) {
-		eprintf("Eror In RUN FW\n");
+		DBG("Eror In RUN FW\n");
 		goto map_fw_error;
 	}
 
         DBG("FW version:%d.%d.%d\n",
-		(u16) (priv->fw_ver >> 32),
+	    (u16) (priv->fw_ver >> 32),
 		(u16) ((priv->fw_ver >> 16) & 0xffff),
 		(u16) (priv->fw_ver & 0xffff));
 
@@ -1098,22 +1101,22 @@ int mtnic_init_card(struct net_device *dev)
 	/* Get device information */
 	err = mtnic_query_cap(priv);
 	if (err) {
-		eprintf("Insufficient resources, aborting.\n");
+		DBG("Insufficient resources, aborting.\n");
 		goto map_fw_error;
 	}
 
 	/* Open NIC */
 	err = mtnic_OPEN_NIC(priv);
 	if (err) {
-		eprintf("Failed opening NIC, aborting.\n");
+		DBG("Failed opening NIC, aborting.\n");
 		goto map_fw_error;
 	}
 
 	/* Allocate and map pages worksace */
 	err = mtnic_map_cmd(priv, MTNIC_IF_CMD_MAP_PAGES, priv->fw.extra_pages);
 	if (err) {
-		eprintf("Couldn't allocate %lx FW extra pages, aborting.\n",
-			priv->fw.extra_pages.num);
+		DBG("Couldn't allocate %lx FW extra pages, aborting.\n",
+		    priv->fw.extra_pages.num);
 		if (priv->fw.extra_pages.buf)
 			free(priv->fw.extra_pages.buf);
 		goto map_fw_error;
@@ -1122,7 +1125,7 @@ int mtnic_init_card(struct net_device *dev)
 	/* Get device offsets */
 	err = mtnic_query_offsets(priv);
 	if (err) {
-		eprintf("Failed retrieving resource offests, aborting.\n");
+		DBG("Failed retrieving resource offests, aborting.\n");
 		free(priv->fw.extra_pages.buf);
 		goto map_extra_error;
 	}
@@ -1131,24 +1134,24 @@ int mtnic_init_card(struct net_device *dev)
         /* Alloc EQ */
 	err = mtnic_alloc_eq(priv);
 	if (err) {
-		eprintf("Failed init shared resources. error: %d\n", err);
+		DBG("Failed init shared resources. error: %d\n", err);
 		goto map_extra_error;
         }
 
 	/* Configure HW */
 	err = mtnic_CONFIG_EQ(priv);
 	if (err) {
-		eprintf("Failed configuring EQ\n");
+		DBG("Failed configuring EQ\n");
 		goto eq_error;
 	}
 	err = mtnic_CONFIG_RX(priv);
 	if (err) {
-		eprintf("Failed Rx configuration\n");
+		DBG("Failed Rx configuration\n");
 		goto eq_error;
 	}
 	err = mtnic_CONFIG_TX(priv);
 	if (err) {
-		eprintf("Failed Tx configuration\n");
+		DBG("Failed Tx configuration\n");
 		goto eq_error;
 	}
 
@@ -1270,7 +1273,7 @@ next:
 	if (ring->prod - ring->cons < (MAX_GAP_PROD_CONS)) {
 		err = mtnic_alloc_iobuf(priv, &priv->rx_ring, DEF_IOBUF_SIZE);
 		if (err) {
-			eprintf("ERROR Allocating io buffer");
+			DBG("ERROR Allocating io buffer");
 			return MTNIC_ERROR;
 		}
 	}
@@ -1316,7 +1319,7 @@ mtnic_open(struct net_device *dev)
 	/* Alloc and configure CQs, TX, RX */
 	err = mtnic_alloc_resources(dev);
 	if (err) {
-		eprintf("Error allocating resources\n");
+		DBG("Error allocating resources\n");
 		return MTNIC_ERROR;
 	}
 
@@ -1325,8 +1328,8 @@ mtnic_open(struct net_device *dev)
 		cq = &priv->cq[cq_ind];
 		err = mtnic_CONFIG_CQ(priv, priv->port, cq_ind, cq);
 		if (err) {
-			eprintf("Failed configuring CQ:%d error %d\n",
-				cq_ind, err);
+			DBG("Failed configuring CQ:%d error %d\n",
+			    cq_ind, err);
 			if (cq_ind)
 				goto cq_error;
 			else
@@ -1341,7 +1344,7 @@ mtnic_open(struct net_device *dev)
 	ring = &priv->tx_ring;
         err = mtnic_CONFIG_TX_RING(priv, priv->port, 0, ring);
 	if (err) {
-		eprintf("Failed configuring Tx ring:0\n");
+		DBG("Failed configuring Tx ring:0\n");
                 goto cq_error;
 	}
 
@@ -1349,7 +1352,7 @@ mtnic_open(struct net_device *dev)
         ring = &priv->rx_ring;
         err = mtnic_CONFIG_RX_RING(priv, priv->port, 0, ring);
 	if (err) {
-		eprintf("Failed configuring Rx ring:0\n");
+		DBG("Failed configuring Rx ring:0\n");
 		goto tx_error;
 	}
 
@@ -1358,42 +1361,42 @@ mtnic_open(struct net_device *dev)
 	if (!err)
 		err = mtnic_SET_PORT_RSS_INDIRECTION(priv, priv->port);
 	if (err) {
-		eprintf("Failed configuring RSS steering\n");
+		DBG("Failed configuring RSS steering\n");
 		goto rx_error;
 	}
 
 	/* Set the port default ring to ring 0 */
 	err = mtnic_SET_PORT_DEFAULT_RING(priv, priv->port, 0);
 	if (err) {
-		eprintf("Failed setting default ring\n");
+		DBG("Failed setting default ring\n");
 		goto rx_error;
 	}
 
 	/* Set Mac address */
 	err = mtnic_SET_RX_RING_ADDR(priv, priv->port, &priv->fw.mac[priv->port]);
 	if (err) {
-		eprintf("Failed setting default MAC address\n");
+		DBG("Failed setting default MAC address\n");
 		goto rx_error;
 	}
 
 	/* Set MTU  */
 	err = mtnic_SET_PORT_MTU(priv, priv->port, DEF_MTU);
 	if (err) {
-		eprintf("Failed setting MTU\n");
+		DBG("Failed setting MTU\n");
 		goto rx_error;
 	}
 
 	/* Configure VLAN filter */
 	err = mtnic_CONFIG_PORT_VLAN_FILTER(priv, priv->port);
         if (err) {
-		eprintf("Failed configuring VLAN filter\n");
+		DBG("Failed configuring VLAN filter\n");
 		goto rx_error;
 	}
 
 	/* Bring up physical link */
 	err = mtnic_SET_PORT_STATE(priv, priv->port, 1);
 	if (err) {
-		eprintf("Failed bringing up port\n");
+		DBG("Failed bringing up port\n");
 		goto rx_error;
 	}
 	mdelay(300); /* Let link state stabilize if cable was connected */
@@ -1402,11 +1405,11 @@ mtnic_open(struct net_device *dev)
 
 	err = mtnic_HEART_BEAT(priv, &dev_link_state);
 	if (err) {
-		eprintf("Failed getting device link state\n");
+		DBG("Failed getting device link state\n");
 		return MTNIC_ERROR;
 	}
 	if (!(dev_link_state & 0x3)) {
-		eprintf("Link down, check cables and restart\n");
+		DBG("Link down, check cables and restart\n");
 		return MTNIC_ERROR;
 	}
 
@@ -1453,12 +1456,12 @@ mtnic_poll(struct net_device *dev)
 		/* Check device */
 		err = mtnic_HEART_BEAT(priv, &dev_link_state);
 		if (err) {
-			eprintf("Device has internal error\n");
+			DBG("Device has internal error\n");
 			priv->state = CARD_DOWN;
 			return;
 		}
 		if (!(dev_link_state & 0x3)) {
-			eprintf("Link down, check cables and restart\n");
+			DBG("Link down, check cables and restart\n");
 			priv->state = CARD_DOWN;
 			return;
 		}
@@ -1472,7 +1475,7 @@ mtnic_poll(struct net_device *dev)
                         err = mtnic_process_rx_cq(priv, cq->dev, cq);
 			if (err) {
 				priv->state = CARD_DOWN;
-				eprintf(" Error allocating RX buffers\n");
+				DBG(" Error allocating RX buffers\n");
 				return;
 			}
                 } else {
@@ -1664,17 +1667,11 @@ mtnic_probe(struct pci_device *pci,
 	void *dev_id;
 	int i;
 
-	if (pci->vendor != MELLANOX_VENDOR_ID) {
-		eprintf("");
-		return 0;
-	}
-	printf("\nMellanox Technologies LTD - Boot over MTNIC implementaion\n");
-
         adjust_pci_device(pci);
 
         err = mtnic_init_pci(pci);
 	if (err) {
-		eprintf("Error in pci_init\n");
+		DBG("Error in pci_init\n");
 		return MTNIC_ERROR;
 	}
 
@@ -1683,7 +1680,7 @@ mtnic_probe(struct pci_device *pci,
 
         err = restore_config();
 	if (err) {
-		eprintf("");
+		DBG("Error restoring config\n");
 		return err;
 	}
 
@@ -1693,14 +1690,14 @@ mtnic_probe(struct pci_device *pci,
 	result = ntohl(readl(dev_id));
 	iounmap(dev_id);
         if (result != MTNIC_DEVICE_ID) {
-		eprintf("Wrong Devie ID (0x%lx) !!!", result);
+		DBG("Wrong Devie ID (0x%lx) !!!", result);
 		return MTNIC_ERROR;
 	}
 
 	/* Initializing net device */
         dev = alloc_etherdev(sizeof(struct mtnic_priv));
 	if (dev == NULL) {
-		eprintf("Net device allocation failed\n");
+		DBG("Net device allocation failed\n");
 		return MTNIC_ERROR;
 	}
 	/*
@@ -1719,7 +1716,7 @@ mtnic_probe(struct pci_device *pci,
 	/* Initialize hardware */
 	err = mtnic_init_card(dev);
 	if (err) {
-		eprintf("Error in init_card\n");
+		DBG("Error in init_card\n");
 		return MTNIC_ERROR;
 	}
 
@@ -1735,7 +1732,7 @@ mtnic_probe(struct pci_device *pci,
 	netdev_link_up ( dev );
 
 	if (register_netdev(dev)) {
-		eprintf("Netdev registration failed\n");
+		DBG("Netdev registration failed\n");
 		return MTNIC_ERROR;
 	}
 
