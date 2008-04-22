@@ -456,14 +456,13 @@ struct hermon {
 	/** ICM area */
 	userptr_t icm;
 
+	/** Event queue */
+	struct hermon_event_queue eq;
 	/** Reserved LKey
 	 *
 	 * Used to get unrestricted memory access.
 	 */
 	unsigned long reserved_lkey;
-
-	/** Event queue */
-	struct hermon_event_queue eq;
 
 	/** Completion queue in-use bitmask */
 	hermon_bitmask_t cq_inuse[ HERMON_BITMASK_SIZE ( HERMON_MAX_CQS ) ];
