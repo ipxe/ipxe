@@ -122,6 +122,10 @@ struct arbelprm_event_mask_st {
 	pseudo_bit_t reserved2[0x00016];
 } __attribute__ (( packed ));
 
+struct arbelprm_eq_set_ci_st {
+	pseudo_bit_t ci[0x00020];
+} __attribute__ (( packed ));
+
 struct arbelprm_port_state_change_event_st {
 	pseudo_bit_t reserved[0x00020];
 	struct arbelprm_port_state_change_st data;
@@ -140,6 +144,7 @@ struct MLX_DECLARE_STRUCT ( arbelprm_cq_arm_db_record );
 struct MLX_DECLARE_STRUCT ( arbelprm_cq_ci_db_record );
 struct MLX_DECLARE_STRUCT ( arbelprm_event_mask );
 struct MLX_DECLARE_STRUCT ( arbelprm_event_queue_entry );
+struct MLX_DECLARE_STRUCT ( arbelprm_eq_set_ci );
 struct MLX_DECLARE_STRUCT ( arbelprm_eqc );
 struct MLX_DECLARE_STRUCT ( arbelprm_hca_command_register );
 struct MLX_DECLARE_STRUCT ( arbelprm_init_hca );
@@ -212,6 +217,11 @@ union arbelprm_doorbell_record {
 union arbelprm_doorbell_register {
 	struct arbelprm_send_doorbell send;
 	uint32_t dword[2];
+} __attribute__ (( packed ));
+
+union arbelprm_eq_doorbell_register {
+	struct arbelprm_eq_set_ci ci;
+	uint32_t dword[1];
 } __attribute__ (( packed ));
 
 union arbelprm_mad {

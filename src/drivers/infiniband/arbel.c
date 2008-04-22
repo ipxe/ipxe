@@ -1410,6 +1410,7 @@ static void arbel_poll_eq ( struct ib_device *ibdev ) {
 	struct arbel *arbel = ib_get_drvdata ( ibdev );
 	struct arbel_event_queue *arbel_eq = &arbel->eq;
 	union arbelprm_event_entry *eqe;
+	union arbelprm_eq_doorbell_register db_reg;
 	unsigned int eqe_idx_mask;
 	unsigned int event_type;
 
@@ -1445,10 +1446,11 @@ static void arbel_poll_eq ( struct ib_device *ibdev ) {
 		arbel_eq->next_idx++;
 
 		/* Ring doorbell */
+		MLX_FILL_1 ( &db_reg.ci, 0, ci, arbel_eq->next_idx );
 		DBGCP ( arbel, "Ringing doorbell %08lx with %08lx\n",
 			virt_to_phys ( arbel_eq->doorbell ),
-			arbel_eq->next_idx );
-		writel ( arbel_eq->next_idx, arbel_eq->doorbell );
+			db_reg.dword[0] );
+		writel ( db_reg.dword[0], arbel_eq->doorbell );
 	}
 }
 
