@@ -278,8 +278,8 @@ TGT_PCI_DEVICE	= $(PCI_DEVICE_$(TGT_ROM_NAME))
 #
 TGT_LD_DRIVERS	= $(subst -,_,$(patsubst %,obj_%,$(TGT_DRIVERS)))
 TGT_LD_PREFIX	= obj_$(TGT_PREFIX)prefix
-TGT_LD_IDS	= $(if $(TGT_PCI_VENDOR),pci_vendor_id=$(TGT_PCI_VENDOR)) \
-		  $(if $(TGT_PCI_DEVICE),pci_device_id=$(TGT_PCI_DEVICE))
+TGT_LD_IDS	= pci_vendor_id=$(firstword $(TGT_PCI_VENDOR) 0) \
+		  pci_device_id=$(firstword $(TGT_PCI_DEVICE) 0)
 
 # Calculate linker flags based on link-time options for the current
 # target type (e.g. "bin/dfe538--prism2_pci.zrom.tmp") and derive the
