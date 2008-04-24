@@ -456,17 +456,18 @@ static int iscsi_build_login_request_strings ( struct iscsi_session *iscsi,
 				    "InitiatorName=%s%c"
 				    "TargetName=%s%c"
 				    "SessionType=Normal%c"
-				    "AuthMethod=CHAP,None%c",
+				    "AuthMethod=%sNone%c",
 				    iscsi_initiator_iqn(), 0,
-				    iscsi->target_iqn, 0, 0, 0 );
+				    iscsi->target_iqn, 0, 0,
+				    ( ( iscsi->username && iscsi->password ) ?
+				      "CHAP," : "" ), 0 );
 	}
 
 	if ( iscsi->status & ISCSI_STATUS_STRINGS_CHAP_ALGORITHM ) {
 		used += ssnprintf ( data + used, len - used, "CHAP_A=5%c", 0 );
 	}
 	
-	if ( ( iscsi->status & ISCSI_STATUS_STRINGS_CHAP_RESPONSE ) &&
-	     iscsi->username ) {
+	if ( ( iscsi->status & ISCSI_STATUS_STRINGS_CHAP_RESPONSE ) ) {
 		used += ssnprintf ( data + used, len - used,
 				    "CHAP_N=%s%cCHAP_R=0x",
 				    iscsi->username, 0 );
