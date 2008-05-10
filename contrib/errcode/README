@@ -20,6 +20,9 @@ A PHP script is provided as a web interface.  First edit errcode.php to point
 $ERRCODE_PATH to the errcode.py script.  Then move errcode.php to a location
 visible from your web server.
 
+[OPTIONAL]
+A simple IRC bot is provided.  Edit gpxebot.py to fill in the IRC details.
+
 Usage
 -----
 Looking up error codes on the command-line:

@@ -40,7 +40,7 @@ def lookup_errno_component(defines, component):
     else:
         return '0x%x' % component
 
-class Errno(object):
+class Errcode(object):
     def __init__(self, errno):
         self.pxenv_status = to_pxenv_status(errno)
         self.uniq = to_uniq(errno)
@@ -74,5 +74,5 @@ if __name__ == '__main__':
     except ValueError:
         usage()
 
-    print Errno(errno)
+    print Errcode(errno)
     sys.exit(0)
