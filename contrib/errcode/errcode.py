@@ -1,4 +1,19 @@
 #!/usr/bin/env python
+# Copyright (C) 2008 Stefan Hajnoczi <stefanha@gmail.com>.
+#
+# This program is free software; you can redistribute it and/or
+# modify it under the terms of the GNU General Public License as
+# published by the Free Software Foundation; either version 2 of the
+# License, or any later version.
+#
+# This program is distributed in the hope that it will be useful, but
+# WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+# General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program; if not, write to the Free Software
+# Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
 import sys
 
 try:
@@ -19,11 +34,11 @@ def to_errfile(errno):
 def to_posix_errno(errno):
     return (errno >> 24) & 0x7f
 
-def lookup_errno_component(defines, selector, component):
-    for key, val in defines.iteritems():
-        if selector(val) == component:
-            return key
-    return '0x%x' % component
+def lookup_errno_component(defines, component):
+    if component in defines:
+        return defines[component]
+    else:
+        return '0x%x' % component
 
 class Errno(object):
     def __init__(self, errno):
@@ -37,10 +52,10 @@ class Errno(object):
 
     def prettystr(self):
         return 'pxenv_status=%s uniq=%d errfile=%s posix_errno=%s' % (
-                lookup_errno_component(errcodedb.pxenv_status, to_pxenv_status, self.pxenv_status),
+                lookup_errno_component(errcodedb.pxenv_status, self.pxenv_status),
                 self.uniq,
-                lookup_errno_component(errcodedb.errfile, to_errfile, self.errfile),
-                lookup_errno_component(errcodedb.posix_errno, to_posix_errno, self.posix_errno)
+                lookup_errno_component(errcodedb.errfile, self.errfile),
+                lookup_errno_component(errcodedb.posix_errno, self.posix_errno)
                 )
 
     def __str__(self):

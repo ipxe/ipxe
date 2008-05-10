@@ -1,0 +1,32 @@
+Error Code Lookup for gPXE
+==========================
+This program looks up gPXE error codes so you can locate the line of source
+code which produced the error.
+
+Setup
+-----
+You must run:
+./build_errcodedb.py >errcodedb.py
+
+This extracts error code definitions from the gPXE source code and produces a
+"database" which is used by the main program.
+
+Once you have done this errcode.py and errcodedb.py are the only files you
+need.  They are now independent of the gPXE source code and can be moved
+anywhere.
+
+[OPTIONAL]
+A PHP script is provided as a web interface.  First edit errcode.php to point
+$ERRCODE_PATH to the errcode.py script.  Then move errcode.php to a location
+visible from your web server.
+
+Usage
+-----
+Looking up error codes on the command-line:
+./errcode.py 0x12345678
+
+Further information
+-------------------
+See http://etherboot.org/.
+
+Released under the GPL and written by Stefan Hajnoczi <stefanha@gmail.com>.
