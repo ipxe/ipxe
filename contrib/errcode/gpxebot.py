@@ -88,7 +88,10 @@ def parse(line):
         who = None
     args = []
     while line and line[0] != ':' and line.find(' ') != -1:
-        arg, line = line.split(None, 1)
+        fields = line.split(None, 1)
+        if len(fields) == 1:
+            fields.append(None)
+        arg, line = fields
         args.append(arg)
     if line:
         if line[0] == ':':
