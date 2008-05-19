@@ -273,7 +273,7 @@ static int ipv4_ll_addr ( struct in_addr dest, struct in_addr src,
 		memcpy ( ll_dest, ll_protocol->ll_broadcast,
 			 ll_protocol->ll_addr_len );
 		return 0;
-	} else if ( IN_MULTICAST ( dest.s_addr ) ) {
+	} else if ( IN_MULTICAST ( ntohl ( dest.s_addr ) ) ) {
 		/* Special case: IPv4 multicast over Ethernet.	This
 		 * code may need to be generalised once we find out
 		 * what happens for other link layers.
