@@ -1879,7 +1879,8 @@ static int tg3_setup_hw(struct tg3 *tp)
 	     (65 << GRC_MISC_CFG_PRESCALAR_SHIFT));
 
 	/* Initialize MBUF/DESC pool. */
-	if (GET_ASIC_REV(tp->pci_chip_rev_id) != ASIC_REV_5705) {
+	if ((GET_ASIC_REV(tp->pci_chip_rev_id) != ASIC_REV_5705) &&
+		(tp->pci_chip_rev_id != CHIPREV_ID_5721)) {
 		tw32(BUFMGR_MB_POOL_ADDR, NIC_SRAM_MBUF_POOL_BASE);
 		if (GET_ASIC_REV(tp->pci_chip_rev_id) == ASIC_REV_5704)
 			tw32(BUFMGR_MB_POOL_SIZE, NIC_SRAM_MBUF_POOL_SIZE64);
@@ -3365,6 +3366,7 @@ PCI_ROM(0x14e4, 0x1648, "tg3-5704",        "Broadcom Tigon 3 5704"),
 PCI_ROM(0x14e4, 0x164d, "tg3-5702FE",      "Broadcom Tigon 3 5702FE"),
 PCI_ROM(0x14e4, 0x1653, "tg3-5705",        "Broadcom Tigon 3 5705"),
 PCI_ROM(0x14e4, 0x1654, "tg3-5705_2",      "Broadcom Tigon 3 5705_2"),
+PCI_ROM(0x14e4, 0x1659, "tg3-5721",        "Broadcom Tigon 3 5721"),
 PCI_ROM(0x14e4, 0x165d, "tg3-5705M",       "Broadcom Tigon 3 5705M"),
 PCI_ROM(0x14e4, 0x165e, "tg3-5705M_2",     "Broadcom Tigon 3 5705M_2"),
 PCI_ROM(0x14e4, 0x1677, "tg3-5751",        "Broadcom Tigon 3 5751"),

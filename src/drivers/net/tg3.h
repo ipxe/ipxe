@@ -283,6 +283,7 @@ typedef unsigned long dma_addr_t;
 #define  CHIPREV_ID_5705_A1		 0x3001
 #define	 CHIPREV_ID_5705_A2              0x3002
 #define  CHIPREV_ID_5705_A3              0x3003
+#define  CHIPREV_ID_5721                 0x4101
 #define  CHIPREV_ID_5750_A0              0x4000
 #define  CHIPREV_ID_5750_A1              0x4001
 #define  CHIPREV_ID_5750_A3              0x4003
