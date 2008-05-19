@@ -10,6 +10,8 @@ Skeleton NIC driver for Etherboot
  * your option) any later version.
  */
 
+/* to get toupper() */
+#include <ctype.h>
 /* to get some global routines like printf */
 #include "etherboot.h"
 /* to get the interface to the body of the program */
@@ -31,12 +33,7 @@ int prompt_key(int secs, unsigned char *ch_p)
 
 	for (tmo = currticks() + secs * TICKS_PER_SEC; currticks() < tmo;) {
 		if (iskey()) {
-			ch = getchar();
-			/* toupper does not work ... */
-			if (ch == 'v')
-				ch = 'V';
-			if (ch == 'i')
-				ch = 'I';
+			ch = toupper(getchar());
 			if ((ch=='V') || (ch=='I')) {
 				*ch_p = ch;
 				return 1;
