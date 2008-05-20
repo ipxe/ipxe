@@ -12,11 +12,11 @@
 union uuid {
 	/** Canonical form (00000000-0000-0000-0000-000000000000) */
 	struct {
-		/** 8 hex digits, little-endian */
+		/** 8 hex digits, big-endian */
 		uint32_t a;
-		/** 2 hex digits, little-endian */
+		/** 2 hex digits, big-endian */
 		uint16_t b;
-		/** 2 hex digits, little-endian */
+		/** 2 hex digits, big-endian */
 		uint16_t c;
 		/** 2 hex digits, big-endian */
 		uint16_t d;

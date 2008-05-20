@@ -37,9 +37,9 @@ char * uuid_ntoa ( union uuid *uuid ) {
 	static char buf[37]; /* "00000000-0000-0000-0000-000000000000" */
 
 	sprintf ( buf, "%08lx-%04x-%04x-%04x-%02x%02x%02x%02x%02x%02x",
-		  le32_to_cpu ( uuid->canonical.a ),
-		  le16_to_cpu ( uuid->canonical.b ),
-		  le16_to_cpu ( uuid->canonical.c ),
+		  be32_to_cpu ( uuid->canonical.a ),
+		  be16_to_cpu ( uuid->canonical.b ),
+		  be16_to_cpu ( uuid->canonical.c ),
 		  be16_to_cpu ( uuid->canonical.d ),
 		  uuid->canonical.e[0], uuid->canonical.e[1],
 		  uuid->canonical.e[2], uuid->canonical.e[3],
