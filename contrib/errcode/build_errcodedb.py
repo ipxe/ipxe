@@ -22,9 +22,9 @@ errfile_files = ('../../src/include/gpxe/errfile.h',
             '../../src/arch/i386/include/bits/errfile.h')
 posix_errno_files = ('../../src/include/errno.h', )
 
-PXENV_STATUS_RE = re.compile(r'^#define\s+(PXENV_STATUS_[^\s]+)\s+(.+)$')
-ERRFILE_RE = re.compile(r'^#define\s+(ERRFILE_[^\s]+)\s+(.+)$')
-POSIX_ERRNO_RE = re.compile(r'^#define\s+(E[A-Z]+)\s+.*(0x[0-9a-f]+).*$')
+PXENV_STATUS_RE = re.compile(r'^#define\s+(PXENV_STATUS_[^\s]+)\s+(.+)$', re.M)
+ERRFILE_RE = re.compile(r'^#define\s+(ERRFILE_[^\s]+)\s+(.+)$', re.M)
+POSIX_ERRNO_RE = re.compile(r'^#define\s+(E[A-Z0-9]+)\s+(?:\\\n)?.*(0x[0-9a-f]+).*$', re.M)
 
 def err(msg):
     sys.stderr.write('%s: %s\n' % (sys.argv[0], msg))
@@ -41,11 +41,10 @@ def to_posix_errno(errno):
 
 def load_header_file(filename, regexp):
     defines = {}
-    for line in open(filename, 'r'):
-        m = regexp.match(line)
-        if m:
-            key, val = m.groups()
-            defines[key] = val
+    data = open(filename, 'r').read()
+    for m in regexp.finditer(data):
+        key, val = m.groups()
+        defines[key] = val
     return defines
 
 def evaluate(defines, expr):
