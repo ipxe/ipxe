@@ -85,11 +85,24 @@ pnpheader:
 	.equ pnpheader_len, . - pnpheader
 	.size pnpheader, . - pnpheader
 
+/* Manufacturer string */
 mfgstr:
 	.asciz	"http://etherboot.org"
 	.size mfgstr, . - mfgstr
+
+/* Product string
+ *
+ * Defaults to "gPXE".  If the ROM image is writable at initialisation
+ * time, it will be filled in to include the PCI bus:dev.fn number of
+ * the card as well.
+ */
 prodstr:
-	.asciz	"gPXE"
+	.ascii	"gPXE"
+prodstr_separator:
+	.byte	0
+	.ascii	"(PCI "
+prodstr_pci_id:
+	.asciz	"xx:xx.x)"		/* Filled in by init code */
 	.size prodstr, . - prodstr
 	
 undiheader:
@@ -120,24 +133,31 @@ init:
 	cld
 	pushw	%cs
 	popw	%ds
+	movw	%di, %bx
+	xorw	%di, %di
 	/* Print message as early as possible */
 	movw	$init_message, %si
 	call	print_message
+	call	print_pci_busdevfn
+	/* Fill in product name string, if possible */
+	movw	$prodstr_pci_id, %di
+	call	print_pci_busdevfn
+	movb	$' ', prodstr_separator
+	xorw	%di, %di
 	/* Check for PnP BIOS */
-	testw	$0x0f, %di	/* PnP signature must be aligned - bochs    */
+	testw	$0x0f, %bx	/* PnP signature must be aligned - bochs    */
 	jnz	hook_int19	/* uses unalignment to indicate 'fake' PnP. */
-	cmpl	$PNP_SIGNATURE, %es:0(%di)
+	cmpl	$PNP_SIGNATURE, %es:0(%bx)
 	jne	hook_int19
 	/* Is PnP: print PnP message */
 	movw	$init_message_pnp, %si
 	call	print_message
-	xchgw	%bx, %bx
 	/* Check for BBS */
-	pushw	%es:0x1b(%di)	/* Real-mode data segment */
+	pushw	%es:0x1b(%bx)	/* Real-mode data segment */
 	pushw	%ds		/* &(bbs_version) */
 	pushw	$bbs_version
 	pushw	$PNP_GET_BBS_VERSION
-	lcall	*%es:0xd(%di)
+	lcall	*%es:0xd(%bx)
 	addw	$8, %sp
 	testw	%ax, %ax
 	jne	hook_int19
@@ -155,18 +175,18 @@ hook_int19:
 	popl	%es:( 0x19 * 4 )
 hook_bbs:
 	/* Check for PMM */
-	movw	$( 0xe000 - 1 ), %di
+	movw	$( 0xe00 - 1 ), %bx
 pmm_scan:
-	incw	%di
+	incw	%bx
 	jz	no_pmm
-	movw	%di, %es
+	movw	%bx, %es
 	cmpl	$PMM_SIGNATURE, %es:0
 	jne	pmm_scan
-	xorw	%bx, %bx
+	xorw	%dx, %dx
 	xorw	%si, %si
 	movzbw	%es:5, %cx
 1:	es lodsb
-	addb	%al, %bl
+	addb	%al, %dl
 	loop	1b
 	jnz	pmm_scan
 	/* PMM found: print PMM message */
@@ -221,7 +241,7 @@ no_pmm:
 	.size init, . - init
 
 init_message:
-	.asciz	"gPXE (http://etherboot.org) -"
+	.asciz	"gPXE (http://etherboot.org) - PCI "
 	.size	init_message, . - init_message
 init_message_pnp:
 	.asciz	" PnP"
@@ -292,6 +312,7 @@ exec:	/* Set %ds = %cs */
 
 	/* Print message as soon as possible */
 	movw	$exec_message, %si
+	xorw	%di, %di
 	call	print_message
 
 	/* Store magic word on BIOS stack and remember BIOS %ss:sp */

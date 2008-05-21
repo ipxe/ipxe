@@ -37,6 +37,7 @@
 	cld
 	/* Print welcome message */
 	movw	$10f, %si
+	xorw	%di, %di
 	call	print_message
 	.section ".prefix.data"
 10:	.asciz	"PXE->EB:"
@@ -48,24 +49,23 @@
  */
 detect_pxenv:
 	/* Signature check */
-	les	pxenv_segoff, %di
-	cmpl	$0x4e455850, %es:(%di)	/* 'PXEN' signature */
+	les	pxenv_segoff, %bx
+	cmpl	$0x4e455850, %es:(%bx)	/* 'PXEN' signature */
 	jne	no_pxenv
-	cmpw	$0x2b56, %es:4(%di)	/* 'V+' signature */
+	cmpw	$0x2b56, %es:4(%bx)	/* 'V+' signature */
 	jne	no_pxenv
 	/* Record entry point and UNDI segments */
-	pushl	%es:0x0a(%di)		/* Entry point */
+	pushl	%es:0x0a(%bx)		/* Entry point */
 	popl	entry_segoff
-	pushw	%es:0x24(%di)		/* UNDI code segment */
-	pushw	%es:0x26(%di)		/* UNDI code size */
+	pushw	%es:0x24(%bx)		/* UNDI code segment */
+	pushw	%es:0x26(%bx)		/* UNDI code size */
 	popl	undi_code_segoff
-	pushw	%es:0x20(%di)		/* UNDI data segment */
-	pushw	%es:0x22(%di)		/* UNDI data size */
+	pushw	%es:0x20(%bx)		/* UNDI data segment */
+	pushw	%es:0x22(%bx)		/* UNDI data size */
 	popl	undi_data_segoff
 	/* Print "PXENV+ at <address>" */
 	movw	$10f, %si
 	call	print_message
-	movw	%bx, %di
 	call	print_segoff
 	movb	$',', %al
 	call	print_character
@@ -86,20 +86,20 @@ no_pxenv:
  */
 detect_ppxe:
 	/* Signature check */
-	les	ppxe_segoff, %di
-	cmpl	$0x45585021, %es:(%di)	/* '!PXE' signature */
+	les	ppxe_segoff, %bx
+	cmpl	$0x45585021, %es:(%bx)	/* '!PXE' signature */
 	jne	no_ppxe
 	/* Record structure address, entry point, and UNDI segments */
 	pushw	%es
 	popw	ppxe_segment
-	movw	%di, ppxe_offset
-	pushl	%es:0x10(%di)		/* Entry point */
+	movw	%bx, ppxe_offset
+	pushl	%es:0x10(%bx)		/* Entry point */
 	popl	entry_segoff
-	pushw	%es:0x30(%di)		/* UNDI code segment */
-	pushw	%es:0x36(%di)		/* UNDI code size */
+	pushw	%es:0x30(%bx)		/* UNDI code segment */
+	pushw	%es:0x36(%bx)		/* UNDI code size */
 	popl	undi_code_segoff
-	pushw	%es:0x28(%di)		/* UNDI data segment */
-	pushw	%es:0x2e(%di)		/* UNDI data size */
+	pushw	%es:0x28(%bx)		/* UNDI data segment */
+	pushw	%es:0x2e(%bx)		/* UNDI data size */
 	popl	undi_data_segoff
 	/* Print "!PXE at <address>" */
 	movw	$10f, %si
@@ -167,7 +167,7 @@ print_structure_information:
 	/* Print entry point */
 	movw	$10f, %si
 	call	print_message
-	les	entry_segoff, %di
+	les	entry_segoff, %bx
 	call	print_segoff
 	.section ".prefix.data"
 10:	.asciz	" entry point at "
@@ -175,7 +175,7 @@ print_structure_information:
 	/* Print UNDI code segment */
 	movw	$10f, %si
 	call	print_message
-	les	undi_code_segoff, %di
+	les	undi_code_segoff, %bx
 	call	print_segoff
 	.section ".prefix.data"
 10:	.asciz	"\n         UNDI code segment "
@@ -183,7 +183,7 @@ print_structure_information:
 	/* Print UNDI data segment */
 	movw	$10f, %si
 	call	print_message
-	les	undi_data_segoff, %di
+	les	undi_data_segoff, %bx
 	call	print_segoff
 	.section ".prefix.data"
 10:	.asciz	", data segment "
@@ -271,8 +271,8 @@ unload_base_code:
 	call	print_pxe_error
 	jmp	99f
 1:	/* Free base memory used by PXE base code */
-	movw	%fs:(0x13), %si
-	movw	undi_fbms_start, %di
+	movw	undi_fbms_start, %ax
+	movw	%fs:(0x13), %bx
 	call	free_basemem
 99:
 
@@ -289,8 +289,8 @@ unload_undi:
 	call	print_pxe_error
 	jmp	99f
 1:	/* Free base memory used by UNDI */
-	movw	undi_fbms_start, %si
-	movw	undi_fbms_end, %di
+	movw	undi_fbms_end, %ax
+	movw	undi_fbms_start, %bx
 	call	free_basemem
 	/* Clear UNDI_FL_STARTED */
 	andw	$~UNDI_FL_STARTED, flags
@@ -324,9 +324,10 @@ finished:
  * Subroutine: print segment:offset address
  *
  * Parameters:
- *   %es:%di : segment:offset address to print
+ *   %es:%bx : segment:offset address to print
+ *   %ds:di : output buffer (or %di=0 to print to console)
  * Returns:
- *   Nothing
+ *   %ds:di : next character in output buffer (if applicable)
  *****************************************************************************
  */
 print_segoff:
@@ -337,7 +338,7 @@ print_segoff:
 	call	print_hex_word
 	movb	$':', %al
 	call	print_character
-	movw	%di, %ax
+	movw	%bx, %ax
 	call	print_hex_word
 	/* Restore registers and return */
 	popw	%ax
@@ -348,8 +349,9 @@ print_segoff:
  *
  * Parameters:
  *   %ax : word to print
+ *   %ds:di : output buffer (or %di=0 to print to console)
  * Returns:
- *   Nothing
+ *   %ds:di : next character in output buffer (if applicable)
  *****************************************************************************
  */
 print_word:
@@ -379,43 +381,10 @@ print_word:
 	ret
 	
 /*****************************************************************************
- * Subroutine: print PCI bus:dev.fn
- *
- * Parameters:
- *   %ax : PCI bus:dev.fn to print
- * Returns:
- *   Nothing
- *****************************************************************************
- */
-print_pci_busdevfn:
-	/* Preserve registers */
-	pushw	%ax
-	/* Print bus */
-	xchgb	%al, %ah
-	call	print_hex_byte
-	/* Print ":" */
-	movb	$':', %al
-	call	print_character
-	/* Print device */
-	movb	%ah, %al
-	shrb	$3, %al
-	call	print_hex_byte
-	/* Print "." */
-	movb	$'.', %al
-	call	print_character
-	/* Print function */
-	movb	%ah, %al
-	andb	$0x07, %al
-	call	print_hex_nibble
-	/* Restore registers and return */
-	popw	%ax
-	ret	
-
-/*****************************************************************************
  * Subroutine: zero 1kB block of base memory
  *
  * Parameters:
- *   %si : block to zero (in kB)
+ *   %bx : block to zero (in kB)
  * Returns:
  *   Nothing
  *****************************************************************************
@@ -427,7 +396,7 @@ zero_kb:
 	pushw	%di
 	pushw	%es
 	/* Zero block */
-	movw	%si, %ax
+	movw	%bx, %ax
 	shlw	$6, %ax
 	movw	%ax, %es
 	movw	$0x400, %cx
@@ -445,33 +414,31 @@ zero_kb:
  * Subroutine: free and zero base memory
  *
  * Parameters:
- *   %si : Expected current free base memory counter (in kB)
- *   %di : Desired new free base memory counter (in kB)
+ *   %ax : Desired new free base memory counter (in kB)
+ *   %bx : Expected current free base memory counter (in kB)
  *   %fs : BIOS data segment (0x40)
  * Returns:
- *   %ax : Actual new free base memory counter (in kB)
+ *   None
  *
- * The base memory from %si kB to %di kB is unconditionally zeroed.
+ * The base memory from %bx kB to %ax kB is unconditionally zeroed.
  * It will be freed if and only if the expected current free base
- * memory counter (%si) matches the actual current free base memory
+ * memory counter (%bx) matches the actual current free base memory
  * counter in 0x40:0x13; if this does not match then the memory will
  * be leaked.
  *****************************************************************************
  */
 free_basemem:
 	/* Zero base memory */
-	pushw	%si
-1:	cmpw	%si, %di
+	pushw	%bx
+1:	cmpw	%bx, %ax
 	je	2f
 	call	zero_kb
-	incw	%si
+	incw	%bx
 	jmp	1b
-2:	popw	%si
+2:	popw	%bx
 	/* Free base memory */
-	movw	%fs:(0x13), %ax		/* Current FBMS to %ax */
-	cmpw	%ax, %si		/* Update FBMS only if "old" value  */
+	cmpw	%fs:(0x13), %bx		/* Update FBMS only if "old" value  */
 	jne	1f			/* is correct			    */
-	movw	%di, %ax
 1:	movw	%ax, %fs:(0x13)
 	ret
 

@@ -48,10 +48,9 @@
  *
  * Parameters:
  *   %al : character to print
+ *   %ds:di : output buffer (or %di=0 to print to console)
  * Returns:
- *   Nothing
- * Corrupts:
- *   %ax
+ *   %ds:di : next character in output buffer (if applicable)
  *****************************************************************************
  */
 	.section ".prefix.lib"
@@ -59,19 +58,27 @@
 	.globl	print_character
 print_character:
 	/* Preserve registers */
+	pushw	%ax
 	pushw	%bx
 	pushw	%bp
-	/* Print character */
+	/* If %di is non-zero, write character to buffer and exit */
+	testw	%di, %di
+	jz	1f
+	movb	%al, %ds:(%di)
+	incw	%di
+	jmp	3f
+1:	/* Print character */
 	movw	$0x0007, %bx		/* page 0, attribute 7 (normal) */
 	movb	$0x0e, %ah		/* write char, tty mode */
 	cmpb	$0x0a, %al		/* '\n'? */
-	jne	1f
+	jne	2f
 	int	$0x10
 	movb	$0x0d, %al
-1:	int	$0x10
+2:	int	$0x10
 	/* Restore registers and return */
-	popw	%bp
+3:	popw	%bp
 	popw	%bx
+	popw	%ax
 	ret
 	.size	print_character, . - print_character
 
@@ -80,8 +87,10 @@ print_character:
  *
  * Parameters:
  *   %ds:si : string to print
+ *   %ds:di : output buffer (or %di=0 to print to console)
  * Returns:
  *   %ds:si : character after terminating NUL
+ *   %ds:di : next character in output buffer (if applicable)
  *****************************************************************************
  */
 	.section ".prefix.lib"
@@ -109,8 +118,9 @@ print_message:
  *   %al : byte to print
  *   %ax : word to print
  *   %eax : dword to print
+ *   %ds:di : output buffer (or %di=0 to print to console)
  * Returns:
- *   Nothing
+ *   %ds:di : next character in output buffer (if applicable)
  *****************************************************************************
  */
 	.section ".prefix.lib"
@@ -150,6 +160,44 @@ print_hex_nibble:
 	popw	%ax
 	ret
 	.size	print_hex_nibble, . - print_hex_nibble
+
+/*****************************************************************************
+ * Utility function: print PCI bus:dev.fn
+ *
+ * Parameters:
+ *   %ax : PCI bus:dev.fn to print
+ *   %ds:di : output buffer (or %di=0 to print to console)
+ * Returns:
+ *   %ds:di : next character in output buffer (if applicable)
+ *****************************************************************************
+ */
+	.section ".prefix.lib"
+	.code16
+	.globl	print_pci_busdevfn
+print_pci_busdevfn:
+	/* Preserve registers */
+	pushw	%ax
+	/* Print bus */
+	xchgb	%al, %ah
+	call	print_hex_byte
+	/* Print ":" */
+	movb	$':', %al
+	call	print_character
+	/* Print device */
+	movb	%ah, %al
+	shrb	$3, %al
+	call	print_hex_byte
+	/* Print "." */
+	movb	$'.', %al
+	call	print_character
+	/* Print function */
+	movb	%ah, %al
+	andb	$0x07, %al
+	call	print_hex_nibble
+	/* Restore registers and return */
+	popw	%ax
+	ret
+	.size	print_pci_busdevfn, . - print_pci_busdevfn
 
 /****************************************************************************
  * pm_call (real-mode near call)
