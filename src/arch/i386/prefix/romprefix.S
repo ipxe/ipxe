@@ -130,9 +130,12 @@ init:
 	pushaw
 	pushw	%ds
 	pushw	%es
+	pushw	%fs
 	cld
 	pushw	%cs
 	popw	%ds
+	pushw	$0x40
+	popw	%fs
 	movw	%di, %bx
 	xorw	%di, %di
 	/* Print message as early as possible */
@@ -227,11 +230,53 @@ gotpmm:	/* PMM allocation succeeded: copy ROM to PMM block */
 	loop	1b
 	subb	%bl, checksum
 	popal
-no_pmm:
-	/* Print CRLF to terminate messages */
-	movw	$'\n', %ax
-	call	print_character
+no_pmm:	/* Prompt for POST-time shell */
+	movw	$init_message_prompt, %si
+	call	print_message
+	/* Empty the keyboard buffer before waiting for input */
+empty_keyboard_buffer:
+	movb	$0x01, %ah
+	int	$0x16
+	jz	1f
+	xorw	%ax, %ax
+	int	$0x16
+	jmp	empty_keyboard_buffer
+1:	/* Wait for up to 3s for a key press */
+	movw	$(18 * 3), %cx	/* Approx 3s worth of timer ticks */
+wait_for_key:
+	decw	%cx
+	jz	no_key_pressed
+	/* Wait for timer tick to be updated */
+	movl	%fs:(0x6c), %eax
+1:	pushf
+	sti
+	hlt
+	popf
+	cmpl	%fs:(0x6c), %eax
+	je	1b
+	/* Check to see if a key was pressed */
+	movb	$0x01, %ah
+	int	$0x16
+	jz	wait_for_key
+	/* Check to see if key was Ctrl-B */
+	cmpb	$0x02, %al
+	je	1f
+	/* Key was not Ctrl-B: remove from buffer and stop waiting */
+	xorw	%ax, %ax
+	int	$0x16
+	jmp	no_key_pressed
+1:	/* Key was Ctrl-B: leave in keyboard buffer and invoke gPXE.
+	 * The keypress will be picked up by the initial shell
+	 * prompt, and we will drop into a shell.
+	 */
+	pushw	%cs
+	call	exec
+no_key_pressed:
+	/* Print blank lines to terminate messages */
+	movw	$init_message_end, %si
+	call	print_message
 	/* Restore registers */
+	popw	%fs
 	popw	%es
 	popw	%ds
 	popaw
@@ -245,19 +290,25 @@ init_message:
 	.size	init_message, . - init_message
 init_message_pnp:
 	.asciz	" PnP"
-	.size init_message_pnp, . - init_message_pnp
+	.size	init_message_pnp, . - init_message_pnp
 init_message_bbs:
 	.asciz	" BBS"
-	.size init_message_bbs, . - init_message_bbs
+	.size	init_message_bbs, . - init_message_bbs
 init_message_pmm:
 	.asciz	" PMM"
-	.size init_message_pmm, . - init_message_pmm
+	.size	init_message_pmm, . - init_message_pmm
 init_message_pmm_failed:
 	.asciz	"(failed)"
-	.size init_message_pmm_failed, . - init_message_pmm_failed
+	.size	init_message_pmm_failed, . - init_message_pmm_failed
 init_message_int19:
 	.asciz	" INT19"
-	.size init_message_int19, . - init_message_int19
+	.size	init_message_int19, . - init_message_int19
+init_message_prompt:
+	.asciz	"\nPress Ctrl-B to configure gPXE..."
+	.size	init_message_prompt, . - init_message_prompt
+init_message_end:
+	.asciz	"\n\n\n"
+	.size	init_message_end, . - init_message_end
 
 /* ROM image location
  *
@@ -361,7 +412,7 @@ exec:	/* Set %ds = %cs */
 	.previous
 
 exec_message:
-	.asciz	"gPXE starting boot\n"
+	.asciz	"Entering gPXE\n"
 	.size exec_message, . - exec_message
 
 /* UNDI loader
