@@ -8,9 +8,7 @@ SRCDIRS		+= arch/i386/core arch/i386/transitions arch/i386/prefix
 SRCDIRS		+= arch/i386/firmware/pcbios
 SRCDIRS		+= arch/i386/image
 SRCDIRS		+= arch/i386/drivers
-SRCDIRS		+= arch/i386/drivers/bus
 SRCDIRS		+= arch/i386/drivers/net
-SRCDIRS		+= arch/i386/drivers/disk
 SRCDIRS		+= arch/i386/interface/pcbios
 SRCDIRS		+= arch/i386/interface/pxe
 
