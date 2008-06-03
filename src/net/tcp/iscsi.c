@@ -831,6 +831,35 @@ static int iscsi_rx_buffered_data ( struct iscsi_session *iscsi,
 }
 
 /**
+ * Convert iSCSI response status to return status code
+ *
+ * @v status_class	iSCSI status class
+ * @v status_detail	iSCSI status detail
+ * @ret rc		Return status code
+ */
+static int iscsi_status_to_rc ( unsigned int status_class,
+				unsigned int status_detail ) {
+	switch ( status_class ) {
+	case ISCSI_STATUS_INITIATOR_ERROR :
+		switch ( status_detail ) {
+		case ISCSI_STATUS_INITIATOR_ERROR_AUTHENTICATION :
+			return -EACCES;
+		case ISCSI_STATUS_INITIATOR_ERROR_AUTHORISATION :
+			return -EPERM;
+		case ISCSI_STATUS_INITIATOR_ERROR_NOT_FOUND :
+		case ISCSI_STATUS_INITIATOR_ERROR_REMOVED :
+			return -ENODEV;
+		default :
+			return -ENOTSUP;
+		}
+	case ISCSI_STATUS_TARGET_ERROR :
+		return -EIO;
+	default :
+		return -EINVAL;
+	}
+}
+
+/**
  * Receive data segment of an iSCSI login response PDU
  *
  * @v iscsi		iSCSI session
@@ -877,8 +906,10 @@ static int iscsi_rx_login_response ( struct iscsi_session *iscsi,
 	if ( response->status_class != 0 ) {
 		DBGC ( iscsi, "iSCSI login failure: class %02x detail %02x\n",
 		       response->status_class, response->status_detail );
-		iscsi->instant_rc = -EPERM;
-		return -EPERM;
+		rc = iscsi_status_to_rc ( response->status_class,
+					  response->status_detail );
+		iscsi->instant_rc = rc;
+		return rc;
 	}
 
 	/* Handle login transitions */
@@ -1177,7 +1208,7 @@ static int iscsi_rx_data ( struct iscsi_session *iscsi, const void *data,
 			return 0;
 		DBGC ( iscsi, "iSCSI %p unknown opcode %02x\n", iscsi,
 		       response->opcode );
-		return -EOPNOTSUPP;
+		return -ENOTSUP;
 	}
 }
 
