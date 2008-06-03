@@ -39,6 +39,7 @@ struct image *embedded_image(void)
 		return image = NULL;
 	}
 	copy_to_user(image->data, 0, _embedded_image_start, eisize);
+	register_image(image);
 
 	/* Reclaim embedded image memory */
 	reclaimed = 1;
