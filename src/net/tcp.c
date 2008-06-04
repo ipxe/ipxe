@@ -65,6 +65,11 @@ struct tcp_connection {
 	 * Equivalent to RCV.NXT in RFC 793 terminology.
 	 */
 	uint32_t rcv_ack;
+	/** Receive window
+	 *
+	 * Equivalent to RCV.WND in RFC 793 terminology.
+	 */
+	uint32_t rcv_win;
 	/** Most recent received timestamp
 	 *
 	 * Equivalent to TS.Recent in RFC 1323 terminology.
@@ -394,7 +399,7 @@ static int tcp_xmit ( struct tcp_connection *tcp, int force_send ) {
 	size_t len = 0;
 	size_t seq_len;
 	size_t app_win;
-	size_t rcv_win;
+	size_t max_rcv_win;
 
 	/* If retransmission timer is already running, do nothing */
 	if ( timer_running ( &tcp->timer ) )
@@ -439,14 +444,16 @@ static int tcp_xmit ( struct tcp_connection *tcp, int force_send ) {
 	/* Fill data payload from transmit queue */
 	tcp_process_queue ( tcp, len, iobuf, 0 );
 
-	/* Estimate window size */
-	rcv_win = ( ( freemem * 3 ) / 4 );
-	if ( rcv_win > TCP_MAX_WINDOW_SIZE )
-		rcv_win = TCP_MAX_WINDOW_SIZE;
+	/* Expand receive window if possible */
+	max_rcv_win = ( ( freemem * 3 ) / 4 );
+	if ( max_rcv_win > TCP_MAX_WINDOW_SIZE )
+		max_rcv_win = TCP_MAX_WINDOW_SIZE;
 	app_win = xfer_window ( &tcp->xfer );
-	if ( rcv_win > app_win )
-		rcv_win = app_win;
-	rcv_win &= ~0x03; /* Keep everything dword-aligned */
+	if ( max_rcv_win > app_win )
+		max_rcv_win = app_win;
+	max_rcv_win &= ~0x03; /* Keep everything dword-aligned */
+	if ( tcp->rcv_win < max_rcv_win )
+		tcp->rcv_win = max_rcv_win;
 
 	/* Fill up the TCP header */
 	payload = iobuf->data;
@@ -472,7 +479,7 @@ static int tcp_xmit ( struct tcp_connection *tcp, int force_send ) {
 	tcphdr->ack = htonl ( tcp->rcv_ack );
 	tcphdr->hlen = ( ( payload - iobuf->data ) << 2 );
 	tcphdr->flags = flags;
-	tcphdr->win = htons ( rcv_win );
+	tcphdr->win = htons ( tcp->rcv_win );
 	tcphdr->csum = tcpip_chksum ( iobuf->data, iob_len ( iobuf ) );
 
 	/* Dump header */
@@ -633,6 +640,21 @@ static void tcp_rx_opts ( struct tcp_connection *tcp, const void *data,
 }
 
 /**
+ * Consume received sequence space
+ *
+ * @v tcp		TCP connection
+ * @v seq_len		Sequence space length to consume
+ */
+static void tcp_rx_seq ( struct tcp_connection *tcp, size_t seq_len ) {
+	tcp->rcv_ack += seq_len;
+	if ( tcp->rcv_win > seq_len ) {
+		tcp->rcv_win -= seq_len;
+	} else {
+		tcp->rcv_win = 0;
+	}
+}
+
+/**
  * Handle TCP received SYN
  *
  * @v tcp		TCP connection
@@ -659,7 +681,7 @@ static int tcp_rx_syn ( struct tcp_connection *tcp, uint32_t seq,
 			    TCP_STATE_RCVD ( TCP_SYN ) );
 
 	/* Acknowledge SYN */
-	tcp->rcv_ack++;
+	tcp_rx_seq ( tcp, 1 );
 
 	return 0;
 }
@@ -747,7 +769,8 @@ static int tcp_rx_data ( struct tcp_connection *tcp, uint32_t seq,
 		return rc;
 
 	/* Acknowledge new data */
-	tcp->rcv_ack += len;
+	tcp_rx_seq ( tcp, len );
+
 	return 0;
 }
 
@@ -766,7 +789,7 @@ static int tcp_rx_fin ( struct tcp_connection *tcp, uint32_t seq ) {
 
 	/* Mark FIN as received and acknowledge it */
 	tcp->tcp_state |= TCP_STATE_RCVD ( TCP_FIN );
-	tcp->rcv_ack++;
+	tcp_rx_seq ( tcp, 1 );
 
 	/* Close connection */
 	tcp_close ( tcp, 0 );
@@ -789,7 +812,7 @@ static int tcp_rx_rst ( struct tcp_connection *tcp, uint32_t seq ) {
 	 * ACKed.
 	 */
 	if ( tcp->tcp_state & TCP_STATE_RCVD ( TCP_SYN ) ) {
-		if ( ( tcp->rcv_ack - seq ) > 0 )
+		if ( ( seq - tcp->rcv_ack ) >= tcp->rcv_win )
 			return 0;
 	} else {
 		if ( ! ( tcp->tcp_state & TCP_STATE_ACKED ( TCP_SYN ) ) )
@@ -850,7 +873,8 @@ static int tcp_rx ( struct io_buffer *iobuf,
 		rc = -EINVAL;
 		goto discard;
 	}
-	csum = tcpip_continue_chksum ( pshdr_csum, iobuf->data, iob_len ( iobuf ));
+	csum = tcpip_continue_chksum ( pshdr_csum, iobuf->data,
+				       iob_len ( iobuf ) );
 	if ( csum != 0 ) {
 		DBG ( "TCP checksum incorrect (is %04x including checksum "
 		      "field, should be 0000)\n", csum );
@@ -922,10 +946,19 @@ static int tcp_rx ( struct io_buffer *iobuf,
 	/* Dump out any state change as a result of the received packet */
 	tcp_dump_state ( tcp );
 
-	/* Send out any pending data.  If peer is expecting an ACK for
-	 * this packet then force sending a reply.
+	/* Send out any pending data.  We force sending a reply if either
+	 *
+	 *  a) the peer is expecting an ACK (i.e. consumed sequence space), or
+	 *  b) either end of the packet was outside the receive window
+	 *
+	 * Case (b) enables us to support TCP keepalives using
+	 * zero-length packets, which we would otherwise ignore.  Note
+	 * that for case (b), we need *only* consider zero-length
+	 * packets, since non-zero-length packets will already be
+	 * caught by case (a).
 	 */
-	tcp_xmit ( tcp, ( start_seq != seq ) );
+	tcp_xmit ( tcp, ( ( start_seq != seq ) ||
+			  ( ( seq - tcp->rcv_ack ) > tcp->rcv_win ) ) );
 
 	/* If this packet was the last we expect to receive, set up
 	 * timer to expire and cause the connection to be freed.
