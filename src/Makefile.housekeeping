@@ -121,8 +121,8 @@ CFLAGS	+= $(SP_FLAGS)
 CFLAGS	+= -include compiler.h
 
 # config/%.h files are generated from config.h using mkconfig.pl
-config/%.h : config.h
-	$(MKCONFIG) $<
+config/%.h : config*.h
+	$(MKCONFIG) config.h
 CLEANUP	+= config/*.h
 
 # SRCDIRS lists all directories containing source files.

@@ -166,3 +166,5 @@
 #undef	NULL_TRAP		/* Attempt to catch NULL function calls */
 
 /* @END general.h */
+
+/* @TRYSOURCE config-local.h */

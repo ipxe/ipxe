@@ -7,6 +7,7 @@ use warnings;
 
 my $cfgdir = "config";
 my $config_h = shift || "config.h";
+my @input_files;
 
 # Read in a whole file
 #
@@ -110,14 +111,14 @@ sub postamble {
   return "\n#endif /* $guard */\n";
 } 
 
-# Get the new configuration by splitting config.h file using the
-# @BEGIN/@END tags
+# Parse one config.h file into an existing configuration
 #
-sub new_config {
+sub parse_config {
   my $file = shift;
-
-  my $cfg = {};
+  my $cfg = shift;
   my $cursor = "";
+
+  push ( @input_files, $file );
 
   open my $fh, "<$file" or die "Could not open $file: $!\n";
   while ( <$fh> ) {
@@ -133,14 +134,28 @@ sub new_config {
 	  ." at $file line $.\n" unless $cursor eq $oldcursor;
       $cfg->{$cursor} .= $prefix."*/\n";
       $cursor = "";
+    } elsif ( ( my $newfile ) = /\@TRYSOURCE\s+([\w\-]+\.h)/ ) {
+      die "Missing \"\@END $cursor\" before \"\@TRYSOURCE $newfile\""
+	  ." at $file line $.\n" if $cursor;
+      parse_config ( $newfile, $cfg ) if -e $newfile;
     } else {
       $cfg->{$cursor} .= $_ if $cursor;
     }
   }
   close $fh;
   die "Missing \"\@END $cursor\" in $file\n" if $cursor;
+}
 
-  foreach $cursor ( keys %$cfg ) {
+# Get the new configuration by splitting config.h file using the
+# @BEGIN/@END tags
+#
+sub new_config {
+  my $file = shift;
+  my $cfg = {};
+
+  parse_config ( $file, $cfg );
+
+  foreach my $cursor ( keys %$cfg ) {
     $cfg->{$cursor} .= postamble ( $cursor );
   }
 
@@ -180,9 +195,11 @@ foreach my $file ( keys %$new ) {
 }
 
 # If we now have fragments that are older than config.h, set the
-# timestamp on config.h to match the oldest fragment, to prevent make
-# from always attempting to rebuild the fragments.
+# timestamp on each input file to match the oldest fragment, to
+# prevent make from always attempting to rebuild the fragments.
 #
-if ( $oldest < file_mtime ( $config_h ) ) {
-  utime time(), $oldest, $config_h or die "Could not touch $config_h: $!\n";
+foreach my $file ( @input_files ) {
+  if ( $oldest < file_mtime ( $file ) ) {
+    utime time(), $oldest, $file or die "Could not touch $file: $!\n";
+  }
 }
