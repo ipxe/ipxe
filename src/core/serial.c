@@ -12,10 +12,10 @@
  */
 
 #include "stddef.h"
-#include "console.h"
 #include <gpxe/init.h>
 #include "io.h"
 #include <unistd.h>
+#include <gpxe/serial.h>
 #include "config/serial.h"
 
 /* Set default values if none specified */
@@ -91,13 +91,11 @@
 #define uart_writeb(val,addr) outb((val),(addr))
 #endif
 
-struct console_driver serial_console __console_driver;
-
 /*
  * void serial_putc(int ch);
  *	Write character `ch' to port UART_BASE.
  */
-static void serial_putc ( int ch ) {
+void serial_putc ( int ch ) {
 	int i;
 	int status;
 	i = 1000; /* timeout */
@@ -116,7 +114,7 @@ static void serial_putc ( int ch ) {
  * int serial_getc(void);
  *	Read a character from port UART_BASE.
  */
-static int serial_getc ( void ) {
+int serial_getc ( void ) {
 	int status;
 	int ch;
 	do {
@@ -135,7 +133,7 @@ static int serial_getc ( void ) {
  *       If there is a character in the input buffer of port UART_BASE,
  *       return nonzero; otherwise return 0.
  */
-static int serial_ischar ( void ) {
+int serial_ischar ( void ) {
 	int status;
 	status = uart_readb(UART_BASE + UART_LSR);	/* line status reg; */
 	return status & 1;		/* rx char available */
@@ -217,7 +215,6 @@ static void serial_init ( void ) {
 		/* line status reg */
 		status = uart_readb(UART_BASE + UART_LSR);
 	} while(status & UART_LSR_DR);
-	serial_console.disabled = 0;
  out:
 	return;
 }
@@ -229,10 +226,6 @@ static void serial_init ( void ) {
  */
 static void serial_fini ( void ) {
 	int i, status;
-	if (serial_console.disabled) {
-		/* no serial interface */
-		return;
-	}
 	/* Flush the output buffer to avoid dropping characters,
 	 * if we are reinitializing the serial port.
 	 */
@@ -243,26 +236,17 @@ static void serial_fini ( void ) {
 	/* Don't mark it as disabled; it's still usable */
 }
 
-struct console_driver serial_console __console_driver = {
-	.putchar = serial_putc,
-	.getchar = serial_getc,
-	.iskey = serial_ischar,
-	.disabled = 1,
-};
-
-/** Serial console startup function */
-struct startup_fn serial_startup_fn __startup_fn ( STARTUP_NORMAL ) = {
-	.startup = serial_init,
-	.shutdown = serial_fini,
-};
-
 /**
- * Serial console initialisation function
+ * Serial driver initialisation function
  *
- * Initialise console early on so that it is available to capture
- * early debug messages.  It is safe to call serial_init() multiple
- * times.
+ * Initialise serial port early on so that it is available to capture
+ * early debug messages.
  */
-struct init_fn serial_init_fn __init_fn ( INIT_CONSOLE ) = {
+struct init_fn serial_init_fn __init_fn ( INIT_SERIAL ) = {
 	.initialise = serial_init,
+};
+
+/** Serial driver startup function */
+struct startup_fn serial_startup_fn __startup_fn ( STARTUP_NORMAL ) = {
+	.shutdown = serial_fini,
 };
