@@ -50,6 +50,7 @@
 	.section ".data16"
 	.align 16
 gdt:
+gdtr:		/* The first GDT entry is unused, the GDTR can fit here. */
 gdt_limit:		.word gdt_length - 1
 gdt_base:		.long 0
 			.word 0 /* padding */
@@ -127,7 +128,7 @@ init_librm:
 	addr32 leal	(%eax, %edi), %ebx
 	movl	%ebx, _text16
 
-	/* Store rm_ds and _data16, set up real_ds segment and set GDT base */
+	/* Store rm_ds and _data16, set up real_ds segment */
 	xorl	%eax, %eax
 	movw	%ds, %ax
 	movw	%ax, %cs:rm_ds
@@ -136,9 +137,12 @@ init_librm:
 	call	set_seg_base
 	addr32 leal	(%eax, %edi), %ebx
 	movl	%ebx, _data16
-	addl	$gdt, %eax
+
+	/* Set GDT and IDT base */
 	movl	%eax, gdt_base
-		
+	addl	$gdt, gdt_base
+	call	idt_init
+
 	/* Restore registers */
 	negl	%edi
 	popl	%ebx
@@ -147,14 +151,16 @@ init_librm:
 
 	.section ".text16"
 	.code16
+	.weak idt_init
 set_seg_base:
 1:	movw	%ax, 2(%bx)
 	rorl	$16, %eax
 	movb	%al, 4(%bx)
 	movb	%ah, 7(%bx)
 	roll	$16, %eax
+idt_init: /* Reuse the return opcode here */
 	ret
-	
+
 /****************************************************************************
  * real_to_prot (real-mode near call, 32-bit virtual return address)
  *
@@ -197,7 +203,8 @@ real_to_prot:
 
 	/* Switch to protected mode */
 	cli
-	data32 lgdt	gdt
+	data32 lgdt	gdtr
+	data32 lidt	idtr
 	movl	%cr0, %eax
 	orb	$CR0_PE, %al
 	movl	%eax, %cr0
@@ -231,6 +238,14 @@ real_to_prot:
 
 	/* Return to virtual address */
 	ret
+
+	/* Default IDTR with no interrupts */
+	.section ".data16"
+	.weak idtr
+idtr:
+rm_idtr:
+	.word 0xffff /* limit */
+	.long 0 /* base */
 
 /****************************************************************************
  * prot_to_real (protected-mode near call, 32-bit real-mode return address)
@@ -300,6 +315,9 @@ p2r_jump_target:
 	movw	%bp, %ss
 	movl	%edx, %esp
 
+	/* Reset IDTR to the real-mode defaults */
+	lidt	rm_idtr
+
 	/* Return to real-mode address */
 	data32 ret
 
@@ -318,7 +336,7 @@ rm_cs:	.word 0
 	.globl rm_ds
 	.section ".text16.data"
 rm_ds:	.word 0
-	
+
 /****************************************************************************
  * prot_call (real-mode far call, 16-bit real-mode far return address)
  *
@@ -354,7 +372,8 @@ rm_ds:	.word 0
  */
 
 #define PC_OFFSET_GDT ( 0 )
-#define PC_OFFSET_IX86 ( PC_OFFSET_GDT + 8 /* pad to 8 to keep alignment */ )
+#define PC_OFFSET_IDT ( PC_OFFSET_GDT + 8 /* pad to 8 to keep alignment */ )
+#define PC_OFFSET_IX86 ( PC_OFFSET_IDT + 8 /* pad to 8 to keep alignment */ )
 #define PC_OFFSET_RETADDR ( PC_OFFSET_IX86 + SIZEOF_I386_ALL_REGS )
 #define PC_OFFSET_FUNCTION ( PC_OFFSET_RETADDR + 4 )
 #define PC_OFFSET_END ( PC_OFFSET_FUNCTION + 4 )
@@ -372,8 +391,9 @@ prot_call:
 	pushw	%ds
 	pushw	%ss
 	pushw	%cs
-	subw	$8, %sp
+	subw	$16, %sp
 	movw	%sp, %bp
+	sidt	8(%bp)
 	sgdt	(%bp)
 
 	/* For sanity's sake, clear the direction flag as soon as possible */
@@ -402,10 +422,11 @@ prot_call:
 	.section ".text16"
 	.code16
 1:	
-	/* Reload GDT, restore registers and flags and return */
+	/* Reload GDT and IDT, restore registers and flags and return */
 	movw	%sp, %bp
 	lgdt	(%bp)
-	addw	$12, %sp /* also skip %cs and %ss */
+	lidt	8(%bp)
+	addw	$20, %sp /* also skip %cs and %ss */
 	popw	%ds
 	popw	%es
 	popw	%fs
@@ -495,7 +516,7 @@ real_call:
 	 */
 	.section ".data16"
 rc_function:	.word 0, 0
-	
+
 /****************************************************************************
  * Stored real-mode and protected-mode stack pointers
  *

@@ -198,3 +198,6 @@ REQUIRE_OBJECT ( sanboot_cmd );
 #ifdef NULL_TRAP
 REQUIRE_OBJECT ( nulltrap );
 #endif
+#ifdef GDBSTUB
+REQUIRE_OBJECT ( gdbidt );
+#endif
