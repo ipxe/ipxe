@@ -27,7 +27,7 @@
 #include <stddef.h>
 #include <stdio.h>
 #include <ctype.h>
-#include <assert.h>
+#include <byteswap.h>
 #include <gpxe/process.h>
 #include <gpxe/serial.h>
 #include "gdbmach.h"
@@ -67,20 +67,60 @@ static uint8_t gdbstub_to_hex_digit ( uint8_t b ) {
 	return ( b < 0xa ? '0' : 'a' - 0xa ) + b;
 }
 
-static void gdbstub_from_hex_buf ( char *dst, char *src, int len ) {
-	while ( len-- > 0 ) {
-		*dst = gdbstub_from_hex_digit ( *src++ );
-		if ( len-- > 0 ) {
-			*dst = (*dst << 4) | gdbstub_from_hex_digit ( *src++ );
+/*
+ * To make reading/writing device memory atomic, we check for
+ * 2- or 4-byte aligned operations and handle them specially.
+ */
+
+static void gdbstub_from_hex_buf ( char *dst, char *src, int lenbytes ) {
+	if ( lenbytes == 2 && ( ( unsigned long ) dst & 0x1 ) == 0 ) {
+		uint16_t i = gdbstub_from_hex_digit ( src [ 2 ] ) << 12 |
+			gdbstub_from_hex_digit ( src [ 3 ] ) << 8 |
+			gdbstub_from_hex_digit ( src [ 0 ] ) << 4 |
+			gdbstub_from_hex_digit ( src [ 1 ] );
+		* ( uint16_t * ) dst = cpu_to_le16 ( i );
+	} else if ( lenbytes == 4 && ( ( unsigned long ) dst & 0x3 ) == 0 ) {
+		uint32_t i = gdbstub_from_hex_digit ( src [ 6 ] ) << 28 |
+			gdbstub_from_hex_digit ( src [ 7 ] ) << 24 |
+			gdbstub_from_hex_digit ( src [ 4 ] ) << 20 |
+			gdbstub_from_hex_digit ( src [ 5 ] ) << 16 |
+			gdbstub_from_hex_digit ( src [ 2 ] ) << 12 |
+			gdbstub_from_hex_digit ( src [ 3 ] ) << 8 |
+			gdbstub_from_hex_digit ( src [ 0 ] ) << 4 |
+			gdbstub_from_hex_digit ( src [ 1 ] );
+		* ( uint32_t * ) dst = cpu_to_le32 ( i );
+	} else {
+		while ( lenbytes-- > 0 ) {
+			*dst++ = gdbstub_from_hex_digit ( src [ 0 ] ) << 4 |
+				gdbstub_from_hex_digit ( src [ 1 ] );
+			src += 2;
 		}
-		dst++;
 	}
 }
 
-static void gdbstub_to_hex_buf ( char *dst, char *src, int len ) {
-	while ( len-- > 0 ) {
-		*dst++ = gdbstub_to_hex_digit ( *src >> 4 );
-		*dst++ = gdbstub_to_hex_digit ( *src++ );
+static void gdbstub_to_hex_buf ( char *dst, char *src, int lenbytes ) {
+	if ( lenbytes == 2 && ( ( unsigned long ) src & 0x1 ) == 0 ) {
+		uint16_t i = cpu_to_le16 ( * ( uint16_t * ) src );
+		dst [ 0 ] = gdbstub_to_hex_digit ( i >> 4 );
+		dst [ 1 ] = gdbstub_to_hex_digit ( i );
+		dst [ 2 ] = gdbstub_to_hex_digit ( i >> 12 );
+		dst [ 3 ] = gdbstub_to_hex_digit ( i >> 8 );
+	} else if ( lenbytes == 4 && ( ( unsigned long ) src & 0x3 ) == 0 ) {
+		uint32_t i = cpu_to_le32 ( * ( uint32_t * ) src );
+		dst [ 0 ] = gdbstub_to_hex_digit ( i >> 4 );
+		dst [ 1 ] = gdbstub_to_hex_digit ( i );
+		dst [ 2 ] = gdbstub_to_hex_digit ( i >> 12 );
+		dst [ 3 ] = gdbstub_to_hex_digit ( i >> 8 );
+		dst [ 4 ] = gdbstub_to_hex_digit ( i >> 20 );
+		dst [ 5 ] = gdbstub_to_hex_digit ( i >> 16);
+		dst [ 6 ] = gdbstub_to_hex_digit ( i >> 28 );
+		dst [ 7 ] = gdbstub_to_hex_digit ( i >> 24 );
+	} else {
+		while ( lenbytes-- > 0 ) {
+			*dst++ = gdbstub_to_hex_digit ( *src >> 4 );
+			*dst++ = gdbstub_to_hex_digit ( *src );
+			src++;
+		}
 	}
 }
 
@@ -179,7 +219,7 @@ static void gdbstub_write_regs ( struct gdbstub *stub ) {
 		gdbstub_send_errno ( stub, POSIX_EINVAL );
 		return;
 	}
-	gdbstub_from_hex_buf ( ( char * ) stub->regs, &stub->payload [ 1 ], stub->len );
+	gdbstub_from_hex_buf ( ( char * ) stub->regs, &stub->payload [ 1 ], GDBMACH_SIZEOF_REGS );
 	gdbstub_send_ok ( stub );
 }
 
@@ -204,7 +244,7 @@ static void gdbstub_write_mem ( struct gdbstub *stub ) {
 		gdbstub_send_errno ( stub, POSIX_EINVAL );
 		return;
 	}
-	gdbstub_from_hex_buf ( ( char * ) args [ 0 ], &stub->payload [ colon + 1 ], stub->len - colon - 1 );
+	gdbstub_from_hex_buf ( ( char * ) args [ 0 ], &stub->payload [ colon + 1 ], ( stub->len - colon - 1 ) / 2 );
 	gdbstub_send_ok ( stub );
 }
 
