@@ -260,6 +260,14 @@ static struct dhcp_settings * dhcpset_create ( const struct dhcphdr *dhcphdr,
 	return dhcpset;
 }
 
+/** DHCP server address setting */
+struct setting dhcp_server_setting __setting = {
+	.name = "dhcp-server",
+	.description = "DHCP server address",
+	.tag = DHCP_SERVER_IDENTIFIER,
+	.type = &setting_type_ipv4,
+};
+
 /****************************************************************************
  *
  * DHCP session
