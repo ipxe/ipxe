@@ -235,11 +235,14 @@ static void gdbstub_rx_packet ( struct gdbstub *stub ) {
 		case 'M':
 			gdbstub_write_mem ( stub );
 			break;
-		case 'c':
-			gdbstub_continue ( stub, 0 );
-			break;
-		case 's':
-			gdbstub_continue ( stub, 1 );
+		case 'c': /* Continue */
+		case 'k': /* Kill */
+		case 's': /* Step */
+		case 'D': /* Detach */
+			gdbstub_continue ( stub, stub->payload [ 0 ] == 's' );
+			if ( stub->payload [ 0 ] == 'D' ) {
+				gdbstub_send_ok ( stub );
+			}
 			break;
 		default:
 			stub->len = 0;

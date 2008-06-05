@@ -25,5 +25,9 @@ gdbstub_test:
 	int	$3
 	addl	$8, %esp
 
+	/* 5. Step test */
+	int	$3
+	nop
+
 1:
 	jmp	1b
