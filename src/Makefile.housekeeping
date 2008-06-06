@@ -371,7 +371,7 @@ $(BIN)/%.tmp : $(BLIB) $(MAKEDEPS) $(LDSCRIPT)
 	$(Q)$(OBJDUMP) -ht $@ | $(SORTOBJDUMP) >> $(BIN)/$*.tmp.map
 
 # Keep intermediate object file (useful for debugging)
-.SECONDARY : $(BIN)/%.tmp
+.PRECIOUS : $(BIN)/%.tmp
 
 # Show a linker map for the specified target
 #
