@@ -62,6 +62,15 @@ struct sockaddr_in {
 	uint16_t sin_port;
 	/** IPv4 address */
 	struct in_addr sin_addr;
+	/** Padding
+	 *
+	 * This ensures that a struct @c sockaddr_tcpip is large
+	 * enough to hold a socket address for any TCP/IP address
+	 * family.
+	 */
+	char pad[ sizeof ( struct sockaddr ) - sizeof ( sa_family_t )
+					     - sizeof ( uint16_t )
+					     - sizeof ( struct in_addr ) ];
 };
 
 /**
