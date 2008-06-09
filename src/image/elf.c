@@ -21,6 +21,9 @@
  *
  * ELF image format
  *
+ * A "pure" ELF image is not a bootable image.  There are various
+ * bootable formats based upon ELF (e.g. Multiboot), which share
+ * common ELF-related functionality.
  */
 
 #include <errno.h>
@@ -30,21 +33,9 @@
 #include <gpxe/image.h>
 #include <gpxe/elf.h>
 
-struct image_type elf_image_type __image_type ( PROBE_NORMAL );
-
 typedef Elf32_Ehdr	Elf_Ehdr;
 typedef Elf32_Phdr	Elf_Phdr;
 typedef Elf32_Off	Elf_Off;
-
-/**
- * Execute ELF image
- *
- * @v image		ELF file
- * @ret rc		Return status code
- */
-static int elf_exec ( struct image *image __unused ) {
-	return -ENOTSUP;
-}
 
 /**
  * Load ELF segment into memory
@@ -112,16 +103,15 @@ int elf_load ( struct image *image ) {
 	unsigned int phnum;
 	int rc;
 
+	/* Image type must already have been set by caller */
+	assert ( image->type != NULL );
+
 	/* Read ELF header */
 	copy_from_user ( &ehdr, image->data, 0, sizeof ( ehdr ) );
 	if ( memcmp ( &ehdr.e_ident[EI_MAG0], ELFMAG, SELFMAG ) != 0 ) {
 		DBG ( "Invalid ELF signature\n" );
 		return -ENOEXEC;
 	}
-
-	/* This is an ELF image, valid or otherwise */
-	if ( ! image->type )
-		image->type = &elf_image_type;
 
 	/* Read ELF program headers */
 	for ( phoff = ehdr.e_phoff , phnum = ehdr.e_phnum ; phnum ;
@@ -141,10 +131,3 @@ int elf_load ( struct image *image ) {
 
 	return 0;
 }
-
-/** ELF image type */
-struct image_type elf_image_type __image_type ( PROBE_NORMAL ) = {
-	.name = "ELF",
-	.load = elf_load,
-	.exec = elf_exec,
-};

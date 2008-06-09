@@ -131,11 +131,8 @@ REQUIRE_OBJECT ( nmb );
 #ifdef IMAGE_NBI
 REQUIRE_OBJECT ( nbi );
 #endif
-#ifdef IMAGE_ELF64
-REQUIRE_OBJECT ( elf64 );
-#endif
 #ifdef IMAGE_ELF
-REQUIRE_OBJECT ( elf );
+REQUIRE_OBJECT ( elfboot );
 #endif
 #ifdef IMAGE_FREEBSD
 REQUIRE_OBJECT ( freebsd );

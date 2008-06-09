@@ -121,8 +121,7 @@
  *
  */
 #undef	IMAGE_NBI		/* NBI image support */
-#undef	IMAGE_ELF64		/* ELF64 image support */
-#undef	IMAGE_ELF		/* ELF image support */
+#define	IMAGE_ELF		/* ELF image support */
 #undef	IMAGE_FREEBSD		/* FreeBSD kernel image support */
 #define	IMAGE_MULTIBOOT		/* MultiBoot image support */
 #undef	IMAGE_AOUT		/* a.out image support */

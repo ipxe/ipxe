@@ -43,6 +43,7 @@
 #define DHCP_EB_FEATURE_MULTIBOOT	0x19 /**< Multiboot format */
 #define DHCP_EB_FEATURE_NBI		0x20 /**< NBI format */
 #define DHCP_EB_FEATURE_PXE		0x21 /**< PXE format */
+#define DHCP_EB_FEATURE_ELF		0x22 /**< ELF format */
 
 /** @} */
 
