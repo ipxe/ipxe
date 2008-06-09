@@ -45,7 +45,7 @@ DOXYGEN		:= doxygen
 # If invoked with no build target, print out a helpfully suggestive
 # message.
 #
-noargs : blib $(BIN)/NIC $(BIN)/gpxe.dsk $(BIN)/gpxe.iso $(BIN)/gpxe.usb
+noargs : blib $(BIN)/NIC $(BIN)/gpxe.dsk $(BIN)/gpxe.iso $(BIN)/gpxe.usb $(BIN)/undionly.kpxe
 	@$(ECHO) '==========================================================='
 	@$(ECHO)
 	@$(ECHO) 'To create a bootable floppy, type'
