@@ -632,27 +632,30 @@ static struct xfer_interface_operations slam_xfer_operations = {
 static int slam_parse_multicast_address ( struct slam_request *slam,
 					  const char *path,
 					  struct sockaddr_in *address ) {
-	char path_dup[ strlen ( path ) + 1 ];
+	char path_dup[ strlen ( path ) /* no +1 */ ];
 	char *sep;
+	char *end;
 
-	/* Create temporary copy of path */
-	memcpy ( path_dup, path, sizeof ( path_dup ) );
+	/* Create temporary copy of path, minus the leading '/' */
+	assert ( *path == '/' );
+	memcpy ( path_dup, ( path + 1 ) , sizeof ( path_dup ) );
 
 	/* Parse port, if present */
 	sep = strchr ( path_dup, ':' );
 	if ( sep ) {
 		*(sep++) = '\0';
-		address->sin_port = htons ( strtoul ( sep, &sep, 0 ) );
-		if ( *sep != '\0' ) {
-			DBGC ( slam, "SLAM %p invalid multicast port\n",
-			       slam );
+		address->sin_port = htons ( strtoul ( sep, &end, 0 ) );
+		if ( *end != '\0' ) {
+			DBGC ( slam, "SLAM %p invalid multicast port "
+			       "\"%s\"\n", slam, sep );
 			return -EINVAL;
 		}
 	}
 
 	/* Parse address */
 	if ( inet_aton ( path_dup, &address->sin_addr ) == 0 ) {
-		DBGC ( slam, "SLAM %p invalid multicast address\n", slam );
+		DBGC ( slam, "SLAM %p invalid multicast address \"%s\"\n",
+		       slam, path_dup );
 		return -EINVAL;
 	}
 
