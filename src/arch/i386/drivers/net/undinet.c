@@ -543,9 +543,13 @@ static int undinet_open ( struct net_device *netdev ) {
 	undinet_call ( undinic, PXENV_UNDI_SET_STATION_ADDRESS,
 		       &undi_set_address, sizeof ( undi_set_address ) );
 
-	/* Open NIC */
+	/* Open NIC.  We ask for promiscuous operation, since it's the
+	 * only way to ask for all multicast addresses.  On any
+	 * switched network, it shouldn't really make a difference to
+	 * performance.
+	 */
 	memset ( &undi_open, 0, sizeof ( undi_open ) );
-	undi_open.PktFilter = ( FLTR_DIRECTED | FLTR_BRDCST );
+	undi_open.PktFilter = ( FLTR_DIRECTED | FLTR_BRDCST | FLTR_PRMSCS );
 	if ( ( rc = undinet_call ( undinic, PXENV_UNDI_OPEN, &undi_open,
 				   sizeof ( undi_open ) ) ) != 0 )
 		goto err;
