@@ -93,6 +93,16 @@ FEATURE ( FEATURE_PROTOCOL, "SLAM", DHCP_EB_FEATURE_SLAM, 1 );
 #define SLAM_MAX_HEADER_LEN ( 8 /* transaction id */ + 8 /* total_bytes */ + \
 			      8 /* block_size */ )
 
+/** Maximum SLAM NACK length
+ *
+ * This is a policy decision.  Shorter packets take less time to
+ * construct and spew out less debug output, and there's a limit to
+ * how useful it is to send a complete missing-block list anyway; if
+ * the loss rate is high then we're going to have to retransmit an
+ * updated missing-block list anyway.
+ */
+#define SLAM_MAX_NACK_LEN 16
+
 /** A SLAM request */
 struct slam_request {
 	/** Reference counter */
@@ -198,8 +208,8 @@ static int slam_put_value ( struct slam_request *slam,
 	 */
 	len = ( ( flsl ( value ) + 10 ) / 8 );
 	if ( len >= iob_tailroom ( iobuf ) ) {
-		DBGC ( slam, "SLAM %p cannot add %d-byte value\n",
-		       slam, len );
+		DBGC2 ( slam, "SLAM %p cannot add %d-byte value\n",
+			slam, len );
 		return -ENOBUFS;
 	}
 	/* There is no valid way within the protocol that we can end
@@ -221,6 +231,52 @@ static int slam_put_value ( struct slam_request *slam,
 }
 
 /**
+ * Build SLAM compressed missing-block list
+ *
+ * @v slam		SLAM request
+ * @v iobuf		I/O buffer
+ * @ret rc		Return status code
+ */
+static int slam_build_block_list ( struct slam_request *slam,
+				   struct io_buffer *iobuf ) {
+	unsigned int block;
+	unsigned int block_count;
+	int block_present;
+	int last_block_present;
+	int rc;
+
+	DBGC ( slam, "SLAM %p asking for ", slam );
+
+	/* Walk bitmap to construct list */
+	block_count = 0;
+	last_block_present = ( ! 0 );
+	for ( block = 0 ; block < slam->num_blocks ; block++ ) {
+		block_present = ( !! bitmap_test ( &slam->bitmap, block ) );
+		if ( block_present != last_block_present ) {
+			if ( ( rc = slam_put_value ( slam, iobuf,
+						     block_count ) ) != 0 ) {
+				DBGC ( slam, "...\n" );
+				return rc;
+			}
+			DBGC ( slam, "%c%d",
+			       ( last_block_present ? ' ' : '-' ),
+			       ( last_block_present ? block : block - 1 ) );
+			block_count = 0;
+			last_block_present = block_present;
+		}
+		block_count++;
+	}
+	if ( ( rc = slam_put_value ( slam, iobuf, block_count ) ) != 0 ) {
+		DBGC ( slam, "...\n" );
+		return rc;
+	}
+	DBGC ( slam, "%c%d\n", ( last_block_present ? ' ' : '-' ),
+	       ( last_block_present ? block : block - 1 ) );
+
+	return 0;
+}
+
+/**
  * Send SLAM NACK packet
  *
  * @v slam		SLAM request
@@ -228,10 +284,6 @@ static int slam_put_value ( struct slam_request *slam,
  */
 static int slam_tx_nack ( struct slam_request *slam ) {
 	struct io_buffer *iobuf;
-	unsigned int block;
-	unsigned int block_count;
-	int block_present;
-	int last_block_present;
 	uint8_t *nul;
 
 	DBGC ( slam, "SLAM %p transmitting NACK\n", slam );
@@ -243,26 +295,17 @@ static int slam_tx_nack ( struct slam_request *slam ) {
 	 * data we can fit in a packet.  If we overrun, it seems to be
 	 * acceptable to drop information anyway.
 	 */
-	iobuf = xfer_alloc_iob ( &slam->socket,	slam->block_size );
+	iobuf = xfer_alloc_iob ( &slam->socket,	SLAM_MAX_NACK_LEN );
 	if ( ! iobuf ) {
 		DBGC ( slam, "SLAM %p could not allocate I/O buffer\n",
 		       slam );
 		return -ENOMEM;
 	}
 
-	/* Walk bitmap to construct list */
-	block_count = 0;
-	last_block_present = ( ! 0 );
-	for ( block = 0 ; block < slam->num_blocks ; block++ ) {
-		block_present = ( !! bitmap_test ( &slam->bitmap, block ) );
-		if ( block_present != last_block_present ) {
-			slam_put_value ( slam, iobuf, block_count );
-			block_count = 0;
-			last_block_present = block_present;
-		}
-		block_count++;
-	}
-	slam_put_value ( slam, iobuf, block_count );
+	/* Build block list.  (Errors are non-fatal; it just means we
+	 * couldn't fit the compressed list within the packet.)
+	 */
+	slam_build_block_list ( slam, iobuf );
 
 	/* Add NUL terminator */
 	nul = iob_put ( iobuf, 1 );
@@ -697,7 +740,6 @@ static int slam_open ( struct xfer_interface *xfer, struct uri *uri ) {
 	/* Fake an invalid cached header of { 0x00, ... } */
 	slam->header_len = 1;
 	/* Fake parameters for initial NACK */
-	slam->block_size = 512;
 	slam->num_blocks = 1;
 	if ( ( rc = bitmap_resize ( &slam->bitmap, 1 ) ) != 0 ) {
 		DBGC ( slam, "SLAM %p could not allocate initial bitmap: "
