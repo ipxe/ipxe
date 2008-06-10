@@ -191,14 +191,14 @@ static void slam_finished ( struct slam_request *slam, int rc ) {
  * @v slam		SLAM request
  * @v iobuf		I/O buffer
  * @v value		Value to add
- * @ret rc		Return status code
+ * @v reserved		Length of reserved space at end of buffer
+ * @ret len		Length of value, or negative error.
  *
- * Adds a variable-length value to the end of an I/O buffer.  Will
- * refuse to use the last byte of the I/O buffer; this is to allow
- * space for the terminating NUL.
+ * Adds a variable-length value to the end of an I/O buffer.
  */
 static int slam_put_value ( struct slam_request *slam,
-			    struct io_buffer *iobuf, unsigned long value ) {
+			    struct io_buffer *iobuf, unsigned long value,
+			    size_t reserved ) {
 	uint8_t *data;
 	size_t len;
 	unsigned int i;
@@ -207,7 +207,7 @@ static int slam_put_value ( struct slam_request *slam,
 	 * leave at least one byte in the I/O buffer.
 	 */
 	len = ( ( flsl ( value ) + 10 ) / 8 );
-	if ( len >= iob_tailroom ( iobuf ) ) {
+	if ( ( len + reserved ) > iob_tailroom ( iobuf ) ) {
 		DBGC2 ( slam, "SLAM %p cannot add %d-byte value\n",
 			slam, len );
 		return -ENOBUFS;
@@ -227,7 +227,7 @@ static int slam_put_value ( struct slam_request *slam,
 	*data |= ( len << 5 );
 	assert ( value == 0 );
 
-	return 0;
+	return len;
 }
 
 /**
@@ -239,13 +239,16 @@ static int slam_put_value ( struct slam_request *slam,
  */
 static int slam_build_block_list ( struct slam_request *slam,
 				   struct io_buffer *iobuf ) {
-	unsigned int block;
-	unsigned int block_count;
+	unsigned long block;
+	unsigned long block_count;
 	int block_present;
 	int last_block_present;
+	int len;
+	size_t last_len = 0;
+	unsigned long last_block_count = 0;
 	int rc;
 
-	DBGC ( slam, "SLAM %p asking for ", slam );
+	DBGC ( slam, "SLAM %p asking for", slam );
 
 	/* Walk bitmap to construct list */
 	block_count = 0;
@@ -253,27 +256,43 @@ static int slam_build_block_list ( struct slam_request *slam,
 	for ( block = 0 ; block < slam->num_blocks ; block++ ) {
 		block_present = ( !! bitmap_test ( &slam->bitmap, block ) );
 		if ( block_present != last_block_present ) {
-			if ( ( rc = slam_put_value ( slam, iobuf,
-						     block_count ) ) != 0 ) {
-				DBGC ( slam, "...\n" );
-				return rc;
-			}
-			DBGC ( slam, "%c%d",
+			if ( ( len = slam_put_value ( slam, iobuf, block_count,
+					     ( sizeof ( block ) + 1 ) ) ) < 0 )
+				goto truncated;
+			DBGC ( slam, "%c%ld",
 			       ( last_block_present ? ' ' : '-' ),
 			       ( last_block_present ? block : block - 1 ) );
-			block_count = 0;
+			last_len = len;
+			last_block_count = block_count;
 			last_block_present = block_present;
+			block_count = 0;
 		}
 		block_count++;
 	}
-	if ( ( rc = slam_put_value ( slam, iobuf, block_count ) ) != 0 ) {
-		DBGC ( slam, "...\n" );
-		return rc;
-	}
-	DBGC ( slam, "%c%d\n", ( last_block_present ? ' ' : '-' ),
+	if ( ( len = slam_put_value ( slam, iobuf, block_count,
+				      ( sizeof ( block ) + 1 ) ) ) < 0 )
+		goto truncated;
+	DBGC ( slam, "%c%ld\n", ( last_block_present ? ' ' : '-' ),
 	       ( last_block_present ? block : block - 1 ) );
 
 	return 0;
+
+ truncated:
+	rc = len;
+	block -= block_count;
+	assert ( last_len != 0 ); /* Cannot truncate on first entry */
+	if ( last_block_present ) {
+		/* Replace last missing-blocks number */
+		DBGC ( slam, "#" );
+		iob_unput ( iobuf, last_len );
+		block -= last_block_count;
+	}
+	/* Report all remaining blocks as missing */
+	block_count = ( slam->num_blocks - block );
+	DBGC ( slam, "-%ld\n", ( slam->num_blocks - 1 ) );
+	len = slam_put_value ( slam, iobuf, block_count, 1 );
+	assert ( len > 0 );
+	return rc;
 }
 
 /**
