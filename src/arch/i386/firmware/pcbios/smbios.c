@@ -275,14 +275,12 @@ int read_smbios_string ( struct smbios_structure *structure,
 		 * smbios_strings struct is constructed so as to
 		 * always end on a string boundary.
 		 */
-		string_len = strlen_user ( smbios.address,
-					   ( structure->offset + offset ) );
+		string_len = strlen_user ( smbios.address, offset );
 		if ( --index == 0 ) {
 			/* Copy string, truncating as necessary. */
 			if ( len > string_len )
 				len = string_len;
-			copy_from_user ( data, smbios.address,
-					 ( structure->offset + offset ), len );
+			copy_from_user ( data, smbios.address, offset, len );
 			return string_len;
 		}
 	}
