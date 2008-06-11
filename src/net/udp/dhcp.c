@@ -932,7 +932,7 @@ static void dhcp_timer_expired ( struct retry_timer *timer, int fail ) {
 	}
 
 	/* Give up waiting for ProxyDHCP before we reach the failure point */
-	if ( elapsed > PROXYDHCP_WAIT_TIME ) {
+	if ( dhcp->dhcpoffer && ( elapsed > PROXYDHCP_WAIT_TIME ) ) {
 		if ( dhcp->state == DHCP_STATE_DISCOVER ) {
 			dhcp_set_state ( dhcp, DHCP_STATE_REQUEST );
 			return;
