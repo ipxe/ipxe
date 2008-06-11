@@ -88,9 +88,15 @@ static struct console_driver * has_input ( void ) {
  */
 int getchar ( void ) {
 	struct console_driver *console;
-	int character = 256;
+	int character;
 
-	while ( character == 256 ) {
+	while ( 1 ) {
+		console = has_input();
+		if ( console && console->getchar ) {
+			character = console->getchar ();
+			break;
+		}
+
 		/* Doze for a while (until the next interrupt).  This works
 		 * fine, because the keyboard is interrupt-driven, and the
 		 * timer interrupt (approx. every 50msec) takes care of the
@@ -105,10 +111,6 @@ int getchar ( void ) {
 		 * input.
 		 */
 		step();
-		
-		console = has_input();
-		if ( console && console->getchar )
-			character = console->getchar ();
 	}
 
 	/* CR -> LF translation */
