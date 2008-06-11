@@ -1,0 +1,228 @@
+/*
+ * Copyright (C) 2008 Stefan Hajnoczi <stefanha@gmail.com>.
+ *
+ * This program is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU General Public License as
+ * published by the Free Software Foundation; either version 2 of the
+ * License, or any later version.
+ *
+ * This program is distributed in the hope that it will be useful, but
+ * WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ * General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program; if not, write to the Free Software
+ * Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
+ */
+
+#include <stdio.h>
+#include <string.h>
+#include <byteswap.h>
+#include <gpxe/iobuf.h>
+#include <gpxe/in.h>
+#include <gpxe/if_arp.h>
+#include <gpxe/if_ether.h>
+#include <gpxe/ip.h>
+#include <gpxe/udp.h>
+#include <gpxe/netdevice.h>
+#include <gpxe/gdbstub.h>
+
+struct gdb_transport udp_gdb_transport __gdb_transport;
+
+static struct net_device *netdev;
+static uint8_t dest_eth[ETH_ALEN];
+static uint8_t source_eth[ETH_ALEN];
+static struct sockaddr_in dest_addr;
+static struct sockaddr_in source_addr;
+
+static void gdbudp_ensure_netdev_open ( struct net_device *netdev ) {
+	if ( ( netdev->state & NETDEV_OPEN) == 0 ) {
+		netdev_open ( netdev );
+	}
+	/* TODO forcing the netdev to be open is useful when
+	 * gPXE closes the netdev between breakpoints.  Should
+	 * we restore the state of the netdev, i.e. closed,
+	 * before leaving the interrupt handler? */
+}
+
+static size_t gdbudp_recv ( char *buf, size_t len ) {
+	struct io_buffer *iob;
+	struct ethhdr *ethhdr;
+	struct arphdr *arphdr;
+	struct iphdr *iphdr;
+	struct udp_header *udphdr;
+	size_t payload_len;
+
+	assert ( netdev );
+	gdbudp_ensure_netdev_open ( netdev );
+
+	for ( ; ; ) {
+		while ( ( iob = netdev_rx_dequeue ( netdev ) ) != NULL ) {
+			if ( iob_len ( iob ) > sizeof ( *ethhdr ) + sizeof ( *iphdr ) + sizeof ( *udphdr ) + len ) {
+				goto bad_packet;
+			}
+
+			/* Ethernet header */
+			ethhdr = iob->data;
+			iob_pull ( iob, sizeof ( *ethhdr ) );
+			if ( ethhdr->h_protocol == htons ( ETH_P_ARP ) ) {
+				/* Handle ARP requests so the client can connect to us */
+				arphdr = iob->data;
+				if ( arphdr->ar_hrd != htons ( ARPHRD_ETHER ) ||
+						arphdr->ar_pro != htons ( ETH_P_IP ) ||
+						arphdr->ar_hln != ETH_ALEN ||
+						arphdr->ar_pln != sizeof ( struct in_addr ) ||
+						arphdr->ar_op != htons ( ARPOP_REQUEST ) ||
+						memcmp ( arp_target_pa ( arphdr ), &source_addr.sin_addr.s_addr, sizeof ( struct in_addr ) ) ) {
+					goto bad_packet;
+				}
+
+				/* Generate an ARP reply */
+				arphdr->ar_op = htons ( ARPOP_REPLY );
+				memswap ( arp_sender_pa ( arphdr ), arp_target_pa ( arphdr ), sizeof ( struct in_addr ) );
+				memcpy ( arp_target_ha ( arphdr ), arp_sender_ha ( arphdr ), ETH_ALEN );
+				memcpy ( arp_sender_ha ( arphdr ), source_eth, ETH_ALEN );
+
+				/* Fix up ethernet header */
+				ethhdr = iob_push ( iob, sizeof ( *ethhdr ) );
+				memswap ( ethhdr->h_source, ethhdr->h_dest, ETH_ALEN );
+
+				netdev_tx ( netdev, iob );
+				continue; /* no need to free iob */
+			}
+			if ( ethhdr->h_protocol != htons ( ETH_P_IP ) ) {
+				goto bad_packet;
+			}
+
+			/* IP header */
+			iphdr = iob->data;
+			iob_pull ( iob, sizeof ( *iphdr ) );
+			if ( iphdr->protocol != IP_UDP || iphdr->dest.s_addr != source_addr.sin_addr.s_addr ) {
+				goto bad_packet;
+			}
+
+			/* UDP header */
+			udphdr = iob->data;
+			if ( udphdr->dest != source_addr.sin_port ) {
+				goto bad_packet;
+			}
+
+			/* Learn the remote connection details */
+			memcpy ( dest_eth, ethhdr->h_source, ETH_ALEN );
+			dest_addr.sin_addr.s_addr = iphdr->src.s_addr;
+			dest_addr.sin_port = udphdr->src;
+
+			/* Payload */
+			payload_len = ntohs ( udphdr->len );
+			if ( payload_len < sizeof ( *udphdr ) ||
+					payload_len > iob_len ( iob ) ) {
+				goto bad_packet;
+			}
+			payload_len -= sizeof ( *udphdr );
+			iob_pull ( iob, sizeof ( *udphdr ) );
+			memcpy ( buf, iob->data, payload_len );
+
+			free_iob ( iob );
+			return payload_len;
+
+bad_packet:
+			free_iob ( iob );
+		}
+		netdev_poll ( netdev );
+	}
+}
+
+static void gdbudp_send ( const char *buf, size_t len ) {
+	struct io_buffer *iob;
+	struct ethhdr *ethhdr;
+	struct iphdr *iphdr;
+	struct udp_header *udphdr;
+
+	/* Check that we are connected */
+	if ( dest_addr.sin_port == 0 ) {
+		return;
+	}
+
+	assert ( netdev );
+	gdbudp_ensure_netdev_open ( netdev );
+
+	iob = alloc_iob ( sizeof ( *ethhdr ) + sizeof ( *iphdr ) + sizeof ( *udphdr ) + len );
+	if ( !iob ) {
+		return;
+	}
+
+	/* Payload */
+	iob_reserve ( iob, sizeof ( *ethhdr ) + sizeof ( *iphdr ) + sizeof ( *udphdr ) );
+	memcpy ( iob_put ( iob, len ), buf, len );
+
+	/* UDP header */
+	udphdr = iob_push ( iob, sizeof ( *udphdr ) );
+	udphdr->src = source_addr.sin_port;
+	udphdr->dest = dest_addr.sin_port;
+	udphdr->len = htons ( iob_len ( iob ) );
+	udphdr->chksum = 0; /* optional and we are not using it */
+
+	/* IP header */
+	iphdr = iob_push ( iob, sizeof ( *iphdr ) );
+	memset ( iphdr, 0, sizeof ( *iphdr ) );
+	iphdr->verhdrlen = ( IP_VER | ( sizeof ( *iphdr ) / 4 ) );
+	iphdr->service = IP_TOS;
+	iphdr->len = htons ( iob_len ( iob ) );	
+	iphdr->ttl = IP_TTL;
+	iphdr->protocol = IP_UDP;
+	iphdr->dest.s_addr = dest_addr.sin_addr.s_addr;
+	iphdr->src.s_addr = source_addr.sin_addr.s_addr;
+	iphdr->chksum = tcpip_chksum ( iphdr, sizeof ( *iphdr ) );
+
+	/* Ethernet header */
+	ethhdr = iob_push ( iob, sizeof ( *ethhdr ) );
+	memcpy ( ethhdr->h_dest, dest_eth, ETH_ALEN );
+	memcpy ( ethhdr->h_source, source_eth, ETH_ALEN );
+	ethhdr->h_protocol = htons ( ETH_P_IP );
+
+	netdev_tx ( netdev, iob );
+}
+
+static int gdbudp_init ( int argc, char **argv ) {
+	struct settings *settings;
+
+	if ( argc != 1 ) {
+		printf ( "udp: missing <interface> argument\n" );
+		return 1;
+	}
+
+	netdev = find_netdev ( argv[0] );
+	if ( !netdev ) {
+		printf ( "%s: no such interface\n", argv[0] );
+		return 1;
+	}
+
+	if ( !netdev_link_ok ( netdev ) ) {
+		printf ( "%s: link not up\n", argv[0] );
+		return 1;
+	}
+
+	/* Load network settings from device.  We keep the MAC address,
+	 * IP address, and UDP port.  The MAC and IP could be fetched
+	 * from the network device each time they are used in rx/tx.
+	 * Storing a separate copy makes it possible to use different
+	 * MAC/IP settings than the network stack. */
+	memcpy ( source_eth, netdev->ll_addr, ETH_ALEN );
+	source_addr.sin_port = htons ( 43770 ); /* TODO default port */
+	settings = netdev_settings ( netdev );
+	fetch_ipv4_setting ( settings, &ip_setting, &source_addr.sin_addr );
+	if ( source_addr.sin_addr.s_addr == 0 ) {
+		printf ( "%s: no IP address configured\n", argv[0] );
+		return 1;
+	}
+
+	return 0;
+}
+
+struct gdb_transport udp_gdb_transport __gdb_transport = {
+	.name = "udp",
+	.init = gdbudp_init,
+	.send = gdbudp_send,
+	.recv = gdbudp_recv,
+};

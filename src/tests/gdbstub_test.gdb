@@ -3,14 +3,14 @@
 # Run:
 #   make bin/gpxe.hd.tmp
 #   make
-#   tests/gdbstub_test.gdb
+#   gdb
+#   (gdb) target remote :TCPPORT
+#   OR
+#   (gdb) target remote udp:IP:UDPPORT
+#   (gdb) source tests/gdbstub_test.gdb
 
 define gpxe_load_symbols
 	file bin/gpxe.hd.tmp
-end
-
-define gpxe_connect
-	target remote localhost:4444
 end
 
 define gpxe_assert
@@ -78,7 +78,6 @@ define gpxe_test_step
 end
 
 gpxe_load_symbols
-gpxe_connect
 gpxe_start_tests
 gpxe_test_regs_read
 gpxe_test_regs_write

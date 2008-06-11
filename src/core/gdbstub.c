@@ -24,22 +24,24 @@
  */
 
 #include <stdlib.h>
-#include <stddef.h>
 #include <stdio.h>
+#include <string.h>
 #include <ctype.h>
 #include <byteswap.h>
-#include <gpxe/process.h>
-#include <gpxe/serial.h>
+#include <gpxe/gdbstub.h>
 #include "gdbmach.h"
 
 enum {
-	POSIX_EINVAL = 0x1c /* used to report bad arguments to GDB */
+	POSIX_EINVAL = 0x1c,  /* used to report bad arguments to GDB */
+	SIZEOF_PAYLOAD = 256, /* buffer size of GDB payload data */
 };
 
 struct gdbstub {
+	struct gdb_transport *trans;
+	int exit_handler; /* leave interrupt handler */
+
 	int signo;
 	gdbreg_t *regs;
-	int exit_handler; /* leave interrupt handler */
 
 	void ( * parse ) ( struct gdbstub *stub, char ch );
 	uint8_t cksum1;
@@ -47,9 +49,14 @@ struct gdbstub {
 	/* Buffer for payload data when parsing a packet.  Once the
 	 * packet has been received, this buffer is used to hold
 	 * the reply payload. */
-	char payload [ 256 ];
-	int len;
+	char buf [ SIZEOF_PAYLOAD + 4 ]; /* $...PAYLOAD...#XX */
+	char *payload;                   /* start of payload */
+	int len;                         /* length of payload */
 };
+
+/* Transports */
+static struct gdb_transport gdb_transport_start[0] __table_start ( struct gdb_transport, gdb_transports );
+static struct gdb_transport gdb_transport_end[0] __table_end ( struct gdb_transport, gdb_transports );
 
 /* Packet parser states */
 static void gdbstub_state_new ( struct gdbstub *stub, char ch );
@@ -132,29 +139,13 @@ static uint8_t gdbstub_cksum ( char *data, int len ) {
 	return cksum;
 }
 
-static int gdbstub_getchar ( struct gdbstub *stub ) {
-	if ( stub->exit_handler ) {
-		return -1;
-	}
-	return serial_getc();
-}
-
-static void gdbstub_putchar ( struct gdbstub * stub __unused, char ch ) {
-	serial_putc ( ch );
-}
-
 static void gdbstub_tx_packet ( struct gdbstub *stub ) {
 	uint8_t cksum = gdbstub_cksum ( stub->payload, stub->len );
-	int i;
-
-	gdbstub_putchar ( stub, '$' );
-	for ( i = 0; i < stub->len; i++ ) {
-		gdbstub_putchar ( stub, stub->payload [ i ] );
-	}
-	gdbstub_putchar ( stub, '#' );
-	gdbstub_putchar ( stub, gdbstub_to_hex_digit ( cksum >> 4 ) );
-	gdbstub_putchar ( stub, gdbstub_to_hex_digit ( cksum ) );
-
+	stub->buf [ 0 ] = '$';
+	stub->buf [ stub->len + 1 ] = '#';
+	stub->buf [ stub->len + 2 ] = gdbstub_to_hex_digit ( cksum >> 4 );
+	stub->buf [ stub->len + 3 ] = gdbstub_to_hex_digit ( cksum );
+	stub->trans->send ( stub->buf, stub->len + 4 );
 	stub->parse = gdbstub_state_wait_ack;
 }
 
@@ -229,7 +220,7 @@ static void gdbstub_read_mem ( struct gdbstub *stub ) {
 		gdbstub_send_errno ( stub, POSIX_EINVAL );
 		return;
 	}
-	args [ 1 ] = ( args [ 1 ] < sizeof stub->payload / 2 ) ? args [ 1 ] : sizeof stub->payload / 2;
+	args [ 1 ] = ( args [ 1 ] < SIZEOF_PAYLOAD / 2 ) ? args [ 1 ] : SIZEOF_PAYLOAD / 2;
 	gdbstub_to_hex_buf ( stub->payload, ( char * ) args [ 0 ], args [ 1 ] );
 	stub->len = args [ 1 ] * 2;
 	gdbstub_tx_packet ( stub );
@@ -306,7 +297,7 @@ static void gdbstub_state_data ( struct gdbstub *stub, char ch ) {
 		stub->len = 0; /* retry new packet */
 	} else {
 		/* If the length exceeds our buffer, let the checksum fail */
-		if ( stub->len < ( int ) sizeof stub->payload ) {
+		if ( stub->len < SIZEOF_PAYLOAD ) {
 			stub->payload [ stub->len++ ] = ch;
 		}
 	}
@@ -325,12 +316,12 @@ static void gdbstub_state_cksum2 ( struct gdbstub *stub, char ch ) {
 	their_cksum = stub->cksum1 + gdbstub_from_hex_digit ( ch );
 	our_cksum = gdbstub_cksum ( stub->payload, stub->len );
 	if ( their_cksum == our_cksum ) {
-		gdbstub_putchar ( stub, '+' );
+		stub->trans->send ( "+", 1 );
 		if ( stub->len > 0 ) {
 			gdbstub_rx_packet ( stub );
 		}
 	} else {
-		gdbstub_putchar ( stub, '-' );
+		stub->trans->send ( "-", 1 );
 	}
 }
 
@@ -351,23 +342,37 @@ static struct gdbstub stub = {
 };
 
 __cdecl void gdbstub_handler ( int signo, gdbreg_t *regs ) {
-	int ch;
+	char packet [ SIZEOF_PAYLOAD + 4 ];
+	size_t len, i;
+
+	/* A transport must be set up */
+	if ( !stub.trans ) {
+		return;
+	}
+
 	stub.signo = signo;
 	stub.regs = regs;
 	stub.exit_handler = 0;
 	gdbstub_report_signal ( &stub );
-	while ( ( ch = gdbstub_getchar( &stub ) ) != -1 ) {
-		gdbstub_parse ( &stub, ch );
+	while ( !stub.exit_handler && ( len = stub.trans->recv ( packet, sizeof ( packet ) ) ) > 0 ) {
+		for ( i = 0; i < len; i++ ) {
+			gdbstub_parse ( &stub, packet [ i ] );
+		}
 	}
 }
 
-/* Activity monitor to detect packets from GDB when we are not active */
-static void gdbstub_activity_step ( struct process *process __unused ) {
-	if ( serial_ischar() ) {
-		gdbmach_breakpoint();
+struct gdb_transport *find_gdb_transport ( const char *name ) {
+	struct gdb_transport *trans;
+	for ( trans = gdb_transport_start; trans < gdb_transport_end; trans++ ) {
+		if ( strcmp ( trans->name, name ) == 0 ) {
+			return trans;
+		}
 	}
+	return NULL;
 }
 
-struct process gdbstub_activity_process __permanent_process = {
-	.step = gdbstub_activity_step,
-};
+void gdbstub_start ( struct gdb_transport *trans ) {
+	stub.trans = trans;
+	stub.payload = &stub.buf [ 1 ];
+	gdbmach_breakpoint();
+}
