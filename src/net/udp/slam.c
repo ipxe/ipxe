@@ -94,12 +94,19 @@ FEATURE ( FEATURE_PROTOCOL, "SLAM", DHCP_EB_FEATURE_SLAM, 1 );
 #define SLAM_MAX_HEADER_LEN ( 7 /* transaction id */ + 7 /* total_bytes */ + \
 			      7 /* block_size */ )
 
+/** Maximum number of blocks to request per NACK
+ *
+ * This is a policy decision equivalent to selecting a TCP window
+ * size.
+ */
+#define SLAM_MAX_BLOCKS_PER_NACK 4
+
 /** Maximum SLAM NACK length
  *
- * We only ever send a NACK for a single packet.
+ * We only ever send a NACK for a single range of up to @c
+ * SLAM_MAX_BLOCKS_PER_NACK blocks.
  */
-#define SLAM_MAX_NACK_LEN ( 7 /* block */ + 1 /* #blocks = 1 */ + \
-			    1 /* NUL */ )
+#define SLAM_MAX_NACK_LEN ( 7 /* block */ + 7 /* #blocks */ + 1 /* NUL */ )
 
 /** SLAM slave timeout */
 #define SLAM_SLAVE_TIMEOUT ( 1 * TICKS_PER_SEC )
@@ -242,7 +249,8 @@ static int slam_put_value ( struct slam_request *slam,
  */
 static int slam_tx_nack ( struct slam_request *slam ) {
 	struct io_buffer *iobuf;
-	unsigned long block;
+	unsigned long first_block;
+	unsigned long num_blocks;
 	uint8_t *nul;
 	int rc;
 
@@ -263,16 +271,27 @@ static int slam_tx_nack ( struct slam_request *slam ) {
 	 * data out as fast as it can.  On a gigabit network, without
 	 * RX checksumming, this would inevitably cause packet drops.
 	 */
-	block = bitmap_first_gap ( &slam->bitmap );
-	if ( block ) {
-		DBGCP ( slam, "SLAM %p transmitting NACK for block %ld\n",
-			slam, block );
-	} else {
-		DBGC ( slam, "SLAM %p transmitting initial NACK\n", slam );
+	first_block = bitmap_first_gap ( &slam->bitmap );
+	for ( num_blocks = 1 ; ; num_blocks++ ) {
+		if ( num_blocks >= SLAM_MAX_BLOCKS_PER_NACK )
+			break;
+		if ( ( first_block + num_blocks ) >= slam->num_blocks )
+			break;
+		if ( bitmap_test ( &slam->bitmap,
+				   ( first_block + num_blocks ) ) )
+			break;
 	}
-	if ( ( rc = slam_put_value ( slam, iobuf, block ) ) != 0 )
+	if ( first_block ) {
+		DBGCP ( slam, "SLAM %p transmitting NACK for blocks "
+			"%ld-%ld\n", slam, first_block,
+			( first_block + num_blocks - 1 ) );
+	} else {
+		DBGC ( slam, "SLAM %p transmitting initial NACK for blocks "
+		       "0-%ld\n", slam, ( num_blocks - 1 ) );
+	}
+	if ( ( rc = slam_put_value ( slam, iobuf, first_block ) ) != 0 )
 		return rc;
-	if ( ( rc = slam_put_value ( slam, iobuf, 1 ) ) != 0 )
+	if ( ( rc = slam_put_value ( slam, iobuf, num_blocks ) ) != 0 )
 		return rc;
 	nul = iob_put ( iobuf, 1 );
 	*nul = 0;
