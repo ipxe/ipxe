@@ -30,6 +30,7 @@
 #include <gpxe/open.h>
 #include <gpxe/uri.h>
 #include <gpxe/tcpip.h>
+#include <gpxe/timer.h>
 #include <gpxe/retry.h>
 
 /** @file
@@ -90,18 +91,18 @@ FEATURE ( FEATURE_PROTOCOL, "SLAM", DHCP_EB_FEATURE_SLAM, 1 );
 #define SLAM_DEFAULT_MULTICAST_PORT 10000
 
 /** Maximum SLAM header length */
-#define SLAM_MAX_HEADER_LEN ( 8 /* transaction id */ + 8 /* total_bytes */ + \
-			      8 /* block_size */ )
+#define SLAM_MAX_HEADER_LEN ( 7 /* transaction id */ + 7 /* total_bytes */ + \
+			      7 /* block_size */ )
 
 /** Maximum SLAM NACK length
  *
- * This is a policy decision.  Shorter packets take less time to
- * construct and spew out less debug output, and there's a limit to
- * how useful it is to send a complete missing-block list anyway; if
- * the loss rate is high then we're going to have to retransmit an
- * updated missing-block list anyway.
+ * We only ever send a NACK for a single packet.
  */
-#define SLAM_MAX_NACK_LEN 16
+#define SLAM_MAX_NACK_LEN ( 7 /* block */ + 1 /* #blocks = 1 */ + \
+			    1 /* NUL */ )
+
+/** SLAM slave timeout */
+#define SLAM_SLAVE_TIMEOUT ( 1 * TICKS_PER_SEC )
 
 /** A SLAM request */
 struct slam_request {
@@ -115,8 +116,10 @@ struct slam_request {
 	/** Multicast socket */
 	struct xfer_interface mc_socket;
 
-	/** NACK timer */
-	struct retry_timer timer;
+	/** Master client retry timer */
+	struct retry_timer master_timer;
+	/** Slave client retry timer */
+	struct retry_timer slave_timer;
 
 	/** Cached header */
 	uint8_t header[SLAM_MAX_HEADER_LEN];
@@ -167,8 +170,9 @@ static void slam_finished ( struct slam_request *slam, int rc ) {
 				   sizeof ( slam_disconnect ) );
 	}
 
-	/* Stop the retry timer */
-	stop_timer ( &slam->timer );
+	/* Stop the retry timers */
+	stop_timer ( &slam->master_timer );
+	stop_timer ( &slam->slave_timer );
 
 	/* Close all data transfer interfaces */
 	xfer_nullify ( &slam->socket );
@@ -191,14 +195,14 @@ static void slam_finished ( struct slam_request *slam, int rc ) {
  * @v slam		SLAM request
  * @v iobuf		I/O buffer
  * @v value		Value to add
- * @v reserved		Length of reserved space at end of buffer
- * @ret len		Length of value, or negative error.
+ * @ret rc		Return status code
  *
- * Adds a variable-length value to the end of an I/O buffer.
+ * Adds a variable-length value to the end of an I/O buffer.  Will
+ * always leave at least one byte of tailroom in the I/O buffer (to
+ * allow space for the terminating NUL).
  */
 static int slam_put_value ( struct slam_request *slam,
-			    struct io_buffer *iobuf, unsigned long value,
-			    size_t reserved ) {
+			    struct io_buffer *iobuf, unsigned long value ) {
 	uint8_t *data;
 	size_t len;
 	unsigned int i;
@@ -207,7 +211,7 @@ static int slam_put_value ( struct slam_request *slam,
 	 * leave at least one byte in the I/O buffer.
 	 */
 	len = ( ( flsl ( value ) + 10 ) / 8 );
-	if ( ( len + reserved ) > iob_tailroom ( iobuf ) ) {
+	if ( len >= iob_tailroom ( iobuf ) ) {
 		DBGC2 ( slam, "SLAM %p cannot add %d-byte value\n",
 			slam, len );
 		return -ENOBUFS;
@@ -227,72 +231,7 @@ static int slam_put_value ( struct slam_request *slam,
 	*data |= ( len << 5 );
 	assert ( value == 0 );
 
-	return len;
-}
-
-/**
- * Build SLAM compressed missing-block list
- *
- * @v slam		SLAM request
- * @v iobuf		I/O buffer
- * @ret rc		Return status code
- */
-static int slam_build_block_list ( struct slam_request *slam,
-				   struct io_buffer *iobuf ) {
-	unsigned long block;
-	unsigned long block_count;
-	int block_present;
-	int last_block_present;
-	int len;
-	size_t last_len = 0;
-	unsigned long last_block_count = 0;
-	int rc;
-
-	DBGC ( slam, "SLAM %p asking for", slam );
-
-	/* Walk bitmap to construct list */
-	block_count = 0;
-	last_block_present = ( ! 0 );
-	for ( block = 0 ; block < slam->num_blocks ; block++ ) {
-		block_present = ( !! bitmap_test ( &slam->bitmap, block ) );
-		if ( block_present != last_block_present ) {
-			if ( ( len = slam_put_value ( slam, iobuf, block_count,
-					     ( sizeof ( block ) + 1 ) ) ) < 0 )
-				goto truncated;
-			DBGC ( slam, "%c%ld",
-			       ( last_block_present ? ' ' : '-' ),
-			       ( last_block_present ? block : block - 1 ) );
-			last_len = len;
-			last_block_count = block_count;
-			last_block_present = block_present;
-			block_count = 0;
-		}
-		block_count++;
-	}
-	if ( ( len = slam_put_value ( slam, iobuf, block_count,
-				      ( sizeof ( block ) + 1 ) ) ) < 0 )
-		goto truncated;
-	DBGC ( slam, "%c%ld\n", ( last_block_present ? ' ' : '-' ),
-	       ( last_block_present ? block : block - 1 ) );
-
 	return 0;
-
- truncated:
-	rc = len;
-	block -= block_count;
-	assert ( last_len != 0 ); /* Cannot truncate on first entry */
-	if ( last_block_present ) {
-		/* Replace last missing-blocks number */
-		DBGC ( slam, "#" );
-		iob_unput ( iobuf, last_len );
-		block -= last_block_count;
-	}
-	/* Report all remaining blocks as missing */
-	block_count = ( slam->num_blocks - block );
-	DBGC ( slam, "-%ld\n", ( slam->num_blocks - 1 ) );
-	len = slam_put_value ( slam, iobuf, block_count, 1 );
-	assert ( len > 0 );
-	return rc;
 }
 
 /**
@@ -303,17 +242,14 @@ static int slam_build_block_list ( struct slam_request *slam,
  */
 static int slam_tx_nack ( struct slam_request *slam ) {
 	struct io_buffer *iobuf;
+	unsigned long block;
 	uint8_t *nul;
-
-	DBGC ( slam, "SLAM %p transmitting NACK\n", slam );
+	int rc;
 
 	/* Mark NACK as sent, so that we know we have to disconnect later */
 	slam->nack_sent = 1;
 
-	/* Use the current block size as a good estimate of how much
-	 * data we can fit in a packet.  If we overrun, it seems to be
-	 * acceptable to drop information anyway.
-	 */
+	/* Allocate I/O buffer */
 	iobuf = xfer_alloc_iob ( &slam->socket,	SLAM_MAX_NACK_LEN );
 	if ( ! iobuf ) {
 		DBGC ( slam, "SLAM %p could not allocate I/O buffer\n",
@@ -321,12 +257,23 @@ static int slam_tx_nack ( struct slam_request *slam ) {
 		return -ENOMEM;
 	}
 
-	/* Build block list.  (Errors are non-fatal; it just means we
-	 * couldn't fit the compressed list within the packet.)
+	/* Construct NACK.  We always request only a single packet;
+	 * this allows us to force multicast-TFTP-style flow control
+	 * on the SLAM server, which will otherwise just blast the
+	 * data out as fast as it can.  On a gigabit network, without
+	 * RX checksumming, this would inevitably cause packet drops.
 	 */
-	slam_build_block_list ( slam, iobuf );
-
-	/* Add NUL terminator */
+	block = bitmap_first_gap ( &slam->bitmap );
+	if ( block ) {
+		DBGCP ( slam, "SLAM %p transmitting NACK for block %ld\n",
+			slam, block );
+	} else {
+		DBGC ( slam, "SLAM %p transmitting initial NACK\n", slam );
+	}
+	if ( ( rc = slam_put_value ( slam, iobuf, block ) ) != 0 )
+		return rc;
+	if ( ( rc = slam_put_value ( slam, iobuf, 1 ) ) != 0 )
+		return rc;
 	nul = iob_put ( iobuf, 1 );
 	*nul = 0;
 
@@ -335,18 +282,47 @@ static int slam_tx_nack ( struct slam_request *slam ) {
 }
 
 /**
- * Handle SLAM retransmission timer expiry
+ * Handle SLAM master client retry timer expiry
  *
- * @v timer		Retry timer
+ * @v timer		Master retry timer
  * @v fail		Failure indicator
  */
-static void slam_timer_expired ( struct retry_timer *timer, int fail ) {
+static void slam_master_timer_expired ( struct retry_timer *timer,
+					int fail ) {
 	struct slam_request *slam =
-		container_of ( timer, struct slam_request, timer );
+		container_of ( timer, struct slam_request, master_timer );
 
 	if ( fail ) {
+		/* Allow timer to stop running.  We will terminate the
+		 * connection only if the slave timer times out.
+		 */
+		DBGC ( slam, "SLAM %p giving up acting as master client\n",
+		       slam );
+	} else {
+		/* Retransmit NACK */
+		start_timer ( timer );
+		slam_tx_nack ( slam );
+	}
+}
+
+/**
+ * Handle SLAM slave client retry timer expiry
+ *
+ * @v timer		Master retry timer
+ * @v fail		Failure indicator
+ */
+static void slam_slave_timer_expired ( struct retry_timer *timer,
+					int fail ) {
+	struct slam_request *slam =
+		container_of ( timer, struct slam_request, slave_timer );
+
+	if ( fail ) {
+		/* Terminate connection */
 		slam_finished ( slam, -ETIMEDOUT );
 	} else {
+		/* Try sending a NACK */
+		DBGC ( slam, "SLAM %p trying to become master client\n",
+		       slam );
 		start_timer ( timer );
 		slam_tx_nack ( slam );
 	}
@@ -490,9 +466,10 @@ static int slam_mc_socket_deliver ( struct xfer_interface *mc_socket,
 	size_t len;
 	int rc;
 
-	/* Hit the timer */
-	stop_timer ( &slam->timer );
-	start_timer ( &slam->timer );
+	/* Stop the master client timer.  Restart the slave client timer. */
+	stop_timer ( &slam->master_timer );
+	stop_timer ( &slam->slave_timer );
+	start_timer_fixed ( &slam->slave_timer, SLAM_SLAVE_TIMEOUT );
 
 	/* Read and strip packet header */
 	if ( ( rc = slam_pull_header ( slam, iobuf ) ) != 0 )
@@ -569,9 +546,9 @@ static int slam_socket_deliver ( struct xfer_interface *socket,
 		container_of ( socket, struct slam_request, socket );
 	int rc;
 
-	/* Hit the timer */
-	stop_timer ( &slam->timer );
-	start_timer ( &slam->timer );
+	/* Restart the master client timer */
+	stop_timer ( &slam->master_timer );
+	start_timer ( &slam->master_timer );
 
 	/* Read and strip packet header */
 	if ( ( rc = slam_pull_header ( slam, iobuf ) ) != 0 )
@@ -755,7 +732,8 @@ static int slam_open ( struct xfer_interface *xfer, struct uri *uri ) {
 	xfer_init ( &slam->socket, &slam_socket_operations, &slam->refcnt );
 	xfer_init ( &slam->mc_socket, &slam_mc_socket_operations,
 		    &slam->refcnt );
-	slam->timer.expired = slam_timer_expired;
+	slam->master_timer.expired = slam_master_timer_expired;
+	slam->slave_timer.expired = slam_slave_timer_expired;
 	/* Fake an invalid cached header of { 0x00, ... } */
 	slam->header_len = 1;
 	/* Fake parameters for initial NACK */
@@ -792,8 +770,8 @@ static int slam_open ( struct xfer_interface *xfer, struct uri *uri ) {
 		goto err;
 	}
 
-	/* Start retry timer */
-	start_timer ( &slam->timer );
+	/* Start slave retry timer */
+	start_timer_fixed ( &slam->slave_timer, SLAM_SLAVE_TIMEOUT );
 
 	/* Attach to parent interface, mortalise self, and return */
 	xfer_plug_plug ( &slam->xfer, xfer );
