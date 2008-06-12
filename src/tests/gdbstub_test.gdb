@@ -77,6 +77,34 @@ define gpxe_test_step
 	gpxe_assert ({char}($eip-1)) (char)0x90 "gpxe_test_step" # nop = 0x90
 end
 
+define gpxe_test_awatch
+	awatch watch_me
+
+	c
+	gpxe_assert $ecx 0x600d0000 "gpxe_test_awatch"
+	if $ecx == 0x600d0000
+		c
+	end
+
+	c
+	gpxe_assert $ecx 0x600d0001 "gpxe_test_awatch"
+	if $ecx == 0x600d0001
+		c
+	end
+
+	delete
+end
+
+define gpxe_test_watch
+	watch watch_me
+	c
+	gpxe_assert $ecx 0x600d0002 "gpxe_test_watch"
+	if $ecx == 0x600d0002
+		c
+	end
+	delete
+end
+
 gpxe_load_symbols
 gpxe_start_tests
 gpxe_test_regs_read
@@ -84,3 +112,5 @@ gpxe_test_regs_write
 gpxe_test_mem_read
 gpxe_test_mem_write
 gpxe_test_step
+gpxe_test_awatch
+gpxe_test_watch

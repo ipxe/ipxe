@@ -184,7 +184,7 @@ do_interrupt:
 	/* Call GDB stub exception handler */
 	pushl	%esp
 	pushl	(IH_OFFSET_SIGNO + 4)(%esp)
-	call	gdbstub_handler
+	call	gdbmach_handler
 	addl	$8, %esp
 
 	/* Restore CPU state from GDB register snapshot */

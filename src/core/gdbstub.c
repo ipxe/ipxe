@@ -249,6 +249,22 @@ static void gdbstub_continue ( struct gdbstub *stub, int single_step ) {
 	/* Reply will be sent when we hit the next breakpoint or interrupt */
 }
 
+static void gdbstub_breakpoint ( struct gdbstub *stub ) {
+	unsigned long args [ 3 ];
+	int enable = stub->payload [ 0 ] == 'Z' ? 1 : 0;
+	if ( !gdbstub_get_packet_args ( stub, args, sizeof args / sizeof args [ 0 ], NULL ) ) {
+		gdbstub_send_errno ( stub, POSIX_EINVAL );
+		return;
+	}
+	if ( gdbmach_set_breakpoint ( args [ 0 ], args [ 1 ], args [ 2 ], enable ) ) {
+		gdbstub_send_ok ( stub );
+	} else {
+		/* Not supported */
+		stub->len = 0;
+		gdbstub_tx_packet ( stub );
+	}
+}
+
 static void gdbstub_rx_packet ( struct gdbstub *stub ) {
 	switch ( stub->payload [ 0 ] ) {
 		case '?':
@@ -274,6 +290,10 @@ static void gdbstub_rx_packet ( struct gdbstub *stub ) {
 			if ( stub->payload [ 0 ] == 'D' ) {
 				gdbstub_send_ok ( stub );
 			}
+			break;
+		case 'Z': /* Insert breakpoint */
+		case 'z': /* Remove breakpoint */
+			gdbstub_breakpoint ( stub );
 			break;
 		default:
 			stub->len = 0;
@@ -341,7 +361,7 @@ static struct gdbstub stub = {
 	.parse = gdbstub_state_new
 };
 
-__cdecl void gdbstub_handler ( int signo, gdbreg_t *regs ) {
+void gdbstub_handler ( int signo, gdbreg_t *regs ) {
 	char packet [ SIZEOF_PAYLOAD + 4 ];
 	size_t len, i;
 

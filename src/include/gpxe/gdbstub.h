@@ -9,6 +9,7 @@
 
 #include <stdint.h>
 #include <gpxe/tables.h>
+#include <gdbmach.h>
 
 /**
  * A transport mechanism for the GDB protocol
@@ -60,5 +61,13 @@ extern struct gdb_transport *find_gdb_transport ( const char *name );
  * @v trans GDB transport
  */
 extern void gdbstub_start ( struct gdb_transport *trans );
+
+/**
+ * Interrupt handler
+ *
+ * @signo POSIX signal number
+ * @regs CPU register snapshot
+ **/
+extern void gdbstub_handler ( int signo, gdbreg_t *regs );
 
 #endif /* _GPXE_GDBSTUB_H */

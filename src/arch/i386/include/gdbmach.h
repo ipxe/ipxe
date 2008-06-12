@@ -10,6 +10,8 @@
  *
  */
 
+#include <stdint.h>
+
 typedef uint32_t gdbreg_t;
 
 /* The register snapshot, this must be in sync with interrupt handler and the
@@ -35,6 +37,15 @@ enum {
 	GDBMACH_SIZEOF_REGS = GDBMACH_NREGS * sizeof ( gdbreg_t )
 };
 
+/* Breakpoint types */
+enum {
+	GDBMACH_BPMEM,
+	GDBMACH_BPHW,
+	GDBMACH_WATCH,
+	GDBMACH_RWATCH,
+	GDBMACH_AWATCH,
+};
+
 static inline void gdbmach_set_pc ( gdbreg_t *regs, gdbreg_t pc ) {
 	regs [ GDBMACH_EIP ] = pc;
 }
@@ -47,5 +58,7 @@ static inline void gdbmach_set_single_step ( gdbreg_t *regs, int step ) {
 static inline void gdbmach_breakpoint ( void ) {
 	__asm__ __volatile__ ( "int $3\n" );
 }
+
+extern int gdbmach_set_breakpoint ( int type, unsigned long addr, size_t len, int enable );
 
 #endif /* GDBMACH_H */

@@ -1,4 +1,9 @@
 	.arch i386
+
+	.section ".data"
+watch_me:
+	.long 0xfeedbeef
+
 	.section ".text"
 	.code32
 gdbstub_test:
@@ -28,6 +33,22 @@ gdbstub_test:
 	/* 5. Step test */
 	int	$3
 	nop
+
+	/* 6. Access watch test */
+	movl	$0x600d0000, %ecx
+	movl	watch_me, %eax
+	movl	$0xbad00000, %ecx
+	int	$3
+	movl	$0x600d0001, %ecx
+	movl	%eax, watch_me
+	movl	$0xbad00001, %ecx
+	int	$3
+
+	/* 7. Write watch test */
+	movl	$0x600d0002, %ecx
+	movl	%eax, watch_me
+	movl	$0xbad00002, %ecx
+	int	$3
 
 1:
 	jmp	1b
