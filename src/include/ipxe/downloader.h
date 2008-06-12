@@ -9,10 +9,10 @@
 
 FILE_LICENCE ( GPL2_OR_LATER );
 
-struct job_interface;
+struct interface;
 struct image;
 
-extern int create_downloader ( struct job_interface *job, struct image *image,
+extern int create_downloader ( struct interface *job, struct image *image,
 			       int ( * register_image ) ( struct image *image ),
 			       int type, ... );
 

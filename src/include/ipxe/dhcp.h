@@ -18,7 +18,7 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #include <ipxe/netdevice.h>
 #include <ipxe/uaccess.h>
 
-struct job_interface;
+struct interface;
 struct dhcp_options;
 struct dhcp_packet;
 
@@ -622,8 +622,8 @@ extern int dhcp_create_request ( struct dhcp_packet *dhcppkt,
 				 struct net_device *netdev,
 				 unsigned int msgtype, struct in_addr ciaddr,
 				 void *data, size_t max_len );
-extern int start_dhcp ( struct job_interface *job, struct net_device *netdev );
-extern int start_pxebs ( struct job_interface *job, struct net_device *netdev,
+extern int start_dhcp ( struct interface *job, struct net_device *netdev );
+extern int start_pxebs ( struct interface *job, struct net_device *netdev,
 			 unsigned int pxe_type );
 
 /* In environments that can provide cached DHCP packets, this function

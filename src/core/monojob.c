@@ -36,25 +36,19 @@ FILE_LICENCE ( GPL2_OR_LATER );
 
 static int monojob_rc;
 
-static void monojob_done ( struct job_interface *job __unused, int rc ) {
+static void monojob_close ( struct interface *intf, int rc ) {
 	monojob_rc = rc;
+	intf_restart ( intf, rc );
 }
 
-/** Single foreground job operations */
-static struct job_interface_operations monojob_operations = {
-	.done		= monojob_done,
-	.kill		= ignore_job_kill,
-	.progress	= ignore_job_progress,
+static struct interface_operation monojob_intf_op[] = {
+	INTF_OP ( intf_close, struct interface *, monojob_close ),
 };
 
-/** Single foreground job */
-struct job_interface monojob = {
-	.intf = {
-		.dest = &null_job.intf,
-		.refcnt = NULL,
-	},
-	.op = &monojob_operations,
-};
+static struct interface_descriptor monojob_intf_desc =
+	INTF_DESC_PURE ( monojob_intf_op );
+
+struct interface monojob = INTF_INIT ( monojob_intf_desc );
 
 /**
  * Wait for single foreground job to complete
@@ -77,9 +71,8 @@ int monojob_wait ( const char *string ) {
 			key = getchar();
 			switch ( key ) {
 			case CTRL_C:
-				job_kill ( &monojob );
-				rc = -ECANCELED;
-				goto done;
+				monojob_close ( &monojob, -ECANCELED );
+				break;
 			default:
 				break;
 			}
@@ -92,8 +85,6 @@ int monojob_wait ( const char *string ) {
 	}
 	rc = monojob_rc;
 
-done:
-	job_done ( &monojob, rc );
 	if ( rc ) {
 		printf ( " %s\n", strerror ( rc ) );
 	} else {
