@@ -62,6 +62,14 @@ struct bzimage_header {
 	uint32_t cmd_line_ptr;
 	/** Highest legal initrd address */
 	uint32_t initrd_addr_max;
+	/** Physical addr alignment required for kernel	*/
+	uint32_t kernel_alignment;
+	/** Whether kernel is relocatable or not */
+	uint8_t relocatable_kernel;
+	/** Unused */
+	uint8_t pad2[3];
+	/** Maximum size of the kernel command line */
+	uint32_t cmdline_size;
 } __attribute__ (( packed ));
 
 /** Offset of bzImage header within kernel image */

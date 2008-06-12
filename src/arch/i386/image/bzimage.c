@@ -76,6 +76,8 @@ struct bzimage_exec_context {
 	size_t rm_heap;
 	/** Command line (offset from rm_kernel) */
 	size_t rm_cmdline;
+	/** Command line maximum length */
+	size_t cmdline_size;
 	/** Video mode */
 	unsigned int vid_mode;
 	/** Memory limit */
@@ -162,8 +164,8 @@ static int bzimage_set_cmdline ( struct image *image,
 
 	/* Copy command line down to real-mode portion */
 	cmdline_len = ( strlen ( cmdline ) + 1 );
-	if ( cmdline_len > BZI_CMDLINE_SIZE )
-		cmdline_len = BZI_CMDLINE_SIZE;
+	if ( cmdline_len > exec_ctx->cmdline_size )
+		cmdline_len = exec_ctx->cmdline_size;
 	copy_to_user ( exec_ctx->rm_kernel, exec_ctx->rm_cmdline,
 		       cmdline, cmdline_len );
 	DBGC ( image, "bzImage %p command line \"%s\"\n", image, cmdline );
@@ -320,6 +322,12 @@ static int bzimage_exec ( struct image *image ) {
 	} else {
 		exec_ctx.mem_limit = BZI_INITRD_MAX;
 	}
+	if ( bzhdr.version >= 0x0206 ) {
+		exec_ctx.cmdline_size = bzhdr.cmdline_size;
+	} else {
+		exec_ctx.cmdline_size = BZI_CMDLINE_SIZE;
+	}
+	DBG ( "cmdline_size = %zd\n", exec_ctx.cmdline_size );
 
 	/* Parse command line for bootloader parameters */
 	if ( ( rc = bzimage_parse_cmdline ( image, &exec_ctx, cmdline ) ) != 0)
