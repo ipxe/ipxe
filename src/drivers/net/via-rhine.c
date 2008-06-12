@@ -1179,9 +1179,9 @@ rhine_disable ( struct nic *nic ) {
 
     printf ("rhine disable\n");
     /* Switch to loopback mode to avoid hardware races. */
-    writeb(0x60 | 0x01, byTCR);
+    outb(0x60 | 0x01, byTCR);
     /* Stop the chip's Tx and Rx processes. */
-    writew(CR_STOP, byCR0);
+    outw(CR_STOP, byCR0);
 }
 
 /**************************************************************************
@@ -1279,7 +1279,7 @@ rhine_reset (struct nic *nic)
     outw (0, byIMR0);
 }
 /* Beware of PCI posted writes */
-#define IOSYNC  do { readb(nic->ioaddr + StationAddr); } while (0)
+#define IOSYNC  do { inb(nic->ioaddr + StationAddr); } while (0)
 
 static int
 rhine_poll (struct nic *nic, int retreive)
