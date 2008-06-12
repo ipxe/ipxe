@@ -18,19 +18,42 @@
 
 FILE_LICENCE ( GPL2_OR_LATER );
 
+#include <string.h>
 #include <ipxe/interface.h>
 
 /** @file
  *
- * Object communication interfaces
+ * Object interfaces
+ *
+ */
+
+/*****************************************************************************
+ *
+ * The null interface
+ *
+ */
+
+/** Null interface operations */
+static struct interface_operation null_intf_op[] = {};
+
+/** Null interface descriptor */
+struct interface_descriptor null_intf_desc =
+	INTF_DESC_PURE ( null_intf_op );
+
+/** The null interface */
+struct interface null_intf = INTF_INIT ( null_intf_desc );
+
+/*****************************************************************************
+ *
+ * Object interface plumbing
  *
  */
 
 /**
- * Plug an interface into a new destination interface
+ * Plug an object interface into a new destination object interface
  *
- * @v intf		Interface
- * @v dest		New destination interface
+ * @v intf		Object interface
+ * @v dest		New destination object interface
  *
  * The reference to the existing destination interface is dropped, a
  * reference to the new destination interface is obtained, and the
@@ -39,24 +62,209 @@ FILE_LICENCE ( GPL2_OR_LATER );
  * Note that there is no "unplug" call; instead you must plug the
  * interface into a null interface.
  */
-void plug ( struct interface *intf, struct interface *dest ) {
-	DBGC ( intf, "INTF %p moving from INTF %p to INTF %p\n",
-	       intf, intf->dest, dest );
+void intf_plug ( struct interface *intf, struct interface *dest ) {
+	DBGC ( INTF_COL ( intf ),
+	       "INTF " INTF_INTF_FMT " replug to " INTF_FMT "\n",
+	       INTF_INTF_DBG ( intf, intf->dest ), INTF_DBG ( dest ) );
+	intf_get ( dest );
 	intf_put ( intf->dest );
-	intf->dest = intf_get ( dest );
+	intf->dest = dest;
 }
 
 /**
- * Plug two interfaces together
+ * Plug two object interfaces together
  *
- * @v a			Interface A
- * @v b			Interface B
+ * @v a			Object interface A
+ * @v b			Object interface B
  *
  * Plugs interface A into interface B, and interface B into interface
  * A.  (The basic plug() function is unidirectional; this function is
  * merely a shorthand for two calls to plug(), hence the name.)
  */
-void plug_plug ( struct interface *a, struct interface *b ) {
-	plug ( a, b );
-	plug ( b, a );
+void intf_plug_plug ( struct interface *a, struct interface *b ) {
+	intf_plug ( a, b );
+	intf_plug ( b, a );
+}
+
+/**
+ * Unplug an object interface
+ *
+ * @v intf		Object interface
+ */
+void intf_unplug ( struct interface *intf ) {
+	intf_plug ( intf, &null_intf );
+}
+
+/**
+ * Ignore all further operations on an object interface
+ *
+ * @v intf		Object interface
+ */
+void intf_nullify ( struct interface *intf ) {
+	intf->desc = &null_intf_desc;
+}
+
+/**
+ * Increment reference count on an object interface
+ *
+ * @v intf		Object interface
+ * @ret intf		Object interface
+ */
+struct interface * intf_get ( struct interface *intf ) {
+	ref_get ( intf->refcnt );
+	return intf;
+}
+
+/**
+ * Decrement reference count on an object interface
+ *
+ * @v intf		Object interface
+ */
+void intf_put ( struct interface *intf ) {
+	ref_put ( intf->refcnt );
+}
+
+/**
+ * Get pointer to object containing object interface
+ *
+ * @v intf		Object interface
+ * @ret object		Containing object
+ */
+void * intf_object ( struct interface *intf ) {
+	return ( ( ( void * ) intf ) - intf->desc->offset );
+}
+
+/**
+ * Get pass-through interface
+ *
+ * @v intf		Object interface
+ * @ret passthru	Pass-through interface, or NULL
+ */
+static struct interface * intf_get_passthru ( struct interface *intf ) {
+	struct interface_descriptor *desc = intf->desc;
+
+	if ( desc->passthru_offset ) {
+		return ( ( ( void * ) intf ) + desc->passthru_offset );
+	} else {
+		return NULL;
+	}
+}
+
+/**
+ * Get object interface destination and operation method
+ *
+ * @v intf		Object interface
+ * @v type		Operation type
+ * @ret dest		Destination interface
+ * @ret func		Implementing method, or NULL
+ */
+void * intf_get_dest_op_untyped ( struct interface *intf, void *type,
+				  struct interface **dest ) {
+	struct interface_descriptor *desc;
+	struct interface_operation *op;
+	unsigned int i;
+
+	while ( 1 ) {
+		/* Search for an implementing method provided by the
+		 * current destination interface.
+		 */
+		*dest = intf_get ( intf->dest );
+		desc = (*dest)->desc;
+		for ( i = desc->num_op, op = desc->op ; i ; i--, op++ ) {
+			if ( op->type == type )
+				return op->func;
+		}
+
+		/* Pass through to the underlying interface, if applicable */
+		if ( ! ( intf = intf_get_passthru ( *dest ) ) )
+			return NULL;
+		intf_put ( *dest );
+	}
+}
+
+/*****************************************************************************
+ *
+ * Generic interface operations
+ *
+ */
+
+/**
+ * Close an object interface
+ *
+ * @v intf		Object interface
+ * @v rc		Reason for close
+ *
+ * Note that this function merely informs the destination object that
+ * the interface is about to be closed; it doesn't actually disconnect
+ * the interface.  In most cases, you probably want to use
+ * intf_shutdown() or intf_restart() instead.
+ */
+void intf_close ( struct interface *intf, int rc ) {
+	struct interface *dest;
+	intf_close_TYPE ( void * ) *op =
+		intf_get_dest_op ( intf, intf_close, &dest );
+	void *object = intf_object ( dest );
+
+	DBGC ( INTF_COL ( intf ), "INTF " INTF_INTF_FMT " close (%s)\n",
+	       INTF_INTF_DBG ( intf, dest ), strerror ( rc ) );
+
+	if ( op ) {
+		op ( object, rc );
+	} else {
+		/* Default is to ignore intf_close() */
+	}
+
+	intf_put ( dest );
+}
+
+/**
+ * Shut down an object interface
+ *
+ * @v intf		Object interface
+ * @v rc		Reason for close
+ *
+ * Blocks further operations from being received via the interface,
+ * executes a close operation on the destination interface, and
+ * unplugs the interface.
+ */
+void intf_shutdown ( struct interface *intf, int rc ) {
+
+	DBGC ( INTF_COL ( intf ), "INTF " INTF_FMT " shutting down (%s)\n",
+	       INTF_DBG ( intf ), strerror ( rc ) );
+
+	/* Block further operations */
+	intf_nullify ( intf );
+
+	/* Notify destination of close */
+	intf_close ( intf, rc );
+
+	/* Unplug interface */
+	intf_unplug ( intf );
+}
+
+/**
+ * Shut down and restart an object interface
+ *
+ * @v intf		Object interface
+ * @v rc		Reason for close
+ *
+ * Shuts down the interface, then unblocks operations that were
+ * blocked during shutdown.
+ */
+void intf_restart ( struct interface *intf, int rc ) {
+	struct interface_descriptor *desc = intf->desc;
+
+	/* Shut down the interface */
+	intf_shutdown ( intf, rc );
+
+	DBGC ( INTF_COL ( intf ), "INTF " INTF_FMT " restarting\n",
+	       INTF_DBG ( intf ) );
+
+	/* Restore the interface descriptor.  Must be done after
+	 * shutdown (rather than inhibiting intf_shutdown() from
+	 * nullifying the descriptor) in order to avoid a potential
+	 * infinite loop as the intf_close() operations on each side
+	 * of the link call each other recursively.
+	 */
+	intf->desc = desc;
 }

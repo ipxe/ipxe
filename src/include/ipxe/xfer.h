@@ -238,7 +238,7 @@ xfer_put ( struct xfer_interface *xfer ) {
  */
 static inline __attribute__ (( always_inline )) void
 xfer_plug ( struct xfer_interface *xfer, struct xfer_interface *dest ) {
-	plug ( &xfer->intf, &dest->intf );
+	intf_plug ( &xfer->intf, &dest->intf );
 }
 
 /**
@@ -249,7 +249,7 @@ xfer_plug ( struct xfer_interface *xfer, struct xfer_interface *dest ) {
  */
 static inline __attribute__ (( always_inline )) void
 xfer_plug_plug ( struct xfer_interface *a, struct xfer_interface *b ) {
-	plug_plug ( &a->intf, &b->intf );
+	intf_plug_plug ( &a->intf, &b->intf );
 }
 
 /**
@@ -259,7 +259,7 @@ xfer_plug_plug ( struct xfer_interface *a, struct xfer_interface *b ) {
  */
 static inline __attribute__ (( always_inline )) void
 xfer_unplug ( struct xfer_interface *xfer ) {
-	plug ( &xfer->intf, &null_xfer.intf );
+	intf_plug ( &xfer->intf, &null_xfer.intf );
 }
 
 /**

@@ -131,7 +131,7 @@ job_put ( struct job_interface *job ) {
  */
 static inline void job_plug ( struct job_interface *job,
 			       struct job_interface *dest ) {
-	plug ( &job->intf, &dest->intf );
+	intf_plug ( &job->intf, &dest->intf );
 }
 
 /**
@@ -142,7 +142,7 @@ static inline void job_plug ( struct job_interface *job,
  */
 static inline void job_plug_plug ( struct job_interface *a,
 				    struct job_interface *b ) {
-	plug_plug ( &a->intf, &b->intf );
+	intf_plug_plug ( &a->intf, &b->intf );
 }
 
 /**
@@ -151,7 +151,7 @@ static inline void job_plug_plug ( struct job_interface *a,
  * @v job		Job control interface
  */
 static inline void job_unplug ( struct job_interface *job ) {
-	plug ( &job->intf, &null_job.intf );
+	intf_plug ( &job->intf, &null_job.intf );
 }
 
 /**
