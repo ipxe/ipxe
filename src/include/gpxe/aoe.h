@@ -11,7 +11,6 @@
 #include <gpxe/list.h>
 #include <gpxe/if_ether.h>
 #include <gpxe/retry.h>
-#include <gpxe/async.h>
 #include <gpxe/ata.h>
 
 /** An AoE ATA command */
