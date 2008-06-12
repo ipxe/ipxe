@@ -49,16 +49,25 @@ enum image_action {
  */
 static int imgfill_cmdline ( struct image *image, unsigned int nargs, 
 			     char **args ) {
-	char buf[256];
-	size_t used = 0;
+	size_t len;
+	unsigned int i;
 
-	memset ( buf, 0, sizeof ( buf ) );
-	while ( ( used < sizeof ( buf ) ) && nargs-- ) {
-		used += snprintf ( &buf[used], ( sizeof ( buf ) - used ),
-				   " %s", *(args++) );
+	/* Determine total length of command line */
+	len = 1; /* NUL */
+	for ( i = 0 ; i < nargs ; i++ )
+		len += ( 1 /* space */ + strlen ( args[i] ) );
+
+	{
+		char buf[len];
+		char *ptr = buf;
+
+		/* Assemble command line */
+		for ( i = 0 ; i < nargs ; i++ )
+			ptr += sprintf ( ptr, " %s", args[i] );
+		assert ( ptr == ( buf + len - 1 ) );
+
+		return image_set_cmdline ( image, &buf[1] );
 	}
-
-	return image_set_cmdline ( image, &buf[1] );
 }
 
 /**
