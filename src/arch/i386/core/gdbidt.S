@@ -163,12 +163,18 @@ int_page_fault:
 #define IH_OFFSET_FLUX_END ( IH_OFFSET_END - 20 )
 do_interrupt:
 	/* Store CPU state in GDB register snapshot */
-	pushl	%gs
-	pushl	%fs
-	pushl	%es
-	pushl	%ds
-	pushl	%ss
-	pushl	IH_OFFSET_FLUX_OLD_CS(%esp)
+	pushw	$0
+	pushw	%gs
+	pushw	$0
+	pushw	%fs
+	pushw	$0
+	pushw	%es
+	pushw	$0
+	pushw	%ds
+	pushw	$0
+	pushw	%ss
+	pushw	$0
+	pushw	IH_OFFSET_FLUX_OLD_CS + 2(%esp)
 	pushl	IH_OFFSET_FLUX_OLD_EFLAGS(%esp)
 	pushl	IH_OFFSET_FLUX_OLD_EIP(%esp)
 	pushl	%edi

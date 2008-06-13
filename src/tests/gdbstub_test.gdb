@@ -81,13 +81,13 @@ define gpxe_test_awatch
 	awatch watch_me
 
 	c
-	gpxe_assert $ecx 0x600d0000 "gpxe_test_awatch"
+	gpxe_assert $ecx 0x600d0000 "gpxe_test_awatch read"
 	if $ecx == 0x600d0000
 		c
 	end
 
 	c
-	gpxe_assert $ecx 0x600d0001 "gpxe_test_awatch"
+	gpxe_assert $ecx 0x600d0001 "gpxe_test_awatch write"
 	if $ecx == 0x600d0001
 		c
 	end
