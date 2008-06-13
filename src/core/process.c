@@ -82,9 +82,11 @@ void step ( void ) {
 	list_for_each_entry ( process, &run_queue, list ) {
 		list_del ( &process->list );
 		list_add_tail ( &process->list, &run_queue );
+		ref_get ( process->refcnt ); /* Inhibit destruction mid-step */
 		DBGC2 ( process, "PROCESS %p executing\n", process );
 		process->step ( process );
 		DBGC2 ( process, "PROCESS %p finished executing\n", process );
+		ref_put ( process->refcnt ); /* Allow destruction */
 		break;
 	}
 }
