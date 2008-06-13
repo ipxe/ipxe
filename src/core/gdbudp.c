@@ -27,6 +27,17 @@
 #include <gpxe/udp.h>
 #include <gpxe/netdevice.h>
 #include <gpxe/gdbstub.h>
+#include <bios.h>
+
+/** @file
+ *
+ * GDB over UDP transport
+ *
+ */
+
+enum {
+	DEFAULT_PORT = 43770, /* UDP listen port */
+};
 
 struct gdb_transport udp_gdb_transport __gdb_transport;
 
@@ -37,13 +48,11 @@ static struct sockaddr_in dest_addr;
 static struct sockaddr_in source_addr;
 
 static void gdbudp_ensure_netdev_open ( struct net_device *netdev ) {
-	if ( ( netdev->state & NETDEV_OPEN) == 0 ) {
-		netdev_open ( netdev );
-	}
-	/* TODO forcing the netdev to be open is useful when
-	 * gPXE closes the netdev between breakpoints.  Should
-	 * we restore the state of the netdev, i.e. closed,
-	 * before leaving the interrupt handler? */
+	/* The device may have been closed between breakpoints */
+	assert ( netdev );
+	netdev_open ( netdev );
+
+	/* Strictly speaking, we may need to close the device when leaving the interrupt handler */
 }
 
 static size_t gdbudp_recv ( char *buf, size_t len ) {
@@ -54,27 +63,28 @@ static size_t gdbudp_recv ( char *buf, size_t len ) {
 	struct udp_header *udphdr;
 	size_t payload_len;
 
-	assert ( netdev );
 	gdbudp_ensure_netdev_open ( netdev );
 
 	for ( ; ; ) {
+		netdev_poll ( netdev );
 		while ( ( iob = netdev_rx_dequeue ( netdev ) ) != NULL ) {
-			if ( iob_len ( iob ) > sizeof ( *ethhdr ) + sizeof ( *iphdr ) + sizeof ( *udphdr ) + len ) {
+			/* Ethernet header */
+			if ( iob_len ( iob ) < sizeof ( *ethhdr ) ) {
 				goto bad_packet;
 			}
-
-			/* Ethernet header */
 			ethhdr = iob->data;
 			iob_pull ( iob, sizeof ( *ethhdr ) );
+
+			/* Handle ARP requests so the client can find our MAC */
 			if ( ethhdr->h_protocol == htons ( ETH_P_ARP ) ) {
-				/* Handle ARP requests so the client can connect to us */
 				arphdr = iob->data;
-				if ( arphdr->ar_hrd != htons ( ARPHRD_ETHER ) ||
+				if ( iob_len ( iob ) < sizeof ( *arphdr ) + 2 * ( ETH_ALEN + sizeof ( struct in_addr ) ) ||
+						arphdr->ar_hrd != htons ( ARPHRD_ETHER ) ||
 						arphdr->ar_pro != htons ( ETH_P_IP ) ||
 						arphdr->ar_hln != ETH_ALEN ||
 						arphdr->ar_pln != sizeof ( struct in_addr ) ||
 						arphdr->ar_op != htons ( ARPOP_REQUEST ) ||
-						memcmp ( arp_target_pa ( arphdr ), &source_addr.sin_addr.s_addr, sizeof ( struct in_addr ) ) ) {
+						* ( uint32_t * ) arp_target_pa ( arphdr ) != source_addr.sin_addr.s_addr ) {
 					goto bad_packet;
 				}
 
@@ -91,11 +101,15 @@ static size_t gdbudp_recv ( char *buf, size_t len ) {
 				netdev_tx ( netdev, iob );
 				continue; /* no need to free iob */
 			}
+
 			if ( ethhdr->h_protocol != htons ( ETH_P_IP ) ) {
 				goto bad_packet;
 			}
 
 			/* IP header */
+			if ( iob_len ( iob ) < sizeof ( *iphdr ) ) {
+				goto bad_packet;
+			}
 			iphdr = iob->data;
 			iob_pull ( iob, sizeof ( *iphdr ) );
 			if ( iphdr->protocol != IP_UDP || iphdr->dest.s_addr != source_addr.sin_addr.s_addr ) {
@@ -103,6 +117,9 @@ static size_t gdbudp_recv ( char *buf, size_t len ) {
 			}
 
 			/* UDP header */
+			if ( iob_len ( iob ) < sizeof ( *udphdr ) ) {
+				goto bad_packet;
+			}
 			udphdr = iob->data;
 			if ( udphdr->dest != source_addr.sin_port ) {
 				goto bad_packet;
@@ -115,12 +132,14 @@ static size_t gdbudp_recv ( char *buf, size_t len ) {
 
 			/* Payload */
 			payload_len = ntohs ( udphdr->len );
-			if ( payload_len < sizeof ( *udphdr ) ||
-					payload_len > iob_len ( iob ) ) {
+			if ( payload_len < sizeof ( *udphdr ) || payload_len > iob_len ( iob ) ) {
 				goto bad_packet;
 			}
 			payload_len -= sizeof ( *udphdr );
 			iob_pull ( iob, sizeof ( *udphdr ) );
+			if ( payload_len > len ) {
+				goto bad_packet;
+			}
 			memcpy ( buf, iob->data, payload_len );
 
 			free_iob ( iob );
@@ -129,7 +148,7 @@ static size_t gdbudp_recv ( char *buf, size_t len ) {
 bad_packet:
 			free_iob ( iob );
 		}
-		netdev_poll ( netdev );
+		cpu_nap();
 	}
 }
 
@@ -144,7 +163,6 @@ static void gdbudp_send ( const char *buf, size_t len ) {
 		return;
 	}
 
-	assert ( netdev );
 	gdbudp_ensure_netdev_open ( netdev );
 
 	iob = alloc_iob ( sizeof ( *ethhdr ) + sizeof ( *iphdr ) + sizeof ( *udphdr ) + len );
@@ -192,14 +210,22 @@ static int gdbudp_init ( int argc, char **argv ) {
 		return 1;
 	}
 
+	/* Release old network device */
+	netdev_put ( netdev );
+
 	netdev = find_netdev ( argv[0] );
 	if ( !netdev ) {
 		printf ( "%s: no such interface\n", argv[0] );
 		return 1;
 	}
 
+	/* Hold network device */
+	netdev_get ( netdev );
+
 	if ( !netdev_link_ok ( netdev ) ) {
 		printf ( "%s: link not up\n", argv[0] );
+		netdev_put ( netdev );
+		netdev = NULL;
 		return 1;
 	}
 
@@ -209,11 +235,13 @@ static int gdbudp_init ( int argc, char **argv ) {
 	 * Storing a separate copy makes it possible to use different
 	 * MAC/IP settings than the network stack. */
 	memcpy ( source_eth, netdev->ll_addr, ETH_ALEN );
-	source_addr.sin_port = htons ( 43770 ); /* TODO default port */
+	source_addr.sin_port = htons ( DEFAULT_PORT );
 	settings = netdev_settings ( netdev );
 	fetch_ipv4_setting ( settings, &ip_setting, &source_addr.sin_addr );
 	if ( source_addr.sin_addr.s_addr == 0 ) {
 		printf ( "%s: no IP address configured\n", argv[0] );
+		netdev_put ( netdev );
+		netdev = NULL;
 		return 1;
 	}
 
