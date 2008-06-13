@@ -7,54 +7,55 @@
 
 FILE_LICENCE ( GPL2_OR_LATER );
 
-static int comboot_resolv_rc;
-static struct in_addr comboot_resolv_addr;
-
-static void comboot_resolv_done ( struct resolv_interface *resolv,
-				  struct sockaddr *sa, int rc ) {
-	struct sockaddr_in *sin;
-
-	resolv_unplug ( resolv );
-
-	if ( rc != 0 ) {
-		comboot_resolv_rc = rc;
-		return;
-	}
-
-	if ( sa->sa_family != AF_INET ) {
-		comboot_resolv_rc = -EAFNOSUPPORT;
-		return;
-	}
-
-	sin = ( ( struct sockaddr_in * ) sa );
-	comboot_resolv_addr = sin->sin_addr;
-
-	comboot_resolv_rc = 0;
-}
-
-static struct resolv_interface_operations comboot_resolv_ops = {
-	.done = comboot_resolv_done,
+struct comboot_resolver {
+	struct interface intf;
+	int rc;
+	struct in_addr addr;
 };
 
-static struct resolv_interface comboot_resolver = {
-	.intf = {
-		.dest = &null_resolv.intf,
-		.refcnt = NULL,
-	},
-	.op = &comboot_resolv_ops,
+static void comboot_resolv_close ( struct comboot_resolver *comboot_resolver,
+				   int rc ) {
+	comboot_resolver->rc = rc;
+	intf_shutdown ( &comboot_resolver->intf, rc );
+}
+
+static void comboot_resolv_done ( struct comboot_resolver *comboot_resolver,
+				  struct sockaddr *sa ) {
+	struct sockaddr_in *sin;
+
+	if ( sa->sa_family == AF_INET ) {
+		sin = ( ( struct sockaddr_in * ) sa );
+		comboot_resolver->addr = sin->sin_addr;
+	}
+}
+
+static struct interface_operation comboot_resolv_op[] = {
+	INTF_OP ( intf_close, struct comboot_resolver *, comboot_resolv_close ),
+	INTF_OP ( resolv_done, struct comboot_resolver *, comboot_resolv_done ),
+};
+
+static struct interface_descriptor comboot_resolv_desc =
+	INTF_DESC ( struct comboot_resolver, intf, comboot_resolv_op );
+
+static struct comboot_resolver comboot_resolver = {
+	.intf = INTF_INIT ( comboot_resolv_desc ),
 };
 
 int comboot_resolv ( const char *name, struct in_addr *address ) {
 	int rc;
 
-	comboot_resolv_rc = -EINPROGRESS;
+	comboot_resolver.rc = -EINPROGRESS;
+	comboot_resolver.addr.s_addr = 0;
 
-	if ( ( rc = resolv ( &comboot_resolver, name, NULL ) ) != 0 )
+	if ( ( rc = resolv ( &comboot_resolver.intf, name, NULL ) ) != 0 )
 		return rc;
 
-	while ( comboot_resolv_rc == -EINPROGRESS )
+	while ( comboot_resolver.rc == -EINPROGRESS )
 		step();
 
-	*address = comboot_resolv_addr;
-	return comboot_resolv_rc;
+	if ( ! comboot_resolver.addr.s_addr )
+		return -EAFNOSUPPORT;
+
+	*address = comboot_resolver.addr;
+	return comboot_resolver.rc;
 }

@@ -9,126 +9,10 @@
 
 FILE_LICENCE ( GPL2_OR_LATER );
 
-#include <ipxe/refcnt.h>
 #include <ipxe/interface.h>
 #include <ipxe/tables.h>
-#include <ipxe/socket.h>
 
-struct resolv_interface;
-
-/** Name resolution interface operations */
-struct resolv_interface_operations {
-	/** Name resolution completed
-	 *
-	 * @v resolv		Name resolution interface
-	 * @v sa		Completed socket address (if successful)
-	 * @v rc		Final status code
-	 */
-	void ( * done ) ( struct resolv_interface *resolv,
-			  struct sockaddr *sa, int rc );
-};
-
-/** A name resolution interface */
-struct resolv_interface {
-	/** Generic object communication interface */
-	struct interface intf;
-	/** Operations for received messages */
-	struct resolv_interface_operations *op;
-};
-
-extern struct resolv_interface null_resolv;
-extern struct resolv_interface_operations null_resolv_ops;
-
-/**
- * Initialise a name resolution interface
- *
- * @v resolv		Name resolution interface
- * @v op		Name resolution interface operations
- * @v refcnt		Containing object reference counter, or NULL
- */
-static inline void resolv_init ( struct resolv_interface *resolv,
-				 struct resolv_interface_operations *op,
-				 struct refcnt *refcnt ) {
-	resolv->intf.dest = &null_resolv.intf;
-	resolv->intf.refcnt = refcnt;
-	resolv->op = op;
-}
-
-/**
- * Get name resolution interface from generic object communication interface
- *
- * @v intf		Generic object communication interface
- * @ret resolv		Name resolution interface
- */
-static inline __attribute__ (( always_inline )) struct resolv_interface *
-intf_to_resolv ( struct interface *intf ) {
-	return container_of ( intf, struct resolv_interface, intf );
-}
-
-/**
- * Get reference to destination name resolution interface
- *
- * @v resolv		Name resolution interface
- * @ret dest		Destination interface
- */
-static inline __attribute__ (( always_inline )) struct resolv_interface *
-resolv_get_dest ( struct resolv_interface *resolv ) {
-	return intf_to_resolv ( intf_get ( resolv->intf.dest ) );
-}
-
-/**
- * Drop reference to name resolution interface
- *
- * @v resolv		name resolution interface
- */
-static inline __attribute__ (( always_inline )) void
-resolv_put ( struct resolv_interface *resolv ) {
-	intf_put ( &resolv->intf );
-}
-
-/**
- * Plug a name resolution interface into a new destination interface
- *
- * @v resolv		Name resolution interface
- * @v dest		New destination interface
- */
-static inline __attribute__ (( always_inline )) void
-resolv_plug ( struct resolv_interface *resolv, struct resolv_interface *dest ) {
-	intf_plug ( &resolv->intf, &dest->intf );
-}
-
-/**
- * Plug two name resolution interfaces together
- *
- * @v a			Name resolution interface A
- * @v b			Name resolution interface B
- */
-static inline __attribute__ (( always_inline )) void
-resolv_plug_plug ( struct resolv_interface *a, struct resolv_interface *b ) {
-	intf_plug_plug ( &a->intf, &b->intf );
-}
-
-/**
- * Unplug a name resolution interface
- *
- * @v resolv		Name resolution interface
- */
-static inline __attribute__ (( always_inline )) void
-resolv_unplug ( struct resolv_interface *resolv ) {
-	intf_plug ( &resolv->intf, &null_resolv.intf );
-}
-
-/**
- * Stop using a name resolution interface
- *
- * @v resolv		Name resolution interface
- *
- * After calling this method, no further messages will be received via
- * the interface.
- */
-static inline void resolv_nullify ( struct resolv_interface *resolv ) {
-	resolv->op = &null_resolv_ops;
-};
+struct sockaddr;
 
 /** A name resolver */
 struct resolver {
@@ -141,7 +25,7 @@ struct resolver {
 	 * @v sa		Socket address to complete
 	 * @ret rc		Return status code
 	 */
-	int ( * resolv ) ( struct resolv_interface *resolv, const char *name,
+	int ( * resolv ) ( struct interface *resolv, const char *name,
 			   struct sockaddr *sa );
 };
 
@@ -157,14 +41,11 @@ struct resolver {
 /** Register as a name resolver */
 #define __resolver( resolv_order ) __table_entry ( RESOLVERS, resolv_order )
 
-extern void resolv_done ( struct resolv_interface *resolv,
-			  struct sockaddr *sa, int rc );
-extern void ignore_resolv_done ( struct resolv_interface *resolv,
-			  struct sockaddr *sa, int rc );
-extern struct resolv_interface_operations null_resolv_ops;
-extern struct resolv_interface null_resolv;
+extern void resolv_done ( struct interface *intf, struct sockaddr *sa );
+#define resolv_done_TYPE( object_type ) \
+	typeof ( void ( object_type, struct sockaddr *sa ) )
 
-extern int resolv ( struct resolv_interface *resolv, const char *name,
+extern int resolv ( struct interface *resolv, const char *name,
 		    struct sockaddr *sa );
 
 #endif /* _IPXE_RESOLV_H */

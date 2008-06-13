@@ -58,7 +58,7 @@ struct dns_request {
 	/** Reference counter */
 	struct refcnt refcnt;
 	/** Name resolution interface */
-	struct resolv_interface resolv;
+	struct interface resolv;
 	/** Data transfer interface */
 	struct xfer_interface socket;
 	/** Retry timer */
@@ -93,8 +93,8 @@ static void dns_done ( struct dns_request *dns, int rc ) {
 	xfer_nullify ( &dns->socket );
 	xfer_close ( &dns->socket, rc );
 
-	/* Mark name resolution as complete */
-	resolv_done ( &dns->resolv, &dns->sa, rc );
+	/* Shut down interfaces */
+	intf_shutdown ( &dns->resolv, rc );
 }
 
 /**
@@ -377,6 +377,9 @@ static int dns_xfer_deliver_raw ( struct xfer_interface *socket,
 			sin->sin_family = AF_INET;
 			sin->sin_addr = rr_info->a.in_addr;
 
+			/* Return resolved address */
+			resolv_done ( &dns->resolv, &dns->sa );
+
 			/* Mark operation as complete */
 			dns_done ( dns, 0 );
 			return 0;
@@ -468,6 +471,15 @@ static struct xfer_interface_operations dns_socket_operations = {
 	.deliver_raw	= dns_xfer_deliver_raw,
 };
 
+/** DNS resolver interface operations */
+static struct interface_operation dns_resolv_op[] = {
+	INTF_OP ( intf_close, struct dns_request *, dns_done ),
+};
+
+/** DNS resolver interface descriptor */
+static struct interface_descriptor dns_resolv_desc =
+	INTF_DESC ( struct dns_request, resolv, dns_resolv_op );
+
 /**
  * Resolve name using DNS
  *
@@ -476,7 +488,7 @@ static struct xfer_interface_operations dns_socket_operations = {
  * @v sa		Socket address to fill in
  * @ret rc		Return status code
  */
-static int dns_resolv ( struct resolv_interface *resolv,
+static int dns_resolv ( struct interface *resolv,
 			const char *name, struct sockaddr *sa ) {
 	struct dns_request *dns;
 	char *fqdn;
@@ -504,7 +516,7 @@ static int dns_resolv ( struct resolv_interface *resolv,
 		goto err_alloc_dns;
 	}
 	ref_init ( &dns->refcnt, NULL );
-	resolv_init ( &dns->resolv, &null_resolv_ops, &dns->refcnt );
+	intf_init ( &dns->resolv, &dns_resolv_desc, &dns->refcnt );
 	xfer_init ( &dns->socket, &dns_socket_operations, &dns->refcnt );
 	timer_init ( &dns->timer, dns_timer_expired );
 	memcpy ( &dns->sa, sa, sizeof ( dns->sa ) );
@@ -530,7 +542,7 @@ static int dns_resolv ( struct resolv_interface *resolv,
 	dns_send_packet ( dns );
 
 	/* Attach parent interface, mortalise self, and return */
-	resolv_plug_plug ( &dns->resolv, resolv );
+	intf_plug_plug ( &dns->resolv, resolv );
 	ref_put ( &dns->refcnt );
 	free ( fqdn );
 	return 0;	
