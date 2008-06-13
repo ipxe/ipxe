@@ -44,7 +44,6 @@ struct hwbp {
 
 static struct hwbp hwbps [ 4 ];
 static gdbreg_t dr7 = DR7_CLEAR;
-static gdbreg_t dr6;
 
 static struct hwbp *gdbmach_find_hwbp ( int type, unsigned long addr, size_t len ) {
 	struct hwbp *available = NULL;
@@ -131,14 +130,14 @@ int gdbmach_set_breakpoint ( int type, unsigned long addr, size_t len, int enabl
 }
 
 static void gdbmach_disable_hwbps ( void ) {
-	/* Store and clear breakpoint status register */
-	__asm__ __volatile__ ( "movl %%dr6, %0\n" "movl %1, %%dr6\n" : "=r" ( dr6 ) : "r" ( DR6_CLEAR ) );
-
 	/* Store and clear hardware breakpoints */
 	__asm__ __volatile__ ( "movl %0, %%dr7\n" : : "r" ( DR7_CLEAR ) );
 }
 
 static void gdbmach_enable_hwbps ( void ) {
+	/* Clear breakpoint status register */
+	__asm__ __volatile__ ( "movl %0, %%dr6\n" : : "r" ( DR6_CLEAR ) );
+
 	/* Restore hardware breakpoints */
 	__asm__ __volatile__ ( "movl %0, %%dr7\n" : : "r" ( dr7 ) );
 }
