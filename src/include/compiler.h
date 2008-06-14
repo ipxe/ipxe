@@ -345,7 +345,7 @@ extern void dbg_hex_dump_da ( unsigned long dispaddr,
  * @endcode
  *
  */
-#define __shared __asm__ ( "_shared_bss" )
+#define __shared __asm__ ( "_shared_bss" ) __aligned
 
 /**
  * Optimisation barrier
