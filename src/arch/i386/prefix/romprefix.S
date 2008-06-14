@@ -173,6 +173,8 @@ hook_int19:
 	call	print_message
 	xorw	%ax, %ax
 	movw	%ax, %es
+	pushl	%es:( 0x19 * 4 )
+	popl	orig_int19
 	pushw	%cs
 	pushw	$int19_entry
 	popl	%es:( 0x19 * 4 )
@@ -345,14 +347,24 @@ bev_entry:
 
 /* INT19 entry point
  *
- * Called via the hooked INT 19 if we detected a non-PnP BIOS.
+ * Called via the hooked INT 19 if we detected a non-PnP BIOS.  We
+ * attempt to return via the original INT 19 vector (if we were able to
+ * store it).
  */
 int19_entry:
 	pushw	%cs
 	call	exec
-	/* No real way to return from INT19 */
+	movl	%cs:orig_int19, %eax
+	testl	%eax, %eax
+	je	1f
+	/* Chain to original INT 19 vector */
+	ljmp	*%cs:orig_int19
+1:	/* No chained vector: issue INT 18 as a last resort */
 	int	$0x18
 	.size	int19_entry, . - int19_entry
+orig_int19:
+	.long	0
+	.size	orig_int19, . - orig_int19
 
 /* Execute as a boot device
  *
