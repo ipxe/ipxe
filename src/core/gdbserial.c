@@ -19,6 +19,7 @@
 #include <assert.h>
 #include <gpxe/serial.h>
 #include <gpxe/gdbstub.h>
+#include <gpxe/gdbserial.h>
 
 struct gdb_transport serial_gdb_transport __gdb_transport;
 
@@ -39,3 +40,7 @@ struct gdb_transport serial_gdb_transport __gdb_transport = {
 	.recv = gdbserial_recv,
 	.send = gdbserial_send,
 };
+
+struct gdb_transport *gdbserial_configure ( void ) {
+	return &serial_gdb_transport;
+}

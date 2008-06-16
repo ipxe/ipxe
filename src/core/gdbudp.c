@@ -19,6 +19,7 @@
 #include <stdio.h>
 #include <string.h>
 #include <byteswap.h>
+#include <bios.h>
 #include <gpxe/iobuf.h>
 #include <gpxe/in.h>
 #include <gpxe/if_arp.h>
@@ -27,7 +28,7 @@
 #include <gpxe/udp.h>
 #include <gpxe/netdevice.h>
 #include <gpxe/gdbstub.h>
-#include <bios.h>
+#include <gpxe/gdbudp.h>
 
 /** @file
  *
@@ -43,7 +44,6 @@ struct gdb_transport udp_gdb_transport __gdb_transport;
 
 static struct net_device *netdev;
 static uint8_t dest_eth[ETH_ALEN];
-static uint8_t source_eth[ETH_ALEN];
 static struct sockaddr_in dest_addr;
 static struct sockaddr_in source_addr;
 
@@ -92,11 +92,12 @@ static size_t gdbudp_recv ( char *buf, size_t len ) {
 				arphdr->ar_op = htons ( ARPOP_REPLY );
 				memswap ( arp_sender_pa ( arphdr ), arp_target_pa ( arphdr ), sizeof ( struct in_addr ) );
 				memcpy ( arp_target_ha ( arphdr ), arp_sender_ha ( arphdr ), ETH_ALEN );
-				memcpy ( arp_sender_ha ( arphdr ), source_eth, ETH_ALEN );
+				memcpy ( arp_sender_ha ( arphdr ), netdev->ll_addr, ETH_ALEN );
 
 				/* Fix up ethernet header */
 				ethhdr = iob_push ( iob, sizeof ( *ethhdr ) );
-				memswap ( ethhdr->h_source, ethhdr->h_dest, ETH_ALEN );
+				memcpy ( ethhdr->h_dest, ethhdr->h_source, ETH_ALEN );
+				memcpy ( ethhdr->h_source, netdev->ll_addr, ETH_ALEN );
 
 				netdev_tx ( netdev, iob );
 				continue; /* no need to free iob */
@@ -196,55 +197,55 @@ static void gdbudp_send ( const char *buf, size_t len ) {
 	/* Ethernet header */
 	ethhdr = iob_push ( iob, sizeof ( *ethhdr ) );
 	memcpy ( ethhdr->h_dest, dest_eth, ETH_ALEN );
-	memcpy ( ethhdr->h_source, source_eth, ETH_ALEN );
+	memcpy ( ethhdr->h_source, netdev->ll_addr, ETH_ALEN );
 	ethhdr->h_protocol = htons ( ETH_P_IP );
 
 	netdev_tx ( netdev, iob );
 }
 
-static int gdbudp_init ( int argc, char **argv ) {
+struct gdb_transport *gdbudp_configure ( const char *name, struct sockaddr_in *addr ) {
 	struct settings *settings;
-
-	if ( argc != 1 ) {
-		printf ( "udp: missing <interface> argument\n" );
-		return 1;
-	}
 
 	/* Release old network device */
 	netdev_put ( netdev );
 
-	netdev = find_netdev ( argv[0] );
+	netdev = find_netdev ( name );
 	if ( !netdev ) {
-		printf ( "%s: no such interface\n", argv[0] );
-		return 1;
+		return NULL;
 	}
 
 	/* Hold network device */
 	netdev_get ( netdev );
 
-	if ( !netdev_link_ok ( netdev ) ) {
-		printf ( "%s: link not up\n", argv[0] );
-		netdev_put ( netdev );
-		netdev = NULL;
+	/* Source UDP port */
+	source_addr.sin_port = ( addr && addr->sin_port ) ? addr->sin_port : htons ( DEFAULT_PORT );
+
+	/* Source IP address */
+	if ( addr && addr->sin_addr.s_addr ) {
+		source_addr.sin_addr.s_addr = addr->sin_addr.s_addr;
+	} else {
+		settings = netdev_settings ( netdev );
+		fetch_ipv4_setting ( settings, &ip_setting, &source_addr.sin_addr );
+		if ( source_addr.sin_addr.s_addr == 0 ) {
+			netdev_put ( netdev );
+			netdev = NULL;
+			return NULL;
+		}
+	}
+
+	return &udp_gdb_transport;
+}
+
+static int gdbudp_init ( int argc, char **argv ) {
+	if ( argc != 1 ) {
+		printf ( "udp: missing <interface> argument\n" );
 		return 1;
 	}
 
-	/* Load network settings from device.  We keep the MAC address,
-	 * IP address, and UDP port.  The MAC and IP could be fetched
-	 * from the network device each time they are used in rx/tx.
-	 * Storing a separate copy makes it possible to use different
-	 * MAC/IP settings than the network stack. */
-	memcpy ( source_eth, netdev->ll_addr, ETH_ALEN );
-	source_addr.sin_port = htons ( DEFAULT_PORT );
-	settings = netdev_settings ( netdev );
-	fetch_ipv4_setting ( settings, &ip_setting, &source_addr.sin_addr );
-	if ( source_addr.sin_addr.s_addr == 0 ) {
-		printf ( "%s: no IP address configured\n", argv[0] );
-		netdev_put ( netdev );
-		netdev = NULL;
+	if ( !gdbudp_configure ( argv[0], NULL ) ) {
+		printf ( "%s: device does not exist or has no IP address\n", argv[0] );
 		return 1;
 	}
-
 	return 0;
 }
 
