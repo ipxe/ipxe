@@ -350,6 +350,10 @@ static void gdbstub_state_wait_ack ( struct gdbstub *stub, char ch ) {
 		stub->parse = gdbstub_state_new;
 	} else if ( ch == '-' ) {
 		gdbstub_tx_packet ( stub ); /* retransmit */
+	} else if ( ch == '$' ) {
+		/* GDB is reconnecting, drop our packet and listen to GDB */
+		stub->trans->send ( "-", 1 );
+		stub->parse = gdbstub_state_new;
 	}
 }
 
