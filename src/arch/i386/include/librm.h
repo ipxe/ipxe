@@ -211,6 +211,23 @@ strlen_user ( userptr_t buffer, off_t offset ) {
 }
 
 /**
+ * Find character in user buffer
+ *
+ * @v buffer		User buffer
+ * @v offset		Starting offset within buffer
+ * @v c			Character to search for
+ * @v len		Length of user buffer
+ * @ret offset		Offset of character, or <0 if not found
+ */
+static inline __attribute__ (( always_inline )) off_t
+memchr_user ( userptr_t buffer, off_t offset, int c, size_t len ) {
+	void *found;
+
+	found = memchr ( ( ( void * ) buffer + offset ), c, len );
+	return ( found ? ( found - ( void * ) buffer ) : -1 );
+}
+
+/**
  * Convert virtual address to user buffer
  *
  * @v virtual		Virtual address

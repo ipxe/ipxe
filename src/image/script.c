@@ -37,11 +37,9 @@ struct image_type script_image_type __image_type ( PROBE_NORMAL );
  * @ret rc		Return status code
  */
 static int script_exec ( struct image *image ) {
-	char cmdbuf[256];
 	size_t offset = 0;
-	size_t remaining;
+	off_t eol;
 	size_t len;
-	char *eol;
 	int rc;
 
 	/* Temporarily de-register image, so that a "boot" command
@@ -53,36 +51,29 @@ static int script_exec ( struct image *image ) {
 
 	while ( offset < image->len ) {
 	
-		/* Read up to cmdbuf bytes from script into buffer */
-		remaining = ( image->len - offset );
-		len = sizeof ( cmdbuf );
-		if ( len > remaining )
-			len = remaining;
-		memset ( cmdbuf, 0, sizeof ( cmdbuf ) );
-		copy_from_user ( cmdbuf, image->data, offset, len );
+		/* Find length of next line, excluding any terminating '\n' */
+		eol = memchr_user ( image->data, offset, '\n',
+				    ( image->len - offset ) );
+		if ( eol < 0 )
+			eol = image->len;
+		len = ( eol - offset );
 
-		/* Find end of line */
-		eol = memchr ( cmdbuf, '\n', sizeof ( cmdbuf ) );
-		if ( ! eol )
-			eol = memchr ( cmdbuf, '\0', sizeof ( cmdbuf ) );
-		if ( ! eol ) {
-			DBG ( "Script line too long (max %zd bytes)\n",
-			      sizeof ( cmdbuf ) );
-			rc = -ENOEXEC;
-			goto done;
-		}
+		/* Copy line, terminate with NUL, and execute command */
+		{
+			char cmdbuf[ len + 1 ];
 
-		/* Mark end of line and execute command */
-		*eol = '\0';
-		DBG ( "$ %s\n", cmdbuf );
-		if ( ( rc = system ( cmdbuf ) ) != 0 ) {
-			DBG ( "Command \"%s\" failed: %s\n",
-			      cmdbuf, strerror ( rc ) );
-			goto done;
+			copy_from_user ( cmdbuf, image->data, offset, len );
+			cmdbuf[len] = '\0';
+			DBG ( "$ %s\n", cmdbuf );
+			if ( ( rc = system ( cmdbuf ) ) != 0 ) {
+				DBG ( "Command \"%s\" failed: %s\n",
+				      cmdbuf, strerror ( rc ) );
+				goto done;
+			}
 		}
 		
 		/* Move to next line */
-		offset += ( ( eol - cmdbuf ) + 1 );
+		offset += ( len + 1 );
 	}
 
 	rc = 0;
