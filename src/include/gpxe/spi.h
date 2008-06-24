@@ -225,6 +225,15 @@ init_at25040 ( struct spi_device *device ) {
 	init_spi ( device );
 }
 
+/** ST M25P32 serial flash */
+static inline __attribute__ (( always_inline )) void
+init_m25p32 ( struct spi_device *device ) {
+	device->address_len = 24;
+	device->nvs.size = ( 4 * 1024 * 1024 );
+	device->nvs.block_size = 256;
+	init_spi ( device );
+}
+
 /** Microchip 25XX640 serial EEPROM */
 static inline __attribute__ (( always_inline )) void
 init_mc25xx640 ( struct spi_device *device ) {
