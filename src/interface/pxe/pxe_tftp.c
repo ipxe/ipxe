@@ -189,7 +189,7 @@ static int pxe_tftp_open ( uint32_t ipaddress, unsigned int port,
 	if ( blksize < TFTP_DEFAULT_BLKSIZE )
 		blksize = TFTP_DEFAULT_BLKSIZE;
 	snprintf ( uri_string, sizeof ( uri_string ),
-		   "tftp://%s:%d%s%s?blksize=%d",
+		   "tftp://%s:%d%s%s?blksize=%zd",
 		   inet_ntoa ( address ), ntohs ( port ),
 		   ( ( filename[0] == '/' ) ? "" : "/" ), filename, blksize );
 	DBG ( " %s", uri_string );

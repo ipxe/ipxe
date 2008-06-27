@@ -4,7 +4,6 @@
  * data structure.
  */
 
-#include <stdio.h>
 #include <gpxe/image.h>
 #include <gpxe/malloc.h>
 #include <gpxe/uaccess.h>
@@ -25,8 +24,8 @@ struct image *embedded_image(void)
 	if ( reclaimed )
 		return NULL;	/* Already reclaimed */
 
-	printf("Embedded image: %d bytes at %p\n",
-	       eisize, _embedded_image_start);
+	DBG ( "Embedded image: %zd bytes at %p\n",
+	      eisize, _embedded_image_start );
 
 	image = alloc_image();
 	if (!image)
