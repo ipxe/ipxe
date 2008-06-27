@@ -12,6 +12,7 @@
 
 #define KC_CMD_WIN	0xd0		/* read  output port */
 #define KC_CMD_WOUT	0xd1		/* write output port */
+#define KC_CMD_NULL	0xff		/* null command ("pulse nothing") */
 #define KB_SET_A20	0xdf		/* enable A20,
 					   enable output buffer full interrupt
 					   enable data line
@@ -129,6 +130,8 @@ void gateA20_set ( void ) {
 			outb ( KC_CMD_WOUT, K_CMD );
 			empty_8042();
 			outb ( KB_SET_A20, K_RDWR );
+			empty_8042();
+			outb ( KC_CMD_NULL, K_CMD );
 			empty_8042();
 			if ( gateA20_is_set ( A20_KBC_RETRIES ) ) {
 				DBG ( "Enabled gate A20 using "
