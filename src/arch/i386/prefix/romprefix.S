@@ -180,7 +180,7 @@ hook_int19:
 	popl	%es:( 0x19 * 4 )
 hook_bbs:
 	/* Check for PMM */
-	movw	$( 0xe00 - 1 ), %bx
+	movw	$( 0xe000 - 1 ), %bx
 pmm_scan:
 	incw	%bx
 	jz	no_pmm
