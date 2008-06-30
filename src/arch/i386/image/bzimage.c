@@ -414,7 +414,9 @@ static int bzimage_load_header ( struct image *image,
 	}
 
 	/* Calculate load address and size of real-mode portion */
-	load_ctx->rm_kernel_seg = 0x1000; /* place RM kernel at 1000:0000 */
+	load_ctx->rm_kernel_seg = ( ( bzhdr->loadflags & BZI_LOAD_HIGH ) ?
+				    0x1000 :  /* 1000:0000 (bzImage) */
+				    0x9000 ); /* 9000:0000 (zImage) */
 	load_ctx->rm_kernel = real_to_user ( load_ctx->rm_kernel_seg, 0 );
 	load_ctx->rm_filesz =
 		( ( bzhdr->setup_sects ? bzhdr->setup_sects : 4 ) + 1 ) << 9;
