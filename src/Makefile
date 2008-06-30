@@ -68,11 +68,6 @@ noargs : blib $(BIN)/NIC $(BIN)/gpxe.dsk $(BIN)/gpxe.iso $(BIN)/gpxe.usb $(BIN)/
 	@$(ECHO)
 	@$(ECHO) '==========================================================='
 
-# Grab the central Config file.
-#
-MAKEDEPS	+= Config
-include Config
-
 # If no architecture is specified in Config or on the command-line,
 # use that of the build machine.
 #
