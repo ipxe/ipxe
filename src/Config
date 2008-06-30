@@ -373,9 +373,3 @@
 #			  address by one (0x300 -> 0x301) will force a
 #			  more aggressive probing algorithm. This might
 #			  be neccessary after a soft-reset of the NIC.
-
-
-CFLAGS_3c503	= -DINCLUDE_3C503 # -DT503_SHMEM
-CFLAGS_ne	= -DINCLUDE_NE -DNE_SCAN=0x300,0x280,0x320,0x340,0x380
-CFLAGS_ns8390	= -DINCLUDE_NS8390	# NE2000/PCI!
-CFLAGS_wd	= -DINCLUDE_WD -DWD_DEFAULT_MEM=0xCC000

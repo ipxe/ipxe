@@ -29,6 +29,12 @@ SMC8416 PIO support added by Andrew Bettison (andrewb@zip.com.au) on 4/3/02
 
 #if 1
 
+#if !defined(INCLUDE_NS8390) && !defined(INCLUDE_WD) && \
+    !defined(INCLUDE_NE) && !defined(INCLUDE_3C503)
+  /* The driver named ns8390 is the PCI driver, often called
+     "PCI ne2000 clones". */
+# define INCLUDE_NS8390 1
+#endif
 
 #include "etherboot.h"
 #include "nic.h"
