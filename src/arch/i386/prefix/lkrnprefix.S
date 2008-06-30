@@ -10,8 +10,8 @@
 	Description:	
 
 	This is just a little bit of code and data that can get prepended
-	to an Etherboot ROM image in order to allow LILO to load the
-	result as if it were a Linux kernel image.
+	to a ROM image in order to allow bootloaders to load the result
+	as if it were a Linux kernel image.
 
 	A real Linux kernel image consists of a one-sector boot loader
 	(to load the image from a floppy disk), followed a few sectors
@@ -21,19 +21,16 @@
 	contains some other parameters that aren't interesting in this
 	case.
 
-	When LILO loads the sectors that comprise a kernel image, it doesn't
-	execute the code in the first sector (since that code would try to
-	load the image from a floppy disk.)  The code in the first sector
-	below doesn't expect to get executed (and prints an error message
-	if it ever -is- executed.)  LILO's only interested in knowing the
-	number of setup sectors advertised in the table (at offset 497 in
-	the first sector.)
+	When a bootloader loads the sectors that comprise a kernel image,
+	it doesn't execute the code in the first sector (since that code
+	would try to load the image from a floppy disk.)  The code in the
+	first sector below doesn't expect to get executed (and prints an
+	error message if it ever -is- executed.)
 
-	Etherboot doesn't require much in the way of setup code.
-	Historically, the Linux kernel required at least 4 sectors of
-	setup code.  Current versions of LILO look at the byte at
-	offset 497 in the first sector to indicate how many sectors
-	of setup code are contained in the image.
+	We don't require much in the way of setup code.  Historically, the
+	Linux kernel required at least 4 sectors of setup code.
+	Therefore, at least 4 sectors must be present even though we don't
+	use them.
 
 */
 
@@ -85,15 +82,25 @@ why:	.ascii	"This image cannot be loaded from a floppy disk.\r\n"
 why_end: 
 
 
+/*
+	The following header is documented in the Linux source code at
+	Documentation/i386/boot.txt
+*/
 	.org	497
 setup_sects: 
 	.byte	SETUPSECS
 root_flags: 
 	.word	0
 syssize: 
-	.word	_load_size_pgh - PREFIXPGH
-swap_dev: 
-	.word	0
+	.long	_load_size_pgh - PREFIXPGH
+
+	.section ".zinfo.fixup", "a"	/* Compressor fixup information */
+	.ascii	"SUBL"
+	.long	syssize
+	.long	16
+	.long	0
+	.previous
+	
 ram_size: 
 	.word	0
 vid_mode: 
@@ -102,43 +109,85 @@ root_dev:
 	.word	0
 boot_flag: 
 	.word	0xAA55
-
-
-	.org	512
-
-	.section ".zinfo.fixup", "a"	/* Compressor fixup information */
-	.ascii	"SUBW"
-	.long	syssize
-	.long	16
+jump:
+	jmp	setup_code
+header:
+	.byte	'H', 'd', 'r', 'S'
+version:
+	.word	0x0207 /* 2.07 */
+realmode_swtch:
 	.long	0
-	.previous
-	
-/*
-	We're now at the beginning of the second sector of the image -
-	where the setup code goes.
+start_sys:
+	.word	0
+kernel_version:
+	.word	0
+type_of_loader:
+	.byte	0
+loadflags:
+	.byte	0
+setup_move_size:
+	.word	0
+code32_start:
+	.long	0
+ramdisk_image:
+	.long	0
+ramdisk_size:
+	.long	0
+bootsect_kludge:
+	.long	0
+heap_end_ptr:
+	.word	0
+pad1:
+	.word	0
+cmd_line_ptr:
+	.long	0
+initrd_addr_max:
+	.long	0
+kernel_alignment:
+	.long	0
+relocatable_kernel:
+	.byte	0
+pad2:
+	.byte	0, 0, 0
+cmdline_size:
+	.long	0
+hardware_subarch:
+	.long	0
+hardware_subarch_data:
+	.byte	0, 0, 0, 0, 0, 0, 0, 0
 
-	We don't need to do too much setup for Etherboot.
+/*
+	We don't need to do too much setup.
 
 	This code gets loaded at SETUPSEG:0.  It wants to start
-	executing the Etherboot image that's loaded at SYSSEG:0 and
+	executing the image that's loaded at SYSSEG:0 and
 	whose entry point is SYSSEG:0.
 */
 setup_code:
-	/* Etherboot expects to be contiguous in memory once loaded.
-	 * LILO doesn't do this, but since we don't need any
-	 * information that's left in the prefix, it doesn't matter:
-	 * we just have to ensure that %cs:0000 is where the start of
-	 * the Etherboot image *would* be.
+	/* We expect to be contiguous in memory once loaded.  The Linux image
+	 * boot process requires that setup code is loaded separately from
+	 * "non-real code".  Since we don't need any information that's left
+	 * in the prefix, it doesn't matter: we just have to ensure that
+	 * %cs:0000 is where the start of the image *would* be.
 	 */
-	ljmp	$(SYSSEG-(PREFIXSIZE/16)), $run_etherboot
+	ljmp	$(SYSSEG-(PREFIXSIZE/16)), $run_gpxe
 
 
 	.org	PREFIXSIZE
 /*
 	We're now at the beginning of the kernel proper.
  */
-run_etherboot:
+run_gpxe:
+	/* Set up stack just below 0x7c00 */
+	xorw	%ax, %ax
+	movw	%ax, %ss
+	movw	$0x7c00, %sp
+
 	call	install
+
+	/* Set up real-mode stack */
+	movw	%bx, %ss
+	movw	$_estack16, %sp
 
 	/* Jump to .text16 segment */
 	pushw	%ax
