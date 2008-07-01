@@ -51,13 +51,13 @@ extern char *text16;
 	( * ( ( typeof ( _text16_ ## variable ) * )			\
 	      & ( text16 [ ( size_t ) & ( _text16_ ## variable ) ] ) ) )
 
-#define __from_data16( variable )					\
-	( * ( ( typeof ( variable ) * )					\
-	      ( ( ( void * ) &(variable) ) - ( ( void * ) data16 ) ) ) )
+#define __from_data16( pointer )					\
+	( ( unsigned int )						\
+	  ( ( ( void * ) (pointer) ) - ( ( void * ) data16 ) ) )
 
-#define __from_text16( variable )					\
-	( * ( ( typeof ( variable ) * )					\
-	      ( ( ( void * ) &(variable) ) - ( ( void * ) text16 ) ) ) )
+#define __from_text16( pointer )					\
+	( ( unsigned int )						\
+	  ( ( ( void * ) (pointer) ) - ( ( void * ) text16 ) ) )
 
 /* Variables in librm.S, present in the normal data segment */
 extern uint16_t __data16 ( rm_cs );

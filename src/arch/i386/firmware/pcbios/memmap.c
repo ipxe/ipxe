@@ -147,7 +147,7 @@ static int meme820 ( struct memory_map *memmap ) {
 					 "=b" ( next ), "=D" ( discard_D ),
 					 "=c" ( discard_c ), "=d" ( discard_d )
 				       : "a" ( 0xe820 ), "b" ( next ),
-					 "D" ( &__from_data16 ( e820buf ) ),
+					 "D" ( __from_data16 ( &e820buf ) ),
 					 "c" ( sizeof ( e820buf ) ),
 					 "d" ( SMAP )
 				       : "memory" );

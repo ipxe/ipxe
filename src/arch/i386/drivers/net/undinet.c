@@ -176,9 +176,9 @@ static int undinet_call ( struct undi_nic *undinic, unsigned int function,
 					   "addw $6, %%sp\n\t" )
 			       : "=a" ( exit ), "=b" ( discard_b ),
 			         "=D" ( discard_D )
-			       : "p" ( &__from_data16 ( undinet_entry_point )),
+			       : "p" ( __from_data16 ( &undinet_entry_point )),
 			         "b" ( function ),
-			         "D" ( &__from_data16 ( undinet_params ) )
+			         "D" ( __from_data16 ( &undinet_params ) )
 			       : "ecx", "edx", "esi", "ebp" );
 
 	/* UNDI API calls may rudely change the status of A20 and not
@@ -211,7 +211,7 @@ static int undinet_call ( struct undi_nic *undinic, unsigned int function,
 	if ( rc != 0 ) {
 		SEGOFF16_t rm_params = {
 			.segment = rm_ds,
-			.offset = (intptr_t) &__from_data16 ( undinet_params ),
+			.offset = __from_data16 ( &undinet_params ),
 		};
 
 		DBGC ( undinic, "UNDINIC %p %s failed: %s\n", undinic,
@@ -357,17 +357,14 @@ static int undinet_transmit ( struct net_device *netdev,
 	/* Create PXENV_UNDI_TRANSMIT data structure */
 	memset ( &undi_transmit, 0, sizeof ( undi_transmit ) );
 	undi_transmit.DestAddr.segment = rm_ds;
-	undi_transmit.DestAddr.offset
-		= ( ( unsigned ) & __from_data16 ( undinet_tbd ) );
+	undi_transmit.DestAddr.offset = __from_data16 ( &undinet_tbd );
 	undi_transmit.TBD.segment = rm_ds;
-	undi_transmit.TBD.offset
-		= ( ( unsigned ) & __from_data16 ( undinet_tbd ) );
+	undi_transmit.TBD.offset = __from_data16 ( &undinet_tbd );
 
 	/* Create PXENV_UNDI_TBD data structure */
 	undinet_tbd.ImmedLength = len;
 	undinet_tbd.Xmit.segment = rm_ds;
-	undinet_tbd.Xmit.offset 
-		= ( ( unsigned ) & __from_data16 ( basemem_packet ) );
+	undinet_tbd.Xmit.offset = __from_data16 ( basemem_packet );
 
 	/* Issue PXE API call */
 	if ( ( rc = undinet_call ( undinic, PXENV_UNDI_TRANSMIT,

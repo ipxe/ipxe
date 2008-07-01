@@ -93,8 +93,8 @@ int undi_load ( struct undi_device *undi, struct undi_rom *undirom ) {
 					   "lcall *%c2\n\t"
 					   "addw $4, %%sp\n\t" )
 			       : "=a" ( exit )
-			       : "a" ( & __from_data16 ( undi_loader ) ),
-			         "p" ( & __from_data16 ( undi_loader_entry ) )
+			       : "a" ( __from_data16 ( &undi_loader ) ),
+			         "p" ( __from_data16 ( &undi_loader_entry ) )
 			       : "ebx", "ecx", "edx", "esi", "edi", "ebp" );
 
 	/* UNDI API calls may rudely change the status of A20 and not

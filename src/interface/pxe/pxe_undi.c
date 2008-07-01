@@ -597,8 +597,7 @@ PXENV_EXIT_t pxenv_undi_isr ( struct s_PXENV_UNDI_ISR *undi_isr ) {
 		undi_isr->FrameHeaderLength =
 			pxe_netdev->ll_protocol->ll_header_len;
 		undi_isr->Frame.segment = rm_ds;
-		undi_isr->Frame.offset =
-			( ( unsigned ) & __from_data16 ( basemem_packet ) );
+		undi_isr->Frame.offset = __from_data16 ( basemem_packet );
 		/* Probably ought to fill in packet type */
 		undi_isr->ProtType = P_UNKNOWN;
 		undi_isr->PktType = XMT_DESTADDR;

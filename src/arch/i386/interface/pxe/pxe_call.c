@@ -441,8 +441,8 @@ int pxe_start_nbp ( void ) {
 					   "addw $4, %%sp\n\t" )
 			       : "=a" ( rc ), "=b" ( discard_b ),
 			         "=c" ( discard_c )
-			       :  "a" ( & __from_text16 ( ppxe ) ),
-			          "b" ( & __from_text16 ( pxenv ) ),
+			       :  "a" ( __from_text16 ( &ppxe ) ),
+			          "b" ( __from_text16 ( &pxenv ) ),
 			          "c" ( rm_cs )
 			       : "edx", "esi", "edi", "ebp", "memory" );
 

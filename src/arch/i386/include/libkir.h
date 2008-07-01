@@ -19,8 +19,8 @@
 #define __text16_array( variable,array ) variable array
 #define __use_data16( variable ) variable
 #define __use_text16( variable ) variable
-#define __from_data16( variable ) variable
-#define __from_text16( variable ) variable
+#define __from_data16( pointer ) pointer
+#define __from_text16( pointer ) pointer
 
 /* Real-mode data and code segments */
 static inline __attribute__ (( always_inline )) unsigned int _rm_cs ( void ) {
