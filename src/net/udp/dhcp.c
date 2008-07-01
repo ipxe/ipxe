@@ -685,6 +685,7 @@ static void dhcp_store_dhcpoffer ( struct dhcp_session *dhcp,
  */
 static void dhcp_rx_dhcpoffer ( struct dhcp_session *dhcp,
 				struct dhcp_settings *dhcpoffer ) {
+	struct in_addr server_id;
 	char vci[9]; /* "PXEClient" */
 	int len;
 	uint8_t ignore_proxy = 0;
@@ -692,7 +693,8 @@ static void dhcp_rx_dhcpoffer ( struct dhcp_session *dhcp,
 
 	/* Check for presence of DHCP server ID */
 	if ( dhcppkt_fetch ( &dhcpoffer->dhcppkt, DHCP_SERVER_IDENTIFIER,
-			     NULL, 0 ) != sizeof ( struct in_addr ) ) {
+			     &server_id, sizeof ( server_id ) )
+	     != sizeof ( server_id ) ) {
 		DBGC ( dhcp, "DHCP %p received DHCPOFFER %p missing server "
 		       "identifier\n", dhcp, dhcpoffer );
 		return;
@@ -700,8 +702,9 @@ static void dhcp_rx_dhcpoffer ( struct dhcp_session *dhcp,
 
 	/* If there is an IP address, it's a normal DHCPOFFER */
 	if ( dhcpoffer->dhcppkt.dhcphdr->yiaddr.s_addr != 0 ) {
-		DBGC ( dhcp, "DHCP %p received DHCPOFFER %p has IP address\n",
-		       dhcp, dhcpoffer );
+		DBGC ( dhcp, "DHCP %p received DHCPOFFER %p from %s has IP "
+		       "address\n",
+		       dhcp, dhcpoffer, inet_ntoa ( server_id ) );
 		dhcp_store_dhcpoffer ( dhcp, dhcpoffer, &dhcp->dhcpoffer );
 	}
 
@@ -713,8 +716,9 @@ static void dhcp_rx_dhcpoffer ( struct dhcp_session *dhcp,
 			      vci, sizeof ( vci ) );
 	if ( ( len >= ( int ) sizeof ( vci ) ) &&
 	     ( strncmp ( "PXEClient", vci, sizeof ( vci ) ) == 0 ) ) {
-		DBGC ( dhcp, "DHCP %p received DHCPOFFER %p is a "
-		       "ProxyDHCPOFFER\n", dhcp, dhcpoffer );
+		DBGC ( dhcp, "DHCP %p received DHCPOFFER %p from %s is a "
+		       "ProxyDHCPOFFER\n",
+		       dhcp, dhcpoffer, inet_ntoa ( server_id ) );
 		dhcp_store_dhcpoffer ( dhcp, dhcpoffer,
 				       &dhcp->proxydhcpoffer );
 	}
@@ -802,8 +806,8 @@ static void dhcp_rx_dhcpack ( struct dhcp_session *dhcp,
 	dhcppkt_fetch ( &dhcpack->dhcppkt, DHCP_SERVER_IDENTIFIER,
 			&ack_server_id, sizeof ( ack_server_id ) );
 	if ( offer_server_id.s_addr != ack_server_id.s_addr ) {
-		DBGC ( dhcp, "DHCP %p ignoring DHCPACK with wrong server ID\n",
-		       dhcp );
+		DBGC ( dhcp, "DHCP %p ignoring DHCPACK with wrong server ID "
+		       "%s\n", dhcp, inet_ntoa ( ack_server_id ) );
 		return;
 	}
 
@@ -830,7 +834,21 @@ static void dhcp_rx_dhcpack ( struct dhcp_session *dhcp,
  */
 static void dhcp_rx_proxydhcpack ( struct dhcp_session *dhcp,
 				   struct dhcp_settings *proxydhcpack ) {
+	struct in_addr offer_server_id = { 0 };
+	struct in_addr ack_server_id = { 0 };
 	int rc;
+
+	/* Verify server ID matches */
+	assert ( dhcp->proxydhcpoffer != NULL );
+	dhcppkt_fetch ( &dhcp->proxydhcpoffer->dhcppkt, DHCP_SERVER_IDENTIFIER,
+			&offer_server_id, sizeof ( offer_server_id ) );
+	dhcppkt_fetch ( &proxydhcpack->dhcppkt, DHCP_SERVER_IDENTIFIER,
+			&ack_server_id, sizeof ( ack_server_id ) );
+	if ( offer_server_id.s_addr != ack_server_id.s_addr ) {
+		DBGC ( dhcp, "DHCP %p ignoring ProxyDHCPACK with wrong server "
+		       "ID %s\n", dhcp, inet_ntoa ( ack_server_id ) );
+		return;
+	}
 
 	/* Rename settings */
 	proxydhcpack->settings.name = PROXYDHCP_SETTINGS_NAME;
