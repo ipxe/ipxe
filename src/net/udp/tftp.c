@@ -316,17 +316,30 @@ void tftp_set_mtftp_port ( unsigned int port ) {
  */
 static int tftp_send_rrq ( struct tftp_request *tftp ) {
 	struct tftp_rrq *rrq;
-	const char *path = tftp->uri->path;
-	size_t len = ( sizeof ( *rrq ) + strlen ( path ) + 1 /* NUL */
-		       + 5 + 1 /* "octet" + NUL */
-		       + 7 + 1 + 5 + 1 /* "blksize" + NUL + ddddd + NUL */
-		       + 5 + 1 + 1 + 1 /* "tsize" + NUL + "0" + NUL */ 
-		       + 9 + 1 + 1 /* "multicast" + NUL + NUL */ );
+	const char *path;
+	size_t len;
 	struct io_buffer *iobuf;
+
+	/* Strip initial '/' if present.  If we were opened via the
+	 * URI interface, then there will be an initial '/', since a
+	 * full tftp:// URI provides no way to specify a non-absolute
+	 * path.  However, many TFTP servers (particularly Windows
+	 * TFTP servers) complain about having an initial '/', and it
+	 * violates user expectations to have a '/' silently added to
+	 * the DHCP-specified filename.
+	 */
+	path = tftp->uri->path;
+	if ( *path == '/' )
+		path++;
 
 	DBGC ( tftp, "TFTP %p requesting \"%s\"\n", tftp, path );
 
 	/* Allocate buffer */
+	len = ( sizeof ( *rrq ) + strlen ( path ) + 1 /* NUL */
+		+ 5 + 1 /* "octet" + NUL */
+		+ 7 + 1 + 5 + 1 /* "blksize" + NUL + ddddd + NUL */
+		+ 5 + 1 + 1 + 1 /* "tsize" + NUL + "0" + NUL */ 
+		+ 9 + 1 + 1 /* "multicast" + NUL + NUL */ );
 	iobuf = xfer_alloc_iob ( &tftp->socket, len );
 	if ( ! iobuf )
 		return -ENOMEM;
