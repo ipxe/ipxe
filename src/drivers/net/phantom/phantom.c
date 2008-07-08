@@ -1863,16 +1863,16 @@ static int phantom_probe ( struct pci_device *pci,
 	if ( ( rc = phantom_init_cmdpeg ( phantom ) ) != 0 )
 		goto err_init_cmdpeg;
 
+	/* Initialise the receive firmware */
+	if ( ( rc = phantom_init_rcvpeg ( phantom ) ) != 0 )
+		goto err_init_rcvpeg;
+
 	/* Read MAC addresses */
 	for ( i = 0 ; i < phantom->num_ports ; i++ ) {
 		phantom_port = netdev_priv ( phantom->netdev[i] );
 		phantom_get_macaddr ( phantom_port,
 				      phantom->netdev[i]->ll_addr );
 	}
-
-	/* Initialise the receive firmware */
-	if ( ( rc = phantom_init_rcvpeg ( phantom ) ) != 0 )
-		goto err_init_rcvpeg;
 
 	/* Register network devices */
 	for ( i = 0 ; i < phantom->num_ports ; i++ ) {
