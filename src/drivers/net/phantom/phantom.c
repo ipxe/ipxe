@@ -1327,17 +1327,6 @@ static void phantom_close ( struct net_device *netdev ) {
 	struct io_buffer *iobuf;
 	unsigned int i;
 
-	/* BUG5671
-	 *
-	 * When the last TX context is destroyed, the firmware will
-	 * pause the Egress Packet Generator (EPG).  The corresponding
-	 * code that is supposed to unpause the EPG when the first TX
-	 * context is created is #if 0'd out (with a comment saying
-	 * FIXME).  The net result of this is that if you close and
-	 * then reopen the interface, you will no longer be able to
-	 * transmit packets.
-	 */
-
 	/* Shut down the port */
 	phantom_del_macaddr ( phantom_port, netdev->ll_addr );
 	phantom_del_macaddr ( phantom_port,
