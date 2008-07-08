@@ -138,12 +138,15 @@ find_dhcp_packet_field ( unsigned int tag ) {
 int dhcppkt_store ( struct dhcp_packet *dhcppkt, unsigned int tag,
 		    const void *data, size_t len ) {
 	struct dhcp_packet_field *field;
+	void *field_data;
 	int rc;
 
 	/* If this is a special field, fill it in */
 	if ( ( field = find_dhcp_packet_field ( tag ) ) != NULL ) {
 		if ( len > field->len )
 			return -ENOSPC;
+		field_data = dhcp_packet_field ( dhcppkt->dhcphdr, field );
+		memset ( field_data, 0, field->len );
 		memcpy ( dhcp_packet_field ( dhcppkt->dhcphdr, field ),
 			 data, len );
 		return 0;
