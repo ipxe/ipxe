@@ -86,19 +86,23 @@ int imgexec ( struct image *image ) {
 }
 
 /**
- * Identify the first loaded image
+ * Identify the only loaded image
  *
- * @ret image		Image, or NULL
+ * @ret image		Image, or NULL if 0 or >1 images are loaded
  */
 struct image * imgautoselect ( void ) {
 	struct image *image;
+	struct image *selected_image = NULL;
+	int flagged_images = 0;
 
 	for_each_image ( image ) {
-		if ( image->flags & IMAGE_LOADED )
-			return image;
+		if ( image->flags & IMAGE_LOADED ) {
+			selected_image = image;
+			flagged_images++;
+		}
 	}
 
-	return NULL;
+	return ( ( flagged_images == 1 ) ? selected_image : NULL );
 }
 
 /**

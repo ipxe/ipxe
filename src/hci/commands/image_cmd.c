@@ -407,7 +407,7 @@ static int imgexec_exec ( int argc, char **argv ) {
 	} else {
 		image = imgautoselect();
 		if ( ! image ) {
-			printf ( "No loaded images\n" );
+			printf ( "No (unique) loaded image\n" );
 			return 1;
 		}
 	}
