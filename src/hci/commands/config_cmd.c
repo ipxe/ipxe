@@ -5,7 +5,8 @@
 #include <gpxe/settings_ui.h>
 
 static int config_exec ( int argc, char **argv ) {
-	struct settings *settings = NULL;
+	char *settings_name;
+	struct settings *settings;
 	int rc;
 
 	if ( argc > 2 ) {
@@ -14,12 +15,11 @@ static int config_exec ( int argc, char **argv ) {
 		return 1;
 	}
 
-	if ( argc == 2 ) {
-		settings = find_settings ( argv[1] );
-		if ( ! settings ) {
-			printf ( "No such scope \"%s\"\n", argv[1] );
-			return 1;
-		}
+	settings_name = ( ( argc == 2 ) ? argv[1] : "" );
+	settings = find_settings ( argv[1] );
+	if ( ! settings ) {
+		printf ( "No such scope \"%s\"\n", settings_name );
+		return 1;
 	}
 
 	if ( ( rc = settings_ui ( settings ) ) != 0 ) {
