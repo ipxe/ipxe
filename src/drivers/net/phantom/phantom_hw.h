@@ -3,6 +3,7 @@
 
 /*
  * Copyright (C) 2008 Michael Brown <mbrown@fensystems.co.uk>.
+ * Copyright (C) 2008 NetXen, Inc.
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License as
