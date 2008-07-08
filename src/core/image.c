@@ -156,7 +156,7 @@ void unregister_image ( struct image *image ) {
 struct image * find_image ( const char *name ) {
 	struct image *image;
 
-	for_each_image ( image ) {
+	list_for_each_entry ( image, &images, list ) {
 		if ( strcmp ( image->name, name ) == 0 )
 			return image;
 	}
@@ -172,20 +172,11 @@ struct image * find_image ( const char *name ) {
  * @ret rc		Return status code
  */
 static int image_load_type ( struct image *image, struct image_type *type ) {
-	struct image *tmp_image;
 	int rc;
 
 	/* Check image is actually loadable */
 	if ( ! type->load )
 		return -ENOEXEC;
-
-	/* Clear the loaded flag on all images; loading this image
-	 * will invalidate any previous loads.  (Even if loading
-	 * fails, the previously loaded image may still have been
-	 * partially overwritten.)
-	 */
-	for_each_image ( tmp_image )
-		tmp_image->flags &= ~IMAGE_LOADED;
 
 	/* Try the image loader */
 	if ( ( rc = type->load ( image ) ) != 0 ) {
