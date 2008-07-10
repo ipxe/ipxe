@@ -865,51 +865,76 @@ static void dhcp_rx_proxydhcpack ( struct dhcp_session *dhcp,
  * Receive new data
  *
  * @v xfer 		Data transfer interface
- * @v data		Received data
- * @v len		Length of received data
+ * @v iobuf		I/O buffer
+ * @v meta		Transfer metadata
  * @ret rc		Return status code
  */
-static int dhcp_deliver_raw ( struct xfer_interface *xfer,
-			      const void *data, size_t len ) {
+static int dhcp_deliver_iob ( struct xfer_interface *xfer,
+			      struct io_buffer *iobuf,
+			      struct xfer_metadata *meta ) {
 	struct dhcp_session *dhcp =
 		container_of ( xfer, struct dhcp_session, xfer );
+	struct sockaddr_tcpip *st_src;
+	unsigned int src_port;
 	struct dhcp_settings *dhcpset;
 	struct dhcphdr *dhcphdr;
 	uint8_t msgtype = 0;
+	int rc = 0;
+
+	/* Sanity checks */
+	if ( ! meta ) {
+		DBGC ( dhcp, "DHCP %p received packet without metadata\n",
+		       dhcp );
+		rc = -EINVAL;
+		goto err_no_meta;
+	}
+	if ( ! meta->src ) {
+		DBGC ( dhcp, "DHCP %p received packet without source port\n",
+		       dhcp );
+		rc = -EINVAL;
+		goto err_no_src;
+	}
+	st_src = ( struct sockaddr_tcpip * ) meta->src;
+	src_port = st_src->st_port;
 
 	/* Convert packet into a DHCP settings block */
-	dhcpset = dhcpset_create ( data, len );
+	dhcpset = dhcpset_create ( iobuf->data, iob_len ( iobuf ) );
 	if ( ! dhcpset ) {
 		DBGC ( dhcp, "DHCP %p could not store DHCP packet\n", dhcp );
-		return -ENOMEM;
+		rc = -ENOMEM;
+		goto err_dhcpset_create;
 	}
 	dhcphdr = dhcpset->dhcppkt.dhcphdr;
 
 	/* Identify message type */
 	dhcppkt_fetch ( &dhcpset->dhcppkt, DHCP_MESSAGE_TYPE, &msgtype,
 			sizeof ( msgtype ) );
-	DBGC ( dhcp, "DHCP %p received %s %p\n",
-	       dhcp, dhcp_msgtype_name ( msgtype ), dhcpset );
+	DBGC ( dhcp, "DHCP %p received %s %p from port %d\n", dhcp,
+	       dhcp_msgtype_name ( msgtype ), dhcpset, ntohs ( src_port ) );
 
 	/* Check for matching transaction ID */
 	if ( dhcphdr->xid != dhcp_xid ( dhcp->netdev ) ) {
 		DBGC ( dhcp, "DHCP %p received %s %p has bad transaction ID\n",
 		       dhcp, dhcp_msgtype_name ( msgtype ), dhcpset );
-		goto out;
+		rc = -EINVAL;
+		goto err_xid;
 	};
 
 	/* Handle packet based on current state */
 	switch ( dhcp->state ) {
 	case DHCP_STATE_DISCOVER:
-		if ( msgtype == DHCPOFFER )
+		if ( ( msgtype == DHCPOFFER ) &&
+		     ( src_port == htons ( BOOTPS_PORT ) ) )
 			dhcp_rx_dhcpoffer ( dhcp, dhcpset );
 		break;
 	case DHCP_STATE_REQUEST:
-		if ( msgtype == DHCPACK )
+		if ( ( msgtype == DHCPACK ) &&
+		     ( src_port == htons ( BOOTPS_PORT ) ) )
 			dhcp_rx_dhcpack ( dhcp, dhcpset );
 		break;
 	case DHCP_STATE_PROXYREQUEST:
-		if ( msgtype == DHCPACK )
+		if ( ( msgtype == DHCPACK ) &&
+		     ( src_port == htons ( PROXYDHCP_PORT ) ) )
 			dhcp_rx_proxydhcpack ( dhcp, dhcpset );
 		break;
 	default:
@@ -917,9 +942,13 @@ static int dhcp_deliver_raw ( struct xfer_interface *xfer,
 		break;
 	}
 
- out:
+ err_xid:
 	dhcpset_put ( dhcpset );
-	return 0;
+ err_dhcpset_create:
+ err_no_src:
+ err_no_meta:
+	free_iob ( iobuf );
+	return rc;
 }
 
 /** DHCP data transfer interface operations */
@@ -928,8 +957,8 @@ static struct xfer_interface_operations dhcp_xfer_operations = {
 	.vredirect	= xfer_vopen,
 	.window		= unlimited_xfer_window,
 	.alloc_iob	= default_xfer_alloc_iob,
-	.deliver_iob	= xfer_deliver_as_raw,
-	.deliver_raw	= dhcp_deliver_raw,
+	.deliver_iob	= dhcp_deliver_iob,
+	.deliver_raw	= xfer_deliver_as_iob,
 };
 
 /**
