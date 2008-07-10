@@ -82,6 +82,7 @@ static unsigned long BASE;
 #define PCI_DEVICE_ID_NVIDIA_NVENET_9           0x0057
 #define PCI_DEVICE_ID_NVIDIA_NVENET_10          0x0037
 #define PCI_DEVICE_ID_NVIDIA_NVENET_11          0x0038
+#define PCI_DEVICE_ID_NVIDIA_NVENET_15          0x0373
 
 
 /*
@@ -1338,6 +1339,8 @@ static int forcedeth_probe ( struct nic *nic, struct pci_device *pci ) {
  		else
  			np->tx_flags |= NV_TX2_LASTPACKET1;
   		break;
+	case 0x0373:
+		/* Fall Through */
  	case 0x0086:
  		/* Fall Through */
  	case 0x008c:
@@ -1420,6 +1423,7 @@ PCI_ROM(0x10de, 0x0056, "nforce8", "nForce NVENET_8 Ethernet Controller"),
 PCI_ROM(0x10de, 0x0057, "nforce9", "nForce NVENET_9 Ethernet Controller"),
 PCI_ROM(0x10de, 0x0037, "nforce10", "nForce NVENET_10 Ethernet Controller"),
 PCI_ROM(0x10de, 0x0038, "nforce11", "nForce NVENET_11 Ethernet Controller"),
+PCI_ROM(0x10de, 0x0373, "nforce15", "nForce NVENET_15 Ethernet Controller")
 };
 
 PCI_DRIVER ( forcedeth_driver, forcedeth_nics, PCI_NO_CLASS );
