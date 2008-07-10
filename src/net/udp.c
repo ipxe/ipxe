@@ -55,11 +55,12 @@ struct tcpip_protocol udp_protocol;
  */
 static int udp_bind ( struct udp_connection *udp ) {
 	struct udp_connection *existing;
-	static uint16_t try_port = 1024;
+	static uint16_t try_port = 1023;
 
 	/* If no port specified, find the first available port */
 	if ( ! udp->local.st_port ) {
-		for ( ; try_port ; try_port++ ) {
+		while ( try_port ) {
+			try_port++;
 			if ( try_port < 1024 )
 				continue;
 			udp->local.st_port = htons ( try_port );
