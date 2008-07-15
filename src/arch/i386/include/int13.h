@@ -69,8 +69,20 @@ struct int13_drive {
 	/** Underlying block device */
 	struct block_device *blockdev;
 
-	/** BIOS drive number (0x80-0xff) */
+	/** BIOS in-use drive number (0x80-0xff) */
 	unsigned int drive;
+	/** BIOS natural drive number (0x80-0xff)
+	 *
+	 * This is the drive number that would have been assigned by
+	 * 'naturally' appending the drive to the end of the BIOS
+	 * drive list.
+	 *
+	 * If the emulated drive replaces a preexisting drive, this is
+	 * the drive number that the preexisting drive gets remapped
+	 * to.
+	 */
+	unsigned int natural_drive;
+
 	/** Number of cylinders
 	 *
 	 * The cylinder number field in an INT 13 call is ten bits

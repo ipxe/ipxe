@@ -325,15 +325,20 @@ static int int13_get_extended_parameters ( struct int13_drive *drive,
 static __cdecl void int13 ( struct i386_all_regs *ix86 ) {
 	int command = ix86->regs.ah;
 	unsigned int bios_drive = ix86->regs.dl;
-	unsigned int original_bios_drive = bios_drive;
 	struct int13_drive *drive;
 	int status;
 
 	list_for_each_entry ( drive, &drives, list ) {
-		if ( drive->drive > bios_drive )
-			continue;
-		if ( drive->drive < bios_drive ) {
-			original_bios_drive--;
+
+		if ( bios_drive != drive->drive ) {
+			/* Remap any accesses to this drive's natural number */
+			if ( bios_drive == drive->natural_drive ) {
+				DBG ( "INT 13,%04x (%02x) remapped to "
+				      "(%02x)\n", ix86->regs.ax,
+				      bios_drive, drive->drive );
+				ix86->regs.dl = drive->drive;
+				return;
+			}
 			continue;
 		}
 		
@@ -393,13 +398,6 @@ static __cdecl void int13 ( struct i386_all_regs *ix86 ) {
 
 		return;
 	}
-
-	/* Remap BIOS drive */
-	if ( bios_drive != original_bios_drive ) {
-		DBG ( "INT 13,%04x (%02x) remapped to (%02x)\n",
-		      ix86->regs.ax, bios_drive, original_bios_drive );
-	}
-	ix86->regs.dl = original_bios_drive;
 }
 
 /**
@@ -542,19 +540,28 @@ void register_int13_drive ( struct int13_drive *drive ) {
 	/* Give drive a default geometry if none specified */
 	guess_int13_geometry ( drive );
 
-	/* Assign drive number if none specified, update BIOS drive count */
+	/* Assign natural drive number */
 	get_real ( num_drives, BDA_SEG, BDA_NUM_DRIVES );
-	if ( ( drive->drive & 0xff ) == 0xff )
-		drive->drive = num_drives;
-	drive->drive |= 0x80;
+	drive->natural_drive = ( num_drives | 0x80 );
 	num_drives++;
-	if ( num_drives <= ( drive->drive & 0x7f ) )
-		num_drives = ( ( drive->drive & 0x7f ) + 1 );
+
+	/* Assign drive number */
+	if ( ( drive->drive & 0xff ) == 0xff ) {
+		/* Drive number == -1 => use natural drive number */
+		drive->drive = drive->natural_drive;
+	} else {
+		/* Use specified drive number (+0x80 if necessary) */
+		drive->drive |= 0x80;
+		if ( num_drives <= ( drive->drive & 0x7f ) )
+			num_drives = ( ( drive->drive & 0x7f ) + 1 );
+	}
+
+	/* Update BIOS drive count */
 	put_real ( num_drives, BDA_SEG, BDA_NUM_DRIVES );
 
-	DBG ( "Registered INT13 drive %02x with C/H/S geometry %d/%d/%d\n",
-	      drive->drive, drive->cylinders, drive->heads,
-	      drive->sectors_per_track );
+	DBG ( "Registered INT13 drive %02x (naturally %02x) with C/H/S "
+	      "geometry %d/%d/%d\n", drive->drive, drive->natural_drive,
+	      drive->cylinders, drive->heads, drive->sectors_per_track );
 
 	/* Hook INT 13 vector if not already hooked */
 	if ( list_empty ( &drives ) )
