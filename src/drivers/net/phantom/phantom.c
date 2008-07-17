@@ -1445,9 +1445,20 @@ static void phantom_poll ( struct net_device *netdev ) {
 
 		/* Check received opcode */
 		sds_opcode = NX_GET ( sds, opcode );
-		switch ( sds_opcode ) {
-		case UNM_RXPKT_DESC:
-		case UNM_SYN_OFFLOAD:
+		if ( ( sds_opcode == UNM_RXPKT_DESC ) ||
+		     ( sds_opcode == UNM_SYN_OFFLOAD ) ) {
+
+			/* Sanity check: ensure that all of the SDS
+			 * descriptor has been written.
+			 */
+			if ( NX_GET ( sds, total_length ) == 0 ) {
+				DBGC ( phantom, "Phantom %p port %d SDS %d "
+				       "incomplete; deferring\n", phantom,
+				       phantom_port->port, sds_consumer_idx );
+				/* Leave for next poll() */
+				break;
+			}
+
 			/* Process received packet */
 			sds_handle = NX_GET ( sds, handle );
 			iobuf = phantom_port->rds_iobuf[sds_handle];
@@ -1459,25 +1470,27 @@ static void phantom_poll ( struct net_device *netdev ) {
 				phantom, phantom_port->port, sds_handle );
 			netdev_rx ( netdev, iobuf );
 			phantom_port->rds_iobuf[sds_handle] = NULL;
-			break;
-		default:
+
+			/* Update RDS consumer counter.  This is a
+			 * lower bound for the number of descriptors
+			 * that have been read by the hardware, since
+			 * the hardware must have read at least one
+			 * descriptor for each completion that we
+			 * receive.
+			 */
+			rds_consumer_idx =
+				( ( rds_consumer_idx + 1 ) % PHN_NUM_RDS );
+			phantom_port->rds_consumer_idx = rds_consumer_idx;
+
+		} else {
+
 			DBGC ( phantom, "Phantom %p port %d unexpected SDS "
 			       "opcode %02x\n",
 			       phantom, phantom_port->port, sds_opcode );
 			DBGC_HDA ( phantom, virt_to_bus ( sds ),
 				   sds, sizeof ( *sds ) );
-			break;
 		}
 			
-		/* Update RDS consumer counter.  This is a lower bound
-		 * for the number of descriptors that have been read
-		 * by the hardware, since the hardware must have read
-		 * at least one descriptor for each completion that we
-		 * receive.
-		 */
-		rds_consumer_idx = ( ( rds_consumer_idx + 1 ) % PHN_NUM_RDS );
-		phantom_port->rds_consumer_idx = rds_consumer_idx;
-
 		/* Clear status descriptor */
 		memset ( sds, 0, sizeof ( *sds ) );
 
