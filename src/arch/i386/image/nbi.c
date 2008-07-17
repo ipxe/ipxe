@@ -429,7 +429,7 @@ static int nbi_exec ( struct image *image ) {
 	/* Shut down now if NBI image will not return */
 	may_return = NBI_PROGRAM_RETURNS ( imgheader.flags );
 	if ( ! may_return )
-		shutdown();
+		shutdown ( SHUTDOWN_BOOT );
 
 	/* Execute NBI image */
 	if ( NBI_LINEAR_EXEC_ADDR ( imgheader.flags ) ) {

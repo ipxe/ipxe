@@ -224,7 +224,7 @@ static void serial_init ( void ) {
  *	Cleanup our use of the serial port, in particular flush the
  *	output buffer so we don't accidentially lose characters.
  */
-static void serial_fini ( void ) {
+static void serial_fini ( int flags __unused ) {
 	int i, status;
 	/* Flush the output buffer to avoid dropping characters,
 	 * if we are reinitializing the serial port.
@@ -247,6 +247,6 @@ struct init_fn serial_init_fn __init_fn ( INIT_SERIAL ) = {
 };
 
 /** Serial driver startup function */
-struct startup_fn serial_startup_fn __startup_fn ( STARTUP_NORMAL ) = {
+struct startup_fn serial_startup_fn __startup_fn ( STARTUP_EARLY ) = {
 	.shutdown = serial_fini,
 };

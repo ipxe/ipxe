@@ -20,6 +20,7 @@
 #include <gpxe/list.h>
 #include <gpxe/tables.h>
 #include <gpxe/device.h>
+#include <gpxe/init.h>
 
 /**
  * @file
@@ -68,13 +69,11 @@ static void rootdev_remove ( struct root_device *rootdev ) {
 /**
  * Probe all devices
  *
- * @ret rc		Return status code
- *
  * This initiates probing for all devices in the system.  After this
  * call, the device hierarchy will be populated, and all hardware
  * should be ready to use.
  */
-int probe_devices ( void ) {
+static void probe_devices ( void ) {
 	struct root_device *rootdev;
 	int rc;
 
@@ -84,19 +83,28 @@ int probe_devices ( void ) {
 		if ( ( rc = rootdev_probe ( rootdev ) ) != 0 )
 			list_del ( &rootdev->dev.siblings );
 	}
-	return 0;
 }
 
 /**
  * Remove all devices
  *
  */
-void remove_devices ( void ) {
+static void remove_devices ( int flags ) {
 	struct root_device *rootdev;
 	struct root_device *tmp;
+
+	if ( flags & SHUTDOWN_KEEP_DEVICES ) {
+		DBG ( "Refusing to remove devices on shutdown\n" );
+		return;
+	}
 
 	list_for_each_entry_safe ( rootdev, tmp, &devices, dev.siblings ) {
 		rootdev_remove ( rootdev );
 		list_del ( &rootdev->dev.siblings );
 	}
 }
+
+struct startup_fn startup_devices __startup_fn ( STARTUP_NORMAL ) = {
+	.startup = probe_devices,
+	.shutdown = remove_devices,
+};

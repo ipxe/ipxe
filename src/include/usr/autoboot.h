@@ -7,6 +7,8 @@
  *
  */
 
+extern int shutdown_exit_flags;
+
 extern void autoboot ( void );
 extern int boot_root_path ( const char *root_path );
 

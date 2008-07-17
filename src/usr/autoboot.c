@@ -41,6 +41,9 @@
 /** Time to wait for link-up */
 #define LINK_WAIT_MS 15000
 
+/** Shutdown flags for exit */
+int shutdown_exit_flags = 0;
+
 /**
  * Identify the boot network device
  *

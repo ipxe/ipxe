@@ -155,6 +155,7 @@
 #define ERRFILE_ibft		      ( ERRFILE_OTHER | 0x000c0000 )
 #define ERRFILE_tls		      ( ERRFILE_OTHER | 0x000d0000 )
 #define ERRFILE_ifmgmt		      ( ERRFILE_OTHER | 0x000e0000 )
+#define ERRFILE_iscsiboot	      ( ERRFILE_OTHER | 0x000f0000 )
 
 /** @} */
 

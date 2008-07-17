@@ -277,7 +277,7 @@ static int multiboot_exec ( struct image *image ) {
 	/* Multiboot images may not return and have no callback
 	 * interface, so shut everything down prior to booting the OS.
 	 */
-	shutdown();
+	shutdown ( SHUTDOWN_BOOT );
 
 	/* Jump to OS with flat physical addressing */
 	__asm__ __volatile__ ( PHYS_CODE ( "call *%%edi\n\t" )

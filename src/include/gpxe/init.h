@@ -28,6 +28,16 @@ struct init_fn {
 
 /** @} */
 
+/** Shutdown flags */
+enum shutdown_flags {
+	/** Shutdown is in order to exit (return to gPXE's caller) */
+	SHUTDOWN_EXIT = 0x0001,
+	/** Shutdown is in order to boot an OS */
+	SHUTDOWN_BOOT = 0x0002,
+	/** Do not remove devices */
+	SHUTDOWN_KEEP_DEVICES = 0x0004,
+};
+
 /**
  * A startup/shutdown function
  *
@@ -36,7 +46,7 @@ struct init_fn {
  */
 struct startup_fn {
 	void ( * startup ) ( void );
-	void ( * shutdown ) ( void );
+	void ( * shutdown ) ( int flags );
 };
 
 /** Declare a startup/shutdown function */
@@ -58,6 +68,6 @@ struct startup_fn {
 
 extern void initialise ( void );
 extern void startup ( void );
-extern void shutdown ( void );
+extern void shutdown ( int flags );
 
 #endif /* _GPXE_INIT_H */

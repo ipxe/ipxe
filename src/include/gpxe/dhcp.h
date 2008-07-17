@@ -164,7 +164,7 @@ struct dhcp_packet;
  * priority of multiple option blocks (e.g. options from non-volatile
  * storage versus options from a DHCP server).
  */
-#define DHCP_EB_PRIORITY DHCP_ENCAP_OPT ( DHCP_EB_ENCAP, 1 )
+#define DHCP_EB_PRIORITY DHCP_ENCAP_OPT ( DHCP_EB_ENCAP, 0x01 )
 
 /** "Your" IP address
  *
@@ -172,7 +172,7 @@ struct dhcp_packet;
  * field, in order to provide a consistent approach to storing and
  * processing options.  It should never be present in a DHCP packet.
  */
-#define DHCP_EB_YIADDR DHCP_ENCAP_OPT ( DHCP_EB_ENCAP, 2 )
+#define DHCP_EB_YIADDR DHCP_ENCAP_OPT ( DHCP_EB_ENCAP, 0x02 )
 
 /** "Server" IP address
  *
@@ -180,7 +180,16 @@ struct dhcp_packet;
  * field, in order to provide a consistent approach to storing and
  * processing options.  It should never be present in a DHCP packet.
  */
-#define DHCP_EB_SIADDR DHCP_ENCAP_OPT ( DHCP_EB_ENCAP, 3 )
+#define DHCP_EB_SIADDR DHCP_ENCAP_OPT ( DHCP_EB_ENCAP, 0x03 )
+
+/** Keep SAN drive registered
+ *
+ * If set to a non-zero value, gPXE will not detach any SAN drive
+ * after failing to boot from it.  (This option is required in order
+ * to perform a Windows Server 2008 installation direct to an iSCSI
+ * target.)
+ */
+#define DHCP_EB_KEEP_SAN DHCP_ENCAP_OPT ( DHCP_EB_ENCAP, 0x08 )
 
 /*
  * Tags in the range 0x10-0x7f are reserved for feature markers

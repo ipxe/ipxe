@@ -318,7 +318,7 @@ PXENV_EXIT_t pxenv_stop_undi ( struct s_PXENV_STOP_UNDI *stop_undi ) {
 	pxe_set_netdev ( NULL );
 
 	/* Prepare for unload */
-	shutdown();
+	shutdown ( SHUTDOWN_BOOT );
 
 	stop_undi->Status = PXENV_STATUS_SUCCESS;
 	return PXENV_EXIT_SUCCESS;

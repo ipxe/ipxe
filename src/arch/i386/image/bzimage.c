@@ -348,7 +348,7 @@ static int bzimage_exec ( struct image *image ) {
 		       sizeof ( bzhdr ) );
 
 	/* Prepare for exiting */
-	shutdown();
+	shutdown ( SHUTDOWN_BOOT );
 
 	DBGC ( image, "bzImage %p jumping to RM kernel at %04x:0000 "
 	       "(stack %04x:%04zx)\n", image,

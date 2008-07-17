@@ -205,3 +205,10 @@ REQUIRE_OBJECT ( gdbidt );
 REQUIRE_OBJECT ( gdbudp );
 REQUIRE_OBJECT ( gdbstub_cmd );
 #endif
+
+/*
+ * Drag in objects that are always required, but not dragged in via
+ * symbol dependencies.
+ *
+ */
+REQUIRE_OBJECT ( device );

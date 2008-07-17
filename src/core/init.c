@@ -79,16 +79,13 @@ void startup ( void ) {
 			startup_fn->startup();
 	}
 
-	/* Probe for all devices.  Treated separately because nothing
-	 * else will drag in device.o
-	 */
-	probe_devices();
-
 	started = 1;
 }
 
 /**
  * Shut down gPXE
+ *
+ * @v flags		Shutdown behaviour flags
  *
  * This function reverses the actions of startup(), and leaves gPXE in
  * a state ready to be removed from memory.  You may call startup()
@@ -97,20 +94,17 @@ void startup ( void ) {
  * Call this function only once, before either exiting main() or
  * starting up a non-returnable image.
  */
-void shutdown ( void ) {
+void shutdown ( int flags ) {
 	struct startup_fn *startup_fn;
 
 	if ( ! started )
 		return;
 
-	/* Remove all devices */
-	remove_devices();
-
 	/* Call registered shutdown functions (in reverse order) */
 	for ( startup_fn = startup_fns_end - 1 ; startup_fn >= startup_fns ;
 	      startup_fn-- ) {
 		if ( startup_fn->shutdown )
-			startup_fn->shutdown();
+			startup_fn->shutdown ( flags );
 	}
 
 	started = 0;

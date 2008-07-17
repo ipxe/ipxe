@@ -128,7 +128,7 @@ static void hide_etherboot ( void ) {
  * Uninstalls the INT 15 handler installed by hide_etherboot(), if
  * possible.
  */
-static void unhide_etherboot ( void ) {
+static void unhide_etherboot ( int flags __unused ) {
 
 	/* If we have more than one hooked interrupt at this point, it
 	 * means that some other vector is still hooked, in which case

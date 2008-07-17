@@ -62,7 +62,7 @@ __cdecl int main ( void ) {
 			shell();
 	}
 
-	shutdown();
+	shutdown ( SHUTDOWN_EXIT | shutdown_exit_flags );
 
 	return 0;
 }
