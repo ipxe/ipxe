@@ -205,7 +205,7 @@ $(BIN)/deps/%.d : % $(MAKEDEPS) $(PARSEROM)
 # Calculate and include the list of Makefile rules files
 #
 AUTO_DEPS	= $(patsubst %,$(BIN)/deps/%.d,$(AUTO_SRCS))
-include $(AUTO_DEPS)
+-include $(AUTO_DEPS)
 autodeps :
 	@$(ECHO) $(AUTO_DEPS)
 VERYCLEANUP	+= $(BIN)/deps
@@ -459,7 +459,7 @@ $(BIN)/deps/%.media.d : $(MAKEDEPS)
 MEDIA_DEPS		= $(patsubst %,$(BIN)/deps/%.media.d,$(AUTO_MEDIA))
 mediadeps :
 	@$(ECHO) $(MEDIA_DEPS)
-include $(MEDIA_DEPS)
+-include $(MEDIA_DEPS)
 
 # The "allXXXs" targets for each suffix
 #
