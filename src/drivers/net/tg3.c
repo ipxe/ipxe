@@ -1431,7 +1431,8 @@ static int tg3_stop_block(struct tg3 *tp, unsigned long ofs, uint32_t enable_bit
 	unsigned int i;
 	uint32_t val;
 
-	if (GET_ASIC_REV(tp->pci_chip_rev_id) == ASIC_REV_5705) {
+	if (GET_ASIC_REV(tp->pci_chip_rev_id) == ASIC_REV_5705 ||
+	    GET_ASIC_REV(tp->pci_chip_rev_id) == ASIC_REV_5787) {
 		switch(ofs) {
 		case RCVLSC_MODE:
 		case DMAC_MODE:
@@ -1439,7 +1440,7 @@ static int tg3_stop_block(struct tg3 *tp, unsigned long ofs, uint32_t enable_bit
 		case BUFMGR_MODE:
 		case MEMARB_MODE:
 			/* We can't enable/disable these bits of the
-			 * 5705, just say success.
+			 * 5705 or 5787, just say success.
 			 */
 			return 0;
 		default:
@@ -1470,6 +1471,7 @@ static int tg3_stop_block(struct tg3 *tp, unsigned long ofs, uint32_t enable_bit
 static int tg3_abort_hw(struct tg3 *tp)
 {
 	int i, err;
+	uint32_t val;
 
 	tg3_disable_ints(tp);
 
@@ -1513,8 +1515,14 @@ static int tg3_abort_hw(struct tg3 *tp)
 	err |= tg3_stop_block(tp, WDMAC_MODE,  WDMAC_MODE_ENABLE);
 	err |= tg3_stop_block(tp, MBFREE_MODE, MBFREE_MODE_ENABLE);
 
-	tw32(FTQ_RESET, 0xffffffff);
-	tw32(FTQ_RESET, 0x00000000);
+	val = tr32(FTQ_RESET);
+	val |= FTQ_RESET_DMA_READ_QUEUE | FTQ_RESET_DMA_HIGH_PRI_READ |
+	       FTQ_RESET_SEND_BD_COMPLETION | FTQ_RESET_DMA_WRITE |
+	       FTQ_RESET_DMA_HIGH_PRI_WRITE | FTQ_RESET_SEND_DATA_COMPLETION |
+	       FTQ_RESET_HOST_COALESCING | FTQ_RESET_MAC_TX |
+	       FTQ_RESET_RX_BD_COMPLETE | FTQ_RESET_RX_LIST_PLCMT |
+               FTQ_RESET_RX_DATA_COMPLETION;
+	tw32(FTQ_RESET, val);
 
 	err |= tg3_stop_block(tp, BUFMGR_MODE, BUFMGR_MODE_ENABLE);
 	err |= tg3_stop_block(tp, MEMARB_MODE, MEMARB_MODE_ENABLE);
@@ -1554,8 +1562,19 @@ static void tg3_chip_reset(struct tg3 *tp)
 	// Alf: here patched
 	/* do the reset */
 	val = GRC_MISC_CFG_CORECLK_RESET;
+	if (tp->tg3_flags2 & TG3_FLG2_PCI_EXPRESS) {
+		if (tr32(0x7e2c) == 0x60) {
+			tw32(0x7e2c, 0x20);
+		}
+		if (tp->pci_chip_rev_id != CHIPREV_ID_5750_A0) {
+			tw32(GRC_MISC_CFG, (1 << 29));
+			val |= (1 << 29);
+		}
+	}
+	
 	if ((GET_ASIC_REV(tp->pci_chip_rev_id) == ASIC_REV_5705)
-	    || (GET_ASIC_REV(tp->pci_chip_rev_id) == ASIC_REV_5750)) {
+	    || (GET_ASIC_REV(tp->pci_chip_rev_id) == ASIC_REV_5750)
+	    || (GET_ASIC_REV(tp->pci_chip_rev_id) == ASIC_REV_5787)) {
 		val |= GRC_MISC_CFG_KEEP_GPHY_POWER;
 	}
 
@@ -1644,7 +1663,8 @@ static int tg3_restart_fw(struct tg3 *tp, uint32_t state)
 		udelay(10);
 	}
 	if (i >= 100000 &&
-		    !(tp->tg3_flags2 & TG3_FLG2_SUN_5704)) {
+		    !(tp->tg3_flags2 & TG3_FLG2_SUN_5704) &&
+		    !(GET_ASIC_REV(tp->pci_chip_rev_id) == ASIC_REV_5787)) {
 		printf ( "Firmware will not restart magic=%#lx\n",
 			val );
 		return -ENODEV;
@@ -1879,7 +1899,9 @@ static int tg3_setup_hw(struct tg3 *tp)
 	     (65 << GRC_MISC_CFG_PRESCALAR_SHIFT));
 
 	/* Initialize MBUF/DESC pool. */
-	if ((GET_ASIC_REV(tp->pci_chip_rev_id) != ASIC_REV_5705) &&
+	if (GET_ASIC_REV(tp->pci_chip_rev_id) == ASIC_REV_5787) {
+		/* Do nothing. */
+	} else if ((GET_ASIC_REV(tp->pci_chip_rev_id) != ASIC_REV_5705) &&
 		(tp->pci_chip_rev_id != CHIPREV_ID_5721)) {
 		tw32(BUFMGR_MB_POOL_ADDR, NIC_SRAM_MBUF_POOL_BASE);
 		if (GET_ASIC_REV(tp->pci_chip_rev_id) == ASIC_REV_5704)
@@ -1976,7 +1998,8 @@ static int tg3_setup_hw(struct tg3 *tp)
 		TG3_WRITE_SETTINGS(table_all);
 		tw32(RCVDBDI_STD_BD + TG3_BDINFO_HOST_ADDR + TG3_64BIT_REG_LOW, 
 			virt_to_bus(tp->rx_std));
-		if (GET_ASIC_REV(tp->pci_chip_rev_id) == ASIC_REV_5705) {
+		if (GET_ASIC_REV(tp->pci_chip_rev_id) == ASIC_REV_5705 ||
+		    GET_ASIC_REV(tp->pci_chip_rev_id) == ASIC_REV_5787) {
 			tw32(RCVDBDI_STD_BD + TG3_BDINFO_MAXLEN_FLAGS,
 				RX_STD_MAX_SIZE_5705 << BDINFO_FLAGS_MAXLEN_SHIFT);
 		} else {
@@ -1985,10 +2008,11 @@ static int tg3_setup_hw(struct tg3 *tp)
 	}
 
 	
-	/* There is only one send ring on 5705, no need to explicitly
+	/* There is only one send ring on 5705 and 5787, no need to explicitly
 	 * disable the others.
 	 */
-	if (GET_ASIC_REV(tp->pci_chip_rev_id) != ASIC_REV_5705) {
+	if (GET_ASIC_REV(tp->pci_chip_rev_id) != ASIC_REV_5705 &&
+	    GET_ASIC_REV(tp->pci_chip_rev_id) != ASIC_REV_5787) {
 		/* Clear out send RCB ring in SRAM. */
 		for (i = NIC_SRAM_SEND_RCB; i < NIC_SRAM_RCV_RET_RCB; i += TG3_BDINFO_SIZE)
 			tg3_write_mem(i + TG3_BDINFO_MAXLEN_FLAGS, BDINFO_FLAGS_DISABLED);
@@ -2004,10 +2028,11 @@ static int tg3_setup_hw(struct tg3 *tp)
 		(TG3_TX_RING_SIZE << BDINFO_FLAGS_MAXLEN_SHIFT),
 		NIC_SRAM_TX_BUFFER_DESC);
 
-	/* There is only one receive return ring on 5705, no need to explicitly
-	 * disable the others.
+	/* There is only one receive return ring on 5705 and 5787, no need to
+	 * explicitly disable the others.
 	 */
-	if (GET_ASIC_REV(tp->pci_chip_rev_id) != ASIC_REV_5705) {
+	if (GET_ASIC_REV(tp->pci_chip_rev_id) != ASIC_REV_5705 &&
+	    GET_ASIC_REV(tp->pci_chip_rev_id) != ASIC_REV_5787) {
 		for (i = NIC_SRAM_RCV_RET_RCB; i < NIC_SRAM_STATS_BLK; i += TG3_BDINFO_SIZE) {
 			tg3_write_mem(i + TG3_BDINFO_MAXLEN_FLAGS,
 				BDINFO_FLAGS_DISABLED);
@@ -2086,6 +2111,11 @@ static int tg3_setup_hw(struct tg3 *tp)
 		!(tp->tg3_flags2 & TG3_FLG2_IS_5788)) {
 		val |= WDMAC_MODE_RX_ACCEL;
 	}
+
+	/* Host coalescing bug fix */
+	if (GET_ASIC_REV(tp->pci_chip_rev_id) == ASIC_REV_5787)
+		val |= (1 << 29);
+
 	tw32_carefully(WDMAC_MODE, val);
 
 	if ((tp->tg3_flags & TG3_FLAG_PCIX_MODE) != 0) {
@@ -2182,7 +2212,8 @@ static int tg3_setup_hw(struct tg3 *tp)
 			virt_to_bus(tp->hw_stats));
 		tw32(HOSTCC_STATUS_BLK_HOST_ADDR + TG3_64BIT_REG_LOW,
 			virt_to_bus(tp->hw_status));
-		if (GET_ASIC_REV(tp->pci_chip_rev_id) != ASIC_REV_5705) {
+		if (GET_ASIC_REV(tp->pci_chip_rev_id) != ASIC_REV_5705 &&
+		    GET_ASIC_REV(tp->pci_chip_rev_id) != ASIC_REV_5787) {
 			TG3_WRITE_SETTINGS(table_not_5705);
 		}
 	}
@@ -2762,15 +2793,9 @@ static int tg3_get_invariants(struct tg3 *tp)
 	/* determine if it is PCIE system */
 	// Alf : I have no idea what this is about...
 	// But it's definitely usefull
-	if (GET_ASIC_REV(tp->pci_chip_rev_id) == ASIC_REV_5750) {
-	  val = tr32(TG3PCI_MSI_CAP_ID) ;
-	  if (((val >> 8) & 0xff) == T3_PCIE_CAPABILITY_ID_REG) {
-	    val = tr32(T3_PCIE_CAPABILITY_ID_REG) ;
-	    if ((val & 0xff) == T3_PCIE_CAPABILITY_ID) {
-	      tp->tg3_flags2 |= TG3_FLG2_PCI_EXPRESS ;
-	    }
-	  }
-	}
+	val = pci_find_capability(tp->pdev, PCI_CAP_ID_EXP);
+	if (val)
+		tp->tg3_flags2 |= TG3_FLG2_PCI_EXPRESS;
 
 	/* Force the chip into D0. */
 	tg3_set_power_state_0(tp);
@@ -3010,6 +3035,7 @@ static const char * tg3_phy_string(struct tg3 *tp)
         case PHY_ID_BCM5705:    return "5705";
         case PHY_ID_BCM5750:    return "5750";
 	case PHY_ID_BCM5751:	return "5751"; 
+	case PHY_ID_BCM5787:	return "5787";
 	case PHY_ID_BCM8002:	return "8002/serdes";
 	case PHY_ID_SERDES:	return "serdes";
 	default:		return "unknown";
@@ -3370,6 +3396,7 @@ PCI_ROM(0x14e4, 0x1659, "tg3-5721",        "Broadcom Tigon 3 5721"),
 PCI_ROM(0x14e4, 0x165d, "tg3-5705M",       "Broadcom Tigon 3 5705M"),
 PCI_ROM(0x14e4, 0x165e, "tg3-5705M_2",     "Broadcom Tigon 3 5705M_2"),
 PCI_ROM(0x14e4, 0x1677, "tg3-5751",        "Broadcom Tigon 3 5751"),
+PCI_ROM(0x14e4, 0x167a, "tg3-5754",        "Broadcom Tigon 3 5754"),
 PCI_ROM(0x14e4, 0x1696, "tg3-5782",        "Broadcom Tigon 3 5782"),
 PCI_ROM(0x14e4, 0x169c, "tg3-5788",        "Broadcom Tigon 3 5788"),
 PCI_ROM(0x14e4, 0x169d, "tg3-5789",        "Broadcom Tigon 3 5789"),

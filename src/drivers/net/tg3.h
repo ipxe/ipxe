@@ -294,6 +294,7 @@ typedef unsigned long dma_addr_t;
 #define   ASIC_REV_5704			 0x02
 #define   ASIC_REV_5705			 0x03
 #define   ASIC_REV_5750			 0x04
+#define   ASIC_REV_5787			 0x0b
 #define  GET_CHIP_REV(CHIP_REV_ID)	((CHIP_REV_ID) >> 8)
 #define   CHIPREV_5700_AX		 0x70
 #define   CHIPREV_5700_BX		 0x71
@@ -1273,6 +1274,17 @@ typedef unsigned long dma_addr_t;
 
 /* Flow Through queues */
 #define FTQ_RESET			0x00005c00
+#define FTQ_RESET_DMA_READ_QUEUE	(1 << 1)
+#define FTQ_RESET_DMA_HIGH_PRI_READ	(1 << 2)
+#define FTQ_RESET_SEND_BD_COMPLETION	(1 << 4)
+#define FTQ_RESET_DMA_WRITE		(1 << 6)
+#define FTQ_RESET_DMA_HIGH_PRI_WRITE	(1 << 7)
+#define FTQ_RESET_SEND_DATA_COMPLETION	(1 << 9)
+#define FTQ_RESET_HOST_COALESCING	(1 << 10)
+#define FTQ_RESET_MAC_TX		(1 << 11)
+#define FTQ_RESET_RX_BD_COMPLETE	(1 << 13)
+#define FTQ_RESET_RX_LIST_PLCMT		(1 << 14)
+#define FTQ_RESET_RX_DATA_COMPLETION	(1 << 16)
 /* 0x5c04 --> 0x5c10 unused */
 #define FTQ_DMA_NORM_READ_CTL		0x00005c10
 #define FTQ_DMA_NORM_READ_FULL_CNT	0x00005c14
@@ -2130,7 +2142,8 @@ struct tg3 {
 #define PHY_ID_BCM5703			0x60008160
 #define PHY_ID_BCM5704			0x60008190
 #define PHY_ID_BCM5705			0x600081a0
-#define PHY_ID_BCM5750                  0x60008180
+#define PHY_ID_BCM5750			0x60008180
+#define PHY_ID_BCM5787			0xbc050ce0
 #define PHY_ID_BCM8002			0x60010140
 #define PHY_ID_BCM5751			0x00206180
 #define PHY_ID_SERDES			0xfeedbee0
@@ -2157,7 +2170,8 @@ struct tg3 {
 	((X) == PHY_ID_BCM5400 || (X) == PHY_ID_BCM5401 || \
 	 (X) == PHY_ID_BCM5411 || (X) == PHY_ID_BCM5701 || \
 	 (X) == PHY_ID_BCM5703 || (X) == PHY_ID_BCM5704 || \
-	 (X) == PHY_ID_BCM5705 || (X) == PHY_ID_BCM5750 || (X) == PHY_ID_BCM5751 || \
+	 (X) == PHY_ID_BCM5705 || (X) == PHY_ID_BCM5750 || \
+	 (X) == PHY_ID_BCM5751 || (X) == PHY_ID_BCM5787 || \
 	 (X) == PHY_ID_BCM8002 || (X) == PHY_ID_SERDES)
 
 	unsigned long			regs;
