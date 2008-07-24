@@ -24,6 +24,7 @@
 #include <gpxe/keys.h>
 #include <gpxe/job.h>
 #include <gpxe/monojob.h>
+#include <gpxe/timer.h>
 
 /** @file
  *
@@ -62,9 +63,11 @@ struct job_interface monojob = {
 int monojob_wait ( const char *string ) {
 	int key;
 	int rc;
+	tick_t last_progress_dot;
 
-	printf ( "%s... ", string );
+	printf ( "%s.", string );
 	monojob_rc = -EINPROGRESS;
+	last_progress_dot = currticks();
 	while ( monojob_rc == -EINPROGRESS ) {
 		step();
 		if ( iskey() ) {
@@ -78,14 +81,18 @@ int monojob_wait ( const char *string ) {
 				break;
 			}
 		}
+		if ( ( currticks() - last_progress_dot ) > TICKS_PER_SEC ) {
+			printf ( "." );
+			last_progress_dot = currticks();
+		}
 	}
 	rc = monojob_rc;
 
 done:
 	if ( rc ) {
-		printf ( "%s\n", strerror ( rc ) );
+		printf ( " %s\n", strerror ( rc ) );
 	} else {
-		printf ( "ok\n" );
+		printf ( " ok\n" );
 	}
 	return rc;
 }
