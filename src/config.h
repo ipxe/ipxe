@@ -58,6 +58,8 @@
  */
 #define TIMER_BIOS		/* 18Hz BIOS timer */
 #define TIMER_RDTSC		/* CPU TimeStamp Counter timer */
+#define BANNER_TIMEOUT	20	/* Tenths of a second for which the shell
+				   banner should appear */
 
 /* @END general.h */
 

@@ -18,7 +18,8 @@
 
 #include <stdio.h>
 #include <console.h>
-#include <gpxe/timer.h>
+#include <unistd.h>
+#include <config/general.h>
 #include <gpxe/shell_banner.h>
 
 /** @file
@@ -27,28 +28,28 @@
  *
  */
 
-#define BANNER_TIMEOUT ( 2 * TICKS_PER_SEC )
-
 /**
  * Print shell banner and prompt for shell entry
  *
  * @ret	enter_shell		User wants to enter shell
  */
 int shell_banner ( void ) {
-	unsigned long timeout = ( currticks() + BANNER_TIMEOUT );
+	int wait_count = 0;
 	int enter_shell = 0;
 	int key;
 
 	printf ( "\nPress Ctrl-B for the gPXE command line..." );
 
 	/* Wait for key */
-	while ( currticks() < timeout ) {
+	while ( wait_count < BANNER_TIMEOUT ) {
 		if ( iskey() ) {
 			key = getchar();
 			if ( key == 0x02 /* Ctrl-B */ )
 				enter_shell = 1;
 			break;
 		}
+		mdelay(100);
+		wait_count++;
 	}
 
 	/* Clear the "Press Ctrl-B" line */
