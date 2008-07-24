@@ -1634,6 +1634,7 @@ static int phantom_read_flash ( struct phantom_nic *phantom ) {
 	/* Identify board type and number of ports */
 	switch ( board_info.board_type ) {
 	case UNM_BRDTYPE_P3_4_GB:
+	case UNM_BRDTYPE_P3_4_GB_MM:
 		phantom->num_ports = 4;
 		break;
 	case UNM_BRDTYPE_P3_HMEZ:
