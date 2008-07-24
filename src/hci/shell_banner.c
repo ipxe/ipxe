@@ -20,6 +20,7 @@
 #include <console.h>
 #include <unistd.h>
 #include <config/general.h>
+#include <gpxe/keys.h>
 #include <gpxe/shell_banner.h>
 
 /** @file
@@ -34,22 +35,21 @@
  * @ret	enter_shell		User wants to enter shell
  */
 int shell_banner ( void ) {
-	int wait_count = 0;
 	int enter_shell = 0;
+	int wait_count;
 	int key;
 
 	printf ( "\nPress Ctrl-B for the gPXE command line..." );
 
 	/* Wait for key */
-	while ( wait_count < BANNER_TIMEOUT ) {
+	for ( wait_count = 0 ; wait_count < BANNER_TIMEOUT ; wait_count++ ) {
 		if ( iskey() ) {
 			key = getchar();
-			if ( key == 0x02 /* Ctrl-B */ )
+			if ( key == CTRL_B )
 				enter_shell = 1;
 			break;
 		}
 		mdelay(100);
-		wait_count++;
 	}
 
 	/* Clear the "Press Ctrl-B" line */
