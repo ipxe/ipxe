@@ -156,3 +156,31 @@ struct setting uuid_setting __setting = {
 				struct smbios_system_information, uuid ),
 	.type = &setting_type_uuid,
 };
+
+/** Other SMBIOS named settings */
+struct setting smbios_named_settings[] __setting = {
+	{
+		.name = "manufacturer",
+		.description = "Manufacturer",
+		.tag = SMBIOS_STRING_TAG ( SMBIOS_TYPE_SYSTEM_INFORMATION,
+					   struct smbios_system_information,
+					   manufacturer ),
+		.type = &setting_type_string,
+	},
+	{
+		.name = "product",
+		.description = "Product name",
+		.tag = SMBIOS_STRING_TAG ( SMBIOS_TYPE_SYSTEM_INFORMATION,
+					   struct smbios_system_information,
+					   product ),
+		.type = &setting_type_string,
+	},
+	{
+		.name = "serial",
+		.description = "Serial number",
+		.tag = SMBIOS_STRING_TAG ( SMBIOS_TYPE_SYSTEM_INFORMATION,
+					   struct smbios_system_information,
+					   serial ),
+		.type = &setting_type_string,
+	},
+};
