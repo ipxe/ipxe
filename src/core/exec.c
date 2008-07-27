@@ -26,6 +26,7 @@
 #include <assert.h>
 #include <gpxe/tables.h>
 #include <gpxe/command.h>
+#include <gpxe/settings.h>
 
 /** @file
  *
@@ -87,6 +88,76 @@ int execv ( const char *command, char * const argv[] ) {
 }
 
 /**
+ * Expand variables within command line
+ *
+ * @v command		Command line
+ * @ret expcmd		Expanded command line
+ *
+ * The expanded command line is allocated with malloc() and the caller
+ * must eventually free() it.
+ */
+static char * expand_command ( const char *command ) {
+	char *expcmd;
+	char *start;
+	char *end;
+	char *head;
+	char *name;
+	char *tail;
+	int setting_len;
+	int new_len;
+	char *tmp;
+
+	/* Obtain temporary modifiable copy of command line */
+	expcmd = strdup ( command );
+	if ( ! expcmd )
+		return NULL;
+
+	/* Expand while expansions remain */
+	while ( 1 ) {
+
+		head = expcmd;
+
+		/* Locate opener */
+		start = strstr ( expcmd, "${" );
+		if ( ! start )
+			break;
+		*start = '\0';
+		name = ( start + 2 );
+
+		/* Locate closer */
+		end = strstr ( name, "}" );
+		if ( ! end )
+			break;
+		*end = '\0';
+		tail = ( end + 1 );
+
+		/* Determine setting length */
+		setting_len = fetchf_named_setting ( name, NULL, 0 );
+		if ( setting_len < 0 )
+			setting_len = 0; /* Treat error as empty setting */
+
+		/* Read setting into temporary buffer */
+		{
+			char setting_buf[ setting_len + 1 ];
+
+			setting_buf[0] = '\0';
+			fetchf_named_setting ( name, setting_buf,
+					       sizeof ( setting_buf ) );
+
+			/* Construct expanded string and discard old string */
+			tmp = expcmd;
+			new_len = asprintf ( &expcmd, "%s%s%s",
+					     head, setting_buf, tail );
+			free ( tmp );
+			if ( new_len < 0 )
+				return NULL;
+		}
+	}
+
+	return expcmd;
+}
+
+/**
  * Split command line into argv array
  *
  * @v args		Command line
@@ -135,8 +206,8 @@ int system ( const char *command ) {
 	int argc;
 	int rc = 0;
 
-	/* Obtain temporary modifiable copy of command line */
-	args = strdup ( command );
+	/* Perform variable expansion */
+	args = expand_command ( command );
 	if ( ! args )
 		return -ENOMEM;
 
@@ -157,3 +228,26 @@ int system ( const char *command ) {
 	free ( args );
 	return rc;
 }
+
+/**
+ * The "echo" command
+ *
+ * @v argc		Argument count
+ * @v argv		Argument list
+ * @ret rc		Exit code
+ */
+static int echo_exec ( int argc, char **argv ) {
+	int i;
+
+	for ( i = 1 ; i < argc ; i++ ) {
+		printf ( "%s%s", ( ( i == 1 ) ? "" : " " ), argv[i] );
+	}
+	printf ( "\n" );
+	return 0;
+}
+
+/** "echo" command */
+struct command echo_command __command = {
+	.name = "echo",
+	.exec = echo_exec,
+};
