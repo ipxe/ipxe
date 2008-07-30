@@ -110,7 +110,10 @@ root_dev:
 boot_flag: 
 	.word	0xAA55
 jump:
-	jmp	setup_code
+	/* Manually specify a two-byte jmp instruction here rather
+	 * than leaving it up to the assembler. */
+	.byte	0xeb
+	.byte	setup_code - header
 header:
 	.byte	'H', 'd', 'r', 'S'
 version:
@@ -142,7 +145,10 @@ pad1:
 cmd_line_ptr:
 	.long	0
 initrd_addr_max:
-	.long	0
+	/* We don't use an initrd but some bootloaders (e.g. SYSLINUX) have
+	 * been known to require this field.  Set the value to 2 GB.  This
+	 * value is also used by the Linux kernel. */
+	.long	0x7fffffff
 kernel_alignment:
 	.long	0
 relocatable_kernel:
