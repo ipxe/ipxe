@@ -221,6 +221,7 @@ static void ftp_reply ( struct ftp_request *ftp ) {
 		 ( ( status_major == '3' ) && ( ftp->state == FTP_USER ) ) ) ){
 		/* Flag protocol error and close connections */
 		ftp_done ( ftp, -EPROTO );
+		return;
 	}
 
 	/* Open passive connection when we get "PASV" response */
