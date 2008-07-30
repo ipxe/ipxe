@@ -8,6 +8,7 @@
 
 #define PNP_SIGNATURE ( '$' + ( 'P' << 8 ) + ( 'n' << 16 ) + ( 'P' << 24 ) )
 #define PMM_SIGNATURE ( '$' + ( 'P' << 8 ) + ( 'M' << 16 ) + ( 'M' << 24 ) )
+#define PCI_SIGNATURE ( 'P' + ( 'C' << 8 ) + ( 'I' << 16 ) + ( ' ' << 24 ) )
 #define STACK_MAGIC ( 'L' + ( 'R' << 8 ) + ( 'E' << 16 ) + ( 'T' << 24 ) )
 #define PNP_GET_BBS_VERSION 0x60
 
@@ -40,25 +41,31 @@ checksum:
 
 pciheader:
 	.ascii	"PCIR"			/* Signature */
-	.word	pci_vendor_id		/* Vendor ID */ 
-	.word	pci_device_id		/* Device ID */
-	.word	0x0000			/* pointer to vital product data */
+	.word	pci_vendor_id		/* Vendor identification */ 
+	.word	pci_device_id		/* Device identification */
+	.word	0x0000			/* Device list pointer */
 	.word	pciheader_len		/* PCI data structure length */
-	.byte	0x00			/* PCI data structure revision */
-	.byte	0x02			/* Device Base Type code */
-	.byte	0x00			/* Device Sub-Type code */
-	.byte	0x00			/* Device Interface Type code */
-pciheader_size:	.word _load_size_sect	/* Image length same as offset 02h */
-	.word	0x0001			/* revision level of code/data */
-	.byte	0x00			/* code type */
-	.byte	0x80			/* Flags (last PCI data structure) */
-	.word	0x0000			/* reserved */
+	.byte	0x03			/* PCI data structure revision */
+	.byte	0x02, 0x00, 0x00	/* Class code */
+pciheader_image_length:
+	.word	_load_size_sect		/* Image length */
+	.word	0x0001			/* Revision level */
+	.byte	0x00			/* Code type */
+	.byte	0x80			/* Last image indicator */
+pciheader_runtime_length:
+	.word	_load_size_sect		/* Maximum run-time image length */
+	.word	0x0000			/* Configuration utility code header */
+	.word	0x0000			/* DMTF CLP entry point */
 	.equ pciheader_len, . - pciheader
 	.size pciheader, . - pciheader
 	
 	.section ".zinfo.fixup", "a"	/* Compressor fixup information */
 	.ascii	"SUBW"
-	.long	pciheader_size
+	.long	pciheader_image_length
+	.long	512
+	.long	0
+	.ascii	"SUBW"
+	.long	pciheader_runtime_length
 	.long	512
 	.long	0
 	.previous
@@ -131,22 +138,36 @@ init:
 	pushw	%ds
 	pushw	%es
 	pushw	%fs
+	pushw	%gs
 	cld
 	pushw	%cs
 	popw	%ds
 	pushw	$0x40
 	popw	%fs
+	/* Shuffle some registers around.  We need %di available for
+	 * the print_xxx functions, and in a register that's
+	 * addressable from %es, so shuffle as follows:
+	 *
+	 *    %di (pointer to PnP structure) => %bx
+	 *    %bx (runtime segment address, for PCI 3.0) => %gs
+	 */
+	movw	%bx, %gs
 	movw	%di, %bx
-	xorw	%di, %di
 	/* Print message as early as possible */
 	movw	$init_message, %si
+	xorw	%di, %di
 	call	print_message
 	call	print_pci_busdevfn
 	/* Fill in product name string, if possible */
 	movw	$prodstr_pci_id, %di
 	call	print_pci_busdevfn
 	movb	$' ', prodstr_separator
+	/* Print segment address */
+	movb	$' ', %al
 	xorw	%di, %di
+	call	print_character
+	movw	%cs, %ax
+	call	print_hex_word
 	/* Check for PnP BIOS */
 	testw	$0x0f, %bx	/* PnP signature must be aligned - bochs    */
 	jnz	hook_int19	/* uses unalignment to indicate 'fake' PnP. */
@@ -154,6 +175,7 @@ init:
 	jne	hook_int19
 	/* Is PnP: print PnP message */
 	movw	$init_message_pnp, %si
+	xorw	%di, %di
 	call	print_message
 	/* Check for BBS */
 	pushw	%es:0x1b(%bx)	/* Real-mode data segment */
@@ -165,11 +187,13 @@ init:
 	testw	%ax, %ax
 	jne	hook_int19
 	movw	$init_message_bbs, %si
+	xorw	%di, %di
 	call	print_message
 	jmp	hook_bbs
 	/* Not BBS-compliant - must hook INT 19 */
 hook_int19:
 	movw	$init_message_int19, %si
+	xorw	%di, %di
 	call	print_message
 	xorw	%ax, %ax
 	movw	%ax, %es
@@ -196,6 +220,7 @@ pmm_scan:
 	jnz	pmm_scan
 	/* PMM found: print PMM message */
 	movw	$init_message_pmm, %si
+	xorw	%di, %di
 	call	print_message
 	/* Try to allocate 2MB block via PMM */
 	pushw	$0x0006		/* Aligned, extended memory */
@@ -206,8 +231,9 @@ pmm_scan:
 	addw	$12, %sp
 	testw	%dx, %dx	/* %ax==0 even on success, since align=2MB */
 	jnz	gotpmm
-	movw	$init_message_pmm_failed, %si
-	call	print_message
+	movb	$'-', %al
+	xorw	%di, %di
+	call	print_character
 	jmp	no_pmm
 gotpmm:	/* PMM allocation succeeded: copy ROM to PMM block */
 	pushal			/* PMM presence implies 1kB stack */
@@ -232,8 +258,44 @@ gotpmm:	/* PMM allocation succeeded: copy ROM to PMM block */
 	loop	1b
 	subb	%bl, checksum
 	popal
-no_pmm:	/* Prompt for POST-time shell */
+no_pmm:
+	/* Check for PCI BIOS */
+	pushl	%edx
+	stc
+	movw	$0xb101, %ax
+	int	$0x1a
+	jc	no_pci
+	cmpl	$PCI_SIGNATURE, %edx
+	popl	%edx
+	jne	no_pci
+	testb	%ah, %ah
+	jnz	no_pci
+	movw	$init_message_pci, %si
+	xorw	%di, %di
+	call	print_message
+	movb	%bh, %al
+	call	print_hex_nibble
+	movb	$'.', %al
+	call	print_character
+	movb	%bl, %al
+	call	print_hex_byte
+	cmpb	$3, %bh
+	jb	no_pci3
+	/* Copy self to option ROM space (required for PCI3.0) */
+	movb	$' ', %al
+	xorw	%di, %di
+	call	print_character
+	movw	%gs, %ax
+	call	print_hex_word
+	movzbw	romheader_size, %cx
+	shlw	$9, %cx
+	movw	%ax, %es
+	rep	movsb
+no_pci3:
+no_pci:
+	/* Prompt for POST-time shell */
 	movw	$init_message_prompt, %si
+	xorw	%di, %di
 	call	print_message
 	/* Empty the keyboard buffer before waiting for input */
 empty_keyboard_buffer:
@@ -276,8 +338,10 @@ wait_for_key:
 no_key_pressed:
 	/* Print blank lines to terminate messages */
 	movw	$init_message_end, %si
+	xorw	%di, %di
 	call	print_message
 	/* Restore registers */
+	popw	%gs
 	popw	%fs
 	popw	%es
 	popw	%ds
@@ -290,6 +354,9 @@ no_key_pressed:
 init_message:
 	.asciz	"gPXE (http://etherboot.org) - PCI "
 	.size	init_message, . - init_message
+init_message_pci:
+	.asciz	" PCI"
+	.size	init_message_pci, . - init_message_pci
 init_message_pnp:
 	.asciz	" PnP"
 	.size	init_message_pnp, . - init_message_pnp
@@ -299,9 +366,6 @@ init_message_bbs:
 init_message_pmm:
 	.asciz	" PMM"
 	.size	init_message_pmm, . - init_message_pmm
-init_message_pmm_failed:
-	.asciz	"(failed)"
-	.size	init_message_pmm_failed, . - init_message_pmm_failed
 init_message_int19:
 	.asciz	" INT19"
 	.size	init_message_int19, . - init_message_int19
