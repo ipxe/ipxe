@@ -35,6 +35,7 @@ enum ftp_state {
 	FTP_TYPE,
 	FTP_PASV,
 	FTP_RETR,
+	FTP_WAIT,
 	FTP_QUIT,
 	FTP_DONE,
 };
@@ -116,14 +117,15 @@ static void ftp_done ( struct ftp_request *ftp, int rc ) {
  * snprintf() call.
  */
 static const char * ftp_strings[] = {
-	[FTP_CONNECT]	= "",
+	[FTP_CONNECT]	= NULL,
 	[FTP_USER]	= "USER anonymous\r\n",
 	[FTP_PASS]	= "PASS etherboot@etherboot.org\r\n",
 	[FTP_TYPE]	= "TYPE I\r\n",
 	[FTP_PASV]	= "PASV\r\n",
-	[FTP_RETR]	= "RETR %s\r\n", 
+	[FTP_RETR]	= "RETR %s\r\n",
+	[FTP_WAIT]	= NULL,
 	[FTP_QUIT]	= "QUIT\r\n",
-	[FTP_DONE]	= "",
+	[FTP_DONE]	= NULL,
 };
 
 /**
@@ -167,6 +169,27 @@ static void ftp_parse_value ( char **text, uint8_t *value, size_t len ) {
 		if ( **text )
 			(*text)++;
 	} while ( --len );
+}
+
+/**
+ * Move to next state and send the appropriate FTP control string
+ *
+ * @v ftp		FTP request
+ *
+ */
+static void ftp_next_state ( struct ftp_request *ftp ) {
+
+	/* Move to next state */
+	if ( ftp->state < FTP_DONE )
+		ftp->state++;
+
+	/* Send control string if needed */
+	if ( ftp_strings[ftp->state] != NULL ) {
+		DBGC ( ftp, "FTP %p sending ", ftp );
+		DBGC ( ftp, ftp_strings[ftp->state], ftp->uri->path );
+		xfer_printf ( &ftp->control, ftp_strings[ftp->state],
+			      ftp->uri->path );
+	}	
 }
 
 /**
@@ -223,17 +246,9 @@ static void ftp_reply ( struct ftp_request *ftp ) {
 		}
 	}
 
-	/* Move to next state */
-	if ( ftp->state < FTP_DONE )
-		ftp->state++;
-
-	/* Send control string */
-	if ( ftp->state < FTP_DONE ) {
-		DBGC ( ftp, "FTP %p sending ", ftp );
-		DBGC ( ftp, ftp_strings[ftp->state], ftp->uri->path );
-		xfer_printf ( &ftp->control, ftp_strings[ftp->state],
-			      ftp->uri->path );
-	}
+	/* Move to next state and send control string */
+	ftp_next_state ( ftp );
+	
 }
 
 /**
@@ -331,8 +346,11 @@ static void ftp_data_closed ( struct xfer_interface *data, int rc ) {
 	       ftp, strerror ( rc ) );
 	
 	/* If there was an error, close control channel and record status */
-	if ( rc )
+	if ( rc ) {
 		ftp_done ( ftp, rc );
+	} else {
+		ftp_next_state ( ftp );
+	}
 }
 
 /**
