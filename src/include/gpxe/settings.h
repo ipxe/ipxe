@@ -215,6 +215,7 @@ extern struct setting password_setting __setting;
 extern struct setting priority_setting __setting;
 extern struct setting bios_drive_setting __setting;
 extern struct setting uuid_setting __setting;
+extern struct setting next_server_setting __setting;
 
 /**
  * Initialise a settings block

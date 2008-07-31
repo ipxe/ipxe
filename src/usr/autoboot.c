@@ -24,6 +24,7 @@
 #include <gpxe/settings.h>
 #include <gpxe/image.h>
 #include <gpxe/embedded.h>
+#include <gpxe/uri.h>
 #include <usr/ifmgmt.h>
 #include <usr/route.h>
 #include <usr/dhcpmgmt.h>
@@ -78,14 +79,38 @@ static int boot_embedded_image ( void ) {
 }
 
 /**
- * Boot using filename
+ * Boot using next-server and filename
  *
  * @v filename		Boot filename
  * @ret rc		Return status code
  */
-static int boot_filename ( const char *filename ) {
+static int boot_next_server_and_filename ( struct in_addr next_server,
+					   const char *filename ) {
+	struct uri *uri;
 	struct image *image;
+	char buf[ 23 /* tftp://xxx.xxx.xxx.xxx/ */ + strlen(filename) + 1 ];
+	int filename_is_absolute;
 	int rc;
+
+	/* Construct URI */
+	uri = parse_uri ( filename );
+	if ( ! uri ) {
+		printf ( "Out of memory\n" );
+		return -ENOMEM;
+	}
+	filename_is_absolute = uri_is_absolute ( uri );
+	uri_put ( uri );
+	if ( ! filename_is_absolute ) {
+		/* Construct a tftp:// URI for the filename.  We can't
+		 * just rely on the current working URI, because the
+		 * relative URI resolution will remove the distinction
+		 * between filenames with and without initial slashes,
+		 * which is significant for TFTP.
+		 */
+		snprintf ( buf, sizeof ( buf ), "tftp://%s/%s",
+			   inet_ntoa ( next_server ), filename );
+		filename = buf;
+	}
 
 	image = alloc_image();
 	if ( ! image ) {
@@ -135,6 +160,7 @@ int boot_root_path ( const char *root_path ) {
  */
 static int netboot ( struct net_device *netdev ) {
 	char buf[256];
+	struct in_addr next_server;
 	int rc;
 
 	/* Open device and display device status */
@@ -161,10 +187,11 @@ static int netboot ( struct net_device *netdev ) {
 		return rc;
 
 	/* Try to download and boot whatever we are given as a filename */
+	fetch_ipv4_setting ( NULL, &next_server_setting, &next_server );
 	fetch_string_setting ( NULL, &filename_setting, buf, sizeof ( buf ) );
 	if ( buf[0] ) {
 		printf ( "Booting from filename \"%s\"\n", buf );
-		return boot_filename ( buf );
+		return boot_next_server_and_filename ( next_server, buf );
 	}
 	
 	/* No filename; try the root path */
