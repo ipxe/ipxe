@@ -66,12 +66,12 @@ static const uint8_t dhcp_op[] = {
 /** Raw option data for options common to all DHCP requests */
 static uint8_t dhcp_request_options_data[] = {
 	DHCP_MAX_MESSAGE_SIZE, DHCP_WORD ( ETH_MAX_MTU ),
+	DHCP_CLIENT_ARCHITECTURE, DHCP_WORD ( 0 ),
+	DHCP_CLIENT_NDI, DHCP_OPTION ( 1 /* UNDI */ , 2, 1 /* v2.1 */ ),
 	DHCP_VENDOR_CLASS_ID,
 	DHCP_STRING (  'P', 'X', 'E', 'C', 'l', 'i', 'e', 'n', 't', ':',
 		       'A', 'r', 'c', 'h', ':', '0', '0', '0', '0', '0', ':',
 		       'U', 'N', 'D', 'I', ':', '0', '0', '2', '0', '0', '1' ),
-	DHCP_CLIENT_ARCHITECTURE, DHCP_WORD ( 0 ),
-	DHCP_CLIENT_NDI, DHCP_OPTION ( 1 /* UNDI */ , 2, 1 /* v2.1 */ ),
 	DHCP_PARAMETER_REQUEST_LIST,
 	DHCP_OPTION ( DHCP_SUBNET_MASK, DHCP_ROUTERS, DHCP_DNS_SERVERS,
 		      DHCP_LOG_SERVERS, DHCP_HOST_NAME, DHCP_DOMAIN_NAME,
