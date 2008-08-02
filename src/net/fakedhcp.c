@@ -181,11 +181,9 @@ int create_fakeproxydhcpack ( struct net_device *netdev,
 	/* Identify ProxyDHCP settings */
 	settings = find_settings ( PROXYDHCP_SETTINGS_NAME );
 
-	/* No ProxyDHCP settings => return empty block */
-	if ( ! settings ) {
-		memset ( data, 0, max_len );
-		return 0;
-	}
+	/* No ProxyDHCP settings => use normal DHCPACK */
+	if ( ! settings )
+		return create_fakedhcpack ( netdev, data, max_len );
 
 	/* Create base DHCPACK packet */
 	if ( ( rc = dhcp_create_packet ( &dhcppkt, netdev, DHCPACK, NULL,
