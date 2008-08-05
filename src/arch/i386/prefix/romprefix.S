@@ -290,7 +290,9 @@ no_pmm:
 	movzbw	romheader_size, %cx
 	shlw	$9, %cx
 	movw	%ax, %es
-	rep	movsb
+	xorw	%si, %si
+	xorw	%di, %di
+	cs rep	movsb
 no_pci3:
 no_pci:
 	/* Prompt for POST-time shell */
