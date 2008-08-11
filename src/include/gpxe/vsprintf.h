@@ -66,6 +66,7 @@ extern size_t vcprintf ( struct printf_context *ctx, const char *fmt,
 			 va_list args );
 extern int vssnprintf ( char *buf, ssize_t ssize, const char *fmt,
 			va_list args );
-extern int ssnprintf ( char *buf, ssize_t ssize, const char *fmt, ... );
+extern int __attribute__ (( format ( printf, 3, 4 ) ))
+ssnprintf ( char *buf, ssize_t ssize, const char *fmt, ... );
 
 #endif /* _GPXE_VSPRINTF_H */
