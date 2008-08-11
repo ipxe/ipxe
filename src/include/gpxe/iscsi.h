@@ -522,12 +522,25 @@ struct iscsi_session {
 	 */
 	int retry_count;
 
-	/** Username (if any) */
-	char *username;
-	/** Password (if any) */
-	char *password;
-	/** CHAP challenge/response */
-	struct chap_challenge chap;
+	/** Initiator username (if any) */
+	char *initiator_username;
+	/** Initiator password (if any) */
+	char *initiator_password;
+	/** Target username (if any) */
+	char *target_username;
+	/** Target password (if any) */
+	char *target_password;
+	/** Target has authenticated acceptably */
+	int target_auth_ok;
+	/** CHAP challenge (for target auth only)
+	 *
+	 * This is a block of random data; the first byte is used as
+	 * the CHAP identifier (CHAP_I) and the remainder as the CHAP
+	 * challenge (CHAP_C).
+	 */
+	unsigned char chap_challenge[17];
+	/** CHAP response (used for both initiator and target auth) */
+	struct chap_response chap;
 
 	/** Target session identifying handle
 	 *
@@ -642,8 +655,11 @@ struct iscsi_session {
 /** iSCSI session needs to send the CHAP response */
 #define ISCSI_STATUS_STRINGS_CHAP_RESPONSE 0x0400
 
+/** iSCSI session needs to send the mutual CHAP challenge */
+#define ISCSI_STATUS_STRINGS_CHAP_CHALLENGE 0x0800
+
 /** iSCSI session needs to send the operational negotiation strings */
-#define ISCSI_STATUS_STRINGS_OPERATIONAL 0x0800
+#define ISCSI_STATUS_STRINGS_OPERATIONAL 0x1000
 
 /** Mask for all iSCSI "needs to send" flags */
 #define ISCSI_STATUS_STRINGS_MASK 0xff00

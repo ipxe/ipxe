@@ -49,11 +49,17 @@ static char *iscsi_explicit_initiator_iqn;
 /** Default iSCSI initiator name (constructed from hostname) */
 static char *iscsi_default_initiator_iqn;
 
-/** iSCSI username */
-static char *iscsi_username;
+/** iSCSI initiator username */
+static char *iscsi_initiator_username;
 
-/** iSCSI password */
-static char *iscsi_password;
+/** iSCSI initiator password */
+static char *iscsi_initiator_password;
+
+/** iSCSI target username */
+static char *iscsi_target_username;
+
+/** iSCSI target password */
+static char *iscsi_target_password;
 
 static void iscsi_start_tx ( struct iscsi_session *iscsi );
 static void iscsi_start_login ( struct iscsi_session *iscsi );
@@ -81,8 +87,10 @@ static void iscsi_free ( struct refcnt *refcnt ) {
 
 	free ( iscsi->target_address );
 	free ( iscsi->target_iqn );
-	free ( iscsi->username );
-	free ( iscsi->password );
+	free ( iscsi->initiator_username );
+	free ( iscsi->initiator_password );
+	free ( iscsi->target_username );
+	free ( iscsi->target_password );
 	chap_finish ( &iscsi->chap );
 	iscsi_rx_buffered_data_done ( iscsi );
 	free ( iscsi );
@@ -143,6 +151,9 @@ static void iscsi_close_connection ( struct iscsi_session *iscsi, int rc ) {
 
 	/* Clear connection status */
 	iscsi->status = 0;
+
+	/* Deauthenticate target */
+	iscsi->target_auth_ok = 0;
 
 	/* Reset TX and RX state machines */
 	iscsi->tx_state = ISCSI_TX_IDLE;
@@ -213,11 +224,12 @@ static void iscsi_start_command ( struct iscsi_session *iscsi ) {
 	command->cmdsn = htonl ( iscsi->cmdsn );
 	command->expstatsn = htonl ( iscsi->statsn + 1 );
 	memcpy ( &command->cdb, &iscsi->command->cdb, sizeof ( command->cdb ));
-	DBGC ( iscsi, "iSCSI %p start " SCSI_CDB_FORMAT " %s %#zx\n",
-	       iscsi, SCSI_CDB_DATA ( command->cdb ),
-	       ( iscsi->command->data_in ? "in" : "out" ),
-	       ( iscsi->command->data_in ?
-		 iscsi->command->data_in_len : iscsi->command->data_out_len ));
+	DBGC2 ( iscsi, "iSCSI %p start " SCSI_CDB_FORMAT " %s %#zx\n",
+		iscsi, SCSI_CDB_DATA ( command->cdb ),
+		( iscsi->command->data_in ? "in" : "out" ),
+		( iscsi->command->data_in ?
+		  iscsi->command->data_in_len :
+		  iscsi->command->data_out_len ) );
 }
 
 /**
@@ -450,17 +462,25 @@ static int iscsi_build_login_request_strings ( struct iscsi_session *iscsi,
 					       void *data, size_t len ) {
 	unsigned int used = 0;
 	unsigned int i;
+	const char *auth_method;
 
 	if ( iscsi->status & ISCSI_STATUS_STRINGS_SECURITY ) {
+		/* Default to allowing no authentication */
+		auth_method = "None";
+		/* If we have a credential to supply, permit CHAP */
+		if ( iscsi->initiator_username )
+			auth_method = "CHAP,None";
+		/* If we have a credential to check, force CHAP */
+		if ( iscsi->target_username )
+			auth_method = "CHAP";
 		used += ssnprintf ( data + used, len - used,
 				    "InitiatorName=%s%c"
 				    "TargetName=%s%c"
 				    "SessionType=Normal%c"
-				    "AuthMethod=%sNone%c",
+				    "AuthMethod=%s%c",
 				    iscsi_initiator_iqn(), 0,
 				    iscsi->target_iqn, 0, 0,
-				    ( ( iscsi->username && iscsi->password ) ?
-				      "CHAP," : "" ), 0 );
+				    auth_method, 0 );
 	}
 
 	if ( iscsi->status & ISCSI_STATUS_STRINGS_CHAP_ALGORITHM ) {
@@ -468,12 +488,24 @@ static int iscsi_build_login_request_strings ( struct iscsi_session *iscsi,
 	}
 	
 	if ( ( iscsi->status & ISCSI_STATUS_STRINGS_CHAP_RESPONSE ) ) {
+		assert ( iscsi->initiator_username != NULL );
 		used += ssnprintf ( data + used, len - used,
 				    "CHAP_N=%s%cCHAP_R=0x",
-				    iscsi->username, 0 );
+				    iscsi->initiator_username, 0 );
 		for ( i = 0 ; i < iscsi->chap.response_len ; i++ ) {
 			used += ssnprintf ( data + used, len - used, "%02x",
 					    iscsi->chap.response[i] );
+		}
+		used += ssnprintf ( data + used, len - used, "%c", 0 );
+	}
+
+	if ( ( iscsi->status & ISCSI_STATUS_STRINGS_CHAP_CHALLENGE ) ) {
+		used += ssnprintf ( data + used, len - used,
+				    "CHAP_I=%d%cCHAP_C=0x",
+				    iscsi->chap_challenge[0], 0 );
+		for ( i = 1 ; i < sizeof ( iscsi->chap_challenge ) ; i++ ) {
+			used += ssnprintf ( data + used, len - used, "%02x",
+					    iscsi->chap_challenge[i] );
 		}
 		used += ssnprintf ( data + used, len - used, "%c", 0 );
 	}
@@ -602,12 +634,17 @@ static int iscsi_handle_targetaddress_value ( struct iscsi_session *iscsi,
 static int iscsi_handle_authmethod_value ( struct iscsi_session *iscsi,
 					   const char *value ) {
 
+	/* Mark target as authenticated if no authentication required */
+	if ( ! iscsi->target_username )
+		iscsi->target_auth_ok = 1;
+
 	/* If server requests CHAP, send the CHAP_A string */
 	if ( strcmp ( value, "CHAP" ) == 0 ) {
 		DBGC ( iscsi, "iSCSI %p initiating CHAP authentication\n",
 		       iscsi );
 		iscsi->status |= ISCSI_STATUS_STRINGS_CHAP_ALGORITHM;
 	}
+
 	return 0;
 }
 
@@ -620,7 +657,6 @@ static int iscsi_handle_authmethod_value ( struct iscsi_session *iscsi,
  */
 static int iscsi_handle_chap_a_value ( struct iscsi_session *iscsi,
 				       const char *value ) {
-	int rc;
 
 	/* We only ever offer "5" (i.e. MD5) as an algorithm, so if
 	 * the server responds with anything else it is a protocol
@@ -630,13 +666,6 @@ static int iscsi_handle_chap_a_value ( struct iscsi_session *iscsi,
 		DBGC ( iscsi, "iSCSI %p got invalid CHAP algorithm \"%s\"\n",
 		       iscsi, value );
 		return -EPROTO;
-	}
-
-	/* Prepare for CHAP with MD5 */
-	if ( ( rc = chap_init ( &iscsi->chap, &md5_algorithm ) ) != 0 ) {
-		DBGC ( iscsi, "iSCSI %p could not initialise CHAP: %s\n",
-		       iscsi, strerror ( rc ) );
-		return rc;
 	}
 
 	return 0;
@@ -653,6 +682,7 @@ static int iscsi_handle_chap_i_value ( struct iscsi_session *iscsi,
 				       const char *value ) {
 	unsigned int identifier;
 	char *endp;
+	int rc;
 
 	/* The CHAP identifier is an integer value */
 	identifier = strtoul ( value, &endp, 0 );
@@ -662,13 +692,21 @@ static int iscsi_handle_chap_i_value ( struct iscsi_session *iscsi,
 		return -EPROTO;
 	}
 
+	/* Prepare for CHAP with MD5 */
+	chap_finish ( &iscsi->chap );
+	if ( ( rc = chap_init ( &iscsi->chap, &md5_algorithm ) ) != 0 ) {
+		DBGC ( iscsi, "iSCSI %p could not initialise CHAP: %s\n",
+		       iscsi, strerror ( rc ) );
+		return rc;
+	}
+
 	/* Identifier and secret are the first two components of the
 	 * challenge.
 	 */
 	chap_set_identifier ( &iscsi->chap, identifier );
-	if ( iscsi->password ) {
-		chap_update ( &iscsi->chap, iscsi->password,
-			      strlen ( iscsi->password ) );
+	if ( iscsi->initiator_password ) {
+		chap_update ( &iscsi->chap, iscsi->initiator_password,
+			      strlen ( iscsi->initiator_password ) );
 	}
 
 	return 0;
@@ -686,11 +724,13 @@ static int iscsi_handle_chap_c_value ( struct iscsi_session *iscsi,
 	char buf[3];
 	char *endp;
 	uint8_t byte;
+	unsigned int i;
 
 	/* Check and strip leading "0x" */
 	if ( ( value[0] != '0' ) || ( value[1] != 'x' ) ) {
 		DBGC ( iscsi, "iSCSI %p saw invalid CHAP challenge \"%s\"\n",
 		       iscsi, value );
+		return -EPROTO;
 	}
 	value += 2;
 
@@ -711,6 +751,114 @@ static int iscsi_handle_chap_c_value ( struct iscsi_session *iscsi,
 	DBGC ( iscsi, "iSCSI %p sending CHAP response\n", iscsi );
 	chap_respond ( &iscsi->chap );
 	iscsi->status |= ISCSI_STATUS_STRINGS_CHAP_RESPONSE;
+
+	/* Send CHAP challenge, if applicable */
+	if ( iscsi->target_username ) {
+		iscsi->status |= ISCSI_STATUS_STRINGS_CHAP_CHALLENGE;
+		/* Generate CHAP challenge data */
+		for ( i = 0 ; i < sizeof ( iscsi->chap_challenge ) ; i++ ) {
+			iscsi->chap_challenge[i] = random();
+		}
+	}
+
+	return 0;
+}
+
+/**
+ * Handle iSCSI CHAP_N text value
+ *
+ * @v iscsi		iSCSI session
+ * @v value		CHAP_N value
+ * @ret rc		Return status code
+ */
+static int iscsi_handle_chap_n_value ( struct iscsi_session *iscsi,
+				       const char *value ) {
+
+	/* The target username isn't actually involved at any point in
+	 * the authentication process; it merely serves to identify
+	 * which password the target is using to generate the CHAP
+	 * response.  We unnecessarily verify that the username is as
+	 * expected, in order to provide mildly helpful diagnostics if
+	 * the target is supplying the wrong username/password
+	 * combination.
+	 */
+	if ( iscsi->target_username &&
+	     ( strcmp ( iscsi->target_username, value ) != 0 ) ) {
+		DBGC ( iscsi, "iSCSI %p target username \"%s\" incorrect "
+		       "(wanted \"%s\")\n",
+		       iscsi, value, iscsi->target_username );
+		return -EACCES;
+	}
+
+	return 0;
+}
+
+/**
+ * Handle iSCSI CHAP_R text value
+ *
+ * @v iscsi		iSCSI session
+ * @v value		CHAP_R value
+ * @ret rc		Return status code
+ */
+static int iscsi_handle_chap_r_value ( struct iscsi_session *iscsi,
+				       const char *value ) {
+	char buf[3];
+	char *endp;
+	uint8_t byte;
+	unsigned int i;
+	int rc;
+
+	/* Generate CHAP response for verification */
+	chap_finish ( &iscsi->chap );
+	if ( ( rc = chap_init ( &iscsi->chap, &md5_algorithm ) ) != 0 ) {
+		DBGC ( iscsi, "iSCSI %p could not initialise CHAP: %s\n",
+		       iscsi, strerror ( rc ) );
+		return rc;
+	}
+	chap_set_identifier ( &iscsi->chap, iscsi->chap_challenge[0] );
+	if ( iscsi->target_password ) {
+		chap_update ( &iscsi->chap, iscsi->target_password,
+			      strlen ( iscsi->target_password ) );
+	}
+	chap_update ( &iscsi->chap, &iscsi->chap_challenge[1],
+		      ( sizeof ( iscsi->chap_challenge ) - 1 ) );
+	chap_respond ( &iscsi->chap );
+
+	/* Check and strip leading "0x" */
+	if ( ( value[0] != '0' ) || ( value[1] != 'x' ) ) {
+		DBGC ( iscsi, "iSCSI %p saw invalid CHAP response \"%s\"\n",
+		       iscsi, value );
+		return -EPROTO;
+	}
+	value += 2;
+
+	/* Check CHAP response length */
+	if ( strlen ( value ) != ( 2 * iscsi->chap.response_len ) ) {
+		DBGC ( iscsi, "iSCSI %p invalid CHAP response length\n",
+		       iscsi );
+		return -EPROTO;
+	}
+
+	/* Process response an octet at a time */
+	for ( i = 0 ; ( value[0] && value[1] ) ; value += 2, i++ ) {
+		memcpy ( buf, value, 2 );
+		buf[2] = 0;
+		byte = strtoul ( buf, &endp, 16 );
+		if ( *endp != '\0' ) {
+			DBGC ( iscsi, "iSCSI %p saw invalid CHAP response "
+			       "byte \"%s\"\n", iscsi, buf );
+			return -EPROTO;
+		}
+		if ( byte != iscsi->chap.response[i] ) {
+			DBGC ( iscsi, "iSCSI %p saw incorrect CHAP "
+			       "response\n", iscsi );
+			return -EACCES;
+		}
+	}
+	assert ( i == iscsi->chap.response_len );
+
+	/* Mark session as authenticated */
+	iscsi->target_auth_ok = 1;
 
 	return 0;
 }
@@ -739,6 +887,8 @@ static struct iscsi_string_type iscsi_string_types[] = {
 	{ "CHAP_A=", iscsi_handle_chap_a_value },
 	{ "CHAP_I=", iscsi_handle_chap_i_value },
 	{ "CHAP_C=", iscsi_handle_chap_c_value },
+	{ "CHAP_N=", iscsi_handle_chap_n_value },
+	{ "CHAP_R=", iscsi_handle_chap_r_value },
 	{ NULL, NULL }
 };
 
@@ -937,6 +1087,13 @@ static int iscsi_rx_login_response ( struct iscsi_session *iscsi,
 	     ISCSI_STATUS_FULL_FEATURE_PHASE ) {
 		iscsi_start_login ( iscsi );
 		return 0;
+	}
+
+	/* Check that target authentication was successful (if required) */
+	if ( ! iscsi->target_auth_ok ) {
+		DBGC ( iscsi, "iSCSI %p nefarious target tried to bypass "
+		       "authentication\n", iscsi );
+		return -EPROTO;
 	}
 
 	/* Reset retry count */
@@ -1148,9 +1305,9 @@ static int iscsi_rx_bhs ( struct iscsi_session *iscsi, const void *data,
 			  size_t len, size_t remaining __unused ) {
 	memcpy ( &iscsi->rx_bhs.bytes[iscsi->rx_offset], data, len );
 	if ( ( iscsi->rx_offset + len ) >= sizeof ( iscsi->rx_bhs ) ) {
-		DBGC ( iscsi, "iSCSI %p received PDU opcode %#x len %#lx\n",
-		       iscsi, iscsi->rx_bhs.common.opcode,
-		       ISCSI_DATA_LEN ( iscsi->rx_bhs.common.lengths ) );
+		DBGC2 ( iscsi, "iSCSI %p received PDU opcode %#x len %#lx\n",
+			iscsi, iscsi->rx_bhs.common.opcode,
+			ISCSI_DATA_LEN ( iscsi->rx_bhs.common.lengths ) );
 	}
 	return 0;
 }
@@ -1546,26 +1703,61 @@ static int iscsi_parse_root_path ( struct iscsi_session *iscsi,
  * Set iSCSI authentication details
  *
  * @v iscsi		iSCSI session
- * @v username		Username, if any
- * @v password		Password, if any
+ * @v initiator_username Initiator username, if any
+ * @v initiator_password Initiator password, if any
+ * @v target_username	Target username, if any
+ * @v target_password	Target password, if any
  * @ret rc		Return status code
  */
 static int iscsi_set_auth ( struct iscsi_session *iscsi,
-			    const char *username, const char *password ) {
+			    const char *initiator_username,
+			    const char *initiator_password,
+			    const char *target_username,
+			    const char *target_password ) {
 
-	if ( username ) {
-		iscsi->username = strdup ( username );
-		if ( ! iscsi->username )
-			return -ENOMEM;
-	}
+	/* Check for initiator or target credentials */
+	if ( initiator_username || initiator_password ||
+	     target_username || target_password ) {
 
-	if ( password ) {
-		iscsi->password = strdup ( password );
-		if ( ! iscsi->password )
+		/* We must have at least an initiator username+password */
+		if ( ! ( initiator_username && initiator_password ) )
+			goto invalid_auth;
+
+		/* Store initiator credentials */
+		iscsi->initiator_username = strdup ( initiator_username );
+		if ( ! iscsi->initiator_username )
 			return -ENOMEM;
+		iscsi->initiator_password = strdup ( initiator_password );
+		if ( ! iscsi->initiator_password )
+			return -ENOMEM;
+
+		/* Check for target credentials */
+		if ( target_username || target_password ) {
+
+			/* We must have target username+password */
+			if ( ! ( target_username && target_password ) )
+				goto invalid_auth;
+
+			/* Store target credentials */
+			iscsi->target_username = strdup ( target_username );
+			if ( ! iscsi->target_username )
+				return -ENOMEM;
+			iscsi->target_password = strdup ( target_password );
+			if ( ! iscsi->target_password )
+				return -ENOMEM;
+		}
 	}
 
 	return 0;
+
+ invalid_auth:
+	DBGC ( iscsi, "iSCSI %p invalid credentials: initiator "
+	       "%sname,%spw, target %sname,%spw\n", iscsi,
+	       ( initiator_username ? "" : "no " ),
+	       ( initiator_password ? "" : "no " ),
+	       ( target_username ? "" : "no " ),
+	       ( target_password ? "" : "no " ) );
+	return -EINVAL;
 }
 
 /**
@@ -1591,8 +1783,11 @@ int iscsi_attach ( struct scsi_device *scsi, const char *root_path ) {
 	if ( ( rc = iscsi_parse_root_path ( iscsi, root_path ) ) != 0 )
 		goto err;
 	/* Set fields not specified by root path */
-	if ( ( rc = iscsi_set_auth ( iscsi, iscsi_username,
-				     iscsi_password ) ) != 0 )
+	if ( ( rc = iscsi_set_auth ( iscsi,
+				     iscsi_initiator_username,
+				     iscsi_initiator_password,
+				     iscsi_target_username,
+				     iscsi_target_password ) ) != 0 )
 		goto err;
 
 	/* Sanity checks */
@@ -1635,6 +1830,22 @@ struct setting initiator_iqn_setting __setting = {
 	.type = &setting_type_string,
 };
 
+/** iSCSI reverse username setting */
+struct setting reverse_username_setting __setting = {
+	.name = "reverse-username",
+	.description = "Reverse user name",
+	.tag = DHCP_EB_REVERSE_USERNAME,
+	.type = &setting_type_string,
+};
+
+/** iSCSI reverse password setting */
+struct setting reverse_password_setting __setting = {
+	.name = "reverse-password",
+	.description = "Reverse password",
+	.tag = DHCP_EB_REVERSE_PASSWORD,
+	.type = &setting_type_string,
+};
+
 /** An iSCSI string setting */
 struct iscsi_string_setting {
 	/** Setting */
@@ -1654,12 +1865,22 @@ static struct iscsi_string_setting iscsi_string_settings[] = {
 	},
 	{
 		.setting = &username_setting,
-		.string = &iscsi_username,
+		.string = &iscsi_initiator_username,
 		.prefix = "",
 	},
 	{
 		.setting = &password_setting,
-		.string = &iscsi_password,
+		.string = &iscsi_initiator_password,
+		.prefix = "",
+	},
+	{
+		.setting = &reverse_username_setting,
+		.string = &iscsi_target_username,
+		.prefix = "",
+	},
+	{
+		.setting = &reverse_password_setting,
+		.string = &iscsi_target_password,
 		.prefix = "",
 	},
 	{

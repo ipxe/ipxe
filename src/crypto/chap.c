@@ -41,7 +41,7 @@
  * allocates memory, and so may fail.  The allocated memory must
  * eventually be freed by a call to chap_finish().
  */
-int chap_init ( struct chap_challenge *chap,
+int chap_init ( struct chap_response *chap,
 		struct crypto_algorithm *digest ) {
 	size_t state_len;
 	void *state;
@@ -71,11 +71,11 @@ int chap_init ( struct chap_challenge *chap,
 /**
  * Add data to the CHAP challenge
  *
- * @v chap		CHAP challenge/response
+ * @v chap		CHAP response
  * @v data		Data to add
  * @v len		Length of data to add
  */
-void chap_update ( struct chap_challenge *chap, const void *data,
+void chap_update ( struct chap_response *chap, const void *data,
 		   size_t len ) {
 	assert ( chap->digest != NULL );
 	assert ( chap->digest_context != NULL );
@@ -89,12 +89,12 @@ void chap_update ( struct chap_challenge *chap, const void *data,
 /**
  * Respond to the CHAP challenge
  *
- * @v chap		CHAP challenge/response
+ * @v chap		CHAP response
  *
  * Calculates the final CHAP response value, and places it in @c
  * chap->response, with a length of @c chap->response_len.
  */
-void chap_respond ( struct chap_challenge *chap ) {
+void chap_respond ( struct chap_response *chap ) {
 	assert ( chap->digest != NULL );
 	assert ( chap->digest_context != NULL );
 	assert ( chap->response != NULL );
@@ -108,11 +108,11 @@ void chap_respond ( struct chap_challenge *chap ) {
 }
 
 /**
- * Free resources used by a CHAP challenge/response
+ * Free resources used by a CHAP response
  *
- * @v chap		CHAP challenge/response
+ * @v chap		CHAP response
  */
-void chap_finish ( struct chap_challenge *chap ) {
+void chap_finish ( struct chap_response *chap ) {
 	void *state = chap->digest_context;
 
 	DBG ( "CHAP %p finished\n", chap );

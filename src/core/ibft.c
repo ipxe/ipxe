@@ -165,16 +165,19 @@ static int ibft_alloc_string ( struct ibft_string_block *strings,
  *
  * @v strings		iBFT string block descriptor
  * @v string		String field
- * @v data		String to fill in
+ * @v data		String to fill in, or NULL
  * @ret rc		Return status code
  */
 static int ibft_set_string ( struct ibft_string_block *strings,
 			     struct ibft_string *string, const char *data ) {
-	size_t len = strlen ( data );
 	char *dest;
 	int rc;
 
-	if ( ( rc = ibft_alloc_string ( strings, string, len ) ) != 0 )
+	if ( ! data )
+		return 0;
+
+	if ( ( rc = ibft_alloc_string ( strings, string,
+					strlen ( data ) ) ) != 0 )
 		return rc;
 	dest = ( ( ( char * ) strings->table ) + string->offset );
 	strcpy ( dest, data );
@@ -271,6 +274,62 @@ static int ibft_fill_initiator ( struct ibft_initiator *initiator,
 }
 
 /**
+ * Fill in Target CHAP portion of iBFT
+ *
+ * @v target		Target portion of iBFT
+ * @v strings		iBFT string block descriptor
+ * @v iscsi		iSCSI session
+ * @ret rc		Return status code
+ */
+static int ibft_fill_target_chap ( struct ibft_target *target,
+				   struct ibft_string_block *strings,
+				   struct iscsi_session *iscsi ) {
+	int rc;
+
+	if ( ! iscsi->initiator_username )
+		return 0;
+	assert ( iscsi->initiator_password );
+
+	target->chap_type = IBFT_CHAP_ONE_WAY;
+	if ( ( rc = ibft_set_string ( strings, &target->chap_name,
+				      iscsi->initiator_username ) ) != 0 )
+		return rc;
+	if ( ( rc = ibft_set_string ( strings, &target->chap_secret,
+				      iscsi->initiator_password ) ) != 0 )
+		return rc;
+	return 0;
+}
+
+/**
+ * Fill in Target Reverse CHAP portion of iBFT
+ *
+ * @v target		Target portion of iBFT
+ * @v strings		iBFT string block descriptor
+ * @v iscsi		iSCSI session
+ * @ret rc		Return status code
+ */
+static int ibft_fill_target_reverse_chap ( struct ibft_target *target,
+					   struct ibft_string_block *strings,
+					   struct iscsi_session *iscsi ) {
+	int rc;
+
+	if ( ! iscsi->target_username )
+		return 0;
+	assert ( iscsi->target_password );
+	assert ( iscsi->initiator_username );
+	assert ( iscsi->initiator_password );
+
+	target->chap_type = IBFT_CHAP_MUTUAL;
+	if ( ( rc = ibft_set_string ( strings, &target->reverse_chap_name,
+				      iscsi->target_username ) ) != 0 )
+		return rc;
+	if ( ( rc = ibft_set_string ( strings, &target->reverse_chap_secret,
+				      iscsi->target_password ) ) != 0 )
+		return rc;
+	return 0;
+}
+
+/**
  * Fill in Target portion of iBFT
  *
  * @v target		Target portion of iBFT
@@ -291,17 +350,11 @@ static int ibft_fill_target ( struct ibft_target *target,
 	if ( ( rc = ibft_set_string ( strings, &target->target_name,
 				      iscsi->target_iqn ) ) != 0 )
 		return rc;
-	if ( iscsi->username ) {
-		if ( ( rc = ibft_set_string ( strings, &target->chap_name,
-					      iscsi->username ) ) != 0 )
-			return rc;
-	}
-	if ( iscsi->password ) {
-		if ( ( rc = ibft_set_string ( strings, &target->chap_secret,
-					      iscsi->password ) ) != 0 )
-			return rc;
-		target->chap_type = IBFT_CHAP_ONE_WAY;
-	}
+	if ( ( rc = ibft_fill_target_chap ( target, strings, iscsi ) ) != 0 )
+		return rc;
+	if ( ( rc = ibft_fill_target_reverse_chap ( target, strings,
+						    iscsi ) ) != 0 )
+		return rc;
 
 	return 0;
 }

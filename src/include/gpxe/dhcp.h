@@ -241,6 +241,24 @@ struct dhcp_packet;
  */
 #define DHCP_EB_PASSWORD DHCP_ENCAP_OPT ( DHCP_EB_ENCAP, 0xbf )
 
+/** Reverse username
+ *
+ * This will be used as the reverse username (i.e. the username
+ * provided by the server) for any required authentication.  It is
+ * expected that this option's value will be held in non-volatile
+ * storage, rather than transmitted as part of a DHCP packet.
+ */
+#define DHCP_EB_REVERSE_USERNAME DHCP_ENCAP_OPT ( DHCP_EB_ENCAP, 0xc0 )
+
+/** Reverse password
+ *
+ * This will be used as the reverse password (i.e. the password
+ * provided by the server) for any required authentication.  It is
+ * expected that this option's value will be held in non-volatile
+ * storage, rather than transmitted as part of a DHCP packet.
+ */
+#define DHCP_EB_REVERSE_PASSWORD DHCP_ENCAP_OPT ( DHCP_EB_ENCAP, 0xc1 )
+
 /** iSCSI primary target IQN */
 #define DHCP_ISCSI_PRIMARY_TARGET_IQN 201
 
