@@ -36,20 +36,11 @@
  * 
  */
 
-/** Default timeout value */
-#define MIN_TIMEOUT ( TICKS_PER_SEC / 4 )
-
-/** Limit after which the timeout will be deemed permanent */
-#define MAX_TIMEOUT ( 10 * TICKS_PER_SEC )
-
 /* The theoretical minimum that the algorithm in stop_timer() can
  * adjust the timeout back down to is seven ticks, so set the minimum
  * timeout to at least that value for the sake of consistency.
  */
-#if MIN_TIMEOUT < 7
-#undef MIN_TIMEOUT
 #define MIN_TIMEOUT 7
-#endif
 
 /** List of running timers */
 static LIST_HEAD ( timers );
@@ -67,8 +58,17 @@ void start_timer ( struct retry_timer *timer ) {
 	if ( ! timer_running ( timer ) )
 		list_add ( &timer->list, &timers );
 	timer->start = currticks();
-	if ( timer->timeout < MIN_TIMEOUT )
-		timer->timeout = MIN_TIMEOUT;
+
+	/* 0 means "use default timeout" */
+	if ( timer->min_timeout == 0 )
+		timer->min_timeout = DEFAULT_MIN_TIMEOUT;
+	/* We must never be less than MIN_TIMEOUT under any circumstances */
+	if ( timer->min_timeout < MIN_TIMEOUT )
+		timer->min_timeout = MIN_TIMEOUT;
+	/* Honor user-specified minimum timeout */
+	if ( timer->timeout < timer->min_timeout )
+		timer->timeout = timer->min_timeout;
+
 	DBG2 ( "Timer %p started at time %ld (expires at %ld)\n",
 	       timer, timer->start, ( timer->start + timer->timeout ) );
 }
@@ -150,8 +150,10 @@ static void timer_expired ( struct retry_timer *timer ) {
 
 	/* Back off the timeout value */
 	timer->timeout <<= 1;
-	if ( ( fail = ( timer->timeout > MAX_TIMEOUT ) ) )
-		timer->timeout = MAX_TIMEOUT;
+	if ( timer->max_timeout == 0 ) /* 0 means "use default timeout" */
+		timer->max_timeout = DEFAULT_MAX_TIMEOUT;
+	if ( ( fail = ( timer->timeout > timer->max_timeout ) ) )
+		timer->timeout = timer->max_timeout;
 	DBG ( "Timer %p timeout backed off to %ld\n",
 	      timer, timer->timeout );
 

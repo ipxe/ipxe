@@ -1059,6 +1059,8 @@ int start_dhcp ( struct job_interface *job, struct net_device *netdev ) {
 	xfer_init ( &dhcp->xfer, &dhcp_xfer_operations, &dhcp->refcnt );
 	dhcp->netdev = netdev_get ( netdev );
 	dhcp->timer.expired = dhcp_timer_expired;
+	dhcp->timer.min_timeout = DHCP_MIN_TIMEOUT;
+	dhcp->timer.max_timeout = DHCP_MAX_TIMEOUT;
 	dhcp->start = currticks();
 
 	/* Instantiate child objects and attach to our interfaces */

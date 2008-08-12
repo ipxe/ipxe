@@ -9,12 +9,28 @@
 
 #include <gpxe/list.h>
 
+/** Default timeout value */
+#define DEFAULT_MIN_TIMEOUT ( TICKS_PER_SEC / 4 )
+
+/** Limit after which the timeout will be deemed permanent */
+#define DEFAULT_MAX_TIMEOUT ( 10 * TICKS_PER_SEC )
+
 /** A retry timer */
 struct retry_timer {
 	/** List of active timers */
 	struct list_head list;
 	/** Timeout value (in ticks) */
 	unsigned long timeout;
+	/** Minimum timeout value (in ticks)
+	 *
+	 * A value of zero means "use default timeout."
+	 */
+	unsigned long min_timeout;
+	/** Maximum timeout value before failure (in ticks)
+	 *
+	 * A value of zero means "use default timeout."
+	 */
+	unsigned long max_timeout;
 	/** Start time (in ticks)
 	 *
 	 * A start time of zero indicates a stopped timer.
