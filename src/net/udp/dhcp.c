@@ -818,6 +818,7 @@ static void dhcp_rx_dhcpack ( struct dhcp_session *dhcp,
 
 	/* If we have a ProxyDHCPOFFER, transition to PROXYDHCPREQUEST */
 	if ( dhcp->proxydhcpoffer ) {
+		dhcp->timer.min_timeout = 0;
 		dhcp_set_state ( dhcp, DHCP_STATE_PROXYREQUEST );
 		return;
 	}
