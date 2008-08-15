@@ -38,6 +38,7 @@ die "ROM image truncated (is $filelength, should be $romlength)\n"
 printf "ROM header:\n\n";
 printf "  Length:\t0x%02x (%d)\n", $rom->{length}, ( $rom->{length} * 512 );
 printf "  Checksum:\t0x%02x (0x%02x)\n", $rom->{checksum}, $rom->checksum;
+printf "  Init:\t\t0x%04x\n", $rom->{init};
 printf "  UNDI header:\t0x%04x\n", $rom->{undi_header};
 printf "  PCI header:\t0x%04x\n", $rom->{pci_header};
 printf "  PnP header:\t0x%04x\n", $rom->{pnp_header};

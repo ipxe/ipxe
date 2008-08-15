@@ -73,7 +73,10 @@ sub FETCH {
   my $raw = substr ( ${$self->{data}},
 		     ( $self->{offset} + $self->{fields}->{$key}->{offset} ),
 		     $self->{fields}->{$key}->{length} );
-  return unpack ( $self->{fields}->{$key}->{pack}, $raw );
+  my $unpack = ( ref $self->{fields}->{$key}->{unpack} ?
+		 $self->{fields}->{$key}->{unpack} :
+		 sub { unpack ( $self->{fields}->{$key}->{pack}, shift ); } );
+  return &$unpack ( $raw );
 }
 
 sub STORE {
@@ -82,7 +85,10 @@ sub STORE {
   my $value = shift;
 
   croak "Nonexistent field \"$key\"" unless $self->EXISTS ( $key );
-  my $raw = pack ( $self->{fields}->{$key}->{pack}, $value );
+  my $pack = ( ref $self->{fields}->{$key}->{pack} ?
+	       $self->{fields}->{$key}->{pack} :
+	       sub { pack ( $self->{fields}->{$key}->{pack}, shift ); } );
+  my $raw = &$pack ( $value );
   substr ( ${$self->{data}},
 	   ( $self->{offset} + $self->{fields}->{$key}->{offset} ),
 	   $self->{fields}->{$key}->{length} ) = $raw;
@@ -168,6 +174,36 @@ use constant PNP_SIGNATURE => '$PnP';
 our @EXPORT_OK = qw ( ROM_SIGNATURE PCI_SIGNATURE PNP_SIGNATURE );
 our %EXPORT_TAGS = ( all => [ @EXPORT_OK ] );
 
+use constant JMP_SHORT => 0xeb;
+use constant JMP_NEAR => 0xe9;
+
+sub pack_init {
+  my $dest = shift;
+
+  # Always create a near jump; it's simpler
+  if ( $dest ) {
+    return pack ( "CS", JMP_NEAR, ( $dest - 6 ) );
+  } else {
+    return pack ( "CS", 0, 0 );
+  }
+}
+
+sub unpack_init {
+  my $instr = shift;
+
+  # Accept both short and near jumps
+  ( my $jump, my $offset ) = unpack ( "CS", $instr );
+  if ( $jump == JMP_SHORT ) {
+    return ( $offset + 5 );
+  } elsif ( $jump == JMP_NEAR ) {
+    return ( $offset + 6 );
+  } elsif ( $jump == 0 ) {
+    return 0;
+  } else {
+    croak "Unrecognised jump instruction in init vector\n";
+  }
+}
+
 =pod
 
 =item C<< new () >>
@@ -187,7 +223,11 @@ sub new {
     fields => {
       signature =>	{ offset => 0x00, length => 0x02, pack => "S" },
       length =>		{ offset => 0x02, length => 0x01, pack => "C" },
+      # "init" is part of a jump instruction
+      init =>		{ offset => 0x03, length => 0x03,
+			  pack => \&pack_init, unpack => \&unpack_init },
       checksum =>	{ offset => 0x06, length => 0x01, pack => "C" },
+      bofm_header =>	{ offset => 0x14, length => 0x02, pack => "S" },
       undi_header =>	{ offset => 0x16, length => 0x02, pack => "S" },
       pci_header =>	{ offset => 0x18, length => 0x02, pack => "S" },
       pnp_header =>	{ offset => 0x1a, length => 0x02, pack => "S" },

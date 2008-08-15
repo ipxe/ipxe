@@ -23,6 +23,18 @@ use FindBin;
 use lib "$FindBin::Bin";
 use Option::ROM qw ( :all );
 
+sub merge_entry_points {
+  my $baserom_entry = \shift;
+  my $rom_entry = \shift;
+  my $offset = shift;
+
+  if ( $$rom_entry ) {
+    my $old_entry = $$baserom_entry;
+    $$baserom_entry = ( $offset + $$rom_entry );
+    $$rom_entry = $old_entry;
+  }
+}
+
 my @romfiles = @ARGV;
 my @roms = map { my $rom = new Option::ROM; $rom->load($_); $rom } @romfiles;
 
@@ -33,6 +45,12 @@ foreach my $rom ( @roms ) {
 
   # Update base length
   $baserom->{length} += $rom->{length};
+
+  # Merge initialisation entry point
+  merge_entry_points ( $baserom->{init}, $rom->{init}, $offset );
+
+  # Merge BOFM header
+  merge_entry_points ( $baserom->{bofm_header}, $rom->{bofm_header}, $offset );
 
   # Update PCI header, if present in both
   my $baserom_pci = $baserom->pci_header;
@@ -52,8 +70,8 @@ foreach my $rom ( @roms ) {
     # Merge CLP entry point
     if ( exists ( $baserom_pci->{clp_entry} ) &&
 	 exists ( $rom_pci->{clp_entry} ) ) {
-      $baserom_pci->{clp_entry} = ( $offset + $rom_pci->{clp_entry} )
-	  if $rom_pci->{clp_entry};
+      merge_entry_points ( $baserom_pci->{clp_entry}, $rom_pci->{clp_entry},
+			   $offset );
     }
   }
 
@@ -61,9 +79,9 @@ foreach my $rom ( @roms ) {
   my $baserom_pnp = $baserom->pnp_header;
   my $rom_pnp = $rom->pnp_header;
   if ( $baserom_pnp && $rom_pnp ) {
-    $baserom_pnp->{bcv} = ( $offset + $rom_pnp->{bcv} ) if $rom_pnp->{bcv};
-    $baserom_pnp->{bdv} = ( $offset + $rom_pnp->{bdv} ) if $rom_pnp->{bdv};
-    $baserom_pnp->{bev} = ( $offset + $rom_pnp->{bev} ) if $rom_pnp->{bev};
+    merge_entry_points ( $baserom_pnp->{bcv}, $rom_pnp->{bcv}, $offset );
+    merge_entry_points ( $baserom_pnp->{bdv}, $rom_pnp->{bdv}, $offset );
+    merge_entry_points ( $baserom_pnp->{bev}, $rom_pnp->{bev}, $offset );
   }
 
   # Fix checksum for this ROM segment
