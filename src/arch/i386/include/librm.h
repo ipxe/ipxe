@@ -279,6 +279,9 @@ user_to_phys ( userptr_t buffer, off_t offset ) {
 	return virt_to_phys ( ( void * ) buffer + offset );
 }
 
+extern uint16_t copy_user_to_rm_stack ( userptr_t data, size_t size );
+extern void remove_user_from_rm_stack ( userptr_t data, size_t size );
+
 /* TEXT16_CODE: declare a fragment of code that resides in .text16 */
 #define TEXT16_CODE( asm_code_str )			\
 	".section \".text16\", \"ax\", @progbits\n\t"	\
