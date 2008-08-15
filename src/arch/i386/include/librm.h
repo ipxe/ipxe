@@ -60,6 +60,8 @@ extern char *text16;
 	  ( ( ( void * ) (pointer) ) - ( ( void * ) text16 ) ) )
 
 /* Variables in librm.S, present in the normal data segment */
+extern uint16_t rm_sp;
+extern uint16_t rm_ss;
 extern uint16_t __data16 ( rm_cs );
 #define rm_cs __use_data16 ( rm_cs )
 extern uint16_t __text16 ( rm_ds );

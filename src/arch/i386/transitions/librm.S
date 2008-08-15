@@ -552,7 +552,9 @@ rc_function:	.word 0, 0
  ****************************************************************************
  */
 	.section ".data"
+	.globl rm_sp
 rm_sp:	.word 0
+	.globl rm_ss
 rm_ss:	.word 0
 pm_esp:	.long _estack
 
