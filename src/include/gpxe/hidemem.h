@@ -8,16 +8,8 @@
  *
  */
 
-/**
- * Unique IDs for hidden regions
- */
-enum hidemem_region_id {
-	TEXT = 0,
-	BASEMEM,
-	EXTMEM,
-};
+#include <stdint.h>
 
-extern void hide_region ( unsigned int region_id, physaddr_t start,
-			  physaddr_t end );
+extern void hide_umalloc ( physaddr_t start, physaddr_t end );
 
 #endif /* _GPXE_HIDEMEM_H */

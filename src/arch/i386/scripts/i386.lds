@@ -82,7 +82,6 @@ SECTIONS {
 	__data16 = .;
 	*(.data16)
 	*(.data16.*)
-	*(SORT(.tbl.data16.*))	/* Various tables.  See include/tables.h */
 	_edata16_progbits = .;
     }
     .bss16 : AT ( _data16_load_offset + __bss16 ) {

@@ -194,8 +194,8 @@ userptr_t urealloc ( userptr_t ptr, size_t new_size ) {
 
 	/* Collect any free blocks and update hidden memory region */
 	ecollect_free();
-	hide_region ( EXTMEM, user_to_phys ( bottom, -sizeof ( extmem ) ),
-		      user_to_phys ( top, 0 ) );
+	hide_umalloc ( user_to_phys ( bottom, -sizeof ( extmem ) ),
+		       user_to_phys ( top, 0 ) );
 
 	return ( new_size ? new : UNOWHERE );
 }
