@@ -136,8 +136,8 @@ static int find_smbios ( void ) {
 		}
 
 		/* Fill result structure */
-		DBG ( "Found SMBIOS entry point at %04x:%04x\n",
-		      BIOS_SEG, offset );
+		DBG ( "Found SMBIOS v%d.%d entry point at %04x:%04x\n",
+		      u.entry.major, u.entry.minor, BIOS_SEG, offset );
 		smbios.address = phys_to_user ( u.entry.smbios_address );
 		smbios.len = u.entry.smbios_len;
 		smbios.count = u.entry.smbios_count;
