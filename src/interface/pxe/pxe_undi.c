@@ -221,7 +221,7 @@ PXENV_EXIT_t pxenv_undi_transmit ( struct s_PXENV_UNDI_TRANSMIT
 		undi_transmit->Status = PXENV_STATUS_UNDI_INVALID_PARAMETER;
 		return PXENV_EXIT_FAILURE;
 	}
-	DBG ( " %s", ( net_protocol ? net_protocol->name : "UNKNOWN" ) );
+	DBG ( " %s", ( net_protocol ? net_protocol->name : "RAW" ) );
 
 	/* Calculate total packet length */
 	copy_from_real ( &tbd, undi_transmit->TBD.segment,
@@ -264,6 +264,7 @@ PXENV_EXIT_t pxenv_undi_transmit ( struct s_PXENV_UNDI_TRANSMIT
 					 pxe_netdev->ll_protocol->ll_addr_len );
 			ll_dest = destaddr;
 		} else {
+			DBG ( " BCAST" );
 			ll_dest = pxe_netdev->ll_protocol->ll_broadcast;
 		}
 		rc = net_tx ( iobuf, pxe_netdev, net_protocol, ll_dest );
@@ -559,13 +560,25 @@ PXENV_EXIT_t pxenv_undi_isr ( struct s_PXENV_UNDI_ISR *undi_isr ) {
 		undi_isr->FuncFlag = PXENV_UNDI_ISR_OUT_OURS;
 		break;
 	case PXENV_UNDI_ISR_IN_PROCESS :
+		DBG ( " PROCESS" );
+		/* Fall through */
 	case PXENV_UNDI_ISR_IN_GET_NEXT :
-		DBG ( " PROCESS/GET_NEXT" );
+		DBG ( " GET_NEXT" );
+
+		/* Some dumb NBPs (e.g. emBoot's winBoot/i) never call
+		 * PXENV_UNDI_ISR with FuncFlag=PXENV_UNDI_ISR_START;
+		 * they just sit in a tight polling loop merrily
+		 * violating the PXE spec with repeated calls to
+		 * PXENV_UNDI_ISR_IN_PROCESS.  Force extra polls to
+		 * cope with these out-of-spec clients.
+		 */
+		netdev_poll ( pxe_netdev );
 
 		/* If we have not yet marked a TX as complete, and the
 		 * netdev TX queue is empty, report the TX completion.
 		 */
 		if ( undi_tx_count && list_empty ( &pxe_netdev->tx_queue ) ) {
+			DBG ( " TXC" );
 			undi_tx_count--;
 			undi_isr->FuncFlag = PXENV_UNDI_ISR_OUT_TRANSMIT;
 			break;
@@ -574,6 +587,7 @@ PXENV_EXIT_t pxenv_undi_isr ( struct s_PXENV_UNDI_ISR *undi_isr ) {
 		/* Remove first packet from netdev RX queue */
 		iobuf = netdev_rx_dequeue ( pxe_netdev );
 		if ( ! iobuf ) {
+			DBG ( " DONE" );
 			/* No more packets remaining */
 			undi_isr->FuncFlag = PXENV_UNDI_ISR_OUT_DONE;
 			/* Re-enable interrupts */
@@ -583,7 +597,7 @@ PXENV_EXIT_t pxenv_undi_isr ( struct s_PXENV_UNDI_ISR *undi_isr ) {
 
 		/* Copy packet to base memory buffer */
 		len = iob_len ( iobuf );
-		DBG ( " RECEIVE %zd", len );
+		DBG ( " RX %zd", len );
 		if ( len > sizeof ( basemem_packet ) ) {
 			/* Should never happen */
 			len = sizeof ( basemem_packet );
