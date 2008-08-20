@@ -439,6 +439,7 @@ struct net_device * find_netdev_by_location ( unsigned int bus_type,
  */
 int net_tx ( struct io_buffer *iobuf, struct net_device *netdev,
 	     struct net_protocol *net_protocol, const void *ll_dest ) {
+	int rc;
 
 	/* Force a poll on the netdevice to (potentially) clear any
 	 * backed-up TX completions.  This is needed on some network
@@ -447,7 +448,15 @@ int net_tx ( struct io_buffer *iobuf, struct net_device *netdev,
 	 */
 	netdev_poll ( netdev );
 
-	return netdev->ll_protocol->tx ( iobuf, netdev, net_protocol, ll_dest );
+	/* Add link-layer header */
+	if ( ( rc = netdev->ll_protocol->push ( iobuf, netdev, net_protocol,
+						ll_dest ) ) != 0 ) {
+		free_iob ( iobuf );
+		return rc;
+	}
+
+	/* Transmit packet */
+	return netdev_tx ( netdev, iobuf );
 }
 
 /**
@@ -485,6 +494,10 @@ int net_rx ( struct io_buffer *iobuf, struct net_device *netdev,
 static void net_step ( struct process *process __unused ) {
 	struct net_device *netdev;
 	struct io_buffer *iobuf;
+	struct ll_protocol *ll_protocol;
+	uint16_t net_proto;
+	const void *ll_source;
+	int rc;
 
 	/* Poll and process each network device */
 	list_for_each_entry ( netdev, &net_devices, list ) {
@@ -499,10 +512,21 @@ static void net_step ( struct process *process __unused ) {
 		 * NIC faster than they arrive.
 		 */
 		if ( ( iobuf = netdev_rx_dequeue ( netdev ) ) ) {
+
 			DBGC ( netdev, "NETDEV %p processing %p (%p+%zx)\n",
 			       netdev, iobuf, iobuf->data,
 			       iob_len ( iobuf ) );
-			netdev->ll_protocol->rx ( iobuf, netdev );
+
+			/* Remove link-layer header */
+			ll_protocol = netdev->ll_protocol;
+			if ( ( rc = ll_protocol->pull ( iobuf, netdev,
+							&net_proto,
+							&ll_source ) ) != 0 ) {
+				free_iob ( iobuf );
+				continue;
+			}
+
+			net_rx ( iobuf, netdev, net_proto, ll_source );
 		}
 	}
 }

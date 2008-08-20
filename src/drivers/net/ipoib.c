@@ -153,18 +153,17 @@ static struct ipoib_mac ipoib_broadcast = {
 };
 
 /**
- * Transmit IPoIB packet
+ * Add IPoIB link-layer header
  *
  * @v iobuf		I/O buffer
  * @v netdev		Network device
  * @v net_protocol	Network-layer protocol
  * @v ll_dest		Link-layer destination address
- *
- * Prepends the IPoIB link-layer header and transmits the packet.
  */
-static int ipoib_tx ( struct io_buffer *iobuf, struct net_device *netdev,
-		      struct net_protocol *net_protocol,
-		      const void *ll_dest ) {
+static int ipoib_push ( struct io_buffer *iobuf,
+			struct net_device *netdev __unused,
+			struct net_protocol *net_protocol,
+			const void *ll_dest ) {
 	struct ipoib_hdr *ipoib_hdr =
 		iob_push ( iobuf, sizeof ( *ipoib_hdr ) );
 
@@ -174,36 +173,38 @@ static int ipoib_tx ( struct io_buffer *iobuf, struct net_device *netdev,
 	ipoib_hdr->real.proto = net_protocol->net_proto;
 	ipoib_hdr->real.reserved = 0;
 
-	/* Hand off to network device */
-	return netdev_tx ( netdev, iobuf );
+	return 0;
 }
 
 /**
- * Process received IPoIB packet
+ * Remove IPoIB link-layer header
  *
- * @v iobuf	I/O buffer
- * @v netdev	Network device
- *
- * Strips off the IPoIB link-layer header and passes up to the
- * network-layer protocol.
+ * @v iobuf		I/O buffer
+ * @v netdev		Network device
+ * @v net_proto		Network-layer protocol, in network-byte order
+ * @v ll_source		Source link-layer address
+ * @ret rc		Return status code
  */
-static int ipoib_rx ( struct io_buffer *iobuf, struct net_device *netdev ) {
+static int ipoib_pull ( struct io_buffer *iobuf,
+			struct net_device *netdev __unused,
+			uint16_t *net_proto, const void **ll_source ) {
 	struct ipoib_hdr *ipoib_hdr = iobuf->data;
 
 	/* Sanity check */
 	if ( iob_len ( iobuf ) < sizeof ( *ipoib_hdr ) ) {
 		DBG ( "IPoIB packet too short for link-layer header\n" );
 		DBG_HD ( iobuf->data, iob_len ( iobuf ) );
-		free_iob ( iobuf );
 		return -EINVAL;
 	}
 
 	/* Strip off IPoIB header */
 	iob_pull ( iobuf, sizeof ( *ipoib_hdr ) );
 
-	/* Hand off to network-layer protocol */
-	return net_rx ( iobuf, netdev, ipoib_hdr->real.proto,
-			&ipoib_hdr->pseudo.peer );
+	/* Fill in required fields */
+	*net_proto = ipoib_hdr->real.proto;
+	*ll_source = &ipoib_hdr->pseudo.peer;
+
+	return 0;
 }
 
 /**
@@ -231,8 +232,8 @@ struct ll_protocol ipoib_protocol __ll_protocol = {
 	.ll_addr_len	= IPOIB_ALEN,
 	.ll_header_len	= IPOIB_HLEN,
 	.ll_broadcast	= ( uint8_t * ) &ipoib_broadcast,
-	.tx		= ipoib_tx,
-	.rx		= ipoib_rx,
+	.push		= ipoib_push,
+	.pull		= ipoib_pull,
 	.ntoa		= ipoib_ntoa,
 };
 

@@ -251,11 +251,9 @@ PXENV_EXIT_t pxenv_undi_transmit ( struct s_PXENV_UNDI_TRANSMIT
 				 datablk->TDDataLen );
 	}
 
-	/* Transmit packet */
-	if ( net_protocol == NULL ) {
-		/* Link-layer header already present */
-		rc = netdev_tx ( pxe_netdev, iobuf );
-	} else {
+	/* Add link-layer header, if required to do so */
+	if ( net_protocol != NULL ) {
+
 		/* Calculate destination address */
 		if ( undi_transmit->XmitFlag == XMT_DESTADDR ) {
 			copy_from_real ( destaddr,
@@ -267,14 +265,28 @@ PXENV_EXIT_t pxenv_undi_transmit ( struct s_PXENV_UNDI_TRANSMIT
 			DBG ( " BCAST" );
 			ll_dest = pxe_netdev->ll_protocol->ll_broadcast;
 		}
-		rc = net_tx ( iobuf, pxe_netdev, net_protocol, ll_dest );
+
+		/* Add link-layer header */
+		if ( ( rc = pxe_netdev->ll_protocol->push ( iobuf, pxe_netdev,
+							    net_protocol,
+							    ll_dest )) != 0 ){
+			free_iob ( iobuf );
+			undi_transmit->Status = PXENV_STATUS ( rc );
+			return PXENV_EXIT_FAILURE;
+		}
+	}
+
+	/* Transmit packet */
+	if ( ( rc = netdev_tx ( pxe_netdev, iobuf ) ) != 0 ) {
+		undi_transmit->Status = PXENV_STATUS ( rc );
+		return PXENV_EXIT_FAILURE;
 	}
 
 	/* Flag transmission as in-progress */
 	undi_tx_count++;
 
-	undi_transmit->Status = PXENV_STATUS ( rc );
-	return ( ( rc == 0 ) ? PXENV_EXIT_SUCCESS : PXENV_EXIT_FAILURE );
+	undi_transmit->Status = PXENV_STATUS_SUCCESS;
+	return PXENV_EXIT_SUCCESS;
 }
 
 /* PXENV_UNDI_SET_MCAST_ADDRESS
@@ -532,6 +544,13 @@ PXENV_EXIT_t pxenv_undi_get_state ( struct s_PXENV_UNDI_GET_STATE
 PXENV_EXIT_t pxenv_undi_isr ( struct s_PXENV_UNDI_ISR *undi_isr ) {
 	struct io_buffer *iobuf;
 	size_t len;
+	struct ll_protocol *ll_protocol;
+	const void *ll_source;
+	uint16_t net_proto;
+	size_t ll_hlen;
+	struct net_protocol *net_protocol;
+	unsigned int prottype;
+	int rc;
 
 	DBG ( "PXENV_UNDI_ISR" );
 
@@ -604,16 +623,46 @@ PXENV_EXIT_t pxenv_undi_isr ( struct s_PXENV_UNDI_ISR *undi_isr ) {
 		}
 		memcpy ( basemem_packet, iobuf->data, len );
 
+		/* Strip link-layer header */
+		ll_protocol = pxe_netdev->ll_protocol;
+		if ( ( rc = ll_protocol->pull ( iobuf, pxe_netdev,
+						&net_proto,
+						&ll_source ) ) != 0 ) {
+			/* Assume unknown net_proto and no ll_source */
+			net_proto = 0;
+			ll_source = NULL;
+		}
+		ll_hlen = ( len - iob_len ( iobuf ) );
+
+		/* Determine network-layer protocol */
+		switch ( net_proto ) {
+		case htons ( ETH_P_IP ):
+			net_protocol = &ipv4_protocol;
+			prottype = P_IP;
+			break;
+		case htons ( ETH_P_ARP ):
+			net_protocol = &arp_protocol;
+			prottype = P_ARP;
+			break;
+		case htons ( ETH_P_RARP ):
+			net_protocol = &rarp_protocol;
+			prottype = P_RARP;
+			break;
+		default:
+			net_protocol = NULL;
+			prottype = P_UNKNOWN;
+			break;
+		}
+		DBG ( " %s", ( net_protocol ? net_protocol->name : "RAW" ) );
+
 		/* Fill in UNDI_ISR structure */
 		undi_isr->FuncFlag = PXENV_UNDI_ISR_OUT_RECEIVE;
 		undi_isr->BufferLength = len;
 		undi_isr->FrameLength = len;
-		undi_isr->FrameHeaderLength =
-			pxe_netdev->ll_protocol->ll_header_len;
+		undi_isr->FrameHeaderLength = ll_hlen;
 		undi_isr->Frame.segment = rm_ds;
 		undi_isr->Frame.offset = __from_data16 ( basemem_packet );
-		/* Probably ought to fill in packet type */
-		undi_isr->ProtType = P_UNKNOWN;
+		undi_isr->ProtType = prottype;
 		undi_isr->PktType = XMT_DESTADDR;
 
 		/* Free packet */

@@ -38,17 +38,16 @@
 static uint8_t eth_broadcast[ETH_ALEN] = { 0xff, 0xff, 0xff, 0xff, 0xff, 0xff};
 
 /**
- * Transmit Ethernet packet
+ * Add Ethernet link-layer header
  *
  * @v iobuf		I/O buffer
  * @v netdev		Network device
  * @v net_protocol	Network-layer protocol
  * @v ll_dest		Link-layer destination address
- *
- * Prepends the Ethernet link-layer header and transmits the packet.
  */
-static int eth_tx ( struct io_buffer *iobuf, struct net_device *netdev,
-		    struct net_protocol *net_protocol, const void *ll_dest ) {
+static int eth_push ( struct io_buffer *iobuf, struct net_device *netdev,
+		      struct net_protocol *net_protocol,
+		      const void *ll_dest ) {
 	struct ethhdr *ethhdr = iob_push ( iobuf, sizeof ( *ethhdr ) );
 
 	/* Build Ethernet header */
@@ -56,35 +55,38 @@ static int eth_tx ( struct io_buffer *iobuf, struct net_device *netdev,
 	memcpy ( ethhdr->h_source, netdev->ll_addr, ETH_ALEN );
 	ethhdr->h_protocol = net_protocol->net_proto;
 
-	/* Hand off to network device */
-	return netdev_tx ( netdev, iobuf );
+	return 0;
 }
 
 /**
- * Process received Ethernet packet
+ * Remove Ethernet link-layer header
  *
- * @v iobuf	I/O buffer
- * @v netdev	Network device
- *
- * Strips off the Ethernet link-layer header and passes up to the
- * network-layer protocol.
+ * @v iobuf		I/O buffer
+ * @v netdev		Network device
+ * @v net_proto		Network-layer protocol, in network-byte order
+ * @v ll_source		Source link-layer address
+ * @ret rc		Return status code
  */
-static int eth_rx ( struct io_buffer *iobuf, struct net_device *netdev ) {
+static int eth_pull ( struct io_buffer *iobuf,
+		      struct net_device *netdev __unused,
+		      uint16_t *net_proto, const void **ll_source ) {
 	struct ethhdr *ethhdr = iobuf->data;
 
 	/* Sanity check */
 	if ( iob_len ( iobuf ) < sizeof ( *ethhdr ) ) {
 		DBG ( "Ethernet packet too short (%zd bytes)\n",
 		      iob_len ( iobuf ) );
-		free_iob ( iobuf );
 		return -EINVAL;
 	}
 
 	/* Strip off Ethernet header */
 	iob_pull ( iobuf, sizeof ( *ethhdr ) );
 
-	/* Hand off to network-layer protocol */
-	return net_rx ( iobuf, netdev, ethhdr->h_protocol, ethhdr->h_source );
+	/* Fill in required fields */
+	*net_proto = ethhdr->h_protocol;
+	*ll_source = ethhdr->h_source;
+
+	return 0;
 }
 
 /**
@@ -110,7 +112,7 @@ struct ll_protocol ethernet_protocol __ll_protocol = {
 	.ll_addr_len	= ETH_ALEN,
 	.ll_header_len	= ETH_HLEN,
 	.ll_broadcast	= eth_broadcast,
-	.tx		= eth_tx,
-	.rx		= eth_rx,
+	.push		= eth_push,
+	.pull		= eth_pull,
 	.ntoa		= eth_ntoa,
 };
