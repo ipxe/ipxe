@@ -166,6 +166,7 @@ PXENV_EXIT_t pxenv_udp_open ( struct s_PXENV_UDP_OPEN *pxenv_udp_open ) {
 
 	/* Record source IP address */
 	pxe_udp.local.sin_addr.s_addr = pxenv_udp_open->src_ip;
+	DBG ( " %s", inet_ntoa ( pxe_udp.local.sin_addr ) );
 
 	/* Open promiscuous UDP connection */
 	xfer_close ( &pxe_udp.xfer, 0 );
@@ -355,8 +356,10 @@ PXENV_EXIT_t pxenv_udp_write ( struct s_PXENV_UDP_WRITE *pxenv_udp_write ) {
  *
  */
 PXENV_EXIT_t pxenv_udp_read ( struct s_PXENV_UDP_READ *pxenv_udp_read ) {
-	struct in_addr dest_ip = { .s_addr = pxenv_udp_read->dest_ip };
-	uint16_t d_port = pxenv_udp_read->d_port;
+	struct in_addr dest_ip_wanted = { .s_addr = pxenv_udp_read->dest_ip };
+	struct in_addr dest_ip;
+	uint16_t d_port_wanted = pxenv_udp_read->d_port;
+	uint16_t d_port;
 
 	DBG ( "PXENV_UDP_READ" );
 
@@ -368,12 +371,21 @@ PXENV_EXIT_t pxenv_udp_read ( struct s_PXENV_UDP_READ *pxenv_udp_read ) {
 		pxe_udp.pxenv_udp_read = NULL;
 		goto no_packet;
 	}
+	dest_ip.s_addr = pxenv_udp_read->dest_ip;
+	d_port = pxenv_udp_read->d_port;
 
 	/* Filter on destination address and/or port */
-	if ( dest_ip.s_addr && ( dest_ip.s_addr != pxenv_udp_read->dest_ip ) )
+	if ( dest_ip_wanted.s_addr &&
+	     ( dest_ip_wanted.s_addr != dest_ip.s_addr ) ) {
+		DBG ( " wrong IP %s", inet_ntoa ( dest_ip ) );
+		DBG ( " (wanted %s)", inet_ntoa ( dest_ip_wanted ) );
 		goto no_packet;
-	if ( d_port && ( d_port != pxenv_udp_read->d_port ) )
+	}
+	if ( d_port_wanted && ( d_port_wanted != d_port ) ) {
+		DBG ( " wrong port %d ", htons ( d_port ) );
+		DBG ( " (wanted %d)", htons ( d_port_wanted ) );
 		goto no_packet;
+	}
 
 	DBG ( " %04x:%04x+%x %s:", pxenv_udp_read->buffer.segment,
 	      pxenv_udp_read->buffer.offset, pxenv_udp_read->buffer_size,
