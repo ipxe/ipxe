@@ -255,6 +255,7 @@ PXENV_EXIT_t pxenv_udp_write ( struct s_PXENV_UDP_WRITE *pxenv_udp_write ) {
 	struct xfer_metadata meta = {
 		.src = ( struct sockaddr * ) &pxe_udp.local,
 		.dest = ( struct sockaddr * ) &dest,
+		.netdev = pxe_netdev,
 	};
 	size_t len;
 	struct io_buffer *iobuf;
