@@ -49,6 +49,7 @@ static int elfboot_exec ( struct image *image ) {
 	shutdown ( SHUTDOWN_BOOT );
 
 	/* Jump to OS with flat physical addressing */
+	DBGC ( image, "ELF %p starting execution at %lx\n", image, entry );
 	__asm__ __volatile__ ( PHYS_CODE ( "call *%%edi\n\t" )
 			       : : "D" ( entry )
 			       : "eax", "ebx", "ecx", "edx", "esi", "ebp",

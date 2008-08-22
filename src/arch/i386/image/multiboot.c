@@ -280,6 +280,8 @@ static int multiboot_exec ( struct image *image ) {
 	shutdown ( SHUTDOWN_BOOT );
 
 	/* Jump to OS with flat physical addressing */
+	DBGC ( image, "MULTIBOOT %p starting execution at %lx\n",
+	       image, entry );
 	__asm__ __volatile__ ( PHYS_CODE ( "call *%%edi\n\t" )
 			       : : "a" ( MULTIBOOT_BOOTLOADER_MAGIC ),
 			           "b" ( virt_to_phys ( &mbinfo ) ),
