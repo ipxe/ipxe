@@ -144,6 +144,7 @@ init:
 	popw	%ds
 	pushw	$0x40
 	popw	%fs
+
 	/* Shuffle some registers around.  We need %di available for
 	 * the print_xxx functions, and in a register that's
 	 * addressable from %es, so shuffle as follows:
@@ -153,21 +154,53 @@ init:
 	 */
 	movw	%bx, %gs
 	movw	%di, %bx
+
 	/* Print message as early as possible */
 	movw	$init_message, %si
 	xorw	%di, %di
 	call	print_message
 	call	print_pci_busdevfn
+
 	/* Fill in product name string, if possible */
 	movw	$prodstr_pci_id, %di
 	call	print_pci_busdevfn
 	movb	$' ', prodstr_separator
+
 	/* Print segment address */
 	movb	$' ', %al
 	xorw	%di, %di
 	call	print_character
 	movw	%cs, %ax
 	call	print_hex_word
+
+	/* Check for PCI BIOS version */
+	pushl	%ebx
+	pushl	%edx
+	stc
+	movw	$0xb101, %ax
+	int	$0x1a
+	jc	1f
+	cmpl	$PCI_SIGNATURE, %edx
+	jne	1f
+	testb	%ah, %ah
+	jnz	1f
+	movw	$init_message_pci, %si
+	xorw	%di, %di
+	call	print_message
+	movb	%bh, %al
+	call	print_hex_nibble
+	movb	$'.', %al
+	call	print_character
+	movb	%bl, %al
+	call	print_hex_byte
+	cmpb	$3, %bh
+	jae	2f
+1:	/* PCI <3.0: set %gs (runtime segment) = %cs (init-time segment) */
+	pushw	%cs
+	popw	%gs
+2:	popl	%edx
+	popl	%ebx
+
 	/* Check for PnP BIOS */
 	testw	$0x0f, %bx	/* PnP signature must be aligned - bochs    */
 	jnz	hook_int19	/* uses unalignment to indicate 'fake' PnP. */
@@ -177,6 +210,7 @@ init:
 	movw	$init_message_pnp, %si
 	xorw	%di, %di
 	call	print_message
+
 	/* Check for BBS */
 	pushw	%es:0x1b(%bx)	/* Real-mode data segment */
 	pushw	%ds		/* &(bbs_version) */
@@ -199,10 +233,11 @@ hook_int19:
 	movw	%ax, %es
 	pushl	%es:( 0x19 * 4 )
 	popl	orig_int19
-	pushw	%cs
+	pushw	%gs /* %gs contains runtime %cs */
 	pushw	$int19_entry
 	popl	%es:( 0x19 * 4 )
 hook_bbs:
+
 	/* Check for PMM */
 	movw	$( 0xe000 - 1 ), %bx
 pmm_scan:
@@ -259,29 +294,11 @@ gotpmm:	/* PMM allocation succeeded: copy ROM to PMM block */
 	subb	%bl, checksum
 	popal
 no_pmm:
-	/* Check for PCI BIOS */
-	pushl	%edx
-	stc
-	movw	$0xb101, %ax
-	int	$0x1a
-	jc	no_pci
-	cmpl	$PCI_SIGNATURE, %edx
-	popl	%edx
-	jne	no_pci
-	testb	%ah, %ah
-	jnz	no_pci
-	movw	$init_message_pci, %si
-	xorw	%di, %di
-	call	print_message
-	movb	%bh, %al
-	call	print_hex_nibble
-	movb	$'.', %al
-	call	print_character
-	movb	%bl, %al
-	call	print_hex_byte
-	cmpb	$3, %bh
-	jb	no_pci3
-	/* Copy self to option ROM space (required for PCI3.0) */
+
+	/* Copy self to option ROM space.  Required for PCI3.0, which
+	 * loads us to a temporary location in low memory.  Will be a
+	 * no-op for lower PCI versions.
+	 */
 	movb	$' ', %al
 	xorw	%di, %di
 	call	print_character
@@ -293,8 +310,7 @@ no_pmm:
 	xorw	%si, %si
 	xorw	%di, %di
 	cs rep	movsb
-no_pci3:
-no_pci:
+
 	/* Prompt for POST-time shell */
 	movw	$init_message_prompt, %si
 	xorw	%di, %di
@@ -338,16 +354,19 @@ wait_for_key:
 	pushw	%cs
 	call	exec
 no_key_pressed:
+
 	/* Print blank lines to terminate messages */
 	movw	$init_message_end, %si
 	xorw	%di, %di
 	call	print_message
+
 	/* Restore registers */
 	popw	%gs
 	popw	%fs
 	popw	%es
 	popw	%ds
 	popaw
+
 	/* Indicate boot capability to PnP BIOS, if present */
 	movw	$0x20, %ax
 	lret
