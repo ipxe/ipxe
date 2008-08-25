@@ -11,6 +11,7 @@
 #define PCI_SIGNATURE ( 'P' + ( 'C' << 8 ) + ( 'I' << 16 ) + ( ' ' << 24 ) )
 #define STACK_MAGIC ( 'L' + ( 'R' << 8 ) + ( 'E' << 16 ) + ( 'T' << 24 ) )
 #define PNP_GET_BBS_VERSION 0x60
+#define PMM_ALLOCATE 0x0000
 
 	.text
 	.code16
@@ -83,7 +84,7 @@ pnpheader:
 	.byte	0x02			/* Device base type code */
 	.byte	0x00			/* Device sub-type code */
 	.byte	0x00			/* Device interface type code */
-	.byte	0x54			/* Device indicator */
+	.byte	0xf4			/* Device indicator */
 	.word	0x0000			/* Boot connection vector */
 	.word	0x0000			/* Disconnect vector */
 	.word	bev_entry		/* Boot execution vector */
@@ -203,14 +204,13 @@ init:
 
 	/* Check for PnP BIOS */
 	testw	$0x0f, %bx	/* PnP signature must be aligned - bochs    */
-	jnz	hook_int19	/* uses unalignment to indicate 'fake' PnP. */
+	jnz	no_bbs		/* uses unalignment to indicate 'fake' PnP. */
 	cmpl	$PNP_SIGNATURE, %es:0(%bx)
-	jne	hook_int19
+	jne	no_bbs
 	/* Is PnP: print PnP message */
 	movw	$init_message_pnp, %si
 	xorw	%di, %di
 	call	print_message
-
 	/* Check for BBS */
 	pushw	%es:0x1b(%bx)	/* Real-mode data segment */
 	pushw	%ds		/* &(bbs_version) */
@@ -219,13 +219,8 @@ init:
 	lcall	*%es:0xd(%bx)
 	addw	$8, %sp
 	testw	%ax, %ax
-	jne	hook_int19
-	movw	$init_message_bbs, %si
-	xorw	%di, %di
-	call	print_message
-	jmp	hook_bbs
-	/* Not BBS-compliant - must hook INT 19 */
-hook_int19:
+	je	got_bbs
+no_bbs:	/* Not BBS-compliant - must hook INT 19 */
 	movw	$init_message_int19, %si
 	xorw	%di, %di
 	call	print_message
@@ -236,7 +231,12 @@ hook_int19:
 	pushw	%gs /* %gs contains runtime %cs */
 	pushw	$int19_entry
 	popl	%es:( 0x19 * 4 )
-hook_bbs:
+	jmp	bbs_done
+got_bbs: /* BBS compliant - no need to hook INT 19 */
+	movw	$init_message_bbs, %si
+	xorw	%di, %di
+	call	print_message
+bbs_done:
 
 	/* Check for PMM */
 	movw	$( 0xe000 - 1 ), %bx
@@ -261,22 +261,20 @@ pmm_scan:
 	pushw	$0x0006		/* Aligned, extended memory */
 	pushl	$0xffffffff	/* No handle */
 	pushl	$( 0x00200000 / 16 ) /* 2MB in paragraphs */
-	pushw	$0x0000		/* pmmAllocate */
+	pushw	$PMM_ALLOCATE
 	lcall	*%es:7
 	addw	$12, %sp
-	testw	%dx, %dx	/* %ax==0 even on success, since align=2MB */
-	jnz	gotpmm
-	movb	$'-', %al
+	movw	%dx, %ax
 	xorw	%di, %di
-	call	print_character
-	jmp	no_pmm
-gotpmm:	/* PMM allocation succeeded: copy ROM to PMM block */
+	call	print_hex_word
+	movw	%dx, ( image_source + 2 )
+	testw	%dx, %dx	/* %ax==0 even on success, since align=2MB */
+	jz	no_pmm
+	/* PMM allocation succeeded: copy ROM to PMM block */
 	pushal			/* PMM presence implies 1kB stack */
-	movw	%ax, %es	/* %ax=0 already - see above */
-	pushw	%dx
-	pushw	%ax
-	popl	%edi
-	movl	%edi, image_source
+	xorw	%ax, %ax
+	movw	%ax, %es
+	movl	image_source, %edi
 	xorl	%esi, %esi
 	movzbl	romheader_size, %ecx
 	shll	$9, %ecx
@@ -373,7 +371,7 @@ no_key_pressed:
 	.size init, . - init
 
 init_message:
-	.asciz	"gPXE (http://etherboot.org) - PCI "
+	.asciz	"gPXE (http://etherboot.org) - "
 	.size	init_message, . - init_message
 init_message_pci:
 	.asciz	" PCI"
@@ -419,6 +417,7 @@ decompress_to:
  */
 bbs_version:
 	.word	0
+	.size	bbs_version, . - bbs_version
 
 /* Boot Execution Vector entry point
  *
@@ -459,8 +458,10 @@ exec:	/* Set %ds = %cs */
 	popw	%ds
 
 	/* Print message as soon as possible */
-	movw	$exec_message, %si
+	movw	$prodstr, %si
 	xorw	%di, %di
+	call	print_message
+	movw	$exec_message, %si
 	call	print_message
 
 	/* Store magic word on BIOS stack and remember BIOS %ss:sp */
@@ -509,7 +510,7 @@ exec:	/* Set %ds = %cs */
 	.previous
 
 exec_message:
-	.asciz	"Entering gPXE\n"
+	.asciz	" starting execution\n"
 	.size exec_message, . - exec_message
 
 /* UNDI loader
