@@ -1711,7 +1711,8 @@ static int phantom_init_cmdpeg ( struct phantom_nic *phantom ) {
 			 UNM_NIC_REG_DUMMY_BUF );
 
 	/* Tell the hardware that tuning is complete */
-	phantom_writel ( phantom, 1, UNM_ROMUSB_GLB_PEGTUNE_DONE );
+	phantom_writel ( phantom, UNM_ROMUSB_GLB_PEGTUNE_DONE_MAGIC,
+			 UNM_ROMUSB_GLB_PEGTUNE_DONE );
 
 	/* Wait for command PEG to finish initialising */
 	DBGC ( phantom, "Phantom %p initialising command PEG (will take up to "
@@ -1857,6 +1858,17 @@ static int phantom_probe ( struct pci_device *pci,
 		netdev->dev = &pci->dev;
 		phantom_port->phantom = phantom;
 		phantom_port->port = i;
+	}
+
+	/* BUG5945 - need to hack PCI config space on P3 B1 silicon.
+	 * B2 will have this fixed; remove this hack when B1 is no
+	 * longer in use.
+	 */
+	{
+		uint32_t temp;
+		pci_read_config_dword ( pci, 0xc8, &temp );
+		pci_read_config_dword ( pci, 0xc8, &temp );
+		pci_write_config_dword ( pci, 0xc8, 0xf1000 );
 	}
 
 	/* Allocate dummy DMA buffer and perform initial hardware handshake */
