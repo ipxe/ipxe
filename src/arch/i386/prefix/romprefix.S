@@ -177,6 +177,7 @@ init:
 	/* Check for PCI BIOS version */
 	pushl	%ebx
 	pushl	%edx
+	pushl	%edi
 	stc
 	movw	$0xb101, %ax
 	int	$0x1a
@@ -199,7 +200,8 @@ init:
 1:	/* PCI <3.0: set %gs (runtime segment) = %cs (init-time segment) */
 	pushw	%cs
 	popw	%gs
-2:	popl	%edx
+2:	popl	%edi
+	popl	%edx
 	popl	%ebx
 
 	/* Check for PnP BIOS */
