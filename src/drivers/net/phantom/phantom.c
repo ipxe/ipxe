@@ -1554,9 +1554,6 @@ static int phantom_map_crb ( struct phantom_nic *phantom,
 	unsigned long bar0_start;
 	unsigned long bar0_size;
 
-	/* CRB window is always in the last 32MB of BAR0 (which may be
-	 * a 32MB or a 128MB BAR).
-	 */
 	bar0_start = pci_bar_start ( pci, PCI_BASE_ADDRESS_0 );
 	bar0_size = pci_bar_size ( pci, PCI_BASE_ADDRESS_0 );
 	DBGC ( phantom, "Phantom %p BAR0 is %08lx+%lx\n",
