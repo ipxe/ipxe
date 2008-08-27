@@ -192,10 +192,12 @@ sub unpack_init {
   my $instr = shift;
 
   # Accept both short and near jumps
-  ( my $jump, my $offset ) = unpack ( "CS", $instr );
+  my $jump = unpack ( "C", $instr );
   if ( $jump == JMP_SHORT ) {
+    my $offset = unpack ( "xC", $instr );
     return ( $offset + 5 );
   } elsif ( $jump == JMP_NEAR ) {
+    my $offset = unpack ( "xS", $instr );
     return ( $offset + 6 );
   } elsif ( $jump == 0 ) {
     return 0;
