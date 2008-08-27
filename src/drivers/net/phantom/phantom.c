@@ -1861,12 +1861,14 @@ static int phantom_probe ( struct pci_device *pci,
 	 * B2 will have this fixed; remove this hack when B1 is no
 	 * longer in use.
 	 */
-	{
+	for ( i = 0 ; i < 8 ; i++ ) {
 		uint32_t temp;
+		pci->devfn = PCI_DEVFN ( PCI_SLOT ( pci->devfn ), i );
 		pci_read_config_dword ( pci, 0xc8, &temp );
 		pci_read_config_dword ( pci, 0xc8, &temp );
 		pci_write_config_dword ( pci, 0xc8, 0xf1000 );
 	}
+	pci->devfn = PCI_DEVFN ( PCI_SLOT ( pci->devfn ), 0 );
 
 	/* Allocate dummy DMA buffer and perform initial hardware handshake */
 	phantom->dma_buf = malloc_dma ( sizeof ( *(phantom->dma_buf) ),
