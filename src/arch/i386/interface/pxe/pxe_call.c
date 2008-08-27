@@ -347,6 +347,9 @@ __cdecl void pxe_loader_call ( struct i386_all_regs *ix86 ) {
 	/* Copy parameter block from caller */
 	copy_from_user ( &params, uparams, 0, sizeof ( params ) );
 
+	/* Fill in ROM segment address */
+	ppxe.UNDIROMID.segment = ix86->segs.ds;
+
 	/* Set default status in case child routine fails to do so */
 	params.Status = PXENV_STATUS_FAILURE;
 

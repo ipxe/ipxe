@@ -31,6 +31,16 @@ SECTIONS {
      */
 
     /*
+     * Weak symbols that need zero values if not otherwise defined
+     */
+
+    . = 0;
+    .weak : AT ( 0 ) {
+	*(.weak)
+    }
+    _assert = ASSERT ( ( . == 0 ), ".weak is non-zero length" );
+
+    /*
      * The prefix
      */
 

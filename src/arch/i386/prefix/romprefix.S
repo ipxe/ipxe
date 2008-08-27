@@ -112,7 +112,8 @@ prodstr_separator:
 prodstr_pci_id:
 	.asciz	"xx:xx.x)"		/* Filled in by init code */
 	.size prodstr, . - prodstr
-	
+
+	.globl	undiheader	
 undiheader:
 	.ascii	"UNDI"			/* Signature */
 	.byte	undiheader_len		/* Length of structure */
@@ -524,18 +525,22 @@ undiloader:
 	/* Save registers */
 	pushl	%esi
 	pushl	%edi
+	pushw	%ds
 	pushw	%es
 	pushw	%bx
+	/* ROM segment address to %ds */
+	pushw	%cs
+	popw	%ds
 	/* UNDI loader parameter structure address into %es:%di */
 	movw	%sp, %bx
-	movw	%ss:16(%bx), %di
-	movw	%ss:18(%bx), %es
+	movw	%ss:18(%bx), %di
+	movw	%ss:20(%bx), %es
 	/* Install to specified real-mode addresses */
 	pushw	%di
 	movw	%es:12(%di), %bx
 	movw	%es:14(%di), %ax
-	movl	%cs:image_source, %esi
-	movl	%cs:decompress_to, %edi
+	movl	image_source, %esi
+	movl	decompress_to, %edi
 	call	install_prealloc
 	popw	%di
 	/* Call UNDI loader C code */
@@ -550,6 +555,7 @@ undiloader:
 	/* Restore registers and return */
 	popw	%bx
 	popw	%es
+	popw	%ds
 	popl	%edi
 	popl	%esi
 	lret
