@@ -123,6 +123,7 @@ undiheader:
 	.word	_data16_size		/* Stack segment size */
 	.word	_data16_size		/* Data segment size */
 	.word	_text16_size		/* Code segment size */
+	.ascii	"PCIR"			/* Bus type */
 	.equ undiheader_len, . - undiheader
 	.size undiheader, . - undiheader
 
