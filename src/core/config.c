@@ -158,6 +158,14 @@ REQUIRE_OBJECT ( bzimage );
 #ifdef IMAGE_ELTORITO
 REQUIRE_OBJECT ( eltorito );
 #endif
+#ifdef IMAGE_COMBOOT
+REQUIRE_OBJECT ( comboot );
+REQUIRE_OBJECT ( com32 );
+REQUIRE_OBJECT ( comboot_call );
+REQUIRE_OBJECT ( com32_call );
+REQUIRE_OBJECT ( com32_wrapper );
+REQUIRE_OBJECT ( comboot_resolv );
+#endif
 
 /*
  * Drag in all requested commands

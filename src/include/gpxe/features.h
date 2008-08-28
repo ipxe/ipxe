@@ -45,6 +45,7 @@
 #define DHCP_EB_FEATURE_NBI		0x20 /**< NBI format */
 #define DHCP_EB_FEATURE_PXE		0x21 /**< PXE format */
 #define DHCP_EB_FEATURE_ELF		0x22 /**< ELF format */
+#define DHCP_EB_FEATURE_COMBOOT		0x23 /**< COMBOOT format */
 
 /** @} */
 
