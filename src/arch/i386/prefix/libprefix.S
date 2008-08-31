@@ -294,7 +294,7 @@ pm_call:
 	movw	%ss, %ax
 	shll	$4, %eax
 	movzwl	%bp, %edi
-	leal	PM_CALL_VAR(gdt)(%eax, %edi), %eax
+	addr32 leal PM_CALL_VAR(gdt)(%eax, %edi), %eax
 	movl	%eax, PM_CALL_VAR(gdt_base)(%bp)
 	movw	%cs, %ax
 	movw	$PM_CALL_VAR(pm_cs), %di
