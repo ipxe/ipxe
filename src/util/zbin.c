@@ -90,7 +90,8 @@ static int read_file ( const char *filename, void **buf, size_t *len ) {
 	return 0;
 
  err:
-	fclose ( file );
+	if ( file )
+		fclose ( file );
 	return -1;
 }
 
