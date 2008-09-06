@@ -103,6 +103,16 @@ pxenv:
  *   none
  ****************************************************************************
  */
+	/* Wyse Streaming Manager server (WLDRM13.BIN) assumes that
+	 * the PXENV+ entry point is at UNDI_CS:0000; apparently,
+	 * somebody at Wyse has difficulty distinguishing between the
+	 * words "may" and "must"...
+	 */
+	.section ".text16.null"
+	.code16
+pxenv_null_entry:
+	jmp	pxenv_entry
+
 	.section ".text16"
 	.code16
 pxenv_entry:
