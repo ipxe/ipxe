@@ -58,7 +58,6 @@ To get qemu running is fairly simple:
       popd
 
 9.  Start qemu
-      export SDL_VIDEO_X11_DGAMOUSE=0
       ./qemu/i386-softmmu/qemu -L qemu/pc-bios \
 			       -net nic,model=rtl8139 -net tap,ifname=tap0 \
 			       -boot a -fda ../../src/bin/rtl8139.pdsk 

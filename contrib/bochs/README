@@ -25,9 +25,10 @@ To get bochs running is fairly simple:
 
 3.  Configure bochs with
       pushd bochs
-      ./configure --enable-all-optimisations --enable-pci --enable-pnic \
-                  --enable-debugger --enable-magic-breakpoints \
-		  --enable-disasm --enable-show-ips --enable-ne2000
+      ./configure --enable-all-optimisations --enable-show-ips \
+		  --enable-cpu-level=6 \
+		  --enable-pci --enable-pnic --enable-ne2000 \
+                  --enable-debugger --enable-disasm
       popd
 
 4.  Build bochs:
