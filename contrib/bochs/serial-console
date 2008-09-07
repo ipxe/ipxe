@@ -224,8 +224,8 @@ if ( -t STDIN ) {
   $restore_termios = POSIX::Termios->new;
   $termios->getattr ( fileno(STDIN) );
   $restore_termios->getattr ( fileno(STDIN) );
-  $termios->setlflag ( $termios->getlflag &
-		       ~(ICANON) & ~(ECHO) );
+  $termios->setlflag ( $termios->getlflag & ~(ICANON) & ~(ECHO) );
+  $termios->setiflag ( $termios->getiflag & ~(ICRNL) );
   $termios->setattr ( fileno(STDIN), TCSANOW );
 }
 
