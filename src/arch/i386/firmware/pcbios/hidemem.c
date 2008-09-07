@@ -20,6 +20,7 @@
 #include <biosint.h>
 #include <basemem.h>
 #include <gpxe/init.h>
+#include <gpxe/memmap.h>
 #include <gpxe/hidemem.h>
 
 /** Alignment for hidden memory regions */
@@ -121,6 +122,11 @@ void hide_text ( void ) {
  * returned by the BIOS.
  */
 static void hide_etherboot ( void ) {
+	struct memory_map memmap;
+
+	/* Dump memory map before mangling */
+	DBG ( "Hiding gPXE from system memory map\n" );
+	get_memmap ( &memmap );
 
 	/* Initialise the hidden regions */
 	hide_basemem();
@@ -130,6 +136,10 @@ static void hide_etherboot ( void ) {
 	/* Hook INT 15 */
 	hook_bios_interrupt ( 0x15, ( unsigned int ) int15,
 			      &int15_vector );
+
+	/* Dump memory map after mangling */
+	DBG ( "Hidden gPXE from system memory map\n" );
+	get_memmap ( &memmap );
 }
 
 /**

@@ -43,6 +43,8 @@ int prep_segment ( userptr_t segment, size_t filesz, size_t memsz ) {
 	physaddr_t end = user_to_phys ( segment, memsz );
 	unsigned int i;
 
+	DBG ( "Preparing segment [%lx,%lx,%lx)\n", start, mid, end );
+
 	/* Sanity check */
 	if ( filesz > memsz ) {
 		DBG ( "Insane segment [%lx,%lx,%lx)\n", start, mid, end );
