@@ -188,9 +188,9 @@ static void undirom_probe_all_roms ( void ) {
 
 	DBG ( "Scanning for PXE expansion ROMs\n" );
 
-	/* Scan through expansion ROM region at 2kB intervals */
+	/* Scan through expansion ROM region at 512 byte intervals */
 	for ( rom_segment = 0xc000 ; rom_segment < 0x10000 ;
-	      rom_segment += 0x80 ) {
+	      rom_segment += 0x20 ) {
 		undirom_probe ( rom_segment );
 	}
 
