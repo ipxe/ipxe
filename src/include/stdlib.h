@@ -68,5 +68,6 @@ static inline void srand ( unsigned int seed ) {
  */
 
 extern int system ( const char *command );
+extern __cdecl int main ( void );
 
 #endif /* STDLIB_H */
