@@ -325,6 +325,9 @@ extern void dbg_hex_dump_da ( unsigned long dispaddr,
 /** Declare a data structure to be aligned with 16-byte alignment */
 #define __aligned __attribute__ (( aligned ( 16 ) ))
 
+/** Declare a function to be always inline */
+#define __always_inline __attribute__ (( always_inline ))
+
 /**
  * Shared data.
  *
