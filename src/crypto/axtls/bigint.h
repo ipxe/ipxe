@@ -19,8 +19,6 @@
 #ifndef BIGINT_HEADER
 #define BIGINT_HEADER
 
-#include "config.h"
-
 /* enable features based on a 'super-set' capbaility. */
 #if defined(CONFIG_SSL_FULL_MODE) 
 #define CONFIG_SSL_ENABLE_CLIENT
