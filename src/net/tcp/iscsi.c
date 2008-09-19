@@ -1886,7 +1886,7 @@ static struct iscsi_string_setting iscsi_string_settings[] = {
 	{
 		.setting = &hostname_setting,
 		.string = &iscsi_default_initiator_iqn,
-		.prefix = "iqn.2000-09.org.etherboot:",
+		.prefix = "iqn.2000-01.org.etherboot:",
 	},
 };
 
