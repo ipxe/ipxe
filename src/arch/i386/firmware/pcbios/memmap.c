@@ -86,9 +86,9 @@ static unsigned int extmemsize_e801 ( void ) {
 	}
 
 	extmem = ( extmem_1m_to_16m_k + ( extmem_16m_plus_64k * 64 ) );
-	DBG ( "INT 15,e801 extended memory size %d+64*%d=%d kB [100000,%x)\n",
-	      extmem_1m_to_16m_k, extmem_16m_plus_64k, extmem,
-	      ( 0x100000 + ( extmem * 1024 ) ) );
+	DBG ( "INT 15,e801 extended memory size %d+64*%d=%d kB "
+	      "[100000,%llx)\n", extmem_1m_to_16m_k, extmem_16m_plus_64k,
+	      extmem, ( 0x100000 + ( ( ( uint64_t ) extmem ) * 1024 ) ) );
 	return extmem;
 }
 
