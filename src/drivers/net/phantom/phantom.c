@@ -1692,8 +1692,6 @@ static int phantom_init_cmdpeg ( struct phantom_nic *phantom ) {
 	phantom_writel ( phantom, 0, UNM_CAM_RAM_COLD_BOOT );
 
 	/* Set port modes */
-	phantom_writel ( phantom, UNM_CAM_RAM_PORT_MODE_AUTO_NEG,
-			 UNM_CAM_RAM_PORT_MODE );
 	phantom_writel ( phantom, UNM_CAM_RAM_PORT_MODE_AUTO_NEG_1G,
 			 UNM_CAM_RAM_WOL_PORT_MODE );
 
