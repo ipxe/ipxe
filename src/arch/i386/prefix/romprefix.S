@@ -145,8 +145,6 @@ init:
 	cld
 	pushw	%cs
 	popw	%ds
-	pushw	$0x40
-	popw	%fs
 
 	/* Shuffle some registers around.  We need %di available for
 	 * the print_xxx functions, and in a register that's
@@ -317,46 +315,17 @@ no_pmm:
 	movw	$init_message_prompt, %si
 	xorw	%di, %di
 	call	print_message
-	/* Empty the keyboard buffer before waiting for input */
-empty_keyboard_buffer:
-	movb	$0x01, %ah
-	int	$0x16
-	jz	1f
-	xorw	%ax, %ax
-	int	$0x16
-	jmp	empty_keyboard_buffer
-1:	/* Wait for up to 3s for a key press */
-	movw	$(18 * 3), %cx	/* Approx 3s worth of timer ticks */
-wait_for_key:
-	decw	%cx
-	jz	no_key_pressed
-	/* Wait for timer tick to be updated */
-	movl	%fs:(0x6c), %eax
-1:	pushf
-	sti
-	hlt
-	popf
-	cmpl	%fs:(0x6c), %eax
-	je	1b
-	/* Check to see if a key was pressed */
-	movb	$0x01, %ah
-	int	$0x16
-	jz	wait_for_key
-	/* Check to see if key was Ctrl-B */
-	cmpb	$0x02, %al
-	je	1f
-	/* Key was not Ctrl-B: remove from buffer and stop waiting */
-	xorw	%ax, %ax
-	int	$0x16
-	jmp	no_key_pressed
-1:	/* Key was Ctrl-B: leave in keyboard buffer and invoke gPXE.
-	 * The keypress will be picked up by the initial shell
-	 * prompt, and we will drop into a shell.
+	/* Wait for Ctrl-B */
+	movw	$0xff02, %bx
+	call	wait_for_key
+	jnz	1f
+	/* Ctrl-B was pressed: invoke gPXE.  The keypress will be
+	 * picked up by the initial shell prompt, and we will drop
+	 * into a shell.
 	 */
 	pushw	%cs
 	call	exec
-no_key_pressed:
-
+1:
 	/* Print blank lines to terminate messages */
 	movw	$init_message_end, %si
 	xorw	%di, %di
@@ -436,24 +405,54 @@ bev_entry:
 /* INT19 entry point
  *
  * Called via the hooked INT 19 if we detected a non-PnP BIOS.  We
- * attempt to return via the original INT 19 vector (if we were able to
- * store it).
+ * attempt to return via the original INT 19 vector (if we were able
+ * to store it).
  */
 int19_entry:
 	pushw	%cs
+	popw	%ds
+	/* Prompt user to press B to boot */
+	movw	$int19_message_prompt, %si
+	xorw	%di, %di
+	call	print_message
+	movw	$prodstr, %si
+	call	print_message
+	movw	$int19_message_dots, %si
+	call	print_message
+	movw	$0xdf42, %bx
+	call	wait_for_key
+	jnz	1f
+	/* Leave keypress in buffer and start gPXE.  The keypress will
+	 * cause the usual initial Ctrl-B prompt to be skipped.
+	 */
+	pushw	%cs
 	call	exec
+1:	/* Print blank lines to terminate messages */
+	movw	$int19_message_end, %si
+	xorw	%di, %di
+	call	print_message
+	/* Try to call original INT 19 vector */
 	movl	%cs:orig_int19, %eax
 	testl	%eax, %eax
-	je	1f
-	/* Chain to original INT 19 vector */
+	je	2f
 	ljmp	*%cs:orig_int19
-1:	/* No chained vector: issue INT 18 as a last resort */
+2:	/* No chained vector: issue INT 18 as a last resort */
 	int	$0x18
 	.size	int19_entry, . - int19_entry
 orig_int19:
 	.long	0
 	.size	orig_int19, . - orig_int19
 
+int19_message_prompt:
+	.asciz	"Press B to boot from "
+	.size	int19_message_prompt, . - int19_message_prompt
+int19_message_dots:
+	.asciz	"..."
+	.size	int19_message_dots, . - int19_message_dots
+int19_message_end:
+	.asciz	"\n\n\n"
+	.size	int19_message_end, . - int19_message_end
+	
 /* Execute as a boot device
  *
  */
@@ -560,3 +559,67 @@ undiloader:
 	popl	%esi
 	lret
 	.size undiloader, . - undiloader
+
+/* Wait for key press specified by %bl (masked by %bh)
+ *
+ * Used by init and INT19 code when prompting user.  If the specified
+ * key is pressed, it is left in the keyboard buffer.
+ *
+ * Returns with ZF set iff specified key is pressed.
+ */
+wait_for_key:
+	/* Preserve registers */
+	pushw	%cx
+	pushw	%ax
+1:	/* Empty the keyboard buffer before waiting for input */
+	movb	$0x01, %ah
+	int	$0x16
+	jz	2f
+	xorw	%ax, %ax
+	int	$0x16
+	jmp	1b
+2:	/* Wait for up to 5s for a key press */
+	movw	$(18 * 5), %cx	/* Approx 5s worth of timer ticks */
+3:	decw	%cx
+	js	99f		/* Exit with ZF clear */
+	/* Wait for timer tick to be updated */
+	call	wait_for_tick
+	/* Check to see if a key was pressed */
+	movb	$0x01, %ah
+	int	$0x16
+	jz	3b
+	/* Check to see if key was the specified key */
+	andb	%bh, %al
+	cmpb	%al, %bl
+	je	99f		/* Exit with ZF set */
+	/* Not the specified key: remove from buffer and stop waiting */
+	pushfw
+	xorw	%ax, %ax
+	int	$0x16
+	popfw			/* Exit with ZF clear */
+99:	/* Restore registers and return */
+	popw	%ax
+	popw	%cx
+	ret
+	.size wait_for_key, . - wait_for_key
+
+/* Wait for timer tick
+ *
+ * Used by wait_for_key
+ */
+wait_for_tick:
+	pushl	%eax
+	pushw	%fs
+	movw	$0x40, %ax
+	movw	%ax, %fs
+	movl	%fs:(0x6c), %eax
+1:	pushf
+	sti
+	hlt
+	popf
+	cmpl	%fs:(0x6c), %eax
+	je	1b
+	popw	%fs
+	popl	%eax
+	ret
+	.size wait_for_tick, . - wait_for_tick
