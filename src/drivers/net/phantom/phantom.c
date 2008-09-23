@@ -1673,6 +1673,17 @@ static int phantom_init_cmdpeg ( struct phantom_nic *phantom ) {
 	uint32_t cmdpeg_state;
 	uint32_t last_cmdpeg_state = 0;
 
+	/* Check for a previous initialisation.  This could have
+	 * happened if, for example, the BIOS used the UNDI API to
+	 * drive the NIC prior to a full PXE boot.
+	 */
+	cmdpeg_state = phantom_readl ( phantom, UNM_NIC_REG_CMDPEG_STATE );
+	if ( cmdpeg_state == UNM_NIC_REG_CMDPEG_STATE_INITIALIZE_ACK ) {
+		DBGC ( phantom, "Phantom %p command PEG already initialized\n",
+		       phantom );
+		return 0;
+	}
+
 	/* If this was a cold boot, check that the hardware came up ok */
 	cold_boot = phantom_readl ( phantom, UNM_CAM_RAM_COLD_BOOT );
 	if ( cold_boot == UNM_CAM_RAM_COLD_BOOT_MAGIC ) {
