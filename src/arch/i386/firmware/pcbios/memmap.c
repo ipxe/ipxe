@@ -89,6 +89,17 @@ static unsigned int extmemsize_e801 ( void ) {
 	DBG ( "INT 15,e801 extended memory size %d+64*%d=%d kB "
 	      "[100000,%llx)\n", extmem_1m_to_16m_k, extmem_16m_plus_64k,
 	      extmem, ( 0x100000 + ( ( ( uint64_t ) extmem ) * 1024 ) ) );
+
+	/* Sanity check.  Some BIOSes report the entire 4GB address
+	 * space as available, which cannot be correct (since that
+	 * would leave no address space available for 32-bit PCI
+	 * BARs).
+	 */
+	if ( extmem == ( 0x400000 - 0x400 ) ) {
+		DBG ( "INT 15,e801 reported whole 4GB; assuming insane\n" );
+		return 0;
+	}
+
 	return extmem;
 }
 
@@ -185,6 +196,28 @@ static int meme820 ( struct memory_map *memmap ) {
 			break;
 		}
 	} while ( next != 0 );
+
+	/* Sanity checks.  Some BIOSes report complete garbage via INT
+	 * 15,e820 (especially at POST time), despite passing the
+	 * signature checks.  We currently check for a base memory
+	 * region (starting at 0) and at least one high memory region
+	 * (starting at 0x100000).
+	 */
+	if ( memmap->count < 2 ) {
+		DBG ( "INT 15,e820 returned only %d regions; assuming "
+		      "insane\n", memmap->count );
+		return -EINVAL;
+	}
+	if ( memmap->regions[0].start != 0 ) {
+		DBG ( "INT 15,e820 region 0 starts at %llx (expected 0); "
+		      "assuming insane\n", memmap->regions[0].start );
+		return -EINVAL;
+	}
+	if ( memmap->regions[1].start != 0x100000 ) {
+		DBG ( "INT 15,e820 region 1 starts at %llx (expected 100000); "
+		      "assuming insane\n", memmap->regions[0].start );
+		return -EINVAL;
+	}
 
 	return 0;
 }
