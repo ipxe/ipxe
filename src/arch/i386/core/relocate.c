@@ -93,11 +93,16 @@ __cdecl void relocate ( struct i386_all_regs *ix86 ) {
 			/* If last byte that might be used (r_end-1)
 			 * is in an odd megabyte, round down r_end to
 			 * the top of the next even megabyte.
+			 *
+			 * Make sure that we don't accidentally wrap
+			 * r_end below 0.
 			 */
-			r_end = ( r_end - 1 ) & ~0xfffff;
-			DBG ( "...end truncated to %lx "
-			      "(avoid ending in odd megabyte)\n",
-			      r_end );
+			if ( r_end >= 1 ) {
+				r_end = ( r_end - 1 ) & ~0xfffff;
+				DBG ( "...end truncated to %lx "
+				      "(avoid ending in odd megabyte)\n",
+				      r_end );
+			}
 		} else if ( ( r_end - size ) & 0x100000 ) {
 			/* If the last byte that might be used
 			 * (r_end-1) is in an even megabyte, but the
@@ -108,7 +113,7 @@ __cdecl void relocate ( struct i386_all_regs *ix86 ) {
 			 * Make sure that we don't accidentally wrap
 			 * r_end below 0.
 			 */
-			if ( r_end > 0x100000 ) {
+			if ( r_end >= 0x100000 ) {
 				r_end = ( r_end - 0x100000 ) & ~0xfffff;
 				DBG ( "...end truncated to %lx "
 				      "(avoid starting in odd megabyte)\n",
