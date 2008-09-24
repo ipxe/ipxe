@@ -28,6 +28,7 @@
 #include <gpxe/vsprintf.h>
 #include <gpxe/dhcp.h>
 #include <gpxe/uuid.h>
+#include <gpxe/uri.h>
 #include <gpxe/settings.h>
 
 /** @file
@@ -743,6 +744,58 @@ struct setting_type setting_type_string __setting_type = {
 	.name = "string",
 	.storef = storef_string,
 	.fetchf = fetchf_string,
+};
+
+/**
+ * Parse and store value of URI-encoded string setting
+ *
+ * @v settings		Settings block
+ * @v setting		Setting to store
+ * @v value		Formatted setting data
+ * @ret rc		Return status code
+ */
+static int storef_uristring ( struct settings *settings,
+			      struct setting *setting,
+			      const char *value ) {
+	char buf[ strlen ( value ) + 1 ]; /* Decoding never expands string */
+	size_t len;
+
+	len = uri_decode ( value, buf, sizeof ( buf ) );
+	return store_setting ( settings, setting, buf, len );
+}
+
+/**
+ * Fetch and format value of URI-encoded string setting
+ *
+ * @v settings		Settings block, or NULL to search all blocks
+ * @v setting		Setting to fetch
+ * @v buf		Buffer to contain formatted value
+ * @v len		Length of buffer
+ * @ret len		Length of formatted value, or negative error
+ */
+static int fetchf_uristring ( struct settings *settings,
+			      struct setting *setting,
+			      char *buf, size_t len ) {
+	size_t raw_len;
+
+	/* We need to always retrieve the full raw string to know the
+	 * length of the encoded string.
+	 */
+	raw_len = fetch_setting ( settings, setting, NULL, 0 );
+	{
+		char raw_buf[ raw_len + 1 ];
+       
+		fetch_string_setting ( settings, setting, raw_buf,
+				       sizeof ( raw_buf ) );
+		return uri_encode ( raw_buf, buf, len );
+	}
+}
+
+/** A URI-encoded string setting type */
+struct setting_type setting_type_uristring __setting_type = {
+	.name = "uristring",
+	.storef = storef_uristring,
+	.fetchf = fetchf_uristring,
 };
 
 /**
