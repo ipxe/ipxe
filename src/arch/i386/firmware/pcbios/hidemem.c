@@ -64,6 +64,10 @@ extern struct segoff __text16 ( int15_vector );
 /* The linker defines these symbols for us */
 extern char _text[];
 extern char _end[];
+extern char _text16_size[];
+#define _text16_size ( ( unsigned int ) _text16_size )
+extern char _data16_size[];
+#define _data16_size ( ( unsigned int ) _data16_size )
 
 /**
  * Hide region of memory from system memory map
@@ -123,6 +127,9 @@ void hide_text ( void ) {
  */
 static void hide_etherboot ( void ) {
 	struct memory_map memmap;
+	unsigned int rm_ds_top;
+	unsigned int rm_cs_top;
+	unsigned int fbms;
 
 	/* Dump memory map before mangling */
 	DBG ( "Hiding gPXE from system memory map\n" );
@@ -132,6 +139,26 @@ static void hide_etherboot ( void ) {
 	hide_basemem();
 	hide_umalloc ( virt_to_phys ( _text ), virt_to_phys ( _text ) );
 	hide_text();
+
+	/* Some really moronic BIOSes bring up the PXE stack via the
+	 * UNDI loader entry point and then don't bother to unload it
+	 * before overwriting the code and data segments.  If this
+	 * happens, we really don't want to leave INT 15 hooked,
+	 * because that will cause any loaded OS to die horribly as
+	 * soon as it attempts to fetch the system memory map.
+	 *
+	 * We use a heuristic to guess whether or not we are being
+	 * loaded sensibly.
+	 */
+	rm_cs_top = ( ( ( rm_cs << 4 ) + _text16_size + 1024 - 1 ) >> 10 );
+	rm_ds_top = ( ( ( rm_ds << 4 ) + _data16_size + 1024 - 1 ) >> 10 );
+	fbms = get_fbms();
+	if ( ( rm_cs_top < fbms ) && ( rm_ds_top < fbms ) ) {
+		DBG ( "Detected potentially unsafe UNDI load at CS=%04x "
+		      "DS=%04x FBMS=%dkB\n", rm_cs, rm_ds, fbms );
+		DBG ( "Disabling INT 15 memory hiding\n" );
+		return;
+	}
 
 	/* Hook INT 15 */
 	hook_bios_interrupt ( 0x15, ( unsigned int ) int15,
