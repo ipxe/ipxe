@@ -135,5 +135,7 @@ extern char * resolve_path ( const char *base_path,
 extern struct uri * resolve_uri ( struct uri *base_uri,
 				  struct uri *relative_uri );
 extern void churi ( struct uri *uri );
+extern size_t uri_encode ( const char *raw_string, char *buf, size_t len );
+extern size_t uri_decode ( const char *encoded_string, char *buf, size_t len );
 
 #endif /* _GPXE_URI_H */

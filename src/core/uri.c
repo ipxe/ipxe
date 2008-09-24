@@ -26,6 +26,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <libgen.h>
+#include <ctype.h>
 #include <gpxe/vsprintf.h>
 #include <gpxe/uri.h>
 
@@ -380,4 +381,81 @@ struct uri * resolve_uri ( struct uri *base_uri,
 	new_uri = uri_dup ( &tmp_uri );
 	free ( tmp_path );
 	return new_uri;
+}
+
+/**
+ * Test for unreserved URI characters
+ *
+ * @v c			Character to test
+ * @ret is_unreserved	Character is an unreserved character
+ */
+static int is_unreserved_uri_char ( int c ) {
+	/* According to RFC3986, the unreserved character set is
+	 *
+	 * A-Z a-z 0-9 - _ . ~
+	 */
+	return ( isupper ( c ) || islower ( c ) || isdigit ( c ) ||
+		 ( c == '-' ) || ( c == '_' ) ||
+		 ( c == '.' ) || ( c == '~' ) );
+}
+
+/**
+ * URI-encode string
+ *
+ * @v raw_string	String to be URI-encoded
+ * @v buf		Buffer to contain encoded string
+ * @v len		Length of buffer
+ * @ret len		Length of encoded string (excluding NUL)
+ */
+size_t uri_encode ( const char *raw_string, char *buf, size_t len ) {
+	ssize_t remaining = len;
+	size_t used;
+	unsigned char c;
+
+	if ( len )
+		buf[0] = '\0';
+
+	while ( ( c = *(raw_string++) ) ) {
+		if ( is_unreserved_uri_char ( c ) ) {
+			used = ssnprintf ( buf, remaining, "%c", c );
+		} else {
+			used = ssnprintf ( buf, remaining, "%%%02X", c );
+		}
+		buf += used;
+		remaining -= used;
+	}
+
+	return ( len - remaining );
+}
+
+/**
+ * Decode URI-encoded string
+ *
+ * @v encoded_string	URI-encoded string
+ * @v buf		Buffer to contain decoded string
+ * @v len		Length of buffer
+ * @ret len		Length of decoded string (excluding NUL)
+ */
+size_t uri_decode ( const char *encoded_string, char *buf, size_t len ) {
+	ssize_t remaining = len;
+	char hexbuf[3];
+	char *hexbuf_end;
+	unsigned char c;
+
+	if ( len )
+		buf[0] = '\0';
+
+	while ( *encoded_string ) {
+		if ( *encoded_string == '%' ) {
+			encoded_string++;
+			snprintf ( hexbuf, sizeof ( hexbuf ), "%s",
+				   encoded_string );
+			c = strtoul ( hexbuf, &hexbuf_end, 16 );
+			encoded_string += ( hexbuf_end - hexbuf );
+		} else {
+			c = *(encoded_string++);
+		}
+		ssnprintf ( buf++, remaining--, "%c", c );
+	}
+	return ( len - remaining );
 }
