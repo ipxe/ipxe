@@ -245,10 +245,19 @@ get_underlying_e820:
 	pushl	%ebx
 	pushl	%ecx
 	pushl	%edx
+	pushw	%es
+	pushw	%di
+	pushw	%ds
+	popw	%es
+	movw	$underlying_e820_cache, %di
+	movl	$20, %ecx
 	movl	underlying_e820_ebx, %ebx
 	stc
 	pushfw
 	lcall	*%cs:int15_vector
+	popw	%di
+	popw	%es
+	/* Check for error return from underlying e820 call */
 	jc	1f /* CF set: error */
 	cmpl	$SMAP, %eax
 	je	2f /* 'SMAP' missing: error */
@@ -262,25 +271,6 @@ get_underlying_e820:
 	popl	%ecx
 	popl	%ebx
 	popl	%eax
-	/* Copy result to cache */
-	pushw	%es
-	pushw	%fs
-	pushw	%si
-	pushw	%di
-	pushw	%cx
-	pushw	%es
-	popw	%fs
-	movw	%di, %si
-	pushw	%ds
-	popw	%es
-	movw	$underlying_e820_cache, %di
-	movw	$20, %cx
-	fs rep movsb
-	popw	%cx
-	popw	%di
-	popw	%si
-	popw	%fs
-	popw	%es
 	/* Mark cache as containing this result */
 	incw	underlying_e820_index
 
