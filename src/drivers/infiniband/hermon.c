@@ -1684,7 +1684,7 @@ static int hermon_start_firmware ( struct hermon *hermon ) {
 
 	/* Allocate firmware pages and map firmware area */
 	fw_size = ( fw_pages * HERMON_PAGE_SIZE );
-	hermon->firmware_area = umalloc ( fw_size );
+	hermon->firmware_area = umalloc ( fw_size * 2 );
 	if ( ! hermon->firmware_area ) {
 		rc = -ENOMEM;
 		goto err_alloc_fa;
