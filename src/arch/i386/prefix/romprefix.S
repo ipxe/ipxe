@@ -6,12 +6,21 @@
  * table so using a noticeable amount of stack space is a no-no.
  */
 
+#include <config/general.h>
+
 #define PNP_SIGNATURE ( '$' + ( 'P' << 8 ) + ( 'n' << 16 ) + ( 'P' << 24 ) )
 #define PMM_SIGNATURE ( '$' + ( 'P' << 8 ) + ( 'M' << 16 ) + ( 'M' << 24 ) )
 #define PCI_SIGNATURE ( 'P' + ( 'C' << 8 ) + ( 'I' << 16 ) + ( ' ' << 24 ) )
 #define STACK_MAGIC ( 'L' + ( 'R' << 8 ) + ( 'E' << 16 ) + ( 'T' << 24 ) )
 #define PNP_GET_BBS_VERSION 0x60
 #define PMM_ALLOCATE 0x0000
+
+/* ROM banner timeout.  Based on the configurable BANNER_TIMEOUT in
+ * config.h, but converted to a number of (18Hz) timer ticks, and
+ * doubled to allow for BIOSes that switch video modes immediately
+ * beforehand, so rendering the message almost invisible to the user.
+ */
+#define ROM_BANNER_TIMEOUT ( 2 * ( 18 * BANNER_TIMEOUT ) / 10 )
 
 	.text
 	.code16
@@ -318,6 +327,12 @@ no_pmm:
 	/* Wait for Ctrl-B */
 	movw	$0xff02, %bx
 	call	wait_for_key
+	/* Clear prompt */
+	pushf
+	movw	$clear_message, %si
+	xorw	%di, %di
+	call	print_message
+	popf
 	jnz	1f
 	/* Ctrl-B was pressed: invoke gPXE.  The keypress will be
 	 * picked up by the initial shell prompt, and we will drop
@@ -326,11 +341,6 @@ no_pmm:
 	pushw	%cs
 	call	exec
 1:
-	/* Print blank lines to terminate messages */
-	movw	$init_message_end, %si
-	xorw	%di, %di
-	call	print_message
-
 	/* Restore registers */
 	popw	%gs
 	popw	%fs
@@ -364,9 +374,9 @@ init_message_int19:
 init_message_prompt:
 	.asciz	"\nPress Ctrl-B to configure gPXE..."
 	.size	init_message_prompt, . - init_message_prompt
-init_message_end:
-	.asciz	"\n\n\n"
-	.size	init_message_end, . - init_message_end
+clear_message:
+	.asciz	"\r                                     \n\n"
+	.size	clear_message, . - clear_message
 
 /* ROM image location
  *
@@ -421,17 +431,18 @@ int19_entry:
 	call	print_message
 	movw	$0xdf42, %bx
 	call	wait_for_key
+	pushf
+	movw	$clear_message, %si
+	xorw	%di, %di
+	call	print_message
+	popf
 	jnz	1f
 	/* Leave keypress in buffer and start gPXE.  The keypress will
 	 * cause the usual initial Ctrl-B prompt to be skipped.
 	 */
 	pushw	%cs
 	call	exec
-1:	/* Print blank lines to terminate messages */
-	movw	$int19_message_end, %si
-	xorw	%di, %di
-	call	print_message
-	/* Try to call original INT 19 vector */
+1:	/* Try to call original INT 19 vector */
 	movl	%cs:orig_int19, %eax
 	testl	%eax, %eax
 	je	2f
@@ -449,9 +460,6 @@ int19_message_prompt:
 int19_message_dots:
 	.asciz	"..."
 	.size	int19_message_dots, . - int19_message_dots
-int19_message_end:
-	.asciz	"\n\n\n"
-	.size	int19_message_end, . - int19_message_end
 	
 /* Execute as a boot device
  *
@@ -578,8 +586,8 @@ wait_for_key:
 	xorw	%ax, %ax
 	int	$0x16
 	jmp	1b
-2:	/* Wait for up to 5s for a key press */
-	movw	$(18 * 5), %cx	/* Approx 5s worth of timer ticks */
+2:	/* Wait for a key press */
+	movw	$ROM_BANNER_TIMEOUT, %cx
 3:	decw	%cx
 	js	99f		/* Exit with ZF clear */
 	/* Wait for timer tick to be updated */
