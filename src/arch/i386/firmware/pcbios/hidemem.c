@@ -19,9 +19,13 @@
 #include <realmode.h>
 #include <biosint.h>
 #include <basemem.h>
+#include <fakee820.h>
 #include <gpxe/init.h>
 #include <gpxe/memmap.h>
 #include <gpxe/hidemem.h>
+
+/** Set to true if you want to test a fake E820 map */
+#define FAKE_E820 0
 
 /** Alignment for hidden memory regions */
 #define ALIGN_HIDDEN 4096   /* 4kB page alignment should be enough */
@@ -135,6 +139,13 @@ static void hide_etherboot ( void ) {
 	DBG ( "Hiding gPXE from system memory map\n" );
 	get_memmap ( &memmap );
 
+	/* Hook in fake E820 map, if we're testing one */
+	if ( FAKE_E820 ) {
+		DBG ( "Hooking in fake E820 map\n" );
+		fake_e820();
+		get_memmap ( &memmap );
+	}
+
 	/* Initialise the hidden regions */
 	hide_basemem();
 	hide_umalloc ( virt_to_phys ( _text ), virt_to_phys ( _text ) );
@@ -194,6 +205,10 @@ static void unhide_etherboot ( int flags __unused ) {
 	 */
 	unhook_bios_interrupt ( 0x15, ( unsigned int ) int15,
 				&int15_vector );
+
+	/* Unhook fake E820 map, if used */
+	if ( FAKE_E820 )
+		unfake_e820();
 }
 
 /** Hide Etherboot startup function */
