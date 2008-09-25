@@ -102,6 +102,7 @@ struct dhcp_packet;
 
 /** DHCP message type */
 #define DHCP_MESSAGE_TYPE 53
+#define DHCPNONE 0
 #define DHCPDISCOVER 1
 #define DHCPOFFER 2
 #define DHCPREQUEST 3

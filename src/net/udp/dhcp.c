@@ -65,7 +65,8 @@ static const uint8_t dhcp_op[] = {
 
 /** Raw option data for options common to all DHCP requests */
 static uint8_t dhcp_request_options_data[] = {
-	DHCP_MAX_MESSAGE_SIZE, DHCP_WORD ( ETH_MAX_MTU ),
+	DHCP_MAX_MESSAGE_SIZE,
+	DHCP_WORD ( ETH_MAX_MTU - 20 /* IP header */ - 8 /* UDP header */ ),
 	DHCP_CLIENT_ARCHITECTURE, DHCP_WORD ( 0 ),
 	DHCP_CLIENT_NDI, DHCP_OPTION ( 1 /* UNDI */ , 2, 1 /* v2.1 */ ),
 	DHCP_VENDOR_CLASS_ID,
@@ -128,7 +129,7 @@ struct dhcp_client_uuid {
  */
 static inline const char * dhcp_msgtype_name ( unsigned int msgtype ) {
 	switch ( msgtype ) {
-	case 0:			return "BOOTP"; /* Non-DHCP packet */
+	case DHCPNONE:		return "BOOTP"; /* Non-DHCP packet */
 	case DHCPDISCOVER:	return "DHCPDISCOVER";
 	case DHCPOFFER:		return "DHCPOFFER";
 	case DHCPREQUEST:	return "DHCPREQUEST";
@@ -685,7 +686,7 @@ static void dhcp_store_dhcpoffer ( struct dhcp_session *dhcp,
  */
 static void dhcp_rx_dhcpoffer ( struct dhcp_session *dhcp,
 				struct dhcp_settings *dhcpoffer ) {
-	struct in_addr server_id;
+	struct in_addr server_id = { 0 };
 	char vci[9]; /* "PXEClient" */
 	int len;
 	uint8_t ignore_proxy = 0;
@@ -697,7 +698,7 @@ static void dhcp_rx_dhcpoffer ( struct dhcp_session *dhcp,
 	     != sizeof ( server_id ) ) {
 		DBGC ( dhcp, "DHCP %p received DHCPOFFER %p missing server "
 		       "identifier\n", dhcp, dhcpoffer );
-		return;
+		/* Could be a valid BOOTP offer; do not abort processing */
 	}
 
 	/* If there is an IP address, it's a normal DHCPOFFER */
@@ -714,7 +715,8 @@ static void dhcp_rx_dhcpoffer ( struct dhcp_session *dhcp,
 	 */
 	len = dhcppkt_fetch ( &dhcpoffer->dhcppkt, DHCP_VENDOR_CLASS_ID,
 			      vci, sizeof ( vci ) );
-	if ( ( len >= ( int ) sizeof ( vci ) ) &&
+	if ( ( server_id.s_addr != 0 ) &&
+	     ( len >= ( int ) sizeof ( vci ) ) &&
 	     ( strncmp ( "PXEClient", vci, sizeof ( vci ) ) == 0 ) ) {
 		DBGC ( dhcp, "DHCP %p received DHCPOFFER %p from %s is a "
 		       "ProxyDHCPOFFER\n",
@@ -924,12 +926,12 @@ static int dhcp_deliver_iob ( struct xfer_interface *xfer,
 	/* Handle packet based on current state */
 	switch ( dhcp->state ) {
 	case DHCP_STATE_DISCOVER:
-		if ( ( msgtype == DHCPOFFER ) &&
+		if ( ( ( msgtype == DHCPOFFER ) || ( msgtype == DHCPNONE ) ) &&
 		     ( src_port == htons ( BOOTPS_PORT ) ) )
 			dhcp_rx_dhcpoffer ( dhcp, dhcpset );
 		break;
 	case DHCP_STATE_REQUEST:
-		if ( ( msgtype == DHCPACK ) &&
+		if ( ( ( msgtype == DHCPACK ) || ( msgtype == DHCPNONE ) ) &&
 		     ( src_port == htons ( BOOTPS_PORT ) ) )
 			dhcp_rx_dhcpack ( dhcp, dhcpset );
 		break;
