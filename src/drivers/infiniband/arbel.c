@@ -1714,7 +1714,7 @@ static int arbel_start_firmware ( struct arbel *arbel ) {
 
 	/* Allocate firmware pages and map firmware area */
 	fw_size = ( fw_pages * 4096 );
-	arbel->firmware_area = umalloc ( fw_size );
+	arbel->firmware_area = umalloc ( fw_size * 2 );
 	if ( ! arbel->firmware_area ) {
 		rc = -ENOMEM;
 		goto err_alloc_fa;
