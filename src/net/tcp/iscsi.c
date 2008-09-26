@@ -1625,25 +1625,28 @@ enum iscsi_root_path_component {
  */
 static int iscsi_parse_lun ( struct iscsi_session *iscsi,
 			     const char *lun_string ) {
-	char *p = ( char * ) lun_string;
 	union {
 		uint64_t u64;
 		uint16_t u16[4];
 	} lun;
+	char *p;
 	int i;
 
-	/* Empty LUN; assume LUN 0 */
-	if ( ! *lun_string )
-		return 0;
-
-	for ( i = 0 ; i < 4 ; i++ ) {
-		lun.u16[i] = strtoul ( p, &p, 16 );
-		if ( *p != '-' )
+	memset ( &lun, 0, sizeof ( lun ) );
+	if ( lun_string ) {
+		p = ( char * ) lun_string;
+		
+		for ( i = 0 ; i < 4 ; i++ ) {
+			lun.u16[i] = htons ( strtoul ( p, &p, 16 ) );
+			if ( *p == '\0' )
+				break;
+			if ( *p != '-' )
+				return -EINVAL;
+			p++;
+		}
+		if ( *p )
 			return -EINVAL;
-		p++;
 	}
-	if ( *p )
-		return -EINVAL;
 
 	iscsi->lun = lun.u64;
 	return 0;
