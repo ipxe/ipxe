@@ -375,7 +375,7 @@ init_message_prompt:
 	.asciz	"\nPress Ctrl-B to configure gPXE..."
 	.size	init_message_prompt, . - init_message_prompt
 clear_message:
-	.asciz	"\r                                     \n\n"
+	.asciz	"\r                                          \n\n"
 	.size	clear_message, . - clear_message
 
 /* ROM image location
