@@ -1040,6 +1040,8 @@ static int fetchf_hex ( struct settings *settings, struct setting *setting,
 
 		check_len = fetch_setting ( settings, setting, raw,
 					    sizeof ( raw ) );
+		if ( check_len < 0 )
+			return check_len;
 		assert ( check_len == raw_len );
 		
 		if ( len )
