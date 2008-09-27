@@ -1653,6 +1653,47 @@ static struct ib_device_operations hermon_ib_operations = {
  */
 
 /**
+ * Map virtual to physical address for firmware usage
+ *
+ * @v hermon		Hermon device
+ * @v map		Mapping function
+ * @v va		Virtual address
+ * @v pa		Physical address
+ * @v len		Length of region
+ * @ret rc		Return status code
+ */
+static int hermon_map_vpm ( struct hermon *hermon,
+			    int ( *map ) ( struct hermon *hermon,
+			    const struct hermonprm_virtual_physical_mapping* ),
+			    uint64_t va, physaddr_t pa, size_t len ) {
+	struct hermonprm_virtual_physical_mapping mapping;
+	int rc;
+
+	assert ( ( va & ( HERMON_PAGE_SIZE - 1 ) ) == 0 );
+	assert ( ( pa & ( HERMON_PAGE_SIZE - 1 ) ) == 0 );
+	assert ( ( len & ( HERMON_PAGE_SIZE - 1 ) ) == 0 );
+
+	while ( len ) {
+		memset ( &mapping, 0, sizeof ( mapping ) );
+		MLX_FILL_1 ( &mapping, 0, va_h, ( va >> 32 ) );
+		MLX_FILL_1 ( &mapping, 1, va_l, ( va >> 12 ) );
+		MLX_FILL_2 ( &mapping, 3,
+			     log2size, 0,
+			     pa_l, ( pa >> 12 ) );
+		if ( ( rc = map ( hermon, &mapping ) ) != 0 ) {
+			DBGC ( hermon, "Hermon %p could not map %llx => %lx: "
+			       "%s\n", hermon, va, pa, strerror ( rc ) );
+			return rc;
+		}
+		pa += HERMON_PAGE_SIZE;
+		va += HERMON_PAGE_SIZE;
+		len -= HERMON_PAGE_SIZE;
+	}
+
+	return 0;
+}
+
+/**
  * Start firmware running
  *
  * @v hermon		Hermon device
@@ -1660,9 +1701,7 @@ static struct ib_device_operations hermon_ib_operations = {
  */
 static int hermon_start_firmware ( struct hermon *hermon ) {
 	struct hermonprm_query_fw fw;
-	struct hermonprm_virtual_physical_mapping map_fa;
 	unsigned int fw_pages;
-	unsigned int log2_fw_pages;
 	size_t fw_size;
 	physaddr_t fw_base;
 	int rc;
@@ -1677,27 +1716,21 @@ static int hermon_start_firmware ( struct hermon *hermon ) {
 	       MLX_GET ( &fw, fw_rev_major ), MLX_GET ( &fw, fw_rev_minor ),
 	       MLX_GET ( &fw, fw_rev_subminor ) );
 	fw_pages = MLX_GET ( &fw, fw_pages );
-	log2_fw_pages = fls ( fw_pages - 1 );
-	fw_pages = ( 1 << log2_fw_pages );
-	DBGC ( hermon, "Hermon %p requires %d kB for firmware\n",
-	       hermon, ( fw_pages * 4 ) );
+	DBGC ( hermon, "Hermon %p requires %d pages (%d kB) for firmware\n",
+	       hermon, fw_pages, ( fw_pages * ( HERMON_PAGE_SIZE / 1024 ) ) );
 
 	/* Allocate firmware pages and map firmware area */
 	fw_size = ( fw_pages * HERMON_PAGE_SIZE );
-	hermon->firmware_area = umalloc ( fw_size * 2 );
+	hermon->firmware_area = umalloc ( fw_size );
 	if ( ! hermon->firmware_area ) {
 		rc = -ENOMEM;
 		goto err_alloc_fa;
 	}
-	fw_base = ( user_to_phys ( hermon->firmware_area, fw_size ) &
-		    ~( fw_size - 1 ) );
+	fw_base = user_to_phys ( hermon->firmware_area, 0 );
 	DBGC ( hermon, "Hermon %p firmware area at physical [%lx,%lx)\n",
 	       hermon, fw_base, ( fw_base + fw_size ) );
-	memset ( &map_fa, 0, sizeof ( map_fa ) );
-	MLX_FILL_2 ( &map_fa, 3,
-		     log2size, log2_fw_pages,
-		     pa_l, ( fw_base >> 12 ) );
-	if ( ( rc = hermon_cmd_map_fa ( hermon, &map_fa ) ) != 0 ) {
+	if ( ( rc = hermon_map_vpm ( hermon, hermon_cmd_map_fa,
+				     0, fw_base, fw_size ) ) != 0 ) {
 		DBGC ( hermon, "Hermon %p could not map firmware: %s\n",
 		       hermon, strerror ( rc ) );
 		goto err_map_fa;
@@ -1714,8 +1747,8 @@ static int hermon_start_firmware ( struct hermon *hermon ) {
 	return 0;
 
  err_run_fw:
-	hermon_cmd_unmap_fa ( hermon );
  err_map_fa:
+	hermon_cmd_unmap_fa ( hermon );
 	ufree ( hermon->firmware_area );
 	hermon->firmware_area = UNULL;
  err_alloc_fa:
@@ -1816,8 +1849,6 @@ static int hermon_alloc_icm ( struct hermon *hermon,
 			      struct hermonprm_init_hca *init_hca ) {
 	struct hermonprm_scalar_parameter icm_size;
 	struct hermonprm_scalar_parameter icm_aux_size;
-	struct hermonprm_virtual_physical_mapping map_icm_aux;
-	struct hermonprm_virtual_physical_mapping map_icm;
 	uint64_t icm_offset = 0;
 	unsigned int log_num_qps, log_num_srqs, log_num_cqs, log_num_eqs;
 	unsigned int log_num_mtts, log_num_mpts;
@@ -2000,13 +2031,11 @@ static int hermon_alloc_icm ( struct hermon *hermon,
 		goto err_set_icm_size;
 	}
 	icm_aux_len = ( MLX_GET ( &icm_aux_size, value ) * HERMON_PAGE_SIZE );
-	/* Must round up to nearest power of two :( */
-	icm_aux_len = ( 1 << fls ( icm_aux_len - 1 ) );
 
 	/* Allocate ICM data and auxiliary area */
 	DBGC ( hermon, "Hermon %p requires %zd kB ICM and %zd kB AUX ICM\n",
 	       hermon, ( icm_len / 1024 ), ( icm_aux_len / 1024 ) );
-	hermon->icm = umalloc ( 2 * icm_aux_len + icm_len );
+	hermon->icm = umalloc ( icm_aux_len + icm_len );
 	if ( ! hermon->icm ) {
 		rc = -ENOMEM;
 		goto err_alloc;
@@ -2014,39 +2043,25 @@ static int hermon_alloc_icm ( struct hermon *hermon,
 	icm_phys = user_to_phys ( hermon->icm, 0 );
 
 	/* Map ICM auxiliary area */
-	icm_phys = ( ( icm_phys + icm_aux_len - 1 ) & ~( icm_aux_len - 1 ) );
-	memset ( &map_icm_aux, 0, sizeof ( map_icm_aux ) );
-	MLX_FILL_2 ( &map_icm_aux, 3,
-		     log2size, fls ( ( icm_aux_len / HERMON_PAGE_SIZE ) - 1 ),
-		     pa_l, ( icm_phys >> 12 ) );
-	DBGC ( hermon, "Hermon %p mapping ICM AUX (2^%d pages) => %08lx\n",
-	       hermon, fls ( ( icm_aux_len / HERMON_PAGE_SIZE ) - 1 ),
-	       icm_phys );
-	if ( ( rc = hermon_cmd_map_icm_aux ( hermon, &map_icm_aux ) ) != 0 ) {
+	DBGC ( hermon, "Hermon %p mapping ICM AUX => %08lx\n",
+	       hermon, icm_phys );
+	if ( ( rc = hermon_map_vpm ( hermon, hermon_cmd_map_icm_aux,
+				     0, icm_phys, icm_aux_len ) ) != 0 ) {
 		DBGC ( hermon, "Hermon %p could not map AUX ICM: %s\n",
-		       hermon, strerror ( rc ) );
+		       hermon, strerror ( rc ) );		
 		goto err_map_icm_aux;
 	}
 	icm_phys += icm_aux_len;
 
 	/* MAP ICM area */
 	for ( i = 0 ; i < HERMON_ICM_NUM_REGIONS ; i++ ) {
-		memset ( &map_icm, 0, sizeof ( map_icm ) );
-		MLX_FILL_1 ( &map_icm, 0,
-			     va_h, ( hermon->icm_map[i].offset >> 32 ) );
-		MLX_FILL_1 ( &map_icm, 1,
-			     va_l, ( hermon->icm_map[i].offset >> 12 ) );
-		MLX_FILL_2 ( &map_icm, 3,
-			     log2size,
-			     fls ( ( hermon->icm_map[i].len /
-				     HERMON_PAGE_SIZE ) - 1 ),
-			     pa_l, ( icm_phys >> 12 ) );
-		DBGC ( hermon, "Hermon %p mapping ICM %llx+%zx (2^%d pages) "
-		       "=> %08lx\n", hermon, hermon->icm_map[i].offset,
-		       hermon->icm_map[i].len,
-		       fls ( ( hermon->icm_map[i].len /
-			       HERMON_PAGE_SIZE ) - 1 ), icm_phys );
-		if ( ( rc = hermon_cmd_map_icm ( hermon, &map_icm ) ) != 0 ) {
+		DBGC ( hermon, "Hermon %p mapping ICM %llx+%zx => %08lx\n",
+		       hermon, hermon->icm_map[i].offset,
+		       hermon->icm_map[i].len, icm_phys );
+		if ( ( rc = hermon_map_vpm ( hermon, hermon_cmd_map_icm,
+					     hermon->icm_map[i].offset,
+					     icm_phys,
+					     hermon->icm_map[i].len ) ) != 0 ){
 			DBGC ( hermon, "Hermon %p could not map ICM: %s\n",
 			       hermon, strerror ( rc ) );
 			goto err_map_icm;
@@ -2058,8 +2073,8 @@ static int hermon_alloc_icm ( struct hermon *hermon,
 
  err_map_icm:
 	assert ( i == 0 ); /* We don't handle partial failure at present */
-	hermon_cmd_unmap_icm_aux ( hermon );
  err_map_icm_aux:
+	hermon_cmd_unmap_icm_aux ( hermon );
 	ufree ( hermon->icm );
 	hermon->icm = UNULL;
  err_alloc:
