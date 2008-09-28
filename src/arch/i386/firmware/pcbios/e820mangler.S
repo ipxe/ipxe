@@ -436,6 +436,7 @@ get_mangled_e820:
 
 	/* Peek ahead to see if there are any further nonempty regions */
 	pushal
+	pushw	%es
 	subw	$20, %sp
 	movl	$0xe820, %eax
 	movl	$SMAP, %edx
@@ -445,6 +446,7 @@ get_mangled_e820:
 	movw	%sp, %di
 	call	get_nonempty_e820
 	addr32 leal 20(%esp), %esp /* avoid changing flags */
+	popw	%es
 	popal
 	jnc	99f /* There are further nonempty regions */
 
