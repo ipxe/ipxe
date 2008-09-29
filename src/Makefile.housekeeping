@@ -58,16 +58,16 @@ ECHO_E_BIN_ECHO_TAB 	:= $(shell $(ECHO_E_BIN_ECHO) '\t')
 ECHO_E_BIN_ECHO_E_TAB 	:= $(shell $(ECHO_E_BIN_ECHO_E) '\t')
 
 ifeq ($(ECHO_E_ECHO_TAB),$(TAB))
-ECHO_E		?= $(ECHO_E_ECHO)
+ECHO_E		:= $(ECHO_E_ECHO)
 endif
 ifeq ($(ECHO_E_ECHO_E_TAB),$(TAB))
-ECHO_E		?= $(ECHO_E_ECHO_E)
+ECHO_E		:= $(ECHO_E_ECHO_E)
 endif
 ifeq ($(ECHO_E_BIN_ECHO_TAB),$(TAB))
-ECHO_E		?= $(ECHO_E_BIN_ECHO)
+ECHO_E		:= $(ECHO_E_BIN_ECHO)
 endif
 ifeq ($(ECHO_E_BIN_ECHO_E_TAB),$(TAB))
-ECHO_E		?= $(ECHO_E_BIN_ECHO_E)
+ECHO_E		:= $(ECHO_E_BIN_ECHO_E)
 endif
 
 .echocheck :
