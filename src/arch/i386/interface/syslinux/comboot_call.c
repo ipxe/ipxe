@@ -53,6 +53,14 @@ static char __data16_array ( syslinux_configuration_file, [] ) = "";
 static uint8_t __data16 ( comboot_feature_flags ) = COMBOOT_FEATURE_IDLE_LOOP;
 #define comboot_feature_flags __use_data16 ( comboot_feature_flags )
 
+typedef union {
+	syslinux_pm_regs pm; syslinux_rm_regs rm;
+} syslinux_regs;
+
+/** Initial register values for INT 22h AX=1Ah and 1Bh */
+static syslinux_regs __text16 ( comboot_initial_regs );
+#define comboot_initial_regs __use_text16 ( comboot_initial_regs )
+
 static struct segoff __text16 ( int20_vector );
 #define int20_vector __use_text16 ( int20_vector )
 
@@ -316,7 +324,7 @@ static __asmcall void int22 ( struct i386_all_regs *ix86 ) {
 	case 0x0001: /* Get Version */
 
 		/* Number of INT 22h API functions available */
-		ix86->regs.ax = 0x0018;
+		ix86->regs.ax = 0x001B;
 
 		/* SYSLINUX version number */
 		ix86->regs.ch = 0; /* major */
@@ -567,6 +575,58 @@ static __asmcall void int22 ( struct i386_all_regs *ix86 ) {
 		ix86->segs.es = 0;
 		ix86->regs.bx = 0;
 		ix86->flags &= ~CF;
+		break;
+
+	case 0x001B: /* Cleanup, shuffle and boot to real mode */
+		if ( ix86->regs.cx > COMBOOT_MAX_SHUFFLE_DESCRIPTORS )
+			break;
+
+		/* Perform final cleanup */
+		shutdown ( SHUTDOWN_BOOT );
+
+		/* Perform sequence of copies */
+		shuffle ( ix86->segs.es, ix86->regs.di, ix86->regs.cx );
+
+		/* Copy initial register values to .text16 */
+		memcpy_user ( real_to_user ( rm_cs, (unsigned) __from_text16 ( &comboot_initial_regs ) ), 0,
+		              real_to_user ( ix86->segs.ds, ix86->regs.si ), 0,
+		              sizeof(syslinux_rm_regs) );
+
+		/* Load initial register values */
+		__asm__ __volatile__ (
+			REAL_CODE (
+				/* Point SS:SP at the register value structure */
+				"pushw %%cs\n\t"
+				"popw %%ss\n\t"
+				"movw $comboot_initial_regs, %%sp\n\t"
+
+				/* Segment registers */
+				"popw %%es\n\t"
+				"popw %%ax\n\t" /* Skip CS */
+				"popw %%ds\n\t"
+				"popw %%ax\n\t" /* Skip SS for now */
+				"popw %%fs\n\t"
+				"popw %%gs\n\t"
+
+				/* GP registers */
+				"popl %%eax\n\t"
+				"popl %%ecx\n\t"
+				"popl %%edx\n\t"
+				"popl %%ebx\n\t"
+				"popl %%ebp\n\t" /* Skip ESP for now */
+				"popl %%ebp\n\t"
+				"popl %%esi\n\t"
+				"popl %%edi\n\t"
+
+				/* Load correct SS:ESP */
+				"movw $(comboot_initial_regs + 6), %%sp\n\t"
+				"popw %%ss\n\t"
+				"movl %%cs:(comboot_initial_regs + 28), %%esp\n\t"
+
+				"ljmp *%%cs:(comboot_initial_regs + 44)\n\t"
+			)
+			: : );
+
 		break;
 
 	default:
