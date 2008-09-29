@@ -60,10 +60,10 @@ static struct hwbp *gdbmach_find_hwbp ( int type, unsigned long addr, size_t len
 }
 
 static void gdbmach_commit_hwbp ( struct hwbp *bp ) {
-	int regnum = bp - hwbps;
+	unsigned int regnum = bp - hwbps;
 
 	/* Set breakpoint address */
-	assert ( regnum >= 0 && regnum < sizeof hwbps / sizeof hwbps [ 0 ] );
+	assert ( regnum < ( sizeof hwbps / sizeof hwbps [ 0 ] ) );
 	switch ( regnum ) {
 		case 0:
 			__asm__ __volatile__ ( "movl %0, %%dr0\n" : : "r" ( bp->addr ) );
