@@ -2252,9 +2252,9 @@ static int hermon_probe ( struct pci_device *pci,
 
 	return 0;
 
-	i = ( HERMON_NUM_PORTS - 1 );
+	i = HERMON_NUM_PORTS;
  err_register_ibdev:
-	for ( ; i >= 0 ; i-- )
+	for ( i-- ; i >= 0 ; i-- )
 		unregister_ibdev ( hermon->ibdev[i] );
 	hermon_destroy_eq ( hermon );
  err_create_eq:
@@ -2270,9 +2270,9 @@ static int hermon_probe ( struct pci_device *pci,
  err_mailbox_out:
 	free_dma ( hermon->mailbox_in, HERMON_MBOX_SIZE );
  err_mailbox_in:
-	i = ( HERMON_NUM_PORTS - 1 );
+	i = HERMON_NUM_PORTS;
  err_alloc_ibdev:
-	for ( ; i >= 0 ; i-- )
+	for ( i-- ; i >= 0 ; i-- )
 		ibdev_put ( hermon->ibdev[i] );
 	free ( hermon );
  err_alloc_hermon:
