@@ -41,12 +41,20 @@ struct e820_entry {
 	uint64_t len;
 	/** Type of region */
 	uint32_t type;
+	/** Extended attributes (optional) */
+	uint32_t attrs;
 } __attribute__ (( packed ));
 
 #define E820_TYPE_RAM		1 /**< Normal memory */
 #define E820_TYPE_RESERVED	2 /**< Reserved and unavailable */
 #define E820_TYPE_ACPI		3 /**< ACPI reclaim memory */
 #define E820_TYPE_NVS		4 /**< ACPI NVS memory */
+
+#define E820_ATTR_ENABLED	0x00000001UL
+#define E820_ATTR_NONVOLATILE	0x00000002UL
+#define E820_ATTR_UNKNOWN	0xfffffffcUL
+
+#define E820_MIN_SIZE		20
 
 /** Buffer for INT 15,e820 calls */
 static struct e820_entry __bss16 ( e820buf );
@@ -148,8 +156,15 @@ static int meme820 ( struct memory_map *memmap ) {
 	struct memory_region *region = memmap->regions;
 	uint32_t next = 0;
 	uint32_t smap;
+	size_t size;
 	unsigned int flags;
-	unsigned int discard_c, discard_d, discard_D;
+	unsigned int discard_d, discard_D;
+
+	/* Clear the E820 buffer.  Do this once before starting,
+	 * rather than on each call; some BIOSes rely on the contents
+	 * being preserved between calls.
+	 */
+	memset ( &e820buf, 0, sizeof ( e820buf ) );
 
 	do {
 		__asm__ __volatile__ ( REAL_CODE ( "stc\n\t"
@@ -158,7 +173,7 @@ static int meme820 ( struct memory_map *memmap ) {
 						   "popw %w0\n\t" )
 				       : "=r" ( flags ), "=a" ( smap ),
 					 "=b" ( next ), "=D" ( discard_D ),
-					 "=c" ( discard_c ), "=d" ( discard_d )
+					 "=c" ( size ), "=d" ( discard_d )
 				       : "a" ( 0xe820 ), "b" ( next ),
 					 "D" ( __from_data16 ( &e820buf ) ),
 					 "c" ( sizeof ( e820buf ) ),
@@ -170,16 +185,41 @@ static int meme820 ( struct memory_map *memmap ) {
 			return -ENOTSUP;
 		}
 
+		if ( size < E820_MIN_SIZE ) {
+			DBG ( "INT 15,e820 returned only %zd bytes\n", size );
+			return -EINVAL;
+		}
+
 		if ( flags & CF ) {
 			DBG ( "INT 15,e820 terminated on CF set\n" );
 			break;
 		}
 
-		DBG ( "INT 15,e820 region [%llx,%llx) type %d\n",
+		DBG ( "INT 15,e820 region [%llx,%llx) type %d",
 		      e820buf.start, ( e820buf.start + e820buf.len ),
 		      ( int ) e820buf.type );
+		if ( size > offsetof ( typeof ( e820buf ), attrs ) ) {
+			DBG ( " (%s", ( ( e820buf.attrs & E820_ATTR_ENABLED )
+					? "enabled" : "disabled" ) );
+			if ( e820buf.attrs & E820_ATTR_NONVOLATILE )
+				DBG ( ", non-volatile" );
+			if ( e820buf.attrs & E820_ATTR_UNKNOWN )
+				DBG ( ", other [%08lx]", e820buf.attrs );
+			DBG ( ")" );
+		}
+		DBG ( "\n" );
+
+		/* Discard non-RAM regions */
 		if ( e820buf.type != E820_TYPE_RAM )
 			continue;
+
+		/* Check extended attributes, if present */
+		if ( size > offsetof ( typeof ( e820buf ), attrs ) ) {
+			if ( ! ( e820buf.attrs & E820_ATTR_ENABLED ) )
+				continue;
+			if ( e820buf.attrs & E820_ATTR_NONVOLATILE )
+				continue;
+		}
 
 		region->start = e820buf.start;
 		region->end = e820buf.start + e820buf.len;
