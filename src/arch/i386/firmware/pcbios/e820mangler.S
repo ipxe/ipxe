@@ -25,6 +25,26 @@
 
 #define SMAP 0x534d4150
 
+/* Most documentation refers to the E820 buffer as being 20 bytes, and
+ * the API makes it perfectly legitimate to pass only a 20-byte buffer
+ * and expect to get valid data.  However, some morons at ACPI decided
+ * to extend the data structure by adding an extra "extended
+ * attributes" field and by including critical information within this
+ * field, such as whether or not the region is enabled.  A caller who
+ * passes in only a 20-byte buffer therefore risks getting very, very
+ * misleading information.
+ *
+ * I have personally witnessed an HP BIOS that returns a value of
+ * 0x0009 in the extended attributes field.  If we don't pass this
+ * value through to the caller, 32-bit WinPE will die, usually with a
+ * PAGE_FAULT_IN_NONPAGED_AREA blue screen of death.
+ *
+ * Allow a ridiculously large maximum value (64 bytes) for the E820
+ * buffer as a guard against insufficiently creative idiots in the
+ * future.
+ */
+#define E820MAXSIZE	64
+
 /****************************************************************************
  *
  * Allowed memory windows
@@ -204,19 +224,22 @@ get_underlying_e820:
 
 	/* If the requested region is in the cache, return it */
 	cmpw	%bx, underlying_e820_index
-	jne	1f
+	jne	2f
 	pushw	%di
 	pushw	%si
 	movw	$underlying_e820_cache, %si
-	movw	$20, %cx
+	cmpl	underlying_e820_cache_size, %ecx
+	jbe	1f
+	movl	underlying_e820_cache_size, %ecx
+1:	pushl	%ecx
 	rep movsb
+	popl	%ecx
 	popw	%si
 	popw	%di
-	movw	$20, %cx
 	incw	%bx
 	movl	%edx, %eax
 	ret
-1:	
+2:	
 	/* If the requested region is earlier than the cached region,
 	 * invalidate the cache.
 	 */
@@ -250,23 +273,26 @@ get_underlying_e820:
 	pushw	%ds
 	popw	%es
 	movw	$underlying_e820_cache, %di
-	movl	$20, %ecx
-	movl	underlying_e820_ebx, %ebx
+	cmpl	$E820MAXSIZE, %ecx
+	jbe	1f
+	movl	$E820MAXSIZE, %ecx
+1:	movl	underlying_e820_ebx, %ebx
 	stc
 	pushfw
 	lcall	*%cs:int15_vector
 	popw	%di
 	popw	%es
 	/* Check for error return from underlying e820 call */
-	jc	1f /* CF set: error */
+	jc	2f /* CF set: error */
 	cmpl	$SMAP, %eax
-	je	2f /* 'SMAP' missing: error */
-1:	/* An error occurred: return values returned by underlying e820 call */
+	je	3f /* 'SMAP' missing: error */
+2:	/* An error occurred: return values returned by underlying e820 call */
 	stc	/* Force CF set if SMAP was missing */
 	addr32 leal 16(%esp), %esp /* avoid changing other flags */
 	ret
-2:	/* No error occurred */
+3:	/* No error occurred */
 	movl	%ebx, underlying_e820_ebx
+	movl	%ecx, underlying_e820_cache_size
 	popl	%edx
 	popl	%ecx
 	popl	%ebx
@@ -290,8 +316,13 @@ underlying_e820_ebx:
 
 	.section ".bss16"
 underlying_e820_cache:
-	.space	20
+	.space	E820MAXSIZE
 	.size underlying_e820_cache, . - underlying_e820_cache
+
+	.section ".bss16"
+underlying_e820_cache_size:
+	.long	0
+	.size	underlying_e820_cache_size, . - underlying_e820_cache_size
 
 /****************************************************************************
  * Get windowed e820 region, without empty region stripping
@@ -437,15 +468,15 @@ get_mangled_e820:
 	/* Peek ahead to see if there are any further nonempty regions */
 	pushal
 	pushw	%es
-	subw	$20, %sp
+	movw	%sp, %bp
+	subw	%cx, %sp
 	movl	$0xe820, %eax
 	movl	$SMAP, %edx
-	movl	$20, %ecx
 	pushw	%ss
 	popw	%es
 	movw	%sp, %di
 	call	get_nonempty_e820
-	addr32 leal 20(%esp), %esp /* avoid changing flags */
+	movw	%bp, %sp
 	popw	%es
 	popal
 	jnc	99f /* There are further nonempty regions */
