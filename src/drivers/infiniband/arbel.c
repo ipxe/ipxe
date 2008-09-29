@@ -2183,9 +2183,9 @@ static int arbel_probe ( struct pci_device *pci,
 
 	return 0;
 
-	i = ( ARBEL_NUM_PORTS - 1 );
+	i = ARBEL_NUM_PORTS;
  err_register_ibdev:
-	for ( ; i >= 0 ; i-- )
+	for ( i-- ; i >= 0 ; i-- )
 		unregister_ibdev ( arbel->ibdev[i] );
 	arbel_destroy_eq ( arbel );
  err_create_eq:
@@ -2201,9 +2201,9 @@ static int arbel_probe ( struct pci_device *pci,
  err_mailbox_out:
 	free_dma ( arbel->mailbox_in, ARBEL_MBOX_SIZE );
  err_mailbox_in:
-	i = ( ARBEL_NUM_PORTS - 1 );
+	i = ARBEL_NUM_PORTS;
  err_alloc_ibdev:
-	for ( ; i >= 0 ; i-- )
+	for ( i-- ; i >= 0 ; i-- )
 		ibdev_put ( arbel->ibdev[i] );
 	free ( arbel );
  err_alloc_arbel:
