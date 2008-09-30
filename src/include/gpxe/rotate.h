@@ -1,5 +1,5 @@
-#ifndef _GPXE_BITOPS_H
-#define _GPXE_BITOPS_H
+#ifndef _GPXE_ROTATE_H
+#define _GPXE_ROTATE_H
 
 /** @file
  *
@@ -24,4 +24,4 @@ static inline uint64_t ror64 ( uint64_t data, unsigned int rotation ) {
         return ( ( data >> rotation ) | ( data << ( 64 - rotation ) ) );
 }
 
-#endif /* _GPXE_BITOPS_H */
+#endif /* _GPXE_ROTATE_H */

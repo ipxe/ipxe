@@ -14,7 +14,7 @@
 #include <ctype.h>
 #include <assert.h>
 #include <byteswap.h>
-#include <gpxe/bitops.h>
+#include <gpxe/rotate.h>
 #include <gpxe/crypto.h>
 
 /* Drag in pscrypto.h */
