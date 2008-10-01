@@ -131,11 +131,26 @@ extern void dbg_decolourise ( void );
 extern void dbg_hex_dump_da ( unsigned long dispaddr,
 			      const void *data, unsigned long len );
 
-/* Compatibility with existing Makefile */
 #if DEBUG_SYMBOL
-#define DBGLVL DEBUG_SYMBOL
+#define DBGLVL_MAX DEBUG_SYMBOL
+#else
+#define DBGLVL_MAX 0
+#endif
+
+/* Allow for selective disabling of enabled debug levels */
+#if DBGLVL_MAX
+int __debug_disable;
+#define DBGLVL ( DBGLVL_MAX & ~__debug_disable )
+#define DBG_DISABLE( level ) do {				\
+	__debug_disable |= ( (level) & DBGLVL_MAX );		\
+	} while ( 0 )
+#define DBG_ENABLE( level ) do {				\
+	__debug_disable &= ~( (level) & DBGLVL_MAX );		\
+	} while ( 0 )
 #else
 #define DBGLVL 0
+#define DBG_DISABLE( level ) do { } while ( 0 )
+#define DBG_ENABLE( level ) do { } while ( 0 )
 #endif
 
 #define DBGLVL_LOG	1
