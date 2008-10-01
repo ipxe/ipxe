@@ -1069,9 +1069,9 @@ static struct bit_basher_operations ef1002_basher_ops = {
 };
 
 static void ef1002_init_eeprom ( struct efab_nic *efab ) {
-	efab->ef1002_i2c.basher.op = &ef1002_basher_ops;
-	init_i2c_bit_basher ( &efab->ef1002_i2c );
-	efab->ef1002_eeprom.address = EF1_EEPROM_I2C_ID;
+	init_i2c_bit_basher ( &efab->ef1002_i2c,
+			      &ef1002_basher_ops );
+	init_i2c_eeprom ( &efab->ef1002_eeprom, EF1_EEPROM_I2C_ID );
 }
 
 /**

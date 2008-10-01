@@ -8,6 +8,7 @@
  */
 
 #include <stdint.h>
+#include <gpxe/bitbash.h>
 
 /** An I2C device
  *
@@ -15,10 +16,35 @@
  * is accessed via an I2C interface.
  */
 struct i2c_device {
-	/** Address of this device */
-	unsigned int address;
-	/** Flag indicating a ten-bit address format */
-	int tenbit;
+	/** Address of this device
+	 *
+	 * The actual address sent on the bus will look like
+	 *
+	 *    <start> <device address> <word address overflow> <r/w>
+	 *
+	 * The "word address overflow" is any excess bits from the
+	 * word address, i.e. any portion that does not fit within the
+	 * defined word address length.
+	 */
+	unsigned int dev_addr;
+	/** Device address length, in bytes
+	 *
+	 * This is the number of bytes that comprise the device
+	 * address, defined to be the portion that terminates with the
+	 * read/write bit.
+	 */
+	unsigned int dev_addr_len;
+	/** Word adddress length, in bytes
+	 *
+	 * This is the number of bytes that comprise the word address,
+	 * defined to be the portion that starts after the read/write
+	 * bit and ends before the first data byte.
+	 *
+	 * For some devices, this length will be zero (i.e. the word
+	 * address is contained entirely within the "word address
+	 * overflow").
+	 */
+	unsigned int word_addr_len;
 };
 
 /** An I2C interface
@@ -91,6 +117,9 @@ enum {
 /** Delay required for bit-bashing operation */
 #define I2C_UDELAY 5
 
+/** Maximum number of cycles to use when attempting a bus reset */
+#define I2C_RESET_MAX_CYCLES 32
+
 /**
  * Check presence of I2C device
  *
@@ -106,6 +135,35 @@ static inline int i2c_check_presence ( struct i2c_interface *i2c,
 	return i2c->write ( i2c, i2cdev, 0, NULL, 0 );
 }
 
-extern void init_i2c_bit_basher ( struct i2c_bit_basher *i2cbit );
+extern int init_i2c_bit_basher ( struct i2c_bit_basher *i2cbit,
+				 struct bit_basher_operations *bash_op );
+
+/**
+ * Initialise generic I2C EEPROM device
+ *
+ * @v i2cdev		I2C device
+ */
+static inline __always_inline void
+init_i2c_eeprom ( struct i2c_device *i2cdev, unsigned int dev_addr ) {
+	i2cdev->dev_addr = dev_addr;
+	i2cdev->dev_addr_len = 1;
+	i2cdev->word_addr_len = 1;
+}
+
+/**
+ * Initialise Atmel AT24C11
+ *
+ * @v i2cdev		I2C device
+ */
+static inline __always_inline void
+init_at24c11 ( struct i2c_device *i2cdev ) {
+	/* This chip has no device address; it must be the only chip
+	 * on the bus.  The word address is contained entirely within
+	 * the device address field.
+	 */
+	i2cdev->dev_addr = 0;
+	i2cdev->dev_addr_len = 1;
+	i2cdev->word_addr_len = 0;
+}
 
 #endif /* _GPXE_I2C_H */

@@ -19,6 +19,7 @@
 #include <stddef.h>
 #include <stdint.h>
 #include <errno.h>
+#include <string.h>
 #include <assert.h>
 #include <unistd.h>
 #include <gpxe/bitbash.h>
@@ -49,6 +50,7 @@ static void i2c_delay ( void ) {
  * @v state		New state of SCL
  */
 static void setscl ( struct bit_basher *basher, int state ) {
+	DBG2 ( "%c", ( state ? '/' : '\\' ) );
 	write_bit ( basher, I2C_BIT_SCL, state );
 	i2c_delay();
 }
@@ -60,6 +62,7 @@ static void setscl ( struct bit_basher *basher, int state ) {
  * @v state		New state of SDA
  */
 static void setsda ( struct bit_basher *basher, int state ) {
+	DBG2 ( "%c", ( state ? '1' : '0' ) );
 	write_bit ( basher, I2C_BIT_SDA, state );
 	i2c_delay();
 }
@@ -71,7 +74,10 @@ static void setsda ( struct bit_basher *basher, int state ) {
  * @ret state		State of SDA
  */
 static int getsda ( struct bit_basher *basher ) {
-	return read_bit ( basher, I2C_BIT_SDA );
+	int state;
+	state = read_bit ( basher, I2C_BIT_SDA );
+	DBG2 ( "%c", ( state ? '+' : '-' ) );
+	return state;
 }
 
 /**
@@ -137,15 +143,20 @@ static void i2c_stop ( struct bit_basher *basher ) {
  */
 static int i2c_send_byte ( struct bit_basher *basher, uint8_t byte ) {
 	int i;
-	
+	int ack;
+
 	/* Send byte */
+	DBG2 ( "[send %02x]", byte );
 	for ( i = 8 ; i ; i-- ) {
 		i2c_send_bit ( basher, byte & 0x80 );
 		byte <<= 1;
 	}
 
 	/* Check for acknowledgement from slave */
-	return ( i2c_recv_bit ( basher ) == 0 ? 0 : -EIO );
+	ack = ( i2c_recv_bit ( basher ) == 0 );
+	DBG2 ( "%s", ( ack ? "[acked]" : "[not acked]" ) );
+
+	return ( ack ? 0 : -EIO );
 }
 
 /**
@@ -157,19 +168,20 @@ static int i2c_send_byte ( struct bit_basher *basher, uint8_t byte ) {
  * Receives a byte via the I2C bus and sends NACK to the slave device.
  */
 static uint8_t i2c_recv_byte ( struct bit_basher *basher ) {
-	uint8_t value = 0;
+	uint8_t byte = 0;
 	int i;
 
 	/* Receive byte */
 	for ( i = 8 ; i ; i-- ) {
-		value <<= 1;
-		value |= ( i2c_recv_bit ( basher ) & 0x1 );
+		byte <<= 1;
+		byte |= ( i2c_recv_bit ( basher ) & 0x1 );
 	}
 
 	/* Send NACK */
 	i2c_send_bit ( basher, 1 );
 
-	return value;
+	DBG2 ( "[rcvd %02x]", byte );
+	return byte;
 }
 
 /**
@@ -177,34 +189,73 @@ static uint8_t i2c_recv_byte ( struct bit_basher *basher ) {
  *
  * @v basher		Bit-bashing interface
  * @v i2cdev		I2C device
+ * @v offset		Starting offset within the device
  * @v direction		I2C_READ or I2C_WRITE
  * @ret rc		Return status code
  */
 static int i2c_select ( struct bit_basher *basher, struct i2c_device *i2cdev,
-			unsigned int direction ) {
+			unsigned int offset, unsigned int direction ) {
 	unsigned int address;
+	int shift;
+	unsigned int byte;
 	int rc;
 
 	i2c_start ( basher );
 
-	/* First byte of the address */
-	address = i2cdev->address;
-	if ( i2cdev->tenbit ) {
-		address |= I2C_TENBIT_ADDRESS;
-		address >>= 8;
-	}
-	if ( ( rc = i2c_send_byte ( basher, 
-				    ( ( address << 1 ) | direction ) ) ) != 0 )
-		return rc;
+	/* Calculate address to appear on bus */
+	address = ( ( ( i2cdev->dev_addr |
+			( offset >> ( 8 * i2cdev->word_addr_len ) ) ) << 1 )
+		    | direction );
 
-	/* Second byte of the address (10-bit addresses only) */
-	if ( i2cdev->tenbit ) {
-		if ( ( rc = i2c_send_byte ( basher,
-					    ( i2cdev->address & 0xff ) ) ) !=0)
+	/* Send address a byte at a time */
+	for ( shift = ( 8 * ( i2cdev->dev_addr_len - 1 ) ) ;
+	      shift >= 0 ; shift -= 8 ) {
+		byte = ( ( address >> shift ) & 0xff );
+		if ( ( rc = i2c_send_byte ( basher, byte ) ) != 0 )
 			return rc;
 	}
 
 	return 0;
+}
+
+/**
+ * Reset I2C bus
+ *
+ * @v basher		Bit-bashing interface
+ * @ret rc		Return status code
+ *
+ * i2c devices often don't have a reset line, so even a reboot or
+ * system power cycle is sometimes not enough to bring them back to a
+ * known state.
+ */
+static int i2c_reset ( struct bit_basher *basher ) {
+	unsigned int i;
+	int sda;
+
+	/* Clock through several cycles, waiting for an opportunity to
+	 * pull SDA low while SCL is high (which creates a start
+	 * condition).
+	 */
+	setscl ( basher, 0 );
+	setsda ( basher, 1 );
+	for ( i = 0 ; i < I2C_RESET_MAX_CYCLES ; i++ ) {
+		setscl ( basher, 1 );
+		sda = getsda ( basher );
+		if ( sda ) {
+			/* Now that the device will see a start, issue it */
+			i2c_start ( basher );
+			/* Stop the bus to leave it in a known good state */
+			i2c_stop ( basher );
+			DBGC ( basher, "I2CBIT %p reset after %d attempts\n",
+			       basher, ( i + 1 ) );
+			return 0;
+		}
+		setscl ( basher, 0 );
+	}
+
+	DBGC ( basher, "I2CBIT %p could not reset after %d attempts\n",
+	       basher, i );
+	return -ETIMEDOUT;
 }
 
 /**
@@ -228,12 +279,14 @@ static int i2c_bit_read ( struct i2c_interface *i2c,
 	struct bit_basher *basher = &i2cbit->basher;
 	int rc = 0;
 
-	DBG ( "Reading from I2C device %x: ", i2cdev->address );
+	DBGC ( basher, "I2CBIT %p reading from device %x: ",
+	       basher, i2cdev->dev_addr );
 
-	while ( 1 ) {
+	for ( ; ; data++, offset++ ) {
 
 		/* Select device for writing */
-		if ( ( rc = i2c_select ( basher, i2cdev, I2C_WRITE ) ) != 0 )
+		if ( ( rc = i2c_select ( basher, i2cdev, offset,
+					 I2C_WRITE ) ) != 0 )
 			break;
 
 		/* Abort at end of data */
@@ -241,19 +294,20 @@ static int i2c_bit_read ( struct i2c_interface *i2c,
 			break;
 
 		/* Select offset */
-		if ( ( rc = i2c_send_byte ( basher, offset++ ) ) != 0 )
+		if ( ( rc = i2c_send_byte ( basher, offset ) ) != 0 )
 			break;
 		
 		/* Select device for reading */
-		if ( ( rc = i2c_select ( basher, i2cdev, I2C_READ ) ) != 0 )
+		if ( ( rc = i2c_select ( basher, i2cdev, offset,
+					 I2C_READ ) ) != 0 )
 			break;
 
 		/* Read byte */
-		*data++ = i2c_recv_byte ( basher );
-		DBG ( "%02x ", *(data - 1) );
+		*data = i2c_recv_byte ( basher );
+		DBGC ( basher, "%02x ", *data );
 	}
 	
-	DBG ( "%s\n", ( rc ? "failed" : "" ) );
+	DBGC ( basher, "%s\n", ( rc ? "failed" : "" ) );
 	i2c_stop ( basher );
 	return rc;
 }
@@ -279,12 +333,14 @@ static int i2c_bit_write ( struct i2c_interface *i2c,
 	struct bit_basher *basher = &i2cbit->basher;
 	int rc = 0;
 
-	DBG ( "Writing to I2C device %x: ", i2cdev->address );
+	DBGC ( basher, "I2CBIT %p writing to device %x: ",
+	       basher, i2cdev->dev_addr );
 
-	while ( 1 ) {
+	for ( ; ; data++, offset++ ) {
 
 		/* Select device for writing */
-		if ( ( rc = i2c_select ( basher, i2cdev, I2C_WRITE ) ) != 0 )
+		if ( ( rc = i2c_select ( basher, i2cdev, offset,
+					 I2C_WRITE ) ) != 0 )
 			break;
 		
 		/* Abort at end of data */
@@ -292,16 +348,16 @@ static int i2c_bit_write ( struct i2c_interface *i2c,
 			break;
 
 		/* Select offset */
-		if ( ( rc = i2c_send_byte ( basher, offset++ ) ) != 0 )
+		if ( ( rc = i2c_send_byte ( basher, offset ) ) != 0 )
 			break;
 		
 		/* Write data to device */
-		DBG ( "%02x ", *data );
-		if ( ( rc = i2c_send_byte ( basher, *data++ ) ) != 0 )
+		DBGC ( basher, "%02x ", *data );
+		if ( ( rc = i2c_send_byte ( basher, *data ) ) != 0 )
 			break;
 	}
 	
-	DBG ( "%s\n", ( rc ? "failed" : "" ) );
+	DBGC ( basher, "%s\n", ( rc ? "failed" : "" ) );
 	i2c_stop ( basher );
 	return rc;
 }
@@ -310,13 +366,26 @@ static int i2c_bit_write ( struct i2c_interface *i2c,
  * Initialise I2C bit-bashing interface
  *
  * @v i2cbit		I2C bit-bashing interface
+ * @v bash_op		Bit-basher operations
  */
-void init_i2c_bit_basher ( struct i2c_bit_basher *i2cbit ) {
+int init_i2c_bit_basher ( struct i2c_bit_basher *i2cbit,
+			  struct bit_basher_operations *bash_op ) {
 	struct bit_basher *basher = &i2cbit->basher;
-	
+	int rc;
+
+	/* Initialise data structures */
+	basher->op = bash_op;
 	assert ( basher->op->read != NULL );
 	assert ( basher->op->write != NULL );
 	i2cbit->i2c.read = i2c_bit_read;
 	i2cbit->i2c.write = i2c_bit_write;
-	i2c_stop ( basher );
+
+	/* Reset I2C bus */
+	if ( ( rc = i2c_reset ( basher ) ) != 0 ) {
+		DBGC ( basher, "I2CBIT %p could not reset I2C bus: %s\n",
+		       basher, strerror ( rc ) );
+		return rc;
+	}
+
+	return 0;
 }
