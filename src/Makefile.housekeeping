@@ -112,7 +112,8 @@ oldgas :
 # default, even when -ffreestanding is specified.  We therefore need
 # to disable -fstack-protector if the compiler supports it.
 #
-SP_TEST = $(CC) -fno-stack-protector -x c -E - < /dev/null >/dev/null 2>&1
+SP_TEST = $(CC) -fno-stack-protector -x c -c /dev/null \
+		-o /dev/null >/dev/null 2>&1
 SP_FLAGS := $(shell $(SP_TEST) && $(ECHO) '-fno-stack-protector')
 CFLAGS	+= $(SP_FLAGS)
 
