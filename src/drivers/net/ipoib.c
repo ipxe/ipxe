@@ -278,13 +278,21 @@ static void ipoib_destroy_qset ( struct ipoib_device *ipoib,
  *
  * @v ipoib		IPoIB device
  * @v qset		Queue set
+ * @v num_cqes		Number of completion queue entries
+ * @v num_send_wqes	Number of send work queue entries
+ * @v complete_send	Send completion handler
+ * @v num_recv_wqes	Number of receive work queue entries
+ * @v complete_recv	Receive completion handler
+ * @v qkey		Queue key
  * @ret rc		Return status code
  */
 static int ipoib_create_qset ( struct ipoib_device *ipoib,
 			       struct ipoib_queue_set *qset,
 			       unsigned int num_cqes,
 			       unsigned int num_send_wqes,
+			       ib_completer_t complete_send,
 			       unsigned int num_recv_wqes,
+			       ib_completer_t complete_recv,
 			       unsigned long qkey ) {
 	struct ib_device *ibdev = ipoib->ibdev;
 	int rc;
@@ -297,7 +305,8 @@ static int ipoib_create_qset ( struct ipoib_device *ipoib,
 	qset->recv_max_fill = num_recv_wqes;
 
 	/* Allocate completion queue */
-	qset->cq = ib_create_cq ( ibdev, num_cqes );
+	qset->cq = ib_create_cq ( ibdev, num_cqes, complete_send,
+				  complete_recv );
 	if ( ! qset->cq ) {
 		DBGC ( ipoib, "IPoIB %p could not allocate completion queue\n",
 		       ipoib );
@@ -759,10 +768,8 @@ static void ipoib_poll ( struct net_device *netdev ) {
 	struct ipoib_device *ipoib = netdev->priv;
 	struct ib_device *ibdev = ipoib->ibdev;
 
-	ib_poll_cq ( ibdev, ipoib->meta.cq, ipoib_meta_complete_send,
-		     ipoib_meta_complete_recv );
-	ib_poll_cq ( ibdev, ipoib->data.cq, ipoib_data_complete_send,
-		     ipoib_data_complete_recv );
+	ib_poll_cq ( ibdev, ipoib->meta.cq );
+	ib_poll_cq ( ibdev, ipoib->data.cq );
 	ipoib_refill_recv ( ipoib, &ipoib->meta );
 	ipoib_refill_recv ( ipoib, &ipoib->data );
 }
@@ -847,7 +854,9 @@ static int ipoib_open ( struct net_device *netdev ) {
 	if ( ( rc = ipoib_create_qset ( ipoib, &ipoib->meta,
 					IPOIB_META_NUM_CQES,
 					IPOIB_META_NUM_SEND_WQES,
+					ipoib_meta_complete_send,
 					IPOIB_META_NUM_RECV_WQES,
+					ipoib_meta_complete_recv,
 					IB_GLOBAL_QKEY ) ) != 0 ) {
 		DBGC ( ipoib, "IPoIB %p could not allocate metadata QP: %s\n",
 		       ipoib, strerror ( rc ) );
@@ -858,7 +867,9 @@ static int ipoib_open ( struct net_device *netdev ) {
 	if ( ( rc = ipoib_create_qset ( ipoib, &ipoib->data,
 					IPOIB_DATA_NUM_CQES,
 					IPOIB_DATA_NUM_SEND_WQES,
+					ipoib_data_complete_send,
 					IPOIB_DATA_NUM_RECV_WQES,
+					ipoib_data_complete_recv,
 					IB_GLOBAL_QKEY ) ) != 0 ) {
 		DBGC ( ipoib, "IPoIB %p could not allocate data QP: %s\n",
 		       ipoib, strerror ( rc ) );

@@ -1106,15 +1106,11 @@ static int arbel_post_recv ( struct ib_device *ibdev,
  * @v ibdev		Infiniband device
  * @v cq		Completion queue
  * @v cqe		Hardware completion queue entry
- * @v complete_send	Send completion handler
- * @v complete_recv	Receive completion handler
  * @ret rc		Return status code
  */
 static int arbel_complete ( struct ib_device *ibdev,
 			    struct ib_completion_queue *cq,
-			    union arbelprm_completion_entry *cqe,
-			    ib_completer_t complete_send,
-			    ib_completer_t complete_recv ) {
+			    union arbelprm_completion_entry *cqe ) {
 	struct arbel *arbel = ib_get_drvdata ( ibdev );
 	struct ib_completion completion;
 	struct ib_work_queue *wq;
@@ -1124,7 +1120,6 @@ static int arbel_complete ( struct ib_device *ibdev,
 	struct arbel_recv_work_queue *arbel_recv_wq;
 	struct arbelprm_recv_wqe *recv_wqe;
 	struct io_buffer *iobuf;
-	ib_completer_t complete;
 	unsigned int opcode;
 	unsigned long qpn;
 	int is_send;
@@ -1201,8 +1196,11 @@ static int arbel_complete ( struct ib_device *ibdev,
 	}
 
 	/* Pass off to caller's completion handler */
-	complete = ( is_send ? complete_send : complete_recv );
-	complete ( ibdev, qp, &completion, iobuf );
+	if ( is_send ) {
+		ib_complete_send ( ibdev, qp, &completion, iobuf );
+	} else {
+		ib_complete_recv ( ibdev, qp, &completion, iobuf );
+	}
 
 	return rc;
 }			     
@@ -1212,13 +1210,9 @@ static int arbel_complete ( struct ib_device *ibdev,
  *
  * @v ibdev		Infiniband device
  * @v cq		Completion queue
- * @v complete_send	Send completion handler
- * @v complete_recv	Receive completion handler
  */
 static void arbel_poll_cq ( struct ib_device *ibdev,
-			    struct ib_completion_queue *cq,
-			    ib_completer_t complete_send,
-			    ib_completer_t complete_recv ) {
+			    struct ib_completion_queue *cq ) {
 	struct arbel *arbel = ib_get_drvdata ( ibdev );
 	struct arbel_completion_queue *arbel_cq = ib_cq_get_drvdata ( cq );
 	struct arbelprm_cq_ci_db_record *ci_db_rec;
@@ -1236,8 +1230,7 @@ static void arbel_poll_cq ( struct ib_device *ibdev,
 		}
 
 		/* Handle completion */
-		if ( ( rc = arbel_complete ( ibdev, cq, cqe, complete_send,
-					     complete_recv ) ) != 0 ) {
+		if ( ( rc = arbel_complete ( ibdev, cq, cqe ) ) != 0 ) {
 			DBGC ( arbel, "Arbel %p failed to complete: %s\n",
 			       arbel, strerror ( rc ) );
 			DBGC_HD ( arbel, cqe, sizeof ( *cqe ) );

@@ -46,10 +46,13 @@ struct list_head ib_devices = LIST_HEAD_INIT ( ib_devices );
  *
  * @v ibdev		Infiniband device
  * @v num_cqes		Number of completion queue entries
+ * @v complete_send	Send completion handler
+ * @v complete_recv	Receive completion handler
  * @ret cq		New completion queue
  */
-struct ib_completion_queue * ib_create_cq ( struct ib_device *ibdev,
-					    unsigned int num_cqes ) {
+struct ib_completion_queue *
+ib_create_cq ( struct ib_device *ibdev, unsigned int num_cqes,
+	       ib_completer_t complete_send, ib_completer_t complete_recv ) {
 	struct ib_completion_queue *cq;
 	int rc;
 
@@ -61,6 +64,8 @@ struct ib_completion_queue * ib_create_cq ( struct ib_device *ibdev,
 		return NULL;
 	cq->num_cqes = num_cqes;
 	INIT_LIST_HEAD ( &cq->work_queues );
+	cq->complete_send = complete_send;
+	cq->complete_recv = complete_recv;
 
 	/* Perform device-specific initialisation and get CQN */
 	if ( ( rc = ibdev->op->create_cq ( ibdev, cq ) ) != 0 ) {
@@ -190,11 +195,33 @@ int ib_modify_qp ( struct ib_device *ibdev, struct ib_queue_pair *qp,
  * @v qp		Queue pair
  */
 void ib_destroy_qp ( struct ib_device *ibdev, struct ib_queue_pair *qp ) {
+	struct ib_completion completion = {
+		.syndrome = IB_SYN_LOCAL_QP,
+	};
+	struct io_buffer *iobuf;
+	unsigned int i;
+
 	DBGC ( ibdev, "IBDEV %p destroying QPN %#lx\n",
 	       ibdev, qp->qpn );
+
+	/* Perform device-specific destruction */
 	ibdev->op->destroy_qp ( ibdev, qp );
+
+	/* Complete any remaining I/O buffers with errors */
+	for ( i = 0 ; i < qp->send.num_wqes ; i++ ) {
+		if ( ( iobuf = qp->send.iobufs[i] ) != NULL )
+			ib_complete_send ( ibdev, qp, &completion, iobuf );
+	}
+	for ( i = 0 ; i < qp->recv.num_wqes ; i++ ) {
+		if ( ( iobuf = qp->recv.iobufs[i] ) != NULL )
+			ib_complete_recv ( ibdev, qp, &completion, iobuf );
+	}
+
+	/* Remove work queues from completion queue */
 	list_del ( &qp->send.list );
 	list_del ( &qp->recv.list );
+
+	/* Free QP */
 	free ( qp );
 }
 

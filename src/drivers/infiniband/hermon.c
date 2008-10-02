@@ -1101,22 +1101,17 @@ static int hermon_post_recv ( struct ib_device *ibdev,
  * @v ibdev		Infiniband device
  * @v cq		Completion queue
  * @v cqe		Hardware completion queue entry
- * @v complete_send	Send completion handler
- * @v complete_recv	Receive completion handler
  * @ret rc		Return status code
  */
 static int hermon_complete ( struct ib_device *ibdev,
 			     struct ib_completion_queue *cq,
-			     union hermonprm_completion_entry *cqe,
-			     ib_completer_t complete_send,
-			     ib_completer_t complete_recv ) {
+			     union hermonprm_completion_entry *cqe ) {
 	struct hermon *hermon = ib_get_drvdata ( ibdev );
 	struct ib_completion completion;
 	struct ib_work_queue *wq;
 	struct ib_queue_pair *qp;
 	struct hermon_queue_pair *hermon_qp;
 	struct io_buffer *iobuf;
-	ib_completer_t complete;
 	unsigned int opcode;
 	unsigned long qpn;
 	int is_send;
@@ -1172,8 +1167,11 @@ static int hermon_complete ( struct ib_device *ibdev,
 	}
 
 	/* Pass off to caller's completion handler */
-	complete = ( is_send ? complete_send : complete_recv );
-	complete ( ibdev, qp, &completion, iobuf );
+	if ( is_send ) {
+		ib_complete_send ( ibdev, qp, &completion, iobuf );
+	} else {
+		ib_complete_recv ( ibdev, qp, &completion, iobuf );
+	}
 
 	return rc;
 }
@@ -1183,13 +1181,9 @@ static int hermon_complete ( struct ib_device *ibdev,
  *
  * @v ibdev		Infiniband device
  * @v cq		Completion queue
- * @v complete_send	Send completion handler
- * @v complete_recv	Receive completion handler
  */
 static void hermon_poll_cq ( struct ib_device *ibdev,
-			     struct ib_completion_queue *cq,
-			     ib_completer_t complete_send,
-			     ib_completer_t complete_recv ) {
+			     struct ib_completion_queue *cq ) {
 	struct hermon *hermon = ib_get_drvdata ( ibdev );
 	struct hermon_completion_queue *hermon_cq = ib_cq_get_drvdata ( cq );
 	union hermonprm_completion_entry *cqe;
@@ -1209,8 +1203,7 @@ static void hermon_poll_cq ( struct ib_device *ibdev,
 		DBGCP_HD ( hermon, cqe, sizeof ( *cqe ) );
 
 		/* Handle completion */
-		if ( ( rc = hermon_complete ( ibdev, cq, cqe, complete_send,
-					      complete_recv ) ) != 0 ) {
+		if ( ( rc = hermon_complete ( ibdev, cq, cqe ) ) != 0 ) {
 			DBGC ( hermon, "Hermon %p failed to complete: %s\n",
 			       hermon, strerror ( rc ) );
 			DBGC_HD ( hermon, cqe, sizeof ( *cqe ) );

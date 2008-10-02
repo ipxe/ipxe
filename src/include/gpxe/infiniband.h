@@ -101,6 +101,37 @@ enum ib_queue_pair_mods {
 	IB_MODIFY_QKEY = 0x0001,
 };
 
+/** An Infiniband completion */
+struct ib_completion {
+	/** Syndrome
+	 *
+	 * If non-zero, then the completion is in error.
+	 */
+	unsigned int syndrome;
+	/** Length */
+	size_t len;
+};
+
+/** Infiniband completion syndromes */
+enum ib_syndrome {
+	IB_SYN_NONE = 0,
+	IB_SYN_LOCAL_LENGTH = 1,
+	IB_SYN_LOCAL_QP = 2,
+	IB_SYN_LOCAL_PROT = 4,
+};
+
+/** An Infiniband completion handler
+ *
+ * @v ibdev		Infiniband device
+ * @v qp		Queue pair
+ * @v completion	Completion
+ * @v iobuf		I/O buffer
+ */
+typedef void ( * ib_completer_t ) ( struct ib_device *ibdev,
+				    struct ib_queue_pair *qp,
+				    struct ib_completion *completion,
+				    struct io_buffer *iobuf );
+
 /** An Infiniband Completion Queue */
 struct ib_completion_queue {
 	/** Completion queue number */
@@ -117,32 +148,13 @@ struct ib_completion_queue {
 	unsigned long next_idx;
 	/** List of work queues completing to this queue */
 	struct list_head work_queues;
+	/** Send completion handler */
+	ib_completer_t complete_send;
+	/** Receive completion handler */
+	ib_completer_t complete_recv;
 	/** Driver private data */
 	void *drv_priv;
 };
-
-/** An Infiniband completion */
-struct ib_completion {
-	/** Syndrome
-	 *
-	 * If non-zero, then the completion is in error.
-	 */
-	unsigned int syndrome;
-	/** Length */
-	size_t len;
-};
-
-/** An Infiniband completion handler
- *
- * @v ibdev		Infiniband device
- * @v qp		Queue pair
- * @v completion	Completion
- * @v iobuf		I/O buffer
- */
-typedef void ( * ib_completer_t ) ( struct ib_device *ibdev,
-				    struct ib_queue_pair *qp,
-				    struct ib_completion *completion,
-				    struct io_buffer *iobuf );
 
 /** An Infiniband Address Vector */
 struct ib_address_vector {
@@ -246,15 +258,12 @@ struct ib_device_operations {
 	 *
 	 * @v ibdev		Infiniband device
 	 * @v cq		Completion queue
-	 * @v complete_send	Send completion handler
-	 * @v complete_recv	Receive completion handler
 	 *
-	 * The completion handler takes ownership of the I/O buffer.
+	 * The relevant completion handler (specified at completion
+	 * queue creation time) takes ownership of the I/O buffer.
 	 */
 	void ( * poll_cq ) ( struct ib_device *ibdev,
-			     struct ib_completion_queue *cq,
-			     ib_completer_t complete_send,
-			     ib_completer_t complete_recv );
+			     struct ib_completion_queue *cq );
 	/**
 	 * Poll event queue
 	 *
@@ -331,8 +340,9 @@ struct ib_device {
 	void *owner_priv;
 };
 
-extern struct ib_completion_queue * ib_create_cq ( struct ib_device *ibdev,
-						   unsigned int num_cqes );
+extern struct ib_completion_queue *
+ib_create_cq ( struct ib_device *ibdev, unsigned int num_cqes,
+	       ib_completer_t complete_send, ib_completer_t complete_recv );
 extern void ib_destroy_cq ( struct ib_device *ibdev,
 			    struct ib_completion_queue *cq );
 extern struct ib_queue_pair *
@@ -380,17 +390,44 @@ ib_post_recv ( struct ib_device *ibdev, struct ib_queue_pair *qp,
 }
 
 /**
+ * Complete send work queue entry
+ *
+ * @v ibdev		Infiniband device
+ * @v qp		Queue pair
+ * @v completion	Completion
+ * @v iobuf		I/O buffer
+ */
+static inline __attribute__ (( always_inline )) void
+ib_complete_send ( struct ib_device *ibdev, struct ib_queue_pair *qp,
+		   struct ib_completion *completion,
+		   struct io_buffer *iobuf ) {
+	return qp->send.cq->complete_send ( ibdev, qp, completion, iobuf );
+}
+
+/**
+ * Complete receive work queue entry
+ *
+ * @v ibdev		Infiniband device
+ * @v qp		Queue pair
+ * @v completion	Completion
+ * @v iobuf		I/O buffer
+ */
+static inline __attribute__ (( always_inline )) void
+ib_complete_recv ( struct ib_device *ibdev, struct ib_queue_pair *qp,
+		   struct ib_completion *completion,
+		   struct io_buffer *iobuf ) {
+	return qp->recv.cq->complete_recv ( ibdev, qp, completion, iobuf );
+}
+
+/**
  * Poll completion queue
  *
  * @v ibdev		Infiniband device
  * @v cq		Completion queue
- * @v complete_send	Send completion handler
- * @v complete_recv	Receive completion handler
  */
 static inline __attribute__ (( always_inline )) void
-ib_poll_cq ( struct ib_device *ibdev, struct ib_completion_queue *cq,
-	     ib_completer_t complete_send, ib_completer_t complete_recv ) {
-	ibdev->op->poll_cq ( ibdev, cq, complete_send, complete_recv );
+ib_poll_cq ( struct ib_device *ibdev, struct ib_completion_queue *cq ) {
+	ibdev->op->poll_cq ( ibdev, cq );
 }
 
 /**
