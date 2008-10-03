@@ -66,6 +66,8 @@ struct ib_work_queue {
 	struct list_head list;
 	/** Number of work queue entries */
 	unsigned int num_wqes;
+	/** Number of occupied work queue entries */
+	unsigned int fill;
 	/** Next work queue entry index
 	 *
 	 * This is the index of the next entry to be filled (i.e. the
@@ -355,69 +357,23 @@ extern void ib_destroy_qp ( struct ib_device *ibdev,
 			    struct ib_queue_pair *qp );
 extern struct ib_work_queue * ib_find_wq ( struct ib_completion_queue *cq,
 					   unsigned long qpn, int is_send );
+extern int ib_post_send ( struct ib_device *ibdev, struct ib_queue_pair *qp,
+			  struct ib_address_vector *av,
+			  struct io_buffer *iobuf );
+extern int ib_post_recv ( struct ib_device *ibdev, struct ib_queue_pair *qp,
+			  struct io_buffer *iobuf );
+extern void ib_complete_send ( struct ib_device *ibdev,
+			       struct ib_queue_pair *qp,
+			       struct ib_completion *completion,
+			       struct io_buffer *iobuf );
+extern void ib_complete_recv ( struct ib_device *ibdev,
+			       struct ib_queue_pair *qp,
+			       struct ib_completion *completion,
+			       struct io_buffer *iobuf );
 extern struct ib_device * alloc_ibdev ( size_t priv_size );
 extern int register_ibdev ( struct ib_device *ibdev );
 extern void unregister_ibdev ( struct ib_device *ibdev );
 extern void ib_link_state_changed ( struct ib_device *ibdev );
-
-/**
- * Post send work queue entry
- *
- * @v ibdev		Infiniband device
- * @v qp		Queue pair
- * @v av		Address vector
- * @v iobuf		I/O buffer
- * @ret rc		Return status code
- */
-static inline __attribute__ (( always_inline )) int
-ib_post_send ( struct ib_device *ibdev, struct ib_queue_pair *qp,
-	       struct ib_address_vector *av, struct io_buffer *iobuf ) {
-	return ibdev->op->post_send ( ibdev, qp, av, iobuf );
-}
-
-/**
- * Post receive work queue entry
- *
- * @v ibdev		Infiniband device
- * @v qp		Queue pair
- * @v iobuf		I/O buffer
- * @ret rc		Return status code
- */
-static inline __attribute__ (( always_inline )) int
-ib_post_recv ( struct ib_device *ibdev, struct ib_queue_pair *qp,
-	       struct io_buffer *iobuf ) {
-	return ibdev->op->post_recv ( ibdev, qp, iobuf );
-}
-
-/**
- * Complete send work queue entry
- *
- * @v ibdev		Infiniband device
- * @v qp		Queue pair
- * @v completion	Completion
- * @v iobuf		I/O buffer
- */
-static inline __attribute__ (( always_inline )) void
-ib_complete_send ( struct ib_device *ibdev, struct ib_queue_pair *qp,
-		   struct ib_completion *completion,
-		   struct io_buffer *iobuf ) {
-	return qp->send.cq->complete_send ( ibdev, qp, completion, iobuf );
-}
-
-/**
- * Complete receive work queue entry
- *
- * @v ibdev		Infiniband device
- * @v qp		Queue pair
- * @v completion	Completion
- * @v iobuf		I/O buffer
- */
-static inline __attribute__ (( always_inline )) void
-ib_complete_recv ( struct ib_device *ibdev, struct ib_queue_pair *qp,
-		   struct ib_completion *completion,
-		   struct io_buffer *iobuf ) {
-	return qp->recv.cq->complete_recv ( ibdev, qp, completion, iobuf );
-}
 
 /**
  * Poll completion queue

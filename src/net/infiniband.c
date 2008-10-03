@@ -244,6 +244,97 @@ struct ib_work_queue * ib_find_wq ( struct ib_completion_queue *cq,
 	return NULL;
 }
 
+/**
+ * Post send work queue entry
+ *
+ * @v ibdev		Infiniband device
+ * @v qp		Queue pair
+ * @v av		Address vector
+ * @v iobuf		I/O buffer
+ * @ret rc		Return status code
+ */
+int ib_post_send ( struct ib_device *ibdev, struct ib_queue_pair *qp,
+		   struct ib_address_vector *av, struct io_buffer *iobuf ) {
+	int rc;
+
+	/* Check queue fill level */
+	if ( qp->send.fill >= qp->send.num_wqes ) {
+		DBGC ( ibdev, "IBDEV %p QPN %#lx send queue full\n",
+		       ibdev, qp->qpn );
+		return -ENOBUFS;
+	}
+
+	/* Post to hardware */
+	if ( ( rc = ibdev->op->post_send ( ibdev, qp, av, iobuf ) ) != 0 ) {
+		DBGC ( ibdev, "IBDEV %p QPN %#lx could not post send WQE: "
+		       "%s\n", ibdev, qp->qpn, strerror ( rc ) );
+		return rc;
+	}
+
+	qp->send.fill++;
+	return 0;
+}
+
+/**
+ * Post receive work queue entry
+ *
+ * @v ibdev		Infiniband device
+ * @v qp		Queue pair
+ * @v iobuf		I/O buffer
+ * @ret rc		Return status code
+ */
+int ib_post_recv ( struct ib_device *ibdev, struct ib_queue_pair *qp,
+		   struct io_buffer *iobuf ) {
+	int rc;
+
+	/* Check queue fill level */
+	if ( qp->recv.fill >= qp->recv.num_wqes ) {
+		DBGC ( ibdev, "IBDEV %p QPN %#lx receive queue full\n",
+		       ibdev, qp->qpn );
+		return -ENOBUFS;
+	}
+
+	/* Post to hardware */
+	if ( ( rc = ibdev->op->post_recv ( ibdev, qp, iobuf ) ) != 0 ) {
+		DBGC ( ibdev, "IBDEV %p QPN %#lx could not post receive WQE: "
+		       "%s\n", ibdev, qp->qpn, strerror ( rc ) );
+		return rc;
+	}
+
+	qp->recv.fill++;
+	return 0;
+}
+
+/**
+ * Complete send work queue entry
+ *
+ * @v ibdev		Infiniband device
+ * @v qp		Queue pair
+ * @v completion	Completion
+ * @v iobuf		I/O buffer
+ */
+void ib_complete_send ( struct ib_device *ibdev, struct ib_queue_pair *qp,
+			struct ib_completion *completion,
+			struct io_buffer *iobuf ) {
+	qp->send.cq->complete_send ( ibdev, qp, completion, iobuf );
+	qp->send.fill--;
+}
+
+/**
+ * Complete receive work queue entry
+ *
+ * @v ibdev		Infiniband device
+ * @v qp		Queue pair
+ * @v completion	Completion
+ * @v iobuf		I/O buffer
+ */
+void ib_complete_recv ( struct ib_device *ibdev, struct ib_queue_pair *qp,
+			struct ib_completion *completion,
+			struct io_buffer *iobuf ) {
+	qp->recv.cq->complete_recv ( ibdev, qp, completion, iobuf );
+	qp->recv.fill--;
+}
+
 /***************************************************************************
  *
  * Management datagram operations
