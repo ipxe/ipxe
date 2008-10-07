@@ -1,3 +1,59 @@
+# Force i386-only instructions
+#
+CFLAGS		+= -march=i386
+
+# Code size reduction.
+#
+CFLAGS		+= -fstrength-reduce -fomit-frame-pointer
+
+# Code size reduction.  gcc3 needs a different syntax to gcc2 if you
+# want to avoid spurious warnings.
+#
+GCC_VERSION	:= $(subst ., ,$(shell $(CC) -dumpversion))
+GCC_MAJOR	:= $(firstword $(GCC_VERSION))
+ifeq ($(GCC_MAJOR),2)
+CFLAGS		+= -malign-jumps=1 -malign-loops=1 -malign-functions=1
+else
+CFLAGS		+= -falign-jumps=1 -falign-loops=1 -falign-functions=1
+endif
+
+# Code size reduction.  This is almost always a win.  The kernel uses it, too.
+#
+CFLAGS		+= -mpreferred-stack-boundary=2
+
+# Code size reduction.  Use regparm for all functions - C functions
+# called from assembly (or vice versa) need __cdecl now
+#
+CFLAGS		+= -mregparm=3
+
+# Code size reduction.  Use -mrtd (same __cdecl requirements as above)
+CFLAGS		+= -mrtd
+
+# Code size reduction.  This is the logical complement to -mregparm=3.
+# It doesn't currently buy us anything, but if anything ever tries to
+# return small structures, let's be prepared
+#
+CFLAGS		+= -freg-struct-return
+
+# Stop ld from complaining about our customised linker script
+#
+LDFLAGS		+= -N --no-check-sections
+
+# Force 32-bit code even on an x86-64 machine
+#
+CFLAGS		+= -m32
+ASFLAGS         += --32
+LDFLAGS         += -m elf_i386
+
+# EFI requires -fshort-wchar, and nothing else currently uses wchar_t
+#
+CFLAGS		+= -fshort-wchar
+
+# We need to undefine the default macro "i386" when compiling .S
+# files, otherwise ".arch i386" translates to ".arch 1"...
+#
+CFLAGS			+= -Ui386
+
 # Locations of utilities
 #
 ISOLINUX_BIN	= /usr/lib/syslinux/isolinux.bin
@@ -24,11 +80,6 @@ NON_AUTO_SRCS	+= arch/i386/core/wince_loader.c
 #
 OBJS_unnrv2b		= unnrv2b unnrv2b16
 CFLAGS_unnrv2b16	= -DCODE16
-
-# We need to undefine the default macro "i386" when compiling .S
-# files, otherwise ".arch i386" translates to ".arch 1"...
-#
-CFLAGS_S		+= -Ui386
 
 # The i386 linker script
 #

@@ -73,19 +73,6 @@ noargs : blib $(BIN)/NIC $(BIN)/gpxe.dsk $(BIN)/gpxe.iso $(BIN)/gpxe.usb $(BIN)/
 #
 ARCH		:= $(shell uname -m | sed -e 's,i[3456789]86,i386,')
 
-# handle x86_64 like i386, but set -m32 option for 32bit code only
-ifeq ($(ARCH),x86_64)
-ARCH		:= i386
-CFLAGS		+= -m32
-ASFLAGS         += --32
-LDFLAGS         += -m elf_i386
-endif
-
-# Drag in architecture-specific Config
-#
-MAKEDEPS	+= arch/$(ARCH)/Config
-include arch/$(ARCH)/Config
-
 # Common flags
 #
 CFLAGS		+= -I include -I arch/$(ARCH)/include -I . -DARCH=$(ARCH)
