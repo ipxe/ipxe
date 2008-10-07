@@ -234,14 +234,6 @@ endif
 
 ###############################################################################
 #
-# config/%.h files are generated from config.h using mkconfig.pl
-#
-config/%.h : config*.h
-	$(MKCONFIG) config.h
-CLEANUP	+= config/*.h
-
-###############################################################################
-#
 # Source file handling
 
 # SRCDIRS lists all directories containing source files.

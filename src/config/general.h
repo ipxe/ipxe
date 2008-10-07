@@ -1,15 +1,13 @@
-/*
- * This file defines the configuration for Etherboot.
+#ifndef CONFIG_GENERAL_H
+#define CONFIG_GENERAL_H
+
+/** @file
  *
- * The build system splits this file into several individual header
- * files of the form config/%.h, so that changing one option doesn't
- * necessitate a rebuild of every single object.  For this reason, it
- * is important to maintain the strict formatting in this file.
+ * General configuration
  *
  */
 
-/* @BEGIN general.h
- *
+/*
  * Console configuration
  *
  * These options specify the console types that Etherboot will use for
@@ -23,36 +21,7 @@
 #undef	CONSOLE_BTEXT		/* Who knows what this does? */
 #undef	CONSOLE_PC_KBD		/* Direct access to PC keyboard */
 
-/* @END general.h */
-
-/* @BEGIN serial.h
- *
- * Serial port configuration
- *
- * These options affect the operation of the serial console.  They
- * take effect only if the serial console is included using the
- * CONSOLE_SERIAL option.
- *
- */
-
-#define	COMCONSOLE	0x3f8		/* I/O port address */
-
-/* Keep settings from a previous user of the serial port (e.g. lilo or
- * LinuxBIOS), ignoring COMSPEED, COMDATA, COMPARITY and COMSTOP.
- */
-#undef	COMPRESERVE
-
-#ifndef COMPRESERVE
-#define	COMSPEED	115200		/* Baud rate */
-#define	COMDATA		8		/* Data bits */ 
-#define	COMPARITY	0		/* Parity: 0=None, 1=Odd, 2=Even */
-#define	COMSTOP		1		/* Stop bits */
-#endif
-
-/* @END serial.h */
-
-/* @BEGIN general.h
- *
+/*
  * Timer configuration
  *
  */
@@ -61,33 +30,14 @@
 #define BANNER_TIMEOUT	20	/* Tenths of a second for which the shell
 				   banner should appear */
 
-/* @END general.h */
-
-/* @BEGIN isa.h
- *
- * ISA probe address configuration
- *
- * You can override the list of addresses that will be probed by any
- * ISA drivers.
- *
- */
-#undef	ISA_PROBE_ADDRS		/* e.g. 0x200, 0x300 */
-#undef	ISA_PROBE_ONLY		/* Do not probe any other addresses */
-
-/* @END isa.h */
-
-/* @BEGIN general.h
- *
+/*
  * Network protocols
  *
  */
 
 #define	NET_PROTO_IPV4		/* IPv4 protocol */
 
-/* @END general.h */
-
-/* @BEGIN general.h
- *
+/*
  * Download protocols
  *
  */
@@ -101,10 +51,7 @@
 #undef	DOWNLOAD_PROTO_SLAM	/* Scalable Local Area Multicast */
 #undef	DOWNLOAD_PROTO_FSP	/* FSP? */
 
-/* @END general.h */
-
-/* @BEGIN general.h
- *
+/*
  * Name resolution modules
  *
  */
@@ -112,10 +59,7 @@
 #define	DNS_RESOLVER		/* DNS resolver */
 #undef	NMB_RESOLVER		/* NMB resolver */
 
-/* @END general.h */
-
-/* @BEGIN general.h
- *
+/*
  * Image types
  *
  * Etherboot supports various image formats.  Select whichever ones
@@ -133,10 +77,7 @@
 #define IMAGE_BZIMAGE		/* Linux bzImage image support */
 #define IMAGE_COMBOOT		/* SYSLINUX COMBOOT image support */
 
-/* @END general.h */ 
-
-/* @BEGIN general.h
- *
+/*
  * Command-line commands to include
  *
  */
@@ -149,10 +90,7 @@
 #define DHCP_CMD		/* DHCP management commands */
 #define SANBOOT_CMD		/* SAN boot commands */
 
-/* @END general.h */ 
-
-/* @BEGIN general.h
- *
+/*
  * Obscure configuration options
  *
  * You probably don't need to touch these.
@@ -170,6 +108,4 @@
 #undef	GDBUDP			/* Remote GDB debugging over UDP
 				 * (both may be set) */
 
-/* @END general.h */
-
-/* @TRYSOURCE config-local.h */
+#endif /* CONFIG_GENERAL_H */
