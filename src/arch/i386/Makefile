@@ -144,14 +144,3 @@ NON_AUTO_MEDIA		+= usb
 # output of "make"
 #
 MEDIA		+= $(NON_AUTO_MEDIA)
-
-# Shortcut to allow typing just
-#   make bin-kir/%
-# rather than
-#   make -f arch/i386/kir-Makefile bin-kir/%
-# for building a KEEP_IT_REAL flavour.
-#
-$(BIN)-kir/% : kir-target
-	$(MAKE) -f arch/i386/kir-Makefile $(MAKECMDGOALS)
-
-.PHONY : kir-target

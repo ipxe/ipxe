@@ -1,50 +1,10 @@
 # -*- makefile -*- : Force emacs to use Makefile mode
-
+#
 # This file contains various boring housekeeping functions that would
 # otherwise seriously clutter up the main Makefile.
 
-# Objects to be removed by "make clean"
+###############################################################################
 #
-CLEANUP	:= $(BIN)/*.* # *.* to avoid catching the "CVS" directory
-
-# Version number calculations 
-#
-VERSION_MAJOR	= 0
-VERSION_MINOR	= 9
-VERSION_PATCH	= 5
-EXTRAVERSION	= +
-MM_VERSION	= $(VERSION_MAJOR).$(VERSION_MINOR)
-VERSION		= $(MM_VERSION).$(VERSION_PATCH)$(EXTRAVERSION)
-CFLAGS		+= -DVERSION_MAJOR=$(VERSION_MAJOR) \
-		   -DVERSION_MINOR=$(VERSION_MINOR) \
-		   -DVERSION=\"$(VERSION)\"
-IDENT		= '$(@F) $(VERSION) (GPL) etherboot.org'
-version :
-	@$(ECHO) $(VERSION)
-
-configure : 
-	@$(ECHO) "No configuration needed."
-
-install :
-	@$(ECHO) "No installation required. Generated images will be placed in the" $(BIN) "directory."
-
-# Check for tools that can cause failed builds
-#
-.toolcheck : Makefile
-	@if $(CC) -v 2>&1 | grep -is 'gcc version 2\.96' > /dev/null; then \
-		$(ECHO) 'gcc 2.96 is unsuitable for compiling Etherboot'; \
-		$(ECHO) 'Use gcc 2.95 or gcc 3.x instead'; \
-		exit 1; \
-	fi
-	@if [ `perl -e 'use bytes; print chr(255)' | wc -c` = 2 ]; then \
-		$(ECHO) 'Your Perl version has a Unicode handling bug'; \
-		$(ECHO) 'Execute this command before compiling Etherboot:'; \
-		$(ECHO) 'export LANG=$${LANG%.UTF-8}'; \
-		exit 1; \
-	fi
-	@$(TOUCH) $@
-VERYCLEANUP	+= .toolcheck
-
 # Find a usable "echo -e" substitute.
 #
 TAB 			:= $(shell $(PRINTF) '\t')
@@ -86,20 +46,36 @@ else
 	@$(ECHO) "No usable \"echo -e\" substitute found"
 	@exit 1
 endif
+MAKEDEPS	+= .echocheck
 VERYCLEANUP	+= .echocheck
 
 echo :
 	@$(ECHO) "Using \"$(ECHO_E)\" for \"echo -e\""
 
-# Build verbosity
+###############################################################################
 #
-ifeq ($(V),1)
-Q = 
-QM = @\#
-else
-Q = @
-QM = @
-endif
+# Check for tools that can cause failed builds
+#
+.toolcheck :
+	@if $(CC) -v 2>&1 | grep -is 'gcc version 2\.96' > /dev/null; then \
+		$(ECHO) 'gcc 2.96 is unsuitable for compiling Etherboot'; \
+		$(ECHO) 'Use gcc 2.95 or gcc 3.x instead'; \
+		exit 1; \
+	fi
+	@if [ `perl -e 'use bytes; print chr(255)' | wc -c` = 2 ]; then \
+		$(ECHO) 'Your Perl version has a Unicode handling bug'; \
+		$(ECHO) 'Execute this command before compiling Etherboot:'; \
+		$(ECHO) 'export LANG=$${LANG%.UTF-8}'; \
+		exit 1; \
+	fi
+	@$(TOUCH) $@
+MAKEDEPS	+= .toolcheck
+VERYCLEANUP	+= .toolcheck
+
+###############################################################################
+#
+# Check for various tool workarounds
+#
 
 # Check for an old version of gas (binutils 2.9.1)
 #
@@ -117,14 +93,156 @@ SP_TEST = $(CC) -fno-stack-protector -x c -c /dev/null \
 SP_FLAGS := $(shell $(SP_TEST) && $(ECHO) '-fno-stack-protector')
 CFLAGS	+= $(SP_FLAGS)
 
-# compiler.h is needed for our linking and debugging system
+###############################################################################
 #
-CFLAGS	+= -include compiler.h
+# Build verbosity
+#
+ifeq ($(V),1)
+Q :=
+QM := @\#
+else
+Q := @
+QM := @
+endif
 
+###############################################################################
+#
+# Set BIN according to whatever was specified on the command line as
+# the build target.
+#
+
+# Determine how many different BIN directories are mentioned in the
+# make goals.
+#
+BIN_GOALS	:= $(filter bin/% bin-%,$(MAKECMDGOALS))
+BIN_GOAL_BINS	:= $(foreach BG,$(BIN_GOALS),$(firstword $(subst /, ,$(BG))))
+NUM_BINS	:= $(words $(sort $(BIN_GOAL_BINS)))
+
+ifeq ($(NUM_BINS),0)
+
+# No BIN directory was specified.  Set BIN to "bin" as a sensible
+# default.
+
+BIN		:= bin
+
+else # NUM_BINS == 0
+
+ifeq ($(NUM_BINS),1)
+
+# If exactly one BIN directory was specified, set BIN to match this
+# directory.
+#
+BIN		:= $(firstword $(BIN_GOAL_BINS))
+
+else # NUM_BINS == 1
+
+# More than one BIN directory was specified.  We cannot handle the
+# latter case within a single make invocation, so set up recursive
+# targets for each BIN directory.
+#
+# Leave $(BIN) undefined.  This has implications for any target that
+# depends on $(BIN); such targets should be made conditional upon the
+# existence of $(BIN).
+#
+$(BIN_GOALS) : % : BIN_RECURSE
+	$(Q)$(MAKE) --no-print-directory BIN=$(firstword $(subst /, ,$@)) $@
+.PHONY : BIN_RECURSE
+
+endif # NUM_BINS == 1
+endif # NUM_BINS == 0
+
+ifdef BIN
+
+# Create $(BIN) directory if it doesn't exist yet
+#
+ifeq ($(wildcard $(BIN)),)
+$(shell $(MKDIR) -p $(BIN))
+endif
+
+# Target to allow e.g. "make bin-efi arch"
+#
+$(BIN) :
+	@# Do nothing, silently
+.PHONY : $(BIN)
+
+# Remove everything in $(BIN) for a "make clean"
+#
+CLEANUP	+= $(BIN)/*.* # Avoid picking up directories
+
+endif # defined(BIN)
+
+# Determine whether or not we need to include the dependency files
+#
+NO_DEP_TARGETS	:= $(BIN) clean veryclean
+ifeq ($(MAKECMDGOALS),)
+NEED_DEPS	:= 1
+endif
+ifneq ($(strip $(filter-out $(NO_DEP_TARGETS),$(MAKECMDGOALS))),)
+NEED_DEPS	:= 1
+endif
+
+###############################################################################
+#
+# Select build architecture and platform based on $(BIN)
+#
+# BIN has the form bin[-[arch-]platform]
+
+ARCHS		:= $(patsubst arch/%,%,$(wildcard arch/*))
+PLATFORMS	:= $(patsubst config/defaults/%.h,%,\
+		     $(wildcard config/defaults/*.h))
+archs :
+	@$(ECHO) $(ARCHS)
+
+platforms :
+	@$(ECHO) $(PLATFORMS)
+
+ifdef BIN
+
+# Determine architecture portion of $(BIN), if present
+BIN_ARCH	:= $(strip $(foreach A,$(ARCHS),\
+			     $(patsubst bin-$(A)-%,$(A),\
+			       $(filter bin-$(A)-%,$(BIN)))))
+
+# Determine platform portion of $(BIN), if present
+ifeq ($(BIN_ARCH),)
+BIN_PLATFORM	:= $(patsubst bin-%,%,$(filter bin-%,$(BIN)))
+else
+BIN_PLATFORM	:= $(patsubst bin-$(BIN_ARCH)-%,%,$(BIN))
+endif
+
+# Determine build architecture
+DEFAULT_ARCH	:= i386
+ARCH		:= $(firstword $(BIN_ARCH) $(DEFAULT_ARCH))
+CFLAGS		+= -DARCH=$(ARCH)
+arch :
+	@$(ECHO) $(ARCH)
+.PHONY : arch
+
+# Determine build platform
+DEFAULT_PLATFORM := pcbios
+PLATFORM	:= $(firstword $(BIN_PLATFORM) $(DEFAULT_PLATFORM))
+CFLAGS		+= -DPLATFORM=$(PLATFORM)
+platform :
+	@$(ECHO) $(PLATFORM)
+
+endif # defined(BIN)
+
+# Include architecture-specific Makefile
+ifdef ARCH
+include arch/$(ARCH)/Makefile
+endif
+
+###############################################################################
+#
 # config/%.h files are generated from config.h using mkconfig.pl
+#
 config/%.h : config*.h
 	$(MKCONFIG) config.h
 CLEANUP	+= config/*.h
+
+###############################################################################
+#
+# Source file handling
 
 # SRCDIRS lists all directories containing source files.
 srcdirs :
@@ -145,6 +263,67 @@ AUTO_SRCS = $(filter-out $(NON_AUTO_SRCS),$(SRCS))
 autosrcs :
 	@$(ECHO) $(AUTO_SRCS)
 
+# Just about everything else in this section depends upon having
+# $(BIN) set
+
+ifdef BIN
+
+# Common flags
+#
+CFLAGS		+= -I include -I arch/$(ARCH)/include -I .
+CFLAGS		+= -Os -ffreestanding
+CFLAGS		+= -Wall -W
+CFLAGS		+= -g
+CFLAGS		+= $(EXTRA_CFLAGS)
+ASFLAGS		+= $(EXTRA_ASFLAGS)
+LDFLAGS		+= $(EXTRA_LDFLAGS)
+
+# Embedded image, if present
+#
+EMBEDDED_IMAGE	= /dev/null
+
+# Inhibit -Werror if NO_WERROR is specified on make command line
+#
+ifneq ($(NO_WERROR),1)
+CFLAGS		+= -Werror
+endif
+
+# compiler.h is needed for our linking and debugging system
+#
+CFLAGS		+= -include compiler.h
+
+# CFLAGS for specific object types
+#
+CFLAGS_c	+=
+CFLAGS_S 	+= -DASSEMBLY
+
+# Base object name of the current target
+#
+OBJECT		= $(firstword $(subst ., ,$(@F)))
+
+# CFLAGS for specific object files.  You can define
+# e.g. CFLAGS_rtl8139, and have those flags automatically used when
+# compiling bin/rtl8139.o.
+#
+OBJ_CFLAGS	= $(CFLAGS_$(OBJECT)) -DOBJECT=$(subst -,_,$(OBJECT))
+$(BIN)/%.flags :
+	@$(ECHO) $(OBJ_CFLAGS)
+
+# Rules for specific object types.
+#
+COMPILE_c	= $(CC) $(CFLAGS) $(CFLAGS_c) $(OBJ_CFLAGS)
+RULE_c		= $(Q)$(COMPILE_c) -c $< -o $@
+RULE_c_to_dbg%.o = $(Q)$(COMPILE_c) -Ddebug_$(OBJECT)=$* -c $< -o $@
+RULE_c_to_c	= $(Q)$(COMPILE_c) -E -c $< > $@
+RULE_c_to_s	= $(Q)$(COMPILE_c) -S -g0 -c $< -o $@
+
+PREPROCESS_S	= $(CPP) $(CFLAGS) $(CFLAGS_S) $(OBJ_CFLAGS)
+ASSEMBLE_S	= $(AS) $(ASFLAGS)
+RULE_S		= $(Q)$(PREPROCESS_S) $< | $(ASSEMBLE_S) -o $@
+RULE_S_to_s	= $(Q)$(PREPROCESS_S) $< > $@
+
+DEBUG_TARGETS	+= dbg%.o c s
+
 # We automatically generate rules for any file mentioned in AUTO_SRCS
 # using the following set of templates.  It would be cleaner to use
 # $(eval ...), but this function exists only in GNU make >= 3.80.
@@ -158,7 +337,7 @@ autosrcs :
 #
 define src_template
 
-	@$(ECHO) "Generating Makefile rules for $(1)"
+	@$(ECHO) "  [DEPS] $(1)"
 	@$(MKDIR) -p $(dir $(2))
 	@$(RM) $(2)
 	@$(TOUCH) $(2)
@@ -183,13 +362,13 @@ define obj_template
 		-Wno-error -MM $(1) -MT "$(4)_DEPS" -MG -MP | \
 		sed 's/_DEPS\s*:/_DEPS =/' >> $(2)
 	@$(ECHO_E) '\n$$(BIN)/$(4).o : $(1) $$(MAKEDEPS) $$($(4)_DEPS)' \
-		 '\n\t$$(QM)$(ECHO) "  [BUILD] $$@"\n' \
+		 '\n\t$$(QM)$(ECHO) "  [BUILD] $$@"' \
 		 '\n\t$$(RULE_$(3))\n' \
 		 '\nBOBJS += $$(BIN)/$(4).o\n' \
 		 $(foreach TGT,$(DEBUG_TARGETS), \
 		    $(if $(RULE_$(3)_to_$(TGT)), \
 		    '\n$$(BIN)/$(4).$(TGT) : $(1) $$(MAKEDEPS) $$($(4)_DEPS)' \
-		    '\n\t$$(QM)$(ECHO) "  [BUILD] $$@"\n' \
+		    '\n\t$$(QM)$(ECHO) "  [BUILD] $$@"' \
 		    '\n\t$$(RULE_$(3)_to_$(TGT))\n' \
 		    '\n$(TGT)_OBJS += $$(BIN)/$(4).$(TGT)\n' ) ) \
 		 '\n$(2) : $$($(4)_DEPS)\n' \
@@ -206,7 +385,9 @@ $(BIN)/deps/%.d : % $(MAKEDEPS) $(PARSEROM)
 # Calculate and include the list of Makefile rules files
 #
 AUTO_DEPS	= $(patsubst %,$(BIN)/deps/%.d,$(AUTO_SRCS))
+ifdef NEED_DEPS
 -include $(AUTO_DEPS)
+endif
 autodeps :
 	@$(ECHO) $(AUTO_DEPS)
 VERYCLEANUP	+= $(BIN)/deps
@@ -238,7 +419,7 @@ $(BIN)/NIC : $(AUTO_DEPS)
 	     'it is only for rom-o-matic' >> $@
 	@$(ECHO) >> $@
 	@perl -ne 'chomp; print "$$1\n" if /\# NIC\t(.*)$$/' $^ >> $@
-CLEANUP		+= $(BIN)/NIC
+CLEANUP		+= $(BIN)/NIC	# Doesn't match the $(BIN)/*.* pattern
 
 # Analyse a target name (e.g. "bin/dfe538--prism2_pci.zrom.tmp") and
 # derive the variables:
@@ -343,8 +524,13 @@ $(BIN)/%.info :
 # in order to correctly rebuild blib whenever the list of objects
 # changes.
 #
-BLIB_LIST	= $(BIN)/.blib.list
-ifneq ($(shell cat $(BLIB_LIST)),$(BLIB_OBJS))
+BLIB_LIST	:= $(BIN)/.blib.list
+ifeq ($(wildcard $(BLIB_LIST)),)
+BLIB_LIST_OBJS	:=
+else
+BLIB_LIST_OBJS	:= $(shell cat $(BLIB_LIST))
+endif
+ifneq ($(BLIB_LIST_OBJS),$(BLIB_OBJS))
 $(shell $(ECHO) "$(BLIB_OBJS)" > $(BLIB_LIST))
 endif
 
@@ -397,10 +583,6 @@ $(BIN)/%.zbin : $(BIN)/%.bin $(BIN)/%.zinfo $(ZBIN)
 	$(QM)$(ECHO) "  [ZBIN] $@"
 	$(Q)$(ZBIN) $(BIN)/$*.bin $(BIN)/$*.zinfo > $@
 
-# Build bochs symbol table
-$(BIN)/%.bxs : $(BIN)/%.tmp
-	$(NM) $< | cut -d" " -f1,3 > $@
-
 # Rules for each media format.  These are generated and placed in an
 # external Makefile fragment.  We could do this via $(eval ...), but
 # that would require make >= 3.80.
@@ -436,7 +618,7 @@ automedia :
 #
 define media_template
 
-	@$(ECHO) "Generating Makefile rules for $(1) media"
+	@$(ECHO) "  [MEDIADEPS] $(1)"
 	@$(MKDIR) -p $(dir $(2))
 	@$(RM) $(2)
 	@$(TOUCH) $(2)
@@ -460,7 +642,18 @@ $(BIN)/deps/%.media.d : $(MAKEDEPS)
 MEDIA_DEPS		= $(patsubst %,$(BIN)/deps/%.media.d,$(AUTO_MEDIA))
 mediadeps :
 	@$(ECHO) $(MEDIA_DEPS)
+ifdef NEED_DEPS
 -include $(MEDIA_DEPS)
+endif
+
+# Wrap up binary blobs (for embedded images)
+#
+$(BIN)/%.o : payload/%.img
+	$(QM)echo "  [WRAP] $@"
+	$(Q)$(LD) -b binary -r -o $@ $< --undefined obj_payload \
+		--defsym obj_$*=0
+
+BOBJS += $(patsubst payload/%.img,$(BIN)/%.o,$(wildcard payload/*.img))
 
 # The "allXXXs" targets for each suffix
 #
@@ -473,15 +666,23 @@ allpxes allisos alldsks : all%s : $(foreach DRIVER,$(DRIVERS),$(BIN)/$(DRIVER).%
 $(BIN)/etherboot.% : $(BIN)/gpxe.%
 	ln -sf $(notdir $<) $@
 
-# Wrap up binary blobs
+endif # defined(BIN)
+
+###############################################################################
 #
-$(BIN)/%.o : payload/%.img
-	$(QM)echo "  [WRAP] $@"
-	$(Q)$(LD) -b binary -r -o $@ $< --undefined obj_payload \
-		--defsym obj_$*=0
+# Rules for finalising files.  TGT_MAKEROM_FLAGS is defined as part of
+# the automatic build system and varies by target; it includes the
+# "-p 0x1234,0x5678" string to set the PCI IDs.
+#
+FINALISE_rom	= $(MAKEROM) $(MAKEROM_FLAGS) $(TGT_MAKEROM_FLAGS) \
+		  -i$(IDENT) -s 0 $@
 
-BOBJS += $(patsubst payload/%.img,$(BIN)/%.o,$(wildcard payload/*.img))
+# Some ROMs require specific flags to be passed to makerom.pl
+#
+MAKEROM_FLAGS_3c503 = -3
 
+###############################################################################
+#
 # The compression utilities
 #
 $(NRV2B) : util/nrv2b.c $(MAKEDEPS)
@@ -495,6 +696,8 @@ $(ZBIN) : util/zbin.c util/nrv2b.c $(MAKEDEPS)
 	$(Q)$(HOST_CC) -O2 -o $@ $<
 CLEANUP += $(ZBIN)
 
+###############################################################################
+#
 # Auto-incrementing build serial number.  Append "bs" to your list of
 # build targets to get a serial number printed at the end of the
 # build.  Enable -DBUILD_SERIAL in order to see it when the code runs.
@@ -518,27 +721,30 @@ bs : $(BUILDSERIAL_NOW)
 	@$(ECHO) $$(( $(shell cat $<) + 1 )) > $(BUILDSERIAL_NEXT)
 	@$(ECHO) "Build serial number is $(shell cat $<)"
 
-# List of available architectures
+###############################################################################
 #
-ARCHS	= $(filter-out CVS,$(patsubst arch/%,%,$(wildcard arch/*)))
-archs :
-	@$(ECHO) $(ARCHS)
-
-OTHER_ARCHS	= $(filter-out $(ARCH),$(ARCHS))
-otherarchs :
-	@$(ECHO) $(OTHER_ARCHS)
-
-# Build the TAGS file for emacs
+# Build the TAGS file(s) for emacs
 #
-TAGS : TAGS.$(ARCH)
+TAGS :
+	ctags -e -R -f $@ --exclude=bin
 
-TAGS.$(ARCH) : 
-	ctags -e -R -f $@ --exclude=bin \
-		$(foreach ARCH,$(OTHER_ARCHS),--exclude=arch/$(ARCH))
-CLEANUP	+= TAGS*
+CLEANUP	+= TAGS
 
+###############################################################################
+#
+# Force rebuild for any given target
+#
+%.rebuild :
+	rm -f $*
+	$(Q)$(MAKE) $*
+
+###############################################################################
+#
 # Symbol table checks
 #
+
+ifdef BIN
+
 SYMTAB	= $(BIN)/symtab
 $(SYMTAB) : $(BLIB)
 	$(OBJDUMP) -w -t $< > $@
@@ -548,14 +754,27 @@ CLEANUP	+= $(BIN)/symtab
 symcheck : $(SYMTAB)
 	$(SYMCHECK) $<
 
-# Force rebuild for any given target
-#
-$(BIN)/%.rebuild :
-	rm -f $(BIN)/$*
-	$(MAKE) $(MAKEFLAGS) $(BIN)/$*
+endif # defined(BIN)
 
+###############################################################################
+#
+# Build bochs symbol table
+#
+
+ifdef BIN
+
+$(BIN)/%.bxs : $(BIN)/%.tmp
+	$(NM) $< | cut -d" " -f1,3 > $@
+
+endif # defined(BIN)
+
+###############################################################################
+#
 # Documentation
 #
+
+ifdef BIN
+
 $(BIN)/doxygen.cfg : doxygen.cfg $(MAKEDEPS)
 	$(PERL) -pe 's{\@SRCDIRS\@}{$(SRCDIRS)}; ' \
 		-e  's{\@BIN\@}{$(BIN)}; ' \
@@ -579,6 +798,10 @@ docview :
 		$(ECHO) "Documentation index in $(BIN)/doc/html/index.html" ; \
 	fi
 
+endif # defined(BIN)
+
+###############################################################################
+#
 # Clean-up
 #
 clean :
@@ -586,19 +809,3 @@ clean :
 
 veryclean : clean
 	$(RM) -r $(VERYCLEANUP)
-
-# Make clean tarballs for release
-
-tarball : ../VERSION
-	($(ECHO) -n $(VERSION) ''; date -u +'%Y-%m-%d') > ../VERSION
-	$(RM) -r /tmp/$(USER)/gpxe-$(VERSION)
-	mkdir -p /tmp/$(USER)/gpxe-$(VERSION)
-	cp -rP .. /tmp/$(USER)/gpxe-$(VERSION)
-	( cd /tmp/$(USER)/gpxe-$(VERSION)/src ; $(MAKE) veryclean ; $(RM) -r bin/deps )
-	( cd /tmp/$(USER); tar cf /tmp/$(USER)/gpxe-$(VERSION).tar --exclude ".git*" --exclude "#*" \
-	  --exclude "*~" gpxe-$(VERSION) )
-	bzip2 -9 < /tmp/$(USER)/gpxe-$(VERSION).tar > /tmp/$(USER)/gpxe-$(VERSION).tar.bz2
-	gzip -9 < /tmp/$(USER)/gpxe-$(VERSION).tar > /tmp/$(USER)/gpxe-$(VERSION).tar.gz
-	$(RM) -r /tmp/$(USER)/gpxe-$(VERSION)
-	$(RM) /tmp/$(USER)/gpxe-$(VERSION).tar
-	( cd /tmp/$(USER) ; tar -zxf /tmp/$(USER)/gpxe-$(VERSION).tar.gz )
