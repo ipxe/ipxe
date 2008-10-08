@@ -187,6 +187,8 @@ static int vring_get_buf(int queue_index, unsigned int *len)
    u32 id;
    int ret;
 
+   BUG_ON(!vring_more_used(queue_index));
+
    elem = &vr->used->ring[last_used_idx[queue_index] % vr->num];
    wmb();
    id = elem->id;
@@ -365,6 +367,8 @@ static void virtnet_transmit(struct nic *nic, const char *destaddr,
 
    vring_add_buf(TX_INDEX, 0, 0);
 
+   vring_kick(nic, TX_INDEX, 1);
+
    /*
     * http://www.etherboot.org/wiki/dev/devmanual
     *
@@ -372,12 +376,10 @@ static void virtnet_transmit(struct nic *nic, const char *destaddr,
     *    before returning from this routine"
     */
 
-   while (vring_more_used(TX_INDEX)) {
+   while (!vring_more_used(TX_INDEX)) {
            mb();
            udelay(10);
    }
-
-   vring_kick(nic, TX_INDEX, 1);
 
    /* free desc */
 
