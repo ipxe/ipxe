@@ -144,7 +144,7 @@ got_sectors:
 	/* Jump to loaded copy */
 	ljmp	$SYSSEG, $start_runtime
 
-endseg:	.word SYSSEG + _load_size_pgh
+endseg:	.word SYSSEG + _filesz_pgh
 	.section ".zinfo.fixup", "a"	/* Compressor fixup information */
 	.ascii	"SUBW"
 	.long	endseg

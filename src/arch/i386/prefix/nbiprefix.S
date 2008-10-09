@@ -32,8 +32,8 @@ segment_header:
 	.byte	0
 	.byte	0x04		/* Last segment */
 	.long	0x00007e00
-imglen:	.long	_load_size - 512
-memlen:	.long	_load_size - 512
+imglen:	.long	_filesz - 512
+memlen:	.long	_filesz - 512
 	.size	segment_header, . - segment_header
 
 	.section ".zinfo.fixup", "a"	/* Compressor fixup information */

@@ -30,7 +30,7 @@
 	.org	0x00
 romheader:
 	.word	0xAA55			/* BIOS extension signature */
-romheader_size:	.byte _load_size_sect	/* Size in 512-byte blocks */
+romheader_size:	.byte _filesz_sect	/* Size in 512-byte blocks */
 	jmp	init			/* Initialisation vector */
 checksum:
 	.byte	0
@@ -58,12 +58,12 @@ pciheader:
 	.byte	0x03			/* PCI data structure revision */
 	.byte	0x02, 0x00, 0x00	/* Class code */
 pciheader_image_length:
-	.word	_load_size_sect		/* Image length */
+	.word	_filesz_sect		/* Image length */
 	.word	0x0001			/* Revision level */
 	.byte	0x00			/* Code type */
 	.byte	0x80			/* Last image indicator */
 pciheader_runtime_length:
-	.word	_load_size_sect		/* Maximum run-time image length */
+	.word	_filesz_sect		/* Maximum run-time image length */
 	.word	0x0000			/* Configuration utility code header */
 	.word	0x0000			/* DMTF CLP entry point */
 	.equ pciheader_len, . - pciheader
@@ -130,9 +130,9 @@ undiheader:
 	.byte	0			/* Structure revision */
 	.byte	0,1,2			/* PXE version: 2.1.0 */
 	.word	undiloader		/* Offset to loader routine */
-	.word	_data16_size		/* Stack segment size */
-	.word	_data16_size		/* Data segment size */
-	.word	_text16_size		/* Code segment size */
+	.word	_data16_memsz		/* Stack segment size */
+	.word	_data16_memsz		/* Data segment size */
+	.word	_text16_memsz		/* Code segment size */
 	.ascii	"PCIR"			/* Bus type */
 	.equ undiheader_len, . - undiheader
 	.size undiheader, . - undiheader
@@ -294,7 +294,7 @@ pmm_scan:
 	/* Shrink ROM and update checksum */
 	xorw	%bx, %bx
 	xorw	%si, %si
-	movw	$_prefix_size_sect, %cx
+	movw	$_prefix_memsz_sect, %cx
 	movb	%cl, romheader_size
 	shlw	$9, %cx
 1:	lodsb

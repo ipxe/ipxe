@@ -92,7 +92,7 @@ setup_sects:
 root_flags: 
 	.word	0
 syssize: 
-	.long	_load_size_pgh - PREFIXPGH
+	.long	_filesz_pgh - PREFIXPGH
 
 	.section ".zinfo.fixup", "a"	/* Compressor fixup information */
 	.ascii	"SUBL"

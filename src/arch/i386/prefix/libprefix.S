@@ -511,11 +511,11 @@ alloc_basemem:
 	shlw	$6, %ax
 
 	/* .data16 segment address */
-	subw	$_data16_size_pgh, %ax
+	subw	$_data16_memsz_pgh, %ax
 	pushw	%ax
 
 	/* .text16 segment address */
-	subw	$_text16_size_pgh, %ax
+	subw	$_text16_memsz_pgh, %ax
 	pushw	%ax
 
 	/* Update FBMS */
@@ -594,19 +594,19 @@ install_prealloc:
 	jnz	1f
 	movw	%cs, %si
 	shll	$4, %esi
-1:	addl	$_payload_offset, %esi
+1:	addl	$_payload_lma, %esi
 
 	/* Install .text16 and .data16 */
 	pushl	%edi
 	movzwl	%ax, %edi
 	shll	$4, %edi
-	movl	$_text16_size, %ecx
+	movl	$_text16_memsz, %ecx
 	movl	%ecx, %edx
 	call	install_block		/* .text16 */
 	movzwl	%bx, %edi
 	shll	$4, %edi
-	movl	$_data16_progbits_size, %ecx
-	movl	$_data16_size, %edx
+	movl	$_data16_filesz, %ecx
+	movl	$_data16_memsz, %edx
 	call	install_block		/* .data16 */
 	popl	%edi
 
@@ -622,8 +622,8 @@ install_prealloc:
 	 * prior to reading the E820 memory map and relocating
 	 * properly.
 	 */
-	movl	$_textdata_progbits_size, %ecx
-	movl	$_textdata_size, %edx
+	movl	$_textdata_filesz, %ecx
+	movl	$_textdata_memsz, %edx
 	call	install_block
 
 	/* Initialise librm at current location */
@@ -681,25 +681,25 @@ prot_call_vector:
 #if COMPRESS
 	.section ".zinfo", "a"
 	.ascii	"COPY"
-	.long	_prefix_load_offset
-	.long	_prefix_progbits_size
+	.long	_prefix_lma
+	.long	_prefix_filesz
 	.long	_max_align
 	.ascii	"PACK"
-	.long	_text16_load_offset
-	.long	_text16_progbits_size
+	.long	_text16_lma
+	.long	_text16_filesz
 	.long	_max_align
 	.ascii	"PACK"
-	.long	_data16_load_offset
-	.long	_data16_progbits_size
+	.long	_data16_lma
+	.long	_data16_filesz
 	.long	_max_align
 	.ascii	"PACK"
-	.long	_textdata_load_offset
-	.long	_textdata_progbits_size
+	.long	_textdata_lma
+	.long	_textdata_filesz
 	.long	_max_align
 #else /* COMPRESS */
 	.section ".zinfo", "a"
 	.ascii	"COPY"
-	.long	_prefix_load_offset
-	.long	_load_size
+	.long	_prefix_lma
+	.long	_filesz
 	.long	_max_align
 #endif /* COMPRESS */

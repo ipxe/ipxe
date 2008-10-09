@@ -55,8 +55,8 @@ extern struct hidden_region __data16 ( hidemem_umalloc );
 #define hidemem_umalloc __use_data16 ( hidemem_umalloc )
 
 /** Hidden text memory */
-extern struct hidden_region __data16 ( hidemem_text );
-#define hidemem_text __use_data16 ( hidemem_text )
+extern struct hidden_region __data16 ( hidemem_textdata );
+#define hidemem_textdata __use_data16 ( hidemem_textdata )
 
 /** Assembly routine in e820mangler.S */
 extern void int15();
@@ -66,12 +66,12 @@ extern struct segoff __text16 ( int15_vector );
 #define int15_vector __use_text16 ( int15_vector )
 
 /* The linker defines these symbols for us */
-extern char _text[];
-extern char _end[];
-extern char _text16_size[];
-#define _text16_size ( ( unsigned int ) _text16_size )
-extern char _data16_size[];
-#define _data16_size ( ( unsigned int ) _data16_size )
+extern char _textdata[];
+extern char _etextdata[];
+extern char _text16_memsz[];
+#define _text16_memsz ( ( unsigned int ) _text16_memsz )
+extern char _data16_memsz[];
+#define _data16_memsz ( ( unsigned int ) _data16_memsz )
 
 /**
  * Hide region of memory from system memory map
@@ -110,7 +110,7 @@ void hide_basemem ( void ) {
  *
  */
 void hide_umalloc ( physaddr_t start, physaddr_t end ) {
-	assert ( end <= virt_to_phys ( _text ) );
+	assert ( end <= virt_to_phys ( _textdata ) );
 	hide_region ( &hidemem_umalloc, start, end );
 }
 
@@ -118,9 +118,9 @@ void hide_umalloc ( physaddr_t start, physaddr_t end ) {
  * Hide .text and .data
  *
  */
-void hide_text ( void ) {
-	hide_region ( &hidemem_text, virt_to_phys ( _text ),
-		      virt_to_phys ( _end ) );
+void hide_textdata ( void ) {
+	hide_region ( &hidemem_textdata, virt_to_phys ( _textdata ),
+		      virt_to_phys ( _etextdata ) );
 }
 
 /**
@@ -148,8 +148,8 @@ static void hide_etherboot ( void ) {
 
 	/* Initialise the hidden regions */
 	hide_basemem();
-	hide_umalloc ( virt_to_phys ( _text ), virt_to_phys ( _text ) );
-	hide_text();
+	hide_umalloc ( virt_to_phys ( _textdata ), virt_to_phys ( _textdata ) );
+	hide_textdata();
 
 	/* Some really moronic BIOSes bring up the PXE stack via the
 	 * UNDI loader entry point and then don't bother to unload it
@@ -161,8 +161,8 @@ static void hide_etherboot ( void ) {
 	 * We use a heuristic to guess whether or not we are being
 	 * loaded sensibly.
 	 */
-	rm_cs_top = ( ( ( rm_cs << 4 ) + _text16_size + 1024 - 1 ) >> 10 );
-	rm_ds_top = ( ( ( rm_ds << 4 ) + _data16_size + 1024 - 1 ) >> 10 );
+	rm_cs_top = ( ( ( rm_cs << 4 ) + _text16_memsz + 1024 - 1 ) >> 10 );
+	rm_ds_top = ( ( ( rm_ds << 4 ) + _data16_memsz + 1024 - 1 ) >> 10 );
 	fbms = get_fbms();
 	if ( ( rm_cs_top < fbms ) && ( rm_ds_top < fbms ) ) {
 		DBG ( "Detected potentially unsafe UNDI load at CS=%04x "

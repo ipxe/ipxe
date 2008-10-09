@@ -18,8 +18,8 @@ extern char _max_align[];
 #define max_align ( ( unsigned int ) _max_align )
 
 /* Linker symbols */
-extern char _text[];
-extern char _end[];
+extern char _textdata[];
+extern char _etextdata[];
 
 /* within 1MB of 4GB is too close. 
  * MAX_ADDR is the maximum address we can easily do DMA to.
@@ -47,8 +47,8 @@ __cdecl void relocate ( struct i386_all_regs *ix86 ) {
 
 	/* Get memory map and current location */
 	get_memmap ( &memmap );
-	start = virt_to_phys ( _text );
-	end = virt_to_phys ( _end );
+	start = virt_to_phys ( _textdata );
+	end = virt_to_phys ( _etextdata );
 	size = ( end - start );
 	padded_size = ( size + max_align - 1 );
 

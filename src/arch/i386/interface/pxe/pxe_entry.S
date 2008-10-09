@@ -44,10 +44,10 @@ ppxe:
 	.byte SegDescCnt		/* SegDescCnt */
 	.word 0				/* FirstSelector */
 pxe_segments:
-	.word 0, 0, 0, _data16_size	/* Stack */
-	.word 0, 0, 0, _data16_size	/* UNDIData */
-	.word 0, 0, 0, _text16_size	/* UNDICode */
-	.word 0, 0, 0, _text16_size	/* UNDICodeWrite */
+	.word 0, 0, 0, _data16_memsz	/* Stack */
+	.word 0, 0, 0, _data16_memsz	/* UNDIData */
+	.word 0, 0, 0, _text16_memsz	/* UNDICode */
+	.word 0, 0, 0, _text16_memsz	/* UNDICodeWrite */
 	.word 0, 0, 0, 0		/* BC_Data */
 	.word 0, 0, 0, 0		/* BC_Code */
 	.word 0, 0, 0, 0		/* BC_CodeWrite */
@@ -76,15 +76,15 @@ pxenv:
 	.long 0				/* PMEntry */
 	.word 0				/* PMSelector */
 	.word 0				/* StackSeg */
-	.word _data16_size		/* StackSize */
+	.word _data16_memsz		/* StackSize */
 	.word 0				/* BC_CodeSeg */
 	.word 0				/* BC_CodeSize */
 	.word 0				/* BC_DataSeg */
 	.word 0				/* BC_DataSize */
 	.word 0				/* UNDIDataSeg */
-	.word _data16_size		/* UNDIDataSize */
+	.word _data16_memsz		/* UNDIDataSize */
 	.word 0				/* UNDICodeSeg */
-	.word _text16_size		/* UNDICodeSize */
+	.word _text16_memsz		/* UNDICodeSize */
 	.word ppxe, 0			/* PXEPtr */
 	.equ	pxenv_length, . - pxenv
 	.size	pxenv, . - pxenv

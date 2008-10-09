@@ -66,7 +66,7 @@
 	.align 16
 	.globl hidemem_base
 	.globl hidemem_umalloc
-	.globl hidemem_text
+	.globl hidemem_textdata
 memory_windows:
 base_memory_window:	.long 0x00000000, 0x00000000 /* Start of memory */
 
@@ -76,7 +76,7 @@ ext_memory_window:	.long 0x000a0000, 0x00000000 /* 640kB mark */
 hidemem_umalloc:	.long 0xffffffff, 0xffffffff /* Changes at runtime */
 			.long 0xffffffff, 0xffffffff /* Changes at runtime */
 
-hidemem_text:		.long 0xffffffff, 0xffffffff /* Changes at runtime */
+hidemem_textdata:	.long 0xffffffff, 0xffffffff /* Changes at runtime */
 			.long 0xffffffff, 0xffffffff /* Changes at runtime */
 
 			.long 0xffffffff, 0xffffffff /* End of memory */

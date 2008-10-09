@@ -63,7 +63,7 @@ max_sector:
 max_head:
 	.byte	0
 load_length:
-	.long	_load_size_sect
+	.long	_filesz_sect
 	
 	.section ".zinfo.fixup", "a"	/* Compressor fixup information */
 	.ascii	"SUBL"
