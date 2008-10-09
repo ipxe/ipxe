@@ -6,6 +6,8 @@
 #include "nrv2b.c"
 FILE *infile, *outfile;
 
+#define DEBUG 0
+
 struct input_file {
 	void *buf;
 	size_t len;
@@ -151,6 +153,11 @@ static int process_zinfo_copy ( struct input_file *input,
 		return -1;
 	}
 
+	if ( DEBUG ) {
+		fprintf ( stderr, "COPY [%#zx,%#zx) to [%#zx,%#zx)\n", offset, ( offset + len ),
+			  output->len, ( output->len + len ) );
+	}
+
 	memcpy ( ( output->buf + output->len ),
 		 ( input->buf + offset ), len );
 	output->len += len;
@@ -184,6 +191,11 @@ static int process_zinfo_pack ( struct input_file *input,
 		return -1;
 	}
 
+	if ( DEBUG ) {
+		fprintf ( stderr, "PACK [%#zx,%#zx) to [%#zx,%#zx)\n", offset, ( offset + len ),
+			  output->len, ( output->len + packed_len ) );
+	}
+
 	output->len += packed_len;
 	if ( output->len > output->max_len ) {
 		fprintf ( stderr, "Output buffer overrun on pack\n" );
@@ -200,6 +212,8 @@ static int process_zinfo_subtract ( struct input_file *input,
 	size_t offset = subtract->offset;
 	void *target;
 	long delta;
+	unsigned long old;
+	unsigned long new;
 
 	if ( ( offset + datasize ) > output->len ) {
 		fprintf ( stderr, "Subtract at %#zx outside output buffer\n",
@@ -214,21 +228,34 @@ static int process_zinfo_subtract ( struct input_file *input,
 	switch ( datasize ) {
 	case 1: {
 		uint8_t *byte = target;
+		old = *byte;
 		*byte += delta;
+		new = *byte;
 		break; }
 	case 2: {
 		uint16_t *word = target;
+		old = *word;
 		*word += delta;
+		new = *word;
 		break; }
 	case 4: {
 		uint32_t *dword = target;
+		old = *dword;
 		*dword += delta;
+		new = *dword;
 		break; }
 	default:
 		fprintf ( stderr, "Unsupported subtract datasize %d\n",
 			  datasize );
 		return -1;
 	}
+
+	if ( DEBUG ) {
+		fprintf ( stderr, "SUBx [%#zx,%#zx) (%#lx+(%#lx/%#lx)-(%#lx/%#lx)) = %#lx\n",
+			  offset, ( offset + datasize ), old, output->len, subtract->divisor,
+			  input->len, subtract->divisor, new );
+	}
+
 	return 0;
 }
 
