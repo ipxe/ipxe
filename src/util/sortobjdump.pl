@@ -8,7 +8,7 @@ use warnings;
 # linker maps produced by "make bin/%.map" by also showing the values
 # of all non-global symbols.
 
-my %section_idx = ( "*ABS*" => "." );
+my %section_idx = ( "*ABS*" => ".", "*UND*" => "_" );
 my %lines;
 while ( <> ) {
   if ( /^\s+(\d+)\s+([\.\*]\S+)\s+[0-9a-fA-F]+\s+[0-9a-fA-F]/ ) {
