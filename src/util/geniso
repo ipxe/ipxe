@@ -52,5 +52,5 @@ do
 	echo "" KERNEL $g
 	cp -p $f $dir/$g
 done >> $cfg
-mkisofs -l -o $out -c boot.cat -b isolinux.bin -no-emul-boot -boot-load-size 4 -boot-info-table $dir
+mkisofs -q -l -o $out -c boot.cat -b isolinux.bin -no-emul-boot -boot-load-size 4 -boot-info-table $dir
 rm -fr $dir

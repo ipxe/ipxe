@@ -88,14 +88,16 @@ include arch/i386/Makefile.$(PLATFORM)
 # rule to write disk images to /dev/fd0
 NON_AUTO_MEDIA	+= fd0
 %fd0 : %dsk
-	dd if=$< bs=512 conv=sync of=/dev/fd0
-	sync
+	$(QM)$(ECHO) "  [DD] $@"
+	$(Q)dd if=$< bs=512 conv=sync of=/dev/fd0
+	$(Q)sync
 
 # rule to create padded disk images
 NON_AUTO_MEDIA	+= pdsk
 %pdsk : %dsk
-	cp $< $@
-	$(PERL) ./util/dskpad.pl $@
+	$(QM)$(ECHO) "  [DSKPAD] $@"
+	$(Q)cp $< $@
+	$(Q)$(PERL) ./util/dskpad.pl $@
 
 # Add NON_AUTO_MEDIA to the media list, so that they show up in the
 # output of "make"
