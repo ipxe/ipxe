@@ -229,6 +229,7 @@ endif # defined(BIN)
 
 # Include architecture-specific Makefile
 ifdef ARCH
+MAKEDEPS	+= arch/$(ARCH)/Makefile
 include arch/$(ARCH)/Makefile
 endif
 
