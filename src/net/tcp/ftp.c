@@ -109,23 +109,39 @@ static void ftp_done ( struct ftp_request *ftp, int rc ) {
  *
  */
 
+/** An FTP control channel string */
+struct ftp_control_string {
+	/** Literal portion */
+	const char *literal;
+	/** Variable portion
+	 *
+	 * @v ftp	FTP request
+	 * @ret string	Variable portion of string
+	 */
+	const char * ( *variable ) ( struct ftp_request *ftp );
+};
+
 /**
- * FTP control channel strings
+ * Retrieve FTP pathname
  *
- * These are used as printf() format strings.  Since only one of them
- * (RETR) takes an argument, we always supply that argument to the
- * snprintf() call.
+ * @v ftp		FTP request
+ * @ret path		FTP pathname
  */
-static const char * ftp_strings[] = {
-	[FTP_CONNECT]	= NULL,
-	[FTP_USER]	= "USER anonymous\r\n",
-	[FTP_PASS]	= "PASS etherboot@etherboot.org\r\n",
-	[FTP_TYPE]	= "TYPE I\r\n",
-	[FTP_PASV]	= "PASV\r\n",
-	[FTP_RETR]	= "RETR %s\r\n",
-	[FTP_WAIT]	= NULL,
-	[FTP_QUIT]	= "QUIT\r\n",
-	[FTP_DONE]	= NULL,
+static const char * ftp_uri_path ( struct ftp_request *ftp ) {
+	return ftp->uri->path;
+}
+
+/** FTP control channel strings */
+static struct ftp_control_string ftp_strings[] = {
+	[FTP_CONNECT]	= { NULL, NULL },
+	[FTP_USER]	= { "USER anonymous", NULL },
+	[FTP_PASS]	= { "PASS etherboot@etherboot.org", NULL },
+	[FTP_TYPE]	= { "TYPE I", NULL },
+	[FTP_PASV]	= { "PASV", NULL },
+	[FTP_RETR]	= { "RETR ", ftp_uri_path },
+	[FTP_WAIT]	= { NULL, NULL },
+	[FTP_QUIT]	= { "QUIT", NULL },
+	[FTP_DONE]	= { NULL, NULL },
 };
 
 /**
@@ -178,18 +194,23 @@ static void ftp_parse_value ( char **text, uint8_t *value, size_t len ) {
  *
  */
 static void ftp_next_state ( struct ftp_request *ftp ) {
+	struct ftp_control_string *ftp_string;
+	const char *literal;
+	const char *variable;
 
 	/* Move to next state */
 	if ( ftp->state < FTP_DONE )
 		ftp->state++;
 
 	/* Send control string if needed */
-	if ( ftp_strings[ftp->state] != NULL ) {
-		DBGC ( ftp, "FTP %p sending ", ftp );
-		DBGC ( ftp, ftp_strings[ftp->state], ftp->uri->path );
-		xfer_printf ( &ftp->control, ftp_strings[ftp->state],
-			      ftp->uri->path );
-	}	
+	ftp_string = &ftp_strings[ftp->state];
+	literal = ftp_string->literal;
+	variable = ( ftp_string->variable ?
+		     ftp_string->variable ( ftp ) : "" );
+	if ( literal ) {
+		DBGC ( ftp, "FTP %p sending %s%s\n", ftp, literal, variable );
+		xfer_printf ( &ftp->control, "%s%s\r\n", literal, variable );
+	}
 }
 
 /**

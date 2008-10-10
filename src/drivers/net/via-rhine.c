@@ -1008,7 +1008,7 @@ rhine_probe1 (struct nic *nic, struct pci_device *pci, int ioaddr, int chip_id, 
     unsigned char mode3_reg;
 
     if (rhine_debug > 0 && did_version++ == 0)
-	printf (version);
+	printf ("%s",version);
 
     // get revision id.
     pci_read_config_byte(pci, PCI_REVISION, &revision_id);

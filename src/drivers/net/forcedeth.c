@@ -452,7 +452,7 @@ static int reg_delay(int offset, u32 mask,
 		delaymax -= delay;
 		if (delaymax < 0) {
 			if (msg)
-				printf(msg);
+				printf("%s", msg);
 			return 1;
 		}
 	} while ((readl(base + offset) & mask) != target);

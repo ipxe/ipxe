@@ -149,8 +149,8 @@ extern int xfer_deliver_raw ( struct xfer_interface *xfer,
 			      const void *data, size_t len );
 extern int xfer_vprintf ( struct xfer_interface *xfer,
 			  const char *format, va_list args );
-extern int xfer_printf ( struct xfer_interface *xfer,
-			 const char *format, ... );
+extern int __attribute__ (( format ( printf, 2, 3 ) ))
+xfer_printf ( struct xfer_interface *xfer, const char *format, ... );
 extern int xfer_seek ( struct xfer_interface *xfer, off_t offset, int whence );
 
 extern void ignore_xfer_close ( struct xfer_interface *xfer, int rc );

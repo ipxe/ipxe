@@ -265,7 +265,7 @@ ifdef BIN
 #
 CFLAGS		+= -I include -I arch/$(ARCH)/include -I .
 CFLAGS		+= -Os -ffreestanding
-CFLAGS		+= -Wall -W
+CFLAGS		+= -Wall -W -Wformat-nonliteral
 CFLAGS		+= -g
 CFLAGS		+= $(EXTRA_CFLAGS)
 ASFLAGS		+= $(EXTRA_ASFLAGS)
