@@ -1,0 +1,49 @@
+# -*- makefile -*- : Force emacs to use Makefile mode
+
+# The i386 linker script
+#
+LDSCRIPT	= arch/i386/scripts/i386.lds
+
+# Stop ld from complaining about our customised linker script
+#
+LDFLAGS		+= -N --no-check-sections
+
+# Media types.
+#
+MEDIA		+= rom
+MEDIA		+= pxe
+MEDIA		+= kpxe
+MEDIA		+= elf
+MEDIA		+= elfd
+MEDIA		+= lmelf
+MEDIA		+= lmelfd
+MEDIA		+= lkrn
+MEDIA		+= bImage
+MEDIA		+= dsk
+MEDIA		+= nbi
+MEDIA		+= hd
+MEDIA		+= raw
+MEDIA		+= com
+MEDIA		+= exe
+
+# rule to make a non-emulation ISO boot image
+NON_AUTO_MEDIA	+= iso
+%iso:	%lkrn util/geniso
+	ISOLINUX_BIN=$(ISOLINUX_BIN) bash util/geniso $@ $<
+
+# rule to make a floppy emulation ISO boot image
+NON_AUTO_MEDIA	+= liso
+%liso:	%lkrn util/genliso
+	bash util/genliso $@ $<
+
+# Special target for building Master Boot Record binary
+$(BIN)/mbr.bin : $(BIN)/mbr.o
+	$(OBJCOPY) -O binary $< $@
+
+# rule to make a USB disk image
+$(BIN)/usbdisk.bin : $(BIN)/usbdisk.o
+	$(OBJCOPY) -O binary $< $@
+
+NON_AUTO_MEDIA	+= usb
+%usb: $(BIN)/usbdisk.bin %hd
+	cat $^ > $@

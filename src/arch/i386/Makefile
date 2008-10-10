@@ -35,10 +35,6 @@ CFLAGS		+= -mrtd
 #
 CFLAGS		+= -freg-struct-return
 
-# Stop ld from complaining about our customised linker script
-#
-LDFLAGS		+= -N --no-check-sections
-
 # Force 32-bit code even on an x86-64 machine
 #
 CFLAGS		+= -m32
@@ -78,67 +74,28 @@ NON_AUTO_SRCS	+= arch/i386/core/wince_loader.c
 
 # unnrv2b.S is used to generate a 16-bit as well as a 32-bit object.
 #
-OBJS_unnrv2b		= unnrv2b unnrv2b16
-CFLAGS_unnrv2b16	= -DCODE16
+OBJS_unnrv2b	= unnrv2b unnrv2b16
+CFLAGS_unnrv2b16 = -DCODE16
 
-# The i386 linker script
+# Include platform-specific Makefile
 #
-LDSCRIPT		= arch/i386/scripts/i386.lds
-
-# Media types.
-# 
-MEDIA			+= rom
-MEDIA			+= pxe
-MEDIA			+= kpxe
-MEDIA			+= elf
-MEDIA			+= elfd
-MEDIA			+= lmelf
-MEDIA			+= lmelfd
-MEDIA			+= lkrn
-MEDIA			+= bImage
-MEDIA			+= dsk
-MEDIA			+= nbi
-MEDIA			+= hd
-MEDIA			+= raw
-MEDIA			+= com
-MEDIA			+= exe
-
-# Special target for building Master Boot Record binary
-$(BIN)/mbr.bin : $(BIN)/mbr.o
-	$(OBJCOPY) -O binary $< $@
+MAKEDEPS	+= arch/i386/Makefile.$(PLATFORM)
+include arch/i386/Makefile.$(PLATFORM)
 
 # Some suffixes (e.g. %.fd0) are generated directly from other
 # finished files (e.g. %.dsk), rather than having their own prefix.
 
 # rule to write disk images to /dev/fd0
-NON_AUTO_MEDIA		+= fd0
+NON_AUTO_MEDIA	+= fd0
 %fd0 : %dsk
 	dd if=$< bs=512 conv=sync of=/dev/fd0
 	sync
 
 # rule to create padded disk images
-NON_AUTO_MEDIA		+= pdsk
+NON_AUTO_MEDIA	+= pdsk
 %pdsk : %dsk
 	cp $< $@
 	$(PERL) ./util/dskpad.pl $@
-
-# rule to make a non-emulation ISO boot image
-NON_AUTO_MEDIA		+= iso
-%iso:	%lkrn util/geniso
-	ISOLINUX_BIN=$(ISOLINUX_BIN) bash util/geniso $@ $<
-
-# rule to make a floppy emulation ISO boot image
-NON_AUTO_MEDIA		+= liso
-%liso:	%lkrn util/genliso
-	bash util/genliso $@ $<
-
-# rule to make a USB disk image
-$(BIN)/usbdisk.bin : $(BIN)/usbdisk.o
-	$(OBJCOPY) -O binary $< $@
-
-NON_AUTO_MEDIA		+= usb
-%usb: $(BIN)/usbdisk.bin %hd
-	cat $^ > $@
 
 # Add NON_AUTO_MEDIA to the media list, so that they show up in the
 # output of "make"
