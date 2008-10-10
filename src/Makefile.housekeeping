@@ -379,7 +379,9 @@ $(BIN)/deps/%.d : % $(MAKEDEPS) $(PARSEROM)
 #
 AUTO_DEPS	= $(patsubst %,$(BIN)/deps/%.d,$(AUTO_SRCS))
 ifdef NEED_DEPS
+ifneq ($(AUTO_DEPS),)
 -include $(AUTO_DEPS)
+endif
 endif
 autodeps :
 	@$(ECHO) $(AUTO_DEPS)
@@ -636,7 +638,9 @@ MEDIA_DEPS		= $(patsubst %,$(BIN)/deps/%.media.d,$(AUTO_MEDIA))
 mediadeps :
 	@$(ECHO) $(MEDIA_DEPS)
 ifdef NEED_DEPS
+ifneq ($(MEDIA_DEPS),)
 -include $(MEDIA_DEPS)
+endif
 endif
 
 # Wrap up binary blobs (for embedded images)
