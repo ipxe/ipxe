@@ -2,7 +2,7 @@
 #define _PCIDIRECT_H
 
 #include <stdint.h>
-#include <io.h>
+#include <gpxe/io.h>
 
 /** @file
  *

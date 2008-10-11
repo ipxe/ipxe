@@ -1,7 +1,7 @@
 #include <stdio.h>
 #include <stdint.h>
 #include <stdarg.h>
-#include <io.h>
+#include <gpxe/io.h>
 #include <console.h>
 
 void pause ( void ) {

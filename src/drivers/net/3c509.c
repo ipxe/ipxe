@@ -8,7 +8,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <errno.h>
-#include <io.h>
+#include <gpxe/io.h>
 #include <unistd.h>
 #include <gpxe/device.h>
 #include <gpxe/isa.h>

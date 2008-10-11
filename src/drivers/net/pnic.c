@@ -14,7 +14,7 @@ Bochs Pseudo NIC driver for Etherboot
 
 #include <stdint.h>
 #include <stdio.h>
-#include <io.h>
+#include <gpxe/io.h>
 #include <errno.h>
 #include <gpxe/pci.h>
 #include <gpxe/if_ether.h>

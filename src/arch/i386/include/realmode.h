@@ -5,7 +5,7 @@
 
 #include "stdint.h"
 #include "registers.h"
-#include "io.h"
+#include <gpxe/io.h>
 
 /*
  * Data structures and type definitions

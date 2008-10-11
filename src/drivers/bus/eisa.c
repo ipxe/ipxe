@@ -3,7 +3,7 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <errno.h>
-#include <io.h>
+#include <gpxe/io.h>
 #include <unistd.h>
 #include <gpxe/eisa.h>
 

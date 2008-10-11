@@ -10,7 +10,7 @@
  *		yhlu@tyan.com
  */
 
-#include "io.h"
+#include <gpxe/io.h>
 #include "console.h"
 
 static char key_map[][128] = {

@@ -1,4 +1,4 @@
-#include <io.h>
+#include <gpxe/io.h>
 #include <registers.h>
 #include <gpxe/memmap.h>
 

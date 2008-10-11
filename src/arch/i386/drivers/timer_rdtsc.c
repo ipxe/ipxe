@@ -5,7 +5,7 @@
 #include <stdio.h>
 #include <bits/cpu.h>
 #include <bits/timer2.h>
-#include <io.h>
+#include <gpxe/io.h>
 
 
 #define rdtsc(low,high) \

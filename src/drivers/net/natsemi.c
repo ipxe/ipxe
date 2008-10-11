@@ -61,7 +61,7 @@
 #include <stdint.h>
 #include <stdlib.h>
 #include <stdio.h>
-#include <io.h>
+#include <gpxe/io.h>
 #include <errno.h>
 #include <byteswap.h>
 #include <unistd.h>

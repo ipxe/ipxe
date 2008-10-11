@@ -7,7 +7,7 @@
 
 #include "stddef.h"
 #include "string.h"
-#include "io.h"
+#include <gpxe/io.h>
 #include "console.h"
 #include <gpxe/init.h>
 #include "vga.h"

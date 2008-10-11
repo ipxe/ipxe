@@ -14,7 +14,7 @@
 #include <stddef.h>
 #include <bits/timer2.h>
 #include <gpxe/timer.h>
-#include <io.h>
+#include <gpxe/io.h>
 
 /* Timers tick over at this rate */
 #define TIMER2_TICK_RATE	1193180U

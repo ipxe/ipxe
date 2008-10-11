@@ -13,7 +13,7 @@
 
 #include "stddef.h"
 #include <gpxe/init.h>
-#include "io.h"
+#include <gpxe/io.h>
 #include <unistd.h>
 #include <gpxe/serial.h>
 #include "config/serial.h"

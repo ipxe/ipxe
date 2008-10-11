@@ -20,7 +20,7 @@
 #include <stdint.h>
 #include <string.h>
 #include <strings.h>
-#include <io.h>
+#include <gpxe/io.h>
 #include <gpxe/list.h>
 #include <gpxe/init.h>
 #include <gpxe/malloc.h>
