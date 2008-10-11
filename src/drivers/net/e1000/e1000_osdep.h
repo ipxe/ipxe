@@ -74,60 +74,60 @@ typedef enum {
 #define DEBUGOUT3 DEBUGOUT1
 #define DEBUGOUT7 DEBUGOUT1
 
-#define E1000_WRITE_REG(a, reg, value) ( \
+#define E1000_WRITE_REG(a, reg, value) \
     writel((value), ((a)->hw_addr + \
-        (((a)->mac_type >= e1000_82543) ? E1000_##reg : E1000_82542_##reg))))
-
-#define E1000_READ_REG(a, reg) ( \
-    readl((a)->hw_addr + \
         (((a)->mac_type >= e1000_82543) ? E1000_##reg : E1000_82542_##reg)))
 
-#define E1000_WRITE_REG_ARRAY(a, reg, offset, value) ( \
+#define E1000_READ_REG(a, reg) \
+    readl((a)->hw_addr + \
+        (((a)->mac_type >= e1000_82543) ? E1000_##reg : E1000_82542_##reg))
+
+#define E1000_WRITE_REG_ARRAY(a, reg, offset, value) \
     writel((value), ((a)->hw_addr + \
         (((a)->mac_type >= e1000_82543) ? E1000_##reg : E1000_82542_##reg) + \
-        ((offset) << 2))))
+        ((offset) << 2)))
 
-#define E1000_READ_REG_ARRAY(a, reg, offset) ( \
+#define E1000_READ_REG_ARRAY(a, reg, offset) \
     readl((a)->hw_addr + \
         (((a)->mac_type >= e1000_82543) ? E1000_##reg : E1000_82542_##reg) + \
-        ((offset) << 2)))
+        ((offset) << 2))
 
 #define E1000_READ_REG_ARRAY_DWORD E1000_READ_REG_ARRAY
 #define E1000_WRITE_REG_ARRAY_DWORD E1000_WRITE_REG_ARRAY
 
-#define E1000_WRITE_REG_ARRAY_WORD(a, reg, offset, value) ( \
+#define E1000_WRITE_REG_ARRAY_WORD(a, reg, offset, value) \
     writew((value), ((a)->hw_addr + \
-        (((a)->mac_type >= e1000_82543) ? E1000_##reg : E1000_82542_##reg) + \
-        ((offset) << 1))))
-
-#define E1000_READ_REG_ARRAY_WORD(a, reg, offset) ( \
-    readw((a)->hw_addr + \
         (((a)->mac_type >= e1000_82543) ? E1000_##reg : E1000_82542_##reg) + \
         ((offset) << 1)))
 
-#define E1000_WRITE_REG_ARRAY_BYTE(a, reg, offset, value) ( \
-    writeb((value), ((a)->hw_addr + \
+#define E1000_READ_REG_ARRAY_WORD(a, reg, offset) \
+    readw((a)->hw_addr + \
         (((a)->mac_type >= e1000_82543) ? E1000_##reg : E1000_82542_##reg) + \
-        (offset))))
+        ((offset) << 1))
 
-#define E1000_READ_REG_ARRAY_BYTE(a, reg, offset) ( \
-    readb((a)->hw_addr + \
+#define E1000_WRITE_REG_ARRAY_BYTE(a, reg, offset, value) \
+    writeb((value), ((a)->hw_addr + \
         (((a)->mac_type >= e1000_82543) ? E1000_##reg : E1000_82542_##reg) + \
         (offset)))
 
+#define E1000_READ_REG_ARRAY_BYTE(a, reg, offset) \
+    readb((a)->hw_addr + \
+        (((a)->mac_type >= e1000_82543) ? E1000_##reg : E1000_82542_##reg) + \
+        (offset))
+
 #define E1000_WRITE_FLUSH(a) E1000_READ_REG(a, STATUS)
 
-#define E1000_WRITE_ICH_FLASH_REG(a, reg, value) ( \
-    writel((value), ((a)->flash_address + reg)))
+#define E1000_WRITE_ICH_FLASH_REG(a, reg, value) \
+    writel((value), ((a)->flash_address + reg))
 
-#define E1000_READ_ICH_FLASH_REG(a, reg) ( \
-    readl((a)->flash_address + reg))
+#define E1000_READ_ICH_FLASH_REG(a, reg) \
+    readl((a)->flash_address + reg)
 
-#define E1000_WRITE_ICH_FLASH_REG16(a, reg, value) ( \
-    writew((value), ((a)->flash_address + reg)))
+#define E1000_WRITE_ICH_FLASH_REG16(a, reg, value) \
+    writew((value), ((a)->flash_address + reg))
 
-#define E1000_READ_ICH_FLASH_REG16(a, reg) ( \
-    readw((a)->flash_address + reg))
+#define E1000_READ_ICH_FLASH_REG16(a, reg) \
+    readw((a)->flash_address + reg)
 
 #define	msleep(n) 	mdelay(n)
 
