@@ -8,20 +8,6 @@
  */
 
 /*
- * Console configuration
- *
- * These options specify the console types that Etherboot will use for
- * interaction with the user.
- *
- */
-
-#define	CONSOLE_FIRMWARE	/* Default BIOS console */
-#undef	CONSOLE_SERIAL		/* Serial port */
-#undef	CONSOLE_DIRECT_VGA	/* Direct access to VGA card */
-#undef	CONSOLE_BTEXT		/* Who knows what this does? */
-#undef	CONSOLE_PC_KBD		/* Direct access to PC keyboard */
-
-/*
  * Timer configuration
  *
  */

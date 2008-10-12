@@ -9,4 +9,6 @@
 
 #define IOAPI_X86
 
+#define CONSOLE_PCBIOS
+
 #endif /* CONFIG_DEFAULTS_PCBIOS_H */

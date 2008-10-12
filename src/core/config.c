@@ -5,7 +5,8 @@
  * your option) any later version.
  */
 
-#include "config/general.h"
+#include <config/general.h>
+#include <config/console.h>
 
 /*
  * Build ID string calculations
@@ -38,19 +39,9 @@
 /*
  * Drag in all requested console types
  *
- * CONSOLE_DUAL sets both CONSOLE_FIRMWARE and CONSOLE_SERIAL for
- * legacy compatibility.
- *
  */
 
-#ifdef	CONSOLE_DUAL
-#undef	CONSOLE_FIRMWARE
-#define	CONSOLE_FIRMWARE	1
-#undef	CONSOLE_SERIAL
-#define	CONSOLE_SERIAL		1
-#endif
-
-#ifdef CONSOLE_FIRMWARE
+#ifdef CONSOLE_PCBIOS
 REQUIRE_OBJECT ( bios_console );
 #endif
 #ifdef CONSOLE_SERIAL
