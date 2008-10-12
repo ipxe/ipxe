@@ -17,6 +17,7 @@
 #include <gpxe/isa.h>
 #include <gpxe/eisa.h>
 #include <gpxe/mca.h>
+#include <gpxe/io.h>
 #include "dhcp.h"
 
 typedef enum {
