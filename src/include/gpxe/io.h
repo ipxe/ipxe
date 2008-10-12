@@ -149,6 +149,46 @@
 	} while ( 0 )
 
 /**
+ * Convert virtual address to a physical address
+ *
+ * @v addr		Virtual address
+ * @ret phys_addr	Physical address
+ */
+unsigned long virt_to_phys ( volatile const void *addr );
+
+/**
+ * Convert physical address to a virtual address
+ *
+ * @v addr		Virtual address
+ * @ret phys_addr	Physical address
+ *
+ * This operation isn't actually valid within our memory model, and is
+ * impossible to achieve under -DKEEP_IT_REAL.  Some drivers haven't
+ * been updated to avoid it yet, though.
+ */
+void * phys_to_virt ( unsigned long phys_addr );
+
+/**
+ * Convert virtual address to a bus address
+ *
+ * @v addr		Virtual address
+ * @ret bus_addr	Bus address
+ */
+unsigned long virt_to_bus ( volatile const void *addr );
+
+/**
+ * Convert bus address to a virtual address
+ *
+ * @v bus_addr		Bus address
+ * @ret addr		Virtual address
+ *
+ * This operation isn't actually valid within our memory model, and is
+ * impossible to achieve under -DKEEP_IT_REAL.  Some drivers haven't
+ * been updated to avoid it yet, though.
+ */
+void * bus_to_virt ( unsigned long bus_addr );
+
+/**
  * Map bus address as an I/O address
  *
  * @v bus_addr		Bus address
@@ -171,26 +211,6 @@ void iounmap ( volatile const void *io_addr );
  * @ret bus_addr	Bus address
  */
 unsigned long io_to_bus ( volatile const void *io_addr );
-
-/**
- * Convert virtual address to a bus address
- *
- * @v addr		Virtual address
- * @ret bus_addr	Bus address
- */
-unsigned long virt_to_bus ( volatile const void *addr );
-
-/**
- * Convert bus address to a virtual address
- *
- * @v bus_addr		Bus address
- * @ret addr		Virtual address
- *
- * This operation isn't actually valid within our memory model, and is
- * impossible to achieve under -DKEEP_IT_REAL.  Some drivers haven't
- * been updated to avoid it yet, though.
- */
-void * bus_to_virt ( unsigned long bus_addr );
 
 /**
  * Read byte from memory-mapped device

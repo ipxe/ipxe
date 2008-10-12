@@ -32,18 +32,6 @@
 /* Variables in virtaddr.S */
 extern unsigned long virt_offset;
 
-/*
- * Convert between virtual and physical addresses
- *
- */
-static inline unsigned long virt_to_phys ( volatile const void *virt_addr ) {
-	return ( ( unsigned long ) virt_addr ) + virt_offset;
-}
-
-static inline void * phys_to_virt ( unsigned long phys_addr ) {
-	return ( void * ) ( phys_addr - virt_offset );
-}
-
 #else /* KEEP_IT_REAL */
 
 #include <stdint.h>

@@ -28,6 +28,26 @@
  *
  */
 
+static inline __always_inline unsigned long
+IOAPI_INLINE ( x86, virt_to_phys ) ( volatile const void *addr ) {
+	return ( ( ( unsigned long ) addr ) + virt_offset );
+}
+
+static inline __always_inline void *
+IOAPI_INLINE ( x86, phys_to_virt ) ( unsigned long phys_addr ) {
+	return ( ( void * ) ( phys_addr - virt_offset ) );
+}
+
+static inline __always_inline unsigned long
+IOAPI_INLINE ( x86, virt_to_bus ) ( volatile const void *addr ) {
+	return virt_to_phys ( addr );
+}
+
+static inline __always_inline void *
+IOAPI_INLINE ( x86, bus_to_virt ) ( unsigned long bus_addr ) {
+	return phys_to_virt ( bus_addr );
+}
+
 static inline __always_inline void *
 IOAPI_INLINE ( x86, ioremap ) ( unsigned long bus_addr, size_t len __unused ) {
 	return phys_to_virt ( bus_addr );
@@ -41,16 +61,6 @@ IOAPI_INLINE ( x86, iounmap ) ( volatile const void *io_addr __unused ) {
 static inline __always_inline unsigned long
 IOAPI_INLINE ( x86, io_to_bus ) ( volatile const void *io_addr ) {
 	return virt_to_phys ( io_addr );
-}
-
-static inline __always_inline unsigned long
-IOAPI_INLINE ( x86, virt_to_bus ) ( volatile const void *addr ) {
-	return virt_to_phys ( addr );
-}
-
-static inline __always_inline void *
-IOAPI_INLINE ( x86, bus_to_virt ) ( unsigned long bus_addr ) {
-	return phys_to_virt ( bus_addr );
 }
 
 /*
