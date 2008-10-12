@@ -784,7 +784,7 @@ ReadMII (int byMIIIndex, int ioaddr)
     char byMIIAdrbak;
     char byMIICRbak;
     char byMIItemp;
-    tick_t ct;
+    unsigned long ct;
 
     byMIIAdrbak = inb (byMIIAD);
     byMIICRbak = inb (byMIICR);
@@ -800,7 +800,7 @@ ReadMII (int byMIIIndex, int ioaddr)
     byMIItemp = byMIItemp & 0x40;
 
     ct = currticks();
-    while (byMIItemp != 0 && ct + 2*USECS_IN_MSEC < currticks())
+    while (byMIItemp != 0 && ct + 2*1000 < currticks())
     {
 	byMIItemp = inb (byMIICR);
 	byMIItemp = byMIItemp & 0x40;
@@ -825,7 +825,7 @@ WriteMII (char byMIISetByte, char byMIISetBit, char byMIIOP, int ioaddr)
     char byMIIAdrbak;
     char byMIICRbak;
     char byMIItemp;
-    tick_t ct;
+    unsigned long ct;
 
 
     byMIIAdrbak = inb (byMIIAD);
@@ -842,7 +842,7 @@ WriteMII (char byMIISetByte, char byMIISetBit, char byMIIOP, int ioaddr)
     byMIItemp = byMIItemp & 0x40;
 
     ct = currticks();
-    while (byMIItemp != 0 && ct + 2*USECS_IN_MSEC < currticks())
+    while (byMIItemp != 0 && ct + 2*1000 < currticks())
     {
 	byMIItemp = inb (byMIICR);
 	byMIItemp = byMIItemp & 0x40;
@@ -872,7 +872,7 @@ WriteMII (char byMIISetByte, char byMIISetBit, char byMIIOP, int ioaddr)
     byMIItemp = byMIItemp & 0x20;
 
     ct = currticks();
-    while (byMIItemp != 0 && ct + 2*USECS_IN_MSEC < currticks())
+    while (byMIItemp != 0 && ct + 2*1000 < currticks())
     {
 	byMIItemp = inb (byMIICR);
 	byMIItemp = byMIItemp & 0x20;
@@ -1346,7 +1346,7 @@ rhine_transmit (struct nic *nic,
     unsigned char CR1bak;
     unsigned char CR0bak;
     unsigned int nstype;
-    tick_t ct;
+    unsigned long ct;
 
 
     /*printf ("rhine_transmit\n"); */
@@ -1390,7 +1390,7 @@ rhine_transmit (struct nic *nic,
 	ct = currticks();
         /* Wait until transmit is finished or timeout*/
         while((tp->tx_ring[entry].tx_status.bits.own_bit !=0) &&
-		ct + 10*USECS_IN_MSEC < currticks())
+		ct + 10*1000 < currticks())
         ;
 
         if(tp->tx_ring[entry].tx_status.bits.terr == 0)

@@ -1,7 +1,5 @@
 /*
- * core/timer.c
- *
- * Copyright (C) 2007 Alexey Zaytsev <alexey.zaytsev@gmail.com>
+ * Copyright (C) 2008 Michael Brown <mbrown@fensystems.co.uk>.
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License as
@@ -18,96 +16,25 @@
  * Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
  */
 
-#include <stddef.h>
-#include <assert.h>
-#include <gpxe/timer.h>
-
-static struct timer ts_table[0]
-	__table_start ( struct timer, timers );
-static struct timer ts_table_end[0]
-	__table_end ( struct timer, timers );
-
-/*
- * This function may be used in custom timer driver.
- *
- * This udelay implementation works well if you've got a
- * fast currticks().
- */
-void generic_currticks_udelay ( unsigned int usecs ) {
-	tick_t start;
-	tick_t elapsed;
-	
-	start = currticks();
-	do {
-		/* xxx: Relax the cpu some way. */
-		elapsed = ( currticks() - start );
-	} while ( elapsed < usecs );
-}
+#include <unistd.h>
 
 /**
- * Identify timer source
+ * Delay for a fixed number of milliseconds
  *
- * @ret timer		Timer source
+ * @v msecs		Number of milliseconds for which to delay
  */
-static struct timer * timer ( void ) {
-	static struct timer *ts = NULL;
-
-	/* If we have a timer, use it */
-	if ( ts )
-		return ts;
-
-	/* Scan for a usable timer */
-	for ( ts = ts_table ; ts < ts_table_end ; ts++ ) {
-		if ( ts->init() == 0 )
-			return ts;
-	}
-
-	/* No timer found; we cannot continue */
-	assert ( 0 );
-	while ( 1 ) {};
-}
-
-/**
- * Read current time
- *
- * @ret ticks	Current time, in ticks
- */
-tick_t currticks ( void ) {
-	tick_t ct;
-
-	ct = timer()->currticks();
-	DBG ( "currticks: %ld.%06ld seconds\n",
-	      ct / USECS_IN_SEC, ct % USECS_IN_SEC );
-
-	return ct;
-}
-
-/**
- * Delay
- *
- * @v usecs	Time to delay, in microseconds
- */
-void udelay ( unsigned int usecs ) {
-	timer()->udelay ( usecs );
-}
-
-/**
- * Delay
- *
- * @v msecs	Time to delay, in milliseconds
- */
-void mdelay ( unsigned int msecs ) {
+void mdelay ( unsigned long msecs ) {
 	while ( msecs-- )
-		udelay ( USECS_IN_MSEC );
+		udelay ( 1000 );
 }
 
 /**
- * Delay
+ * Delay for a fixed number of seconds
  *
- * @v secs	Time to delay, in seconds
+ * @v secs		Number of seconds for which to delay
  */
 unsigned int sleep ( unsigned int secs ) {
 	while ( secs-- )
-		mdelay ( MSECS_IN_SEC );
+		mdelay ( 1000 );
 	return 0;
 }

@@ -309,7 +309,7 @@ epic100_transmit(struct nic *nic, const char *destaddr, unsigned int type,
     unsigned short nstype;
     unsigned char *txp;
     int entry;
-    tick_t ct;
+    unsigned long ct;
 
     /* Calculate the next Tx descriptor entry. */
     entry = cur_tx % TX_RING_SIZE;
@@ -352,7 +352,7 @@ epic100_transmit(struct nic *nic, const char *destaddr, unsigned int type,
     ct = currticks();
     /* timeout 10 ms for transmit */
     while ((le32_to_cpu(tx_ring[entry].status) & (TRING_OWN)) &&
-		ct + 10*USECS_IN_MSEC < currticks())
+		ct + 10*1000 < currticks())
 	/* Wait */;
 
     if ((le32_to_cpu(tx_ring[entry].status) & TRING_OWN) != 0)

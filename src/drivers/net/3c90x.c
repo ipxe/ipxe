@@ -497,7 +497,7 @@ a3c90x_transmit(struct nic *nic __unused, const char *d, unsigned int t,
 
     unsigned char status;
     unsigned i, retries;
-    tick_t ct;
+    unsigned long ct;
 
     for (retries=0; retries < XMIT_RETRIES ; retries++)
 	{
@@ -543,7 +543,7 @@ a3c90x_transmit(struct nic *nic __unused, const char *d, unsigned int t,
 	ct = currticks();
 
 	while (!(inw(INF_3C90X.IOAddr + regCommandIntStatus_w)&0x0004) &&
-		ct + 10*USECS_IN_MSEC < currticks());
+		ct + 10*1000 < currticks());
 		;
 
 	if (!(inw(INF_3C90X.IOAddr + regCommandIntStatus_w)&0x0004))

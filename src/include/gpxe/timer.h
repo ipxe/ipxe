@@ -1,41 +1,73 @@
-#ifndef	GPXE_TIMER_H
-#define GPXE_TIMER_H
+#ifndef	_GPXE_TIMER_H
+#define _GPXE_TIMER_H
 
-#include <stddef.h>
-#include <gpxe/tables.h>
+/** @file
+ *
+ * gPXE timer API
+ *
+ * The timer API provides udelay() for fixed delays, and currticks()
+ * for a monotonically increasing tick counter.
+ */
 
-typedef unsigned long tick_t;
+#include <gpxe/api.h>
+#include <config/timer.h>
 
-#define MSECS_IN_SEC (1000)
-#define USECS_IN_SEC (1000*1000)
-#define USECS_IN_MSEC (1000)
+/**
+ * Calculate static inline timer API function name
+ *
+ * @v _prefix		Subsystem prefix
+ * @v _api_func		API function
+ * @ret _subsys_func	Subsystem API function
+ */
+#define TIMER_INLINE( _subsys, _api_func ) \
+	SINGLE_API_INLINE ( TIMER_PREFIX_ ## _subsys, _api_func )
 
-#define	TICKS_PER_SEC	USECS_IN_SEC
+/**
+ * Provide a timer API implementation
+ *
+ * @v _prefix		Subsystem prefix
+ * @v _api_func		API function
+ * @v _func		Implementing function
+ */
+#define PROVIDE_TIMER( _subsys, _api_func, _func ) \
+	PROVIDE_SINGLE_API ( TIMER_PREFIX_ ## _subsys, _api_func, _func )
 
-extern tick_t currticks ( void );
+/**
+ * Provide a static inline timer API implementation
+ *
+ * @v _prefix		Subsystem prefix
+ * @v _api_func		API function
+ */
+#define PROVIDE_TIMER_INLINE( _subsys, _api_func ) \
+	PROVIDE_SINGLE_API_INLINE ( TIMER_PREFIX_ ## _subsys, _api_func )
 
-extern void generic_currticks_udelay ( unsigned int usecs );
+/* Include all architecture-independent I/O API headers */
 
-/** A timer */
-struct timer {
-	/** Initialise timer
-	 *
-	 * @ret rc	Return status code
-	 */
-	int ( * init ) ( void );
-	/** Read current time
-	 *
-	 * @ret ticks	Current time, in ticks
-	 */
-	tick_t ( * currticks ) ( void );
-	/** Delay
-	 *
-	 * @v usecs	Time to delay, in microseconds
-	 */
-	void ( * udelay ) ( unsigned int usecs );
-};
+/* Include all architecture-dependent I/O API headers */
+#include <bits/timer.h>
 
-#define __timer( order ) __table ( struct timer, timers, order )
+/**
+ * Delay for a fixed number of microseconds
+ *
+ * @v usecs		Number of microseconds for which to delay
+ */
+void udelay ( unsigned long usecs );
 
-#endif	/* GPXE_TIMER_H */
+/**
+ * Get current system time in ticks
+ *
+ * @ret ticks		Current time, in ticks
+ */
+unsigned long currticks ( void );
 
+/**
+ * Get number of ticks per second
+ *
+ * @ret ticks_per_sec	Number of ticks per second
+ */
+unsigned long ticks_per_sec ( void );
+
+/** Number of ticks per second */
+#define TICKS_PER_SEC ( ticks_per_sec() )
+
+#endif /* _GPXE_TIMER_H */

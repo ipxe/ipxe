@@ -112,7 +112,7 @@ static const char *w89c840_version = "driver Version 0.94 - December 12, 2003";
 
 /* Operational parameters that usually are not changed. */
 /* Time in jiffies before concluding the transmitter is hung. */
-#define TX_TIMEOUT  (10*USECS_IN_MSEC)
+#define TX_TIMEOUT  (10*1000)
 
 #define PKT_BUF_SZ  1536  /* Size of each temporary Rx buffer.*/
 
@@ -486,7 +486,7 @@ static void w89c840_transmit(
     /* send the packet to destination */
     unsigned entry;
     int transmit_status;
-    tick_t ct;
+    unsigned long ct;
 
     /* Caution: the write order is important here, set the field
        with the "ownership" bits last. */

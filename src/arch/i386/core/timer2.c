@@ -12,12 +12,11 @@
  */
 
 #include <stddef.h>
-#include <bits/timer2.h>
-#include <gpxe/timer.h>
+#include <gpxe/timer2.h>
 #include <gpxe/io.h>
 
 /* Timers tick over at this rate */
-#define TIMER2_TICK_RATE	1193180U
+#define TIMER2_TICKS_PER_SEC	1193180U
 
 /* Parallel Peripheral Controller Port B */
 #define	PPC_PORTB	0x61
@@ -52,8 +51,7 @@
 #define	BINARY_COUNT	0x00
 #define	BCD_COUNT	0x01
 
-static void load_timer2(unsigned int ticks)
-{
+static void load_timer2 ( unsigned int ticks ) {
 	/*
 	 * Now let's take care of PPC channel 2
 	 *
@@ -75,15 +73,13 @@ static void load_timer2(unsigned int ticks)
 	outb(ticks >> 8, TIMER2_PORT);
 }
 
-static int timer2_running(void)
-{
+static int timer2_running ( void ) {
 	return ((inb(PPC_PORTB) & PPCB_T2OUT) == 0);
 }
 
-void i386_timer2_udelay(unsigned int usecs)
-{
-		load_timer2((usecs * TIMER2_TICK_RATE)/USECS_IN_SEC);
-		while (timer2_running())
-			;
+void timer2_udelay ( unsigned long usecs ) {
+	load_timer2 ( ( usecs * TIMER2_TICKS_PER_SEC ) / ( 1000 * 1000 ) );
+	while (timer2_running()) {
+		/* Do nothing */
+	}
 }
-
