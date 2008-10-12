@@ -83,7 +83,7 @@ int monojob_wait ( const char *string ) {
 			}
 		}
 		elapsed = ( currticks() - last_progress_dot );
-		if ( elapsed > TICKS_PER_SEC ) {
+		if ( elapsed >= TICKS_PER_SEC ) {
 			printf ( "." );
 			last_progress_dot = currticks();
 		}
