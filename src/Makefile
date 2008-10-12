@@ -37,6 +37,7 @@ SYMCHECK	:= $(PERL) ./util/symcheck.pl
 SORTOBJDUMP	:= $(PERL) ./util/sortobjdump.pl
 NRV2B		:= ./util/nrv2b
 ZBIN		:= ./util/zbin
+EFILINK		:= ./util/efilink
 DOXYGEN		:= doxygen
 
 ###############################################################################
@@ -57,7 +58,7 @@ SRCDIRS		+= drivers/block
 SRCDIRS		+= drivers/nvs
 SRCDIRS		+= drivers/bitbash
 SRCDIRS		+= drivers/infiniband
-SRCDIRS		+= interface/pxe
+SRCDIRS		+= interface/pxe interface/efi
 SRCDIRS		+= tests
 SRCDIRS		+= crypto crypto/axtls crypto/matrixssl
 SRCDIRS		+= hci hci/commands hci/tui

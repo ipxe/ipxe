@@ -23,6 +23,7 @@
 	PROVIDE_SINGLE_API ( UMALLOC_PREFIX_ ## _subsys, _api_func, _func )
 
 /* Include all architecture-independent I/O API headers */
+#include <gpxe/efi/efi_umalloc.h>
 
 /* Include all architecture-dependent I/O API headers */
 #include <bits/umalloc.h>

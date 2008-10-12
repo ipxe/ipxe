@@ -42,6 +42,7 @@
 	PROVIDE_SINGLE_API_INLINE ( TIMER_PREFIX_ ## _subsys, _api_func )
 
 /* Include all architecture-independent I/O API headers */
+#include <gpxe/efi/efi_timer.h>
 
 /* Include all architecture-dependent I/O API headers */
 #include <bits/timer.h>

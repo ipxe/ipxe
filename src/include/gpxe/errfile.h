@@ -139,6 +139,7 @@
 #define ERRFILE_elf		      ( ERRFILE_IMAGE | 0x00010000 )
 #define ERRFILE_script		      ( ERRFILE_IMAGE | 0x00020000 )
 #define ERRFILE_segment		      ( ERRFILE_IMAGE | 0x00030000 )
+#define ERRFILE_efi_image	      ( ERRFILE_IMAGE | 0x00040000 )
 
 #define ERRFILE_asn1		      ( ERRFILE_OTHER | 0x00000000 )
 #define ERRFILE_chap		      ( ERRFILE_OTHER | 0x00010000 )
@@ -156,6 +157,7 @@
 #define ERRFILE_tls		      ( ERRFILE_OTHER | 0x000d0000 )
 #define ERRFILE_ifmgmt		      ( ERRFILE_OTHER | 0x000e0000 )
 #define ERRFILE_iscsiboot	      ( ERRFILE_OTHER | 0x000f0000 )
+#define ERRFILE_efi_pci		      ( ERRFILE_OTHER | 0x00100000 )
 
 /** @} */
 

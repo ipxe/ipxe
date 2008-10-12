@@ -695,6 +695,15 @@ CLEANUP += $(ZBIN)
 
 ###############################################################################
 #
+# The EFI custom linker
+#
+$(EFILINK) : util/efilink.c $(MAKEDEPS)
+	$(QM)$(ECHO) "  [HOSTCC] $@"
+	$(Q)$(HOST_CC) -O2 -o $@ $< -lbfd
+CLEANUP += $(EFILINK)
+
+###############################################################################
+#
 # Auto-incrementing build serial number.  Append "bs" to your list of
 # build targets to get a serial number printed at the end of the
 # build.  Enable -DBUILD_SERIAL in order to see it when the code runs.

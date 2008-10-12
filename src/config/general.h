@@ -70,6 +70,7 @@
 //#define	IMAGE_SCRIPT		/* gPXE script image support */
 //#define	IMAGE_BZIMAGE		/* Linux bzImage image support */
 //#define	IMAGE_COMBOOT		/* SYSLINUX COMBOOT image support */
+//#define	IMAGE_EFI		/* EFI image support */
 
 /*
  * Command-line commands to include

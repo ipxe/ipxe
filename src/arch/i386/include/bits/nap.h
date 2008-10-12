@@ -8,5 +8,6 @@
  */
 
 #include <gpxe/bios_nap.h>
+#include <gpxe/efi/efix86_nap.h>
 
 #endif /* _BITS_MAP_H */

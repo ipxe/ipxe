@@ -51,6 +51,7 @@
 	PROVIDE_SINGLE_API_INLINE ( IOAPI_PREFIX_ ## _subsys, _api_func )
 
 /* Include all architecture-independent I/O API headers */
+#include <gpxe/efi/efi_io.h>
 
 /* Include all architecture-dependent I/O API headers */
 #include <bits/io.h>

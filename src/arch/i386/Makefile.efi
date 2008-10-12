@@ -1,0 +1,24 @@
+# -*- makefile -*- : Force emacs to use Makefile mode
+
+# The EFI linker script
+#
+LDSCRIPT	= arch/i386/scripts/efi.lds
+
+# Use a relocatable link; we perform final relocations in the efilink utility.
+#
+LDFLAGS		+= -r -d -S
+
+# Media types.
+#
+NON_AUTO_MEDIA	+= efi
+
+# Rule for building EFI files
+#
+$(BIN)/%.efi.tmp-reloc : $(BIN)/%.efi.tmp $(EFILINK)
+	$(QM)$(ECHO) "  [EFILINK] $@"
+	$(Q)$(LD) -e 0 -o /dev/null $< # Check for unresolved symbols
+	$(Q)$(EFILINK) $< $@
+
+$(BIN)/%.efi : $(BIN)/%.efi.tmp-reloc
+	$(QM)$(ECHO) "  [FINISH] $@"
+	$(Q)$(OBJCOPY) -Obinary $< $@

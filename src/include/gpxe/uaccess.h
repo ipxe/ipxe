@@ -186,6 +186,7 @@ trivial_memchr_user ( userptr_t buffer, off_t offset, int c, size_t len ) {
 	PROVIDE_SINGLE_API_INLINE ( UACCESS_PREFIX_ ## _subsys, _api_func )
 
 /* Include all architecture-independent user access API headers */
+#include <gpxe/efi/efi_uaccess.h>
 
 /* Include all architecture-dependent user access API headers */
 #include <bits/uaccess.h>

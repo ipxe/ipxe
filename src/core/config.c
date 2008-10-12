@@ -59,6 +59,9 @@ REQUIRE_OBJECT ( pc_kbd );
 #ifdef CONSOLE_SYSLOG
 REQUIRE_OBJECT ( syslog );
 #endif
+#ifdef CONSOLE_EFI
+REQUIRE_OBJECT ( efi_console );
+#endif
 
 /*
  * Drag in all requested network protocols
@@ -157,6 +160,9 @@ REQUIRE_OBJECT ( comboot_call );
 REQUIRE_OBJECT ( com32_call );
 REQUIRE_OBJECT ( com32_wrapper );
 REQUIRE_OBJECT ( comboot_resolv );
+#endif
+#ifdef IMAGE_EFI
+REQUIRE_OBJECT ( efi_image );
 #endif
 
 /*
