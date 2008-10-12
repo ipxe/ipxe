@@ -1,10 +1,9 @@
 #include "stddef.h"
 #include "console.h"
 #include <gpxe/process.h>
+#include <gpxe/nap.h>
 
 /** @file */
-
-#include "bios.h"
 
 static struct console_driver console_drivers[0]
 	__table_start ( struct console_driver, console );
@@ -81,9 +80,6 @@ static struct console_driver * has_input ( void ) {
  * @endcode
  *
  * The character read will not be echoed back to any console.
- *
- * @bug We need a cleaner way to pick up cpu_nap().  It makes a
- * real-mode call, and so we don't want to use it with LinuxBIOS.
  *
  */
 int getchar ( void ) {

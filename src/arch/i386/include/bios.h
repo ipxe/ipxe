@@ -5,6 +5,4 @@
 #define BDA_FBMS 0x0013
 #define BDA_NUM_DRIVES 0x0075
 
-extern void cpu_nap ( void );
-
 #endif /* BIOS_H */

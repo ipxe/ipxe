@@ -19,7 +19,6 @@
 #include <stdio.h>
 #include <string.h>
 #include <byteswap.h>
-#include <bios.h>
 #include <gpxe/iobuf.h>
 #include <gpxe/in.h>
 #include <gpxe/if_arp.h>
@@ -27,6 +26,7 @@
 #include <gpxe/ip.h>
 #include <gpxe/udp.h>
 #include <gpxe/netdevice.h>
+#include <gpxe/nap.h>
 #include <gpxe/gdbstub.h>
 #include <gpxe/gdbudp.h>
 

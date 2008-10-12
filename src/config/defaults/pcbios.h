@@ -11,5 +11,6 @@
 #define PCIAPI_PCBIOS
 #define TIMER_PCBIOS
 #define CONSOLE_PCBIOS
+#define NAP_PCBIOS
 
 #endif /* CONFIG_DEFAULTS_PCBIOS_H */
