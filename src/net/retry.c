@@ -55,9 +55,10 @@ static LIST_HEAD ( timers );
  * be stopped and the timer's callback function will be called.
  */
 void start_timer ( struct retry_timer *timer ) {
-	if ( ! timer_running ( timer ) )
+	if ( ! timer->running )
 		list_add ( &timer->list, &timers );
 	timer->start = currticks();
+	timer->running = 1;
 
 	/* 0 means "use default timeout" */
 	if ( timer->min_timeout == 0 )
@@ -82,6 +83,8 @@ void start_timer ( struct retry_timer *timer ) {
 void start_timer_fixed ( struct retry_timer *timer, unsigned long timeout ) {
 	start_timer ( timer );
 	timer->timeout = timeout;
+	DBG2 ( "Timer %p expiry time changed to %ld\n",
+	       timer, ( timer->start + timer->timeout ) );
 }
 
 /**
@@ -97,12 +100,12 @@ void stop_timer ( struct retry_timer *timer ) {
 	unsigned long runtime;
 
 	/* If timer was already stopped, do nothing */
-	if ( ! timer_running ( timer ) )
+	if ( ! timer->running )
 		return;
 
 	list_del ( &timer->list );
 	runtime = ( now - timer->start );
-	timer->start = 0;
+	timer->running = 0;
 	DBG2 ( "Timer %p stopped at time %ld (ran for %ld)\n",
 	       timer, now, runtime );
 
@@ -144,8 +147,9 @@ static void timer_expired ( struct retry_timer *timer ) {
 	/* Stop timer without performing RTT calculations */
 	DBG2 ( "Timer %p stopped at time %ld on expiry\n",
 	       timer, currticks() );
+	assert ( timer->running );
 	list_del ( &timer->list );
-	timer->start = 0;
+	timer->running = 0;
 	timer->count++;
 
 	/* Back off the timeout value */

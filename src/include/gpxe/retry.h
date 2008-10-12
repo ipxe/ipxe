@@ -19,6 +19,8 @@
 struct retry_timer {
 	/** List of active timers */
 	struct list_head list;
+	/** Timer is currently running */
+	unsigned int running;
 	/** Timeout value (in ticks) */
 	unsigned long timeout;
 	/** Minimum timeout value (in ticks)
@@ -31,10 +33,7 @@ struct retry_timer {
 	 * A value of zero means "use default timeout."
 	 */
 	unsigned long max_timeout;
-	/** Start time (in ticks)
-	 *
-	 * A start time of zero indicates a stopped timer.
-	 */
+	/** Start time (in ticks) */
 	unsigned long start;
 	/** Retry count */
 	unsigned int count;
@@ -74,7 +73,7 @@ static inline void start_timer_nodelay ( struct retry_timer *timer ) {
  */
 static inline __attribute__ (( always_inline )) unsigned long
 timer_running ( struct retry_timer *timer ) {
-	return ( timer->start );
+	return ( timer->running );
 }
 
 #endif /* _GPXE_RETRY_H */
