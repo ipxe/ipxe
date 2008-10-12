@@ -25,6 +25,7 @@
 #include <assert.h>
 #include <byteswap.h>
 #include <gpxe/pci.h>
+#include <gpxe/io.h>
 #include <gpxe/malloc.h>
 #include <gpxe/iobuf.h>
 #include <gpxe/netdevice.h>
