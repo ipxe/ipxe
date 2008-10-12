@@ -4,6 +4,12 @@
 #include <stdint.h>
 #include <gpxe/io.h>
 
+#ifdef PCIAPI_DIRECT
+#define PCIAPI_PREFIX_direct
+#else
+#define PCIAPI_PREFIX_direct __direct_
+#endif
+
 /** @file
  *
  * PCI configuration space access via Type 1 accesses
@@ -22,7 +28,8 @@ extern void pcidirect_prepare ( struct pci_device *pci, int where );
  *
  * @ret max_bus		Maximum bus number
  */
-static inline int pcidirect_max_bus ( void ) {
+static inline __always_inline int
+PCIAPI_INLINE ( direct, pci_max_bus ) ( void ) {
 	/* No way to work this out via Type 1 accesses */
 	return 0xff;
 }
@@ -35,9 +42,10 @@ static inline int pcidirect_max_bus ( void ) {
  * @v value	Value read
  * @ret rc	Return status code
  */
-static inline __attribute__ (( always_inline )) int
-pcidirect_read_config_byte ( struct pci_device *pci, unsigned int where,
-			     uint8_t *value ) {
+static inline __always_inline int
+PCIAPI_INLINE ( direct, pci_read_config_byte ) ( struct pci_device *pci,
+						 unsigned int where,
+						 uint8_t *value ) {
 	pcidirect_prepare ( pci, where );
 	*value = inb ( PCIDIRECT_CONFIG_DATA + ( where & 3 ) );
 	return 0;
@@ -51,9 +59,10 @@ pcidirect_read_config_byte ( struct pci_device *pci, unsigned int where,
  * @v value	Value read
  * @ret rc	Return status code
  */
-static inline __attribute__ (( always_inline )) int
-pcidirect_read_config_word ( struct pci_device *pci, unsigned int where,
-			     uint16_t *value ) {
+static inline __always_inline int
+PCIAPI_INLINE ( direct, pci_read_config_word ) ( struct pci_device *pci,
+						 unsigned int where,
+						 uint16_t *value ) {
 	pcidirect_prepare ( pci, where );
 	*value = inw ( PCIDIRECT_CONFIG_DATA + ( where & 2 ) );
 	return 0;
@@ -67,9 +76,10 @@ pcidirect_read_config_word ( struct pci_device *pci, unsigned int where,
  * @v value	Value read
  * @ret rc	Return status code
  */
-static inline __attribute__ (( always_inline )) int
-pcidirect_read_config_dword ( struct pci_device *pci, unsigned int where,
-			      uint32_t *value ) {
+static inline __always_inline int
+PCIAPI_INLINE ( direct, pci_read_config_dword ) ( struct pci_device *pci,
+						  unsigned int where,
+						  uint32_t *value ) {
 	pcidirect_prepare ( pci, where );
 	*value = inl ( PCIDIRECT_CONFIG_DATA );
 	return 0;
@@ -83,9 +93,10 @@ pcidirect_read_config_dword ( struct pci_device *pci, unsigned int where,
  * @v value	Value to be written
  * @ret rc	Return status code
  */
-static inline __attribute__ (( always_inline )) int
-pcidirect_write_config_byte ( struct pci_device *pci, unsigned int where,
-			      uint8_t value ) {
+static inline __always_inline int
+PCIAPI_INLINE ( direct, pci_write_config_byte ) ( struct pci_device *pci,
+						  unsigned int where,
+						  uint8_t value ) {
 	pcidirect_prepare ( pci, where );
 	outb ( value, PCIDIRECT_CONFIG_DATA + ( where & 3 ) );
 	return 0;
@@ -99,9 +110,10 @@ pcidirect_write_config_byte ( struct pci_device *pci, unsigned int where,
  * @v value	Value to be written
  * @ret rc	Return status code
  */
-static inline __attribute__ (( always_inline )) int
-pcidirect_write_config_word ( struct pci_device *pci, unsigned int where,
-			      uint16_t value ) {
+static inline __always_inline int
+PCIAPI_INLINE ( direct, pci_write_config_word ) ( struct pci_device *pci,
+						  unsigned int where,
+						  uint16_t value ) {
 	pcidirect_prepare ( pci, where );
 	outw ( value, PCIDIRECT_CONFIG_DATA + ( where & 2 ) );
 	return 0;
@@ -115,9 +127,10 @@ pcidirect_write_config_word ( struct pci_device *pci, unsigned int where,
  * @v value	Value to be written
  * @ret rc	Return status code
  */
-static inline __attribute__ (( always_inline )) int
-pcidirect_write_config_dword ( struct pci_device *pci, unsigned int where,
-			       uint32_t value ) {
+static inline __always_inline int
+PCIAPI_INLINE ( direct, pci_write_config_dword ) ( struct pci_device *pci,
+						   unsigned int where,
+						   uint32_t value ) {
 	pcidirect_prepare ( pci, where );
 	outl ( value, PCIDIRECT_CONFIG_DATA );
 	return 0;

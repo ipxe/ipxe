@@ -1,5 +1,5 @@
-#ifndef _PCIBIOS_H
-#define _PCIBIOS_H
+#ifndef _GPXE_PCIBIOS_H
+#define _GPXE_PCIBIOS_H
 
 #include <stdint.h>
 
@@ -8,6 +8,12 @@
  * PCI configuration space access via PCI BIOS
  *
  */
+
+#ifdef PCIAPI_PCBIOS
+#define PCIAPI_PREFIX_pcbios
+#else
+#define PCIAPI_PREFIX_pcbios __pcbios_
+#endif
 
 struct pci_device;
 
@@ -19,7 +25,6 @@ struct pci_device;
 #define PCIBIOS_WRITE_CONFIG_WORD	0xb10c0000
 #define PCIBIOS_WRITE_CONFIG_DWORD	0xb10d0000
 
-extern int pcibios_max_bus ( void );
 extern int pcibios_read ( struct pci_device *pci, uint32_t command,
 			  uint32_t *value );
 extern int pcibios_write ( struct pci_device *pci, uint32_t command,
@@ -33,9 +38,10 @@ extern int pcibios_write ( struct pci_device *pci, uint32_t command,
  * @v value	Value read
  * @ret rc	Return status code
  */
-static inline __attribute__ (( always_inline )) int
-pcibios_read_config_byte ( struct pci_device *pci, unsigned int where,
-			   uint8_t *value ) {
+static inline __always_inline int
+PCIAPI_INLINE ( pcbios, pci_read_config_byte ) ( struct pci_device *pci,
+						 unsigned int where,
+						 uint8_t *value ) {
 	uint32_t tmp;
 	int rc;
 
@@ -52,9 +58,10 @@ pcibios_read_config_byte ( struct pci_device *pci, unsigned int where,
  * @v value	Value read
  * @ret rc	Return status code
  */
-static inline __attribute__ (( always_inline )) int
-pcibios_read_config_word ( struct pci_device *pci, unsigned int where,
-			   uint16_t *value ) {
+static inline __always_inline int
+PCIAPI_INLINE ( pcbios, pci_read_config_word ) ( struct pci_device *pci,
+						 unsigned int where,
+						 uint16_t *value ) {
 	uint32_t tmp;
 	int rc;
 
@@ -71,9 +78,10 @@ pcibios_read_config_word ( struct pci_device *pci, unsigned int where,
  * @v value	Value read
  * @ret rc	Return status code
  */
-static inline __attribute__ (( always_inline )) int
-pcibios_read_config_dword ( struct pci_device *pci, unsigned int where,
-			    uint32_t *value ) {
+static inline __always_inline int
+PCIAPI_INLINE ( pcbios, pci_read_config_dword ) ( struct pci_device *pci,
+						  unsigned int where,
+						  uint32_t *value ) {
 	return pcibios_read ( pci, PCIBIOS_READ_CONFIG_DWORD | where, value );
 }
 
@@ -85,9 +93,10 @@ pcibios_read_config_dword ( struct pci_device *pci, unsigned int where,
  * @v value	Value to be written
  * @ret rc	Return status code
  */
-static inline __attribute__ (( always_inline )) int
-pcibios_write_config_byte ( struct pci_device *pci, unsigned int where,
-			    uint8_t value ) {
+static inline __always_inline int
+PCIAPI_INLINE ( pcbios, pci_write_config_byte ) ( struct pci_device *pci,
+						  unsigned int where,
+						  uint8_t value ) {
 	return pcibios_write ( pci, PCIBIOS_WRITE_CONFIG_BYTE | where, value );
 }
 
@@ -99,9 +108,10 @@ pcibios_write_config_byte ( struct pci_device *pci, unsigned int where,
  * @v value	Value to be written
  * @ret rc	Return status code
  */
-static inline __attribute__ (( always_inline )) int
-pcibios_write_config_word ( struct pci_device *pci, unsigned int where,
-			    uint16_t value ) {
+static inline __always_inline int
+PCIAPI_INLINE ( pcbios, pci_write_config_word ) ( struct pci_device *pci,
+						  unsigned int where,
+						  uint16_t value ) {
 	return pcibios_write ( pci, PCIBIOS_WRITE_CONFIG_WORD | where, value );
 }
 
@@ -113,10 +123,11 @@ pcibios_write_config_word ( struct pci_device *pci, unsigned int where,
  * @v value	Value to be written
  * @ret rc	Return status code
  */
-static inline __attribute__ (( always_inline )) int
-pcibios_write_config_dword ( struct pci_device *pci, unsigned int where,
-			     uint32_t value ) {
+static inline __always_inline int
+PCIAPI_INLINE ( pcbios, pci_write_config_dword ) ( struct pci_device *pci,
+						   unsigned int where,
+						   uint32_t value ) {
 	return pcibios_write ( pci, PCIBIOS_WRITE_CONFIG_DWORD | where, value);
 }
 
-#endif /* _PCIBIOS_H */
+#endif /* _GPXE_PCIBIOS_H */

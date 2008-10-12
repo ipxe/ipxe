@@ -19,7 +19,7 @@
 #include <stdint.h>
 #include <gpxe/device.h>
 #include <gpxe/tables.h>
-#include <pci_io.h>
+#include <gpxe/pci_io.h>
 #include "pci_ids.h"
 
 /*

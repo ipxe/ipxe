@@ -18,7 +18,6 @@
 
 #include <stdint.h>
 #include <gpxe/pci.h>
-#include <pcibios.h>
 #include <realmode.h>
 
 /** @file
@@ -32,7 +31,7 @@
  *
  * @ret max_bus		Maximum bus number
  */
-int pcibios_max_bus ( void ) {
+static int pcibios_max_bus ( void ) {
 	int discard_a, discard_D;
 	uint8_t max_bus;
 
@@ -104,3 +103,11 @@ int pcibios_write ( struct pci_device *pci, uint32_t command, uint32_t value ){
 	
 	return ( ( status >> 8 ) & 0xff );
 }
+
+PROVIDE_PCIAPI ( pcbios, pci_max_bus, pcibios_max_bus );
+PROVIDE_PCIAPI_INLINE ( pcbios, pci_read_config_byte );
+PROVIDE_PCIAPI_INLINE ( pcbios, pci_read_config_word );
+PROVIDE_PCIAPI_INLINE ( pcbios, pci_read_config_dword );
+PROVIDE_PCIAPI_INLINE ( pcbios, pci_write_config_byte );
+PROVIDE_PCIAPI_INLINE ( pcbios, pci_write_config_word );
+PROVIDE_PCIAPI_INLINE ( pcbios, pci_write_config_dword );
