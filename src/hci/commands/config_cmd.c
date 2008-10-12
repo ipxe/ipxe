@@ -16,7 +16,7 @@ static int config_exec ( int argc, char **argv ) {
 	}
 
 	settings_name = ( ( argc == 2 ) ? argv[1] : "" );
-	settings = find_settings ( argv[1] );
+	settings = find_settings ( settings_name );
 	if ( ! settings ) {
 		printf ( "No such scope \"%s\"\n", settings_name );
 		return 1;
