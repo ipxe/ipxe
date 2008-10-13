@@ -23,7 +23,7 @@ SECTIONS {
      *
      */
 
-    .prefix : AT ( _prefix_lma ) {
+    .prefix : {
 	_prefix = .;
 	*(.prefix)
 	*(.prefix.*)
@@ -40,7 +40,7 @@ SECTIONS {
      */
 
     . = ALIGN ( _max_align );
-    .text : AT ( _text_lma ) {
+    .text : {
 	_text = .;
 	*(.text)
 	*(.text.*)
@@ -57,7 +57,7 @@ SECTIONS {
      */
 
     . = ALIGN ( _max_align );
-    .rodata : AT ( _rodata_lma ) {
+    .rodata : {
 	_rodata = .;
 	*(.rodata)
 	*(.rodata.*)
@@ -74,7 +74,7 @@ SECTIONS {
      */
 
     . = ALIGN ( _max_align );
-    .data : AT ( _data_lma ) {
+    .data : {
 	_data = .;
 	*(.data)
 	*(.data.*)
@@ -98,7 +98,7 @@ SECTIONS {
      */
 
     . = ALIGN ( _max_align );
-    .bss : AT ( _bss_lma ) {
+    .bss : { 
 	_bss = .;
 	/* EFI seems to not support proper bss sections */
 	_mbss = .;
@@ -114,7 +114,7 @@ SECTIONS {
      */
 
     . = ALIGN ( _max_align );
-    .reloc : AT ( _reloc_lma ) {
+    .reloc : {
 	_reloc = .;
 	/* Provide some dummy contents to force ld to include this
 	 * section.  It will be created by the efilink utility.
