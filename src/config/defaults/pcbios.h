@@ -15,4 +15,11 @@
 #define NAP_PCBIOS
 #define UMALLOC_MEMTOP
 
+#define	IMAGE_ELF		/* ELF image support */
+#define	IMAGE_MULTIBOOT		/* MultiBoot image support */
+#define	IMAGE_PXE		/* PXE image support */
+#define IMAGE_SCRIPT		/* gPXE script image support */
+#define IMAGE_BZIMAGE		/* Linux bzImage image support */
+#define IMAGE_COMBOOT		/* SYSLINUX COMBOOT image support */
+
 #endif /* CONFIG_DEFAULTS_PCBIOS_H */

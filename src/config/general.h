@@ -7,6 +7,8 @@
  *
  */
 
+#include <config/defaults.h>
+
 /*
  * Timer configuration
  *
@@ -50,16 +52,16 @@
  * you want to use.
  *
  */
-#undef	IMAGE_NBI		/* NBI image support */
-#define	IMAGE_ELF		/* ELF image support */
-#undef	IMAGE_FREEBSD		/* FreeBSD kernel image support */
-#define	IMAGE_MULTIBOOT		/* MultiBoot image support */
-#undef	IMAGE_AOUT		/* a.out image support */
-#undef	IMAGE_WINCE		/* WinCE image support */
-#define	IMAGE_PXE		/* PXE image support */
-#define IMAGE_SCRIPT		/* gPXE script image support */
-#define IMAGE_BZIMAGE		/* Linux bzImage image support */
-#define IMAGE_COMBOOT		/* SYSLINUX COMBOOT image support */
+//#define	IMAGE_NBI		/* NBI image support */
+//#define	IMAGE_ELF		/* ELF image support */
+//#define	IMAGE_FREEBSD		/* FreeBSD kernel image support */
+//#define	IMAGE_MULTIBOOT		/* MultiBoot image support */
+//#define	IMAGE_AOUT		/* a.out image support */
+//#define	IMAGE_WINCE		/* WinCE image support */
+//#define	IMAGE_PXE		/* PXE image support */
+//#define	IMAGE_SCRIPT		/* gPXE script image support */
+//#define	IMAGE_BZIMAGE		/* Linux bzImage image support */
+//#define	IMAGE_COMBOOT		/* SYSLINUX COMBOOT image support */
 
 /*
  * Command-line commands to include
