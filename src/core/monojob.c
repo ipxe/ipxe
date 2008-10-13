@@ -91,6 +91,7 @@ int monojob_wait ( const char *string ) {
 	rc = monojob_rc;
 
 done:
+	job_done ( &monojob, rc );
 	if ( rc ) {
 		printf ( " %s\n", strerror ( rc ) );
 	} else {
