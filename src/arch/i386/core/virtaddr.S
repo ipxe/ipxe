@@ -4,7 +4,7 @@
  *
  */
 
-#include "virtaddr.h"
+#include "librm.h"
 		
 	.arch i386
 	.text

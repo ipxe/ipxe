@@ -1,21 +1,109 @@
 #ifndef LIBRM_H
 #define LIBRM_H
 
-/* Drag in protected-mode segment selector values */
-#include "virtaddr.h"
-#include "realmode.h"
+/* Segment selectors as used in our protected-mode GDTs.
+ *
+ * Don't change these unless you really know what you're doing.
+ */
+
+#define VIRTUAL_CS 0x08
+#define VIRTUAL_DS 0x10
+#define PHYSICAL_CS 0x18
+#define PHYSICAL_DS 0x20
+#define REAL_CS 0x28
+#define REAL_DS 0x30
+#if 0
+#define LONG_CS 0x38
+#define LONG_DS 0x40
+#endif
 
 #ifndef ASSEMBLY
 
-#include "stddef.h"
-#include "string.h"
+#ifdef UACCESS_LIBRM
+#define UACCESS_PREFIX_librm
+#else
+#define UACCESS_PREFIX_librm __librm_
+#endif
 
-/*
- * Data structures and type definitions
+/* Variables in librm.S */
+extern unsigned long virt_offset;
+
+/**
+ * Convert physical address to user pointer
+ *
+ * @v phys_addr		Physical address
+ * @ret userptr		User pointer
+ */
+static inline __always_inline userptr_t
+UACCESS_INLINE ( librm, phys_to_user ) ( unsigned long phys_addr ) {
+	return ( phys_addr - virt_offset );
+}
+
+/**
+ * Convert user buffer to physical address
+ *
+ * @v userptr		User pointer
+ * @v offset		Offset from user pointer
+ * @ret phys_addr	Physical address
+ */
+static inline __always_inline unsigned long
+UACCESS_INLINE ( librm, user_to_phys ) ( userptr_t userptr, off_t offset ) {
+	return ( userptr + offset + virt_offset );
+}
+
+static inline __always_inline userptr_t
+UACCESS_INLINE ( librm, virt_to_user ) ( volatile const void *addr ) {
+	return trivial_virt_to_user ( addr );
+}
+
+static inline __always_inline void *
+UACCESS_INLINE ( librm, user_to_virt ) ( userptr_t userptr, off_t offset ) {
+	return trivial_user_to_virt ( userptr, offset );
+}
+
+static inline __always_inline userptr_t
+UACCESS_INLINE ( librm, userptr_add ) ( userptr_t userptr, off_t offset ) {
+	return trivial_userptr_add ( userptr, offset );
+}
+
+static inline __always_inline void
+UACCESS_INLINE ( librm, memcpy_user ) ( userptr_t dest, off_t dest_off,
+					userptr_t src, off_t src_off,
+					size_t len ) {
+	trivial_memcpy_user ( dest, dest_off, src, src_off, len );
+}
+
+static inline __always_inline void
+UACCESS_INLINE ( librm, memmove_user ) ( userptr_t dest, off_t dest_off,
+					 userptr_t src, off_t src_off,
+					 size_t len ) {
+	trivial_memmove_user ( dest, dest_off, src, src_off, len );
+}
+
+static inline __always_inline void
+UACCESS_INLINE ( librm, memset_user ) ( userptr_t buffer, off_t offset,
+					int c, size_t len ) {
+	trivial_memset_user ( buffer, offset, c, len );
+}
+
+static inline __always_inline size_t
+UACCESS_INLINE ( librm, strlen_user ) ( userptr_t buffer, off_t offset ) {
+	return trivial_strlen_user ( buffer, offset );
+}
+
+static inline __always_inline off_t
+UACCESS_INLINE ( librm, memchr_user ) ( userptr_t buffer, off_t offset,
+					int c, size_t len ) {
+	return trivial_memchr_user ( buffer, offset, c, len );
+}
+
+
+/******************************************************************************
+ *
+ * Access to variables in .data16 and .text16
  *
  */
 
-/* Access to variables in .data16 and .text16 */
 extern char *data16;
 extern char *text16;
 
@@ -72,178 +160,6 @@ extern uint16_t __text16 ( rm_ds );
  */
 extern void gateA20_set ( void );
 
-/*
- * librm_mgmt: functions for manipulating base memory and executing
- * real-mode code.
- *
- * Full API documentation for these functions is in realmode.h.
- *
- */
-
-/* Macro for obtaining a physical address from a segment:offset pair. */
-#define VIRTUAL(x,y) ( phys_to_virt ( ( ( x ) << 4 ) + ( y ) ) )
-
-/* Copy to/from base memory */
-static inline __attribute__ (( always_inline )) void
-copy_to_real_librm ( unsigned int dest_seg, unsigned int dest_off,
-		     void *src, size_t n ) {
-	memcpy ( VIRTUAL ( dest_seg, dest_off ), src, n );
-}
-static inline __attribute__ (( always_inline )) void
-copy_from_real_librm ( void *dest, unsigned int src_seg,
-		       unsigned int src_off, size_t n ) {
-	memcpy ( dest, VIRTUAL ( src_seg, src_off ), n );
-}
-#define put_real_librm( var, dest_seg, dest_off )			      \
-	do {								      \
-		* ( ( typeof(var) * ) VIRTUAL ( dest_seg, dest_off ) ) = var; \
-	} while ( 0 )
-#define get_real_librm( var, src_seg, src_off )				      \
-	do {								      \
-		var = * ( ( typeof(var) * ) VIRTUAL ( src_seg, src_off ) ); \
-	} while ( 0 )
-#define copy_to_real copy_to_real_librm
-#define copy_from_real copy_from_real_librm
-#define put_real put_real_librm
-#define get_real get_real_librm
-
-/**
- * A pointer to a user buffer
- *
- * Even though we could just use a void *, we use an intptr_t so that
- * attempts to use normal pointers show up as compiler warnings.  Such
- * code is actually valid for librm, but not for libkir (i.e. under
- * KEEP_IT_REAL), so it's good to have the warnings even under librm.
- */
-typedef intptr_t userptr_t;
-
-/**
- * Add offset to user pointer
- *
- * @v ptr		User pointer
- * @v offset		Offset
- * @ret new_ptr		New pointer value
- */
-static inline __attribute__ (( always_inline )) userptr_t
-userptr_add ( userptr_t ptr, off_t offset ) {
-	return ( ptr + offset );
-}
-
-/**
- * Copy data to user buffer
- *
- * @v buffer		User buffer
- * @v offset		Offset within user buffer
- * @v src		Source
- * @v len		Length
- */
-static inline __attribute__ (( always_inline )) void
-copy_to_user ( userptr_t buffer, off_t offset, const void *src, size_t len ) {
-	memcpy ( ( ( void * ) buffer + offset ), src, len );
-}
-
-/**
- * Copy data from user buffer
- *
- * @v dest		Destination
- * @v buffer		User buffer
- * @v offset		Offset within user buffer
- * @v len		Length
- */
-static inline __attribute__ (( always_inline )) void
-copy_from_user ( void *dest, userptr_t buffer, off_t offset, size_t len ) {
-	memcpy ( dest, ( ( void * ) buffer + offset ), len );
-}
-
-/**
- * Copy data between user buffers
- *
- * @v dest		Destination user buffer
- * @v dest_off		Offset within destination buffer
- * @v src		Source user buffer
- * @v src_off		Offset within source buffer
- * @v len		Length
- */
-static inline __attribute__ (( always_inline )) void
-memcpy_user ( userptr_t dest, off_t dest_off, userptr_t src, off_t src_off,
-	      size_t len ) {
-	memcpy ( ( ( void * ) dest + dest_off ), ( ( void * ) src + src_off ),
-		 len );
-}
-
-/**
- * Copy data between user buffers, allowing for overlap
- *
- * @v dest		Destination user buffer
- * @v dest_off		Offset within destination buffer
- * @v src		Source user buffer
- * @v src_off		Offset within source buffer
- * @v len		Length
- */
-static inline __attribute__ (( always_inline )) void
-memmove_user ( userptr_t dest, off_t dest_off, userptr_t src, off_t src_off,
-	       size_t len ) {
-	memmove ( ( ( void * ) dest + dest_off ), ( ( void * ) src + src_off ),
-		  len );
-}
-
-/**
- * Fill user buffer with a constant byte
- *
- * @v buffer		User buffer
- * @v offset		Offset within buffer
- * @v c			Constant byte with which to fill
- * @v len		Length
- */
-static inline __attribute__ (( always_inline )) void
-memset_user ( userptr_t buffer, off_t offset, int c, size_t len ) {
-	memset ( ( ( void * ) buffer + offset ), c, len );
-}
-
-/**
- * Find length of NUL-terminated string in user buffer
- *
- * @v buffer		User buffer
- * @v offset		Offset within buffer
- * @ret len		Length of string (excluding NUL)
- */
-static inline __attribute__ (( always_inline )) size_t
-strlen_user ( userptr_t buffer, off_t offset ) {
-	return strlen ( ( void * ) buffer + offset );
-}
-
-/**
- * Find character in user buffer
- *
- * @v buffer		User buffer
- * @v offset		Starting offset within buffer
- * @v c			Character to search for
- * @v len		Length of user buffer
- * @ret offset		Offset of character, or <0 if not found
- */
-static inline __attribute__ (( always_inline )) off_t
-memchr_user ( userptr_t buffer, off_t offset, int c, size_t len ) {
-	void *found;
-
-	found = memchr ( ( ( void * ) buffer + offset ), c, len );
-	return ( found ? ( found - ( void * ) buffer ) : -1 );
-}
-
-/**
- * Convert virtual address to user buffer
- *
- * @v virtual		Virtual address
- * @ret buffer		User buffer
- *
- * This constructs a user buffer from an ordinary pointer.  Use it
- * when you need to pass a pointer to an internal buffer to a function
- * that expects a @c userptr_t.
- */
-static inline __attribute__ (( always_inline )) userptr_t
-virt_to_user ( void * virtual ) {
-	return ( ( intptr_t ) virtual );
-}
-
 /**
  * Convert segment:offset address to user buffer
  *
@@ -251,32 +167,9 @@ virt_to_user ( void * virtual ) {
  * @v offset		Real-mode offset
  * @ret buffer		User buffer
  */
-static inline __attribute__ (( always_inline )) userptr_t
+static inline __always_inline userptr_t
 real_to_user ( unsigned int segment, unsigned int offset ) {
-	return virt_to_user ( VIRTUAL ( segment, offset ) );
-}
-
-/**
- * Convert physical address to user buffer
- *
- * @v physical		Physical address
- * @ret buffer		User buffer
- */
-static inline __attribute__ (( always_inline )) userptr_t
-phys_to_user ( physaddr_t physical ) {
-	return virt_to_user ( phys_to_virt ( physical ) );
-}
-
-/**
- * Convert user buffer to physical address
- *
- * @v buffer		User buffer
- * @v offset		Offset within user buffer
- * @ret physical	Physical address
- */
-static inline __attribute__ (( always_inline )) physaddr_t
-user_to_phys ( userptr_t buffer, off_t offset ) {
-	return virt_to_phys ( ( void * ) buffer + offset );
+	return ( phys_to_user ( ( segment << 4 ) + offset ) );
 }
 
 extern uint16_t copy_user_to_rm_stack ( userptr_t data, size_t size );

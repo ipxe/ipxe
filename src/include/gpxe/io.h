@@ -19,6 +19,7 @@
 #include <stdint.h>
 #include <gpxe/api.h>
 #include <config/ioapi.h>
+#include <gpxe/uaccess.h>
 
 /**
  * Calculate static inline I/O API function name
@@ -149,24 +150,20 @@
 	} while ( 0 )
 
 /**
- * Convert virtual address to a physical address
+ * Convert physical address to a bus address
  *
- * @v addr		Virtual address
- * @ret phys_addr	Physical address
+ * @v phys_addr		Physical address
+ * @ret bus_addr	Bus address
  */
-unsigned long virt_to_phys ( volatile const void *addr );
+unsigned long phys_to_bus ( unsigned long phys_addr );
 
 /**
- * Convert physical address to a virtual address
+ * Convert bus address to a physical address
  *
- * @v addr		Virtual address
+ * @v bus_addr		Bus address
  * @ret phys_addr	Physical address
- *
- * This operation isn't actually valid within our memory model, and is
- * impossible to achieve under -DKEEP_IT_REAL.  Some drivers haven't
- * been updated to avoid it yet, though.
  */
-void * phys_to_virt ( unsigned long phys_addr );
+unsigned long bus_to_phys ( unsigned long bus_addr );
 
 /**
  * Convert virtual address to a bus address
@@ -174,7 +171,10 @@ void * phys_to_virt ( unsigned long phys_addr );
  * @v addr		Virtual address
  * @ret bus_addr	Bus address
  */
-unsigned long virt_to_bus ( volatile const void *addr );
+static inline __always_inline unsigned long
+virt_to_bus ( volatile const void *addr ) {
+	return phys_to_bus ( virt_to_phys ( addr ) );
+}
 
 /**
  * Convert bus address to a virtual address
@@ -182,11 +182,11 @@ unsigned long virt_to_bus ( volatile const void *addr );
  * @v bus_addr		Bus address
  * @ret addr		Virtual address
  *
- * This operation isn't actually valid within our memory model, and is
- * impossible to achieve under -DKEEP_IT_REAL.  Some drivers haven't
- * been updated to avoid it yet, though.
+ * This operation is not available under all memory models.
  */
-void * bus_to_virt ( unsigned long bus_addr );
+static inline __always_inline void * bus_to_virt ( unsigned long bus_addr ) {
+	return phys_to_virt ( bus_to_phys ( bus_addr ) );
+}
 
 /**
  * Map bus address as an I/O address

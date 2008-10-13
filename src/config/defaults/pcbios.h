@@ -7,6 +7,7 @@
  *
  */
 
+#define UACCESS_LIBRM
 #define IOAPI_X86
 #define PCIAPI_PCBIOS
 #define TIMER_PCBIOS

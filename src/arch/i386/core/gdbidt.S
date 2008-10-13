@@ -2,7 +2,7 @@
  * Interrupt Descriptor Table (IDT) setup and interrupt handlers for GDB stub.
  */
 
-#include <virtaddr.h>
+#include <librm.h>
 
 #define SIZEOF_I386_REGS	32
 #define SIZEOF_I386_FLAGS	4

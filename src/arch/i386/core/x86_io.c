@@ -65,10 +65,8 @@ static void x86_writeq ( uint64_t data, volatile uint64_t *io_addr ) {
 			       : : "A" ( data ), "r" ( io_addr ) );
 }
 
-PROVIDE_IOAPI_INLINE ( x86, virt_to_phys );
-PROVIDE_IOAPI_INLINE ( x86, phys_to_virt );
-PROVIDE_IOAPI_INLINE ( x86, virt_to_bus );
-PROVIDE_IOAPI_INLINE ( x86, bus_to_virt );
+PROVIDE_IOAPI_INLINE ( x86, phys_to_bus );
+PROVIDE_IOAPI_INLINE ( x86, bus_to_phys );
 PROVIDE_IOAPI_INLINE ( x86, ioremap );
 PROVIDE_IOAPI_INLINE ( x86, iounmap );
 PROVIDE_IOAPI_INLINE ( x86, io_to_bus );

@@ -10,8 +10,7 @@
  *
  */
 
-#include "compiler.h" /* for doxygen */
-#include "stdint.h"
+#include <stdint.h>
 
 /**
  * A 16-bit general register.
@@ -183,5 +182,15 @@ struct i386_all_regs {
 #define ZF ( 1 <<  6 )
 #define SF ( 1 <<  7 )
 #define OF ( 1 << 11 )
+
+/* Segment:offset structure.  Note that the order within the structure
+ * is offset:segment.
+ */
+struct segoff {
+	uint16_t offset;
+	uint16_t segment;
+} PACKED;
+
+typedef struct segoff segoff_t;
 
 #endif /* REGISTERS_H */

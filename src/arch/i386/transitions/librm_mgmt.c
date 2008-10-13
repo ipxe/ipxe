@@ -6,7 +6,7 @@
  */
 
 #include <stdint.h>
-#include <librm.h>
+#include <realmode.h>
 
 /*
  * This file provides functions for managing librm.
@@ -43,3 +43,14 @@ void remove_user_from_rm_stack ( userptr_t data, size_t size ) {
 	}
 	rm_sp += size;
 };
+
+PROVIDE_UACCESS_INLINE ( librm, phys_to_user );
+PROVIDE_UACCESS_INLINE ( librm, user_to_phys );
+PROVIDE_UACCESS_INLINE ( librm, virt_to_user );
+PROVIDE_UACCESS_INLINE ( librm, user_to_virt );
+PROVIDE_UACCESS_INLINE ( librm, userptr_add );
+PROVIDE_UACCESS_INLINE ( librm, memcpy_user );
+PROVIDE_UACCESS_INLINE ( librm, memmove_user );
+PROVIDE_UACCESS_INLINE ( librm, memset_user );
+PROVIDE_UACCESS_INLINE ( librm, strlen_user );
+PROVIDE_UACCESS_INLINE ( librm, memchr_user );

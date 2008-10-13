@@ -7,9 +7,8 @@
  *
  */
 
-#include "stdint.h"
-#include "pxe_addr.h" /* Architecture-specific PXE definitions */
-#include "errno.h" /* PXE status codes */
+#include <stdint.h>
+#include <errno.h> /* PXE status codes */
 
 /** @addtogroup pxe Preboot eXecution Environment (PXE) API
  *  @{

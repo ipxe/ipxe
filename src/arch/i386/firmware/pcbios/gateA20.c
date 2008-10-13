@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <realmode.h>
 #include <bios.h>
+#include <gpxe/io.h>
 #include <gpxe/timer.h>
 
 #define K_RDWR		0x60		/* keyboard data & cmds (read/write) */

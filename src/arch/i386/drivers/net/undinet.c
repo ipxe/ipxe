@@ -23,6 +23,7 @@
 #include <biosint.h>
 #include <pnpbios.h>
 #include <basemem_packet.h>
+#include <gpxe/io.h>
 #include <gpxe/iobuf.h>
 #include <gpxe/netdevice.h>
 #include <gpxe/if_ether.h>

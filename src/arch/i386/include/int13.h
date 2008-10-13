@@ -9,6 +9,7 @@
 
 #include <stdint.h>
 #include <gpxe/list.h>
+#include <realmode.h>
 
 struct block_device;
 

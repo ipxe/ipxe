@@ -1,42 +1,12 @@
 #ifndef REALMODE_H
 #define REALMODE_H
 
-#ifndef ASSEMBLY
-
-#include "stdint.h"
-#include "registers.h"
-#include <gpxe/io.h>
+#include <stdint.h>
+#include <registers.h>
+#include <gpxe/uaccess.h>
 
 /*
  * Data structures and type definitions
- *
- */
-
-/* Segment:offset structure.  Note that the order within the structure
- * is offset:segment.
- */
-struct segoff {
-	uint16_t offset;
-	uint16_t segment;
-} __attribute__ (( packed ));
-
-typedef struct segoff segoff_t;
-
-/* Macro hackery needed to stringify bits of inline assembly */
-#define RM_XSTR(x) #x
-#define RM_STR(x) RM_XSTR(x)
-
-/* Drag in the selected real-mode transition library header */
-#ifdef KEEP_IT_REAL
-#include "libkir.h"
-#else
-#include "librm.h"
-#endif
-
-/*
- * The API to some functions is identical between librm and libkir, so
- * they are documented here, even though the prototypes are in librm.h
- * and libkir.h.
  *
  */
 
@@ -92,24 +62,53 @@ typedef struct segoff segoff_t;
  * assembler output to make sure that it's doing the right thing.
  */
 
-/*
- * void copy_to_real ( uint16_t dest_seg, uint16_t dest_off,
- *		       void *src, size_t n )
- * void copy_from_real ( void *dest, uint16_t src_seg, uint16_t src_off,
- *			 size_t n )
+/**
+ * Copy data to base memory
  *
- * These functions can be used to copy data to and from arbitrary
- * locations in base memory.
+ * @v dest_seg		Destination segment
+ * @v dest_off		Destination offset
+ * @v src		Source
+ * @v len		Length
  */
+static inline __always_inline void
+copy_to_real ( unsigned int dest_seg, unsigned int dest_off,
+	       void *src, size_t n ) {
+	copy_to_user ( real_to_user ( dest_seg, dest_off ), 0, src, n );
+}
 
-/*
- * put_real ( variable, uint16_t dest_seg, uint16_t dest_off )
- * get_real ( variable, uint16_t src_seg, uint16_t src_off )
+/**
+ * Copy data to base memory
  *
- * These macros can be used to read or write single variables to and
- * from arbitrary locations in base memory.  "variable" must be a
- * variable of either 1, 2 or 4 bytes in length.
+ * @v dest		Destination
+ * @v src_seg		Source segment
+ * @v src_off		Source offset
+ * @v len		Length
  */
+static inline __always_inline void
+copy_from_real ( void *dest, unsigned int src_seg,
+		 unsigned int src_off, size_t n ) {
+	copy_from_user ( dest, real_to_user ( src_seg, src_off ), 0, n );
+}
+
+/**
+ * Write a single variable to base memory
+ *
+ * @v var		Variable to write
+ * @v dest_seg		Destination segment
+ * @v dest_off		Destination offset
+ */
+#define put_real( var, dest_seg, dest_off ) \
+	copy_to_real ( (dest_seg), (dest_off), &(var), sizeof (var) )
+
+/**
+ * Read a single variable from base memory
+ *
+ * @v var		Variable to read
+ * @v src_seg		Source segment
+ * @v src_off		Source offset
+ */
+#define get_real( var, src_seg, src_off ) \
+	copy_from_real ( &(var), (src_seg), (src_off), sizeof (var) )
 
 /*
  * REAL_CODE ( asm_code_str )
@@ -122,7 +121,5 @@ typedef struct segoff segoff_t;
  *			      : "=a" ( character ) : "a" ( 0x0000 ) );
  *
  */
-
-#endif /* ASSEMBLY */
 
 #endif /* REALMODE_H */

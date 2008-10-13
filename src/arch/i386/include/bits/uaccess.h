@@ -1,6 +1,12 @@
 #ifndef _BITS_UACCESS_H
 #define _BITS_UACCESS_H
 
-#include <realmode.h>
+/** @file
+ *
+ * i386-specific user access API implementations
+ *
+ */
+
+#include <librm.h>
 
 #endif /* _BITS_UACCESS_H */

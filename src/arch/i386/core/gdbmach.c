@@ -19,7 +19,7 @@
 #include <stddef.h>
 #include <stdio.h>
 #include <assert.h>
-#include <virtaddr.h>
+#include <gpxe/uaccess.h>
 #include <gpxe/gdbstub.h>
 #include <gdbmach.h>
 
