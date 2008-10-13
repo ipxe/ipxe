@@ -6,7 +6,7 @@
  * @{
  */
 
-#define ERRFILE_umalloc		( ERRFILE_ARCH | ERRFILE_CORE | 0x00000000 )
+#define ERRFILE_memtop_umalloc	( ERRFILE_ARCH | ERRFILE_CORE | 0x00000000 )
 #define ERRFILE_memmap		( ERRFILE_ARCH | ERRFILE_CORE | 0x00010000 )
 #define ERRFILE_pnpbios		( ERRFILE_ARCH | ERRFILE_CORE | 0x00020000 )
 #define ERRFILE_smbios		( ERRFILE_ARCH | ERRFILE_CORE | 0x00030000 )

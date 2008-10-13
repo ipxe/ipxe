@@ -13,5 +13,6 @@
 #define TIMER_PCBIOS
 #define CONSOLE_PCBIOS
 #define NAP_PCBIOS
+#define UMALLOC_MEMTOP
 
 #endif /* CONFIG_DEFAULTS_PCBIOS_H */

@@ -36,9 +36,6 @@
 /** Equivalent of NOWHERE for user pointers */
 #define UNOWHERE ( ~UNULL )
 
-/** Start of Etherboot text, as defined by the linker */
-extern char _text[];
-
 /** An external memory block */
 struct external_memory {
 	/** Size of this memory block (excluding this header) */
@@ -135,7 +132,7 @@ static void ecollect_free ( void ) {
  * Calling realloc() with a new size of zero is a valid way to free a
  * memory block.
  */
-userptr_t urealloc ( userptr_t ptr, size_t new_size ) {
+static userptr_t memtop_urealloc ( userptr_t ptr, size_t new_size ) {
 	struct external_memory extmem;
 	userptr_t new = ptr;
 	size_t align;
@@ -200,25 +197,4 @@ userptr_t urealloc ( userptr_t ptr, size_t new_size ) {
 	return ( new_size ? new : UNOWHERE );
 }
 
-/**
- * Allocate external memory
- *
- * @v size		Requested size
- * @ret ptr		Memory, or UNULL
- *
- * Memory is guaranteed to be aligned to a page boundary.
- */
-userptr_t umalloc ( size_t size ) {
-	return urealloc ( UNULL, size );
-}
-
-/**
- * Free external memory
- *
- * @v ptr		Memory allocated by umalloc(), or UNULL
- *
- * If @c ptr is UNULL, no action is taken.
- */
-void ufree ( userptr_t ptr ) {
-	urealloc ( ptr, 0 );
-}
+PROVIDE_UMALLOC ( memtop, urealloc, memtop_urealloc );
