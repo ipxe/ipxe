@@ -38,6 +38,14 @@
 #undef	DOWNLOAD_PROTO_FSP	/* FSP? */
 
 /*
+ * SAN boot protocols
+ *
+ */
+
+//#undef	SANBOOT_PROTO_ISCSI	/* iSCSI protocol */
+//#undef	SANBOOT_PROTO_AOE	/* AoE protocol */
+
+/*
  * Name resolution modules
  *
  */

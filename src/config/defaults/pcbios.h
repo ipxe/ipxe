@@ -22,4 +22,7 @@
 #define IMAGE_BZIMAGE		/* Linux bzImage image support */
 #define IMAGE_COMBOOT		/* SYSLINUX COMBOOT image support */
 
+#define	SANBOOT_PROTO_ISCSI	/* iSCSI protocol */
+#define	SANBOOT_PROTO_AOE	/* AoE protocol */
+
 #endif /* CONFIG_DEFAULTS_PCBIOS_H */

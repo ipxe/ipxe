@@ -95,6 +95,17 @@ REQUIRE_OBJECT ( slam );
 #endif
 
 /*
+ * Drag in all requested SAN boot protocols
+ *
+ */
+#ifdef SANBOOT_PROTO_ISCSI
+REQUIRE_OBJECT ( iscsiboot );
+#endif
+#ifdef SANBOOT_PROTO_AOE
+REQUIRE_OBJECT ( aoeboot );
+#endif
+
+/*
  * Drag in all requested resolvers
  *
  */

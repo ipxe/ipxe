@@ -24,13 +24,12 @@
 #include <gpxe/settings.h>
 #include <gpxe/image.h>
 #include <gpxe/embedded.h>
+#include <gpxe/sanboot.h>
 #include <gpxe/uri.h>
 #include <usr/ifmgmt.h>
 #include <usr/route.h>
 #include <usr/dhcpmgmt.h>
 #include <usr/imgmgmt.h>
-#include <usr/iscsiboot.h>
-#include <usr/aoeboot.h>
 #include <usr/autoboot.h>
 
 /** @file
@@ -44,6 +43,12 @@
 
 /** Shutdown flags for exit */
 int shutdown_exit_flags = 0;
+
+/* SAN boot protocols */
+static struct sanboot_protocol sanboot_protocols[0] \
+	__table_start ( struct sanboot_protocol, sanboot_protocols );
+static struct sanboot_protocol sanboot_protocols_end[0] \
+	__table_end ( struct sanboot_protocol, sanboot_protocols );
 
 /**
  * Identify the boot network device
@@ -141,12 +146,15 @@ static int boot_next_server_and_filename ( struct in_addr next_server,
  * @ret rc		Return status code
  */
 int boot_root_path ( const char *root_path ) {
+	struct sanboot_protocol *sanboot;
 
 	/* Quick hack */
-	if ( strncmp ( root_path, "iscsi:", 6 ) == 0 ) {
-		return iscsiboot ( root_path );
-	} else if ( strncmp ( root_path, "aoe:", 4 ) == 0 ) {
-		return aoeboot ( root_path );
+	for ( sanboot = sanboot_protocols ;
+	      sanboot < sanboot_protocols_end ; sanboot++ ) {
+		if ( strncmp ( root_path, sanboot->prefix,
+			       strlen ( sanboot->prefix ) ) == 0 ) {
+			return sanboot->boot ( root_path );
+		}
 	}
 
 	return -ENOTSUP;
