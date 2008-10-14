@@ -33,9 +33,6 @@
  * IP over Infiniband
  */
 
-/** IPoIB MTU */
-#define IPOIB_MTU 2048
-
 /** Number of IPoIB data send work queue entries */
 #define IPOIB_DATA_NUM_SEND_WQES 2
 
@@ -727,7 +724,7 @@ static void ipoib_refill_recv ( struct ipoib_device *ipoib,
 	int rc;
 
 	while ( qset->recv_fill < qset->recv_max_fill ) {
-		iobuf = alloc_iob ( IPOIB_MTU );
+		iobuf = alloc_iob ( IPOIB_PKT_LEN );
 		if ( ! iobuf )
 			break;
 		if ( ( rc = ib_post_recv ( ibdev, qset->qp, iobuf ) ) != 0 ) {

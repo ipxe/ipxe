@@ -241,6 +241,11 @@ struct net_device {
 	 * This is the bitwise-OR of zero or more NETDEV_XXX constants.
 	 */
 	unsigned int state;
+	/** Maximum packet length
+	 *
+	 * This length includes any link-layer headers.
+	 */
+	size_t max_pkt_len;
 	/** TX packet queue */
 	struct list_head tx_queue;
 	/** RX packet queue */

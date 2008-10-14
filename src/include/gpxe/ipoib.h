@@ -8,6 +8,9 @@
 
 #include <gpxe/infiniband.h>
 
+/** IPoIB packet length */
+#define IPOIB_PKT_LEN 2048
+
 /** IPoIB MAC address length */
 #define IPOIB_ALEN 20
 
@@ -68,6 +71,7 @@ static inline struct net_device * alloc_ipoibdev ( size_t priv_size ) {
 	netdev = alloc_netdev ( priv_size );
 	if ( netdev ) {
 		netdev->ll_protocol = &ipoib_protocol;
+		netdev->max_pkt_len = IPOIB_PKT_LEN;
 	}
 	return netdev;
 }
