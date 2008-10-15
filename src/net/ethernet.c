@@ -24,6 +24,7 @@
 #include <assert.h>
 #include <gpxe/if_arp.h>
 #include <gpxe/if_ether.h>
+#include <gpxe/in.h>
 #include <gpxe/netdevice.h>
 #include <gpxe/iobuf.h>
 #include <gpxe/ethernet.h>
@@ -92,8 +93,8 @@ static int eth_pull ( struct io_buffer *iobuf,
 /**
  * Transcribe Ethernet address
  *
- * @v ll_addr	Link-layer address
- * @ret string	Link-layer address in human-readable format
+ * @v ll_addr		Link-layer address
+ * @ret string		Link-layer address in human-readable format
  */
 const char * eth_ntoa ( const void *ll_addr ) {
 	static char buf[18]; /* "00:00:00:00:00:00" */
@@ -103,6 +104,32 @@ const char * eth_ntoa ( const void *ll_addr ) {
 		  eth_addr[0], eth_addr[1], eth_addr[2],
 		  eth_addr[3], eth_addr[4], eth_addr[5] );
 	return buf;
+}
+
+/**
+ * Hash multicast address
+ *
+ * @v af		Address family
+ * @v net_addr		Network-layer address
+ * @v ll_addr		Link-layer address to fill in
+ * @ret rc		Return status code
+ */
+static int eth_mc_hash ( unsigned int af, const void *net_addr,
+			 void *ll_addr ) {
+	const uint8_t *net_addr_bytes = net_addr;
+	uint8_t *ll_addr_bytes = ll_addr;
+
+	switch ( af ) {
+	case AF_INET:
+		ll_addr_bytes[0] = 0x01;
+		ll_addr_bytes[1] = 0x00;
+		ll_addr_bytes[2] = 0x5e;
+		ll_addr_bytes[3] = net_addr_bytes[1] & 0x7f;
+		ll_addr_bytes[4] = net_addr_bytes[2];
+		ll_addr_bytes[5] = net_addr_bytes[3];
+	default:
+		return -ENOTSUP;
+	}
 }
 
 /** Ethernet protocol */
@@ -115,4 +142,5 @@ struct ll_protocol ethernet_protocol __ll_protocol = {
 	.push		= eth_push,
 	.pull		= eth_pull,
 	.ntoa		= eth_ntoa,
+	.mc_hash	= eth_mc_hash,
 };

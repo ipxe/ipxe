@@ -120,6 +120,16 @@ struct ll_protocol {
 	 * allocated.
 	 */
 	const char * ( * ntoa ) ( const void * ll_addr );
+	/**
+	 * Hash multicast address
+	 *
+	 * @v af	Address family
+	 * @v net_addr	Network-layer address
+	 * @v ll_addr	Link-layer address to fill in
+	 * @ret rc	Return status code
+	 */
+	int ( * mc_hash ) ( unsigned int af, const void *net_addr,
+			    void *ll_addr );
 	/** Link-layer protocol
 	 *
 	 * This is an ARPHRD_XXX constant, in network byte order.

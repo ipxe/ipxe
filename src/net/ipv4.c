@@ -266,7 +266,6 @@ static uint16_t ipv4_pshdr_chksum ( struct io_buffer *iobuf, uint16_t csum ) {
 static int ipv4_ll_addr ( struct in_addr dest, struct in_addr src,
 			  struct net_device *netdev, uint8_t *ll_dest ) {
 	struct ll_protocol *ll_protocol = netdev->ll_protocol;
-	uint8_t *dest_bytes = ( ( uint8_t * ) &dest );
 
 	if ( dest.s_addr == INADDR_BROADCAST ) {
 		/* Broadcast address */
@@ -274,17 +273,7 @@ static int ipv4_ll_addr ( struct in_addr dest, struct in_addr src,
 			 ll_protocol->ll_addr_len );
 		return 0;
 	} else if ( IN_MULTICAST ( ntohl ( dest.s_addr ) ) ) {
-		/* Special case: IPv4 multicast over Ethernet.	This
-		 * code may need to be generalised once we find out
-		 * what happens for other link layers.
-		 */
-		ll_dest[0] = 0x01;
-		ll_dest[1] = 0x00;
-		ll_dest[2] = 0x5e;
-		ll_dest[3] = dest_bytes[1] & 0x7f;
-		ll_dest[4] = dest_bytes[2];
-		ll_dest[5] = dest_bytes[3];
-		return 0;
+		return ll_protocol->mc_hash ( AF_INET, &dest, ll_dest );
 	} else {
 		/* Unicast address: resolve via ARP */
 		return arp_resolve ( netdev, &ipv4_protocol, &dest,

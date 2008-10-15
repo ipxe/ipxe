@@ -222,6 +222,21 @@ const char * ipoib_ntoa ( const void *ll_addr ) {
 	return buf;
 }
 
+/**
+ * Hash multicast address
+ *
+ * @v af		Address family
+ * @v net_addr		Network-layer address
+ * @v ll_addr		Link-layer address to fill in
+ * @ret rc		Return status code
+ */
+static int ipoib_mc_hash ( unsigned int af __unused,
+			   const void *net_addr __unused,
+			   void *ll_addr __unused ) {
+
+	return -ENOTSUP;
+}
+
 /** IPoIB protocol */
 struct ll_protocol ipoib_protocol __ll_protocol = {
 	.name		= "IPoIB",
@@ -232,6 +247,7 @@ struct ll_protocol ipoib_protocol __ll_protocol = {
 	.push		= ipoib_push,
 	.pull		= ipoib_pull,
 	.ntoa		= ipoib_ntoa,
+	.mc_hash	= ipoib_mc_hash,
 };
 
 /****************************************************************************
