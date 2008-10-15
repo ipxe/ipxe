@@ -439,6 +439,7 @@ struct net_device * find_netdev_by_location ( unsigned int bus_type,
  */
 int net_tx ( struct io_buffer *iobuf, struct net_device *netdev,
 	     struct net_protocol *net_protocol, const void *ll_dest ) {
+	struct ll_protocol *ll_protocol = netdev->ll_protocol;
 	int rc;
 
 	/* Force a poll on the netdevice to (potentially) clear any
@@ -449,8 +450,8 @@ int net_tx ( struct io_buffer *iobuf, struct net_device *netdev,
 	netdev_poll ( netdev );
 
 	/* Add link-layer header */
-	if ( ( rc = netdev->ll_protocol->push ( iobuf, netdev, net_protocol,
-						ll_dest ) ) != 0 ) {
+	if ( ( rc = ll_protocol->push ( iobuf, ll_dest, netdev->ll_addr,
+					net_protocol->net_proto ) ) != 0 ) {
 		free_iob ( iobuf );
 		return rc;
 	}
@@ -495,8 +496,9 @@ static void net_step ( struct process *process __unused ) {
 	struct net_device *netdev;
 	struct io_buffer *iobuf;
 	struct ll_protocol *ll_protocol;
-	uint16_t net_proto;
+	const void *ll_dest;
 	const void *ll_source;
+	uint16_t net_proto;
 	int rc;
 
 	/* Poll and process each network device */
@@ -519,9 +521,9 @@ static void net_step ( struct process *process __unused ) {
 
 			/* Remove link-layer header */
 			ll_protocol = netdev->ll_protocol;
-			if ( ( rc = ll_protocol->pull ( iobuf, netdev,
-							&net_proto,
-							&ll_source ) ) != 0 ) {
+			if ( ( rc = ll_protocol->pull ( iobuf, &ll_dest,
+							&ll_source,
+							&net_proto ) ) != 0 ) {
 				free_iob ( iobuf );
 				continue;
 			}

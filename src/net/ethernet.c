@@ -42,19 +42,19 @@ static uint8_t eth_broadcast[ETH_ALEN] = { 0xff, 0xff, 0xff, 0xff, 0xff, 0xff};
  * Add Ethernet link-layer header
  *
  * @v iobuf		I/O buffer
- * @v netdev		Network device
- * @v net_protocol	Network-layer protocol
  * @v ll_dest		Link-layer destination address
+ * @v ll_source		Source link-layer address
+ * @v net_proto		Network-layer protocol, in network-byte order
+ * @ret rc		Return status code
  */
-static int eth_push ( struct io_buffer *iobuf, struct net_device *netdev,
-		      struct net_protocol *net_protocol,
-		      const void *ll_dest ) {
+static int eth_push ( struct io_buffer *iobuf, const void *ll_dest,
+		      const void *ll_source, uint16_t net_proto ) {
 	struct ethhdr *ethhdr = iob_push ( iobuf, sizeof ( *ethhdr ) );
 
 	/* Build Ethernet header */
 	memcpy ( ethhdr->h_dest, ll_dest, ETH_ALEN );
-	memcpy ( ethhdr->h_source, netdev->ll_addr, ETH_ALEN );
-	ethhdr->h_protocol = net_protocol->net_proto;
+	memcpy ( ethhdr->h_source, ll_source, ETH_ALEN );
+	ethhdr->h_protocol = net_proto;
 
 	return 0;
 }
@@ -63,14 +63,13 @@ static int eth_push ( struct io_buffer *iobuf, struct net_device *netdev,
  * Remove Ethernet link-layer header
  *
  * @v iobuf		I/O buffer
- * @v netdev		Network device
- * @v net_proto		Network-layer protocol, in network-byte order
- * @v ll_source		Source link-layer address
+ * @ret ll_dest		Link-layer destination address
+ * @ret ll_source	Source link-layer address
+ * @ret net_proto	Network-layer protocol, in network-byte order
  * @ret rc		Return status code
  */
-static int eth_pull ( struct io_buffer *iobuf,
-		      struct net_device *netdev __unused,
-		      uint16_t *net_proto, const void **ll_source ) {
+static int eth_pull ( struct io_buffer *iobuf, const void **ll_dest,
+		      const void **ll_source, uint16_t *net_proto ) {
 	struct ethhdr *ethhdr = iobuf->data;
 
 	/* Sanity check */
@@ -84,8 +83,9 @@ static int eth_pull ( struct io_buffer *iobuf,
 	iob_pull ( iobuf, sizeof ( *ethhdr ) );
 
 	/* Fill in required fields */
-	*net_proto = ethhdr->h_protocol;
+	*ll_dest = ethhdr->h_dest;
 	*ll_source = ethhdr->h_source;
+	*net_proto = ethhdr->h_protocol;
 
 	return 0;
 }

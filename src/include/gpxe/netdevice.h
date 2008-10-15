@@ -79,34 +79,24 @@ struct ll_protocol {
 	 * Add link-layer header
 	 *
 	 * @v iobuf		I/O buffer
-	 * @v netdev		Network device
-	 * @v net_protocol	Network-layer protocol
 	 * @v ll_dest		Link-layer destination address
+	 * @v ll_source		Source link-layer address
+	 * @v net_proto		Network-layer protocol, in network-byte order
 	 * @ret rc		Return status code
-	 *
-	 * This method should prepend in the link-layer header
-	 * (e.g. the Ethernet DIX header).
 	 */
-	int ( * push ) ( struct io_buffer *iobuf, struct net_device *netdev,
-			 struct net_protocol *net_protocol,
-			 const void *ll_dest );
+	int ( * push ) ( struct io_buffer *iobuf, const void *ll_dest,
+			 const void *ll_source, uint16_t net_proto );
 	/**
 	 * Remove link-layer header
 	 *
-	 * @v iobuf	I/O buffer
-	 * @v netdev	Network device
-	 * @v net_proto	Network-layer protocol, in network-byte order
-	 * @v ll_source	Source link-layer address
-	 * @ret rc	Return status code
-	 *
-	 * This method should strip off the link-layer header
-	 * (e.g. the Ethernet DIX header) and return the protocol and
-	 * source link-layer address.  The method must not alter the
-	 * packet content, and may return the link-layer address as a
-	 * pointer to data within the packet.
+	 * @v iobuf		I/O buffer
+	 * @ret ll_dest		Link-layer destination address
+	 * @ret ll_source	Source link-layer address
+	 * @ret net_proto	Network-layer protocol, in network-byte order
+	 * @ret rc		Return status code
 	 */
-	int ( * pull ) ( struct io_buffer *iobuf, struct net_device *netdev,
-			 uint16_t *net_proto, const void **ll_source );
+	int ( * pull ) ( struct io_buffer *iobuf, const void **ll_dest,
+			 const void **ll_source, uint16_t *net_proto );
 	/**
 	 * Transcribe link-layer address
 	 *

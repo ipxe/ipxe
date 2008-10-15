@@ -153,21 +153,20 @@ static struct ipoib_mac ipoib_broadcast = {
  * Add IPoIB link-layer header
  *
  * @v iobuf		I/O buffer
- * @v netdev		Network device
- * @v net_protocol	Network-layer protocol
  * @v ll_dest		Link-layer destination address
+ * @v ll_source		Source link-layer address
+ * @v net_proto		Network-layer protocol, in network-byte order
+ * @ret rc		Return status code
  */
-static int ipoib_push ( struct io_buffer *iobuf,
-			struct net_device *netdev __unused,
-			struct net_protocol *net_protocol,
-			const void *ll_dest ) {
+static int ipoib_push ( struct io_buffer *iobuf, const void *ll_dest,
+			const void *ll_source __unused, uint16_t net_proto ) {
 	struct ipoib_hdr *ipoib_hdr =
 		iob_push ( iobuf, sizeof ( *ipoib_hdr ) );
 
 	/* Build IPoIB header */
 	memcpy ( &ipoib_hdr->pseudo.peer, ll_dest,
 		 sizeof ( ipoib_hdr->pseudo.peer ) );
-	ipoib_hdr->real.proto = net_protocol->net_proto;
+	ipoib_hdr->real.proto = net_proto;
 	ipoib_hdr->real.reserved = 0;
 
 	return 0;
@@ -177,14 +176,13 @@ static int ipoib_push ( struct io_buffer *iobuf,
  * Remove IPoIB link-layer header
  *
  * @v iobuf		I/O buffer
- * @v netdev		Network device
- * @v net_proto		Network-layer protocol, in network-byte order
- * @v ll_source		Source link-layer address
+ * @ret ll_dest		Link-layer destination address
+ * @ret ll_source	Source link-layer address
+ * @ret net_proto	Network-layer protocol, in network-byte order
  * @ret rc		Return status code
  */
-static int ipoib_pull ( struct io_buffer *iobuf,
-			struct net_device *netdev __unused,
-			uint16_t *net_proto, const void **ll_source ) {
+static int ipoib_pull ( struct io_buffer *iobuf, const void **ll_dest,
+			const void **ll_source, uint16_t *net_proto ) {
 	struct ipoib_hdr *ipoib_hdr = iobuf->data;
 
 	/* Sanity check */
@@ -198,8 +196,9 @@ static int ipoib_pull ( struct io_buffer *iobuf,
 	iob_pull ( iobuf, sizeof ( *ipoib_hdr ) );
 
 	/* Fill in required fields */
-	*net_proto = ipoib_hdr->real.proto;
+	*ll_dest = &ipoib_broadcast; /* Doesn't really exist in packet */
 	*ll_source = &ipoib_hdr->pseudo.peer;
+	*net_proto = ipoib_hdr->real.proto;
 
 	return 0;
 }

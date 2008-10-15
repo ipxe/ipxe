@@ -199,9 +199,10 @@ PXENV_EXIT_t pxenv_undi_transmit ( struct s_PXENV_UNDI_TRANSMIT
 	struct DataBlk *datablk;
 	struct io_buffer *iobuf;
 	struct net_protocol *net_protocol;
+	struct ll_protocol *ll_protocol = pxe_netdev->ll_protocol;
 	char destaddr[MAX_LL_ADDR_LEN];
 	const void *ll_dest;
-	size_t ll_hlen = pxe_netdev->ll_protocol->ll_header_len;
+	size_t ll_hlen = ll_protocol->ll_header_len;
 	size_t len;
 	unsigned int i;
 	int rc;
@@ -259,17 +260,17 @@ PXENV_EXIT_t pxenv_undi_transmit ( struct s_PXENV_UNDI_TRANSMIT
 			copy_from_real ( destaddr,
 					 undi_transmit->DestAddr.segment,
 					 undi_transmit->DestAddr.offset,
-					 pxe_netdev->ll_protocol->ll_addr_len );
+					 ll_protocol->ll_addr_len );
 			ll_dest = destaddr;
 		} else {
 			DBG ( " BCAST" );
-			ll_dest = pxe_netdev->ll_protocol->ll_broadcast;
+			ll_dest = ll_protocol->ll_broadcast;
 		}
 
 		/* Add link-layer header */
-		if ( ( rc = pxe_netdev->ll_protocol->push ( iobuf, pxe_netdev,
-							    net_protocol,
-							    ll_dest )) != 0 ){
+		if ( ( rc = ll_protocol->push ( iobuf, ll_dest,
+						pxe_netdev->ll_addr,
+						net_protocol->net_proto ))!=0){
 			free_iob ( iobuf );
 			undi_transmit->Status = PXENV_STATUS ( rc );
 			return PXENV_EXIT_FAILURE;
@@ -545,6 +546,7 @@ PXENV_EXIT_t pxenv_undi_isr ( struct s_PXENV_UNDI_ISR *undi_isr ) {
 	struct io_buffer *iobuf;
 	size_t len;
 	struct ll_protocol *ll_protocol;
+	const void *ll_dest;
 	const void *ll_source;
 	uint16_t net_proto;
 	size_t ll_hlen;
@@ -625,9 +627,8 @@ PXENV_EXIT_t pxenv_undi_isr ( struct s_PXENV_UNDI_ISR *undi_isr ) {
 
 		/* Strip link-layer header */
 		ll_protocol = pxe_netdev->ll_protocol;
-		if ( ( rc = ll_protocol->pull ( iobuf, pxe_netdev,
-						&net_proto,
-						&ll_source ) ) != 0 ) {
+		if ( ( rc = ll_protocol->pull ( iobuf, &ll_dest, &ll_source,
+						&net_proto ) ) != 0 ) {
 			/* Assume unknown net_proto and no ll_source */
 			net_proto = 0;
 			ll_source = NULL;
