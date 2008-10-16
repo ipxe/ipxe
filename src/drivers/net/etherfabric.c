@@ -15,17 +15,21 @@
  *
  **************************************************************************
  */
-
-#include "etherboot.h"
-#include "nic.h"
+#include <stdint.h>
+#include <stdlib.h>
+#include <unistd.h>
 #include <errno.h>
+#include <assert.h>
+#include <byteswap.h>
+#include <console.h>
 #include <gpxe/pci.h>
-#include <gpxe/bitbash.h>
-#include <gpxe/i2c.h>
-#include <gpxe/spi.h>
-#include <gpxe/nvo.h>
-#define dma_addr_t unsigned long
+#include <gpxe/malloc.h>
+#include <gpxe/ethernet.h>
+#include <gpxe/iobuf.h>
+#include <gpxe/netdevice.h>
+#include <gpxe/timer.h>
 #include "etherfabric.h"
+#include "etherfabric_nic.h"
 
 /**************************************************************************
  *
@@ -34,193 +38,35 @@
  **************************************************************************
  */
 
-#define EFAB_ASSERT(x)                                                        \
-        do {                                                                  \
-                if ( ! (x) ) {                                                \
-                        DBG ( "ASSERT(%s) failed at %s line %d [%s]\n", #x,   \
-                              __FILE__, __LINE__, __FUNCTION__ );             \
-                }                                                             \
-        } while (0)
-
-#define EFAB_TRACE(...) DBG ( __VA_ARGS__ )
-
 #define EFAB_REGDUMP(...)
+#define EFAB_TRACE(...) DBGP(__VA_ARGS__)
 
-#define EFAB_LOG(...) printf ( __VA_ARGS__ )
-#define EFAB_ERR(...) printf ( __VA_ARGS__ )
+// printf() is not allowed within drivers.  Use DBG() instead.
+#define EFAB_LOG(...) DBG(__VA_ARGS__)
+#define EFAB_ERR(...) DBG(__VA_ARGS__)
 
-#define FALCON_USE_IO_BAR 1
+#define FALCON_USE_IO_BAR 0
 
-/*
- * EtherFabric constants 
- *
- */
-
-/* PCI Definitions */
-#define EFAB_VENDID_LEVEL5	0x1924
-#define FALCON_P_DEVID		0x0703  /* Temporary PCI ID */
-#define EF1002_DEVID		0xC101
+#define HZ 100
+#define EFAB_BYTE 1
 
 /**************************************************************************
  *
- * Data structures
+ * Hardware data structures and sizing
  *
  **************************************************************************
  */
+extern int __invalid_queue_size;
+#define FQS(_prefix, _x)					\
+	( ( (_x) == 512 ) ? _prefix ## _SIZE_512 :		\
+	  ( ( (_x) == 1024 ) ? _prefix ## _SIZE_1K :		\
+	    ( ( (_x) == 2048 ) ? _prefix ## _SIZE_2K :		\
+	      ( ( (_x) == 4096) ? _prefix ## _SIZE_4K :		\
+		__invalid_queue_size ) ) ) )
 
-/*
- * Buffers used for TX, RX and event queue
- *
- */
-#define EFAB_BUF_ALIGN		4096
-#define EFAB_DATA_BUF_SIZE	2048
-#define EFAB_RX_BUFS		16
-#define EFAB_RXD_SIZE		512
-#define EFAB_TXD_SIZE		512
-#define EFAB_EVQ_SIZE		512
-struct efab_buffers {
-	uint8_t eventq[4096];
-	uint8_t rxd[4096];
-	uint8_t txd[4096];
-	uint8_t tx_buf[EFAB_DATA_BUF_SIZE];
-	uint8_t rx_buf[EFAB_RX_BUFS][EFAB_DATA_BUF_SIZE];
-	uint8_t padding[EFAB_BUF_ALIGN-1];
-};
-static struct efab_buffers efab_buffers;
 
-/** An RX buffer */
-struct efab_rx_buf {
-	uint8_t *addr;
-	unsigned int len;
-	int id;
-};
-
-/** A TX buffer */
-struct efab_tx_buf {
-	uint8_t *addr;
-	unsigned int len;
-	int id;
-};
-
-/** Etherfabric event type */
-enum efab_event_type {
-	EFAB_EV_NONE = 0,
-	EFAB_EV_TX,
-	EFAB_EV_RX,
-};
-
-/** Etherfabric event */
-struct efab_event {
-	/** Event type */
-	enum efab_event_type type;
-	/** RX buffer ID */
-	int rx_id;
-	/** RX length */
-	unsigned int rx_len;
-	/** Packet should be dropped */
-	int drop;
-};
-
-/*
- * Etherfabric abstraction layer
- *
- */
-struct efab_nic;
-struct efab_operations {
-	void ( * get_membase ) ( struct efab_nic *efab );
-	int ( * reset ) ( struct efab_nic *efab );
-	int ( * init_nic ) ( struct efab_nic *efab );
-	int ( * read_eeprom ) ( struct efab_nic *efab );
-	void ( * build_rx_desc ) ( struct efab_nic *efab,
-				   struct efab_rx_buf *rx_buf );
-	void ( * notify_rx_desc ) ( struct efab_nic *efab );
-	void ( * build_tx_desc ) ( struct efab_nic *efab,
-				   struct efab_tx_buf *tx_buf );
-	void ( * notify_tx_desc ) ( struct efab_nic *efab );
-	int ( * fetch_event ) ( struct efab_nic *efab,
-				struct efab_event *event );
-	void ( * mask_irq ) ( struct efab_nic *efab, int enabled );
-	void ( * generate_irq ) ( struct efab_nic *efab );
-	void ( * mdio_write ) ( struct efab_nic *efab, int location,
-				int value );
-	int ( * mdio_read ) ( struct efab_nic *efab, int location );
-};
-
-struct efab_mac_operations {
-	void ( * mac_writel ) ( struct efab_nic *efab, efab_dword_t *value,
-				unsigned int mac_reg );
-	void ( * mac_readl ) ( struct efab_nic *efab, efab_dword_t *value,
-			       unsigned int mac_reg );
-	int ( * init ) ( struct efab_nic *efab );
-	int ( * reset ) ( struct efab_nic *efab );
-};
-
-/*
- * Driver private data structure
- *
- */
-struct efab_nic {
-
-	/** PCI device */
-	struct pci_device *pci;
-
-	/** Operations table */
-	struct efab_operations *op;
-
-	/** MAC operations table */
-	struct efab_mac_operations *mac_op;
-
-	/** Memory base */
-	void *membase;
-
-	/** I/O base */
-	unsigned int iobase;
-
-	/** Buffers */
-	uint8_t *eventq;		/* Falcon only */
-	uint8_t *txd;			/* Falcon only */
-	uint8_t *rxd;			/* Falcon only */
-	struct efab_tx_buf tx_buf;
-	struct efab_rx_buf rx_bufs[EFAB_RX_BUFS];
-
-	/** Buffer pointers */
-	unsigned int eventq_read_ptr;	/* Falcon only */
-	unsigned int tx_write_ptr;
-	unsigned int rx_write_ptr;
-
-	/** Port 0/1 on the NIC */
-	int port;
-	
-	/** MAC address */
-	uint8_t mac_addr[ETH_ALEN];
-	/** GMII link options */
-	unsigned int link_options;
-	/** Link status */
-	int link_up;
-       
-	/* Nic type fields */
-	int has_flash : 1;
-	int has_eeprom : 1;
-	int is_10g : 1;
-	int is_dual : 1;
-	int is_asic : 1;
-
-	/** INT_REG_KER for Falcon */
-	efab_oword_t int_ker __attribute__ (( aligned ( 16 ) ));
-
-	/** I2C access */
-	struct i2c_bit_basher ef1002_i2c;
-	unsigned long ef1002_i2c_outputs;
-	struct i2c_device ef1002_eeprom;
-
-	/** SPI access */
-	struct spi_bus spi;
-	struct spi_device falcon_flash;
-	struct spi_device falcon_eeprom;
-
-	/** Non-volatile options */
-	struct nvo_block nvo;
-};
+#define EFAB_MAX_FRAME_LEN(mtu)				\
+	( ( ( ( mtu ) + 4/* FCS */ ) + 7 ) & ~7 )
 
 /**************************************************************************
  *
@@ -228,6 +74,10 @@ struct efab_nic {
  *
  **************************************************************************
  */
+
+static void falcon_mdio_write (struct efab_nic *efab, int device,
+			       int location, int value );
+static int falcon_mdio_read ( struct efab_nic *efab, int device, int location );
 
 /* GMII registers */
 #define MII_BMSR		0x01	/* Basic mode status register  */
@@ -257,7 +107,8 @@ struct efab_nic {
 #define LPA_100			(LPA_100FULL | LPA_100HALF | LPA_100BASE4)
 #define LPA_1000		( LPA_1000FULL | LPA_1000HALF )
 #define LPA_10000               ( LPA_10000FULL | LPA_10000HALF )
-#define LPA_DUPLEX		( LPA_10FULL | LPA_100FULL | LPA_1000FULL )
+#define LPA_DUPLEX		( LPA_10FULL | LPA_100FULL | LPA_1000FULL | \
+				  LPA_10000FULL )
 
 /* Mask of bits not associated with speed or duplexity. */
 #define LPA_OTHER		~( LPA_10FULL | LPA_10HALF | LPA_100FULL | \
@@ -270,13 +121,15 @@ struct efab_nic {
  * Retrieve GMII autonegotiation advertised abilities
  *
  */
-static unsigned int gmii_autoneg_advertised ( struct efab_nic *efab ) {
+static unsigned int
+gmii_autoneg_advertised ( struct efab_nic *efab )
+{
 	unsigned int mii_advertise;
 	unsigned int gmii_advertise;
-	
+
 	/* Extended bits are in bits 8 and 9 of GMII_GTCR */
-	mii_advertise = efab->op->mdio_read ( efab, MII_ADVERTISE );
-	gmii_advertise = ( ( efab->op->mdio_read ( efab, GMII_GTCR ) >> 8 )
+	mii_advertise = falcon_mdio_read ( efab, 0, MII_ADVERTISE );
+	gmii_advertise = ( ( falcon_mdio_read ( efab, 0, GMII_GTCR ) >> 8 )
 			   & 0x03 );
 	return ( ( gmii_advertise << 16 ) | mii_advertise );
 }
@@ -285,13 +138,15 @@ static unsigned int gmii_autoneg_advertised ( struct efab_nic *efab ) {
  * Retrieve GMII autonegotiation link partner abilities
  *
  */
-static unsigned int gmii_autoneg_lpa ( struct efab_nic *efab ) {
+static unsigned int
+gmii_autoneg_lpa ( struct efab_nic *efab )
+{
 	unsigned int mii_lpa;
 	unsigned int gmii_lpa;
-	
+
 	/* Extended bits are in bits 10 and 11 of GMII_GTSR */
-	mii_lpa = efab->op->mdio_read ( efab, MII_LPA );
-	gmii_lpa = ( efab->op->mdio_read ( efab, GMII_GTSR ) >> 10 ) & 0x03;
+	mii_lpa = falcon_mdio_read ( efab, 0, MII_LPA );
+	gmii_lpa = ( falcon_mdio_read ( efab, 0, GMII_GTSR ) >> 10 ) & 0x03;
 	return ( ( gmii_lpa << 16 ) | mii_lpa );
 }
 
@@ -299,7 +154,9 @@ static unsigned int gmii_autoneg_lpa ( struct efab_nic *efab ) {
  * Calculate GMII autonegotiated link technology
  *
  */
-static unsigned int gmii_nway_result ( unsigned int negotiated ) {
+static unsigned int
+gmii_nway_result ( unsigned int negotiated )
+{
 	unsigned int other_bits;
 
 	/* Mask out the speed and duplexity bits */
@@ -324,67 +181,1587 @@ static unsigned int gmii_nway_result ( unsigned int negotiated ) {
  * Check GMII PHY link status
  *
  */
-static int gmii_link_ok ( struct efab_nic *efab ) {
+static int
+gmii_link_ok ( struct efab_nic *efab )
+{
 	int status;
 	int phy_status;
-	
+
 	/* BMSR is latching - it returns "link down" if the link has
 	 * been down at any point since the last read.  To get a
 	 * real-time status, we therefore read the register twice and
 	 * use the result of the second read.
 	 */
-	efab->op->mdio_read ( efab, MII_BMSR );
-	status = efab->op->mdio_read ( efab, MII_BMSR );
+	(void) falcon_mdio_read ( efab, 0, MII_BMSR );
+	status = falcon_mdio_read ( efab, 0, MII_BMSR );
 
 	/* Read the PHY-specific Status Register.  This is
 	 * non-latching, so we need do only a single read.
 	 */
-	phy_status = efab->op->mdio_read ( efab, GMII_PSSR );
+	phy_status = falcon_mdio_read ( efab, 0, GMII_PSSR );
 
 	return ( ( status & BMSR_LSTATUS ) && ( phy_status & PSSR_LSTATUS ) );
 }
 
 /**************************************************************************
  *
- * Alaska PHY
+ * MDIO routines
  *
  **************************************************************************
  */
 
-/**
- * Initialise Alaska PHY
- *
- */
-static void alaska_init ( struct efab_nic *efab ) {
-	unsigned int advertised, lpa;
+/* Numbering of the MDIO Manageable Devices (MMDs) */
+/* Physical Medium Attachment/ Physical Medium Dependent sublayer */
+#define MDIO_MMD_PMAPMD	(1)
+/* WAN Interface Sublayer */
+#define MDIO_MMD_WIS	(2)
+/* Physical Coding Sublayer */
+#define MDIO_MMD_PCS	(3)
+/* PHY Extender Sublayer */
+#define MDIO_MMD_PHYXS	(4)
+/* Extender Sublayer */
+#define MDIO_MMD_DTEXS	(5)
+/* Transmission convergence */
+#define MDIO_MMD_TC	(6)
+/* Auto negotiation */
+#define MDIO_MMD_AN	(7)
 
-	/* Read link up status */
-	efab->link_up = gmii_link_ok ( efab );
+/* Generic register locations */
+#define MDIO_MMDREG_CTRL1	(0)
+#define MDIO_MMDREG_STAT1	(1)
+#define MDIO_MMDREG_DEVS0	(5)
+#define MDIO_MMDREG_STAT2	(8)
 
-	if ( ! efab->link_up )
-		return;
+/* Bits in MMDREG_CTRL1 */
+/* Reset */
+#define MDIO_MMDREG_CTRL1_RESET_LBN	(15)
+#define MDIO_MMDREG_CTRL1_RESET_WIDTH	(1)
 
-	/* Determine link options from PHY. */
-	advertised = gmii_autoneg_advertised ( efab );
-	lpa = gmii_autoneg_lpa ( efab );
-	efab->link_options = gmii_nway_result ( advertised & lpa );
+/* Bits in MMDREG_STAT1 */
+#define MDIO_MMDREG_STAT1_FAULT_LBN	(7)
+#define MDIO_MMDREG_STAT1_FAULT_WIDTH	(1)
 
-	/* print out the link speed */
-	EFAB_LOG ( "%dMbps %s-duplex (%04x,%04x)\n",
-		 ( efab->link_options & LPA_10000 ? 1000 :
-		   ( efab->link_options & LPA_1000 ? 1000 :
-		     ( efab->link_options & LPA_100 ? 100 : 10 ) ) ),
-		 ( efab->link_options & LPA_DUPLEX ? "full" : "half" ),
-		 advertised, lpa );
+/* Link state */
+#define MDIO_MMDREG_STAT1_LINK_LBN	(2)
+#define MDIO_MMDREG_STAT1_LINK_WIDTH	(1)
+
+/* Bits in MMDREG_DEVS0. */
+#define DEV_PRESENT_BIT(_b) (1 << _b)
+
+#define MDIO_MMDREG_DEVS0_DTEXS	 DEV_PRESENT_BIT(MDIO_MMD_DTEXS)
+#define MDIO_MMDREG_DEVS0_PHYXS	 DEV_PRESENT_BIT(MDIO_MMD_PHYXS)
+#define MDIO_MMDREG_DEVS0_PCS	 DEV_PRESENT_BIT(MDIO_MMD_PCS)
+#define MDIO_MMDREG_DEVS0_WIS	 DEV_PRESENT_BIT(MDIO_MMD_WIS)
+#define MDIO_MMDREG_DEVS0_PMAPMD DEV_PRESENT_BIT(MDIO_MMD_PMAPMD)
+
+#define MDIO_MMDREG_DEVS0_AN     DEV_PRESENT_BIT(MDIO_MMD_AN)
+
+/* Bits in MMDREG_STAT2 */
+#define MDIO_MMDREG_STAT2_PRESENT_VAL	(2)
+#define MDIO_MMDREG_STAT2_PRESENT_LBN	(14)
+#define MDIO_MMDREG_STAT2_PRESENT_WIDTH (2)
+
+/* PHY XGXS lane state */
+#define MDIO_PHYXS_LANE_STATE		(0x18) 
+#define MDIO_PHYXS_LANE_ALIGNED_LBN	(12)
+#define MDIO_PHYXS_LANE_SYNC0_LBN	(0)
+#define MDIO_PHYXS_LANE_SYNC1_LBN	(1)
+#define MDIO_PHYXS_LANE_SYNC2_LBN	(2)
+#define MDIO_PHYXS_LANE_SYNC3_LBN	(3)
+
+/* This ought to be ridiculous overkill. We expect it to fail rarely */
+#define MDIO45_RESET_TRIES      100
+#define MDIO45_RESET_SPINTIME   10
+
+static int
+mdio_clause45_wait_reset_mmds ( struct efab_nic* efab )
+{
+	int tries = MDIO45_RESET_TRIES;
+	int in_reset;
+
+	while(tries) {
+		int mask = efab->phy_op->mmds;
+		int mmd = 0;
+		in_reset = 0;
+		while(mask) {
+			if (mask & 1) {
+				int stat = falcon_mdio_read ( efab,  mmd,
+							      MDIO_MMDREG_CTRL1 );
+				if (stat < 0) {
+					EFAB_ERR("Failed to read status of MMD %d\n",
+						 mmd );
+					in_reset = 1;
+					break;
+				}
+				if (stat & (1 << MDIO_MMDREG_CTRL1_RESET_LBN))
+					in_reset |= (1 << mmd);
+			}
+			mask = mask >> 1;
+			mmd++;
+		}
+		if (!in_reset)
+			break;
+		tries--;
+		mdelay ( MDIO45_RESET_SPINTIME );
+	}
+	if (in_reset != 0) {
+		EFAB_ERR("Not all MMDs came out of reset in time. MMDs "
+			 "still in reset: %x\n", in_reset);
+		return -ETIMEDOUT;
+	}
+	return 0;
 }
 
+static int
+mdio_clause45_reset_mmd ( struct efab_nic *efab, int mmd )
+{
+	int tries = MDIO45_RESET_TRIES;
+	int ctrl;
 
-/**************************************************************************
+	falcon_mdio_write ( efab, mmd, MDIO_MMDREG_CTRL1,
+			    ( 1 << MDIO_MMDREG_CTRL1_RESET_LBN ) );
+
+	/* Wait for the reset bit to clear. */
+	do {
+		mdelay ( MDIO45_RESET_SPINTIME );
+
+		ctrl = falcon_mdio_read ( efab, mmd, MDIO_MMDREG_CTRL1 );
+		if ( ~ctrl & ( 1 << MDIO_MMDREG_CTRL1_RESET_LBN ) )
+			return 0;
+	} while ( --tries );
+
+	EFAB_ERR ( "Failed to reset mmd %d\n", mmd );
+
+	return -ETIMEDOUT;
+}
+
+static int
+mdio_clause45_links_ok(struct efab_nic *efab )
+{
+	int status, good;
+	int ok = 1;
+	int mmd = 0;
+	int mmd_mask = efab->phy_op->mmds;
+
+	while (mmd_mask) {
+		if (mmd_mask & 1) {
+			/* Double reads because link state is latched, and a
+			 * read	moves the current state into the register */
+			status = falcon_mdio_read ( efab, mmd,
+						    MDIO_MMDREG_STAT1 );
+			status = falcon_mdio_read ( efab, mmd,
+						    MDIO_MMDREG_STAT1 );
+
+			good = status & (1 << MDIO_MMDREG_STAT1_LINK_LBN);
+			ok = ok && good;
+		}
+		mmd_mask = (mmd_mask >> 1);
+		mmd++;
+	}
+	return ok;
+}
+
+static int
+mdio_clause45_check_mmds ( struct efab_nic *efab )
+{
+	int mmd = 0;
+	int devices = falcon_mdio_read ( efab, MDIO_MMD_PHYXS,
+					 MDIO_MMDREG_DEVS0 );
+	int mmd_mask = efab->phy_op->mmds;
+
+	/* Check all the expected MMDs are present */
+	if ( devices < 0 ) {
+		EFAB_ERR ( "Failed to read devices present\n" );
+		return -EIO;
+	}
+	if ( ( devices & mmd_mask ) != mmd_mask ) {
+		EFAB_ERR ( "required MMDs not present: got %x, wanted %x\n",
+			   devices, mmd_mask );
+		return -EIO;
+	}
+
+	/* Check all required MMDs are responding and happy. */
+	while ( mmd_mask ) {
+		if ( mmd_mask & 1 ) {
+			efab_dword_t reg;
+			int status;
+			reg.opaque = falcon_mdio_read ( efab, mmd,
+							MDIO_MMDREG_STAT2 );
+			status = EFAB_DWORD_FIELD ( reg,
+						    MDIO_MMDREG_STAT2_PRESENT );
+			if ( status != MDIO_MMDREG_STAT2_PRESENT_VAL ) {
+
+
+				return -EIO;
+			}
+		}
+		mmd_mask >>= 1;
+		mmd++;
+	}
+
+	return 0;
+}
+
+/* I/O BAR address register */
+#define FCN_IOM_IND_ADR_REG 0x0
+
+/* I/O BAR data register */
+#define FCN_IOM_IND_DAT_REG 0x4
+
+/* Address region register */
+#define FCN_ADR_REGION_REG_KER	0x00
+#define FCN_ADR_REGION0_LBN	0
+#define FCN_ADR_REGION0_WIDTH	18
+#define FCN_ADR_REGION1_LBN	32
+#define FCN_ADR_REGION1_WIDTH	18
+#define FCN_ADR_REGION2_LBN	64
+#define FCN_ADR_REGION2_WIDTH	18
+#define FCN_ADR_REGION3_LBN	96
+#define FCN_ADR_REGION3_WIDTH	18
+
+/* Interrupt enable register */
+#define FCN_INT_EN_REG_KER 0x0010
+#define FCN_MEM_PERR_INT_EN_KER_LBN 5
+#define FCN_MEM_PERR_INT_EN_KER_WIDTH 1
+#define FCN_KER_INT_CHAR_LBN 4
+#define FCN_KER_INT_CHAR_WIDTH 1
+#define FCN_KER_INT_KER_LBN 3
+#define FCN_KER_INT_KER_WIDTH 1
+#define FCN_ILL_ADR_ERR_INT_EN_KER_LBN 2
+#define FCN_ILL_ADR_ERR_INT_EN_KER_WIDTH 1
+#define FCN_SRM_PERR_INT_EN_KER_LBN 1
+#define FCN_SRM_PERR_INT_EN_KER_WIDTH 1
+#define FCN_DRV_INT_EN_KER_LBN 0
+#define FCN_DRV_INT_EN_KER_WIDTH 1
+
+/* Interrupt status register */
+#define FCN_INT_ADR_REG_KER	0x0030
+#define FCN_INT_ADR_KER_LBN 0
+#define FCN_INT_ADR_KER_WIDTH EFAB_DMA_TYPE_WIDTH ( 64 )
+
+/* Interrupt status register (B0 only) */
+#define INT_ISR0_B0 0x90
+#define INT_ISR1_B0 0xA0
+
+/* Interrupt acknowledge register (A0/A1 only) */
+#define FCN_INT_ACK_KER_REG_A1 0x0050
+#define INT_ACK_DUMMY_DATA_LBN 0
+#define INT_ACK_DUMMY_DATA_WIDTH 32
+
+/* Interrupt acknowledge work-around register (A0/A1 only )*/
+#define WORK_AROUND_BROKEN_PCI_READS_REG_KER_A1 0x0070
+
+/* Hardware initialisation register */
+#define FCN_HW_INIT_REG_KER 0x00c0
+#define FCN_BCSR_TARGET_MASK_LBN 101
+#define FCN_BCSR_TARGET_MASK_WIDTH 4
+
+/* SPI host command register */
+#define FCN_EE_SPI_HCMD_REG 0x0100
+#define FCN_EE_SPI_HCMD_CMD_EN_LBN 31
+#define FCN_EE_SPI_HCMD_CMD_EN_WIDTH 1
+#define FCN_EE_WR_TIMER_ACTIVE_LBN 28
+#define FCN_EE_WR_TIMER_ACTIVE_WIDTH 1
+#define FCN_EE_SPI_HCMD_SF_SEL_LBN 24
+#define FCN_EE_SPI_HCMD_SF_SEL_WIDTH 1
+#define FCN_EE_SPI_EEPROM 0
+#define FCN_EE_SPI_FLASH 1
+#define FCN_EE_SPI_HCMD_DABCNT_LBN 16
+#define FCN_EE_SPI_HCMD_DABCNT_WIDTH 5
+#define FCN_EE_SPI_HCMD_READ_LBN 15
+#define FCN_EE_SPI_HCMD_READ_WIDTH 1
+#define FCN_EE_SPI_READ 1
+#define FCN_EE_SPI_WRITE 0
+#define FCN_EE_SPI_HCMD_DUBCNT_LBN 12
+#define FCN_EE_SPI_HCMD_DUBCNT_WIDTH 2
+#define FCN_EE_SPI_HCMD_ADBCNT_LBN 8
+#define FCN_EE_SPI_HCMD_ADBCNT_WIDTH 2
+#define FCN_EE_SPI_HCMD_ENC_LBN 0
+#define FCN_EE_SPI_HCMD_ENC_WIDTH 8
+
+/* SPI host address register */
+#define FCN_EE_SPI_HADR_REG 0x0110
+#define FCN_EE_SPI_HADR_DUBYTE_LBN 24
+#define FCN_EE_SPI_HADR_DUBYTE_WIDTH 8
+#define FCN_EE_SPI_HADR_ADR_LBN 0
+#define FCN_EE_SPI_HADR_ADR_WIDTH 24
+
+/* SPI host data register */
+#define FCN_EE_SPI_HDATA_REG 0x0120
+#define FCN_EE_SPI_HDATA3_LBN 96
+#define FCN_EE_SPI_HDATA3_WIDTH 32
+#define FCN_EE_SPI_HDATA2_LBN 64
+#define FCN_EE_SPI_HDATA2_WIDTH 32
+#define FCN_EE_SPI_HDATA1_LBN 32
+#define FCN_EE_SPI_HDATA1_WIDTH 32
+#define FCN_EE_SPI_HDATA0_LBN 0
+#define FCN_EE_SPI_HDATA0_WIDTH 32
+
+/* VPD Config 0 Register register */
+#define FCN_EE_VPD_CFG_REG 0x0140
+#define FCN_EE_VPD_EN_LBN 0
+#define FCN_EE_VPD_EN_WIDTH 1
+#define FCN_EE_VPD_EN_AD9_MODE_LBN 1
+#define FCN_EE_VPD_EN_AD9_MODE_WIDTH 1
+#define FCN_EE_EE_CLOCK_DIV_LBN 112
+#define FCN_EE_EE_CLOCK_DIV_WIDTH 7
+#define FCN_EE_SF_CLOCK_DIV_LBN 120
+#define FCN_EE_SF_CLOCK_DIV_WIDTH 7
+
+
+/* NIC status register */
+#define FCN_NIC_STAT_REG 0x0200
+#define FCN_ONCHIP_SRAM_LBN 16
+#define FCN_ONCHIP_SRAM_WIDTH 1
+#define FCN_SF_PRST_LBN 9
+#define FCN_SF_PRST_WIDTH 1
+#define FCN_EE_PRST_LBN 8
+#define FCN_EE_PRST_WIDTH 1
+#define FCN_EE_STRAP_LBN 7
+#define FCN_EE_STRAP_WIDTH 1
+#define FCN_PCI_PCIX_MODE_LBN 4
+#define FCN_PCI_PCIX_MODE_WIDTH 3
+#define FCN_PCI_PCIX_MODE_PCI33_DECODE 0
+#define FCN_PCI_PCIX_MODE_PCI66_DECODE 1
+#define FCN_PCI_PCIX_MODE_PCIX66_DECODE 5
+#define FCN_PCI_PCIX_MODE_PCIX100_DECODE 6
+#define FCN_PCI_PCIX_MODE_PCIX133_DECODE 7
+#define FCN_STRAP_ISCSI_EN_LBN 3
+#define FCN_STRAP_ISCSI_EN_WIDTH 1
+#define FCN_STRAP_PINS_LBN 0
+#define FCN_STRAP_PINS_WIDTH 3
+#define FCN_STRAP_10G_LBN 2
+#define FCN_STRAP_10G_WIDTH 1
+#define FCN_STRAP_DUAL_PORT_LBN 1
+#define FCN_STRAP_DUAL_PORT_WIDTH 1
+#define FCN_STRAP_PCIE_LBN 0
+#define FCN_STRAP_PCIE_WIDTH 1
+
+/* Falcon revisions */
+#define FALCON_REV_A0 0
+#define FALCON_REV_A1 1
+#define FALCON_REV_B0 2
+
+/* GPIO control register */
+#define FCN_GPIO_CTL_REG_KER 0x0210
+#define FCN_GPIO_CTL_REG_KER 0x0210
+
+#define FCN_GPIO3_OEN_LBN 27
+#define FCN_GPIO3_OEN_WIDTH 1
+#define FCN_GPIO2_OEN_LBN 26
+#define FCN_GPIO2_OEN_WIDTH 1
+#define FCN_GPIO1_OEN_LBN 25
+#define FCN_GPIO1_OEN_WIDTH 1
+#define FCN_GPIO0_OEN_LBN 24
+#define FCN_GPIO0_OEN_WIDTH 1
+
+#define FCN_GPIO3_OUT_LBN 19
+#define FCN_GPIO3_OUT_WIDTH 1
+#define FCN_GPIO2_OUT_LBN 18
+#define FCN_GPIO2_OUT_WIDTH 1
+#define FCN_GPIO1_OUT_LBN 17
+#define FCN_GPIO1_OUT_WIDTH 1
+#define FCN_GPIO0_OUT_LBN 16
+#define FCN_GPIO0_OUT_WIDTH 1
+
+#define FCN_GPIO3_IN_LBN 11
+#define FCN_GPIO3_IN_WIDTH 1
+#define FCN_GPIO2_IN_LBN 10
+#define FCN_GPIO2_IN_WIDTH 1
+#define FCN_GPIO1_IN_LBN 9
+#define FCN_GPIO1_IN_WIDTH 1
+#define FCN_GPIO0_IN_LBN 8
+#define FCN_GPIO0_IN_WIDTH 1
+
+#define FCN_FLASH_PRESENT_LBN 7
+#define FCN_FLASH_PRESENT_WIDTH 1
+#define FCN_EEPROM_PRESENT_LBN 6
+#define FCN_EEPROM_PRESENT_WIDTH 1
+#define FCN_BOOTED_USING_NVDEVICE_LBN 3
+#define FCN_BOOTED_USING_NVDEVICE_WIDTH 1
+
+/* Defines for extra non-volatile storage */
+#define FCN_NV_MAGIC_NUMBER 0xFA1C
+
+/* Global control register */
+#define FCN_GLB_CTL_REG_KER	0x0220
+#define FCN_EXT_PHY_RST_CTL_LBN 63
+#define FCN_EXT_PHY_RST_CTL_WIDTH 1
+#define FCN_PCIE_SD_RST_CTL_LBN 61
+#define FCN_PCIE_SD_RST_CTL_WIDTH 1
+#define FCN_PCIE_STCK_RST_CTL_LBN 59
+#define FCN_PCIE_STCK_RST_CTL_WIDTH 1
+#define FCN_PCIE_NSTCK_RST_CTL_LBN 58
+#define FCN_PCIE_NSTCK_RST_CTL_WIDTH 1
+#define FCN_PCIE_CORE_RST_CTL_LBN 57
+#define FCN_PCIE_CORE_RST_CTL_WIDTH 1
+#define FCN_EE_RST_CTL_LBN 49
+#define FCN_EE_RST_CTL_WIDTH 1
+#define FCN_RST_EXT_PHY_LBN 31
+#define FCN_RST_EXT_PHY_WIDTH 1
+#define FCN_EXT_PHY_RST_DUR_LBN 1
+#define FCN_EXT_PHY_RST_DUR_WIDTH 3
+#define FCN_SWRST_LBN 0
+#define FCN_SWRST_WIDTH 1
+#define INCLUDE_IN_RESET 0
+#define EXCLUDE_FROM_RESET 1
+
+/* FPGA build version */
+#define FCN_ALTERA_BUILD_REG_KER 0x0300
+#define FCN_VER_MAJOR_LBN 24
+#define FCN_VER_MAJOR_WIDTH 8
+#define FCN_VER_MINOR_LBN 16
+#define FCN_VER_MINOR_WIDTH 8
+#define FCN_VER_BUILD_LBN 0
+#define FCN_VER_BUILD_WIDTH 16
+#define FCN_VER_ALL_LBN 0
+#define FCN_VER_ALL_WIDTH 32
+
+/* Spare EEPROM bits register (flash 0x390) */
+#define FCN_SPARE_REG_KER 0x310
+#define FCN_MEM_PERR_EN_TX_DATA_LBN 72
+#define FCN_MEM_PERR_EN_TX_DATA_WIDTH 2
+
+/* Timer table for kernel access */
+#define FCN_TIMER_CMD_REG_KER 0x420
+#define FCN_TIMER_MODE_LBN 12
+#define FCN_TIMER_MODE_WIDTH 2
+#define FCN_TIMER_MODE_DIS 0
+#define FCN_TIMER_MODE_INT_HLDOFF 1
+#define FCN_TIMER_VAL_LBN 0
+#define FCN_TIMER_VAL_WIDTH 12
+
+/* Receive configuration register */
+#define FCN_RX_CFG_REG_KER 0x800
+#define FCN_RX_XOFF_EN_LBN 0
+#define FCN_RX_XOFF_EN_WIDTH 1
+
+/* SRAM receive descriptor cache configuration register */
+#define FCN_SRM_RX_DC_CFG_REG_KER 0x610
+#define FCN_SRM_RX_DC_BASE_ADR_LBN 0
+#define FCN_SRM_RX_DC_BASE_ADR_WIDTH 21
+
+/* SRAM transmit descriptor cache configuration register */
+#define FCN_SRM_TX_DC_CFG_REG_KER 0x620
+#define FCN_SRM_TX_DC_BASE_ADR_LBN 0
+#define FCN_SRM_TX_DC_BASE_ADR_WIDTH 21
+
+/* SRAM configuration register */
+#define FCN_SRM_CFG_REG_KER 0x630
+#define FCN_SRAM_OOB_ADR_INTEN_LBN 5
+#define FCN_SRAM_OOB_ADR_INTEN_WIDTH 1
+#define FCN_SRAM_OOB_BUF_INTEN_LBN 4
+#define FCN_SRAM_OOB_BUF_INTEN_WIDTH 1
+#define FCN_SRAM_OOB_BT_INIT_EN_LBN 3
+#define FCN_SRAM_OOB_BT_INIT_EN_WIDTH 1
+#define FCN_SRM_NUM_BANK_LBN 2
+#define FCN_SRM_NUM_BANK_WIDTH 1
+#define FCN_SRM_BANK_SIZE_LBN 0
+#define FCN_SRM_BANK_SIZE_WIDTH 2
+#define FCN_SRM_NUM_BANKS_AND_BANK_SIZE_LBN 0
+#define FCN_SRM_NUM_BANKS_AND_BANK_SIZE_WIDTH 3
+
+#define FCN_RX_CFG_REG_KER 0x800
+#define FCN_RX_INGR_EN_B0_LBN 47
+#define FCN_RX_INGR_EN_B0_WIDTH 1
+#define FCN_RX_USR_BUF_SIZE_B0_LBN 19
+#define FCN_RX_USR_BUF_SIZE_B0_WIDTH 9
+#define FCN_RX_XON_MAC_TH_B0_LBN 10
+#define FCN_RX_XON_MAC_TH_B0_WIDTH 9
+#define FCN_RX_XOFF_MAC_TH_B0_LBN 1
+#define FCN_RX_XOFF_MAC_TH_B0_WIDTH 9
+#define FCN_RX_XOFF_MAC_EN_B0_LBN 0
+#define FCN_RX_XOFF_MAC_EN_B0_WIDTH 1
+#define FCN_RX_USR_BUF_SIZE_A1_LBN 11
+#define FCN_RX_USR_BUF_SIZE_A1_WIDTH 9
+#define FCN_RX_XON_MAC_TH_A1_LBN 6
+#define FCN_RX_XON_MAC_TH_A1_WIDTH 5
+#define FCN_RX_XOFF_MAC_TH_A1_LBN 1
+#define FCN_RX_XOFF_MAC_TH_A1_WIDTH 5
+#define FCN_RX_XOFF_MAC_EN_A1_LBN 0
+#define FCN_RX_XOFF_MAC_EN_A1_WIDTH 1
+
+#define FCN_RX_USR_BUF_SIZE_A1_LBN 11
+#define FCN_RX_USR_BUF_SIZE_A1_WIDTH 9
+#define FCN_RX_XOFF_MAC_EN_A1_LBN 0
+#define FCN_RX_XOFF_MAC_EN_A1_WIDTH 1
+
+/* Receive filter control register */
+#define FCN_RX_FILTER_CTL_REG_KER 0x810
+#define FCN_UDP_FULL_SRCH_LIMIT_LBN 32
+#define FCN_UDP_FULL_SRCH_LIMIT_WIDTH 8
+#define FCN_NUM_KER_LBN 24
+#define FCN_NUM_KER_WIDTH 2
+#define FCN_UDP_WILD_SRCH_LIMIT_LBN 16
+#define FCN_UDP_WILD_SRCH_LIMIT_WIDTH 8
+#define FCN_TCP_WILD_SRCH_LIMIT_LBN 8
+#define FCN_TCP_WILD_SRCH_LIMIT_WIDTH 8
+#define FCN_TCP_FULL_SRCH_LIMIT_LBN 0
+#define FCN_TCP_FULL_SRCH_LIMIT_WIDTH 8
+
+/* RX queue flush register */
+#define FCN_RX_FLUSH_DESCQ_REG_KER 0x0820
+#define FCN_RX_FLUSH_DESCQ_CMD_LBN 24
+#define FCN_RX_FLUSH_DESCQ_CMD_WIDTH 1
+#define FCN_RX_FLUSH_DESCQ_LBN 0
+#define FCN_RX_FLUSH_DESCQ_WIDTH 12
+
+/* Receive descriptor update register */
+#define FCN_RX_DESC_UPD_REG_KER 0x0830
+#define FCN_RX_DESC_WPTR_LBN 96
+#define FCN_RX_DESC_WPTR_WIDTH 12
+#define FCN_RX_DESC_UPD_REG_KER_DWORD ( FCN_RX_DESC_UPD_REG_KER + 12 )
+#define FCN_RX_DESC_WPTR_DWORD_LBN 0
+#define FCN_RX_DESC_WPTR_DWORD_WIDTH 12
+
+/* Receive descriptor cache configuration register */
+#define FCN_RX_DC_CFG_REG_KER 0x840
+#define FCN_RX_DC_SIZE_LBN 0
+#define FCN_RX_DC_SIZE_WIDTH 2
+
+#define FCN_RX_SELF_RST_REG_KER 0x890
+#define FCN_RX_ISCSI_DIS_LBN 17
+#define FCN_RX_ISCSI_DIS_WIDTH 1
+#define FCN_RX_NODESC_WAIT_DIS_LBN 9
+#define FCN_RX_NODESC_WAIT_DIS_WIDTH 1
+#define FCN_RX_RECOVERY_EN_LBN 8
+#define FCN_RX_RECOVERY_EN_WIDTH 1
+
+/* TX queue flush register */
+#define FCN_TX_FLUSH_DESCQ_REG_KER 0x0a00
+#define FCN_TX_FLUSH_DESCQ_CMD_LBN 12
+#define FCN_TX_FLUSH_DESCQ_CMD_WIDTH 1
+#define FCN_TX_FLUSH_DESCQ_LBN 0
+#define FCN_TX_FLUSH_DESCQ_WIDTH 12
+
+/* Transmit configuration register 2 */
+#define FCN_TX_CFG2_REG_KER 0xa80
+#define FCN_TX_DIS_NON_IP_EV_LBN 17
+#define FCN_TX_DIS_NON_IP_EV_WIDTH 1
+
+/* Transmit descriptor update register */
+#define FCN_TX_DESC_UPD_REG_KER 0x0a10
+#define FCN_TX_DESC_WPTR_LBN 96
+#define FCN_TX_DESC_WPTR_WIDTH 12
+#define FCN_TX_DESC_UPD_REG_KER_DWORD ( FCN_TX_DESC_UPD_REG_KER + 12 )
+#define FCN_TX_DESC_WPTR_DWORD_LBN 0
+#define FCN_TX_DESC_WPTR_DWORD_WIDTH 12
+
+/* Transmit descriptor cache configuration register */
+#define FCN_TX_DC_CFG_REG_KER 0xa20
+#define FCN_TX_DC_SIZE_LBN 0
+#define FCN_TX_DC_SIZE_WIDTH 2
+
+/* PHY management transmit data register */
+#define FCN_MD_TXD_REG_KER 0xc00
+#define FCN_MD_TXD_LBN 0
+#define FCN_MD_TXD_WIDTH 16
+
+/* PHY management receive data register */
+#define FCN_MD_RXD_REG_KER 0xc10
+#define FCN_MD_RXD_LBN 0
+#define FCN_MD_RXD_WIDTH 16
+
+/* PHY management configuration & status register */
+#define FCN_MD_CS_REG_KER 0xc20
+#define FCN_MD_GC_LBN 4
+#define FCN_MD_GC_WIDTH 1
+#define FCN_MD_RIC_LBN 2
+#define FCN_MD_RIC_WIDTH 1
+#define FCN_MD_RDC_LBN 1
+#define FCN_MD_RDC_WIDTH 1
+#define FCN_MD_WRC_LBN 0
+#define FCN_MD_WRC_WIDTH 1
+
+/* PHY management PHY address register */
+#define FCN_MD_PHY_ADR_REG_KER 0xc30
+#define FCN_MD_PHY_ADR_LBN 0
+#define FCN_MD_PHY_ADR_WIDTH 16
+
+/* PHY management ID register */
+#define FCN_MD_ID_REG_KER 0xc40
+#define FCN_MD_PRT_ADR_LBN 11
+#define FCN_MD_PRT_ADR_WIDTH 5
+#define FCN_MD_DEV_ADR_LBN 6
+#define FCN_MD_DEV_ADR_WIDTH 5
+
+/* PHY management status & mask register */
+#define FCN_MD_STAT_REG_KER 0xc50
+#define FCN_MD_PINT_LBN 4
+#define FCN_MD_PINT_WIDTH 1
+#define FCN_MD_DONE_LBN 3
+#define FCN_MD_DONE_WIDTH 1
+#define FCN_MD_BSERR_LBN 2
+#define FCN_MD_BSERR_WIDTH 1
+#define FCN_MD_LNFL_LBN 1
+#define FCN_MD_LNFL_WIDTH 1
+#define FCN_MD_BSY_LBN 0
+#define FCN_MD_BSY_WIDTH 1
+
+/* Port 0 and 1 MAC control registers */
+#define FCN_MAC0_CTRL_REG_KER 0xc80
+#define FCN_MAC1_CTRL_REG_KER 0xc90
+#define FCN_MAC_XOFF_VAL_LBN 16
+#define FCN_MAC_XOFF_VAL_WIDTH 16
+#define FCN_MAC_BCAD_ACPT_LBN 4
+#define FCN_MAC_BCAD_ACPT_WIDTH 1
+#define FCN_MAC_UC_PROM_LBN 3
+#define FCN_MAC_UC_PROM_WIDTH 1
+#define FCN_MAC_LINK_STATUS_LBN 2
+#define FCN_MAC_LINK_STATUS_WIDTH 1
+#define FCN_MAC_SPEED_LBN 0
+#define FCN_MAC_SPEED_WIDTH 2
+
+/* 10Gig Xaui XGXS Default Values  */
+#define XX_TXDRV_DEQ_DEFAULT 0xe /* deq=.6 */
+#define XX_TXDRV_DTX_DEFAULT 0x5 /* 1.25 */
+#define XX_SD_CTL_DRV_DEFAULT 0  /* 20mA */
+
+/* GMAC registers */
+#define FALCON_GMAC_REGBANK 0xe00
+#define FALCON_GMAC_REGBANK_SIZE 0x200
+#define FALCON_GMAC_REG_SIZE 0x10
+
+/* XGMAC registers */
+#define FALCON_XMAC_REGBANK 0x1200
+#define FALCON_XMAC_REGBANK_SIZE 0x200
+#define FALCON_XMAC_REG_SIZE 0x10
+
+/* XGMAC address register low */
+#define FCN_XM_ADR_LO_REG_MAC 0x00
+#define FCN_XM_ADR_3_LBN 24
+#define FCN_XM_ADR_3_WIDTH 8
+#define FCN_XM_ADR_2_LBN 16
+#define FCN_XM_ADR_2_WIDTH 8
+#define FCN_XM_ADR_1_LBN 8
+#define FCN_XM_ADR_1_WIDTH 8
+#define FCN_XM_ADR_0_LBN 0
+#define FCN_XM_ADR_0_WIDTH 8
+
+/* XGMAC address register high */
+#define FCN_XM_ADR_HI_REG_MAC 0x01
+#define FCN_XM_ADR_5_LBN 8
+#define FCN_XM_ADR_5_WIDTH 8
+#define FCN_XM_ADR_4_LBN 0
+#define FCN_XM_ADR_4_WIDTH 8
+
+/* XGMAC global configuration - port 0*/
+#define FCN_XM_GLB_CFG_REG_MAC 0x02
+#define FCN_XM_RX_STAT_EN_LBN 11
+#define FCN_XM_RX_STAT_EN_WIDTH 1
+#define FCN_XM_TX_STAT_EN_LBN 10
+#define FCN_XM_TX_STAT_EN_WIDTH 1
+#define FCN_XM_RX_JUMBO_MODE_LBN 6
+#define FCN_XM_RX_JUMBO_MODE_WIDTH 1
+#define FCN_XM_CORE_RST_LBN 0
+#define FCN_XM_CORE_RST_WIDTH 1
+
+/* XGMAC transmit configuration - port 0 */
+#define FCN_XM_TX_CFG_REG_MAC 0x03
+#define FCN_XM_IPG_LBN 16
+#define FCN_XM_IPG_WIDTH 4
+#define FCN_XM_FCNTL_LBN 10
+#define FCN_XM_FCNTL_WIDTH 1
+#define FCN_XM_TXCRC_LBN 8
+#define FCN_XM_TXCRC_WIDTH 1
+#define FCN_XM_AUTO_PAD_LBN 5
+#define FCN_XM_AUTO_PAD_WIDTH 1
+#define FCN_XM_TX_PRMBL_LBN 2
+#define FCN_XM_TX_PRMBL_WIDTH 1
+#define FCN_XM_TXEN_LBN 1
+#define FCN_XM_TXEN_WIDTH 1
+
+/* XGMAC receive configuration - port 0 */
+#define FCN_XM_RX_CFG_REG_MAC 0x04
+#define FCN_XM_PASS_CRC_ERR_LBN 25
+#define FCN_XM_PASS_CRC_ERR_WIDTH 1
+#define FCN_XM_AUTO_DEPAD_LBN 8
+#define FCN_XM_AUTO_DEPAD_WIDTH 1
+#define FCN_XM_RXEN_LBN 1
+#define FCN_XM_RXEN_WIDTH 1
+
+/* XGMAC management interrupt mask register */
+#define FCN_XM_MGT_INT_MSK_REG_MAC_B0 0x5
+#define FCN_XM_MSK_PRMBLE_ERR_LBN 2
+#define FCN_XM_MSK_PRMBLE_ERR_WIDTH 1
+#define FCN_XM_MSK_RMTFLT_LBN 1
+#define FCN_XM_MSK_RMTFLT_WIDTH 1
+#define FCN_XM_MSK_LCLFLT_LBN 0
+#define FCN_XM_MSK_LCLFLT_WIDTH 1
+
+/* XGMAC flow control register */
+#define FCN_XM_FC_REG_MAC 0x7
+#define FCN_XM_PAUSE_TIME_LBN 16
+#define FCN_XM_PAUSE_TIME_WIDTH 16
+#define FCN_XM_DIS_FCNTL_LBN 0
+#define FCN_XM_DIS_FCNTL_WIDTH 1
+
+/* XGMAC transmit parameter register */
+#define FCN_XM_TX_PARAM_REG_MAC 0x0d
+#define FCN_XM_TX_JUMBO_MODE_LBN 31
+#define FCN_XM_TX_JUMBO_MODE_WIDTH 1
+#define FCN_XM_MAX_TX_FRM_SIZE_LBN 16
+#define FCN_XM_MAX_TX_FRM_SIZE_WIDTH 14
+#define FCN_XM_ACPT_ALL_MCAST_LBN 11
+#define FCN_XM_ACPT_ALL_MCAST_WIDTH 1
+
+/* XGMAC receive parameter register */
+#define FCN_XM_RX_PARAM_REG_MAC 0x0e
+#define FCN_XM_MAX_RX_FRM_SIZE_LBN 0
+#define FCN_XM_MAX_RX_FRM_SIZE_WIDTH 14
+
+/* XGMAC management interrupt status register */
+#define FCN_XM_MGT_INT_REG_MAC_B0 0x0f
+#define FCN_XM_PRMBLE_ERR 2
+#define FCN_XM_PRMBLE_WIDTH 1
+#define FCN_XM_RMTFLT_LBN 1
+#define FCN_XM_RMTFLT_WIDTH 1
+#define FCN_XM_LCLFLT_LBN 0
+#define FCN_XM_LCLFLT_WIDTH 1
+
+/* XAUI XGXS core status register */
+#define FCN_XX_ALIGN_DONE_LBN 20
+#define FCN_XX_ALIGN_DONE_WIDTH 1
+#define FCN_XX_CORE_STAT_REG_MAC 0x16
+#define FCN_XX_SYNC_STAT_LBN 16
+#define FCN_XX_SYNC_STAT_WIDTH 4
+#define FCN_XX_SYNC_STAT_DECODE_SYNCED 0xf
+#define FCN_XX_COMMA_DET_LBN 12
+#define FCN_XX_COMMA_DET_WIDTH 4
+#define FCN_XX_COMMA_DET_RESET 0xf
+#define FCN_XX_CHARERR_LBN 4
+#define FCN_XX_CHARERR_WIDTH 4
+#define FCN_XX_CHARERR_RESET 0xf
+#define FCN_XX_DISPERR_LBN 0
+#define FCN_XX_DISPERR_WIDTH 4
+#define FCN_XX_DISPERR_RESET 0xf
+
+/* XGXS/XAUI powerdown/reset register */
+#define FCN_XX_PWR_RST_REG_MAC 0x10
+#define FCN_XX_PWRDND_EN_LBN 15
+#define FCN_XX_PWRDND_EN_WIDTH 1
+#define FCN_XX_PWRDNC_EN_LBN 14
+#define FCN_XX_PWRDNC_EN_WIDTH 1
+#define FCN_XX_PWRDNB_EN_LBN 13
+#define FCN_XX_PWRDNB_EN_WIDTH 1
+#define FCN_XX_PWRDNA_EN_LBN 12
+#define FCN_XX_PWRDNA_EN_WIDTH 1
+#define FCN_XX_RSTPLLCD_EN_LBN 9
+#define FCN_XX_RSTPLLCD_EN_WIDTH 1
+#define FCN_XX_RSTPLLAB_EN_LBN 8
+#define FCN_XX_RSTPLLAB_EN_WIDTH 1
+#define FCN_XX_RESETD_EN_LBN 7
+#define FCN_XX_RESETD_EN_WIDTH 1
+#define FCN_XX_RESETC_EN_LBN 6
+#define FCN_XX_RESETC_EN_WIDTH 1
+#define FCN_XX_RESETB_EN_LBN 5
+#define FCN_XX_RESETB_EN_WIDTH 1
+#define FCN_XX_RESETA_EN_LBN 4
+#define FCN_XX_RESETA_EN_WIDTH 1
+#define FCN_XX_RSTXGXSRX_EN_LBN 2
+#define FCN_XX_RSTXGXSRX_EN_WIDTH 1
+#define FCN_XX_RSTXGXSTX_EN_LBN 1
+#define FCN_XX_RSTXGXSTX_EN_WIDTH 1
+#define FCN_XX_RST_XX_EN_LBN 0
+#define FCN_XX_RST_XX_EN_WIDTH 1
+
+
+/* XGXS/XAUI powerdown/reset control register */
+#define FCN_XX_SD_CTL_REG_MAC 0x11
+#define FCN_XX_TERMADJ1_LBN 17
+#define FCN_XX_TERMADJ1_WIDTH 1
+#define FCN_XX_TERMADJ0_LBN 16
+#define FCN_XX_TERMADJ0_WIDTH 1
+#define FCN_XX_HIDRVD_LBN 15
+#define FCN_XX_HIDRVD_WIDTH 1
+#define FCN_XX_LODRVD_LBN 14
+#define FCN_XX_LODRVD_WIDTH 1
+#define FCN_XX_HIDRVC_LBN 13
+#define FCN_XX_HIDRVC_WIDTH 1
+#define FCN_XX_LODRVC_LBN 12
+#define FCN_XX_LODRVC_WIDTH 1
+#define FCN_XX_HIDRVB_LBN 11
+#define FCN_XX_HIDRVB_WIDTH 1
+#define FCN_XX_LODRVB_LBN 10
+#define FCN_XX_LODRVB_WIDTH 1
+#define FCN_XX_HIDRVA_LBN 9
+#define FCN_XX_HIDRVA_WIDTH 1
+#define FCN_XX_LODRVA_LBN 8
+#define FCN_XX_LODRVA_WIDTH 1
+#define FCN_XX_LPBKD_LBN 3
+#define FCN_XX_LPBKD_WIDTH 1
+#define FCN_XX_LPBKC_LBN 2
+#define FCN_XX_LPBKC_WIDTH 1
+#define FCN_XX_LPBKB_LBN 1
+#define FCN_XX_LPBKB_WIDTH 1
+#define FCN_XX_LPBKA_LBN 0
+#define FCN_XX_LPBKA_WIDTH 1
+
+#define FCN_XX_TXDRV_CTL_REG_MAC 0x12
+#define FCN_XX_DEQD_LBN 28
+#define FCN_XX_DEQD_WIDTH 4
+#define FCN_XX_DEQC_LBN 24
+#define FCN_XX_DEQC_WIDTH 4
+#define FCN_XX_DEQB_LBN 20
+#define FCN_XX_DEQB_WIDTH 4
+#define FCN_XX_DEQA_LBN 16
+#define FCN_XX_DEQA_WIDTH 4
+#define FCN_XX_DTXD_LBN 12
+#define FCN_XX_DTXD_WIDTH 4
+#define FCN_XX_DTXC_LBN 8
+#define FCN_XX_DTXC_WIDTH 4
+#define FCN_XX_DTXB_LBN 4
+#define FCN_XX_DTXB_WIDTH 4
+#define FCN_XX_DTXA_LBN 0
+#define FCN_XX_DTXA_WIDTH 4
+
+/* Receive filter table */
+#define FCN_RX_FILTER_TBL0 0xF00000 
+
+/* Receive descriptor pointer table */
+#define FCN_RX_DESC_PTR_TBL_KER_A1 0x11800
+#define FCN_RX_DESC_PTR_TBL_KER_B0 0xF40000
+#define FCN_RX_ISCSI_DDIG_EN_LBN 88
+#define FCN_RX_ISCSI_DDIG_EN_WIDTH 1
+#define FCN_RX_ISCSI_HDIG_EN_LBN 87
+#define FCN_RX_ISCSI_HDIG_EN_WIDTH 1
+#define FCN_RX_DESCQ_BUF_BASE_ID_LBN 36
+#define FCN_RX_DESCQ_BUF_BASE_ID_WIDTH 20
+#define FCN_RX_DESCQ_EVQ_ID_LBN 24
+#define FCN_RX_DESCQ_EVQ_ID_WIDTH 12
+#define FCN_RX_DESCQ_OWNER_ID_LBN 10
+#define FCN_RX_DESCQ_OWNER_ID_WIDTH 14
+#define FCN_RX_DESCQ_SIZE_LBN 3
+#define FCN_RX_DESCQ_SIZE_WIDTH 2
+#define FCN_RX_DESCQ_SIZE_4K 3
+#define FCN_RX_DESCQ_SIZE_2K 2
+#define FCN_RX_DESCQ_SIZE_1K 1
+#define FCN_RX_DESCQ_SIZE_512 0
+#define FCN_RX_DESCQ_TYPE_LBN 2
+#define FCN_RX_DESCQ_TYPE_WIDTH 1
+#define FCN_RX_DESCQ_JUMBO_LBN 1
+#define FCN_RX_DESCQ_JUMBO_WIDTH 1
+#define FCN_RX_DESCQ_EN_LBN 0
+#define FCN_RX_DESCQ_EN_WIDTH 1
+
+/* Transmit descriptor pointer table */
+#define FCN_TX_DESC_PTR_TBL_KER_A1 0x11900
+#define FCN_TX_DESC_PTR_TBL_KER_B0 0xF50000
+#define FCN_TX_NON_IP_DROP_DIS_B0_LBN 91
+#define FCN_TX_NON_IP_DROP_DIS_B0_WIDTH 1
+#define FCN_TX_DESCQ_EN_LBN 88
+#define FCN_TX_DESCQ_EN_WIDTH 1
+#define FCN_TX_ISCSI_DDIG_EN_LBN 87
+#define FCN_TX_ISCSI_DDIG_EN_WIDTH 1
+#define FCN_TX_ISCSI_HDIG_EN_LBN 86
+#define FCN_TX_ISCSI_HDIG_EN_WIDTH 1
+#define FCN_TX_DESCQ_BUF_BASE_ID_LBN 36
+#define FCN_TX_DESCQ_BUF_BASE_ID_WIDTH 20
+#define FCN_TX_DESCQ_EVQ_ID_LBN 24
+#define FCN_TX_DESCQ_EVQ_ID_WIDTH 12
+#define FCN_TX_DESCQ_OWNER_ID_LBN 10
+#define FCN_TX_DESCQ_OWNER_ID_WIDTH 14
+#define FCN_TX_DESCQ_SIZE_LBN 3
+#define FCN_TX_DESCQ_SIZE_WIDTH 2
+#define FCN_TX_DESCQ_SIZE_4K 3
+#define FCN_TX_DESCQ_SIZE_2K 2
+#define FCN_TX_DESCQ_SIZE_1K 1
+#define FCN_TX_DESCQ_SIZE_512 0
+#define FCN_TX_DESCQ_TYPE_LBN 1
+#define FCN_TX_DESCQ_TYPE_WIDTH 2
+#define FCN_TX_DESCQ_FLUSH_LBN 0
+#define FCN_TX_DESCQ_FLUSH_WIDTH 1
+
+/* Event queue pointer */
+#define FCN_EVQ_PTR_TBL_KER_A1 0x11a00
+#define FCN_EVQ_PTR_TBL_KER_B0 0xf60000
+#define FCN_EVQ_EN_LBN 23
+#define FCN_EVQ_EN_WIDTH 1
+#define FCN_EVQ_SIZE_LBN 20
+#define FCN_EVQ_SIZE_WIDTH 3
+#define FCN_EVQ_SIZE_32K 6
+#define FCN_EVQ_SIZE_16K 5
+#define FCN_EVQ_SIZE_8K 4
+#define FCN_EVQ_SIZE_4K 3
+#define FCN_EVQ_SIZE_2K 2
+#define FCN_EVQ_SIZE_1K 1
+#define FCN_EVQ_SIZE_512 0
+#define FCN_EVQ_BUF_BASE_ID_LBN 0
+#define FCN_EVQ_BUF_BASE_ID_WIDTH 20
+
+/* RSS indirection table */
+#define FCN_RX_RSS_INDIR_TBL_B0 0xFB0000
+
+/* Event queue read pointer */
+#define FCN_EVQ_RPTR_REG_KER_A1 0x11b00
+#define FCN_EVQ_RPTR_REG_KER_B0 0xfa0000
+#define FCN_EVQ_RPTR_LBN 0
+#define FCN_EVQ_RPTR_WIDTH 14
+#define FCN_EVQ_RPTR_REG_KER_DWORD_A1 ( FCN_EVQ_RPTR_REG_KER_A1 + 0 )
+#define FCN_EVQ_RPTR_REG_KER_DWORD_B0 ( FCN_EVQ_RPTR_REG_KER_B0 + 0 )
+#define FCN_EVQ_RPTR_DWORD_LBN 0
+#define FCN_EVQ_RPTR_DWORD_WIDTH 14
+
+/* Special buffer descriptors */
+#define FCN_BUF_FULL_TBL_KER_A1 0x18000
+#define FCN_BUF_FULL_TBL_KER_B0 0x800000
+#define FCN_IP_DAT_BUF_SIZE_LBN 50
+#define FCN_IP_DAT_BUF_SIZE_WIDTH 1
+#define FCN_IP_DAT_BUF_SIZE_8K 1
+#define FCN_IP_DAT_BUF_SIZE_4K 0
+#define FCN_BUF_ADR_FBUF_LBN 14
+#define FCN_BUF_ADR_FBUF_WIDTH 34
+#define FCN_BUF_OWNER_ID_FBUF_LBN 0
+#define FCN_BUF_OWNER_ID_FBUF_WIDTH 14
+
+/** Offset of a GMAC register within Falcon */
+#define FALCON_GMAC_REG( efab, mac_reg )				\
+	( FALCON_GMAC_REGBANK +					\
+	  ( (mac_reg) * FALCON_GMAC_REG_SIZE ) )
+
+/** Offset of an XMAC register within Falcon */
+#define FALCON_XMAC_REG( efab_port, mac_reg )			\
+	( FALCON_XMAC_REGBANK +					\
+	  ( (mac_reg) * FALCON_XMAC_REG_SIZE ) )
+
+#define FCN_MAC_DATA_LBN 0
+#define FCN_MAC_DATA_WIDTH 32
+
+/* Transmit descriptor */
+#define FCN_TX_KER_PORT_LBN 63
+#define FCN_TX_KER_PORT_WIDTH 1
+#define FCN_TX_KER_BYTE_CNT_LBN 48
+#define FCN_TX_KER_BYTE_CNT_WIDTH 14
+#define FCN_TX_KER_BUF_ADR_LBN 0
+#define FCN_TX_KER_BUF_ADR_WIDTH EFAB_DMA_TYPE_WIDTH ( 46 )
+
+
+/* Receive descriptor */
+#define FCN_RX_KER_BUF_SIZE_LBN 48
+#define FCN_RX_KER_BUF_SIZE_WIDTH 14
+#define FCN_RX_KER_BUF_ADR_LBN 0
+#define FCN_RX_KER_BUF_ADR_WIDTH EFAB_DMA_TYPE_WIDTH ( 46 )
+
+/* Event queue entries */
+#define FCN_EV_CODE_LBN 60
+#define FCN_EV_CODE_WIDTH 4
+#define FCN_RX_IP_EV_DECODE 0
+#define FCN_TX_IP_EV_DECODE 2
+#define FCN_DRIVER_EV_DECODE 5
+
+/* Receive events */
+#define FCN_RX_EV_PKT_OK_LBN 56
+#define FCN_RX_EV_PKT_OK_WIDTH 1
+#define FCN_RX_PORT_LBN 30
+#define FCN_RX_PORT_WIDTH 1
+#define FCN_RX_EV_BYTE_CNT_LBN 16
+#define FCN_RX_EV_BYTE_CNT_WIDTH 14
+#define FCN_RX_EV_DESC_PTR_LBN 0
+#define FCN_RX_EV_DESC_PTR_WIDTH 12
+
+/* Transmit events */
+#define FCN_TX_EV_DESC_PTR_LBN 0
+#define FCN_TX_EV_DESC_PTR_WIDTH 12
+
+/*******************************************************************************
  *
- * Mentor MAC
  *
- **************************************************************************
+ * Low-level hardware access
+ *
+ *
+ *******************************************************************************/ 
+
+#define FCN_REVISION_REG(efab, reg) \
+	( ( efab->pci_revision == FALCON_REV_B0 ) ? reg ## _B0 : reg ## _A1 )
+
+#define EFAB_SET_OWORD_FIELD_VER(efab, reg, field, val)			\
+	if ( efab->pci_revision == FALCON_REV_B0 )			\
+		EFAB_SET_OWORD_FIELD ( reg, field ## _B0, val );	\
+	else								\
+		EFAB_SET_OWORD_FIELD ( reg, field ## _A1, val );
+
+#if FALCON_USE_IO_BAR
+
+/* Write dword via the I/O BAR */
+static inline void _falcon_writel ( struct efab_nic *efab, uint32_t value,
+				    unsigned int reg ) {
+	outl ( reg, efab->iobase + FCN_IOM_IND_ADR_REG );
+	outl ( value, efab->iobase + FCN_IOM_IND_DAT_REG );
+}
+
+/* Read dword via the I/O BAR */
+static inline uint32_t _falcon_readl ( struct efab_nic *efab,
+				       unsigned int reg ) {
+	outl ( reg, efab->iobase + FCN_IOM_IND_ADR_REG );
+	return inl ( efab->iobase + FCN_IOM_IND_DAT_REG );
+}
+
+#else /* FALCON_USE_IO_BAR */
+
+#define _falcon_writel( efab, value, reg ) \
+	writel ( (value), (efab)->membase + (reg) )
+#define _falcon_readl( efab, reg ) readl ( (efab)->membase + (reg) )
+
+#endif /* FALCON_USE_IO_BAR */
+
+/**
+ * Write to a Falcon register
+ *
  */
+static inline void
+falcon_write ( struct efab_nic *efab, efab_oword_t *value, unsigned int reg )
+{
+
+	EFAB_REGDUMP ( "Writing register %x with " EFAB_OWORD_FMT "\n",
+		       reg, EFAB_OWORD_VAL ( *value ) );
+
+	_falcon_writel ( efab, value->u32[0], reg + 0  );
+	_falcon_writel ( efab, value->u32[1], reg + 4  );
+	_falcon_writel ( efab, value->u32[2], reg + 8  );
+	wmb();
+	_falcon_writel ( efab, value->u32[3], reg + 12 );
+	wmb();
+}
+
+/**
+ * Write to Falcon SRAM
+ *
+ */
+static inline void
+falcon_write_sram ( struct efab_nic *efab, efab_qword_t *value,
+		    unsigned int index )
+{
+	unsigned int reg = ( FCN_REVISION_REG ( efab, FCN_BUF_FULL_TBL_KER ) +
+			     ( index * sizeof ( *value ) ) );
+
+	EFAB_REGDUMP ( "Writing SRAM register %x with " EFAB_QWORD_FMT "\n",
+		       reg, EFAB_QWORD_VAL ( *value ) );
+
+	_falcon_writel ( efab, value->u32[0], reg + 0  );
+	_falcon_writel ( efab, value->u32[1], reg + 4  );
+	wmb();
+}
+
+/**
+ * Write dword to Falcon register that allows partial writes
+ *
+ */
+static inline void
+falcon_writel ( struct efab_nic *efab, efab_dword_t *value, unsigned int reg )
+{
+	EFAB_REGDUMP ( "Writing partial register %x with " EFAB_DWORD_FMT "\n",
+		       reg, EFAB_DWORD_VAL ( *value ) );
+	_falcon_writel ( efab, value->u32[0], reg );
+}
+
+/**
+ * Read from a Falcon register
+ *
+ */
+static inline void
+falcon_read ( struct efab_nic *efab, efab_oword_t *value, unsigned int reg )
+{
+	value->u32[0] = _falcon_readl ( efab, reg + 0  );
+	wmb();
+	value->u32[1] = _falcon_readl ( efab, reg + 4  );
+	value->u32[2] = _falcon_readl ( efab, reg + 8  );
+	value->u32[3] = _falcon_readl ( efab, reg + 12 );
+
+	EFAB_REGDUMP ( "Read from register %x, got " EFAB_OWORD_FMT "\n",
+		       reg, EFAB_OWORD_VAL ( *value ) );
+}
+
+/** 
+ * Read from Falcon SRAM
+ *
+ */
+static inline void
+falcon_read_sram ( struct efab_nic *efab, efab_qword_t *value,
+		   unsigned int index )
+{
+	unsigned int reg = ( FCN_REVISION_REG ( efab, FCN_BUF_FULL_TBL_KER ) +
+			     ( index * sizeof ( *value ) ) );
+
+	value->u32[0] = _falcon_readl ( efab, reg + 0 );
+	value->u32[1] = _falcon_readl ( efab, reg + 4 );
+	EFAB_REGDUMP ( "Read from SRAM register %x, got " EFAB_QWORD_FMT "\n",
+		       reg, EFAB_QWORD_VAL ( *value ) );
+}
+
+/**
+ * Read dword from a portion of a Falcon register
+ *
+ */
+static inline void
+falcon_readl ( struct efab_nic *efab, efab_dword_t *value, unsigned int reg )
+{
+	value->u32[0] = _falcon_readl ( efab, reg );
+	EFAB_REGDUMP ( "Read from register %x, got " EFAB_DWORD_FMT "\n",
+		       reg, EFAB_DWORD_VAL ( *value ) );
+}
+
+#define FCN_DUMP_REG( efab, _reg ) do {				\
+		efab_oword_t reg;				\
+		falcon_read ( efab, &reg, _reg );		\
+		EFAB_LOG ( #_reg " = " EFAB_OWORD_FMT "\n",	\
+			   EFAB_OWORD_VAL ( reg ) );		\
+	} while ( 0 );
+
+#define FCN_DUMP_MAC_REG( efab, _mac_reg ) do {				\
+		efab_dword_t reg;					\
+		efab->mac_op->mac_readl ( efab, &reg, _mac_reg );	\
+		EFAB_LOG ( #_mac_reg " = " EFAB_DWORD_FMT "\n",		\
+			   EFAB_DWORD_VAL ( reg ) );			\
+	} while ( 0 );
+
+/**
+ * See if an event is present
+ *
+ * @v event		Falcon event structure
+ * @ret True		An event is pending
+ * @ret False		No event is pending
+ *
+ * We check both the high and low dword of the event for all ones.  We
+ * wrote all ones when we cleared the event, and no valid event can
+ * have all ones in either its high or low dwords.  This approach is
+ * robust against reordering.
+ *
+ * Note that using a single 64-bit comparison is incorrect; even
+ * though the CPU read will be atomic, the DMA write may not be.
+ */
+static inline int
+falcon_event_present ( falcon_event_t* event )
+{
+	return ( ! ( EFAB_DWORD_IS_ALL_ONES ( event->dword[0] ) |
+		     EFAB_DWORD_IS_ALL_ONES ( event->dword[1] ) ) );
+}
+
+static void
+falcon_eventq_read_ack ( struct efab_nic *efab, struct efab_ev_queue *ev_queue )
+{
+	efab_dword_t reg;
+
+	EFAB_POPULATE_DWORD_1 ( reg, FCN_EVQ_RPTR_DWORD, ev_queue->read_ptr );
+	falcon_writel ( efab, &reg,
+			FCN_REVISION_REG ( efab, FCN_EVQ_RPTR_REG_KER_DWORD ) );
+}
+
+#if 0
+/**
+ * Dump register contents (for debugging)
+ *
+ * Marked as static inline so that it will not be compiled in if not
+ * used.
+ */
+static inline void
+falcon_dump_regs ( struct efab_nic *efab )
+{
+	FCN_DUMP_REG ( efab, FCN_INT_EN_REG_KER );
+	FCN_DUMP_REG ( efab, FCN_INT_ADR_REG_KER );
+	FCN_DUMP_REG ( efab, FCN_GLB_CTL_REG_KER );
+	FCN_DUMP_REG ( efab, FCN_TIMER_CMD_REG_KER );
+	FCN_DUMP_REG ( efab, FCN_SRM_RX_DC_CFG_REG_KER );
+	FCN_DUMP_REG ( efab, FCN_SRM_TX_DC_CFG_REG_KER );
+	FCN_DUMP_REG ( efab, FCN_RX_FILTER_CTL_REG_KER );
+	FCN_DUMP_REG ( efab, FCN_RX_DC_CFG_REG_KER );
+	FCN_DUMP_REG ( efab, FCN_TX_DC_CFG_REG_KER );
+	FCN_DUMP_REG ( efab, FCN_MAC0_CTRL_REG_KER );
+	FCN_DUMP_REG ( efab, FCN_MAC1_CTRL_REG_KER );
+	FCN_DUMP_REG ( efab, FCN_REVISION_REG ( efab, FCN_RX_DESC_PTR_TBL_KER ) );
+	FCN_DUMP_REG ( efab, FCN_REVISION_REG ( efab, FCN_TX_DESC_PTR_TBL_KER ) );
+	FCN_DUMP_REG ( efab, FCN_REVISION_REG ( efab, FCN_EVQ_PTR_TBL_KER ) );
+	FCN_DUMP_MAC_REG ( efab, GM_CFG1_REG_MAC );
+	FCN_DUMP_MAC_REG ( efab, GM_CFG2_REG_MAC );
+	FCN_DUMP_MAC_REG ( efab, GM_MAX_FLEN_REG_MAC );
+	FCN_DUMP_MAC_REG ( efab, GM_MII_MGMT_CFG_REG_MAC );
+	FCN_DUMP_MAC_REG ( efab, GM_ADR1_REG_MAC );
+	FCN_DUMP_MAC_REG ( efab, GM_ADR2_REG_MAC );
+	FCN_DUMP_MAC_REG ( efab, GMF_CFG0_REG_MAC );
+	FCN_DUMP_MAC_REG ( efab, GMF_CFG1_REG_MAC );
+	FCN_DUMP_MAC_REG ( efab, GMF_CFG2_REG_MAC );
+	FCN_DUMP_MAC_REG ( efab, GMF_CFG3_REG_MAC );
+	FCN_DUMP_MAC_REG ( efab, GMF_CFG4_REG_MAC );
+	FCN_DUMP_MAC_REG ( efab, GMF_CFG5_REG_MAC );
+}
+#endif
+
+static void
+falcon_interrupts ( struct efab_nic *efab, int enabled, int force )
+{
+	efab_oword_t int_en_reg_ker;
+
+	EFAB_POPULATE_OWORD_2 ( int_en_reg_ker,
+				FCN_KER_INT_KER, force,
+				FCN_DRV_INT_EN_KER, enabled );
+	falcon_write ( efab, &int_en_reg_ker, FCN_INT_EN_REG_KER );	
+}
+
+/*******************************************************************************
+ *
+ *
+ * SPI access
+ *
+ *
+ *******************************************************************************/ 
+
+
+/** Maximum length for a single SPI transaction */
+#define FALCON_SPI_MAX_LEN 16
+
+static int
+falcon_spi_wait ( struct efab_nic *efab )
+{
+	efab_oword_t reg;
+	int count;
+
+	count = 0;
+	do {
+		udelay ( 100 );
+		falcon_read ( efab, &reg, FCN_EE_SPI_HCMD_REG );
+		if ( EFAB_OWORD_FIELD ( reg, FCN_EE_SPI_HCMD_CMD_EN ) == 0 )
+			return 0;
+	} while ( ++count < 1000 );
+
+	EFAB_ERR ( "Timed out waiting for SPI\n" );
+	return -ETIMEDOUT;
+}
+
+static int
+falcon_spi_rw ( struct spi_bus* bus, struct spi_device *device,
+		unsigned int command, int address,
+		const void* data_out, void *data_in, size_t len )
+{
+	struct efab_nic *efab = container_of ( bus, struct efab_nic, spi_bus );
+	int address_len, rc, device_id, read_cmd;
+	efab_oword_t reg;
+
+	/* falcon_init_spi_device() should have reduced the block size
+	 * down so this constraint holds */
+	assert ( len <= FALCON_SPI_MAX_LEN );
+
+	/* Is this the FLASH or EEPROM device? */
+	if ( device == &efab->spi_flash )
+		device_id = FCN_EE_SPI_FLASH;
+	else if ( device == &efab->spi_eeprom )
+		device_id = FCN_EE_SPI_EEPROM;
+	else {
+		EFAB_ERR ( "Unknown device %p\n", device );
+		return -EINVAL;
+	}
+
+	EFAB_TRACE ( "Executing spi command %d on device %d at %d for %d bytes\n",
+		     command, device_id, address, len );
+
+	/* The bus must be idle */
+	rc = falcon_spi_wait ( efab );
+	if ( rc )
+		goto fail1;
+
+	/* Copy data out */
+	if ( data_out ) {
+		memcpy ( &reg, data_out, len );
+		falcon_write ( efab, &reg, FCN_EE_SPI_HDATA_REG );
+	}
+
+	/* Program address register */
+	if ( address >= 0 ) {
+		EFAB_POPULATE_OWORD_1 ( reg, FCN_EE_SPI_HADR_ADR, address );
+		falcon_write ( efab, &reg, FCN_EE_SPI_HADR_REG );
+	}
+
+	/* Issue command */
+	address_len = ( address >= 0 ) ? device->address_len / 8 : 0;
+	read_cmd = ( data_in ? FCN_EE_SPI_READ : FCN_EE_SPI_WRITE );
+	EFAB_POPULATE_OWORD_7 ( reg,
+				FCN_EE_SPI_HCMD_CMD_EN, 1,
+				FCN_EE_SPI_HCMD_SF_SEL, device_id,
+				FCN_EE_SPI_HCMD_DABCNT, len,
+				FCN_EE_SPI_HCMD_READ, read_cmd,
+				FCN_EE_SPI_HCMD_DUBCNT, 0,
+				FCN_EE_SPI_HCMD_ADBCNT, address_len,
+				FCN_EE_SPI_HCMD_ENC, command );
+	falcon_write ( efab, &reg, FCN_EE_SPI_HCMD_REG );
+
+	/* Wait for the command to complete */
+	rc = falcon_spi_wait ( efab );
+	if ( rc )
+		goto fail2;
+
+	/* Copy data in */
+	if ( data_in ) {
+		falcon_read ( efab, &reg, FCN_EE_SPI_HDATA_REG );
+		memcpy ( data_in, &reg, len );
+	}
+
+	return 0;
+
+fail2:
+fail1:
+	EFAB_ERR ( "Failed SPI command %d to device %d address 0x%x len 0x%x\n",
+		   command, device_id, address, len );
+
+	return rc;
+}
+
+/** Portion of EEPROM available for non-volatile options */
+static struct nvo_fragment falcon_nvo_fragments[] = {
+	{ 0x100, 0xf0 },
+	{ 0, 0 }
+};
+
+/*******************************************************************************
+ *
+ *
+ * Falcon bit-bashed I2C interface
+ *
+ *
+ *******************************************************************************/ 
+
+static void
+falcon_i2c_bit_write ( struct bit_basher *basher, unsigned int bit_id,
+		       unsigned long data )
+{
+	struct efab_nic *efab = container_of ( basher, struct efab_nic,
+					       i2c_bb.basher );
+	efab_oword_t reg;
+
+	falcon_read ( efab, &reg, FCN_GPIO_CTL_REG_KER );
+	switch ( bit_id ) {
+	case I2C_BIT_SCL:
+		EFAB_SET_OWORD_FIELD ( reg, FCN_GPIO0_OEN, ( data ? 0 : 1 ) );
+		break;
+	case I2C_BIT_SDA:
+		EFAB_SET_OWORD_FIELD ( reg, FCN_GPIO3_OEN, ( data ? 0 : 1 ) );
+		break;
+	default:
+		EFAB_ERR ( "%s bit=%d\n", __func__, bit_id );
+		break;
+	}
+
+	falcon_write ( efab, &reg,  FCN_GPIO_CTL_REG_KER );
+}
+
+static int
+falcon_i2c_bit_read ( struct bit_basher *basher, unsigned int bit_id )
+{
+	struct efab_nic *efab = container_of ( basher, struct efab_nic,
+					       i2c_bb.basher );
+	efab_oword_t reg;
+	
+	falcon_read ( efab, &reg, FCN_GPIO_CTL_REG_KER );
+	switch ( bit_id ) {
+	case I2C_BIT_SCL:
+		return EFAB_OWORD_FIELD ( reg, FCN_GPIO0_IN );
+		break;
+	case I2C_BIT_SDA:
+		return EFAB_OWORD_FIELD ( reg, FCN_GPIO3_IN );
+		break;
+	default:
+		EFAB_ERR ( "%s bit=%d\n", __func__, bit_id );
+		break;
+	}
+
+	return -1;
+}
+
+static struct bit_basher_operations falcon_i2c_bit_ops = {
+	.read           = falcon_i2c_bit_read,
+	.write          = falcon_i2c_bit_write,
+};
+
+
+/*******************************************************************************
+ *
+ *
+ * MDIO access
+ *
+ *
+ *******************************************************************************/ 
+
+static int
+falcon_gmii_wait ( struct efab_nic *efab )
+{
+	efab_dword_t md_stat;
+	int count;
+
+	/* wait upto 10ms */
+	for (count = 0; count < 1000; count++) {
+		falcon_readl ( efab, &md_stat, FCN_MD_STAT_REG_KER );
+		if ( EFAB_DWORD_FIELD ( md_stat, FCN_MD_BSY ) == 0 ) {
+			if ( EFAB_DWORD_FIELD ( md_stat, FCN_MD_LNFL ) != 0 ||
+			     EFAB_DWORD_FIELD ( md_stat, FCN_MD_BSERR ) != 0 ) {
+				EFAB_ERR ( "Error from GMII access "
+					   EFAB_DWORD_FMT"\n",
+					   EFAB_DWORD_VAL ( md_stat ));
+				return -EIO;
+			}
+			return 0;
+		}
+		udelay(10);
+	}
+
+	EFAB_ERR ( "Timed out waiting for GMII\n" );
+	return -ETIMEDOUT;
+}
+
+static void
+falcon_mdio_write ( struct efab_nic *efab, int device,
+		    int location, int value )
+{
+	efab_oword_t reg;
+
+	EFAB_TRACE ( "Writing GMII %d register %02x with %04x\n",
+		     device, location, value );
+
+	/* Check MII not currently being accessed */
+	if ( falcon_gmii_wait ( efab ) )
+		return;
+
+	/* Write the address/ID register */
+	EFAB_POPULATE_OWORD_1 ( reg, FCN_MD_PHY_ADR, location );
+	falcon_write ( efab, &reg, FCN_MD_PHY_ADR_REG_KER );
+
+	if ( efab->phy_10g ) {
+		/* clause45 */
+		EFAB_POPULATE_OWORD_2 ( reg, 
+					FCN_MD_PRT_ADR, efab->phy_addr,
+					FCN_MD_DEV_ADR, device );
+	}
+	else {
+		/* clause22 */
+		assert ( device == 0 );
+
+		EFAB_POPULATE_OWORD_2 ( reg,
+					FCN_MD_PRT_ADR, efab->phy_addr,
+					FCN_MD_DEV_ADR, location );
+	}
+	falcon_write ( efab, &reg, FCN_MD_ID_REG_KER );
+		
+
+	/* Write data */
+	EFAB_POPULATE_OWORD_1 ( reg, FCN_MD_TXD, value );
+	falcon_write ( efab, &reg, FCN_MD_TXD_REG_KER );
+
+	EFAB_POPULATE_OWORD_2 ( reg,
+				FCN_MD_WRC, 1,
+				FCN_MD_GC, ( efab->phy_10g ? 0 : 1 ) );
+	falcon_write ( efab, &reg, FCN_MD_CS_REG_KER );
+		
+	/* Wait for data to be written */
+	if ( falcon_gmii_wait ( efab ) ) {
+		/* Abort the write operation */
+		EFAB_POPULATE_OWORD_2 ( reg,
+					FCN_MD_WRC, 0,
+					FCN_MD_GC, 1);
+		falcon_write ( efab, &reg, FCN_MD_CS_REG_KER );
+		udelay(10);
+	}
+}
+
+static int
+falcon_mdio_read ( struct efab_nic *efab, int device, int location )
+{
+	efab_oword_t reg;
+	int value;
+
+	/* Check MII not currently being accessed */
+	if ( falcon_gmii_wait ( efab ) ) 
+		return -1;
+
+	if ( efab->phy_10g ) {
+		/* clause45 */
+		EFAB_POPULATE_OWORD_1 ( reg, FCN_MD_PHY_ADR, location );
+		falcon_write ( efab, &reg, FCN_MD_PHY_ADR_REG_KER );
+
+		EFAB_POPULATE_OWORD_2 ( reg,
+					FCN_MD_PRT_ADR, efab->phy_addr,
+					FCN_MD_DEV_ADR, device );
+		falcon_write ( efab, &reg, FCN_MD_ID_REG_KER);
+
+		/* request data to be read */
+		EFAB_POPULATE_OWORD_2 ( reg,
+					FCN_MD_RDC, 1,
+					FCN_MD_GC, 0 );
+	}
+	else {
+		/* clause22 */
+		assert ( device == 0 );
+
+		EFAB_POPULATE_OWORD_2 ( reg,
+					FCN_MD_PRT_ADR, efab->phy_addr,
+					FCN_MD_DEV_ADR, location );
+		falcon_write ( efab, &reg, FCN_MD_ID_REG_KER );
+
+		/* Request data to be read */
+		EFAB_POPULATE_OWORD_2 ( reg,
+					FCN_MD_RIC, 1,
+					FCN_MD_GC, 1 );
+	}
+
+	falcon_write ( efab, &reg, FCN_MD_CS_REG_KER );
+		
+	/* Wait for data to become available */
+	if ( falcon_gmii_wait ( efab ) ) {
+		/* Abort the read operation */
+		EFAB_POPULATE_OWORD_2 ( reg,
+					FCN_MD_RIC, 0,
+					FCN_MD_GC, 1 );
+		falcon_write ( efab, &reg, FCN_MD_CS_REG_KER );
+		udelay ( 10 );
+		value = -1;
+	}
+	else {
+		/* Read the data */
+		falcon_read ( efab, &reg, FCN_MD_RXD_REG_KER );
+		value = EFAB_OWORD_FIELD ( reg, FCN_MD_RXD );
+	}
+
+	EFAB_TRACE ( "Read from GMII %d register %02x, got %04x\n",
+		     device, location, value );
+
+	return value;
+}
+
+/*******************************************************************************
+ *
+ *
+ * MAC wrapper
+ *
+ *
+ *******************************************************************************/
+
+static void
+falcon_reconfigure_mac_wrapper ( struct efab_nic *efab )
+{
+	efab_oword_t reg;
+	int link_speed;
+
+	if ( efab->link_options & LPA_10000 ) {
+		link_speed = 0x3;
+	} else if ( efab->link_options & LPA_1000 ) {
+		link_speed = 0x2;
+	} else if ( efab->link_options & LPA_100 ) {
+		link_speed = 0x1;
+	} else {
+		link_speed = 0x0;
+	}
+	EFAB_POPULATE_OWORD_5 ( reg,
+				FCN_MAC_XOFF_VAL, 0xffff /* datasheet */,
+				FCN_MAC_BCAD_ACPT, 1,
+				FCN_MAC_UC_PROM, 0,
+				FCN_MAC_LINK_STATUS, 1,
+				FCN_MAC_SPEED, link_speed );
+
+	falcon_write ( efab, &reg, FCN_MAC0_CTRL_REG_KER );
+}
+
+/*******************************************************************************
+ *
+ *
+ * GMAC handling
+ *
+ *
+ *******************************************************************************/
 
 /* GMAC configuration register 1 */
 #define GM_CFG1_REG_MAC 0x00
@@ -517,51 +1894,55 @@ static void alaska_init ( struct efab_nic *efab ) {
 #define GMF_HSTFLTRFRMDC_PAUSE_LBN 12
 #define GMF_HSTFLTRFRMDC_PAUSE_WIDTH 1
 
-struct efab_mentormac_parameters {
-	int gmf_cfgfrth;
-	int gmf_cfgftth;
-	int gmf_cfghwmft;
-	int gmf_cfghwm;
-	int gmf_cfglwm;
-};
+static void
+falcon_gmac_writel ( struct efab_nic *efab, efab_dword_t *value,
+		     unsigned int mac_reg )
+{
+	efab_oword_t temp;
 
-/**
- * Reset Mentor MAC
- *
- */
-static void mentormac_reset ( struct efab_nic *efab ) {
+	EFAB_POPULATE_OWORD_1 ( temp, FCN_MAC_DATA,
+				EFAB_DWORD_FIELD ( *value, FCN_MAC_DATA ) );
+	falcon_write ( efab, &temp, FALCON_GMAC_REG ( efab, mac_reg ) );
+}
+
+static void
+falcon_gmac_readl ( struct efab_nic *efab, efab_dword_t *value,
+		    unsigned int mac_reg )
+{
+	efab_oword_t temp;
+
+	falcon_read ( efab, &temp, FALCON_GMAC_REG ( efab, mac_reg ) );
+	EFAB_POPULATE_DWORD_1 ( *value, FCN_MAC_DATA,
+				EFAB_OWORD_FIELD ( temp, FCN_MAC_DATA ) );
+}
+
+static void
+mentormac_reset ( struct efab_nic *efab )
+{
 	efab_dword_t reg;
-	int save_port;
 
 	/* Take into reset */
 	EFAB_POPULATE_DWORD_1 ( reg, GM_SW_RST, 1 );
-	efab->mac_op->mac_writel ( efab, &reg, GM_CFG1_REG_MAC );
+	falcon_gmac_writel ( efab, &reg, GM_CFG1_REG_MAC );
 	udelay ( 1000 );
 
 	/* Take out of reset */
 	EFAB_POPULATE_DWORD_1 ( reg, GM_SW_RST, 0 );
-	efab->mac_op->mac_writel ( efab, &reg, GM_CFG1_REG_MAC );
+	falcon_gmac_writel ( efab, &reg, GM_CFG1_REG_MAC );
 	udelay ( 1000 );
 
-	/* Mentor MAC connects both PHYs to MAC 0 */
-	save_port = efab->port;
-	efab->port = 0;
 	/* Configure GMII interface so PHY is accessible.  Note that
 	 * GMII interface is connected only to port 0, and that on
 	 * Falcon this is a no-op.
 	 */
 	EFAB_POPULATE_DWORD_1 ( reg, GM_MGMT_CLK_SEL, 0x4 );
-	efab->mac_op->mac_writel ( efab, &reg, GM_MII_MGMT_CFG_REG_MAC );
+	falcon_gmac_writel ( efab, &reg, GM_MII_MGMT_CFG_REG_MAC );
 	udelay ( 10 );
-	efab->port = save_port;
 }
 
-/**
- * Initialise Mentor MAC
- *
- */
-static void mentormac_init ( struct efab_nic *efab,
-			     struct efab_mentormac_parameters *params ) {
+static void
+mentormac_init ( struct efab_nic *efab )
+{
 	int pause, if_mode, full_duplex, bytemode, half_duplex;
 	efab_dword_t reg;
 
@@ -576,7 +1957,7 @@ static void mentormac_init ( struct efab_nic *efab,
 				GM_TX_FC_EN, pause,
 				GM_RX_EN, 1,
 				GM_RX_FC_EN, 1 );
-	efab->mac_op->mac_writel ( efab, &reg, GM_CFG1_REG_MAC );
+	falcon_gmac_writel ( efab, &reg, GM_CFG1_REG_MAC );
 	udelay ( 10 );
 
 	/* Configuration register 2 */
@@ -587,12 +1968,13 @@ static void mentormac_init ( struct efab_nic *efab,
 				GM_PAD_CRC_EN, 1,
 				GM_FD, full_duplex,
 				GM_PAMBL_LEN, 0x7 /* ? */ );
-	efab->mac_op->mac_writel ( efab, &reg, GM_CFG2_REG_MAC );
+	falcon_gmac_writel ( efab, &reg, GM_CFG2_REG_MAC );
 	udelay ( 10 );
 
 	/* Max frame len register */
-	EFAB_POPULATE_DWORD_1 ( reg, GM_MAX_FLEN, ETH_FRAME_LEN + 4 /* FCS */);
-	efab->mac_op->mac_writel ( efab, &reg, GM_MAX_FLEN_REG_MAC );
+	EFAB_POPULATE_DWORD_1 ( reg, GM_MAX_FLEN,
+				EFAB_MAX_FRAME_LEN ( ETH_FRAME_LEN ) );
+	falcon_gmac_writel ( efab, &reg, GM_MAX_FLEN_REG_MAC );
 	udelay ( 10 );
 
 	/* FIFO configuration register 0 */
@@ -602,44 +1984,44 @@ static void mentormac_init ( struct efab_nic *efab,
 				GMF_FRFENREQ, 1,
 				GMF_SRFENREQ, 1,
 				GMF_WTMENREQ, 1 );
-	efab->mac_op->mac_writel ( efab, &reg, GMF_CFG0_REG_MAC );
+	falcon_gmac_writel ( efab, &reg, GMF_CFG0_REG_MAC );
 	udelay ( 10 );
 
 	/* FIFO configuration register 1 */
 	EFAB_POPULATE_DWORD_2 ( reg,
-				GMF_CFGFRTH, params->gmf_cfgfrth,
+				GMF_CFGFRTH, 0x12,
 				GMF_CFGXOFFRTX, 0xffff );
-	efab->mac_op->mac_writel ( efab, &reg, GMF_CFG1_REG_MAC );
+	falcon_gmac_writel ( efab, &reg, GMF_CFG1_REG_MAC );
 	udelay ( 10 );
 
 	/* FIFO configuration register 2 */
 	EFAB_POPULATE_DWORD_2 ( reg,
-				GMF_CFGHWM, params->gmf_cfghwm,
-				GMF_CFGLWM, params->gmf_cfglwm );
-	efab->mac_op->mac_writel ( efab, &reg, GMF_CFG2_REG_MAC );
+				GMF_CFGHWM, 0x3f,
+				GMF_CFGLWM, 0xa );
+	falcon_gmac_writel ( efab, &reg, GMF_CFG2_REG_MAC );
 	udelay ( 10 );
 
 	/* FIFO configuration register 3 */
 	EFAB_POPULATE_DWORD_2 ( reg,
-				GMF_CFGHWMFT, params->gmf_cfghwmft,
-				GMF_CFGFTTH, params->gmf_cfgftth );
-	efab->mac_op->mac_writel ( efab, &reg, GMF_CFG3_REG_MAC );
+				GMF_CFGHWMFT, 0x1c,
+				GMF_CFGFTTH, 0x08 );
+	falcon_gmac_writel ( efab, &reg, GMF_CFG3_REG_MAC );
 	udelay ( 10 );
 
 	/* FIFO configuration register 4 */
 	EFAB_POPULATE_DWORD_1 ( reg, GMF_HSTFLTRFRM_PAUSE, 1 );
-	efab->mac_op->mac_writel ( efab, &reg, GMF_CFG4_REG_MAC );
+	falcon_gmac_writel ( efab, &reg, GMF_CFG4_REG_MAC );
 	udelay ( 10 );
 	
 	/* FIFO configuration register 5 */
 	bytemode = ( efab->link_options & LPA_1000 ) ? 1 : 0;
 	half_duplex = ( efab->link_options & LPA_DUPLEX ) ? 0 : 1;
-	efab->mac_op->mac_readl ( efab, &reg, GMF_CFG5_REG_MAC );
+	falcon_gmac_readl ( efab, &reg, GMF_CFG5_REG_MAC );
 	EFAB_SET_DWORD_FIELD ( reg, GMF_CFGBYTMODE, bytemode );
 	EFAB_SET_DWORD_FIELD ( reg, GMF_CFGHDPLX, half_duplex );
 	EFAB_SET_DWORD_FIELD ( reg, GMF_HSTDRPLT64, half_duplex );
 	EFAB_SET_DWORD_FIELD ( reg, GMF_HSTFLTRFRMDC_PAUSE, 0 );
-	efab->mac_op->mac_writel ( efab, &reg, GMF_CFG5_REG_MAC );
+	falcon_gmac_writel ( efab, &reg, GMF_CFG5_REG_MAC );
 	udelay ( 10 );
 	
 	/* MAC address */
@@ -648,1961 +2030,58 @@ static void mentormac_init ( struct efab_nic *efab,
 				GM_HWADDR_4, efab->mac_addr[4],
 				GM_HWADDR_3, efab->mac_addr[3],
 				GM_HWADDR_2, efab->mac_addr[2] );
-	efab->mac_op->mac_writel ( efab, &reg, GM_ADR1_REG_MAC );
+	falcon_gmac_writel ( efab, &reg, GM_ADR1_REG_MAC );
 	udelay ( 10 );
 	EFAB_POPULATE_DWORD_2 ( reg,
 				GM_HWADDR_1, efab->mac_addr[1],
 				GM_HWADDR_0, efab->mac_addr[0] );
-	efab->mac_op->mac_writel ( efab, &reg, GM_ADR2_REG_MAC );
+	falcon_gmac_writel ( efab, &reg, GM_ADR2_REG_MAC );
 	udelay ( 10 );
 }
 
-/**
- * Wait for GMII access to complete
- *
- */
-static int mentormac_gmii_wait ( struct efab_nic *efab ) {
-	int count;
-	efab_dword_t indicator;
-
-	for ( count = 0 ; count < 1000 ; count++ ) {
-		udelay ( 10 );
-		efab->mac_op->mac_readl ( efab, &indicator,
-					  GM_MII_MGMT_IND_REG_MAC );
-		if ( EFAB_DWORD_FIELD ( indicator, GM_MGMT_BUSY ) == 0 )
-			return 1;
-	}
-	EFAB_ERR ( "Timed out waiting for GMII\n" );
-	return 0;
-}
-
-/**
- * Write a GMII register
- *
- */
-static void mentormac_mdio_write ( struct efab_nic *efab, int phy_id,
-				   int location, int value ) {
-	efab_dword_t reg;
-	int save_port;
-
-	EFAB_TRACE ( "Writing GMII %d register %02x with %04x\n", phy_id,
-		     location, value );
-
-	/* Mentor MAC connects both PHYs to MAC 0 */
-	save_port = efab->port;
-	efab->port = 0;
-
-	/* Check MII not currently being accessed */
-	if ( ! mentormac_gmii_wait ( efab ) )
-		goto out;
-
-	/* Write the address register */
-	EFAB_POPULATE_DWORD_2 ( reg,
-				GM_MGMT_PHY_ADDR, phy_id,
-				GM_MGMT_REG_ADDR, location );
-	efab->mac_op->mac_writel ( efab, &reg, GM_MII_MGMT_ADR_REG_MAC );
-	udelay ( 10 );
-
-	/* Write data */
-	EFAB_POPULATE_DWORD_1 ( reg, GM_MGMT_CTL, value );
-	efab->mac_op->mac_writel ( efab, &reg, GM_MII_MGMT_CTL_REG_MAC );
-
-	/* Wait for data to be written */
-	mentormac_gmii_wait ( efab );
-
- out:
-	/* Restore efab->port */
-	efab->port = save_port;
-}
-
-/**
- * Read a GMII register
- *
- */
-static int mentormac_mdio_read ( struct efab_nic *efab, int phy_id,
-				 int location ) {
-	efab_dword_t reg;
-	int value = 0xffff;
-	int save_port;
-
-	/* Mentor MAC connects both PHYs to MAC 0 */
-	save_port = efab->port;
-	efab->port = 0;
-
-	/* Check MII not currently being accessed */
-	if ( ! mentormac_gmii_wait ( efab ) )
-		goto out;
-
-	/* Write the address register */
-	EFAB_POPULATE_DWORD_2 ( reg,
-				GM_MGMT_PHY_ADDR, phy_id,
-				GM_MGMT_REG_ADDR, location );
-	efab->mac_op->mac_writel ( efab, &reg, GM_MII_MGMT_ADR_REG_MAC );
-	udelay ( 10 );
-
-	/* Request data to be read */
-	EFAB_POPULATE_DWORD_1 ( reg, GM_MGMT_RD_CYC, 1 );
-	efab->mac_op->mac_writel ( efab, &reg, GM_MII_MGMT_CMD_REG_MAC );
-
-	/* Wait for data to be become available */
-	if ( mentormac_gmii_wait ( efab ) ) {
-		/* Read data */
-		efab->mac_op->mac_readl ( efab, &reg, GM_MII_MGMT_STAT_REG_MAC );
-		value = EFAB_DWORD_FIELD ( reg, GM_MGMT_STAT );
-		EFAB_TRACE ( "Read from GMII %d register %02x, got %04x\n",
-			     phy_id, location, value );
-	}
-
-	/* Signal completion */
-	EFAB_ZERO_DWORD ( reg );
-	efab->mac_op->mac_writel ( efab, &reg, GM_MII_MGMT_CMD_REG_MAC );
-	udelay ( 10 );
-
- out:
-	/* Restore efab->port */
-	efab->port = save_port;
-
-	return value;
-}
-
-/**************************************************************************
- *
- * EF1002 routines
- *
- **************************************************************************
- */
-
-/** Control and General Status */
-#define EF1_CTR_GEN_STATUS0_REG 0x0
-#define EF1_MASTER_EVENTS_LBN 12
-#define EF1_MASTER_EVENTS_WIDTH 1
-#define EF1_TX_ENGINE_EN_LBN 19
-#define EF1_TX_ENGINE_EN_WIDTH 1
-#define EF1_RX_ENGINE_EN_LBN 18
-#define EF1_RX_ENGINE_EN_WIDTH 1
-#define EF1_TURBO2_LBN 17
-#define EF1_TURBO2_WIDTH 1
-#define EF1_TURBO1_LBN 16
-#define EF1_TURBO1_WIDTH 1
-#define EF1_TURBO3_LBN 14
-#define EF1_TURBO3_WIDTH 1
-#define EF1_LB_RESET_LBN 3
-#define EF1_LB_RESET_WIDTH 1
-#define EF1_MAC_RESET_LBN 2
-#define EF1_MAC_RESET_WIDTH 1
-#define EF1_CAM_ENABLE_LBN 1
-#define EF1_CAM_ENABLE_WIDTH 1
-
-/** IRQ sources */
-#define EF1_IRQ_SRC_REG 0x0008
-
-/** IRQ mask */
-#define EF1_IRQ_MASK_REG 0x000c
-#define EF1_IRQ_PHY1_LBN 11
-#define EF1_IRQ_PHY1_WIDTH 1
-#define EF1_IRQ_PHY0_LBN 10
-#define EF1_IRQ_PHY0_WIDTH 1
-#define EF1_IRQ_SERR_LBN 7
-#define EF1_IRQ_SERR_WIDTH 1
-#define EF1_IRQ_EVQ_LBN 3
-#define EF1_IRQ_EVQ_WIDTH 1
-
-/** Event generation */
-#define EF1_EVT3_REG 0x38
-
-/** EEPROMaccess */
-#define EF1_EEPROM_REG 0x40
-#define EF1_EEPROM_SDA_LBN 31
-#define EF1_EEPROM_SDA_WIDTH 1
-#define EF1_EEPROM_SCL_LBN 30
-#define EF1_EEPROM_SCL_WIDTH 1
-#define EF1_JTAG_DISCONNECT_LBN 17
-#define EF1_JTAG_DISCONNECT_WIDTH 1
-#define EF1_EEPROM_LBN 0
-#define EF1_EEPROM_WIDTH 32
-
-/** Control register 2 */
-#define EF1_CTL2_REG 0x4c
-#define EF1_PLL_TRAP_LBN 31
-#define EF1_PLL_TRAP_WIDTH 1
-#define EF1_MEM_MAP_4MB_LBN 11
-#define EF1_MEM_MAP_4MB_WIDTH 1
-#define EF1_EV_INTR_CLR_WRITE_LBN 6
-#define EF1_EV_INTR_CLR_WRITE_WIDTH 1
-#define EF1_BURST_MERGE_LBN 5
-#define EF1_BURST_MERGE_WIDTH 1
-#define EF1_CLEAR_NULL_PAD_LBN 4
-#define EF1_CLEAR_NULL_PAD_WIDTH 1
-#define EF1_SW_RESET_LBN 2
-#define EF1_SW_RESET_WIDTH 1
-#define EF1_INTR_AFTER_EVENT_LBN 1
-#define EF1_INTR_AFTER_EVENT_WIDTH 1
-
-/** Event FIFO */
-#define EF1_EVENT_FIFO_REG 0x50
-
-/** Event FIFO count */
-#define EF1_EVENT_FIFO_COUNT_REG 0x5c
-#define EF1_EV_COUNT_LBN 0
-#define EF1_EV_COUNT_WIDTH 16
-
-/** TX DMA control and status */
-#define EF1_DMA_TX_CSR_REG 0x80
-#define EF1_DMA_TX_CSR_CHAIN_EN_LBN 8
-#define EF1_DMA_TX_CSR_CHAIN_EN_WIDTH 1
-#define EF1_DMA_TX_CSR_ENABLE_LBN 4
-#define EF1_DMA_TX_CSR_ENABLE_WIDTH 1
-#define EF1_DMA_TX_CSR_INT_EN_LBN 0
-#define EF1_DMA_TX_CSR_INT_EN_WIDTH 1
-
-/** RX DMA control and status */
-#define EF1_DMA_RX_CSR_REG 0xa0
-#define EF1_DMA_RX_ABOVE_1GB_EN_LBN 6
-#define EF1_DMA_RX_ABOVE_1GB_EN_WIDTH 1
-#define EF1_DMA_RX_BELOW_1MB_EN_LBN 5
-#define EF1_DMA_RX_BELOW_1MB_EN_WIDTH 1 
-#define EF1_DMA_RX_CSR_ENABLE_LBN 0
-#define EF1_DMA_RX_CSR_ENABLE_WIDTH 1
-
-/** Level 5 watermark register (in MAC space) */
-#define EF1_GMF_L5WM_REG_MAC 0x20
-#define EF1_L5WM_LBN 0
-#define EF1_L5WM_WIDTH 32
-
-/** MAC clock */
-#define EF1_GM_MAC_CLK_REG 0x112000
-#define EF1_GM_PORT0_MAC_CLK_LBN 0
-#define EF1_GM_PORT0_MAC_CLK_WIDTH 1
-#define EF1_GM_PORT1_MAC_CLK_LBN 1
-#define EF1_GM_PORT1_MAC_CLK_WIDTH 1
-
-/** TX descriptor FIFO */
-#define EF1_TX_DESC_FIFO 0x141000
-#define EF1_TX_KER_EVQ_LBN 80
-#define EF1_TX_KER_EVQ_WIDTH 12
-#define EF1_TX_KER_IDX_LBN 64
-#define EF1_TX_KER_IDX_WIDTH 16
-#define EF1_TX_KER_MODE_LBN 63
-#define EF1_TX_KER_MODE_WIDTH 1
-#define EF1_TX_KER_PORT_LBN 60
-#define EF1_TX_KER_PORT_WIDTH 1
-#define EF1_TX_KER_CONT_LBN 56
-#define EF1_TX_KER_CONT_WIDTH 1
-#define EF1_TX_KER_BYTE_CNT_LBN 32
-#define EF1_TX_KER_BYTE_CNT_WIDTH 24
-#define EF1_TX_KER_BUF_ADR_LBN 0
-#define EF1_TX_KER_BUF_ADR_WIDTH 32
-
-/** TX descriptor FIFO flush */
-#define EF1_TX_DESC_FIFO_FLUSH 0x141ffc
-
-/** RX descriptor FIFO */
-#define EF1_RX_DESC_FIFO 0x145000
-#define EF1_RX_KER_EVQ_LBN 48
-#define EF1_RX_KER_EVQ_WIDTH 12
-#define EF1_RX_KER_IDX_LBN 32
-#define EF1_RX_KER_IDX_WIDTH 16
-#define EF1_RX_KER_BUF_ADR_LBN 0
-#define EF1_RX_KER_BUF_ADR_WIDTH 32
-
-/** RX descriptor FIFO flush */
-#define EF1_RX_DESC_FIFO_FLUSH 0x145ffc 
-
-/** CAM */
-#define EF1_CAM_BASE 0x1c0000
-#define EF1_CAM_WTF_DOES_THIS_DO_LBN 0
-#define EF1_CAM_WTF_DOES_THIS_DO_WIDTH 32
-
-/** Event queue pointers */
-#define EF1_EVQ_PTR_BASE 0x260000
-#define EF1_EVQ_SIZE_LBN 29
-#define EF1_EVQ_SIZE_WIDTH 2
-#define EF1_EVQ_SIZE_4K 3
-#define EF1_EVQ_SIZE_2K 2
-#define EF1_EVQ_SIZE_1K 1
-#define EF1_EVQ_SIZE_512 0
-#define EF1_EVQ_BUF_BASE_ID_LBN 0
-#define EF1_EVQ_BUF_BASE_ID_WIDTH 29
-
-/* MAC registers */
-#define EF1002_MAC_REGBANK 0x110000
-#define EF1002_MAC_REGBANK_SIZE 0x1000
-#define EF1002_MAC_REG_SIZE 0x08
-
-/** Offset of a MAC register within EF1002 */
-#define EF1002_MAC_REG( efab, mac_reg )				\
-	( EF1002_MAC_REGBANK +					\
-	  ( (efab)->port * EF1002_MAC_REGBANK_SIZE ) +		\
-	  ( (mac_reg) * EF1002_MAC_REG_SIZE ) )
-
-/* Event queue entries */
-#define EF1_EV_CODE_LBN 20
-#define EF1_EV_CODE_WIDTH 8
-#define EF1_RX_EV_DECODE 0x01
-#define EF1_TX_EV_DECODE 0x02
-#define EF1_TIMER_EV_DECODE 0x0b
-#define EF1_DRV_GEN_EV_DECODE 0x0f
-
-/* Receive events */
-#define EF1_RX_EV_LEN_LBN 48
-#define EF1_RX_EV_LEN_WIDTH 16
-#define EF1_RX_EV_PORT_LBN 17
-#define EF1_RX_EV_PORT_WIDTH 3
-#define EF1_RX_EV_OK_LBN 16
-#define EF1_RX_EV_OK_WIDTH 1
-#define EF1_RX_EV_IDX_LBN 0
-#define EF1_RX_EV_IDX_WIDTH 16
-
-/* Transmit events */
-#define EF1_TX_EV_PORT_LBN 17
-#define EF1_TX_EV_PORT_WIDTH 3
-#define EF1_TX_EV_OK_LBN 16
-#define EF1_TX_EV_OK_WIDTH 1
-#define EF1_TX_EV_IDX_LBN 0
-#define EF1_TX_EV_IDX_WIDTH 16
-
-/* forward decleration */
-static struct efab_mac_operations ef1002_mac_operations;
-
-/* I2C ID of the EEPROM */
-#define EF1_EEPROM_I2C_ID 0x50
-
-/* Offset of MAC address within EEPROM */
-#define EF1_EEPROM_HWADDR_OFFSET 0x0
-
-/**
- * Write dword to EF1002 register
- *
- */
-static inline void ef1002_writel ( struct efab_nic *efab, efab_dword_t *value,
-				   unsigned int reg ) {
-	EFAB_REGDUMP ( "Writing register %x with " EFAB_DWORD_FMT "\n",
-		       reg, EFAB_DWORD_VAL ( *value ) );
-	writel ( value->u32[0], efab->membase + reg );
-}
-
-/**
- * Read dword from an EF1002 register
- *
- */
-static inline void ef1002_readl ( struct efab_nic *efab, efab_dword_t *value,
-				  unsigned int reg ) {
-	value->u32[0] = readl ( efab->membase + reg );
-	EFAB_REGDUMP ( "Read from register %x, got " EFAB_DWORD_FMT "\n",
-		       reg, EFAB_DWORD_VAL ( *value ) );
-}
-
-/**
- * Read dword from an EF1002 register, silently
- *
- */
-static inline void ef1002_readl_silent ( struct efab_nic *efab,
-					 efab_dword_t *value,
-					 unsigned int reg ) {
-	value->u32[0] = readl ( efab->membase + reg );
-}
-
-/**
- * Get memory base
- *
- */
-static void ef1002_get_membase ( struct efab_nic *efab ) {
-	unsigned long membase_phys;
-
-	membase_phys = pci_bar_start ( efab->pci, PCI_BASE_ADDRESS_0 );
-	efab->membase = ioremap ( membase_phys, 0x800000 );
-}
-
-/** PCI registers to backup/restore over a device reset */
-static const unsigned int efab_pci_reg_addr[] = {
-	PCI_COMMAND, 0x0c /* PCI_CACHE_LINE_SIZE */,
-	PCI_BASE_ADDRESS_0, PCI_BASE_ADDRESS_1, PCI_BASE_ADDRESS_2,
-	PCI_BASE_ADDRESS_3, PCI_ROM_ADDRESS, PCI_INTERRUPT_LINE,
-};
-/** Number of registers in efab_pci_reg_addr */
-#define EFAB_NUM_PCI_REG \
-	( sizeof ( efab_pci_reg_addr ) / sizeof ( efab_pci_reg_addr[0] ) )
-/** PCI configuration space backup */
-struct efab_pci_reg {
-	uint32_t reg[EFAB_NUM_PCI_REG];
-};
-
-/*
- * I2C interface and EEPROM
- *
- */
-
-static unsigned long ef1002_i2c_bits[] = {
-	[I2C_BIT_SCL] = ( 1 << 30 ),
-	[I2C_BIT_SDA] = ( 1 << 31 ),
-};
-
-static void ef1002_i2c_write_bit ( struct bit_basher *basher,
-				   unsigned int bit_id, unsigned long data ) {
-	struct efab_nic *efab = container_of ( basher, struct efab_nic,
-					       ef1002_i2c.basher );
-	unsigned long mask;
-	efab_dword_t reg;
-
-	mask = ef1002_i2c_bits[bit_id];
-	efab->ef1002_i2c_outputs &= ~mask;
-	efab->ef1002_i2c_outputs |= ( data & mask );
-	EFAB_POPULATE_DWORD_1 ( reg, EF1_EEPROM, efab->ef1002_i2c_outputs );
-	ef1002_writel ( efab, &reg, EF1_EEPROM_REG );
-}
-
-static int ef1002_i2c_read_bit ( struct bit_basher *basher,
-				 unsigned int bit_id ) {
-	struct efab_nic *efab = container_of ( basher, struct efab_nic,
-					       ef1002_i2c.basher );
-	unsigned long mask;
-	efab_dword_t reg;
-
-	mask = ef1002_i2c_bits[bit_id];
-	ef1002_readl ( efab, &reg, EF1_EEPROM_REG );
-	return ( EFAB_DWORD_FIELD ( reg, EF1_EEPROM ) & mask );
-}
-
-static struct bit_basher_operations ef1002_basher_ops = {
-	.read = ef1002_i2c_read_bit,
-	.write = ef1002_i2c_write_bit,
-};
-
-static void ef1002_init_eeprom ( struct efab_nic *efab ) {
-	init_i2c_bit_basher ( &efab->ef1002_i2c,
-			      &ef1002_basher_ops );
-	init_i2c_eeprom ( &efab->ef1002_eeprom, EF1_EEPROM_I2C_ID );
-}
-
-/**
- * Reset device
- *
- */
-static int ef1002_reset ( struct efab_nic *efab ) {
-	struct efab_pci_reg pci_reg;
-	struct pci_device *pci_dev = efab->pci;
-	efab_dword_t reg;
-	unsigned int i;
-	uint32_t tmp;
-
-	/* Back up PCI configuration registers */
-	for ( i = 0 ; i < EFAB_NUM_PCI_REG ; i++ ) {
-		pci_read_config_dword ( pci_dev, efab_pci_reg_addr[i],
-					&pci_reg.reg[i] );
-	}
-
-	/* Reset the whole device. */
-	EFAB_POPULATE_DWORD_1 ( reg, EF1_SW_RESET, 1 );
-	ef1002_writel ( efab, &reg, EF1_CTL2_REG );
-	mdelay ( 200 );
-	
-	/* Restore PCI configuration space */
-	for ( i = 0 ; i < EFAB_NUM_PCI_REG ; i++ ) {
-		pci_write_config_dword ( pci_dev, efab_pci_reg_addr[i],
-					 pci_reg.reg[i] );
-	}
-
-	/* Verify PCI configuration space */
-	for ( i = 0 ; i < EFAB_NUM_PCI_REG ; i++ ) {
-		pci_read_config_dword ( pci_dev, efab_pci_reg_addr[i], &tmp );
-		if ( tmp != pci_reg.reg[i] ) {
-			EFAB_LOG ( "PCI restore failed on register %02x "
-				   "(is %08lx, should be %08lx); reboot\n",
-				 i, tmp, pci_reg.reg[i] );
-			return 0;
-		}
-	}
-
-	/* Verify device reset complete */
-	ef1002_readl ( efab, &reg, EF1_CTR_GEN_STATUS0_REG );
-	if ( EFAB_DWORD_IS_ALL_ONES ( reg ) ) {
-		EFAB_ERR ( "Reset failed\n" );
-		return 0;
-	}
-
-	return 1;
-}
-
-/**
- * Initialise NIC
- *
- */
-static int ef1002_init_nic ( struct efab_nic *efab ) {
-	efab_dword_t reg;
-	
-	/* patch in the MAC operations */
-	efab->mac_op = &ef1002_mac_operations;
-
-	/* No idea what CAM is, but the 'datasheet' says that we have
-	 * to write these values in at start of day
-	 */
-	EFAB_POPULATE_DWORD_1 ( reg, EF1_CAM_WTF_DOES_THIS_DO, 0x6 );
-	ef1002_writel ( efab, &reg, EF1_CAM_BASE + 0x20018 );
-	udelay ( 1000 );
-	EFAB_POPULATE_DWORD_1 ( reg, EF1_CAM_WTF_DOES_THIS_DO, 0x01000000 );
-	ef1002_writel ( efab, &reg, EF1_CAM_BASE + 0x00018 );
-	udelay ( 1000 );
-
-	/* General control register 0 */
-	ef1002_readl ( efab, &reg, EF1_CTR_GEN_STATUS0_REG );
-	EFAB_SET_DWORD_FIELD ( reg, EF1_MASTER_EVENTS, 0 );
-	EFAB_SET_DWORD_FIELD ( reg, EF1_TX_ENGINE_EN, 0 );
-	EFAB_SET_DWORD_FIELD ( reg, EF1_RX_ENGINE_EN, 0 );
-	EFAB_SET_DWORD_FIELD ( reg, EF1_TURBO2, 1 );
-	EFAB_SET_DWORD_FIELD ( reg, EF1_TURBO1, 1 );
-	EFAB_SET_DWORD_FIELD ( reg, EF1_TURBO3, 1 );
-	EFAB_SET_DWORD_FIELD ( reg, EF1_CAM_ENABLE, 1 );
-	ef1002_writel ( efab, &reg, EF1_CTR_GEN_STATUS0_REG );
-	udelay ( 1000 );
-
-	/* General control register 2 */
-	ef1002_readl ( efab, &reg, EF1_CTL2_REG );
-	EFAB_SET_DWORD_FIELD ( reg, EF1_PLL_TRAP, 1 );
-	EFAB_SET_DWORD_FIELD ( reg, EF1_MEM_MAP_4MB, 0 );
-	EFAB_SET_DWORD_FIELD ( reg, EF1_EV_INTR_CLR_WRITE, 0 );
-	EFAB_SET_DWORD_FIELD ( reg, EF1_BURST_MERGE, 0 );
-	EFAB_SET_DWORD_FIELD ( reg, EF1_CLEAR_NULL_PAD, 1 );
-	EFAB_SET_DWORD_FIELD ( reg, EF1_INTR_AFTER_EVENT, 1 );
-	ef1002_writel ( efab, &reg, EF1_CTL2_REG );
-	udelay ( 1000 );
-
-	/* Enable RX DMA */
-	ef1002_readl ( efab, &reg, EF1_DMA_RX_CSR_REG );
-	EFAB_SET_DWORD_FIELD ( reg, EF1_DMA_RX_CSR_ENABLE, 1 );
-	EFAB_SET_DWORD_FIELD ( reg, EF1_DMA_RX_BELOW_1MB_EN, 1 );
-	EFAB_SET_DWORD_FIELD ( reg, EF1_DMA_RX_ABOVE_1GB_EN, 1 );
-	ef1002_writel ( efab, &reg, EF1_DMA_RX_CSR_REG );
-	udelay ( 1000 );
-
-	/* Enable TX DMA */
-	ef1002_readl ( efab, &reg, EF1_DMA_TX_CSR_REG );
-	EFAB_SET_DWORD_FIELD ( reg, EF1_DMA_TX_CSR_CHAIN_EN, 1 );
-	EFAB_SET_DWORD_FIELD ( reg, EF1_DMA_TX_CSR_ENABLE, 0 /* ?? */ );
-	EFAB_SET_DWORD_FIELD ( reg, EF1_DMA_TX_CSR_INT_EN, 0 /* ?? */ );
-	ef1002_writel ( efab, &reg, EF1_DMA_TX_CSR_REG );
-	udelay ( 1000 );
-
-	/* Disconnect the JTAG chain.  Read-modify-write is impossible
-	 * on the I2C control bits, since reading gives the state of
-	 * the line inputs rather than the last written state.
-	 */
-	ef1002_readl ( efab, &reg, EF1_EEPROM_REG );
-	EFAB_SET_DWORD_FIELD ( reg, EF1_EEPROM_SDA, 1 );
-	EFAB_SET_DWORD_FIELD ( reg, EF1_EEPROM_SCL, 1 );
-	EFAB_SET_DWORD_FIELD ( reg, EF1_JTAG_DISCONNECT, 1 );
-	ef1002_writel ( efab, &reg, EF1_EEPROM_REG );
-	udelay ( 10 );
-
-	/* Flush descriptor queues */
-	EFAB_ZERO_DWORD ( reg );
-	ef1002_writel ( efab, &reg, EF1_RX_DESC_FIFO_FLUSH );
-	ef1002_writel ( efab, &reg, EF1_TX_DESC_FIFO_FLUSH );
-	wmb();
-	udelay ( 10000 );
-
-	/* Reset MAC */
-	efab->mac_op->reset ( efab );
-
-	/* Attach I2C bus */
-	ef1002_init_eeprom ( efab );
-
-	return 1;
-}
-
-/**
- * Read MAC address from EEPROM
- *
- */
-static int ef1002_read_eeprom ( struct efab_nic *efab ) {
-	struct i2c_interface *i2c = &efab->ef1002_i2c.i2c;
-	struct i2c_device *i2cdev = &efab->ef1002_eeprom;
-
-	if ( i2c->read ( i2c, i2cdev, EF1_EEPROM_HWADDR_OFFSET,
-			 efab->mac_addr, sizeof ( efab->mac_addr ) ) != 0 )
-		return 0;
-
-	efab->mac_addr[ETH_ALEN-1] += efab->port;
-
-	return 1;
-}
-
-/** RX descriptor */
-typedef efab_qword_t ef1002_rx_desc_t;
-
-/**
- * Build RX descriptor
- *
- */
-static void ef1002_build_rx_desc ( struct efab_nic *efab,
-				   struct efab_rx_buf *rx_buf ) {
-	ef1002_rx_desc_t rxd;
-
-	EFAB_POPULATE_QWORD_3 ( rxd,
-				EF1_RX_KER_EVQ, 0,
-				EF1_RX_KER_IDX, rx_buf->id,
-				EF1_RX_KER_BUF_ADR,
-				virt_to_bus ( rx_buf->addr ) );
-	ef1002_writel ( efab, &rxd.dword[0], EF1_RX_DESC_FIFO + 0 );
-	wmb();
-	ef1002_writel ( efab, &rxd.dword[1], EF1_RX_DESC_FIFO + 4 );
-	udelay ( 10 );
-}
-
-/**
- * Update RX descriptor write pointer
- *
- */
-static void ef1002_notify_rx_desc ( struct efab_nic *efab __unused ) {
-	/* Nothing to do */
-}
-
-/** TX descriptor */
-typedef efab_oword_t ef1002_tx_desc_t;
-
-/**
- * Build TX descriptor
- *
- */
-static void ef1002_build_tx_desc ( struct efab_nic *efab,
-				   struct efab_tx_buf *tx_buf ) {
-	ef1002_tx_desc_t txd;
-
-	EFAB_POPULATE_OWORD_7 ( txd,
-				EF1_TX_KER_EVQ, 0,
-				EF1_TX_KER_IDX, tx_buf->id,
-				EF1_TX_KER_MODE, 0 /* IP mode */,
-				EF1_TX_KER_PORT, efab->port,
-				EF1_TX_KER_CONT, 0,
-				EF1_TX_KER_BYTE_CNT, tx_buf->len,
-				EF1_TX_KER_BUF_ADR,
-				virt_to_bus ( tx_buf->addr ) );
-
-	ef1002_writel ( efab, &txd.dword[0], EF1_TX_DESC_FIFO + 0 );
-	ef1002_writel ( efab, &txd.dword[1], EF1_TX_DESC_FIFO + 4 );
-	wmb();
-	ef1002_writel ( efab, &txd.dword[2], EF1_TX_DESC_FIFO + 8 );
-	udelay ( 10 );
-}
-
-/**
- * Update TX descriptor write pointer
- *
- */
-static void ef1002_notify_tx_desc ( struct efab_nic *efab __unused ) {
-	/* Nothing to do */
-}
-
-/** An event */
-typedef efab_qword_t ef1002_event_t;
-
-/**
- * Retrieve event from event queue
- *
- */
-static int ef1002_fetch_event ( struct efab_nic *efab,
-				struct efab_event *event ) {
-	efab_dword_t reg;
-	int ev_code;
-	int words;
-
-	/* Check event FIFO depth */
-	ef1002_readl_silent ( efab, &reg, EF1_EVENT_FIFO_COUNT_REG );
-	words = EFAB_DWORD_FIELD ( reg, EF1_EV_COUNT );
-	if ( ! words )
-		return 0;
-
-	/* Read event data */
-	ef1002_readl ( efab, &reg, EF1_EVENT_FIFO_REG );
-	DBG ( "Event is " EFAB_DWORD_FMT "\n", EFAB_DWORD_VAL ( reg ) );
-
-	/* Decode event */
-	ev_code = EFAB_DWORD_FIELD ( reg, EF1_EV_CODE );
-	event->drop = 0;
-	switch ( ev_code ) {
-	case EF1_TX_EV_DECODE:
-		event->type = EFAB_EV_TX;
-		break;
-	case EF1_RX_EV_DECODE:
-		event->type = EFAB_EV_RX;
-		event->rx_id = EFAB_DWORD_FIELD ( reg, EF1_RX_EV_IDX );
-		/* RX len not available via event FIFO */
-		event->rx_len = ETH_FRAME_LEN;
-		break;
-	case EF1_TIMER_EV_DECODE:
-		/* These are safe to ignore.  We seem to get some at
-		 * start of day, presumably due to the timers starting
-		 * up with random contents.
-		 */
-		event->type = EFAB_EV_NONE;
-		break;
-	default:
-		EFAB_ERR ( "Unknown event type %d\n", ev_code );
-		event->type = EFAB_EV_NONE;
-	}
-
-	/* Clear any pending interrupts */
-	ef1002_readl ( efab, &reg, EF1_IRQ_SRC_REG );
-
-	return 1;
-}
-
-/**
- * Enable/disable interrupts
- *
- */
-static void ef1002_mask_irq ( struct efab_nic *efab, int enabled ) {
-	efab_dword_t irq_mask;
-
-	EFAB_POPULATE_DWORD_2 ( irq_mask,
-				EF1_IRQ_SERR, enabled,
-				EF1_IRQ_EVQ, enabled );
-	ef1002_writel ( efab, &irq_mask, EF1_IRQ_MASK_REG );
-}
-
-/**
- * Generate interrupt
- *
- */
-static void ef1002_generate_irq ( struct efab_nic *efab ) {
-	ef1002_event_t test_event;
-
-	EFAB_POPULATE_QWORD_1 ( test_event,
-				EF1_EV_CODE, EF1_DRV_GEN_EV_DECODE );
-	ef1002_writel ( efab, &test_event.dword[0], EF1_EVT3_REG );
-}
-
-/**
- * Write dword to an EF1002 MAC register
- *
- */
-static void ef1002_mac_writel ( struct efab_nic *efab,
-				efab_dword_t *value, unsigned int mac_reg ) {
-	ef1002_writel ( efab, value, EF1002_MAC_REG ( efab, mac_reg ) );
-}
-
-/**
- * Read dword from an EF1002 MAC register
- *
- */
-static void ef1002_mac_readl ( struct efab_nic *efab,
-			       efab_dword_t *value, unsigned int mac_reg ) {
-	ef1002_readl ( efab, value, EF1002_MAC_REG ( efab, mac_reg ) );
-}
-
-/**
- * Initialise MAC
- *
- */
-static int ef1002_init_mac ( struct efab_nic *efab ) {
-	static struct efab_mentormac_parameters ef1002_mentormac_params = {
-		.gmf_cfgfrth = 0x13,
-		.gmf_cfgftth = 0x10,
-		.gmf_cfghwmft = 0x555,
-		.gmf_cfghwm = 0x2a,
-		.gmf_cfglwm = 0x15,
-	};
-	efab_dword_t reg;
-	unsigned int mac_clk;
+static int
+falcon_init_gmac ( struct efab_nic *efab )
+{
+	/* Reset the MAC */
+	mentormac_reset ( efab );
 
 	/* Initialise PHY */
-	alaska_init ( efab );
+	efab->phy_op->init ( efab );
+
+	/* check the link is up */
+	if ( !efab->link_up )
+		return -EAGAIN;
 
 	/* Initialise MAC */
-	mentormac_init ( efab, &ef1002_mentormac_params );
+	mentormac_init ( efab );
 
-	/* Write Level 5 watermark register */
-	EFAB_POPULATE_DWORD_1 ( reg, EF1_L5WM, 0x10040000 );
-	efab->mac_op->mac_writel ( efab, &reg, EF1_GMF_L5WM_REG_MAC );
-	udelay ( 10 );
+	/* reconfigure the MAC wrapper */
+	falcon_reconfigure_mac_wrapper ( efab );
 
-	/* Set MAC clock speed */
-	ef1002_readl ( efab, &reg, EF1_GM_MAC_CLK_REG );
-	mac_clk = ( efab->link_options & LPA_1000 ) ? 0 : 1;
-	if ( efab->port == 0 ) {
-		EFAB_SET_DWORD_FIELD ( reg, EF1_GM_PORT0_MAC_CLK, mac_clk );
-	} else {
-		EFAB_SET_DWORD_FIELD ( reg, EF1_GM_PORT1_MAC_CLK, mac_clk );
-	}
-	ef1002_writel ( efab, &reg, EF1_GM_MAC_CLK_REG );
-	udelay ( 10 );
-
-	return 1;
-}
-
-/**
- * Reset MAC
- *
- */
-static int ef1002_reset_mac ( struct efab_nic *efab ) {
-	mentormac_reset ( efab );
-	return 1;
-}
-
-/** MDIO write */
-static void ef1002_mdio_write ( struct efab_nic *efab, int location,
-				int value ) {
-	mentormac_mdio_write ( efab, efab->port + 2, location, value );
-}
-
-/** MDIO read */
-static int ef1002_mdio_read ( struct efab_nic *efab, int location ) {
-	return mentormac_mdio_read ( efab, efab->port + 2, location );
-}
-
-static struct efab_operations ef1002_operations = {
-	.get_membase		= ef1002_get_membase,
-	.reset			= ef1002_reset,
-	.init_nic		= ef1002_init_nic,
-	.read_eeprom		= ef1002_read_eeprom,
-	.build_rx_desc		= ef1002_build_rx_desc,
-	.notify_rx_desc		= ef1002_notify_rx_desc,
-	.build_tx_desc		= ef1002_build_tx_desc,
-	.notify_tx_desc		= ef1002_notify_tx_desc,
-	.fetch_event		= ef1002_fetch_event,
-	.mask_irq		= ef1002_mask_irq,
-	.generate_irq		= ef1002_generate_irq,
-	.mdio_write		= ef1002_mdio_write,
-	.mdio_read		= ef1002_mdio_read,
-};
-
-static struct efab_mac_operations ef1002_mac_operations = {
-	.mac_writel		= ef1002_mac_writel,
-	.mac_readl		= ef1002_mac_readl,
-	.init                   = ef1002_init_mac,
-	.reset                  = ef1002_reset_mac,
-};
-	
-/**************************************************************************
- *
- * Falcon routines
- *
- **************************************************************************
- */
-
-/* I/O BAR address register */
-#define FCN_IOM_IND_ADR_REG 0x0
-
-/* I/O BAR data register */
-#define FCN_IOM_IND_DAT_REG 0x4
-
-/* Interrupt enable register */
-#define FCN_INT_EN_REG_KER 0x0010
-#define FCN_MEM_PERR_INT_EN_KER_LBN 5
-#define FCN_MEM_PERR_INT_EN_KER_WIDTH 1
-#define FCN_KER_INT_CHAR_LBN 4
-#define FCN_KER_INT_CHAR_WIDTH 1
-#define FCN_KER_INT_KER_LBN 3
-#define FCN_KER_INT_KER_WIDTH 1
-#define FCN_ILL_ADR_ERR_INT_EN_KER_LBN 2
-#define FCN_ILL_ADR_ERR_INT_EN_KER_WIDTH 1
-#define FCN_SRM_PERR_INT_EN_KER_LBN 1
-#define FCN_SRM_PERR_INT_EN_KER_WIDTH 1
-#define FCN_DRV_INT_EN_KER_LBN 0
-#define FCN_DRV_INT_EN_KER_WIDTH 1
-
-/* Interrupt status register */
-#define FCN_INT_ADR_REG_KER	0x0030
-#define FCN_INT_ADR_KER_LBN 0
-#define FCN_INT_ADR_KER_WIDTH EFAB_DMA_TYPE_WIDTH ( 64 )
-
-/* Interrupt acknowledge register */
-#define FCN_INT_ACK_KER_REG 0x0050
-
-/* SPI host command register */
-#define FCN_EE_SPI_HCMD_REG_KER 0x0100
-#define FCN_EE_SPI_HCMD_CMD_EN_LBN 31
-#define FCN_EE_SPI_HCMD_CMD_EN_WIDTH 1
-#define FCN_EE_WR_TIMER_ACTIVE_LBN 28
-#define FCN_EE_WR_TIMER_ACTIVE_WIDTH 1
-#define FCN_EE_SPI_HCMD_SF_SEL_LBN 24
-#define FCN_EE_SPI_HCMD_SF_SEL_WIDTH 1
-#define FCN_EE_SPI_EEPROM 0
-#define FCN_EE_SPI_FLASH 1
-#define FCN_EE_SPI_HCMD_DABCNT_LBN 16
-#define FCN_EE_SPI_HCMD_DABCNT_WIDTH 5
-#define FCN_EE_SPI_HCMD_READ_LBN 15
-#define FCN_EE_SPI_HCMD_READ_WIDTH 1
-#define FCN_EE_SPI_READ 1
-#define FCN_EE_SPI_WRITE 0
-#define FCN_EE_SPI_HCMD_DUBCNT_LBN 12
-#define FCN_EE_SPI_HCMD_DUBCNT_WIDTH 2
-#define FCN_EE_SPI_HCMD_ADBCNT_LBN 8
-#define FCN_EE_SPI_HCMD_ADBCNT_WIDTH 2
-#define FCN_EE_SPI_HCMD_ENC_LBN 0
-#define FCN_EE_SPI_HCMD_ENC_WIDTH 8
-
-/* SPI host address register */
-#define FCN_EE_SPI_HADR_REG_KER 0x0110
-#define FCN_EE_SPI_HADR_DUBYTE_LBN 24
-#define FCN_EE_SPI_HADR_DUBYTE_WIDTH 8
-#define FCN_EE_SPI_HADR_ADR_LBN 0
-#define FCN_EE_SPI_HADR_ADR_WIDTH 24
-
-/* SPI host data register */
-#define FCN_EE_SPI_HDATA_REG_KER 0x0120
-#define FCN_EE_SPI_HDATA3_LBN 96
-#define FCN_EE_SPI_HDATA3_WIDTH 32
-#define FCN_EE_SPI_HDATA2_LBN 64
-#define FCN_EE_SPI_HDATA2_WIDTH 32
-#define FCN_EE_SPI_HDATA1_LBN 32
-#define FCN_EE_SPI_HDATA1_WIDTH 32
-#define FCN_EE_SPI_HDATA0_LBN 0
-#define FCN_EE_SPI_HDATA0_WIDTH 32
-
-/* VPI configuration register */
-#define FCN_VPD_CONFIG_REG_KER 0x0140
-#define FCN_VPD_9BIT_LBN 1
-#define FCN_VPD_9BIT_WIDTH 1
-
-/* NIC status register */
-#define FCN_NIC_STAT_REG 0x0200
-#define ONCHIP_SRAM_LBN 16
-#define ONCHIP_SRAM_WIDTH 1
-#define SF_PRST_LBN 9
-#define SF_PRST_WIDTH 1
-#define EE_PRST_LBN 8
-#define EE_PRST_WIDTH 1
-#define EE_STRAP_LBN 7
-#define EE_STRAP_WIDTH 1
-#define PCI_PCIX_MODE_LBN 4
-#define PCI_PCIX_MODE_WIDTH 3
-#define PCI_PCIX_MODE_PCI33_DECODE 0
-#define PCI_PCIX_MODE_PCI66_DECODE 1
-#define PCI_PCIX_MODE_PCIX66_DECODE 5
-#define PCI_PCIX_MODE_PCIX100_DECODE 6
-#define PCI_PCIX_MODE_PCIX133_DECODE 7
-#define STRAP_ISCSI_EN_LBN 3
-#define STRAP_ISCSI_EN_WIDTH 1
-#define STRAP_PINS_LBN 0
-#define STRAP_PINS_WIDTH 3
-/* These bit definitions are extrapolated from the list of numerical
- * values for STRAP_PINS.  If you want a laugh, read the datasheet's
- * definition for when bits 2:0 are set to 7.
- */
-#define STRAP_10G_LBN 2
-#define STRAP_10G_WIDTH 1
-#define STRAP_DUAL_PORT_LBN 1
-#define STRAP_DUAL_PORT_WIDTH 1
-#define STRAP_PCIE_LBN 0
-#define STRAP_PCIE_WIDTH 1
-
-/* GPIO control register */
-#define FCN_GPIO_CTL_REG_KER 0x0210
-#define FCN_FLASH_PRESENT_LBN 7
-#define FCN_FLASH_PRESENT_WIDTH 1
-#define FCN_EEPROM_PRESENT_LBN 6
-#define FCN_EEPROM_PRESENT_WIDTH 1
-
-/* Global control register */
-#define FCN_GLB_CTL_REG_KER	0x0220
-#define EXT_PHY_RST_CTL_LBN 63
-#define EXT_PHY_RST_CTL_WIDTH 1
-#define PCIE_SD_RST_CTL_LBN 61
-#define PCIE_SD_RST_CTL_WIDTH 1
-#define PCIX_RST_CTL_LBN 60
-#define PCIX_RST_CTL_WIDTH 1
-#define PCIE_STCK_RST_CTL_LBN 59
-#define PCIE_STCK_RST_CTL_WIDTH 1
-#define PCIE_NSTCK_RST_CTL_LBN 58
-#define PCIE_NSTCK_RST_CTL_WIDTH 1
-#define PCIE_CORE_RST_CTL_LBN 57
-#define PCIE_CORE_RST_CTL_WIDTH 1
-#define EE_RST_CTL_LBN 49
-#define EE_RST_CTL_WIDTH 1
-#define CS_RST_CTL_LBN 48
-#define CS_RST_CTL_WIDTH 1
-#define RST_EXT_PHY_LBN 31
-#define RST_EXT_PHY_WIDTH 1
-#define INT_RST_DUR_LBN 4
-#define INT_RST_DUR_WIDTH 3
-#define EXT_PHY_RST_DUR_LBN 1
-#define EXT_PHY_RST_DUR_WIDTH 3
-#define SWRST_LBN 0
-#define SWRST_WIDTH 1
-#define INCLUDE_IN_RESET 0
-#define EXCLUDE_FROM_RESET 1
-
-/* FPGA build version */
-#define ALTERA_BUILD_REG_KER 0x0300
-#define VER_MAJOR_LBN 24
-#define VER_MAJOR_WIDTH 8
-#define VER_MINOR_LBN 16
-#define VER_MINOR_WIDTH 8
-#define VER_BUILD_LBN 0
-#define VER_BUILD_WIDTH 16
-#define VER_ALL_LBN 0
-#define VER_ALL_WIDTH 32
-
-/* Timer table for kernel access */
-#define FCN_TIMER_CMD_REG_KER 0x420
-#define FCN_TIMER_MODE_LBN 12
-#define FCN_TIMER_MODE_WIDTH 2
-#define FCN_TIMER_MODE_DIS 0
-#define FCN_TIMER_MODE_INT_HLDOFF 1
-#define FCN_TIMER_VAL_LBN 0
-#define FCN_TIMER_VAL_WIDTH 12
-
-/* Receive configuration register */
-#define FCN_RX_CFG_REG_KER 0x800
-#define FCN_RX_XOFF_EN_LBN 0
-#define FCN_RX_XOFF_EN_WIDTH 1
-
-/* SRAM receive descriptor cache configuration register */
-#define FCN_SRM_RX_DC_CFG_REG_KER 0x610
-#define FCN_SRM_RX_DC_BASE_ADR_LBN 0
-#define FCN_SRM_RX_DC_BASE_ADR_WIDTH 21
-
-/* SRAM transmit descriptor cache configuration register */
-#define FCN_SRM_TX_DC_CFG_REG_KER 0x620
-#define FCN_SRM_TX_DC_BASE_ADR_LBN 0
-#define FCN_SRM_TX_DC_BASE_ADR_WIDTH 21
-
-/* Receive filter control register */
-#define FCN_RX_FILTER_CTL_REG_KER 0x810
-#define FCN_NUM_KER_LBN 24
-#define FCN_NUM_KER_WIDTH 2
-
-/* Receive descriptor update register */
-#define FCN_RX_DESC_UPD_REG_KER 0x0830
-#define FCN_RX_DESC_WPTR_LBN 96
-#define FCN_RX_DESC_WPTR_WIDTH 12
-#define FCN_RX_DESC_UPD_REG_KER_DWORD ( FCN_RX_DESC_UPD_REG_KER + 12 )
-#define FCN_RX_DESC_WPTR_DWORD_LBN 0
-#define FCN_RX_DESC_WPTR_DWORD_WIDTH 12
-
-/* Receive descriptor cache configuration register */
-#define FCN_RX_DC_CFG_REG_KER 0x840
-#define FCN_RX_DC_SIZE_LBN 0
-#define FCN_RX_DC_SIZE_WIDTH 2
-
-/* Transmit descriptor update register */
-#define FCN_TX_DESC_UPD_REG_KER 0x0a10
-#define FCN_TX_DESC_WPTR_LBN 96
-#define FCN_TX_DESC_WPTR_WIDTH 12
-#define FCN_TX_DESC_UPD_REG_KER_DWORD ( FCN_TX_DESC_UPD_REG_KER + 12 )
-#define FCN_TX_DESC_WPTR_DWORD_LBN 0
-#define FCN_TX_DESC_WPTR_DWORD_WIDTH 12
-
-/* Transmit descriptor cache configuration register */
-#define FCN_TX_DC_CFG_REG_KER 0xa20
-#define FCN_TX_DC_SIZE_LBN 0
-#define FCN_TX_DC_SIZE_WIDTH 2
-
-/* PHY management transmit data register */
-#define FCN_MD_TXD_REG_KER 0xc00
-#define FCN_MD_TXD_LBN 0
-#define FCN_MD_TXD_WIDTH 16
-
-/* PHY management receive data register */
-#define FCN_MD_RXD_REG_KER 0xc10
-#define FCN_MD_RXD_LBN 0
-#define FCN_MD_RXD_WIDTH 16
-
-/* PHY management configuration & status register */
-#define FCN_MD_CS_REG_KER 0xc20
-#define FCN_MD_GC_LBN 4
-#define FCN_MD_GC_WIDTH 1
-#define FCN_MD_RIC_LBN 2
-#define FCN_MD_RIC_WIDTH 1
-#define FCN_MD_WRC_LBN 0
-#define FCN_MD_WRC_WIDTH 1
-
-/* PHY management PHY address register */
-#define FCN_MD_PHY_ADR_REG_KER 0xc30
-#define FCN_MD_PHY_ADR_LBN 0
-#define FCN_MD_PHY_ADR_WIDTH 16
-
-/* PHY management ID register */
-#define FCN_MD_ID_REG_KER 0xc40
-#define FCN_MD_PRT_ADR_LBN 11
-#define FCN_MD_PRT_ADR_WIDTH 5
-#define FCN_MD_DEV_ADR_LBN 6
-#define FCN_MD_DEV_ADR_WIDTH 5
-
-/* PHY management status & mask register */
-#define FCN_MD_STAT_REG_KER 0xc50
-#define FCN_MD_BSY_LBN 0
-#define FCN_MD_BSY_WIDTH 1
-
-/* Port 0 and 1 MAC control registers */
-#define FCN_MAC0_CTRL_REG_KER 0xc80
-#define FCN_MAC1_CTRL_REG_KER 0xc90
-#define FCN_MAC_XOFF_VAL_LBN 16
-#define FCN_MAC_XOFF_VAL_WIDTH 16
-#define FCN_MAC_BCAD_ACPT_LBN 4
-#define FCN_MAC_BCAD_ACPT_WIDTH 1
-#define FCN_MAC_UC_PROM_LBN 3
-#define FCN_MAC_UC_PROM_WIDTH 1
-#define FCN_MAC_LINK_STATUS_LBN 2
-#define FCN_MAC_LINK_STATUS_WIDTH 1
-#define FCN_MAC_SPEED_LBN 0
-#define FCN_MAC_SPEED_WIDTH 2
-
-/* GMAC registers */
-#define FALCON_GMAC_REGBANK 0xe00
-#define FALCON_GMAC_REGBANK_SIZE 0x200
-#define FALCON_GMAC_REG_SIZE 0x10
-
-/* XGMAC registers */
-#define FALCON_XMAC_REGBANK 0x1200
-#define FALCON_XMAC_REGBANK_SIZE 0x200
-#define FALCON_XMAC_REG_SIZE 0x10
-
-/* XGMAC address register low */
-#define FCN_XM_ADR_LO_REG_MAC 0x00
-#define FCN_XM_ADR_3_LBN 24
-#define FCN_XM_ADR_3_WIDTH 8
-#define FCN_XM_ADR_2_LBN 16
-#define FCN_XM_ADR_2_WIDTH 8
-#define FCN_XM_ADR_1_LBN 8
-#define FCN_XM_ADR_1_WIDTH 8
-#define FCN_XM_ADR_0_LBN 0
-#define FCN_XM_ADR_0_WIDTH 8
-
-/* XGMAC address register high */
-#define FCN_XM_ADR_HI_REG_MAC 0x01
-#define FCN_XM_ADR_5_LBN 8
-#define FCN_XM_ADR_5_WIDTH 8
-#define FCN_XM_ADR_4_LBN 0
-#define FCN_XM_ADR_4_WIDTH 8
-
-/* XGMAC global configuration - port 0*/
-#define FCN_XM_GLB_CFG_REG_MAC 0x02
-#define FCN_XM_RX_STAT_EN_LBN 11
-#define FCN_XM_RX_STAT_EN_WIDTH 1
-#define FCN_XM_TX_STAT_EN_LBN 10
-#define FCN_XM_TX_STAT_EN_WIDTH 1
-#define FCN_XM_RX_JUMBO_MODE_LBN 6
-#define FCN_XM_RX_JUMBO_MODE_WIDTH 1
-#define FCN_XM_CORE_RST_LBN 0
-#define FCN_XM_CORE_RST_WIDTH 1
-
-/* XGMAC transmit configuration - port 0 */
-#define FCN_XM_TX_CFG_REG_MAC 0x03
-#define FCN_XM_IPG_LBN 16
-#define FCN_XM_IPG_WIDTH 4
-#define FCN_XM_FCNTL_LBN 10
-#define FCN_XM_FCNTL_WIDTH 1
-#define FCN_XM_TXCRC_LBN 8
-#define FCN_XM_TXCRC_WIDTH 1
-#define FCN_XM_AUTO_PAD_LBN 5
-#define FCN_XM_AUTO_PAD_WIDTH 1
-#define FCN_XM_TX_PRMBL_LBN 2
-#define FCN_XM_TX_PRMBL_WIDTH 1
-#define FCN_XM_TXEN_LBN 1
-#define FCN_XM_TXEN_WIDTH 1
-
-/* XGMAC receive configuration - port 0 */
-#define FCN_XM_RX_CFG_REG_MAC 0x04
-#define FCN_XM_PASS_CRC_ERR_LBN 25
-#define FCN_XM_PASS_CRC_ERR_WIDTH 1
-#define FCN_XM_AUTO_DEPAD_LBN 8
-#define FCN_XM_AUTO_DEPAD_WIDTH 1
-#define FCN_XM_RXEN_LBN 1
-#define FCN_XM_RXEN_WIDTH 1
-
-/* XGMAC transmit parameter register */
-#define FCN_XM_TX_PARAM_REG_MAC 0x0d
-#define FCN_XM_TX_JUMBO_MODE_LBN 31
-#define FCN_XM_TX_JUMBO_MODE_WIDTH 1
-#define FCN_XM_MAX_TX_FRM_SIZE_LBN 16
-#define FCN_XM_MAX_TX_FRM_SIZE_WIDTH 14
-
-/* XGMAC receive parameter register */
-#define FCN_XM_RX_PARAM_REG_MAC 0x0e
-#define FCN_XM_MAX_RX_FRM_SIZE_LBN 0
-#define FCN_XM_MAX_RX_FRM_SIZE_WIDTH 14
-
-/* XAUI XGXS core status register */
-#define FCN_XX_ALIGN_DONE_LBN 20
-#define FCN_XX_ALIGN_DONE_WIDTH 1
-#define FCN_XX_CORE_STAT_REG_MAC 0x16
-#define FCN_XX_SYNC_STAT_LBN 16
-#define FCN_XX_SYNC_STAT_WIDTH 4
-#define FCN_XX_SYNC_STAT_DECODE_SYNCED 0xf
-#define FCN_XX_COMMA_DET_LBN 12
-#define FCN_XX_COMMA_DET_WIDTH 4
-#define FCN_XX_COMMA_DET_RESET 0xf
-
-
-/* XGXS/XAUI powerdown/reset register */
-#define FCN_XX_PWR_RST_REG_MAC 0x10
-#define FCN_XX_RSTXGXSRX_EN_LBN 2
-#define FCN_XX_RSTXGXSRX_EN_WIDTH 1
-#define FCN_XX_RSTXGXSTX_EN_LBN 1
-#define FCN_XX_RSTXGXSTX_EN_WIDTH 1
-#define FCN_XX_RST_XX_EN_LBN 0
-#define FCN_XX_RST_XX_EN_WIDTH 1
-
-/* Receive descriptor pointer table */
-#define FCN_RX_DESC_PTR_TBL_KER 0x11800
-#define FCN_RX_DESCQ_BUF_BASE_ID_LBN 36
-#define FCN_RX_DESCQ_BUF_BASE_ID_WIDTH 20
-#define FCN_RX_DESCQ_EVQ_ID_LBN 24
-#define FCN_RX_DESCQ_EVQ_ID_WIDTH 12
-#define FCN_RX_DESCQ_OWNER_ID_LBN 10
-#define FCN_RX_DESCQ_OWNER_ID_WIDTH 14
-#define FCN_RX_DESCQ_SIZE_LBN 3
-#define FCN_RX_DESCQ_SIZE_WIDTH 2
-#define FCN_RX_DESCQ_SIZE_4K 3
-#define FCN_RX_DESCQ_SIZE_2K 2
-#define FCN_RX_DESCQ_SIZE_1K 1
-#define FCN_RX_DESCQ_SIZE_512 0
-#define FCN_RX_DESCQ_TYPE_LBN 2
-#define FCN_RX_DESCQ_TYPE_WIDTH 1
-#define FCN_RX_DESCQ_JUMBO_LBN 1
-#define FCN_RX_DESCQ_JUMBO_WIDTH 1
-#define FCN_RX_DESCQ_EN_LBN 0
-#define FCN_RX_DESCQ_EN_WIDTH 1
-
-/* Transmit descriptor pointer table */
-#define FCN_TX_DESC_PTR_TBL_KER 0x11900
-#define FCN_TX_DESCQ_EN_LBN 88
-#define FCN_TX_DESCQ_EN_WIDTH 1
-#define FCN_TX_DESCQ_BUF_BASE_ID_LBN 36
-#define FCN_TX_DESCQ_BUF_BASE_ID_WIDTH 20
-#define FCN_TX_DESCQ_EVQ_ID_LBN 24
-#define FCN_TX_DESCQ_EVQ_ID_WIDTH 12
-#define FCN_TX_DESCQ_OWNER_ID_LBN 10
-#define FCN_TX_DESCQ_OWNER_ID_WIDTH 14
-#define FCN_TX_DESCQ_SIZE_LBN 3
-#define FCN_TX_DESCQ_SIZE_WIDTH 2
-#define FCN_TX_DESCQ_SIZE_4K 3
-#define FCN_TX_DESCQ_SIZE_2K 2
-#define FCN_TX_DESCQ_SIZE_1K 1
-#define FCN_TX_DESCQ_SIZE_512 0
-#define FCN_TX_DESCQ_TYPE_LBN 1
-#define FCN_TX_DESCQ_TYPE_WIDTH 2
-#define FCN_TX_DESCQ_FLUSH_LBN 0
-#define FCN_TX_DESCQ_FLUSH_WIDTH 1
-
-/* Event queue pointer */
-#define FCN_EVQ_PTR_TBL_KER 0x11a00
-#define FCN_EVQ_EN_LBN 23
-#define FCN_EVQ_EN_WIDTH 1
-#define FCN_EVQ_SIZE_LBN 20
-#define FCN_EVQ_SIZE_WIDTH 3
-#define FCN_EVQ_SIZE_32K 6
-#define FCN_EVQ_SIZE_16K 5
-#define FCN_EVQ_SIZE_8K 4
-#define FCN_EVQ_SIZE_4K 3
-#define FCN_EVQ_SIZE_2K 2
-#define FCN_EVQ_SIZE_1K 1
-#define FCN_EVQ_SIZE_512 0
-#define FCN_EVQ_BUF_BASE_ID_LBN 0
-#define FCN_EVQ_BUF_BASE_ID_WIDTH 20
-
-/* Event queue read pointer */
-#define FCN_EVQ_RPTR_REG_KER 0x11b00
-#define FCN_EVQ_RPTR_LBN 0
-#define FCN_EVQ_RPTR_WIDTH 14
-#define FCN_EVQ_RPTR_REG_KER_DWORD ( FCN_EVQ_RPTR_REG_KER + 0 )
-#define FCN_EVQ_RPTR_DWORD_LBN 0
-#define FCN_EVQ_RPTR_DWORD_WIDTH 14
-
-/* Special buffer descriptors */
-#define FCN_BUF_FULL_TBL_KER 0x18000
-#define FCN_IP_DAT_BUF_SIZE_LBN 50
-#define FCN_IP_DAT_BUF_SIZE_WIDTH 1
-#define FCN_IP_DAT_BUF_SIZE_8K 1
-#define FCN_IP_DAT_BUF_SIZE_4K 0
-#define FCN_BUF_ADR_FBUF_LBN 14
-#define FCN_BUF_ADR_FBUF_WIDTH 34
-#define FCN_BUF_OWNER_ID_FBUF_LBN 0
-#define FCN_BUF_OWNER_ID_FBUF_WIDTH 14
-
-/** Offset of a GMAC register within Falcon */
-#define FALCON_GMAC_REG( efab, mac_reg )				\
-	( FALCON_GMAC_REGBANK +					\
-	  ( (efab)->port * FALCON_GMAC_REGBANK_SIZE ) +		\
-	  ( (mac_reg) * FALCON_GMAC_REG_SIZE ) )
-
-/** Offset of an XMAC register within Falcon */
-#define FALCON_XMAC_REG( efab_port, mac_reg )			\
-	( FALCON_XMAC_REGBANK +					\
-	  ( (efab_port)->port * FALCON_XMAC_REGBANK_SIZE ) +	\
-	  ( (mac_reg) * FALCON_XMAC_REG_SIZE ) )
-
-#define FCN_MAC_DATA_LBN 0
-#define FCN_MAC_DATA_WIDTH 32
-
-/* Transmit descriptor */
-#define FCN_TX_KER_PORT_LBN 63
-#define FCN_TX_KER_PORT_WIDTH 1
-#define FCN_TX_KER_BYTE_CNT_LBN 48
-#define FCN_TX_KER_BYTE_CNT_WIDTH 14
-#define FCN_TX_KER_BUF_ADR_LBN 0
-#define FCN_TX_KER_BUF_ADR_WIDTH EFAB_DMA_TYPE_WIDTH ( 46 )
-
-
-/* Receive descriptor */
-#define FCN_RX_KER_BUF_SIZE_LBN 48
-#define FCN_RX_KER_BUF_SIZE_WIDTH 14
-#define FCN_RX_KER_BUF_ADR_LBN 0
-#define FCN_RX_KER_BUF_ADR_WIDTH EFAB_DMA_TYPE_WIDTH ( 46 )
-
-/* Event queue entries */
-#define FCN_EV_CODE_LBN 60
-#define FCN_EV_CODE_WIDTH 4
-#define FCN_RX_IP_EV_DECODE 0
-#define FCN_TX_IP_EV_DECODE 2
-#define FCN_DRIVER_EV_DECODE 5
-
-/* Receive events */
-#define FCN_RX_EV_PKT_OK_LBN 56
-#define FCN_RX_EV_PKT_OK_WIDTH 1
-#define FCN_RX_PORT_LBN 30
-#define FCN_RX_PORT_WIDTH 1
-#define FCN_RX_EV_BYTE_CNT_LBN 16
-#define FCN_RX_EV_BYTE_CNT_WIDTH 14
-#define FCN_RX_EV_DESC_PTR_LBN 0
-#define FCN_RX_EV_DESC_PTR_WIDTH 12
-
-/* Transmit events */
-#define FCN_TX_EV_DESC_PTR_LBN 0
-#define FCN_TX_EV_DESC_PTR_WIDTH 12
-
-/* Fixed special buffer numbers to use */
-#define FALCON_EVQ_ID 0
-#define FALCON_TXD_ID 1
-#define FALCON_RXD_ID 2
-
-#if FALCON_USE_IO_BAR
-
-/* Write dword via the I/O BAR */
-static inline void _falcon_writel ( struct efab_nic *efab, uint32_t value,
-				    unsigned int reg ) {
-	outl ( reg, efab->iobase + FCN_IOM_IND_ADR_REG );
-	outl ( value, efab->iobase + FCN_IOM_IND_DAT_REG );
-}
-
-/* Read dword via the I/O BAR */
-static inline uint32_t _falcon_readl ( struct efab_nic *efab,
-				       unsigned int reg ) {
-	outl ( reg, efab->iobase + FCN_IOM_IND_ADR_REG );
-	return inl ( efab->iobase + FCN_IOM_IND_DAT_REG );
-}
-
-#else /* FALCON_USE_IO_BAR */
-
-#define _falcon_writel( efab, value, reg ) \
-	writel ( (value), (efab)->membase + (reg) )
-#define _falcon_readl( efab, reg ) readl ( (efab)->membase + (reg) )
-
-#endif /* FALCON_USE_IO_BAR */
-
-/**
- * Write to a Falcon register
- *
- */
-static inline void falcon_write ( struct efab_nic *efab, efab_oword_t *value,
-				  unsigned int reg ) {
-
-	EFAB_REGDUMP ( "Writing register %x with " EFAB_OWORD_FMT "\n",
-		       reg, EFAB_OWORD_VAL ( *value ) );
-
-	_falcon_writel ( efab, value->u32[0], reg + 0  );
-	_falcon_writel ( efab, value->u32[1], reg + 4  );
-	_falcon_writel ( efab, value->u32[2], reg + 8  );
-	_falcon_writel ( efab, value->u32[3], reg + 12 );
-	wmb();
-}
-
-/**
- * Write to Falcon SRAM
- *
- */
-static inline void falcon_write_sram ( struct efab_nic *efab,
-				       efab_qword_t *value,
-				       unsigned int index ) {
-	unsigned int reg = ( FCN_BUF_FULL_TBL_KER +
-			     ( index * sizeof ( *value ) ) );
-
-	EFAB_REGDUMP ( "Writing SRAM register %x with " EFAB_QWORD_FMT "\n",
-		       reg, EFAB_QWORD_VAL ( *value ) );
-
-	_falcon_writel ( efab, value->u32[0], reg + 0  );
-	_falcon_writel ( efab, value->u32[1], reg + 4  );
-	wmb();
-}
-
-/**
- * Write dword to Falcon register that allows partial writes
- *
- */
-static inline void falcon_writel ( struct efab_nic *efab, efab_dword_t *value,
-				   unsigned int reg ) {
-	EFAB_REGDUMP ( "Writing partial register %x with " EFAB_DWORD_FMT "\n",
-		       reg, EFAB_DWORD_VAL ( *value ) );
-	_falcon_writel ( efab, value->u32[0], reg );
-}
-
-/**
- * Read from a Falcon register
- *
- */
-static inline void falcon_read ( struct efab_nic *efab, efab_oword_t *value,
-				 unsigned int reg ) {
-	value->u32[0] = _falcon_readl ( efab, reg + 0  );
-	value->u32[1] = _falcon_readl ( efab, reg + 4  );
-	value->u32[2] = _falcon_readl ( efab, reg + 8  );
-	value->u32[3] = _falcon_readl ( efab, reg + 12 );
-
-	EFAB_REGDUMP ( "Read from register %x, got " EFAB_OWORD_FMT "\n",
-		       reg, EFAB_OWORD_VAL ( *value ) );
-}
-
-/** 
- * Read from Falcon SRAM
- *
- */
-static inline void falcon_read_sram ( struct efab_nic *efab,
-				      efab_qword_t *value,
-				      unsigned int index ) {
-	unsigned int reg = ( FCN_BUF_FULL_TBL_KER +
-			     ( index * sizeof ( *value ) ) );
-
-	value->u32[0] = _falcon_readl ( efab, reg + 0 );
-	value->u32[1] = _falcon_readl ( efab, reg + 4 );
-	EFAB_REGDUMP ( "Read from SRAM register %x, got " EFAB_QWORD_FMT "\n",
-		       reg, EFAB_QWORD_VAL ( *value ) );
-}
-
-/**
- * Read dword from a portion of a Falcon register
- *
- */
-static inline void falcon_readl ( struct efab_nic *efab, efab_dword_t *value,
-				  unsigned int reg ) {
-	value->u32[0] = _falcon_readl ( efab, reg );
-	EFAB_REGDUMP ( "Read from register %x, got " EFAB_DWORD_FMT "\n",
-		       reg, EFAB_DWORD_VAL ( *value ) );
-}
-
-/**
- * Verified write to Falcon SRAM
- *
- */
-static inline void falcon_write_sram_verify ( struct efab_nic *efab,
-					     efab_qword_t *value,
-					     unsigned int index ) {
-	efab_qword_t verify;
-	
-	falcon_write_sram ( efab, value, index );
-	udelay ( 1000 );
-	falcon_read_sram ( efab, &verify, index );
-	if ( memcmp ( &verify, value, sizeof ( verify ) ) != 0 ) {
-		EFAB_ERR ( "SRAM index %x failure: wrote " EFAB_QWORD_FMT
-			   " got " EFAB_QWORD_FMT "\n", index,
-			   EFAB_QWORD_VAL ( *value ),
-			   EFAB_QWORD_VAL ( verify ) );
-	}
-}
-
-/**
- * Get memory base
- *
- */
-static void falcon_get_membase ( struct efab_nic *efab ) {
-	unsigned long membase_phys;
-
-	membase_phys = pci_bar_start ( efab->pci, PCI_BASE_ADDRESS_2 );
-	efab->membase = ioremap ( membase_phys, 0x20000 );
-}
-
-#define FCN_DUMP_REG( efab, _reg ) do {				\
-		efab_oword_t reg;				\
-		falcon_read ( efab, &reg, _reg );		\
-		EFAB_LOG ( #_reg " = " EFAB_OWORD_FMT "\n",	\
-			   EFAB_OWORD_VAL ( reg ) );		\
-	} while ( 0 );
-
-#define FCN_DUMP_MAC_REG( efab, _mac_reg ) do {				\
-		efab_dword_t reg;					\
-		efab->mac_op->mac_readl ( efab, &reg, _mac_reg );	\
-		EFAB_LOG ( #_mac_reg " = " EFAB_DWORD_FMT "\n",		\
-			   EFAB_DWORD_VAL ( reg ) );			\
-	} while ( 0 );
-
-/**
- * Dump register contents (for debugging)
- *
- * Marked as static inline so that it will not be compiled in if not
- * used.
- */
-static inline void falcon_dump_regs ( struct efab_nic *efab ) {
-	FCN_DUMP_REG ( efab, FCN_INT_EN_REG_KER );
-	FCN_DUMP_REG ( efab, FCN_INT_ADR_REG_KER );
-	FCN_DUMP_REG ( efab, FCN_GLB_CTL_REG_KER );
-	FCN_DUMP_REG ( efab, FCN_TIMER_CMD_REG_KER );
-	FCN_DUMP_REG ( efab, FCN_SRM_RX_DC_CFG_REG_KER );
-	FCN_DUMP_REG ( efab, FCN_SRM_TX_DC_CFG_REG_KER );
-	FCN_DUMP_REG ( efab, FCN_RX_FILTER_CTL_REG_KER );
-	FCN_DUMP_REG ( efab, FCN_RX_DC_CFG_REG_KER );
-	FCN_DUMP_REG ( efab, FCN_TX_DC_CFG_REG_KER );
-	FCN_DUMP_REG ( efab, FCN_MAC0_CTRL_REG_KER );
-	FCN_DUMP_REG ( efab, FCN_MAC1_CTRL_REG_KER );
-	FCN_DUMP_REG ( efab, FCN_RX_DESC_PTR_TBL_KER );
-	FCN_DUMP_REG ( efab, FCN_TX_DESC_PTR_TBL_KER );
-	FCN_DUMP_REG ( efab, FCN_EVQ_PTR_TBL_KER );
-	FCN_DUMP_MAC_REG ( efab, GM_CFG1_REG_MAC );
-	FCN_DUMP_MAC_REG ( efab, GM_CFG2_REG_MAC );
-	FCN_DUMP_MAC_REG ( efab, GM_MAX_FLEN_REG_MAC );
-	FCN_DUMP_MAC_REG ( efab, GM_MII_MGMT_CFG_REG_MAC );
-	FCN_DUMP_MAC_REG ( efab, GM_ADR1_REG_MAC );
-	FCN_DUMP_MAC_REG ( efab, GM_ADR2_REG_MAC );
-	FCN_DUMP_MAC_REG ( efab, GMF_CFG0_REG_MAC );
-	FCN_DUMP_MAC_REG ( efab, GMF_CFG1_REG_MAC );
-	FCN_DUMP_MAC_REG ( efab, GMF_CFG2_REG_MAC );
-	FCN_DUMP_MAC_REG ( efab, GMF_CFG3_REG_MAC );
-	FCN_DUMP_MAC_REG ( efab, GMF_CFG4_REG_MAC );
-	FCN_DUMP_MAC_REG ( efab, GMF_CFG5_REG_MAC );
-}
-
-/**
- * Create special buffer
- *
- */
-static void falcon_create_special_buffer ( struct efab_nic *efab,
-					   void *addr, unsigned int index ) {
-	efab_qword_t buf_desc;
-	unsigned long dma_addr;
-
-	memset ( addr, 0, 4096 );
-	dma_addr = virt_to_bus ( addr );
-	EFAB_ASSERT ( ( dma_addr & ( EFAB_BUF_ALIGN - 1 ) ) == 0 );
-	EFAB_POPULATE_QWORD_3 ( buf_desc,
-				FCN_IP_DAT_BUF_SIZE, FCN_IP_DAT_BUF_SIZE_4K,
-				FCN_BUF_ADR_FBUF, ( dma_addr >> 12 ),
-				FCN_BUF_OWNER_ID_FBUF, 0 );
-	falcon_write_sram_verify ( efab, &buf_desc, index );
-}
-
-/**
- * Update event queue read pointer
- *
- */
-static void falcon_eventq_read_ack ( struct efab_nic *efab ) {
-	efab_dword_t reg;
-
-	EFAB_ASSERT ( efab->eventq_read_ptr < EFAB_EVQ_SIZE );
-
-	EFAB_POPULATE_DWORD_1 ( reg, FCN_EVQ_RPTR_DWORD,
-				efab->eventq_read_ptr );
-	falcon_writel ( efab, &reg, FCN_EVQ_RPTR_REG_KER_DWORD );
-}
-
-/**
- * Reset device
- *
- */
-static int falcon_reset ( struct efab_nic *efab ) {
-	efab_oword_t glb_ctl_reg_ker;
-
-	/* Initiate software reset */
-	EFAB_POPULATE_OWORD_7 ( glb_ctl_reg_ker,
-				PCIE_CORE_RST_CTL, EXCLUDE_FROM_RESET,
-				PCIE_NSTCK_RST_CTL, EXCLUDE_FROM_RESET,
-				PCIE_SD_RST_CTL, EXCLUDE_FROM_RESET,
-				EE_RST_CTL, EXCLUDE_FROM_RESET,
-				PCIX_RST_CTL, EXCLUDE_FROM_RESET,
-				EXT_PHY_RST_DUR, 0x7 /* datasheet recommended */,
-				SWRST, 1 );
-
-	falcon_write ( efab, &glb_ctl_reg_ker, FCN_GLB_CTL_REG_KER );
-
-	/* Allow 20ms for reset */
-	mdelay ( 20 );
-
-	/* Check for device reset complete */
-	falcon_read ( efab, &glb_ctl_reg_ker, FCN_GLB_CTL_REG_KER );
-	if ( EFAB_OWORD_FIELD ( glb_ctl_reg_ker, SWRST ) != 0 ) {
-		EFAB_ERR ( "Reset failed\n" );
-		return 0;
-	}
-
-	return 1;
-}
-
-/**
- * Wait for SPI command completion
- *
- */
-static int falcon_spi_wait ( struct efab_nic *efab ) {
-	efab_oword_t reg;
-	int count;
-
-	count = 0;
-	do {
-		udelay ( 100 );
-		falcon_read ( efab, &reg, FCN_EE_SPI_HCMD_REG_KER );
-		if ( EFAB_OWORD_FIELD ( reg, FCN_EE_SPI_HCMD_CMD_EN ) == 0 )
-			return 1;
-	} while ( ++count < 1000 );
-	printf ( "Timed out waiting for SPI\n" );
 	return 0;
 }
 
-/**
- * Perform SPI read/write
- *
- */
-static int falcon_spi_rw ( struct spi_bus *bus, struct spi_device *device,
-			   unsigned int command, int address,
-			   const void *data_out, void *data_in, size_t len ) {
-	struct efab_nic *efab = container_of ( bus, struct efab_nic, spi );
-	efab_oword_t reg;
-
-	/* Program address register */
-	EFAB_POPULATE_OWORD_1 ( reg, FCN_EE_SPI_HADR_ADR, address );
-	falcon_write ( efab, &reg, FCN_EE_SPI_HADR_REG_KER );
-	
-	/* Program data register, if applicable */
-	if ( data_out ) {
-		memcpy ( &reg, data_out, len );
-		falcon_write ( efab, &reg, FCN_EE_SPI_HDATA_REG_KER );
-	}
-
-	/* Issue command */
-	EFAB_POPULATE_OWORD_7 ( reg,
-				FCN_EE_SPI_HCMD_CMD_EN, 1, 
-				FCN_EE_SPI_HCMD_SF_SEL, device->slave,
-				FCN_EE_SPI_HCMD_DABCNT, len,
-				FCN_EE_SPI_HCMD_READ, ( data_out ?
-					  FCN_EE_SPI_WRITE : FCN_EE_SPI_READ ),
-				FCN_EE_SPI_HCMD_DUBCNT, 0,
-				FCN_EE_SPI_HCMD_ADBCNT,
-				( device->address_len / 8 ),
-				FCN_EE_SPI_HCMD_ENC, command );
-	falcon_write ( efab, &reg, FCN_EE_SPI_HCMD_REG_KER );
-	
-	/* Wait for operation to complete */
-	if ( ! falcon_spi_wait ( efab ) )
-		return 0;
-
-	/* Read data, if applicable */
-	if ( data_in ) {
-		falcon_read ( efab, &reg, FCN_EE_SPI_HDATA_REG_KER );
-		memcpy ( data_in, &reg, len );
-	}
-	
-	return 0;
-}
-
-/**
- * Initialise SPI bus and devices
- *
- */
-static void falcon_init_spi ( struct efab_nic *efab ) {
-	efab_oword_t reg;
-	int eeprom_9bit;
-
-	/* Initialise SPI bus */
-	efab->spi.rw = falcon_spi_rw;
-	efab->falcon_eeprom.bus = &efab->spi;
-	efab->falcon_eeprom.slave = FCN_EE_SPI_EEPROM;
-	efab->falcon_flash.bus = &efab->spi;
-	efab->falcon_flash.slave = FCN_EE_SPI_FLASH;
-
-	/* Initialise flash if present */
-	if ( efab->has_flash ) {
-		DBG ( "Flash is present\n" );
-		init_at25f1024 ( &efab->falcon_flash );
-	}
-
-	/* Initialise EEPROM if present */
-	if ( efab->has_eeprom ) {
-		if ( efab->is_asic ) {
-			falcon_read ( efab, &reg, FCN_VPD_CONFIG_REG_KER );
-			eeprom_9bit = EFAB_OWORD_FIELD ( reg, FCN_VPD_9BIT );
-		} else {
-			eeprom_9bit = 1;
-		}
-		if ( eeprom_9bit ) {
-			DBG ( "Small EEPROM is present\n" );
-			init_at25040 ( &efab->falcon_eeprom );
-		} else {
-			DBG ( "Large EEPROM is present\n" );
-			init_mc25xx640 ( &efab->falcon_eeprom );
-			/* Falcon's SPI interface cannot support a block
-			   size larger than 16, so forcibly reduce it
-			 */
-			efab->falcon_eeprom.nvs.block_size = 16;
-		}
-	}
-}
-
-/** Offset of MAC address within EEPROM or Flash */
-#define FALCON_MAC_ADDRESS_OFFSET(port) ( 0x310 + 0x08 * (port) )
-
-static struct nvo_fragment falcon_eeprom_fragments[] = {
-	{ 0x100, 0x100 },
-	{ 0, 0 }
+static struct efab_mac_operations falcon_gmac_operations = {
+	.init                   = falcon_init_gmac,
 };
 
-/**
- * Read MAC address from EEPROM
+
+/*******************************************************************************
  *
- */
-static int falcon_read_eeprom ( struct efab_nic *efab ) {
-	struct nvs_device *nvs;
-
-	/* Determine the NVS device containing the MAC address */
-	nvs = ( efab->has_flash ?
-		&efab->falcon_flash.nvs : &efab->falcon_eeprom.nvs );
-
-	return ( nvs_read ( nvs, FALCON_MAC_ADDRESS_OFFSET ( efab->port ),
-			    efab->mac_addr, sizeof ( efab->mac_addr ) ) == 0 );
-}
-
-/** RX descriptor */
-typedef efab_qword_t falcon_rx_desc_t;
-
-/**
- * Build RX descriptor
  *
- */
-static void falcon_build_rx_desc ( struct efab_nic *efab,
-				   struct efab_rx_buf *rx_buf ) {
-	falcon_rx_desc_t *rxd;
-
-	rxd = ( ( falcon_rx_desc_t * ) efab->rxd ) + rx_buf->id;
-	EFAB_POPULATE_QWORD_2 ( *rxd,
-				FCN_RX_KER_BUF_SIZE, EFAB_DATA_BUF_SIZE,
-				FCN_RX_KER_BUF_ADR,
-				virt_to_bus ( rx_buf->addr ) );
-}
-
-/**
- * Update RX descriptor write pointer
+ * XMAC handling
  *
- */
-static void falcon_notify_rx_desc ( struct efab_nic *efab ) {
-	efab_dword_t reg;
-
-	EFAB_POPULATE_DWORD_1 ( reg, FCN_RX_DESC_WPTR_DWORD,
-				efab->rx_write_ptr );
-	falcon_writel ( efab, &reg, FCN_RX_DESC_UPD_REG_KER_DWORD );
-}
-
-/** TX descriptor */
-typedef efab_qword_t falcon_tx_desc_t;
-
-/**
- * Build TX descriptor
  *
- */
-static void falcon_build_tx_desc ( struct efab_nic *efab,
-				   struct efab_tx_buf *tx_buf ) {
-	falcon_rx_desc_t *txd;
-
-	txd = ( ( falcon_rx_desc_t * ) efab->txd ) + tx_buf->id;
-	EFAB_POPULATE_QWORD_3 ( *txd,
-				FCN_TX_KER_PORT, efab->port,
-				FCN_TX_KER_BYTE_CNT, tx_buf->len,
-				FCN_TX_KER_BUF_ADR,
-				virt_to_bus ( tx_buf->addr ) );
-}
-
-/**
- * Update TX descriptor write pointer
- *
- */
-static void falcon_notify_tx_desc ( struct efab_nic *efab ) {
-	efab_dword_t reg;
-
-	EFAB_POPULATE_DWORD_1 ( reg, FCN_TX_DESC_WPTR_DWORD,
-				efab->tx_write_ptr );
-	falcon_writel ( efab, &reg, FCN_TX_DESC_UPD_REG_KER_DWORD );
-}
-
-/** An event */
-typedef efab_qword_t falcon_event_t;
-
-/**
- * See if an event is present
- *
- * @v event		Falcon event structure
- * @ret True		An event is pending
- * @ret False		No event is pending
- *
- * We check both the high and low dword of the event for all ones.  We
- * wrote all ones when we cleared the event, and no valid event can
- * have all ones in either its high or low dwords.  This approach is
- * robust against reordering.
- *
- * Note that using a single 64-bit comparison is incorrect; even
- * though the CPU read will be atomic, the DMA write may not be.
- */
-static inline int falcon_event_present ( falcon_event_t* event ) {
-	return ( ! ( EFAB_DWORD_IS_ALL_ONES ( event->dword[0] ) |
-		     EFAB_DWORD_IS_ALL_ONES ( event->dword[1] ) ) );
-}
-	
-/**
- * Retrieve event from event queue
- *
- */
-static int falcon_fetch_event ( struct efab_nic *efab,
-				struct efab_event *event ) {
-	falcon_event_t *evt;
-	int ev_code;
-	int rx_port;
-
-	/* Check for event */
-	evt = ( ( falcon_event_t * ) efab->eventq ) + efab->eventq_read_ptr;
-	if ( !falcon_event_present ( evt ) ) {
-		/* No event */
-		return 0;
-	}
-	
-	DBG ( "Event is " EFAB_QWORD_FMT "\n", EFAB_QWORD_VAL ( *evt ) );
-
-	/* Decode event */
-	ev_code = EFAB_QWORD_FIELD ( *evt, FCN_EV_CODE );
-	event->drop = 0;
-	switch ( ev_code ) {
-	case FCN_TX_IP_EV_DECODE:
-		event->type = EFAB_EV_TX;
-		break;
-	case FCN_RX_IP_EV_DECODE:
-		event->type = EFAB_EV_RX;
-		event->rx_id = EFAB_QWORD_FIELD ( *evt, FCN_RX_EV_DESC_PTR );
-		event->rx_len = EFAB_QWORD_FIELD ( *evt, FCN_RX_EV_BYTE_CNT );
-		event->drop = !EFAB_QWORD_FIELD ( *evt, FCN_RX_EV_PKT_OK );
-		rx_port = EFAB_QWORD_FIELD ( *evt, FCN_RX_PORT );
-		if ( rx_port != efab->port ) {
-			/* Ignore packets on the wrong port.  We can't
-			 * just set event->type = EFAB_EV_NONE,
-			 * because then the descriptor ring won't get
-			 * refilled.
-			 */
-			event->rx_len = 0;
-		}
-		break;
-	case FCN_DRIVER_EV_DECODE:
-		/* Ignore start-of-day events */
-		event->type = EFAB_EV_NONE;
-		break;
-	default:
-		EFAB_ERR ( "Unknown event type %d data %08lx\n", ev_code,
-			   EFAB_DWORD_FIELD ( *evt, EFAB_DWORD_0 ) );
-		event->type = EFAB_EV_NONE;
-	}
-
-	/* Clear event and any pending interrupts */
-	EFAB_SET_QWORD ( *evt );
-	falcon_writel ( efab, 0, FCN_INT_ACK_KER_REG );
-	udelay ( 10 );
-
-	/* Increment and update event queue read pointer */
-	efab->eventq_read_ptr = ( ( efab->eventq_read_ptr + 1 )
-				  % EFAB_EVQ_SIZE );
-	falcon_eventq_read_ack ( efab );
-
-	return 1;
-}
-
-/**
- * Enable/disable/generate interrupt
- *
- */
-static inline void falcon_interrupts ( struct efab_nic *efab, int enabled,
-				       int force ) {
-	efab_oword_t int_en_reg_ker;
-
-	EFAB_POPULATE_OWORD_2 ( int_en_reg_ker,
-				FCN_KER_INT_KER, force,
-				FCN_DRV_INT_EN_KER, enabled );
-	falcon_write ( efab, &int_en_reg_ker, FCN_INT_EN_REG_KER );	
-}
-
-/**
- * Enable/disable interrupts
- *
- */
-static void falcon_mask_irq ( struct efab_nic *efab, int enabled ) {
-	falcon_interrupts ( efab, enabled, 0 );
-	if ( enabled ) {
-		/* Events won't trigger interrupts until we do this */
-		falcon_eventq_read_ack ( efab );
-	}
-}
-
-/**
- * Generate interrupt
- *
- */
-static void falcon_generate_irq ( struct efab_nic *efab ) {
-	falcon_interrupts ( efab, 1, 1 );
-}
-
-
-/**
- * Reconfigure MAC wrapper
- *
- */
-static void falcon_reconfigure_mac_wrapper ( struct efab_nic *efab ) {
-	efab_oword_t reg;
-	int link_speed;
-
-	if ( efab->link_options & LPA_10000 ) {
-		link_speed = 0x3;
-	} else if ( efab->link_options & LPA_1000 ) {
-		link_speed = 0x2;
-	} else if ( efab->link_options & LPA_100 ) {
-		link_speed = 0x1;
-	} else {
-		link_speed = 0x0;
-	}
-	EFAB_POPULATE_OWORD_5 ( reg,
-				FCN_MAC_XOFF_VAL, 0xffff /* datasheet */,
-				FCN_MAC_BCAD_ACPT, 1,
-				FCN_MAC_UC_PROM, 0,
-				FCN_MAC_LINK_STATUS, 1,
-				FCN_MAC_SPEED, link_speed );
-	falcon_write ( efab, &reg,
-		       ( efab->port == 0 ?
-			 FCN_MAC0_CTRL_REG_KER : FCN_MAC1_CTRL_REG_KER ) );
-
-	/* Disable flow-control (i.e. never generate pause frames) */
-	falcon_read ( efab, &reg, FCN_RX_CFG_REG_KER );
-	EFAB_SET_OWORD_FIELD ( reg, FCN_RX_XOFF_EN, 0 );
-	falcon_write ( efab, &reg, FCN_RX_CFG_REG_KER );
-}
-
-/**
- * Write dword to a Falcon MAC register
- *
- */
-static void falcon_gmac_writel ( struct efab_nic *efab,
-				 efab_dword_t *value, unsigned int mac_reg ) {
-	efab_oword_t temp;
-
-	EFAB_POPULATE_OWORD_1 ( temp, FCN_MAC_DATA,
-				EFAB_DWORD_FIELD ( *value, FCN_MAC_DATA ) );
-	falcon_write ( efab, &temp, FALCON_GMAC_REG ( efab, mac_reg ) );
-}
-
-/**
- * Read dword from a Falcon GMAC register
- *
- */
-static void falcon_gmac_readl ( struct efab_nic *efab, efab_dword_t *value,
-				unsigned int mac_reg ) {
-	efab_oword_t temp;
-
-	falcon_read ( efab, &temp, FALCON_GMAC_REG ( efab, mac_reg ) );
-	EFAB_POPULATE_DWORD_1 ( *value, FCN_MAC_DATA,
-				EFAB_OWORD_FIELD ( temp, FCN_MAC_DATA ) );
-}
+ *******************************************************************************/
 
 /**
  * Write dword to a Falcon XMAC register
  *
  */
-static void falcon_xmac_writel ( struct efab_nic *efab,
-				 efab_dword_t *value, unsigned int mac_reg ) {
+static void
+falcon_xmac_writel ( struct efab_nic *efab, efab_dword_t *value,
+		     unsigned int mac_reg )
+{
 	efab_oword_t temp;
 
 	EFAB_POPULATE_OWORD_1 ( temp, FCN_MAC_DATA,
@@ -2615,9 +2094,10 @@ static void falcon_xmac_writel ( struct efab_nic *efab,
  * Read dword from a Falcon XMAC register
  *
  */
-static void falcon_xmac_readl ( struct efab_nic *efab,
-				efab_dword_t *value,
-				unsigned int mac_reg ) {
+static void
+falcon_xmac_readl ( struct efab_nic *efab, efab_dword_t *value,
+		    unsigned int mac_reg )
+{
 	efab_oword_t temp;
 
 	falcon_read ( efab, &temp,
@@ -2627,109 +2107,159 @@ static void falcon_xmac_readl ( struct efab_nic *efab,
 }
 
 /**
- * Initialise GMAC
- *
+ * Configure Falcon XAUI output
  */
-static int falcon_init_gmac ( struct efab_nic *efab ) {
-	static struct efab_mentormac_parameters falcon_mentormac_params = {
-		.gmf_cfgfrth = 0x12,
-		.gmf_cfgftth = 0x08,
-		.gmf_cfghwmft = 0x1c,
-		.gmf_cfghwm = 0x3f,
-		.gmf_cfglwm = 0xa,
-	};
+static void
+falcon_setup_xaui ( struct efab_nic *efab )
+{
+	efab_dword_t sdctl, txdrv;
 
-	/* Initialise PHY */
-	alaska_init ( efab );
+	falcon_xmac_readl ( efab, &sdctl, FCN_XX_SD_CTL_REG_MAC );
+	EFAB_SET_DWORD_FIELD ( sdctl, FCN_XX_HIDRVD, XX_SD_CTL_DRV_DEFAULT );
+	EFAB_SET_DWORD_FIELD ( sdctl, FCN_XX_LODRVD, XX_SD_CTL_DRV_DEFAULT );
+	EFAB_SET_DWORD_FIELD ( sdctl, FCN_XX_HIDRVC, XX_SD_CTL_DRV_DEFAULT );
+	EFAB_SET_DWORD_FIELD ( sdctl, FCN_XX_LODRVC, XX_SD_CTL_DRV_DEFAULT );
+	EFAB_SET_DWORD_FIELD ( sdctl, FCN_XX_HIDRVB, XX_SD_CTL_DRV_DEFAULT );
+	EFAB_SET_DWORD_FIELD ( sdctl, FCN_XX_LODRVB, XX_SD_CTL_DRV_DEFAULT );
+	EFAB_SET_DWORD_FIELD ( sdctl, FCN_XX_HIDRVA, XX_SD_CTL_DRV_DEFAULT );
+	EFAB_SET_DWORD_FIELD ( sdctl, FCN_XX_LODRVA, XX_SD_CTL_DRV_DEFAULT );
+	falcon_xmac_writel ( efab, &sdctl, FCN_XX_SD_CTL_REG_MAC );
 
-	/* check the link is up */
-	if ( !efab->link_up )
-		return 0;
-
-	/* Initialise MAC */
-	mentormac_init ( efab, &falcon_mentormac_params );
-
-	/* reconfigure the MAC wrapper */
-	falcon_reconfigure_mac_wrapper ( efab );
-
-	return 1;
+	EFAB_POPULATE_DWORD_8 ( txdrv,
+				FCN_XX_DEQD, XX_TXDRV_DEQ_DEFAULT,
+				FCN_XX_DEQC, XX_TXDRV_DEQ_DEFAULT,
+				FCN_XX_DEQB, XX_TXDRV_DEQ_DEFAULT,
+				FCN_XX_DEQA, XX_TXDRV_DEQ_DEFAULT,
+				FCN_XX_DTXD, XX_TXDRV_DTX_DEFAULT,
+				FCN_XX_DTXC, XX_TXDRV_DTX_DEFAULT,
+				FCN_XX_DTXB, XX_TXDRV_DTX_DEFAULT,
+				FCN_XX_DTXA, XX_TXDRV_DTX_DEFAULT);
+	falcon_xmac_writel ( efab, &txdrv, FCN_XX_TXDRV_CTL_REG_MAC);
 }
 
-/**
- * Reset GMAC
- *
- */
-static int falcon_reset_gmac ( struct efab_nic *efab ) {
-	mentormac_reset ( efab );
-	return 1;
-}
-
-/**
- * Reset XAUI/XGXS block
- *
- */
-static int falcon_reset_xaui ( struct efab_nic *efab )
+static int
+falcon_xgmii_status ( struct efab_nic *efab )
 {
 	efab_dword_t reg;
-	int count;
-	
-	EFAB_POPULATE_DWORD_1 ( reg, FCN_XX_RST_XX_EN, 1 );
-	efab->mac_op->mac_writel ( efab, &reg, FCN_XX_PWR_RST_REG_MAC );
 
-	for ( count = 0 ; count < 1000 ; count++ ) {
-		udelay ( 10 );
-		efab->mac_op->mac_readl ( efab, &reg,
-					  FCN_XX_PWR_RST_REG_MAC );
-		if ( EFAB_DWORD_FIELD ( reg, FCN_XX_RST_XX_EN ) == 0 )
-			return 1;
+	if ( efab->pci_revision  < FALCON_REV_B0 )
+		return 1;
+	/* The ISR latches, so clear it and re-read */
+	falcon_xmac_readl ( efab, &reg, FCN_XM_MGT_INT_REG_MAC_B0 );
+	falcon_xmac_readl ( efab, &reg, FCN_XM_MGT_INT_REG_MAC_B0 );
+
+	if ( EFAB_DWORD_FIELD ( reg, FCN_XM_LCLFLT ) ||
+	     EFAB_DWORD_FIELD ( reg, FCN_XM_RMTFLT ) ) {
+		EFAB_TRACE ( "MGT_INT: "EFAB_DWORD_FMT"\n",
+			     EFAB_DWORD_VAL ( reg ) );
+		return 0;
 	}
-	
-	/* an error of some kind */
-	return 0;
+
+	return 1;
+}
+
+static void
+falcon_mask_status_intr ( struct efab_nic *efab, int enable )
+{
+	efab_dword_t reg;
+
+	if ( efab->pci_revision  < FALCON_REV_B0 )
+		return;
+
+	/* Flush the ISR */
+	if ( enable )
+		falcon_xmac_readl ( efab, &reg, FCN_XM_MGT_INT_REG_MAC_B0 );
+
+	EFAB_POPULATE_DWORD_2 ( reg,
+				FCN_XM_MSK_RMTFLT, !enable,
+				FCN_XM_MSK_LCLFLT, !enable);
+	falcon_xmac_readl ( efab, &reg, FCN_XM_MGT_INT_MSK_REG_MAC_B0 );
 }
 
 /**
  * Reset 10G MAC connected to port
  *
  */
-static int falcon_reset_xmac ( struct efab_nic *efab ) {
+static int
+falcon_reset_xmac ( struct efab_nic *efab )
+{
 	efab_dword_t reg;
 	int count;
 
 	EFAB_POPULATE_DWORD_1 ( reg, FCN_XM_CORE_RST, 1 );
-	efab->mac_op->mac_writel ( efab, &reg, FCN_XM_GLB_CFG_REG_MAC );
+	falcon_xmac_writel ( efab, &reg, FCN_XM_GLB_CFG_REG_MAC );
 
 	for ( count = 0 ; count < 1000 ; count++ ) {
 		udelay ( 10 );
-		efab->mac_op->mac_readl ( efab, &reg,
-					  FCN_XM_GLB_CFG_REG_MAC );
+		falcon_xmac_readl ( efab, &reg,
+				    FCN_XM_GLB_CFG_REG_MAC );
 		if ( EFAB_DWORD_FIELD ( reg, FCN_XM_CORE_RST ) == 0 )
-			return 1;
+			return 0;
 	}
-	return 0;
+	return -ETIMEDOUT;
 }
 
-/**
- * Get status of 10G link
- *
- */
-static int falcon_xaui_link_ok ( struct efab_nic *efab ) {
-	efab_dword_t reg;
-	int align_done;
-	int sync_status;
-	int link_ok = 0;
 
-	/* Read link status */
-	efab->mac_op->mac_readl ( efab, &reg, FCN_XX_CORE_STAT_REG_MAC );
-	align_done = EFAB_DWORD_FIELD ( reg, FCN_XX_ALIGN_DONE );
-	sync_status = EFAB_DWORD_FIELD ( reg, FCN_XX_SYNC_STAT );
-	if ( align_done && ( sync_status == FCN_XX_SYNC_STAT_DECODE_SYNCED ) ) {
-		link_ok = 1;
+static int
+falcon_reset_xaui ( struct efab_nic *efab )
+{
+	efab_dword_t reg;
+	int count;
+
+	if (!efab->is_asic)
+		return 0;
+
+	EFAB_POPULATE_DWORD_1 ( reg, FCN_XX_RST_XX_EN, 1 );
+	falcon_xmac_writel ( efab, &reg, FCN_XX_PWR_RST_REG_MAC );
+
+	/* Give some time for the link to establish */
+	for (count = 0; count < 1000; count++) { /* wait upto 10ms */
+		falcon_xmac_readl ( efab, &reg, FCN_XX_PWR_RST_REG_MAC );
+		if ( EFAB_DWORD_FIELD ( reg, FCN_XX_RST_XX_EN ) == 0 ) {
+			falcon_setup_xaui ( efab );
+			return 0;
+		}
+		udelay(10);
+	}
+	EFAB_ERR ( "timed out waiting for XAUI/XGXS reset\n" );
+	return -ETIMEDOUT;
+}
+
+static int
+falcon_xaui_link_ok ( struct efab_nic *efab )
+{
+	efab_dword_t reg;
+	int align_done, lane_status, sync;
+	int has_phyxs;
+	int link_ok = 1;
+
+	/* Read Falcon XAUI side */
+	if ( efab->is_asic ) {
+		/* Read link status */
+		falcon_xmac_readl ( efab, &reg, FCN_XX_CORE_STAT_REG_MAC );
+		align_done = EFAB_DWORD_FIELD ( reg, FCN_XX_ALIGN_DONE );
+
+		sync = EFAB_DWORD_FIELD ( reg, FCN_XX_SYNC_STAT );
+		sync = ( sync == FCN_XX_SYNC_STAT_DECODE_SYNCED );
+		
+		link_ok = align_done && sync;
 	}
 
 	/* Clear link status ready for next read */
 	EFAB_SET_DWORD_FIELD ( reg, FCN_XX_COMMA_DET, FCN_XX_COMMA_DET_RESET );
-	efab->mac_op->mac_writel ( efab, &reg, FCN_XX_CORE_STAT_REG_MAC );
+	EFAB_SET_DWORD_FIELD ( reg, FCN_XX_CHARERR, FCN_XX_CHARERR_RESET);
+	EFAB_SET_DWORD_FIELD ( reg, FCN_XX_DISPERR, FCN_XX_DISPERR_RESET);
+	falcon_xmac_writel ( efab, &reg, FCN_XX_CORE_STAT_REG_MAC );
+
+	has_phyxs = ( efab->phy_op->mmds & ( 1 << MDIO_MMD_PHYXS ) );
+	if ( link_ok && has_phyxs ) {
+		lane_status = falcon_mdio_read ( efab, MDIO_MMD_PHYXS,
+						 MDIO_PHYXS_LANE_STATE );
+		link_ok = ( lane_status & ( 1 << MDIO_PHYXS_LANE_ALIGNED_LBN ) );
+
+		if (!link_ok )
+			EFAB_LOG ( "XGXS lane status: %x\n", lane_status );
+	}
 
 	return link_ok;
 }
@@ -2738,28 +2268,18 @@ static int falcon_xaui_link_ok ( struct efab_nic *efab ) {
  * Initialise XMAC
  *
  */
-static int falcon_init_xmac ( struct efab_nic *efab ) {
+static void
+falcon_reconfigure_xmac ( struct efab_nic *efab )
+{
 	efab_dword_t reg;
-	int count;
+	int max_frame_len;
 
-	if ( !falcon_reset_xmac ( efab ) ) {
-		EFAB_ERR ( "failed resetting XMAC\n" );
-		return 0;
-	}
-	if ( !falcon_reset_xaui ( efab ) ) {
-		EFAB_ERR ( "failed resetting XAUI\n");
-		return 0;
-	}
-
-	/* CX4 is always 10000FD only */
-	efab->link_options = LPA_10000FULL;
-	
-	/* Configure MAC */
+	/* Configure MAC - cut-thru mode is hard wired on */
 	EFAB_POPULATE_DWORD_3 ( reg,
 				FCN_XM_RX_JUMBO_MODE, 1,
 				FCN_XM_TX_STAT_EN, 1,
 				FCN_XM_RX_STAT_EN, 1);
-	efab->mac_op->mac_writel ( efab, &reg, FCN_XM_GLB_CFG_REG_MAC );
+	falcon_xmac_writel ( efab, &reg, FCN_XM_GLB_CFG_REG_MAC );
 
 	/* Configure TX */
 	EFAB_POPULATE_DWORD_6 ( reg, 
@@ -2769,23 +2289,31 @@ static int falcon_init_xmac ( struct efab_nic *efab ) {
 				FCN_XM_TXCRC, 1,
 				FCN_XM_FCNTL, 1,
 				FCN_XM_IPG, 0x3 );
-	efab->mac_op->mac_writel ( efab, &reg, FCN_XM_TX_CFG_REG_MAC );
+	falcon_xmac_writel ( efab, &reg, FCN_XM_TX_CFG_REG_MAC );
 
 	/* Configure RX */
-	EFAB_POPULATE_DWORD_3 ( reg,
+	EFAB_POPULATE_DWORD_4 ( reg,
 				FCN_XM_RXEN, 1,
-				FCN_XM_AUTO_DEPAD, 1,
+				FCN_XM_AUTO_DEPAD, 0,
+				FCN_XM_ACPT_ALL_MCAST, 1,
 				FCN_XM_PASS_CRC_ERR, 1 );
-	efab->mac_op->mac_writel ( efab, &reg, FCN_XM_RX_CFG_REG_MAC );
+	falcon_xmac_writel ( efab, &reg, FCN_XM_RX_CFG_REG_MAC );
 
 	/* Set frame length */
+	max_frame_len = EFAB_MAX_FRAME_LEN ( ETH_FRAME_LEN );
 	EFAB_POPULATE_DWORD_1 ( reg,
-				FCN_XM_MAX_RX_FRM_SIZE, ETH_FRAME_LEN );
-	efab->mac_op->mac_writel ( efab, &reg, FCN_XM_RX_PARAM_REG_MAC );
+				FCN_XM_MAX_RX_FRM_SIZE, max_frame_len );
+	falcon_xmac_writel ( efab, &reg, FCN_XM_RX_PARAM_REG_MAC );
 	EFAB_POPULATE_DWORD_2 ( reg,
-				FCN_XM_MAX_TX_FRM_SIZE, ETH_FRAME_LEN,
+				FCN_XM_MAX_TX_FRM_SIZE, max_frame_len,
 				FCN_XM_TX_JUMBO_MODE, 1 );
-	efab->mac_op->mac_writel ( efab, &reg, FCN_XM_TX_PARAM_REG_MAC );
+	falcon_xmac_writel ( efab, &reg, FCN_XM_TX_PARAM_REG_MAC );
+
+	/* Enable flow control receipt */
+	EFAB_POPULATE_DWORD_2 ( reg,
+				FCN_XM_PAUSE_TIME, 0xfffe,
+				FCN_XM_DIS_FCNTL, 0 );
+	falcon_xmac_writel ( efab, &reg, FCN_XM_FC_REG_MAC );
 
 	/* Set MAC address */
 	EFAB_POPULATE_DWORD_4 ( reg,
@@ -2793,639 +2321,1921 @@ static int falcon_init_xmac ( struct efab_nic *efab ) {
 				FCN_XM_ADR_1, efab->mac_addr[1],
 				FCN_XM_ADR_2, efab->mac_addr[2],
 				FCN_XM_ADR_3, efab->mac_addr[3] );
-	efab->mac_op->mac_writel ( efab, &reg, FCN_XM_ADR_LO_REG_MAC );
+	falcon_xmac_writel ( efab, &reg, FCN_XM_ADR_LO_REG_MAC );
 	EFAB_POPULATE_DWORD_2 ( reg,
 				FCN_XM_ADR_4, efab->mac_addr[4],
 				FCN_XM_ADR_5, efab->mac_addr[5] );
-	efab->mac_op->mac_writel ( efab, &reg, FCN_XM_ADR_HI_REG_MAC );
-
-	/* Reconfigure MAC wrapper */
-	falcon_reconfigure_mac_wrapper ( efab );
-
-	/**
-	 * Try resetting XAUI on its own waiting for the link
-	 * to come up
-	 */
-	for(count=0; count<5; count++) {
-		/* Check link status */
-		efab->link_up = falcon_xaui_link_ok ( efab );
-		if ( efab->link_up ) {
-			/**
-			 * Print out a speed message since we don't have a PHY
-			 */
-			EFAB_LOG ( "%dMbps %s-duplex\n",
-				 ( efab->link_options & LPA_10000 ? 1000 :
-				   ( efab->link_options & LPA_1000 ? 1000 :
-				     ( efab->link_options & LPA_100 ? 100 : 10 ) ) ),
-				 ( efab->link_options & LPA_DUPLEX ? "full" : "half" ) );
-			break;
-		}
-
-		if ( !falcon_reset_xaui ( efab ) ) {
-			EFAB_ERR ( "failed resetting xaui\n" );
-			return 0;
-		}
-		udelay(100);
-	}
-
-	return 1;
+	falcon_xmac_writel ( efab, &reg, FCN_XM_ADR_HI_REG_MAC );
 }
 
-/**
- * Wait for GMII access to complete
- *
- */
-static int falcon_gmii_wait ( struct efab_nic *efab ) {
-	efab_oword_t md_stat;
-	int count;
+static int
+falcon_init_xmac ( struct efab_nic *efab )
+{
+	int count, rc;
 
-	for ( count = 0 ; count < 1000 ; count++ ) {
-		udelay ( 10 );
-		falcon_read ( efab, &md_stat, FCN_MD_STAT_REG_KER );
-		if ( EFAB_OWORD_FIELD ( md_stat, FCN_MD_BSY ) == 0 )
-			return 1;
+	/* Mask the PHY management interrupt */
+	falcon_mask_status_intr ( efab, 0 );
+
+	/* Initialise the PHY to instantiate the clock. */
+	rc = efab->phy_op->init ( efab );
+	if ( rc ) {
+		EFAB_ERR ( "unable to initialise PHY\n" );
+		goto fail1;
 	}
-	EFAB_ERR ( "Timed out waiting for GMII\n" );
+
+	falcon_reset_xaui ( efab );
+
+	/* Give the PHY and MAC time to faff */
+	mdelay ( 100 );
+
+	/* Reset and reconfigure the XMAC */
+	rc = falcon_reset_xmac ( efab );
+	if ( rc )
+		goto fail2;
+	falcon_reconfigure_xmac ( efab );
+	falcon_reconfigure_mac_wrapper ( efab );
+	/**
+	 * Now wait for the link to come up. This may take a while
+	 * for some slower PHY's.
+	 */
+	for (count=0; count<50; count++) {
+		int link_ok = 1;
+
+		/* Wait a while for the link to come up. */
+		mdelay ( 100 );
+		if ((count % 5) == 0)
+			putchar ( '.' );
+
+		/* Does the PHY think the wire-side link is up? */
+		link_ok = mdio_clause45_links_ok ( efab );
+		/* Ensure the XAUI link to the PHY is good */
+		if ( link_ok ) {
+			link_ok = falcon_xaui_link_ok ( efab );
+			if ( !link_ok )
+				falcon_reset_xaui ( efab );
+		}
+
+		/* Check fault indication */
+		if ( link_ok )
+			link_ok = falcon_xgmii_status ( efab );
+
+		efab->link_up = link_ok;
+		if ( link_ok ) {
+			/* unmask the status interrupt */
+			falcon_mask_status_intr ( efab, 1 );
+			return 0;
+		}
+	}
+
+	/* Link failed to come up, but initialisation was fine. */
+	rc = -ETIMEDOUT;
+
+fail2:
+fail1:
+	return rc;
+}
+
+static struct efab_mac_operations falcon_xmac_operations = {
+	.init                   = falcon_init_xmac,
+};
+
+/*******************************************************************************
+ *
+ *
+ * Null PHY handling
+ *
+ *
+ *******************************************************************************/
+
+static int
+falcon_xaui_phy_init ( struct efab_nic *efab )
+{
+	/* CX4 is always 10000FD only */
+	efab->link_options = LPA_10000FULL;
+
+	/* There is no PHY! */
 	return 0;
 }
 
-
-static struct efab_mac_operations falcon_xmac_operations = {
-	.mac_readl              = falcon_xmac_readl,
-	.mac_writel             = falcon_xmac_writel,
-	.init                   = falcon_init_xmac,
-	.reset                  = falcon_reset_xmac,
+static struct efab_phy_operations falcon_xaui_phy_ops = {
+	.init                   = falcon_xaui_phy_init,
+	.mmds                   = 0,
 };
 
-static struct efab_mac_operations falcon_gmac_operations = {
-	.mac_readl              = falcon_gmac_readl,
-	.mac_writel             = falcon_gmac_writel,
-	.init                   = falcon_init_gmac,
-	.reset                  = falcon_reset_gmac,
-};
 
+/*******************************************************************************
+ *
+ *
+ * Alaska PHY
+ *
+ *
+ *******************************************************************************/
 
 /**
- * Initialise NIC
+ * Initialise Alaska PHY
  *
  */
-static int falcon_init_nic ( struct efab_nic *efab ) {
-	efab_oword_t reg;
-	efab_dword_t timer_cmd;
-	int version, minor;
+static int
+alaska_init ( struct efab_nic *efab )
+{
+	unsigned int advertised, lpa;
 
-	/* use card in internal SRAM mode */
-	falcon_read ( efab, &reg, FCN_NIC_STAT_REG );
-	EFAB_SET_OWORD_FIELD ( reg, ONCHIP_SRAM, 1 );
-	falcon_write ( efab, &reg, FCN_NIC_STAT_REG );
-	wmb();
+	/* Read link up status */
+	efab->link_up = gmii_link_ok ( efab );
 
-	/* identify FPGA/ASIC, and strapping mode */
-	falcon_read ( efab, &reg, ALTERA_BUILD_REG_KER );
-	version = EFAB_OWORD_FIELD ( reg, VER_ALL );
-	efab->is_asic = version ? 0 : 1;
+	if ( ! efab->link_up )
+		return -EIO;
+
+	/* Determine link options from PHY. */
+	advertised = gmii_autoneg_advertised ( efab );
+	lpa = gmii_autoneg_lpa ( efab );
+	efab->link_options = gmii_nway_result ( advertised & lpa );
+
+	return 0;
+}
+
+static struct efab_phy_operations falcon_alaska_phy_ops = {
+	.init  	    	= alaska_init,
+};
+
+/*******************************************************************************
+ *
+ *
+ * xfp
+ *
+ *
+ *******************************************************************************/
+
+#define XFP_REQUIRED_DEVS ( MDIO_MMDREG_DEVS0_PCS    |		\
+			    MDIO_MMDREG_DEVS0_PMAPMD |		\
+			    MDIO_MMDREG_DEVS0_PHYXS )
+
+static int
+falcon_xfp_phy_init ( struct efab_nic *efab )
+{
+	int rc;
+
+	/* Optical link is always 10000FD only */
+	efab->link_options = LPA_10000FULL;
+
+	/* Reset the PHY */
+	rc = mdio_clause45_reset_mmd ( efab, MDIO_MMD_PHYXS );
+	if ( rc )
+		return rc;
+
+	return 0;
+}
+
+static struct efab_phy_operations falcon_xfp_phy_ops = {
+	.init                   = falcon_xfp_phy_init,
+	.mmds                   = XFP_REQUIRED_DEVS,
+};
+
+/*******************************************************************************
+ *
+ *
+ * txc43128
+ *
+ *
+ *******************************************************************************/
+
+/* Command register */
+#define TXC_GLRGS_GLCMD		(0xc004)
+#define TXC_GLCMD_LMTSWRST_LBN	(14)
+
+/* Amplitude on lanes 0+1, 2+3 */
+#define  TXC_ALRGS_ATXAMP0	(0xc041)
+#define  TXC_ALRGS_ATXAMP1	(0xc042)
+/* Bit position of value for lane 0+2, 1+3 */
+#define TXC_ATXAMP_LANE02_LBN	(3)
+#define TXC_ATXAMP_LANE13_LBN	(11)
+
+#define TXC_ATXAMP_1280_mV	(0)
+#define TXC_ATXAMP_1200_mV	(8)
+#define TXC_ATXAMP_1120_mV	(12)
+#define TXC_ATXAMP_1060_mV	(14)
+#define TXC_ATXAMP_0820_mV	(25)
+#define TXC_ATXAMP_0720_mV	(26)
+#define TXC_ATXAMP_0580_mV	(27)
+#define TXC_ATXAMP_0440_mV	(28)
+
+#define TXC_ATXAMP_0820_BOTH	( (TXC_ATXAMP_0820_mV << TXC_ATXAMP_LANE02_LBN) | \
+				  (TXC_ATXAMP_0820_mV << TXC_ATXAMP_LANE13_LBN) )
+
+#define TXC_ATXAMP_DEFAULT	(0x6060) /* From databook */
+
+/* Preemphasis on lanes 0+1, 2+3 */
+#define  TXC_ALRGS_ATXPRE0	(0xc043)
+#define  TXC_ALRGS_ATXPRE1	(0xc044)
+
+#define TXC_ATXPRE_NONE (0)
+#define TXC_ATXPRE_DEFAULT	(0x1010) /* From databook */
+
+#define TXC_REQUIRED_DEVS ( MDIO_MMDREG_DEVS0_PCS    |	       \
+			    MDIO_MMDREG_DEVS0_PMAPMD |	       \
+			    MDIO_MMDREG_DEVS0_PHYXS )
+
+static int
+falcon_txc_logic_reset ( struct efab_nic *efab )
+{
+	int val;
+	int tries = 50;
+
+	val = falcon_mdio_read ( efab, MDIO_MMD_PCS, TXC_GLRGS_GLCMD );
+	val |= (1 << TXC_GLCMD_LMTSWRST_LBN);
+	falcon_mdio_write ( efab, MDIO_MMD_PCS, TXC_GLRGS_GLCMD, val );
+
+	while ( tries--) {
+		val = falcon_mdio_read ( efab, MDIO_MMD_PCS, TXC_GLRGS_GLCMD );
+		if ( ~val & ( 1 << TXC_GLCMD_LMTSWRST_LBN ) )
+			return 0;
+		udelay(1);
+	}
+
+	EFAB_ERR ( "logic reset failed\n" );
+
+	return -ETIMEDOUT;
+}
+
+static int
+falcon_txc_phy_init ( struct efab_nic *efab )
+{
+	int rc;
+
+	/* CX4 is always 10000FD only */
+	efab->link_options = LPA_10000FULL;
+
+	/* reset the phy */
+	rc = mdio_clause45_reset_mmd ( efab, MDIO_MMD_PMAPMD );
+	if ( rc )
+		goto fail1;
+
+	rc = mdio_clause45_check_mmds ( efab );
+	if ( rc )
+		goto fail2;
+
+	/* Turn amplitude down and preemphasis off on the host side
+	 * (PHY<->MAC) as this is believed less likely to upset falcon
+	 * and no adverse effects have been noted. It probably also 
+	 * saves a picowatt or two */
+
+	/* Turn off preemphasis */
+	falcon_mdio_write ( efab, MDIO_MMD_PHYXS, TXC_ALRGS_ATXPRE0,
+			    TXC_ATXPRE_NONE );
+	falcon_mdio_write ( efab, MDIO_MMD_PHYXS, TXC_ALRGS_ATXPRE1,
+			    TXC_ATXPRE_NONE );
+
+	/* Turn down the amplitude */
+	falcon_mdio_write ( efab, MDIO_MMD_PHYXS, TXC_ALRGS_ATXAMP0,
+			    TXC_ATXAMP_0820_BOTH );
+	falcon_mdio_write ( efab, MDIO_MMD_PHYXS, TXC_ALRGS_ATXAMP1,
+			    TXC_ATXAMP_0820_BOTH );
+
+	/* Set the line side amplitude and preemphasis to the databook
+	 * defaults as an erratum causes them to be 0 on at least some
+	 * PHY rev.s */
+	falcon_mdio_write ( efab, MDIO_MMD_PMAPMD, TXC_ALRGS_ATXPRE0,
+			    TXC_ATXPRE_DEFAULT );
+	falcon_mdio_write ( efab, MDIO_MMD_PMAPMD, TXC_ALRGS_ATXPRE1,
+			    TXC_ATXPRE_DEFAULT );
+	falcon_mdio_write ( efab, MDIO_MMD_PMAPMD, TXC_ALRGS_ATXAMP0,
+			    TXC_ATXAMP_DEFAULT );
+	falcon_mdio_write ( efab, MDIO_MMD_PMAPMD, TXC_ALRGS_ATXAMP1,
+			    TXC_ATXAMP_DEFAULT );
+
+	rc = falcon_txc_logic_reset ( efab );
+	if ( rc )
+		goto fail3;
+
+	return 0;
+
+fail3:
+fail2:
+fail1:
+	return rc;
+}
+
+static struct efab_phy_operations falcon_txc_phy_ops = {
+	.init                   = falcon_txc_phy_init,
+	.mmds                   = TXC_REQUIRED_DEVS,
+};
+
+/*******************************************************************************
+ *
+ *
+ * tenxpress
+ *
+ *
+ *******************************************************************************/
+
+
+#define TENXPRESS_REQUIRED_DEVS ( MDIO_MMDREG_DEVS0_PMAPMD |	\
+				  MDIO_MMDREG_DEVS0_PCS    |	\
+				  MDIO_MMDREG_DEVS0_PHYXS )
+
+#define	PCS_TEST_SELECT_REG 0xd807	/* PRM 10.5.8 */
+#define	CLK312_EN_LBN 3
+#define	CLK312_EN_WIDTH 1
+
+#define PCS_CLOCK_CTRL_REG 0xd801
+#define PLL312_RST_N_LBN 2
+
+/* Special Software reset register */
+#define PMA_PMD_EXT_CTRL_REG 49152
+#define PMA_PMD_EXT_SSR_LBN 15
+
+/* Boot status register */
+#define PCS_BOOT_STATUS_REG	0xd000
+#define PCS_BOOT_FATAL_ERR_LBN	0
+#define PCS_BOOT_PROGRESS_LBN	1
+#define PCS_BOOT_PROGRESS_WIDTH	2
+#define PCS_BOOT_COMPLETE_LBN	3
+
+#define PCS_SOFT_RST2_REG 0xd806
+#define SERDES_RST_N_LBN 13
+#define XGXS_RST_N_LBN 12
+
+static int
+falcon_tenxpress_check_c11 ( struct efab_nic *efab )
+{
+	int count;
+	uint32_t boot_stat;
+
+	/* Check that the C11 CPU has booted */
+	for (count=0; count<10; count++) {
+		boot_stat = falcon_mdio_read ( efab, MDIO_MMD_PCS,
+					       PCS_BOOT_STATUS_REG );
+		if ( boot_stat & ( 1 << PCS_BOOT_COMPLETE_LBN ) )
+			return 0;
+
+		udelay(10);
+	}
+
+	EFAB_ERR ( "C11 failed to boot\n" );
+	return -ETIMEDOUT;
+}
+
+static int
+falcon_tenxpress_phy_init ( struct efab_nic *efab )
+{
+	int rc, reg;
+
+	/* 10XPRESS is always 10000FD (at the moment) */
+	efab->link_options = LPA_10000FULL;
+
+	/* Wait for the blocks to come out of reset */
+	rc = mdio_clause45_wait_reset_mmds ( efab );
+	if ( rc )
+		goto fail1;
+
+	rc = mdio_clause45_check_mmds ( efab );
+	if ( rc )
+		goto fail2;
+
+	/* Turn on the clock  */
+	reg = (1 << CLK312_EN_LBN);
+	falcon_mdio_write ( efab, MDIO_MMD_PCS, PCS_TEST_SELECT_REG, reg);
+
+	/* Wait 200ms for the PHY to boot */
+	mdelay(200);
+
+	rc = falcon_tenxpress_check_c11 ( efab );
+	if ( rc )
+		goto fail3;
+
+	return 0;
+
+fail3:
+fail2:
+fail1:
+	return rc;
+}
+
+static struct efab_phy_operations falcon_tenxpress_phy_ops = {
+	.init                   = falcon_tenxpress_phy_init,
+	.mmds                   = TENXPRESS_REQUIRED_DEVS,
+};
+
+/*******************************************************************************
+ *
+ *
+ * PM8358
+ *
+ *
+ *******************************************************************************/
+
+/* The PM8358 just presents a DTE XS */
+#define PM8358_REQUIRED_DEVS (MDIO_MMDREG_DEVS0_DTEXS)
+
+/* PHY-specific definitions */
+/* Master ID and Global Performance Monitor Update */
+#define PMC_MASTER_REG (0xd000)
+/* Analog Tx Rx settings under software control */
+#define PMC_MASTER_ANLG_CTRL (1<< 11)
+
+/* Master Configuration register 2 */
+#define PMC_MCONF2_REG	(0xd002)
+/* Drive Tx off centre of data eye (1) vs. clock edge (0) */
+#define	PMC_MCONF2_TEDGE (1 << 2) 
+/* Drive Rx off centre of data eye (1) vs. clock edge (0) */
+#define PMC_MCONF2_REDGE (1 << 3)
+
+/* Analog Rx settings */
+#define PMC_ANALOG_RX_CFG0   (0xd025)
+#define PMC_ANALOG_RX_CFG1   (0xd02d)
+#define PMC_ANALOG_RX_CFG2   (0xd035)
+#define PMC_ANALOG_RX_CFG3   (0xd03d)
+
+
+#define PMC_ANALOG_RX_TERM     (1 << 15) /* Bit 15 of RX CFG: 0 for 100 ohms float,
+					    1 for 50 to 1.2V */
+#define PMC_ANALOG_RX_EQ_MASK (3 << 8)
+#define PMC_ANALOG_RX_EQ_NONE (0 << 8)
+#define PMC_ANALOG_RX_EQ_HALF (1 << 8)
+#define PMC_ANALOG_RX_EQ_FULL (2 << 8)
+#define PMC_ANALOG_RX_EQ_RSVD (3 << 8)
+
+static int
+falcon_pm8358_phy_init ( struct efab_nic *efab )
+{
+	int rc, reg, i;
+
+	/* This is a XAUI retimer part */
+	efab->link_options = LPA_10000FULL;
+
+	rc = mdio_clause45_reset_mmd ( efab, MDIO_MMDREG_DEVS0_DTEXS );
+	if ( rc )
+		return rc;
 	
-	if ( efab->is_asic ) {
-		falcon_read ( efab, &reg, FCN_NIC_STAT_REG );
-		if ( EFAB_OWORD_FIELD ( reg, STRAP_10G ) ) {
-			efab->is_10g = 1;
-		}
-		if ( EFAB_OWORD_FIELD ( reg, STRAP_DUAL_PORT ) ) {
-			efab->is_dual = 1;
-		}
+	/* Enable software control of analogue settings */
+	reg = falcon_mdio_read ( efab, MDIO_MMD_DTEXS,  PMC_MASTER_REG );
+	reg |= PMC_MASTER_ANLG_CTRL;
+	falcon_mdio_write ( efab, MDIO_MMD_DTEXS, PMC_MASTER_REG, reg );
+
+	/* Turn rx eq on for all channels */
+	for (i=0; i< 3; i++) {
+		/* The analog CFG registers are evenly spaced 8 apart */
+		uint16_t addr = PMC_ANALOG_RX_CFG0 + 8*i;
+		reg = falcon_mdio_read ( efab, MDIO_MMD_DTEXS, addr );
+		reg = ( reg & ~PMC_ANALOG_RX_EQ_MASK ) | PMC_ANALOG_RX_EQ_FULL;
+		falcon_mdio_write ( efab, MDIO_MMD_DTEXS, addr, reg );
+	}
+
+	/* Set TEDGE, clear REDGE */
+	reg = falcon_mdio_read ( efab, MDIO_MMD_DTEXS, PMC_MCONF2_REG );
+	reg = ( reg & ~PMC_MCONF2_REDGE) | PMC_MCONF2_TEDGE;
+	falcon_mdio_write ( efab, MDIO_MMD_DTEXS, PMC_MCONF2_REG, reg );
+
+	return 0;
+}
+
+static struct efab_phy_operations falcon_pm8358_phy_ops = {
+	.init                   = falcon_pm8358_phy_init,
+	.mmds                   = PM8358_REQUIRED_DEVS,
+};
+
+/*******************************************************************************
+ *
+ *
+ * SFE4001 support
+ *
+ *
+ *******************************************************************************/
+
+#define MAX_TEMP_THRESH 90
+
+/* I2C Expander */
+#define PCA9539 0x74
+
+#define P0_IN 0x00
+#define P0_OUT 0x02
+#define P0_CONFIG 0x06
+
+#define P0_EN_1V0X_LBN 0
+#define P0_EN_1V0X_WIDTH 1
+#define P0_EN_1V2_LBN 1
+#define P0_EN_1V2_WIDTH 1
+#define P0_EN_2V5_LBN 2
+#define P0_EN_2V5_WIDTH 1
+#define P0_EN_3V3X_LBN 3
+#define P0_EN_3V3X_WIDTH 1
+#define P0_EN_5V_LBN 4
+#define P0_EN_5V_WIDTH 1
+#define P0_X_TRST_LBN 6
+#define P0_X_TRST_WIDTH 1
+
+#define P1_IN 0x01
+#define P1_CONFIG 0x07
+
+#define P1_AFE_PWD_LBN 0
+#define P1_AFE_PWD_WIDTH 1
+#define P1_DSP_PWD25_LBN 1
+#define P1_DSP_PWD25_WIDTH 1
+#define P1_SPARE_LBN 4
+#define P1_SPARE_WIDTH 4
+
+/* Temperature Sensor */
+#define MAX6647	0x4e
+
+#define RSL	0x02
+#define RLHN	0x05
+#define WLHO	0x0b
+
+static struct i2c_device i2c_pca9539 = {
+	.dev_addr = PCA9539,
+	.dev_addr_len = 1,
+	.word_addr_len = 1,
+};
+
+
+static struct i2c_device i2c_max6647 = {
+	.dev_addr = MAX6647,
+	.dev_addr_len = 1,
+	.word_addr_len = 1,
+};
+
+static int
+sfe4001_init ( struct efab_nic *efab )
+{
+	struct i2c_interface *i2c = &efab->i2c_bb.i2c;
+	efab_dword_t reg;
+	uint8_t in, cfg, out;
+	int count, rc;
+
+	EFAB_LOG ( "Initialise SFE4001 board\n" );
+
+	/* Ensure XGXS and XAUI SerDes are held in reset */
+	EFAB_POPULATE_DWORD_7 ( reg,
+				FCN_XX_PWRDNA_EN, 1,
+				FCN_XX_PWRDNB_EN, 1,
+				FCN_XX_RSTPLLAB_EN, 1,
+				FCN_XX_RESETA_EN, 1,
+				FCN_XX_RESETB_EN, 1,
+				FCN_XX_RSTXGXSRX_EN, 1,
+				FCN_XX_RSTXGXSTX_EN, 1 );
+	falcon_xmac_writel ( efab, &reg, FCN_XX_PWR_RST_REG_MAC);
+	udelay(10);
+
+	/* Set DSP over-temperature alert threshold */
+	cfg = MAX_TEMP_THRESH;
+	rc = i2c->write ( i2c, &i2c_max6647, WLHO, &cfg, EFAB_BYTE );
+	if ( rc )
+		goto fail1;
+
+	/* Read it back and verify */
+	rc = i2c->read ( i2c, &i2c_max6647, RLHN, &in, EFAB_BYTE );
+	if ( rc )
+		goto fail2;
+
+	if ( in != MAX_TEMP_THRESH ) {
+		EFAB_ERR ( "Unable to verify MAX6647 limit (requested=%d "
+			   "confirmed=%d)\n", cfg, in );
+		rc = -EIO;
+		goto fail3;
+	}
+
+	/* Clear any previous over-temperature alert */
+	rc = i2c->read ( i2c, &i2c_max6647, RSL, &in, EFAB_BYTE );
+	if ( rc )
+		goto fail4;
+
+	/* Enable port 0 and 1 outputs on IO expander */
+	cfg = 0x00;
+	rc = i2c->write ( i2c, &i2c_pca9539, P0_CONFIG, &cfg, EFAB_BYTE );
+	if ( rc )
+		goto fail5;
+	cfg = 0xff & ~(1 << P1_SPARE_LBN);
+	rc = i2c->write ( i2c, &i2c_pca9539, P1_CONFIG, &cfg, EFAB_BYTE );
+	if ( rc )
+		goto fail6;
+
+	/* Turn all power off then wait 1 sec. This ensures PHY is reset */
+	out = 0xff & ~((0 << P0_EN_1V2_LBN) | (0 << P0_EN_2V5_LBN) |
+		       (0 << P0_EN_3V3X_LBN) | (0 << P0_EN_5V_LBN) |
+		       (0 << P0_EN_1V0X_LBN));
+
+	rc = i2c->write ( i2c, &i2c_pca9539, P0_OUT, &out, EFAB_BYTE );
+	if ( rc )
+		goto fail7;
+
+	mdelay(1000);
+
+	for (count=0; count<20; count++) {
+		/* Turn on 1.2V, 2.5V, 3.3V and 5V power rails */
+		out = 0xff & ~( (1 << P0_EN_1V2_LBN)  | (1 << P0_EN_2V5_LBN) |
+				(1 << P0_EN_3V3X_LBN) | (1 << P0_EN_5V_LBN)  | 
+				(1 << P0_X_TRST_LBN) );
+
+		rc = i2c->write ( i2c, &i2c_pca9539, P0_OUT, &out, EFAB_BYTE );
+		if ( rc )
+			goto fail8;
+
+		mdelay ( 10 );
+		
+		/* Turn on the 1V power rail */
+		out  &= ~( 1 << P0_EN_1V0X_LBN );
+		rc = i2c->write ( i2c, &i2c_pca9539, P0_OUT, &out, EFAB_BYTE );
+		if ( rc )
+			goto fail9;
+
+		EFAB_LOG ( "Waiting for power...(attempt %d)\n", count);
+		mdelay ( 1000 );
+
+		/* Check DSP is powered */
+		rc = i2c->read ( i2c, &i2c_pca9539, P1_IN, &in, EFAB_BYTE );
+		if ( rc )
+			goto fail10;
+
+		if ( in & ( 1 << P1_AFE_PWD_LBN ) )
+			return 0;
+	}
+
+	rc = -ETIMEDOUT;
+
+fail10:
+fail9:
+fail8:
+fail7:
+	/* Turn off power rails */
+	out = 0xff;
+	(void) i2c->write ( i2c, &i2c_pca9539, P0_OUT, &out, EFAB_BYTE );
+	/* Disable port 1 outputs on IO expander */
+	out = 0xff;
+	(void) i2c->write ( i2c, &i2c_pca9539, P1_CONFIG, &out, EFAB_BYTE );
+fail6:
+	/* Disable port 0 outputs */
+	out = 0xff;
+	(void) i2c->write ( i2c, &i2c_pca9539, P1_CONFIG, &out, EFAB_BYTE );
+fail5:
+fail4:
+fail3:
+fail2:
+fail1:
+	EFAB_ERR ( "Failed initialising SFE4001 board\n" );
+	return rc;
+}
+
+static void
+sfe4001_fini ( struct efab_nic *efab )
+{
+	struct i2c_interface *i2c = &efab->i2c_bb.i2c;
+	uint8_t in, cfg, out;
+
+	EFAB_ERR ( "Turning off SFE4001\n" );
+
+	/* Turn off all power rails */
+	out = 0xff;
+	(void) i2c->write ( i2c, &i2c_pca9539, P0_OUT, &out, EFAB_BYTE );
+
+	/* Disable port 1 outputs on IO expander */
+	cfg = 0xff;
+	(void) i2c->write ( i2c, &i2c_pca9539, P1_CONFIG, &cfg, EFAB_BYTE );
+
+	/* Disable port 0 outputs on IO expander */
+	cfg = 0xff;
+	(void) i2c->write ( i2c, &i2c_pca9539, P0_CONFIG, &cfg, EFAB_BYTE );
+
+	/* Clear any over-temperature alert */
+	(void) i2c->read ( i2c, &i2c_max6647, RSL, &in, EFAB_BYTE );
+}
+
+struct efab_board_operations sfe4001_ops = {
+	.init		= sfe4001_init,
+	.fini		= sfe4001_fini,
+};
+
+static int sfe4002_init ( struct efab_nic *efab __attribute__((unused)) )
+{
+	return 0;
+}
+static void sfe4002_fini ( struct efab_nic *efab __attribute__((unused)) )
+{
+}
+
+struct efab_board_operations sfe4002_ops = {
+	.init		= sfe4002_init,
+	.fini		= sfe4002_fini,
+};
+
+static int sfe4003_init ( struct efab_nic *efab __attribute__((unused)) )
+{
+	return 0;
+}
+static void sfe4003_fini ( struct efab_nic *efab __attribute__((unused)) )
+{
+}
+
+struct efab_board_operations sfe4003_ops = {
+	.init		= sfe4003_init,
+	.fini		= sfe4003_fini,
+};
+
+/*******************************************************************************
+ *
+ *
+ * Hardware initialisation
+ *
+ *
+ *******************************************************************************/ 
+
+static void
+falcon_free_special_buffer ( void *p )
+{
+	/* We don't bother cleaning up the buffer table entries -
+	 * we're hardly limited */
+	free_dma ( p, EFAB_BUF_ALIGN );
+}
+
+static void*
+falcon_alloc_special_buffer ( struct efab_nic *efab, int bytes,
+			      struct efab_special_buffer *entry )
+{
+	void* buffer;
+	int remaining;
+	efab_qword_t buf_desc;
+	unsigned long dma_addr;
+
+	/* Allocate the buffer, aligned on a buffer address boundary */
+	buffer = malloc_dma ( bytes, EFAB_BUF_ALIGN );
+	if ( ! buffer )
+		return NULL;
+
+	/* Push buffer table entries to back the buffer */
+	entry->id = efab->buffer_head;
+	entry->dma_addr = dma_addr = virt_to_bus ( buffer );
+	assert ( ( dma_addr & ( EFAB_BUF_ALIGN - 1 ) ) == 0 );
+
+	remaining = bytes;
+	while ( remaining > 0 ) {
+		EFAB_POPULATE_QWORD_3 ( buf_desc,
+					FCN_IP_DAT_BUF_SIZE, FCN_IP_DAT_BUF_SIZE_4K,
+					FCN_BUF_ADR_FBUF, ( dma_addr >> 12 ),
+					FCN_BUF_OWNER_ID_FBUF, 0 );
+
+		falcon_write_sram ( efab, &buf_desc, efab->buffer_head );
+
+		++efab->buffer_head;
+		dma_addr += EFAB_BUF_ALIGN;
+		remaining -= EFAB_BUF_ALIGN;
+	}
+
+	EFAB_TRACE ( "Allocated 0x%x bytes at %p backed by buffer table "
+		     "entries 0x%x..0x%x\n", bytes, buffer, entry->id,
+		     efab->buffer_head - 1 );
+
+	return buffer;
+}
+
+static void
+clear_b0_fpga_memories ( struct efab_nic *efab)
+{
+	efab_oword_t blanko, temp;
+	efab_dword_t blankd;
+	int offset; 
+
+	EFAB_ZERO_OWORD ( blanko );
+	EFAB_ZERO_DWORD ( blankd );
+
+	/* Clear the address region register */
+	EFAB_POPULATE_OWORD_4 ( temp,
+				FCN_ADR_REGION0, 0,
+				FCN_ADR_REGION1, ( 1 << 16 ),
+				FCN_ADR_REGION2, ( 2 << 16 ),
+				FCN_ADR_REGION3, ( 3 << 16 ) );
+	falcon_write ( efab, &temp, FCN_ADR_REGION_REG_KER );
+	
+	EFAB_TRACE ( "Clearing filter and RSS tables\n" );
+
+	for ( offset = FCN_RX_FILTER_TBL0 ;
+	      offset < FCN_RX_RSS_INDIR_TBL_B0+0x800 ;
+	      offset += 0x10 ) {
+		falcon_write ( efab, &blanko, offset );
+	}
+
+	EFAB_TRACE ( "Wiping buffer tables\n" );
+
+	/* Notice the 8 byte access mode */
+	for ( offset = 0x2800000 ;
+	      offset < 0x3000000 ;
+	      offset += 0x8) {
+		_falcon_writel ( efab, 0, offset );
+		_falcon_writel ( efab, 0, offset + 4 );
+		wmb();
+	}
+}
+
+static int
+falcon_reset ( struct efab_nic *efab )
+{
+	efab_oword_t glb_ctl_reg_ker;
+
+	/* Initiate software reset */
+	EFAB_POPULATE_OWORD_6 ( glb_ctl_reg_ker,
+				FCN_PCIE_CORE_RST_CTL, EXCLUDE_FROM_RESET,
+				FCN_PCIE_NSTCK_RST_CTL, EXCLUDE_FROM_RESET,
+				FCN_PCIE_SD_RST_CTL, EXCLUDE_FROM_RESET,
+				FCN_EE_RST_CTL, EXCLUDE_FROM_RESET,
+				FCN_EXT_PHY_RST_DUR, 0x7, /* 10ms */
+				FCN_SWRST, 1 );
+
+	falcon_write ( efab, &glb_ctl_reg_ker, FCN_GLB_CTL_REG_KER );
+
+	/* Allow 50ms for reset */
+	mdelay ( 50 );
+
+	/* Check for device reset complete */
+	falcon_read ( efab, &glb_ctl_reg_ker, FCN_GLB_CTL_REG_KER );
+	if ( EFAB_OWORD_FIELD ( glb_ctl_reg_ker, FCN_SWRST ) != 0 ) {
+		EFAB_ERR ( "Reset failed\n" );
+		return -ETIMEDOUT;
+	}
+
+	if ( ( efab->pci_revision == FALCON_REV_B0 ) && !efab->is_asic ) {
+		clear_b0_fpga_memories ( efab );
+	}
+
+	return 0;
+}
+
+/** Offset of MAC address within EEPROM or Flash */
+#define FALCON_MAC_ADDRESS_OFFSET 0x310
+
+/*
+ * Falcon EEPROM structure
+ */
+#define SF_NV_CONFIG_BASE 0x300
+#define SF_NV_CONFIG_EXTRA 0xA0
+
+struct falcon_nv_config_ver2 {
+	uint16_t nports;
+	uint8_t  port0_phy_addr;
+	uint8_t  port0_phy_type;
+	uint8_t  port1_phy_addr;
+	uint8_t  port1_phy_type;
+	uint16_t asic_sub_revision;
+	uint16_t board_revision;
+	uint8_t mac_location;
+};
+
+struct falcon_nv_extra {
+	uint16_t magicnumber;
+	uint16_t structure_version;
+	uint16_t checksum;
+	union {
+		struct falcon_nv_config_ver2 ver2;
+	} ver_specific;
+};
+
+#define BOARD_TYPE(_rev) (_rev >> 8)
+
+static void
+falcon_probe_nic_variant ( struct efab_nic *efab, struct pci_device *pci )
+{
+	efab_oword_t altera_build, nic_stat;
+	int is_pcie, fpga_version;
+	uint8_t revision;
+
+	/* PCI revision */
+	pci_read_config_byte ( pci, PCI_CLASS_REVISION, &revision );
+	efab->pci_revision = revision;
+
+	/* Asic vs FPGA */
+	falcon_read ( efab, &altera_build, FCN_ALTERA_BUILD_REG_KER );
+	fpga_version = EFAB_OWORD_FIELD ( altera_build, FCN_VER_ALL );
+	efab->is_asic = (fpga_version == 0);
+
+	/* MAC and PCI type */
+	falcon_read ( efab, &nic_stat, FCN_NIC_STAT_REG );
+	if ( efab->pci_revision == FALCON_REV_B0 ) {
+		is_pcie = 1;
+		efab->phy_10g = EFAB_OWORD_FIELD ( nic_stat, FCN_STRAP_10G );
+	}
+	else if ( efab->is_asic ) {
+		is_pcie = EFAB_OWORD_FIELD ( nic_stat, FCN_STRAP_PCIE );
+		efab->phy_10g = EFAB_OWORD_FIELD ( nic_stat, FCN_STRAP_10G );
 	}
 	else {
-		falcon_read ( efab, &reg, ALTERA_BUILD_REG_KER );
-		minor = EFAB_OWORD_FIELD ( reg, VER_MINOR );
-		
-		if ( minor == 0x14 ) {
-			efab->is_10g = 1;
-		} else if ( minor == 0x13 ) {
-			efab->is_dual = 1;
-		}
+		int minor = EFAB_OWORD_FIELD ( altera_build,  FCN_VER_MINOR );
+		is_pcie = 0;
+		efab->phy_10g = ( minor == 0x14 );
+	}
+}
+
+static void
+falcon_init_spi_device ( struct efab_nic *efab, struct spi_device *spi )
+{
+	/* Falcon's SPI interface only supports reads/writes of up to 16 bytes.
+	 * Reduce the nvs block size down to satisfy this - which means callers
+	 * should use the nvs_* functions rather than spi_*. */
+	if ( spi->nvs.block_size > FALCON_SPI_MAX_LEN )
+		spi->nvs.block_size = FALCON_SPI_MAX_LEN;
+
+	spi->bus = &efab->spi_bus;
+	efab->spi = spi;
+}
+
+static int
+falcon_probe_spi ( struct efab_nic *efab )
+{
+	efab_oword_t nic_stat, gpio_ctl, ee_vpd_cfg;
+	int has_flash, has_eeprom, ad9bit;
+
+	falcon_read ( efab, &nic_stat, FCN_NIC_STAT_REG );
+	falcon_read ( efab, &gpio_ctl, FCN_GPIO_CTL_REG_KER );
+	falcon_read ( efab, &ee_vpd_cfg, FCN_EE_VPD_CFG_REG );
+
+	/* determine if FLASH / EEPROM is present */
+	if ( ( efab->pci_revision >= FALCON_REV_B0 ) || efab->is_asic ) {
+		has_flash = EFAB_OWORD_FIELD ( nic_stat, FCN_SF_PRST );
+		has_eeprom = EFAB_OWORD_FIELD ( nic_stat, FCN_EE_PRST );
+	} else {
+		has_flash = EFAB_OWORD_FIELD ( gpio_ctl, FCN_FLASH_PRESENT );
+		has_eeprom = EFAB_OWORD_FIELD ( gpio_ctl, FCN_EEPROM_PRESENT );
+	}
+	ad9bit = EFAB_OWORD_FIELD ( ee_vpd_cfg, FCN_EE_VPD_EN_AD9_MODE );
+
+	/* Configure the SPI and I2C bus */
+	efab->spi_bus.rw = falcon_spi_rw;
+	init_i2c_bit_basher ( &efab->i2c_bb, &falcon_i2c_bit_ops );
+
+	/* Configure the EEPROM SPI device. Generally, an Atmel 25040
+	 * (or similar) is used, but this is only possible if there is also
+	 * a flash device present to store the boot-time chip configuration.
+	 */
+	if ( has_eeprom ) {
+		if ( has_flash && ad9bit )
+			init_at25040 ( &efab->spi_eeprom );
+		else
+			init_mc25xx640 ( &efab->spi_eeprom );
+		falcon_init_spi_device ( efab, &efab->spi_eeprom );
 	}
 
-	DBG ( "NIC type: %s %dx%s\n",
-	      efab->is_asic ? "ASIC" : "FPGA",
-	      efab->is_dual ? 2 : 1,
-	      efab->is_10g ? "10G" : "1G" );
+	/* Configure the FLASH SPI device */
+	if ( has_flash ) {
+		init_at25f1024 ( &efab->spi_flash );
+		falcon_init_spi_device ( efab, &efab->spi_flash );
+	}
 
-	/* patch in MAC operations */
-	if ( efab->is_10g )
+	EFAB_LOG ( "flash is %s, EEPROM is %s%s\n",
+		   ( has_flash ? "present" : "absent" ),
+		   ( has_eeprom ? "present " : "absent" ),
+		   ( has_eeprom ? (ad9bit ? "(9bit)" : "(16bit)") : "") );
+
+	/* The device MUST have flash or eeprom */
+	if ( ! efab->spi ) {
+		EFAB_ERR ( "Device appears to have no flash or eeprom\n" );
+		return -EIO;
+	}
+
+	/* If the device has EEPROM attached, then advertise NVO space */
+	if ( has_eeprom )
+		nvo_init ( &efab->nvo, &efab->spi_eeprom.nvs, falcon_nvo_fragments,
+			   &efab->netdev->refcnt );
+
+	return 0;
+}
+
+static int
+falcon_probe_nvram ( struct efab_nic *efab )
+{
+	struct nvs_device *nvs = &efab->spi->nvs;
+	struct falcon_nv_extra nv;
+	int rc, board_revision;
+
+	/* Read the MAC address */
+	rc = nvs_read ( nvs, FALCON_MAC_ADDRESS_OFFSET,
+			efab->mac_addr, ETH_ALEN );
+	if ( rc )
+		return rc;
+
+	/* Poke through the NVRAM structure for the PHY type. */
+	rc = nvs_read ( nvs, SF_NV_CONFIG_BASE + SF_NV_CONFIG_EXTRA,
+			&nv, sizeof ( nv ) );
+	if ( rc )
+		return rc;
+
+	/* Handle each supported NVRAM version */
+	if ( ( le16_to_cpu ( nv.magicnumber ) == FCN_NV_MAGIC_NUMBER ) &&
+	     ( le16_to_cpu ( nv.structure_version ) >= 2 ) ) {
+		struct falcon_nv_config_ver2* ver2 = &nv.ver_specific.ver2;
+		
+		/* Get the PHY type */
+		efab->phy_addr = le16_to_cpu ( ver2->port0_phy_addr );
+		efab->phy_type = le16_to_cpu ( ver2->port0_phy_type );
+		board_revision = le16_to_cpu ( ver2->board_revision );
+	}
+	else {
+		EFAB_ERR ( "NVram is not recognised\n" );
+		return -EINVAL;
+	}
+
+	efab->board_type = BOARD_TYPE ( board_revision );
+	
+	EFAB_TRACE ( "Falcon board %d phy %d @ addr %d\n",
+		     efab->board_type, efab->phy_type, efab->phy_addr );
+
+	/* Patch in the board operations */
+	switch ( efab->board_type ) {
+	case EFAB_BOARD_SFE4001:
+		efab->board_op = &sfe4001_ops;
+		break;
+	case EFAB_BOARD_SFE4002:
+		efab->board_op = &sfe4002_ops;
+		break;
+	case EFAB_BOARD_SFE4003:
+		efab->board_op = &sfe4003_ops;
+		break;
+	default:
+		EFAB_ERR ( "Unrecognised board type\n" );
+		return -EINVAL;
+	}
+
+	/* Patch in MAC operations */
+	if ( efab->phy_10g )
 		efab->mac_op = &falcon_xmac_operations;
 	else
 		efab->mac_op = &falcon_gmac_operations;
+
+	/* Hook in the PHY ops */
+	switch ( efab->phy_type ) {
+	case PHY_TYPE_10XPRESS:
+		efab->phy_op = &falcon_tenxpress_phy_ops;
+		break;
+	case PHY_TYPE_CX4:
+		efab->phy_op = &falcon_xaui_phy_ops;
+		break;
+	case PHY_TYPE_XFP:
+		efab->phy_op = &falcon_xfp_phy_ops;
+		break;
+	case PHY_TYPE_CX4_RTMR:
+		efab->phy_op = &falcon_txc_phy_ops;
+		break;
+	case PHY_TYPE_PM8358:
+		efab->phy_op = &falcon_pm8358_phy_ops;
+		break;
+	case PHY_TYPE_1GIG_ALASKA:
+		efab->phy_op = &falcon_alaska_phy_ops;
+		break;
+	default:
+		EFAB_ERR ( "Unknown PHY type: %d\n", efab->phy_type );
+		return -EINVAL;
+	}
+
+	return 0;
+}
+
+static int
+falcon_init_sram ( struct efab_nic *efab )
+{
+	efab_oword_t reg;
+	int count;
+
+	/* use card in internal SRAM mode */
+	falcon_read ( efab, &reg, FCN_NIC_STAT_REG );
+	EFAB_SET_OWORD_FIELD ( reg, FCN_ONCHIP_SRAM, 1 );
+	falcon_write ( efab, &reg, FCN_NIC_STAT_REG );
+
+	/* Deactivate any external SRAM that might be present */
+	EFAB_POPULATE_OWORD_2 ( reg, 
+				FCN_GPIO1_OEN, 1,
+				FCN_GPIO1_OUT, 1 );
+	falcon_write ( efab, &reg, FCN_GPIO_CTL_REG_KER );
+
+	/* Initiate SRAM reset */
+	EFAB_POPULATE_OWORD_2 ( reg,
+				FCN_SRAM_OOB_BT_INIT_EN, 1,
+				FCN_SRM_NUM_BANKS_AND_BANK_SIZE, 0 );
+	falcon_write ( efab, &reg, FCN_SRM_CFG_REG_KER );
+
+	/* Wait for SRAM reset to complete */
+	count = 0;
+	do {
+		/* SRAM reset is slow; expect around 16ms */
+		mdelay ( 20 );
+
+		/* Check for reset complete */
+		falcon_read ( efab, &reg, FCN_SRM_CFG_REG_KER );
+		if ( !EFAB_OWORD_FIELD ( reg, FCN_SRAM_OOB_BT_INIT_EN ) )
+			return 0;
+	} while (++count < 20);	/* wait upto 0.4 sec */
+
+	EFAB_ERR ( "timed out waiting for SRAM reset\n");
+	return -ETIMEDOUT;
+}
+
+static void
+falcon_setup_nic ( struct efab_nic *efab )
+{
+	efab_dword_t timer_cmd;
+	efab_oword_t reg;
+	int tx_fc, xoff_thresh, xon_thresh;
+
+	/* bug5129: Clear the parity enables on the TX data fifos as 
+	 * they produce false parity errors because of timing issues 
+	 */
+	falcon_read ( efab, &reg, FCN_SPARE_REG_KER );
+	EFAB_SET_OWORD_FIELD ( reg, FCN_MEM_PERR_EN_TX_DATA, 0 );
+	falcon_write ( efab, &reg, FCN_SPARE_REG_KER );
 	
-	if ( !efab->is_dual && ( efab->port == 1 ) ) {
-		/* device doesn't exist */
-		return 0;
-	}
-
-	/* determine EEPROM / FLASH */
-	if ( efab->is_asic ) {
-		falcon_read ( efab, &reg, FCN_NIC_STAT_REG );
-		efab->has_flash = EFAB_OWORD_FIELD ( reg, SF_PRST );
-		efab->has_eeprom = EFAB_OWORD_FIELD ( reg, EE_PRST );
-	} else {
-		falcon_read ( efab, &reg, FCN_GPIO_CTL_REG_KER );
-		efab->has_flash = EFAB_OWORD_FIELD ( reg, FCN_FLASH_PRESENT );
-		efab->has_eeprom = EFAB_OWORD_FIELD ( reg, FCN_EEPROM_PRESENT);
-	}
-	DBG ( "flash is %s, EEPROM is %s\n",
-	      ( efab->has_flash ? "present" : "absent" ),
-	      ( efab->has_eeprom ? "present" : "absent" ) );
-	falcon_init_spi ( efab );
-
 	/* Set up TX and RX descriptor caches in SRAM */
-	EFAB_POPULATE_OWORD_1 ( reg, FCN_SRM_TX_DC_BASE_ADR,
-				0x130000 /* recommended in datasheet */ );
+	EFAB_POPULATE_OWORD_1 ( reg, FCN_SRM_TX_DC_BASE_ADR, 0x130000 );
 	falcon_write ( efab, &reg, FCN_SRM_TX_DC_CFG_REG_KER );
-	EFAB_POPULATE_OWORD_1 ( reg, FCN_TX_DC_SIZE, 2 /* 32 descriptors */ );
+	EFAB_POPULATE_OWORD_1 ( reg, FCN_TX_DC_SIZE, 1 /* 16 descriptors */ );
 	falcon_write ( efab, &reg, FCN_TX_DC_CFG_REG_KER );
-	EFAB_POPULATE_OWORD_1 ( reg, FCN_SRM_RX_DC_BASE_ADR,
-				0x100000 /* recommended in datasheet */ );
+	EFAB_POPULATE_OWORD_1 ( reg, FCN_SRM_RX_DC_BASE_ADR, 0x100000 );
 	falcon_write ( efab, &reg, FCN_SRM_RX_DC_CFG_REG_KER );
 	EFAB_POPULATE_OWORD_1 ( reg, FCN_RX_DC_SIZE, 2 /* 32 descriptors */ );
 	falcon_write ( efab, &reg, FCN_RX_DC_CFG_REG_KER );
 	
-	/* Set number of RSS CPUs */
-	EFAB_POPULATE_OWORD_1 ( reg, FCN_NUM_KER, 0 );
+	/* Set number of RSS CPUs
+	 * bug7244: Increase filter depth to reduce RX_RESET likelyhood
+	 */
+	EFAB_POPULATE_OWORD_5 ( reg,
+				FCN_NUM_KER, 0,
+				FCN_UDP_FULL_SRCH_LIMIT, 8,
+                                FCN_UDP_WILD_SRCH_LIMIT, 8,
+                                FCN_TCP_WILD_SRCH_LIMIT, 8,
+                                FCN_TCP_FULL_SRCH_LIMIT, 8);
 	falcon_write ( efab, &reg, FCN_RX_FILTER_CTL_REG_KER );
 	udelay ( 1000 );
-	
-	/* Reset the MAC */
-	mentormac_reset ( efab );
 
-	/* Set up event queue */
-	falcon_create_special_buffer ( efab, efab->eventq, FALCON_EVQ_ID );
-	/* Fill eventq with all ones ( empty events ) */
-	memset(efab->eventq, 0xff, 4096);
-	/* push eventq to card */
-	EFAB_POPULATE_OWORD_3 ( reg,
-				FCN_EVQ_EN, 1,
-				FCN_EVQ_SIZE, FCN_EVQ_SIZE_512,
-				FCN_EVQ_BUF_BASE_ID, FALCON_EVQ_ID );
-	falcon_write ( efab, &reg, FCN_EVQ_PTR_TBL_KER );
-	udelay ( 1000 );
+	/* Setup RX.  Wait for descriptor is broken and must
+	 * be disabled.  RXDP recovery shouldn't be needed, but is.
+	 * disable ISCSI parsing because we don't need it
+	 */
+	falcon_read ( efab, &reg, FCN_RX_SELF_RST_REG_KER );
+	EFAB_SET_OWORD_FIELD ( reg, FCN_RX_NODESC_WAIT_DIS, 1 );
+	EFAB_SET_OWORD_FIELD ( reg, FCN_RX_RECOVERY_EN, 1 );
+	EFAB_SET_OWORD_FIELD ( reg, FCN_RX_ISCSI_DIS, 1 );
+	falcon_write ( efab, &reg, FCN_RX_SELF_RST_REG_KER );
+	
+	/* Determine recommended flow control settings. *
+	 * Flow control is qualified on B0 and A1/1G, not on A1/10G */
+	if ( efab->pci_revision == FALCON_REV_B0 ) {
+		tx_fc = 1;
+		xoff_thresh = 54272;  /* ~80Kb - 3*max MTU */
+		xon_thresh = 27648; /* ~3*max MTU */
+	}
+	else if ( !efab->phy_10g ) {
+		tx_fc = 1;
+		xoff_thresh = 2048;
+		xon_thresh = 512;
+	}
+	else {
+		tx_fc = xoff_thresh = xon_thresh = 0;
+	}
+
+	/* Setup TX and RX */
+	falcon_read ( efab, &reg, FCN_TX_CFG2_REG_KER );
+	EFAB_SET_OWORD_FIELD ( reg, FCN_TX_DIS_NON_IP_EV, 1 );
+	falcon_write ( efab, &reg, FCN_TX_CFG2_REG_KER );
+
+	falcon_read ( efab, &reg, FCN_RX_CFG_REG_KER );
+	EFAB_SET_OWORD_FIELD_VER ( efab, reg, FCN_RX_USR_BUF_SIZE,
+				   (3*4096) / 32 );
+	if ( efab->pci_revision == FALCON_REV_B0)
+		EFAB_SET_OWORD_FIELD ( reg, FCN_RX_INGR_EN_B0, 1 );
+	EFAB_SET_OWORD_FIELD_VER ( efab, reg, FCN_RX_XON_MAC_TH,
+				   xon_thresh / 256);
+	EFAB_SET_OWORD_FIELD_VER ( efab, reg, FCN_RX_XOFF_MAC_TH,
+				   xoff_thresh / 256);
+	EFAB_SET_OWORD_FIELD_VER ( efab, reg, FCN_RX_XOFF_MAC_EN, tx_fc);
+	falcon_write ( efab, &reg, FCN_RX_CFG_REG_KER );
 
 	/* Set timer register */
 	EFAB_POPULATE_DWORD_2 ( timer_cmd,
 				FCN_TIMER_MODE, FCN_TIMER_MODE_DIS,
 				FCN_TIMER_VAL, 0 );
 	falcon_writel ( efab, &timer_cmd, FCN_TIMER_CMD_REG_KER );
-	udelay ( 1000 );
+}
 
-	/* Initialise event queue read pointer */
-	falcon_eventq_read_ack ( efab );
+static void
+falcon_init_resources ( struct efab_nic *efab )
+{
+	struct efab_ev_queue *ev_queue = &efab->ev_queue;
+	struct efab_rx_queue *rx_queue = &efab->rx_queue;
+	struct efab_tx_queue *tx_queue = &efab->tx_queue;
+
+	efab_oword_t reg;
+	int jumbo;
+
+	/* Initialise the ptrs */
+	tx_queue->read_ptr = tx_queue->write_ptr = 0;
+	rx_queue->read_ptr = rx_queue->write_ptr = 0;
+	ev_queue->read_ptr = 0;
+
+	/* Push the event queue to the hardware */
+	EFAB_POPULATE_OWORD_3 ( reg,
+				FCN_EVQ_EN, 1,
+				FCN_EVQ_SIZE, FQS(FCN_EVQ, EFAB_EVQ_SIZE),
+				FCN_EVQ_BUF_BASE_ID, ev_queue->entry.id );
+	falcon_write ( efab, &reg, 
+		       FCN_REVISION_REG ( efab, FCN_EVQ_PTR_TBL_KER ) );
 	
-	/* Set up TX descriptor ring */
-	falcon_create_special_buffer ( efab, efab->txd, FALCON_TXD_ID );
-	EFAB_POPULATE_OWORD_5 ( reg,
+	/* Push the tx queue to the hardware */
+	EFAB_POPULATE_OWORD_8 ( reg,
 				FCN_TX_DESCQ_EN, 1,
-				FCN_TX_DESCQ_BUF_BASE_ID, FALCON_TXD_ID,
+				FCN_TX_ISCSI_DDIG_EN, 0,
+				FCN_TX_ISCSI_DDIG_EN, 0,
+				FCN_TX_DESCQ_BUF_BASE_ID, tx_queue->entry.id,
 				FCN_TX_DESCQ_EVQ_ID, 0,
-				FCN_TX_DESCQ_SIZE, FCN_TX_DESCQ_SIZE_512,
-				FCN_TX_DESCQ_TYPE, 0 /* kernel queue */ );
-	falcon_write ( efab, &reg, FCN_TX_DESC_PTR_TBL_KER );
-
-	/* Set up RX descriptor ring */
-	falcon_create_special_buffer ( efab, efab->rxd, FALCON_RXD_ID );
-	EFAB_POPULATE_OWORD_6 ( reg,
-				FCN_RX_DESCQ_BUF_BASE_ID, FALCON_RXD_ID,
+				FCN_TX_DESCQ_SIZE, FQS(FCN_TX_DESCQ, EFAB_TXD_SIZE),
+				FCN_TX_DESCQ_TYPE, 0 /* kernel queue */,
+				FCN_TX_NON_IP_DROP_DIS_B0, 1 );
+	falcon_write ( efab, &reg, 
+		       FCN_REVISION_REG ( efab, FCN_TX_DESC_PTR_TBL_KER ) );
+	
+	/* Push the rx queue to the hardware */
+	jumbo = ( efab->pci_revision == FALCON_REV_B0 ) ? 0 : 1;
+	EFAB_POPULATE_OWORD_8 ( reg,
+				FCN_RX_ISCSI_DDIG_EN, 0,
+				FCN_RX_ISCSI_HDIG_EN, 0,
+				FCN_RX_DESCQ_BUF_BASE_ID, rx_queue->entry.id,
 				FCN_RX_DESCQ_EVQ_ID, 0,
-				FCN_RX_DESCQ_SIZE, FCN_RX_DESCQ_SIZE_512,
+				FCN_RX_DESCQ_SIZE, FQS(FCN_RX_DESCQ, EFAB_RXD_SIZE),
 				FCN_RX_DESCQ_TYPE, 0 /* kernel queue */,
-				FCN_RX_DESCQ_JUMBO, 1,
+				FCN_RX_DESCQ_JUMBO, jumbo,
 				FCN_RX_DESCQ_EN, 1 );
-	falcon_write ( efab, &reg, FCN_RX_DESC_PTR_TBL_KER );
+	falcon_write ( efab, &reg,
+		       FCN_REVISION_REG ( efab, FCN_RX_DESC_PTR_TBL_KER ) );
 
 	/* Program INT_ADR_REG_KER */
 	EFAB_POPULATE_OWORD_1 ( reg,
-				FCN_INT_ADR_KER,
-				virt_to_bus ( &efab->int_ker ) );
+				FCN_INT_ADR_KER, virt_to_bus ( &efab->int_ker ) );
 	falcon_write ( efab, &reg, FCN_INT_ADR_REG_KER );
-	udelay ( 1000 );
 
-	/* Register non-volatile storage */
-	if ( efab->has_eeprom ) {
-		nvo_init ( &efab->nvo, &efab->falcon_eeprom.nvs,
-			   falcon_eeprom_fragments, NULL /* hack */ );
-		if ( register_nvo ( &efab->nvo, NULL /* hack */ ) != 0 )
-			return 0;
+	/* Ack the event queue */
+	falcon_eventq_read_ack ( efab, ev_queue );
+}
+
+static void
+falcon_fini_resources ( struct efab_nic *efab )
+{
+	efab_oword_t cmd;
+	
+	/* Disable interrupts */
+	falcon_interrupts ( efab, 0, 0 );
+
+	/* Flush the dma queues */
+	EFAB_POPULATE_OWORD_2 ( cmd,
+				FCN_TX_FLUSH_DESCQ_CMD, 1,
+				FCN_TX_FLUSH_DESCQ, 0 );
+	falcon_write ( efab, &cmd, 
+		       FCN_REVISION_REG ( efab, FCN_TX_DESC_PTR_TBL_KER ) );
+
+	EFAB_POPULATE_OWORD_2 ( cmd,
+				FCN_RX_FLUSH_DESCQ_CMD, 1,
+				FCN_RX_FLUSH_DESCQ, 0 );
+	falcon_write ( efab, &cmd,
+		       FCN_REVISION_REG ( efab, FCN_RX_DESC_PTR_TBL_KER ) );
+
+	mdelay ( 100 );
+
+	/* Remove descriptor rings from card */
+	EFAB_ZERO_OWORD ( cmd );
+	falcon_write ( efab, &cmd, 
+		       FCN_REVISION_REG ( efab, FCN_TX_DESC_PTR_TBL_KER ) );
+	falcon_write ( efab, &cmd, 
+		       FCN_REVISION_REG ( efab, FCN_RX_DESC_PTR_TBL_KER ) );
+	falcon_write ( efab, &cmd, 
+		       FCN_REVISION_REG ( efab, FCN_EVQ_PTR_TBL_KER ) );
+}
+
+/*******************************************************************************
+ *
+ *
+ * Hardware rx path
+ *
+ *
+ *******************************************************************************/
+
+static void
+falcon_build_rx_desc ( falcon_rx_desc_t *rxd, struct io_buffer *iob )
+{
+	EFAB_POPULATE_QWORD_2 ( *rxd,
+				FCN_RX_KER_BUF_SIZE, EFAB_RX_BUF_SIZE,
+				FCN_RX_KER_BUF_ADR, virt_to_bus ( iob->data ) );
+}
+
+static void
+falcon_notify_rx_desc ( struct efab_nic *efab, struct efab_rx_queue *rx_queue )
+{
+	efab_dword_t reg;
+	int ptr = rx_queue->write_ptr % EFAB_RXD_SIZE;
+
+	EFAB_POPULATE_DWORD_1 ( reg, FCN_RX_DESC_WPTR_DWORD, ptr );
+	falcon_writel ( efab, &reg, FCN_RX_DESC_UPD_REG_KER_DWORD );
+}
+
+
+/*******************************************************************************
+ *
+ *
+ * Hardware tx path
+ *
+ *
+ *******************************************************************************/
+
+static void
+falcon_build_tx_desc ( falcon_tx_desc_t *txd, struct io_buffer *iob )
+{
+	EFAB_POPULATE_QWORD_2 ( *txd,
+				FCN_TX_KER_BYTE_CNT, iob_len ( iob ),
+				FCN_TX_KER_BUF_ADR, virt_to_bus ( iob->data ) );
+}
+
+static void
+falcon_notify_tx_desc ( struct efab_nic *efab,
+			struct efab_tx_queue *tx_queue )
+{
+	efab_dword_t reg;
+	int ptr = tx_queue->write_ptr % EFAB_TXD_SIZE;
+
+	EFAB_POPULATE_DWORD_1 ( reg, FCN_TX_DESC_WPTR_DWORD, ptr );
+	falcon_writel ( efab, &reg, FCN_TX_DESC_UPD_REG_KER_DWORD );
+}
+
+
+/*******************************************************************************
+ *
+ *
+ * Software receive interface
+ *
+ *
+ *******************************************************************************/ 
+
+static int
+efab_fill_rx_queue ( struct efab_nic *efab,
+		     struct efab_rx_queue *rx_queue )
+{
+	int fill_level = rx_queue->write_ptr - rx_queue->read_ptr;
+	int space = EFAB_NUM_RX_DESC - fill_level - 1;
+	int pushed = 0;
+
+	while ( space ) {
+		int buf_id = rx_queue->write_ptr % EFAB_NUM_RX_DESC;
+		int desc_id = rx_queue->write_ptr % EFAB_RXD_SIZE;
+		struct io_buffer *iob;
+		falcon_rx_desc_t *rxd;
+
+		assert ( rx_queue->buf[buf_id] == NULL );
+		iob = alloc_iob ( EFAB_RX_BUF_SIZE );
+		if ( !iob )
+			break;
+
+		EFAB_TRACE ( "pushing rx_buf[%d] iob %p data %p\n",
+			     buf_id, iob, iob->data );
+
+		rx_queue->buf[buf_id] = iob;
+		rxd = rx_queue->ring + desc_id;
+		falcon_build_rx_desc ( rxd, iob );
+		++rx_queue->write_ptr;
+		++pushed;
+		--space;
 	}
 
-	return 1;
-}
+	if ( pushed ) {
+		/* Push the ptr to hardware */
+		falcon_notify_rx_desc ( efab, rx_queue );
 
-/** MDIO write */
-static void falcon_mdio_write ( struct efab_nic *efab, int location,
-				int value ) {
-	int phy_id = efab->port + 2;
-	efab_oword_t reg;
-
-	EFAB_TRACE ( "Writing GMII %d register %02x with %04x\n",
-		     phy_id, location, value );
-
-	/* Check MII not currently being accessed */
-	if ( ! falcon_gmii_wait ( efab ) )
-		return;
-
-	/* Write the address registers */
-	EFAB_POPULATE_OWORD_1 ( reg, FCN_MD_PHY_ADR, 0 /* phy_id ? */ );
-	falcon_write ( efab, &reg, FCN_MD_PHY_ADR_REG_KER );
-	udelay ( 10 );
-	EFAB_POPULATE_OWORD_2 ( reg,
-				FCN_MD_PRT_ADR, phy_id,
-				FCN_MD_DEV_ADR, location );
-	falcon_write ( efab, &reg, FCN_MD_ID_REG_KER );
-	udelay ( 10 );
-
-	/* Write data */
-	EFAB_POPULATE_OWORD_1 ( reg, FCN_MD_TXD, value );
-	falcon_write ( efab, &reg, FCN_MD_TXD_REG_KER );
-	udelay ( 10 );
-	EFAB_POPULATE_OWORD_2 ( reg,
-				FCN_MD_WRC, 1,
-				FCN_MD_GC, 1 );
-	falcon_write ( efab, &reg, FCN_MD_CS_REG_KER );
-	udelay ( 10 );
-	
-	/* Wait for data to be written */
-	falcon_gmii_wait ( efab );
-}
-
-/** MDIO read */
-static int falcon_mdio_read ( struct efab_nic *efab, int location ) {
-	int phy_id = efab->port + 2;
-	efab_oword_t reg;
-	int value;
-
-	/* Check MII not currently being accessed */
-	if ( ! falcon_gmii_wait ( efab ) )
-		return 0xffff;
-
-	/* Write the address registers */
-	EFAB_POPULATE_OWORD_1 ( reg, FCN_MD_PHY_ADR, 0 /* phy_id ? */ );
-	falcon_write ( efab, &reg, FCN_MD_PHY_ADR_REG_KER );
-	udelay ( 10 );
-	EFAB_POPULATE_OWORD_2 ( reg,
-				FCN_MD_PRT_ADR, phy_id,
-				FCN_MD_DEV_ADR, location );
-	falcon_write ( efab, &reg, FCN_MD_ID_REG_KER );
-	udelay ( 10 );
-
-	/* Request data to be read */
-	EFAB_POPULATE_OWORD_2 ( reg,
-				FCN_MD_RIC, 1,
-				FCN_MD_GC, 1 );
-	falcon_write ( efab, &reg, FCN_MD_CS_REG_KER );
-	udelay ( 10 );
-	
-	/* Wait for data to become available */
-	falcon_gmii_wait ( efab );
-
-	/* Read the data */
-	falcon_read ( efab, &reg, FCN_MD_RXD_REG_KER );
-	value = EFAB_OWORD_FIELD ( reg, FCN_MD_RXD );
-
-	EFAB_TRACE ( "Read from GMII %d register %02x, got %04x\n",
-		     phy_id, location, value );
-
-	return value;
-}
-
-static struct efab_operations falcon_operations = {
-	.get_membase		= falcon_get_membase,
-	.reset			= falcon_reset,
-	.init_nic		= falcon_init_nic,
-	.read_eeprom		= falcon_read_eeprom,
-	.build_rx_desc		= falcon_build_rx_desc,
-	.notify_rx_desc		= falcon_notify_rx_desc,
-	.build_tx_desc		= falcon_build_tx_desc,
-	.notify_tx_desc		= falcon_notify_tx_desc,
-	.fetch_event		= falcon_fetch_event,
-	.mask_irq		= falcon_mask_irq,
-	.generate_irq		= falcon_generate_irq,
-	.mdio_write		= falcon_mdio_write,
-	.mdio_read		= falcon_mdio_read,
-};
-
-/**************************************************************************
- *
- * Etherfabric abstraction layer
- *
- **************************************************************************
- */
-
-/**
- * Push RX buffer to RXD ring
- *
- */
-static inline void efab_push_rx_buffer ( struct efab_nic *efab,
-					 struct efab_rx_buf *rx_buf ) {
-	/* Create RX descriptor */
-	rx_buf->id = efab->rx_write_ptr;
-	efab->op->build_rx_desc ( efab, rx_buf );
-
-	/* Update RX write pointer */
-	efab->rx_write_ptr = ( efab->rx_write_ptr + 1 ) % EFAB_RXD_SIZE;
-	efab->op->notify_rx_desc ( efab );
-
-	DBG ( "Added RX id %x\n", rx_buf->id );
-}
-
-/**
- * Push TX buffer to TXD ring
- *
- */
-static inline void efab_push_tx_buffer ( struct efab_nic *efab,
-					 struct efab_tx_buf *tx_buf ) {
-	/* Create TX descriptor */
-	tx_buf->id = efab->tx_write_ptr;
-	efab->op->build_tx_desc ( efab, tx_buf );
-
-	/* Update TX write pointer */
-	efab->tx_write_ptr = ( efab->tx_write_ptr + 1 ) % EFAB_TXD_SIZE;
-	efab->op->notify_tx_desc ( efab );
-
-	DBG ( "Added TX id %x\n", tx_buf->id );
-}
-
-/**
- * Initialise MAC and wait for link up
- *
- */
-static int efab_init_mac ( struct efab_nic *efab ) {
-	int count;
-
-	/* This can take several seconds */
-	EFAB_LOG ( "Waiting for link.." );
-	for ( count=0; count<5; count++ ) {
-		putchar ( '.' );
-
-		if ( ! efab->mac_op->init ( efab ) ) {
-			EFAB_ERR ( "Failed reinitialising MAC\n" );
-			return 0;
-		}
-		if ( efab->link_up ) {
-			/* PHY init printed the message for us */
-			return 1;
-		}
-		EFAB_ERR( "link is down" );
-		sleep ( 1 );
+		fill_level = rx_queue->write_ptr - rx_queue->read_ptr;
+		EFAB_TRACE ( "pushed %d rx buffers to fill level %d\n",
+			     pushed, fill_level );
 	}
-	EFAB_ERR ( " timed initialising MAC\n " );
+
+	if ( fill_level == 0 )
+		return -ENOMEM;
+	return 0;
+}
+	
+static void
+efab_receive ( struct efab_nic *efab, unsigned int id, int len, int drop )
+{
+	struct efab_rx_queue *rx_queue = &efab->rx_queue;
+	struct io_buffer *iob;
+	unsigned int read_ptr = rx_queue->read_ptr % EFAB_RXD_SIZE;
+	unsigned int buf_ptr = rx_queue->read_ptr % EFAB_NUM_RX_DESC;
+
+	assert ( id == read_ptr );
+	
+	/* Pop this rx buffer out of the software ring */
+	iob = rx_queue->buf[buf_ptr];
+	rx_queue->buf[buf_ptr] = NULL;
+
+	EFAB_TRACE ( "popping rx_buf[%d] iob %p data %p with %d bytes %s\n",
+		     id, iob, iob->data, len, drop ? "bad" : "ok" );
+
+	/* Pass the packet up if required */
+	if ( drop )
+		free_iob ( iob );
+	else {
+		iob_put ( iob, len );
+		netdev_rx ( efab->netdev, iob );
+	}
+
+	++rx_queue->read_ptr;
+}
+
+/*******************************************************************************
+ *
+ *
+ * Software transmit interface
+ *
+ *
+ *******************************************************************************/ 
+
+static int
+efab_transmit ( struct net_device *netdev, struct io_buffer *iob )
+{
+	struct efab_nic *efab = netdev_priv ( netdev );
+	struct efab_tx_queue *tx_queue = &efab->tx_queue;
+	int fill_level, space;
+	falcon_tx_desc_t *txd;
+	int buf_id;
+
+	fill_level = tx_queue->write_ptr - tx_queue->read_ptr;
+	space = EFAB_TXD_SIZE - fill_level - 1;
+	if ( space < 1 )
+		return -ENOBUFS;
+
+	/* Save the iobuffer for later completion */
+	buf_id = tx_queue->write_ptr % EFAB_TXD_SIZE;
+	assert ( tx_queue->buf[buf_id] == NULL );
+	tx_queue->buf[buf_id] = iob;
+
+	EFAB_TRACE ( "tx_buf[%d] for iob %p data %p len %d\n",
+		     buf_id, iob, iob->data, iob_len ( iob ) );
+
+	/* Form the descriptor, and push it to hardware */
+	txd = tx_queue->ring + buf_id;
+	falcon_build_tx_desc ( txd, iob );
+	++tx_queue->write_ptr;
+	falcon_notify_tx_desc ( efab, tx_queue );
 
 	return 0;
 }
 
-/**
- * Initialise NIC
+static int
+efab_transmit_done ( struct efab_nic *efab, int id )
+{
+	struct efab_tx_queue *tx_queue = &efab->tx_queue;
+	unsigned int read_ptr, stop;
+
+	/* Complete all buffers from read_ptr up to and including id */
+	read_ptr = tx_queue->read_ptr % EFAB_TXD_SIZE;
+	stop = ( id + 1 ) % EFAB_TXD_SIZE;
+
+	while ( read_ptr != stop ) {
+		struct io_buffer *iob = tx_queue->buf[read_ptr];
+		assert ( iob );
+
+		/* Complete the tx buffer */
+		if ( iob )
+			netdev_tx_complete ( efab->netdev, iob );
+		tx_queue->buf[read_ptr] = NULL;
+		
+		++tx_queue->read_ptr;
+		read_ptr = tx_queue->read_ptr % EFAB_TXD_SIZE;
+	}
+
+	return 0;
+}
+
+/*******************************************************************************
  *
- */
-static int efab_init_nic ( struct efab_nic *efab ) {
+ *
+ * Hardware event path
+ *
+ *
+ *******************************************************************************/
+
+static void
+falcon_clear_interrupts ( struct efab_nic *efab )
+{
+	efab_dword_t reg;
+
+	if ( efab->pci_revision == FALCON_REV_B0 ) {
+		/* read the ISR */
+		falcon_readl( efab, &reg, INT_ISR0_B0 );
+	}
+	else {
+		/* write to the INT_ACK register */
+		falcon_writel ( efab, 0, FCN_INT_ACK_KER_REG_A1 );
+		mb();
+		falcon_readl ( efab, &reg,
+			       WORK_AROUND_BROKEN_PCI_READS_REG_KER_A1 );
+	}
+}
+
+static void
+falcon_handle_event ( struct efab_nic *efab, falcon_event_t *evt )
+{
+	int ev_code, desc_ptr, len, drop;
+
+	/* Decode event */
+	ev_code = EFAB_QWORD_FIELD ( *evt, FCN_EV_CODE );
+	switch ( ev_code ) {
+	case FCN_TX_IP_EV_DECODE:
+		desc_ptr = EFAB_QWORD_FIELD ( *evt, FCN_TX_EV_DESC_PTR );
+		efab_transmit_done ( efab, desc_ptr );
+		break;
+	
+	case FCN_RX_IP_EV_DECODE:
+		desc_ptr = EFAB_QWORD_FIELD ( *evt, FCN_RX_EV_DESC_PTR );
+		len = EFAB_QWORD_FIELD ( *evt, FCN_RX_EV_BYTE_CNT );
+		drop = !EFAB_QWORD_FIELD ( *evt, FCN_RX_EV_PKT_OK );
+
+		efab_receive ( efab, desc_ptr, len, drop );
+		break;
+
+	default:
+		EFAB_TRACE ( "Unknown event type %d\n", ev_code );
+		break;
+	}
+}
+
+/*******************************************************************************
+ *
+ *
+ * Software (polling) interrupt handler
+ *
+ *
+ *******************************************************************************/
+
+static void
+efab_poll ( struct net_device *netdev )
+{
+	struct efab_nic *efab = netdev_priv ( netdev );
+	struct efab_ev_queue *ev_queue = &efab->ev_queue;
+	struct efab_rx_queue *rx_queue = &efab->rx_queue;
+	falcon_event_t *evt;
+
+	/* Read the event queue by directly looking for events
+	 * (we don't even bother to read the eventq write ptr) */
+	evt = ev_queue->ring + ev_queue->read_ptr;
+	while ( falcon_event_present ( evt ) ) {
+		
+		EFAB_TRACE ( "Event at index 0x%x address %p is "
+			     EFAB_QWORD_FMT "\n", ev_queue->read_ptr,
+			     evt, EFAB_QWORD_VAL ( *evt ) );
+		
+		falcon_handle_event ( efab, evt );
+		
+		/* Clear the event */
+		EFAB_SET_QWORD ( *evt );
+	
+		/* Move to the next event. We don't ack the event
+		 * queue until the end */
+		ev_queue->read_ptr = ( ( ev_queue->read_ptr + 1 ) %
+				       EFAB_EVQ_SIZE );
+		evt = ev_queue->ring + ev_queue->read_ptr;
+	}
+
+	/* Push more buffers if needed */
+	(void) efab_fill_rx_queue ( efab, rx_queue );
+
+	/* Clear any pending interrupts */
+	falcon_clear_interrupts ( efab );
+
+	/* Ack the event queue */
+	falcon_eventq_read_ack ( efab, ev_queue );
+}
+
+static void
+efab_irq ( struct net_device *netdev, int enable )
+{
+	struct efab_nic *efab = netdev_priv ( netdev );
+	struct efab_ev_queue *ev_queue = &efab->ev_queue;
+
+	switch ( enable ) {
+	case 0:
+		falcon_interrupts ( efab, 0, 0 );
+		break;
+	case 1:
+		falcon_interrupts ( efab, 1, 0 );
+		falcon_eventq_read_ack ( efab, ev_queue );
+		break;
+	case 2:
+		falcon_interrupts ( efab, 1, 1 );
+		break;
+	}
+}
+
+/*******************************************************************************
+ *
+ *
+ * Software open/close
+ *
+ *
+ *******************************************************************************/
+
+static void
+efab_free_resources ( struct efab_nic *efab )
+{
+	struct efab_ev_queue *ev_queue = &efab->ev_queue;
+	struct efab_rx_queue *rx_queue = &efab->rx_queue;
+	struct efab_tx_queue *tx_queue = &efab->tx_queue;
 	int i;
 
-	/* Initialise NIC */
-	if ( ! efab->op->init_nic ( efab ) )
-		return 0;
-
-	/* Push RX descriptors */
-	for ( i = 0 ; i < EFAB_RX_BUFS ; i++ ) {
-		efab_push_rx_buffer ( efab, &efab->rx_bufs[i] );
+	for ( i = 0; i < EFAB_NUM_RX_DESC; i++ ) {
+		if ( rx_queue->buf[i] )
+			free_iob ( rx_queue->buf[i] );
 	}
 
-	/* Read MAC address from EEPROM */
-	if ( ! efab->op->read_eeprom ( efab ) )
-		return 0;
+	for ( i = 0; i < EFAB_TXD_SIZE; i++ ) {
+		if ( tx_queue->buf[i] )
+			netdev_tx_complete ( efab->netdev,  tx_queue->buf[i] );
+	}
 
-	/* Initialise MAC and wait for link up */
-	if ( ! efab_init_mac ( efab ) )
-		return 0;
+	if ( rx_queue->ring )
+		falcon_free_special_buffer ( rx_queue->ring );
 
-	return 1;
+	if ( tx_queue->ring )
+		falcon_free_special_buffer ( tx_queue->ring );
+
+	if ( ev_queue->ring )
+		falcon_free_special_buffer ( ev_queue->ring );
+
+	memset ( rx_queue, 0, sizeof ( *rx_queue ) );
+	memset ( tx_queue, 0, sizeof ( *tx_queue ) );
+	memset ( ev_queue, 0, sizeof ( *ev_queue ) );
+
+	/* Ensure subsequent buffer allocations start at id 0 */
+	efab->buffer_head = 0;
 }
 
-/**************************************************************************
- *
- * Etherboot interface
- *
- **************************************************************************
- */
+static int
+efab_alloc_resources ( struct efab_nic *efab )
+{
+	struct efab_ev_queue *ev_queue = &efab->ev_queue;
+	struct efab_rx_queue *rx_queue = &efab->rx_queue;
+	struct efab_tx_queue *tx_queue = &efab->tx_queue;
+	size_t bytes;
 
-/**************************************************************************
-POLL - Wait for a frame
-***************************************************************************/
-static int etherfabric_poll ( struct nic *nic, int retrieve ) {
-	struct efab_nic *efab = nic->priv_data;
-	struct efab_event event;
-	static struct efab_rx_buf *rx_buf = NULL;
-	int i, drop = 0;
+	/* Allocate the hardware event queue */
+	bytes = sizeof ( falcon_event_t ) * EFAB_TXD_SIZE;
+	ev_queue->ring = falcon_alloc_special_buffer ( efab, bytes,
+						       &ev_queue->entry );
+	if ( !ev_queue->ring )
+		goto fail1;
 
-	/* Process the event queue until we hit either a packet
-	 * received event or an empty event slot.
-	 */
-	while ( ( rx_buf == NULL ) &&
-		efab->op->fetch_event ( efab, &event ) ) {
-		drop = event.drop;
-		if ( event.type == EFAB_EV_TX ) {
-			/* TX completed - mark as done */
-			DBG ( "TX id %x complete\n",
-			      efab->tx_buf.id );
-		} else if ( event.type == EFAB_EV_RX ) {
-			/* RX - find corresponding buffer */
-			for ( i = 0 ; i < EFAB_RX_BUFS ; i++ ) {
-				if ( efab->rx_bufs[i].id == event.rx_id ) {
-					rx_buf = &efab->rx_bufs[i];
-					rx_buf->len = event.rx_len;
-					DBG ( "RX id %x (len %x) received\n",
-					      rx_buf->id, rx_buf->len );
-					break;
-				}
-			}
-			if ( ! rx_buf ) {
-				EFAB_ERR ( "Invalid RX ID %x\n", event.rx_id );
-			}
-		} else if ( event.type == EFAB_EV_NONE ) {
-			DBG ( "Ignorable event\n" );
-		} else {
-			DBG ( "Unknown event\n" );
+	/* Initialise the hardware event queue */
+	memset ( ev_queue->ring, 0xff, bytes );
+
+	/* Allocate the hardware tx queue */
+	bytes = sizeof ( falcon_tx_desc_t ) * EFAB_TXD_SIZE;
+	tx_queue->ring = falcon_alloc_special_buffer ( efab, bytes,
+						       &tx_queue->entry );
+	if ( ! tx_queue->ring )
+		goto fail2;
+
+	/* Allocate the hardware rx queue */
+	bytes = sizeof ( falcon_rx_desc_t ) * EFAB_RXD_SIZE;
+	rx_queue->ring = falcon_alloc_special_buffer ( efab, bytes,
+						       &rx_queue->entry );
+	if ( ! rx_queue->ring )
+		goto fail3;
+
+	return 0;
+
+fail3:
+	falcon_free_special_buffer ( tx_queue->ring );
+	tx_queue->ring = NULL;
+fail2:
+	falcon_free_special_buffer ( ev_queue->ring );
+	ev_queue->ring = NULL;
+fail1:
+	return -ENOMEM;
+}
+
+static int
+efab_init_mac ( struct efab_nic *efab )
+{
+	int count, rc;
+
+	/* This can take several seconds */
+	EFAB_LOG ( "Waiting for link..\n" );
+	for ( count=0; count<5; count++ ) {
+		rc = efab->mac_op->init ( efab );
+		if ( rc ) {
+			EFAB_ERR ( "Failed reinitialising MAC, error %s\n",
+				strerror ( rc ));
+			return rc;
 		}
-	}
 
-	/* If there is no packet, return 0 */
-	if ( ! rx_buf )
+		/* Sleep for 2s to wait for the link to settle, either
+		 * because we want to use it, or because we're about
+		 * to reset the mac anyway
+		 */
+		sleep ( 2 );
+
+		if ( ! efab->link_up ) {
+			EFAB_ERR ( "!\n" );
+			continue;
+		}
+
+		EFAB_LOG ( "\n%dMbps %s-duplex\n",
+			   ( efab->link_options & LPA_10000 ? 10000 :
+			     ( efab->link_options & LPA_1000 ? 1000 :
+			       ( efab->link_options & LPA_100 ? 100 : 10 ) ) ),
+			   ( efab->link_options & LPA_DUPLEX ?
+			     "full" : "half" ) );
+
+		/* TODO: Move link state handling to the poll() routine */
+		netdev_link_up ( efab->netdev );
 		return 0;
-
-	/* drop this event if necessary */
-	if ( drop ) {
-		DBG( "discarding  RX event\n" );
-		return 0;
 	}
 
-	/* If we don't want to retrieve it just yet, return 1 */
-	if ( ! retrieve )
-		return 1;
-
-	/* There seems to be a hardware race.  The event can show up
-	 * on the event FIFO before the DMA has completed, so we
-	 * insert a tiny delay.  If this proves unreliable, we should
-	 * switch to using event DMA rather than the event FIFO, since
-	 * event DMA ordering is guaranteed.
-	 */
-	udelay ( 2 );
-
-	/* Copy packet contents */
-	nic->packetlen = rx_buf->len;
-	memcpy ( nic->packet, rx_buf->addr, nic->packetlen );
-
-	/* Give this buffer back to the NIC */
-	efab_push_rx_buffer ( efab, rx_buf );
-
-	/* Prepare to receive next packet */
-	rx_buf = NULL;
-
-	return 1;
+	EFAB_ERR ( "timed initialising MAC\n" );
+	return -ETIMEDOUT;
 }
 
-/**************************************************************************
-TRANSMIT - Transmit a frame
-***************************************************************************/
-static void etherfabric_transmit ( struct nic *nic, const char *dest,
-				   unsigned int type, unsigned int size,
-				   const char *data ) {
-	struct efab_nic *efab = nic->priv_data;
-	unsigned int nstype = htons ( type );
+static void
+efab_close ( struct net_device *netdev )
+{
+	struct efab_nic *efab = netdev_priv ( netdev );
 
-	/* Fill TX buffer, pad to ETH_ZLEN */
-	memcpy ( efab->tx_buf.addr, dest, ETH_ALEN );
-	memcpy ( efab->tx_buf.addr + ETH_ALEN, nic->node_addr, ETH_ALEN );
-	memcpy ( efab->tx_buf.addr + 2 * ETH_ALEN, &nstype, 2 );
-	memcpy ( efab->tx_buf.addr + ETH_HLEN, data, size );
-	size += ETH_HLEN;
-        while ( size < ETH_ZLEN ) {
-                efab->tx_buf.addr[size++] = '\0';
-        }
-	efab->tx_buf.len = size;
-
-	/* Push TX descriptor */
-	efab_push_tx_buffer ( efab, &efab->tx_buf );
-
-	/* Allow enough time for the packet to be transmitted.  This
-	 * is a temporary hack until we update to the new driver API.
-	 */
-	udelay ( 20 );
-
-	return;
+	falcon_fini_resources ( efab );
+	efab_free_resources ( efab );
+	efab->board_op->fini ( efab );
+	falcon_reset ( efab );
 }
 
-/**************************************************************************
-DISABLE - Turn off ethernet interface
-***************************************************************************/
-static void etherfabric_disable ( struct nic *nic ) {
-	struct efab_nic *efab = nic->priv_data;
+static int
+efab_open ( struct net_device *netdev )
+{
+	struct efab_nic *efab = netdev_priv ( netdev );
+	struct efab_rx_queue *rx_queue = &efab->rx_queue;
+	int rc;
 
-	efab->op->reset ( efab );
-	if ( efab->membase )
-		iounmap ( efab->membase );
-}
+	rc = falcon_reset ( efab );
+	if ( rc )
+		goto fail1;
 
-/**************************************************************************
-IRQ - handle interrupts
-***************************************************************************/
-static void etherfabric_irq ( struct nic *nic, irq_action_t action ) {
-	struct efab_nic *efab = nic->priv_data;
-       
-	switch ( action ) {
-	case DISABLE :
-		efab->op->mask_irq ( efab, 1 );
-		break;
-	case ENABLE :
-		efab->op->mask_irq ( efab, 0 );
-		break;
-	case FORCE :
-		/* Force NIC to generate a receive interrupt */
-		efab->op->generate_irq ( efab );
-		break;
-	}
+	rc = efab->board_op->init ( efab );
+	if ( rc )
+		goto fail2;
 	
-	return;
+	rc = falcon_init_sram ( efab );
+	if ( rc )
+		goto fail3;
+
+	/* Configure descriptor caches before pushing hardware queues */
+	falcon_setup_nic ( efab );
+
+	rc = efab_alloc_resources ( efab );
+	if ( rc )
+		goto fail4;
+	
+	falcon_init_resources ( efab );
+
+	/* Push rx buffers */
+	rc = efab_fill_rx_queue ( efab, rx_queue );
+	if ( rc )
+		goto fail5;
+
+	/* Try and bring the interface up */
+	rc = efab_init_mac ( efab );
+	if ( rc )
+		goto fail6;
+
+	return 0;
+
+fail6:
+fail5:
+	efab_free_resources ( efab );
+fail4:
+fail3:
+	efab->board_op->fini ( efab );
+fail2:
+	falcon_reset ( efab );
+fail1:
+	return rc;
 }
 
-static struct nic_operations etherfabric_operations = {
-	.connect	= dummy_connect,
-	.poll		= etherfabric_poll,
-	.transmit	= etherfabric_transmit,
-	.irq		= etherfabric_irq,
+static struct net_device_operations efab_operations = {
+        .open           = efab_open,
+        .close          = efab_close,
+        .transmit       = efab_transmit,
+        .poll           = efab_poll,
+        .irq            = efab_irq,
 };
 
-/**************************************************************************
-PROBE - Look for an adapter, this routine's visible to the outside
-***************************************************************************/
-static int etherfabric_probe ( struct nic *nic, struct pci_device *pci ) {
-	static struct efab_nic efab;
-	static int nic_port = 1;
-	struct efab_buffers *buffers;
-	int i;
+static void
+efab_remove ( struct pci_device *pci )
+{
+	struct net_device *netdev = pci_get_drvdata ( pci );
+	struct efab_nic *efab = netdev_priv ( netdev );
 
-	/* Set up our private data structure */
-	nic->priv_data = &efab;
-	memset ( &efab, 0, sizeof ( efab ) );
-	memset ( &efab_buffers, 0, sizeof ( efab_buffers ) );
+	if ( efab->membase ) {
+		falcon_reset ( efab );
 
-	/* Hook in appropriate operations table.  Do this early. */
-	if ( pci->device == EF1002_DEVID ) {
-		efab.op = &ef1002_operations;
-	} else {
-		efab.op = &falcon_operations;
+		iounmap ( efab->membase );
+		efab->membase = NULL;
 	}
 
-	/* Initialise efab data structure */
-	efab.pci = pci;
-	buffers = ( ( struct efab_buffers * )
-		    ( ( ( void * ) &efab_buffers ) +
-		      ( - virt_to_bus ( &efab_buffers ) ) % EFAB_BUF_ALIGN ) );
-	efab.eventq = buffers->eventq;
-	efab.txd = buffers->txd;
-	efab.rxd = buffers->rxd;
-	efab.tx_buf.addr = buffers->tx_buf;
-	for ( i = 0 ; i < EFAB_RX_BUFS ; i++ ) {
-		efab.rx_bufs[i].addr = buffers->rx_buf[i];
+	if ( efab->nvo.nvs ) {
+		unregister_nvo ( &efab->nvo );
+		efab->nvo.nvs = NULL;
 	}
+
+	unregister_netdev ( netdev );
+	netdev_nullify ( netdev );
+	netdev_put ( netdev );
+}
+
+static int
+efab_probe ( struct pci_device *pci,
+	     const struct pci_device_id *id )
+{
+	struct net_device *netdev;
+	struct efab_nic *efab;
+	int rc, mmio_start, mmio_len;
+
+	/* Create the network adapter */
+	netdev = alloc_etherdev ( sizeof ( struct efab_nic ) );
+	if ( ! netdev ) {
+		rc = -ENOMEM;
+		goto fail1;
+	}
+
+	/* Initialise the network adapter, and initialise private storage */
+	netdev_init ( netdev, &efab_operations );
+	pci_set_drvdata ( pci, netdev );
+	netdev->dev = &pci->dev;
+
+	efab = netdev_priv ( netdev );
+	memset ( efab, 0, sizeof ( *efab ) );
+	efab->netdev = netdev;
+
+	/* Get iobase/membase */
+	mmio_start = pci_bar_start ( pci, PCI_BASE_ADDRESS_2 );
+	mmio_len = pci_bar_size ( pci, PCI_BASE_ADDRESS_2 );
+	efab->membase = ioremap ( mmio_start, mmio_len );
+	EFAB_TRACE ( "BAR of %x bytes at phys %x mapped at %p\n",
+		     mmio_len, mmio_start, efab->membase );
 
 	/* Enable the PCI device */
 	adjust_pci_device ( pci );
-	nic->ioaddr = pci->ioaddr & ~3;
-	nic->irqno = pci->irq;
+	efab->iobase = pci->ioaddr & ~3;
 
-	/* Get iobase/membase */
-	efab.iobase = nic->ioaddr;
-	efab.op->get_membase ( &efab );
+	/* Determine the NIC variant */
+	falcon_probe_nic_variant ( efab, pci );
 
-	/* Switch NIC ports (i.e. try different ports on each probe) */
-	nic_port = 1 - nic_port;
-	efab.port = nic_port;
+	/* Read the SPI interface and determine the MAC address,
+	 * and the board and phy variant. Hook in the op tables */
+	rc = falcon_probe_spi ( efab );
+	if ( rc )
+		goto fail2;
+	rc = falcon_probe_nvram ( efab );
+	if ( rc )
+		goto fail3;
 
-	/* Initialise hardware */
-	if ( ! efab_init_nic ( &efab ) )
-		return 0;
-	memcpy ( nic->node_addr, efab.mac_addr, ETH_ALEN );
+	memcpy ( netdev->ll_addr, efab->mac_addr, ETH_ALEN );
 
-	/* point to NIC specific routines */
-	nic->nic_op = &etherfabric_operations;
+	netdev_link_up ( netdev );
+	rc = register_netdev ( netdev );
+	if ( rc )
+		goto fail4;
 
-	return 1;
+	/* Advertise non-volatile storage */
+	if ( efab->nvo.nvs ) {
+		rc = register_nvo ( &efab->nvo, netdev_settings ( netdev ) );
+		if ( rc )
+			goto fail5;
+	}
+
+	EFAB_LOG ( "Found %s EtherFabric %s %s revision %d\n", id->name,
+		   efab->is_asic ? "ASIC" : "FPGA",
+		   efab->phy_10g ? "10G" : "1G",
+		   efab->pci_revision );
+
+	return 0;
+
+fail5:
+	unregister_netdev ( netdev );
+fail4:
+fail3:
+fail2:
+	iounmap ( efab->membase );
+	efab->membase = NULL;
+	netdev_put ( netdev );
+fail1:
+	return rc;
 }
 
-static struct pci_device_id etherfabric_nics[] = {
-PCI_ROM(0x1924, 0xC101, "ef1002", "EtherFabric EF1002"),
-PCI_ROM(0x1924, 0x0703, "falcon", "EtherFabric Falcon"),
+
+static struct pci_device_id efab_nics[] = {
+	PCI_ROM(0x1924, 0x0703, "falcon", "EtherFabric Falcon"),
+	PCI_ROM(0x1924, 0x0710, "falconb0", "EtherFabric FalconB0"),
 };
 
-PCI_DRIVER ( etherfabric_driver, etherfabric_nics, PCI_NO_CLASS );
-
-DRIVER ( "EFAB", nic_driver, pci_driver, etherfabric_driver,
-	 etherfabric_probe, etherfabric_disable );
+struct pci_driver etherfabric_driver __pci_driver = {
+	.ids = efab_nics,
+	.id_count = sizeof ( efab_nics ) / sizeof ( efab_nics[0] ),
+	.probe = efab_probe,
+	.remove = efab_remove,
+};
 
 /*
  * Local variables:
