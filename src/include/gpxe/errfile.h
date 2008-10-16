@@ -158,6 +158,7 @@
 #define ERRFILE_ifmgmt		      ( ERRFILE_OTHER | 0x000e0000 )
 #define ERRFILE_iscsiboot	      ( ERRFILE_OTHER | 0x000f0000 )
 #define ERRFILE_efi_pci		      ( ERRFILE_OTHER | 0x00100000 )
+#define ERRFILE_efi_snp		      ( ERRFILE_OTHER | 0x00110000 )
 
 /** @} */
 
