@@ -205,7 +205,16 @@ init:
 	movb	%bl, %al
 	call	print_hex_byte
 	cmpb	$3, %bh
+	jb	1f
+	/* PCI >=3.0: leave %gs as-is if sane */
+	movw	%gs, %ax
+	cmpw	$0xc000, %ax
 	jae	2f
+	/* PCI 3.0 with insane %gs value: print error and ignore %gs */
+	movb	$'!', %al
+	call	print_character
+	movw	%gs, %ax
+	call	print_hex_word
 1:	/* PCI <3.0: set %gs (runtime segment) = %cs (init-time segment) */
 	pushw	%cs
 	popw	%gs
