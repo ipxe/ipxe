@@ -42,7 +42,7 @@ checksum:
 	.word	pnpheader
 	.size romheader, . - romheader
 	
-	.section ".zinfo.fixup", "a"	/* Compressor fixup information */
+	.section ".zinfo.fixup", "a", @progbits	/* Compressor fixups */
 	.ascii	"SUBB"
 	.long	romheader_size
 	.long	512
@@ -69,7 +69,7 @@ pciheader_runtime_length:
 	.equ pciheader_len, . - pciheader
 	.size pciheader, . - pciheader
 	
-	.section ".zinfo.fixup", "a"	/* Compressor fixup information */
+	.section ".zinfo.fixup", "a", @progbits	/* Compressor fixups */
 	.ascii	"SUBW"
 	.long	pciheader_image_length
 	.long	512

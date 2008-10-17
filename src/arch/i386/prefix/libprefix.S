@@ -679,7 +679,7 @@ prot_call_vector:
 
 	/* File split information for the compressor */
 #if COMPRESS
-	.section ".zinfo", "a"
+	.section ".zinfo", "a", @progbits
 	.ascii	"COPY"
 	.long	_prefix_lma
 	.long	_prefix_filesz
@@ -697,7 +697,7 @@ prot_call_vector:
 	.long	_textdata_filesz
 	.long	_max_align
 #else /* COMPRESS */
-	.section ".zinfo", "a"
+	.section ".zinfo", "a", @progbits
 	.ascii	"COPY"
 	.long	_prefix_lma
 	.long	_filesz

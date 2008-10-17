@@ -34,7 +34,7 @@ SECTIONS {
 	*(.prefix)
 	*(.prefix.*)
 	_mprefix = .;
-    } .prefix_bss (NOLOAD) : {
+    } .prefix_bss (NOLOAD) : AT ( _end_lma ) {
 	_eprefix = .;
     }
     _prefix_filesz	= ABSOLUTE ( _mprefix - _prefix );
@@ -52,7 +52,7 @@ SECTIONS {
 	*(.text16)
 	*(.text16.*)
 	_mtext16 = .;
-    } .text16_bss (NOLOAD) : {
+    } .text16_bss (NOLOAD) : AT ( _end_lma ) {
 	_etext16 = .;
     }
     _text16_filesz	= ABSOLUTE ( _mtext16 - _text16 );
@@ -71,7 +71,7 @@ SECTIONS {
 	*(.data16)
 	*(.data16.*)
 	_mdata16 = .;
-    } .data16_bss (NOLOAD) : {
+    } .data16_bss (NOLOAD) : AT ( _end_lma ) {
 	*(.bss16)
 	*(.bss16.*)
 	*(.stack16)
@@ -98,7 +98,7 @@ SECTIONS {
 	*(.data.*)
 	*(SORT(.tbl.*))		/* Various tables.  See include/tables.h */
 	_mtextdata = .;
-    } .textdata_bss (NOLOAD) : {
+    } .textdata_bss (NOLOAD) : AT ( _end_lma ) {
 	*(.bss)
 	*(.bss.*)
 	*(COMMON)
@@ -119,7 +119,7 @@ SECTIONS {
 	*(.zinfo)
 	*(.zinfo.*)
 	_mzinfo = .;
-    } .zinfo_bss (NOLOAD) : {
+    } .zinfo_bss (NOLOAD) : AT ( _end_lma ) {
 	_ezinfo = .;
     }
     _zinfo_filesz	= ABSOLUTE ( _mzinfo - _zinfo );
@@ -130,7 +130,7 @@ SECTIONS {
      *
      */
 
-    .weak 0x0 : {
+    .weak 0x0 : AT ( _end_lma ) {
 	_weak = .;
 	*(.weak)
 	_eweak = .;
@@ -180,6 +180,8 @@ SECTIONS {
     _zinfo_lma		= .;
     .			+= _zinfo_filesz;
     .			= ALIGN ( _max_align );
+
+    _end_lma		= .;
 
     /*
      * Values calculated to save code from doing it

@@ -94,7 +94,7 @@ root_flags:
 syssize: 
 	.long	_filesz_pgh - PREFIXPGH
 
-	.section ".zinfo.fixup", "a"	/* Compressor fixup information */
+	.section ".zinfo.fixup", "a", @progbits	/* Compressor fixups */
 	.ascii	"SUBL"
 	.long	syssize
 	.long	16

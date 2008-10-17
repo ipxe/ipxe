@@ -65,7 +65,7 @@ max_head:
 load_length:
 	.long	_filesz_sect
 	
-	.section ".zinfo.fixup", "a"	/* Compressor fixup information */
+	.section ".zinfo.fixup", "a", @progbits	/* Compressor fixups */
 	.ascii	"SUBL"
 	.long	load_length
 	.long	512

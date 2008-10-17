@@ -36,7 +36,7 @@ imglen:	.long	_filesz - 512
 memlen:	.long	_filesz - 512
 	.size	segment_header, . - segment_header
 
-	.section ".zinfo.fixup", "a"	/* Compressor fixup information */
+	.section ".zinfo.fixup", "a", @progbits	/* Compressor fixups */
 	.ascii	"SUBL"
 	.long	imglen
 	.long	1
