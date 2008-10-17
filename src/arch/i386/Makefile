@@ -38,8 +38,12 @@ CFLAGS		+= -freg-struct-return
 # Force 32-bit code even on an x86-64 machine
 #
 CFLAGS		+= -m32
-ASFLAGS         += --32
-LDFLAGS         += -m elf_i386
+ASFLAGS		+= --32
+ifeq ($(HOST_OS),FreeBSD)
+LDFLAGS		+= -m elf_i386_fbsd
+else
+LDFLAGS		+= -m elf_i386
+endif
 
 # EFI requires -fshort-wchar, and nothing else currently uses wchar_t
 #

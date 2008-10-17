@@ -54,6 +54,14 @@ echo :
 
 ###############################################################################
 #
+# Determine host OS
+#
+HOST_OS		:= $(shell uname -s)
+hostos :
+	@$(ECHO) $(HOST_OS)
+
+###############################################################################
+#
 # Check for tools that can cause failed builds
 #
 .toolcheck :
