@@ -28,7 +28,7 @@ SECTIONS {
 	*(.prefix)
 	*(.prefix.*)
 	_mprefix = .;
-    } .prefix_bss (NOLOAD) : {
+    } .bss.prefix (NOLOAD) : {
 	_eprefix = .;
     }
     _prefix_filesz	= ABSOLUTE ( _mprefix - _prefix );
@@ -45,7 +45,7 @@ SECTIONS {
 	*(.text)
 	*(.text.*)
 	_mtext = .;
-    } .text_bss (NOLOAD) : {
+    } .bss.text (NOLOAD) : {
 	_etext = .;
     }
     _text_filesz	= ABSOLUTE ( _mtext - _text );
@@ -62,7 +62,7 @@ SECTIONS {
 	*(.rodata)
 	*(.rodata.*)
 	_mrodata = .;
-    } .rodata_bss (NOLOAD) : {
+    } .bss.rodata (NOLOAD) : {
 	_erodata = .;
     }
     _rodata_filesz	= ABSOLUTE ( _mrodata - _rodata );
@@ -86,7 +86,7 @@ SECTIONS {
 	*(.stack)
 	*(.stack.*)
 	_mdata = .;
-    } .data_bss (NOLOAD) : {
+    } .bss.data (NOLOAD) : {
 	_edata = .;
     }
     _data_filesz	= ABSOLUTE ( _mdata - _data );
@@ -102,7 +102,7 @@ SECTIONS {
 	_bss = .;
 	/* EFI seems to not support proper bss sections */
 	_mbss = .;
-    } .bss_bss (NOLOAD) : {
+    } .bss.bss (NOLOAD) : {
 	_ebss = .;
     }
     _bss_filesz		= ABSOLUTE ( _mbss - _bss );
@@ -121,7 +121,7 @@ SECTIONS {
 	 */
 	. += 1;
 	_mreloc = .;
-    } .reloc_bss (NOLOAD) : {
+    } .bss.reloc (NOLOAD) : {
 	_ereloc = .;
     }
     _reloc_filesz	= ABSOLUTE ( _mreloc - _reloc );
