@@ -45,6 +45,15 @@
 
 FEATURE ( FEATURE_PROTOCOL, "TFTP", DHCP_EB_FEATURE_TFTP, 1 );
 
+/* TFTP-specific error codes */
+#define ETFTP_INVALID_BLKSIZE	EUNIQ_01
+#define ETFTP_INVALID_TSIZE	EUNIQ_02
+#define ETFTP_MC_NO_PORT	EUNIQ_03
+#define ETFTP_MC_NO_MC		EUNIQ_04
+#define ETFTP_MC_INVALID_MC	EUNIQ_05
+#define ETFTP_MC_INVALID_IP	EUNIQ_06
+#define ETFTP_MC_INVALID_PORT	EUNIQ_07
+
 /**
  * A TFTP request
  *
@@ -504,7 +513,7 @@ static int tftp_process_blksize ( struct tftp_request *tftp,
 	if ( *end ) {
 		DBGC ( tftp, "TFTP %p got invalid blksize \"%s\"\n",
 		       tftp, value );
-		return -EINVAL;
+		return -( EINVAL | ETFTP_INVALID_BLKSIZE );
 	}
 	DBGC ( tftp, "TFTP %p blksize=%d\n", tftp, tftp->blksize );
 
@@ -526,7 +535,7 @@ static int tftp_process_tsize ( struct tftp_request *tftp,
 	if ( *end ) {
 		DBGC ( tftp, "TFTP %p got invalid tsize \"%s\"\n",
 		       tftp, value );
-		return -EINVAL;
+		return -( EINVAL | ETFTP_INVALID_TSIZE );
 	}
 	DBGC ( tftp, "TFTP %p tsize=%ld\n", tftp, tftp->tsize );
 
@@ -560,13 +569,13 @@ static int tftp_process_multicast ( struct tftp_request *tftp,
 	port = strchr ( addr, ',' );
 	if ( ! port ) {
 		DBGC ( tftp, "TFTP %p multicast missing port,mc\n", tftp );
-		return -EINVAL;
+		return -( EINVAL | ETFTP_MC_NO_PORT );
 	}
 	*(port++) = '\0';
 	mc = strchr ( port, ',' );
 	if ( ! mc ) {
 		DBGC ( tftp, "TFTP %p multicast missing mc\n", tftp );
-		return -EINVAL;
+		return -( EINVAL | ETFTP_MC_NO_MC );
 	}
 	*(mc++) = '\0';
 
@@ -575,7 +584,7 @@ static int tftp_process_multicast ( struct tftp_request *tftp,
 		tftp->flags &= ~TFTP_FL_SEND_ACK;
 	if ( *mc_end ) {
 		DBGC ( tftp, "TFTP %p multicast invalid mc %s\n", tftp, mc );
-		return -EINVAL;
+		return -( EINVAL | ETFTP_MC_INVALID_MC );
 	}
 	DBGC ( tftp, "TFTP %p is%s the master client\n",
 	       tftp, ( ( tftp->flags & TFTP_FL_SEND_ACK ) ? "" : " not" ) );
@@ -584,7 +593,7 @@ static int tftp_process_multicast ( struct tftp_request *tftp,
 		if ( inet_aton ( addr, &socket.sin.sin_addr ) == 0 ) {
 			DBGC ( tftp, "TFTP %p multicast invalid IP address "
 			       "%s\n", tftp, addr );
-			return -EINVAL;
+			return -( EINVAL | ETFTP_MC_INVALID_IP );
 		}
 		DBGC ( tftp, "TFTP %p multicast IP address %s\n",
 		       tftp, inet_ntoa ( socket.sin.sin_addr ) );
@@ -592,7 +601,7 @@ static int tftp_process_multicast ( struct tftp_request *tftp,
 		if ( *port_end ) {
 			DBGC ( tftp, "TFTP %p multicast invalid port %s\n",
 			       tftp, port );
-			return -EINVAL;
+			return -( EINVAL | ETFTP_MC_INVALID_PORT );
 		}
 		DBGC ( tftp, "TFTP %p multicast port %d\n",
 		       tftp, ntohs ( socket.sin.sin_port ) );
