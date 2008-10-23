@@ -167,6 +167,10 @@ static int meme820 ( struct memory_map *memmap ) {
 	memset ( &e820buf, 0, sizeof ( e820buf ) );
 
 	do {
+		/* Some BIOSes corrupt %esi for fun. Guard against
+		 * this by telling gcc that all non-output registers
+		 * may be corrupted.
+		 */
 		__asm__ __volatile__ ( REAL_CODE ( "stc\n\t"
 						   "int $0x15\n\t"
 						   "pushfw\n\t"
@@ -178,7 +182,7 @@ static int meme820 ( struct memory_map *memmap ) {
 					 "D" ( __from_data16 ( &e820buf ) ),
 					 "c" ( sizeof ( e820buf ) ),
 					 "d" ( SMAP )
-				       : "memory" );
+				       : "esi", "memory" );
 
 		if ( smap != SMAP ) {
 			DBG ( "INT 15,e820 failed SMAP signature check\n" );
