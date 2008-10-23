@@ -228,21 +228,8 @@ struct phantom_nic {
  */
 static unsigned long phantom_crb_access_128m ( struct phantom_nic *phantom,
 					       unsigned long reg ) {
-	static const uint32_t reg_window[] = {
-		[UNM_CRB_BLK_PCIE]	= 0x0000000,
-		[UNM_CRB_BLK_CAM]	= 0x2000000,
-		[UNM_CRB_BLK_ROMUSB]	= 0x2000000,
-		[UNM_CRB_BLK_TEST]	= 0x0000000,
-	};
-	static const uint32_t reg_bases[] = {
-		[UNM_CRB_BLK_PCIE]	= 0x6100000,
-		[UNM_CRB_BLK_CAM]	= 0x6200000,
-		[UNM_CRB_BLK_ROMUSB]	= 0x7300000,
-		[UNM_CRB_BLK_TEST]	= 0x6200000,
-	};
-	unsigned int block = UNM_CRB_BLK ( reg );
-	unsigned long offset = UNM_CRB_OFFSET ( reg );
-	uint32_t window = reg_window[block];
+	unsigned long offset = ( 0x6000000 + ( reg & 0x1ffffff ) );
+	uint32_t window = ( reg & 0x2000000 );
 	uint32_t verify_window;
 
 	if ( phantom->crb_window != window ) {
@@ -258,7 +245,7 @@ static unsigned long phantom_crb_access_128m ( struct phantom_nic *phantom,
 		phantom->crb_window = window;
 	}
 
-	return ( reg_bases[block] + offset );
+	return offset;
 }
 
 /**
@@ -270,21 +257,8 @@ static unsigned long phantom_crb_access_128m ( struct phantom_nic *phantom,
  */
 static unsigned long phantom_crb_access_32m ( struct phantom_nic *phantom,
 					      unsigned long reg ) {
-	static const uint32_t reg_window[] = {
-		[UNM_CRB_BLK_PCIE]	= 0x0000000,
-		[UNM_CRB_BLK_CAM]	= 0x2000000,
-		[UNM_CRB_BLK_ROMUSB]	= 0x2000000,
-		[UNM_CRB_BLK_TEST]	= 0x0000000,
-	};
-	static const uint32_t reg_bases[] = {
-		[UNM_CRB_BLK_PCIE]	= 0x0100000,
-		[UNM_CRB_BLK_CAM]	= 0x0200000,
-		[UNM_CRB_BLK_ROMUSB]	= 0x1300000,
-		[UNM_CRB_BLK_TEST]	= 0x0200000,
-	};
-	unsigned int block = UNM_CRB_BLK ( reg );
-	unsigned long offset = UNM_CRB_OFFSET ( reg );
-	uint32_t window = reg_window[block];
+	unsigned long offset = ( reg & 0x1ffffff );
+	uint32_t window = ( reg & 0x2000000 );
 	uint32_t verify_window;
 
 	if ( phantom->crb_window != window ) {
@@ -300,7 +274,7 @@ static unsigned long phantom_crb_access_32m ( struct phantom_nic *phantom,
 		phantom->crb_window = window;
 	}
 
-	return ( reg_bases[block] + offset );
+	return offset;
 }
 
 /**
@@ -312,31 +286,49 @@ static unsigned long phantom_crb_access_32m ( struct phantom_nic *phantom,
  */
 static unsigned long phantom_crb_access_2m ( struct phantom_nic *phantom,
 					     unsigned long reg ) {
-	static const uint32_t reg_window_hi[] = {
-		[UNM_CRB_BLK_PCIE]	= 0x77300000,
-		[UNM_CRB_BLK_CAM]	= 0x41600000,
-		[UNM_CRB_BLK_ROMUSB]	= 0x42100000,
-		[UNM_CRB_BLK_TEST]	= 0x29500000,
+	static const struct {
+		uint8_t block;
+		uint16_t window_hi;
+	} reg_window_hi[] = {
+		{ UNM_CRB_BLK_PCIE,	0x773 },
+		{ UNM_CRB_BLK_CAM,	0x416 },
+		{ UNM_CRB_BLK_ROMUSB,	0x421 },
+		{ UNM_CRB_BLK_TEST,	0x295 },
 	};
 	unsigned int block = UNM_CRB_BLK ( reg );
 	unsigned long offset = UNM_CRB_OFFSET ( reg );
-	uint32_t window = ( reg_window_hi[block] | ( offset & 0x000f0000 ) );
+	uint32_t window;
 	uint32_t verify_window;
+	unsigned int i;
 
-	if ( phantom->crb_window != window ) {
+	for ( i = 0 ; i < ( sizeof ( reg_window_hi ) /
+			    sizeof ( reg_window_hi[0] ) ) ; i++ ) {
 
-		/* Write to the CRB window register */
-		writel ( window, phantom->bar0 + UNM_2M_CRB_WINDOW );
+		if ( reg_window_hi[i].block != block )
+			continue;
 
-		/* Ensure that the write has reached the card */
-		verify_window = readl ( phantom->bar0 + UNM_2M_CRB_WINDOW );
-		assert ( verify_window == window );
+		window = ( ( reg_window_hi[i].window_hi << 20 ) |
+			   ( offset & 0x000f0000 ) );
 
-		/* Record new window */
-		phantom->crb_window = window;
+		if ( phantom->crb_window != window ) {
+
+			/* Write to the CRB window register */
+			writel ( window, phantom->bar0 + UNM_2M_CRB_WINDOW );
+
+			/* Ensure that the write has reached the card */
+			verify_window = readl ( phantom->bar0 +
+						UNM_2M_CRB_WINDOW );
+			assert ( verify_window == window );
+
+			/* Record new window */
+			phantom->crb_window = window;
+		}
+
+		return ( 0x1e0000 + ( offset & 0xffff ) );
 	}
 
-	return ( 0x1e0000 + ( offset & 0xffff ) );
+	assert ( 0 );
+	return 0;
 }
 
 /**

@@ -76,14 +76,14 @@ typedef uint32_t nx_rcode_t;
  * address by the phantom_crb_access_xxx() methods.
  */
 enum unm_reg_blocks {
-	UNM_CRB_BLK_PCIE,
-	UNM_CRB_BLK_CAM,
-	UNM_CRB_BLK_ROMUSB,
-	UNM_CRB_BLK_TEST,
+	UNM_CRB_BLK_PCIE	= 0x01,
+	UNM_CRB_BLK_CAM		= 0x22,
+	UNM_CRB_BLK_ROMUSB	= 0x33,
+	UNM_CRB_BLK_TEST	= 0x02,
 };
-#define UNM_CRB_BASE(blk)		( (blk) << 24 )
-#define UNM_CRB_BLK(reg)		( (reg) >> 24 )
-#define UNM_CRB_OFFSET(reg)		( (reg) & 0x00ffffff )
+#define UNM_CRB_BASE(blk)		( (blk) << 20 )
+#define UNM_CRB_BLK(reg)		( (reg) >> 20 )
+#define UNM_CRB_OFFSET(reg)		( (reg) & 0x000fffff )
 
 #define UNM_CRB_PCIE			UNM_CRB_BASE ( UNM_CRB_BLK_PCIE )
 #define UNM_PCIE_SEM2_LOCK		( UNM_CRB_PCIE + 0x1c010 )
