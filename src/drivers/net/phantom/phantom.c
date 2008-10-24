@@ -394,8 +394,9 @@ static inline void phantom_write_hilo ( struct phantom_nic *phantom,
  * @v buf		8-byte buffer to fill
  * @ret rc		Return status code
  */
-static int phantom_read_test_mem ( struct phantom_nic *phantom,
-				   uint64_t offset, uint32_t buf[2] ) {
+static int phantom_read_test_mem_block ( struct phantom_nic *phantom,
+					 unsigned long offset,
+					 uint32_t buf[2] ) {
 	unsigned int retries;
 	uint32_t test_control;
 
@@ -422,28 +423,57 @@ static int phantom_read_test_mem ( struct phantom_nic *phantom,
 }
 
 /**
+ * Read single byte from Phantom test memory
+ *
+ * @v phantom		Phantom NIC
+ * @v offset		Offset within test memory
+ * @ret byte		Byte read, or negative error
+ */
+static int phantom_read_test_mem ( struct phantom_nic *phantom,
+				   unsigned long offset ) {
+	static union {
+		uint8_t bytes[8];
+		uint32_t dwords[2];
+	} cache;
+	static unsigned long cache_offset = -1UL;
+	unsigned long sub_offset;
+	int rc;
+
+	sub_offset = ( offset & ( sizeof ( cache ) - 1 ) );
+	offset = ( offset & ~( sizeof ( cache ) - 1 ) );
+
+	if ( cache_offset != offset ) {
+		if ( ( rc = phantom_read_test_mem_block ( phantom, offset,
+							  cache.dwords )) !=0 )
+			return rc;
+		cache_offset = offset;
+	}
+
+	return cache.bytes[sub_offset];
+}
+
+/**
  * Dump Phantom firmware dmesg log
  *
  * @v phantom		Phantom NIC
  * @v log		Log number
+ * @v max_lines		Maximum number of lines to show, or -1 to show all
+ * @ret rc		Return status code
  */
-static void phantom_dmesg ( struct phantom_nic *phantom, unsigned int log ) {
+static int phantom_dmesg ( struct phantom_nic *phantom, unsigned int log,
+			    unsigned int max_lines ) {
 	uint32_t head;
 	uint32_t tail;
 	uint32_t len;
 	uint32_t sig;
 	uint32_t offset;
-	union {
-		uint8_t bytes[8];
-		uint32_t dwords[2];
-	} buf;
-	unsigned int i;
-	int rc;
+	int byte;
 
 	/* Optimise out for non-debug builds */
 	if ( ! DBG_LOG )
-		return;
+		return 0;
 
+	/* Locate log */
 	head = phantom_readl ( phantom, UNM_CAM_RAM_DMESG_HEAD ( log ) );
 	len = phantom_readl ( phantom, UNM_CAM_RAM_DMESG_LEN ( log ) );
 	tail = phantom_readl ( phantom, UNM_CAM_RAM_DMESG_TAIL ( log ) );
@@ -456,32 +486,37 @@ static void phantom_dmesg ( struct phantom_nic *phantom, unsigned int log ) {
 		       sig, UNM_CAM_RAM_DMESG_SIG_MAGIC );
 	}
 
-	for ( offset = head ; offset < tail ; offset += 8 ) {
-		if ( ( rc = phantom_read_test_mem ( phantom, offset,
-						    buf.dwords ) ) != 0 ) {
-			DBGC ( phantom, "Phantom %p could not read from test "
-			       "memory: %s\n", phantom, strerror ( rc ) );
+	/* Locate start of last (max_lines) lines */
+	for ( offset = tail ; offset > head ; offset-- ) {
+		if ( ( byte = phantom_read_test_mem ( phantom,
+						      ( offset - 1 ) ) ) < 0 )
+			return byte;
+		if ( ( byte == '\n' ) && ( max_lines-- == 0 ) )
 			break;
-		}
-		for ( i = 0 ; ( ( i < sizeof ( buf ) ) &&
-				( offset + i ) < tail ) ; i++ ) {
-			DBG ( "%c", buf.bytes[i] );
-		}
+	}
+
+	/* Print lines */
+	for ( ; offset < tail ; offset++ ) {
+		if ( ( byte = phantom_read_test_mem ( phantom, offset ) ) < 0 )
+			return byte;
+		DBG ( "%c", byte );
 	}
 	DBG ( "\n" );
+	return 0;
 }
 
 /**
  * Dump Phantom firmware dmesg logs
  *
  * @v phantom		Phantom NIC
+ * @v max_lines		Maximum number of lines to show, or -1 to show all
  */
 static void __attribute__ (( unused ))
-phantom_dmesg_all ( struct phantom_nic *phantom ) {
+phantom_dmesg_all ( struct phantom_nic *phantom, unsigned int max_lines ) {
 	unsigned int i;
 
 	for ( i = 0 ; i < UNM_CAM_RAM_NUM_DMESG_BUFFERS ; i++ )
-		phantom_dmesg ( phantom, i );
+		phantom_dmesg ( phantom, i, max_lines );
 }
 
 /***************************************************************************
