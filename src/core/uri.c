@@ -92,8 +92,12 @@ struct uri * parse_uri ( const char *uri_string ) {
 		uri->fragment = tmp;
 	}
 
-	/* Identify absolute/relative URI */
-	if ( ( tmp = strchr ( raw, ':' ) ) ) {
+	/* Identify absolute/relative URI.  We ignore schemes that are
+	 * apparently only a single character long, since otherwise we
+	 * misinterpret a DOS-style path name ("C:\path\to\file") as a
+	 * URI with scheme="C",opaque="\path\to\file".
+	 */
+	if ( ( tmp = strchr ( raw, ':' ) ) && ( tmp > ( raw + 1 ) ) ) {
 		/* Absolute URI: identify hierarchical/opaque */
 		uri->scheme = raw;
 		*(tmp++) = '\0';
