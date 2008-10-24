@@ -294,6 +294,11 @@ static unsigned long phantom_crb_access_2m ( struct phantom_nic *phantom,
 		{ UNM_CRB_BLK_CAM,	0x416 },
 		{ UNM_CRB_BLK_ROMUSB,	0x421 },
 		{ UNM_CRB_BLK_TEST,	0x295 },
+		{ UNM_CRB_BLK_PEG_0,	0x340 },
+		{ UNM_CRB_BLK_PEG_1,	0x341 },
+		{ UNM_CRB_BLK_PEG_2,	0x342 },
+		{ UNM_CRB_BLK_PEG_3,	0x343 },
+		{ UNM_CRB_BLK_PEG_4,	0x34b },
 	};
 	unsigned int block = UNM_CRB_BLK ( reg );
 	unsigned long offset = UNM_CRB_OFFSET ( reg );
@@ -1688,6 +1693,39 @@ static int phantom_read_flash ( struct phantom_nic *phantom ) {
 }
 
 /**
+ * Halt all PEGs
+ *
+ * @v phantom		Phantom NIC
+ */
+static void phantom_halt_pegs ( struct phantom_nic *phantom ) {
+	phantom_writel ( phantom, 1, UNM_PEG_0_HALT );
+	phantom_writel ( phantom, 1, UNM_PEG_1_HALT );
+	phantom_writel ( phantom, 1, UNM_PEG_2_HALT );
+	phantom_writel ( phantom, 1, UNM_PEG_3_HALT );
+	phantom_writel ( phantom, 1, UNM_PEG_4_HALT );
+}
+
+/**
+ * Unhalt all PEGs
+ *
+ * @v phantom		Phantom NIC
+ */
+static void phantom_unhalt_pegs ( struct phantom_nic *phantom ) {
+	uint32_t halt_status;
+
+	halt_status = phantom_readl ( phantom, UNM_PEG_0_HALT_STATUS );
+	phantom_writel ( phantom, halt_status, UNM_PEG_0_HALT_STATUS );
+	halt_status = phantom_readl ( phantom, UNM_PEG_1_HALT_STATUS );
+	phantom_writel ( phantom, halt_status, UNM_PEG_1_HALT_STATUS );
+	halt_status = phantom_readl ( phantom, UNM_PEG_2_HALT_STATUS );
+	phantom_writel ( phantom, halt_status, UNM_PEG_2_HALT_STATUS );
+	halt_status = phantom_readl ( phantom, UNM_PEG_3_HALT_STATUS );
+	phantom_writel ( phantom, halt_status, UNM_PEG_3_HALT_STATUS );
+	halt_status = phantom_readl ( phantom, UNM_PEG_4_HALT_STATUS );
+	phantom_writel ( phantom, halt_status, UNM_PEG_4_HALT_STATUS );
+}
+
+/**
  * Initialise the Phantom command PEG
  *
  * @v phantom		Phantom NIC
@@ -1709,6 +1747,11 @@ static int phantom_init_cmdpeg ( struct phantom_nic *phantom ) {
 	if ( cmdpeg_state == UNM_NIC_REG_CMDPEG_STATE_INITIALIZE_ACK ) {
 		DBGC ( phantom, "Phantom %p command PEG already initialized\n",
 		       phantom );
+		/* Unhalt the PEGs.  Previous firmware (e.g. BOFM) may
+		 * have halted the PEGs to prevent internal bus
+		 * collisions when the BIOS re-reads the expansion ROM.
+		 */
+		phantom_unhalt_pegs ( phantom );
 		return 0;
 	}
 
@@ -1942,6 +1985,7 @@ static int phantom_probe ( struct pci_device *pci,
 	for ( ; i >= 0 ; i-- )
 		unregister_netdev ( phantom->netdev[i] );
  err_init_rcvpeg:
+	phantom_halt_pegs ( phantom );
  err_init_cmdpeg:
 	free_dma ( phantom->dma_buf, sizeof ( *(phantom->dma_buf) ) );
 	phantom->dma_buf = NULL;
@@ -1970,6 +2014,7 @@ static void phantom_remove ( struct pci_device *pci ) {
 
 	for ( i = ( phantom->num_ports - 1 ) ; i >= 0 ; i-- )
 		unregister_netdev ( phantom->netdev[i] );
+	phantom_halt_pegs ( phantom );
 	free_dma ( phantom->dma_buf, sizeof ( *(phantom->dma_buf) ) );
 	phantom->dma_buf = NULL;
 	for ( i = ( phantom->num_ports - 1 ) ; i >= 0 ; i-- ) {

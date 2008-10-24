@@ -80,6 +80,11 @@ enum unm_reg_blocks {
 	UNM_CRB_BLK_CAM		= 0x22,
 	UNM_CRB_BLK_ROMUSB	= 0x33,
 	UNM_CRB_BLK_TEST	= 0x02,
+	UNM_CRB_BLK_PEG_0	= 0x11,
+	UNM_CRB_BLK_PEG_1	= 0x12,
+	UNM_CRB_BLK_PEG_2	= 0x13,
+	UNM_CRB_BLK_PEG_3	= 0x14,
+	UNM_CRB_BLK_PEG_4	= 0x0f,
 };
 #define UNM_CRB_BASE(blk)		( (blk) << 20 )
 #define UNM_CRB_BLK(reg)		( (reg) >> 20 )
@@ -159,6 +164,26 @@ enum unm_reg_blocks {
 #define UNM_TEST_ADDR_HI		( UNM_CRB_TEST + 0x00098 )
 #define UNM_TEST_RDDATA_LO		( UNM_CRB_TEST + 0x000a8 )
 #define UNM_TEST_RDDATA_HI		( UNM_CRB_TEST + 0x000ac )
+
+#define UNM_CRB_PEG_0			UNM_CRB_BASE ( UNM_CRB_BLK_PEG_0 )
+#define UNM_PEG_0_HALT_STATUS		( UNM_CRB_PEG_0 + 0x00030 )
+#define UNM_PEG_0_HALT			( UNM_CRB_PEG_0 + 0x0003c )
+
+#define UNM_CRB_PEG_1			UNM_CRB_BASE ( UNM_CRB_BLK_PEG_1 )
+#define UNM_PEG_1_HALT_STATUS		( UNM_CRB_PEG_1 + 0x00030 )
+#define UNM_PEG_1_HALT			( UNM_CRB_PEG_1 + 0x0003c )
+
+#define UNM_CRB_PEG_2			UNM_CRB_BASE ( UNM_CRB_BLK_PEG_2 )
+#define UNM_PEG_2_HALT_STATUS		( UNM_CRB_PEG_2 + 0x00030 )
+#define UNM_PEG_2_HALT			( UNM_CRB_PEG_2 + 0x0003c )
+
+#define UNM_CRB_PEG_3			UNM_CRB_BASE ( UNM_CRB_BLK_PEG_3 )
+#define UNM_PEG_3_HALT_STATUS		( UNM_CRB_PEG_3 + 0x00030 )
+#define UNM_PEG_3_HALT			( UNM_CRB_PEG_3 + 0x0003c )
+
+#define UNM_CRB_PEG_4			UNM_CRB_BASE ( UNM_CRB_BLK_PEG_4 )
+#define UNM_PEG_4_HALT_STATUS		( UNM_CRB_PEG_4 + 0x00030 )
+#define UNM_PEG_4_HALT			( UNM_CRB_PEG_4 + 0x0003c )
 
 /******************************************************************************
  *
