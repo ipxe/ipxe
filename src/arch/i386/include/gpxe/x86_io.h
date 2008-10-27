@@ -118,9 +118,9 @@ static inline __always_inline void					      \
 IOAPI_INLINE ( x86, outs ## _insn_suffix ) ( volatile _type *io_addr,	      \
 					     const _type *data,		      \
 					     unsigned int count ) {	      \
-	unsigned int discard_D;						      \
+	unsigned int discard_S;						      \
 	__asm__ __volatile__ ( "rep outs" #_insn_suffix			      \
-			       : "=D" ( discard_D )			      \
+			       : "=S" ( discard_S )			      \
 			       : "d" ( io_addr ), "c" ( count ),	      \
 				 "0" ( data ) );			      \
 }
