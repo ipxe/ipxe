@@ -20,6 +20,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <gpxe/device.h>
+#include <gpxe/init.h>
 #include <undi.h>
 #include <undinet.h>
 #include <undipreload.h>
@@ -106,4 +107,21 @@ static struct root_driver undi_root_driver = {
 struct root_device undi_root_device __root_device = {
 	.dev = { .name = "UNDI" },
 	.driver = &undi_root_driver,
+};
+
+/**
+ * Prepare for exit
+ *
+ * @v flags		Shutdown flags
+ */
+static void undionly_shutdown ( int flags ) {
+	/* If we are shutting down to boot an OS, clear the "keep PXE
+	 * stack" flag.
+	 */
+	if ( flags & SHUTDOWN_BOOT )
+		preloaded_undi.flags &= ~UNDI_FL_KEEP_ALL;
+}
+
+struct startup_fn startup_undionly __startup_fn ( STARTUP_LATE ) = {
+	.shutdown = undionly_shutdown,
 };

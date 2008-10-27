@@ -669,15 +669,19 @@ int undinet_probe ( struct undi_device *undi ) {
 	undi->flags |= UNDI_FL_STARTED;
 
 	/* Bring up UNDI stack */
-	memset ( &undi_startup, 0, sizeof ( undi_startup ) );
-	if ( ( rc = undinet_call ( undinic, PXENV_UNDI_STARTUP, &undi_startup,
-				   sizeof ( undi_startup ) ) ) != 0 )
-		goto err_undi_startup;
-	memset ( &undi_initialize, 0, sizeof ( undi_initialize ) );
-	if ( ( rc = undinet_call ( undinic, PXENV_UNDI_INITIALIZE,
-				   &undi_initialize,
-				   sizeof ( undi_initialize ) ) ) != 0 )
-		goto err_undi_initialize;
+	if ( ! ( undi->flags & UNDI_FL_INITIALIZED ) ) {
+		memset ( &undi_startup, 0, sizeof ( undi_startup ) );
+		if ( ( rc = undinet_call ( undinic, PXENV_UNDI_STARTUP,
+					   &undi_startup,
+					   sizeof ( undi_startup ) ) ) != 0 )
+			goto err_undi_startup;
+		memset ( &undi_initialize, 0, sizeof ( undi_initialize ) );
+		if ( ( rc = undinet_call ( undinic, PXENV_UNDI_INITIALIZE,
+					   &undi_initialize,
+					   sizeof ( undi_initialize ))) != 0 )
+			goto err_undi_initialize;
+	}
+	undi->flags |= UNDI_FL_INITIALIZED;
 
 	/* Get device information */
 	memset ( &undi_info, 0, sizeof ( undi_info ) );
@@ -731,11 +735,13 @@ int undinet_probe ( struct undi_device *undi ) {
 	memset ( &undi_cleanup, 0, sizeof ( undi_cleanup ) );
 	undinet_call ( undinic, PXENV_UNDI_CLEANUP, &undi_cleanup,
 		       sizeof ( undi_cleanup ) );
+	undi->flags &= ~UNDI_FL_INITIALIZED;
  err_undi_startup:
 	/* Unhook UNDI stack */
 	memset ( &stop_undi, 0, sizeof ( stop_undi ) );
 	undinet_call ( undinic, PXENV_STOP_UNDI, &stop_undi,
 		       sizeof ( stop_undi ) );
+	undi->flags &= ~UNDI_FL_STARTED;
  err_start_undi:
 	netdev_nullify ( netdev );
 	netdev_put ( netdev );
@@ -758,19 +764,26 @@ void undinet_remove ( struct undi_device *undi ) {
 	/* Unregister net device */
 	unregister_netdev ( netdev );
 
-	/* Shut down UNDI stack */
-	memset ( &undi_shutdown, 0, sizeof ( undi_shutdown ) );
-	undinet_call ( undinic, PXENV_UNDI_SHUTDOWN, &undi_shutdown,
-		       sizeof ( undi_shutdown ) );
-	memset ( &undi_cleanup, 0, sizeof ( undi_cleanup ) );
-	undinet_call ( undinic, PXENV_UNDI_CLEANUP, &undi_cleanup,
-		       sizeof ( undi_cleanup ) );
+	/* If we are preparing for an OS boot, or if we cannot exit
+	 * via the PXE stack, then shut down the PXE stack.
+	 */
+	if ( ! ( undi->flags & UNDI_FL_KEEP_ALL ) ) {
 
-	/* Unhook UNDI stack */
-	memset ( &stop_undi, 0, sizeof ( stop_undi ) );
-	undinet_call ( undinic, PXENV_STOP_UNDI, &stop_undi,
-		       sizeof ( stop_undi ) );
-	undi->flags &= ~UNDI_FL_STARTED;
+		/* Shut down UNDI stack */
+		memset ( &undi_shutdown, 0, sizeof ( undi_shutdown ) );
+		undinet_call ( undinic, PXENV_UNDI_SHUTDOWN, &undi_shutdown,
+			       sizeof ( undi_shutdown ) );
+		memset ( &undi_cleanup, 0, sizeof ( undi_cleanup ) );
+		undinet_call ( undinic, PXENV_UNDI_CLEANUP, &undi_cleanup,
+			       sizeof ( undi_cleanup ) );
+		undi->flags &= ~UNDI_FL_INITIALIZED;
+
+		/* Unhook UNDI stack */
+		memset ( &stop_undi, 0, sizeof ( stop_undi ) );
+		undinet_call ( undinic, PXENV_STOP_UNDI, &stop_undi,
+			       sizeof ( stop_undi ) );
+		undi->flags &= ~UNDI_FL_STARTED;
+	}
 
 	/* Clear entry point */
 	memset ( &undinet_entry_point, 0, sizeof ( undinet_entry_point ) );

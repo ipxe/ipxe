@@ -13,6 +13,7 @@ LDFLAGS		+= -N --no-check-sections
 MEDIA		+= rom
 MEDIA		+= pxe
 MEDIA		+= kpxe
+MEDIA		+= kkpxe
 MEDIA		+= elf
 MEDIA		+= elfd
 MEDIA		+= lmelf

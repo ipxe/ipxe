@@ -63,6 +63,7 @@ struct startup_fn {
 
 #define STARTUP_EARLY	01	/**< Early startup */
 #define STARTUP_NORMAL	02	/**< Normal startup */
+#define STARTUP_LATE	03	/**< Late startup */
 
 /** @} */
 
