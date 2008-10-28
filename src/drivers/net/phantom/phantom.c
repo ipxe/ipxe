@@ -32,6 +32,7 @@
 #include <gpxe/if_ether.h>
 #include <gpxe/ethernet.h>
 #include <gpxe/spi.h>
+#include <gpxe/settings.h>
 #include "phantom.h"
 
 /**
@@ -71,6 +72,9 @@
 
 /** Maximum time to wait for test memory */
 #define PHN_TEST_MEM_TIMEOUT_MS 100
+
+/** Maximum time to wait for CLP command to be issued */
+#define PHN_CLP_CMD_TIMEOUT_MS 500
 
 /** Link state poll frequency
  *
@@ -150,6 +154,9 @@ struct phantom_nic_port {
 
 	/** Descriptor rings */
 	struct phantom_descriptor_rings *desc;
+
+	/** Non-volatile settings */
+	struct settings settings;
 };
 
 /** RX context creation request and response buffers */
@@ -1576,6 +1583,330 @@ static struct net_device_operations phantom_operations = {
 	.irq		= phantom_irq,
 };
 
+/***************************************************************************
+ *
+ * CLP settings
+ *
+ */
+
+/** Phantom CLP data
+ *
+ */
+union phantom_clp_data {
+	/** Data bytes
+	 *
+	 * This field is right-aligned; if only N bytes are present
+	 * then bytes[0]..bytes[7-N] should be zero, and the data
+	 * should be in bytes[7-N+1] to bytes[7];
+	 */
+	uint8_t bytes[8];
+	/** Dwords for the CLP interface */
+	struct {
+		/** High dword, in network byte order */
+		uint32_t hi;
+		/** Low dword, in network byte order */
+		uint32_t lo;
+	} dwords;
+};
+#define PHN_CLP_BLKSIZE ( sizeof ( union phantom_clp_data ) )
+
+/**
+ * Wait for Phantom CLP command to complete
+ *
+ * @v phantom		Phantom NIC
+ * @ret rc		Return status code
+ */
+static int phantom_clp_wait ( struct phantom_nic *phantom ) {
+	unsigned int retries;
+	uint32_t status;
+
+	for ( retries = 0 ; retries < PHN_CLP_CMD_TIMEOUT_MS ; retries++ ) {
+		status = phantom_readl ( phantom, UNM_CAM_RAM_CLP_STATUS );
+		if ( status & UNM_CAM_RAM_CLP_STATUS_DONE )
+			return 0;
+		mdelay ( 1 );
+	}
+
+	DBGC ( phantom, "Phantom %p timed out waiting for CLP command\n",
+	       phantom );
+	return -ETIMEDOUT;
+}
+
+/**
+ * Issue Phantom CLP command
+ *
+ * @v phantom		Phantom NIC
+ * @v port		Virtual port number
+ * @v opcode		Opcode
+ * @v data_in		Data in, or NULL
+ * @v data_out		Data out, or NULL
+ * @v offset		Offset within data
+ * @v len		Data buffer length
+ * @ret len		Total transfer length (for reads), or negative error
+ */
+static int phantom_clp_cmd ( struct phantom_nic *phantom, unsigned int port,
+			     unsigned int opcode, const void *data_in,
+			     void *data_out, size_t offset, size_t len ) {
+	union phantom_clp_data data;
+	unsigned int index = ( offset / sizeof ( data ) );
+	unsigned int last = 0;
+	size_t in_frag_len;
+	uint8_t *in_frag;
+	uint32_t command;
+	uint32_t status;
+	size_t read_len;
+	unsigned int error;
+	size_t out_frag_len;
+	uint8_t *out_frag;
+	int rc;
+
+	/* Sanity checks */
+	assert ( ( offset % sizeof ( data ) ) == 0 );
+	if ( len > 255 ) {
+		DBGC ( phantom, "Phantom %p invalid CLP length %zd\n",
+		       phantom, len );
+		return -EINVAL;
+	}
+
+	/* Check that CLP interface is ready */
+	if ( ( rc = phantom_clp_wait ( phantom ) ) != 0 )
+		return rc;
+
+	/* Copy data in */
+	memset ( &data, 0, sizeof ( data ) );
+	if ( data_in ) {
+		assert ( offset < len );
+		in_frag_len = ( len - offset );
+		if ( in_frag_len > sizeof ( data ) ) {
+			in_frag_len = sizeof ( data );
+		} else {
+			last = 1;
+		}
+		in_frag = &data.bytes[ sizeof ( data ) - in_frag_len ];
+		memcpy ( in_frag, ( data_in + offset ), in_frag_len );
+		phantom_writel ( phantom, be32_to_cpu ( data.dwords.lo ),
+				 UNM_CAM_RAM_CLP_DATA_LO );
+		phantom_writel ( phantom, be32_to_cpu ( data.dwords.hi ),
+				 UNM_CAM_RAM_CLP_DATA_HI );
+	}
+
+	/* Issue CLP command */
+	command = ( ( index << 24 ) | ( ( data_in ? len : 0 ) << 16 ) |
+		    ( port << 8 ) | ( last << 7 ) | ( opcode << 0 ) );
+	phantom_writel ( phantom, command, UNM_CAM_RAM_CLP_COMMAND );
+	mb();
+	phantom_writel ( phantom, UNM_CAM_RAM_CLP_STATUS_START,
+			 UNM_CAM_RAM_CLP_STATUS );
+
+	/* Wait for command to complete */
+	if ( ( rc = phantom_clp_wait ( phantom ) ) != 0 )
+		return rc;
+
+	/* Get command status */
+	status = phantom_readl ( phantom, UNM_CAM_RAM_CLP_STATUS );
+	read_len = ( ( status >> 16 ) & 0xff );
+	error = ( ( status >> 8 ) & 0xff );
+	if ( error ) {
+		DBGC ( phantom, "Phantom %p CLP command error %02x\n",
+		       phantom, error );
+		return -EIO;
+	}
+
+	/* Copy data out */
+	if ( data_out ) {
+		data.dwords.lo = cpu_to_be32 ( phantom_readl ( phantom,
+						  UNM_CAM_RAM_CLP_DATA_LO ) );
+		data.dwords.hi = cpu_to_be32 ( phantom_readl ( phantom,
+						  UNM_CAM_RAM_CLP_DATA_HI ) );
+		out_frag_len = ( read_len - offset );
+		if ( out_frag_len > sizeof ( data ) )
+			out_frag_len = sizeof ( data );
+		out_frag = &data.bytes[ sizeof ( data ) - out_frag_len ];
+		if ( out_frag_len > ( len - offset ) )
+			out_frag_len = ( len - offset );
+		memcpy ( ( data_out + offset ), out_frag, out_frag_len );
+	}
+
+	return read_len;
+}
+
+/**
+ * Store Phantom CLP setting
+ *
+ * @v phantom		Phantom NIC
+ * @v port		Virtual port number
+ * @v setting		Setting number
+ * @v data		Data buffer
+ * @v len		Length of data buffer
+ * @ret rc		Return status code
+ */
+static int phantom_clp_store ( struct phantom_nic *phantom, unsigned int port,
+			       unsigned int setting, const void *data,
+			       size_t len ) {
+	unsigned int opcode = setting;
+	size_t offset;
+	int rc;
+
+	for ( offset = 0 ; offset < len ; offset += PHN_CLP_BLKSIZE ) {
+		if ( ( rc = phantom_clp_cmd ( phantom, port, opcode, data,
+					      NULL, offset, len ) ) < 0 )
+			return rc;
+	}
+	return 0;
+}
+
+/**
+ * Fetch Phantom CLP setting
+ *
+ * @v phantom		Phantom NIC
+ * @v port		Virtual port number
+ * @v setting		Setting number
+ * @v data		Data buffer
+ * @v len		Length of data buffer
+ * @ret len		Length of setting, or negative error
+ */
+static int phantom_clp_fetch ( struct phantom_nic *phantom, unsigned int port,
+			       unsigned int setting, void *data, size_t len ) {
+	unsigned int opcode = ( setting + 1 );
+	size_t offset = 0;
+	int read_len;
+
+	while ( 1 ) {
+		read_len = phantom_clp_cmd ( phantom, port, opcode, NULL,
+					     data, offset, len );
+		if ( read_len < 0 )
+			return read_len;
+		offset += PHN_CLP_BLKSIZE;
+		if ( offset >= ( unsigned ) read_len )
+			break;
+		if ( offset >= len )
+			break;
+	}
+	return read_len;
+}
+
+/** A Phantom CLP setting */
+struct phantom_clp_setting {
+	/** gPXE setting */
+	struct setting *setting;
+	/** Setting number */
+	unsigned int number;
+};
+
+/** Phantom CLP settings */
+static struct phantom_clp_setting clp_settings[] = {
+	{ &mac_setting, 0x01 },
+};
+
+/**
+ * Find Phantom CLP setting
+ *
+ * @v setting		gPXE setting
+ * @v clp_setting	Equivalent Phantom CLP setting, or NULL
+ */
+static struct phantom_clp_setting *
+phantom_find_clp_setting ( struct phantom_nic *phantom,
+			   struct setting *setting ) {
+	struct phantom_clp_setting *clp_setting;
+	unsigned int i;
+
+	for ( i = 0 ; i < ( sizeof ( clp_settings ) /
+			    sizeof ( clp_settings[0] ) ) ; i++ ) {
+		clp_setting = &clp_settings[i];
+		if ( setting_cmp ( setting, clp_setting->setting ) == 0 )
+			return clp_setting;
+	}
+
+	DBGC2 ( phantom, "Phantom %p has no \"%s\" setting\n",
+		phantom, setting->name );
+
+	return NULL;
+}
+
+/**
+ * Store Phantom CLP setting
+ *
+ * @v settings		Settings block
+ * @v setting		Setting to store
+ * @v data		Setting data, or NULL to clear setting
+ * @v len		Length of setting data
+ * @ret rc		Return status code
+ */
+static int phantom_store_setting ( struct settings *settings,
+				   struct setting *setting,
+				   const void *data, size_t len ) {
+	struct phantom_nic_port *phantom_port =
+		container_of ( settings, struct phantom_nic_port, settings );
+	struct phantom_nic *phantom = phantom_port->phantom;
+	struct phantom_clp_setting *clp_setting;
+	int rc;
+
+	/* Find Phantom setting equivalent to gPXE setting */
+	clp_setting = phantom_find_clp_setting ( phantom, setting );
+	if ( ! clp_setting )
+		return -ENOTSUP;
+
+	/* Store setting */
+	if ( ( rc = phantom_clp_store ( phantom, phantom_port->port,
+					clp_setting->number,
+					data, len ) ) != 0 ) {
+		DBGC ( phantom, "Phantom %p could not store setting \"%s\": "
+		       "%s\n", phantom, setting->name, strerror ( rc ) );
+		return rc;
+	}
+
+	return 0;
+}
+
+/**
+ * Fetch Phantom CLP setting
+ *
+ * @v settings		Settings block
+ * @v setting		Setting to fetch
+ * @v data		Buffer to fill with setting data
+ * @v len		Length of buffer
+ * @ret len		Length of setting data, or negative error
+ */
+static int phantom_fetch_setting ( struct settings *settings,
+				   struct setting *setting,
+				   void *data, size_t len ) {
+	struct phantom_nic_port *phantom_port =
+		container_of ( settings, struct phantom_nic_port, settings );
+	struct phantom_nic *phantom = phantom_port->phantom;
+	struct phantom_clp_setting *clp_setting;
+	int read_len;
+	int rc;
+
+	/* Find Phantom setting equivalent to gPXE setting */
+	clp_setting = phantom_find_clp_setting ( phantom, setting );
+	if ( ! clp_setting )
+		return -ENOTSUP;
+
+	/* Fetch setting */
+	if ( ( read_len = phantom_clp_fetch ( phantom, phantom_port->port,
+					      clp_setting->number,
+					      data, len ) ) < 0 ) {
+		rc = read_len;
+		DBGC ( phantom, "Phantom %p could not fetch setting \"%s\": "
+		       "%s\n", phantom, setting->name, strerror ( rc ) );
+		return rc;
+	}
+
+	return read_len;
+}
+
+/** Phantom CLP settings operations */
+static struct settings_operations phantom_settings_operations = {
+	.store		= phantom_store_setting,
+	.fetch		= phantom_fetch_setting,
+};
+
+/***************************************************************************
+ *
+ * Initialisation
+ *
+ */
+
 /**
  * Map Phantom CRB window
  *
@@ -1894,6 +2225,7 @@ static int phantom_probe ( struct pci_device *pci,
 	struct phantom_nic *phantom;
 	struct net_device *netdev;
 	struct phantom_nic_port *phantom_port;
+	struct settings *parent_settings;
 	int i;
 	int rc;
 
@@ -1935,6 +2267,9 @@ static int phantom_probe ( struct pci_device *pci,
 		netdev->dev = &pci->dev;
 		phantom_port->phantom = phantom;
 		phantom_port->port = i;
+		settings_init ( &phantom_port->settings,
+				&phantom_settings_operations,
+				&netdev->refcnt, "clp" );
 	}
 
 	/* BUG5945 - need to hack PCI config space on P3 B1 silicon.
@@ -1978,8 +2313,27 @@ static int phantom_probe ( struct pci_device *pci,
 		}
 	}
 
+	/* Register settings blocks */
+	for ( i = 0 ; i < phantom->num_ports ; i++ ) {
+		phantom_port = netdev_priv ( phantom->netdev[i] );
+		parent_settings = netdev_settings ( phantom->netdev[i] );
+		if ( ( rc = register_settings ( &phantom_port->settings,
+						parent_settings ) ) != 0 ) {
+			DBGC ( phantom, "Phantom %p could not register port "
+			       "%d settings: %s\n",
+			       phantom, i, strerror ( rc ) );
+			goto err_register_settings;
+		}
+	}
+
 	return 0;
 
+	i = ( phantom->num_ports - 1 );
+ err_register_settings:
+	for ( ; i >= 0 ; i-- ) {
+		phantom_port = netdev_priv ( phantom->netdev[i] );
+		unregister_settings ( &phantom_port->settings );
+	}
 	i = ( phantom->num_ports - 1 );
  err_register_netdev:
 	for ( ; i >= 0 ; i-- )
@@ -2010,8 +2364,13 @@ static int phantom_probe ( struct pci_device *pci,
  */
 static void phantom_remove ( struct pci_device *pci ) {
 	struct phantom_nic *phantom = pci_get_drvdata ( pci );
+	struct phantom_nic_port *phantom_port;
 	int i;
 
+	for ( i = ( phantom->num_ports - 1 ) ; i >= 0 ; i-- ) {
+		phantom_port = netdev_priv ( phantom->netdev[i] );
+		unregister_settings ( &phantom_port->settings );
+	}
 	for ( i = ( phantom->num_ports - 1 ) ; i >= 0 ; i-- )
 		unregister_netdev ( phantom->netdev[i] );
 	phantom_halt_pegs ( phantom );
