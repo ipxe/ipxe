@@ -72,6 +72,14 @@ struct settings {
 	struct refcnt *refcnt;
 	/** Name */
 	const char *name;
+	/** Tag magic
+	 *
+	 * This value will be ORed in to any numerical tags
+	 * constructed by parse_setting_name(), and can be used to
+	 * avoid e.g. attempting to retrieve the subnet mask from
+	 * SMBIOS, or the system UUID from DHCP.
+	 */
+	unsigned int tag_magic;
 	/** Parent settings block */
 	struct settings *parent;
 	/** Sibling settings blocks */
@@ -225,16 +233,19 @@ extern struct setting mac_setting __setting;
  * @v op		Settings block operations
  * @v refcnt		Containing object reference counter, or NULL
  * @v name		Settings block name
+ * @v tag_magic		Tag magic
  */
 static inline void settings_init ( struct settings *settings,
 				   struct settings_operations *op,
 				   struct refcnt *refcnt,
-				   const char *name ) {
+				   const char *name,
+				   unsigned int tag_magic ) {
 	INIT_LIST_HEAD ( &settings->siblings );
 	INIT_LIST_HEAD ( &settings->children );
 	settings->op = op;
 	settings->refcnt = refcnt;
 	settings->name = name;
+	settings->tag_magic = tag_magic;
 }
 
 /**
@@ -248,7 +259,7 @@ static inline void simple_settings_init ( struct simple_settings *simple,
 					  struct refcnt *refcnt,
 					  const char *name ) {
 	settings_init ( &simple->settings, &simple_settings_operations,
-			refcnt, name );
+			refcnt, name, 0 );
 }
 
 /**

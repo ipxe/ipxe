@@ -1589,6 +1589,12 @@ static struct net_device_operations phantom_operations = {
  *
  */
 
+/** Phantom CLP settings tag magic */
+#define PHN_CLP_TAG_MAGIC 0xc19c1900UL
+
+/** Phantom CLP settings tag magic mask */
+#define PHN_CLP_TAG_MAGIC_MASK 0xffffff00UL
+
 /** Phantom CLP data
  *
  */
@@ -1790,7 +1796,7 @@ struct phantom_clp_setting {
 	/** gPXE setting */
 	struct setting *setting;
 	/** Setting number */
-	unsigned int number;
+	unsigned int clp_setting;
 };
 
 /** Phantom CLP settings */
@@ -1802,25 +1808,29 @@ static struct phantom_clp_setting clp_settings[] = {
  * Find Phantom CLP setting
  *
  * @v setting		gPXE setting
- * @v clp_setting	Equivalent Phantom CLP setting, or NULL
+ * @v clp_setting	Setting number, or 0 if not found
  */
-static struct phantom_clp_setting *
-phantom_find_clp_setting ( struct phantom_nic *phantom,
-			   struct setting *setting ) {
+static unsigned int
+phantom_clp_setting ( struct phantom_nic *phantom, struct setting *setting ) {
 	struct phantom_clp_setting *clp_setting;
 	unsigned int i;
 
+	/* Search the list of explicitly-defined settings */
 	for ( i = 0 ; i < ( sizeof ( clp_settings ) /
 			    sizeof ( clp_settings[0] ) ) ; i++ ) {
 		clp_setting = &clp_settings[i];
 		if ( setting_cmp ( setting, clp_setting->setting ) == 0 )
-			return clp_setting;
+			return clp_setting->clp_setting;
 	}
+
+	/* Allow for use of numbered settings */
+	if ( ( setting->tag & PHN_CLP_TAG_MAGIC_MASK ) == PHN_CLP_TAG_MAGIC )
+		return ( setting->tag & ~PHN_CLP_TAG_MAGIC_MASK );
 
 	DBGC2 ( phantom, "Phantom %p has no \"%s\" setting\n",
 		phantom, setting->name );
 
-	return NULL;
+	return 0;
 }
 
 /**
@@ -1838,18 +1848,17 @@ static int phantom_store_setting ( struct settings *settings,
 	struct phantom_nic_port *phantom_port =
 		container_of ( settings, struct phantom_nic_port, settings );
 	struct phantom_nic *phantom = phantom_port->phantom;
-	struct phantom_clp_setting *clp_setting;
+	unsigned int clp_setting;
 	int rc;
 
 	/* Find Phantom setting equivalent to gPXE setting */
-	clp_setting = phantom_find_clp_setting ( phantom, setting );
+	clp_setting = phantom_clp_setting ( phantom, setting );
 	if ( ! clp_setting )
 		return -ENOTSUP;
 
 	/* Store setting */
 	if ( ( rc = phantom_clp_store ( phantom, phantom_port->port,
-					clp_setting->number,
-					data, len ) ) != 0 ) {
+					clp_setting, data, len ) ) != 0 ) {
 		DBGC ( phantom, "Phantom %p could not store setting \"%s\": "
 		       "%s\n", phantom, setting->name, strerror ( rc ) );
 		return rc;
@@ -1873,19 +1882,18 @@ static int phantom_fetch_setting ( struct settings *settings,
 	struct phantom_nic_port *phantom_port =
 		container_of ( settings, struct phantom_nic_port, settings );
 	struct phantom_nic *phantom = phantom_port->phantom;
-	struct phantom_clp_setting *clp_setting;
+	unsigned int clp_setting;
 	int read_len;
 	int rc;
 
 	/* Find Phantom setting equivalent to gPXE setting */
-	clp_setting = phantom_find_clp_setting ( phantom, setting );
+	clp_setting = phantom_clp_setting ( phantom, setting );
 	if ( ! clp_setting )
 		return -ENOTSUP;
 
 	/* Fetch setting */
 	if ( ( read_len = phantom_clp_fetch ( phantom, phantom_port->port,
-					      clp_setting->number,
-					      data, len ) ) < 0 ) {
+					      clp_setting, data, len ) ) < 0 ){
 		rc = read_len;
 		DBGC ( phantom, "Phantom %p could not fetch setting \"%s\": "
 		       "%s\n", phantom, setting->name, strerror ( rc ) );
@@ -2269,7 +2277,7 @@ static int phantom_probe ( struct pci_device *pci,
 		phantom_port->port = i;
 		settings_init ( &phantom_port->settings,
 				&phantom_settings_operations,
-				&netdev->refcnt, "clp" );
+				&netdev->refcnt, "clp", PHN_CLP_TAG_MAGIC );
 	}
 
 	/* BUG5945 - need to hack PCI config space on P3 B1 silicon.

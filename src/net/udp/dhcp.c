@@ -256,7 +256,7 @@ static struct dhcp_settings * dhcpset_create ( const struct dhcphdr *dhcphdr,
 		dhcppkt_init ( &dhcpset->dhcppkt, data, len );
 		settings_init ( &dhcpset->settings,
 				&dhcpset_settings_operations, &dhcpset->refcnt,
-				DHCP_SETTINGS_NAME );
+				DHCP_SETTINGS_NAME, 0 );
 	}
 	return dhcpset;
 }

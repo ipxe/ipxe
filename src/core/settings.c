@@ -665,6 +665,7 @@ static int parse_setting_name ( const char *name, struct settings **settings,
 			}
 			tmp++;
 		}
+		setting->tag |= (*settings)->tag_magic;
 	}
 
 	/* Identify setting type, if specified */

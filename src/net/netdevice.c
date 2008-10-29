@@ -268,7 +268,7 @@ struct net_device * alloc_netdev ( size_t priv_size ) {
 		INIT_LIST_HEAD ( &netdev->rx_queue );
 		settings_init ( netdev_settings ( netdev ),
 				&netdev_settings_operations, &netdev->refcnt,
-				netdev->name );
+				netdev->name, 0 );
 		netdev->priv = ( ( ( void * ) netdev ) + sizeof ( *netdev ) );
 	}
 	return netdev;
