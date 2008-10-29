@@ -190,11 +190,11 @@ init:
 	stc
 	movw	$0xb101, %ax
 	int	$0x1a
-	jc	1f
+	jc	no_pci3
 	cmpl	$PCI_SIGNATURE, %edx
-	jne	1f
+	jne	no_pci3
 	testb	%ah, %ah
-	jnz	1f
+	jnz	no_pci3
 	movw	$init_message_pci, %si
 	xorw	%di, %di
 	call	print_message
@@ -205,20 +205,33 @@ init:
 	movb	%bl, %al
 	call	print_hex_byte
 	cmpb	$3, %bh
-	jb	1f
+	jb	no_pci3
 	/* PCI >=3.0: leave %gs as-is if sane */
 	movw	%gs, %ax
-	cmpw	$0xc000, %ax
-	jae	2f
-	/* PCI 3.0 with insane %gs value: print error and ignore %gs */
+	cmpw	$0xa000, %ax	/* Insane if %gs < 0xa000 */
+	jb	pci3_insane
+	movw	%cs, %bx	/* Sane if %cs == %gs */
+	cmpw	%bx, %ax
+	je	1f
+	movzbw	romheader_size, %cx /* Sane if %cs+len <= %gs */
+	shlw	$5, %cx
+	addw	%cx, %bx
+	cmpw	%bx, %ax
+	jae	1f
+	movw	%cs, %bx	/* Sane if %gs+len <= %cs */
+	addw	%cx, %ax
+	cmpw	%bx, %ax
+	jbe	1f
+pci3_insane: /* PCI 3.0 with insane %gs value: print error and ignore %gs */
 	movb	$'!', %al
 	call	print_character
 	movw	%gs, %ax
 	call	print_hex_word
-1:	/* PCI <3.0: set %gs (runtime segment) = %cs (init-time segment) */
+no_pci3:
+	/* PCI <3.0: set %gs (runtime segment) = %cs (init-time segment) */
 	pushw	%cs
 	popw	%gs
-2:	popl	%edi
+1:	popl	%edi
 	popl	%edx
 	popl	%ebx
 
