@@ -372,11 +372,12 @@ static int nbi_boot32 ( struct image *image, struct imgheader *imgheader ) {
  * @ret netdev		Boot network device
  */
 static struct net_device * guess_boot_netdev ( void ) {
-	struct net_device *boot_netdev;
+	struct net_device *netdev;
 
 	/* Just use the first network device */
-	for_each_netdev ( boot_netdev ) {
-		return boot_netdev;
+	for_each_netdev ( netdev ) {
+		if ( netdev->state & NETDEV_OPEN )
+			return netdev;
 	}
 
 	return NULL;
