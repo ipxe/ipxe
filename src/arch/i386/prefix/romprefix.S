@@ -109,12 +109,12 @@ mfgstr:
 
 /* Product string
  *
- * Defaults to "gPXE".  If the ROM image is writable at initialisation
- * time, it will be filled in to include the PCI bus:dev.fn number of
- * the card as well.
+ * Defaults to PRODUCT_SHORT_NAME.  If the ROM image is writable at
+ * initialisation time, it will be filled in to include the PCI
+ * bus:dev.fn number of the card as well.
  */
 prodstr:
-	.ascii	"gPXE"
+	.ascii	PRODUCT_SHORT_NAME
 prodstr_separator:
 	.byte	0
 	.ascii	"(PCI "
@@ -346,23 +346,28 @@ no_pmm:
 	movw	$init_message_prompt, %si
 	xorw	%di, %di
 	call	print_message
+	movw	$prodstr, %si
+	call	print_message
+	movw	$init_message_dots, %si
+	call	print_message
 	/* Wait for Ctrl-B */
 	movw	$0xff02, %bx
 	call	wait_for_key
 	/* Clear prompt */
 	pushf
-	movw	$clear_message, %si
 	xorw	%di, %di
+	call	print_kill_line
+	movw	$init_message_done, %si
 	call	print_message
 	popf
-	jnz	1f
+	jnz	2f
 	/* Ctrl-B was pressed: invoke gPXE.  The keypress will be
 	 * picked up by the initial shell prompt, and we will drop
 	 * into a shell.
 	 */
 	pushw	%cs
 	call	exec
-1:
+2:
 	/* Restore registers */
 	popw	%gs
 	popw	%fs
@@ -375,7 +380,26 @@ no_pmm:
 	lret
 	.size init, . - init
 
+/*
+ * Note to hardware vendors:
+ *
+ * If you wish to brand this boot ROM, please do so by defining the
+ * strings PRODUCT_NAME and PRODUCT_SHORT_NAME in config/general.h.
+ *
+ * While nothing in the GPL prevents you from removing all references
+ * to gPXE or http://etherboot.org, we prefer you not to do so.
+ *
+ * If you have an OEM-mandated branding requirement that cannot be
+ * satisfied simply by defining PRODUCT_NAME and PRODUCT_SHORT_NAME,
+ * please contact us.
+ *
+ * [ Including an ASCII NUL in PRODUCT_NAME is considered to be
+ *   bypassing the spirit of this request! ]
+ */
 init_message:
+	.ascii	"\n"
+	.ascii	PRODUCT_NAME
+	.ascii	"\n"
 	.asciz	"gPXE (http://etherboot.org) - "
 	.size	init_message, . - init_message
 init_message_pci:
@@ -394,11 +418,14 @@ init_message_int19:
 	.asciz	" INT19"
 	.size	init_message_int19, . - init_message_int19
 init_message_prompt:
-	.asciz	"\nPress Ctrl-B to configure gPXE..."
+	.asciz	"\nPress Ctrl-B to configure "
 	.size	init_message_prompt, . - init_message_prompt
-clear_message:
-	.asciz	"\r                                          \n\n"
-	.size	clear_message, . - clear_message
+init_message_dots:
+	.asciz	"..."
+	.size	init_message_dots, . - init_message_dots
+init_message_done:
+	.asciz	"\n\n"
+	.size	init_message_done, . - init_message_done
 
 /* ROM image location
  *
@@ -454,8 +481,9 @@ int19_entry:
 	movw	$0xdf42, %bx
 	call	wait_for_key
 	pushf
-	movw	$clear_message, %si
 	xorw	%di, %di
+	call	print_kill_line
+	movw	$int19_message_done, %si
 	call	print_message
 	popf
 	jnz	1f
@@ -482,6 +510,9 @@ int19_message_prompt:
 int19_message_dots:
 	.asciz	"..."
 	.size	int19_message_dots, . - int19_message_dots
+int19_message_done:
+	.asciz	"\n\n"
+	.size	int19_message_done, . - int19_message_done
 	
 /* Execute as a boot device
  *

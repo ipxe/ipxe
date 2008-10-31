@@ -20,6 +20,7 @@ Literature dealing with the network protocols:
 #include <gpxe/shell.h>
 #include <gpxe/shell_banner.h>
 #include <usr/autoboot.h>
+#include <config/general.h>
 
 #define NORMAL	"\033[0m"
 #define BOLD	"\033[1m"
@@ -39,8 +40,19 @@ __cdecl int main ( void ) {
 	initialise();
 	startup();
 
-	/* Print welcome banner */
-	printf ( NORMAL "\n\n\n" BOLD "gPXE " VERSION
+	/*
+	 * Print welcome banner
+	 *
+	 *
+	 * If you wish to brand this build of gPXE, please do so by
+	 * defining the string PRODUCT_NAME in config/general.h.
+	 *
+	 * While nothing in the GPL prevents you from removing all
+	 * references to gPXE or http://etherboot.org, we prefer you
+	 * not to do so.
+	 *
+	 */
+	printf ( NORMAL "\n\n" PRODUCT_NAME "\n" BOLD "gPXE " VERSION
 		 NORMAL " -- Open Source Boot Firmware -- "
 		 CYAN "http://etherboot.org" NORMAL "\n"
 		 "Features:" );

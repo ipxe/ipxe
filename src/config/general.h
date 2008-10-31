@@ -10,6 +10,22 @@
 #include <config/defaults.h>
 
 /*
+ * Branding
+ *
+ * Vendors may use these strings to add their own branding to gPXE.
+ * PRODUCT_NAME is displayed prior to any gPXE branding in startup
+ * messages, and PRODUCT_SHORT_NAME is used where a brief product
+ * label is required (e.g. in BIOS boot selection menus).
+ *
+ * To minimise end-user confusion, it's probably a good idea to either
+ * make PRODUCT_SHORT_NAME a substring of PRODUCT_NAME or leave it as
+ * "gPXE".
+ *
+ */
+#define PRODUCT_NAME ""
+#define PRODUCT_SHORT_NAME "gPXE"
+
+/*
  * Timer configuration
  *
  */

@@ -199,6 +199,39 @@ print_pci_busdevfn:
 	ret
 	.size	print_pci_busdevfn, . - print_pci_busdevfn
 
+/*****************************************************************************
+ * Utility function: clear current line
+ *
+ * Parameters:
+ *   %ds:di : output buffer (or %di=0 to print to console)
+ * Returns:
+ *   %ds:di : next character in output buffer (if applicable)
+ *****************************************************************************
+ */
+	.section ".prefix.lib"
+	.code16
+	.globl	print_kill_line
+print_kill_line:
+	/* Preserve registers */
+	pushw	%ax
+	pushw	%cx
+	/* Print CR */
+	movb	$'\r', %al
+	call	print_character
+	/* Print 79 spaces */
+	movb	$' ', %al
+	movw	$79, %cx
+1:	call	print_character
+	loop	1b
+	/* Print CR */
+	movb	$'\r', %al
+	call	print_character
+	/* Restore registers and return */
+	popw	%cx
+	popw	%ax
+	ret
+	.size	print_kill_line, . - print_kill_line
+
 /****************************************************************************
  * pm_call (real-mode near call)
  *
