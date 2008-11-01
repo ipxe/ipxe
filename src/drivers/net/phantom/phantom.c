@@ -1938,6 +1938,32 @@ static void phantom_get_macaddr ( struct phantom_nic *phantom,
 }
 
 /**
+ * Check Phantom is enabled for boot
+ *
+ * @v phanton_port	Phantom NIC
+ * @ret rc		Return status code
+ *
+ * This is something of an ugly hack to accommodate an OEM
+ * requirement.  The NIC has only one expansion ROM BAR, rather than
+ * one per port.  To allow individual ports to be selectively
+ * enabled/disabled for PXE boot (as required), we must therefore
+ * leave the expansion ROM always enabled, and place the per-port
+ * enable/disable logic within the gPXE driver.
+ */
+static int phantom_check_boot_enable ( struct phantom_nic *phantom ) {
+	unsigned long boot_enable;
+
+	boot_enable = phantom_readl ( phantom, UNM_CAM_RAM_BOOT_ENABLE );
+	if ( ! ( boot_enable & ( 1 << phantom->port ) ) ) {
+		DBGC ( phantom, "Phantom %p PXE boot is disabled\n",
+		       phantom );
+		return -ENOTSUP;
+	}
+
+	return 0;
+}
+
+/**
  * Initialise Phantom receive PEG
  *
  * @v phantom		Phantom NIC
@@ -2034,6 +2060,10 @@ static int phantom_probe ( struct pci_device *pci,
 	/* Read MAC addresses */
 	phantom_get_macaddr ( phantom, netdev->ll_addr );
 
+	/* Skip if boot disabled on NIC */
+	if ( ( rc = phantom_check_boot_enable ( phantom ) ) != 0 )
+		goto err_check_boot_enable;
+
 	/* Register network devices */
 	if ( ( rc = register_netdev ( netdev ) ) != 0 ) {
 		DBGC ( phantom, "Phantom %p could not register net device: "
@@ -2056,6 +2086,7 @@ static int phantom_probe ( struct pci_device *pci,
  err_register_settings:
 	unregister_netdev ( netdev );
  err_register_netdev:
+ err_check_boot_enable:
  err_init_rcvpeg:
  err_init_cmdpeg:
 	phantom_halt_pegs ( phantom );
