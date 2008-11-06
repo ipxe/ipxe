@@ -341,7 +341,7 @@ pm_call:
 	/* Switch CPU to protected mode and load up segment registers */
 	pushl	%eax
 	cli
-	lgdt	PM_CALL_VAR(gdt)(%bp)
+	data32 lgdt PM_CALL_VAR(gdt)(%bp)
 	movl	%cr0, %eax
 	orb	$CR0_PE, %al
 	movl	%eax, %cr0
@@ -377,7 +377,7 @@ pm_call:
 	popw	%es
 	popw	%fs
 	popw	%gs
-	lgdt	PM_CALL_VAR(pm_saved_gdt)(%bp)
+	data32 lgdt PM_CALL_VAR(pm_saved_gdt)(%bp)
 	popfl
 	movw	%bp, %sp
 	popw	%bp

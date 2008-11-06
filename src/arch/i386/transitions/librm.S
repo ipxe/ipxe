@@ -203,8 +203,8 @@ real_to_prot:
 
 	/* Switch to protected mode */
 	cli
-	data32 lgdt	gdtr
-	data32 lidt	idtr
+	data32 lgdt gdtr
+	data32 lidt idtr
 	movl	%cr0, %eax
 	orb	$CR0_PE, %al
 	movl	%eax, %cr0
@@ -316,7 +316,7 @@ p2r_jump_target:
 	movl	%edx, %esp
 
 	/* Reset IDTR to the real-mode defaults */
-	lidt	rm_idtr
+	data32 lidt rm_idtr
 
 	/* Return to real-mode address */
 	data32 ret
@@ -424,8 +424,8 @@ prot_call:
 1:	
 	/* Reload GDT and IDT, restore registers and flags and return */
 	movw	%sp, %bp
-	lgdt	(%bp)
-	lidt	8(%bp)
+	data32 lgdt (%bp)
+	data32 lidt 8(%bp)
 	addw	$20, %sp /* also skip %cs and %ss */
 	popw	%ds
 	popw	%es
