@@ -1006,7 +1006,7 @@ static int arbel_post_send ( struct ib_device *ibdev,
 		     ud_address_vector.pd, ARBEL_GLOBAL_PD,
 		     ud_address_vector.port_number, ibdev->port );
 	MLX_FILL_2 ( &wqe->ud, 1,
-		     ud_address_vector.rlid, av->dlid,
+		     ud_address_vector.rlid, av->lid,
 		     ud_address_vector.g, av->gid_present );
 	MLX_FILL_2 ( &wqe->ud, 2,
 		     ud_address_vector.max_stat_rate,
@@ -1015,7 +1015,7 @@ static int arbel_post_send ( struct ib_device *ibdev,
 	MLX_FILL_1 ( &wqe->ud, 3, ud_address_vector.sl, av->sl );
 	gid = ( av->gid_present ? &av->gid : &arbel_no_gid );
 	memcpy ( &wqe->ud.u.dwords[4], gid, sizeof ( *gid ) );
-	MLX_FILL_1 ( &wqe->ud, 8, destination_qp, av->dest_qp );
+	MLX_FILL_1 ( &wqe->ud, 8, destination_qp, av->qpn );
 	MLX_FILL_1 ( &wqe->ud, 9, q_key, av->qkey );
 	MLX_FILL_1 ( &wqe->data[0], 0, byte_count, iob_len ( iobuf ) );
 	MLX_FILL_1 ( &wqe->data[0], 1, l_key, arbel->reserved_lkey );
@@ -1112,7 +1112,6 @@ static int arbel_complete ( struct ib_device *ibdev,
 			    struct ib_completion_queue *cq,
 			    union arbelprm_completion_entry *cqe ) {
 	struct arbel *arbel = ib_get_drvdata ( ibdev );
-	struct ib_completion completion;
 	struct ib_work_queue *wq;
 	struct ib_queue_pair *qp;
 	struct arbel_queue_pair *arbel_qp;
@@ -1120,15 +1119,17 @@ static int arbel_complete ( struct ib_device *ibdev,
 	struct arbel_recv_work_queue *arbel_recv_wq;
 	struct arbelprm_recv_wqe *recv_wqe;
 	struct io_buffer *iobuf;
+	struct ib_address_vector av;
+	struct ib_global_route_header *grh;
 	unsigned int opcode;
 	unsigned long qpn;
 	int is_send;
 	unsigned long wqe_adr;
 	unsigned int wqe_idx;
+	size_t len;
 	int rc = 0;
 
 	/* Parse completion */
-	memset ( &completion, 0, sizeof ( completion ) );
 	qpn = MLX_GET ( &cqe->normal, my_qpn );
 	is_send = MLX_GET ( &cqe->normal, s );
 	wqe_adr = ( MLX_GET ( &cqe->normal, wqe_adr ) << 6 );
@@ -1136,9 +1137,8 @@ static int arbel_complete ( struct ib_device *ibdev,
 	if ( opcode >= ARBEL_OPCODE_RECV_ERROR ) {
 		/* "s" field is not valid for error opcodes */
 		is_send = ( opcode == ARBEL_OPCODE_SEND_ERROR );
-		completion.syndrome = MLX_GET ( &cqe->error, syndrome );
-		DBGC ( arbel, "Arbel %p CPN %lx syndrome %x vendor %lx\n",
-		       arbel, cq->cqn, completion.syndrome,
+		DBGC ( arbel, "Arbel %p CPN %lx syndrome %lx vendor %lx\n",
+		       arbel, cq->cqn, MLX_GET ( &cqe->error, syndrome ),
 		       MLX_GET ( &cqe->error, vendor_code ) );
 		rc = -EIO;
 		/* Don't return immediately; propagate error to completer */
@@ -1176,9 +1176,12 @@ static int arbel_complete ( struct ib_device *ibdev,
 	}
 	wq->iobufs[wqe_idx] = NULL;
 
-	/* Fill in length for received packets */
-	if ( ! is_send ) {
-		completion.len = MLX_GET ( &cqe->normal, byte_cnt );
+	if ( is_send ) {
+		/* Hand off to completion handler */
+		ib_complete_send ( ibdev, qp, iobuf, rc );
+	} else {
+		/* Set received length */
+		len = MLX_GET ( &cqe->normal, byte_cnt );
 		recv_wqe = &arbel_recv_wq->wqe[wqe_idx].recv;
 		assert ( MLX_GET ( &recv_wqe->data[0], local_address_l ) ==
 			 virt_to_bus ( iobuf->data ) );
@@ -1187,19 +1190,20 @@ static int arbel_complete ( struct ib_device *ibdev,
 		MLX_FILL_1 ( &recv_wqe->data[0], 0, byte_count, 0 );
 		MLX_FILL_1 ( &recv_wqe->data[0], 1,
 			     l_key, ARBEL_INVALID_LKEY );
-		if ( completion.len > iob_tailroom ( iobuf ) ) {
-			DBGC ( arbel, "Arbel %p CQN %lx QPN %lx IDX %x "
-			       "overlength received packet length %zd\n",
-			       arbel, cq->cqn, qpn, wqe_idx, completion.len );
-			return -EIO;
-		}
-	}
-
-	/* Pass off to caller's completion handler */
-	if ( is_send ) {
-		ib_complete_send ( ibdev, qp, &completion, iobuf );
-	} else {
-		ib_complete_recv ( ibdev, qp, &completion, iobuf );
+		assert ( len <= iob_tailroom ( iobuf ) );
+		iob_put ( iobuf, len );
+		assert ( iob_len ( iobuf ) >= sizeof ( *grh ) );
+		grh = iobuf->data;
+		iob_pull ( iobuf, sizeof ( *grh ) );
+		/* Construct address vector */
+		memset ( &av, 0, sizeof ( av ) );
+		av.qpn = MLX_GET ( &cqe->normal, rqpn );
+		av.lid = MLX_GET ( &cqe->normal, rlid );
+		av.sl = MLX_GET ( &cqe->normal, sl );
+		av.gid_present = MLX_GET ( &cqe->normal, g );
+		memcpy ( &av.gid, &grh->sgid, sizeof ( av.gid ) );
+		/* Hand off to completion handler */
+		ib_complete_recv ( ibdev, qp, &av, iobuf, rc );
 	}
 
 	return rc;

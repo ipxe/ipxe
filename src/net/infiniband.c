@@ -46,13 +46,12 @@ struct list_head ib_devices = LIST_HEAD_INIT ( ib_devices );
  *
  * @v ibdev		Infiniband device
  * @v num_cqes		Number of completion queue entries
- * @v complete_send	Send completion handler
- * @v complete_recv	Receive completion handler
+ * @v op		Completion queue operations
  * @ret cq		New completion queue
  */
 struct ib_completion_queue *
 ib_create_cq ( struct ib_device *ibdev, unsigned int num_cqes,
-	       ib_completer_t complete_send, ib_completer_t complete_recv ) {
+	       struct ib_completion_queue_operations *op ) {
 	struct ib_completion_queue *cq;
 	int rc;
 
@@ -64,8 +63,7 @@ ib_create_cq ( struct ib_device *ibdev, unsigned int num_cqes,
 		return NULL;
 	cq->num_cqes = num_cqes;
 	INIT_LIST_HEAD ( &cq->work_queues );
-	cq->complete_send = complete_send;
-	cq->complete_recv = complete_recv;
+	cq->op = op;
 
 	/* Perform device-specific initialisation and get CQN */
 	if ( ( rc = ibdev->op->create_cq ( ibdev, cq ) ) != 0 ) {
@@ -195,9 +193,6 @@ int ib_modify_qp ( struct ib_device *ibdev, struct ib_queue_pair *qp,
  * @v qp		Queue pair
  */
 void ib_destroy_qp ( struct ib_device *ibdev, struct ib_queue_pair *qp ) {
-	struct ib_completion completion = {
-		.syndrome = IB_SYN_LOCAL_QP,
-	};
 	struct io_buffer *iobuf;
 	unsigned int i;
 
@@ -210,11 +205,13 @@ void ib_destroy_qp ( struct ib_device *ibdev, struct ib_queue_pair *qp ) {
 	/* Complete any remaining I/O buffers with errors */
 	for ( i = 0 ; i < qp->send.num_wqes ; i++ ) {
 		if ( ( iobuf = qp->send.iobufs[i] ) != NULL )
-			ib_complete_send ( ibdev, qp, &completion, iobuf );
+			ib_complete_send ( ibdev, qp, iobuf, -ECANCELED );
 	}
 	for ( i = 0 ; i < qp->recv.num_wqes ; i++ ) {
-		if ( ( iobuf = qp->recv.iobufs[i] ) != NULL )
-			ib_complete_recv ( ibdev, qp, &completion, iobuf );
+		if ( ( iobuf = qp->recv.iobufs[i] ) != NULL ) {
+			ib_complete_recv ( ibdev, qp, NULL, iobuf,
+					   -ECANCELED );
+		}
 	}
 
 	/* Remove work queues from completion queue */
@@ -254,7 +251,8 @@ struct ib_work_queue * ib_find_wq ( struct ib_completion_queue *cq,
  * @ret rc		Return status code
  */
 int ib_post_send ( struct ib_device *ibdev, struct ib_queue_pair *qp,
-		   struct ib_address_vector *av, struct io_buffer *iobuf ) {
+		   struct ib_address_vector *av,
+		   struct io_buffer *iobuf ) {
 	int rc;
 
 	/* Check queue fill level */
@@ -310,13 +308,12 @@ int ib_post_recv ( struct ib_device *ibdev, struct ib_queue_pair *qp,
  *
  * @v ibdev		Infiniband device
  * @v qp		Queue pair
- * @v completion	Completion
  * @v iobuf		I/O buffer
+ * @v rc		Completion status code
  */
 void ib_complete_send ( struct ib_device *ibdev, struct ib_queue_pair *qp,
-			struct ib_completion *completion,
-			struct io_buffer *iobuf ) {
-	qp->send.cq->complete_send ( ibdev, qp, completion, iobuf );
+			struct io_buffer *iobuf, int rc ) {
+	qp->send.cq->op->complete_send ( ibdev, qp, iobuf, rc );
 	qp->send.fill--;
 }
 
@@ -325,13 +322,14 @@ void ib_complete_send ( struct ib_device *ibdev, struct ib_queue_pair *qp,
  *
  * @v ibdev		Infiniband device
  * @v qp		Queue pair
- * @v completion	Completion
+ * @v av		Address vector
  * @v iobuf		I/O buffer
+ * @v rc		Completion status code
  */
 void ib_complete_recv ( struct ib_device *ibdev, struct ib_queue_pair *qp,
-			struct ib_completion *completion,
-			struct io_buffer *iobuf ) {
-	qp->recv.cq->complete_recv ( ibdev, qp, completion, iobuf );
+			struct ib_address_vector *av,
+			struct io_buffer *iobuf, int rc ) {
+	qp->recv.cq->op->complete_recv ( ibdev, qp, av, iobuf, rc );
 	qp->recv.fill--;
 }
 

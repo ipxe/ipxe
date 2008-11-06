@@ -52,6 +52,7 @@ struct ib_global_route_header {
 
 struct ib_device;
 struct ib_queue_pair;
+struct ib_address_vector;
 struct ib_completion_queue;
 
 /** An Infiniband Work Queue */
@@ -103,36 +104,57 @@ enum ib_queue_pair_mods {
 	IB_MODIFY_QKEY = 0x0001,
 };
 
-/** An Infiniband completion */
-struct ib_completion {
-	/** Syndrome
+/** An Infiniband Address Vector */
+struct ib_address_vector {
+	/** Queue Pair Number */
+	unsigned long qpn;
+	/** Queue key
 	 *
-	 * If non-zero, then the completion is in error.
+	 * Not specified for received packets.
 	 */
-	unsigned int syndrome;
-	/** Length */
-	size_t len;
+	unsigned long qkey;
+	/** Local ID */
+	unsigned int lid;
+	/** Rate
+	 *
+	 * Not specified for received packets.
+	 */
+	unsigned int rate;
+	/** Service level */
+	unsigned int sl;
+	/** GID is present */
+	unsigned int gid_present;
+	/** GID, if present */
+	struct ib_gid gid;
 };
 
-/** Infiniband completion syndromes */
-enum ib_syndrome {
-	IB_SYN_NONE = 0,
-	IB_SYN_LOCAL_LENGTH = 1,
-	IB_SYN_LOCAL_QP = 2,
-	IB_SYN_LOCAL_PROT = 4,
+/** Infiniband completion queue operations */
+struct ib_completion_queue_operations {
+	/**
+	 * Complete Send WQE
+	 *
+	 * @v ibdev		Infiniband device
+	 * @v qp		Queue pair
+	 * @v iobuf		I/O buffer
+	 * @v rc		Completion status code
+	 */
+	void ( * complete_send ) ( struct ib_device *ibdev,
+				   struct ib_queue_pair *qp,
+				   struct io_buffer *iobuf, int rc );
+	/**
+	 * Complete Receive WQE
+	 *
+	 * @v ibdev		Infiniband device
+	 * @v qp		Queue pair
+	 * @v av		Address vector, or NULL
+	 * @v iobuf		I/O buffer
+	 * @v rc		Completion status code
+	 */
+	void ( * complete_recv ) ( struct ib_device *ibdev,
+				   struct ib_queue_pair *qp,
+				   struct ib_address_vector *av,
+				   struct io_buffer *iobuf, int rc );
 };
-
-/** An Infiniband completion handler
- *
- * @v ibdev		Infiniband device
- * @v qp		Queue pair
- * @v completion	Completion
- * @v iobuf		I/O buffer
- */
-typedef void ( * ib_completer_t ) ( struct ib_device *ibdev,
-				    struct ib_queue_pair *qp,
-				    struct ib_completion *completion,
-				    struct io_buffer *iobuf );
 
 /** An Infiniband Completion Queue */
 struct ib_completion_queue {
@@ -150,30 +172,10 @@ struct ib_completion_queue {
 	unsigned long next_idx;
 	/** List of work queues completing to this queue */
 	struct list_head work_queues;
-	/** Send completion handler */
-	ib_completer_t complete_send;
-	/** Receive completion handler */
-	ib_completer_t complete_recv;
+	/** Completion queue operations */
+	struct ib_completion_queue_operations *op;
 	/** Driver private data */
 	void *drv_priv;
-};
-
-/** An Infiniband Address Vector */
-struct ib_address_vector {
-	/** Destination Queue Pair */
-	unsigned int dest_qp;
-	/** Queue key */
-	unsigned long qkey;
-	/** Destination Local ID */
-	unsigned int dlid;
-	/** Rate */
-	unsigned int rate;
-	/** Service level */
-	unsigned int sl;
-	/** GID is present */
-	unsigned int gid_present;
-	/** GID */
-	struct ib_gid gid;
 };
 
 struct ib_mad_hdr;
@@ -344,7 +346,7 @@ struct ib_device {
 
 extern struct ib_completion_queue *
 ib_create_cq ( struct ib_device *ibdev, unsigned int num_cqes,
-	       ib_completer_t complete_send, ib_completer_t complete_recv );
+	       struct ib_completion_queue_operations *op );
 extern void ib_destroy_cq ( struct ib_device *ibdev,
 			    struct ib_completion_queue *cq );
 extern struct ib_queue_pair *
@@ -364,12 +366,11 @@ extern int ib_post_recv ( struct ib_device *ibdev, struct ib_queue_pair *qp,
 			  struct io_buffer *iobuf );
 extern void ib_complete_send ( struct ib_device *ibdev,
 			       struct ib_queue_pair *qp,
-			       struct ib_completion *completion,
-			       struct io_buffer *iobuf );
+			       struct io_buffer *iobuf, int rc );
 extern void ib_complete_recv ( struct ib_device *ibdev,
 			       struct ib_queue_pair *qp,
-			       struct ib_completion *completion,
-			       struct io_buffer *iobuf );
+			       struct ib_address_vector *av,
+			       struct io_buffer *iobuf, int rc );
 extern struct ib_device * alloc_ibdev ( size_t priv_size );
 extern int register_ibdev ( struct ib_device *ibdev );
 extern void unregister_ibdev ( struct ib_device *ibdev );

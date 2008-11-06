@@ -1015,7 +1015,7 @@ static int hermon_post_send ( struct ib_device *ibdev,
 		     ud_address_vector.pd, HERMON_GLOBAL_PD,
 		     ud_address_vector.port_number, ibdev->port );
 	MLX_FILL_2 ( &wqe->ud, 1,
-		     ud_address_vector.rlid, av->dlid,
+		     ud_address_vector.rlid, av->lid,
 		     ud_address_vector.g, av->gid_present );
 	MLX_FILL_1 ( &wqe->ud, 2,
 		     ud_address_vector.max_stat_rate,
@@ -1024,7 +1024,7 @@ static int hermon_post_send ( struct ib_device *ibdev,
 	MLX_FILL_1 ( &wqe->ud, 3, ud_address_vector.sl, av->sl );
 	gid = ( av->gid_present ? &av->gid : &hermon_no_gid );
 	memcpy ( &wqe->ud.u.dwords[4], gid, sizeof ( *gid ) );
-	MLX_FILL_1 ( &wqe->ud, 8, destination_qp, av->dest_qp );
+	MLX_FILL_1 ( &wqe->ud, 8, destination_qp, av->qpn );
 	MLX_FILL_1 ( &wqe->ud, 9, q_key, av->qkey );
 	MLX_FILL_1 ( &wqe->data[0], 0, byte_count, iob_len ( iobuf ) );
 	MLX_FILL_1 ( &wqe->data[0], 1, l_key, hermon->reserved_lkey );
@@ -1107,28 +1107,28 @@ static int hermon_complete ( struct ib_device *ibdev,
 			     struct ib_completion_queue *cq,
 			     union hermonprm_completion_entry *cqe ) {
 	struct hermon *hermon = ib_get_drvdata ( ibdev );
-	struct ib_completion completion;
 	struct ib_work_queue *wq;
 	struct ib_queue_pair *qp;
 	struct hermon_queue_pair *hermon_qp;
 	struct io_buffer *iobuf;
+	struct ib_address_vector av;
+	struct ib_global_route_header *grh;
 	unsigned int opcode;
 	unsigned long qpn;
 	int is_send;
 	unsigned int wqe_idx;
+	size_t len;
 	int rc = 0;
 
 	/* Parse completion */
-	memset ( &completion, 0, sizeof ( completion ) );
 	qpn = MLX_GET ( &cqe->normal, qpn );
 	is_send = MLX_GET ( &cqe->normal, s_r );
 	opcode = MLX_GET ( &cqe->normal, opcode );
 	if ( opcode >= HERMON_OPCODE_RECV_ERROR ) {
 		/* "s" field is not valid for error opcodes */
 		is_send = ( opcode == HERMON_OPCODE_SEND_ERROR );
-		completion.syndrome = MLX_GET ( &cqe->error, syndrome );
-		DBGC ( hermon, "Hermon %p CQN %lx syndrome %x vendor %lx\n",
-		       hermon, cq->cqn, completion.syndrome,
+		DBGC ( hermon, "Hermon %p CQN %lx syndrome %lx vendor %lx\n",
+		       hermon, cq->cqn, MLX_GET ( &cqe->error, syndrome ),
 		       MLX_GET ( &cqe->error, vendor_error_syndrome ) );
 		rc = -EIO;
 		/* Don't return immediately; propagate error to completer */
@@ -1155,22 +1155,26 @@ static int hermon_complete ( struct ib_device *ibdev,
 	}
 	wq->iobufs[wqe_idx] = NULL;
 
-	/* Fill in length for received packets */
-	if ( ! is_send ) {
-		completion.len = MLX_GET ( &cqe->normal, byte_cnt );
-		if ( completion.len > iob_tailroom ( iobuf ) ) {
-			DBGC ( hermon, "Hermon %p CQN %lx QPN %lx IDX %x "
-			       "overlength received packet length %zd\n",
-			       hermon, cq->cqn, qpn, wqe_idx, completion.len );
-			return -EIO;
-		}
-	}
-
-	/* Pass off to caller's completion handler */
 	if ( is_send ) {
-		ib_complete_send ( ibdev, qp, &completion, iobuf );
+		/* Hand off to completion handler */
+		ib_complete_send ( ibdev, qp, iobuf, rc );
 	} else {
-		ib_complete_recv ( ibdev, qp, &completion, iobuf );
+		/* Set received length */
+		len = MLX_GET ( &cqe->normal, byte_cnt );
+		assert ( len <= iob_tailroom ( iobuf ) );
+		iob_put ( iobuf, len );
+		assert ( iob_len ( iobuf ) >= sizeof ( *grh ) );
+		grh = iobuf->data;
+		iob_pull ( iobuf, sizeof ( *grh ) );
+		/* Construct address vector */
+		memset ( &av, 0, sizeof ( av ) );
+		av.qpn = MLX_GET ( &cqe->normal, srq_rqpn );
+		av.lid = MLX_GET ( &cqe->normal, slid_smac47_32 );
+		av.sl = MLX_GET ( &cqe->normal, sl );
+		av.gid_present = MLX_GET ( &cqe->normal, g );
+		memcpy ( &av.gid, &grh->sgid, sizeof ( av.gid ) );
+		/* Hand off to completion handler */
+		ib_complete_recv ( ibdev, qp, &av, iobuf, rc );
 	}
 
 	return rc;
