@@ -33,6 +33,7 @@
 #include <gpxe/iobuf.h>
 #include <gpxe/netdevice.h>
 #include <gpxe/infiniband.h>
+#include <gpxe/ib_smc.h>
 #include "arbel.h"
 
 /**
@@ -480,6 +481,50 @@ arbel_cmd_map_fa ( struct arbel *arbel,
 			   ARBEL_HCR_IN_CMD ( ARBEL_HCR_MAP_FA,
 					      1, sizeof ( *map ) ),
 			   0, map, 1, NULL );
+}
+
+/***************************************************************************
+ *
+ * MAD operations
+ *
+ ***************************************************************************
+ */
+
+/**
+ * Issue management datagram
+ *
+ * @v ibdev		Infiniband device
+ * @v mad		Management datagram
+ * @ret rc		Return status code
+ */
+static int arbel_mad ( struct ib_device *ibdev, union ib_mad *mad ) {
+	struct arbel *arbel = ib_get_drvdata ( ibdev );
+	union arbelprm_mad mad_ifc;
+	int rc;
+
+	linker_assert ( sizeof ( *mad ) == sizeof ( mad_ifc.mad ),
+			mad_size_mismatch );
+
+	/* Copy in request packet */
+	memcpy ( &mad_ifc.mad, mad, sizeof ( mad_ifc.mad ) );
+
+	/* Issue MAD */
+	if ( ( rc = arbel_cmd_mad_ifc ( arbel, ibdev->port,
+					&mad_ifc ) ) != 0 ) {
+		DBGC ( arbel, "Arbel %p could not issue MAD IFC: %s\n",
+		       arbel, strerror ( rc ) );
+		return rc;
+	}
+
+	/* Copy out reply packet */
+	memcpy ( mad, &mad_ifc.mad, sizeof ( *mad ) );
+
+	if ( mad->hdr.status != 0 ) {
+		DBGC ( arbel, "Arbel %p MAD IFC status %04x\n",
+		       arbel, ntohs ( mad->hdr.status ) );
+		return -EIO;
+	}
+	return 0;
 }
 
 /***************************************************************************
@@ -1394,6 +1439,9 @@ static void arbel_event_port_state_change ( struct arbel *arbel,
 		return;
 	}
 
+	/* Update MAD parameters */
+	ib_smc_update ( arbel->ibdev[port], arbel_mad );
+
 	/* Notify Infiniband core of link state change */
 	ib_link_state_changed ( arbel->ibdev[port] );
 }
@@ -1482,6 +1530,9 @@ static int arbel_open ( struct ib_device *ibdev ) {
 		       arbel, strerror ( rc ) );
 		return rc;
 	}
+
+	/* Update MAD parameters */
+	ib_smc_update ( ibdev, arbel_mad );
 
 	return 0;
 }
@@ -1598,51 +1649,6 @@ static void arbel_mcast_detach ( struct ib_device *ibdev,
 	}
 }
 
-/***************************************************************************
- *
- * MAD operations
- *
- ***************************************************************************
- */
-
-/**
- * Issue management datagram
- *
- * @v ibdev		Infiniband device
- * @v mad		Management datagram
- * @v len		Length of management datagram
- * @ret rc		Return status code
- */
-static int arbel_mad ( struct ib_device *ibdev, struct ib_mad_hdr *mad,
-		       size_t len ) {
-	struct arbel *arbel = ib_get_drvdata ( ibdev );
-	union arbelprm_mad mad_ifc;
-	int rc;
-
-	/* Copy in request packet */
-	memset ( &mad_ifc, 0, sizeof ( mad_ifc ) );
-	assert ( len <= sizeof ( mad_ifc.mad ) );
-	memcpy ( &mad_ifc.mad, mad, len );
-
-	/* Issue MAD */
-	if ( ( rc = arbel_cmd_mad_ifc ( arbel, ibdev->port,
-					&mad_ifc ) ) != 0 ) {
-		DBGC ( arbel, "Arbel %p could not issue MAD IFC: %s\n",
-		       arbel, strerror ( rc ) );
-		return rc;
-	}
-
-	/* Copy out reply packet */
-	memcpy ( mad, &mad_ifc.mad, len );
-
-	if ( mad->status != 0 ) {
-		DBGC ( arbel, "Arbel %p MAD IFC status %04x\n",
-		       arbel, ntohs ( mad->status ) );
-		return -EIO;
-	}
-	return 0;
-}
-
 /** Arbel Infiniband operations */
 static struct ib_device_operations arbel_ib_operations = {
 	.create_cq	= arbel_create_cq,
@@ -1658,7 +1664,6 @@ static struct ib_device_operations arbel_ib_operations = {
 	.close		= arbel_close,
 	.mcast_attach	= arbel_mcast_attach,
 	.mcast_detach	= arbel_mcast_detach,
-	.mad		= arbel_mad,
 };
 
 /***************************************************************************

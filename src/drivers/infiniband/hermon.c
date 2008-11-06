@@ -31,6 +31,7 @@
 #include <gpxe/iobuf.h>
 #include <gpxe/netdevice.h>
 #include <gpxe/infiniband.h>
+#include <gpxe/ib_smc.h>
 #include "hermon.h"
 
 /**
@@ -606,6 +607,50 @@ static void hermon_free_mtt ( struct hermon *hermon,
 			      struct hermon_mtt *mtt ) {
 	hermon_bitmask_free ( hermon->mtt_inuse, mtt->mtt_offset,
 			      mtt->num_pages );
+}
+
+/***************************************************************************
+ *
+ * MAD operations
+ *
+ ***************************************************************************
+ */
+
+/**
+ * Issue management datagram
+ *
+ * @v ibdev		Infiniband device
+ * @v mad		Management datagram
+ * @ret rc		Return status code
+ */
+static int hermon_mad ( struct ib_device *ibdev, union ib_mad *mad ) {
+	struct hermon *hermon = ib_get_drvdata ( ibdev );
+	union hermonprm_mad mad_ifc;
+	int rc;
+
+	linker_assert ( sizeof ( *mad ) == sizeof ( mad_ifc.mad ),
+			mad_size_mismatch );
+
+	/* Copy in request packet */
+	memcpy ( &mad_ifc.mad, mad, sizeof ( mad_ifc.mad ) );
+
+	/* Issue MAD */
+	if ( ( rc = hermon_cmd_mad_ifc ( hermon, ibdev->port,
+					 &mad_ifc ) ) != 0 ) {
+		DBGC ( hermon, "Hermon %p could not issue MAD IFC: %s\n",
+		       hermon, strerror ( rc ) );
+		return rc;
+	}
+
+	/* Copy out reply packet */
+	memcpy ( mad, &mad_ifc.mad, sizeof ( *mad ) );
+
+	if ( mad->hdr.status != 0 ) {
+		DBGC ( hermon, "Hermon %p MAD IFC status %04x\n",
+		       hermon, ntohs ( mad->hdr.status ) );
+		return -EIO;
+	}
+	return 0;
 }
 
 /***************************************************************************
@@ -1377,6 +1422,9 @@ static void hermon_event_port_state_change ( struct hermon *hermon,
 		return;
 	}
 
+	/* Update MAD parameters */
+	ib_smc_update ( hermon->ibdev[port], hermon_mad );
+
 	/* Notify Infiniband core of link state change */
 	ib_link_state_changed ( hermon->ibdev[port] );
 }
@@ -1464,6 +1512,9 @@ static int hermon_open ( struct ib_device *ibdev ) {
 		       hermon, strerror ( rc ) );
 		return rc;
 	}
+
+	/* Update MAD parameters */
+	ib_smc_update ( ibdev, hermon_mad );
 
 	return 0;
 }
@@ -1579,51 +1630,6 @@ static void hermon_mcast_detach ( struct ib_device *ibdev,
 	}
 }
 
-/***************************************************************************
- *
- * MAD operations
- *
- ***************************************************************************
- */
-
-/**
- * Issue management datagram
- *
- * @v ibdev		Infiniband device
- * @v mad		Management datagram
- * @v len		Length of management datagram
- * @ret rc		Return status code
- */
-static int hermon_mad ( struct ib_device *ibdev, struct ib_mad_hdr *mad,
-			size_t len ) {
-	struct hermon *hermon = ib_get_drvdata ( ibdev );
-	union hermonprm_mad mad_ifc;
-	int rc;
-
-	/* Copy in request packet */
-	memset ( &mad_ifc, 0, sizeof ( mad_ifc ) );
-	assert ( len <= sizeof ( mad_ifc.mad ) );
-	memcpy ( &mad_ifc.mad, mad, len );
-
-	/* Issue MAD */
-	if ( ( rc = hermon_cmd_mad_ifc ( hermon, ibdev->port,
-					 &mad_ifc ) ) != 0 ) {
-		DBGC ( hermon, "Hermon %p could not issue MAD IFC: %s\n",
-		       hermon, strerror ( rc ) );
-		return rc;
-	}
-
-	/* Copy out reply packet */
-	memcpy ( mad, &mad_ifc.mad, len );
-
-	if ( mad->status != 0 ) {
-		DBGC ( hermon, "Hermon %p MAD IFC status %04x\n",
-		       hermon, ntohs ( mad->status ) );
-		return -EIO;
-	}
-	return 0;
-}
-
 /** Hermon Infiniband operations */
 static struct ib_device_operations hermon_ib_operations = {
 	.create_cq	= hermon_create_cq,
@@ -1639,7 +1645,6 @@ static struct ib_device_operations hermon_ib_operations = {
 	.close		= hermon_close,
 	.mcast_attach	= hermon_mcast_attach,
 	.mcast_detach	= hermon_mcast_detach,
-	.mad		= hermon_mad,
 };
 
 /***************************************************************************
