@@ -60,7 +60,7 @@ ib_create_cq ( struct ib_device *ibdev, unsigned int num_cqes,
 	/* Allocate and initialise data structure */
 	cq = zalloc ( sizeof ( *cq ) );
 	if ( ! cq )
-		return NULL;
+		goto err_alloc_cq;
 	cq->num_cqes = num_cqes;
 	INIT_LIST_HEAD ( &cq->work_queues );
 	cq->op = op;
@@ -69,14 +69,19 @@ ib_create_cq ( struct ib_device *ibdev, unsigned int num_cqes,
 	if ( ( rc = ibdev->op->create_cq ( ibdev, cq ) ) != 0 ) {
 		DBGC ( ibdev, "IBDEV %p could not initialise completion "
 		       "queue: %s\n", ibdev, strerror ( rc ) );
-		free ( cq );
-		return NULL;
+		goto err_dev_create_cq;
 	}
 
 	DBGC ( ibdev, "IBDEV %p created %d-entry completion queue %p (%p) "
 	       "with CQN %#lx\n", ibdev, num_cqes, cq,
 	       ib_cq_get_drvdata ( cq ), cq->cqn );
 	return cq;
+
+	ibdev->op->destroy_cq ( ibdev, cq );
+ err_dev_create_cq:
+	free ( cq );
+ err_alloc_cq:
+	return NULL;
 }
 
 /**
@@ -123,7 +128,9 @@ struct ib_queue_pair * ib_create_qp ( struct ib_device *ibdev,
 		       ( num_recv_wqes * sizeof ( qp->recv.iobufs[0] ) ) );
 	qp = zalloc ( total_size );
 	if ( ! qp )
-		return NULL;
+		goto err_alloc_qp;
+	qp->ibdev = ibdev;
+	list_add ( &qp->list, &ibdev->qps );
 	qp->qkey = qkey;
 	qp->send.qp = qp;
 	qp->send.is_send = 1;
@@ -137,15 +144,13 @@ struct ib_queue_pair * ib_create_qp ( struct ib_device *ibdev,
 	qp->recv.num_wqes = num_recv_wqes;
 	qp->recv.iobufs = ( ( ( void * ) qp ) + sizeof ( *qp ) +
 			    ( num_send_wqes * sizeof ( qp->send.iobufs[0] ) ));
+	INIT_LIST_HEAD ( &qp->mgids );
 
 	/* Perform device-specific initialisation and get QPN */
 	if ( ( rc = ibdev->op->create_qp ( ibdev, qp ) ) != 0 ) {
 		DBGC ( ibdev, "IBDEV %p could not initialise queue pair: "
 		       "%s\n", ibdev, strerror ( rc ) );
-		list_del ( &qp->send.list );
-		list_del ( &qp->recv.list );
-		free ( qp );
-		return NULL;
+		goto err_dev_create_qp;
 	}
 
 	DBGC ( ibdev, "IBDEV %p created queue pair %p (%p) with QPN %#lx\n",
@@ -157,6 +162,15 @@ struct ib_queue_pair * ib_create_qp ( struct ib_device *ibdev,
 	       ibdev, qp->qpn, num_recv_wqes, qp->recv.iobufs,
 	       ( ( ( void * ) qp ) + total_size ) );
 	return qp;
+
+	ibdev->op->destroy_qp ( ibdev, qp );
+ err_dev_create_qp:
+	list_del ( &qp->send.list );
+	list_del ( &qp->recv.list );
+	list_del ( &qp->list );
+	free ( qp );
+ err_alloc_qp:
+	return NULL;
 }
 
 /**
@@ -199,6 +213,8 @@ void ib_destroy_qp ( struct ib_device *ibdev, struct ib_queue_pair *qp ) {
 	DBGC ( ibdev, "IBDEV %p destroying QPN %#lx\n",
 	       ibdev, qp->qpn );
 
+	assert ( list_empty ( &qp->mgids ) );
+
 	/* Perform device-specific destruction */
 	ibdev->op->destroy_qp ( ibdev, qp );
 
@@ -219,7 +235,49 @@ void ib_destroy_qp ( struct ib_device *ibdev, struct ib_queue_pair *qp ) {
 	list_del ( &qp->recv.list );
 
 	/* Free QP */
+	list_del ( &qp->list );
 	free ( qp );
+}
+
+/**
+ * Find queue pair by QPN
+ *
+ * @v ibdev		Infiniband device
+ * @v qpn		Queue pair number
+ * @ret qp		Queue pair, or NULL
+ */
+struct ib_queue_pair * ib_find_qp_qpn ( struct ib_device *ibdev,
+					unsigned long qpn ) {
+	struct ib_queue_pair *qp;
+
+	list_for_each_entry ( qp, &ibdev->qps, list ) {
+		if ( qp->qpn == qpn )
+			return qp;
+	}
+	return NULL;
+}
+
+/**
+ * Find queue pair by multicast GID
+ *
+ * @v ibdev		Infiniband device
+ * @v gid		Multicast GID
+ * @ret qp		Queue pair, or NULL
+ */
+struct ib_queue_pair * ib_find_qp_mgid ( struct ib_device *ibdev,
+					 struct ib_gid *gid ) {
+	struct ib_queue_pair *qp;
+	struct ib_multicast_gid *mgid;
+
+	list_for_each_entry ( qp, &ibdev->qps, list ) {
+		list_for_each_entry ( mgid, &qp->mgids, list ) {
+			if ( memcmp ( &mgid->gid, gid,
+				      sizeof ( mgid->gid ) ) == 0 ) {
+				return qp;
+			}
+		}
+	}
+	return NULL;
 }
 
 /**
@@ -333,6 +391,66 @@ void ib_complete_recv ( struct ib_device *ibdev, struct ib_queue_pair *qp,
 	qp->recv.fill--;
 }
 
+/**
+ * Attach to multicast group
+ *
+ * @v ibdev		Infiniband device
+ * @v qp		Queue pair
+ * @v gid		Multicast GID
+ * @ret rc		Return status code
+ */
+int ib_mcast_attach ( struct ib_device *ibdev, struct ib_queue_pair *qp,
+		      struct ib_gid *gid ) {
+	struct ib_multicast_gid *mgid;
+	int rc;
+
+	/* Add to software multicast GID list */
+	mgid = zalloc ( sizeof ( *mgid ) );
+	if ( ! mgid ) {
+		rc = -ENOMEM;
+		goto err_alloc_mgid;
+	}
+	memcpy ( &mgid->gid, gid, sizeof ( mgid->gid ) );
+	list_add ( &mgid->list, &qp->mgids );
+
+	/* Add to hardware multicast GID list */
+	if ( ( rc = ibdev->op->mcast_attach ( ibdev, qp, gid ) ) != 0 )
+		goto err_dev_mcast_attach;
+
+	return 0;
+
+ err_dev_mcast_attach:
+	list_del ( &mgid->list );
+	free ( mgid );
+ err_alloc_mgid:
+	return rc;
+}
+
+/**
+ * Detach from multicast group
+ *
+ * @v ibdev		Infiniband device
+ * @v qp		Queue pair
+ * @v gid		Multicast GID
+ */
+void ib_mcast_detach ( struct ib_device *ibdev, struct ib_queue_pair *qp,
+		       struct ib_gid *gid ) {
+	struct ib_multicast_gid *mgid;
+
+	/* Remove from hardware multicast GID list */
+	ibdev->op->mcast_detach ( ibdev, qp, gid );
+
+	/* Remove from software multicast GID list */
+	list_for_each_entry ( mgid, &qp->mgids, list ) {
+		if ( memcmp ( &mgid->gid, gid, sizeof ( mgid->gid ) ) == 0 ) {
+			list_del ( &mgid->list );
+			free ( mgid );
+			break;
+		}
+	}
+}
+
+
 /***************************************************************************
  *
  * Event queues
@@ -392,6 +510,7 @@ struct ib_device * alloc_ibdev ( size_t priv_size ) {
 	if ( ibdev ) {
 		drv_priv = ( ( ( void * ) ibdev ) + sizeof ( *ibdev ) );
 		ib_set_drvdata ( ibdev, drv_priv );
+		INIT_LIST_HEAD ( &ibdev->qps );
 		ibdev->lid = IB_LID_NONE;
 		ibdev->pkey = IB_PKEY_NONE;
 	}

@@ -55,8 +55,20 @@ struct ib_work_queue {
 	void *drv_priv;
 };
 
+/** An Infiniband multicast GID */
+struct ib_multicast_gid {
+	/** List of multicast GIDs on this QP */
+	struct list_head list;
+	/** Multicast GID */
+	struct ib_gid gid;
+};
+
 /** An Infiniband Queue Pair */
 struct ib_queue_pair {
+	/** Containing Infiniband device */
+	struct ib_device *ibdev;
+	/** List of queue pairs on this Infiniband device */
+	struct list_head list;
 	/** Queue Pair Number */
 	unsigned long qpn;
 	/** Queue key */
@@ -65,6 +77,8 @@ struct ib_queue_pair {
 	struct ib_work_queue send;
 	/** Receive queue */
 	struct ib_work_queue recv;
+	/** List of multicast GIDs */
+	struct list_head mgids;
 	/** Driver private data */
 	void *drv_priv;
 	/** Queue owner private data */
@@ -286,6 +300,8 @@ struct ib_device {
 	struct list_head list;
 	/** Underlying device */
 	struct device *dev;
+	/** List of queue pairs */
+	struct list_head qps;
 	/** Infiniband operations */
 	struct ib_device_operations *op;
 	/** Port number */
@@ -308,6 +324,9 @@ struct ib_device {
 	/** Partition key */
 	uint16_t pkey;
 
+	/** Outbound packet sequence number */
+	uint32_t psn;
+
 	/** Driver private data */
 	void *drv_priv;
 	/** Owner private data */
@@ -327,6 +346,10 @@ extern int ib_modify_qp ( struct ib_device *ibdev, struct ib_queue_pair *qp,
 			  unsigned long mod_list, unsigned long qkey );
 extern void ib_destroy_qp ( struct ib_device *ibdev,
 			    struct ib_queue_pair *qp );
+extern struct ib_queue_pair * ib_find_qp_qpn ( struct ib_device *ibdev,
+					       unsigned long qpn );
+extern struct ib_queue_pair * ib_find_qp_mgid ( struct ib_device *ibdev,
+						struct ib_gid *gid );
 extern struct ib_work_queue * ib_find_wq ( struct ib_completion_queue *cq,
 					   unsigned long qpn, int is_send );
 extern int ib_post_send ( struct ib_device *ibdev, struct ib_queue_pair *qp,
@@ -341,6 +364,10 @@ extern void ib_complete_recv ( struct ib_device *ibdev,
 			       struct ib_queue_pair *qp,
 			       struct ib_address_vector *av,
 			       struct io_buffer *iobuf, int rc );
+extern int ib_mcast_attach ( struct ib_device *ibdev, struct ib_queue_pair *qp,
+			     struct ib_gid *gid );
+extern void ib_mcast_detach ( struct ib_device *ibdev,
+			      struct ib_queue_pair *qp, struct ib_gid *gid );
 extern struct ib_device * alloc_ibdev ( size_t priv_size );
 extern int register_ibdev ( struct ib_device *ibdev );
 extern void unregister_ibdev ( struct ib_device *ibdev );
@@ -392,33 +419,6 @@ ib_close ( struct ib_device *ibdev ) {
 static inline __always_inline int
 ib_link_ok ( struct ib_device *ibdev ) {
 	return ( ibdev->port_state == IB_PORT_STATE_ACTIVE );
-}
-
-/**
- * Attach to multicast group
- *
- * @v ibdev		Infiniband device
- * @v qp		Queue pair
- * @v gid		Multicast GID
- * @ret rc		Return status code
- */
-static inline __always_inline int
-ib_mcast_attach ( struct ib_device *ibdev, struct ib_queue_pair *qp,
-		  struct ib_gid *gid ) {
-	return ibdev->op->mcast_attach ( ibdev, qp, gid );
-}
-
-/**
- * Detach from multicast group
- *
- * @v ibdev		Infiniband device
- * @v qp		Queue pair
- * @v gid		Multicast GID
- */
-static inline __always_inline void
-ib_mcast_detach ( struct ib_device *ibdev, struct ib_queue_pair *qp,
-		  struct ib_gid *gid ) {
-	ibdev->op->mcast_detach ( ibdev, qp, gid );
 }
 
 /**
