@@ -135,6 +135,7 @@
 #define ERRFILE_netdev_settings		( ERRFILE_NET | 0x00140000 )
 #define ERRFILE_dhcppkt			( ERRFILE_NET | 0x00150000 )
 #define ERRFILE_slam			( ERRFILE_NET | 0x00160000 )
+#define ERRFILE_ib_sma			( ERRFILE_NET | 0x00170000 )
 
 #define ERRFILE_image		      ( ERRFILE_IMAGE | 0x00000000 )
 #define ERRFILE_elf		      ( ERRFILE_IMAGE | 0x00010000 )
