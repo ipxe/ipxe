@@ -384,6 +384,7 @@ int fetch_setting_len ( struct settings *settings, struct setting *setting ) {
  */
 int fetch_string_setting ( struct settings *settings, struct setting *setting,
 			   char *data, size_t len ) {
+	memset ( data, 0, len );
 	return fetch_setting ( settings, setting, data,
 			       ( ( len > 0 ) ? ( len - 1 ) : 0 ) );
 }
