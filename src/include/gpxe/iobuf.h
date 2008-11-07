@@ -181,6 +181,24 @@ static inline size_t iob_tailroom ( struct io_buffer *iobuf ) {
 	return ( iobuf->end - iobuf->tail );
 }
 
+/**
+ * Create a temporary I/O buffer
+ *
+ * @v iobuf	I/O buffer
+ * @v data	Data buffer
+ * @v len	Length of data
+ * @v max_len	Length of buffer
+ *
+ * It is sometimes useful to use the iob_xxx() methods on temporary
+ * data buffers.
+ */
+static inline void iob_populate ( struct io_buffer *iobuf,
+				  void *data, size_t len, size_t max_len ) {
+	iobuf->head = iobuf->data = data;
+	iobuf->tail = ( data + len );
+	iobuf->end = ( data + max_len );
+}
+
 extern struct io_buffer * __malloc alloc_iob ( size_t len );
 extern void free_iob ( struct io_buffer *iobuf );
 extern void iob_pad ( struct io_buffer *iobuf, size_t min_len );
