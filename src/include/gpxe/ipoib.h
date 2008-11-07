@@ -26,33 +26,30 @@ struct ipoib_mac {
 } __attribute__ (( packed ));
 
 /** IPoIB link-layer header length */
-#define IPOIB_HLEN 24
+#define IPOIB_HLEN 4
 
-/**
- * IPoIB link-layer header pseudo portion
- *
- * This part doesn't actually exist on the wire, but it provides a
- * convenient way to fit into the typical network device model.
- */
-struct ipoib_pseudo_hdr {
-	/** Peer address */
-	struct ipoib_mac peer;
-} __attribute__ (( packed ));
-
-/** IPoIB link-layer header real portion */
-struct ipoib_real_hdr {
+/** IPoIB link-layer header */
+struct ipoib_hdr {
 	/** Network-layer protocol */
 	uint16_t proto;
 	/** Reserved, must be zero */
-	uint16_t reserved;
-} __attribute__ (( packed ));
-
-/** An IPoIB link-layer header */
-struct ipoib_hdr {
-	/** Pseudo portion */
-	struct ipoib_pseudo_hdr pseudo;
-	/** Real portion */
-	struct ipoib_real_hdr real;
+	union {
+		/** Reserved, must be zero */
+		uint16_t reserved;
+		/** Peer addresses
+		 *
+		 * We use these fields internally to represent the
+		 * peer addresses using a lookup key.  There simply
+		 * isn't enough room in the IPoIB header to store
+		 * literal source or destination MAC addresses.
+		 */
+		struct {
+			/** Destination address key */
+			uint8_t dest;
+			/** Source address key */
+			uint8_t src;
+		} __attribute__ (( packed )) peer;
+	} __attribute__ (( packed )) u;
 } __attribute__ (( packed ));
 
 extern struct ll_protocol ipoib_protocol;

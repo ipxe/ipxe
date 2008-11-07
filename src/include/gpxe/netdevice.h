@@ -23,7 +23,7 @@ struct device;
 #define MAX_LL_ADDR_LEN 20
 
 /** Maximum length of a link-layer header */
-#define MAX_LL_HEADER_LEN 32
+#define MAX_LL_HEADER_LEN 6
 
 /** Maximum length of a network-layer address */
 #define MAX_NET_ADDR_LEN 4

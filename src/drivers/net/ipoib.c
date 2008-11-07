@@ -85,32 +85,6 @@ struct ipoib_device {
 	int broadcast_attached;
 };
 
-/**
- * IPoIB path cache entry
- *
- * This serves a similar role to the ARP cache for Ethernet.  (ARP
- * *is* used on IPoIB; we have two caches to maintain.)
- */
-struct ipoib_cached_path {
-	/** Destination GID */
-	struct ib_gid gid;
-	/** Destination LID */
-	unsigned int dlid;
-	/** Service level */
-	unsigned int sl;
-	/** Rate */
-	unsigned int rate;
-};
-
-/** Number of IPoIB path cache entries */
-#define IPOIB_NUM_CACHED_PATHS 2
-
-/** IPoIB path cache */
-static struct ipoib_cached_path ipoib_path_cache[IPOIB_NUM_CACHED_PATHS];
-
-/** Oldest IPoIB path cache entry index */
-static unsigned int ipoib_path_cache_idx = 0;
-
 /** TID half used to identify get path record replies */
 #define IPOIB_TID_GET_PATH_REC 0x11111111UL
 
@@ -119,22 +93,6 @@ static unsigned int ipoib_path_cache_idx = 0;
 
 /** IPoIB metadata TID */
 static uint32_t ipoib_meta_tid = 0;
-
-/** IPv4 broadcast GID */
-static const struct ib_gid ipv4_broadcast_gid = {
-	{ { 0xff, 0x12, 0x40, 0x1b, 0x00, 0x00, 0x00, 0x00,
-	    0x00, 0x00, 0x00, 0x00, 0xff, 0xff, 0xff, 0xff } }
-};
-
-/** Maximum time we will wait for the broadcast join to succeed */
-#define IPOIB_JOIN_MAX_DELAY_MS 1000
-
-/****************************************************************************
- *
- * IPoIB link layer
- *
- ****************************************************************************
- */
 
 /** Broadcast QPN used in IPoIB MAC addresses
  *
@@ -145,7 +103,135 @@ static const struct ib_gid ipv4_broadcast_gid = {
 /** Broadcast IPoIB address */
 static struct ipoib_mac ipoib_broadcast = {
 	.qpn = ntohl ( IPOIB_BROADCAST_QPN ),
+	.gid.u.bytes = 	{ 0xff, 0x12, 0x40, 0x1b, 0x00, 0x00, 0x00, 0x00,
+			  0x00, 0x00, 0x00, 0x00, 0xff, 0xff, 0xff, 0xff },
 };
+
+/****************************************************************************
+ *
+ * IPoIB peer cache
+ *
+ ****************************************************************************
+ */
+
+/**
+ * IPoIB peer address
+ *
+ * This serves a similar role to the ARP cache for Ethernet.  (ARP
+ * *is* used on IPoIB; we have two caches to maintain.)
+ */
+struct ipoib_peer {
+	/** Key */
+	uint8_t key;
+	/** MAC address */
+	struct ipoib_mac mac;
+	/** LID */
+	unsigned int lid;
+	/** Service level */
+	unsigned int sl;
+	/** Rate */
+	unsigned int rate;
+};
+
+/** Number of IPoIB peer cache entries
+ *
+ * Must be a power of two.
+ */
+#define IPOIB_NUM_CACHED_PEERS 4
+
+/** IPoIB peer address cache */
+static struct ipoib_peer ipoib_peer_cache[IPOIB_NUM_CACHED_PEERS];
+
+/** Oldest IPoIB peer cache entry index */
+static unsigned int ipoib_peer_cache_idx = 1;
+
+/**
+ * Look up cached peer by key
+ *
+ * @v key		Peer cache key
+ * @ret peer		Peer cache entry, or NULL
+ */
+static struct ipoib_peer * ipoib_lookup_peer_by_key ( unsigned int key ) {
+	struct ipoib_peer *peer;
+	unsigned int i;
+
+	for ( i = 0 ; i < IPOIB_NUM_CACHED_PEERS ; i++ ) {
+		peer = &ipoib_peer_cache[i];
+		if ( peer->key == key )
+			return peer;
+	}
+
+	if ( key != 0 ) {
+		DBG ( "IPoIB warning: peer cache lost track of key %x while "
+		      "still in use\n", key );
+	}
+	return NULL;
+}
+
+/**
+ * Look up cached peer by GID
+ *
+ * @v gid		Peer GID
+ * @ret peer		Peer cache entry, or NULL
+ */
+static struct ipoib_peer *
+ipoib_lookup_peer_by_gid ( const struct ib_gid *gid ) {
+	struct ipoib_peer *peer;
+	unsigned int i;
+
+	for ( i = 0 ; i < IPOIB_NUM_CACHED_PEERS ; i++ ) {
+		peer = &ipoib_peer_cache[i];
+		if ( memcmp ( &peer->mac.gid, gid,
+			      sizeof ( peer->mac.gid) ) == 0 ) {
+			return peer;
+		}
+	}
+
+	return NULL;
+}
+
+/**
+ * Store GID and QPN in peer cache
+ *
+ * @v gid		Peer GID
+ * @v qpn		Peer QPN
+ * @ret peer		Peer cache entry
+ */
+static struct ipoib_peer *
+ipoib_cache_peer ( const struct ib_gid *gid, unsigned long qpn ) {
+	struct ipoib_peer *peer;
+	unsigned int key;
+
+	/* Look for existing cache entry */
+	peer = ipoib_lookup_peer_by_gid ( gid );
+	if ( peer ) {
+		assert ( peer->mac.qpn = ntohl ( qpn ) );
+		return peer;
+	}
+
+	/* No entry found: create a new one */
+	key = ipoib_peer_cache_idx++;
+	peer = &ipoib_peer_cache[ key % IPOIB_NUM_CACHED_PEERS ];
+	if ( peer->key )
+		DBG ( "IPoIB peer %x evicted from cache\n", peer->key );
+
+	memset ( peer, 0, sizeof ( *peer ) );
+	peer->key = key;
+	peer->mac.qpn = htonl ( qpn );
+	memcpy ( &peer->mac.gid, gid, sizeof ( peer->mac.gid ) );
+	DBG ( "IPoIB peer %x has GID %08lx:%08lx:%08lx:%08lx and QPN %lx\n",
+	      peer->key, htonl ( gid->u.dwords[0] ),
+	      htonl ( gid->u.dwords[1] ), htonl ( gid->u.dwords[2] ),
+	      htonl ( gid->u.dwords[3] ), qpn );
+	return peer;
+}
+
+/****************************************************************************
+ *
+ * IPoIB link layer
+ *
+ ****************************************************************************
+ */
 
 /**
  * Add IPoIB link-layer header
@@ -160,12 +246,19 @@ static int ipoib_push ( struct io_buffer *iobuf, const void *ll_dest,
 			const void *ll_source __unused, uint16_t net_proto ) {
 	struct ipoib_hdr *ipoib_hdr =
 		iob_push ( iobuf, sizeof ( *ipoib_hdr ) );
+	const struct ipoib_mac *dest_mac = ll_dest;
+	const struct ipoib_mac *src_mac = ll_source;
+	struct ipoib_peer *dest;
+	struct ipoib_peer *src;
+
+	/* Add link-layer addresses to cache */
+	dest = ipoib_cache_peer ( &dest_mac->gid, ntohl ( dest_mac->qpn ) );
+	src = ipoib_cache_peer ( &src_mac->gid, ntohl ( src_mac->qpn ) );
 
 	/* Build IPoIB header */
-	memcpy ( &ipoib_hdr->pseudo.peer, ll_dest,
-		 sizeof ( ipoib_hdr->pseudo.peer ) );
-	ipoib_hdr->real.proto = net_proto;
-	ipoib_hdr->real.reserved = 0;
+	ipoib_hdr->proto = net_proto;
+	ipoib_hdr->u.peer.dest = dest->key;
+	ipoib_hdr->u.peer.src = src->key;
 
 	return 0;
 }
@@ -182,6 +275,8 @@ static int ipoib_push ( struct io_buffer *iobuf, const void *ll_dest,
 static int ipoib_pull ( struct io_buffer *iobuf, const void **ll_dest,
 			const void **ll_source, uint16_t *net_proto ) {
 	struct ipoib_hdr *ipoib_hdr = iobuf->data;
+	struct ipoib_peer *dest;
+	struct ipoib_peer *source;
 
 	/* Sanity check */
 	if ( iob_len ( iobuf ) < sizeof ( *ipoib_hdr ) ) {
@@ -193,10 +288,17 @@ static int ipoib_pull ( struct io_buffer *iobuf, const void **ll_dest,
 	/* Strip off IPoIB header */
 	iob_pull ( iobuf, sizeof ( *ipoib_hdr ) );
 
+	/* Identify source and destination addresses, and clear
+	 * reserved word in IPoIB header
+	 */
+	dest = ipoib_lookup_peer_by_key ( ipoib_hdr->u.peer.dest );
+	source = ipoib_lookup_peer_by_key ( ipoib_hdr->u.peer.src );
+	ipoib_hdr->u.reserved = 0;
+
 	/* Fill in required fields */
-	*ll_dest = &ipoib_broadcast; /* Doesn't really exist in packet */
-	*ll_source = &ipoib_hdr->pseudo.peer;
-	*net_proto = ipoib_hdr->real.proto;
+	*ll_dest = ( dest ? &dest->mac : &ipoib_broadcast );
+	*ll_source = ( source ? &source->mac : &ipoib_broadcast );
+	*net_proto = ipoib_hdr->proto;
 
 	return 0;
 }
@@ -328,28 +430,6 @@ static int ipoib_create_qset ( struct ipoib_device *ipoib,
 }
 
 /**
- * Find path cache entry by GID
- *
- * @v gid		GID
- * @ret entry		Path cache entry, or NULL
- */
-static struct ipoib_cached_path *
-ipoib_find_cached_path ( struct ib_gid *gid ) {
-	struct ipoib_cached_path *path;
-	unsigned int i;
-
-	for ( i = 0 ; i < IPOIB_NUM_CACHED_PATHS ; i++ ) {
-		path = &ipoib_path_cache[i];
-		if ( memcmp ( &path->gid, gid, sizeof ( *gid ) ) == 0 )
-			return path;
-	}
-	DBG ( "IPoIB %08lx:%08lx:%08lx:%08lx cache miss\n",
-	      htonl ( gid->u.dwords[0] ), htonl ( gid->u.dwords[1] ),
-	      htonl ( gid->u.dwords[2] ), htonl ( gid->u.dwords[3] ) );
-	return NULL;
-}
-
-/**
  * Transmit path record request
  *
  * @v ipoib		IPoIB device
@@ -477,18 +557,17 @@ static int ipoib_transmit ( struct net_device *netdev,
 			    struct io_buffer *iobuf ) {
 	struct ipoib_device *ipoib = netdev->priv;
 	struct ib_device *ibdev = ipoib->ibdev;
-	struct ipoib_pseudo_hdr *ipoib_pshdr = iobuf->data;
+	struct ipoib_hdr *ipoib_hdr;
+	struct ipoib_peer *dest;
 	struct ib_address_vector av;
 	struct ib_gid *gid;
-	struct ipoib_cached_path *path;
-	int rc;
 
 	/* Sanity check */
-	if ( iob_len ( iobuf ) < sizeof ( *ipoib_pshdr ) ) {
+	if ( iob_len ( iobuf ) < sizeof ( *ipoib_hdr ) ) {
 		DBGC ( ipoib, "IPoIB %p buffer too short\n", ipoib );
 		return -EINVAL;
 	}
-	iob_pull ( iobuf, ( sizeof ( *ipoib_pshdr ) ) );
+	ipoib_hdr = iobuf->data;
 
 	/* Attempting transmission while link is down will put the
 	 * queue pair into an error state, so don't try it.
@@ -496,30 +575,33 @@ static int ipoib_transmit ( struct net_device *netdev,
 	if ( ! ib_link_ok ( ibdev ) )
 		return -ENETUNREACH;
 
+	/* Identify destination address */
+	dest = ipoib_lookup_peer_by_key ( ipoib_hdr->u.peer.dest );
+	if ( ! dest )
+		return -ENXIO;
+	ipoib_hdr->u.reserved = 0;
+
 	/* Construct address vector */
 	memset ( &av, 0, sizeof ( av ) );
-	av.qkey = IB_GLOBAL_QKEY;
+	av.qkey = ipoib->data_qkey;
 	av.gid_present = 1;
-	if ( ipoib_pshdr->peer.qpn == htonl ( IPOIB_BROADCAST_QPN ) ) {
-		/* Broadcast address */
+	if ( dest->mac.qpn == htonl ( IPOIB_BROADCAST_QPN ) ) {
+		/* Broadcast */
 		av.qpn = IB_BROADCAST_QPN;
 		av.lid = ipoib->broadcast_lid;
 		gid = &ipoib->broadcast_gid;
 	} else {
-		/* Unicast - look in path cache */
-		path = ipoib_find_cached_path ( &ipoib_pshdr->peer.gid );
-		if ( ! path ) {
-			/* No path entry - get path record */
-			rc = ipoib_get_path_record ( ipoib,
-						     &ipoib_pshdr->peer.gid );
-			netdev_tx_complete ( netdev, iobuf );
-			return rc;
+		/* Unicast */
+		if ( ! dest->lid ) {
+			/* No LID yet - get path record to fetch LID */
+			ipoib_get_path_record ( ipoib, &dest->mac.gid );
+			return -ENOENT;
 		}
-		av.qpn = ntohl ( ipoib_pshdr->peer.qpn );
-		av.lid = path->dlid;
-		av.rate = path->rate;
-		av.sl = path->sl;
-		gid = &ipoib_pshdr->peer.gid;
+		av.qpn = ntohl ( dest->mac.qpn );
+		av.lid = dest->lid;
+		av.rate = dest->rate;
+		av.sl = dest->sl;
+		gid = &dest->mac.gid;
 	}
 	memcpy ( &av.gid, gid, sizeof ( av.gid ) );
 
@@ -553,28 +635,35 @@ static void ipoib_data_complete_send ( struct ib_device *ibdev __unused,
  */
 static void ipoib_data_complete_recv ( struct ib_device *ibdev __unused,
 				       struct ib_queue_pair *qp,
-				       struct ib_address_vector *av __unused,
+				       struct ib_address_vector *av,
 				       struct io_buffer *iobuf, int rc ) {
 	struct net_device *netdev = ib_qp_get_ownerdata ( qp );
 	struct ipoib_device *ipoib = netdev->priv;
-	struct ipoib_pseudo_hdr *ipoib_pshdr;
+	struct ipoib_hdr *ipoib_hdr;
+	struct ipoib_peer *src;
 
 	if ( rc != 0 ) {
 		netdev_rx_err ( netdev, iobuf, rc );
 		return;
 	}
 
-	if ( iob_len ( iobuf ) < sizeof ( struct ipoib_real_hdr ) ) {
+	/* Sanity check */
+	if ( iob_len ( iobuf ) < sizeof ( struct ipoib_hdr ) ) {
 		DBGC ( ipoib, "IPoIB %p received data packet too short to "
 		       "contain IPoIB header\n", ipoib );
 		DBGC_HD ( ipoib, iobuf->data, iob_len ( iobuf ) );
 		netdev_rx_err ( netdev, iobuf, -EIO );
 		return;
 	}
+	ipoib_hdr = iobuf->data;
 
-	ipoib_pshdr = iob_push ( iobuf, sizeof ( *ipoib_pshdr ) );
-	/* FIXME: fill in a MAC address for the sake of AoE! */
+	/* Parse source address */
+	if ( av->gid_present ) {
+		src = ipoib_cache_peer ( &av->gid, av->qpn );
+		ipoib_hdr->u.peer.src = src->key;
+	}
 
+	/* Hand off to network layer */
 	netdev_rx ( netdev, iobuf );
 }
 
@@ -611,26 +700,25 @@ static void ipoib_meta_complete_send ( struct ib_device *ibdev __unused,
  * @v ipoib		IPoIB device
  * @v path_record	Path record
  */
-static void ipoib_recv_path_record ( struct ipoib_device *ipoib __unused,
+static void ipoib_recv_path_record ( struct ipoib_device *ipoib,
 				     struct ib_mad_path_record *path_record ) {
-	struct ipoib_cached_path *path;
+	struct ipoib_peer *peer;
+
+	/* Locate peer cache entry */
+	peer = ipoib_lookup_peer_by_gid ( &path_record->dgid );
+	if ( ! peer ) {
+		DBGC ( ipoib, "IPoIB %p received unsolicited path record\n",
+		       ipoib );
+		return;
+	}
 
 	/* Update path cache entry */
-	path = &ipoib_path_cache[ipoib_path_cache_idx];
-	memcpy ( &path->gid, &path_record->dgid, sizeof ( path->gid ) );
-	path->dlid = ntohs ( path_record->dlid );
-	path->sl = ( path_record->reserved__sl & 0x0f );
-	path->rate = ( path_record->rate_selector__rate & 0x3f );
+	peer->lid = ntohs ( path_record->dlid );
+	peer->sl = ( path_record->reserved__sl & 0x0f );
+	peer->rate = ( path_record->rate_selector__rate & 0x3f );
 
-	DBG ( "IPoIB %08lx:%08lx:%08lx:%08lx dlid %x sl %x rate %x\n",
-	      htonl ( path->gid.u.dwords[0] ), htonl ( path->gid.u.dwords[1] ),
-	      htonl ( path->gid.u.dwords[2] ), htonl ( path->gid.u.dwords[3] ),
-	      path->dlid, path->sl, path->rate );
-	
-	/* Update path cache index */
-	ipoib_path_cache_idx++;
-	if ( ipoib_path_cache_idx == IPOIB_NUM_CACHED_PATHS )
-		ipoib_path_cache_idx = 0;
+	DBG ( "IPoIB peer %x has dlid %x sl %x rate %x\n",
+	      peer->key, peer->lid, peer->sl, peer->rate );
 }
 
 /**
@@ -933,7 +1021,7 @@ static void ipoib_set_ib_params ( struct ipoib_device *ipoib ) {
 	memcpy ( &mac->gid, &ibdev->gid, sizeof ( mac->gid ) );
 
 	/* Calculate broadcast GID based on partition key */
-	memcpy ( &ipoib->broadcast_gid, &ipv4_broadcast_gid,
+	memcpy ( &ipoib->broadcast_gid, &ipoib_broadcast.gid,
 		 sizeof ( ipoib->broadcast_gid ) );
 	ipoib->broadcast_gid.u.words[2] = htons ( ibdev->pkey );
 
