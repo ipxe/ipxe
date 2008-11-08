@@ -317,14 +317,14 @@ efi_snp_statistics ( EFI_SIMPLE_NETWORK_PROTOCOL *snp, BOOLEAN reset,
 
 	/* Gather statistics */
 	memset ( &stats_buf, 0, sizeof ( stats_buf ) );
-	stats_buf.TxGoodFrames = snpdev->netdev->stats.tx_ok;
-	stats_buf.TxDroppedFrames = snpdev->netdev->stats.tx_err;
-	stats_buf.TxTotalFrames = ( snpdev->netdev->stats.tx_ok +
-				    snpdev->netdev->stats.tx_err );
-	stats_buf.RxGoodFrames = snpdev->netdev->stats.rx_ok;
-	stats_buf.RxDroppedFrames = snpdev->netdev->stats.rx_err;
-	stats_buf.RxTotalFrames = ( snpdev->netdev->stats.rx_ok +
-				    snpdev->netdev->stats.rx_err );
+	stats_buf.TxGoodFrames = snpdev->netdev->tx_stats.good;
+	stats_buf.TxDroppedFrames = snpdev->netdev->tx_stats.bad;
+	stats_buf.TxTotalFrames = ( snpdev->netdev->tx_stats.good +
+				    snpdev->netdev->tx_stats.bad );
+	stats_buf.RxGoodFrames = snpdev->netdev->rx_stats.good;
+	stats_buf.RxDroppedFrames = snpdev->netdev->rx_stats.bad;
+	stats_buf.RxTotalFrames = ( snpdev->netdev->rx_stats.good +
+				    snpdev->netdev->rx_stats.bad );
 	if ( *stats_len > sizeof ( stats_buf ) )
 		*stats_len = sizeof ( stats_buf );
 	if ( stats )
@@ -332,8 +332,10 @@ efi_snp_statistics ( EFI_SIMPLE_NETWORK_PROTOCOL *snp, BOOLEAN reset,
 
 	/* Reset statistics if requested to do so */
 	if ( reset ) {
-		memset ( &snpdev->netdev->stats, 0,
-			 sizeof ( snpdev->netdev->stats ) );
+		memset ( &snpdev->netdev->tx_stats, 0,
+			 sizeof ( snpdev->netdev->tx_stats ) );
+		memset ( &snpdev->netdev->rx_stats, 0,
+			 sizeof ( snpdev->netdev->rx_stats ) );
 	}
 
 	return 0;

@@ -392,10 +392,10 @@ PXENV_EXIT_t pxenv_undi_get_statistics ( struct s_PXENV_UNDI_GET_STATISTICS
 					 *undi_get_statistics ) {
 	DBG ( "PXENV_UNDI_GET_STATISTICS" );
 
-	undi_get_statistics->XmtGoodFrames = pxe_netdev->stats.tx_ok;
-	undi_get_statistics->RcvGoodFrames = pxe_netdev->stats.rx_ok;
-	undi_get_statistics->RcvCRCErrors = pxe_netdev->stats.rx_err;
-	undi_get_statistics->RcvResourceErrors = pxe_netdev->stats.rx_err;
+	undi_get_statistics->XmtGoodFrames = pxe_netdev->tx_stats.good;
+	undi_get_statistics->RcvGoodFrames = pxe_netdev->rx_stats.good;
+	undi_get_statistics->RcvCRCErrors = pxe_netdev->rx_stats.bad;
+	undi_get_statistics->RcvResourceErrors = pxe_netdev->rx_stats.bad;
 
 	undi_get_statistics->Status = PXENV_STATUS_SUCCESS;
 	return PXENV_EXIT_SUCCESS;
@@ -409,7 +409,8 @@ PXENV_EXIT_t pxenv_undi_clear_statistics ( struct s_PXENV_UNDI_CLEAR_STATISTICS
 					   *undi_clear_statistics ) {
 	DBG ( "PXENV_UNDI_CLEAR_STATISTICS" );
 
-	memset ( &pxe_netdev->stats, 0, sizeof ( pxe_netdev->stats ) );
+	memset ( &pxe_netdev->tx_stats, 0, sizeof ( pxe_netdev->tx_stats ) );
+	memset ( &pxe_netdev->rx_stats, 0, sizeof ( pxe_netdev->rx_stats ) );
 
 	undi_clear_statistics->Status = PXENV_STATUS_SUCCESS;
 	return PXENV_EXIT_SUCCESS;

@@ -193,16 +193,25 @@ struct net_device_operations {
 	void ( * irq ) ( struct net_device *netdev, int enable );
 };
 
+/** Network device error */
+struct net_device_error {
+	/** Error status code */
+	int rc;
+	/** Error count */
+	unsigned int count;
+};
+
+/** Maximum number of unique errors that we will keep track of */
+#define NETDEV_MAX_UNIQUE_ERRORS 4
+
 /** Network device statistics */
 struct net_device_stats {
-	/** Count of successfully completed transmissions */
-	unsigned int tx_ok;
-	/** Count of transmission errors */
-	unsigned int tx_err;
-	/** Count of successfully received packets */
-	unsigned int rx_ok;
-	/** Count of reception errors */
-	unsigned int rx_err;
+	/** Count of successful completions */
+	unsigned int good;
+	/** Count of error completions */
+	unsigned int bad;
+	/** Error breakdowns */
+	struct net_device_error errors[NETDEV_MAX_UNIQUE_ERRORS];
 };
 
 /**
@@ -250,8 +259,10 @@ struct net_device {
 	struct list_head tx_queue;
 	/** RX packet queue */
 	struct list_head rx_queue;
-	/** Device statistics */
-	struct net_device_stats stats;
+	/** TX statistics */
+	struct net_device_stats tx_stats;
+	/** RX statistics */
+	struct net_device_stats rx_stats;
 
 	/** Configuration settings applicable to this device */
 	struct simple_settings settings;
