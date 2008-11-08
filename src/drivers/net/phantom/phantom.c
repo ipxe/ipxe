@@ -1785,19 +1785,6 @@ static int phantom_map_crb ( struct phantom_nic *phantom,
 }
 
 /**
- * Halt all PEGs
- *
- * @v phantom		Phantom NIC
- */
-static void phantom_halt_pegs ( struct phantom_nic *phantom ) {
-	phantom_writel ( phantom, 1, UNM_PEG_0_HALT );
-	phantom_writel ( phantom, 1, UNM_PEG_1_HALT );
-	phantom_writel ( phantom, 1, UNM_PEG_2_HALT );
-	phantom_writel ( phantom, 1, UNM_PEG_3_HALT );
-	phantom_writel ( phantom, 1, UNM_PEG_4_HALT );
-}
-
-/**
  * Unhalt all PEGs
  *
  * @v phantom		Phantom NIC
@@ -2089,7 +2076,6 @@ static int phantom_probe ( struct pci_device *pci,
  err_check_boot_enable:
  err_init_rcvpeg:
  err_init_cmdpeg:
-	phantom_halt_pegs ( phantom );
  err_map_crb:
 	netdev_nullify ( netdev );
 	netdev_put ( netdev );
@@ -2108,7 +2094,6 @@ static void phantom_remove ( struct pci_device *pci ) {
 
 	unregister_settings ( &phantom->settings );
 	unregister_netdev ( netdev );
-	phantom_halt_pegs ( phantom );
 	netdev_nullify ( netdev );
 	netdev_put ( netdev );
 }
