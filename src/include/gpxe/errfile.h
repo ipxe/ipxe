@@ -106,6 +106,7 @@
 #define ERRFILE_e1000_hw	     ( ERRFILE_DRIVER | 0x00490000 )
 #define ERRFILE_mtnic		     ( ERRFILE_DRIVER | 0x004a0000 )
 #define ERRFILE_phantom		     ( ERRFILE_DRIVER | 0x004b0000 )
+#define ERRFILE_ne2k_isa	     ( ERRFILE_DRIVER | 0x004c0000 )
 
 #define ERRFILE_scsi		     ( ERRFILE_DRIVER | 0x00700000 )
 #define ERRFILE_arbel		     ( ERRFILE_DRIVER | 0x00710000 )
