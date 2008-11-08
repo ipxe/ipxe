@@ -94,6 +94,13 @@ static int aoe_send_command ( struct aoe_session *aoe ) {
 		return -ENETUNREACH;
 	}
 
+	/* If we are transmitting anything that requires a response,
+         * start the retransmission timer.  Do this before attempting
+         * to allocate the I/O buffer, in case allocation itself
+         * fails.
+         */
+	start_timer ( &aoe->timer );
+
 	/* Calculate count and data_out_len for this subcommand */
 	count = command->cb.count.native;
 	if ( count > AOE_MAX_COUNT )
@@ -101,8 +108,8 @@ static int aoe_send_command ( struct aoe_session *aoe ) {
 	data_out_len = ( command->data_out ? ( count * ATA_SECTOR_SIZE ) : 0 );
 
 	/* Create outgoing I/O buffer */
-	iobuf = alloc_iob ( ETH_HLEN + sizeof ( *aoehdr ) + sizeof ( *aoecmd ) +
-			  data_out_len );
+	iobuf = alloc_iob ( ETH_HLEN + sizeof ( *aoehdr ) +
+			    sizeof ( *aoecmd ) + data_out_len );
 	if ( ! iobuf )
 		return -ENOMEM;
 	iob_reserve ( iobuf, ETH_HLEN );
@@ -133,7 +140,6 @@ static int aoe_send_command ( struct aoe_session *aoe ) {
 			 aoe->command_offset, data_out_len );
 
 	/* Send packet */
-	start_timer ( &aoe->timer );
 	return net_tx ( iobuf, aoe->netdev, &aoe_protocol, aoe->target );
 }
 
@@ -231,7 +237,8 @@ static int aoe_rx_response ( struct aoe_session *aoe, struct aoehdr *aoehdr,
  * @ret rc		Return status code
  *
  */
-static int aoe_rx ( struct io_buffer *iobuf, struct net_device *netdev __unused,
+static int aoe_rx ( struct io_buffer *iobuf,
+		    struct net_device *netdev __unused,
 		    const void *ll_source ) {
 	struct aoehdr *aoehdr = iobuf->data;
 	unsigned int len = iob_len ( iobuf );
