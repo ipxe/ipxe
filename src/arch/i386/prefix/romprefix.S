@@ -14,6 +14,7 @@
 #define STACK_MAGIC ( 'L' + ( 'R' << 8 ) + ( 'E' << 16 ) + ( 'T' << 24 ) )
 #define PNP_GET_BBS_VERSION 0x60
 #define PMM_ALLOCATE 0x0000
+#define PMM_DEALLOCATE 0x0002
 
 /* ROM banner timeout.  Based on the configurable BANNER_TIMEOUT in
  * config.h, but converted to a number of (18Hz) timer ticks, and
@@ -290,21 +291,52 @@ pmm_scan:
 	movw	$init_message_pmm, %si
 	xorw	%di, %di
 	call	print_message
-	/* Try to allocate 2MB block via PMM */
+	/* We have PMM and so a 1kB stack: preserve upper register halves */
+	pushal
+	/* Calculate required allocation size in %esi */
+	movzbl	romheader_size, %eax
+	shll	$9, %eax
+	addl	$_textdata_memsz, %eax
+	orw	$0xffff, %ax	/* Ensure allocation size is at least 64kB */
+	bsrl	%eax, %ecx
+	subw	$15, %cx	/* Round up and convert to 64kB count */
+	movw	$1, %si
+	shlw	%cl, %si
+pmm_loop:
+	/* Try to allocate block via PMM */
 	pushw	$0x0006		/* Aligned, extended memory */
 	pushl	$0xffffffff	/* No handle */
-	pushl	$( 0x00200000 / 16 ) /* 2MB in paragraphs */
+	movzwl	%si, %eax
+	shll	$12, %eax
+	pushl	%eax		/* Allocation size in paragraphs */
 	pushw	$PMM_ALLOCATE
 	lcall	*%es:7
 	addw	$12, %sp
+	/* Abort if allocation fails */
+	testw	%dx, %dx	/* %ax==0 even on success, since align>=64kB */
+	jz	pmm_fail
+	/* If block has A20==1, free block and try again with twice
+	 * the allocation size (and hence alignment).
+	 */
+	testw	$0x0010, %dx
+	jz	got_pmm
+	pushw	%dx
+	pushw	$0
+	pushw	$PMM_DEALLOCATE
+	lcall	*%es:7
+	addw	$6, %sp
+	addw	%si, %si
+	jmp	pmm_loop
+got_pmm: /* PMM allocation succeeded */
+	movw	%dx, ( image_source + 2 )
 	movw	%dx, %ax
 	xorw	%di, %di
 	call	print_hex_word
-	movw	%dx, ( image_source + 2 )
-	testw	%dx, %dx	/* %ax==0 even on success, since align=2MB */
-	jz	no_pmm
-	/* PMM allocation succeeded: copy ROM to PMM block */
-	pushal			/* PMM presence implies 1kB stack */
+	movb	$'@', %al
+	call	print_character
+	movw	%si, %ax
+	call	print_hex_byte
+	/* Copy ROM to PMM block */
 	xorw	%ax, %ax
 	movw	%ax, %es
 	movl	image_source, %edi
@@ -323,6 +355,8 @@ pmm_scan:
 	addb	%al, %bl
 	loop	1b
 	subb	%bl, checksum
+pmm_fail:
+	/* Restore upper register halves */
 	popal
 no_pmm:
 
