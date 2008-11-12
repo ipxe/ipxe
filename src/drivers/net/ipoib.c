@@ -440,31 +440,32 @@ static int ipoib_get_path_record ( struct ipoib_device *ipoib,
 				   struct ib_gid *gid ) {
 	struct ib_device *ibdev = ipoib->ibdev;
 	struct io_buffer *iobuf;
-	struct ib_mad_path_record *path_record;
+	struct ib_mad_sa *sa;
 	struct ib_address_vector av;
 	int rc;
 
 	/* Allocate I/O buffer */
-	iobuf = alloc_iob ( sizeof ( *path_record ) );
+	iobuf = alloc_iob ( sizeof ( *sa ) );
 	if ( ! iobuf )
 		return -ENOMEM;
-	iob_put ( iobuf, sizeof ( *path_record ) );
-	path_record = iobuf->data;
-	memset ( path_record, 0, sizeof ( *path_record ) );
+	iob_put ( iobuf, sizeof ( *sa ) );
+	sa = iobuf->data;
+	memset ( sa, 0, sizeof ( *sa ) );
 
 	/* Construct path record request */
-	path_record->mad_hdr.base_version = IB_MGMT_BASE_VERSION;
-	path_record->mad_hdr.mgmt_class = IB_MGMT_CLASS_SUBN_ADM;
-	path_record->mad_hdr.class_version = 2;
-	path_record->mad_hdr.method = IB_MGMT_METHOD_GET;
-	path_record->mad_hdr.attr_id = htons ( IB_SA_ATTR_PATH_REC );
-	path_record->mad_hdr.tid[0] = IPOIB_TID_GET_PATH_REC;
-	path_record->mad_hdr.tid[1] = ipoib_meta_tid++;
-	path_record->sa_hdr.comp_mask[1] =
+	sa->mad_hdr.base_version = IB_MGMT_BASE_VERSION;
+	sa->mad_hdr.mgmt_class = IB_MGMT_CLASS_SUBN_ADM;
+	sa->mad_hdr.class_version = 2;
+	sa->mad_hdr.method = IB_MGMT_METHOD_GET;
+	sa->mad_hdr.attr_id = htons ( IB_SA_ATTR_PATH_REC );
+	sa->mad_hdr.tid[0] = IPOIB_TID_GET_PATH_REC;
+	sa->mad_hdr.tid[1] = ipoib_meta_tid++;
+	sa->sa_hdr.comp_mask[1] =
 		htonl ( IB_SA_PATH_REC_DGID | IB_SA_PATH_REC_SGID );
-	memcpy ( &path_record->dgid, gid, sizeof ( path_record->dgid ) );
-	memcpy ( &path_record->sgid, &ibdev->gid,
-		 sizeof ( path_record->sgid ) );
+	memcpy ( &sa->sa_data.path_record.dgid, gid,
+		 sizeof ( sa->sa_data.path_record.dgid ) );
+	memcpy ( &sa->sa_data.path_record.sgid, &ibdev->gid,
+		 sizeof ( sa->sa_data.path_record.sgid ) );
 
 	/* Construct address vector */
 	memset ( &av, 0, sizeof ( av ) );
@@ -497,35 +498,35 @@ static int ipoib_mc_member_record ( struct ipoib_device *ipoib,
 				    struct ib_gid *gid, int join ) {
 	struct ib_device *ibdev = ipoib->ibdev;
 	struct io_buffer *iobuf;
-	struct ib_mad_mc_member_record *mc_member_record;
+	struct ib_mad_sa *sa;
 	struct ib_address_vector av;
 	int rc;
 
 	/* Allocate I/O buffer */
-	iobuf = alloc_iob ( sizeof ( *mc_member_record ) );
+	iobuf = alloc_iob ( sizeof ( *sa ) );
 	if ( ! iobuf )
 		return -ENOMEM;
-	iob_put ( iobuf, sizeof ( *mc_member_record ) );
-	mc_member_record = iobuf->data;
-	memset ( mc_member_record, 0, sizeof ( *mc_member_record ) );
+	iob_put ( iobuf, sizeof ( *sa ) );
+	sa = iobuf->data;
+	memset ( sa, 0, sizeof ( *sa ) );
 
 	/* Construct path record request */
-	mc_member_record->mad_hdr.base_version = IB_MGMT_BASE_VERSION;
-	mc_member_record->mad_hdr.mgmt_class = IB_MGMT_CLASS_SUBN_ADM;
-	mc_member_record->mad_hdr.class_version = 2;
-	mc_member_record->mad_hdr.method = 
+	sa->mad_hdr.base_version = IB_MGMT_BASE_VERSION;
+	sa->mad_hdr.mgmt_class = IB_MGMT_CLASS_SUBN_ADM;
+	sa->mad_hdr.class_version = 2;
+	sa->mad_hdr.method =
 		( join ? IB_MGMT_METHOD_SET : IB_MGMT_METHOD_DELETE );
-	mc_member_record->mad_hdr.attr_id = htons ( IB_SA_ATTR_MC_MEMBER_REC );
-	mc_member_record->mad_hdr.tid[0] = IPOIB_TID_MC_MEMBER_REC;
-	mc_member_record->mad_hdr.tid[1] = ipoib_meta_tid++;
-	mc_member_record->sa_hdr.comp_mask[1] =
+	sa->mad_hdr.attr_id = htons ( IB_SA_ATTR_MC_MEMBER_REC );
+	sa->mad_hdr.tid[0] = IPOIB_TID_MC_MEMBER_REC;
+	sa->mad_hdr.tid[1] = ipoib_meta_tid++;
+	sa->sa_hdr.comp_mask[1] =
 		htonl ( IB_SA_MCMEMBER_REC_MGID | IB_SA_MCMEMBER_REC_PORT_GID |
 			IB_SA_MCMEMBER_REC_JOIN_STATE );
-	mc_member_record->scope__join_state = 1;
-	memcpy ( &mc_member_record->mgid, gid,
-		 sizeof ( mc_member_record->mgid ) );
-	memcpy ( &mc_member_record->port_gid, &ibdev->gid,
-		 sizeof ( mc_member_record->port_gid ) );
+	sa->sa_data.mc_member_record.scope__join_state = 1;
+	memcpy ( &sa->sa_data.mc_member_record.mgid, gid,
+		 sizeof ( sa->sa_data.mc_member_record.mgid ) );
+	memcpy ( &sa->sa_data.mc_member_record.port_gid, &ibdev->gid,
+		 sizeof ( sa->sa_data.mc_member_record.port_gid ) );
 
 	/* Construct address vector */
 	memset ( &av, 0, sizeof ( av ) );
@@ -701,7 +702,7 @@ static void ipoib_meta_complete_send ( struct ib_device *ibdev __unused,
  * @v path_record	Path record
  */
 static void ipoib_recv_path_record ( struct ipoib_device *ipoib,
-				     struct ib_mad_path_record *path_record ) {
+				     struct ib_path_record *path_record ) {
 	struct ipoib_peer *peer;
 
 	/* Locate peer cache entry */
@@ -728,7 +729,7 @@ static void ipoib_recv_path_record ( struct ipoib_device *ipoib,
  * @v mc_member_record	Multicast membership record
  */
 static void ipoib_recv_mc_member_record ( struct ipoib_device *ipoib,
-			  struct ib_mad_mc_member_record *mc_member_record ) {
+			       struct ib_mc_member_record *mc_member_record ) {
 	int joined;
 	int rc;
 
@@ -765,7 +766,7 @@ ipoib_meta_complete_recv ( struct ib_device *ibdev __unused,
 			   struct io_buffer *iobuf, int rc ) {
 	struct net_device *netdev = ib_qp_get_ownerdata ( qp );
 	struct ipoib_device *ipoib = netdev->priv;
-	union ib_mad *mad;
+	struct ib_mad_sa *sa;
 
 	if ( rc != 0 ) {
 		DBGC ( ipoib, "IPoIB %p metadata RX completion error: %s\n",
@@ -773,31 +774,32 @@ ipoib_meta_complete_recv ( struct ib_device *ibdev __unused,
 		goto done;
 	}
 
-	if ( iob_len ( iobuf ) < sizeof ( *mad ) ) {
+	if ( iob_len ( iobuf ) < sizeof ( *sa ) ) {
 		DBGC ( ipoib, "IPoIB %p received metadata packet too short "
 		       "to contain reply\n", ipoib );
 		DBGC_HD ( ipoib, iobuf->data, iob_len ( iobuf ) );
 		goto done;
 	}
-	mad = iobuf->data;
+	sa = iobuf->data;
 
-	if ( mad->hdr.status != 0 ) {
+	if ( sa->mad_hdr.status != 0 ) {
 		DBGC ( ipoib, "IPoIB %p metadata RX err status %04x\n",
-		       ipoib, ntohs ( mad->hdr.status ) );
+		       ipoib, ntohs ( sa->mad_hdr.status ) );
 		goto done;
 	}
 
-	switch ( mad->hdr.tid[0] ) {
+	switch ( sa->mad_hdr.tid[0] ) {
 	case IPOIB_TID_GET_PATH_REC:
-		ipoib_recv_path_record ( ipoib, &mad->path_record );
+		ipoib_recv_path_record ( ipoib, &sa->sa_data.path_record );
 		break;
 	case IPOIB_TID_MC_MEMBER_REC:
-		ipoib_recv_mc_member_record ( ipoib, &mad->mc_member_record );
+		ipoib_recv_mc_member_record ( ipoib,
+					      &sa->sa_data.mc_member_record );
 		break;
 	default:
 		DBGC ( ipoib, "IPoIB %p unwanted response:\n",
 		       ipoib );
-		DBGC_HD ( ipoib, mad, sizeof ( *mad ) );
+		DBGC_HD ( ipoib, sa, sizeof ( *sa ) );
 		break;
 	}
 

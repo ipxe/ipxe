@@ -264,6 +264,8 @@ static int ib_sma_mad ( struct ib_sma *sma, union ib_mad *mad ) {
 	struct ib_mad_hdr *hdr = &mad->hdr;
 	struct ib_mad_smp *smp = &mad->smp;
 	struct ib_sma_handler *handler = NULL;
+	unsigned int hop_pointer;
+	unsigned int hop_count;
 	int rc;
 
 	DBGC ( sma, "SMA %p received SMP with bv=%02x mc=%02x cv=%02x "
@@ -336,7 +338,17 @@ static int ib_sma_mad ( struct ib_sma *sma, union ib_mad *mad ) {
 	/* Set response fields for directed route SMPs */
 	if ( hdr->mgmt_class == IB_MGMT_CLASS_SUBN_DIRECTED_ROUTE ) {
 		hdr->status |= htons ( IB_SMP_STATUS_D_INBOUND );
-		smp->return_path.hops[0] = ibdev->port;
+		hop_pointer = smp->mad_hdr.class_specific.smp.hop_pointer;
+		hop_count = smp->mad_hdr.class_specific.smp.hop_count;
+		assert ( hop_count == hop_pointer );
+		if ( hop_pointer < ( sizeof ( smp->return_path.hops ) /
+				     sizeof ( smp->return_path.hops[0] ) ) ) {
+			smp->return_path.hops[hop_pointer] = ibdev->port;
+		} else {
+			DBGC ( sma, "SMA %p invalid hop pointer %d\n",
+			       sma, hop_pointer );
+			return -EINVAL;
+		}
 	}
 
 	DBGC ( sma, "SMA %p responding with status=%04x\n",
