@@ -201,7 +201,7 @@ enum linda_eager_buffer_size {
 
 /** Linda external parallel bus chip selects */
 #define LINDA_EPB_CS_SERDES 1
-#define LINDA_EPB_CS_8051 2
+#define LINDA_EPB_CS_UC 2
 
 /** Linda external parallel bus read/write operations */
 #define LINDA_EPB_WRITE 0
@@ -224,10 +224,10 @@ enum linda_eager_buffer_size {
 #define LINDA_EPB_LOC_ADDRESS( _loc )	( (_loc) & 0xffff )
 #define LINDA_EPB_LOC_CS( _loc )	( (_loc) >> 16 )
 
-/** Linda external parallel bus 8051 microcontroller register addresses */
+/** Linda external parallel bus microcontroller register addresses */
 #define LINDA_EPB_UC_CHANNEL 6
 #define LINDA_EPB_UC_LOC( _reg ) \
-	LINDA_EPB_LOC ( LINDA_EPB_CS_8051, LINDA_EPB_UC_CHANNEL, 0, (_reg) )
+	LINDA_EPB_LOC ( LINDA_EPB_CS_UC, LINDA_EPB_UC_CHANNEL, 0, (_reg) )
 #define LINDA_EPB_UC_CTL	LINDA_EPB_UC_LOC ( 0 )
 #define LINDA_EPB_UC_CTL_WRITE	1
 #define LINDA_EPB_UC_CTL_READ	2

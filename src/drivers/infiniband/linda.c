@@ -2096,12 +2096,12 @@ static struct linda_serdes_param linda_serdes_defaults3[] = {
 };
 
 /**
- * Program the 8051 microcontroller RAM
+ * Program the microcontroller RAM
  *
  * @v linda		Linda device
  * @ret rc		Return status code
  */
-static int linda_program_8051 ( struct linda *linda ) {
+static int linda_program_uc_ram ( struct linda *linda ) {
 	int rc;
 
 	if ( ( rc = linda_ib_epb_ram_xfer ( linda, 0, linda_ib_fw, NULL,
@@ -2115,12 +2115,12 @@ static int linda_program_8051 ( struct linda *linda ) {
 }
 
 /**
- * Verify the 8051 microcontroller RAM
+ * Verify the microcontroller RAM
  *
  * @v linda		Linda device
  * @ret rc		Return status code
  */
-static int linda_verify_8051 ( struct linda *linda ) {
+static int linda_verify_uc_ram ( struct linda *linda ) {
 	uint8_t verify[LINDA_EPB_UC_CHUNK_SIZE];
 	unsigned int offset;
 	int rc;
@@ -2150,7 +2150,7 @@ static int linda_verify_8051 ( struct linda *linda ) {
 }
 
 /**
- * Use the 8051 microcontroller to trim the IB link
+ * Use the microcontroller to trim the IB link
  *
  * @v linda		Linda device
  * @ret rc		Return status code
@@ -2161,7 +2161,7 @@ static int linda_trim_ib ( struct linda *linda ) {
 	unsigned int i;
 	int rc;
 
-	/* Bring the 8051 out of reset */
+	/* Bring the microcontroller out of reset */
 	linda_readq ( linda, &ctrl, QIB_7220_IBSerDesCtrl_offset );
 	BIT_SET ( &ctrl, ResetIB_uC_Core, 0 );
 	linda_writeq ( linda, &ctrl, QIB_7220_IBSerDesCtrl_offset );
@@ -2179,7 +2179,7 @@ static int linda_trim_ib ( struct linda *linda ) {
 	DBGC ( linda, "Linda %p timed out waiting for trim done\n", linda );
 	rc = -ETIMEDOUT;
  out_reset:
-	/* Put the 8051 back into reset */
+	/* Put the microcontroller back into reset */
 	BIT_SET ( &ctrl, ResetIB_uC_Core, 1 );
 	linda_writeq ( linda, &ctrl, QIB_7220_IBSerDesCtrl_offset );
 
@@ -2240,12 +2240,12 @@ static int linda_init_ib_serdes ( struct linda *linda ) {
 		return rc;
 
 	/* Program the microcontroller RAM */
-	if ( ( rc = linda_program_8051 ( linda ) ) != 0 )
+	if ( ( rc = linda_program_uc_ram ( linda ) ) != 0 )
 		return rc;
 
 	/* Verify the microcontroller RAM contents */
 	if ( DBGLVL_LOG ) {
-		if ( ( rc = linda_verify_8051 ( linda ) ) != 0 )
+		if ( ( rc = linda_verify_uc_ram ( linda ) ) != 0 )
 			return rc;
 	}
 
