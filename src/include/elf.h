@@ -227,10 +227,6 @@ typedef struct {
 
 /* Standardized Elf image notes for booting... The name for all of these is ELFBoot */
 
-
-/* ELF Defines for the current architecture */
-#include "bits/elf.h"
-
 #endif /* ASSEMBLY */
 
 #endif /* ELF_H */
