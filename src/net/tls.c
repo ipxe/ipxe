@@ -270,16 +270,16 @@ static void tls_generate_master_secret ( struct tls_session *tls ) {
 	DBGC_HD ( tls, &tls->pre_master_secret,
 		  sizeof ( tls->pre_master_secret ) );
 	DBGC ( tls, "TLS %p client random bytes:\n", tls );
-	DBGC_HD ( tls, &tls->client_random, sizeof ( tls->server_random ) );
+	DBGC_HD ( tls, &tls->client_random, sizeof ( tls->client_random ) );
 	DBGC ( tls, "TLS %p server random bytes:\n", tls );
 	DBGC_HD ( tls, &tls->server_random, sizeof ( tls->server_random ) );
 
-	tls_prf_label ( tls, tls->pre_master_secret,
+	tls_prf_label ( tls, &tls->pre_master_secret,
 			sizeof ( tls->pre_master_secret ),
-			tls->master_secret, sizeof ( tls->master_secret ),
+			&tls->master_secret, sizeof ( tls->master_secret ),
 			"master secret",
-			tls->client_random, sizeof ( tls->client_random ),
-			tls->server_random, sizeof ( tls->server_random ) );
+			&tls->client_random, sizeof ( tls->client_random ),
+			&tls->server_random, sizeof ( tls->server_random ) );
 
 	DBGC ( tls, "TLS %p generated master secret:\n", tls );
 	DBGC_HD ( tls, &tls->master_secret, sizeof ( tls->master_secret ) );
@@ -304,10 +304,10 @@ static int tls_generate_keys ( struct tls_session *tls ) {
 	int rc;
 
 	/* Generate key block */
-	tls_prf_label ( tls, tls->master_secret, sizeof ( tls->master_secret ),
+	tls_prf_label ( tls, &tls->master_secret, sizeof ( tls->master_secret ),
 			key_block, sizeof ( key_block ), "key expansion",
-			tls->server_random, sizeof ( tls->server_random ),
-			tls->client_random, sizeof ( tls->client_random ) );
+			&tls->server_random, sizeof ( tls->server_random ),
+			&tls->client_random, sizeof ( tls->client_random ) );
 
 	/* Split key block into portions */
 	key = key_block;
@@ -604,7 +604,7 @@ static int tls_send_client_hello ( struct tls_session *tls ) {
 			      htonl ( sizeof ( hello ) -
 				      sizeof ( hello.type_length ) ) );
 	hello.version = htons ( TLS_VERSION_TLS_1_0 );
-	memcpy ( &hello.random, tls->client_random, sizeof ( hello.random ) );
+	memcpy ( &hello.random, &tls->client_random, sizeof ( hello.random ) );
 	hello.cipher_suite_len = htons ( sizeof ( hello.cipher_suites ) );
 	hello.cipher_suites[0] = htons ( TLS_RSA_WITH_AES_128_CBC_SHA );
 	hello.cipher_suites[1] = htons ( TLS_RSA_WITH_AES_256_CBC_SHA );
@@ -643,7 +643,7 @@ static int tls_send_client_key_exchange ( struct tls_session *tls ) {
 		  sizeof ( tls->pre_master_secret ) );
 	DBGC_HD ( tls, tls->rsa_mod, tls->rsa_mod_len );
 	DBGC_HD ( tls, tls->rsa_pub_exp, tls->rsa_pub_exp_len );
-	RSA_encrypt ( rsa_ctx, tls->pre_master_secret,
+	RSA_encrypt ( rsa_ctx, ( const uint8_t * ) &tls->pre_master_secret,
 		      sizeof ( tls->pre_master_secret ),
 		      key_xchg.encrypted_pre_master_secret, 0 );
 	DBGC ( tls, "RSA encrypt done.  Ciphertext:\n" );
@@ -685,7 +685,7 @@ static int tls_send_finished ( struct tls_session *tls ) {
 				 htonl ( sizeof ( finished ) -
 					 sizeof ( finished.type_length ) ) );
 	tls_verify_handshake ( tls, digest );
-	tls_prf_label ( tls, tls->master_secret, sizeof ( tls->master_secret ),
+	tls_prf_label ( tls, &tls->master_secret, sizeof ( tls->master_secret ),
 			finished.verify_data, sizeof ( finished.verify_data ),
 			"client finished", digest, sizeof ( digest ) );
 
@@ -802,7 +802,7 @@ static int tls_new_server_hello ( struct tls_session *tls,
 	}
 
 	/* Copy out server random bytes */
-	memcpy ( tls->server_random, hello_a->random,
+	memcpy ( &tls->server_random, &hello_a->random,
 		 sizeof ( tls->server_random ) );
 
 	/* Select cipher suite */
@@ -1710,13 +1710,12 @@ int add_tls ( struct xfer_interface *xfer, struct xfer_interface **next ) {
 	tls_clear_cipher ( tls, &tls->tx_cipherspec_pending );
 	tls_clear_cipher ( tls, &tls->rx_cipherspec );
 	tls_clear_cipher ( tls, &tls->rx_cipherspec_pending );
-	*( ( uint32_t * ) tls->client_random ) = 0; /* GMT Unix time */
-	tls_generate_random ( ( tls->client_random + 4 ),
-			      ( sizeof ( tls->client_random ) - 4 ) );
-	*( ( uint16_t * ) tls->pre_master_secret )
-		= htons ( TLS_VERSION_TLS_1_0 );
-	tls_generate_random ( ( tls->pre_master_secret + 2 ),
-			      ( sizeof ( tls->pre_master_secret ) - 2 ) );
+	tls->client_random.gmt_unix_time = 0;
+	tls_generate_random ( &tls->client_random.random,
+			      ( sizeof ( tls->client_random.random ) ) );
+	tls->pre_master_secret.version = htons ( TLS_VERSION_TLS_1_0 );
+	tls_generate_random ( &tls->pre_master_secret.random,
+			      ( sizeof ( tls->pre_master_secret.random ) ) );
 	digest_init ( &md5_algorithm, tls->handshake_md5_ctx );
 	digest_init ( &sha1_algorithm, tls->handshake_sha1_ctx );
 	tls->tx_state = TLS_TX_CLIENT_HELLO;

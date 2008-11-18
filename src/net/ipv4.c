@@ -188,7 +188,7 @@ static struct io_buffer * ipv4_reassemble ( struct io_buffer * iobuf ) {
 				free_iob ( iobuf );
 
 				/** Check if the fragment series is over */
-				if ( !iphdr->frags & IP_MASK_MOREFRAGS ) {
+				if ( ! ( iphdr->frags & IP_MASK_MOREFRAGS ) ) {
 					iobuf = fragbuf->frag_iob;
 					free_fragbuf ( fragbuf );
 					return iobuf;

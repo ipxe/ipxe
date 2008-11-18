@@ -158,7 +158,7 @@ static int meme820 ( struct memory_map *memmap ) {
 	uint32_t smap;
 	size_t size;
 	unsigned int flags;
-	unsigned int discard_d, discard_D;
+	unsigned int discard_D;
 
 	/* Clear the E820 buffer.  Do this once before starting,
 	 * rather than on each call; some BIOSes rely on the contents
@@ -171,13 +171,15 @@ static int meme820 ( struct memory_map *memmap ) {
 		 * this by telling gcc that all non-output registers
 		 * may be corrupted.
 		 */
-		__asm__ __volatile__ ( REAL_CODE ( "stc\n\t"
+		__asm__ __volatile__ ( REAL_CODE ( "pushl %%ebp\n\t"
+						   "stc\n\t"
 						   "int $0x15\n\t"
 						   "pushfw\n\t"
-						   "popw %w0\n\t" )
-				       : "=r" ( flags ), "=a" ( smap ),
-					 "=b" ( next ), "=D" ( discard_D ),
-					 "=c" ( size ), "=d" ( discard_d )
+						   "popw %%dx\n\t"
+						   "popl %%ebp\n\t" )
+				       : "=a" ( smap ), "=b" ( next ),
+					 "=c" ( size ), "=d" ( flags ),
+					 "=D" ( discard_D )
 				       : "a" ( 0xe820 ), "b" ( next ),
 					 "D" ( __from_data16 ( &e820buf ) ),
 					 "c" ( sizeof ( e820buf ) ),

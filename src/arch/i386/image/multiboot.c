@@ -282,11 +282,13 @@ static int multiboot_exec ( struct image *image ) {
 	/* Jump to OS with flat physical addressing */
 	DBGC ( image, "MULTIBOOT %p starting execution at %lx\n",
 	       image, entry );
-	__asm__ __volatile__ ( PHYS_CODE ( "call *%%edi\n\t" )
+	__asm__ __volatile__ ( PHYS_CODE ( "pushl %%ebp\n\t"
+					   "call *%%edi\n\t"
+					   "popl %%ebp\n\t" )
 			       : : "a" ( MULTIBOOT_BOOTLOADER_MAGIC ),
 			           "b" ( virt_to_phys ( &mbinfo ) ),
 			           "D" ( entry )
-			       : "ecx", "edx", "esi", "ebp", "memory" );
+			       : "ecx", "edx", "esi", "memory" );
 
 	DBGC ( image, "MULTIBOOT %p returned\n", image );
 
