@@ -149,7 +149,13 @@ SECTIONS {
 
     /DISCARD/ : {
 	*(.comment)
+	*(.comment.*)
 	*(.note)
+	*(.note.*)
+	*(.eh_frame)
+	*(.eh_frame.*)
+	*(.rel)
+	*(.rel.*)
     }
 
     /*
