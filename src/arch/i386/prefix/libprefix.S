@@ -537,17 +537,20 @@ install_block:
 	.code16
 	.globl	alloc_basemem
 alloc_basemem:
+	/* Preserve registers */
+	pushw	%fs
+
 	/* FBMS => %ax as segment address */
-	movw	$0x40, %ax
-	movw	%ax, %fs
+	pushw	$0x40
+	popw	%fs
 	movw	%fs:0x13, %ax
 	shlw	$6, %ax
 
-	/* .data16 segment address */
+	/* Calculate .data16 segment address */
 	subw	$_data16_memsz_pgh, %ax
 	pushw	%ax
 
-	/* .text16 segment address */
+	/* Calculate .text16 segment address */
 	subw	$_text16_memsz_pgh, %ax
 	pushw	%ax
 
@@ -555,11 +558,66 @@ alloc_basemem:
 	shrw	$6, %ax
 	movw	%ax, %fs:0x13
 
-	/* Return */
+	/* Retrieve .text16 and .data16 segment addresses */
 	popw	%ax
 	popw	%bx
+
+	/* Restore registers and return */
+	popw	%fs
 	ret
 	.size alloc_basemem, . - alloc_basemem
+
+/****************************************************************************
+ * free_basemem (real-mode near call)
+ *
+ * Free space allocated with alloc_basemem.
+ *
+ * Parameters:
+ *   %ax : .text16 segment address
+ *   %bx : .data16 segment address
+ * Returns:
+ *   %ax : 0 if successfully freed
+ * Corrupts:
+ *   none
+ ****************************************************************************
+ */
+	.section ".text16"
+	.code16
+	.globl	free_basemem
+free_basemem:
+	/* Preserve registers */
+	pushw	%fs
+
+	/* Check FBMS counter */
+	pushw	%ax
+	shrw	$6, %ax
+	pushw	$0x40
+	popw	%fs
+	cmpw	%ax, %fs:0x13
+	popw	%ax
+	jne	1f
+
+	/* Check hooked interrupt count */
+	cmpw	$0, %cs:hooked_bios_interrupts
+	jne	1f
+
+	/* OK to free memory */
+	addw	$_text16_memsz_pgh, %ax
+	addw	$_data16_memsz_pgh, %ax
+	shrw	$6, %ax
+	movw	%ax, %fs:0x13
+	xorw	%ax, %ax
+
+1:	/* Restore registers and return */
+	popw	%fs
+	ret
+	.size free_basemem, . - free_basemem
+
+	.section ".text16.data"
+	.globl	hooked_bios_interrupts
+hooked_bios_interrupts:
+	.word	0
+	.size	hooked_bios_interrupts, . - hooked_bios_interrupts
 
 /****************************************************************************
  * install (real-mode near call)
@@ -708,6 +766,29 @@ prot_call_vector:
 	.word 0
 	.size prot_call_vector, . - prot_call_vector
 #endif
+
+/****************************************************************************
+ * uninstall (real-mode near call)
+ *
+ * Uninstall all text and data segments.
+ *
+ * Parameters:
+ *   %ax  : .text16 segment address
+ *   %bx  : .data16 segment address
+ * Returns:
+ *   none
+ * Corrupts:
+ *   none
+ ****************************************************************************
+ */
+	.section ".text16"
+	.code16
+	.globl uninstall
+uninstall:
+	call	free_basemem
+	ret
+	.size uninstall, . - uninstall
+
 
 
 	/* File split information for the compressor */

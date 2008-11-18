@@ -318,7 +318,7 @@ print_free_basemem:
  *****************************************************************************
  */	
 finished:
-	jmp	run_etherboot
+	jmp	run_gpxe
 
 /*****************************************************************************
  * Subroutine: print segment:offset address
@@ -554,11 +554,11 @@ flags:			.word UNDI_FL_STARTED
 	.equ undi_device_size, ( . - undi_device )
 
 /*****************************************************************************
- * Run Etherboot main code
+ * Run gPXE main code
  *****************************************************************************
  */	
-run_etherboot:
-	/* Install Etherboot */
+run_gpxe:
+	/* Install gPXE */
 	call	install
 
 	/* Set up real-mode stack */
@@ -585,7 +585,10 @@ run_etherboot:
 	pushl	$main
 	pushw	%cs
 	call	prot_call
-	popl	%eax /* discard */
+	popl	%ecx /* discard */
+
+	/* Uninstall gPXE */
+	call	uninstall
 
 	/* Boot next device */
 	int	$0x18

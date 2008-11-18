@@ -189,6 +189,7 @@ run_gpxe:
 	movw	%ax, %ss
 	movw	$0x7c00, %sp
 
+	/* Install gPXE */
 	call	install
 
 	/* Set up real-mode stack */
@@ -204,7 +205,10 @@ run_gpxe:
 	pushl	$main
 	pushw	%cs
 	call	prot_call
-	popl	%eax /* discard */
+	popl	%ecx /* discard */
+
+	/* Uninstall gPXE */
+	call	uninstall
 
 	/* Boot next device */
 	int $0x18

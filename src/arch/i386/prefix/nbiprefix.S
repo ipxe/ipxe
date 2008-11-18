@@ -52,7 +52,7 @@ memlen:	.long	_filesz - 512
  *****************************************************************************
  */
 entry:
-	/* Install low and high memory regions */
+	/* Install gPXE */
 	call	install
 
 	/* Jump to .text16 segment */
@@ -64,7 +64,10 @@ entry:
 	pushl	$main
 	pushw	%cs
 	call	prot_call
-	popl	%eax /* discard */
+	popl	%ecx /* discard */
+
+	/* Uninstall gPXE */
+	call	uninstall
 
 	/* Reboot system */
 	int $0x19

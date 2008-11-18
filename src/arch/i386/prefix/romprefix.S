@@ -591,8 +591,11 @@ exec:	/* Set %ds = %cs */
 	pushl	$main
 	pushw	%cs
 	call	prot_call
-	/* No need to clean up stack; we are about to reload %ss:sp */
-	
+	popl	%ecx /* discard */
+
+	/* Uninstall gPXE */
+	call	uninstall
+
 	/* Restore BIOS stack */
 	movw	%dx, %ss
 	movw	%bp, %sp

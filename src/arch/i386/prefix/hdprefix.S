@@ -82,6 +82,7 @@ load_failed:
 	.byte 0x55, 0xaa
 
 start_image:
+	/* Install gPXE */
 	call	install
 
 	/* Set up real-mode stack */
@@ -97,7 +98,10 @@ start_image:
 	pushl	$main
 	pushw	%cs
 	call	prot_call
-	popl	%eax /* discard */
+	popl	%ecx /* discard */
+
+	/* Uninstall gPXE */
+	call	uninstall
 
 	/* Boot next device */
 	int $0x18
