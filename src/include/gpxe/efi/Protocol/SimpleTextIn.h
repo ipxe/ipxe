@@ -118,25 +118,16 @@ EFI_STATUS
   OUT EFI_INPUT_KEY                       *Key
   );
 
-/**
-  @par Protocol Description:
-  The EFI_SIMPLE_TEXT_INPUT_PROTOCOL is used on the ConsoleIn device.
-  It is the minimum required protocol for ConsoleIn.
-
-  @param Reset
-  Reset the ConsoleIn device.
-
-  @param ReadKeyStroke
-  Returns the next input character.
-
-  @param WaitForKey
-  Event to use with WaitForEvent() to wait for a key to be available.
-
-**/
-
+///
+/// The EFI_SIMPLE_TEXT_INPUT_PROTOCOL is used on the ConsoleIn device.
+/// It is the minimum required protocol for ConsoleIn.
+///
 struct _EFI_SIMPLE_TEXT_INPUT_PROTOCOL {
   EFI_INPUT_RESET     Reset;
   EFI_INPUT_READ_KEY  ReadKeyStroke;
+  ///
+  /// Event to use with WaitForEvent() to wait for a key to be available
+  ///
   EFI_EVENT           WaitForKey;
 };
 

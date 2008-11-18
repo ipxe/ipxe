@@ -28,8 +28,12 @@
  * filesystems, compilation under -mrtd and -mregparm=3, etc.
  */
 
-/* Include the top-level EFI header file */
+/* EFI headers rudely redefine NULL */
+#undef NULL
+
+/* Include the top-level EFI header files */
 #include <gpxe/efi/Uefi.h>
+#include <gpxe/efi/PiDxe.h>
 
 /* Reset any trailing #pragma pack directives */
 #pragma pack()

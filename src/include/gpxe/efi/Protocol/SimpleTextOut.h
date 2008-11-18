@@ -20,8 +20,6 @@
 #ifndef __SIMPLE_TEXT_OUT_H__
 #define __SIMPLE_TEXT_OUT_H__
 
-#include <gpxe/efi/PiDxe.h>
-
 #define EFI_SIMPLE_TEXT_OUTPUT_PROTOCOL_GUID \
   { \
     0x387477c2, 0x69c7, 0x11d2, {0x8e, 0x39, 0x0, 0xa0, 0xc9, 0x69, 0x72, 0x3b } \
@@ -375,43 +373,12 @@ typedef struct {
   BOOLEAN CursorVisible;
 } EFI_SIMPLE_TEXT_OUTPUT_MODE;
 
-/**
-  @par Protocol Description:
-  The SIMPLE_TEXT_OUTPUT protocol is used to control text-based output devices.
-  It is the minimum required protocol for any handle supplied as the ConsoleOut
-  or StandardError device. In addition, the minimum supported text mode of such
-  devices is at least 80 x 25 characters.
-
-  @param Reset
-  Reset the ConsoleOut device.
-
-  @param OutputString
-  Displays the Unicode string on the device at the current cursor location.
-
-  @param TestString
-  Tests to see if the ConsoleOut device supports this Unicode string.
-
-  @param QueryMode
-  Queries information concerning the output device's supported text mode.
-
-  @param SetMode
-  Sets the current mode of the output device.
-
-  @param SetAttribute
-  Sets the foreground and background color of the text that is output.
-
-  @param ClearScreen
-  Clears the screen with the currently set background color.
-
-  @param SetCursorPosition
-  Sets the current cursor position.
-
-  @param EnableCursor
-  Turns the visibility of the cursor on/off.
-
-  @param Mode
-  Pointer to SIMPLE_TEXT_OUTPUT_MODE data.
-**/
+///
+/// The SIMPLE_TEXT_OUTPUT protocol is used to control text-based output devices.
+/// It is the minimum required protocol for any handle supplied as the ConsoleOut
+/// or StandardError device. In addition, the minimum supported text mode of such
+/// devices is at least 80 x 25 characters.
+///
 struct _EFI_SIMPLE_TEXT_OUTPUT_PROTOCOL {
   EFI_TEXT_RESET                Reset;
 
@@ -426,9 +393,9 @@ struct _EFI_SIMPLE_TEXT_OUTPUT_PROTOCOL {
   EFI_TEXT_SET_CURSOR_POSITION  SetCursorPosition;
   EFI_TEXT_ENABLE_CURSOR        EnableCursor;
 
-  //
-  // Current mode
-  //
+  ///
+  /// Pointer to SIMPLE_TEXT_OUTPUT_MODE data.
+  ///
   EFI_SIMPLE_TEXT_OUTPUT_MODE   *Mode;
 };
 

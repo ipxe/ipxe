@@ -1,5 +1,4 @@
 /** @file
-
   Root include file for Mde Package Base type modules
 
   This is the include file for any module of type base. Base modules only use
@@ -57,34 +56,18 @@ struct _LIST_ENTRY {
 // Modifiers for Data Types used to self document code.
 // This concept is borrowed for UEFI specification.
 //
-#ifndef IN
-//
-// Some other envirnments use this construct, so #ifndef to prevent
-// mulitple definition.
-//
 #define IN
 #define OUT
 #define OPTIONAL
-#endif
 
-//
-// Constants. They may exist in other build structures, so #ifndef them.
-//
-#ifndef TRUE
 //
 //  UEFI specification claims 1 and 0. We are concerned about the
 //  complier portability so we did it this way.
 //
 #define TRUE  ((BOOLEAN)(1==1))
-#endif
-
-#ifndef FALSE
 #define FALSE ((BOOLEAN)(0==1))
-#endif
 
-#ifndef NULL
 #define NULL  ((VOID *) 0)
-#endif
 
 #define  BIT0     0x00000001
 #define  BIT1     0x00000002
@@ -196,14 +179,10 @@ struct _LIST_ENTRY {
 //
 // Also support coding convention rules for var arg macros
 //
-#ifndef VA_START
-
 typedef CHAR8 *VA_LIST;
 #define VA_START(ap, v) (ap = (VA_LIST) & (v) + _INT_SIZE_OF (v))
 #define VA_ARG(ap, t)   (*(t *) ((ap += _INT_SIZE_OF (t)) - _INT_SIZE_OF (t)))
 #define VA_END(ap)      (ap = (VA_LIST) 0)
-
-#endif
 
 //
 // Macro that returns the byte offset of a field in a data structure.
@@ -217,19 +196,20 @@ typedef CHAR8 *VA_LIST;
 #define _CR(Record, TYPE, Field)  ((TYPE *) ((CHAR8 *) (Record) - (CHAR8 *) &(((TYPE *) 0)->Field)))
 
 ///
+///  ALIGN_VALUE - aligns a value up to the next boundary of the given alignment.
+///
+#define ALIGN_VALUE(Value, Alignment) ((Value) + (((Alignment) - (Value)) & ((Alignment) - 1)))
+
+///
 ///  ALIGN_POINTER - aligns a pointer to the lowest boundry
 ///
-#define ALIGN_POINTER(p, s) ((VOID *) ((UINTN)(p) + (((s) - ((UINTN) (p))) & ((s) - 1))))
+#define ALIGN_POINTER(Pointer, Alignment) ((VOID *) (ALIGN_VALUE ((UINTN)(Pointer), (Alignment))))
 
 ///
 ///  ALIGN_VARIABLE - aligns a variable up to the next natural boundry for int size of a processor
 ///
-#define ALIGN_VARIABLE(Value, Adjustment) \
-  Adjustment = 0U; \
-  if ((UINTN) (Value) % sizeof (UINTN)) { \
-    (Adjustment) = (UINTN)(sizeof (UINTN) - ((UINTN) (Value) % sizeof (UINTN))); \
-  } \
-  (Value) = (UINTN)((UINTN) (Value) + (UINTN) (Adjustment))
+#define ALIGN_VARIABLE(Value)  ALIGN_VALUE ((Value), sizeof (UINTN))
+
 
 //
 // Return the maximum of two operands.
@@ -300,6 +280,50 @@ typedef INTN RETURN_STATUS;
 #define RETURN_WARN_DELETE_FAILURE   ENCODE_WARNING (2)
 #define RETURN_WARN_WRITE_FAILURE    ENCODE_WARNING (3)
 #define RETURN_WARN_BUFFER_TOO_SMALL ENCODE_WARNING (4)
+
+/**
+  Returns a 16-bit signature built from 2 ASCII characters.
+
+  @param  A	   The first ASCII character.
+  @param  B	   The second ASCII character.
+
+  @return A 16-bit value built from the two ASCII characters specified by A and B.
+
+**/
+#define SIGNATURE_16(A, B)        ((A) | (B << 8))
+
+/**
+  Returns a 32-bit signature built from 4 ASCII characters.
+
+  @param  A	   The first ASCII character.
+  @param  B	   The second ASCII character.
+  @param  C	   The third ASCII character.
+  @param  D	   The fourth ASCII character.
+
+  @return A 32-bit value built from the two ASCII characters specified by A, B,
+          C and D.
+
+**/
+#define SIGNATURE_32(A, B, C, D)  (SIGNATURE_16 (A, B) | (SIGNATURE_16 (C, D) << 16))
+
+/**
+  Returns a 64-bit signature built from 8 ASCII characters.
+
+  @param  A	   The first ASCII character.
+  @param  B	   The second ASCII character.
+  @param  C	   The third ASCII character.
+  @param  D	   The fourth ASCII character.
+  @param  E	   The fifth ASCII character.
+  @param  F	   The sixth ASCII character.
+  @param  G	   The seventh ASCII character.
+  @param  H	   The eighth ASCII character.
+
+  @return A 64-bit value built from the two ASCII characters specified by A, B,
+          C, D, E, F, G and H.
+
+**/
+#define SIGNATURE_64(A, B, C, D, E, F, G, H) \
+    (SIGNATURE_32 (A, B, C, D) | ((UINT64) (SIGNATURE_32 (E, F, G, H)) << 32))
 
 #endif
 

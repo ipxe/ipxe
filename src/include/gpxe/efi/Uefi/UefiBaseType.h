@@ -1,5 +1,4 @@
 /** @file
-
   Defines data types and constants introduced in UEFI.
 
   Copyright (c) 2006 - 2008, Intel Corporation
@@ -18,33 +17,40 @@
 
 #include <gpxe/efi/Base.h>
 
+//
+// Basical data type definitions introduced in UEFI.
+//
+
 ///
-/// Basical data type definitions introduced in UEFI.
+/// 128-bit buffer containing a unique identifier value.
 ///
 typedef GUID                      EFI_GUID;
-
 ///
 /// Function return status for EFI API
 ///
 typedef RETURN_STATUS             EFI_STATUS;
+///
+/// A collection of related interfaces.
+///
 typedef VOID                      *EFI_HANDLE;
-
+///
+/// Handle to an event structure.
+///
 typedef VOID                      *EFI_EVENT;
-
+///
+/// Task priority level.
+///
 typedef UINTN                     EFI_TPL;
-
-
+///
+/// Logical block address.
+///
 typedef UINT64                    EFI_LBA;
-
-
-typedef UINT16                    STRING_REF;
-
 typedef UINT64                    EFI_PHYSICAL_ADDRESS;
 typedef UINT64                    EFI_VIRTUAL_ADDRESS;
 
 ///
 /// EFI Time Abstraction:
-///  Year:       2000 - 20XX
+///  Year:       1998 - 20XX
 ///  Month:      1 - 12
 ///  Day:        1 - 31
 ///  Hour:       0 - 23
@@ -68,21 +74,31 @@ typedef struct {
 } EFI_TIME;
 
 
-//
-// Networking Definitions
-//
+///
+/// 4-byte buffer. An IPv4 internet protocol address.
+///
 typedef struct {
   UINT8 Addr[4];
 } EFI_IPv4_ADDRESS;
 
+///
+/// 16-byte buffer. An IPv6 internet protocol address
+///
 typedef struct {
   UINT8 Addr[16];
 } EFI_IPv6_ADDRESS;
 
+///
+/// 32-byte buffer containing a network Media Access Control address.
+///
 typedef struct {
   UINT8 Addr[32];
 } EFI_MAC_ADDRESS;
 
+///
+/// 16-byte buffer aligned on a 4-byte boundary.
+/// An IPv4 or IPv6 internet protocol address.
+///
 typedef union {
   UINT32            Addr[4];
   EFI_IPv4_ADDRESS  v4;
@@ -131,8 +147,6 @@ typedef union {
 #define EFI_WARN_BUFFER_TOO_SMALL RETURN_WARN_BUFFER_TOO_SMALL
 
 
-#define NULL_HANDLE               ((VOID *) 0)
-
 //
 // Define macro to encode the status code.
 //
@@ -143,10 +157,9 @@ typedef union {
 //
 // Define macros to build data structure signatures from characters.
 //
-#define EFI_SIGNATURE_16(A, B)        ((A) | (B << 8))
-#define EFI_SIGNATURE_32(A, B, C, D)  (EFI_SIGNATURE_16 (A, B) | (EFI_SIGNATURE_16 (C, D) << 16))
-#define EFI_SIGNATURE_64(A, B, C, D, E, F, G, H) \
-    (EFI_SIGNATURE_32 (A, B, C, D) | ((UINT64) (EFI_SIGNATURE_32 (E, F, G, H)) << 32))
+#define EFI_SIGNATURE_16(A, B)                    SIGNATURE_16 (A, B)
+#define EFI_SIGNATURE_32(A, B, C, D)              SIGNATURE_32 (A, B, C, D)
+#define EFI_SIGNATURE_64(A, B, C, D, E, F, G, H)  SIGNATURE_64 (A, B, C, D, E, F, G, H)
 
 
 ///
@@ -170,5 +183,18 @@ typedef union {
 
 #define EFI_MAX_BIT               MAX_BIT
 #define EFI_MAX_ADDRESS           MAX_ADDRESS
+
+
+///
+/// Limited buffer size for a language code recommended by RFC3066
+/// (42 characters plus a NULL terminator)
+///
+#define RFC_3066_ENTRY_SIZE             (42 + 1)
+
+///
+/// The size of a 3 character ISO639 language code.
+///
+#define ISO_639_2_ENTRY_SIZE            3
+
 
 #endif

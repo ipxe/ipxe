@@ -18,7 +18,6 @@
 #ifndef __EFI_DRIVER_BINDING_H__
 #define __EFI_DRIVER_BINDING_H__
 
-#include <gpxe/efi/PiDxe.h>
 #include <gpxe/efi/Protocol/DevicePath.h>
 ///
 /// Global ID for the ControllerHandle Driver Protocol
@@ -31,7 +30,12 @@
 typedef struct _EFI_DRIVER_BINDING_PROTOCOL  EFI_DRIVER_BINDING_PROTOCOL;
 
 /**
-  Test to see if this driver supports ControllerHandle.
+  Test to see if this driver supports ControllerHandle. This service
+  is called by the EFI boot service ConnectController(). In
+  order to make drivers as small as possible, there are a few calling
+  restrictions for this service. ConnectController() must
+  follow these calling restrictions. If any other agent wishes to call
+  Supported() it must also follow these calling restrictions.
 
   @param  This                Protocol instance pointer.
   @param  ControllerHandle    Handle of device to test
@@ -52,7 +56,12 @@ EFI_STATUS
   );
 
 /**
-  Start this driver on ControllerHandle.
+  Start this driver on ControllerHandle. This service is called by the
+  EFI boot service ConnectController(). In order to make
+  drivers as small as possible, there are a few calling restrictions for
+  this service. ConnectController() must follow these
+  calling restrictions. If any other agent wishes to call Start() it
+  must also follow these calling restrictions.
 
   @param  This                 Protocol instance pointer.
   @param  ControllerHandle     Handle of device to bind driver to
@@ -73,7 +82,12 @@ EFI_STATUS
   );
 
 /**
-  Stop this driver on ControllerHandle.
+  Stop this driver on ControllerHandle. This service is called by the
+  EFI boot service DisconnectController(). In order to
+  make drivers as small as possible, there are a few calling
+  restrictions for this service. DisconnectController()
+  must follow these calling restrictions. If any other agent wishes
+  to call Stop() it must also follow these calling restrictions.
 
   @param  This              Protocol instance pointer.
   @param  ControllerHandle  Handle of device to stop driver on
@@ -94,70 +108,43 @@ EFI_STATUS
   IN  EFI_HANDLE                            *ChildHandleBuffer OPTIONAL
   );
 
-//
-// Interface structure for the ControllerHandle Driver Protocol
-//
-/**
-  @par Protocol Description:
-  This protocol provides the services required to determine if a driver supports a given controller.
-  If a controller is supported, then it also provides routines to start and stop the controller.
-
-  @param Supported
-  Tests to see if this driver supports a given controller. This service
-  is called by the EFI boot service ConnectController(). In
-  order to make drivers as small as possible, there are a few calling
-  restrictions for this service. ConnectController() must
-  follow these calling restrictions. If any other agent wishes to call
-  Supported() it must also follow these calling restrictions.
-
-
-  @param Start
-  Starts a controller using this driver. This service is called by the
-  EFI boot service ConnectController(). In order to make
-  drivers as small as possible, there are a few calling restrictions for
-  this service. ConnectController() must follow these
-  calling restrictions. If any other agent wishes to call Start() it
-  must also follow these calling restrictions.
-
-  @param Stop
-  Stops a controller using this driver. This service is called by the
-  EFI boot service DisconnectController(). In order to
-  make drivers as small as possible, there are a few calling
-  restrictions for this service. DisconnectController()
-  must follow these calling restrictions. If any other agent wishes
-  to call Stop() it must also follow these calling restrictions.
-
-  @param Version
-  The version number of the UEFI driver that produced the
-  EFI_DRIVER_BINDING_PROTOCOL. This field is used by
-  the EFI boot service ConnectController() to determine
-  the order that driver's Supported() service will be used when
-  a controller needs to be started. EFI Driver Binding Protocol
-  instances with higher Version values will be used before ones
-  with lower Version values. The Version values of 0x0-
-  0x0f and 0xfffffff0-0xffffffff are reserved for
-  platform/OEM specific drivers. The Version values of 0x10-
-  0xffffffef are reserved for IHV-developed drivers.
-
-  @param ImageHandle
-  The image handle of the UEFI driver that produced this instance
-  of the EFI_DRIVER_BINDING_PROTOCOL.
-
-  @param DriverBindingHandle
-  The handle on which this instance of the
-  EFI_DRIVER_BINDING_PROTOCOL is installed. In most
-  cases, this is the same handle as ImageHandle. However, for
-  UEFI drivers that produce more than one instance of the
-  EFI_DRIVER_BINDING_PROTOCOL, this value may not be
-  the same as ImageHandle.
-
-**/
+///
+/// This protocol provides the services required to determine if a driver supports a given controller.
+/// If a controller is supported, then it also provides routines to start and stop the controller.
+///
 struct _EFI_DRIVER_BINDING_PROTOCOL {
   EFI_DRIVER_BINDING_SUPPORTED  Supported;
   EFI_DRIVER_BINDING_START      Start;
   EFI_DRIVER_BINDING_STOP       Stop;
+
+  ///
+  /// The version number of the UEFI driver that produced the
+  /// EFI_DRIVER_BINDING_PROTOCOL. This field is used by
+  /// the EFI boot service ConnectController() to determine
+  /// the order that driver's Supported() service will be used when
+  /// a controller needs to be started. EFI Driver Binding Protocol
+  /// instances with higher Version values will be used before ones
+  /// with lower Version values. The Version values of 0x0-
+  /// 0x0f and 0xfffffff0-0xffffffff are reserved for
+  /// platform/OEM specific drivers. The Version values of 0x10-
+  /// 0xffffffef are reserved for IHV-developed drivers.
+  ///
   UINT32                        Version;
+
+  ///
+  /// The image handle of the UEFI driver that produced this instance
+  /// of the EFI_DRIVER_BINDING_PROTOCOL.
+  ///
   EFI_HANDLE                    ImageHandle;
+
+  ///
+  /// The handle on which this instance of the
+  /// EFI_DRIVER_BINDING_PROTOCOL is installed. In most
+  /// cases, this is the same handle as ImageHandle. However, for
+  /// UEFI drivers that produce more than one instance of the
+  /// EFI_DRIVER_BINDING_PROTOCOL, this value may not be
+  /// the same as ImageHandle.
+  ///
   EFI_HANDLE                    DriverBindingHandle;
 };
 

@@ -11,7 +11,7 @@
   WITHOUT WARRANTIES OR REPRESENTATIONS OF ANY KIND, EITHER EXPRESS OR IMPLIED.
 
   @par Revision Reference:
-  Version 1.0.
+  PI Version 1.0
 
 **/
 
@@ -76,7 +76,7 @@ typedef struct {
 ///
 typedef struct {
   ///
-  /// A GUID that defines the memory allocation region¡¯s type and purpose, as well as
+  /// A GUID that defines the memory allocation region's type and purpose, as well as
   /// other fields within the memory allocation HOB. This GUID is used to define the
   /// additional data within the HOB that may be present for the memory allocation HOB.
   /// Type EFI_GUID is defined in InstallProtocolInterface() in the UEFI 2.0
@@ -84,9 +84,11 @@ typedef struct {
   ///
   EFI_GUID              Name;
 
+  ///
   /// The base address of memory allocated by this HOB. Type
   /// EFI_PHYSICAL_ADDRESS is defined in AllocatePages() in the UEFI 2.0
   /// specification.
+  ///
   EFI_PHYSICAL_ADDRESS  MemoryBaseAddress;
 
   ///
@@ -155,7 +157,7 @@ typedef struct {
 } EFI_HOB_MEMORY_ALLOCATION_MODULE;
 
 ///
-/// type of Recount type
+/// Resource type
 ///
 typedef UINT32 EFI_RESOURCE_TYPE;
 

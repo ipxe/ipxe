@@ -19,8 +19,6 @@
 #ifndef __PCI_ROOT_BRIDGE_IO_H__
 #define __PCI_ROOT_BRIDGE_IO_H__
 
-#include <gpxe/efi/PiDxe.h>
-
 #define EFI_PCI_ROOT_BRIDGE_IO_PROTOCOL_GUID \
   { \
     0x2f707ebb, 0x4a1a, 0x11d4, {0x9a, 0x38, 0x00, 0x90, 0x27, 0x3f, 0xc1, 0x4d } \
@@ -360,73 +358,14 @@ EFI_STATUS
   OUT VOID                                     **Resources
   );
 
-/**
-  @par Protocol Description:
-  Provides the basic Memory, I/O, PCI configuration, and DMA interfaces that are
-  used to abstract accesses to PCI controllers behind a PCI Root Bridge Controller.
-
-  @param ParentHandle
-  The EFI_HANDLE of the PCI Host Bridge of which this PCI Root Bridge is a member.
-
-  @param PollMem
-  Polls an address in memory mapped I/O space until an exit condition is met,
-  or a timeout occurs.
-
-  @param PollIo
-  Polls an address in I/O space until an exit condition is met, or a timeout occurs.
-
-  @param Mem.Read
-  Allows reads from memory mapped I/O space.
-
-  @param Mem.Write
-  Allows writes to memory mapped I/O space.
-
-  @param Io.Read
-  Allows reads from I/O space.
-
-  @param Io.Write
-  Allows writes to I/O space.
-
-  @param Pci.Read
-  Allows reads from PCI configuration space.
-
-  @param Pci.Write
-  Allows writes to PCI configuration space.
-
-  @param CopyMem
-  Allows one region of PCI root bridge memory space to be copied to another
-  region of PCI root bridge memory space.
-
-  @param Map
-  Provides the PCI controller's specific addresses needed to access system memory for DMA.
-
-  @param Unmap
-  Releases any resources allocated by Map().
-
-  @param AllocateBuffer
-  Allocates pages that are suitable for a common buffer mapping.
-
-  @param FreeBuffer
-  Free pages that were allocated with AllocateBuffer().
-
-  @param Flush
-  Flushes all PCI posted write transactions to system memory.
-
-  @param GetAttributes
-  Gets the attributes that a PCI root bridge supports setting with SetAttributes(),
-  and the attributes that a PCI root bridge is currently using.
-
-  @param SetAttributes
-  Sets attributes for a resource range on a PCI root bridge.
-
-  @param Configuration
-  Gets the current resource settings for this PCI root bridge.
-
-  @param SegmentNumber
-  The segment number that this PCI root bridge resides.
-
-**/
+///
+/// Provides the basic Memory, I/O, PCI configuration, and DMA interfaces that are
+/// used to abstract accesses to PCI controllers behind a PCI Root Bridge Controller.
+///
 struct _EFI_PCI_ROOT_BRIDGE_IO_PROTOCOL {
+  ///
+  /// The EFI_HANDLE of the PCI Host Bridge of which this PCI Root Bridge is a member.
+  ///
   EFI_HANDLE                                      ParentHandle;
   EFI_PCI_ROOT_BRIDGE_IO_PROTOCOL_POLL_IO_MEM     PollMem;
   EFI_PCI_ROOT_BRIDGE_IO_PROTOCOL_POLL_IO_MEM     PollIo;
@@ -442,6 +381,10 @@ struct _EFI_PCI_ROOT_BRIDGE_IO_PROTOCOL {
   EFI_PCI_ROOT_BRIDGE_IO_PROTOCOL_GET_ATTRIBUTES  GetAttributes;
   EFI_PCI_ROOT_BRIDGE_IO_PROTOCOL_SET_ATTRIBUTES  SetAttributes;
   EFI_PCI_ROOT_BRIDGE_IO_PROTOCOL_CONFIGURATION   Configuration;
+
+  ///
+  /// The segment number that this PCI root bridge resides.
+  ///
   UINT32                                          SegmentNumber;
 };
 
