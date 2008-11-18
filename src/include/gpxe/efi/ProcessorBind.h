@@ -8,3 +8,7 @@
 #if __i386__
 #include <gpxe/efi/Ia32/ProcessorBind.h>
 #endif
+
+#if __x86_64__
+#include <gpxe/efi/X64/ProcessorBind.h>
+#endif

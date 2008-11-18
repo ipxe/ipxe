@@ -32,9 +32,7 @@
  * @v len		Length
  * @ret dest		Destination address
  */
-__attribute__ (( regparm ( 3 ) )) void * __memcpy ( void *dest,
-						    const void *src,
-						    size_t len ) {
+void * __memcpy ( void *dest, const void *src, size_t len ) {
 	void *edi = dest;
 	const void *esi = src;
 	int discard_ecx;

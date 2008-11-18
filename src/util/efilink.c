@@ -56,6 +56,9 @@ static void generate_pe_reloc ( struct pe_relocs **pe_reltab,
 	start_rva = ( rva & ~0xfff );
 	reloc = ( rva & 0xfff );
 	switch ( size ) {
+	case 8:
+		reloc |= 0xa000;
+		break;
 	case 4:
 		reloc |= 0x3000;
 		break;
@@ -385,13 +388,18 @@ static void process_reloc ( asection *section, arelent *rel,
 		/* Skip absolute symbols; the symbol value won't
 		 * change when the object is loaded.
 		 */
-	} else if ( strcmp ( howto->name, "R_386_32" ) == 0 ) {
+	} else if ( strcmp ( howto->name, "R_X86_64_64" ) == 0 ) {
+		/* Generate an 8-byte PE relocation */
+		generate_pe_reloc ( pe_reltab, offset, 8 );
+	} else if ( ( strcmp ( howto->name, "R_386_32" ) == 0 ) ||
+		    ( strcmp ( howto->name, "R_X86_64_32" ) == 0 ) ) {
 		/* Generate a 4-byte PE relocation */
 		generate_pe_reloc ( pe_reltab, offset, 4 );
 	} else if ( strcmp ( howto->name, "R_386_16" ) == 0 ) {
 		/* Generate a 2-byte PE relocation */
 		generate_pe_reloc ( pe_reltab, offset, 2 );
-	} else if ( strcmp ( howto->name, "R_386_PC32" ) == 0 ) {
+	} else if ( ( strcmp ( howto->name, "R_386_PC32" ) == 0 ) ||
+		    ( strcmp ( howto->name, "R_X86_64_PC32" ) == 0 ) ) {
 		/* Skip PC-relative relocations; all relative offsets
 		 * remain unaltered when the object is loaded.
 		 */

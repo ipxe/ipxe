@@ -68,7 +68,6 @@ SRCDIRS		+= arch/i386/drivers/net
 SRCDIRS		+= arch/i386/interface/pcbios
 SRCDIRS		+= arch/i386/interface/pxe
 SRCDIRS 	+= arch/i386/interface/syslinux
-SRCDIRS 	+= arch/i386/interface/efi
 
 # The various xxx_loader.c files are #included into core/loader.c and
 # should not be compiled directly.
@@ -81,6 +80,11 @@ NON_AUTO_SRCS	+= arch/i386/core/wince_loader.c
 #
 OBJS_unnrv2b	= unnrv2b unnrv2b16
 CFLAGS_unnrv2b16 = -DCODE16
+
+# Include common x86 Makefile
+#
+MAKEDEPS	+= arch/x86/Makefile
+include arch/x86/Makefile
 
 # Include platform-specific Makefile
 #

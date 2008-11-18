@@ -59,6 +59,15 @@ __asm__ ( ".equ\t" OBJECT_SYMBOL_STR ", 0" );
 #define REQUIRE_OBJECT(object) \
 	__asm__ ( ".equ\tneed_" #object ", obj_" #object );
 
+/* Force visibility of all symbols to "hidden", i.e. inform gcc that
+ * all symbol references resolve strictly within our final binary.
+ * This avoids unnecessary PLT/GOT entries on x86_64.
+ *
+ * This is a stronger claim than specifying "-fvisibility=hidden",
+ * since it also affects symbols marked with "extern".
+ */
+#pragma GCC visibility push(hidden)
+
 /** @def DBG
  *
  * Print a debugging message.

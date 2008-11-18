@@ -23,9 +23,7 @@
 
 #define __HAVE_ARCH_MEMCPY
 
-extern __attribute__ (( regparm ( 3 ) )) void * __memcpy ( void *dest,
-							   const void *src,
-							   size_t len );
+extern void * __memcpy ( void *dest, const void *src, size_t len );
 
 #if 0
 static inline __attribute__ (( always_inline )) void *
