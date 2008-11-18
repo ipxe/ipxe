@@ -163,30 +163,30 @@ SECTIONS {
     PROVIDE ( _max_align = 16 );
     .			= 0;
 
+    .			= ALIGN ( _max_align );
     _prefix_lma		= .;
     .			+= _prefix_filesz;
+
     .			= ALIGN ( _max_align );
-
     _payload_lma	= .;
-
     _text16_lma		= .;
     .			+= _text16_filesz;
-    .			= ALIGN ( _max_align );
 
+    .			= ALIGN ( _max_align );
     _data16_lma		= .;
     .			+= _data16_filesz;
-    .			= ALIGN ( _max_align );
 
+    .			= ALIGN ( _max_align );
     _textdata_lma	= .;
     .			+= _textdata_filesz;
-    .			= ALIGN ( _max_align );
 
     _filesz		= .; /* Do not include zinfo block in file size */
 
+    .			= ALIGN ( _max_align );
     _zinfo_lma		= .;
     .			+= _zinfo_filesz;
-    .			= ALIGN ( _max_align );
 
+    .			= ALIGN ( _max_align );
     _end_lma		= .;
 
     /*
