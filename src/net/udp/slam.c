@@ -219,7 +219,7 @@ static int slam_put_value ( struct slam_request *slam,
 	 */
 	len = ( ( flsl ( value ) + 10 ) / 8 );
 	if ( len >= iob_tailroom ( iobuf ) ) {
-		DBGC2 ( slam, "SLAM %p cannot add %d-byte value\n",
+		DBGC2 ( slam, "SLAM %p cannot add %zd-byte value\n",
 			slam, len );
 		return -ENOBUFS;
 	}
@@ -380,7 +380,7 @@ static int slam_pull_value ( struct slam_request *slam,
 	len = ( *data >> 5 );
 	if ( ( len == 0 ) ||
 	     ( value && ( len > sizeof ( *value ) ) ) ) {
-		DBGC ( slam, "SLAM %p invalid value length %d bytes\n",
+		DBGC ( slam, "SLAM %p invalid value length %zd bytes\n",
 		       slam, len );
 		return -EINVAL;
 	}

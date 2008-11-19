@@ -438,12 +438,13 @@ static struct xfer_interface_operations udp_xfer_operations = {
 
 /** UDP socket opener */
 struct socket_opener udp_socket_opener __socket_opener = {
-	.semantics	= SOCK_DGRAM,
+	.semantics	= UDP_SOCK_DGRAM,
 	.family		= AF_INET,
 	.open		= udp_open,
 };
 
-char UDP_SOCK_DGRAM[1];
+/** Linkage hack */
+int udp_sock_dgram = UDP_SOCK_DGRAM;
 
 /**
  * Open UDP URI

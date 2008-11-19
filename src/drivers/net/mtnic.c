@@ -37,6 +37,7 @@
 #include <gpxe/umalloc.h>
 #include <byteswap.h>
 #include <unistd.h>
+#include <gpxe/io.h>
 #include <gpxe/pci.h>
 #include <gpxe/ethernet.h>
 #include <gpxe/netdevice.h>
@@ -1618,8 +1619,8 @@ mtnic_disable(struct pci_device *pci)
 
                 free(priv->cmd.buf);
 		iounmap(priv->hcr);
-                ufree((u32)priv->fw.fw_pages.buf);
-		ufree((u32)priv->fw.extra_pages.buf);
+                ufree((intptr_t)priv->fw.fw_pages.buf);
+		ufree((intptr_t)priv->fw.extra_pages.buf);
                 free(priv->eq.buf);
 		iounmap(priv->eq_db);
                 priv->state = CARD_DOWN;

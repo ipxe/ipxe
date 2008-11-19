@@ -25,6 +25,7 @@
 #include <unistd.h>
 #include <errno.h>
 #include <byteswap.h>
+#include <gpxe/io.h>
 #include <gpxe/pci.h>
 #include <gpxe/malloc.h>
 #include <gpxe/umalloc.h>

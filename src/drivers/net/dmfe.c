@@ -133,14 +133,14 @@
 /* Structure/enum declaration ------------------------------- */
 struct tx_desc {
 	u32 tdes0, tdes1, tdes2, tdes3;	/* Data for the card */
-	u32 tx_buf_ptr;		/* Data for us */
-	 u32 /* struct tx_desc * */ next_tx_desc;
+	void * tx_buf_ptr;		/* Data for us */
+	struct tx_desc * next_tx_desc;
 } __attribute__ ((aligned(32)));
 
 struct rx_desc {
 	u32 rdes0, rdes1, rdes2, rdes3;	/* Data for the card */
-	u32 rx_skb_ptr;		/* Data for us */
-	 u32 /* struct rx_desc * */ next_rx_desc;
+	void * rx_skb_ptr;		/* Data for us */
+	struct rx_desc * next_rx_desc;
 } __attribute__ ((aligned(32)));
 
 static struct dmfe_private {
@@ -522,30 +522,30 @@ static void dmfe_descriptor_init(struct nic *nic __unused, unsigned long ioaddr)
 
 	/* Init Transmit chain */
 	for (i = 0; i < TX_DESC_CNT; i++) {
-		txd[i].tx_buf_ptr = (u32) & txb[i];
+		txd[i].tx_buf_ptr = &txb[i];
 		txd[i].tdes0 = cpu_to_le32(0);
 		txd[i].tdes1 = cpu_to_le32(0x81000000);	/* IC, chain */
 		txd[i].tdes2 = cpu_to_le32(virt_to_bus(&txb[i]));
 		txd[i].tdes3 = cpu_to_le32(virt_to_bus(&txd[i + 1]));
-		txd[i].next_tx_desc = virt_to_le32desc(&txd[i + 1]);	
+		txd[i].next_tx_desc = &txd[i + 1];
 	}
 	/* Mark the last entry as wrapping the ring */
 	txd[i - 1].tdes3 = virt_to_le32desc(&txd[0]);
-	txd[i - 1].next_tx_desc = (u32) & txd[0];
+	txd[i - 1].next_tx_desc = &txd[0];
 
 	/* receive descriptor chain */
 	for (i = 0; i < RX_DESC_CNT; i++) {
-		rxd[i].rx_skb_ptr = (u32) & rxb[i * RX_ALLOC_SIZE];
+		rxd[i].rx_skb_ptr = &rxb[i * RX_ALLOC_SIZE];
 		rxd[i].rdes0 = cpu_to_le32(0x80000000);
 		rxd[i].rdes1 = cpu_to_le32(0x01000600);
 		rxd[i].rdes2 =
 		    cpu_to_le32(virt_to_bus(&rxb[i * RX_ALLOC_SIZE]));
 		rxd[i].rdes3 = cpu_to_le32(virt_to_bus(&rxd[i + 1]));
-		rxd[i].next_rx_desc = virt_to_le32desc(&rxd[i + 1]);
+		rxd[i].next_rx_desc = &rxd[i + 1];
 	}
 	/* Mark the last entry as wrapping the ring */
 	rxd[i - 1].rdes3 = cpu_to_le32(virt_to_bus(&rxd[0]));
-	rxd[i - 1].next_rx_desc = virt_to_le32desc(&rxd[0]);
+	rxd[i - 1].next_rx_desc = &rxd[0];
 
 }
 

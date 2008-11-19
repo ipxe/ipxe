@@ -22,6 +22,7 @@
 #include <assert.h>
 #include <byteswap.h>
 #include <console.h>
+#include <gpxe/io.h>
 #include <gpxe/pci.h>
 #include <gpxe/malloc.h>
 #include <gpxe/ethernet.h>
@@ -1449,7 +1450,7 @@ falcon_spi_rw ( struct spi_bus* bus, struct spi_device *device,
 		return -EINVAL;
 	}
 
-	EFAB_TRACE ( "Executing spi command %d on device %d at %d for %d bytes\n",
+	EFAB_TRACE ( "Executing spi command %d on device %d at %d for %zd bytes\n",
 		     command, device_id, address, len );
 
 	/* The bus must be idle */
@@ -1497,7 +1498,7 @@ falcon_spi_rw ( struct spi_bus* bus, struct spi_device *device,
 
 fail2:
 fail1:
-	EFAB_ERR ( "Failed SPI command %d to device %d address 0x%x len 0x%x\n",
+	EFAB_ERR ( "Failed SPI command %d to device %d address 0x%x len 0x%zx\n",
 		   command, device_id, address, len );
 
 	return rc;
@@ -3763,7 +3764,7 @@ efab_transmit ( struct net_device *netdev, struct io_buffer *iob )
 	assert ( tx_queue->buf[buf_id] == NULL );
 	tx_queue->buf[buf_id] = iob;
 
-	EFAB_TRACE ( "tx_buf[%d] for iob %p data %p len %d\n",
+	EFAB_TRACE ( "tx_buf[%d] for iob %p data %p len %zd\n",
 		     buf_id, iob, iob->data, iob_len ( iob ) );
 
 	/* Form the descriptor, and push it to hardware */

@@ -21,6 +21,7 @@
 #include <errno.h>
 #include <unistd.h>
 #include <assert.h>
+#include <gpxe/io.h>
 #include <gpxe/pci.h>
 #include <gpxe/infiniband.h>
 #include <gpxe/i2c.h>
@@ -1065,7 +1066,7 @@ static int linda_post_recv ( struct ib_device *ibdev,
 		return -EINVAL;
 	}
 	if ( len != LINDA_RECV_PAYLOAD_SIZE ) {
-		DBGC ( linda, "Linda %p QPN %ld wrong RX buffer size (%d)\n",
+		DBGC ( linda, "Linda %p QPN %ld wrong RX buffer size (%zd)\n",
 		       linda, qp->qpn, len );
 		return -EINVAL;
 	}

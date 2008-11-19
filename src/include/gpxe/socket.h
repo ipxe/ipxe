@@ -7,6 +7,8 @@
  *
  */
 
+#include <stdint.h>
+
 /**
  * @defgroup commtypes Communication semantics
  *
@@ -14,12 +16,14 @@
  */
 
 /** Connection-based, reliable streams */
-#define SOCK_STREAM	( ( int ) TCP_SOCK_STREAM )
-extern char TCP_SOCK_STREAM[];
+extern int tcp_sock_stream;
+#define TCP_SOCK_STREAM 0x1
+#define SOCK_STREAM tcp_sock_stream
 
 /** Connectionless, unreliable streams */
-#define SOCK_DGRAM	( ( int ) UDP_SOCK_DGRAM )
-extern char UDP_SOCK_DGRAM[];
+extern int udp_sock_dgram;
+#define UDP_SOCK_DGRAM 0x2
+#define SOCK_DGRAM udp_sock_dgram
 
 /** @} */
 

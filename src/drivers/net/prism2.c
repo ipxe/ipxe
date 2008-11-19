@@ -118,7 +118,7 @@ static const char hardcoded_ssid[] = "";
 typedef struct hfa384x
 {
   UINT32 iobase;
-  UINT32 membase;
+  void *membase;
   UINT16 lastcmd;
   UINT16 status;         /* in host order */
   UINT16 resp0;          /* in host order */

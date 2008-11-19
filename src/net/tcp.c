@@ -483,7 +483,7 @@ static int tcp_xmit ( struct tcp_connection *tcp, int force_send ) {
 	tcphdr->csum = tcpip_chksum ( iobuf->data, iob_len ( iobuf ) );
 
 	/* Dump header */
-	DBGC ( tcp, "TCP %p TX %d->%d %08x..%08x           %08x %4zd",
+	DBGC ( tcp, "TCP %p TX %d->%d %08x..%08zx           %08x %4zd",
 	       tcp, ntohs ( tcphdr->src ), ntohs ( tcphdr->dest ),
 	       ntohl ( tcphdr->seq ), ( ntohl ( tcphdr->seq ) + seq_len ),
 	       ntohl ( tcphdr->ack ), len );
@@ -702,7 +702,7 @@ static int tcp_rx_ack ( struct tcp_connection *tcp, uint32_t ack,
 
 	/* Ignore duplicate or out-of-range ACK */
 	if ( ack_len > tcp->snd_sent ) {
-		DBGC ( tcp, "TCP %p received ACK for [%08x,%08x), "
+		DBGC ( tcp, "TCP %p received ACK for [%08x,%08zx), "
 		       "sent only [%08x,%08x)\n", tcp, tcp->snd_seq,
 		       ( tcp->snd_seq + ack_len ), tcp->snd_seq,
 		       ( tcp->snd_seq + tcp->snd_sent ) );
@@ -894,7 +894,7 @@ static int tcp_rx ( struct io_buffer *iobuf,
 	len = iob_len ( iobuf );
 
 	/* Dump header */
-	DBGC ( tcp, "TCP %p RX %d<-%d           %08x %08x..%08x %4zd",
+	DBGC ( tcp, "TCP %p RX %d<-%d           %08x %08x..%08zx %4zd",
 	       tcp, ntohs ( tcphdr->dest ), ntohs ( tcphdr->src ),
 	       ntohl ( tcphdr->ack ), ntohl ( tcphdr->seq ),
 	       ( ntohl ( tcphdr->seq ) + len +
@@ -1070,12 +1070,13 @@ static struct xfer_interface_operations tcp_xfer_operations = {
 
 /** TCP socket opener */
 struct socket_opener tcp_socket_opener __socket_opener = {
-	.semantics	= SOCK_STREAM,
+	.semantics	= TCP_SOCK_STREAM,
 	.family		= AF_INET,
 	.open		= tcp_open,
 };
 
-char TCP_SOCK_STREAM[1];
+/** Linkage hack */
+int tcp_sock_stream = TCP_SOCK_STREAM;
 
 /**
  * Open TCP URI

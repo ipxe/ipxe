@@ -173,8 +173,9 @@ efi_snp_initialize ( EFI_SIMPLE_NETWORK_PROTOCOL *snp,
 		container_of ( snp, struct efi_snp_device, snp );
 	int rc;
 
-	DBGC2 ( snpdev, "SNPDEV %p INITIALIZE (%d extra RX, %d extra TX)\n",
-		snpdev, extra_rx_bufsize, extra_tx_bufsize );
+	DBGC2 ( snpdev, "SNPDEV %p INITIALIZE (%ld extra RX, %ld extra TX)\n",
+		snpdev, ( ( unsigned long ) extra_rx_bufsize ),
+		( ( unsigned long ) extra_tx_bufsize ) );
 
 	if ( ( rc = netdev_open ( snpdev->netdev ) ) != 0 ) {
 		DBGC ( snpdev, "SNPDEV %p could not open %s: %s\n",
@@ -252,9 +253,9 @@ efi_snp_receive_filters ( EFI_SIMPLE_NETWORK_PROTOCOL *snp, UINT32 enable,
 		container_of ( snp, struct efi_snp_device, snp );
 	unsigned int i;
 
-	DBGC2 ( snpdev, "SNPDEV %p RECEIVE_FILTERS %08x&~%08x%s %d mcast\n",
+	DBGC2 ( snpdev, "SNPDEV %p RECEIVE_FILTERS %08x&~%08x%s %ld mcast\n",
 		snpdev, enable, disable, ( mcast_reset ? " reset" : "" ),
-		mcast_count );
+		( ( unsigned long ) mcast_count ) );
 	for ( i = 0 ; i < mcast_count ; i++ ) {
 		DBGC2_HDA ( snpdev, i, &mcast[i],
 			    snpdev->netdev->ll_protocol->ll_addr_len );
@@ -390,8 +391,9 @@ efi_snp_nvdata ( EFI_SIMPLE_NETWORK_PROTOCOL *snp, BOOLEAN read,
 	struct efi_snp_device *snpdev =
 		container_of ( snp, struct efi_snp_device, snp );
 
-	DBGC2 ( snpdev, "SNPDEV %p NVDATA %s %x+%x\n", snpdev,
-		( read ? "read" : "write" ), offset, len );
+	DBGC2 ( snpdev, "SNPDEV %p NVDATA %s %lx+%lx\n", snpdev,
+		( read ? "read" : "write" ), ( ( unsigned long ) offset ),
+		( ( unsigned long ) len ) );
 	if ( ! read )
 		DBGC2_HDA ( snpdev, offset, data, len );
 
@@ -492,7 +494,8 @@ efi_snp_transmit ( EFI_SIMPLE_NETWORK_PROTOCOL *snp,
 	int rc;
 	EFI_STATUS efirc;
 
-	DBGC2 ( snpdev, "SNPDEV %p TRANSMIT %p+%x", snpdev, data, len );
+	DBGC2 ( snpdev, "SNPDEV %p TRANSMIT %p+%lx", snpdev, data,
+		( ( unsigned long ) len ) );
 	if ( ll_header_len ) {
 		if ( ll_src ) {
 			DBGC2 ( snpdev, " src %s",
@@ -512,13 +515,14 @@ efi_snp_transmit ( EFI_SIMPLE_NETWORK_PROTOCOL *snp,
 	if ( ll_header_len ) {
 		if ( ll_header_len != ll_protocol->ll_header_len ) {
 			DBGC ( snpdev, "SNPDEV %p TX invalid header length "
-			       "%d\n", snpdev, ll_header_len );
+			       "%ld\n", snpdev,
+			       ( ( unsigned long ) ll_header_len ) );
 			efirc = EFI_INVALID_PARAMETER;
 			goto err_sanity;
 		}
 		if ( len < ll_header_len ) {
-			DBGC ( snpdev, "SNPDEV %p invalid packet length %d\n",
-			       snpdev, len );
+			DBGC ( snpdev, "SNPDEV %p invalid packet length %ld\n",
+			       snpdev, ( ( unsigned long ) len ) );
 			efirc = EFI_BUFFER_TOO_SMALL;
 			goto err_sanity;
 		}
@@ -541,8 +545,8 @@ efi_snp_transmit ( EFI_SIMPLE_NETWORK_PROTOCOL *snp,
 	/* Allocate buffer */
 	iobuf = alloc_iob ( len );
 	if ( ! iobuf ) {
-		DBGC ( snpdev, "SNPDEV %p TX could not allocate %d-byte "
-		       "buffer\n", snpdev, len );
+		DBGC ( snpdev, "SNPDEV %p TX could not allocate %ld-byte "
+		       "buffer\n", snpdev, ( ( unsigned long ) len ) );
 		efirc = EFI_DEVICE_ERROR;
 		goto err_alloc_iob;
 	}
@@ -610,7 +614,8 @@ efi_snp_receive ( EFI_SIMPLE_NETWORK_PROTOCOL *snp,
 	int rc;
 	EFI_STATUS efirc;
 
-	DBGC2 ( snpdev, "SNPDEV %p RECEIVE %p(+%x)", snpdev, data, *len );
+	DBGC2 ( snpdev, "SNPDEV %p RECEIVE %p(+%lx)", snpdev, data,
+		( ( unsigned long ) *len ) );
 
 	/* Poll the network device */
 	efi_snp_poll ( snpdev );
@@ -741,8 +746,10 @@ efi_snp_netdev ( EFI_DRIVER_BINDING_PROTOCOL *driver, EFI_HANDLE device ) {
 		       driver, device, efi_strerror ( efirc ) );
 		goto out_no_pci_location;
 	}
-	DBGCP ( driver, "SNPDRV %p device %p is PCI %04x:%02x:%02x.%x\n",
-		driver, device, pci_segment, pci_bus, pci_dev, pci_fn );
+	DBGCP ( driver, "SNPDRV %p device %p is PCI %04lx:%02lx:%02lx.%lx\n",
+		driver, device, ( ( unsigned long ) pci_segment ),
+		( ( unsigned long ) pci_bus ), ( ( unsigned long ) pci_dev ),
+		( ( unsigned long ) pci_fn ) );
 
 	/* Look up corresponding network device */
 	pci_busdevfn = PCI_BUSDEVFN ( pci_bus, PCI_DEVFN ( pci_dev, pci_fn ) );
@@ -858,7 +865,7 @@ efi_snp_driver_start ( EFI_DRIVER_BINDING_PROTOCOL *driver,
 	/* Sanity check */
 	if ( netdev->ll_protocol->ll_addr_len > sizeof ( EFI_MAC_ADDRESS ) ) {
 		DBGC ( snpdev, "SNPDEV %p cannot support link-layer address "
-		       "length %zd for %s\n", snpdev,
+		       "length %d for %s\n", snpdev,
 		       netdev->ll_protocol->ll_addr_len, netdev->name );
 		efirc = EFI_INVALID_PARAMETER;
 		goto err_ll_addr_len;
@@ -923,8 +930,8 @@ efi_snp_driver_stop ( EFI_DRIVER_BINDING_PROTOCOL *driver,
 	EFI_BOOT_SERVICES *bs = efi_systab->BootServices;
 	struct efi_snp_device *snpdev;
 
-	DBGCP ( driver, "SNPDRV %p DRIVER_STOP %p (%d %p)\n",
-		driver, device, num_children, children );
+	DBGCP ( driver, "SNPDRV %p DRIVER_STOP %p (%ld %p)\n",
+		driver, device, ( ( unsigned long ) num_children ), children );
 
 	/* Locate SNP device */
 	snpdev = efi_snp_snpdev ( driver, device );

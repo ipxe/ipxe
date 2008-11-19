@@ -550,7 +550,7 @@ static void velocity_transmit(struct nic *nic, const char *dest,	/* Destination 
 		vptr->td_rings[entry].tdesc0.pktsize = pktlen;
 		vptr->td_rings[entry].td_buf[0].pa_low = virt_to_bus(ptxb);
 		vptr->td_rings[entry].td_buf[0].pa_high &=
-		    cpu_to_le32(0xffff0000L);
+		    cpu_to_le32(0xffff0000UL);
 		vptr->td_rings[entry].td_buf[0].bufsize =
 		    vptr->td_rings[entry].tdesc0.pktsize;
 		vptr->td_rings[entry].tdesc1.CMDZ = 2;

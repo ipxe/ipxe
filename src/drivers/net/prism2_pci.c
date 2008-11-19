@@ -22,14 +22,11 @@ $Id$
 
 static int prism2_pci_probe ( struct nic *nic, struct pci_device *pci ) {
   hfa384x_t *hw = &hw_global;
-  uint32_t membase = 0; /* Prism2.5 Memory Base */
 
-  pci_read_config_dword( pci, PRISM2_PCI_MEM_BASE, &membase);
-  membase &= PCI_BASE_ADDRESS_MEM_MASK;
-  hw->membase = (uint32_t) phys_to_virt(membase);
-  printf ( "Prism2.5 has registers at %#lx\n", hw->membase );
+  printf ( "Prism2.5 has registers at %#lx\n", pci->membase );
+  hw->membase = ioremap ( pci->membase, 0x100 );
 
-  nic->ioaddr = hw->membase;
+  nic->ioaddr = pci->membase;
   nic->irqno = 0;
 
   return prism2_probe ( nic, hw );

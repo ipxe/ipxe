@@ -1194,40 +1194,44 @@ rhine_reset (struct nic *nic)
     int ioaddr = tp->ioaddr;
     int i, j;
     int FDXFlag, CRbak;
-    int rx_ring_tmp, rx_ring_tmp1;
-    int tx_ring_tmp, tx_ring_tmp1;
-    int rx_bufs_tmp, rx_bufs_tmp1;
-    int tx_bufs_tmp, tx_bufs_tmp1;
+    void *rx_ring_tmp;
+    void *tx_ring_tmp;
+    void *rx_bufs_tmp;
+    void *tx_bufs_tmp;
+    unsigned long rx_ring_tmp1;
+    unsigned long tx_ring_tmp1;
+    unsigned long rx_bufs_tmp1;
+    unsigned long tx_bufs_tmp1;
 
     /* printf ("rhine_reset\n"); */
     /* Soft reset the chip. */
     /*outb(CmdReset, ioaddr + ChipCmd); */
 
-    tx_bufs_tmp = (int) rhine_buffers.txbuf;
-    tx_ring_tmp = (int) rhine_buffers.txdesc;
-    rx_bufs_tmp = (int) rhine_buffers.rxbuf;
-    rx_ring_tmp = (int) rhine_buffers.rxdesc;
+    tx_bufs_tmp = rhine_buffers.txbuf;
+    tx_ring_tmp = rhine_buffers.txdesc;
+    rx_bufs_tmp = rhine_buffers.rxbuf;
+    rx_ring_tmp = rhine_buffers.rxdesc;
 
     /* tune RD TD 32 byte alignment */
-    rx_ring_tmp1 = (int) virt_to_bus ((char *) rx_ring_tmp);
+    rx_ring_tmp1 = virt_to_bus ( rx_ring_tmp );
     j = (rx_ring_tmp1 + 32) & (~0x1f);
     /* printf ("txring[%d]", j); */
     tp->rx_ring = (struct rhine_rx_desc *) bus_to_virt (j);
 
-    tx_ring_tmp1 = (int) virt_to_bus ((char *) tx_ring_tmp);
+    tx_ring_tmp1 = virt_to_bus ( tx_ring_tmp );
     j = (tx_ring_tmp1 + 32) & (~0x1f);
     tp->tx_ring = (struct rhine_tx_desc *) bus_to_virt (j);
     /* printf ("rxring[%X]", j); */
 
 
-    tx_bufs_tmp1 = (int) virt_to_bus ((char *) tx_bufs_tmp);
+    tx_bufs_tmp1 = virt_to_bus ( tx_bufs_tmp );
     j = (int) (tx_bufs_tmp1 + 32) & (~0x1f);
-    tx_bufs_tmp = (int) bus_to_virt (j);
+    tx_bufs_tmp = bus_to_virt (j);
     /* printf ("txb[%X]", j); */
 
-    rx_bufs_tmp1 = (int) virt_to_bus ((char *) rx_bufs_tmp);
+    rx_bufs_tmp1 = virt_to_bus ( rx_bufs_tmp );
     j = (int) (rx_bufs_tmp1 + 32) & (~0x1f);
-    rx_bufs_tmp = (int) bus_to_virt (j);
+    rx_bufs_tmp = bus_to_virt (j);
     /* printf ("rxb[%X][%X]", rx_bufs_tmp1, j); */
 
     for (i = 0; i < RX_RING_SIZE; i++)
