@@ -75,6 +75,11 @@ static int ramdisk_write ( struct block_device *blockdev, uint64_t block,
 	return 0;
 }
 
+static struct block_device_operations ramdisk_operations = {
+	.read	= ramdisk_read,
+	.write	= ramdisk_write
+};
+
 int init_ramdisk ( struct ramdisk *ramdisk, userptr_t data, size_t len,
 		   unsigned int blksize ) {
 	
@@ -82,8 +87,7 @@ int init_ramdisk ( struct ramdisk *ramdisk, userptr_t data, size_t len,
 		blksize = 512;
 
 	ramdisk->data = data;
-	ramdisk->blockdev.read = ramdisk_read;
-	ramdisk->blockdev.write = ramdisk_write;
+	ramdisk->blockdev.op = &ramdisk_operations;
 	ramdisk->blockdev.blksize = blksize;
 	ramdisk->blockdev.blocks = ( len / blksize );
 

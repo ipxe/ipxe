@@ -228,6 +228,16 @@ static int scsi_read_capacity_16 ( struct block_device *blockdev ) {
 	return 0;
 }
 
+static struct block_device_operations scsi_operations_16 = {
+	.read	= scsi_read_16,
+	.write	= scsi_write_16,
+};
+
+static struct block_device_operations scsi_operations_10 = {
+	.read	= scsi_read_10,
+	.write	= scsi_write_10,
+};
+
 /**
  * Initialise SCSI device
  *
@@ -250,8 +260,7 @@ int init_scsidev ( struct scsi_device *scsi ) {
 	scsi_read_capacity_10 ( &scsi->blockdev );
 
 	/* Try READ CAPACITY (10), which is a mandatory command, first. */
-	scsi->blockdev.read = scsi_read_10;
-	scsi->blockdev.write = scsi_write_10;
+	scsi->blockdev.op = &scsi_operations_10;
 	if ( ( rc = scsi_read_capacity_10 ( &scsi->blockdev ) ) != 0 )
 		return rc;
 
@@ -261,8 +270,7 @@ int init_scsidev ( struct scsi_device *scsi ) {
 	 * mandatory, so we can't just use it straight off.
 	 */
 	if ( scsi->blockdev.blocks == 0 ) {
-		scsi->blockdev.read = scsi_read_16;
-		scsi->blockdev.write = scsi_write_16;
+		scsi->blockdev.op = &scsi_operations_16;
 		if ( ( rc = scsi_read_capacity_16 ( &scsi->blockdev ) ) != 0 )
 			return rc;
 	}

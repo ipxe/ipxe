@@ -139,6 +139,11 @@ static int ata_identify ( struct block_device *blockdev ) {
 	return 0;
 }
 
+static struct block_device_operations ata_operations = {
+	.read	= ata_read,
+	.write	= ata_write
+};
+
 /**
  * Initialise ATA device
  *
@@ -153,7 +158,6 @@ static int ata_identify ( struct block_device *blockdev ) {
  */
 int init_atadev ( struct ata_device *ata ) {
 	/** Fill in read and write methods, and get device capacity */
-	ata->blockdev.read = ata_read;
-	ata->blockdev.write = ata_write;
+	ata->blockdev.op = &ata_operations;
 	return ata_identify ( &ata->blockdev );
 }

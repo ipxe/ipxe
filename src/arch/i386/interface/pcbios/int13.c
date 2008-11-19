@@ -144,7 +144,7 @@ static int int13_rw_sectors ( struct int13_drive *drive,
 static int int13_read_sectors ( struct int13_drive *drive,
 				struct i386_all_regs *ix86 ) {
 	DBG ( "Read: " );
-	return int13_rw_sectors ( drive, ix86, drive->blockdev->read );
+	return int13_rw_sectors ( drive, ix86, drive->blockdev->op->read );
 }
 
 /**
@@ -163,7 +163,7 @@ static int int13_read_sectors ( struct int13_drive *drive,
 static int int13_write_sectors ( struct int13_drive *drive,
 				 struct i386_all_regs *ix86 ) {
 	DBG ( "Write: " );
-	return int13_rw_sectors ( drive, ix86, drive->blockdev->write );
+	return int13_rw_sectors ( drive, ix86, drive->blockdev->op->write );
 }
 
 /**
@@ -275,7 +275,7 @@ static int int13_extended_rw ( struct int13_drive *drive,
 static int int13_extended_read ( struct int13_drive *drive,
 				 struct i386_all_regs *ix86 ) {
 	DBG ( "Extended read: " );
-	return int13_extended_rw ( drive, ix86, drive->blockdev->read );
+	return int13_extended_rw ( drive, ix86, drive->blockdev->op->read );
 }
 
 /**
@@ -288,7 +288,7 @@ static int int13_extended_read ( struct int13_drive *drive,
 static int int13_extended_write ( struct int13_drive *drive,
 				  struct i386_all_regs *ix86 ) {
 	DBG ( "Extended write: " );
-	return int13_extended_rw ( drive, ix86, drive->blockdev->write );
+	return int13_extended_rw ( drive, ix86, drive->blockdev->op->write );
 }
 
 /**
@@ -488,8 +488,8 @@ static void guess_int13_geometry ( struct int13_drive *drive ) {
 	/* Scan through partition table and modify guesses for heads
 	 * and sectors_per_track if we find any used partitions.
 	 */
-	if ( drive->blockdev->read ( drive->blockdev, 0, 1,
-				     virt_to_user ( &mbr ) ) == 0 ) {
+	if ( drive->blockdev->op->read ( drive->blockdev, 0, 1,
+				         virt_to_user ( &mbr ) ) == 0 ) {
 		for ( i = 0 ; i < 4 ; i++ ) {
 			partition = &mbr.partitions[i];
 			if ( ! partition->type )
