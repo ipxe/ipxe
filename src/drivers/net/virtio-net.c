@@ -66,20 +66,27 @@ enum {
    QUEUE_NB
 };
 
-static virtio_queue_t queue[QUEUE_NB];
-static struct vring vring[QUEUE_NB];
-static u16 free_head[QUEUE_NB];
-static u16 last_used_idx[QUEUE_NB];
-static u16 vdata[QUEUE_NB][MAX_QUEUE_NUM];
+struct vring_virtqueue {
+   virtio_queue_t queue;
+   struct vring vring;
+   u16 free_head;
+   u16 last_used_idx;
+   u16 vdata[MAX_QUEUE_NUM];
+   /* PCI */
+   int queue_index;
+};
+
+static struct vring_virtqueue virtqueue[QUEUE_NB];
 
 /*
  * Virtio PCI interface
  *
  */
 
-static int vp_find_vq(unsigned int ioaddr, int queue_index)
+static int vp_find_vq(unsigned int ioaddr, int queue_index,
+                      struct vring_virtqueue *vq)
 {
-   struct vring * vr = &vring[queue_index];
+   struct vring * vr = &vq->vring;
    u16 num;
 
    /* select the queue */
@@ -106,9 +113,11 @@ static int vp_find_vq(unsigned int ioaddr, int queue_index)
            return -1;
    }
 
+   vq->queue_index = queue_index;
+
    /* initialize the queue */
 
-   vring_init(vr, num, (unsigned char*)&queue[queue_index]);
+   vring_init(vr, num, (unsigned char*)&vq->queue);
 
    /* activate the queue
     *
@@ -126,14 +135,14 @@ static int vp_find_vq(unsigned int ioaddr, int queue_index)
  *
  */
 
-static void vring_enable_cb(int queue_index)
+static void vring_enable_cb(struct vring_virtqueue *vq)
 {
-   vring[queue_index].avail->flags &= ~VRING_AVAIL_F_NO_INTERRUPT;
+   vq->vring.avail->flags &= ~VRING_AVAIL_F_NO_INTERRUPT;
 }
 
-static void vring_disable_cb(int queue_index)
+static void vring_disable_cb(struct vring_virtqueue *vq)
 {
-   vring[queue_index].avail->flags |= VRING_AVAIL_F_NO_INTERRUPT;
+   vq->vring.avail->flags |= VRING_AVAIL_F_NO_INTERRUPT;
 }
 
 /*
@@ -142,12 +151,12 @@ static void vring_disable_cb(int queue_index)
  * put at the begin of the free list the current desc[head]
  */
 
-static void vring_detach(int queue_index, unsigned int head)
+static void vring_detach(struct vring_virtqueue *vq, unsigned int head)
 {
-   struct vring *vr = &vring[queue_index];
-        unsigned int i;
+   struct vring *vr = &vq->vring;
+   unsigned int i;
 
-        /* find end of given descriptor */
+   /* find end of given descriptor */
 
    i = head;
    while (vr->desc[i].flags & VRING_DESC_F_NEXT)
@@ -155,9 +164,9 @@ static void vring_detach(int queue_index, unsigned int head)
 
    /* link it with free list and point to it */
 
-   vr->desc[i].next = free_head[queue_index];
+   vr->desc[i].next = vq->free_head;
    wmb();
-   free_head[queue_index] = head;
+   vq->free_head = head;
 }
 
 /*
@@ -167,10 +176,10 @@ static void vring_detach(int queue_index, unsigned int head)
  *
  */
 
-static inline int vring_more_used(int queue_index)
+static inline int vring_more_used(struct vring_virtqueue *vq)
 {
    wmb();
-   return last_used_idx[queue_index] != vring[queue_index].used->idx;
+   return vq->last_used_idx != vq->vring.used->idx;
 }
 
 /*
@@ -180,43 +189,42 @@ static inline int vring_more_used(int queue_index)
  *
  */
 
-static int vring_get_buf(int queue_index, unsigned int *len)
+static int vring_get_buf(struct vring_virtqueue *vq, unsigned int *len)
 {
-   struct vring *vr = &vring[queue_index];
+   struct vring *vr = &vq->vring;
    struct vring_used_elem *elem;
    u32 id;
    int ret;
 
-   BUG_ON(!vring_more_used(queue_index));
+   BUG_ON(!vring_more_used(vq));
 
-   elem = &vr->used->ring[last_used_idx[queue_index] % vr->num];
+   elem = &vr->used->ring[vq->last_used_idx % vr->num];
    wmb();
    id = elem->id;
    if (len != NULL)
            *len = elem->len;
 
-   ret = vdata[queue_index][id];
+   ret = vq->vdata[id];
 
-   vring_detach(queue_index, id);
+   vring_detach(vq, id);
 
-   last_used_idx[queue_index]++;
+   vq->last_used_idx++;
 
    return ret;
 }
 
-static void vring_add_buf(int queue_index,
+static void vring_add_buf(struct vring_virtqueue *vq,
 			  struct vring_list list[],
 			  unsigned int out, unsigned int in,
 			  int index, int num_added)
 {
-   struct vring *vr = &vring[queue_index];
+   struct vring *vr = &vq->vring;
    int i, avail, head, prev;
 
-   BUG_ON(queue_index >= QUEUE_NB);
    BUG_ON(out + in == 0);
 
    prev = 0;
-   head = free_head[queue_index];
+   head = vq->free_head;
    for (i = head; out; i = vr->desc[i].next, out--) {
 
            vr->desc[i].flags = VRING_DESC_F_NEXT;
@@ -235,25 +243,26 @@ static void vring_add_buf(int queue_index,
    }
    vr->desc[prev].flags &= ~VRING_DESC_F_NEXT;
 
-   free_head[queue_index] = i;
+   vq->free_head = i;
 
-   vdata[queue_index][head] = index;
+   vq->vdata[head] = index;
 
    avail = (vr->avail->idx + num_added) % vr->num;
    vr->avail->ring[avail] = head;
    wmb();
 }
 
-static void vring_kick(struct nic *nic, int queue_index, int num_added)
+static void vring_kick(struct nic *nic, struct vring_virtqueue *vq,
+                       int num_added)
 {
-   struct vring *vr = &vring[queue_index];
+   struct vring *vr = &vq->vring;
 
    wmb();
    vr->avail->idx += num_added;
 
    mb();
    if (!(vr->used->flags & VRING_USED_F_NO_NOTIFY))
-           vp_notify(nic->ioaddr, queue_index);
+           vp_notify(nic->ioaddr, vq->queue_index);
 }
 
 /*
@@ -268,7 +277,7 @@ static void virtnet_disable(struct nic *nic)
    int i;
 
    for (i = 0; i < QUEUE_NB; i++) {
-           vring_disable_cb(i);
+           vring_disable_cb(&virtqueue[i]);
            vp_del_vq(nic->ioaddr, i);
    }
    vp_reset(nic->ioaddr);
@@ -292,13 +301,13 @@ static int virtnet_poll(struct nic *nic, int retrieve)
    struct virtio_net_hdr *hdr;
    struct vring_list list[2];
 
-   if (!vring_more_used(RX_INDEX))
+   if (!vring_more_used(&virtqueue[RX_INDEX]))
            return 0;
 
    if (!retrieve)
            return 1;
 
-   token = vring_get_buf(RX_INDEX, &len);
+   token = vring_get_buf(&virtqueue[RX_INDEX], &len);
 
    BUG_ON(len > sizeof(struct virtio_net_hdr) + ETH_FRAME_LEN);
 
@@ -315,8 +324,8 @@ static int virtnet_poll(struct nic *nic, int retrieve)
    list[1].addr = (char*)&rx_buffer[token];
    list[1].length = ETH_FRAME_LEN;
 
-   vring_add_buf(RX_INDEX, list, 0, 2, token, 0);
-   vring_kick(nic, RX_INDEX, 1);
+   vring_add_buf(&virtqueue[RX_INDEX], list, 0, 2, token, 0);
+   vring_kick(nic, &virtqueue[RX_INDEX], 1);
 
    return 1;
 }
@@ -362,9 +371,9 @@ static void virtnet_transmit(struct nic *nic, const char *destaddr,
    list[1].addr = (char*)&tx_eth_frame;
    list[1].length = ETH_FRAME_LEN;
 
-   vring_add_buf(TX_INDEX, list, 2, 0, 0, 0);
+   vring_add_buf(&virtqueue[TX_INDEX], list, 2, 0, 0, 0);
 
-   vring_kick(nic, TX_INDEX, 1);
+   vring_kick(nic, &virtqueue[TX_INDEX], 1);
 
    /*
     * http://www.etherboot.org/wiki/dev/devmanual
@@ -373,26 +382,26 @@ static void virtnet_transmit(struct nic *nic, const char *destaddr,
     *    before returning from this routine"
     */
 
-   while (!vring_more_used(TX_INDEX)) {
+   while (!vring_more_used(&virtqueue[TX_INDEX])) {
            mb();
            udelay(10);
    }
 
    /* free desc */
 
-   (void)vring_get_buf(TX_INDEX, NULL);
+   (void)vring_get_buf(&virtqueue[TX_INDEX], NULL);
 }
 
 static void virtnet_irq(struct nic *nic __unused, irq_action_t action)
 {
    switch ( action ) {
    case DISABLE :
-           vring_disable_cb(RX_INDEX);
-           vring_disable_cb(TX_INDEX);
+           vring_disable_cb(&virtqueue[RX_INDEX]);
+           vring_disable_cb(&virtqueue[TX_INDEX]);
            break;
    case ENABLE :
-           vring_enable_cb(RX_INDEX);
-           vring_enable_cb(TX_INDEX);
+           vring_enable_cb(&virtqueue[RX_INDEX]);
+           vring_enable_cb(&virtqueue[TX_INDEX]);
            break;
    case FORCE :
            break;
@@ -409,12 +418,12 @@ static void provide_buffers(struct nic *nic)
            list[0].length = sizeof(struct virtio_net_hdr);
            list[1].addr = (char*)&rx_buffer[i];
            list[1].length = ETH_FRAME_LEN;
-           vring_add_buf(RX_INDEX, list, 0, 2, i, i);
+           vring_add_buf(&virtqueue[RX_INDEX], list, 0, 2, i, i);
    }
 
    /* nofify */
 
-   vring_kick(nic, RX_INDEX, i);
+   vring_kick(nic, &virtqueue[RX_INDEX], i);
 }
 
 static struct nic_operations virtnet_operations = {
@@ -464,10 +473,10 @@ static int virtnet_probe(struct nic *nic, struct pci_device *pci)
    /* initialize emit/receive queue */
 
    for (i = 0; i < QUEUE_NB; i++) {
-           free_head[i] = 0;
-           last_used_idx[i] = 0;
-           memset((char*)&queue[i], 0, sizeof(queue[i]));
-           if (vp_find_vq(nic->ioaddr, i) == -1)
+           virtqueue[i].free_head = 0;
+           virtqueue[i].last_used_idx = 0;
+           memset((char*)&virtqueue[i].queue, 0, sizeof(virtqueue[i].queue));
+           if (vp_find_vq(nic->ioaddr, i, &virtqueue[i]) == -1)
                    printf("Cannot register queue #%d\n", i);
    }
 
