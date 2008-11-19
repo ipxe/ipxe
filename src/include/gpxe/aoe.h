@@ -13,8 +13,24 @@
 #include <gpxe/retry.h>
 #include <gpxe/ata.h>
 
+/** An AoE config command */
+struct aoecfg {
+	/** AoE Queue depth */
+	uint16_t bufcnt;
+	/** ATA target firmware version */
+	uint16_t fwver;
+	/** ATA target sector count */
+	uint8_t scnt;
+	/** AoE config string subcommand */
+	uint8_t aoeccmd;
+	/** AoE config string length */
+	uint16_t cfglen;
+	/** AoE config string */
+	uint8_t data[0];
+} __attribute__ (( packed ));
+
 /** An AoE ATA command */
-struct aoecmd {
+struct aoeata {
 	/** AoE command flags */
 	uint8_t aflags;
 	/** ATA error/feature register */
@@ -37,6 +53,14 @@ struct aoecmd {
 #define AOE_FL_ASYNC	0x02	/**< Asynchronous write */
 #define AOE_FL_WRITE	0x01	/**< Write command */
 
+/** An AoE command */
+union aoecmd {
+	/** Config command */
+	struct aoecfg cfg;
+	/** ATA command */
+	struct aoeata ata;
+};
+
 /** An AoE header */
 struct aoehdr {
 	/** Protocol version number and flags */
@@ -52,10 +76,7 @@ struct aoehdr {
 	/** Tag, in network byte order */
 	uint32_t tag;
 	/** Payload */
-	union {
-		/** ATA command */
-		struct aoecmd command[0];
-	} arg;
+	union aoecmd cmd[0];
 } __attribute__ (( packed ));
 
 #define AOE_VERSION	0x10	/**< Version 1 */
@@ -99,6 +120,8 @@ struct aoe_session {
 	/** Tag for current AoE command */
 	uint32_t tag;
 
+	/** Current AOE command */
+	uint8_t aoe_cmd_type;
 	/** Current ATA command */
 	struct ata_command *command;
 	/** Overall status of current ATA command */
