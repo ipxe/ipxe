@@ -707,7 +707,7 @@ CLEANUP += $(ZBIN)
 #
 $(EFILINK) : util/efilink.c $(MAKEDEPS)
 	$(QM)$(ECHO) "  [HOSTCC] $@"
-	$(Q)$(HOST_CC) -O2 -o $@ $< -lbfd
+	$(Q)$(HOST_CC) -O2 -o $@ $< -lbfd -liberty
 CLEANUP += $(EFILINK)
 
 ###############################################################################
