@@ -41,7 +41,7 @@ uint16_t __bss16 ( com32_saved_sp );
 /**
  * Interrupt call helper
  */
-void __cdecl com32_intcall ( uint8_t interrupt, physaddr_t inregs_phys, physaddr_t outregs_phys ) {
+void __asmcall com32_intcall ( uint8_t interrupt, physaddr_t inregs_phys, physaddr_t outregs_phys ) {
 
 	memcpy_user ( virt_to_user( &com32_regs ), 0,
 	              phys_to_user ( inregs_phys ), 0,
@@ -111,7 +111,7 @@ void __cdecl com32_intcall ( uint8_t interrupt, physaddr_t inregs_phys, physaddr
 /**
  * Farcall helper
  */
-void __cdecl com32_farcall ( uint32_t proc, physaddr_t inregs_phys, physaddr_t outregs_phys ) {
+void __asmcall com32_farcall ( uint32_t proc, physaddr_t inregs_phys, physaddr_t outregs_phys ) {
 
 	memcpy_user ( virt_to_user( &com32_regs ), 0,
 	              phys_to_user ( inregs_phys ), 0,
@@ -170,7 +170,7 @@ void __cdecl com32_farcall ( uint32_t proc, physaddr_t inregs_phys, physaddr_t o
 /**
  * CDECL farcall helper
  */
-int __cdecl com32_cfarcall ( uint32_t proc, physaddr_t stack, size_t stacksz ) {
+int __asmcall com32_cfarcall ( uint32_t proc, physaddr_t stack, size_t stacksz ) {
 	int32_t eax;
 
 	copy_user_to_rm_stack ( phys_to_user ( stack ), stacksz );

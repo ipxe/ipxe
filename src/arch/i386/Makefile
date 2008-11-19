@@ -22,11 +22,11 @@ endif
 CFLAGS		+= -mpreferred-stack-boundary=2
 
 # Code size reduction.  Use regparm for all functions - C functions
-# called from assembly (or vice versa) need __cdecl now
+# called from assembly (or vice versa) need __asmcall now
 #
 CFLAGS		+= -mregparm=3
 
-# Code size reduction.  Use -mrtd (same __cdecl requirements as above)
+# Code size reduction.  Use -mrtd (same __asmcall requirements as above)
 CFLAGS		+= -mrtd
 
 # Code size reduction.  This is the logical complement to -mregparm=3.

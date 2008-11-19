@@ -39,7 +39,7 @@ extern char _etextdata[];
  * address space, and returns the physical address of the new location
  * to the prefix in %edi.
  */
-__cdecl void relocate ( struct i386_all_regs *ix86 ) {
+__asmcall void relocate ( struct i386_all_regs *ix86 ) {
 	struct memory_map memmap;
 	unsigned long start, end, size, padded_size;
 	unsigned long new_start, new_end;

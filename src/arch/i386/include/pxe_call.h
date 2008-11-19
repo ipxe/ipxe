@@ -30,6 +30,6 @@ extern void pxe_hook_int1a ( void );
 extern int pxe_unhook_int1a ( void );
 extern void pxe_init_structures ( void );
 extern int pxe_start_nbp ( void );
-extern __cdecl void pxe_api_call ( struct i386_all_regs *ix86 );
+extern __asmcall void pxe_api_call ( struct i386_all_regs *ix86 );
 
 #endif /* _PXE_CALL_H */

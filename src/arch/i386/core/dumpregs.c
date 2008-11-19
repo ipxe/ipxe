@@ -1,7 +1,7 @@
 #include <stdio.h>
 #include <realmode.h>
 
-void __cdecl _dump_regs ( struct i386_all_regs *ix86 ) {
+void __asmcall _dump_regs ( struct i386_all_regs *ix86 ) {
 
 	__asm__ __volatile__ (
 		TEXT16_CODE ( ".globl dump_regs\n\t"

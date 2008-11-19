@@ -142,7 +142,7 @@ static void gdbmach_enable_hwbps ( void ) {
 	__asm__ __volatile__ ( "movl %0, %%dr7\n" : : "r" ( dr7 ) );
 }
 
-__cdecl void gdbmach_handler ( int signo, gdbreg_t *regs ) {
+__asmcall void gdbmach_handler ( int signo, gdbreg_t *regs ) {
 	gdbmach_disable_hwbps();
 	gdbstub_handler ( signo, regs );
 	gdbmach_enable_hwbps();

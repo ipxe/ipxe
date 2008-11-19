@@ -34,7 +34,7 @@ static struct feature features_end[0] __table_end ( struct feature, features );
  *
  * @ret rc		Return status code
  */
-__cdecl int main ( void ) {
+__asmcall int main ( void ) {
 	struct feature *feature;
 
 	initialise();

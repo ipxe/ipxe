@@ -212,7 +212,7 @@ void comboot_run_kernel ( )
 /**
  * Terminate program interrupt handler
  */
-static __cdecl void int20 ( struct i386_all_regs *ix86 __unused ) {
+static __asmcall void int20 ( struct i386_all_regs *ix86 __unused ) {
 	longjmp ( comboot_return, COMBOOT_RETURN_EXIT );
 }
 
@@ -220,7 +220,7 @@ static __cdecl void int20 ( struct i386_all_regs *ix86 __unused ) {
 /**
  * DOS-compatible API
  */
-static __cdecl void int21 ( struct i386_all_regs *ix86 ) {
+static __asmcall void int21 ( struct i386_all_regs *ix86 ) {
 	ix86->flags |= CF;
 
 	switch ( ix86->regs.ah ) {
@@ -287,7 +287,7 @@ static __cdecl void int21 ( struct i386_all_regs *ix86 ) {
 /**
  * SYSLINUX API
  */
-static __cdecl void int22 ( struct i386_all_regs *ix86 ) {
+static __asmcall void int22 ( struct i386_all_regs *ix86 ) {
 	ix86->flags |= CF;
 
 	switch ( ix86->regs.ax ) {

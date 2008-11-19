@@ -302,9 +302,6 @@ int __debug_disable;
 /** Declare a variable or data structure as unused. */
 #define __unused __attribute__ (( unused ))
 
-/** Apply standard C calling conventions */
-#define __cdecl __attribute__ (( cdecl , regparm(0) ))
-
 /**
  * Declare a function as pure - i.e. without side effects
  */
@@ -371,5 +368,7 @@ int __debug_disable;
 #define barrier() __asm__ __volatile__ ( "" : : : "memory" )
 
 #endif /* ASSEMBLY */
+
+#include <bits/compiler.h>
 
 #endif /* COMPILER_H */
