@@ -58,6 +58,11 @@ struct vring {
    struct vring_used *used;
 };
 
+struct vring_list {
+  char *addr;
+  unsigned int length;
+};
+
 static inline void vring_init(struct vring *vr,
                          unsigned int num, unsigned char *queue)
 {
@@ -90,4 +95,5 @@ static inline void vring_init(struct vring *vr,
       (sizeof(struct vring_avail) + sizeof(u16) * num)) \
          + PAGE_MASK) & ~PAGE_MASK) + \
          (sizeof(struct vring_used) + sizeof(struct vring_used_elem) * num))
+
 #endif /* _VIRTIO_RING_H_ */

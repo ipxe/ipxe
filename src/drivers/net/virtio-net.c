@@ -204,52 +204,36 @@ static int vring_get_buf(int queue_index, unsigned int *len)
    return ret;
 }
 
-static void vring_add_buf(int queue_index, int index, int num_added)
+static void vring_add_buf(int queue_index,
+			  struct vring_list list[],
+			  unsigned int out, unsigned int in,
+			  int index, int num_added)
 {
    struct vring *vr = &vring[queue_index];
-   int i, avail, head;
+   int i, avail, head, prev;
 
    BUG_ON(queue_index >= QUEUE_NB);
+   BUG_ON(out + in == 0);
 
+   prev = 0;
    head = free_head[queue_index];
-   i = head;
-
-   if (queue_index == TX_INDEX) {
-
-           BUG_ON(index != 0);
-
-           /* add header into vring */
+   for (i = head; out; i = vr->desc[i].next, out--) {
 
            vr->desc[i].flags = VRING_DESC_F_NEXT;
-           vr->desc[i].addr = (u64)virt_to_phys(&tx_virtio_hdr);
-           vr->desc[i].len = sizeof(struct virtio_net_hdr);
-           i = vr->desc[i].next;
-
-           /* add frame buffer into vring */
-
-           vr->desc[i].flags = 0;
-           vr->desc[i].addr = (u64)virt_to_phys(&tx_eth_frame);
-           vr->desc[i].len = ETH_FRAME_LEN;
-           i = vr->desc[i].next;
-
-   } else if (queue_index == RX_INDEX) {
-
-           BUG_ON(index >= RX_BUF_NB);
-
-           /* add header into vring */
+           vr->desc[i].addr = (u64)virt_to_phys(list->addr);
+           vr->desc[i].len = list->length;
+           prev = i;
+           list++;
+   }
+   for ( ; in; i = vr->desc[i].next, in--) {
 
            vr->desc[i].flags = VRING_DESC_F_NEXT|VRING_DESC_F_WRITE;
-           vr->desc[i].addr = (u64)virt_to_phys(&rx_hdr[index]);
-           vr->desc[i].len = sizeof(struct virtio_net_hdr);
-           i = vr->desc[i].next;
-
-           /* add frame buffer into vring */
-
-           vr->desc[i].flags = VRING_DESC_F_WRITE;
-           vr->desc[i].addr = (u64)virt_to_phys(&rx_buffer[index]);
-           vr->desc[i].len = ETH_FRAME_LEN;
-           i = vr->desc[i].next;
+           vr->desc[i].addr = (u64)virt_to_phys(list->addr);
+           vr->desc[i].len = list->length;
+           prev = i;
+           list++;
    }
+   vr->desc[prev].flags &= ~VRING_DESC_F_NEXT;
 
    free_head[queue_index] = i;
 
@@ -306,6 +290,7 @@ static int virtnet_poll(struct nic *nic, int retrieve)
    unsigned int len;
    u16 token;
    struct virtio_net_hdr *hdr;
+   struct vring_list list[2];
 
    if (!vring_more_used(RX_INDEX))
            return 0;
@@ -320,12 +305,17 @@ static int virtnet_poll(struct nic *nic, int retrieve)
    hdr = &rx_hdr[token];   /* FIXME: check flags */
    len -= sizeof(struct virtio_net_hdr);
 
-        nic->packetlen = len;
+   nic->packetlen = len;
    memcpy(nic->packet, (char *)rx_buffer[token], nic->packetlen);
 
    /* add buffer to desc */
 
-   vring_add_buf(RX_INDEX, token, 0);
+   list[0].addr = (char*)&rx_hdr[token];
+   list[0].length = sizeof(struct virtio_net_hdr);
+   list[1].addr = (char*)&rx_buffer[token];
+   list[1].length = ETH_FRAME_LEN;
+
+   vring_add_buf(RX_INDEX, list, 0, 2, token, 0);
    vring_kick(nic, RX_INDEX, 1);
 
    return 1;
@@ -342,6 +332,8 @@ static int virtnet_poll(struct nic *nic, int retrieve)
 static void virtnet_transmit(struct nic *nic, const char *destaddr,
         unsigned int type, unsigned int len, const char *data)
 {
+   struct vring_list list[2];
+
    /*
     * from http://www.etherboot.org/wiki/dev/devmanual :
     *     "You do not need more than one transmit buffer."
@@ -365,7 +357,12 @@ static void virtnet_transmit(struct nic *nic, const char *destaddr,
    tx_eth_frame.hdr.type = htons(type);
    memcpy(tx_eth_frame.data, data, len);
 
-   vring_add_buf(TX_INDEX, 0, 0);
+   list[0].addr = (char*)&tx_virtio_hdr;
+   list[0].length = sizeof(struct virtio_net_hdr);
+   list[1].addr = (char*)&tx_eth_frame;
+   list[1].length = ETH_FRAME_LEN;
+
+   vring_add_buf(TX_INDEX, list, 2, 0, 0, 0);
 
    vring_kick(nic, TX_INDEX, 1);
 
@@ -405,9 +402,15 @@ static void virtnet_irq(struct nic *nic __unused, irq_action_t action)
 static void provide_buffers(struct nic *nic)
 {
    int i;
+   struct vring_list list[2];
 
-   for (i = 0; i < RX_BUF_NB; i++)
-           vring_add_buf(RX_INDEX, i, i);
+   for (i = 0; i < RX_BUF_NB; i++) {
+           list[0].addr = (char*)&rx_hdr[i];
+           list[0].length = sizeof(struct virtio_net_hdr);
+           list[1].addr = (char*)&rx_buffer[i];
+           list[1].length = ETH_FRAME_LEN;
+           vring_add_buf(RX_INDEX, list, 0, 2, i, i);
+   }
 
    /* nofify */
 
