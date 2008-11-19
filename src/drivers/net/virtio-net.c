@@ -77,18 +77,18 @@ static u16 vdata[QUEUE_NB][MAX_QUEUE_NUM];
  *
  */
 
-static int vp_find_vq(struct nic *nic, int queue_index)
+static int vp_find_vq(unsigned int ioaddr, int queue_index)
 {
    struct vring * vr = &vring[queue_index];
    u16 num;
 
    /* select the queue */
 
-   outw(queue_index, nic->ioaddr + VIRTIO_PCI_QUEUE_SEL);
+   outw(queue_index, ioaddr + VIRTIO_PCI_QUEUE_SEL);
 
    /* check if the queue is available */
 
-   num = inw(nic->ioaddr + VIRTIO_PCI_QUEUE_NUM);
+   num = inw(ioaddr + VIRTIO_PCI_QUEUE_NUM);
    if (!num) {
            printf("ERROR: queue size is 0\n");
            return -1;
@@ -101,7 +101,7 @@ static int vp_find_vq(struct nic *nic, int queue_index)
 
    /* check if the queue is already active */
 
-   if (inl(nic->ioaddr + VIRTIO_PCI_QUEUE_PFN)) {
+   if (inl(ioaddr + VIRTIO_PCI_QUEUE_PFN)) {
            printf("ERROR: queue already active\n");
            return -1;
    }
@@ -116,7 +116,7 @@ static int vp_find_vq(struct nic *nic, int queue_index)
     */
 
    outl((unsigned long)virt_to_phys(vr->desc) >> PAGE_SHIFT,
-        nic->ioaddr + VIRTIO_PCI_QUEUE_PFN);
+        ioaddr + VIRTIO_PCI_QUEUE_PFN);
 
    return num;
 }
@@ -253,7 +253,7 @@ static void vring_kick(struct nic *nic, int queue_index, int num_added)
 
    mb();
    if (!(vr->used->flags & VRING_USED_F_NO_NOTIFY))
-           vp_notify(nic, queue_index);
+           vp_notify(nic->ioaddr, queue_index);
 }
 
 /*
@@ -269,9 +269,9 @@ static void virtnet_disable(struct nic *nic)
 
    for (i = 0; i < QUEUE_NB; i++) {
            vring_disable_cb(i);
-           vp_del_vq(nic, i);
+           vp_del_vq(nic->ioaddr, i);
    }
-   vp_reset(nic);
+   vp_reset(nic->ioaddr);
 }
 
 /*
@@ -448,11 +448,11 @@ static int virtnet_probe(struct nic *nic, struct pci_device *pci)
 
    adjust_pci_device(pci);
 
-   vp_reset(nic);
+   vp_reset(nic->ioaddr);
 
-   features = vp_get_features(nic);
+   features = vp_get_features(nic->ioaddr);
    if (features & (1 << VIRTIO_NET_F_MAC)) {
-           vp_get(nic, offsetof(struct virtio_net_config, mac),
+           vp_get(nic->ioaddr, offsetof(struct virtio_net_config, mac),
                   nic->node_addr, ETH_ALEN);
            printf("MAC address ");
 	   for (i = 0; i < ETH_ALEN; i++) {
@@ -467,7 +467,7 @@ static int virtnet_probe(struct nic *nic, struct pci_device *pci)
            free_head[i] = 0;
            last_used_idx[i] = 0;
            memset((char*)&queue[i], 0, sizeof(queue[i]));
-           if (vp_find_vq(nic, i) == -1)
+           if (vp_find_vq(nic->ioaddr, i) == -1)
                    printf("Cannot register queue #%d\n", i);
    }
 
@@ -481,8 +481,8 @@ static int virtnet_probe(struct nic *nic, struct pci_device *pci)
 
    /* driver is ready */
 
-   vp_set_features(nic, features & (1 << VIRTIO_NET_F_MAC));
-   vp_set_status(nic, VIRTIO_CONFIG_S_DRIVER | VIRTIO_CONFIG_S_DRIVER_OK);
+   vp_set_features(nic->ioaddr, features & (1 << VIRTIO_NET_F_MAC));
+   vp_set_status(nic->ioaddr, VIRTIO_CONFIG_S_DRIVER | VIRTIO_CONFIG_S_DRIVER_OK);
 
    return 1;
 }
