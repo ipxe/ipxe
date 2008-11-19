@@ -219,7 +219,7 @@ ipoib_cache_peer ( const struct ib_gid *gid, unsigned long qpn ) {
 	peer->key = key;
 	peer->mac.qpn = htonl ( qpn );
 	memcpy ( &peer->mac.gid, gid, sizeof ( peer->mac.gid ) );
-	DBG ( "IPoIB peer %x has GID %08lx:%08lx:%08lx:%08lx and QPN %lx\n",
+	DBG ( "IPoIB peer %x has GID %08x:%08x:%08x:%08x and QPN %lx\n",
 	      peer->key, htonl ( gid->u.dwords[0] ),
 	      htonl ( gid->u.dwords[1] ), htonl ( gid->u.dwords[2] ),
 	      htonl ( gid->u.dwords[3] ), qpn );
@@ -313,7 +313,7 @@ const char * ipoib_ntoa ( const void *ll_addr ) {
 	static char buf[45];
 	const struct ipoib_mac *mac = ll_addr;
 
-	snprintf ( buf, sizeof ( buf ), "%08lx:%08lx:%08lx:%08lx:%08lx",
+	snprintf ( buf, sizeof ( buf ), "%08x:%08x:%08x:%08x:%08x",
 		   htonl ( mac->qpn ), htonl ( mac->gid.u.dwords[0] ),
 		   htonl ( mac->gid.u.dwords[1] ),
 		   htonl ( mac->gid.u.dwords[2] ),

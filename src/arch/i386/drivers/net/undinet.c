@@ -701,7 +701,7 @@ int undinet_probe ( struct undi_device *undi ) {
 				   &undi_iface,
 				   sizeof ( undi_iface ) ) ) != 0 )
 		goto err_undi_get_iface_info;
-	DBGC ( undinic, "UNDINIC %p has type %s and link speed %ld\n",
+	DBGC ( undinic, "UNDINIC %p has type %s and link speed %d\n",
 	       undinic, undi_iface.IfaceType, undi_iface.LinkSpeed );
 	if ( strncmp ( ( ( char * ) undi_iface.IfaceType ), "Etherboot",
 		       sizeof ( undi_iface.IfaceType ) ) == 0 ) {

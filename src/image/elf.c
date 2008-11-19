@@ -72,7 +72,7 @@ static int elf_load_segment ( struct image *image, Elf_Phdr *phdr ) {
 	}
 	buffer = phys_to_user ( dest );
 
-	DBG ( "ELF loading segment [%lx,%lx) to [%lx,%lx,%lx)\n",
+	DBG ( "ELF loading segment [%x,%x) to [%x,%x,%x)\n",
 	      phdr->p_offset, ( phdr->p_offset + phdr->p_filesz ),
 	      phdr->p_paddr, ( phdr->p_paddr + phdr->p_filesz ),
 	      ( phdr->p_paddr + phdr->p_memsz ) );

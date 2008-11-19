@@ -1429,7 +1429,7 @@ e1000_copper_link_preconfig(struct e1000_hw *hw)
         DEBUGOUT("Error, did not detect valid phy.\n");
         return ret_val;
     }
-    DEBUGOUT1("Phy ID = %#08lx \n", hw->phy_id);
+    DEBUGOUT1("Phy ID = %#08x \n", hw->phy_id);
 
     /* Set PHY to class A mode (if necessary) */
     ret_val = e1000_set_phy_mode(hw);
@@ -3551,7 +3551,7 @@ e1000_read_phy_reg_ex(struct e1000_hw *hw, uint32_t reg_addr,
     DEBUGFUNC("e1000_read_phy_reg_ex");
 
     if (reg_addr > MAX_PHY_REG_ADDRESS) {
-        DEBUGOUT1("PHY Address %ld is out of range\n", reg_addr);
+        DEBUGOUT1("PHY Address %d is out of range\n", reg_addr);
         return -E1000_ERR_PARAM;
     }
 
@@ -3689,7 +3689,7 @@ e1000_write_phy_reg_ex(struct e1000_hw *hw, uint32_t reg_addr,
     DEBUGFUNC("e1000_write_phy_reg_ex");
 
     if (reg_addr > MAX_PHY_REG_ADDRESS) {
-        DEBUGOUT1("PHY Address %ld is out of range\n", reg_addr);
+        DEBUGOUT1("PHY Address %d is out of range\n", reg_addr);
         return -E1000_ERR_PARAM;
     }
 
@@ -4141,10 +4141,10 @@ e1000_detect_gig_phy(struct e1000_hw *hw)
     phy_init_status = e1000_set_phy_type(hw);
 
     if ((match) && (phy_init_status == E1000_SUCCESS)) {
-        DEBUGOUT1("PHY ID %#08lx detected\n", hw->phy_id);
+        DEBUGOUT1("PHY ID %#08x detected\n", hw->phy_id);
         return E1000_SUCCESS;
     }
-    DEBUGOUT1("Invalid PHY ID %#08lx\n", hw->phy_id);
+    DEBUGOUT1("Invalid PHY ID %#08x\n", hw->phy_id);
     return -E1000_ERR_PHY;
 }
 
@@ -8795,13 +8795,13 @@ e1000_verify_write_ich8_byte(struct e1000_hw *hw, uint32_t index, uint8_t byte)
     int32_t error = E1000_SUCCESS;
     int32_t program_retries = 0;
 
-    DEBUGOUT2("Byte := %2.2X Offset := %ld\n", byte, index);
+    DEBUGOUT2("Byte := %2.2X Offset := %d\n", byte, index);
 
     error = e1000_write_ich8_byte(hw, index, byte);
 
     if (error != E1000_SUCCESS) {
         for (program_retries = 0; program_retries < 100; program_retries++) {
-            DEBUGOUT2("Retrying \t Byte := %2.2X Offset := %ld\n", byte, index);
+            DEBUGOUT2("Retrying \t Byte := %2.2X Offset := %d\n", byte, index);
             error = e1000_write_ich8_byte(hw, index, byte);
             udelay(100);
             if (error == E1000_SUCCESS)

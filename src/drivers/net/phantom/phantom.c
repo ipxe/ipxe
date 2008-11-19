@@ -460,11 +460,11 @@ static int phantom_dmesg ( struct phantom_nic *phantom, unsigned int log,
 	len = phantom_readl ( phantom, UNM_CAM_RAM_DMESG_LEN ( log ) );
 	tail = phantom_readl ( phantom, UNM_CAM_RAM_DMESG_TAIL ( log ) );
 	sig = phantom_readl ( phantom, UNM_CAM_RAM_DMESG_SIG ( log ) );
-	DBGC ( phantom, "Phantom %p firmware dmesg buffer %d (%08lx-%08lx)\n",
+	DBGC ( phantom, "Phantom %p firmware dmesg buffer %d (%08x-%08x)\n",
 	       phantom, log, head, tail );
 	assert ( ( head & 0x07 ) == 0 );
 	if ( sig != UNM_CAM_RAM_DMESG_SIG_MAGIC ) {
-		DBGC ( phantom, "Warning: bad signature %08lx (want %08lx)\n",
+		DBGC ( phantom, "Warning: bad signature %08x (want %08lx)\n",
 		       sig, UNM_CAM_RAM_DMESG_SIG_MAGIC );
 	}
 
@@ -558,8 +558,8 @@ static int phantom_issue_cmd ( struct phantom_nic *phantom,
 	/* Issue command */
 	signature = NX_CDRP_SIGNATURE_MAKE ( phantom->port,
 					     NXHAL_VERSION );
-	DBGC2 ( phantom, "Phantom %p issuing command %08lx (%08lx, %08lx, "
-		"%08lx)\n", phantom, command, arg1, arg2, arg3 );
+	DBGC2 ( phantom, "Phantom %p issuing command %08x (%08x, %08x, "
+		"%08x)\n", phantom, command, arg1, arg2, arg3 );
 	phantom_writel ( phantom, signature, UNM_NIC_REG_NX_SIGN );
 	phantom_writel ( phantom, arg1, UNM_NIC_REG_NX_ARG1 );
 	phantom_writel ( phantom, arg2, UNM_NIC_REG_NX_ARG2 );
@@ -1036,7 +1036,7 @@ static void phantom_poll_link_state ( struct net_device *netdev ) {
 		return;
 
 	/* Record new link state */
-	DBGC ( phantom, "Phantom %p new link state %08lx (was %08lx)\n",
+	DBGC ( phantom, "Phantom %p new link state %08x (was %08x)\n",
 	       phantom, xg_state_p3, phantom->link_state );
 	phantom->link_state = xg_state_p3;
 
@@ -1840,13 +1840,13 @@ static int phantom_init_cmdpeg ( struct phantom_nic *phantom ) {
 		       phantom );
 		sw_reset = phantom_readl ( phantom, UNM_ROMUSB_GLB_SW_RESET );
 		if ( sw_reset != UNM_ROMUSB_GLB_SW_RESET_MAGIC ) {
-			DBGC ( phantom, "Phantom %p reset failed: %08lx\n",
+			DBGC ( phantom, "Phantom %p reset failed: %08x\n",
 			       phantom, sw_reset );
 			return -EIO;
 		}
 	} else {
 		DBGC ( phantom, "Phantom %p coming up from warm boot "
-		       "(%08lx)\n", phantom, cold_boot );
+		       "(%08x)\n", phantom, cold_boot );
 	}
 	/* Clear cold-boot flag */
 	phantom_writel ( phantom, 0, UNM_CAM_RAM_COLD_BOOT );
@@ -1874,7 +1874,7 @@ static int phantom_init_cmdpeg ( struct phantom_nic *phantom ) {
 					       UNM_NIC_REG_CMDPEG_STATE );
 		if ( cmdpeg_state != last_cmdpeg_state ) {
 			DBGC ( phantom, "Phantom %p command PEG state is "
-			       "%08lx after %d seconds...\n",
+			       "%08x after %d seconds...\n",
 			       phantom, cmdpeg_state, retries );
 			last_cmdpeg_state = cmdpeg_state;
 		}
@@ -1889,7 +1889,7 @@ static int phantom_init_cmdpeg ( struct phantom_nic *phantom ) {
 	}
 
 	DBGC ( phantom, "Phantom %p timed out waiting for command PEG to "
-	       "initialise (status %08lx)\n", phantom, cmdpeg_state );
+	       "initialise (status %08x)\n", phantom, cmdpeg_state );
 	return -ETIMEDOUT;
 }
 
@@ -1968,7 +1968,7 @@ static int phantom_init_rcvpeg ( struct phantom_nic *phantom ) {
 					       UNM_NIC_REG_RCVPEG_STATE );
 		if ( rcvpeg_state != last_rcvpeg_state ) {
 			DBGC ( phantom, "Phantom %p receive PEG state is "
-			       "%08lx after %d seconds...\n",
+			       "%08x after %d seconds...\n",
 			       phantom, rcvpeg_state, retries );
 			last_rcvpeg_state = rcvpeg_state;
 		}
@@ -1978,7 +1978,7 @@ static int phantom_init_rcvpeg ( struct phantom_nic *phantom ) {
 	}
 
 	DBGC ( phantom, "Phantom %p timed out waiting for receive PEG to "
-	       "initialise (status %08lx)\n", phantom, rcvpeg_state );
+	       "initialise (status %08x)\n", phantom, rcvpeg_state );
 	return -ETIMEDOUT;
 }
 

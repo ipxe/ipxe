@@ -695,7 +695,7 @@ sis900_init_rxfilter(struct nic *nic)
         outl(w, ioaddr + rfdr);
 
         if (sis900_debug > 0)
-            printf("sis900_init_rxfilter: Receive Filter Addrss[%d]=%lX\n",
+            printf("sis900_init_rxfilter: Receive Filter Addrss[%d]=%X\n",
                    i, inl(ioaddr + rfdr));
     }
 
@@ -724,7 +724,7 @@ sis900_init_txd(struct nic *nic __unused)
     /* load Transmit Descriptor Register */
     outl(virt_to_bus(&txd), ioaddr + txdp); 
     if (sis900_debug > 0)
-        printf("sis900_init_txd: TX descriptor register loaded with: %lX\n", 
+        printf("sis900_init_txd: TX descriptor register loaded with: %X\n", 
                inl(ioaddr + txdp));
 }
 
@@ -760,7 +760,7 @@ sis900_init_rxd(struct nic *nic __unused)
     outl(virt_to_bus(&rxd[0]), ioaddr + rxdp);
 
     if (sis900_debug > 0)
-        printf("sis900_init_rxd: RX descriptor register loaded with: %lX\n", 
+        printf("sis900_init_rxd: RX descriptor register loaded with: %X\n", 
                inl(ioaddr + rxdp));
 
 }
@@ -1114,7 +1114,7 @@ sis900_transmit(struct nic  *nic,
     /* load Transmit Descriptor Register */
     outl(virt_to_bus(&txd), ioaddr + txdp); 
     if (sis900_debug > 1)
-        printf("sis900_transmit: TX descriptor register loaded with: %lX\n", 
+        printf("sis900_transmit: TX descriptor register loaded with: %X\n", 
                inl(ioaddr + txdp));
 
     memcpy(txb, d, ETH_ALEN);

@@ -1305,7 +1305,7 @@ static int iscsi_rx_bhs ( struct iscsi_session *iscsi, const void *data,
 			  size_t len, size_t remaining __unused ) {
 	memcpy ( &iscsi->rx_bhs.bytes[iscsi->rx_offset], data, len );
 	if ( ( iscsi->rx_offset + len ) >= sizeof ( iscsi->rx_bhs ) ) {
-		DBGC2 ( iscsi, "iSCSI %p received PDU opcode %#x len %#lx\n",
+		DBGC2 ( iscsi, "iSCSI %p received PDU opcode %#x len %#x\n",
 			iscsi, iscsi->rx_bhs.common.opcode,
 			ISCSI_DATA_LEN ( iscsi->rx_bhs.common.lengths ) );
 	}

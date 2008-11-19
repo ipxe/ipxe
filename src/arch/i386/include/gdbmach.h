@@ -12,7 +12,7 @@
 
 #include <stdint.h>
 
-typedef uint32_t gdbreg_t;
+typedef unsigned long gdbreg_t;
 
 /* The register snapshot, this must be in sync with interrupt handler and the
  * GDB protocol. */

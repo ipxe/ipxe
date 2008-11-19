@@ -258,8 +258,8 @@ e1000_configure_tx ( struct e1000_adapter *adapter )
 	E1000_WRITE_REG ( hw, TDBAL, virt_to_bus ( adapter->tx_base ) );
 	E1000_WRITE_REG ( hw, TDLEN, adapter->tx_ring_size );
 			  
-        DBG ( "TDBAL: %#08lx\n",  E1000_READ_REG ( hw, TDBAL ) );
-        DBG ( "TDLEN: %ld\n",     E1000_READ_REG ( hw, TDLEN ) );
+        DBG ( "TDBAL: %#08x\n",  E1000_READ_REG ( hw, TDBAL ) );
+        DBG ( "TDLEN: %d\n",     E1000_READ_REG ( hw, TDLEN ) );
 
 	/* Setup the HW Tx Head and Tail descriptor pointers */
 	E1000_WRITE_REG ( hw, TDH, 0 );
@@ -385,9 +385,9 @@ e1000_configure_rx ( struct e1000_adapter *adapter )
 	E1000_WRITE_REG ( hw, RCTL, rctl );
 	E1000_WRITE_FLUSH ( hw );
 
-        DBG ( "RDBAL: %#08lx\n",  E1000_READ_REG ( hw, RDBAL ) );
-        DBG ( "RDLEN: %ld\n",     E1000_READ_REG ( hw, RDLEN ) );
-        DBG ( "RCTL:  %#08lx\n",  E1000_READ_REG ( hw, RCTL ) );
+        DBG ( "RDBAL: %#08x\n",  E1000_READ_REG ( hw, RDBAL ) );
+        DBG ( "RDLEN: %d\n",     E1000_READ_REG ( hw, RDLEN ) );
+        DBG ( "RCTL:  %#08x\n",  E1000_READ_REG ( hw, RCTL ) );
 }
 
 /**
@@ -577,7 +577,7 @@ e1000_transmit ( struct net_device *netdev, struct io_buffer *iobuf )
 		E1000_TXD_CMD_IFCS | iob_len ( iobuf );
 	tx_curr_desc->upper.data = 0;
 	
-	DBG ( "TX fill: %ld tx_curr: %ld addr: %#08lx len: %zd\n", adapter->tx_fill_ctr, 
+	DBG ( "TX fill: %d tx_curr: %d addr: %#08lx len: %zd\n", adapter->tx_fill_ctr, 
 	      tx_curr, virt_to_bus ( iobuf->data ), iob_len ( iobuf ) );
 	      
 	/* Point to next free descriptor */
@@ -620,7 +620,7 @@ e1000_poll ( struct net_device *netdev )
 	if ( ! icr )
 		return;
 		
-        DBG ( "e1000_poll: intr_status = %#08lx\n", icr );
+        DBG ( "e1000_poll: intr_status = %#08x\n", icr );
 
 	/* Check status of transmitted packets
 	 */
@@ -635,17 +635,17 @@ e1000_poll ( struct net_device *netdev )
 		if ( ! ( tx_status & E1000_TXD_STAT_DD ) )
 			break;
 		
-		DBG ( "Sent packet. tx_head: %ld tx_tail: %ld tx_status: %#08lx\n",
+		DBG ( "Sent packet. tx_head: %d tx_tail: %d tx_status: %#08x\n",
 	    	      adapter->tx_head, adapter->tx_tail, tx_status );
 
 		if ( tx_status & ( E1000_TXD_STAT_EC | E1000_TXD_STAT_LC | 
 				   E1000_TXD_STAT_TU ) ) {
 			netdev_tx_complete_err ( netdev, adapter->tx_iobuf[i], -EINVAL );
-			DBG ( "Error transmitting packet, tx_status: %#08lx\n",
+			DBG ( "Error transmitting packet, tx_status: %#08x\n",
 			      tx_status );
 		} else {
 			netdev_tx_complete ( netdev, adapter->tx_iobuf[i] );
-			DBG ( "Success transmitting packet, tx_status: %#08lx\n",
+			DBG ( "Success transmitting packet, tx_status: %#08x\n",
 			      tx_status );
 		}
 
@@ -667,16 +667,16 @@ e1000_poll ( struct net_device *netdev )
 			          ( i * sizeof ( *adapter->rx_base ) ); 
 		rx_status = rx_curr_desc->status;
 		
-		DBG2 ( "Before DD Check RX_status: %#08lx\n", rx_status );
+		DBG2 ( "Before DD Check RX_status: %#08x\n", rx_status );
 	
 		if ( ! ( rx_status & E1000_RXD_STAT_DD ) )
 			break;
 
-		DBG ( "RCTL = %#08lx\n", E1000_READ_REG ( &adapter->hw, RCTL ) );
+		DBG ( "RCTL = %#08x\n", E1000_READ_REG ( &adapter->hw, RCTL ) );
 	
 		rx_len = rx_curr_desc->length;
 
-                DBG ( "Received packet, rx_curr: %ld  rx_status: %#08lx  rx_len: %ld\n",
+                DBG ( "Received packet, rx_curr: %d  rx_status: %#08x  rx_len: %d\n",
                       i, rx_status, rx_len );
                 
                 rx_err = rx_curr_desc->errors;
@@ -685,7 +685,7 @@ e1000_poll ( struct net_device *netdev )
 		
 			netdev_rx_err ( netdev, NULL, -EINVAL );
 			DBG ( "e1000_poll: Corrupted packet received!"
-			      " rx_err: %#08lx\n", rx_err );
+			      " rx_err: %#08x\n", rx_err );
 		} else 	{
 		
 			/* If unable allocate space for this packet,
@@ -962,7 +962,7 @@ e1000_open ( struct net_device *netdev )
 
 	e1000_configure_rx ( adapter );
 	
-        DBG ( "RXDCTL: %#08lx\n",  E1000_READ_REG ( &adapter->hw, RXDCTL ) );
+        DBG ( "RXDCTL: %#08x\n",  E1000_READ_REG ( &adapter->hw, RXDCTL ) );
 
 	return 0;
 

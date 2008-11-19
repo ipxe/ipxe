@@ -156,7 +156,7 @@ int ib_smc_update ( struct ib_device *ibdev, ib_local_mad_t local_mad ) {
 		return rc;
 	ibdev->pkey = ntohs ( smp->pkey_table.pkey[0] );
 
-	DBGC ( ibdev, "IBDEV %p port GID is %08lx:%08lx:%08lx:%08lx\n", ibdev,
+	DBGC ( ibdev, "IBDEV %p port GID is %08x:%08x:%08x:%08x\n", ibdev,
 	       htonl ( ibdev->gid.u.dwords[0] ),
 	       htonl ( ibdev->gid.u.dwords[1] ),
 	       htonl ( ibdev->gid.u.dwords[2] ),

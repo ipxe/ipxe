@@ -84,7 +84,7 @@ static void isapnpbus_remove ( struct root_device *rootdev );
  *
  */
 
-#define ISAPNP_CARD_ID_FMT "ID %04x:%04x (\"%s\") serial %lx"
+#define ISAPNP_CARD_ID_FMT "ID %04x:%04x (\"%s\") serial %x"
 #define ISAPNP_CARD_ID_DATA(identifier)					  \
 	(identifier)->vendor_id, (identifier)->prod_id,			  \
 	isa_id_string ( (identifier)->vendor_id, (identifier)->prod_id ), \

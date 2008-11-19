@@ -12,8 +12,8 @@ void __asmcall _dump_regs ( struct i386_all_regs *ix86 ) {
 			      "addr32 leal 4(%%esp), %%esp\n\t"
 			      "ret\n\t" ) : : );
 
-	printf ( "EAX=%08lx EBX=%08lx ECX=%08lx EDX=%08lx\n"
-		 "ESI=%08lx EDI=%08lx EBP=%08lx ESP=%08lx\n"
+	printf ( "EAX=%08x EBX=%08x ECX=%08x EDX=%08x\n"
+		 "ESI=%08x EDI=%08x EBP=%08x ESP=%08x\n"
 		 "CS=%04x SS=%04x DS=%04x ES=%04x FS=%04x GS=%04x\n",
 		 ix86->regs.eax, ix86->regs.ebx, ix86->regs.ecx,
 		 ix86->regs.edx, ix86->regs.esi, ix86->regs.edi,

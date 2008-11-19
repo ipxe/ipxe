@@ -425,7 +425,7 @@ static void rtl8169_get_mac_version(struct rtl8169_private *tp,
 	DBG ( "tp->mac_version = %d\n", tp->mac_version );
 
 	if (p->mask == 0x00000000) {
-		DBG ( "unknown MAC (%08lx)\n", reg );
+		DBG ( "unknown MAC (%08x)\n", reg );
 	}
 }
 
@@ -1621,17 +1621,17 @@ rtl8169_process_tx_packets ( struct net_device *netdev )
 
 		tx_status = tx_curr_desc->opts1;
 
-		DBG2 ( "Before DescOwn check tx_status: %#08lx\n", tx_status );
+		DBG2 ( "Before DescOwn check tx_status: %#08x\n", tx_status );
 
 		/* if the packet at tx_tail is not owned by hardware it is for us */
 		if ( tx_status & DescOwn )
 			break;
 
 		DBG ( "Transmitted packet.\n" );
-		DBG ( "tp->tx_fill_ctr     = %ld\n", tp->tx_fill_ctr );
-		DBG ( "tp->tx_tail         = %ld\n", tp->tx_tail );
-		DBG ( "tp->tx_curr         = %ld\n", tp->tx_curr );
-		DBG ( "tx_status           = %ld\n", tx_status );
+		DBG ( "tp->tx_fill_ctr     = %d\n", tp->tx_fill_ctr );
+		DBG ( "tp->tx_tail         = %d\n", tp->tx_tail );
+		DBG ( "tp->tx_curr         = %d\n", tp->tx_curr );
+		DBG ( "tx_status           = %d\n", tx_status );
 		DBG ( "tx_curr_desc        = %#08lx\n", virt_to_bus ( tx_curr_desc ) );
 
 		/* Pass packet to core for processing */
@@ -1660,7 +1660,7 @@ rtl8169_populate_rx_descriptor ( struct rtl8169_private *tp, struct RxDesc *rx_d
 {
 	DBGP ( "rtl8169_populate_rx_descriptor\n" );
 
-	DBG ( "Populating rx descriptor %ld\n", index );
+	DBG ( "Populating rx descriptor %d\n", index );
 
 	memset ( rx_desc, 0, sizeof ( *rx_desc ) );
 
@@ -1755,7 +1755,7 @@ rtl8169_process_rx_packets ( struct net_device *netdev )
 
 		rx_status = rx_curr_desc->opts1;
 
-		DBG2 ( "Before DescOwn check rx_status: %#08lx\n", rx_status );
+		DBG2 ( "Before DescOwn check rx_status: %#08x\n", rx_status );
 
 		/* Hardware still owns the descriptor */
 		if ( rx_status & DescOwn )
@@ -1768,9 +1768,9 @@ rtl8169_process_rx_packets ( struct net_device *netdev )
 		rx_len = rx_status & 0x3fff;
 
 		DBG ( "Received packet.\n" );
-		DBG ( "tp->rx_curr         = %ld\n", tp->rx_curr );
+		DBG ( "tp->rx_curr         = %d\n", tp->rx_curr );
 		DBG ( "rx_len              = %d\n", rx_len );
-		DBG ( "rx_status           = %#08lx\n", rx_status );
+		DBG ( "rx_status           = %#08x\n", rx_status );
 		DBG ( "rx_curr_desc        = %#08lx\n", virt_to_bus ( rx_curr_desc ) );
 
 		if ( rx_status & RxRES ) {
@@ -1778,7 +1778,7 @@ rtl8169_process_rx_packets ( struct net_device *netdev )
 			netdev_rx_err ( netdev, tp->rx_iobuf[tp->rx_curr], -EINVAL );
 
 			DBG ( "rtl8169_poll: Corrupted packet received!\n"
-			       " rx_status: %#08lx\n", rx_status );
+			       " rx_status: %#08x\n", rx_status );
 
 		} else 	{
 
@@ -1964,11 +1964,11 @@ rtl8169_transmit ( struct net_device *netdev, struct io_buffer *iobuf )
 
 	tx_curr_desc = tp->tx_base + tp->tx_curr;
 
-	DBG ( "tp->tx_fill_ctr = %ld\n", tp->tx_fill_ctr );
-	DBG ( "tp->tx_curr     = %ld\n", tp->tx_curr );
+	DBG ( "tp->tx_fill_ctr = %d\n", tp->tx_fill_ctr );
+	DBG ( "tp->tx_curr     = %d\n", tp->tx_curr );
 	DBG ( "tx_curr_desc    = %#08lx\n", virt_to_bus ( tx_curr_desc ) );
 	DBG ( "iobuf->data     = %#08lx\n", virt_to_bus ( iobuf->data ) );
-	DBG ( "tx_len          = %ld\n", tx_len );
+	DBG ( "tx_len          = %d\n", tx_len );
 
 	/* Configure current descriptor to transmit supplied packet */
 	tx_curr_desc->addr_hi = 0;
@@ -1981,10 +1981,10 @@ rtl8169_transmit ( struct net_device *netdev, struct io_buffer *iobuf )
 	/* Mark descriptor as owned by NIC */
 	tx_curr_desc->opts1 |= DescOwn;
 
-	DBG ( "tx_curr_desc->opts1   = %#08lx\n", tx_curr_desc->opts1 );
-	DBG ( "tx_curr_desc->opts2   = %#08lx\n", tx_curr_desc->opts2 );
-	DBG ( "tx_curr_desc->addr_hi = %#08lx\n", tx_curr_desc->addr_hi );
-	DBG ( "tx_curr_desc->addr_lo = %#08lx\n", tx_curr_desc->addr_lo );
+	DBG ( "tx_curr_desc->opts1   = %#08x\n", tx_curr_desc->opts1 );
+	DBG ( "tx_curr_desc->opts2   = %#08x\n", tx_curr_desc->opts2 );
+	DBG ( "tx_curr_desc->addr_hi = %#08x\n", tx_curr_desc->addr_hi );
+	DBG ( "tx_curr_desc->addr_lo = %#08x\n", tx_curr_desc->addr_lo );
 
 	RTL_W8 ( TxPoll, NPQ );	/* set polling bit */
 

@@ -173,7 +173,7 @@ efi_snp_initialize ( EFI_SIMPLE_NETWORK_PROTOCOL *snp,
 		container_of ( snp, struct efi_snp_device, snp );
 	int rc;
 
-	DBGC2 ( snpdev, "SNPDEV %p INITIALIZE (%ld extra RX, %ld extra TX)\n",
+	DBGC2 ( snpdev, "SNPDEV %p INITIALIZE (%d extra RX, %d extra TX)\n",
 		snpdev, extra_rx_bufsize, extra_tx_bufsize );
 
 	if ( ( rc = netdev_open ( snpdev->netdev ) ) != 0 ) {
@@ -252,7 +252,7 @@ efi_snp_receive_filters ( EFI_SIMPLE_NETWORK_PROTOCOL *snp, UINT32 enable,
 		container_of ( snp, struct efi_snp_device, snp );
 	unsigned int i;
 
-	DBGC2 ( snpdev, "SNPDEV %p RECEIVE_FILTERS %08lx&~%08lx%s %ld mcast\n",
+	DBGC2 ( snpdev, "SNPDEV %p RECEIVE_FILTERS %08x&~%08x%s %d mcast\n",
 		snpdev, enable, disable, ( mcast_reset ? " reset" : "" ),
 		mcast_count );
 	for ( i = 0 ; i < mcast_count ; i++ ) {
@@ -390,7 +390,7 @@ efi_snp_nvdata ( EFI_SIMPLE_NETWORK_PROTOCOL *snp, BOOLEAN read,
 	struct efi_snp_device *snpdev =
 		container_of ( snp, struct efi_snp_device, snp );
 
-	DBGC2 ( snpdev, "SNPDEV %p NVDATA %s %lx+%lx\n", snpdev,
+	DBGC2 ( snpdev, "SNPDEV %p NVDATA %s %x+%x\n", snpdev,
 		( read ? "read" : "write" ), offset, len );
 	if ( ! read )
 		DBGC2_HDA ( snpdev, offset, data, len );
@@ -435,7 +435,7 @@ efi_snp_get_status ( EFI_SIMPLE_NETWORK_PROTOCOL *snp,
 			*interrupts |= EFI_SIMPLE_NETWORK_RECEIVE_INTERRUPT;
 			snpdev->rx_count_interrupts--;
 		}
-		DBGC2 ( snpdev, " INTS:%02lx", *interrupts );
+		DBGC2 ( snpdev, " INTS:%02x", *interrupts );
 	}
 
 	/* TX completions.  It would be possible to design a more
@@ -492,7 +492,7 @@ efi_snp_transmit ( EFI_SIMPLE_NETWORK_PROTOCOL *snp,
 	int rc;
 	EFI_STATUS efirc;
 
-	DBGC2 ( snpdev, "SNPDEV %p TRANSMIT %p+%lx", snpdev, data, len );
+	DBGC2 ( snpdev, "SNPDEV %p TRANSMIT %p+%x", snpdev, data, len );
 	if ( ll_header_len ) {
 		if ( ll_src ) {
 			DBGC2 ( snpdev, " src %s",
@@ -512,12 +512,12 @@ efi_snp_transmit ( EFI_SIMPLE_NETWORK_PROTOCOL *snp,
 	if ( ll_header_len ) {
 		if ( ll_header_len != ll_protocol->ll_header_len ) {
 			DBGC ( snpdev, "SNPDEV %p TX invalid header length "
-			       "%ld\n", snpdev, ll_header_len );
+			       "%d\n", snpdev, ll_header_len );
 			efirc = EFI_INVALID_PARAMETER;
 			goto err_sanity;
 		}
 		if ( len < ll_header_len ) {
-			DBGC ( snpdev, "SNPDEV %p invalid packet length %ld\n",
+			DBGC ( snpdev, "SNPDEV %p invalid packet length %d\n",
 			       snpdev, len );
 			efirc = EFI_BUFFER_TOO_SMALL;
 			goto err_sanity;
@@ -541,7 +541,7 @@ efi_snp_transmit ( EFI_SIMPLE_NETWORK_PROTOCOL *snp,
 	/* Allocate buffer */
 	iobuf = alloc_iob ( len );
 	if ( ! iobuf ) {
-		DBGC ( snpdev, "SNPDEV %p TX could not allocate %ld-byte "
+		DBGC ( snpdev, "SNPDEV %p TX could not allocate %d-byte "
 		       "buffer\n", snpdev, len );
 		efirc = EFI_DEVICE_ERROR;
 		goto err_alloc_iob;
@@ -610,7 +610,7 @@ efi_snp_receive ( EFI_SIMPLE_NETWORK_PROTOCOL *snp,
 	int rc;
 	EFI_STATUS efirc;
 
-	DBGC2 ( snpdev, "SNPDEV %p RECEIVE %p(+%lx)", snpdev, data, *len );
+	DBGC2 ( snpdev, "SNPDEV %p RECEIVE %p(+%x)", snpdev, data, *len );
 
 	/* Poll the network device */
 	efi_snp_poll ( snpdev );
@@ -737,10 +737,10 @@ efi_snp_netdev ( EFI_DRIVER_BINDING_PROTOCOL *driver, EFI_HANDLE device ) {
 	if ( ( efirc = u.pci->GetLocation ( u.pci, &pci_segment, &pci_bus,
 					    &pci_dev, &pci_fn ) ) != 0 ) {
 		DBGC ( driver, "SNPDRV %p device %p could not get PCI "
-		       "location: %lx\n", driver, device, efirc );
+		       "location: %x\n", driver, device, efirc );
 		goto out_no_pci_location;
 	}
-	DBGCP ( driver, "SNPDRV %p device %p is PCI %04lx:%02lx:%02lx.%lx\n",
+	DBGCP ( driver, "SNPDRV %p device %p is PCI %04x:%02x:%02x.%x\n",
 		driver, device, pci_segment, pci_bus, pci_dev, pci_fn );
 
 	/* Look up corresponding network device */
@@ -786,7 +786,7 @@ efi_snp_snpdev ( EFI_DRIVER_BINDING_PROTOCOL *driver, EFI_HANDLE device ) {
 					  device,
 					  EFI_OPEN_PROTOCOL_GET_PROTOCOL))!=0){
 		DBGC ( driver, "SNPDRV %p device %p could not locate SNP: "
-		       "%lx\n", driver, device, efirc );
+		       "%x\n", driver, device, efirc );
 		return NULL;
 	}
 
@@ -869,7 +869,7 @@ efi_snp_driver_start ( EFI_DRIVER_BINDING_PROTOCOL *driver,
 	if ( ( efirc = bs->CreateEvent ( EVT_NOTIFY_WAIT, TPL_NOTIFY,
 					 efi_snp_wait_for_packet, snpdev,
 					 &snpdev->snp.WaitForPacket ) ) != 0 ){
-		DBGC ( snpdev, "SNPDEV %p could not create event: %lx\n",
+		DBGC ( snpdev, "SNPDEV %p could not create event: %x\n",
 		       snpdev, efirc );
 		goto err_create_event;
 	}
@@ -882,7 +882,7 @@ efi_snp_driver_start ( EFI_DRIVER_BINDING_PROTOCOL *driver,
 	if ( ( efirc = bs->InstallProtocolInterface ( &device,
 				&efi_simple_network_protocol_guid,
 				EFI_NATIVE_INTERFACE, &snpdev->snp ) ) != 0 ) {
-		DBGC ( snpdev, "SNPDEV %p could not install protocol: %lx\n",
+		DBGC ( snpdev, "SNPDEV %p could not install protocol: %x\n",
 		       snpdev, efirc );
 		goto err_install_protocol_interface;
 	}
@@ -922,7 +922,7 @@ efi_snp_driver_stop ( EFI_DRIVER_BINDING_PROTOCOL *driver,
 	EFI_BOOT_SERVICES *bs = efi_systab->BootServices;
 	struct efi_snp_device *snpdev;
 
-	DBGCP ( driver, "SNPDRV %p DRIVER_STOP %p (%ld %p)\n",
+	DBGCP ( driver, "SNPDRV %p DRIVER_STOP %p (%d %p)\n",
 		driver, device, num_children, children );
 
 	/* Locate SNP device */
@@ -970,7 +970,7 @@ int efi_snp_install ( void ) {
 					EFI_NATIVE_INTERFACE,
 					driver ) ) != 0 ) {
 		DBGC ( driver, "SNPDRV %p could not install driver binding: "
-		       "%lx\n", driver, efirc );
+		       "%x\n", driver, efirc );
 		return EFIRC_TO_RC ( efirc );
 	}
 

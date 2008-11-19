@@ -1234,7 +1234,7 @@ static int velocity_open(struct nic *nic, struct pci_device *pci __unused)
 
 	/* Tx Descriptor needs 64 bytes alignment; */
 	TxPhyAddr = virt_to_bus(vptr->TxDescArrays);
-	printf("Unaligned Address : %lX\n", TxPhyAddr);
+	printf("Unaligned Address : %X\n", TxPhyAddr);
 	diff = 64 - (TxPhyAddr - ((TxPhyAddr >> 6) << 6));
 	TxPhyAddr += diff;
 	vptr->td_rings = (struct tx_desc *) (vptr->TxDescArrays + diff);

@@ -483,7 +483,7 @@ static int tcp_xmit ( struct tcp_connection *tcp, int force_send ) {
 	tcphdr->csum = tcpip_chksum ( iobuf->data, iob_len ( iobuf ) );
 
 	/* Dump header */
-	DBGC ( tcp, "TCP %p TX %d->%d %08lx..%08lx           %08lx %4zd",
+	DBGC ( tcp, "TCP %p TX %d->%d %08x..%08x           %08x %4zd",
 	       tcp, ntohs ( tcphdr->src ), ntohs ( tcphdr->dest ),
 	       ntohl ( tcphdr->seq ), ( ntohl ( tcphdr->seq ) + seq_len ),
 	       ntohl ( tcphdr->ack ), len );
@@ -564,7 +564,7 @@ static int tcp_xmit_reset ( struct tcp_connection *tcp,
 	tcphdr->csum = tcpip_chksum ( iobuf->data, iob_len ( iobuf ) );
 
 	/* Dump header */
-	DBGC ( tcp, "TCP %p TX %d->%d %08lx..%08lx           %08lx %4d",
+	DBGC ( tcp, "TCP %p TX %d->%d %08x..%08x           %08x %4d",
 	       tcp, ntohs ( tcphdr->src ), ntohs ( tcphdr->dest ),
 	       ntohl ( tcphdr->seq ), ( ntohl ( tcphdr->seq ) ),
 	       ntohl ( tcphdr->ack ), 0 );
@@ -702,8 +702,8 @@ static int tcp_rx_ack ( struct tcp_connection *tcp, uint32_t ack,
 
 	/* Ignore duplicate or out-of-range ACK */
 	if ( ack_len > tcp->snd_sent ) {
-		DBGC ( tcp, "TCP %p received ACK for [%08lx,%08lx), "
-		       "sent only [%08lx,%08lx)\n", tcp, tcp->snd_seq,
+		DBGC ( tcp, "TCP %p received ACK for [%08x,%08x), "
+		       "sent only [%08x,%08x)\n", tcp, tcp->snd_seq,
 		       ( tcp->snd_seq + ack_len ), tcp->snd_seq,
 		       ( tcp->snd_seq + tcp->snd_sent ) );
 		return -EINVAL;
@@ -894,7 +894,7 @@ static int tcp_rx ( struct io_buffer *iobuf,
 	len = iob_len ( iobuf );
 
 	/* Dump header */
-	DBGC ( tcp, "TCP %p RX %d<-%d           %08lx %08lx..%08lx %4zd",
+	DBGC ( tcp, "TCP %p RX %d<-%d           %08x %08x..%08x %4zd",
 	       tcp, ntohs ( tcphdr->dest ), ntohs ( tcphdr->src ),
 	       ntohl ( tcphdr->ack ), ntohl ( tcphdr->seq ),
 	       ( ntohl ( tcphdr->seq ) + len +

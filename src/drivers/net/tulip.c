@@ -1201,7 +1201,7 @@ static void tulip_disable ( struct nic *nic ) {
     outl(inl(ioaddr + CSR6) & ~0x00002002, ioaddr + CSR6);
 
     /* Clear the missed-packet counter. */
-    (volatile unsigned long)inl(ioaddr + CSR8);
+    inl(ioaddr + CSR8);
 }
 
 /*********************************************************************/
@@ -1265,7 +1265,7 @@ static int tulip_probe ( struct nic *nic, struct pci_device *pci ) {
     outl(inl(ioaddr + CSR6) & ~0x00002002, ioaddr + CSR6);
 
     /* Clear the missed-packet counter. */
-    (volatile unsigned long)inl(ioaddr + CSR8);
+    inl(ioaddr + CSR8);
 
     printf("\n");                /* so we start on a fresh line */
 #ifdef TULIP_DEBUG_WHERE

@@ -129,7 +129,7 @@ static void linda_readq ( struct linda *linda, uint32_t *dwords,
 			       "movq %%mm0, (%0)\n\t"
 			       : : "r" ( dwords ), "r" ( addr ) : "memory" );
 
-	DBGIO ( "[%08lx] => %08lx%08lx\n",
+	DBGIO ( "[%08lx] => %08x%08x\n",
 		virt_to_phys ( addr ), dwords[1], dwords[0] );
 }
 #define linda_readq( _linda, _ptr, _offset ) \
@@ -150,7 +150,7 @@ static void linda_writeq ( struct linda *linda, const uint32_t *dwords,
 			   unsigned long offset ) {
 	void *addr = ( linda->regs + offset );
 
-	DBGIO ( "[%08lx] <= %08lx%08lx\n",
+	DBGIO ( "[%08lx] <= %08x%08x\n",
 		virt_to_phys ( addr ), dwords[1], dwords[0] );
 
 	__asm__ __volatile__ ( "movq (%0), %%mm0\n\t"

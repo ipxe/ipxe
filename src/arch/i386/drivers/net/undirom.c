@@ -52,7 +52,7 @@ static int undirom_parse_pxeromid ( struct undi_rom *undirom,
 			 sizeof ( undi_rom_id ) );
 	if ( undi_rom_id.Signature != UNDI_ROM_ID_SIGNATURE ) {
 		DBGC ( undirom, "UNDIROM %p has bad PXE ROM ID signature "
-		       "%08lx\n", undirom, undi_rom_id.Signature );
+		       "%08x\n", undirom, undi_rom_id.Signature );
 		return -EINVAL;
 	}
 
@@ -94,7 +94,7 @@ static int undirom_parse_pcirheader ( struct undi_rom *undirom,
 			 sizeof ( pcir_header ) );
 	if ( pcir_header.signature != PCIR_SIGNATURE ) {
 		DBGC ( undirom, "UNDIROM %p has bad PCI expansion header "
-		       "signature %08lx\n", undirom, pcir_header.signature );
+		       "signature %08x\n", undirom, pcir_header.signature );
 		return -EINVAL;
 	}
 

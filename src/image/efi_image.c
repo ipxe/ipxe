@@ -43,7 +43,7 @@ static int efi_image_exec ( struct image *image ) {
 				       user_to_virt ( image->data, 0 ),
 				       image->len, &handle ) ) != 0 ) {
 		/* Not an EFI image */
-		DBGC ( image, "EFIIMAGE %p could not load: %lx\n",
+		DBGC ( image, "EFIIMAGE %p could not load: %x\n",
 		       image, efirc );
 		return -ENOEXEC;
 	}
@@ -51,7 +51,7 @@ static int efi_image_exec ( struct image *image ) {
 	/* Start the image */
 	if ( ( efirc = bs->StartImage ( handle, &exit_data_size,
 					&exit_data ) ) != 0 ) {
-		DBGC ( image, "EFIIMAGE %p returned with status %lx\n",
+		DBGC ( image, "EFIIMAGE %p returned with status %x\n",
 		       image, efirc );
 		goto done;
 	}
@@ -81,7 +81,7 @@ static int efi_image_load ( struct image *image ) {
 				       user_to_virt ( image->data, 0 ),
 				       image->len, &handle ) ) != 0 ) {
 		/* Not an EFI image */
-		DBGC ( image, "EFIIMAGE %p could not load: %lx\n",
+		DBGC ( image, "EFIIMAGE %p could not load: %x\n",
 		       image, efirc );
 		return -ENOEXEC;
 	}

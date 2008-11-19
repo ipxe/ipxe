@@ -1460,7 +1460,7 @@ static int tg3_stop_block(struct tg3 *tp, unsigned long ofs, uint32_t enable_bit
 	}
 
 	if (i == MAX_WAIT_CNT) {
-		printf( "tg3_stop_block timed out, ofs=%#lx enable_bit=%3lx\n",
+		printf( "tg3_stop_block timed out, ofs=%#lx enable_bit=%3x\n",
 		       ofs, enable_bit );
 		return -ENODEV;
 	}
@@ -1665,7 +1665,7 @@ static int tg3_restart_fw(struct tg3 *tp, uint32_t state)
 	if (i >= 100000 &&
 		    !(tp->tg3_flags2 & TG3_FLG2_SUN_5704) &&
 		    !(GET_ASIC_REV(tp->pci_chip_rev_id) == ASIC_REV_5787)) {
-		printf ( "Firmware will not restart magic=%#lx\n",
+		printf ( "Firmware will not restart magic=%#x\n",
 			val );
 		return -ENODEV;
 	}

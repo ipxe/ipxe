@@ -485,7 +485,7 @@ PXENV_EXIT_t pxenv_tftp_read_file ( struct s_PXENV_TFTP_READ_FILE
 				    *tftp_read_file ) {
 	int rc;
 
-	DBG ( "PXENV_TFTP_READ_FILE to %08lx+%lx", tftp_read_file->Buffer,
+	DBG ( "PXENV_TFTP_READ_FILE to %08x+%x", tftp_read_file->Buffer,
 	      tftp_read_file->BufferSize );
 
 	/* Open TFTP file */

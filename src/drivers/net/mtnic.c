@@ -87,7 +87,7 @@
 * and it's physical aligned address in 'pa'
 */
 static int
-mtnic_alloc_aligned(unsigned int size, void **va, u32 *pa, unsigned int alignment)
+mtnic_alloc_aligned(unsigned int size, void **va, unsigned long *pa, unsigned int alignment)
 {
 	*va = alloc_memblock(size, alignment);
 	if (!*va) {
@@ -157,7 +157,7 @@ mtnic_alloc_iobuf(struct mtnic_priv *priv, struct mtnic_ring *ring,
 		if (!&ring->iobuf[index]) {
 			if (ring->prod <= (ring->cons + 1)) {
 				DBG("Error allocating Rx io "
-				    "buffer number %lx", index);
+				    "buffer number %x", index);
 				/* In case of error freeing io buffer */
 				mtnic_free_io_buffers(ring);
 				return MTNIC_ERROR;
@@ -211,14 +211,14 @@ mtnic_alloc_ring(struct mtnic_priv *priv, struct mtnic_ring *ring,
 	err = mtnic_alloc_aligned(ring->buf_size, (void *)&ring->buf,
 			    &ring->dma, PAGE_SIZE);
         if (err) {
-		DBG("Failed allocating descriptor ring sizeof %lx\n",
+		DBG("Failed allocating descriptor ring sizeof %x\n",
 		    ring->buf_size);
 		return MTNIC_ERROR;
 	}
         memset(ring->buf, 0, ring->buf_size);
 
-	DBG("Allocated %s ring (addr:%p) - buf:%p size:%lx"
-	    "buf_size:%lx dma:%lx\n",
+	DBG("Allocated %s ring (addr:%p) - buf:%p size:%x"
+	    "buf_size:%x dma:%lx\n",
 	    is_rx ? "Rx" : "Tx", ring, ring->buf, ring->size,
 	    ring->buf_size, ring->dma);
 
@@ -262,7 +262,7 @@ mtnic_alloc_ring(struct mtnic_priv *priv, struct mtnic_ring *ring,
 			((u32) priv->fw.tx_offset[priv->port]) << 8);
 
 		/* Map Tx+CQ doorbells */
-		DBG("Mapping TxCQ doorbell at offset:0x%lx\n",
+		DBG("Mapping TxCQ doorbell at offset:0x%x\n",
 		    priv->fw.txcq_db_offset);
 		ring->txcq_db = ioremap(mtnic_pci_dev.dev.bar[2] +
 				priv->fw.txcq_db_offset, PAGE_SIZE);
@@ -317,9 +317,9 @@ mtnic_alloc_cq(struct net_device *dev, int num, struct mtnic_cq *cq,
 		return MTNIC_ERROR;
 	}
         memset(cq->buf, 0, cq->buf_size);
-        DBG("Allocated CQ (addr:%p) - size:%lx buf:%p buf_size:%lx "
+        DBG("Allocated CQ (addr:%p) - size:%x buf:%p buf_size:%x "
 	    "dma:%lx db:%p db_dma:%lx\n"
-	    "cqn offset:%lx \n", cq, cq->size, cq->buf,
+	    "cqn offset:%x \n", cq, cq->size, cq->buf,
 	    cq->buf_size, cq->dma, cq->db,
 	    cq->db_dma, offset_ind);
 
@@ -570,7 +570,7 @@ mtnic_map_cmd(struct mtnic_priv *priv, u16 op, struct mtnic_pages pages)
 	len = PAGE_SIZE * pages.num;
 	pages.buf = (u32 *)umalloc(PAGE_SIZE * (pages.num + 1));
 	addr = PAGE_SIZE + ((virt_to_bus(pages.buf) & 0xfffff000) + PAGE_SIZE);
-	DBG("Mapping pages: size: %lx address: %p\n", pages.num, pages.buf);
+	DBG("Mapping pages: size: %x address: %p\n", pages.num, pages.buf);
 
 	if (addr & (PAGE_MASK)) {
 		DBG("Got FW area not aligned to %d (%llx/%x)\n",
@@ -657,7 +657,7 @@ mtnic_OPEN_NIC(struct mtnic_priv *priv)
 
 	err = mtnic_cmd(priv, NULL, extra_pages, 0, MTNIC_IF_CMD_OPEN_NIC);
 	priv->fw.extra_pages.num = be32_to_cpu(*(extra_pages+1));
-	DBG("Extra pages num is %lx\n", priv->fw.extra_pages.num);
+	DBG("Extra pages num is %x\n", priv->fw.extra_pages.num);
 	return err;
 }
 
@@ -748,7 +748,7 @@ mtnic_CONFIG_CQ(struct mtnic_priv *priv, int port,
 	config_cq->offset = ((cq->dma) & (PAGE_MASK)) >> 6;
 	config_cq->db_record_addr_l = cpu_to_be32(cq->db_dma);
         config_cq->page_address[1] = cpu_to_be32(cq->dma);
-	DBG("config cq address: %lx dma_address: %lx"
+	DBG("config cq address: %x dma_address: %lx"
 	    "offset: %d size %d index: %d "
 	    , config_cq->page_address[1],cq->dma,
 	    config_cq->offset, config_cq->size, config_cq->cq );
@@ -1115,7 +1115,7 @@ int mtnic_init_card(struct net_device *dev)
 	/* Allocate and map pages worksace */
 	err = mtnic_map_cmd(priv, MTNIC_IF_CMD_MAP_PAGES, priv->fw.extra_pages);
 	if (err) {
-		DBG("Couldn't allocate %lx FW extra pages, aborting.\n",
+		DBG("Couldn't allocate %x FW extra pages, aborting.\n",
 		    priv->fw.extra_pages.num);
 		if (priv->fw.extra_pages.buf)
 			free(priv->fw.extra_pages.buf);
@@ -1503,7 +1503,7 @@ mtnic_transmit( struct net_device *dev, struct io_buffer *iobuf )
 
         index = ring->prod & ring->size_mask;
 	if ((ring->prod - ring->cons) >= ring->size) {
-		DBG("No space left for descriptors!!! cons: %lx prod: %lx\n",
+		DBG("No space left for descriptors!!! cons: %x prod: %x\n",
 		    ring->cons, ring->prod);
 		mdelay(5);
 		return MTNIC_ERROR;/* no space left */
@@ -1690,7 +1690,7 @@ mtnic_probe(struct pci_device *pci,
 	result = ntohl(readl(dev_id));
 	iounmap(dev_id);
         if (result != MTNIC_DEVICE_ID) {
-		DBG("Wrong Devie ID (0x%lx) !!!", result);
+		DBG("Wrong Devie ID (0x%x) !!!", result);
 		return MTNIC_ERROR;
 	}
 

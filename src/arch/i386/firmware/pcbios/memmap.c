@@ -210,7 +210,7 @@ static int meme820 ( struct memory_map *memmap ) {
 			if ( e820buf.attrs & E820_ATTR_NONVOLATILE )
 				DBG ( ", non-volatile" );
 			if ( e820buf.attrs & E820_ATTR_UNKNOWN )
-				DBG ( ", other [%08lx]", e820buf.attrs );
+				DBG ( ", other [%08x]", e820buf.attrs );
 			DBG ( ")" );
 		}
 		DBG ( "\n" );

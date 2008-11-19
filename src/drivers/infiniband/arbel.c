@@ -992,7 +992,7 @@ static void arbel_ring_doorbell ( struct arbel *arbel,
 				  union arbelprm_doorbell_register *db_reg,
 				  unsigned int offset ) {
 
-	DBGC2 ( arbel, "Arbel %p ringing doorbell %08lx:%08lx at %lx\n",
+	DBGC2 ( arbel, "Arbel %p ringing doorbell %08x:%08x at %lx\n",
 		arbel, db_reg->dword[0], db_reg->dword[1],
 		virt_to_phys ( arbel->uar + offset ) );
 
@@ -1182,7 +1182,7 @@ static int arbel_complete ( struct ib_device *ibdev,
 	if ( opcode >= ARBEL_OPCODE_RECV_ERROR ) {
 		/* "s" field is not valid for error opcodes */
 		is_send = ( opcode == ARBEL_OPCODE_SEND_ERROR );
-		DBGC ( arbel, "Arbel %p CPN %lx syndrome %lx vendor %lx\n",
+		DBGC ( arbel, "Arbel %p CPN %lx syndrome %x vendor %x\n",
 		       arbel, cq->cqn, MLX_GET ( &cqe->error, syndrome ),
 		       MLX_GET ( &cqe->error, vendor_code ) );
 		rc = -EIO;
@@ -1492,7 +1492,7 @@ static void arbel_poll_eq ( struct ib_device *ibdev ) {
 
 		/* Ring doorbell */
 		MLX_FILL_1 ( &db_reg.ci, 0, ci, arbel_eq->next_idx );
-		DBGCP ( arbel, "Ringing doorbell %08lx with %08lx\n",
+		DBGCP ( arbel, "Ringing doorbell %08lx with %08x\n",
 			virt_to_phys ( arbel_eq->doorbell ),
 			db_reg.dword[0] );
 		writel ( db_reg.dword[0], arbel_eq->doorbell );
@@ -1696,7 +1696,7 @@ static int arbel_start_firmware ( struct arbel *arbel ) {
 		       arbel, strerror ( rc ) );
 		goto err_query_fw;
 	}
-	DBGC ( arbel, "Arbel %p firmware version %ld.%ld.%ld\n", arbel,
+	DBGC ( arbel, "Arbel %p firmware version %d.%d.%d\n", arbel,
 	       MLX_GET ( &fw, fw_rev_major ), MLX_GET ( &fw, fw_rev_minor ),
 	       MLX_GET ( &fw, fw_rev_subminor ) );
 	fw_pages = MLX_GET ( &fw, fw_pages );

@@ -220,7 +220,7 @@ multiboot_build_module_list ( struct image *image,
 
 	/* Dump module configuration */
 	for ( i = 0 ; i < count ; i++ ) {
-		DBGC ( image, "MULTIBOOT %p module %d is [%lx,%lx)\n",
+		DBGC ( image, "MULTIBOOT %p module %d is [%x,%x)\n",
 		       image, i, modules[i].mod_start,
 		       modules[i].mod_end );
 	}
@@ -418,7 +418,7 @@ static int multiboot_load ( struct image *image ) {
 		       image );
 		return rc;
 	}
-	DBGC ( image, "MULTIBOOT %p found header with flags %08lx\n",
+	DBGC ( image, "MULTIBOOT %p found header with flags %08x\n",
 	       image, hdr.mb.flags );
 
 	/* This is a multiboot image, valid or otherwise */
@@ -427,7 +427,7 @@ static int multiboot_load ( struct image *image ) {
 
 	/* Abort if we detect flags that we cannot support */
 	if ( hdr.mb.flags & MB_UNSUPPORTED_FLAGS ) {
-		DBGC ( image, "MULTIBOOT %p flags %08lx not supported\n",
+		DBGC ( image, "MULTIBOOT %p flags %08x not supported\n",
 		       image, ( hdr.mb.flags & MB_UNSUPPORTED_FLAGS ) );
 		return -ENOTSUP;
 	}

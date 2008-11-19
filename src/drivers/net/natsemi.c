@@ -358,7 +358,7 @@ static int natsemi_open (struct net_device *netdev)
 	}
 	outl (virt_to_bus (&np->tx[0]),np->ioaddr + TxRingPtr);
 
-	DBG ("Natsemi Tx descriptor loaded with: %#08lx\n",
+	DBG ("Natsemi Tx descriptor loaded with: %#08x\n",
 	     inl (np->ioaddr + TxRingPtr));
 
 	/* Setup RX ring
@@ -377,7 +377,7 @@ static int natsemi_open (struct net_device *netdev)
 	}
 	outl (virt_to_bus (&np->rx[0]), np->ioaddr + RxRingPtr);
 
-	DBG ("Natsemi Rx descriptor loaded with: %#08lx\n",
+	DBG ("Natsemi Rx descriptor loaded with: %#08x\n",
 	      inl (np->ioaddr + RxRingPtr));		
 
 	/* Setup RX Filter 
@@ -401,7 +401,7 @@ static int natsemi_open (struct net_device *netdev)
 	outl (tx_config, np->ioaddr + TxConfig);
 	outl (rx_config, np->ioaddr + RxConfig);
 
-	DBG ("Tx config register = %#08lx Rx config register = %#08lx\n", 
+	DBG ("Tx config register = %#08x Rx config register = %#08x\n", 
                inl (np->ioaddr + TxConfig),
 	       inl (np->ioaddr + RxConfig));
 
@@ -552,7 +552,7 @@ static void natsemi_poll (struct net_device *netdev)
 			netdev_rx_err (netdev, NULL, -EINVAL);
 
 			DBG ("natsemi_poll: Corrupted packet received!"
-			     " Status = %#08lx\n",
+			     " Status = %#08x\n",
 			      np->rx[np->rx_cur].cmdsts);
 
 		} else 	{

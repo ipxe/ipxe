@@ -1086,7 +1086,7 @@ static int hermon_post_send ( struct ib_device *ibdev,
 
 	/* Ring doorbell register */
 	MLX_FILL_1 ( &db_reg.send, 0, qn, qp->qpn );
-	DBGCP ( hermon, "Ringing doorbell %08lx with %08lx\n",
+	DBGCP ( hermon, "Ringing doorbell %08lx with %08x\n",
 		virt_to_phys ( hermon_send_wq->doorbell ), db_reg.dword[0] );
 	writel ( db_reg.dword[0], ( hermon_send_wq->doorbell ) );
 
@@ -1172,7 +1172,7 @@ static int hermon_complete ( struct ib_device *ibdev,
 	if ( opcode >= HERMON_OPCODE_RECV_ERROR ) {
 		/* "s" field is not valid for error opcodes */
 		is_send = ( opcode == HERMON_OPCODE_SEND_ERROR );
-		DBGC ( hermon, "Hermon %p CQN %lx syndrome %lx vendor %lx\n",
+		DBGC ( hermon, "Hermon %p CQN %lx syndrome %x vendor %x\n",
 		       hermon, cq->cqn, MLX_GET ( &cqe->error, syndrome ),
 		       MLX_GET ( &cqe->error, vendor_error_syndrome ) );
 		rc = -EIO;
@@ -1473,7 +1473,7 @@ static void hermon_poll_eq ( struct ib_device *ibdev ) {
 		/* Ring doorbell */
 		MLX_FILL_1 ( &db_reg.event, 0,
 			     ci, ( hermon_eq->next_idx & 0x00ffffffUL ) );
-		DBGCP ( hermon, "Ringing doorbell %08lx with %08lx\n",
+		DBGCP ( hermon, "Ringing doorbell %08lx with %08x\n",
 			virt_to_phys ( hermon_eq->doorbell ),
 			db_reg.dword[0] );
 		writel ( db_reg.dword[0], hermon_eq->doorbell );
@@ -1714,7 +1714,7 @@ static int hermon_start_firmware ( struct hermon *hermon ) {
 		       hermon, strerror ( rc ) );
 		goto err_query_fw;
 	}
-	DBGC ( hermon, "Hermon %p firmware version %ld.%ld.%ld\n", hermon,
+	DBGC ( hermon, "Hermon %p firmware version %d.%d.%d\n", hermon,
 	       MLX_GET ( &fw, fw_rev_major ), MLX_GET ( &fw, fw_rev_minor ),
 	       MLX_GET ( &fw, fw_rev_subminor ) );
 	fw_pages = MLX_GET ( &fw, fw_pages );

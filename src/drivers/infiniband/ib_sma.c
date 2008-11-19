@@ -269,7 +269,7 @@ static int ib_sma_mad ( struct ib_sma *sma, union ib_mad *mad ) {
 	int rc;
 
 	DBGC ( sma, "SMA %p received SMP with bv=%02x mc=%02x cv=%02x "
-	       "meth=%02x attr=%04x mod=%08lx\n", sma, hdr->base_version,
+	       "meth=%02x attr=%04x mod=%08x\n", sma, hdr->base_version,
 	       hdr->mgmt_class, hdr->class_version, hdr->method,
 	       ntohs ( hdr->attr_id ), ntohl ( hdr->attr_mod ) );
 	DBGC2_HDA ( sma, 0, mad, sizeof ( *mad ) );

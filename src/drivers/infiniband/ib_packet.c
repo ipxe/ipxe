@@ -222,7 +222,7 @@ int ib_pull ( struct ib_device *ibdev, struct io_buffer *iobuf,
 		}
 	}
 
-	DBGC2 ( ibdev, "IBDEV %p RX %04x:%08lx <= %04x:%08lx (key %08lx)\n",
+	DBGC2 ( ibdev, "IBDEV %p RX %04x:%08lx <= %04x:%08lx (key %08x)\n",
 		ibdev, lid,
 		( IB_LID_MULTICAST( lid ) ? ( qp ? (*qp)->qpn : -1UL ) : qpn ),
 		av->lid, av->qpn, ntohl ( deth->qkey ) );

@@ -376,7 +376,7 @@ struct mtnic_err_buf {
 
 struct mtnic_cmd {
 	void                     *buf;
-	u32	                mapping;
+	unsigned long             mapping;
 	u32	 	      	  tbit;
 };
 

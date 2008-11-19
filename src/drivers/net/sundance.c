@@ -689,9 +689,9 @@ static int sundance_probe ( struct nic *nic, struct pci_device *pci ) {
 	}
 
 	/* Reset the chip to erase previous misconfiguration */
-	DBG ( "ASIC Control is %#lx\n", inl(BASE + ASICCtrl) );
+	DBG ( "ASIC Control is %#x\n", inl(BASE + ASICCtrl) );
 	outw(0x007f, BASE + ASICCtrl + 2);
-	DBG ( "ASIC Control is now %#lx.\n", inl(BASE + ASICCtrl) );
+	DBG ( "ASIC Control is now %#x.\n", inl(BASE + ASICCtrl) );
 
 	sundance_reset(nic);
 	if (sdc->an_enable) {
