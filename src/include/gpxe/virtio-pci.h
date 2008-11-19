@@ -91,4 +91,7 @@ static inline void vp_del_vq(unsigned int ioaddr, int queue_index)
 
    outl(0, ioaddr + VIRTIO_PCI_QUEUE_PFN);
 }
+
+int vp_find_vq(unsigned int ioaddr, int queue_index,
+               struct vring_virtqueue *vq);
 #endif /* _VIRTIO_PCI_H_ */

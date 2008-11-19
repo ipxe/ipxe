@@ -58,6 +58,24 @@ struct vring {
    struct vring_used *used;
 };
 
+#define vring_size(num) \
+   (((((sizeof(struct vring_desc) * num) + \
+      (sizeof(struct vring_avail) + sizeof(u16) * num)) \
+         + PAGE_MASK) & ~PAGE_MASK) + \
+         (sizeof(struct vring_used) + sizeof(struct vring_used_elem) * num))
+
+typedef unsigned char virtio_queue_t[PAGE_MASK + vring_size(MAX_QUEUE_NUM)];
+
+struct vring_virtqueue {
+   virtio_queue_t queue;
+   struct vring vring;
+   u16 free_head;
+   u16 last_used_idx;
+   u16 vdata[MAX_QUEUE_NUM];
+   /* PCI */
+   int queue_index;
+};
+
 struct vring_list {
   char *addr;
   unsigned int length;
@@ -90,10 +108,35 @@ static inline void vring_init(struct vring *vr,
    vr->desc[i].next = 0;
 }
 
-#define vring_size(num) \
-   (((((sizeof(struct vring_desc) * num) + \
-      (sizeof(struct vring_avail) + sizeof(u16) * num)) \
-         + PAGE_MASK) & ~PAGE_MASK) + \
-         (sizeof(struct vring_used) + sizeof(struct vring_used_elem) * num))
+static inline void vring_enable_cb(struct vring_virtqueue *vq)
+{
+   vq->vring.avail->flags &= ~VRING_AVAIL_F_NO_INTERRUPT;
+}
+
+static inline void vring_disable_cb(struct vring_virtqueue *vq)
+{
+   vq->vring.avail->flags |= VRING_AVAIL_F_NO_INTERRUPT;
+}
+
+
+/*
+ * vring_more_used
+ *
+ * is there some used buffers ?
+ *
+ */
+
+static inline int vring_more_used(struct vring_virtqueue *vq)
+{
+   wmb();
+   return vq->last_used_idx != vq->vring.used->idx;
+}
+
+void vring_detach(struct vring_virtqueue *vq, unsigned int head);
+int vring_get_buf(struct vring_virtqueue *vq, unsigned int *len);
+void vring_add_buf(struct vring_virtqueue *vq, struct vring_list list[],
+                   unsigned int out, unsigned int in,
+                   int index, int num_added);
+void vring_kick(unsigned int ioaddr, struct vring_virtqueue *vq, int num_added);
 
 #endif /* _VIRTIO_RING_H_ */
