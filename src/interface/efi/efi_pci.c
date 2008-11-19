@@ -46,9 +46,9 @@ int efipci_read ( struct pci_device *pci, unsigned long location,
 					  efipci_address ( pci, location ), 1,
 					  value ) ) != 0 ) {
 		DBG ( "EFIPCI config read from %02x:%02x.%x offset %02lx "
-		      "failed: %x\n", pci->bus, PCI_SLOT ( pci->devfn ),
+		      "failed: %s\n", pci->bus, PCI_SLOT ( pci->devfn ),
 		      PCI_FUNC ( pci->devfn ), EFIPCI_OFFSET ( location ),
-		      efirc );
+		      efi_strerror ( efirc ) );
 		return -EIO;
 	}
 
@@ -63,9 +63,9 @@ int efipci_write ( struct pci_device *pci, unsigned long location,
 					   efipci_address ( pci, location ), 1,
 					   &value ) ) != 0 ) {
 		DBG ( "EFIPCI config write to %02x:%02x.%x offset %02lx "
-		      "failed: %x\n", pci->bus, PCI_SLOT ( pci->devfn ),
+		      "failed: %s\n", pci->bus, PCI_SLOT ( pci->devfn ),
 		      PCI_FUNC ( pci->devfn ), EFIPCI_OFFSET ( location ),
-		      efirc );
+		      efi_strerror ( efirc ) );
 		return -EIO;
 	}
 

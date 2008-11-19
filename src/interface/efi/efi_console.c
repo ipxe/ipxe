@@ -224,7 +224,8 @@ static int efi_getchar ( void ) {
 
 	/* Read key from real EFI console */
 	if ( ( efirc = conin->ReadKeyStroke ( conin, &key ) ) != 0 ) {
-		DBG ( "EFI could not read keystroke: %x\n", efirc );
+		DBG ( "EFI could not read keystroke: %s\n",
+		      efi_strerror ( efirc ) );
 		return 0;
 	}
 	DBG2 ( "EFI read key stroke with unicode %04x scancode %04x\n",

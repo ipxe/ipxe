@@ -737,7 +737,8 @@ efi_snp_netdev ( EFI_DRIVER_BINDING_PROTOCOL *driver, EFI_HANDLE device ) {
 	if ( ( efirc = u.pci->GetLocation ( u.pci, &pci_segment, &pci_bus,
 					    &pci_dev, &pci_fn ) ) != 0 ) {
 		DBGC ( driver, "SNPDRV %p device %p could not get PCI "
-		       "location: %x\n", driver, device, efirc );
+		       "location: %s\n",
+		       driver, device, efi_strerror ( efirc ) );
 		goto out_no_pci_location;
 	}
 	DBGCP ( driver, "SNPDRV %p device %p is PCI %04x:%02x:%02x.%x\n",
@@ -786,7 +787,7 @@ efi_snp_snpdev ( EFI_DRIVER_BINDING_PROTOCOL *driver, EFI_HANDLE device ) {
 					  device,
 					  EFI_OPEN_PROTOCOL_GET_PROTOCOL))!=0){
 		DBGC ( driver, "SNPDRV %p device %p could not locate SNP: "
-		       "%x\n", driver, device, efirc );
+		       "%s\n", driver, device, efi_strerror ( efirc ) );
 		return NULL;
 	}
 
@@ -869,8 +870,8 @@ efi_snp_driver_start ( EFI_DRIVER_BINDING_PROTOCOL *driver,
 	if ( ( efirc = bs->CreateEvent ( EVT_NOTIFY_WAIT, TPL_NOTIFY,
 					 efi_snp_wait_for_packet, snpdev,
 					 &snpdev->snp.WaitForPacket ) ) != 0 ){
-		DBGC ( snpdev, "SNPDEV %p could not create event: %x\n",
-		       snpdev, efirc );
+		DBGC ( snpdev, "SNPDEV %p could not create event: %s\n",
+		       snpdev, efi_strerror ( efirc ) );
 		goto err_create_event;
 	}
 
@@ -882,8 +883,8 @@ efi_snp_driver_start ( EFI_DRIVER_BINDING_PROTOCOL *driver,
 	if ( ( efirc = bs->InstallProtocolInterface ( &device,
 				&efi_simple_network_protocol_guid,
 				EFI_NATIVE_INTERFACE, &snpdev->snp ) ) != 0 ) {
-		DBGC ( snpdev, "SNPDEV %p could not install protocol: %x\n",
-		       snpdev, efirc );
+		DBGC ( snpdev, "SNPDEV %p could not install protocol: %s\n",
+		       snpdev, efi_strerror ( efirc ) );
 		goto err_install_protocol_interface;
 	}
 
@@ -970,7 +971,7 @@ int efi_snp_install ( void ) {
 					EFI_NATIVE_INTERFACE,
 					driver ) ) != 0 ) {
 		DBGC ( driver, "SNPDRV %p could not install driver binding: "
-		       "%x\n", driver, efirc );
+		       "%s\n", driver, efi_strerror ( efirc ) );
 		return EFIRC_TO_RC ( efirc );
 	}
 

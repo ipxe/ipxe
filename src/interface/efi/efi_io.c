@@ -86,7 +86,8 @@ unsigned long long efi_ioread ( volatile void *io_addr, size_t size ) {
 	if ( ( efirc = read ( cpu_io, efi_width ( size ),
 			      ( intptr_t ) io_addr, 1,
 			      ( void * ) &data ) ) != 0 ) {
-		DBG ( "EFI I/O read at %p failed: %x\n", io_addr, efirc );
+		DBG ( "EFI I/O read at %p failed: %s\n",
+		      io_addr, efi_strerror ( efirc ) );
 		return -1ULL;
 	}
 
@@ -111,7 +112,8 @@ void efi_iowrite ( unsigned long long data, volatile void *io_addr,
 	if ( ( efirc = write ( cpu_io, efi_width ( size ),
 			       ( intptr_t ) io_addr, 1,
 			       ( void * ) &data ) ) != 0 ) {
-		DBG ( "EFI I/O write at %p failed: %x\n", io_addr, efirc );
+		DBG ( "EFI I/O write at %p failed: %s\n",
+		      io_addr, efi_strerror ( efirc ) );
 	}
 }
 
@@ -134,8 +136,8 @@ void efi_ioreads ( volatile void *io_addr, void *data,
 	if ( ( efirc = read ( cpu_io, efi_width ( size ),
 			      ( intptr_t ) io_addr, count,
 			      ( void * ) data ) ) != 0 ) {
-		DBG ( "EFI I/O string read at %p failed: %x\n",
-		      io_addr, efirc );
+		DBG ( "EFI I/O string read at %p failed: %s\n",
+		      io_addr, efi_strerror ( efirc ) );
 	}
 }
 
@@ -158,8 +160,8 @@ void efi_iowrites ( volatile void *io_addr, const void *data,
 	if ( ( efirc = write ( cpu_io, efi_width ( size ),
 			       ( intptr_t ) io_addr, count,
 			       ( void * ) data ) ) != 0 ) {
-		DBG ( "EFI I/O write at %p failed: %x\n",
-		      io_addr, efirc );
+		DBG ( "EFI I/O write at %p failed: %s\n",
+		      io_addr, efi_strerror ( efirc ) );
 	}
 }
 

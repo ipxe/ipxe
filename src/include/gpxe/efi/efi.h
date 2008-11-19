@@ -90,4 +90,6 @@ struct efi_protocol {
 extern EFI_HANDLE efi_image_handle;
 extern EFI_SYSTEM_TABLE *efi_systab;
 
+extern const char * efi_strerror ( EFI_STATUS efirc );
+
 #endif /* _EFI_H */

@@ -53,8 +53,8 @@ static void efi_udelay ( unsigned long usecs ) {
 	EFI_STATUS efirc;
 
 	if ( ( efirc = bs->Stall ( usecs ) ) != 0 ) {
-		DBG ( "EFI could not delay for %ldus: %x\n",
-		      usecs, efirc );
+		DBG ( "EFI could not delay for %ldus: %s\n",
+		      usecs, efi_strerror ( efirc ) );
 		/* Probably screwed */
 	}
 }
@@ -71,7 +71,8 @@ static unsigned long efi_currticks ( void ) {
 	/* Read CPU timer 0 (TSC) */
 	if ( ( efirc = cpu_arch->GetTimerValue ( cpu_arch, 0, &time,
 						 NULL ) ) != 0 ) {
-		DBG ( "EFI could not read CPU timer: %x\n", efirc );
+		DBG ( "EFI could not read CPU timer: %s\n",
+		      efi_strerror ( efirc ) );
 		/* Probably screwed */
 		return -1UL;
 	}

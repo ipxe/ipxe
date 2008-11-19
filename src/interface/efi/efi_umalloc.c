@@ -56,8 +56,8 @@ static userptr_t efi_urealloc ( userptr_t old_ptr, size_t new_size ) {
 						   EfiBootServicesData,
 						   new_pages,
 						   &phys_addr ) ) != 0 ) {
-			DBG ( "EFI could not allocate %d pages: %x\n",
-			      new_pages, efirc );
+			DBG ( "EFI could not allocate %d pages: %s\n",
+			      new_pages, efi_strerror ( efirc ) );
 			return UNULL;
 		}
 		assert ( phys_addr != 0 );
@@ -81,8 +81,8 @@ static userptr_t efi_urealloc ( userptr_t old_ptr, size_t new_size ) {
 		old_pages = ( EFI_SIZE_TO_PAGES ( old_size ) + 1 );
 		phys_addr = user_to_phys ( old_ptr, -EFI_PAGE_SIZE );
 		if ( ( efirc = bs->FreePages ( phys_addr, old_pages ) ) != 0 ){
-			DBG ( "EFI could not free %d pages at %llx: %x\n",
-			      old_pages, phys_addr, efirc );
+			DBG ( "EFI could not free %d pages at %llx: %s\n",
+			      old_pages, phys_addr, efi_strerror ( efirc ) );
 			/* Not fatal; we have leaked memory but successfully
 			 * allocated (if asked to do so).
 			 */
