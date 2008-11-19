@@ -4,7 +4,7 @@
 
 #include "libgcc.h"
 
-LIBGCC int64_t __divdi3(int64_t num, int64_t den)
+__libgcc int64_t __divdi3(int64_t num, int64_t den)
 {
   int minus = 0;
   int64_t v;
