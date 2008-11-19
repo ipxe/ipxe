@@ -21,8 +21,8 @@
 
 #include "etherboot.h"
 #include "nic.h"
-#include "virtio-ring.h"
-#include "virtio-pci.h"
+#include "gpxe/virtio-ring.h"
+#include "gpxe/virtio-pci.h"
 #include "virtio-net.h"
 
 #define BUG() do { \
