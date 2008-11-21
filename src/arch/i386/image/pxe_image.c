@@ -42,20 +42,14 @@ struct image_type pxe_image_type __image_type ( PROBE_PXE );
  * @ret rc		Return status code
  */
 static int pxe_exec ( struct image *image ) {
-	struct net_device *netdev;
 	int rc;
 
 	/* Ensure that PXE stack is ready to use */
 	pxe_init_structures();
 	pxe_hook_int1a();
 
-	/* Arbitrarily pick the first open network device to use for PXE */
-	for_each_netdev ( netdev ) {
-		if ( netdev->state & NETDEV_OPEN ) {
-			pxe_set_netdev ( netdev );
-			break;
-		}
-	}
+	/* Arbitrarily pick the most recently opened network device */
+	pxe_set_netdev ( last_opened_netdev() );
 
 	/* Many things will break if pxe_netdev is NULL */
 	if ( ! pxe_netdev ) {

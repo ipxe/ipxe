@@ -10,23 +10,6 @@
 #include <gpxe/abft.h>
 #include <int13.h>
 
-/**
- * Guess boot network device
- *
- * @ret netdev		Boot network device
- */
-static struct net_device * guess_boot_netdev ( void ) {
-	struct net_device *netdev;
-
-	/* Just use the first network device */
-	for_each_netdev ( netdev ) {
-		if ( netdev->state & NETDEV_OPEN )
-			return netdev;
-	}
-
-	return NULL;
-}
-
 static int aoeboot ( const char *root_path ) {
 	struct ata_device ata;
 	struct int13_drive drive;
@@ -38,7 +21,7 @@ static int aoeboot ( const char *root_path ) {
 	printf ( "AoE booting from %s\n", root_path );
 
 	/* FIXME: ugly, ugly hack */
-	struct net_device *netdev = guess_boot_netdev();
+	struct net_device *netdev = last_opened_netdev();
 
 	if ( ( rc = aoe_attach ( &ata, netdev, root_path ) ) != 0 ) {
 		printf ( "Could not attach AoE device: %s\n",

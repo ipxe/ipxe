@@ -367,23 +367,6 @@ static int nbi_boot32 ( struct image *image, struct imgheader *imgheader ) {
 }
 
 /**
- * Guess boot network device
- *
- * @ret netdev		Boot network device
- */
-static struct net_device * guess_boot_netdev ( void ) {
-	struct net_device *netdev;
-
-	/* Just use the first network device */
-	for_each_netdev ( netdev ) {
-		if ( netdev->state & NETDEV_OPEN )
-			return netdev;
-	}
-
-	return NULL;
-}
-
-/**
  * Prepare DHCP parameter block for NBI image
  *
  * @v image		NBI image
@@ -393,7 +376,7 @@ static int nbi_prepare_dhcp ( struct image *image ) {
 	struct net_device *boot_netdev;
 	int rc;
 
-	boot_netdev = guess_boot_netdev();
+	boot_netdev = last_opened_netdev();
 	if ( ! boot_netdev ) {
 		DBGC ( image, "NBI %p could not identify a network device\n",
 		       image );

@@ -20,23 +20,6 @@ struct setting keep_san_setting __setting = {
 	.type = &setting_type_int8,
 };
 
-/**
- * Guess boot network device
- *
- * @ret netdev		Boot network device
- */
-static struct net_device * guess_boot_netdev ( void ) {
-	struct net_device *netdev;
-
-	/* Just use the first network device */
-	for_each_netdev ( netdev ) {
-		if ( netdev->state & NETDEV_OPEN )
-			return netdev;
-	}
-
-	return NULL;
-}
-
 static int iscsiboot ( const char *root_path ) {
 	struct scsi_device *scsi;
 	struct int13_drive *drive;
@@ -70,7 +53,7 @@ static int iscsiboot ( const char *root_path ) {
 	drive->blockdev = &scsi->blockdev;
 
 	/* FIXME: ugly, ugly hack */
-	struct net_device *netdev = guess_boot_netdev();
+	struct net_device *netdev = last_opened_netdev();
 	struct iscsi_session *iscsi =
 		container_of ( scsi->backend, struct iscsi_session, refcnt );
 	ibft_fill_data ( netdev, iscsi );
