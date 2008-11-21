@@ -51,8 +51,10 @@ static int pxe_exec ( struct image *image ) {
 
 	/* Arbitrarily pick the first open network device to use for PXE */
 	for_each_netdev ( netdev ) {
-		pxe_set_netdev ( netdev );
-		break;
+		if ( netdev->state & NETDEV_OPEN ) {
+			pxe_set_netdev ( netdev );
+			break;
+		}
 	}
 
 	/* Many things will break if pxe_netdev is NULL */
