@@ -45,6 +45,9 @@ static struct net_protocol net_protocols_end[0]
 /** List of network devices */
 struct list_head net_devices = LIST_HEAD_INIT ( net_devices );
 
+/** List of open network devices, in reverse order of opening */
+struct list_head open_net_devices = LIST_HEAD_INIT ( open_net_devices );
+
 /**
  * Record network device statistic
  *
@@ -368,6 +371,10 @@ int netdev_open ( struct net_device *netdev ) {
 
 	/* Mark as opened */
 	netdev->state |= NETDEV_OPEN;
+
+	/* Add to head of open devices list */
+	list_add ( &netdev->open_list, &open_net_devices );
+
 	return 0;
 }
 
@@ -393,6 +400,9 @@ void netdev_close ( struct net_device *netdev ) {
 
 	/* Mark as closed */
 	netdev->state &= ~NETDEV_OPEN;
+
+	/* Remove from open devices list */
+	list_del ( &netdev->open_list );
 }
 
 /**
@@ -460,6 +470,22 @@ struct net_device * find_netdev_by_location ( unsigned int bus_type,
 	}
 
 	return NULL;	
+}
+
+/**
+ * Get most recently opened network device
+ *
+ * @ret netdev		Most recently opened network device, or NULL
+ */
+struct net_device * last_opened_netdev ( void ) {
+	struct net_device *netdev;
+
+	list_for_each_entry ( netdev, &open_net_devices, open_list ) {
+		assert ( netdev->state & NETDEV_OPEN );
+		return netdev;
+	}
+
+	return NULL;
 }
 
 /**

@@ -229,6 +229,8 @@ struct net_device {
 	struct refcnt refcnt;
 	/** List of network devices */
 	struct list_head list;
+	/** List of open network devices */
+	struct list_head open_list;
 	/** Name of this network device */
 	char name[8];
 	/** Underlying hardware device */
@@ -424,6 +426,7 @@ extern void netdev_irq ( struct net_device *netdev, int enable );
 extern struct net_device * find_netdev ( const char *name );
 extern struct net_device * find_netdev_by_location ( unsigned int bus_type,
 						     unsigned int location );
+extern struct net_device * last_opened_netdev ( void );
 extern int net_tx ( struct io_buffer *iobuf, struct net_device *netdev,
 		    struct net_protocol *net_protocol, const void *ll_dest );
 extern int net_rx ( struct io_buffer *iobuf, struct net_device *netdev,
