@@ -22,6 +22,7 @@
 #include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
+#include <stdio.h>
 #include <errno.h>
 #include <byteswap.h>
 #include <gpxe/refcnt.h>
@@ -46,6 +47,9 @@ FEATURE ( FEATURE_PROTOCOL, "DNS", DHCP_EB_FEATURE_DNS, 1 );
 static struct sockaddr_tcpip nameserver = {
 	.st_port = htons ( DNS_PORT ),
 };
+
+/** The local domain */
+static char *localdomain;
 
 /** A DNS request */
 struct dns_request {
@@ -177,6 +181,27 @@ static union dns_rr_info * dns_find_rr ( struct dns_request *dns,
 	}
 
 	return NULL;
+}
+
+/**
+ * Append DHCP domain name if available and name is not fully qualified
+ *
+ * @v string		Name as a NUL-terminated string
+ * @ret fqdn		Fully-qualified domain name, malloc'd copy
+ *
+ * The caller must free fqdn which is allocated even if the name is already
+ * fully qualified.
+ */
+static char * dns_qualify_name ( const char *string ) {
+	char *fqdn;
+
+	/* Leave unchanged if already fully-qualified or no local domain */
+	if ( ( ! localdomain ) || ( strchr ( string, '.' ) != 0 ) )
+		return strdup ( string );
+
+	/* Append local domain to name */
+	asprintf ( &fqdn, "%s.%s", string, localdomain );
+	return fqdn;
 }
 
 /**
@@ -452,19 +477,30 @@ static struct xfer_interface_operations dns_socket_operations = {
 static int dns_resolv ( struct resolv_interface *resolv,
 			const char *name, struct sockaddr *sa ) {
 	struct dns_request *dns;
+	char *fqdn;
 	int rc;
 
 	/* Fail immediately if no DNS servers */
 	if ( ! nameserver.st_family ) {
 		DBG ( "DNS not attempting to resolve \"%s\": "
 		      "no DNS servers\n", name );
-		return -ENXIO;
+		rc = -ENXIO;
+		goto err_no_nameserver;
+	}
+
+	/* Ensure fully-qualified domain name if DHCP option was given */
+	fqdn = dns_qualify_name ( name );
+	if ( ! fqdn ) {
+		rc = -ENOMEM;
+		goto err_qualify_name;
 	}
 
 	/* Allocate DNS structure */
 	dns = zalloc ( sizeof ( *dns ) );
-	if ( ! dns )
-		return -ENOMEM;
+	if ( ! dns ) {
+		rc = -ENOMEM;
+		goto err_alloc_dns;
+	}
 	resolv_init ( &dns->resolv, &null_resolv_ops, &dns->refcnt );
 	xfer_init ( &dns->socket, &dns_socket_operations, &dns->refcnt );
 	dns->timer.expired = dns_timer_expired;
@@ -474,7 +510,7 @@ static int dns_resolv ( struct resolv_interface *resolv,
 	dns->query.dns.flags = htons ( DNS_FLAG_QUERY | DNS_FLAG_OPCODE_QUERY |
 				       DNS_FLAG_RD );
 	dns->query.dns.qdcount = htons ( 1 );
-	dns->qinfo = ( void * ) dns_make_name ( name, dns->query.payload );
+	dns->qinfo = ( void * ) dns_make_name ( fqdn, dns->query.payload );
 	dns->qinfo->qtype = htons ( DNS_TYPE_A );
 	dns->qinfo->qclass = htons ( DNS_CLASS_IN );
 
@@ -484,7 +520,7 @@ static int dns_resolv ( struct resolv_interface *resolv,
 				       NULL ) ) != 0 ) {
 		DBGC ( dns, "DNS %p could not open socket: %s\n",
 		       dns, strerror ( rc ) );
-		goto err;
+		goto err_open_socket;
 	}
 
 	/* Send first DNS packet */
@@ -493,10 +529,15 @@ static int dns_resolv ( struct resolv_interface *resolv,
 	/* Attach parent interface, mortalise self, and return */
 	resolv_plug_plug ( &dns->resolv, resolv );
 	ref_put ( &dns->refcnt );
+	free ( fqdn );
 	return 0;	
 
- err:
+ err_open_socket:
+ err_alloc_dns:
 	ref_put ( &dns->refcnt );
+ err_qualify_name:
+	free ( fqdn );
+ err_no_nameserver:
 	return rc;
 }
 
@@ -521,12 +562,20 @@ struct setting dns_setting __setting = {
 	.type = &setting_type_ipv4,
 };
 
+/** Domain name setting */
+struct setting domain_setting __setting = {
+	.name = "domain",
+	.description = "Local domain",
+	.tag = DHCP_DOMAIN_NAME,
+	.type = &setting_type_string,
+};
+
 /**
- * Apply nameserver setting
+ * Apply DNS settings
  *
  * @ret rc		Return status code
  */
-static int apply_nameserver_setting ( void ) {
+static int apply_dns_settings ( void ) {
 	struct sockaddr_in *sin_nameserver =
 		( struct sockaddr_in * ) &nameserver;
 	int len;
@@ -538,10 +587,15 @@ static int apply_nameserver_setting ( void ) {
 		      inet_ntoa ( sin_nameserver->sin_addr ) );
 	}
 
+	/* Get local domain DHCP option */
+	if ( ( len = fetch_string_setting_copy ( NULL, &domain_setting,
+						 &localdomain ) ) >= 0 )
+		DBG ( "DNS local domain %s\n", localdomain );
+
 	return 0;
 }
 
-/** Nameserver setting applicator */
-struct settings_applicator nameserver_applicator __settings_applicator = {
-	.apply = apply_nameserver_setting,
+/** DNS settings applicator */
+struct settings_applicator dns_applicator __settings_applicator = {
+	.apply = apply_dns_settings,
 };

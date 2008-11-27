@@ -218,6 +218,7 @@ extern struct setting ip_setting __setting;
 extern struct setting netmask_setting __setting;
 extern struct setting gateway_setting __setting;
 extern struct setting dns_setting __setting;
+extern struct setting domain_setting __setting;
 extern struct setting hostname_setting __setting;
 extern struct setting filename_setting __setting;
 extern struct setting root_path_setting __setting;
