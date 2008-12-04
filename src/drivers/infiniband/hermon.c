@@ -2309,6 +2309,7 @@ static struct pci_device_id hermon_nics[] = {
 	PCI_ROM ( 0x15b3, 0x6340, "mt25408", "MT25408 HCA driver" ),
 	PCI_ROM ( 0x15b3, 0x634a, "mt25418", "MT25418 HCA driver" ),
 	PCI_ROM ( 0x15b3, 0x6732, "mt26418", "MT26418 HCA driver" ),
+	PCI_ROM ( 0x15b3, 0x673c, "mt26428", "MT26428 HCA driver" ),
 };
 
 struct pci_driver hermon_driver __pci_driver = {
