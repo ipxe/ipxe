@@ -512,7 +512,7 @@ int19_entry:
 	call	print_message
 	movw	$int19_message_dots, %si
 	call	print_message
-	movw	$0xdf42, %bx
+	movw	$0xdf4e, %bx
 	call	wait_for_key
 	pushf
 	xorw	%di, %di
@@ -520,7 +520,7 @@ int19_entry:
 	movw	$int19_message_done, %si
 	call	print_message
 	popf
-	jnz	1f
+	jz	1f
 	/* Leave keypress in buffer and start gPXE.  The keypress will
 	 * cause the usual initial Ctrl-B prompt to be skipped.
 	 */
@@ -539,7 +539,7 @@ orig_int19:
 	.size	orig_int19, . - orig_int19
 
 int19_message_prompt:
-	.asciz	"Press B to boot from "
+	.asciz	"Press N to skip booting from "
 	.size	int19_message_prompt, . - int19_message_prompt
 int19_message_dots:
 	.asciz	"..."
