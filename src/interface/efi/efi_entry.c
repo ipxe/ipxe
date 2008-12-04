@@ -17,6 +17,7 @@
  */
 
 #include <stdlib.h>
+#include <string.h>
 #include <gpxe/efi/efi.h>
 #include <gpxe/uuid.h>
 
@@ -32,6 +33,30 @@ static struct efi_protocol efi_protocols[0] \
 static struct efi_protocol efi_protocols_end[0] \
 	__table_end ( struct efi_protocol, efi_protocols );
 
+/** Declared used EFI configuration tables */
+static struct efi_config_table efi_config_tables[0] \
+	__table_start ( struct efi_config_table, efi_config_tables );
+static struct efi_config_table efi_config_tables_end[0] \
+	__table_end ( struct efi_config_table, efi_config_tables );
+
+/**
+ * Look up EFI configuration table
+ *
+ * @v guid		Configuration table GUID
+ * @ret table		Configuration table, or NULL
+ */
+static void * efi_find_table ( EFI_GUID *guid ) {
+	unsigned int i;
+
+	for ( i = 0 ; i < efi_systab->NumberOfTableEntries ; i++ ) {
+		if ( memcmp ( &efi_systab->ConfigurationTable[i].VendorGuid,
+			      guid, sizeof ( *guid ) ) == 0 )
+			return efi_systab->ConfigurationTable[i].VendorTable;
+	}
+
+	return NULL;
+}
+
 /**
  * EFI entry point
  *
@@ -43,6 +68,7 @@ EFI_STATUS EFIAPI efi_entry ( EFI_HANDLE image_handle,
 			      EFI_SYSTEM_TABLE *systab ) {
 	EFI_BOOT_SERVICES *bs;
 	struct efi_protocol *prot;
+	struct efi_config_table *tab;
 	EFI_STATUS efirc;
 
 	/* Store image handle and system table pointer for future use */
@@ -65,17 +91,32 @@ EFI_STATUS EFIAPI efi_entry ( EFI_HANDLE image_handle,
 	}
 	DBGC ( systab, "EFI handle %p systab %p\n", image_handle, systab );
 
-	/* Look up required protocols */
+	/* Look up used protocols */
 	bs = systab->BootServices;
 	for ( prot = efi_protocols ; prot < efi_protocols_end ; prot++ ) {
 		if ( ( efirc = bs->LocateProtocol ( &prot->u.guid, NULL,
-						    prot->protocol ) ) != 0 ) {
+						    prot->protocol ) ) == 0 ) {
+			DBGC ( systab, "EFI protocol %s is at %p\n",
+			       uuid_ntoa ( &prot->u.uuid ), *(prot->protocol));
+		} else {
 			DBGC ( systab, "EFI does not provide protocol %s\n",
 			       uuid_ntoa ( &prot->u.uuid ) );
+			/* All protocols are required */
 			return efirc;
 		}
-		DBGC ( systab, "EFI protocol %s is at %p\n",
-		       uuid_ntoa ( &prot->u.uuid ), *(prot->protocol) );
+	}
+
+	/* Look up used configuration tables */
+	for ( tab = efi_config_tables ; tab < efi_config_tables_end ; tab++ ) {
+		if ( ( *(tab->table) = efi_find_table ( &tab->u.guid ) ) ) {
+			DBGC ( systab, "EFI configuration table %s is at %p\n",
+			       uuid_ntoa ( &tab->u.uuid ), *(tab->table) );
+		} else {
+			DBGC ( systab, "EFI does not provide configuration "
+			       "table %s\n", uuid_ntoa ( &tab->u.uuid ) );
+			if ( tab->required )
+				return EFI_NOT_AVAILABLE_YET;
+		}
 	}
 
 	/* Call to main() */

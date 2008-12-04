@@ -43,6 +43,7 @@
 
 /** An EFI protocol used by gPXE */
 struct efi_protocol {
+	/** GUID */
 	union {
 		/** EFI protocol GUID */
 		EFI_GUID guid;
@@ -68,6 +69,38 @@ struct efi_protocol {
 		.protocol = ( ( void ** ) ( void * )			     \
 			      ( ( (_ptr) == ( ( _protocol ** ) NULL ) ) ?    \
 				(_ptr) : (_ptr) ) ),			     \
+	}
+
+/** An EFI configuration table used by gPXE */
+struct efi_config_table {
+	/** GUID */
+	union {
+		/** EFI configuration table GUID */
+		EFI_GUID guid;
+		/** UUID structure understood by gPXE */
+		union uuid uuid;
+	} u;
+	/** Variable containing pointer to configuration table */
+	void **table;
+	/** Table is required for operation */
+	int required;
+};
+
+/** Declare an EFI configuration table used by gPXE */
+#define __efi_config_table \
+	__table ( struct efi_config_table, efi_config_tables, 01 )
+
+/** Declare an EFI configuration table to be used by gPXE
+ *
+ * @v _table		EFI configuration table name
+ * @v _ptr		Pointer to configuration table
+ * @v _required		Table is required for operation
+ */
+#define EFI_USE_TABLE( _table, _ptr, _required )			     \
+	struct efi_config_table __ ## _table __efi_config_table = {	     \
+		.u.guid = _table ## _GUID,				     \
+		.table = ( ( void ** ) ( void * ) (_ptr) ),		     \
+		.required = (_required),				     \
 	}
 
 /** Convert a gPXE status code to an EFI status code
