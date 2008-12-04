@@ -14,6 +14,7 @@
 #define CONSOLE_PCBIOS
 #define NAP_PCBIOS
 #define UMALLOC_MEMTOP
+#define SMBIOS_PCBIOS
 
 #define	IMAGE_ELF		/* ELF image support */
 #define	IMAGE_MULTIBOOT		/* MultiBoot image support */

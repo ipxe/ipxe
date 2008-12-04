@@ -14,6 +14,7 @@
 #define TIMER_EFI
 #define NAP_EFIX86
 #define UMALLOC_EFI
+#define SMBIOS_EFI
 
 #define	IMAGE_EFI		/* EFI image support */
 

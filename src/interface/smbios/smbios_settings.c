@@ -22,7 +22,7 @@
 #include <gpxe/settings.h>
 #include <gpxe/init.h>
 #include <gpxe/uuid.h>
-#include <smbios.h>
+#include <gpxe/smbios.h>
 
 /** SMBIOS settings tag magic number */
 #define SMBIOS_TAG_MAGIC 0x5B /* "SmBios" */

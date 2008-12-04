@@ -21,9 +21,7 @@
 #include <errno.h>
 #include <assert.h>
 #include <gpxe/uaccess.h>
-#include <realmode.h>
-#include <pnpbios.h>
-#include <smbios.h>
+#include <gpxe/smbios.h>
 
 /** @file
  *
@@ -31,122 +29,10 @@
  *
  */
 
-/** Signature for SMBIOS entry point */
-#define SMBIOS_SIGNATURE \
-        ( ( '_' << 0 ) + ( 'S' << 8 ) + ( 'M' << 16 ) + ( '_' << 24 ) )
-
-/**
- * SMBIOS entry point
- *
- * This is the single table which describes the list of SMBIOS
- * structures.  It is located by scanning through the BIOS segment.
- */
-struct smbios_entry {
-	/** Signature
-	 *
-	 * Must be equal to SMBIOS_SIGNATURE
-	 */
-	uint32_t signature;
-	/** Checksum */
-	uint8_t checksum;
-	/** Length */
-	uint8_t len;
-	/** Major version */
-	uint8_t major;
-	/** Minor version */
-	uint8_t minor;
-	/** Maximum structure size */
-	uint16_t max;
-	/** Entry point revision */
-	uint8_t revision;
-	/** Formatted area */
-	uint8_t formatted[5];
-	/** DMI Signature */
-	uint8_t dmi_signature[5];
-	/** DMI checksum */
-	uint8_t dmi_checksum;
-	/** Structure table length */
-	uint16_t smbios_len;
-	/** Structure table address */
-	physaddr_t smbios_address;
-	/** Number of SMBIOS structures */
-	uint16_t smbios_count;
-	/** BCD revision */
-	uint8_t bcd_revision;
-} __attribute__ (( packed ));
-
-/**
- * SMBIOS entry point descriptor
- *
- * This contains the information from the SMBIOS entry point that we
- * care about.
- */
-struct smbios {
-	/** Start of SMBIOS structures */
-	userptr_t address;
-	/** Length of SMBIOS structures */ 
-	size_t len;
-	/** Number of SMBIOS structures */
-	unsigned int count;
-};
-
 /** SMBIOS entry point descriptor */
 static struct smbios smbios = {
 	.address = UNULL,
 };
-
-/**
- * Find SMBIOS
- *
- * @ret rc		Return status code
- */
-static int find_smbios ( void ) {
-	union {
-		struct smbios_entry entry;
-		uint8_t bytes[256]; /* 256 is maximum length possible */
-	} u;
-	static unsigned int offset = 0;
-	size_t len;
-	unsigned int i;
-	uint8_t sum;
-
-	/* Return cached result if avaiable */
-	if ( smbios.address != UNULL )
-		return 0;
-
-	/* Try to find SMBIOS */
-	for ( ; offset < 0x10000 ; offset += 0x10 ) {
-
-		/* Read start of header and verify signature */
-		copy_from_real ( &u.entry, BIOS_SEG, offset,
-				 sizeof ( u.entry ));
-		if ( u.entry.signature != SMBIOS_SIGNATURE )
-			continue;
-
-		/* Read whole header and verify checksum */
-		len = u.entry.len;
-		copy_from_real ( &u.bytes, BIOS_SEG, offset, len );
-		for ( i = 0 , sum = 0 ; i < len ; i++ ) {
-			sum += u.bytes[i];
-		}
-		if ( sum != 0 ) {
-			DBG ( "SMBIOS at %04x:%04x has bad checksum %02x\n",
-			      BIOS_SEG, offset, sum );
-			continue;
-		}
-
-		/* Fill result structure */
-		DBG ( "Found SMBIOS v%d.%d entry point at %04x:%04x\n",
-		      u.entry.major, u.entry.minor, BIOS_SEG, offset );
-		smbios.address = phys_to_user ( u.entry.smbios_address );
-		smbios.len = u.entry.smbios_len;
-		smbios.count = u.entry.smbios_count;
-		return 0;
-	}
-
-	DBG ( "No SMBIOS found\n" );
-	return -ENODEV;
-}
 
 /**
  * Find SMBIOS strings terminator
@@ -182,8 +68,10 @@ int find_smbios_structure ( unsigned int type,
 	int rc;
 
 	/* Find SMBIOS */
-	if ( ( rc = find_smbios() ) != 0 )
+	if ( ( smbios.address == UNULL ) &&
+	     ( ( rc = find_smbios ( &smbios ) ) != 0 ) )
 		return rc;
+	assert ( smbios.address != UNULL );
 
 	/* Scan through list of structures */
 	while ( ( ( offset + sizeof ( structure->header ) ) < smbios.len )

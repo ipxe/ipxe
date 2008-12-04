@@ -164,6 +164,9 @@
 #define ERRFILE_iscsiboot	      ( ERRFILE_OTHER | 0x000f0000 )
 #define ERRFILE_efi_pci		      ( ERRFILE_OTHER | 0x00100000 )
 #define ERRFILE_efi_snp		      ( ERRFILE_OTHER | 0x00110000 )
+#define ERRFILE_smbios		      ( ERRFILE_OTHER | 0x00120000 )
+#define ERRFILE_smbios_settings	      ( ERRFILE_OTHER | 0x00130000 )
+#define ERRFILE_efi_smbios	      ( ERRFILE_OTHER | 0x00140000 )
 
 /** @} */
 
