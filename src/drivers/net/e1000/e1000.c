@@ -818,8 +818,8 @@ e1000_probe ( struct pci_device *pdev,
 	 * because it depends on mac_type 
 	 */
 	if ( ( adapter->hw.mac_type == e1000_ich8lan ) && ( pdev->ioaddr ) ) {
-		flash_start = pci_bar_start ( pdev, 1 );
-		flash_len = pci_bar_size ( pdev, 1 );
+		flash_start = pci_bar_start ( pdev, PCI_BASE_ADDRESS_1 );
+		flash_len = pci_bar_size ( pdev, PCI_BASE_ADDRESS_1 );
 		adapter->hw.flash_address = ioremap ( flash_start, flash_len );
 		if ( ! adapter->hw.flash_address )
 			goto err_flashmap;
