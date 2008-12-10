@@ -32,6 +32,7 @@ FILE_LICENCE ( GPL_ANY );
 #include <gpxe/iobuf.h>
 #include <gpxe/netdevice.h>
 #include <gpxe/timer.h>
+#include <mii.h>
 #include "etherfabric.h"
 #include "etherfabric_nic.h"
 
@@ -84,39 +85,23 @@ static void falcon_mdio_write (struct efab_nic *efab, int device,
 static int falcon_mdio_read ( struct efab_nic *efab, int device, int location );
 
 /* GMII registers */
-#define MII_BMSR		0x01	/* Basic mode status register  */
-#define MII_ADVERTISE		0x04	/* Advertisement control register */
-#define MII_LPA			0x05	/* Link partner ability register*/
-#define GMII_GTCR		0x09	/* 1000BASE-T control register */
-#define GMII_GTSR		0x0a	/* 1000BASE-T status register */
 #define GMII_PSSR		0x11	/* PHY-specific status register */
 
-/* Basic mode status register. */
-#define BMSR_LSTATUS		0x0004	/* Link status                 */
-
-/* Link partner ability register. */
-#define LPA_10HALF              0x0020  /* Can do 10mbps half-duplex   */
-#define LPA_10FULL              0x0040  /* Can do 10mbps full-duplex   */
-#define LPA_100HALF             0x0080  /* Can do 100mbps half-duplex  */
-#define LPA_100FULL             0x0100  /* Can do 100mbps full-duplex  */
-#define LPA_100BASE4            0x0200  /* Can do 100mbps 4k packets   */
-#define LPA_PAUSE		0x0400	/* Bit 10 - MAC pause */
-
 /* Pseudo extensions to the link partner ability register */
-#define LPA_1000FULL		0x00020000
-#define LPA_1000HALF		0x00010000
-#define LPA_10000FULL		0x00040000
-#define LPA_10000HALF		0x00080000
+#define LPA_EF_1000FULL		0x00020000
+#define LPA_EF_1000HALF		0x00010000
+#define LPA_EF_10000FULL		0x00040000
+#define LPA_EF_10000HALF		0x00080000
 
 #define LPA_100			(LPA_100FULL | LPA_100HALF | LPA_100BASE4)
-#define LPA_1000		( LPA_1000FULL | LPA_1000HALF )
-#define LPA_10000               ( LPA_10000FULL | LPA_10000HALF )
-#define LPA_DUPLEX		( LPA_10FULL | LPA_100FULL | LPA_1000FULL | \
-				  LPA_10000FULL )
+#define LPA_EF_1000		( LPA_EF_1000FULL | LPA_EF_1000HALF )
+#define LPA_EF_10000               ( LPA_EF_10000FULL | LPA_EF_10000HALF )
+#define LPA_EF_DUPLEX		( LPA_10FULL | LPA_100FULL | LPA_EF_1000FULL | \
+				  LPA_EF_10000FULL )
 
 /* Mask of bits not associated with speed or duplexity. */
 #define LPA_OTHER		~( LPA_10FULL | LPA_10HALF | LPA_100FULL | \
-				   LPA_100HALF | LPA_1000FULL | LPA_1000HALF )
+				   LPA_100HALF | LPA_EF_1000FULL | LPA_EF_1000HALF )
 
 /* PHY-specific status register */
 #define PSSR_LSTATUS		0x0400	/* Bit 10 - link status */
@@ -131,9 +116,9 @@ gmii_autoneg_advertised ( struct efab_nic *efab )
 	unsigned int mii_advertise;
 	unsigned int gmii_advertise;
 
-	/* Extended bits are in bits 8 and 9 of GMII_GTCR */
+	/* Extended bits are in bits 8 and 9 of MII_CTRL1000 */
 	mii_advertise = falcon_mdio_read ( efab, 0, MII_ADVERTISE );
-	gmii_advertise = ( ( falcon_mdio_read ( efab, 0, GMII_GTCR ) >> 8 )
+	gmii_advertise = ( ( falcon_mdio_read ( efab, 0, MII_CTRL1000 ) >> 8 )
 			   & 0x03 );
 	return ( ( gmii_advertise << 16 ) | mii_advertise );
 }
@@ -148,9 +133,9 @@ gmii_autoneg_lpa ( struct efab_nic *efab )
 	unsigned int mii_lpa;
 	unsigned int gmii_lpa;
 
-	/* Extended bits are in bits 10 and 11 of GMII_GTSR */
+	/* Extended bits are in bits 10 and 11 of MII_STAT1000 */
 	mii_lpa = falcon_mdio_read ( efab, 0, MII_LPA );
-	gmii_lpa = ( falcon_mdio_read ( efab, 0, GMII_GTSR ) >> 10 ) & 0x03;
+	gmii_lpa = ( falcon_mdio_read ( efab, 0, MII_STAT1000 ) >> 10 ) & 0x03;
 	return ( ( gmii_lpa << 16 ) | mii_lpa );
 }
 
@@ -166,10 +151,10 @@ gmii_nway_result ( unsigned int negotiated )
 	/* Mask out the speed and duplexity bits */
 	other_bits = negotiated & LPA_OTHER;
 
-	if ( negotiated & LPA_1000FULL )
-		return ( other_bits | LPA_1000FULL );
-	else if ( negotiated & LPA_1000HALF )
-		return ( other_bits | LPA_1000HALF );
+	if ( negotiated & LPA_EF_1000FULL )
+		return ( other_bits | LPA_EF_1000FULL );
+	else if ( negotiated & LPA_EF_1000HALF )
+		return ( other_bits | LPA_EF_1000HALF );
 	else if ( negotiated & LPA_100FULL )
 		return ( other_bits | LPA_100FULL );
 	else if ( negotiated & LPA_100BASE4 )
@@ -1740,9 +1725,9 @@ falcon_reconfigure_mac_wrapper ( struct efab_nic *efab )
 	efab_oword_t reg;
 	int link_speed;
 
-	if ( efab->link_options & LPA_10000 ) {
+	if ( efab->link_options & LPA_EF_10000 ) {
 		link_speed = 0x3;
-	} else if ( efab->link_options & LPA_1000 ) {
+	} else if ( efab->link_options & LPA_EF_1000 ) {
 		link_speed = 0x2;
 	} else if ( efab->link_options & LPA_100 ) {
 		link_speed = 0x1;
@@ -1951,8 +1936,8 @@ mentormac_init ( struct efab_nic *efab )
 	efab_dword_t reg;
 
 	/* Configuration register 1 */
-	pause = ( efab->link_options & LPA_PAUSE ) ? 1 : 0;
-	if ( ! ( efab->link_options & LPA_DUPLEX ) ) {
+	pause = ( efab->link_options & LPA_PAUSE_CAP ) ? 1 : 0;
+	if ( ! ( efab->link_options & LPA_EF_DUPLEX ) ) {
 		/* Half-duplex operation requires TX flow control */
 		pause = 1;
 	}
@@ -1965,8 +1950,8 @@ mentormac_init ( struct efab_nic *efab )
 	udelay ( 10 );
 
 	/* Configuration register 2 */
-	if_mode = ( efab->link_options & LPA_1000 ) ? 2 : 1;
-	full_duplex = ( efab->link_options & LPA_DUPLEX ) ? 1 : 0;
+	if_mode = ( efab->link_options & LPA_EF_1000 ) ? 2 : 1;
+	full_duplex = ( efab->link_options & LPA_EF_DUPLEX ) ? 1 : 0;
 	EFAB_POPULATE_DWORD_4 ( reg,
 				GM_IF_MODE, if_mode,
 				GM_PAD_CRC_EN, 1,
@@ -2018,8 +2003,8 @@ mentormac_init ( struct efab_nic *efab )
 	udelay ( 10 );
 	
 	/* FIFO configuration register 5 */
-	bytemode = ( efab->link_options & LPA_1000 ) ? 1 : 0;
-	half_duplex = ( efab->link_options & LPA_DUPLEX ) ? 0 : 1;
+	bytemode = ( efab->link_options & LPA_EF_1000 ) ? 1 : 0;
+	half_duplex = ( efab->link_options & LPA_EF_DUPLEX ) ? 0 : 1;
 	falcon_gmac_readl ( efab, &reg, GMF_CFG5_REG_MAC );
 	EFAB_SET_DWORD_FIELD ( reg, GMF_CFGBYTMODE, bytemode );
 	EFAB_SET_DWORD_FIELD ( reg, GMF_CFGHDPLX, half_duplex );
@@ -2415,7 +2400,7 @@ static int
 falcon_xaui_phy_init ( struct efab_nic *efab )
 {
 	/* CX4 is always 10000FD only */
-	efab->link_options = LPA_10000FULL;
+	efab->link_options = LPA_EF_10000FULL;
 
 	/* There is no PHY! */
 	return 0;
@@ -2480,7 +2465,7 @@ falcon_xfp_phy_init ( struct efab_nic *efab )
 	int rc;
 
 	/* Optical link is always 10000FD only */
-	efab->link_options = LPA_10000FULL;
+	efab->link_options = LPA_EF_10000FULL;
 
 	/* Reset the PHY */
 	rc = mdio_clause45_reset_mmd ( efab, MDIO_MMD_PHYXS );
@@ -2567,7 +2552,7 @@ falcon_txc_phy_init ( struct efab_nic *efab )
 	int rc;
 
 	/* CX4 is always 10000FD only */
-	efab->link_options = LPA_10000FULL;
+	efab->link_options = LPA_EF_10000FULL;
 
 	/* reset the phy */
 	rc = mdio_clause45_reset_mmd ( efab, MDIO_MMD_PMAPMD );
@@ -2685,7 +2670,7 @@ falcon_tenxpress_phy_init ( struct efab_nic *efab )
 	int rc, reg;
 
 	/* 10XPRESS is always 10000FD (at the moment) */
-	efab->link_options = LPA_10000FULL;
+	efab->link_options = LPA_EF_10000FULL;
 
 	/* Wait for the blocks to come out of reset */
 	rc = mdio_clause45_wait_reset_mmds ( efab );
@@ -2765,7 +2750,7 @@ falcon_pm8358_phy_init ( struct efab_nic *efab )
 	int rc, reg, i;
 
 	/* This is a XAUI retimer part */
-	efab->link_options = LPA_10000FULL;
+	efab->link_options = LPA_EF_10000FULL;
 
 	rc = mdio_clause45_reset_mmd ( efab, MDIO_MMDREG_DEVS0_DTEXS );
 	if ( rc )
@@ -4039,10 +4024,10 @@ efab_init_mac ( struct efab_nic *efab )
 		}
 
 		EFAB_LOG ( "\n%dMbps %s-duplex\n",
-			   ( efab->link_options & LPA_10000 ? 10000 :
-			     ( efab->link_options & LPA_1000 ? 1000 :
+			   ( efab->link_options & LPA_EF_10000 ? 10000 :
+			     ( efab->link_options & LPA_EF_1000 ? 1000 :
 			       ( efab->link_options & LPA_100 ? 100 : 10 ) ) ),
-			   ( efab->link_options & LPA_DUPLEX ?
+			   ( efab->link_options & LPA_EF_DUPLEX ?
 			     "full" : "half" ) );
 
 		/* TODO: Move link state handling to the poll() routine */

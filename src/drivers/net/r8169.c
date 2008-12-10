@@ -41,6 +41,7 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #include <gpxe/netdevice.h>
 #include <gpxe/pci.h>
 #include <gpxe/timer.h>
+#include <mii.h>
 
 #include "r8169.h"
 

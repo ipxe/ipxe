@@ -231,14 +231,6 @@ typedef unsigned long int		dword;
 #define RS_MULTICAST	0x0001
 #define RS_ERRORS	(RS_ALGNERR | RS_BADCRC | RS_TOOLONG | RS_TOOSHORT)
 
-// Management Interface Register (MII)
-#define MII_REG         0x0008
-#define MII_MSK_CRS100  0x4000 // Disables CRS100 detection during tx half dup
-#define MII_MDOE        0x0008 // MII Output Enable
-#define MII_MCLK        0x0004 // MII Clock, pin MDCLK
-#define MII_MDI         0x0002 // MII Input, pin MDI
-#define MII_MDO         0x0001 // MII Output, pin MDO
-
 // PHY Register Addresses (LAN91C111 Internal PHY)
 
 // PHY Control Register

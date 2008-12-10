@@ -20,6 +20,7 @@ FILE_LICENCE ( GPL2_ONLY );
 #include <gpxe/pci.h>
 #include <gpxe/ethernet.h>
 #include "string.h"
+#include <mii.h>
 #include "tg3.h"
 
 #define SUPPORT_COPPER_PHY  1

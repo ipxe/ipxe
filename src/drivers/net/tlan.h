@@ -313,41 +313,6 @@ typedef struct tlan_adapter_entry {
 
 /* ThunderLAN MII Registers */
 
-/* Generic MII/PHY Registers */
-
-#define MII_GEN_CTL			0x00
-#define 	MII_GC_RESET		0x8000
-#define		MII_GC_LOOPBK		0x4000
-#define		MII_GC_SPEEDSEL		0x2000
-#define		MII_GC_AUTOENB		0x1000
-#define		MII_GC_PDOWN		0x0800
-#define		MII_GC_ISOLATE		0x0400
-#define		MII_GC_AUTORSRT		0x0200
-#define		MII_GC_DUPLEX		0x0100
-#define		MII_GC_COLTEST		0x0080
-#define		MII_GC_RESERVED		0x007F
-#define MII_GEN_STS			0x01
-#define		MII_GS_100BT4		0x8000
-#define		MII_GS_100BTXFD		0x4000
-#define		MII_GS_100BTXHD		0x2000
-#define		MII_GS_10BTFD		0x1000
-#define		MII_GS_10BTHD		0x0800
-#define		MII_GS_RESERVED		0x07C0
-#define		MII_GS_AUTOCMPLT	0x0020
-#define		MII_GS_RFLT		0x0010
-#define		MII_GS_AUTONEG		0x0008
-#define		MII_GS_LINK		0x0004
-#define		MII_GS_JABBER		0x0002
-#define		MII_GS_EXTCAP		0x0001
-#define MII_GEN_ID_HI			0x02
-#define MII_GEN_ID_LO			0x03
-#define 	MII_GIL_OUI		0xFC00
-#define 	MII_GIL_MODEL		0x03F0
-#define 	MII_GIL_REVISION	0x000F
-#define MII_AN_ADV			0x04
-#define MII_AN_LPA			0x05
-#define MII_AN_EXP			0x06
-
 /* ThunderLAN Specific MII/PHY Registers */
 
 #define TLAN_TLPHY_ID			0x10

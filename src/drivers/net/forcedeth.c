@@ -373,13 +373,6 @@ enum {
 #define PHY_1000	0x2
 #define PHY_HALF	0x100
 
-/* FIXME: MII defines that should be added to <linux/mii.h> */
-#define MII_1000BT_CR	0x09
-#define MII_1000BT_SR	0x0a
-#define ADVERTISE_1000FULL	0x0200
-#define ADVERTISE_1000HALF	0x0100
-#define LPA_1000FULL	0x0800
-#define LPA_1000HALF	0x0400
 
 /* Bit to know if MAC addr is stored in correct order */
 #define MAC_ADDR_CORRECT	0x01
@@ -465,26 +458,6 @@ static int reg_delay(int offset, u32 mask,
 }
 
 #define MII_READ	(-1)
-#define MII_PHYSID1         0x02	/* PHYS ID 1                   */
-#define MII_PHYSID2         0x03	/* PHYS ID 2                   */
-#define MII_BMCR            0x00	/* Basic mode control register */
-#define MII_BMSR            0x01	/* Basic mode status register  */
-#define MII_ADVERTISE       0x04	/* Advertisement control reg   */
-#define MII_LPA             0x05	/* Link partner ability reg    */
-
-#define BMSR_ANEGCOMPLETE       0x0020	/* Auto-negotiation complete   */
-
-/* Link partner ability register. */
-#define LPA_SLCT                0x001f	/* Same as advertise selector  */
-#define LPA_10HALF              0x0020	/* Can do 10mbps half-duplex   */
-#define LPA_10FULL              0x0040	/* Can do 10mbps full-duplex   */
-#define LPA_100HALF             0x0080	/* Can do 100mbps half-duplex  */
-#define LPA_100FULL             0x0100	/* Can do 100mbps full-duplex  */
-#define LPA_100BASE4            0x0200	/* Can do 100mbps 4k packets   */
-#define LPA_RESV                0x1c00	/* Unused...                   */
-#define LPA_RFAULT              0x2000	/* Link partner faulted        */
-#define LPA_LPACK               0x4000	/* Link partner acked us       */
-#define LPA_NPAGE               0x8000	/* Next page bit               */
 
 /* mii_rw: read/write a register on the PHY.
  *
@@ -586,7 +559,7 @@ static int phy_init(struct nic *nic)
 	if (mii_status & PHY_GIGABIT) {
 		np->gigabit = PHY_GIGABIT;
 		mii_control_1000 =
-		    mii_rw(nic, np->phyaddr, MII_1000BT_CR, MII_READ);
+		    mii_rw(nic, np->phyaddr, MII_CTRL1000, MII_READ);
 		mii_control_1000 &= ~ADVERTISE_1000HALF;
 		if (phyinterface & PHY_RGMII)
 			mii_control_1000 |= ADVERTISE_1000FULL;
@@ -594,7 +567,7 @@ static int phy_init(struct nic *nic)
 			mii_control_1000 &= ~ADVERTISE_1000FULL;
 
 		if (mii_rw
-		    (nic, np->phyaddr, MII_1000BT_CR, mii_control_1000)) {
+		    (nic, np->phyaddr, MII_CTRL1000, mii_control_1000)) {
 			printf("phy init failed.\n");
 			return PHY_ERROR;
 		}
@@ -788,9 +761,9 @@ static int update_linkspeed(struct nic *nic)
 	retval = 1;
 	if (np->gigabit == PHY_GIGABIT) {
 		control_1000 =
-		    mii_rw(nic, np->phyaddr, MII_1000BT_CR, MII_READ);
+		    mii_rw(nic, np->phyaddr, MII_CTRL1000, MII_READ);
 		status_1000 =
-		    mii_rw(nic, np->phyaddr, MII_1000BT_SR, MII_READ);
+		    mii_rw(nic, np->phyaddr, MII_STAT1000, MII_READ);
 
 		if ((control_1000 & ADVERTISE_1000FULL) &&
 		    (status_1000 & LPA_1000FULL)) {

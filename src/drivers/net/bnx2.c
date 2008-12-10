@@ -20,6 +20,7 @@ FILE_LICENCE ( GPL_ANY );
 #include <gpxe/pci.h>
 #include <gpxe/ethernet.h>
 #include "string.h"
+#include <mii.h>
 #include "bnx2.h"
 #include "bnx2_fw.h"
 
