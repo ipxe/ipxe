@@ -222,12 +222,6 @@ struct {
 	unsigned char rxb[RX_RING_SIZE][PKT_BUF_SZ];
 } pcnet32_bufs __shared;
 
-/* May need to be moved to mii.h */
-struct mii_if_info {
-	int phy_id;
-	int advertising;
-	unsigned int full_duplex:1;	/* is full duplex? */
-};
 
 /*
  * The first three fields of pcnet32_private are read by the ethernet device 

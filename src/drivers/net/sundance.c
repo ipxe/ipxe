@@ -59,13 +59,6 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #define virt_to_le32desc(addr)  cpu_to_le32(virt_to_bus(addr))
 #define le32desc_to_virt(addr)  bus_to_virt(le32_to_cpu(addr))
 
-/* May need to be moved to mii.h */
-struct mii_if_info {
-	int phy_id;
-	int advertising;
-	unsigned int full_duplex:1;	/* is full duplex? */
-};
-
 /* Set the mtu */
 static int mtu = 1514;
 
