@@ -148,7 +148,8 @@ void adjust_pci_device ( struct pci_device *pci ) {
 	unsigned char pci_latency;
 
 	pci_read_config_word ( pci, PCI_COMMAND, &pci_command );
-	new_command = pci_command | PCI_COMMAND_MASTER | PCI_COMMAND_IO;
+	new_command = ( pci_command | PCI_COMMAND_MASTER |
+			PCI_COMMAND_MEM | PCI_COMMAND_IO );
 	if ( pci_command != new_command ) {
 		DBG ( "PCI BIOS has not enabled device %02x:%02x.%x! "
 		      "Updating PCI command %04x->%04x\n", pci->bus,
