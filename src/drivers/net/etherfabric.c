@@ -4151,7 +4151,8 @@ efab_probe ( struct pci_device *pci,
 {
 	struct net_device *netdev;
 	struct efab_nic *efab;
-	int rc, mmio_start, mmio_len;
+	unsigned long mmio_start, mmio_len;
+	int rc;
 
 	/* Create the network adapter */
 	netdev = alloc_etherdev ( sizeof ( struct efab_nic ) );
@@ -4173,7 +4174,7 @@ efab_probe ( struct pci_device *pci,
 	mmio_start = pci_bar_start ( pci, PCI_BASE_ADDRESS_2 );
 	mmio_len = pci_bar_size ( pci, PCI_BASE_ADDRESS_2 );
 	efab->membase = ioremap ( mmio_start, mmio_len );
-	EFAB_TRACE ( "BAR of %x bytes at phys %x mapped at %p\n",
+	EFAB_TRACE ( "BAR of %lx bytes at phys %lx mapped at %p\n",
 		     mmio_len, mmio_start, efab->membase );
 
 	/* Enable the PCI device */
