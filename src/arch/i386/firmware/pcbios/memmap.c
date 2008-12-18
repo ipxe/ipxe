@@ -201,6 +201,13 @@ static int meme820 ( struct memory_map *memmap ) {
 			break;
 		}
 
+		/* If first region is not RAM, assume map is invalid */
+		if ( ( memmap->count == 0 ) &&
+		     ( e820buf.type != E820_TYPE_RAM ) ) {
+		       DBG ( "INT 15,e820 failed, first entry not RAM\n" );
+		       return -EINVAL;
+		}
+
 		DBG ( "INT 15,e820 region [%llx,%llx) type %d",
 		      e820buf.start, ( e820buf.start + e820buf.len ),
 		      ( int ) e820buf.type );
