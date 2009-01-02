@@ -306,6 +306,8 @@ struct ib_device {
 	struct ib_device_operations *op;
 	/** Port number */
 	unsigned int port;
+	/** Port open request counter */
+	unsigned int open_count;
 
 	/** Port state */
 	uint8_t port_state;
@@ -364,6 +366,8 @@ extern void ib_complete_recv ( struct ib_device *ibdev,
 			       struct ib_queue_pair *qp,
 			       struct ib_address_vector *av,
 			       struct io_buffer *iobuf, int rc );
+extern int ib_open ( struct ib_device *ibdev );
+extern void ib_close ( struct ib_device *ibdev );
 extern int ib_mcast_attach ( struct ib_device *ibdev, struct ib_queue_pair *qp,
 			     struct ib_gid *gid );
 extern void ib_mcast_detach ( struct ib_device *ibdev,
@@ -387,27 +391,6 @@ extern struct list_head ib_devices;
 static inline __always_inline void
 ib_poll_cq ( struct ib_device *ibdev, struct ib_completion_queue *cq ) {
 	ibdev->op->poll_cq ( ibdev, cq );
-}
-
-/**
- * Open port
- *
- * @v ibdev		Infiniband device
- * @ret rc		Return status code
- */
-static inline __always_inline int
-ib_open ( struct ib_device *ibdev ) {
-	return ibdev->op->open ( ibdev );
-}
-
-/**
- * Close port
- *
- * @v ibdev		Infiniband device
- */
-static inline __always_inline void
-ib_close ( struct ib_device *ibdev ) {
-	ibdev->op->close ( ibdev );
 }
 
 /**

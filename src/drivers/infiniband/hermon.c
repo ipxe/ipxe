@@ -2244,6 +2244,10 @@ static int hermon_probe ( struct pci_device *pci,
 	if ( ( rc = hermon_create_eq ( hermon ) ) != 0 )
 		goto err_create_eq;
 
+	/* Update MAD parameters */
+	for ( i = 0 ; i < HERMON_NUM_PORTS ; i++ )
+		ib_smc_update ( hermon->ibdev[i], hermon_mad );
+
 	/* Register Infiniband devices */
 	for ( i = 0 ; i < HERMON_NUM_PORTS ; i++ ) {
 		if ( ( rc = register_ibdev ( hermon->ibdev[i] ) ) != 0 ) {

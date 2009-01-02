@@ -926,6 +926,13 @@ static int ipoib_open ( struct net_device *netdev ) {
 	struct ipoib_mac *mac = ( ( struct ipoib_mac * ) netdev->ll_addr );
 	int rc;
 
+	/* Open IB device */
+	if ( ( rc = ib_open ( ipoib->ibdev ) ) != 0 ) {
+		DBGC ( ipoib, "IPoIB %p could not open device: %s\n",
+		       ipoib, strerror ( rc ) );
+		goto err_ib_open;
+	}
+
 	/* Allocate metadata queue set */
 	if ( ( rc = ipoib_create_qset ( ipoib, &ipoib->meta,
 					IPOIB_META_NUM_CQES,
@@ -971,6 +978,8 @@ static int ipoib_open ( struct net_device *netdev ) {
  err_create_data_qset:
 	ipoib_destroy_qset ( ipoib, &ipoib->meta );
  err_create_meta_qset:
+	ib_close ( ipoib->ibdev );
+ err_ib_open:
 	return rc;
 }
 
@@ -992,6 +1001,9 @@ static void ipoib_close ( struct net_device *netdev ) {
 	/* Tear down the queues */
 	ipoib_destroy_qset ( ipoib, &ipoib->data );
 	ipoib_destroy_qset ( ipoib, &ipoib->meta );
+
+	/* Close IB device */
+	ib_close ( ipoib->ibdev );
 }
 
 /** IPoIB network device operations */

@@ -392,6 +392,42 @@ void ib_complete_recv ( struct ib_device *ibdev, struct ib_queue_pair *qp,
 }
 
 /**
+ * Open port
+ *
+ * @v ibdev		Infiniband device
+ * @ret rc		Return status code
+ */
+int ib_open ( struct ib_device *ibdev ) {
+	int rc;
+
+	/* Open device if this is the first requested opening */
+	if ( ibdev->open_count == 0 ) {
+		if ( ( rc = ibdev->op->open ( ibdev ) ) != 0 )
+			return rc;
+	}
+
+	/* Increment device open request counter */
+	ibdev->open_count++;
+
+	return 0;
+}
+
+/**
+ * Close port
+ *
+ * @v ibdev		Infiniband device
+ */
+void ib_close ( struct ib_device *ibdev ) {
+
+	/* Decrement device open request counter */
+	ibdev->open_count--;
+
+	/* Close device if this was the last remaining requested opening */
+	if ( ibdev->open_count == 0 )
+		ibdev->op->close ( ibdev );
+}
+
+/**
  * Attach to multicast group
  *
  * @v ibdev		Infiniband device
@@ -530,10 +566,6 @@ int register_ibdev ( struct ib_device *ibdev ) {
 	ibdev_get ( ibdev );
 	list_add_tail ( &ibdev->list, &ib_devices );
 
-	/* Open link */
-	if ( ( rc = ib_open ( ibdev ) ) != 0 )
-		goto err_open;
-
 	/* Add IPoIB device */
 	if ( ( rc = ipoib_probe ( ibdev ) ) != 0 ) {
 		DBGC ( ibdev, "IBDEV %p could not add IPoIB device: %s\n",
@@ -546,8 +578,6 @@ int register_ibdev ( struct ib_device *ibdev ) {
 	return 0;
 
  err_ipoib_probe:
-	ib_close ( ibdev );
- err_open:
 	list_del ( &ibdev->list );
 	ibdev_put ( ibdev );
 	return rc;
@@ -562,7 +592,6 @@ void unregister_ibdev ( struct ib_device *ibdev ) {
 
 	/* Close device */
 	ipoib_remove ( ibdev );
-	ib_close ( ibdev );
 
 	/* Remove from device list */
 	list_del ( &ibdev->list );
