@@ -16,7 +16,8 @@ NON_AUTO_MEDIA	+= efi
 #
 $(BIN)/%.efi.tmp-reloc : $(BIN)/%.efi.tmp $(EFILINK)
 	$(QM)$(ECHO) "  [EFILINK] $@"
-	$(Q)$(LD) -e 0 -o /dev/null $< # Check for unresolved symbols
+	$(Q)# Check for unresolved symbols
+	$(Q)$(LD) -e 0 --no-warn-mismatch -o /dev/null $<
 	$(Q)$(EFILINK) $< $@
 
 $(BIN)/%.efi : $(BIN)/%.efi.tmp-reloc
