@@ -71,7 +71,7 @@ struct sockaddr_in {
 	char pad[ sizeof ( struct sockaddr ) - sizeof ( sa_family_t )
 					     - sizeof ( uint16_t )
 					     - sizeof ( struct in_addr ) ];
-};
+} __attribute__ (( may_alias ));
 
 /**
  * IPv6 socket address
@@ -87,7 +87,7 @@ struct sockaddr_in6 {
         uint32_t        sin6_flowinfo;  /* Flow number */
         struct in6_addr sin6_addr;      /* 128-bit destination address */
         uint32_t        sin6_scope_id;  /* Scope ID */
-};
+} __attribute__ (( may_alias ));
 
 extern int inet_aton ( const char *cp, struct in_addr *inp );
 extern char * inet_ntoa ( struct in_addr in );

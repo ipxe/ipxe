@@ -94,6 +94,6 @@ struct sockaddr {
 	 * family.
 	 */
 	char pad[ SA_LEN - sizeof ( sa_family_t ) ];
-};
+} __attribute__ (( may_alias ));
 
 #endif /* _GPXE_SOCKET_H */

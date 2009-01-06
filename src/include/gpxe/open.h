@@ -9,10 +9,10 @@
 
 #include <stdarg.h>
 #include <gpxe/tables.h>
+#include <gpxe/socket.h>
 
 struct xfer_interface;
 struct uri;
-struct sockaddr;
 
 /** Location types */
 enum {

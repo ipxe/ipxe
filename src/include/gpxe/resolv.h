@@ -10,8 +10,8 @@
 #include <gpxe/refcnt.h>
 #include <gpxe/interface.h>
 #include <gpxe/tables.h>
+#include <gpxe/socket.h>
 
-struct sockaddr;
 struct resolv_interface;
 
 /** Name resolution interface operations */

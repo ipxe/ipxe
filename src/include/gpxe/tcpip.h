@@ -40,7 +40,7 @@ struct sockaddr_tcpip {
 	 */
 	char pad[ sizeof ( struct sockaddr ) -
 		  ( sizeof ( sa_family_t ) + sizeof ( uint16_t ) ) ];
-};
+} __attribute__ (( may_alias ));
 
 /** 
  * A transport-layer protocol of the TCP/IP stack (eg. UDP, TCP, etc)

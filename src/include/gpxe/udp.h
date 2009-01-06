@@ -15,7 +15,6 @@
 #include <gpxe/if_ether.h>
 
 struct xfer_interface;
-struct sockaddr;
 
 /**
  * UDP constants
