@@ -1,19 +1,10 @@
 # -*- makefile -*- : Force emacs to use Makefile mode
 
-# The EFI linker script
+# Specify EFI image builder
 #
-LDSCRIPT	= arch/x86/scripts/efi.lds
+ELF2EFI		= $(ELF2EFI32)
 
-# Retain relocation information for elf2efi
+# Include generic EFI Makefile
 #
-LDFLAGS		+= -q -S
-
-# Media types.
-#
-NON_AUTO_MEDIA	+= efi
-
-# Rule for building EFI files
-#
-$(BIN)/%.efi : $(BIN)/%.efi.tmp $(ELF2EFI32)
-	$(QM)$(ECHO) "  [FINISH] $@"
-	$(Q)$(ELF2EFI32) $< $@
+MAKEDEPS	+= arch/x86/Makefile.efi
+include arch/x86/Makefile.efi

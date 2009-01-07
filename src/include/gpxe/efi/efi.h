@@ -126,5 +126,6 @@ extern EFI_SYSTEM_TABLE *efi_systab;
 extern const char * efi_strerror ( EFI_STATUS efirc );
 extern EFI_STATUS efi_init ( EFI_HANDLE image_handle,
 			     EFI_SYSTEM_TABLE *systab );
+extern int efi_snp_install ( void );
 
 #endif /* _EFI_H */

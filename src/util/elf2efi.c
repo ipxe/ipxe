@@ -25,6 +25,7 @@
 #include <unistd.h>
 #include <errno.h>
 #include <assert.h>
+#include <getopt.h>
 #include <bfd.h>
 
 /* Include the EFI PE image header file */
@@ -68,6 +69,8 @@ typedef uint64_t UINT64;
 #define  BIT30    0x40000000
 #define  BIT31    0x80000000
 #include "../include/gpxe/efi/IndustryStandard/PeImage.h"
+
+#define eprintf(...) fprintf ( stderr, __VA_ARGS__ )
 
 #define EFI_FILE_ALIGN 0x20
 
@@ -127,11 +130,15 @@ static struct pe_header efi_pe_header = {
 			.FileAlignment = EFI_FILE_ALIGN,
 			.SizeOfImage = sizeof ( efi_pe_header ),
 			.SizeOfHeaders = sizeof ( efi_pe_header ),
-			.Subsystem = EFI_IMAGE_SUBSYSTEM_EFI_APPLICATION,
 			.NumberOfRvaAndSizes =
 				EFI_IMAGE_NUMBER_OF_DIRECTORY_ENTRIES,
 		},
 	},
+};
+
+/** Command-line options */
+struct options {
+	unsigned int subsystem;
 };
 
 /**
@@ -145,7 +152,7 @@ static void * xmalloc ( size_t len ) {
 
 	ptr = malloc ( len );
 	if ( ! ptr ) {
-		fprintf ( stderr, "Could not allocate %zd bytes\n", len );
+		eprintf ( "Could not allocate %zd bytes\n", len );
 		exit ( 1 );
 	}
 
@@ -190,7 +197,7 @@ static void generate_pe_reloc ( struct pe_relocs **pe_reltab,
 		reloc |= 0x2000;
 		break;
 	default:
-		fprintf ( stderr, "Unsupported relocation size %zd\n", size );
+		eprintf ( "Unsupported relocation size %zd\n", size );
 		exit ( 1 );
 	}
 
@@ -271,7 +278,7 @@ static bfd * open_input_bfd ( const char *filename ) {
 	/* Open the file */
 	bfd = bfd_openr ( filename, NULL );
 	if ( ! bfd ) {
-		fprintf ( stderr, "Cannot open %s: ", filename );
+		eprintf ( "Cannot open %s: ", filename );
 		bfd_perror ( NULL );
 		exit ( 1 );
 	}
@@ -280,7 +287,7 @@ static bfd * open_input_bfd ( const char *filename ) {
 	 * we get a segfault from later BFD calls.
 	 */
 	if ( bfd_check_format ( bfd, bfd_object ) < 0 ) {
-		fprintf ( stderr, "%s is not an object file\n", filename );
+		eprintf ( "%s is not an object file\n", filename );
 		exit ( 1 );
 	}
 
@@ -442,8 +449,7 @@ static struct pe_section * process_section ( bfd *bfd,
 	if ( flags & SEC_LOAD ) {
 		if ( ! bfd_get_section_contents ( bfd, section, new->contents,
 						  0, section_memsz ) ) {
-			fprintf ( stderr, "Cannot read section %s: ",
-				  section->name );
+			eprintf ( "Cannot read section %s: ", section->name );
 			bfd_perror ( NULL );
 			exit ( 1 );
 		}
@@ -518,8 +524,7 @@ static void process_reloc ( bfd *bfd, asection *section, arelent *rel,
 		 * remain unaltered when the object is loaded.
 		 */
 	} else {
-		fprintf ( stderr, "Unrecognised relocation type %s\n",
-			  howto->name );
+		eprintf ( "Unrecognised relocation type %s\n", howto->name );
 		exit ( 1 );
 	}
 }
@@ -670,7 +675,7 @@ static void write_pe_file ( struct pe_header *pe_header,
 	for ( section = pe_sections ; section ; section = section->next ) {
 		if ( fseek ( pe, section->hdr.PointerToRawData,
 			     SEEK_SET ) != 0 ) {
-			fprintf ( stderr, "Could not seek to %lx: %s\n",
+			eprintf ( "Could not seek to %lx: %s\n",
 				  section->hdr.PointerToRawData,
 				  strerror ( errno ) );
 			exit ( 1 );
@@ -678,7 +683,7 @@ static void write_pe_file ( struct pe_header *pe_header,
 		if ( section->hdr.SizeOfRawData &&
 		     ( fwrite ( section->contents, section->hdr.SizeOfRawData,
 				1, pe ) != 1 ) ) {
-			fprintf ( stderr, "Could not write section %.8s: %s\n",
+			eprintf ( "Could not write section %.8s: %s\n",
 				  section->hdr.Name, strerror ( errno ) );
 			exit ( 1 );
 		}
@@ -691,7 +696,8 @@ static void write_pe_file ( struct pe_header *pe_header,
  * @v elf_name		ELF file name
  * @v pe_name		PE file name
  */
-static void elf2pe ( const char *elf_name, const char *pe_name ) {
+static void elf2pe ( const char *elf_name, const char *pe_name,
+		     struct options *opts ) {
 	bfd *bfd;
 	asymbol **symtab;
 	asection *section;
@@ -711,6 +717,7 @@ static void elf2pe ( const char *elf_name, const char *pe_name ) {
 	memcpy ( &pe_header, &efi_pe_header, sizeof ( pe_header ) );
 	pe_header.nt.OptionalHeader.AddressOfEntryPoint =
 		bfd_get_start_address ( bfd );
+	pe_header.nt.OptionalHeader.Subsystem = opts->subsystem;
 
 	/* For each input section, build an output section and create
 	 * the appropriate relocation records
@@ -742,7 +749,7 @@ static void elf2pe ( const char *elf_name, const char *pe_name ) {
 	/* Write out PE file */
 	pe = fopen ( pe_name, "w" );
 	if ( ! pe ) {
-		fprintf ( stderr, "Could not open %s for writing: %s\n",
+		eprintf ( "Could not open %s for writing: %s\n",
 			  pe_name, strerror ( errno ) );
 		exit ( 1 );
 	}
@@ -753,12 +760,84 @@ static void elf2pe ( const char *elf_name, const char *pe_name ) {
 	bfd_close ( bfd );
 }
 
+/**
+ * Print help
+ *
+ * @v program_name	Program name
+ */
+static void print_help ( const char *program_name ) {
+	eprintf ( "Syntax: %s [--subsystem=<number>] infile outfile\n",
+		  program_name );
+}
+
+/**
+ * Parse command-line options
+ *
+ * @v argc		Argument count
+ * @v argv		Argument list
+ * @v opts		Options structure to populate
+ */
+static int parse_options ( const int argc, char **argv,
+			   struct options *opts ) {
+	char *end;
+	int c;
+
+	while (1) {
+		int option_index = 0;
+		static struct option long_options[] = {
+			{ "subsystem", required_argument, NULL, 's' },
+			{ "help", 0, NULL, 'h' },
+			{ 0, 0, 0, 0 }
+		};
+
+		if ( ( c = getopt_long ( argc, argv, "s:h",
+					 long_options,
+					 &option_index ) ) == -1 ) {
+			break;
+		}
+
+		switch ( c ) {
+		case 's':
+			opts->subsystem = strtoul ( optarg, &end, 0 );
+			if ( *end ) {
+				eprintf ( "Invalid subsytem \"%s\"\n",
+					  optarg );
+				exit ( 2 );
+			}
+			break;
+		case 'h':
+			print_help ( argv[0] );
+			exit ( 0 );
+		case '?':
+		default:
+			exit ( 2 );
+		}
+	}
+	return optind;
+}
+
 int main ( int argc, char **argv ) {
+	struct options opts = {
+		.subsystem = EFI_IMAGE_SUBSYSTEM_EFI_APPLICATION,
+	};
+	unsigned int infile_index;
+	const char *infile;
+	const char *outfile;
 
 	/* Initialise libbfd */
 	bfd_init();
 
-	elf2pe ( argv[1], argv[2] );
+	/* Parse command-line arguments */
+	infile_index = parse_options ( argc, argv, &opts );
+	if ( argc != ( infile_index + 2 ) ) {
+		print_help ( argv[0] );
+		exit ( 2 );
+	}
+	infile = argv[infile_index];
+	outfile = argv[infile_index + 1];
+
+	/* Convert file */
+	elf2pe ( infile, outfile, &opts );
 
 	return 0;
 }
