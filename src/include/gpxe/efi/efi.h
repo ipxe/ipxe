@@ -124,5 +124,7 @@ extern EFI_HANDLE efi_image_handle;
 extern EFI_SYSTEM_TABLE *efi_systab;
 
 extern const char * efi_strerror ( EFI_STATUS efirc );
+extern EFI_STATUS efi_init ( EFI_HANDLE image_handle,
+			     EFI_SYSTEM_TABLE *systab );
 
 #endif /* _EFI_H */

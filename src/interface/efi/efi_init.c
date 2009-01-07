@@ -16,7 +16,6 @@
  * Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
  */
 
-#include <stdlib.h>
 #include <string.h>
 #include <gpxe/efi/efi.h>
 #include <gpxe/uuid.h>
@@ -58,14 +57,14 @@ static void * efi_find_table ( EFI_GUID *guid ) {
 }
 
 /**
- * EFI entry point
+ * Initialise EFI environment
  *
  * @v image_handle	Image handle
  * @v systab		System table
  * @ret efirc		EFI return status code
  */
-EFI_STATUS EFIAPI efi_entry ( EFI_HANDLE image_handle,
-			      EFI_SYSTEM_TABLE *systab ) {
+EFI_STATUS efi_init ( EFI_HANDLE image_handle,
+		      EFI_SYSTEM_TABLE *systab ) {
 	EFI_BOOT_SERVICES *bs;
 	struct efi_protocol *prot;
 	struct efi_config_table *tab;
@@ -119,6 +118,5 @@ EFI_STATUS EFIAPI efi_entry ( EFI_HANDLE image_handle,
 		}
 	}
 
-	/* Call to main() */
-	return RC_TO_EFIRC ( main () );
+	return 0;
 }

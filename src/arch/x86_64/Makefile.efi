@@ -6,11 +6,11 @@ CFLAGS		+= -mno-red-zone
 
 # The EFI linker script
 #
-LDSCRIPT	= arch/x86_64/scripts/efi.lds
+LDSCRIPT	= arch/x86/scripts/efi.lds
 
-# Use a relocatable link; we perform final relocations in the efilink utility.
+# Retain relocation information for elf2efi
 #
-LDFLAGS		+= -r -d -S
+LDFLAGS		+= -q -S
 
 # Media types.
 #
@@ -18,12 +18,6 @@ NON_AUTO_MEDIA	+= efi
 
 # Rule for building EFI files
 #
-$(BIN)/%.efi.tmp-reloc : $(BIN)/%.efi.tmp $(EFILINK)
-	$(QM)$(ECHO) "  [EFILINK] $@"
-	$(Q)# Check for unresolved symbols
-	$(Q)$(LD) -e 0 --no-warn-mismatch -o /dev/null $<
-	$(Q)$(EFILINK) $< $@
-
-$(BIN)/%.efi : $(BIN)/%.efi.tmp-reloc
+$(BIN)/%.efi : $(BIN)/%.efi.tmp $(ELF2EFI64)
 	$(QM)$(ECHO) "  [FINISH] $@"
-	$(Q)$(OBJCOPY) -Obinary $< $@
+	$(Q)$(ELF2EFI64) $< $@

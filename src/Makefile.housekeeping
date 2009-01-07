@@ -703,12 +703,17 @@ CLEANUP += $(ZBIN)
 
 ###############################################################################
 #
-# The EFI custom linker
+# The EFI image converter
 #
-$(EFILINK) : util/efilink.c $(MAKEDEPS)
+$(ELF2EFI32) : util/elf2efi.c $(MAKEDEPS)
 	$(QM)$(ECHO) "  [HOSTCC] $@"
-	$(Q)$(HOST_CC) -O2 -o $@ $< -lbfd -liberty
-CLEANUP += $(EFILINK)
+	$(Q)$(HOST_CC) -DMDE_CPU_IA32 -O2 -o $@ $< -lbfd -liberty
+CLEANUP += $(ELF2EFI32)
+
+$(ELF2EFI64) : util/elf2efi.c $(MAKEDEPS)
+	$(QM)$(ECHO) "  [HOSTCC] $@"
+	$(Q)$(HOST_CC) -DMDE_CPU_X64 -O2 -o $@ $< -lbfd -liberty
+CLEANUP += $(ELF2EFI64)
 
 ###############################################################################
 #

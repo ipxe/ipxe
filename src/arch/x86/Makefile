@@ -6,3 +6,4 @@ CFLAGS		+= -Iarch/x86/include
 #
 SRCDIRS		+= arch/x86/core
 SRCDIRS 	+= arch/x86/interface/efi
+SRCDIRS 	+= arch/x86/prefix

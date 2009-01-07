@@ -2,4 +2,5 @@ nrv2b
 zbin
 hijack
 prototester
-efilink
+elf2efi32
+elf2efi64

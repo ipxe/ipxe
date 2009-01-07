@@ -37,7 +37,8 @@ SYMCHECK	:= $(PERL) ./util/symcheck.pl
 SORTOBJDUMP	:= $(PERL) ./util/sortobjdump.pl
 NRV2B		:= ./util/nrv2b
 ZBIN		:= ./util/zbin
-EFILINK		:= ./util/efilink
+ELF2EFI32	:= ./util/elf2efi32
+ELF2EFI64	:= ./util/elf2efi64
 DOXYGEN		:= doxygen
 
 ###############################################################################
