@@ -38,6 +38,7 @@
 #include <gpxe/dhcp.h>
 #include <gpxe/dhcpopts.h>
 #include <gpxe/dhcppkt.h>
+#include <gpxe/features.h>
 
 /** @file
  *
@@ -92,6 +93,9 @@ static struct dhcp_options dhcp_request_options = {
 /** DHCP feature codes */
 static uint8_t dhcp_features[0] __table_start ( uint8_t, dhcp_features );
 static uint8_t dhcp_features_end[0] __table_end ( uint8_t, dhcp_features );
+
+/** Version number feature */
+FEATURE_VERSION ( VERSION_MAJOR, VERSION_MINOR, VERSION_PATCH );
 
 /** DHCP network device descriptor */
 struct dhcp_netdev_desc {

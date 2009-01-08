@@ -51,17 +51,16 @@
 /** @} */
 
 /** Declare a feature code for DHCP */
-#define __dhcp_feature( category )					    \
-	 __table ( uint8_t, dhcp_features, category )
+#define __dhcp_feature __table ( uint8_t, dhcp_features, 01 )
 
 /** Construct a DHCP feature table entry */
-#define DHCP_FEATURE( category, feature_opt, version )			    \
-	_DHCP_FEATURE ( category, OBJECT, feature_opt, version )
-#define _DHCP_FEATURE( category, _name, feature_opt, version )		    \
-	__DHCP_FEATURE ( category, _name, feature_opt, version )
-#define __DHCP_FEATURE( category, _name, feature_opt, version )		    \
-	uint8_t __dhcp_feature_ ## _name [] __dhcp_feature ( category ) = { \
-		feature_opt, DHCP_BYTE ( version )			    \
+#define DHCP_FEATURE( feature_opt, ... )				    \
+	_DHCP_FEATURE ( OBJECT, feature_opt, __VA_ARGS__ )
+#define _DHCP_FEATURE( _name, feature_opt, ... )			    \
+	__DHCP_FEATURE ( _name, feature_opt, __VA_ARGS__ )
+#define __DHCP_FEATURE( _name, feature_opt, ... )			    \
+	uint8_t __dhcp_feature_ ## _name [] __dhcp_feature = {		    \
+		feature_opt, DHCP_OPTION ( __VA_ARGS__ )		    \
 	};
 
 /** A named feature */
@@ -87,6 +86,10 @@ struct feature {
 /** Declare a feature */
 #define FEATURE( category, text, feature_opt, version )			    \
 	FEATURE_NAME ( category, text );				    \
-	DHCP_FEATURE ( category, feature_opt, version );
+	DHCP_FEATURE ( feature_opt, version );
+
+/** Declare the version number feature */
+#define FEATURE_VERSION( ... )						    \
+	DHCP_FEATURE ( DHCP_ENCAPSULATED ( DHCP_EB_VERSION ), __VA_ARGS__ )
 
 #endif /* _GPXE_FEATURES_H */

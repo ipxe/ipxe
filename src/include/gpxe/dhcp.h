@@ -260,6 +260,9 @@ struct dhcp_packet;
  */
 #define DHCP_EB_REVERSE_PASSWORD DHCP_ENCAP_OPT ( DHCP_EB_ENCAP, 0xc1 )
 
+/** gPXE version number */
+#define DHCP_EB_VERSION DHCP_ENCAP_OPT ( DHCP_EB_ENCAP, 0xeb )
+
 /** iSCSI primary target IQN */
 #define DHCP_ISCSI_PRIMARY_TARGET_IQN 201
 
