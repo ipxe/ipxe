@@ -707,13 +707,20 @@ CLEANUP += $(ZBIN)
 #
 $(ELF2EFI32) : util/elf2efi.c $(MAKEDEPS)
 	$(QM)$(ECHO) "  [HOSTCC] $@"
-	$(Q)$(HOST_CC) -DMDE_CPU_IA32 -O2 -o $@ $< -lbfd -liberty
+	$(Q)$(HOST_CC) -DMDE_CPU_IA32 -idirafter include -O2 \
+		-o $@ $< -lbfd -liberty
 CLEANUP += $(ELF2EFI32)
 
 $(ELF2EFI64) : util/elf2efi.c $(MAKEDEPS)
 	$(QM)$(ECHO) "  [HOSTCC] $@"
-	$(Q)$(HOST_CC) -DMDE_CPU_X64 -O2 -o $@ $< -lbfd -liberty
+	$(Q)$(HOST_CC) -DMDE_CPU_X64 -idirafter include -O2 \
+		-o $@ $< -lbfd -liberty
 CLEANUP += $(ELF2EFI64)
+
+$(EFIROM) : util/efirom.c $(MAKEDEPS)
+	$(QM)$(ECHO) "  [HOSTCC] $@"
+	$(Q)$(HOST_CC) -idirafter include -O2 -o $@ $<
+CLEANUP += $(EFIROM)
 
 ###############################################################################
 #

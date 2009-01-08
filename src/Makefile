@@ -39,6 +39,7 @@ NRV2B		:= ./util/nrv2b
 ZBIN		:= ./util/zbin
 ELF2EFI32	:= ./util/elf2efi32
 ELF2EFI64	:= ./util/elf2efi64
+EFIROM		:= ./util/efirom
 DOXYGEN		:= doxygen
 
 ###############################################################################
