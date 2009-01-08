@@ -37,6 +37,9 @@ static struct feature features_end[0] __table_end ( struct feature, features );
 __asmcall int main ( void ) {
 	struct feature *feature;
 
+	/* Some devices take an unreasonably long time to initialise */
+	printf ( PRODUCT_SHORT_NAME " initialising devices...\n" );
+
 	initialise();
 	startup();
 
