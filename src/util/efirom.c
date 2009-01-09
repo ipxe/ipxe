@@ -21,6 +21,7 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
+#include <sys/stat.h>
 #include <unistd.h>
 #include <errno.h>
 #include <assert.h>
@@ -64,46 +65,7 @@ static void * xmalloc ( size_t len ) {
 static size_t file_size ( FILE *file ) {
 	ssize_t len;
 
-	if ( fseek ( file, 0, SEEK_END ) != 0 ) {
-		eprintf ( "Could not seek: %s\n", strerror ( errno ) );
-		exit ( 1 );
-	}
-	len = ftell ( file );
-	if ( len < 0 ) {
-		eprintf ( "Could not determine file size: %s\n",
-			  strerror ( errno ) );
-		exit ( 1 );
-	}
 	return len;
-}
-
-/**
- * Copy file
- *
- * @v in		Input file
- * @v out		Output file
- * @v len		Length to copy
- */
-static void file_copy ( FILE *in, FILE *out, size_t len ) {
-	char buf[4096];
-	size_t frag_len;
-
-	while ( len ) {
-		frag_len = len;
-		if ( frag_len > sizeof ( buf ) )
-			frag_len = sizeof ( buf );
-		if ( fread ( buf, frag_len, 1, in ) != 1 ) {
-			eprintf ( "Could not read: %s\n",
-				  strerror ( errno ) );
-			exit ( 1 );
-		}
-		if ( fwrite ( buf, frag_len, 1, out ) != 1 ) {
-			eprintf ( "Could not write: %s\n",
-				  strerror ( errno ) );
-			exit ( 1 );
-		}
-		len -= frag_len;
-	}
 }
 
 /**
@@ -113,42 +75,26 @@ static void file_copy ( FILE *in, FILE *out, size_t len ) {
  * @ret machine		Machine type
  * @ret subsystem	EFI subsystem
  */
-static void read_pe_info ( FILE *pe, uint16_t *machine,
+static void read_pe_info ( void *pe, uint16_t *machine,
 			   uint16_t *subsystem ) {
-	EFI_IMAGE_DOS_HEADER dos;
+	EFI_IMAGE_DOS_HEADER *dos;
 	union {
 		EFI_IMAGE_NT_HEADERS32 nt32;
 		EFI_IMAGE_NT_HEADERS64 nt64;
-	} nt;
-
-	/* Read DOS header */
-	if ( fseek ( pe, 0, SEEK_SET ) != 0 ) {
-		eprintf ( "Could not seek: %s\n", strerror ( errno ) );
-		exit ( 1 );
-	}
-	if ( fread ( &dos, sizeof ( dos ), 1, pe ) != 1 ) {
-		eprintf ( "Could not read: %s\n", strerror ( errno ) );
-		exit ( 1 );
-	}
-
-	/* Read NT header */
-	if ( fseek ( pe, dos.e_lfanew, SEEK_SET ) != 0 ) {
-		eprintf ( "Could not seek: %s\n", strerror ( errno ) );
-		exit ( 1 );
-	}
-	if ( fread ( &nt, sizeof ( nt ), 1, pe ) != 1 ) {
-		eprintf ( "Could not read: %s\n", strerror ( errno ) );
-		exit ( 1 );
-	}
+	} *nt;
 
 	/* Locate NT header */
-	*machine = nt.nt32.FileHeader.Machine;
+	dos = pe;
+	nt = ( pe + dos->e_lfanew );
+
+	/* Parse out PE information */
+	*machine = nt->nt32.FileHeader.Machine;
 	switch ( *machine ) {
 	case EFI_IMAGE_MACHINE_IA32:
-		*subsystem = nt.nt32.OptionalHeader.Subsystem;
+		*subsystem = nt->nt32.OptionalHeader.Subsystem;
 		break;
 	case EFI_IMAGE_MACHINE_X64:
-		*subsystem = nt.nt64.OptionalHeader.Subsystem;
+		*subsystem = nt->nt64.OptionalHeader.Subsystem;
 		break;
 	default:
 		eprintf ( "Unrecognised machine type %04x\n", *machine );
@@ -166,52 +112,65 @@ static void make_efi_rom ( FILE *pe, FILE *rom, struct options *opts ) {
 	struct {
 		EFI_PCI_EXPANSION_ROM_HEADER rom;
 		PCI_DATA_STRUCTURE pci __attribute__ (( aligned ( 4 ) ));
-	} headers;
+		uint8_t checksum;
+	} *headers;
+	struct stat pe_stat;
 	size_t pe_size;
 	size_t rom_size;
-	unsigned int rom_size_sectors;
+	void *buf;
+	void *payload;
+	unsigned int i;
+	uint8_t checksum;
 
-	/* Determine output file size */
-	pe_size = file_size ( pe );
-	rom_size = ( pe_size + sizeof ( headers ) );
-	rom_size_sectors = ( ( rom_size + 511 ) / 512 );
+	/* Determine PE file size */
+	if ( fstat ( fileno ( pe ), &pe_stat ) != 0 ) {
+		eprintf ( "Could not stat PE file: %s\n",
+			  strerror ( errno ) );
+		exit ( 1 );
+	}
+	pe_size = pe_stat.st_size;
 
-	/* Construct ROM header */
-	memset ( &headers, 0, sizeof ( headers ) );
-	headers.rom.Signature = PCI_EXPANSION_ROM_HEADER_SIGNATURE;
-	headers.rom.InitializationSize = rom_size_sectors;
-	headers.rom.EfiSignature = EFI_PCI_EXPANSION_ROM_HEADER_EFISIGNATURE;
-	read_pe_info ( pe, &headers.rom.EfiMachineType,
-		       &headers.rom.EfiSubsystem );
-	headers.rom.EfiImageHeaderOffset = sizeof ( headers );
-	headers.rom.PcirOffset =
-		offsetof ( typeof ( headers ), pci );
-	headers.pci.Signature = PCI_DATA_STRUCTURE_SIGNATURE;
-	headers.pci.VendorId = opts->vendor;
-	headers.pci.DeviceId = opts->device;
-	headers.pci.Length = sizeof ( headers.pci );
-	headers.pci.ClassCode[0] = PCI_CLASS_NETWORK;
-	headers.pci.ImageLength = rom_size_sectors;
-	headers.pci.CodeType = 0x03; /* No constant in EFI headers? */
-	headers.pci.Indicator = 0x80; /* No constant in EFI headers? */
+	/* Determine ROM file size */
+	rom_size = ( ( pe_size + sizeof ( *headers ) + 511 ) & ~511 );
 
-	/* Write out ROM header */
-	if ( fwrite ( &headers, sizeof ( headers ), 1, rom ) != 1 ) {
-		eprintf ( "Could not write headers: %s\n",
+	/* Allocate ROM buffer and read in PE file */
+	buf = xmalloc ( rom_size );
+	memset ( buf, 0, rom_size );
+	headers = buf;
+	payload = ( buf + sizeof ( *headers ) );
+	if ( fread ( payload, pe_size, 1, pe ) != 1 ) {
+		eprintf ( "Could not read PE file: %s\n",
 			  strerror ( errno ) );
 		exit ( 1 );
 	}
 
-	/* Write out payload */
-	if ( fseek ( pe, 0, SEEK_SET ) != 0 ) {
-		eprintf ( "Could not seek: %s\n", strerror ( errno ) );
-		exit ( 1 );
-	}
-	file_copy ( pe, rom, pe_size );
+	/* Construct ROM header */
+	headers->rom.Signature = PCI_EXPANSION_ROM_HEADER_SIGNATURE;
+	headers->rom.InitializationSize = ( rom_size / 512 );
+	headers->rom.EfiSignature = EFI_PCI_EXPANSION_ROM_HEADER_EFISIGNATURE;
+	read_pe_info ( payload, &headers->rom.EfiMachineType,
+		       &headers->rom.EfiSubsystem );
+	headers->rom.EfiImageHeaderOffset = sizeof ( *headers );
+	headers->rom.PcirOffset =
+		offsetof ( typeof ( *headers ), pci );
+	headers->pci.Signature = PCI_DATA_STRUCTURE_SIGNATURE;
+	headers->pci.VendorId = opts->vendor;
+	headers->pci.DeviceId = opts->device;
+	headers->pci.Length = sizeof ( headers->pci );
+	headers->pci.ClassCode[0] = PCI_CLASS_NETWORK;
+	headers->pci.ImageLength = ( rom_size / 512 );
+	headers->pci.CodeType = 0x03; /* No constant in EFI headers? */
+	headers->pci.Indicator = 0x80; /* No constant in EFI headers? */
 
-	/* Round up to 512-byte boundary */
-	if ( ftruncate ( fileno ( rom ), ( rom_size_sectors * 512 ) ) != 0 ) {
-		eprintf ( "Could not set length: %s\n", strerror ( errno ) );
+	/* Fix image checksum */
+	for ( i = 0, checksum = 0 ; i < rom_size ; i++ )
+		checksum += *( ( uint8_t * ) buf + i );
+	headers->checksum -= checksum;
+
+	/* Write out ROM */
+	if ( fwrite ( buf, rom_size, 1, rom ) != 1 ) {
+		eprintf ( "Could not write ROM file: %s\n",
+			  strerror ( errno ) );
 		exit ( 1 );
 	}
 }
