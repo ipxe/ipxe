@@ -36,41 +36,46 @@ die "ROM image truncated (is $filelength, should be $romlength)\n"
     if $filelength < $romlength;
 
 printf "ROM header:\n\n";
-printf "  Length:\t0x%02x (%d)\n", $rom->{length}, ( $rom->{length} * 512 );
-printf "  Checksum:\t0x%02x (0x%02x)\n", $rom->{checksum}, $rom->checksum;
-printf "  Init:\t\t0x%04x\n", $rom->{init};
-printf "  UNDI header:\t0x%04x\n", $rom->{undi_header};
-printf "  PCI header:\t0x%04x\n", $rom->{pci_header};
-printf "  PnP header:\t0x%04x\n", $rom->{pnp_header};
+printf "  %-16s 0x%02x (%d)\n", "Length:", $rom->{length}, ( $rom->{length} * 512 );
+printf "  %-16s 0x%02x (%s0x%02x)\n", "Checksum:", $rom->{checksum},
+       ( ( $rom->checksum == 0 ) ? "" : "INCORRECT: " ), $rom->checksum;
+printf "  %-16s 0x%04x\n", "Init:", $rom->{init};
+printf "  %-16s 0x%04x\n", "UNDI header:", $rom->{undi_header};
+printf "  %-16s 0x%04x\n", "PCI header:", $rom->{pci_header};
+printf "  %-16s 0x%04x\n", "PnP header:", $rom->{pnp_header};
 printf "\n";
 
 my $pci = $rom->pci_header();
 if ( $pci ) {
   printf "PCI header:\n\n";
-  printf "  Signature:\t%s\n", $pci->{signature};
-  printf "  Vendor id:\t0x%04x\n", $pci->{vendor_id};
-  printf "  Device id:\t0x%04x\n", $pci->{device_id};
-  printf "  Device class:\t0x%02x%02x%02x\n",
+  printf "  %-16s %s\n", "Signature:", $pci->{signature};
+  printf "  %-16s 0x%04x\n", "Vendor ID:", $pci->{vendor_id};
+  printf "  %-16s 0x%04x\n", "Device ID:", $pci->{device_id};
+  printf "  %-16s 0x%02x%02x%02x\n", "Device class:",
 	 $pci->{base_class}, $pci->{sub_class}, $pci->{prog_intf};
-  printf "  Image length:\t0x%04x (%d)\n",
+  printf "  %-16s 0x%04x (%d)\n", "Image length:",
 	 $pci->{image_length}, ( $pci->{image_length} * 512 );
-  printf "  Runtime length:\t0x%04x (%d)\n",
+  printf "  %-16s 0x%04x (%d)\n", "Runtime length:",
 	 $pci->{runtime_length}, ( $pci->{runtime_length} * 512 );
-  printf "  Config header:\t0x%04x\n", $pci->{conf_header};
-  printf "  CLP entry:\t0x%04x\n", $pci->{clp_entry};
+  if ( exists $pci->{conf_header} ) {
+    printf "  %-16s 0x%04x\n", "Config header:", $pci->{conf_header};
+    printf "  %-16s 0x%04x\n", "CLP entry:", $pci->{clp_entry};
+  }
   printf "\n";
 }
 
 my $pnp = $rom->pnp_header();
 if ( $pnp ) {
   printf "PnP header:\n\n";
-  printf "  Signature:\t%s\n", $pnp->{signature};
-  printf "  Checksum:\t0x%02x (0x%02x)\n", $pnp->{checksum}, $pnp->checksum;
-  printf "  Manufacturer:\t0x%04x \"%s\"\n",
+  printf "  %-16s %s\n", "Signature:", $pnp->{signature};
+  printf "  %-16s 0x%02x (%s0x%02x)\n", "Checksum:", $pnp->{checksum},
+	 ( ( $pnp->checksum == 0 ) ? "" : "INCORRECT: " ), $pnp->checksum;
+  printf "  %-16s 0x%04x \"%s\"\n", "Manufacturer:",
 	 $pnp->{manufacturer}, $pnp->manufacturer;
-  printf "  Product:\t0x%04x \"%s\"\n", $pnp->{product}, $pnp->product;
-  printf "  BCV:\t\t0x%04x\n", $pnp->{bcv};
-  printf "  BDV:\t\t0x%04x\n", $pnp->{bdv};
-  printf "  BEV:\t\t0x%04x\n", $pnp->{bev};
+  printf "  %-16s 0x%04x \"%s\"\n", "Product:",
+	 $pnp->{product}, $pnp->product;
+  printf "  %-16s 0x%04x\n", "BCV:", $pnp->{bcv};
+  printf "  %-16s 0x%04x\n", "BDV:", $pnp->{bdv};
+  printf "  %-16s 0x%04x\n", "BEV:", $pnp->{bev};
   printf "\n";
 }
