@@ -91,13 +91,15 @@ static EFI_GUID efi_component_name2_protocol_guid
 static EFI_GUID efi_device_path_protocol_guid
 	= EFI_DEVICE_PATH_PROTOCOL_GUID;
 
-/** Efi network interface identifier GUID */
-static EFI_GUID efi_nii_protocol_guid = {
-	/* No, this isn't the GUID defined as
-	 * EFI_NETWORK_INTERFACE_IDENTIFIER_PROTOCOL_GUID in
-	 * Protocol/NetworkInterfaceIdentifier.h.  That GUID gets
-	 * ignored by the EFI network stack.  You have to use this one
-	 * instead.
+/** EFI network interface identifier GUID */
+static EFI_GUID efi_nii_protocol_guid
+	= EFI_NETWORK_INTERFACE_IDENTIFIER_PROTOCOL_GUID;
+
+/** EFI network interface identifier GUID (extra special version) */
+static EFI_GUID efi_nii31_protocol_guid = {
+	/* At some point, it seems that someone decided to change the
+	 * GUID.  Current EFI builds ignore the older GUID, older EFI
+	 * builds ignore the newer GUID, so we have to expose both.
 	 */
 	0x1ACED566, 0x76ED, 0x4218,
 	{ 0xBC, 0x81, 0x76, 0x7F, 0x1F, 0x97, 0x7A, 0x89 }
@@ -987,6 +989,7 @@ efi_snp_driver_start ( EFI_DRIVER_BINDING_PROTOCOL *driver,
 			&efi_simple_network_protocol_guid, &snpdev->snp,
 			&efi_device_path_protocol_guid, &snpdev->path,
 			&efi_nii_protocol_guid, &snpdev->nii,
+			&efi_nii31_protocol_guid, &snpdev->nii,
 			NULL ) ) != 0 ) {
 		DBGC ( snpdev, "SNPDEV %p could not install protocols: "
 		       "%s\n", snpdev, efi_strerror ( efirc ) );
@@ -1002,6 +1005,7 @@ efi_snp_driver_start ( EFI_DRIVER_BINDING_PROTOCOL *driver,
 			&efi_simple_network_protocol_guid, &snpdev->snp,
 			&efi_device_path_protocol_guid, &snpdev->path,
 			&efi_nii_protocol_guid, &snpdev->nii,
+			&efi_nii31_protocol_guid, &snpdev->nii,
 			NULL );
  err_install_protocol_interface:
 	bs->CloseEvent ( snpdev->snp.WaitForPacket );
@@ -1051,6 +1055,7 @@ efi_snp_driver_stop ( EFI_DRIVER_BINDING_PROTOCOL *driver,
 			&efi_simple_network_protocol_guid, &snpdev->snp,
 			&efi_device_path_protocol_guid, &snpdev->path,
 			&efi_nii_protocol_guid, &snpdev->nii,
+			&efi_nii31_protocol_guid, &snpdev->nii,
 			NULL );
 	bs->CloseEvent ( snpdev->snp.WaitForPacket );
 	netdev_put ( snpdev->netdev );
