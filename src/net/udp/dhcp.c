@@ -845,16 +845,20 @@ static void dhcp_rx_proxydhcpack ( struct dhcp_session *dhcp,
 	struct in_addr ack_server_id = { 0 };
 	int rc;
 
-	/* Verify server ID matches */
+	/* Verify server ID matches, if present */
 	assert ( dhcp->proxydhcpoffer != NULL );
-	dhcppkt_fetch ( &dhcp->proxydhcpoffer->dhcppkt, DHCP_SERVER_IDENTIFIER,
-			&offer_server_id, sizeof ( offer_server_id ) );
-	dhcppkt_fetch ( &proxydhcpack->dhcppkt, DHCP_SERVER_IDENTIFIER,
-			&ack_server_id, sizeof ( ack_server_id ) );
-	if ( offer_server_id.s_addr != ack_server_id.s_addr ) {
-		DBGC ( dhcp, "DHCP %p ignoring ProxyDHCPACK with wrong server "
-		       "ID %s\n", dhcp, inet_ntoa ( ack_server_id ) );
-		return;
+	if ( ( rc = dhcppkt_fetch ( &proxydhcpack->dhcppkt,
+				    DHCP_SERVER_IDENTIFIER, &ack_server_id,
+				    sizeof ( ack_server_id ) ) ) > 0 ) {
+		dhcppkt_fetch ( &dhcp->proxydhcpoffer->dhcppkt,
+				DHCP_SERVER_IDENTIFIER, &offer_server_id,
+				sizeof ( offer_server_id ) );
+		if ( offer_server_id.s_addr != ack_server_id.s_addr ) {
+			DBGC ( dhcp, "DHCP %p ignoring ProxyDHCPACK with "
+			       "wrong server ID %s\n",
+			       dhcp, inet_ntoa ( ack_server_id ) );
+			return;
+		}
 	}
 
 	/* Rename settings */
