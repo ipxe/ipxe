@@ -176,6 +176,7 @@ int create_fakeproxydhcpack ( struct net_device *netdev,
 			      void *data, size_t max_len ) {
 	struct dhcp_packet dhcppkt;
 	struct settings *settings;
+	struct settings *bs_settings;
 	int rc;
 
 	/* Identify ProxyDHCP settings */
@@ -198,6 +199,16 @@ int create_fakeproxydhcpack ( struct net_device *netdev,
 		DBG ( "Could not set ProxyDHCPACK settings: %s\n",
 		      strerror ( rc ) );
 		return rc;
+	}
+
+	/* Merge in BootServerDHCP options, if present */
+	bs_settings = find_settings ( BSDHCP_SETTINGS_NAME );
+	if ( bs_settings ) {
+		if ( ( rc = copy_settings ( &dhcppkt, bs_settings ) ) != 0 ) {
+			DBG ( "Could not set BootServerDHCPACK settings: "
+			      "%s\n", strerror ( rc ) );
+			return rc;
+		}
 	}
 
 	return 0;

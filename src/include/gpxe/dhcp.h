@@ -81,6 +81,9 @@ struct dhcp_packet;
 /** Vendor encapsulated options */
 #define DHCP_VENDOR_ENCAP 43
 
+/** PXE boot server multicast address */
+#define DHCP_PXE_BOOT_SERVER_MCAST DHCP_ENCAP_OPT ( DHCP_VENDOR_ENCAP, 7 )
+
 /** Requested IP address */
 #define DHCP_REQUESTED_ADDRESS 50
 
@@ -479,6 +482,9 @@ struct dhcphdr {
 
 /** Settings block name used for ProxyDHCP responses */
 #define PROXYDHCP_SETTINGS_NAME "proxydhcp"
+
+/** Setting block name used for BootServerDHCP responses */
+#define BSDHCP_SETTINGS_NAME "bs"
 
 extern int dhcp_create_packet ( struct dhcp_packet *dhcppkt,
 				struct net_device *netdev, uint8_t msgtype,

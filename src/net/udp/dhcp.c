@@ -287,6 +287,8 @@ enum dhcp_session_state {
 	DHCP_STATE_REQUEST,
 	/** Sending ProxyDHCPREQUESTs, waiting for ProxyDHCPACK */
 	DHCP_STATE_PROXYREQUEST,
+	/** Sending BootServerDHCPREQUESTs, waiting for BootServerDHCPACK */
+	DHCP_STATE_BSREQUEST,
 };
 
 /**
@@ -300,6 +302,7 @@ static inline const char * dhcp_state_name ( enum dhcp_session_state state ) {
 	case DHCP_STATE_DISCOVER:	return "DHCPDISCOVER";
 	case DHCP_STATE_REQUEST:	return "DHCPREQUEST";
 	case DHCP_STATE_PROXYREQUEST:	return "ProxyDHCPREQUEST";
+	case DHCP_STATE_BSREQUEST:	return "BootServerREQUEST";
 	default:			return "<invalid>";
 	}
 }
@@ -326,6 +329,12 @@ struct dhcp_session {
 	struct dhcp_settings *dhcpoffer;
 	/** ProxyDHCPOFFER obtained during DHCPDISCOVER */
 	struct dhcp_settings *proxydhcpoffer;
+	/** DHCPACK obtained during DHCPREQUEST */
+	struct dhcp_settings *dhcpack;
+	/** ProxyDHCPACK obtained during ProxyDHCPREQUEST */
+	struct dhcp_settings *proxydhcpack;
+	/** BootServerDHCPACK obtained during BootServerDHCPREQUEST */
+	struct dhcp_settings *bsdhcpack;
 	/** Retransmission timer */
 	struct retry_timer timer;
 	/** Start time of the current state (in ticks) */
@@ -344,6 +353,9 @@ static void dhcp_free ( struct refcnt *refcnt ) {
 	netdev_put ( dhcp->netdev );
 	dhcpset_put ( dhcp->dhcpoffer );
 	dhcpset_put ( dhcp->proxydhcpoffer );
+	dhcpset_put ( dhcp->dhcpack );
+	dhcpset_put ( dhcp->proxydhcpack );
+	dhcpset_put ( dhcp->bsdhcpack );
 	free ( dhcp );
 }
 
@@ -555,6 +567,10 @@ static int dhcp_tx ( struct dhcp_session *dhcp ) {
 		.sin_family = AF_INET,
 		.sin_port = htons ( PROXYDHCP_PORT ),
 	};
+	static struct sockaddr_in client = {
+		.sin_family = AF_INET,
+		.sin_port = htons ( BOOTPC_PORT ),
+	};
 	struct xfer_metadata meta = {
 		.netdev = dhcp->netdev,
 	};
@@ -584,9 +600,28 @@ static int dhcp_tx ( struct dhcp_session *dhcp ) {
 		DBGC ( dhcp, "DHCP %p transmitting ProxyDHCPREQUEST\n", dhcp );
 		assert ( dhcp->dhcpoffer );
 		assert ( dhcp->proxydhcpoffer );
+		assert ( dhcp->dhcpack );
 		offer = &dhcp->proxydhcpoffer->dhcppkt;
 		ciaddr = dhcp->dhcpoffer->dhcppkt.dhcphdr->yiaddr;
 		check_len = dhcppkt_fetch ( offer, DHCP_SERVER_IDENTIFIER,
+					    &proxydhcp_server.sin_addr,
+					    sizeof(proxydhcp_server.sin_addr));
+		meta.dest = ( struct sockaddr * ) &proxydhcp_server;
+		assert ( ciaddr.s_addr != 0 );
+		assert ( proxydhcp_server.sin_addr.s_addr != 0 );
+		assert ( check_len == sizeof ( proxydhcp_server.sin_addr ) );
+		break;
+	case DHCP_STATE_BSREQUEST:
+		DBGC ( dhcp, "DHCP %p transmitting BootServerREQUEST\n",
+		       dhcp );
+		assert ( dhcp->dhcpoffer );
+		assert ( dhcp->proxydhcpoffer );
+		assert ( dhcp->dhcpack );
+		assert ( dhcp->proxydhcpack );
+		offer = &dhcp->proxydhcpoffer->dhcppkt;
+		ciaddr = dhcp->dhcpoffer->dhcppkt.dhcphdr->yiaddr;
+		check_len = dhcppkt_fetch ( &dhcp->proxydhcpack->dhcppkt,
+					    DHCP_PXE_BOOT_SERVER_MCAST,
 					    &proxydhcp_server.sin_addr,
 					    sizeof(proxydhcp_server.sin_addr));
 		meta.dest = ( struct sockaddr * ) &proxydhcp_server;
@@ -611,6 +646,12 @@ static int dhcp_tx ( struct dhcp_session *dhcp ) {
 		DBGC ( dhcp, "DHCP %p could not construct DHCP request: %s\n",
 		       dhcp, strerror ( rc ) );
 		goto done;
+	}
+
+	/* Explicitly specify source address, if available. */
+	if ( ciaddr.s_addr ) {
+		client.sin_addr = ciaddr;
+		meta.src = ( struct sockaddr * ) &client;
 	}
 
 	/* Transmit the packet */
@@ -650,6 +691,7 @@ static void dhcp_set_state ( struct dhcp_session *dhcp,
  * @v dhcp		DHCP session
  */
 static void dhcp_next_state ( struct dhcp_session *dhcp ) {
+	struct in_addr bs_mcast = { 0 };
 
 	switch ( dhcp->state ) {
 	case DHCP_STATE_DISCOVER:
@@ -662,6 +704,17 @@ static void dhcp_next_state ( struct dhcp_session *dhcp ) {
 		}
 		/* Fall through */
 	case DHCP_STATE_PROXYREQUEST:
+		if ( dhcp->proxydhcpack ) {
+			dhcppkt_fetch ( &dhcp->proxydhcpack->dhcppkt,
+					DHCP_PXE_BOOT_SERVER_MCAST,
+					&bs_mcast, sizeof ( bs_mcast ) );
+			if ( bs_mcast.s_addr ) {
+				dhcp_set_state ( dhcp, DHCP_STATE_BSREQUEST );
+				break;
+			}
+		}
+		/* Fall through */
+	case DHCP_STATE_BSREQUEST:
 		dhcp_finished ( dhcp, 0 );
 		break;
 	default:
@@ -845,9 +898,13 @@ static void dhcp_rx_dhcpack ( struct dhcp_session *dhcp,
 		return;
 	}
 
+	/* Record DHCPACK */
+	assert ( dhcp->dhcpack == NULL );
+	dhcp->dhcpack = dhcpset_get ( dhcpack );
+
 	/* Register settings */
 	parent = netdev_settings ( dhcp->netdev );
-	if ( ( rc = dhcp_store_dhcpack ( dhcp, dhcpack, parent ) ) !=0 )
+	if ( ( rc = dhcp_store_dhcpack ( dhcp, dhcpack, parent ) ) != 0 )
 		return;
 
 	/* Transition to next state */
@@ -885,8 +942,37 @@ static void dhcp_rx_proxydhcpack ( struct dhcp_session *dhcp,
 	/* Rename settings */
 	proxydhcpack->settings.name = PROXYDHCP_SETTINGS_NAME;
 
+	/* Record ProxyDHCPACK */
+	assert ( dhcp->proxydhcpack == NULL );
+	dhcp->proxydhcpack = dhcpset_get ( proxydhcpack );
+
 	/* Register settings */
 	if ( ( rc = dhcp_store_dhcpack ( dhcp, proxydhcpack, NULL ) ) != 0 )
+		return;
+
+	/* Transition to next state */
+	dhcp_next_state ( dhcp );
+}
+
+/**
+ * Handle received BootServerDHCPACK
+ *
+ * @v dhcp		DHCP session
+ * @v bsdhcpack	Received BootServerDHCPACK
+ */
+static void dhcp_rx_bsdhcpack ( struct dhcp_session *dhcp,
+				struct dhcp_settings *bsdhcpack ) {
+	int rc;
+
+	/* Rename settings */
+	bsdhcpack->settings.name = BSDHCP_SETTINGS_NAME;
+
+	/* Record ProxyDHCPACK */
+	assert ( dhcp->bsdhcpack == NULL );
+	dhcp->bsdhcpack = dhcpset_get ( bsdhcpack );
+
+	/* Register settings */
+	if ( ( rc = dhcp_store_dhcpack ( dhcp, bsdhcpack, NULL ) ) != 0 )
 		return;
 
 	/* Transition to next state */
@@ -968,6 +1054,11 @@ static int dhcp_deliver_iob ( struct xfer_interface *xfer,
 		if ( ( msgtype == DHCPACK ) &&
 		     ( src_port == htons ( PROXYDHCP_PORT ) ) )
 			dhcp_rx_proxydhcpack ( dhcp, dhcpset );
+		break;
+	case DHCP_STATE_BSREQUEST:
+		if ( ( msgtype == DHCPACK ) &&
+		     ( src_port == htons ( PROXYDHCP_PORT ) ) )
+			dhcp_rx_bsdhcpack ( dhcp, dhcpset );
 		break;
 	default:
 		assert ( 0 );
