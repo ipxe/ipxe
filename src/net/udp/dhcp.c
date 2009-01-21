@@ -640,7 +640,35 @@ static void dhcp_set_state ( struct dhcp_session *dhcp,
 	       dhcp, dhcp_state_name ( state ) );
 	dhcp->state = state;
 	dhcp->start = currticks();
+	dhcp->timer.min_timeout = 0;
 	start_timer_nodelay ( &dhcp->timer );
+}
+
+/**
+ * Transition to next DHCP state
+ *
+ * @v dhcp		DHCP session
+ */
+static void dhcp_next_state ( struct dhcp_session *dhcp ) {
+
+	switch ( dhcp->state ) {
+	case DHCP_STATE_DISCOVER:
+		dhcp_set_state ( dhcp, DHCP_STATE_REQUEST );
+		break;
+	case DHCP_STATE_REQUEST:
+		if ( dhcp->proxydhcpoffer ) {
+			dhcp_set_state ( dhcp, DHCP_STATE_PROXYREQUEST );
+			break;
+		}
+		/* Fall through */
+	case DHCP_STATE_PROXYREQUEST:
+		dhcp_finished ( dhcp, 0 );
+		break;
+	default:
+		assert ( 0 );
+		return;
+	}
+
 }
 
 /**
@@ -759,7 +787,7 @@ static void dhcp_rx_dhcpoffer ( struct dhcp_session *dhcp,
 		return;
 
 	/* Transition to DHCPREQUEST */
-	dhcp_set_state ( dhcp, DHCP_STATE_REQUEST );
+	dhcp_next_state ( dhcp );
 }
 
 /**
@@ -822,15 +850,8 @@ static void dhcp_rx_dhcpack ( struct dhcp_session *dhcp,
 	if ( ( rc = dhcp_store_dhcpack ( dhcp, dhcpack, parent ) ) !=0 )
 		return;
 
-	/* If we have a ProxyDHCPOFFER, transition to PROXYDHCPREQUEST */
-	if ( dhcp->proxydhcpoffer ) {
-		dhcp->timer.min_timeout = 0;
-		dhcp_set_state ( dhcp, DHCP_STATE_PROXYREQUEST );
-		return;
-	}
-
-	/* Terminate DHCP */
-	dhcp_finished ( dhcp, 0 );
+	/* Transition to next state */
+	dhcp_next_state ( dhcp );
 }
 
 /**
@@ -868,8 +889,8 @@ static void dhcp_rx_proxydhcpack ( struct dhcp_session *dhcp,
 	if ( ( rc = dhcp_store_dhcpack ( dhcp, proxydhcpack, NULL ) ) != 0 )
 		return;
 
-	/* Terminate DHCP */
-	dhcp_finished ( dhcp, 0 );
+	/* Transition to next state */
+	dhcp_next_state ( dhcp );
 }
 
 /**
@@ -991,13 +1012,8 @@ static void dhcp_timer_expired ( struct retry_timer *timer, int fail ) {
 
 	/* Give up waiting for ProxyDHCP before we reach the failure point */
 	if ( dhcp->dhcpoffer && ( elapsed > PROXYDHCP_WAIT_TIME ) ) {
-		if ( dhcp->state == DHCP_STATE_DISCOVER ) {
-			dhcp_set_state ( dhcp, DHCP_STATE_REQUEST );
-			return;
-		} else if ( dhcp->state == DHCP_STATE_PROXYREQUEST ) {
-			dhcp_finished ( dhcp, 0 );
-			return;
-		}
+		dhcp_next_state ( dhcp );
+		return;
 	}
 
 	/* Otherwise, retransmit current packet */
