@@ -182,13 +182,13 @@ static void udp_close ( struct udp_connection *udp, int rc ) {
  *
  * @v udp		UDP connection
  * @v iobuf		I/O buffer
- * @v src_port		Source port, or 0 to use default
+ * @v src		Source address, or NULL to use default
  * @v dest		Destination address, or NULL to use default
  * @v netdev		Network device, or NULL to use default
  * @ret rc		Return status code
  */
 static int udp_tx ( struct udp_connection *udp, struct io_buffer *iobuf,
-		    unsigned int src_port, struct sockaddr_tcpip *dest,
+		    struct sockaddr_tcpip *src, struct sockaddr_tcpip *dest,
 		    struct net_device *netdev ) {
        	struct udp_header *udphdr;
 	size_t len;
@@ -201,8 +201,8 @@ static int udp_tx ( struct udp_connection *udp, struct io_buffer *iobuf,
 	}
 
 	/* Fill in default values if not explicitly provided */
-	if ( ! src_port )
-		src_port = udp->local.st_port;
+	if ( ! src )
+		src = &udp->local;
 	if ( ! dest )
 		dest = &udp->peer;
 
@@ -210,7 +210,7 @@ static int udp_tx ( struct udp_connection *udp, struct io_buffer *iobuf,
 	udphdr = iob_push ( iobuf, sizeof ( *udphdr ) );
 	len = iob_len ( iobuf );
 	udphdr->dest = dest->st_port;
-	udphdr->src = src_port;
+	udphdr->src = src->st_port;
 	udphdr->len = htons ( len );
 	udphdr->chksum = 0;
 	udphdr->chksum = tcpip_chksum ( udphdr, len );
@@ -221,7 +221,7 @@ static int udp_tx ( struct udp_connection *udp, struct io_buffer *iobuf,
 	       ntohs ( udphdr->len ) );
 
 	/* Send it to the next layer for processing */
-	if ( ( rc = tcpip_tx ( iobuf, &udp_protocol, dest, netdev,
+	if ( ( rc = tcpip_tx ( iobuf, &udp_protocol, src, dest, netdev,
 			       &udphdr->chksum ) ) != 0 ) {
 		DBGC ( udp, "UDP %p could not transmit packet: %s\n",
 		       udp, strerror ( rc ) );
@@ -399,22 +399,19 @@ static int udp_xfer_deliver_iob ( struct xfer_interface *xfer,
 				  struct xfer_metadata *meta ) {
 	struct udp_connection *udp =
 		container_of ( xfer, struct udp_connection, xfer );
-	struct sockaddr_tcpip *src;
+	struct sockaddr_tcpip *src = NULL;
 	struct sockaddr_tcpip *dest = NULL;
 	struct net_device *netdev = NULL;
-	unsigned int src_port = 0;
 
 	/* Apply xfer metadata */
 	if ( meta ) {
 		src = ( struct sockaddr_tcpip * ) meta->src;
-		if ( src )
-			src_port = src->st_port;
 		dest = ( struct sockaddr_tcpip * ) meta->dest;
 		netdev = meta->netdev;
 	}
 
 	/* Transmit data, if possible */
-	udp_tx ( udp, iobuf, src_port, dest, netdev );
+	udp_tx ( udp, iobuf, src, dest, netdev );
 
 	return 0;
 }

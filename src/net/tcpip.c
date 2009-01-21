@@ -64,14 +64,15 @@ int tcpip_rx ( struct io_buffer *iobuf, uint8_t tcpip_proto,
  *
  * @v iobuf		I/O buffer
  * @v tcpip_protocol	Transport-layer protocol
+ * @v st_src		Source address, or NULL to use route default
  * @v st_dest		Destination address
  * @v netdev		Network device to use if no route found, or NULL
  * @v trans_csum	Transport-layer checksum to complete, or NULL
  * @ret rc		Return status code
  */
 int tcpip_tx ( struct io_buffer *iobuf, struct tcpip_protocol *tcpip_protocol,
-	       struct sockaddr_tcpip *st_dest, struct net_device *netdev,
-	       uint16_t *trans_csum ) {
+	       struct sockaddr_tcpip *st_src, struct sockaddr_tcpip *st_dest,
+	       struct net_device *netdev, uint16_t *trans_csum ) {
 	struct tcpip_net_protocol *tcpip_net;
 
 	/* Hand off packet to the appropriate network-layer protocol */
@@ -79,8 +80,8 @@ int tcpip_tx ( struct io_buffer *iobuf, struct tcpip_protocol *tcpip_protocol,
 	      tcpip_net < tcpip_net_protocols_end ; tcpip_net++ ) {
 		if ( tcpip_net->sa_family == st_dest->st_family ) {
 			DBG ( "TCP/IP sending %s packet\n", tcpip_net->name );
-			return tcpip_net->tx ( iobuf, tcpip_protocol, st_dest,
-					       netdev, trans_csum );
+			return tcpip_net->tx ( iobuf, tcpip_protocol, st_src,
+					       st_dest, netdev, trans_csum );
 		}
 	}
 	

@@ -286,6 +286,7 @@ static int ipv4_ll_addr ( struct in_addr dest, struct in_addr src,
  *
  * @v iobuf		I/O buffer
  * @v tcpip		Transport-layer protocol
+ * @v st_src		Source network-layer address
  * @v st_dest		Destination network-layer address
  * @v netdev		Network device to use if no route found, or NULL
  * @v trans_csum	Transport-layer checksum to complete, or NULL
@@ -295,10 +296,12 @@ static int ipv4_ll_addr ( struct in_addr dest, struct in_addr src,
  */
 static int ipv4_tx ( struct io_buffer *iobuf,
 		     struct tcpip_protocol *tcpip_protocol,
+		     struct sockaddr_tcpip *st_src,
 		     struct sockaddr_tcpip *st_dest,
 		     struct net_device *netdev,
 		     uint16_t *trans_csum ) {
 	struct iphdr *iphdr = iob_push ( iobuf, sizeof ( *iphdr ) );
+	struct sockaddr_in *sin_src = ( ( struct sockaddr_in * ) st_src );
 	struct sockaddr_in *sin_dest = ( ( struct sockaddr_in * ) st_dest );
 	struct ipv4_miniroute *miniroute;
 	struct in_addr next_hop;
@@ -317,7 +320,11 @@ static int ipv4_tx ( struct io_buffer *iobuf,
 
 	/* Use routing table to identify next hop and transmitting netdev */
 	next_hop = iphdr->dest;
-	if ( ( miniroute = ipv4_route ( &next_hop ) ) ) {
+	if ( sin_src )
+		iphdr->src = sin_src->sin_addr;
+	if ( ( next_hop.s_addr != INADDR_BROADCAST ) &&
+	     ( ! IN_MULTICAST ( ntohl ( next_hop.s_addr ) ) ) &&
+	     ( ( miniroute = ipv4_route ( &next_hop ) ) != NULL ) ) {
 		iphdr->src = miniroute->address;
 		netdev = miniroute->netdev;
 	}

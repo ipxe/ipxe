@@ -491,7 +491,7 @@ static int tcp_xmit ( struct tcp_connection *tcp, int force_send ) {
 	DBGC ( tcp, "\n" );
 
 	/* Transmit packet */
-	return tcpip_tx ( iobuf, &tcp_protocol, &tcp->peer, NULL,
+	return tcpip_tx ( iobuf, &tcp_protocol, NULL, &tcp->peer, NULL,
 			  &tcphdr->csum );
 }
 
@@ -572,7 +572,7 @@ static int tcp_xmit_reset ( struct tcp_connection *tcp,
 	DBGC ( tcp, "\n" );
 
 	/* Transmit packet */
-	return tcpip_tx ( iobuf, &tcp_protocol, st_dest,
+	return tcpip_tx ( iobuf, &tcp_protocol, NULL, st_dest,
 			  NULL, &tcphdr->csum );
 }
 

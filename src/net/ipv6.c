@@ -176,6 +176,7 @@ void ipv6_dump ( struct ip6_header *ip6hdr ) {
  */
 static int ipv6_tx ( struct io_buffer *iobuf,
 		     struct tcpip_protocol *tcpip,
+		     struct sockaddr_tcpip *st_src __unused,
 		     struct sockaddr_tcpip *st_dest,
 		     struct net_device *netdev,
 		     uint16_t *trans_csum ) {
