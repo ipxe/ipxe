@@ -127,6 +127,7 @@ static int eth_mc_hash ( unsigned int af, const void *net_addr,
 		ll_addr_bytes[3] = net_addr_bytes[1] & 0x7f;
 		ll_addr_bytes[4] = net_addr_bytes[2];
 		ll_addr_bytes[5] = net_addr_bytes[3];
+		return 0;
 	default:
 		return -ENOTSUP;
 	}
