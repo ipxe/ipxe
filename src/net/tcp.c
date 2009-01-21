@@ -478,7 +478,7 @@ static int tcp_xmit ( struct tcp_connection *tcp, int force_send ) {
 	tcphdr->seq = htonl ( tcp->snd_seq );
 	tcphdr->ack = htonl ( tcp->rcv_ack );
 	tcphdr->hlen = ( ( payload - iobuf->data ) << 2 );
-	tcphdr->flags = flags;
+	tcphdr->flags = ( flags | TCP_PSH );
 	tcphdr->win = htons ( tcp->rcv_win );
 	tcphdr->csum = tcpip_chksum ( iobuf->data, iob_len ( iobuf ) );
 
