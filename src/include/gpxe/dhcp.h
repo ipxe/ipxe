@@ -25,8 +25,8 @@ struct dhcp_pxe_boot_menu_item;
 /** BOOTP/DHCP client port */
 #define BOOTPC_PORT 68
 
-/** ProxyDHCP server port */
-#define PROXYDHCP_PORT 4011
+/** PXE server port */
+#define PXE_PORT 4011
 
 /** Construct a tag value for an encapsulated option
  *
@@ -207,12 +207,12 @@ struct dhcp_pxe_boot_menu_item;
  *
  */
 
-/** Ignore ProxyDHCP
+/** Skip PXE DHCP protocol extensions such as ProxyDHCP
  *
  * If set to a non-zero value, gPXE will not wait for ProxyDHCP offers
- * and will ignore any ProxyDHCP offers that it receives.
+ * and will ignore any PXE-specific DHCP offers that it receives.
  */
-#define DHCP_EB_NO_PROXYDHCP DHCP_ENCAP_OPT ( DHCP_EB_ENCAP, 0xb0 )
+#define DHCP_EB_NO_PXEDHCP DHCP_ENCAP_OPT ( DHCP_EB_ENCAP, 0xb0 )
 
 /** Network device descriptor
  *
