@@ -745,6 +745,13 @@ static void dhcp_next_state ( struct dhcp_session *dhcp ) {
 		break;
 	case DHCP_STATE_REQUEST:
 		if ( dhcp->proxydhcpoffer ) {
+			/* Store DHCPACK as ProxyDHCPACK.  This
+			 * handles the case in which the DHCP server
+			 * itself responds with "PXEClient" and PXE
+			 * options but there is no actual ProxyDHCP
+			 * server resident on the machine.
+			 */
+			dhcp->proxydhcpack = dhcpset_get ( dhcp->dhcpack );
 			dhcp_set_state ( dhcp, DHCP_STATE_PROXYREQUEST );
 			break;
 		}
@@ -990,7 +997,7 @@ static void dhcp_rx_proxydhcpack ( struct dhcp_session *dhcp,
 	proxydhcpack->settings.name = PROXYDHCP_SETTINGS_NAME;
 
 	/* Record ProxyDHCPACK */
-	assert ( dhcp->proxydhcpack == NULL );
+	dhcpset_put ( dhcp->proxydhcpack );
 	dhcp->proxydhcpack = dhcpset_get ( proxydhcpack );
 
 	/* Register settings */
