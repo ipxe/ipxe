@@ -108,11 +108,12 @@ static int copy_settings ( struct dhcp_packet *dest,
 int create_fakedhcpdiscover ( struct net_device *netdev,
 			      void *data, size_t max_len ) {
 	struct dhcp_packet dhcppkt;
-	struct in_addr ciaddr = { 0 };
+	struct in_addr dummy_addr = { 0 };
 	int rc;
 
-	if ( ( rc = dhcp_create_request ( &dhcppkt, netdev, ciaddr, NULL, data,
-					  max_len ) ) != 0 ) {
+	if ( ( rc = dhcp_create_request ( &dhcppkt, netdev, DHCPDISCOVER,
+					  dummy_addr, dummy_addr, dummy_addr,
+					  NULL, data, max_len ) ) != 0 ) {
 		DBG ( "Could not create DHCPDISCOVER: %s\n",
 		      strerror ( rc ) );
 		return rc;

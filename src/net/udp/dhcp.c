@@ -125,6 +125,21 @@ struct dhcp_client_uuid {
 
 #define DHCP_CLIENT_UUID_TYPE 0
 
+/** DHCP PXE boot menu item */
+struct dhcp_pxe_boot_menu_item {
+	/** "Type"
+	 *
+	 * This field actually identifies the specific boot server (or
+	 * cluster of boot servers offering identical boot files).
+	 */
+	uint16_t type;
+	/** "Layer"
+	 *
+	 * Just don't ask.
+	 */
+	uint16_t layer;
+} __attribute__ (( packed ));
+
 /**
  * Name a DHCP packet type
  *
@@ -448,27 +463,30 @@ int dhcp_create_packet ( struct dhcp_packet *dhcppkt,
  *
  * @v dhcppkt		DHCP packet structure to fill in
  * @v netdev		Network device
- * @v ciaddr		Client IP address
- * @v offer		DHCP offer, if applicable
+ * @v msgtype		DHCP message type
+ * @v ciaddr		Client IP address, if applicable
+ * @v server		Server identifier, if applicable
+ * @v requested_ip	Requested address, if applicable
+ * @v menu_item		PXE menu item, if applicable
  * @v data		Buffer for DHCP packet
  * @v max_len		Size of DHCP packet buffer
  * @ret rc		Return status code
  */
 int dhcp_create_request ( struct dhcp_packet *dhcppkt,
-			  struct net_device *netdev, struct in_addr ciaddr,
-			  struct dhcp_packet *offer,
+			  struct net_device *netdev, unsigned int msgtype,
+			  struct in_addr ciaddr, struct in_addr server,
+			  struct in_addr requested_ip,
+			  struct dhcp_pxe_boot_menu_item *menu_item,
 			  void *data, size_t max_len ) {
 	struct device_description *desc = &netdev->dev->desc;
 	struct dhcp_netdev_desc dhcp_desc;
 	struct dhcp_client_id client_id;
 	struct dhcp_client_uuid client_uuid;
-	unsigned int msgtype;
 	size_t dhcp_features_len;
 	size_t ll_addr_len;
 	int rc;
 
 	/* Create DHCP packet */
-	msgtype = ( offer ? DHCPREQUEST : DHCPDISCOVER );
 	if ( ( rc = dhcp_create_packet ( dhcppkt, netdev, msgtype,
 					 &dhcp_request_options, data,
 					 max_len ) ) != 0 ) {
@@ -480,30 +498,23 @@ int dhcp_create_request ( struct dhcp_packet *dhcppkt,
 	/* Set client IP address */
 	dhcppkt->dhcphdr->ciaddr = ciaddr;
 
-	/* Copy any required options from previous server repsonse */
-	if ( offer ) {
-		struct in_addr server = { 0 };
-		struct in_addr *ip = &offer->dhcphdr->yiaddr;
-
-		/* Copy server identifier, if present */
-		if ( ( dhcppkt_fetch ( offer, DHCP_SERVER_IDENTIFIER, &server,
-				       sizeof ( server ) ) >= 0 ) &&
-		     ( ( rc = dhcppkt_store ( dhcppkt, DHCP_SERVER_IDENTIFIER,
-					      &server,
-					      sizeof ( server ) ) ) != 0 ) ) {
+	/* Set server ID, if present */
+	if ( server.s_addr &&
+	     ( ( rc = dhcppkt_store ( dhcppkt, DHCP_SERVER_IDENTIFIER,
+				      &server, sizeof ( server ) ) ) != 0 ) ) {
 			DBG ( "DHCP could not set server ID: %s\n",
 			      strerror ( rc ) );
 			return rc;
-		}
+	}
 
-		/* Copy requested IP address, if present */
-		if ( ( ip->s_addr != 0 ) &&
-		     ( ( rc = dhcppkt_store ( dhcppkt, DHCP_REQUESTED_ADDRESS,
-					      ip, sizeof ( *ip ) ) ) != 0 ) ) {
-			DBG ( "DHCP could not set requested address: %s\n",
-			      strerror ( rc ) );
-			return rc;
-		}
+	/* Set requested IP address, if present */
+	if ( requested_ip.s_addr &&
+	     ( ( rc = dhcppkt_store ( dhcppkt, DHCP_REQUESTED_ADDRESS,
+				      &requested_ip,
+				      sizeof ( requested_ip ) ) ) != 0 ) ) {
+		DBG ( "DHCP could not set requested address: %s\n",
+		      strerror ( rc ) );
+		return rc;
 	}
 
 	/* Add options to identify the feature list */
@@ -553,6 +564,16 @@ int dhcp_create_request ( struct dhcp_packet *dhcppkt,
 		}
 	}
 
+	/* Set PXE boot menu item, if present */
+	if ( menu_item && menu_item->type &&
+	     ( ( rc = dhcppkt_store ( dhcppkt, DHCP_PXE_BOOT_MENU_ITEM,
+				      menu_item,
+				      sizeof ( *menu_item ) ) ) != 0 ) ) {
+		DBG ( "DHCP could not set PXE menu item: %s\n",
+		      strerror ( rc ) );
+		return rc;
+	}
+
 	return 0;
 }
 
@@ -563,11 +584,11 @@ int dhcp_create_request ( struct dhcp_packet *dhcppkt,
  * @ret rc		Return status code
  */
 static int dhcp_tx ( struct dhcp_session *dhcp ) {
-	static struct sockaddr_in proxydhcp_server = {
+	static struct sockaddr_in dest = {
 		.sin_family = AF_INET,
 		.sin_port = htons ( PROXYDHCP_PORT ),
 	};
-	static struct sockaddr_in client = {
+	static struct sockaddr_in src = {
 		.sin_family = AF_INET,
 		.sin_port = htons ( BOOTPC_PORT ),
 	};
@@ -576,9 +597,11 @@ static int dhcp_tx ( struct dhcp_session *dhcp ) {
 	};
 	struct io_buffer *iobuf;
 	struct dhcp_packet dhcppkt;
-	struct dhcp_packet *offer = NULL;
 	struct in_addr ciaddr = { 0 };
-	int check_len;
+	struct in_addr server = { 0 };
+	struct in_addr requested_ip = { 0 };
+	struct dhcp_pxe_boot_menu_item menu_item = { 0, 0 };
+	unsigned int msgtype;
 	int rc;
 
 	/* Start retry timer.  Do this first so that failures to
@@ -589,50 +612,72 @@ static int dhcp_tx ( struct dhcp_session *dhcp ) {
 	/* Determine packet contents based on current state */
 	switch ( dhcp->state ) {
 	case DHCP_STATE_DISCOVER:
-		DBGC ( dhcp, "DHCP %p transmitting DHCPDISCOVER\n", dhcp );
+		msgtype = DHCPDISCOVER;
 		break;
 	case DHCP_STATE_REQUEST:
-		DBGC ( dhcp, "DHCP %p transmitting DHCPREQUEST\n", dhcp );
 		assert ( dhcp->dhcpoffer );
-		offer = &dhcp->dhcpoffer->dhcppkt;
+		msgtype = DHCPREQUEST;
+		dhcppkt_fetch ( &dhcp->dhcpoffer->dhcppkt,
+				DHCP_SERVER_IDENTIFIER, &server,
+				sizeof ( server ) );
+		requested_ip = dhcp->dhcpoffer->dhcppkt.dhcphdr->yiaddr;
 		break;
 	case DHCP_STATE_PROXYREQUEST:
-		DBGC ( dhcp, "DHCP %p transmitting ProxyDHCPREQUEST\n", dhcp );
 		assert ( dhcp->dhcpoffer );
 		assert ( dhcp->proxydhcpoffer );
 		assert ( dhcp->dhcpack );
-		offer = &dhcp->proxydhcpoffer->dhcppkt;
+		msgtype = DHCPREQUEST;
 		ciaddr = dhcp->dhcpoffer->dhcppkt.dhcphdr->yiaddr;
-		check_len = dhcppkt_fetch ( offer, DHCP_SERVER_IDENTIFIER,
-					    &proxydhcp_server.sin_addr,
-					    sizeof(proxydhcp_server.sin_addr));
-		meta.dest = ( struct sockaddr * ) &proxydhcp_server;
-		assert ( ciaddr.s_addr != 0 );
-		assert ( proxydhcp_server.sin_addr.s_addr != 0 );
-		assert ( check_len == sizeof ( proxydhcp_server.sin_addr ) );
+		dhcppkt_fetch ( &dhcp->proxydhcpoffer->dhcppkt,
+				DHCP_SERVER_IDENTIFIER, &dest.sin_addr,
+				sizeof ( dest.sin_addr ) );
+		meta.dest = ( struct sockaddr * ) &dest;
+		server = dest.sin_addr;
+		assert ( dest.sin_addr.s_addr );
+		assert ( ciaddr.s_addr );
 		break;
 	case DHCP_STATE_BSREQUEST:
-		DBGC ( dhcp, "DHCP %p transmitting BootServerREQUEST\n",
-		       dhcp );
 		assert ( dhcp->dhcpoffer );
 		assert ( dhcp->proxydhcpoffer );
 		assert ( dhcp->dhcpack );
 		assert ( dhcp->proxydhcpack );
-		offer = &dhcp->proxydhcpoffer->dhcppkt;
+		msgtype = DHCPREQUEST;
 		ciaddr = dhcp->dhcpoffer->dhcppkt.dhcphdr->yiaddr;
-		check_len = dhcppkt_fetch ( &dhcp->proxydhcpack->dhcppkt,
-					    DHCP_PXE_BOOT_SERVER_MCAST,
-					    &proxydhcp_server.sin_addr,
-					    sizeof(proxydhcp_server.sin_addr));
-		meta.dest = ( struct sockaddr * ) &proxydhcp_server;
-		assert ( ciaddr.s_addr != 0 );
-		assert ( proxydhcp_server.sin_addr.s_addr != 0 );
-		assert ( check_len == sizeof ( proxydhcp_server.sin_addr ) );
+		dhcppkt_fetch ( &dhcp->proxydhcpack->dhcppkt,
+				DHCP_PXE_BOOT_SERVER_MCAST,
+				&dest.sin_addr, sizeof ( dest.sin_addr ) );
+		meta.dest = ( struct sockaddr * ) &dest;
+		dhcppkt_fetch ( &dhcp->proxydhcpack->dhcppkt,
+				DHCP_PXE_BOOT_MENU, &menu_item.type,
+				sizeof ( menu_item.type ) );
+		assert ( dest.sin_addr.s_addr );
+		assert ( menu_item.type );
+		assert ( ciaddr.s_addr );
 		break;
 	default:
 		assert ( 0 );
-		break;
+		return -EINVAL;
 	}
+
+	DBGC ( dhcp, "DHCP %p %s", dhcp, dhcp_msgtype_name ( msgtype ) );
+	if ( server.s_addr )
+		DBGC ( dhcp, " to %s", inet_ntoa ( server ) );
+	if ( meta.dest ) {
+		if ( dest.sin_addr.s_addr == server.s_addr ) {
+			DBGC ( dhcp, ":%d (unicast)",
+			       ntohs ( dest.sin_port ) );
+		} else {
+			DBGC ( dhcp, " via %s:%d", inet_ntoa ( dest.sin_addr ),
+			       ntohs ( dest.sin_port ) );
+		}
+	} else {
+		DBGC ( dhcp, " (broadcast)" );
+	}
+	if ( requested_ip.s_addr )
+		DBGC ( dhcp, " for %s", inet_ntoa ( requested_ip ) );
+	if ( menu_item.type )
+		DBGC ( dhcp, " for item %04x", ntohs ( menu_item.type ) );
+	DBGC ( dhcp, "\n" );
 
 	/* Allocate buffer for packet */
 	iobuf = xfer_alloc_iob ( &dhcp->xfer, DHCP_MIN_LEN );
@@ -640,8 +685,9 @@ static int dhcp_tx ( struct dhcp_session *dhcp ) {
 		return -ENOMEM;
 
 	/* Create DHCP packet in temporary buffer */
-	if ( ( rc = dhcp_create_request ( &dhcppkt, dhcp->netdev,
-					  ciaddr, offer, iobuf->data,
+	if ( ( rc = dhcp_create_request ( &dhcppkt, dhcp->netdev, msgtype,
+					  ciaddr, server, requested_ip,
+					  &menu_item, iobuf->data,
 					  iob_tailroom ( iobuf ) ) ) != 0 ) {
 		DBGC ( dhcp, "DHCP %p could not construct DHCP request: %s\n",
 		       dhcp, strerror ( rc ) );
@@ -650,8 +696,8 @@ static int dhcp_tx ( struct dhcp_session *dhcp ) {
 
 	/* Explicitly specify source address, if available. */
 	if ( ciaddr.s_addr ) {
-		client.sin_addr = ciaddr;
-		meta.src = ( struct sockaddr * ) &client;
+		src.sin_addr = ciaddr;
+		meta.src = ( struct sockaddr * ) &src;
 	}
 
 	/* Transmit the packet */
@@ -756,7 +802,7 @@ static void dhcp_store_dhcpoffer ( struct dhcp_session *dhcp,
 			DBGC ( dhcp, "DHCP %p stored DHCPOFFER %p discarded\n",
 			       dhcp, *stored_dhcpoffer );
 		}
-		DBGC ( dhcp, "DHCP %p received DHCPOFFER %p stored\n",
+		DBGC ( dhcp, "DHCP %p DHCPOFFER %p stored\n",
 		       dhcp, dhcpoffer );
 		dhcpset_put ( *stored_dhcpoffer );
 		*stored_dhcpoffer = dhcpset_get ( dhcpoffer );
@@ -781,16 +827,17 @@ static void dhcp_rx_dhcpoffer ( struct dhcp_session *dhcp,
 	if ( dhcppkt_fetch ( &dhcpoffer->dhcppkt, DHCP_SERVER_IDENTIFIER,
 			     &server_id, sizeof ( server_id ) )
 	     != sizeof ( server_id ) ) {
-		DBGC ( dhcp, "DHCP %p received DHCPOFFER %p missing server "
-		       "identifier\n", dhcp, dhcpoffer );
+		DBGC ( dhcp, "DHCP %p DHCPOFFER %p missing server ID\n",
+		       dhcp, dhcpoffer );
 		/* Could be a valid BOOTP offer; do not abort processing */
 	}
 
 	/* If there is an IP address, it's a normal DHCPOFFER */
 	if ( dhcpoffer->dhcppkt.dhcphdr->yiaddr.s_addr != 0 ) {
-		DBGC ( dhcp, "DHCP %p received DHCPOFFER %p from %s has IP "
-		       "address\n",
+		DBGC ( dhcp, "DHCP %p DHCPOFFER %p from %s",
 		       dhcp, dhcpoffer, inet_ntoa ( server_id ) );
+		DBGC ( dhcp, " has IP %s\n",
+		       inet_ntoa ( dhcpoffer->dhcppkt.dhcphdr->yiaddr ) );
 		dhcp_store_dhcpoffer ( dhcp, dhcpoffer, &dhcp->dhcpoffer );
 	}
 
@@ -803,7 +850,7 @@ static void dhcp_rx_dhcpoffer ( struct dhcp_session *dhcp,
 	if ( ( server_id.s_addr != 0 ) &&
 	     ( len >= ( int ) sizeof ( vci ) ) &&
 	     ( strncmp ( "PXEClient", vci, sizeof ( vci ) ) == 0 ) ) {
-		DBGC ( dhcp, "DHCP %p received DHCPOFFER %p from %s is a "
+		DBGC ( dhcp, "DHCP %p DHCPOFFER %p from %s is a "
 		       "ProxyDHCPOFFER\n",
 		       dhcp, dhcpoffer, inet_ntoa ( server_id ) );
 		dhcp_store_dhcpoffer ( dhcp, dhcpoffer,
@@ -992,7 +1039,7 @@ static int dhcp_deliver_iob ( struct xfer_interface *xfer,
 			      struct xfer_metadata *meta ) {
 	struct dhcp_session *dhcp =
 		container_of ( xfer, struct dhcp_session, xfer );
-	struct sockaddr_tcpip *st_src;
+	struct sockaddr_in *sin_src;
 	unsigned int src_port;
 	struct dhcp_settings *dhcpset;
 	struct dhcphdr *dhcphdr;
@@ -1012,8 +1059,8 @@ static int dhcp_deliver_iob ( struct xfer_interface *xfer,
 		rc = -EINVAL;
 		goto err_no_src;
 	}
-	st_src = ( struct sockaddr_tcpip * ) meta->src;
-	src_port = st_src->st_port;
+	sin_src = ( struct sockaddr_in * ) meta->src;
+	src_port = sin_src->sin_port;
 
 	/* Convert packet into a DHCP settings block */
 	dhcpset = dhcpset_create ( iobuf->data, iob_len ( iobuf ) );
@@ -1027,12 +1074,13 @@ static int dhcp_deliver_iob ( struct xfer_interface *xfer,
 	/* Identify message type */
 	dhcppkt_fetch ( &dhcpset->dhcppkt, DHCP_MESSAGE_TYPE, &msgtype,
 			sizeof ( msgtype ) );
-	DBGC ( dhcp, "DHCP %p received %s %p from port %d\n", dhcp,
-	       dhcp_msgtype_name ( msgtype ), dhcpset, ntohs ( src_port ) );
+	DBGC ( dhcp, "DHCP %p %s %p from %s:%d\n", dhcp,
+	       dhcp_msgtype_name ( msgtype ), dhcpset,
+	       inet_ntoa ( sin_src->sin_addr ), ntohs ( src_port ) );
 
 	/* Check for matching transaction ID */
 	if ( dhcphdr->xid != dhcp_xid ( dhcp->netdev ) ) {
-		DBGC ( dhcp, "DHCP %p received %s %p has bad transaction ID\n",
+		DBGC ( dhcp, "DHCP %p %s %p has bad transaction ID\n",
 		       dhcp, dhcp_msgtype_name ( msgtype ), dhcpset );
 		rc = -EINVAL;
 		goto err_xid;

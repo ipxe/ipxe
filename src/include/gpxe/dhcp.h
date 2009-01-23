@@ -17,6 +17,7 @@ struct net_device;
 struct job_interface;
 struct dhcp_options;
 struct dhcp_packet;
+struct dhcp_pxe_boot_menu_item;
 
 /** BOOTP/DHCP server port */
 #define BOOTPS_PORT 67
@@ -83,6 +84,12 @@ struct dhcp_packet;
 
 /** PXE boot server multicast address */
 #define DHCP_PXE_BOOT_SERVER_MCAST DHCP_ENCAP_OPT ( DHCP_VENDOR_ENCAP, 7 )
+
+/** PXE boot menu */
+#define DHCP_PXE_BOOT_MENU DHCP_ENCAP_OPT ( DHCP_VENDOR_ENCAP, 9 )
+
+/** PXE boot menu item */
+#define DHCP_PXE_BOOT_MENU_ITEM DHCP_ENCAP_OPT ( DHCP_VENDOR_ENCAP, 71 )
 
 /** Requested IP address */
 #define DHCP_REQUESTED_ADDRESS 50
@@ -492,8 +499,10 @@ extern int dhcp_create_packet ( struct dhcp_packet *dhcppkt,
 				void *data, size_t max_len );
 extern int dhcp_create_request ( struct dhcp_packet *dhcppkt,
 				 struct net_device *netdev,
-				 struct in_addr ciaddr,
-				 struct dhcp_packet *dhcpoffer,
+				 unsigned int msgtype, struct in_addr ciaddr,
+				 struct in_addr server,
+				 struct in_addr requested_ip,
+				 struct dhcp_pxe_boot_menu_item *menu_item,
 				 void *data, size_t max_len );
 extern int start_dhcp ( struct job_interface *job, struct net_device *netdev );
 
