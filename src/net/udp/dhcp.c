@@ -19,9 +19,11 @@
 #include <string.h>
 #include <stdlib.h>
 #include <stdio.h>
+#include <ctype.h>
 #include <errno.h>
 #include <assert.h>
 #include <byteswap.h>
+#include <console.h>
 #include <gpxe/if_ether.h>
 #include <gpxe/netdevice.h>
 #include <gpxe/device.h>
@@ -39,6 +41,7 @@
 #include <gpxe/dhcpopts.h>
 #include <gpxe/dhcppkt.h>
 #include <gpxe/features.h>
+#include <gpxe/keys.h>
 
 /** @file
  *
@@ -125,6 +128,32 @@ struct dhcp_client_uuid {
 
 #define DHCP_CLIENT_UUID_TYPE 0
 
+/** DHCP PXE boot prompt */
+struct dhcp_pxe_boot_prompt {
+	/** Timeout
+	 *
+	 * A value of 0 means "time out immediately and select first
+	 * boot item, without displaying the prompt".  A value of 255
+	 * means "display menu immediately with no timeout".  Any
+	 * other value means "display prompt, wait this many seconds
+	 * for keypress, if key is F8, display menu, otherwise select
+	 * first boot item".
+	 */
+	uint8_t timeout;
+	/** Prompt to press F8 */
+	char prompt[0];
+} __attribute__ (( packed ));
+
+/** DHCP PXE boot menu item description */
+struct dhcp_pxe_boot_menu_item_desc {
+	/** "Type" */
+	uint16_t type;
+	/** Description length */
+	uint8_t desc_len;
+	/** Description */
+	char desc[0];
+} __attribute__ (( packed ));
+
 /** DHCP PXE boot menu item */
 struct dhcp_pxe_boot_menu_item {
 	/** "Type"
@@ -139,6 +168,9 @@ struct dhcp_pxe_boot_menu_item {
 	 */
 	uint16_t layer;
 } __attribute__ (( packed ));
+
+/** Maximum allowed number of PXE boot menu items */
+#define PXE_BOOT_MENU_MAX_ITEMS 20
 
 /**
  * Name a DHCP packet type
@@ -352,6 +384,9 @@ struct dhcp_session {
 	struct dhcp_settings *pxedhcpack;
 	/** BootServerDHCPACK obtained during BootServerDHCPREQUEST */
 	struct dhcp_settings *bsdhcpack;
+	/** PXE boot menu item */
+	struct dhcp_pxe_boot_menu_item menu_item;
+
 	/** Retransmission timer */
 	struct retry_timer timer;
 	/** Start time of the current state (in ticks) */
@@ -602,7 +637,6 @@ static int dhcp_tx ( struct dhcp_session *dhcp ) {
 	struct in_addr ciaddr = { 0 };
 	struct in_addr server = { 0 };
 	struct in_addr requested_ip = { 0 };
-	struct dhcp_pxe_boot_menu_item menu_item = { 0, 0 };
 	unsigned int msgtype;
 	int rc;
 
@@ -649,11 +683,7 @@ static int dhcp_tx ( struct dhcp_session *dhcp ) {
 				DHCP_PXE_BOOT_SERVER_MCAST,
 				&dest.sin_addr, sizeof ( dest.sin_addr ) );
 		meta.dest = ( struct sockaddr * ) &dest;
-		dhcppkt_fetch ( &dhcp->pxedhcpack->dhcppkt,
-				DHCP_PXE_BOOT_MENU, &menu_item.type,
-				sizeof ( menu_item.type ) );
 		assert ( dest.sin_addr.s_addr );
-		assert ( menu_item.type );
 		assert ( ciaddr.s_addr );
 		break;
 	default:
@@ -677,8 +707,10 @@ static int dhcp_tx ( struct dhcp_session *dhcp ) {
 	}
 	if ( requested_ip.s_addr )
 		DBGC ( dhcp, " for %s", inet_ntoa ( requested_ip ) );
-	if ( menu_item.type )
-		DBGC ( dhcp, " for item %04x", ntohs ( menu_item.type ) );
+	if ( dhcp->menu_item.type ) {
+		DBGC ( dhcp, " for item %04x",
+		       ntohs ( dhcp->menu_item.type ) );
+	}
 	DBGC ( dhcp, "\n" );
 
 	/* Allocate buffer for packet */
@@ -689,7 +721,7 @@ static int dhcp_tx ( struct dhcp_session *dhcp ) {
 	/* Create DHCP packet in temporary buffer */
 	if ( ( rc = dhcp_create_request ( &dhcppkt, dhcp->netdev, msgtype,
 					  ciaddr, server, requested_ip,
-					  &menu_item, iobuf->data,
+					  &dhcp->menu_item, iobuf->data,
 					  iob_tailroom ( iobuf ) ) ) != 0 ) {
 		DBGC ( dhcp, "DHCP %p could not construct DHCP request: %s\n",
 		       dhcp, strerror ( rc ) );
@@ -718,6 +750,154 @@ static int dhcp_tx ( struct dhcp_session *dhcp ) {
 }
 
 /**
+ * Prompt for PXE boot menu selection
+ *
+ * @v pxedhcpack	PXEDHCPACK packet
+ * @ret rc		Return status code
+ *
+ * Note that a success return status indicates that the PXE boot menu
+ * should be displayed.
+ */
+static int dhcp_pxe_boot_menu_prompt ( struct dhcp_packet *pxedhcpack ) {
+	union {
+		uint8_t buf[80];
+		struct dhcp_pxe_boot_prompt prompt;
+	} u;
+	ssize_t slen;
+	unsigned long start;
+	int key;
+
+	/* Parse menu prompt */
+	memset ( &u, 0, sizeof ( u ) );
+	if ( ( slen = dhcppkt_fetch ( pxedhcpack, DHCP_PXE_BOOT_MENU_PROMPT,
+				      &u, sizeof ( u ) ) ) <= 0 ) {
+		/* If prompt is not present, we should always display
+		 * the menu.
+		 */
+		return 0;
+	}
+
+	/* Display prompt, if applicable */
+	if ( u.prompt.timeout )
+		printf ( "\n%s\n", u.prompt.prompt );
+
+	/* Timeout==0xff means display menu immediately */
+	if ( u.prompt.timeout == 0xff )
+		return 0;
+
+	/* Wait for F8 or other key press */
+	start = currticks();
+	while ( ( currticks() - start ) <
+		( u.prompt.timeout * TICKS_PER_SEC ) ) {
+		if ( iskey() ) {
+			key = getkey();
+			return ( ( key == KEY_F8 ) ? 0 : -ECANCELED );
+		}
+	}
+
+	return -ECANCELED;
+}
+
+/**
+ * Perform PXE boot menu selection
+ *
+ * @v pxedhcpack	PXEDHCPACK packet
+ * @v menu_item		PXE boot menu item to fill in
+ * @ret rc		Return status code
+ *
+ * Note that a success return status indicates that a PXE boot menu
+ * item has been selected, and that the DHCP session should perform a
+ * boot server request/ack.
+ */
+static int dhcp_pxe_boot_menu ( struct dhcp_packet *pxedhcpack,
+				struct dhcp_pxe_boot_menu_item *menu_item ) {
+	uint8_t buf[256];
+	ssize_t slen;
+	size_t menu_len;
+	struct dhcp_pxe_boot_menu_item_desc *menu_item_desc;
+	size_t menu_item_desc_len;
+	struct {
+		uint16_t type;
+		char *desc;
+	} menu[PXE_BOOT_MENU_MAX_ITEMS];
+	size_t offset = 0;
+	unsigned int num_menu_items = 0;
+	unsigned int i;
+	unsigned int selected_menu_item;
+	int key;
+	int rc;
+
+	/* Check for boot menu */
+	memset ( &buf, 0, sizeof ( buf ) );
+	if ( ( slen = dhcppkt_fetch ( pxedhcpack, DHCP_PXE_BOOT_MENU,
+				      &buf, sizeof ( buf ) ) ) <= 0 ) {
+		DBGC2 ( pxedhcpack, "PXEDHCPACK %p has no boot menu\n",
+			pxedhcpack );
+		return slen;
+	}
+	menu_len = slen;
+
+	/* Parse boot menu */
+	while ( offset < menu_len ) {
+		menu_item_desc = ( ( void * ) ( buf + offset ) );
+		menu_item_desc_len = ( sizeof ( *menu_item_desc ) +
+				       menu_item_desc->desc_len );
+		if ( ( offset + menu_item_desc_len ) > menu_len ) {
+			DBGC ( pxedhcpack, "PXEDHCPACK %p has malformed "
+			       "boot menu\n", pxedhcpack );
+			return -EINVAL;
+		}
+		menu[num_menu_items].type = menu_item_desc->type;
+		menu[num_menu_items].desc = menu_item_desc->desc;
+		/* Set type to 0; this ensures that the description
+		 * for the previous menu item is NUL-terminated.
+		 * (Final item is NUL-terminated anyway.)
+		 */
+		menu_item_desc->type = 0;
+		offset += menu_item_desc_len;
+		num_menu_items++;
+		if ( num_menu_items == ( sizeof ( menu ) /
+					 sizeof ( menu[0] ) ) ) {
+			DBGC ( pxedhcpack, "PXEDHCPACK %p has too many "
+			       "menu items\n", pxedhcpack );
+			/* Silently ignore remaining items */
+			break;
+		}
+	}
+	if ( ! num_menu_items ) {
+		DBGC ( pxedhcpack, "PXEDHCPACK %p has no menu items\n",
+		       pxedhcpack );
+		return -EINVAL;
+	}
+
+	/* Default to first menu item */
+	menu_item->type = menu[0].type;
+
+	/* Prompt for menu, if necessary */
+	if ( ( rc = dhcp_pxe_boot_menu_prompt ( pxedhcpack ) ) != 0 ) {
+		/* Failure to display menu means we should just
+		 * continue with the boot.
+		 */
+		return 0;
+	}
+
+	/* Display menu */
+	for ( i = 0 ; i < num_menu_items ; i++ ) {
+		printf ( "%c. %s\n", ( 'A' + i ), menu[i].desc );
+	}
+
+	/* Obtain selection */
+	while ( 1 ) {
+		key = getkey();
+		selected_menu_item = ( toupper ( key ) - 'A' );
+		if ( selected_menu_item < num_menu_items ) {
+			menu_item->type = menu[selected_menu_item].type;
+			return 0;
+		}
+	}
+}
+
+/**
  * Transition to new DHCP session state
  *
  * @v dhcp		DHCP session
@@ -739,7 +919,8 @@ static void dhcp_set_state ( struct dhcp_session *dhcp,
  * @v dhcp		DHCP session
  */
 static void dhcp_next_state ( struct dhcp_session *dhcp ) {
-	struct in_addr bs_mcast = { 0 };
+
+	stop_timer ( &dhcp->timer );
 
 	switch ( dhcp->state ) {
 	case DHCP_STATE_DISCOVER:
@@ -760,10 +941,9 @@ static void dhcp_next_state ( struct dhcp_session *dhcp ) {
 		/* Fall through */
 	case DHCP_STATE_PROXYREQUEST:
 		if ( dhcp->pxedhcpack ) {
-			dhcppkt_fetch ( &dhcp->pxedhcpack->dhcppkt,
-					DHCP_PXE_BOOT_SERVER_MCAST,
-					&bs_mcast, sizeof ( bs_mcast ) );
-			if ( bs_mcast.s_addr ) {
+			dhcp_pxe_boot_menu ( &dhcp->pxedhcpack->dhcppkt,
+					     &dhcp->menu_item );
+			if ( dhcp->menu_item.type ) {
 				dhcp_set_state ( dhcp, DHCP_STATE_BSREQUEST );
 				break;
 			}

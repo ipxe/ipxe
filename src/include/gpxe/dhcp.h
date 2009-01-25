@@ -88,6 +88,9 @@ struct dhcp_pxe_boot_menu_item;
 /** PXE boot menu */
 #define DHCP_PXE_BOOT_MENU DHCP_ENCAP_OPT ( DHCP_VENDOR_ENCAP, 9 )
 
+/** PXE boot menu prompt */
+#define DHCP_PXE_BOOT_MENU_PROMPT DHCP_ENCAP_OPT ( DHCP_VENDOR_ENCAP, 10 )
+
 /** PXE boot menu item */
 #define DHCP_PXE_BOOT_MENU_ITEM DHCP_ENCAP_OPT ( DHCP_VENDOR_ENCAP, 71 )
 
@@ -478,7 +481,7 @@ struct dhcphdr {
 #define DHCP_MIN_LEN 552
 
 /** Maximum time that we will wait for ProxyDHCP responses */
-#define PROXYDHCP_WAIT_TIME ( TICKS_PER_SEC * 1 )
+#define PROXYDHCP_WAIT_TIME ( 2 * TICKS_PER_SEC )
 
 /** Timeouts for sending DHCP packets */
 #define DHCP_MIN_TIMEOUT ( 1 * TICKS_PER_SEC )
