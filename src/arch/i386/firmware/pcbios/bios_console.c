@@ -193,13 +193,14 @@ static const char *ansi_input = "";
  * dense range, so subtracting a constant and treating them as offsets
  * into an array works efficiently.
  */
-#define BIOS_KEY_MIN 0x47
+#define BIOS_KEY_MIN 0x42
 
 /** Offset into list of interesting BIOS scancodes */
 #define BIOS_KEY(scancode) ( (scancode) - BIOS_KEY_MIN )
 
 /** Mapping from BIOS scan codes to ANSI escape sequences */
 static const char *ansi_sequences[] = {
+	[ BIOS_KEY ( 0x42 ) ] = "[19~",	/* F8 (required for PXE) */
 	[ BIOS_KEY ( 0x47 ) ] = "[H",	/* Home */
 	[ BIOS_KEY ( 0x48 ) ] = "[A",	/* Up arrow */
 	[ BIOS_KEY ( 0x4b ) ] = "[D",	/* Left arrow */
@@ -222,6 +223,7 @@ static const char * scancode_to_ansi_seq ( unsigned int scancode ) {
 			  sizeof ( ansi_sequences[0] ) ) ) {
 		return ansi_sequences[bios_key];
 	}
+	DBG ( "Unrecognised BIOS scancode %02x\n", scancode );
 	return NULL;
 }
 
