@@ -52,26 +52,23 @@
  *
  * The names are chosen to match those used by curses.  The values are
  * chosen to facilitate easy conversion from a received ANSI escape
- * sequence to a KEY_XXX constant.  The KEY_XXX constant is simply
- * 0x100 plus the first byte following CSI in the ANSI escape
- * sequence.  For example, KEY_LEFT is 0x144, since a left cursor key
- * is transmitted as the ANSI sequence "^[[D".
+ * sequence to a KEY_XXX constant.
  */
 
-#define KEY_ANSI( character ) ( 0x100 + (character) )
+#define KEY_ANSI( n, terminator ) ( 0x100 * ( (n) + 1 ) + (terminator) )
 
 #define KEY_MIN		0x101
-#define KEY_UP		KEY_ANSI ( 'A' )	/**< Up arrow */
-#define KEY_DOWN	KEY_ANSI ( 'B' )	/**< Down arrow */
-#define KEY_RIGHT	KEY_ANSI ( 'C' )	/**< Right arrow */
-#define KEY_LEFT	KEY_ANSI ( 'D' )	/**< Left arrow */
-#define KEY_END		KEY_ANSI ( 'F' )	/**< End */
-#define KEY_HOME	KEY_ANSI ( 'H' )	/**< Home */
-#define KEY_IC		KEY_ANSI ( '2' )	/**< Insert */
-#define KEY_DC		KEY_ANSI ( '3' )	/**< Delete */
-#define KEY_PPAGE	KEY_ANSI ( '5' )	/**< Page up */
-#define KEY_NPAGE	KEY_ANSI ( '6' )	/**< Page down */
-#define KEY_MAX		0x1ff
+#define KEY_UP		KEY_ANSI ( 0, 'A' )	/**< Up arrow */
+#define KEY_DOWN	KEY_ANSI ( 0, 'B' )	/**< Down arrow */
+#define KEY_RIGHT	KEY_ANSI ( 0, 'C' )	/**< Right arrow */
+#define KEY_LEFT	KEY_ANSI ( 0, 'D' )	/**< Left arrow */
+#define KEY_END		KEY_ANSI ( 0, 'F' )	/**< End */
+#define KEY_HOME	KEY_ANSI ( 0, 'H' )	/**< Home */
+#define KEY_IC		KEY_ANSI ( 2, '~' )	/**< Insert */
+#define KEY_DC		KEY_ANSI ( 3, '~' )	/**< Delete */
+#define KEY_PPAGE	KEY_ANSI ( 5, '~' )	/**< Page up */
+#define KEY_NPAGE	KEY_ANSI ( 6, '~' )	/**< Page down */
+#define KEY_F8		KEY_ANSI ( 19, '~' )	/**< F8 (for PXE) */
 
 /* Not in the [KEY_MIN,KEY_MAX] range; terminals seem to send these as
  * normal ASCII values.

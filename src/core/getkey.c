@@ -16,6 +16,7 @@
  * Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
  */
 
+#include <ctype.h>
 #include <console.h>
 #include <gpxe/process.h>
 #include <gpxe/keys.h>
@@ -59,21 +60,22 @@ static int getchar_timeout ( unsigned long timeout ) {
  */
 int getkey ( void ) {
 	int character;
-	int key;
+	unsigned int n = 0;
 
 	character = getchar();
 	if ( character != ESC )
 		return character;
 
-	key = 0;
 	while ( ( character = getchar_timeout ( GETKEY_TIMEOUT ) ) >= 0 ) {
 		if ( character == '[' )
 			continue;
-		if ( ! key )
-			key = KEY_ANSI ( character );
+		if ( isdigit ( character ) ) {
+			n = ( ( n * 10 ) + ( character - '0' ) );
+			continue;
+		}
 		if ( character >= 0x40 )
-			break;
+			return KEY_ANSI ( n, character );
 	}
 
-	return ( key ? key : ESC );
+	return ESC;
 }
