@@ -390,6 +390,38 @@ int fetch_string_setting ( struct settings *settings, struct setting *setting,
 }
 
 /**
+ * Fetch value of string setting
+ *
+ * @v settings		Settings block, or NULL to search all blocks
+ * @v setting		Setting to fetch
+ * @v data		Buffer to allocate and fill with setting string data
+ * @ret len		Length of string setting, or negative error
+ *
+ * The resulting string is guaranteed to be correctly NUL-terminated.
+ * The returned length will be the length of the underlying setting
+ * data.  The caller is responsible for eventually freeing the
+ * allocated buffer.
+ */
+int fetch_string_setting_copy ( struct settings *settings,
+				struct setting *setting,
+				char **data ) {
+	int len;
+	int check_len;
+
+	len = fetch_setting_len ( settings, setting );
+	if ( len < 0 )
+		return len;
+
+	*data = malloc ( len + 1 );
+	if ( ! *data )
+		return -ENOMEM;
+
+	fetch_string_setting ( settings, setting, *data, ( len + 1 ) );
+	assert ( check_len == len );
+	return len;
+}
+
+/**
  * Fetch value of IPv4 address setting
  *
  * @v settings		Settings block, or NULL to search all blocks
