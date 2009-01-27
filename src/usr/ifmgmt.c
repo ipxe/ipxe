@@ -20,9 +20,11 @@
 #include <stdio.h>
 #include <unistd.h>
 #include <errno.h>
+#include <console.h>
 #include <gpxe/netdevice.h>
 #include <gpxe/device.h>
 #include <gpxe/process.h>
+#include <gpxe/keys.h>
 #include <usr/ifmgmt.h>
 
 /** @file
@@ -101,12 +103,19 @@ void ifstat ( struct net_device *netdev ) {
  * @v max_wait_ms	Maximum time to wait, in ms
  */
 int iflinkwait ( struct net_device *netdev, unsigned int max_wait_ms ) {
+	int key;
+
 	while ( 1 ) {
 		if ( netdev_link_ok ( netdev ) )
 			return 0;
 		if ( max_wait_ms-- == 0 )
 			return -ETIMEDOUT;
 		step();
+		if ( iskey() ) {
+			key = getchar();
+			if ( key == CTRL_C )
+				return -ECANCELED;
+		}
 		mdelay ( 1 );
 	}
 }
