@@ -986,11 +986,29 @@ static void tftp_xfer_close ( struct xfer_interface *xfer, int rc ) {
 	tftp_done ( tftp, rc );
 }
 
+/**
+ * Check flow control window
+ *
+ * @v xfer		Data transfer interface
+ * @ret len		Length of window
+ */
+static size_t tftp_xfer_window ( struct xfer_interface *xfer ) {
+	struct tftp_request *tftp =
+		container_of ( xfer, struct tftp_request, xfer );
+
+	/* We abuse this data-xfer method to convey the blocksize to
+	 * the caller.  This really should be done using some kind of
+	 * stat() method, but we don't yet have the facility to do
+	 * that.
+	 */
+	return tftp->blksize;
+}
+
 /** TFTP data transfer interface operations */
 static struct xfer_interface_operations tftp_xfer_operations = {
 	.close		= tftp_xfer_close,
 	.vredirect	= ignore_xfer_vredirect,
-	.window		= unlimited_xfer_window,
+	.window		= tftp_xfer_window,
 	.alloc_iob	= default_xfer_alloc_iob,
 	.deliver_iob	= xfer_deliver_as_raw,
 	.deliver_raw	= ignore_xfer_deliver_raw,

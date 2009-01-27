@@ -113,12 +113,6 @@ static int pxe_tftp_xfer_deliver_iob ( struct xfer_interface *xfer __unused,
 	/* Calculate new buffer position */
 	pxe_tftp.offset += len;
 
-	/* Mildly ugly hack; assume that the first non-zero seek
-	 * indicates the block size.
-	 */
-	if ( pxe_tftp.blksize == 0 )
-		pxe_tftp.blksize = pxe_tftp.offset;
-
 	/* Record maximum offset as the file size */
 	if ( pxe_tftp.max_offset < pxe_tftp.offset )
 		pxe_tftp.max_offset = pxe_tftp.offset;
@@ -265,10 +259,12 @@ PXENV_EXIT_t pxenv_tftp_open ( struct s_PXENV_TFTP_OPEN *tftp_open ) {
 
 	/* Wait for OACK to arrive so that we have the block size */
 	while ( ( ( rc = pxe_tftp.rc ) == -EINPROGRESS ) &&
-		( pxe_tftp.blksize == 0 ) ) {
+		( pxe_tftp.max_offset == 0 ) ) {
 		step();
 	}
+	pxe_tftp.blksize = xfer_window ( &pxe_tftp.xfer );
 	tftp_open->PacketSize = pxe_tftp.blksize;
+	DBG ( " blksize=%d", tftp_open->PacketSize );
 
 	/* EINPROGRESS is normal; we don't wait for the whole transfer */
 	if ( rc == -EINPROGRESS )
@@ -571,6 +567,7 @@ PXENV_EXIT_t pxenv_tftp_get_fsize ( struct s_PXENV_TFTP_GET_FSIZE
 		step();
 	}
 	tftp_get_fsize->FileSize = pxe_tftp.max_offset;
+	DBG ( " fsize=%d", tftp_get_fsize->FileSize );
 
 	/* EINPROGRESS is normal; we don't wait for the whole transfer */
 	if ( rc == -EINPROGRESS )
