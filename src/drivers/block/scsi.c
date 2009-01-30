@@ -29,6 +29,13 @@
  *
  */
 
+/** Maximum number of dummy "read capacity (10)" operations
+ *
+ * These are issued at connection setup to draw out various useless
+ * power-on messages.
+ */
+#define SCSI_MAX_DUMMY_READ_CAP 10
+
 static inline __attribute__ (( always_inline )) struct scsi_device *
 block_to_scsi ( struct block_device *blockdev ) {
 	return container_of ( blockdev, struct scsi_device, blockdev );
@@ -250,14 +257,21 @@ static struct block_device_operations scsi_operations_10 = {
  * CAPACITY call to determine the block size and total device size.
  */
 int init_scsidev ( struct scsi_device *scsi ) {
+	unsigned int i;
 	int rc;
 
-	/* Issue a theoretically extraneous READ CAPACITY (10)
-	 * command, solely in order to draw out the "CHECK CONDITION
-	 * (power-on occurred)" that some dumb targets insist on
-	 * sending as an error at start of day.
+	/* Issue some theoretically extraneous READ CAPACITY (10)
+	 * commands, solely in order to draw out the "CHECK CONDITION
+	 * (power-on occurred)", "CHECK CONDITION (reported LUNs data
+	 * has changed)" etc. that some dumb targets insist on sending
+	 * as an error at start of day.  The precise command that we
+	 * use is unimportant; we just need to provide the target with
+	 * an opportunity to send its responses.
 	 */
-	scsi_read_capacity_10 ( &scsi->blockdev );
+	for ( i = 0 ; i < SCSI_MAX_DUMMY_READ_CAP ; i++ ) {
+		if ( ( rc = scsi_read_capacity_10 ( &scsi->blockdev ) ) == 0 )
+			break;
+	}
 
 	/* Try READ CAPACITY (10), which is a mandatory command, first. */
 	scsi->blockdev.op = &scsi_operations_10;
