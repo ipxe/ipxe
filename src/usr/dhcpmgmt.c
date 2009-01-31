@@ -46,3 +46,17 @@ int dhcp ( struct net_device *netdev ) {
 
 	return rc;
 }
+
+int pxebs ( struct net_device *netdev, struct in_addr pxe_server,
+	    unsigned int pxe_type ) {
+	int rc;
+
+	/* Perform PXE Boot Server Discovery */
+	printf ( "PXEBS (%s %s type %d)",
+		 netdev->name, inet_ntoa ( pxe_server ), pxe_type );
+	if ( ( rc = start_pxebs ( &monojob, netdev, pxe_server,
+				  pxe_type ) ) == 0 )
+		rc = monojob_wait ( "" );
+
+	return rc;
+}

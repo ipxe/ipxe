@@ -26,6 +26,7 @@
 #include <assert.h>
 #include <getopt.h>
 #include <gpxe/netdevice.h>
+#include <gpxe/in.h>
 #include <gpxe/command.h>
 #include <usr/dhcpmgmt.h>
 
@@ -60,7 +61,7 @@ static int dhcp_exec ( int argc, char **argv ) {
 		{ "help", 0, NULL, 'h' },
 		{ NULL, 0, NULL, 0 },
 	};
-	const char *name;
+	const char *netdev_txt;
 	struct net_device *netdev;
 	int c;
 	int rc;
@@ -82,17 +83,101 @@ static int dhcp_exec ( int argc, char **argv ) {
 		dhcp_syntax ( argv );
 		return 1;
 	}
-	name = argv[optind];
+	netdev_txt = argv[optind];
 
-	/* Perform DHCP */
-	netdev = find_netdev ( name );
+	/* Parse arguments */
+	netdev = find_netdev ( netdev_txt );
 	if ( ! netdev ) {
-		printf ( "No such interface: %s\n", name );
+		printf ( "No such interface: %s\n", netdev_txt );
 		return 1;
 	}
+
+	/* Perform DHCP */
 	if ( ( rc = dhcp ( netdev ) ) != 0 ) {
 		printf ( "Could not configure %s: %s\n", netdev->name,
 			 strerror ( rc ) );
+		return 1;
+	}
+
+	return 0;
+}
+
+/**
+ * "pxebs" command syntax message
+ *
+ * @v argv		Argument list
+ */
+static void pxebs_syntax ( char **argv ) {
+	printf ( "Usage:\n"
+		 "  %s <interface> <discovery_ip> <server_type>\n"
+		 "\n"
+		 "Perform PXE Boot Server discovery\n",
+		 argv[0] );
+}
+
+/**
+ * The "pxebs" command
+ *
+ * @v argc		Argument count
+ * @v argv		Argument list
+ * @ret rc		Exit code
+ */
+static int pxebs_exec ( int argc, char **argv ) {
+	static struct option longopts[] = {
+		{ "help", 0, NULL, 'h' },
+		{ NULL, 0, NULL, 0 },
+	};
+	const char *netdev_txt;
+	const char *pxe_server_txt;
+	const char *pxe_type_txt;
+	struct net_device *netdev;
+	struct in_addr pxe_server;
+	unsigned int pxe_type;
+	char *end;
+	int c;
+	int rc;
+
+	/* Parse options */
+	while ( ( c = getopt_long ( argc, argv, "h", longopts, NULL ) ) >= 0 ){
+		switch ( c ) {
+		case 'h':
+			/* Display help text */
+		default:
+			/* Unrecognised/invalid option */
+			pxebs_syntax ( argv );
+			return 1;
+		}
+	}
+
+	/* Need exactly one interface name remaining after the options */
+	if ( optind != ( argc - 3 ) ) {
+		pxebs_syntax ( argv );
+		return 1;
+	}
+	netdev_txt = argv[optind];
+	pxe_server_txt = argv[ optind + 1 ];
+	pxe_type_txt = argv[ optind + 2 ];
+
+	/* Parse arguments */
+	netdev = find_netdev ( netdev_txt );
+	if ( ! netdev ) {
+		printf ( "No such interface: %s\n", netdev_txt );
+		return 1;
+	}
+	if ( inet_aton ( pxe_server_txt, &pxe_server ) == 0 ) {
+		printf ( "Bad discovery IP address: %s\n", pxe_server_txt );
+		return 1;
+	}
+	pxe_type = strtoul ( pxe_type_txt, &end, 0 );
+	if ( *end ) {
+		printf ( "Bad server type: %s\n", pxe_type_txt );
+		return 1;
+	}
+
+	/* Perform Boot Server Discovery */
+	if ( ( rc = pxebs ( netdev, pxe_server, pxe_type ) ) != 0 ) {
+		printf ( "Could not discover boot server on %s: %s\n",
+			 netdev->name, strerror ( rc ) );
 		return 1;
 	}
 
@@ -104,5 +189,9 @@ struct command dhcp_commands[] __command = {
 	{
 		.name = "dhcp",
 		.exec = dhcp_exec,
+	},
+	{
+		.name = "pxebs",
+		.exec = pxebs_exec,
 	},
 };

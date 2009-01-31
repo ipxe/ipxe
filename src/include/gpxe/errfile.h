@@ -167,6 +167,7 @@
 #define ERRFILE_smbios		      ( ERRFILE_OTHER | 0x00120000 )
 #define ERRFILE_smbios_settings	      ( ERRFILE_OTHER | 0x00130000 )
 #define ERRFILE_efi_smbios	      ( ERRFILE_OTHER | 0x00140000 )
+#define ERRFILE_pxemenu		      ( ERRFILE_OTHER | 0x00150000 )
 
 /** @} */
 

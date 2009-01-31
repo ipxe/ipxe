@@ -12,12 +12,12 @@
 #include <gpxe/list.h>
 #include <gpxe/refcnt.h>
 #include <gpxe/tables.h>
+#include <gpxe/uuid.h>
+#include <gpxe/netdevice.h>
 
-struct net_device;
 struct job_interface;
 struct dhcp_options;
 struct dhcp_packet;
-struct dhcp_pxe_boot_menu_item;
 
 /** BOOTP/DHCP server port */
 #define BOOTPS_PORT 67
@@ -88,11 +88,52 @@ struct dhcp_pxe_boot_menu_item;
 /** PXE boot menu */
 #define DHCP_PXE_BOOT_MENU DHCP_ENCAP_OPT ( DHCP_VENDOR_ENCAP, 9 )
 
+/** PXE boot menu */
+struct dhcp_pxe_boot_menu {
+	/** "Type" */
+	uint16_t type;
+	/** Description length */
+	uint8_t desc_len;
+	/** Description */
+	char desc[0];
+} __attribute__ (( packed ));
+
 /** PXE boot menu prompt */
 #define DHCP_PXE_BOOT_MENU_PROMPT DHCP_ENCAP_OPT ( DHCP_VENDOR_ENCAP, 10 )
 
+/** PXE boot menu prompt */
+struct dhcp_pxe_boot_menu_prompt {
+	/** Timeout
+	 *
+	 * A value of 0 means "time out immediately and select first
+	 * boot item, without displaying the prompt".  A value of 255
+	 * means "display menu immediately with no timeout".  Any
+	 * other value means "display prompt, wait this many seconds
+	 * for keypress, if key is F8, display menu, otherwise select
+	 * first boot item".
+	 */
+	uint8_t timeout;
+	/** Prompt to press F8 */
+	char prompt[0];
+} __attribute__ (( packed ));
+
 /** PXE boot menu item */
 #define DHCP_PXE_BOOT_MENU_ITEM DHCP_ENCAP_OPT ( DHCP_VENDOR_ENCAP, 71 )
+
+/** PXE boot menu item */
+struct dhcp_pxe_boot_menu_item {
+	/** "Type"
+	 *
+	 * This field actually identifies the specific boot server (or
+	 * cluster of boot servers offering identical boot files).
+	 */
+	uint16_t type;
+	/** "Layer"
+	 *
+	 * Just don't ask.
+	 */
+	uint16_t layer;
+} __attribute__ (( packed ));
 
 /** Requested IP address */
 #define DHCP_REQUESTED_ADDRESS 50
@@ -140,6 +181,14 @@ struct dhcp_pxe_boot_menu_item;
 /** Client identifier */
 #define DHCP_CLIENT_ID 61
 
+/** Client identifier */
+struct dhcp_client_id {
+	/** Link-layer protocol */
+	uint8_t ll_proto;
+	/** Link-layer address */
+	uint8_t ll_addr[MAX_LL_ADDR_LEN];
+} __attribute__ (( packed ));
+
 /** TFTP server name
  *
  * This option replaces the fixed "sname" field, when that field is
@@ -162,6 +211,16 @@ struct dhcp_pxe_boot_menu_item;
 
 /** UUID client identifier */
 #define DHCP_CLIENT_UUID 97
+
+/** UUID client identifier */
+struct dhcp_client_uuid {
+	/** Identifier type */
+	uint8_t type;
+	/** UUID */
+	union uuid uuid;
+} __attribute__ (( packed ));
+
+#define DHCP_CLIENT_UUID_TYPE 0
 
 /** Etherboot-specific encapsulated options
  *
@@ -213,7 +272,7 @@ struct dhcp_pxe_boot_menu_item;
 /** Skip PXE DHCP protocol extensions such as ProxyDHCP
  *
  * If set to a non-zero value, gPXE will not wait for ProxyDHCP offers
- * and will ignore any PXE-specific DHCP offers that it receives.
+ * and will ignore any PXE-specific DHCP options that it receives.
  */
 #define DHCP_EB_NO_PXEDHCP DHCP_ENCAP_OPT ( DHCP_EB_ENCAP, 0xb0 )
 
@@ -229,6 +288,16 @@ struct dhcp_pxe_boot_menu_item;
  * Byte 4 : PCI device ID LSB
  */
 #define DHCP_EB_BUS_ID DHCP_ENCAP_OPT ( DHCP_EB_ENCAP, 0xb1 )
+
+/** Network device descriptor */
+struct dhcp_netdev_desc {
+	/** Bus type ID */
+	uint8_t type;
+	/** Vendor ID */
+	uint16_t vendor;
+	/** Device ID */
+	uint16_t device;
+} __attribute__ (( packed ));
 
 /** BIOS drive number
  *
@@ -480,12 +549,12 @@ struct dhcphdr {
  */
 #define DHCP_MIN_LEN 552
 
-/** Maximum time that we will wait for ProxyDHCP responses */
-#define PROXYDHCP_WAIT_TIME ( 2 * TICKS_PER_SEC )
-
 /** Timeouts for sending DHCP packets */
 #define DHCP_MIN_TIMEOUT ( 1 * TICKS_PER_SEC )
 #define DHCP_MAX_TIMEOUT ( 10 * TICKS_PER_SEC )
+
+/** Maximum time that we will wait for ProxyDHCP responses */
+#define PROXYDHCP_MAX_TIMEOUT ( 2 * TICKS_PER_SEC )
 
 /** Settings block name used for DHCP responses */
 #define DHCP_SETTINGS_NAME "dhcp"
@@ -494,19 +563,18 @@ struct dhcphdr {
 #define PROXYDHCP_SETTINGS_NAME "proxydhcp"
 
 /** Setting block name used for BootServerDHCP responses */
-#define BSDHCP_SETTINGS_NAME "bs"
+#define PXEBS_SETTINGS_NAME "pxebs"
 
 extern int dhcp_create_packet ( struct dhcp_packet *dhcppkt,
 				struct net_device *netdev, uint8_t msgtype,
-				struct dhcp_options *options, 
+				const void *options, size_t options_len,
 				void *data, size_t max_len );
 extern int dhcp_create_request ( struct dhcp_packet *dhcppkt,
 				 struct net_device *netdev,
 				 unsigned int msgtype, struct in_addr ciaddr,
-				 struct in_addr server,
-				 struct in_addr requested_ip,
-				 struct dhcp_pxe_boot_menu_item *menu_item,
 				 void *data, size_t max_len );
 extern int start_dhcp ( struct job_interface *job, struct net_device *netdev );
+extern int start_pxebs ( struct job_interface *job, struct net_device *netdev,
+			 struct in_addr pxe_server, unsigned int pxe_type );
 
 #endif /* _GPXE_DHCP_H */

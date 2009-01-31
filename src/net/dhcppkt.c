@@ -32,6 +32,12 @@
  *
  */
 
+/****************************************************************************
+ *
+ * DHCP packet raw interface
+ *
+ */
+
 /**
  * Calculate used length of an IPv4 field within a DHCP packet
  *
@@ -193,21 +199,79 @@ int dhcppkt_fetch ( struct dhcp_packet *dhcppkt, unsigned int tag,
 	return dhcpopt_fetch ( &dhcppkt->options, tag, data, len );
 }
 
-/**
- * Initialise prepopulated DHCP packet
+/****************************************************************************
  *
- * @v dhcppkt		Uninitialised DHCP packet
- * @v data		Memory for DHCP packet data
- * @v max_len		Length of memory for DHCP packet data
+ * DHCP packet settings interface
  *
- * The memory content must already be filled with valid DHCP options.
- * A zeroed block counts as a block of valid DHCP options.
  */
-void dhcppkt_init ( struct dhcp_packet *dhcppkt, void *data, size_t len ) {
+
+/**
+ * Store value of DHCP setting
+ *
+ * @v settings		Settings block
+ * @v setting		Setting to store
+ * @v data		Setting data, or NULL to clear setting
+ * @v len		Length of setting data
+ * @ret rc		Return status code
+ */
+static int dhcppkt_settings_store ( struct settings *settings,
+				    struct setting *setting,
+				    const void *data, size_t len ) {
+	struct dhcp_packet *dhcppkt =
+		container_of ( settings, struct dhcp_packet, settings );
+
+	return dhcppkt_store ( dhcppkt, setting->tag, data, len );
+}
+
+/**
+ * Fetch value of DHCP setting
+ *
+ * @v settings		Settings block, or NULL to search all blocks
+ * @v setting		Setting to fetch
+ * @v data		Buffer to fill with setting data
+ * @v len		Length of buffer
+ * @ret len		Length of setting data, or negative error
+ */
+static int dhcppkt_settings_fetch ( struct settings *settings,
+				    struct setting *setting,
+				    void *data, size_t len ) {
+	struct dhcp_packet *dhcppkt =
+		container_of ( settings, struct dhcp_packet, settings );
+
+	return dhcppkt_fetch ( dhcppkt, setting->tag, data, len );
+}
+
+/** DHCP settings operations */
+static struct settings_operations dhcppkt_settings_operations = {
+	.store = dhcppkt_settings_store,
+	.fetch = dhcppkt_settings_fetch,
+};
+
+/****************************************************************************
+ *
+ * Constructor
+ *
+ */
+
+/**
+ * Initialise DHCP packet
+ *
+ * @v dhcppkt		DHCP packet structure to fill in
+ * @v data		DHCP packet raw data
+ * @v max_len		Length of raw data buffer
+ *
+ * Initialise a DHCP packet structure from a data buffer containing a
+ * DHCP packet.
+ */
+void dhcppkt_init ( struct dhcp_packet *dhcppkt, struct dhcphdr *data,
+		    size_t len ) {
 	dhcppkt->dhcphdr = data;
 	dhcppkt->max_len = len;
 	dhcpopt_init ( &dhcppkt->options, &dhcppkt->dhcphdr->options,
 		       ( len - offsetof ( struct dhcphdr, options ) ) );
 	dhcppkt->len = ( offsetof ( struct dhcphdr, options ) +
 			 dhcppkt->options.len );
+	settings_init ( &dhcppkt->settings,
+			&dhcppkt_settings_operations, &dhcppkt->refcnt,
+			DHCP_SETTINGS_NAME, 0 );
 }

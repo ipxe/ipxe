@@ -15,7 +15,7 @@ extern int create_fakedhcpdiscover ( struct net_device *netdev,
 				     void *data, size_t max_len );
 extern int create_fakedhcpack ( struct net_device *netdev,
 				void *data, size_t max_len );
-extern int create_fakeproxydhcpack ( struct net_device *netdev,
-				     void *data, size_t max_len );
+extern int create_fakepxebsack ( struct net_device *netdev,
+				 void *data, size_t max_len );
 
 #endif /* _GPXE_FAKEDHCP_H */

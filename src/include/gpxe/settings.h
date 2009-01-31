@@ -304,4 +304,16 @@ static inline int delete_named_setting ( const char *name ) {
 	return storef_named_setting ( name, NULL );
 }
 
+/**
+ * Check existence of setting
+ *
+ * @v settings		Settings block, or NULL to search all blocks
+ * @v setting		Setting to fetch
+ * @ret exists		Setting exists
+ */
+static inline int setting_exists ( struct settings *settings,
+				   struct setting *setting ) {
+	return ( fetch_setting_len ( settings, setting ) >= 0 );
+}
+
 #endif /* _GPXE_SETTINGS_H */

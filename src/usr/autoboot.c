@@ -89,8 +89,8 @@ static int boot_embedded_image ( void ) {
  * @v filename		Boot filename
  * @ret rc		Return status code
  */
-static int boot_next_server_and_filename ( struct in_addr next_server,
-					   const char *filename ) {
+int boot_next_server_and_filename ( struct in_addr next_server,
+				    const char *filename ) {
 	struct uri *uri;
 	struct image *image;
 	char buf[ 23 /* tftp://xxx.xxx.xxx.xxx/ */ + strlen(filename) + 1 ];
@@ -167,6 +167,7 @@ int boot_root_path ( const char *root_path ) {
  * @ret rc		Return status code
  */
 static int netboot ( struct net_device *netdev ) {
+	struct setting tmp_setting = { .name = NULL };
 	char buf[256];
 	struct in_addr next_server;
 	int rc;
@@ -193,6 +194,16 @@ static int netboot ( struct net_device *netdev ) {
 	rc = boot_embedded_image ();
 	if ( rc != ENOENT )
 		return rc;
+
+	/* Try PXE menu boot, if we have PXE menu options */
+	tmp_setting.tag = DHCP_VENDOR_CLASS_ID;
+	fetch_string_setting ( NULL, &tmp_setting, buf, sizeof ( buf ) );
+	tmp_setting.tag = DHCP_PXE_BOOT_MENU;
+	if ( ( strcmp ( buf, "PXEClient" ) == 0 ) &&
+	     setting_exists ( NULL, &tmp_setting ) ) {
+		printf ( "Booting from PXE menu\n" );
+		return pxe_menu_boot ( netdev );
+	}
 
 	/* Try to download and boot whatever we are given as a filename */
 	fetch_ipv4_setting ( NULL, &next_server_setting, &next_server );

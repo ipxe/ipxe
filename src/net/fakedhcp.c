@@ -108,12 +108,11 @@ static int copy_settings ( struct dhcp_packet *dest,
 int create_fakedhcpdiscover ( struct net_device *netdev,
 			      void *data, size_t max_len ) {
 	struct dhcp_packet dhcppkt;
-	struct in_addr dummy_addr = { 0 };
+	struct in_addr ciaddr = { 0 };
 	int rc;
 
 	if ( ( rc = dhcp_create_request ( &dhcppkt, netdev, DHCPDISCOVER,
-					  dummy_addr, dummy_addr, dummy_addr,
-					  NULL, data, max_len ) ) != 0 ) {
+					  ciaddr, data, max_len ) ) != 0 ) {
 		DBG ( "Could not create DHCPDISCOVER: %s\n",
 		      strerror ( rc ) );
 		return rc;
@@ -138,7 +137,7 @@ int create_fakedhcpack ( struct net_device *netdev,
 	int rc;
 
 	/* Create base DHCPACK packet */
-	if ( ( rc = dhcp_create_packet ( &dhcppkt, netdev, DHCPACK, NULL,
+	if ( ( rc = dhcp_create_packet ( &dhcppkt, netdev, DHCPACK, NULL, 0,
 					 data, max_len ) ) != 0 ) {
 		DBG ( "Could not create DHCPACK: %s\n", strerror ( rc ) );
 		return rc;
@@ -164,7 +163,7 @@ int create_fakedhcpack ( struct net_device *netdev,
 }
 
 /**
- * Create ProxyDHCPACK packet
+ * Create fake PXE Boot Server ACK packet
  *
  * @v netdev		Network device
  * @v data		Buffer for DHCP packet
@@ -173,43 +172,43 @@ int create_fakedhcpack ( struct net_device *netdev,
  *
  * Used by external code.
  */
-int create_fakeproxydhcpack ( struct net_device *netdev,
-			      void *data, size_t max_len ) {
+int create_fakepxebsack ( struct net_device *netdev,
+			  void *data, size_t max_len ) {
 	struct dhcp_packet dhcppkt;
-	struct settings *settings;
-	struct settings *bs_settings;
+	struct settings *proxy_settings;
+	struct settings *pxebs_settings;
 	int rc;
 
-	/* Identify ProxyDHCP settings */
-	settings = find_settings ( PROXYDHCP_SETTINGS_NAME );
-
-	/* No ProxyDHCP settings => use normal DHCPACK */
-	if ( ! settings )
+	/* Identify available settings */
+	proxy_settings = find_settings ( PROXYDHCP_SETTINGS_NAME );
+	pxebs_settings = find_settings ( PXEBS_SETTINGS_NAME );
+	if ( ( ! proxy_settings ) && ( ! pxebs_settings ) ) {
+		/* No PXE boot server; return the regular DHCPACK */
 		return create_fakedhcpack ( netdev, data, max_len );
+	}
 
 	/* Create base DHCPACK packet */
-	if ( ( rc = dhcp_create_packet ( &dhcppkt, netdev, DHCPACK, NULL,
+	if ( ( rc = dhcp_create_packet ( &dhcppkt, netdev, DHCPACK, NULL, 0,
 					 data, max_len ) ) != 0 ) {
-		DBG ( "Could not create ProxyDHCPACK: %s\n",
+		DBG ( "Could not create PXE BS ACK: %s\n",
 		      strerror ( rc ) );
 		return rc;
 	}
 
 	/* Merge in ProxyDHCP options */
-	if ( ( rc = copy_settings ( &dhcppkt, settings ) ) != 0 ) {
-		DBG ( "Could not set ProxyDHCPACK settings: %s\n",
+	if ( proxy_settings &&
+	     ( ( rc = copy_settings ( &dhcppkt, proxy_settings ) ) != 0 ) ) {
+		DBG ( "Could not copy ProxyDHCP settings: %s\n",
 		      strerror ( rc ) );
 		return rc;
 	}
 
 	/* Merge in BootServerDHCP options, if present */
-	bs_settings = find_settings ( BSDHCP_SETTINGS_NAME );
-	if ( bs_settings ) {
-		if ( ( rc = copy_settings ( &dhcppkt, bs_settings ) ) != 0 ) {
-			DBG ( "Could not set BootServerDHCPACK settings: "
-			      "%s\n", strerror ( rc ) );
-			return rc;
-		}
+	if ( pxebs_settings &&
+	     ( ( rc = copy_settings ( &dhcppkt, pxebs_settings ) ) != 0 ) ) {
+		DBG ( "Could not copy PXE BS settings: %s\n",
+		      strerror ( rc ) );
+		return rc;
 	}
 
 	return 0;

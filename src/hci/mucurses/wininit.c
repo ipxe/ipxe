@@ -18,7 +18,7 @@ WINDOW *initscr ( void ) {
 	stdscr->scr->init( stdscr->scr );
 	stdscr->height = LINES;
 	stdscr->width = COLS;
-	erase();
+	move ( 0, 0 );
 	return stdscr;
 }
 
@@ -29,7 +29,7 @@ WINDOW *initscr ( void ) {
 int endwin ( void ) {
 	attrset ( 0 );
 	color_set ( 0, NULL );
-	erase();
+	mvprintw ( ( LINES - 1 ), 0, "\n" );
 	stdscr->scr->exit( stdscr->scr );
 	return OK;
 }
