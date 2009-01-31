@@ -183,11 +183,16 @@ static void reprioritise_settings ( struct settings *settings ) {
  * @ret rc		Return status code
  */
 int register_settings ( struct settings *settings, struct settings *parent ) {
+	struct settings *old_settings;
 
 	/* NULL parent => add to settings root */
 	assert ( settings != NULL );
 	if ( parent == NULL )
 		parent = &settings_root;
+
+	/* Remove any existing settings with the same name */
+	if ( ( old_settings = find_child_settings ( parent, settings->name ) ))
+		unregister_settings ( old_settings );
 
 	/* Add to list of settings */
 	ref_get ( settings->refcnt );
