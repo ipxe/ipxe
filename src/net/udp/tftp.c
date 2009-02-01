@@ -741,6 +741,11 @@ static int tftp_rx_data ( struct tftp_request *tftp,
 		rc = -EINVAL;
 		goto done;
 	}
+	if ( data->block == 0 ) {
+		DBGC ( tftp, "TFTP %p received data block 0\n", tftp );
+		rc = -EINVAL;
+		goto done;
+	}
 
 	/* Extract data */
 	block = ( ntohs ( data->block ) - 1 );
