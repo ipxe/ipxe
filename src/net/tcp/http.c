@@ -340,8 +340,7 @@ static int http_socket_deliver_iob ( struct xfer_interface *socket,
 			/* Once we're into the data phase, just fill
 			 * the data buffer
 			 */
-			rc = http_rx_data ( http, iobuf );
-			iobuf = NULL;
+			rc = http_rx_data ( http, iob_disown ( iobuf ) );
 			goto done;
 		case HTTP_RX_RESPONSE:
 		case HTTP_RX_HEADER:

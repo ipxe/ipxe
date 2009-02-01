@@ -602,10 +602,9 @@ efi_snp_transmit ( EFI_SIMPLE_NETWORK_PROTOCOL *snp,
 	}
 
 	/* Transmit packet */
-	if ( ( rc = netdev_tx ( snpdev->netdev, iobuf ) ) != 0 ) {
+	if ( ( rc = netdev_tx ( snpdev->netdev, iob_disown ( iobuf ) ) ) != 0){
 		DBGC ( snpdev, "SNPDEV %p TX could not transmit: %s\n",
 		       snpdev, strerror ( rc ) );
-		iobuf = NULL;
 		efirc = RC_TO_EFIRC ( rc );
 		goto err_tx;
 	}

@@ -976,9 +976,8 @@ static int dhcp_tx ( struct dhcp_session *dhcp ) {
 
 	/* Transmit the packet */
 	iob_put ( iobuf, dhcppkt.len );
-	rc = xfer_deliver_iob_meta ( &dhcp->xfer, iobuf, &meta );
-	iobuf = NULL;
-	if ( rc != 0 ) {
+	if ( ( rc = xfer_deliver_iob_meta ( &dhcp->xfer, iob_disown ( iobuf ),
+					    &meta ) ) != 0 ) {
 		DBGC ( dhcp, "DHCP %p could not transmit UDP packet: %s\n",
 		       dhcp, strerror ( rc ) );
 		goto done;

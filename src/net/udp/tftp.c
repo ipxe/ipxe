@@ -763,9 +763,8 @@ static int tftp_rx_data ( struct tftp_request *tftp,
 	memset ( &meta, 0, sizeof ( meta ) );
 	meta.whence = SEEK_SET;
 	meta.offset = offset;
-	rc = xfer_deliver_iob_meta ( &tftp->xfer, iobuf, &meta );
-	iobuf = NULL;
-	if ( rc != 0 ) {
+	if ( ( rc = xfer_deliver_iob_meta ( &tftp->xfer, iob_disown ( iobuf ),
+					    &meta ) ) != 0 ) {
 		DBGC ( tftp, "TFTP %p could not deliver data: %s\n",
 		       tftp, strerror ( rc ) );
 		goto done;
@@ -887,8 +886,7 @@ static int tftp_rx ( struct tftp_request *tftp,
 		rc = tftp_rx_oack ( tftp, iobuf->data, len );
 		break;
 	case htons ( TFTP_DATA ):
-		rc = tftp_rx_data ( tftp, iobuf );
-		iobuf = NULL;
+		rc = tftp_rx_data ( tftp, iob_disown ( iobuf ) );
 		break;
 	case htons ( TFTP_ERROR ):
 		rc = tftp_rx_error ( tftp, iobuf->data, len );

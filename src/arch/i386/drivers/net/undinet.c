@@ -482,8 +482,7 @@ static void undinet_poll ( struct net_device *netdev ) {
 					 undi_isr.Frame.offset, frag_len );
 			if ( iob_len ( iobuf ) == len ) {
 				/* Whole packet received; deliver it */
-				netdev_rx ( netdev, iobuf );
-				iobuf = NULL;
+				netdev_rx ( netdev, iob_disown ( iobuf ) );
 				/* Etherboot 5.4 fails to return all packets
 				 * under mild load; pretend it retriggered.
 				 */

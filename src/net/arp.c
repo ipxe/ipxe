@@ -265,8 +265,8 @@ static int arp_rx ( struct io_buffer *iobuf, struct net_device *netdev,
 	memcpy ( arp_sender_ha ( arphdr ), netdev->ll_addr, arphdr->ar_hln );
 
 	/* Send reply */
-	net_tx ( iobuf, netdev, &arp_protocol, arp_target_ha (arphdr ) );
-	iobuf = NULL;
+	net_tx ( iob_disown ( iobuf ), netdev, &arp_protocol,
+		 arp_target_ha ( arphdr ) );
 
  done:
 	free_iob ( iobuf );

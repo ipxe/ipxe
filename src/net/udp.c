@@ -328,8 +328,7 @@ static int udp_rx ( struct io_buffer *iobuf, struct sockaddr_tcpip *st_src,
 	memset ( &meta, 0, sizeof ( meta ) );
 	meta.src = ( struct sockaddr * ) st_src;
 	meta.dest = ( struct sockaddr * ) st_dest;
-	rc = xfer_deliver_iob_meta ( &udp->xfer, iobuf, &meta );
-	iobuf = NULL;
+	rc = xfer_deliver_iob_meta ( &udp->xfer, iob_disown ( iobuf ), &meta );
 
  done:
 	free_iob ( iobuf );

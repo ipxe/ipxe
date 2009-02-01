@@ -199,6 +199,26 @@ static inline void iob_populate ( struct io_buffer *iobuf,
 	iobuf->end = ( data + max_len );
 }
 
+/**
+ * Disown an I/O buffer
+ *
+ * @v iobuf	I/O buffer
+ *
+ * There are many functions that take ownership of the I/O buffer they
+ * are passed as a parameter.  The caller should not retain a pointer
+ * to the I/O buffer.  Use iob_disown() to automatically nullify the
+ * caller's pointer, e.g.:
+ *
+ *     xfer_deliver_iob ( xfer, iob_disown ( iobuf ) );
+ *
+ * This will ensure that iobuf is set to NULL for any code after the
+ * call to xfer_deliver_iob().
+ */
+#define iob_disown( iobuf ) ( {				\
+	struct io_buffer *__iobuf = (iobuf);		\
+	(iobuf) = NULL;					\
+	__iobuf; } )
+
 extern struct io_buffer * __malloc alloc_iob ( size_t len );
 extern void free_iob ( struct io_buffer *iobuf );
 extern void iob_pad ( struct io_buffer *iobuf, size_t min_len );
