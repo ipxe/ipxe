@@ -1,5 +1,5 @@
-Running Etherboot within qemu
-=============================
+Running gPXE within qemu
+========================
 
 Michael Brown <mbrown@fensystems.co.uk>
 
@@ -9,13 +9,10 @@ To get qemu running is fairly simple:
       make
 
 2.  Get the qemu source code:
-      cvs -d:pserver:anonymous@cvs.savannah.nongnu.org:/sources/qemu \
-           login
-      cvs -d:pserver:anonymous@cvs.savannah.nongnu.org:/sources/qemu \
-           co qemu
+      svn co svn://svn.savannah.nongnu.org/qemu/trunk qemu
 
 2a. Patch the qemu code.  There is currently a bug that causes qemu to
-    execute Etherboot incredibly slowly.  The bug seems to be related
+    execute gPXE incredibly slowly.  The bug seems to be related
     to the relative prioritisation of CPU and I/O operations within
     qemu.  This patch (which I found via Google) isn't a proper fix,
     but it does work around the problem:
@@ -23,12 +20,8 @@ To get qemu running is fairly simple:
 
 3.  Configure qemu with
       pushd qemu
-      ./configure --enable-system
+      ./configure --target-list=i386-softmmu,x86_64-softmmu
       popd
-
-    Note that qemu will not compile with gcc4; if your system's
-    default compiler is gcc4 then specify the path to gcc3 using
-    e.g. --cc=gcc-3.3.6
 
 4.  Build qemu:
       make -C qemu
@@ -44,7 +37,7 @@ To get qemu running is fairly simple:
         range dynamic-bootp 10.254.254.1 10.254.254.1;
       }
     You will also need to add in any of your usual declarations for
-    Etherboot, e.g. 'filename "vmlinuz.ltsp";'.  Note that this setup
+    gPXE, e.g. 'filename "vmlinuz.ltsp";'.  Note that this setup
     assumes that your DHCP server, TFTP server etc. all live on the
     machine you are using for running qemu.  If not, then you're on
     your own.
@@ -52,7 +45,7 @@ To get qemu running is fairly simple:
 7.  As root, restart dhcpd
       /etc/init.d/dhcpd restart
 
-8.  Build Etherboot floppy disk images and pad to 1.44MB
+8.  Build gPXE floppy disk images and pad to 1.44MB
       pushd ../../src
       make bin/rtl8139.pdsk
       popd
@@ -62,8 +55,8 @@ To get qemu running is fairly simple:
 			       -net nic,model=rtl8139 -net tap,ifname=tap0 \
 			       -boot a -fda ../../src/bin/rtl8139.pdsk 
 
-You should see qemu start up, load up Etherboot and attempt to boot
-from the network.
+You should see qemu start up, load up gPXE and attempt to boot from
+the network.
 
 
 
@@ -71,8 +64,8 @@ Serial console
 ==============
 
 You can use the program "serial-console" to obtain a virtual serial
-console for Etherboot running within qemu.  Run "./serial-console" on
-a spare tty (e.g. a separate xterm window) before starting qemu, and
+console for gPXE running within qemu.  Run "./serial-console" on a
+spare tty (e.g. a separate xterm window) before starting qemu, and
 ensure that you have enabled CONSOLE_SERIAL in config.h.
 
 When serial-console starts, it will print out the message "Slave pty
