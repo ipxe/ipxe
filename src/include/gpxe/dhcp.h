@@ -203,6 +203,9 @@ struct dhcp_client_id {
  */
 #define DHCP_BOOTFILE_NAME 67
 
+/** User class identifier */
+#define DHCP_USER_CLASS_ID 77
+
 /** Client system architecture */
 #define DHCP_CLIENT_ARCHITECTURE 93
 

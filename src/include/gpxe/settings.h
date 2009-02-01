@@ -225,10 +225,10 @@ extern struct setting root_path_setting __setting;
 extern struct setting username_setting __setting;
 extern struct setting password_setting __setting;
 extern struct setting priority_setting __setting;
-extern struct setting bios_drive_setting __setting;
 extern struct setting uuid_setting __setting;
 extern struct setting next_server_setting __setting;
 extern struct setting mac_setting __setting;
+extern struct setting user_class_setting __setting;
 
 /**
  * Initialise a settings block

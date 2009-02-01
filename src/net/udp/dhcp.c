@@ -101,6 +101,14 @@ struct setting dhcp_server_setting __setting = {
 	.type = &setting_type_ipv4,
 };
 
+/** DHCP user class setting */
+struct setting user_class_setting __setting = {
+	.name = "user-class",
+	.description = "User class identifier",
+	.tag = DHCP_USER_CLASS_ID,
+	.type = &setting_type_string,
+};
+
 /**
  * Name a DHCP packet type
  *
@@ -834,6 +842,7 @@ int dhcp_create_request ( struct dhcp_packet *dhcppkt,
 	struct dhcp_client_uuid client_uuid;
 	size_t dhcp_features_len;
 	size_t ll_addr_len;
+	ssize_t len;
 	int rc;
 
 	/* Create DHCP packet */
@@ -885,12 +894,26 @@ int dhcp_create_request ( struct dhcp_packet *dhcppkt,
 
 	/* Add client UUID, if we have one.  Required for PXE. */
 	client_uuid.type = DHCP_CLIENT_UUID_TYPE;
-	if ( ( rc = fetch_uuid_setting ( NULL, &uuid_setting,
-					 &client_uuid.uuid ) ) >= 0 ) {
+	if ( ( len = fetch_uuid_setting ( NULL, &uuid_setting,
+					  &client_uuid.uuid ) ) >= 0 ) {
 		if ( ( rc = dhcppkt_store ( dhcppkt, DHCP_CLIENT_UUID,
 					    &client_uuid,
 					    sizeof ( client_uuid ) ) ) != 0 ) {
 			DBG ( "DHCP could not set client UUID: %s\n",
+			      strerror ( rc ) );
+			return rc;
+		}
+	}
+
+	/* Add user class, if we have one. */
+	if ( ( len = fetch_setting_len ( NULL, &user_class_setting ) ) >= 0 ) {
+		char user_class[len];
+		fetch_setting ( NULL, &user_class_setting, user_class,
+				sizeof ( user_class ) );
+		if ( ( rc = dhcppkt_store ( dhcppkt, DHCP_USER_CLASS_ID,
+					    &user_class,
+					    sizeof ( user_class ) ) ) != 0 ) {
+			DBG ( "DHCP could not set user class: %s\n",
 			      strerror ( rc ) );
 			return rc;
 		}
