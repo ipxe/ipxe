@@ -95,8 +95,9 @@ static int pxe_menu_parse ( struct pxe_menu **menu ) {
 
 	/* Fetch relevant settings */
 	tmp_setting.tag = DHCP_PXE_BOOT_SERVER_MCAST;
-	server.s_addr = INADDR_BROADCAST;
 	fetch_ipv4_setting ( NULL, &tmp_setting, &server );
+	if ( ! server.s_addr )
+		server.s_addr = INADDR_BROADCAST;
 	tmp_setting.tag = DHCP_PXE_BOOT_MENU_PROMPT;
 	fetch_setting ( NULL, &tmp_setting, &prompt, sizeof ( prompt ) );
 	tmp_setting.tag = DHCP_PXE_BOOT_MENU;
