@@ -82,6 +82,21 @@ struct dhcp_packet;
 /** Vendor encapsulated options */
 #define DHCP_VENDOR_ENCAP 43
 
+/** PXE boot server discovery control */
+#define DHCP_PXE_DISCOVERY_CONTROL DHCP_ENCAP_OPT ( DHCP_VENDOR_ENCAP, 6 )
+
+/** PXE boot server discovery control bits */
+enum dhcp_pxe_discovery_control {
+	/** Inhibit broadcast discovery */
+	PXEBS_NO_BROADCAST = 1,
+	/** Inhibit multicast discovery */
+	PXEBS_NO_MULTICAST = 2,
+	/** Accept only servers in DHCP_PXE_BOOT_SERVERS list */
+	PXEBS_NO_UNKNOWN_SERVERS = 4,
+	/** Skip discovery if filename present */
+	PXEBS_SKIP = 8,
+};
+
 /** PXE boot server multicast address */
 #define DHCP_PXE_BOOT_SERVER_MCAST DHCP_ENCAP_OPT ( DHCP_VENDOR_ENCAP, 7 )
 

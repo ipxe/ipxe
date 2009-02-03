@@ -167,9 +167,15 @@ int boot_root_path ( const char *root_path ) {
  * @ret rc		Return status code
  */
 static int netboot ( struct net_device *netdev ) {
-	struct setting tmp_setting = { .name = NULL };
+	struct setting vendor_class_id_setting
+		= { .tag = DHCP_VENDOR_CLASS_ID };
+	struct setting pxe_discovery_control_setting
+		= { .tag = DHCP_PXE_DISCOVERY_CONTROL };
+	struct setting pxe_boot_menu_setting
+		= { .tag = DHCP_PXE_BOOT_MENU };
 	char buf[256];
 	struct in_addr next_server;
+	unsigned int pxe_discovery_control;
 	int rc;
 
 	/* Open device and display device status */
@@ -195,12 +201,15 @@ static int netboot ( struct net_device *netdev ) {
 	if ( rc != ENOENT )
 		return rc;
 
-	/* Try PXE menu boot, if we have PXE menu options */
-	tmp_setting.tag = DHCP_VENDOR_CLASS_ID;
-	fetch_string_setting ( NULL, &tmp_setting, buf, sizeof ( buf ) );
-	tmp_setting.tag = DHCP_PXE_BOOT_MENU;
+	/* Try PXE menu boot, if applicable */
+	fetch_string_setting ( NULL, &vendor_class_id_setting,
+			       buf, sizeof ( buf ) );
+	pxe_discovery_control =
+		fetch_uintz_setting ( NULL, &pxe_discovery_control_setting );
 	if ( ( strcmp ( buf, "PXEClient" ) == 0 ) &&
-	     setting_exists ( NULL, &tmp_setting ) ) {
+	     setting_exists ( NULL, &pxe_boot_menu_setting ) &&
+	     ( ! ( ( pxe_discovery_control & PXEBS_SKIP ) &&
+		   setting_exists ( NULL, &filename_setting ) ) ) ) {
 		printf ( "Booting from PXE menu\n" );
 		return pxe_menu_boot ( netdev );
 	}
