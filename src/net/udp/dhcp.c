@@ -175,11 +175,12 @@ struct dhcp_session_state {
 	 * @v dhcppkt		DHCP packet
 	 * @v peer		DHCP server address
 	 * @v msgtype		DHCP message type
+	 * @v server_id		DHCP server ID
 	 */
 	void ( * rx ) ( struct dhcp_session *dhcp,
 			struct dhcp_packet *dhcppkt,
 			struct sockaddr_in *peer,
-			uint8_t msgtype );
+			uint8_t msgtype, struct in_addr server_id );
 	/** Handle timer expiry
 	 *
 	 * @v dhcp		DHCP session
@@ -226,10 +227,12 @@ struct dhcp_session {
 	/** ProxyDHCP server priority */
 	int proxy_priority;
 
-	/** PXE Boot Server */
-	struct in_addr pxe_server;
 	/** PXE Boot Server type */
 	uint16_t pxe_type;
+	/** List of PXE Boot Servers to attempt */
+	struct in_addr *pxe_attempt;
+	/** List of PXE Boot Servers to accept */
+	struct in_addr *pxe_accept;
 
 	/** Retransmission timer */
 	struct retry_timer timer;
@@ -322,11 +325,12 @@ static int dhcp_discovery_tx ( struct dhcp_session *dhcp,
  * @v dhcppkt		DHCP packet
  * @v peer		DHCP server address
  * @v msgtype		DHCP message type
+ * @v server_id		DHCP server ID
  */
 static void dhcp_discovery_rx ( struct dhcp_session *dhcp,
 				struct dhcp_packet *dhcppkt,
-				struct sockaddr_in *peer, uint8_t msgtype ) {
-	struct in_addr server_id = { 0 };
+				struct sockaddr_in *peer, uint8_t msgtype,
+				struct in_addr server_id ) {
 	struct in_addr ip;
 	char vci[9]; /* "PXEClient" */
 	int vci_len;
@@ -338,10 +342,6 @@ static void dhcp_discovery_rx ( struct dhcp_session *dhcp,
 	DBGC ( dhcp, "DHCP %p %s from %s:%d", dhcp,
 	       dhcp_msgtype_name ( msgtype ), inet_ntoa ( peer->sin_addr ),
 	       ntohs ( peer->sin_port ) );
-
-	/* Identify server ID */
-	dhcppkt_fetch ( dhcppkt, DHCP_SERVER_IDENTIFIER,
-			&server_id, sizeof ( server_id ) );
 	if ( server_id.s_addr != peer->sin_addr.s_addr )
 		DBGC ( dhcp, " (%s)", inet_ntoa ( server_id ) );
 
@@ -480,11 +480,12 @@ static int dhcp_request_tx ( struct dhcp_session *dhcp,
  * @v dhcppkt		DHCP packet
  * @v peer		DHCP server address
  * @v msgtype		DHCP message type
+ * @v server_id		DHCP server ID
  */
 static void dhcp_request_rx ( struct dhcp_session *dhcp,
 			      struct dhcp_packet *dhcppkt,
-			      struct sockaddr_in *peer, uint8_t msgtype ) {
-	struct in_addr server_id = { 0 };
+			      struct sockaddr_in *peer, uint8_t msgtype,
+			      struct in_addr server_id ) {
 	struct in_addr ip;
 	struct settings *parent;
 	int rc;
@@ -492,10 +493,6 @@ static void dhcp_request_rx ( struct dhcp_session *dhcp,
 	DBGC ( dhcp, "DHCP %p %s from %s:%d", dhcp,
 	       dhcp_msgtype_name ( msgtype ), inet_ntoa ( peer->sin_addr ),
 	       ntohs ( peer->sin_port ) );
-
-	/* Identify server ID */
-	dhcppkt_fetch ( dhcppkt, DHCP_SERVER_IDENTIFIER,
-			&server_id, sizeof ( server_id ) );
 	if ( server_id.s_addr != peer->sin_addr.s_addr )
 		DBGC ( dhcp, " (%s)", inet_ntoa ( server_id ) );
 
@@ -591,20 +588,17 @@ static int dhcp_proxy_tx ( struct dhcp_session *dhcp,
  * @v dhcppkt		DHCP packet
  * @v peer		DHCP server address
  * @v msgtype		DHCP message type
+ * @v server_id		DHCP server ID
  */
 static void dhcp_proxy_rx ( struct dhcp_session *dhcp,
 			    struct dhcp_packet *dhcppkt,
-			    struct sockaddr_in *peer, uint8_t msgtype ) {
-	struct in_addr server_id = { 0 };
+			    struct sockaddr_in *peer, uint8_t msgtype,
+			    struct in_addr server_id ) {
 	int rc;
 
 	DBGC ( dhcp, "DHCP %p %s from %s:%d", dhcp,
 	       dhcp_msgtype_name ( msgtype ), inet_ntoa ( peer->sin_addr ),
 	       ntohs ( peer->sin_port ) );
-
-	/* Identify server ID */
-	dhcppkt_fetch ( dhcppkt, DHCP_SERVER_IDENTIFIER,
-			&server_id, sizeof ( server_id ) );
 	if ( server_id.s_addr != peer->sin_addr.s_addr )
 		DBGC ( dhcp, " (%s)", inet_ntoa ( server_id ) );
 	DBGC ( dhcp, "\n" );
@@ -673,7 +667,7 @@ static int dhcp_pxebs_tx ( struct dhcp_session *dhcp,
 	int rc;
 
 	DBGC ( dhcp, "DHCP %p PXEBS REQUEST to %s:%d for type %d\n",
-	       dhcp, inet_ntoa ( dhcp->pxe_server ), PXE_PORT,
+	       dhcp, inet_ntoa ( *(dhcp->pxe_attempt) ), PXE_PORT,
 	       ntohs ( dhcp->pxe_type ) );
 
 	/* Set boot menu item */
@@ -683,9 +677,35 @@ static int dhcp_pxebs_tx ( struct dhcp_session *dhcp,
 		return rc;
 
 	/* Set server address */
-	peer->sin_addr = dhcp->pxe_server;
+	peer->sin_addr = *(dhcp->pxe_attempt);
 	peer->sin_port = htons ( PXE_PORT );
 
+	return 0;
+}
+
+/**
+ * Check to see if PXE Boot Server address is acceptable
+ *
+ * @v dhcp		DHCP session
+ * @v bs		Boot Server address
+ * @ret accept		Boot Server is acceptable
+ */
+static int dhcp_pxebs_accept ( struct dhcp_session *dhcp,
+			       struct in_addr bs ) {
+	struct in_addr *accept;
+
+	/* Accept if we have no acceptance filter */
+	if ( ! dhcp->pxe_accept )
+		return 1;
+
+	/* Scan through acceptance list */
+	for ( accept = dhcp->pxe_accept ; accept->s_addr ; accept++ ) {
+		if ( accept->s_addr == bs.s_addr )
+			return 1;
+	}
+
+	DBGC ( dhcp, "DHCP %p rejecting server %s\n",
+	       dhcp, inet_ntoa ( bs ) );
 	return 0;
 }
 
@@ -696,16 +716,20 @@ static int dhcp_pxebs_tx ( struct dhcp_session *dhcp,
  * @v dhcppkt		DHCP packet
  * @v peer		DHCP server address
  * @v msgtype		DHCP message type
+ * @v server_id		DHCP server ID
  */
 static void dhcp_pxebs_rx ( struct dhcp_session *dhcp,
 			    struct dhcp_packet *dhcppkt,
-			    struct sockaddr_in *peer, uint8_t msgtype ) {
+			    struct sockaddr_in *peer, uint8_t msgtype,
+			    struct in_addr server_id ) {
 	struct dhcp_pxe_boot_menu_item menu_item = { 0, 0 };
 	int rc;
 
 	DBGC ( dhcp, "DHCP %p %s from %s:%d", dhcp,
 	       dhcp_msgtype_name ( msgtype ), inet_ntoa ( peer->sin_addr ),
 	       ntohs ( peer->sin_port ) );
+	if ( server_id.s_addr != peer->sin_addr.s_addr )
+		DBGC ( dhcp, " (%s)", inet_ntoa ( server_id ) );
 
 	/* Identify boot menu item */
 	dhcppkt_fetch ( dhcppkt, DHCP_PXE_BOOT_MENU_ITEM,
@@ -720,6 +744,9 @@ static void dhcp_pxebs_rx ( struct dhcp_session *dhcp,
 	if ( msgtype != DHCPACK )
 		return;
 	if ( menu_item.type != dhcp->pxe_type )
+		return;
+	if ( ! dhcp_pxebs_accept ( dhcp, ( server_id.s_addr ?
+					   server_id : peer->sin_addr ) ) )
 		return;
 
 	/* Register settings */
@@ -741,6 +768,21 @@ static void dhcp_pxebs_rx ( struct dhcp_session *dhcp,
  * @v dhcp		DHCP session
  */
 static void dhcp_pxebs_expired ( struct dhcp_session *dhcp ) {
+	unsigned long elapsed = ( currticks() - dhcp->start );
+
+	/* Give up waiting before we reach the failure point, and fail
+	 * over to the next server in the attempt list
+	 */
+	if ( elapsed > PXEBS_MAX_TIMEOUT ) {
+		dhcp->pxe_attempt++;
+		if ( dhcp->pxe_attempt->s_addr ) {
+			dhcp_set_state ( dhcp, &dhcp_state_pxebs );
+			return;
+		} else {
+			dhcp_finished ( dhcp, -ETIMEDOUT );
+			return;
+		}
+	}
 
 	/* Retransmit current packet */
 	dhcp_tx ( dhcp );
@@ -1006,6 +1048,7 @@ static int dhcp_deliver_iob ( struct xfer_interface *xfer,
 	struct dhcp_packet *dhcppkt;
 	struct dhcphdr *dhcphdr;
 	uint8_t msgtype = 0;
+	struct in_addr server_id = { 0 };
 	int rc = 0;
 
 	/* Sanity checks */
@@ -1042,6 +1085,10 @@ static int dhcp_deliver_iob ( struct xfer_interface *xfer,
 	dhcppkt_fetch ( dhcppkt, DHCP_MESSAGE_TYPE, &msgtype,
 			sizeof ( msgtype ) );
 
+	/* Identify server ID */
+	dhcppkt_fetch ( dhcppkt, DHCP_SERVER_IDENTIFIER,
+			&server_id, sizeof ( server_id ) );
+
 	/* Check for matching transaction ID */
 	if ( dhcphdr->xid != dhcp_xid ( dhcp->netdev ) ) {
 		DBGC ( dhcp, "DHCP %p %s from %s:%d has bad transaction "
@@ -1053,7 +1100,7 @@ static int dhcp_deliver_iob ( struct xfer_interface *xfer,
 	};
 
 	/* Handle packet based on current state */
-	dhcp->state->rx ( dhcp, dhcppkt, peer, msgtype );
+	dhcp->state->rx ( dhcp, dhcppkt, peer, msgtype, server_id );
 
  err_xid:
 	dhcppkt_put ( dhcppkt );
@@ -1184,11 +1231,49 @@ int start_dhcp ( struct job_interface *job, struct net_device *netdev ) {
 }
 
 /**
+ * Retrieve list of PXE boot servers for a given server type
+ *
+ * @v dhcp		DHCP session
+ * @v raw		DHCP PXE boot server list
+ * @v raw_len		Length of DHCP PXE boot server list
+ * @v ip		IP address list to fill in
+ *
+ * The caller must ensure that the IP address list has sufficient
+ * space.
+ */
+static void pxebs_list ( struct dhcp_session *dhcp, void *raw,
+			 size_t raw_len, struct in_addr *ip ) {
+	struct dhcp_pxe_boot_server *server = raw;
+	size_t server_len;
+	unsigned int i;
+
+	while ( raw_len ) {
+		if ( raw_len < sizeof ( *server ) ) {
+			DBGC ( dhcp, "DHCP %p malformed PXE server list\n",
+			       dhcp );
+			break;
+		}
+		server_len = offsetof ( typeof ( *server ),
+					ip[ server->num_ip ] );
+		if ( raw_len < server_len ) {
+			DBGC ( dhcp, "DHCP %p malformed PXE server list\n",
+			       dhcp );
+			break;
+		}
+		if ( server->type == dhcp->pxe_type ) {
+			for ( i = 0 ; i < server->num_ip ; i++ )
+				*(ip++) = server->ip[i];
+		}
+		server = ( ( ( void * ) server ) + server_len );
+		raw_len -= server_len;
+	}
+}
+
+/**
  * Start PXE Boot Server Discovery on a network device
  *
  * @v job		Job control interface
  * @v netdev		Network device
- * @v pxe_server	PXE server (may be a multicast address)
  * @v pxe_type		PXE server type
  * @ret rc		Return status code
  *
@@ -1197,12 +1282,28 @@ int start_dhcp ( struct job_interface *job, struct net_device *netdev ) {
  * source.
  */
 int start_pxebs ( struct job_interface *job, struct net_device *netdev,
-		  struct in_addr pxe_server, unsigned int pxe_type ) {
+		  unsigned int pxe_type ) {
+	struct setting pxe_discovery_control_setting =
+		{ .tag = DHCP_PXE_DISCOVERY_CONTROL };
+	struct setting pxe_boot_servers_setting =
+		{ .tag = DHCP_PXE_BOOT_SERVERS };
+	struct setting pxe_boot_server_mcast_setting =
+		{ .tag = DHCP_PXE_BOOT_SERVER_MCAST };
+	ssize_t pxebs_list_len;
 	struct dhcp_session *dhcp;
+	struct in_addr *ip;
+	unsigned int pxe_discovery_control;
 	int rc;
 
+	/* Get upper bound for PXE boot server IP address list */
+	pxebs_list_len = fetch_setting_len ( NULL, &pxe_boot_servers_setting );
+	if ( pxebs_list_len < 0 )
+		pxebs_list_len = 0;
+
 	/* Allocate and initialise structure */
-	dhcp = zalloc ( sizeof ( *dhcp ) );
+	dhcp = zalloc ( sizeof ( *dhcp ) + sizeof ( *ip ) /* mcast */ +
+			sizeof ( *ip ) /* bcast */ + pxebs_list_len +
+			sizeof ( *ip ) /* terminator */ );
 	if ( ! dhcp )
 		return -ENOMEM;
 	dhcp->refcnt.free = dhcp_free;
@@ -1213,9 +1314,48 @@ int start_pxebs ( struct job_interface *job, struct net_device *netdev,
 	fetch_ipv4_setting ( netdev_settings ( netdev ), &ip_setting,
 			     &dhcp->local.sin_addr );
 	dhcp->local.sin_port = htons ( BOOTPC_PORT );
-	dhcp->pxe_server = pxe_server;
 	dhcp->pxe_type = htons ( pxe_type );
 	dhcp->timer.expired = dhcp_timer_expired;
+
+	/* Construct PXE boot server IP address lists */
+	pxe_discovery_control =
+		fetch_uintz_setting ( NULL, &pxe_discovery_control_setting );
+	ip = ( ( ( void * ) dhcp ) + sizeof ( *dhcp ) );
+	dhcp->pxe_attempt = ip;
+	if ( ! ( pxe_discovery_control & PXEBS_NO_MULTICAST ) ) {
+		fetch_ipv4_setting ( NULL, &pxe_boot_server_mcast_setting, ip);
+		if ( ip->s_addr )
+			ip++;
+	}
+	if ( ! ( pxe_discovery_control & PXEBS_NO_BROADCAST ) )
+		(ip++)->s_addr = INADDR_BROADCAST;
+	if ( pxe_discovery_control & PXEBS_NO_UNKNOWN_SERVERS )
+		dhcp->pxe_accept = ip;
+	if ( pxebs_list_len ) {
+		uint8_t buf[pxebs_list_len];
+
+		fetch_setting ( NULL, &pxe_boot_servers_setting,
+				buf, sizeof ( buf ) );
+		pxebs_list ( dhcp, buf, sizeof ( buf ), ip );
+	}
+	if ( ! dhcp->pxe_attempt->s_addr ) {
+		DBGC ( dhcp, "DHCP %p has no PXE boot servers for type %04x\n",
+		       dhcp, pxe_type );
+		rc = -EINVAL;
+		goto err;
+	}
+
+	/* Dump out PXE server lists */
+	DBGC ( dhcp, "DHCP %p attempting", dhcp );
+	for ( ip = dhcp->pxe_attempt ; ip->s_addr ; ip++ )
+		DBGC ( dhcp, " %s", inet_ntoa ( *ip ) );
+	DBGC ( dhcp, "\n" );
+	if ( dhcp->pxe_accept ) {
+		DBGC ( dhcp, "DHCP %p accepting", dhcp );
+		for ( ip = dhcp->pxe_accept ; ip->s_addr ; ip++ )
+			DBGC ( dhcp, " %s", inet_ntoa ( *ip ) );
+		DBGC ( dhcp, "\n" );
+	}
 
 	/* Instantiate child objects and attach to our interfaces */
 	if ( ( rc = xfer_open_socket ( &dhcp->xfer, SOCK_DGRAM, &dhcp_peer,

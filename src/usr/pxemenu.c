@@ -57,8 +57,6 @@ struct pxe_menu_item {
  * options.
  */
 struct pxe_menu {
-	/** Boot Server address */
-	struct in_addr server;
 	/** Timeout (in seconds)
 	 *
 	 * Negative indicates no timeout (i.e. wait indefinitely)
@@ -83,7 +81,6 @@ struct pxe_menu {
  */
 static int pxe_menu_parse ( struct pxe_menu **menu ) {
 	struct setting tmp_setting = { .name = NULL };
-	struct in_addr server;
 	struct dhcp_pxe_boot_menu_prompt prompt = { .timeout = 0 };
 	uint8_t raw_menu[256];
 	int raw_menu_len;
@@ -94,10 +91,6 @@ static int pxe_menu_parse ( struct pxe_menu **menu ) {
 	int rc;
 
 	/* Fetch relevant settings */
-	tmp_setting.tag = DHCP_PXE_BOOT_SERVER_MCAST;
-	fetch_ipv4_setting ( NULL, &tmp_setting, &server );
-	if ( ! server.s_addr )
-		server.s_addr = INADDR_BROADCAST;
 	tmp_setting.tag = DHCP_PXE_BOOT_MENU_PROMPT;
 	fetch_setting ( NULL, &tmp_setting, &prompt, sizeof ( prompt ) );
 	tmp_setting.tag = DHCP_PXE_BOOT_MENU;
@@ -142,7 +135,6 @@ static int pxe_menu_parse ( struct pxe_menu **menu ) {
 	}
 
 	/* Fill in parsed menu */
-	(*menu)->server = server;
 	(*menu)->timeout =
 		( ( prompt.timeout == 0xff ) ? -1 : prompt.timeout );
 	(*menu)->num_items = num_menu_items;
@@ -296,7 +288,6 @@ int pxe_menu_select ( struct pxe_menu *menu ) {
  */
 int pxe_menu_boot ( struct net_device *netdev ) {
 	struct pxe_menu *menu;
-	struct in_addr pxe_server;
 	unsigned int pxe_type;
 	struct settings *pxebs_settings;
 	struct in_addr next_server;
@@ -312,7 +303,6 @@ int pxe_menu_boot ( struct net_device *netdev ) {
 		free ( menu );
 		return rc;
 	}
-	pxe_server = menu->server;
 	pxe_type = menu->items[menu->selection].type;
 
 	/* Free boot menu */
@@ -323,7 +313,7 @@ int pxe_menu_boot ( struct net_device *netdev ) {
 		return 0;
 
 	/* Attempt PXE Boot Server Discovery */
-	if ( ( rc = pxebs ( netdev, pxe_server, pxe_type ) ) != 0 )
+	if ( ( rc = pxebs ( netdev, pxe_type ) ) != 0 )
 		return rc;
 
 	/* Attempt boot */

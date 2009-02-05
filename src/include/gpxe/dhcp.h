@@ -100,6 +100,19 @@ enum dhcp_pxe_discovery_control {
 /** PXE boot server multicast address */
 #define DHCP_PXE_BOOT_SERVER_MCAST DHCP_ENCAP_OPT ( DHCP_VENDOR_ENCAP, 7 )
 
+/** PXE boot servers */
+#define DHCP_PXE_BOOT_SERVERS DHCP_ENCAP_OPT ( DHCP_VENDOR_ENCAP, 8 )
+
+/** PXE boot server */
+struct dhcp_pxe_boot_server {
+	/** "Type" */
+	uint16_t type;
+	/** Number of IPv4 addresses */
+	uint8_t num_ip;
+	/** IPv4 addresses */
+	struct in_addr ip[0];
+} __attribute__ (( packed ));
+
 /** PXE boot menu */
 #define DHCP_PXE_BOOT_MENU DHCP_ENCAP_OPT ( DHCP_VENDOR_ENCAP, 9 )
 
@@ -574,6 +587,9 @@ struct dhcphdr {
 /** Maximum time that we will wait for ProxyDHCP responses */
 #define PROXYDHCP_MAX_TIMEOUT ( 2 * TICKS_PER_SEC )
 
+/** Maximum time that we will wait for Boot Server responses */
+#define PXEBS_MAX_TIMEOUT ( 3 * TICKS_PER_SEC )
+
 /** Settings block name used for DHCP responses */
 #define DHCP_SETTINGS_NAME "dhcp"
 
@@ -593,6 +609,6 @@ extern int dhcp_create_request ( struct dhcp_packet *dhcppkt,
 				 void *data, size_t max_len );
 extern int start_dhcp ( struct job_interface *job, struct net_device *netdev );
 extern int start_pxebs ( struct job_interface *job, struct net_device *netdev,
-			 struct in_addr pxe_server, unsigned int pxe_type );
+			 unsigned int pxe_type );
 
 #endif /* _GPXE_DHCP_H */

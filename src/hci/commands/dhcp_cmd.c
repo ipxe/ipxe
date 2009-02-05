@@ -109,7 +109,7 @@ static int dhcp_exec ( int argc, char **argv ) {
  */
 static void pxebs_syntax ( char **argv ) {
 	printf ( "Usage:\n"
-		 "  %s <interface> <discovery_ip> <server_type>\n"
+		 "  %s <interface> <server_type>\n"
 		 "\n"
 		 "Perform PXE Boot Server discovery\n",
 		 argv[0] );
@@ -128,10 +128,8 @@ static int pxebs_exec ( int argc, char **argv ) {
 		{ NULL, 0, NULL, 0 },
 	};
 	const char *netdev_txt;
-	const char *pxe_server_txt;
 	const char *pxe_type_txt;
 	struct net_device *netdev;
-	struct in_addr pxe_server;
 	unsigned int pxe_type;
 	char *end;
 	int c;
@@ -148,24 +146,17 @@ static int pxebs_exec ( int argc, char **argv ) {
 			return 1;
 		}
 	}
-
-	/* Need exactly one interface name remaining after the options */
-	if ( optind != ( argc - 3 ) ) {
+	if ( optind != ( argc - 2 ) ) {
 		pxebs_syntax ( argv );
 		return 1;
 	}
 	netdev_txt = argv[optind];
-	pxe_server_txt = argv[ optind + 1 ];
-	pxe_type_txt = argv[ optind + 2 ];
+	pxe_type_txt = argv[ optind + 1 ];
 
 	/* Parse arguments */
 	netdev = find_netdev ( netdev_txt );
 	if ( ! netdev ) {
 		printf ( "No such interface: %s\n", netdev_txt );
-		return 1;
-	}
-	if ( inet_aton ( pxe_server_txt, &pxe_server ) == 0 ) {
-		printf ( "Bad discovery IP address: %s\n", pxe_server_txt );
 		return 1;
 	}
 	pxe_type = strtoul ( pxe_type_txt, &end, 0 );
@@ -175,7 +166,7 @@ static int pxebs_exec ( int argc, char **argv ) {
 	}
 
 	/* Perform Boot Server Discovery */
-	if ( ( rc = pxebs ( netdev, pxe_server, pxe_type ) ) != 0 ) {
+	if ( ( rc = pxebs ( netdev, pxe_type ) ) != 0 ) {
 		printf ( "Could not discover boot server on %s: %s\n",
 			 netdev->name, strerror ( rc ) );
 		return 1;

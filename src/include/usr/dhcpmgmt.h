@@ -10,7 +10,6 @@
 struct net_device;
 
 extern int dhcp ( struct net_device *netdev );
-extern int pxebs ( struct net_device *netdev, struct in_addr pxe_server,
-		   unsigned int pxe_type );
+extern int pxebs ( struct net_device *netdev, unsigned int pxe_type );
 
 #endif /* _USR_DHCPMGMT_H */
