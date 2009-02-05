@@ -26,9 +26,9 @@
 #include <curses.h>
 #include <console.h>
 #include <gpxe/dhcp.h>
-#include <gpxe/vsprintf.h>
 #include <gpxe/keys.h>
 #include <gpxe/timer.h>
+#include <gpxe/process.h>
 #include <usr/dhcpmgmt.h>
 #include <usr/autoboot.h>
 
@@ -57,6 +57,8 @@ struct pxe_menu_item {
  * options.
  */
 struct pxe_menu {
+	/** Prompt string (optional) */
+	const char *prompt;
 	/** Timeout (in seconds)
 	 *
 	 * Negative indicates no timeout (i.e. wait indefinitely)
@@ -80,22 +82,24 @@ struct pxe_menu {
  * boot menu.
  */
 static int pxe_menu_parse ( struct pxe_menu **menu ) {
-	struct setting tmp_setting = { .name = NULL };
-	struct dhcp_pxe_boot_menu_prompt prompt = { .timeout = 0 };
+	struct setting pxe_boot_menu_prompt_setting =
+		{ .tag = DHCP_PXE_BOOT_MENU_PROMPT };
+	struct setting pxe_boot_menu_setting =
+		{ .tag = DHCP_PXE_BOOT_MENU };
 	uint8_t raw_menu[256];
+	int raw_prompt_len;
 	int raw_menu_len;
 	struct dhcp_pxe_boot_menu *raw_menu_item;
+	struct dhcp_pxe_boot_menu_prompt *raw_menu_prompt;
 	void *raw_menu_end;
 	unsigned int num_menu_items;
 	unsigned int i;
 	int rc;
 
-	/* Fetch relevant settings */
-	tmp_setting.tag = DHCP_PXE_BOOT_MENU_PROMPT;
-	fetch_setting ( NULL, &tmp_setting, &prompt, sizeof ( prompt ) );
-	tmp_setting.tag = DHCP_PXE_BOOT_MENU;
+	/* Fetch raw menu */
 	memset ( raw_menu, 0, sizeof ( raw_menu ) );
-	if ( ( raw_menu_len = fetch_setting ( NULL, &tmp_setting, raw_menu,
+	if ( ( raw_menu_len = fetch_setting ( NULL, &pxe_boot_menu_setting,
+					      raw_menu,
 					      sizeof ( raw_menu ) ) ) < 0 ) {
 		rc = raw_menu_len;
 		DBG ( "Could not retrieve raw PXE boot menu: %s\n",
@@ -107,6 +111,12 @@ static int pxe_menu_parse ( struct pxe_menu **menu ) {
 		return -ENOSPC;
 	}
 	raw_menu_end = ( raw_menu + raw_menu_len );
+
+	/* Fetch raw prompt length */
+	raw_prompt_len = fetch_setting_len ( NULL,
+					     &pxe_boot_menu_prompt_setting );
+	if ( raw_prompt_len < 0 )
+		raw_prompt_len = 0;
 
 	/* Count menu items */
 	num_menu_items = 0;
@@ -128,15 +138,14 @@ static int pxe_menu_parse ( struct pxe_menu **menu ) {
 	/* Allocate space for parsed menu */
 	*menu = zalloc ( sizeof ( **menu ) +
 			 ( num_menu_items * sizeof ( (*menu)->items[0] ) ) +
-			 raw_menu_len + 1 /* NUL */ );
+			 raw_menu_len + 1 /* NUL */ +
+			 raw_prompt_len + 1 /* NUL */ );
 	if ( ! *menu ) {
 		DBG ( "Could not allocate PXE boot menu\n" );
 		return -ENOMEM;
 	}
 
 	/* Fill in parsed menu */
-	(*menu)->timeout =
-		( ( prompt.timeout == 0xff ) ? -1 : prompt.timeout );
 	(*menu)->num_items = num_menu_items;
 	raw_menu_item = ( ( ( void * ) (*menu) ) + sizeof ( **menu ) +
 			  ( num_menu_items * sizeof ( (*menu)->items[0] ) ) );
@@ -153,6 +162,18 @@ static int pxe_menu_parse ( struct pxe_menu **menu ) {
 				  sizeof ( *raw_menu_item ) +
 				  raw_menu_item->desc_len );
 	}
+	if ( raw_prompt_len ) {
+		raw_menu_prompt = ( ( ( void * ) raw_menu_item ) +
+				    1 /* NUL */ );
+		fetch_setting ( NULL, &pxe_boot_menu_prompt_setting,
+				raw_menu_prompt, raw_prompt_len );
+		(*menu)->timeout =
+			( ( raw_menu_prompt->timeout == 0xff ) ?
+			  -1 : raw_menu_prompt->timeout );
+		(*menu)->prompt = raw_menu_prompt->prompt;
+	} else {
+		(*menu)->timeout = -1;
+	}
 
 	return 0;
 }
@@ -162,29 +183,20 @@ static int pxe_menu_parse ( struct pxe_menu **menu ) {
  *
  * @v menu		PXE boot menu
  * @v index		Index of item to draw
+ * @v selected		Item is selected
  */
 static void pxe_menu_draw_item ( struct pxe_menu *menu,
-				 unsigned int index ) {
-	int selected = ( menu->selection == index );
+				 unsigned int index, int selected ) {
 	char buf[COLS+1];
-	char *tmp = buf;
-	ssize_t remaining = sizeof ( buf );
 	size_t len;
 	unsigned int row;
 
 	/* Prepare space-padded row content */
-	len = ssnprintf ( tmp, remaining, " %c. %s",
-			  ( 'A' + index ), menu->items[index].desc );
-	tmp += len;
-	remaining -= len;
-	if ( selected && ( menu->timeout > 0 ) ) {
-		len = ssnprintf ( tmp, remaining, " (%d)", menu->timeout );
-		tmp += len;
-		remaining -= len;
-	}
-	for ( ; remaining > 1 ; tmp++, remaining-- )
-		*tmp = ' ';
-	*tmp = '\0';
+	len = snprintf ( buf, sizeof ( buf ), " %c. %s",
+			 ( 'A' + index ), menu->items[index].desc );
+	while ( len < ( sizeof ( buf ) - 1 ) )
+		buf[len++] = ' ';
+	buf[ sizeof ( buf ) - 1 ] = '\0';
 
 	/* Draw row */
 	row = ( LINES - menu->num_items + index );
@@ -199,11 +211,7 @@ static void pxe_menu_draw_item ( struct pxe_menu *menu,
  * @v menu		PXE boot menu
  * @ret rc		Return status code
  */
-int pxe_menu_select ( struct pxe_menu *menu ) {
-	unsigned long start = currticks();
-	unsigned long now;
-	unsigned long elapsed;
-	unsigned int old_selection;
+static int pxe_menu_select ( struct pxe_menu *menu ) {
 	int key;
 	unsigned int key_selection;
 	unsigned int i;
@@ -220,37 +228,24 @@ int pxe_menu_select ( struct pxe_menu *menu ) {
 	for ( i = 0 ; i < menu->num_items ; i++ )
 		printf ( "\n" );
 	for ( i = 0 ; i < menu->num_items ; i++ )
-		pxe_menu_draw_item ( menu, ( menu->num_items - i - 1 ) );
+		pxe_menu_draw_item ( menu, ( menu->num_items - i - 1 ), 0 );
 
 	while ( 1 ) {
 
-		/* Decrease timeout if necessary */
-		if ( menu->timeout > 0 ) {
-			now = currticks();
-			elapsed = ( now - start );
-			if ( elapsed >= TICKS_PER_SEC ) {
-				start = now;
-				menu->timeout--;
-				pxe_menu_draw_item ( menu, menu->selection );
-			}
-		}
+		/* Highlight currently selected item */
+		pxe_menu_draw_item ( menu, menu->selection, 1 );
 
-		/* Select current item if we have timed out */
-		if ( menu->timeout == 0 )
-			break;
-
-		/* Check for keyboard input */
-		if ( ! iskey() )
-			continue;
+		/* Wait for keyboard input */
+		while ( ! iskey() )
+			step();
 		key = getkey();
 
-		/* Any keyboard input cancels the timeout */
-		menu->timeout = -1;
-		pxe_menu_draw_item ( menu, menu->selection );
+		/* Unhighlight currently selected item */
+		pxe_menu_draw_item ( menu, menu->selection, 0 );
 
 		/* Act upon key */
-		old_selection = menu->selection;
 		if ( ( key == CR ) || ( key == LF ) ) {
+			pxe_menu_draw_item ( menu, menu->selection, 1 );
 			break;
 		} else if ( key == CTRL_C ) {
 			rc = -ECANCELED;
@@ -265,15 +260,74 @@ int pxe_menu_select ( struct pxe_menu *menu ) {
 			    ( ( key_selection = ( toupper ( key ) - 'A' ) )
 			      < menu->num_items ) ) {
 			menu->selection = key_selection;
-			menu->timeout = 0;
+			pxe_menu_draw_item ( menu, menu->selection, 1 );
+			break;
 		}
-		pxe_menu_draw_item ( menu, old_selection );
-		pxe_menu_draw_item ( menu, menu->selection );
 	}
 
 	/* Shut down UI */
 	endwin();
 
+	return rc;
+}
+
+/**
+ * Prompt for (and make selection from) PXE boot menu
+ *
+ * @v menu		PXE boot menu
+ * @ret rc		Return status code
+ */
+static int pxe_menu_prompt_and_select ( struct pxe_menu *menu ) {
+	unsigned long start = currticks();
+	unsigned long now;
+	unsigned long elapsed;
+	size_t len = 0;
+	int key;
+	int rc = 0;
+
+	/* Display menu immediately, if specified to do so */
+	if ( menu->timeout < 0 ) {
+		if ( menu->prompt )
+			printf ( "%s\n", menu->prompt );
+		return pxe_menu_select ( menu );
+	}
+
+	/* Display prompt, if specified */
+	if ( menu->prompt )
+		printf ( "%s", menu->prompt );
+
+	/* Wait for timeout, if specified */
+	while ( menu->timeout > 0 ) {
+		if ( ! len )
+			len = printf ( " (%d)", menu->timeout );
+		if ( iskey() ) {
+			key = getkey();
+			if ( key == KEY_F8 ) {
+				/* Display menu */
+				printf ( "\n" );
+				return pxe_menu_select ( menu );
+			} else if ( key == CTRL_C ) {
+				/* Abort */
+				rc = -ECANCELED;
+				break;
+			} else {
+				/* Stop waiting */
+				break;
+			}
+		}
+		now = currticks();
+		elapsed = ( now - start );
+		if ( elapsed >= TICKS_PER_SEC ) {
+			menu->timeout -= 1;
+			do {
+				printf ( "\b \b" );
+			} while ( --len );
+			start = now;
+		}
+	}
+
+	/* Return with default option selected */
+	printf ( "\n" );
 	return rc;
 }
 
@@ -299,7 +353,7 @@ int pxe_menu_boot ( struct net_device *netdev ) {
 		return rc;
 
 	/* Make selection from boot menu */
-	if ( ( rc = pxe_menu_select ( menu ) ) != 0 ) {
+	if ( ( rc = pxe_menu_prompt_and_select ( menu ) ) != 0 ) {
 		free ( menu );
 		return rc;
 	}
