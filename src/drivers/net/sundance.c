@@ -869,6 +869,7 @@ static void set_rx_mode(struct nic *nic __unused)
 static struct pci_device_id sundance_nics[] = {
 	PCI_ROM(0x13f0, 0x0201, "sundance", "ST201 Sundance 'Alta' based Adaptor"),
 	PCI_ROM(0x1186, 0x1002, "dfe530txs", "D-Link DFE530TXS (Sundance ST201 Alta)"),
+	PCI_ROM(0x13f0, 0x0200, "ip100a", "IC+ IP100A"),
 };
 
 PCI_DRIVER ( sundance_driver, sundance_nics, PCI_NO_CLASS );
