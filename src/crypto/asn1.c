@@ -32,7 +32,7 @@
  *
  * @v cursor		ASN.1 object cursor
  * @v type		Expected type
- * @ret len		Length of object body, or -1 on error
+ * @ret len		Length of object body, or negative error
  *
  * The object cursor will be updated to point to the start of the
  * object body (i.e. the first byte following the length byte(s)), and
@@ -44,29 +44,32 @@
  * the cursor will be invalidated and a negative value will be
  * returned.
  */
-static int asn1_start_object ( struct asn1_cursor *cursor,
+static int asn1_start ( struct asn1_cursor *cursor,
 			       unsigned int type ) {
 	unsigned int len_len;
 	unsigned int len;
+	int rc;
 
 	/* Sanity check */
 	if ( cursor->len < 2 /* Tag byte and first length byte */ ) {
 		if ( cursor->len )
 			DBGC ( cursor, "ASN1 %p too short\n", cursor );
+		rc = -EINVAL;
 		goto notfound;
 	}
 
 	/* Check the tag byte */
-	if ( cursor->data[0] != type ) {
+	if ( *( ( uint8_t * ) cursor->data ) != type ) {
 		DBGC ( cursor, "ASN1 %p type mismatch (expected %d, got %d)\n",
-		       cursor, type, cursor->data[0] );
+		       cursor, type, *( ( uint8_t * ) cursor->data ) );
+		rc = -ENXIO;
 		goto notfound;
 	}
 	cursor->data++;
 	cursor->len--;
 
 	/* Extract length of the length field and sanity check */
-	len_len = cursor->data[0];
+	len_len = *( ( uint8_t * ) cursor->data );
 	if ( len_len & 0x80 ) {
 		len_len = ( len_len & 0x7f );
 		cursor->data++;
@@ -77,19 +80,21 @@ static int asn1_start_object ( struct asn1_cursor *cursor,
 	if ( cursor->len < len_len ) {
 		DBGC ( cursor, "ASN1 %p bad length field length %d (max "
 		       "%zd)\n", cursor, len_len, cursor->len );
+		rc = -EINVAL;
 		goto notfound;
 	}
 
 	/* Extract the length and sanity check */
 	for ( len = 0 ; len_len ; len_len-- ) {
 		len <<= 8;
-		len |= cursor->data[0];
+		len |= *( ( uint8_t * ) cursor->data );
 		cursor->data++;
 		cursor->len--;
 	}
 	if ( cursor->len < len ) {
 		DBGC ( cursor, "ASN1 %p bad length %d (max %zd)\n",
 		       cursor, len, cursor->len );
+		rc = -EINVAL;
 		goto notfound;
 	}
 
@@ -98,7 +103,7 @@ static int asn1_start_object ( struct asn1_cursor *cursor,
  notfound:
 	cursor->data = NULL;
 	cursor->len = 0;
-	return -1;
+	return rc;
 }
 
 /**
@@ -112,12 +117,12 @@ static int asn1_start_object ( struct asn1_cursor *cursor,
  * current ASN.1 object.  If any error occurs, the object cursor will
  * be invalidated.
  */
-int asn1_enter_object ( struct asn1_cursor *cursor, unsigned int type ) {
+int asn1_enter ( struct asn1_cursor *cursor, unsigned int type ) {
 	int len;
 
-	len = asn1_start_object ( cursor, type );
+	len = asn1_start ( cursor, type );
 	if ( len < 0 )
-		return -ENOENT;
+		return len;
 
 	cursor->len = len;
 	DBGC ( cursor, "ASN1 %p entered object type %02x (len %x)\n",
@@ -137,12 +142,12 @@ int asn1_enter_object ( struct asn1_cursor *cursor, unsigned int type ) {
  * object.  If any error occurs, the object cursor will be
  * invalidated.
  */
-int asn1_skip_object ( struct asn1_cursor *cursor, unsigned int type ) {
+int asn1_skip ( struct asn1_cursor *cursor, unsigned int type ) {
 	int len;
 
-	len = asn1_start_object ( cursor, type );
+	len = asn1_start ( cursor, type );
 	if ( len < 0 )
-		return -ENOENT;
+		return len;
 
 	cursor->data += len;
 	cursor->len -= len;

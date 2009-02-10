@@ -14,6 +14,7 @@
 #include <gpxe/crypto.h>
 #include <gpxe/md5.h>
 #include <gpxe/sha1.h>
+#include <gpxe/x509.h>
 
 /** A TLS header */
 struct tls_header {
@@ -157,10 +158,7 @@ struct tls_session {
 	uint8_t handshake_sha1_ctx[SHA1_CTX_SIZE];
 
 	/** Hack: server RSA public key */
-	uint8_t *rsa_mod;
-	size_t rsa_mod_len;
-	uint8_t *rsa_pub_exp;
-	size_t rsa_pub_exp_len;
+	struct x509_rsa_public_key rsa;
 
 	/** TX sequence number */
 	uint64_t tx_seq;

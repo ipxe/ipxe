@@ -21,12 +21,12 @@
  */
 struct asn1_cursor {
 	/** Start of data */
-	uint8_t *data;
+	void *data;
 	/** Length of data */
 	size_t len;
 };
 
-extern int asn1_enter_object ( struct asn1_cursor *cursor, unsigned int type );
-extern int asn1_skip_object ( struct asn1_cursor *cursor, unsigned int type );
+extern int asn1_enter ( struct asn1_cursor *cursor, unsigned int type );
+extern int asn1_skip ( struct asn1_cursor *cursor, unsigned int type );
 
 #endif /* _GPXE_ASN1_H */
