@@ -825,12 +825,15 @@ static int storef_uristring ( struct settings *settings,
 static int fetchf_uristring ( struct settings *settings,
 			      struct setting *setting,
 			      char *buf, size_t len ) {
-	size_t raw_len;
+	ssize_t raw_len;
 
 	/* We need to always retrieve the full raw string to know the
 	 * length of the encoded string.
 	 */
 	raw_len = fetch_setting ( settings, setting, NULL, 0 );
+	if ( raw_len < 0 )
+		return raw_len;
+
 	{
 		char raw_buf[ raw_len + 1 ];
        
