@@ -407,8 +407,21 @@ static void http_step ( struct process *process ) {
 
 		/* Construct authorisation, if applicable */
 		if ( user_pw_len ) {
-			snprintf ( user_pw, sizeof ( user_pw ), "%s:%s",
-				   user, password );
+			char *buf = user_pw;
+			ssize_t remaining = sizeof ( user_pw );
+			size_t len;
+
+			/* URI-decode the username and password */
+			len = uri_decode ( user, buf, remaining );
+			buf += len;
+			remaining -= len;
+			*(remaining--, buf++) = ':';
+			len = uri_decode ( password, buf, remaining );
+			buf += len;
+			remaining -= len;
+			assert ( remaining >= 0 );
+
+			/* Base64-encode the "user:password" string */
 			base64_encode ( user_pw, user_pw_base64 );
 		}
 
