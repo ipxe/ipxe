@@ -276,6 +276,7 @@ CFLAGS		+= -Os -ffreestanding
 CFLAGS		+= -Wall -W -Wformat-nonliteral
 CFLAGS		+= -g
 CFLAGS		+= $(EXTRA_CFLAGS)
+ASFLAGS		+= --fatal-warnings
 ASFLAGS		+= $(EXTRA_ASFLAGS)
 LDFLAGS		+= $(EXTRA_LDFLAGS)
 
