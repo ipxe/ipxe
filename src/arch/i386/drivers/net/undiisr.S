@@ -10,11 +10,9 @@
 	
 	.text
 	.arch i386
-	.section ".text16", "ax", @progbits
-	.section ".data16", "aw", @progbits
 	.code16
 
-	.section ".text16"
+	.section ".text16", "ax", @progbits
 	.globl undiisr
 undiisr:
 	
@@ -75,7 +73,7 @@ exit:	/* Restore registers and return */
 	popw	%ds
 	iret
 
-	.section ".data16"
+	.section ".data16", "aw", @progbits
 undinet_params:
 status:			.word	0
 funcflag:		.word	0

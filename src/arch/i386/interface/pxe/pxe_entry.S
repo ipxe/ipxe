@@ -18,15 +18,12 @@
  */
 
 	.arch i386
-	.section ".text16", "awx", @progbits
-	.section ".text16.data", "aw", @progbits
-	.section ".data16", "aw", @progbits
 
 /****************************************************************************
  * !PXE structure
  ****************************************************************************
  */
-	.section ".text16.data"
+	.section ".text16.data", "aw", @progbits
 	.globl ppxe
 	.align 16
 ppxe:
@@ -56,7 +53,7 @@ pxe_segments:
 	.size	ppxe, . - ppxe
 
 	/* Define undiheader=0 as a weak symbol for non-ROM builds */
-	.section ".weak"
+	.section ".weak", "a", @nobits
 	.weak	undiheader
 undiheader:
 
@@ -64,7 +61,7 @@ undiheader:
  * PXENV+ structure
  ****************************************************************************
  */
-	.section ".text16.data"
+	.section ".text16.data", "aw", @progbits
 	.globl pxenv
 	.align 16
 pxenv:
@@ -108,12 +105,12 @@ pxenv:
 	 * somebody at Wyse has difficulty distinguishing between the
 	 * words "may" and "must"...
 	 */
-	.section ".text16.null"
+	.section ".text16.null", "ax", @progbits
 	.code16
 pxenv_null_entry:
 	jmp	pxenv_entry
 
-	.section ".text16"
+	.section ".text16", "ax", @progbits
 	.code16
 pxenv_entry:
 	pushl	$pxe_api_call
@@ -137,7 +134,7 @@ pxenv_entry:
  *   none
  ****************************************************************************
  */
-	.section ".text16"
+	.section ".text16", "ax", @progbits
 	.code16
 pxe_entry:
 pxe_entry_sp:
@@ -186,7 +183,7 @@ pxe_entry_common:
  *   none
  ****************************************************************************
  */
-	.section ".text16"
+	.section ".text16", "ax", @progbits
 	.code16
 	.globl	pxe_int_1a
 pxe_int_1a:
@@ -205,6 +202,6 @@ pxe_int_1a:
 	popfw
 	ljmp	*%cs:pxe_int_1a_vector
 
-	.section ".text16.data"
+	.section ".text16.data", "aw", @progbits
 	.globl	pxe_int_1a_vector
 pxe_int_1a_vector:	.long 0

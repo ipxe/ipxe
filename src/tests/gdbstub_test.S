@@ -1,10 +1,10 @@
 	.arch i386
 
-	.section ".data"
+	.section ".data", "aw", @progbits
 watch_me:
 	.long 0xfeedbeef
 
-	.section ".text"
+	.section ".text", "ax", @progbits
 	.code32
 gdbstub_test:
 	/* 1. Read registers test */

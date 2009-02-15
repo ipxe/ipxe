@@ -19,9 +19,6 @@
 #define SIZEOF_I386_ALL_REGS	( SIZEOF_REAL_MODE_REGS + SIZEOF_I386_FLAGS )
 	
 	.arch i386
-	.section ".text16", "ax", @progbits
-	.section ".text16.data", "aw", @progbits
-	.section ".data16", "aw", @progbits
 
 /****************************************************************************
  * Global descriptor table
@@ -47,7 +44,7 @@
 #else
 #define RM_LIMIT_16_19__AVL__SIZE__GRANULARITY 0x00
 #endif
-	.section ".data16"
+	.section ".data16", "aw", @progbits
 	.align 16
 gdt:
 gdtr:		/* The first GDT entry is unused, the GDTR can fit here. */
@@ -99,7 +96,7 @@ gdt_end:
  *   %edi : Physical base of protected-mode code (virt_offset)
  ****************************************************************************
  */
-	.section ".text16"
+	.section ".text16", "ax", @progbits
 	.code16
 	.globl init_librm
 init_librm:
@@ -149,7 +146,7 @@ init_librm:
 	popl	%eax
 	lret
 
-	.section ".text16"
+	.section ".text16", "ax", @progbits
 	.code16
 	.weak idt_init
 set_seg_base:
@@ -177,7 +174,7 @@ idt_init: /* Reuse the return opcode here */
  *
  ****************************************************************************
  */
-	.section ".text16"
+	.section ".text16", "ax", @progbits
 	.code16
 real_to_prot:
 	/* Make sure we have our data segment available */
@@ -209,7 +206,7 @@ real_to_prot:
 	orb	$CR0_PE, %al
 	movl	%eax, %cr0
 	data32 ljmp	$VIRTUAL_CS, $1f
-	.section ".text"
+	.section ".text", "ax", @progbits
 	.code32
 1:
 	/* Set up protected-mode data segments and stack pointer */
@@ -240,7 +237,7 @@ real_to_prot:
 	ret
 
 	/* Default IDTR with no interrupts */
-	.section ".data16"
+	.section ".data16", "aw", @progbits
 	.weak idtr
 idtr:
 rm_idtr:
@@ -266,7 +263,7 @@ rm_idtr:
  *
  ****************************************************************************
  */
-	.section ".text"
+	.section ".text", "ax", @progbits
 	.code32
 prot_to_real:
 	/* Add return address to data to be moved to RM stack */
@@ -296,7 +293,7 @@ prot_to_real:
 	movw	%ax, %gs
 	movw	%ax, %ss
 	ljmp	$REAL_CS, $1f
-	.section ".text16"
+	.section ".text16", "ax", @progbits
 	.code16
 1:
 	/* Switch to real mode */
@@ -328,13 +325,13 @@ p2r_jump_target:
 	 * rather than .data16 because code needs to be able to locate
 	 * the data segment.
 	 */
-	.section ".data16"
+	.section ".data16", "aw", @progbits
 p2r_jump_vector:
 	.word	p2r_jump_target
 	.globl rm_cs
 rm_cs:	.word 0
 	.globl rm_ds
-	.section ".text16.data"
+	.section ".text16.data", "aw", @progbits
 rm_ds:	.word 0
 
 /****************************************************************************
@@ -378,7 +375,7 @@ rm_ds:	.word 0
 #define PC_OFFSET_FUNCTION ( PC_OFFSET_RETADDR + 4 )
 #define PC_OFFSET_END ( PC_OFFSET_FUNCTION + 4 )
 
-	.section ".text16"
+	.section ".text16", "ax", @progbits
 	.code16
 	.globl prot_call
 prot_call:
@@ -403,7 +400,7 @@ prot_call:
 	movl	$PC_OFFSET_END, %ecx
 	pushl	$1f
 	jmp	real_to_prot
-	.section ".text"
+	.section ".text", "ax", @progbits
 	.code32
 1:
 	/* Set up environment expected by C code */
@@ -419,7 +416,7 @@ prot_call:
 	movl	$PC_OFFSET_END, %ecx
 	pushl	$1f
 	jmp	prot_to_real
-	.section ".text16"
+	.section ".text16", "ax", @progbits
 	.code16
 1:	
 	/* Reload GDT and IDT, restore registers and flags and return */
@@ -475,7 +472,7 @@ prot_call:
 #define RC_OFFSET_FUNCTION ( RC_OFFSET_RETADDR + 4 )
 #define RC_OFFSET_END ( RC_OFFSET_FUNCTION + 4 )
 
-	.section ".text"
+	.section ".text", "ax", @progbits
 	.code32
 	.globl real_call
 real_call:
@@ -487,7 +484,7 @@ real_call:
 	movl	$( RC_OFFSET_RETADDR + 4 /* function pointer copy */ ), %ecx
 	pushl	$1f
 	jmp	prot_to_real
-	.section ".text16"
+	.section ".text16", "ax", @progbits
 	.code16
 1:
 	/* Call real-mode function */
@@ -503,7 +500,7 @@ real_call:
 	movl	$RC_OFFSET_RETADDR, %ecx
 	pushl	$1f
 	jmp	real_to_prot
-	.section ".text"
+	.section ".text", "ax", @progbits
 	.code32
 1:
 	/* Restore registers and return */
@@ -514,7 +511,7 @@ real_call:
 	/* Function vector, used because "call xx(%sp)" is not a valid
 	 * 16-bit expression.
 	 */
-	.section ".data16"
+	.section ".data16", "aw", @progbits
 rc_function:	.word 0, 0
 
 /****************************************************************************
@@ -551,7 +548,7 @@ rc_function:	.word 0, 0
  * to us.
  ****************************************************************************
  */
-	.section ".data"
+	.section ".data", "aw", @progbits
 	.globl rm_sp
 rm_sp:	.word 0
 	.globl rm_ss
@@ -567,13 +564,13 @@ pm_esp:	.long _estack
  ****************************************************************************
  */
 	/* Internal copies, created by init_librm (which runs in real mode) */
-	.section ".data16"
+	.section ".data16", "aw", @progbits
 _virt_offset:	.long 0
 _text16:	.long 0
 _data16:	.long 0
 
 	/* Externally-visible copies, created by real_to_prot */
-	.section ".data"
+	.section ".data", "aw", @progbits
 	.globl virt_offset
 virt_offset:	.long 0	
 	.globl text16

@@ -18,8 +18,6 @@
  */
 
 	.arch i386
-	.section ".prefix.lib", "awx", @progbits
-	.section ".data16", "aw", @progbits
 
 /**
  * High memory temporary load address
@@ -53,7 +51,7 @@
  *   %ds:di : next character in output buffer (if applicable)
  *****************************************************************************
  */
-	.section ".prefix.lib"
+	.section ".prefix.lib", "awx", @progbits
 	.code16
 	.globl	print_character
 print_character:
@@ -93,7 +91,7 @@ print_character:
  *   %ds:di : next character in output buffer (if applicable)
  *****************************************************************************
  */
-	.section ".prefix.lib"
+	.section ".prefix.lib", "awx", @progbits
 	.code16
 	.globl	print_message
 print_message:
@@ -123,7 +121,7 @@ print_message:
  *   %ds:di : next character in output buffer (if applicable)
  *****************************************************************************
  */
-	.section ".prefix.lib"
+	.section ".prefix.lib", "awx", @progbits
 	.code16
 	.globl	print_hex_dword
 print_hex_dword:
@@ -171,7 +169,7 @@ print_hex_nibble:
  *   %ds:di : next character in output buffer (if applicable)
  *****************************************************************************
  */
-	.section ".prefix.lib"
+	.section ".prefix.lib", "awx", @progbits
 	.code16
 	.globl	print_pci_busdevfn
 print_pci_busdevfn:
@@ -208,7 +206,7 @@ print_pci_busdevfn:
  *   %ds:di : next character in output buffer (if applicable)
  *****************************************************************************
  */
-	.section ".prefix.lib"
+	.section ".prefix.lib", "awx", @progbits
 	.code16
 	.globl	print_kill_line
 print_kill_line:
@@ -256,7 +254,7 @@ print_kill_line:
 #ifndef KEEP_IT_REAL
 
 	/* GDT for protected-mode calls */
-	.section ".prefix.lib"
+	.section ".prefix.lib", "awx", @progbits
 	.align 16
 pm_call_vars:
 gdt:
@@ -279,7 +277,7 @@ gdt_end:
 	.equ	gdt_length, . - gdt
 	.size	gdt, . - gdt
 
-	.section ".prefix.lib"
+	.section ".prefix.lib", "awx", @progbits
 	.align 16
 pm_saved_gdt:	
 	.long	0, 0
@@ -288,7 +286,7 @@ pm_saved_gdt:
 	.equ	pm_call_vars_size, . - pm_call_vars
 #define PM_CALL_VAR(x) ( -pm_call_vars_size + ( (x) - pm_call_vars ) )
 
-	.section ".prefix.lib"
+	.section ".prefix.lib", "awx", @progbits
 	.code16
 pm_call:
 	/* Preserve registers, flags, and RM return point */
@@ -411,7 +409,7 @@ set_seg_base:
  *   None
  ****************************************************************************
  */
-	.section ".prefix.lib"
+	.section ".prefix.lib", "awx", @progbits
 	.code16
 copy_bytes:
 	pushl %ecx
@@ -436,7 +434,7 @@ copy_bytes:
  *   none
  ****************************************************************************
  */
-	.section ".prefix.lib"
+	.section ".prefix.lib", "awx", @progbits
 	.code16
 install_block:
 	
@@ -533,7 +531,7 @@ install_block:
  *   none
  ****************************************************************************
  */
-	.section ".prefix.lib"
+	.section ".prefix.lib", "awx", @progbits
 	.code16
 	.globl	alloc_basemem
 alloc_basemem:
@@ -581,7 +579,7 @@ alloc_basemem:
  *   none
  ****************************************************************************
  */
-	.section ".text16"
+	.section ".text16", "ax", @progbits
 	.code16
 	.globl	free_basemem
 free_basemem:
@@ -613,7 +611,7 @@ free_basemem:
 	ret
 	.size free_basemem, . - free_basemem
 
-	.section ".text16.data"
+	.section ".text16.data", "aw", @progbits
 	.globl	hooked_bios_interrupts
 hooked_bios_interrupts:
 	.word	0
@@ -633,7 +631,7 @@ hooked_bios_interrupts:
  *   none
  ****************************************************************************
  */
-	.section ".prefix.lib"
+	.section ".prefix.lib", "awx", @progbits
 	.code16
 	.globl install
 install:
@@ -668,7 +666,7 @@ install:
  *   none
  ****************************************************************************
  */
-	.section ".prefix.lib"
+	.section ".prefix.lib", "awx", @progbits
 	.code16
 	.globl install_prealloc
 install_prealloc:
@@ -750,7 +748,7 @@ install_prealloc:
 	.size install_prealloc, . - install_prealloc
 
 	/* Vectors for far calls to .text16 functions */
-	.section ".data16"
+	.section ".data16", "aw", @progbits
 #ifdef KEEP_IT_REAL
 init_libkir_vector:
 	.word init_libkir
@@ -781,7 +779,7 @@ prot_call_vector:
  *   none
  ****************************************************************************
  */
-	.section ".text16"
+	.section ".text16", "ax", @progbits
 	.code16
 	.globl uninstall
 uninstall:

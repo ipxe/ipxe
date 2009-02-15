@@ -11,7 +11,7 @@
  * Interrupt Descriptor Table
  ****************************************************************************
  */
-	.section ".data16"
+	.section ".data16", "aw", @progbits
 	.globl idtr
 idtr:
 idt_limit:
@@ -68,7 +68,7 @@ idt_fixed:
  * Destroys %ax, %bx, and %di.
  ****************************************************************************
  */
-	.section ".text16"
+	.section ".text16", "ax", @progbits
 	.code16
 	.globl idt_init
 idt_init:
@@ -100,7 +100,7 @@ idt_init:
  * Interrupt handlers
  ****************************************************************************
  */
-	.section ".text"
+	.section ".text", "ax", @progbits
 	.code32
 
 /* POSIX signal numbers for reporting traps to GDB */

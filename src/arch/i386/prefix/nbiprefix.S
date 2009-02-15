@@ -1,9 +1,7 @@
 	.text
 	.arch i386
-	.section ".prefix", "ax", @progbits
-	.section ".prefix.data", "aw", @progbits
 	.code16
-	.section ".prefix"
+	.section ".prefix", "ax", @progbits
 	.org 0
 
 nbi_header:

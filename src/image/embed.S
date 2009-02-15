@@ -1,4 +1,4 @@
-	.section ".data", "aw"
+	.section ".data", "aw", @progbits
 	.balign 4
 	.globl _embedded_image_start
 _embedded_image_start:

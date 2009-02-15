@@ -6,8 +6,6 @@
 	.text
 	.arch i386
 	.org 0
-	.section ".prefix", "ax", @progbits
-	.section ".prefix.data", "aw", @progbits
 	.code16
 
 #include <undi.h>
@@ -16,7 +14,7 @@
  * Entry point:	set operating context, print welcome message
  *****************************************************************************
  */
-	.section ".prefix"
+	.section ".prefix", "ax", @progbits
 	/* Set up our non-stack segment registers */
 	jmp	$0x7c0, $1f
 1:	movw	%cs, %ax
@@ -39,7 +37,7 @@
 	movw	$10f, %si
 	xorw	%di, %di
 	call	print_message
-	.section ".prefix.data"
+	.section ".prefix.data", "aw", @progbits
 10:	.asciz	"PXE->EB:"
 	.previous
 
@@ -70,7 +68,7 @@ detect_pxenv:
 	movb	$',', %al
 	call	print_character
 	jmp	99f
-	.section ".prefix.data"
+	.section ".prefix.data", "aw", @progbits
 10:	.asciz	" PXENV+ at "
 	.previous
 
@@ -108,7 +106,7 @@ detect_ppxe:
 	movb	$',', %al
 	call	print_character
 	jmp	99f
-	.section ".prefix.data"
+	.section ".prefix.data", "aw", @progbits
 10:	.asciz	" !PXE at "
 	.previous
 
@@ -131,7 +129,7 @@ check_have_stack:
 	movw	$10f, %si
 	call	print_message
 	jmp	finished
-	.section ".prefix.data"
+	.section ".prefix.data", "aw", @progbits
 10:	.asciz	" No PXE stack found!\n"
 	.previous
 99:	
@@ -169,7 +167,7 @@ print_structure_information:
 	call	print_message
 	les	entry_segoff, %bx
 	call	print_segoff
-	.section ".prefix.data"
+	.section ".prefix.data", "aw", @progbits
 10:	.asciz	" entry point at "
 	.previous
 	/* Print UNDI code segment */
@@ -177,7 +175,7 @@ print_structure_information:
 	call	print_message
 	les	undi_code_segoff, %bx
 	call	print_segoff
-	.section ".prefix.data"
+	.section ".prefix.data", "aw", @progbits
 10:	.asciz	"\n         UNDI code segment "
 	.previous
 	/* Print UNDI data segment */
@@ -185,7 +183,7 @@ print_structure_information:
 	call	print_message
 	les	undi_data_segoff, %bx
 	call	print_segoff
-	.section ".prefix.data"
+	.section ".prefix.data", "aw", @progbits
 10:	.asciz	", data segment "
 	.previous
 	/* Print UNDI memory usage */
@@ -199,7 +197,7 @@ print_structure_information:
 	call	print_word
 	movw	$20f, %si
 	call	print_message
-	.section ".prefix.data"
+	.section ".prefix.data", "aw", @progbits
 10:	.asciz	" ("
 20:	.asciz	"kB)\n"
 	.previous
@@ -233,7 +231,7 @@ pci_physical_device:
 	movb	$0x0a, %al
 	call	print_character
 	jmp	99f
-	.section ".prefix.data"
+	.section ".prefix.data", "aw", @progbits
 10:	.asciz	"         UNDI device is PCI "
 	.previous
 
@@ -241,7 +239,7 @@ no_physical_device:
 	/* No device found, or device type not understood */
 	movw	$10f, %si
 	call	print_message
-	.section ".prefix.data"
+	.section ".prefix.data", "aw", @progbits
 10:	.asciz	"         Unable to determine UNDI physical device\n"
 	.previous
 
@@ -308,7 +306,7 @@ print_free_basemem:
 	call	print_word
 	movw	$20f, %si
 	call	print_message
-	.section ".prefix.data"
+	.section ".prefix.data", "aw", @progbits
 10:	.asciz	"         "
 20:	.asciz	"kB free base memory after PXE unload\n"
 	.previous
@@ -503,7 +501,7 @@ print_pxe_error:
 	call	print_message
 	popw	%si
 	ret
-	.section ".prefix.data"
+	.section ".prefix.data", "aw", @progbits
 10:	.asciz	"         UNDI API call "
 20:	.asciz	" failed: status code "
 30:	.asciz	"\n"
