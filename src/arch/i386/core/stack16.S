@@ -4,7 +4,7 @@
  * Internal stack
  ****************************************************************************
  */
-	.section ".stack16"
+	.section ".stack16", "aw", @nobits
 	.align 8
 	.globl _stack16
 _stack16:
