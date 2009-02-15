@@ -92,7 +92,7 @@ static int init_eheap ( void ) {
 		}
 	}
 
-	if ( ! top ) {
+	if ( ! heap_size ) {
 		DBG ( "No external heap available\n" );
 		return -ENOMEM;
 	}
@@ -139,9 +139,9 @@ static userptr_t memtop_urealloc ( userptr_t ptr, size_t new_size ) {
 	int rc;
 
 	/* Initialise external memory allocator if necessary */
-	if ( ! top  ) {
+	if ( bottom == top ) {
 		if ( ( rc = init_eheap() ) != 0 )
-			return rc;
+			return UNULL;
 	}
 
 	/* Get block properties into extmem */
