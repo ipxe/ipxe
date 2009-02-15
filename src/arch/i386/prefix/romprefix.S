@@ -345,20 +345,22 @@ got_pmm: /* PMM allocation succeeded */
 	shll	$9, %ecx
 	addr32 rep movsb	/* PMM presence implies flat real mode */
 	movl	%edi, decompress_to
-	/* Shrink ROM and update checksum */
+	/* Shrink ROM */
+	movb	$_prefix_memsz_sect, romheader_size
+pmm_fail:
+	/* Restore upper register halves */
+	popal
+no_pmm:
+
+	/* Update checksum */
 	xorw	%bx, %bx
 	xorw	%si, %si
-	movw	$_prefix_memsz_sect, %cx
-	movb	%cl, romheader_size
+	movzbw	romheader_size, %cx
 	shlw	$9, %cx
 1:	lodsb
 	addb	%al, %bl
 	loop	1b
 	subb	%bl, checksum
-pmm_fail:
-	/* Restore upper register halves */
-	popal
-no_pmm:
 
 	/* Copy self to option ROM space.  Required for PCI3.0, which
 	 * loads us to a temporary location in low memory.  Will be a
