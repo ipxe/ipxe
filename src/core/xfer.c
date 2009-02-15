@@ -28,6 +28,14 @@
  */
 
 /**
+ * Dummy transfer metadata
+ *
+ * This gets passed to xfer_interface::deliver_iob() and equivalents
+ * when no metadata is available.
+ */
+static struct xfer_metadata dummy_metadata;
+
+/**
  * Close data transfer interface
  *
  * @v xfer		Data transfer interface
@@ -159,7 +167,6 @@ int xfer_deliver_iob_meta ( struct xfer_interface *xfer,
  */
 int xfer_deliver_iob ( struct xfer_interface *xfer,
 		       struct io_buffer *iobuf ) {
-	static struct xfer_metadata dummy_metadata;
 	return xfer_deliver_iob_meta ( xfer, iobuf, &dummy_metadata );
 }
 
@@ -366,7 +373,7 @@ int xfer_deliver_as_iob ( struct xfer_interface *xfer,
 		return -ENOMEM;
 
 	memcpy ( iob_put ( iobuf, len ), data, len );
-	return xfer->op->deliver_iob ( xfer, iobuf, NULL );
+	return xfer->op->deliver_iob ( xfer, iobuf, &dummy_metadata );
 }
 
 /**

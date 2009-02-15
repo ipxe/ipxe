@@ -390,7 +390,7 @@ static struct io_buffer * udp_alloc_iob ( struct xfer_interface *xfer,
  *
  * @v xfer		Data transfer interface
  * @v iobuf		Datagram I/O buffer
- * @v meta		Data transfer metadata, or NULL
+ * @v meta		Data transfer metadata
  * @ret rc		Return status code
  */
 static int udp_xfer_deliver_iob ( struct xfer_interface *xfer,
@@ -398,19 +398,10 @@ static int udp_xfer_deliver_iob ( struct xfer_interface *xfer,
 				  struct xfer_metadata *meta ) {
 	struct udp_connection *udp =
 		container_of ( xfer, struct udp_connection, xfer );
-	struct sockaddr_tcpip *src = NULL;
-	struct sockaddr_tcpip *dest = NULL;
-	struct net_device *netdev = NULL;
-
-	/* Apply xfer metadata */
-	if ( meta ) {
-		src = ( struct sockaddr_tcpip * ) meta->src;
-		dest = ( struct sockaddr_tcpip * ) meta->dest;
-		netdev = meta->netdev;
-	}
 
 	/* Transmit data, if possible */
-	udp_tx ( udp, iobuf, src, dest, netdev );
+	udp_tx ( udp, iobuf, ( ( struct sockaddr_tcpip * ) meta->src ),
+		 ( ( struct sockaddr_tcpip * ) meta->dest ), meta->netdev );
 
 	return 0;
 }

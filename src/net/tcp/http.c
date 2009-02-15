@@ -321,7 +321,7 @@ static int http_rx_data ( struct http_request *http,
  *
  * @v socket		Transport layer interface
  * @v iobuf		I/O buffer
- * @v meta		Data transfer metadata, or NULL
+ * @v meta		Data transfer metadata
  * @ret rc		Return status code
  */
 static int http_socket_deliver_iob ( struct xfer_interface *socket,

@@ -1052,12 +1052,6 @@ static int dhcp_deliver_iob ( struct xfer_interface *xfer,
 	int rc = 0;
 
 	/* Sanity checks */
-	if ( ! meta ) {
-		DBGC ( dhcp, "DHCP %p received packet without metadata\n",
-		       dhcp );
-		rc = -EINVAL;
-		goto err_no_meta;
-	}
 	if ( ! meta->src ) {
 		DBGC ( dhcp, "DHCP %p received packet without source port\n",
 		       dhcp );
@@ -1106,7 +1100,6 @@ static int dhcp_deliver_iob ( struct xfer_interface *xfer,
 	dhcppkt_put ( dhcppkt );
  err_alloc_dhcppkt:
  err_no_src:
- err_no_meta:
 	free_iob ( iobuf );
 	return rc;
 }

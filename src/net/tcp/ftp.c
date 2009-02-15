@@ -380,7 +380,7 @@ static void ftp_data_closed ( struct xfer_interface *data, int rc ) {
  *
  * @v xfer		FTP data channel interface
  * @v iobuf		I/O buffer
- * @v meta		Data transfer metadata, or NULL
+ * @v meta		Data transfer metadata
  * @ret rc		Return status code
  */
 static int ftp_data_deliver_iob ( struct xfer_interface *data,

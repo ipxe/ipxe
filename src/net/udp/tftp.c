@@ -839,7 +839,7 @@ static int tftp_rx_error ( struct tftp_request *tftp, void *buf, size_t len ) {
  *
  * @v tftp		TFTP connection
  * @v iobuf		I/O buffer
- * @v meta		Transfer metadata, or NULL
+ * @v meta		Transfer metadata
  * @ret rc		Return status code
  */
 static int tftp_rx ( struct tftp_request *tftp,
@@ -854,11 +854,6 @@ static int tftp_rx ( struct tftp_request *tftp,
 	if ( len < sizeof ( *common ) ) {
 		DBGC ( tftp, "TFTP %p received underlength packet length "
 		       "%zd\n", tftp, len );
-		goto done;
-	}
-	if ( ! meta ) {
-		DBGC ( tftp, "TFTP %p received packet without metadata\n",
-		       tftp );
 		goto done;
 	}
 	if ( ! meta->src ) {
@@ -907,7 +902,7 @@ static int tftp_rx ( struct tftp_request *tftp,
  *
  * @v socket		Transport layer interface
  * @v iobuf		I/O buffer
- * @v meta		Transfer metadata, or NULL
+ * @v meta		Transfer metadata
  * @ret rc		Return status code
  */
 static int tftp_socket_deliver_iob ( struct xfer_interface *socket,
@@ -951,7 +946,7 @@ static struct xfer_interface_operations tftp_socket_operations = {
  *
  * @v mc_socket		Multicast transport layer interface
  * @v iobuf		I/O buffer
- * @v meta		Transfer metadata, or NULL
+ * @v meta		Transfer metadata
  * @ret rc		Return status code
  */
 static int tftp_mc_socket_deliver_iob ( struct xfer_interface *mc_socket,

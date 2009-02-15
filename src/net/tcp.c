@@ -1033,7 +1033,7 @@ static size_t tcp_xfer_window ( struct xfer_interface *xfer ) {
  *
  * @v xfer		Data transfer interface
  * @v iobuf		Datagram I/O buffer
- * @v meta		Data transfer metadata, or NULL
+ * @v meta		Data transfer metadata
  * @ret rc		Return status code
  */
 static int tcp_xfer_deliver_iob ( struct xfer_interface *xfer,
