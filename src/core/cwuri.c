@@ -36,6 +36,9 @@ struct uri *cwuri = NULL;
  * @v uri		New working URI, or NULL
  */
 void churi ( struct uri *uri ) {
+	struct uri *new_uri;
+
+	new_uri = resolve_uri ( cwuri, uri );
 	uri_put ( cwuri );
-	cwuri = uri_get ( uri );
+	cwuri = new_uri;
 }
