@@ -175,10 +175,10 @@ init:
 	/* Fill in product name string, if possible */
 	movw	$prodstr_pci_id, %di
 	call	print_pci_busdevfn
-	movb	$' ', prodstr_separator
+	movb	$( ' ' ), prodstr_separator
 
 	/* Print segment address */
-	movb	$' ', %al
+	movb	$( ' ' ), %al
 	xorw	%di, %di
 	call	print_character
 	movw	%cs, %ax
@@ -201,7 +201,7 @@ init:
 	call	print_message
 	movb	%bh, %al
 	call	print_hex_nibble
-	movb	$'.', %al
+	movb	$( '.' ), %al
 	call	print_character
 	movb	%bl, %al
 	call	print_hex_byte
@@ -224,7 +224,7 @@ init:
 	cmpw	%bx, %ax
 	jbe	1f
 pci3_insane: /* PCI 3.0 with insane %gs value: print error and ignore %gs */
-	movb	$'!', %al
+	movb	$( '!' ), %al
 	call	print_character
 	movw	%gs, %ax
 	call	print_hex_word
@@ -332,7 +332,7 @@ got_pmm: /* PMM allocation succeeded */
 	movw	%dx, %ax
 	xorw	%di, %di
 	call	print_hex_word
-	movb	$'@', %al
+	movb	$( '@' ), %al
 	call	print_character
 	movw	%si, %ax
 	call	print_hex_byte
@@ -366,7 +366,7 @@ no_pmm:
 	 * loads us to a temporary location in low memory.  Will be a
 	 * no-op for lower PCI versions.
 	 */
-	movb	$' ', %al
+	movb	$( ' ' ), %al
 	xorw	%di, %di
 	call	print_character
 	movw	%gs, %ax

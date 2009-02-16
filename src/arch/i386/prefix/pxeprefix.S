@@ -65,7 +65,7 @@ detect_pxenv:
 	movw	$10f, %si
 	call	print_message
 	call	print_segoff
-	movb	$',', %al
+	movb	$( ',' ), %al
 	call	print_character
 	jmp	99f
 	.section ".prefix.data", "aw", @progbits
@@ -103,7 +103,7 @@ detect_ppxe:
 	movw	$10f, %si
 	call	print_message
 	call	print_segoff
-	movb	$',', %al
+	movb	$( ',' ), %al
 	call	print_character
 	jmp	99f
 	.section ".prefix.data", "aw", @progbits
@@ -191,7 +191,7 @@ print_structure_information:
 	call	print_message
 	movw	undi_fbms_start, %ax
 	call	print_word
-	movb	$'-', %al
+	movb	$( '-' ), %al
 	call	print_character
 	movw	undi_fbms_end, %ax
 	call	print_word
@@ -334,7 +334,7 @@ print_segoff:
 	/* Print "<segment>:offset" */
 	movw	%es, %ax
 	call	print_hex_word
-	movb	$':', %al
+	movb	$( ':' ), %al
 	call	print_character
 	movw	%bx, %ax
 	call	print_hex_word

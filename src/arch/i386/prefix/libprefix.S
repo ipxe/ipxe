@@ -179,14 +179,14 @@ print_pci_busdevfn:
 	xchgb	%al, %ah
 	call	print_hex_byte
 	/* Print ":" */
-	movb	$':', %al
+	movb	$( ':' ), %al
 	call	print_character
 	/* Print device */
 	movb	%ah, %al
 	shrb	$3, %al
 	call	print_hex_byte
 	/* Print "." */
-	movb	$'.', %al
+	movb	$( '.' ), %al
 	call	print_character
 	/* Print function */
 	movb	%ah, %al
@@ -214,15 +214,15 @@ print_kill_line:
 	pushw	%ax
 	pushw	%cx
 	/* Print CR */
-	movb	$'\r', %al
+	movb	$( '\r' ), %al
 	call	print_character
 	/* Print 79 spaces */
-	movb	$' ', %al
+	movb	$( ' ' ), %al
 	movw	$79, %cx
 1:	call	print_character
 	loop	1b
 	/* Print CR */
-	movb	$'\r', %al
+	movb	$( '\r' ), %al
 	call	print_character
 	/* Restore registers and return */
 	popw	%cx
