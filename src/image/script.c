@@ -94,6 +94,12 @@ static int script_load ( struct image *image ) {
 	static const char magic[] = "#!gpxe\n";
 	char test[ sizeof ( magic ) - 1 ];
 
+	/* Sanity check */
+	if ( image->len < sizeof ( test ) ) {
+		DBG ( "Too short to be a script\n" );
+		return -ENOEXEC;
+	}
+
 	/* Check for magic signature */
 	copy_from_user ( test, image->data, 0, sizeof ( test ) );
 	if ( memcmp ( test, magic, sizeof ( test ) ) != 0 ) {

@@ -88,6 +88,12 @@ int pxe_load ( struct image *image ) {
 	if ( filesz > ( 0xa0000 - 0x7c00 ) )
 		return -ENOEXEC;
 
+	/* Rejecting zero-length images is also useful, since these
+	 * end up looking to the user like bugs in gPXE.
+	 */
+	if ( ! filesz )
+		return -ENOEXEC;
+
 	/* There are no signature checks for PXE; we will accept anything */
 	if ( ! image->type )
 		image->type = &pxe_image_type;
