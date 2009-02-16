@@ -66,7 +66,9 @@ __asm__ ( ".equ\t" OBJECT_SYMBOL_STR ", 0" );
  * This is a stronger claim than specifying "-fvisibility=hidden",
  * since it also affects symbols marked with "extern".
  */
+#if __GNUC__ >= 4
 #pragma GCC visibility push(hidden)
+#endif
 
 /** @def DBG
  *
