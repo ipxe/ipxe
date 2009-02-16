@@ -23,7 +23,6 @@
 #include <gpxe/dhcp.h>
 #include <gpxe/settings.h>
 #include <gpxe/image.h>
-#include <gpxe/embedded.h>
 #include <gpxe/sanboot.h>
 #include <gpxe/uri.h>
 #include <usr/ifmgmt.h>
@@ -57,30 +56,6 @@ static struct sanboot_protocol sanboot_protocols_end[0] \
  */
 static struct net_device * find_boot_netdev ( void ) {
 	return NULL;
-}
-
-/**
- * Boot embedded image
- *
- * @ret rc		Return status code
- */
-static int boot_embedded_image ( void ) {
-	struct image *image;
-	int rc;
-
-	image = embedded_image();
-	if ( !image )
-		return ENOENT;
-
-	if ( ( rc = imgload ( image ) ) != 0 ) {
-		printf ( "Could not load embedded image: %s\n",
-			 strerror ( rc ) );
-	} else if ( ( rc = imgexec ( image ) ) != 0 ) {
-		printf ( "Could not boot embedded image: %s\n",
-			 strerror ( rc ) );
-	}
-	image_put ( image );
-	return rc;
 }
 
 /**
@@ -195,11 +170,6 @@ static int netboot ( struct net_device *netdev ) {
 	if ( ( rc = dhcp ( netdev ) ) != 0 )
 		return rc;
 	route();
-
-	/* Try to boot an embedded image if we have one */
-	rc = boot_embedded_image ();
-	if ( rc != ENOENT )
-		return rc;
 
 	/* Try PXE menu boot, if applicable */
 	fetch_string_setting ( NULL, &vendor_class_id_setting,

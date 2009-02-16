@@ -218,3 +218,4 @@ REQUIRE_OBJECT ( gdbstub_cmd );
  *
  */
 REQUIRE_OBJECT ( device );
+REQUIRE_OBJECT ( embedded );

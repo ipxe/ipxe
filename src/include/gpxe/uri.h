@@ -7,6 +7,7 @@
  *
  */
 
+#include <stddef.h>
 #include <stdlib.h>
 #include <gpxe/refcnt.h>
 

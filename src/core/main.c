@@ -19,6 +19,7 @@ Literature dealing with the network protocols:
 #include <gpxe/features.h>
 #include <gpxe/shell.h>
 #include <gpxe/shell_banner.h>
+#include <gpxe/image.h>
 #include <usr/autoboot.h>
 #include <config/general.h>
 
@@ -36,6 +37,7 @@ static struct feature features_end[0] __table_end ( struct feature, features );
  */
 __asmcall int main ( void ) {
 	struct feature *feature;
+	struct image *image;
 
 	/* Some devices take an unreasonably long time to initialise */
 	printf ( PRODUCT_SHORT_NAME " initialising devices...\n" );
@@ -68,11 +70,16 @@ __asmcall int main ( void ) {
 		/* User wants shell; just give them a shell */
 		shell();
 	} else {
-		/* User doesn't want shell; try booting.  If booting
-		 * fails, offer a second chance to enter the shell for
-		 * diagnostics.
+		/* User doesn't want shell; load and execute the first
+		 * image.  If booting fails (i.e. if the image
+		 * returns, or fails to execute), offer a second
+		 * chance to enter the shell for diagnostics.
 		 */
-		autoboot();
+		for_each_image ( image ) {
+			image_exec ( image );
+			break;
+		}
+
 		if ( shell_banner() )
 			shell();
 	}

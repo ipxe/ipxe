@@ -1,0 +1,4 @@
+#!gpxe
+dhcp net0
+imgload img1
+boot img1

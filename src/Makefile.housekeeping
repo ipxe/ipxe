@@ -85,6 +85,13 @@ VERYCLEANUP	+= .toolcheck
 # Check for various tool workarounds
 #
 
+# Make syntax does not allow use of comma or space in certain places.
+# This ugly workaround is suggested in the manual.
+#
+COMMA	:= ,
+EMPTY	:=
+SPACE	:= $(EMPTY) $(EMPTY)
+
 # Check for an old version of gas (binutils 2.9.1)
 #
 OLDGAS	:= $(shell $(AS) --version | grep -q '2\.9\.1' && $(ECHO) -DGAS291)
@@ -280,9 +287,9 @@ ASFLAGS		+= --fatal-warnings
 ASFLAGS		+= $(EXTRA_ASFLAGS)
 LDFLAGS		+= $(EXTRA_LDFLAGS)
 
-# Embedded image, if present
+# Embedded image(s), or default if not set
 #
-EMBEDDED_IMAGE	= /dev/null
+EMBEDDED_IMAGE	= image/default.gpxe
 
 # Inhibit -Werror if NO_WERROR is specified on make command line
 #
@@ -406,13 +413,31 @@ drivers :
 roms :
 	@$(ECHO) $(ROMS)
 
-# Embedded binary
-$(BIN)/embedimg.bin: $(EMBEDDED_IMAGE)
-	$(QM)$(ECHO) "  [COPY] $@"
-	$(Q)$(CP) -f $(EMBEDDED_IMAGE) $@
+# List of embedded images included in the last build of embedded.o.
+# This is needed in order to correctly rebuild embedded.o whenever the
+# list of objects changes.
+#
+EMBEDDED_LIST	:= $(BIN)/.embedded.list
+ifeq ($(wildcard $(EMBEDDED_LIST)),)
+EMBEDDED_LIST_IMAGE :=
+else
+EMBEDDED_LIST_IMAGE := $(shell cat $(EMBEDDED_LIST))
+endif
+ifneq ($(EMBEDDED_LIST_IMAGE),$(EMBEDDED_IMAGE))
+$(shell $(ECHO) "$(EMBEDDED_IMAGE)" > $(EMBEDDED_LIST))
+endif
 
-$(BIN)/embed.o: $(BIN)/embedimg.bin
-CFLAGS_embed = -DEMBEDIMG=\"$(BIN)/embedimg.bin\"
+$(EMBEDDED_LIST) :
+
+VERYCLEANUP	+= $(EMBEDDED_LIST)
+
+EMBEDDED_FILES	:= $(subst $(COMMA), ,$(EMBEDDED_IMAGE))
+EMBED_ALL	:= $(foreach i,$(shell seq 1 $(words $(EMBEDDED_FILES))),\
+		     EMBED ( $(i), \"$(word $(i), $(EMBEDDED_FILES))\",\
+			     \"$(notdir $(word $(i),$(EMBEDDED_FILES)))\" ))
+
+$(BIN)/embedded.o : $(EMBEDDED_FILES) $(EMBEDDED_LIST)
+CFLAGS_embedded = -DEMBED_ALL="$(EMBED_ALL)"
 
 # Generate the NIC file from the parsed source files.  The NIC file is
 # only for rom-o-matic.
@@ -491,7 +516,6 @@ TGT_MAKEROM_FLAGS = $(strip $(MAKEROM_FLAGS_$(TGT_ROM_NAME)) \
 # Calculate list of debugging versions of objects to be included in
 # the target.
 #
-COMMA		:= ,
 DEBUG_LIST	= $(subst $(COMMA), ,$(DEBUG))
 DEBUG_OBJ_LEVEL	= $(firstword $(word 2,$(subst :, ,$(1))) 1)
 DEBUG_OBJ_BASE	= $(word 1,$(subst :, ,$(1))).dbg$(call DEBUG_OBJ_LEVEL,$(1))

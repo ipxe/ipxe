@@ -1,0 +1,8 @@
+#!gpxe
+ifopen net0
+set net0/ip 10.0.2.15
+set net0/netmask 255.255.255.0
+set net0/gateway 10.0.2.2
+set net0/dns 10.0.2.3
+kernel http://etherboot.org/gtest/gtest.gpxe
+boot gtest.gpxe
