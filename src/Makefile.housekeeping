@@ -283,7 +283,6 @@ CFLAGS		+= -Os -ffreestanding
 CFLAGS		+= -Wall -W -Wformat-nonliteral
 CFLAGS		+= -g
 CFLAGS		+= $(EXTRA_CFLAGS)
-ASFLAGS		+= --fatal-warnings
 ASFLAGS		+= $(EXTRA_ASFLAGS)
 LDFLAGS		+= $(EXTRA_LDFLAGS)
 
@@ -295,6 +294,7 @@ EMBEDDED_IMAGE	= image/default.gpxe
 #
 ifneq ($(NO_WERROR),1)
 CFLAGS		+= -Werror
+ASFLAGS		+= --fatal-warnings
 endif
 
 # compiler.h is needed for our linking and debugging system
