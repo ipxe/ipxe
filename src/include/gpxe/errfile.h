@@ -139,6 +139,7 @@
 #define ERRFILE_slam			( ERRFILE_NET | 0x00160000 )
 #define ERRFILE_ib_sma			( ERRFILE_NET | 0x00170000 )
 #define ERRFILE_ib_packet		( ERRFILE_NET | 0x00180000 )
+#define ERRFILE_icmp			( ERRFILE_NET | 0x00190000 )
 
 #define ERRFILE_image		      ( ERRFILE_IMAGE | 0x00000000 )
 #define ERRFILE_elf		      ( ERRFILE_IMAGE | 0x00010000 )

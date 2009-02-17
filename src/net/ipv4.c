@@ -627,3 +627,6 @@ static int ipv4_create_routes ( void ) {
 struct settings_applicator ipv4_settings_applicator __settings_applicator = {
 	.apply = ipv4_create_routes,
 };
+
+/* Drag in ICMP */
+REQUIRE_OBJECT ( icmp );
