@@ -391,10 +391,10 @@ static void http_step ( struct process *process ) {
 	const char *host = http->uri->host;
 	const char *query = http->uri->query;
 	const char *user = http->uri->user;
-	const char *password = http->uri->password;
-	size_t user_pw_len = ( ( user && password ) ?
-			       ( strlen ( user ) + 1 /* ":" */ +
-				 strlen ( password ) ) : 0 );
+	const char *password =
+		( http->uri->password ? http->uri->password : "" );
+	size_t user_pw_len = ( user ? ( strlen ( user ) + 1 /* ":" */ +
+					strlen ( password ) ) : 0 );
 	size_t user_pw_base64_len = base64_encoded_len ( user_pw_len );
 	char user_pw[ user_pw_len + 1 /* NUL */ ];
 	char user_pw_base64[ user_pw_base64_len + 1 /* NUL */ ];
@@ -406,7 +406,7 @@ static void http_step ( struct process *process ) {
 		process_del ( &http->process );
 
 		/* Construct authorisation, if applicable */
-		if ( user_pw_len ) {
+		if ( user ) {
 			char *buf = user_pw;
 			ssize_t remaining = sizeof ( user_pw );
 			size_t len;
@@ -435,11 +435,10 @@ static void http_step ( struct process *process ) {
 					  ( path ? path : "/" ),
 					  ( query ? "?" : "" ),
 					  ( query ? query : "" ),
-					  ( user_pw_len ?
+					  ( user ?
 					    "Authorization: Basic " : "" ),
-					  ( user_pw_len ?
-					    user_pw_base64 : "" ),
-					  ( user_pw_len ? "\r\n" : "" ),
+					  ( user ? user_pw_base64 : "" ),
+					  ( user ? "\r\n" : "" ),
 					  host ) ) != 0 ) {
 			http_done ( http, rc );
 		}
