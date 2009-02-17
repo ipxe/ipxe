@@ -24,14 +24,22 @@ struct edit_box {
 	unsigned int width;
 	/** First displayed character */
 	unsigned int first;
+	/** Flags */
+	unsigned int flags;
+};
+
+/** Editable text box widget flags */
+enum edit_box_flags {
+	/** Show stars instead of contents (for password widgets) */
+	EDITBOX_STARS = 0x0001,
 };
 
 extern void init_editbox ( struct edit_box *box, char *buf, size_t len,
 			   WINDOW *win, unsigned int row, unsigned int col,
-			   unsigned int width ) 
+			   unsigned int width, unsigned int flags )
 			   __attribute__ (( nonnull (1, 2) ));
 extern void draw_editbox ( struct edit_box *box ) __nonnull;
-static inline int __pure edit_editbox ( struct edit_box *box, int key ) __nonnull;
+static inline int edit_editbox ( struct edit_box *box, int key ) __nonnull;
 
 /**
  * Edit text box widget

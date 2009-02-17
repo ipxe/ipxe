@@ -123,7 +123,7 @@ static void load_setting ( struct setting_widget *widget ) {
 	init_editbox ( &widget->editbox, widget->value,
 		       sizeof ( widget->value ), NULL, widget->row,
 		       ( widget->col + offsetof ( struct setting_row, value )),
-		       sizeof ( ( ( struct setting_row * ) NULL )->value ) );
+		       sizeof ( ( ( struct setting_row * ) NULL )->value ), 0);
 }
 
 /**
