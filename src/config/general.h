@@ -100,6 +100,7 @@
 #define IMAGE_CMD		/* Image management commands */
 #define DHCP_CMD		/* DHCP management commands */
 #define SANBOOT_CMD		/* SAN boot commands */
+#define LOGIN_CMD		/* Login command */
 
 /*
  * Obscure configuration options

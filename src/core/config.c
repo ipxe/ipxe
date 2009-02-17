@@ -193,6 +193,9 @@ REQUIRE_OBJECT ( dhcp_cmd );
 #ifdef SANBOOT_CMD
 REQUIRE_OBJECT ( sanboot_cmd );
 #endif
+#ifdef LOGIN_CMD
+REQUIRE_OBJECT ( login_cmd );
+#endif
 
 /*
  * Drag in miscellaneous objects

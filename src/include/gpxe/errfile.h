@@ -171,6 +171,7 @@
 #define ERRFILE_efi_smbios	      ( ERRFILE_OTHER | 0x00140000 )
 #define ERRFILE_pxemenu		      ( ERRFILE_OTHER | 0x00150000 )
 #define ERRFILE_x509		      ( ERRFILE_OTHER | 0x00160000 )
+#define ERRFILE_login_ui	      ( ERRFILE_OTHER | 0x00170000 )
 
 /** @} */
 
