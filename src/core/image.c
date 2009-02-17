@@ -275,8 +275,7 @@ int image_exec ( struct image *image ) {
 	/* Pick up replacement image before we drop the original
 	 * image's temporary reference.
 	 */
-	if ( ( replacement = image->replacement ) != NULL )
-		image_get ( replacement );
+	replacement = image->replacement;
 
 	/* Drop temporary reference to the original image */
 	image_put ( image );

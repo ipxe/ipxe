@@ -157,7 +157,7 @@ void comboot_force_text_mode ( void ) {
  * Fetch kernel and optional initrd
  */
 static int comboot_fetch_kernel ( char *kernel_file, char *cmdline ) {
-	struct image *kernel;
+	struct image *kernel = NULL;
 	struct image *initrd = NULL;
 	char *initrd_file;
 	int rc;
@@ -181,13 +181,13 @@ static int comboot_fetch_kernel ( char *kernel_file, char *cmdline ) {
 		if ( ! initrd ) {
 			DBG ( "COMBOOT: could not allocate initrd\n" );
 			rc = -ENOMEM;
-			goto err_alloc_initrd;
+			goto out;
 		}
 		if ( ( rc = imgfetch ( initrd, initrd_file,
 				       register_image ) ) != 0 ) {
 			DBG ( "COMBOOT: could not fetch initrd: %s\n",
 			      strerror ( rc ) );
-			goto err_fetch_initrd;
+			goto out;
 		}
 
 		/* Restore space after initrd name, if applicable */
@@ -202,32 +202,31 @@ static int comboot_fetch_kernel ( char *kernel_file, char *cmdline ) {
 	if ( ! kernel ) {
 		DBG ( "COMBOOT: could not allocate kernel\n" );
 		rc = -ENOMEM;
-		goto err_alloc_kernel;
+		goto out;
 	}
 	if ( ( rc = imgfetch ( kernel, kernel_file,
 			       register_image ) ) != 0 ) {
 		DBG ( "COMBOOT: could not fetch kernel: %s\n",
 		      strerror ( rc ) );
-		goto err_fetch_kernel;
+		goto out;
 	}
 	if ( ( rc = image_set_cmdline ( kernel, cmdline ) ) != 0 ) {
 		DBG ( "COMBOOT: could not set kernel command line: %s\n",
 		      strerror ( rc ) );
-		goto err_set_cmdline;
+		goto out;
 	}
 
 	/* Store kernel as replacement image */
-	comboot_replacement_image = kernel;
+	assert ( comboot_replacement_image == NULL );
+	comboot_replacement_image = image_get ( kernel );
 
-	return 0;
-
- err_set_cmdline:
- err_fetch_kernel:
+ out:
+	/* Drop image references unconditionally; either we want to
+	 * discard them, or they have been registered and we should
+	 * drop out local reference.
+	 */
 	image_put ( kernel );
- err_alloc_kernel:
- err_fetch_initrd:
 	image_put ( initrd );
- err_alloc_initrd:
 	return rc;
 }
 

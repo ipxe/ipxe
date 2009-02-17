@@ -53,7 +53,12 @@ struct image {
 	 * style similar to a Unix exec() call) should return from its
 	 * exec() method with the replacement image set to point to
 	 * the new image.  The new image must already be in a suitable
-	 * state for execution.
+	 * state for execution (i.e. loaded).
+	 *
+	 * If an image unregisters itself as a result of being
+	 * executed, it must make sure that its replacement image (if
+	 * any) is registered, otherwise the replacement is likely to
+	 * be freed before it can be executed.
 	 */
 	struct image *replacement;
 };

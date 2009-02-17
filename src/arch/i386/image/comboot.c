@@ -191,6 +191,7 @@ static int comboot_exec ( struct image *image ) {
 		DBGC ( image, "COMBOOT %p: exited to run kernel %p\n",
 		       image, comboot_replacement_image );
 		image->replacement = comboot_replacement_image;
+		comboot_replacement_image = NULL;
 		image_autoload ( image->replacement );
 		break;
 
