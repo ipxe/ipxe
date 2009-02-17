@@ -43,7 +43,10 @@
  */
 int imgfetch ( struct image *image, const char *uri_string,
 	       int ( * image_register ) ( struct image *image ) ) {
+	char uri_string_redacted[ strlen ( uri_string ) + 3 /* "***" */
+				  + 1 /* NUL */ ];
 	struct uri *uri;
+	const char *password;
 	int rc;
 
 	if ( ! ( uri = parse_uri ( uri_string ) ) )
@@ -51,9 +54,17 @@ int imgfetch ( struct image *image, const char *uri_string,
 
 	image_set_uri ( image, uri );
 
+	/* Redact password portion of URI, if necessary */
+	password = uri->password;
+	if ( password )
+		uri->password = "***";
+	unparse_uri ( uri_string_redacted, sizeof ( uri_string_redacted ),
+		      uri );
+	uri->password = password;
+
 	if ( ( rc = create_downloader ( &monojob, image, image_register,
 					LOCATION_URI, uri ) ) == 0 )
-		rc = monojob_wait ( uri_string );
+		rc = monojob_wait ( uri_string_redacted );
 
 	uri_put ( uri );
 	return rc;
