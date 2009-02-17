@@ -67,7 +67,7 @@ extern void int21_wrapper ( void );
 extern void int22_wrapper ( void );
 
 /* setjmp/longjmp context buffer used to return after loading an image */
-jmp_buf comboot_return;
+rmjmp_buf comboot_return;
 
 /* Replacement image when exiting with COMBOOT_EXIT_RUN_KERNEL */
 struct image *comboot_replacement_image;
@@ -235,7 +235,7 @@ static int comboot_fetch_kernel ( char *kernel_file, char *cmdline ) {
  * Terminate program interrupt handler
  */
 static __asmcall void int20 ( struct i386_all_regs *ix86 __unused ) {
-	longjmp ( comboot_return, COMBOOT_EXIT );
+	rmlongjmp ( comboot_return, COMBOOT_EXIT );
 }
 
 
@@ -248,7 +248,7 @@ static __asmcall void int21 ( struct i386_all_regs *ix86 ) {
 	switch ( ix86->regs.ah ) {
 	case 0x00:
 	case 0x4C: /* Terminate program */
-		longjmp ( comboot_return, COMBOOT_EXIT );
+		rmlongjmp ( comboot_return, COMBOOT_EXIT );
 		break;
 
 	case 0x01: /* Get Key with Echo */
@@ -347,13 +347,13 @@ static __asmcall void int22 ( struct i386_all_regs *ix86 ) {
 			DBG ( "COMBOOT: executing command '%s'\n", cmd );
 			system ( cmd );
 			DBG ( "COMBOOT: exiting after executing command...\n" );
-			longjmp ( comboot_return, COMBOOT_EXIT_COMMAND );
+			rmlongjmp ( comboot_return, COMBOOT_EXIT_COMMAND );
 		}
 		break;
 
 	case 0x0004: /* Run default command */
 		/* FIXME: just exit for now */
-		longjmp ( comboot_return, COMBOOT_EXIT_COMMAND );
+		rmlongjmp ( comboot_return, COMBOOT_EXIT_COMMAND );
 		break;
 
 	case 0x0005: /* Force text mode */
@@ -552,7 +552,7 @@ static __asmcall void int22 ( struct i386_all_regs *ix86 ) {
 			 * part of the COMBOOT program's memory space.
 			 */
 			DBG ( "COMBOOT: exiting to run kernel...\n" );
-			longjmp ( comboot_return, COMBOOT_EXIT_RUN_KERNEL );
+			rmlongjmp ( comboot_return, COMBOOT_EXIT_RUN_KERNEL );
 		}
 		break;
 

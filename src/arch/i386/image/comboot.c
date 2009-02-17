@@ -133,7 +133,7 @@ static int comboot_exec ( struct image *image ) {
 	userptr_t seg_userptr = real_to_user ( COMBOOT_PSP_SEG, 0 );
 	int state;
 
-	state = setjmp ( comboot_return );
+	state = rmsetjmp ( comboot_return );
 
 	switch ( state ) {
 	case 0: /* First time through; invoke COMBOOT program */

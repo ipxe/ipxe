@@ -52,7 +52,7 @@ static int com32_exec ( struct image *image ) {
 	int state;
 	uint32_t avail_mem_top;
 
-	state = setjmp ( comboot_return );
+	state = rmsetjmp ( comboot_return );
 
 	switch ( state ) {
 	case 0: /* First time through; invoke COM32 program */
