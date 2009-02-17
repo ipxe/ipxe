@@ -70,20 +70,20 @@ static int com32_exec ( struct image *image ) {
 		}
 
 		DBGC ( image, "COM32 %p: available memory top = 0x%x\n",
-			 image, (int)avail_mem_top );
+		       image, avail_mem_top );
 
 		assert ( avail_mem_top != 0 );
 
 		com32_external_esp = phys_to_virt ( avail_mem_top );
 
 		/* Hook COMBOOT API interrupts */
-		hook_comboot_interrupts( );
+		hook_comboot_interrupts();
 
-		/* Temporarily de-register image, so that a "boot" command
-		 * doesn't throw us into an execution loop.  Hold a reference
-		 * to avoid the image's being freed.
+		/* Unregister image, so that a "boot" command doesn't
+		 * throw us into an execution loop.  We never
+		 * reregister ourselves; COMBOOT images expect to be
+		 * removed on exit.
 		 */
-		image_get ( image );
 		unregister_image ( image );
 
 		__asm__ __volatile__ (
@@ -111,25 +111,31 @@ static int com32_exec ( struct image *image ) {
 			/* %6 */ "r" ( COM32_START_PHYS )
 		:
 			"memory" );
+		DBGC ( image, "COM32 %p: returned\n", image );
 		break;
 
-	case COMBOOT_RETURN_RUN_KERNEL:
-		DBGC ( image, "COM32 %p: returned to run kernel...\n", image );
-		comboot_run_kernel ( );
+	case COMBOOT_EXIT:
+		DBGC ( image, "COM32 %p: exited\n", image );
 		break;
 
-	case COMBOOT_RETURN_EXIT:
+	case COMBOOT_EXIT_RUN_KERNEL:
+		DBGC ( image, "COM32 %p: exited to run kernel %p\n",
+		       image, comboot_replacement_image );
+		image->replacement = comboot_replacement_image;
+		image_autoload ( image->replacement );
 		break;
 
+	case COMBOOT_EXIT_COMMAND:
+		DBGC ( image, "COM32 %p: exited after executing command\n",
+		       image );
+		break;
+
+	default:
+		assert ( 0 );
+		break;
 	}
 
-	comboot_force_text_mode ( );
-
-	DBGC ( image, "COM32 %p returned\n", image );
-
-	/* Re-register image and return */
-	register_image ( image );
-	image_put ( image );
+	comboot_force_text_mode();
 
 	return 0;
 }

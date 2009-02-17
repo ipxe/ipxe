@@ -79,18 +79,14 @@ extern int comboot_resolv ( const char *name, struct in_addr *address );
 /* setjmp/longjmp context buffer used to return after loading an image */
 extern jmp_buf comboot_return;
 
-/* Command line to execute when returning via comboot_return 
- * with COMBOOT_RETURN_RUN_KERNEL
- */
-extern char *comboot_kernel_cmdline;
-
-/* Execute comboot_image_cmdline */
-extern void comboot_run_kernel ( );
+/* Replacement image when exiting with COMBOOT_EXIT_RUN_KERNEL */
+extern struct image *comboot_replacement_image;
 
 extern void *com32_external_esp;
 
-#define COMBOOT_RETURN_EXIT 1
-#define COMBOOT_RETURN_RUN_KERNEL 2
+#define COMBOOT_EXIT 1
+#define COMBOOT_EXIT_RUN_KERNEL 2
+#define COMBOOT_EXIT_COMMAND 3
 
 extern void comboot_force_text_mode ( void );
 

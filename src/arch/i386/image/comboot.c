@@ -142,16 +142,16 @@ static int comboot_exec ( struct image *image ) {
 		comboot_init_psp ( image, seg_userptr );
 
 		/* Hook COMBOOT API interrupts */
-		hook_comboot_interrupts ( );
+		hook_comboot_interrupts();
 
 		DBGC ( image, "executing 16-bit COMBOOT image at %4x:0100\n",
-			 COMBOOT_PSP_SEG );
+		       COMBOOT_PSP_SEG );
 
-		/* Temporarily de-register image, so that a "boot" command
-		 * doesn't throw us into an execution loop.  Hold a reference
-		 * to avoid the image's being freed.
+		/* Unregister image, so that a "boot" command doesn't
+		 * throw us into an execution loop.  We never
+		 * reregister ourselves; COMBOOT images expect to be
+		 * removed on exit.
 		 */
-		image_get ( image );
 		unregister_image ( image );
 
 		/* Store stack segment at 0x38 and stack pointer at 0x3A
@@ -180,26 +180,32 @@ static int comboot_exec ( struct image *image ) {
 				    "xorw %%bp, %%bp\n\t"
 				    "lret\n\t" )
 					 : : "r" ( COMBOOT_PSP_SEG ) : "eax" );
+		DBGC ( image, "COMBOOT %p: returned\n", image );
 		break;
 
-	case COMBOOT_RETURN_RUN_KERNEL:
-		DBGC ( image, "COMBOOT %p: returned to run kernel...\n", image );
-		comboot_run_kernel ( );
+	case COMBOOT_EXIT:
+		DBGC ( image, "COMBOOT %p: exited\n", image );
 		break;
 
-	case COMBOOT_RETURN_EXIT:
+	case COMBOOT_EXIT_RUN_KERNEL:
+		DBGC ( image, "COMBOOT %p: exited to run kernel %p\n",
+		       image, comboot_replacement_image );
+		image->replacement = comboot_replacement_image;
+		image_autoload ( image->replacement );
 		break;
 
+	case COMBOOT_EXIT_COMMAND:
+		DBGC ( image, "COMBOOT %p: exited after executing command\n",
+		       image );
+		break;
+
+	default:
+		assert ( 0 );
+		break;
 	}
 
-	comboot_force_text_mode ( );
+	comboot_force_text_mode();
 
-	DBGC ( image, "COMBOOT %p returned\n", image );
-
-	/* Re-register image and return */
-	register_image ( image );
-	image_put ( image );
-	
 	return 0;
 }
 

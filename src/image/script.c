@@ -43,10 +43,8 @@ static int script_exec ( struct image *image ) {
 	int rc;
 
 	/* Temporarily de-register image, so that a "boot" command
-	 * doesn't throw us into an execution loop.  Hold a reference
-	 * to avoid the image's being freed.
+	 * doesn't throw us into an execution loop.
 	 */
-	image_get ( image );
 	unregister_image ( image );
 
 	while ( offset < image->len ) {
@@ -80,7 +78,6 @@ static int script_exec ( struct image *image ) {
  done:
 	/* Re-register image and return */
 	register_image ( image );
-	image_put ( image );
 	return rc;
 }
 
