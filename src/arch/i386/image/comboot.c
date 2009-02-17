@@ -205,6 +205,7 @@ static int comboot_exec ( struct image *image ) {
 		break;
 	}
 
+	unhook_comboot_interrupts();
 	comboot_force_text_mode();
 
 	return 0;

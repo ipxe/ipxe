@@ -616,3 +616,18 @@ void hook_comboot_interrupts ( ) {
 	hook_bios_interrupt ( 0x22, ( unsigned int ) int22_wrapper,
 	                      &int22_vector );
 }
+
+/**
+ * Unhook BIOS interrupts related to COMBOOT API (INT 20h, 21h, 22h)
+ */
+void unhook_comboot_interrupts ( ) {
+
+	unhook_bios_interrupt ( 0x20, ( unsigned int ) int20_wrapper,
+				&int20_vector );
+
+	unhook_bios_interrupt ( 0x21, ( unsigned int ) int21_wrapper,
+				&int21_vector );
+
+	unhook_bios_interrupt ( 0x22, ( unsigned int ) int22_wrapper,
+				&int22_vector );
+}

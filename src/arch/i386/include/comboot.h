@@ -64,6 +64,7 @@ typedef struct {
 } comboot_shuffle_descriptor;
 
 extern void hook_comboot_interrupts ( );
+extern void unhook_comboot_interrupts ( );
 
 /* These are not the correct prototypes, but it doens't matter, 
  * as we only ever get the address of these functions;
