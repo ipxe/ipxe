@@ -77,6 +77,8 @@ static uint8_t dhcp_request_options_data[] = {
 	DHCP_STRING (  'P', 'X', 'E', 'C', 'l', 'i', 'e', 'n', 't', ':',
 		       'A', 'r', 'c', 'h', ':', '0', '0', '0', '0', '0', ':',
 		       'U', 'N', 'D', 'I', ':', '0', '0', '2', '0', '0', '1' ),
+	DHCP_USER_CLASS_ID,
+	DHCP_STRING ( 'g', 'P', 'X', 'E' ),
 	DHCP_PARAMETER_REQUEST_LIST,
 	DHCP_OPTION ( DHCP_SUBNET_MASK, DHCP_ROUTERS, DHCP_DNS_SERVERS,
 		      DHCP_LOG_SERVERS, DHCP_HOST_NAME, DHCP_DOMAIN_NAME,
