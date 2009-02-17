@@ -284,7 +284,7 @@ struct settings * find_settings ( const char *name ) {
 /**
  * Store value of setting
  *
- * @v settings		Settings block
+ * @v settings		Settings block, or NULL
  * @v setting		Setting to store
  * @v data		Setting data, or NULL to clear setting
  * @v len		Length of setting data
@@ -294,9 +294,9 @@ int store_setting ( struct settings *settings, struct setting *setting,
 		    const void *data, size_t len ) {
 	int rc;
 
-	/* Sanity check */
+	/* NULL settings implies storing into the global settings root */
 	if ( ! settings )
-		return -ENODEV;
+		settings = &settings_root;
 
 	/* Store setting */
 	if ( ( rc = settings->op->store ( settings, setting,
