@@ -247,7 +247,7 @@ static int pxe_menu_select ( struct pxe_menu *menu ) {
 		if ( ( key == CR ) || ( key == LF ) ) {
 			pxe_menu_draw_item ( menu, menu->selection, 1 );
 			break;
-		} else if ( key == CTRL_C ) {
+		} else if ( ( key == CTRL_C ) || ( key == ESC ) ) {
 			rc = -ECANCELED;
 			break;
 		} else if ( key == KEY_UP ) {
@@ -306,7 +306,7 @@ static int pxe_menu_prompt_and_select ( struct pxe_menu *menu ) {
 				/* Display menu */
 				printf ( "\n" );
 				return pxe_menu_select ( menu );
-			} else if ( key == CTRL_C ) {
+			} else if ( ( key == CTRL_C ) || ( key == ESC ) ) {
 				/* Abort */
 				rc = -ECANCELED;
 				break;
