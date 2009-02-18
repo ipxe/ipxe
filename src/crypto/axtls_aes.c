@@ -4,7 +4,7 @@
 #include <gpxe/crypto.h>
 #include <gpxe/aes.h>
 
-static int aes_setkey ( void *ctx, const void *key, size_t keylen ) {
+static int aes_cbc_setkey ( void *ctx, const void *key, size_t keylen ) {
 	AES_CTX *aesctx = ctx;
 	AES_MODE mode;
 
@@ -23,32 +23,32 @@ static int aes_setkey ( void *ctx, const void *key, size_t keylen ) {
 	return 0;
 }
 
-static void aes_setiv ( void *ctx, const void *iv ) {
+static void aes_cbc_setiv ( void *ctx, const void *iv ) {
 	AES_CTX *aesctx = ctx;
 
 	memcpy ( aesctx->iv, iv, sizeof ( aesctx->iv ) );
 }
 
-static void aes_encrypt ( void *ctx, const void *data, void *dst,
-			  size_t len ) {
+static void aes_cbc_encrypt ( void *ctx, const void *data, void *dst,
+			      size_t len ) {
 	AES_CTX *aesctx = ctx;
 
 	AES_cbc_encrypt ( aesctx, data, dst, len );
 }
 
-static void aes_decrypt ( void *ctx, const void *data, void *dst,
-			  size_t len ) {
+static void aes_cbc_decrypt ( void *ctx, const void *data, void *dst,
+			      size_t len ) {
 	AES_CTX *aesctx = ctx;
 
 	AES_cbc_decrypt ( aesctx, data, dst, len );
 }
 
-struct crypto_algorithm aes_algorithm = {
-	.name		= "aes",
+struct crypto_algorithm aes_cbc_algorithm = {
+	.name		= "aes_cbc",
 	.ctxsize	= sizeof ( AES_CTX ),
 	.blocksize	= 16,
-	.setkey		= aes_setkey,
-	.setiv		= aes_setiv,
-	.encode		= aes_encrypt,
-	.decode		= aes_decrypt,
+	.setkey		= aes_cbc_setkey,
+	.setiv		= aes_cbc_setiv,
+	.encode		= aes_cbc_encrypt,
+	.decode		= aes_cbc_decrypt,
 };

@@ -486,12 +486,12 @@ static int tls_select_cipher ( struct tls_session *tls,
 	switch ( cipher_suite ) {
 	case htons ( TLS_RSA_WITH_AES_128_CBC_SHA ):
 		key_len = ( 128 / 8 );
-		cipher = &aes_algorithm;
+		cipher = &aes_cbc_algorithm;
 		digest = &sha1_algorithm;
 		break;
 	case htons ( TLS_RSA_WITH_AES_256_CBC_SHA ):
 		key_len = ( 256 / 8 );
-		cipher = &aes_algorithm;
+		cipher = &aes_cbc_algorithm;
 		digest = &sha1_algorithm;
 		break;
 	default:
