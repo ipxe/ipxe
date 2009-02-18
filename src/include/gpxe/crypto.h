@@ -70,7 +70,6 @@ struct cipher_algorithm {
 	 * @v src		Data to encrypt
 	 * @v dst		Buffer for encrypted data
 	 * @v len		Length of data
-	 * @ret rc		Return status code
 	 *
 	 * @v len is guaranteed to be a multiple of @c blocksize.
 	 */
@@ -82,7 +81,6 @@ struct cipher_algorithm {
 	 * @v src		Data to decrypt
 	 * @v dst		Buffer for decrypted data
 	 * @v len		Length of data
-	 * @ret rc		Return status code
 	 *
 	 * @v len is guaranteed to be a multiple of @c blocksize.
 	 */
@@ -123,16 +121,29 @@ static inline void cipher_setiv ( struct cipher_algorithm *cipher,
 	cipher->setiv ( ctx, iv );
 }
 
+static inline void cipher_encrypt ( struct cipher_algorithm *cipher,
+				    void *ctx, const void *src, void *dst,
+				    size_t len ) {
+	cipher->encrypt ( ctx, src, dst, len );
+}
+#define cipher_encrypt( cipher, ctx, src, dst, len ) do {		\
+	assert ( ( len & ( (cipher)->blocksize - 1 ) ) == 0 );		\
+	cipher_encrypt ( (cipher), (ctx), (src), (dst), (len) );	\
+	} while ( 0 )
+
+static inline void cipher_decrypt ( struct cipher_algorithm *cipher,
+				    void *ctx, const void *src, void *dst,
+				    size_t len ) {
+	cipher->decrypt ( ctx, src, dst, len );
+}
+#define cipher_decrypt( cipher, ctx, src, dst, len ) do {		\
+	assert ( ( len & ( (cipher)->blocksize - 1 ) ) == 0 );		\
+	cipher_decrypt ( (cipher), (ctx), (src), (dst), (len) );	\
+	} while ( 0 )
+
 static inline int is_stream_cipher ( struct cipher_algorithm *cipher ) {
 	return ( cipher->blocksize == 1 );
 }
-
-extern int cipher_encrypt ( struct cipher_algorithm *cipher,
-			    void *ctx, const void *src, void *dst,
-			    size_t len );
-extern int cipher_decrypt ( struct cipher_algorithm *cipher,
-			    void *ctx, const void *src, void *dst,
-			    size_t len );
 
 extern struct digest_algorithm digest_null;
 extern struct cipher_algorithm cipher_null;

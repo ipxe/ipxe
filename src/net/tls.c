@@ -1223,15 +1223,9 @@ static int tls_send_plaintext ( struct tls_session *tls, unsigned int type,
 	tlshdr->length = htons ( plaintext_len );
 	memcpy ( cipherspec->cipher_next_ctx, cipherspec->cipher_ctx,
 		 cipherspec->cipher->ctxsize );
-	if ( ( rc = cipher_encrypt ( cipherspec->cipher,
-				     cipherspec->cipher_next_ctx, plaintext,
-				     iob_put ( ciphertext, plaintext_len ),
-				     plaintext_len ) ) != 0 ) {
-		DBGC ( tls, "TLS %p could not encrypt: %s\n",
-		       tls, strerror ( rc ) );
-		DBGC_HD ( tls, plaintext, plaintext_len );
-		goto done;
-	}
+	cipher_encrypt ( cipherspec->cipher, cipherspec->cipher_next_ctx,
+			 plaintext, iob_put ( ciphertext, plaintext_len ),
+			 plaintext_len );
 
 	/* Free plaintext as soon as possible to conserve memory */
 	free ( plaintext );
@@ -1393,14 +1387,8 @@ static int tls_new_ciphertext ( struct tls_session *tls,
 	}
 
 	/* Decrypt the record */
-	if ( ( rc = cipher_decrypt ( cipherspec->cipher,
-				     cipherspec->cipher_ctx, ciphertext,
-				     plaintext, record_len ) ) != 0 ) {
-		DBGC ( tls, "TLS %p could not decrypt: %s\n",
-		       tls, strerror ( rc ) );
-		DBGC_HD ( tls, ciphertext, record_len );
-		goto done;
-	}
+	cipher_decrypt ( cipherspec->cipher, cipherspec->cipher_ctx,
+			 ciphertext, plaintext, record_len );
 
 	/* Split record into content and MAC */
 	if ( is_stream_cipher ( cipherspec->cipher ) ) {
