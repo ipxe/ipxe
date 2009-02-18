@@ -10,21 +10,46 @@
 #include <stdint.h>
 #include <stddef.h>
 
-/** A cryptographic algorithm */
-struct crypto_algorithm {
+/** A message digest algorithm */
+struct digest_algorithm {
 	/** Algorithm name */
 	const char *name;
 	/** Context size */
 	size_t ctxsize;
 	/** Block size */
 	size_t blocksize;
-	/** Final output size */
+	/** Digest size */
 	size_t digestsize;
-	/** Initialise algorithm
+	/** Initialise digest
 	 *
 	 * @v ctx		Context
 	 */
 	void ( * init ) ( void *ctx );
+	/** Update digest with new data
+	 *
+	 * @v ctx		Context
+	 * @v src		Data to digest
+	 * @v len		Length of data
+	 *
+	 * @v len is not necessarily a multiple of @c blocksize.
+	 */
+	void ( * update ) ( void *ctx, const void *src, size_t len );
+	/** Finalise digest
+	 *
+	 * @v ctx		Context
+	 * @v out		Buffer for digest output
+	 */
+	void ( * final ) ( void *ctx, void *out );
+};
+
+/** A cipher algorithm */
+struct cipher_algorithm {
+	/** Algorithm name */
+	const char *name;
+	/** Context size */
+	size_t ctxsize;
+	/** Block size */
+	size_t blocksize;
 	/** Set key
 	 *
 	 * @v ctx		Context
@@ -38,79 +63,79 @@ struct crypto_algorithm {
 	 * @v ctx		Context
 	 * @v iv		Initialisation vector
 	 */
-	void ( *setiv ) ( void *ctx, const void *iv );
-	/** Encode data
+	void ( * setiv ) ( void *ctx, const void *iv );
+	/** Encrypt data
 	 *
 	 * @v ctx		Context
-	 * @v src		Data to encode
-	 * @v dst		Encoded data, or NULL
-	 * @v len		Length of data
-	 * @ret rc		Return status code
-	 *
-	 * For a cipher algorithm, the enciphered data should be
-	 * placed in @c dst.  For a digest algorithm, only the digest
-	 * state should be updated, and @c dst will be NULL.
-	 *
-	 * @v len is guaranteed to be a multiple of @c blocksize.
-	 */
-	void ( * encode ) ( void *ctx, const void *src, void *dst,
-			    size_t len );
-	/** Decode data
-	 *
-	 * @v ctx		Context
-	 * @v src		Data to decode
-	 * @v dst		Decoded data
+	 * @v src		Data to encrypt
+	 * @v dst		Buffer for encrypted data
 	 * @v len		Length of data
 	 * @ret rc		Return status code
 	 *
 	 * @v len is guaranteed to be a multiple of @c blocksize.
 	 */
-	void ( * decode ) ( void *ctx, const void *src, void *dst,
-			    size_t len );
-	/** Finalise algorithm
+	void ( * encrypt ) ( void *ctx, const void *src, void *dst,
+			     size_t len );
+	/** Decrypt data
 	 *
 	 * @v ctx		Context
-	 * @v out		Algorithm final output
+	 * @v src		Data to decrypt
+	 * @v dst		Buffer for decrypted data
+	 * @v len		Length of data
+	 * @ret rc		Return status code
+	 *
+	 * @v len is guaranteed to be a multiple of @c blocksize.
 	 */
-	void ( * final ) ( void *ctx, void *out );
+	void ( * decrypt ) ( void *ctx, const void *src, void *dst,
+			     size_t len );
 };
 
-static inline void digest_init ( struct crypto_algorithm *crypto,
+/** A public key algorithm */
+struct pubkey_algorithm {
+	/** Algorithm name */
+	const char *name;
+	/** Context size */
+	size_t ctxsize;
+};
+
+static inline void digest_init ( struct digest_algorithm *digest,
 				 void *ctx ) {
-	crypto->init ( ctx );
+	digest->init ( ctx );
 }
 
-static inline void digest_update ( struct crypto_algorithm *crypto,
+static inline void digest_update ( struct digest_algorithm *digest,
 				   void *ctx, const void *data, size_t len ) {
-	crypto->encode ( ctx, data, NULL, len );
+	digest->update ( ctx, data, len );
 }
 
-static inline void digest_final ( struct crypto_algorithm *crypto,
+static inline void digest_final ( struct digest_algorithm *digest,
 				  void *ctx, void *out ) {
-	crypto->final ( ctx, out );
+	digest->final ( ctx, out );
 }
 
-static inline void cipher_setiv ( struct crypto_algorithm *crypto,
-				  void *ctx, const void *iv ) {
-	crypto->setiv ( ctx, iv );
-}
-
-static inline int cipher_setkey ( struct crypto_algorithm *crypto,
+static inline int cipher_setkey ( struct cipher_algorithm *cipher,
 				  void *ctx, const void *key, size_t keylen ) {
-	return crypto->setkey ( ctx, key, keylen );
+	return cipher->setkey ( ctx, key, keylen );
 }
 
-static inline int is_stream_cipher ( struct crypto_algorithm *crypto ) {
-	return ( crypto->blocksize == 1 );
+static inline void cipher_setiv ( struct cipher_algorithm *cipher,
+				  void *ctx, const void *iv ) {
+	cipher->setiv ( ctx, iv );
 }
 
-extern struct crypto_algorithm crypto_null;
+static inline int is_stream_cipher ( struct cipher_algorithm *cipher ) {
+	return ( cipher->blocksize == 1 );
+}
 
-extern int cipher_encrypt ( struct crypto_algorithm *crypto,
+extern int cipher_encrypt ( struct cipher_algorithm *cipher,
 			    void *ctx, const void *src, void *dst,
 			    size_t len );
-extern int cipher_decrypt ( struct crypto_algorithm *crypto,
+extern int cipher_decrypt ( struct cipher_algorithm *cipher,
 			    void *ctx, const void *src, void *dst,
 			    size_t len );
+
+extern struct digest_algorithm digest_null;
+extern struct cipher_algorithm cipher_null;
+extern struct pubkey_algorithm pubkey_null;
 
 #endif /* _GPXE_CRYPTO_H */

@@ -91,11 +91,11 @@ enum tls_tx_state {
 /** A TLS cipher specification */
 struct tls_cipherspec {
 	/** Public-key encryption algorithm */
-	struct crypto_algorithm *pubkey;
+	struct pubkey_algorithm *pubkey;
 	/** Bulk encryption cipher algorithm */
-	struct crypto_algorithm *cipher;
+	struct cipher_algorithm *cipher;
 	/** MAC digest algorithm */
-	struct crypto_algorithm *digest;
+	struct digest_algorithm *digest;
 	/** Key length */
 	size_t key_len;
 	/** Dynamically-allocated storage */

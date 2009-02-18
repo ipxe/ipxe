@@ -59,12 +59,12 @@ static void aes_cbc_decrypt ( void *ctx, const void *data, void *dst,
 	AES_cbc_decrypt ( &aesctx->ctx, data, dst, len );
 }
 
-struct crypto_algorithm aes_cbc_algorithm = {
+struct cipher_algorithm aes_cbc_algorithm = {
 	.name		= "aes_cbc",
 	.ctxsize	= sizeof ( struct aes_cbc_context ),
 	.blocksize	= 16,
 	.setkey		= aes_cbc_setkey,
 	.setiv		= aes_cbc_setiv,
-	.encode		= aes_cbc_encrypt,
-	.decode		= aes_cbc_decrypt,
+	.encrypt	= aes_cbc_encrypt,
+	.decrypt	= aes_cbc_decrypt,
 };

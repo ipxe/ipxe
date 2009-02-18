@@ -167,8 +167,7 @@ static void md5_init(void *context)
 	mctx->byte_count = 0;
 }
 
-static void md5_update(void *context, const void *data, void *dst __unused,
-		       size_t len)
+static void md5_update(void *context, const void *data, size_t len)
 {
 	struct md5_ctx *mctx = context;
 	const u32 avail = sizeof(mctx->block) - (mctx->byte_count & 0x3f);
@@ -224,12 +223,12 @@ static void md5_final(void *context, void *out)
 	memset(mctx, 0, sizeof(*mctx));
 }
 
-struct crypto_algorithm md5_algorithm = {
+struct digest_algorithm md5_algorithm = {
 	.name		= "md5",
 	.ctxsize	= MD5_CTX_SIZE,
 	.blocksize	= ( MD5_BLOCK_WORDS * 4 ),
 	.digestsize	= MD5_DIGEST_SIZE,
 	.init		= md5_init,
-	.encode		= md5_update,
+	.update		= md5_update,
 	.final		= md5_final,
 };

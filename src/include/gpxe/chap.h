@@ -10,12 +10,12 @@
 #include <stdint.h>
 #include <gpxe/md5.h>
 
-struct crypto_algorithm;
+struct digest_algorithm;
 
 /** A CHAP response */
 struct chap_response {
 	/** Digest algorithm used for the response */
-	struct crypto_algorithm *digest;
+	struct digest_algorithm *digest;
 	/** Context used by the digest algorithm */
 	uint8_t *digest_context;
 	/** CHAP response */
@@ -25,7 +25,7 @@ struct chap_response {
 };
 
 extern int chap_init ( struct chap_response *chap,
-		       struct crypto_algorithm *digest );
+		       struct digest_algorithm *digest );
 extern void chap_update ( struct chap_response *chap, const void *data,
 			  size_t len );
 extern void chap_respond ( struct chap_response *chap );

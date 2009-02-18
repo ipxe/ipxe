@@ -2,23 +2,23 @@
 #include <errno.h>
 #include <gpxe/crypto.h>
 
-int cipher_encrypt ( struct crypto_algorithm *crypto,
+int cipher_encrypt ( struct cipher_algorithm *cipher,
 		     void *ctx, const void *src, void *dst,
 		     size_t len ) {
-	if ( ( len & ( crypto->blocksize - 1 ) ) ) {
+	if ( ( len & ( cipher->blocksize - 1 ) ) ) {
 		return -EINVAL;
 	}
-	crypto->encode ( ctx, src, dst, len );
+	cipher->encrypt ( ctx, src, dst, len );
 	return 0;
 }
 
-int cipher_decrypt ( struct crypto_algorithm *crypto,
+int cipher_decrypt ( struct cipher_algorithm *cipher,
 		     void *ctx, const void *src, void *dst,
 		     size_t len ) {
-	if ( ( len & ( crypto->blocksize - 1 ) ) ) {
+	if ( ( len & ( cipher->blocksize - 1 ) ) ) {
 		return -EINVAL;
 	}
-	crypto->decode ( ctx, src, dst, len );
+	cipher->decrypt ( ctx, src, dst, len );
 	return 0;
 }
 

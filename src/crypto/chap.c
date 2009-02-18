@@ -42,7 +42,7 @@
  * eventually be freed by a call to chap_finish().
  */
 int chap_init ( struct chap_response *chap,
-		struct crypto_algorithm *digest ) {
+		struct digest_algorithm *digest ) {
 	size_t state_len;
 	void *state;
 

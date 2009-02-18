@@ -136,7 +136,7 @@ static void tls_generate_random ( void *data, size_t len ) {
  * @v digest_ctx	Digest context
  * @v args		( data, len ) pairs of data, terminated by NULL
  */
-static void tls_hmac_update_va ( struct crypto_algorithm *digest,
+static void tls_hmac_update_va ( struct digest_algorithm *digest,
 				 void *digest_ctx, va_list args ) {
 	void *data;
 	size_t len;
@@ -159,7 +159,7 @@ static void tls_hmac_update_va ( struct crypto_algorithm *digest,
  * @v seeds		( data, len ) pairs of seed data, terminated by NULL
  */
 static void tls_p_hash_va ( struct tls_session *tls,
-			    struct crypto_algorithm *digest,
+			    struct digest_algorithm *digest,
 			    void *secret, size_t secret_len,
 			    void *out, size_t out_len,
 			    va_list seeds ) {
@@ -409,9 +409,9 @@ static void tls_clear_cipher ( struct tls_session *tls __unused,
 			       struct tls_cipherspec *cipherspec ) {
 	free ( cipherspec->dynamic );
 	memset ( cipherspec, 0, sizeof ( cipherspec ) );
-	cipherspec->pubkey = &crypto_null;
-	cipherspec->cipher = &crypto_null;
-	cipherspec->digest = &crypto_null;
+	cipherspec->pubkey = &pubkey_null;
+	cipherspec->cipher = &cipher_null;
+	cipherspec->digest = &digest_null;
 }
 
 /**
@@ -427,9 +427,9 @@ static void tls_clear_cipher ( struct tls_session *tls __unused,
  */
 static int tls_set_cipher ( struct tls_session *tls,
 			    struct tls_cipherspec *cipherspec,
-			    struct crypto_algorithm *pubkey,
-			    struct crypto_algorithm *cipher,
-			    struct crypto_algorithm *digest,
+			    struct pubkey_algorithm *pubkey,
+			    struct cipher_algorithm *cipher,
+			    struct digest_algorithm *digest,
 			    size_t key_len ) {
 	size_t total;
 	void *dynamic;
@@ -473,9 +473,9 @@ static int tls_set_cipher ( struct tls_session *tls,
  */
 static int tls_select_cipher ( struct tls_session *tls,
 			       unsigned int cipher_suite ) {
-	struct crypto_algorithm *pubkey = &crypto_null;
-	struct crypto_algorithm *cipher = &crypto_null;
-	struct crypto_algorithm *digest = &crypto_null;
+	struct pubkey_algorithm *pubkey = &pubkey_null;
+	struct cipher_algorithm *cipher = &cipher_null;
+	struct digest_algorithm *digest = &digest_null;
 	unsigned int key_len = 0;
 	int rc;
 
@@ -524,9 +524,9 @@ static int tls_change_cipher ( struct tls_session *tls,
 
 	/* Sanity check */
 	if ( /* FIXME (when pubkey is not hard-coded to RSA):
-	      * ( pending->pubkey == &crypto_null ) || */
-	     ( pending->cipher == &crypto_null ) ||
-	     ( pending->digest == &crypto_null ) ) {
+	      * ( pending->pubkey == &pubkey_null ) || */
+	     ( pending->cipher == &cipher_null ) ||
+	     ( pending->digest == &digest_null ) ) {
 		DBGC ( tls, "TLS %p refusing to use null cipher\n", tls );
 		return -ENOTSUP;
 	}
@@ -567,8 +567,8 @@ static void tls_add_handshake ( struct tls_session *tls,
  * far.
  */
 static void tls_verify_handshake ( struct tls_session *tls, void *out ) {
-	struct crypto_algorithm *md5 = &md5_algorithm;
-	struct crypto_algorithm *sha1 = &sha1_algorithm;
+	struct digest_algorithm *md5 = &md5_algorithm;
+	struct digest_algorithm *sha1 = &sha1_algorithm;
 	uint8_t md5_ctx[md5->ctxsize];
 	uint8_t sha1_ctx[sha1->ctxsize];
 	void *md5_digest = out;
@@ -1060,7 +1060,7 @@ static void tls_hmac ( struct tls_session *tls __unused,
 		       struct tls_cipherspec *cipherspec,
 		       uint64_t seq, struct tls_header *tlshdr,
 		       const void *data, size_t len, void *hmac ) {
-	struct crypto_algorithm *digest = cipherspec->digest;
+	struct digest_algorithm *digest = cipherspec->digest;
 	uint8_t digest_ctx[digest->ctxsize];
 
 	hmac_init ( digest, digest_ctx, cipherspec->mac_secret,

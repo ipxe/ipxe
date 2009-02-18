@@ -1,9 +1,9 @@
 #ifndef _GPXE_RSA_H
 #define _GPXE_RSA_H
 
-struct crypto_algorithm;
+struct pubkey_algorithm;
 
-extern struct crypto_algorithm rsa_algorithm;
+extern struct pubkey_algorithm rsa_algorithm;
 
 #include "crypto/axtls/crypto.h"
 
