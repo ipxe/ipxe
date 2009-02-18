@@ -433,7 +433,7 @@ void pxe_init_structures ( void ) {
  * @ret rc		Return status code
  */
 int pxe_start_nbp ( void ) {
-	int discard_b, discard_c;
+	int discard_b, discard_c, discard_d;
 	uint16_t rc;
 
 	/* Far call to PXE NBP */
@@ -444,11 +444,12 @@ int pxe_start_nbp ( void ) {
 					   "lcall $0, $0x7c00\n\t"
 					   "addw $4, %%sp\n\t" )
 			       : "=a" ( rc ), "=b" ( discard_b ),
-			         "=c" ( discard_c )
-			       :  "a" ( __from_text16 ( &ppxe ) ),
-			          "b" ( __from_text16 ( &pxenv ) ),
-			          "c" ( rm_cs )
-			       : "edx", "esi", "edi", "ebp", "memory" );
+				 "=c" ( discard_c ), "=d" ( discard_d )
+			       : "a" ( __from_text16 ( &ppxe ) ),
+			         "b" ( __from_text16 ( &pxenv ) ),
+			         "c" ( rm_cs ),
+			         "d" ( virt_to_phys ( &pxenv ) )
+			       : "esi", "edi", "ebp", "memory" );
 
 	return rc;
 }

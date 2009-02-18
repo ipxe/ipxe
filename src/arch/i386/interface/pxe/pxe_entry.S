@@ -178,6 +178,7 @@ pxe_entry_common:
  * Returns:
  *   %ax : 0x564e
  *   %es:bx : Far pointer to the PXENV+ structure
+ *   %edx : Physical address of the PXENV+ structure
  *   CF cleared
  * Corrupts:
  *   none
@@ -191,9 +192,12 @@ pxe_int_1a:
 	cmpw	$0x5650, %ax
 	jne	1f
 	/* INT 1A,5650 - PXE installation check */
-	pushw	%cs
-	popw	%es
+	xorl	%edx, %edx
+	movw	%cs, %dx
+	movw	%dx, %es
 	movw	$pxenv, %bx
+	shll	$4, %edx
+	addl	$pxenv, %edx
 	movw	$0x564e, %ax
 	popfw
 	clc
