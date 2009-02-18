@@ -4,8 +4,13 @@
 #include <gpxe/crypto.h>
 #include <gpxe/aes.h>
 
+struct aes_cbc_context {
+	AES_CTX ctx;
+	int decrypting;
+};
+
 static int aes_cbc_setkey ( void *ctx, const void *key, size_t keylen ) {
-	AES_CTX *aesctx = ctx;
+	struct aes_cbc_context *aesctx = ctx;
 	AES_MODE mode;
 
 	switch ( keylen ) {
@@ -19,33 +24,44 @@ static int aes_cbc_setkey ( void *ctx, const void *key, size_t keylen ) {
 		return -EINVAL;
 	}
 
-	AES_set_key ( aesctx, key, aesctx->iv, mode );
+	AES_set_key ( &aesctx->ctx, key, aesctx->ctx.iv, mode );
+
+	aesctx->decrypting = 0;
+
 	return 0;
 }
 
 static void aes_cbc_setiv ( void *ctx, const void *iv ) {
-	AES_CTX *aesctx = ctx;
+	struct aes_cbc_context *aesctx = ctx;
 
-	memcpy ( aesctx->iv, iv, sizeof ( aesctx->iv ) );
+	memcpy ( aesctx->ctx.iv, iv, sizeof ( aesctx->ctx.iv ) );
 }
 
 static void aes_cbc_encrypt ( void *ctx, const void *data, void *dst,
 			      size_t len ) {
-	AES_CTX *aesctx = ctx;
+	struct aes_cbc_context *aesctx = ctx;
 
-	AES_cbc_encrypt ( aesctx, data, dst, len );
+	if ( aesctx->decrypting )
+		assert ( 0 );
+
+	AES_cbc_encrypt ( &aesctx->ctx, data, dst, len );
 }
 
 static void aes_cbc_decrypt ( void *ctx, const void *data, void *dst,
 			      size_t len ) {
-	AES_CTX *aesctx = ctx;
+	struct aes_cbc_context *aesctx = ctx;
 
-	AES_cbc_decrypt ( aesctx, data, dst, len );
+	if ( ! aesctx->decrypting ) {
+		AES_convert_key ( &aesctx->ctx );
+		aesctx->decrypting = 1;
+	}
+
+	AES_cbc_decrypt ( &aesctx->ctx, data, dst, len );
 }
 
 struct crypto_algorithm aes_cbc_algorithm = {
 	.name		= "aes_cbc",
-	.ctxsize	= sizeof ( AES_CTX ),
+	.ctxsize	= sizeof ( struct aes_cbc_context ),
 	.blocksize	= 16,
 	.setkey		= aes_cbc_setkey,
 	.setiv		= aes_cbc_setiv,

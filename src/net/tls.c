@@ -372,10 +372,6 @@ static int tls_generate_keys ( struct tls_session *tls ) {
 		       tls, strerror ( rc ) );
 		return rc;
 	}
-
-	/* FIXME: AES needs to be fixed to not require this */
-	AES_convert_key ( rx_cipherspec->cipher_ctx );
-
 	DBGC ( tls, "TLS %p RX key:\n", tls );
 	DBGC_HD ( tls, key, key_size );
 	key += key_size;
