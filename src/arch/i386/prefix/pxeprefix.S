@@ -31,18 +31,10 @@
 	pushl	$STACK_MAGIC
 	movw	%ss, %cs:pxe_ss
 	movl	%esp, %cs:pxe_esp
-	movw	%sp, %bp
-	movl	(10*4+4*2+4)(%bp),%ebp	/* !PXE address */
 
-	/* Set up %ds */
+	/* Set up segments */
 	movw	%cs, %ax
 	movw	%ax, %ds
-	/* Record PXENV+ and !PXE nominal addresses */
-	movw	%es, pxenv_segment	/* PXENV+ address */
-	movw	%bx, pxenv_offset
-	movl	%ebp, ppxe_segoff	/* !PXE address */
-	/* Set up %es and %fs */
-	movw	%ax, %es
 	movw	$0x40, %ax		/* BIOS data segment access */
 	movw	%ax, %fs
 	/* Set up stack just below 0x7c00 */
@@ -60,16 +52,57 @@
 	.previous
 
 /*****************************************************************************
- * Verify PXENV+ structure and record parameters of interest
+ * Find us a usable !PXE or PXENV+ entry point
  *****************************************************************************
  */
-detect_pxenv:
-	/* Signature check */
-	les	pxenv_segoff, %bx
-	cmpl	$0x4e455850, %es:(%bx)	/* 'PXEN' signature */
-	jne	no_pxenv
-	cmpw	$0x2b56, %es:4(%bx)	/* 'V+' signature */
-	jne	no_pxenv
+detect_pxe:
+	/* Plan A: !PXE pointer from the stack */
+	lgsl	pxe_esp, %ebp		/* %gs:%bp -> original stack */
+	lesw	%gs:52(%bp), %bx
+	call	is_valid_ppxe
+	je	have_ppxe
+
+	/* Plan B: PXENV+ pointer from initial ES:BX */
+	movw	%gs:32(%bp),%bx
+	movw	%gs:8(%bp),%es
+	call	is_valid_pxenv
+	je	have_pxenv
+
+	/* Plan C: PXENV+ structure via INT 1Ah */
+	movw	$0x5650, %ax
+	int	$0x1a
+	jc	1f
+	cmpw	$0x564e, %ax
+	jne	1f
+	call	is_valid_pxenv
+	je	have_pxenv
+1:
+	/* Plan D: scan base memory for !PXE */
+	call	memory_scan_ppxe
+	je	have_ppxe
+
+	/* Plan E: scan base memory for PXENV+ */
+	call	memory_scan_pxenv
+	jne	stack_not_found
+	
+have_pxenv:
+	movw	%bx, pxenv_offset
+	movw	%es, pxenv_segment
+
+	cmpw	$0x201, %es:6(%bx)	/* API version >= 2.01 */
+	jb	1f
+	cmpb	$0x2c, %es:8(%bx)	/* ... and structure long enough */
+	jb	2f
+
+	lesw	%es:0x28(%bx), %bx	/* Find !PXE from PXENV+ */
+	call	is_valid_ppxe
+	je	have_ppxe
+2:
+	call	memory_scan_ppxe	/* We are *supposed* to have !PXE... */
+	je	have_ppxe
+1:
+	lesw	pxenv_segoff, %bx	/* Nope, we're stuck with PXENV+ */
+
 	/* Record entry point and UNDI segments */
 	pushl	%es:0x0a(%bx)		/* Entry point */
 	popl	entry_segoff
@@ -79,36 +112,22 @@ detect_pxenv:
 	pushw	%es:0x20(%bx)		/* UNDI data segment */
 	pushw	%es:0x22(%bx)		/* UNDI data size */
 	popl	undi_data_segoff
+
 	/* Print "PXENV+ at <address>" */
 	movw	$10f, %si
 	call	print_message
 	call	print_segoff
 	movb	$( ',' ), %al
 	call	print_character
-	jmp	99f
+	jmp	check_have_stack
 	.section ".prefix.data", "aw", @progbits
 10:	.asciz	" PXENV+ at "
 	.previous
 
-no_pxenv:
-	xorl	%eax, %eax
-	movl	%eax, pxenv_segoff
-	
-99:
-	
-/*****************************************************************************
- * Verify !PXE structure and record parameters of interest
- *****************************************************************************
- */
-detect_ppxe:
-	/* Signature check */
-	les	ppxe_segoff, %bx
-	cmpl	$0x45585021, %es:(%bx)	/* '!PXE' signature */
-	jne	no_ppxe
-	/* Record structure address, entry point, and UNDI segments */
-	pushw	%es
-	popw	ppxe_segment
+have_ppxe:
 	movw	%bx, ppxe_offset
+	movw	%es, ppxe_segment
+	
 	pushl	%es:0x10(%bx)		/* Entry point */
 	popl	entry_segoff
 	pushw	%es:0x30(%bx)		/* UNDI code segment */
@@ -123,17 +142,60 @@ detect_ppxe:
 	call	print_segoff
 	movb	$( ',' ), %al
 	call	print_character
-	jmp	99f
+	jmp	check_have_stack
 	.section ".prefix.data", "aw", @progbits
 10:	.asciz	" !PXE at "
 	.previous
 
-no_ppxe:
-	xorl	%eax, %eax
-	movl	%eax, ppxe_segoff
+is_valid_ppxe:
+	cmpl	$0x45585021, %es:(%bx)
+	jne	1f
+	movzbw	%es:4(%bx), %cx
+	cmpw	$0x58, %cx
+	jae	is_valid_checksum
+1:
+	ret
+	
+is_valid_pxenv:
+	cmpl	$0x4e455850, %es:(%bx)
+	jne	1b
+	cmpw	$0x2b56, %es:4(%bx)
+	jne	1b
+	movzbw	%es:8(%bx), %cx
+	cmpw	$0x28, %cx
+	jb	1b
+	
+is_valid_checksum:
+	pushw	%ax
+	movw	%bx, %si
+	xorw	%ax, %ax
+2:
+	es lodsb
+	addb	%al, %ah
+	loopw	2b
+	popw	%ax
+	ret
 
-99:
+memory_scan_ppxe:
+	movw	$is_valid_ppxe, %dx
+	jmp	memory_scan_common
 
+memory_scan_pxenv:
+	movw	$is_valid_pxenv, %dx
+
+memory_scan_common:
+	movw	%fs:(0x13), %ax
+	shlw	$6, %ax
+	decw	%ax
+1:	incw	%ax
+	cmpw	$( 0xa000 - 1 ), %ax
+	ja	2f
+	movw	%ax, %es
+	xorw	%bx, %bx
+	call	*%dx
+	jne	1b
+2:	ret
+	
 /*****************************************************************************
  * Sanity check: we must have an entry point
  *****************************************************************************
@@ -144,6 +206,7 @@ check_have_stack:
 	testl	%eax, %eax
 	jnz	99f
 	/* No entry point: print message and skip everything else */
+stack_not_found:
 	movw	$10f, %si
 	call	print_message
 	jmp	finished
@@ -529,8 +592,8 @@ print_pxe_error:
  */
 	.section ".prefix.data"
 
-pxe_ss:			.word 0
 pxe_esp:		.long 0
+pxe_ss:			.word 0
 
 pxe_parameter_structure: .fill 20
 
