@@ -60,8 +60,8 @@ static int scsi_command ( struct scsi_device *scsi,
 		/* Something went wrong with the issuing mechanism,
 		 * (rather than with the command itself)
 		 */
-		DBG ( "SCSI %p " SCSI_CDB_FORMAT " err %d\n",
-		      scsi, SCSI_CDB_DATA ( command->cdb ), rc );
+		DBG ( "SCSI %p " SCSI_CDB_FORMAT " err %s\n",
+		      scsi, SCSI_CDB_DATA ( command->cdb ), strerror ( rc ) );
 		return rc;
 	}
 
