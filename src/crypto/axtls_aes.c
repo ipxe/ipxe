@@ -33,13 +33,6 @@
 /** Basic AES blocksize */
 #define AES_BLOCKSIZE 16
 
-/****************************************************************************
- *
- * Basic AES algorithm (independent of mode of operation)
- *
- ****************************************************************************
- */
-
 /** AES context */
 struct aes_context {
 	/** AES context for AXTLS */
@@ -169,87 +162,6 @@ static struct cipher_algorithm aes_algorithm = {
 	.decrypt = aes_decrypt,
 };
 
-/****************************************************************************
- *
- * AES with cipher-block chaining (CBC)
- *
- ****************************************************************************
- */
-
-/** AES with CBC context */
-struct aes_cbc_context {
-	/** AES context */
-	struct aes_context aes_ctx;
-	/** CBC context */
-	uint8_t cbc_ctx[AES_BLOCKSIZE];
-};
-
-/**
- * Set key
- *
- * @v ctx		Context
- * @v key		Key
- * @v keylen		Key length
- * @ret rc		Return status code
- */
-static int aes_cbc_setkey ( void *ctx, const void *key, size_t keylen ) {
-	struct aes_cbc_context *aes_cbc_ctx = ctx;
-
-	return cbc_setkey ( ctx, key, keylen, &aes_algorithm,
-			    &aes_cbc_ctx->cbc_ctx );
-}
-
-/**
- * Set initialisation vector
- *
- * @v ctx		Context
- * @v iv		Initialisation vector
- */
-static void aes_cbc_setiv ( void *ctx, const void *iv ) {
-	struct aes_cbc_context *aes_cbc_ctx = ctx;
-
-	cbc_setiv ( ctx, iv, &aes_algorithm, &aes_cbc_ctx->cbc_ctx );
-}
-
-/**
- * Encrypt data
- *
- * @v ctx		Context
- * @v src		Data to encrypt
- * @v dst		Buffer for encrypted data
- * @v len		Length of data
- */
-static void aes_cbc_encrypt ( void *ctx, const void *src, void *dst,
-			      size_t len ) {
-	struct aes_cbc_context *aes_cbc_ctx = ctx;
-
-	cbc_encrypt ( &aes_cbc_ctx->aes_ctx, src, dst, len,
-		      &aes_algorithm, &aes_cbc_ctx->cbc_ctx );
-}
-
-/**
- * Decrypt data
- *
- * @v ctx		Context
- * @v src		Data to decrypt
- * @v dst		Buffer for decrypted data
- * @v len		Length of data
- */
-static void aes_cbc_decrypt ( void *ctx, const void *src, void *dst,
-			      size_t len ) {
-	struct aes_cbc_context *aes_cbc_ctx = ctx;
-
-	cbc_decrypt ( &aes_cbc_ctx->aes_ctx, src, dst, len,
-		      &aes_algorithm, &aes_cbc_ctx->cbc_ctx );
-}
-
 /* AES with cipher-block chaining */
-struct cipher_algorithm aes_cbc_algorithm = {
-	.name		= "aes_cbc",
-	.ctxsize	= sizeof ( struct aes_cbc_context ),
-	.blocksize	= AES_BLOCKSIZE,
-	.setkey		= aes_cbc_setkey,
-	.setiv		= aes_cbc_setiv,
-	.encrypt	= aes_cbc_encrypt,
-	.decrypt	= aes_cbc_decrypt,
-};
+CBC_CIPHER ( aes_cbc, aes_cbc_algorithm,
+	     aes_algorithm, struct aes_context, AES_BLOCKSIZE );

@@ -53,18 +53,18 @@ static void cbc_xor ( const void *src, void *dst, size_t len ) {
  * @v src		Data to encrypt
  * @v dst		Buffer for encrypted data
  * @v len		Length of data
- * @v cipher		Underlying cipher algorithm
+ * @v raw_cipher	Underlying cipher algorithm
  * @v cbc_ctx		CBC context
  */
 void cbc_encrypt ( void *ctx, const void *src, void *dst, size_t len,
-		   struct cipher_algorithm *cipher, void *cbc_ctx ) {
-	size_t blocksize = cipher->blocksize;
+		   struct cipher_algorithm *raw_cipher, void *cbc_ctx ) {
+	size_t blocksize = raw_cipher->blocksize;
 
 	assert ( ( len % blocksize ) == 0 );
 
 	while ( len ) {
 		cbc_xor ( src, cbc_ctx, blocksize );
-		cipher_encrypt ( cipher, ctx, cbc_ctx, dst, blocksize );
+		cipher_encrypt ( raw_cipher, ctx, cbc_ctx, dst, blocksize );
 		memcpy ( cbc_ctx, dst, blocksize );
 		dst += blocksize;
 		src += blocksize;
@@ -79,17 +79,17 @@ void cbc_encrypt ( void *ctx, const void *src, void *dst, size_t len,
  * @v src		Data to decrypt
  * @v dst		Buffer for decrypted data
  * @v len		Length of data
- * @v cipher		Underlying cipher algorithm
+ * @v raw_cipher	Underlying cipher algorithm
  * @v cbc_ctx		CBC context
  */
 void cbc_decrypt ( void *ctx, const void *src, void *dst, size_t len,
-		   struct cipher_algorithm *cipher, void *cbc_ctx ) {
-	size_t blocksize = cipher->blocksize;
+		   struct cipher_algorithm *raw_cipher, void *cbc_ctx ) {
+	size_t blocksize = raw_cipher->blocksize;
 
 	assert ( ( len % blocksize ) == 0 );
 
 	while ( len ) {
-		cipher_decrypt ( cipher, ctx, src, dst, blocksize );
+		cipher_decrypt ( raw_cipher, ctx, src, dst, blocksize );
 		cbc_xor ( cbc_ctx, dst, blocksize );
 		memcpy ( cbc_ctx, src, blocksize );
 		dst += blocksize;
