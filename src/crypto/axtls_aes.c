@@ -1,17 +1,65 @@
-#include "crypto/axtls/crypto.h"
+/*
+ * Copyright (C) 2007 Michael Brown <mbrown@fensystems.co.uk>.
+ *
+ * This program is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU General Public License as
+ * published by the Free Software Foundation; either version 2 of the
+ * License, or any later version.
+ *
+ * This program is distributed in the hope that it will be useful, but
+ * WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ * General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program; if not, write to the Free Software
+ * Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
+ */
+
 #include <string.h>
 #include <errno.h>
+#include <byteswap.h>
 #include <gpxe/crypto.h>
+#include <gpxe/cbc.h>
 #include <gpxe/aes.h>
+#include "crypto/axtls/crypto.h"
 
-struct aes_cbc_context {
-	AES_CTX ctx;
+/** @file
+ *
+ * AES algorithm
+ *
+ */
+
+/** Basic AES blocksize */
+#define AES_BLOCKSIZE 16
+
+/****************************************************************************
+ *
+ * Basic AES algorithm (independent of mode of operation)
+ *
+ ****************************************************************************
+ */
+
+/** AES context */
+struct aes_context {
+	/** AES context for AXTLS */
+	AES_CTX axtls_ctx;
+	/** Cipher is being used for decrypting */
 	int decrypting;
 };
 
-static int aes_cbc_setkey ( void *ctx, const void *key, size_t keylen ) {
-	struct aes_cbc_context *aesctx = ctx;
+/**
+ * Set key
+ *
+ * @v ctx		Context
+ * @v key		Key
+ * @v keylen		Key length
+ * @ret rc		Return status code
+ */
+static int aes_setkey ( void *ctx, const void *key, size_t keylen ) {
+	struct aes_context *aes_ctx = ctx;
 	AES_MODE mode;
+	void *iv;
 
 	switch ( keylen ) {
 	case ( 128 / 8 ):
@@ -24,45 +72,182 @@ static int aes_cbc_setkey ( void *ctx, const void *key, size_t keylen ) {
 		return -EINVAL;
 	}
 
-	AES_set_key ( &aesctx->ctx, key, aesctx->ctx.iv, mode );
+	/* IV is not a relevant concept at this stage; use a dummy
+	 * value that will have no side-effects.
+	 */
+	iv = &aes_ctx->axtls_ctx.iv;
 
-	aesctx->decrypting = 0;
+	AES_set_key ( &aes_ctx->axtls_ctx, key, iv, mode );
+
+	aes_ctx->decrypting = 0;
 
 	return 0;
 }
 
-static void aes_cbc_setiv ( void *ctx, const void *iv ) {
-	struct aes_cbc_context *aesctx = ctx;
-
-	memcpy ( aesctx->ctx.iv, iv, sizeof ( aesctx->ctx.iv ) );
+/**
+ * Set initialisation vector
+ *
+ * @v ctx		Context
+ * @v iv		Initialisation vector
+ */
+static void aes_setiv ( void *ctx __unused, const void *iv __unused ) {
+	/* Nothing to do */
 }
 
-static void aes_cbc_encrypt ( void *ctx, const void *data, void *dst,
-			      size_t len ) {
-	struct aes_cbc_context *aesctx = ctx;
+/**
+ * Call AXTLS' AES_encrypt() or AES_decrypt() functions
+ *
+ * @v axtls_ctx		AXTLS AES context
+ * @v src		Data to process
+ * @v dst		Buffer for output
+ * @v func		AXTLS AES function to call
+ */
+static void aes_call_axtls ( AES_CTX *axtls_ctx, const void *src, void *dst,
+			     void ( * func ) ( const AES_CTX *axtls_ctx,
+					       uint32_t *data ) ){
+	const uint32_t *srcl = src;
+	uint32_t *dstl = dst;
+	unsigned int i;
 
-	if ( aesctx->decrypting )
+	/* AXTLS' AES_encrypt() and AES_decrypt() functions both
+	 * expect to deal with an array of four dwords in host-endian
+	 * order.
+	 */
+	for ( i = 0 ; i < 4 ; i++ )
+		dstl[i] = ntohl ( srcl[i] );
+	func ( axtls_ctx, dstl );
+	for ( i = 0 ; i < 4 ; i++ )
+		dstl[i] = htonl ( dstl[i] );
+}
+
+/**
+ * Encrypt data
+ *
+ * @v ctx		Context
+ * @v src		Data to encrypt
+ * @v dst		Buffer for encrypted data
+ * @v len		Length of data
+ */
+static void aes_encrypt ( void *ctx, const void *src, void *dst,
+			  size_t len ) {
+	struct aes_context *aes_ctx = ctx;
+
+	assert ( len == AES_BLOCKSIZE );
+	if ( aes_ctx->decrypting )
 		assert ( 0 );
-
-	AES_cbc_encrypt ( &aesctx->ctx, data, dst, len );
+	aes_call_axtls ( &aes_ctx->axtls_ctx, src, dst, AES_encrypt );
 }
 
-static void aes_cbc_decrypt ( void *ctx, const void *data, void *dst,
-			      size_t len ) {
-	struct aes_cbc_context *aesctx = ctx;
+/**
+ * Decrypt data
+ *
+ * @v ctx		Context
+ * @v src		Data to decrypt
+ * @v dst		Buffer for decrypted data
+ * @v len		Length of data
+ */
+static void aes_decrypt ( void *ctx, const void *src, void *dst,
+			  size_t len ) {
+	struct aes_context *aes_ctx = ctx;
 
-	if ( ! aesctx->decrypting ) {
-		AES_convert_key ( &aesctx->ctx );
-		aesctx->decrypting = 1;
+	assert ( len == AES_BLOCKSIZE );
+	if ( ! aes_ctx->decrypting ) {
+		AES_convert_key ( &aes_ctx->axtls_ctx );
+		aes_ctx->decrypting = 1;
 	}
-
-	AES_cbc_decrypt ( &aesctx->ctx, data, dst, len );
+	aes_call_axtls ( &aes_ctx->axtls_ctx, src, dst, AES_decrypt );
 }
 
+/** Basic AES algorithm */
+static struct cipher_algorithm aes_algorithm = {
+	.name = "aes",
+	.ctxsize = sizeof ( struct aes_context ),
+	.blocksize = AES_BLOCKSIZE,
+	.setkey = aes_setkey,
+	.setiv = aes_setiv,
+	.encrypt = aes_encrypt,
+	.decrypt = aes_decrypt,
+};
+
+/****************************************************************************
+ *
+ * AES with cipher-block chaining (CBC)
+ *
+ ****************************************************************************
+ */
+
+/** AES with CBC context */
+struct aes_cbc_context {
+	/** AES context */
+	struct aes_context aes_ctx;
+	/** CBC context */
+	uint8_t cbc_ctx[AES_BLOCKSIZE];
+};
+
+/**
+ * Set key
+ *
+ * @v ctx		Context
+ * @v key		Key
+ * @v keylen		Key length
+ * @ret rc		Return status code
+ */
+static int aes_cbc_setkey ( void *ctx, const void *key, size_t keylen ) {
+	struct aes_cbc_context *aes_cbc_ctx = ctx;
+
+	return cbc_setkey ( ctx, key, keylen, &aes_algorithm,
+			    &aes_cbc_ctx->cbc_ctx );
+}
+
+/**
+ * Set initialisation vector
+ *
+ * @v ctx		Context
+ * @v iv		Initialisation vector
+ */
+static void aes_cbc_setiv ( void *ctx, const void *iv ) {
+	struct aes_cbc_context *aes_cbc_ctx = ctx;
+
+	cbc_setiv ( ctx, iv, &aes_algorithm, &aes_cbc_ctx->cbc_ctx );
+}
+
+/**
+ * Encrypt data
+ *
+ * @v ctx		Context
+ * @v src		Data to encrypt
+ * @v dst		Buffer for encrypted data
+ * @v len		Length of data
+ */
+static void aes_cbc_encrypt ( void *ctx, const void *src, void *dst,
+			      size_t len ) {
+	struct aes_cbc_context *aes_cbc_ctx = ctx;
+
+	cbc_encrypt ( &aes_cbc_ctx->aes_ctx, src, dst, len,
+		      &aes_algorithm, &aes_cbc_ctx->cbc_ctx );
+}
+
+/**
+ * Decrypt data
+ *
+ * @v ctx		Context
+ * @v src		Data to decrypt
+ * @v dst		Buffer for decrypted data
+ * @v len		Length of data
+ */
+static void aes_cbc_decrypt ( void *ctx, const void *src, void *dst,
+			      size_t len ) {
+	struct aes_cbc_context *aes_cbc_ctx = ctx;
+
+	cbc_decrypt ( &aes_cbc_ctx->aes_ctx, src, dst, len,
+		      &aes_algorithm, &aes_cbc_ctx->cbc_ctx );
+}
+
+/* AES with cipher-block chaining */
 struct cipher_algorithm aes_cbc_algorithm = {
 	.name		= "aes_cbc",
 	.ctxsize	= sizeof ( struct aes_cbc_context ),
-	.blocksize	= 16,
+	.blocksize	= AES_BLOCKSIZE,
 	.setkey		= aes_cbc_setkey,
 	.setiv		= aes_cbc_setiv,
 	.encrypt	= aes_cbc_encrypt,

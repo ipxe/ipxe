@@ -152,10 +152,6 @@ static const unsigned char Rcon[30]=
 	0xb3,0x7d,0xfa,0xef,0xc5,0x91,
 };
 
-/* ----- static functions ----- */
-static void AES_encrypt(const AES_CTX *ctx, uint32_t *data);
-static void AES_decrypt(const AES_CTX *ctx, uint32_t *data);
-
 /* Perform doubling in Galois Field GF(2^8) using the irreducible polynomial
    x^8+x^4+x^3+x+1 */
 static unsigned char AES_xtime(uint32_t x)
@@ -257,6 +253,7 @@ void AES_convert_key(AES_CTX *ctx)
     }
 }
 
+#if 0
 /**
  * Encrypt a byte sequence (with a block size 16) using the AES cipher.
  */
@@ -358,11 +355,12 @@ void AES_cbc_decrypt(AES_CTX *ctx, const uint8_t *msg, uint8_t *out, int length)
     l2n(xor2, iv);
     l2n(xor3, iv);
 }
+#endif
 
 /**
  * Encrypt a single block (16 bytes) of data
  */
-static void AES_encrypt(const AES_CTX *ctx, uint32_t *data)
+void AES_encrypt(const AES_CTX *ctx, uint32_t *data)
 {
     /* To make this code smaller, generate the sbox entries on the fly.
      * This will have a really heavy effect upon performance.
@@ -418,7 +416,7 @@ static void AES_encrypt(const AES_CTX *ctx, uint32_t *data)
 /**
  * Decrypt a single block (16 bytes) of data
  */
-static void AES_decrypt(const AES_CTX *ctx, uint32_t *data)
+void AES_decrypt(const AES_CTX *ctx, uint32_t *data)
 { 
     uint32_t tmp[4];
     uint32_t xt0,xt1,xt2,xt3,xt4,xt5,xt6;
