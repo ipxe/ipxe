@@ -137,6 +137,17 @@ static void ibft_set_ipaddr_option ( struct ibft_ipaddr *ipaddr,
 }
 
 /**
+ * Read IP address from iBFT (for debugging)
+ *
+ * @v strings		iBFT string block descriptor
+ * @v string		String field
+ * @ret ipaddr		IP address string
+ */
+static const char * ibft_ipaddr ( struct ibft_ipaddr *ipaddr ) {
+	return inet_ntoa ( ipaddr->in );
+}
+
+/**
  * Allocate a string within iBFT
  *
  * @v strings		iBFT string block descriptor
@@ -215,6 +226,18 @@ static int ibft_set_string_option ( struct ibft_string_block *strings,
 }
 
 /**
+ * Read string from iBFT (for debugging)
+ *
+ * @v strings		iBFT string block descriptor
+ * @v string		String field
+ * @ret data		String content (or "<empty>")
+ */
+static const char * ibft_string ( struct ibft_string_block *strings,
+				  struct ibft_string *string ) {
+	return ( ( ( char * ) strings->table ) + string->offset );
+}
+
+/**
  * Fill in NIC portion of iBFT
  *
  * @v nic		NIC portion of iBFT
@@ -231,11 +254,16 @@ static int ibft_fill_nic ( struct ibft_nic *nic,
 
 	/* Extract values from DHCP configuration */
 	ibft_set_ipaddr_option ( &nic->ip_address, &ip_setting );
+	DBG ( "iBFT NIC IP = %s\n", ibft_ipaddr ( &nic->ip_address ) );
 	ibft_set_ipaddr_option ( &nic->gateway, &gateway_setting );
+	DBG ( "iBFT NIC gateway = %s\n", ibft_ipaddr ( &nic->gateway ) );
 	ibft_set_ipaddr_option ( &nic->dns[0], &dns_setting );
+	DBG ( "iBFT NIC DNS = %s\n", ibft_ipaddr ( &nic->dns[0] ) );
 	if ( ( rc = ibft_set_string_option ( strings, &nic->hostname,
 					     &hostname_setting ) ) != 0 )
 		return rc;
+	DBG ( "iBFT NIC hostname = %s\n",
+	      ibft_string ( strings, &nic->hostname ) );
 
 	/* Derive subnet mask prefix from subnet mask */
 	fetch_ipv4_setting ( NULL, &netmask_setting, &netmask_addr );
@@ -245,11 +273,15 @@ static int ibft_fill_nic ( struct ibft_nic *nic,
 		netmask_addr.s_addr >>= 1;
 	}
 	nic->subnet_mask_prefix = netmask_count;
+	DBG ( "iBFT NIC subnet = /%d\n", nic->subnet_mask_prefix );
 
 	/* Extract values from net-device configuration */
 	memcpy ( nic->mac_address, netdev->ll_addr,
 		 sizeof ( nic->mac_address ) );
+	DBG ( "iBFT NIC MAC = %s\n",
+	      netdev->ll_protocol->ntoa ( nic->mac_address ) );
 	nic->pci_bus_dev_func = netdev->dev->desc.location;
+	DBG ( "iBFT NIC PCI = %04x\n", nic->pci_bus_dev_func );
 
 	return 0;
 }
@@ -269,6 +301,8 @@ static int ibft_fill_initiator ( struct ibft_initiator *initiator,
 	if ( ( rc = ibft_set_string ( strings, &initiator->initiator_name,
 				      initiator_iqn ) ) != 0 )
 		return rc;
+	DBG ( "iBFT initiator hostname = %s\n",
+	      ibft_string ( strings, &initiator->initiator_name ) );
 
 	return 0;
 }
@@ -286,17 +320,23 @@ static int ibft_fill_target_chap ( struct ibft_target *target,
 				   struct iscsi_session *iscsi ) {
 	int rc;
 
-	if ( ! iscsi->initiator_username )
+	if ( ! ( iscsi->status & ISCSI_STATUS_AUTH_FORWARD_REQUIRED ) )
 		return 0;
+
+	assert ( iscsi->initiator_username );
 	assert ( iscsi->initiator_password );
 
 	target->chap_type = IBFT_CHAP_ONE_WAY;
 	if ( ( rc = ibft_set_string ( strings, &target->chap_name,
 				      iscsi->initiator_username ) ) != 0 )
 		return rc;
+	DBG ( "iBFT target username = %s\n",
+	      ibft_string ( strings, &target->chap_name ) );
 	if ( ( rc = ibft_set_string ( strings, &target->chap_secret,
 				      iscsi->initiator_password ) ) != 0 )
 		return rc;
+	DBG ( "iBFT target password = <redacted>\n" );
+
 	return 0;
 }
 
@@ -313,19 +353,25 @@ static int ibft_fill_target_reverse_chap ( struct ibft_target *target,
 					   struct iscsi_session *iscsi ) {
 	int rc;
 
-	if ( ! iscsi->target_username )
+	if ( ! ( iscsi->status & ISCSI_STATUS_AUTH_REVERSE_REQUIRED ) )
 		return 0;
-	assert ( iscsi->target_password );
+
 	assert ( iscsi->initiator_username );
 	assert ( iscsi->initiator_password );
+	assert ( iscsi->target_username );
+	assert ( iscsi->target_password );
 
 	target->chap_type = IBFT_CHAP_MUTUAL;
 	if ( ( rc = ibft_set_string ( strings, &target->reverse_chap_name,
 				      iscsi->target_username ) ) != 0 )
 		return rc;
+	DBG ( "iBFT target reverse username = %s\n",
+	      ibft_string ( strings, &target->chap_name ) );
 	if ( ( rc = ibft_set_string ( strings, &target->reverse_chap_secret,
 				      iscsi->target_password ) ) != 0 )
 		return rc;
+	DBG ( "iBFT target reverse password = <redacted>\n" );
+
 	return 0;
 }
 
@@ -346,10 +392,14 @@ static int ibft_fill_target ( struct ibft_target *target,
 
 	/* Fill in Target values */
 	ibft_set_ipaddr ( &target->ip_address, sin_target->sin_addr );
+	DBG ( "iBFT target IP = %s\n", ibft_ipaddr ( &target->ip_address ) );
 	target->socket = ntohs ( sin_target->sin_port );
+	DBG ( "iBFT target port = %d\n", target->socket );
 	if ( ( rc = ibft_set_string ( strings, &target->target_name,
 				      iscsi->target_iqn ) ) != 0 )
 		return rc;
+	DBG ( "iBFT target name = %s\n",
+	      ibft_string ( strings, &target->target_name ) );
 	if ( ( rc = ibft_fill_target_chap ( target, strings, iscsi ) ) != 0 )
 		return rc;
 	if ( ( rc = ibft_fill_target_reverse_chap ( target, strings,

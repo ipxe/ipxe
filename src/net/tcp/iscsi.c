@@ -125,6 +125,8 @@ static int iscsi_open_connection ( struct iscsi_session *iscsi ) {
 	/* Enter security negotiation phase */
 	iscsi->status = ( ISCSI_STATUS_SECURITY_NEGOTIATION_PHASE |
 			  ISCSI_STATUS_STRINGS_SECURITY );
+	if ( iscsi->target_username )
+		iscsi->status |= ISCSI_STATUS_AUTH_REVERSE_REQUIRED;
 
 	/* Assign fresh initiator task tag */
 	iscsi->itt++;
@@ -151,9 +153,6 @@ static void iscsi_close_connection ( struct iscsi_session *iscsi, int rc ) {
 
 	/* Clear connection status */
 	iscsi->status = 0;
-
-	/* Deauthenticate target */
-	iscsi->target_auth_ok = 0;
 
 	/* Reset TX and RX state machines */
 	iscsi->tx_state = ISCSI_TX_IDLE;
@@ -634,15 +633,12 @@ static int iscsi_handle_targetaddress_value ( struct iscsi_session *iscsi,
 static int iscsi_handle_authmethod_value ( struct iscsi_session *iscsi,
 					   const char *value ) {
 
-	/* Mark target as authenticated if no authentication required */
-	if ( ! iscsi->target_username )
-		iscsi->target_auth_ok = 1;
-
 	/* If server requests CHAP, send the CHAP_A string */
 	if ( strcmp ( value, "CHAP" ) == 0 ) {
 		DBGC ( iscsi, "iSCSI %p initiating CHAP authentication\n",
 		       iscsi );
-		iscsi->status |= ISCSI_STATUS_STRINGS_CHAP_ALGORITHM;
+		iscsi->status |= ( ISCSI_STATUS_STRINGS_CHAP_ALGORITHM |
+				   ISCSI_STATUS_AUTH_FORWARD_REQUIRED );
 	}
 
 	return 0;
@@ -858,7 +854,7 @@ static int iscsi_handle_chap_r_value ( struct iscsi_session *iscsi,
 	assert ( i == iscsi->chap.response_len );
 
 	/* Mark session as authenticated */
-	iscsi->target_auth_ok = 1;
+	iscsi->status |= ISCSI_STATUS_AUTH_REVERSE_OK;
 
 	return 0;
 }
@@ -1064,14 +1060,16 @@ static int iscsi_rx_login_response ( struct iscsi_session *iscsi,
 
 	/* Handle login transitions */
 	if ( response->flags & ISCSI_LOGIN_FLAG_TRANSITION ) {
+		iscsi->status &= ~( ISCSI_STATUS_PHASE_MASK |
+				    ISCSI_STATUS_STRINGS_MASK );
 		switch ( response->flags & ISCSI_LOGIN_NSG_MASK ) {
 		case ISCSI_LOGIN_NSG_OPERATIONAL_NEGOTIATION:
-			iscsi->status =
+			iscsi->status |=
 				( ISCSI_STATUS_OPERATIONAL_NEGOTIATION_PHASE |
 				  ISCSI_STATUS_STRINGS_OPERATIONAL );
 			break;
 		case ISCSI_LOGIN_NSG_FULL_FEATURE_PHASE:
-			iscsi->status = ISCSI_STATUS_FULL_FEATURE_PHASE;
+			iscsi->status |= ISCSI_STATUS_FULL_FEATURE_PHASE;
 			break;
 		default:
 			DBGC ( iscsi, "iSCSI %p got invalid response flags "
@@ -1090,7 +1088,8 @@ static int iscsi_rx_login_response ( struct iscsi_session *iscsi,
 	}
 
 	/* Check that target authentication was successful (if required) */
-	if ( ! iscsi->target_auth_ok ) {
+	if ( ( iscsi->status & ISCSI_STATUS_AUTH_REVERSE_REQUIRED ) &&
+	     ! ( iscsi->status & ISCSI_STATUS_AUTH_REVERSE_OK ) ) {
 		DBGC ( iscsi, "iSCSI %p nefarious target tried to bypass "
 		       "authentication\n", iscsi );
 		return -EPROTO;

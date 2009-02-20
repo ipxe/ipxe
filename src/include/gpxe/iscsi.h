@@ -530,8 +530,6 @@ struct iscsi_session {
 	char *target_username;
 	/** Target password (if any) */
 	char *target_password;
-	/** Target has authenticated acceptably */
-	int target_auth_ok;
 	/** CHAP challenge (for target auth only)
 	 *
 	 * This is a block of random data; the first byte is used as
@@ -663,6 +661,15 @@ struct iscsi_session {
 
 /** Mask for all iSCSI "needs to send" flags */
 #define ISCSI_STATUS_STRINGS_MASK 0xff00
+
+/** Target has requested forward (initiator) authentication */
+#define ISCSI_STATUS_AUTH_FORWARD_REQUIRED 0x00010000
+
+/** Initiator requires target (reverse) authentication */
+#define ISCSI_STATUS_AUTH_REVERSE_REQUIRED 0x00020000
+
+/** Target authenticated itself correctly */
+#define ISCSI_STATUS_AUTH_REVERSE_OK 0x00040000
 
 /** Maximum number of retries at connecting */
 #define ISCSI_MAX_RETRIES 2
