@@ -433,23 +433,24 @@ void pxe_init_structures ( void ) {
  * @ret rc		Return status code
  */
 int pxe_start_nbp ( void ) {
-	int discard_b, discard_c, discard_d;
+	int discard_b, discard_c, discard_d, discard_D;
 	uint16_t rc;
 
 	/* Far call to PXE NBP */
-	__asm__ __volatile__ ( REAL_CODE ( "pushw %%cx\n\t"
-					   "pushw %%ax\n\t"
-					   "movw %%cx, %%es\n\t"
+	__asm__ __volatile__ ( REAL_CODE ( "movw %%cx, %%es\n\t"
+					   "pushw %%es\n\t"
+					   "pushw %%di\n\t"
 					   "sti\n\t"
 					   "lcall $0, $0x7c00\n\t"
 					   "addw $4, %%sp\n\t" )
 			       : "=a" ( rc ), "=b" ( discard_b ),
-				 "=c" ( discard_c ), "=d" ( discard_d )
-			       : "a" ( __from_text16 ( &ppxe ) ),
-			         "b" ( __from_text16 ( &pxenv ) ),
+				 "=c" ( discard_c ), "=d" ( discard_d ),
+				 "=D" ( discard_D )
+			       : "a" ( 0 ), "b" ( __from_text16 ( &pxenv ) ),
 			         "c" ( rm_cs ),
-			         "d" ( virt_to_phys ( &pxenv ) )
-			       : "esi", "edi", "ebp", "memory" );
+			         "d" ( virt_to_phys ( &pxenv ) ),
+				 "D" ( __from_text16 ( &ppxe ) )
+			       : "esi", "ebp", "memory" );
 
 	return rc;
 }
