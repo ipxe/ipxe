@@ -133,6 +133,15 @@ extern struct list_head images;
 #define for_each_image( image ) \
 	list_for_each_entry ( (image), &images, list )
 
+/**
+ * Test for existence of images
+ *
+ * @ret existence	Some images exist
+ */
+static inline int have_images ( void ) {
+	return ( ! list_empty ( &images ) );
+}
+
 extern struct image * alloc_image ( void );
 extern int image_set_uri ( struct image *image, struct uri *uri );
 extern int image_set_cmdline ( struct image *image, const char *cmdline );

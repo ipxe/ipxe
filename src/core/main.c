@@ -71,13 +71,17 @@ __asmcall int main ( void ) {
 		shell();
 	} else {
 		/* User doesn't want shell; load and execute the first
-		 * image.  If booting fails (i.e. if the image
-		 * returns, or fails to execute), offer a second
-		 * chance to enter the shell for diagnostics.
+		 * image, or autoboot() if we have no images.  If
+		 * booting fails for any reason, offer a second chance
+		 * to enter the shell for diagnostics.
 		 */
-		for_each_image ( image ) {
-			image_exec ( image );
-			break;
+		if ( have_images() ) {
+			for_each_image ( image ) {
+				image_exec ( image );
+				break;
+			}
+		} else {
+			autoboot();
 		}
 
 		if ( shell_banner() )

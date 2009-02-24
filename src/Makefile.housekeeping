@@ -286,10 +286,6 @@ CFLAGS		+= $(EXTRA_CFLAGS)
 ASFLAGS		+= $(EXTRA_ASFLAGS)
 LDFLAGS		+= $(EXTRA_LDFLAGS)
 
-# Embedded image(s), or default if not set
-#
-EMBEDDED_IMAGE	= image/default.gpxe
-
 # Inhibit -Werror if NO_WERROR is specified on make command line
 #
 ifneq ($(NO_WERROR),1)

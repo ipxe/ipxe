@@ -222,13 +222,13 @@ static int kernel_exec ( int argc, char **argv ) {
 }
 
 /**
- * The "imgauto" command
+ * The "chain" command
  *
  * @v argc		Argument count
  * @v argv		Argument list
  * @ret rc		Exit code
  */
-static int imgauto_exec ( int argc, char **argv) {
+static int chain_exec ( int argc, char **argv) {
 	int rc;
 
 	if ( ( rc = imgfetch_core_exec ( NULL, IMG_EXEC, argc, argv ) ) != 0 )
@@ -563,8 +563,8 @@ struct command image_commands[] __command = {
 		.exec = kernel_exec,
 	},
 	{
-		.name = "imgauto",
-		.exec = imgauto_exec,
+		.name = "chain",
+		.exec = chain_exec,
 	},
 	{
 		.name = "imgload",

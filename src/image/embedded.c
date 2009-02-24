@@ -16,7 +16,8 @@
  *
  * @v refcnt		Reference counter
  */
-static void embedded_image_free ( struct refcnt *refcnt __unused ) {
+static void __attribute__ (( unused ))
+embedded_image_free ( struct refcnt *refcnt __unused ) {
 	/* Do nothing */
 }
 
@@ -51,14 +52,18 @@ static struct image embedded_images[] = {
  * Register all embedded images
  */
 static void embedded_init ( void ) {
-	unsigned int i;
+	int i;
 	struct image *image;
 	void *data;
 	int rc;
 
+	/* Skip if we have no embedded images */
+	if ( ! sizeof ( embedded_images ) )
+		return;
+
 	/* Fix up data pointers and register images */
-	for ( i = 0 ; i < ( sizeof ( embedded_images ) /
-			    sizeof ( embedded_images[0] ) ) ; i++ ) {
+	for ( i = 0 ; i < ( int ) ( sizeof ( embedded_images ) /
+				    sizeof ( embedded_images[0] ) ) ; i++ ) {
 		image = &embedded_images[i];
 
 		/* virt_to_user() cannot be used in a static
