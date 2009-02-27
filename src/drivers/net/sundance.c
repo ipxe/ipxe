@@ -691,6 +691,22 @@ static int sundance_probe ( struct nic *nic, struct pci_device *pci ) {
 	/* Reset the chip to erase previous misconfiguration */
 	DBG ( "ASIC Control is %#x\n", inl(BASE + ASICCtrl) );
 	outw(0x007f, BASE + ASICCtrl + 2);
+
+	/*
+	* wait for reset to complete
+	* this is heavily inspired by the linux sundance driver
+	* according to the linux driver it can take up to 1ms for the reset
+	* to complete
+	*/
+	i = 0;
+	while(inl(BASE + ASICCtrl) & (ResetBusy << 16)) {
+		if(i++ >= 10) {
+			DBG("sundance: NIC reset did not complete.\n");
+			break;
+		}
+		udelay(100);
+	}
+
 	DBG ( "ASIC Control is now %#x.\n", inl(BASE + ASICCtrl) );
 
 	sundance_reset(nic);
