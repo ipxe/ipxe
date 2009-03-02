@@ -105,20 +105,13 @@ have_pxenv:
 
 	/* Record entry point and UNDI segments */
 	pushl	%es:0x0a(%bx)		/* Entry point */
-	popl	entry_segoff
 	pushw	%es:0x24(%bx)		/* UNDI code segment */
 	pushw	%es:0x26(%bx)		/* UNDI code size */
-	popl	undi_code_segoff
 	pushw	%es:0x20(%bx)		/* UNDI data segment */
 	pushw	%es:0x22(%bx)		/* UNDI data size */
-	popl	undi_data_segoff
 
 	/* Print "PXENV+ at <address>" */
 	movw	$10f, %si
-	call	print_message
-	call	print_segoff
-	movb	$( ',' ), %al
-	call	print_character
 	jmp	check_have_stack
 	.section ".prefix.data", "aw", @progbits
 10:	.asciz	" PXENV+ at "
@@ -129,19 +122,13 @@ have_ppxe:
 	movw	%es, ppxe_segment
 	
 	pushl	%es:0x10(%bx)		/* Entry point */
-	popl	entry_segoff
 	pushw	%es:0x30(%bx)		/* UNDI code segment */
 	pushw	%es:0x36(%bx)		/* UNDI code size */
-	popl	undi_code_segoff
 	pushw	%es:0x28(%bx)		/* UNDI data segment */
 	pushw	%es:0x2e(%bx)		/* UNDI data size */
-	popl	undi_data_segoff
+
 	/* Print "!PXE at <address>" */
 	movw	$10f, %si
-	call	print_message
-	call	print_segoff
-	movb	$( ',' ), %al
-	call	print_character
 	jmp	check_have_stack
 	.section ".prefix.data", "aw", @progbits
 10:	.asciz	" !PXE at "
@@ -201,6 +188,17 @@ memory_scan_common:
  *****************************************************************************
  */
 check_have_stack:
+	/* Save common values pushed onto the stack */
+	popl	undi_data_segoff
+	popl	undi_code_segoff
+	popl	entry_segoff
+
+	/* Print have !PXE/PXENV+ message; structure pointer in %es:%bx */
+	call	print_message
+	call	print_segoff
+	movb	$( ',' ), %al
+	call	print_character
+
 	/* Check for entry point */
 	movl	entry_segoff, %eax
 	testl	%eax, %eax
