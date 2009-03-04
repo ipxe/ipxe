@@ -101,6 +101,7 @@
 #define DHCP_CMD		/* DHCP management commands */
 #define SANBOOT_CMD		/* SAN boot commands */
 #define LOGIN_CMD		/* Login command */
+#undef	TIME_CMD		/* Time command */
 
 /*
  * Obscure configuration options
