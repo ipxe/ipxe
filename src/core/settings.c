@@ -118,6 +118,108 @@ struct simple_settings simple_settings_root = {
 #define settings_root simple_settings_root.settings
 
 /**
+ * Find child named settings block
+ *
+ * @v parent		Parent settings block
+ * @v name		Name within this parent
+ * @ret settings	Settings block, or NULL
+ */
+static struct settings * find_child_settings ( struct settings *parent,
+					       const char *name ) {
+	struct settings *settings;
+
+	/* Treat empty name as meaning "this block" */
+	if ( ! *name )
+		return parent;
+
+	/* Look for child with matching name */
+	list_for_each_entry ( settings, &parent->children, siblings ) {
+		if ( strcmp ( settings->name, name ) == 0 )
+			return settings;
+	}
+
+	return NULL;
+}
+
+/**
+ * Find or create child named settings block
+ *
+ * @v parent		Parent settings block
+ * @v name		Name within this parent
+ * @ret settings	Settings block, or NULL
+ */
+static struct settings * autovivify_child_settings ( struct settings *parent,
+						     const char *name ) {
+	struct {
+		struct simple_settings simple;
+		char name[ strlen ( name ) + 1 /* NUL */ ];
+	} *new_child;
+	struct settings *settings;
+
+	/* Return existing settings, if existent */
+	if ( ( settings = find_child_settings ( parent, name ) ) != NULL )
+		return settings;
+
+	/* Create new simple settings block */
+	new_child = zalloc ( sizeof ( *new_child ) );
+	if ( ! new_child ) {
+		DBGC ( parent, "Settings %p could not create child %s\n",
+		       parent, name );
+		return NULL;
+	}
+	memcpy ( new_child->name, name, sizeof ( new_child->name ) );
+	simple_settings_init ( &new_child->simple, NULL, new_child->name );
+	settings = &new_child->simple.settings;
+	register_settings ( settings, parent );
+	return settings;
+}
+
+/**
+ * Parse settings block name
+ *
+ * @v name		Name
+ * @v get_child		Function to find or create child settings block
+ * @ret settings	Settings block, or NULL
+ */
+static struct settings *
+parse_settings_name ( const char *name,
+		      struct settings * ( * get_child ) ( struct settings *,
+							  const char * ) ) {
+	struct settings *settings = &settings_root;
+	char name_copy[ strlen ( name ) + 1 ];
+	char *subname;
+	char *remainder;
+
+	/* Create modifiable copy of name */
+	memcpy ( name_copy, name, sizeof ( name_copy ) );
+	remainder = name_copy;
+
+	/* Parse each name component in turn */
+	while ( remainder ) {
+		subname = remainder;
+		remainder = strchr ( subname, '.' );
+		if ( remainder )
+			*(remainder++) = '\0';
+		settings = get_child ( settings, subname );
+		if ( ! settings )
+			break;
+	}
+
+	return settings;
+}
+
+/**
+ * Find named settings block
+ *
+ * @v name		Name
+ * @ret settings	Settings block, or NULL
+ */
+struct settings * find_settings ( const char *name ) {
+
+	return parse_settings_name ( name, find_child_settings );
+}
+
+/**
  * Apply all settings
  *
  * @ret rc		Return status code
@@ -226,52 +328,6 @@ void unregister_settings ( struct settings *settings ) {
 
 	/* Apply potentially-updated settings */
 	apply_settings();
-}
-
-/**
- * Find child named settings block
- *
- * @v parent		Parent settings block
- * @v name		Name within this parent
- * @ret settings	Settings block, or NULL
- */
-struct settings * find_child_settings ( struct settings *parent,
-					const char *name ) {
-	struct settings *settings;
-	size_t len;
-
-	/* NULL parent => add to settings root */
-	if ( parent == NULL )
-		parent = &settings_root;
-
-	/* Look for a child whose name matches the initial component */
-	list_for_each_entry ( settings, &parent->children, siblings ) {
-		len = strlen ( settings->name );
-		if ( strncmp ( name, settings->name, len ) != 0 )
-			continue;
-		if ( name[len] == 0 )
-			return settings;
-		if ( name[len] == '.' )
-			return find_child_settings ( settings,
-						     ( name + len + 1 ) );
-	}
-
-	return NULL;
-}
-
-/**
- * Find named settings block
- *
- * @v name		Name
- * @ret settings	Settings block, or NULL
- */
-struct settings * find_settings ( const char *name ) {
-
-	/* If name is empty, use the root */
-	if ( ! *name )
-		return &settings_root;
-
-	return find_child_settings ( &settings_root, name );
 }
 
 /******************************************************************************
@@ -641,6 +697,7 @@ static struct setting_type * find_setting_type ( const char *name ) {
  * Parse setting name
  *
  * @v name		Name of setting
+ * @v get_child		Function to find or create child settings block
  * @v settings		Settings block to fill in
  * @v setting		Setting to fill in
  * @ret rc		Return status code
@@ -649,8 +706,11 @@ static struct setting_type * find_setting_type ( const char *name ) {
  * "[settings_name/]tag_name[:type_name]" and fills in the appropriate
  * fields.
  */
-static int parse_setting_name ( const char *name, struct settings **settings,
-				struct setting *setting ) {
+static int
+parse_setting_name ( const char *name,
+		     struct settings * ( * get_child ) ( struct settings *,
+							 const char * ),
+		     struct settings **settings, struct setting *setting ) {
 	char tmp_name[ strlen ( name ) + 1 ];
 	char *settings_name;
 	char *setting_name;
@@ -677,7 +737,7 @@ static int parse_setting_name ( const char *name, struct settings **settings,
 
 	/* Identify settings block, if specified */
 	if ( settings_name ) {
-		*settings = find_settings ( settings_name );
+		*settings = parse_settings_name ( settings_name, get_child );
 		if ( *settings == NULL ) {
 			DBG ( "Unrecognised settings block \"%s\" in \"%s\"\n",
 			      settings_name, name );
@@ -731,7 +791,8 @@ int storef_named_setting ( const char *name, const char *value ) {
 	struct setting setting;
 	int rc;
 
-	if ( ( rc = parse_setting_name ( name, &settings, &setting ) ) != 0 )
+	if ( ( rc = parse_setting_name ( name, autovivify_child_settings,
+					 &settings, &setting ) ) != 0 )
 		return rc;
 	return storef_setting ( settings, &setting, value );
 }
@@ -749,7 +810,8 @@ int fetchf_named_setting ( const char *name, char *buf, size_t len ) {
 	struct setting setting;
 	int rc;
 
-	if ( ( rc = parse_setting_name ( name, &settings, &setting ) ) != 0 )
+	if ( ( rc = parse_setting_name ( name, find_child_settings,
+					 &settings, &setting ) ) != 0 )
 		return rc;
 	return fetchf_setting ( settings, &setting, buf, len );
 }

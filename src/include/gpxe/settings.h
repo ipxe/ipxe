@@ -193,8 +193,6 @@ extern int fetch_uuid_setting ( struct settings *settings,
 				struct setting *setting, union uuid *uuid );
 extern int setting_cmp ( struct setting *a, struct setting *b );
 
-extern struct settings * find_child_settings ( struct settings *parent,
-					       const char *name );
 extern struct settings * find_settings ( const char *name );
 
 extern int storef_setting ( struct settings *settings,
