@@ -173,12 +173,11 @@ static int undinet_call ( struct undi_nic *undinic, unsigned int function,
 	__asm__ __volatile__ ( REAL_CODE ( "pushw %%es\n\t"
 					   "pushw %%di\n\t"
 					   "pushw %%bx\n\t"
-					   "lcall *%c3\n\t"
+					   "lcall *undinet_entry_point\n\t"
 					   "addw $6, %%sp\n\t" )
 			       : "=a" ( exit ), "=b" ( discard_b ),
 			         "=D" ( discard_D )
-			       : "p" ( __from_data16 ( &undinet_entry_point )),
-			         "b" ( function ),
+			       : "b" ( function ),
 			         "D" ( __from_data16 ( &undinet_params ) )
 			       : "ecx", "edx", "esi", "ebp" );
 

@@ -31,6 +31,11 @@
 /* EFI headers rudely redefine NULL */
 #undef NULL
 
+/* EFI headers expect ICC to define __GNUC__ */
+#if defined ( __ICC ) && ! defined ( __GNUC__ )
+#define __GNUC__ 1
+#endif
+
 /* Include the top-level EFI header files */
 #include <gpxe/efi/Uefi.h>
 #include <gpxe/efi/PiDxe.h>
@@ -69,7 +74,7 @@ struct efi_protocol {
 	struct efi_protocol __ ## _protocol __efi_protocol = {		     \
 		.u.guid = _protocol ## _GUID,				     \
 		.protocol = ( ( void ** ) ( void * )			     \
-			      ( ( (_ptr) == ( ( _protocol ** ) NULL ) ) ?    \
+			      ( ( (_ptr) == ( ( _protocol ** ) (_ptr) ) ) ?  \
 				(_ptr) : (_ptr) ) ),			     \
 	}
 

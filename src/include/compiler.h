@@ -212,7 +212,8 @@ int __debug_disable;
  * @v len		Length of data
  */
 #define DBG_HD_IF( level, data, len ) do {			\
-		DBG_HDA_IF ( level, data, data, len );		\
+		const void *_data = data;			\
+		DBG_HDA_IF ( level, _data, _data, len );	\
 	} while ( 0 )
 
 /**

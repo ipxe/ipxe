@@ -234,8 +234,20 @@
  * @endcode
  */
 #define __table_entry( table, idx )					\
-	__attribute__ (( __section__ ( __table_section ( table, idx ) )	\
+	__attribute__ (( __section__ ( __table_section ( table, idx ) ),\
 			 __aligned__ ( __table_alignment ( table ) ) ))
+
+/**
+ * Get start of linker table entries
+ *
+ * @v table		Linker table
+ * @v idx		Sub-table index
+ * @ret entries		Start of entries
+ */
+#define __table_entries( table, idx ) ( {				\
+	static __table_type ( table ) __table_entries[0]		\
+		__table_entry ( table, idx ); 				\
+	__table_entries; } )
 
 /**
  * Get start of linker table
@@ -253,10 +265,7 @@
  *
  * @endcode
  */
-#define table_start( table ) ( {					\
-	static __table_type ( table ) __table_start[0]			\
-		__table_entry ( table, 00 ); 				\
-	__table_start; } )
+#define table_start( table ) __table_entries ( table, 00 )
 
 /**
  * Get end of linker table
@@ -274,10 +283,7 @@
  *
  * @endcode
  */
-#define table_end( table ) ( {						\
-	static __table_type ( table ) __table_end[0]			\
-		__table_entry ( table, 99 ); 				\
-	__table_end; } )
+#define table_end( table ) __table_entries ( table, 99 )
 
 /**
  * Get number of entries in linker table
@@ -351,5 +357,76 @@
 	for ( pointer = ( table_end ( table ) - 1 ) ;			\
 	      pointer >= table_start ( table ) ;			\
 	      pointer-- )
+
+/******************************************************************************
+ *
+ * Intel's C compiler chokes on several of the constructs used in this
+ * file.  The workarounds are ugly, so we use them only for an icc
+ * build.
+ *
+ */
+#define ICC_ALIGN_HACK_FACTOR 128
+#ifdef __ICC
+
+/*
+ * icc miscompiles zero-length arrays by inserting padding to a length
+ * of two array elements.  We therefore have to generate the
+ * __table_entries() symbols by hand in asm.
+ *
+ */
+#undef __table_entries
+#define __table_entries( table, idx ) ( {				\
+	extern __table_type ( table )					\
+		__table_temp_sym ( idx, __LINE__ ) []			\
+		__table_entry ( table, idx ) 				\
+		asm ( __table_entries_sym ( table, idx ) );		\
+	__asm__ ( ".ifndef %c0\n\t"					\
+		  ".section " __table_section ( table, idx ) "\n\t"	\
+		  ".align %c1\n\t"					\
+	          "\n%c0:\n\t"						\
+		  ".previous\n\t" 					\
+		  ".endif\n\t"						\
+		  : : "i" ( __table_temp_sym ( idx, __LINE__ ) ),	\
+		      "i" ( __table_alignment ( table ) ) );		\
+	__table_temp_sym ( idx, __LINE__ ); } )
+#define __table_entries_sym( table, idx )				\
+	"__tbl_" __table_name ( table ) "_" #idx
+#define __table_temp_sym( a, b )					\
+	___table_temp_sym( __table_, a, _, b )
+#define ___table_temp_sym( a, b, c, d ) a ## b ## c ## d
+
+/*
+ * icc ignores __attribute__ (( aligned (x) )) when it is used to
+ * decrease the compiler's default choice of alignment (which may be
+ * higher than the alignment actually required by the structure).  We
+ * work around this by forcing the alignment to a large multiple of
+ * the required value (so that we are never attempting to decrease the
+ * default alignment) and then postprocessing the object file to
+ * reduce the alignment back down to the "real" value.
+ *
+ */
+#undef __table_alignment
+#define __table_alignment( table ) \
+	( ICC_ALIGN_HACK_FACTOR * __alignof__ ( __table_type ( table ) ) )
+
+/*
+ * Because of the alignment hack, we must ensure that the compiler
+ * never tries to place multiple objects within the same section,
+ * otherwise the assembler will insert padding to the (incorrect)
+ * alignment boundary.  Do this by appending the line number to table
+ * section names.
+ *
+ * Note that we don't need to worry about padding between array
+ * elements, since the alignment is declared on the variable (i.e. the
+ * whole array) rather than on the type (i.e. on all individual array
+ * elements).
+ */
+#undef __table_section
+#define __table_section( table, idx ) \
+	".tbl." __table_name ( table ) "." __table_str ( idx ) \
+	"." __table_xstr ( __LINE__ )
+#define __table_xstr( x ) __table_str ( x )
+
+#endif /* __ICC */
 
 #endif /* _GPXE_TABLES_H */

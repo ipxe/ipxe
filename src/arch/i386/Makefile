@@ -4,22 +4,33 @@ CFLAGS		+= -march=i386
 
 # Code size reduction.
 #
-CFLAGS		+= -fstrength-reduce -fomit-frame-pointer
+CFLAGS		+= -fomit-frame-pointer
+
+# Code size reduction.
+#
+ifeq ($(CCTYPE),gcc)
+CFLAGS		+= -fstrength-reduce
+endif
 
 # Code size reduction.  gcc3 needs a different syntax to gcc2 if you
 # want to avoid spurious warnings.
 #
+ifeq ($(CCTYPE),gcc)
 GCC_VERSION	:= $(subst ., ,$(shell $(CC) -dumpversion))
 GCC_MAJOR	:= $(firstword $(GCC_VERSION))
 ifeq ($(GCC_MAJOR),2)
 CFLAGS		+= -malign-jumps=1 -malign-loops=1 -malign-functions=1
 else
 CFLAGS		+= -falign-jumps=1 -falign-loops=1 -falign-functions=1
-endif
+endif # gcc2
+endif # gcc
 
-# Code size reduction.  This is almost always a win.  The kernel uses it, too.
+# Code size reduction.  This is almost always a win.  The kernel uses
+# it, too.
 #
+ifeq ($(CCTYPE),gcc)
 CFLAGS		+= -mpreferred-stack-boundary=2
+endif
 
 # Code size reduction.  Use regparm for all functions - C functions
 # called from assembly (or vice versa) need __asmcall now
@@ -27,7 +38,9 @@ CFLAGS		+= -mpreferred-stack-boundary=2
 CFLAGS		+= -mregparm=3
 
 # Code size reduction.  Use -mrtd (same __asmcall requirements as above)
+ifeq ($(CCTYPE),gcc)
 CFLAGS		+= -mrtd
+endif
 
 # Code size reduction.  This is the logical complement to -mregparm=3.
 # It doesn't currently buy us anything, but if anything ever tries to

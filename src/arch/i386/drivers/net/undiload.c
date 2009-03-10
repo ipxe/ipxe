@@ -90,11 +90,10 @@ int undi_load ( struct undi_device *undi, struct undi_rom *undirom ) {
 	undi_loader_entry = undirom->loader_entry;
 	__asm__ __volatile__ ( REAL_CODE ( "pushw %%ds\n\t"
 					   "pushw %%ax\n\t"
-					   "lcall *%c2\n\t"
+					   "lcall *undi_loader_entry\n\t"
 					   "addw $4, %%sp\n\t" )
 			       : "=a" ( exit )
-			       : "a" ( __from_data16 ( &undi_loader ) ),
-			         "p" ( __from_data16 ( &undi_loader_entry ) )
+			       : "a" ( __from_data16 ( &undi_loader ) )
 			       : "ebx", "ecx", "edx", "esi", "edi", "ebp" );
 
 	/* UNDI API calls may rudely change the status of A20 and not

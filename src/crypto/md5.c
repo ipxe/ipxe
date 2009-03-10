@@ -26,30 +26,28 @@
 #include <gpxe/crypto.h>
 #include <gpxe/md5.h>
 
-#define __md5step __attribute__ (( regparm ( 3 ) ))
-
 struct md5_step {
-	u32 __md5step ( * f ) ( u32 b, u32 c, u32 d );
+	u32 ( * f ) ( u32 b, u32 c, u32 d );
 	u8 coefficient;
 	u8 constant;
 };
 
-static u32 __md5step f1(u32 b, u32 c, u32 d)
+static u32 f1(u32 b, u32 c, u32 d)
 {
 	return ( d ^ ( b & ( c ^ d ) ) );
 }
 
-static u32 __md5step f2(u32 b, u32 c, u32 d)
+static u32 f2(u32 b, u32 c, u32 d)
 {
 	return ( c ^ ( d & ( b ^ c ) ) );
 }
 
-static u32 __md5step f3(u32 b, u32 c, u32 d)
+static u32 f3(u32 b, u32 c, u32 d)
 {
 	return ( b ^ c ^ d );
 }
 
-static u32 __md5step f4(u32 b, u32 c, u32 d)
+static u32 f4(u32 b, u32 c, u32 d)
 {
 	return ( c ^ ( b | ~d ) );
 }

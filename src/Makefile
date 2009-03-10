@@ -22,7 +22,7 @@ ECHO		:= echo
 PRINTF		:= printf
 PERL		:= /usr/bin/perl
 CC		:= $(CROSS_COMPILE)gcc
-CPP		:= $(CROSS_COMPILE)gcc -E -Wp,-Wall
+CPP		:= $(CC) -E
 AS		:= $(CROSS_COMPILE)as
 LD		:= $(CROSS_COMPILE)ld
 SIZE		:= $(CROSS_COMPILE)size
@@ -40,6 +40,7 @@ ZBIN		:= ./util/zbin
 ELF2EFI32	:= ./util/elf2efi32
 ELF2EFI64	:= ./util/elf2efi64
 EFIROM		:= ./util/efirom
+ICCFIX		:= ./util/iccfix
 DOXYGEN		:= doxygen
 
 ###############################################################################
