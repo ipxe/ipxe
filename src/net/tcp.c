@@ -471,6 +471,8 @@ static int tcp_xmit ( struct tcp_connection *tcp, int force_send ) {
 		tsopt->tsopt.tsval = ntohl ( currticks() );
 		tsopt->tsopt.tsecr = ntohl ( tcp->ts_recent );
 	}
+	if ( ! ( flags & TCP_SYN ) )
+		flags |= TCP_PSH;
 	tcphdr = iob_push ( iobuf, sizeof ( *tcphdr ) );
 	memset ( tcphdr, 0, sizeof ( *tcphdr ) );
 	tcphdr->src = tcp->local_port;
@@ -478,7 +480,7 @@ static int tcp_xmit ( struct tcp_connection *tcp, int force_send ) {
 	tcphdr->seq = htonl ( tcp->snd_seq );
 	tcphdr->ack = htonl ( tcp->rcv_ack );
 	tcphdr->hlen = ( ( payload - iobuf->data ) << 2 );
-	tcphdr->flags = ( flags | TCP_PSH );
+	tcphdr->flags = flags;
 	tcphdr->win = htons ( tcp->rcv_win );
 	tcphdr->csum = tcpip_chksum ( iobuf->data, iob_len ( iobuf ) );
 
