@@ -7,11 +7,6 @@
 #include <unistd.h>
 #include <gpxe/eisa.h>
 
-static struct eisa_driver eisa_drivers[0]
-	__table_start ( struct eisa_driver, eisa_drivers );
-static struct eisa_driver eisa_drivers_end[0]
-	__table_end ( struct eisa_driver, eisa_drivers );
-
 static void eisabus_remove ( struct root_device *rootdev );
 
 /**
@@ -57,7 +52,7 @@ static int eisa_probe ( struct eisa_device *eisa ) {
 	      eisa->slot, eisa->vendor_id, eisa->prod_id,
 	      isa_id_string ( eisa->vendor_id, eisa->prod_id ), eisa->ioaddr );
 
-	for ( driver = eisa_drivers; driver < eisa_drivers_end; driver++ ) {
+	for_each_table_entry ( driver, EISA_DRIVERS ) {
 		for ( i = 0 ; i < driver->id_count ; i++ ) {
 			id = &driver->ids[i];
 			if ( id->vendor_id != eisa->vendor_id )

@@ -77,12 +77,8 @@ struct setting_widget {
 	char value[256]; /* enough size for a DHCP string */
 };
 
-/** Registered configuration settings */
-static struct setting all_settings[0]
-	__table_start ( struct setting, settings );
-static struct setting all_settings_end[0]
-	__table_end ( struct setting, settings );
-#define NUM_SETTINGS ( ( unsigned ) ( all_settings_end - all_settings ) )
+/** Number of registered configuration settings */
+#define NUM_SETTINGS table_num_entries ( struct setting, SETTINGS )
 
 static void load_setting ( struct setting_widget *widget ) __nonnull;
 static int save_setting ( struct setting_widget *widget ) __nonnull;
@@ -223,6 +219,9 @@ static int edit_setting ( struct setting_widget *widget, int key ) {
 static void init_setting_index ( struct setting_widget *widget,
 				 struct settings *settings,
 				 unsigned int index ) {
+	struct setting *all_settings =
+		table_start ( struct setting, SETTINGS );
+
 	init_setting ( widget, settings, &all_settings[index],
 		       ( SETTINGS_LIST_ROW + index ), SETTINGS_LIST_COL );
 }

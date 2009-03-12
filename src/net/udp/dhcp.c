@@ -88,10 +88,6 @@ static uint8_t dhcp_request_options_data[] = {
 	DHCP_END
 };
 
-/** DHCP feature codes */
-static uint8_t dhcp_features[0] __table_start ( uint8_t, dhcp_features );
-static uint8_t dhcp_features_end[0] __table_end ( uint8_t, dhcp_features );
-
 /** Version number feature */
 FEATURE_VERSION ( VERSION_MAJOR, VERSION_MINOR, VERSION_PATCH );
 
@@ -884,6 +880,7 @@ int dhcp_create_request ( struct dhcp_packet *dhcppkt,
 	struct dhcp_netdev_desc dhcp_desc;
 	struct dhcp_client_id client_id;
 	struct dhcp_client_uuid client_uuid;
+	uint8_t *dhcp_features;
 	size_t dhcp_features_len;
 	size_t ll_addr_len;
 	ssize_t len;
@@ -903,7 +900,8 @@ int dhcp_create_request ( struct dhcp_packet *dhcppkt,
 	dhcppkt->dhcphdr->ciaddr = ciaddr;
 
 	/* Add options to identify the feature list */
-	dhcp_features_len = ( dhcp_features_end - dhcp_features );
+	dhcp_features = table_start ( uint8_t, DHCP_FEATURES );
+	dhcp_features_len = table_num_entries ( uint8_t, DHCP_FEATURES );
 	if ( ( rc = dhcppkt_store ( dhcppkt, DHCP_EB_ENCAP, dhcp_features,
 				    dhcp_features_len ) ) != 0 ) {
 		DBG ( "DHCP could not set features list option: %s\n",

@@ -279,11 +279,17 @@ struct net_device {
 /** Network device has link */
 #define NETDEV_LINK_UP 0x0002
 
+/** Link-layer protocol table */
+#define LL_PROTOCOLS "ll_protocols"
+
 /** Declare a link-layer protocol */
-#define __ll_protocol  __table ( struct ll_protocol, ll_protocols, 01 )
+#define __ll_protocol  __table ( struct ll_protocol, LL_PROTOCOLS, 01 )
+
+/** Network-layer protocol table */
+#define NET_PROTOCOLS "net_protocols"
 
 /** Declare a network-layer protocol */
-#define __net_protocol __table ( struct net_protocol, net_protocols, 01 )
+#define __net_protocol __table ( struct net_protocol, NET_PROTOCOLS, 01 )
 
 extern struct list_head net_devices;
 extern struct net_device_operations null_netdev_operations;

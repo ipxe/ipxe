@@ -123,9 +123,12 @@ struct image_type {
  */
 #define PROBE_PXE 03
 
+/** Executable or loadable image type table */
+#define IMAGE_TYPES "image_types"
+
 /** An executable or loadable image type */
 #define __image_type( probe_order ) \
-	 __table ( struct image_type, image_types, probe_order )
+	__table ( struct image_type, IMAGE_TYPES, probe_order )
 
 extern struct list_head images;
 

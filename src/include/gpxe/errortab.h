@@ -14,6 +14,8 @@ struct errortab {
 	const char *text;
 };
 
-#define __errortab __table ( struct errortab, errortab, 01 )
+#define ERRORTAB "errortab"
+
+#define __errortab __table ( struct errortab, ERRORTAB, 01 )
 
 #endif /* _GPXE_ERRORTAB_H */

@@ -27,9 +27,6 @@ Literature dealing with the network protocols:
 #define BOLD	"\033[1m"
 #define CYAN	"\033[36m"
 
-static struct feature features[0] __table_start ( struct feature, features );
-static struct feature features_end[0] __table_end ( struct feature, features );
-
 /**
  * Main entry point
  *
@@ -61,7 +58,7 @@ __asmcall int main ( void ) {
 		 NORMAL " -- Open Source Boot Firmware -- "
 		 CYAN "http://etherboot.org" NORMAL "\n"
 		 "Features:" );
-	for ( feature = features ; feature < features_end ; feature++ )
+	for_each_table_entry ( feature, FEATURES )
 		printf ( " %s", feature->name );
 	printf ( "\n" );
 

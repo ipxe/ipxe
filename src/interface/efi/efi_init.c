@@ -26,18 +26,6 @@ EFI_HANDLE efi_image_handle;
 /** System table passed to entry point */
 EFI_SYSTEM_TABLE *efi_systab;
 
-/** Declared used EFI protocols */
-static struct efi_protocol efi_protocols[0] \
-	__table_start ( struct efi_protocol, efi_protocols );
-static struct efi_protocol efi_protocols_end[0] \
-	__table_end ( struct efi_protocol, efi_protocols );
-
-/** Declared used EFI configuration tables */
-static struct efi_config_table efi_config_tables[0] \
-	__table_start ( struct efi_config_table, efi_config_tables );
-static struct efi_config_table efi_config_tables_end[0] \
-	__table_end ( struct efi_config_table, efi_config_tables );
-
 /**
  * Look up EFI configuration table
  *
@@ -92,7 +80,7 @@ EFI_STATUS efi_init ( EFI_HANDLE image_handle,
 
 	/* Look up used protocols */
 	bs = systab->BootServices;
-	for ( prot = efi_protocols ; prot < efi_protocols_end ; prot++ ) {
+	for_each_table_entry ( prot, EFI_PROTOCOLS ) {
 		if ( ( efirc = bs->LocateProtocol ( &prot->u.guid, NULL,
 						    prot->protocol ) ) == 0 ) {
 			DBGC ( systab, "EFI protocol %s is at %p\n",
@@ -106,7 +94,7 @@ EFI_STATUS efi_init ( EFI_HANDLE image_handle,
 	}
 
 	/* Look up used configuration tables */
-	for ( tab = efi_config_tables ; tab < efi_config_tables_end ; tab++ ) {
+	for_each_table_entry ( tab, EFI_CONFIG_TABLES ) {
 		if ( ( *(tab->table) = efi_find_table ( &tab->u.guid ) ) ) {
 			DBGC ( systab, "EFI configuration table %s is at %p\n",
 			       uuid_ntoa ( &tab->u.uuid ), *(tab->table) );

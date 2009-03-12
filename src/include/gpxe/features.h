@@ -50,8 +50,11 @@
 
 /** @} */
 
+/** DHCP feature table */
+#define DHCP_FEATURES "dhcp_features"
+
 /** Declare a feature code for DHCP */
-#define __dhcp_feature __table ( uint8_t, dhcp_features, 01 )
+#define __dhcp_feature __table ( uint8_t, DHCP_FEATURES, 01 )
 
 /** Construct a DHCP feature table entry */
 #define DHCP_FEATURE( feature_opt, ... )				    \
@@ -69,9 +72,12 @@ struct feature {
 	char *name;
 };
 
+/** Named feature table */
+#define FEATURES "features"
+
 /** Declare a named feature */
 #define __feature_name( category )					    \
-	__table ( struct feature, features, category )
+	__table ( struct feature, FEATURES, category )
 
 /** Construct a named feature */
 #define FEATURE_NAME( category, text )					    \

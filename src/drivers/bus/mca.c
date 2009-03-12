@@ -13,11 +13,6 @@
 #include <gpxe/io.h>
 #include <gpxe/mca.h>
 
-static struct mca_driver mca_drivers[0]
-	__table_start ( struct mca_driver, mca_drivers );
-static struct mca_driver mca_drivers_end[0]
-	__table_end ( struct mca_driver, mca_drivers );
-
 static void mcabus_remove ( struct root_device *rootdev );
 
 /**
@@ -41,7 +36,7 @@ static int mca_probe ( struct mca_device *mca ) {
 	      mca->pos[0], mca->pos[1], mca->pos[2], mca->pos[3],
 	      mca->pos[4], mca->pos[5], mca->pos[6], mca->pos[7] );
 
-	for ( driver = mca_drivers; driver < mca_drivers_end; driver++ ){
+	for_each_table_entry ( driver, MCA_DRIVERS ) {
 		for ( i = 0 ; i < driver->id_count ; i++ ) {
 			id = &driver->ids[i];
 			if ( id->id != MCA_ID ( mca ) )

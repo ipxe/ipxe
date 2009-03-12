@@ -34,11 +34,6 @@
  *
  */
 
-static struct command commands[0]
-	__table_start ( struct command, commands );
-static struct command commands_end[0]
-	__table_end ( struct command, commands );
-
 /* Avoid dragging in getopt.o unless a command really uses it */
 int optind;
 int nextchar;
@@ -78,7 +73,7 @@ int execv ( const char *command, char * const argv[] ) {
 	reset_getopt();
 
 	/* Hand off to command implementation */
-	for ( cmd = commands ; cmd < commands_end ; cmd++ ) {
+	for_each_table_entry ( cmd, COMMANDS ) {
 		if ( strcmp ( command, cmd->name ) == 0 )
 			return cmd->exec ( argc, ( char ** ) argv );
 	}

@@ -63,6 +63,9 @@ process_init ( struct process *process,
 	process_add ( process );
 }
 
+/** Permanent process table */
+#define PERMANENT_PROCESSES "processes"
+
 /**
  * Declare a permanent process
  *
@@ -70,6 +73,6 @@ process_init ( struct process *process,
  * at initialisation time.
  */
 #define __permanent_process \
-	__table ( struct process, processes, 01 )
+	__table ( struct process, PERMANENT_PROCESSES, 01 )
 
 #endif /* _GPXE_PROCESS_H */

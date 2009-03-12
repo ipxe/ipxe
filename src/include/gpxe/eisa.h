@@ -79,8 +79,11 @@ struct eisa_driver {
 	void ( * remove ) ( struct eisa_device *eisa );
 };
 
+/** EISA driver table */
+#define EISA_DRIVERS "eisa_drivers"
+
 /** Declare an EISA driver */
-#define __eisa_driver __table ( struct eisa_driver, eisa_drivers, 01 )
+#define __eisa_driver __table ( struct eisa_driver, EISA_DRIVERS, 01 )
 
 extern void eisa_device_enabled ( struct eisa_device *eisa, int enabled );
 

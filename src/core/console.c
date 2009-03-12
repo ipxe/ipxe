@@ -5,11 +5,6 @@
 
 /** @file */
 
-static struct console_driver console_drivers[0]
-	__table_start ( struct console_driver, console );
-static struct console_driver console_drivers_end[0]
-	__table_end ( struct console_driver, console );
-
 /**
  * Write a single character to each console device.
  *
@@ -28,8 +23,7 @@ void putchar ( int character ) {
 	if ( character == '\n' )
 		putchar ( '\r' );
 
-	for ( console = console_drivers; console < console_drivers_end ;
-	      console++ ) {
+	for_each_table_entry ( console, CONSOLES ) {
 		if ( ( ! console->disabled ) && console->putchar )
 			console->putchar ( character );
 	}
@@ -51,8 +45,7 @@ void putchar ( int character ) {
 static struct console_driver * has_input ( void ) {
 	struct console_driver *console;
 
-	for ( console = console_drivers; console < console_drivers_end ;
-	      console++ ) {
+	for_each_table_entry ( console, CONSOLES ) {
 		if ( ( ! console->disabled ) && console->iskey ) {
 			if ( console->iskey () )
 				return console;

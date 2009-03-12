@@ -58,8 +58,11 @@ struct isa_driver {
 	void ( * remove ) ( struct isa_device *isa );
 };
 
+/** ISA driver table */
+#define ISA_DRIVERS "isa_drivers"
+
 /** Declare an ISA driver */
-#define __isa_driver __table ( struct isa_driver, isa_drivers, 01 )
+#define __isa_driver __table ( struct isa_driver, ISA_DRIVERS, 01 )
 
 /**
  * Set ISA driver-private data

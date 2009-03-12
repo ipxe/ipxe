@@ -102,7 +102,10 @@ struct root_driver {
 	void ( * remove ) ( struct root_device *rootdev );
 };
 
+/** Root device table */
+#define ROOT_DEVICES "root_devices"
+
 /** Declare a root device */
-#define __root_device __table ( struct root_device, root_devices, 01 )
+#define __root_device __table ( struct root_device, ROOT_DEVICES, 01 )
 
 #endif /* _GPXE_DEVICE_H */

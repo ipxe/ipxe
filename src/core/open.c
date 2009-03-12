@@ -30,18 +30,6 @@
  *
  */
 
-/** Registered URI openers */
-static struct uri_opener uri_openers[0]
-	__table_start ( struct uri_opener, uri_openers );
-static struct uri_opener uri_openers_end[0]
-	__table_end ( struct uri_opener, uri_openers );
-
-/** Registered socket openers */
-static struct socket_opener socket_openers[0]
-	__table_start ( struct socket_opener, socket_openers );
-static struct socket_opener socket_openers_end[0]
-	__table_end ( struct socket_opener, socket_openers );
-
 /**
  * Open URI
  *
@@ -63,7 +51,7 @@ int xfer_open_uri ( struct xfer_interface *xfer, struct uri *uri ) {
 		return -ENOMEM;
 
 	/* Find opener which supports this URI scheme */
-	for ( opener = uri_openers ; opener < uri_openers_end ; opener++ ) {
+	for_each_table_entry ( opener, URI_OPENERS ) {
 		if ( strcmp ( resolved_uri->scheme, opener->scheme ) == 0 ) {
 			rc = opener->open ( xfer, resolved_uri );
 			goto done;
@@ -121,7 +109,7 @@ int xfer_open_socket ( struct xfer_interface *xfer, int semantics,
 	       socket_semantics_name ( semantics ),
 	       socket_family_name ( peer->sa_family ) );
 
-	for ( opener = socket_openers; opener < socket_openers_end; opener++ ){
+	for_each_table_entry ( opener, SOCKET_OPENERS ) {
 		if ( ( opener->semantics == semantics ) &&
 		     ( opener->family == peer->sa_family ) ) {
 			return opener->open ( xfer, peer, local );

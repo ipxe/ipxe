@@ -98,13 +98,19 @@ struct tcpip_net_protocol {
 		       uint16_t *trans_csum );
 };
 
+/** TCP/IP transport-layer protocol table */
+#define TCPIP_PROTOCOLS "tcpip_protocols"
+
 /** Declare a TCP/IP transport-layer protocol */
 #define	__tcpip_protocol \
-	__table ( struct tcpip_protocol, tcpip_protocols, 01 )
+	__table ( struct tcpip_protocol, TCPIP_PROTOCOLS, 01 )
+
+/** TCP/IP network-layer protocol table */
+#define TCPIP_NET_PROTOCOLS "tcpip_net_protocols"
 
 /** Declare a TCP/IP network-layer protocol */
 #define	__tcpip_net_protocol \
-	__table ( struct tcpip_net_protocol, tcpip_net_protocols, 01 )
+	__table ( struct tcpip_net_protocol, TCPIP_NET_PROTOCOLS, 01 )
 
 extern int tcpip_rx ( struct io_buffer *iobuf, uint8_t tcpip_proto,
 		      struct sockaddr_tcpip *st_src,

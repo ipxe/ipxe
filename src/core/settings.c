@@ -37,24 +37,6 @@
  *
  */
 
-/** Registered settings */
-static struct setting settings[0]
-	__table_start ( struct setting, settings );
-static struct setting settings_end[0]
-	__table_end ( struct setting, settings );
-
-/** Registered setting types */
-static struct setting_type setting_types[0]
-	__table_start ( struct setting_type, setting_types );
-static struct setting_type setting_types_end[0]
-	__table_end ( struct setting_type, setting_types );
-
-/** Registered settings applicators */
-static struct settings_applicator settings_applicators[0]
-	__table_start ( struct settings_applicator, settings_applicators );
-static struct settings_applicator settings_applicators_end[0]
-	__table_end ( struct settings_applicator, settings_applicators );
-
 /******************************************************************************
  *
  * Registered settings blocks
@@ -229,8 +211,7 @@ static int apply_settings ( void ) {
 	int rc;
 
 	/* Call all settings applicators */
-	for ( applicator = settings_applicators ;
-	      applicator < settings_applicators_end ; applicator++ ) {
+	for_each_table_entry ( applicator, SETTINGS_APPLICATORS ) {
 		if ( ( rc = applicator->apply() ) != 0 ) {
 			DBG ( "Could not apply settings using applicator "
 			      "%p: %s\n", applicator, strerror ( rc ) );
@@ -670,7 +651,7 @@ int storef_setting ( struct settings *settings, struct setting *setting,
 static struct setting * find_setting ( const char *name ) {
 	struct setting *setting;
 
-	for ( setting = settings ; setting < settings_end ; setting++ ) {
+	for_each_table_entry ( setting, SETTINGS ) {
 		if ( strcmp ( name, setting->name ) == 0 )
 			return setting;
 	}
@@ -686,7 +667,7 @@ static struct setting * find_setting ( const char *name ) {
 static struct setting_type * find_setting_type ( const char *name ) {
 	struct setting_type *type;
 
-	for ( type = setting_types ; type < setting_types_end ; type++ ) {
+	for_each_table_entry ( type, SETTING_TYPES ) {
 		if ( strcmp ( name, type->name ) == 0 )
 			return type;
 	}

@@ -150,12 +150,6 @@ struct resolver numeric_resolver __resolver ( RESOLV_NUMERIC ) = {
  ***************************************************************************
  */
 
-/** Registered name resolvers */
-static struct resolver resolvers[0]
-	__table_start ( struct resolver, resolvers );
-static struct resolver resolvers_end[0]
-	__table_end ( struct resolver, resolvers );
-
 /** A name resolution multiplexer */
 struct resolv_mux {
 	/** Reference counter */
@@ -223,7 +217,7 @@ static void resolv_mux_done ( struct resolv_interface *resolv,
 
 	/* Attempt next child resolver, if possible */
 	mux->resolver++;
-	if ( mux->resolver >= resolvers_end ) {
+	if ( mux->resolver >= table_end ( struct resolver, RESOLVERS ) ) {
 		DBGC ( mux, "RESOLV %p failed to resolve name\n", mux );
 		goto finished;
 	}
@@ -262,7 +256,7 @@ int resolv ( struct resolv_interface *resolv, const char *name,
 		return -ENOMEM;
 	resolv_init ( &mux->parent, &null_resolv_ops, &mux->refcnt );
 	resolv_init ( &mux->child, &resolv_mux_child_ops, &mux->refcnt );
-	mux->resolver = resolvers;
+	mux->resolver = table_start ( struct resolver, RESOLVERS );
 	memcpy ( &mux->sa, sa, sizeof ( mux->sa ) );
 	memcpy ( mux->name, name, name_len );
 

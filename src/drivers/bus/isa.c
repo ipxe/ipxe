@@ -48,11 +48,6 @@ static isa_probe_addr_t isa_extra_probe_addrs[] = {
 	  isa_extra_probe_addrs[ (ioidx) + ISA_EXTRA_PROBE_ADDR_COUNT ] : \
 	  (driver)->probe_addrs[(ioidx)] )
 
-static struct isa_driver isa_drivers[0]
-	__table_start ( struct isa_driver, isa_drivers );
-static struct isa_driver isa_drivers_end[0]
-	__table_end ( struct isa_driver, isa_drivers );
-
 static void isabus_remove ( struct root_device *rootdev );
 
 /**
@@ -100,7 +95,7 @@ static int isabus_probe ( struct root_device *rootdev ) {
 	int ioidx;
 	int rc;
 
-	for ( driver = isa_drivers ; driver < isa_drivers_end ; driver++ ) {
+	for_each_table_entry ( driver, ISA_DRIVERS ) {
 		for ( ioidx = ISA_IOIDX_MIN ( driver ) ;
 		      ioidx <= ISA_IOIDX_MAX ( driver ) ; ioidx++ ) {
 			/* Allocate struct isa_device */

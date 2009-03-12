@@ -58,8 +58,11 @@ struct uri_opener {
 	int ( * open ) ( struct xfer_interface *xfer, struct uri *uri );
 };
 
+/** URI opener table */
+#define URI_OPENERS "uri_openers"
+
 /** Register a URI opener */
-#define __uri_opener __table ( struct uri_opener, uri_openers, 01 )
+#define __uri_opener __table ( struct uri_opener, URI_OPENERS, 01 )
 
 /** A socket opener */
 struct socket_opener {
@@ -78,8 +81,11 @@ struct socket_opener {
 			 struct sockaddr *local );
 };
 
+/** Socket opener table */
+#define SOCKET_OPENERS "socket_openers"
+
 /** Register a socket opener */
-#define __socket_opener __table ( struct socket_opener, socket_openers, 01 )
+#define __socket_opener __table ( struct socket_opener, SOCKET_OPENERS, 01 )
 
 extern int xfer_open_uri ( struct xfer_interface *xfer, struct uri *uri );
 extern int xfer_open_uri_string ( struct xfer_interface *xfer,

@@ -18,11 +18,6 @@
  *
  */
 
-static struct errortab errortab_start[0]
-	__table_start ( struct errortab, errortab );
-static struct errortab errortab_end[0]
-	__table_end ( struct errortab, errortab );
-
 /**
  * Find error description
  *
@@ -33,8 +28,7 @@ static struct errortab errortab_end[0]
 static struct errortab * find_error ( int errno, int mask ) {
 	struct errortab *errortab;
 
-	for ( errortab = errortab_start ; errortab < errortab_end ;
-	      errortab++ ) {
+	for_each_table_entry ( errortab, ERRORTAB ) {
 		if ( ( ( errortab->errno ^ errno ) & mask ) == 0 )
 			return errortab;
 	}

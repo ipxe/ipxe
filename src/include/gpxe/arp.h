@@ -26,9 +26,12 @@ struct arp_net_protocol {
 			  const void *net_addr );
 };
 
+/** ARP protocol table */
+#define ARP_NET_PROTOCOLS "arp_net_protocols"
+
 /** Declare an ARP protocol */
 #define __arp_net_protocol \
-	__table ( struct arp_net_protocol, arp_net_protocols, 01 )
+	__table ( struct arp_net_protocol, ARP_NET_PROTOCOLS, 01 )
 
 extern struct net_protocol arp_protocol;
 

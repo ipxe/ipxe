@@ -36,8 +36,11 @@ struct setting {
 	unsigned int tag;
 };
 
+/** Configuration setting table */
+#define SETTINGS "settings"
+
 /** Declare a configuration setting */
-#define	__setting __table ( struct setting, settings, 01 )
+#define	__setting __table ( struct setting, SETTINGS, 01 )
 
 /** Settings block operations */
 struct settings_operations {
@@ -123,9 +126,12 @@ struct setting_type {
 			   char *buf, size_t len );
 };
 
+/** Configuration setting type table */
+#define SETTING_TYPES "setting_types"
+
 /** Declare a configuration setting type */
 #define	__setting_type \
-	__table ( struct setting_type, setting_types, 01 )
+	__table ( struct setting_type, SETTING_TYPES, 01 )
 
 /**
  * A settings applicator
@@ -139,9 +145,12 @@ struct settings_applicator {
 	int ( * apply ) ( void );
 };
 
+/** Settings applicator table */
+#define SETTINGS_APPLICATORS "settings_applicators"
+
 /** Declare a settings applicator */
 #define __settings_applicator \
-	__table ( struct settings_applicator, settings_applicators, 01 )
+	__table ( struct settings_applicator, SETTINGS_APPLICATORS, 01 )
 
 /**
  * A simple settings block

@@ -36,12 +36,6 @@
  *
  */
 
-/** Registered network-layer protocols */
-static struct net_protocol net_protocols[0]
-	__table_start ( struct net_protocol, net_protocols );
-static struct net_protocol net_protocols_end[0]
-	__table_end ( struct net_protocol, net_protocols );
-
 /** List of network devices */
 struct list_head net_devices = LIST_HEAD_INIT ( net_devices );
 
@@ -538,8 +532,7 @@ int net_rx ( struct io_buffer *iobuf, struct net_device *netdev,
 	struct net_protocol *net_protocol;
 
 	/* Hand off to network-layer protocol, if any */
-	for ( net_protocol = net_protocols ; net_protocol < net_protocols_end ;
-	      net_protocol++ ) {
+	for_each_table_entry ( net_protocol, NET_PROTOCOLS ) {
 		if ( net_protocol->net_proto == net_proto ) {
 			return net_protocol->rx ( iobuf, netdev, ll_source );
 		}

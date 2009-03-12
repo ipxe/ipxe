@@ -149,9 +149,12 @@ struct resolver {
 /** Normal resolver priority */
 #define RESOLV_NORMAL 02
 
+/** Resolvers table */
+#define RESOLVERS "resolvers"
+
 /** Register as a name resolver */
 #define __resolver( resolv_order ) \
-	__table ( struct resolver, resolvers, resolv_order )
+	__table ( struct resolver, RESOLVERS, resolv_order )
 
 extern void resolv_done ( struct resolv_interface *resolv,
 			  struct sockaddr *sa, int rc );

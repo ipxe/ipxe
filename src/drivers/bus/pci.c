@@ -34,11 +34,6 @@
  *
  */
 
-static struct pci_driver pci_drivers[0]
-	__table_start ( struct pci_driver, pci_drivers );
-static struct pci_driver pci_drivers_end[0]
-	__table_end ( struct pci_driver, pci_drivers );
-
 static void pcibus_remove ( struct root_device *rootdev );
 
 /**
@@ -188,7 +183,7 @@ static int pci_probe ( struct pci_device *pci ) {
 	      PCI_FUNC ( pci->devfn ), pci->vendor, pci->device,
 	      pci->membase, pci->ioaddr, pci->irq );
 
-	for ( driver = pci_drivers ; driver < pci_drivers_end ; driver++ ) {
+	for_each_table_entry ( driver, PCI_DRIVERS ) {
 		for ( i = 0 ; i < driver->id_count ; i++ ) {
 			id = &driver->ids[i];
 			if ( ( id->vendor != PCI_ANY_ID ) &&

@@ -43,12 +43,6 @@
 /** Shutdown flags for exit */
 int shutdown_exit_flags = 0;
 
-/* SAN boot protocols */
-static struct sanboot_protocol sanboot_protocols[0] \
-	__table_start ( struct sanboot_protocol, sanboot_protocols );
-static struct sanboot_protocol sanboot_protocols_end[0] \
-	__table_end ( struct sanboot_protocol, sanboot_protocols );
-
 /**
  * Identify the boot network device
  *
@@ -124,8 +118,7 @@ int boot_root_path ( const char *root_path ) {
 	struct sanboot_protocol *sanboot;
 
 	/* Quick hack */
-	for ( sanboot = sanboot_protocols ;
-	      sanboot < sanboot_protocols_end ; sanboot++ ) {
+	for_each_table_entry ( sanboot, SANBOOT_PROTOCOLS ) {
 		if ( strncmp ( root_path, sanboot->prefix,
 			       strlen ( sanboot->prefix ) ) == 0 ) {
 			return sanboot->boot ( root_path );

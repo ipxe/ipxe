@@ -115,7 +115,7 @@
  *	void ( *frob ) ( void ); 	// The frobnicating function itself
  *   };
  *
- *   #define __frobnicator __table ( frobnicators, 01 )
+ *   #define __frobnicator __table ( struct frobnicator, "frobnicators", 01 )
  *
  * @endcode
  *
@@ -145,14 +145,11 @@
  *
  *   #include "frob.h"
  *
- *   static struct frob frob_start[0] __table_start ( frobnicators );
- *   static struct frob frob_end[0] __table_end ( frobnicators );
- *
  *   // Call all linked-in frobnicators
  *   void frob_all ( void ) {
  *	struct frob *frob;
  *
- *      for ( frob = frob_start ; frob < frob_end ; frob++ ) {
+ *	for_each_table ( frob, "frobnicators" ) {
  *         printf ( "Calling frobnicator \"%s\"\n", frob->name );
  *	   frob->frob ();
  *	}
@@ -170,7 +167,7 @@
 
 #define __table_str( x ) #x
 #define __table_section( table, idx ) \
-	__section__ ( ".tbl." __table_str ( table ) "." __table_str ( idx ) )
+	__section__ ( ".tbl." table "." __table_str ( idx ) )
 
 #define __table_section_start( table ) __table_section ( table, 00 )
 #define __table_section_end( table ) __table_section ( table, 99 )
@@ -185,45 +182,110 @@
  *
  * @code
  *
- *   struct my_foo __table ( foo, 01 ) = {
+ *   #define __frobnicator __table ( struct frobnicator, "frobnicators", 01 )
+ *
+ *   struct frobnicator my_frob __frobnicator = {
  *      ...
  *   };
  *
  * @endcode
  *
  */
-#define __table( type, table, idx )				\
-	__attribute__ (( __table_section ( table, idx ),	\
+#define __table( type, table, idx )					\
+	__attribute__ (( __table_section ( table, idx ),		\
 			 __natural_alignment ( type ) ))
 
 /**
- * Linker table start marker.
+ * Start of linker table.
  *
- * Declares a data structure (usually an empty data structure) to be
- * the start of a linker table.  Use as e.g.
+ * Return the start of a linker table.  Use as e.g.
  *
  * @code
  *
- *   static struct foo_start[0] __table_start ( foo );
+ *   struct frobnicator *frobs =
+ *	table_start ( struct frobnicator, "frobnicators" );
  *
  * @endcode
  *
  */
-#define __table_start( type, table ) __table ( type, table, 00 )
+#define table_start( type, table ) ( {					\
+	static type __table_start[0] __table ( type, table, 00 );	\
+	__table_start; } )
 
 /**
- * Linker table end marker.
+ * End of linker table.
  *
- * Declares a data structure (usually an empty data structure) to be
- * the end of a linker table.  Use as e.g.
+ * Return the end of a linker table.  Use as e.g.
  *
  * @code
  *
- *   static struct foo_end[0] __table_end ( foo );
+ *   struct frobnicator *frobs_end =
+ *	table_end ( struct frobnicator, "frobnicators" );
  *
  * @endcode
  *
  */
-#define __table_end( type, table ) __table ( type, table, 99 )
+#define table_end( type, table ) ( {					\
+	static type __table_end[0] __table ( type, table, 99 );		\
+	__table_end; } )
+
+/**
+ * Calculate number of entries in linker table.
+ *
+ * Return the number of entries within a linker table.  Use as e.g.
+ *
+ * @code
+ *
+ *   unsigned int num_frobs =
+ *	table_num_entries ( struct frobnicator, "frobnicators" );
+ *
+ * @endcode
+ *
+ */
+#define table_num_entries( type, table )				\
+	( ( unsigned int ) ( table_end ( type, table ) -		\
+			     table_start ( type, table ) ) )
+
+/**
+ * Iterate through all entries within a linker table.
+ *
+ * Use as e.g.
+ *
+ * @code
+ *
+ *   struct frobnicator *frob;
+ *
+ *   for_each_table_entry ( frob, "frobnicators" ) {
+ *     ...
+ *   }
+ *
+ * @endcode
+ *
+ */
+#define for_each_table_entry( pointer, table )				\
+	for ( pointer = table_start ( typeof ( * pointer ), table ) ;	\
+	      pointer < table_end ( typeof ( * pointer ), table ) ;	\
+	      pointer++ )
+
+/**
+ * Iterate through all entries within a linker table in reverse order.
+ *
+ * Use as e.g.
+ *
+ * @code
+ *
+ *   struct frobnicator *frob;
+ *
+ *   for_each_table_entry_reverse ( frob, "frobnicators" ) {
+ *     ...
+ *   }
+ *
+ * @endcode
+ *
+ */
+#define for_each_table_entry_reverse( pointer, table )			\
+	for ( pointer = table_end ( typeof ( * pointer ), table ) - 1 ;	\
+	      pointer >= table_start ( typeof ( * pointer ), table ) ;	\
+	      pointer-- )
 
 #endif /* _GPXE_TABLES_H */

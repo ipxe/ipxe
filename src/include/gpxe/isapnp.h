@@ -223,8 +223,11 @@ struct isapnp_driver {
 	void ( * remove ) ( struct isapnp_device *isapnp );
 };
 
+/** ISAPnP driver table */
+#define ISAPNP_DRIVERS "isapnp_drivers"
+
 /** Declare an ISAPnP driver */
-#define __isapnp_driver __table ( struct isapnp_driver, isapnp_drivers, 01 )
+#define __isapnp_driver __table ( struct isapnp_driver, ISAPNP_DRIVERS, 01 )
 
 extern uint16_t isapnp_read_port;
 

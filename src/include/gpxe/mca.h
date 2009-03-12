@@ -77,8 +77,11 @@ struct mca_driver {
 	void ( * remove ) ( struct mca_device *mca );
 };
 
+/** MCA driver table */
+#define MCA_DRIVERS "mca_drivers"
+
 /** Declare an MCA driver */
-#define __mca_driver __table ( struct mca_driver, mca_drivers, 01 )
+#define __mca_driver __table ( struct mca_driver, MCA_DRIVERS, 01 )
 
 /**
  * Set MCA driver-private data

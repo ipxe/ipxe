@@ -25,18 +25,6 @@
  *
  */
 
-/** Registered initialisation functions */
-static struct init_fn init_fns[0]
-	__table_start ( struct init_fn, init_fns );
-static struct init_fn init_fns_end[0]
-	__table_end ( struct init_fn, init_fns );
-
-/** Registered startup/shutdown functions */
-static struct startup_fn startup_fns[0]
-	__table_start ( struct startup_fn, startup_fns );
-static struct startup_fn startup_fns_end[0]
-	__table_end ( struct startup_fn, startup_fns );
-
 /** "startup() has been called" flag */
 static int started = 0;
 
@@ -54,9 +42,8 @@ void initialise ( void ) {
 	struct init_fn *init_fn;
 
 	/* Call registered initialisation functions */
-	for ( init_fn = init_fns ; init_fn < init_fns_end ; init_fn++ ) {
+	for_each_table_entry ( init_fn, INIT_FNS )
 		init_fn->initialise ();
-	}
 }
 
 /**
@@ -73,8 +60,7 @@ void startup ( void ) {
 		return;
 
 	/* Call registered startup functions */
-	for ( startup_fn = startup_fns ; startup_fn < startup_fns_end ;
-	      startup_fn++ ) {
+	for_each_table_entry ( startup_fn, STARTUP_FNS ) {
 		if ( startup_fn->startup )
 			startup_fn->startup();
 	}
@@ -90,7 +76,7 @@ void startup ( void ) {
  * This function reverses the actions of startup(), and leaves gPXE in
  * a state ready to be removed from memory.  You may call startup()
  * again after calling shutdown().
-
+ *
  * Call this function only once, before either exiting main() or
  * starting up a non-returnable image.
  */
@@ -101,8 +87,7 @@ void shutdown ( int flags ) {
 		return;
 
 	/* Call registered shutdown functions (in reverse order) */
-	for ( startup_fn = startup_fns_end - 1 ; startup_fn >= startup_fns ;
-	      startup_fn-- ) {
+	for_each_table_entry_reverse ( startup_fn, STARTUP_FNS ) {
 		if ( startup_fn->shutdown )
 			startup_fn->shutdown ( flags );
 	}

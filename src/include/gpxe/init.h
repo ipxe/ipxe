@@ -13,9 +13,12 @@ struct init_fn {
 	void ( * initialise ) ( void );
 };
 
+/** Initialisation function table */
+#define INIT_FNS "init_fns"
+
 /** Declare an initialisation functon */
 #define __init_fn( init_order ) \
-	__table ( struct init_fn, init_fns, init_order )
+	__table ( struct init_fn, INIT_FNS, init_order )
 
 /** @defgroup initfn_order Initialisation function ordering
  * @{
@@ -49,9 +52,12 @@ struct startup_fn {
 	void ( * shutdown ) ( int flags );
 };
 
+/** Startup/shutdown function table */
+#define STARTUP_FNS "startup_fns"
+
 /** Declare a startup/shutdown function */
 #define __startup_fn( startup_order ) \
-	__table ( struct startup_fn, startup_fns, startup_order )
+	__table ( struct startup_fn, STARTUP_FNS, startup_order )
 
 /** @defgroup startfn_order Startup/shutdown function ordering
  *

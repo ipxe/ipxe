@@ -17,6 +17,8 @@ struct command {
 	int ( * exec ) ( int argc, char **argv );
 };
 
-#define __command __table ( struct command, commands, 01 )
+#define COMMANDS "commands"
+
+#define __command __table ( struct command, COMMANDS, 01 )
 
 #endif /* _GPXE_COMMAND_H */

@@ -85,6 +85,9 @@ struct console_driver {
 	int ( *iskey ) ( void );
 };
 
+/** Console driver table */
+#define CONSOLES "consoles"
+
 /**
  * Mark a <tt> struct console_driver </tt> as being part of the
  * console drivers table.
@@ -102,7 +105,7 @@ struct console_driver {
  * @endcode
  *
  */
-#define __console_driver __table ( struct console_driver, console, 01 )
+#define __console_driver __table ( struct console_driver, CONSOLES, 01 )
 
 /* Function prototypes */
 

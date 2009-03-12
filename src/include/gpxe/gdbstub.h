@@ -45,7 +45,9 @@ struct gdb_transport {
 	void ( * send ) ( const char *buf, size_t len );
 };
 
-#define __gdb_transport __table ( struct gdb_transport, gdb_transports, 01 )
+#define GDB_TRANSPORTS "gdb_transports"
+
+#define __gdb_transport __table ( struct gdb_transport, GDB_TRANSPORTS, 01 )
 
 /**
  * Look up GDB transport by name
