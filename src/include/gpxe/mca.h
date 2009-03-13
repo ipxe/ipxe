@@ -78,10 +78,10 @@ struct mca_driver {
 };
 
 /** MCA driver table */
-#define MCA_DRIVERS "mca_drivers"
+#define MCA_DRIVERS __table ( struct mca_driver, "mca_drivers" )
 
 /** Declare an MCA driver */
-#define __mca_driver __table ( struct mca_driver, MCA_DRIVERS, 01 )
+#define __mca_driver __table_entry ( MCA_DRIVERS, 01 )
 
 /**
  * Set MCA driver-private data

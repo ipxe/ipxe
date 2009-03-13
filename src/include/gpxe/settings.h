@@ -37,10 +37,10 @@ struct setting {
 };
 
 /** Configuration setting table */
-#define SETTINGS "settings"
+#define SETTINGS __table ( struct setting, "settings" )
 
 /** Declare a configuration setting */
-#define	__setting __table ( struct setting, SETTINGS, 01 )
+#define __setting __table_entry ( SETTINGS, 01 )
 
 /** Settings block operations */
 struct settings_operations {
@@ -127,11 +127,10 @@ struct setting_type {
 };
 
 /** Configuration setting type table */
-#define SETTING_TYPES "setting_types"
+#define SETTING_TYPES __table ( struct setting_type, "setting_types" )
 
 /** Declare a configuration setting type */
-#define	__setting_type \
-	__table ( struct setting_type, SETTING_TYPES, 01 )
+#define __setting_type __table_entry ( SETTING_TYPES, 01 )
 
 /**
  * A settings applicator
@@ -146,11 +145,11 @@ struct settings_applicator {
 };
 
 /** Settings applicator table */
-#define SETTINGS_APPLICATORS "settings_applicators"
+#define SETTINGS_APPLICATORS \
+	__table ( struct settings_applicator, "settings_applicators" )
 
 /** Declare a settings applicator */
-#define __settings_applicator \
-	__table ( struct settings_applicator, SETTINGS_APPLICATORS, 01 )
+#define __settings_applicator __table_entry ( SETTINGS_APPLICATORS, 01 )
 
 /**
  * A simple settings block

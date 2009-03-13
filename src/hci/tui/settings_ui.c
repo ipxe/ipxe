@@ -78,7 +78,7 @@ struct setting_widget {
 };
 
 /** Number of registered configuration settings */
-#define NUM_SETTINGS table_num_entries ( struct setting, SETTINGS )
+#define NUM_SETTINGS table_num_entries ( SETTINGS )
 
 static void load_setting ( struct setting_widget *widget ) __nonnull;
 static int save_setting ( struct setting_widget *widget ) __nonnull;
@@ -219,8 +219,7 @@ static int edit_setting ( struct setting_widget *widget, int key ) {
 static void init_setting_index ( struct setting_widget *widget,
 				 struct settings *settings,
 				 unsigned int index ) {
-	struct setting *all_settings =
-		table_start ( struct setting, SETTINGS );
+	struct setting *all_settings = table_start ( SETTINGS );
 
 	init_setting ( widget, settings, &all_settings[index],
 		       ( SETTINGS_LIST_ROW + index ), SETTINGS_LIST_COL );

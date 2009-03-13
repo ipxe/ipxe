@@ -900,8 +900,8 @@ int dhcp_create_request ( struct dhcp_packet *dhcppkt,
 	dhcppkt->dhcphdr->ciaddr = ciaddr;
 
 	/* Add options to identify the feature list */
-	dhcp_features = table_start ( uint8_t, DHCP_FEATURES );
-	dhcp_features_len = table_num_entries ( uint8_t, DHCP_FEATURES );
+	dhcp_features = table_start ( DHCP_FEATURES );
+	dhcp_features_len = table_num_entries ( DHCP_FEATURES );
 	if ( ( rc = dhcppkt_store ( dhcppkt, DHCP_EB_ENCAP, dhcp_features,
 				    dhcp_features_len ) ) != 0 ) {
 		DBG ( "DHCP could not set features list option: %s\n",

@@ -27,11 +27,11 @@ struct arp_net_protocol {
 };
 
 /** ARP protocol table */
-#define ARP_NET_PROTOCOLS "arp_net_protocols"
+#define ARP_NET_PROTOCOLS \
+	__table ( struct arp_net_protocol, "arp_net_protocols" )
 
 /** Declare an ARP protocol */
-#define __arp_net_protocol \
-	__table ( struct arp_net_protocol, ARP_NET_PROTOCOLS, 01 )
+#define __arp_net_protocol __table_entry ( ARP_NET_PROTOCOLS, 01 )
 
 extern struct net_protocol arp_protocol;
 

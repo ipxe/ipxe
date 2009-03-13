@@ -217,7 +217,7 @@ static void resolv_mux_done ( struct resolv_interface *resolv,
 
 	/* Attempt next child resolver, if possible */
 	mux->resolver++;
-	if ( mux->resolver >= table_end ( struct resolver, RESOLVERS ) ) {
+	if ( mux->resolver >= table_end ( RESOLVERS ) ) {
 		DBGC ( mux, "RESOLV %p failed to resolve name\n", mux );
 		goto finished;
 	}
@@ -256,7 +256,7 @@ int resolv ( struct resolv_interface *resolv, const char *name,
 		return -ENOMEM;
 	resolv_init ( &mux->parent, &null_resolv_ops, &mux->refcnt );
 	resolv_init ( &mux->child, &resolv_mux_child_ops, &mux->refcnt );
-	mux->resolver = table_start ( struct resolver, RESOLVERS );
+	mux->resolver = table_start ( RESOLVERS );
 	memcpy ( &mux->sa, sa, sizeof ( mux->sa ) );
 	memcpy ( mux->name, name, name_len );
 

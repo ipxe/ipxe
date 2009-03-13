@@ -309,10 +309,10 @@ struct pci_driver {
 };
 
 /** PCI driver table */
-#define PCI_DRIVERS "pci_drivers"
+#define PCI_DRIVERS __table ( struct pci_driver, "pci_drivers" )
 
 /** Declare a PCI driver */
-#define __pci_driver __table ( struct pci_driver, PCI_DRIVERS, 01 )
+#define __pci_driver __table_entry ( PCI_DRIVERS, 01 )
 
 #define PCI_DEVFN( slot, func )		( ( (slot) << 3 ) | (func) )
 #define PCI_SLOT( devfn )		( ( (devfn) >> 3 ) & 0x1f )

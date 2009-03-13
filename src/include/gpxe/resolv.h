@@ -150,11 +150,10 @@ struct resolver {
 #define RESOLV_NORMAL 02
 
 /** Resolvers table */
-#define RESOLVERS "resolvers"
+#define RESOLVERS __table ( struct resolver, "resolvers" )
 
 /** Register as a name resolver */
-#define __resolver( resolv_order ) \
-	__table ( struct resolver, RESOLVERS, resolv_order )
+#define __resolver( resolv_order ) __table_entry ( RESOLVERS, resolv_order )
 
 extern void resolv_done ( struct resolv_interface *resolv,
 			  struct sockaddr *sa, int rc );

@@ -55,11 +55,10 @@ struct efi_protocol {
 };
 
 /** EFI protocol table */
-#define EFI_PROTOCOLS "efi_protocols"
+#define EFI_PROTOCOLS __table ( struct efi_protocol, "efi_protocols" )
 
 /** Declare an EFI protocol used by gPXE */
-#define __efi_protocol \
-	__table ( struct efi_protocol, EFI_PROTOCOLS, 01 )
+#define __efi_protocol __table_entry ( EFI_PROTOCOLS, 01 )
 
 /** Declare an EFI protocol to be required by gPXE
  *
@@ -90,11 +89,11 @@ struct efi_config_table {
 };
 
 /** EFI configuration table table */
-#define EFI_CONFIG_TABLES "efi_config_tables"
+#define EFI_CONFIG_TABLES \
+	__table ( struct efi_config_table, "efi_config_tables" )
 
 /** Declare an EFI configuration table used by gPXE */
-#define __efi_config_table \
-	__table ( struct efi_config_table, EFI_CONFIG_TABLES, 01 )
+#define __efi_config_table __table_entry ( EFI_CONFIG_TABLES, 01 )
 
 /** Declare an EFI configuration table to be used by gPXE
  *

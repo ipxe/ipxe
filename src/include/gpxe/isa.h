@@ -59,10 +59,10 @@ struct isa_driver {
 };
 
 /** ISA driver table */
-#define ISA_DRIVERS "isa_drivers"
+#define ISA_DRIVERS __table ( struct isa_driver, "isa_drivers" )
 
 /** Declare an ISA driver */
-#define __isa_driver __table ( struct isa_driver, ISA_DRIVERS, 01 )
+#define __isa_driver __table_entry ( ISA_DRIVERS, 01 )
 
 /**
  * Set ISA driver-private data

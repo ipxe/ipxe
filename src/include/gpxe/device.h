@@ -103,9 +103,9 @@ struct root_driver {
 };
 
 /** Root device table */
-#define ROOT_DEVICES "root_devices"
+#define ROOT_DEVICES __table ( struct root_device, "root_devices" )
 
 /** Declare a root device */
-#define __root_device __table ( struct root_device, ROOT_DEVICES, 01 )
+#define __root_device __table_entry ( ROOT_DEVICES, 01 )
 
 #endif /* _GPXE_DEVICE_H */

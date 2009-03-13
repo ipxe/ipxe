@@ -98,7 +98,7 @@
  * The linker script takes care of assembling the tables for us.  All
  * our table sections have names of the format @c .tbl.NAME.NN where
  * @c NAME designates the data structure stored in the table (e.g. @c
- * init_fn) and @c NN is a two-digit decimal number used to impose an
+ * init_fns) and @c NN is a two-digit decimal number used to impose an
  * ordering upon the tables if required.  @c NN=00 is reserved for the
  * symbol indicating "table start", and @c NN=99 is reserved for the
  * symbol indicating "table end".
@@ -115,7 +115,9 @@
  *	void ( *frob ) ( void ); 	// The frobnicating function itself
  *   };
  *
- *   #define __frobnicator __table ( struct frobnicator, "frobnicators", 01 )
+ *   #define FROBNICATORS __table ( struct frobnicator, "frobnicators" )
+ *
+ *   #define __frobnicator __table_entry ( FROBNICATORS, 01 )
  *
  * @endcode
  *
@@ -149,7 +151,7 @@
  *   void frob_all ( void ) {
  *	struct frob *frob;
  *
- *	for_each_table ( frob, "frobnicators" ) {
+ *	for_each_table ( frob, FROBNICATORS ) {
  *         printf ( "Calling frobnicator \"%s\"\n", frob->name );
  *	   frob->frob ();
  *	}
@@ -165,97 +167,154 @@
 #define __attribute__( x )
 #endif
 
-#define __table_str( x ) #x
-#define __table_section( table, idx ) \
-	__section__ ( ".tbl." table "." __table_str ( idx ) )
-
-#define __table_section_start( table ) __table_section ( table, 00 )
-#define __table_section_end( table ) __table_section ( table, 99 )
-
-#define __natural_alignment( type ) __aligned__ ( __alignof__ ( type ) )
+/**
+ * Declare a linker table
+ *
+ * @v type		Data type
+ * @v name		Table name
+ * @ret table		Linker table
+ */
+#define __table( type, name ) ( type, name )
 
 /**
- * Linker table entry.
+ * Get linker table data type
  *
- * Declares a data structure to be part of a linker table.  Use as
- * e.g.
+ * @v table		Linker table
+ * @ret type		Data type
+ */
+#define __table_type( table ) __table_extract_type table
+#define __table_extract_type( type, name ) type
+
+/**
+ * Get linker table name
+ *
+ * @v table		Linker table
+ * @ret name		Table name
+ */
+#define __table_name( table ) __table_extract_name table
+#define __table_extract_name( type, name ) name
+
+/**
+ * Get linker table section name
+ *
+ * @v table		Linker table
+ * @v idx		Sub-table index
+ * @ret section		Section name
+ */
+#define __table_section( table, idx ) \
+	".tbl." __table_name ( table ) "." __table_str ( idx )
+#define __table_str( x ) #x
+
+/**
+ * Get linker table alignment
+ *
+ * @v table		Linker table
+ * @ret align		Alignment
+ */
+#define __table_alignment( table ) __alignof__ ( __table_type ( table ) )
+
+/**
+ * Declare a linker table entry
+ *
+ * @v table		Linker table
+ * @v idx		Sub-table index
+ *
+ * Example usage:
  *
  * @code
  *
- *   #define __frobnicator __table ( struct frobnicator, "frobnicators", 01 )
+ *   #define FROBNICATORS __table ( struct frobnicator, "frobnicators" )
+ *
+ *   #define __frobnicator __table_entry ( FROBNICATORS, 01 )
  *
  *   struct frobnicator my_frob __frobnicator = {
  *      ...
  *   };
  *
  * @endcode
- *
  */
-#define __table( type, table, idx )					\
-	__attribute__ (( __table_section ( table, idx ),		\
-			 __natural_alignment ( type ) ))
+#define __table_entry( table, idx )					\
+	__attribute__ (( __section__ ( __table_section ( table, idx ) )	\
+			 __aligned__ ( __table_alignment ( table ) ) ))
 
 /**
- * Start of linker table.
+ * Get start of linker table
  *
- * Return the start of a linker table.  Use as e.g.
+ * @v table		Linker table
+ * @ret start		Start of linker table
+ *
+ * Example usage:
  *
  * @code
  *
- *   struct frobnicator *frobs =
- *	table_start ( struct frobnicator, "frobnicators" );
+ *   #define FROBNICATORS __table ( struct frobnicator, "frobnicators" )
+ *
+ *   struct frobnicator *frobs = table_start ( FROBNICATORS );
  *
  * @endcode
- *
  */
-#define table_start( type, table ) ( {					\
-	static type __table_start[0] __table ( type, table, 00 );	\
+#define table_start( table ) ( {					\
+	static __table_type ( table ) __table_start[0]			\
+		__table_entry ( table, 00 ); 				\
 	__table_start; } )
 
 /**
- * End of linker table.
+ * Get end of linker table
  *
- * Return the end of a linker table.  Use as e.g.
+ * @v table		Linker table
+ * @ret end		End of linker table
+ *
+ * Example usage:
  *
  * @code
  *
- *   struct frobnicator *frobs_end =
- *	table_end ( struct frobnicator, "frobnicators" );
+ *   #define FROBNICATORS __table ( struct frobnicator, "frobnicators" )
+ *
+ *   struct frobnicator *frobs_end = table_end ( FROBNICATORS );
  *
  * @endcode
- *
  */
-#define table_end( type, table ) ( {					\
-	static type __table_end[0] __table ( type, table, 99 );		\
+#define table_end( table ) ( {						\
+	static __table_type ( table ) __table_end[0]			\
+		__table_entry ( table, 99 ); 				\
 	__table_end; } )
 
 /**
- * Calculate number of entries in linker table.
+ * Get number of entries in linker table
  *
- * Return the number of entries within a linker table.  Use as e.g.
+ * @v table		Linker table
+ * @ret num_entries	Number of entries in linker table
+ *
+ * Example usage:
  *
  * @code
  *
- *   unsigned int num_frobs =
- *	table_num_entries ( struct frobnicator, "frobnicators" );
+ *   #define FROBNICATORS __table ( struct frobnicator, "frobnicators" )
+ *
+ *   unsigned int num_frobs = table_num_entries ( FROBNICATORS );
  *
  * @endcode
  *
  */
-#define table_num_entries( type, table )				\
-	( ( unsigned int ) ( table_end ( type, table ) -		\
-			     table_start ( type, table ) ) )
+#define table_num_entries( table )					\
+	( ( unsigned int ) ( table_end ( table ) -			\
+			     table_start ( table ) ) )
 
 /**
- * Iterate through all entries within a linker table.
+ * Iterate through all entries within a linker table
  *
- * Use as e.g.
+ * @v pointer		Entry pointer
+ * @v table		Linker table
+ *
+ * Example usage:
  *
  * @code
  *
+ *   #define FROBNICATORS __table ( struct frobnicator, "frobnicators" )
+ *
  *   struct frobnicator *frob;
  *
- *   for_each_table_entry ( frob, "frobnicators" ) {
+ *   for_each_table_entry ( frob, FROBNICATORS ) {
  *     ...
  *   }
  *
@@ -263,20 +322,25 @@
  *
  */
 #define for_each_table_entry( pointer, table )				\
-	for ( pointer = table_start ( typeof ( * pointer ), table ) ;	\
-	      pointer < table_end ( typeof ( * pointer ), table ) ;	\
+	for ( pointer = table_start ( table ) ;				\
+	      pointer < table_end ( table ) ;				\
 	      pointer++ )
 
 /**
- * Iterate through all entries within a linker table in reverse order.
+ * Iterate through all entries within a linker table in reverse order
  *
- * Use as e.g.
+ * @v pointer		Entry pointer
+ * @v table		Linker table
+ *
+ * Example usage:
  *
  * @code
  *
+ *   #define FROBNICATORS __table ( struct frobnicator, "frobnicators" )
+ *
  *   struct frobnicator *frob;
  *
- *   for_each_table_entry_reverse ( frob, "frobnicators" ) {
+ *   for_each_table_entry_reverse ( frob, FROBNICATORS ) {
  *     ...
  *   }
  *
@@ -284,8 +348,8 @@
  *
  */
 #define for_each_table_entry_reverse( pointer, table )			\
-	for ( pointer = table_end ( typeof ( * pointer ), table ) - 1 ;	\
-	      pointer >= table_start ( typeof ( * pointer ), table ) ;	\
+	for ( pointer = ( table_end ( table ) - 1 ) ;			\
+	      pointer >= table_start ( table ) ;			\
 	      pointer-- )
 
 #endif /* _GPXE_TABLES_H */

@@ -86,7 +86,7 @@ struct console_driver {
 };
 
 /** Console driver table */
-#define CONSOLES "consoles"
+#define CONSOLES __table ( struct console_driver, "consoles" )
 
 /**
  * Mark a <tt> struct console_driver </tt> as being part of the
@@ -105,7 +105,7 @@ struct console_driver {
  * @endcode
  *
  */
-#define __console_driver __table ( struct console_driver, CONSOLES, 01 )
+#define __console_driver __table_entry ( CONSOLES, 01 )
 
 /* Function prototypes */
 
