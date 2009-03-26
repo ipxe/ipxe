@@ -216,8 +216,8 @@ struct {
 	__attribute__ ((aligned(16)));
 	struct pcnet32_rx_head rx_ring[RX_RING_SIZE]
 	__attribute__ ((aligned(16)));
-	unsigned char txb[PKT_BUF_SZ * TX_RING_SIZE];
-	unsigned char rxb[RX_RING_SIZE * PKT_BUF_SZ];
+	unsigned char txb[TX_RING_SIZE][PKT_BUF_SZ];
+	unsigned char rxb[RX_RING_SIZE][PKT_BUF_SZ];
 } pcnet32_bufs __shared;
 
 /* May need to be moved to mii.h */
@@ -588,7 +588,7 @@ static void pcnet32_transmit(struct nic *nic __unused, const char *d,	/* Destina
 
 	status = 0x8300;
 	/* point to the current txb incase multiple tx_rings are used */
-	ptxb = pcnet32_bufs.txb + (lp->cur_tx * PKT_BUF_SZ);
+	ptxb = pcnet32_bufs.txb[lp->cur_tx];
 
 	/* copy the packet to ring buffer */
 	memcpy(ptxb, d, ETH_ALEN);	/* dst */
