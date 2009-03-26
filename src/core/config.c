@@ -199,6 +199,9 @@ REQUIRE_OBJECT ( login_cmd );
 #ifdef TIME_CMD
 REQUIRE_OBJECT ( time_cmd );
 #endif
+#ifdef DIGEST_CMD
+REQUIRE_OBJECT ( digest_cmd );
+#endif
 
 /*
  * Drag in miscellaneous objects
