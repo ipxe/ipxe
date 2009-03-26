@@ -533,10 +533,12 @@ int net_rx ( struct io_buffer *iobuf, struct net_device *netdev,
 
 	/* Hand off to network-layer protocol, if any */
 	for_each_table_entry ( net_protocol, NET_PROTOCOLS ) {
-		if ( net_protocol->net_proto == net_proto ) {
+		if ( net_protocol->net_proto == net_proto )
 			return net_protocol->rx ( iobuf, netdev, ll_source );
-		}
 	}
+
+	DBGC ( netdev, "NETDEV %p unknown network protocol %04x\n",
+	       netdev, ntohs ( net_proto ) );
 	free_iob ( iobuf );
 	return 0;
 }
