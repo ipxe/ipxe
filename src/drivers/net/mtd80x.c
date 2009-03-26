@@ -656,9 +656,9 @@ static struct nic_operations mtd_operations = {
 };
 
 static struct pci_device_id mtd80x_nics[] = {
-        PCI_ROM(0x1516, 0x0800, "MTD800", "Myson MTD800"),
-        PCI_ROM(0x1516, 0x0803, "MTD803", "Surecom EP-320X"),
-        PCI_ROM(0x1516, 0x0891, "MTD891", "Myson MTD891"),
+        PCI_ROM(0x1516, 0x0800, "MTD800", "Myson MTD800", 0),
+        PCI_ROM(0x1516, 0x0803, "MTD803", "Surecom EP-320X", 0),
+        PCI_ROM(0x1516, 0x0891, "MTD891", "Myson MTD891", 0),
 };
 
 PCI_DRIVER ( mtd80x_driver, mtd80x_nics, PCI_NO_CLASS );

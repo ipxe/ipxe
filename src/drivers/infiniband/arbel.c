@@ -2241,8 +2241,8 @@ static void arbel_remove ( struct pci_device *pci ) {
 }
 
 static struct pci_device_id arbel_nics[] = {
-	PCI_ROM ( 0x15b3, 0x6282, "mt25218", "MT25218 HCA driver" ),
-	PCI_ROM ( 0x15b3, 0x6274, "mt25204", "MT25204 HCA driver" ),
+	PCI_ROM ( 0x15b3, 0x6282, "mt25218", "MT25218 HCA driver", 0 ),
+	PCI_ROM ( 0x15b3, 0x6274, "mt25204", "MT25204 HCA driver", 0 ),
 };
 
 struct pci_driver arbel_driver __pci_driver = {

@@ -610,8 +610,8 @@ static struct nic_operations w89c840_operations = {
 };
 
 static struct pci_device_id w89c840_nics[] = {
-PCI_ROM(0x1050, 0x0840, "winbond840",     "Winbond W89C840F"),
-PCI_ROM(0x11f6, 0x2011, "compexrl100atx", "Compex RL100ATX"),
+PCI_ROM(0x1050, 0x0840, "winbond840",     "Winbond W89C840F", 0),
+PCI_ROM(0x11f6, 0x2011, "compexrl100atx", "Compex RL100ATX", 0),
 };
 
 PCI_DRIVER ( w89c840_driver, w89c840_nics, PCI_NO_CLASS );

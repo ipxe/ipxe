@@ -1278,8 +1278,8 @@ static struct nic_operations sis900_operations = {
 };
 
 static struct pci_device_id sis900_nics[] = {
-PCI_ROM(0x1039, 0x0900, "sis900",  "SIS900"),
-PCI_ROM(0x1039, 0x7016, "sis7016", "SIS7016"),
+PCI_ROM(0x1039, 0x0900, "sis900",  "SIS900", 0),
+PCI_ROM(0x1039, 0x7016, "sis7016", "SIS7016", 0),
 };
 
 PCI_DRIVER ( sis900_driver, sis900_nics, PCI_NO_CLASS );

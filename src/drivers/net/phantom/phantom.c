@@ -2100,7 +2100,7 @@ static void phantom_remove ( struct pci_device *pci ) {
 
 /** Phantom PCI IDs */
 static struct pci_device_id phantom_nics[] = {
-	PCI_ROM ( 0x4040, 0x0100, "nx", "NX" ),
+	PCI_ROM ( 0x4040, 0x0100, "nx", "NX", 0 ),
 };
 
 /** Phantom PCI driver */

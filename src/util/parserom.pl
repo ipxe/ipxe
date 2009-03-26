@@ -45,7 +45,8 @@ while ( <DRV> ) {
          \s*0x([0-9A-Fa-f]{4})\s*, # PCI vendor
          \s*0x([0-9A-Fa-f]{4})\s*, # PCI device
          \s*\"([^\"]*)\"\s*,	   # Image
-         \s*\"([^\"]*)\"\s*	   # Description
+         \s*\"([^\"]*)\"\s*,	   # Description
+         \s*.*\s*		   # Driver data
        \)/x ) {
     ( my $vendor, my $device, my $image, my $desc ) = ( lc $1, lc $2, $3, $4 );
     rom ( "pci", $image, $desc, $vendor, $device );

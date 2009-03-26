@@ -674,7 +674,7 @@ static int amd8111e_probe(struct nic *nic, struct pci_device *pdev)
 }
 
 static struct pci_device_id amd8111e_nics[] = {
-	PCI_ROM(0x1022, 0x7462, "amd8111e",	"AMD8111E"),
+	PCI_ROM(0x1022, 0x7462, "amd8111e",	"AMD8111E", 0),
 };
 
 PCI_DRIVER ( amd8111e_driver, amd8111e_nics, PCI_NO_CLASS );

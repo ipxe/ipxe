@@ -1412,18 +1412,18 @@ static int forcedeth_probe ( struct nic *nic, struct pci_device *pci ) {
 }
 
 static struct pci_device_id forcedeth_nics[] = {
-PCI_ROM(0x10de, 0x01C3, "nforce", "nForce NVENET_1 Ethernet Controller"),
-PCI_ROM(0x10de, 0x0066, "nforce2", "nForce NVENET_2 Ethernet Controller"),
-PCI_ROM(0x10de, 0x00D6, "nforce3", "nForce NVENET_3 Ethernet Controller"),
-PCI_ROM(0x10de, 0x0086, "nforce4", "nForce NVENET_4 Ethernet Controller"),
-PCI_ROM(0x10de, 0x008c, "nforce5", "nForce NVENET_5 Ethernet Controller"),
-PCI_ROM(0x10de, 0x00e6, "nforce6", "nForce NVENET_6 Ethernet Controller"),
-PCI_ROM(0x10de, 0x00df, "nforce7", "nForce NVENET_7 Ethernet Controller"),
-PCI_ROM(0x10de, 0x0056, "nforce8", "nForce NVENET_8 Ethernet Controller"),
-PCI_ROM(0x10de, 0x0057, "nforce9", "nForce NVENET_9 Ethernet Controller"),
-PCI_ROM(0x10de, 0x0037, "nforce10", "nForce NVENET_10 Ethernet Controller"),
-PCI_ROM(0x10de, 0x0038, "nforce11", "nForce NVENET_11 Ethernet Controller"),
-PCI_ROM(0x10de, 0x0373, "nforce15", "nForce NVENET_15 Ethernet Controller")
+PCI_ROM(0x10de, 0x01C3, "nforce", "nForce NVENET_1 Ethernet Controller", 0),
+PCI_ROM(0x10de, 0x0066, "nforce2", "nForce NVENET_2 Ethernet Controller", 0),
+PCI_ROM(0x10de, 0x00D6, "nforce3", "nForce NVENET_3 Ethernet Controller", 0),
+PCI_ROM(0x10de, 0x0086, "nforce4", "nForce NVENET_4 Ethernet Controller", 0),
+PCI_ROM(0x10de, 0x008c, "nforce5", "nForce NVENET_5 Ethernet Controller", 0),
+PCI_ROM(0x10de, 0x00e6, "nforce6", "nForce NVENET_6 Ethernet Controller", 0),
+PCI_ROM(0x10de, 0x00df, "nforce7", "nForce NVENET_7 Ethernet Controller", 0),
+PCI_ROM(0x10de, 0x0056, "nforce8", "nForce NVENET_8 Ethernet Controller", 0),
+PCI_ROM(0x10de, 0x0057, "nforce9", "nForce NVENET_9 Ethernet Controller", 0),
+PCI_ROM(0x10de, 0x0037, "nforce10", "nForce NVENET_10 Ethernet Controller", 0),
+PCI_ROM(0x10de, 0x0038, "nforce11", "nForce NVENET_11 Ethernet Controller", 0),
+PCI_ROM(0x10de, 0x0373, "nforce15", "nForce NVENET_15 Ethernet Controller", 0)
 };
 
 PCI_DRIVER ( forcedeth_driver, forcedeth_nics, PCI_NO_CLASS );

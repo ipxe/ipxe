@@ -563,20 +563,20 @@ static void rtl_remove ( struct pci_device *pci ) {
 }
 
 static struct pci_device_id rtl8139_nics[] = {
-PCI_ROM(0x10ec, 0x8129, "rtl8129",       "Realtek 8129"),
-PCI_ROM(0x10ec, 0x8139, "rtl8139",       "Realtek 8139"),
-PCI_ROM(0x10ec, 0x8138, "rtl8139b",      "Realtek 8139B"),
-PCI_ROM(0x1186, 0x1300, "dfe538",        "DFE530TX+/DFE538TX"),
-PCI_ROM(0x1113, 0x1211, "smc1211-1",     "SMC EZ10/100"),
-PCI_ROM(0x1112, 0x1211, "smc1211",       "SMC EZ10/100"),
-PCI_ROM(0x1500, 0x1360, "delta8139",     "Delta Electronics 8139"),
-PCI_ROM(0x4033, 0x1360, "addtron8139",   "Addtron Technology 8139"),
-PCI_ROM(0x1186, 0x1340, "dfe690txd",     "D-Link DFE690TXD"),
-PCI_ROM(0x13d1, 0xab06, "fe2000vx",      "AboCom FE2000VX"),
-PCI_ROM(0x1259, 0xa117, "allied8139",    "Allied Telesyn 8139"),
-PCI_ROM(0x14ea, 0xab06, "fnw3603tx",     "Planex FNW-3603-TX"),
-PCI_ROM(0x14ea, 0xab07, "fnw3800tx",     "Planex FNW-3800-TX"),
-PCI_ROM(0xffff, 0x8139, "clone-rtl8139", "Cloned 8139"),
+PCI_ROM(0x10ec, 0x8129, "rtl8129",       "Realtek 8129", 0),
+PCI_ROM(0x10ec, 0x8139, "rtl8139",       "Realtek 8139", 0),
+PCI_ROM(0x10ec, 0x8138, "rtl8139b",      "Realtek 8139B", 0),
+PCI_ROM(0x1186, 0x1300, "dfe538",        "DFE530TX+/DFE538TX", 0),
+PCI_ROM(0x1113, 0x1211, "smc1211-1",     "SMC EZ10/100", 0),
+PCI_ROM(0x1112, 0x1211, "smc1211",       "SMC EZ10/100", 0),
+PCI_ROM(0x1500, 0x1360, "delta8139",     "Delta Electronics 8139", 0),
+PCI_ROM(0x4033, 0x1360, "addtron8139",   "Addtron Technology 8139", 0),
+PCI_ROM(0x1186, 0x1340, "dfe690txd",     "D-Link DFE690TXD", 0),
+PCI_ROM(0x13d1, 0xab06, "fe2000vx",      "AboCom FE2000VX", 0),
+PCI_ROM(0x1259, 0xa117, "allied8139",    "Allied Telesyn 8139", 0),
+PCI_ROM(0x14ea, 0xab06, "fnw3603tx",     "Planex FNW-3603-TX", 0),
+PCI_ROM(0x14ea, 0xab07, "fnw3800tx",     "Planex FNW-3800-TX", 0),
+PCI_ROM(0xffff, 0x8139, "clone-rtl8139", "Cloned 8139", 0),
 };
 
 struct pci_driver rtl8139_driver __pci_driver = {

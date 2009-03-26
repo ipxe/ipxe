@@ -241,6 +241,8 @@ struct pci_device_id {
 	uint16_t vendor;
 	/** PCI device ID */
 	uint16_t device;
+	/** Arbitrary driver data */
+	unsigned long driver_data;
 };
 
 /** Match-anything ID */
@@ -328,10 +330,11 @@ struct pci_driver {
  * is also parsed by parserom.pl to generate Makefile rules and files
  * for rom-o-matic.
  */
-#define PCI_ROM( _vendor, _device, _name, _description ) {	\
-	.vendor = _vendor,					\
-	.device = _device,					\
-	.name = _name,						\
+#define PCI_ROM( _vendor, _device, _name, _description, _data ) {	\
+	.vendor = _vendor,						\
+	.device = _device,						\
+	.name = _name,							\
+	.driver_data = _data						\
 }
 
 extern void adjust_pci_device ( struct pci_device *pci );

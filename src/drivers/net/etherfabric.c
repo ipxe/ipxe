@@ -4228,8 +4228,8 @@ fail1:
 
 
 static struct pci_device_id efab_nics[] = {
-	PCI_ROM(0x1924, 0x0703, "falcon", "EtherFabric Falcon"),
-	PCI_ROM(0x1924, 0x0710, "falconb0", "EtherFabric FalconB0"),
+	PCI_ROM(0x1924, 0x0703, "falcon", "EtherFabric Falcon", 0),
+	PCI_ROM(0x1924, 0x0710, "falconb0", "EtherFabric FalconB0", 0),
 };
 
 struct pci_driver etherfabric_driver __pci_driver = {

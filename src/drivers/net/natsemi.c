@@ -596,7 +596,7 @@ static void natsemi_irq (struct net_device *netdev, int enable)
 }
 
 static struct pci_device_id natsemi_nics[] = {
-	PCI_ROM(0x100b, 0x0020, "dp83815", "DP83815"),
+	PCI_ROM(0x100b, 0x0020, "dp83815", "DP83815", 0),
 };
 
 struct pci_driver natsemi_driver __pci_driver = {

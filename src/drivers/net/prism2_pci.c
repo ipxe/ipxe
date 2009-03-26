@@ -37,9 +37,9 @@ static void prism2_pci_disable ( struct nic *nic ) {
 }
 
 static struct pci_device_id prism2_pci_nics[] = {
-PCI_ROM(0x1260, 0x3873, "prism2_pci",	"Harris Semiconductor Prism2.5 clone"),
-PCI_ROM(0x1260, 0x3873, "hwp01170",	"ActionTec HWP01170"),
-PCI_ROM(0x1260, 0x3873, "dwl520",	"DLink DWL-520"),
+PCI_ROM(0x1260, 0x3873, "prism2_pci",	"Harris Semiconductor Prism2.5 clone", 0),
+PCI_ROM(0x1260, 0x3873, "hwp01170",	"ActionTec HWP01170", 0),
+PCI_ROM(0x1260, 0x3873, "dwl520",	"DLink DWL-520", 0),
 };
 
 PCI_DRIVER ( prism2_pci_driver, prism2_pci_nics, PCI_NO_CLASS );

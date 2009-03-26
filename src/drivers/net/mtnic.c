@@ -1835,10 +1835,10 @@ err_init_card:
 
 
 static struct pci_device_id mtnic_nics[] = {
-	PCI_ROM ( 0x15b3, 0x6368, "mt25448", "Mellanox ConnectX EN driver" ),
-	PCI_ROM ( 0x15b3, 0x6372, "mt25458", "Mellanox ConnectX ENt driver" ),
-	PCI_ROM ( 0x15b3, 0x6750, "mt26448", "Mellanox ConnectX EN GEN2 driver" ),
-	PCI_ROM ( 0x15b3, 0x675a, "mt26458", "Mellanox ConnectX ENt GEN2 driver" ),
+	PCI_ROM ( 0x15b3, 0x6368, "mt25448", "Mellanox ConnectX EN driver", 0 ),
+	PCI_ROM ( 0x15b3, 0x6372, "mt25458", "Mellanox ConnectX ENt driver", 0 ),
+	PCI_ROM ( 0x15b3, 0x6750, "mt26448", "Mellanox ConnectX EN GEN2 driver", 0 ),
+	PCI_ROM ( 0x15b3, 0x675a, "mt26458", "Mellanox ConnectX ENt GEN2 driver", 0 ),
 };
 
 struct pci_driver mtnic_driver __pci_driver = {

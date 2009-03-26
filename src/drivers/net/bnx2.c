@@ -2673,10 +2673,10 @@ err_out_disable:
 }
 
 static struct pci_device_id bnx2_nics[] = {
-	PCI_ROM(0x14e4, 0x164a, "bnx2-5706",        "Broadcom NetXtreme II BCM5706"),
-	PCI_ROM(0x14e4, 0x164c, "bnx2-5708",        "Broadcom NetXtreme II BCM5708"),
-	PCI_ROM(0x14e4, 0x16aa, "bnx2-5706S",       "Broadcom NetXtreme II BCM5706S"),
-	PCI_ROM(0x14e4, 0x16ac, "bnx2-5708S",       "Broadcom NetXtreme II BCM5708S"),
+	PCI_ROM(0x14e4, 0x164a, "bnx2-5706",        "Broadcom NetXtreme II BCM5706", 0),
+	PCI_ROM(0x14e4, 0x164c, "bnx2-5708",        "Broadcom NetXtreme II BCM5708", 0),
+	PCI_ROM(0x14e4, 0x16aa, "bnx2-5706S",       "Broadcom NetXtreme II BCM5706S", 0),
+	PCI_ROM(0x14e4, 0x16ac, "bnx2-5708S",       "Broadcom NetXtreme II BCM5708S", 0),
 };
 
 PCI_DRIVER ( bnx2_driver, bnx2_nics, PCI_NO_CLASS );

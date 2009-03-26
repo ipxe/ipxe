@@ -1930,7 +1930,7 @@ int pci_set_power_state(struct pci_device *dev, int state)
 }
 
 static struct pci_device_id velocity_nics[] = {
-	PCI_ROM(0x1106, 0x3119, "via-velocity", "VIA Networking Velocity Family Gigabit Ethernet Adapter"),
+	PCI_ROM(0x1106, 0x3119, "via-velocity", "VIA Networking Velocity Family Gigabit Ethernet Adapter", 0),
 };
 
 PCI_DRIVER ( velocity_driver, velocity_nics, PCI_NO_CLASS );

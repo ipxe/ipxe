@@ -298,7 +298,7 @@ static int virtnet_probe(struct nic *nic, struct pci_device *pci)
 }
 
 static struct pci_device_id virtnet_nics[] = {
-PCI_ROM(0x1af4, 0x1000, "virtio-net",              "Virtio Network Interface"),
+PCI_ROM(0x1af4, 0x1000, "virtio-net",              "Virtio Network Interface", 0),
 };
 
 PCI_DRIVER ( virtnet_driver, virtnet_nics, PCI_NO_CLASS );

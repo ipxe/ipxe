@@ -1006,9 +1006,9 @@ static struct nic_operations pcnet32_operations = {
 };
 
 static struct pci_device_id pcnet32_nics[] = {
-	PCI_ROM(0x1022, 0x2000, "pcnet32", "AMD PCnet/PCI"),
-	PCI_ROM(0x1022, 0x2625, "pcnetfastiii", "AMD PCNet FAST III"),
-	PCI_ROM(0x1022, 0x2001, "amdhomepna", "AMD PCnet/HomePNA"),
+	PCI_ROM(0x1022, 0x2000, "pcnet32", "AMD PCnet/PCI", 0),
+	PCI_ROM(0x1022, 0x2625, "pcnetfastiii", "AMD PCNet FAST III", 0),
+	PCI_ROM(0x1022, 0x2001, "amdhomepna", "AMD PCnet/HomePNA", 0),
 };
 
 PCI_DRIVER ( pcnet32_driver, pcnet32_nics, PCI_NO_CLASS );

@@ -802,7 +802,7 @@ static struct nic_operations ns83820_operations = {
 };
 
 static struct pci_device_id ns83820_nics[] = {
-	PCI_ROM(0x100b, 0x0022, "ns83820", "National Semiconductor 83820"),
+	PCI_ROM(0x100b, 0x0022, "ns83820", "National Semiconductor 83820", 0),
 };
 
 PCI_DRIVER ( ns83820_driver, ns83820_nics, PCI_NO_CLASS );

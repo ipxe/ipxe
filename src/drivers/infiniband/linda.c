@@ -2386,7 +2386,7 @@ static void linda_remove ( struct pci_device *pci ) {
 }
 
 static struct pci_device_id linda_nics[] = {
-	PCI_ROM ( 0x1077, 0x7220, "iba7220", "QLE7240/7280 HCA driver" ),
+	PCI_ROM ( 0x1077, 0x7220, "iba7220", "QLE7240/7280 HCA driver", 0 ),
 };
 
 struct pci_driver linda_driver __pci_driver = {

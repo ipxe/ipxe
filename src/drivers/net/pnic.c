@@ -268,7 +268,7 @@ static int pnic_probe ( struct pci_device *pci,
 
 static struct pci_device_id pnic_nics[] = {
 /* genrules.pl doesn't let us use macros for PCI IDs...*/
-PCI_ROM ( 0xfefe, 0xefef, "pnic", "Bochs Pseudo NIC Adaptor" ),
+PCI_ROM ( 0xfefe, 0xefef, "pnic", "Bochs Pseudo NIC Adaptor", 0 ),
 };
 
 struct pci_driver pnic_driver __pci_driver = {
