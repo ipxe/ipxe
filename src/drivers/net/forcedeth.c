@@ -379,6 +379,9 @@ enum {
 #define LPA_1000FULL	0x0800
 #define LPA_1000HALF	0x0400
 
+/* Bit to know if MAC addr is stored in correct order */
+#define MAC_ADDR_CORRECT	0x01
+
 /* Big endian: should work, but is untested */
 struct ring_desc {
 	u32 PacketBuffer;
@@ -1241,6 +1244,9 @@ static int forcedeth_probe ( struct nic *nic, struct pci_device *pci ) {
 	int sz;
 	u8 *base;
 	int i;
+	struct pci_device_id *ids = pci->driver->ids;
+	int id_count = pci->driver->id_count;
+	unsigned int flags = 0;
 
 	if (pci->ioaddr == 0)
 		return 0;
@@ -1280,12 +1286,31 @@ static int forcedeth_probe ( struct nic *nic, struct pci_device *pci ) {
 	np->orig_mac[0] = readl(base + NvRegMacAddrA);
 	np->orig_mac[1] = readl(base + NvRegMacAddrB);
 
-	nic->node_addr[0] = (np->orig_mac[1] >> 8) & 0xff;
-	nic->node_addr[1] = (np->orig_mac[1] >> 0) & 0xff;
-	nic->node_addr[2] = (np->orig_mac[0] >> 24) & 0xff;
-	nic->node_addr[3] = (np->orig_mac[0] >> 16) & 0xff;
-	nic->node_addr[4] = (np->orig_mac[0] >> 8) & 0xff;
-	nic->node_addr[5] = (np->orig_mac[0] >> 0) & 0xff;
+	/* lookup the flags from pci_device_id */
+	for(i = 0; i < id_count; i++) {
+		if(pci->vendor == ids[i].vendor &&
+		   pci->device == ids[i].device) {
+			flags = ids[i].driver_data;
+			break;
+		   }
+	}
+
+	/* read MAC address */
+	if(flags & MAC_ADDR_CORRECT) {
+		nic->node_addr[0] = (np->orig_mac[0] >>  0) & 0xff;
+		nic->node_addr[1] = (np->orig_mac[0] >>  8) & 0xff;
+		nic->node_addr[2] = (np->orig_mac[0] >> 16) & 0xff;
+		nic->node_addr[3] = (np->orig_mac[0] >> 24) & 0xff;
+		nic->node_addr[4] = (np->orig_mac[1] >>  0) & 0xff;
+		nic->node_addr[5] = (np->orig_mac[1] >>  8) & 0xff;
+	} else {
+		nic->node_addr[0] = (np->orig_mac[1] >>  8) & 0xff;
+		nic->node_addr[1] = (np->orig_mac[1] >>  0) & 0xff;
+		nic->node_addr[2] = (np->orig_mac[0] >> 24) & 0xff;
+		nic->node_addr[3] = (np->orig_mac[0] >> 16) & 0xff;
+		nic->node_addr[4] = (np->orig_mac[0] >>  8) & 0xff;
+		nic->node_addr[5] = (np->orig_mac[0] >>  0) & 0xff;
+	}
 #ifdef LINUX
 	if (!is_valid_ether_addr(dev->dev_addr)) {
 		/*
@@ -1423,7 +1448,9 @@ PCI_ROM(0x10de, 0x0056, "nforce8", "nForce NVENET_8 Ethernet Controller", 0),
 PCI_ROM(0x10de, 0x0057, "nforce9", "nForce NVENET_9 Ethernet Controller", 0),
 PCI_ROM(0x10de, 0x0037, "nforce10", "nForce NVENET_10 Ethernet Controller", 0),
 PCI_ROM(0x10de, 0x0038, "nforce11", "nForce NVENET_11 Ethernet Controller", 0),
-PCI_ROM(0x10de, 0x0373, "nforce15", "nForce NVENET_15 Ethernet Controller", 0)
+PCI_ROM(0x10de, 0x0373, "nforce15", "nForce NVENET_15 Ethernet Controller", 0),
+PCI_ROM(0x10de, 0x0269, "nforce16", "nForce NVENET_16 Ethernet Controller", 0),
+PCI_ROM(0x10de, 0x0760, "nforce17", "nForce NVENET_17 Ethernet Controller", MAC_ADDR_CORRECT),
 };
 
 PCI_DRIVER ( forcedeth_driver, forcedeth_nics, PCI_NO_CLASS );
