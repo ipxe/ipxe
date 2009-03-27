@@ -474,7 +474,7 @@ roms :
 #
 EMBEDDED_LIST	:= $(BIN)/.embedded.list
 ifeq ($(wildcard $(EMBEDDED_LIST)),)
-EMBEDDED_LIST_IMAGE :=
+EMBEDDED_LIST_IMAGE := <invalid>
 else
 EMBEDDED_LIST_IMAGE := $(shell cat $(EMBEDDED_LIST))
 endif
@@ -609,7 +609,7 @@ $(BIN)/%.info :
 #
 BLIB_LIST	:= $(BIN)/.blib.list
 ifeq ($(wildcard $(BLIB_LIST)),)
-BLIB_LIST_OBJS	:=
+BLIB_LIST_OBJS	:= <invalid>
 else
 BLIB_LIST_OBJS	:= $(shell cat $(BLIB_LIST))
 endif
