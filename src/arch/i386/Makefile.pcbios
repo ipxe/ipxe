@@ -45,6 +45,12 @@ NON_AUTO_MEDIA	+= liso
 	$(QM)$(ECHO) "  [GENLISO] $@"
 	$(Q)bash util/genliso $@ $<
 
+# rule to make a syslinux floppy image (mountable, bootable)
+NON_AUTO_MEDIA	+= sdsk
+%sdsk:	%lkrn util/gensdsk
+	$(QM)$(ECHO) "  [GENSDSK] $@"
+	$(Q)bash util/gensdsk $@ $<
+
 # Special target for building Master Boot Record binary
 $(BIN)/mbr.bin : $(BIN)/mbr.o
 	$(QM)$(ECHO) "  [OBJCOPY] $@"
