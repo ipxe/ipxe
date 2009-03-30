@@ -75,6 +75,9 @@ struct bzimage_header {
 /** Offset of bzImage header within kernel image */
 #define BZI_HDR_OFFSET 0x1f1
 
+/** bzImage boot flag value */
+#define BZI_BOOT_FLAG 0xaa55
+
 /** bzImage magic signature value */
 #define BZI_SIGNATURE 0x53726448
 

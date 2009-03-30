@@ -42,9 +42,11 @@ FEATURE ( FEATURE_IMAGE, "bzImage", DHCP_EB_FEATURE_BZIMAGE, 1 );
 struct image_type bzimage_image_type __image_type ( PROBE_NORMAL );
 
 /**
- * bzImage load context
+ * bzImage context
  */
-struct bzimage_load_context {
+struct bzimage_context {
+	/** Boot protocol version */
+	unsigned int version;
 	/** Real-mode kernel portion load segment address */
 	unsigned int rm_kernel_seg;
 	/** Real-mode kernel portion load address */
@@ -55,28 +57,14 @@ struct bzimage_load_context {
 	size_t rm_heap;
 	/** Command line (offset from rm_kernel) */
 	size_t rm_cmdline;
+	/** Command line maximum length */
+	size_t cmdline_size;
 	/** Real-mode kernel portion total memory size */
 	size_t rm_memsz;
 	/** Non-real-mode kernel portion load address */
 	userptr_t pm_kernel;
 	/** Non-real-mode kernel portion file and memory size */
 	size_t pm_sz;
-};
-
-/**
- * bzImage execution context
- */
-struct bzimage_exec_context {
-	/** Real-mode kernel portion load segment address */
-	unsigned int rm_kernel_seg;
-	/** Real-mode kernel portion load address */
-	userptr_t rm_kernel;
-	/** Real-mode heap top (offset from rm_kernel) */
-	size_t rm_heap;
-	/** Command line (offset from rm_kernel) */
-	size_t rm_cmdline;
-	/** Command line maximum length */
-	size_t cmdline_size;
 	/** Video mode */
 	unsigned int vid_mode;
 	/** Memory limit */
@@ -85,18 +73,178 @@ struct bzimage_exec_context {
 	physaddr_t ramdisk_image;
 	/** Initrd size */
 	physaddr_t ramdisk_size;
+
+	/** Command line magic block */
+	struct bzimage_cmdline cmdline_magic;
+	/** bzImage header */
+	struct bzimage_header bzhdr;
 };
+
+/**
+ * Parse bzImage header
+ *
+ * @v image		bzImage file
+ * @v bzimg		bzImage context
+ * @v src		bzImage to parse
+ * @ret rc		Return status code
+ */
+static int bzimage_parse_header ( struct image *image,
+				  struct bzimage_context *bzimg,
+				  userptr_t src ) {
+	unsigned int syssize;
+	int is_bzimage;
+
+	/* Sanity check */
+	if ( image->len < ( BZI_HDR_OFFSET + sizeof ( bzimg->bzhdr ) ) ) {
+		DBGC ( image, "bzImage %p too short for kernel header\n",
+		       image );
+		return -ENOEXEC;
+	}
+
+	/* Read in header structures */
+	memset ( bzimg, 0, sizeof ( *bzimg ) );
+	copy_from_user ( &bzimg->cmdline_magic, src, BZI_CMDLINE_OFFSET,
+			 sizeof ( bzimg->cmdline_magic ) );
+	copy_from_user ( &bzimg->bzhdr, src, BZI_HDR_OFFSET,
+			 sizeof ( bzimg->bzhdr ) );
+
+	/* Calculate size of real-mode portion */
+	bzimg->rm_filesz =
+		( ( bzimg->bzhdr.setup_sects ? bzimg->bzhdr.setup_sects : 4 ) + 1 ) << 9;
+	if ( bzimg->rm_filesz > image->len ) {
+		DBGC ( image, "bzImage %p too short for %zd byte of setup\n",
+		       image, bzimg->rm_filesz );
+		return -ENOEXEC;
+	}
+	bzimg->rm_memsz = BZI_ASSUMED_RM_SIZE;
+
+	/* Calculate size of protected-mode portion */
+	bzimg->pm_sz = ( image->len - bzimg->rm_filesz );
+	syssize = ( ( bzimg->pm_sz + 15 ) / 16 );
+
+	/* Check for signatures and determine version */
+	if ( bzimg->bzhdr.boot_flag != BZI_BOOT_FLAG ) {
+		DBGC ( image, "bzImage %p missing 55AA signature\n", image );
+		return -ENOEXEC;
+	}
+	if ( bzimg->bzhdr.header == BZI_SIGNATURE ) {
+		/* 2.00+ */
+		bzimg->version = bzimg->bzhdr.version;
+	} else {
+		/* Pre-2.00.  Check that the syssize field is correct,
+		 * as a guard against accepting arbitrary binary data,
+		 * since the 55AA check is pretty lax.  Note that the
+		 * syssize field is unreliable for protocols between
+		 * 2.00 and 2.03 inclusive, so we should not always
+		 * check this field.
+		 */
+		bzimg->version = 0x0100;
+		if ( bzimg->bzhdr.syssize != syssize ) {
+			DBGC ( image, "bzImage %p bad syssize %x (expected "
+			       "%x)\n", image, bzimg->bzhdr.syssize, syssize );
+			return -ENOEXEC;
+		}
+	}
+
+	/* Determine image type */
+	is_bzimage = ( ( bzimg->version >= 0x0200 ) ?
+		       ( bzimg->bzhdr.loadflags & BZI_LOAD_HIGH ) : 0 );
+
+	/* Calculate load address of real-mode portion */
+	bzimg->rm_kernel_seg = ( is_bzimage ? 0x1000 : 0x9000 );
+	bzimg->rm_kernel = real_to_user ( bzimg->rm_kernel_seg, 0 );
+
+	/* Allow space for the stack and heap */
+	bzimg->rm_memsz += BZI_STACK_SIZE;
+	bzimg->rm_heap = bzimg->rm_memsz;
+
+	/* Allow space for the command line */
+	bzimg->rm_cmdline = bzimg->rm_memsz;
+	bzimg->rm_memsz += BZI_CMDLINE_SIZE;
+
+	/* Calculate load address of protected-mode portion */
+	bzimg->pm_kernel = phys_to_user ( is_bzimage ? BZI_LOAD_HIGH_ADDR
+					: BZI_LOAD_LOW_ADDR );
+
+	/* Extract video mode */
+	bzimg->vid_mode = bzimg->bzhdr.vid_mode;
+
+	/* Extract memory limit */
+	bzimg->mem_limit = ( ( bzimg->version >= 0x0203 ) ?
+			     bzimg->bzhdr.initrd_addr_max : BZI_INITRD_MAX );
+
+	/* Extract command line size */
+	bzimg->cmdline_size = ( ( bzimg->version >= 0x0206 ) ?
+				bzimg->bzhdr.cmdline_size : BZI_CMDLINE_SIZE );
+
+	DBGC ( image, "bzImage %p version %04x RM %#lx+%#zx PM %#lx+%#zx "
+	       "cmdlen %zd\n", image, bzimg->version,
+	       user_to_phys ( bzimg->rm_kernel, 0 ), bzimg->rm_filesz,
+	       user_to_phys ( bzimg->pm_kernel, 0 ), bzimg->pm_sz,
+	       bzimg->cmdline_size );
+
+	return 0;
+}
+
+/**
+ * Update bzImage header in loaded kernel
+ *
+ * @v image		bzImage file
+ * @v bzimg		bzImage context
+ * @v dst		bzImage to update
+ */
+static void bzimage_update_header ( struct image *image,
+				    struct bzimage_context *bzimg,
+				    userptr_t dst ) {
+
+	/* Set loader type */
+	if ( bzimg->version >= 0x0200 )
+		bzimg->bzhdr.type_of_loader = BZI_LOADER_TYPE_GPXE;
+
+	/* Set heap end pointer */
+	if ( bzimg->version >= 0x0201 ) {
+		bzimg->bzhdr.heap_end_ptr = ( bzimg->rm_heap - 0x200 );
+		bzimg->bzhdr.loadflags |= BZI_CAN_USE_HEAP;
+	}
+
+	/* Set command line */
+	if ( bzimg->version >= 0x0202 ) {
+		bzimg->bzhdr.cmd_line_ptr = user_to_phys ( bzimg->rm_kernel,
+							   bzimg->rm_cmdline );
+	} else {
+		bzimg->cmdline_magic.magic = BZI_CMDLINE_MAGIC;
+		bzimg->cmdline_magic.offset = bzimg->rm_cmdline;
+		bzimg->bzhdr.setup_move_size = bzimg->rm_memsz;
+	}
+
+	/* Set video mode */
+	bzimg->bzhdr.vid_mode = bzimg->vid_mode;
+
+	/* Set initrd address */
+	if ( bzimg->version >= 0x0200 ) {
+		bzimg->bzhdr.ramdisk_image = bzimg->ramdisk_image;
+		bzimg->bzhdr.ramdisk_size = bzimg->ramdisk_size;
+	}
+
+	/* Write out header structures */
+	copy_to_user ( dst, BZI_CMDLINE_OFFSET, &bzimg->cmdline_magic,
+		       sizeof ( bzimg->cmdline_magic ) );
+	copy_to_user ( dst, BZI_HDR_OFFSET, &bzimg->bzhdr,
+		       sizeof ( bzimg->bzhdr ) );
+
+	DBGC ( image, "bzImage %p vidmode %d\n", image, bzimg->vid_mode );
+}
 
 /**
  * Parse kernel command line for bootloader parameters
  *
  * @v image		bzImage file
- * @v exec_ctx		Execution context
+ * @v bzimg		bzImage context
  * @v cmdline		Kernel command line
  * @ret rc		Return status code
  */
 static int bzimage_parse_cmdline ( struct image *image,
-				   struct bzimage_exec_context *exec_ctx,
+				   struct bzimage_context *bzimg,
 				   const char *cmdline ) {
 	char *vga;
 	char *mem;
@@ -105,13 +253,13 @@ static int bzimage_parse_cmdline ( struct image *image,
 	if ( ( vga = strstr ( cmdline, "vga=" ) ) ) {
 		vga += 4;
 		if ( strcmp ( vga, "normal" ) == 0 ) {
-			exec_ctx->vid_mode = BZI_VID_MODE_NORMAL;
+			bzimg->vid_mode = BZI_VID_MODE_NORMAL;
 		} else if ( strcmp ( vga, "ext" ) == 0 ) {
-			exec_ctx->vid_mode = BZI_VID_MODE_EXT;
+			bzimg->vid_mode = BZI_VID_MODE_EXT;
 		} else if ( strcmp ( vga, "ask" ) == 0 ) {
-			exec_ctx->vid_mode = BZI_VID_MODE_ASK;
+			bzimg->vid_mode = BZI_VID_MODE_ASK;
 		} else {
-			exec_ctx->vid_mode = strtoul ( vga, &vga, 0 );
+			bzimg->vid_mode = strtoul ( vga, &vga, 0 );
 			if ( *vga && ( *vga != ' ' ) ) {
 				DBGC ( image, "bzImage %p strange \"vga=\""
 				       "terminator '%c'\n", image, *vga );
@@ -122,17 +270,17 @@ static int bzimage_parse_cmdline ( struct image *image,
 	/* Look for "mem=" */
 	if ( ( mem = strstr ( cmdline, "mem=" ) ) ) {
 		mem += 4;
-		exec_ctx->mem_limit = strtoul ( mem, &mem, 0 );
+		bzimg->mem_limit = strtoul ( mem, &mem, 0 );
 		switch ( *mem ) {
 		case 'G':
 		case 'g':
-			exec_ctx->mem_limit <<= 10;
+			bzimg->mem_limit <<= 10;
 		case 'M':
 		case 'm':
-			exec_ctx->mem_limit <<= 10;
+			bzimg->mem_limit <<= 10;
 		case 'K':
 		case 'k':
-			exec_ctx->mem_limit <<= 10;
+			bzimg->mem_limit <<= 10;
 			break;
 		case '\0':
 		case ' ':
@@ -142,7 +290,7 @@ static int bzimage_parse_cmdline ( struct image *image,
 			       "terminator '%c'\n", image, *mem );
 			break;
 		}
-		exec_ctx->mem_limit -= 1;
+		bzimg->mem_limit -= 1;
 	}
 
 	return 0;
@@ -152,20 +300,20 @@ static int bzimage_parse_cmdline ( struct image *image,
  * Set command line
  *
  * @v image		bzImage image
- * @v exec_ctx		Execution context
+ * @v bzimg		bzImage context
  * @v cmdline		Kernel command line
  * @ret rc		Return status code
  */
 static int bzimage_set_cmdline ( struct image *image,
-				 struct bzimage_exec_context *exec_ctx,
+				 struct bzimage_context *bzimg,
 				 const char *cmdline ) {
 	size_t cmdline_len;
 
 	/* Copy command line down to real-mode portion */
 	cmdline_len = ( strlen ( cmdline ) + 1 );
-	if ( cmdline_len > exec_ctx->cmdline_size )
-		cmdline_len = exec_ctx->cmdline_size;
-	copy_to_user ( exec_ctx->rm_kernel, exec_ctx->rm_cmdline,
+	if ( cmdline_len > bzimg->cmdline_size )
+		cmdline_len = bzimg->cmdline_size;
+	copy_to_user ( bzimg->rm_kernel, bzimg->rm_cmdline,
 		       cmdline, cmdline_len );
 	DBGC ( image, "bzImage %p command line \"%s\"\n", image, cmdline );
 
@@ -217,14 +365,16 @@ static size_t bzimage_load_initrd ( struct image *image,
 	}
 
 	/* Copy in initrd image body */
+	if ( address )
+		memcpy_user ( address, offset, initrd->data, 0, initrd->len );
+	offset += initrd->len;
 	if ( address ) {
 		DBGC ( image, "bzImage %p has initrd %p at [%lx,%lx)\n",
-		       image, initrd, address, ( address + offset ) );
-		memcpy_user ( address, offset, initrd->data, 0,
-			      initrd->len );
+		       image, initrd, user_to_phys ( address, 0 ),
+		       user_to_phys ( address, offset ) );
 	}
-	offset += initrd->len;
 
+	/* Round up to 4-byte boundary */
 	offset = ( ( offset + 0x03 ) & ~0x03 );
 	return offset;
 }
@@ -233,20 +383,19 @@ static size_t bzimage_load_initrd ( struct image *image,
  * Load initrds, if any
  *
  * @v image		bzImage image
- * @v exec_ctx		Execution context
+ * @v bzimg		bzImage context
  * @ret rc		Return status code
  */
 static int bzimage_load_initrds ( struct image *image,
-				  struct bzimage_exec_context *exec_ctx ) {
+				  struct bzimage_context *bzimg ) {
 	struct image *initrd;
 	size_t total_len = 0;
 	physaddr_t address;
 	int rc;
 
 	/* Add up length of all initrd images */
-	for_each_image ( initrd ) {
+	for_each_image ( initrd )
 		total_len += bzimage_load_initrd ( image, initrd, UNULL );
-	}
 
 	/* Give up if no initrd images found */
 	if ( ! total_len )
@@ -268,7 +417,7 @@ static int bzimage_load_initrds ( struct image *image,
 			return -ENOBUFS;
 		}
 		/* Check that we are within the kernel's range */
-		if ( ( address + total_len - 1 ) > exec_ctx->mem_limit )
+		if ( ( address + total_len - 1 ) > bzimg->mem_limit )
 			continue;
 		/* Prepare and verify segment */
 		if ( ( rc = prep_segment ( phys_to_user ( address ), 0,
@@ -279,8 +428,8 @@ static int bzimage_load_initrds ( struct image *image,
 	}
 
 	/* Record initrd location */
-	exec_ctx->ramdisk_image = address;
-	exec_ctx->ramdisk_size = total_len;
+	bzimg->ramdisk_image = address;
+	bzimg->ramdisk_size = total_len;
 
 	/* Construct initrd */
 	DBGC ( image, "bzImage %p constructing initrd at [%lx,%lx)\n",
@@ -300,60 +449,37 @@ static int bzimage_load_initrds ( struct image *image,
  * @ret rc		Return status code
  */
 static int bzimage_exec ( struct image *image ) {
-	struct bzimage_exec_context exec_ctx;
-	struct bzimage_header bzhdr;
+	struct bzimage_context bzimg;
 	const char *cmdline = ( image->cmdline ? image->cmdline : "" );
 	int rc;
 
-	/* Initialise context */
-	memset ( &exec_ctx, 0, sizeof ( exec_ctx ) );
-
-	/* Retrieve kernel header */
-	exec_ctx.rm_kernel_seg = image->priv.ul;
-	exec_ctx.rm_kernel = real_to_user ( exec_ctx.rm_kernel_seg, 0 );
-	copy_from_user ( &bzhdr, exec_ctx.rm_kernel, BZI_HDR_OFFSET,
-			 sizeof ( bzhdr ) );
-	exec_ctx.rm_cmdline = exec_ctx.rm_heap = 
-		( bzhdr.heap_end_ptr + 0x200 );
-	exec_ctx.vid_mode = bzhdr.vid_mode;
-	if ( bzhdr.version >= 0x0203 ) {
-		exec_ctx.mem_limit = bzhdr.initrd_addr_max;
-	} else {
-		exec_ctx.mem_limit = BZI_INITRD_MAX;
-	}
-	if ( bzhdr.version >= 0x0206 ) {
-		exec_ctx.cmdline_size = bzhdr.cmdline_size;
-	} else {
-		exec_ctx.cmdline_size = BZI_CMDLINE_SIZE;
-	}
-	DBG ( "cmdline_size = %zd\n", exec_ctx.cmdline_size );
+	/* Read and parse header from loaded kernel */
+	if ( ( rc = bzimage_parse_header ( image, &bzimg,
+					   image->priv.user ) ) != 0 )
+		return rc;
+	assert ( bzimg.rm_kernel == image->priv.user );
 
 	/* Parse command line for bootloader parameters */
-	if ( ( rc = bzimage_parse_cmdline ( image, &exec_ctx, cmdline ) ) != 0)
+	if ( ( rc = bzimage_parse_cmdline ( image, &bzimg, cmdline ) ) != 0)
 		return rc;
 
 	/* Store command line */
-	if ( ( rc = bzimage_set_cmdline ( image, &exec_ctx, cmdline ) ) != 0 )
+	if ( ( rc = bzimage_set_cmdline ( image, &bzimg, cmdline ) ) != 0 )
 		return rc;
 
 	/* Load any initrds */
-	if ( ( rc = bzimage_load_initrds ( image, &exec_ctx ) ) != 0 )
+	if ( ( rc = bzimage_load_initrds ( image, &bzimg ) ) != 0 )
 		return rc;
 
-	/* Update and store kernel header */
-	bzhdr.vid_mode = exec_ctx.vid_mode;
-	bzhdr.ramdisk_image = exec_ctx.ramdisk_image;
-	bzhdr.ramdisk_size = exec_ctx.ramdisk_size;
-	copy_to_user ( exec_ctx.rm_kernel, BZI_HDR_OFFSET, &bzhdr,
-		       sizeof ( bzhdr ) );
+	/* Update kernel header */
+	bzimage_update_header ( image, &bzimg, bzimg.rm_kernel );
 
 	/* Prepare for exiting */
 	shutdown ( SHUTDOWN_BOOT );
 
 	DBGC ( image, "bzImage %p jumping to RM kernel at %04x:0000 "
-	       "(stack %04x:%04zx)\n", image,
-	       ( exec_ctx.rm_kernel_seg + 0x20 ),
-	       exec_ctx.rm_kernel_seg, exec_ctx.rm_heap );
+	       "(stack %04x:%04zx)\n", image, ( bzimg.rm_kernel_seg + 0x20 ),
+	       bzimg.rm_kernel_seg, bzimg.rm_heap );
 
 	/* Jump to the kernel */
 	__asm__ __volatile__ ( REAL_CODE ( "movw %w0, %%ds\n\t"
@@ -365,9 +491,9 @@ static int bzimage_exec ( struct image *image ) {
 					   "pushw %w2\n\t"
 					   "pushw $0\n\t"
 					   "lret\n\t" )
-			       : : "r" ( exec_ctx.rm_kernel_seg ),
-			           "r" ( exec_ctx.rm_heap ),
-			           "r" ( exec_ctx.rm_kernel_seg + 0x20 ) );
+			       : : "r" ( bzimg.rm_kernel_seg ),
+			           "r" ( bzimg.rm_heap ),
+			           "r" ( bzimg.rm_kernel_seg + 0x20 ) );
 
 	/* There is no way for the image to return, since we provide
 	 * no return address.
@@ -378,192 +504,49 @@ static int bzimage_exec ( struct image *image ) {
 }
 
 /**
- * Load and parse bzImage header
- *
- * @v image		bzImage file
- * @v load_ctx		Load context
- * @v bzhdr		Buffer for bzImage header
- * @ret rc		Return status code
- */
-static int bzimage_load_header ( struct image *image,
-				 struct bzimage_load_context *load_ctx,
-				 struct bzimage_header *bzhdr ) {
-
-	/* Sanity check */
-	if ( image->len < ( BZI_HDR_OFFSET + sizeof ( *bzhdr ) ) ) {
-		DBGC ( image, "bzImage %p too short for kernel header\n",
-		       image );
-		return -ENOEXEC;
-	}
-
-	/* Read and verify header */
-	copy_from_user ( bzhdr, image->data, BZI_HDR_OFFSET,
-			 sizeof ( *bzhdr ) );
-	if ( bzhdr->header != BZI_SIGNATURE ) {
-		DBGC ( image, "bzImage %p bad signature %08x\n",
-		       image, bzhdr->header );
-		return -ENOEXEC;
-	}
-
-	/* We don't support ancient kernels */
-	if ( bzhdr->version < 0x0200 ) {
-		DBGC ( image, "bzImage %p version %04x not supported\n",
-		       image, bzhdr->version );
-		return -ENOTSUP;
-	}
-
-	/* Calculate load address and size of real-mode portion */
-	load_ctx->rm_kernel_seg = ( ( bzhdr->loadflags & BZI_LOAD_HIGH ) ?
-				    0x1000 :  /* 1000:0000 (bzImage) */
-				    0x9000 ); /* 9000:0000 (zImage) */
-	load_ctx->rm_kernel = real_to_user ( load_ctx->rm_kernel_seg, 0 );
-	load_ctx->rm_filesz =
-		( ( bzhdr->setup_sects ? bzhdr->setup_sects : 4 ) + 1 ) << 9;
-	load_ctx->rm_memsz = BZI_ASSUMED_RM_SIZE;
-	if ( load_ctx->rm_filesz > image->len ) {
-		DBGC ( image, "bzImage %p too short for %zd byte of setup\n",
-		       image, load_ctx->rm_filesz );
-		return -ENOEXEC;
-	}
-
-	/* Calculate load address and size of non-real-mode portion */
-	load_ctx->pm_kernel = ( ( bzhdr->loadflags & BZI_LOAD_HIGH ) ?
-				phys_to_user ( BZI_LOAD_HIGH_ADDR ) :
-				phys_to_user ( BZI_LOAD_LOW_ADDR ) );
-	load_ctx->pm_sz = ( image->len - load_ctx->rm_filesz );
-
-	DBGC ( image, "bzImage %p version %04x RM %#zx bytes PM %#zx bytes\n",
-	       image, bzhdr->version, load_ctx->rm_filesz, load_ctx->pm_sz );
-	return 0;
-}
-
-/**
- * Load real-mode portion of bzImage
- *
- * @v image		bzImage file
- * @v load_ctx		Load context
- * @ret rc		Return status code
- */
-static int bzimage_load_real ( struct image *image,
-			       struct bzimage_load_context *load_ctx ) {
-	int rc;
-
-	/* Allow space for the stack and heap */
-	load_ctx->rm_memsz += BZI_STACK_SIZE;
-	load_ctx->rm_heap = load_ctx->rm_memsz;
-
-	/* Allow space for the command line */
-	load_ctx->rm_cmdline = load_ctx->rm_memsz;
-	load_ctx->rm_memsz += BZI_CMDLINE_SIZE;
-
-	/* Prepare, verify, and load the real-mode segment */
-	if ( ( rc = prep_segment ( load_ctx->rm_kernel, load_ctx->rm_filesz,
-				   load_ctx->rm_memsz ) ) != 0 ) {
-		DBGC ( image, "bzImage %p could not prepare RM segment: %s\n",
-		       image, strerror ( rc ) );
-		return rc;
-	}
-	memcpy_user ( load_ctx->rm_kernel, 0, image->data, 0,
-		      load_ctx->rm_filesz );
-
-	return 0;
-}
-
-/**
- * Load non-real-mode portion of bzImage
- *
- * @v image		bzImage file
- * @v load_ctx		Load context
- * @ret rc		Return status code
- */
-static int bzimage_load_non_real ( struct image *image,
-				   struct bzimage_load_context *load_ctx ) {
-	int rc;
-
-	/* Prepare, verify and load the non-real-mode segment */
-	if ( ( rc = prep_segment ( load_ctx->pm_kernel, load_ctx->pm_sz,
-				   load_ctx->pm_sz ) ) != 0 ) {
-		DBGC ( image, "bzImage %p could not prepare PM segment: %s\n",
-		       image, strerror ( rc ) );
-		return rc;
-	}
-	memcpy_user ( load_ctx->pm_kernel, 0, image->data, load_ctx->rm_filesz,
-		      load_ctx->pm_sz );
-
-	return 0;
-}
-
-/**
- * Update and store bzImage header
- *
- * @v image		bzImage file
- * @v load_ctx		Load context
- * @v bzhdr		Original bzImage header
- * @ret rc		Return status code
- */
-static int bzimage_write_header ( struct image *image __unused,
-				  struct bzimage_load_context *load_ctx,
-				  struct bzimage_header *bzhdr ) {
-	struct bzimage_cmdline cmdline;
-
-	/* Update the header and copy it into the loaded kernel */
-	bzhdr->type_of_loader = BZI_LOADER_TYPE_GPXE;
-	if ( bzhdr->version >= 0x0201 ) {
-		bzhdr->heap_end_ptr = ( load_ctx->rm_heap - 0x200 );
-		bzhdr->loadflags |= BZI_CAN_USE_HEAP;
-	}
-	if ( bzhdr->version >= 0x0202 ) {
-		bzhdr->cmd_line_ptr = user_to_phys ( load_ctx->rm_kernel,
-						     load_ctx->rm_cmdline );
-	} else {
-		cmdline.magic = BZI_CMDLINE_MAGIC;
-		cmdline.offset = load_ctx->rm_cmdline;
-		copy_to_user ( load_ctx->rm_kernel, BZI_CMDLINE_OFFSET,
-			       &cmdline, sizeof ( cmdline ) );
-		bzhdr->setup_move_size = load_ctx->rm_memsz;
-	}
-	copy_to_user ( load_ctx->rm_kernel, BZI_HDR_OFFSET,
-		       bzhdr, sizeof ( *bzhdr ) );
-
-	return 0;
-}
-
-/**
  * Load bzImage image into memory
  *
  * @v image		bzImage file
  * @ret rc		Return status code
  */
 int bzimage_load ( struct image *image ) {
-	struct bzimage_load_context load_ctx;
-	struct bzimage_header bzhdr;
+	struct bzimage_context bzimg;
 	int rc;
 
-	/* Initialise context */
-	memset ( &load_ctx, 0, sizeof ( load_ctx ) );
-
-	/* Load and verify header */
-	if ( ( rc = bzimage_load_header ( image, &load_ctx, &bzhdr ) ) != 0 )
+	/* Read and parse header from image */
+	if ( ( rc = bzimage_parse_header ( image, &bzimg,
+					   image->data ) ) != 0 )
 		return rc;
 
 	/* This is a bzImage image, valid or otherwise */
 	if ( ! image->type )
 		image->type = &bzimage_image_type;
 
-	/* Load real-mode portion */
-	if ( ( rc = bzimage_load_real ( image, &load_ctx ) ) != 0 )
+	/* Prepare segments */
+	if ( ( rc = prep_segment ( bzimg.rm_kernel, bzimg.rm_filesz,
+				   bzimg.rm_memsz ) ) != 0 ) {
+		DBGC ( image, "bzImage %p could not prepare RM segment: %s\n",
+		       image, strerror ( rc ) );
 		return rc;
+	}
+	if ( ( rc = prep_segment ( bzimg.pm_kernel, bzimg.pm_sz,
+				   bzimg.pm_sz ) ) != 0 ) {
+		DBGC ( image, "bzImage %p could not prepare PM segment: %s\n",
+		       image, strerror ( rc ) );
+		return rc;
+	}
 
-	/* Load non-real-mode portion */
-	if ( ( rc = bzimage_load_non_real ( image, &load_ctx ) ) != 0 )
-		return rc;
+	/* Load segments */
+	memcpy_user ( bzimg.rm_kernel, 0, image->data,
+		      0, bzimg.rm_filesz );
+	memcpy_user ( bzimg.pm_kernel, 0, image->data,
+		      bzimg.rm_filesz, bzimg.pm_sz );
 
 	/* Update and write out header */
-	if ( ( rc = bzimage_write_header ( image, &load_ctx, &bzhdr ) ) != 0 )
-		return rc;
+	bzimage_update_header ( image, &bzimg, bzimg.rm_kernel );
 
 	/* Record real-mode segment in image private data field */
-	image->priv.ul = load_ctx.rm_kernel_seg;
+	image->priv.user = bzimg.rm_kernel;
 
 	return 0;
 }
