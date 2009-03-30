@@ -1514,7 +1514,7 @@ static int iscsi_vredirect ( struct xfer_interface *socket, int type,
 		va_end ( tmp );
 	}
 
-	return xfer_vopen ( socket, type, args );
+	return xfer_vreopen ( socket, type, args );
 }
 			     
 

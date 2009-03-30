@@ -1107,7 +1107,7 @@ static int dhcp_deliver_iob ( struct xfer_interface *xfer,
 /** DHCP data transfer interface operations */
 static struct xfer_interface_operations dhcp_xfer_operations = {
 	.close		= ignore_xfer_close,
-	.vredirect	= xfer_vopen,
+	.vredirect	= xfer_vreopen,
 	.window		= unlimited_xfer_window,
 	.alloc_iob	= default_xfer_alloc_iob,
 	.deliver_iob	= dhcp_deliver_iob,

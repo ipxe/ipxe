@@ -934,7 +934,7 @@ static int tftp_socket_deliver_iob ( struct xfer_interface *socket,
 /** TFTP socket operations */
 static struct xfer_interface_operations tftp_socket_operations = {
 	.close		= ignore_xfer_close,
-	.vredirect	= xfer_vopen,
+	.vredirect	= xfer_vreopen,
 	.window		= unlimited_xfer_window,
 	.alloc_iob	= default_xfer_alloc_iob,
 	.deliver_iob	= tftp_socket_deliver_iob,
@@ -961,7 +961,7 @@ static int tftp_mc_socket_deliver_iob ( struct xfer_interface *mc_socket,
 /** TFTP multicast socket operations */
 static struct xfer_interface_operations tftp_mc_socket_operations = {
 	.close		= ignore_xfer_close,
-	.vredirect	= xfer_vopen,
+	.vredirect	= xfer_vreopen,
 	.window		= unlimited_xfer_window,
 	.alloc_iob	= default_xfer_alloc_iob,
 	.deliver_iob	= tftp_mc_socket_deliver_iob,

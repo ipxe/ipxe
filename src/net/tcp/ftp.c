@@ -335,7 +335,7 @@ static int ftp_control_deliver_raw ( struct xfer_interface *control,
 /** FTP control channel operations */
 static struct xfer_interface_operations ftp_control_operations = {
 	.close		= ftp_control_close,
-	.vredirect	= xfer_vopen,
+	.vredirect	= xfer_vreopen,
 	.window		= unlimited_xfer_window,
 	.alloc_iob	= default_xfer_alloc_iob,
 	.deliver_iob	= xfer_deliver_as_raw,
@@ -402,7 +402,7 @@ static int ftp_data_deliver_iob ( struct xfer_interface *data,
 /** FTP data channel operations */
 static struct xfer_interface_operations ftp_data_operations = {
 	.close		= ftp_data_closed,
-	.vredirect	= xfer_vopen,
+	.vredirect	= xfer_vreopen,
 	.window		= unlimited_xfer_window,
 	.alloc_iob	= default_xfer_alloc_iob,
 	.deliver_iob	= ftp_data_deliver_iob,

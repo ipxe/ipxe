@@ -205,7 +205,7 @@ static void downloader_xfer_close ( struct xfer_interface *xfer, int rc ) {
 /** Downloader data transfer interface operations */
 static struct xfer_interface_operations downloader_xfer_operations = {
 	.close		= downloader_xfer_close,
-	.vredirect	= xfer_vopen,
+	.vredirect	= xfer_vreopen,
 	.window		= unlimited_xfer_window,
 	.alloc_iob	= default_xfer_alloc_iob,
 	.deliver_iob	= downloader_xfer_deliver_iob,

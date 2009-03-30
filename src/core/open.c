@@ -53,6 +53,8 @@ int xfer_open_uri ( struct xfer_interface *xfer, struct uri *uri ) {
 	/* Find opener which supports this URI scheme */
 	for_each_table_entry ( opener, URI_OPENERS ) {
 		if ( strcmp ( resolved_uri->scheme, opener->scheme ) == 0 ) {
+			DBGC ( xfer, "XFER %p opening %s URI\n",
+			       xfer, opener->scheme );
 			rc = opener->open ( xfer, resolved_uri );
 			goto done;
 		}
@@ -169,4 +171,30 @@ int xfer_open ( struct xfer_interface *xfer, int type, ... ) {
 	rc = xfer_vopen ( xfer, type, args );
 	va_end ( args );
 	return rc;
+}
+
+/**
+ * Reopen location
+ *
+ * @v xfer		Data transfer interface
+ * @v type		Location type
+ * @v args		Remaining arguments depend upon location type
+ * @ret rc		Return status code
+ *
+ * This will close the existing connection and open a new connection
+ * using xfer_vopen().  It is intended to be used as a .vredirect
+ * method handler.
+ */
+int xfer_vreopen ( struct xfer_interface *xfer, int type, va_list args ) {
+	struct xfer_interface_operations *op = xfer->op;
+
+	/* Close existing connection */
+	xfer_nullify ( xfer );
+	xfer_close ( xfer, 0 );
+
+	/* Restore to operational status */
+	xfer->op = op;
+
+	/* Open new location */
+	return xfer_vopen ( xfer, type, args );
 }

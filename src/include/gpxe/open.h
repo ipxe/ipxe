@@ -97,5 +97,7 @@ extern int xfer_open_socket ( struct xfer_interface *xfer, int semantics,
 			      struct sockaddr *peer, struct sockaddr *local );
 extern int xfer_vopen ( struct xfer_interface *xfer, int type, va_list args );
 extern int xfer_open ( struct xfer_interface *xfer, int type, ... );
+extern int xfer_vreopen ( struct xfer_interface *xfer, int type,
+			  va_list args );
 
 #endif /* _GPXE_OPEN_H */

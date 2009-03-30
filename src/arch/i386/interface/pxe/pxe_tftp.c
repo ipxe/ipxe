@@ -138,7 +138,7 @@ static void pxe_tftp_xfer_close ( struct xfer_interface *xfer __unused,
 
 static struct xfer_interface_operations pxe_tftp_xfer_ops = {
 	.close		= pxe_tftp_xfer_close,
-	.vredirect	= xfer_vopen,
+	.vredirect	= xfer_vreopen,
 	.window		= unlimited_xfer_window,
 	.alloc_iob	= default_xfer_alloc_iob,
 	.deliver_iob	= pxe_tftp_xfer_deliver_iob,
