@@ -138,6 +138,8 @@ static void http_done ( struct http_request *http, int rc ) {
 static int http_response_to_rc ( unsigned int response ) {
 	switch ( response ) {
 	case 200:
+	case 301:
+	case 302:
 		return 0;
 	case 404:
 		return -ENOENT;
@@ -177,6 +179,28 @@ static int http_rx_response ( struct http_request *http, char *response ) {
 
 	/* Move to received headers */
 	http->rx_state = HTTP_RX_HEADER;
+	return 0;
+}
+
+/**
+ * Handle HTTP Location header
+ *
+ * @v http		HTTP request
+ * @v value		HTTP header value
+ * @ret rc		Return status code
+ */
+static int http_rx_location ( struct http_request *http, const char *value ) {
+	int rc;
+
+	/* Redirect to new location */
+	DBGC ( http, "HTTP %p redirecting to %s\n", http, value );
+	if ( ( rc = xfer_redirect ( &http->xfer, LOCATION_URI_STRING,
+				    value ) ) != 0 ) {
+		DBGC ( http, "HTTP %p could not redirect: %s\n",
+		       http, strerror ( rc ) );
+		return rc;
+	}
+
 	return 0;
 }
 
@@ -222,6 +246,10 @@ struct http_header_handler {
 
 /** List of HTTP header handlers */
 static struct http_header_handler http_header_handlers[] = {
+	{
+		.header = "Location",
+		.rx = http_rx_location,
+	},
 	{
 		.header = "Content-Length",
 		.rx = http_rx_content_length,
