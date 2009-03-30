@@ -302,9 +302,36 @@ struct named_socket {
 	int have_local;
 };
 
+/**
+ * Finish using named socket
+ *
+ * @v named		Named socket
+ * @v rc		Reason for finish
+ */
+static void named_done ( struct named_socket *named, int rc ) {
+
+	/* Close all interfaces */
+	resolv_nullify ( &named->resolv );
+	xfer_nullify ( &named->xfer );
+	xfer_close ( &named->xfer, rc );
+}
+
+/**
+ * Handle close() event
+ *
+ * @v xfer		Data transfer interface
+ * @v rc		Reason for close
+ */
+static void named_xfer_close ( struct xfer_interface *xfer, int rc ) {
+	struct named_socket *named =
+		container_of ( xfer, struct named_socket, xfer );
+
+	named_done ( named, rc );
+}
+
 /** Named socket opener data transfer interface operations */
 static struct xfer_interface_operations named_xfer_ops = {
-	.close		= ignore_xfer_close,
+	.close		= named_xfer_close,
 	.vredirect	= ignore_xfer_vredirect,
 	.window		= no_xfer_window,
 	.alloc_iob	= default_xfer_alloc_iob,
@@ -324,10 +351,6 @@ static void named_resolv_done ( struct resolv_interface *resolv,
 	struct named_socket *named =
 		container_of ( resolv, struct named_socket, resolv );
 
-	/* Unplug resolver and nullify data transfer interface */
-	resolv_unplug ( &named->resolv );
-	xfer_nullify ( &named->xfer );
-
 	/* Redirect if name resolution was successful */
 	if ( rc == 0 ) {
 		rc = xfer_redirect ( &named->xfer, LOCATION_SOCKET,
@@ -336,12 +359,8 @@ static void named_resolv_done ( struct resolv_interface *resolv,
 				       &named->local : NULL ) );
 	}
 
-	/* Close data transfer interface if redirection failed */
-	if ( rc != 0 )
-		xfer_close ( &named->xfer, rc );
-
-	/* Unplug data transfer interface */
-	xfer_unplug ( &named->xfer );
+	/* Terminate resolution */
+	named_done ( named, rc );
 }
 
 /** Named socket opener name resolution interface operations */
