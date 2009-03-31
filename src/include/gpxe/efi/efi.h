@@ -41,6 +41,7 @@
 #include <gpxe/efi/PiDxe.h>
 
 /* Reset any trailing #pragma pack directives */
+#pragma pack(1)
 #pragma pack()
 
 #include <gpxe/tables.h>
