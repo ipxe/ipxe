@@ -1,8 +1,8 @@
 #ifndef _BITS_STDINT_H
 #define _BITS_STDINT_H
 
-typedef unsigned int		size_t;
-typedef signed int		ssize_t;
+typedef __SIZE_TYPE__		size_t;
+typedef signed long		ssize_t;
 typedef signed long		off_t;
 
 typedef unsigned char		uint8_t;
