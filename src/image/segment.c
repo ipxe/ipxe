@@ -26,6 +26,7 @@
 #include <errno.h>
 #include <gpxe/uaccess.h>
 #include <gpxe/memmap.h>
+#include <gpxe/errortab.h>
 #include <gpxe/segment.h>
 
 /**
@@ -72,3 +73,13 @@ int prep_segment ( userptr_t segment, size_t filesz, size_t memsz ) {
 	      start, mid, end );
 	return -ERANGE;
 }
+
+/**
+ * Segment-specific error messages
+ *
+ * This error happens sufficiently often to merit a user-friendly
+ * description.
+ */
+struct errortab segment_errors[] __errortab = {
+	{ ERANGE, "Requested memory not available" },
+};

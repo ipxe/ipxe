@@ -115,5 +115,6 @@ struct errortab common_errors[] __errortab = {
 	{ ENOSPC, "No space left on device" },
 	{ ENOTSUP, "Not supported" },
 	{ EPERM, "Operation not permitted" },
+	{ ERANGE, "Out of range" },
 	{ ETIMEDOUT, "Connection timed out" },
 };
