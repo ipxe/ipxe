@@ -54,6 +54,14 @@ echo :
 
 ###############################################################################
 #
+# Generate a usable "seq" substitute
+#
+define seq
+	$(shell awk 'BEGIN { for ( i = $(1) ; i <= $(2) ; i++ ) print i }')
+endef
+
+###############################################################################
+#
 # Determine host OS
 #
 HOST_OS		:= $(shell uname -s)
@@ -495,7 +503,7 @@ $(EMBEDDED_LIST) :
 VERYCLEANUP	+= $(EMBEDDED_LIST)
 
 EMBEDDED_FILES	:= $(subst $(COMMA), ,$(EMBEDDED_IMAGE))
-EMBED_ALL	:= $(foreach i,$(shell seq 1 $(words $(EMBEDDED_FILES))),\
+EMBED_ALL	:= $(foreach i,$(call seq,1,$(words $(EMBEDDED_FILES))),\
 		     EMBED ( $(i), \"$(word $(i), $(EMBEDDED_FILES))\",\
 			     \"$(notdir $(word $(i),$(EMBEDDED_FILES)))\" ))
 
