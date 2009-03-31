@@ -98,6 +98,7 @@ static int int13_rw_sectors ( struct int13_drive *drive,
 	unsigned long lba;
 	unsigned int count;
 	userptr_t buffer;
+	int rc;
 
 	/* Validate blocksize */
 	if ( blockdev->blksize != INT13_BLKSIZE ) {
@@ -122,8 +123,10 @@ static int int13_rw_sectors ( struct int13_drive *drive,
 	      head, sector, lba, ix86->segs.es, ix86->regs.bx, count );
 
 	/* Read from / write to block device */
-	if ( io ( blockdev, lba, count, buffer ) != 0 )
+	if ( ( rc = io ( blockdev, lba, count, buffer ) ) != 0 ) {
+		DBG ( "INT 13 failed: %s\n", strerror ( rc ) );
 		return -INT13_STATUS_READ_ERROR;
+	}
 
 	return 0;
 }
@@ -248,6 +251,7 @@ static int int13_extended_rw ( struct int13_drive *drive,
 	uint64_t lba;
 	unsigned long count;
 	userptr_t buffer;
+	int rc;
 
 	/* Read parameters from disk address structure */
 	copy_from_real ( &addr, ix86->segs.ds, ix86->regs.si, sizeof ( addr ));
@@ -259,8 +263,10 @@ static int int13_extended_rw ( struct int13_drive *drive,
 	      addr.buffer.segment, addr.buffer.offset, count );
 	
 	/* Read from / write to block device */
-	if ( io ( blockdev, lba, count, buffer ) != 0 )
+	if ( ( rc = io ( blockdev, lba, count, buffer ) ) != 0 ) {
+		DBG ( "INT 13 failed: %s\n", strerror ( rc ) );
 		return -INT13_STATUS_READ_ERROR;
+	}
 
 	return 0;
 }
@@ -387,7 +393,7 @@ static __asmcall void int13 ( struct i386_all_regs *ix86 ) {
 		/* Negative status indicates an error */
 		if ( status < 0 ) {
 			status = -status;
-			DBG ( "INT13 failed with status %x\n", status );
+			DBG ( "INT 13 returning failure status %x\n", status );
 		} else {
 			ix86->flags &= ~CF;
 		}
@@ -652,7 +658,8 @@ int int13_boot ( unsigned int drive ) {
 
 	/* Jump to boot sector */
 	if ( ( rc = call_bootsector ( 0x0, 0x7c00, drive ) ) != 0 ) {
-		DBG ( "INT 13 drive %02x boot returned\n", drive );
+		DBG ( "INT 13 drive %02x boot returned: %s\n",
+		      drive, strerror ( rc ) );
 		return rc;
 	}
 
