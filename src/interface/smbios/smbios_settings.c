@@ -198,4 +198,12 @@ struct setting smbios_named_settings[] __setting = {
 					   serial ),
 		.type = &setting_type_string,
 	},
+	{
+		.name = "asset",
+		.description = "Asset tag",
+		.tag = SMBIOS_STRING_TAG ( SMBIOS_TYPE_ENCLOSURE_INFORMATION,
+					   struct smbios_enclosure_information,
+					   asset_tag ),
+		.type = &setting_type_string,
+	},
 };

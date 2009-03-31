@@ -113,6 +113,25 @@ struct smbios_system_information {
 /** SMBIOS system information structure type */
 #define SMBIOS_TYPE_SYSTEM_INFORMATION 1
 
+/** SMBIOS enclosure information structure */
+struct smbios_enclosure_information {
+	/** SMBIOS structure header */
+	struct smbios_header header;
+	/** Manufacturer string */
+	uint8_t manufacturer;
+	/** Type string */
+	uint8_t type;
+	/** Version string */
+	uint8_t version;
+	/** Serial number string */
+	uint8_t serial;
+	/** Asset tag */
+	uint8_t asset_tag;
+} __attribute__ (( packed ));
+
+/** SMBIOS enclosure information structure type */
+#define SMBIOS_TYPE_ENCLOSURE_INFORMATION 3
+
 /**
  * SMBIOS entry point descriptor
  *
