@@ -29,6 +29,7 @@
 #include <bfd.h>
 #include <gpxe/efi/efi.h>
 #include <gpxe/efi/IndustryStandard/PeImage.h>
+#include <libgen.h>
 
 #define eprintf(...) fprintf ( stderr, __VA_ARGS__ )
 
@@ -658,6 +659,7 @@ static void write_pe_file ( struct pe_header *pe_header,
  */
 static void elf2pe ( const char *elf_name, const char *pe_name,
 		     struct options *opts ) {
+	char pe_name_tmp[ strlen ( pe_name ) + 1 ];
 	bfd *bfd;
 	asymbol **symtab;
 	asection *section;
@@ -668,6 +670,9 @@ static void elf2pe ( const char *elf_name, const char *pe_name,
 	struct pe_section **next_pe_section = &pe_sections;
 	struct pe_header pe_header;
 	FILE *pe;
+
+	/* Create a modifiable copy of the PE name */
+	memcpy ( pe_name_tmp, pe_name, sizeof ( pe_name_tmp ) );
 
 	/* Open the file */
 	bfd = open_input_bfd ( elf_name );
@@ -703,7 +708,7 @@ static void elf2pe ( const char *elf_name, const char *pe_name,
 
 	/* Create the .reloc section */
 	*(next_pe_section) = create_debug_section ( &pe_header,
-						    basename ( pe_name ) );
+						    basename ( pe_name_tmp ) );
 	next_pe_section = &(*next_pe_section)->next;
 
 	/* Write out PE file */
