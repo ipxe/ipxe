@@ -126,6 +126,14 @@ SP_FLAGS := $(shell $(SP_TEST) && $(ECHO) '-fno-stack-protector')
 CFLAGS	+= $(SP_FLAGS)
 endif
 
+# Some versions of gas choke on division operators, treating them as
+# comment markers.  Specifying --divide will work around this problem,
+# but isn't available on older gas versions.
+#
+DIVIDE_TEST = $(AS) --divide /dev/null -o /dev/null 2>/dev/null
+DIVIDE_FLAGS := $(shell $(DIVIDE_TEST) && $(ECHO) '--divide')
+ASFLAGS	+= $(DIVIDE_FLAGS)
+
 ###############################################################################
 #
 # Build verbosity
