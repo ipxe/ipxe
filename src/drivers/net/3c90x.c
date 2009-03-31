@@ -296,7 +296,7 @@ static void a3c90x_process_tx_packets(struct net_device *netdev)
 		netdev_tx_complete(netdev, p->tx_iobuf[p->tx_tail]);
 
 		DBG("transmitted packet\n");
-		DBG("    size: %d\n", iob_len(p->tx_iobuf[p->tx_tail]));
+		DBG("    size: %zd\n", iob_len(p->tx_iobuf[p->tx_tail]));
 
 		p->tx_tail = (p->tx_tail + 1) % TX_RING_SIZE;
 		p->tx_cnt--;
