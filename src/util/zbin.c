@@ -57,6 +57,10 @@ struct zinfo_file {
 	unsigned int num_entries;
 };
 
+static unsigned long align ( unsigned long value, unsigned long align ) {
+	return ( ( value + align - 1 ) & ~( align - 1 ) );
+}
+
 static int read_file ( const char *filename, void **buf, size_t *len ) {
 	FILE *file;
 	struct stat stat;
@@ -140,14 +144,13 @@ static int process_zinfo_copy ( struct input_file *input,
 	struct zinfo_copy *copy = &zinfo->copy;
 	size_t offset = copy->offset;
 	size_t len = copy->len;
-	unsigned int align = copy->align;
 
 	if ( ( offset + len ) > input->len ) {
 		fprintf ( stderr, "Input buffer overrun on copy\n" );
 		return -1;
 	}
 
-	output->len = ( ( output->len + align - 1 ) & ~( align - 1 ) );
+	output->len = align ( output->len, copy->align );
 	if ( ( output->len + len ) > output->max_len ) {
 		fprintf ( stderr, "Output buffer overrun on copy\n" );
 		return -1;
@@ -170,7 +173,6 @@ static int process_zinfo_pack ( struct input_file *input,
 	struct zinfo_pack *pack = &zinfo->pack;
 	size_t offset = pack->offset;
 	size_t len = pack->len;
-	unsigned int align = pack->align;
 	unsigned long packed_len;
 
 	if ( ( offset + len ) > input->len ) {
@@ -178,7 +180,7 @@ static int process_zinfo_pack ( struct input_file *input,
 		return -1;
 	}
 
-	output->len = ( ( output->len + align - 1 ) & ~( align - 1 ) );
+	output->len = align ( output->len, pack->align );
 	if ( output->len > output->max_len ) {
 		fprintf ( stderr, "Output buffer overrun on pack\n" );
 		return -1;
@@ -222,8 +224,9 @@ static int process_zinfo_subtract ( struct input_file *input,
 	}
 
 	target = ( output->buf + offset );
-	delta = ( ( output->len / subtract->divisor ) -
-		  ( input->len / subtract->divisor ) );
+	delta = ( ( align ( output->len, subtract->divisor ) -
+		    align ( input->len, subtract->divisor ) )
+		  / subtract->divisor );
 
 	switch ( datasize ) {
 	case 1: {
@@ -251,7 +254,7 @@ static int process_zinfo_subtract ( struct input_file *input,
 	}
 
 	if ( DEBUG ) {
-		fprintf ( stderr, "SUBx [%#zx,%#zx) (%#lx+(%#lx/%#lx)-(%#lx/%#lx)) = %#lx\n",
+		fprintf ( stderr, "SUBx [%#zx,%#zx) (%#lx+(%#lx/%#x)-(%#lx/%#x)) = %#lx\n",
 			  offset, ( offset + datasize ), old, output->len, subtract->divisor,
 			  input->len, subtract->divisor, new );
 	}
