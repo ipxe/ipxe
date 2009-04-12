@@ -199,9 +199,12 @@ pxe_int_1a:
 	shll	$4, %edx
 	addl	$pxenv, %edx
 	movw	$0x564e, %ax
+	pushw	%bp
+	movw	%sp, %bp
+	andb	$~0x01, 8(%bp)	/* Clear CF on return */
+	popw	%bp
 	popfw
-	clc
-	lret	$2
+	iret
 1:	/* INT 1A,other - pass through */
 	popfw
 	ljmp	*%cs:pxe_int_1a_vector

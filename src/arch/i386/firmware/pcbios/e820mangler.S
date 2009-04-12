@@ -490,6 +490,18 @@ get_mangled_e820:
 	.size get_mangled_e820, . - get_mangled_e820
 
 /****************************************************************************
+ * Set/clear CF on the stack as appropriate, assumes stack is as it should
+ * be immediately before IRET
+ ****************************************************************************
+ */
+patch_cf:
+	pushw	%bp
+	movw	%sp, %bp
+	setc	8(%bp)	/* Set/reset CF; clears PF, AF, ZF, SF */
+	popw	%bp
+	ret
+
+/****************************************************************************
  * INT 15,e820 handler
  ****************************************************************************
  */
@@ -500,7 +512,8 @@ int15_e820:
 	popw	%ds
 	call	get_mangled_e820
 	popw	%ds
-	lret	$2
+	call	patch_cf
+	iret
 	.size int15_e820, . - int15_e820
 	
 /****************************************************************************
@@ -512,7 +525,7 @@ int15_e801:
 	/* Call previous handler */
 	pushfw
 	lcall	*%cs:int15_vector
-	pushfw
+	call	patch_cf
 	/* Edit result */
 	pushw	%ds
 	pushw	%cs:rm_ds
@@ -524,9 +537,7 @@ int15_e801:
 	xchgw	%ax, %cx
 	xchgw	%bx, %dx
 	popw	%ds
-	/* Restore flags returned by previous handler and return */
-	popfw
-	lret	$2
+	iret
 	.size int15_e801, . - int15_e801
 	
 /****************************************************************************
@@ -538,16 +549,14 @@ int15_88:
 	/* Call previous handler */
 	pushfw
 	lcall	*%cs:int15_vector
-	pushfw
+	call	patch_cf
 	/* Edit result */
 	pushw	%ds
 	pushw	%cs:rm_ds
 	popw	%ds
 	call	patch_1m
 	popw	%ds
-	/* Restore flags returned by previous handler and return */
-	popfw
-	lret	$2
+	iret
 	.size int15_88, . - int15_88
 		
 /****************************************************************************
