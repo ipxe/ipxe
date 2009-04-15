@@ -155,6 +155,8 @@ int dhcppkt_store ( struct dhcp_packet *dhcppkt, unsigned int tag,
 		memset ( field_data, 0, field->len );
 		memcpy ( dhcp_packet_field ( dhcppkt->dhcphdr, field ),
 			 data, len );
+		/* Erase any equivalent option from the options block */
+		dhcpopt_store ( &dhcppkt->options, tag, NULL, 0 );
 		return 0;
 	}
 
@@ -181,14 +183,16 @@ int dhcppkt_fetch ( struct dhcp_packet *dhcppkt, unsigned int tag,
 		    void *data, size_t len ) {
 	struct dhcp_packet_field *field;
 	void *field_data;
-	size_t field_len;
+	size_t field_len = 0;
 	
-	/* If this is a special field, return it */
+	/* Identify special field, if any */
 	if ( ( field = find_dhcp_packet_field ( tag ) ) != NULL ) {
 		field_data = dhcp_packet_field ( dhcppkt->dhcphdr, field );
 		field_len = field->used_len ( field_data, field->len );
-		if ( ! field_len )
-			return -ENOENT;
+	}
+
+	/* Return special field, if it exists and is populated */
+	if ( field_len ) {
 		if ( len > field_len )
 			len = field_len;
 		memcpy ( data, field_data, len );
