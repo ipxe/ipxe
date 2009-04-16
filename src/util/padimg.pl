@@ -9,16 +9,15 @@ my $verbosity = 0;
 my $blksize = 512;
 my $byte = 0;
 
-my $opts = {
+my %opts = (
   'verbose|v+' => sub { $verbosity++; },
   'quiet|q+' => sub { $verbosity--; },
   'blksize|s=o' => sub { $blksize = $_[1]; },
   'byte|b=o' => sub { $byte = $_[1]; },
-};
+);
 
 Getopt::Long::Configure ( 'bundling', 'auto_abbrev' );
-GetOptions ( { map { /^(\w+)/; $1 => $opts->{$_} } keys %$opts }, keys %$opts )
-    or die "Could not parse command-line options\n";
+GetOptions ( %opts ) or die "Could not parse command-line options\n";
 
 while ( my $filename = shift ) {
   die "$filename is not a file\n" unless -f $filename;
