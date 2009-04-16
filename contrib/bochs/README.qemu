@@ -47,13 +47,13 @@ To get qemu running is fairly simple:
 
 8.  Build gPXE floppy disk images and pad to 1.44MB
       pushd ../../src
-      make bin/rtl8139.pdsk
+      make bin/rtl8139.dsk
       popd
 
 9.  Start qemu
       ./qemu/i386-softmmu/qemu -L qemu/pc-bios \
 			       -net nic,model=rtl8139 -net tap,ifname=tap0 \
-			       -boot a -fda ../../src/bin/rtl8139.pdsk 
+			       -boot a -fda ../../src/bin/rtl8139.dsk
 
 You should see qemu start up, load up gPXE and attempt to boot from
 the network.

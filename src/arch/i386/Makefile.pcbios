@@ -27,6 +27,12 @@ MEDIA		+= raw
 MEDIA		+= com
 MEDIA		+= exe
 
+# Padding rules
+#
+PAD_rom		= $(PADIMG) --blksize=512 --byte=0xff $@
+PAD_dsk		= $(PADIMG) --blksize=512 $@
+PAD_hd		= $(PADIMG) --blksize=512 $@
+
 # rule to make a non-emulation ISO boot image
 NON_AUTO_MEDIA	+= iso
 %iso:	%lkrn util/geniso

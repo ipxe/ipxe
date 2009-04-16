@@ -724,6 +724,7 @@ define media_template
 	@$(ECHO_E) '$$(BIN)/%.$(1) : $$(BIN)/%.$(1).zbin' \
 		  '\n\t$$(QM)$(ECHO) "  [FINISH] $$@"' \
 		  '\n\t$$(Q)$$(CP) $$< $$@' \
+		  '\n\t$$(Q)$$(PAD_$(1))' \
 		  '\n\t$$(Q)$$(FINALISE_$(1))' \
 		> $(2)
 

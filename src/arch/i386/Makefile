@@ -114,13 +114,6 @@ NON_AUTO_MEDIA	+= fd0
 	$(Q)dd if=$< bs=512 conv=sync of=/dev/fd0
 	$(Q)sync
 
-# rule to create padded disk images
-NON_AUTO_MEDIA	+= pdsk
-%pdsk : %dsk
-	$(QM)$(ECHO) "  [DSKPAD] $@"
-	$(Q)cp $< $@
-	$(Q)$(PERL) ./util/dskpad.pl $@
-
 # Add NON_AUTO_MEDIA to the media list, so that they show up in the
 # output of "make"
 #
