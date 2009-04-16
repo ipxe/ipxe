@@ -23,8 +23,8 @@ GetOptions ( { map { /^(\w+)/; $1 => $opts->{$_} } keys %$opts }, keys %$opts )
 while ( my $filename = shift ) {
   die "$filename is not a file\n" unless -f $filename;
   my $oldsize = -s $filename;
-  my $newsize = ( ( $oldsize + $blksize - 1 ) & ~( $blksize - 1 ) );
-  my $padsize = ( $newsize - $oldsize );
+  my $padsize = ( ( -$oldsize ) % $blksize );
+  my $newsize = ( $oldsize + $padsize );
   next unless $padsize;
   if ( $verbosity >= 1 ) {
       printf "Padding %s from %d to %d bytes with %d x 0x%02x\n",
@@ -40,5 +40,6 @@ while ( my $filename = shift ) {
     truncate $filename, $newsize
 	or die "Could not resize $filename: $!\n";
   }
-  die "Failed to pad $filename\n" unless -s $filename == $newsize;
+  die "Failed to pad $filename\n"
+      unless ( ( ( -s $filename ) % $blksize ) == 0 );
 }

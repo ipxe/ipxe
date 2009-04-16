@@ -59,3 +59,9 @@ NON_AUTO_MEDIA	+= usb
 %usb: $(BIN)/usbdisk.bin %hd
 	$(QM)$(ECHO) "  [FINISH] $@"
 	$(Q)cat $^ > $@
+
+# Padded floppy image (e.g. for iLO)
+NON_AUTO_MEDIA += pdsk
+%pdsk : %dsk
+	$(Q)cp $< $@
+	$(Q)$(PADIMG) --blksize=1474560 $@
