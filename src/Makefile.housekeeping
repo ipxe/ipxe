@@ -664,6 +664,34 @@ $(BIN)/%.tmp : $(BLIB) $(MAKEDEPS) $(LDSCRIPT)
 $(BIN)/%.map : $(BIN)/%.tmp
 	@less $(BIN)/$*.tmp.map
 
+# Get objects list for the specified target
+#
+define objs_list
+	$(sort $(foreach OBJ_SYMBOL,\
+		 $(filter obj_%,$(shell $(NM) $(1) | cut -d" " -f3)),\
+		 $(patsubst obj_%,%,$(OBJ_SYMBOL))))
+endef
+$(BIN)/%.objs : $(BIN)/%.tmp
+	$(Q)$(ECHO) $(call objs_list,$<)
+
+# Get dependency list for the specified target
+#
+define deps_list
+	$(sort $(foreach OBJ,$(call objs_list,$(1)),$($(OBJ)_DEPS)))
+endef
+$(BIN)/%.deps : $(BIN)/%.tmp
+	$(Q)$(ECHO) $(call deps_list,$<)
+
+# Get unneeded source files for the specified target
+#
+define nodeps_list
+	$(sort $(filter-out $(call deps_list,$<),\
+		 $(foreach BOBJ,$(BOBJS),\
+		   $($(basename $(notdir $(BOBJ)))_DEPS))))
+endef
+$(BIN)/%.nodeps : $(BIN)/%.tmp
+	$(Q)$(ECHO) $(call nodeps_list,$<)
+
 # Extract compression information from intermediate object file
 #
 $(BIN)/%.zinfo : $(BIN)/%.tmp
