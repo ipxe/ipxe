@@ -89,11 +89,6 @@ NON_AUTO_SRCS	+= arch/i386/core/aout_loader.c
 NON_AUTO_SRCS	+= arch/i386/core/freebsd_loader.c
 NON_AUTO_SRCS	+= arch/i386/core/wince_loader.c
 
-# unnrv2b.S is used to generate a 16-bit as well as a 32-bit object.
-#
-OBJS_unnrv2b	= unnrv2b unnrv2b16
-CFLAGS_unnrv2b16 = -DCODE16
-
 # Include common x86 Makefile
 #
 MAKEDEPS	+= arch/x86/Makefile
