@@ -419,23 +419,6 @@ define src_template
 	@$(MKDIR) -p $(dir $(2))
 	@$(RM) $(2)
 	@$(TOUCH) $(2)
-	$(foreach OBJ,$(if $(OBJS_$(4)),$(OBJS_$(4)),$(4)), \
-		$(call obj_template,$(1),$(2),$(3),$(OBJ)))
-	@$(PARSEROM) $(1) >> $(2)
-
-endef
-
-# obj_template : generate Makefile rules for a given resultant object
-# of a particular source file.  (We can have multiple objects per
-# source file via the OBJS_xxx list.)
-#
-# $(1) is the full path to the source file (e.g. "drivers/net/rtl8139.c")
-# $(2) is the full path to the .d file (e.g. "bin/deps/drivers/net/rtl8139.d")
-# $(3) is the source type (e.g. "c")
-# $(4) is the object name (e.g. "rtl8139")
-#
-define obj_template
-
 	@$(CPP) $(CFLAGS) $(CFLAGS_$(3)) $(CFLAGS_$(4)) -DOBJECT=$(4) \
 		-Wno-error -MM $(1) -MG -MP | \
 		sed 's/\.o\s*:/_DEPS =/' >> $(2)
@@ -454,6 +437,7 @@ define obj_template
 		 '\n$(2) : $$($(4)_DEPS)\n' \
 		 '\nTAGS : $$($(4)_DEPS)\n' \
 		>> $(2)
+	@$(PARSEROM) $(1) >> $(2)
 
 endef
 
