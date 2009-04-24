@@ -360,6 +360,13 @@ static int multiboot_load_raw ( struct image *image,
 	userptr_t buffer;
 	int rc;
 
+	/* Sanity check */
+	if ( ! ( hdr->mb.flags & MB_FLAG_RAW ) ) {
+		DBGC ( image, "MULTIBOOT %p is not flagged as a raw image\n",
+		       image );
+		return -EINVAL;
+	}
+
 	/* Verify and prepare segment */
 	offset = ( hdr->offset - hdr->mb.header_addr + hdr->mb.load_addr );
 	filesz = ( hdr->mb.load_end_addr ?
@@ -432,14 +439,14 @@ static int multiboot_load ( struct image *image ) {
 		return -ENOTSUP;
 	}
 
-	/* Load the actual image */
-	if ( hdr.mb.flags & MB_FLAG_RAW ) {
-		if ( ( rc = multiboot_load_raw ( image, &hdr ) ) != 0 )
-			return rc;
-	} else {
-		if ( ( rc = multiboot_load_elf ( image ) ) != 0 )
-			return rc;
-	}
+	/* There is technically a bit MB_FLAG_RAW to indicate whether
+	 * this is an ELF or a raw image.  In practice, grub will use
+	 * the ELF header if present, and Solaris relies on this
+	 * behaviour.
+	 */
+	if ( ( ( rc = multiboot_load_elf ( image ) ) != 0 ) &&
+	     ( ( rc = multiboot_load_raw ( image, &hdr ) ) != 0 ) )
+		return rc;
 
 	return 0;
 }
