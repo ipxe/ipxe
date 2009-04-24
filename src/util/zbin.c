@@ -213,7 +213,8 @@ static int process_zinfo_subtract ( struct input_file *input,
 				    size_t datasize ) {
 	size_t offset = subtract->offset;
 	void *target;
-	long delta;
+	signed long raw_delta;
+	signed long delta;
 	unsigned long old;
 	unsigned long new;
 
@@ -224,9 +225,9 @@ static int process_zinfo_subtract ( struct input_file *input,
 	}
 
 	target = ( output->buf + offset );
-	delta = ( ( align ( output->len, subtract->divisor ) -
-		    align ( input->len, subtract->divisor ) )
-		  / subtract->divisor );
+	raw_delta = ( align ( output->len, subtract->divisor ) -
+		      align ( input->len, subtract->divisor ) );
+	delta = ( raw_delta / ( ( signed long ) subtract->divisor ) );
 
 	switch ( datasize ) {
 	case 1: {
