@@ -408,6 +408,107 @@ int __debug_disable;
 #define barrier() __asm__ __volatile__ ( "" : : : "memory" )
 #endif /* ASSEMBLY */
 
+/**
+ * @defgroup licences Licence declarations
+ *
+ * For reasons that are partly historical, various different files
+ * within the gPXE codebase have differing licences.
+ *
+ * @{
+ */
+
+/** Declare a file as being in the public domain
+ *
+ * This licence declaration is applicable when a file states itself to
+ * be in the public domain.
+ */
+#define FILE_LICENCE_PUBLIC_DOMAIN \
+	PROVIDE_SYMBOL ( __licence_public_domain )
+
+/** Declare a file as being under version 2 (or later) of the GNU GPL
+ *
+ * This licence declaration is applicable when a file states itself to
+ * be licensed under the GNU GPL; "either version 2 of the License, or
+ * (at your option) any later version".
+ */
+#define FILE_LICENCE_GPL2_OR_LATER \
+	PROVIDE_SYMBOL ( __licence_gpl2_or_later )
+
+/** Declare a file as being under version 2 of the GNU GPL
+ *
+ * This licence declaration is applicable when a file states itself to
+ * be licensed under version 2 of the GPL, and does not include the
+ * "or, at your option, any later version" clause.
+ */
+#define FILE_LICENCE_GPL2_ONLY \
+	PROVIDE_SYMBOL ( __licence_gpl2_only )
+
+/** Declare a file as being under any version of the GNU GPL
+ *
+ * This licence declaration is applicable when a file states itself to
+ * be licensed under the GPL, but does not specify a version.
+ *
+ * According to section 9 of the GPLv2, "If the Program does not
+ * specify a version number of this License, you may choose any
+ * version ever published by the Free Software Foundation".
+ */
+#define FILE_LICENCE_GPL_ANY \
+	PROVIDE_SYMBOL ( __licence_gpl_any )
+
+/** Declare a file as being under the three-clause BSD licence
+ *
+ * This licence declaration is applicable when a file states itself to
+ * be licensed under terms allowing redistribution in source and
+ * binary forms (with or without modification) provided that:
+ *
+ *     redistributions of source code retain the copyright notice,
+ *     list of conditions and any attached disclaimers
+ *
+ *     redistributions in binary form reproduce the copyright notice,
+ *     list of conditions and any attached disclaimers in the
+ *     documentation and/or other materials provided with the
+ *     distribution
+ *
+ *     the name of the author is not used to endorse or promote
+ *     products derived from the software without specific prior
+ *     written permission
+ *
+ * It is not necessary for the file to explicitly state that it is
+ * under a "BSD" licence; only that the licensing terms be
+ * functionally equivalent to the standard three-clause BSD licence.
+ */
+#define FILE_LICENCE_BSD3 \
+	PROVIDE_SYMBOL ( __licence_bsd3 )
+
+/** Declare a file as being under the two-clause BSD licence
+ *
+ * This licence declaration is applicable when a file states itself to
+ * be licensed under terms allowing redistribution in source and
+ * binary forms (with or without modification) provided that:
+ *
+ *     redistributions of source code retain the copyright notice,
+ *     list of conditions and any attached disclaimers
+ *
+ *     redistributions in binary form reproduce the copyright notice,
+ *     list of conditions and any attached disclaimers in the
+ *     documentation and/or other materials provided with the
+ *     distribution
+ *
+ * It is not necessary for the file to explicitly state that it is
+ * under a "BSD" licence; only that the licensing terms be
+ * functionally equivalent to the standard two-clause BSD licence.
+ */
+#define FILE_LICENCE_BSD2 \
+	PROVIDE_SYMBOL ( __licence_bsd2 )
+
+/** Declare a particular licence as applying to a file */
+#define FILE_LICENCE( _licence ) FILE_LICENCE_ ## _licence
+
+/** @} */
+
+/* This file itself is under GPLv2-or-later */
+FILE_LICENCE ( GPL2_OR_LATER );
+
 #include <bits/compiler.h>
 
 #endif /* COMPILER_H */
