@@ -24,41 +24,6 @@
  *
  */
 
-/* Not quite sure why cpp requires two levels of macro call in order
- * to actually expand OBJECT...
- */
-#undef _H1
-#define _H1( x, y ) x ## y
-#undef _H2
-#define _H2( x, y ) _H1 ( x, y )
-#define PREFIX_OBJECT(prefix) _H2 ( prefix, OBJECT )
-#define OBJECT_SYMBOL PREFIX_OBJECT(obj_)
-#undef _STR
-#define _STR(s) #s
-#undef _XSTR
-#define _XSTR(s) _STR(s)
-#define OBJECT_SYMBOL_STR _XSTR ( OBJECT_SYMBOL )
-
-#ifdef ASSEMBLY
-
-	.globl	OBJECT_SYMBOL
-	.equ	OBJECT_SYMBOL, 0
-
-#else /* ASSEMBLY */
-
-__asm__ ( ".globl\t" OBJECT_SYMBOL_STR );
-__asm__ ( ".equ\t" OBJECT_SYMBOL_STR ", 0" );
-
-/**
- * Drag in an object by object name.
- *
- * Macro to allow objects to explicitly drag in other objects by
- * object name.  Used by config.c.
- *
- */
-#define REQUIRE_OBJECT(object) \
-	__asm__ ( ".equ\tneed_" #object ", obj_" #object );
-
 /* Force visibility of all symbols to "hidden", i.e. inform gcc that
  * all symbol references resolve strictly within our final binary.
  * This avoids unnecessary PLT/GOT entries on x86_64.
@@ -66,9 +31,68 @@ __asm__ ( ".equ\t" OBJECT_SYMBOL_STR ", 0" );
  * This is a stronger claim than specifying "-fvisibility=hidden",
  * since it also affects symbols marked with "extern".
  */
+#ifndef ASSEMBLY
 #if __GNUC__ >= 4
 #pragma GCC visibility push(hidden)
 #endif
+#endif /* ASSEMBLY */
+
+/**
+ * @defgroup symmacros Macros to provide or require explicit symbols
+ * @{
+ */
+
+/** Provide a symbol within this object file */
+#ifdef ASSEMBLY
+#define PROVIDE_SYMBOL( _sym )				\
+	.globl	_sym ;					\
+	.comm	_sym, 0
+#else /* ASSEMBLY */
+#define PROVIDE_SYMBOL( _sym )				\
+	char _sym[0]
+#endif /* ASSEMBLY */
+
+/** Require a symbol within this object file */
+#ifdef ASSEMBLY
+#define REQUIRE_SYMBOL( _sym )				\
+	.equ	__need_ # _sym, _sym
+#else /* ASSEMBLY */
+#define REQUIRE_SYMBOL( _sym )				\
+	__asm__ ( ".equ\t__need_" #_sym ", " #_sym )
+#endif /* ASSEMBLY */
+
+/** @} */
+
+/**
+ * @defgroup objmacros Macros to provide or require explicit objects
+ * @{
+ */
+
+/* Not quite sure why cpp requires two levels of macro call in order
+ * to actually expand OBJECT...
+ */
+#undef _H1
+#define _H1( x, y ) x ## y
+#undef _H2
+#define _H2( x, y ) _H1 ( x, y )
+#define PREFIX_OBJECT( _prefix ) _H2 ( _prefix, OBJECT )
+#define OBJECT_SYMBOL PREFIX_OBJECT ( obj_ )
+
+/** Always provide the symbol for the current object (defined by -DOBJECT) */
+PROVIDE_SYMBOL ( OBJECT_SYMBOL );
+
+/** Explicitly require another object */
+#define REQUIRE_OBJECT( _obj ) REQUIRE_SYMBOL ( obj_ ## _obj )
+
+/** @} */
+
+/** Select file identifier for errno.h (if used) */
+#define ERRFILE PREFIX_OBJECT ( ERRFILE_ )
+
+/** @defgroup dbg Debugging infrastructure
+ * @{
+ */
+#ifndef ASSEMBLY
 
 /** @def DBG
  *
@@ -117,12 +141,7 @@ __asm__ ( ".equ\t" OBJECT_SYMBOL_STR ", 0" );
  * DEBUG_LEVEL will be inserted into the object file.
  *
  */
-#define DEBUG_SYMBOL PREFIX_OBJECT(debug_)
-
-#if DEBUG_SYMBOL
-#define DEBUG_SYMBOL_STR _XSTR ( DEBUG_SYMBOL )
-__asm__ ( ".equ\tDBGLVL, " DEBUG_SYMBOL_STR );
-#endif
+#define DEBUG_SYMBOL PREFIX_OBJECT ( debug_ )
 
 /** printf() for debugging
  *
@@ -305,8 +324,13 @@ int __debug_disable;
 #define NDEBUG
 #endif
 
-/** Select file identifier for errno.h (if used) */
-#define ERRFILE PREFIX_OBJECT ( ERRFILE_ )
+#endif /* ASSEMBLY */
+/** @} */
+
+/** @defgroup attrs Miscellaneous attributes
+ * @{
+ */
+#ifndef ASSEMBLY
 
 /** Declare a data structure as packed. */
 #define PACKED __attribute__ (( packed ))
@@ -374,11 +398,14 @@ int __debug_disable;
  */
 #define __shared __asm__ ( "_shared_bss" ) __aligned
 
+#endif /* ASSEMBLY */
+/** @} */
+
 /**
  * Optimisation barrier
  */
+#ifndef ASSEMBLY
 #define barrier() __asm__ __volatile__ ( "" : : : "memory" )
-
 #endif /* ASSEMBLY */
 
 #include <bits/compiler.h>
