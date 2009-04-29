@@ -672,12 +672,30 @@ $(BIN)/%.deps : $(BIN)/%.tmp
 # Get unneeded source files for the specified target
 #
 define nodeps_list
-	$(sort $(filter-out $(call deps_list,$<),\
+	$(sort $(filter-out $(call deps_list,$(1)),\
 		 $(foreach BOBJ,$(BOBJS),\
 		   $($(basename $(notdir $(BOBJ)))_DEPS))))
 endef
 $(BIN)/%.nodeps : $(BIN)/%.tmp
 	$(Q)$(ECHO) $(call nodeps_list,$<)
+
+# Get licensing verdict for the specified target
+#
+define unlicensed_deps_list
+	$(shell grep -L FILE_LICENCE $(call deps_list,$(1)))
+endef
+define licence_list
+	$(patsubst __licence_%,%,\
+	  $(filter __licence_%,$(shell $(NM) $(1) | cut -d" " -f3)))
+endef
+$(BIN)/%.licence : $(BIN)/%.tmp
+	$(QM)$(ECHO) "  [LICENCE] $@"
+	$(Q)$(if $(strip $(call unlicensed_deps_list,$<)),\
+		echo -n "Unable to determine licence because the following " ;\
+		echo "files are missing a licence declaration:" ;\
+		echo $(call unlicensed_deps_list,$<);\
+		exit 1,\
+		$(LICENCE) $(call licence_list,$<))
 
 # Extract compression information from intermediate object file
 #

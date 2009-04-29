@@ -36,6 +36,7 @@ MAKEROM		:= $(PERL) ./util/makerom.pl
 SYMCHECK	:= $(PERL) ./util/symcheck.pl
 SORTOBJDUMP	:= $(PERL) ./util/sortobjdump.pl
 PADIMG		:= $(PERL) ./util/padimg.pl
+LICENCE		:= $(PERL) ./util/licence.pl
 NRV2B		:= ./util/nrv2b
 ZBIN		:= ./util/zbin
 ELF2EFI32	:= ./util/elf2efi32
