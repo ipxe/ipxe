@@ -1,7 +1,10 @@
 #define PXENV_UNDI_SHUTDOWN		0x0005
 #define	PXENV_UNDI_GET_NIC_TYPE		0x0012
+#define PXENV_UNDI_GET_IFACE_INFO	0x0013
 #define	PXENV_STOP_UNDI			0x0015
 #define PXENV_UNLOAD_STACK		0x0070
+
+#define PXE_HACK_EB54			0x0001
 
 	.text
 	.arch i386
@@ -11,6 +14,8 @@
 #include <undi.h>
 
 #define STACK_MAGIC ( 'L' + ( 'R' << 8 ) + ( 'E' << 16 ) + ( 'T' << 24 ) )
+#define EB_MAGIC_1 ( 'E' + ( 't' << 8 ) + ( 'h' << 16 ) + ( 'e' << 24 ) )
+#define EB_MAGIC_2 ( 'r' + ( 'b' << 8 ) + ( 'o' << 16 ) + ( 'o' << 24 ) )
 
 /*****************************************************************************
  * Entry point:	set operating context, print welcome message
@@ -307,8 +312,6 @@ pci_physical_device:
 	movw	$10f, %si
 	call	print_message
 	call	print_pci_busdevfn
-	movb	$0x0a, %al
-	call	print_character
 	jmp	99f
 	.section ".prefix.data", "aw", @progbits
 10:	.asciz	"         UNDI device is PCI "
@@ -319,10 +322,45 @@ no_physical_device:
 	movw	$10f, %si
 	call	print_message
 	.section ".prefix.data", "aw", @progbits
-10:	.asciz	"         Unable to determine UNDI physical device\n"
+10:	.asciz	"         Unable to determine UNDI physical device"
 	.previous
 
 99:
+
+/*****************************************************************************
+ * Determine interface type
+ *****************************************************************************
+ */
+get_iface_type:
+	/* Issue PXENV_UNDI_GET_IFACE_INFO */
+	movw	$PXENV_UNDI_GET_IFACE_INFO, %bx
+	call	pxe_call
+	jnc	1f
+	call	print_pxe_error
+	jmp	99f
+1:	/* Print interface type */
+	movw	$10f, %si
+	call	print_message
+	leaw	( pxe_parameter_structure + 0x02 ), %si
+	call	print_message
+	.section ".prefix.data", "aw", @progbits
+10:	.asciz	", type "
+	.previous
+	/* Check for "Etherboot" interface type */
+	cmpl	$EB_MAGIC_1, ( pxe_parameter_structure + 0x02 )
+	jne	99f
+	cmpl	$EB_MAGIC_2, ( pxe_parameter_structure + 0x06 )
+	jne	99f
+	movw	$10f, %si
+	call	print_message
+	.section ".prefix.data", "aw", @progbits
+10:	.asciz	" (workaround enabled)"
+	.previous
+	/* Flag Etherboot workarounds as required */
+	orw	$PXE_HACK_EB54, pxe_hacks
+
+99:	movb	$0x0a, %al
+	call	print_character
 
 /*****************************************************************************
  * Leave NIC in a safe state
@@ -337,6 +375,14 @@ shutdown_nic:
 	call	print_pxe_error
 1:
 unload_base_code:
+	/* Etherboot treats PXENV_UNLOAD_STACK as PXENV_STOP_UNDI, so
+	 * we must not issue this call if the underlying stack is
+	 * Etherboot and we were not intending to issue a PXENV_STOP_UNDI.
+	 */
+#ifdef PXELOADER_KEEP_UNDI
+	testw	$PXE_HACK_EB54, pxe_hacks
+	jnz	99f
+#endif /* PXELOADER_KEEP_UNDI */
 	/* Issue PXENV_UNLOAD_STACK */
 	movw	$PXENV_UNLOAD_STACK, %bx
 	call	pxe_call
@@ -549,7 +595,9 @@ pxe_call:
 	testw	%ax, %ax
 	jz	1f
 	stc
-1:	/* Restore registers and return */
+1:	/* Clear direction flag, for the sake of sanity */
+	cld
+	/* Restore registers and return */
 	popw	%es
 	popw	%di
 	ret
@@ -593,7 +641,7 @@ print_pxe_error:
 pxe_esp:		.long 0
 pxe_ss:			.word 0
 
-pxe_parameter_structure: .fill 20
+pxe_parameter_structure: .fill 64
 
 undi_code_segoff:
 undi_code_size:		.word 0
@@ -602,6 +650,8 @@ undi_code_segment:	.word 0
 undi_data_segoff:
 undi_data_size:		.word 0
 undi_data_segment:	.word 0
+
+pxe_hacks:		.word 0
 
 /* The following fields are part of a struct undi_device */
 
