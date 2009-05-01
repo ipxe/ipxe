@@ -10,6 +10,8 @@
  *
  */
 
+FILE_LICENCE ( GPL2_OR_LATER );
+
 #ifdef NDEBUG
 #define ASSERTING 0
 #else

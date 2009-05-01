@@ -1,6 +1,8 @@
 #ifndef _STRINGS_H
 #define _STRINGS_H
 
+FILE_LICENCE ( GPL2_OR_LATER );
+
 #include <limits.h>
 #include <string.h>
 

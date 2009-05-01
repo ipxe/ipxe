@@ -9,6 +9,8 @@
  * for a monotonically increasing tick counter.
  */
 
+FILE_LICENCE ( GPL2_OR_LATER );
+
 #include <gpxe/api.h>
 #include <config/timer.h>
 

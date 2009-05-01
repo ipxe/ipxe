@@ -5,6 +5,8 @@
 #include <gpxe/process.h>
 #include <gpxe/resolv.h>
 
+FILE_LICENCE ( GPL2_OR_LATER );
+
 static int comboot_resolv_rc;
 static struct in_addr comboot_resolv_addr;
 

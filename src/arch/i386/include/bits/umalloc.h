@@ -7,6 +7,8 @@
  *
  */
 
+FILE_LICENCE ( GPL2_OR_LATER );
+
 #include <gpxe/memtop_umalloc.h>
 
 #endif /* _BITS_UMALLOC_H */

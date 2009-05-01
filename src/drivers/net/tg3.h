@@ -5,6 +5,8 @@
  * Copyright (C) 2001 Jeff Garzik (jgarzik@mandrakesoft.com)
  */
 
+FILE_LICENCE ( GPL2_ONLY );
+
 #ifndef _T3_H
 #define _T3_H
 

@@ -29,6 +29,8 @@
 
  */
 
+FILE_LICENCE ( BSD3 );
+
 /*
  * Created from if_epreg.h by Fred Gray (fgray@rice.edu) to support the
  * 3c590 family.

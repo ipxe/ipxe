@@ -8,6 +8,8 @@
  *
  */
 
+FILE_LICENCE ( GPL2_OR_LATER );
+
 #include <stdint.h>
 
 /** The magic number for the Multiboot header */

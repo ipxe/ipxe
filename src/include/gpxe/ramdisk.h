@@ -8,6 +8,8 @@
  *
  */
 
+FILE_LICENCE ( GPL2_OR_LATER );
+
 #include <gpxe/uaccess.h>
 #include <gpxe/blockdev.h>
 

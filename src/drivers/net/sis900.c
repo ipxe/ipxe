@@ -24,6 +24,8 @@
    preliminary Rev. 1.0 Jan. 18, 1998
    http://www.sis.com.tw/support/databook.htm */
 
+FILE_LICENCE ( GPL_ANY );
+
 /* Revision History */
 
 /*

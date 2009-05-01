@@ -45,6 +45,8 @@
  * indent options: indent -kr -i8 3c90x.c
  */
 
+FILE_LICENCE ( BSD2 );
+
 #ifndef __3C90X_H_
 #define __3C90X_H_
 

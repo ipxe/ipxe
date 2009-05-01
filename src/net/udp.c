@@ -16,6 +16,8 @@
  * UDP protocol
  */
 
+FILE_LICENCE ( GPL2_OR_LATER );
+
 /**
  * A UDP connection
  *

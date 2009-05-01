@@ -43,6 +43,8 @@
   ftp://cesdis.gsfc.nasa.gov/pub/linux/drivers/tulip-devel.html
 */
 
+FILE_LICENCE ( GPL_ANY );
+
 /*********************************************************************/
 /* Revision History                                                  */
 /*********************************************************************/

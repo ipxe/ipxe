@@ -1,6 +1,8 @@
 
 /* epic100.c: A SMC 83c170 EPIC/100 fast ethernet driver for Etherboot */
 
+FILE_LICENCE ( GPL2_OR_LATER );
+
 /* 05/06/2003	timlegge	Fixed relocation and implemented Multicast */
 #define LINUX_OUT_MACROS
 

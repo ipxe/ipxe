@@ -8,6 +8,8 @@
  *
  */
 
+FILE_LICENCE ( GPL2_OR_LATER );
+
 /**
  * Clear a window to the bottom from current cursor position
  *

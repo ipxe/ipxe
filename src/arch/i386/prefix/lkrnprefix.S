@@ -34,6 +34,8 @@
 
 */
 
+FILE_LICENCE ( GPL_ANY )
+
 #define	SETUPSECS 4		/* Minimal nr of setup-sectors */
 #define PREFIXSIZE ((SETUPSECS+1)*512)
 #define PREFIXPGH (PREFIXSIZE / 16 )

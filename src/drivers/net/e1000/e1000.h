@@ -26,6 +26,8 @@
 
 *******************************************************************************/
 
+FILE_LICENCE ( GPL2_ONLY );
+
 /* Linux PRO/1000 Ethernet Driver main header file */
 
 #ifndef _E1000_H_

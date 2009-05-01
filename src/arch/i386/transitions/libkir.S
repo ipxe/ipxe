@@ -5,6 +5,8 @@
  *
  */
 
+FILE_LICENCE ( GPL2_OR_LATER )
+
 /****************************************************************************
  * This file defines libkir: an interface between external and
  * internal environments when -DKEEP_IT_REAL is used, so that both

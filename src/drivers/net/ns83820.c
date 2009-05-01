@@ -35,6 +35,8 @@
 *    Indent Options: indent -kr -i8
 ***************************************************************************/
 
+FILE_LICENCE ( GPL2_OR_LATER );
+
 /* to get some global routines like printf */
 #include "etherboot.h"
 /* to get the interface to the body of the program */

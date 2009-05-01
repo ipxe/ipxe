@@ -7,6 +7,8 @@
  * SYSLINUX COMBOOT
  */
 
+FILE_LICENCE ( GPL2_OR_LATER );
+
 #include <stdint.h>
 #include <setjmp.h>
 #include <gpxe/in.h>

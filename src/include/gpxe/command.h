@@ -1,6 +1,8 @@
 #ifndef _GPXE_COMMAND_H
 #define _GPXE_COMMAND_H
 
+FILE_LICENCE ( GPL2_OR_LATER );
+
 #include <gpxe/tables.h>
 
 /** A command-line command */

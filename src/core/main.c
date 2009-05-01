@@ -14,6 +14,8 @@ Literature dealing with the network protocols:
 
 **************************************************************************/
 
+FILE_LICENCE ( GPL2_OR_LATER );
+
 #include <stdio.h>
 #include <gpxe/init.h>
 #include <gpxe/features.h>

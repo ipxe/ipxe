@@ -19,6 +19,8 @@
  Extracted from ns8390.c and adapted by Pantelis Koukousoulas <pktoss@gmail.com>
  **************************************************************************/
 
+FILE_LICENCE ( BSD2 );
+
 #include "ns8390.h"
 #include "etherboot.h"
 #include "nic.h"

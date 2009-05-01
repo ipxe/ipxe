@@ -6,6 +6,8 @@
 #include <gpxe/io.h>
 #include <gpxe/isa.h>
 
+FILE_LICENCE ( GPL2_OR_LATER );
+
 /*
  * isa.c implements a "classical" port-scanning method of ISA device
  * detection.  The driver must provide a list of probe addresses

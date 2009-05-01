@@ -7,6 +7,8 @@
  *
  */
 
+FILE_LICENCE ( GPL2_OR_LATER );
+
 struct undi_device;
 
 extern int undinet_probe ( struct undi_device *undi );

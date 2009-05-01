@@ -12,6 +12,8 @@ Bochs Pseudo NIC driver for Etherboot
  * See pnic_api.h for an explanation of the Bochs Pseudo NIC.
  */
 
+FILE_LICENCE ( GPL2_OR_LATER );
+
 #include <stdint.h>
 #include <stdio.h>
 #include <gpxe/io.h>

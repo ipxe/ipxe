@@ -4,6 +4,8 @@
 #include <gpxe/settings.h>
 #include <gpxe/settings_ui.h>
 
+FILE_LICENCE ( GPL2_OR_LATER );
+
 static int config_exec ( int argc, char **argv ) {
 	char *settings_name;
 	struct settings *settings;

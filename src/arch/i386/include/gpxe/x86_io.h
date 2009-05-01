@@ -15,6 +15,8 @@
  * into a machine with such an old CPU anyway.
  */
 
+FILE_LICENCE ( GPL2_OR_LATER );
+
 #ifdef IOAPI_X86
 #define IOAPI_PREFIX_x86
 #else

@@ -11,6 +11,8 @@
  *
  */
 
+FILE_LICENCE ( GPL2_OR_LATER );
+
 /** @defgroup Single-implementation APIs
  *
  * These are APIs for which only a single implementation may be

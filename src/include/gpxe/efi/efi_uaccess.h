@@ -10,6 +10,8 @@
  * no-ops.
  */
 
+FILE_LICENCE ( GPL2_OR_LATER );
+
 #ifdef UACCESS_EFI
 #define UACCESS_PREFIX_efi
 #else

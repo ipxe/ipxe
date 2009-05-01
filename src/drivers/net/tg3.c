@@ -6,6 +6,8 @@
  * Copyright (C) 2003 Eric Biederman (ebiederman@lnxi.com)  [etherboot port]
  */
 
+FILE_LICENCE ( GPL2_ONLY );
+
 /* 11-13-2003	timlegge	Fix Issue with NetGear GA302T 
  * 11-18-2003   ebiederm        Generalize NetGear Fix to what the code was supposed to be.
  * 01-06-2005   Alf (Frederic Olivie) Add Dell bcm 5751 (0x1677) support

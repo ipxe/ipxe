@@ -10,6 +10,8 @@
  *
  */
 
+FILE_LICENCE ( GPL2_OR_LATER );
+
 /** A usable memory region */
 struct memory_region {
 	/** Physical start address */

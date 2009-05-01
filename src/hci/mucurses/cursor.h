@@ -7,6 +7,8 @@
  *
  */
 
+FILE_LICENCE ( GPL2_OR_LATER );
+
 struct cursor_pos {
 	unsigned int y, x;
 };

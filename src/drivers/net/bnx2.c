@@ -12,6 +12,7 @@
  * version 1.4.40 from linux 2.6.17
  */
 
+FILE_LICENCE ( GPL_ANY );
 
 #include "etherboot.h"
 #include "nic.h"

@@ -54,7 +54,8 @@ foreach my $datum ( @$data ) {
   $datum->{fields} = $fields;
 }
 
-print "\n/* This file has been further processed by $0 */\n\n\n";
+print "\n/* This file has been further processed by $0 */\n\n"
+print "FILE_LICENCE ( GPL2_ONLY );\n\n";
 
 foreach my $datum ( @$data ) {
   printf "#define %s_offset 0x%08xUL\n",

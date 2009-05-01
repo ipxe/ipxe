@@ -13,6 +13,8 @@
 #include <int13.h>
 #include <usr/autoboot.h>
 
+FILE_LICENCE ( GPL2_OR_LATER );
+
 struct setting keep_san_setting __setting = {
 	.name = "keep-san",
 	.description = "Preserve SAN connection",

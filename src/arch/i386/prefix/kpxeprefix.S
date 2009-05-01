@@ -3,5 +3,7 @@
  *****************************************************************************
  */
 
+FILE_LICENCE ( GPL2_OR_LATER )
+
 #define PXELOADER_KEEP_UNDI
 #include "pxeprefix.S"

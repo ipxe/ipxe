@@ -13,6 +13,8 @@ $Id$
  * your option) any later version.
  */
 
+FILE_LICENCE ( GPL2_OR_LATER );
+
 #include <etherboot.h>
 #include <nic.h>
 #include <gpxe/pci.h>

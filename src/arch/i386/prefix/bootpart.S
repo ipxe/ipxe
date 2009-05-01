@@ -1,3 +1,5 @@
+FILE_LICENCE ( GPL2_OR_LATER )
+
 #define BOOT_SEG	0x07c0
 #define EXEC_SEG	0x0100
 #define STACK_SEG 	0x0200

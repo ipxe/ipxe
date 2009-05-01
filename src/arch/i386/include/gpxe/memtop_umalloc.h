@@ -7,6 +7,8 @@
  *
  */
 
+FILE_LICENCE ( GPL2_OR_LATER );
+
 #ifdef UMALLOC_MEMTOP
 #define UMALLOC_PREFIX_memtop
 #else

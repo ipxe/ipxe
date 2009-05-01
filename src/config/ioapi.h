@@ -7,6 +7,8 @@
  *
  */
 
+FILE_LICENCE ( GPL2_OR_LATER );
+
 #include <config/defaults.h>
 
 //#undef	PCIAPI_PCBIOS		/* Access via PCI BIOS */

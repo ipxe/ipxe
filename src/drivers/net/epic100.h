@@ -1,6 +1,8 @@
 #ifndef	_EPIC100_H_
 # define _EPIC100_H_
 
+FILE_LICENCE ( GPL2_OR_LATER );
+
 #ifndef	PCI_VENDOR_SMC
 # define PCI_VENDOR_SMC		0x10B8
 #endif

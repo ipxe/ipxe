@@ -6,6 +6,8 @@
  * IP over Infiniband
  */
 
+FILE_LICENCE ( GPL2_OR_LATER );
+
 #include <gpxe/infiniband.h>
 
 /** IPoIB packet length */

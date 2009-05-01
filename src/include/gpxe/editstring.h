@@ -7,6 +7,8 @@
  *
  */
 
+FILE_LICENCE ( GPL2_OR_LATER );
+
 /** An editable string */
 struct edit_string {
 	/** Buffer for string */

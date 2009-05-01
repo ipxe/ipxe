@@ -7,6 +7,8 @@
  *
  */
 
+FILE_LICENCE ( GPL2_OR_LATER );
+
 struct ib_device;
 struct ib_queue_pair;
 struct ib_address_vector;

@@ -33,6 +33,8 @@
 *
 ***************************************************************************/
 
+FILE_LICENCE ( GPL2_OR_LATER );
+
 #ifndef ISAPNP_H
 #define ISAPNP_H
 

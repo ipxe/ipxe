@@ -1,6 +1,8 @@
 #ifndef _GPXE_MD5_H
 #define _GPXE_MD5_H
 
+FILE_LICENCE ( GPL2_OR_LATER );
+
 struct digest_algorithm;
 
 #include <stdint.h>

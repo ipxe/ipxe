@@ -30,6 +30,8 @@
  * SOFTWARE.
  */
 
+FILE_LICENCE ( GPL2_ONLY );
+
 /*
  * This file contains the memory image from the vendor, to be copied into
  * the IB SERDES of the IBA7220 during initialization.

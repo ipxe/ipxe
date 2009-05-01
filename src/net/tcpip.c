@@ -14,6 +14,8 @@
  * TCP/IP transport-network layer interface
  */
 
+FILE_LICENCE ( GPL2_OR_LATER );
+
 /** Process a received TCP/IP packet
  *
  * @v iobuf		I/O buffer

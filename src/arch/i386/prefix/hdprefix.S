@@ -1,3 +1,5 @@
+FILE_LICENCE ( GPL2_OR_LATER )
+
 	.text
 	.arch i386
 	.section ".prefix", "awx", @progbits

@@ -5,6 +5,8 @@
  *
  */
 
+FILE_LICENCE ( GPL2_OR_LATER )
+
 /* Drag in local definitions */
 #include "librm.h"
 

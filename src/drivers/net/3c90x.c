@@ -36,6 +36,8 @@
  *   $ indent -kr -i8 3c90x.c
  */
 
+FILE_LICENCE ( BSD2 );
+
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>

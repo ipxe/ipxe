@@ -21,6 +21,8 @@
  *
  */
 
+FILE_LICENCE ( GPL2_OR_LATER );
+
 /* Unique IP datagram identification number */
 static uint16_t next_ident = 0;
 

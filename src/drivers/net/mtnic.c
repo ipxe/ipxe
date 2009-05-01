@@ -30,6 +30,9 @@
  * SOFTWARE.
  *
  */
+
+FILE_LICENCE ( GPL2_ONLY );
+
 #include <strings.h>
 #include <errno.h>
 #include <gpxe/malloc.h>

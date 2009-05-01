@@ -9,6 +9,8 @@
  *
  */
 
+FILE_LICENCE ( GPL2_OR_LATER );
+
 /*
  * The linker passes in the symbol _max_align, which is the alignment
  * that we must preserve, in bytes.

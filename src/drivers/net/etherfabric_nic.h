@@ -15,6 +15,9 @@
  *
  **************************************************************************
  */
+
+FILE_LICENCE ( GPL_ANY );
+
 #ifndef EFAB_NIC_H
 #define  EFAB_NIC_H
 #include <gpxe/bitbash.h>

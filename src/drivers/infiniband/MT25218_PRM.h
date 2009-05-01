@@ -19,6 +19,8 @@
   Copyright (c) 2004 Mellanox Technologies Ltd.  All rights reserved.
 */
 
+FILE_LICENCE ( GPL2_ONLY );
+
 /***
  *** This file was generated at "Tue Nov 22 15:21:23 2005"
  *** by:

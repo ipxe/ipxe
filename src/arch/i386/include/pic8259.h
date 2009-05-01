@@ -4,6 +4,8 @@
  * Initially written by Michael Brown (mcb30).
  */
 
+FILE_LICENCE ( GPL2_OR_LATER );
+
 #ifndef PIC8259_H
 #define PIC8259_H
 

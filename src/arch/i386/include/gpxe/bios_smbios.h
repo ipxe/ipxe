@@ -7,6 +7,8 @@
  *
  */
 
+FILE_LICENCE ( GPL2_OR_LATER );
+
 #ifdef SMBIOS_PCBIOS
 #define SMBIOS_PREFIX_pcbios
 #else

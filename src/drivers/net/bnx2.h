@@ -9,6 +9,7 @@
  * Written by: Michael Chan  (mchan@broadcom.com)
  */
 
+FILE_LICENCE ( GPL_ANY );
 
 #ifndef BNX2_H
 #define BNX2_H

@@ -45,6 +45,8 @@
 * --------------------------------------------------------------------
 */
 
+FILE_LICENCE ( GPL2_ONLY );
+
 #ifndef _WLAN_COMPAT_H
 #define _WLAN_COMPAT_H
 

@@ -7,6 +7,8 @@
  *
  */
 
+FILE_LICENCE ( GPL2_OR_LATER );
+
 /** An ICMP header */
 struct icmp_header {
 	/** Type */

@@ -28,6 +28,8 @@
  *
  */
 
+FILE_LICENCE ( BSD2 );
+
 /** @file
  *
  * iSCSI boot firmware table

@@ -7,6 +7,8 @@
  *	Please keep sorted.
  */
 
+FILE_LICENCE ( GPL2_ONLY );
+
 /* Device classes and subclasses */
 
 #define PCI_CLASS_NOT_DEFINED		0x0000

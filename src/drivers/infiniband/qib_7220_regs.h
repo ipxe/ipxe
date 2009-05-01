@@ -36,6 +36,7 @@
 
 /* This file has been further processed by ./drivers/infiniband/qib_genbits.pl */
 
+FILE_LICENCE ( GPL2_ONLY );
 
 #define QIB_7220_Revision_offset 0x00000000UL
 struct QIB_7220_Revision_pb {

@@ -7,6 +7,8 @@
  *
  */
 
+FILE_LICENCE ( GPL2_OR_LATER );
+
 #ifdef TIMER_EFI
 #define TIMER_PREFIX_efi
 #else

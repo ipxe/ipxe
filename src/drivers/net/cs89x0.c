@@ -20,6 +20,8 @@
    -- quote from email
 **/
 
+FILE_LICENCE ( GPL2_ONLY );
+
 /* cs89x0.c: A Crystal Semiconductor CS89[02]0 driver for etherboot. */
 /*
   Permission is granted to distribute the enclosed cs89x0.[ch] driver

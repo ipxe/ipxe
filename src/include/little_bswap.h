@@ -1,6 +1,8 @@
 #ifndef ETHERBOOT_LITTLE_BSWAP_H
 #define ETHERBOOT_LITTLE_BSWAP_H
 
+FILE_LICENCE ( GPL2_OR_LATER );
+
 #define ntohl(x)	__bswap_32(x)
 #define htonl(x) 	__bswap_32(x)
 #define ntohs(x) 	__bswap_16(x)

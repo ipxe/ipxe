@@ -1,6 +1,8 @@
 #ifndef ETHERBOOT_BITS_BYTESWAP_H
 #define ETHERBOOT_BITS_BYTESWAP_H
 
+FILE_LICENCE ( GPL2_OR_LATER );
+
 static inline __attribute__ ((always_inline, const)) uint16_t
 __bswap_variable_16(uint16_t x)
 {

@@ -1,5 +1,7 @@
 /* #warning "depca.c: FIXME: fix relocation" */
 
+FILE_LICENCE ( GPL_ANY );
+
 #if 0
 /* Not fixed for relocation yet. Probably won't work relocated above 16MB */
 #ifdef ALLMULTI

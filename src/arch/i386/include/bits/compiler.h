@@ -1,6 +1,8 @@
 #ifndef _BITS_COMPILER_H
 #define _BITS_COMPILER_H
 
+FILE_LICENCE ( GPL2_OR_LATER );
+
 #ifndef ASSEMBLY
 
 /** Declare a function with standard calling conventions */

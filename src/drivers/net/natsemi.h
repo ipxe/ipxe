@@ -1,3 +1,5 @@
+FILE_LICENCE ( GPL_ANY );
+
 #define NATSEMI_HW_TIMEOUT 400
 
 #define TX_RING_SIZE 4

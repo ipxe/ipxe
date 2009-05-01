@@ -7,6 +7,8 @@
  *
  */
 
+FILE_LICENCE ( GPL2_OR_LATER );
+
 extern void route ( void );
 
 #endif /* _USR_ROUTE_H */

@@ -7,6 +7,8 @@
  *
  */
 
+FILE_LICENCE ( GPL2_OR_LATER );
+
 struct settings;
 
 extern int settings_ui ( struct settings *settings ) __nonnull;

@@ -7,6 +7,8 @@
 #include <gpxe/settings.h>
 #include <gpxe/command.h>
 
+FILE_LICENCE ( GPL2_OR_LATER );
+
 static int show_exec ( int argc, char **argv ) {
 	char buf[256];
 	int rc;

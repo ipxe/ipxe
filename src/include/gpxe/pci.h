@@ -16,6 +16,8 @@
  * your option) any later version.
  */
 
+FILE_LICENCE ( GPL2_ONLY );
+
 #include <stdint.h>
 #include <gpxe/device.h>
 #include <gpxe/tables.h>

@@ -12,6 +12,8 @@
  *
  */
 
+FILE_LICENCE ( GPL2_OR_LATER );
+
 /**
  * @defgroup scsiops SCSI operation codes
  * @{

@@ -21,6 +21,8 @@
  *		consider these trivial functions to be PD.
  */
 
+FILE_LICENCE ( PUBLIC_DOMAIN );
+
 #define __HAVE_ARCH_MEMCPY
 
 extern void * __memcpy ( void *dest, const void *src, size_t len );

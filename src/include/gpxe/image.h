@@ -8,6 +8,8 @@
  *
  */
 
+FILE_LICENCE ( GPL2_OR_LATER );
+
 #include <gpxe/tables.h>
 #include <gpxe/list.h>
 #include <gpxe/uaccess.h>

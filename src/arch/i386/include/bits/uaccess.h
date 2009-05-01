@@ -7,6 +7,8 @@
  *
  */
 
+FILE_LICENCE ( GPL2_OR_LATER );
+
 #include <librm.h>
 
 #endif /* _BITS_UACCESS_H */

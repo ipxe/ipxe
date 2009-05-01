@@ -26,6 +26,9 @@
  *                                       Linux driver.
  *
  *---------------------------------------------------------------------------*/
+
+FILE_LICENCE ( GPL_ANY );
+
 #define LINUX_OUT_MACROS 1
 #define SMC9000_DEBUG    0
 

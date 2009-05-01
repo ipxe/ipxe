@@ -1,6 +1,8 @@
 #ifndef STDDEF_H
 #define STDDEF_H
 
+FILE_LICENCE ( GPL2_ONLY );
+
 /* for size_t */
 #include <stdint.h>
 

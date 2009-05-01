@@ -17,6 +17,8 @@
  **************************************************************************
  */
 
+FILE_LICENCE ( GPL_ANY );
+
 #ifndef EFAB_BITFIELD_H
 #define EFAB_BITFIELD_H
 

@@ -7,6 +7,8 @@
  *
  */
 
+FILE_LICENCE ( GPL2_OR_LATER );
+
 #define ASN1_INTEGER 0x02
 #define ASN1_BIT_STRING 0x03
 #define ASN1_OCTET_STRING 0x04

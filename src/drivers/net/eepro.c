@@ -31,6 +31,8 @@ has 34 pins, the top row of 2 are not used.
  * your option) any later version.
  */
 
+FILE_LICENCE ( GPL2_OR_LATER );
+
 #include "etherboot.h"
 #include <errno.h>
 #include "nic.h"

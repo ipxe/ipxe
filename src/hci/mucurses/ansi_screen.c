@@ -2,6 +2,8 @@
 #include <curses.h>
 #include <console.h>
 
+FILE_LICENCE ( GPL2_OR_LATER );
+
 static void ansiscr_reset(struct _curses_screen *scr) __nonnull;
 static void ansiscr_movetoyx(struct _curses_screen *scr,
                                unsigned int y, unsigned int x) __nonnull;

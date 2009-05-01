@@ -3,6 +3,8 @@
 #include <gpxe/command.h>
 #include <gpxe/login_ui.h>
 
+FILE_LICENCE ( GPL2_OR_LATER );
+
 static int login_exec ( int argc, char **argv ) {
 	int rc;
 

@@ -20,6 +20,8 @@
  *   Michael Brown 9 Mar 2005
  */
 
+FILE_LICENCE ( GPL2_OR_LATER )
+
 /****************************************************************************
  * This file provides the decompress() and decompress16() functions
  * which can be called in order to decompress an image compressed with

@@ -1,6 +1,8 @@
 #ifndef _PCIDIRECT_H
 #define _PCIDIRECT_H
 
+FILE_LICENCE ( GPL2_OR_LATER );
+
 #include <stdint.h>
 #include <gpxe/io.h>
 

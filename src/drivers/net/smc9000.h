@@ -28,6 +28,9 @@
  * 98-09-27              Daniel Engström moved some static strings back to the
  *                                       main .c file
  * --------------------------------------------------------------------------*/
+
+FILE_LICENCE ( GPL_ANY );
+
 #ifndef	_SMC9000_H_
 # define _SMC9000_H_
 

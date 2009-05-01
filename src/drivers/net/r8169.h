@@ -24,6 +24,8 @@
  *
  */
 
+FILE_LICENCE ( GPL2_OR_LATER );
+
 #ifndef _R8169_H_
 #define _R8169_H_
 

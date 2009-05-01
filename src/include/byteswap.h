@@ -1,6 +1,8 @@
 #ifndef ETHERBOOT_BYTESWAP_H
 #define ETHERBOOT_BYTESWAP_H
 
+FILE_LICENCE ( GPL2_OR_LATER );
+
 #include "endian.h"
 #include "bits/byteswap.h"
 

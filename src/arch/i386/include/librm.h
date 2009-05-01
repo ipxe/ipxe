@@ -1,6 +1,8 @@
 #ifndef LIBRM_H
 #define LIBRM_H
 
+FILE_LICENCE ( GPL2_OR_LATER );
+
 /* Segment selectors as used in our protected-mode GDTs.
  *
  * Don't change these unless you really know what you're doing.

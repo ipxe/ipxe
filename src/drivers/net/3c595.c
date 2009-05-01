@@ -23,6 +23,8 @@
 * timlegge	08-24-2003	Add Multicast Support
 */
 
+FILE_LICENCE ( BSD2 );
+
 /* #define EDEBUG */
 
 #include "etherboot.h"

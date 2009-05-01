@@ -11,6 +11,8 @@
  *
  */
 
+FILE_LICENCE ( GPL2_OR_LATER );
+
 #define	COMCONSOLE	0x3f8		/* I/O port address */
 
 /* Keep settings from a previous user of the serial port (e.g. lilo or

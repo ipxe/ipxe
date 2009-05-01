@@ -7,6 +7,8 @@
  *
  */
 
+FILE_LICENCE ( GPL2_OR_LATER );
+
 #ifdef PCIAPI_EFI
 #define PCIAPI_PREFIX_efi
 #else

@@ -1,6 +1,8 @@
 #ifndef ELF_H
 #define ELF_H
 
+FILE_LICENCE ( GPL2_OR_LATER );
+
 #define EI_NIDENT	16	/* Size of e_ident array. */
 
 /* Values for e_type. */

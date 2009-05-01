@@ -7,6 +7,8 @@
  * Transport Layer Security Protocol
  */
 
+FILE_LICENCE ( GPL2_OR_LATER );
+
 #include <stdint.h>
 #include <gpxe/refcnt.h>
 #include <gpxe/filter.h>

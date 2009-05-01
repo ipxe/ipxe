@@ -7,6 +7,8 @@
  *
  */
 
+FILE_LICENCE ( GPL2_OR_LATER );
+
 /** FTP default port */
 #define FTP_PORT 21
 

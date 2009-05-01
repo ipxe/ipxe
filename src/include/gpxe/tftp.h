@@ -7,6 +7,8 @@
  *
  */
 
+FILE_LICENCE ( GPL2_OR_LATER );
+
 #include <stdint.h>
 
 #define TFTP_PORT	       69 /**< Default TFTP server port */

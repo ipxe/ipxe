@@ -1,6 +1,8 @@
 #include <gpxe/nap.h>
 #include <realmode.h>
 
+FILE_LICENCE ( GPL2_OR_LATER );
+
 /**
  * Save power by halting the CPU until the next interrupt
  *

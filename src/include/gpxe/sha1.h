@@ -1,6 +1,8 @@
 #ifndef _GPXE_SHA1_H
 #define _GPXE_SHA1_H
 
+FILE_LICENCE ( GPL2_OR_LATER );
+
 #include "crypto/axtls/crypto.h"
 
 struct digest_algorithm;

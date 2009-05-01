@@ -6,6 +6,8 @@
  * Keyed-Hashing for Message Authentication
  */
 
+FILE_LICENCE ( GPL2_OR_LATER );
+
 #include <gpxe/crypto.h>
 
 /**

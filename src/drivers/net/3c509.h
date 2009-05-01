@@ -31,6 +31,8 @@
 
  */
 
+FILE_LICENCE ( BSD3 );
+
 #include "nic.h"
 
 /*

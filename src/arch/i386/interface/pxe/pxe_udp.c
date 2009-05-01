@@ -30,6 +30,8 @@
  * Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
  */
 
+FILE_LICENCE ( GPL2_OR_LATER );
+
 /** A PXE UDP connection */
 struct pxe_udp_connection {
 	/** Data transfer interface to UDP stack */

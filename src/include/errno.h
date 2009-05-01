@@ -1,6 +1,8 @@
 #ifndef ERRNO_H
 #define ERRNO_H
 
+FILE_LICENCE ( GPL2_OR_LATER );
+
 /** @file
  *
  * Error codes

@@ -10,6 +10,8 @@
  * 03/26/2004
  */
 
+FILE_LICENCE ( GPL2_ONLY );
+
 /* Generic MII registers. */
 
 #define MII_BMCR            0x00	/* Basic mode control register */

@@ -7,6 +7,8 @@
  *
  */
 
+FILE_LICENCE ( GPL2_OR_LATER );
+
 struct net_protocol;
 
 extern struct net_protocol rarp_protocol;

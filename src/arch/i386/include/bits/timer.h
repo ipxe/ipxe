@@ -7,6 +7,8 @@
  *
  */
 
+FILE_LICENCE ( GPL2_OR_LATER );
+
 #include <gpxe/bios_timer.h>
 #include <gpxe/rdtsc_timer.h>
 

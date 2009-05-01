@@ -10,6 +10,8 @@
 #include <gpxe/abft.h>
 #include <int13.h>
 
+FILE_LICENCE ( GPL2_OR_LATER );
+
 static int aoeboot ( const char *root_path ) {
 	struct ata_device ata;
 	struct int13_drive drive;

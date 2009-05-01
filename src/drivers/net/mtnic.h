@@ -30,6 +30,9 @@
  * SOFTWARE.
  *
  */
+
+FILE_LICENCE ( GPL2_ONLY );
+
 #ifndef H_MTNIC_IF_DEFS_H
 #define H_MTNIC_IF_DEFS_H
 

@@ -28,6 +28,8 @@
  * Copyright (c) a lot of people too. Please respect their work.
  */
 
+FILE_LICENCE ( GPL2_OR_LATER );
+
 #include <errno.h>
 #include <assert.h>
 #include <stdio.h>

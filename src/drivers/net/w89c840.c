@@ -29,6 +29,8 @@
  * Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
  */
 
+FILE_LICENCE ( GPL2_OR_LATER );
+
 /*
  *              date       version  by   what
  *  Written:    Aug 20 2000  V0.10  iko  Initial revision.

@@ -35,6 +35,8 @@ Revision History:
 	3.0.1
 */
 
+FILE_LICENCE ( GPL2_OR_LATER );
+
 #ifndef _AMD811E_H
 #define _AMD811E_H
 

@@ -10,6 +10,8 @@
  *
  */
 
+FILE_LICENCE ( GPL2_OR_LATER );
+
 /**
  * Add a single-byte character and rendition to a window and advance
  * the cursor

@@ -7,6 +7,8 @@
  *
  */
 
+FILE_LICENCE ( GPL2_OR_LATER );
+
 /** A CPIO archive header
  *
  * All field are hexadecimal ASCII numbers padded with '0' on the

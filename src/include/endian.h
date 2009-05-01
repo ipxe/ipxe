@@ -1,6 +1,8 @@
 #ifndef ETHERBOOT_ENDIAN_H
 #define ETHERBOOT_ENDIAN_H
 
+FILE_LICENCE ( GPL2_OR_LATER );
+
 /* Definitions for byte order, according to significance of bytes,
    from low addresses to high addresses.  The value is what you get by
    putting '4' in the most significant byte, '3' in the second most

@@ -16,6 +16,8 @@
    -- quote from email
 **/
 
+FILE_LICENCE ( GPL2_ONLY );
+
 /*  Copyright, 1988-1992, Russell Nelson, Crynwr Software
 
    This program is free software; you can redistribute it and/or modify

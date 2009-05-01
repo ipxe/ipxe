@@ -12,6 +12,8 @@
  *
  */
 
+FILE_LICENCE ( GPL2_OR_LATER );
+
 /**
  * An ATA Logical Block Address
  *

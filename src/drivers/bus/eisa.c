@@ -7,6 +7,8 @@
 #include <unistd.h>
 #include <gpxe/eisa.h>
 
+FILE_LICENCE ( GPL2_OR_LATER );
+
 static void eisabus_remove ( struct root_device *rootdev );
 
 /**

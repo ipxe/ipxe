@@ -8,6 +8,8 @@
  *
  */
 
+FILE_LICENCE ( GPL2_OR_LATER );
+
 static void _wupdcurs ( WINDOW *win ) __nonnull;
 void _wputch ( WINDOW *win, chtype ch, int wrap ) __nonnull;
 void _wputc ( WINDOW *win, char c, int wrap ) __nonnull;

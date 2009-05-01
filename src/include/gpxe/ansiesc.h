@@ -26,6 +26,8 @@
  * 
  */
 
+FILE_LICENCE ( GPL2_OR_LATER );
+
 /** A handler for an escape sequence */
 struct ansiesc_handler {
 	/** The control function identifier

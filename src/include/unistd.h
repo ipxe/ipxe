@@ -1,6 +1,8 @@
 #ifndef _UNISTD_H
 #define _UNISTD_H
 
+FILE_LICENCE ( GPL2_OR_LATER );
+
 #include <stddef.h>
 #include <stdarg.h>
 

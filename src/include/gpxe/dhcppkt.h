@@ -7,6 +7,8 @@
  *
  */
 
+FILE_LICENCE ( GPL2_OR_LATER );
+
 #include <gpxe/dhcp.h>
 #include <gpxe/dhcpopts.h>
 #include <gpxe/refcnt.h>

@@ -15,7 +15,9 @@
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
  */
-	
+
+FILE_LICENCE ( GPL2_OR_LATER )
+
 	.text
 	.arch i386
 	.code16

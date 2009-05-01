@@ -11,6 +11,8 @@
  *   http://www.sis.com.tw/support/databook.htm
  */
 
+FILE_LICENCE ( GPL_ANY );
+
 /* MAC operationl registers of SiS 7016 and SiS 900 ethernet controller */
 /* The I/O extent, SiS 900 needs 256 bytes of io address */
 #define SIS900_TOTAL_SIZE 0x100

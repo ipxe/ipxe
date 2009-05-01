@@ -1,6 +1,8 @@
 #ifndef	_GPXE_IF_ETHER_H
 #define	_GPXE_IF_ETHER_H
 
+FILE_LICENCE ( GPL2_OR_LATER );
+
 #include <stdint.h>
 
 #define ETH_ALEN		6	/* Size of Ethernet address */

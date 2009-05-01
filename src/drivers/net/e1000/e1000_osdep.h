@@ -26,6 +26,7 @@
 
 *******************************************************************************/
 
+FILE_LICENCE ( GPL2_ONLY );
 
 /* glue for the OS independent part of e1000
  * includes register access macros

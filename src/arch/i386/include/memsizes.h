@@ -1,6 +1,8 @@
 #ifndef _MEMSIZES_H
 #define _MEMSIZES_H
 
+FILE_LICENCE ( GPL2_OR_LATER );
+
 #include <basemem.h>
 
 /**

@@ -7,6 +7,8 @@
  *
  */
 
+FILE_LICENCE ( GPL2_OR_LATER );
+
 #include <gpxe/bios_nap.h>
 #include <gpxe/efi/efix86_nap.h>
 

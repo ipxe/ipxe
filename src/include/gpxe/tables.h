@@ -1,6 +1,8 @@
 #ifndef _GPXE_TABLES_H
 #define _GPXE_TABLES_H
 
+FILE_LICENCE ( GPL2_OR_LATER );
+
 /** @page ifdef_harmful #ifdef considered harmful
  *
  * Overuse of @c #ifdef has long been a problem in Etherboot.

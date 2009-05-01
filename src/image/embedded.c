@@ -6,6 +6,8 @@
  * fetching over the network.
  */
 
+FILE_LICENCE ( GPL2_OR_LATER );
+
 #include <string.h>
 #include <gpxe/image.h>
 #include <gpxe/uaccess.h>

@@ -2,6 +2,8 @@
 #include <gpxe/command.h>
 #include <usr/autoboot.h>
 
+FILE_LICENCE ( GPL2_OR_LATER );
+
 static int autoboot_exec ( int argc, char **argv ) {
 
 	if ( argc != 1 ) {

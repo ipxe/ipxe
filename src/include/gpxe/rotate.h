@@ -6,6 +6,8 @@
  * Bit operations
  */
 
+FILE_LICENCE ( GPL2_OR_LATER );
+
 #include <stdint.h>
 
 static inline uint32_t rol32 ( uint32_t data, unsigned int rotation ) {

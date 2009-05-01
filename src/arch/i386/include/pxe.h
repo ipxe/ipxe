@@ -1,6 +1,8 @@
 #ifndef PXE_H
 #define PXE_H
 
+FILE_LICENCE ( GPL2_OR_LATER );
+
 #include "pxe_types.h"
 #include "pxe_api.h"
 #include <gpxe/device.h>

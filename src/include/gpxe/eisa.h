@@ -1,6 +1,8 @@
 #ifndef EISA_H
 #define EISA_H
 
+FILE_LICENCE ( GPL2_OR_LATER );
+
 #include <stdint.h>
 #include <gpxe/isa_ids.h>
 #include <gpxe/device.h>

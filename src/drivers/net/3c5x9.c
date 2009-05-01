@@ -22,6 +22,8 @@ $Id$
 
 ***************************************************************************/
 
+FILE_LICENCE ( BSD2 );
+
 /* #define EDEBUG */
 
 #include <gpxe/ethernet.h>

@@ -1,6 +1,8 @@
 #ifndef _GPXE_SANBOOT_H
 #define _GPXE_SANBOOT_H
 
+FILE_LICENCE ( GPL2_OR_LATER );
+
 #include <gpxe/tables.h>
 
 struct sanboot_protocol {

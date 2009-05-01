@@ -9,6 +9,8 @@
  *
  */
 
+FILE_LICENCE ( GPL2_OR_LATER );
+
 /*
  * Prototypes for the standard functions (malloc() et al) are in
  * stdlib.h.  Include <gpxe/malloc.h> only if you need the

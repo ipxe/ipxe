@@ -7,6 +7,8 @@
  *
  */
 
+FILE_LICENCE ( GPL2_OR_LATER );
+
 /* BIOS segment address */
 #define BIOS_SEG 0xf000
 

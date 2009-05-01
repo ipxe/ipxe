@@ -7,6 +7,8 @@
  *
  */
 
+FILE_LICENCE ( GPL2_OR_LATER );
+
 #include <gpxe/infiniband.h>
 
 typedef int ( * ib_local_mad_t ) ( struct ib_device *ibdev,

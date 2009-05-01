@@ -2,6 +2,8 @@
 MISC Support Routines
 **************************************************************************/
 
+FILE_LICENCE ( GPL2_OR_LATER );
+
 #include <stdlib.h>
 #include <byteswap.h>
 #include <gpxe/in.h>

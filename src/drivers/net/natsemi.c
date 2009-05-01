@@ -46,6 +46,8 @@
 
 */
 
+FILE_LICENCE ( GPL_ANY );
+
 /* Revision History */
 
 /*

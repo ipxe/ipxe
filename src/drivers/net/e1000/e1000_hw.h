@@ -26,6 +26,8 @@
 
 *******************************************************************************/
 
+FILE_LICENCE ( GPL2_ONLY );
+
 /* e1000_hw.h
  * Structures, enums, and macros for the MAC
  */

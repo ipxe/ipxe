@@ -10,6 +10,8 @@
  * no-ops.  I/O is handled using the EFI_CPU_IO_PROTOCOL.
  */
 
+FILE_LICENCE ( GPL2_OR_LATER );
+
 #ifdef IOAPI_EFI
 #define IOAPI_PREFIX_efi
 #else

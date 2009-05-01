@@ -7,6 +7,8 @@
  *
  */
 
+FILE_LICENCE ( GPL2_OR_LATER );
+
 #include <stdarg.h>
 #include <gpxe/tables.h>
 #include <gpxe/socket.h>

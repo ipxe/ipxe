@@ -10,6 +10,8 @@
  *
  */
 
+FILE_LICENCE ( GPL2_OR_LATER );
+
 /*
  * Declaration of variables in .data16
  *

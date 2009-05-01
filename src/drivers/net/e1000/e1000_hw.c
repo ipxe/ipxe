@@ -26,6 +26,8 @@
 
 *******************************************************************************/
 
+FILE_LICENCE ( GPL2_ONLY );
+
 /* e1000_hw.c
  * Shared functions for accessing and configuring the MAC
  */

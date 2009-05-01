@@ -11,6 +11,8 @@
  * published by the Free Software Foundation.
  */
 
+FILE_LICENCE ( GPL2_ONLY );
+
 #ifndef ETHERBOOT_STRING_H
 #define ETHERBOOT_STRING_H
 

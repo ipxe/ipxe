@@ -7,6 +7,8 @@
  *
  */
 
+FILE_LICENCE ( GPL2_OR_LATER );
+
 #ifdef SMBIOS_EFI
 #define SMBIOS_PREFIX_efi
 #else

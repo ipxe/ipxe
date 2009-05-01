@@ -5,6 +5,8 @@
 
 /** @file */
 
+FILE_LICENCE ( GPL2_OR_LATER );
+
 /**
  * Write a single character to each console device.
  *

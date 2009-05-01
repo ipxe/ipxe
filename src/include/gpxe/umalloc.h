@@ -8,6 +8,8 @@
  *
  */
 
+FILE_LICENCE ( GPL2_OR_LATER );
+
 #include <gpxe/api.h>
 #include <config/umalloc.h>
 #include <gpxe/uaccess.h>

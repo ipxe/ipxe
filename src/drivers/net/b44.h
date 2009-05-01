@@ -27,6 +27,9 @@
  *
  * Copyright (c) a lot of people too. Please respect their work.
  */
+
+FILE_LICENCE ( GPL2_OR_LATER );
+
 #ifndef _B44_H
 #define _B44_H
 

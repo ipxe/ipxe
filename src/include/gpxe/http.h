@@ -7,6 +7,8 @@
  *
  */
 
+FILE_LICENCE ( GPL2_OR_LATER );
+
 /** HTTP default port */
 #define HTTP_PORT 80
 

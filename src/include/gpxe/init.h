@@ -1,6 +1,8 @@
 #ifndef _GPXE_INIT_H
 #define _GPXE_INIT_H
 
+FILE_LICENCE ( GPL2_OR_LATER );
+
 #include <gpxe/tables.h>
 
 /**

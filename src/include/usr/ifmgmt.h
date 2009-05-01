@@ -7,6 +7,8 @@
  *
  */
 
+FILE_LICENCE ( GPL2_OR_LATER );
+
 struct net_device;
 
 extern int ifopen ( struct net_device *netdev );

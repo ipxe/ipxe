@@ -9,6 +9,8 @@
  * list.h.
  */
 
+FILE_LICENCE ( GPL2_ONLY );
+
 #include <stddef.h>
 #include <assert.h>
 

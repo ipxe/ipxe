@@ -1,6 +1,8 @@
 #ifndef _BITS_ERRFILE_H
 #define _BITS_ERRFILE_H
 
+FILE_LICENCE ( GPL2_OR_LATER );
+
 /**
  * @addtogroup errfile Error file identifiers
  * @{

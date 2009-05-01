@@ -7,6 +7,8 @@
  *
  */
 
+FILE_LICENCE ( GPL2_OR_LATER );
+
 /*
  * Symbolic names for some standard ASCII characters
  *

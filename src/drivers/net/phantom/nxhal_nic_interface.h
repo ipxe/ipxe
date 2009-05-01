@@ -1,3 +1,5 @@
+FILE_LICENCE ( GPL2_ONLY );
+
 /*
  * Data types and structure for HAL - NIC interface.
  *

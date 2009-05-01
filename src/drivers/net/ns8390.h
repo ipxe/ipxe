@@ -6,6 +6,8 @@ Author: Martin Renters
 
 **************************************************************************/
 
+FILE_LICENCE ( BSD2 );
+
 #define VENDOR_NONE	0
 #define VENDOR_WD	1
 #define VENDOR_NOVELL	2

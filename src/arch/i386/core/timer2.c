@@ -11,6 +11,8 @@
  * your option) any later version.
  */
 
+FILE_LICENCE ( GPL2_OR_LATER );
+
 #include <stddef.h>
 #include <gpxe/timer2.h>
 #include <gpxe/io.h>

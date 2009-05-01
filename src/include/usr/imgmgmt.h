@@ -7,6 +7,8 @@
  *
  */
 
+FILE_LICENCE ( GPL2_OR_LATER );
+
 struct image;
 
 extern int imgfetch ( struct image *image, const char *uri_string,

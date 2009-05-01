@@ -3,6 +3,8 @@
  *
  */
 
+FILE_LICENCE ( BSD2 );
+
 #include "etherboot.h"
 #include <gpxe/mca.h>
 #include <gpxe/isa.h> /* for ISA_ROM */
