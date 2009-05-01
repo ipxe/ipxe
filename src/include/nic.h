@@ -18,7 +18,6 @@
 #include <gpxe/eisa.h>
 #include <gpxe/mca.h>
 #include <gpxe/io.h>
-#include "dhcp.h"
 
 typedef enum {
 	DISABLE = 0,
@@ -45,7 +44,6 @@ struct nic {
 	unsigned char		irqno;
 	unsigned int		mbps;
 	duplex_t		duplex;
-	struct dhcp_dev_id	dhcp_dev_id;
 	void			*priv_data;	/* driver private data */
 };
 
