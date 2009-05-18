@@ -6,6 +6,8 @@
  * table so using a noticeable amount of stack space is a no-no.
  */
 
+FILE_LICENCE ( GPL2_OR_LATER )
+
 #include <config/general.h>
 
 #define PNP_SIGNATURE ( '$' + ( 'P' << 8 ) + ( 'n' << 16 ) + ( 'P' << 24 ) )
