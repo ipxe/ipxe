@@ -335,6 +335,8 @@ static void dhcp_discovery_rx ( struct dhcp_session *dhcp,
 	char vci[9]; /* "PXEClient" */
 	int vci_len;
 	int has_pxeclient;
+	int pxeopts_len;
+	int has_pxeopts;
 	int8_t priority = 0;
 	uint8_t no_pxedhcp = 0;
 	unsigned long elapsed;
@@ -355,8 +357,10 @@ static void dhcp_discovery_rx ( struct dhcp_session *dhcp,
 				  vci, sizeof ( vci ) );
 	has_pxeclient = ( ( vci_len >= ( int ) sizeof ( vci ) ) &&
 			  ( strncmp ( "PXEClient", vci, sizeof (vci) ) == 0 ));
+	pxeopts_len = dhcppkt_fetch ( dhcppkt, DHCP_VENDOR_ENCAP, NULL, 0 );
+	has_pxeopts = ( pxeopts_len >= 0 );
 	if ( has_pxeclient )
-		DBGC ( dhcp, " pxe" );
+		DBGC ( dhcp, "%s", ( has_pxeopts ? " pxe" : " proxy" ) );
 
 	/* Identify priority */
 	dhcppkt_fetch ( dhcppkt, DHCP_EB_PRIORITY, &priority,
@@ -382,7 +386,7 @@ static void dhcp_discovery_rx ( struct dhcp_session *dhcp,
 	}
 
 	/* Select as ProxyDHCP offer, if applicable */
-	if ( has_pxeclient && ( msgtype == DHCPOFFER ) &&
+	if ( has_pxeclient && ( ! has_pxeopts ) && ( msgtype == DHCPOFFER ) &&
 	     ( priority >= dhcp->proxy_priority ) ) {
 		dhcp->proxy_server = server_id;
 		dhcp->proxy_priority = priority;
