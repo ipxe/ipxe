@@ -672,6 +672,7 @@ static int tftp_rx_oack ( struct tftp_request *tftp, void *buf, size_t len ) {
 	char *end = buf + len;
 	char *name;
 	char *value;
+	char *next;
 	int rc = 0;
 
 	/* Sanity check */
@@ -681,26 +682,41 @@ static int tftp_rx_oack ( struct tftp_request *tftp, void *buf, size_t len ) {
 		rc = -EINVAL;
 		goto done;
 	}
-	if ( end[-1] != '\0' ) {
-		DBGC ( tftp, "TFTP %p received OACK missing final NUL\n",
-		       tftp );
-		rc = -EINVAL;
-		goto done;
-	}
 
 	/* Process each option in turn */
-	name = oack->data;
-	while ( name < end ) {
-		value = ( name + strlen ( name ) + 1 );
+	for ( name = oack->data ; name < end ; name = next ) {
+
+		/* Parse option name and value
+		 *
+		 * We treat parsing errors as non-fatal, because there
+		 * exists at least one TFTP server (IBM Tivoli PXE
+		 * Server 5.1.0.3) that has been observed to send
+		 * malformed OACKs containing trailing garbage bytes.
+		 */
+		value = ( name + strnlen ( name, ( end - name ) ) + 1 );
+		if ( value > end ) {
+			DBGC ( tftp, "TFTP %p received OACK with malformed "
+			       "option name:\n", tftp );
+			DBGC_HD ( tftp, oack, len );
+			break;
+		}
 		if ( value == end ) {
 			DBGC ( tftp, "TFTP %p received OACK missing value "
 			       "for option \"%s\"\n", tftp, name );
-			rc = -EINVAL;
-			goto done;
+			DBGC_HD ( tftp, oack, len );
+			break;
 		}
+		next = ( value + strnlen ( value, ( end - value ) ) + 1 );
+		if ( next > end ) {
+			DBGC ( tftp, "TFTP %p received OACK with malformed "
+			       "value for option \"%s\":\n", tftp, name );
+			DBGC_HD ( tftp, oack, len );
+			break;
+		}
+
+		/* Process option */
 		if ( ( rc = tftp_process_option ( tftp, name, value ) ) != 0 )
 			goto done;
-		name = ( value + strlen ( value ) + 1 );
 	}
 
 	/* Process tsize information, if available */
