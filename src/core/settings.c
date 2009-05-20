@@ -544,7 +544,8 @@ int fetch_uint_setting ( struct settings *settings, struct setting *setting,
 		return len;
 
 	/* Mask off sign-extended bits */
-	*value = ( svalue & ( -1UL >> ( sizeof ( long ) - len ) ) );
+	assert ( len <= ( int ) sizeof ( long ) );
+	*value = ( svalue & ( -1UL >> ( 8 * ( sizeof ( long ) - len ) ) ) );
 
 	return len;
 }
