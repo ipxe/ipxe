@@ -670,8 +670,13 @@ static int dhcp_pxebs_tx ( struct dhcp_session *dhcp,
 	struct dhcp_pxe_boot_menu_item menu_item = { 0, 0 };
 	int rc;
 
+	/* Set server address */
+	peer->sin_addr = *(dhcp->pxe_attempt);
+	peer->sin_port = ( ( peer->sin_addr.s_addr == INADDR_BROADCAST ) ?
+			   htons ( BOOTPS_PORT ) : htons ( PXE_PORT ) );
+
 	DBGC ( dhcp, "DHCP %p PXEBS REQUEST to %s:%d for type %d\n",
-	       dhcp, inet_ntoa ( *(dhcp->pxe_attempt) ), PXE_PORT,
+	       dhcp, inet_ntoa ( peer->sin_addr ), ntohs ( peer->sin_port ),
 	       ntohs ( dhcp->pxe_type ) );
 
 	/* Set boot menu item */
@@ -679,10 +684,6 @@ static int dhcp_pxebs_tx ( struct dhcp_session *dhcp,
 	if ( ( rc = dhcppkt_store ( dhcppkt, DHCP_PXE_BOOT_MENU_ITEM,
 				    &menu_item, sizeof ( menu_item ) ) ) != 0 )
 		return rc;
-
-	/* Set server address */
-	peer->sin_addr = *(dhcp->pxe_attempt);
-	peer->sin_port = htons ( PXE_PORT );
 
 	return 0;
 }
@@ -743,7 +744,8 @@ static void dhcp_pxebs_rx ( struct dhcp_session *dhcp,
 	DBGC ( dhcp, "\n" );
 
 	/* Filter out unacceptable responses */
-	if ( peer->sin_port != htons ( PXE_PORT ) )
+	if ( ( peer->sin_port != htons ( BOOTPS_PORT ) ) &&
+	     ( peer->sin_port != htons ( PXE_PORT ) ) )
 		return;
 	if ( msgtype != DHCPACK )
 		return;
