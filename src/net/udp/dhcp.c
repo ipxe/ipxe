@@ -224,6 +224,8 @@ struct dhcp_session {
 	int no_pxedhcp;
 	/** ProxyDHCP server */
 	struct in_addr proxy_server;
+	/** ProxyDHCP port */
+	uint16_t proxy_port;
 	/** ProxyDHCP server priority */
 	int proxy_priority;
 
@@ -357,6 +359,8 @@ static void dhcp_discovery_rx ( struct dhcp_session *dhcp,
 				  vci, sizeof ( vci ) );
 	has_pxeclient = ( ( vci_len >= ( int ) sizeof ( vci ) ) &&
 			  ( strncmp ( "PXEClient", vci, sizeof (vci) ) == 0 ));
+
+	/* Identify presence of vendor-specific options */
 	pxeopts_len = dhcppkt_fetch ( dhcppkt, DHCP_VENDOR_ENCAP, NULL, 0 );
 	has_pxeopts = ( pxeopts_len >= 0 );
 	if ( has_pxeclient )
@@ -386,9 +390,17 @@ static void dhcp_discovery_rx ( struct dhcp_session *dhcp,
 	}
 
 	/* Select as ProxyDHCP offer, if applicable */
-	if ( has_pxeclient && ( ! has_pxeopts ) && ( msgtype == DHCPOFFER ) &&
+	if ( has_pxeclient && ( msgtype == DHCPOFFER ) &&
 	     ( priority >= dhcp->proxy_priority ) ) {
+		/* If the offer already includes the PXE options, then
+		 * assume that we can send the ProxyDHCPREQUEST to
+		 * port 67 (since the DHCPDISCOVER that triggered this
+		 * ProxyDHCPOFFER was sent to port 67).  Otherwise,
+		 * send the ProxyDHCPREQUEST to port 4011.
+		 */
 		dhcp->proxy_server = server_id;
+		dhcp->proxy_port = ( has_pxeopts ? htons ( BOOTPS_PORT )
+				     : htons ( PXE_PORT ) );
 		dhcp->proxy_priority = priority;
 	}
 
@@ -527,7 +539,11 @@ static void dhcp_request_rx ( struct dhcp_session *dhcp,
 	}
 
 	/* Start ProxyDHCPREQUEST if applicable */
-	if ( dhcp->proxy_server.s_addr && ( ! dhcp->no_pxedhcp ) ) {
+	if ( dhcp->proxy_server.s_addr /* Have ProxyDHCP server */ &&
+	     ( ! dhcp->no_pxedhcp ) /* ProxyDHCP not disabled */ &&
+	     ( /* ProxyDHCP server is not just the DHCP server itself */
+	       ( dhcp->proxy_server.s_addr != dhcp->server.s_addr ) ||
+	       ( dhcp->proxy_port != htons ( BOOTPS_PORT ) ) ) ) {
 		dhcp_set_state ( dhcp, &dhcp_state_proxy );
 		return;
 	}
@@ -569,8 +585,8 @@ static int dhcp_proxy_tx ( struct dhcp_session *dhcp,
 			   struct sockaddr_in *peer ) {
 	int rc;
 
-	DBGC ( dhcp, "DHCP %p ProxyDHCP REQUEST to %s:%d\n",
-	       dhcp, inet_ntoa ( dhcp->proxy_server ), PXE_PORT );
+	DBGC ( dhcp, "DHCP %p ProxyDHCP REQUEST to %s:%d\n", dhcp,
+	       inet_ntoa ( dhcp->proxy_server ), ntohs ( dhcp->proxy_port ) );
 
 	/* Set server ID */
 	if ( ( rc = dhcppkt_store ( dhcppkt, DHCP_SERVER_IDENTIFIER,
@@ -580,7 +596,7 @@ static int dhcp_proxy_tx ( struct dhcp_session *dhcp,
 
 	/* Set server address */
 	peer->sin_addr = dhcp->proxy_server;
-	peer->sin_port = htons ( PXE_PORT );
+	peer->sin_port = dhcp->proxy_port;
 
 	return 0;
 }
@@ -608,7 +624,7 @@ static void dhcp_proxy_rx ( struct dhcp_session *dhcp,
 	DBGC ( dhcp, "\n" );
 
 	/* Filter out unacceptable responses */
-	if ( peer->sin_port != htons ( PXE_PORT ) )
+	if ( peer->sin_port != dhcp->proxy_port )
 		return;
 	if ( msgtype != DHCPACK )
 		return;
