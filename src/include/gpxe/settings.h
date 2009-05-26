@@ -13,7 +13,6 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #include <gpxe/tables.h>
 #include <gpxe/list.h>
 #include <gpxe/refcnt.h>
-#include <gpxe/dhcpopts.h>
 
 struct settings;
 struct in_addr;
@@ -69,6 +68,11 @@ struct settings_operations {
 	 */
 	int ( * fetch ) ( struct settings *settings, struct setting *setting,
 			  void *data, size_t len );
+	/** Clear settings block
+	 *
+	 * @v settings		Settings block
+	 */
+	void ( * clear ) ( struct settings *settings );
 };
 
 /** A settings block */
@@ -154,23 +158,24 @@ struct settings_applicator {
 #define __settings_applicator __table_entry ( SETTINGS_APPLICATORS, 01 )
 
 /**
- * A simple settings block
+ * A generic settings block
  *
  */
-struct simple_settings {
+struct generic_settings {
 	/** Settings block */
 	struct settings settings;
-	/** DHCP options */
-	struct dhcp_options dhcpopts;
+	/** List of generic settings */
+	struct list_head list;
 };
 
-extern struct settings_operations simple_settings_operations;
-extern int simple_settings_store ( struct settings *settings,
-				   struct setting *setting,
-				   const void *data, size_t len );
-extern int simple_settings_fetch ( struct settings *settings,
-				   struct setting *setting,
-				   void *data, size_t len );
+extern struct settings_operations generic_settings_operations;
+extern int generic_settings_store ( struct settings *settings,
+				    struct setting *setting,
+				    const void *data, size_t len );
+extern int generic_settings_fetch ( struct settings *settings,
+				    struct setting *setting,
+				    void *data, size_t len );
+extern void generic_settings_clear ( struct settings *settings );
 
 extern int register_settings ( struct settings *settings,
 			       struct settings *parent );
@@ -201,6 +206,7 @@ extern unsigned long fetch_uintz_setting ( struct settings *settings,
 					   struct setting *setting );
 extern int fetch_uuid_setting ( struct settings *settings,
 				struct setting *setting, union uuid *uuid );
+extern void clear_settings ( struct settings *settings );
 extern int setting_cmp ( struct setting *a, struct setting *b );
 
 extern struct settings * find_settings ( const char *name );
@@ -263,15 +269,16 @@ static inline void settings_init ( struct settings *settings,
 /**
  * Initialise a settings block
  *
- * @v simple		Simple settings block
+ * @v generics		Generic settings block
  * @v refcnt		Containing object reference counter, or NULL
  * @v name		Settings block name
  */
-static inline void simple_settings_init ( struct simple_settings *simple,
-					  struct refcnt *refcnt,
-					  const char *name ) {
-	settings_init ( &simple->settings, &simple_settings_operations,
+static inline void generic_settings_init ( struct generic_settings *generics,
+					   struct refcnt *refcnt,
+					   const char *name ) {
+	settings_init ( &generics->settings, &generic_settings_operations,
 			refcnt, name, 0 );
+	INIT_LIST_HEAD ( &generics->list );
 }
 
 /**

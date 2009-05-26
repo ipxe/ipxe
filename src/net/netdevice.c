@@ -282,6 +282,7 @@ static void free_netdev ( struct refcnt *refcnt ) {
 	
 	netdev_tx_flush ( netdev );
 	netdev_rx_flush ( netdev );
+	clear_settings ( netdev_settings ( netdev ) );
 	free ( netdev );
 }
 
@@ -303,9 +304,7 @@ struct net_device * alloc_netdev ( size_t priv_size ) {
 		netdev->refcnt.free = free_netdev;
 		INIT_LIST_HEAD ( &netdev->tx_queue );
 		INIT_LIST_HEAD ( &netdev->rx_queue );
-		settings_init ( netdev_settings ( netdev ),
-				&netdev_settings_operations, &netdev->refcnt,
-				netdev->name, 0 );
+		netdev_settings_init ( netdev );
 		netdev->priv = ( ( ( void * ) netdev ) + sizeof ( *netdev ) );
 	}
 	return netdev;

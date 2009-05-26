@@ -56,9 +56,9 @@ static int netdev_store ( struct settings *settings, struct setting *setting,
 			return -EINVAL;
 		memcpy ( netdev->ll_addr, data, len );
 		return 0;
-	} else {
-		return simple_settings_store ( settings, setting, data, len );
 	}
+
+	return generic_settings_store ( settings, setting, data, len );
 }
 
 /**
@@ -80,13 +80,23 @@ static int netdev_fetch ( struct settings *settings, struct setting *setting,
 			len = netdev->ll_protocol->ll_addr_len;
 		memcpy ( data, netdev->ll_addr, len );
 		return netdev->ll_protocol->ll_addr_len;
-	} else {
-		return simple_settings_fetch ( settings, setting, data, len );
 	}
+
+	return generic_settings_fetch ( settings, setting, data, len );
+}
+
+/**
+ * Clear network device settings
+ *
+ * @v settings		Settings block
+ */
+static void netdev_clear ( struct settings *settings ) {
+	generic_settings_clear ( settings );
 }
 
 /** Network device configuration settings operations */
 struct settings_operations netdev_settings_operations = {
 	.store = netdev_store,
 	.fetch = netdev_fetch,
+	.clear = netdev_clear,
 };

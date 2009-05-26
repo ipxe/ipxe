@@ -64,22 +64,6 @@ FILE_LICENCE ( GPL2_OR_LATER );
 	  ( offsetof ( _structure, _field ) << 8 ) )
 
 /**
- * Store value of SMBIOS setting
- *
- * @v settings		Settings block
- * @v setting		Setting to store
- * @v data		Setting data, or NULL to clear setting
- * @v len		Length of setting data
- * @ret rc		Return status code
- */
-static int smbios_store ( struct settings *settings __unused,
-			  struct setting *setting __unused,
-			  const void *data __unused, size_t len __unused ) {
-	/* Cannot write data into SMBIOS */
-	return -ENOTSUP;
-}
-
-/**
  * Fetch value of SMBIOS setting
  *
  * @v settings		Settings block, or NULL to search all blocks
@@ -135,7 +119,6 @@ static int smbios_fetch ( struct settings *settings __unused,
 
 /** SMBIOS settings operations */
 static struct settings_operations smbios_settings_operations = {
-	.store = smbios_store,
 	.fetch = smbios_fetch,
 };
 

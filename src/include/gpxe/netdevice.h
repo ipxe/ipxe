@@ -269,7 +269,7 @@ struct net_device {
 	struct net_device_stats rx_stats;
 
 	/** Configuration settings applicable to this device */
-	struct simple_settings settings;
+	struct generic_settings settings;
 
 	/** Driver private data */
 	void *priv;
@@ -295,6 +295,7 @@ struct net_device {
 
 extern struct list_head net_devices;
 extern struct net_device_operations null_netdev_operations;
+extern struct settings_operations netdev_settings_operations;
 
 /**
  * Initialise a network device
@@ -386,6 +387,20 @@ netdev_settings ( struct net_device *netdev ) {
 }
 
 /**
+ * Initialise a per-netdevice configuration settings block
+ *
+ * @v generics		Generic settings block
+ * @v refcnt		Containing object reference counter, or NULL
+ * @v name		Settings block name
+ */
+static inline __attribute__ (( always_inline )) void
+netdev_settings_init ( struct net_device *netdev ) {
+	generic_settings_init ( &netdev->settings,
+				&netdev->refcnt, netdev->name );
+	netdev->settings.settings.op = &netdev_settings_operations;
+}
+
+/**
  * Mark network device as having link up
  *
  * @v netdev		Network device
@@ -439,8 +454,6 @@ extern int net_tx ( struct io_buffer *iobuf, struct net_device *netdev,
 		    struct net_protocol *net_protocol, const void *ll_dest );
 extern int net_rx ( struct io_buffer *iobuf, struct net_device *netdev,
 		    uint16_t net_proto, const void *ll_source );
-
-extern struct settings_operations netdev_settings_operations;
 
 /**
  * Complete network transmission
