@@ -141,10 +141,11 @@ static void multiboot_build_memmap ( struct image *image,
 /**
  * Add command line in base memory
  *
+ * @v imgname		Image name
  * @v cmdline		Command line
  * @ret physaddr	Physical address of command line
  */
-physaddr_t multiboot_add_cmdline ( const char *cmdline ) {
+physaddr_t multiboot_add_cmdline ( const char *imgname, const char *cmdline ) {
 	char *mb_cmdline;
 
 	if ( ! cmdline )
@@ -155,7 +156,7 @@ physaddr_t multiboot_add_cmdline ( const char *cmdline ) {
 	mb_cmdline_offset +=
 		( snprintf ( mb_cmdline,
 			     ( sizeof ( mb_cmdlines ) - mb_cmdline_offset ),
-			     "%s", cmdline ) + 1 );
+			     "%s %s", imgname, cmdline ) + 1 );
 
 	/* Truncate to terminating NUL in buffer if necessary */
 	if ( mb_cmdline_offset > sizeof ( mb_cmdlines ) )
@@ -210,8 +211,8 @@ multiboot_build_module_list ( struct image *image,
 			  ( ( count - insert ) * sizeof ( *module ) ) );
 		module->mod_start = start;
 		module->mod_end = end;
-		module->string =
-			multiboot_add_cmdline ( module_image->cmdline );
+		module->string = multiboot_add_cmdline ( module_image->name,
+						       module_image->cmdline );
 		module->reserved = 0;
 		
 		/* We promise to page-align modules */
@@ -269,7 +270,7 @@ static int multiboot_exec ( struct image *image ) {
 	multiboot_build_memmap ( image, &mbinfo, mbmemmap,
 				 ( sizeof(mbmemmap) / sizeof(mbmemmap[0]) ) );
 	mb_cmdline_offset = 0;
-	mbinfo.cmdline = multiboot_add_cmdline ( image->cmdline );
+	mbinfo.cmdline = multiboot_add_cmdline ( image->name, image->cmdline );
 	mbinfo.mods_count = multiboot_build_module_list ( image, mbmodules,
 				( sizeof(mbmodules) / sizeof(mbmodules[0]) ) );
 	mbinfo.mods_addr = virt_to_phys ( mbmodules );
