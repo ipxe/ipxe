@@ -134,6 +134,16 @@ SP_FLAGS := $(shell $(SP_TEST) && $(ECHO) '-fno-stack-protector')
 CFLAGS	+= $(SP_FLAGS)
 endif
 
+# gcc 4.4 generates .eh_frame sections by default, which distort the
+# output of "size".  Inhibit this.
+#
+ifeq ($(CCTYPE),gcc)
+CFI_TEST = $(CC) -fno-dwarf2-cfi-asm -x c -c /dev/null \
+		 -o /dev/null >/dev/null 2>&1
+CFI_FLAGS := $(shell $(CFI_TEST) && $(ECHO) '-fno-dwarf2-cfi-asm')
+CFLAGS	+= $(CFI_FLAGS)
+endif
+
 # Some versions of gas choke on division operators, treating them as
 # comment markers.  Specifying --divide will work around this problem,
 # but isn't available on older gas versions.
