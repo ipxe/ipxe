@@ -60,8 +60,8 @@ static void spi_bit_set_slave_select ( struct spi_bit_basher *spibit,
 	struct bit_basher *basher = &spibit->basher;
 
 	state ^= ( spibit->bus.mode & SPI_MODE_SSPOL );
-	DBG ( "Setting slave %d select %s\n", slave,
-	      ( state ? "high" : "low" ) );
+	DBGC2 ( spibit, "SPIBIT %p setting slave %d select %s\n",
+		spibit, slave, ( state ? "high" : "low" ) );
 
 	spi_bit_delay();
 	write_bit ( basher, SPI_BIT_SS ( slave ), state );
@@ -96,7 +96,8 @@ static void spi_bit_transfer ( struct spi_bit_basher *spibit,
 	unsigned int bit;
 	unsigned int step;
 
-	DBG ( "Transferring %d bits in mode %x\n", len, bus->mode );
+	DBGC2 ( spibit, "SPIBIT %p transferring %d bits in mode %#x\n",
+		spibit, len, bus->mode );
 
 	for ( step = 0 ; step < ( len * 2 ) ; step++ ) {
 		/* Calculate byte offset and byte mask */
@@ -113,6 +114,8 @@ static void spi_bit_transfer ( struct spi_bit_basher *spibit,
 			if ( data_out ) {
 				byte = ( data_out + byte_offset );
 				bit = ( *byte & byte_mask );
+				DBGCP ( spibit, "SPIBIT %p wrote bit %d\n",
+					spibit, ( bit ? 1 : 0 ) );
 			} else {
 				bit = 0;
 			}
@@ -123,6 +126,8 @@ static void spi_bit_transfer ( struct spi_bit_basher *spibit,
 			/* Shift data in */
 			bit = read_bit ( basher, SPI_BIT_MISO );
 			if ( data_in ) {
+				DBGCP ( spibit, "SPIBIT %p read bit %d\n",
+					spibit, ( bit ? 1 : 0 ) );
 				byte = ( data_in + byte_offset );
 				*byte &= ~byte_mask;
 				*byte |= ( bit & byte_mask );
@@ -131,7 +136,7 @@ static void spi_bit_transfer ( struct spi_bit_basher *spibit,
 
 		/* Toggle clock line */
 		spi_bit_delay();
-		sclk = ~sclk;
+		sclk ^= 1;
 		write_bit ( basher, SPI_BIT_SCLK, sclk );
 	}
 }
@@ -153,7 +158,9 @@ static int spi_bit_rw ( struct spi_bus *bus, struct spi_device *device,
 			const void *data_out, void *data_in, size_t len ) {
 	struct spi_bit_basher *spibit
 		= container_of ( bus, struct spi_bit_basher, bus );
-	uint32_t tmp;
+	uint32_t tmp_command;
+	uint32_t tmp_address;
+	uint32_t tmp_address_detect;
 
 	/* Set clock line to idle state */
 	write_bit ( &spibit->basher, SPI_BIT_SCLK, 
@@ -163,17 +170,37 @@ static int spi_bit_rw ( struct spi_bus *bus, struct spi_device *device,
 	spi_bit_set_slave_select ( spibit, device->slave, SELECT_SLAVE );
 
 	/* Transmit command */
-	assert ( device->command_len <= ( 8 * sizeof ( tmp ) ) );
-	tmp = cpu_to_le32 ( command );
-	spi_bit_transfer ( spibit, &tmp, NULL, device->command_len,
+	assert ( device->command_len <= ( 8 * sizeof ( tmp_command ) ) );
+	tmp_command = cpu_to_le32 ( command );
+	spi_bit_transfer ( spibit, &tmp_command, NULL, device->command_len,
 			   SPI_BIT_BIG_ENDIAN );
 
 	/* Transmit address, if present */
 	if ( address >= 0 ) {
-		assert ( device->address_len <= ( 8 * sizeof ( tmp ) ) );
-		tmp = cpu_to_le32 ( address );
-		spi_bit_transfer ( spibit, &tmp, NULL, device->address_len,
-				   SPI_BIT_BIG_ENDIAN );
+		assert ( device->address_len <= ( 8 * sizeof ( tmp_address )));
+		tmp_address = cpu_to_le32 ( address );
+		if ( device->address_len == SPI_AUTODETECT_ADDRESS_LEN ) {
+			/* Autodetect address length.  This relies on
+			 * the device responding with a dummy zero
+			 * data bit before the first real data bit.
+			 */
+			DBGC ( spibit, "SPIBIT %p autodetecting device "
+			       "address length\n", spibit );
+			assert ( address == 0 );
+			device->address_len = 0;
+			do {
+				spi_bit_transfer ( spibit, &tmp_address,
+						   &tmp_address_detect, 1,
+						   SPI_BIT_BIG_ENDIAN );
+				device->address_len++;
+			} while ( le32_to_cpu ( tmp_address_detect ) & 1 );
+			DBGC ( spibit, "SPIBIT %p autodetected device address "
+			       "length %d\n", spibit, device->address_len );
+		} else {
+			spi_bit_transfer ( spibit, &tmp_address, NULL,
+					   device->address_len,
+					   SPI_BIT_BIG_ENDIAN );
+		}
 	}
 
 	/* Transmit/receive data */

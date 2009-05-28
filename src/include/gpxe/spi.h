@@ -104,6 +104,14 @@ struct spi_device {
 	unsigned int munge_address : 1;
 };
 
+/**
+ * SPI magic autodetection address length
+ *
+ * Set @c spi_device::address_len to @c SPI_AUTODETECT_ADDRESS_LEN if
+ * the address length should be autodetected.
+ */
+#define SPI_AUTODETECT_ADDRESS_LEN 0
+
 static inline __attribute__ (( always_inline )) struct spi_device *
 nvs_to_spi ( struct nvs_device *nvs ) {
 	return container_of ( nvs, struct spi_device, nvs );

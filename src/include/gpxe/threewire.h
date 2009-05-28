@@ -45,6 +45,7 @@ extern int threewire_read ( struct nvs_device *nvs, unsigned int address,
 			    void *data, size_t len );
 extern int threewire_write ( struct nvs_device *nvs, unsigned int address,
 			     const void *data, size_t len );
+extern int threewire_detect_address_len ( struct spi_device *device );
 
 /**
  * @defgroup tdevs Three-wire device types
