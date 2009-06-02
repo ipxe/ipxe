@@ -87,6 +87,19 @@ init_at93c56 ( struct spi_device *device, unsigned int organisation ) {
 	init_at93cx6 ( device, organisation );
 }
 
+/**
+ * Initialise Atmel AT93C66 serial EEPROM
+ *
+ * @v device		SPI device
+ * @v organisation	Word organisation (8 or 16)
+ */
+static inline __attribute__ (( always_inline )) void
+init_at93c66 ( struct spi_device *device, unsigned int organisation ) {
+	device->nvs.size = ( 4096 / organisation );
+	device->address_len = ( ( organisation == 8 ) ? 9 : 8 );
+	init_at93cx6 ( device, organisation );
+}
+
 /** @} */
 
 #endif /* _GPXE_THREEWIRE_H */
