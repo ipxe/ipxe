@@ -22,6 +22,7 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #include <string.h>
 #include <stdlib.h>
 #include <stdio.h>
+#include <ctype.h>
 #include <unistd.h>
 #include <getopt.h>
 #include <errno.h>
@@ -170,7 +171,7 @@ static int split_args ( char *args, char * argv[] ) {
 
 	while ( 1 ) {
 		/* Skip over any whitespace / convert to NUL */
-		while ( *args == ' ' ) {
+		while ( isspace ( *args ) ) {
 			if ( argv )
 				*args = '\0';
 			args++;
@@ -183,7 +184,7 @@ static int split_args ( char *args, char * argv[] ) {
 			argv[argc] = args;
 		argc++;
 		/* Skip to start of next whitespace, if any */
-		while ( *args && ( *args != ' ' ) ) {
+		while ( *args && ! isspace ( *args ) ) {
 			args++;
 		}
 	}

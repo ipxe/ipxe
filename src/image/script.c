@@ -27,6 +27,7 @@ FILE_LICENCE ( GPL2_OR_LATER );
 
 #include <string.h>
 #include <stdlib.h>
+#include <ctype.h>
 #include <errno.h>
 #include <gpxe/image.h>
 
@@ -90,8 +91,8 @@ static int script_exec ( struct image *image ) {
  * @ret rc		Return status code
  */
 static int script_load ( struct image *image ) {
-	static const char magic[] = "#!gpxe\n";
-	char test[ sizeof ( magic ) - 1 ];
+	static const char magic[] = "#!gpxe";
+	char test[ sizeof ( magic ) - 1 /* NUL */ + 1 /* terminating space */];
 
 	/* Sanity check */
 	if ( image->len < sizeof ( test ) ) {
@@ -101,7 +102,8 @@ static int script_load ( struct image *image ) {
 
 	/* Check for magic signature */
 	copy_from_user ( test, image->data, 0, sizeof ( test ) );
-	if ( memcmp ( test, magic, sizeof ( test ) ) != 0 ) {
+	if ( ( memcmp ( test, magic, ( sizeof ( test ) - 1 ) ) != 0 ) ||
+	     ! isspace ( test[ sizeof ( test ) - 1 ] ) ) {
 		DBG ( "Invalid magic signature\n" );
 		return -ENOEXEC;
 	}

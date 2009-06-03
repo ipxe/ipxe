@@ -26,4 +26,6 @@ static inline unsigned char toupper(unsigned char c)
 	return c;
 }
 
+extern int isspace ( int c );
+
 #endif /* _CTYPE_H */
