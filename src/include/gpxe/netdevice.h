@@ -21,11 +21,19 @@ struct net_protocol;
 struct ll_protocol;
 struct device;
 
-/** Maximum length of a link-layer address */
+/** Maximum length of a link-layer address
+ *
+ * The longest currently-supported link-layer address is for IPoIB.
+ */
 #define MAX_LL_ADDR_LEN 20
 
-/** Maximum length of a link-layer header */
-#define MAX_LL_HEADER_LEN 6
+/** Maximum length of a link-layer header
+ *
+ * The longest currently-supported link-layer header is for Ethernet.
+ * (The IPoIB link-layer pseudo-header doesn't actually include
+ * link-layer addresses; see ipoib.c for details).
+ */
+#define MAX_LL_HEADER_LEN 14
 
 /** Maximum length of a network-layer address */
 #define MAX_NET_ADDR_LEN 4
