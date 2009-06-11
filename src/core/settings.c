@@ -782,8 +782,12 @@ int setting_cmp ( struct setting *a, struct setting *b ) {
 	if ( a->tag && ( a->tag == b->tag ) )
 		return 0;
 
-	/* Otherwise, compare the names */
-	return strcmp ( a->name, b->name );
+	/* Otherwise, if the settings have names, compare them */
+	if ( a->name && b->name && a->name[0] )
+		return strcmp ( a->name, b->name );
+
+	/* Otherwise, return a non-match */
+	return ( ! 0 );
 }
 
 /******************************************************************************
