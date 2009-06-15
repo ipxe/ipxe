@@ -43,13 +43,15 @@ static uint8_t eth_broadcast[ETH_ALEN] = { 0xff, 0xff, 0xff, 0xff, 0xff, 0xff};
 /**
  * Add Ethernet link-layer header
  *
+ * @v netdev		Network device
  * @v iobuf		I/O buffer
  * @v ll_dest		Link-layer destination address
  * @v ll_source		Source link-layer address
  * @v net_proto		Network-layer protocol, in network-byte order
  * @ret rc		Return status code
  */
-static int eth_push ( struct io_buffer *iobuf, const void *ll_dest,
+static int eth_push ( struct net_device *netdev __unused,
+		      struct io_buffer *iobuf, const void *ll_dest,
 		      const void *ll_source, uint16_t net_proto ) {
 	struct ethhdr *ethhdr = iob_push ( iobuf, sizeof ( *ethhdr ) );
 
@@ -64,13 +66,15 @@ static int eth_push ( struct io_buffer *iobuf, const void *ll_dest,
 /**
  * Remove Ethernet link-layer header
  *
+ * @v netdev		Network device
  * @v iobuf		I/O buffer
  * @ret ll_dest		Link-layer destination address
  * @ret ll_source	Source link-layer address
  * @ret net_proto	Network-layer protocol, in network-byte order
  * @ret rc		Return status code
  */
-static int eth_pull ( struct io_buffer *iobuf, const void **ll_dest,
+static int eth_pull ( struct net_device *netdev __unused, 
+		      struct io_buffer *iobuf, const void **ll_dest,
 		      const void **ll_source, uint16_t *net_proto ) {
 	struct ethhdr *ethhdr = iobuf->data;
 

@@ -88,25 +88,29 @@ struct ll_protocol {
 	/**
 	 * Add link-layer header
 	 *
+	 * @v netdev		Network device
 	 * @v iobuf		I/O buffer
 	 * @v ll_dest		Link-layer destination address
 	 * @v ll_source		Source link-layer address
 	 * @v net_proto		Network-layer protocol, in network-byte order
 	 * @ret rc		Return status code
 	 */
-	int ( * push ) ( struct io_buffer *iobuf, const void *ll_dest,
-			 const void *ll_source, uint16_t net_proto );
+	int ( * push ) ( struct net_device *netdev, struct io_buffer *iobuf,
+			 const void *ll_dest, const void *ll_source,
+			 uint16_t net_proto );
 	/**
 	 * Remove link-layer header
 	 *
+	 * @v netdev		Network device
 	 * @v iobuf		I/O buffer
 	 * @ret ll_dest		Link-layer destination address
 	 * @ret ll_source	Source link-layer address
 	 * @ret net_proto	Network-layer protocol, in network-byte order
 	 * @ret rc		Return status code
 	 */
-	int ( * pull ) ( struct io_buffer *iobuf, const void **ll_dest,
-			 const void **ll_source, uint16_t *net_proto );
+	int ( * pull ) ( struct net_device *netdev, struct io_buffer *iobuf,
+			 const void **ll_dest, const void **ll_source,
+			 uint16_t *net_proto );
 	/**
 	 * Transcribe link-layer address
 	 *

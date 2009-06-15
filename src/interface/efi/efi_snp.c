@@ -594,7 +594,8 @@ efi_snp_transmit ( EFI_SIMPLE_NETWORK_PROTOCOL *snp,
 	/* Create link-layer header, if specified */
 	if ( ll_header_len ) {
 		iob_pull ( iobuf, ll_header_len );
-		if ( ( rc = ll_protocol->push ( iobuf, ll_dest, ll_src,
+		if ( ( rc = ll_protocol->push ( snpdev->netdev,
+						iobuf, ll_dest, ll_src,
 						htons ( *net_proto ) )) != 0 ){
 			DBGC ( snpdev, "SNPDEV %p TX could not construct "
 			       "header: %s\n", snpdev, strerror ( rc ) );
@@ -672,8 +673,8 @@ efi_snp_receive ( EFI_SIMPLE_NETWORK_PROTOCOL *snp,
 	*len = iob_len ( iobuf );
 
 	/* Attempt to decode link-layer header */
-	if ( ( rc = ll_protocol->pull ( iobuf, &iob_ll_dest, &iob_ll_src,
-					&iob_net_proto ) ) != 0 ) {
+	if ( ( rc = ll_protocol->pull ( snpdev->netdev, iobuf, &iob_ll_dest,
+					&iob_ll_src, &iob_net_proto ) ) != 0 ){
 		DBGC ( snpdev, "SNPDEV %p could not parse header: %s\n",
 		       snpdev, strerror ( rc ) );
 		efirc = RC_TO_EFIRC ( rc );

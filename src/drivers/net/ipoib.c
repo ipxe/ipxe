@@ -238,13 +238,15 @@ ipoib_cache_peer ( const struct ib_gid *gid, unsigned long qpn ) {
 /**
  * Add IPoIB link-layer header
  *
+ * @v netdev		Network device
  * @v iobuf		I/O buffer
  * @v ll_dest		Link-layer destination address
  * @v ll_source		Source link-layer address
  * @v net_proto		Network-layer protocol, in network-byte order
  * @ret rc		Return status code
  */
-static int ipoib_push ( struct io_buffer *iobuf, const void *ll_dest,
+static int ipoib_push ( struct net_device *netdev __unused,
+			struct io_buffer *iobuf, const void *ll_dest,
 			const void *ll_source __unused, uint16_t net_proto ) {
 	struct ipoib_hdr *ipoib_hdr =
 		iob_push ( iobuf, sizeof ( *ipoib_hdr ) );
@@ -268,13 +270,15 @@ static int ipoib_push ( struct io_buffer *iobuf, const void *ll_dest,
 /**
  * Remove IPoIB link-layer header
  *
+ * @v netdev		Network device
  * @v iobuf		I/O buffer
  * @ret ll_dest		Link-layer destination address
  * @ret ll_source	Source link-layer address
  * @ret net_proto	Network-layer protocol, in network-byte order
  * @ret rc		Return status code
  */
-static int ipoib_pull ( struct io_buffer *iobuf, const void **ll_dest,
+static int ipoib_pull ( struct net_device *netdev __unused,
+			struct io_buffer *iobuf, const void **ll_dest,
 			const void **ll_source, uint16_t *net_proto ) {
 	struct ipoib_hdr *ipoib_hdr = iobuf->data;
 	struct ipoib_peer *dest;

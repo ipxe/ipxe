@@ -270,7 +270,7 @@ PXENV_EXIT_t pxenv_undi_transmit ( struct s_PXENV_UNDI_TRANSMIT
 		}
 
 		/* Add link-layer header */
-		if ( ( rc = ll_protocol->push ( iobuf, ll_dest,
+		if ( ( rc = ll_protocol->push ( pxe_netdev, iobuf, ll_dest,
 						pxe_netdev->ll_addr,
 						net_protocol->net_proto ))!=0){
 			free_iob ( iobuf );
@@ -630,8 +630,8 @@ PXENV_EXIT_t pxenv_undi_isr ( struct s_PXENV_UNDI_ISR *undi_isr ) {
 
 		/* Strip link-layer header */
 		ll_protocol = pxe_netdev->ll_protocol;
-		if ( ( rc = ll_protocol->pull ( iobuf, &ll_dest, &ll_source,
-						&net_proto ) ) != 0 ) {
+		if ( ( rc = ll_protocol->pull ( pxe_netdev, iobuf, &ll_dest,
+						&ll_source, &net_proto )) !=0){
 			/* Assume unknown net_proto and no ll_source */
 			net_proto = 0;
 			ll_source = NULL;
