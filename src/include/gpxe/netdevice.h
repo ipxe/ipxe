@@ -29,11 +29,12 @@ struct device;
 
 /** Maximum length of a link-layer header
  *
- * The longest currently-supported link-layer header is for Ethernet.
- * (The IPoIB link-layer pseudo-header doesn't actually include
- * link-layer addresses; see ipoib.c for details).
+ * The longest currently-supported link-layer header is for 802.11: a
+ * 24-byte frame header plus an 8-byte 802.3 LLC/SNAP header.  (The
+ * IPoIB link-layer pseudo-header doesn't actually include link-layer
+ * addresses; see ipoib.c for details).
  */
-#define MAX_LL_HEADER_LEN 14
+#define MAX_LL_HEADER_LEN 32
 
 /** Maximum length of a network-layer address */
 #define MAX_NET_ADDR_LEN 4
