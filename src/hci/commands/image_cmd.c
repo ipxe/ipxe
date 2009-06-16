@@ -499,9 +499,9 @@ static int imgstat_exec ( int argc, char **argv ) {
  */
 static void imgfree_syntax ( char **argv ) {
 	printf ( "Usage:\n"
-		 "  %s\n"
+		 "  %s [<image name>]\n"
 		 "\n"
-		 "Free all executable/loadable images\n",
+		 "Free one or all executable/loadable images\n",
 		 argv[0] );
 }
 
@@ -519,6 +519,7 @@ static int imgfree_exec ( int argc, char **argv ) {
 	};
 	struct image *image;
 	struct image *tmp;
+	const char *name = NULL;
 	int c;
 
 	/* Parse options */
@@ -533,15 +534,27 @@ static int imgfree_exec ( int argc, char **argv ) {
 		}
 	}
 
-	/* No arguments */
+	/* Need no more than one image name */
+	if ( optind != argc )
+		name = argv[optind++];
 	if ( optind != argc ) {
 		imgfree_syntax ( argv );
 		return 1;
 	}
 
-	/* Free all images */
-	list_for_each_entry_safe ( image, tmp, &images, list ) {
+	if ( name ) {
+		/* Free specified image (may leak) */
+		image = find_image ( name );
+		if ( ! image ) {
+			printf ( "No such image: %s\n", name );
+			return 1;
+		}
 		imgfree ( image );
+	} else {
+		/* Free all images */
+		list_for_each_entry_safe ( image, tmp, &images, list ) {
+			imgfree ( image );
+		}
 	}
 	return 0;
 }
