@@ -103,25 +103,45 @@ void ifstat ( struct net_device *netdev ) {
 }
 
 /**
- * Wait for link-up
+ * Wait for link-up, with status indication
  *
  * @v netdev		Network device
  * @v max_wait_ms	Maximum time to wait, in ms
  */
 int iflinkwait ( struct net_device *netdev, unsigned int max_wait_ms ) {
 	int key;
+	int rc;
+
+	if ( netdev_link_ok ( netdev ) )
+		return 0;
+
+	printf ( "Waiting for link-up on %s...", netdev->name );
 
 	while ( 1 ) {
-		if ( netdev_link_ok ( netdev ) )
-			return 0;
-		if ( max_wait_ms-- == 0 )
-			return -ETIMEDOUT;
+		if ( netdev_link_ok ( netdev ) ) {
+			rc = 0;
+			break;
+		}
+		if ( max_wait_ms-- == 0 ) {
+			rc = netdev->link_rc;
+			break;
+		}
 		step();
 		if ( iskey() ) {
 			key = getchar();
-			if ( key == CTRL_C )
-				return -ECANCELED;
+			if ( key == CTRL_C ) {
+				rc = -ECANCELED;
+				break;
+			}
 		}
 		mdelay ( 1 );
 	}
+
+	if ( rc == 0 ) {
+		printf ( " ok\n" );
+	} else {
+		printf ( " failed: %s\n", strerror ( rc ) );
+	}
+
+	return rc;
 }

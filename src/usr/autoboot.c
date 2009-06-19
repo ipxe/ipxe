@@ -154,12 +154,8 @@ static int netboot ( struct net_device *netdev ) {
 	ifstat ( netdev );
 
 	/* Wait for link-up */
-	printf ( "Waiting for link-up on %s...", netdev->name );
-	if ( ( rc = iflinkwait ( netdev, LINK_WAIT_MS ) ) != 0 ) {
-		printf ( " no link detected\n" );
+	if ( ( rc = iflinkwait ( netdev, LINK_WAIT_MS ) ) != 0 )
 		return rc;
-	}
-	printf ( " ok\n" );
 
 	/* Configure device via DHCP */
 	if ( ( rc = dhcp ( netdev ) ) != 0 )
