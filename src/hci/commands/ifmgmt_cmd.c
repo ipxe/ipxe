@@ -23,6 +23,7 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #include <gpxe/netdevice.h>
 #include <gpxe/command.h>
 #include <usr/ifmgmt.h>
+#include "ifmgmt_cmd.h"
 
 /** @file
  *
@@ -103,7 +104,7 @@ static int ifcommon_do_list ( int ( * payload ) ( struct net_device * ),
  * @v argv		Argument list
  * @ret rc		Exit code
  */
-static __attribute__ (( regparm ( 2 ) )) int
+__attribute__ (( regparm ( 2 ) )) int
 ifcommon_exec ( int ( * payload ) ( struct net_device * ),
 		const char *verb, int argc, char **argv ) {
 	int c;
