@@ -28,6 +28,8 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #include <usr/ifmgmt.h>
 #include <usr/dhcpmgmt.h>
 
+#define LINK_WAIT_MS	15000
+
 /** @file
  *
  * DHCP management
@@ -39,6 +41,10 @@ int dhcp ( struct net_device *netdev ) {
 
 	/* Check we can open the interface first */
 	if ( ( rc = ifopen ( netdev ) ) != 0 )
+		return rc;
+
+	/* Wait for link-up */
+	if ( ( rc = iflinkwait ( netdev, LINK_WAIT_MS ) ) != 0 )
 		return rc;
 
 	/* Perform DHCP */
