@@ -110,6 +110,7 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #define ERRFILE_phantom		     ( ERRFILE_DRIVER | 0x004b0000 )
 #define ERRFILE_ne2k_isa	     ( ERRFILE_DRIVER | 0x004c0000 )
 #define ERRFILE_b44		     ( ERRFILE_DRIVER | 0x004d0000 )
+#define ERRFILE_rtl818x		     ( ERRFILE_DRIVER | 0x004e0000 )
 
 #define ERRFILE_scsi		     ( ERRFILE_DRIVER | 0x00700000 )
 #define ERRFILE_arbel		     ( ERRFILE_DRIVER | 0x00710000 )
