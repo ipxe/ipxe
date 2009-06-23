@@ -229,6 +229,16 @@ struct tcp_options {
 			TCP_STATE_SENT ( TCP_FIN ) ) )			    \
 	  == TCP_STATE_ACKED ( TCP_SYN ) )
 
+/** Have ever been fully established
+ *
+ * We have been fully established if we have both received a SYN and
+ * had our own SYN acked.
+ */
+#define TCP_HAS_BEEN_ESTABLISHED(state)					    \
+	( ( (state) & ( TCP_STATE_ACKED ( TCP_SYN ) |			    \
+			TCP_STATE_RCVD ( TCP_SYN ) ) )			    \
+	  == ( TCP_STATE_ACKED ( TCP_SYN ) | TCP_STATE_RCVD ( TCP_SYN ) ) )
+
 /** Have closed gracefully
  *
  * We have closed gracefully if we have both received a FIN and had

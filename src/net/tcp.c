@@ -704,29 +704,44 @@ static int tcp_rx_ack ( struct tcp_connection *tcp, uint32_t ack,
 	size_t len;
 	unsigned int acked_flags;
 
-	/* Ignore duplicate or out-of-range ACK */
-	if ( ack_len > tcp->snd_sent ) {
-		DBGC ( tcp, "TCP %p received ACK for [%08x,%08zx), "
-		       "sent only [%08x,%08x)\n", tcp, tcp->snd_seq,
-		       ( tcp->snd_seq + ack_len ), tcp->snd_seq,
-		       ( tcp->snd_seq + tcp->snd_sent ) );
-		return -EINVAL;
-	}
-
-	/* Acknowledge any flags being sent */
+	/* Determine acknowledged flags and data length */
 	len = ack_len;
 	acked_flags = ( TCP_FLAGS_SENDING ( tcp->tcp_state ) &
 			( TCP_SYN | TCP_FIN ) );
 	if ( acked_flags )
 		len--;
 
+	/* Stop retransmission timer if necessary */
+	if ( ack_len == 0 ) {
+		/* Duplicate ACK (or just a packet that isn't
+		 * intending to ACK any new data).  If the
+		 * retransmission timer is running, leave it running
+		 * so that we don't immediately retransmit and cause a
+		 * sorceror's apprentice syndrome.
+		 */
+	} else if ( ack_len <= tcp->snd_sent ) {
+		/* ACK of new data.  Stop the retransmission timer. */
+		stop_timer ( &tcp->timer );
+	} else {
+		/* Out-of-range (or old duplicate) ACK.  Leave the
+		 * timer running, as for the ack_len==0 case, to
+		 * handle old duplicate ACKs.
+		 */
+		DBGC ( tcp, "TCP %p received ACK for [%08x,%08zx), "
+		       "sent only [%08x,%08x)\n", tcp, tcp->snd_seq,
+		       ( tcp->snd_seq + ack_len ), tcp->snd_seq,
+		       ( tcp->snd_seq + tcp->snd_sent ) );
+		/* Send RST if an out-of-range ACK is received on a
+		 * not-yet-established connection.
+		 */
+		if ( ! TCP_HAS_BEEN_ESTABLISHED ( tcp->tcp_state ) )
+			return -EINVAL;
+	}
+
 	/* Update SEQ and sent counters, and window size */
 	tcp->snd_seq = ack;
 	tcp->snd_sent = 0;
 	tcp->snd_win = win;
-
-	/* Stop the retransmission timer */
-	stop_timer ( &tcp->timer );
 
 	/* Remove any acknowledged data from transmit queue */
 	tcp_process_queue ( tcp, len, NULL, 1 );
