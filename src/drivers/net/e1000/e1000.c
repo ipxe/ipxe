@@ -588,6 +588,7 @@ e1000_transmit ( struct net_device *netdev, struct io_buffer *iobuf )
 
 	/* Write new tail to NIC, making packet available for transmit
 	 */
+	wmb();
 	E1000_WRITE_REG ( hw, TDT, adapter->tx_tail );
 
 	return 0;
