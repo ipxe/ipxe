@@ -211,6 +211,12 @@ PXENV_EXIT_t pxenv_undi_transmit ( struct s_PXENV_UNDI_TRANSMIT
 
 	DBG ( "PXENV_UNDI_TRANSMIT" );
 
+	/* Forcibly enable interrupts at this point, to work around
+	 * callers that never call PXENV_UNDI_OPEN before attempting
+	 * to use the UNDI API.
+	 */
+	netdev_irq ( pxe_netdev, 1 );
+
 	/* Identify network-layer protocol */
 	switch ( undi_transmit->Protocol ) {
 	case P_IP:	net_protocol = &ipv4_protocol;	break;
@@ -341,10 +347,17 @@ pxenv_undi_set_station_address ( struct s_PXENV_UNDI_SET_STATION_ADDRESS
 PXENV_EXIT_t
 pxenv_undi_set_packet_filter ( struct s_PXENV_UNDI_SET_PACKET_FILTER
 			       *undi_set_packet_filter ) {
+
 	DBG ( "PXENV_UNDI_SET_PACKET_FILTER" );
 
-	undi_set_packet_filter->Status = PXENV_STATUS_UNSUPPORTED;
-	return PXENV_EXIT_FAILURE;
+	/* Pretend that we succeeded, otherwise the 3Com DOS UNDI
+	 * driver refuses to load.  (We ignore the filter value in the
+	 * PXENV_UNDI_OPEN call anyway.)
+	 */
+	DBG ( " %02x", undi_set_packet_filter->filter );
+	undi_set_packet_filter->Status = PXENV_STATUS_SUCCESS;
+
+	return PXENV_EXIT_SUCCESS;
 }
 
 /* PXENV_UNDI_GET_INFORMATION
