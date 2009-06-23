@@ -534,7 +534,10 @@ PXENV_EXIT_t pxenv_undi_get_iface_info ( struct s_PXENV_UNDI_GET_IFACE_INFO
 	snprintf ( ( char * ) undi_get_iface_info->IfaceType,
 		   sizeof ( undi_get_iface_info->IfaceType ), "gPXE" );
 	undi_get_iface_info->LinkSpeed = 10000000; /* 10 Mbps */
-	undi_get_iface_info->ServiceFlags = 0;
+	undi_get_iface_info->ServiceFlags =
+		( SUPPORTED_BROADCAST | SUPPORTED_MULTICAST |
+		  SUPPORTED_SET_STATION_ADDRESS | SUPPORTED_RESET |
+		  SUPPORTED_OPEN_CLOSE | SUPPORTED_IRQ );
 	memset ( undi_get_iface_info->Reserved, 0,
 		 sizeof(undi_get_iface_info->Reserved) );
 

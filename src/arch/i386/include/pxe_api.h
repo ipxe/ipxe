@@ -1417,6 +1417,25 @@ extern PXENV_EXIT_t pxenv_undi_get_nic_type (
 /** PXE API function code for pxenv_undi_get_iface_info() */
 #define	PXENV_UNDI_GET_IFACE_INFO	0x0013
 
+/** Broadcast supported */
+#define SUPPORTED_BROADCAST		0x0001
+/** Multicast supported */
+#define SUPPORTED_MULTICAST		0x0002
+/** Functional/group addressing supported */
+#define SUPPORTED_GROUP			0x0004
+/** Promiscuous mode supported */
+#define SUPPORTED_PROMISCUOUS		0x0008
+/** Software settable station address */
+#define SUPPORTED_SET_STATION_ADDRESS	0x0010
+/** InitiateDiagnostics supported */
+#define SUPPORTED_DIAGNOSTICS		0x0040
+/** Reset MAC supported */
+#define SUPPORTED_RESET			0x0400
+/** Open / Close Adapter supported */
+#define SUPPORTED_OPEN_CLOSE		0x0800
+/** Interrupt Request supported */
+#define SUPPORTED_IRQ			0x1000
+
 /** Parameter block for pxenv_undi_get_iface_info() */
 struct s_PXENV_UNDI_GET_IFACE_INFO {
 	PXENV_STATUS_t	Status;		/**< PXE status code */
