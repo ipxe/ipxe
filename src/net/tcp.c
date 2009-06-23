@@ -144,15 +144,15 @@ tcp_dump_state ( struct tcp_connection *tcp ) {
 static inline __attribute__ (( always_inline )) void
 tcp_dump_flags ( struct tcp_connection *tcp, unsigned int flags ) {
 	if ( flags & TCP_RST )
-		DBGC ( tcp, " RST" );
+		DBGC2 ( tcp, " RST" );
 	if ( flags & TCP_SYN )
-		DBGC ( tcp, " SYN" );
+		DBGC2 ( tcp, " SYN" );
 	if ( flags & TCP_PSH )
-		DBGC ( tcp, " PSH" );
+		DBGC2 ( tcp, " PSH" );
 	if ( flags & TCP_FIN )
-		DBGC ( tcp, " FIN" );
+		DBGC2 ( tcp, " FIN" );
 	if ( flags & TCP_ACK )
-		DBGC ( tcp, " ACK" );
+		DBGC2 ( tcp, " ACK" );
 }
 
 /***************************************************************************
@@ -487,12 +487,12 @@ static int tcp_xmit ( struct tcp_connection *tcp, int force_send ) {
 	tcphdr->csum = tcpip_chksum ( iobuf->data, iob_len ( iobuf ) );
 
 	/* Dump header */
-	DBGC ( tcp, "TCP %p TX %d->%d %08x..%08zx           %08x %4zd",
-	       tcp, ntohs ( tcphdr->src ), ntohs ( tcphdr->dest ),
-	       ntohl ( tcphdr->seq ), ( ntohl ( tcphdr->seq ) + seq_len ),
-	       ntohl ( tcphdr->ack ), len );
+	DBGC2 ( tcp, "TCP %p TX %d->%d %08x..%08zx           %08x %4zd",
+		tcp, ntohs ( tcphdr->src ), ntohs ( tcphdr->dest ),
+		ntohl ( tcphdr->seq ), ( ntohl ( tcphdr->seq ) + seq_len ),
+		ntohl ( tcphdr->ack ), len );
 	tcp_dump_flags ( tcp, tcphdr->flags );
-	DBGC ( tcp, "\n" );
+	DBGC2 ( tcp, "\n" );
 
 	/* Transmit packet */
 	return tcpip_tx ( iobuf, &tcp_protocol, NULL, &tcp->peer, NULL,
@@ -568,12 +568,12 @@ static int tcp_xmit_reset ( struct tcp_connection *tcp,
 	tcphdr->csum = tcpip_chksum ( iobuf->data, iob_len ( iobuf ) );
 
 	/* Dump header */
-	DBGC ( tcp, "TCP %p TX %d->%d %08x..%08x           %08x %4d",
-	       tcp, ntohs ( tcphdr->src ), ntohs ( tcphdr->dest ),
-	       ntohl ( tcphdr->seq ), ( ntohl ( tcphdr->seq ) ),
-	       ntohl ( tcphdr->ack ), 0 );
+	DBGC2 ( tcp, "TCP %p TX %d->%d %08x..%08x           %08x %4d",
+		tcp, ntohs ( tcphdr->src ), ntohs ( tcphdr->dest ),
+		ntohl ( tcphdr->seq ), ( ntohl ( tcphdr->seq ) ),
+		ntohl ( tcphdr->ack ), 0 );
 	tcp_dump_flags ( tcp, tcphdr->flags );
-	DBGC ( tcp, "\n" );
+	DBGC2 ( tcp, "\n" );
 
 	/* Transmit packet */
 	return tcpip_tx ( iobuf, &tcp_protocol, NULL, st_dest,
@@ -913,13 +913,13 @@ static int tcp_rx ( struct io_buffer *iobuf,
 	len = iob_len ( iobuf );
 
 	/* Dump header */
-	DBGC ( tcp, "TCP %p RX %d<-%d           %08x %08x..%08zx %4zd",
-	       tcp, ntohs ( tcphdr->dest ), ntohs ( tcphdr->src ),
-	       ntohl ( tcphdr->ack ), ntohl ( tcphdr->seq ),
-	       ( ntohl ( tcphdr->seq ) + len +
-		 ( ( tcphdr->flags & ( TCP_SYN | TCP_FIN ) ) ? 1 : 0 ) ), len);
+	DBGC2 ( tcp, "TCP %p RX %d<-%d           %08x %08x..%08zx %4zd",
+		tcp, ntohs ( tcphdr->dest ), ntohs ( tcphdr->src ),
+		ntohl ( tcphdr->ack ), ntohl ( tcphdr->seq ),
+		( ntohl ( tcphdr->seq ) + len +
+		  ( ( tcphdr->flags & ( TCP_SYN | TCP_FIN ) ) ? 1 : 0 )), len);
 	tcp_dump_flags ( tcp, tcphdr->flags );
-	DBGC ( tcp, "\n" );
+	DBGC2 ( tcp, "\n" );
 
 	/* If no connection was found, send RST */
 	if ( ! tcp ) {
