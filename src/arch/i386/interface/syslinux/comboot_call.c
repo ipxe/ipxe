@@ -39,6 +39,8 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #include <gpxe/init.h>
 #include <gpxe/image.h>
 #include <usr/imgmgmt.h>
+#include "config/console.h"
+#include "config/serial.h"
 
 /** The "SYSLINUX" version string */
 static char __data16_array ( syslinux_version, [] ) = "gPXE " VERSION;
@@ -456,8 +458,14 @@ static __asmcall void int22 ( struct i386_all_regs *ix86 ) {
 		break;
 
 	case 0x000B: /* Get Serial Console Configuration */
-		/* FIXME: stub */
+#if defined(CONSOLE_SERIAL) && !defined(COMPRESERVE)
+		ix86->regs.dx = COMCONSOLE;
+		ix86->regs.cx = 115200 / COMSPEED;
+		ix86->regs.bx = 0;
+#else
 		ix86->regs.dx = 0;
+#endif
+
 		ix86->flags &= ~CF;
 		break;
 
