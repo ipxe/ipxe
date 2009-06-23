@@ -726,39 +726,43 @@ static int tcp_rx_ack ( struct tcp_connection *tcp, uint32_t ack,
 	size_t len;
 	unsigned int acked_flags;
 
+	/* Check for out-of-range or old duplicate ACKs */
+	if ( ack_len > tcp->snd_sent ) {
+		DBGC ( tcp, "TCP %p received ACK for %08x..%08zx, "
+		       "sent only %08x..%08x\n", tcp, tcp->snd_seq,
+		       ( tcp->snd_seq + ack_len ), tcp->snd_seq,
+		       ( tcp->snd_seq + tcp->snd_sent ) );
+
+		if ( TCP_HAS_BEEN_ESTABLISHED ( tcp->tcp_state ) ) {
+			/* Just ignore what might be old duplicate ACKs */
+			return 0;
+		} else {
+			/* Send RST if an out-of-range ACK is received
+			 * on a not-yet-established connection, as per
+			 * RFC 793.
+			 */
+			return -EINVAL;
+		}
+	}
+
+	/* Ignore ACKs that don't actually acknowledge any new data.
+	 * (In particular, do not stop the retransmission timer; this
+	 * avoids creating a sorceror's apprentice syndrome when a
+	 * duplicate ACK is received and we still have data in our
+	 * transmit queue.)
+	 */
+	if ( ack_len == 0 )
+		return 0;
+
+	/* Stop the retransmission timer */
+	stop_timer ( &tcp->timer );
+
 	/* Determine acknowledged flags and data length */
 	len = ack_len;
 	acked_flags = ( TCP_FLAGS_SENDING ( tcp->tcp_state ) &
 			( TCP_SYN | TCP_FIN ) );
 	if ( acked_flags )
 		len--;
-
-	/* Stop retransmission timer if necessary */
-	if ( ack_len == 0 ) {
-		/* Duplicate ACK (or just a packet that isn't
-		 * intending to ACK any new data).  If the
-		 * retransmission timer is running, leave it running
-		 * so that we don't immediately retransmit and cause a
-		 * sorceror's apprentice syndrome.
-		 */
-	} else if ( ack_len <= tcp->snd_sent ) {
-		/* ACK of new data.  Stop the retransmission timer. */
-		stop_timer ( &tcp->timer );
-	} else {
-		/* Out-of-range (or old duplicate) ACK.  Leave the
-		 * timer running, as for the ack_len==0 case, to
-		 * handle old duplicate ACKs.
-		 */
-		DBGC ( tcp, "TCP %p received ACK for %08x..%08zx, "
-		       "sent only %08x..%08x\n", tcp, tcp->snd_seq,
-		       ( tcp->snd_seq + ack_len ), tcp->snd_seq,
-		       ( tcp->snd_seq + tcp->snd_sent ) );
-		/* Send RST if an out-of-range ACK is received on a
-		 * not-yet-established connection.
-		 */
-		if ( ! TCP_HAS_BEEN_ESTABLISHED ( tcp->tcp_state ) )
-			return -EINVAL;
-	}
 
 	/* Update SEQ and sent counters, and window size */
 	tcp->snd_seq = ack;
