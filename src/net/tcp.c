@@ -510,8 +510,9 @@ static void tcp_expired ( struct retry_timer *timer, int over ) {
 		container_of ( timer, struct tcp_connection, timer );
 	int graceful_close = TCP_CLOSED_GRACEFULLY ( tcp->tcp_state );
 
-	DBGC ( tcp, "TCP %p timer %s in %s\n", tcp,
-	       ( over ? "expired" : "fired" ), tcp_state ( tcp->tcp_state ) );
+	DBGC ( tcp, "TCP %p timer %s in %s for [%08x,%08x)\n", tcp,
+	       ( over ? "expired" : "fired" ), tcp_state ( tcp->tcp_state ),
+	       tcp->snd_seq, ( tcp->snd_seq + tcp->snd_sent ) );
 
 	assert ( ( tcp->tcp_state == TCP_SYN_SENT ) ||
 		 ( tcp->tcp_state == TCP_SYN_RCVD ) ||
