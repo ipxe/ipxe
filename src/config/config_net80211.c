@@ -31,3 +31,10 @@ REQUIRE_OBJECT ( iwmgmt_cmd );
 REQUIRE_OBJECT ( wireless_errors );
 #endif
 
+/*
+ * Drag in 802.11 cryptosystems and handshaking protocols
+ *
+ */
+#ifdef CRYPTO_80211_WEP
+REQUIRE_OBJECT ( wep );
+#endif

@@ -65,6 +65,12 @@ FILE_LICENCE ( GPL2_OR_LATER );
 //#undef	SANBOOT_PROTO_IB_SRP	/* Infiniband SCSI RDMA protocol */
 
 /*
+ * 802.11 cryptosystems and handshaking protocols
+ *
+ */
+#define	CRYPTO_80211_WEP	/* WEP encryption (deprecated and insecure!) */
+
+/*
  * Name resolution modules
  *
  */
