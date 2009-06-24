@@ -94,6 +94,10 @@ void ifstat ( struct net_device *netdev ) {
 		 ( netdev_link_ok ( netdev ) ? "up" : "down" ),
 		 netdev->tx_stats.good, netdev->tx_stats.bad,
 		 netdev->rx_stats.good, netdev->rx_stats.bad );
+	if ( ! netdev_link_ok ( netdev ) ) {
+		printf ( "  [Link status: %s]\n",
+			 strerror ( netdev->link_rc ) );
+	}
 	ifstat_errors ( &netdev->tx_stats, "TXE" );
 	ifstat_errors ( &netdev->rx_stats, "RXE" );
 }

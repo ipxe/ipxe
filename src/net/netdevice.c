@@ -30,6 +30,7 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #include <gpxe/process.h>
 #include <gpxe/init.h>
 #include <gpxe/device.h>
+#include <gpxe/errortab.h>
 #include <gpxe/netdevice.h>
 
 /** @file
@@ -43,6 +44,34 @@ struct list_head net_devices = LIST_HEAD_INIT ( net_devices );
 
 /** List of open network devices, in reverse order of opening */
 struct list_head open_net_devices = LIST_HEAD_INIT ( open_net_devices );
+
+/** Default link status code */
+#define EUNKNOWN_LINK_STATUS EINPROGRESS
+
+/** Human-readable message for the default link status */
+struct errortab netdev_errors[] __errortab = {
+	{ EUNKNOWN_LINK_STATUS, "Unknown" },
+};
+
+/**
+ * Mark network device as having link down
+ *
+ * @v netdev		Network device
+ */
+void netdev_link_down ( struct net_device *netdev ) {
+
+	switch ( netdev->link_rc ) {
+	case 0:
+	case -EUNKNOWN_LINK_STATUS:
+		netdev->link_rc = -ENOTCONN;
+		break;
+	default:
+		/* Avoid clobbering a more detailed link status code,
+		 * if one is already set.
+		 */
+		break;
+	}
+}
 
 /**
  * Record network device statistic
@@ -302,6 +331,7 @@ struct net_device * alloc_netdev ( size_t priv_size ) {
 	netdev = zalloc ( total_len );
 	if ( netdev ) {
 		netdev->refcnt.free = free_netdev;
+		netdev->link_rc = -EUNKNOWN_LINK_STATUS;
 		INIT_LIST_HEAD ( &netdev->tx_queue );
 		INIT_LIST_HEAD ( &netdev->rx_queue );
 		netdev_settings_init ( netdev );

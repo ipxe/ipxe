@@ -267,6 +267,12 @@ struct net_device {
 	 * This is the bitwise-OR of zero or more NETDEV_XXX constants.
 	 */
 	unsigned int state;
+	/** Link status code
+	 *
+	 * Zero indicates that the link is up; any other value
+	 * indicates the error preventing link-up.
+	 */
+	int link_rc;
 	/** Maximum packet length
 	 *
 	 * This length includes any link-layer headers.
@@ -290,9 +296,6 @@ struct net_device {
 
 /** Network device is open */
 #define NETDEV_OPEN 0x0001
-
-/** Network device has link */
-#define NETDEV_LINK_UP 0x0002
 
 /** Link-layer protocol table */
 #define LL_PROTOCOLS __table ( struct ll_protocol, "ll_protocols" )
@@ -420,17 +423,18 @@ netdev_settings_init ( struct net_device *netdev ) {
  */
 static inline __attribute__ (( always_inline )) void
 netdev_link_up ( struct net_device *netdev ) {
-	netdev->state |= NETDEV_LINK_UP;
+	netdev->link_rc = 0;
 }
 
 /**
- * Mark network device as having link down
+ * Mark network device as having link down due to a specific error
  *
  * @v netdev		Network device
+ * @v rc		Link status code
  */
 static inline __attribute__ (( always_inline )) void
-netdev_link_down ( struct net_device *netdev ) {
-	netdev->state &= ~NETDEV_LINK_UP;
+netdev_link_err ( struct net_device *netdev, int rc ) {
+	netdev->link_rc = rc;
 }
 
 /**
@@ -441,9 +445,10 @@ netdev_link_down ( struct net_device *netdev ) {
  */
 static inline __attribute__ (( always_inline )) int
 netdev_link_ok ( struct net_device *netdev ) {
-	return ( netdev->state & NETDEV_LINK_UP );
+	return ( netdev->link_rc == 0 );
 }
 
+extern void netdev_link_down ( struct net_device *netdev );
 extern int netdev_tx ( struct net_device *netdev, struct io_buffer *iobuf );
 extern void netdev_tx_complete_err ( struct net_device *netdev,
 				 struct io_buffer *iobuf, int rc );

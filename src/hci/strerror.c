@@ -115,6 +115,7 @@ struct errortab common_errors[] __errortab = {
 	{ ENOEXEC, "Not an executable image" },
 	{ ENOMEM, "Out of memory" },
 	{ ENOSPC, "No space left on device" },
+	{ ENOTCONN, "Not connected" },
 	{ ENOTSUP, "Not supported" },
 	{ EPERM, "Operation not permitted" },
 	{ ERANGE, "Out of range" },
