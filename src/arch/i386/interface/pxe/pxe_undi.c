@@ -90,6 +90,20 @@ static void pxe_netdev_close ( void ) {
 	undi_tx_count = 0;
 }
 
+/**
+ * Dump multicast address list
+ *
+ * @v mcast		PXE multicast address list
+ */
+static void pxe_dump_mcast_list ( struct s_PXENV_UNDI_MCAST_ADDRESS *mcast ) {
+	struct ll_protocol *ll_protocol = pxe_netdev->ll_protocol;
+	unsigned int i;
+
+	for ( i = 0 ; i < mcast->MCastAddrCount ; i++ ) {
+		DBG ( " %s", ll_protocol->ntoa ( mcast->McastAddr[i] ) );
+	}
+}
+
 /* PXENV_UNDI_STARTUP
  *
  * Status: working
@@ -135,8 +149,9 @@ PXENV_EXIT_t pxenv_undi_reset_adapter ( struct s_PXENV_UNDI_RESET
 					*undi_reset_adapter ) {
 	int rc;
 
-	DBG ( "PXENV_UNDI_RESET_ADAPTER %04x\n",
-	      undi_reset_adapter->R_Mcast_Buf.MCastAddrCount );
+	DBG ( "PXENV_UNDI_RESET_ADAPTER" );
+	pxe_dump_mcast_list ( &undi_reset_adapter->R_Mcast_Buf );
+	DBG ( "\n" );
 
 	pxe_netdev_close();
 	if ( ( rc = pxe_netdev_open() ) != 0 ) {
@@ -171,9 +186,10 @@ PXENV_EXIT_t pxenv_undi_shutdown ( struct s_PXENV_UNDI_SHUTDOWN
 PXENV_EXIT_t pxenv_undi_open ( struct s_PXENV_UNDI_OPEN *undi_open ) {
 	int rc;
 
-	DBG ( "PXENV_UNDI_OPEN flag %04x filter %04x mcast %04x\n",
-	      undi_open->OpenFlag, undi_open->PktFilter,
-	      undi_open->R_Mcast_Buf.MCastAddrCount );
+	DBG ( "PXENV_UNDI_OPEN flag %04x filter %04x",
+	      undi_open->OpenFlag, undi_open->PktFilter );
+	pxe_dump_mcast_list ( &undi_open->R_Mcast_Buf );
+	DBG ( "\n" );
 
 	if ( ( rc = pxe_netdev_open() ) != 0 ) {
 		DBG ( "PXENV_UNDI_OPEN could not open %s: %s\n",
@@ -318,16 +334,17 @@ PXENV_EXIT_t pxenv_undi_transmit ( struct s_PXENV_UNDI_TRANSMIT
 
 /* PXENV_UNDI_SET_MCAST_ADDRESS
  *
- * Status: stub (no PXE multicast support)
+ * Status: working (for NICs that support receive-all-multicast)
  */
 PXENV_EXIT_t
 pxenv_undi_set_mcast_address ( struct s_PXENV_UNDI_SET_MCAST_ADDRESS
 			       *undi_set_mcast_address ) {
-	DBG ( "PXENV_UNDI_SET_MCAST_ADDRESS %04x failed: unsupported\n",
-	      undi_set_mcast_address->R_Mcast_Buf.MCastAddrCount );
+	DBG ( "PXENV_UNDI_SET_MCAST_ADDRESS" );
+	pxe_dump_mcast_list ( &undi_set_mcast_address->R_Mcast_Buf );
+	DBG ( "\n" );
 
-	undi_set_mcast_address->Status = PXENV_STATUS_UNSUPPORTED;
-	return PXENV_EXIT_FAILURE;
+	undi_set_mcast_address->Status = PXENV_STATUS_SUCCESS;
+	return PXENV_EXIT_SUCCESS;
 }
 
 /* PXENV_UNDI_SET_STATION_ADDRESS
@@ -491,18 +508,28 @@ PXENV_EXIT_t pxenv_undi_force_interrupt ( struct s_PXENV_UNDI_FORCE_INTERRUPT
 
 /* PXENV_UNDI_GET_MCAST_ADDRESS
  *
- * Status: stub (no PXE multicast support)
+ * Status: working
  */
 PXENV_EXIT_t
 pxenv_undi_get_mcast_address ( struct s_PXENV_UNDI_GET_MCAST_ADDRESS
 			       *undi_get_mcast_address ) {
+	struct ll_protocol *ll_protocol = pxe_netdev->ll_protocol;
 	struct in_addr ip = { .s_addr = undi_get_mcast_address->InetAddr };
+	int rc;
 
-	DBG ( "PXENV_UNDI_GET_MCAST_ADDRESS %s failed: unsupported\n",
-	      inet_ntoa ( ip ) );
+	DBG ( "PXENV_UNDI_GET_MCAST_ADDRESS %s", inet_ntoa ( ip ) );
 
-	undi_get_mcast_address->Status = PXENV_STATUS_UNSUPPORTED;
-	return PXENV_EXIT_FAILURE;
+	if ( ( rc = ll_protocol->mc_hash ( AF_INET, &ip,
+				      undi_get_mcast_address->MediaAddr ))!=0){
+		DBG ( " failed: %s\n", strerror ( rc ) );
+		undi_get_mcast_address->Status = PXENV_STATUS ( rc );
+		return PXENV_EXIT_FAILURE;
+	}
+	DBG ( "=>%s\n",
+	      ll_protocol->ntoa ( undi_get_mcast_address->MediaAddr ) );
+
+	undi_get_mcast_address->Status = PXENV_STATUS_SUCCESS;
+	return PXENV_EXIT_SUCCESS;
 }
 
 /* PXENV_UNDI_GET_NIC_TYPE
