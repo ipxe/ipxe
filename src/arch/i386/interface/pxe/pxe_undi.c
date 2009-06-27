@@ -316,17 +316,21 @@ PXENV_EXIT_t pxenv_undi_transmit ( struct s_PXENV_UNDI_TRANSMIT
 		}
 	}
 
+	/* Flag transmission as in-progress.  Do this before starting
+	 * to transmit the packet, because the ISR may trigger before
+	 * we return from netdev_tx().
+	 */
+	undi_tx_count++;
+
 	/* Transmit packet */
-	DBG2 ( "\n" ); /* ISR may trigger before we return from netdev_tx() */
+	DBG2 ( "\n" );
 	if ( ( rc = netdev_tx ( pxe_netdev, iobuf ) ) != 0 ) {
 		DBG2 ( "PXENV_UNDI_TRANSMIT could not transmit: %s\n",
 		       strerror ( rc ) );
+		undi_tx_count--;
 		undi_transmit->Status = PXENV_STATUS ( rc );
 		return PXENV_EXIT_FAILURE;
 	}
-
-	/* Flag transmission as in-progress */
-	undi_tx_count++;
 
 	undi_transmit->Status = PXENV_STATUS_SUCCESS;
 	return PXENV_EXIT_SUCCESS;
