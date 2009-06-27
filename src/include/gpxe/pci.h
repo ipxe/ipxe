@@ -321,6 +321,7 @@ struct pci_driver {
 #define PCI_DEVFN( slot, func )		( ( (slot) << 3 ) | (func) )
 #define PCI_SLOT( devfn )		( ( (devfn) >> 3 ) & 0x1f )
 #define PCI_FUNC( devfn )		( (devfn) & 0x07 )
+#define PCI_BUS( busdevfn )		( (busdevfn) >> 8 )
 #define PCI_BUSDEVFN( bus, devfn )	( ( (bus) << 8 ) | (devfn) )
 
 #define PCI_BASE_CLASS( class )		( (class) >> 16 )
