@@ -37,6 +37,7 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #include <gpxe/init.h>
 #include <gpxe/if_ether.h>
 #include <basemem_packet.h>
+#include <biosint.h>
 #include "pxe.h"
 #include "pxe_call.h"
 
@@ -315,6 +316,14 @@ PXENV_EXIT_t pxenv_stop_undi ( struct s_PXENV_STOP_UNDI *stop_undi ) {
 
 	/* Prepare for unload */
 	shutdown ( SHUTDOWN_BOOT );
+
+	/* Check to see if we still have any hooked interrupts */
+	if ( hooked_bios_interrupts != 0 ) {
+		DBG ( "PXENV_STOP_UNDI failed: %d interrupts still hooked\n",
+		      hooked_bios_interrupts );
+		stop_undi->Status = PXENV_STATUS_KEEP_UNDI;
+		return PXENV_EXIT_FAILURE;
+	}
 
 	stop_undi->Status = PXENV_STATUS_SUCCESS;
 	return PXENV_EXIT_SUCCESS;
