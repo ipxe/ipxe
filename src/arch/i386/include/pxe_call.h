@@ -11,6 +11,8 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #include <pxe_api.h>
 #include <realmode.h>
 
+struct net_device;
+
 /** PXE load address segment */
 #define PXE_LOAD_SEGMENT 0
 
@@ -28,8 +30,8 @@ extern struct s_PXE __text16 ( ppxe );
 extern struct s_PXENV __text16 ( pxenv );
 #define pxenv __use_text16 ( pxenv )
 
-extern void pxe_hook_int1a ( void );
-extern int pxe_unhook_int1a ( void );
+extern void pxe_activate ( struct net_device *netdev );
+extern int pxe_deactivate ( void );
 extern int pxe_start_nbp ( void );
 extern __asmcall void pxe_api_call ( struct i386_all_regs *ix86 );
 

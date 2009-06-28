@@ -37,6 +37,9 @@ extern struct segoff __text16 ( pxe_int_1a_vector );
 /** INT 1A handler */
 extern void pxe_int_1a ( void );
 
+/** INT 1A hooked flag */
+static int int_1a_hooked = 0;
+
 /** A function pointer to hold any PXE API call
  *
  * Used by pxe_api_call() to avoid large swathes of duplicated code.
@@ -365,25 +368,6 @@ __asmcall void pxe_loader_call ( struct i386_all_regs *ix86 ) {
 }
 
 /**
- * Hook INT 1A for PXE
- *
- */
-void pxe_hook_int1a ( void ) {
-	hook_bios_interrupt ( 0x1a, ( unsigned int ) pxe_int_1a,
-			      &pxe_int_1a_vector );
-}
-
-/**
- * Unhook INT 1A for PXE
- *
- * @ret rc		Return status code
- */
-int pxe_unhook_int1a ( void ) {
-	return unhook_bios_interrupt ( 0x1a, ( unsigned int ) pxe_int_1a,
-				       &pxe_int_1a_vector );
-}
-
-/**
  * Calculate byte checksum as used by PXE
  *
  * @v data		Data
@@ -434,6 +418,50 @@ static void pxe_init_structures ( void ) {
 struct init_fn pxe_init_fn __init_fn ( INIT_NORMAL ) = {
 	.initialise = pxe_init_structures,
 };
+
+/**
+ * Activate PXE stack
+ *
+ * @v netdev		Net device to use as PXE net device
+ */
+void pxe_activate ( struct net_device *netdev ) {
+
+	/* Ensure INT 1A is hooked */
+	if ( ! int_1a_hooked ) {
+		hook_bios_interrupt ( 0x1a, ( unsigned int ) pxe_int_1a,
+				      &pxe_int_1a_vector );
+		int_1a_hooked = 1;
+	}
+
+	/* Set PXE network device */
+	pxe_set_netdev ( netdev );
+}
+
+/**
+ * Deactivate PXE stack
+ *
+ * @ret rc		Return status code
+ */
+int pxe_deactivate ( void ) {
+	int rc;
+
+	/* Clear PXE network device */
+	pxe_set_netdev ( NULL );
+
+	/* Ensure INT 1A is unhooked, if possible */
+	if ( int_1a_hooked ) {
+		if ( ( rc = unhook_bios_interrupt ( 0x1a,
+						    (unsigned int) pxe_int_1a,
+						    &pxe_int_1a_vector ))!= 0){
+			DBG ( "Could not unhook INT 1A: %s\n",
+			      strerror ( rc ) );
+			return rc;
+		}
+		int_1a_hooked = 0;
+	}
+
+	return 0;
+}
 
 /**
  * Start PXE NBP at 0000:7c00

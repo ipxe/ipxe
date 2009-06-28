@@ -44,27 +44,24 @@ struct image_type pxe_image_type __image_type ( PROBE_PXE );
  * @ret rc		Return status code
  */
 static int pxe_exec ( struct image *image ) {
+	struct net_device *netdev;
 	int rc;
 
-	/* Ensure that PXE stack is ready to use */
-	pxe_hook_int1a();
-
 	/* Arbitrarily pick the most recently opened network device */
-	pxe_set_netdev ( last_opened_netdev() );
-
-	/* Many things will break if pxe_netdev is NULL */
-	if ( ! pxe_netdev ) {
+	if ( ( netdev = last_opened_netdev() ) == NULL ) {
 		DBGC ( image, "IMAGE %p could not locate PXE net device\n",
 		       image );
 		return -ENODEV;
 	}
 
+	/* Activate PXE */
+	pxe_activate ( netdev );
+
 	/* Start PXE NBP */
 	rc = pxe_start_nbp();
 
 	/* Deactivate PXE */
-	pxe_set_netdev ( NULL );
-	pxe_unhook_int1a();
+	pxe_deactivate();
 
 	return rc;
 }
