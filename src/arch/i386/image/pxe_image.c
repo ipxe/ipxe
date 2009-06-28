@@ -47,7 +47,6 @@ static int pxe_exec ( struct image *image ) {
 	int rc;
 
 	/* Ensure that PXE stack is ready to use */
-	pxe_init_structures();
 	pxe_hook_int1a();
 
 	/* Arbitrarily pick the most recently opened network device */

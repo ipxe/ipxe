@@ -19,6 +19,7 @@
 FILE_LICENCE ( GPL2_OR_LATER );
 
 #include <gpxe/uaccess.h>
+#include <gpxe/init.h>
 #include <registers.h>
 #include <biosint.h>
 #include <pxe.h>
@@ -403,7 +404,7 @@ static uint8_t pxe_checksum ( void *data, size_t size ) {
  * Initialise !PXE and PXENV+ structures
  *
  */
-void pxe_init_structures ( void ) {
+static void pxe_init_structures ( void ) {
 	uint32_t rm_cs_phys = ( rm_cs << 4 );
 	uint32_t rm_ds_phys = ( rm_ds << 4 );
 
@@ -428,6 +429,11 @@ void pxe_init_structures ( void ) {
 	ppxe.StructCksum -= pxe_checksum ( &ppxe, sizeof ( ppxe ) );
 	pxenv.Checksum -= pxe_checksum ( &pxenv, sizeof ( pxenv ) );
 }
+
+/** PXE structure initialiser */
+struct init_fn pxe_init_fn __init_fn ( INIT_NORMAL ) = {
+	.initialise = pxe_init_structures,
+};
 
 /**
  * Start PXE NBP at 0000:7c00
