@@ -23,7 +23,7 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #include <gpxe/netdevice.h>
 #include <gpxe/command.h>
 #include <usr/ifmgmt.h>
-#include "ifmgmt_cmd.h"
+#include <hci/ifmgmt_cmd.h>
 
 /** @file
  *
