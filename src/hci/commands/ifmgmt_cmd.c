@@ -98,15 +98,15 @@ static int ifcommon_do_list ( int ( * payload ) ( struct net_device * ),
 /**
  * Execute if<xxx> command
  *
- * @v payload		Command to execute
- * @v verb		Verb describing the action of the command
  * @v argc		Argument count
  * @v argv		Argument list
+ * @v payload		Command to execute
+ * @v verb		Verb describing the action of the command
  * @ret rc		Exit code
  */
-__attribute__ (( regparm ( 2 ) )) int
-ifcommon_exec ( int ( * payload ) ( struct net_device * ),
-		const char *verb, int argc, char **argv ) {
+int ifcommon_exec ( int argc, char **argv,
+		    int ( * payload ) ( struct net_device * ),
+		    const char *verb ) {
 	int c;
 
 	/* Parse options */
@@ -137,7 +137,7 @@ static int ifopen_payload ( struct net_device *netdev ) {
 }
 
 static int ifopen_exec ( int argc, char **argv ) {
-	return ifcommon_exec ( ifopen_payload, "Open", argc, argv );
+	return ifcommon_exec ( argc, argv, ifopen_payload, "Open" );
 }
 
 /* "ifclose" command */
@@ -148,7 +148,7 @@ static int ifclose_payload ( struct net_device *netdev ) {
 }
 
 static int ifclose_exec ( int argc, char **argv ) {
-	return ifcommon_exec ( ifclose_payload, "Close", argc, argv );
+	return ifcommon_exec ( argc, argv, ifclose_payload, "Close" );
 }
 
 /* "ifstat" command */
@@ -159,8 +159,8 @@ static int ifstat_payload ( struct net_device *netdev ) {
 }
 
 static int ifstat_exec ( int argc, char **argv ) {
-	return ifcommon_exec ( ifstat_payload, "Display status of",
-			       argc, argv );
+	return ifcommon_exec ( argc, argv,
+			       ifstat_payload, "Display status of" );
 }
 
 /** Interface management commands */

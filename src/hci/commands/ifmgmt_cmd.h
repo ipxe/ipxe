@@ -23,8 +23,8 @@ FILE_LICENCE ( GPL2_OR_LATER );
 
 struct net_device;
 
-extern int ifcommon_exec ( int ( * payload ) ( struct net_device * ),
-			   const char *verb, int argc, char **argv )
-	__attribute__ (( regparm ( 2 ) ));
+extern int ifcommon_exec (  int argc, char **argv,
+			    int ( * payload ) ( struct net_device * ),
+			    const char *verb );
 
 #endif /* _IFMGMT_CMD_H */
