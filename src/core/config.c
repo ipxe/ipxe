@@ -204,6 +204,9 @@ REQUIRE_OBJECT ( time_cmd );
 #ifdef DIGEST_CMD
 REQUIRE_OBJECT ( digest_cmd );
 #endif
+#ifdef PXE_CMD
+REQUIRE_OBJECT ( pxe_cmd );
+#endif
 
 /*
  * Drag in miscellaneous objects
