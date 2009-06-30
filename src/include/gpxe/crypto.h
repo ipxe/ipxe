@@ -151,4 +151,6 @@ extern struct digest_algorithm digest_null;
 extern struct cipher_algorithm cipher_null;
 extern struct pubkey_algorithm pubkey_null;
 
+void get_random_bytes ( void *buf, size_t len );
+
 #endif /* _GPXE_CRYPTO_H */
