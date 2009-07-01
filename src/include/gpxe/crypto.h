@@ -129,7 +129,7 @@ static inline void cipher_encrypt ( struct cipher_algorithm *cipher,
 	cipher->encrypt ( ctx, src, dst, len );
 }
 #define cipher_encrypt( cipher, ctx, src, dst, len ) do {		\
-	assert ( ( len & ( (cipher)->blocksize - 1 ) ) == 0 );		\
+	assert ( ( (len) & ( (cipher)->blocksize - 1 ) ) == 0 );	\
 	cipher_encrypt ( (cipher), (ctx), (src), (dst), (len) );	\
 	} while ( 0 )
 
@@ -139,7 +139,7 @@ static inline void cipher_decrypt ( struct cipher_algorithm *cipher,
 	cipher->decrypt ( ctx, src, dst, len );
 }
 #define cipher_decrypt( cipher, ctx, src, dst, len ) do {		\
-	assert ( ( len & ( (cipher)->blocksize - 1 ) ) == 0 );		\
+	assert ( ( (len) & ( (cipher)->blocksize - 1 ) ) == 0 );	\
 	cipher_decrypt ( (cipher), (ctx), (src), (dst), (len) );	\
 	} while ( 0 )
 
