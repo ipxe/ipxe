@@ -374,6 +374,8 @@ extern int ib_mcast_attach ( struct ib_device *ibdev, struct ib_queue_pair *qp,
 			     struct ib_gid *gid );
 extern void ib_mcast_detach ( struct ib_device *ibdev,
 			      struct ib_queue_pair *qp, struct ib_gid *gid );
+extern int ib_get_hca_info ( struct ib_device *ibdev,
+			     struct ib_gid_half *hca_guid );
 extern struct ib_device * alloc_ibdev ( size_t priv_size );
 extern int register_ibdev ( struct ib_device *ibdev );
 extern void unregister_ibdev ( struct ib_device *ibdev );

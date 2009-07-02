@@ -47,27 +47,15 @@ static void ib_sma_get_node_info ( struct ib_sma *sma,
 				   union ib_smp_data *get ) {
 	struct ib_device *ibdev = sma->ibdev;
 	struct ib_node_info *node_info = &get->node_info;
-	struct ib_device *tmp;
 
 	memset ( node_info, 0, sizeof ( *node_info ) );
 	node_info->base_version = IB_MGMT_BASE_VERSION;
 	node_info->class_version = IB_SMP_CLASS_VERSION;
 	node_info->node_type = IB_NODE_TYPE_HCA;
-	/* Search for IB devices with the same physical device to
-	 * identify port count and a suitable Node GUID.
-	 */
-	for_each_ibdev ( tmp ) {
-		if ( tmp->dev != ibdev->dev )
-			continue;
-		if ( node_info->num_ports == 0 ) {
-			memcpy ( node_info->sys_guid, &tmp->gid.u.half[1],
-				 sizeof ( node_info->sys_guid ) );
-			memcpy ( node_info->node_guid, &tmp->gid.u.half[1],
-				 sizeof ( node_info->node_guid ) );
-		}
-		node_info->num_ports++;
-	}
-	memcpy ( node_info->port_guid, &ibdev->gid.u.half[1],
+	node_info->num_ports = ib_get_hca_info ( ibdev, &node_info->sys_guid );
+	memcpy ( &node_info->node_guid, &node_info->sys_guid,
+		 sizeof ( node_info->node_guid ) );
+	memcpy ( &node_info->port_guid, &ibdev->gid.u.half[1],
 		 sizeof ( node_info->port_guid ) );
 	node_info->partition_cap = htons ( 1 );
 	node_info->local_port_num = ibdev->port;

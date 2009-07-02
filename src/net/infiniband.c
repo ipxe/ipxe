@@ -488,6 +488,32 @@ void ib_mcast_detach ( struct ib_device *ibdev, struct ib_queue_pair *qp,
 	}
 }
 
+/**
+ * Get Infiniband HCA information
+ *
+ * @v ibdev		Infiniband device
+ * @ret hca_guid	HCA GUID
+ * @ret num_ports	Number of ports
+ */
+int ib_get_hca_info ( struct ib_device *ibdev,
+		      struct ib_gid_half *hca_guid ) {
+	struct ib_device *tmp;
+	int num_ports = 0;
+
+	/* Search for IB devices with the same physical device to
+	 * identify port count and a suitable Node GUID.
+	 */
+	for_each_ibdev ( tmp ) {
+		if ( tmp->dev != ibdev->dev )
+			continue;
+		if ( num_ports == 0 ) {
+			memcpy ( hca_guid, &tmp->gid.u.half[1],
+				 sizeof ( *hca_guid ) );
+		}
+		num_ports++;
+	}
+	return num_ports;
+}
 
 /***************************************************************************
  *

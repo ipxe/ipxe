@@ -75,9 +75,9 @@ struct ib_node_info {
 	uint8_t class_version;
 	uint8_t node_type;
 	uint8_t num_ports;
-	uint8_t sys_guid[8];
-	uint8_t node_guid[8];
-	uint8_t port_guid[8];
+	struct ib_gid_half sys_guid;
+	struct ib_gid_half node_guid;
+	struct ib_gid_half port_guid;
 	uint16_t partition_cap;
 	uint16_t device_id;
 	uint32_t revision;
