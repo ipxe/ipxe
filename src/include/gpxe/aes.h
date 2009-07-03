@@ -24,4 +24,7 @@ struct aes_context {
 extern struct cipher_algorithm aes_algorithm;
 extern struct cipher_algorithm aes_cbc_algorithm;
 
+int aes_wrap ( const void *kek, const void *src, void *dest, int nblk );
+int aes_unwrap ( const void *kek, const void *src, void *dest, int nblk );
+
 #endif /* _GPXE_AES_H */
