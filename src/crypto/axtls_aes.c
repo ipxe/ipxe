@@ -32,17 +32,6 @@ FILE_LICENCE ( GPL2_OR_LATER );
  *
  */
 
-/** Basic AES blocksize */
-#define AES_BLOCKSIZE 16
-
-/** AES context */
-struct aes_context {
-	/** AES context for AXTLS */
-	AES_CTX axtls_ctx;
-	/** Cipher is being used for decrypting */
-	int decrypting;
-};
-
 /**
  * Set key
  *
@@ -154,7 +143,7 @@ static void aes_decrypt ( void *ctx, const void *src, void *dst,
 }
 
 /** Basic AES algorithm */
-static struct cipher_algorithm aes_algorithm = {
+struct cipher_algorithm aes_algorithm = {
 	.name = "aes",
 	.ctxsize = sizeof ( struct aes_context ),
 	.blocksize = AES_BLOCKSIZE,
