@@ -17,7 +17,7 @@ esac
 isolinux_bin=${ISOLINUX_BIN:-util/isolinux.bin}
 if [ ! -r $isolinux_bin ]
 then
-	echo $0: $isolinux_bin not found, please install, or set ISOLINUX_BIN in arch/i386/config correctly
+	echo $0: $isolinux_bin not found, please install, or set ISOLINUX_BIN in arch/i386/Makefile correctly
 	exit 1
 fi
 out=$1
