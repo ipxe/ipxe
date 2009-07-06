@@ -14,6 +14,7 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #include <gpxe/device.h>
 #include <gpxe/ib_packet.h>
 #include <gpxe/ib_mad.h>
+#include <gpxe/ib_gma.h>
 
 /** Subnet management QPN */
 #define IB_QPN_SMA 0
@@ -131,6 +132,19 @@ struct ib_address_vector {
 	unsigned int gid_present;
 	/** GID, if present */
 	struct ib_gid gid;
+};
+
+/** Infiniband transmission rates */
+enum ib_rate {
+	IB_RATE_2_5 = 2,
+	IB_RATE_10 = 3,
+	IB_RATE_30 = 4,
+	IB_RATE_5 = 5,
+	IB_RATE_20 = 6,
+	IB_RATE_40 = 7,
+	IB_RATE_60 = 8,
+	IB_RATE_80 = 9,
+	IB_RATE_120 = 10,
 };
 
 /** Infiniband completion queue operations */
@@ -353,6 +367,9 @@ struct ib_device {
 
 	/** Outbound packet sequence number */
 	uint32_t psn;
+
+	/** General management agent */
+	struct ib_gma gma;
 
 	/** Driver private data */
 	void *drv_priv;

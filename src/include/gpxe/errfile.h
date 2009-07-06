@@ -144,6 +144,7 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #define ERRFILE_ib_packet		( ERRFILE_NET | 0x00180000 )
 #define ERRFILE_icmp			( ERRFILE_NET | 0x00190000 )
 #define ERRFILE_ib_qset			( ERRFILE_NET | 0x001a0000 )
+#define ERRFILE_ib_gma			( ERRFILE_NET | 0x001b0000 )
 
 #define ERRFILE_image		      ( ERRFILE_IMAGE | 0x00000000 )
 #define ERRFILE_elf		      ( ERRFILE_IMAGE | 0x00010000 )

@@ -485,16 +485,36 @@ void ib_refill_recv ( struct ib_device *ibdev, struct ib_queue_pair *qp ) {
 int ib_open ( struct ib_device *ibdev ) {
 	int rc;
 
-	/* Open device if this is the first requested opening */
-	if ( ibdev->open_count == 0 ) {
-		if ( ( rc = ibdev->op->open ( ibdev ) ) != 0 )
-			return rc;
+	/* Increment device open request counter */
+	if ( ibdev->open_count++ > 0 ) {
+		/* Device was already open; do nothing */
+		return 0;
 	}
 
-	/* Increment device open request counter */
-	ibdev->open_count++;
+	/* Open device */
+	if ( ( rc = ibdev->op->open ( ibdev ) ) != 0 ) {
+		DBGC ( ibdev, "IBDEV %p could not open: %s\n",
+		       ibdev, strerror ( rc ) );
+		goto err_open;
+	}
 
+	/* Create general management agent */
+	if ( ( rc = ib_create_gma ( &ibdev->gma, ibdev, IB_QKEY_GMA ) ) != 0 ){
+		DBGC ( ibdev, "IBDEV %p could not create GMA: %s\n",
+		       ibdev, strerror ( rc ) );
+		goto err_create_gma;
+	}
+
+	assert ( ibdev->open_count == 1 );
 	return 0;
+
+	ib_destroy_gma ( &ibdev->gma );
+ err_create_gma:
+	ibdev->op->close ( ibdev );
+ err_open:
+	assert ( ibdev->open_count == 1 );
+	ibdev->open_count = 0;
+	return rc;
 }
 
 /**
@@ -508,8 +528,10 @@ void ib_close ( struct ib_device *ibdev ) {
 	ibdev->open_count--;
 
 	/* Close device if this was the last remaining requested opening */
-	if ( ibdev->open_count == 0 )
+	if ( ibdev->open_count == 0 ) {
+		ib_destroy_gma ( &ibdev->gma );
 		ibdev->op->close ( ibdev );
+	}
 }
 
 /***************************************************************************
