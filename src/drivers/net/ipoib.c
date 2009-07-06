@@ -743,10 +743,7 @@ static void ipoib_poll ( struct net_device *netdev ) {
 	struct ipoib_device *ipoib = netdev->priv;
 	struct ib_device *ibdev = ipoib->ibdev;
 
-	ib_poll_cq ( ibdev, ipoib->meta.cq );
-	ib_poll_cq ( ibdev, ipoib->data.cq );
-	ib_qset_refill_recv ( ibdev, &ipoib->meta );
-	ib_qset_refill_recv ( ibdev, &ipoib->data );
+	ib_poll_eq ( ibdev );
 }
 
 /**
@@ -861,8 +858,8 @@ static int ipoib_open ( struct net_device *netdev ) {
 	mac->qpn = htonl ( ipoib->data.qp->qpn );
 
 	/* Fill receive rings */
-	ib_qset_refill_recv ( ibdev, &ipoib->meta );
-	ib_qset_refill_recv ( ibdev, &ipoib->data );
+	ib_refill_recv ( ibdev, ipoib->meta.qp );
+	ib_refill_recv ( ibdev, ipoib->data.qp );
 
 	/* Join broadcast group */
 	if ( ( rc = ipoib_join_broadcast_group ( ipoib ) ) != 0 ) {

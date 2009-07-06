@@ -27,7 +27,6 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #include <byteswap.h>
 #include <gpxe/infiniband.h>
 #include <gpxe/iobuf.h>
-#include <gpxe/process.h>
 #include <gpxe/ib_sma.h>
 
 /**
@@ -349,36 +348,6 @@ static int ib_sma_mad ( struct ib_sma *sma, union ib_mad *mad ) {
 }
 
 /**
- * Refill SMA receive ring
- *
- * @v sma		Subnet management agent
- */
-static void ib_sma_refill_recv ( struct ib_sma *sma ) {
-	struct ib_device *ibdev = sma->ibdev;
-	struct io_buffer *iobuf;
-	int rc;
-
-	while ( sma->qp->recv.fill < IB_SMA_NUM_RECV_WQES ) {
-
-		/* Allocate I/O buffer */
-		iobuf = alloc_iob ( IB_MAX_PAYLOAD_SIZE );
-		if ( ! iobuf ) {
-			/* Non-fatal; we will refill on next attempt */
-			return;
-		}
-
-		/* Post I/O buffer */
-		if ( ( rc = ib_post_recv ( ibdev, sma->qp, iobuf ) ) != 0 ) {
-			DBGC ( sma, "SMA %p could not refill: %s\n",
-			       sma, strerror ( rc ) );
-			free_iob ( iobuf );
-			/* Give up */
-			return;
-		}
-	}
-}
-
-/**
  * Complete SMA send
  *
  *
@@ -457,23 +426,6 @@ static struct ib_completion_queue_operations ib_sma_completion_ops = {
 };
 
 /**
- * Poll SMA
- *
- * @v process		Process
- */
-static void ib_sma_step ( struct process *process ) {
-	struct ib_sma *sma =
-		container_of ( process, struct ib_sma, poll );
-	struct ib_device *ibdev = sma->ibdev;
-
-	/* Poll the kernel completion queue */
-	ib_poll_cq ( ibdev, sma->cq );
-
-	/* Refill the receive ring */
-	ib_sma_refill_recv ( sma );
-}
-
-/**
  * Create SMA
  *
  * @v sma		Subnet management agent
@@ -489,7 +441,6 @@ int ib_create_sma ( struct ib_sma *sma, struct ib_device *ibdev,
 	memset ( sma, 0, sizeof ( *sma ) );
 	sma->ibdev = ibdev;
 	sma->op = op;
-	process_init ( &sma->poll, ib_sma_step, &ibdev->refcnt );
 
 	/* Create completion queue */
 	sma->cq = ib_create_cq ( ibdev, IB_SMA_NUM_CQES,
@@ -517,7 +468,7 @@ int ib_create_sma ( struct ib_sma *sma, struct ib_device *ibdev,
 	}
 
 	/* Fill receive ring */
-	ib_sma_refill_recv ( sma );
+	ib_refill_recv ( ibdev, sma->qp );
 	return 0;
 
  err_not_qp0:
@@ -525,7 +476,6 @@ int ib_create_sma ( struct ib_sma *sma, struct ib_device *ibdev,
  err_create_qp:
 	ib_destroy_cq ( ibdev, sma->cq );
  err_create_cq:
-	process_del ( &sma->poll );
 	return rc;
 }
 
@@ -539,5 +489,4 @@ void ib_destroy_sma ( struct ib_sma *sma ) {
 
 	ib_destroy_qp ( ibdev, sma->qp );
 	ib_destroy_cq ( ibdev, sma->cq );
-	process_del ( &sma->poll );
 }

@@ -18,8 +18,6 @@ struct ib_queue_set {
 	struct ib_completion_queue *cq;
 	/** Queue pair */
 	struct ib_queue_pair *qp;
-	/** Receive work queue maximum fill level */
-	unsigned int recv_max_fill;
 };
 
 extern int ib_create_qset ( struct ib_device *ibdev,
@@ -27,8 +25,6 @@ extern int ib_create_qset ( struct ib_device *ibdev,
 			    struct ib_completion_queue_operations *cq_op,
 			    unsigned int num_send_wqes,
 			    unsigned int num_recv_wqes, unsigned long qkey );
-extern void ib_qset_refill_recv ( struct ib_device *ibdev,
-				  struct ib_queue_set *qset );
 extern void ib_destroy_qset ( struct ib_device *ibdev,
 			      struct ib_queue_set *qset );
 

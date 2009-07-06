@@ -154,6 +154,10 @@ struct ib_completion_queue_operations {
 
 /** An Infiniband Completion Queue */
 struct ib_completion_queue {
+	/** Containing Infiniband device */
+	struct ib_device *ibdev;
+	/** List of completion queues on this Infiniband device */
+	struct list_head list;
 	/** Completion queue number */
 	unsigned long cqn;
 	/** Number of completion queue entries */
@@ -310,6 +314,8 @@ struct ib_device {
 	struct list_head list;
 	/** Underlying device */
 	struct device *dev;
+	/** List of completion queues */
+	struct list_head cqs;
 	/** List of queue pairs */
 	struct list_head qps;
 	/** Infiniband operations */
@@ -350,6 +356,8 @@ ib_create_cq ( struct ib_device *ibdev, unsigned int num_cqes,
 	       struct ib_completion_queue_operations *op );
 extern void ib_destroy_cq ( struct ib_device *ibdev,
 			    struct ib_completion_queue *cq );
+extern void ib_poll_cq ( struct ib_device *ibdev,
+			 struct ib_completion_queue *cq );
 extern struct ib_queue_pair *
 ib_create_qp ( struct ib_device *ibdev, unsigned int num_send_wqes,
 	       struct ib_completion_queue *send_cq, unsigned int num_recv_wqes,
@@ -376,6 +384,8 @@ extern void ib_complete_recv ( struct ib_device *ibdev,
 			       struct ib_queue_pair *qp,
 			       struct ib_address_vector *av,
 			       struct io_buffer *iobuf, int rc );
+extern void ib_refill_recv ( struct ib_device *ibdev,
+			     struct ib_queue_pair *qp );
 extern int ib_open ( struct ib_device *ibdev );
 extern void ib_close ( struct ib_device *ibdev );
 extern int ib_mcast_attach ( struct ib_device *ibdev, struct ib_queue_pair *qp,
@@ -388,22 +398,12 @@ extern struct ib_device * alloc_ibdev ( size_t priv_size );
 extern int register_ibdev ( struct ib_device *ibdev );
 extern void unregister_ibdev ( struct ib_device *ibdev );
 extern void ib_link_state_changed ( struct ib_device *ibdev );
+extern void ib_poll_eq ( struct ib_device *ibdev );
 extern struct list_head ib_devices;
 
 /** Iterate over all network devices */
 #define for_each_ibdev( ibdev ) \
 	list_for_each_entry ( (ibdev), &ib_devices, list )
-
-/**
- * Poll completion queue
- *
- * @v ibdev		Infiniband device
- * @v cq		Completion queue
- */
-static inline __always_inline void
-ib_poll_cq ( struct ib_device *ibdev, struct ib_completion_queue *cq ) {
-	ibdev->op->poll_cq ( ibdev, cq );
-}
 
 /**
  * Check link state

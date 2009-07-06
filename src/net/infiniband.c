@@ -43,6 +43,13 @@ FILE_LICENCE ( GPL2_OR_LATER );
 /** List of Infiniband devices */
 struct list_head ib_devices = LIST_HEAD_INIT ( ib_devices );
 
+/***************************************************************************
+ *
+ * Completion queues
+ *
+ ***************************************************************************
+ */
+
 /**
  * Create completion queue
  *
@@ -63,6 +70,8 @@ ib_create_cq ( struct ib_device *ibdev, unsigned int num_cqes,
 	cq = zalloc ( sizeof ( *cq ) );
 	if ( ! cq )
 		goto err_alloc_cq;
+	cq->ibdev = ibdev;
+	list_add ( &cq->list, &ibdev->cqs );
 	cq->num_cqes = num_cqes;
 	INIT_LIST_HEAD ( &cq->work_queues );
 	cq->op = op;
@@ -81,6 +90,7 @@ ib_create_cq ( struct ib_device *ibdev, unsigned int num_cqes,
 
 	ibdev->op->destroy_cq ( ibdev, cq );
  err_dev_create_cq:
+	list_del ( &cq->list );
 	free ( cq );
  err_alloc_cq:
 	return NULL;
@@ -98,8 +108,36 @@ void ib_destroy_cq ( struct ib_device *ibdev,
 	       ibdev, cq->cqn );
 	assert ( list_empty ( &cq->work_queues ) );
 	ibdev->op->destroy_cq ( ibdev, cq );
+	list_del ( &cq->list );
 	free ( cq );
 }
+
+/**
+ * Poll completion queue
+ *
+ * @v ibdev		Infiniband device
+ * @v cq		Completion queue
+ */
+void ib_poll_cq ( struct ib_device *ibdev,
+		  struct ib_completion_queue *cq ) {
+	struct ib_work_queue *wq;
+
+	/* Poll completion queue */
+	ibdev->op->poll_cq ( ibdev, cq );
+
+	/* Refill receive work queues */
+	list_for_each_entry ( wq, &cq->work_queues, list ) {
+		if ( ! wq->is_send )
+			ib_refill_recv ( ibdev, wq->qp );
+	}
+}
+
+/***************************************************************************
+ *
+ * Work queues
+ *
+ ***************************************************************************
+ */
 
 /**
  * Create queue pair
@@ -401,6 +439,44 @@ void ib_complete_recv ( struct ib_device *ibdev, struct ib_queue_pair *qp,
 }
 
 /**
+ * Refill receive work queue
+ *
+ * @v ibdev		Infiniband device
+ * @v qp		Queue pair
+ */
+void ib_refill_recv ( struct ib_device *ibdev, struct ib_queue_pair *qp ) {
+	struct io_buffer *iobuf;
+	int rc;
+
+	/* Keep filling while unfilled entries remain */
+	while ( qp->recv.fill < qp->recv.num_wqes ) {
+
+		/* Allocate I/O buffer */
+		iobuf = alloc_iob ( IB_MAX_PAYLOAD_SIZE );
+		if ( ! iobuf ) {
+			/* Non-fatal; we will refill on next attempt */
+			return;
+		}
+
+		/* Post I/O buffer */
+		if ( ( rc = ib_post_recv ( ibdev, qp, iobuf ) ) != 0 ) {
+			DBGC ( ibdev, "IBDEV %p could not refill: %s\n",
+			       ibdev, strerror ( rc ) );
+			free_iob ( iobuf );
+			/* Give up */
+			return;
+		}
+	}
+}
+
+/***************************************************************************
+ *
+ * Link control
+ *
+ ***************************************************************************
+ */
+
+/**
  * Open port
  *
  * @v ibdev		Infiniband device
@@ -435,6 +511,13 @@ void ib_close ( struct ib_device *ibdev ) {
 	if ( ibdev->open_count == 0 )
 		ibdev->op->close ( ibdev );
 }
+
+/***************************************************************************
+ *
+ * Multicast
+ *
+ ***************************************************************************
+ */
 
 /**
  * Attach to multicast group
@@ -495,6 +578,13 @@ void ib_mcast_detach ( struct ib_device *ibdev, struct ib_queue_pair *qp,
 	}
 }
 
+/***************************************************************************
+ *
+ * Miscellaneous
+ *
+ ***************************************************************************
+ */
+
 /**
  * Get Infiniband HCA information
  *
@@ -541,6 +631,22 @@ void ib_link_state_changed ( struct ib_device *ibdev ) {
 }
 
 /**
+ * Poll event queue
+ *
+ * @v ibdev		Infiniband device
+ */
+void ib_poll_eq ( struct ib_device *ibdev ) {
+	struct ib_completion_queue *cq;
+
+	/* Poll device's event queue */
+	ibdev->op->poll_eq ( ibdev );
+
+	/* Poll all completion queues */
+	list_for_each_entry ( cq, &ibdev->cqs, list )
+		ib_poll_cq ( ibdev, cq );
+}
+
+/**
  * Single-step the Infiniband event queue
  *
  * @v process		Infiniband event queue process
@@ -548,9 +654,8 @@ void ib_link_state_changed ( struct ib_device *ibdev ) {
 static void ib_step ( struct process *process __unused ) {
 	struct ib_device *ibdev;
 
-	list_for_each_entry ( ibdev, &ib_devices, list ) {
-		ibdev->op->poll_eq ( ibdev );
-	}
+	for_each_ibdev ( ibdev )
+		ib_poll_eq ( ibdev );
 }
 
 /** Infiniband event queue process */
@@ -581,6 +686,7 @@ struct ib_device * alloc_ibdev ( size_t priv_size ) {
 	if ( ibdev ) {
 		drv_priv = ( ( ( void * ) ibdev ) + sizeof ( *ibdev ) );
 		ib_set_drvdata ( ibdev, drv_priv );
+		INIT_LIST_HEAD ( &ibdev->cqs );
 		INIT_LIST_HEAD ( &ibdev->qps );
 		ibdev->lid = IB_LID_NONE;
 		ibdev->pkey = IB_PKEY_NONE;

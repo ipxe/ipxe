@@ -54,9 +54,6 @@ int ib_create_qset ( struct ib_device *ibdev, struct ib_queue_set *qset,
 	assert ( qset->cq == NULL );
 	assert ( qset->qp == NULL );
 
-	/* Store queue parameters */
-	qset->recv_max_fill = num_recv_wqes;
-
 	/* Allocate completion queue */
 	qset->cq = ib_create_cq ( ibdev, num_cqes, cq_op );
 	if ( ! qset->cq ) {
@@ -81,37 +78,6 @@ int ib_create_qset ( struct ib_device *ibdev, struct ib_queue_set *qset,
  err:
 	ib_destroy_qset ( ibdev, qset );
 	return rc;
-}
-
-/**
- * Refill IPoIB receive ring
- *
- * @v ibdev		Infiniband device
- * @v qset		Queue set
- */
-void ib_qset_refill_recv ( struct ib_device *ibdev,
-			   struct ib_queue_set *qset ) {
-	struct io_buffer *iobuf;
-	int rc;
-
-	while ( qset->qp->recv.fill < qset->recv_max_fill ) {
-
-		/* Allocate I/O buffer */
-		iobuf = alloc_iob ( IB_MAX_PAYLOAD_SIZE );
-		if ( ! iobuf ) {
-			/* Non-fatal; we will refill on next attempt */
-			return;
-		}
-
-		/* Post I/O buffer */
-		if ( ( rc = ib_post_recv ( ibdev, qset->qp, iobuf ) ) != 0 ) {
-			DBGC ( ibdev, "IBDEV %p could not refill: %s\n",
-			       ibdev, strerror ( rc ) );
-			free_iob ( iobuf );
-			/* Give up */
-			return;
-		}
-	}
 }
 
 /**

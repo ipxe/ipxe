@@ -10,7 +10,6 @@
 FILE_LICENCE ( GPL2_OR_LATER );
 
 #include <gpxe/infiniband.h>
-#include <gpxe/process.h>
 
 /** Infiniband Subnet Management Agent operations */
 struct ib_sma_operations {
@@ -33,8 +32,6 @@ struct ib_sma {
 	struct ib_completion_queue *cq;
 	/** SMA queue pair */
 	struct ib_queue_pair *qp;
-	/** Poll process */
-	struct process poll;
 };
 
 /** SMA number of send WQEs
