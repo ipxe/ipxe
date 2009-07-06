@@ -15,14 +15,23 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #include <gpxe/ib_packet.h>
 #include <gpxe/ib_mad.h>
 
-/** Subnet administrator QPN */
-#define IB_SA_QPN 1
+/** Subnet management QPN */
+#define IB_QPN_SMA 0
+
+/** Subnet management queue key */
+#define IB_QKEY_SMA 0
+
+/** General management QPN */
+#define IB_QPN_GMA 1
+
+/** General management queue key */
+#define IB_QKEY_GMA 0x80010000UL
 
 /** Broadcast QPN */
-#define IB_BROADCAST_QPN 0xffffffUL
+#define IB_QPN_BROADCAST 0xffffffUL
 
-/** Subnet administrator queue key */
-#define IB_GLOBAL_QKEY 0x80010000UL
+/** Default Infiniband partition key */
+#define IB_PKEY_NONE 0xffff
 
 /**
  * Maximum payload size

@@ -106,12 +106,6 @@ enum ib_bth_opcode {
 	BTH_OPCODE_UD_SEND = 0x64,
 };
 
-/** Default Infiniband partition key */
-#define IB_PKEY_NONE 0xffff
-
-/** Subnet management queue pair number */
-#define IB_QPN_SMP 0
-
 /** An Infiniband Datagram Extended Transport Header */
 struct ib_datagram_extended_transport_header {
 	/** Queue key */

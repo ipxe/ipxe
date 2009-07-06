@@ -460,7 +460,7 @@ int ib_create_sma ( struct ib_sma *sma, struct ib_device *ibdev,
 	ib_qp_set_ownerdata ( sma->qp, sma );
 
 	/* If we don't get QP0, we can't function */
-	if ( sma->qp->qpn != IB_QPN_SMP ) {
+	if ( sma->qp->qpn != IB_QPN_SMA ) {
 		DBGC ( sma, "SMA %p on QPN %lx, needs to be on QPN 0\n",
 		       sma, sma->qp->qpn );
 		rc = -ENOTSUP;

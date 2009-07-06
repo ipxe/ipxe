@@ -394,8 +394,8 @@ static int ipoib_get_path_record ( struct ipoib_device *ipoib,
 	memset ( &av, 0, sizeof ( av ) );
 	av.lid = ibdev->sm_lid;
 	av.sl = ibdev->sm_sl;
-	av.qpn = IB_SA_QPN;
-	av.qkey = IB_GLOBAL_QKEY;
+	av.qpn = IB_QPN_GMA;
+	av.qkey = IB_QKEY_GMA;
 
 	/* Post send request */
 	if ( ( rc = ib_post_send ( ibdev, ipoib->meta.qp, &av,
@@ -455,8 +455,8 @@ static int ipoib_mc_member_record ( struct ipoib_device *ipoib,
 	memset ( &av, 0, sizeof ( av ) );
 	av.lid = ibdev->sm_lid;
 	av.sl = ibdev->sm_sl;
-	av.qpn = IB_SA_QPN;
-	av.qkey = IB_GLOBAL_QKEY;
+	av.qpn = IB_QPN_GMA;
+	av.qkey = IB_QKEY_GMA;
 
 	/* Post send request */
 	if ( ( rc = ib_post_send ( ibdev, ipoib->meta.qp, &av,
@@ -511,7 +511,7 @@ static int ipoib_transmit ( struct net_device *netdev,
 	av.gid_present = 1;
 	if ( dest->mac.qpn == htonl ( IPOIB_BROADCAST_QPN ) ) {
 		/* Broadcast */
-		av.qpn = IB_BROADCAST_QPN;
+		av.qpn = IB_QPN_BROADCAST;
 		av.lid = ipoib->broadcast_lid;
 		gid = &ipoib->broadcast_gid;
 	} else {
@@ -835,7 +835,7 @@ static int ipoib_open ( struct net_device *netdev ) {
 				     IPOIB_META_NUM_CQES, &ipoib_meta_cq_op,
 				     IPOIB_META_NUM_SEND_WQES,
 				     IPOIB_META_NUM_RECV_WQES,
-				     IB_GLOBAL_QKEY ) ) != 0 ) {
+				     IB_QKEY_GMA ) ) != 0 ) {
 		DBGC ( ipoib, "IPoIB %p could not allocate metadata QP: %s\n",
 		       ipoib, strerror ( rc ) );
 		goto err_create_meta_qset;
@@ -847,7 +847,7 @@ static int ipoib_open ( struct net_device *netdev ) {
 				     IPOIB_DATA_NUM_CQES, &ipoib_data_cq_op,
 				     IPOIB_DATA_NUM_SEND_WQES,
 				     IPOIB_DATA_NUM_RECV_WQES,
-				     IB_GLOBAL_QKEY ) ) != 0 ) {
+				     IB_QKEY_GMA ) ) != 0 ) {
 		DBGC ( ipoib, "IPoIB %p could not allocate data QP: %s\n",
 		       ipoib, strerror ( rc ) );
 		goto err_create_data_qset;
