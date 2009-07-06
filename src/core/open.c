@@ -188,14 +188,9 @@ int xfer_open ( struct xfer_interface *xfer, int type, ... ) {
  * method handler.
  */
 int xfer_vreopen ( struct xfer_interface *xfer, int type, va_list args ) {
-	struct xfer_interface_operations *op = xfer->op;
 
 	/* Close existing connection */
-	xfer_nullify ( xfer );
 	xfer_close ( xfer, 0 );
-
-	/* Restore to operational status */
-	xfer->op = op;
 
 	/* Open new location */
 	return xfer_vopen ( xfer, type, args );
