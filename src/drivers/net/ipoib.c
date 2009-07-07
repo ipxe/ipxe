@@ -38,23 +38,14 @@ FILE_LICENCE ( GPL2_OR_LATER );
  * IP over Infiniband
  */
 
-/** Number of IPoIB data send work queue entries */
-#define IPOIB_DATA_NUM_SEND_WQES 2
+/** Number of IPoIB send work queue entries */
+#define IPOIB_NUM_SEND_WQES 2
 
-/** Number of IPoIB data receive work queue entries */
-#define IPOIB_DATA_NUM_RECV_WQES 4
+/** Number of IPoIB receive work queue entries */
+#define IPOIB_NUM_RECV_WQES 4
 
-/** Number of IPoIB data completion entries */
-#define IPOIB_DATA_NUM_CQES 8
-
-/** Number of IPoIB metadata send work queue entries */
-#define IPOIB_META_NUM_SEND_WQES 2
-
-/** Number of IPoIB metadata receive work queue entries */
-#define IPOIB_META_NUM_RECV_WQES 2
-
-/** Number of IPoIB metadata completion entries */
-#define IPOIB_META_NUM_CQES 8
+/** Number of IPoIB completion entries */
+#define IPOIB_NUM_CQES 8
 
 /** An IPoIB device */
 struct ipoib_device {
@@ -62,10 +53,8 @@ struct ipoib_device {
 	struct net_device *netdev;
 	/** Underlying Infiniband device */
 	struct ib_device *ibdev;
-	/** Data queue set */
-	struct ib_queue_set data;
-	/** Data queue set */
-	struct ib_queue_set meta;
+	/** Queue set */
+	struct ib_queue_set qset;
 	/** Broadcast MAC */
 	struct ipoib_mac broadcast;
 	/** Joined to multicast group
@@ -372,27 +361,27 @@ static int ipoib_transmit ( struct net_device *netdev,
 		return rc;
 	}
 
-	return ib_post_send ( ibdev, ipoib->data.qp, &av, iobuf );
+	return ib_post_send ( ibdev, ipoib->qset.qp, &av, iobuf );
 }
 
 /**
- * Handle IPoIB data send completion
+ * Handle IPoIB send completion
  *
  * @v ibdev		Infiniband device
  * @v qp		Queue pair
  * @v iobuf		I/O buffer
  * @v rc		Completion status code
  */
-static void ipoib_data_complete_send ( struct ib_device *ibdev __unused,
-				       struct ib_queue_pair *qp,
-				       struct io_buffer *iobuf, int rc ) {
+static void ipoib_complete_send ( struct ib_device *ibdev __unused,
+				  struct ib_queue_pair *qp,
+				  struct io_buffer *iobuf, int rc ) {
 	struct ipoib_device *ipoib = ib_qp_get_ownerdata ( qp );
 
 	netdev_tx_complete_err ( ipoib->netdev, iobuf, rc );
 }
 
 /**
- * Handle IPoIB data receive completion
+ * Handle IPoIB receive completion
  *
  * @v ibdev		Infiniband device
  * @v qp		Queue pair
@@ -400,10 +389,10 @@ static void ipoib_data_complete_send ( struct ib_device *ibdev __unused,
  * @v iobuf		I/O buffer
  * @v rc		Completion status code
  */
-static void ipoib_data_complete_recv ( struct ib_device *ibdev __unused,
-				       struct ib_queue_pair *qp,
-				       struct ib_address_vector *av,
-				       struct io_buffer *iobuf, int rc ) {
+static void ipoib_complete_recv ( struct ib_device *ibdev __unused,
+				  struct ib_queue_pair *qp,
+				  struct ib_address_vector *av,
+				  struct io_buffer *iobuf, int rc ) {
 	struct ipoib_device *ipoib = ib_qp_get_ownerdata ( qp );
 	struct net_device *netdev = ipoib->netdev;
 	struct ipoib_hdr *ipoib_hdr;
@@ -417,7 +406,7 @@ static void ipoib_data_complete_recv ( struct ib_device *ibdev __unused,
 
 	/* Sanity check */
 	if ( iob_len ( iobuf ) < sizeof ( struct ipoib_hdr ) ) {
-		DBGC ( ipoib, "IPoIB %p received data packet too short to "
+		DBGC ( ipoib, "IPoIB %p received packet too short to "
 		       "contain IPoIB header\n", ipoib );
 		DBGC_HD ( ipoib, iobuf->data, iob_len ( iobuf ) );
 		netdev_rx_err ( netdev, iobuf, -EIO );
@@ -437,85 +426,10 @@ static void ipoib_data_complete_recv ( struct ib_device *ibdev __unused,
 	netdev_rx ( netdev, iobuf );
 }
 
-/** IPoIB data completion operations */
-static struct ib_completion_queue_operations ipoib_data_cq_op = {
-	.complete_send = ipoib_data_complete_send,
-	.complete_recv = ipoib_data_complete_recv,
-};
-
-/**
- * Handle IPoIB metadata send completion
- *
- * @v ibdev		Infiniband device
- * @v qp		Queue pair
- * @v iobuf		I/O buffer
- * @v rc		Completion status code
- */
-static void ipoib_meta_complete_send ( struct ib_device *ibdev __unused,
-				       struct ib_queue_pair *qp,
-				       struct io_buffer *iobuf, int rc ) {
-	struct ipoib_device *ipoib = ib_qp_get_ownerdata ( qp );
-
-	if ( rc != 0 ) {
-		DBGC ( ipoib, "IPoIB %p metadata TX completion error: %s\n",
-		       ipoib, strerror ( rc ) );
-	}
-	free_iob ( iobuf );
-}
-
-/**
- * Handle IPoIB metadata receive completion
- *
- * @v ibdev		Infiniband device
- * @v qp		Queue pair
- * @v av		Address vector, or NULL
- * @v iobuf		I/O buffer
- * @v rc		Completion status code
- */
-static void
-ipoib_meta_complete_recv ( struct ib_device *ibdev __unused,
-			   struct ib_queue_pair *qp,
-			   struct ib_address_vector *av __unused,
-			   struct io_buffer *iobuf, int rc ) {
-	struct ipoib_device *ipoib = ib_qp_get_ownerdata ( qp );
-	struct ib_mad_sa *sa;
-
-	if ( rc != 0 ) {
-		DBGC ( ipoib, "IPoIB %p metadata RX completion error: %s\n",
-		       ipoib, strerror ( rc ) );
-		goto done;
-	}
-
-	if ( iob_len ( iobuf ) < sizeof ( *sa ) ) {
-		DBGC ( ipoib, "IPoIB %p received metadata packet too short "
-		       "to contain reply\n", ipoib );
-		DBGC_HD ( ipoib, iobuf->data, iob_len ( iobuf ) );
-		goto done;
-	}
-	sa = iobuf->data;
-
-	if ( sa->mad_hdr.status != 0 ) {
-		DBGC ( ipoib, "IPoIB %p metadata RX err status %04x\n",
-		       ipoib, ntohs ( sa->mad_hdr.status ) );
-		goto done;
-	}
-
-	switch ( sa->mad_hdr.tid[0] ) {
-	default:
-		DBGC ( ipoib, "IPoIB %p unwanted response:\n",
-		       ipoib );
-		DBGC_HD ( ipoib, sa, sizeof ( *sa ) );
-		break;
-	}
-
- done:
-	free_iob ( iobuf );
-}
-
-/** IPoIB metadata completion operations */
-static struct ib_completion_queue_operations ipoib_meta_cq_op = {
-	.complete_send = ipoib_meta_complete_send,
-	.complete_recv = ipoib_meta_complete_recv,
+/** IPoIB completion operations */
+static struct ib_completion_queue_operations ipoib_cq_op = {
+	.complete_send = ipoib_complete_send,
+	.complete_recv = ipoib_complete_recv,
 };
 
 /**
@@ -550,7 +464,7 @@ static void ipoib_irq ( struct net_device *netdev __unused,
 static int ipoib_join_broadcast_group ( struct ipoib_device *ipoib ) {
 	int rc;
 
-	if ( ( rc = ib_mcast_join ( ipoib->ibdev, ipoib->data.qp,
+	if ( ( rc = ib_mcast_join ( ipoib->ibdev, ipoib->qset.qp,
 				    &ipoib->broadcast.gid ) ) != 0 ) {
 		DBGC ( ipoib, "IPoIB %p could not join broadcast group: %s\n",
 		       ipoib, strerror ( rc ) );
@@ -568,9 +482,8 @@ static int ipoib_join_broadcast_group ( struct ipoib_device *ipoib ) {
  */
 static void ipoib_leave_broadcast_group ( struct ipoib_device *ipoib ) {
 
-	/* Detach data queue from broadcast multicast GID */
 	if ( ipoib->broadcast_joined ) {
-		ib_mcast_leave ( ipoib->ibdev, ipoib->data.qp,
+		ib_mcast_leave ( ipoib->ibdev, ipoib->qset.qp,
 				 &ipoib->broadcast.gid );
 		ipoib->broadcast_joined = 0;
 	}
@@ -595,36 +508,21 @@ static int ipoib_open ( struct net_device *netdev ) {
 		goto err_ib_open;
 	}
 
-	/* Allocate metadata queue set */
-	if ( ( rc = ib_create_qset ( ibdev, &ipoib->meta,
-				     IPOIB_META_NUM_CQES, &ipoib_meta_cq_op,
-				     IPOIB_META_NUM_SEND_WQES,
-				     IPOIB_META_NUM_RECV_WQES,
-				     IB_QKEY_GMA ) ) != 0 ) {
-		DBGC ( ipoib, "IPoIB %p could not allocate metadata QP: %s\n",
+	/* Allocate queue set */
+	if ( ( rc = ib_create_qset ( ibdev, &ipoib->qset, IPOIB_NUM_CQES,
+				     &ipoib_cq_op, IPOIB_NUM_SEND_WQES,
+				     IPOIB_NUM_RECV_WQES, 0 ) ) != 0 ) {
+		DBGC ( ipoib, "IPoIB %p could not allocate queue set: %s\n",
 		       ipoib, strerror ( rc ) );
-		goto err_create_meta_qset;
+		goto err_create_qset;
 	}
-	ib_qp_set_ownerdata ( ipoib->meta.qp, ipoib );
+	ib_qp_set_ownerdata ( ipoib->qset.qp, ipoib );
 
-	/* Allocate data queue set */
-	if ( ( rc = ib_create_qset ( ibdev, &ipoib->data,
-				     IPOIB_DATA_NUM_CQES, &ipoib_data_cq_op,
-				     IPOIB_DATA_NUM_SEND_WQES,
-				     IPOIB_DATA_NUM_RECV_WQES,
-				     IB_QKEY_GMA ) ) != 0 ) {
-		DBGC ( ipoib, "IPoIB %p could not allocate data QP: %s\n",
-		       ipoib, strerror ( rc ) );
-		goto err_create_data_qset;
-	}
-	ib_qp_set_ownerdata ( ipoib->data.qp, ipoib );
-
-	/* Update MAC address with data QPN */
-	mac->qpn = htonl ( ipoib->data.qp->qpn );
+	/* Update MAC address with QPN */
+	mac->qpn = htonl ( ipoib->qset.qp->qpn );
 
 	/* Fill receive rings */
-	ib_refill_recv ( ibdev, ipoib->meta.qp );
-	ib_refill_recv ( ibdev, ipoib->data.qp );
+	ib_refill_recv ( ibdev, ipoib->qset.qp );
 
 	/* Join broadcast group */
 	if ( ( rc = ipoib_join_broadcast_group ( ipoib ) ) != 0 ) {
@@ -636,10 +534,8 @@ static int ipoib_open ( struct net_device *netdev ) {
 	return 0;
 
  err_join_broadcast:
-	ib_destroy_qset ( ibdev, &ipoib->data );
- err_create_data_qset:
-	ib_destroy_qset ( ibdev, &ipoib->meta );
- err_create_meta_qset:
+	ib_destroy_qset ( ibdev, &ipoib->qset );
+ err_create_qset:
 	ib_close ( ibdev );
  err_ib_open:
 	return rc;
@@ -657,12 +553,11 @@ static void ipoib_close ( struct net_device *netdev ) {
 	/* Leave broadcast group */
 	ipoib_leave_broadcast_group ( ipoib );
 
-	/* Remove data QPN from MAC address */
+	/* Remove QPN from MAC address */
 	mac->qpn = 0;
 
 	/* Tear down the queues */
-	ib_destroy_qset ( ipoib->ibdev, &ipoib->data );
-	ib_destroy_qset ( ipoib->ibdev, &ipoib->meta );
+	ib_destroy_qset ( ipoib->ibdev, &ipoib->qset );
 
 	/* Close IB device */
 	ib_close ( ipoib->ibdev );
