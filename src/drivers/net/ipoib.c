@@ -29,6 +29,7 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #include <gpxe/netdevice.h>
 #include <gpxe/infiniband.h>
 #include <gpxe/ib_qset.h>
+#include <gpxe/ib_pathrec.h>
 #include <gpxe/ipoib.h>
 
 /** @file
@@ -78,9 +79,6 @@ struct ipoib_device {
 	int broadcast_attached;
 };
 
-/** TID half used to identify get path record replies */
-#define IPOIB_TID_GET_PATH_REC 0x11111111UL
-
 /** TID half used to identify multicast member record replies */
 #define IPOIB_TID_MC_MEMBER_REC 0x22222222UL
 
@@ -118,12 +116,6 @@ struct ipoib_peer {
 	uint8_t key;
 	/** MAC address */
 	struct ipoib_mac mac;
-	/** LID */
-	unsigned int lid;
-	/** Service level */
-	unsigned int sl;
-	/** Rate */
-	unsigned int rate;
 };
 
 /** Number of IPoIB peer cache entries
@@ -353,63 +345,6 @@ struct ll_protocol ipoib_protocol __ll_protocol = {
  */
 
 /**
- * Transmit path record request
- *
- * @v ipoib		IPoIB device
- * @v gid		Destination GID
- * @ret rc		Return status code
- */
-static int ipoib_get_path_record ( struct ipoib_device *ipoib,
-				   struct ib_gid *gid ) {
-	struct ib_device *ibdev = ipoib->ibdev;
-	struct io_buffer *iobuf;
-	struct ib_mad_sa *sa;
-	struct ib_address_vector av;
-	int rc;
-
-	/* Allocate I/O buffer */
-	iobuf = alloc_iob ( sizeof ( *sa ) );
-	if ( ! iobuf )
-		return -ENOMEM;
-	iob_put ( iobuf, sizeof ( *sa ) );
-	sa = iobuf->data;
-	memset ( sa, 0, sizeof ( *sa ) );
-
-	/* Construct path record request */
-	sa->mad_hdr.base_version = IB_MGMT_BASE_VERSION;
-	sa->mad_hdr.mgmt_class = IB_MGMT_CLASS_SUBN_ADM;
-	sa->mad_hdr.class_version = 2;
-	sa->mad_hdr.method = IB_MGMT_METHOD_GET;
-	sa->mad_hdr.attr_id = htons ( IB_SA_ATTR_PATH_REC );
-	sa->mad_hdr.tid[0] = IPOIB_TID_GET_PATH_REC;
-	sa->mad_hdr.tid[1] = ipoib_meta_tid++;
-	sa->sa_hdr.comp_mask[1] =
-		htonl ( IB_SA_PATH_REC_DGID | IB_SA_PATH_REC_SGID );
-	memcpy ( &sa->sa_data.path_record.dgid, gid,
-		 sizeof ( sa->sa_data.path_record.dgid ) );
-	memcpy ( &sa->sa_data.path_record.sgid, &ibdev->gid,
-		 sizeof ( sa->sa_data.path_record.sgid ) );
-
-	/* Construct address vector */
-	memset ( &av, 0, sizeof ( av ) );
-	av.lid = ibdev->sm_lid;
-	av.sl = ibdev->sm_sl;
-	av.qpn = IB_QPN_GMA;
-	av.qkey = IB_QKEY_GMA;
-
-	/* Post send request */
-	if ( ( rc = ib_post_send ( ibdev, ipoib->meta.qp, &av,
-				   iobuf ) ) != 0 ) {
-		DBGC ( ipoib, "IPoIB %p could not send get path record: %s\n",
-		       ipoib, strerror ( rc ) );
-		free_iob ( iobuf );
-		return rc;
-	}
-
-	return 0;
-}
-
-/**
  * Transmit multicast group membership request
  *
  * @v ipoib		IPoIB device
@@ -484,7 +419,7 @@ static int ipoib_transmit ( struct net_device *netdev,
 	struct ipoib_hdr *ipoib_hdr;
 	struct ipoib_peer *dest;
 	struct ib_address_vector av;
-	struct ib_gid *gid;
+	int rc;
 
 	/* Sanity check */
 	if ( iob_len ( iobuf ) < sizeof ( *ipoib_hdr ) ) {
@@ -513,21 +448,16 @@ static int ipoib_transmit ( struct net_device *netdev,
 		/* Broadcast */
 		av.qpn = IB_QPN_BROADCAST;
 		av.lid = ipoib->broadcast_lid;
-		gid = &ipoib->broadcast_gid;
+		memcpy ( &av.gid, &ipoib->broadcast_gid, sizeof ( av.gid ) );
 	} else {
 		/* Unicast */
-		if ( ! dest->lid ) {
-			/* No LID yet - get path record to fetch LID */
-			ipoib_get_path_record ( ipoib, &dest->mac.gid );
-			return -ENOENT;
-		}
 		av.qpn = ntohl ( dest->mac.qpn );
-		av.lid = dest->lid;
-		av.rate = dest->rate;
-		av.sl = dest->sl;
-		gid = &dest->mac.gid;
+		memcpy ( &av.gid, &dest->mac.gid, sizeof ( av.gid ) );
+		if ( ( rc = ib_resolve_path ( ibdev, &av ) ) != 0 ) {
+			/* Path not resolved yet */
+			return rc;
+		}
 	}
-	memcpy ( &av.gid, gid, sizeof ( av.gid ) );
 
 	return ib_post_send ( ibdev, ipoib->data.qp, &av, iobuf );
 }
@@ -618,33 +548,6 @@ static void ipoib_meta_complete_send ( struct ib_device *ibdev __unused,
 }
 
 /**
- * Handle received IPoIB path record
- *
- * @v ipoib		IPoIB device
- * @v path_record	Path record
- */
-static void ipoib_recv_path_record ( struct ipoib_device *ipoib,
-				     struct ib_path_record *path_record ) {
-	struct ipoib_peer *peer;
-
-	/* Locate peer cache entry */
-	peer = ipoib_lookup_peer_by_gid ( &path_record->dgid );
-	if ( ! peer ) {
-		DBGC ( ipoib, "IPoIB %p received unsolicited path record\n",
-		       ipoib );
-		return;
-	}
-
-	/* Update path cache entry */
-	peer->lid = ntohs ( path_record->dlid );
-	peer->sl = ( path_record->reserved__sl & 0x0f );
-	peer->rate = ( path_record->rate_selector__rate & 0x3f );
-
-	DBG ( "IPoIB peer %x has dlid %x sl %x rate %x\n",
-	      peer->key, peer->lid, peer->sl, peer->rate );
-}
-
-/**
  * Handle received IPoIB multicast membership record
  *
  * @v ipoib		IPoIB device
@@ -710,9 +613,6 @@ ipoib_meta_complete_recv ( struct ib_device *ibdev __unused,
 	}
 
 	switch ( sa->mad_hdr.tid[0] ) {
-	case IPOIB_TID_GET_PATH_REC:
-		ipoib_recv_path_record ( ipoib, &sa->sa_data.path_record );
-		break;
 	case IPOIB_TID_MC_MEMBER_REC:
 		ipoib_recv_mc_member_record ( ipoib,
 					      &sa->sa_data.mc_member_record );
