@@ -197,10 +197,6 @@ static void ib_gma_complete_recv ( struct ib_device *ibdev,
 		}
 	}
 
-	/* Construct return address */
-	av->qkey = ( ( av->qpn == IB_QPN_SMA ) ? IB_QKEY_SMA : IB_QKEY_GMA );
-	av->rate = IB_RATE_2_5;
-
 	/* Send MAD response, if applicable */
 	if ( ( rc = ib_post_send ( ibdev, qp, av,
 				   iob_disown ( iobuf ) ) ) != 0 ) {

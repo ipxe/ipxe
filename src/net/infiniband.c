@@ -360,6 +360,12 @@ int ib_post_send ( struct ib_device *ibdev, struct ib_queue_pair *qp,
 		return -ENOBUFS;
 	}
 
+	/* Fill in optional parameters in address vector */
+	if ( ! av->qkey )
+		av->qkey = qp->qkey;
+	if ( ! av->rate )
+		av->rate = IB_RATE_2_5;
+
 	/* Post to hardware */
 	if ( ( rc = ibdev->op->post_send ( ibdev, qp, av, iobuf ) ) != 0 ) {
 		DBGC ( ibdev, "IBDEV %p QPN %#lx could not post send WQE: "

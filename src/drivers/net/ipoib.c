@@ -67,8 +67,6 @@ struct ipoib_device {
 	struct ib_queue_set meta;
 	/** Broadcast MAC */
 	struct ipoib_mac broadcast;
-	/** Data queue key */
-	unsigned long data_qkey;
 	/** Attached to multicast group
 	 *
 	 * This flag indicates whether or not we have attached our
@@ -433,7 +431,6 @@ static int ipoib_transmit ( struct net_device *netdev,
 	/* Construct address vector */
 	memset ( &av, 0, sizeof ( av ) );
 	av.qpn = ntohl ( dest->mac.qpn );
-	av.qkey = ipoib->data_qkey;
 	av.gid_present = 1;
 	memcpy ( &av.gid, &dest->mac.gid, sizeof ( av.gid ) );
 	if ( ( rc = ib_resolve_path ( ibdev, &av ) ) != 0 ) {
@@ -540,18 +537,19 @@ static void ipoib_meta_complete_send ( struct ib_device *ibdev __unused,
  */
 static void ipoib_recv_mc_member_record ( struct ipoib_device *ipoib,
 			       struct ib_mc_member_record *mc_member_record ) {
+	unsigned long data_qkey;
 	int joined;
 	int rc;
 
 	/* Record parameters */
 	joined = ( mc_member_record->scope__join_state & 0x0f );
-	ipoib->data_qkey = ntohl ( mc_member_record->qkey );
+	data_qkey = ntohl ( mc_member_record->qkey );
 	DBGC ( ipoib, "IPoIB %p %s broadcast group: qkey %lx\n",
-	       ipoib, ( joined ? "joined" : "left" ), ipoib->data_qkey );
+	       ipoib, ( joined ? "joined" : "left" ), data_qkey );
 
 	/* Update data queue pair qkey */
 	if ( ( rc = ib_modify_qp ( ipoib->ibdev, ipoib->data.qp,
-				   IB_MODIFY_QKEY, ipoib->data_qkey ) ) != 0 ){
+				   IB_MODIFY_QKEY, data_qkey ) ) != 0 ){
 		DBGC ( ipoib, "IPoIB %p could not update data qkey: %s\n",
 		       ipoib, strerror ( rc ) );
 		return;
