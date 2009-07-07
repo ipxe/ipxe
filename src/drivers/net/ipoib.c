@@ -65,10 +65,8 @@ struct ipoib_device {
 	struct ib_queue_set data;
 	/** Data queue set */
 	struct ib_queue_set meta;
-	/** Broadcast GID */
-	struct ib_gid broadcast_gid;
-	/** Broadcast LID */
-	unsigned int broadcast_lid;
+	/** Broadcast MAC */
+	struct ipoib_mac broadcast;
 	/** Data queue key */
 	unsigned long data_qkey;
 	/** Attached to multicast group
@@ -254,9 +252,10 @@ static int ipoib_push ( struct net_device *netdev __unused,
  * @ret net_proto	Network-layer protocol, in network-byte order
  * @ret rc		Return status code
  */
-static int ipoib_pull ( struct net_device *netdev __unused,
+static int ipoib_pull ( struct net_device *netdev,
 			struct io_buffer *iobuf, const void **ll_dest,
 			const void **ll_source, uint16_t *net_proto ) {
+	struct ipoib_device *ipoib = netdev->priv;
 	struct ipoib_hdr *ipoib_hdr = iobuf->data;
 	struct ipoib_peer *dest;
 	struct ipoib_peer *source;
@@ -279,8 +278,8 @@ static int ipoib_pull ( struct net_device *netdev __unused,
 	ipoib_hdr->u.reserved = 0;
 
 	/* Fill in required fields */
-	*ll_dest = ( dest ? &dest->mac : &ipoib_broadcast );
-	*ll_source = ( source ? &source->mac : &ipoib_broadcast );
+	*ll_dest = ( dest ? &dest->mac : &ipoib->broadcast );
+	*ll_source = ( source ? &source->mac : &ipoib->broadcast );
 	*net_proto = ipoib_hdr->proto;
 
 	return 0;
@@ -330,6 +329,24 @@ struct ll_protocol ipoib_protocol __ll_protocol = {
 	.ntoa		= ipoib_ntoa,
 	.mc_hash	= ipoib_mc_hash,
 };
+
+/**
+ * Allocate IPoIB device
+ *
+ * @v priv_size		Size of driver private data
+ * @ret netdev		Network device, or NULL
+ */
+struct net_device * alloc_ipoibdev ( size_t priv_size ) {
+	struct net_device *netdev;
+
+	netdev = alloc_netdev ( priv_size );
+	if ( netdev ) {
+		netdev->ll_protocol = &ipoib_protocol;
+		netdev->ll_broadcast = ( uint8_t * ) &ipoib_broadcast;
+		netdev->max_pkt_len = IB_MAX_PAYLOAD_SIZE;
+	}
+	return netdev;
+}
 
 /****************************************************************************
  *
@@ -439,17 +456,10 @@ static int ipoib_transmit ( struct net_device *netdev,
 	av.qpn = ntohl ( dest->mac.qpn );
 	av.qkey = ipoib->data_qkey;
 	av.gid_present = 1;
-	if ( av.qpn == IB_QPN_BROADCAST ) {
-		/* Broadcast */
-		av.lid = ipoib->broadcast_lid;
-		memcpy ( &av.gid, &ipoib->broadcast_gid, sizeof ( av.gid ) );
-	} else {
-		/* Unicast */
-		memcpy ( &av.gid, &dest->mac.gid, sizeof ( av.gid ) );
-		if ( ( rc = ib_resolve_path ( ibdev, &av ) ) != 0 ) {
-			/* Path not resolved yet */
-			return rc;
-		}
+	memcpy ( &av.gid, &dest->mac.gid, sizeof ( av.gid ) );
+	if ( ( rc = ib_resolve_path ( ibdev, &av ) ) != 0 ) {
+		/* Path not resolved yet */
+		return rc;
 	}
 
 	return ib_post_send ( ibdev, ipoib->data.qp, &av, iobuf );
@@ -554,10 +564,8 @@ static void ipoib_recv_mc_member_record ( struct ipoib_device *ipoib,
 	/* Record parameters */
 	joined = ( mc_member_record->scope__join_state & 0x0f );
 	ipoib->data_qkey = ntohl ( mc_member_record->qkey );
-	ipoib->broadcast_lid = ntohs ( mc_member_record->mlid );
-	DBGC ( ipoib, "IPoIB %p %s broadcast group: qkey %lx mlid %x\n",
-	       ipoib, ( joined ? "joined" : "left" ), ipoib->data_qkey,
-	       ipoib->broadcast_lid );
+	DBGC ( ipoib, "IPoIB %p %s broadcast group: qkey %lx\n",
+	       ipoib, ( joined ? "joined" : "left" ), ipoib->data_qkey );
 
 	/* Update data queue pair qkey */
 	if ( ( rc = ib_modify_qp ( ipoib->ibdev, ipoib->data.qp,
@@ -666,7 +674,7 @@ static int ipoib_join_broadcast_group ( struct ipoib_device *ipoib ) {
 	/* Attach data queue to broadcast multicast GID */
 	assert ( ipoib->broadcast_attached == 0 );
 	if ( ( rc = ib_mcast_attach ( ipoib->ibdev, ipoib->data.qp,
-				      &ipoib->broadcast_gid ) ) != 0 ){
+				      &ipoib->broadcast.gid ) ) != 0 ){
 		DBGC ( ipoib, "IPoIB %p could not attach to broadcast GID: "
 		       "%s\n", ipoib, strerror ( rc ) );
 		return rc;
@@ -674,7 +682,7 @@ static int ipoib_join_broadcast_group ( struct ipoib_device *ipoib ) {
 	ipoib->broadcast_attached = 1;
 
 	/* Initiate broadcast group join */
-	if ( ( rc = ipoib_mc_member_record ( ipoib, &ipoib->broadcast_gid,
+	if ( ( rc = ipoib_mc_member_record ( ipoib, &ipoib->broadcast.gid,
 					     1 ) ) != 0 ) {
 		DBGC ( ipoib, "IPoIB %p could not send broadcast join: %s\n",
 		       ipoib, strerror ( rc ) );
@@ -699,7 +707,7 @@ static void ipoib_leave_broadcast_group ( struct ipoib_device *ipoib ) {
 	if ( ipoib->broadcast_attached ) {
 		assert ( ipoib->data.qp != NULL );
 		ib_mcast_detach ( ipoib->ibdev, ipoib->data.qp,
-				  &ipoib->broadcast_gid );
+				  &ipoib->broadcast.gid );
 		ipoib->broadcast_attached = 0;
 	}
 }
@@ -825,9 +833,9 @@ static void ipoib_set_ib_params ( struct ipoib_device *ipoib ) {
 	memcpy ( &mac->gid, &ibdev->gid, sizeof ( mac->gid ) );
 
 	/* Calculate broadcast GID based on partition key */
-	memcpy ( &ipoib->broadcast_gid, &ipoib_broadcast.gid,
-		 sizeof ( ipoib->broadcast_gid ) );
-	ipoib->broadcast_gid.u.words[2] = htons ( ibdev->pkey );
+	memcpy ( &ipoib->broadcast, &ipoib_broadcast,
+		 sizeof ( ipoib->broadcast ) );
+	ipoib->broadcast.gid.u.words[2] = htons ( ibdev->pkey );
 
 	/* Set net device link state to reflect Infiniband link state */
 	if ( ib_link_ok ( ibdev ) ) {
@@ -882,6 +890,7 @@ int ipoib_probe ( struct ib_device *ibdev ) {
 	ipoib = netdev->priv;
 	ib_set_ownerdata ( ibdev, netdev );
 	netdev->dev = ibdev->dev;
+	netdev->ll_broadcast = ( ( uint8_t * ) &ipoib->broadcast );
 	memset ( ipoib, 0, sizeof ( *ipoib ) );
 	ipoib->netdev = netdev;
 	ipoib->ibdev = ibdev;
@@ -915,22 +924,4 @@ void ipoib_remove ( struct ib_device *ibdev ) {
 	unregister_netdev ( netdev );
 	netdev_nullify ( netdev );
 	netdev_put ( netdev );
-}
-
-/**
- * Allocate IPoIB device
- *
- * @v priv_size		Size of driver private data
- * @ret netdev		Network device, or NULL
- */
-struct net_device * alloc_ipoibdev ( size_t priv_size ) {
-	struct net_device *netdev;
-
-	netdev = alloc_netdev ( priv_size );
-	if ( netdev ) {
-		netdev->ll_protocol = &ipoib_protocol;
-		netdev->ll_broadcast = ( uint8_t * ) &ipoib_broadcast;
-		netdev->max_pkt_len = IB_MAX_PAYLOAD_SIZE;
-	}
-	return netdev;
 }
