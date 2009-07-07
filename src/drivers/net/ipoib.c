@@ -85,15 +85,9 @@ struct ipoib_device {
 /** IPoIB metadata TID */
 static uint32_t ipoib_meta_tid = 0;
 
-/** Broadcast QPN used in IPoIB MAC addresses
- *
- * This is a guaranteed invalid real QPN
- */
-#define IPOIB_BROADCAST_QPN 0xffffffffUL
-
 /** Broadcast IPoIB address */
 static struct ipoib_mac ipoib_broadcast = {
-	.qpn = ntohl ( IPOIB_BROADCAST_QPN ),
+	.qpn = htonl ( IB_QPN_BROADCAST ),
 	.gid.u.bytes = 	{ 0xff, 0x12, 0x40, 0x1b, 0x00, 0x00, 0x00, 0x00,
 			  0x00, 0x00, 0x00, 0x00, 0xff, 0xff, 0xff, 0xff },
 };
@@ -442,16 +436,15 @@ static int ipoib_transmit ( struct net_device *netdev,
 
 	/* Construct address vector */
 	memset ( &av, 0, sizeof ( av ) );
+	av.qpn = ntohl ( dest->mac.qpn );
 	av.qkey = ipoib->data_qkey;
 	av.gid_present = 1;
-	if ( dest->mac.qpn == htonl ( IPOIB_BROADCAST_QPN ) ) {
+	if ( av.qpn == IB_QPN_BROADCAST ) {
 		/* Broadcast */
-		av.qpn = IB_QPN_BROADCAST;
 		av.lid = ipoib->broadcast_lid;
 		memcpy ( &av.gid, &ipoib->broadcast_gid, sizeof ( av.gid ) );
 	} else {
 		/* Unicast */
-		av.qpn = ntohl ( dest->mac.qpn );
 		memcpy ( &av.gid, &dest->mac.gid, sizeof ( av.gid ) );
 		if ( ( rc = ib_resolve_path ( ibdev, &av ) ) != 0 ) {
 			/* Path not resolved yet */
