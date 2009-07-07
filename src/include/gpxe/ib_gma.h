@@ -63,7 +63,7 @@ struct ib_gma {
 };
 
 extern int ib_gma_request ( struct ib_gma *gma, union ib_mad *mad,
-			    struct ib_address_vector *av );
+			    struct ib_address_vector *av, int retry );
 extern int ib_create_gma ( struct ib_gma *gma, struct ib_device *ibdev,
 			   unsigned long qkey );
 extern void ib_destroy_gma ( struct ib_gma *gma );

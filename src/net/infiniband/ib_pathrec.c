@@ -154,7 +154,7 @@ int ib_resolve_path ( struct ib_device *ibdev,
 		 sizeof ( sa->sa_data.path_record.sgid ) );
 
 	/* Issue path record request */
-	if ( ( rc = ib_gma_request ( &ibdev->gma, &mad, NULL ) ) != 0 ) {
+	if ( ( rc = ib_gma_request ( &ibdev->gma, &mad, NULL, 1 ) ) != 0 ) {
 		DBGC ( ibdev, "IBDEV %p could not get path record: %s\n",
 		       ibdev, strerror ( rc ) );
 		return rc;

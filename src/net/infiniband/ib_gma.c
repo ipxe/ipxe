@@ -237,6 +237,48 @@ static struct ib_completion_queue_operations ib_gma_completion_ops = {
 };
 
 /**
+ * Transmit MAD request
+ *
+ * @v gma		General management agent
+ * @v request		MAD request
+ * @ret rc		Return status code
+ */
+static int ib_gma_send ( struct ib_gma *gma, struct ib_mad_request *request ) {
+	struct io_buffer *iobuf;
+	int rc;
+
+	DBGC ( gma, "GMA %p TX TID %08x%08x (%02x,%02x,%02x,%04x)\n",
+	       gma, ntohl ( request->mad.hdr.tid[0] ),
+	       ntohl ( request->mad.hdr.tid[1] ), request->mad.hdr.mgmt_class,
+	       request->mad.hdr.class_version, request->mad.hdr.method,
+	       ntohs ( request->mad.hdr.attr_id ) );
+	DBGC2_HDA ( gma, 0, &request->mad, sizeof ( request->mad ) );
+
+	/* Construct I/O buffer */
+	iobuf = alloc_iob ( sizeof ( request->mad ) );
+	if ( ! iobuf ) {
+		DBGC ( gma, "GMA %p could not allocate buffer for TID "
+		       "%08x%08x\n", gma, ntohl ( request->mad.hdr.tid[0] ),
+		       ntohl ( request->mad.hdr.tid[1] ) );
+		return -ENOMEM;
+	}
+	memcpy ( iob_put ( iobuf, sizeof ( request->mad ) ), &request->mad,
+		 sizeof ( request->mad ) );
+
+	/* Send I/O buffer */
+	if ( ( rc = ib_post_send ( gma->ibdev, gma->qp, &request->av,
+				   iobuf ) ) != 0 ) {
+		DBGC ( gma, "GMA %p could not send TID %08x%08x: %s\n",
+		       gma,  ntohl ( request->mad.hdr.tid[0] ),
+		       ntohl ( request->mad.hdr.tid[1] ), strerror ( rc ) );
+		free_iob ( iobuf );
+		return rc;
+	}
+
+	return 0;
+}
+
+/**
  * Handle MAD request timer expiry
  *
  * @v timer		Retry timer
@@ -246,9 +288,6 @@ static void ib_gma_timer_expired ( struct retry_timer *timer, int expired ) {
 	struct ib_mad_request *request =
 		container_of ( timer, struct ib_mad_request, timer );
 	struct ib_gma *gma = request->gma;
-	struct ib_device *ibdev = gma->ibdev;
-	struct io_buffer *iobuf;
-	int rc;
 
 	/* Abandon TID if we have tried too many times */
 	if ( expired ) {
@@ -260,36 +299,11 @@ static void ib_gma_timer_expired ( struct retry_timer *timer, int expired ) {
 		return;
 	}
 
-	DBGC ( gma, "GMA %p TX TID %08x%08x (%02x,%02x,%02x,%04x)\n",
-	       gma, ntohl ( request->mad.hdr.tid[0] ),
-	       ntohl ( request->mad.hdr.tid[1] ), request->mad.hdr.mgmt_class,
-	       request->mad.hdr.class_version, request->mad.hdr.method,
-	       ntohs ( request->mad.hdr.attr_id ) );
-	DBGC2_HDA ( gma, 0, &request->mad, sizeof ( request->mad ) );
-
 	/* Restart retransmission timer */
 	start_timer ( timer );
 
-	/* Construct I/O buffer */
-	iobuf = alloc_iob ( sizeof ( request->mad ) );
-	if ( ! iobuf ) {
-		DBGC ( gma, "GMA %p could not allocate buffer for TID "
-		       "%08x%08x\n", gma, ntohl ( request->mad.hdr.tid[0] ),
-		       ntohl ( request->mad.hdr.tid[1] ) );
-		return;
-	}
-	memcpy ( iob_put ( iobuf, sizeof ( request->mad ) ), &request->mad,
-		 sizeof ( request->mad ) );
-
-	/* Post send request */
-	if ( ( rc = ib_post_send ( ibdev, gma->qp, &request->av,
-				   iobuf ) ) != 0 ) {
-		DBGC ( gma, "GMA %p could not send TID %08x%08x: %s\n",
-		       gma,  ntohl ( request->mad.hdr.tid[0] ),
-		       ntohl ( request->mad.hdr.tid[1] ), strerror ( rc ) );
-		free_iob ( iobuf );
-		return;
-	}
+	/* Resend request */
+	ib_gma_send ( gma, request );
 }
 
 /**
@@ -298,10 +312,11 @@ static void ib_gma_timer_expired ( struct retry_timer *timer, int expired ) {
  * @v gma		General management agent
  * @v mad		MAD request
  * @v av		Destination address, or NULL for SM
+ * @v retry		Request should be retried until a response arrives
  * @ret rc		Return status code
  */
 int ib_gma_request ( struct ib_gma *gma, union ib_mad *mad,
-		     struct ib_address_vector *av ) {
+		     struct ib_address_vector *av, int retry ) {
 	struct ib_device *ibdev = gma->ibdev;
 	struct ib_mad_request *request;
 
@@ -312,7 +327,6 @@ int ib_gma_request ( struct ib_gma *gma, union ib_mad *mad,
 		return -ENOMEM;
 	}
 	request->gma = gma;
-	list_add ( &request->list, &gma->requests );
 	request->timer.expired = ib_gma_timer_expired;
 
 	/* Determine address vector */
@@ -332,8 +346,18 @@ int ib_gma_request ( struct ib_gma *gma, union ib_mad *mad,
 	request->mad.hdr.tid[0] = htonl ( IB_GMA_TID_MAGIC );
 	request->mad.hdr.tid[1] = htonl ( ++next_request_tid );
 
-	/* Start timer to initiate transmission */
-	start_timer_nodelay ( &request->timer );
+	/* Send initial request.  Ignore errors; the retry timer will
+	 * take care of those we care about.
+	 */
+	ib_gma_send ( gma, request );
+
+	/* Add to list and start timer if applicable */
+	if ( retry ) {
+		list_add ( &request->list, &gma->requests );
+		start_timer ( &request->timer );
+	} else {
+		free ( request );
+	}
 
 	return 0;
 }
