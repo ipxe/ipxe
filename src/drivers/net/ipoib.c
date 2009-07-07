@@ -100,8 +100,12 @@ static struct ipoib_mac ipoib_broadcast = {
 /**
  * IPoIB peer address
  *
- * This serves a similar role to the ARP cache for Ethernet.  (ARP
- * *is* used on IPoIB; we have two caches to maintain.)
+ * The IPoIB link-layer header is only four bytes long and so does not
+ * have sufficient room to store IPoIB MAC address(es).  We therefore
+ * maintain a cache of MAC addresses identified by a single-byte key,
+ * and abuse the spare two bytes within the link-layer header to
+ * communicate these MAC addresses between the link-layer code and the
+ * netdevice driver.
  */
 struct ipoib_peer {
 	/** Key */
@@ -146,44 +150,22 @@ static struct ipoib_peer * ipoib_lookup_peer_by_key ( unsigned int key ) {
 }
 
 /**
- * Look up cached peer by GID
- *
- * @v gid		Peer GID
- * @ret peer		Peer cache entry, or NULL
- */
-static struct ipoib_peer *
-ipoib_lookup_peer_by_gid ( const struct ib_gid *gid ) {
-	struct ipoib_peer *peer;
-	unsigned int i;
-
-	for ( i = 0 ; i < IPOIB_NUM_CACHED_PEERS ; i++ ) {
-		peer = &ipoib_peer_cache[i];
-		if ( memcmp ( &peer->mac.gid, gid,
-			      sizeof ( peer->mac.gid) ) == 0 ) {
-			return peer;
-		}
-	}
-
-	return NULL;
-}
-
-/**
  * Store GID and QPN in peer cache
  *
  * @v gid		Peer GID
  * @v qpn		Peer QPN
  * @ret peer		Peer cache entry
  */
-static struct ipoib_peer *
-ipoib_cache_peer ( const struct ib_gid *gid, unsigned long qpn ) {
+static struct ipoib_peer * ipoib_cache_peer ( const struct ipoib_mac *mac ) {
 	struct ipoib_peer *peer;
 	unsigned int key;
+	unsigned int i;
 
 	/* Look for existing cache entry */
-	peer = ipoib_lookup_peer_by_gid ( gid );
-	if ( peer ) {
-		assert ( peer->mac.qpn = ntohl ( qpn ) );
-		return peer;
+	for ( i = 0 ; i < IPOIB_NUM_CACHED_PEERS ; i++ ) {
+		peer = &ipoib_peer_cache[i];
+		if ( memcmp ( &peer->mac, mac, sizeof ( peer->mac ) ) == 0 )
+			return peer;
 	}
 
 	/* No entry found: create a new one */
@@ -194,12 +176,9 @@ ipoib_cache_peer ( const struct ib_gid *gid, unsigned long qpn ) {
 
 	memset ( peer, 0, sizeof ( *peer ) );
 	peer->key = key;
-	peer->mac.qpn = htonl ( qpn );
-	memcpy ( &peer->mac.gid, gid, sizeof ( peer->mac.gid ) );
-	DBG ( "IPoIB peer %x has GID %08x:%08x:%08x:%08x and QPN %lx\n",
-	      peer->key, htonl ( gid->u.dwords[0] ),
-	      htonl ( gid->u.dwords[1] ), htonl ( gid->u.dwords[2] ),
-	      htonl ( gid->u.dwords[3] ), qpn );
+	memcpy ( &peer->mac, mac, sizeof ( peer->mac ) );
+	DBG ( "IPoIB peer %x has MAC %s\n",
+	      peer->key, ipoib_ntoa ( &peer->mac ) );
 	return peer;
 }
 
@@ -231,8 +210,8 @@ static int ipoib_push ( struct net_device *netdev __unused,
 	struct ipoib_peer *src;
 
 	/* Add link-layer addresses to cache */
-	dest = ipoib_cache_peer ( &dest_mac->gid, ntohl ( dest_mac->qpn ) );
-	src = ipoib_cache_peer ( &src_mac->gid, ntohl ( src_mac->qpn ) );
+	dest = ipoib_cache_peer ( dest_mac );
+	src = ipoib_cache_peer ( src_mac );
 
 	/* Build IPoIB header */
 	ipoib_hdr->proto = net_proto;
@@ -497,6 +476,7 @@ static void ipoib_data_complete_recv ( struct ib_device *ibdev __unused,
 	struct ipoib_device *ipoib = ib_qp_get_ownerdata ( qp );
 	struct net_device *netdev = ipoib->netdev;
 	struct ipoib_hdr *ipoib_hdr;
+	struct ipoib_mac ll_src;
 	struct ipoib_peer *src;
 
 	if ( rc != 0 ) {
@@ -516,7 +496,9 @@ static void ipoib_data_complete_recv ( struct ib_device *ibdev __unused,
 
 	/* Parse source address */
 	if ( av->gid_present ) {
-		src = ipoib_cache_peer ( &av->gid, av->qpn );
+		ll_src.qpn = htonl ( av->qpn );
+		memcpy ( &ll_src.gid, &av->gid, sizeof ( ll_src.gid ) );
+		src = ipoib_cache_peer ( &ll_src );
 		ipoib_hdr->u.peer.src = src->key;
 	}
 
