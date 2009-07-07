@@ -28,7 +28,6 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #include <gpxe/iobuf.h>
 #include <gpxe/netdevice.h>
 #include <gpxe/infiniband.h>
-#include <gpxe/ib_qset.h>
 #include <gpxe/ib_pathrec.h>
 #include <gpxe/ib_mcast.h>
 #include <gpxe/ipoib.h>
@@ -53,8 +52,10 @@ struct ipoib_device {
 	struct net_device *netdev;
 	/** Underlying Infiniband device */
 	struct ib_device *ibdev;
-	/** Queue set */
-	struct ib_queue_set qset;
+	/** Completion queue */
+	struct ib_completion_queue *cq;
+	/** Queue pair */
+	struct ib_queue_pair *qp;
 	/** Broadcast MAC */
 	struct ipoib_mac broadcast;
 	/** Joined to multicast group
@@ -361,7 +362,7 @@ static int ipoib_transmit ( struct net_device *netdev,
 		return rc;
 	}
 
-	return ib_post_send ( ibdev, ipoib->qset.qp, &av, iobuf );
+	return ib_post_send ( ibdev, ipoib->qp, &av, iobuf );
 }
 
 /**
@@ -464,7 +465,7 @@ static void ipoib_irq ( struct net_device *netdev __unused,
 static int ipoib_join_broadcast_group ( struct ipoib_device *ipoib ) {
 	int rc;
 
-	if ( ( rc = ib_mcast_join ( ipoib->ibdev, ipoib->qset.qp,
+	if ( ( rc = ib_mcast_join ( ipoib->ibdev, ipoib->qp,
 				    &ipoib->broadcast.gid ) ) != 0 ) {
 		DBGC ( ipoib, "IPoIB %p could not join broadcast group: %s\n",
 		       ipoib, strerror ( rc ) );
@@ -483,7 +484,7 @@ static int ipoib_join_broadcast_group ( struct ipoib_device *ipoib ) {
 static void ipoib_leave_broadcast_group ( struct ipoib_device *ipoib ) {
 
 	if ( ipoib->broadcast_joined ) {
-		ib_mcast_leave ( ipoib->ibdev, ipoib->qset.qp,
+		ib_mcast_leave ( ipoib->ibdev, ipoib->qp,
 				 &ipoib->broadcast.gid );
 		ipoib->broadcast_joined = 0;
 	}
@@ -508,21 +509,31 @@ static int ipoib_open ( struct net_device *netdev ) {
 		goto err_ib_open;
 	}
 
-	/* Allocate queue set */
-	if ( ( rc = ib_create_qset ( ibdev, &ipoib->qset, IPOIB_NUM_CQES,
-				     &ipoib_cq_op, IPOIB_NUM_SEND_WQES,
-				     IPOIB_NUM_RECV_WQES, 0 ) ) != 0 ) {
-		DBGC ( ipoib, "IPoIB %p could not allocate queue set: %s\n",
-		       ipoib, strerror ( rc ) );
-		goto err_create_qset;
+	/* Allocate completion queue */
+	ipoib->cq = ib_create_cq ( ibdev, IPOIB_NUM_CQES, &ipoib_cq_op );
+	if ( ! ipoib->cq ) {
+		DBGC ( ipoib, "IPoIB %p could not allocate completion queue\n",
+		       ipoib );
+		rc = -ENOMEM;
+		goto err_create_cq;
 	}
-	ib_qp_set_ownerdata ( ipoib->qset.qp, ipoib );
+
+	/* Allocate queue pair */
+	ipoib->qp = ib_create_qp ( ibdev, IPOIB_NUM_SEND_WQES, ipoib->cq,
+				   IPOIB_NUM_RECV_WQES, ipoib->cq, 0 );
+	if ( ! ipoib->qp ) {
+		DBGC ( ipoib, "IPoIB %p could not allocate queue pair\n",
+		       ipoib );
+		rc = -ENOMEM;
+		goto err_create_qp;
+	}
+	ib_qp_set_ownerdata ( ipoib->qp, ipoib );
 
 	/* Update MAC address with QPN */
-	mac->qpn = htonl ( ipoib->qset.qp->qpn );
+	mac->qpn = htonl ( ipoib->qp->qpn );
 
 	/* Fill receive rings */
-	ib_refill_recv ( ibdev, ipoib->qset.qp );
+	ib_refill_recv ( ibdev, ipoib->qp );
 
 	/* Join broadcast group */
 	if ( ( rc = ipoib_join_broadcast_group ( ipoib ) ) != 0 ) {
@@ -533,9 +544,12 @@ static int ipoib_open ( struct net_device *netdev ) {
 
 	return 0;
 
+	ipoib_leave_broadcast_group ( ipoib );
  err_join_broadcast:
-	ib_destroy_qset ( ibdev, &ipoib->qset );
- err_create_qset:
+	ib_destroy_qp ( ibdev, ipoib->qp );
+ err_create_qp:
+	ib_destroy_cq ( ibdev, ipoib->cq );
+ err_create_cq:
 	ib_close ( ibdev );
  err_ib_open:
 	return rc;
@@ -548,6 +562,7 @@ static int ipoib_open ( struct net_device *netdev ) {
  */
 static void ipoib_close ( struct net_device *netdev ) {
 	struct ipoib_device *ipoib = netdev->priv;
+	struct ib_device *ibdev = ipoib->ibdev;
 	struct ipoib_mac *mac = ( ( struct ipoib_mac * ) netdev->ll_addr );
 
 	/* Leave broadcast group */
@@ -557,10 +572,11 @@ static void ipoib_close ( struct net_device *netdev ) {
 	mac->qpn = 0;
 
 	/* Tear down the queues */
-	ib_destroy_qset ( ipoib->ibdev, &ipoib->qset );
+	ib_destroy_qp ( ibdev, ipoib->qp );
+	ib_destroy_cq ( ibdev, ipoib->cq );
 
 	/* Close IB device */
-	ib_close ( ipoib->ibdev );
+	ib_close ( ibdev );
 }
 
 /** IPoIB network device operations */
