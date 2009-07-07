@@ -554,6 +554,10 @@ void ib_close ( struct ib_device *ibdev ) {
  * @v qp		Queue pair
  * @v gid		Multicast GID
  * @ret rc		Return status code
+ *
+ * Note that this function handles only the local device's attachment
+ * to the multicast GID; it does not issue the relevant MADs to join
+ * the multicast group on the subnet.
  */
 int ib_mcast_attach ( struct ib_device *ibdev, struct ib_queue_pair *qp,
 		      struct ib_gid *gid ) {

@@ -203,6 +203,8 @@ struct ib_smp_class_specific {
 
 #define IB_SA_CLASS_VERSION			2
 
+#define IB_SA_METHOD_DELETE_RESP		0x95
+
 struct ib_rmpp_hdr {
 	uint32_t raw[3];
 } __attribute__ (( packed ));
