@@ -17,9 +17,10 @@ struct ib_device;
 struct ib_completion_queue;
 struct ib_queue_pair;
 union ib_mad;
+struct ib_gma;
 
-/** A MAD attribute handler */
-struct ib_mad_handler {
+/** A GMA attribute handler */
+struct ib_gma_handler {
 	/** Management class */
 	uint8_t mgmt_class;
 	/** Class version */
@@ -32,7 +33,7 @@ struct ib_mad_handler {
 	uint16_t attr_id;
 	/** Handle attribute
 	 *
-	 * @v ibdev	Infiniband device
+	 * @v gma	General management agent
 	 * @v mad	MAD
 	 * @ret rc	Return status code
 	 *
@@ -40,14 +41,14 @@ struct ib_mad_handler {
 	 * handler returns with a non-zero value in the MAD's @c
 	 * method field, it will be sent as a response.
 	 */
-	int ( * handle ) ( struct ib_device *ibdev, union ib_mad *mad );
+	int ( * handle ) ( struct ib_gma *gma, union ib_mad *mad );
 };
 
-/** MAD attribute handlers */
-#define IB_MAD_HANDLERS __table ( struct ib_mad_handler, "ib_mad_handlers" )
+/** GMA attribute handlers */
+#define IB_GMA_HANDLERS __table ( struct ib_gma_handler, "ib_gma_handlers" )
 
-/** Declare a MAD attribute handler */
-#define __ib_mad_handler __table_entry ( IB_MAD_HANDLERS, 01 )
+/** Declare a GMA attribute handler */
+#define __ib_gma_handler __table_entry ( IB_GMA_HANDLERS, 01 )
 
 /** An Infiniband General Management Agent */
 struct ib_gma {

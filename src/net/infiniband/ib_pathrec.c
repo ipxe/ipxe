@@ -98,6 +98,7 @@ ib_find_path_cache_entry ( struct ib_device *ibdev, struct ib_gid *dgid ) {
  */
 int ib_resolve_path ( struct ib_device *ibdev,
 		      struct ib_address_vector *av ) {
+	struct ib_gma *gma = &ibdev->gma;
 	struct ib_gid *gid = &av->gid;
 	struct ib_cached_path_record *cached;
 	union ib_mad mad;
@@ -107,8 +108,8 @@ int ib_resolve_path ( struct ib_device *ibdev,
 
 	/* Sanity check */
 	if ( ! av->gid_present ) {
-		DBGC ( ibdev, "IBDEV %p attempt to look up path record "
-		       "without GID\n", ibdev );
+		DBGC ( gma, "GMA %p attempt to look up path record "
+		       "without GID\n", gma );
 		return -EINVAL;
 	}
 
@@ -119,13 +120,13 @@ int ib_resolve_path ( struct ib_device *ibdev,
 		av->lid = cached->dlid;
 		av->rate = cached->rate;
 		av->sl = cached->sl;
-		DBGC2 ( ibdev, "IBDEV %p cache hit for %08x:%08x:%08x:%08x\n",
-			ibdev, htonl ( gid->u.dwords[0] ),
+		DBGC2 ( gma, "GMA %p cache hit for %08x:%08x:%08x:%08x\n",
+			gma, htonl ( gid->u.dwords[0] ),
 			htonl ( gid->u.dwords[1] ), htonl ( gid->u.dwords[2] ),
 			htonl ( gid->u.dwords[3] ) );
 		return 0;
 	}
-	DBGC ( ibdev, "IBDEV %p cache miss for %08x:%08x:%08x:%08x%s\n", ibdev,
+	DBGC ( gma, "GMA %p cache miss for %08x:%08x:%08x:%08x%s\n", gma,
 	       htonl ( gid->u.dwords[0] ), htonl ( gid->u.dwords[1] ),
 	       htonl ( gid->u.dwords[2] ), htonl ( gid->u.dwords[3] ),
 	       ( cached ? " (in progress)" : "" ) );
@@ -154,9 +155,9 @@ int ib_resolve_path ( struct ib_device *ibdev,
 		 sizeof ( sa->sa_data.path_record.sgid ) );
 
 	/* Issue path record request */
-	if ( ( rc = ib_gma_request ( &ibdev->gma, &mad, NULL, 1 ) ) != 0 ) {
-		DBGC ( ibdev, "IBDEV %p could not get path record: %s\n",
-		       ibdev, strerror ( rc ) );
+	if ( ( rc = ib_gma_request ( gma, &mad, NULL, 1 ) ) != 0 ) {
+		DBGC ( gma, "GMA %p could not get path record: %s\n",
+		       gma, strerror ( rc ) );
 		return rc;
 	}
 
@@ -167,12 +168,13 @@ int ib_resolve_path ( struct ib_device *ibdev,
 /**
  * Handle path record response
  *
- * @v ibdev		Infiniband device
+ * @v gma		General management agent
  * @v mad		MAD
  * @ret rc		Return status code
  */
-static int ib_handle_path_record ( struct ib_device *ibdev,
+static int ib_handle_path_record ( struct ib_gma *gma,
 				   union ib_mad *mad ) {
+	struct ib_device *ibdev = gma->ibdev;
 	struct ib_path_record *path_record = &mad->sa.sa_data.path_record;
 	struct ib_gid *dgid = &path_record->dgid;
 	struct ib_cached_path_record *cached;
@@ -182,8 +184,8 @@ static int ib_handle_path_record ( struct ib_device *ibdev,
 
 	/* Ignore if not a success */
 	if ( mad->hdr.status != htons ( IB_MGMT_STATUS_OK ) ) {
-		DBGC ( ibdev, "IBDEV %p path record lookup failed with status "
-		       "%04x\n", ibdev, ntohs ( mad->hdr.status ) );
+		DBGC ( gma, "GMA %p path record lookup failed with status "
+		       "%04x\n", gma, ntohs ( mad->hdr.status ) );
 		return -EINVAL;
 	}
 
@@ -191,15 +193,15 @@ static int ib_handle_path_record ( struct ib_device *ibdev,
 	dlid = ntohs ( path_record->dlid );
 	sl = ( path_record->reserved__sl & 0x0f );
 	rate = ( path_record->rate_selector__rate & 0x3f );
-	DBGC ( ibdev, "IBDEV %p path to %08x:%08x:%08x:%08x is %04x sl %d "
-	       "rate %d\n", ibdev, htonl ( dgid->u.dwords[0] ),
+	DBGC ( gma, "GMA %p path to %08x:%08x:%08x:%08x is %04x sl %d "
+	       "rate %d\n", gma, htonl ( dgid->u.dwords[0] ),
 	       htonl ( dgid->u.dwords[1] ), htonl ( dgid->u.dwords[2] ),
 	       htonl ( dgid->u.dwords[3] ), dlid, sl, rate );
 
 	/* Look for a matching cache entry to fill in */
 	if ( ( cached = ib_find_path_cache_entry ( ibdev, dgid ) ) != NULL ) {
-		DBGC ( ibdev, "IBDEV %p cache add for %08x:%08x:%08x:%08x\n",
-		       ibdev, htonl ( dgid->u.dwords[0] ),
+		DBGC ( gma, "GMA %p cache add for %08x:%08x:%08x:%08x\n",
+		       gma, htonl ( dgid->u.dwords[0] ),
 		       htonl ( dgid->u.dwords[1] ),
 		       htonl ( dgid->u.dwords[2] ),
 		       htonl ( dgid->u.dwords[3] ) );
@@ -212,7 +214,7 @@ static int ib_handle_path_record ( struct ib_device *ibdev,
 }
 
 /** Path record response handler */
-struct ib_mad_handler ib_path_record_handler __ib_mad_handler = {
+struct ib_gma_handler ib_path_record_handler __ib_gma_handler = {
 	.mgmt_class = IB_MGMT_CLASS_SUBN_ADM,
 	.class_version = IB_SA_CLASS_VERSION,
 	.method = IB_MGMT_METHOD_GET_RESP,

@@ -36,12 +36,12 @@ FILE_LICENCE ( GPL2_OR_LATER );
 /**
  * Transmit multicast group membership request
  *
- * @v ibdev		Infiniband device
+ * @v gma		General management agent
  * @v gid		Multicast GID
  * @v join		Join (rather than leave) group
  * @ret rc		Return status code
  */
-static int ib_mc_member_request ( struct ib_device *ibdev, struct ib_gid *gid,
+static int ib_mc_member_request ( struct ib_gma *gma, struct ib_gid *gid,
 				  int join ) {
 	union ib_mad mad;
 	struct ib_mad_sa *sa = &mad.sa;
@@ -61,14 +61,13 @@ static int ib_mc_member_request ( struct ib_device *ibdev, struct ib_gid *gid,
 	sa->sa_data.mc_member_record.scope__join_state = 1;
 	memcpy ( &sa->sa_data.mc_member_record.mgid, gid,
 		 sizeof ( sa->sa_data.mc_member_record.mgid ) );
-	memcpy ( &sa->sa_data.mc_member_record.port_gid, &ibdev->gid,
+	memcpy ( &sa->sa_data.mc_member_record.port_gid, &gma->ibdev->gid,
 		 sizeof ( sa->sa_data.mc_member_record.port_gid ) );
 
 	/* Issue multicast membership record request */
-	if ( ( rc = ib_gma_request ( &ibdev->gma, &mad, NULL,
-				     join ) ) != 0 ) {
-		DBGC ( ibdev, "IBDEV %p could not join group: %s\n",
-		       ibdev, strerror ( rc ) );
+	if ( ( rc = ib_gma_request ( gma, &mad, NULL, join ) ) != 0 ) {
+		DBGC ( gma, "GMA %p could not join group: %s\n",
+		       gma, strerror ( rc ) );
 		return rc;
 	}
 
@@ -85,22 +84,23 @@ static int ib_mc_member_request ( struct ib_device *ibdev, struct ib_gid *gid,
  */
 int ib_mcast_join ( struct ib_device *ibdev, struct ib_queue_pair *qp,
 		    struct ib_gid *gid ) {
+	struct ib_gma *gma = &ibdev->gma;
 	int rc;
 
-	DBGC ( ibdev, "IBDEV %p QPN %lx joining %08x:%08x:%08x:%08x\n",
-	       ibdev, qp->qpn, ntohl ( gid->u.dwords[0] ),
+	DBGC ( gma, "GMA %p QPN %lx joining %08x:%08x:%08x:%08x\n",
+	       gma, qp->qpn, ntohl ( gid->u.dwords[0] ),
 	       ntohl ( gid->u.dwords[1] ), ntohl ( gid->u.dwords[2] ),
 	       ntohl ( gid->u.dwords[3] ) );
 
 	/* Attach queue pair to multicast GID */
 	if ( ( rc = ib_mcast_attach ( ibdev, qp, gid ) ) != 0 ) {
-		DBGC ( ibdev, "IBDEV %p could not attach: %s\n",
-		       ibdev, strerror ( rc ) );
+		DBGC ( gma, "GMA %p could not attach: %s\n",
+		       gma, strerror ( rc ) );
 		goto err_mcast_attach;
 	}
 
 	/* Initiate multicast membership join */
-	if ( ( rc = ib_mc_member_request ( ibdev, gid, 1 ) ) != 0 )
+	if ( ( rc = ib_mc_member_request ( gma, gid, 1 ) ) != 0 )
 		goto err_mc_member_record;
 
 	return 0;
@@ -120,9 +120,10 @@ int ib_mcast_join ( struct ib_device *ibdev, struct ib_queue_pair *qp,
  */
 void ib_mcast_leave ( struct ib_device *ibdev, struct ib_queue_pair *qp,
 		      struct ib_gid *gid ) {
+	struct ib_gma *gma = &ibdev->gma;
 
-	DBGC ( ibdev, "IBDEV %p QPN %lx leaving %08x:%08x:%08x:%08x\n",
-	       ibdev, qp->qpn, ntohl ( gid->u.dwords[0] ),
+	DBGC ( gma, "GMA %p QPN %lx leaving %08x:%08x:%08x:%08x\n",
+	       gma, qp->qpn, ntohl ( gid->u.dwords[0] ),
 	       ntohl ( gid->u.dwords[1] ), ntohl ( gid->u.dwords[2] ),
 	       ntohl ( gid->u.dwords[3] ) );
 
@@ -130,18 +131,19 @@ void ib_mcast_leave ( struct ib_device *ibdev, struct ib_queue_pair *qp,
 	ib_mcast_detach ( ibdev, qp, gid );
 
 	/* Initiate multicast membership leave */
-	ib_mc_member_request ( ibdev, gid, 0 );
+	ib_mc_member_request ( gma, gid, 0 );
 }
 
 /**
  * Handle multicast membership record join response
  *
- * @v ibdev		Infiniband device
+ * @v gma		General management agent
  * @v mad		MAD
  * @ret rc		Return status code
  */
-static int ib_handle_mc_member_join ( struct ib_device *ibdev,
+static int ib_handle_mc_member_join ( struct ib_gma *gma,
 				      union ib_mad *mad ) {
+	struct ib_device *ibdev = gma->ibdev;
 	struct ib_mc_member_record *mc_member_record =
 		&mad->sa.sa_data.mc_member_record;
 	struct ib_queue_pair *qp;
@@ -151,8 +153,8 @@ static int ib_handle_mc_member_join ( struct ib_device *ibdev,
 
 	/* Ignore if not a success */
 	if ( mad->hdr.status != htons ( IB_MGMT_STATUS_OK ) ) {
-		DBGC ( ibdev, "IBDEV %p join failed with status %04x\n",
-		       ibdev, ntohs ( mad->hdr.status ) );
+		DBGC ( gma, "GMA %p join failed with status %04x\n",
+		       gma, ntohs ( mad->hdr.status ) );
 		return -EINVAL;
 	}
 
@@ -163,24 +165,22 @@ static int ib_handle_mc_member_join ( struct ib_device *ibdev,
 	/* Locate matching queue pair */
 	qp = ib_find_qp_mgid ( ibdev, gid );
 	if ( ! qp ) {
-		DBGC ( ibdev, "IBDEV %p has no QP to join "
-		       "%08x:%08x:%08x:%08x\n", ibdev,
-		       ntohl ( gid->u.dwords[0] ),
+		DBGC ( gma, "GMA %p has no QP to join %08x:%08x:%08x:%08x\n",
+		       gma, ntohl ( gid->u.dwords[0] ),
 		       ntohl ( gid->u.dwords[1] ),
 		       ntohl ( gid->u.dwords[2] ),
 		       ntohl ( gid->u.dwords[3] ) );
 		return -ENOENT;
 	}
-	DBGC ( ibdev, "IBDEV %p QPN %lx joined %08x:%08x:%08x:%08x qkey "
-	       "%lx\n", ibdev, qp->qpn,
-	       ntohl ( gid->u.dwords[0] ), ntohl ( gid->u.dwords[1] ),
-	       ntohl ( gid->u.dwords[2] ), ntohl ( gid->u.dwords[3] ),
-	       qkey );
+	DBGC ( gma, "GMA %p QPN %lx joined %08x:%08x:%08x:%08x qkey %lx\n",
+	       gma, qp->qpn, ntohl ( gid->u.dwords[0] ),
+	       ntohl ( gid->u.dwords[1] ), ntohl ( gid->u.dwords[2] ),
+	       ntohl ( gid->u.dwords[3] ), qkey );
 
 	/* Set queue key */
 	if ( ( rc = ib_modify_qp ( ibdev, qp, IB_MODIFY_QKEY, qkey ) ) != 0 ) {
-		DBGC ( ibdev, "IBDEV %p QPN %lx could not modify qkey: %s\n",
-		       ibdev, qp->qpn, strerror ( rc ) );
+		DBGC ( gma, "GMA %p QPN %lx could not modify qkey: %s\n",
+		       gma, qp->qpn, strerror ( rc ) );
 		return rc;
 	}
 
@@ -190,11 +190,11 @@ static int ib_handle_mc_member_join ( struct ib_device *ibdev,
 /**
  * Handle multicast membership record leave response
  *
- * @v ibdev		Infiniband device
+ * @v gma		General management agent
  * @v mad		MAD
  * @ret rc		Return status code
  */
-static int ib_handle_mc_member_leave ( struct ib_device *ibdev,
+static int ib_handle_mc_member_leave ( struct ib_gma *gma,
 				       union ib_mad *mad ) {
 	struct ib_mc_member_record *mc_member_record =
 		&mad->sa.sa_data.mc_member_record;
@@ -202,14 +202,14 @@ static int ib_handle_mc_member_leave ( struct ib_device *ibdev,
 
 	/* Ignore if not a success */
 	if ( mad->hdr.status != htons ( IB_MGMT_STATUS_OK ) ) {
-		DBGC ( ibdev, "IBDEV %p leave failed with status %04x\n",
-		       ibdev, ntohs ( mad->hdr.status ) );
+		DBGC ( gma, "GMA %p leave failed with status %04x\n",
+		       gma, ntohs ( mad->hdr.status ) );
 		return -EINVAL;
 	}
 
 	/* Extract MAD parameters */
 	gid = &mc_member_record->mgid;
-	DBGC ( ibdev, "IBDEV %p left %08x:%08x:%08x:%08x\n", ibdev,
+	DBGC ( gma, "GMA %p left %08x:%08x:%08x:%08x\n", gma,
 	       ntohl ( gid->u.dwords[0] ), ntohl ( gid->u.dwords[1] ),
 	       ntohl ( gid->u.dwords[2] ), ntohl ( gid->u.dwords[3] ) );
 
@@ -217,7 +217,7 @@ static int ib_handle_mc_member_leave ( struct ib_device *ibdev,
 }
 
 /** Multicast membership record response handler */
-struct ib_mad_handler ib_mc_member_record_handlers[] __ib_mad_handler = {
+struct ib_gma_handler ib_mc_member_record_handlers[] __ib_gma_handler = {
 	{
 		.mgmt_class = IB_MGMT_CLASS_SUBN_ADM,
 		.class_version = IB_SA_CLASS_VERSION,

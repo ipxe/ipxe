@@ -75,26 +75,23 @@ struct ib_mad_request {
 static unsigned int next_request_tid;
 
 /**
- * Identify attribute handler
+ * Call attribute handler
  *
- * @v mgmt_class	Management class
- * @v class_version	Class version
- * @v method		Method
- * @v attr_id		Attribute ID (in network byte order)
- * @ret handler		Attribute handler (or NULL)
+ * @v gma		General management agent
+ * @v mad		MAD
+ * @ret rc		Return status code
  */
-static int ib_handle_mad ( struct ib_device *ibdev,
-			   union ib_mad *mad ) {
+static int ib_handle_mad ( struct ib_gma *gma, union ib_mad *mad ) {
 	struct ib_mad_hdr *hdr = &mad->hdr;
-	struct ib_mad_handler *handler;
+	struct ib_gma_handler *handler;
 
-	for_each_table_entry ( handler, IB_MAD_HANDLERS ) {
+	for_each_table_entry ( handler, IB_GMA_HANDLERS ) {
 		if ( ( handler->mgmt_class == hdr->mgmt_class ) &&
 		     ( handler->class_version == hdr->class_version ) &&
 		     ( handler->method == hdr->method ) &&
 		     ( handler->attr_id == hdr->attr_id ) ) {
 			hdr->method = handler->resp_method;
-			return handler->handle ( ibdev, mad );
+			return handler->handle ( gma, mad );
 		}
 	}
 
@@ -163,7 +160,7 @@ static void ib_gma_complete_recv ( struct ib_device *ibdev,
 	}
 
 	/* Handle MAD, if possible */
-	if ( ( rc = ib_handle_mad ( ibdev, mad ) ) != 0 ) {
+	if ( ( rc = ib_handle_mad ( gma, mad ) ) != 0 ) {
 		DBGC ( gma, "GMA %p could not handle TID %08x%08x: %s\n",
 		       gma, ntohl ( hdr->tid[0] ), ntohl ( hdr->tid[1] ),
 		       strerror ( rc ) );
