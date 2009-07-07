@@ -535,17 +535,11 @@ static int ipoib_open ( struct net_device *netdev ) {
 	/* Fill receive rings */
 	ib_refill_recv ( ibdev, ipoib->qp );
 
-	/* Join broadcast group */
-	if ( ( rc = ipoib_join_broadcast_group ( ipoib ) ) != 0 ) {
-		DBGC ( ipoib, "IPoIB %p could not join broadcast group: %s\n",
-		       ipoib, strerror ( rc ) );
-		goto err_join_broadcast;
-	}
+	/* Fake a link status change to join the broadcast group */
+	ipoib_link_state_changed ( ibdev );
 
 	return 0;
 
-	ipoib_leave_broadcast_group ( ipoib );
- err_join_broadcast:
 	ib_destroy_qp ( ibdev, ipoib->qp );
  err_create_qp:
 	ib_destroy_cq ( ibdev, ipoib->cq );
@@ -639,7 +633,8 @@ void ipoib_link_state_changed ( struct ib_device *ibdev ) {
 	ipoib_set_ib_params ( ipoib );
 
 	/* Join new broadcast group */
-	if ( ( rc = ipoib_join_broadcast_group ( ipoib ) ) != 0 ) {
+	if ( ib_link_ok ( ibdev ) &&
+	     ( ( rc = ipoib_join_broadcast_group ( ipoib ) ) != 0 ) ) {
 		DBGC ( ipoib, "IPoIB %p could not rejoin broadcast group: "
 		       "%s\n", ipoib, strerror ( rc ) );
 		return;
