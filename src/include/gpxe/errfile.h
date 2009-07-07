@@ -115,6 +115,7 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #define ERRFILE_arbel		     ( ERRFILE_DRIVER | 0x00710000 )
 #define ERRFILE_hermon		     ( ERRFILE_DRIVER | 0x00720000 )
 #define ERRFILE_linda		     ( ERRFILE_DRIVER | 0x00730000 )
+#define ERRFILE_ata		     ( ERRFILE_DRIVER | 0x00740000 )
 
 #define ERRFILE_aoe			( ERRFILE_NET | 0x00000000 )
 #define ERRFILE_arp			( ERRFILE_NET | 0x00010000 )

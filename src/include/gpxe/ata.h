@@ -154,6 +154,8 @@ struct ata_command {
 	 * sectors in size.
 	 */
 	userptr_t data_in;
+	/** Command status code */
+	int rc;
 };
 
 /**

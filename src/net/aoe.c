@@ -68,6 +68,7 @@ static void aoe_done ( struct aoe_session *aoe, int rc ) {
 	/* Record overall command status */
 	if ( aoe->command ) {
 		aoe->command->cb.cmd_stat = aoe->status;
+		aoe->command->rc = rc;
 		aoe->command = NULL;
 	}
 
@@ -356,7 +357,6 @@ static int aoe_command ( struct ata_device *ata,
 			 struct ata_command *command ) {
 	struct aoe_session *aoe =
 		container_of ( ata->backend, struct aoe_session, refcnt );
-	int rc;
 
 	aoe->command = command;
 	aoe->status = 0;
@@ -365,14 +365,8 @@ static int aoe_command ( struct ata_device *ata,
 
 	aoe_send_command ( aoe );
 
-	aoe->rc = -EINPROGRESS;
-	while ( aoe->rc == -EINPROGRESS )
-		step();
-	rc = aoe->rc;
-
-	return rc;
+	return 0;
 }
-
 
 /**
  * Issue AoE config query for AoE target discovery
