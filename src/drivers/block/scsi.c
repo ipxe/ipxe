@@ -23,6 +23,7 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #include <byteswap.h>
 #include <errno.h>
 #include <gpxe/blockdev.h>
+#include <gpxe/process.h>
 #include <gpxe/scsi.h>
 
 /** @file
@@ -57,11 +58,22 @@ static int scsi_command ( struct scsi_device *scsi,
 	/* Clear sense response code before issuing command */
 	command->sense_response = 0;
 
+	/* Flag command as in-progress */
+	command->rc = -EINPROGRESS;
+
 	/* Issue SCSI command */
 	if ( ( rc = scsi->command ( scsi, command ) ) != 0 ) {
-		/* Something went wrong with the issuing mechanism,
-		 * (rather than with the command itself)
-		 */
+		/* Something went wrong with the issuing mechanism */
+		DBG ( "SCSI %p " SCSI_CDB_FORMAT " err %s\n",
+		      scsi, SCSI_CDB_DATA ( command->cdb ), strerror ( rc ) );
+		return rc;
+	}
+
+	/* Wait for command to complete */
+	while ( command->rc == -EINPROGRESS )
+		step();
+	if ( ( rc = command->rc ) != 0 ) {
+		/* Something went wrong with the command execution */
 		DBG ( "SCSI %p " SCSI_CDB_FORMAT " err %s\n",
 		      scsi, SCSI_CDB_DATA ( command->cdb ), strerror ( rc ) );
 		return rc;
