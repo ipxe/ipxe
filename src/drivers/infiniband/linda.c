@@ -272,11 +272,6 @@ static int linda_set_port_info ( struct ib_device *ibdev,
 	return 0;
 }
 
-/** Linda subnet management operations */
-static struct ib_sma_operations linda_sma_operations = {
-	.set_port_info	= linda_set_port_info,
-};
-
 /***************************************************************************
  *
  * Context allocation
@@ -1464,6 +1459,7 @@ static struct ib_device_operations linda_ib_operations = {
 	.close		= linda_close,
 	.mcast_attach	= linda_mcast_attach,
 	.mcast_detach	= linda_mcast_detach,
+	.set_port_info	= linda_set_port_info,
 };
 
 /***************************************************************************
@@ -2340,11 +2336,10 @@ static int linda_probe ( struct pci_device *pci,
 		goto err_init_ib_serdes;
 
 	/* Create the SMA */
-	if ( ( rc = ib_create_sma ( &linda->sma, ibdev,
-				    &linda_sma_operations ) ) != 0 )
+	if ( ( rc = ib_create_sma ( &linda->sma, ibdev ) ) != 0 )
 		goto err_create_sma;
 	/* If the SMA doesn't get context 0, we're screwed */
-	assert ( linda_qpn_to_ctx ( linda->sma.qp->qpn ) == 0 );
+	assert ( linda_qpn_to_ctx ( linda->sma.gma.qp->qpn ) == 0 );
 
 	/* Register Infiniband device */
 	if ( ( rc = register_ibdev ( ibdev ) ) != 0 ) {

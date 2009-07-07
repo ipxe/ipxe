@@ -30,6 +30,9 @@ struct ib_smp_hdr {
 	uint8_t reserved[28];
 } __attribute__ (( packed ));
 
+/** Bits to ignore in the management class for subnet management MADs */
+#define IB_SMP_CLASS_IGNORE			0x80
+
 /** Subnet management class version */
 #define IB_SMP_CLASS_VERSION			1
 

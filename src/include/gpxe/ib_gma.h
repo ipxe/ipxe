@@ -23,6 +23,8 @@ struct ib_gma;
 struct ib_gma_handler {
 	/** Management class */
 	uint8_t mgmt_class;
+	/** Management class don't-care bits */
+	uint8_t mgmt_class_ignore;
 	/** Class version */
 	uint8_t class_version;
 	/** Method */

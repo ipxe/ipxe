@@ -86,7 +86,8 @@ static int ib_handle_mad ( struct ib_gma *gma, union ib_mad *mad ) {
 	struct ib_gma_handler *handler;
 
 	for_each_table_entry ( handler, IB_GMA_HANDLERS ) {
-		if ( ( handler->mgmt_class == hdr->mgmt_class ) &&
+		if ( ( ( handler->mgmt_class & ~handler->mgmt_class_ignore ) ==
+		       ( hdr->mgmt_class & ~handler->mgmt_class_ignore ) ) &&
 		     ( handler->class_version == hdr->class_version ) &&
 		     ( handler->method == hdr->method ) &&
 		     ( handler->attr_id == hdr->attr_id ) ) {
