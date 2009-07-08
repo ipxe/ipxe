@@ -1009,11 +1009,6 @@ static void hermon_destroy_qp ( struct ib_device *ibdev,
  ***************************************************************************
  */
 
-/** GID used for GID-less send work queue entries */
-static const struct ib_gid hermon_no_gid = {
-	{ { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 } }
-};
-
 /**
  * Post send work queue entry
  *
@@ -1032,7 +1027,6 @@ static int hermon_post_send ( struct ib_device *ibdev,
 	struct ib_work_queue *wq = &qp->send;
 	struct hermon_send_work_queue *hermon_send_wq = &hermon_qp->send;
 	struct hermonprm_ud_send_wqe *wqe;
-	const struct ib_gid *gid;
 	union hermonprm_doorbell_register db_reg;
 	unsigned int wqe_idx_mask;
 
@@ -1062,8 +1056,7 @@ static int hermon_post_send ( struct ib_device *ibdev,
 		     ( ( ( av->rate < 2 ) || ( av->rate > 10 ) ) ?
 		       8 : ( av->rate + 5 ) ) );
 	MLX_FILL_1 ( &wqe->ud, 3, ud_address_vector.sl, av->sl );
-	gid = ( av->gid_present ? &av->gid : &hermon_no_gid );
-	memcpy ( &wqe->ud.u.dwords[4], gid, sizeof ( *gid ) );
+	memcpy ( &wqe->ud.u.dwords[4], &av->gid, sizeof ( av->gid ) );
 	MLX_FILL_1 ( &wqe->ud, 8, destination_qp, av->qpn );
 	MLX_FILL_1 ( &wqe->ud, 9, q_key, av->qkey );
 	MLX_FILL_1 ( &wqe->data[0], 0, byte_count, iob_len ( iobuf ) );
