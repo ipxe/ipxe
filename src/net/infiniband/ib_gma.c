@@ -207,30 +207,8 @@ static void ib_gma_complete_recv ( struct ib_device *ibdev,
 	free_iob ( iobuf );
 }
 
-/**
- * Complete GMA send
- *
- *
- * @v ibdev		Infiniband device
- * @v qp		Queue pair
- * @v iobuf		I/O buffer
- * @v rc		Completion status code
- */
-static void ib_gma_complete_send ( struct ib_device *ibdev __unused,
-				   struct ib_queue_pair *qp,
-				   struct io_buffer *iobuf, int rc ) {
-	struct ib_gma *gma = ib_qp_get_ownerdata ( qp );
-
-	if ( rc != 0 ) {
-		DBGC ( gma, "GMA %p send completion error: %s\n",
-		       gma, strerror ( rc ) );
-	}
-	free_iob ( iobuf );
-}
-
 /** GMA completion operations */
 static struct ib_completion_queue_operations ib_gma_completion_ops = {
-	.complete_send = ib_gma_complete_send,
 	.complete_recv = ib_gma_complete_recv,
 };
 

@@ -424,7 +424,12 @@ int ib_post_recv ( struct ib_device *ibdev, struct ib_queue_pair *qp,
  */
 void ib_complete_send ( struct ib_device *ibdev, struct ib_queue_pair *qp,
 			struct io_buffer *iobuf, int rc ) {
-	qp->send.cq->op->complete_send ( ibdev, qp, iobuf, rc );
+
+	if ( qp->send.cq->op->complete_send ) {
+		qp->send.cq->op->complete_send ( ibdev, qp, iobuf, rc );
+	} else {
+		free_iob ( iobuf );
+	}
 	qp->send.fill--;
 }
 
@@ -440,7 +445,12 @@ void ib_complete_send ( struct ib_device *ibdev, struct ib_queue_pair *qp,
 void ib_complete_recv ( struct ib_device *ibdev, struct ib_queue_pair *qp,
 			struct ib_address_vector *av,
 			struct io_buffer *iobuf, int rc ) {
-	qp->recv.cq->op->complete_recv ( ibdev, qp, av, iobuf, rc );
+
+	if ( qp->recv.cq->op->complete_recv ) {
+		qp->recv.cq->op->complete_recv ( ibdev, qp, av, iobuf, rc );
+	} else {
+		free_iob ( iobuf );
+	}
 	qp->recv.fill--;
 }
 
