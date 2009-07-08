@@ -213,15 +213,23 @@ int ib_pull ( struct ib_device *ibdev, struct io_buffer *iobuf,
 	/* Determine destination QP, if applicable */
 	if ( qp ) {
 		if ( IB_LID_MULTICAST ( lid ) && grh ) {
-			*qp = ib_find_qp_mgid ( ibdev, &grh->dgid );
+			if ( ! ( *qp = ib_find_qp_mgid ( ibdev, &grh->dgid ))){
+				DBGC ( ibdev, "IBDEV %p RX for unknown MGID "
+				       "%08x:%08x:%08x:%08x\n", ibdev,
+				       ntohl ( grh->dgid.u.dwords[0] ),
+				       ntohl ( grh->dgid.u.dwords[1] ),
+				       ntohl ( grh->dgid.u.dwords[2] ),
+				       ntohl ( grh->dgid.u.dwords[3] ) );
+				return -ENODEV;
+			}
 		} else {
-			*qp = ib_find_qp_qpn ( ibdev, qpn );
+			if ( ! ( *qp = ib_find_qp_qpn ( ibdev, qpn ) ) ) {
+				DBGC ( ibdev, "IBDEV %p RX for nonexistent "
+				       "QPN %lx\n", ibdev, qpn );
+				return -ENODEV;
+			}
 		}
-		if ( ! *qp ) {
-			DBGC ( ibdev, "IBDEV %p RX for nonexistent QP\n",
-			       ibdev );
-			return -ENODEV;
-		}
+		assert ( *qp );
 	}
 
 	DBGC2 ( ibdev, "IBDEV %p RX %04x:%08lx <= %04x:%08lx (key %08x)\n",
