@@ -418,6 +418,14 @@ hermon_cmd_2rst_qp ( struct hermon *hermon, unsigned long qpn ) {
 }
 
 static inline int
+hermon_cmd_conf_special_qp ( struct hermon *hermon, unsigned int internal_qps,
+			     unsigned long base_qpn ) {
+	return hermon_cmd ( hermon,
+			    HERMON_HCR_VOID_CMD ( HERMON_HCR_CONF_SPECIAL_QP ),
+			    internal_qps, NULL, base_qpn, NULL );
+}
+
+static inline int
 hermon_cmd_mad_ifc ( struct hermon *hermon, unsigned int port,
 		     union hermonprm_mad *mad ) {
 	return hermon_cmd ( hermon,
@@ -797,6 +805,63 @@ static void hermon_destroy_cq ( struct ib_device *ibdev,
  */
 
 /**
+ * Assign queue pair number
+ *
+ * @v ibdev		Infiniband device
+ * @v qp		Queue pair
+ * @ret rc		Return status code
+ */
+static int hermon_alloc_qpn ( struct ib_device *ibdev,
+			      struct ib_queue_pair *qp ) {
+	struct hermon *hermon = ib_get_drvdata ( ibdev );
+	unsigned int port_offset;
+	int qpn_offset;
+
+	/* Calculate queue pair number */
+	port_offset = ( ibdev->port - HERMON_PORT_BASE );
+
+	switch ( qp->type ) {
+	case IB_QPT_SMA:
+		qp->qpn = ( hermon->special_qpn_base + port_offset );
+		return 0;
+	case IB_QPT_GMA:
+		qp->qpn = ( hermon->special_qpn_base + 2 + port_offset );
+		return 0;
+	case IB_QPT_UD:
+		/* Find a free queue pair number */
+		qpn_offset = hermon_bitmask_alloc ( hermon->qp_inuse,
+						    HERMON_MAX_QPS, 1 );
+		if ( qpn_offset < 0 ) {
+			DBGC ( hermon, "Hermon %p out of queue pairs\n",
+			       hermon );
+			return qpn_offset;
+		}
+		qp->qpn = ( hermon->qpn_base + qpn_offset );
+		return 0;
+	default:
+		DBGC ( hermon, "Hermon %p unsupported QP type %d\n",
+		       hermon, qp->type );
+		return -ENOTSUP;
+	}
+}
+
+/**
+ * Free queue pair number
+ *
+ * @v ibdev		Infiniband device
+ * @v qp		Queue pair
+ */
+static void hermon_free_qpn ( struct ib_device *ibdev,
+			      struct ib_queue_pair *qp ) {
+	struct hermon *hermon = ib_get_drvdata ( ibdev );
+	int qpn_offset;
+
+	qpn_offset = ( qp->qpn - hermon->qpn_base );
+	if ( qpn_offset >= 0 )
+		hermon_bitmask_free ( hermon->qp_inuse, qpn_offset, 1 );
+}
+
+/**
  * Create queue pair
  *
  * @v ibdev		Infiniband device
@@ -808,19 +873,11 @@ static int hermon_create_qp ( struct ib_device *ibdev,
 	struct hermon *hermon = ib_get_drvdata ( ibdev );
 	struct hermon_queue_pair *hermon_qp;
 	struct hermonprm_qp_ee_state_transitions qpctx;
-	int qpn_offset;
 	int rc;
 
-	/* Find a free queue pair number */
-	qpn_offset = hermon_bitmask_alloc ( hermon->qp_inuse,
-					    HERMON_MAX_QPS, 1 );
-	if ( qpn_offset < 0 ) {
-		DBGC ( hermon, "Hermon %p out of queue pairs\n", hermon );
-		rc = qpn_offset;
-		goto err_qpn_offset;
-	}
-	qp->qpn = ( HERMON_QPN_BASE + hermon->cap.reserved_qps +
-		    qpn_offset );
+	/* Calculate queue pair number */
+	if ( ( rc = hermon_alloc_qpn ( ibdev, qp ) ) != 0 )
+		goto err_alloc_qpn;
 
 	/* Allocate control structures */
 	hermon_qp = zalloc ( sizeof ( *hermon_qp ) );
@@ -867,7 +924,9 @@ static int hermon_create_qp ( struct ib_device *ibdev,
 	memset ( &qpctx, 0, sizeof ( qpctx ) );
 	MLX_FILL_2 ( &qpctx, 2,
 		     qpc_eec_data.pm_state, 0x03 /* Always 0x03 for UD */,
-		     qpc_eec_data.st, HERMON_ST_UD );
+		     qpc_eec_data.st,
+		     ( ( qp->type == IB_QPT_UD ) ?
+		       HERMON_ST_UD : HERMON_ST_MLX ) );
 	MLX_FILL_1 ( &qpctx, 3, qpc_eec_data.pd, HERMON_GLOBAL_PD );
 	MLX_FILL_4 ( &qpctx, 4,
 		     qpc_eec_data.log_rq_size, fls ( qp->recv.num_wqes - 1 ),
@@ -901,7 +960,8 @@ static int hermon_create_qp ( struct ib_device *ibdev,
 		     qpc_eec_data.msg_max, 11 /* 2^11 = 2048 */ );
 	MLX_FILL_1 ( &qpctx, 16,
 		     qpc_eec_data.primary_address_path.sched_queue,
-		     ( 0x83 /* default policy */ |
+		     ( ( ( qp->type == IB_QPT_SMA ) ?
+			 HERMON_SCHED_QP0 : HERMON_SCHED_DEFAULT ) |
 		       ( ( ibdev->port - 1 ) << 6 ) ) );
 	if ( ( rc = hermon_cmd_init2rtr_qp ( hermon, qp->qpn,
 					     &qpctx ) ) != 0 ) {
@@ -935,8 +995,8 @@ static int hermon_create_qp ( struct ib_device *ibdev,
  err_alloc_wqe:
 	free ( hermon_qp );
  err_hermon_qp:
-	hermon_bitmask_free ( hermon->qp_inuse, qpn_offset, 1 );
- err_qpn_offset:
+	hermon_free_qpn ( ibdev, qp );
+ err_alloc_qpn:
 	return rc;
 }
 
@@ -976,7 +1036,6 @@ static void hermon_destroy_qp ( struct ib_device *ibdev,
 				struct ib_queue_pair *qp ) {
 	struct hermon *hermon = ib_get_drvdata ( ibdev );
 	struct hermon_queue_pair *hermon_qp = ib_qp_get_drvdata ( qp );
-	int qpn_offset;
 	int rc;
 
 	/* Take ownership back from hardware */
@@ -995,9 +1054,7 @@ static void hermon_destroy_qp ( struct ib_device *ibdev,
 	free ( hermon_qp );
 
 	/* Mark queue number as free */
-	qpn_offset = ( qp->qpn - HERMON_QPN_BASE -
-		       hermon->cap.reserved_qps );
-	hermon_bitmask_free ( hermon->qp_inuse, qpn_offset, 1 );
+	hermon_free_qpn ( ibdev, qp );
 
 	ib_qp_set_drvdata ( qp, NULL );
 }
@@ -1008,6 +1065,109 @@ static void hermon_destroy_qp ( struct ib_device *ibdev,
  *
  ***************************************************************************
  */
+
+/**
+ * Construct UD send work queue entry
+ *
+ * @v ibdev		Infiniband device
+ * @v qp		Queue pair
+ * @v av		Address vector
+ * @v iobuf		I/O buffer
+ * @v wqe		Send work queue entry
+ * @ret opcode		Control opcode
+ */
+static unsigned int
+hermon_fill_ud_send_wqe ( struct ib_device *ibdev,
+			  struct ib_queue_pair *qp __unused,
+			  struct ib_address_vector *av,
+			  struct io_buffer *iobuf,
+			  union hermon_send_wqe *wqe ) {
+	struct hermon *hermon = ib_get_drvdata ( ibdev );
+
+	MLX_FILL_1 ( &wqe->ud.ctrl, 1, ds,
+		     ( ( offsetof ( typeof ( wqe->ud ), data[1] ) / 16 ) ) );
+	MLX_FILL_1 ( &wqe->ud.ctrl, 2, c, 0x03 /* generate completion */ );
+	MLX_FILL_2 ( &wqe->ud.ud, 0,
+		     ud_address_vector.pd, HERMON_GLOBAL_PD,
+		     ud_address_vector.port_number, ibdev->port );
+	MLX_FILL_2 ( &wqe->ud.ud, 1,
+		     ud_address_vector.rlid, av->lid,
+		     ud_address_vector.g, av->gid_present );
+	MLX_FILL_1 ( &wqe->ud.ud, 2,
+		     ud_address_vector.max_stat_rate,
+		     ( ( ( av->rate < 2 ) || ( av->rate > 10 ) ) ?
+		       8 : ( av->rate + 5 ) ) );
+	MLX_FILL_1 ( &wqe->ud.ud, 3, ud_address_vector.sl, av->sl );
+	memcpy ( &wqe->ud.ud.u.dwords[4], &av->gid, sizeof ( av->gid ) );
+	MLX_FILL_1 ( &wqe->ud.ud, 8, destination_qp, av->qpn );
+	MLX_FILL_1 ( &wqe->ud.ud, 9, q_key, av->qkey );
+	MLX_FILL_1 ( &wqe->ud.data[0], 0, byte_count, iob_len ( iobuf ) );
+	MLX_FILL_1 ( &wqe->ud.data[0], 1, l_key, hermon->reserved_lkey );
+	MLX_FILL_1 ( &wqe->ud.data[0], 3,
+		     local_address_l, virt_to_bus ( iobuf->data ) );
+	return HERMON_OPCODE_SEND;
+}
+
+/**
+ * Construct MLX send work queue entry
+ *
+ * @v ibdev		Infiniband device
+ * @v qp		Queue pair
+ * @v av		Address vector
+ * @v iobuf		I/O buffer
+ * @v wqe		Send work queue entry
+ * @ret opcode		Control opcode
+ */
+static unsigned int
+hermon_fill_mlx_send_wqe ( struct ib_device *ibdev,
+			   struct ib_queue_pair *qp,
+			   struct ib_address_vector *av,
+			   struct io_buffer *iobuf,
+			   union hermon_send_wqe *wqe ) {
+	struct hermon *hermon = ib_get_drvdata ( ibdev );
+	struct io_buffer headers;
+
+	/* Construct IB headers */
+	iob_populate ( &headers, &wqe->mlx.headers, 0,
+		       sizeof ( wqe->mlx.headers ) );
+	iob_reserve ( &headers, sizeof ( wqe->mlx.headers ) );
+	ib_push ( ibdev, &headers, qp, iob_len ( iobuf ), av );
+
+	/* Fill work queue entry */
+	MLX_FILL_1 ( &wqe->mlx.ctrl, 1, ds,
+		     ( ( offsetof ( typeof ( wqe->mlx ), data[2] ) / 16 ) ) );
+	MLX_FILL_5 ( &wqe->mlx.ctrl, 2,
+		     c, 0x03 /* generate completion */,
+		     icrc, 0 /* generate ICRC */,
+		     max_statrate, ( ( ( av->rate < 2 ) || ( av->rate > 10 ) )
+				     ? 8 : ( av->rate + 5 ) ),
+		     slr, 0,
+		     v15, ( ( qp->ext_qpn == IB_QPN_SMA ) ? 1 : 0 ) );
+	MLX_FILL_1 ( &wqe->mlx.ctrl, 3, rlid, av->lid );
+	MLX_FILL_1 ( &wqe->mlx.data[0], 0,
+		     byte_count, iob_len ( &headers ) );
+	MLX_FILL_1 ( &wqe->mlx.data[0], 1, l_key, hermon->reserved_lkey );
+	MLX_FILL_1 ( &wqe->mlx.data[0], 3,
+		     local_address_l, virt_to_bus ( headers.data ) );
+	MLX_FILL_1 ( &wqe->mlx.data[1], 0,
+		     byte_count, ( iob_len ( iobuf ) + 4 /* ICRC */ ) );
+	MLX_FILL_1 ( &wqe->mlx.data[1], 1, l_key, hermon->reserved_lkey );
+	MLX_FILL_1 ( &wqe->mlx.data[1], 3,
+		     local_address_l, virt_to_bus ( iobuf->data ) );
+	return HERMON_OPCODE_SEND;
+}
+
+/** Work queue entry constructors */
+static unsigned int
+( * hermon_fill_send_wqe[] ) ( struct ib_device *ibdev,
+			       struct ib_queue_pair *qp,
+			       struct ib_address_vector *av,
+			       struct io_buffer *iobuf,
+			       union hermon_send_wqe *wqe ) = {
+	[IB_QPT_SMA] = hermon_fill_mlx_send_wqe,
+	[IB_QPT_GMA] = hermon_fill_mlx_send_wqe,
+	[IB_QPT_UD] = hermon_fill_ud_send_wqe,
+};
 
 /**
  * Post send work queue entry
@@ -1026,9 +1186,10 @@ static int hermon_post_send ( struct ib_device *ibdev,
 	struct hermon_queue_pair *hermon_qp = ib_qp_get_drvdata ( qp );
 	struct ib_work_queue *wq = &qp->send;
 	struct hermon_send_work_queue *hermon_send_wq = &hermon_qp->send;
-	struct hermonprm_ud_send_wqe *wqe;
+	union hermon_send_wqe *wqe;
 	union hermonprm_doorbell_register db_reg;
 	unsigned int wqe_idx_mask;
+	unsigned int opcode;
 
 	/* Allocate work queue entry */
 	wqe_idx_mask = ( wq->num_wqes - 1 );
@@ -1038,34 +1199,18 @@ static int hermon_post_send ( struct ib_device *ibdev,
 	}
 	wq->iobufs[wq->next_idx & wqe_idx_mask] = iobuf;
 	wqe = &hermon_send_wq->wqe[ wq->next_idx &
-				    ( hermon_send_wq->num_wqes - 1 ) ].ud;
+				    ( hermon_send_wq->num_wqes - 1 ) ];
 
 	/* Construct work queue entry */
 	memset ( ( ( ( void * ) wqe ) + 4 /* avoid ctrl.owner */ ), 0,
 		   ( sizeof ( *wqe ) - 4 ) );
-	MLX_FILL_1 ( &wqe->ctrl, 1, ds, ( sizeof ( *wqe ) / 16 ) );
-	MLX_FILL_1 ( &wqe->ctrl, 2, c, 0x03 /* generate completion */ );
-	MLX_FILL_2 ( &wqe->ud, 0,
-		     ud_address_vector.pd, HERMON_GLOBAL_PD,
-		     ud_address_vector.port_number, ibdev->port );
-	MLX_FILL_2 ( &wqe->ud, 1,
-		     ud_address_vector.rlid, av->lid,
-		     ud_address_vector.g, av->gid_present );
-	MLX_FILL_1 ( &wqe->ud, 2,
-		     ud_address_vector.max_stat_rate,
-		     ( ( ( av->rate < 2 ) || ( av->rate > 10 ) ) ?
-		       8 : ( av->rate + 5 ) ) );
-	MLX_FILL_1 ( &wqe->ud, 3, ud_address_vector.sl, av->sl );
-	memcpy ( &wqe->ud.u.dwords[4], &av->gid, sizeof ( av->gid ) );
-	MLX_FILL_1 ( &wqe->ud, 8, destination_qp, av->qpn );
-	MLX_FILL_1 ( &wqe->ud, 9, q_key, av->qkey );
-	MLX_FILL_1 ( &wqe->data[0], 0, byte_count, iob_len ( iobuf ) );
-	MLX_FILL_1 ( &wqe->data[0], 1, l_key, hermon->reserved_lkey );
-	MLX_FILL_1 ( &wqe->data[0], 3,
-		     local_address_l, virt_to_bus ( iobuf->data ) );
+	assert ( qp->type < ( sizeof ( hermon_fill_send_wqe ) /
+			      sizeof ( hermon_fill_send_wqe[0] ) ) );
+	assert ( hermon_fill_send_wqe[qp->type] != NULL );
+	opcode = hermon_fill_send_wqe[qp->type] ( ibdev, qp, av, iobuf, wqe );
 	barrier();
 	MLX_FILL_2 ( &wqe->ctrl, 0,
-		     opcode, HERMON_OPCODE_SEND,
+		     opcode, opcode,
 		     owner,
 		     ( ( wq->next_idx & hermon_send_wq->num_wqes ) ? 1 : 0 ) );
 	DBGCP ( hermon, "Hermon %p posting send WQE:\n", hermon );
@@ -1183,7 +1328,7 @@ static int hermon_complete ( struct ib_device *ibdev,
 	iobuf = wq->iobufs[wqe_idx];
 	if ( ! iobuf ) {
 		DBGC ( hermon, "Hermon %p CQN %lx QPN %lx empty WQE %x\n",
-		       hermon, cq->cqn, qpn, wqe_idx );
+		       hermon, cq->cqn, qp->qpn, wqe_idx );
 		return -EIO;
 	}
 	wq->iobufs[wqe_idx] = NULL;
@@ -1523,6 +1668,27 @@ static void hermon_close ( struct ib_device *ibdev ) {
 	}
 }
 
+/**
+ * Set port information
+ *
+ * @v ibdev		Infiniband device
+ * @v mad		Set port information MAD
+ * @ret rc		Return status code
+ */
+static int hermon_set_port_info ( struct ib_device *ibdev,
+				  union ib_mad *mad ) {
+	int rc;
+
+	/* Send the MAD to the embedded SMA */
+	if ( ( rc = hermon_mad ( ibdev, mad ) ) != 0 )
+		return rc;
+
+	/* Update parameters held in software */
+	ib_smc_update ( ibdev, hermon_mad );
+
+	return 0;
+}
+
 /***************************************************************************
  *
  * Multicast group operations
@@ -1633,6 +1799,7 @@ static struct ib_device_operations hermon_ib_operations = {
 	.close		= hermon_close,
 	.mcast_attach	= hermon_mcast_attach,
 	.mcast_detach	= hermon_mcast_detach,
+	.set_port_info	= hermon_set_port_info,
 };
 
 /***************************************************************************
@@ -1863,7 +2030,8 @@ static int hermon_alloc_icm ( struct hermon *hermon,
 	 */
 
 	/* Calculate number of each object type within ICM */
-	log_num_qps = fls ( hermon->cap.reserved_qps + HERMON_MAX_QPS - 1 );
+	log_num_qps = fls ( hermon->cap.reserved_qps +
+			    HERMON_RSVD_SPECIAL_QPS + HERMON_MAX_QPS - 1 );
 	log_num_srqs = fls ( hermon->cap.reserved_srqs - 1 );
 	log_num_cqs = fls ( hermon->cap.reserved_cqs + HERMON_MAX_CQS - 1 );
 	log_num_eqs = fls ( hermon->cap.reserved_eqs + HERMON_MAX_EQS - 1 );
@@ -2149,6 +2317,36 @@ static int hermon_setup_mpt ( struct hermon *hermon ) {
 }
 
 /**
+ * Configure special queue pairs
+ *
+ * @v hermon		Hermon device
+ * @ret rc		Return status code
+ */
+static int hermon_configure_special_qps ( struct hermon *hermon ) {
+	int rc;
+
+	/* Special QP block must be aligned on its own size */
+	hermon->special_qpn_base = ( ( HERMON_QPN_BASE +
+				       hermon->cap.reserved_qps +
+				       HERMON_NUM_SPECIAL_QPS - 1 )
+				     & ~( HERMON_NUM_SPECIAL_QPS - 1 ) );
+	hermon->qpn_base = ( hermon->special_qpn_base +
+			     HERMON_NUM_SPECIAL_QPS );
+	DBGC ( hermon, "Hermon %p special QPs at [%lx,%lx]\n", hermon,
+	       hermon->special_qpn_base, ( hermon->qpn_base - 1 ) );
+
+	/* Issue command to configure special QPs */
+	if ( ( rc = hermon_cmd_conf_special_qp ( hermon, 0x00,
+					  hermon->special_qpn_base ) ) != 0 ) {
+		DBGC ( hermon, "Hermon %p could not configure special QPs: "
+		       "%s\n", hermon, strerror ( rc ) );
+		return rc;
+	}
+
+	return 0;
+}
+
+/**
  * Probe PCI device
  *
  * @v pci		PCI device
@@ -2239,6 +2437,10 @@ static int hermon_probe ( struct pci_device *pci,
 	if ( ( rc = hermon_create_eq ( hermon ) ) != 0 )
 		goto err_create_eq;
 
+	/* Configure special QPs */
+	if ( ( rc = hermon_configure_special_qps ( hermon ) ) != 0 )
+		goto err_conf_special_qps;
+
 	/* Update MAD parameters */
 	for ( i = 0 ; i < HERMON_NUM_PORTS ; i++ )
 		ib_smc_update ( hermon->ibdev[i], hermon_mad );
@@ -2258,6 +2460,7 @@ static int hermon_probe ( struct pci_device *pci,
  err_register_ibdev:
 	for ( i-- ; i >= 0 ; i-- )
 		unregister_ibdev ( hermon->ibdev[i] );
+ err_conf_special_qps:
 	hermon_destroy_eq ( hermon );
  err_create_eq:
  err_setup_mpt:
