@@ -68,11 +68,263 @@ struct ib_mad_request {
  */
 #define IB_GMA_NUM_CQES 8
 
-/** GMA TID magic signature */
+/** TID magic signature */
 #define IB_GMA_TID_MAGIC ( ( 'g' << 24 ) | ( 'P' << 16 ) | ( 'X' << 8 ) | 'E' )
 
 /** TID to use for next MAD request */
 static unsigned int next_request_tid;
+
+/*****************************************************************************
+ *
+ * Subnet management MAD handlers
+ *
+ *****************************************************************************
+ */
+
+/**
+ * Get node information
+ *
+ * @v gma		General management agent
+ * @v mad		MAD
+ * @ret rc		Return status code
+ */
+static int ib_sma_get_node_info ( struct ib_gma *gma,
+				  union ib_mad *mad ) {
+	struct ib_device *ibdev = gma->ibdev;
+	struct ib_node_info *node_info = &mad->smp.smp_data.node_info;
+
+	memset ( node_info, 0, sizeof ( *node_info ) );
+	node_info->base_version = IB_MGMT_BASE_VERSION;
+	node_info->class_version = IB_SMP_CLASS_VERSION;
+	node_info->node_type = IB_NODE_TYPE_HCA;
+	node_info->num_ports = ib_get_hca_info ( ibdev, &node_info->sys_guid );
+	memcpy ( &node_info->node_guid, &node_info->sys_guid,
+		 sizeof ( node_info->node_guid ) );
+	memcpy ( &node_info->port_guid, &ibdev->gid.u.half[1],
+		 sizeof ( node_info->port_guid ) );
+	node_info->partition_cap = htons ( 1 );
+	node_info->local_port_num = ibdev->port;
+
+	return 0;
+}
+
+/**
+ * Get node description
+ *
+ * @v gma		General management agent
+ * @v mad		MAD
+ * @ret rc		Return status code
+ */
+static int ib_sma_get_node_desc ( struct ib_gma *gma,
+				  union ib_mad *mad ) {
+	struct ib_device *ibdev = gma->ibdev;
+	struct ib_node_desc *node_desc = &mad->smp.smp_data.node_desc;
+	struct ib_gid_half *guid = &ibdev->gid.u.half[1];
+
+	memset ( node_desc, 0, sizeof ( *node_desc ) );
+	snprintf ( node_desc->node_string, sizeof ( node_desc->node_string ),
+		   "gPXE %02x:%02x:%02x:%02x:%02x:%02x:%02x:%02x (%s)",
+		   guid->bytes[0], guid->bytes[1], guid->bytes[2],
+		   guid->bytes[3], guid->bytes[4], guid->bytes[5],
+		   guid->bytes[6], guid->bytes[7], ibdev->dev->name );
+
+	return 0;
+}
+
+/**
+ * Get GUID information
+ *
+ * @v gma		General management agent
+ * @v mad		MAD
+ * @ret rc		Return status code
+ */
+static int ib_sma_get_guid_info ( struct ib_gma *gma,
+				  union ib_mad *mad ) {
+	struct ib_device *ibdev = gma->ibdev;
+	struct ib_guid_info *guid_info = &mad->smp.smp_data.guid_info;
+
+	memset ( guid_info, 0, sizeof ( *guid_info ) );
+	memcpy ( guid_info->guid[0], &ibdev->gid.u.half[1],
+		 sizeof ( guid_info->guid[0] ) );
+
+	return 0;
+}
+
+/**
+ * Get port information
+ *
+ * @v gma		General management agent
+ * @v mad		MAD
+ * @ret rc		Return status code
+ */
+static int ib_sma_get_port_info ( struct ib_gma *gma,
+				  union ib_mad *mad ) {
+	struct ib_device *ibdev = gma->ibdev;
+	struct ib_port_info *port_info = &mad->smp.smp_data.port_info;
+
+	memset ( port_info, 0, sizeof ( *port_info ) );
+	memcpy ( port_info->gid_prefix, &ibdev->gid.u.half[0],
+		 sizeof ( port_info->gid_prefix ) );
+	port_info->lid = ntohs ( ibdev->lid );
+	port_info->mastersm_lid = ntohs ( ibdev->sm_lid );
+	port_info->local_port_num = ibdev->port;
+	port_info->link_width_enabled = ibdev->link_width;
+	port_info->link_width_supported = ibdev->link_width;
+	port_info->link_width_active = ibdev->link_width;
+	port_info->link_speed_supported__port_state =
+		( ( ibdev->link_speed << 4 ) | ibdev->port_state );
+	port_info->port_phys_state__link_down_def_state =
+		( ( IB_PORT_PHYS_STATE_POLLING << 4 ) |
+		  IB_PORT_PHYS_STATE_POLLING );
+	port_info->link_speed_active__link_speed_enabled =
+		( ( ibdev->link_speed << 4 ) | ibdev->link_speed );
+	port_info->neighbour_mtu__mastersm_sl =
+		( ( IB_MTU_2048 << 4 ) | ibdev->sm_sl );
+	port_info->vl_cap__init_type = ( IB_VL_0 << 4 );
+	port_info->init_type_reply__mtu_cap = IB_MTU_2048;
+	port_info->operational_vls__enforcement = ( IB_VL_0 << 4 );
+	port_info->guid_cap = 1;
+
+	return 0;
+}
+
+/**
+ * Set port information
+ *
+ * @v gma		General management agent
+ * @v mad		MAD
+ * @ret rc		Return status code
+ */
+static int ib_sma_set_port_info ( struct ib_gma *gma,
+				  union ib_mad *mad ) {
+	struct ib_device *ibdev = gma->ibdev;
+	const struct ib_port_info *port_info = &mad->smp.smp_data.port_info;
+	int rc;
+
+	memcpy ( &ibdev->gid.u.half[0], port_info->gid_prefix,
+		 sizeof ( ibdev->gid.u.half[0] ) );
+	ibdev->lid = ntohs ( port_info->lid );
+	ibdev->sm_lid = ntohs ( port_info->mastersm_lid );
+	ibdev->sm_sl = ( port_info->neighbour_mtu__mastersm_sl & 0xf );
+
+	if ( ( rc = ib_set_port_info ( ibdev, port_info ) ) != 0 ) {
+		DBGC ( ibdev, "IBDEV %p could not set port information: %s\n",
+		       ibdev, strerror ( rc ) );
+		mad->hdr.status =
+			htons ( IB_MGMT_STATUS_UNSUPPORTED_METHOD_ATTR );
+	}
+
+	return ib_sma_get_port_info ( gma, mad );
+}
+
+/**
+ * Get partition key table
+ *
+ * @v gma		General management agent
+ * @v mad		MAD
+ * @ret rc		Return status code
+ */
+static int ib_sma_get_pkey_table ( struct ib_gma *gma,
+				   union ib_mad *mad ) {
+	struct ib_device *ibdev = gma->ibdev;
+	struct ib_pkey_table *pkey_table = &mad->smp.smp_data.pkey_table;
+
+	memset ( pkey_table, 0, sizeof ( *pkey_table ) );
+	pkey_table->pkey[0] = htons ( ibdev->pkey );
+
+	return 0;
+}
+
+/**
+ * Set partition key table
+ *
+ * @v gma		General management agent
+ * @v mad		MAD
+ * @ret rc		Return status code
+ */
+static int ib_sma_set_pkey_table ( struct ib_gma *gma,
+				   union ib_mad *mad ) {
+	struct ib_device *ibdev = gma->ibdev;
+	struct ib_pkey_table *pkey_table = &mad->smp.smp_data.pkey_table;
+
+	ibdev->pkey = ntohs ( pkey_table->pkey[0] );
+
+	return ib_sma_get_pkey_table ( gma, mad );
+}
+
+/** List of attribute handlers */
+struct ib_gma_handler ib_sma_handlers[] __ib_gma_handler = {
+	{
+		.mgmt_class = IB_MGMT_CLASS_SUBN_LID_ROUTED,
+		.mgmt_class_ignore = IB_SMP_CLASS_IGNORE,
+		.class_version = IB_SMP_CLASS_VERSION,
+		.method = IB_MGMT_METHOD_GET,
+		.resp_method = IB_MGMT_METHOD_GET_RESP,
+		.attr_id = htons ( IB_SMP_ATTR_NODE_INFO ),
+		.handle = ib_sma_get_node_info,
+	},
+	{
+		.mgmt_class = IB_MGMT_CLASS_SUBN_LID_ROUTED,
+		.mgmt_class_ignore = IB_SMP_CLASS_IGNORE,
+		.class_version = IB_SMP_CLASS_VERSION,
+		.method = IB_MGMT_METHOD_GET,
+		.resp_method = IB_MGMT_METHOD_GET_RESP,
+		.attr_id = htons ( IB_SMP_ATTR_NODE_DESC ),
+		.handle = ib_sma_get_node_desc,
+	},
+	{
+		.mgmt_class = IB_MGMT_CLASS_SUBN_LID_ROUTED,
+		.mgmt_class_ignore = IB_SMP_CLASS_IGNORE,
+		.class_version = IB_SMP_CLASS_VERSION,
+		.method = IB_MGMT_METHOD_GET,
+		.resp_method = IB_MGMT_METHOD_GET_RESP,
+		.attr_id = htons ( IB_SMP_ATTR_GUID_INFO ),
+		.handle = ib_sma_get_guid_info,
+	},
+	{
+		.mgmt_class = IB_MGMT_CLASS_SUBN_LID_ROUTED,
+		.mgmt_class_ignore = IB_SMP_CLASS_IGNORE,
+		.class_version = IB_SMP_CLASS_VERSION,
+		.method = IB_MGMT_METHOD_GET,
+		.resp_method = IB_MGMT_METHOD_GET_RESP,
+		.attr_id = htons ( IB_SMP_ATTR_PORT_INFO ),
+		.handle = ib_sma_get_port_info,
+	},
+	{
+		.mgmt_class = IB_MGMT_CLASS_SUBN_LID_ROUTED,
+		.mgmt_class_ignore = IB_SMP_CLASS_IGNORE,
+		.class_version = IB_SMP_CLASS_VERSION,
+		.method = IB_MGMT_METHOD_SET,
+		.resp_method = IB_MGMT_METHOD_GET_RESP,
+		.attr_id = htons ( IB_SMP_ATTR_PORT_INFO ),
+		.handle = ib_sma_set_port_info,
+	},
+	{
+		.mgmt_class = IB_MGMT_CLASS_SUBN_LID_ROUTED,
+		.mgmt_class_ignore = IB_SMP_CLASS_IGNORE,
+		.class_version = IB_SMP_CLASS_VERSION,
+		.method = IB_MGMT_METHOD_GET,
+		.resp_method = IB_MGMT_METHOD_GET_RESP,
+		.attr_id = htons ( IB_SMP_ATTR_PKEY_TABLE ),
+		.handle = ib_sma_get_pkey_table,
+	},
+	{
+		.mgmt_class = IB_MGMT_CLASS_SUBN_LID_ROUTED,
+		.mgmt_class_ignore = IB_SMP_CLASS_IGNORE,
+		.class_version = IB_SMP_CLASS_VERSION,
+		.method = IB_MGMT_METHOD_SET,
+		.resp_method = IB_MGMT_METHOD_GET_RESP,
+		.attr_id = htons ( IB_SMP_ATTR_PKEY_TABLE ),
+		.handle = ib_sma_set_pkey_table,
+	},
+};
+
+/*****************************************************************************
+ *
+ * General management agent
+ *
+ *****************************************************************************
+ */
 
 /**
  * Call attribute handler
@@ -341,18 +593,19 @@ int ib_gma_request ( struct ib_gma *gma, union ib_mad *mad,
 /**
  * Create GMA
  *
- * @v gma		General management agent
  * @v ibdev		Infiniband device
  * @v type		Queue pair type
- * @ret rc		Return status code
+ * @ret gma		General management agent, or NULL
  */
-int ib_create_gma ( struct ib_gma *gma, struct ib_device *ibdev,
-		    enum ib_queue_pair_type type ) {
+struct ib_gma * ib_create_gma ( struct ib_device *ibdev,
+				enum ib_queue_pair_type type ) {
+	struct ib_gma *gma;
 	unsigned long qkey;
-	int rc;
 
-	/* Initialise fields */
-	memset ( gma, 0, sizeof ( *gma ) );
+	/* Allocate and initialise fields */
+	gma = zalloc ( sizeof ( *gma ) );
+	if ( ! gma )
+		goto err_alloc;
 	gma->ibdev = ibdev;
 	INIT_LIST_HEAD ( &gma->requests );
 
@@ -362,7 +615,6 @@ int ib_create_gma ( struct ib_gma *gma, struct ib_device *ibdev,
 	if ( ! gma->cq ) {
 		DBGC ( gma, "GMA %p could not allocate completion queue\n",
 		       gma );
-		rc = -ENOMEM;
 		goto err_create_cq;
 	}
 
@@ -372,7 +624,6 @@ int ib_create_gma ( struct ib_gma *gma, struct ib_device *ibdev,
 				 IB_GMA_NUM_RECV_WQES, gma->cq, qkey );
 	if ( ! gma->qp ) {
 		DBGC ( gma, "GMA %p could not allocate queue pair\n", gma );
-		rc = -ENOMEM;
 		goto err_create_qp;
 	}
 	ib_qp_set_ownerdata ( gma->qp, gma );
@@ -381,13 +632,15 @@ int ib_create_gma ( struct ib_gma *gma, struct ib_device *ibdev,
 
 	/* Fill receive ring */
 	ib_refill_recv ( ibdev, gma->qp );
-	return 0;
+	return gma;
 
 	ib_destroy_qp ( ibdev, gma->qp );
  err_create_qp:
 	ib_destroy_cq ( ibdev, gma->cq );
  err_create_cq:
-	return rc;
+	free ( gma );
+ err_alloc:
+	return NULL;
 }
 
 /**
@@ -409,4 +662,5 @@ void ib_destroy_gma ( struct ib_gma *gma ) {
 
 	ib_destroy_qp ( ibdev, gma->qp );
 	ib_destroy_cq ( ibdev, gma->cq );
+	free ( gma );
 }

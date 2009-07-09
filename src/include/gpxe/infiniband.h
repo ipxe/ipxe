@@ -14,7 +14,6 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #include <gpxe/device.h>
 #include <gpxe/ib_packet.h>
 #include <gpxe/ib_mad.h>
-#include <gpxe/ib_gma.h>
 
 /** Subnet management QPN */
 #define IB_QPN_SMA 0
@@ -46,6 +45,7 @@ struct ib_device;
 struct ib_queue_pair;
 struct ib_address_vector;
 struct ib_completion_queue;
+struct ib_gma;
 
 /** An Infiniband Work Queue */
 struct ib_work_queue {
@@ -387,8 +387,10 @@ struct ib_device {
 	/** Outbound packet sequence number */
 	uint32_t psn;
 
+	/** Subnet management agent */
+	struct ib_gma *sma;
 	/** General management agent */
-	struct ib_gma gma;
+	struct ib_gma *gma;
 
 	/** Driver private data */
 	void *drv_priv;

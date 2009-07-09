@@ -98,7 +98,7 @@ ib_find_path_cache_entry ( struct ib_device *ibdev, struct ib_gid *dgid ) {
  */
 int ib_resolve_path ( struct ib_device *ibdev,
 		      struct ib_address_vector *av ) {
-	struct ib_gma *gma = &ibdev->gma;
+	struct ib_gma *gma = ibdev->gma;
 	struct ib_gid *gid = &av->gid;
 	struct ib_cached_path_record *cached;
 	union ib_mad mad;

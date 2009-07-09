@@ -84,7 +84,7 @@ static int ib_mc_member_request ( struct ib_gma *gma, struct ib_gid *gid,
  */
 int ib_mcast_join ( struct ib_device *ibdev, struct ib_queue_pair *qp,
 		    struct ib_gid *gid ) {
-	struct ib_gma *gma = &ibdev->gma;
+	struct ib_gma *gma = ibdev->gma;
 	int rc;
 
 	DBGC ( gma, "GMA %p QPN %lx joining %08x:%08x:%08x:%08x\n",
@@ -120,7 +120,7 @@ int ib_mcast_join ( struct ib_device *ibdev, struct ib_queue_pair *qp,
  */
 void ib_mcast_leave ( struct ib_device *ibdev, struct ib_queue_pair *qp,
 		      struct ib_gid *gid ) {
-	struct ib_gma *gma = &ibdev->gma;
+	struct ib_gma *gma = ibdev->gma;
 
 	DBGC ( gma, "GMA %p QPN %lx leaving %08x:%08x:%08x:%08x\n",
 	       gma, qp->qpn, ntohl ( gid->u.dwords[0] ),

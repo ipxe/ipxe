@@ -30,7 +30,6 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #include <gpxe/bitbash.h>
 #include <gpxe/malloc.h>
 #include <gpxe/iobuf.h>
-#include <gpxe/ib_sma.h>
 #include "linda.h"
 
 /**
@@ -97,9 +96,6 @@ struct linda {
 	struct i2c_bit_basher i2c;
 	/** I2C serial EEPROM */
 	struct i2c_device eeprom;
-
-	/** Subnet management agent */
-	struct ib_sma sma;
 };
 
 /***************************************************************************
@@ -2335,12 +2331,6 @@ static int linda_probe ( struct pci_device *pci,
 	if ( ( rc = linda_init_ib_serdes ( linda ) ) != 0 )
 		goto err_init_ib_serdes;
 
-	/* Create the SMA */
-	if ( ( rc = ib_create_sma ( &linda->sma, ibdev ) ) != 0 )
-		goto err_create_sma;
-	/* If the SMA doesn't get context 0, we're screwed */
-	assert ( linda_qpn_to_ctx ( linda->sma.gma.qp->qpn ) == 0 );
-
 	/* Register Infiniband device */
 	if ( ( rc = register_ibdev ( ibdev ) ) != 0 ) {
 		DBGC ( linda, "Linda %p could not register IB "
@@ -2352,8 +2342,6 @@ static int linda_probe ( struct pci_device *pci,
 
 	unregister_ibdev ( ibdev );
  err_register_ibdev:
-	ib_destroy_sma ( &linda->sma );
- err_create_sma:
 	linda_fini_recv ( linda );
  err_init_recv:
 	linda_fini_send ( linda );
@@ -2376,7 +2364,6 @@ static void linda_remove ( struct pci_device *pci ) {
 	struct linda *linda = ib_get_drvdata ( ibdev );
 
 	unregister_ibdev ( ibdev );
-	ib_destroy_sma ( &linda->sma );
 	linda_fini_recv ( linda );
 	linda_fini_send ( linda );
 	ibdev_put ( ibdev );

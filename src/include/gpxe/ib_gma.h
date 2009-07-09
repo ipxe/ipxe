@@ -12,13 +12,9 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #include <gpxe/list.h>
 #include <gpxe/retry.h>
 #include <gpxe/tables.h>
+#include <gpxe/infiniband.h>
 
-struct ib_device;
-struct ib_completion_queue;
-struct ib_queue_pair;
-union ib_mad;
 struct ib_gma;
-enum ib_queue_pair_type;
 
 /** A GMA attribute handler */
 struct ib_gma_handler {
@@ -68,8 +64,8 @@ struct ib_gma {
 
 extern int ib_gma_request ( struct ib_gma *gma, union ib_mad *mad,
 			    struct ib_address_vector *av, int retry );
-extern int ib_create_gma ( struct ib_gma *gma, struct ib_device *ibdev,
-			   enum ib_queue_pair_type type );
+extern struct ib_gma * ib_create_gma ( struct ib_device *ibdev,
+				       enum ib_queue_pair_type type );
 extern void ib_destroy_gma ( struct ib_gma *gma );
 
 #endif /* _GPXE_IB_GMA_H */
