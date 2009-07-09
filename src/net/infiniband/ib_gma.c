@@ -343,11 +343,12 @@ int ib_gma_request ( struct ib_gma *gma, union ib_mad *mad,
  *
  * @v gma		General management agent
  * @v ibdev		Infiniband device
- * @v qkey		Queue key
+ * @v type		Queue pair type
  * @ret rc		Return status code
  */
 int ib_create_gma ( struct ib_gma *gma, struct ib_device *ibdev,
-		    unsigned long qkey ) {
+		    enum ib_queue_pair_type type ) {
+	unsigned long qkey;
 	int rc;
 
 	/* Initialise fields */
@@ -366,7 +367,8 @@ int ib_create_gma ( struct ib_gma *gma, struct ib_device *ibdev,
 	}
 
 	/* Create queue pair */
-	gma->qp = ib_create_qp ( ibdev, IB_GMA_NUM_SEND_WQES, gma->cq,
+	qkey = ( ( type == IB_QPT_SMA ) ? IB_QKEY_SMA : IB_QKEY_GMA );
+	gma->qp = ib_create_qp ( ibdev, type, IB_GMA_NUM_SEND_WQES, gma->cq,
 				 IB_GMA_NUM_RECV_WQES, gma->cq, qkey );
 	if ( ! gma->qp ) {
 		DBGC ( gma, "GMA %p could not allocate queue pair\n", gma );

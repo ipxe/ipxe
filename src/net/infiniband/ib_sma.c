@@ -286,7 +286,7 @@ int ib_create_sma ( struct ib_sma *sma, struct ib_device *ibdev ) {
 	int rc;
 
 	/* Initialise GMA */
-	if ( ( rc = ib_create_gma ( &sma->gma, ibdev, 0 ) ) != 0 ) {
+	if ( ( rc = ib_create_gma ( &sma->gma, ibdev, IB_QPT_SMA ) ) != 0 ) {
 		DBGC ( sma, "SMA %p could not create GMA: %s\n",
 		       sma, strerror ( rc ) );
 		goto err_create_gma;

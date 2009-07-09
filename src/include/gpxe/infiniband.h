@@ -83,6 +83,13 @@ struct ib_multicast_gid {
 	struct ib_gid gid;
 };
 
+/** An Infiniband queue pair type */
+enum ib_queue_pair_type {
+	IB_QPT_SMA,
+	IB_QPT_GMA,
+	IB_QPT_UD,
+};
+
 /** An Infiniband Queue Pair */
 struct ib_queue_pair {
 	/** Containing Infiniband device */
@@ -91,6 +98,8 @@ struct ib_queue_pair {
 	struct list_head list;
 	/** Queue Pair Number */
 	unsigned long qpn;
+	/** Queue pair type */
+	enum ib_queue_pair_type type;
 	/** Queue key */
 	unsigned long qkey;
 	/** Send queue */
@@ -395,9 +404,10 @@ extern void ib_destroy_cq ( struct ib_device *ibdev,
 extern void ib_poll_cq ( struct ib_device *ibdev,
 			 struct ib_completion_queue *cq );
 extern struct ib_queue_pair *
-ib_create_qp ( struct ib_device *ibdev, unsigned int num_send_wqes,
-	       struct ib_completion_queue *send_cq, unsigned int num_recv_wqes,
-	       struct ib_completion_queue *recv_cq, unsigned long qkey );
+ib_create_qp ( struct ib_device *ibdev, enum ib_queue_pair_type type,
+	       unsigned int num_send_wqes, struct ib_completion_queue *send_cq,
+	       unsigned int num_recv_wqes, struct ib_completion_queue *recv_cq,
+	       unsigned long qkey );
 extern int ib_modify_qp ( struct ib_device *ibdev, struct ib_queue_pair *qp,
 			  unsigned long mod_list, unsigned long qkey );
 extern void ib_destroy_qp ( struct ib_device *ibdev,

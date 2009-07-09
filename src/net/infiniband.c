@@ -143,6 +143,7 @@ void ib_poll_cq ( struct ib_device *ibdev,
  * Create queue pair
  *
  * @v ibdev		Infiniband device
+ * @v type		Queue pair type
  * @v num_send_wqes	Number of send work queue entries
  * @v send_cq		Send completion queue
  * @v num_recv_wqes	Number of receive work queue entries
@@ -151,6 +152,7 @@ void ib_poll_cq ( struct ib_device *ibdev,
  * @ret qp		Queue pair
  */
 struct ib_queue_pair * ib_create_qp ( struct ib_device *ibdev,
+				      enum ib_queue_pair_type type,
 				      unsigned int num_send_wqes,
 				      struct ib_completion_queue *send_cq,
 				      unsigned int num_recv_wqes,
@@ -171,6 +173,7 @@ struct ib_queue_pair * ib_create_qp ( struct ib_device *ibdev,
 		goto err_alloc_qp;
 	qp->ibdev = ibdev;
 	list_add ( &qp->list, &ibdev->qps );
+	qp->type = type;
 	qp->qkey = qkey;
 	qp->send.qp = qp;
 	qp->send.is_send = 1;
@@ -515,7 +518,7 @@ int ib_open ( struct ib_device *ibdev ) {
 	}
 
 	/* Create general management agent */
-	if ( ( rc = ib_create_gma ( &ibdev->gma, ibdev, IB_QKEY_GMA ) ) != 0 ){
+	if ( ( rc = ib_create_gma ( &ibdev->gma, ibdev, IB_QPT_GMA ) ) != 0 ) {
 		DBGC ( ibdev, "IBDEV %p could not create GMA: %s\n",
 		       ibdev, strerror ( rc ) );
 		goto err_create_gma;

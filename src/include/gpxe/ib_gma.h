@@ -18,6 +18,7 @@ struct ib_completion_queue;
 struct ib_queue_pair;
 union ib_mad;
 struct ib_gma;
+enum ib_queue_pair_type;
 
 /** A GMA attribute handler */
 struct ib_gma_handler {
@@ -68,7 +69,7 @@ struct ib_gma {
 extern int ib_gma_request ( struct ib_gma *gma, union ib_mad *mad,
 			    struct ib_address_vector *av, int retry );
 extern int ib_create_gma ( struct ib_gma *gma, struct ib_device *ibdev,
-			   unsigned long qkey );
+			   enum ib_queue_pair_type type );
 extern void ib_destroy_gma ( struct ib_gma *gma );
 
 #endif /* _GPXE_IB_GMA_H */
