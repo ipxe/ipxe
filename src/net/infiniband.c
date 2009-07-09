@@ -196,7 +196,6 @@ struct ib_queue_pair * ib_create_qp ( struct ib_device *ibdev,
 		       "%s\n", ibdev, strerror ( rc ) );
 		goto err_dev_create_qp;
 	}
-
 	DBGC ( ibdev, "IBDEV %p created queue pair %p (%p) with QPN %#lx\n",
 	       ibdev, qp, ib_qp_get_drvdata ( qp ), qp->qpn );
 	DBGC ( ibdev, "IBDEV %p QPN %#lx has %d send entries at [%p,%p)\n",
@@ -205,6 +204,24 @@ struct ib_queue_pair * ib_create_qp ( struct ib_device *ibdev,
 	DBGC ( ibdev, "IBDEV %p QPN %#lx has %d receive entries at [%p,%p)\n",
 	       ibdev, qp->qpn, num_recv_wqes, qp->recv.iobufs,
 	       ( ( ( void * ) qp ) + total_size ) );
+
+	/* Calculate externally-visible QPN */
+	switch ( type ) {
+	case IB_QPT_SMA:
+		qp->ext_qpn = IB_QPN_SMA;
+		break;
+	case IB_QPT_GMA:
+		qp->ext_qpn = IB_QPN_GMA;
+		break;
+	default:
+		qp->ext_qpn = qp->qpn;
+		break;
+	}
+	if ( qp->ext_qpn != qp->qpn ) {
+		DBGC ( ibdev, "IBDEV %p QPN %#lx has external QPN %#lx\n",
+		       ibdev, qp->qpn, qp->ext_qpn );
+	}
+
 	return qp;
 
 	ibdev->op->destroy_qp ( ibdev, qp );
@@ -295,7 +312,7 @@ struct ib_queue_pair * ib_find_qp_qpn ( struct ib_device *ibdev,
 	struct ib_queue_pair *qp;
 
 	list_for_each_entry ( qp, &ibdev->qps, list ) {
-		if ( qp->qpn == qpn )
+		if ( ( qpn == qp->qpn ) || ( qpn == qp->ext_qpn ) )
 			return qp;
 	}
 	return NULL;

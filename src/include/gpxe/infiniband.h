@@ -96,8 +96,15 @@ struct ib_queue_pair {
 	struct ib_device *ibdev;
 	/** List of queue pairs on this Infiniband device */
 	struct list_head list;
-	/** Queue Pair Number */
+	/** Queue pair number */
 	unsigned long qpn;
+	/** Externally-visible queue pair number
+	 *
+	 * This may differ from the real queue pair number (e.g. when
+	 * the HCA cannot use the management QPNs 0 and 1 as hardware
+	 * QPNs and needs to remap them).
+	 */
+	unsigned long ext_qpn;
 	/** Queue pair type */
 	enum ib_queue_pair_type type;
 	/** Queue key */
