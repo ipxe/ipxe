@@ -1663,6 +1663,12 @@ static int hermon_map_vpm ( struct hermon *hermon,
 	assert ( ( pa & ( HERMON_PAGE_SIZE - 1 ) ) == 0 );
 	assert ( ( len & ( HERMON_PAGE_SIZE - 1 ) ) == 0 );
 
+	/* These mappings tend to generate huge volumes of
+	 * uninteresting debug data, which basically makes it
+	 * impossible to use debugging otherwise.
+	 */
+	DBG_DISABLE ( DBGLVL_LOG | DBGLVL_EXTRA );
+
 	while ( len ) {
 		memset ( &mapping, 0, sizeof ( mapping ) );
 		MLX_FILL_1 ( &mapping, 0, va_h, ( va >> 32 ) );
@@ -1671,6 +1677,7 @@ static int hermon_map_vpm ( struct hermon *hermon,
 			     log2size, 0,
 			     pa_l, ( pa >> 12 ) );
 		if ( ( rc = map ( hermon, &mapping ) ) != 0 ) {
+			DBG_ENABLE ( DBGLVL_LOG | DBGLVL_EXTRA );
 			DBGC ( hermon, "Hermon %p could not map %llx => %lx: "
 			       "%s\n", hermon, va, pa, strerror ( rc ) );
 			return rc;
@@ -1680,6 +1687,7 @@ static int hermon_map_vpm ( struct hermon *hermon,
 		len -= HERMON_PAGE_SIZE;
 	}
 
+	DBG_ENABLE ( DBGLVL_LOG | DBGLVL_EXTRA );
 	return 0;
 }
 
