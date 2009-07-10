@@ -170,9 +170,10 @@ int ib_resolve_path ( struct ib_device *ibdev,
  *
  * @v gma		General management agent
  * @v mad		MAD
+ * @ret response	MAD response
  */
-static void ib_handle_path_record ( struct ib_gma *gma,
-				    union ib_mad *mad ) {
+static union ib_mad * ib_handle_path_record ( struct ib_gma *gma,
+					      union ib_mad *mad ) {
 	struct ib_device *ibdev = gma->ibdev;
 	struct ib_path_record *path_record = &mad->sa.sa_data.path_record;
 	struct ib_gid *dgid = &path_record->dgid;
@@ -185,7 +186,7 @@ static void ib_handle_path_record ( struct ib_gma *gma,
 	if ( mad->hdr.status != htons ( IB_MGMT_STATUS_OK ) ) {
 		DBGC ( gma, "GMA %p path record lookup failed with status "
 		       "%04x\n", gma, ntohs ( mad->hdr.status ) );
-		return;
+		return NULL;
 	}
 
 	/* Extract values from MAD */
@@ -208,6 +209,8 @@ static void ib_handle_path_record ( struct ib_gma *gma,
 		cached->rate = rate;
 		cached->sl = sl;
 	}
+
+	return NULL;
 }
 
 /** Path record response handler */

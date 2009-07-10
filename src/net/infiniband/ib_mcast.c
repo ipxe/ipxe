@@ -139,9 +139,10 @@ void ib_mcast_leave ( struct ib_device *ibdev, struct ib_queue_pair *qp,
  *
  * @v gma		General management agent
  * @v mad		MAD
+ * @ret mad		MAD response
  */
-static void ib_handle_mc_member_join ( struct ib_gma *gma,
-				       union ib_mad *mad ) {
+static union ib_mad * ib_handle_mc_member_join ( struct ib_gma *gma,
+						 union ib_mad *mad ) {
 	struct ib_device *ibdev = gma->ibdev;
 	struct ib_mc_member_record *mc_member_record =
 		&mad->sa.sa_data.mc_member_record;
@@ -154,7 +155,7 @@ static void ib_handle_mc_member_join ( struct ib_gma *gma,
 	if ( mad->hdr.status != htons ( IB_MGMT_STATUS_OK ) ) {
 		DBGC ( gma, "GMA %p join failed with status %04x\n",
 		       gma, ntohs ( mad->hdr.status ) );
-		return;
+		return NULL;
 	}
 
 	/* Extract MAD parameters */
@@ -169,7 +170,7 @@ static void ib_handle_mc_member_join ( struct ib_gma *gma,
 		       ntohl ( gid->u.dwords[1] ),
 		       ntohl ( gid->u.dwords[2] ),
 		       ntohl ( gid->u.dwords[3] ) );
-		return;
+		return NULL;
 	}
 	DBGC ( gma, "GMA %p QPN %lx joined %08x:%08x:%08x:%08x qkey %lx\n",
 	       gma, qp->qpn, ntohl ( gid->u.dwords[0] ),
@@ -180,8 +181,10 @@ static void ib_handle_mc_member_join ( struct ib_gma *gma,
 	if ( ( rc = ib_modify_qp ( ibdev, qp, IB_MODIFY_QKEY, qkey ) ) != 0 ) {
 		DBGC ( gma, "GMA %p QPN %lx could not modify qkey: %s\n",
 		       gma, qp->qpn, strerror ( rc ) );
-		return;
+		return NULL;
 	}
+
+	return NULL;
 }
 
 /**
@@ -189,9 +192,10 @@ static void ib_handle_mc_member_join ( struct ib_gma *gma,
  *
  * @v gma		General management agent
  * @v mad		MAD
+ * @v response		MAD response
  */
-static void ib_handle_mc_member_leave ( struct ib_gma *gma,
-					union ib_mad *mad ) {
+static union ib_mad * ib_handle_mc_member_leave ( struct ib_gma *gma,
+						  union ib_mad *mad ) {
 	struct ib_mc_member_record *mc_member_record =
 		&mad->sa.sa_data.mc_member_record;
 	struct ib_gid *gid;
@@ -200,7 +204,7 @@ static void ib_handle_mc_member_leave ( struct ib_gma *gma,
 	if ( mad->hdr.status != htons ( IB_MGMT_STATUS_OK ) ) {
 		DBGC ( gma, "GMA %p leave failed with status %04x\n",
 		       gma, ntohs ( mad->hdr.status ) );
-		return;
+		return NULL;
 	}
 
 	/* Extract MAD parameters */
@@ -208,6 +212,8 @@ static void ib_handle_mc_member_leave ( struct ib_gma *gma,
 	DBGC ( gma, "GMA %p left %08x:%08x:%08x:%08x\n", gma,
 	       ntohl ( gid->u.dwords[0] ), ntohl ( gid->u.dwords[1] ),
 	       ntohl ( gid->u.dwords[2] ), ntohl ( gid->u.dwords[3] ) );
+
+	return NULL;
 }
 
 /** Multicast membership record response handler */

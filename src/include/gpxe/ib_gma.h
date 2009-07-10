@@ -26,20 +26,15 @@ struct ib_gma_handler {
 	uint8_t class_version;
 	/** Method */
 	uint8_t method;
-	/** Response method, or zero */
-	uint8_t resp_method;
 	/** Attribute (in network byte order) */
 	uint16_t attr_id;
 	/** Handle attribute
 	 *
-	 * @v gma	General management agent
-	 * @v mad	MAD
-	 *
-	 * The handler should modify the MAD as applicable.  If the
-	 * handler returns with a non-zero value in the MAD's @c
-	 * method field, it will be sent as a response.
+	 * @v gma		General management agent
+	 * @v mad		MAD
+	 * @ret response	MAD response, or NULL to send no response
 	 */
-	void ( * handle ) ( struct ib_gma *gma, union ib_mad *mad );
+	union ib_mad * ( * handle ) ( struct ib_gma *gma, union ib_mad *mad );
 };
 
 /** GMA attribute handlers */
