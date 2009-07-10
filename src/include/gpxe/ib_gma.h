@@ -34,13 +34,12 @@ struct ib_gma_handler {
 	 *
 	 * @v gma	General management agent
 	 * @v mad	MAD
-	 * @ret rc	Return status code
 	 *
 	 * The handler should modify the MAD as applicable.  If the
 	 * handler returns with a non-zero value in the MAD's @c
 	 * method field, it will be sent as a response.
 	 */
-	int ( * handle ) ( struct ib_gma *gma, union ib_mad *mad );
+	void ( * handle ) ( struct ib_gma *gma, union ib_mad *mad );
 };
 
 /** GMA attribute handlers */

@@ -86,10 +86,9 @@ static unsigned int next_request_tid;
  *
  * @v gma		General management agent
  * @v mad		MAD
- * @ret rc		Return status code
  */
-static int ib_sma_get_node_info ( struct ib_gma *gma,
-				  union ib_mad *mad ) {
+static void ib_sma_get_node_info ( struct ib_gma *gma,
+				   union ib_mad *mad ) {
 	struct ib_device *ibdev = gma->ibdev;
 	struct ib_node_info *node_info = &mad->smp.smp_data.node_info;
 
@@ -104,8 +103,6 @@ static int ib_sma_get_node_info ( struct ib_gma *gma,
 		 sizeof ( node_info->port_guid ) );
 	node_info->partition_cap = htons ( 1 );
 	node_info->local_port_num = ibdev->port;
-
-	return 0;
 }
 
 /**
@@ -113,10 +110,9 @@ static int ib_sma_get_node_info ( struct ib_gma *gma,
  *
  * @v gma		General management agent
  * @v mad		MAD
- * @ret rc		Return status code
  */
-static int ib_sma_get_node_desc ( struct ib_gma *gma,
-				  union ib_mad *mad ) {
+static void ib_sma_get_node_desc ( struct ib_gma *gma,
+				   union ib_mad *mad ) {
 	struct ib_device *ibdev = gma->ibdev;
 	struct ib_node_desc *node_desc = &mad->smp.smp_data.node_desc;
 	struct ib_gid_half *guid = &ibdev->gid.u.half[1];
@@ -127,8 +123,6 @@ static int ib_sma_get_node_desc ( struct ib_gma *gma,
 		   guid->bytes[0], guid->bytes[1], guid->bytes[2],
 		   guid->bytes[3], guid->bytes[4], guid->bytes[5],
 		   guid->bytes[6], guid->bytes[7], ibdev->dev->name );
-
-	return 0;
 }
 
 /**
@@ -136,18 +130,15 @@ static int ib_sma_get_node_desc ( struct ib_gma *gma,
  *
  * @v gma		General management agent
  * @v mad		MAD
- * @ret rc		Return status code
  */
-static int ib_sma_get_guid_info ( struct ib_gma *gma,
-				  union ib_mad *mad ) {
+static void ib_sma_get_guid_info ( struct ib_gma *gma,
+				   union ib_mad *mad ) {
 	struct ib_device *ibdev = gma->ibdev;
 	struct ib_guid_info *guid_info = &mad->smp.smp_data.guid_info;
 
 	memset ( guid_info, 0, sizeof ( *guid_info ) );
 	memcpy ( guid_info->guid[0], &ibdev->gid.u.half[1],
 		 sizeof ( guid_info->guid[0] ) );
-
-	return 0;
 }
 
 /**
@@ -155,10 +146,9 @@ static int ib_sma_get_guid_info ( struct ib_gma *gma,
  *
  * @v gma		General management agent
  * @v mad		MAD
- * @ret rc		Return status code
  */
-static int ib_sma_get_port_info ( struct ib_gma *gma,
-				  union ib_mad *mad ) {
+static void ib_sma_get_port_info ( struct ib_gma *gma,
+				   union ib_mad *mad ) {
 	struct ib_device *ibdev = gma->ibdev;
 	struct ib_port_info *port_info = &mad->smp.smp_data.port_info;
 
@@ -184,8 +174,6 @@ static int ib_sma_get_port_info ( struct ib_gma *gma,
 	port_info->init_type_reply__mtu_cap = IB_MTU_2048;
 	port_info->operational_vls__enforcement = ( IB_VL_0 << 4 );
 	port_info->guid_cap = 1;
-
-	return 0;
 }
 
 /**
@@ -193,10 +181,9 @@ static int ib_sma_get_port_info ( struct ib_gma *gma,
  *
  * @v gma		General management agent
  * @v mad		MAD
- * @ret rc		Return status code
  */
-static int ib_sma_set_port_info ( struct ib_gma *gma,
-				  union ib_mad *mad ) {
+static void ib_sma_set_port_info ( struct ib_gma *gma,
+				   union ib_mad *mad ) {
 	struct ib_device *ibdev = gma->ibdev;
 	const struct ib_port_info *port_info = &mad->smp.smp_data.port_info;
 	int rc;
@@ -214,7 +201,7 @@ static int ib_sma_set_port_info ( struct ib_gma *gma,
 			htons ( IB_MGMT_STATUS_UNSUPPORTED_METHOD_ATTR );
 	}
 
-	return ib_sma_get_port_info ( gma, mad );
+	ib_sma_get_port_info ( gma, mad );
 }
 
 /**
@@ -222,17 +209,14 @@ static int ib_sma_set_port_info ( struct ib_gma *gma,
  *
  * @v gma		General management agent
  * @v mad		MAD
- * @ret rc		Return status code
  */
-static int ib_sma_get_pkey_table ( struct ib_gma *gma,
-				   union ib_mad *mad ) {
+static void ib_sma_get_pkey_table ( struct ib_gma *gma,
+				    union ib_mad *mad ) {
 	struct ib_device *ibdev = gma->ibdev;
 	struct ib_pkey_table *pkey_table = &mad->smp.smp_data.pkey_table;
 
 	memset ( pkey_table, 0, sizeof ( *pkey_table ) );
 	pkey_table->pkey[0] = htons ( ibdev->pkey );
-
-	return 0;
 }
 
 /**
@@ -240,16 +224,15 @@ static int ib_sma_get_pkey_table ( struct ib_gma *gma,
  *
  * @v gma		General management agent
  * @v mad		MAD
- * @ret rc		Return status code
  */
-static int ib_sma_set_pkey_table ( struct ib_gma *gma,
-				   union ib_mad *mad ) {
+static void ib_sma_set_pkey_table ( struct ib_gma *gma,
+				    union ib_mad *mad ) {
 	struct ib_device *ibdev = gma->ibdev;
 	struct ib_pkey_table *pkey_table = &mad->smp.smp_data.pkey_table;
 
 	ibdev->pkey = ntohs ( pkey_table->pkey[0] );
 
-	return ib_sma_get_pkey_table ( gma, mad );
+	ib_sma_get_pkey_table ( gma, mad );
 }
 
 /** List of attribute handlers */
@@ -331,9 +314,8 @@ struct ib_gma_handler ib_sma_handlers[] __ib_gma_handler = {
  *
  * @v gma		General management agent
  * @v mad		MAD
- * @ret rc		Return status code
  */
-static int ib_handle_mad ( struct ib_gma *gma, union ib_mad *mad ) {
+static void ib_handle_mad ( struct ib_gma *gma, union ib_mad *mad ) {
 	struct ib_mad_hdr *hdr = &mad->hdr;
 	struct ib_gma_handler *handler;
 
@@ -344,13 +326,13 @@ static int ib_handle_mad ( struct ib_gma *gma, union ib_mad *mad ) {
 		     ( handler->method == hdr->method ) &&
 		     ( handler->attr_id == hdr->attr_id ) ) {
 			hdr->method = handler->resp_method;
-			return handler->handle ( gma, mad );
+			handler->handle ( gma, mad );
+			return;
 		}
 	}
 
 	hdr->method = IB_MGMT_METHOD_TRAP;
 	hdr->status = htons ( IB_MGMT_STATUS_UNSUPPORTED_METHOD_ATTR );
-	return -ENOTSUP;
 }
 
 /**
@@ -412,21 +394,17 @@ static void ib_gma_complete_recv ( struct ib_device *ibdev,
 		}
 	}
 
-	/* Handle MAD, if possible */
-	if ( ( rc = ib_handle_mad ( gma, mad ) ) != 0 ) {
-		DBGC ( gma, "GMA %p could not handle TID %08x%08x: %s\n",
-		       gma, ntohl ( hdr->tid[0] ), ntohl ( hdr->tid[1] ),
-		       strerror ( rc ) );
-		/* Do not abort; we may want to send an error response */
-	}
+	/* Handle MAD */
+	ib_handle_mad ( gma, mad );
 
 	/* Finish processing if we have no response to send */
 	if ( ! hdr->method )
 		goto out;
 
-	DBGC ( gma, "GMA %p TX TID %08x%08x (%02x,%02x,%02x,%04x)\n", gma,
-	       ntohl ( hdr->tid[0] ), ntohl ( hdr->tid[1] ), hdr->mgmt_class,
-	       hdr->class_version, hdr->method, ntohs ( hdr->attr_id ) );
+	DBGC ( gma, "GMA %p TX TID %08x%08x (%02x,%02x,%02x,%04x) status "
+	       "%04x\n", gma, ntohl ( hdr->tid[0] ), ntohl ( hdr->tid[1] ),
+	       hdr->mgmt_class, hdr->class_version, hdr->method,
+	       ntohs ( hdr->attr_id ), ntohs ( hdr->status ) );
 	DBGC2_HDA ( gma, 0, mad, sizeof ( *mad ) );
 
 	/* Set response fields for directed route SMPs */
