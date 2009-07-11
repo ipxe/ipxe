@@ -204,16 +204,17 @@ static union ib_mad * ib_sma_get_port_info ( struct ib_gma *gma,
 	port_info->lid = ntohs ( ibdev->lid );
 	port_info->mastersm_lid = ntohs ( ibdev->sm_lid );
 	port_info->local_port_num = ibdev->port;
-	port_info->link_width_enabled = ibdev->link_width;
-	port_info->link_width_supported = ibdev->link_width;
-	port_info->link_width_active = ibdev->link_width;
+	port_info->link_width_enabled = ibdev->link_width_enabled;
+	port_info->link_width_supported = ibdev->link_width_supported;
+	port_info->link_width_active = ibdev->link_width_active;
 	port_info->link_speed_supported__port_state =
-		( ( ibdev->link_speed << 4 ) | ibdev->port_state );
+		( ( ibdev->link_speed_supported << 4 ) | ibdev->port_state );
 	port_info->port_phys_state__link_down_def_state =
 		( ( IB_PORT_PHYS_STATE_POLLING << 4 ) |
 		  IB_PORT_PHYS_STATE_POLLING );
 	port_info->link_speed_active__link_speed_enabled =
-		( ( ibdev->link_speed << 4 ) | ibdev->link_speed );
+		( ( ibdev->link_speed_active << 4 ) |
+		  ibdev->link_speed_enabled );
 	port_info->neighbour_mtu__mastersm_sl =
 		( ( IB_MTU_2048 << 4 ) | ibdev->sm_sl );
 	port_info->vl_cap__init_type = ( IB_VL_0 << 4 );
@@ -236,17 +237,27 @@ static union ib_mad * ib_sma_set_port_info ( struct ib_gma *gma,
 					     union ib_mad *mad ) {
 	struct ib_device *ibdev = gma->ibdev;
 	const struct ib_port_info *port_info = &mad->smp.smp_data.port_info;
+	unsigned int link_width_enabled;
+	unsigned int link_speed_enabled;
 	int rc;
 
 	memcpy ( &ibdev->gid.u.half[0], port_info->gid_prefix,
 		 sizeof ( ibdev->gid.u.half[0] ) );
 	ibdev->lid = ntohs ( port_info->lid );
 	ibdev->sm_lid = ntohs ( port_info->mastersm_lid );
+	if ( ( link_width_enabled = port_info->link_width_enabled ) )
+		ibdev->link_width_enabled = link_width_enabled;
+	if ( ( link_speed_enabled =
+	       ( port_info->link_speed_active__link_speed_enabled & 0xf ) ) )
+		ibdev->link_speed_enabled = link_speed_enabled;
 	ibdev->sm_sl = ( port_info->neighbour_mtu__mastersm_sl & 0xf );
+	DBGC ( gma, "GMA %p set LID %04x SMLID %04x link width %02x speed "
+	       "%02x\n", gma, ibdev->lid, ibdev->sm_lid,
+	       ibdev->link_width_enabled, ibdev->link_speed_enabled );
 
 	if ( ( rc = ib_set_port_info ( ibdev, port_info ) ) != 0 ) {
-		DBGC ( ibdev, "IBDEV %p could not set port information: %s\n",
-		       ibdev, strerror ( rc ) );
+		DBGC ( gma, "GMA %p could not set port information: %s\n",
+		       gma, strerror ( rc ) );
 		mad->hdr.status =
 			htons ( IB_MGMT_STATUS_UNSUPPORTED_METHOD_ATTR );
 	}

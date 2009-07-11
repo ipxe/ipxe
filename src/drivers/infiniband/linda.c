@@ -231,9 +231,9 @@ static void linda_link_state_changed ( struct ib_device *ibdev ) {
 
 	/* Notify Infiniband core of link state change */
 	ibdev->port_state = ( link_state + 1 );
-	ibdev->link_width =
+	ibdev->link_width_active =
 		( link_width ? IB_LINK_WIDTH_4X : IB_LINK_WIDTH_1X );
-	ibdev->link_speed =
+	ibdev->link_speed_active =
 		( link_speed ? IB_LINK_SPEED_DDR : IB_LINK_SPEED_SDR );
 	ib_link_state_changed ( ibdev );
 }
@@ -2213,7 +2213,7 @@ static int linda_init_ib_serdes ( struct linda *linda ) {
 	linda_writeq ( linda, &ibcctrl, QIB_7220_IBCCtrl_offset );
 
 	/* Force SDR only to avoid needing all the DDR tuning,
-	 * Mellanox compatibiltiy hacks etc.  SDR is plenty for
+	 * Mellanox compatibility hacks etc.  SDR is plenty for
 	 * boot-time operation.
 	 */
 	linda_readq ( linda, &ibcddrctrl, QIB_7220_IBCDDRCtrl_offset );
@@ -2310,6 +2310,14 @@ static int linda_probe ( struct pci_device *pci,
 		BIT_GET ( &revision, R_Arch ),
 		BIT_GET ( &revision, R_ChipRevMajor ),
 		BIT_GET ( &revision, R_ChipRevMinor ) );
+
+	/* Record link capabilities.  Note that we force SDR only to
+	 * avoid having to carry extra code for DDR tuning etc.
+	 */
+	ibdev->link_width_enabled = ibdev->link_width_supported =
+		( IB_LINK_WIDTH_4X | IB_LINK_WIDTH_1X );
+	ibdev->link_speed_enabled = ibdev->link_speed_supported =
+		IB_LINK_SPEED_SDR;
 
 	/* Initialise I2C subsystem */
 	if ( ( rc = linda_init_i2c ( linda ) ) != 0 )

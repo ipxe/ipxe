@@ -131,7 +131,9 @@ static int ib_smc_get_pkey_table ( struct ib_device *ibdev,
  */
 int ib_smc_update ( struct ib_device *ibdev, ib_local_mad_t local_mad ) {
 	union ib_mad mad;
-	union ib_smp_data *smp = &mad.smp.smp_data;
+	struct ib_port_info *port_info = &mad.smp.smp_data.port_info;
+	struct ib_guid_info *guid_info = &mad.smp.smp_data.guid_info;
+	struct ib_pkey_table *pkey_table = &mad.smp.smp_data.pkey_table;
 	int rc;
 
 	/* Port info gives us the link state, the first half of the
@@ -139,24 +141,33 @@ int ib_smc_update ( struct ib_device *ibdev, ib_local_mad_t local_mad ) {
 	 */
 	if ( ( rc = ib_smc_get_port_info ( ibdev, local_mad, &mad ) ) != 0 )
 		return rc;
-	ibdev->port_state =
-		( smp->port_info.link_speed_supported__port_state & 0x0f );
-	memcpy ( &ibdev->gid.u.half[0], smp->port_info.gid_prefix,
+	memcpy ( &ibdev->gid.u.half[0], port_info->gid_prefix,
 		 sizeof ( ibdev->gid.u.half[0] ) );
-	ibdev->lid = ntohs ( smp->port_info.lid );
-	ibdev->sm_lid = ntohs ( smp->port_info.mastersm_lid );
-	ibdev->sm_sl = ( smp->port_info.neighbour_mtu__mastersm_sl & 0xf );
+	ibdev->lid = ntohs ( port_info->lid );
+	ibdev->sm_lid = ntohs ( port_info->mastersm_lid );
+	ibdev->link_width_enabled = port_info->link_width_enabled;
+	ibdev->link_width_supported = port_info->link_width_supported;
+	ibdev->link_width_active = port_info->link_width_active;
+	ibdev->link_speed_supported =
+		( port_info->link_speed_supported__port_state >> 4 );
+	ibdev->port_state =
+		( port_info->link_speed_supported__port_state & 0xf );
+	ibdev->link_speed_active =
+		( port_info->link_speed_active__link_speed_enabled >> 4 );
+	ibdev->link_speed_enabled =
+		( port_info->link_speed_active__link_speed_enabled & 0xf );
+	ibdev->sm_sl = ( port_info->neighbour_mtu__mastersm_sl & 0xf );
 
 	/* GUID info gives us the second half of the port GID */
 	if ( ( rc = ib_smc_get_guid_info ( ibdev, local_mad, &mad ) ) != 0 )
 		return rc;
-	memcpy ( &ibdev->gid.u.half[1], smp->guid_info.guid[0],
+	memcpy ( &ibdev->gid.u.half[1], guid_info->guid[0],
 		 sizeof ( ibdev->gid.u.half[1] ) );
 
 	/* Get partition key */
 	if ( ( rc = ib_smc_get_pkey_table ( ibdev, local_mad, &mad ) ) != 0 )
 		return rc;
-	ibdev->pkey = ntohs ( smp->pkey_table.pkey[0] );
+	ibdev->pkey = ntohs ( pkey_table->pkey[0] );
 
 	DBGC ( ibdev, "IBDEV %p port GID is %08x:%08x:%08x:%08x\n", ibdev,
 	       htonl ( ibdev->gid.u.dwords[0] ),

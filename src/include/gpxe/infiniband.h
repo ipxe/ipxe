@@ -376,10 +376,18 @@ struct ib_device {
 
 	/** Port state */
 	uint8_t port_state;
-	/** Link width */
-	uint8_t link_width;
-	/** Link speed */
-	uint8_t link_speed;
+	/** Link width supported */
+	uint8_t link_width_supported;
+	/** Link width enabled */
+	uint8_t link_width_enabled;
+	/** Link width active */
+	uint8_t link_width_active;
+	/** Link speed supported */
+	uint8_t link_speed_supported;
+	/** Link speed enabled */
+	uint8_t link_speed_enabled;
+	/** Link speed active */
+	uint8_t link_speed_active;
 	/** Port GID */
 	struct ib_gid gid;
 	/** Port LID */
