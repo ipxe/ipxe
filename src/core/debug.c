@@ -36,7 +36,8 @@ static void dbg_hex_dump_da_row ( unsigned long dispaddr, const void *data,
 			printf ( "   " );
 			continue;
 		}
-		printf ( " %02x", bytes[i] );
+		printf ( "%c%02x",
+			 ( ( ( i % 16 ) == 8 ) ? '-' : ' ' ), bytes[i] );
 	}
 	printf ( " : " );
 	for ( i = offset ; i < ( offset + 16 ) ; i++ ) {
