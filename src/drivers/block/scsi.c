@@ -55,6 +55,9 @@ static int scsi_command ( struct scsi_device *scsi,
 			  struct scsi_command *command ) {
 	int rc;
 
+	DBGC2 ( scsi, "SCSI %p " SCSI_CDB_FORMAT "\n",
+		scsi, SCSI_CDB_DATA ( command->cdb ) );
+
 	/* Clear sense response code before issuing command */
 	command->sense_response = 0;
 
@@ -64,8 +67,8 @@ static int scsi_command ( struct scsi_device *scsi,
 	/* Issue SCSI command */
 	if ( ( rc = scsi->command ( scsi, command ) ) != 0 ) {
 		/* Something went wrong with the issuing mechanism */
-		DBG ( "SCSI %p " SCSI_CDB_FORMAT " err %s\n",
-		      scsi, SCSI_CDB_DATA ( command->cdb ), strerror ( rc ) );
+		DBGC ( scsi, "SCSI %p " SCSI_CDB_FORMAT " err %s\n",
+		       scsi, SCSI_CDB_DATA ( command->cdb ), strerror ( rc ) );
 		return rc;
 	}
 
@@ -74,16 +77,16 @@ static int scsi_command ( struct scsi_device *scsi,
 		step();
 	if ( ( rc = command->rc ) != 0 ) {
 		/* Something went wrong with the command execution */
-		DBG ( "SCSI %p " SCSI_CDB_FORMAT " err %s\n",
-		      scsi, SCSI_CDB_DATA ( command->cdb ), strerror ( rc ) );
+		DBGC ( scsi, "SCSI %p " SCSI_CDB_FORMAT " err %s\n",
+		       scsi, SCSI_CDB_DATA ( command->cdb ), strerror ( rc ) );
 		return rc;
 	}
 
 	/* Check for SCSI errors */
 	if ( command->status != 0 ) {
-		DBG ( "SCSI %p " SCSI_CDB_FORMAT " status %02x sense %02x\n",
-		      scsi, SCSI_CDB_DATA ( command->cdb ),
-		      command->status, command->sense_response );
+		DBGC ( scsi, "SCSI %p " SCSI_CDB_FORMAT " status %02x sense "
+		       "%02x\n", scsi, SCSI_CDB_DATA ( command->cdb ),
+		       command->status, command->sense_response );
 		return -EIO;
 	}
 
@@ -285,12 +288,17 @@ int init_scsidev ( struct scsi_device *scsi ) {
 	for ( i = 0 ; i < SCSI_MAX_DUMMY_READ_CAP ; i++ ) {
 		if ( ( rc = scsi_read_capacity_10 ( &scsi->blockdev ) ) == 0 )
 			break;
+		DBGC ( scsi, "SCSI %p ignoring start-of-day error (#%d)\n",
+		       scsi, ( i + 1 ) );
 	}
 
 	/* Try READ CAPACITY (10), which is a mandatory command, first. */
 	scsi->blockdev.op = &scsi_operations_10;
-	if ( ( rc = scsi_read_capacity_10 ( &scsi->blockdev ) ) != 0 )
+	if ( ( rc = scsi_read_capacity_10 ( &scsi->blockdev ) ) != 0 ) {
+		DBGC ( scsi, "SCSI %p could not READ CAPACITY (10): %s\n",
+		       scsi, strerror ( rc ) );
 		return rc;
+	}
 
 	/* If capacity range was exceeded (i.e. capacity.lba was
 	 * 0xffffffff, meaning that blockdev->blocks is now zero), use
@@ -299,9 +307,18 @@ int init_scsidev ( struct scsi_device *scsi ) {
 	 */
 	if ( scsi->blockdev.blocks == 0 ) {
 		scsi->blockdev.op = &scsi_operations_16;
-		if ( ( rc = scsi_read_capacity_16 ( &scsi->blockdev ) ) != 0 )
+		if ( ( rc = scsi_read_capacity_16 ( &scsi->blockdev ) ) != 0 ){
+			DBGC ( scsi, "SCSI %p could not READ CAPACITY (16): "
+			       "%s\n", scsi, strerror ( rc ) );
 			return rc;
+		}
 	}
+
+	DBGC ( scsi, "SCSI %p using READ/WRITE (%d) commands\n", scsi,
+	       ( ( scsi->blockdev.op == &scsi_operations_10 ) ? 10 : 16 ) );
+	DBGC ( scsi, "SCSI %p capacity is %ld MB (%#llx blocks)\n", scsi,
+	       ( ( unsigned long ) ( scsi->blockdev.blocks >> 11 ) ),
+	       scsi->blockdev.blocks );
 
 	return 0;
 }
