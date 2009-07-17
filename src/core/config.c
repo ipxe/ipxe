@@ -109,6 +109,9 @@ REQUIRE_OBJECT ( iscsiboot );
 #ifdef SANBOOT_PROTO_AOE
 REQUIRE_OBJECT ( aoeboot );
 #endif
+#ifdef SANBOOT_PROTO_IB_SRP
+REQUIRE_OBJECT ( ib_srpboot );
+#endif
 
 /*
  * Drag in all requested resolvers
