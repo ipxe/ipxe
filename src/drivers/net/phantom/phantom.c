@@ -1156,7 +1156,7 @@ static int phantom_open ( struct net_device *netdev ) {
 	 * firmware doesn't currently support this.
 	 */
 	if ( ( rc = phantom_add_macaddr ( phantom,
-				   netdev->ll_protocol->ll_broadcast ) ) != 0 )
+					  netdev->ll_broadcast ) ) != 0 )
 		goto err_add_macaddr_broadcast;
 	if ( ( rc = phantom_add_macaddr ( phantom,
 					  netdev->ll_addr ) ) != 0 )
@@ -1166,8 +1166,7 @@ static int phantom_open ( struct net_device *netdev ) {
 
 	phantom_del_macaddr ( phantom, netdev->ll_addr );
  err_add_macaddr_unicast:
-	phantom_del_macaddr ( phantom,
-			      netdev->ll_protocol->ll_broadcast );
+	phantom_del_macaddr ( phantom, netdev->ll_broadcast );
  err_add_macaddr_broadcast:
 	phantom_destroy_tx_ctx ( phantom );
  err_create_tx_ctx:
@@ -1191,8 +1190,7 @@ static void phantom_close ( struct net_device *netdev ) {
 
 	/* Shut down the port */
 	phantom_del_macaddr ( phantom, netdev->ll_addr );
-	phantom_del_macaddr ( phantom,
-			      netdev->ll_protocol->ll_broadcast );
+	phantom_del_macaddr ( phantom, netdev->ll_broadcast );
 	phantom_destroy_tx_ctx ( phantom );
 	phantom_destroy_rx_ctx ( phantom );
 	free_dma ( phantom->desc, sizeof ( *(phantom->desc) ) );

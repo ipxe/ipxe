@@ -122,7 +122,7 @@ int legacy_probe ( void *hwdev,
 
 	/* Do not remove this message */
 	printf ( "WARNING: Using legacy NIC wrapper on %s\n",
-		 ethernet_protocol.ntoa ( nic.node_addr ) );
+		 netdev->ll_protocol->ntoa ( nic.node_addr ) );
 
 	legacy_registered = 1;
 	return 0;

@@ -144,8 +144,6 @@ struct ll_protocol {
 	uint8_t ll_addr_len;
 	/** Link-layer header length */
 	uint8_t ll_header_len;
-	/** Link-layer broadcast address */
-	const uint8_t *ll_broadcast;
 };
 
 /** Network device operations */
@@ -261,6 +259,8 @@ struct net_device {
 	 * For Ethernet, this is the MAC address.
 	 */
 	uint8_t ll_addr[MAX_LL_ADDR_LEN];
+	/** Link-layer broadcast address */
+	const uint8_t *ll_broadcast;
 
 	/** Current device state
 	 *

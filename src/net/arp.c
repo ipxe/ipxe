@@ -156,7 +156,7 @@ int arp_resolve ( struct net_device *netdev, struct net_protocol *net_protocol,
 
 	/* Transmit ARP request */
 	if ( ( rc = net_tx ( iobuf, netdev, &arp_protocol, 
-			     ll_protocol->ll_broadcast ) ) != 0 )
+			     netdev->ll_broadcast ) ) != 0 )
 		return rc;
 
 	return -ENOENT;

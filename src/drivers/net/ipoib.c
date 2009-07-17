@@ -348,7 +348,6 @@ struct ll_protocol ipoib_protocol __ll_protocol = {
 	.ll_proto	= htons ( ARPHRD_INFINIBAND ),
 	.ll_addr_len	= IPOIB_ALEN,
 	.ll_header_len	= IPOIB_HLEN,
-	.ll_broadcast	= ( uint8_t * ) &ipoib_broadcast,
 	.push		= ipoib_push,
 	.pull		= ipoib_pull,
 	.ntoa		= ipoib_ntoa,
@@ -1131,4 +1130,22 @@ void ipoib_remove ( struct ib_device *ibdev ) {
 	unregister_netdev ( netdev );
 	netdev_nullify ( netdev );
 	netdev_put ( netdev );
+}
+
+/**
+ * Allocate IPoIB device
+ *
+ * @v priv_size		Size of driver private data
+ * @ret netdev		Network device, or NULL
+ */
+struct net_device * alloc_ipoibdev ( size_t priv_size ) {
+	struct net_device *netdev;
+
+	netdev = alloc_netdev ( priv_size );
+	if ( netdev ) {
+		netdev->ll_protocol = &ipoib_protocol;
+		netdev->ll_broadcast = ( uint8_t * ) &ipoib_broadcast;
+		netdev->max_pkt_len = IPOIB_PKT_LEN;
+	}
+	return netdev;
 }

@@ -129,8 +129,7 @@ static void efi_snp_set_mode ( struct efi_snp_device *snpdev ) {
 				    EFI_SIMPLE_NETWORK_RECEIVE_BROADCAST );
 	assert ( ll_addr_len <= sizeof ( mode->CurrentAddress ) );
 	memcpy ( &mode->CurrentAddress, netdev->ll_addr, ll_addr_len );
-	memcpy ( &mode->BroadcastAddress, netdev->ll_protocol->ll_broadcast,
-		 ll_addr_len );
+	memcpy ( &mode->BroadcastAddress, netdev->ll_broadcast, ll_addr_len );
 	memcpy ( &mode->PermanentAddress, netdev->ll_addr, ll_addr_len );
 	mode->IfType = ntohs ( netdev->ll_protocol->ll_proto );
 	mode->MacAddressChangeable = TRUE;

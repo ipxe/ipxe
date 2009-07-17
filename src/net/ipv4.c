@@ -271,7 +271,7 @@ static int ipv4_ll_addr ( struct in_addr dest, struct in_addr src,
 
 	if ( dest.s_addr == INADDR_BROADCAST ) {
 		/* Broadcast address */
-		memcpy ( ll_dest, ll_protocol->ll_broadcast,
+		memcpy ( ll_dest, netdev->ll_broadcast,
 			 ll_protocol->ll_addr_len );
 		return 0;
 	} else if ( IN_MULTICAST ( ntohl ( dest.s_addr ) ) ) {

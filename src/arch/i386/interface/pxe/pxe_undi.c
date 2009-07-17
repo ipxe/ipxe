@@ -300,7 +300,7 @@ PXENV_EXIT_t pxenv_undi_transmit ( struct s_PXENV_UNDI_TRANSMIT
 			ll_dest = destaddr;
 			DBG2 ( " DEST %s", ll_protocol->ntoa ( ll_dest ) );
 		} else {
-			ll_dest = ll_protocol->ll_broadcast;
+			ll_dest = pxe_netdev->ll_broadcast;
 			DBG2 ( " BCAST" );
 		}
 

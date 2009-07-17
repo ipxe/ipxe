@@ -145,9 +145,26 @@ struct ll_protocol ethernet_protocol __ll_protocol = {
 	.ll_proto	= htons ( ARPHRD_ETHER ),
 	.ll_addr_len	= ETH_ALEN,
 	.ll_header_len	= ETH_HLEN,
-	.ll_broadcast	= eth_broadcast,
 	.push		= eth_push,
 	.pull		= eth_pull,
 	.ntoa		= eth_ntoa,
 	.mc_hash	= eth_mc_hash,
 };
+
+/**
+ * Allocate Ethernet device
+ *
+ * @v priv_size		Size of driver private data
+ * @ret netdev		Network device, or NULL
+ */
+struct net_device * alloc_etherdev ( size_t priv_size ) {
+	struct net_device *netdev;
+
+	netdev = alloc_netdev ( priv_size );
+	if ( netdev ) {
+		netdev->ll_protocol = &ethernet_protocol;
+		netdev->ll_broadcast = eth_broadcast;
+		netdev->max_pkt_len = ETH_FRAME_LEN;
+	}
+	return netdev;
+}
