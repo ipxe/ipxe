@@ -255,7 +255,7 @@ static union ib_mad * ib_sma_set_port_info ( struct ib_gma *gma,
 	       "%02x\n", gma, ibdev->lid, ibdev->sm_lid,
 	       ibdev->link_width_enabled, ibdev->link_speed_enabled );
 
-	if ( ( rc = ib_set_port_info ( ibdev, port_info ) ) != 0 ) {
+	if ( ( rc = ib_set_port_info ( ibdev, mad ) ) != 0 ) {
 		DBGC ( gma, "GMA %p could not set port information: %s\n",
 		       gma, strerror ( rc ) );
 		mad->hdr.status =

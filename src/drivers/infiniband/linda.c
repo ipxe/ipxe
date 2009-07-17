@@ -242,11 +242,11 @@ static void linda_link_state_changed ( struct ib_device *ibdev ) {
  * Set port information
  *
  * @v ibdev		Infiniband device
- * @v port_info		New port information
+ * @v mad		Set port information MAD
  */
-static int linda_set_port_info ( struct ib_device *ibdev,
-				 const struct ib_port_info *port_info ) {
+static int linda_set_port_info ( struct ib_device *ibdev, union ib_mad *mad ) {
 	struct linda *linda = ib_get_drvdata ( ibdev );
+	struct ib_port_info *port_info = &mad->smp.smp_data.port_info;
 	struct QIB_7220_IBCCtrl ibcctrl;
 	unsigned int port_state;
 	unsigned int link_state;

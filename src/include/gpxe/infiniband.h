@@ -346,13 +346,12 @@ struct ib_device_operations {
 	/** Set port information
 	 *
 	 * @v ibdev		Infiniband device
-	 * @v port_info		New port information
+	 * @v mad		Set port information MAD
 	 *
 	 * This method is required only by adapters that do not have
 	 * an embedded SMA.
 	 */
-	int ( * set_port_info ) ( struct ib_device *ibdev,
-				  const struct ib_port_info *port_info );
+	int ( * set_port_info ) ( struct ib_device *ibdev, union ib_mad *mad );
 };
 
 /** An Infiniband device */
@@ -457,8 +456,7 @@ extern void ib_mcast_detach ( struct ib_device *ibdev,
 			      struct ib_queue_pair *qp, struct ib_gid *gid );
 extern int ib_get_hca_info ( struct ib_device *ibdev,
 			     struct ib_gid_half *hca_guid );
-extern int ib_set_port_info ( struct ib_device *ibdev,
-			      const struct ib_port_info *port_info );
+extern int ib_set_port_info ( struct ib_device *ibdev, union ib_mad *mad );
 extern struct ib_device * alloc_ibdev ( size_t priv_size );
 extern int register_ibdev ( struct ib_device *ibdev );
 extern void unregister_ibdev ( struct ib_device *ibdev );

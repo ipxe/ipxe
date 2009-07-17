@@ -687,13 +687,13 @@ int ib_get_hca_info ( struct ib_device *ibdev,
 	return num_ports;
 }
 
-/** Set port information
+/**
+ * Set port information
  *
  * @v ibdev		Infiniband device
- * @v port_info		New port information
+ * @v mad		Set port information MAD
  */
-int ib_set_port_info ( struct ib_device *ibdev,
-		       const struct ib_port_info *port_info ) {
+int ib_set_port_info ( struct ib_device *ibdev, union ib_mad *mad ) {
 	int rc;
 
 	/* Adapters with embedded SMAs do not need to support this method */
@@ -703,7 +703,7 @@ int ib_set_port_info ( struct ib_device *ibdev,
 		return -ENOTSUP;
 	}
 
-	if ( ( rc = ibdev->op->set_port_info ( ibdev, port_info ) ) != 0 ) {
+	if ( ( rc = ibdev->op->set_port_info ( ibdev, mad ) ) != 0 ) {
 		DBGC ( ibdev, "IBDEV %p could not set port information: %s\n",
 		       ibdev, strerror ( rc ) );
 		return rc;
