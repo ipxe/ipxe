@@ -201,9 +201,10 @@ static int hermon_cmd ( struct hermon *hermon, unsigned long command,
 		     opcode_modifier, op_mod,
 		     go, 1,
 		     t, hermon->toggle );
-	DBGC ( hermon, "Hermon %p issuing command:\n", hermon );
-	DBGC_HDA ( hermon, virt_to_phys ( hermon->config + HERMON_HCR_BASE ),
-		   &hcr, sizeof ( hcr ) );
+	DBGC ( hermon, "Hermon %p issuing command %04x\n",
+	       hermon, opcode );
+	DBGC2_HDA ( hermon, virt_to_phys ( hermon->config + HERMON_HCR_BASE ),
+		    &hcr, sizeof ( hcr ) );
 	if ( in_len && ( command & HERMON_HCR_IN_MBOX ) ) {
 		DBGC2 ( hermon, "Input mailbox:\n" );
 		DBGC2_HDA ( hermon, virt_to_phys ( in_buffer ), in_buffer,
@@ -415,6 +416,15 @@ hermon_cmd_2rst_qp ( struct hermon *hermon, unsigned long qpn ) {
 	return hermon_cmd ( hermon,
 			    HERMON_HCR_VOID_CMD ( HERMON_HCR_2RST_QP ),
 			    0x03, NULL, qpn, NULL );
+}
+
+static inline int
+hermon_cmd_query_qp ( struct hermon *hermon, unsigned long qpn,
+		      struct hermonprm_qp_ee_state_transitions *ctx ) {
+	return hermon_cmd ( hermon,
+			    HERMON_HCR_OUT_CMD ( HERMON_HCR_QUERY_QP,
+						 1, sizeof ( *ctx ) ),
+			    0, NULL, qpn, ctx );
 }
 
 static inline int
@@ -828,6 +838,7 @@ static int hermon_alloc_qpn ( struct ib_device *ibdev,
 		qp->qpn = ( hermon->special_qpn_base + 2 + port_offset );
 		return 0;
 	case IB_QPT_UD:
+	case IB_QPT_RC:
 		/* Find a free queue pair number */
 		qpn_offset = hermon_bitmask_alloc ( hermon->qp_inuse,
 						    HERMON_MAX_QPS, 1 );
@@ -859,6 +870,64 @@ static void hermon_free_qpn ( struct ib_device *ibdev,
 	qpn_offset = ( qp->qpn - hermon->qpn_base );
 	if ( qpn_offset >= 0 )
 		hermon_bitmask_free ( hermon->qp_inuse, qpn_offset, 1 );
+}
+
+/**
+ * Calculate transmission rate
+ *
+ * @v av		Address vector
+ * @ret hermon_rate	Hermon rate
+ */
+static unsigned int hermon_rate ( struct ib_address_vector *av ) {
+	return ( ( ( av->rate >= IB_RATE_2_5 ) && ( av->rate <= IB_RATE_120 ) )
+		 ? ( av->rate + 5 ) : 0 );
+}
+
+/**
+ * Calculate schedule queue
+ *
+ * @v ibdev		Infiniband device
+ * @v qp		Queue pair
+ * @ret sched_queue	Schedule queue
+ */
+static unsigned int hermon_sched_queue ( struct ib_device *ibdev,
+					 struct ib_queue_pair *qp ) {
+	return ( ( ( qp->type == IB_QPT_SMA ) ?
+		   HERMON_SCHED_QP0 : HERMON_SCHED_DEFAULT ) |
+		 ( ( ibdev->port - 1 ) << 6 ) );
+}
+
+/** Queue pair transport service type map */
+static uint8_t hermon_qp_st[] = {
+	[IB_QPT_SMA] = HERMON_ST_MLX,
+	[IB_QPT_GMA] = HERMON_ST_MLX,
+	[IB_QPT_UD] = HERMON_ST_UD,
+	[IB_QPT_RC] = HERMON_ST_RC,
+};
+
+/**
+ * Dump queue pair context (for debugging only)
+ *
+ * @v hermon		Hermon device
+ * @v qp		Queue pair
+ * @ret rc		Return status code
+ */
+static inline int hermon_dump_qpctx ( struct hermon *hermon,
+				      struct ib_queue_pair *qp ) {
+	struct hermonprm_qp_ee_state_transitions qpctx;
+	int rc;
+
+	memset ( &qpctx, 0, sizeof ( qpctx ) );
+	if ( ( rc = hermon_cmd_query_qp ( hermon, qp->qpn, &qpctx ) ) != 0 ) {
+		DBGC ( hermon, "Hermon %p QUERY_QP failed: %s\n",
+		       hermon, strerror ( rc ) );
+		return rc;
+	}
+	DBGC ( hermon, "Hermon %p QPN %lx context:\n", hermon, qp->qpn );
+	DBGC_HDA ( hermon, 0, &qpctx.u.dwords[2],
+		   ( sizeof ( qpctx ) - 8 ) );
+
+	return 0;
 }
 
 /**
@@ -923,10 +992,8 @@ static int hermon_create_qp ( struct ib_device *ibdev,
 	/* Transition queue to INIT state */
 	memset ( &qpctx, 0, sizeof ( qpctx ) );
 	MLX_FILL_2 ( &qpctx, 2,
-		     qpc_eec_data.pm_state, 0x03 /* Always 0x03 for UD */,
-		     qpc_eec_data.st,
-		     ( ( qp->type == IB_QPT_UD ) ?
-		       HERMON_ST_UD : HERMON_ST_MLX ) );
+		     qpc_eec_data.pm_state, HERMON_PM_STATE_MIGRATED,
+		     qpc_eec_data.st, hermon_qp_st[qp->type] );
 	MLX_FILL_1 ( &qpctx, 3, qpc_eec_data.pd, HERMON_GLOBAL_PD );
 	MLX_FILL_4 ( &qpctx, 4,
 		     qpc_eec_data.log_rq_size, fls ( qp->recv.num_wqes - 1 ),
@@ -939,7 +1006,11 @@ static int hermon_create_qp ( struct ib_device *ibdev,
 	MLX_FILL_1 ( &qpctx, 5,
 		     qpc_eec_data.usr_page, HERMON_UAR_NON_EQ_PAGE );
 	MLX_FILL_1 ( &qpctx, 33, qpc_eec_data.cqn_snd, qp->send.cq->cqn );
-	MLX_FILL_1 ( &qpctx, 38, qpc_eec_data.page_offset,
+	MLX_FILL_4 ( &qpctx, 38,
+		     qpc_eec_data.rre, 1,
+		     qpc_eec_data.rwe, 1,
+		     qpc_eec_data.rae, 1,
+		     qpc_eec_data.page_offset,
 		     ( hermon_qp->mtt.page_offset >> 6 ) );
 	MLX_FILL_1 ( &qpctx, 41, qpc_eec_data.cqn_rcv, qp->recv.cq->cqn );
 	MLX_FILL_1 ( &qpctx, 43, qpc_eec_data.db_record_addr_l,
@@ -953,29 +1024,6 @@ static int hermon_create_qp ( struct ib_device *ibdev,
 		goto err_rst2init_qp;
 	}
 
-	/* Transition queue to RTR state */
-	memset ( &qpctx, 0, sizeof ( qpctx ) );
-	MLX_FILL_2 ( &qpctx, 4,
-		     qpc_eec_data.mtu, HERMON_MTU_2048,
-		     qpc_eec_data.msg_max, 11 /* 2^11 = 2048 */ );
-	MLX_FILL_1 ( &qpctx, 16,
-		     qpc_eec_data.primary_address_path.sched_queue,
-		     ( ( ( qp->type == IB_QPT_SMA ) ?
-			 HERMON_SCHED_QP0 : HERMON_SCHED_DEFAULT ) |
-		       ( ( ibdev->port - 1 ) << 6 ) ) );
-	if ( ( rc = hermon_cmd_init2rtr_qp ( hermon, qp->qpn,
-					     &qpctx ) ) != 0 ) {
-		DBGC ( hermon, "Hermon %p INIT2RTR_QP failed: %s\n",
-		       hermon, strerror ( rc ) );
-		goto err_init2rtr_qp;
-	}
-	memset ( &qpctx, 0, sizeof ( qpctx ) );
-	if ( ( rc = hermon_cmd_rtr2rts_qp ( hermon, qp->qpn, &qpctx ) ) != 0 ){
-		DBGC ( hermon, "Hermon %p RTR2RTS_QP failed: %s\n",
-		       hermon, strerror ( rc ) );
-		goto err_rtr2rts_qp;
-	}
-
 	DBGC ( hermon, "Hermon %p QPN %#lx send ring at [%p,%p)\n",
 	       hermon, qp->qpn, hermon_qp->send.wqe,
 	       ( ((void *)hermon_qp->send.wqe ) + hermon_qp->send.wqe_size ) );
@@ -985,8 +1033,6 @@ static int hermon_create_qp ( struct ib_device *ibdev,
 	ib_qp_set_drvdata ( qp, hermon_qp );
 	return 0;
 
- err_rtr2rts_qp:
- err_init2rtr_qp:
 	hermon_cmd_2rst_qp ( hermon, qp->qpn );
  err_rst2init_qp:
 	hermon_free_mtt ( hermon, &hermon_qp->mtt );
@@ -1013,12 +1059,41 @@ static int hermon_modify_qp ( struct ib_device *ibdev,
 	struct hermonprm_qp_ee_state_transitions qpctx;
 	int rc;
 
-	/* Issue RTS2RTS_QP */
+	/* Transition queue to RTR state */
 	memset ( &qpctx, 0, sizeof ( qpctx ) );
 	MLX_FILL_1 ( &qpctx, 0, opt_param_mask, HERMON_QP_OPT_PARAM_QKEY );
+	MLX_FILL_2 ( &qpctx, 4,
+		     qpc_eec_data.mtu, HERMON_MTU_2048,
+		     qpc_eec_data.msg_max, 31 );// 11 /* 2^11 = 2048 */ );
+	MLX_FILL_1 ( &qpctx, 7, qpc_eec_data.remote_qpn_een, qp->av.qpn );
+	MLX_FILL_1 ( &qpctx, 9,
+		     qpc_eec_data.primary_address_path.rlid, qp->av.lid );
+	MLX_FILL_1 ( &qpctx, 10,
+		     qpc_eec_data.primary_address_path.max_stat_rate,
+		     hermon_rate ( &qp->av ) );
+	memcpy ( &qpctx.u.dwords[12], &qp->av.gid, sizeof ( qp->av.gid ) );
+	MLX_FILL_1 ( &qpctx, 16,
+		     qpc_eec_data.primary_address_path.sched_queue,
+		     hermon_sched_queue ( ibdev, qp ) );
+	MLX_FILL_1 ( &qpctx, 39, qpc_eec_data.next_rcv_psn, qp->recv.psn );
 	MLX_FILL_1 ( &qpctx, 44, qpc_eec_data.q_key, qp->qkey );
-	if ( ( rc = hermon_cmd_rts2rts_qp ( hermon, qp->qpn, &qpctx ) ) != 0 ){
-		DBGC ( hermon, "Hermon %p RTS2RTS_QP failed: %s\n",
+	if ( ( rc = hermon_cmd_init2rtr_qp ( hermon, qp->qpn,
+					     &qpctx ) ) != 0 ) {
+		DBGC ( hermon, "Hermon %p INIT2RTR_QP failed: %s\n",
+		       hermon, strerror ( rc ) );
+		return rc;
+	}
+
+	/* Transition queue to RTS state */
+	memset ( &qpctx, 0, sizeof ( qpctx ) );
+	MLX_FILL_1 ( &qpctx, 10,
+		     qpc_eec_data.primary_address_path.ack_timeout, 0x13 );
+	MLX_FILL_2 ( &qpctx, 30,
+		     qpc_eec_data.retry_count, HERMON_RETRY_MAX,
+		     qpc_eec_data.rnr_retry, HERMON_RETRY_MAX );
+	MLX_FILL_1 ( &qpctx, 32, qpc_eec_data.next_send_psn, qp->send.psn );
+	if ( ( rc = hermon_cmd_rtr2rts_qp ( hermon, qp->qpn, &qpctx ) ) != 0 ){
+		DBGC ( hermon, "Hermon %p RTR2RTS_QP failed: %s\n",
 		       hermon, strerror ( rc ) );
 		return rc;
 	}
@@ -1094,15 +1169,13 @@ hermon_fill_ud_send_wqe ( struct ib_device *ibdev,
 		     ud_address_vector.rlid, av->lid,
 		     ud_address_vector.g, av->gid_present );
 	MLX_FILL_1 ( &wqe->ud.ud, 2,
-		     ud_address_vector.max_stat_rate,
-		     ( ( ( av->rate < 2 ) || ( av->rate > 10 ) ) ?
-		       8 : ( av->rate + 5 ) ) );
+		     ud_address_vector.max_stat_rate, hermon_rate ( av ) );
 	MLX_FILL_1 ( &wqe->ud.ud, 3, ud_address_vector.sl, av->sl );
 	memcpy ( &wqe->ud.ud.u.dwords[4], &av->gid, sizeof ( av->gid ) );
 	MLX_FILL_1 ( &wqe->ud.ud, 8, destination_qp, av->qpn );
 	MLX_FILL_1 ( &wqe->ud.ud, 9, q_key, av->qkey );
 	MLX_FILL_1 ( &wqe->ud.data[0], 0, byte_count, iob_len ( iobuf ) );
-	MLX_FILL_1 ( &wqe->ud.data[0], 1, l_key, hermon->reserved_lkey );
+	MLX_FILL_1 ( &wqe->ud.data[0], 1, l_key, hermon->lkey );
 	MLX_FILL_1 ( &wqe->ud.data[0], 3,
 		     local_address_l, virt_to_bus ( iobuf->data ) );
 	return HERMON_OPCODE_SEND;
@@ -1139,20 +1212,47 @@ hermon_fill_mlx_send_wqe ( struct ib_device *ibdev,
 	MLX_FILL_5 ( &wqe->mlx.ctrl, 2,
 		     c, 0x03 /* generate completion */,
 		     icrc, 0 /* generate ICRC */,
-		     max_statrate, ( ( ( av->rate < 2 ) || ( av->rate > 10 ) )
-				     ? 8 : ( av->rate + 5 ) ),
+		     max_statrate, hermon_rate ( av ),
 		     slr, 0,
 		     v15, ( ( qp->ext_qpn == IB_QPN_SMA ) ? 1 : 0 ) );
 	MLX_FILL_1 ( &wqe->mlx.ctrl, 3, rlid, av->lid );
 	MLX_FILL_1 ( &wqe->mlx.data[0], 0,
 		     byte_count, iob_len ( &headers ) );
-	MLX_FILL_1 ( &wqe->mlx.data[0], 1, l_key, hermon->reserved_lkey );
+	MLX_FILL_1 ( &wqe->mlx.data[0], 1, l_key, hermon->lkey );
 	MLX_FILL_1 ( &wqe->mlx.data[0], 3,
 		     local_address_l, virt_to_bus ( headers.data ) );
 	MLX_FILL_1 ( &wqe->mlx.data[1], 0,
 		     byte_count, ( iob_len ( iobuf ) + 4 /* ICRC */ ) );
-	MLX_FILL_1 ( &wqe->mlx.data[1], 1, l_key, hermon->reserved_lkey );
+	MLX_FILL_1 ( &wqe->mlx.data[1], 1, l_key, hermon->lkey );
 	MLX_FILL_1 ( &wqe->mlx.data[1], 3,
+		     local_address_l, virt_to_bus ( iobuf->data ) );
+	return HERMON_OPCODE_SEND;
+}
+
+/**
+ * Construct RC send work queue entry
+ *
+ * @v ibdev		Infiniband device
+ * @v qp		Queue pair
+ * @v av		Address vector
+ * @v iobuf		I/O buffer
+ * @v wqe		Send work queue entry
+ * @ret opcode		Control opcode
+ */
+static unsigned int
+hermon_fill_rc_send_wqe ( struct ib_device *ibdev,
+			  struct ib_queue_pair *qp __unused,
+			  struct ib_address_vector *av __unused,
+			  struct io_buffer *iobuf,
+			  union hermon_send_wqe *wqe ) {
+	struct hermon *hermon = ib_get_drvdata ( ibdev );
+
+	MLX_FILL_1 ( &wqe->rc.ctrl, 1, ds,
+		     ( ( offsetof ( typeof ( wqe->rc ), data[1] ) / 16 ) ) );
+	MLX_FILL_1 ( &wqe->rc.ctrl, 2, c, 0x03 /* generate completion */ );
+	MLX_FILL_1 ( &wqe->rc.data[0], 0, byte_count, iob_len ( iobuf ) );
+	MLX_FILL_1 ( &wqe->rc.data[0], 1, l_key, hermon->lkey );
+	MLX_FILL_1 ( &wqe->rc.data[0], 3,
 		     local_address_l, virt_to_bus ( iobuf->data ) );
 	return HERMON_OPCODE_SEND;
 }
@@ -1167,6 +1267,7 @@ static unsigned int
 	[IB_QPT_SMA] = hermon_fill_mlx_send_wqe,
 	[IB_QPT_GMA] = hermon_fill_mlx_send_wqe,
 	[IB_QPT_UD] = hermon_fill_ud_send_wqe,
+	[IB_QPT_RC] = hermon_fill_rc_send_wqe,
 };
 
 /**
@@ -1258,7 +1359,7 @@ static int hermon_post_recv ( struct ib_device *ibdev,
 
 	/* Construct work queue entry */
 	MLX_FILL_1 ( &wqe->data[0], 0, byte_count, iob_tailroom ( iobuf ) );
-	MLX_FILL_1 ( &wqe->data[0], 1, l_key, hermon->reserved_lkey );
+	MLX_FILL_1 ( &wqe->data[0], 1, l_key, hermon->lkey );
 	MLX_FILL_1 ( &wqe->data[0], 3,
 		     local_address_l, virt_to_bus ( iobuf->data ) );
 
@@ -1289,8 +1390,9 @@ static int hermon_complete ( struct ib_device *ibdev,
 	struct ib_queue_pair *qp;
 	struct hermon_queue_pair *hermon_qp;
 	struct io_buffer *iobuf;
-	struct ib_address_vector av;
+	struct ib_address_vector recv_av;
 	struct ib_global_route_header *grh;
+	struct ib_address_vector *av;
 	unsigned int opcode;
 	unsigned long qpn;
 	int is_send;
@@ -1341,18 +1443,31 @@ static int hermon_complete ( struct ib_device *ibdev,
 		len = MLX_GET ( &cqe->normal, byte_cnt );
 		assert ( len <= iob_tailroom ( iobuf ) );
 		iob_put ( iobuf, len );
-		assert ( iob_len ( iobuf ) >= sizeof ( *grh ) );
-		grh = iobuf->data;
-		iob_pull ( iobuf, sizeof ( *grh ) );
-		/* Construct address vector */
-		memset ( &av, 0, sizeof ( av ) );
-		av.qpn = MLX_GET ( &cqe->normal, srq_rqpn );
-		av.lid = MLX_GET ( &cqe->normal, slid_smac47_32 );
-		av.sl = MLX_GET ( &cqe->normal, sl );
-		av.gid_present = MLX_GET ( &cqe->normal, g );
-		memcpy ( &av.gid, &grh->sgid, sizeof ( av.gid ) );
+		switch ( qp->type ) {
+		case IB_QPT_SMA:
+		case IB_QPT_GMA:
+		case IB_QPT_UD:
+			assert ( iob_len ( iobuf ) >= sizeof ( *grh ) );
+			grh = iobuf->data;
+			iob_pull ( iobuf, sizeof ( *grh ) );
+			/* Construct address vector */
+			av = &recv_av;
+			memset ( av, 0, sizeof ( *av ) );
+			av->qpn = MLX_GET ( &cqe->normal, srq_rqpn );
+			av->lid = MLX_GET ( &cqe->normal, slid_smac47_32 );
+			av->sl = MLX_GET ( &cqe->normal, sl );
+			av->gid_present = MLX_GET ( &cqe->normal, g );
+			memcpy ( &av->gid, &grh->sgid, sizeof ( av->gid ) );
+			break;
+		case IB_QPT_RC:
+			av = &qp->av;
+			break;
+		default:
+			assert ( 0 );
+			return -EINVAL;
+		}
 		/* Hand off to completion handler */
-		ib_complete_recv ( ibdev, qp, &av, iobuf, rc );
+		ib_complete_recv ( ibdev, qp, av, iobuf, rc );
 	}
 
 	return rc;
@@ -1669,14 +1784,14 @@ static void hermon_close ( struct ib_device *ibdev ) {
 }
 
 /**
- * Set port information
+ * Inform embedded subnet management agent of a received MAD
  *
  * @v ibdev		Infiniband device
- * @v mad		Set port information MAD
+ * @v mad		MAD
  * @ret rc		Return status code
  */
-static int hermon_set_port_info ( struct ib_device *ibdev,
-				  union ib_mad *mad ) {
+static int hermon_inform_sma ( struct ib_device *ibdev,
+			       union ib_mad *mad ) {
 	int rc;
 
 	/* Send the MAD to the embedded SMA */
@@ -1799,7 +1914,8 @@ static struct ib_device_operations hermon_ib_operations = {
 	.close		= hermon_close,
 	.mcast_attach	= hermon_mcast_attach,
 	.mcast_detach	= hermon_mcast_detach,
-	.set_port_info	= hermon_set_port_info,
+	.set_port_info	= hermon_inform_sma,
+	.set_pkey_table	= hermon_inform_sma,
 };
 
 /***************************************************************************
@@ -2293,17 +2409,21 @@ static int hermon_setup_mpt ( struct hermon *hermon ) {
 
 	/* Derive key */
 	key = ( hermon->cap.reserved_mrws | HERMON_MKEY_PREFIX );
-	hermon->reserved_lkey = ( ( key << 8 ) | ( key >> 24 ) );
+	hermon->lkey = ( ( key << 8 ) | ( key >> 24 ) );
 
 	/* Initialise memory protection table */
 	memset ( &mpt, 0, sizeof ( mpt ) );
-	MLX_FILL_4 ( &mpt, 0,
-		     r_w, 1,
-		     pa, 1,
+	MLX_FILL_7 ( &mpt, 0,
+		     atomic, 1,
+		     rw, 1,
+		     rr, 1,
+		     lw, 1,
 		     lr, 1,
-		     lw, 1 );
+		     pa, 1,
+		     r_w, 1 );
 	MLX_FILL_1 ( &mpt, 2, mem_key, key );
-	MLX_FILL_1 ( &mpt, 3, pd, HERMON_GLOBAL_PD );
+	MLX_FILL_1 ( &mpt, 3,
+		     pd, HERMON_GLOBAL_PD );
 	MLX_FILL_1 ( &mpt, 10, len64, 1 );
 	if ( ( rc = hermon_cmd_sw2hw_mpt ( hermon,
 					   hermon->cap.reserved_mrws,
@@ -2432,6 +2552,8 @@ static int hermon_probe ( struct pci_device *pci,
 	/* Set up memory protection */
 	if ( ( rc = hermon_setup_mpt ( hermon ) ) != 0 )
 		goto err_setup_mpt;
+	for ( i = 0 ; i < HERMON_NUM_PORTS ; i++ )
+		hermon->ibdev[i]->rdma_key = hermon->lkey;
 
 	/* Set up event queue */
 	if ( ( rc = hermon_create_eq ( hermon ) ) != 0 )
