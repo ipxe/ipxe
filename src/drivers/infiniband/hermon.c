@@ -885,7 +885,6 @@ static int hermon_create_qp ( struct ib_device *ibdev,
 	MLX_FILL_1 ( &qpctx, 41, qpc_eec_data.cqn_rcv, qp->recv.cq->cqn );
 	MLX_FILL_1 ( &qpctx, 43, qpc_eec_data.db_record_addr_l,
 		     ( virt_to_phys ( &hermon_qp->recv.doorbell ) >> 2 ) );
-	MLX_FILL_1 ( &qpctx, 44, qpc_eec_data.q_key, qp->qkey );
 	MLX_FILL_1 ( &qpctx, 53, qpc_eec_data.mtt_base_addr_l,
 		     ( hermon_qp->mtt.mtt_base_addr >> 3 ) );
 	if ( ( rc = hermon_cmd_rst2init_qp ( hermon, qp->qpn,
@@ -946,24 +945,17 @@ static int hermon_create_qp ( struct ib_device *ibdev,
  *
  * @v ibdev		Infiniband device
  * @v qp		Queue pair
- * @v mod_list		Modification list
  * @ret rc		Return status code
  */
 static int hermon_modify_qp ( struct ib_device *ibdev,
-			      struct ib_queue_pair *qp,
-			      unsigned long mod_list ) {
+			      struct ib_queue_pair *qp ) {
 	struct hermon *hermon = ib_get_drvdata ( ibdev );
 	struct hermonprm_qp_ee_state_transitions qpctx;
-	unsigned long optparammask = 0;
 	int rc;
-
-	/* Construct optparammask */
-	if ( mod_list & IB_MODIFY_QKEY )
-		optparammask |= HERMON_QP_OPT_PARAM_QKEY;
 
 	/* Issue RTS2RTS_QP */
 	memset ( &qpctx, 0, sizeof ( qpctx ) );
-	MLX_FILL_1 ( &qpctx, 0, opt_param_mask, optparammask );
+	MLX_FILL_1 ( &qpctx, 0, opt_param_mask, HERMON_QP_OPT_PARAM_QKEY );
 	MLX_FILL_1 ( &qpctx, 44, qpc_eec_data.q_key, qp->qkey );
 	if ( ( rc = hermon_cmd_rts2rts_qp ( hermon, qp->qpn, &qpctx ) ) != 0 ){
 		DBGC ( hermon, "Hermon %p RTS2RTS_QP failed: %s\n",

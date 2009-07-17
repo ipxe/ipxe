@@ -268,6 +268,18 @@ static int linda_set_port_info ( struct ib_device *ibdev, union ib_mad *mad ) {
 	return 0;
 }
 
+/**
+ * Set partition key table
+ *
+ * @v ibdev		Infiniband device
+ * @v mad		Set partition key table MAD
+ */
+static int linda_set_pkey_table ( struct ib_device *ibdev __unused,
+				  union ib_mad *mad __unused ) {
+	/* Nothing to do */
+	return 0;
+}
+
 /***************************************************************************
  *
  * Context allocation
@@ -852,12 +864,10 @@ static int linda_create_qp ( struct ib_device *ibdev,
  *
  * @v ibdev		Infiniband device
  * @v qp		Queue pair
- * @v mod_list		Modification list
  * @ret rc		Return status code
  */
 static int linda_modify_qp ( struct ib_device *ibdev,
-			     struct ib_queue_pair *qp,
-			     unsigned long mod_list __unused ) {
+			     struct ib_queue_pair *qp ) {
 	struct linda *linda = ib_get_drvdata ( ibdev );
 
 	/* Nothing to do; the hardware doesn't have a notion of queue
@@ -1456,6 +1466,7 @@ static struct ib_device_operations linda_ib_operations = {
 	.mcast_attach	= linda_mcast_attach,
 	.mcast_detach	= linda_mcast_detach,
 	.set_port_info	= linda_set_port_info,
+	.set_pkey_table	= linda_set_pkey_table,
 };
 
 /***************************************************************************

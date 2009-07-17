@@ -178,7 +178,8 @@ static union ib_mad * ib_handle_mc_member_join ( struct ib_gma *gma,
 	       ntohl ( gid->u.dwords[3] ), qkey );
 
 	/* Set queue key */
-	if ( ( rc = ib_modify_qp ( ibdev, qp, IB_MODIFY_QKEY, qkey ) ) != 0 ) {
+	qp->qkey = qkey;
+	if ( ( rc = ib_modify_qp ( ibdev, qp ) ) != 0 ) {
 		DBGC ( gma, "GMA %p QPN %lx could not modify qkey: %s\n",
 		       gma, qp->qpn, strerror ( rc ) );
 		return NULL;

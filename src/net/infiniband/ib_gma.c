@@ -296,8 +296,17 @@ static union ib_mad * ib_sma_set_pkey_table ( struct ib_gma *gma,
 					      union ib_mad *mad ) {
 	struct ib_device *ibdev = gma->ibdev;
 	struct ib_pkey_table *pkey_table = &mad->smp.smp_data.pkey_table;
+	int rc;
 
 	ibdev->pkey = ntohs ( pkey_table->pkey[0] );
+	DBGC ( gma, "GMA %p set pkey %04x\n", gma, ibdev->pkey );
+
+	if ( ( rc = ib_set_pkey_table ( ibdev, mad ) ) != 0 ) {
+		DBGC ( gma, "GMA %p could not set pkey table: %s\n",
+		       gma, strerror ( rc ) );
+		mad->hdr.status =
+			htons ( IB_MGMT_STATUS_UNSUPPORTED_METHOD_ATTR );
+	}
 
 	return ib_sma_get_pkey_table ( gma, mad );
 }
@@ -618,7 +627,7 @@ int ib_gma_request ( struct ib_gma *gma, union ib_mad *mad,
 struct ib_gma * ib_create_gma ( struct ib_device *ibdev,
 				enum ib_queue_pair_type type ) {
 	struct ib_gma *gma;
-	unsigned long qkey;
+	int rc;
 
 	/* Allocate and initialise fields */
 	gma = zalloc ( sizeof ( *gma ) );
@@ -637,21 +646,28 @@ struct ib_gma * ib_create_gma ( struct ib_device *ibdev,
 	}
 
 	/* Create queue pair */
-	qkey = ( ( type == IB_QPT_SMA ) ? IB_QKEY_SMA : IB_QKEY_GMA );
 	gma->qp = ib_create_qp ( ibdev, type, IB_GMA_NUM_SEND_WQES, gma->cq,
-				 IB_GMA_NUM_RECV_WQES, gma->cq, qkey );
+				 IB_GMA_NUM_RECV_WQES, gma->cq );
 	if ( ! gma->qp ) {
 		DBGC ( gma, "GMA %p could not allocate queue pair\n", gma );
 		goto err_create_qp;
 	}
 	ib_qp_set_ownerdata ( gma->qp, gma );
-
 	DBGC ( gma, "GMA %p running on QPN %#lx\n", gma, gma->qp->qpn );
+
+	/* Set queue key */
+	gma->qp->qkey = ( ( type == IB_QPT_SMA ) ? IB_QKEY_SMA : IB_QKEY_GMA );
+	if ( ( rc = ib_modify_qp ( ibdev, gma->qp ) ) != 0 ) {
+		DBGC ( gma, "GMA %p could not set queue key: %s\n",
+		       gma, strerror ( rc ) );
+		goto err_modify_qp;
+	}
 
 	/* Fill receive ring */
 	ib_refill_recv ( ibdev, gma->qp );
 	return gma;
 
+ err_modify_qp:
 	ib_destroy_qp ( ibdev, gma->qp );
  err_create_qp:
 	ib_destroy_cq ( ibdev, gma->cq );

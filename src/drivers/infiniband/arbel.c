@@ -855,7 +855,6 @@ static int arbel_create_qp ( struct ib_device *ibdev,
 		     ( virt_to_bus ( arbel_qp->recv.wqe ) >> 6 ) );
 	MLX_FILL_1 ( &qpctx, 43, qpc_eec_data.rcv_db_record_index,
 		     arbel_qp->recv.doorbell_idx );
-	MLX_FILL_1 ( &qpctx, 44, qpc_eec_data.q_key, qp->qkey );
 	if ( ( rc = arbel_cmd_rst2init_qpee ( arbel, qp->qpn, &qpctx )) != 0 ){
 		DBGC ( arbel, "Arbel %p RST2INIT_QPEE failed: %s\n",
 		       arbel, strerror ( rc ) );
@@ -908,24 +907,17 @@ static int arbel_create_qp ( struct ib_device *ibdev,
  *
  * @v ibdev		Infiniband device
  * @v qp		Queue pair
- * @v mod_list		Modification list
  * @ret rc		Return status code
  */
 static int arbel_modify_qp ( struct ib_device *ibdev,
-			     struct ib_queue_pair *qp,
-			     unsigned long mod_list ) {
+			     struct ib_queue_pair *qp ) {
 	struct arbel *arbel = ib_get_drvdata ( ibdev );
 	struct arbelprm_qp_ee_state_transitions qpctx;
-	unsigned long optparammask = 0;
 	int rc;
-
-	/* Construct optparammask */
-	if ( mod_list & IB_MODIFY_QKEY )
-		optparammask |= ARBEL_QPEE_OPT_PARAM_QKEY;
 
 	/* Issue RTS2RTS_QP */
 	memset ( &qpctx, 0, sizeof ( qpctx ) );
-	MLX_FILL_1 ( &qpctx, 0, opt_param_mask, optparammask );
+	MLX_FILL_1 ( &qpctx, 0, opt_param_mask, ARBEL_QPEE_OPT_PARAM_QKEY );
 	MLX_FILL_1 ( &qpctx, 44, qpc_eec_data.q_key, qp->qkey );
 	if ( ( rc = arbel_cmd_rts2rts_qp ( arbel, qp->qpn, &qpctx ) ) != 0 ){
 		DBGC ( arbel, "Arbel %p RTS2RTS_QP failed: %s\n",

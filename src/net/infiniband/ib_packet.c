@@ -100,7 +100,7 @@ int ib_push ( struct ib_device *ibdev, struct io_buffer *iobuf,
 	bth->se__m__padcnt__tver = ( pad_len << 4 );
 	bth->pkey = htons ( ibdev->pkey );
 	bth->dest_qp = htonl ( av->qpn );
-	bth->ack__psn = htonl ( ( ibdev->psn++ ) & 0xffffffUL );
+	bth->ack__psn = htonl ( ( qp->send.psn++ ) & 0xffffffUL );
 
 	/* Construct DETH */
 	deth->qkey = htonl ( av->qkey );

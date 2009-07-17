@@ -521,7 +521,7 @@ static int ipoib_open ( struct net_device *netdev ) {
 	/* Allocate queue pair */
 	ipoib->qp = ib_create_qp ( ibdev, IB_QPT_UD,
 				   IPOIB_NUM_SEND_WQES, ipoib->cq,
-				   IPOIB_NUM_RECV_WQES, ipoib->cq, 0 );
+				   IPOIB_NUM_RECV_WQES, ipoib->cq );
 	if ( ! ipoib->qp ) {
 		DBGC ( ipoib, "IPoIB %p could not allocate queue pair\n",
 		       ipoib );

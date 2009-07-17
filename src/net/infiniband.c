@@ -149,16 +149,17 @@ void ib_poll_cq ( struct ib_device *ibdev,
  * @v send_cq		Send completion queue
  * @v num_recv_wqes	Number of receive work queue entries
  * @v recv_cq		Receive completion queue
- * @v qkey		Queue key
  * @ret qp		Queue pair
+ *
+ * The queue pair will be left in the INIT state; you must call
+ * ib_modify_qp() before it is ready to use for sending and receiving.
  */
 struct ib_queue_pair * ib_create_qp ( struct ib_device *ibdev,
 				      enum ib_queue_pair_type type,
 				      unsigned int num_send_wqes,
 				      struct ib_completion_queue *send_cq,
 				      unsigned int num_recv_wqes,
-				      struct ib_completion_queue *recv_cq,
-				      unsigned long qkey ) {
+				      struct ib_completion_queue *recv_cq ) {
 	struct ib_queue_pair *qp;
 	size_t total_size;
 	int rc;
@@ -175,16 +176,17 @@ struct ib_queue_pair * ib_create_qp ( struct ib_device *ibdev,
 	qp->ibdev = ibdev;
 	list_add ( &qp->list, &ibdev->qps );
 	qp->type = type;
-	qp->qkey = qkey;
 	qp->send.qp = qp;
 	qp->send.is_send = 1;
 	qp->send.cq = send_cq;
 	list_add ( &qp->send.list, &send_cq->work_queues );
+	qp->send.psn = ( random() & 0xffffffUL );
 	qp->send.num_wqes = num_send_wqes;
 	qp->send.iobufs = ( ( ( void * ) qp ) + sizeof ( *qp ) );
 	qp->recv.qp = qp;
 	qp->recv.cq = recv_cq;
 	list_add ( &qp->recv.list, &recv_cq->work_queues );
+	qp->recv.psn = ( random() & 0xffffffUL );
 	qp->recv.num_wqes = num_recv_wqes;
 	qp->recv.iobufs = ( ( ( void * ) qp ) + sizeof ( *qp ) +
 			    ( num_send_wqes * sizeof ( qp->send.iobufs[0] ) ));
@@ -239,20 +241,15 @@ struct ib_queue_pair * ib_create_qp ( struct ib_device *ibdev,
  *
  * @v ibdev		Infiniband device
  * @v qp		Queue pair
- * @v mod_list		Modification list
- * @v qkey		New queue key, if applicable
+ * @v av		New address vector, if applicable
  * @ret rc		Return status code
  */
-int ib_modify_qp ( struct ib_device *ibdev, struct ib_queue_pair *qp,
-		   unsigned long mod_list, unsigned long qkey ) {
+int ib_modify_qp ( struct ib_device *ibdev, struct ib_queue_pair *qp ) {
 	int rc;
 
 	DBGC ( ibdev, "IBDEV %p modifying QPN %#lx\n", ibdev, qp->qpn );
 
-	if ( mod_list & IB_MODIFY_QKEY )
-		qp->qkey = qkey;
-
-	if ( ( rc = ibdev->op->modify_qp ( ibdev, qp, mod_list ) ) != 0 ) {
+	if ( ( rc = ibdev->op->modify_qp ( ibdev, qp ) ) != 0 ) {
 		DBGC ( ibdev, "IBDEV %p could not modify QPN %#lx: %s\n",
 		       ibdev, qp->qpn, strerror ( rc ) );
 		return rc;
@@ -372,6 +369,7 @@ struct ib_work_queue * ib_find_wq ( struct ib_completion_queue *cq,
 int ib_post_send ( struct ib_device *ibdev, struct ib_queue_pair *qp,
 		   struct ib_address_vector *av,
 		   struct io_buffer *iobuf ) {
+	struct ib_address_vector av_copy;
 	int rc;
 
 	/* Check queue fill level */
@@ -380,6 +378,14 @@ int ib_post_send ( struct ib_device *ibdev, struct ib_queue_pair *qp,
 		       ibdev, qp->qpn );
 		return -ENOBUFS;
 	}
+
+	/* Use default address vector if none specified */
+	if ( ! av )
+		av = &qp->av;
+
+	/* Make modifiable copy of address vector */
+	memcpy ( &av_copy, av, sizeof ( av_copy ) );
+	av = &av_copy;
 
 	/* Fill in optional parameters in address vector */
 	if ( ! av->qkey )
@@ -706,6 +712,31 @@ int ib_set_port_info ( struct ib_device *ibdev, union ib_mad *mad ) {
 	if ( ( rc = ibdev->op->set_port_info ( ibdev, mad ) ) != 0 ) {
 		DBGC ( ibdev, "IBDEV %p could not set port information: %s\n",
 		       ibdev, strerror ( rc ) );
+		return rc;
+	}
+
+	return 0;
+};
+
+/**
+ * Set partition key table
+ *
+ * @v ibdev		Infiniband device
+ * @v mad		Set partition key table MAD
+ */
+int ib_set_pkey_table ( struct ib_device *ibdev, union ib_mad *mad ) {
+	int rc;
+
+	/* Adapters with embedded SMAs do not need to support this method */
+	if ( ! ibdev->op->set_pkey_table ) {
+		DBGC ( ibdev, "IBDEV %p does not support setting partition "
+		       "key table\n", ibdev );
+		return -ENOTSUP;
+	}
+
+	if ( ( rc = ibdev->op->set_pkey_table ( ibdev, mad ) ) != 0 ) {
+		DBGC ( ibdev, "IBDEV %p could not set partition key table: "
+		       "%s\n", ibdev, strerror ( rc ) );
 		return rc;
 	}
 

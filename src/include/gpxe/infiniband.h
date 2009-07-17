@@ -47,6 +47,43 @@ struct ib_address_vector;
 struct ib_completion_queue;
 struct ib_gma;
 
+/** Infiniband transmission rates */
+enum ib_rate {
+	IB_RATE_2_5 = 2,
+	IB_RATE_10 = 3,
+	IB_RATE_30 = 4,
+	IB_RATE_5 = 5,
+	IB_RATE_20 = 6,
+	IB_RATE_40 = 7,
+	IB_RATE_60 = 8,
+	IB_RATE_80 = 9,
+	IB_RATE_120 = 10,
+};
+
+/** An Infiniband Address Vector */
+struct ib_address_vector {
+	/** Queue Pair Number */
+	unsigned long qpn;
+	/** Queue key
+	 *
+	 * Not specified for received packets.
+	 */
+	unsigned long qkey;
+	/** Local ID */
+	unsigned int lid;
+	/** Rate
+	 *
+	 * Not specified for received packets.
+	 */
+	enum ib_rate rate;
+	/** Service level */
+	unsigned int sl;
+	/** GID is present */
+	unsigned int gid_present;
+	/** GID, if present */
+	struct ib_gid gid;
+};
+
 /** An Infiniband Work Queue */
 struct ib_work_queue {
 	/** Containing queue pair */
@@ -57,6 +94,8 @@ struct ib_work_queue {
 	struct ib_completion_queue *cq;
 	/** List of work queues on this completion queue */
 	struct list_head list;
+	/** Packet sequence number */
+	uint32_t psn;
 	/** Number of work queue entries */
 	unsigned int num_wqes;
 	/** Number of occupied work queue entries */
@@ -88,6 +127,7 @@ enum ib_queue_pair_type {
 	IB_QPT_SMA,
 	IB_QPT_GMA,
 	IB_QPT_UD,
+	IB_QPT_RC,
 };
 
 /** An Infiniband Queue Pair */
@@ -115,52 +155,12 @@ struct ib_queue_pair {
 	struct ib_work_queue recv;
 	/** List of multicast GIDs */
 	struct list_head mgids;
+	/** Address vector */
+	struct ib_address_vector av;
 	/** Driver private data */
 	void *drv_priv;
 	/** Queue owner private data */
 	void *owner_priv;
-};
-
-/** Infiniband queue pair modification flags */
-enum ib_queue_pair_mods {
-	IB_MODIFY_QKEY = 0x0001,
-};
-
-/** An Infiniband Address Vector */
-struct ib_address_vector {
-	/** Queue Pair Number */
-	unsigned long qpn;
-	/** Queue key
-	 *
-	 * Not specified for received packets.
-	 */
-	unsigned long qkey;
-	/** Local ID */
-	unsigned int lid;
-	/** Rate
-	 *
-	 * Not specified for received packets.
-	 */
-	unsigned int rate;
-	/** Service level */
-	unsigned int sl;
-	/** GID is present */
-	unsigned int gid_present;
-	/** GID, if present */
-	struct ib_gid gid;
-};
-
-/** Infiniband transmission rates */
-enum ib_rate {
-	IB_RATE_2_5 = 2,
-	IB_RATE_10 = 3,
-	IB_RATE_30 = 4,
-	IB_RATE_5 = 5,
-	IB_RATE_20 = 6,
-	IB_RATE_40 = 7,
-	IB_RATE_60 = 8,
-	IB_RATE_80 = 9,
-	IB_RATE_120 = 10,
 };
 
 /** Infiniband completion queue operations */
@@ -250,12 +250,10 @@ struct ib_device_operations {
 	 *
 	 * @v ibdev		Infiniband device
 	 * @v qp		Queue pair
-	 * @v mod_list		Modification list
 	 * @ret rc		Return status code
 	 */
 	int ( * modify_qp ) ( struct ib_device *ibdev,
-			      struct ib_queue_pair *qp,
-			      unsigned long mod_list );
+			      struct ib_queue_pair *qp );
 	/** Destroy queue pair
 	 *
 	 * @v ibdev		Infiniband device
@@ -352,6 +350,16 @@ struct ib_device_operations {
 	 * an embedded SMA.
 	 */
 	int ( * set_port_info ) ( struct ib_device *ibdev, union ib_mad *mad );
+	/** Set partition key table
+	 *
+	 * @v ibdev		Infiniband device
+	 * @v mad		Set partition key table MAD
+	 *
+	 * This method is required only by adapters that do not have
+	 * an embedded SMA.
+	 */
+	int ( * set_pkey_table ) ( struct ib_device *ibdev,
+				   union ib_mad *mad );
 };
 
 /** An Infiniband device */
@@ -398,8 +406,12 @@ struct ib_device {
 	/** Partition key */
 	uint16_t pkey;
 
-	/** Outbound packet sequence number */
-	uint32_t psn;
+	/** RDMA key
+	 *
+	 * This is a single key allowing unrestricted access to
+	 * memory.
+	 */
+	uint32_t rdma_key;
 
 	/** Subnet management agent */
 	struct ib_gma *sma;
@@ -422,10 +434,9 @@ extern void ib_poll_cq ( struct ib_device *ibdev,
 extern struct ib_queue_pair *
 ib_create_qp ( struct ib_device *ibdev, enum ib_queue_pair_type type,
 	       unsigned int num_send_wqes, struct ib_completion_queue *send_cq,
-	       unsigned int num_recv_wqes, struct ib_completion_queue *recv_cq,
-	       unsigned long qkey );
-extern int ib_modify_qp ( struct ib_device *ibdev, struct ib_queue_pair *qp,
-			  unsigned long mod_list, unsigned long qkey );
+	       unsigned int num_recv_wqes,
+	       struct ib_completion_queue *recv_cq );
+extern int ib_modify_qp ( struct ib_device *ibdev, struct ib_queue_pair *qp );
 extern void ib_destroy_qp ( struct ib_device *ibdev,
 			    struct ib_queue_pair *qp );
 extern struct ib_queue_pair * ib_find_qp_qpn ( struct ib_device *ibdev,
@@ -457,6 +468,7 @@ extern void ib_mcast_detach ( struct ib_device *ibdev,
 extern int ib_get_hca_info ( struct ib_device *ibdev,
 			     struct ib_gid_half *hca_guid );
 extern int ib_set_port_info ( struct ib_device *ibdev, union ib_mad *mad );
+extern int ib_set_pkey_table ( struct ib_device *ibdev, union ib_mad *mad );
 extern struct ib_device * alloc_ibdev ( size_t priv_size );
 extern int register_ibdev ( struct ib_device *ibdev );
 extern void unregister_ibdev ( struct ib_device *ibdev );
