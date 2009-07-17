@@ -24,6 +24,14 @@ FILE_LICENCE ( GPL2_OR_LATER );
 /** Subnet administrator queue key */
 #define IB_GLOBAL_QKEY 0x80010000UL
 
+/**
+ * Maximum payload size
+ *
+ * This is currently hard-coded in various places (drivers, subnet
+ * management agent, etc.) to 2048.
+ */
+#define IB_MAX_PAYLOAD_SIZE 2048
+
 struct ib_device;
 struct ib_queue_pair;
 struct ib_address_vector;

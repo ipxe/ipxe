@@ -40,7 +40,6 @@ FILE_LICENCE ( GPL2_OR_LATER );
  * @v cq_op		Completion queue operations
  * @v num_send_wqes	Number of send work queue entries
  * @v num_recv_wqes	Number of receive work queue entries
- * @v recv_pkt_len	Receive packet length
  * @v qkey		Queue key
  * @ret rc		Return status code
  */
@@ -48,7 +47,7 @@ int ib_create_qset ( struct ib_device *ibdev, struct ib_queue_set *qset,
 		     unsigned int num_cqes,
 		     struct ib_completion_queue_operations *cq_op,
 		     unsigned int num_send_wqes, unsigned int num_recv_wqes,
-		     size_t recv_pkt_len, unsigned long qkey ) {
+		     unsigned long qkey ) {
 	int rc;
 
 	/* Sanity check */
@@ -57,7 +56,6 @@ int ib_create_qset ( struct ib_device *ibdev, struct ib_queue_set *qset,
 
 	/* Store queue parameters */
 	qset->recv_max_fill = num_recv_wqes;
-	qset->recv_pkt_len = recv_pkt_len;
 
 	/* Allocate completion queue */
 	qset->cq = ib_create_cq ( ibdev, num_cqes, cq_op );
@@ -99,7 +97,7 @@ void ib_qset_refill_recv ( struct ib_device *ibdev,
 	while ( qset->qp->recv.fill < qset->recv_max_fill ) {
 
 		/* Allocate I/O buffer */
-		iobuf = alloc_iob ( qset->recv_pkt_len );
+		iobuf = alloc_iob ( IB_MAX_PAYLOAD_SIZE );
 		if ( ! iobuf ) {
 			/* Non-fatal; we will refill on next attempt */
 			return;

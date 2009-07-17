@@ -361,7 +361,7 @@ static void ib_sma_refill_recv ( struct ib_sma *sma ) {
 	while ( sma->qp->recv.fill < IB_SMA_NUM_RECV_WQES ) {
 
 		/* Allocate I/O buffer */
-		iobuf = alloc_iob ( IB_SMA_PAYLOAD_LEN );
+		iobuf = alloc_iob ( IB_MAX_PAYLOAD_SIZE );
 		if ( ! iobuf ) {
 			/* Non-fatal; we will refill on next attempt */
 			return;

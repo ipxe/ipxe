@@ -10,9 +10,6 @@ FILE_LICENCE ( GPL2_OR_LATER );
 
 #include <gpxe/infiniband.h>
 
-/** IPoIB packet length */
-#define IPOIB_PKT_LEN 2048
-
 /** IPoIB MAC address length */
 #define IPOIB_ALEN 20
 

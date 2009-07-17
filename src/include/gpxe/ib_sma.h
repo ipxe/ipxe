@@ -37,9 +37,6 @@ struct ib_sma {
 	struct process poll;
 };
 
-/** SMA payload size allocated for received packets */
-#define IB_SMA_PAYLOAD_LEN 2048
-
 /** SMA number of send WQEs
  *
  * This is a policy decision.

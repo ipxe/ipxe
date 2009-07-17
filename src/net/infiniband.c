@@ -345,6 +345,13 @@ int ib_post_recv ( struct ib_device *ibdev, struct ib_queue_pair *qp,
 		   struct io_buffer *iobuf ) {
 	int rc;
 
+	/* Check packet length */
+	if ( iob_tailroom ( iobuf ) < IB_MAX_PAYLOAD_SIZE ) {
+		DBGC ( ibdev, "IBDEV %p QPN %#lx wrong RX buffer size (%zd)\n",
+		       ibdev, qp->qpn, iob_tailroom ( iobuf ) );
+		return -EINVAL;
+	}
+
 	/* Check queue fill level */
 	if ( qp->recv.fill >= qp->recv.num_wqes ) {
 		DBGC ( ibdev, "IBDEV %p QPN %#lx receive queue full\n",

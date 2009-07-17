@@ -838,7 +838,7 @@ static int ipoib_open ( struct net_device *netdev ) {
 				     IPOIB_META_NUM_CQES, &ipoib_meta_cq_op,
 				     IPOIB_META_NUM_SEND_WQES,
 				     IPOIB_META_NUM_RECV_WQES,
-				     IPOIB_PKT_LEN, IB_GLOBAL_QKEY ) ) != 0 ) {
+				     IB_GLOBAL_QKEY ) ) != 0 ) {
 		DBGC ( ipoib, "IPoIB %p could not allocate metadata QP: %s\n",
 		       ipoib, strerror ( rc ) );
 		goto err_create_meta_qset;
@@ -850,7 +850,7 @@ static int ipoib_open ( struct net_device *netdev ) {
 				     IPOIB_DATA_NUM_CQES, &ipoib_data_cq_op,
 				     IPOIB_DATA_NUM_SEND_WQES,
 				     IPOIB_DATA_NUM_RECV_WQES,
-				     IPOIB_PKT_LEN, IB_GLOBAL_QKEY ) ) != 0 ) {
+				     IB_GLOBAL_QKEY ) ) != 0 ) {
 		DBGC ( ipoib, "IPoIB %p could not allocate data QP: %s\n",
 		       ipoib, strerror ( rc ) );
 		goto err_create_data_qset;
@@ -1040,7 +1040,7 @@ struct net_device * alloc_ipoibdev ( size_t priv_size ) {
 	if ( netdev ) {
 		netdev->ll_protocol = &ipoib_protocol;
 		netdev->ll_broadcast = ( uint8_t * ) &ipoib_broadcast;
-		netdev->max_pkt_len = IPOIB_PKT_LEN;
+		netdev->max_pkt_len = IB_MAX_PAYLOAD_SIZE;
 	}
 	return netdev;
 }
