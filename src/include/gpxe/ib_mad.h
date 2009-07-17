@@ -284,6 +284,172 @@ union ib_sa_data {
 
 /*****************************************************************************
  *
+ * Communication management MADs
+ *
+ *****************************************************************************
+ */
+
+/** Communication management class version */
+#define IB_CM_CLASS_VERSION			2
+
+/* Communication management attributes */
+#define IB_CM_ATTR_CLASS_PORT_INFO		0x0001
+#define IB_CM_ATTR_CONNECT_REQUEST		0x0010
+#define IB_CM_ATTR_MSG_RCPT_ACK			0x0011
+#define IB_CM_ATTR_CONNECT_REJECT		0x0012
+#define IB_CM_ATTR_CONNECT_REPLY		0x0013
+#define IB_CM_ATTR_READY_TO_USE			0x0014
+#define IB_CM_ATTR_DISCONNECT_REQUEST		0x0015
+#define IB_CM_ATTR_DISCONNECT_REPLY		0x0016
+#define IB_CM_ATTR_SERVICE_ID_RES_REQ		0x0016
+#define IB_CM_ATTR_SERVICE_ID_RES_REQ_RESP	0x0018
+#define IB_CM_ATTR_LOAD_ALTERNATE_PATH		0x0019
+#define IB_CM_ATTR_ALTERNATE_PATH_RESPONSE	0x001a
+
+/** A communication management path */
+struct ib_cm_path {
+	/** Local port LID */
+	uint16_t local_lid;
+	/** Remote port LID */
+	uint16_t remote_lid;
+	/** Local port GID */
+	struct ib_gid local_gid;
+	/** Remote port GID */
+	struct ib_gid remote_gid;
+	/** Flow label and rate */
+	uint32_t flow_label__rate;
+	/** Traffic class */
+	uint8_t tc;
+	/** Hop limit */
+	uint8_t hop_limit;
+	/** SL and subnet local*/
+	uint8_t sl__subnet_local;
+	/** Local ACK timeout */
+	uint8_t local_ack_timeout;
+} __attribute__ (( packed ));
+
+/** A communication management connection request
+ *
+ * Defined in section 12.6.5 of the IBA.
+ */
+struct ib_cm_connect_request {
+	/** Local communication ID */
+	uint32_t local_id;
+	/** Reserved */
+	uint32_t reserved0[1];
+	/** Service ID */
+	struct ib_gid_half service_id;
+	/** Local CA GUID */
+	struct ib_gid_half local_ca;
+	/** Reserved */
+	uint32_t reserved1[1];
+	/** Local queue key */
+	uint32_t local_qkey;
+	/** Local QPN and responder resources*/
+	uint32_t local_qpn__responder_resources;
+	/** Local EECN and initiator depth */
+	uint32_t local_eecn__initiator_depth;
+	/** Remote EECN, remote CM response timeout, transport service
+	 * type, EE flow control
+	 */
+	uint32_t remote_eecn__remote_timeout__service_type__ee_flow_ctrl;
+	/** Starting PSN, local CM response timeout and retry count */
+	uint32_t starting_psn__local_timeout__retry_count;
+	/** Partition key */
+	uint16_t pkey;
+	/** Path packet payload MTU, RDC exists, RNR retry count */
+	uint8_t payload_mtu__rdc_exists__rnr_retry;
+	/** Max CM retries and SRQ */
+	uint8_t max_cm_retries__srq;
+	/** Primary path */
+	struct ib_cm_path primary;
+	/** Alternate path */
+	struct ib_cm_path alternate;
+	/** Private data */
+	uint8_t private_data[92];
+} __attribute__ (( packed ));
+
+/** CM transport types */
+#define IB_CM_TRANSPORT_RC		0
+#define IB_CM_TRANSPORT_UC		1
+#define IB_CM_TRANSPORT_RD		2
+
+/** A communication management connection rejection
+ *
+ * Defined in section 12.6.7 of the IBA.
+ */
+struct ib_cm_connect_reject {
+	/** Local communication ID */
+	uint32_t local_id;
+	/** Remote communication ID */
+	uint32_t remote_id;
+	/** Message rejected */
+	uint8_t message;
+	/** Reject information length */
+	uint8_t info_len;
+	/** Rejection reason */
+	uint16_t reason;
+	/** Additional rejection information */
+	uint8_t info[72];
+	/** Private data */
+	uint8_t private_data[148];
+} __attribute__ (( packed ));
+
+/** A communication management connection reply
+ *
+ * Defined in section 12.6.8 of the IBA.
+ */
+struct ib_cm_connect_reply {
+	/** Local communication ID */
+	uint32_t local_id;
+	/** Remote communication ID */
+	uint32_t remote_id;
+	/** Local queue key */
+	uint32_t local_qkey;
+	/** Local QPN */
+	uint32_t local_qpn;
+	/** Local EECN */
+	uint32_t local_eecn;
+	/** Starting PSN */
+	uint32_t starting_psn;
+	/** Responder resources */
+	uint8_t responder_resources;
+	/** Initiator depth */
+	uint8_t initiator_depth;
+	/** Target ACK delay, failover accepted, and end-to-end flow control */
+	uint8_t target_ack_delay__failover_accepted__ee_flow_ctrl;
+	/** RNR retry count, SRQ */
+	uint8_t rnr_retry__srq;
+	/** Local CA GUID */
+	struct ib_gid_half local_ca;
+	/** Private data */
+	uint8_t private_data[196];
+} __attribute__ (( packed ));
+
+/** A communication management ready to use reply
+ *
+ * Defined in section 12.6.9 of the IBA.
+ */
+struct ib_cm_ready_to_use {
+	/** Local communication ID */
+	uint32_t local_id;
+	/** Remote communication ID */
+	uint32_t remote_id;
+	/** Private data */
+	uint8_t private_data[224];
+} __attribute__ (( packed ));
+
+/** A communication management attribute */
+union ib_cm_data {
+	struct ib_cm_connect_request connect_request;
+	struct ib_cm_connect_reject connect_reject;
+	struct ib_cm_connect_reply connect_reply;
+	struct ib_cm_ready_to_use ready_to_use;
+	uint8_t bytes[232];
+} __attribute__ (( packed ));
+
+/*****************************************************************************
+ *
  * MADs
  *
  *****************************************************************************
@@ -362,11 +528,18 @@ struct ib_mad_sa {
 	union ib_sa_data sa_data;
 } __attribute__ (( packed ));
 
+/** A communication management MAD */
+struct ib_mad_cm {
+	struct ib_mad_hdr mad_hdr;
+	union ib_cm_data cm_data;
+} __attribute__ (( packed ));
+
 /** A management datagram */
 union ib_mad {
 	struct ib_mad_hdr hdr;
 	struct ib_mad_smp smp;
 	struct ib_mad_sa sa;
+	struct ib_mad_cm cm;
 	uint8_t bytes[256];
 } __attribute__ (( packed ));
 
