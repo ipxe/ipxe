@@ -794,6 +794,11 @@ int net80211_register ( struct net80211_device *dev,
 	memcpy ( dev->hw, hw, sizeof ( *hw ) );
 	memcpy ( dev->netdev->ll_addr, hw->hwaddr, ETH_ALEN );
 
+	/* Set some sensible channel defaults for driver's open() function */
+	memcpy ( dev->channels, dev->hw->channels,
+		 NET80211_MAX_CHANNELS * sizeof ( dev->channels[0] ) );
+	dev->channel = 0;
+
 	list_add_tail ( &dev->list, &net80211_devices );
 	return register_netdev ( dev->netdev );
 }
