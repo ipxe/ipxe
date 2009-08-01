@@ -31,11 +31,19 @@ FILE_LICENCE(GPL2_OR_LATER);
 /** Maximum cryptographic overhead before encrypted data */
 #define IEEE80211_MAX_CRYPTO_HEADER	8
 
-/** Maximum cryptographic overhead after encrypted data */
-#define IEEE80211_MAX_CRYPTO_TRAILER    12
+/** Maximum cryptographic overhead after encrypted data
+ *
+ * This does not count the MIC in TKIP frames, since that is
+ * considered to be part of the MSDU and thus contributes to the size
+ * of the data field.
+ *
+ * It @e does count the MIC in CCMP frames, which is considered part
+ * of the MPDU (outside the data field).
+ */
+#define IEEE80211_MAX_CRYPTO_TRAILER    8
 
 /** Total maximum cryptographic overhead */
-#define IEEE80211_MAX_CRYPTO_OVERHEAD	20
+#define IEEE80211_MAX_CRYPTO_OVERHEAD	16
 
 /** Bytes of network-layer data that can go into a regular data frame */
 #define IEEE80211_MAX_FRAME_DATA	2296
@@ -58,10 +66,10 @@ FILE_LICENCE(GPL2_OR_LATER);
 
 /** Maximum combined frame length
  *
- * The biggest frame will include 32 frame header bytes, 20 bytes of
+ * The biggest frame will include 32 frame header bytes, 16 bytes of
  * crypto overhead, and 2304 data bytes.
  */
-#define IEEE80211_MAX_FRAME_LEN         2356
+#define IEEE80211_MAX_FRAME_LEN         2352
 
 /** Maximum length of an ESSID */
 #define IEEE80211_MAX_SSID_LEN          32
