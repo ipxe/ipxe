@@ -37,6 +37,21 @@
 #endif
 #endif /* ASSEMBLY */
 
+#undef _S1
+#undef _S2
+#undef _C1
+#undef _C2
+
+/** Concatenate non-expanded arguments */
+#define _C1( x, y ) x ## y
+/** Concatenate expanded arguments */
+#define _C2( x, y ) _C1 ( x, y )
+
+/** Stringify non-expanded argument */
+#define _S1( x ) #x
+/** Stringify expanded argument */
+#define _S2( x ) _S1 ( x )
+
 /**
  * @defgroup symmacros Macros to provide or require explicit symbols
  * @{
@@ -52,14 +67,88 @@
 	char _sym[0]
 #endif /* ASSEMBLY */
 
-/** Require a symbol within this object file */
+/** Require a symbol within this object file
+ *
+ * The symbol is referenced by a relocation in a discarded section, so
+ * if it is not available at link time the link will fail.
+ */
 #ifdef ASSEMBLY
 #define REQUIRE_SYMBOL( _sym )				\
-	.equ	__need_ # _sym, _sym
+	.section ".discard", "a", @progbits ;		\
+	.extern	_sym ;					\
+	.long	_sym ;					\
+	.previous
 #else /* ASSEMBLY */
 #define REQUIRE_SYMBOL( _sym )				\
+	extern char _sym;				\
+	static char * _C2 ( _C2 ( __require_, _sym ), _C2 ( _, __LINE__ ) ) \
+		__attribute__ (( section ( ".discard" ), used )) \
+		= &_sym
+#endif
+
+/** Request that a symbol be available at runtime
+ *
+ * The requested symbol is entered as undefined into the symbol table
+ * for this object, so the linker will pull in other object files as
+ * necessary to satisfy the reference. However, the undefined symbol
+ * is not referenced in any relocations, so the link can still succeed
+ * if no file contains it.
+ *
+ * A symbol passed to this macro may not be referenced anywhere
+ * else in the file. If you want to do that, see IMPORT_SYMBOL().
+ */
+#ifdef ASSEMBLY
+#define REQUEST_SYMBOL( _sym )				\
+	.equ	__need_ ## _sym, _sym
+#else /* ASSEMBLY */
+#define REQUEST_SYMBOL( _sym )				\
 	__asm__ ( ".equ\t__need_" #_sym ", " #_sym )
 #endif /* ASSEMBLY */
+
+/** Set up a symbol to be usable in another file by IMPORT_SYMBOL()
+ *
+ * The symbol must already be marked as global.
+ */
+#define EXPORT_SYMBOL( _sym )	PROVIDE_SYMBOL ( __export_ ## _sym )
+
+/** Make a symbol usable to this file if available at link time
+ *
+ * If no file passed to the linker contains the symbol, it will have
+ * @c NULL value to future uses. Keep in mind that the symbol value is
+ * really the @e address of a variable or function; see the code
+ * snippet below.
+ *
+ * In C using IMPORT_SYMBOL, you must specify the declaration as the
+ * second argument, for instance
+ *
+ * @code
+ *   IMPORT_SYMBOL ( my_func, int my_func ( int arg ) );
+ *   IMPORT_SYMBOL ( my_var, int my_var );
+ *
+ *   void use_imports ( void ) {
+ * 	if ( my_func && &my_var )
+ * 	   my_var = my_func ( my_var );
+ *   }
+ * @endcode
+ *
+ * GCC considers a weak declaration to override a strong one no matter
+ * which comes first, so it is safe to include a header file declaring
+ * the imported symbol normally, but providing the declaration to
+ * IMPORT_SYMBOL is still required.
+ *
+ * If no EXPORT_SYMBOL declaration exists for the imported symbol in
+ * another file, the behavior will be most likely be identical to that
+ * for an unavailable symbol.
+ */
+#ifdef ASSEMBLY
+#define IMPORT_SYMBOL( _sym )				\
+	REQUEST_SYMBOL ( __export_ ## _sym ) ;		\
+	.weak	_sym
+#else /* ASSEMBLY */
+#define IMPORT_SYMBOL( _sym, _decl )			\
+	REQUEST_SYMBOL ( __export_ ## _sym ) ;		\
+	extern _decl __attribute__ (( weak ))
+#endif
 
 /** @} */
 
@@ -68,14 +157,7 @@
  * @{
  */
 
-/* Not quite sure why cpp requires two levels of macro call in order
- * to actually expand OBJECT...
- */
-#undef _H1
-#define _H1( x, y ) x ## y
-#undef _H2
-#define _H2( x, y ) _H1 ( x, y )
-#define PREFIX_OBJECT( _prefix ) _H2 ( _prefix, OBJECT )
+#define PREFIX_OBJECT( _prefix ) _C2 ( _prefix, OBJECT )
 #define OBJECT_SYMBOL PREFIX_OBJECT ( obj_ )
 
 /** Always provide the symbol for the current object (defined by -DOBJECT) */
@@ -83,6 +165,9 @@ PROVIDE_SYMBOL ( OBJECT_SYMBOL );
 
 /** Explicitly require another object */
 #define REQUIRE_OBJECT( _obj ) REQUIRE_SYMBOL ( obj_ ## _obj )
+
+/** Pull in another object if it exists */
+#define REQUEST_OBJECT( _obj ) REQUEST_SYMBOL ( obj_ ## _obj )
 
 /** @} */
 

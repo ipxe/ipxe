@@ -152,6 +152,7 @@ SECTIONS {
 	*(.eh_frame.*)
 	*(.rel)
 	*(.rel.*)
+	*(.discard)
     }
 
     /*

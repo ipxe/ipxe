@@ -130,6 +130,7 @@ SECTIONS {
     /DISCARD/ : {
 	*(.comment)
 	*(.note)
+	*(.discard)
     }
 
     /*
