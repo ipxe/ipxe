@@ -28,6 +28,8 @@ my $known_licences = {
       public_domain => 1,
       bsd3 => 1,
       bsd2 => 1,
+      mit  => 1,
+      isc  => 1,
     },
   },
   gpl2_or_later => {
@@ -37,6 +39,8 @@ my $known_licences = {
       public_domain => 1,
       bsd3 => 1,
       bsd2 => 1,
+      mit  => 1,
+      isc  => 1,
     },
   },
   gpl2_only => {
@@ -47,6 +51,8 @@ my $known_licences = {
       public_domain => 1,
       bsd3 => 1,
       bsd2 => 1,
+      mit  => 1,
+      isc  => 1,
     },
   },
   public_domain => {
@@ -59,6 +65,8 @@ my $known_licences = {
       public_domain => 1,
       bsd3 => 1,
       bsd2 => 1,
+      mit  => 1,
+      isc  => 1,
     },
   },
   bsd3 => {
@@ -66,10 +74,27 @@ my $known_licences = {
     can_subsume => {
       public_domain => 1,
       bsd2 => 1,
+      mit  => 1,
+      isc  => 1,
     },
   },
   bsd2 => {
     desc => "BSD Licence (without advertising or endorsement clauses)",
+    can_subsume => {
+      public_domain => 1,
+      mit  => 1,
+      isc  => 1,
+    },
+  },
+  mit => {
+    desc => "MIT/X11/Xorg Licence",
+    can_subsume => {
+      public_domain => 1,
+      isc => 1,
+    },
+  },
+  isc => {
+    desc => "ISC Licence",
     can_subsume => {
       public_domain => 1,
     },
