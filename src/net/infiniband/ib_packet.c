@@ -76,7 +76,7 @@ int ib_push ( struct ib_device *ibdev, struct io_buffer *iobuf,
 	lrh_len = ( payload_len + iob_len ( iobuf ) - orig_iob_len );
 
 	/* Construct LRH */
-	vl = ( ( qp->ext_qpn == IB_QPN_SMA ) ? IB_VL_SMP : IB_VL_DEFAULT );
+	vl = ( ( qp->ext_qpn == IB_QPN_SMI ) ? IB_VL_SMP : IB_VL_DEFAULT );
 	lrh->vl__lver = ( vl << 4 );
 	lnh = ( grh ? IB_LNH_GRH : IB_LNH_BTH );
 	lrh->sl__lnh = ( ( av->sl << 4 ) | lnh );

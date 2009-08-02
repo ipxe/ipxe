@@ -209,11 +209,11 @@ struct ib_queue_pair * ib_create_qp ( struct ib_device *ibdev,
 
 	/* Calculate externally-visible QPN */
 	switch ( type ) {
-	case IB_QPT_SMA:
-		qp->ext_qpn = IB_QPN_SMA;
+	case IB_QPT_SMI:
+		qp->ext_qpn = IB_QPN_SMI;
 		break;
-	case IB_QPT_GMA:
-		qp->ext_qpn = IB_QPN_GMA;
+	case IB_QPT_GSI:
+		qp->ext_qpn = IB_QPN_GSI;
 		break;
 	default:
 		qp->ext_qpn = qp->qpn;
@@ -535,7 +535,7 @@ int ib_open ( struct ib_device *ibdev ) {
 	}
 
 	/* Create subnet management agent */
-	ibdev->sma = ib_create_gma ( ibdev, IB_QPT_SMA );
+	ibdev->sma = ib_create_gma ( ibdev, IB_QPT_SMI );
 	if ( ! ibdev->sma ) {
 		DBGC ( ibdev, "IBDEV %p could not create SMA\n", ibdev );
 		rc = -ENOMEM;
@@ -543,7 +543,7 @@ int ib_open ( struct ib_device *ibdev ) {
 	}
 
 	/* Create general management agent */
-	ibdev->gma = ib_create_gma ( ibdev, IB_QPT_GMA );
+	ibdev->gma = ib_create_gma ( ibdev, IB_QPT_GSI );
 	if ( ! ibdev->gma ) {
 		DBGC ( ibdev, "IBDEV %p could not create GMA\n", ibdev );
 		rc = -ENOMEM;

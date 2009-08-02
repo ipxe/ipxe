@@ -15,17 +15,17 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #include <gpxe/ib_packet.h>
 #include <gpxe/ib_mad.h>
 
-/** Subnet management QPN */
-#define IB_QPN_SMA 0
+/** Subnet management interface QPN */
+#define IB_QPN_SMI 0
 
-/** Subnet management queue key */
-#define IB_QKEY_SMA 0
+/** Subnet management interface queue key */
+#define IB_QKEY_SMI 0
 
-/** General management QPN */
-#define IB_QPN_GMA 1
+/** General service interface QPN */
+#define IB_QPN_GSI 1
 
-/** General management queue key */
-#define IB_QKEY_GMA 0x80010000UL
+/** General service interface queue key */
+#define IB_QKEY_GSI 0x80010000UL
 
 /** Broadcast QPN */
 #define IB_QPN_BROADCAST 0xffffffUL
@@ -124,8 +124,8 @@ struct ib_multicast_gid {
 
 /** An Infiniband queue pair type */
 enum ib_queue_pair_type {
-	IB_QPT_SMA,
-	IB_QPT_GMA,
+	IB_QPT_SMI,
+	IB_QPT_GSI,
 	IB_QPT_UD,
 	IB_QPT_RC,
 };

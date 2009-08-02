@@ -831,10 +831,10 @@ static int hermon_alloc_qpn ( struct ib_device *ibdev,
 	port_offset = ( ibdev->port - HERMON_PORT_BASE );
 
 	switch ( qp->type ) {
-	case IB_QPT_SMA:
+	case IB_QPT_SMI:
 		qp->qpn = ( hermon->special_qpn_base + port_offset );
 		return 0;
-	case IB_QPT_GMA:
+	case IB_QPT_GSI:
 		qp->qpn = ( hermon->special_qpn_base + 2 + port_offset );
 		return 0;
 	case IB_QPT_UD:
@@ -892,15 +892,15 @@ static unsigned int hermon_rate ( struct ib_address_vector *av ) {
  */
 static unsigned int hermon_sched_queue ( struct ib_device *ibdev,
 					 struct ib_queue_pair *qp ) {
-	return ( ( ( qp->type == IB_QPT_SMA ) ?
+	return ( ( ( qp->type == IB_QPT_SMI ) ?
 		   HERMON_SCHED_QP0 : HERMON_SCHED_DEFAULT ) |
 		 ( ( ibdev->port - 1 ) << 6 ) );
 }
 
 /** Queue pair transport service type map */
 static uint8_t hermon_qp_st[] = {
-	[IB_QPT_SMA] = HERMON_ST_MLX,
-	[IB_QPT_GMA] = HERMON_ST_MLX,
+	[IB_QPT_SMI] = HERMON_ST_MLX,
+	[IB_QPT_GSI] = HERMON_ST_MLX,
 	[IB_QPT_UD] = HERMON_ST_UD,
 	[IB_QPT_RC] = HERMON_ST_RC,
 };
@@ -1214,7 +1214,7 @@ hermon_fill_mlx_send_wqe ( struct ib_device *ibdev,
 		     icrc, 0 /* generate ICRC */,
 		     max_statrate, hermon_rate ( av ),
 		     slr, 0,
-		     v15, ( ( qp->ext_qpn == IB_QPN_SMA ) ? 1 : 0 ) );
+		     v15, ( ( qp->ext_qpn == IB_QPN_SMI ) ? 1 : 0 ) );
 	MLX_FILL_1 ( &wqe->mlx.ctrl, 3, rlid, av->lid );
 	MLX_FILL_1 ( &wqe->mlx.data[0], 0,
 		     byte_count, iob_len ( &headers ) );
@@ -1264,8 +1264,8 @@ static unsigned int
 			       struct ib_address_vector *av,
 			       struct io_buffer *iobuf,
 			       union hermon_send_wqe *wqe ) = {
-	[IB_QPT_SMA] = hermon_fill_mlx_send_wqe,
-	[IB_QPT_GMA] = hermon_fill_mlx_send_wqe,
+	[IB_QPT_SMI] = hermon_fill_mlx_send_wqe,
+	[IB_QPT_GSI] = hermon_fill_mlx_send_wqe,
 	[IB_QPT_UD] = hermon_fill_ud_send_wqe,
 	[IB_QPT_RC] = hermon_fill_rc_send_wqe,
 };
@@ -1444,8 +1444,8 @@ static int hermon_complete ( struct ib_device *ibdev,
 		assert ( len <= iob_tailroom ( iobuf ) );
 		iob_put ( iobuf, len );
 		switch ( qp->type ) {
-		case IB_QPT_SMA:
-		case IB_QPT_GMA:
+		case IB_QPT_SMI:
+		case IB_QPT_GSI:
 		case IB_QPT_UD:
 			assert ( iob_len ( iobuf ) >= sizeof ( *grh ) );
 			grh = iobuf->data;

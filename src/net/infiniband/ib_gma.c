@@ -590,8 +590,8 @@ int ib_gma_request ( struct ib_gma *gma, union ib_mad *mad,
 	} else {
 		request->av.lid = ibdev->sm_lid;
 		request->av.sl = ibdev->sm_sl;
-		request->av.qpn = IB_QPN_GMA;
-		request->av.qkey = IB_QKEY_GMA;
+		request->av.qpn = IB_QPN_GSI;
+		request->av.qkey = IB_QKEY_GSI;
 	}
 
 	/* Copy MAD body */
@@ -656,7 +656,7 @@ struct ib_gma * ib_create_gma ( struct ib_device *ibdev,
 	DBGC ( gma, "GMA %p running on QPN %#lx\n", gma, gma->qp->qpn );
 
 	/* Set queue key */
-	gma->qp->qkey = ( ( type == IB_QPT_SMA ) ? IB_QKEY_SMA : IB_QKEY_GMA );
+	gma->qp->qkey = ( ( type == IB_QPT_SMI ) ? IB_QKEY_SMI : IB_QKEY_GSI );
 	if ( ( rc = ib_modify_qp ( ibdev, gma->qp ) ) != 0 ) {
 		DBGC ( gma, "GMA %p could not set queue key: %s\n",
 		       gma, strerror ( rc ) );
