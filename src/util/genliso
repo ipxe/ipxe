@@ -70,6 +70,6 @@ then
 	exit 1
 fi
 
-mkisofs -o $out -c boot.cat -b boot.img $dir
+mkisofs -q -o $out -c boot.cat -b boot.img $dir
 
 rm -fr $dir
