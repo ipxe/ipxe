@@ -105,7 +105,7 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #define LOGIN_CMD		/* Login command */
 #undef	TIME_CMD		/* Time commands */
 #undef	DIGEST_CMD		/* Image crypto digest commands */
-#define	PXE_CMD			/* PXE commands */
+//#undef	PXE_CMD			/* PXE commands */
 
 /*
  * Obscure configuration options
