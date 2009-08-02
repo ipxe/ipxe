@@ -235,6 +235,33 @@ FILE_LICENCE ( GPL2_ONLY );
 #define PCI_MSI_DATA_32		8	/* 16 bits of data for 32-bit devices */
 #define PCI_MSI_DATA_64		12	/* 16 bits of data for 64-bit devices */
 
+/* Advanced Error Reporting */
+
+#define PCI_ERR_UNCOR_STATUS	4	/* Uncorrectable Error Status */
+#define  PCI_ERR_UNC_TRAIN	0x00000001	/* Training */
+#define  PCI_ERR_UNC_DLP	0x00000010	/* Data Link Protocol */
+#define  PCI_ERR_UNC_POISON_TLP	0x00001000	/* Poisoned TLP */
+#define  PCI_ERR_UNC_FCP	0x00002000	/* Flow Control Protocol */
+#define  PCI_ERR_UNC_COMP_TIME	0x00004000	/* Completion Timeout */
+#define  PCI_ERR_UNC_COMP_ABORT	0x00008000	/* Completer Abort */
+#define  PCI_ERR_UNC_UNX_COMP	0x00010000	/* Unexpected Completion */
+#define  PCI_ERR_UNC_RX_OVER	0x00020000	/* Receiver Overflow */
+#define  PCI_ERR_UNC_MALF_TLP	0x00040000	/* Malformed TLP */
+#define  PCI_ERR_UNC_ECRC	0x00080000	/* ECRC Error Status */
+#define  PCI_ERR_UNC_UNSUP	0x00100000	/* Unsupported Request */
+#define PCI_ERR_UNCOR_MASK	8	/* Uncorrectable Error Mask */
+	/* Same bits as above */
+#define PCI_ERR_UNCOR_SEVER	12	/* Uncorrectable Error Severity */
+	/* Same bits as above */
+#define PCI_ERR_COR_STATUS	16	/* Correctable Error Status */
+#define  PCI_ERR_COR_RCVR	0x00000001	/* Receiver Error Status */
+#define  PCI_ERR_COR_BAD_TLP	0x00000040	/* Bad TLP Status */
+#define  PCI_ERR_COR_BAD_DLLP	0x00000080	/* Bad DLLP Status */
+#define  PCI_ERR_COR_REP_ROLL	0x00000100	/* REPLAY_NUM Rollover */
+#define  PCI_ERR_COR_REP_TIMER	0x00001000	/* Replay Timer Timeout */
+#define PCI_ERR_COR_MASK	20	/* Correctable Error Mask */
+	/* Same bits as above */
+
 /** A PCI device ID list entry */
 struct pci_device_id {
 	/** Name */
