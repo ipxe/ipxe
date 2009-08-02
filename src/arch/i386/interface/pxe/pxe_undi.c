@@ -724,7 +724,7 @@ PXENV_EXIT_t pxenv_undi_isr ( struct s_PXENV_UNDI_ISR *undi_isr ) {
 		DBGC2 ( &pxenv_undi_isr, " RX" );
 		if ( len > sizeof ( basemem_packet ) ) {
 			/* Should never happen */
-			DBGC2 ( &pxenv_undi_isr, " overlength (%x)", len );
+			DBGC2 ( &pxenv_undi_isr, " overlength (%zx)", len );
 			len = sizeof ( basemem_packet );
 		}
 		memcpy ( basemem_packet, iobuf->data, len );
