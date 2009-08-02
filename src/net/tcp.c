@@ -399,9 +399,9 @@ static int tcp_xmit ( struct tcp_connection *tcp, int force_send ) {
 	void *payload;
 	unsigned int flags;
 	size_t len = 0;
-	size_t seq_len;
-	size_t app_win;
-	size_t max_rcv_win;
+	uint32_t seq_len;
+	uint32_t app_win;
+	uint32_t max_rcv_win;
 	int rc;
 
 	/* If retransmission timer is already running, do nothing */
@@ -490,7 +490,7 @@ static int tcp_xmit ( struct tcp_connection *tcp, int force_send ) {
 	tcphdr->csum = tcpip_chksum ( iobuf->data, iob_len ( iobuf ) );
 
 	/* Dump header */
-	DBGC2 ( tcp, "TCP %p TX %d->%d %08x..%08zx           %08x %4zd",
+	DBGC2 ( tcp, "TCP %p TX %d->%d %08x..%08x           %08x %4zd",
 		tcp, ntohs ( tcphdr->src ), ntohs ( tcphdr->dest ),
 		ntohl ( tcphdr->seq ), ( ntohl ( tcphdr->seq ) + seq_len ),
 		ntohl ( tcphdr->ack ), len );
@@ -671,7 +671,7 @@ static void tcp_rx_opts ( struct tcp_connection *tcp, const void *data,
  * @v tcp		TCP connection
  * @v seq_len		Sequence space length to consume
  */
-static void tcp_rx_seq ( struct tcp_connection *tcp, size_t seq_len ) {
+static void tcp_rx_seq ( struct tcp_connection *tcp, uint32_t seq_len ) {
 	tcp->rcv_ack += seq_len;
 	if ( tcp->rcv_win > seq_len ) {
 		tcp->rcv_win -= seq_len;
@@ -722,13 +722,13 @@ static int tcp_rx_syn ( struct tcp_connection *tcp, uint32_t seq,
  */
 static int tcp_rx_ack ( struct tcp_connection *tcp, uint32_t ack,
 			uint32_t win ) {
-	size_t ack_len = ( ack - tcp->snd_seq );
+	uint32_t ack_len = ( ack - tcp->snd_seq );
 	size_t len;
 	unsigned int acked_flags;
 
 	/* Check for out-of-range or old duplicate ACKs */
 	if ( ack_len > tcp->snd_sent ) {
-		DBGC ( tcp, "TCP %p received ACK for %08x..%08zx, "
+		DBGC ( tcp, "TCP %p received ACK for %08x..%08x, "
 		       "sent only %08x..%08x\n", tcp, tcp->snd_seq,
 		       ( tcp->snd_seq + ack_len ), tcp->snd_seq,
 		       ( tcp->snd_seq + tcp->snd_sent ) );
@@ -795,8 +795,8 @@ static int tcp_rx_ack ( struct tcp_connection *tcp, uint32_t ack,
  */
 static int tcp_rx_data ( struct tcp_connection *tcp, uint32_t seq,
 			 struct io_buffer *iobuf ) {
-	size_t already_rcvd;
-	size_t len;
+	uint32_t already_rcvd;
+	uint32_t len;
 	int rc;
 
 	/* Ignore duplicate or out-of-order data */
