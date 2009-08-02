@@ -24,11 +24,10 @@ Mtools\ version\ 3.9.9*|Mtools\ version\ 3.9.1[0-9]*|Mtools\ version\ 4.*)
 esac
 img=$1
 shift
-dir=bin/sdsk.dir
-mkdir -p $dir
+dir=`mktemp -d bin/sdsk.dir.XXXXXX`
 
 mformat -f 1440 -C -i $img ::
-cfg=bin/syslinux.cfg
+cfg=$dir/syslinux.cfg
 cat > $cfg <<EOF
 
 # These default options can be changed in the gensdsk script

@@ -22,8 +22,7 @@ then
 fi
 out=$1
 shift
-dir=bin/iso.dir
-mkdir -p $dir
+dir=`mktemp -d bin/iso.dir.XXXXXX`
 cfg=$dir/isolinux.cfg
 cp -p $isolinux_bin $dir
 cat > $cfg <<EOF
