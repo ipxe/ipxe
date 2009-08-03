@@ -16,7 +16,11 @@ struct io_buffer;
 
 /** Half of an Infiniband Global Identifier */
 struct ib_gid_half {
-	uint8_t bytes[8];
+	union {
+		uint8_t bytes[8];
+		uint16_t words[4];
+		uint32_t dwords[2];
+	} u;
 };
 
 /** An Infiniband Global Identifier */

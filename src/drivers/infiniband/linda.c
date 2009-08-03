@@ -1606,15 +1606,15 @@ static int linda_read_eeprom ( struct linda *linda,
 
 	/* Read GUID */
 	if ( ( rc = i2c->read ( i2c, &linda->eeprom, LINDA_EEPROM_GUID_OFFSET,
-				guid->bytes, sizeof ( *guid ) ) ) != 0 ) {
+				guid->u.bytes, sizeof ( *guid ) ) ) != 0 ) {
 		DBGC ( linda, "Linda %p could not read GUID: %s\n",
 		       linda, strerror ( rc ) );
 		return rc;
 	}
 	DBGC2 ( linda, "Linda %p has GUID %02x:%02x:%02x:%02x:%02x:%02x:"
-		"%02x:%02x\n", linda, guid->bytes[0], guid->bytes[1],
-		guid->bytes[2], guid->bytes[3], guid->bytes[4],
-		guid->bytes[5], guid->bytes[6], guid->bytes[7] );
+		"%02x:%02x\n", linda, guid->u.bytes[0], guid->u.bytes[1],
+		guid->u.bytes[2], guid->u.bytes[3], guid->u.bytes[4],
+		guid->u.bytes[5], guid->u.bytes[6], guid->u.bytes[7] );
 
 	/* Read serial number (debug only) */
 	if ( DBG_LOG ) {

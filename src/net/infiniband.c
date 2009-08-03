@@ -33,6 +33,8 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #include <gpxe/ipoib.h>
 #include <gpxe/process.h>
 #include <gpxe/infiniband.h>
+#include <gpxe/ib_mi.h>
+#include <gpxe/ib_sma.h>
 #include <gpxe/ib_gma.h>
 
 /** @file
@@ -534,11 +536,18 @@ int ib_open ( struct ib_device *ibdev ) {
 		return 0;
 	}
 
-	/* Create subnet management agent */
-	ibdev->sma = ib_create_gma ( ibdev, IB_QPT_SMI );
-	if ( ! ibdev->sma ) {
-		DBGC ( ibdev, "IBDEV %p could not create SMA\n", ibdev );
+	/* Create subnet management interface */
+	ibdev->smi = ib_create_mi ( ibdev, IB_QPT_SMI );
+	if ( ! ibdev->smi ) {
+		DBGC ( ibdev, "IBDEV %p could not create SMI\n", ibdev );
 		rc = -ENOMEM;
+		goto err_create_smi;
+	}
+
+	/* Create subnet management agent */
+	if ( ( rc = ib_create_sma ( ibdev, ibdev->smi ) ) != 0 ) {
+		DBGC ( ibdev, "IBDEV %p could not create SMA: %s\n",
+		       ibdev, strerror ( rc ) );
 		goto err_create_sma;
 	}
 
@@ -564,8 +573,10 @@ int ib_open ( struct ib_device *ibdev ) {
  err_open:
 	ib_destroy_gma ( ibdev->gma );
  err_create_gma:
-	ib_destroy_gma ( ibdev->sma );
+	ib_destroy_sma ( ibdev, ibdev->smi );
  err_create_sma:
+	ib_destroy_mi ( ibdev, ibdev->smi );
+ err_create_smi:
 	assert ( ibdev->open_count == 1 );
 	ibdev->open_count = 0;
 	return rc;
@@ -584,7 +595,8 @@ void ib_close ( struct ib_device *ibdev ) {
 	/* Close device if this was the last remaining requested opening */
 	if ( ibdev->open_count == 0 ) {
 		ib_destroy_gma ( ibdev->gma );
-		ib_destroy_gma ( ibdev->sma );
+		ib_destroy_sma ( ibdev, ibdev->smi );
+		ib_destroy_mi ( ibdev, ibdev->smi );
 		ibdev->op->close ( ibdev );
 	}
 }

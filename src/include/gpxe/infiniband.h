@@ -45,6 +45,7 @@ struct ib_device;
 struct ib_queue_pair;
 struct ib_address_vector;
 struct ib_completion_queue;
+struct ib_mad_interface;
 struct ib_gma;
 
 /** Infiniband transmission rates */
@@ -413,8 +414,8 @@ struct ib_device {
 	 */
 	uint32_t rdma_key;
 
-	/** Subnet management agent */
-	struct ib_gma *sma;
+	/** Subnet management interface */
+	struct ib_mad_interface *smi;
 	/** General management agent */
 	struct ib_gma *gma;
 
