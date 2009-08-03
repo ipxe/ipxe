@@ -491,7 +491,9 @@ struct ib_mad_hdr {
 #define IB_MGMT_CLASS_CM			0x07
 #define IB_MGMT_CLASS_SNMP			0x08
 #define IB_MGMT_CLASS_VENDOR_RANGE2_START	0x30
-#define IB_MGMT_CLASS_VENDOR_RANGE2_END		0x4F
+#define IB_MGMT_CLASS_VENDOR_RANGE2_END		0x4f
+
+#define IB_MGMT_CLASS_MASK			0x7f
 
 /* Management methods */
 #define IB_MGMT_METHOD_GET			0x01
