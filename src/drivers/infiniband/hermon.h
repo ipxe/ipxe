@@ -21,7 +21,7 @@ FILE_LICENCE ( GPL2_OR_LATER );
  */
 
 /* Ports in existence */
-#define HERMON_NUM_PORTS		2
+#define HERMON_MAX_PORTS		2
 #define HERMON_PORT_BASE		1
 
 /* PCI BARs */
@@ -61,6 +61,7 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #define HERMON_HCR_READ_MCG		0x0025
 #define HERMON_HCR_WRITE_MCG		0x0026
 #define HERMON_HCR_MGID_HASH		0x0027
+#define HERMON_HCR_SENSE_PORT		0x004d
 #define HERMON_HCR_RUN_FW		0x0ff6
 #define HERMON_HCR_DISABLE_LAM		0x0ff7
 #define HERMON_HCR_ENABLE_LAM		0x0ff8
@@ -164,6 +165,14 @@ struct hermonprm_port_state_change_event_st {
 	struct hermonprm_port_state_change_st data;
 } __attribute__ (( packed ));
 
+/** Hermon sense port */
+struct hermonprm_sense_port_st {
+	pseudo_bit_t port_type[0x00020];
+/* -------------- */
+	pseudo_bit_t reserved[0x00020];
+};
+#define HERMON_PORT_TYPE_IB		1
+
 /*
  * Wrapper structures for hardware datatypes
  *
@@ -192,6 +201,7 @@ struct MLX_DECLARE_STRUCT ( hermonprm_query_dev_cap );
 struct MLX_DECLARE_STRUCT ( hermonprm_query_fw );
 struct MLX_DECLARE_STRUCT ( hermonprm_queue_pair_ee_context_entry );
 struct MLX_DECLARE_STRUCT ( hermonprm_scalar_parameter );
+struct MLX_DECLARE_STRUCT ( hermonprm_sense_port );
 struct MLX_DECLARE_STRUCT ( hermonprm_send_db_register );
 struct MLX_DECLARE_STRUCT ( hermonprm_ud_address_vector );
 struct MLX_DECLARE_STRUCT ( hermonprm_virtual_physical_mapping );
@@ -296,6 +306,10 @@ struct hermon_dev_cap {
 	size_t dmpt_entry_size;
 	/** Number of reserved UARs */
 	unsigned int reserved_uars;
+	/** Number of ports */
+	unsigned int num_ports;
+	/** Dual-port different protocol */
+	int dpdp;
 };
 
 /** Number of cMPT entries of each type */
@@ -523,7 +537,7 @@ struct hermon {
 	unsigned long qpn_base;
 
 	/** Infiniband devices */
-	struct ib_device *ibdev[HERMON_NUM_PORTS];
+	struct ib_device *ibdev[HERMON_MAX_PORTS];
 };
 
 /** Global protection domain */

@@ -2071,7 +2071,11 @@ struct hermonprm_query_dev_cap_st {	/* Little Endian */
     pseudo_bit_t	pkv[0x00001];          /* PKey Violation Counter Supported */
     pseudo_bit_t	qkv[0x00001];          /* QKey Violation Coutner Supported */
     pseudo_bit_t	vmm[0x00001];          /* Hermon New */
-    pseudo_bit_t	reserved27[0x00005];
+    pseudo_bit_t	fcoe[0x00001];
+    pseudo_bit_t	dpdp[0x00001];	       /* Dual Port Different Protocols */
+    pseudo_bit_t	raw_ethertype[0x00001];
+    pseudo_bit_t	raw_ipv6[0x00001];
+    pseudo_bit_t	blh[0x00001];
     pseudo_bit_t	mw[0x00001];           /* Memory windows supported */
     pseudo_bit_t	apm[0x00001];          /* Automatic Path Migration Supported */
     pseudo_bit_t	atm[0x00001];          /* Atomic operations supported (atomicity is guaranteed between QPs on this HCA) */

@@ -541,6 +541,16 @@ hermon_cmd_map_fa ( struct hermon *hermon,
 			    0, map, 1, NULL );
 }
 
+static inline int
+hermon_cmd_sense_port ( struct hermon *hermon, unsigned int port,
+			struct hermonprm_sense_port *port_type ) {
+	return hermon_cmd ( hermon,
+                            HERMON_HCR_OUT_CMD ( HERMON_HCR_SENSE_PORT,
+                                                 1, sizeof ( *port_type ) ),
+                            0, NULL, port, port_type );
+}
+
+
 /***************************************************************************
  *
  * Memory translation table operations
@@ -1664,7 +1674,7 @@ static void hermon_event_port_state_change ( struct hermon *hermon,
 	       ( link_up ? "up" : "down" ) );
 
 	/* Sanity check */
-	if ( port >= HERMON_NUM_PORTS ) {
+	if ( port >= hermon->cap.num_ports ) {
 		DBGC ( hermon, "Hermon %p port %d does not exist!\n",
 		       hermon, ( port + 1 ) );
 		return;
@@ -1736,6 +1746,36 @@ static void hermon_poll_eq ( struct ib_device *ibdev ) {
  */
 
 /**
+ * Sense port type
+ *
+ * @v ibdev		Infiniband device
+ * @ret port_type	Port type, or negative error
+ */
+static int hermon_sense_port_type ( struct ib_device *ibdev ) {
+	struct hermon *hermon = ib_get_drvdata ( ibdev );
+	struct hermonprm_sense_port sense_port;
+	int port_type;
+	int rc;
+
+	/* If DPDP is not supported, always assume Infiniband */
+	if ( ! hermon->cap.dpdp )
+		return HERMON_PORT_TYPE_IB;
+
+	/* Sense the port type */
+	if ( ( rc = hermon_cmd_sense_port ( hermon, ibdev->port,
+					    &sense_port ) ) != 0 ) {
+		DBGC ( hermon, "Hermon %p port %d sense failed: %s\n",
+		       hermon, ibdev->port, strerror ( rc ) );
+		return rc;
+	}
+	port_type = MLX_GET ( &sense_port, port_type );
+
+	DBGC ( hermon, "Hermon %p port %d type %d\n",
+	       hermon, ibdev->port, port_type );
+	return port_type;
+}
+
+/**
  * Initialise Infiniband link
  *
  * @v ibdev		Infiniband device
@@ -1744,8 +1784,19 @@ static void hermon_poll_eq ( struct ib_device *ibdev ) {
 static int hermon_open ( struct ib_device *ibdev ) {
 	struct hermon *hermon = ib_get_drvdata ( ibdev );
 	struct hermonprm_init_port init_port;
+	int port_type;
 	int rc;
 
+	/* Check we are connected to an Infiniband network */
+	if ( ( rc = port_type = hermon_sense_port_type ( ibdev ) ) < 0 )
+		return rc;
+	if ( port_type != HERMON_PORT_TYPE_IB ) {
+		DBGC ( hermon, "Hermon %p port %d not connected to an "
+		       "Infiniband network", hermon, ibdev->port );
+		return -ENOTCONN;
+        }
+
+	/* Init Port */
 	memset ( &init_port, 0, sizeof ( init_port ) );
 	MLX_FILL_2 ( &init_port, 0,
 		     port_width_cap, 3,
@@ -2099,6 +2150,15 @@ static int hermon_get_cap ( struct hermon *hermon ) {
 		( 1 << MLX_GET ( &dev_cap, log2_rsvd_mrws ) );
 	hermon->cap.dmpt_entry_size = MLX_GET ( &dev_cap, d_mpt_entry_sz );
 	hermon->cap.reserved_uars = MLX_GET ( &dev_cap, num_rsvd_uars );
+	hermon->cap.num_ports = MLX_GET ( &dev_cap, num_ports );
+	hermon->cap.dpdp = MLX_GET ( &dev_cap, dpdp );
+
+	/* Sanity check */
+	if ( hermon->cap.num_ports > HERMON_MAX_PORTS ) {
+		DBGC ( hermon, "Hermon %p has %d ports (only %d supported)\n",
+		       hermon, hermon->cap.num_ports, HERMON_MAX_PORTS );
+		hermon->cap.num_ports = HERMON_MAX_PORTS;
+	}
 
 	return 0;
 }
@@ -2478,7 +2538,7 @@ static int hermon_probe ( struct pci_device *pci,
 	struct hermon *hermon;
 	struct ib_device *ibdev;
 	struct hermonprm_init_hca init_hca;
-	int i;
+	unsigned int i;
 	int rc;
 
 	/* Allocate Hermon device */
@@ -2488,20 +2548,6 @@ static int hermon_probe ( struct pci_device *pci,
 		goto err_alloc_hermon;
 	}
 	pci_set_drvdata ( pci, hermon );
-
-	/* Allocate Infiniband devices */
-	for ( i = 0 ; i < HERMON_NUM_PORTS ; i++ ) {
-	        ibdev = alloc_ibdev ( 0 );
-		if ( ! ibdev ) {
-			rc = -ENOMEM;
-			goto err_alloc_ibdev;
-		}
-		hermon->ibdev[i] = ibdev;
-		ibdev->op = &hermon_ib_operations;
-		ibdev->dev = &pci->dev;
-		ibdev->port = ( HERMON_PORT_BASE + i );
-		ib_set_drvdata ( ibdev, hermon );
-	}
 
 	/* Fix up PCI device */
 	adjust_pci_device ( pci );
@@ -2534,6 +2580,20 @@ static int hermon_probe ( struct pci_device *pci,
 	if ( ( rc = hermon_get_cap ( hermon ) ) != 0 )
 		goto err_get_cap;
 
+	/* Allocate Infiniband devices */
+	for ( i = 0 ; i < hermon->cap.num_ports ; i++ ) {
+	        ibdev = alloc_ibdev ( 0 );
+		if ( ! ibdev ) {
+			rc = -ENOMEM;
+			goto err_alloc_ibdev;
+		}
+		hermon->ibdev[i] = ibdev;
+		ibdev->op = &hermon_ib_operations;
+		ibdev->dev = &pci->dev;
+		ibdev->port = ( HERMON_PORT_BASE + i );
+		ib_set_drvdata ( ibdev, hermon );
+	}
+
 	/* Allocate ICM */
 	memset ( &init_hca, 0, sizeof ( init_hca ) );
 	if ( ( rc = hermon_alloc_icm ( hermon, &init_hca ) ) != 0 )
@@ -2552,7 +2612,7 @@ static int hermon_probe ( struct pci_device *pci,
 	/* Set up memory protection */
 	if ( ( rc = hermon_setup_mpt ( hermon ) ) != 0 )
 		goto err_setup_mpt;
-	for ( i = 0 ; i < HERMON_NUM_PORTS ; i++ )
+	for ( i = 0 ; i < hermon->cap.num_ports ; i++ )
 		hermon->ibdev[i]->rdma_key = hermon->lkey;
 
 	/* Set up event queue */
@@ -2563,12 +2623,13 @@ static int hermon_probe ( struct pci_device *pci,
 	if ( ( rc = hermon_configure_special_qps ( hermon ) ) != 0 )
 		goto err_conf_special_qps;
 
-	/* Update MAD parameters */
-	for ( i = 0 ; i < HERMON_NUM_PORTS ; i++ )
+	/* Update IPoIB MAC address */
+	for ( i = 0 ; i < hermon->cap.num_ports ; i++ ) {
 		ib_smc_update ( hermon->ibdev[i], hermon_mad );
+	}
 
 	/* Register Infiniband devices */
-	for ( i = 0 ; i < HERMON_NUM_PORTS ; i++ ) {
+	for ( i = 0 ; i < hermon->cap.num_ports ; i++ ) {
 		if ( ( rc = register_ibdev ( hermon->ibdev[i] ) ) != 0 ) {
 			DBGC ( hermon, "Hermon %p could not register IB "
 			       "device: %s\n", hermon, strerror ( rc ) );
@@ -2578,9 +2639,9 @@ static int hermon_probe ( struct pci_device *pci,
 
 	return 0;
 
-	i = HERMON_NUM_PORTS;
+	i = hermon->cap.num_ports;
  err_register_ibdev:
-	for ( i-- ; i >= 0 ; i-- )
+	for ( i-- ; ( signed int ) i >= 0 ; i-- )
 		unregister_ibdev ( hermon->ibdev[i] );
  err_conf_special_qps:
 	hermon_destroy_eq ( hermon );
@@ -2590,6 +2651,10 @@ static int hermon_probe ( struct pci_device *pci,
  err_init_hca:
 	hermon_free_icm ( hermon );
  err_alloc_icm:
+	i = hermon->cap.num_ports;
+ err_alloc_ibdev:
+	for ( i-- ; ( signed int ) i >= 0 ; i-- )
+		ibdev_put ( hermon->ibdev[i] );
  err_get_cap:
 	hermon_stop_firmware ( hermon );
  err_start_firmware:
@@ -2597,10 +2662,6 @@ static int hermon_probe ( struct pci_device *pci,
  err_mailbox_out:
 	free_dma ( hermon->mailbox_in, HERMON_MBOX_SIZE );
  err_mailbox_in:
-	i = HERMON_NUM_PORTS;
- err_alloc_ibdev:
-	for ( i-- ; i >= 0 ; i-- )
-		ibdev_put ( hermon->ibdev[i] );
 	free ( hermon );
  err_alloc_hermon:
 	return rc;
@@ -2615,7 +2676,7 @@ static void hermon_remove ( struct pci_device *pci ) {
 	struct hermon *hermon = pci_get_drvdata ( pci );
 	int i;
 
-	for ( i = ( HERMON_NUM_PORTS - 1 ) ; i >= 0 ; i-- )
+	for ( i = ( hermon->cap.num_ports - 1 ) ; i >= 0 ; i-- )
 		unregister_ibdev ( hermon->ibdev[i] );
 	hermon_destroy_eq ( hermon );
 	hermon_cmd_close_hca ( hermon );
@@ -2624,7 +2685,7 @@ static void hermon_remove ( struct pci_device *pci ) {
 	hermon_stop_firmware ( hermon );
 	free_dma ( hermon->mailbox_out, HERMON_MBOX_SIZE );
 	free_dma ( hermon->mailbox_in, HERMON_MBOX_SIZE );
-	for ( i = ( HERMON_NUM_PORTS - 1 ) ; i >= 0 ; i-- )
+	for ( i = ( hermon->cap.num_ports - 1 ) ; i >= 0 ; i-- )
 		ibdev_put ( hermon->ibdev[i] );
 	free ( hermon );
 }
