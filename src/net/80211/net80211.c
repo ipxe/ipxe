@@ -1521,8 +1521,7 @@ net80211_probe_finish_best ( struct net80211_probe_ctx *ctx )
 		DBGC ( ctx->dev, "802.11 %p probe: found nothing for '%s'\n",
 		       ctx->dev, ctx->essid );
 
-	if ( ! list_empty ( ctx->beacons ) )
-		net80211_free_wlanlist ( ctx->beacons );
+	net80211_free_wlanlist ( ctx->beacons );
 
 	net80211_keep_mgmt ( ctx->dev, ctx->old_keep_mgmt );
 
