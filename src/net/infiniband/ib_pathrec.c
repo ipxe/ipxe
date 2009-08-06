@@ -19,11 +19,12 @@
 FILE_LICENCE ( GPL2_OR_LATER );
 
 #include <stdint.h>
+#include <stdlib.h>
 #include <string.h>
 #include <byteswap.h>
 #include <errno.h>
 #include <gpxe/infiniband.h>
-#include <gpxe/ib_gma.h>
+#include <gpxe/ib_mi.h>
 #include <gpxe/ib_pathrec.h>
 
 /** @file
@@ -32,56 +33,162 @@ FILE_LICENCE ( GPL2_OR_LATER );
  *
  */
 
-/** Number of path record cache entries
+/**
+ * Handle path transaction completion
+ *
+ * @v ibdev		Infiniband device
+ * @v mi		Management interface
+ * @v madx		Management transaction
+ * @v rc		Status code
+ * @v mad		Received MAD (or NULL on error)
+ * @v av		Source address vector (or NULL on error)
+ */
+static void ib_path_complete ( struct ib_device *ibdev,
+			       struct ib_mad_interface *mi,
+			       struct ib_mad_transaction *madx,
+			       int rc, union ib_mad *mad,
+			       struct ib_address_vector *av __unused ) {
+	struct ib_path *path = ib_madx_get_ownerdata ( madx );
+	struct ib_gid *dgid = &path->av.gid;
+	struct ib_path_record *pathrec = &mad->sa.sa_data.path_record;
+
+	/* Report failures */
+	if ( rc != 0 ) {
+		DBGC ( ibdev, "IBDEV %p path lookup for %08x:%08x:%08x:%08x "
+		       "failed: %s\n", ibdev, htonl ( dgid->u.dwords[0] ),
+		       htonl ( dgid->u.dwords[1] ),
+		       htonl ( dgid->u.dwords[2] ),
+		       htonl ( dgid->u.dwords[3] ), strerror ( rc ) );
+		goto out;
+	}
+
+	/* Extract values from MAD */
+	path->av.lid = ntohs ( pathrec->dlid );
+	path->av.sl = ( pathrec->reserved__sl & 0x0f );
+	path->av.rate = ( pathrec->rate_selector__rate & 0x3f );
+	DBGC ( ibdev, "IBDEV %p path to %08x:%08x:%08x:%08x is %04x sl %d "
+	       "rate %d\n", ibdev, htonl ( dgid->u.dwords[0] ),
+	       htonl ( dgid->u.dwords[1] ), htonl ( dgid->u.dwords[2] ),
+	       htonl ( dgid->u.dwords[3] ), path->av.lid, path->av.sl,
+	       path->av.rate );
+
+ out:
+	/* Destroy the completed transaction */
+	ib_destroy_madx ( ibdev, mi, madx );
+	path->madx = NULL;
+
+	/* Hand off to upper completion handler */
+	path->op->complete ( ibdev, path, rc, &path->av );
+}
+
+/** Path transaction completion operations */
+static struct ib_mad_transaction_operations ib_path_op = {
+	.complete = ib_path_complete,
+};
+
+/**
+ * Create path
+ *
+ * @v ibdev		Infiniband device
+ * @v av		Address vector to complete
+ * @v op		Path operations
+ * @ret path		Path
+ */
+struct ib_path *
+ib_create_path ( struct ib_device *ibdev, struct ib_address_vector *av,
+		 struct ib_path_operations *op ) {
+	struct ib_path *path;
+	union ib_mad mad;
+	struct ib_mad_sa *sa = &mad.sa;
+
+	/* Allocate and initialise structure */
+	path = zalloc ( sizeof ( *path ) );
+	if ( ! path )
+		goto err_alloc_path;
+	path->ibdev = ibdev;
+	memcpy ( &path->av, av, sizeof ( path->av ) );
+	path->op = op;
+
+	/* Construct path request */
+	memset ( sa, 0, sizeof ( *sa ) );
+	sa->mad_hdr.mgmt_class = IB_MGMT_CLASS_SUBN_ADM;
+	sa->mad_hdr.class_version = IB_SA_CLASS_VERSION;
+	sa->mad_hdr.method = IB_MGMT_METHOD_GET;
+	sa->mad_hdr.attr_id = htons ( IB_SA_ATTR_PATH_REC );
+	sa->sa_hdr.comp_mask[1] =
+		htonl ( IB_SA_PATH_REC_DGID | IB_SA_PATH_REC_SGID );
+	memcpy ( &sa->sa_data.path_record.dgid, &path->av.gid,
+		 sizeof ( sa->sa_data.path_record.dgid ) );
+	memcpy ( &sa->sa_data.path_record.sgid, &ibdev->gid,
+		 sizeof ( sa->sa_data.path_record.sgid ) );
+
+	/* Create management transaction */
+	path->madx = ib_create_madx ( ibdev, ibdev->gsi, &mad, NULL,
+				      &ib_path_op );
+	if ( ! path->madx )
+		goto err_create_madx;
+	ib_madx_set_ownerdata ( path->madx, path );
+
+	return path;
+
+	ib_destroy_madx ( ibdev, ibdev->gsi, path->madx );
+ err_create_madx:
+	free ( path );
+ err_alloc_path:
+	return NULL;
+}
+
+/**
+ * Destroy path
+ *
+ * @v ibdev		Infiniband device
+ * @v path		Path
+ */
+void ib_destroy_path ( struct ib_device *ibdev, struct ib_path *path ) {
+
+	if ( path->madx )
+		ib_destroy_madx ( ibdev, ibdev->gsi, path->madx );
+	free ( path );
+}
+
+/** Number of path cache entries
  *
  * Must be a power of two.
  */
 #define IB_NUM_CACHED_PATHS 4
 
-/** A path record cache entry */
-struct ib_cached_path_record {
-	/** Infiniband device's port GID
-	 *
-	 * Used to disambiguate cache entries when we have multiple
-	 * Infiniband devices, without having to maintain a pointer to
-	 * the Infiniband device.
-	 */
-	struct ib_gid sgid;
-	/** Destination GID */
-	struct ib_gid dgid;
-	/** Destination LID */
-	unsigned int dlid;
-	/** Rate */
-	unsigned int rate;
-	/** Service level */
-	unsigned int sl;
+/** A cached path */
+struct ib_cached_path {
+	/** Path */
+	struct ib_path *path;
 };
 
-/** Path record cache */
-static struct ib_cached_path_record ib_path_cache[IB_NUM_CACHED_PATHS];
+/** Path cache */
+static struct ib_cached_path ib_path_cache[IB_NUM_CACHED_PATHS];
 
-/** Oldest path record cache entry index */
+/** Oldest path cache entry index */
 static unsigned int ib_path_cache_idx;
 
 /**
- * Find path record cache entry
+ * Find path cache entry
  *
  * @v ibdev		Infiniband device
  * @v dgid		Destination GID
- * @ret cached		Path record cache entry, or NULL
+ * @ret path		Path cache entry, or NULL
  */
-static struct ib_cached_path_record *
+static struct ib_cached_path *
 ib_find_path_cache_entry ( struct ib_device *ibdev, struct ib_gid *dgid ) {
-	struct ib_cached_path_record *cached;
+	struct ib_cached_path *cached;
 	unsigned int i;
 
 	for ( i = 0 ; i < IB_NUM_CACHED_PATHS ; i++ ) {
 		cached = &ib_path_cache[i];
-		if ( memcmp ( &cached->sgid, &ibdev->gid,
-			      sizeof ( cached->sgid ) ) != 0 )
+		if ( ! cached->path )
 			continue;
-		if ( memcmp ( &cached->dgid, dgid,
-			      sizeof ( cached->dgid ) ) != 0 )
+		if ( cached->path->ibdev != ibdev )
+			continue;
+		if ( memcmp ( &cached->path->av.gid, dgid,
+			      sizeof ( cached->path->av.gid ) ) != 0 )
 			continue;
 		return cached;
 	}
@@ -90,134 +197,98 @@ ib_find_path_cache_entry ( struct ib_device *ibdev, struct ib_gid *dgid ) {
 }
 
 /**
- * Resolve path record
+ * Handle cached path transaction completion
+ *
+ * @v ibdev		Infiniband device
+ * @v path		Path
+ * @v rc		Status code
+ * @v av		Address vector, or NULL on error
+ */
+static void ib_cached_path_complete ( struct ib_device *ibdev,
+				      struct ib_path *path, int rc,
+				      struct ib_address_vector *av __unused ) {
+	struct ib_cached_path *cached = ib_path_get_ownerdata ( path );
+
+	/* If the transaction failed, erase the cache entry */
+	if ( rc != 0 ) {
+		/* Destroy the old cache entry */
+		ib_destroy_path ( ibdev, path );
+		memset ( cached, 0, sizeof ( *cached ) );
+		return;
+	}
+
+	/* Do not destroy the completed transaction; we still need to
+	 * refer to the resolved path.
+	 */
+}
+
+/** Cached path transaction completion operations */
+static struct ib_path_operations ib_cached_path_op = {
+	.complete = ib_cached_path_complete,
+};
+
+/**
+ * Resolve path
  *
  * @v ibdev		Infiniband device
  * @v av		Address vector to complete
  * @ret rc		Return status code
+ *
+ * This provides a non-transactional way to resolve a path, via a
+ * cache similar to ARP.
  */
-int ib_resolve_path ( struct ib_device *ibdev,
-		      struct ib_address_vector *av ) {
-	struct ib_gma *gma = ibdev->gma;
+int ib_resolve_path ( struct ib_device *ibdev, struct ib_address_vector *av ) {
 	struct ib_gid *gid = &av->gid;
-	struct ib_cached_path_record *cached;
-	union ib_mad mad;
-	struct ib_mad_sa *sa = &mad.sa;
+	struct ib_cached_path *cached;
 	unsigned int cache_idx;
-	int rc;
 
 	/* Sanity check */
 	if ( ! av->gid_present ) {
-		DBGC ( gma, "GMA %p attempt to look up path record "
-		       "without GID\n", gma );
+		DBGC ( ibdev, "IBDEV %p attempt to look up path "
+		       "without GID\n", ibdev );
 		return -EINVAL;
 	}
 
 	/* Look in cache for a matching entry */
 	cached = ib_find_path_cache_entry ( ibdev, gid );
-	if ( cached && cached->dlid ) {
+	if ( cached && cached->path->av.lid ) {
 		/* Populated entry found */
-		av->lid = cached->dlid;
-		av->rate = cached->rate;
-		av->sl = cached->sl;
-		DBGC2 ( gma, "GMA %p cache hit for %08x:%08x:%08x:%08x\n",
-			gma, htonl ( gid->u.dwords[0] ),
+		av->lid = cached->path->av.lid;
+		av->rate = cached->path->av.rate;
+		av->sl = cached->path->av.sl;
+		DBGC2 ( ibdev, "IBDEV %p cache hit for %08x:%08x:%08x:%08x\n",
+			ibdev, htonl ( gid->u.dwords[0] ),
 			htonl ( gid->u.dwords[1] ), htonl ( gid->u.dwords[2] ),
 			htonl ( gid->u.dwords[3] ) );
 		return 0;
 	}
-	DBGC ( gma, "GMA %p cache miss for %08x:%08x:%08x:%08x%s\n", gma,
-	       htonl ( gid->u.dwords[0] ), htonl ( gid->u.dwords[1] ),
+	DBGC ( ibdev, "IBDEV %p cache miss for %08x:%08x:%08x:%08x%s\n",
+	       ibdev, htonl ( gid->u.dwords[0] ), htonl ( gid->u.dwords[1] ),
 	       htonl ( gid->u.dwords[2] ), htonl ( gid->u.dwords[3] ),
 	       ( cached ? " (in progress)" : "" ) );
 
-	/* If no unresolved entry was found, then create a new one */
-	if ( ! cached ) {
-		cache_idx = ( (ib_path_cache_idx++) % IB_NUM_CACHED_PATHS );
-		cached = &ib_path_cache[cache_idx];
-		memset ( cached, 0, sizeof ( *cached ) );
-		memcpy ( &cached->sgid, &ibdev->gid, sizeof ( cached->sgid ) );
-		memcpy ( &cached->dgid, gid, sizeof ( cached->dgid ) );
-	}
+	/* If lookup is already in progress, do nothing */
+	if ( cached )
+		return -ENOENT;
 
-	/* Construct path record request */
-	memset ( sa, 0, sizeof ( *sa ) );
-	sa->mad_hdr.base_version = IB_MGMT_BASE_VERSION;
-	sa->mad_hdr.mgmt_class = IB_MGMT_CLASS_SUBN_ADM;
-	sa->mad_hdr.class_version = IB_SA_CLASS_VERSION;
-	sa->mad_hdr.method = IB_MGMT_METHOD_GET;
-	sa->mad_hdr.attr_id = htons ( IB_SA_ATTR_PATH_REC );
-	sa->sa_hdr.comp_mask[1] =
-		htonl ( IB_SA_PATH_REC_DGID | IB_SA_PATH_REC_SGID );
-	memcpy ( &sa->sa_data.path_record.dgid, &cached->dgid,
-		 sizeof ( sa->sa_data.path_record.dgid ) );
-	memcpy ( &sa->sa_data.path_record.sgid, &cached->sgid,
-		 sizeof ( sa->sa_data.path_record.sgid ) );
+	/* Locate a new cache entry to use */
+	cache_idx = ( (ib_path_cache_idx++) % IB_NUM_CACHED_PATHS );
+	cached = &ib_path_cache[cache_idx];
 
-	/* Issue path record request */
-	if ( ( rc = ib_gma_request ( gma, &mad, NULL, 1 ) ) != 0 ) {
-		DBGC ( gma, "GMA %p could not get path record: %s\n",
-		       gma, strerror ( rc ) );
-		return rc;
+	/* Destroy the old cache entry */
+	if ( cached->path )
+		ib_destroy_path ( ibdev, cached->path );
+	memset ( cached, 0, sizeof ( *cached ) );
+
+	/* Create new path */
+	cached->path = ib_create_path ( ibdev, av, &ib_cached_path_op );
+	if ( ! cached->path ) {
+		DBGC ( ibdev, "IBDEV %p could not create path\n",
+		       ibdev );
+		return -ENOMEM;
 	}
+	ib_path_set_ownerdata ( cached->path, cached );
 
 	/* Not found yet */
 	return -ENOENT;
 }
-
-/**
- * Handle path record response
- *
- * @v gma		General management agent
- * @v mad		MAD
- * @ret response	MAD response
- */
-static union ib_mad * ib_handle_path_record ( struct ib_gma *gma,
-					      union ib_mad *mad ) {
-	struct ib_device *ibdev = gma->ibdev;
-	struct ib_path_record *path_record = &mad->sa.sa_data.path_record;
-	struct ib_gid *dgid = &path_record->dgid;
-	struct ib_cached_path_record *cached;
-	unsigned int dlid;
-	unsigned int sl;
-	unsigned int rate;
-
-	/* Ignore if not a success */
-	if ( mad->hdr.status != htons ( IB_MGMT_STATUS_OK ) ) {
-		DBGC ( gma, "GMA %p path record lookup failed with status "
-		       "%04x\n", gma, ntohs ( mad->hdr.status ) );
-		return NULL;
-	}
-
-	/* Extract values from MAD */
-	dlid = ntohs ( path_record->dlid );
-	sl = ( path_record->reserved__sl & 0x0f );
-	rate = ( path_record->rate_selector__rate & 0x3f );
-	DBGC ( gma, "GMA %p path to %08x:%08x:%08x:%08x is %04x sl %d "
-	       "rate %d\n", gma, htonl ( dgid->u.dwords[0] ),
-	       htonl ( dgid->u.dwords[1] ), htonl ( dgid->u.dwords[2] ),
-	       htonl ( dgid->u.dwords[3] ), dlid, sl, rate );
-
-	/* Look for a matching cache entry to fill in */
-	if ( ( cached = ib_find_path_cache_entry ( ibdev, dgid ) ) != NULL ) {
-		DBGC ( gma, "GMA %p cache add for %08x:%08x:%08x:%08x\n",
-		       gma, htonl ( dgid->u.dwords[0] ),
-		       htonl ( dgid->u.dwords[1] ),
-		       htonl ( dgid->u.dwords[2] ),
-		       htonl ( dgid->u.dwords[3] ) );
-		cached->dlid = dlid;
-		cached->rate = rate;
-		cached->sl = sl;
-	}
-
-	return NULL;
-}
-
-/** Path record response handler */
-struct ib_gma_handler ib_path_record_handler __ib_gma_handler = {
-	.mgmt_class = IB_MGMT_CLASS_SUBN_ADM,
-	.class_version = IB_SA_CLASS_VERSION,
-	.method = IB_MGMT_METHOD_GET_RESP,
-	.attr_id = htons ( IB_SA_ATTR_PATH_REC ),
-	.handle = ib_handle_path_record,
-};

@@ -58,12 +58,14 @@ struct ipoib_device {
 	struct ib_queue_pair *qp;
 	/** Broadcast MAC */
 	struct ipoib_mac broadcast;
-	/** Joined to multicast group
+	/** Joined to IPv4 broadcast multicast group
 	 *
 	 * This flag indicates whether or not we have initiated the
-	 * join to the IPv4 multicast group.
+	 * join to the IPv4 broadcast multicast group.
 	 */
 	int broadcast_joined;
+	/** IPv4 broadcast multicast group membership */
+	struct ib_mc_membership broadcast_membership;
 };
 
 /** Broadcast IPoIB address */
@@ -457,6 +459,26 @@ static void ipoib_irq ( struct net_device *netdev __unused,
 }
 
 /**
+ * Handle IPv4 broadcast multicast group join completion
+ *
+ * @v ibdev		Infiniband device
+ * @v qp		Queue pair
+ * @v membership	Multicast group membership
+ * @v rc		Status code
+ * @v mad		Response MAD (or NULL on error)
+ */
+void ipoib_join_complete ( struct ib_device *ibdev __unused,
+			   struct ib_queue_pair *qp __unused,
+			   struct ib_mc_membership *membership, int rc,
+			   union ib_mad *mad __unused ) {
+	struct ipoib_device *ipoib = container_of ( membership,
+				   struct ipoib_device, broadcast_membership );
+
+	/* Record join status as link status */
+	netdev_link_err ( ipoib->netdev, rc );
+}
+
+/**
  * Join IPv4 broadcast multicast group
  *
  * @v ipoib		IPoIB device
@@ -466,7 +488,9 @@ static int ipoib_join_broadcast_group ( struct ipoib_device *ipoib ) {
 	int rc;
 
 	if ( ( rc = ib_mcast_join ( ipoib->ibdev, ipoib->qp,
-				    &ipoib->broadcast.gid ) ) != 0 ) {
+				    &ipoib->broadcast_membership,
+				    &ipoib->broadcast.gid,
+				    ipoib_join_complete ) ) != 0 ) {
 		DBGC ( ipoib, "IPoIB %p could not join broadcast group: %s\n",
 		       ipoib, strerror ( rc ) );
 		return rc;
@@ -485,7 +509,7 @@ static void ipoib_leave_broadcast_group ( struct ipoib_device *ipoib ) {
 
 	if ( ipoib->broadcast_joined ) {
 		ib_mcast_leave ( ipoib->ibdev, ipoib->qp,
-				 &ipoib->broadcast.gid );
+				 &ipoib->broadcast_membership );
 		ipoib->broadcast_joined = 0;
 	}
 }

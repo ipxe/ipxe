@@ -303,6 +303,16 @@ union ib_sa_data {
 #define IB_CM_ATTR_LOAD_ALTERNATE_PATH		0x0019
 #define IB_CM_ATTR_ALTERNATE_PATH_RESPONSE	0x001a
 
+/** Communication management common fields */
+struct ib_cm_common {
+	/** Local communication ID */
+	uint32_t local_id;
+	/** Remote communication ID */
+	uint32_t remote_id;
+	/** Reserved */
+	uint8_t reserved[224];
+} __attribute__ (( packed ));
+
 /** A communication management path */
 struct ib_cm_path {
 	/** Local port LID */
@@ -438,6 +448,7 @@ struct ib_cm_ready_to_use {
 
 /** A communication management attribute */
 union ib_cm_data {
+	struct ib_cm_common common;
 	struct ib_cm_connect_request connect_request;
 	struct ib_cm_connect_reject connect_reject;
 	struct ib_cm_connect_reply connect_reply;

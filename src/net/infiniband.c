@@ -35,7 +35,6 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #include <gpxe/infiniband.h>
 #include <gpxe/ib_mi.h>
 #include <gpxe/ib_sma.h>
-#include <gpxe/ib_gma.h>
 
 /** @file
  *
@@ -551,12 +550,12 @@ int ib_open ( struct ib_device *ibdev ) {
 		goto err_create_sma;
 	}
 
-	/* Create general management agent */
-	ibdev->gma = ib_create_gma ( ibdev, IB_QPT_GSI );
-	if ( ! ibdev->gma ) {
-		DBGC ( ibdev, "IBDEV %p could not create GMA\n", ibdev );
+	/* Create general services interface */
+	ibdev->gsi = ib_create_mi ( ibdev, IB_QPT_GSI );
+	if ( ! ibdev->gsi ) {
+		DBGC ( ibdev, "IBDEV %p could not create GSI\n", ibdev );
 		rc = -ENOMEM;
-		goto err_create_gma;
+		goto err_create_gsi;
 	}
 
 	/* Open device */
@@ -571,8 +570,8 @@ int ib_open ( struct ib_device *ibdev ) {
 
 	ibdev->op->close ( ibdev );
  err_open:
-	ib_destroy_gma ( ibdev->gma );
- err_create_gma:
+	ib_destroy_mi ( ibdev, ibdev->gsi );
+ err_create_gsi:
 	ib_destroy_sma ( ibdev, ibdev->smi );
  err_create_sma:
 	ib_destroy_mi ( ibdev, ibdev->smi );
@@ -594,7 +593,7 @@ void ib_close ( struct ib_device *ibdev ) {
 
 	/* Close device if this was the last remaining requested opening */
 	if ( ibdev->open_count == 0 ) {
-		ib_destroy_gma ( ibdev->gma );
+		ib_destroy_mi ( ibdev, ibdev->gsi );
 		ib_destroy_sma ( ibdev, ibdev->smi );
 		ib_destroy_mi ( ibdev, ibdev->smi );
 		ibdev->op->close ( ibdev );

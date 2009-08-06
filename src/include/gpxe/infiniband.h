@@ -46,7 +46,6 @@ struct ib_queue_pair;
 struct ib_address_vector;
 struct ib_completion_queue;
 struct ib_mad_interface;
-struct ib_gma;
 
 /** Infiniband transmission rates */
 enum ib_rate {
@@ -416,8 +415,8 @@ struct ib_device {
 
 	/** Subnet management interface */
 	struct ib_mad_interface *smi;
-	/** General management agent */
-	struct ib_gma *gma;
+	/** General services interface */
+	struct ib_mad_interface *gsi;
 
 	/** Driver private data */
 	void *drv_priv;
