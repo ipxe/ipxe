@@ -154,7 +154,6 @@ static void net80211_netdev_irq ( struct net_device *netdev, int enable );
  * @defgroup net80211_linklayer 802.11 link-layer protocol functions
  * @{
  */
-static u16 net80211_duration ( struct net80211_device *dev, int bytes );
 static int net80211_ll_push ( struct net_device *netdev,
 			      struct io_buffer *iobuf, const void *ll_dest,
 			      const void *ll_source, uint16_t net_proto );
@@ -171,6 +170,7 @@ static int net80211_ll_mc_hash ( unsigned int af, const void *net_addr,
  */
 static void net80211_add_channels ( struct net80211_device *dev, int start,
 				    int len, int txpower );
+static void net80211_filter_hw_channels ( struct net80211_device *dev );
 static void net80211_set_rtscts_rate ( struct net80211_device *dev );
 static int net80211_process_capab ( struct net80211_device *dev,
 				    u16 capab );
@@ -430,10 +430,9 @@ static inline int net80211_rate_is_erp ( u16 rate )
  *
  * No other frame types are currently supported by gPXE.
  */
-static u16 net80211_duration ( struct net80211_device *dev, int bytes )
+u16 net80211_duration ( struct net80211_device *dev, int bytes, u16 rate )
 {
 	struct net80211_channel *chan = &dev->channels[dev->channel];
-	u16 rate = dev->rates[dev->rate];
 	u32 kbps = rate * 100;
 
 	if ( chan->band == NET80211_BAND_5GHZ || net80211_rate_is_erp ( rate ) ) {
@@ -496,7 +495,7 @@ static int net80211_ll_push ( struct net_device *netdev,
 
 	/* We don't send fragmented frames, so duration is the time
 	   for an SIFS + 10-byte ACK. */
-	hdr->duration = net80211_duration ( dev, 10 );
+	hdr->duration = net80211_duration ( dev, 10, dev->rates[dev->rate] );
 
 	memcpy ( hdr->addr1, dev->bssid, ETH_ALEN );
 	memcpy ( hdr->addr2, ll_source, ETH_ALEN );
@@ -712,7 +711,7 @@ int net80211_tx_mgmt ( struct net80211_device *dev, u16 fc, u8 dest[6],
 
 	hdr->fc = IEEE80211_THIS_VERSION | IEEE80211_TYPE_MGMT |
 	    ( fc & ~IEEE80211_FC_PROTECTED );
-	hdr->duration = net80211_duration ( dev, 10 );
+	hdr->duration = net80211_duration ( dev, 10, dev->rates[dev->rate] );
 	hdr->seq = IEEE80211_MAKESEQ ( ++dev->last_tx_seqnr, 0 );
 
 	memcpy ( hdr->addr1, dest, ETH_ALEN );	/* DA = RA */
@@ -908,6 +907,7 @@ static void net80211_add_channels ( struct net80211_device *dev, int start,
 	for ( i = dev->nr_channels; len-- && i < NET80211_MAX_CHANNELS; i++ ) {
 		dev->channels[i].channel_nr = chan;
 		dev->channels[i].maxpower = txpower;
+		dev->channels[i].hw_value = 0;
 
 		if ( chan >= 1 && chan <= 14 ) {
 			dev->channels[i].band = NET80211_BAND_2GHZ;
@@ -924,6 +924,65 @@ static void net80211_add_channels ( struct net80211_device *dev, int start,
 	}
 
 	dev->nr_channels = i;
+}
+
+/**
+ * Filter 802.11 device channels for hardware capabilities
+ *
+ * @v dev	802.11 device
+ *
+ * Hardware may support fewer channels than regulatory restrictions
+ * allow; this function filters out channels in dev->channels that are
+ * not supported by the hardware list in dev->hwinfo. It also copies
+ * over the net80211_channel::hw_value and limits maximum TX power
+ * appropriately.
+ *
+ * Channels are matched based on center frequency, ignoring band and
+ * channel number.
+ *
+ * If the driver specifies no supported channels, the effect will be
+ * as though all were supported.
+ */
+static void net80211_filter_hw_channels ( struct net80211_device *dev )
+{
+	int delta = 0, i = 0;
+	int old_freq = dev->channels[dev->channel].center_freq;
+	struct net80211_channel *chan, *hwchan;
+
+	if ( ! dev->hw->nr_channels )
+		return;
+
+	dev->channel = 0;
+	for ( chan = dev->channels; chan < dev->channels + dev->nr_channels;
+	      chan++, i++ ) {
+		int ok = 0;
+		for ( hwchan = dev->hw->channels;
+		      hwchan < dev->hw->channels + dev->hw->nr_channels;
+		      hwchan++ ) {
+			if ( hwchan->center_freq == chan->center_freq ) {
+				ok = 1;
+				break;
+			}
+		}
+
+		if ( ! ok )
+			delta++;
+		else {
+			chan->hw_value = hwchan->hw_value;
+			if ( hwchan->maxpower != 0 &&
+			     chan->maxpower > hwchan->maxpower )
+				chan->maxpower = hwchan->maxpower;
+			if ( old_freq == chan->center_freq )
+				dev->channel = i - delta;
+			if ( delta )
+				chan[-delta] = *chan;
+		}
+	}
+
+	dev->nr_channels -= delta;
+
+	if ( dev->channels[dev->channel].center_freq != old_freq )
+		dev->op->config ( dev, NET80211_CFG_CHANNEL );
 }
 
 /**
@@ -981,6 +1040,7 @@ static int net80211_process_ie ( struct net80211_device *dev,
 	int have_rates = 0, i;
 	int ds_channel = 0;
 	int changed = 0;
+	int band = dev->channels[dev->channel].band;
 
 	if ( ( void * ) ie >= ie_end )
 		return 0;
@@ -1042,6 +1102,7 @@ static int net80211_process_ie ( struct net80211_device *dev,
 							t->band.max_txpower );
 				}
 			}
+			net80211_filter_hw_channels ( dev );
 			break;
 
 		case IEEE80211_IE_ERP_INFO:
@@ -1067,9 +1128,8 @@ static int net80211_process_ie ( struct net80211_device *dev,
 		dev->rate = 0;
 		for ( i = 0; i < dev->nr_rates; i++ ) {
 			int ok = 0;
-			for ( j = 0; j < dev->hw->nr_supported_rates; j++ ) {
-				if ( dev->hw->supported_rates[j] ==
-				     dev->rates[i] ) {
+			for ( j = 0; j < dev->hw->nr_rates[band]; j++ ) {
+				if ( dev->hw->rates[band][j] == dev->rates[i] ){
 					ok = 1;
 					break;
 				}
@@ -1597,7 +1657,7 @@ static void net80211_step_associate ( struct process *proc )
 			int band = dev->hw->bands;
 
 			if ( active )
-				band &= ~NET80211_BAND_5GHZ;
+				band &= ~NET80211_BAND_BIT_5GHZ;
 
 			rc = net80211_prepare_probe ( dev, band, active );
 			if ( rc )
@@ -1916,7 +1976,7 @@ int net80211_prepare_probe ( struct net80211_device *dev, int band,
 {
 	assert ( dev->netdev->state & NETDEV_OPEN );
 
-	if ( active && band != NET80211_BAND_2GHZ ) {
+	if ( active && ( band & NET80211_BAND_BIT_5GHZ ) ) {
 		DBGC ( dev, "802.11 %p cannot perform active scanning on "
 		       "5GHz band\n", dev );
 		return -EINVAL_ACTIVE_SCAN;
@@ -1935,22 +1995,24 @@ int net80211_prepare_probe ( struct net80211_device *dev, int band,
 	if ( active )
 		net80211_add_channels ( dev, 1, 11, NET80211_REG_TXPOWER );
 	else {
-		if ( band & NET80211_BAND_2GHZ )
+		if ( band & NET80211_BAND_BIT_2GHZ )
 			net80211_add_channels ( dev, 1, 14,
 						NET80211_REG_TXPOWER );
-		if ( band & NET80211_BAND_5GHZ )
+		if ( band & NET80211_BAND_BIT_5GHZ )
 			net80211_add_channels ( dev, 36, 8,
 						NET80211_REG_TXPOWER );
 	}
+
+	net80211_filter_hw_channels ( dev );
 
 	/* Use channel 1 for now */
 	dev->channel = 0;
 	dev->op->config ( dev, NET80211_CFG_CHANNEL );
 
-	/* Always do active probes at 1Mbps */
+	/* Always do active probes at lowest (presumably first) speed */
 	dev->rate = 0;
 	dev->nr_rates = 1;
-	dev->rates[0] = 10;
+	dev->rates[0] = dev->hw->rates[dev->channels[0].band][0];
 	dev->op->config ( dev, NET80211_CFG_RATE );
 
 	return 0;

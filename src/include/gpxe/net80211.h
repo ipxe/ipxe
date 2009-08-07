@@ -42,9 +42,16 @@ FILE_LICENCE ( GPL2_OR_LATER );
 /** @{ */
 
 /** The 2.4 GHz ISM band, unlicensed in most countries */
-#define NET80211_BAND_2GHZ	(1 << 0)
+#define NET80211_BAND_2GHZ	0
 /** The band from 4.9 GHz to 5.7 GHz, which tends to be more restricted */
-#define NET80211_BAND_5GHZ	(1 << 1)
+#define NET80211_BAND_5GHZ	1
+/** Number of RF bands */
+#define NET80211_NR_BANDS	2
+
+/** Bitmask for the 2GHz band */
+#define NET80211_BAND_BIT_2GHZ	(1 << 0)
+/** Bitmask for the 5GHz band */
+#define NET80211_BAND_BIT_5GHZ	(1 << 1)
 
 /** @} */
 
@@ -397,6 +404,9 @@ struct net80211_channel
 	 */
 	u16 center_freq;
 
+	/** Hardware channel value */
+	u16 hw_value;
+
 	/** Maximum allowable transmit power, in dBm
 	 *
 	 * This should be interpreted as EIRP, the power supplied to
@@ -478,15 +488,21 @@ struct net80211_hw_info
 	 */
 	unsigned signal_max;
 
-	/** List of transmission rates supported by the card
+	/** List of RF channels supported by the card */
+	struct net80211_channel channels[NET80211_MAX_CHANNELS];
+
+	/** Number of supported channels */
+	int nr_channels;
+
+	/** List of transmission rates supported by the card, indexed by band
 	 *
 	 * Rates should be in 100kbps increments (e.g. 11 Mbps would
 	 * be represented as the number 110).
 	 */
-	u16 supported_rates[NET80211_MAX_RATES];
+	u16 rates[NET80211_NR_BANDS][NET80211_MAX_RATES];
 
-	/** Number of supported rates */
-	int nr_supported_rates;
+	/** Number of supported rates, indexed by band */
+	int nr_rates[NET80211_NR_BANDS];
 
 	/** Estimate of the time required to change channels, in microseconds
 	 *
@@ -969,6 +985,7 @@ struct net80211_device *net80211_alloc ( size_t priv_size );
 int net80211_register ( struct net80211_device *dev,
 			struct net80211_device_operations *ops,
 			struct net80211_hw_info *hw );
+u16 net80211_duration ( struct net80211_device *dev, int bytes, u16 rate );
 void net80211_rx ( struct net80211_device *dev, struct io_buffer *iob,
 		   int signal, u16 rate );
 void net80211_rx_err ( struct net80211_device *dev,
@@ -979,5 +996,21 @@ void net80211_unregister ( struct net80211_device *dev );
 void net80211_free ( struct net80211_device *dev );
 /** @} */
 
+/**
+ * Calculate duration field for a CTS control frame
+ *
+ * @v dev	802.11 device
+ * @v size	Size of the packet being cleared to send
+ *
+ * A CTS control frame's duration field captures the frame being
+ * protected and its 10-byte ACK.
+ */
+static inline u16 net80211_cts_duration ( struct net80211_device *dev,
+					  int size )
+{
+	return ( net80211_duration ( dev, 10,
+				     dev->rates[dev->rtscts_rate] ) +
+		 net80211_duration ( dev, size, dev->rates[dev->rate] ) );
+}
 
 #endif

@@ -186,12 +186,15 @@ static int rtl818x_tx(struct net80211_device *dev, struct io_buffer *iob)
 			plcp_len |= 1 << 15;
 	}
 
+	entry = &priv->tx_ring[priv->tx_prod];
+
 	if (dev->phy_flags & NET80211_PHY_USE_PROTECTION) {
 		tx_flags |= RTL818X_TX_DESC_FLAG_CTS;
 		tx_flags |= priv->hw_rtscts_rate << 19;
+		entry->rts_duration = net80211_cts_duration(dev, len);
+	} else {
+		entry->rts_duration = 0;
 	}
-
-	entry = &priv->tx_ring[priv->tx_prod];
 
 	if (entry->flags & RTL818X_TX_DESC_FLAG_OWN) {
 		/* card hasn't processed the old packet yet! */
@@ -201,7 +204,6 @@ static int rtl818x_tx(struct net80211_device *dev, struct io_buffer *iob)
 	priv->tx_buf[priv->tx_prod] = iob;
 	priv->tx_prod = (priv->tx_prod + 1) % RTL818X_TX_RING_SIZE;
 
-	entry->rts_duration = 0;
 	entry->plcp_len = cpu_to_le16(plcp_len);
 	entry->tx_buf = cpu_to_le32(virt_to_bus(iob->data));
 	entry->frame_len = cpu_to_le32(len);
@@ -626,20 +628,7 @@ static struct bit_basher_operations rtl818x_basher_ops = {
 	.write = rtl818x_spi_write_bit,
 };
 
-/* The net80211 code makes a copy of this, so we're OK modifying the
-   static version as we initialize the card, as long as we don't
-   depend on possibly-modified values in case there are multiple cards. */
-static struct net80211_hw_info rtl818x_hwinfo = {
-	/* MAC address filled in at runtime */
-	/* modes filled in at runtime */
-	.bands = NET80211_BAND_2GHZ,
-	.flags = NET80211_HW_RX_HAS_FCS,
-	.signal_type = NET80211_SIGNAL_ARBITRARY,
-	/* supported rates filled in at runtime */
-	.signal_max = 65,
-	.channel_change_time = 1000, /* no idea what the actual value is */
-};
-
+#if DBGLVL_MAX
 static const char *rtl818x_rf_names[] = {
 	NULL,			/* no 0 */
 	"Intersil", "RFMD",	/* unsupported 1-2 */
@@ -649,6 +638,7 @@ static const char *rtl818x_rf_names[] = {
 	"RTL8255",		/* unsupported 10 */
 };
 #define RTL818X_NR_RF_NAMES 11
+#endif
 
 struct net80211_device_operations rtl818x_operations = {
 	.open = rtl818x_start,
@@ -669,6 +659,13 @@ static int rtl818x_probe(struct pci_device *pdev,
 	const char *chip_name;
 	u32 reg;
 	u16 eeprom_val;
+	struct net80211_hw_info *hwinfo;
+
+	hwinfo = zalloc(sizeof(*hwinfo));
+	if (!hwinfo) {
+		DBG("rtl818x: hwinfo alloc failed\n");
+		return -ENOMEM;
+	}
 
 	adjust_pci_device(pdev);
 
@@ -715,15 +712,21 @@ static int rtl818x_probe(struct pci_device *pdev,
 
 	priv->r8185 = reg & RTL818X_TX_CONF_R8185_ABC;
 
-	memcpy(rtl818x_hwinfo.supported_rates, rtl818x_rates,
+	hwinfo->bands = NET80211_BAND_BIT_2GHZ;
+	hwinfo->flags = NET80211_HW_RX_HAS_FCS;
+	hwinfo->signal_type = NET80211_SIGNAL_ARBITRARY;
+	hwinfo->signal_max = 65;
+	hwinfo->channel_change_time = 1000;
+
+	memcpy(hwinfo->rates[NET80211_BAND_2GHZ], rtl818x_rates,
 	       sizeof(*rtl818x_rates) * RTL818X_NR_RATES);
 
 	if (priv->r8185) {
-		rtl818x_hwinfo.modes = NET80211_MODE_B | NET80211_MODE_G;
-		rtl818x_hwinfo.nr_supported_rates = RTL818X_NR_RATES;
+		hwinfo->modes = NET80211_MODE_B | NET80211_MODE_G;
+		hwinfo->nr_rates[NET80211_BAND_2GHZ] = RTL818X_NR_RATES;
 	} else {
-		rtl818x_hwinfo.modes = NET80211_MODE_B;
-		rtl818x_hwinfo.nr_supported_rates = RTL818X_NR_B_RATES;
+		hwinfo->modes = NET80211_MODE_B;
+		hwinfo->nr_rates[NET80211_BAND_2GHZ] = RTL818X_NR_B_RATES;
 	}
 
 	priv->spibit.basher.op = &rtl818x_basher_ops;
@@ -755,6 +758,7 @@ static int rtl818x_probe(struct pci_device *pdev,
 	}
 
 	if (!priv->rf) {
+#if DBGLVL_MAX
 		if (eeprom_val < RTL818X_NR_RF_NAMES &&
 		    rtl818x_rf_names[eeprom_val] != NULL)
 			DBG("rtl818x: %s RF frontend not supported!\n",
@@ -762,6 +766,7 @@ static int rtl818x_probe(struct pci_device *pdev,
 		else
 			DBG("rtl818x: RF frontend #%d not recognized!\n",
 			    eeprom_val);
+#endif
 
 		err = -ENOSYS;
 		goto err_free_dev;
@@ -777,7 +782,7 @@ static int rtl818x_probe(struct pci_device *pdev,
 	}
 
 	/* read the MAC address */
-	nvs_read(&priv->eeprom.nvs, 0x7, rtl818x_hwinfo.hwaddr, 6);
+	nvs_read(&priv->eeprom.nvs, 0x7, hwinfo->hwaddr, 6);
 
 	/* CCK TX power */
 	for (i = 0; i < 14; i += 2) {
@@ -799,11 +804,13 @@ static int rtl818x_probe(struct pci_device *pdev,
 
 	rtl818x_iowrite8(priv, &priv->map->EEPROM_CMD, RTL818X_EEPROM_CMD_NORMAL);
 
-	err = net80211_register(dev, &rtl818x_operations, &rtl818x_hwinfo);
+	err = net80211_register(dev, &rtl818x_operations, hwinfo);
 	if (err) {
 		DBG("rtl818x: cannot register device\n");
 		goto err_free_dev;
 	}
+
+	free(hwinfo);
 
 	DBG("rtl818x: Realtek RTL818%s (RF chip %s) with address %s\n",
 	    chip_name, priv->rf->name, netdev_hwaddr(dev->netdev));
@@ -813,6 +820,7 @@ static int rtl818x_probe(struct pci_device *pdev,
  err_free_dev:
 	pci_set_drvdata(pdev, NULL);
 	net80211_free(dev);
+	free(hwinfo);
 	return err;
 }
 
