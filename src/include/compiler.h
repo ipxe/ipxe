@@ -501,6 +501,16 @@ int __debug_disable;
 #define FILE_LICENCE_BSD2 \
 	PROVIDE_SYMBOL ( __licence_bsd2 )
 
+/** Declare a file as being under the one-clause MIT-style licence
+ *
+ * This licence declaration is applicable when a file states itself to
+ * be licensed under terms allowing redistribution for any purpose
+ * with or without fee, provided that the copyright notice and
+ * permission notice appear in all copies.
+ */
+#define FILE_LICENCE_MIT \
+	PROVIDE_SYMBOL ( __licence_mit )
+
 /** Declare a particular licence as applying to a file */
 #define FILE_LICENCE( _licence ) FILE_LICENCE_ ## _licence
 
