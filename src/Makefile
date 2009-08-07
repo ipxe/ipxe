@@ -62,6 +62,7 @@ SRCDIRS		+= drivers/net
 SRCDIRS		+= drivers/net/e1000
 SRCDIRS		+= drivers/net/phantom
 SRCDIRS		+= drivers/net/rtl818x
+SRCDIRS		+= drivers/net/ath5k
 SRCDIRS		+= drivers/block
 SRCDIRS		+= drivers/nvs
 SRCDIRS		+= drivers/bitbash
