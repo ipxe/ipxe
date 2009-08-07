@@ -10,6 +10,24 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #include <config/general.h>
 #include <config/console.h>
 
+/** @file
+ *
+ * Configuration options
+ *
+ * This file contains macros that pull various objects into the link
+ * based on definitions in configuration header files. Ideally it
+ * should be the only place in gPXE where one might need to use #ifdef
+ * for compile-time options.
+ *
+ * In the fairly common case where an object should only be considered
+ * for inclusion if the subsystem it depends on is present, its
+ * configuration macros should be placed in a file named
+ * <tt>config_<i>subsystem</i>.c</tt>, where @e subsystem is the
+ * object basename of the main source file for that subsystem. The
+ * build system will pull in that file if @c subsystem.c is included
+ * in the final gPXE executable built.
+ */
+
 /*
  * Build ID string calculations
  *

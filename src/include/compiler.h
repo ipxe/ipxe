@@ -159,9 +159,14 @@
 
 #define PREFIX_OBJECT( _prefix ) _C2 ( _prefix, OBJECT )
 #define OBJECT_SYMBOL PREFIX_OBJECT ( obj_ )
+#define REQUEST_EXPANDED( _sym ) REQUEST_SYMBOL ( _sym )
+#define CONFIG_SYMBOL PREFIX_OBJECT ( obj_config_ )
 
 /** Always provide the symbol for the current object (defined by -DOBJECT) */
 PROVIDE_SYMBOL ( OBJECT_SYMBOL );
+
+/** Pull in an object-specific configuration file if available */
+REQUEST_EXPANDED ( CONFIG_SYMBOL );
 
 /** Explicitly require another object */
 #define REQUIRE_OBJECT( _obj ) REQUIRE_SYMBOL ( obj_ ## _obj )

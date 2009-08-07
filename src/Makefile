@@ -73,6 +73,7 @@ SRCDIRS		+= crypto crypto/axtls crypto/matrixssl
 SRCDIRS		+= hci hci/commands hci/tui
 SRCDIRS		+= hci/mucurses hci/mucurses/widgets
 SRCDIRS		+= usr
+SRCDIRS		+= config
 
 # NON_AUTO_SRCS lists files that are excluded from the normal
 # automatic build system.
