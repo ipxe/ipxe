@@ -99,6 +99,7 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #define	NVO_CMD			/* Non-volatile option storage commands */
 #define	CONFIG_CMD		/* Option configuration console */
 #define	IFMGMT_CMD		/* Interface management commands */
+#define	IWMGMT_CMD		/* Wireless interface management commands */
 #define	ROUTE_CMD		/* Routing table management commands */
 #define IMAGE_CMD		/* Image management commands */
 #define DHCP_CMD		/* DHCP management commands */
@@ -107,6 +108,12 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #undef	TIME_CMD		/* Time commands */
 #undef	DIGEST_CMD		/* Image crypto digest commands */
 //#undef	PXE_CMD			/* PXE commands */
+
+/*
+ * Error message tables to include
+ *
+ */
+#undef	ERRMSG_80211		/* All 802.11 error descriptions (~3.3kb) */
 
 /*
  * Obscure configuration options

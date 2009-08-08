@@ -204,6 +204,7 @@ REQUIRE_OBJECT ( config_cmd );
 #ifdef IFMGMT_CMD
 REQUIRE_OBJECT ( ifmgmt_cmd );
 #endif
+/* IWMGMT_CMD is brought in by net80211.c if requested */
 #ifdef ROUTE_CMD
 REQUIRE_OBJECT ( route_cmd );
 #endif
