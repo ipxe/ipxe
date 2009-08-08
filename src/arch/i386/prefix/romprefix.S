@@ -238,24 +238,37 @@ no_pci3:
 	popl	%edx
 	popl	%ebx
 
-	/* Check for PnP BIOS */
-	testw	$0x0f, %bx	/* PnP signature must be aligned - bochs    */
-	jnz	no_bbs		/* uses unalignment to indicate 'fake' PnP. */
-	cmpl	$PNP_SIGNATURE, %es:0(%bx)
-	jne	no_bbs
+	/* Check for PnP BIOS.  Although %es:di should point to the
+	 * PnP BIOS signature on entry, some BIOSes fail to do this.
+	 */
+	movw	$( 0xf000 - 1 ), %bx
+pnp_scan:
+	incw	%bx
+	jz	no_pnp
+	movw	%bx, %es
+	cmpl	$PNP_SIGNATURE, %es:0
+	jne	pnp_scan
+	xorw	%dx, %dx
+	xorw	%si, %si
+	movzbw	%es:5, %cx
+1:	es lodsb
+	addb	%al, %dl
+	loop	1b
+	jnz	pnp_scan
 	/* Is PnP: print PnP message */
 	movw	$init_message_pnp, %si
 	xorw	%di, %di
 	call	print_message
 	/* Check for BBS */
-	pushw	%es:0x1b(%bx)	/* Real-mode data segment */
+	pushw	%es:0x1b	/* Real-mode data segment */
 	pushw	%ds		/* &(bbs_version) */
 	pushw	$bbs_version
 	pushw	$PNP_GET_BBS_VERSION
-	lcall	*%es:0xd(%bx)
+	lcall	*%es:0xd
 	addw	$8, %sp
 	testw	%ax, %ax
 	je	got_bbs
+no_pnp:	/* Not PnP-compliant - therefore cannot be BBS-compliant */
 no_bbs:	/* Not BBS-compliant - must hook INT 19 */
 	movw	$init_message_int19, %si
 	xorw	%di, %di
