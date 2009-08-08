@@ -20,6 +20,7 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #define ETH_P_RARP	0x8035	/* Reverse Address resolution Protocol */
 #define ETH_P_IPV6	0x86DD	/* IPv6 over blueblook */
 #define ETH_P_SLOW	0x8809	/* Ethernet slow protocols */
+#define ETH_P_EAPOL	0x888E	/* 802.1X EAP over LANs */
 #define ETH_P_AOE	0x88A2	/* ATA over Ethernet */
 
 /** An Ethernet link-layer header */
