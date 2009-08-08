@@ -38,3 +38,8 @@ REQUIRE_OBJECT ( wireless_errors );
 #ifdef CRYPTO_80211_WEP
 REQUIRE_OBJECT ( wep );
 #endif
+
+#ifdef CRYPTO_80211_WPA
+REQUIRE_OBJECT ( wpa_psk );
+REQUIRE_OBJECT ( wpa_tkip );
+#endif

@@ -163,6 +163,7 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #define ERRFILE_eapol			( ERRFILE_NET | 0x00250000 )
 #define ERRFILE_wpa			( ERRFILE_NET | 0x00260000 )
 #define ERRFILE_wpa_psk			( ERRFILE_NET | 0x00270000 )
+#define ERRFILE_wpa_tkip		( ERRFILE_NET | 0x00280000 )
 
 #define ERRFILE_image		      ( ERRFILE_IMAGE | 0x00000000 )
 #define ERRFILE_elf		      ( ERRFILE_IMAGE | 0x00010000 )

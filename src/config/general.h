@@ -69,7 +69,7 @@ FILE_LICENCE ( GPL2_OR_LATER );
  *
  */
 #define	CRYPTO_80211_WEP	/* WEP encryption (deprecated and insecure!) */
-#define CRYPTO_80211_WPA_PSK	/* WPA "Personal" frontend using a passphrase */
+#define	CRYPTO_80211_WPA	/* WPA Personal, authenticating with passphrase */
 
 /*
  * Name resolution modules
