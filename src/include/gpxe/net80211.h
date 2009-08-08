@@ -119,6 +119,9 @@ enum net80211_security_proto {
 	 * in the same 4-way handshake as the PSK method.
 	 */
 	NET80211_SECPROT_EAP = 2,
+
+	/** Dummy value used when the handshaking type can't be detected */
+	NET80211_SECPROT_UNKNOWN = 3,
 };
 
 
@@ -169,6 +172,9 @@ enum net80211_crypto_alg {
 	 * against WEP and minor success against TKIP fail.
 	 */
 	NET80211_CRYPT_CCMP = 3,
+
+	/** Dummy value used when the cryptosystem can't be detected */
+	NET80211_CRYPT_UNKNOWN = 4,
 };
 
 
@@ -539,37 +545,171 @@ struct net80211_frag_cache
 	struct io_buffer *iob[16];
 };
 
-/** Interface to an 802.11 cryptographic algorithm
+
+/** Interface to an 802.11 security handshaking protocol
  *
- * Cryptographic algorithms define a net80211_crypto structure
- * statically, using a gPXE linker table to make it available to the
- * 802.11 layer. When the algorithm needs to be used, the 802.11 code
- * will allocate a copy of the static definition plus whatever space
- * the algorithm has requested for private state, and point
- * net80211_device::crypto at it.
+ * Security handshaking protocols handle parsing a user-specified key
+ * into a suitable input to the encryption algorithm, and for WPA and
+ * better systems, manage performing whatever authentication with the
+ * network is necessary.
+ *
+ * At all times when any method in this structure is called with a
+ * net80211_device argument @a dev, a dynamically allocated copy of
+ * the handshaker structure itself with space for the requested amount
+ * of private data may be accessed as @c dev->handshaker. The
+ * structure will not be modified, and will only be freed during
+ * reassociation and device closing after the @a stop method has been
+ * called.
+ */
+struct net80211_handshaker
+{
+	/** The security handshaking protocol implemented */
+	enum net80211_security_proto protocol;
+
+	/** Initialize security handshaking protocol
+	 *
+	 * @v dev	802.11 device
+	 * @ret rc	Return status code
+	 *
+	 * This method is expected to access @c netX/key or other
+	 * applicable settings to determine the parameters for
+	 * handshaking. If no handshaking is required, it should call
+	 * sec80211_install() with the cryptosystem and key that are
+	 * to be used, and @c start and @c step should be set to @c
+	 * NULL.
+	 *
+	 * This is always called just before association is performed,
+	 * but after its parameters have been set; in particular, you
+	 * may rely on the contents of the @a essid field in @a dev.
+	 */
+	int ( * init ) ( struct net80211_device *dev );
+
+	/** Start handshaking
+	 *
+	 * @v dev	802.11 device
+	 * @ret rc	Return status code
+	 *
+	 * This method is expected to set up internal state so that
+	 * packets sent immediately after association, before @a step
+	 * can be called, will be handled appropriately.
+	 *
+	 * This is always called just before association is attempted.
+	 */
+	int ( * start ) ( struct net80211_device *dev );
+
+	/** Process handshaking state
+	 *
+	 * @v dev	802.11 device
+	 * @ret rc	Return status code, or positive if done
+	 *
+	 * This method is expected to perform as much progress on the
+	 * protocol it implements as is possible without blocking. It
+	 * should return 0 if it wishes to be called again, a negative
+	 * return status code on error, or a positive value if
+	 * handshaking is complete. In the case of a positive return,
+	 * net80211_crypto_install() must have been called.
+	 *
+	 * If handshaking may require further action (e.g. an AP that
+	 * might decide to rekey), handlers must be installed by this
+	 * function that will act without further calls to @a step.
+	 */
+	int ( * step ) ( struct net80211_device *dev );
+
+	/** Change cryptographic key based on setting
+	 *
+	 * @v dev	802.11 device
+	 * @ret rc	Return status code
+	 *
+	 * This method is called whenever the @c netX/key setting
+	 * @e may have been changed. It is expected to determine
+	 * whether it did in fact change, and if so, to install the
+	 * new key using net80211_crypto_install(). If it is not
+	 * possible to do this immediately, this method should return
+	 * an error; in that case the 802.11 stack will reassociate,
+	 * following the usual init/start/step sequence.
+	 *
+	 * This method is only relevant when it is possible to
+	 * associate successfully with an incorrect key. When it is
+	 * not, a failed association will be retried until the user
+	 * changes the key setting, and a successful association will
+	 * not be dropped due to such a change. When association with
+	 * an incorrect key is impossible, this function should return
+	 * 0 after performing no action.
+	 */
+	int ( * change_key ) ( struct net80211_device *dev );
+
+	/** Stop security handshaking handlers
+	 *
+	 * @v dev	802.11 device
+	 *
+	 * This method is called just before freeing a security
+	 * handshaker; it could, for example, delete a process that @a
+	 * start had created to manage the security of the connection.
+	 * If not needed it may be set to NULL.
+	 */
+	void ( * stop ) ( struct net80211_device *dev );
+
+	/** Amount of private data requested
+	 *
+	 * Before @c init is called for the first time, this structure's
+	 * @c priv pointer will point to this many bytes of allocated
+	 * data, where the allocation will be performed separately for
+	 * each net80211_device.
+	 */
+	int priv_len;
+
+	/** Whether @a start has been called
+	 *
+	 * Reset to 0 after @a stop is called.
+	 */
+	int started;
+
+	/** Pointer to private data
+	 *
+	 * In initializing this structure statically for a linker
+	 * table, set this to NULL.
+	 */
+	void *priv;
+};
+
+#define NET80211_HANDSHAKERS __table ( struct net80211_handshaker, \
+				       "net80211_handshakers" )
+#define __net80211_handshaker __table_entry ( NET80211_HANDSHAKERS, 01 )
+
+
+/** Interface to an 802.11 cryptosystem
+ *
+ * Cryptosystems define a net80211_crypto structure statically, using
+ * a gPXE linker table to make it available to the 802.11 layer. When
+ * the cryptosystem needs to be used, the 802.11 code will allocate a
+ * copy of the static definition plus whatever space the algorithm has
+ * requested for private state, and point net80211_device::crypto or
+ * net80211_device::gcrypto at it.
  */
 struct net80211_crypto
 {
 	/** The cryptographic algorithm implemented */
 	enum net80211_crypto_alg algorithm;
 
-	/** Initialize cryptographic algorithm using a given key
+	/** Initialize cryptosystem using a given key
 	 *
-	 * @v crypto	802.11 cryptographic algorithm
+	 * @v crypto	802.11 cryptosystem
 	 * @v key	Pointer to key bytes
 	 * @v keylen	Number of key bytes
+	 * @v rsc	Initial receive sequence counter, if applicable
 	 * @ret rc	Return status code
 	 *
 	 * This method is passed the communication key provided by the
 	 * security handshake handler, which will already be in the
-	 * low-level form required.
+	 * low-level form required. It may not store a pointer to the
+	 * key after returning; it must copy it to its private storage.
 	 */
-	int ( * initialize ) ( struct net80211_crypto *crypto, u8 *key,
-			       int keylen );
+	int ( * init ) ( struct net80211_crypto *crypto, const void *key,
+			 int keylen, const void *rsc );
 
-	/** Encrypt a frame using the cryptographic algorithm
+	/** Encrypt a frame using the cryptosystem
 	 *
-	 * @v crypto	802.11 cryptographic algorithm
+	 * @v crypto	802.11 cryptosystem
 	 * @v iob	I/O buffer
 	 * @ret eiob	Newly allocated I/O buffer with encrypted packet
 	 *
@@ -593,9 +733,9 @@ struct net80211_crypto
 	struct io_buffer * ( * encrypt ) ( struct net80211_crypto *crypto,
 					   struct io_buffer *iob );
 
-	/** Decrypt a frame using the cryptographic algorithm
+	/** Decrypt a frame using the cryptosystem
 	 *
-	 * @v crypto	802.11 cryptographic algorithm
+	 * @v crypto	802.11 cryptosystem
 	 * @v eiob	Encrypted I/O buffer
 	 * @ret iob	Newly allocated I/O buffer with decrypted packet
 	 *
@@ -625,6 +765,9 @@ struct net80211_crypto
 	/** Private data for the algorithm to store key and state info */
 	void *priv;
 };
+
+#define NET80211_CRYPTOS __table ( struct net80211_crypto, "net80211_cryptos" )
+#define __net80211_crypto __table_entry ( NET80211_CRYPTOS, 01 )
 
 
 struct net80211_probe_ctx;
@@ -732,6 +875,9 @@ struct net80211_device
 		struct net80211_assoc_ctx *assoc;
 	} ctx;
 
+	/** Security handshaker being used */
+	struct net80211_handshaker *handshaker;
+
 	/** State of our association to the network
 	 *
 	 * Since the association process happens asynchronously, it's
@@ -777,13 +923,32 @@ struct net80211_device
 	/** Return status code associated with @c state */
 	int assoc_rc;
 
+	/** RSN or WPA information element to include with association
+	 *
+	 * If set to @c NULL, none will be included. It is expected
+	 * that this will be set by the @a init function of a security
+	 * handshaker if it is needed.
+	 */
+	union ieee80211_ie *rsn_ie;
+
 	/* ---------- Parameters of currently associated network ---------- */
 
-	/** 802.11 cryptographic algorithm for our current network
+	/** 802.11 cryptosystem for our current network
 	 *
 	 * For an open network, this will be set to NULL.
 	 */
 	struct net80211_crypto *crypto;
+
+	/** 802.11 cryptosystem for multicast and broadcast frames
+	 *
+	 * If this is NULL, the cryptosystem used for receiving
+	 * unicast frames will also be used for receiving multicast
+	 * and broadcast frames. Transmitted multicast and broadcast
+	 * frames are always sent unicast to the AP, who multicasts
+	 * them on our behalf; thus they always use the unicast
+	 * cryptosystem.
+	 */
+	struct net80211_crypto *gcrypto;
 
 	/** MAC address of the access point most recently associated */
 	u8 bssid[ETH_ALEN];
@@ -927,6 +1092,10 @@ struct net80211_wlan
 };
 
 
+/** 802.11 encryption key setting */
+extern struct setting net80211_key_setting __setting;
+
+
 /**
  * @defgroup net80211_probe 802.11 network location API
  * @{
@@ -974,6 +1143,7 @@ int net80211_send_auth ( struct net80211_device *dev,
 			 struct net80211_wlan *wlan, int method );
 int net80211_send_assoc ( struct net80211_device *dev,
 			  struct net80211_wlan *wlan );
+void net80211_deauthenticate ( struct net80211_device *dev, int rc );
 /** @} */
 
 

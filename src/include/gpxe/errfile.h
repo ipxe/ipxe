@@ -158,6 +158,7 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #define ERRFILE_ib_mi			( ERRFILE_NET | 0x00200000 )
 #define ERRFILE_ib_cmrc			( ERRFILE_NET | 0x00210000 )
 #define ERRFILE_ib_srp			( ERRFILE_NET | 0x00220000 )
+#define ERRFILE_sec80211		( ERRFILE_NET | 0x00230000 )
 
 #define ERRFILE_image		      ( ERRFILE_IMAGE | 0x00000000 )
 #define ERRFILE_elf		      ( ERRFILE_IMAGE | 0x00010000 )

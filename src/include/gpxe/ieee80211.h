@@ -2,6 +2,7 @@
 #define _GPXE_IEEE80211_H
 
 #include <gpxe/if_ether.h>	/* for ETH_ALEN */
+#include <endian.h>
 
 /** @file
  * Constants and data structures defined in IEEE 802.11, subsetted
@@ -779,10 +780,9 @@ struct ieee80211_ie_erp_info {
  *
  * Showing once again a striking clarity of design, the IEEE folks put
  * dynamically-sized data in the middle of this structure. As such,
- * the below structure definition is only a guideline; the
- * @c IEEE80211_RSN_FIELD, @c IEEE80211_RSN_CIPHER, and
- * @c IEEE80211_RSN_AUTHTYPE macros should be used to access any
- * data.
+ * the below structure definition only works for IEs we create
+ * ourselves, which always have one pairwise cipher and one AKM;
+ * received IEs should be parsed piecemeal.
  *
  * Also inspired was IEEE's choice of 16-bit fields to count the
  * number of 4-byte elements in a structure with a maximum length of
@@ -790,11 +790,9 @@ struct ieee80211_ie_erp_info {
  *
  * Many fields reference a cipher or authentication-type ID; this is a
  * three-byte OUI followed by one byte identifying the cipher with
- * respect to that OUI. For all standard ciphers the OUI is 00:0F:AC.
- *
- * The authentication types referenced in this structure have nothing
- * to do with 802.11 authentication frames or the @c algorithm field
- * within them.
+ * respect to that OUI. For all standard ciphers the OUI is 00:0F:AC,
+ * except in old-style WPA IEs encapsulated in vendor-specific IEs,
+ * where it's 00:50:F2.
  */
 struct ieee80211_ie_rsn {
 	/** Information element ID */
@@ -807,21 +805,21 @@ struct ieee80211_ie_rsn {
 	u16 version;
 
 	/** Cipher ID for the cipher used in multicast/broadcast frames */
-	u8 group_cipher[4];
+	u32 group_cipher;
 
 	/** Number of unicast ciphers supported */
 	u16 pairwise_count;
 
 	/** List of cipher IDs for supported unicast frame ciphers */
-	u8 pairwise_cipher[4];
+	u32 pairwise_cipher[1];
 
 	/** Number of authentication types supported */
 	u16 akm_count;
 
 	/** List of authentication type IDs for supported types */
-	u8 akm_list[4];
+	u32 akm_list[1];
 
-	/** Security capabilities field. */
+	/** Security capabilities field (RSN only) */
 	u16 rsn_capab;
 
 	/** Number of PMKIDs included (present only in association frames) */
@@ -834,140 +832,69 @@ struct ieee80211_ie_rsn {
 /** Information element ID for Robust Security Network information element */
 #define IEEE80211_IE_RSN	48
 
-/** OUI for standard ciphers in RSN information element */
-#define  IEEE80211_RSN_OUI	"\x00\x0F\xAC"
-
-/** Extract RSN IE version field */
-#define  IEEE80211_RSN_FIELD_version( rsnp ) ( (rsnp)->version )
-
-/** Extract RSN IE group_cipher field */
-#define  IEEE80211_RSN_FIELD_group_cipher( rsnp ) ( (rsnp)->group_cipher )
-
-/** Extract RSN IE pairwise_count field */
-#define  IEEE80211_RSN_FIELD_pairwise_count( rsnp ) ( (rsnp)->pairwise_count )
-
-/** Extract RSN IE akm_count field */
-#define  IEEE80211_RSN_FIELD_akm_count( rsnp )			\
-	( ( ( struct ieee80211_ie_rsn * ) ( ( void * ) ( rsnp ) + \
-		4*( ( rsnp )->pairwise_count - 1 ) ) )->akm_count )
-
-/** Extract RSN IE rsn_capab field */
-#define  IEEE80211_RSN_FIELD_rsn_capab( rsnp )			\
-	( ( ( struct ieee80211_ie_rsn * ) ( ( void * ) ( rsnp ) + \
-		4*( ( rsnp )->pairwise_count - 1 ) +		\
-		4*( ( rsnp )->akm_count - 1 ) ) )->rsn_capab )
-
-/** Extract RSN IE pmkid_count field */
-#define  IEEE80211_RSN_FIELD_pmkid_count( rsnp )		\
-	( ( ( struct ieee80211_ie_rsn * ) ( ( void * ) ( rsnp ) + \
-		4*( ( rsnp )->pairwise_count - 1 ) +		\
-		4*( ( rsnp )->akm_count - 1 ) ) )->pmkid_count )
-
-/** Extract field from RSN information element
- *
- * @v rsnp	Pointer to RSN information element
- * @v field	Name of field to extract
- * @ret val	Lvalue of the requested field
- *
- * You must fill the fields of the structure in order for this to work
- * properly.
- */
-#define  IEEE80211_RSN_FIELD( rsnp, field )	\
-	IEEE80211_RSN_FIELD_ ## field ( rsnp )
-
-/** Get pointer to pairwise cipher from RSN information element
- *
- * @v rsnp	Pointer to RSN information element
- * @v cipher	Index of pairwise cipher to extract
- * @ret ptr	Pointer to requested cipher
- */
-#define  IEEE80211_RSN_CIPHER( rsnp, cipher )	\
-	( ( rsnp )->pairwise_cipher + 4 * ( cipher ) )
-
-/** Get pointer to authentication type from RSN information element
- *
- * @v rsnp	Pointer to RSN information element
- * @v akm	Index of authentication type to extract
- * @ret ptr	Pointer to requested authentication type
- *
- * The @c pairwise_count field must be correct.
- */
-#define  IEEE80211_RSN_AUTHTYPE( rsnp, akm )	\
-    ( ( rsnp )->akm_list + 4 * ( ( rsnp )->pairwise_count - 1 ) + 4 * ( akm ) )
-
-/** Get pointer to PMKID from RSN information element
- *
- * @v rsnp	Pointer to RSN information element
- * @v idx	Index of PMKID to extract
- * @ret ptr	Pointer to requested PMKID
- *
- * The @c pairwise_count and @c akm_count fields must be correct.
- */
-#define  IEEE80211_RSN_PMKID( rsnp, idx )	\
-	( ( rsnp )->pmkid_list + 4 * ( ( rsnp )->pairwise_count - 1 ) +	\
-			4 * ( ( rsnp )->akm_count - 1 ) + 16 * ( idx ) )
-
-/** Verify size of RSN information element
- *
- * @v rsnp	Pointer to RSN information element
- * @ret ok	TRUE if count fields are consistent with length field
- *
- * It is important to drop any RSN IE that does not pass this function
- * before using the @c IEEE80211_RSN_FIELD, @c IEEE80211_RSN_CIPHER,
- * and @c IEEE80211_RSN_AUTHTYPE macros, to avoid potential security
- * compromise due to a malformed RSN IE.
- *
- * This function does not consider the possibility of some PMKIDs
- * included in the RSN IE, because PMKIDs are only included in RSN IEs
- * sent in association request frames, and we should never receive an
- * association request frame. An RSN IE that includes PMKIDs will
- * always fail this check.
- */
-static inline int ieee80211_rsn_check ( struct ieee80211_ie_rsn *rsnp ) {
-	if ( rsnp->len < 12 + 4 * rsnp->pairwise_count )
-		return 0;
-	return ( rsnp->len == 12 + 4 * ( rsnp->pairwise_count +
-				IEEE80211_RSN_FIELD ( rsnp, akm_count ) ) );
-}
-
 /** Calculate necessary size of RSN information element
  *
  * @v npair	Number of pairwise ciphers supported
  * @v nauth	Number of authentication types supported
  * @v npmkid	Number of PMKIDs to include
- * @ret size	Necessary size of RSN IE, including header bytes
+ * @v is_rsn	If TRUE, calculate RSN IE size; if FALSE, calculate WPA IE size
+ * @ret size	Necessary size of IE, including header bytes
  */
-static inline size_t ieee80211_rsn_size ( int npair, int nauth, int npmkid ) {
-	return 16 + 4 * ( npair + nauth ) + 16 * npmkid;
+static inline size_t ieee80211_rsn_size ( int npair, int nauth, int npmkid,
+					  int rsn_ie ) {
+	return 16 + 4 * ( npair + nauth ) + 16 * npmkid - 4 * ! rsn_ie;
 }
+
+/** Make OUI plus type byte into 32-bit integer for easy comparison */
+#if __BYTE_ORDER == __BIG_ENDIAN
+#define _MKOUI( a, b, c, t )	\
+		( ( ( a ) << 24 ) | ( ( b ) << 16 ) | ( ( c ) << 8 ) | ( d ) )
+#define  OUI_ORG_MASK		0xFFFFFF00
+#define  OUI_TYPE_MASK		0x000000FF
+#else
+#define _MKOUI( a, b, c, t )	\
+		( ( ( t ) << 24 ) | ( ( c ) << 16 ) | ( ( b ) << 8 ) | ( a ) )
+#define  OUI_ORG_MASK		0x00FFFFFF
+#define  OUI_TYPE_MASK		0xFF000000
+#endif
+
+/** Organization part for OUIs in standard RSN IE */
+#define  IEEE80211_RSN_OUI	_MKOUI ( 0x00, 0x0F, 0xAC, 0 )
+
+/** Organization part for OUIs in old WPA IE */
+#define  IEEE80211_WPA_OUI	_MKOUI ( 0x00, 0x50, 0xF2, 0 )
+
+/** Old vendor-type WPA IE OUI type + subtype */
+#define  IEEE80211_WPA_OUI_VEN	_MKOUI ( 0x00, 0x50, 0xF2, 0x01 )
+
 
 /** 802.11 RSN IE: expected version number */
 #define  IEEE80211_RSN_VERSION		1
 
-/** 802.11 RSN IE: fourth byte of cipher type for 40-bit WEP */
-#define  IEEE80211_RSN_CTYPE_WEP40	1
+/** 802.11 RSN IE: cipher type for 40-bit WEP */
+#define  IEEE80211_RSN_CTYPE_WEP40	_MKOUI ( 0, 0, 0, 0x01 )
 
-/** 802.11 RSN IE: fourth byte of cipher type for 104-bit WEP */
-#define  IEEE80211_RSN_CTYPE_WEP104	5
+/** 802.11 RSN IE: cipher type for 104-bit WEP */
+#define  IEEE80211_RSN_CTYPE_WEP104	_MKOUI ( 0, 0, 0, 0x05 )
 
-/** 802.11 RSN IE: fourth byte of cipher type for TKIP ("WPA") */
-#define  IEEE80211_RSN_CTYPE_TKIP	2
+/** 802.11 RSN IE: cipher type for TKIP ("WPA") */
+#define  IEEE80211_RSN_CTYPE_TKIP	_MKOUI ( 0, 0, 0, 0x02 )
 
-/** 802.11 RSN IE: fourth byte of cipher type for CCMP ("WPA2") */
-#define  IEEE80211_RSN_CTYPE_CCMP	4
+/** 802.11 RSN IE: cipher type for CCMP ("WPA2") */
+#define  IEEE80211_RSN_CTYPE_CCMP	_MKOUI ( 0, 0, 0, 0x04 )
 
-/** 802.11 RSN IE: fourth byte of cipher type for "use group"
+/** 802.11 RSN IE: cipher type for "use group"
  *
  * This can only appear as a pairwise cipher, and means unicast frames
  * should be encrypted in the same way as broadcast/multicast frames.
  */
-#define  IEEE80211_RSN_CTYPE_USEGROUP	0
+#define  IEEE80211_RSN_CTYPE_USEGROUP	_MKOUI ( 0, 0, 0, 0x00 )
 
-/** 802.11 RSN IE: fourth byte of auth method type for using an 802.1X server */
-#define  IEEE80211_RSN_ATYPE_8021X	1
+/** 802.11 RSN IE: auth method type for using an 802.1X server */
+#define  IEEE80211_RSN_ATYPE_8021X	_MKOUI ( 0, 0, 0, 0x01 )
 
-/** 802.11 RSN IE: fourth byte of auth method type for using a pre-shared key */
-#define  IEEE80211_RSN_ATYPE_PSK	2
+/** 802.11 RSN IE: auth method type for using a pre-shared key */
+#define  IEEE80211_RSN_ATYPE_PSK	_MKOUI ( 0, 0, 0, 0x02 )
 
 /** 802.11 RSN IE capabilities: AP supports pre-authentication */
 #define  IEEE80211_RSN_CAPAB_PREAUTH	0x001
@@ -995,6 +922,42 @@ static inline size_t ieee80211_rsn_size ( int npair, int nauth, int npmkid ) {
 
 /** 802.11 RSN IE capabilities: PeerKey Handshaking is suported */
 #define  IEEE80211_RSN_CAPAB_PEERKEY	0x200
+
+
+/** 802.11 RSN IE capabilities: One replay counter
+ *
+ * This should be AND'ed with @c IEEE80211_RSN_CAPAB_PTKSA_REPLAY or
+ * @c IEEE80211_RSN_CAPAB_GTKSA_REPLAY (or both) to produce a value
+ * which can be OR'ed into the capabilities field.
+ */
+#define IEEE80211_RSN_1_CTR		0x000
+
+/** 802.11 RSN IE capabilities: Two replay counters */
+#define IEEE80211_RSN_2_CTR		0x014
+
+/** 802.11 RSN IE capabilities: Four replay counters */
+#define IEEE80211_RSN_4_CTR		0x028
+
+/** 802.11 RSN IE capabilities: 16 replay counters */
+#define IEEE80211_RSN_16_CTR		0x03C
+
+
+/** 802.11 Vendor Specific information element
+ *
+ * One often sees the RSN IE masquerading as vendor-specific on
+ * devices that were produced prior to 802.11i (the WPA amendment)
+ * being finalized.
+ */
+struct ieee80211_ie_vendor {
+	u8 id;			/**< Vendor-specific ID: 221 */
+	u8 len;			/**< Vendor-specific length: variable */
+	u32 oui;		/**< OUI and vendor-specific type byte */
+	u8 data[0];		/**< Vendor-specific data */
+} __attribute__ ((packed));
+
+/** Information element ID for Vendor Specific information element */
+#define IEEE80211_IE_VENDOR	221
+
 
 
 
@@ -1034,7 +997,22 @@ union ieee80211_ie
 
 	/** Security information */
 	struct ieee80211_ie_rsn rsn;
+
+	/** Vendor-specific */
+	struct ieee80211_ie_vendor vendor;
 };
+
+/** Check that 802.11 information element is bounded by buffer
+ *
+ * @v ie	Information element
+ * @v end	End of buffer in which information element is stored
+ * @ret ok	TRUE if the IE is completely contained within the buffer
+ */
+static inline int ieee80211_ie_bound ( union ieee80211_ie *ie, void *end )
+{
+	void *iep = ie;
+	return ( iep + 2 <= end && iep + 2 + ie->len <= end );
+}
 
 /** Advance to next 802.11 information element
  *
@@ -1055,7 +1033,7 @@ static inline union ieee80211_ie * ieee80211_next_ie ( union ieee80211_ie *ie,
 	if ( ! end )
 		return next_ie;
 
-	if ( next_ie_byte < end && next_ie_byte + next_ie->len <= end )
+	if ( ieee80211_ie_bound ( next_ie, end ) )
 		return next_ie;
 
 	return NULL;

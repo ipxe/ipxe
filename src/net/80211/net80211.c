@@ -29,6 +29,7 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #include <gpxe/ieee80211.h>
 #include <gpxe/netdevice.h>
 #include <gpxe/net80211.h>
+#include <gpxe/sec80211.h>
 #include <gpxe/timer.h>
 #include <gpxe/nap.h>
 #include <unistd.h>
@@ -188,7 +189,8 @@ static void net80211_handle_auth ( struct net80211_device *dev,
 				   struct io_buffer *iob );
 static void net80211_handle_assoc_reply ( struct net80211_device *dev,
 					  struct io_buffer *iob );
-static int net80211_send_disassoc ( struct net80211_device *dev, int reason );
+static int net80211_send_disassoc ( struct net80211_device *dev, int reason,
+				    int deauth );
 static void net80211_handle_mgmt ( struct net80211_device *dev,
 				   struct io_buffer *iob, int signal );
 /** @} */
@@ -208,15 +210,16 @@ static void net80211_rx_frag ( struct net80211_device *dev,
  * @defgroup net80211_settings 802.11 settings handlers
  * @{
  */
-static int net80211_check_ssid_update ( void );
+static int net80211_check_settings_update ( void );
 
 /** 802.11 settings applicator
  *
  * When the SSID is changed, this will cause any open devices to
- * re-associate.
+ * re-associate; when the encryption key is changed, we similarly
+ * update their state.
  */
-struct settings_applicator net80211_ssid_applicator __settings_applicator = {
-	.apply = net80211_check_ssid_update,
+struct settings_applicator net80211_applicator __settings_applicator = {
+	.apply = net80211_check_settings_update,
 };
 
 /** The network name to associate with
@@ -240,6 +243,18 @@ struct setting net80211_active_setting __setting = {
 	.name = "active-scan",
 	.description = "Use an active scan during 802.11 association",
 	.type = &setting_type_int8,
+};
+
+/** The cryptographic key to use
+ *
+ * For hex WEP keys, as is common, this must be entered using the
+ * normal gPXE method for entering hex settings; an ASCII string of
+ * hex characters will not behave as expected.
+ */
+struct setting net80211_key_setting __setting = {
+	.name = "key",
+	.description = "Encryption key for protected 802.11 networks",
+	.type = &setting_type_string,
 };
 
 /** @} */
@@ -294,7 +309,16 @@ static void net80211_netdev_close ( struct net_device *netdev )
 
 	/* Send disassociation frame to AP, to be polite */
 	if ( dev->state & NET80211_ASSOCIATED )
-		net80211_send_disassoc ( dev, IEEE80211_REASON_LEAVING );
+		net80211_send_disassoc ( dev, IEEE80211_REASON_LEAVING, 0 );
+
+	if ( dev->handshaker && dev->handshaker->stop &&
+	     dev->handshaker->started )
+		dev->handshaker->stop ( dev );
+
+	free ( dev->crypto );
+	free ( dev->handshaker );
+	dev->crypto = NULL;
+	dev->handshaker = NULL;
 
 	netdev_link_down ( netdev );
 	dev->state = 0;
@@ -317,16 +341,25 @@ static int net80211_netdev_transmit ( struct net_device *netdev,
 				      struct io_buffer *iobuf )
 {
 	struct net80211_device *dev = netdev->priv;
+	struct ieee80211_frame *hdr = iobuf->data;
 	int rc = -ENOSYS;
 
-	if ( dev->crypto ) {
+	if ( dev->crypto && ! ( hdr->fc & IEEE80211_FC_PROTECTED ) &&
+	     ( ( hdr->fc & IEEE80211_FC_TYPE ) == IEEE80211_TYPE_DATA ) ) {
 		struct io_buffer *niob = dev->crypto->encrypt ( dev->crypto,
 								iobuf );
 		if ( ! niob )
 			return -ENOMEM;	/* only reason encryption could fail */
 
-		free_iob ( iobuf );
-		iobuf = niob;
+		/* Free the non-encrypted iob */
+		netdev_tx_complete ( netdev, iobuf );
+
+		/* Transmit the encrypted iob; the Protected flag is
+		   set, so we won't recurse into here again */
+		netdev_tx ( netdev, niob );
+
+		/* Don't transmit the freed packet */
+		return 0;
 	}
 
 	if ( dev->op->transmit )
@@ -482,7 +515,7 @@ static int net80211_ll_push ( struct net_device *netdev,
 		( void * ) hdr + IEEE80211_TYP_FRAME_HEADER_LEN;
 
 	/* We can't send data packets if we're not associated. */
-	if ( ! netdev_link_ok ( netdev ) ) {
+	if ( ! ( dev->state & NET80211_ASSOCIATED ) ) {
 		if ( dev->assoc_rc )
 			return dev->assoc_rc;
 		return -ENETUNREACH;
@@ -1032,7 +1065,7 @@ static int net80211_process_ie ( struct net80211_device *dev,
 	int changed = 0;
 	int band = dev->channels[dev->channel].band;
 
-	if ( ( void * ) ie >= ie_end )
+	if ( ! ieee80211_ie_bound ( ie, ie_end ) )
 		return 0;
 
 	for ( ; ie; ie = ieee80211_next_ie ( ie, ie_end ) ) {
@@ -1103,10 +1136,6 @@ static int net80211_process_ie ( struct net80211_device *dev,
 			if ( ! ( ie->erp_info & IEEE80211_ERP_BARKER_LONG ) )
 				dev->phy_flags |= NET80211_PHY_USE_SHORT_PREAMBLE;
 			break;
-
-		case IEEE80211_IE_RSN:
-			/* XXX need to implement WPA stuff */
-			break;
 		}
 	}
 
@@ -1140,10 +1169,20 @@ static int net80211_process_ie ( struct net80211_device *dev,
 		   exist, so insertion sort works well. */
 		for ( i = 1; i < dev->nr_rates; i++ ) {
 			u16 rate = dev->rates[i];
+			u32 tmp, br, mask;
 
 			for ( j = i - 1; j >= 0 && dev->rates[j] >= rate; j-- )
 				dev->rates[j + 1] = dev->rates[j];
 			dev->rates[j + 1] = rate;
+
+			/* Adjust basic_rates to match by rotating the
+			   bits from bit j+1 to bit i left one position. */
+			mask = ( ( 1 << i ) - 1 ) & ~( ( 1 << ( j + 1 ) ) - 1 );
+			br = dev->basic_rates;
+			tmp = br & ( 1 << i );
+			br = ( br & ~( mask | tmp ) ) | ( ( br & mask ) << 1 );
+			br |= ( tmp >> ( i - j - 1 ) );
+			dev->basic_rates = br;
 		}
 
 		net80211_set_rtscts_rate ( dev );
@@ -1187,28 +1226,42 @@ net80211_marshal_request_info ( struct net80211_device *dev,
 
 	ie->id = IEEE80211_IE_RATES;
 	ie->len = dev->nr_rates;
+	if ( ie->len > 8 )
+		ie->len = 8;
+
 	for ( i = 0; i < ie->len; i++ ) {
 		ie->rates[i] = dev->rates[i] / 5;
 		if ( dev->basic_rates & ( 1 << i ) )
 			ie->rates[i] |= 0x80;
 	}
 
-	if ( ie->len > 8 ) {
-		/* 802.11 requires we use an Extended Basic Rates IE
-		   for the rates beyond the eighth. */
-		int rates = ie->len;
+	ie = ieee80211_next_ie ( ie, NULL );
 
-		memmove ( ( void * ) ie + 2 + 8 + 2, ( void * ) ie + 2 + 8,
-			  rates - 8 );
-		ie->len = 8;
-
+	if ( dev->rsn_ie && dev->rsn_ie->id == IEEE80211_IE_RSN ) {
+		memcpy ( ie, dev->rsn_ie, dev->rsn_ie->len + 2 );
 		ie = ieee80211_next_ie ( ie, NULL );
-
-		ie->id = IEEE80211_IE_EXT_RATES;
-		ie->len = rates - 8;
 	}
 
-	ie = ieee80211_next_ie ( ie, NULL );
+	if ( dev->nr_rates > 8 ) {
+		/* 802.11 requires we use an Extended Basic Rates IE
+		   for the rates beyond the eighth. */
+
+		ie->id = IEEE80211_IE_EXT_RATES;
+		ie->len = dev->nr_rates - 8;
+
+		for ( ; i < dev->nr_rates; i++ ) {
+			ie->rates[i - 8] = dev->rates[i] / 5;
+			if ( dev->basic_rates & ( 1 << i ) )
+				ie->rates[i - 8] |= 0x80;
+		}
+
+		ie = ieee80211_next_ie ( ie, NULL );
+	}
+
+	if ( dev->rsn_ie && dev->rsn_ie->id == IEEE80211_IE_VENDOR ) {
+		memcpy ( ie, dev->rsn_ie, dev->rsn_ie->len + 2 );
+		ie = ieee80211_next_ie ( ie, NULL );
+	}
 
 	return ie;
 }
@@ -1275,13 +1328,6 @@ struct net80211_probe_ctx * net80211_probe_start ( struct net80211_device *dev,
 
 		ie = net80211_marshal_request_info ( dev,
 						     probe_req->info_element );
-		ie->id = IEEE80211_IE_REQUEST;
-		ie->len = 3;
-		ie->request[0] = IEEE80211_IE_COUNTRY;
-		ie->request[1] = IEEE80211_IE_ERP_INFO;
-		ie->request[2] = IEEE80211_IE_RSN;
-
-		ie = ieee80211_next_ie ( ie, NULL );
 
 		iob_put ( ctx->probe, ( void * ) ie - ctx->probe->data );
 	}
@@ -1404,6 +1450,10 @@ int net80211_probe_step ( struct net80211_probe_ctx *ctx )
 		}
 
 		ie = beacon->info_element;
+
+		if ( ! ieee80211_ie_bound ( ie, iob->tail ) )
+			ie = NULL;
+
 		while ( ie && ie->id != IEEE80211_IE_SSID )
 			ie = ieee80211_next_ie ( ie, iob->tail );
 
@@ -1459,10 +1509,27 @@ int net80211_probe_step ( struct net80211_probe_ctx *ctx )
 		memcpy ( iob_put ( wlan->beacon, iob_len ( iob ) ),
 			 iob->data, iob_len ( iob ) );
 
-		/* XXX actually check capab and RSN ie to
-		   figure this out */
-		wlan->handshaking = NET80211_SECPROT_NONE;
-		wlan->crypto = NET80211_CRYPT_NONE;
+		if ( ( rc = sec80211_detect ( wlan->beacon, &wlan->handshaking,
+					      &wlan->crypto ) ) == -ENOTSUP ) {
+			struct ieee80211_beacon *beacon =
+				( struct ieee80211_beacon * ) hdr->data;
+
+			if ( beacon->capability & IEEE80211_CAPAB_PRIVACY ) {
+				DBG ( "802.11 %p probe: secured network %s but "
+				      "encryption support not compiled in\n",
+				      dev, wlan->essid );
+				wlan->handshaking = NET80211_SECPROT_UNKNOWN;
+				wlan->crypto = NET80211_CRYPT_UNKNOWN;
+			} else {
+				wlan->handshaking = NET80211_SECPROT_NONE;
+				wlan->crypto = NET80211_CRYPT_NONE;
+			}
+		} else if ( rc != 0 ) {
+			DBGC ( dev, "802.11 %p probe warning: network "
+			       "%s with unidentifiable security "
+			       "settings: %s\n", dev, wlan->essid,
+			       strerror ( rc ) );
+		}
 
 		ctx->ticks_beacon = now;
 
@@ -1739,6 +1806,14 @@ static void net80211_step_associate ( struct process *proc )
 
 		DBGC ( dev, "802.11 %p associating\n", dev );
 
+		if ( dev->handshaker && dev->handshaker->start &&
+		     ! dev->handshaker->started ) {
+			rc = dev->handshaker->start ( dev );
+			if ( rc < 0 )
+				goto fail;
+			dev->handshaker->started = 1;
+		}
+
 		rc = net80211_send_assoc ( dev, dev->associating );
 		if ( rc )
 			goto fail;
@@ -1750,9 +1825,29 @@ static void net80211_step_associate ( struct process *proc )
 		/* state: crypto sync */
 		DBGC ( dev, "802.11 %p security handshaking\n", dev );
 
-		dev->state |= NET80211_CRYPTO_SYNCED;
-		/* XXX need to actually do something here once we
-		   support WPA */
+		if ( ! dev->handshaker || ! dev->handshaker->step ) {
+			dev->state |= NET80211_CRYPTO_SYNCED;
+			return;
+		}
+
+		rc = dev->handshaker->step ( dev );
+
+		if ( rc < 0 ) {
+			/* Only record the returned error if we're
+			   still marked as associated, because an
+			   asynchronous error will have already been
+			   reported to net80211_deauthenticate() and
+			   assoc_rc thereby set. */
+			if ( dev->state & NET80211_ASSOCIATED )
+				dev->assoc_rc = rc;
+			rc = 0;
+			goto fail;
+		}
+
+		if ( rc > 0 ) {
+			dev->assoc_rc = 0;
+			dev->state |= NET80211_CRYPTO_SYNCED;
+		}
 		return;
 	}
 
@@ -1804,27 +1899,36 @@ static void net80211_step_associate ( struct process *proc )
 }
 
 /**
- * Check for 802.11 SSID updates
+ * Check for 802.11 SSID or key updates
  *
  * This acts as a settings applicator; if the user changes netX/ssid,
  * and netX is currently open, the association task will be invoked
- * again.
+ * again. If the user changes the encryption key, the current security
+ * handshaker will be asked to update its state to match; if that is
+ * impossible without reassociation, we reassociate.
  */
-static int net80211_check_ssid_update ( void )
+static int net80211_check_settings_update ( void )
 {
 	struct net80211_device *dev;
 	char ssid[IEEE80211_MAX_SSID_LEN + 1];
+	int key_reassoc;
 
 	list_for_each_entry ( dev, &net80211_devices, list ) {
 		if ( ! ( dev->netdev->state & NETDEV_OPEN ) )
 			continue;
 
+		key_reassoc = 0;
+		if ( dev->handshaker && dev->handshaker->change_key &&
+		     dev->handshaker->change_key ( dev ) < 0 )
+			key_reassoc = 1;
+
 		fetch_string_setting ( netdev_settings ( dev->netdev ),
 				       &net80211_ssid_setting, ssid,
 				       IEEE80211_MAX_SSID_LEN + 1 );
 
-		if ( strcmp ( ssid, dev->essid ) != 0 &&
-		     ! ( ! ssid[0] && ( dev->state & NET80211_AUTO_SSID ) ) ) {
+		if ( key_reassoc ||
+		     ( ! ( ! ssid[0] && ( dev->state & NET80211_AUTO_SSID ) ) &&
+		       strcmp ( ssid, dev->essid ) != 0 ) ) {
 			DBGC ( dev, "802.11 %p updating association: "
 			       "%s -> %s\n", dev, dev->essid, ssid );
 			net80211_autoassociate ( dev );
@@ -1846,6 +1950,8 @@ void net80211_autoassociate ( struct net80211_device *dev )
 	if ( ! ( dev->state & NET80211_WORKING ) ) {
 		DBGC2 ( dev, "802.11 %p spawning association process\n", dev );
 		process_add ( &dev->proc_assoc );
+	} else {
+		DBGC2 ( dev, "802.11 %p restarting association\n", dev );
 	}
 
 	/* Clean up everything an earlier association process might
@@ -1865,6 +1971,7 @@ void net80211_autoassociate ( struct net80211_device *dev )
 			       IEEE80211_MAX_SSID_LEN + 1 );
 	dev->ctx.probe = NULL;
 	dev->associating = NULL;
+	dev->assoc_rc = 0;
 	net80211_set_state ( dev, NET80211_PROBED, NET80211_WORKING, 0 );
 }
 
@@ -2020,6 +2127,7 @@ int net80211_prepare_assoc ( struct net80211_device *dev,
 	struct ieee80211_frame *hdr = wlan->beacon->data;
 	struct ieee80211_beacon *beacon =
 		( struct ieee80211_beacon * ) hdr->data;
+	struct net80211_handshaker *handshaker;
 	int rc;
 
 	assert ( dev->netdev->state & NETDEV_OPEN );
@@ -2028,10 +2136,11 @@ int net80211_prepare_assoc ( struct net80211_device *dev,
 	memcpy ( dev->bssid, wlan->bssid, ETH_ALEN );
 	strcpy ( dev->essid, wlan->essid );
 
+	free ( dev->rsn_ie );
+	dev->rsn_ie = NULL;
+
 	dev->last_beacon_timestamp = beacon->timestamp;
 	dev->tx_beacon_interval = 1024 * beacon->beacon_interval;
-
-	/* XXX do crypto setup here */
 
 	/* Barring an IE that tells us the channel outright, assume
 	   the channel we heard this AP best on is the channel it's
@@ -2050,6 +2159,46 @@ int net80211_prepare_assoc ( struct net80211_device *dev,
 	/* Associate at the lowest rate so we know it'll get through */
 	dev->rate = 0;
 	dev->op->config ( dev, NET80211_CFG_RATE );
+
+	/* Free old handshaker and crypto, if they exist */
+	if ( dev->handshaker && dev->handshaker->stop &&
+	     dev->handshaker->started )
+		dev->handshaker->stop ( dev );
+	free ( dev->handshaker );
+	dev->handshaker = NULL;
+	free ( dev->crypto );
+	free ( dev->gcrypto );
+	dev->crypto = dev->gcrypto = NULL;
+
+	/* Find new security handshaker to use */
+	for_each_table_entry ( handshaker, NET80211_HANDSHAKERS ) {
+		if ( handshaker->protocol == wlan->handshaking ) {
+			dev->handshaker = zalloc ( sizeof ( *handshaker ) +
+						   handshaker->priv_len );
+			if ( ! dev->handshaker )
+				return -ENOMEM;
+
+			memcpy ( dev->handshaker, handshaker,
+				 sizeof ( *handshaker ) );
+			dev->handshaker->priv = ( ( void * ) dev->handshaker +
+						  sizeof ( *handshaker ) );
+			break;
+		}
+	}
+
+	if ( ( wlan->handshaking != NET80211_SECPROT_NONE ) &&
+	     ! dev->handshaker ) {
+		DBGC ( dev, "802.11 %p no support for handshaking scheme %d\n",
+		       dev, wlan->handshaking );
+		return -( ENOTSUP | ( wlan->handshaking << 8 ) );
+	}
+
+	/* Initialize security handshaker */
+	if ( dev->handshaker ) {
+		rc = dev->handshaker->init ( dev );
+		if ( rc < 0 )
+			return rc;
+	}
 
 	return 0;
 }
@@ -2091,8 +2240,8 @@ int net80211_send_auth ( struct net80211_device *dev,
  *
  * If the authentication method being used is Shared Key, and the
  * frame that was received included challenge text, the frame is
- * encrypted using the cryptographic algorithm currently in effect and
- * sent back to the AP to complete the authentication.
+ * encrypted using the cryptosystem currently in effect and sent back
+ * to the AP to complete the authentication.
  */
 static void net80211_handle_auth ( struct net80211_device *dev,
 				   struct io_buffer *iob )
@@ -2181,8 +2330,6 @@ int net80211_send_assoc ( struct net80211_device *dev,
 	DBGP ( "802.11 %p about to send association request:\n", dev );
 	DBGP_HD ( iob->data, ( void * ) ie - iob->data );
 
-	/* XXX add RSN ie for WPA support */
-
 	iob_put ( iob, ( void * ) ie - iob->data );
 
 	return net80211_tx_mgmt ( dev, IEEE80211_STYPE_ASSOC_REQ,
@@ -2227,9 +2374,11 @@ static void net80211_handle_assoc_reply ( struct net80211_device *dev,
  *
  * @v dev	802.11 device
  * @v reason	Reason for disassociation
+ * @v deauth	If TRUE, send deauthentication instead of disassociation
  * @ret rc	Return status code
  */
-static int net80211_send_disassoc ( struct net80211_device *dev, int reason )
+static int net80211_send_disassoc ( struct net80211_device *dev, int reason,
+				    int deauth )
 {
 	struct io_buffer *iob = alloc_iob ( 64 );
 	struct ieee80211_disassoc *disassoc;
@@ -2242,8 +2391,28 @@ static int net80211_send_disassoc ( struct net80211_device *dev, int reason )
 	disassoc = iob_put ( iob, sizeof ( *disassoc ) );
 	disassoc->reason = reason;
 
-	return net80211_tx_mgmt ( dev, IEEE80211_STYPE_DISASSOC, dev->bssid,
-				  iob );
+	return net80211_tx_mgmt ( dev, deauth ? IEEE80211_STYPE_DEAUTH :
+				  IEEE80211_STYPE_DISASSOC, dev->bssid, iob );
+}
+
+
+/**
+ * Deauthenticate from current network and try again
+ *
+ * @v dev	802.11 device
+ * @v rc	Return status code indicating reason
+ *
+ * The deauthentication will be sent using an 802.11 "unspecified
+ * reason", as is common, but @a rc will be set as a link-up
+ * error to aid the user in debugging.
+ */
+void net80211_deauthenticate ( struct net80211_device *dev, int rc )
+{
+	net80211_send_disassoc ( dev, IEEE80211_REASON_UNSPECIFIED, 1 );
+	dev->assoc_rc = rc;
+	netdev_link_err ( dev->netdev, rc );
+
+	net80211_autoassociate ( dev );
 }
 
 
@@ -2557,14 +2726,29 @@ void net80211_rx ( struct net80211_device *dev, struct io_buffer *iob,
 		iob_unput ( iob, 4 );
 	}
 
-	if ( hdr->fc & IEEE80211_FC_PROTECTED ) {
+	/* Only decrypt packets from our BSSID, to avoid spurious errors */
+	if ( ( hdr->fc & IEEE80211_FC_PROTECTED ) &&
+	     ! memcmp ( hdr->addr2, dev->bssid, ETH_ALEN ) ) {
+		/* Decrypt packet; record and drop if it fails */
 		struct io_buffer *niob;
-		if ( ! dev->crypto )
-			goto drop;	/* can't decrypt packets on an open network */
+		struct net80211_crypto *crypto = dev->crypto;
 
-		niob = dev->crypto->decrypt ( dev->crypto, iob );
-		if ( ! niob )
-			goto drop;	/* drop failed decryption */
+		if ( ! dev->crypto ) {
+			DBGC ( dev, "802.11 %p cannot decrypt packet "
+			       "without a cryptosystem\n", dev );
+			goto drop_crypt;
+		}
+
+		if ( ( hdr->addr1[0] & 1 ) && dev->gcrypto ) {
+			/* Use group decryption if needed */
+			crypto = dev->gcrypto;
+		}
+
+		niob = crypto->decrypt ( crypto, iob );
+		if ( ! niob ) {
+			DBGC ( dev, "802.11 %p decryption error\n", dev );
+			goto drop_crypt;
+		}
 		free_iob ( iob );
 		iob = niob;
 	}
@@ -2593,11 +2777,16 @@ void net80211_rx ( struct net80211_device *dev, struct io_buffer *iob,
 		rc80211_update_rx ( dev, hdr->fc & IEEE80211_FC_RETRY, rate );
 
 	/* Pass packet onward */
-	if ( netdev_link_ok ( dev->netdev ) ) {
+	if ( dev->state & NET80211_ASSOCIATED ) {
 		netdev_rx ( dev->netdev, iob );
 		return;
 	}
 
+	/* No association? Drop it. */
+	goto drop;
+
+ drop_crypt:
+	netdev_rx_err ( dev->netdev, NULL, EINVAL_CRYPTO_REQUEST );
  drop:
 	DBGC2 ( dev, "802.11 %p dropped packet fc=%04x seq=%04x\n", dev,
 		hdr->fc, hdr->seq );
