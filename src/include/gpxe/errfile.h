@@ -162,6 +162,7 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #define ERRFILE_wep			( ERRFILE_NET | 0x00240000 )
 #define ERRFILE_eapol			( ERRFILE_NET | 0x00250000 )
 #define ERRFILE_wpa			( ERRFILE_NET | 0x00260000 )
+#define ERRFILE_wpa_psk			( ERRFILE_NET | 0x00270000 )
 
 #define ERRFILE_image		      ( ERRFILE_IMAGE | 0x00000000 )
 #define ERRFILE_elf		      ( ERRFILE_IMAGE | 0x00010000 )
