@@ -425,6 +425,14 @@ struct hermon_recv_work_queue {
 /** Base queue pair number */
 #define HERMON_QPN_BASE 0x550000
 
+/** Hermon queue pair state */
+enum hermon_queue_pair_state {
+	HERMON_QP_ST_RST = 0,
+	HERMON_QP_ST_INIT,
+	HERMON_QP_ST_RTR,
+	HERMON_QP_ST_RTS,
+};
+
 /** A Hermon queue pair */
 struct hermon_queue_pair {
 	/** Work queue buffer */
@@ -437,6 +445,8 @@ struct hermon_queue_pair {
 	struct hermon_send_work_queue send;
 	/** Receive work queue */
 	struct hermon_recv_work_queue recv;
+	/** Queue state */
+	enum hermon_queue_pair_state state;
 };
 
 /** Maximum number of allocatable completion queues

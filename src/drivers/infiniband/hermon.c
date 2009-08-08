@@ -1033,6 +1033,7 @@ static int hermon_create_qp ( struct ib_device *ibdev,
 		       hermon, strerror ( rc ) );
 		goto err_rst2init_qp;
 	}
+	hermon_qp->state = HERMON_QP_ST_INIT;
 
 	DBGC ( hermon, "Hermon %p QPN %#lx send ring at [%p,%p)\n",
 	       hermon, qp->qpn, hermon_qp->send.wqe,
@@ -1066,44 +1067,66 @@ static int hermon_create_qp ( struct ib_device *ibdev,
 static int hermon_modify_qp ( struct ib_device *ibdev,
 			      struct ib_queue_pair *qp ) {
 	struct hermon *hermon = ib_get_drvdata ( ibdev );
+	struct hermon_queue_pair *hermon_qp = ib_qp_get_drvdata ( qp );
 	struct hermonprm_qp_ee_state_transitions qpctx;
 	int rc;
 
-	/* Transition queue to RTR state */
-	memset ( &qpctx, 0, sizeof ( qpctx ) );
-	MLX_FILL_1 ( &qpctx, 0, opt_param_mask, HERMON_QP_OPT_PARAM_QKEY );
-	MLX_FILL_2 ( &qpctx, 4,
-		     qpc_eec_data.mtu, HERMON_MTU_2048,
-		     qpc_eec_data.msg_max, 31 );// 11 /* 2^11 = 2048 */ );
-	MLX_FILL_1 ( &qpctx, 7, qpc_eec_data.remote_qpn_een, qp->av.qpn );
-	MLX_FILL_1 ( &qpctx, 9,
-		     qpc_eec_data.primary_address_path.rlid, qp->av.lid );
-	MLX_FILL_1 ( &qpctx, 10,
-		     qpc_eec_data.primary_address_path.max_stat_rate,
-		     hermon_rate ( &qp->av ) );
-	memcpy ( &qpctx.u.dwords[12], &qp->av.gid, sizeof ( qp->av.gid ) );
-	MLX_FILL_1 ( &qpctx, 16,
-		     qpc_eec_data.primary_address_path.sched_queue,
-		     hermon_sched_queue ( ibdev, qp ) );
-	MLX_FILL_1 ( &qpctx, 39, qpc_eec_data.next_rcv_psn, qp->recv.psn );
-	MLX_FILL_1 ( &qpctx, 44, qpc_eec_data.q_key, qp->qkey );
-	if ( ( rc = hermon_cmd_init2rtr_qp ( hermon, qp->qpn,
-					     &qpctx ) ) != 0 ) {
-		DBGC ( hermon, "Hermon %p INIT2RTR_QP failed: %s\n",
-		       hermon, strerror ( rc ) );
-		return rc;
+	/* Transition queue to RTR state, if applicable */
+	if ( hermon_qp->state < HERMON_QP_ST_RTR ) {
+		memset ( &qpctx, 0, sizeof ( qpctx ) );
+		MLX_FILL_2 ( &qpctx, 4,
+			     qpc_eec_data.mtu, HERMON_MTU_2048,
+			     qpc_eec_data.msg_max, 31 );
+		MLX_FILL_1 ( &qpctx, 7,
+			     qpc_eec_data.remote_qpn_een, qp->av.qpn );
+		MLX_FILL_1 ( &qpctx, 9,
+			     qpc_eec_data.primary_address_path.rlid,
+			     qp->av.lid );
+		MLX_FILL_1 ( &qpctx, 10,
+			     qpc_eec_data.primary_address_path.max_stat_rate,
+			     hermon_rate ( &qp->av ) );
+		memcpy ( &qpctx.u.dwords[12], &qp->av.gid,
+			 sizeof ( qp->av.gid ) );
+		MLX_FILL_1 ( &qpctx, 16,
+			     qpc_eec_data.primary_address_path.sched_queue,
+			     hermon_sched_queue ( ibdev, qp ) );
+		MLX_FILL_1 ( &qpctx, 39,
+			     qpc_eec_data.next_rcv_psn, qp->recv.psn );
+		if ( ( rc = hermon_cmd_init2rtr_qp ( hermon, qp->qpn,
+						     &qpctx ) ) != 0 ) {
+			DBGC ( hermon, "Hermon %p INIT2RTR_QP failed: %s\n",
+			       hermon, strerror ( rc ) );
+			return rc;
+		}
+		hermon_qp->state = HERMON_QP_ST_RTR;
 	}
 
 	/* Transition queue to RTS state */
+	if ( hermon_qp->state < HERMON_QP_ST_RTS ) {
+		memset ( &qpctx, 0, sizeof ( qpctx ) );
+		MLX_FILL_1 ( &qpctx, 10,
+			     qpc_eec_data.primary_address_path.ack_timeout,
+			     0x13 );
+		MLX_FILL_2 ( &qpctx, 30,
+			     qpc_eec_data.retry_count, HERMON_RETRY_MAX,
+			     qpc_eec_data.rnr_retry, HERMON_RETRY_MAX );
+		MLX_FILL_1 ( &qpctx, 32,
+			     qpc_eec_data.next_send_psn, qp->send.psn );
+		if ( ( rc = hermon_cmd_rtr2rts_qp ( hermon, qp->qpn,
+						    &qpctx ) ) != 0 ) {
+			DBGC ( hermon, "Hermon %p RTR2RTS_QP failed: %s\n",
+			       hermon, strerror ( rc ) );
+			return rc;
+		}
+		hermon_qp->state = HERMON_QP_ST_RTS;
+	}
+
+	/* Update parameters in RTS state */
 	memset ( &qpctx, 0, sizeof ( qpctx ) );
-	MLX_FILL_1 ( &qpctx, 10,
-		     qpc_eec_data.primary_address_path.ack_timeout, 0x13 );
-	MLX_FILL_2 ( &qpctx, 30,
-		     qpc_eec_data.retry_count, HERMON_RETRY_MAX,
-		     qpc_eec_data.rnr_retry, HERMON_RETRY_MAX );
-	MLX_FILL_1 ( &qpctx, 32, qpc_eec_data.next_send_psn, qp->send.psn );
-	if ( ( rc = hermon_cmd_rtr2rts_qp ( hermon, qp->qpn, &qpctx ) ) != 0 ){
-		DBGC ( hermon, "Hermon %p RTR2RTS_QP failed: %s\n",
+	MLX_FILL_1 ( &qpctx, 0, opt_param_mask, HERMON_QP_OPT_PARAM_QKEY );
+	MLX_FILL_1 ( &qpctx, 44, qpc_eec_data.q_key, qp->qkey );
+	if ( ( rc = hermon_cmd_rts2rts_qp ( hermon, qp->qpn, &qpctx ) ) != 0 ){
+		DBGC ( hermon, "Hermon %p RTS2RTS_QP failed: %s\n",
 		       hermon, strerror ( rc ) );
 		return rc;
 	}
