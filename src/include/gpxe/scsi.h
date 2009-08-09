@@ -270,6 +270,8 @@ struct scsi_device {
 	struct refcnt *backend;
 };
 
+extern int scsi_detached_command ( struct scsi_device *scsi,
+				   struct scsi_command *command );
 extern int init_scsidev ( struct scsi_device *scsi );
 
 #endif /* _GPXE_SCSI_H */

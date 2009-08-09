@@ -45,6 +45,18 @@ block_to_scsi ( struct block_device *blockdev ) {
 }
 
 /**
+ * Handle SCSI command with no backing device
+ *
+ * @v scsi		SCSI device
+ * @v command		SCSI command
+ * @ret rc		Return status code
+ */
+int scsi_detached_command ( struct scsi_device *scsi __unused,
+			    struct scsi_command *command __unused ) {
+	return -ENODEV;
+}
+
+/**
  * Issue SCSI command
  *
  * @v scsi		SCSI device

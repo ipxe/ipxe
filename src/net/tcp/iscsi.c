@@ -1571,11 +1571,6 @@ static int iscsi_command ( struct scsi_device *scsi,
 	return 0;
 }
 
-static int iscsi_detached_command ( struct scsi_device *scsi __unused,
-				    struct scsi_command *command __unused ) {
-	return -ENODEV;
-}
-
 /**
  * Shut down iSCSI interface
  *
@@ -1588,7 +1583,7 @@ void iscsi_detach ( struct scsi_device *scsi ) {
 	xfer_nullify ( &iscsi->socket );
 	iscsi_close_connection ( iscsi, 0 );
 	process_del ( &iscsi->process );
-	scsi->command = iscsi_detached_command;
+	scsi->command = scsi_detached_command;
 	ref_put ( scsi->backend );
 	scsi->backend = NULL;
 }
