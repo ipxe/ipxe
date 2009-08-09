@@ -472,6 +472,7 @@ extern int ib_set_pkey_table ( struct ib_device *ibdev, union ib_mad *mad );
 extern struct ib_device * alloc_ibdev ( size_t priv_size );
 extern int register_ibdev ( struct ib_device *ibdev );
 extern void unregister_ibdev ( struct ib_device *ibdev );
+extern struct ib_device * find_ibdev ( struct ib_gid *gid );
 extern void ib_link_state_changed ( struct ib_device *ibdev );
 extern void ib_poll_eq ( struct ib_device *ibdev );
 extern struct list_head ib_devices;

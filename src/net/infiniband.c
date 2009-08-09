@@ -882,3 +882,19 @@ void unregister_ibdev ( struct ib_device *ibdev ) {
 	ibdev_put ( ibdev );
 	DBGC ( ibdev, "IBDEV %p unregistered\n", ibdev );
 }
+
+/**
+ * Find Infiniband device by GID
+ *
+ * @v gid		GID
+ * @ret ibdev		Infiniband device, or NULL
+ */
+struct ib_device * find_ibdev ( struct ib_gid *gid ) {
+	struct ib_device *ibdev;
+
+	for_each_ibdev ( ibdev ) {
+		if ( memcmp ( gid, &ibdev->gid, sizeof ( *gid ) ) == 0 )
+			return ibdev;
+	}
+	return NULL;
+}
