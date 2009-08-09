@@ -46,6 +46,9 @@ struct ib_connection {
 	/** Connection operations */
 	struct ib_connection_operations *op;
 
+	/** List of connections */
+	struct list_head list;
+
 	/** Path to target */
 	struct ib_path *path;
 	/** Connection request management transaction */

@@ -36,6 +36,9 @@ FILE_LICENCE ( GPL2_OR_LATER );
  *
  */
 
+/** List of connections */
+static LIST_HEAD ( ib_cm_conns );
+
 /**
  * Send "ready to use" response
  *
@@ -70,6 +73,54 @@ static int ib_cm_send_rtu ( struct ib_device *ibdev,
 
 	return 0;
 }
+
+/**
+ * Handle duplicate connection replies
+ *
+ * @v ibdev		Infiniband device
+ * @v mi		Management interface
+ * @v mad		Received MAD
+ * @v av		Source address vector
+ * @ret rc		Return status code
+ *
+ * If a "ready to use" MAD is lost, the peer may resend the connection
+ * reply.  We have to respond to these with duplicate "ready to use"
+ * MADs, otherwise the peer may time out and drop the connection.
+ */
+static void ib_cm_connect_rep ( struct ib_device *ibdev,
+				struct ib_mad_interface *mi,
+				union ib_mad *mad,
+				struct ib_address_vector *av ) {
+	struct ib_cm_connect_reply *connect_rep =
+		&mad->cm.cm_data.connect_reply;
+	struct ib_connection *conn;
+	int rc;
+
+	/* Identify connection */
+	list_for_each_entry ( conn, &ib_cm_conns, list ) {
+		if ( ntohl ( connect_rep->remote_id ) != conn->local_id )
+			continue;
+		/* Try to send "ready to use" reply */
+		if ( ( rc = ib_cm_send_rtu ( ibdev, mi, conn, av ) ) != 0 ) {
+			/* Ignore errors */
+			return;
+		}
+		return;
+	}
+
+	DBG ( "CM unidentified connection %08x\n",
+	      ntohl ( connect_rep->remote_id ) );
+}
+
+/** Communication management agents */
+struct ib_mad_agent ib_cm_agent[] __ib_mad_agent = {
+	{
+		.mgmt_class = IB_MGMT_CLASS_CM,
+		.class_version = IB_CM_CLASS_VERSION,
+		.attr_id = htons ( IB_CM_ATTR_CONNECT_REPLY ),
+		.handle = ib_cm_connect_rep,
+	},
+};
 
 /**
  * Handle connection request transaction completion
@@ -296,6 +347,9 @@ ib_create_conn ( struct ib_device *ibdev, struct ib_queue_pair *qp,
 		goto err_create_path;
 	ib_path_set_ownerdata ( conn->path, conn );
 
+	/* Add to list of connections */
+	list_add ( &conn->list, &ib_cm_conns );
+
 	DBGC ( conn, "CM %p created for IBDEV %p QPN %lx\n",
 	       conn, ibdev, qp->qpn );
 	DBGC ( conn, "CM %p connecting to %08x:%08x:%08x:%08x %08x:%08x\n",
@@ -324,6 +378,7 @@ void ib_destroy_conn ( struct ib_device *ibdev,
 		       struct ib_queue_pair *qp __unused,
 		       struct ib_connection *conn ) {
 
+	list_del ( &conn->list );
 	if ( conn->madx )
 		ib_destroy_madx ( ibdev, ibdev->gsi, conn->madx );
 	if ( conn->path )
