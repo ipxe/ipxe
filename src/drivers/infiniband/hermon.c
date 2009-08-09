@@ -857,7 +857,8 @@ static int hermon_alloc_qpn ( struct ib_device *ibdev,
 			       hermon );
 			return qpn_offset;
 		}
-		qp->qpn = ( hermon->qpn_base + qpn_offset );
+		qp->qpn = ( ( random() & HERMON_QPN_RANDOM_MASK ) |
+			    ( hermon->qpn_base + qpn_offset ) );
 		return 0;
 	default:
 		DBGC ( hermon, "Hermon %p unsupported QP type %d\n",
@@ -877,7 +878,8 @@ static void hermon_free_qpn ( struct ib_device *ibdev,
 	struct hermon *hermon = ib_get_drvdata ( ibdev );
 	int qpn_offset;
 
-	qpn_offset = ( qp->qpn - hermon->qpn_base );
+	qpn_offset = ( ( qp->qpn & ~HERMON_QPN_RANDOM_MASK )
+		       - hermon->qpn_base );
 	if ( qpn_offset >= 0 )
 		hermon_bitmask_free ( hermon->qp_inuse, qpn_offset, 1 );
 }
@@ -2529,8 +2531,7 @@ static int hermon_configure_special_qps ( struct hermon *hermon ) {
 	int rc;
 
 	/* Special QP block must be aligned on its own size */
-	hermon->special_qpn_base = ( ( HERMON_QPN_BASE +
-				       hermon->cap.reserved_qps +
+	hermon->special_qpn_base = ( ( hermon->cap.reserved_qps +
 				       HERMON_NUM_SPECIAL_QPS - 1 )
 				     & ~( HERMON_NUM_SPECIAL_QPS - 1 ) );
 	hermon->qpn_base = ( hermon->special_qpn_base +

@@ -422,8 +422,8 @@ struct hermon_recv_work_queue {
  */
 #define HERMON_MAX_QPS		8
 
-/** Base queue pair number */
-#define HERMON_QPN_BASE 0x550000
+/** Queue pair number randomisation mask */
+#define HERMON_QPN_RANDOM_MASK 0xfff000
 
 /** Hermon queue pair state */
 enum hermon_queue_pair_state {
