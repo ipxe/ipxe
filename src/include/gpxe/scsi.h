@@ -253,8 +253,6 @@ struct scsi_lun {
 struct scsi_device {
 	/** Block device interface */
 	struct block_device blockdev;
-	/** Logical unit number (LUN) */
-	struct scsi_lun lun;
 	/**
 	 * Issue SCSI command
 	 *

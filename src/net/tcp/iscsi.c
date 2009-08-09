@@ -1763,7 +1763,6 @@ int iscsi_attach ( struct scsi_device *scsi, const char *root_path ) {
 	/* Attach parent interface, mortalise self, and return */
 	scsi->backend = ref_get ( &iscsi->refcnt );
 	scsi->command = iscsi_command;
-	scsi->lun = iscsi->lun;
 	ref_put ( &iscsi->refcnt );
 	return 0;
 	
