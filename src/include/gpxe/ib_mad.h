@@ -402,6 +402,11 @@ struct ib_cm_connect_reject {
 	uint8_t private_data[148];
 } __attribute__ (( packed ));
 
+/** CM rejection reasons */
+#define IB_CM_REJECT_BAD_SERVICE_ID	8
+#define IB_CM_REJECT_STALE_CONN		10
+#define IB_CM_REJECT_CONSUMER		28
+
 /** A communication management connection reply
  *
  * Defined in section 12.6.8 of the IBA.

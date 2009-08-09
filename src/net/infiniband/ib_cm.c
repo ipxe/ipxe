@@ -123,6 +123,25 @@ struct ib_mad_agent ib_cm_agent[] __ib_mad_agent = {
 };
 
 /**
+ * Convert connection rejection reason to return status code
+ *
+ * @v reason		Rejection reason (in network byte order)
+ * @ret rc		Return status code
+ */
+static int ib_cm_rejection_reason_to_rc ( uint16_t reason ) {
+	switch ( reason ) {
+	case htons ( IB_CM_REJECT_BAD_SERVICE_ID ) :
+		return -ENODEV;
+	case htons ( IB_CM_REJECT_STALE_CONN ) :
+		return -EALREADY;
+	case htons ( IB_CM_REJECT_CONSUMER ) :
+		return -ENOTTY;
+	default:
+		return -EPERM;
+	}
+}
+
+/**
  * Handle connection request transaction completion
  *
  * @v ibdev		Infiniband device
@@ -189,9 +208,12 @@ static void ib_cm_req_complete ( struct ib_device *ibdev,
 		/* Extract fields */
 		DBGC ( conn, "CM %p connection rejected (reason %d)\n",
 		       conn, ntohs ( connect_rej->reason ) );
-		private_data = &connect_rej->private_data;
-		private_data_len = sizeof ( connect_rej->private_data );
-		rc = -ENOTCONN;
+		/* Private data is valid only for a Consumer Reject */
+		if ( connect_rej->reason == htons ( IB_CM_REJECT_CONSUMER ) ) {
+			private_data = &connect_rej->private_data;
+			private_data_len = sizeof (connect_rej->private_data);
+		}
+		rc = ib_cm_rejection_reason_to_rc ( connect_rej->reason );
 		break;
 
 	default:

@@ -172,7 +172,8 @@ static void ib_cmrc_changed ( struct ib_device *ibdev __unused,
 	/* Pass up any private data */
 	DBGC2 ( cmrc, "CMRC %p received private data:\n", cmrc );
 	DBGC2_HDA ( cmrc, 0, private_data, private_data_len );
-	if ( ( rc_xfer = xfer_deliver_raw ( &cmrc->xfer, private_data,
+	if ( private_data &&
+	     ( rc_xfer = xfer_deliver_raw ( &cmrc->xfer, private_data,
 					    private_data_len ) ) != 0 ) {
 		DBGC ( cmrc, "CMRC %p could not deliver private data: %s\n",
 		       cmrc, strerror ( rc_xfer ) );
