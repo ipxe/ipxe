@@ -19,6 +19,7 @@
 FILE_LICENCE ( GPL2_OR_LATER );
 
 #include <stddef.h>
+#include <stdlib.h>
 #include <string.h>
 #include <byteswap.h>
 #include <errno.h>
@@ -331,6 +332,35 @@ int init_scsidev ( struct scsi_device *scsi ) {
 	DBGC ( scsi, "SCSI %p capacity is %ld MB (%#llx blocks)\n", scsi,
 	       ( ( unsigned long ) ( scsi->blockdev.blocks >> 11 ) ),
 	       scsi->blockdev.blocks );
+
+	return 0;
+}
+
+/**
+ * Parse SCSI LUN
+ *
+ * @v lun_string	LUN string representation
+ * @v lun		LUN to fill in
+ * @ret rc		Return status code
+ */
+int scsi_parse_lun ( const char *lun_string, struct scsi_lun *lun ) {
+	char *p;
+	int i;
+
+	memset ( lun, 0, sizeof ( *lun ) );
+	if ( lun_string ) {
+		p = ( char * ) lun_string;
+		for ( i = 0 ; i < 4 ; i++ ) {
+			lun->u16[i] = htons ( strtoul ( p, &p, 16 ) );
+			if ( *p == '\0' )
+				break;
+			if ( *p != '-' )
+				return -EINVAL;
+			p++;
+		}
+		if ( *p )
+			return -EINVAL;
+	}
 
 	return 0;
 }

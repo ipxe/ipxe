@@ -240,16 +240,21 @@ struct scsi_command {
 	int rc;
 };
 
+/** A SCSI LUN
+ *
+ * This is a four-level LUN as specified by SAM-2, in big-endian
+ * order.
+ */
+struct scsi_lun {
+	uint16_t u16[4];
+}  __attribute__ (( packed ));
+
 /** A SCSI device */
 struct scsi_device {
 	/** Block device interface */
 	struct block_device blockdev;
-	/** Logical unit number (LUN)
-	 *
-	 * This is a four-level LUN as specified by SAM-2, in
-	 * big-endian order.
-	 */
-	uint64_t lun;
+	/** Logical unit number (LUN) */
+	struct scsi_lun lun;
 	/**
 	 * Issue SCSI command
 	 *
@@ -273,5 +278,6 @@ struct scsi_device {
 extern int scsi_detached_command ( struct scsi_device *scsi,
 				   struct scsi_command *command );
 extern int init_scsidev ( struct scsi_device *scsi );
+extern int scsi_parse_lun ( const char *lun_string, struct scsi_lun *lun );
 
 #endif /* _GPXE_SCSI_H */

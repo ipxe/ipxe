@@ -1606,42 +1606,6 @@ enum iscsi_root_path_component {
 };
 
 /**
- * Parse iSCSI LUN
- *
- * @v iscsi		iSCSI session
- * @v lun_string	LUN string representation (as per RFC4173)
- * @ret rc		Return status code
- */
-static int iscsi_parse_lun ( struct iscsi_session *iscsi,
-			     const char *lun_string ) {
-	union {
-		uint64_t u64;
-		uint16_t u16[4];
-	} lun;
-	char *p;
-	int i;
-
-	memset ( &lun, 0, sizeof ( lun ) );
-	if ( lun_string ) {
-		p = ( char * ) lun_string;
-		
-		for ( i = 0 ; i < 4 ; i++ ) {
-			lun.u16[i] = htons ( strtoul ( p, &p, 16 ) );
-			if ( *p == '\0' )
-				break;
-			if ( *p != '-' )
-				return -EINVAL;
-			p++;
-		}
-		if ( *p )
-			return -EINVAL;
-	}
-
-	iscsi->lun = lun.u64;
-	return 0;
-}
-
-/**
  * Parse iSCSI root path
  *
  * @v iscsi		iSCSI session
@@ -1679,7 +1643,7 @@ static int iscsi_parse_root_path ( struct iscsi_session *iscsi,
 	iscsi->target_port = strtoul ( rp_comp[RP_PORT], NULL, 10 );
 	if ( ! iscsi->target_port )
 		iscsi->target_port = ISCSI_PORT;
-	if ( ( rc = iscsi_parse_lun ( iscsi, rp_comp[RP_LUN] ) ) != 0 ) {
+	if ( ( rc = scsi_parse_lun ( rp_comp[RP_LUN], &iscsi->lun ) ) != 0 ) {
 		DBGC ( iscsi, "iSCSI %p invalid LUN \"%s\"\n",
 		       iscsi, rp_comp[RP_LUN] );
 		return rc;
