@@ -1108,7 +1108,7 @@ static int hermon_modify_qp ( struct ib_device *ibdev,
 		memset ( &qpctx, 0, sizeof ( qpctx ) );
 		MLX_FILL_1 ( &qpctx, 10,
 			     qpc_eec_data.primary_address_path.ack_timeout,
-			     0x13 );
+			     14 /* 4.096us * 2^(14) = 67ms */ );
 		MLX_FILL_2 ( &qpctx, 30,
 			     qpc_eec_data.retry_count, HERMON_RETRY_MAX,
 			     qpc_eec_data.rnr_retry, HERMON_RETRY_MAX );
