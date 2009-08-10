@@ -47,6 +47,7 @@ static inline __attribute__ (( always_inline )) void
 process_init_stopped ( struct process *process,
 		       void ( * step ) ( struct process *process ),
 		       struct refcnt *refcnt ) {
+	INIT_LIST_HEAD ( &process->list );
 	process->step = step;
 	process->refcnt = refcnt;
 }

@@ -37,11 +37,18 @@ static LIST_HEAD ( run_queue );
  * Add process to process list
  *
  * @v process		Process
+ *
+ * It is safe to call process_add() multiple times; further calls will
+ * have no effect.
  */
 void process_add ( struct process *process ) {
-	DBGC ( process, "PROCESS %p starting\n", process );
-	ref_get ( process->refcnt );
-	list_add_tail ( &process->list, &run_queue );
+	if ( list_empty ( &process->list ) ) {
+		DBGC ( process, "PROCESS %p starting\n", process );
+		ref_get ( process->refcnt );
+		list_add_tail ( &process->list, &run_queue );
+	} else {
+		DBGC ( process, "PROCESS %p already started\n", process );
+	}
 }
 
 /**

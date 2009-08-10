@@ -625,5 +625,6 @@ static void net_step ( struct process *process __unused ) {
 
 /** Networking stack process */
 struct process net_process __permanent_process = {
+	.list = LIST_HEAD_INIT ( net_process.list ),
 	.step = net_step,
 };
