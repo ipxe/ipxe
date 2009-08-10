@@ -45,6 +45,9 @@ FILE_LICENCE ( GPL2_OR_LATER );
 /** List of Infiniband devices */
 struct list_head ib_devices = LIST_HEAD_INIT ( ib_devices );
 
+/** List of open Infiniband devices, in reverse order of opening */
+static struct list_head open_ib_devices = LIST_HEAD_INIT ( open_ib_devices );
+
 /***************************************************************************
  *
  * Completion queues
@@ -565,6 +568,9 @@ int ib_open ( struct ib_device *ibdev ) {
 		goto err_open;
 	}
 
+	/* Add to head of open devices list */
+	list_add ( &ibdev->open_list, &open_ib_devices );
+
 	assert ( ibdev->open_count == 1 );
 	return 0;
 
@@ -593,6 +599,7 @@ void ib_close ( struct ib_device *ibdev ) {
 
 	/* Close device if this was the last remaining requested opening */
 	if ( ibdev->open_count == 0 ) {
+		list_del ( &ibdev->open_list );
 		ib_destroy_mi ( ibdev, ibdev->gsi );
 		ib_destroy_sma ( ibdev, ibdev->smi );
 		ib_destroy_mi ( ibdev, ibdev->smi );
@@ -896,5 +903,21 @@ struct ib_device * find_ibdev ( struct ib_gid *gid ) {
 		if ( memcmp ( gid, &ibdev->gid, sizeof ( *gid ) ) == 0 )
 			return ibdev;
 	}
+	return NULL;
+}
+
+/**
+ * Get most recently opened Infiniband device
+ *
+ * @ret ibdev		Most recently opened Infiniband device, or NULL
+ */
+struct ib_device * last_opened_ibdev ( void ) {
+	struct ib_device *ibdev;
+
+	list_for_each_entry ( ibdev, &open_ib_devices, open_list ) {
+		assert ( ibdev->open_count != 0 );
+		return ibdev;
+	}
+
 	return NULL;
 }

@@ -43,7 +43,7 @@ FILE_LICENCE ( GPL2_OR_LATER );
 struct list_head net_devices = LIST_HEAD_INIT ( net_devices );
 
 /** List of open network devices, in reverse order of opening */
-struct list_head open_net_devices = LIST_HEAD_INIT ( open_net_devices );
+static struct list_head open_net_devices = LIST_HEAD_INIT ( open_net_devices );
 
 /** Default link status code */
 #define EUNKNOWN_LINK_STATUS EINPROGRESS
