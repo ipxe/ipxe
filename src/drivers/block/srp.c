@@ -80,19 +80,16 @@ static void srp_fail ( struct srp_device *srp, int rc ) {
 	/* Clear session state */
 	srp->state = 0;
 
-	/* Increment retry count */
-	srp->retry_count++;
-
-	/* If we have reached the retry limit, permanently abort the
-	 * session.
-	 */
+	/* If we have reached the retry limit, report the failure */
 	if ( srp->retry_count >= SRP_MAX_RETRIES ) {
-		srp->instant_rc = rc;
 		srp_scsi_done ( srp, rc );
 		return;
 	}
 
-	/* Otherwise, try to reopen the connection */
+	/* Otherwise, increment the retry count and try to reopen the
+	 * connection
+	 */
+	srp->retry_count++;
 	srp_login ( srp );
 }
 
@@ -444,10 +441,6 @@ static int srp_command ( struct scsi_device *scsi,
 			 struct scsi_command *command ) {
 	struct srp_device *srp =
 		container_of ( scsi->backend, struct srp_device, refcnt );
-
-	/* Return instant failure, if we have already aborted the session */
-	if ( srp->instant_rc )
-		return srp->instant_rc;
 
 	/* Store SCSI command */
 	if ( srp->command ) {

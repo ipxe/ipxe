@@ -828,12 +828,6 @@ struct srp_device {
 	unsigned int state;
 	/** Retry counter */
 	unsigned int retry_count;
-	/** Instant return status code
-	 *
-	 * Used to avoid retrying the connection on every new SCSI
-	 * command after the retry count has been exceeded.
-	 */
-	int instant_rc;
 	/** Current SCSI command */
 	struct scsi_command *command;
 
