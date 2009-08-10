@@ -148,6 +148,8 @@ static void ib_cm_req_complete ( struct ib_device *ibdev,
 	size_t private_data_len = 0;
 
 	/* Report failures */
+	if ( ( rc == 0 ) && ( mad->hdr.status != htons ( IB_MGMT_STATUS_OK ) ))
+		rc = -EIO;
 	if ( rc != 0 ) {
 		DBGC ( conn, "CM %p connection request failed: %s\n",
 		       conn, strerror ( rc ) );
@@ -195,7 +197,7 @@ static void ib_cm_req_complete ( struct ib_device *ibdev,
 	default:
 		DBGC ( conn, "CM %p unexpected response (attribute %04x)\n",
 		       conn, ntohs ( mad->hdr.attr_id ) );
-		rc = -EIO;
+		rc = -ENOTSUP;
 		break;
 	}
 

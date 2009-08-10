@@ -53,6 +53,8 @@ static void ib_path_complete ( struct ib_device *ibdev,
 	struct ib_path_record *pathrec = &mad->sa.sa_data.path_record;
 
 	/* Report failures */
+	if ( ( rc == 0 ) && ( mad->hdr.status != htons ( IB_MGMT_STATUS_OK ) ))
+		rc = -ENETUNREACH;
 	if ( rc != 0 ) {
 		DBGC ( ibdev, "IBDEV %p path lookup for %08x:%08x:%08x:%08x "
 		       "failed: %s\n", ibdev, htonl ( dgid->u.dwords[0] ),

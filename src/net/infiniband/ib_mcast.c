@@ -86,6 +86,8 @@ static void ib_mcast_complete ( struct ib_device *ibdev,
 	unsigned long qkey;
 
 	/* Report failures */
+	if ( ( rc == 0 ) && ( mad->hdr.status != htons ( IB_MGMT_STATUS_OK ) ))
+		rc = -ENOTCONN;
 	if ( rc != 0 ) {
 		DBGC ( ibdev, "IBDEV %p QPN %lx join failed: %s\n",
 		       ibdev, qp->qpn, strerror ( rc ) );

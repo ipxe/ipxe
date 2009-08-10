@@ -76,18 +76,14 @@ static int ib_mi_handle ( struct ib_device *ibdev,
 	struct ib_mad_hdr *hdr = &mad->hdr;
 	struct ib_mad_transaction *madx;
 	struct ib_mad_agent *agent;
-	int rc;
 
 	/* Look for a matching transaction by TID */
 	list_for_each_entry ( madx, &mi->madx, list ) {
 		if ( memcmp ( &hdr->tid, &madx->mad.hdr.tid,
 			      sizeof ( hdr->tid ) ) != 0 )
 			continue;
-		/* Get transaction result status */
-		rc = ( ( hdr->status == htons ( IB_MGMT_STATUS_OK ) ) ?
-		       0 : -EIO );
 		/* Found a matching transaction */
-		madx->op->complete ( ibdev, mi, madx, rc, mad, av );
+		madx->op->complete ( ibdev, mi, madx, 0, mad, av );
 		return 0;
 	}
 
