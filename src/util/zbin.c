@@ -38,7 +38,7 @@ struct zinfo_pack {
 	uint32_t align;
 };
 
-struct zinfo_subtract {
+struct zinfo_add {
 	char type[4];
 	uint32_t offset;
 	uint32_t divisor;
@@ -49,7 +49,7 @@ union zinfo_record {
 	struct zinfo_common common;
 	struct zinfo_copy copy;
 	struct zinfo_pack pack;
-	struct zinfo_subtract subtract;
+	struct zinfo_add add;
 };
 
 struct zinfo_file {
@@ -157,8 +157,9 @@ static int process_zinfo_copy ( struct input_file *input,
 	}
 
 	if ( DEBUG ) {
-		fprintf ( stderr, "COPY [%#zx,%#zx) to [%#zx,%#zx)\n", offset, ( offset + len ),
-			  output->len, ( output->len + len ) );
+		fprintf ( stderr, "COPY [%#zx,%#zx) to [%#zx,%#zx)\n",
+			  offset, ( offset + len ), output->len,
+			  ( output->len + len ) );
 	}
 
 	memcpy ( ( output->buf + output->len ),
@@ -194,8 +195,9 @@ static int process_zinfo_pack ( struct input_file *input,
 	}
 
 	if ( DEBUG ) {
-		fprintf ( stderr, "PACK [%#zx,%#zx) to [%#zx,%#zx)\n", offset, ( offset + len ),
-			  output->len, ( output->len + packed_len ) );
+		fprintf ( stderr, "PACK [%#zx,%#zx) to [%#zx,%#zx)\n",
+			  offset, ( offset + len ), output->len,
+			  ( output->len + packed_len ) );
 	}
 
 	output->len += packed_len;
@@ -207,78 +209,102 @@ static int process_zinfo_pack ( struct input_file *input,
 	return 0;
 }
 
-static int process_zinfo_subtract ( struct input_file *input,
-				    struct output_file *output,
-				    struct zinfo_subtract *subtract,
-				    size_t datasize ) {
-	size_t offset = subtract->offset;
+static int process_zinfo_add ( struct input_file *input,
+			       struct output_file *output,
+			       struct zinfo_add *add,
+			       size_t datasize ) {
+	size_t offset = add->offset;
 	void *target;
-	signed long raw_delta;
-	signed long delta;
-	unsigned long old;
-	unsigned long new;
+	signed long addend;
+	unsigned long size;
+	signed long val;
+	unsigned long mask;
 
 	if ( ( offset + datasize ) > output->len ) {
-		fprintf ( stderr, "Subtract at %#zx outside output buffer\n",
+		fprintf ( stderr, "Add at %#zx outside output buffer\n",
 			  offset );
 		return -1;
 	}
 
 	target = ( output->buf + offset );
-	raw_delta = ( align ( output->len, subtract->divisor ) -
-		      align ( input->len, subtract->divisor ) );
-	delta = ( raw_delta / ( ( signed long ) subtract->divisor ) );
+	size = ( align ( output->len, add->divisor ) / add->divisor );
 
 	switch ( datasize ) {
-	case 1: {
-		uint8_t *byte = target;
-		old = *byte;
-		*byte += delta;
-		new = *byte;
-		break; }
-	case 2: {
-		uint16_t *word = target;
-		old = *word;
-		*word += delta;
-		new = *word;
-		break; }
-	case 4: {
-		uint32_t *dword = target;
-		old = *dword;
-		*dword += delta;
-		new = *dword;
-		break; }
+	case 1:
+		addend = *( ( int8_t * ) target );
+		break;
+	case 2:
+		addend = *( ( int16_t * ) target );
+		break;
+	case 4:
+		addend = *( ( int32_t * ) target );
+		break;
 	default:
-		fprintf ( stderr, "Unsupported subtract datasize %d\n",
+		fprintf ( stderr, "Unsupported add datasize %d\n",
 			  datasize );
 		return -1;
 	}
 
+	val = size + addend;
+
+	/* The result of 1UL << ( 8 * sizeof(unsigned long) ) is undefined */
+	mask = ( ( datasize < sizeof ( mask ) ) ?
+		 ( ( 1UL << ( 8 * datasize ) ) - 1 ) : ~0UL );
+
+	if ( val < 0 ) {
+		fprintf ( stderr, "Add %s%#lx+%#lx at %#zx %sflows field\n",
+			  ( ( addend < 0 ) ? "-" : "" ), abs ( addend ), size,
+			  offset, ( ( addend < 0 ) ? "under" : "over" ) );
+		return -1;
+	}
+
+	if ( val & ~mask ) {
+		fprintf ( stderr, "Add %s%#lx+%#lx at %#zx overflows %d-byte "
+			  "field (%d bytes too big)\n",
+			  ( ( addend < 0 ) ? "-" : "" ), abs ( addend ), size,
+			  offset, datasize,
+			  ( ( val - mask - 1 ) * add->divisor ) );
+		return -1;
+	}
+
+	switch ( datasize ) {
+	case 1:
+		*( ( uint8_t * ) target ) = val;
+		break;
+	case 2:
+		*( ( uint16_t * ) target ) = val;
+		break;
+	case 4:
+		*( ( uint32_t * ) target ) = val;
+		break;
+	}
+
 	if ( DEBUG ) {
-		fprintf ( stderr, "SUBx [%#zx,%#zx) (%#lx+(%#lx/%#x)-(%#lx/%#x)) = %#lx\n",
-			  offset, ( offset + datasize ), old, output->len, subtract->divisor,
-			  input->len, subtract->divisor, new );
+		fprintf ( stderr, "ADDx [%#zx,%#zx) (%s%#lx+(%#lx/%#x)) = "
+			  "%#lx\n", offset, ( offset + datasize ),
+			  ( ( addend < 0 ) ? "-" : "" ), abs ( addend ),
+			  output->len, add->divisor, val );
 	}
 
 	return 0;
 }
 
-static int process_zinfo_subb ( struct input_file *input,
+static int process_zinfo_addb ( struct input_file *input,
 				struct output_file *output,
 				union zinfo_record *zinfo ) {
-	return process_zinfo_subtract ( input, output, &zinfo->subtract, 1 );
+	return process_zinfo_add ( input, output, &zinfo->add, 1 );
 }
 
-static int process_zinfo_subw ( struct input_file *input,
+static int process_zinfo_addw ( struct input_file *input,
 				struct output_file *output,
 				union zinfo_record *zinfo ) {
-	return process_zinfo_subtract ( input, output, &zinfo->subtract, 2 );
+	return process_zinfo_add ( input, output, &zinfo->add, 2 );
 }
 
-static int process_zinfo_subl ( struct input_file *input,
+static int process_zinfo_addl ( struct input_file *input,
 				struct output_file *output,
 				union zinfo_record *zinfo ) {
-	return process_zinfo_subtract ( input, output, &zinfo->subtract, 4 );
+	return process_zinfo_add ( input, output, &zinfo->add, 4 );
 }
 
 struct zinfo_processor {
@@ -291,9 +317,9 @@ struct zinfo_processor {
 static struct zinfo_processor zinfo_processors[] = {
 	{ "COPY", process_zinfo_copy },
 	{ "PACK", process_zinfo_pack },
-	{ "SUBB", process_zinfo_subb },
-	{ "SUBW", process_zinfo_subw },
-	{ "SUBL", process_zinfo_subl },
+	{ "ADDB", process_zinfo_addb },
+	{ "ADDW", process_zinfo_addw },
+	{ "ADDL", process_zinfo_addl },
 };
 
 static int process_zinfo ( struct input_file *input,

@@ -94,10 +94,10 @@ setup_sects:
 root_flags: 
 	.word	0
 syssize: 
-	.long	_filesz_pgh - PREFIXPGH
+	.long	-PREFIXPGH
 
 	.section ".zinfo.fixup", "a", @progbits	/* Compressor fixups */
-	.ascii	"SUBL"
+	.ascii	"ADDL"
 	.long	syssize
 	.long	16
 	.long	0

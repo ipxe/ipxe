@@ -30,16 +30,16 @@ segment_header:
 	.byte	0
 	.byte	0x04		/* Last segment */
 	.long	0x00007e00
-imglen:	.long	_filesz - 512
-memlen:	.long	_filesz - 512
+imglen:	.long	-512
+memlen:	.long	-512
 	.size	segment_header, . - segment_header
 
 	.section ".zinfo.fixup", "a", @progbits	/* Compressor fixups */
-	.ascii	"SUBL"
+	.ascii	"ADDL"
 	.long	imglen
 	.long	1
 	.long	0
-	.ascii	"SUBL"
+	.ascii	"ADDL"
 	.long	memlen
 	.long	1
 	.long	0

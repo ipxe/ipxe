@@ -33,7 +33,7 @@ FILE_LICENCE ( GPL2_OR_LATER )
 	.org	0x00
 romheader:
 	.word	0xAA55			/* BIOS extension signature */
-romheader_size:	.byte _filesz_sect	/* Size in 512-byte blocks */
+romheader_size:	.byte 0			/* Size in 512-byte blocks */
 	jmp	init			/* Initialisation vector */
 checksum:
 	.byte	0
@@ -46,7 +46,7 @@ checksum:
 	.size romheader, . - romheader
 	
 	.section ".zinfo.fixup", "a", @progbits	/* Compressor fixups */
-	.ascii	"SUBB"
+	.ascii	"ADDB"
 	.long	romheader_size
 	.long	512
 	.long	0
@@ -61,23 +61,23 @@ pciheader:
 	.byte	0x03			/* PCI data structure revision */
 	.byte	0x02, 0x00, 0x00	/* Class code */
 pciheader_image_length:
-	.word	_filesz_sect		/* Image length */
+	.word	0			/* Image length */
 	.word	0x0001			/* Revision level */
 	.byte	0x00			/* Code type */
 	.byte	0x80			/* Last image indicator */
 pciheader_runtime_length:
-	.word	_filesz_sect		/* Maximum run-time image length */
+	.word	0			/* Maximum run-time image length */
 	.word	0x0000			/* Configuration utility code header */
 	.word	0x0000			/* DMTF CLP entry point */
 	.equ pciheader_len, . - pciheader
 	.size pciheader, . - pciheader
 	
 	.section ".zinfo.fixup", "a", @progbits	/* Compressor fixups */
-	.ascii	"SUBW"
+	.ascii	"ADDW"
 	.long	pciheader_image_length
 	.long	512
 	.long	0
-	.ascii	"SUBW"
+	.ascii	"ADDW"
 	.long	pciheader_runtime_length
 	.long	512
 	.long	0

@@ -65,10 +65,10 @@ max_sector:
 max_head:
 	.byte	0
 load_length:
-	.long	_filesz_sect
+	.long	0
 	
 	.section ".zinfo.fixup", "a", @progbits	/* Compressor fixups */
-	.ascii	"SUBL"
+	.ascii	"ADDL"
 	.long	load_length
 	.long	512
 	.long	0
