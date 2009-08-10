@@ -6,6 +6,7 @@
 #include <gpxe/sanboot.h>
 #include <int13.h>
 #include <gpxe/srp.h>
+#include <gpxe/sbft.h>
 
 FILE_LICENCE ( GPL2_OR_LATER );
 
@@ -37,6 +38,11 @@ static int ib_srpboot ( const char *root_path ) {
 	}
 
 	drive->blockdev = &scsi->blockdev;
+
+	/* FIXME: ugly, ugly hack */
+	struct srp_device *srp =
+		container_of ( scsi->backend, struct srp_device, refcnt );
+	sbft_fill_data ( srp );
 
 	register_int13_drive ( drive );
 	printf ( "Registered as BIOS drive %#02x\n", drive->drive );
