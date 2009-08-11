@@ -292,6 +292,11 @@ MAKEDEPS	+= arch/$(ARCH)/Makefile
 include arch/$(ARCH)/Makefile
 endif
 
+# Include architecture-specific include path
+ifdef ARCH
+INCDIRS		+= arch/$(ARCH)/include
+endif
+
 ###############################################################################
 #
 # Source file handling
@@ -320,9 +325,13 @@ autosrcs :
 
 ifdef BIN
 
+# INCDIRS lists the include path
+incdirs :
+	@$(ECHO) $(INCDIRS)
+
 # Common flags
 #
-CFLAGS		+= -I include -I arch/$(ARCH)/include -I .
+CFLAGS		+= $(foreach INC,$(INCDIRS),-I$(INC))
 CFLAGS		+= -Os
 CFLAGS		+= -g
 ifeq ($(CCTYPE),gcc)
@@ -953,19 +962,23 @@ endif # defined(BIN)
 ifdef BIN
 
 $(BIN)/doxygen.cfg : doxygen.cfg $(MAKEDEPS)
-	$(PERL) -pe 's{\@SRCDIRS\@}{$(SRCDIRS)}; ' \
+	$(Q)$(PERL) -pe 's{\@SRCDIRS\@}{$(SRCDIRS)}; ' \
+		-e  's{\@INCDIRS\@}{$(filter-out .,$(INCDIRS))}; ' \
 		-e  's{\@BIN\@}{$(BIN)}; ' \
 		-e  's{\@ARCH\@}{$(ARCH)}; ' \
 		$< > $@
 
 $(BIN)/doc : $(BIN)/doxygen.cfg
-	$(DOXYGEN) $<
+	$(Q)$(DOXYGEN) $<
 
 .PHONY : $(BIN)/doc
 
-VERYCLEANUP	+= $(BIN)/doc
-
 doc : $(BIN)/doc
+
+doc-clean :
+	$(Q)$(RM) -r $(BIN)/doc
+
+VERYCLEANUP	+= $(BIN)/doc
 
 docview :
 	@[ -f $(BIN)/doc/html/index.html ] || $(MAKE) $(BIN)/doc

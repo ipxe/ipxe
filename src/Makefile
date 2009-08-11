@@ -80,6 +80,11 @@ SRCDIRS		+= usr
 NON_AUTO_SRCS	:=
 NON_AUTO_SRCS	+= drivers/net/prism2.c
 
+# INCDIRS lists the include path
+#
+INCDIRS		:=
+INCDIRS		+= include .
+
 ###############################################################################
 #
 # Default build target: build the most common targets and print out a

@@ -1,6 +1,6 @@
 # Include common x86 headers
 #
-CFLAGS		+= -Iarch/x86/include
+INCDIRS		+= arch/x86/include
 
 # x86-specific directories containing source files
 #
