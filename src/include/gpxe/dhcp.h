@@ -601,6 +601,8 @@ struct dhcphdr {
 /** Setting block name used for BootServerDHCP responses */
 #define PXEBS_SETTINGS_NAME "pxebs"
 
+extern void * dhcp_chaddr ( struct net_device *netdev, uint8_t *hlen,
+			    uint16_t *flags );
 extern int dhcp_create_packet ( struct dhcp_packet *dhcppkt,
 				struct net_device *netdev, uint8_t msgtype,
 				const void *options, size_t options_len,

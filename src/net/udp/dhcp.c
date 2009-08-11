@@ -827,6 +827,46 @@ static struct dhcp_session_state dhcp_state_pxebs = {
  */
 
 /**
+ * Construct DHCP client hardware address field and broadcast flag
+ *
+ * @v netdev		Network device
+ * @v hlen		DHCP hardware address length to fill in
+ * @v flags		DHCP flags to fill in
+ * @ret chaddr		DHCP client hardware address
+ */
+void * dhcp_chaddr ( struct net_device *netdev, uint8_t *hlen,
+		     uint16_t *flags ) {
+	struct ll_protocol *ll_protocol = netdev->ll_protocol;
+	typeof ( ( ( struct dhcphdr * ) NULL )->chaddr ) chaddr;
+
+	/* If the link-layer address cannot fit into the chaddr field
+	 * (as is the case for IPoIB) then try using the hardware
+	 * address instead.  If we do this, set the broadcast flag,
+	 * since chaddr then does not represent a valid link-layer
+	 * address for the return path.
+	 *
+	 * If even the hardware address is too large, use an empty
+	 * chaddr field and set the broadcast flag.
+	 *
+	 * This goes against RFC4390, but RFC4390 mandates that we use
+	 * a DHCP client identifier that conforms with RFC4361, which
+	 * we cannot do without either persistent (NIC-independent)
+	 * storage, or by eliminating the hardware address completely
+	 * from the DHCP packet, which seems unfriendly to users.
+	 */
+	if ( ( *hlen = ll_protocol->ll_addr_len ) <= sizeof ( chaddr ) ) {
+		return netdev->ll_addr;
+	}
+	*flags = htons ( BOOTP_FL_BROADCAST );
+	if ( ( *hlen = ll_protocol->hw_addr_len ) <= sizeof ( chaddr ) ) {
+		return netdev->hw_addr;
+	} else {
+		*hlen = 0;
+		return NULL;
+	}
+}
+
+/**
  * Create a DHCP packet
  *
  * @v dhcppkt		DHCP packet structure to fill in
@@ -846,7 +886,7 @@ int dhcp_create_packet ( struct dhcp_packet *dhcppkt,
 			 const void *options, size_t options_len,
 			 void *data, size_t max_len ) {
 	struct dhcphdr *dhcphdr = data;
-	unsigned int hlen;
+	void *chaddr;
 	int rc;
 
 	/* Sanity check */
@@ -859,16 +899,8 @@ int dhcp_create_packet ( struct dhcp_packet *dhcppkt,
 	dhcphdr->magic = htonl ( DHCP_MAGIC_COOKIE );
 	dhcphdr->htype = ntohs ( netdev->ll_protocol->ll_proto );
 	dhcphdr->op = dhcp_op[msgtype];
-	/* If hardware length exceeds the chaddr field length, don't
-	 * use the chaddr field.  This is as per RFC4390.
-	 */
-	hlen = netdev->ll_protocol->ll_addr_len;
-	if ( hlen > sizeof ( dhcphdr->chaddr ) ) {
-		hlen = 0;
-		dhcphdr->flags = htons ( BOOTP_FL_BROADCAST );
-	}
-	dhcphdr->hlen = hlen;
-	memcpy ( dhcphdr->chaddr, netdev->ll_addr, hlen );
+	chaddr = dhcp_chaddr ( netdev, &dhcphdr->hlen, &dhcphdr->flags );
+	memcpy ( dhcphdr->chaddr, chaddr, dhcphdr->hlen );
 	memcpy ( dhcphdr->options, options, options_len );
 
 	/* Initialise DHCP packet structure */
