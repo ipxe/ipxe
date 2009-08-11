@@ -1897,10 +1897,10 @@ static int phantom_init_cmdpeg ( struct phantom_nic *phantom ) {
  * Read Phantom MAC address
  *
  * @v phanton_port	Phantom NIC
- * @v ll_addr		Buffer to fill with MAC address
+ * @v hw_addr		Buffer to fill with MAC address
  */
 static void phantom_get_macaddr ( struct phantom_nic *phantom,
-				  uint8_t *ll_addr ) {
+				  uint8_t *hw_addr ) {
 	union {
 		uint8_t mac_addr[2][ETH_ALEN];
 		uint32_t dwords[3];
@@ -1917,11 +1917,11 @@ static void phantom_get_macaddr ( struct phantom_nic *phantom,
 
 	/* Copy out the relevant MAC address */
 	for ( i = 0 ; i < ETH_ALEN ; i++ ) {
-		ll_addr[ ETH_ALEN - i - 1 ] =
+		hw_addr[ ETH_ALEN - i - 1 ] =
 			u.mac_addr[ phantom->port & 1 ][i];
 	}
 	DBGC ( phantom, "Phantom %p MAC address is %s\n",
-	       phantom, eth_ntoa ( ll_addr ) );
+	       phantom, eth_ntoa ( hw_addr ) );
 }
 
 /**
@@ -2045,7 +2045,7 @@ static int phantom_probe ( struct pci_device *pci,
 		goto err_init_rcvpeg;
 
 	/* Read MAC addresses */
-	phantom_get_macaddr ( phantom, netdev->ll_addr );
+	phantom_get_macaddr ( phantom, netdev->hw_addr );
 
 	/* Skip if boot disabled on NIC */
 	if ( ( rc = phantom_check_boot_enable ( phantom ) ) != 0 )

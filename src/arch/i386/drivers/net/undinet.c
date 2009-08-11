@@ -689,7 +689,7 @@ int undinet_probe ( struct undi_device *undi ) {
 	if ( ( rc = undinet_call ( undinic, PXENV_UNDI_GET_INFORMATION,
 				   &undi_info, sizeof ( undi_info ) ) ) != 0 )
 		goto err_undi_get_information;
-	memcpy ( netdev->ll_addr, undi_info.PermNodeAddress, ETH_ALEN );
+	memcpy ( netdev->hw_addr, undi_info.PermNodeAddress, ETH_ALEN );
 	undinic->irq = undi_info.IntNumber;
 	if ( undinic->irq > IRQ_MAX ) {
 		DBGC ( undinic, "UNDINIC %p invalid IRQ %d\n",
@@ -697,7 +697,7 @@ int undinet_probe ( struct undi_device *undi ) {
 		goto err_bad_irq;
 	}
 	DBGC ( undinic, "UNDINIC %p is %s on IRQ %d\n",
-	       undinic, eth_ntoa ( netdev->ll_addr ), undinic->irq );
+	       undinic, eth_ntoa ( netdev->hw_addr ), undinic->irq );
 
 	/* Get interface information */
 	memset ( &undi_iface, 0, sizeof ( undi_iface ) );

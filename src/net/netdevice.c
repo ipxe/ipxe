@@ -357,6 +357,10 @@ int register_netdev ( struct net_device *netdev ) {
 	snprintf ( netdev->name, sizeof ( netdev->name ), "net%d",
 		   ifindex++ );
 
+	/* Set initial link-layer address */
+	memcpy ( netdev->ll_addr, netdev->hw_addr,
+		 netdev->ll_protocol->ll_addr_len );
+
 	/* Register per-netdev configuration settings */
 	if ( ( rc = register_settings ( netdev_settings ( netdev ),
 					NULL ) ) != 0 ) {
@@ -370,7 +374,7 @@ int register_netdev ( struct net_device *netdev ) {
 	list_add_tail ( &netdev->list, &net_devices );
 	DBGC ( netdev, "NETDEV %p registered as %s (phys %s hwaddr %s)\n",
 	       netdev, netdev->name, netdev->dev->name,
-	       netdev_hwaddr ( netdev ) );
+	       netdev_addr ( netdev ) );
 
 	return 0;
 }

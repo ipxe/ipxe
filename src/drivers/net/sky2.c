@@ -2210,14 +2210,14 @@ static struct net_device *sky2_init_netdev(struct sky2_hw *hw,
 	sky2->port = port;
 
 	/* read the mac address */
-	memcpy(dev->ll_addr, (void *)(hw->regs + B2_MAC_1 + port * 8), ETH_ALEN);
+	memcpy(dev->hw_addr, (void *)(hw->regs + B2_MAC_1 + port * 8), ETH_ALEN);
 
 	return dev;
 }
 
 static void sky2_show_addr(struct net_device *dev)
 {
-	DBG2(PFX "%s: addr %s\n", dev->name, netdev_hwaddr(dev));
+	DBG2(PFX "%s: addr %s\n", dev->name, netdev_addr(dev));
 }
 
 #if DBGLVL_MAX

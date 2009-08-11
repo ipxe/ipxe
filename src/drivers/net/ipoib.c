@@ -608,27 +608,24 @@ static struct net_device_operations ipoib_operations = {
 };
 
 /**
- * Update IPoIB dynamic Infiniband parameters
+ * Handle link status change
  *
- * @v ipoib		IPoIB device
- *
- * The Infiniband port GID and partition key will change at runtime,
- * when the link is established (or lost).  The MAC address is based
- * on the port GID, and the broadcast GID is based on the partition
- * key.  This function recalculates these IPoIB device parameters.
+ * @v ibdev		Infiniband device
  */
-static void ipoib_set_ib_params ( struct ipoib_device *ipoib ) {
-	struct ib_device *ibdev = ipoib->ibdev;
-	struct net_device *netdev = ipoib->netdev;
-	struct ipoib_mac *mac;
+void ipoib_link_state_changed ( struct ib_device *ibdev ) {
+	struct net_device *netdev = ib_get_ownerdata ( ibdev );
+	struct ipoib_device *ipoib = netdev->priv;
+	struct ipoib_mac *mac = ( ( struct ipoib_mac * ) netdev->ll_addr );
+	int rc;
 
-	/* Calculate GID portion of MAC address based on port GID */
-	mac = ( ( struct ipoib_mac * ) netdev->ll_addr );
-	memcpy ( &mac->gid, &ibdev->gid, sizeof ( mac->gid ) );
+	/* Leave existing broadcast group */
+	ipoib_leave_broadcast_group ( ipoib );
 
-	/* Calculate broadcast GID based on partition key */
-	memcpy ( &ipoib->broadcast, &ipoib_broadcast,
-		 sizeof ( ipoib->broadcast ) );
+	/* Update MAC address based on potentially-new GID prefix */
+	memcpy ( &mac->gid.u.half[0], &ibdev->gid.u.half[0],
+		 sizeof ( mac->gid.u.half[0] ) );
+
+	/* Update broadcast GID based on potentially-new partition key */
 	ipoib->broadcast.gid.u.words[2] = htons ( ibdev->pkey );
 
 	/* Set net device link state to reflect Infiniband link state */
@@ -637,25 +634,6 @@ static void ipoib_set_ib_params ( struct ipoib_device *ipoib ) {
 	} else {
 		netdev_link_down ( netdev );
 	}
-}
-
-/**
- * Handle link status change
- *
- * @v ibdev		Infiniband device
- */
-void ipoib_link_state_changed ( struct ib_device *ibdev ) {
-	struct net_device *netdev = ib_get_ownerdata ( ibdev );
-	struct ipoib_device *ipoib = netdev->priv;
-	int rc;
-
-	/* Leave existing broadcast group */
-	ipoib_leave_broadcast_group ( ipoib );
-
-	/* Update MAC address and broadcast GID based on new port GID
-	 * and partition key.
-	 */
-	ipoib_set_ib_params ( ipoib );
 
 	/* Join new broadcast group */
 	if ( ib_link_ok ( ibdev ) &&
@@ -675,6 +653,7 @@ void ipoib_link_state_changed ( struct ib_device *ibdev ) {
 int ipoib_probe ( struct ib_device *ibdev ) {
 	struct net_device *netdev;
 	struct ipoib_device *ipoib;
+	struct ipoib_mac *mac;
 	int rc;
 
 	/* Allocate network device */
@@ -685,16 +664,19 @@ int ipoib_probe ( struct ib_device *ibdev ) {
 	ipoib = netdev->priv;
 	ib_set_ownerdata ( ibdev, netdev );
 	netdev->dev = ibdev->dev;
-	netdev->ll_broadcast = ( ( uint8_t * ) &ipoib->broadcast );
 	memset ( ipoib, 0, sizeof ( *ipoib ) );
 	ipoib->netdev = netdev;
 	ipoib->ibdev = ibdev;
 
-	/* Calculate as much of the broadcast GID and the MAC address
-	 * as we can.  We won't know either of these in full until we
-	 * have link-up.
-	 */
-	ipoib_set_ib_params ( ipoib );
+	/* Extract hardware address */
+	mac = ( ( struct ipoib_mac * ) netdev->hw_addr );
+	memcpy ( &mac->gid.u.half[1], &ibdev->gid.u.half[1],
+		 sizeof ( mac->gid.u.half[1] ) );
+
+	/* Set default broadcast address */
+	memcpy ( &ipoib->broadcast, &ipoib_broadcast,
+		 sizeof ( ipoib->broadcast ) );
+	netdev->ll_broadcast = ( ( uint8_t * ) &ipoib->broadcast );
 
 	/* Register network device */
 	if ( ( rc = register_netdev ( netdev ) ) != 0 )

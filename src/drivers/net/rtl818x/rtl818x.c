@@ -813,7 +813,7 @@ static int rtl818x_probe(struct pci_device *pdev,
 	free(hwinfo);
 
 	DBG("rtl818x: Realtek RTL818%s (RF chip %s) with address %s\n",
-	    chip_name, priv->rf->name, netdev_hwaddr(dev->netdev));
+	    chip_name, priv->rf->name, netdev_addr(dev->netdev));
 
 	return 0;
 

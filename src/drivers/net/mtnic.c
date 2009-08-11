@@ -1814,7 +1814,7 @@ mtnic_probe(struct pci_device *pci,
 		/* Program the MAC address */
 		mac = priv->mtnic->fw.mac[port_index];
 		for (mac_idx = 0; mac_idx < MAC_ADDRESS_SIZE; ++mac_idx) {
-			mtnic->netdev[port_index]->ll_addr[MAC_ADDRESS_SIZE - mac_idx - 1] = mac & 0xFF;
+			mtnic->netdev[port_index]->hw_addr[MAC_ADDRESS_SIZE - mac_idx - 1] = mac & 0xFF;
 			mac = mac >> 8;
 		}
 

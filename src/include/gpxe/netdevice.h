@@ -254,9 +254,16 @@ struct net_device {
 
 	/** Link-layer protocol */
 	struct ll_protocol *ll_protocol;
+	/** Hardware address
+	 *
+	 * This is an address which is an intrinsic property of the
+	 * hardware, e.g. an address held in EEPROM.
+	 */
+	uint8_t hw_addr[MAX_LL_ADDR_LEN];
 	/** Link-layer address
 	 *
-	 * For Ethernet, this is the MAC address.
+	 * This is the current link-layer address assigned to the
+	 * device.  It can be changed at runtime.
 	 */
 	uint8_t ll_addr[MAX_LL_ADDR_LEN];
 	/** Link-layer broadcast address */
@@ -337,12 +344,12 @@ static inline void netdev_nullify ( struct net_device *netdev ) {
 }
 
 /**
- * Get printable network device hardware address
+ * Get printable network device link-layer address
  *
  * @v netdev		Network device
- * @ret name		Hardware address
+ * @ret name		Link-layer address
  */
-static inline const char * netdev_hwaddr ( struct net_device *netdev ) {
+static inline const char * netdev_addr ( struct net_device *netdev ) {
 	return netdev->ll_protocol->ntoa ( netdev->ll_addr );
 }
 

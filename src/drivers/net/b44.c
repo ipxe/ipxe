@@ -594,12 +594,12 @@ static void b44_load_mac_and_phy_addr(struct b44_private *bp)
 
 	/* Load MAC address, note byteswapping */
 	b44_read_eeprom(bp, &eeprom[0]);
-	bp->netdev->ll_addr[0] = eeprom[79];
-	bp->netdev->ll_addr[1] = eeprom[78];
-	bp->netdev->ll_addr[2] = eeprom[81];
-	bp->netdev->ll_addr[3] = eeprom[80];
-	bp->netdev->ll_addr[4] = eeprom[83];
-	bp->netdev->ll_addr[5] = eeprom[82];
+	bp->netdev->hw_addr[0] = eeprom[79];
+	bp->netdev->hw_addr[1] = eeprom[78];
+	bp->netdev->hw_addr[2] = eeprom[81];
+	bp->netdev->hw_addr[3] = eeprom[80];
+	bp->netdev->hw_addr[4] = eeprom[83];
+	bp->netdev->hw_addr[5] = eeprom[82];
 
 	/* Load PHY address */
 	bp->phy_addr = eeprom[90] & 0x1f;

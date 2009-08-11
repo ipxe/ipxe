@@ -421,15 +421,11 @@ PXENV_EXIT_t pxenv_undi_get_information ( struct s_PXENV_UNDI_GET_INFORMATION
 	undi_get_information->MaxTranUnit = ETH_MAX_MTU;
 	undi_get_information->HwType = ntohs ( ll_protocol->ll_proto );
 	undi_get_information->HwAddrLen = ll_protocol->ll_addr_len;
-	/* Cheat: assume card is always configured with its permanent
-	 * node address.  This is a valid assumption within Etherboot
-	 * at the time of writing.
-	 */
 	memcpy ( &undi_get_information->CurrentNodeAddress,
 		 pxe_netdev->ll_addr,
 		 sizeof ( undi_get_information->CurrentNodeAddress ) );
 	memcpy ( &undi_get_information->PermNodeAddress,
-		 pxe_netdev->ll_addr,
+		 pxe_netdev->hw_addr,
 		 sizeof ( undi_get_information->PermNodeAddress ) );
 	undi_get_information->ROMAddress = 0;
 		/* nic.rom_info->rom_segment; */

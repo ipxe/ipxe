@@ -204,7 +204,7 @@ static int natsemi_probe (struct pci_device *pci,
 	last = prev_bytes[1] >> 7;
 	for ( i = 0 ; i < ETH_ALEN ; i++ ) {
 		last1 = ll_addr_encoded[i] >> 7;
-	 	netdev->ll_addr[i] = ll_addr_encoded[i] << 1 | last;
+		netdev->hw_addr[i] = ll_addr_encoded[i] << 1 | last;
 		last = last1;
 	}
 

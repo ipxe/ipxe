@@ -2209,9 +2209,9 @@ rtl8169_probe ( struct pci_device *pdev, const struct pci_device_id *ent )
 
 	/* Get MAC address */
 	for ( i = 0; i < MAC_ADDR_LEN; i++ )
-		netdev->ll_addr[i] = RTL_R8 ( MAC0 + i );
+		netdev->hw_addr[i] = RTL_R8 ( MAC0 + i );
 
-	DBG ( "%s\n", eth_ntoa ( netdev->ll_addr ) );
+	DBG ( "%s\n", eth_ntoa ( netdev->hw_addr ) );
 
 	rtl8169_init_phy ( netdev, tp );
 

@@ -99,7 +99,7 @@ int legacy_probe ( void *hwdev,
 	set_drvdata ( hwdev, netdev );
 	netdev->dev = dev;
 
-	nic.node_addr = netdev->ll_addr;
+	nic.node_addr = netdev->hw_addr;
 	nic.irqno = dev->desc.irq;
 
 	if ( ! probe ( &nic, hwdev ) ) {

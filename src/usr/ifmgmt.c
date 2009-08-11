@@ -89,7 +89,7 @@ static void ifstat_errors ( struct net_device_stats *stats,
 void ifstat ( struct net_device *netdev ) {
 	printf ( "%s: %s on %s (%s)\n"
 		 "  [Link:%s, TX:%d TXE:%d RX:%d RXE:%d]\n",
-		 netdev->name, netdev_hwaddr ( netdev ), netdev->dev->name,
+		 netdev->name, netdev_addr ( netdev ), netdev->dev->name,
 		 ( ( netdev->state & NETDEV_OPEN ) ? "open" : "closed" ),
 		 ( netdev_link_ok ( netdev ) ? "up" : "down" ),
 		 netdev->tx_stats.good, netdev->tx_stats.bad,

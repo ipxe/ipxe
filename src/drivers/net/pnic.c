@@ -250,7 +250,7 @@ static int pnic_probe ( struct pci_device *pci,
 
 	/* Get MAC address */
 	status = pnic_command ( pnic, PNIC_CMD_READ_MAC, NULL, 0,
-				netdev->ll_addr, ETH_ALEN, NULL );
+				netdev->hw_addr, ETH_ALEN, NULL );
 
 	/* Mark as link up; PNIC has no concept of link state */
 	netdev_link_up ( netdev );

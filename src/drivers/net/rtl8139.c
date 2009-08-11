@@ -525,7 +525,7 @@ static int rtl_probe ( struct pci_device *pci,
 	/* Reset the NIC, set up EEPROM access and read MAC address */
 	rtl_reset ( netdev );
 	rtl_init_eeprom ( netdev );
-	nvs_read ( &rtl->eeprom.nvs, EE_MAC, netdev->ll_addr, ETH_ALEN );
+	nvs_read ( &rtl->eeprom.nvs, EE_MAC, netdev->hw_addr, ETH_ALEN );
 
 	/* Mark as link up; we don't yet handle link state */
 	netdev_link_up ( netdev );

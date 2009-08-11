@@ -928,7 +928,7 @@ static int a3c90x_probe(struct pci_device *pci,
 	/* load eeprom contents to inf_3c90x->eeprom */
 	a3c90x_internal_ReadEepromContents(inf_3c90x);
 
-	HWAddr = netdev->ll_addr;
+	HWAddr = netdev->hw_addr;
 
 	/* Retrieve the Hardware address */
 	HWAddr[0] = inf_3c90x->eeprom[eepromHwAddrOffset + 0] >> 8;

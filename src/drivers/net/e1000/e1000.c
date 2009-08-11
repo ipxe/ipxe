@@ -853,7 +853,7 @@ e1000_probe ( struct pci_device *pdev,
 	if ( e1000_read_mac_addr ( &adapter->hw ) )
 		DBG ( "EEPROM Read Error\n" );
 
-        memcpy ( netdev->ll_addr, adapter->hw.mac_addr, ETH_ALEN );
+        memcpy ( netdev->hw_addr, adapter->hw.mac_addr, ETH_ALEN );
 
 	/* print bus type/speed/width info */
 	{

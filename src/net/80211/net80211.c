@@ -792,7 +792,7 @@ int net80211_register ( struct net80211_device *dev,
 		return -ENOMEM;
 
 	memcpy ( dev->hw, hw, sizeof ( *hw ) );
-	memcpy ( dev->netdev->ll_addr, hw->hwaddr, ETH_ALEN );
+	memcpy ( dev->netdev->hw_addr, hw->hwaddr, ETH_ALEN );
 
 	/* Set some sensible channel defaults for driver's open() function */
 	memcpy ( dev->channels, dev->hw->channels,

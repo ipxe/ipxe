@@ -4181,7 +4181,7 @@ efab_probe ( struct pci_device *pci,
 	if ( rc )
 		goto fail3;
 
-	memcpy ( netdev->ll_addr, efab->mac_addr, ETH_ALEN );
+	memcpy ( netdev->hw_addr, efab->mac_addr, ETH_ALEN );
 
 	netdev_link_up ( netdev );
 	rc = register_netdev ( netdev );
