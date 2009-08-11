@@ -767,7 +767,8 @@ struct net80211_device * net80211_alloc ( size_t priv_size )
 	dev->priv = ( u8 * ) dev + sizeof ( *dev );
 	dev->op = &net80211_null_ops;
 
-	dev->proc_assoc.step = net80211_step_associate;
+	process_init_stopped ( &dev->proc_assoc, net80211_step_associate,
+			       &netdev->refcnt );
 	INIT_LIST_HEAD ( &dev->mgmt_queue );
 	INIT_LIST_HEAD ( &dev->mgmt_info_queue );
 
