@@ -602,9 +602,11 @@ static struct ll_protocol net80211_ll_protocol __ll_protocol = {
 	.name = "802.11",
 	.push = net80211_ll_push,
 	.pull = net80211_ll_pull,
+	.init_addr = eth_init_addr,
 	.ntoa = eth_ntoa,
 	.mc_hash = net80211_ll_mc_hash,
 	.ll_proto = htons ( ARPHRD_ETHER ),	/* "encapsulated Ethernet" */
+	.hw_addr_len = ETH_ALEN,
 	.ll_addr_len = ETH_ALEN,
 	.ll_header_len = IEEE80211_TYP_FRAME_HEADER_LEN +
 				IEEE80211_LLC_HEADER_LEN,

@@ -358,8 +358,7 @@ int register_netdev ( struct net_device *netdev ) {
 		   ifindex++ );
 
 	/* Set initial link-layer address */
-	memcpy ( netdev->ll_addr, netdev->hw_addr,
-		 netdev->ll_protocol->ll_addr_len );
+	netdev->ll_protocol->init_addr ( netdev->hw_addr, netdev->ll_addr );
 
 	/* Register per-netdev configuration settings */
 	if ( ( rc = register_settings ( netdev_settings ( netdev ),

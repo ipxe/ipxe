@@ -250,7 +250,21 @@ static int ipoib_pull ( struct net_device *netdev,
 }
 
 /**
- * Transcribe IPoIB address
+ * Initialise IPoIB link-layer address
+ *
+ * @v hw_addr		Hardware address
+ * @v ll_addr		Link-layer address
+ */
+static void ipoib_init_addr ( const void *hw_addr, void *ll_addr ) {
+	const struct ib_gid_half *guid = hw_addr;
+	struct ipoib_mac *mac = ll_addr;
+
+	memset ( mac, 0, sizeof ( *mac ) );
+	memcpy ( &mac->gid.u.half[1], guid, sizeof ( mac->gid.u.half[1] ) );
+}
+
+/**
+ * Transcribe IPoIB link-layer address
  *
  * @v ll_addr	Link-layer address
  * @ret string	Link-layer address in human-readable format
@@ -286,10 +300,12 @@ static int ipoib_mc_hash ( unsigned int af __unused,
 struct ll_protocol ipoib_protocol __ll_protocol = {
 	.name		= "IPoIB",
 	.ll_proto	= htons ( ARPHRD_INFINIBAND ),
+	.hw_addr_len	= sizeof ( struct ib_gid_half ),
 	.ll_addr_len	= IPOIB_ALEN,
 	.ll_header_len	= IPOIB_HLEN,
 	.push		= ipoib_push,
 	.pull		= ipoib_pull,
+	.init_addr	= ipoib_init_addr,
 	.ntoa		= ipoib_ntoa,
 	.mc_hash	= ipoib_mc_hash,
 };
@@ -653,7 +669,6 @@ void ipoib_link_state_changed ( struct ib_device *ibdev ) {
 int ipoib_probe ( struct ib_device *ibdev ) {
 	struct net_device *netdev;
 	struct ipoib_device *ipoib;
-	struct ipoib_mac *mac;
 	int rc;
 
 	/* Allocate network device */
@@ -669,9 +684,8 @@ int ipoib_probe ( struct ib_device *ibdev ) {
 	ipoib->ibdev = ibdev;
 
 	/* Extract hardware address */
-	mac = ( ( struct ipoib_mac * ) netdev->hw_addr );
-	memcpy ( &mac->gid.u.half[1], &ibdev->gid.u.half[1],
-		 sizeof ( mac->gid.u.half[1] ) );
+	memcpy ( netdev->hw_addr, &ibdev->gid.u.half[1],
+		 sizeof ( ibdev->gid.u.half[1] ) );
 
 	/* Set default broadcast address */
 	memcpy ( &ipoib->broadcast, &ipoib_broadcast,

@@ -412,6 +412,7 @@ PXENV_EXIT_t pxenv_undi_get_information ( struct s_PXENV_UNDI_GET_INFORMATION
 					  *undi_get_information ) {
 	struct device *dev = pxe_netdev->dev;
 	struct ll_protocol *ll_protocol = pxe_netdev->ll_protocol;
+	size_t ll_addr_len = ll_protocol->ll_addr_len;
 
 	DBG ( "PXENV_UNDI_GET_INFORMATION" );
 
@@ -420,13 +421,14 @@ PXENV_EXIT_t pxenv_undi_get_information ( struct s_PXENV_UNDI_GET_INFORMATION
 	/* Cheat: assume all cards can cope with this */
 	undi_get_information->MaxTranUnit = ETH_MAX_MTU;
 	undi_get_information->HwType = ntohs ( ll_protocol->ll_proto );
-	undi_get_information->HwAddrLen = ll_protocol->ll_addr_len;
+	undi_get_information->HwAddrLen = ll_addr_len;
+	assert ( ll_addr_len <=
+		 sizeof ( undi_get_information->CurrentNodeAddress ) );
 	memcpy ( &undi_get_information->CurrentNodeAddress,
 		 pxe_netdev->ll_addr,
 		 sizeof ( undi_get_information->CurrentNodeAddress ) );
-	memcpy ( &undi_get_information->PermNodeAddress,
-		 pxe_netdev->hw_addr,
-		 sizeof ( undi_get_information->PermNodeAddress ) );
+	ll_protocol->init_addr ( pxe_netdev->hw_addr,
+				 &undi_get_information->PermNodeAddress );
 	undi_get_information->ROMAddress = 0;
 		/* nic.rom_info->rom_segment; */
 	/* We only provide the ability to receive or transmit a single

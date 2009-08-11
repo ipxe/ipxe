@@ -97,6 +97,16 @@ static int eth_pull ( struct net_device *netdev __unused,
 }
 
 /**
+ * Initialise Ethernet address
+ *
+ * @v hw_addr		Hardware address
+ * @v ll_addr		Link-layer address
+ */
+void eth_init_addr ( const void *hw_addr, void *ll_addr ) {
+	memcpy ( ll_addr, hw_addr, ETH_ALEN );
+}
+
+/**
  * Transcribe Ethernet address
  *
  * @v ll_addr		Link-layer address
@@ -143,10 +153,12 @@ static int eth_mc_hash ( unsigned int af, const void *net_addr,
 struct ll_protocol ethernet_protocol __ll_protocol = {
 	.name		= "Ethernet",
 	.ll_proto	= htons ( ARPHRD_ETHER ),
+	.hw_addr_len	= ETH_ALEN,
 	.ll_addr_len	= ETH_ALEN,
 	.ll_header_len	= ETH_HLEN,
 	.push		= eth_push,
 	.pull		= eth_pull,
+	.init_addr	= eth_init_addr,
 	.ntoa		= eth_ntoa,
 	.mc_hash	= eth_mc_hash,
 };

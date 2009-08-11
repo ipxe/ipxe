@@ -21,6 +21,12 @@ struct net_protocol;
 struct ll_protocol;
 struct device;
 
+/** Maximum length of a hardware address
+ *
+ * The longest currently-supported link-layer address is for IPoIB.
+ */
+#define MAX_HW_ADDR_LEN 8
+
 /** Maximum length of a link-layer address
  *
  * The longest currently-supported link-layer address is for IPoIB.
@@ -113,6 +119,13 @@ struct ll_protocol {
 			 const void **ll_dest, const void **ll_source,
 			 uint16_t *net_proto );
 	/**
+	 * Initialise link-layer address
+	 *
+	 * @v hw_addr		Hardware address
+	 * @v ll_addr		Link-layer address to fill in
+	 */
+	void ( * init_addr ) ( const void *hw_addr, void *ll_addr );
+	/**
 	 * Transcribe link-layer address
 	 *
 	 * @v ll_addr	Link-layer address
@@ -124,7 +137,7 @@ struct ll_protocol {
 	 * The buffer used to hold the transcription is statically
 	 * allocated.
 	 */
-	const char * ( * ntoa ) ( const void * ll_addr );
+	const char * ( * ntoa ) ( const void *ll_addr );
 	/**
 	 * Hash multicast address
 	 *
@@ -140,6 +153,8 @@ struct ll_protocol {
 	 * This is an ARPHRD_XXX constant, in network byte order.
 	 */
 	uint16_t ll_proto;
+	/** Hardware address length */
+	uint8_t hw_addr_len;
 	/** Link-layer address length */
 	uint8_t ll_addr_len;
 	/** Link-layer header length */
@@ -258,8 +273,11 @@ struct net_device {
 	 *
 	 * This is an address which is an intrinsic property of the
 	 * hardware, e.g. an address held in EEPROM.
+	 *
+	 * Note that the hardware address may not be the same length
+	 * as the link-layer address.
 	 */
-	uint8_t hw_addr[MAX_LL_ADDR_LEN];
+	uint8_t hw_addr[MAX_HW_ADDR_LEN];
 	/** Link-layer address
 	 *
 	 * This is the current link-layer address assigned to the

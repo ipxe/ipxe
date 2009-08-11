@@ -119,10 +119,11 @@ static EFI_GUID efi_pci_io_protocol_guid
 static void efi_snp_set_mode ( struct efi_snp_device *snpdev ) {
 	struct net_device *netdev = snpdev->netdev;
 	EFI_SIMPLE_NETWORK_MODE *mode = &snpdev->mode;
-	unsigned int ll_addr_len = netdev->ll_protocol->ll_addr_len;
+	struct ll_protocol *ll_protocol = netdev->ll_protocol;
+	unsigned int ll_addr_len = ll_protocol->ll_addr_len;
 
 	mode->HwAddressSize = ll_addr_len;
-	mode->MediaHeaderSize = netdev->ll_protocol->ll_header_len;
+	mode->MediaHeaderSize = ll_protocol->ll_header_len;
 	mode->MaxPacketSize = netdev->max_pkt_len;
 	mode->ReceiveFilterMask = ( EFI_SIMPLE_NETWORK_RECEIVE_UNICAST |
 				    EFI_SIMPLE_NETWORK_RECEIVE_MULTICAST |
@@ -130,8 +131,8 @@ static void efi_snp_set_mode ( struct efi_snp_device *snpdev ) {
 	assert ( ll_addr_len <= sizeof ( mode->CurrentAddress ) );
 	memcpy ( &mode->CurrentAddress, netdev->ll_addr, ll_addr_len );
 	memcpy ( &mode->BroadcastAddress, netdev->ll_broadcast, ll_addr_len );
-	memcpy ( &mode->PermanentAddress, netdev->hw_addr, ll_addr_len );
-	mode->IfType = ntohs ( netdev->ll_protocol->ll_proto );
+	ll_protocol->init_addr ( netdev->hw_addr, &mode->PermanentAddress );
+	mode->IfType = ntohs ( ll_protocol->ll_proto );
 	mode->MacAddressChangeable = TRUE;
 	mode->MediaPresentSupported = TRUE;
 	mode->MediaPresent = ( netdev_link_ok ( netdev ) ? TRUE : FALSE );
