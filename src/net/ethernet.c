@@ -130,8 +130,7 @@ const char * eth_ntoa ( const void *ll_addr ) {
  * @v ll_addr		Link-layer address to fill in
  * @ret rc		Return status code
  */
-static int eth_mc_hash ( unsigned int af, const void *net_addr,
-			 void *ll_addr ) {
+int eth_mc_hash ( unsigned int af, const void *net_addr, void *ll_addr ) {
 	const uint8_t *net_addr_bytes = net_addr;
 	uint8_t *ll_addr_bytes = ll_addr;
 

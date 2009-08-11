@@ -160,8 +160,6 @@ static int net80211_ll_push ( struct net_device *netdev,
 static int net80211_ll_pull ( struct net_device *netdev,
 			      struct io_buffer *iobuf, const void **ll_dest,
 			      const void **ll_source, uint16_t * net_proto );
-static int net80211_ll_mc_hash ( unsigned int af, const void *net_addr,
-				 void *ll_addr );
 /** @} */
 
 /**
@@ -580,23 +578,6 @@ static int net80211_ll_pull ( struct net_device *netdev __unused,
 	return 0;
 }
 
-/**
- * Hash 802.11 multicast address
- *
- * @v af	Address family
- * @v net_addr	Network-layer address
- * @ret ll_addr	Filled link-layer address
- * @ret rc	Return status code
- *
- * Currently unimplemented.
- */
-static int net80211_ll_mc_hash ( unsigned int af __unused,
-				 const void *net_addr __unused,
-				 void *ll_addr __unused )
-{
-	return -ENOTSUP;
-}
-
 /** 802.11 link-layer protocol */
 static struct ll_protocol net80211_ll_protocol __ll_protocol = {
 	.name = "802.11",
@@ -604,7 +585,7 @@ static struct ll_protocol net80211_ll_protocol __ll_protocol = {
 	.pull = net80211_ll_pull,
 	.init_addr = eth_init_addr,
 	.ntoa = eth_ntoa,
-	.mc_hash = net80211_ll_mc_hash,
+	.mc_hash = eth_mc_hash,
 	.ll_proto = htons ( ARPHRD_ETHER ),	/* "encapsulated Ethernet" */
 	.hw_addr_len = ETH_ALEN,
 	.ll_addr_len = ETH_ALEN,
