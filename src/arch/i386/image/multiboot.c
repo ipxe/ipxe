@@ -267,8 +267,6 @@ static int multiboot_exec ( struct image *image ) {
 	memset ( &mbinfo, 0, sizeof ( mbinfo ) );
 	mbinfo.flags = ( MBI_FLAG_LOADER | MBI_FLAG_MEM | MBI_FLAG_MMAP |
 			 MBI_FLAG_CMDLINE | MBI_FLAG_MODS );
-	multiboot_build_memmap ( image, &mbinfo, mbmemmap,
-				 ( sizeof(mbmemmap) / sizeof(mbmemmap[0]) ) );
 	mb_cmdline_offset = 0;
 	mbinfo.cmdline = multiboot_add_cmdline ( image->name, image->cmdline );
 	mbinfo.mods_count = multiboot_build_module_list ( image, mbmodules,
@@ -281,6 +279,12 @@ static int multiboot_exec ( struct image *image ) {
 	 * interface, so shut everything down prior to booting the OS.
 	 */
 	shutdown ( SHUTDOWN_BOOT );
+
+	/* Build memory map after unhiding bootloader memory regions as part of
+	 * shutting everything down.
+	 */
+	multiboot_build_memmap ( image, &mbinfo, mbmemmap,
+				 ( sizeof(mbmemmap) / sizeof(mbmemmap[0]) ) );
 
 	/* Jump to OS with flat physical addressing */
 	DBGC ( image, "MULTIBOOT %p starting execution at %lx\n",
