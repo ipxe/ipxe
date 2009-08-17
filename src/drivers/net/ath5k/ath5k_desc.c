@@ -383,16 +383,6 @@ static int ath5k_hw_setup_rx_desc(struct ath5k_hw *ah __unused,
 	if (flags & AR5K_RXDESC_INTREQ)
 		rx_ctl->rx_control_1 |= AR5K_DESC_RX_CTL1_INTREQ;
 
-	if (desc->ds_link < ah->ah_sc->desc_daddr ||
-	    desc->ds_link + sizeof(struct ath5k_desc) > ah->ah_sc->desc_daddr + ah->ah_sc->desc_len ||
-	    size != 2400 ||
-	    *(void **)bus_to_virt(desc->ds_data + 2408) != bus_to_virt(desc->ds_data)) {
-		DBG("ath5k! set rx desc %p for %d bytes at %p (%08x) link to %p (%08x)\n",
-		    desc, size, bus_to_virt(desc->ds_data), desc->ds_data,
-		    bus_to_virt(desc->ds_link), desc->ds_link);
-		asm("cli;hlt");
-	}
-
 	return 0;
 }
 
