@@ -126,18 +126,37 @@ static int downloader_ensure_size ( struct downloader *downloader,
  * @v job		Downloader job control interface
  */
 static void downloader_job_kill ( struct job_interface *job ) {
-	struct downloader *downloader = 
+	struct downloader *downloader =
 		container_of ( job, struct downloader, job );
 
 	/* Terminate download */
 	downloader_finished ( downloader, -ECANCELED );
 }
 
+/**
+ * Report progress of download job
+ *
+ * @v job		Downloader job control interface
+ * @v progress		Progress report to fill in
+ */
+static void downloader_job_progress ( struct job_interface *job,
+				      struct job_progress *progress ) {
+	struct downloader *downloader =
+		container_of ( job, struct downloader, job );
+
+	/* This is not entirely accurate, since downloaded data may
+	 * arrive out of order (e.g. with multicast protocols), but
+	 * it's a reasonable first approximation.
+	 */
+	progress->completed = downloader->pos;
+	progress->total = downloader->image->len;
+}
+
 /** Downloader job control interface operations */
 static struct job_interface_operations downloader_job_operations = {
 	.done		= ignore_job_done,
 	.kill		= downloader_job_kill,
-	.progress	= ignore_job_progress,
+	.progress	= downloader_job_progress,
 };
 
 /****************************************************************************
