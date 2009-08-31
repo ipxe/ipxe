@@ -68,6 +68,8 @@ extern struct job_interface_operations null_job_ops;
 
 extern void job_done ( struct job_interface *job, int rc );
 extern void job_kill ( struct job_interface *job );
+extern void job_progress ( struct job_interface *job,
+			   struct job_progress *progress );
 
 extern void ignore_job_done ( struct job_interface *job, int rc );
 extern void ignore_job_kill ( struct job_interface *job );

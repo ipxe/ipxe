@@ -44,6 +44,14 @@ void job_kill ( struct job_interface *job ) {
 	job_put ( dest );
 }
 
+void job_progress ( struct job_interface *job,
+		    struct job_progress *progress ) {
+	struct job_interface *dest = job_get_dest ( job );
+
+	dest->op->progress ( dest, progress );
+	job_put ( dest );
+}
+
 /****************************************************************************
  *
  * Helper methods
