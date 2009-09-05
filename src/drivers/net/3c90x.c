@@ -619,13 +619,13 @@ static void a3c90x_remove(struct pci_device *pci)
 
 	DBGP("a3c90x_remove\n");
 
-	unregister_netdev(netdev);
+	a3c90x_reset(inf_3c90x);
 
 	/* Disable the receiver and transmitter. */
 	outw(cmdRxDisable, inf_3c90x->IOAddr + regCommandIntStatus_w);
 	outw(cmdTxDisable, inf_3c90x->IOAddr + regCommandIntStatus_w);
 
-	a3c90x_reset(inf_3c90x);
+	unregister_netdev(netdev);
 	netdev_nullify(netdev);
 	netdev_put(netdev);
 }
@@ -845,9 +845,9 @@ static void a3c90x_close(struct net_device *netdev)
 
 	DBGP("a3c90x_close\n");
 
+	a3c90x_reset(inf_3c90x);
 	outw(cmdRxDisable, inf_3c90x->IOAddr + regCommandIntStatus_w);
 	outw(cmdTxDisable, inf_3c90x->IOAddr + regCommandIntStatus_w);
-	a3c90x_reset(inf_3c90x);
 	a3c90x_free_resources(inf_3c90x);
 }
 
