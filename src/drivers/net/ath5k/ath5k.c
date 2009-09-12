@@ -1195,11 +1195,12 @@ ath5k_handle_rx(struct ath5k_softc *sc)
 
 		if (rs.rs_status) {
 			if (rs.rs_status & AR5K_RXERR_PHY) {
-				DBG("ath5k: rx PHY error\n");
+				/* These are uncommon, and may indicate a real problem. */
+				net80211_rx_err(sc->dev, NULL, EIO);
 				goto next;
 			}
 			if (rs.rs_status & AR5K_RXERR_CRC) {
-				net80211_rx_err(sc->dev, NULL, EIO);
+				/* These occur *all the time*. */
 				goto next;
 			}
 			if (rs.rs_status & AR5K_RXERR_DECRYPT) {
@@ -1358,6 +1359,8 @@ ath5k_init(struct ath5k_softc *sc)
 	if (ret)
 		goto done;
 
+	ath5k_rfkill_hw_start(ah);
+
 	/*
 	 * Reset the key cache since some parts do not reset the
 	 * contents on initial power up or resume from suspend.
@@ -1404,6 +1407,8 @@ ath5k_stop_hw(struct ath5k_softc *sc)
 		ath5k_hw_phy_disable(ah);
 	} else
 		sc->rxlink = NULL;
+
+	ath5k_rfkill_hw_stop(sc->ah);
 
 	return 0;
 }

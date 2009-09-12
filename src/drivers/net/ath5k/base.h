@@ -123,6 +123,11 @@ struct ath5k_softc {
 	unsigned int		txbuf_len;	/* buf count in txbuf list */
 	struct ath5k_txq	txq;		/* tx queue */
 
+	struct {
+		u16 gpio;
+		unsigned polarity;
+	} rf_kill;
+
 	int			last_calib_ticks;
 
 	int 			power_level;	/* Requested tx power in dbm */
