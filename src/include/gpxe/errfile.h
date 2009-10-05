@@ -113,6 +113,7 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #define ERRFILE_rtl818x		     ( ERRFILE_DRIVER | 0x004e0000 )
 #define ERRFILE_sky2                 ( ERRFILE_DRIVER | 0x004f0000 )
 #define ERRFILE_ath5k		     ( ERRFILE_DRIVER | 0x00500000 )
+#define ERRFILE_atl1e		     ( ERRFILE_DRIVER | 0x00510000 )
 
 #define ERRFILE_scsi		     ( ERRFILE_DRIVER | 0x00700000 )
 #define ERRFILE_arbel		     ( ERRFILE_DRIVER | 0x00710000 )
