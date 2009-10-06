@@ -351,6 +351,7 @@ got_pmm: /* PMM allocation succeeded */
 	call	print_character
 	movw	%si, %ax
 	call	print_hex_byte
+pmm_copy:
 	/* Copy ROM to PMM block */
 	xorw	%ax, %ax
 	movw	%ax, %es
@@ -362,7 +363,19 @@ got_pmm: /* PMM allocation succeeded */
 	movl	%edi, decompress_to
 	/* Shrink ROM */
 	movb	$_prefix_memsz_sect, romheader_size
+#ifdef SHRINK_WITHOUT_PMM
+	jmp	pmm_done
 pmm_fail:
+	/* Print marker and copy ourselves to high memory */
+	movl	$HIGHMEM_LOADPOINT, image_source
+	xorw	%di, %di
+	movb	$( '!' ), %al
+	call	print_character
+	jmp	pmm_copy
+pmm_done:
+#else
+pmm_fail:
+#endif
 	/* Restore upper register halves */
 	popal
 no_pmm:
