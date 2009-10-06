@@ -1,17 +1,17 @@
 /*
- * eepro100.c -- This file implements the eepro100 driver for etherboot.
+ * eepro100.c -- This is a driver for Intel Fast Ethernet Controllers
+ * (ifec).
  *
+ * Originally written for Etherboot by:
  *
- * Copyright (C) AW Computer Systems.
- * written by R.E.Wolff -- R.E.Wolff@BitWizard.nl
+ *   Copyright (C) AW Computer Systems.
+ *   written by R.E.Wolff -- R.E.Wolff@BitWizard.nl
  *
+ *   AW Computer Systems is contributing to the free software community
+ *   by paying for this driver and then putting the result under GPL.
  *
- * AW Computer Systems is contributing to the free software community
- * by paying for this driver and then putting the result under GPL.
- *
- * If you need a Linux device driver, please contact BitWizard for a
- * quote.
- *
+ *   If you need a Linux device driver, please contact BitWizard for a
+ *   quote.
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License as
@@ -28,14 +28,17 @@
  * Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
  *
  *
- *              date       version  by   what
- *  Written:    May 29 1997  V0.10  REW  Initial revision.
- * changes:     May 31 1997  V0.90  REW  Works!
- *              Jun 1  1997  V0.91  REW  Cleanup
- *              Jun 2  1997  V0.92  REW  Add some code documentation
- *              Jul 25 1997  V1.00  REW  Tested by AW to work in a PROM
- *                                       Cleanup for publication
+ *              date       version  by      what
+ *  Written:    May 29 1997  V0.10  REW     Initial revision.
+ * changes:     May 31 1997  V0.90  REW     Works!
+ *              Jun 1  1997  V0.91  REW     Cleanup
+ *              Jun 2  1997  V0.92  REW     Add some code documentation
+ *              Jul 25 1997  V1.00  REW     Tested by AW to work in a PROM
+ *                                          Cleanup for publication
  *              Dez 11 2004  V1.10  Kiszka  Add RX ring buffer support
+ *              Jun    2008  v2.0   mdeck   Updated to gPXE. Changed much.
+ *
+ * Cleanups and fixes by Thomas Miletich<thomas.miletich@gmail.com>
  *
  * This is the etherboot intel etherexpress Pro/100B driver.
  *
@@ -44,8 +47,6 @@
  * lower level routines have been cut-and-pasted into this source.
  *
  * The driver was finished before Intel got the NDA out of the closet.
- * I still don't have the docs.
- *
  *
  * Datasheet is now published and available from 
  * ftp://download.intel.com/design/network/manuals/8255X_OpenSDM.pdf
@@ -54,754 +55,1106 @@
 
 FILE_LICENCE ( GPL2_OR_LATER );
 
-/* Philosophy of this driver.
- *
- * Probing:
- *
- * Using the pci.c functions of the Etherboot code, the 82557 chip is detected.
- * It is verified that the BIOS initialized everything properly and if
- * something is missing it is done now.
- *
- *
- * Initialization:
- *
- *
- * The chip is then initialized to "know" its ethernet address, and to
- * start recieving packets. The Linux driver has a whole transmit and
- * recieve ring of buffers. This is neat if you need high performance:
- * you can write the buffers asynchronously to the chip reading the
- * buffers and transmitting them over the network.  Performance is NOT
- * an issue here. We can boot a 400k kernel in about two
- * seconds. (Theory: 0.4 seconds). Booting a system is going to take
- * about half a minute anyway, so getting 10 times closer to the
- * theoretical limit is going to make a difference of a few percent. */
-/* Not totally true: busy networks can cause packet drops due to RX
- * buffer overflows. Fixed in V1.10 of this driver. [Kiszka] */
 /*
+ * General Theory of Operation
  *
- * Transmitting and recieving.
+ * Initialization
  *
- * We have only one transmit descriptor. It has two buffer descriptors:
- * one for the header, and the other for the data.
- * We have multiple receive buffers (currently: 4). The chip is told to
- * receive packets and suspend itself once it ran on the last free buffer.
- * The recieve (poll) routine simply looks at the current recieve buffer,
- * picks the packet if any, and releases this buffer again (classic ring
- * buffer concept). This helps to avoid packet drops on busy networks.
+ * ifec_pci_probe() is called by gPXE during initialization. Typical NIC
+ * initialization is performed.  EEPROM data is read.
  *
- * Caveats:
+ * Network Boot
  *
- * The Etherboot framework moves the code to the 48k segment from
- * 0x94000 to 0xa0000. There is just a little room between the end of
- * this driver and the 0xa0000 address. If you compile in too many
- * features, this will overflow.
- * The number under "hex" in the output of size that scrolls by while
- * compiling should be less than 8000. Maybe even the stack is up there,
- * so that you need even more headroom.
+ * ifec_net_open() is called by gPXE before attempting to network boot from the
+ * card.  Here, the Command Unit & Receive Unit are initialized.  The tx & rx
+ * rings are setup.  The MAC address is programmed and the card is configured.
+ *
+ * Transmit
+ *
+ * ifec_net_transmit() enqueues a packet in the tx ring - active::tcbs[]  The tx
+ * ring is composed of TCBs linked to each other into a ring.  A tx request
+ * fills out the next available TCB with a pointer to the packet data.
+ * The last enqueued tx is always at active::tcb_head.  Thus, a tx request fills
+ * out the TCB following tcb_head.
+ * active::tcb_tail points to the TCB we're awaiting completion of.
+ * ifec_tx_process() checks tcb_tail, and once complete,
+ * blindly increments tcb_tail to the next ring TCB.
+ *
+ * Receive
+ *
+ * priv::rfds[] is an array of Receive Frame Descriptors. The RFDs are linked
+ * together to form a ring.
+ * ifec_net_poll() calls ifec_rx_process(), which checks the next RFD for
+ * data.  If we received a packet, we allocate a new io_buffer and copy the
+ * packet data into it. If alloc_iob() fails, we don't touch the RFD and try
+ * again on the next poll.
  */
 
-/* The etherboot authors seem to dislike the argument ordering in
- * outb macros that Linux uses. I disklike the confusion that this
- * has caused even more.... This file uses the Linux argument ordering.  */
-/* Sorry not us. It's inherited code from FreeBSD. [The authors] */
+/*
+ * Debugging levels:
+ *	- DBG() is for any errors, i.e. failed alloc_iob(), malloc_dma(),
+ *	  TX overflow, corrupted packets, ...
+ *	- DBG2() is for successful events, like packet received,
+ *	  packet transmitted, and other general notifications.
+ *	- DBGP() prints the name of each called function on entry
+ */
 
-#include "etherboot.h"
-#include "nic.h"
+#include <stdint.h>
+#include <byteswap.h>
+#include <errno.h>
+#include <stdio.h>
+#include <unistd.h>
 #include <gpxe/ethernet.h>
+#include <gpxe/if_ether.h>
+#include <gpxe/iobuf.h>
+#include <gpxe/malloc.h>
 #include <gpxe/pci.h>
+#include <gpxe/spi_bit.h>
+#include <gpxe/timer.h>
+#include <gpxe/nvs.h>
+#include <gpxe/threewire.h>
+#include <gpxe/netdevice.h>
+#include "eepro100.h"
 
-static int ioaddr;
+/****************************** Global data **********************************/
 
-enum speedo_offsets {
-  SCBStatus = 0, SCBCmd = 2,      /* Rx/Command Unit command and status. */
-  SCBPointer = 4,                 /* General purpose pointer. */
-  SCBPort = 8,                    /* Misc. commands and operands.  */
-  SCBflash = 12, SCBeeprom = 14,  /* EEPROM and flash memory control. */
-  SCBCtrlMDI = 16,                /* MDI interface control. */
-  SCBEarlyRx = 20,                /* Early receive byte count. */
-};
-
-enum SCBCmdBits {
-	SCBMaskCmdDone=0x8000, SCBMaskRxDone=0x4000, SCBMaskCmdIdle=0x2000,
-	SCBMaskRxSuspend=0x1000, SCBMaskEarlyRx=0x0800, SCBMaskFlowCtl=0x0400,
-	SCBTriggerIntr=0x0200, SCBMaskAll=0x0100,
-	/* The rest are Rx and Tx commands. */
-	CUStart=0x0010, CUResume=0x0020, CUStatsAddr=0x0040, CUShowStats=0x0050,
-	CUCmdBase=0x0060,	/* CU Base address (set to zero) . */
-	CUDumpStats=0x0070, /* Dump then reset stats counters. */
-	RxStart=0x0001, RxResume=0x0002, RxAbort=0x0004, RxAddrLoad=0x0006,
-	RxResumeNoResources=0x0007,
-};
-
-static int do_eeprom_cmd(int cmd, int cmd_len);
-void hd(void *where, int n);
-
-/***********************************************************************/
-/*                       I82557 related defines                        */
-/***********************************************************************/
-
-/* Serial EEPROM section.
-   A "bit" grungy, but we work our way through bit-by-bit :->. */
-/*  EEPROM_Ctrl bits. */
-#define EE_SHIFT_CLK    0x01    /* EEPROM shift clock. */
-#define EE_CS           0x02    /* EEPROM chip select. */
-#define EE_DATA_WRITE   0x04    /* EEPROM chip data in. */
-#define EE_DATA_READ    0x08    /* EEPROM chip data out. */
-#define EE_WRITE_0      0x4802
-#define EE_WRITE_1      0x4806
-#define EE_ENB          (0x4800 | EE_CS)
-
-/* The EEPROM commands include the alway-set leading bit. */
-#define EE_READ_CMD     6
-
-/* The SCB accepts the following controls for the Tx and Rx units: */
-#define  CU_START       0x0010
-#define  CU_RESUME      0x0020
-#define  CU_STATSADDR   0x0040
-#define  CU_SHOWSTATS   0x0050  /* Dump statistics counters. */
-#define  CU_CMD_BASE    0x0060  /* Base address to add to add CU commands. */
-#define  CU_DUMPSTATS   0x0070  /* Dump then reset stats counters. */
-
-#define  RX_START       0x0001
-#define  RX_RESUME      0x0002
-#define  RX_ABORT       0x0004
-#define  RX_ADDR_LOAD   0x0006
-#define  RX_RESUMENR    0x0007
-#define INT_MASK        0x0100
-#define DRVR_INT        0x0200          /* Driver generated interrupt. */
-
-enum phy_chips { NonSuchPhy=0, I82553AB, I82553C, I82503, DP83840, S80C240,
-                                         S80C24, PhyUndefined, DP83840A=10, };
-
-/* Commands that can be put in a command list entry. */
-enum commands {
-  CmdNOp = 0,
-  CmdIASetup = 1,
-  CmdConfigure = 2,
-  CmdMulticastList = 3,
-  CmdTx = 4,
-  CmdTDR = 5,
-  CmdDump = 6,
-  CmdDiagnose = 7,
-
-  /* And some extra flags: */
-  CmdSuspend = 0x4000,      /* Suspend after completion. */
-  CmdIntr = 0x2000,         /* Interrupt after completion. */
-  CmdTxFlex = 0x0008,       /* Use "Flexible mode" for CmdTx command. */
-};
-
-/* How to wait for the command unit to accept a command.
-   Typically this takes 0 ticks. */
-static inline void wait_for_cmd_done(int cmd_ioaddr)
-{
-  int wait = 0;
-  int delayed_cmd;
-
-  do
-    if (inb(cmd_ioaddr) == 0) return;
-  while(++wait <= 100);
-  delayed_cmd = inb(cmd_ioaddr);
-  do
-    if (inb(cmd_ioaddr) == 0) break;
-  while(++wait <= 10000);
-  printf("Command %2.2x was not immediately accepted, %d ticks!\n",
-      delayed_cmd, wait);
-}
-
-/* Elements of the dump_statistics block. This block must be lword aligned. */
-static struct speedo_stats {
-        u32 tx_good_frames;
-        u32 tx_coll16_errs;
-        u32 tx_late_colls;
-        u32 tx_underruns;
-        u32 tx_lost_carrier;
-        u32 tx_deferred;
-        u32 tx_one_colls;
-        u32 tx_multi_colls;
-        u32 tx_total_colls;
-        u32 rx_good_frames;
-        u32 rx_crc_errs;
-        u32 rx_align_errs;
-        u32 rx_resource_errs;
-        u32 rx_overrun_errs;
-        u32 rx_colls_errs;
-        u32 rx_runt_errs;
-        u32 done_marker;
-} lstats;
-
-/* A speedo3 TX buffer descriptor with two buffers... */
-static struct TxFD {
-	volatile s16 status;
-	s16 command;
-	u32 link;          /* void * */
-	u32 tx_desc_addr;  /* (almost) Always points to the tx_buf_addr element. */
-	s32 count;         /* # of TBD (=2), Tx start thresh., etc. */
-	/* This constitutes two "TBD" entries: hdr and data */
-	u32 tx_buf_addr0;  /* void *, header of frame to be transmitted.  */
-	s32 tx_buf_size0;  /* Length of Tx hdr. */
-	u32 tx_buf_addr1;  /* void *, data to be transmitted.  */
-	s32 tx_buf_size1;  /* Length of Tx data. */
-} txfd;
-
-struct RxFD {               /* Receive frame descriptor. */
-	volatile s16 status;
-	s16 command;
-	u32 link;                 /* struct RxFD * */
-	u32 rx_buf_addr;          /* void * */
-	u16 count;
-	u16 size;
-	char packet[1518];
-};
-
-static struct nic_operations eepro100_operations;
-
-#define RXFD_COUNT 4
-struct {
-	struct RxFD rxfds[RXFD_COUNT];
-} eepro100_bufs __shared;
-#define rxfds eepro100_bufs.rxfds
-static unsigned int rxfd = 0;
-
-static int congenb = 0;         /* Enable congestion control in the DP83840. */
-static int txfifo = 8;          /* Tx FIFO threshold in 4 byte units, 0-15 */
-static int rxfifo = 8;          /* Rx FIFO threshold, default 32 bytes. */
-static int txdmacount = 0;      /* Tx DMA burst length, 0-127, default 0. */
-static int rxdmacount = 0;      /* Rx DMA length, 0 means no preemption. */
-
-/* I don't understand a byte in this structure. It was copied from the
- * Linux kernel initialization for the eepro100. -- REW */
-static struct ConfCmd {
-  s16 status;
-  s16 command;
-  u32 link;
-  unsigned char data[22];
-} confcmd = {
-  0, 0, 0, /* filled in later */
-  {22, 0x08, 0, 0,  0, 0x80, 0x32, 0x03,  1, /* 1=Use MII  0=Use AUI */
-   0, 0x2E, 0,  0x60, 0,
-   0xf2, 0x48,   0, 0x40, 0xf2, 0x80,        /* 0x40=Force full-duplex */
-   0x3f, 0x05, }
-};
-
-/***********************************************************************/
-/*                       Locally used functions                        */
-/***********************************************************************/
-
-/* Support function: mdio_write
- *
- * This probably writes to the "physical media interface chip".
- * -- REW
+/*
+ * This is the default configuration command data. The values were copied from
+ * the Linux kernel initialization for the eepro100.
  */
+static struct ifec_cfg ifec_cfg = {
+	.status  = 0,
+	.command = CmdConfigure | CmdSuspend,
+	.link    = 0,        /* Filled in later */
+	.byte = { 22,        /* How many bytes in this array */
+	          ( TX_FIFO << 4 ) | RX_FIFO,  /* Rx & Tx FIFO limits */
+	          0, 0,                        /* Adaptive Interframe Spacing */
+	          RX_DMA_COUNT,                /* Rx DMA max byte count */
+	          TX_DMA_COUNT + 0x80,         /* Tx DMA max byte count */
+	          0x32,      /* Many bits. */
+	          0x03,      /* Discard short receive & Underrun retries */
+	          1,         /* 1=Use MII  0=Use AUI */
+	          0,
+	          0x2E,      /* NSAI, Preamble length, & Loopback*/
+	          0,         /* Linear priority */
+	          0x60,      /* L PRI MODE & Interframe spacing */
+	          0, 0xf2,
+	          0x48,      /* Promiscuous, Broadcast disable, CRS & CDT */
+	          0, 0x40,
+	          0xf2,      /* Stripping, Padding, Receive CRC Transfer */
+	          0x80,      /* 0x40=Force full-duplex, 0x80=Allowfull-duplex*/
+	          0x3f,      /* Multiple IA */
+	          0x0D }     /* Multicast all */
+};
 
-static int mdio_write(int phy_id, int location, int value)
+static struct net_device_operations ifec_operations = {
+	.open     = ifec_net_open,
+	.close    = ifec_net_close,
+	.transmit = ifec_net_transmit,
+	.poll     = ifec_net_poll,
+	.irq      = ifec_net_irq
+};
+
+/******************* gPXE PCI Device Driver API functions ********************/
+
+/*
+ * Initialize the PCI device.
+ *
+ * @v pci 		The device's associated pci_device structure.
+ * @v id  		The PCI device + vendor id.
+ * @ret rc		Returns zero if successfully initialized.
+ *
+ * This function is called very early on, while gPXE is initializing.
+ * This is a gPXE PCI Device Driver API function.
+ */
+static int ifec_pci_probe ( struct pci_device *pci,
+                            const struct pci_device_id *id __unused )
 {
-	int val, boguscnt = 64*4;         /* <64 usec. to complete, typ 27 ticks */
+	struct net_device *netdev;
+	struct ifec_private *priv;
+	int rc;
 
-	outl(0x04000000 | (location<<16) | (phy_id<<21) | value,
-	     ioaddr + SCBCtrlMDI);
-	do {
-		udelay(16);
+	DBGP ( "ifec_pci_probe: " );
 
-		val = inl(ioaddr + SCBCtrlMDI);
-		if (--boguscnt < 0) {
-			printf(" mdio_write() timed out with val = %X.\n", val);
-			break;
-		}
-	} while (! (val & 0x10000000));
-	return val & 0xffff;
+	if ( pci->ioaddr == 0 )
+		return -EINVAL;
+
+	netdev = alloc_etherdev ( sizeof(*priv) );
+	if ( !netdev )
+		return -ENOMEM;
+
+	netdev_init ( netdev, &ifec_operations );
+	priv = netdev->priv;
+
+	pci_set_drvdata ( pci, netdev );
+	netdev->dev = &pci->dev;
+
+	/* enable bus master, etc */
+	adjust_pci_device( pci );
+
+	DBGP ( "pci " );
+
+	memset ( priv, 0, sizeof(*priv) );
+	priv->ioaddr = pci->ioaddr;
+
+	ifec_reset ( netdev );
+	DBGP ( "reset " );
+
+	ifec_init_eeprom ( netdev );
+
+	/* read MAC address */
+	nvs_read ( &priv->eeprom.nvs, EEPROM_ADDR_MAC_0, netdev->hw_addr,
+		   ETH_ALEN );
+	/* read mdio_register */
+	nvs_read ( &priv->eeprom.nvs, EEPROM_ADDR_MDIO_REGISTER,
+		   &priv->mdio_register, 2 );
+
+	ifec_link_update ( netdev );	/* Update link state */
+
+	if ( ( rc = register_netdev ( netdev ) ) != 0 )
+		goto error;
+
+	DBGP ( "ints\n" );
+
+	return 0;
+
+error:
+	ifec_reset     ( netdev );
+	netdev_nullify ( netdev );
+	netdev_put     ( netdev );
+
+	return rc;
 }
 
-/* Support function: mdio_read
+/*
+ * Remove a device from the PCI device list.
+ *
+ * @v pci		PCI device to remove.
+ *
+ * This is a PCI Device Driver API function.
+ */
+static void ifec_pci_remove ( struct pci_device *pci )
+{
+	struct net_device *netdev = pci_get_drvdata ( pci );
+
+	DBGP ( "ifec_pci_remove\n" );
+
+	unregister_netdev ( netdev );
+	ifec_reset        ( netdev );
+	netdev_nullify    ( netdev );
+	netdev_put        ( netdev );
+}
+
+/****************** gPXE Network Device Driver API functions *****************/
+
+/*
+ * Close a network device.
+ *
+ * @v netdev		Device to close.
+ *
+ * This is a gPXE Network Device Driver API function.
+ */
+static void ifec_net_close ( struct net_device *netdev )
+{
+	struct ifec_private *priv = netdev->priv;
+	unsigned long ioaddr = priv->ioaddr;
+	unsigned short intr_status;
+
+	DBGP ( "ifec_net_close\n" );
+
+	/* disable interrupts */
+	ifec_net_irq ( netdev, 0 );
+
+	/* Ack & clear ints */
+	intr_status = inw ( ioaddr + SCBStatus );
+	outw ( intr_status, ioaddr + SCBStatus );
+	inw ( ioaddr + SCBStatus );
+
+	ifec_reset ( netdev );
+
+	/* Free any resources */
+	ifec_free ( netdev );
+}
+
+/* Interrupts to be masked */
+#define INTERRUPT_MASK	( SCBMaskEarlyRx | SCBMaskFlowCtl )
+
+/*
+ * Enable or disable IRQ masking.
+ *
+ * @v netdev		Device to control.
+ * @v enable		Zero to mask off IRQ, non-zero to enable IRQ.
+ *
+ * This is a gPXE Network Driver API function.
+ */
+static void ifec_net_irq ( struct net_device *netdev, int enable )
+{
+	struct ifec_private *priv = netdev->priv;
+	unsigned long ioaddr = priv->ioaddr;
+
+	DBGP ( "ifec_net_irq\n" );
+
+	outw ( enable ? INTERRUPT_MASK : SCBMaskAll, ioaddr + SCBCmd );
+}
+
+/*
+ * Opens a network device.
+ *
+ * @v netdev		Device to be opened.
+ * @ret rc  		Non-zero if failed to open.
+ *
+ * This enables tx and rx on the device.
+ * This is a gPXE Network Device Driver API function.
+ */
+static int ifec_net_open ( struct net_device *netdev )
+{
+	struct ifec_private *priv = netdev->priv;
+	struct ifec_ias *ias = NULL;
+	struct ifec_cfg *cfg = NULL;
+	int i, options;
+	int rc = -ENOMEM;
+
+	DBGP ( "ifec_net_open: " );
+
+	/* Ensure interrupts are disabled. */
+	ifec_net_irq ( netdev, 0 );
+
+	/* Initialize Command Unit and Receive Unit base addresses. */
+	ifec_scb_cmd ( netdev, 0, RUAddrLoad );
+	ifec_scb_cmd ( netdev, virt_to_bus ( &priv->stats ), CUStatsAddr );
+	ifec_scb_cmd ( netdev, 0, CUCmdBase );
+
+	/* Initialize both rings */
+	if ( ( rc = ifec_rx_setup ( netdev ) ) != 0 )
+		goto error;
+	if ( ( rc = ifec_tx_setup ( netdev ) ) != 0 )
+		goto error;
+
+	/* Initialize MDIO */
+	options = 0x00; /* 0x40 = 10mbps half duplex, 0x00 = Autosense */
+	ifec_mdio_setup ( netdev, options );
+
+	/* Prepare MAC address w/ Individual Address Setup (ias) command.*/
+	ias = malloc_dma ( sizeof ( *ias ), CB_ALIGN );
+	if ( !ias ) {
+		rc = -ENOMEM;
+		goto error;
+	}
+	ias->command      = CmdIASetup;
+	ias->status       = 0;
+	memcpy ( ias->ia, netdev->ll_addr, ETH_ALEN );
+
+	/* Prepare operating parameters w/ a configure command. */
+	cfg = malloc_dma ( sizeof ( *cfg ), CB_ALIGN );
+	if ( !cfg ) {
+		rc = -ENOMEM;
+		goto error;
+	}
+	memcpy ( cfg, &ifec_cfg, sizeof ( *cfg ) );
+	cfg->link     = virt_to_bus ( priv->tcbs );
+	cfg->byte[19] = ( options & 0x10 ) ? 0xC0 : 0x80;
+	ias->link     = virt_to_bus ( cfg );
+
+	/* Issue the ias and configure commands. */
+	ifec_scb_cmd ( netdev, virt_to_bus ( ias ), CUStart );
+	ifec_scb_cmd_wait ( netdev );
+	priv->configured = 1;
+
+	/* Wait up to 10 ms for configuration to initiate */
+	for ( i = 10; i && !cfg->status; i-- )
+		mdelay ( 1 );
+	if ( ! cfg->status ) {
+		DBG ( "Failed to initiate!\n" );
+		goto error;
+	}
+	free_dma ( ias, sizeof ( *ias ) );
+	free_dma ( cfg, sizeof ( *cfg ) );
+	DBG2 ( "cfg " );
+
+	/* Enable rx by sending ring address to card */
+	if ( priv->rfds[0] != NULL ) {
+		ifec_scb_cmd ( netdev, virt_to_bus( priv->rfds[0] ), RUStart );
+		ifec_scb_cmd_wait ( netdev );
+	}
+	DBG2 ( "rx_start\n" );
+
+	return 0;
+
+error:
+	free_dma ( cfg, sizeof ( *cfg ) );
+	free_dma ( ias, sizeof ( *ias ) );
+	ifec_free ( netdev );
+	ifec_reset ( netdev );
+	return rc;
+}
+
+/*
+ * This function allows a driver to process events during operation.
+ *
+ * @v netdev		Device being polled.
+ *
+ * This is called periodically by gPXE to let the driver check the status of
+ * transmitted packets and to allow the driver to check for received packets.
+ * This is a gPXE Network Device Driver API function.
+ */
+static void ifec_net_poll ( struct net_device *netdev )
+{
+	struct ifec_private *priv = netdev->priv;
+	static int linkpoll = 0;
+	unsigned short intr_status;
+
+	DBGP ( "ifec_net_poll\n" );
+
+	/* acknowledge interrupts ASAP */
+	intr_status = inw ( priv->ioaddr + SCBStatus );
+	outw ( intr_status, priv->ioaddr + SCBStatus );
+	inw ( priv->ioaddr + SCBStatus );
+
+	DBG2 ( "poll - status: 0x%04X\n", intr_status );
+
+	if ( ++linkpoll > LINK_CHECK_PERIOD ) {
+		linkpoll = 0;
+		ifec_link_update ( netdev );	/* Update link state */
+	}
+
+	/* anything to do here? */
+	if ( ( intr_status & ( ~INTERRUPT_MASK ) ) == 0 )
+		return;
+
+	/* process received and transmitted packets */
+	ifec_tx_process ( netdev );
+	ifec_rx_process ( netdev );
+
+	ifec_check_ru_status ( netdev, intr_status );
+
+	return;
+}
+
+/*
+ * This transmits a packet.
+ *
+ * @v netdev		Device to transmit from.
+ * @v iobuf 		Data to transmit.
+ * @ret rc  		Non-zero if failed to transmit.
+ *
+ * This is a gPXE Network Driver API function.
+ */
+static int ifec_net_transmit ( struct net_device *netdev,
+                               struct io_buffer *iobuf )
+{
+	struct ifec_private *priv = netdev->priv;
+	struct ifec_tcb *tcb = priv->tcb_head->next;
+	unsigned long ioaddr = priv->ioaddr;
+
+	DBGP ( "ifec_net_transmit\n" );
+
+	/* Wait for TCB to become available. */
+	if ( tcb->status || tcb->iob ) {
+		DBG ( "TX overflow\n" );
+		return -ENOBUFS;
+	}
+
+	DBG2 ( "transmitting packet (%d bytes). status = %hX, cmd=%hX\n",
+		iob_len ( iobuf ), tcb->status, inw ( ioaddr + SCBCmd ) );
+
+	tcb->command   = CmdSuspend | CmdTx | CmdTxFlex;
+	tcb->count     = 0x01208000;
+	tcb->tbd_addr0 = virt_to_bus ( iobuf->data );
+	tcb->tbd_size0 = 0x3FFF & iob_len ( iobuf );
+	tcb->iob = iobuf;
+
+	ifec_tx_wake ( netdev );
+
+	/* Append to end of ring. */
+	priv->tcb_head = tcb;
+
+	return 0;
+}
+
+/*************************** Local support functions *************************/
+
+/* Define what each GPIO Pin does */
+static const uint16_t ifec_ee_bits[] = {
+	[SPI_BIT_SCLK]	= EE_SHIFT_CLK,
+	[SPI_BIT_MOSI]	= EE_DATA_WRITE,
+	[SPI_BIT_MISO]	= EE_DATA_READ,
+	[SPI_BIT_SS(0)]	= EE_ENB,
+};
+
+/*
+ * Read a single bit from the GPIO pins used for SPI.
+ * should be called by SPI bitbash functions only
+ *
+ * @v basher		Bitbash device
+ * @v bit_id		Line to be read
+ */
+static int ifec_spi_read_bit ( struct bit_basher *basher,
+			       unsigned int bit_id )
+{
+	struct ifec_private *priv =
+		container_of ( basher, struct ifec_private, spi.basher );
+	unsigned long ee_addr = priv->ioaddr + CSREeprom;
+	unsigned int ret = 0;
+	uint16_t mask;
+
+	DBGP ( "ifec_spi_read_bit\n" );
+
+	mask = ifec_ee_bits[bit_id];
+	ret = inw (ee_addr);
+
+	return ( ret & mask ) ? 1 : 0;
+}
+
+/*
+ * Write a single bit to the GPIO pins used for SPI.
+ * should be called by SPI bitbash functions only
+ *
+ * @v basher		Bitbash device
+ * @v bit_id		Line to write to
+ * @v data		Value to write
+ */
+static void ifec_spi_write_bit ( struct bit_basher *basher,
+				 unsigned int bit_id,
+				 unsigned long data )
+{
+	struct ifec_private *priv =
+		container_of ( basher, struct ifec_private, spi.basher );
+	unsigned long ee_addr = priv->ioaddr + CSREeprom;
+	short val;
+	uint16_t mask = ifec_ee_bits[bit_id];
+
+	DBGP ( "ifec_spi_write_bit\n" );
+
+	val = inw ( ee_addr );
+	val &= ~mask;
+	val |= data & mask;
+
+	outw ( val, ee_addr );
+}
+
+/* set function pointer to SPI read- and write-bit functions */
+static struct bit_basher_operations ifec_basher_ops = {
+	.read = ifec_spi_read_bit,
+	.write = ifec_spi_write_bit,
+};
+
+/*
+ * Initialize the eeprom stuff
+ *
+ * @v netdev		Network device
+ */
+static void ifec_init_eeprom ( struct net_device *netdev )
+{
+	struct ifec_private *priv = netdev->priv;
+
+	DBGP ( "ifec_init_eeprom\n" );
+
+	priv->spi.basher.op = &ifec_basher_ops;
+	priv->spi.bus.mode = SPI_MODE_THREEWIRE;
+	init_spi_bit_basher ( &priv->spi );
+
+	priv->eeprom.bus = &priv->spi.bus;
+
+	/* init as 93c46(93c14 compatible) first, to set the command len,
+	 * block size and word len. Needs to be set for address len detection.
+	 */
+	init_at93c46 ( &priv->eeprom, 16 );
+
+	/* detect address length, */
+	threewire_detect_address_len ( &priv->eeprom );
+
+	/* address len == 8 means 93c66 instead of 93c46 */
+	if ( priv->eeprom.address_len == 8 )
+		init_at93c66 ( &priv->eeprom, 16 );
+}
+
+/*
+ * Check if the network cable is plugged in.
+ *
+ * @v netdev  		Network device to check.
+ * @ret retval		greater 0 if linkup.
+ */
+static int ifec_link_check ( struct net_device *netdev )
+{
+	struct ifec_private *priv = netdev->priv;
+	unsigned short mdio_register = priv->mdio_register;
+
+	DBGP ( "ifec_link_check\n" );
+
+	/* Read the status register once to discard stale data */
+	ifec_mdio_read ( netdev, mdio_register & 0x1f, 1 );
+	/* Check to see if network cable is plugged in. */
+	if ( ! ( ifec_mdio_read ( netdev, mdio_register & 0x1f, 1 )
+		  & ( 1 << 2 ) ) ) {
+		return 0;
+	}
+	return 1;
+}
+
+/*
+ * Check network cable link, inform gPXE as appropriate.
+ *
+ * @v netdev  		Network device to check.
+ */
+static void ifec_link_update ( struct net_device *netdev )
+{
+	DBGP ( "ifec_link_update\n" );
+
+	/* Update link state */
+	if ( ifec_link_check ( netdev ) )
+		netdev_link_up ( netdev );
+	else
+		netdev_link_down ( netdev );
+}
+
+/*
+ * Support function: ifec_mdio_read
  *
  * This probably reads a register in the "physical media interface chip".
  * -- REW
  */
-static int mdio_read(int phy_id, int location)
+static int ifec_mdio_read ( struct net_device *netdev, int phy_id,
+                                                       int location )
 {
-	int val, boguscnt = 64*4;               /* <64 usec. to complete, typ 27 ticks */
-	outl(0x08000000 | (location<<16) | (phy_id<<21), ioaddr + SCBCtrlMDI);
+	struct ifec_private *priv = netdev->priv;
+	unsigned long ioaddr = priv->ioaddr;
+	int val;
+	int boguscnt = 64*4;     /* <64 usec. to complete, typ 27 ticks */
+
+	DBGP ( "ifec_mdio_read\n" );
+
+	outl ( 0x08000000 | ( location << 16 ) | ( phy_id << 21 ),
+	       ioaddr + CSRCtrlMDI );
 	do {
-		udelay(16);
+		udelay ( 16 );
 
-		val = inl(ioaddr + SCBCtrlMDI);
+		val = inl ( ioaddr + CSRCtrlMDI );
 
-		if (--boguscnt < 0) {
-			printf( " mdio_read() timed out with val = %X.\n", val);
+		if ( --boguscnt < 0 ) {
+			DBG ( " ifec_mdio_read() time out with val = %X.\n",
+			         val );
 			break;
 		}
-	} while (! (val & 0x10000000));
+	} while (! ( val & 0x10000000 ) );
 	return val & 0xffff;
 }
 
-/* The fixes for the code were kindly provided by Dragan Stancevic
-   <visitor@valinux.com> to strictly follow Intel specifications of EEPROM
-   access timing.
-   The publicly available sheet 64486302 (sec. 3.1) specifies 1us access
-   interval for serial EEPROM.  However, it looks like that there is an
-   additional requirement dictating larger udelay's in the code below.
-   2000/05/24  SAW */
-static int do_eeprom_cmd(int cmd, int cmd_len)
-{
-	unsigned retval = 0;
-	long ee_addr = ioaddr + SCBeeprom;
-
-	outw(EE_ENB, ee_addr); udelay(2);
-	outw(EE_ENB | EE_SHIFT_CLK, ee_addr); udelay(2);
-
-	/* Shift the command bits out. */
-	do {
-		short dataval = (cmd & (1 << cmd_len)) ? EE_WRITE_1 : EE_WRITE_0;
-		outw(dataval, ee_addr); udelay(2);
-		outw(dataval | EE_SHIFT_CLK, ee_addr); udelay(2);
-		retval = (retval << 1) | ((inw(ee_addr) & EE_DATA_READ) ? 1 : 0);
-	} while (--cmd_len >= 0);
-	outw(EE_ENB, ee_addr); udelay(2);
-
-	/* Terminate the EEPROM access. */
-	outw(EE_ENB & ~EE_CS, ee_addr);
-	return retval;
-}
-
-#if 0
-static inline void whereami (const char *str)
-{
-  printf ("%s\n", str);
-  sleep (2);
-}
-#else
-#define whereami(s)
-#endif
-
-static void eepro100_irq(struct nic *nic __unused, irq_action_t action)
-{
-	uint16_t enabled_mask = ( SCBMaskCmdDone | SCBMaskCmdIdle |
-				  SCBMaskEarlyRx | SCBMaskFlowCtl );
-
-	switch ( action ) {
-	case DISABLE :
-		outw(SCBMaskAll, ioaddr + SCBCmd);
-		break;
-	case ENABLE :
-		outw(enabled_mask, ioaddr + SCBCmd);
-		break;
-	case FORCE :
-		outw(enabled_mask | SCBTriggerIntr, ioaddr + SCBCmd);
-		break;
-	}
-}
-
-/* function: eepro100_transmit
- * This transmits a packet.
+/*
+ * Initializes MDIO.
  *
- * Arguments: char d[6]:          destination ethernet address.
- *            unsigned short t:   ethernet protocol type.
- *            unsigned short s:   size of the data-part of the packet.
- *            char *p:            the data for the packet.
- * returns:   void.
+ * @v netdev 		Network device
+ * @v options		MDIO options
  */
-
-static void eepro100_transmit(struct nic *nic, const char *d, unsigned int t, unsigned int s, const char *p)
+static void ifec_mdio_setup ( struct net_device *netdev, int options )
 {
-	struct eth_hdr {
-		unsigned char dst_addr[ETH_ALEN];
-		unsigned char src_addr[ETH_ALEN];
-		unsigned short type;
-	} hdr;
-	unsigned short status;
-	int s1, s2;
-	unsigned long ct;
+	struct ifec_private *priv = netdev->priv;
+	unsigned short mdio_register = priv->mdio_register;
 
-	status = inw(ioaddr + SCBStatus);
-	/* Acknowledge all of the current interrupt sources ASAP. */
-	outw(status & 0xfc00, ioaddr + SCBStatus);
+	DBGP ( "ifec_mdio_setup\n" );
 
-#ifdef	DEBUG
-	printf ("transmitting type %hX packet (%d bytes). status = %hX, cmd=%hX\n",
-		t, s, status, inw (ioaddr + SCBCmd));
-#endif
-
-	memcpy (&hdr.dst_addr, d, ETH_ALEN);
-	memcpy (&hdr.src_addr, nic->node_addr, ETH_ALEN);
-
-	hdr.type = htons (t);
-
-	txfd.status = 0;
-	txfd.command = CmdSuspend | CmdTx | CmdTxFlex;
-	txfd.link   = virt_to_bus (&txfd);
-	txfd.count   = 0x02208000;
-	txfd.tx_desc_addr = virt_to_bus(&txfd.tx_buf_addr0);
-
-	txfd.tx_buf_addr0 = virt_to_bus (&hdr);
-	txfd.tx_buf_size0 = sizeof (hdr);
-
-	txfd.tx_buf_addr1 = virt_to_bus (p);
-	txfd.tx_buf_size1 = s;
-
-#ifdef	DEBUG
-	printf ("txfd: \n");
-	hd (&txfd, sizeof (txfd));
-#endif
-
-	outl(virt_to_bus(&txfd), ioaddr + SCBPointer);
-	outb(CU_START, ioaddr + SCBCmd);
-	wait_for_cmd_done(ioaddr + SCBCmd);
-
-	s1 = inw (ioaddr + SCBStatus);
-
-	ct = currticks();
-	/* timeout 10 ms for transmit */
-	while (!txfd.status && ct + 10*1000)
-		/* Wait */;
-	s2 = inw (ioaddr + SCBStatus);
-
-#ifdef	DEBUG
-	printf ("s1 = %hX, s2 = %hX.\n", s1, s2);
-#endif
+	if (   ( (mdio_register>>8) & 0x3f ) == DP83840
+	    || ( (mdio_register>>8) & 0x3f ) == DP83840A ) {
+		int mdi_reg23 = ifec_mdio_read ( netdev, mdio_register
+						  & 0x1f, 23 ) | 0x0422;
+		if (CONGENB)
+			mdi_reg23 |= 0x0100;
+		DBG2 ( "DP83840 specific setup, setting register 23 to "
+		                                         "%hX.\n", mdi_reg23 );
+		ifec_mdio_write ( netdev, mdio_register & 0x1f, 23, mdi_reg23 );
+	}
+	DBG2 ( "dp83840 " );
+	if ( options != 0 ) {
+		ifec_mdio_write ( netdev, mdio_register & 0x1f, 0,
+		                           ( (options & 0x20) ? 0x2000 : 0 ) |
+		                           ( (options & 0x10) ? 0x0100 : 0 ) );
+		DBG2 ( "set mdio_register. " );
+	}
 }
 
 /*
- * Sometimes the receiver stops making progress.  This routine knows how to
- * get it going again, without losing packets or being otherwise nasty like
- * a chip reset would be.  Previously the driver had a whole sequence
- * of if RxSuspended, if it's no buffers do one thing, if it's no resources,
- * do another, etc.  But those things don't really matter.  Separate logic
- * in the ISR provides for allocating buffers--the other half of operation
- * is just making sure the receiver is active.  speedo_rx_soft_reset does that.
- * This problem with the old, more involved algorithm is shown up under
- * ping floods on the order of 60K packets/second on a 100Mbps fdx network.
+ * Support function: ifec_mdio_write
+ *
+ * This probably writes to the "physical media interface chip".
+ * -- REW
  */
-static void
-speedo_rx_soft_reset(void)
+static int ifec_mdio_write ( struct net_device *netdev,
+                             int phy_id, int location, int value )
 {
-	int i;
+	struct ifec_private *priv = netdev->priv;
+	unsigned long ioaddr = priv->ioaddr;
+	int val;
+	int boguscnt = 64*4;     /* <64 usec. to complete, typ 27 ticks */
 
+	DBGP ( "ifec_mdio_write\n" );
 
-#ifdef	DEBUG
-	printf("reset\n");
-#endif
-	wait_for_cmd_done(ioaddr + SCBCmd);
-	/*
-	 * Put the hardware into a known state.
-	 */
-	outb(RX_ABORT, ioaddr + SCBCmd);
+	outl ( 0x04000000 | ( location << 16 ) | ( phy_id << 21 ) | value,
+	       ioaddr + CSRCtrlMDI );
+	do {
+		udelay ( 16 );
 
-	for (i = 0; i < RXFD_COUNT; i++) {
-		rxfds[i].status      = 0;
-		rxfds[i].rx_buf_addr = 0xffffffff;
-		rxfds[i].count       = 0;
-		rxfds[i].size        = 1528;
-	}
-
-	wait_for_cmd_done(ioaddr + SCBCmd);
-
-	outl(virt_to_bus(&rxfds[rxfd]), ioaddr + SCBPointer);
-	outb(RX_START, ioaddr + SCBCmd);
+		val = inl ( ioaddr + CSRCtrlMDI );
+		if ( --boguscnt < 0 ) {
+			DBG ( " ifec_mdio_write() time out with val = %X.\n",
+			      val );
+			break;
+		}
+	} while (! ( val & 0x10000000 ) );
+	return val & 0xffff;
 }
 
-/* function: eepro100_poll / eth_poll
- * This receives a packet from the network.
+/*
+ * Resets the hardware.
  *
- * Arguments: none
- *
- * returns:   1 if a packet was received.
- *            0 if no packet was received.
- * side effects:
- *            returns the packet in the array nic->packet.
- *            returns the length of the packet in nic->packetlen.
+ * @v netdev		Network device
  */
-
-static int eepro100_poll(struct nic *nic, int retrieve)
+static void ifec_reset ( struct net_device *netdev )
 {
-	if (rxfds[rxfd].status) {
-		if (!retrieve)
-			return 1;
-#ifdef	DEBUG
-		printf("Got a packet: Len = %d, rxfd = %d.\n",
-		       rxfds[rxfd].count & 0x3fff, rxfd);
-#endif
-		/* First save the data from the rxfd */
-		nic->packetlen = rxfds[rxfd].count & 0x3fff;
-		memcpy(nic->packet, rxfds[rxfd].packet, nic->packetlen);
+	struct ifec_private *priv = netdev->priv;
+	unsigned long ioaddr = priv->ioaddr;
 
-		rxfds[rxfd].status      = 0;
-		rxfds[rxfd].command     = 0xc000;
-		rxfds[rxfd].rx_buf_addr = 0xFFFFFFFF;
-		rxfds[rxfd].count       = 0;
-		rxfds[rxfd].size        = 1528;
-		rxfds[(rxfd-1) % RXFD_COUNT].command = 0x0000;
-		rxfd = (rxfd+1) % RXFD_COUNT;
+	DBGP ( "ifec_reset\n" );
 
-#ifdef	DEBUG
-		hd (nic->packet, 0x30);
-#endif
+	/* do partial reset first */
+	outl ( PortPartialReset, ioaddr + CSRPort );
+	inw ( ioaddr + SCBStatus );
+	udelay ( 20 );
 
-		/* Acknowledge all conceivable interrupts */
-		outw(0xff00, ioaddr + SCBStatus);
+	/* full reset */
+	outl ( PortReset, ioaddr + CSRPort );
+	inw ( ioaddr + SCBStatus );
+	udelay ( 20 );
 
-		return 1;
+	/* disable interrupts again */
+	ifec_net_irq ( netdev, 0 );
+}
+
+/*
+ * free()s the tx/rx rings.
+ *
+ * @v netdev		Network device
+ */
+static void ifec_free ( struct net_device *netdev )
+{
+	struct ifec_private *priv = netdev_priv ( netdev );
+	int i;
+
+	DBGP ( "ifec_free\n" );
+
+	/* free all allocated receive io_buffers */
+	for ( i = 0; i < RFD_COUNT; i++ ) {
+		free_iob ( priv->rx_iobs[i] );
+		priv->rx_iobs[i] = NULL;
+		priv->rfds[i] = NULL;
 	}
 
+	/* free TX ring buffer */
+	free_dma ( priv->tcbs, TX_RING_BYTES );
+
+	priv->tcbs = NULL;
+}
+
+/*
+ * Initializes an RFD.
+ *
+ * @v rfd    		RFD struct to initialize
+ * @v command		Command word
+ * @v link   		Link value
+ */
+static void ifec_rfd_init ( struct ifec_rfd *rfd, s16 command, u32 link )
+{
+	DBGP ( "ifec_rfd_init\n" );
+
+	rfd->status      = 0;
+	rfd->command     = command;
+	rfd->rx_buf_addr = 0xFFFFFFFF;
+	rfd->count       = 0;
+	rfd->size        = RFD_PACKET_LEN;
+	rfd->link        = link;
+}
+
+/*
+ * Send address of new RFD to card
+ *
+ * @v netdev		Network device
+ */
+static void ifec_reprime_ru ( struct net_device *netdev )
+{
+	struct ifec_private *priv = netdev->priv;
+	int cur_rx = priv->cur_rx;
+	
+	DBGP ( "ifec_reprime_ru\n" );
+	
+	if ( priv->rfds[cur_rx] != NULL ) {
+		ifec_scb_cmd ( netdev, virt_to_bus ( priv->rfds[cur_rx] ),
+			       RUStart );
+		ifec_scb_cmd_wait ( netdev );
+	}
+}
+
+/*
+ * Check if reprime of RU needed
+ *
+ * @v netdev		Network device
+ */
+static void ifec_check_ru_status ( struct net_device *netdev,
+				   unsigned short intr_status )
+{
+	struct ifec_private *priv = netdev->priv;
+
+	DBGP ( "ifec_check_ru_status\n" );
+
 	/*
-	 * The chip may have suspended reception for various reasons.
-	 * Check for that, and re-prime it should this be the case.
-	 */
-	switch ((inw(ioaddr + SCBStatus) >> 2) & 0xf) {
+	* The chip may have suspended reception for various reasons.
+	* Check for that, and re-prime it should this be the case.
+	*/
+	switch ( ( intr_status >> 2 ) & 0xf ) {
 		case 0:  /* Idle */
+		case 4:  /* Ready */
 			break;
 		case 1:  /* Suspended */
-		case 2:  /* No resources (RxFDs) */
+		case 2:  /* No resources (RFDs) */
 		case 9:  /* Suspended with no more RBDs */
 		case 10: /* No resources due to no RBDs */
 		case 12: /* Ready with no RBDs */
-			speedo_rx_soft_reset();
+			DBG ( "ifec_net_poll: RU reprimed.\n" );
+			ifec_reprime_ru ( netdev );
 			break;
 		default:
 			/* reserved values */
+			DBG ( "ifec_net_poll: RU state anomaly: %i\n",
+			      ( inw ( priv->ioaddr + SCBStatus ) >> 2 ) & 0xf );
 			break;
 	}
+}
+
+#define RFD_STATUS ( RFD_OK | RFDRxCol | RFDRxErr | RFDShort | \
+		     RFDDMAOverrun | RFDNoBufs | RFDCRCError )
+/*
+ * Looks for received packets in the rx ring, reports success or error to
+ * the core accordingly. Starts reallocation of rx ring.
+ *
+ * @v netdev		Network device
+ */
+static void ifec_rx_process ( struct net_device *netdev )
+{
+	struct ifec_private *priv   = netdev->priv;
+	int cur_rx = priv->cur_rx;
+	struct io_buffer *iob = priv->rx_iobs[cur_rx];
+	struct ifec_rfd *rfd = priv->rfds[cur_rx];
+	unsigned int rx_len;
+	s16 status;
+
+	DBGP ( "ifec_rx_process\n" );
+
+	/* Process any received packets */
+	while ( iob && rfd && ( status = rfd->status ) ) {
+		rx_len = rfd->count & RFDMaskCount;
+
+		DBG2 ( "Got a packet: Len = %d, cur_rx = %d.\n", rx_len,
+		       cur_rx );
+		DBGIO_HD ( (void*)rfd->packet, 0x30 );
+
+		if ( ( status & RFD_STATUS ) != RFD_OK ) {
+			DBG ( "Corrupted packet received. "
+			      "Status = %#08hx\n", status );
+			netdev_rx_err ( netdev, iob, -EINVAL );
+		} else {
+			/* Hand off the packet to the network subsystem */
+			iob_put ( iob, rx_len );
+			DBG2 ( "Received packet: %p, len: %d\n", iob, rx_len );
+			netdev_rx ( netdev, iob );
+		}
+
+		/* make sure we don't reuse this RFD */
+		priv->rx_iobs[cur_rx] = NULL;
+		priv->rfds[cur_rx] = NULL;
+
+		/* Next RFD */
+		priv->cur_rx = ( cur_rx + 1 ) % RFD_COUNT;
+		cur_rx = priv->cur_rx;
+		iob = priv->rx_iobs[cur_rx];
+		rfd = priv->rfds[cur_rx];
+	}
+
+	ifec_refill_rx_ring ( netdev );
+}
+
+/*
+ * Allocates io_buffer, set pointers in ifec_private structure accordingly,
+ * reserves space for RFD header in io_buffer.
+ *
+ * @v netdev		Network device
+ * @v cur		Descriptor number to work on
+ * @v cmd		Value to set cmd field in RFD to
+ * @v link		Pointer to ned RFD
+ * @ret rc		0 on success, negative on failure
+ */
+static int ifec_get_rx_desc ( struct net_device *netdev, int cur, int cmd,
+			      int link )
+{
+	struct ifec_private *priv = netdev->priv;
+	struct ifec_rfd *rfd  = priv->rfds[cur];
+
+	DBGP ( "ifec_get_rx_desc\n" );
+
+	priv->rx_iobs[cur] = alloc_iob ( sizeof ( *rfd ) );
+	if ( ! priv->rx_iobs[cur] ) {
+		DBG ( "alloc_iob failed. desc. nr: %d\n", cur );
+		priv->rfds[cur] = NULL;
+		return -ENOMEM;
+	}
+
+	/* Initialize new tail. */
+	priv->rfds[cur] = priv->rx_iobs[cur]->data;
+	ifec_rfd_init ( priv->rfds[cur], cmd, link );
+	iob_reserve ( priv->rx_iobs[cur], RFD_HEADER_LEN );
+
 	return 0;
 }
 
-/* function: eepro100_disable
- * resets the card. This is used to allow Etherboot or Linux
- * to probe the card again from a "virginal" state....
- * Arguments: none
+/*
+ * Allocate new descriptor entries and initialize them if needed
  *
- * returns:   void.
+ * @v netdev		Network device
  */
-static void eepro100_disable ( struct nic *nic __unused ) {
-/* from eepro100_reset */
-	outl(0, ioaddr + SCBPort);
-/* from eepro100_disable */
-	/* See if this PartialReset solves the problem with interfering with
-	   kernel operation after Etherboot hands over. - Ken 20001102 */
-	outl(2, ioaddr + SCBPort);
+static void ifec_refill_rx_ring ( struct net_device *netdev )
+{
+	struct ifec_private *priv = netdev->priv;
+	int i, cur_rx;
+	unsigned short intr_status;
 
-	/* The following is from the Intel e100 driver.
-	 * This hopefully solves the problem with hanging hard DOS images. */
+	DBGP ( "ifec_refill_rx_ring\n" );
 
-	/* wait for the reset to take effect */
-	udelay(20);
+	for ( i = 0; i < RFD_COUNT; i++ ) {
+		cur_rx = ( priv->cur_rx + i ) % RFD_COUNT;
+		/* only refill if empty */
+		if ( priv->rfds[cur_rx] != NULL ||
+		     priv->rx_iobs[cur_rx] != NULL )
+			continue;
 
-	/* Mask off our interrupt line -- it is unmasked after reset */
-	{
-		u16 intr_status;
-		/* Disable interrupts on our PCI board by setting the mask bit */
-		outw(INT_MASK, ioaddr + SCBCmd);
-		intr_status = inw(ioaddr + SCBStatus);
-		/* ack and clear intrs */
-		outw(intr_status, ioaddr + SCBStatus);
-		inw(ioaddr + SCBStatus);
+		DBG2 ( "refilling RFD %d\n", cur_rx );
+
+		if ( ifec_get_rx_desc ( netdev, cur_rx,
+		     CmdSuspend | CmdEndOfList, 0 ) == 0 ) {
+			if ( i > 0 ) {
+				int prev_rx = ( ( ( cur_rx + RFD_COUNT ) - 1 )
+						% RFD_COUNT );
+				struct ifec_rfd *rfd = priv->rfds[prev_rx];
+
+				rfd->command = 0;
+				rfd->link = virt_to_bus ( priv->rfds[cur_rx] );
+			}
+		}
+	}
+
+	intr_status = inw ( priv->ioaddr + SCBStatus );
+	ifec_check_ru_status ( netdev, intr_status );
+}
+
+/*
+ * Initial allocation & initialization of the rx ring.
+ *
+ * @v netdev  		Device of rx ring.
+ * @ret rc    		Non-zero if error occured
+ */
+static int ifec_rx_setup ( struct net_device *netdev )
+{
+	struct ifec_private *priv = netdev->priv;
+	int i;
+
+	DBGP ( "ifec_rx_setup\n" );
+
+	priv->cur_rx = 0;
+
+	/* init values for ifec_refill_rx_ring() */
+	for ( i = 0; i < RFD_COUNT; i++ ) {
+		priv->rfds[i] = NULL;
+		priv->rx_iobs[i] = NULL;
+	}
+	ifec_refill_rx_ring ( netdev );
+
+	return 0;
+}
+
+/*
+ * Initiates a SCB command.
+ *
+ * @v netdev		Network device
+ * @v ptr   		General pointer value for command.
+ * @v cmd   		Command to issue.
+ * @ret rc  		Non-zero if command not issued.
+ */
+static int ifec_scb_cmd ( struct net_device *netdev, u32 ptr, u8 cmd )
+{
+	struct ifec_private *priv = netdev->priv;
+	unsigned long ioaddr = priv->ioaddr;
+	int rc;
+
+	DBGP ( "ifec_scb_cmd\n" );
+
+	rc = ifec_scb_cmd_wait ( netdev );	/* Wait until ready */
+	if ( !rc ) {
+		outl ( ptr, ioaddr + SCBPointer );
+		outb ( cmd, ioaddr + SCBCmd );		/* Issue command */
+	}
+	return rc;
+}
+
+/*
+ * Wait for command unit to accept a command.
+ *
+ * @v cmd_ioaddr	I/O address of command register.
+ * @ret rc      	Non-zero if command timed out.
+ */
+static int ifec_scb_cmd_wait ( struct net_device *netdev )
+{
+	struct ifec_private *priv = netdev->priv;
+	unsigned long cmd_ioaddr = priv->ioaddr + SCBCmd;
+	int rc, wait = CU_CMD_TIMEOUT;
+
+	DBGP ( "ifec_scb_cmd_wait\n" );
+
+	for ( ; wait && ( rc = inb ( cmd_ioaddr ) ); wait-- )
+		udelay ( 1 );
+
+	if ( !wait )
+		DBG ( "ifec_scb_cmd_wait timeout!\n" );
+	return rc;
+}
+
+/*
+ * Check status of transmitted packets & perform tx completions.
+ *
+ * @v netdev    	Network device.
+ */
+static void ifec_tx_process ( struct net_device *netdev )
+{
+	struct ifec_private *priv = netdev->priv;
+	struct ifec_tcb *tcb = priv->tcb_tail;
+	s16 status;
+
+	DBGP ( "ifec_tx_process\n" );
+
+	/* Check status of transmitted packets */
+	while ( ( status = tcb->status ) && tcb->iob ) {
+		if ( status & TCB_U ) {
+			/* report error to gPXE */
+			DBG ( "ifec_tx_process : tx error!\n " );
+			netdev_tx_complete_err ( netdev, tcb->iob, -EINVAL );
+		} else {
+			/* report successful transmit */
+			netdev_tx_complete ( netdev, tcb->iob );
+		}
+		DBG2 ( "tx completion\n" );
+
+		tcb->iob = NULL;
+		tcb->status = 0;
+
+		priv->tcb_tail = tcb->next;	/* Next TCB */
+		tcb = tcb->next;
 	}
 }
 
-/* exported function: eepro100_probe / eth_probe
- * initializes a card
+/*
+ * Allocates & initialize tx resources.
  *
- * side effects:
- *            leaves the ioaddress of the 82557 chip in the variable ioaddr.
- *            leaves the 82557 initialized, and ready to recieve packets.
+ * @v netdev    	Network device.
+ * @ret rc      	Non-zero if error occurred.
  */
-
-static int eepro100_probe ( struct nic *nic, struct pci_device *pci ) {
-
-	unsigned short sum = 0;
+static int ifec_tx_setup ( struct net_device *netdev )
+{
+	struct ifec_private *priv = netdev->priv;
+	struct ifec_tcb *tcb;
 	int i;
-	int read_cmd, ee_size;
-	int options;
-	int rx_mode;
-	unsigned long ct;
 
-	/* we cache only the first few words of the EEPROM data
-	   be careful not to access beyond this array */
-	unsigned short eeprom[16];
+	DBGP ( "ifec_tx_setup\n" );
 
-	if (pci->ioaddr == 0)
-		return 0;
-
-	adjust_pci_device(pci);
-
-        nic->ioaddr = pci->ioaddr;
-        nic->irqno = pci->irq;
-
-	ioaddr = nic->ioaddr;
-
-	if ((do_eeprom_cmd(EE_READ_CMD << 24, 27) & 0xffe0000)
-		== 0xffe0000) {
-		ee_size = 0x100;
-		read_cmd = EE_READ_CMD << 24;
-	} else {
-		ee_size = 0x40;
-		read_cmd = EE_READ_CMD << 22;
+	/* allocate tx ring */
+	priv->tcbs = malloc_dma ( TX_RING_BYTES, CB_ALIGN );
+	if ( !priv->tcbs ) {
+		DBG ( "TX-ring allocation failed\n" );
+		return -ENOMEM;
 	}
 
-	for (i = 0, sum = 0; i < ee_size; i++) {
-		unsigned short value = do_eeprom_cmd(read_cmd | (i << 16), 27);
-		if (i < (int)(sizeof(eeprom)/sizeof(eeprom[0])))
-			eeprom[i] = value;
-		sum += value;
+	tcb = priv->tcb_tail = priv->tcbs;
+	priv->tx_curr = priv->tx_tail = 0;
+	priv->tx_cnt = 0;
+
+	for ( i = 0; i < TCB_COUNT; i++, tcb++ ) {
+		tcb->status    = 0;
+		tcb->count     = 0x01208000;
+		tcb->iob       = NULL;
+		tcb->tbda_addr = virt_to_bus ( &tcb->tbd_addr0 );
+		tcb->link      = virt_to_bus ( tcb + 1 );
+		tcb->next      = tcb + 1;
+	}
+	/* We point tcb_head at the last TCB, so the first ifec_net_transmit()
+	 * will use the first (head->next) TCB to transmit. */
+	priv->tcb_head = --tcb;
+	tcb->link = virt_to_bus ( priv->tcbs );
+	tcb->next = priv->tcbs;
+	
+	return 0;
+}
+
+/*
+ * Wake up the Command Unit and issue a Resume/Start.
+ *
+ * @v netdev		Network device containing Command Unit
+ *
+ * The time between clearing the S bit and issuing Resume must be as short as
+ * possible to prevent a race condition. As noted in linux eepro100.c :
+ *   Note: Watch out for the potential race condition here: imagine
+ *	erasing the previous suspend
+ *		the chip processes the previous command
+ *		the chip processes the final command, and suspends
+ *	doing the CU_RESUME
+ *		the chip processes the next-yet-valid post-final-command.
+ *   So blindly sending a CU_RESUME is only safe if we do it immediately after
+ *   erasing the previous CmdSuspend, without the possibility of an intervening
+ *   delay.
+ */
+void ifec_tx_wake ( struct net_device *netdev )
+{
+	struct ifec_private *priv = netdev->priv;
+	unsigned long ioaddr = priv->ioaddr;
+	struct ifec_tcb *tcb = priv->tcb_head->next;
+
+	DBGP ( "ifec_tx_wake\n" );
+
+	/* For the special case of the first transmit, we issue a START. The
+	 * card won't RESUME after the configure command. */
+	if ( priv->configured ) {
+		priv->configured = 0;
+		ifec_scb_cmd ( netdev, virt_to_bus ( tcb ), CUStart );
+		ifec_scb_cmd_wait ( netdev );
+		return;
 	}
 
-	for (i=0;i<ETH_ALEN;i++) {
-		nic->node_addr[i] =  (eeprom[i/2] >> (8*(i&1))) & 0xff;
+	/* Resume if suspended. */
+	switch ( ( inw ( ioaddr + SCBStatus ) >> 6 ) & 0x3 ) {
+	case 0:  /* Idle - We should not reach this state. */
+		DBG2 ( "ifec_tx_wake: tx idle!\n" );
+		ifec_scb_cmd ( netdev, virt_to_bus ( tcb ), CUStart );
+		ifec_scb_cmd_wait ( netdev );
+		return;
+	case 1:  /* Suspended */
+		DBG2 ( "s" );
+		break;
+	default: /* Active */
+		DBG2 ( "a" );
 	}
-
-	DBG ( "Ethernet addr: %s\n", eth_ntoa ( nic->node_addr ) );
-
-	if (sum != 0xBABA)
-		printf("eepro100: Invalid EEPROM checksum %#hX, "
-		       "check settings before activating this device!\n", sum);
-	outl(0, ioaddr + SCBPort);
-	udelay (10000);
-	whereami ("Got eeprom.");
-
-	/* Base = 0, disable all interrupts  */
-	outl(0, ioaddr + SCBPointer);
-	outw(INT_MASK | RX_ADDR_LOAD, ioaddr + SCBCmd);
-	wait_for_cmd_done(ioaddr + SCBCmd);
-	whereami ("set rx base addr.");
-
-	outl(virt_to_bus(&lstats), ioaddr + SCBPointer);
-	outb(CU_STATSADDR, ioaddr + SCBCmd);
-	wait_for_cmd_done(ioaddr + SCBCmd);
-	whereami ("set stats addr.");
-
-	/* INIT RX stuff. */
-	for (i = 0; i < RXFD_COUNT; i++) {
-		rxfds[i].status      = 0x0000;
-		rxfds[i].command     = 0x0000;
-		rxfds[i].rx_buf_addr = 0xFFFFFFFF;
-		rxfds[i].count       = 0;
-		rxfds[i].size        = 1528;
-		rxfds[i].link        = virt_to_bus(&rxfds[i+1]);
-	}
-
-	rxfds[RXFD_COUNT-1].status  = 0x0000;
-	rxfds[RXFD_COUNT-1].command = 0xC000;
-	rxfds[RXFD_COUNT-1].link    = virt_to_bus(&rxfds[0]);
-
-	outl(virt_to_bus(&rxfds[0]), ioaddr + SCBPointer);
-	outb(RX_START, ioaddr + SCBCmd);
-	wait_for_cmd_done(ioaddr + SCBCmd);
-
-	whereami ("started RX process.");
-
-	/* INIT TX stuff. */
-
-	/* Base = 0 */
-	outl(0, ioaddr + SCBPointer);
-	outb(CU_CMD_BASE, ioaddr + SCBCmd);
-	wait_for_cmd_done(ioaddr + SCBCmd);
-
-	whereami ("set TX base addr.");
-
-	txfd.command      = (CmdIASetup);
-	txfd.status       = 0x0000;
-	txfd.link         = virt_to_bus (&confcmd);
-
-	{
-		char *t = (char *)&txfd.tx_desc_addr;
-
-		for (i=0;i<ETH_ALEN;i++)
-			t[i] = nic->node_addr[i];
-	}
-
-#ifdef	DEBUG
-	printf ("Setup_eaddr:\n");
-	hd (&txfd, 0x20);
-#endif
-	/*      options = 0x40; */ /* 10mbps half duplex... */
-	options = 0x00;            /* Autosense */
-
-#ifdef PROMISC
-	rx_mode = 3;
-#elif ALLMULTI
-	rx_mode = 1;
-#else
-	rx_mode = 0;
-#endif
-
-	if (   ((eeprom[6]>>8) & 0x3f) == DP83840
-	       || ((eeprom[6]>>8) & 0x3f) == DP83840A) {
-		int mdi_reg23 = mdio_read(eeprom[6] & 0x1f, 23) | 0x0422;
-		if (congenb)
-			mdi_reg23 |= 0x0100;
-		printf("  DP83840 specific setup, setting register 23 to %hX.\n",
-		       mdi_reg23);
-		mdio_write(eeprom[6] & 0x1f, 23, mdi_reg23);
-	}
-	whereami ("Done DP8340 special setup.");
-	if (options != 0) {
-		mdio_write(eeprom[6] & 0x1f, 0,
-			   ((options & 0x20) ? 0x2000 : 0) |    /* 100mbps? */
-			   ((options & 0x10) ? 0x0100 : 0)); /* Full duplex? */
-		whereami ("set mdio_register.");
-	}
-
-	confcmd.command  = CmdSuspend | CmdConfigure;
-	confcmd.status   = 0x0000;
-	confcmd.link     = virt_to_bus (&txfd);
-	confcmd.data[1]  = (txfifo << 4) | rxfifo;
-	confcmd.data[4]  = rxdmacount;
-	confcmd.data[5]  = txdmacount + 0x80;
-	confcmd.data[15] = (rx_mode & 2) ? 0x49: 0x48;
-	confcmd.data[19] = (options & 0x10) ? 0xC0 : 0x80;
-	confcmd.data[21] = (rx_mode & 1) ? 0x0D: 0x05;
-
-	outl(virt_to_bus(&txfd), ioaddr + SCBPointer);
-	outb(CU_START, ioaddr + SCBCmd);
-	wait_for_cmd_done(ioaddr + SCBCmd);
-
-	whereami ("started TX thingy (config, iasetup).");
-
-	ct = currticks();
-	while (!txfd.status && ct + 10*1000 < currticks())
-		/* Wait */;
-
-	/* Read the status register once to disgard stale data */
-	mdio_read(eeprom[6] & 0x1f, 1);
-	/* Check to see if the network cable is plugged in.
-	 * This allows for faster failure if there is nothing
-	 * we can do.
-	 */
-	if (!(mdio_read(eeprom[6] & 0x1f, 1) & (1 << 2))) {
-		printf("Valid link not established\n");
-		eepro100_disable(nic);
-		return 0;
-	}
-	nic->nic_op	= &eepro100_operations;
-	return 1;
+	ifec_scb_cmd_wait ( netdev );
+	outl ( 0, ioaddr + SCBPointer );
+	priv->tcb_head->command &= ~CmdSuspend;
+	/* Immediately issue Resume command */
+	outb ( CUResume, ioaddr + SCBCmd );
+	ifec_scb_cmd_wait ( netdev );
 }
 
 /*********************************************************************/
 
-#ifdef	DEBUG
-
-/* Hexdump a number of bytes from memory... */
-void hd (void *where, int n)
-{
-	int i;
-
-	while (n > 0) {
-		printf ("%X ", where);
-		for (i=0;i < ( (n>16)?16:n);i++)
-			printf (" %hhX", ((char *)where)[i]);
-		printf ("\n");
-		n -= 16;
-		where += 16;
-	}
-}
-#endif
-
-static struct nic_operations eepro100_operations = {
-	.connect	= dummy_connect,
-	.poll		= eepro100_poll,
-	.transmit	= eepro100_transmit,
-	.irq		= eepro100_irq,
-
-};
-
-static struct pci_device_id eepro100_nics[] = {
+static struct pci_device_id ifec_nics[] = {
 PCI_ROM(0x8086, 0x1029, "id1029",        "Intel EtherExpressPro100 ID1029", 0),
 PCI_ROM(0x8086, 0x1030, "id1030",        "Intel EtherExpressPro100 ID1030", 0),
 PCI_ROM(0x8086, 0x1031, "82801cam",      "Intel 82801CAM (ICH3) Chipset Ethernet Controller", 0),
@@ -818,7 +1171,7 @@ PCI_ROM(0x8086, 0x103b, "82562etb",      "Intel PRO100 VE 82562ETB", 0),
 PCI_ROM(0x8086, 0x103c, "eepro100-103c", "Intel PRO/100 VM Network Connection", 0),
 PCI_ROM(0x8086, 0x103d, "eepro100-103d", "Intel PRO/100 VE Network Connection", 0),
 PCI_ROM(0x8086, 0x103e, "eepro100-103e", "Intel PRO/100 VM Network Connection", 0),
-PCI_ROM(0x8086, 0x1051, "prove",       "Intel PRO/100 VE Network Connection", 0),
+PCI_ROM(0x8086, 0x1051, "prove",         "Intel PRO/100 VE Network Connection", 0),
 PCI_ROM(0x8086, 0x1059, "82551qm",       "Intel PRO/100 M Mobile Connection", 0),
 PCI_ROM(0x8086, 0x1209, "82559er",       "Intel EtherExpressPro100 82559ER", 0),
 PCI_ROM(0x8086, 0x1227, "82865",         "Intel 82865 EtherExpress PRO/100A", 0),
@@ -838,11 +1191,12 @@ PCI_ROM(0x8086, 0x5201, "eepro100-5201", "Intel EtherExpress PRO/100 Intelligent
  * a workaround for hardware bug on 10 mbit half duplex (see linux driver eepro100.c)
  * 2003/03/17 gbaum */
 
-
-PCI_DRIVER ( eepro100_driver, eepro100_nics, PCI_NO_CLASS );
-
-DRIVER ( "EEPRO100", nic_driver, pci_driver, eepro100_driver,
-	 eepro100_probe, eepro100_disable );
+struct pci_driver ifec_driver __pci_driver = {
+	.ids      = ifec_nics,
+	.id_count = ( sizeof (ifec_nics) / sizeof (ifec_nics[0]) ),
+	.probe    = ifec_pci_probe,
+	.remove   = ifec_pci_remove
+};
 
 /*
  * Local variables:
