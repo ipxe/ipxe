@@ -126,6 +126,7 @@ prodstr_pci_id:
 	.size prodstr, . - prodstr
 
 	.globl	undiheader	
+	.weak	undiloader
 undiheader:
 	.ascii	"UNDI"			/* Signature */
 	.byte	undiheader_len		/* Length of structure */
@@ -495,6 +496,7 @@ init_message_done:
  *
  * May be either within option ROM space, or within PMM-allocated block.
  */
+	.globl	image_source
 image_source:
 	.long	0
 	.size	image_source, . - image_source
@@ -503,6 +505,7 @@ image_source:
  *
  * May be either at HIGHMEM_LOADPOINT, or within PMM-allocated block.
  */
+	.globl	decompress_to
 decompress_to:
 	.long	HIGHMEM_LOADPOINT
 	.size	decompress_to, . - decompress_to
@@ -643,50 +646,6 @@ exec:	/* Set %ds = %cs */
 exec_message:
 	.asciz	" starting execution\n"
 	.size exec_message, . - exec_message
-
-/* UNDI loader
- *
- * Called by an external program to load our PXE stack.
- */
-undiloader:
-	/* Save registers */
-	pushl	%esi
-	pushl	%edi
-	pushw	%ds
-	pushw	%es
-	pushw	%bx
-	/* ROM segment address to %ds */
-	pushw	%cs
-	popw	%ds
-	/* UNDI loader parameter structure address into %es:%di */
-	movw	%sp, %bx
-	movw	%ss:18(%bx), %di
-	movw	%ss:20(%bx), %es
-	/* Install to specified real-mode addresses */
-	pushw	%di
-	movw	%es:12(%di), %bx
-	movw	%es:14(%di), %ax
-	movl	image_source, %esi
-	movl	decompress_to, %edi
-	call	install_prealloc
-	popw	%di
-	/* Call UNDI loader C code */
-	pushl	$pxe_loader_call
-	pushw	%cs
-	pushw	$1f
-	pushw	%ax
-	pushw	$prot_call
-	lret
-1:	popw	%bx	/* discard */
-	popw	%bx	/* discard */
-	/* Restore registers and return */
-	popw	%bx
-	popw	%es
-	popw	%ds
-	popl	%edi
-	popl	%esi
-	lret
-	.size undiloader, . - undiloader
 
 /* Wait for key press specified by %bl (masked by %bh)
  *

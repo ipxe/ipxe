@@ -25,6 +25,8 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #define IMAGE_BZIMAGE		/* Linux bzImage image support */
 #define IMAGE_COMBOOT		/* SYSLINUX COMBOOT image support */
 
+#define PXE_STACK		/* PXE stack in gPXE - required for PXELINUX */
+#define PXE_MENU		/* PXE menu booting */
 #define	PXE_CMD			/* PXE commands */
 
 #define	SANBOOT_PROTO_ISCSI	/* iSCSI protocol */

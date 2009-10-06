@@ -445,8 +445,10 @@ static __asmcall void int22 ( struct i386_all_regs *ix86 ) {
 		break;
 
 	case 0x0009: /* Call PXE Stack */
-		pxe_api_call ( ix86 );
-		ix86->flags &= ~CF;
+		if ( pxe_api_call_weak ( ix86 ) != 0 )
+			ix86->flags |= CF;
+		else
+			ix86->flags &= ~CF;
 		break;
 
 	case 0x000A: /* Get Derivative-Specific Information */

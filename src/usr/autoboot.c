@@ -151,7 +151,7 @@ static int netboot ( struct net_device *netdev ) {
 			       buf, sizeof ( buf ) );
 	pxe_discovery_control =
 		fetch_uintz_setting ( NULL, &pxe_discovery_control_setting );
-	if ( ( strcmp ( buf, "PXEClient" ) == 0 ) &&
+	if ( ( strcmp ( buf, "PXEClient" ) == 0 ) && pxe_menu_boot != NULL &&
 	     setting_exists ( NULL, &pxe_boot_menu_setting ) &&
 	     ( ! ( ( pxe_discovery_control & PXEBS_SKIP ) &&
 		   setting_exists ( NULL, &filename_setting ) ) ) ) {

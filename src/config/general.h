@@ -42,6 +42,13 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #define	NET_PROTO_IPV4		/* IPv4 protocol */
 
 /*
+ * PXE support
+ *
+ */
+//#undef	PXE_STACK		/* PXE stack in gPXE - you want this! */
+//#undef	PXE_MENU		/* PXE menu booting */
+
+/*
  * Download protocols
  *
  */

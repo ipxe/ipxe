@@ -92,6 +92,17 @@ REQUIRE_OBJECT ( ipv4 );
 #endif
 
 /*
+ * Drag in all requested PXE support
+ *
+ */
+#ifdef PXE_MENU
+REQUIRE_OBJECT ( pxemenu );
+#endif
+#ifdef PXE_STACK
+REQUIRE_OBJECT ( pxe_call );
+#endif
+
+/*
  * Drag in all requested download protocols
  *
  */

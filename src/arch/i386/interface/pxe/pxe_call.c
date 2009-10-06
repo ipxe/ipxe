@@ -340,6 +340,18 @@ __asmcall void pxe_api_call ( struct i386_all_regs *ix86 ) {
 }
 
 /**
+ * Dispatch weak PXE API call with PXE stack available
+ *
+ * @v ix86		Registers for PXE call
+ * @ret present		Zero (PXE stack present)
+ */
+int _pxe_api_call_weak ( struct i386_all_regs *ix86 )
+{
+	pxe_api_call ( ix86 );
+	return 0;
+}
+
+/**
  * Dispatch PXE loader call
  *
  * @v es:di		Address of PXE parameter block
