@@ -131,9 +131,9 @@ sub writerom ($$) {
 sub checksum ($) {
 	my ($romref) = @_;
 
-	substr($$romref, 5, 1) = "\x00";
+	substr($$romref, 6, 1) = "\x00";
 	my $sum = unpack('%8C*', $$romref);
-	substr($$romref, 5, 1) = chr(256 - $sum);
+	substr($$romref, 6, 1) = chr(256 - $sum);
 	# Double check
 	$sum = unpack('%8C*', $$romref);
 	if ($sum != 0) {
