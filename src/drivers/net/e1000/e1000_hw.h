@@ -64,6 +64,7 @@ typedef enum {
     e1000_82573,
     e1000_80003es2lan,
     e1000_ich8lan,
+    e1000_82576,
     e1000_num_macs
 } e1000_mac_type;
 
@@ -502,6 +503,7 @@ int32_t e1000_check_phy_reset_block(struct e1000_hw *hw);
 #define E1000_DEV_ID_ICH8_IFE_G          0x10C5
 #define E1000_DEV_ID_ICH8_IGP_M          0x104D
 
+#define E1000_DEV_ID_82576                    0x10C9
 
 #define NODE_ADDRESS_SIZE 6
 #define ETH_LENGTH_OF_ADDRESS 6
@@ -569,7 +571,8 @@ int32_t e1000_check_phy_reset_block(struct e1000_hw *hw);
     E1000_IMS_TXDW   |    \
     E1000_IMS_RXDMT0 |    \
     E1000_IMS_RXSEQ  |    \
-    E1000_IMS_LSC)
+    E1000_IMS_LSC    |    \
+    E1000_IMS_DOUTSYNC)
 
 /* Additional interrupts need to be handled for e1000_ich8lan:
     DSW = The FW changed the status of the DISSW bit in FWSM
@@ -1748,12 +1751,16 @@ struct e1000_hw {
 /* Receive Address */
 #define E1000_RAH_AV  0x80000000        /* Receive descriptor valid */
 
+#define E1000_RAH_POOL_1 0x00040000
+
 /* Interrupt Cause Read */
 #define E1000_ICR_TXDW          0x00000001 /* Transmit desc written back */
 #define E1000_ICR_TXQE          0x00000002 /* Transmit Queue empty */
 #define E1000_ICR_LSC           0x00000004 /* Link Status Change */
 #define E1000_ICR_RXSEQ         0x00000008 /* rx sequence error */
 #define E1000_ICR_RXDMT0        0x00000010 /* rx desc min. threshold (0) */
+/* LAN connected device generates an interrupt */
+#define E1000_ICR_DOUTSYNC      0x10000000 /* NIC DMA out of sync */
 #define E1000_ICR_RXO           0x00000040 /* rx overrun */
 #define E1000_ICR_RXT0          0x00000080 /* rx timer intr (ring 0) */
 #define E1000_ICR_MDAC          0x00000200 /* MDIO access complete */
@@ -1815,6 +1822,7 @@ struct e1000_hw {
 #define E1000_IMS_RXSEQ     E1000_ICR_RXSEQ     /* rx sequence error */
 #define E1000_IMS_RXDMT0    E1000_ICR_RXDMT0    /* rx desc min. threshold */
 #define E1000_IMS_RXO       E1000_ICR_RXO       /* rx overrun */
+#define E1000_IMS_DOUTSYNC  E1000_ICR_DOUTSYNC  /* NIC DMA out of sync */
 #define E1000_IMS_RXT0      E1000_ICR_RXT0      /* rx timer intr */
 #define E1000_IMS_MDAC      E1000_ICR_MDAC      /* MDIO access complete */
 #define E1000_IMS_RXCFG     E1000_ICR_RXCFG     /* RX /c/ ordered set */
@@ -1975,6 +1983,10 @@ struct e1000_hw {
 #define E1000_RXDCTL_HTHRESH 0x00003F00 /* RXDCTL Host Threshold */
 #define E1000_RXDCTL_WTHRESH 0x003F0000 /* RXDCTL Writeback Threshold */
 #define E1000_RXDCTL_GRAN    0x01000000 /* RXDCTL Granularity */
+#define E1000_RXDCTL_QUEUE_ENABLE  0x02000000 /* Enable specific Rx Queue */
+#define IGB_RX_PTHRESH                    16
+#define IGB_RX_HTHRESH                     8
+#define IGB_RX_WTHRESH                     1
 
 /* Transmit Descriptor Control */
 #define E1000_TXDCTL_PTHRESH 0x0000003F /* TXDCTL Prefetch Threshold */
@@ -1985,6 +1997,7 @@ struct e1000_hw {
 #define E1000_TXDCTL_FULL_TX_DESC_WB 0x01010000 /* GRAN=1, WTHRESH=1 */
 #define E1000_TXDCTL_COUNT_DESC 0x00400000 /* Enable the counting of desc.
                                               still to be processed. */
+#define E1000_TXDCTL_QUEUE_ENABLE  0x02000000 /* Enable specific Tx Queue */
 /* Transmit Configuration Word */
 #define E1000_TXCW_FD         0x00000020        /* TXCW full duplex */
 #define E1000_TXCW_HD         0x00000040        /* TXCW half duplex */
@@ -2034,6 +2047,7 @@ struct e1000_hw {
 
 /* Multiple Receive Queue Control */
 #define E1000_MRQC_ENABLE_MASK              0x00000003
+#define E1000_MRQC_ENABLE_VMDQ              0x00000003
 #define E1000_MRQC_ENABLE_RSS_2Q            0x00000001
 #define E1000_MRQC_ENABLE_RSS_INT           0x00000004
 #define E1000_MRQC_RSS_FIELD_MASK           0xFFFF0000
@@ -2437,6 +2451,7 @@ struct e1000_host_command_info {
 #define E1000_PBA_38K 0x0026
 #define E1000_PBA_40K 0x0028
 #define E1000_PBA_48K 0x0030    /* 48KB, default RX allocation */
+#define E1000_PBA_64K 0x0040    /* 64KB */
 
 #define E1000_PBS_16K E1000_PBA_16K
 

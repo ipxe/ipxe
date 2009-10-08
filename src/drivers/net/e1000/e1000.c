@@ -73,6 +73,7 @@ e1000_get_hw_control ( struct e1000_adapter *adapter )
 		break;
 	case e1000_82571:
 	case e1000_82572:
+	case e1000_82576:
 	case e1000_80003es2lan:
 	case e1000_ich8lan:
 		ctrl_ext = E1000_READ_REG(&adapter->hw, CTRL_EXT);
@@ -253,6 +254,7 @@ e1000_configure_tx ( struct e1000_adapter *adapter )
 {
 	struct e1000_hw *hw = &adapter->hw;
 	uint32_t tctl;
+	uint32_t txdctl;
 
 	DBG ( "e1000_configure_tx\n" );
 
@@ -270,6 +272,12 @@ e1000_configure_tx ( struct e1000_adapter *adapter )
 	adapter->tx_head = 0;
 	adapter->tx_tail = 0;
 	adapter->tx_fill_ctr = 0;
+
+	if (hw->mac_type == e1000_82576) {
+		txdctl = E1000_READ_REG ( hw, TXDCTL );
+		txdctl |= E1000_TXDCTL_QUEUE_ENABLE;
+		E1000_WRITE_REG ( hw, TXDCTL, txdctl );
+	}
 
 	/* Setup Transmit Descriptor Settings for eop descriptor */
 	tctl = E1000_TCTL_PSP | E1000_TCTL_EN |
@@ -359,13 +367,15 @@ static void
 e1000_configure_rx ( struct e1000_adapter *adapter )
 {
 	struct e1000_hw *hw = &adapter->hw;
-	uint32_t rctl;
+	uint32_t rctl, rxdctl, mrqc, rxcsum;
 
 	DBG ( "e1000_configure_rx\n" );
 
 	/* disable receives while setting up the descriptors */
 	rctl = E1000_READ_REG ( hw, RCTL );
 	E1000_WRITE_REG ( hw, RCTL, rctl & ~E1000_RCTL_EN );
+	E1000_WRITE_FLUSH ( hw );
+	mdelay(10);
 
 	adapter->rx_curr = 0;
 
@@ -377,15 +387,56 @@ e1000_configure_rx ( struct e1000_adapter *adapter )
 	E1000_WRITE_REG ( hw, RDLEN, adapter->rx_ring_size );
 
 	E1000_WRITE_REG ( hw, RDH, 0 );
-	E1000_WRITE_REG ( hw, RDT, NUM_RX_DESC - 1 );
-	
-	/* Enable Receives */
-	rctl = ( E1000_RCTL_EN | E1000_RCTL_BAM | E1000_RCTL_SZ_2048 |
-		 E1000_RCTL_MPE 
-		);
+	if (hw->mac_type == e1000_82576)
+		E1000_WRITE_REG ( hw, RDT, 0 );
+	else
+		E1000_WRITE_REG ( hw, RDT, NUM_RX_DESC - 1 );
 
+	/* This doesn't seem to  be necessary for correct operation,
+	 * but it seems as well to be implicit
+	 */
+	if (hw->mac_type == e1000_82576) {
+		rxdctl = E1000_READ_REG ( hw, RXDCTL );
+		rxdctl |= E1000_RXDCTL_QUEUE_ENABLE;
+		rxdctl &= 0xFFF00000;
+		rxdctl |= IGB_RX_PTHRESH;
+		rxdctl |= IGB_RX_HTHRESH << 8;
+		rxdctl |= IGB_RX_WTHRESH << 16;
+		E1000_WRITE_REG ( hw, RXDCTL, rxdctl );
+		E1000_WRITE_FLUSH ( hw );
+
+		rxcsum = E1000_READ_REG(hw, RXCSUM);
+		rxcsum &= ~( E1000_RXCSUM_TUOFL | E1000_RXCSUM_IPPCSE );
+		E1000_WRITE_REG ( hw, RXCSUM, 0 );
+
+		/* The initial value for MRQC disables multiple receive
+		 * queues, however this setting is not recommended.
+		 * - Intel® 82576 Gigabit Ethernet Controller Datasheet r2.41
+	         *   Section 8.10.9 Multiple Queues Command Register - MRQC
+		 */
+		mrqc = E1000_MRQC_ENABLE_VMDQ;
+		E1000_WRITE_REG ( hw, MRQC, mrqc );
+	}
+
+	/* Enable Receives */
+	rctl |=  E1000_RCTL_EN | E1000_RCTL_BAM | E1000_RCTL_SZ_2048 |
+		 E1000_RCTL_MPE;
 	E1000_WRITE_REG ( hw, RCTL, rctl );
 	E1000_WRITE_FLUSH ( hw );
+
+	/* On the 82576, RDT([0]) must not be "bumped" before
+	 * the enable bit of RXDCTL([0]) is set.
+	 * - Intel® 82576 Gigabit Ethernet Controller Datasheet r2.41
+	 *   Section 4.5.9 receive Initialization
+	 *
+	 * By observation I have found to occur when the enable bit of
+	 * RCTL is set. The datasheet recommends polling for this bit,
+	 * however as I see no evidence of this in the Linux igb driver
+	 * I have omitted that step.
+	 * - Simon Horman, May 2009
+	 */
+	if (hw->mac_type == e1000_82576)
+		E1000_WRITE_REG ( hw, RDT, NUM_RX_DESC - 1 );
 
         DBG ( "RDBAL: %#08x\n",  E1000_READ_REG ( hw, RDBAL ) );
         DBG ( "RDLEN: %d\n",     E1000_READ_REG ( hw, RDLEN ) );
@@ -433,6 +484,9 @@ e1000_reset ( struct e1000_adapter *adapter )
 	case e1000_82573:
 		pba = E1000_PBA_20K;
 		break;
+	case e1000_82576:
+		pba = E1000_PBA_64K;
+		break;
 	case e1000_ich8lan:
 		pba = E1000_PBA_8K;
 	case e1000_undefined:
@@ -446,6 +500,7 @@ e1000_reset ( struct e1000_adapter *adapter )
 	/* Set the FC high water mark to 90% of the FIFO size.
 	 * Required to clear last 3 LSB */
 	fc_high_water_mark = ((pba * 9216)/10) & 0xFFF8;
+
 	/* We can't use 90% on small FIFOs because the remainder
 	 * would be less than 1 full frame.  In this case, we size
 	 * it to allow at least a full frame above the high water
@@ -453,9 +508,20 @@ e1000_reset ( struct e1000_adapter *adapter )
 	if (pba < E1000_PBA_16K)
 		fc_high_water_mark = (pba * 1024) - 1600;
 
-	adapter->hw.fc_high_water = fc_high_water_mark;
-	adapter->hw.fc_low_water = fc_high_water_mark - 8;
-	if (adapter->hw.mac_type == e1000_80003es2lan)
+	/* This actually applies to < e1000_82575, one revision less than
+	 * e1000_82576, but e1000_82575 isn't currently defined in the code */
+	if (adapter->hw.mac_type < e1000_82576) {
+		/* 8-byte granularity */
+		adapter->hw.fc_high_water = fc_high_water_mark & 0xFFF8;
+		adapter->hw.fc_low_water = adapter->hw.fc_high_water - 8;
+	} else {
+		/* 16-byte granularity */
+		adapter->hw.fc_high_water = fc_high_water_mark & 0xFFF0;
+		adapter->hw.fc_low_water = adapter->hw.fc_high_water - 16;
+	}
+
+	if (adapter->hw.mac_type == e1000_80003es2lan ||
+	    adapter->hw.mac_type == e1000_82576)
 		adapter->hw.fc_pause_time = 0xFFFF;
 	else
 		adapter->hw.fc_pause_time = E1000_FC_PAUSE_TIME;
@@ -1102,6 +1168,7 @@ static struct pci_device_id e1000_nics[] = {
 	PCI_ROM(0x8086, 0x10bc, "e1000-0x10bc", "e1000-0x10bc", 0),
 	PCI_ROM(0x8086, 0x10c4, "e1000-0x10c4", "e1000-0x10c4", 0),
 	PCI_ROM(0x8086, 0x10c5, "e1000-0x10c5", "e1000-0x10c5", 0),
+	PCI_ROM(0x8086, 0x10c9, "e1000-0x10c9", "e1000-0x10c9", 0),
 	PCI_ROM(0x8086, 0x10d9, "e1000-0x10d9", "e1000-0x10d9", 0),
 	PCI_ROM(0x8086, 0x10da, "e1000-0x10da", "e1000-0x10da", 0),
 };

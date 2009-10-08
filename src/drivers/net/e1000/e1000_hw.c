@@ -419,6 +419,9 @@ e1000_set_mac_type(struct e1000_hw *hw)
 	case E1000_DEV_ID_ICH8_IGP_M:
 		hw->mac_type = e1000_ich8lan;
 		break;
+	case E1000_DEV_ID_82576:
+		hw->mac_type = e1000_82576;
+		break;
 	default:
 		/* Should never have loaded on this device */
 		return -E1000_ERR_MAC_TYPE;
@@ -426,6 +429,7 @@ e1000_set_mac_type(struct e1000_hw *hw)
 
 	switch (hw->mac_type) {
 	case e1000_ich8lan:
+	case e1000_82576:
 		hw->swfwhw_semaphore_present = TRUE;
 		hw->asf_firmware_present = TRUE;
 		break;
@@ -504,6 +508,7 @@ e1000_set_media_type(struct e1000_hw *hw)
             break;
         case e1000_ich8lan:
         case e1000_82573:
+        case e1000_82576:
             /* The STATUS_TBIMODE bit is reserved or reused for the this
              * device.
              */
@@ -750,7 +755,8 @@ e1000_reset_hw(struct e1000_hw *hw)
 static void
 e1000_initialize_hardware_bits(struct e1000_hw *hw)
 {
-    if ((hw->mac_type >= e1000_82571) && (!hw->initialize_hw_bits_disable)) {
+    if ((hw->mac_type >= e1000_82571 && hw->mac_type < e1000_82576) &&
+        (!hw->initialize_hw_bits_disable)) {
         /* Settings common to all PCI-express silicon */
         uint32_t reg_ctrl, reg_ctrl_ext;
         uint32_t reg_tarc0, reg_tarc1;
@@ -907,11 +913,27 @@ e1000_init_hw(struct e1000_hw *hw)
 
     /* Disabling VLAN filtering. */
     DEBUGOUT("Initializing the IEEE VLAN\n");
-    /* VET hardcoded to standard value and VFTA removed in ICH8 LAN */
-    if (hw->mac_type != e1000_ich8lan) {
+    switch (hw->mac_type) {
+    case e1000_ich8lan:
+        /* VET hardcoded to standard value and VFTA removed in ICH8 LAN */
+        break;
+    case e1000_82576:
+        /* There is no need to clear vfta on 82576 if VLANs are not used.
+         * - Intel® 82576 Gigabit Ethernet Controller Datasheet r2.41
+         *   Section 8.10.19 Table Array - VFTA
+         *
+         * Setting VET may also be unnecessary, however the documentation
+         * isn't specific on this point. The value used here is as advised in
+	 * - Intel® 82576 Gigabit Ethernet Controller Datasheet r2.41
+         *   Section 8.2.7 VLAN Ether Type - VET
+         */
+        E1000_WRITE_REG(hw, VET, ETHERNET_IEEE_VLAN_TYPE);
+        break;
+    default:
         if (hw->mac_type < e1000_82545_rev_3)
             E1000_WRITE_REG(hw, VET, 0);
         e1000_clear_vfta(hw);
+        break;
     }
 
     /* For 82542 (rev 2.0), disable MWI and put the receiver into reset */
@@ -1477,9 +1499,13 @@ e1000_copper_link_igp_setup(struct e1000_hw *hw)
         return ret_val;
     }
 
-    /* Wait 15ms for MAC to configure PHY from eeprom settings */
-    msleep(15);
-    if (hw->mac_type != e1000_ich8lan) {
+    /*
+     * Wait 100ms for MAC to configure PHY from NVM settings, to avoid
+     * timeout issues when LFS is enabled.
+     */
+    msleep(100);
+
+    if (hw->mac_type != e1000_ich8lan && hw->mac_type != e1000_82576) {
     /* Configure activity LED after PHY reset */
     led_ctrl = E1000_READ_REG(hw, LEDCTL);
     led_ctrl &= IGP_ACTIVITY_LED_MASK;
@@ -3493,7 +3519,7 @@ e1000_read_phy_reg(struct e1000_hw *hw,
 
     DEBUGFUNC("e1000_read_phy_reg");
 
-    if ((hw->mac_type == e1000_80003es2lan) &&
+    if ((hw->mac_type == e1000_80003es2lan || hw->mac_type == e1000_82576) &&
         (E1000_READ_REG(hw, STATUS) & E1000_STATUS_FUNC_1)) {
         swfw = E1000_SWFW_PHY1_SM;
     } else {
@@ -3631,7 +3657,7 @@ e1000_write_phy_reg(struct e1000_hw *hw, uint32_t reg_addr,
 
     DEBUGFUNC("e1000_write_phy_reg");
 
-    if ((hw->mac_type == e1000_80003es2lan) &&
+    if ((hw->mac_type == e1000_80003es2lan || hw->mac_type == e1000_82576) &&
         (E1000_READ_REG(hw, STATUS) & E1000_STATUS_FUNC_1)) {
         swfw = E1000_SWFW_PHY1_SM;
     } else {
@@ -3751,7 +3777,7 @@ e1000_read_kmrn_reg(struct e1000_hw *hw,
     uint16_t swfw;
     DEBUGFUNC("e1000_read_kmrn_reg");
 
-    if ((hw->mac_type == e1000_80003es2lan) &&
+    if ((hw->mac_type == e1000_80003es2lan || hw->mac_type == e1000_82576) &&
         (E1000_READ_REG(hw, STATUS) & E1000_STATUS_FUNC_1)) {
         swfw = E1000_SWFW_PHY1_SM;
     } else {
@@ -3784,7 +3810,7 @@ e1000_write_kmrn_reg(struct e1000_hw *hw,
     uint16_t swfw;
     DEBUGFUNC("e1000_write_kmrn_reg");
 
-    if ((hw->mac_type == e1000_80003es2lan) &&
+    if ((hw->mac_type == e1000_80003es2lan || hw->mac_type == e1000_82576) &&
         (E1000_READ_REG(hw, STATUS) & E1000_STATUS_FUNC_1)) {
         swfw = E1000_SWFW_PHY1_SM;
     } else {
@@ -3826,7 +3852,8 @@ e1000_phy_hw_reset(struct e1000_hw *hw)
     DEBUGOUT("Resetting Phy...\n");
 
     if (hw->mac_type > e1000_82543) {
-        if ((hw->mac_type == e1000_80003es2lan) &&
+        if ((hw->mac_type == e1000_80003es2lan ||
+             hw->mac_type == e1000_82576) &&
             (E1000_READ_REG(hw, STATUS) & E1000_STATUS_FUNC_1)) {
             swfw = E1000_SWFW_PHY1_SM;
         } else {
@@ -4135,6 +4162,9 @@ e1000_detect_gig_phy(struct e1000_hw *hw)
         if (hw->phy_id == IFE_E_PHY_ID) match = TRUE;
         if (hw->phy_id == IFE_PLUS_E_PHY_ID) match = TRUE;
         if (hw->phy_id == IFE_C_E_PHY_ID) match = TRUE;
+        break;
+    case e1000_82576:
+        match = TRUE;
         break;
     default:
         DEBUGOUT1("Invalid MAC type %d\n", hw->mac_type);
@@ -4609,6 +4639,38 @@ e1000_init_eeprom_params(struct e1000_hw *hw)
 
         break;
         }
+    case e1000_82576:
+        {
+        uint16_t size;
+
+        eeprom->type = e1000_eeprom_spi;
+        eeprom->opcode_bits = 8;
+        eeprom->delay_usec = 1;
+        if (eecd & E1000_EECD_ADDR_BITS) {
+            eeprom->page_size = 32;
+            eeprom->address_bits = 16;
+        } else {
+            eeprom->page_size = 8;
+            eeprom->address_bits = 8;
+        }
+        eeprom->use_eerd = TRUE;
+        eeprom->use_eewr = FALSE;
+
+        size = (uint16_t)((eecd & E1000_EECD_SIZE_EX_MASK) >>
+                          E1000_EECD_SIZE_EX_SHIFT);
+	/*
+	 * Added to a constant, "size" becomes the left-shift value
+	 * for setting word_size.
+	 */
+	size += EEPROM_WORD_SIZE_SHIFT;
+
+	/* EEPROM access above 16k is unsupported */
+	if (size > 14)
+		size = 14;
+	eeprom->word_size = 1 << size;
+
+        break;
+        }
     default:
         break;
     }
@@ -5014,8 +5076,7 @@ e1000_read_eeprom(struct e1000_hw *hw,
      * directly. In this case, we need to acquire the EEPROM so that
      * FW or other port software does not interrupt.
      */
-    if (e1000_is_onboard_nvm_eeprom(hw) == TRUE &&
-        hw->eeprom.use_eerd == FALSE) {
+    if (hw->eeprom.use_eerd == FALSE && e1000_is_onboard_nvm_eeprom(hw)) {
         /* Prepare the EEPROM for bit-bang reading */
         if (e1000_acquire_eeprom(hw) != E1000_SUCCESS)
             return -E1000_ERR_EEPROM;
@@ -5197,6 +5258,8 @@ e1000_is_onboard_nvm_eeprom(struct e1000_hw *hw)
     uint32_t eecd = 0;
 
     DEBUGFUNC("e1000_is_onboard_nvm_eeprom");
+
+    assert(hw->mac_type != e1000_82576);
 
     if (hw->mac_type == e1000_ich8lan)
         return FALSE;
@@ -5732,6 +5795,7 @@ e1000_read_mac_addr(struct e1000_hw * hw)
     case e1000_82546:
     case e1000_82546_rev_3:
     case e1000_82571:
+    case e1000_82576:
     case e1000_80003es2lan:
         if (E1000_READ_REG(hw, STATUS) & E1000_STATUS_FUNC_1)
             hw->perm_mac_addr[5] ^= 0x01;
@@ -5944,6 +6008,13 @@ e1000_rar_set(struct e1000_hw *hw,
     case e1000_80003es2lan:
         if (hw->leave_av_bit_off == TRUE)
             break;
+    case e1000_82576:
+        /* If MAC address zero, no need to set the AV bit */
+        if (rar_low || rar_high)
+            rar_high |= E1000_RAH_AV;
+            // Only neded when Multiple Receive Queues are enabmed in MRQC
+        rar_high |= E1000_RAH_POOL_1;
+        break;
     default:
         /* Indicate to hardware the Address is Valid. */
         rar_high |= E1000_RAH_AV;
@@ -6609,6 +6680,7 @@ e1000_get_bus_info(struct e1000_hw *hw)
     case e1000_82572:
     case e1000_82573:
     case e1000_80003es2lan:
+    case e1000_82576:
         hw->bus_type = e1000_bus_type_pci_express;
         hw->bus_speed = e1000_bus_speed_2500;
         ret_val = e1000_read_pcie_cap_reg(hw,
@@ -8027,6 +8099,7 @@ e1000_get_auto_rd_done(struct e1000_hw *hw)
     case e1000_82573:
     case e1000_80003es2lan:
     case e1000_ich8lan:
+    case e1000_82576:
         while (timeout) {
             if (E1000_READ_REG(hw, EECD) & E1000_EECD_AUTO_RD)
                 break;
@@ -8072,6 +8145,7 @@ e1000_get_phy_cfg_done(struct e1000_hw *hw)
         mdelay(10);
         break;
     case e1000_80003es2lan:
+    case e1000_82576:
         /* Separate *_CFG_DONE_* bit for each port */
         if (E1000_READ_REG(hw, STATUS) & E1000_STATUS_FUNC_1)
             cfg_mask = E1000_EEPROM_CFG_DONE_PORT_1;
@@ -8282,6 +8356,7 @@ e1000_arc_subsystem_valid(struct e1000_hw *hw)
     case e1000_82572:
     case e1000_82573:
     case e1000_80003es2lan:
+    case e1000_82576:
         fwsm = E1000_READ_REG(hw, FWSM);
         if ((fwsm & E1000_FWSM_MODE_MASK) != 0)
             return TRUE;
