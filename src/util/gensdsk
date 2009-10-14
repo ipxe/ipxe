@@ -15,7 +15,7 @@ case $# in
 	;;
 esac
 case "`mtools -V`" in
-Mtools\ version\ 3.9.9*|Mtools\ version\ 3.9.1[0-9]*|Mtools\ version\ 4.*)
+Mtools\ version\ 3.9.9*|Mtools\ version\ 3.9.1[0-9]*|[mM]tools\ *\ [4-9].*)
 	;;
 *)
 	echo Mtools version 3.9.9 or later is required
