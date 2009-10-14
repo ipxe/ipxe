@@ -29,6 +29,11 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #define HERMON_PCI_CONFIG_BAR_SIZE	0x100000
 #define HERMON_PCI_UAR_BAR		PCI_BASE_ADDRESS_2
 
+/* Device reset */
+#define HERMON_RESET_OFFSET		0x0f0010
+#define HERMON_RESET_MAGIC		0x01000000UL
+#define HERMON_RESET_WAIT_TIME_MS	1000
+
 /* Work queue entry and completion queue entry opcodes */
 #define HERMON_OPCODE_NOP		0x00
 #define HERMON_OPCODE_SEND		0x0a

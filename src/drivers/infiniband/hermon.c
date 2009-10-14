@@ -29,6 +29,7 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #include <byteswap.h>
 #include <gpxe/io.h>
 #include <gpxe/pci.h>
+#include <gpxe/pcibackup.h>
 #include <gpxe/malloc.h>
 #include <gpxe/umalloc.h>
 #include <gpxe/iobuf.h>
@@ -2551,6 +2552,25 @@ static int hermon_configure_special_qps ( struct hermon *hermon ) {
 }
 
 /**
+ * Reset device
+ *
+ * @v hermon		Hermon device
+ * @v pci		PCI device
+ */
+static void hermon_reset ( struct hermon *hermon,
+			   struct pci_device *pci ) {
+	struct pci_config_backup backup;
+	static const uint8_t backup_exclude[] =
+		PCI_CONFIG_BACKUP_EXCLUDE ( 0x58, 0x5c );
+
+	pci_backup ( pci, &backup, backup_exclude );
+	writel ( HERMON_RESET_MAGIC,
+		 ( hermon->config + HERMON_RESET_OFFSET ) );
+	mdelay ( HERMON_RESET_WAIT_TIME_MS );
+	pci_restore ( pci, &backup, backup_exclude );
+}
+
+/**
  * Probe PCI device
  *
  * @v pci		PCI device
@@ -2581,6 +2601,9 @@ static int hermon_probe ( struct pci_device *pci,
 				   HERMON_PCI_CONFIG_BAR_SIZE );
 	hermon->uar = ioremap ( pci_bar_start ( pci, HERMON_PCI_UAR_BAR ),
 				HERMON_UAR_NON_EQ_PAGE * HERMON_PAGE_SIZE );
+
+	/* Reset device */
+	hermon_reset ( hermon, pci );
 
 	/* Allocate space for mailboxes */
 	hermon->mailbox_in = malloc_dma ( HERMON_MBOX_SIZE,
