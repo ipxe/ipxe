@@ -306,7 +306,8 @@ static int ath5k_probe(struct pci_device *pdev,
 		 * DMA to work so force a reasonable value here if it
 		 * comes up zero.
 		 */
-		pci_write_config_byte(pdev, PCI_CACHE_LINE_SIZE, 16);
+		csz = 16;
+		pci_write_config_byte(pdev, PCI_CACHE_LINE_SIZE, csz);
 	}
 	/*
 	 * The default setting of latency timer yields poor results,
