@@ -310,7 +310,9 @@ static void ib_cm_path_complete ( struct ib_device *ibdev,
 		 private_data_len );
 
 	/* Create connection request */
-	conn->madx = ib_create_madx ( ibdev, ibdev->gsi, &mad, NULL,
+	av->qpn = IB_QPN_GSI;
+	av->qkey = IB_QKEY_GSI;
+	conn->madx = ib_create_madx ( ibdev, ibdev->gsi, &mad, av,
 				      &ib_cm_req_op );
 	if ( ! conn->madx ) {
 		DBGC ( conn, "CM %p could not create connection request\n",
