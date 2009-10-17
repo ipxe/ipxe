@@ -197,7 +197,7 @@ static int process_zinfo_pack ( struct input_file *input,
 	if ( DEBUG ) {
 		fprintf ( stderr, "PACK [%#zx,%#zx) to [%#zx,%#zx)\n",
 			  offset, ( offset + len ), output->len,
-			  ( output->len + packed_len ) );
+			  ( size_t )( output->len + packed_len ) );
 	}
 
 	output->len += packed_len;
@@ -252,18 +252,18 @@ static int process_zinfo_add ( struct input_file *input,
 		 ( ( 1UL << ( 8 * datasize ) ) - 1 ) : ~0UL );
 
 	if ( val < 0 ) {
-		fprintf ( stderr, "Add %s%#lx+%#lx at %#zx %sflows field\n",
+		fprintf ( stderr, "Add %s%#x+%#lx at %#zx %sflows field\n",
 			  ( ( addend < 0 ) ? "-" : "" ), abs ( addend ), size,
 			  offset, ( ( addend < 0 ) ? "under" : "over" ) );
 		return -1;
 	}
 
 	if ( val & ~mask ) {
-		fprintf ( stderr, "Add %s%#lx+%#lx at %#zx overflows %d-byte "
+		fprintf ( stderr, "Add %s%#x+%#lx at %#zx overflows %d-byte "
 			  "field (%d bytes too big)\n",
 			  ( ( addend < 0 ) ? "-" : "" ), abs ( addend ), size,
 			  offset, datasize,
-			  ( ( val - mask - 1 ) * add->divisor ) );
+			  ( int )( ( val - mask - 1 ) * add->divisor ) );
 		return -1;
 	}
 
@@ -280,7 +280,7 @@ static int process_zinfo_add ( struct input_file *input,
 	}
 
 	if ( DEBUG ) {
-		fprintf ( stderr, "ADDx [%#zx,%#zx) (%s%#lx+(%#lx/%#x)) = "
+		fprintf ( stderr, "ADDx [%#zx,%#zx) (%s%#x+(%#x/%#x)) = "
 			  "%#lx\n", offset, ( offset + datasize ),
 			  ( ( addend < 0 ) ? "-" : "" ), abs ( addend ),
 			  output->len, add->divisor, val );
