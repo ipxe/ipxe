@@ -693,7 +693,7 @@ static int dhcp_pxebs_tx ( struct dhcp_session *dhcp,
 
 	DBGC ( dhcp, "DHCP %p PXEBS REQUEST to %s:%d for type %d\n",
 	       dhcp, inet_ntoa ( peer->sin_addr ), ntohs ( peer->sin_port ),
-	       ntohs ( dhcp->pxe_type ) );
+	       le16_to_cpu ( dhcp->pxe_type ) );
 
 	/* Set boot menu item */
 	menu_item.type = dhcp->pxe_type;
@@ -1363,7 +1363,7 @@ int start_pxebs ( struct job_interface *job, struct net_device *netdev,
 	fetch_ipv4_setting ( netdev_settings ( netdev ), &ip_setting,
 			     &dhcp->local.sin_addr );
 	dhcp->local.sin_port = htons ( BOOTPC_PORT );
-	dhcp->pxe_type = htons ( pxe_type );
+	dhcp->pxe_type = cpu_to_le16 ( pxe_type );
 	dhcp->timer.expired = dhcp_timer_expired;
 
 	/* Construct PXE boot server IP address lists */
