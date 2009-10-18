@@ -963,7 +963,7 @@ static int sis190_get_mac_addr_from_apc(struct pci_device *pdev,
 					struct net_device *dev)
 {
 	struct sis190_private *tp = netdev_priv(dev);
-	struct pci_device *isa_bridge;
+	struct pci_device *isa_bridge = NULL;
 	struct device *d;
 	u8 reg, tmp8;
 	unsigned int i;
