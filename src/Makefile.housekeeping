@@ -831,6 +831,8 @@ endif # defined(BIN)
 FINALISE_rom	= $(MAKEROM) $(MAKEROM_FLAGS) $(TGT_MAKEROM_FLAGS) \
 		  -i$(IDENT) -s 0 $@
 FINALISE_hrom	= $(FINALISE_rom)
+FINALISE_xrom	= $(MAKEROM) $(MAKEROM_FLAGS) $(TGT_MAKEROM_FLAGS) \
+		  -i$(IDENT) -n -s 0 $@
 
 # Some ROMs require specific flags to be passed to makerom.pl
 #

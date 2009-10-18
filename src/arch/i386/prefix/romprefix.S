@@ -25,6 +25,19 @@ FILE_LICENCE ( GPL2_OR_LATER )
  */
 #define ROM_BANNER_TIMEOUT ( 2 * ( 18 * BANNER_TIMEOUT ) / 10 )
 
+/* We can load a ROM in two ways: have the BIOS load all of it (.rom prefix)
+ * or have the BIOS load a stub that loads the rest using PCI (.xrom prefix).
+ * The latter is not as widely supported, but allows the use of large ROMs
+ * on some systems with crowded option ROM space.
+ */
+
+#ifdef LOAD_ROM_FROM_PCI
+#define ROM_SIZE_VALUE	_prefix_filesz_sect /* Amount to load in BIOS */
+#else
+#define ROM_SIZE_VALUE	0		/* Load amount (before compr. fixup) */
+#endif
+
+
 	.text
 	.code16
 	.arch i386
@@ -33,10 +46,12 @@ FILE_LICENCE ( GPL2_OR_LATER )
 	.org	0x00
 romheader:
 	.word	0xAA55			/* BIOS extension signature */
-romheader_size:	.byte 0			/* Size in 512-byte blocks */
+romheader_size:	.byte ROM_SIZE_VALUE	/* Size in 512-byte blocks */
 	jmp	init			/* Initialisation vector */
 checksum:
-	.byte	0
+	.byte	0, 0
+real_size:
+	.word	0
 	.org	0x16
 	.word	undiheader
 	.org	0x18
@@ -44,10 +59,16 @@ checksum:
 	.org	0x1a
 	.word	pnpheader
 	.size romheader, . - romheader
-	
+
 	.section ".zinfo.fixup", "a", @progbits	/* Compressor fixups */
+#ifndef LOAD_ROM_FROM_PCI
 	.ascii	"ADDB"
 	.long	romheader_size
+	.long	512
+	.long	0
+#endif
+	.ascii	"ADDB"
+	.long	real_size
 	.long	512
 	.long	0
 	.previous
@@ -61,17 +82,18 @@ pciheader:
 	.byte	0x03			/* PCI data structure revision */
 	.byte	0x02, 0x00, 0x00	/* Class code */
 pciheader_image_length:
-	.word	0			/* Image length */
+	.word	ROM_SIZE_VALUE		/* Image length */
 	.word	0x0001			/* Revision level */
 	.byte	0x00			/* Code type */
 	.byte	0x80			/* Last image indicator */
 pciheader_runtime_length:
-	.word	0			/* Maximum run-time image length */
+	.word	ROM_SIZE_VALUE		/* Maximum run-time image length */
 	.word	0x0000			/* Configuration utility code header */
 	.word	0x0000			/* DMTF CLP entry point */
 	.equ pciheader_len, . - pciheader
 	.size pciheader, . - pciheader
-	
+
+#ifndef LOAD_ROM_FROM_PCI
 	.section ".zinfo.fixup", "a", @progbits	/* Compressor fixups */
 	.ascii	"ADDW"
 	.long	pciheader_image_length
@@ -82,6 +104,7 @@ pciheader_runtime_length:
 	.long	512
 	.long	0
 	.previous
+#endif
 
 pnpheader:
 	.ascii	"$PnP"			/* Signature */
@@ -175,6 +198,11 @@ init:
 	call	print_message
 	call	print_pci_busdevfn
 
+#ifdef LOAD_ROM_FROM_PCI
+	/* Save PCI bus:dev.fn for later use */
+	movw	%ax, pci_busdevfn
+#endif
+
 	/* Fill in product name string, if possible */
 	movw	$prodstr_pci_id, %di
 	call	print_pci_busdevfn
@@ -199,6 +227,9 @@ init:
 	jne	no_pci3
 	testb	%ah, %ah
 	jnz	no_pci3
+#ifdef LOAD_ROM_FROM_PCI
+	incb	pcibios_present
+#endif
 	movw	$init_message_pci, %si
 	xorw	%di, %di
 	call	print_message
@@ -310,7 +341,7 @@ pmm_scan:
 	/* We have PMM and so a 1kB stack: preserve upper register halves */
 	pushal
 	/* Calculate required allocation size in %esi */
-	movzbl	romheader_size, %eax
+	movzwl	real_size, %eax
 	shll	$9, %eax
 	addl	$_textdata_memsz, %eax
 	orw	$0xffff, %ax	/* Ensure allocation size is at least 64kB */
@@ -364,7 +395,7 @@ pmm_copy:
 	movl	%edi, decompress_to
 	/* Shrink ROM */
 	movb	$_prefix_memsz_sect, romheader_size
-#ifdef SHRINK_WITHOUT_PMM
+#if defined(SHRINK_WITHOUT_PMM) || defined(LOAD_ROM_FROM_PCI)
 	jmp	pmm_done
 pmm_fail:
 	/* Print marker and copy ourselves to high memory */
@@ -379,8 +410,28 @@ pmm_fail:
 #endif
 	/* Restore upper register halves */
 	popal
+#if defined(LOAD_ROM_FROM_PCI)
+	call	load_from_pci
+	jc	load_err
+	jmp	load_ok
 no_pmm:
+	/* Cannot continue without PMM - print error message */
+	xorw	%di, %di
+	movw	$init_message_no_pmm, %si
+	call	print_message
+load_err:
+	/* Wait for five seconds to let user see message */
+	movw	$90, %cx
+1:	call	wait_for_tick
+	loop	1b
+	/* Mark environment as invalid and return */
+	movl	$0, decompress_to
+	jmp	out
 
+load_ok:
+#else
+no_pmm:
+#endif
 	/* Update checksum */
 	xorw	%bx, %bx
 	xorw	%si, %si
@@ -425,14 +476,14 @@ no_pmm:
 	movw	$init_message_done, %si
 	call	print_message
 	popf
-	jnz	2f
+	jnz	out
 	/* Ctrl-B was pressed: invoke gPXE.  The keypress will be
 	 * picked up by the initial shell prompt, and we will drop
 	 * into a shell.
 	 */
 	pushw	%cs
 	call	exec
-2:
+out:
 	/* Restore registers */
 	popw	%gs
 	popw	%fs
@@ -479,6 +530,11 @@ init_message_bbs:
 init_message_pmm:
 	.asciz	" PMM"
 	.size	init_message_pmm, . - init_message_pmm
+#ifdef LOAD_ROM_FROM_PCI
+init_message_no_pmm:
+	.asciz	"\nPMM required but not present!\n"
+	.size	init_message_no_pmm, . - init_message_no_pmm
+#endif
 init_message_int19:
 	.asciz	" INT19"
 	.size	init_message_int19, . - init_message_int19
@@ -504,11 +560,31 @@ image_source:
 /* Temporary decompression area
  *
  * May be either at HIGHMEM_LOADPOINT, or within PMM-allocated block.
+ * If a PCI ROM load fails, this will be set to zero.
  */
 	.globl	decompress_to
 decompress_to:
 	.long	HIGHMEM_LOADPOINT
 	.size	decompress_to, . - decompress_to
+
+#ifdef LOAD_ROM_FROM_PCI
+
+/* Set if the PCI BIOS is present, even <3.0 */
+pcibios_present:
+	.byte	0
+	.byte	0		/* for alignment */
+	.size	pcibios_present, . - pcibios_present
+
+/* PCI bus:device.function word
+ *
+ * Filled in by init in the .xrom case, so the remainder of the ROM
+ * can be located.
+ */
+pci_busdevfn:
+	.word	0
+	.size	pci_busdevfn, . - pci_busdevfn
+
+#endif
 
 /* BBS version
  *
@@ -527,6 +603,289 @@ bev_entry:
 	call	exec
 	lret
 	.size	bev_entry, . - bev_entry
+
+
+#ifdef LOAD_ROM_FROM_PCI
+
+#define PCI_ROM_ADDRESS		0x30	/* Bits 31:11 address, 10:1 reserved */
+#define PCI_ROM_ADDRESS_ENABLE	 0x00000001
+#define PCI_ROM_ADDRESS_MASK	 0xfffff800
+
+#define PCIBIOS_READ_WORD	0xb109
+#define PCIBIOS_READ_DWORD	0xb10a
+#define PCIBIOS_WRITE_WORD	0xb10c
+#define PCIBIOS_WRITE_DWORD	0xb10d
+
+/* Determine size of PCI BAR
+ *
+ *  %bx : PCI bus:dev.fn to probe
+ *  %di : Address of BAR to find size of
+ * %edx : Mask of address bits within BAR
+ *
+ * %ecx : Size for a memory resource,
+ *	  1 for an I/O resource (bit 0 set).
+ *   CF : Set on error or nonexistent device (all-ones read)
+ *
+ * All other registers saved.
+ */
+pci_bar_size:
+	/* Save registers */
+	pushw	%ax
+	pushl	%esi
+	pushl	%edx
+
+	/* Read current BAR value */
+	movw	$PCIBIOS_READ_DWORD, %ax
+	int	$0x1a
+
+	/* Check for device existence and save it */
+	testb	$1, %cl		/* I/O bit? */
+	jz	1f
+	andl	$1, %ecx	/* If so, exit with %ecx = 1 */
+	jmp	99f
+1:	notl	%ecx
+	testl	%ecx, %ecx	/* Set ZF iff %ecx was all-ones */
+	notl	%ecx
+	jnz	1f
+	stc			/* All ones - exit with CF set */
+	jmp	99f
+1:	movl	%ecx, %esi	/* Save in %esi */
+
+	/* Write all ones to BAR */
+	movl	%edx, %ecx
+	movw	$PCIBIOS_WRITE_DWORD, %ax
+	int	$0x1a
+
+	/* Read back BAR */
+	movw	$PCIBIOS_READ_DWORD, %ax
+	int	$0x1a
+
+	/* Find decode size from least set bit in mask BAR */
+	bsfl	%ecx, %ecx	/* Find least set bit, log2(decode size) */
+	jz	1f		/* Mask BAR should not be zero */
+	xorl	%edx, %edx
+	incl	%edx
+	shll	%cl, %edx	/* %edx = decode size */
+	jmp	2f
+1:	xorl	%edx, %edx	/* Return zero size for mask BAR zero */
+
+	/* Restore old BAR value */
+2:	movl	%esi, %ecx
+	movw	$PCIBIOS_WRITE_DWORD, %ax
+	int	$0x1a
+
+	movl	%edx, %ecx	/* Return size in %ecx */
+
+	/* Restore registers and return */
+99:	popl	%edx
+	popl	%esi
+	popw	%ax
+	ret
+
+	.size	pci_bar_size, . - pci_bar_size
+
+/* PCI ROM loader
+ *
+ * Called from init in the .xrom case to load the non-prefix code
+ * using the PCI ROM BAR.
+ *
+ * Returns with carry flag set on error. All registers saved.
+ */
+load_from_pci:
+	/*
+	 * Use PCI BIOS access to config space. The calls take
+	 *
+	 *   %ah : 0xb1		%al : function
+	 *   %bx : bus/dev/fn
+	 *   %di : config space address
+	 *  %ecx : value to write (for writes)
+	 *
+	 *  %ecx : value read (for reads)
+	 *   %ah : return code
+	 *    CF : error indication
+	 *
+	 * All registers not used for return are preserved.
+	 */
+
+	/* Save registers and set up %es for big real mode */
+	pushal
+	pushw	%es
+	xorw	%ax, %ax
+	movw	%ax, %es
+
+	/* Check PCI BIOS presence */
+	cmpb	$0, pcibios_present
+	jz	err_pcibios
+
+	/* Load existing PCI ROM BAR */
+	movw	$PCIBIOS_READ_DWORD, %ax
+	movw	pci_busdevfn, %bx
+	movw	$PCI_ROM_ADDRESS, %di
+	int	$0x1a
+
+	/* Maybe it's already enabled? */
+	testb	$PCI_ROM_ADDRESS_ENABLE, %cl
+	jz	1f
+	movb	$1, %dl		/* Flag indicating no deinit required */
+	movl	%ecx, %ebp
+	jmp	check_rom
+
+	/* Determine PCI BAR decode size */
+1:	movl	$PCI_ROM_ADDRESS_MASK, %edx
+	call	pci_bar_size	/* Returns decode size in %ecx */
+	jc	err_size_insane	/* CF => no ROM BAR, %ecx == ffffffff */
+
+	/* Check sanity of decode size */
+	xorl	%eax, %eax
+	movw	real_size, %ax
+	shll	$9, %eax	/* %eax = ROM size */
+	cmpl	%ecx, %eax
+	ja	err_size_insane	/* Insane if decode size < ROM size */
+	cmpl	$0x100000, %ecx
+	jae	err_size_insane	/* Insane if decode size >= 1MB */
+
+	/* Find a place to map the BAR
+	 * In theory we should examine e820 and all PCI BARs to find a
+	 * free region. However, we run at POST when e820 may not be
+	 * available, and memory reads of an unmapped location are
+	 * de facto standardized to return all-ones. Thus, we can get
+	 * away with searching high memory (0xf0000000 and up) on
+	 * multiples of the ROM BAR decode size for a sufficiently
+	 * large all-ones region.
+	 */
+	movl	%ecx, %edx	/* Save ROM BAR size in %edx */
+	movl	$0xf0000000, %ebp
+	xorl	%eax, %eax
+	notl	%eax		/* %eax = all ones */
+bar_search:
+	movl	%ebp, %edi
+	movl	%edx, %ecx
+	shrl	$2, %ecx
+	addr32 repe scasl	/* Scan %es:edi for anything not all-ones */
+	jz	bar_found
+	addl	%edx, %ebp
+	testl	$0x80000000, %ebp
+	jz	err_no_bar
+	jmp	bar_search
+
+bar_found:
+	movl	%edi, %ebp
+	/* Save current BAR value on stack to restore later */
+	movw	$PCIBIOS_READ_DWORD, %ax
+	movw	$PCI_ROM_ADDRESS, %di
+	int	$0x1a
+	pushl	%ecx
+
+	/* Map the ROM */
+	movw	$PCIBIOS_WRITE_DWORD, %ax
+	movl	%ebp, %ecx
+	orb	$PCI_ROM_ADDRESS_ENABLE, %cl
+	int	$0x1a
+
+	xorb	%dl, %dl	/* %dl = 0 : ROM was not already mapped */
+check_rom:
+	/* Check and copy ROM - enter with %dl set to skip unmapping,
+	 * %ebp set to mapped ROM BAR address.
+	 * We check up to prodstr_separator for equality, since anything past
+	 * that may have been modified. Since our check includes the checksum
+	 * byte over the whole ROM stub, that should be sufficient.
+	 */
+	xorb	%dh, %dh	/* %dh = 0 : ROM did not fail integrity check */
+
+	/* Verify ROM integrity */
+	xorl	%esi, %esi
+	movl	%ebp, %edi
+	movl	$prodstr_separator, %ecx
+	addr32 repe cmpsb
+	jz	copy_rom
+	incb	%dh		/* ROM failed integrity check */
+	movl	%ecx, %ebp	/* Save number of bytes left */
+	jmp	skip_load
+
+copy_rom:
+	/* Print BAR address and indicate whether we mapped it ourselves */
+	movb	$( ' ' ), %al
+	xorw	%di, %di
+	call	print_character
+	movl	%ebp, %eax
+	call	print_hex_dword
+	movb	$( '-' ), %al	/* '-' for self-mapped */
+	subb	%dl, %al
+	subb	%dl, %al	/* '+' = '-' - 2 for BIOS-mapped */
+	call	print_character
+
+	/* Copy ROM at %ebp to PMM or highmem block */
+	movl	%ebp, %esi
+	movl	image_source, %edi
+	movzwl	real_size, %ecx
+	shll	$9, %ecx
+	addr32 es rep movsb
+	movl	%edi, decompress_to
+skip_load:
+	testb	%dl, %dl	/* Was ROM already mapped? */
+	jnz	skip_unmap
+
+	/* Unmap the ROM by restoring old ROM BAR */
+	movw	$PCIBIOS_WRITE_DWORD, %ax
+	movw	$PCI_ROM_ADDRESS, %di
+	popl	%ecx
+	int	$0x1a
+
+skip_unmap:
+	/* Error handling */
+	testb	%dh, %dh
+	jnz	err_rom_invalid
+	clc
+	jmp	99f
+
+err_pcibios:			/* No PCI BIOS available */
+	movw	$load_message_no_pcibios, %si
+	xorl	%eax, %eax	/* "error code" is zero */
+	jmp	1f
+err_size_insane:		/* BAR has size (%ecx) that is insane */
+	movw	$load_message_size_insane, %si
+	movl	%ecx, %eax
+	jmp	1f
+err_no_bar:			/* No space of sufficient size (%edx) found */
+	movw	$load_message_no_bar, %si
+	movl	%edx, %eax
+	jmp	1f
+err_rom_invalid:		/* Loaded ROM does not match (%ebp bytes left) */
+	movw	$load_message_rom_invalid, %si
+	movzbl	romheader_size, %eax
+	shll	$9, %eax
+	subl	%ebp, %eax
+	decl	%eax		/* %eax is now byte index of failure */
+
+1:	/* Error handler - print message at %si and dword in %eax */
+	xorw	%di, %di
+	call	print_message
+	call	print_hex_dword
+	stc
+99:	popw	%es
+	popal
+	ret
+
+	.size	load_from_pci, . - load_from_pci
+
+load_message_no_pcibios:
+	.asciz	"\nNo PCI BIOS found! "
+	.size	load_message_no_pcibios, . - load_message_no_pcibios
+
+load_message_size_insane:
+	.asciz	"\nROM resource has invalid size "
+	.size	load_message_size_insane, . - load_message_size_insane
+
+load_message_no_bar:
+	.asciz	"\nNo memory hole of sufficient size "
+	.size	load_message_no_bar, . - load_message_no_bar
+
+load_message_rom_invalid:
+	.asciz	"\nLoaded ROM is invalid at "
+	.size	load_message_rom_invalid, . - load_message_rom_invalid
+
+#endif /* LOAD_ROM_FROM_PCI */
+
 
 /* INT19 entry point
  *
@@ -587,6 +946,14 @@ int19_message_done:
 exec:	/* Set %ds = %cs */
 	pushw	%cs
 	popw	%ds
+
+#ifdef LOAD_ROM_FROM_PCI
+	/* Don't execute if load was invalid */
+	cmpl	$0, decompress_to
+	jne	1f
+	lret
+1:
+#endif
 
 	/* Print message as soon as possible */
 	movw	$prodstr, %si
