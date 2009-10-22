@@ -71,6 +71,7 @@ static const uint8_t dhcp_op[] = {
 
 /** Raw option data for options common to all DHCP requests */
 static uint8_t dhcp_request_options_data[] = {
+	DHCP_MESSAGE_TYPE, DHCP_BYTE ( 0 ),
 	DHCP_MAX_MESSAGE_SIZE,
 	DHCP_WORD ( ETH_MAX_MTU - 20 /* IP header */ - 8 /* UDP header */ ),
 	DHCP_CLIENT_ARCHITECTURE, DHCP_WORD ( 0 ),
