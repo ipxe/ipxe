@@ -103,7 +103,7 @@ static unsigned int dhcp_option_len ( struct dhcp_option *option ) {
  * DHCP option block.  Encapsulated options may be searched for by
  * using DHCP_ENCAP_OPT() to construct the tag value.
  *
- * If the option is encapsulated, and @c encapsulator is non-NULL, it
+ * If the option is encapsulated, and @c encap_offset is non-NULL, it
  * will be filled in with the offset of the encapsulating option.
  *
  * This routine is designed to be paranoid.  It does not assume that
@@ -136,8 +136,15 @@ static int find_dhcp_option_with_encap ( struct dhcp_options *options,
 		if ( remaining < 0 )
 			break;
 		/* Check for explicit end marker */
-		if ( option->tag == DHCP_END )
-			break;
+		if ( option->tag == DHCP_END ) {
+			if ( tag == DHCP_END )
+				/* Special case where the caller is interested
+				 * in whether we have this marker or not.
+				 */
+				return offset;
+			else
+				break;
+		}
 		/* Check for matching tag */
 		if ( option->tag == tag ) {
 			DBGC ( options, "DHCPOPT %p found %s (length %d)\n",
@@ -256,7 +263,7 @@ static int set_dhcp_option ( struct dhcp_options *options, unsigned int tag,
 	static const uint8_t empty_encapsulator[] = { DHCP_END };
 	int offset;
 	int encap_offset = -1;
-	int creation_offset = 0;
+	int creation_offset;
 	struct dhcp_option *option;
 	unsigned int encap_tag = DHCP_ENCAPSULATOR ( tag );
 	size_t old_len = 0;
@@ -267,6 +274,10 @@ static int set_dhcp_option ( struct dhcp_options *options, unsigned int tag,
 	if ( tag == DHCP_PAD )
 		return -ENOTTY;
 
+	creation_offset = find_dhcp_option_with_encap ( options, DHCP_END,
+							NULL );
+	if ( creation_offset < 0 )
+		creation_offset = options->len;
 	/* Find old instance of this option, if any */
 	offset = find_dhcp_option_with_encap ( options, tag, &encap_offset );
 	if ( offset >= 0 ) {
