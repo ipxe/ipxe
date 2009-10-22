@@ -328,11 +328,20 @@ parse_settings_name ( const char *name,
 
 	/* Parse each name component in turn */
 	while ( remainder ) {
+		struct net_device *netdev;
+
 		subname = remainder;
 		remainder = strchr ( subname, '.' );
 		if ( remainder )
 			*(remainder++) = '\0';
-		settings = get_child ( settings, subname );
+
+		/* Special case "netX" root settings block */
+		if ( ( subname == name_copy ) && ! strcmp ( subname, "netX" ) &&
+		     ( ( netdev = last_opened_netdev() ) != NULL ) )
+			settings = get_child ( settings, netdev->name );
+		else
+			settings = get_child ( settings, subname );
+
 		if ( ! settings )
 			break;
 	}
