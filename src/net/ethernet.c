@@ -148,6 +148,17 @@ int eth_mc_hash ( unsigned int af, const void *net_addr, void *ll_addr ) {
 	}
 }
 
+/**
+ * Generate Ethernet-compatible compressed link-layer address
+ *
+ * @v ll_addr		Link-layer address
+ * @v eth_addr		Ethernet-compatible address to fill in
+ */
+int eth_eth_addr ( const void *ll_addr, void *eth_addr ) {
+	memcpy ( eth_addr, ll_addr, ETH_ALEN );
+	return 0;
+}
+
 /** Ethernet protocol */
 struct ll_protocol ethernet_protocol __ll_protocol = {
 	.name		= "Ethernet",
@@ -160,6 +171,7 @@ struct ll_protocol ethernet_protocol __ll_protocol = {
 	.init_addr	= eth_init_addr,
 	.ntoa		= eth_ntoa,
 	.mc_hash	= eth_mc_hash,
+	.eth_addr	= eth_eth_addr,
 };
 
 /**

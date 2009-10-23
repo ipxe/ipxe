@@ -586,6 +586,7 @@ static struct ll_protocol net80211_ll_protocol __ll_protocol = {
 	.init_addr = eth_init_addr,
 	.ntoa = eth_ntoa,
 	.mc_hash = eth_mc_hash,
+	.eth_addr = eth_eth_addr,
 	.ll_proto = htons ( ARPHRD_ETHER ),	/* "encapsulated Ethernet" */
 	.hw_addr_len = ETH_ALEN,
 	.ll_addr_len = ETH_ALEN,

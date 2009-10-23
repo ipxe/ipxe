@@ -296,6 +296,62 @@ static int ipoib_mc_hash ( unsigned int af __unused,
 	return -ENOTSUP;
 }
 
+/**
+ * Generate Mellanox Ethernet-compatible compressed link-layer address
+ *
+ * @v ll_addr		Link-layer address
+ * @v eth_addr		Ethernet-compatible address to fill in
+ */
+static int ipoib_mlx_eth_addr ( const struct ib_gid_half *guid,
+				uint8_t *eth_addr ) {
+	eth_addr[0] = ( ( guid->u.bytes[3] == 2 ) ? 0x00 : 0x02 );
+	eth_addr[1] = guid->u.bytes[1];
+	eth_addr[2] = guid->u.bytes[2];
+	eth_addr[3] = guid->u.bytes[5];
+	eth_addr[4] = guid->u.bytes[6];
+	eth_addr[5] = guid->u.bytes[7];
+	return 0;
+}
+
+/** An IPoIB Ethernet-compatible compressed link-layer address generator */
+struct ipoib_eth_addr_handler {
+	/** GUID byte 1 */
+	uint8_t byte1;
+	/** GUID byte 2 */
+	uint8_t byte2;
+	/** Handler */
+	int ( * eth_addr ) ( const struct ib_gid_half *guid,
+			     uint8_t *eth_addr );
+};
+
+/** IPoIB Ethernet-compatible compressed link-layer address generators */
+static struct ipoib_eth_addr_handler ipoib_eth_addr_handlers[] = {
+	{ 0x02, 0xc9, ipoib_mlx_eth_addr },
+};
+
+/**
+ * Generate Ethernet-compatible compressed link-layer address
+ *
+ * @v ll_addr		Link-layer address
+ * @v eth_addr		Ethernet-compatible address to fill in
+ */
+static int ipoib_eth_addr ( const void *ll_addr, void *eth_addr ) {
+	const struct ipoib_mac *ipoib_addr = ll_addr;
+	const struct ib_gid_half *guid = &ipoib_addr->gid.u.half[1];
+	struct ipoib_eth_addr_handler *handler;
+	unsigned int i;
+
+	for ( i = 0 ; i < ( sizeof ( ipoib_eth_addr_handlers ) /
+			    sizeof ( ipoib_eth_addr_handlers[0] ) ) ; i++ ) {
+		handler = &ipoib_eth_addr_handlers[i];
+		if ( ( handler->byte1 == guid->u.bytes[1] ) &&
+		     ( handler->byte2 == guid->u.bytes[2] ) ) {
+			return handler->eth_addr ( guid, eth_addr );
+		}
+	}
+	return -ENOTSUP;
+}
+
 /** IPoIB protocol */
 struct ll_protocol ipoib_protocol __ll_protocol = {
 	.name		= "IPoIB",
@@ -308,6 +364,7 @@ struct ll_protocol ipoib_protocol __ll_protocol = {
 	.init_addr	= ipoib_init_addr,
 	.ntoa		= ipoib_ntoa,
 	.mc_hash	= ipoib_mc_hash,
+	.eth_addr	= ipoib_eth_addr,
 };
 
 /**

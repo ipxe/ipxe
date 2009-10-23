@@ -128,8 +128,8 @@ struct ll_protocol {
 	/**
 	 * Transcribe link-layer address
 	 *
-	 * @v ll_addr	Link-layer address
-	 * @ret string	Human-readable transcription of address
+	 * @v ll_addr		Link-layer address
+	 * @ret string		Human-readable transcription of address
 	 *
 	 * This method should convert the link-layer address into a
 	 * human-readable format.
@@ -141,13 +141,20 @@ struct ll_protocol {
 	/**
 	 * Hash multicast address
 	 *
-	 * @v af	Address family
-	 * @v net_addr	Network-layer address
-	 * @v ll_addr	Link-layer address to fill in
-	 * @ret rc	Return status code
+	 * @v af		Address family
+	 * @v net_addr		Network-layer address
+	 * @v ll_addr		Link-layer address to fill in
+	 * @ret rc		Return status code
 	 */
 	int ( * mc_hash ) ( unsigned int af, const void *net_addr,
 			    void *ll_addr );
+	/**
+	 * Generate Ethernet-compatible compressed link-layer address
+	 *
+	 * @v ll_addr		Link-layer address
+	 * @v eth_addr		Ethernet-compatible address to fill in
+	 */
+	int ( * eth_addr ) ( const void *ll_addr, void *eth_addr );
 	/** Link-layer protocol
 	 *
 	 * This is an ARPHRD_XXX constant, in network byte order.
