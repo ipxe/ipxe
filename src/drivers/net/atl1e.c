@@ -1296,13 +1296,13 @@ void atl1e_hw_set_mac_addr(struct atl1e_hw *hw)
  */
 static int atl1e_get_permanent_address(struct atl1e_hw *hw)
 {
-	u32 addr[2];
+	union {
+		u32 dword[2];
+		u8 byte[8];
+	} hw_addr;
 	u32 i;
 	u32 twsi_ctrl_data;
 	u8  eth_addr[ETH_ALEN];
-
-	/* init */
-	addr[0] = addr[1] = 0;
 
 	if (!atl1e_check_eeprom_exist(hw)) {
 		/* eeprom exist */
@@ -1320,10 +1320,11 @@ static int atl1e_get_permanent_address(struct atl1e_hw *hw)
 	}
 
 	/* maybe MAC-address is from BIOS */
-	addr[0] = AT_READ_REG(hw, REG_MAC_STA_ADDR);
-	addr[1] = AT_READ_REG(hw, REG_MAC_STA_ADDR + 4);
-	*(u32 *) &eth_addr[2] = swap32(addr[0]);
-	*(u16 *) &eth_addr[0] = swap16(*(u16 *)&addr[1]);
+	hw_addr.dword[0] = AT_READ_REG(hw, REG_MAC_STA_ADDR);
+	hw_addr.dword[1] = AT_READ_REG(hw, REG_MAC_STA_ADDR + 4);
+	for (i = 0; i < ETH_ALEN; i++) {
+		eth_addr[ETH_ALEN - i - 1] = hw_addr.byte[i];
+	}
 
 	memcpy(hw->perm_mac_addr, eth_addr, ETH_ALEN);
 	return 0;
