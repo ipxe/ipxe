@@ -26,8 +26,8 @@ FILE_LICENCE ( GPL_ANY );
 #include "sis190.h"
 
 static struct pci_device_id sis190_pci_tbl[] = {
-	PCI_ROM (0x1039, 0x0190, "SiS 190", "SiS 190", 0),
-	PCI_ROM (0x1039, 0x0191, "SiS 191", "SiS 191", 0),
+	PCI_ROM (0x1039, 0x0190, "sis190", "sis190", 0),
+	PCI_ROM (0x1039, 0x0191, "sis191", "sis191", 0),
 };
 
 /******************************************************************************
