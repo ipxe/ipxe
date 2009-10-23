@@ -42,9 +42,9 @@ static struct pci_device_id sis190_pci_tbl[] = {
  */
 
 static struct pci_device_id sis190_isa_bridge_tbl[] = {
-	PCI_ROM (0x1039, 0x0965, "", "", 0),
-	PCI_ROM (0x1039, 0x0966, "", "", 0),
-	PCI_ROM (0x1039, 0x0968, "", "", 0),
+	PCI_ID (0x1039, 0x0965, "", "", 0),
+	PCI_ID (0x1039, 0x0966, "", "", 0),
+	PCI_ID (0x1039, 0x0968, "", "", 0),
 };
 
 static int sis190_isa_bridge_probe(struct pci_device *pdev __unused,

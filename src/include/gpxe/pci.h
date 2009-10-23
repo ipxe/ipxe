@@ -359,13 +359,18 @@ struct pci_driver {
  * PCI_ROM is used to build up entries in a struct pci_id array.  It
  * is also parsed by parserom.pl to generate Makefile rules and files
  * for rom-o-matic.
+ *
+ * PCI_ID can be used to generate entries without creating a
+ * corresponding ROM in the build process.
  */
-#define PCI_ROM( _vendor, _device, _name, _description, _data ) {	\
+#define PCI_ID( _vendor, _device, _name, _description, _data ) {	\
 	.vendor = _vendor,						\
 	.device = _device,						\
 	.name = _name,							\
 	.driver_data = _data						\
 }
+#define PCI_ROM( _vendor, _device, _name, _description, _data ) \
+	PCI_ID( _vendor, _device, _name, _description, _data )
 
 extern void adjust_pci_device ( struct pci_device *pci );
 extern unsigned long pci_bar_start ( struct pci_device *pci,
