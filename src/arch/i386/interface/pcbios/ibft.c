@@ -37,6 +37,7 @@ FILE_LICENCE ( BSD2 );
 #include <gpxe/acpi.h>
 #include <gpxe/in.h>
 #include <gpxe/netdevice.h>
+#include <gpxe/ethernet.h>
 #include <gpxe/dhcp.h>
 #include <gpxe/iscsi.h>
 #include <gpxe/ibft.h>
@@ -251,6 +252,7 @@ static const char * ibft_string ( struct ibft_string_block *strings,
 static int ibft_fill_nic ( struct ibft_nic *nic,
 			   struct ibft_string_block *strings,
 			   struct net_device *netdev ) {
+	struct ll_protocol *ll_protocol = netdev->ll_protocol;
 	struct in_addr netmask_addr = { 0 };
 	unsigned int netmask_count = 0;
 	int rc;
@@ -279,10 +281,12 @@ static int ibft_fill_nic ( struct ibft_nic *nic,
 	DBG ( "iBFT NIC subnet = /%d\n", nic->subnet_mask_prefix );
 
 	/* Extract values from net-device configuration */
-	memcpy ( nic->mac_address, netdev->ll_addr,
-		 sizeof ( nic->mac_address ) );
-	DBG ( "iBFT NIC MAC = %s\n",
-	      netdev->ll_protocol->ntoa ( nic->mac_address ) );
+	if ( ( rc = ll_protocol->eth_addr ( netdev->ll_addr,
+					    nic->mac_address ) ) != 0 ) {
+		DBG ( "Could not determine iBFT MAC: %s\n", strerror ( rc ) );
+		return rc;
+	}
+	DBG ( "iBFT NIC MAC = %s\n", eth_ntoa ( nic->mac_address ) );
 	nic->pci_bus_dev_func = netdev->dev->desc.location;
 	DBG ( "iBFT NIC PCI = %04x\n", nic->pci_bus_dev_func );
 
