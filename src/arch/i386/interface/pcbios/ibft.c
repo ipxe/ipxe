@@ -236,7 +236,8 @@ static int ibft_set_string_option ( struct ibft_string_block *strings,
  */
 static const char * ibft_string ( struct ibft_string_block *strings,
 				  struct ibft_string *string ) {
-	return ( ( ( char * ) strings->table ) + string->offset );
+	return ( string->offset ?
+		 ( ( ( char * ) strings->table ) + string->offset ) : NULL );
 }
 
 /**
