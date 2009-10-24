@@ -1,6 +1,7 @@
-
 #ifndef __SIS190_H__
 #define __SIS190_H__
+
+FILE_LICENCE ( GPL_ANY );
 
 #include <stdint.h>
 #include <stdio.h>
