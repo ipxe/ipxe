@@ -627,7 +627,7 @@ static void dhcp_proxy_rx ( struct dhcp_session *dhcp,
 	/* Filter out unacceptable responses */
 	if ( peer->sin_port != dhcp->proxy_port )
 		return;
-	if ( msgtype != DHCPACK )
+	if ( ( msgtype != DHCPOFFER ) && ( msgtype != DHCPACK ) )
 		return;
 	if ( server_id.s_addr /* Linux PXE server omits server ID */ &&
 	     ( server_id.s_addr != dhcp->proxy_server.s_addr ) )
