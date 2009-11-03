@@ -361,8 +361,8 @@ static void dhcp_discovery_rx ( struct dhcp_session *dhcp,
 	has_pxeclient = ( ( vci_len >= ( int ) sizeof ( vci ) ) &&
 			  ( strncmp ( "PXEClient", vci, sizeof (vci) ) == 0 ));
 
-	/* Identify presence of vendor-specific options */
-	pxeopts_len = dhcppkt_fetch ( dhcppkt, DHCP_VENDOR_ENCAP, NULL, 0 );
+	/* Identify presence of PXE-specific options */
+	pxeopts_len = dhcppkt_fetch ( dhcppkt, DHCP_PXE_BOOT_MENU, NULL, 0 );
 	has_pxeopts = ( pxeopts_len >= 0 );
 	if ( has_pxeclient )
 		DBGC ( dhcp, "%s", ( has_pxeopts ? " pxe" : " proxy" ) );
