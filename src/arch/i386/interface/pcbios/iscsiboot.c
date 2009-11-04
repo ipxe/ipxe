@@ -4,28 +4,16 @@
 #include <stdio.h>
 #include <errno.h>
 #include <gpxe/iscsi.h>
-#include <gpxe/settings.h>
-#include <gpxe/dhcp.h>
 #include <gpxe/netdevice.h>
 #include <gpxe/ibft.h>
-#include <gpxe/init.h>
 #include <gpxe/sanboot.h>
 #include <int13.h>
-#include <usr/autoboot.h>
 
 FILE_LICENCE ( GPL2_OR_LATER );
-
-struct setting keep_san_setting __setting = {
-	.name = "keep-san",
-	.description = "Preserve SAN connection",
-	.tag = DHCP_EB_KEEP_SAN,
-	.type = &setting_type_int8,
-};
 
 static int iscsiboot ( const char *root_path ) {
 	struct scsi_device *scsi;
 	struct int13_drive *drive;
-	int keep_san;
 	int rc;
 
 	scsi = zalloc ( sizeof ( *scsi ) );
@@ -67,12 +55,8 @@ static int iscsiboot ( const char *root_path ) {
 	printf ( "Boot failed\n" );
 
 	/* Leave drive registered, if instructed to do so */
-	keep_san = fetch_intz_setting ( NULL, &keep_san_setting );
-	if ( keep_san ) {
-		printf ( "Preserving connection to SAN disk\n" );
-		shutdown_exit_flags |= SHUTDOWN_KEEP_DEVICES;
+	if ( keep_san() )
 		return rc;
-	}
 
 	printf ( "Unregistering BIOS drive %#02x\n", drive->drive );
 	unregister_int13_drive ( drive );

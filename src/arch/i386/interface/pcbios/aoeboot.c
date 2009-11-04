@@ -49,6 +49,10 @@ static int aoeboot ( const char *root_path ) {
 	rc = int13_boot ( drive.drive );
 	printf ( "Boot failed\n" );
 
+	/* Leave drive registered, if instructed to do so */
+	if ( keep_san() )
+		return rc;
+
 	printf ( "Unregistering BIOS drive %#02x\n", drive.drive );
 	unregister_int13_drive ( &drive );
 
