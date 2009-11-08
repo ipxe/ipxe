@@ -290,6 +290,65 @@ e1000_configure_tx ( struct e1000_adapter *adapter )
         E1000_WRITE_FLUSH ( hw );
 }
 
+static void
+e1000_free_rx_resources ( struct e1000_adapter *adapter )
+{
+	int i;
+
+	DBG ( "e1000_free_rx_resources\n" );
+
+	free_dma ( adapter->rx_base, adapter->rx_ring_size );
+
+	for ( i = 0; i < NUM_RX_DESC; i++ ) {
+		free_iob ( adapter->rx_iobuf[i] );
+	}
+}
+
+/**
+ * e1000_refill_rx_ring - allocate Rx io_buffers
+ *
+ * @v adapter	e1000 private structure
+ *
+ * @ret rc       Returns 0 on success, negative on failure
+ **/
+int e1000_refill_rx_ring ( struct e1000_adapter *adapter )
+{
+	int i, rx_curr;
+	int rc = 0;
+	struct e1000_rx_desc *rx_curr_desc;
+	struct e1000_hw *hw = &adapter->hw;
+	struct io_buffer *iob;
+
+	DBG ("e1000_refill_rx_ring\n");
+
+	for ( i = 0; i < NUM_RX_DESC; i++ ) {
+		rx_curr = ( ( adapter->rx_curr + i ) % NUM_RX_DESC );
+		rx_curr_desc = adapter->rx_base + rx_curr;
+
+		if ( rx_curr_desc->status & E1000_RXD_STAT_DD )
+			continue;
+
+		if ( adapter->rx_iobuf[rx_curr] != NULL )
+			continue;
+
+		DBG2 ( "Refilling rx desc %d\n", rx_curr );
+
+		iob = alloc_iob ( MAXIMUM_ETHERNET_VLAN_SIZE );
+		adapter->rx_iobuf[rx_curr] = iob;
+
+		if ( ! iob ) {
+			DBG ( "alloc_iob failed\n" );
+			rc = -ENOMEM;
+			break;
+		} else {
+			rx_curr_desc->buffer_addr = virt_to_bus ( iob->data );
+
+			E1000_WRITE_REG ( hw, RDT, rx_curr );
+		}
+	}
+	return rc;
+}
+
 /**
  * e1000_setup_rx_resources - allocate Rx resources (Descriptors)
  *
@@ -300,8 +359,7 @@ e1000_configure_tx ( struct e1000_adapter *adapter )
 static int
 e1000_setup_rx_resources ( struct e1000_adapter *adapter )
 {
-	int i, j;
-	struct e1000_rx_desc *rx_curr_desc;
+	int i, rc = 0;
 	
 	DBG ( "e1000_setup_rx_resources\n" );
 	
@@ -311,50 +369,23 @@ e1000_setup_rx_resources ( struct e1000_adapter *adapter )
 
         adapter->rx_base = 
         	malloc_dma ( adapter->rx_ring_size, adapter->rx_ring_size );
-        		     
+
        	if ( ! adapter->rx_base ) {
        		return -ENOMEM;
 	}
 	memset ( adapter->rx_base, 0, adapter->rx_ring_size );
 
 	for ( i = 0; i < NUM_RX_DESC; i++ ) {
-	
-		adapter->rx_iobuf[i] = alloc_iob ( MAXIMUM_ETHERNET_VLAN_SIZE );
-		
-		/* If unable to allocate all iobufs, free any that
-		 * were successfully allocated, and return an error 
-		 */
-		if ( ! adapter->rx_iobuf[i] ) {
-			for ( j = 0; j < i; j++ ) {
-				free_iob ( adapter->rx_iobuf[j] );
-			}
-			return -ENOMEM;
-		}
-
-		rx_curr_desc = ( void * ) ( adapter->rx_base ) + 
-					  ( i * sizeof ( *adapter->rx_base ) ); 
-			
-		rx_curr_desc->buffer_addr = virt_to_bus ( adapter->rx_iobuf[i]->data );	
-
-		DBG ( "i = %d  rx_curr_desc->buffer_addr = %#16llx\n", 
-		      i, rx_curr_desc->buffer_addr );
-		
-	}	
-	return 0;
-}
-
-static void
-e1000_free_rx_resources ( struct e1000_adapter *adapter )
-{
-	int i;
-	
-	DBG ( "e1000_free_rx_resources\n" );
-
-        free_dma ( adapter->rx_base, adapter->rx_ring_size );
-
-	for ( i = 0; i < NUM_RX_DESC; i++ ) {
-		free_iob ( adapter->rx_iobuf[i] );
+		/* let e1000_refill_rx_ring() io_buffer allocations */
+		adapter->rx_iobuf[i] = NULL;
 	}
+
+	/* allocate io_buffers */
+	rc = e1000_refill_rx_ring ( adapter );
+	if ( rc < 0 )
+		e1000_free_rx_resources ( adapter );
+
+	return rc;
 }
 
 /**
@@ -676,12 +707,10 @@ e1000_poll ( struct net_device *netdev )
 	uint32_t rx_status;
 	uint32_t rx_len;
 	uint32_t rx_err;
-	struct io_buffer *rx_iob;
 	struct e1000_tx_desc *tx_curr_desc;
 	struct e1000_rx_desc *rx_curr_desc;
 	uint32_t i;
-	uint64_t tmp_buffer_addr;
-	
+
 	DBGP ( "e1000_poll\n" );
 
 	/* Acknowledge interrupts */
@@ -741,46 +770,37 @@ e1000_poll ( struct net_device *netdev )
 		if ( ! ( rx_status & E1000_RXD_STAT_DD ) )
 			break;
 
+		if ( adapter->rx_iobuf[i] == NULL )
+			break;
+
 		DBG ( "RCTL = %#08x\n", E1000_READ_REG ( &adapter->hw, RCTL ) );
 	
 		rx_len = rx_curr_desc->length;
 
                 DBG ( "Received packet, rx_curr: %d  rx_status: %#08x  rx_len: %d\n",
                       i, rx_status, rx_len );
-                
+
                 rx_err = rx_curr_desc->errors;
-                
+
+		iob_put ( adapter->rx_iobuf[i], rx_len );
+
 		if ( rx_err & E1000_RXD_ERR_FRAME_ERR_MASK ) {
 		
-			netdev_rx_err ( netdev, NULL, -EINVAL );
+			netdev_rx_err ( netdev, adapter->rx_iobuf[i], -EINVAL );
 			DBG ( "e1000_poll: Corrupted packet received!"
 			      " rx_err: %#08x\n", rx_err );
 		} else 	{
-		
-			/* If unable allocate space for this packet,
-			 *  try again next poll
-			 */
-			rx_iob = alloc_iob ( rx_len );
-			if ( ! rx_iob ) 
-				break;
-				
-			memcpy ( iob_put ( rx_iob, rx_len ), 
-				adapter->rx_iobuf[i]->data, rx_len );
-				
-			/* Add this packet to the receive queue. 
-			 */
-			netdev_rx ( netdev, rx_iob );
+			/* Add this packet to the receive queue. */
+			netdev_rx ( netdev, adapter->rx_iobuf[i] );
 		}
+		adapter->rx_iobuf[i] = NULL;
 
-		tmp_buffer_addr = rx_curr_desc->buffer_addr;
 		memset ( rx_curr_desc, 0, sizeof ( *rx_curr_desc ) );
-		rx_curr_desc->buffer_addr = tmp_buffer_addr;
-
-		E1000_WRITE_REG ( hw, RDT, adapter->rx_curr );
 
 		adapter->rx_curr = ( adapter->rx_curr + 1 ) % NUM_RX_DESC;
 	}
-}				
+	e1000_refill_rx_ring(adapter);
+}
 
 /**
  * e1000_irq - enable or Disable interrupts
