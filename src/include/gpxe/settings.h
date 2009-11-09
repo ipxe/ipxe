@@ -242,6 +242,7 @@ extern struct setting priority_setting __setting;
 extern struct setting uuid_setting __setting;
 extern struct setting next_server_setting __setting;
 extern struct setting mac_setting __setting;
+extern struct setting busid_setting __setting;
 extern struct setting user_class_setting __setting;
 
 /**

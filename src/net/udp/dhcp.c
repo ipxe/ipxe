@@ -932,7 +932,6 @@ int dhcp_create_packet ( struct dhcp_packet *dhcppkt,
 int dhcp_create_request ( struct dhcp_packet *dhcppkt,
 			  struct net_device *netdev, unsigned int msgtype,
 			  struct in_addr ciaddr, void *data, size_t max_len ) {
-	struct device_description *desc = &netdev->dev->desc;
 	struct dhcp_netdev_desc dhcp_desc;
 	struct dhcp_client_id client_id;
 	struct dhcp_client_uuid client_uuid;
@@ -966,9 +965,8 @@ int dhcp_create_request ( struct dhcp_packet *dhcppkt,
 	}
 
 	/* Add options to identify the network device */
-	dhcp_desc.type = desc->bus_type;
-	dhcp_desc.vendor = htons ( desc->vendor );
-	dhcp_desc.device = htons ( desc->device );
+	fetch_setting ( &netdev->settings.settings, &busid_setting, &dhcp_desc,
+		sizeof ( dhcp_desc ) );
 	if ( ( rc = dhcppkt_store ( dhcppkt, DHCP_EB_BUS_ID, &dhcp_desc,
 				    sizeof ( dhcp_desc ) ) ) != 0 ) {
 		DBG ( "DHCP could not set bus ID option: %s\n",
