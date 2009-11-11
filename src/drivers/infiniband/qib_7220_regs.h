@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2008 QLogic Corporation. All rights reserved.
+ * Copyright (c) 2008, 2009 QLogic Corporation. All rights reserved.
  *
  *
  * This software is available to you under a choice of one of two
@@ -30,9 +30,8 @@
  * CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
  * SOFTWARE.
  *
- * This file is mechanically generated. Any hand-edits will be lost.
- * If not now, soon.
  */
+/* This file is mechanically generated from RTL. Any hand-edits will be lost! */
 
 /* This file has been further processed by ./drivers/infiniband/qib_genbits.pl */
 
@@ -45,8 +44,8 @@ struct QIB_7220_Revision_pb {
 	pseudo_bit_t R_Arch[8];
 	pseudo_bit_t R_SW[8];
 	pseudo_bit_t BoardID[8];
-	pseudo_bit_t R_Palldium_Revcode[22];
-	pseudo_bit_t R_Palladium[1];
+	pseudo_bit_t R_Emulation_Revcode[22];
+	pseudo_bit_t R_Emulation[1];
 	pseudo_bit_t R_Simulator[1];
 };
 struct QIB_7220_Revision {
@@ -1251,7 +1250,6 @@ struct QIB_7220_SendDmaReqTagUsed_pb {
 	pseudo_bit_t ReqTagUsed_7_0[8];
 	pseudo_bit_t _unused_0[8];
 	pseudo_bit_t Reserved[48];
-	pseudo_bit_t _unused_1[8];
 };
 struct QIB_7220_SendDmaReqTagUsed {
 	PSEUDO_BIT_STRUCT ( struct QIB_7220_SendDmaReqTagUsed_pb );
