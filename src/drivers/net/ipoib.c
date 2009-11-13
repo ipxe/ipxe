@@ -71,7 +71,7 @@ struct ipoib_device {
 
 /** Broadcast IPoIB address */
 static struct ipoib_mac ipoib_broadcast = {
-	.qpn = htonl ( IB_QPN_BROADCAST ),
+	.flags__qpn = htonl ( IB_QPN_BROADCAST ),
 	.gid.u.bytes = 	{ 0xff, 0x12, 0x40, 0x1b, 0x00, 0x00, 0x00, 0x00,
 			  0x00, 0x00, 0x00, 0x00, 0xff, 0xff, 0xff, 0xff },
 };
@@ -146,8 +146,7 @@ static struct ipoib_peer * ipoib_lookup_peer_by_key ( unsigned int key ) {
 /**
  * Store GID and QPN in peer cache
  *
- * @v gid		Peer GID
- * @v qpn		Peer QPN
+ * @v mac		Peer MAC address
  * @ret peer		Peer cache entry
  */
 static struct ipoib_peer * ipoib_cache_peer ( const struct ipoib_mac *mac ) {
@@ -283,7 +282,7 @@ const char * ipoib_ntoa ( const void *ll_addr ) {
 	const struct ipoib_mac *mac = ll_addr;
 
 	snprintf ( buf, sizeof ( buf ), "%08x:%08x:%08x:%08x:%08x",
-		   htonl ( mac->qpn ), htonl ( mac->gid.u.dwords[0] ),
+		   htonl ( mac->flags__qpn ), htonl ( mac->gid.u.dwords[0] ),
 		   htonl ( mac->gid.u.dwords[1] ),
 		   htonl ( mac->gid.u.dwords[2] ),
 		   htonl ( mac->gid.u.dwords[3] ) );
@@ -438,7 +437,7 @@ static int ipoib_transmit ( struct net_device *netdev,
 
 	/* Construct address vector */
 	memset ( &av, 0, sizeof ( av ) );
-	av.qpn = ntohl ( dest->mac.qpn );
+	av.qpn = ( ntohl ( dest->mac.flags__qpn ) & IB_QPN_MASK );
 	av.gid_present = 1;
 	memcpy ( &av.gid, &dest->mac.gid, sizeof ( av.gid ) );
 	if ( ( rc = ib_resolve_path ( ibdev, &av ) ) != 0 ) {
@@ -501,7 +500,7 @@ static void ipoib_complete_recv ( struct ib_device *ibdev __unused,
 
 	/* Parse source address */
 	if ( av->gid_present ) {
-		ll_src.qpn = htonl ( av->qpn );
+		ll_src.flags__qpn = htonl ( av->qpn );
 		memcpy ( &ll_src.gid, &av->gid, sizeof ( ll_src.gid ) );
 		src = ipoib_cache_peer ( &ll_src );
 		ipoib_hdr->u.peer.src = src->key;
@@ -637,7 +636,7 @@ static int ipoib_open ( struct net_device *netdev ) {
 	ib_qp_set_ownerdata ( ipoib->qp, ipoib );
 
 	/* Update MAC address with QPN */
-	mac->qpn = htonl ( ipoib->qp->qpn );
+	mac->flags__qpn = htonl ( ipoib->qp->qpn );
 
 	/* Fill receive rings */
 	ib_refill_recv ( ibdev, ipoib->qp );
@@ -670,7 +669,7 @@ static void ipoib_close ( struct net_device *netdev ) {
 	ipoib_leave_broadcast_group ( ipoib );
 
 	/* Remove QPN from MAC address */
-	mac->qpn = 0;
+	mac->flags__qpn = 0;
 
 	/* Tear down the queues */
 	ib_destroy_qp ( ibdev, ipoib->qp );

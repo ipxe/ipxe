@@ -17,9 +17,10 @@ FILE_LICENCE ( GPL2_OR_LATER );
 struct ipoib_mac {
 	/** Queue pair number
 	 *
-	 * MSB must be zero; QPNs are only 24-bit.
+	 * MSB indicates support for IPoIB "connected mode".  Lower 24
+	 * bits are the QPN.
 	 */
-	uint32_t qpn;
+	uint32_t flags__qpn;
 	/** Port GID */
 	struct ib_gid gid;
 } __attribute__ (( packed ));

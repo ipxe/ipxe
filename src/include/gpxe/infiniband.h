@@ -30,6 +30,9 @@ FILE_LICENCE ( GPL2_OR_LATER );
 /** Broadcast QPN */
 #define IB_QPN_BROADCAST 0xffffffUL
 
+/** QPN mask */
+#define IB_QPN_MASK 0xffffffUL
+
 /** Default Infiniband partition key */
 #define IB_PKEY_DEFAULT 0xffff
 
