@@ -867,7 +867,7 @@ struct ib_device * alloc_ibdev ( size_t priv_size ) {
 		INIT_LIST_HEAD ( &ibdev->qps );
 		ibdev->port_state = IB_PORT_STATE_DOWN;
 		ibdev->lid = IB_LID_NONE;
-		ibdev->pkey = IB_PKEY_NONE;
+		ibdev->pkey = IB_PKEY_DEFAULT;
 	}
 	return ibdev;
 }

@@ -31,7 +31,7 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #define IB_QPN_BROADCAST 0xffffffUL
 
 /** Default Infiniband partition key */
-#define IB_PKEY_NONE 0xffff
+#define IB_PKEY_DEFAULT 0xffff
 
 /**
  * Maximum payload size

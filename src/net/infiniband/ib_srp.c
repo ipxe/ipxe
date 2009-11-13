@@ -218,7 +218,7 @@ static int ib_srp_parse_pkey ( const char *rp_comp,
 			       struct ib_srp_root_path *rp ) {
 	int pkey;
 
-	if ( ( pkey = ib_srp_parse_integer ( rp_comp, IB_PKEY_NONE ) ) < 0 )
+	if ( ( pkey = ib_srp_parse_integer ( rp_comp, IB_PKEY_DEFAULT ) ) < 0 )
 		return pkey;
 	rp->ib->pkey = pkey;
 	return 0;
