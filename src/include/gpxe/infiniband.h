@@ -33,6 +33,9 @@ FILE_LICENCE ( GPL2_OR_LATER );
 /** Default Infiniband partition key */
 #define IB_PKEY_DEFAULT 0xffff
 
+/** Infiniband partition key full membership flag */
+#define IB_PKEY_FULL 0x8000
+
 /**
  * Maximum payload size
  *

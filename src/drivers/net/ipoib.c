@@ -708,7 +708,8 @@ void ipoib_link_state_changed ( struct ib_device *ibdev ) {
 		 sizeof ( mac->gid.u.half[0] ) );
 
 	/* Update broadcast GID based on potentially-new partition key */
-	ipoib->broadcast.gid.u.words[2] = htons ( ibdev->pkey );
+	ipoib->broadcast.gid.u.words[2] =
+		htons ( ibdev->pkey | IB_PKEY_FULL );
 
 	/* Set net device link state to reflect Infiniband link state */
 	rc = ib_link_rc ( ibdev );
