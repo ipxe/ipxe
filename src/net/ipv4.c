@@ -600,18 +600,18 @@ static int ipv4_create_routes ( void ) {
 		fetch_ipv4_setting ( settings, &ip_setting, &address );
 		if ( ! address.s_addr )
 			continue;
-		/* Calculate default netmask */
-		if ( IN_CLASSA ( ntohl ( address.s_addr ) ) ) {
-			netmask.s_addr = htonl ( IN_CLASSA_NET );
-		} else if ( IN_CLASSB ( ntohl ( address.s_addr ) ) ) {
-			netmask.s_addr = htonl ( IN_CLASSB_NET );
-		} else if ( IN_CLASSC ( ntohl ( address.s_addr ) ) ) {
-			netmask.s_addr = htonl ( IN_CLASSC_NET );
-		} else {
-			netmask.s_addr = 0;
-		}
-		/* Override with subnet mask, if present */
+		/* Get subnet mask */
 		fetch_ipv4_setting ( settings, &netmask_setting, &netmask );
+		/* Calculate default netmask, if necessary */
+		if ( ! netmask.s_addr ) {
+			if ( IN_CLASSA ( ntohl ( address.s_addr ) ) ) {
+				netmask.s_addr = htonl ( IN_CLASSA_NET );
+			} else if ( IN_CLASSB ( ntohl ( address.s_addr ) ) ) {
+				netmask.s_addr = htonl ( IN_CLASSB_NET );
+			} else if ( IN_CLASSC ( ntohl ( address.s_addr ) ) ) {
+				netmask.s_addr = htonl ( IN_CLASSC_NET );
+			}
+		}
 		/* Get default gateway, if present */
 		fetch_ipv4_setting ( settings, &gateway_setting, &gateway );
 		/* Configure route */
