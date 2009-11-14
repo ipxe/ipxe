@@ -36,7 +36,7 @@ void route ( void ) {
 		printf ( "%s: %s/", miniroute->netdev->name,
 			 inet_ntoa ( miniroute->address ) );
 		printf ( "%s", inet_ntoa ( miniroute->netmask ) );
-		if ( miniroute->gateway.s_addr != INADDR_NONE )
+		if ( miniroute->gateway.s_addr )
 			printf ( " gw %s", inet_ntoa ( miniroute->gateway ) );
 		if ( ! ( miniroute->netdev->state & NETDEV_OPEN ) )
 			printf ( " (inaccessible)" );

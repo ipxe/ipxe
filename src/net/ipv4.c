@@ -40,7 +40,7 @@ static LIST_HEAD ( frag_buffers );
  * @v netdev		Network device
  * @v address		IPv4 address
  * @v netmask		Subnet mask
- * @v gateway		Gateway address (or @c INADDR_NONE for no gateway)
+ * @v gateway		Gateway address (if any)
  * @ret miniroute	Routing table entry, or NULL
  */
 static struct ipv4_miniroute * __malloc
@@ -50,7 +50,7 @@ add_ipv4_miniroute ( struct net_device *netdev, struct in_addr address,
 
 	DBG ( "IPv4 add %s", inet_ntoa ( address ) );
 	DBG ( "/%s ", inet_ntoa ( netmask ) );
-	if ( gateway.s_addr != INADDR_NONE )
+	if ( gateway.s_addr )
 		DBG ( "gw %s ", inet_ntoa ( gateway ) );
 	DBG ( "via %s\n", netdev->name );
 
@@ -70,7 +70,7 @@ add_ipv4_miniroute ( struct net_device *netdev, struct in_addr address,
 	/* Add to end of list if we have a gateway, otherwise
 	 * to start of list.
 	 */
-	if ( gateway.s_addr != INADDR_NONE ) {
+	if ( gateway.s_addr ) {
 		list_add_tail ( &miniroute->list, &ipv4_miniroutes );
 	} else {
 		list_add ( &miniroute->list, &ipv4_miniroutes );
@@ -88,7 +88,7 @@ static void del_ipv4_miniroute ( struct ipv4_miniroute *miniroute ) {
 
 	DBG ( "IPv4 del %s", inet_ntoa ( miniroute->address ) );
 	DBG ( "/%s ", inet_ntoa ( miniroute->netmask ) );
-	if ( miniroute->gateway.s_addr != INADDR_NONE )
+	if ( miniroute->gateway.s_addr )
 		DBG ( "gw %s ", inet_ntoa ( miniroute->gateway ) );
 	DBG ( "via %s\n", miniroute->netdev->name );
 
@@ -120,7 +120,7 @@ static struct ipv4_miniroute * ipv4_route ( struct in_addr *dest ) {
 	list_for_each_entry ( miniroute, &ipv4_miniroutes, list ) {
 		local = ( ( ( dest->s_addr ^ miniroute->address.s_addr )
 			    & miniroute->netmask.s_addr ) == 0 );
-		has_gw = ( miniroute->gateway.s_addr != INADDR_NONE );
+		has_gw = ( miniroute->gateway.s_addr );
 		if ( local || has_gw ) {
 			if ( ! local )
 				*dest = miniroute->gateway;
@@ -586,7 +586,7 @@ static int ipv4_create_routes ( void ) {
 	struct settings *settings;
 	struct in_addr address = { 0 };
 	struct in_addr netmask = { 0 };
-	struct in_addr gateway = { INADDR_NONE };
+	struct in_addr gateway = { 0 };
 
 	/* Delete all existing routes */
 	list_for_each_entry_safe ( miniroute, tmp, &ipv4_miniroutes, list )
@@ -613,7 +613,6 @@ static int ipv4_create_routes ( void ) {
 		/* Override with subnet mask, if present */
 		fetch_ipv4_setting ( settings, &netmask_setting, &netmask );
 		/* Get default gateway, if present */
-		gateway.s_addr = INADDR_NONE;
 		fetch_ipv4_setting ( settings, &gateway_setting, &gateway );
 		/* Configure route */
 		miniroute = add_ipv4_miniroute ( netdev, address,
