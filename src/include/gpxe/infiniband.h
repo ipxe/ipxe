@@ -463,6 +463,7 @@ extern void ib_refill_recv ( struct ib_device *ibdev,
 			     struct ib_queue_pair *qp );
 extern int ib_open ( struct ib_device *ibdev );
 extern void ib_close ( struct ib_device *ibdev );
+extern int ib_link_rc ( struct ib_device *ibdev );
 extern int ib_mcast_attach ( struct ib_device *ibdev, struct ib_queue_pair *qp,
 			     struct ib_gid *gid );
 extern void ib_mcast_detach ( struct ib_device *ibdev,

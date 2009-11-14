@@ -27,6 +27,7 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #include <errno.h>
 #include <assert.h>
 #include <gpxe/list.h>
+#include <gpxe/errortab.h>
 #include <gpxe/if_arp.h>
 #include <gpxe/netdevice.h>
 #include <gpxe/iobuf.h>
@@ -47,6 +48,16 @@ struct list_head ib_devices = LIST_HEAD_INIT ( ib_devices );
 
 /** List of open Infiniband devices, in reverse order of opening */
 static struct list_head open_ib_devices = LIST_HEAD_INIT ( open_ib_devices );
+
+/* Disambiguate the various possible EINPROGRESSes */
+#define EINPROGRESS_INIT ( EINPROGRESS | EUNIQ_01 )
+#define EINPROGRESS_ARMED ( EINPROGRESS | EUNIQ_02 )
+
+/** Human-readable message for the link statuses */
+struct errortab infiniband_errors[] __errortab = {
+	{ EINPROGRESS_INIT, "Initialising" },
+	{ EINPROGRESS_ARMED, "Armed" },
+};
 
 /***************************************************************************
  *
@@ -607,6 +618,22 @@ void ib_close ( struct ib_device *ibdev ) {
 	}
 }
 
+/**
+ * Get link state
+ *
+ * @v ibdev		Infiniband device
+ * @ret rc		Link status code
+ */
+int ib_link_rc ( struct ib_device *ibdev ) {
+	switch ( ibdev->port_state ) {
+	case IB_PORT_STATE_DOWN:	return -ENOTCONN;
+	case IB_PORT_STATE_INIT:	return -EINPROGRESS_INIT;
+	case IB_PORT_STATE_ARMED:	return -EINPROGRESS_ARMED;
+	case IB_PORT_STATE_ACTIVE:	return 0;
+	default:			return -EINVAL;
+	}
+}
+
 /***************************************************************************
  *
  * Multicast
@@ -838,6 +865,7 @@ struct ib_device * alloc_ibdev ( size_t priv_size ) {
 		ib_set_drvdata ( ibdev, drv_priv );
 		INIT_LIST_HEAD ( &ibdev->cqs );
 		INIT_LIST_HEAD ( &ibdev->qps );
+		ibdev->port_state = IB_PORT_STATE_DOWN;
 		ibdev->lid = IB_LID_NONE;
 		ibdev->pkey = IB_PKEY_NONE;
 	}

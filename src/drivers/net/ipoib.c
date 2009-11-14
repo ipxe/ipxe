@@ -24,6 +24,7 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #include <string.h>
 #include <byteswap.h>
 #include <errno.h>
+#include <gpxe/errortab.h>
 #include <gpxe/if_arp.h>
 #include <gpxe/iobuf.h>
 #include <gpxe/netdevice.h>
@@ -73,6 +74,14 @@ static struct ipoib_mac ipoib_broadcast = {
 	.qpn = htonl ( IB_QPN_BROADCAST ),
 	.gid.u.bytes = 	{ 0xff, 0x12, 0x40, 0x1b, 0x00, 0x00, 0x00, 0x00,
 			  0x00, 0x00, 0x00, 0x00, 0xff, 0xff, 0xff, 0xff },
+};
+
+/** Link status for "broadcast join in progress" */
+#define EINPROGRESS_JOINING ( EINPROGRESS | EUNIQ_01 )
+
+/** Human-readable message for the link status */
+struct errortab ipoib_errors[] __errortab = {
+	{ EINPROGRESS_JOINING, "Joining" },
 };
 
 /****************************************************************************
@@ -702,17 +711,15 @@ void ipoib_link_state_changed ( struct ib_device *ibdev ) {
 	ipoib->broadcast.gid.u.words[2] = htons ( ibdev->pkey );
 
 	/* Set net device link state to reflect Infiniband link state */
-	if ( ib_link_ok ( ibdev ) ) {
-		netdev_link_up ( netdev );
-	} else {
-		netdev_link_down ( netdev );
-	}
+	rc = ib_link_rc ( ibdev );
+	netdev_link_err ( netdev, ( rc ? rc : -EINPROGRESS_JOINING ) );
 
 	/* Join new broadcast group */
 	if ( ib_link_ok ( ibdev ) &&
 	     ( ( rc = ipoib_join_broadcast_group ( ipoib ) ) != 0 ) ) {
 		DBGC ( ipoib, "IPoIB %p could not rejoin broadcast group: "
 		       "%s\n", ipoib, strerror ( rc ) );
+		netdev_link_err ( netdev, rc );
 		return;
 	}
 }
