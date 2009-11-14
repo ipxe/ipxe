@@ -24,14 +24,13 @@ FILE_LICENCE ( GPL2_OR_LATER );
  * Find error description
  *
  * @v errno		Error number
- * @v mask		Mask of bits that we care about
  * @ret errortab	Error description, or NULL
  */
-static struct errortab * find_error ( int errno, int mask ) {
+static struct errortab * find_error ( int errno ) {
 	struct errortab *errortab;
 
 	for_each_table_entry ( errortab, ERRORTAB ) {
-		if ( ( ( errortab->errno ^ errno ) & mask ) == 0 )
+		if ( errortab->errno == errno )
 			return errortab;
 	}
 
@@ -50,13 +49,13 @@ static struct errortab * find_closest_error ( int errno ) {
 	struct errortab *errortab;
 
 	/* First, look for an exact match */
-	if ( ( errortab = find_error ( errno, 0x7fffffff ) ) != NULL )
+	if ( ( errortab = find_error ( errno ) ) != NULL )
 		return errortab;
 
 	/* Second, try masking off the gPXE-specific bit and seeing if
 	 * we have an entry for the generic POSIX error message.
 	 */
-	if ( ( errortab = find_error ( errno, 0x4f0000ff ) ) != NULL )
+	if ( ( errortab = find_error ( errno & 0x7f0000ff ) ) != NULL )
 		return errortab;
 
 	return NULL;
