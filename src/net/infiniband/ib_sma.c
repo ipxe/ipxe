@@ -87,16 +87,17 @@ static void ib_sma_node_desc ( struct ib_device *ibdev,
 			       union ib_mad *mad,
 			       struct ib_address_vector *av ) {
 	struct ib_node_desc *node_desc = &mad->smp.smp_data.node_desc;
-	struct ib_gid_half *guid = &ibdev->gid.u.half[1];
+	struct ib_gid_half guid;
 	int rc;
 
 	/* Fill in information */
 	memset ( node_desc, 0, sizeof ( *node_desc ) );
+	ib_get_hca_info ( ibdev, &guid );
 	snprintf ( node_desc->node_string, sizeof ( node_desc->node_string ),
 		   "gPXE %02x:%02x:%02x:%02x:%02x:%02x:%02x:%02x (%s)",
-		   guid->u.bytes[0], guid->u.bytes[1], guid->u.bytes[2],
-		   guid->u.bytes[3], guid->u.bytes[4], guid->u.bytes[5],
-		   guid->u.bytes[6], guid->u.bytes[7], ibdev->dev->name );
+		   guid.u.bytes[0], guid.u.bytes[1], guid.u.bytes[2],
+		   guid.u.bytes[3], guid.u.bytes[4], guid.u.bytes[5],
+		   guid.u.bytes[6], guid.u.bytes[7], ibdev->dev->name );
 
 	/* Send GetResponse */
 	mad->hdr.method = IB_MGMT_METHOD_GET_RESP;
