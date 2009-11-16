@@ -25,6 +25,7 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #include <stdio.h>
 #include <unistd.h>
 #include <byteswap.h>
+#include <gpxe/settings.h>
 #include <gpxe/infiniband.h>
 #include <gpxe/iobuf.h>
 #include <gpxe/ib_mi.h>
@@ -88,13 +89,18 @@ static void ib_sma_node_desc ( struct ib_device *ibdev,
 			       struct ib_address_vector *av ) {
 	struct ib_node_desc *node_desc = &mad->smp.smp_data.node_desc;
 	struct ib_gid_half guid;
+	char hostname[ sizeof ( node_desc->node_string ) ];
+	int hostname_len;
 	int rc;
 
 	/* Fill in information */
 	memset ( node_desc, 0, sizeof ( *node_desc ) );
 	ib_get_hca_info ( ibdev, &guid );
+	hostname_len = fetch_string_setting ( NULL, &hostname_setting,
+					      hostname, sizeof ( hostname ) );
 	snprintf ( node_desc->node_string, sizeof ( node_desc->node_string ),
-		   "gPXE %02x:%02x:%02x:%02x:%02x:%02x:%02x:%02x (%s)",
+		   "gPXE %s%s%02x:%02x:%02x:%02x:%02x:%02x:%02x:%02x (%s)",
+		   hostname, ( ( hostname_len >= 0 ) ? " " : "" ),
 		   guid.u.bytes[0], guid.u.bytes[1], guid.u.bytes[2],
 		   guid.u.bytes[3], guid.u.bytes[4], guid.u.bytes[5],
 		   guid.u.bytes[6], guid.u.bytes[7], ibdev->dev->name );
