@@ -239,6 +239,32 @@ static void linda_link_state_changed ( struct ib_device *ibdev ) {
 }
 
 /**
+ * Wait for link state change to take effect
+ *
+ * @v linda		Linda device
+ * @v new_link_state	Expected link state
+ * @ret rc		Return status code
+ */
+static int linda_link_state_check ( struct linda *linda,
+				    unsigned int new_link_state ) {
+	struct QIB_7220_IBCStatus ibcstatus;
+	unsigned int link_state;
+	unsigned int i;
+
+	for ( i = 0 ; i < LINDA_LINK_STATE_MAX_WAIT_US ; i++ ) {
+		linda_readq ( linda, &ibcstatus, QIB_7220_IBCStatus_offset );
+		link_state = BIT_GET ( &ibcstatus, LinkState );
+		if ( link_state == new_link_state )
+			return 0;
+		udelay ( 1 );
+	}
+
+	DBGC ( linda, "Linda %p timed out waiting for link state %s\n",
+	       linda, linda_link_state_text ( link_state ) );
+	return -ETIMEDOUT;
+}
+
+/**
  * Set port information
  *
  * @v ibdev		Infiniband device
@@ -260,6 +286,12 @@ static int linda_set_port_info ( struct ib_device *ibdev, union ib_mad *mad ) {
 		linda_readq ( linda, &ibcctrl, QIB_7220_IBCCtrl_offset );
 		BIT_SET ( &ibcctrl, LinkCmd, link_state );
 		linda_writeq ( linda, &ibcctrl, QIB_7220_IBCCtrl_offset );
+
+		/* Wait for link state change to take effect.  Ignore
+		 * errors; the current link state will be returned via
+		 * the GetResponse MAD.
+		 */
+		linda_link_state_check ( linda, link_state );
 	}
 
 	/* Detect and report link state change */

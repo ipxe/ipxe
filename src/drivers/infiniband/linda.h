@@ -270,4 +270,7 @@ enum linda_link_state {
 	LINDA_LINK_STATE_ACT_DEFER = 4,
 };
 
+/** Maximum time to wait for link state changes, in us */
+#define LINDA_LINK_STATE_MAX_WAIT_US 20
+
 #endif /* _LINDA_H */
