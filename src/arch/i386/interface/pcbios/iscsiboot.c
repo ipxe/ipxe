@@ -27,8 +27,6 @@ static int iscsiboot ( const char *root_path ) {
 		goto err_alloc_drive;
 	}
 
-	printf ( "iSCSI booting from %s\n", root_path );
-
 	if ( ( rc = iscsi_attach ( scsi, root_path ) ) != 0 ) {
 		printf ( "Could not attach iSCSI device: %s\n",
 			 strerror ( rc ) );

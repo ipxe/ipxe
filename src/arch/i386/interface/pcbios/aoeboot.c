@@ -20,8 +20,6 @@ static int aoeboot ( const char *root_path ) {
 	memset ( &ata, 0, sizeof ( ata ) );
 	memset ( &drive, 0, sizeof ( drive ) );
 
-	printf ( "AoE booting from %s\n", root_path );
-
 	/* FIXME: ugly, ugly hack */
 	struct net_device *netdev = last_opened_netdev();
 

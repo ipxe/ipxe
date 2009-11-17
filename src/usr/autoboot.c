@@ -67,10 +67,8 @@ int boot_next_server_and_filename ( struct in_addr next_server,
 
 	/* Construct URI */
 	uri = parse_uri ( filename );
-	if ( ! uri ) {
-		printf ( "Out of memory\n" );
+	if ( ! uri )
 		return -ENOMEM;
-	}
 	filename_is_absolute = uri_is_absolute ( uri );
 	uri_put ( uri );
 	if ( ! filename_is_absolute ) {
@@ -86,21 +84,14 @@ int boot_next_server_and_filename ( struct in_addr next_server,
 	}
 
 	image = alloc_image();
-	if ( ! image ) {
-		printf ( "Out of memory\n" );
+	if ( ! image )
 		return -ENOMEM;
-	}
 	if ( ( rc = imgfetch ( image, filename,
 			       register_and_autoload_image ) ) != 0 ) {
-		printf ( "Could not load %s: %s\n",
-			 filename, strerror ( rc ) );
 		goto done;
 	}
-	if ( ( rc = imgexec ( image ) ) != 0 ) {
-		printf ( "Could not boot %s: %s\n",
-			 filename, strerror ( rc ) );
+	if ( ( rc = imgexec ( image ) ) != 0 )
 		goto done;
-	}
 
  done:
 	image_put ( image );
@@ -173,14 +164,25 @@ static int netboot ( struct net_device *netdev ) {
 	fetch_string_setting ( NULL, &filename_setting, buf, sizeof ( buf ) );
 	if ( buf[0] ) {
 		printf ( "Booting from filename \"%s\"\n", buf );
-		return boot_next_server_and_filename ( next_server, buf );
+		if ( ( rc = boot_next_server_and_filename ( next_server,
+							    buf ) ) != 0 ) {
+			printf ( "Could not boot from filename \"%s\": %s\n",
+				 buf, strerror ( rc ) );
+			return rc;
+		}
+		return 0;
 	}
 	
 	/* No filename; try the root path */
 	fetch_string_setting ( NULL, &root_path_setting, buf, sizeof ( buf ) );
 	if ( buf[0] ) {
 		printf ( "Booting from root path \"%s\"\n", buf );
-		return boot_root_path ( buf );
+		if ( ( rc = boot_root_path ( buf ) ) != 0 ) {
+			printf ( "Could not boot from root path \"%s\": %s\n",
+				 buf, strerror ( rc ) );
+			return rc;
+		}
+		return 0;
 	}
 
 	printf ( "No filename or root path specified\n" );
