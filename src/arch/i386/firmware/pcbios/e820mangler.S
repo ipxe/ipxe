@@ -237,6 +237,7 @@ get_underlying_e820:
 	popw	%di
 	incw	%bx
 	movl	%edx, %eax
+	clc
 	ret
 2:	
 	/* If the requested region is earlier than the cached region,
