@@ -207,9 +207,13 @@ static int int13_get_parameters ( struct int13_drive *drive,
  */
 static int int13_get_disk_type ( struct int13_drive *drive,
 				 struct i386_all_regs *ix86 ) {
+	uint32_t blocks;
+
 	DBG ( "Get disk type\n" );
-	ix86->regs.cx = ( drive->cylinders >> 16 );
-	ix86->regs.dx = ( drive->cylinders & 0xffff );
+	blocks = ( ( drive->blockdev->blocks <= 0xffffffffUL ) ?
+		   drive->blockdev->blocks : 0xffffffffUL );
+	ix86->regs.cx = ( blocks >> 16 );
+	ix86->regs.dx = ( blocks & 0xffff );
 	return INT13_DISK_TYPE_HDD;
 }
 
