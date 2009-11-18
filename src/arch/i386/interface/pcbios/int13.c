@@ -52,6 +52,48 @@ extern void int13_wrapper ( void );
 static LIST_HEAD ( drives );
 
 /**
+ * Number of BIOS drives
+ *
+ * Note that this is the number of drives in the system as a whole
+ * (i.e. a mirror of the counter at 40:75), rather than a count of the
+ * number of emulated drives.
+ */
+static uint8_t num_drives;
+
+/**
+ * Update BIOS drive count
+ */
+static void int13_set_num_drives ( void ) {
+	struct int13_drive *drive;
+
+	/* Get current drive count */
+	get_real ( num_drives, BDA_SEG, BDA_NUM_DRIVES );
+
+	/* Ensure count is large enough to cover all of our emulated drives */
+	list_for_each_entry ( drive, &drives, list ) {
+		if ( num_drives <= ( drive->drive & 0x7f ) )
+			num_drives = ( ( drive->drive & 0x7f ) + 1 );
+	}
+
+	/* Update current drive count */
+	put_real ( num_drives, BDA_SEG, BDA_NUM_DRIVES );
+}
+
+/**
+ * Check number of drives
+ */
+static void int13_check_num_drives ( void ) {
+	uint8_t check_num_drives;
+
+	get_real ( check_num_drives, BDA_SEG, BDA_NUM_DRIVES );
+	if ( check_num_drives != num_drives ) {
+		int13_set_num_drives();
+		DBG ( "INT13 fixing up number of drives from %d to %d\n",
+		      check_num_drives, num_drives );
+	}
+}
+
+/**
  * INT 13, 00 - Reset disk system
  *
  * @v drive		Emulated drive
@@ -340,6 +382,9 @@ static __asmcall void int13 ( struct i386_all_regs *ix86 ) {
 	struct int13_drive *drive;
 	int status;
 
+	/* Check BIOS hasn't killed off our drive */
+	int13_check_num_drives();
+
 	list_for_each_entry ( drive, &drives, list ) {
 
 		if ( bios_drive != drive->drive ) {
@@ -555,7 +600,6 @@ void register_int13_drive ( struct int13_drive *drive ) {
 	/* Assign natural drive number */
 	get_real ( num_drives, BDA_SEG, BDA_NUM_DRIVES );
 	drive->natural_drive = ( num_drives | 0x80 );
-	num_drives++;
 
 	/* Assign drive number */
 	if ( ( drive->drive & 0xff ) == 0xff ) {
@@ -564,12 +608,7 @@ void register_int13_drive ( struct int13_drive *drive ) {
 	} else {
 		/* Use specified drive number (+0x80 if necessary) */
 		drive->drive |= 0x80;
-		if ( num_drives <= ( drive->drive & 0x7f ) )
-			num_drives = ( ( drive->drive & 0x7f ) + 1 );
 	}
-
-	/* Update BIOS drive count */
-	put_real ( num_drives, BDA_SEG, BDA_NUM_DRIVES );
 
 	DBG ( "Registered INT13 drive %02x (naturally %02x) with C/H/S "
 	      "geometry %d/%d/%d\n", drive->drive, drive->natural_drive,
@@ -581,6 +620,9 @@ void register_int13_drive ( struct int13_drive *drive ) {
 
 	/* Add to list of emulated drives */
 	list_add ( &drive->list, &drives );
+
+	/* Update BIOS drive count */
+	int13_set_num_drives();
 }
 
 /**
