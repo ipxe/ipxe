@@ -2299,6 +2299,7 @@ struct e1000_host_command_info {
 #define EEPROM_INIT_CONTROL3_PORT_A   0x0024
 #define EEPROM_CFG                    0x0012
 #define EEPROM_FLASH_VERSION          0x0032
+#define EEPROM_ALT_MAC_ADDR_PTR       0x0037
 #define EEPROM_CHECKSUM_REG           0x003F
 
 #define E1000_EEPROM_CFG_DONE         0x00040000   /* MNG config cycle done */

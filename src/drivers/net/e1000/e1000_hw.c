@@ -728,6 +728,17 @@ e1000_reset_hw(struct e1000_hw *hw)
     /* Clear any pending interrupt events. */
     icr = E1000_READ_REG(hw, ICR);
 
+    if (hw->mac_type == e1000_82571 && hw->laa_is_present == TRUE) {
+        /*
+         * Hold a copy of the LAA in RAR[14] This is done so that
+         * between the time RAR[0] gets clobbered and the time it
+         * gets fixed, the actual LAA is in one of the RARs and no
+         * incoming packets directed to this port are dropped.
+         * Eventually the LAA will be in RAR[0] and RAR[14].
+         */
+        e1000_rar_set(hw, hw->mac_addr, E1000_RAR_ENTRIES - 1);
+    }
+
     /* If MWI was previously enabled, reenable it. */
     if (hw->mac_type == e1000_82542_rev2_0) {
         if (hw->pci_cmd_word & PCI_COMMAND_INVALIDATE)
@@ -5774,13 +5785,48 @@ e1000_commit_shadow_ram(struct e1000_hw *hw)
 int32_t
 e1000_read_mac_addr(struct e1000_hw * hw)
 {
-    uint16_t offset;
+    uint16_t offset, mac_addr_offset = 0;
     uint16_t eeprom_data, i;
+    int32_t ret_val;
 
     DEBUGFUNC("e1000_read_mac_addr");
 
+    if (hw->mac_type == e1000_82571) {
+        /* Check for an alternate MAC address.  An alternate MAC
+         * address can be setup by pre-boot software and must be
+         * treated like a permanent address and must override the
+         * actual permanent MAC address.*/
+        ret_val = e1000_read_eeprom(hw, EEPROM_ALT_MAC_ADDR_PTR, 1,
+                                    &mac_addr_offset);
+        if (ret_val) {
+            DEBUGOUT("EEPROM Read Error\n");
+            return -E1000_ERR_EEPROM;
+        }
+        if (mac_addr_offset == 0xFFFF)
+            mac_addr_offset = 0;
+
+        if (mac_addr_offset) {
+            if (E1000_READ_REG(hw, STATUS) & E1000_STATUS_FUNC_1)
+                mac_addr_offset += NODE_ADDRESS_SIZE/sizeof(u16);
+
+                /* make sure we have a valid mac address here
+                 * before using it */
+               ret_val = e1000_read_eeprom(hw, mac_addr_offset, 1,
+                                           &eeprom_data);
+               if (ret_val) {
+                   DEBUGOUT("EEPROM Read Error\n");
+                   return -E1000_ERR_EEPROM;
+               }
+               if (eeprom_data & 0x0001)
+                   mac_addr_offset = 0;
+        }
+
+        if (mac_addr_offset)
+            hw->laa_is_present = TRUE;
+    }
+
     for (i = 0; i < NODE_ADDRESS_SIZE; i += 2) {
-        offset = i >> 1;
+        offset = mac_addr_offset + (i >> 1);
         if (e1000_read_eeprom(hw, offset, 1, &eeprom_data) < 0) {
             DEBUGOUT("EEPROM Read Error\n");
             return -E1000_ERR_EEPROM;
@@ -5797,7 +5843,8 @@ e1000_read_mac_addr(struct e1000_hw * hw)
     case e1000_82571:
     case e1000_82576:
     case e1000_80003es2lan:
-        if (E1000_READ_REG(hw, STATUS) & E1000_STATUS_FUNC_1)
+        if (!mac_addr_offset &&
+            E1000_READ_REG(hw, STATUS) & E1000_STATUS_FUNC_1)
             hw->perm_mac_addr[5] ^= 0x01;
         break;
     }
