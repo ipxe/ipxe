@@ -85,7 +85,7 @@ struct uri * parse_uri ( const char *uri_string ) {
 		return NULL;
 	raw = ( ( ( char * ) uri ) + sizeof ( *uri ) );
 
-	/* Zero URI struct and copy in the raw string */
+	/* Copy in the raw string */
 	memcpy ( raw, uri_string, raw_len );
 
 	/* Start by chopping off the fragment, if it exists */
