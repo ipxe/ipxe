@@ -153,7 +153,7 @@ static int pxe_menu_parse ( struct pxe_menu **menu ) {
 			  ( num_menu_items * sizeof ( (*menu)->items[0] ) ) );
 	memcpy ( raw_menu_item, raw_menu, raw_menu_len );
 	for ( i = 0 ; i < num_menu_items ; i++ ) {
-		(*menu)->items[i].type = ntohs ( raw_menu_item->type );
+		(*menu)->items[i].type = le16_to_cpu ( raw_menu_item->type );
 		(*menu)->items[i].desc = raw_menu_item->desc;
 		/* Set type to 0; this ensures that the description
 		 * for the previous menu item is NUL-terminated.
