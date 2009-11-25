@@ -93,8 +93,7 @@ e1000_get_hw_control ( struct e1000_adapter *adapter )
 static void
 e1000_irq_enable ( struct e1000_adapter *adapter )
 {
-	E1000_WRITE_REG ( &adapter->hw, IMS, E1000_IMS_RXDMT0 |
-			                     E1000_IMS_RXSEQ );
+	E1000_WRITE_REG ( &adapter->hw, IMS, IMS_ENABLE_MASK );
 	E1000_WRITE_FLUSH ( &adapter->hw );
 }
 
