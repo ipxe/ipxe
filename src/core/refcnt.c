@@ -76,3 +76,15 @@ void ref_put ( struct refcnt *refcnt ) {
 		free ( refcnt );
 	}
 }
+
+/**
+ * Do not free reference-counted object
+ *
+ * @v refcnt		Reference counter
+ *
+ * This is meant for initializing a reference counter structure in a
+ * statically allocated object.
+ */
+void ref_no_free ( struct refcnt *refcnt __unused ) {
+	/* Do nothing */
+}

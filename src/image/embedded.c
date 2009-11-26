@@ -13,16 +13,6 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #include <ipxe/uaccess.h>
 #include <ipxe/init.h>
 
-/**
- * Free embedded image
- *
- * @v refcnt		Reference counter
- */
-static void __attribute__ (( unused ))
-embedded_image_free ( struct refcnt *refcnt __unused ) {
-	/* Do nothing */
-}
-
 /* Raw image data for all embedded images */
 #undef EMBED
 #define EMBED( _index, _path, _name )					\
@@ -41,7 +31,7 @@ EMBED_ALL
 /* Image structures for all embedded images */
 #undef EMBED
 #define EMBED( _index, _path, _name ) {					\
-	.refcnt = REF_INIT ( embedded_image_free ),			\
+	.refcnt = REF_INIT ( ref_no_free ),				\
 	.name = _name,							\
 	.data = ( userptr_t ) ( embedded_image_ ## _index ## _data ),	\
 	.len = ( size_t ) embedded_image_ ## _index ## _len,		\

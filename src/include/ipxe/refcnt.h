@@ -77,5 +77,6 @@ ref_init ( struct refcnt *refcnt,
 
 extern struct refcnt * ref_get ( struct refcnt *refcnt );
 extern void ref_put ( struct refcnt *refcnt );
+extern void ref_no_free ( struct refcnt *refcnt );
 
 #endif /* _IPXE_REFCNT_H */
