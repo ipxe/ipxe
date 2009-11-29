@@ -1026,12 +1026,6 @@ static int net80211_process_capab ( struct net80211_device *dev,
 		return -ENOSYS;
 	}
 
-	if ( capab & IEEE80211_CAPAB_SPECTRUM_MGMT ) {
-		DBGC ( dev, "802.11 %p cannot handle spectrum managed "
-		       "network\n", dev );
-		return -ENOSYS;
-	}
-
 	dev->phy_flags &= ~( NET80211_PHY_USE_SHORT_PREAMBLE |
 			     NET80211_PHY_USE_SHORT_SLOT );
 
