@@ -70,7 +70,7 @@ FILE_LICENCE ( GPL2_OR_LATER );
  */
 #define	CRYPTO_80211_WEP	/* WEP encryption (deprecated and insecure!) */
 #define	CRYPTO_80211_WPA	/* WPA Personal, authenticating with passphrase */
-#undef	CRYPTO_80211_WPA2	/* Add support for stronger WPA cryptography */
+#define	CRYPTO_80211_WPA2	/* Add support for stronger WPA cryptography */
 
 /*
  * Name resolution modules
