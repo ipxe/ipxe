@@ -110,18 +110,6 @@ e1000_irq_disable ( struct e1000_adapter *adapter )
 }
 
 /**
- * e1000_irq_force - trigger interrupt
- *
- * @v adapter	e1000 private structure
- **/
-static void
-e1000_irq_force ( struct e1000_adapter *adapter )
-{
-	E1000_WRITE_REG ( &adapter->hw, ICS, E1000_ICS_RXDMT0 );
-	E1000_WRITE_FLUSH ( &adapter->hw );
-}
-
-/**
  * e1000_sw_init - Initialize general software structures (struct e1000_adapter)
  *
  * @v adapter	e1000 private structure
@@ -813,18 +801,11 @@ e1000_irq ( struct net_device *netdev, int enable )
 	struct e1000_adapter *adapter = netdev_priv(netdev);
 
 	DBG ( "e1000_irq\n" );
-	
-	switch ( enable ) {
-	case 0 :
-		e1000_irq_disable ( adapter );
-		break;
-	case 1 :
+
+	if ( enable )
 		e1000_irq_enable ( adapter );
-		break;
-	case 2 :
-		e1000_irq_force ( adapter );
-		break;
-	}
+	else
+		e1000_irq_disable ( adapter );
 }
 
 static struct net_device_operations e1000_operations;
