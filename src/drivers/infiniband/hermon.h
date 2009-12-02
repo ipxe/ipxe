@@ -68,6 +68,8 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #define HERMON_HCR_READ_MCG		0x0025
 #define HERMON_HCR_WRITE_MCG		0x0026
 #define HERMON_HCR_MGID_HASH		0x0027
+#define HERMON_HCR_MOD_STAT_CFG		0x0034
+#define HERMON_HCR_QUERY_PORT		0x0043
 #define HERMON_HCR_SENSE_PORT		0x004d
 #define HERMON_HCR_RUN_FW		0x0ff6
 #define HERMON_HCR_DISABLE_LAM		0x0ff7
@@ -86,7 +88,9 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #define HERMON_ST_MLX			0x07
 
 /* Port types */
+#define HERMON_PORT_TYPE_UNKNOWN	0
 #define HERMON_PORT_TYPE_IB		1
+#define HERMON_PORT_TYPE_ETH		2
 
 /* MTUs */
 #define HERMON_MTU_2048			0x04
@@ -191,16 +195,18 @@ struct hermonprm_event_mask_st {
 
 struct hermonprm_port_state_change_event_st {
 	pseudo_bit_t reserved[0x00020];
+/* -------------- */
 	struct hermonprm_port_state_change_st data;
 } __attribute__ (( packed ));
 
 struct hermonprm_sense_port_st {
-	pseudo_bit_t port_type[0x00020];
+	pseudo_bit_t reserved0[0x00020];
 /* -------------- */
-	pseudo_bit_t reserved[0x00020];
+	pseudo_bit_t port_type[0x00002];
+	pseudo_bit_t reserved1[0x00018];
 } __attribute__ (( packed ));
 
-struct hermonprm_set_port_st {
+struct hermonprm_set_port_ib_st {
 	pseudo_bit_t rqk[0x00001];
 	pseudo_bit_t rcm[0x00001];
 	pseudo_bit_t reserved0[0x00002];
@@ -242,6 +248,134 @@ struct hermonprm_set_port_st {
 	pseudo_bit_t max_pkey[0x00010];
 } __attribute__ (( packed ));
 
+struct hermonprm_query_port_cap_st {
+	pseudo_bit_t eth_mtu[0x00010];
+	pseudo_bit_t ib_mtu[0x00004];
+	pseudo_bit_t reserved0[0x00004];
+	pseudo_bit_t ib[0x00001];
+	pseudo_bit_t eth[0x00001];
+	pseudo_bit_t reserved1[0x00005];
+	pseudo_bit_t link_state[0x00001];
+/* -------------- */
+	pseudo_bit_t log_max_pkey[0x00004];
+	pseudo_bit_t log_max_gid[0x00004];
+	pseudo_bit_t ib_port_width[0x00004];
+	pseudo_bit_t reserved2[0x00004];
+	pseudo_bit_t eth_link_speed[0x00004];
+	pseudo_bit_t reserved3[0x00004];
+	pseudo_bit_t ib_link_speed[0x00004];
+	pseudo_bit_t reserved4[0x00004];
+/* -------------- */
+	pseudo_bit_t max_vl_ib[0x00004];
+	pseudo_bit_t reserved5[0x00004];
+	pseudo_bit_t log_max_mac[0x00004];
+	pseudo_bit_t log_max_vlan[0x00004];
+	pseudo_bit_t reserved6[0x00010];
+/* -------------- */
+	pseudo_bit_t reserved7[0x00020];
+/* -------------- */
+	pseudo_bit_t mac_47_32[0x00010];
+	pseudo_bit_t reserved8[0x00010];
+/* -------------- */
+	pseudo_bit_t mac_31_0[0x00020];
+/* -------------- */
+	pseudo_bit_t vendor_oui[0x00018];
+	pseudo_bit_t transceiver_type[0x00008];
+/* -------------- */
+	pseudo_bit_t reserved9[0x00010];
+	pseudo_bit_t wavelength[0x00010];
+/* -------------- */
+	pseudo_bit_t transceiver_code_hi[0x00020];
+/* -------------- */
+	pseudo_bit_t transceiver_code_lo[0x00020];
+/* -------------- */
+	pseudo_bit_t reserved10[0x000c0];
+} __attribute__ (( packed ));
+
+struct hermonprm_set_port_general_context_st {
+	pseudo_bit_t v_mtu[0x00001];
+	pseudo_bit_t v_pprx[0x00001];
+	pseudo_bit_t v_pptx[0x00001];
+	pseudo_bit_t reserved0[0x0001d];
+/* -------------- */
+	pseudo_bit_t mtu[0x00010];
+	pseudo_bit_t reserved1[0x00010];
+/* -------------- */
+	pseudo_bit_t reserved2[0x00010];
+	pseudo_bit_t pfctx[0x00008];
+	pseudo_bit_t reserved3[0x00007];
+	pseudo_bit_t pptx[0x00001];
+/* -------------- */
+	pseudo_bit_t reserved4[0x00010];
+	pseudo_bit_t pfcrx[0x00008];
+	pseudo_bit_t reserved5[0x00007];
+	pseudo_bit_t pprx[0x00001];
+/* -------------- */
+} __attribute__ (( packed ));
+
+struct hermonprm_set_port_rqp_calc_st {
+	pseudo_bit_t base_qpn[0x00018];
+	pseudo_bit_t reserved0[0x00008];
+/* -------------- */
+	pseudo_bit_t n_p[0x00002];
+	pseudo_bit_t reserved1[0x00006];
+	pseudo_bit_t n_v[0x00003];
+	pseudo_bit_t reserved2[0x00005];
+	pseudo_bit_t n_m[0x00004];
+	pseudo_bit_t reserved3[0x0000c];
+/* -------------- */
+	pseudo_bit_t mac_miss_index[0x00008];
+	pseudo_bit_t reserved4[0x00018];
+/* -------------- */
+	pseudo_bit_t vlan_miss_index[0x00007];
+	pseudo_bit_t reserved5[0x00008];
+	pseudo_bit_t intra_miss[0x00001];
+	pseudo_bit_t no_vlan_index[0x00007];
+	pseudo_bit_t reserved6[0x00008];
+	pseudo_bit_t intra_no_vlan[0x00001];
+/* -------------- */
+	pseudo_bit_t no_vlan_prio[0x00003];
+	pseudo_bit_t reserved7[0x0001d];
+/* -------------- */
+	pseudo_bit_t promisc_qpn[0x00018];
+	pseudo_bit_t reserved8[0x00007];
+	pseudo_bit_t en_uc_promisc[0x00001];
+/* -------------- */
+	pseudo_bit_t def_mcast_qpn[0x00018];
+	pseudo_bit_t reserved9[0x00005];
+	pseudo_bit_t mc_by_vlan[0x00001];
+	pseudo_bit_t mc_promisc_mode[0x00002];
+/* -------------- */
+	pseudo_bit_t reserved10[0x00020];
+/* -------------- */
+} __attribute__ (( packed ));
+
+struct hermonprm_set_port_mac_table_st {
+	pseudo_bit_t mac_h[0x00010];
+	pseudo_bit_t reserved0[0x0000f];
+	pseudo_bit_t v[0x00001];
+/* -------------- */
+	pseudo_bit_t mac_l[0x00020];
+/* -------------- */
+} __attribute__ (( packed ));
+
+struct hermonprm_set_port_vlan_st {
+	pseudo_bit_t vlan_id[0x0000c];
+	pseudo_bit_t reserved0[0x00012];
+	pseudo_bit_t intra[0x00001];
+	pseudo_bit_t v[0x00001];
+/* -------------- */
+} __attribute__ (( packed ));
+
+struct hermonprm_mod_stat_cfg_pf_net_boot_st {
+	pseudo_bit_t reserved1[0x0001c];
+	pseudo_bit_t pf_net_boot[0x00001];
+	pseudo_bit_t reserved2[0x00002];
+	pseudo_bit_t pf_net_boot_m[0x00001];
+/* -------------- */
+	pseudo_bit_t reserved0[0x00020];
+} __attribute__ (( packed ));
+
 /*
  * Wrapper structures for hardware datatypes
  *
@@ -260,6 +394,7 @@ struct MLX_DECLARE_STRUCT ( hermonprm_init_hca );
 struct MLX_DECLARE_STRUCT ( hermonprm_mad_ifc );
 struct MLX_DECLARE_STRUCT ( hermonprm_mcg_entry );
 struct MLX_DECLARE_STRUCT ( hermonprm_mgm_hash );
+struct MLX_DECLARE_STRUCT ( hermonprm_mod_stat_cfg_pf_net_boot );
 struct MLX_DECLARE_STRUCT ( hermonprm_mpt );
 struct MLX_DECLARE_STRUCT ( hermonprm_mtt );
 struct MLX_DECLARE_STRUCT ( hermonprm_port_state_change_event );
@@ -267,11 +402,16 @@ struct MLX_DECLARE_STRUCT ( hermonprm_qp_db_record );
 struct MLX_DECLARE_STRUCT ( hermonprm_qp_ee_state_transitions );
 struct MLX_DECLARE_STRUCT ( hermonprm_query_dev_cap );
 struct MLX_DECLARE_STRUCT ( hermonprm_query_fw );
+struct MLX_DECLARE_STRUCT ( hermonprm_query_port_cap );
 struct MLX_DECLARE_STRUCT ( hermonprm_queue_pair_ee_context_entry );
 struct MLX_DECLARE_STRUCT ( hermonprm_scalar_parameter );
 struct MLX_DECLARE_STRUCT ( hermonprm_sense_port );
 struct MLX_DECLARE_STRUCT ( hermonprm_send_db_register );
-struct MLX_DECLARE_STRUCT ( hermonprm_set_port );
+struct MLX_DECLARE_STRUCT ( hermonprm_set_port_ib );
+struct MLX_DECLARE_STRUCT ( hermonprm_set_port_general_context );
+struct MLX_DECLARE_STRUCT ( hermonprm_set_port_mac_table );
+struct MLX_DECLARE_STRUCT ( hermonprm_set_port_rqp_calc );
+struct MLX_DECLARE_STRUCT ( hermonprm_set_port_vlan );
 struct MLX_DECLARE_STRUCT ( hermonprm_ud_address_vector );
 struct MLX_DECLARE_STRUCT ( hermonprm_virtual_physical_mapping );
 struct MLX_DECLARE_STRUCT ( hermonprm_wqe_segment_ctrl_mlx );
@@ -334,6 +474,14 @@ union hermonprm_doorbell_register {
 union hermonprm_mad {
 	struct hermonprm_mad_ifc ifc;
 	union ib_mad mad;
+} __attribute__ (( packed ));
+
+union hermonprm_set_port {
+	struct hermonprm_set_port_ib ib;
+	struct hermonprm_set_port_general_context general;
+	struct hermonprm_set_port_rqp_calc rqp_calc;
+	struct hermonprm_set_port_mac_table mac_table[128];
+	struct hermonprm_set_port_vlan vlan;
 } __attribute__ (( packed ));
 
 /*
