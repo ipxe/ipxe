@@ -1,4 +1,4 @@
-FILES = cromutil bromutil
+FILES = cromutil ocromutil bromutil
 
 INCLUDEDIR = /usr/include
 CFLAGS = -O2 -fomit-frame-pointer -Wall -I$(INCLUDEDIR)
