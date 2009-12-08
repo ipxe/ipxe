@@ -55,8 +55,13 @@ int dhcp ( struct net_device *netdev ) {
 	printf ( "DHCP (%s ", netdev->name );
 	while ( hlen-- )
 		printf ( "%02x%c", *(chaddr++), ( hlen ? ':' : ')' ) );
-	if ( ( rc = start_dhcp ( &monojob, netdev ) ) == 0 )
+
+	if ( ( rc = start_dhcp ( &monojob, netdev ) ) == 0 ) {
 		rc = monojob_wait ( "" );
+	} else if ( rc > 0 ) {
+		printf ( " using cached\n" );
+		rc = 0;
+	}
 
 	return rc;
 }
