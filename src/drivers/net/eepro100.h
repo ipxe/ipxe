@@ -2,6 +2,8 @@
 #ifndef __EEPRO100_H_
 #define __EEPRO100_H_
 
+FILE_LICENCE ( GPL2_OR_LATER );
+
 #define CONGENB         0	/* Enable congestion control in the DP83840. */
 #define TX_FIFO         8	/* Tx FIFO threshold in 4 byte units, 0-15 */
 #define RX_FIFO         8	/* Rx FIFO threshold, default 32 bytes. */
