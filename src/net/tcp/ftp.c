@@ -131,11 +131,33 @@ static const char * ftp_uri_path ( struct ftp_request *ftp ) {
 	return ftp->uri->path;
 }
 
+/**
+ * Retrieve FTP user
+ *
+ * @v ftp		FTP request
+ * @ret user		FTP user
+ */
+static const char * ftp_user ( struct ftp_request *ftp ) {
+	static char *ftp_default_user = "anonymous";
+	return ftp->uri->user ? ftp->uri->user : ftp_default_user;
+}
+
+/**
+ * Retrieve FTP password
+ *
+ * @v ftp		FTP request
+ * @ret password	FTP password
+ */
+static const char * ftp_password ( struct ftp_request *ftp ) {
+	static char *ftp_default_password = "etherboot@etherboot.org";
+	return ftp->uri->password ? ftp->uri->password : ftp_default_password;
+}
+
 /** FTP control channel strings */
 static struct ftp_control_string ftp_strings[] = {
 	[FTP_CONNECT]	= { NULL, NULL },
-	[FTP_USER]	= { "USER anonymous", NULL },
-	[FTP_PASS]	= { "PASS etherboot@etherboot.org", NULL },
+	[FTP_USER]	= { "USER ", ftp_user },
+	[FTP_PASS]	= { "PASS ", ftp_password },
 	[FTP_TYPE]	= { "TYPE I", NULL },
 	[FTP_PASV]	= { "PASV", NULL },
 	[FTP_RETR]	= { "RETR ", ftp_uri_path },
