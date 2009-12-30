@@ -22,6 +22,9 @@ static struct uri_test uri_tests[] = {
 	  "http://etherboot.org/page3" },
 	{ "tftp://192.168.0.1/", "/tftpboot/vmlinuz",
 	  "tftp://192.168.0.1/tftpboot/vmlinuz" },
+	{ "ftp://the%41nswer%3d:%34ty%32wo@ether%62oot.org:8080/p%41th/foo",
+	  "to?%41=b#%43d",
+	  "ftp://theAnswer%3d:4ty2wo@etherboot.org:8080/path/to?a=b#cd" },
 #if 0
 	"http://www.etherboot.org/wiki",
 	"mailto:bob@nowhere.com",
@@ -41,7 +44,7 @@ static int test_parse_unparse ( const char *uri_string ) {
 		rc = -ENOMEM;
 		goto done;
 	}
-	len = unparse_uri ( buf, sizeof ( buf ), uri );
+	len = unparse_uri ( buf, sizeof ( buf ), uri, URI_ALL );
 
 	/* Compare result */
 	if ( strcmp ( buf, uri_string ) != 0 ) {
@@ -92,7 +95,7 @@ static int test_resolve ( const char *base_uri_string,
 	}
 
 	/* Compare result */
-	len = unparse_uri ( buf, sizeof ( buf ), resolved_uri );
+	len = unparse_uri ( buf, sizeof ( buf ), resolved_uri, URI_ALL );
 	if ( strcmp ( buf, resolved_uri_string ) != 0 ) {
 		printf ( "Resolution of \"%s\"+\"%s\" produced \"%s\"\n",
 			 base_uri_string, relative_uri_string, buf );

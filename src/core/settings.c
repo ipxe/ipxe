@@ -1085,7 +1085,7 @@ static int fetchf_uristring ( struct settings *settings,
        
 		fetch_string_setting ( settings, setting, raw_buf,
 				       sizeof ( raw_buf ) );
-		return uri_encode ( raw_buf, buf, len );
+		return uri_encode ( raw_buf, buf, len, URI_FRAGMENT );
 	}
 }
 

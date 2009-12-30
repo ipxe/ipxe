@@ -76,6 +76,7 @@ struct uri * parse_uri ( const char *uri_string ) {
 	char *tmp;
 	char *path = NULL;
 	char *authority = NULL;
+	int i;
 	size_t raw_len;
 
 	/* Allocate space for URI struct and a copy of the string */
@@ -171,6 +172,14 @@ struct uri * parse_uri ( const char *uri_string ) {
 		uri->port = tmp;
 	}
 
+	/* Decode fields that should be decoded */
+	for ( i = URI_FIRST_FIELD; i <= URI_LAST_FIELD; i++ ) {
+		const char *field = uri_get_field ( uri, i );
+		if ( field && ( URI_ENCODED & ( 1 << i ) ) )
+			uri_decode ( field, ( char * ) field,
+				     strlen ( field ) + 1 /* NUL */ );
+	}
+
  done:
 	DBG ( "URI \"%s\" split into", uri_string );
 	dump_uri ( uri );
@@ -198,10 +207,19 @@ unsigned int uri_port ( struct uri *uri, unsigned int default_port ) {
  * @v buf		Buffer to fill with URI string
  * @v size		Size of buffer
  * @v uri		URI to write into buffer, or NULL
+ * @v fields		Bitmask of fields to include in URI string, or URI_ALL
  * @ret len		Length of URI string
  */
-int unparse_uri ( char *buf, size_t size, struct uri *uri ) {
+int unparse_uri ( char *buf, size_t size, struct uri *uri,
+		  unsigned int fields ) {
+	/* List of characters that typically go before certain fields */
+	static char separators[] = { /* scheme */ 0, /* opaque */ ':',
+				     /* user */ 0, /* password */ ':',
+				     /* host */ '@', /* port */ ':',
+				     /* path */ 0, /* query */ '?',
+				     /* fragment */ '#' };
 	int used = 0;
+	int i;
 
 	DBG ( "URI unparsing" );
 	dump_uri ( uri );
@@ -214,55 +232,39 @@ int unparse_uri ( char *buf, size_t size, struct uri *uri ) {
 		return 0;
 	}
 
-	/* Special-case opaque URIs */
-	if ( uri->opaque ) {
-		return ssnprintf ( ( buf + used ), ( size - used ),
-				   "%s:%s", uri->scheme, uri->opaque );
-	}
+	/* Iterate through requested fields */
+	for ( i = URI_FIRST_FIELD; i <= URI_LAST_FIELD; i++ ) {
+		const char *field = uri_get_field ( uri, i );
+		char sep = separators[i];
 
-	/* scheme:// */
-	if ( uri->scheme ) {
-		used += ssnprintf ( ( buf + used ), ( size - used ),
-				    "%s://", uri->scheme );
-	}
+		/* Ensure `fields' only contains bits for fields that exist */
+		if ( ! field )
+			fields &= ~( 1 << i );
 
-	/* [user[:password]@]host[:port] */
-	if ( uri->host ) {
-		if ( uri->user ) {
-			used += ssnprintf ( ( buf + used ), ( size - used ),
-					    "%s", uri->user );
-			if ( uri->password ) {
-				used += ssnprintf ( ( buf + used ),
-						    ( size - used ),
-						    ":%s", uri->password );
+		/* Store this field if we were asked to */
+		if ( fields & ( 1 << i ) ) {
+			/* Print :// if we're non-opaque and had a scheme */
+			if ( ( fields & URI_SCHEME_BIT ) &&
+			     ( i > URI_OPAQUE ) ) {
+				used += ssnprintf ( buf + used, size - used,
+						    "://" );
+				/* Only print :// once */
+				fields &= ~URI_SCHEME_BIT;
 			}
-			used += ssnprintf ( ( buf + used ), ( size - used ),
-					    "@" );
+
+			/* Only print separator if an earlier field exists */
+			if ( sep && ( fields & ( ( 1 << i ) - 1 ) ) )
+				used += ssnprintf ( buf + used, size - used,
+						    "%c", sep );
+
+			/* Print contents of field, possibly encoded */
+			if ( URI_ENCODED & ( 1 << i ) )
+				used += uri_encode ( field, buf + used,
+						     size - used, i );
+			else
+				used += ssnprintf ( buf + used, size - used,
+						    "%s", field );
 		}
-		used += ssnprintf ( ( buf + used ), ( size - used ), "%s",
-				    uri->host );
-		if ( uri->port ) {
-			used += ssnprintf ( ( buf + used ), ( size - used ),
-					    ":%s", uri->port );
-		}
-	}
-
-	/* /path */
-	if ( uri->path ) {
-		used += ssnprintf ( ( buf + used ), ( size - used ),
-				    "%s", uri->path );
-	}
-
-	/* ?query */
-	if ( uri->query ) {
-		used += ssnprintf ( ( buf + used ), ( size - used ),
-				    "?%s", uri->query );
-	}
-
-	/* #fragment */
-	if ( uri->fragment ) {
-		used += ssnprintf ( ( buf + used ), ( size - used ),
-				    "#%s", uri->fragment );
 	}
 
 	return used;
@@ -277,10 +279,10 @@ int unparse_uri ( char *buf, size_t size, struct uri *uri ) {
  * Creates a modifiable copy of a URI.
  */
 struct uri * uri_dup ( struct uri *uri ) {
-	size_t len = ( unparse_uri ( NULL, 0, uri ) + 1 );
+	size_t len = ( unparse_uri ( NULL, 0, uri, URI_ALL ) + 1 );
 	char buf[len];
 
-	unparse_uri ( buf, len, uri );
+	unparse_uri ( buf, len, uri, URI_ALL );
 	return parse_uri ( buf );
 }
 
@@ -393,16 +395,31 @@ struct uri * resolve_uri ( struct uri *base_uri,
  * Test for unreserved URI characters
  *
  * @v c			Character to test
+ * @v field		Field of URI in which character lies
  * @ret is_unreserved	Character is an unreserved character
  */
-static int is_unreserved_uri_char ( int c ) {
+static int is_unreserved_uri_char ( int c, int field ) {
 	/* According to RFC3986, the unreserved character set is
 	 *
 	 * A-Z a-z 0-9 - _ . ~
+	 *
+	 * but we also pass & ; = in queries, / in paths,
+	 * and everything in opaques
 	 */
-	return ( isupper ( c ) || islower ( c ) || isdigit ( c ) ||
-		 ( c == '-' ) || ( c == '_' ) ||
-		 ( c == '.' ) || ( c == '~' ) );
+	int ok = ( isupper ( c ) || islower ( c ) || isdigit ( c ) ||
+		    ( c == '-' ) || ( c == '_' ) ||
+		    ( c == '.' ) || ( c == '~' ) );
+
+	if ( field == URI_QUERY )
+		ok = ok || ( c == ';' ) || ( c == '&' ) || ( c == '=' );
+
+	if ( field == URI_PATH )
+		ok = ok || ( c == '/' );
+
+	if ( field == URI_OPAQUE )
+		ok = 1;
+
+	return ok;
 }
 
 /**
@@ -411,18 +428,20 @@ static int is_unreserved_uri_char ( int c ) {
  * @v raw_string	String to be URI-encoded
  * @v buf		Buffer to contain encoded string
  * @v len		Length of buffer
+ * @v field		Field of URI in which string lies
  * @ret len		Length of encoded string (excluding NUL)
  */
-size_t uri_encode ( const char *raw_string, char *buf, size_t len ) {
+size_t uri_encode ( const char *raw_string, char *buf, ssize_t len,
+		    int field ) {
 	ssize_t remaining = len;
 	size_t used;
 	unsigned char c;
 
-	if ( len )
+	if ( len > 0 )
 		buf[0] = '\0';
 
 	while ( ( c = *(raw_string++) ) ) {
-		if ( is_unreserved_uri_char ( c ) ) {
+		if ( is_unreserved_uri_char ( c, field ) ) {
 			used = ssnprintf ( buf, remaining, "%c", c );
 		} else {
 			used = ssnprintf ( buf, remaining, "%%%02X", c );
@@ -441,17 +460,17 @@ size_t uri_encode ( const char *raw_string, char *buf, size_t len ) {
  * @v buf		Buffer to contain decoded string
  * @v len		Length of buffer
  * @ret len		Length of decoded string (excluding NUL)
+ *
+ * This function may be used in-place, with @a buf the same as
+ * @a encoded_string.
  */
-size_t uri_decode ( const char *encoded_string, char *buf, size_t len ) {
-	ssize_t remaining = len;
+size_t uri_decode ( const char *encoded_string, char *buf, ssize_t len ) {
+	ssize_t remaining;
 	char hexbuf[3];
 	char *hexbuf_end;
 	unsigned char c;
 
-	if ( len )
-		buf[0] = '\0';
-
-	while ( *encoded_string ) {
+	for ( remaining = len; *encoded_string; remaining-- ) {
 		if ( *encoded_string == '%' ) {
 			encoded_string++;
 			snprintf ( hexbuf, sizeof ( hexbuf ), "%s",
@@ -461,7 +480,12 @@ size_t uri_decode ( const char *encoded_string, char *buf, size_t len ) {
 		} else {
 			c = *(encoded_string++);
 		}
-		ssnprintf ( buf++, remaining--, "%c", c );
+		if ( remaining > 1 )
+			*buf++ = c;
 	}
+
+	if ( len )
+		*buf = 0;
+
 	return ( len - remaining );
 }

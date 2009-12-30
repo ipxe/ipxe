@@ -61,7 +61,9 @@ int boot_next_server_and_filename ( struct in_addr next_server,
 				    const char *filename ) {
 	struct uri *uri;
 	struct image *image;
-	char buf[ 23 /* tftp://xxx.xxx.xxx.xxx/ */ + strlen(filename) + 1 ];
+	char buf[ 23 /* tftp://xxx.xxx.xxx.xxx/ */ +
+		  ( 3 * strlen(filename) ) /* completely URI-encoded */
+		  + 1 /* NUL */ ];
 	int filename_is_absolute;
 	int rc;
 
@@ -78,8 +80,10 @@ int boot_next_server_and_filename ( struct in_addr next_server,
 		 * between filenames with and without initial slashes,
 		 * which is significant for TFTP.
 		 */
-		snprintf ( buf, sizeof ( buf ), "tftp://%s/%s",
-			   inet_ntoa ( next_server ), filename );
+		snprintf ( buf, sizeof ( buf ), "tftp://%s/",
+			   inet_ntoa ( next_server ) );
+		uri_encode ( filename, buf + strlen ( buf ),
+			     sizeof ( buf ) - strlen ( buf ), URI_PATH );
 		filename = buf;
 	}
 

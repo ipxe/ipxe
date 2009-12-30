@@ -417,9 +417,7 @@ static int http_socket_deliver_iob ( struct xfer_interface *socket,
 static void http_step ( struct process *process ) {
 	struct http_request *http =
 		container_of ( process, struct http_request, process );
-	const char *path = http->uri->path;
 	const char *host = http->uri->host;
-	const char *query = http->uri->query;
 	const char *user = http->uri->user;
 	const char *password =
 		( http->uri->password ? http->uri->password : "" );
@@ -429,27 +427,24 @@ static void http_step ( struct process *process ) {
 	char user_pw[ user_pw_len + 1 /* NUL */ ];
 	char user_pw_base64[ user_pw_base64_len + 1 /* NUL */ ];
 	int rc;
+	int request_len = unparse_uri ( NULL, 0, http->uri,
+					URI_PATH_BIT | URI_QUERY_BIT );
 
 	if ( xfer_window ( &http->socket ) ) {
+		char request[request_len + 1];
+
+		/* Construct path?query request */
+		unparse_uri ( request, sizeof ( request ), http->uri,
+			      URI_PATH_BIT | URI_QUERY_BIT );
 
 		/* We want to execute only once */
 		process_del ( &http->process );
 
 		/* Construct authorisation, if applicable */
 		if ( user ) {
-			char *buf = user_pw;
-			ssize_t remaining = sizeof ( user_pw );
-			size_t len;
-
-			/* URI-decode the username and password */
-			len = uri_decode ( user, buf, remaining );
-			buf += len;
-			remaining -= len;
-			*(remaining--, buf++) = ':';
-			len = uri_decode ( password, buf, remaining );
-			buf += len;
-			remaining -= len;
-			assert ( remaining >= 0 );
+			/* Make "user:password" string from decoded fields */
+			snprintf ( user_pw, sizeof ( user_pw ), "%s:%s",
+				   user, password );
 
 			/* Base64-encode the "user:password" string */
 			base64_encode ( user_pw, user_pw_base64 );
@@ -457,14 +452,12 @@ static void http_step ( struct process *process ) {
 
 		/* Send GET request */
 		if ( ( rc = xfer_printf ( &http->socket,
-					  "GET %s%s%s HTTP/1.0\r\n"
+					  "GET %s HTTP/1.0\r\n"
 					  "User-Agent: gPXE/" VERSION "\r\n"
 					  "%s%s%s"
 					  "Host: %s\r\n"
 					  "\r\n",
-					  ( path ? path : "/" ),
-					  ( query ? "?" : "" ),
-					  ( query ? query : "" ),
+					  request,
 					  ( user ?
 					    "Authorization: Basic " : "" ),
 					  ( user ? user_pw_base64 : "" ),

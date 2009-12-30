@@ -61,7 +61,7 @@ int imgfetch ( struct image *image, const char *uri_string,
 	if ( password )
 		uri->password = "***";
 	unparse_uri ( uri_string_redacted, sizeof ( uri_string_redacted ),
-		      uri );
+		      uri, URI_ALL );
 	uri->password = password;
 
 	if ( ( rc = create_downloader ( &monojob, image, image_register,
