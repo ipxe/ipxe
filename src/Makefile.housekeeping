@@ -677,7 +677,7 @@ endef
 $(BIN)/%.objs : $(BIN)/%.tmp
 	$(Q)$(ECHO) $(call objs_list,$<)
 $(BIN)/%.sizes : $(BIN)/%.tmp
-	$(Q)$(SIZE) -t $(foreach OBJ,$(call objs_list,$<),$(BIN)/$(OBJ).o) | \
+	$(Q)$(SIZE) -t $(foreach OBJ,$(call objs_list,$<),$(wildcard $(BIN)/$(subst _,?,$(OBJ)).o)) | \
 		sort -g
 
 # Get dependency list for the specified target
