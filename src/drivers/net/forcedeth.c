@@ -1321,6 +1321,7 @@ static int forcedeth_probe ( struct nic *nic, struct pci_device *pci ) {
 
   	switch (pci->device) {
   	case 0x01C3:		// nforce
+	case 0x054C:
  		// DEV_IRQMASK_1|DEV_NEED_TIMERIRQ|DEV_NEED_LINKTIMER,
  		np->irqmask = NVREG_IRQMASK_WANTED_2 | NVREG_IRQ_TIMER;
 		//              np->need_linktimer = 1;
@@ -1426,6 +1427,7 @@ PCI_ROM(0x10de, 0x0038, "nforce11", "nForce NVENET_11 Ethernet Controller", 0),
 PCI_ROM(0x10de, 0x0373, "nforce15", "nForce NVENET_15 Ethernet Controller", 0),
 PCI_ROM(0x10de, 0x0269, "nforce16", "nForce NVENET_16 Ethernet Controller", 0),
 PCI_ROM(0x10de, 0x0760, "nforce17", "nForce NVENET_17 Ethernet Controller", MAC_ADDR_CORRECT),
+PCI_ROM(0x10de, 0x054c, "nforce67", "nForce NVENET_67 Ethernet Controller", MAC_ADDR_CORRECT),
 };
 
 PCI_DRIVER ( forcedeth_driver, forcedeth_nics, PCI_NO_CLASS );
