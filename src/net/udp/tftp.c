@@ -747,7 +747,7 @@ static int tftp_rx_data ( struct tftp_request *tftp,
 			  struct io_buffer *iobuf ) {
 	struct tftp_data *data = iobuf->data;
 	struct xfer_metadata meta;
-	int block;
+	unsigned int block;
 	off_t offset;
 	size_t data_len;
 	int rc;
@@ -759,14 +759,17 @@ static int tftp_rx_data ( struct tftp_request *tftp,
 		rc = -EINVAL;
 		goto done;
 	}
-	if ( data->block == 0 ) {
+
+	/* Calculate block number */
+	block = ( ( bitmap_first_gap ( &tftp->bitmap ) + 1 ) & ~0xffff );
+	if ( data->block == 0 && block == 0 ) {
 		DBGC ( tftp, "TFTP %p received data block 0\n", tftp );
 		rc = -EINVAL;
 		goto done;
 	}
+	block += ( ntohs ( data->block ) - 1 );
 
 	/* Extract data */
-	block = ( ntohs ( data->block ) - 1 );
 	offset = ( block * tftp->blksize );
 	iob_pull ( iobuf, sizeof ( *data ) );
 	data_len = iob_len ( iobuf );
