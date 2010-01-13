@@ -418,9 +418,16 @@ static int tftp_send_ack ( struct tftp_request *tftp ) {
  */
 static int tftp_send_packet ( struct tftp_request *tftp ) {
 
-	/* Update retransmission timer */
+	/* Update retransmission timer.  While name resolution takes place the
+	 * window is zero.  Avoid unnecessary delay after name resolution
+	 * completes by retrying immediately.
+	 */
 	stop_timer ( &tftp->timer );
-	start_timer ( &tftp->timer );
+	if ( xfer_window ( &tftp->socket ) ) {
+		start_timer ( &tftp->timer );
+	} else {
+		start_timer_nodelay ( &tftp->timer );
+	}
 
 	/* Send RRQ or ACK as appropriate */
 	if ( ! tftp->peer.st_family ) {
