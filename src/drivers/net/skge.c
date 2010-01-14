@@ -3,14 +3,15 @@
  * Ethernet adapters. Derived from Linux skge driver (v1.13), which was
  * based on earlier sk98lin, e100 and FreeBSD if_sk drivers.
  *
- * This driver intentionally does not support all the features
- * of the original driver such as link fail-over and link management because
+ * This driver intentionally does not support all the features of the
+ * original driver such as link fail-over and link management because
  * those should be done at higher levels.
  *
  * Copyright (C) 2004, 2005 Stephen Hemminger <shemminger@osdl.org>
  *
- * Modified for gPXE, July 2008 by Michael Decker and in
- * December 2009 by Thomas Miletich <thomas.miletich@gmail.com>
+ * Modified for gPXE, July 2008 by Michael Decker <mrd999@gmail.com>
+ * Tested and Modified in December 2009 by
+ *    Thomas Miletich <thomas.miletich@gmail.com>
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
