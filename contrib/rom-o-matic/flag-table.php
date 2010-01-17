@@ -27,6 +27,7 @@ $ofmts = array
 	  "Linux kernel (SYSLINUX/GRUB/LILO) loadable image (.lkrn)" => "lkrn",
 	  "USB Keychain disk image (.usb)" => "usb",
 	  "ROM binary (flashable) image (.rom)" => "rom",
+	  "ROM binary (flashable) for problem PMM BIOSES  (.hrom)" => "hrom",
 	  "PXE bootstrap loader image [Unload PXE stack] (.pxe)" => "pxe",
 	  "PXE bootstrap loader keep [Keep PXE stack method 1] (.kpxe)" => "kpxe",
 	  "PXE bootstrap loader keep [Keep PXE stack method 2] (.kkpxe)" => "kkpxe",
