@@ -773,7 +773,7 @@ static int tftp_rx_oack ( struct tftp_request *tftp, void *buf, size_t len ) {
 	/* Abort request if only trying to determine file size */
 	if ( tftp->flags & TFTP_FL_SIZEONLY ) {
 		rc = 0;
-		tftp_send_error ( tftp, TFTP_ERR_UNKNOWN_TID, "TFTP Aborted" );
+		tftp_send_error ( tftp, 0, "TFTP Aborted" );
 		tftp_done ( tftp, rc );
 		return rc;
 	}
@@ -808,7 +808,7 @@ static int tftp_rx_data ( struct tftp_request *tftp,
 	if ( tftp->flags & TFTP_FL_SIZEONLY ) {
 		/* If we get here then server doesn't support SIZE option */
 		rc = -ENOTSUP;
-		tftp_send_error ( tftp, TFTP_ERR_UNKNOWN_TID, "TFTP Aborted" );
+		tftp_send_error ( tftp, 0, "TFTP Aborted" );
 		goto done;
 	}
 
