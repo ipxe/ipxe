@@ -60,8 +60,11 @@ int pci_find_capability ( struct pci_device *pci, int cap ) {
  * function.
  */
 unsigned long pci_bar_size ( struct pci_device *pci, unsigned int reg ) {
+	uint16_t cmd;
 	uint32_t start, size;
 
+	/* Save the original command register */
+	pci_read_config_word ( pci, PCI_COMMAND, &cmd );
 	/* Save the original bar */
 	pci_read_config_dword ( pci, reg, &start );
 	/* Compute which bits can be set */
@@ -70,6 +73,8 @@ unsigned long pci_bar_size ( struct pci_device *pci, unsigned int reg ) {
 	/* Restore the original size */
 	pci_write_config_dword ( pci, reg, start );
 	/* Find the significant bits */
+	/* Restore the original command register. This reenables decoding. */
+	pci_write_config_word ( pci, PCI_COMMAND, cmd );
 	if ( start & PCI_BASE_ADDRESS_SPACE_IO ) {
 		size &= PCI_BASE_ADDRESS_IO_MASK;
 	} else {
