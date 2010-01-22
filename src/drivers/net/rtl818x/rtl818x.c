@@ -680,9 +680,6 @@ static int rtl818x_probe(struct pci_device *pdev,
 	dev->netdev->dev = &pdev->dev;
 
 	priv->map = (struct rtl818x_csr *)pdev->ioaddr;
-	if (!priv->map)
-		priv->map = (struct rtl818x_csr *)pdev->membase;
-
 	if (!priv->map) {
 		DBG("rtl818x: cannot find device memory\n");
 		err = -ENXIO;
