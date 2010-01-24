@@ -277,3 +277,36 @@ Provider:	Set to 0x45585067 ("gPXE").  Another implementation of this
 APIMask:	Bitmask of supported API functions (one bit for each function
 		in the range 00e0h to 00ffh).
 Flags:		Set to zero, reserved for future use.
+
+
+
+
+FILE EXIT HOOK
+
+Op-Code:	PXENV_FILE_EXIT_HOOK (00e7h)
+
+Input:		Far pointer to a t_PXENV_FILE_EXIT_HOOK parameter
+		structure that has been initialized by the caller.
+
+Output:		PXENV_EXIT_SUCCESS or PXENV_EXIT_FAILURE must be
+		returned in AX.  The Status field in the parameter
+		structure must be set to one of the values represented
+		by the PXENV_STATUS_xxx constants.
+
+Description:	Modify the exit path to jump to the specified code.
+		Only valid for pxeprefix-based builds.
+
+typedef struct s_PXENV_FILE_EXIT_HOOK {
+        PXENV_STATUS_t Status;
+        SEGOFF16_t Hook;
+} t_PXENV_FILE_EXIT_HOOK;
+
+
+Set before calling API service:
+
+Hook:		The SEG16:OFF16 of the code to jump to.
+
+
+Returned from API service:
+
+Status:		See PXENV_STATUS_xxx constants.

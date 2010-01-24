@@ -1778,6 +1778,28 @@ extern PXENV_EXIT_t pxenv_file_api_check ( struct s_PXENV_FILE_API_CHECK *file_a
 
 /** @} */ /* pxenv_file_api_check */
 
+/** @defgroup pxenv_file_exit_hook PXENV_FILE_EXIT_HOOK
+ *
+ * FILE EXIT HOOK
+ *
+ * @{
+ */
+
+/** PXE API function code for pxenv_file_exit_hook() */
+#define PXENV_FILE_EXIT_HOOK			0x00e7
+
+/** Parameter block for pxenv_file_exit_hook() */
+struct s_PXENV_FILE_EXIT_HOOK {
+	PXENV_STATUS_t Status;		/**< PXE status code */
+	SEGOFF16_t Hook;		/**< SEG16:OFF16 to jump to */
+} PACKED;
+
+typedef struct s_PXENV_FILE_EXIT_HOOK PXENV_FILE_EXIT_HOOK_t;
+
+extern PXENV_EXIT_t pxenv_file_exit_hook ( struct s_PXENV_FILE_EXIT_HOOK *file_exit_hook );
+
+/** @} */ /* pxenv_file_exit_hook */
+
 /** @} */ /* pxe_file_api */
 
 /** @defgroup pxe_loader_api PXE Loader API

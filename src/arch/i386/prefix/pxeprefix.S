@@ -718,6 +718,13 @@ run_gpxe:
 	lret
 	.section ".text16", "ax", @progbits
 1:
+	/* Update the exit hook */
+	movw	%cs,pxe_exit_hook+2
+	push	%ax
+	mov	$2f,%ax
+	mov	%ax,pxe_exit_hook
+	pop	%ax
+
 	/* Run main program */
 	pushl	$main
 	pushw	%cs
@@ -731,7 +738,10 @@ run_gpxe:
 	movw	%di, %ss
 	movl	%ebp, %esp
 
-	/* Check PXE stack magic */
+	/* Jump to hook if applicable */
+	ljmpw	*pxe_exit_hook
+
+2:	/* Check PXE stack magic */
 	popl	%eax
 	cmpl	$STACK_MAGIC, %eax
 	jne	1f

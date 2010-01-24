@@ -12,9 +12,12 @@
 #include <gpxe/posix_io.h>
 #include <gpxe/features.h>
 #include <pxe.h>
+#include <realmode.h>
 
 /*
  * Copyright (C) 2007 Michael Brown <mbrown@fensystems.co.uk>.
+ * Portions (C) 2010 Shao Miller <shao.miller@yrdsb.edu.on.ca>.
+ *              [PXE exit hook logic]
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License as
@@ -230,6 +233,9 @@ PXENV_EXIT_t pxenv_file_exec ( struct s_PXENV_FILE_EXEC *file_exec ) {
 	return PXENV_EXIT_SUCCESS;
 }
 
+segoff_t __data16 ( pxe_exit_hook ) = { 0, 0 };
+#define pxe_exit_hook __use_data16 ( pxe_exit_hook )
+
 /**
  * FILE API CHECK
  *
@@ -260,7 +266,41 @@ PXENV_EXIT_t pxenv_file_api_check ( struct s_PXENV_FILE_API_CHECK *file_api_chec
 		file_api_check->Magic    = 0xe9c17b20;
 		file_api_check->Provider = 0x45585067; /* "gPXE" */
 		file_api_check->APIMask  = 0x0000007f; /* Functions e0-e6 */
+		/* Check to see if we have a PXE exit hook */
+		if ( pxe_exit_hook.segment | pxe_exit_hook.offset )
+			/* Function e7, also */
+			file_api_check->APIMask |= 0x00000080;
 		file_api_check->Flags    = 0;	       /* None defined */
 		return PXENV_EXIT_SUCCESS;
 	}
 }
+
+/**
+ * FILE EXIT HOOK
+ *
+ * @v file_exit_hook			Pointer to a struct
+ *					s_PXENV_FILE_EXIT_HOOK
+ * @v s_PXENV_FILE_EXIT_HOOK::Hook	SEG16:OFF16 to jump to
+ * @ret #PXENV_EXIT_SUCCESS		Successfully set hook
+ * @ret #PXENV_EXIT_FAILURE		We're not an NBP build
+ * @ret s_PXENV_FILE_EXIT_HOOK::Status	PXE status code
+ *
+ */
+PXENV_EXIT_t pxenv_file_exit_hook ( struct s_PXENV_FILE_EXIT_HOOK
+					*file_exit_hook ) {
+	DBG ( "PXENV_FILE_EXIT_HOOK" );
+
+	/* Check to see if we have a PXE exit hook */
+	if ( pxe_exit_hook.segment | pxe_exit_hook.offset ) {
+		/* We'll jump to the specified SEG16:OFF16 during exit */
+		pxe_exit_hook.segment = file_exit_hook->Hook.segment;
+		pxe_exit_hook.offset = file_exit_hook->Hook.offset;
+		file_exit_hook->Status = PXENV_STATUS_SUCCESS;
+		return PXENV_EXIT_SUCCESS;
+	}
+
+	DBG ( " not NBP" );
+	file_exit_hook->Status = PXENV_STATUS_UNSUPPORTED;
+	return PXENV_EXIT_FAILURE;
+}
+
