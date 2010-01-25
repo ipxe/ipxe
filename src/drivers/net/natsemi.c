@@ -270,7 +270,7 @@ static void natsemi_reset (struct net_device *netdev)
         wcsr = inl (np->ioaddr + WOLCmd) & WCSR_RESET_SAVE;
 
         /* RFCR */
-        rfcr = readl (np->ioaddr + RxFilterAddr) & RFCR_RESET_SAVE;
+        rfcr = inl (np->ioaddr + RxFilterAddr) & RFCR_RESET_SAVE;
 
         /* PMATCH */
         for (i = 0; i < 3; i++) {
