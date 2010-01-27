@@ -225,12 +225,13 @@ int unparse_uri ( char *buf, size_t size, struct uri *uri,
 	dump_uri ( uri );
 	DBG ( "\n" );
 
+	/* Ensure buffer is NUL-terminated */
+	if ( size )
+		buf[0] = '\0';
+
 	/* Special-case NULL URI */
-	if ( ! uri ) {
-		if ( size )
-			buf[0] = '\0';
+	if ( ! uri )
 		return 0;
-	}
 
 	/* Iterate through requested fields */
 	for ( i = URI_FIRST_FIELD; i <= URI_LAST_FIELD; i++ ) {
