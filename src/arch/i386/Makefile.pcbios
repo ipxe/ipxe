@@ -21,7 +21,6 @@ MEDIA		+= elfd
 MEDIA		+= lmelf
 MEDIA		+= lmelfd
 MEDIA		+= lkrn
-MEDIA		+= bImage
 MEDIA		+= dsk
 MEDIA		+= nbi
 MEDIA		+= hd
