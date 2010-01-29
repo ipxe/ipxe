@@ -25,7 +25,6 @@ MEDIA		+= dsk
 MEDIA		+= nbi
 MEDIA		+= hd
 MEDIA		+= raw
-MEDIA		+= exe
 
 # Padding rules
 #
