@@ -9,7 +9,6 @@ Literature dealing with the network protocols:
 	DHCP - RFC2131, RFC2132 (options)
 	TFTP - RFC1350, RFC2347 (options), RFC2348 (blocksize), RFC2349 (tsize)
 	RPC - RFC1831, RFC1832 (XDR), RFC1833 (rpcbind/portmapper)
-	NFS - RFC1094, RFC1813 (v3, useful for clarifications, not implemented)
 	IGMP - RFC1112
 
 **************************************************************************/

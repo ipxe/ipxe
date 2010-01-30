@@ -1426,7 +1426,7 @@ struct setting filename_setting __setting = {
 /** Root path setting */
 struct setting root_path_setting __setting = {
 	.name = "root-path",
-	.description = "NFS/iSCSI root path",
+	.description = "iSCSI root path",
 	.tag = DHCP_ROOT_PATH,
 	.type = &setting_type_string,
 };

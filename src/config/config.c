@@ -109,9 +109,6 @@ REQUIRE_OBJECT ( pxe_call );
 #ifdef DOWNLOAD_PROTO_TFTP
 REQUIRE_OBJECT ( tftp );
 #endif
-#ifdef DOWNLOAD_PROTO_NFS
-REQUIRE_OBJECT ( nfs );
-#endif
 #ifdef DOWNLOAD_PROTO_HTTP
 REQUIRE_OBJECT ( http );
 #endif
