@@ -83,7 +83,6 @@ FILE_LICENCE ( GPL2_OR_LATER );
  */
 
 #define	DNS_RESOLVER		/* DNS resolver */
-#undef	NMB_RESOLVER		/* NMB resolver */
 
 /*
  * Image types

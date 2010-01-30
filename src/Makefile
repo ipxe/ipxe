@@ -54,7 +54,6 @@ BFD_DIR		:= $(BINUTILS_DIR)
 SRCDIRS		:=
 SRCDIRS		+= libgcc
 SRCDIRS		+= core
-SRCDIRS		+= proto
 SRCDIRS		+= net net/tcp net/udp net/infiniband net/80211
 SRCDIRS		+= image
 SRCDIRS		+= drivers/bus

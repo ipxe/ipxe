@@ -146,9 +146,6 @@ REQUIRE_OBJECT ( ib_srpboot );
 #ifdef DNS_RESOLVER
 REQUIRE_OBJECT ( dns );
 #endif
-#ifdef NMB_RESOLVER
-REQUIRE_OBJECT ( nmb );
-#endif
 
 /*
  * Drag in all requested image formats
