@@ -117,6 +117,9 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #define ERRFILE_sis190		     ( ERRFILE_DRIVER | 0x00520000 )
 #define ERRFILE_myri10ge	     ( ERRFILE_DRIVER | 0x00530000 )
 #define ERRFILE_skge		     ( ERRFILE_DRIVER | 0x00540000 )
+#define ERRFILE_vxge_main	     ( ERRFILE_DRIVER | 0x00550000 )
+#define ERRFILE_vxge_config	     ( ERRFILE_DRIVER | 0x00560000 )
+#define ERRFILE_vxge_traffic	     ( ERRFILE_DRIVER | 0x00570000 )
 
 #define ERRFILE_scsi		     ( ERRFILE_DRIVER | 0x00700000 )
 #define ERRFILE_arbel		     ( ERRFILE_DRIVER | 0x00710000 )
