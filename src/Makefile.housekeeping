@@ -375,6 +375,35 @@ CFLAGS		+= -Werror
 ASFLAGS		+= --fatal-warnings
 endif
 
+# Function trace recorder state in the last build.  This is needed
+# in order to correctly rebuild whenever the function recorder is
+# enabled/disabled.
+#
+FNREC_STATE	:= $(BIN)/.fnrec.state
+ifeq ($(wildcard $(FNREC_STATE)),)
+FNREC_STATE_OLD := <invalid>
+else
+FNREC_STATE_OLD	:= $(shell cat $(FNREC_STATE))
+endif
+ifeq ($(FNREC_STATE_OLD),$(FNREC))
+$(FNREC_STATE) :
+else
+$(FNREC_STATE) : clean
+$(shell $(ECHO) "$(FNREC)" > $(FNREC_STATE))
+endif
+
+VERYCLEANUP	+= $(FNREC_STATE)
+MAKEDEPS	+= $(FNREC_STATE)
+
+ifeq ($(FNREC),1)
+# Enabling -finstrument-functions affects gcc's analysis and leads to spurious
+# warnings about use of uninitialised variables.
+#
+CFLAGS		+= -Wno-uninitialized
+CFLAGS		+= -finstrument-functions
+CFLAGS		+= -finstrument-functions-exclude-file-list=core/fnrec.c
+endif
+
 # compiler.h is needed for our linking and debugging system
 #
 CFLAGS		+= -include compiler.h
