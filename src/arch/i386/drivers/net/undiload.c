@@ -58,6 +58,12 @@ int undi_load ( struct undi_device *undi, struct undi_rom *undirom ) {
 	uint16_t exit;
 	int rc;
 
+	/* Only one UNDI instance may be loaded at any given time */
+	if ( undi_loader_entry.segment ) {
+		DBG ( "UNDI %p cannot load multiple instances\n", undi );
+		return -EBUSY;
+	}
+
 	/* Set up START_UNDI parameters */
 	memset ( &undi_loader, 0, sizeof ( undi_loader ) );
 	undi_loader.AX = undi->pci_busdevfn;
@@ -109,6 +115,9 @@ int undi_load ( struct undi_device *undi, struct undi_rom *undirom ) {
 	gateA20_set();
 
 	if ( exit != PXENV_EXIT_SUCCESS ) {
+		/* Clear entry point */
+		memset ( &undi_loader_entry, 0, sizeof ( undi_loader_entry ) );
+
 		rc = -undi_loader.Status;
 		if ( rc == 0 ) /* Paranoia */
 			rc = -EIO;
@@ -150,6 +159,9 @@ int undi_unload ( struct undi_device *undi ) {
 	static uint32_t dead = 0xdeaddead;
 
 	DBGC ( undi, "UNDI %p unloading\n", undi );
+
+	/* Clear entry point */
+	memset ( &undi_loader_entry, 0, sizeof ( undi_loader_entry ) );
 
 	/* Erase signatures */
 	if ( undi->pxenv.segment )
