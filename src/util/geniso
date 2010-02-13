@@ -13,6 +13,7 @@ case $# in
 	exit 1
 	;;
 esac
+
 # This should be the default location of the isolinux.bin file
 isolinux_bin=${ISOLINUX_BIN:-util/isolinux.bin}
 if [ ! -r $isolinux_bin ]
@@ -20,6 +21,15 @@ then
 	echo $0: $isolinux_bin not found, please install, or set ISOLINUX_BIN in arch/i386/Makefile correctly
 	exit 1
 fi
+
+# There should either be mkisofs or the compatible genisoimage program
+mkisofs=`which mkisofs genisoimage | head -n1`
+if [ -z $mkisofs ]
+then
+	echo $0: mkisofs or genisoimage not found, please install or set PATH
+	exit 1
+fi
+
 out=$1
 shift
 dir=`mktemp -d bin/iso.dir.XXXXXX`
@@ -51,5 +61,5 @@ do
 	echo "" KERNEL $g
 	cp -p $f $dir/$g
 done >> $cfg
-mkisofs -q -l -o $out -c boot.cat -b isolinux.bin -no-emul-boot -boot-load-size 4 -boot-info-table $dir
+$mkisofs -quiet -l -o $out -c boot.cat -b isolinux.bin -no-emul-boot -boot-load-size 4 -boot-info-table $dir
 rm -fr $dir
