@@ -434,9 +434,9 @@ static int iscsi_tx_data_out ( struct iscsi_session *iscsi ) {
  *
  *     HeaderDigest=None
  *     DataDigest=None
- *     MaxConnections is irrelevant; we make only one connection anyway
+ *     MaxConnections is irrelevant; we make only one connection anyway [4]
  *     InitialR2T=Yes [1]
- *     ImmediateData is irrelevant; we never send immediate data
+ *     ImmediateData is irrelevant; we never send immediate data [4]
  *     MaxRecvDataSegmentLength=8192 (default; we don't care) [3]
  *     MaxBurstLength=262144 (default; we don't care) [3]
  *     FirstBurstLength=262144 (default; we don't care)
@@ -459,6 +459,11 @@ static int iscsi_tx_data_out ( struct iscsi_session *iscsi ) {
  * these parameters, but some targets (notably OpenSolaris)
  * incorrectly assume a default value of zero, so we explicitly
  * specify the default values.
+ *
+ * [4] We are quite happy to use the RFC-defined default values for
+ * these parameters, but some targets (notably a QNAP TS-639Pro) fail
+ * unless they are supplied, so we explicitly specify the default
+ * values.
  */
 static int iscsi_build_login_request_strings ( struct iscsi_session *iscsi,
 					       void *data, size_t len ) {
@@ -516,7 +521,9 @@ static int iscsi_build_login_request_strings ( struct iscsi_session *iscsi,
 		used += ssnprintf ( data + used, len - used,
 				    "HeaderDigest=None%c"
 				    "DataDigest=None%c"
+				    "MaxConnections=1%c"
 				    "InitialR2T=Yes%c"
+				    "ImmediateData=No%c"
 				    "MaxRecvDataSegmentLength=8192%c"
 				    "MaxBurstLength=262144%c"
 				    "DefaultTime2Wait=0%c"
@@ -525,7 +532,7 @@ static int iscsi_build_login_request_strings ( struct iscsi_session *iscsi,
 				    "DataPDUInOrder=Yes%c"
 				    "DataSequenceInOrder=Yes%c"
 				    "ErrorRecoveryLevel=0%c",
-				    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 );
+				    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 );
 	}
 
 	return used;
