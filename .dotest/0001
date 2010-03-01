@@ -1,0 +1,103 @@
+Return-Path: <gpxe-devel-bounces@etherboot.org>
+Received: from p02c12m103.mxlogic.net (208.65.145.245) by entity.com with
+ ESMTP (EIMS X 3.3.9) for <mdc@entity.com>; Mon, 1 Mar 2010 15:40:07 -0500
+Received: from unknown [140.211.167.171] (EHLO etherboot.org)
+	by p02c12m103.mxlogic.net(mxl_mta-6.5.0-1) over TLS secured channel
+	with ESMTP id fd42c8b4.0.4168455.00-005.7521746.p02c12m103.mxlogic.net (envelope-from <gpxe-devel-bounces@etherboot.org>);
+	Mon, 01 Mar 2010 13:34:39 -0700 (MST)
+Received: from etherboot.org (localhost.localdomain [127.0.0.1])
+	by etherboot.org (8.14.2/8.14.1) with ESMTP id o21KYbS7012321;
+	Mon, 1 Mar 2010 15:34:38 -0500
+Received: from p02c11m026.mxlogic.net (mxl144v245.mxlogic.net [208.65.144.245])
+	by etherboot.org (8.14.2/8.14.1) with ESMTP id o21KYY2N012318
+	for <gpxe-devel@etherboot.org>; Mon, 1 Mar 2010 15:34:34 -0500
+Received: from unknown [74.125.82.172] (EHLO mail-wy0-f172.google.com)
+	by p02c11m026.mxlogic.net(mxl_mta-6.5.0-1)
+	with ESMTP id 9d42c8b4.0.166215.00-009.325205.p02c11m026.mxlogic.net
+	(envelope-from <stefanha@gmail.com>); 
+	Mon, 01 Mar 2010 13:34:33 -0700 (MST)
+Received: by wyb40 with SMTP id 40so1419829wyb.3
+	for <gpxe-devel@etherboot.org>; Mon, 01 Mar 2010 12:34:32 -0800 (PST)
+Received: by 10.216.90.131 with SMTP id e3mr3423835wef.69.1267475672513;
+	Mon, 01 Mar 2010 12:34:32 -0800 (PST)
+Received: from localhost.localdomain ([109.170.137.145])
+	by mx.google.com with ESMTPS id q9sm12235819gve.9.2010.03.01.12.34.30
+	(version=TLSv1/SSLv3 cipher=RC4-MD5);
+	Mon, 01 Mar 2010 12:34:31 -0800 (PST)
+From: Stefan Hajnoczi <stefanha@gmail.com>
+To: gpxe-devel@etherboot.org
+Date: Mon,  1 Mar 2010 20:34:47 +0000
+Message-Id: <1267475687-2588-1-git-send-email-stefanha@gmail.com>
+X-Mailer: git-send-email 1.6.6.1
+X-Spam: [F=0.0026605109; B=0.500(0); spf=0.500; CM=0.500; MH=0.500(2010030128);
+	R=0.010(110211361); S=0.200(2010022601); SC=none]
+X-MAIL-FROM: <stefanha@gmail.com>
+X-SOURCE-IP: [74.125.82.172]
+X-AnalysisOut: [v=1.0 c=1 a=rKSIm1mMmeAA:10 a=D3jKoc08XWmMkYP2DZwE0A==:17 ]
+X-AnalysisOut: [a=RqVXL-LNAAAA:8 a=iLNU1ar6AAAA:8 a=pGLkceISAAAA:8 a=AuZ9e]
+X-AnalysisOut: [Z2SswYdc2fNWtAA:9 a=CPnfYM3Gieb-gT-cb9IA:7 a=LC8435YRJuG01]
+X-AnalysisOut: [rSSbKrC0rh93LgA:4 a=DOYNd9a5gwgA:10 a=-XwJ49_kmwcA:10 a=MS]
+X-AnalysisOut: [l-tDqOz04A:10]
+Subject: [gPXE-devel] [PATCH] [makefile] Disable ccache for embedded.o
+X-BeenThere: gpxe-devel@etherboot.org
+X-Mailman-Version: 2.1.9
+Precedence: list
+List-Id: gPXE development discussion <gpxe-devel.etherboot.org>
+List-Unsubscribe: <http://etherboot.org/mailman/listinfo/gpxe-devel>,
+	<mailto:gpxe-devel-request@etherboot.org?subject=unsubscribe>
+List-Archive: <http://etherboot.org/pipermail/gpxe-devel>
+List-Post: <mailto:gpxe-devel@etherboot.org>
+List-Help: <mailto:gpxe-devel-request@etherboot.org?subject=help>
+List-Subscribe: <http://etherboot.org/mailman/listinfo/gpxe-devel>,
+	<mailto:gpxe-devel-request@etherboot.org?subject=subscribe>
+MIME-Version: 1.0
+Content-Type: text/plain; charset="us-ascii"
+Content-Transfer-Encoding: 7bit
+Sender: gpxe-devel-bounces@etherboot.org
+Errors-To: gpxe-devel-bounces@etherboot.org
+X-Spam: [F=0.2573030374; B=0.500(0); CM=0.500; MH=0.500(2010030128); R=0.580(1102113526); S=0.200(2010022601); SC=none]
+X-MAIL-FROM: <gpxe-devel-bounces@etherboot.org>
+X-SOURCE-IP: [140.211.167.171]
+X-AnalysisOut: [v=1.0 c=1 a=0P5afutgQfoA:10 a=xR1HcFQh7M/g2HrvuBmjtA==:17 ]
+X-AnalysisOut: [a=RqVXL-LNAAAA:8 a=iLNU1ar6AAAA:8 a=pGLkceISAAAA:8 a=ZQMZI]
+X-AnalysisOut: [4RIAAAA:8 a=AuZ9eZ2SswYdc2fNWtAA:9 a=re_wC--vStNGNHZ52bYA:]
+X-AnalysisOut: [7 a=aNBrdc3xVhUQmJpx8CKas0b13rQA:4 a=DOYNd9a5gwgA:10 a=-Xw]
+X-AnalysisOut: [J49_kmwcA:10 a=MSl-tDqOz04A:10 a=ivdeCs68_u8A:10]
+
+Embedded image support uses .incbin in inline assembly to include binary
+files.  The file dependency is not spotted by ccache when deciding
+whether or not to rebuild embedded.o.  This results in builds that
+contain an outdated version of the embedded image when ccache is used.
+
+Reported-by: Tim 'Shaggy' Bielawa <tbielawa@jabber.org>
+Reported-by: Matt Domsch <Matt_Domsch@dell.com>
+Signed-off-by: Stefan Hajnoczi <stefanha@gmail.com>
+---
+ src/Makefile.housekeeping |    7 +++++++
+ 1 files changed, 7 insertions(+), 0 deletions(-)
+
+diff --git a/src/Makefile.housekeeping b/src/Makefile.housekeeping
+index 1f5e115..8ba7e44 100644
+--- a/src/Makefile.housekeeping
++++ b/src/Makefile.housekeeping
+@@ -511,6 +511,13 @@ EMBED_ALL	:= $(foreach i,$(call seq,1,$(words $(EMBEDDED_FILES))),\
+ 			     \"$(notdir $(word $(i),$(EMBEDDED_FILES)))\" ))
+ 
+ $(BIN)/embedded.o : $(EMBEDDED_FILES) $(EMBEDDED_LIST)
++
++# This file uses .incbin inline assembly to include a binary file.
++# Unfortunately ccache does not detect this dependency and caches builds even
++# when the binary file has changed.
++#
++$(BIN)/embedded.o : override CC := env CCACHE_DISABLE=1 $(CC)
++
+ CFLAGS_embedded = -DEMBED_ALL="$(EMBED_ALL)"
+ 
+ # Generate the NIC file from the parsed source files.  The NIC file is
+-- 
+1.6.6.1
+
+_______________________________________________
+gPXE-devel mailing list
+gPXE-devel@etherboot.org
+http://etherboot.org/mailman/listinfo/gpxe-devel

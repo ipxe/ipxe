@@ -1,0 +1,8 @@
+Embedded image support uses .incbin in inline assembly to include binary
+files.  The file dependency is not spotted by ccache when deciding
+whether or not to rebuild embedded.o.  This results in builds that
+contain an outdated version of the embedded image when ccache is used.
+
+Reported-by: Tim 'Shaggy' Bielawa <tbielawa@jabber.org>
+Reported-by: Matt Domsch <Matt_Domsch@dell.com>
+Signed-off-by: Stefan Hajnoczi <stefanha@gmail.com>
