@@ -43,11 +43,11 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #include "config/serial.h"
 
 /** The "SYSLINUX" version string */
-static char __data16_array ( syslinux_version, [] ) = "gPXE " VERSION;
+static char __data16_array ( syslinux_version, [] ) = "\r\ngPXE " VERSION;
 #define syslinux_version __use_data16 ( syslinux_version )
 
 /** The "SYSLINUX" copyright string */
-static char __data16_array ( syslinux_copyright, [] ) = "http://etherboot.org";
+static char __data16_array ( syslinux_copyright, [] ) = " http://etherboot.org";
 #define syslinux_copyright __use_data16 ( syslinux_copyright )
 
 static char __data16_array ( syslinux_configuration_file, [] ) = "";
