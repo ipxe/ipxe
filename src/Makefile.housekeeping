@@ -511,6 +511,13 @@ EMBED_ALL	:= $(foreach i,$(call seq,1,$(words $(EMBEDDED_FILES))),\
 			     \"$(notdir $(word $(i),$(EMBEDDED_FILES)))\" ))
 
 $(BIN)/embedded.o : $(EMBEDDED_FILES) $(EMBEDDED_LIST)
+
+# This file uses .incbin inline assembly to include a binary file.
+# Unfortunately ccache does not detect this dependency and caches builds even
+# when the binary file has changed.
+#
+$(BIN)/embedded.o : override CC := env CCACHE_DISABLE=1 $(CC)
+
 CFLAGS_embedded = -DEMBED_ALL="$(EMBED_ALL)"
 
 # Generate the NIC file from the parsed source files.  The NIC file is
