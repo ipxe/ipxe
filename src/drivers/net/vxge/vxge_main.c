@@ -712,13 +712,14 @@ static struct net_device_operations vxge_operations = {
 	.irq            = vxge_irq,
 };
 
-static struct pci_device_id vxge_nics[] = {
-	PCI_ROM(0x17d5, 0x5833, "vxge-x3100", "Neterion X3100 Series", 0),
+static struct pci_device_id vxge_main_nics[] = {
+	/* If you change this, also adjust vxge_nics[] in vxge.c */
+	PCI_ID(0x17d5, 0x5833, "vxge-x3100", "Neterion X3100 Series", 0),
 };
 
 struct pci_driver vxge_driver __pci_driver = {
-	.ids = vxge_nics,
-	.id_count = (sizeof(vxge_nics) / sizeof(vxge_nics[0])),
+	.ids = vxge_main_nics,
+	.id_count = (sizeof(vxge_main_nics) / sizeof(vxge_main_nics[0])),
 	.probe = vxge_probe,
 	.remove = vxge_remove,
 };
