@@ -105,6 +105,7 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #define ERRFILE_w89c840		     ( ERRFILE_DRIVER | 0x00460000 )
 #define ERRFILE_ipoib		     ( ERRFILE_DRIVER | 0x00470000 )
 #define ERRFILE_e1000_main	     ( ERRFILE_DRIVER | 0x00480000 )
+#define ERRFILE_e1000e_main	     ( ERRFILE_DRIVER | 0x00490000 )
 #define ERRFILE_mtnic		     ( ERRFILE_DRIVER | 0x004a0000 )
 #define ERRFILE_phantom		     ( ERRFILE_DRIVER | 0x004b0000 )
 #define ERRFILE_ne2k_isa	     ( ERRFILE_DRIVER | 0x004c0000 )
