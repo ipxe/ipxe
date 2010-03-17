@@ -45,6 +45,19 @@ FILE_LICENCE ( GPL2_OR_LATER );
 
 FEATURE ( FEATURE_PROTOCOL, "iSCSI", DHCP_EB_FEATURE_ISCSI, 1 );
 
+/* Disambiguate the various error causes */
+#define EACCES_INCORRECT_TARGET_USERNAME ( EACCES | EUNIQ_01 )
+#define EACCES_INCORRECT_TARGET_PASSWORD ( EACCES | EUNIQ_02 )
+#define ENOTSUP_INITIATOR_STATUS ( ENOTSUP | EUNIQ_01 )
+#define ENOTSUP_OPCODE ( ENOTSUP | EUNIQ_02 )
+#define ENOTSUP_DISCOVERY ( ENOTSUP | EUNIQ_03 )
+#define EPERM_INITIATOR_AUTHENTICATION ( EPERM | EUNIQ_01 )
+#define EPERM_INITIATOR_AUTHORISATION ( EPERM | EUNIQ_02 )
+#define EPROTO_INVALID_CHAP_ALGORITHM ( EPROTO | EUNIQ_01 )
+#define EPROTO_INVALID_CHAP_IDENTIFIER ( EPROTO | EUNIQ_02 )
+#define EPROTO_INVALID_CHAP_CHALLENGE ( EPROTO | EUNIQ_03 )
+#define EPROTO_INVALID_CHAP_RESPONSE ( EPROTO | EUNIQ_04 )
+
 /** iSCSI initiator name (explicitly specified) */
 static char *iscsi_explicit_initiator_iqn;
 
@@ -671,7 +684,7 @@ static int iscsi_handle_chap_a_value ( struct iscsi_session *iscsi,
 	if ( strcmp ( value, "5" ) != 0 ) {
 		DBGC ( iscsi, "iSCSI %p got invalid CHAP algorithm \"%s\"\n",
 		       iscsi, value );
-		return -EPROTO;
+		return -EPROTO_INVALID_CHAP_ALGORITHM;
 	}
 
 	return 0;
@@ -695,7 +708,7 @@ static int iscsi_handle_chap_i_value ( struct iscsi_session *iscsi,
 	if ( *endp != '\0' ) {
 		DBGC ( iscsi, "iSCSI %p saw invalid CHAP identifier \"%s\"\n",
 		       iscsi, value );
-		return -EPROTO;
+		return -EPROTO_INVALID_CHAP_IDENTIFIER;
 	}
 
 	/* Prepare for CHAP with MD5 */
@@ -736,7 +749,7 @@ static int iscsi_handle_chap_c_value ( struct iscsi_session *iscsi,
 	if ( ( value[0] != '0' ) || ( value[1] != 'x' ) ) {
 		DBGC ( iscsi, "iSCSI %p saw invalid CHAP challenge \"%s\"\n",
 		       iscsi, value );
-		return -EPROTO;
+		return -EPROTO_INVALID_CHAP_CHALLENGE;
 	}
 	value += 2;
 
@@ -748,7 +761,7 @@ static int iscsi_handle_chap_c_value ( struct iscsi_session *iscsi,
 		if ( *endp != '\0' ) {
 			DBGC ( iscsi, "iSCSI %p saw invalid CHAP challenge "
 			       "byte \"%s\"\n", iscsi, buf );
-			return -EPROTO;
+			return -EPROTO_INVALID_CHAP_CHALLENGE;
 		}
 		chap_update ( &iscsi->chap, &byte, sizeof ( byte ) );
 	}
@@ -793,7 +806,7 @@ static int iscsi_handle_chap_n_value ( struct iscsi_session *iscsi,
 		DBGC ( iscsi, "iSCSI %p target username \"%s\" incorrect "
 		       "(wanted \"%s\")\n",
 		       iscsi, value, iscsi->target_username );
-		return -EACCES;
+		return -EACCES_INCORRECT_TARGET_USERNAME;
 	}
 
 	return 0;
@@ -834,7 +847,7 @@ static int iscsi_handle_chap_r_value ( struct iscsi_session *iscsi,
 	if ( ( value[0] != '0' ) || ( value[1] != 'x' ) ) {
 		DBGC ( iscsi, "iSCSI %p saw invalid CHAP response \"%s\"\n",
 		       iscsi, value );
-		return -EPROTO;
+		return -EPROTO_INVALID_CHAP_RESPONSE;
 	}
 	value += 2;
 
@@ -842,7 +855,7 @@ static int iscsi_handle_chap_r_value ( struct iscsi_session *iscsi,
 	if ( strlen ( value ) != ( 2 * iscsi->chap.response_len ) ) {
 		DBGC ( iscsi, "iSCSI %p invalid CHAP response length\n",
 		       iscsi );
-		return -EPROTO;
+		return -EPROTO_INVALID_CHAP_RESPONSE;
 	}
 
 	/* Process response an octet at a time */
@@ -853,12 +866,12 @@ static int iscsi_handle_chap_r_value ( struct iscsi_session *iscsi,
 		if ( *endp != '\0' ) {
 			DBGC ( iscsi, "iSCSI %p saw invalid CHAP response "
 			       "byte \"%s\"\n", iscsi, buf );
-			return -EPROTO;
+			return -EPROTO_INVALID_CHAP_RESPONSE;
 		}
 		if ( byte != iscsi->chap.response[i] ) {
 			DBGC ( iscsi, "iSCSI %p saw incorrect CHAP "
 			       "response\n", iscsi );
-			return -EACCES;
+			return -EACCES_INCORRECT_TARGET_PASSWORD;
 		}
 	}
 	assert ( i == iscsi->chap.response_len );
@@ -999,14 +1012,14 @@ static int iscsi_status_to_rc ( unsigned int status_class,
 	case ISCSI_STATUS_INITIATOR_ERROR :
 		switch ( status_detail ) {
 		case ISCSI_STATUS_INITIATOR_ERROR_AUTHENTICATION :
-			return -EACCES;
+			return -EPERM_INITIATOR_AUTHENTICATION;
 		case ISCSI_STATUS_INITIATOR_ERROR_AUTHORISATION :
-			return -EPERM;
+			return -EPERM_INITIATOR_AUTHORISATION;
 		case ISCSI_STATUS_INITIATOR_ERROR_NOT_FOUND :
 		case ISCSI_STATUS_INITIATOR_ERROR_REMOVED :
 			return -ENODEV;
 		default :
-			return -ENOTSUP;
+			return -ENOTSUP_INITIATOR_STATUS;
 		}
 	case ISCSI_STATUS_TARGET_ERROR :
 		return -EIO;
@@ -1374,7 +1387,7 @@ static int iscsi_rx_data ( struct iscsi_session *iscsi, const void *data,
 			return 0;
 		DBGC ( iscsi, "iSCSI %p unknown opcode %02x\n", iscsi,
 		       response->opcode );
-		return -ENOTSUP;
+		return -ENOTSUP_OPCODE;
 	}
 }
 
@@ -1757,7 +1770,7 @@ int iscsi_attach ( struct scsi_device *scsi, const char *root_path ) {
 	if ( ! iscsi->target_address ) {
 		DBGC ( iscsi, "iSCSI %p does not yet support discovery\n",
 		       iscsi );
-		rc = -ENOTSUP;
+		rc = -ENOTSUP_DISCOVERY;
 		goto err;
 	}
 	if ( ! iscsi->target_iqn ) {
