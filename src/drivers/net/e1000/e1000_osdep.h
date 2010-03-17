@@ -1,7 +1,7 @@
 /*******************************************************************************
 
   Intel PRO/1000 Linux driver
-  Copyright(c) 1999 - 2006 Intel Corporation.
+  Copyright(c) 1999 - 2008 Intel Corporation.
 
   This program is free software; you can redistribute it and/or modify it
   under the terms and conditions of the GNU General Public License,
@@ -26,118 +26,93 @@
 
 *******************************************************************************/
 
-FILE_LICENCE ( GPL2_ONLY );
+FILE_LICENCE ( GPL2_OR_LATER );
 
-/* glue for the OS independent part of e1000
+/* glue for the OS-dependent part of e1000
  * includes register access macros
  */
 
 #ifndef _E1000_OSDEP_H_
 #define _E1000_OSDEP_H_
 
-#include <stdint.h>
-#include <stdlib.h>
-#include <stdio.h>
-#include <gpxe/io.h>
-#include <errno.h>
-#include <unistd.h>
-#include <byteswap.h>
-#include <gpxe/pci.h>
-#include <gpxe/if_ether.h>
-#include <gpxe/ethernet.h>
-#include <gpxe/iobuf.h>
-#include <gpxe/netdevice.h>
+#define u8         unsigned char
+#define bool       boolean_t
+#define dma_addr_t unsigned long
+#define __le16     uint16_t
+#define __le32     uint32_t
+#define __le64     uint64_t
 
+#define __iomem
+
+#define ETH_FCS_LEN 4
+
+typedef int spinlock_t;
 typedef enum {
-#undef FALSE
-    FALSE = 0,
-#undef TRUE
-    TRUE = 1
+    false = 0,
+    true = 1
 } boolean_t;
 
-/* Debugging #defines */
+#define usec_delay(x) udelay(x)
+#define msec_delay(x) mdelay(x)
+#define msec_delay_irq(x) mdelay(x)
 
-#if 1
+#define PCI_COMMAND_REGISTER   PCI_COMMAND
+#define CMD_MEM_WRT_INVALIDATE PCI_COMMAND_INVALIDATE
+#define ETH_ADDR_LEN           ETH_ALEN
+
 #define DEBUGFUNC(F) DBG(F "\n")
-#else
-#define DEBUGFUNC(F)
-#endif
 
-#if 1
 #define DEBUGOUT(S)             DBG(S)
 #define DEBUGOUT1(S, A...)      DBG(S, A)
-#else
-#define DEBUGOUT(S)
-#define DEBUGOUT1(S, A...)
-#endif
 
 #define DEBUGOUT2 DEBUGOUT1
-#define DEBUGOUT3 DEBUGOUT1
-#define DEBUGOUT7 DEBUGOUT1
+#define DEBUGOUT3 DEBUGOUT2
+#define DEBUGOUT7 DEBUGOUT3
+
+#define E1000_REGISTER(a, reg) (((a)->mac.type >= e1000_82543) \
+                               ? reg                           \
+                               : e1000_translate_register_82542(reg))
 
 #define E1000_WRITE_REG(a, reg, value) \
-    writel((value), ((a)->hw_addr + \
-        (((a)->mac_type >= e1000_82543) ? E1000_##reg : E1000_82542_##reg)))
+    writel((value), ((a)->hw_addr + E1000_REGISTER(a, reg)))
 
-#define E1000_READ_REG(a, reg) \
-    readl((a)->hw_addr + \
-        (((a)->mac_type >= e1000_82543) ? E1000_##reg : E1000_82542_##reg))
+#define E1000_READ_REG(a, reg) (readl((a)->hw_addr + E1000_REGISTER(a, reg)))
 
 #define E1000_WRITE_REG_ARRAY(a, reg, offset, value) \
-    writel((value), ((a)->hw_addr + \
-        (((a)->mac_type >= e1000_82543) ? E1000_##reg : E1000_82542_##reg) + \
-        ((offset) << 2)))
+    writel((value), ((a)->hw_addr + E1000_REGISTER(a, reg) + ((offset) << 2)))
 
-#define E1000_READ_REG_ARRAY(a, reg, offset) \
-    readl((a)->hw_addr + \
-        (((a)->mac_type >= e1000_82543) ? E1000_##reg : E1000_82542_##reg) + \
-        ((offset) << 2))
+#define E1000_READ_REG_ARRAY(a, reg, offset) ( \
+    readl((a)->hw_addr + E1000_REGISTER(a, reg) + ((offset) << 2)))
 
 #define E1000_READ_REG_ARRAY_DWORD E1000_READ_REG_ARRAY
 #define E1000_WRITE_REG_ARRAY_DWORD E1000_WRITE_REG_ARRAY
 
-#define E1000_WRITE_REG_ARRAY_WORD(a, reg, offset, value) \
-    writew((value), ((a)->hw_addr + \
-        (((a)->mac_type >= e1000_82543) ? E1000_##reg : E1000_82542_##reg) + \
-        ((offset) << 1)))
+#define E1000_WRITE_REG_ARRAY_WORD(a, reg, offset, value) ( \
+    writew((value), ((a)->hw_addr + E1000_REGISTER(a, reg) + ((offset) << 1))))
 
-#define E1000_READ_REG_ARRAY_WORD(a, reg, offset) \
-    readw((a)->hw_addr + \
-        (((a)->mac_type >= e1000_82543) ? E1000_##reg : E1000_82542_##reg) + \
-        ((offset) << 1))
+#define E1000_READ_REG_ARRAY_WORD(a, reg, offset) ( \
+    readw((a)->hw_addr + E1000_REGISTER(a, reg) + ((offset) << 1)))
 
-#define E1000_WRITE_REG_ARRAY_BYTE(a, reg, offset, value) \
-    writeb((value), ((a)->hw_addr + \
-        (((a)->mac_type >= e1000_82543) ? E1000_##reg : E1000_82542_##reg) + \
-        (offset)))
+#define E1000_WRITE_REG_ARRAY_BYTE(a, reg, offset, value) ( \
+    writeb((value), ((a)->hw_addr + E1000_REGISTER(a, reg) + (offset))))
 
-#define E1000_READ_REG_ARRAY_BYTE(a, reg, offset) \
-    readb((a)->hw_addr + \
-        (((a)->mac_type >= e1000_82543) ? E1000_##reg : E1000_82542_##reg) + \
-        (offset))
+#define E1000_READ_REG_ARRAY_BYTE(a, reg, offset) ( \
+    readb((a)->hw_addr + E1000_REGISTER(a, reg) + (offset)))
 
-#define E1000_WRITE_FLUSH(a) E1000_READ_REG(a, STATUS)
+#define E1000_WRITE_REG_IO(a, reg, offset) do { \
+    outl(reg, ((a)->io_base));                  \
+    outl(offset, ((a)->io_base + 4));      } while(0)
 
-#define E1000_WRITE_ICH_FLASH_REG(a, reg, value) \
-    writel((value), ((a)->flash_address + reg))
+#define E1000_WRITE_FLUSH(a) E1000_READ_REG(a, E1000_STATUS)
 
-#define E1000_READ_ICH_FLASH_REG(a, reg) \
-    readl((a)->flash_address + reg)
+#define E1000_WRITE_FLASH_REG(a, reg, value) ( \
+    writel((value), ((a)->flash_address + reg)))
 
-#define E1000_WRITE_ICH_FLASH_REG16(a, reg, value) \
-    writew((value), ((a)->flash_address + reg))
+#define E1000_WRITE_FLASH_REG16(a, reg, value) ( \
+    writew((value), ((a)->flash_address + reg)))
 
-#define E1000_READ_ICH_FLASH_REG16(a, reg) \
-    readw((a)->flash_address + reg)
+#define E1000_READ_FLASH_REG(a, reg) (readl((a)->flash_address + reg))
 
-#define	msleep(n) 	mdelay(n)
+#define E1000_READ_FLASH_REG16(a, reg) (readw((a)->flash_address + reg))
 
 #endif /* _E1000_OSDEP_H_ */
-
-/*
- * Local variables:
- *  c-basic-offset: 8
- *  c-indent-level: 8
- *  tab-width: 8
- * End:
- */

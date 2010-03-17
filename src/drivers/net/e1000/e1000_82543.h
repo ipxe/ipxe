@@ -26,10 +26,20 @@
 
 *******************************************************************************/
 
-FILE_LICENCE ( GPL2_ONLY );
+FILE_LICENCE ( GPL2_OR_LATER );
 
-REQUIRE_OBJECT(e1000_main);
-REQUIRE_OBJECT(e1000_82540);
-REQUIRE_OBJECT(e1000_82541);
-REQUIRE_OBJECT(e1000_82542);
-REQUIRE_OBJECT(e1000_82543);
+#ifndef _E1000_82543_H_
+#define _E1000_82543_H_
+
+#define PHY_PREAMBLE      0xFFFFFFFF
+#define PHY_PREAMBLE_SIZE 32
+#define PHY_SOF           0x1
+#define PHY_OP_READ       0x2
+#define PHY_OP_WRITE      0x1
+#define PHY_TURNAROUND    0x2
+
+#define TBI_COMPAT_ENABLED 0x1 /* Global "knob" for the workaround */
+/* If TBI_COMPAT_ENABLED, then this is the current state (on/off) */
+#define TBI_SBP_ENABLED    0x2
+
+#endif
