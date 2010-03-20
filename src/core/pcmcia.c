@@ -25,6 +25,9 @@
  *	at some point. If there's anything obvious or better, not-so-obvious,
  *	please contact me by e-mail: anselm (AT) hoffmeister (DOT) be   *THANKS*
  */
+
+FILE_LICENCE ( GPL2_ONLY );
+
 #include <stdio.h>
 #include <pcmcia.h>
 #include <i82365.h>

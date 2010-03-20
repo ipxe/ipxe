@@ -10,6 +10,8 @@
  * published by the Free Software Foundation.
  */
 
+FILE_LICENCE ( GPL2_ONLY );
+
 /*
  * stupid library routines.. The optimized versions should generally be found
  * as inline code in <asm-xx/string.h>

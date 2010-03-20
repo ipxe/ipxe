@@ -14,6 +14,8 @@
  * are Copyright (C) 1999 David A. Hinds.  All Rights Reserved.
  */
 
+FILE_LICENCE ( GPL2_ONLY );
+
 #ifndef _LINUX_I82365_H
 #define _LINUX_I82365_H
 
