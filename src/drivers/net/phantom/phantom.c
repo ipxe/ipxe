@@ -45,7 +45,7 @@ FILE_LICENCE ( GPL2_OR_LATER );
  */
 
 /** Maximum number of ports */
-#define PHN_MAX_NUM_PORTS 4
+#define PHN_MAX_NUM_PORTS 8
 
 /** Maximum time to wait for command PEG to initialise
  *
@@ -154,6 +154,10 @@ struct phantom_nic {
 	unsigned long rds_producer_crb;
 	/** RX status descriptor consumer CRB offset */
 	unsigned long sds_consumer_crb;
+	/** RX interrupt mask CRB offset */
+	unsigned long sds_irq_mask_crb;
+	/** RX interrupts enabled */
+	unsigned int sds_irq_enabled;
 
 	/** RX producer index */
 	unsigned int rds_producer_idx;
@@ -190,6 +194,30 @@ struct phantom_nic {
 
 	/** Non-volatile settings */
 	struct settings settings;
+};
+
+/** Interrupt mask registers */
+static const unsigned long phantom_irq_mask_reg[PHN_MAX_NUM_PORTS] = {
+	UNM_PCIE_IRQ_MASK_F0,
+	UNM_PCIE_IRQ_MASK_F1,
+	UNM_PCIE_IRQ_MASK_F2,
+	UNM_PCIE_IRQ_MASK_F3,
+	UNM_PCIE_IRQ_MASK_F4,
+	UNM_PCIE_IRQ_MASK_F5,
+	UNM_PCIE_IRQ_MASK_F6,
+	UNM_PCIE_IRQ_MASK_F7,
+};
+
+/** Interrupt status registers */
+static const unsigned long phantom_irq_status_reg[PHN_MAX_NUM_PORTS] = {
+	UNM_PCIE_IRQ_STATUS_F0,
+	UNM_PCIE_IRQ_STATUS_F1,
+	UNM_PCIE_IRQ_STATUS_F2,
+	UNM_PCIE_IRQ_STATUS_F3,
+	UNM_PCIE_IRQ_STATUS_F4,
+	UNM_PCIE_IRQ_STATUS_F5,
+	UNM_PCIE_IRQ_STATUS_F6,
+	UNM_PCIE_IRQ_STATUS_F7,
 };
 
 /***************************************************************************
@@ -664,10 +692,13 @@ static int phantom_create_rx_ctx ( struct phantom_nic *phantom ) {
 		le16_to_cpu ( buf->cardrsp.rx_ctx.context_id );
 	phantom->rds_producer_crb =
 		( UNM_CAM_RAM +
-		  le32_to_cpu ( buf->cardrsp.rds.host_producer_crb ));
+		  le32_to_cpu ( buf->cardrsp.rds.host_producer_crb ) );
 	phantom->sds_consumer_crb =
 		( UNM_CAM_RAM +
-		  le32_to_cpu ( buf->cardrsp.sds.host_consumer_crb ));
+		  le32_to_cpu ( buf->cardrsp.sds.host_consumer_crb ) );
+	phantom->sds_irq_mask_crb =
+		( UNM_CAM_RAM +
+		  le32_to_cpu ( buf->cardrsp.sds.interrupt_crb ) );
 
 	DBGC ( phantom, "Phantom %p created RX context (id %04x, port phys "
 	       "%02x virt %02x)\n", phantom, phantom->rx_context_id,
@@ -678,6 +709,8 @@ static int phantom_create_rx_ctx ( struct phantom_nic *phantom ) {
 	       phantom, phantom->rds_producer_crb );
 	DBGC ( phantom, "Phantom %p SDS consumer CRB is %08lx\n",
 	       phantom, phantom->sds_consumer_crb );
+	DBGC ( phantom, "Phantom %p SDS interrupt mask CRB is %08lx\n",
+	       phantom, phantom->sds_irq_mask_crb );
 
  out:
 	free_dma ( buf, sizeof ( *buf ) );
@@ -1263,6 +1296,8 @@ static int phantom_transmit ( struct net_device *netdev,
 static void phantom_poll ( struct net_device *netdev ) {
 	struct phantom_nic *phantom = netdev_priv ( netdev );
 	struct io_buffer *iobuf;
+	unsigned int irq_vector;
+	unsigned int irq_state;
 	unsigned int cds_consumer_idx;
 	unsigned int raw_new_cds_consumer_idx;
 	unsigned int new_cds_consumer_idx;
@@ -1271,6 +1306,32 @@ static void phantom_poll ( struct net_device *netdev ) {
 	struct phantom_sds *sds;
 	unsigned int sds_handle;
 	unsigned int sds_opcode;
+
+	/* Occasionally poll the link state */
+	if ( phantom->link_poll_timer-- == 0 ) {
+		phantom_poll_link_state ( netdev );
+		/* Reset the link poll timer */
+		phantom->link_poll_timer = PHN_LINK_POLL_FREQUENCY;
+	}
+
+	/* Check for interrupts */
+	if ( phantom->sds_irq_enabled ) {
+
+		/* Do nothing unless an interrupt is asserted */
+		irq_vector = phantom_readl ( phantom, UNM_PCIE_IRQ_VECTOR );
+		if ( ! ( irq_vector & UNM_PCIE_IRQ_VECTOR_BIT( phantom->port )))
+			return;
+
+		/* Do nothing unless interrupt state machine has stabilised */
+		irq_state = phantom_readl ( phantom, UNM_PCIE_IRQ_STATE );
+		if ( ! UNM_PCIE_IRQ_STATE_TRIGGERED ( irq_state ) )
+			return;
+
+		/* Acknowledge interrupt */
+		phantom_writel ( phantom, UNM_PCIE_IRQ_STATUS_MAGIC,
+				 phantom_irq_status_reg[phantom->port] );
+		phantom_readl ( phantom, UNM_PCIE_IRQ_VECTOR );
+	}
 
 	/* Check for TX completions */
 	cds_consumer_idx = phantom->cds_consumer_idx;
@@ -1361,13 +1422,6 @@ static void phantom_poll ( struct net_device *netdev ) {
 
 	/* Refill the RX descriptor ring */
 	phantom_refill_rx_ring ( netdev );
-
-	/* Occasionally poll the link state */
-	if ( phantom->link_poll_timer-- == 0 ) {
-		phantom_poll_link_state ( netdev );
-		/* Reset the link poll timer */
-		phantom->link_poll_timer = PHN_LINK_POLL_FREQUENCY;
-	}
 }
 
 /**
@@ -1378,16 +1432,12 @@ static void phantom_poll ( struct net_device *netdev ) {
  */
 static void phantom_irq ( struct net_device *netdev, int enable ) {
 	struct phantom_nic *phantom = netdev_priv ( netdev );
-	static const unsigned long sw_int_mask_reg[PHN_MAX_NUM_PORTS] = {
-		UNM_NIC_REG_SW_INT_MASK_0,
-		UNM_NIC_REG_SW_INT_MASK_1,
-		UNM_NIC_REG_SW_INT_MASK_2,
-		UNM_NIC_REG_SW_INT_MASK_3
-	};
 
-	phantom_writel ( phantom,
-			 ( enable ? 1 : 0 ),
-			 sw_int_mask_reg[phantom->port] );
+	phantom_writel ( phantom, ( enable ? 1 : 0 ),
+			 phantom->sds_irq_mask_crb );
+	phantom_writel ( phantom, UNM_PCIE_IRQ_MASK_MAGIC,
+			 phantom_irq_mask_reg[phantom->port] );
+	phantom->sds_irq_enabled = enable;
 }
 
 /** Phantom net device operations */
