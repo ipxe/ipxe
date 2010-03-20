@@ -22,6 +22,8 @@
  * Temple Place - Suite 330, Boston, MA  02111-1307, USA.
  */
 
+FILE_LICENCE ( GPL2_OR_LATER );
+
 #ifndef _ATL1E_H_
 #define _ATL1E_H_
 

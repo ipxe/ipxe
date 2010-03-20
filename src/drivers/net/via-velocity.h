@@ -24,6 +24,8 @@
  *       Copyright (c) 2006 by Timothy Legge <tlegge@rogers.com>
  */
 
+FILE_LICENCE ( GPL2_OR_LATER );
+
 #ifndef VELOCITY_H
 #define VELOCITY_H
 

@@ -16,6 +16,8 @@
  *  Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 
+FILE_LICENCE ( GPL2_OR_LATER );
+
 /**
  * AES implementation - this is a small code version. There are much faster
  * versions around but they are much larger in size (i.e. they use large 

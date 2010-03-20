@@ -14,6 +14,8 @@
  *
  */
 
+FILE_LICENCE ( GPL2_OR_LATER );
+
 #include "etherboot.h"
 #include "ipxe/io.h"
 #include "ipxe/virtio-ring.h"
