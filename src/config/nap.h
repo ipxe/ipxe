@@ -14,4 +14,6 @@ FILE_LICENCE ( GPL2_OR_LATER );
 //#undef		NAP_PCBIOS
 //#define		NAP_NULL
 
+#include <config/local/nap.h>
+
 #endif /* CONFIG_NAP_H */

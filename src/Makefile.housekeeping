@@ -468,7 +468,7 @@ define src_template
 	@$(RM) $(2)
 	@$(TOUCH) $(2)
 	@$(CPP) $(CFLAGS) $(CFLAGS_$(3)) $(CFLAGS_$(4)) -DOBJECT=$(4) \
-		-Wno-error -MM $(1) -MG -MP | \
+		-Wno-error -M $(1) -MG -MP | \
 		sed 's/\.o\s*:/_DEPS =/' >> $(2)
 	@$(ECHO_E) '\n$$(BIN)/$(4).o :' \
 		 '$(1) $$(MAKEDEPS) $$(POST_O_DEPS) $$($(4)_DEPS)' \
@@ -920,6 +920,13 @@ $(ICCFIX) : util/iccfix.c $(MAKEDEPS)
 	$(QM)$(ECHO) "  [HOSTCC] $@"
 	$(Q)$(HOST_CC) -idirafter include -O2 -o $@ $<
 CLEANUP += $(ICCFIX)
+
+###############################################################################
+#
+# Local configs
+#
+config/local/%.h :
+	$(Q)touch $@
 
 ###############################################################################
 #

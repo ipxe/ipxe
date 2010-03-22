@@ -20,4 +20,6 @@ FILE_LICENCE ( GPL2_OR_LATER );
 //#define	CONSOLE_BTEXT		/* Who knows what this does? */
 //#define	CONSOLE_PC_KBD		/* Direct access to PC keyboard */
 
+#include <config/local/console.h>
+
 #endif /* CONFIG_CONSOLE_H */

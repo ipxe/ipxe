@@ -145,4 +145,6 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #undef	GDBUDP			/* Remote GDB debugging over UDP
 				 * (both may be set) */
 
+#include <config/local/general.h>
+
 #endif /* CONFIG_GENERAL_H */

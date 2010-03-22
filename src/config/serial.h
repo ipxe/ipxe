@@ -32,4 +32,6 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #define	COMSTOP		1		/* Stop bits */
 #endif
 
+#include <config/local/serial.h>
+
 #endif /* CONFIG_SERIAL_H */
