@@ -329,6 +329,9 @@ struct net_device {
 /** Network device is open */
 #define NETDEV_OPEN 0x0001
 
+/** Network device interrupts are enabled */
+#define NETDEV_IRQ_ENABLED 0x0002
+
 /** Link-layer protocol table */
 #define LL_PROTOCOLS __table ( struct ll_protocol, "ll_protocols" )
 
@@ -489,6 +492,17 @@ netdev_link_ok ( struct net_device *netdev ) {
 static inline __attribute__ (( always_inline )) int
 netdev_is_open ( struct net_device *netdev ) {
 	return ( netdev->state & NETDEV_OPEN );
+}
+
+/**
+ * Check whether or not network device interrupts are currently enabled
+ *
+ * @v netdev		Network device
+ * @v irq_enabled	Network device interrupts are enabled
+ */
+static inline __attribute__ (( always_inline )) int
+netdev_irq_enabled ( struct net_device *netdev ) {
+	return ( netdev->state & NETDEV_IRQ_ENABLED );
 }
 
 extern void netdev_link_down ( struct net_device *netdev );

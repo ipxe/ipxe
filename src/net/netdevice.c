@@ -460,7 +460,14 @@ void unregister_netdev ( struct net_device *netdev ) {
  * @v enable		Interrupts should be enabled
  */
 void netdev_irq ( struct net_device *netdev, int enable ) {
+
+	/* Enable or disable device interrupts */
 	netdev->op->irq ( netdev, enable );
+
+	/* Record interrupt enabled state */
+	netdev->state &= ~NETDEV_IRQ_ENABLED;
+	if ( enable )
+		netdev->state |= NETDEV_IRQ_ENABLED;
 }
 
 /**
