@@ -125,7 +125,7 @@ int iwlist ( struct net80211_device *dev ) {
 	char ssid_buf[22];
 	int rc;
 	unsigned i;
-	int was_opened = dev->netdev->state & NETDEV_OPEN;
+	int was_opened = netdev_is_open ( dev->netdev );
 	int was_channel = dev->channels[dev->channel].channel_nr;
 
 	if ( ! was_opened ) {

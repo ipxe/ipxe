@@ -366,7 +366,7 @@ pxenv_undi_set_station_address ( struct s_PXENV_UNDI_SET_STATION_ADDRESS
 	/* If adapter is open, the change will have no effect; return
 	 * an error
 	 */
-	if ( pxe_netdev->state & NETDEV_OPEN ) {
+	if ( netdev_is_open ( pxe_netdev ) ) {
 		DBG ( " failed: netdev is open\n" );
 		undi_set_station_address->Status =
 			PXENV_STATUS_UNDI_INVALID_STATE;

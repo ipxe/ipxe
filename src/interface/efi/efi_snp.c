@@ -328,7 +328,7 @@ efi_snp_station_address ( EFI_SIMPLE_NETWORK_PROTOCOL *snp, BOOLEAN reset,
 	memcpy ( snpdev->netdev->ll_addr, new, ll_protocol->ll_addr_len );
 
 	/* MAC address changes take effect only on netdev_open() */
-	if ( snpdev->netdev->state & NETDEV_OPEN ) {
+	if ( netdev_is_open ( snpdev->netdev ) ) {
 		DBGC ( snpdev, "SNPDEV %p MAC address changed while net "
 		       "devive open\n", snpdev );
 	}
@@ -713,7 +713,7 @@ static VOID EFIAPI efi_snp_wait_for_packet ( EFI_EVENT event,
 	DBGCP ( snpdev, "SNPDEV %p WAIT_FOR_PACKET\n", snpdev );
 
 	/* Do nothing unless the net device is open */
-	if ( ! ( snpdev->netdev->state & NETDEV_OPEN ) )
+	if ( ! netdev_is_open ( snpdev->netdev ) )
 		return;
 
 	/* Poll the network device */

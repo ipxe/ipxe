@@ -130,7 +130,7 @@ int netdev_tx ( struct net_device *netdev, struct io_buffer *iobuf ) {
 
 	list_add_tail ( &iobuf->list, &netdev->tx_queue );
 
-	if ( ! ( netdev->state & NETDEV_OPEN ) ) {
+	if ( ! netdev_is_open ( netdev ) ) {
 		rc = -ENETUNREACH;
 		goto err;
 	}
@@ -263,7 +263,7 @@ void netdev_rx_err ( struct net_device *netdev,
  */
 void netdev_poll ( struct net_device *netdev ) {
 
-	if ( netdev->state & NETDEV_OPEN )
+	if ( netdev_is_open ( netdev ) )
 		netdev->op->poll ( netdev );
 }
 
@@ -509,7 +509,7 @@ struct net_device * last_opened_netdev ( void ) {
 	struct net_device *netdev;
 
 	list_for_each_entry ( netdev, &open_net_devices, open_list ) {
-		assert ( netdev->state & NETDEV_OPEN );
+		assert ( netdev_is_open ( netdev ) );
 		return netdev;
 	}
 

@@ -118,7 +118,7 @@ static struct ipv4_miniroute * ipv4_route ( struct in_addr *dest ) {
 
 	/* Find first usable route in routing table */
 	list_for_each_entry ( miniroute, &ipv4_miniroutes, list ) {
-		if ( ! ( miniroute->netdev->state & NETDEV_OPEN ) )
+		if ( ! netdev_is_open ( miniroute->netdev ) )
 			continue;
 		local = ( ( ( dest->s_addr ^ miniroute->address.s_addr )
 			    & miniroute->netmask.s_addr ) == 0 );

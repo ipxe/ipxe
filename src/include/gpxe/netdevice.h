@@ -480,6 +480,17 @@ netdev_link_ok ( struct net_device *netdev ) {
 	return ( netdev->link_rc == 0 );
 }
 
+/**
+ * Check whether or not network device is open
+ *
+ * @v netdev		Network device
+ * @v is_open		Network device is open
+ */
+static inline __attribute__ (( always_inline )) int
+netdev_is_open ( struct net_device *netdev ) {
+	return ( netdev->state & NETDEV_OPEN );
+}
+
 extern void netdev_link_down ( struct net_device *netdev );
 extern int netdev_tx ( struct net_device *netdev, struct io_buffer *iobuf );
 extern void netdev_tx_complete_err ( struct net_device *netdev,

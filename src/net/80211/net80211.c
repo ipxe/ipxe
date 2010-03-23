@@ -1304,7 +1304,7 @@ struct net80211_probe_ctx * net80211_probe_start ( struct net80211_device *dev,
 	if ( ! ctx )
 		return NULL;
 
-	assert ( dev->netdev->state & NETDEV_OPEN );
+	assert ( netdev_is_open ( dev->netdev ) );
 
 	ctx->dev = dev;
 	ctx->old_keep_mgmt = net80211_keep_mgmt ( dev, 1 );
@@ -1908,7 +1908,7 @@ static int net80211_check_settings_update ( void )
 	int key_reassoc;
 
 	list_for_each_entry ( dev, &net80211_devices, list ) {
-		if ( ! ( dev->netdev->state & NETDEV_OPEN ) )
+		if ( ! netdev_is_open ( dev->netdev ) )
 			continue;
 
 		key_reassoc = 0;
@@ -2012,7 +2012,7 @@ static void net80211_set_rtscts_rate ( struct net80211_device *dev )
  */
 void net80211_set_rate_idx ( struct net80211_device *dev, int rate )
 {
-	assert ( dev->netdev->state & NETDEV_OPEN );
+	assert ( netdev_is_open ( dev->netdev ) );
 
 	if ( rate >= 0 && rate < dev->nr_rates && rate != dev->rate ) {
 		DBGC2 ( dev, "802.11 %p changing rate from %d->%d Mbps\n",
@@ -2035,7 +2035,7 @@ int net80211_change_channel ( struct net80211_device *dev, int channel )
 {
 	int i, oldchan = dev->channel;
 
-	assert ( dev->netdev->state & NETDEV_OPEN );
+	assert ( netdev_is_open ( dev->netdev ) );
 
 	for ( i = 0; i < dev->nr_channels; i++ ) {
 		if ( dev->channels[i].channel_nr == channel ) {
@@ -2064,7 +2064,7 @@ int net80211_change_channel ( struct net80211_device *dev, int channel )
 int net80211_prepare_probe ( struct net80211_device *dev, int band,
 			     int active )
 {
-	assert ( dev->netdev->state & NETDEV_OPEN );
+	assert ( netdev_is_open ( dev->netdev ) );
 
 	if ( active && ( band & NET80211_BAND_BIT_5GHZ ) ) {
 		DBGC ( dev, "802.11 %p cannot perform active scanning on "
@@ -2124,7 +2124,7 @@ int net80211_prepare_assoc ( struct net80211_device *dev,
 	struct net80211_handshaker *handshaker;
 	int rc;
 
-	assert ( dev->netdev->state & NETDEV_OPEN );
+	assert ( netdev_is_open ( dev->netdev ) );
 
 	net80211_set_state ( dev, NET80211_ASSOCIATED, 0, 0 );
 	memcpy ( dev->bssid, wlan->bssid, ETH_ALEN );

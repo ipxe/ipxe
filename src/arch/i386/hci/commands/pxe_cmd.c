@@ -6,7 +6,7 @@
 FILE_LICENCE ( GPL2_OR_LATER );
 
 static int startpxe_payload ( struct net_device *netdev ) {
-	if ( netdev->state & NETDEV_OPEN )
+	if ( netdev_is_open ( netdev ) )
 		pxe_activate ( netdev );
 	return 0;
 }
