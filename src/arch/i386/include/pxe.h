@@ -149,6 +149,4 @@ extern struct net_device *pxe_netdev;
 
 extern void pxe_set_netdev ( struct net_device *netdev );
 
-extern void pxe_set_cached_filename ( const unsigned char *filename );
-
 #endif /* PXE_H */

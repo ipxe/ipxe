@@ -171,9 +171,6 @@ static int pxe_tftp_open ( uint32_t ipaddress, unsigned int port,
 	struct in_addr address;
 	int rc;
 
-	/* Intel bug-for-bug hack */
-	pxe_set_cached_filename ( filename );
-
 	/* Reset PXE TFTP connection structure */
 	memset ( &pxe_tftp, 0, sizeof ( pxe_tftp ) );
 	xfer_init ( &pxe_tftp.xfer, &pxe_tftp_xfer_ops, NULL );
@@ -470,17 +467,6 @@ PXENV_EXIT_t pxenv_tftp_read ( struct s_PXENV_TFTP_READ *tftp_read ) {
  * value before calling this function in protected mode.  You cannot
  * call this function with a 32-bit stack segment.  (See the relevant
  * @ref pxe_x86_pmode16 "implementation note" for more details.)
- *
- * @note Microsoft's NTLDR assumes that the filename passed in via
- * s_PXENV_TFTP_READ_FILE::FileName will be stored in the "file" field
- * of the stored DHCPACK packet, whence it will be returned via any
- * subsequent calls to pxenv_get_cached_info().  Though this is
- * essentially a bug in the Intel PXE implementation (not, for once,
- * in the specification!), it is a bug that Microsoft relies upon, and
- * so we implement this bug-for-bug compatibility by overwriting the
- * filename stored DHCPACK packet with the filename passed in
- * s_PXENV_TFTP_READ_FILE::FileName.
- *
  */
 PXENV_EXIT_t pxenv_tftp_read_file ( struct s_PXENV_TFTP_READ_FILE
 				    *tftp_read_file ) {
