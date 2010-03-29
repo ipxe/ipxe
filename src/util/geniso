@@ -23,7 +23,7 @@ then
 fi
 
 # There should either be mkisofs or the compatible genisoimage program
-mkisofs=`which mkisofs genisoimage | head -n1`
+mkisofs=`which mkisofs genisoimage 2>/dev/null | head -n1`
 if [ -z $mkisofs ]
 then
 	echo $0: mkisofs or genisoimage not found, please install or set PATH
