@@ -877,12 +877,12 @@ ELF2EFI_CFLAGS	:= -I$(BINUTILS_DIR)/include -I$(BFD_DIR)/include \
 
 $(ELF2EFI32) : util/elf2efi.c $(MAKEDEPS)
 	$(QM)$(ECHO) "  [HOSTCC] $@"
-	$(Q)$(HOST_CC) $(ELF2EFI_CFLAGS) -DMDE_CPU_IA32 -O2 -o $@ $<
+	$(Q)$(HOST_CC) $< $(ELF2EFI_CFLAGS) -DMDE_CPU_IA32 -O2 -o $@
 CLEANUP += $(ELF2EFI32)
 
 $(ELF2EFI64) : util/elf2efi.c $(MAKEDEPS)
 	$(QM)$(ECHO) "  [HOSTCC] $@"
-	$(Q)$(HOST_CC) $(ELF2EFI_CFLAGS) -DMDE_CPU_X64 -O2 -o $@ $<
+	$(Q)$(HOST_CC) $< $(ELF2EFI_CFLAGS) -DMDE_CPU_X64 -O2 -o $@
 CLEANUP += $(ELF2EFI64)
 
 $(EFIROM) : util/efirom.c $(MAKEDEPS)
