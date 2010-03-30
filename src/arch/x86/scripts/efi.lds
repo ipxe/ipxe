@@ -5,8 +5,6 @@
  *
  */
 
-ENTRY ( _start )
-
 SECTIONS {
 
     /* The file starts at a virtual address of zero, and sections are

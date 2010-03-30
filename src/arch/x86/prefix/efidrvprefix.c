@@ -29,8 +29,8 @@ FILE_LICENCE ( GPL2_OR_LATER );
  * @v systab		System table
  * @ret efirc		EFI return status code
  */
-EFI_STATUS EFIAPI _start ( EFI_HANDLE image_handle,
-			   EFI_SYSTEM_TABLE *systab ) {
+EFI_STATUS EFIAPI _efidrv_start ( EFI_HANDLE image_handle,
+				  EFI_SYSTEM_TABLE *systab ) {
 	EFI_STATUS efirc;
 
 	/* Initialise EFI environment */

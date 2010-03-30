@@ -612,7 +612,8 @@ TGT_LD_IDS	= pci_vendor_id=$(firstword $(TGT_PCI_VENDOR) 0) \
 #
 TGT_LD_FLAGS	= $(foreach SYM,$(TGT_LD_PREFIX) $(TGT_LD_DRIVERS) obj_config,\
 		    -u $(SYM) --defsym check_$(SYM)=$(SYM) ) \
-		  $(patsubst %,--defsym %,$(TGT_LD_IDS))
+		  $(patsubst %,--defsym %,$(TGT_LD_IDS)) \
+		  $(TGT_LD_FLAGS_PRE)
 
 # Calculate list of debugging versions of objects to be included in
 # the target.
