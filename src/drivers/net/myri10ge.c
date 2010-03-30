@@ -723,7 +723,7 @@ static int myri10ge_net_open ( struct net_device *netdev )
 
 	/* Set the interrupt queue size. */
 
-	data[0] = ( sizeof ( priv->dma->receive_completion )
+	data[0] = ( (uint32_t)( sizeof ( priv->dma->receive_completion ) )
 		    | MXGEFW_CMD_SET_INTRQ_SIZE_FLAG_NO_STRICT_SIZE_CHECK );
 	TRY ( CMD_SET_ , INTRQ_SIZE , );
 
@@ -973,7 +973,7 @@ static int myri10ge_net_transmit ( struct net_device *netdev,
 		return -ENOBUFS;
 	}
 
-	DBG2 ( "TX %p+%d ", iobuf->data, iob_len ( iobuf ) );
+	DBG2 ( "TX %p+%zd ", iobuf->data, iob_len ( iobuf ) );
 	DBG2_HD ( iobuf->data, 14 );
 
 	/* Record the packet being transmitted, so we can later report

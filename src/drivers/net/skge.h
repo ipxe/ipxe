@@ -2461,7 +2461,7 @@ struct skge_ring {
 
 
 struct skge_hw {
-	u32	     regs;
+	unsigned long	     regs;
 	struct pci_device    *pdev;
 	u32		     intr_mask;
 	struct net_device    *dev[2];

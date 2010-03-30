@@ -843,7 +843,7 @@ ath5k_rxbuf_setup(struct ath5k_softc *sc, struct ath5k_buf *bf)
 	if (ah->ah_setup_rx_desc(ah, ds,
 				 iob_tailroom(iob),	/* buffer size */
 				 0) != 0) {
-		DBG("ath5k: error setting up RX descriptor for %d bytes\n", iob_tailroom(iob));
+		DBG("ath5k: error setting up RX descriptor for %zd bytes\n", iob_tailroom(iob));
 		return -EINVAL;
 	}
 
@@ -1293,7 +1293,7 @@ ath5k_tx_processq(struct ath5k_softc *sc, struct ath5k_txq *txq)
 		iob = bf->iob;
 		bf->iob = NULL;
 
-		DBG2("ath5k: tx %d bytes complete, %d retries\n",
+		DBG2("ath5k: tx %zd bytes complete, %d retries\n",
 		     iob_len(iob), ts.ts_retry[0]);
 
 		net80211_tx_complete(sc->dev, iob, ts.ts_retry[0],

@@ -448,7 +448,7 @@ static int ifec_net_transmit ( struct net_device *netdev,
 		return -ENOBUFS;
 	}
 
-	DBG2 ( "transmitting packet (%d bytes). status = %hX, cmd=%hX\n",
+	DBG2 ( "transmitting packet (%zd bytes). status = %hX, cmd=%hX\n",
 		iob_len ( iobuf ), tcb->status, inw ( ioaddr + SCBCmd ) );
 
 	tcb->command   = CmdSuspend | CmdTx | CmdTxFlex;

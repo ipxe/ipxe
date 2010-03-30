@@ -383,7 +383,7 @@ static int wpa_maybe_install_gtk ( struct wpa_common_ctx *ctx,
 		return -ENOENT;
 
 	if ( ie->len - 6u > sizeof ( ctx->gtk.tk ) ) {
-		DBGC ( ctx, "WPA %p: GTK KDE is too long (%d bytes, max %d)\n",
+		DBGC ( ctx, "WPA %p: GTK KDE is too long (%d bytes, max %zd)\n",
 		       ctx, ie->len - 4, sizeof ( ctx->gtk.tk ) );
 		return -EINVAL;
 	}
@@ -737,7 +737,7 @@ static int wpa_handle_1_of_2 ( struct wpa_common_ctx *ctx,
 			return rc; /* non-fatal */
 		}
 		if ( pkt->datalen > sizeof ( ctx->gtk.tk ) ) {
-			DBGC ( ctx, "WPA %p: too much GTK data (%d > %d)\n",
+			DBGC ( ctx, "WPA %p: too much GTK data (%d > %zd)\n",
 			       ctx, pkt->datalen, sizeof ( ctx->gtk.tk ) );
 			return wpa_fail ( ctx, -EINVAL );
 		}
@@ -813,7 +813,7 @@ static int eapol_key_rx ( struct io_buffer *iob, struct net_device *netdev,
 	}
 
 	if ( ( void * ) ( pkt + 1 ) + ntohs ( pkt->datalen ) > iob->tail ) {
-		DBGC ( ctx, "WPA %p: packet truncated (has %d extra bytes, "
+		DBGC ( ctx, "WPA %p: packet truncated (has %zd extra bytes, "
 		       "states %d)\n", ctx, iob->tail - ( void * ) ( pkt + 1 ),
 		       ntohs ( pkt->datalen ) );
 		rc = -EINVAL;

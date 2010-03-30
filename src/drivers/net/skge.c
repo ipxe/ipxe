@@ -1983,13 +1983,13 @@ static void skge_rx_refill(struct net_device *dev)
 		if (iob || (control & BMU_OWN))
 			continue;
 
-		DBG2("refilling rx desc %d: ", (ring->to_clean - ring->start));
+		DBG2("refilling rx desc %zd: ", (ring->to_clean - ring->start));
 
 		iob = alloc_iob(RX_BUF_SIZE);
 		if (iob) {
 			skge_rx_setup(skge, e, iob, RX_BUF_SIZE);
 		} else {
-			DBG("descr %d: alloc_iob() failed\n",
+			DBG("descr %zd: alloc_iob() failed\n",
 			     (ring->to_clean - ring->start));
 			/* We pass the descriptor to the NIC even if the
 			 * allocation failed. The card will stop as soon as it
@@ -2354,7 +2354,7 @@ static int skge_probe(struct pci_device *pdev,
 
 	hw->pdev = pdev;
 
-	hw->regs = (u32)ioremap(pci_bar_start(pdev, PCI_BASE_ADDRESS_0),
+	hw->regs = (unsigned long)ioremap(pci_bar_start(pdev, PCI_BASE_ADDRESS_0),
 				SKGE_REG_SIZE);
 	if (!hw->regs) {
 		DBG(PFX "cannot map device registers\n");
