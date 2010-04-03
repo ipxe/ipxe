@@ -1171,7 +1171,7 @@ static int tulip_poll(struct nic *nic, int retrieve)
     if (rx_ring[tp->cur_rx].status & 0x00008000) {
 	/* return the descriptor and buffer to receive ring */
         rx_ring[tp->cur_rx].status = 0x80000000;
-	tp->cur_rx = (++tp->cur_rx) % RX_RING_SIZE;
+	tp->cur_rx = (tp->cur_rx + 1) % RX_RING_SIZE;
         return 0;
     }
 
@@ -1180,7 +1180,7 @@ static int tulip_poll(struct nic *nic, int retrieve)
 
     /* return the descriptor and buffer to receive ring */
     rx_ring[tp->cur_rx].status = 0x80000000;
-    tp->cur_rx = (++tp->cur_rx) % RX_RING_SIZE;
+    tp->cur_rx = (tp->cur_rx + 1) % RX_RING_SIZE;
 
     return 1;
 }

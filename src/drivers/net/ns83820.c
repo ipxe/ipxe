@@ -687,7 +687,7 @@ static int ns83820_poll(struct nic *nic, int retrieve)
 	//			rx_ring[entry].link = 0;
 	rx_ring[entry].cmdsts = cpu_to_le32(CMDSTS_OWN);
 
-	ns->cur_rx = ++ns->cur_rx % NR_RX_DESC;
+	ns->cur_rx = (ns->cur_rx + 1) % NR_RX_DESC;
 
 	if (ns->cur_rx == 0)	/* We have wrapped the ring */
 	  kick_rx();
