@@ -831,6 +831,11 @@ $(BIN)/%.zbin : $(BIN)/%.bin $(BIN)/%.zinfo $(ZBIN)
 # ROMS), and (b) the linker is so fast that it probably wouldn't make
 # much difference to the overall build time.
 
+# Add NON_AUTO_MEDIA to the media list, so that they show up in the
+# output of "make"
+#
+MEDIA		+= $(NON_AUTO_MEDIA)
+
 media :
 	@$(ECHO) $(MEDIA)
 

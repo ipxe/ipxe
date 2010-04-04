@@ -102,18 +102,3 @@ include arch/x86/Makefile
 #
 MAKEDEPS	+= arch/i386/Makefile.$(PLATFORM)
 include arch/i386/Makefile.$(PLATFORM)
-
-# Some suffixes (e.g. %.fd0) are generated directly from other
-# finished files (e.g. %.dsk), rather than having their own prefix.
-
-# rule to write disk images to /dev/fd0
-NON_AUTO_MEDIA	+= fd0
-%fd0 : %dsk
-	$(QM)$(ECHO) "  [DD] $@"
-	$(Q)dd if=$< bs=512 conv=sync of=/dev/fd0
-	$(Q)sync
-
-# Add NON_AUTO_MEDIA to the media list, so that they show up in the
-# output of "make"
-#
-MEDIA		+= $(NON_AUTO_MEDIA)

@@ -55,6 +55,13 @@ NON_AUTO_MEDIA	+= sdsk
 	$(QM)$(ECHO) "  [GENSDSK] $@"
 	$(Q)bash util/gensdsk $@ $<
 
+# rule to write disk images to /dev/fd0
+NON_AUTO_MEDIA	+= fd0
+%fd0 : %dsk
+	$(QM)$(ECHO) "  [DD] $@"
+	$(Q)dd if=$< bs=512 conv=sync of=/dev/fd0
+	$(Q)sync
+
 # Special target for building Master Boot Record binary
 $(BIN)/mbr.bin : $(BIN)/mbr.o
 	$(QM)$(ECHO) "  [OBJCOPY] $@"
