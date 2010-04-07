@@ -82,6 +82,9 @@ REQUIRE_OBJECT ( syslog );
 #ifdef CONSOLE_EFI
 REQUIRE_OBJECT ( efi_console );
 #endif
+#ifdef CONSOLE_LINUX
+REQUIRE_OBJECT ( linux_console );
+#endif
 
 /*
  * Drag in all requested network protocols
