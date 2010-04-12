@@ -74,8 +74,8 @@ struct uri * parse_uri ( const char *uri_string ) {
 	struct uri *uri;
 	char *raw;
 	char *tmp;
-	char *path = NULL;
-	char *authority = NULL;
+	char *path;
+	char *authority;
 	int i;
 	size_t raw_len;
 
@@ -110,6 +110,7 @@ struct uri * parse_uri ( const char *uri_string ) {
 		} else {
 			/* Absolute URI with opaque part */
 			uri->opaque = tmp;
+			path = NULL;
 		}
 	} else {
 		/* Relative URI */
@@ -148,7 +149,14 @@ struct uri * parse_uri ( const char *uri_string ) {
 	} else {
 		/* Absolute/relative path */
 		uri->path = path;
+		authority = NULL;
 	}
+
+	/* If we don't have an authority (i.e. we have a non-net
+	 * path), we're already finished processing
+	 */
+	if ( ! authority )
+		goto done;
 
 	/* Split authority into user[:password] and host[:port] portions */
 	if ( ( tmp = strchr ( authority, '@' ) ) ) {
