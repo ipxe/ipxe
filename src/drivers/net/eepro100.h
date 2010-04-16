@@ -183,8 +183,6 @@ static int  ifec_net_transmit ( struct net_device*, struct io_buffer *iobuf );
 
 /* Local function prototypes */
 static void ifec_init_eeprom     ( struct net_device * );
-static int  ifec_link_check      ( struct net_device * );
-static void ifec_link_update     ( struct net_device * );
 static int  ifec_mdio_read       ( struct net_device *, int phy, int location );
 static void ifec_mdio_setup      ( struct net_device *, int options );
 static int  ifec_mdio_write      ( struct net_device *, int phy, int loc, int val);

@@ -209,7 +209,7 @@ static int ifec_pci_probe ( struct pci_device *pci,
 	nvs_read ( &priv->eeprom.nvs, EEPROM_ADDR_MDIO_REGISTER,
 		   &priv->mdio_register, 2 );
 
-	ifec_link_update ( netdev );	/* Update link state */
+	netdev_link_up ( netdev );
 
 	if ( ( rc = register_netdev ( netdev ) ) != 0 )
 		goto error;
@@ -400,7 +400,6 @@ error:
 static void ifec_net_poll ( struct net_device *netdev )
 {
 	struct ifec_private *priv = netdev->priv;
-	static int linkpoll = 0;
 	unsigned short intr_status;
 
 	DBGP ( "ifec_net_poll\n" );
@@ -411,11 +410,6 @@ static void ifec_net_poll ( struct net_device *netdev )
 	inw ( priv->ioaddr + SCBStatus );
 
 	DBG2 ( "poll - status: 0x%04X\n", intr_status );
-
-	if ( ++linkpoll > LINK_CHECK_PERIOD ) {
-		linkpoll = 0;
-		ifec_link_update ( netdev );	/* Update link state */
-	}
 
 	/* anything to do here? */
 	if ( ( intr_status & ( ~INTERRUPT_MASK ) ) == 0 )
@@ -566,45 +560,6 @@ static void ifec_init_eeprom ( struct net_device *netdev )
 	/* address len == 8 means 93c66 instead of 93c46 */
 	if ( priv->eeprom.address_len == 8 )
 		init_at93c66 ( &priv->eeprom, 16 );
-}
-
-/*
- * Check if the network cable is plugged in.
- *
- * @v netdev  		Network device to check.
- * @ret retval		greater 0 if linkup.
- */
-static int ifec_link_check ( struct net_device *netdev )
-{
-	struct ifec_private *priv = netdev->priv;
-	unsigned short mdio_register = priv->mdio_register;
-
-	DBGP ( "ifec_link_check\n" );
-
-	/* Read the status register once to discard stale data */
-	ifec_mdio_read ( netdev, mdio_register & 0x1f, 1 );
-	/* Check to see if network cable is plugged in. */
-	if ( ! ( ifec_mdio_read ( netdev, mdio_register & 0x1f, 1 )
-		  & ( 1 << 2 ) ) ) {
-		return 0;
-	}
-	return 1;
-}
-
-/*
- * Check network cable link, inform gPXE as appropriate.
- *
- * @v netdev  		Network device to check.
- */
-static void ifec_link_update ( struct net_device *netdev )
-{
-	DBGP ( "ifec_link_update\n" );
-
-	/* Update link state */
-	if ( ifec_link_check ( netdev ) )
-		netdev_link_up ( netdev );
-	else
-		netdev_link_down ( netdev );
 }
 
 /*
