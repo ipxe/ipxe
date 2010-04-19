@@ -233,156 +233,128 @@ print_kill_line:
 	.size	print_kill_line, . - print_kill_line
 
 /****************************************************************************
- * pm_call (real-mode near call)
+ * flatten_real_mode
  *
- * Call routine in 16-bit protected mode for access to extended memory
+ * Set up 4GB segment limits
  *
  * Parameters:
- *   %ax : address of routine to call in 16-bit protected mode
+ *   none
  * Returns:
  *   none
  * Corrupts:
- *   %ax
- *
- * The specified routine is called in 16-bit protected mode, with:
- *
- *   %cs : 16-bit code segment with base matching real-mode %cs
- *   %ss : 16-bit data segment with base matching real-mode %ss
- *   %ds,%es,%fs,%gs : 32-bit data segment with zero base and 4GB limit
- *
+ *   none
  ****************************************************************************
  */
-
 #ifndef KEEP_IT_REAL
 
 	/* GDT for protected-mode calls */
 	.section ".prefix.lib", "awx", @progbits
 	.align 16
-pm_call_vars:
-gdt:
-gdt_limit:		.word gdt_length - 1
-gdt_base:		.long 0
+flatten_vars:
+flatten_gdt:
+flatten_gdt_limit:	.word flatten_gdt_length - 1
+flatten_gdt_base:	.long 0
 			.word 0 /* padding */
-pm_cs:		/* 16-bit protected-mode flat code segment */
-	.equ    PM_CS, pm_cs - gdt
+flatten_cs:	/* 16-bit protected-mode flat code segment */
+	.equ    FLAT_CS, flatten_cs - flatten_gdt
 	.word   0xffff, 0
 	.byte   0, 0x9b, 0x8f, 0
-pm_ss:		/* 16-bit protected-mode flat stack segment */
-	.equ    PM_SS, pm_ss - gdt
+flatten_ss:	/* 16-bit protected-mode flat stack segment */
+	.equ    FLAT_SS, flatten_ss - flatten_gdt
 	.word   0xffff, 0
 	.byte   0, 0x93, 0x8f, 0
-pm_ds:		/* 32-bit protected-mode flat data segment */
-	.equ    PM_DS, pm_ds - gdt
-	.word   0xffff, 0
-	.byte   0, 0x93, 0xcf, 0
-gdt_end:
-	.equ	gdt_length, . - gdt
-	.size	gdt, . - gdt
+flatten_gdt_end:
+	.equ	flatten_gdt_length, . - flatten_gdt
+	.size	flatten_gdt, . - flatten_gdt
 
 	.section ".prefix.lib", "awx", @progbits
 	.align 16
-pm_saved_gdt:	
+flatten_saved_gdt:
 	.long	0, 0
-	.size	pm_saved_gdt, . - pm_saved_gdt
+	.size	flatten_saved_gdt, . - flatten_saved_gdt
 
-	.equ	pm_call_vars_size, . - pm_call_vars
-#define PM_CALL_VAR(x) ( -pm_call_vars_size + ( (x) - pm_call_vars ) )
+	.equ	flatten_vars_size, . - flatten_vars
+#define FLATTEN_VAR(x) ( -flatten_vars_size + ( (x) - flatten_vars ) )
 
 	.section ".prefix.lib", "awx", @progbits
 	.code16
-pm_call:
-	/* Preserve registers, flags, and RM return point */
+flatten_real_mode:
+	/* Preserve registers and flags, allocate local variable block */
 	pushw	%bp
 	movw	%sp, %bp
-	subw	$pm_call_vars_size, %sp
+	subw	$flatten_vars_size, %sp
 	andw	$0xfff0, %sp
 	pushfl
+	pushl	%eax
+	pushl	%edi
+	pushw	%si
+	pushw	%cx
 	pushw	%gs
 	pushw	%fs
 	pushw	%es
 	pushw	%ds
 	pushw	%ss
-	pushw	%cs
-	pushw	$99f
 
-	/* Set up local variable block, and preserve GDT */
-	pushw	%cx
-	pushw	%si
-	pushw	%di
+	/* Fill local variable block and preserve GDT */
 	pushw	%ss
 	popw	%es
-	movw	$pm_call_vars, %si
-	leaw	PM_CALL_VAR(pm_call_vars)(%bp), %di
-	movw	$pm_call_vars_size, %cx
+	movw	$flatten_vars, %si
+	leaw	FLATTEN_VAR(flatten_vars)(%bp), %di
+	movw	$flatten_vars_size, %cx
 	cs rep movsb
-	popw	%di
-	popw	%si
-	popw	%cx
-	sgdt	PM_CALL_VAR(pm_saved_gdt)(%bp)
+	sgdt	FLATTEN_VAR(flatten_saved_gdt)(%bp)
 
 	/* Set up GDT bases */
-	pushl	%eax
-	pushl	%edi
 	xorl	%eax, %eax
 	movw	%ss, %ax
 	shll	$4, %eax
 	movzwl	%bp, %edi
-	addr32 leal PM_CALL_VAR(gdt)(%eax, %edi), %eax
-	movl	%eax, PM_CALL_VAR(gdt_base)(%bp)
+	addr32 leal FLATTEN_VAR(flatten_gdt)(%eax, %edi), %eax
+	movl	%eax, FLATTEN_VAR(flatten_gdt_base)(%bp)
 	movw	%cs, %ax
-	movw	$PM_CALL_VAR(pm_cs), %di
+	movw	$FLATTEN_VAR(flatten_cs), %di
 	call	set_seg_base
 	movw	%ss, %ax
-	movw	$PM_CALL_VAR(pm_ss), %di
+	movw	$FLATTEN_VAR(flatten_ss), %di
 	call	set_seg_base
-	popl	%edi
-	popl	%eax
 
-	/* Switch CPU to protected mode and load up segment registers */
-	pushl	%eax
+	/* Switch temporarily to protected mode and set segment registers */
+	pushw	%cs
+	pushw	$2f
 	cli
-	data32 lgdt PM_CALL_VAR(gdt)(%bp)
+	data32 lgdt FLATTEN_VAR(flatten_gdt)(%bp)
 	movl	%cr0, %eax
 	orb	$CR0_PE, %al
 	movl	%eax, %cr0
-	ljmp	$PM_CS, $1f
-1:	movw	$PM_SS, %ax
+	ljmp	$FLAT_CS, $1f
+1:	movw	$FLAT_SS, %ax
 	movw	%ax, %ss
-	movw	$PM_DS, %ax
 	movw	%ax, %ds
 	movw	%ax, %es
 	movw	%ax, %fs
 	movw	%ax, %gs
-	popl	%eax
-
-	/* Call PM routine */
-	call	*%ax
-
-	/* Set real-mode segment limits on %ds, %es, %fs and %gs */
-	movw	%ss, %ax
-	movw	%ax, %ds
-	movw	%ax, %es
-	movw	%ax, %fs
-	movw	%ax, %gs
-
-	/* Return CPU to real mode */
 	movl	%cr0, %eax
 	andb	$0!CR0_PE, %al
 	movl	%eax, %cr0
+	lret
+2:	/* lret will ljmp to here */
 
-	/* Restore registers and flags */
-	lret	/* will ljmp to 99f */
-99:	popw	%ss
+	/* Restore GDT, registers and flags */
+	data32 lgdt FLATTEN_VAR(flatten_saved_gdt)(%bp)
+	popw	%ss
 	popw	%ds
 	popw	%es
 	popw	%fs
 	popw	%gs
-	data32 lgdt PM_CALL_VAR(pm_saved_gdt)(%bp)
+	popw	%cx
+	popw	%si
+	popl	%edi
+	popl	%eax
 	popfl
 	movw	%bp, %sp
 	popw	%bp
 	ret
-	.size pm_call, . - pm_call
+	.size flatten_real_mode, . - flatten_real_mode
 
 set_seg_base:
 	rolw	$4, %ax
@@ -396,7 +368,7 @@ set_seg_base:
 #endif /* KEEP_IT_REAL */
 
 /****************************************************************************
- * copy_bytes (real-mode or 16-bit protected-mode near call)
+ * copy_bytes
  *
  * Copy bytes
  *
@@ -411,6 +383,7 @@ set_seg_base:
  *   None
  ****************************************************************************
  */
+#if ! COMPRESS
 	.section ".prefix.lib", "awx", @progbits
 	.code16
 copy_bytes:
@@ -419,9 +392,10 @@ copy_bytes:
 	popl %ecx
 	ret
 	.size copy_bytes, . - copy_bytes
+#endif /* COMPRESS */
 
 /****************************************************************************
- * install_block (real-mode near call)
+ * install_block
  *
  * Install block to specified address
  *
@@ -439,39 +413,22 @@ copy_bytes:
 	.section ".prefix.lib", "awx", @progbits
 	.code16
 install_block:
-	
-#ifdef KEEP_IT_REAL
-
 	/* Preserve registers */
 	pushw	%ds
 	pushw	%es
 	pushl	%ecx
 	pushl	%edi
 	
-	/* Convert %esi and %edi to segment registers */
+	/* Convert %esi and %edi to %ds:esi and %es:edi */
 	shrl	$4, %esi
 	movw	%si, %ds
 	xorw	%si, %si
+	shll	$4, %esi
 	shrl	$4, %edi
 	movw	%di, %es
 	xorw	%di, %di
+	shll	$4, %edi
 
-#else /* KEEP_IT_REAL */
-
-	/* Call self in protected mode */
-	pushw	%ax
-	movw	$1f, %ax
-	call	pm_call
-	popw	%ax
-	ret
-1:
-	/* Preserve registers */
-	pushl	%ecx
-	pushl	%edi
-	
-#endif /* KEEP_IT_REAL */
-
-	
 #if COMPRESS
 	/* Decompress source to destination */
 	call	decompress16
@@ -492,33 +449,22 @@ install_block:
 	addl	$0xf, %esi
 	andl	$~0xf, %esi
 
-
-#ifdef KEEP_IT_REAL
-
 	/* Convert %ds:esi back to a physical address */
-	movzwl	%ds, %cx
+	xorl	%ecx, %ecx
+	movw	%ds, %cx
 	shll	$4, %ecx
 	addl	%ecx, %esi
 
-	/* Restore registers */
+	/* Restore registers and return */
 	popl	%edi
 	popl	%ecx
 	popw	%es
 	popw	%ds
-
-#else /* KEEP_IT_REAL */
-
-	/* Restore registers */
-	popl	%edi
-	popl	%ecx
-
-#endif
-
 	ret
 	.size install_block, . - install_block
-	
+
 /****************************************************************************
- * alloc_basemem (real-mode near call)
+ * alloc_basemem
  *
  * Allocate space for .text16 and .data16 from top of base memory.
  * Memory is allocated using the BIOS free base memory counter at
@@ -568,7 +514,7 @@ alloc_basemem:
 	.size alloc_basemem, . - alloc_basemem
 
 /****************************************************************************
- * free_basemem (real-mode near call)
+ * free_basemem
  *
  * Free space allocated with alloc_basemem.
  *
@@ -620,7 +566,7 @@ hooked_bios_interrupts:
 	.size	hooked_bios_interrupts, . - hooked_bios_interrupts
 
 /****************************************************************************
- * install (real-mode near call)
+ * install
  *
  * Install all text and data segments.
  *
@@ -655,7 +601,7 @@ install:
 	.size install, . - install
 
 /****************************************************************************
- * install_prealloc (real-mode near call)
+ * install_prealloc
  *
  * Install all text and data segments.
  *
@@ -679,6 +625,11 @@ install_prealloc:
 
 	/* Sanity: clear the direction flag asap */
 	cld
+
+#ifndef KEEP_IT_REAL
+	/* Flatten real mode */
+	call	flatten_real_mode
+#endif
 
 	/* Calculate physical address of payload (i.e. first source) */
 	testl	%esi, %esi
@@ -732,16 +683,15 @@ install_prealloc:
 
 	/* Copy code to new location */
 	pushl	%edi
-	pushw	%ax
-	movw	$copy_bytes, %ax
-	call	pm_call
-	popw	%ax
+	xorw	%ax, %ax
+	movw	%ax, %es
+	es rep addr32 movsb
 	popl	%edi
 
 	/* Initialise librm at new location */
 	lcall	*init_librm_vector
-
 #endif
+
 	/* Restore registers */
 	popw	%es
 	popw	%ds
@@ -749,7 +699,9 @@ install_prealloc:
 	ret
 	.size install_prealloc, . - install_prealloc
 
-	/* Vectors for far calls to .text16 functions */
+	/* Vectors for far calls to .text16 functions.  Must be in
+	 * .data16, since .prefix may not be writable.
+	 */
 	.section ".data16", "aw", @progbits
 #ifdef KEEP_IT_REAL
 init_libkir_vector:
@@ -768,7 +720,7 @@ prot_call_vector:
 #endif
 
 /****************************************************************************
- * uninstall (real-mode near call)
+ * uninstall
  *
  * Uninstall all text and data segments.
  *
