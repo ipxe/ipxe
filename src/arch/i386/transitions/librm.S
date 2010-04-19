@@ -28,9 +28,6 @@ FILE_LICENCE ( GPL2_OR_LATER )
  * Call init_librm to set up the GDT before attempting to use any
  * protected-mode code.
  *
- * Define FLATTEN_REAL_MODE if you want to use so-called "flat real
- * mode" with 4GB limits instead.
- *
  * NOTE: This must be located before prot_to_real, otherwise gas
  * throws a "can't handle non absolute segment in `ljmp'" error due to
  * not knowing the value of REAL_CS when the ljmp is encountered.
@@ -40,12 +37,6 @@ FILE_LICENCE ( GPL2_OR_LATER )
  * "non absolute segment" error.  This is most probably a bug in gas.
  ****************************************************************************
  */
-	
-#ifdef FLATTEN_REAL_MODE
-#define RM_LIMIT_16_19__AVL__SIZE__GRANULARITY 0x8f
-#else
-#define RM_LIMIT_16_19__AVL__SIZE__GRANULARITY 0x00
-#endif
 	.section ".data16", "aw", @progbits
 	.align 16
 gdt:
@@ -75,14 +66,14 @@ physical_ds:	/* 32 bit protected mode data segment, physical addresses */
 	.byte	0, 0x93, 0xcf, 0	
 
 	.org	gdt + REAL_CS, 0
-real_cs: 	/* 16 bit real mode code segment */
+real_cs: 	/* 16 bit flat real mode code segment */
 	.word	0xffff, 0
-	.byte	0, 0x9b, RM_LIMIT_16_19__AVL__SIZE__GRANULARITY, 0
+	.byte	0, 0x9b, 0x8f, 0
 
 	.org	gdt + REAL_DS	
-real_ds:	/* 16 bit real mode data segment */
+real_ds:	/* 16 bit flat real mode data segment */
 	.word	0xffff, 0
-	.byte	0, 0x93, RM_LIMIT_16_19__AVL__SIZE__GRANULARITY, 0
+	.byte	0, 0x93, 0x8f, 0
 	
 gdt_end:
 	.equ	gdt_length, gdt_end - gdt

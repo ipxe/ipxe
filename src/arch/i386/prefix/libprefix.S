@@ -263,14 +263,14 @@ gdt:
 gdt_limit:		.word gdt_length - 1
 gdt_base:		.long 0
 			.word 0 /* padding */
-pm_cs:		/* 16-bit protected-mode code segment */	
+pm_cs:		/* 16-bit protected-mode flat code segment */
 	.equ    PM_CS, pm_cs - gdt
 	.word   0xffff, 0
-	.byte   0, 0x9b, 0x00, 0
-pm_ss:		/* 16-bit protected-mode stack segment */
+	.byte   0, 0x9b, 0x8f, 0
+pm_ss:		/* 16-bit protected-mode flat stack segment */
 	.equ    PM_SS, pm_ss - gdt
 	.word   0xffff, 0
-	.byte   0, 0x93, 0x00, 0
+	.byte   0, 0x93, 0x8f, 0
 pm_ds:		/* 32-bit protected-mode flat data segment */
 	.equ    PM_DS, pm_ds - gdt
 	.word   0xffff, 0
