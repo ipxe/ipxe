@@ -194,7 +194,6 @@ SECTIONS {
      * Values calculated to save code from doing it
      *
      */
-    _prefix_filesz_sect = ( ( _prefix_filesz + 511 ) / 512 );
     _prefix_memsz_pgh	= ( ( _prefix_memsz + 15 ) / 16 );
     _prefix_memsz_sect	= ( ( _prefix_memsz + 511 ) / 512 );
     _text16_memsz_pgh	= ( ( _text16_memsz + 15 ) / 16 );

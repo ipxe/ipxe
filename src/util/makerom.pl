@@ -130,14 +130,14 @@ sub writerom ($$) {
 	close(R);
 }
 
-sub checksum ($$) {
-	my ($romref, $romsize) = @_;
+sub checksum ($) {
+	my ($romref) = @_;
 
 	substr($$romref, 6, 1) = "\x00";
-	my $sum = unpack('%8C*', substr($$romref, 0, $romsize));
+	my $sum = unpack('%8C*', $$romref);
 	substr($$romref, 6, 1) = chr(256 - $sum);
 	# Double check
-	$sum = unpack('%8C*', substr($$romref, 0, $romsize));
+	$sum = unpack('%8C*', $$romref);
 	if ($sum != 0) {
 		print "Checksum fails\n"
 	} elsif ($opts{'v'}) {
@@ -146,10 +146,10 @@ sub checksum ($$) {
 }
 
 sub makerom () {
-	my ($rom, $romsize, $stubsize);
+	my ($rom, $romsize);
 
-	getopts('3xni:p:s:v', \%opts);
-	$ARGV[0] or die "Usage: $0 [-s romsize] [-i ident] [-p vendorid,deviceid] [-n] [-x] [-3] rom-file\n";
+	getopts('3xi:p:s:v', \%opts);
+	$ARGV[0] or die "Usage: $0 [-s romsize] [-i ident] [-p vendorid,deviceid] [-x] [-3] rom-file\n";
 	open(R, $ARGV[0]) or die "$ARGV[0]: $!\n";
 	# Read in the whole ROM in one gulp
 	my $filesize = read(R, $rom, MAXROMSIZE+1);
@@ -183,16 +183,10 @@ sub makerom () {
 	}
 	# Pad with 0xFF to $romsize
 	$rom .= "\xFF" x ($romsize - length($rom));
-	# If this is a stub ROM, don't force header size to the full amount
-	if (!$opts{'n'}) {
-		if ($romsize >= 128 * 1024) {
-			print "Warning: ROM size exceeds extension BIOS limit\n";
-		}
-		substr($rom, 2, 1) = chr(($romsize / 512) % 256);
-	} else {
-		$stubsize = ord(substr($rom, 2, 1)) * 512;
-		print "Stub size is $stubsize\n" if $opts{'v'};
+	if ($romsize >= 128 * 1024) {
+		print "Warning: ROM size exceeds extension BIOS limit\n";
 	}
+	substr($rom, 2, 1) = chr(($romsize / 512) % 256);
 	print "ROM size is $romsize\n" if $opts{'v'};
 	# set the product string only if we don't have one yet
 	my $pnp_hdr_offset = unpack('v', substr($rom, PNP_PTR_LOC, 2));
@@ -202,7 +196,7 @@ sub makerom () {
 	# 3c503 requires last two bytes to be 0x80
 	substr($rom, MINROMSIZE-2, 2) = "\x80\x80"
 		if ($opts{'3'} and $romsize == MINROMSIZE);
-	checksum(\$rom, $opts{'n'} ? $stubsize : $romsize);
+	checksum(\$rom);
 	writerom($ARGV[0], \$rom);
 }
 
@@ -219,7 +213,7 @@ sub modrom () {
 	print "$filesize bytes read\n" if $opts{'v'};
 	pcipnpheaders(\$rom, undef);
 	undiheaders(\$rom);
-	checksum(\$rom, ord(substr($rom, 2, 1)) * 512);
+	checksum(\$rom);
 	writerom($ARGV[0], \$rom);
 }
 
