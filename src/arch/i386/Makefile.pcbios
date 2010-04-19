@@ -11,7 +11,6 @@ LDFLAGS		+= -N --no-check-sections
 # Media types.
 #
 MEDIA		+= rom
-MEDIA		+= hrom
 MEDIA		+= pxe
 MEDIA		+= kpxe
 MEDIA		+= kkpxe
@@ -24,7 +23,6 @@ MEDIA		+= raw
 # Padding rules
 #
 PAD_rom		= $(PADIMG) --blksize=512 --byte=0xff $@
-PAD_hrom	= $(PAD_rom)
 PAD_dsk		= $(PADIMG) --blksize=512 $@
 PAD_hd		= $(PADIMG) --blksize=32768 $@
 
