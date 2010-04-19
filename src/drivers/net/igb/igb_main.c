@@ -626,7 +626,7 @@ static void igb_process_rx_packets ( struct net_device *netdev )
 	}
 }
 
-/** Functions that implement the gPXE driver API **/
+/** Functions that implement the iPXE driver API **/
 
 /**
  * igb_close - Disables a network interface

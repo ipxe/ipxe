@@ -26,9 +26,9 @@
 #include <errno.h>
 #include <assert.h>
 #include <getopt.h>
-#include <gpxe/efi/efi.h>
-#include <gpxe/efi/IndustryStandard/PeImage.h>
-#include <gpxe/efi/IndustryStandard/Pci22.h>
+#include <ipxe/efi/efi.h>
+#include <ipxe/efi/IndustryStandard/PeImage.h>
+#include <ipxe/efi/IndustryStandard/Pci22.h>
 
 #define eprintf(...) fprintf ( stderr, __VA_ARGS__ )
 

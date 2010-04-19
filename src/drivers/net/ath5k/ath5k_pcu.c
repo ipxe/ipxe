@@ -6,7 +6,7 @@
  * Copyright (c) 2007-2008 Pavel Roskin <proski@gnu.org>
  * Copyright (c) 2007-2008 Jiri Slaby <jirislaby@gmail.com>
  *
- * Lightly modified for gPXE, July 2009, by Joshua Oreman <oremanj@rwcr.net>.
+ * Lightly modified for iPXE, July 2009, by Joshua Oreman <oremanj@rwcr.net>.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -43,7 +43,7 @@ FILE_LICENCE ( MIT );
  *
  * Initialize PCU for the various operating modes (AP/STA etc)
  *
- * For gPXE we always assume STA mode.
+ * For iPXE we always assume STA mode.
  */
 int ath5k_hw_set_opmode(struct ath5k_hw *ah)
 {

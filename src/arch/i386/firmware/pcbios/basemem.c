@@ -22,7 +22,7 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #include <realmode.h>
 #include <bios.h>
 #include <basemem.h>
-#include <gpxe/hidemem.h>
+#include <ipxe/hidemem.h>
 
 /** @file
  *

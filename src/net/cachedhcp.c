@@ -21,11 +21,11 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <gpxe/dhcp.h>
-#include <gpxe/dhcppkt.h>
-#include <gpxe/netdevice.h>
-#include <gpxe/iobuf.h>
-#include <gpxe/uaccess.h>
+#include <ipxe/dhcp.h>
+#include <ipxe/dhcppkt.h>
+#include <ipxe/netdevice.h>
+#include <ipxe/iobuf.h>
+#include <ipxe/uaccess.h>
 
 /** @file
  *

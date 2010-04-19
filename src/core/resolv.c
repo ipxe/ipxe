@@ -22,11 +22,11 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #include <stdlib.h>
 #include <string.h>
 #include <errno.h>
-#include <gpxe/in.h>
-#include <gpxe/xfer.h>
-#include <gpxe/open.h>
-#include <gpxe/process.h>
-#include <gpxe/resolv.h>
+#include <ipxe/in.h>
+#include <ipxe/xfer.h>
+#include <ipxe/open.h>
+#include <ipxe/process.h>
+#include <ipxe/resolv.h>
 
 /** @file
  *

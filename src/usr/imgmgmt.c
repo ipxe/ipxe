@@ -22,11 +22,11 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #include <stdlib.h>
 #include <stdio.h>
 #include <errno.h>
-#include <gpxe/image.h>
-#include <gpxe/downloader.h>
-#include <gpxe/monojob.h>
-#include <gpxe/open.h>
-#include <gpxe/uri.h>
+#include <ipxe/image.h>
+#include <ipxe/downloader.h>
+#include <ipxe/monojob.h>
+#include <ipxe/open.h>
+#include <ipxe/uri.h>
 #include <usr/imgmgmt.h>
 
 /** @file

@@ -33,21 +33,21 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #include <pxe_call.h>
 #include <setjmp.h>
 #include <string.h>
-#include <gpxe/posix_io.h>
-#include <gpxe/process.h>
-#include <gpxe/serial.h>
-#include <gpxe/init.h>
-#include <gpxe/image.h>
+#include <ipxe/posix_io.h>
+#include <ipxe/process.h>
+#include <ipxe/serial.h>
+#include <ipxe/init.h>
+#include <ipxe/image.h>
 #include <usr/imgmgmt.h>
 #include "config/console.h"
 #include "config/serial.h"
 
 /** The "SYSLINUX" version string */
-static char __data16_array ( syslinux_version, [] ) = "\r\ngPXE " VERSION;
+static char __data16_array ( syslinux_version, [] ) = "\r\niPXE " VERSION;
 #define syslinux_version __use_data16 ( syslinux_version )
 
 /** The "SYSLINUX" copyright string */
-static char __data16_array ( syslinux_copyright, [] ) = " http://etherboot.org";
+static char __data16_array ( syslinux_copyright, [] ) = " http://ipxe.org";
 #define syslinux_copyright __use_data16 ( syslinux_copyright )
 
 static char __data16_array ( syslinux_configuration_file, [] ) = "";
@@ -335,7 +335,7 @@ static __asmcall void int22 ( struct i386_all_regs *ix86 ) {
 		ix86->regs.cl = 0; /* minor */
 
 		/* SYSLINUX derivative ID */
-		ix86->regs.dl = BZI_LOADER_TYPE_GPXE;
+		ix86->regs.dl = BZI_LOADER_TYPE_IPXE;
 
 		/* SYSLINUX version and copyright strings */
 		ix86->segs.es = rm_ds;
@@ -396,7 +396,7 @@ static __asmcall void int22 ( struct i386_all_regs *ix86 ) {
 				break;
 			}
 
-			/* This relies on the fact that a gPXE POSIX fd will
+			/* This relies on the fact that a iPXE POSIX fd will
 			 * always fit in 16 bits.
 			 */
 #if (POSIX_FD_MAX > 65535)
@@ -453,9 +453,9 @@ static __asmcall void int22 ( struct i386_all_regs *ix86 ) {
 
 	case 0x000A: /* Get Derivative-Specific Information */
 
-		/* gPXE has its own derivative ID, so there is no defined
+		/* iPXE has its own derivative ID, so there is no defined
 		 * output here; just return AL for now */
-		ix86->regs.al = BZI_LOADER_TYPE_GPXE;
+		ix86->regs.al = BZI_LOADER_TYPE_IPXE;
 		ix86->flags &= ~CF;
 		break;
 

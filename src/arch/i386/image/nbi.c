@@ -4,13 +4,13 @@
 #include <gateA20.h>
 #include <memsizes.h>
 #include <basemem_packet.h>
-#include <gpxe/uaccess.h>
-#include <gpxe/segment.h>
-#include <gpxe/init.h>
-#include <gpxe/netdevice.h>
-#include <gpxe/fakedhcp.h>
-#include <gpxe/image.h>
-#include <gpxe/features.h>
+#include <ipxe/uaccess.h>
+#include <ipxe/segment.h>
+#include <ipxe/init.h>
+#include <ipxe/netdevice.h>
+#include <ipxe/fakedhcp.h>
+#include <ipxe/image.h>
+#include <ipxe/features.h>
 
 /** @file
  *

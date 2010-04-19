@@ -25,11 +25,11 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #include <biosint.h>
 #include <pnpbios.h>
 #include <basemem_packet.h>
-#include <gpxe/io.h>
-#include <gpxe/iobuf.h>
-#include <gpxe/netdevice.h>
-#include <gpxe/if_ether.h>
-#include <gpxe/ethernet.h>
+#include <ipxe/io.h>
+#include <ipxe/iobuf.h>
+#include <ipxe/netdevice.h>
+#include <ipxe/if_ether.h>
+#include <ipxe/ethernet.h>
 #include <undi.h>
 #include <undinet.h>
 #include <pxeparent.h>

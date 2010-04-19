@@ -20,8 +20,8 @@ FILE_LICENCE ( GPL2_OR_LATER );
 
 #include <stdint.h>
 #include <errno.h>
-#include <gpxe/iobuf.h>
-#include <gpxe/netdevice.h>
+#include <ipxe/iobuf.h>
+#include <ipxe/netdevice.h>
 
 /** @file
  *

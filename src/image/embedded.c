@@ -2,16 +2,16 @@
  *
  * Embedded image support
  *
- * Embedded images are images built into the gPXE binary and do not require
+ * Embedded images are images built into the iPXE binary and do not require
  * fetching over the network.
  */
 
 FILE_LICENCE ( GPL2_OR_LATER );
 
 #include <string.h>
-#include <gpxe/image.h>
-#include <gpxe/uaccess.h>
-#include <gpxe/init.h>
+#include <ipxe/image.h>
+#include <ipxe/uaccess.h>
+#include <ipxe/init.h>
 
 /**
  * Free embedded image

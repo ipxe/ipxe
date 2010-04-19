@@ -10,7 +10,7 @@
 FILE_LICENCE ( GPL2_OR_LATER );
 
 #include <stdint.h>
-#include <gpxe/list.h>
+#include <ipxe/list.h>
 #include <realmode.h>
 
 struct block_device;

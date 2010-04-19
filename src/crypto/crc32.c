@@ -20,7 +20,7 @@
 
 FILE_LICENCE ( GPL2_OR_LATER );
 
-#include <gpxe/crc32.h>
+#include <ipxe/crc32.h>
 
 #define CRCPOLY		0xedb88320
 

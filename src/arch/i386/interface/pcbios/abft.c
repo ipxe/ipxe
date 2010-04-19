@@ -19,9 +19,9 @@
 FILE_LICENCE ( GPL2_OR_LATER );
 
 #include <realmode.h>
-#include <gpxe/aoe.h>
-#include <gpxe/netdevice.h>
-#include <gpxe/abft.h>
+#include <ipxe/aoe.h>
+#include <ipxe/netdevice.h>
+#include <ipxe/abft.h>
 
 /** @file
  *
@@ -30,7 +30,7 @@ FILE_LICENCE ( GPL2_OR_LATER );
  */
 
 #define abftab __use_data16 ( abftab )
-/** The aBFT used by gPXE */
+/** The aBFT used by iPXE */
 struct abft_table __data16 ( abftab ) __attribute__ (( aligned ( 16 ) )) = {
 	/* ACPI header */
 	.acpi = {
@@ -38,7 +38,7 @@ struct abft_table __data16 ( abftab ) __attribute__ (( aligned ( 16 ) )) = {
 		.length = sizeof ( abftab ),
 		.revision = 1,
 		.oem_id = "FENSYS",
-		.oem_table_id = "gPXE",
+		.oem_table_id = "iPXE",
 	},
 };
 

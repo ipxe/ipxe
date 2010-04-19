@@ -25,11 +25,11 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #include <stdio.h>
 #include <unistd.h>
 #include <byteswap.h>
-#include <gpxe/settings.h>
-#include <gpxe/infiniband.h>
-#include <gpxe/iobuf.h>
-#include <gpxe/ib_mi.h>
-#include <gpxe/ib_sma.h>
+#include <ipxe/settings.h>
+#include <ipxe/infiniband.h>
+#include <ipxe/iobuf.h>
+#include <ipxe/ib_mi.h>
+#include <ipxe/ib_sma.h>
 
 /**
  * @file
@@ -99,7 +99,7 @@ static void ib_sma_node_desc ( struct ib_device *ibdev,
 	hostname_len = fetch_string_setting ( NULL, &hostname_setting,
 					      hostname, sizeof ( hostname ) );
 	snprintf ( node_desc->node_string, sizeof ( node_desc->node_string ),
-		   "gPXE %s%s%02x:%02x:%02x:%02x:%02x:%02x:%02x:%02x (%s)",
+		   "iPXE %s%s%02x:%02x:%02x:%02x:%02x:%02x:%02x:%02x (%s)",
 		   hostname, ( ( hostname_len >= 0 ) ? " " : "" ),
 		   guid.u.bytes[0], guid.u.bytes[1], guid.u.bytes[2],
 		   guid.u.bytes[3], guid.u.bytes[4], guid.u.bytes[5],

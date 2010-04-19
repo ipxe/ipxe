@@ -24,10 +24,10 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #include <string.h>
 #include <curses.h>
 #include <console.h>
-#include <gpxe/settings.h>
-#include <gpxe/editbox.h>
-#include <gpxe/keys.h>
-#include <gpxe/settings_ui.h>
+#include <ipxe/settings.h>
+#include <ipxe/editbox.h>
+#include <ipxe/keys.h>
+#include <ipxe/settings_ui.h>
 
 /** @file
  *
@@ -301,7 +301,7 @@ static void alert ( const char *fmt, ... ) {
  */
 static void draw_title_row ( void ) {
 	attron ( A_BOLD );
-	msg ( TITLE_ROW, "gPXE option configuration console" );
+	msg ( TITLE_ROW, "iPXE option configuration console" );
 	attroff ( A_BOLD );
 }
 

@@ -18,7 +18,7 @@
 
 FILE_LICENCE ( GPL2_OR_LATER );
 
-#include <gpxe/init.h>
+#include <ipxe/init.h>
 #include "pxe.h"
 #include "pxe_call.h"
 

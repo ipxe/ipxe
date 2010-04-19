@@ -54,7 +54,7 @@ assert_printf ( const char *fmt, ... ) asm ( "printf" );
  * If the condition is not true, the link will fail with an unresolved
  * symbol (error_symbol).
  *
- * This macro is gPXE-specific.  Do not use this macro in code
+ * This macro is iPXE-specific.  Do not use this macro in code
  * intended to be portable.
  *
  */

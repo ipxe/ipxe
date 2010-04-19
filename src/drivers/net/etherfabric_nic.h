@@ -20,11 +20,11 @@ FILE_LICENCE ( GPL_ANY );
 
 #ifndef EFAB_NIC_H
 #define  EFAB_NIC_H
-#include <gpxe/bitbash.h>
-#include <gpxe/i2c.h>
-#include <gpxe/spi.h>
-#include <gpxe/nvo.h>
-#include <gpxe/if_ether.h>
+#include <ipxe/bitbash.h>
+#include <ipxe/i2c.h>
+#include <ipxe/spi.h>
+#include <ipxe/nvo.h>
+#include <ipxe/if_ether.h>
 /**************************************************************************
  *
  * Constants and macros

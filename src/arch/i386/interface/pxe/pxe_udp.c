@@ -6,10 +6,10 @@
 
 #include <string.h>
 #include <byteswap.h>
-#include <gpxe/xfer.h>
-#include <gpxe/udp.h>
-#include <gpxe/uaccess.h>
-#include <gpxe/process.h>
+#include <ipxe/xfer.h>
+#include <ipxe/udp.h>
+#include <ipxe/uaccess.h>
+#include <ipxe/process.h>
 #include <pxe.h>
 
 /*

@@ -4,12 +4,12 @@
 #include <assert.h>
 #include <byteswap.h>
 #include <errno.h>
-#include <gpxe/tcpip.h>
-#include <gpxe/iobuf.h>
-#include <gpxe/xfer.h>
-#include <gpxe/open.h>
-#include <gpxe/uri.h>
-#include <gpxe/udp.h>
+#include <ipxe/tcpip.h>
+#include <ipxe/iobuf.h>
+#include <ipxe/xfer.h>
+#include <ipxe/open.h>
+#include <ipxe/uri.h>
+#include <ipxe/udp.h>
 
 /** @file
  *

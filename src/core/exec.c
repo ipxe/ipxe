@@ -27,9 +27,9 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #include <getopt.h>
 #include <errno.h>
 #include <assert.h>
-#include <gpxe/tables.h>
-#include <gpxe/command.h>
-#include <gpxe/settings.h>
+#include <ipxe/tables.h>
+#include <ipxe/command.h>
+#include <ipxe/settings.h>
 
 /** @file
  *

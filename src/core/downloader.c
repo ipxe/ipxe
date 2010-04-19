@@ -21,13 +21,13 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #include <stdlib.h>
 #include <stdarg.h>
 #include <errno.h>
-#include <gpxe/xfer.h>
-#include <gpxe/open.h>
-#include <gpxe/job.h>
-#include <gpxe/uaccess.h>
-#include <gpxe/umalloc.h>
-#include <gpxe/image.h>
-#include <gpxe/downloader.h>
+#include <ipxe/xfer.h>
+#include <ipxe/open.h>
+#include <ipxe/job.h>
+#include <ipxe/uaccess.h>
+#include <ipxe/umalloc.h>
+#include <ipxe/image.h>
+#include <ipxe/downloader.h>
 
 /** @file
  *

@@ -24,10 +24,10 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #include <byteswap.h>
 #include <errno.h>
 #include <assert.h>
-#include <gpxe/infiniband.h>
-#include <gpxe/ib_mi.h>
-#include <gpxe/ib_pathrec.h>
-#include <gpxe/ib_cm.h>
+#include <ipxe/infiniband.h>
+#include <ipxe/ib_mi.h>
+#include <ipxe/ib_pathrec.h>
+#include <ipxe/ib_cm.h>
 
 /**
  * @file

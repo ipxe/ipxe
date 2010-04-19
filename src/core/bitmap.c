@@ -19,7 +19,7 @@
 FILE_LICENCE ( GPL2_OR_LATER );
 
 #include <errno.h>
-#include <gpxe/bitmap.h>
+#include <ipxe/bitmap.h>
 
 /** @file
  *

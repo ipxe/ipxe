@@ -158,19 +158,19 @@ $build_dir = mktempcopy ( "$src_dir", "/tmp", "MDCROM" );
 $config_dir = $build_dir . "/config";
 
 // Write config files with supplied flags
-write_gpxe_config_files ( $config_dir, $flags );
+write_ipxe_config_files ( $config_dir, $flags );
 
 // Handle a possible embedded script
 $emb_script_cmd = "";
 $embedded_script = isset ( $_POST['embedded_script'] ) ? $_POST['embedded_script'] : "";
 if ( $embedded_script != "" ) {
-    $emb_script_path = "$build_dir" . "/script0.gpxe";
+    $emb_script_path = "$build_dir" . "/script0.ipxe";
 
-	if ( substr ( $embedded_script, 0, 5 ) != "#!gpxe" ) {
-		$embedded_script = "#!gpxe\n" . $embedded_script;
+	if ( substr ( $embedded_script, 0, 5 ) != "#!ipxe" ) {
+		$embedded_script = "#!ipxe\n" . $embedded_script;
 	}
 
-    // gPXE 0.9.7 doesn't like '\r\n" in the shebang...
+    // iPXE 0.9.7 doesn't like '\r\n" in the shebang...
     $embedded_script = str_replace ( "\r\n", "\n", $embedded_script );
 
     write_file_from_string ( $emb_script_path, $embedded_script );
@@ -239,7 +239,7 @@ if ( $status == 0 ) {
             // Delete build directory as soon as it is not needed
             rm_build_dir ();
 
-            $output_filename = "gpxe-${version}-${nic}.${fmt_extension}";
+            $output_filename = "ipxe-${version}-${nic}.${fmt_extension}";
 
             // Try to force IE to handle downloading right.
             Header ( "Cache-control: private");

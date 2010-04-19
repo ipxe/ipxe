@@ -33,12 +33,12 @@ FILE_LICENCE ( BSD2 );
 #include <stdlib.h>
 #include <string.h>
 #include <errno.h>
-#include <gpxe/iobuf.h>
-#include <gpxe/xfer.h>
-#include <gpxe/process.h>
-#include <gpxe/infiniband.h>
-#include <gpxe/ib_cm.h>
-#include <gpxe/ib_cmrc.h>
+#include <ipxe/iobuf.h>
+#include <ipxe/xfer.h>
+#include <ipxe/process.h>
+#include <ipxe/infiniband.h>
+#include <ipxe/ib_cm.h>
+#include <ipxe/ib_cmrc.h>
 
 /**
  * @file

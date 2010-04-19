@@ -1,7 +1,7 @@
 #ifndef CONSOLE_H
 #define CONSOLE_H
 
-#include <gpxe/tables.h>
+#include <ipxe/tables.h>
 
 /** @file
  *

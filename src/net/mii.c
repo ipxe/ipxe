@@ -2,7 +2,7 @@
 
 	mii.c: MII interface library
 
-	Ported to gPXE by Daniel Verkamp <daniel@drv.nu>
+	Ported to iPXE by Daniel Verkamp <daniel@drv.nu>
 	from Linux drivers/net/mii.c
 
 	Maintained by Jeff Garzik <jgarzik@pobox.com>

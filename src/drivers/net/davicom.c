@@ -45,8 +45,8 @@ FILE_LICENCE ( GPL_ANY );
 
 #include "etherboot.h"
 #include "nic.h"
-#include <gpxe/pci.h>
-#include <gpxe/ethernet.h>
+#include <ipxe/pci.h>
+#include <ipxe/ethernet.h>
 
 #undef DAVICOM_DEBUG
 #undef DAVICOM_DEBUG_WHERE

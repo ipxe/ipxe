@@ -14,8 +14,8 @@
 FILE_LICENCE ( GPL2_OR_LATER );
 
 #include <stddef.h>
-#include <gpxe/timer2.h>
-#include <gpxe/io.h>
+#include <ipxe/timer2.h>
+#include <ipxe/io.h>
 
 /* Timers tick over at this rate */
 #define TIMER2_TICKS_PER_SEC	1193180U

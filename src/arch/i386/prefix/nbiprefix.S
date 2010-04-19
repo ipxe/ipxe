@@ -50,7 +50,7 @@ memlen:	.long	-512
  *****************************************************************************
  */
 entry:
-	/* Install gPXE */
+	/* Install iPXE */
 	call	install
 
 	/* Jump to .text16 segment */
@@ -64,7 +64,7 @@ entry:
 	call	prot_call
 	popl	%ecx /* discard */
 
-	/* Uninstall gPXE */
+	/* Uninstall iPXE */
 	call	uninstall
 
 	/* Reboot system */

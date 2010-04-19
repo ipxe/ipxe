@@ -86,11 +86,11 @@ struct bzimage_header {
 /** bzImage boot loader identifier for Etherboot */
 #define BZI_LOADER_TYPE_ETHERBOOT 0x40
 
-/** bzImage boot loader identifier for gPXE
+/** bzImage boot loader identifier for iPXE
  *
  * We advertise ourselves as Etherboot version 6.
  */
-#define BZI_LOADER_TYPE_GPXE ( BZI_LOADER_TYPE_ETHERBOOT | 0x06 )
+#define BZI_LOADER_TYPE_IPXE ( BZI_LOADER_TYPE_ETHERBOOT | 0x06 )
 
 /** bzImage "load high" flag */
 #define BZI_LOAD_HIGH 0x01

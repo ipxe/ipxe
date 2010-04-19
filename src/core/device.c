@@ -19,10 +19,10 @@
 FILE_LICENCE ( GPL2_OR_LATER );
 
 #include <string.h>
-#include <gpxe/list.h>
-#include <gpxe/tables.h>
-#include <gpxe/device.h>
-#include <gpxe/init.h>
+#include <ipxe/list.h>
+#include <ipxe/tables.h>
+#include <ipxe/device.h>
+#include <ipxe/init.h>
 
 /**
  * @file

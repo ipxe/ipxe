@@ -20,7 +20,7 @@ FILE_LICENCE ( GPL2_OR_LATER );
 
 #include <string.h>
 #include <errno.h>
-#include <gpxe/job.h>
+#include <ipxe/job.h>
 
 /** @file
  *

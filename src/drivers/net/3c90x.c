@@ -1,11 +1,11 @@
 /*
- * 3c90x.c -- This file implements a gPXE API 3c90x driver
+ * 3c90x.c -- This file implements a iPXE API 3c90x driver
  *
  * Originally written for etherboot by:
  *   Greg Beeley, Greg.Beeley@LightSys.org
  * Modified by Steve Smith,
  *   Steve.Smith@Juno.Com. Alignment bug fix Neil Newell (nn@icenoir.net).
- * Almost totally Rewritten to use gPXE API, implementation of tx/rx ring support
+ * Almost totally Rewritten to use iPXE API, implementation of tx/rx ring support
  *   by Thomas Miletich, thomas.miletich@gmail.com
  *   Thanks to Marty Connor and Stefan Hajnoczi for their help and feedback,
  *   and to Daniel Verkamp for his help with testing.
@@ -47,15 +47,15 @@ FILE_LICENCE ( BSD2 );
 #include <assert.h>
 #include <byteswap.h>
 #include <errno.h>
-#include <gpxe/ethernet.h>
-#include <gpxe/if_ether.h>
-#include <gpxe/io.h>
-#include <gpxe/iobuf.h>
-#include <gpxe/malloc.h>
-#include <gpxe/netdevice.h>
-#include <gpxe/pci.h>
-#include <gpxe/timer.h>
-#include <gpxe/nvs.h>
+#include <ipxe/ethernet.h>
+#include <ipxe/if_ether.h>
+#include <ipxe/io.h>
+#include <ipxe/iobuf.h>
+#include <ipxe/malloc.h>
+#include <ipxe/netdevice.h>
+#include <ipxe/pci.h>
+#include <ipxe/timer.h>
+#include <ipxe/nvs.h>
 
 #include "3c90x.h"
 
@@ -271,7 +271,7 @@ static int a3c90x_setup_tx_ring(struct INF_3C90X *p)
 
 /**
  * a3c90x_process_tx_packets - Checks for successfully sent packets,
- * reports them to gPXE with netdev_tx_complete();
+ * reports them to iPXE with netdev_tx_complete();
  *
  * @v netdev	Network device info
  */
@@ -513,7 +513,7 @@ static void a3c90x_free_rx_iobuf(struct INF_3C90X *p)
 
 /**
  * a3c90x_process_rx_packets - Checks for received packets,
- * reports them to gPXE with netdev_rx() or netdev_rx_err() if there was an
+ * reports them to iPXE with netdev_rx() or netdev_rx_err() if there was an
  * error while receiving the packet
  *
  * @v netdev	Network device info
@@ -608,7 +608,7 @@ static void a3c90x_free_resources(struct INF_3C90X *p)
 
 /**
  * a3c90x_remove - Routine to remove the card. Unregisters
- * the NIC from gPXE, disables RX/TX and resets the card.
+ * the NIC from iPXE, disables RX/TX and resets the card.
  *
  * @v pci	PCI device info
  */

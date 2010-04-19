@@ -5,7 +5,7 @@
  * Derived from Intel e1000 driver
  * Copyright(c) 1999 - 2005 Intel Corporation. All rights reserved.
  *
- * Modified for gPXE, October 2009 by Joshua Oreman <oremanj@rwcr.net>
+ * Modified for iPXE, October 2009 by Joshua Oreman <oremanj@rwcr.net>
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by the Free
@@ -31,14 +31,14 @@
 #include <unistd.h>
 #include <byteswap.h>
 #include <errno.h>
-#include <gpxe/malloc.h>
-#include <gpxe/pci.h>
-#include <gpxe/pci_io.h>
-#include <gpxe/iobuf.h>
-#include <gpxe/netdevice.h>
-#include <gpxe/ethernet.h>
-#include <gpxe/if_ether.h>
-#include <gpxe/io.h>
+#include <ipxe/malloc.h>
+#include <ipxe/pci.h>
+#include <ipxe/pci_io.h>
+#include <ipxe/iobuf.h>
+#include <ipxe/netdevice.h>
+#include <ipxe/ethernet.h>
+#include <ipxe/if_ether.h>
+#include <ipxe/io.h>
 
 #define ETH_FCS_LEN	4
 #define VLAN_HLEN	4

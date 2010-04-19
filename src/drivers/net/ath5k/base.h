@@ -2,7 +2,7 @@
  * Copyright (c) 2002-2007 Sam Leffler, Errno Consulting
  * All rights reserved.
  *
- * Modified for gPXE, July 2009, by Joshua Oreman <oremanj@rwcr.net>
+ * Modified for iPXE, July 2009, by Joshua Oreman <oremanj@rwcr.net>
  * Original from Linux kernel 2.6.30.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -47,7 +47,7 @@
 FILE_LICENCE ( BSD3 );
 
 #include "ath5k.h"
-#include <gpxe/iobuf.h>
+#include <ipxe/iobuf.h>
 
 #define	ATH_RXBUF	16		/* number of RX buffers */
 #define	ATH_TXBUF	16		/* number of TX buffers */

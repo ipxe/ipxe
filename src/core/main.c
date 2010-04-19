@@ -1,5 +1,5 @@
 /**************************************************************************
-gPXE -  Network Bootstrap Program
+iPXE -  Network Bootstrap Program
 
 Literature dealing with the network protocols:
 	ARP - RFC826
@@ -15,11 +15,11 @@ Literature dealing with the network protocols:
 FILE_LICENCE ( GPL2_OR_LATER );
 
 #include <stdio.h>
-#include <gpxe/init.h>
-#include <gpxe/features.h>
-#include <gpxe/shell.h>
-#include <gpxe/shell_banner.h>
-#include <gpxe/image.h>
+#include <ipxe/init.h>
+#include <ipxe/features.h>
+#include <ipxe/shell.h>
+#include <ipxe/shell_banner.h>
+#include <ipxe/image.h>
 #include <usr/autoboot.h>
 #include <config/general.h>
 
@@ -46,17 +46,17 @@ __asmcall int main ( void ) {
 	 * Print welcome banner
 	 *
 	 *
-	 * If you wish to brand this build of gPXE, please do so by
+	 * If you wish to brand this build of iPXE, please do so by
 	 * defining the string PRODUCT_NAME in config/general.h.
 	 *
 	 * While nothing in the GPL prevents you from removing all
-	 * references to gPXE or http://etherboot.org, we prefer you
-	 * not to do so.
+	 * references to iPXE or http://ipxe.org, we prefer you not to
+	 * do so.
 	 *
 	 */
-	printf ( NORMAL "\n\n" PRODUCT_NAME "\n" BOLD "gPXE " VERSION
-		 NORMAL " -- Open Source Boot Firmware -- "
-		 CYAN "http://etherboot.org" NORMAL "\n"
+	printf ( NORMAL "\n\n" PRODUCT_NAME "\n" BOLD "iPXE " VERSION
+		 NORMAL " -- Open Source Network Boot Firmware -- "
+		 CYAN "http://ipxe.org" NORMAL "\n"
 		 "Features:" );
 	for_each_table_entry ( feature, FEATURES )
 		printf ( " %s", feature->name );

@@ -21,9 +21,9 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #include <string.h>
 #include <errno.h>
 #include <byteswap.h>
-#include <gpxe/crypto.h>
-#include <gpxe/cbc.h>
-#include <gpxe/aes.h>
+#include <ipxe/crypto.h>
+#include <ipxe/cbc.h>
+#include <ipxe/aes.h>
 #include "crypto/axtls/crypto.h"
 
 /** @file

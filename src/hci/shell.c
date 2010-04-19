@@ -22,8 +22,8 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #include <stdlib.h>
 #include <stdio.h>
 #include <readline/readline.h>
-#include <gpxe/command.h>
-#include <gpxe/shell.h>
+#include <ipxe/command.h>
+#include <ipxe/shell.h>
 
 /** @file
  *
@@ -32,7 +32,7 @@ FILE_LICENCE ( GPL2_OR_LATER );
  */
 
 /** The shell prompt string */
-static const char shell_prompt[] = "gPXE> ";
+static const char shell_prompt[] = "iPXE> ";
 
 /** Flag set in order to exit shell */
 static int exit_flag = 0;

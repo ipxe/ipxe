@@ -19,7 +19,7 @@
 FILE_LICENCE ( GPL2_OR_LATER );
 
 #include <stdlib.h>
-#include <gpxe/efi/efi.h>
+#include <ipxe/efi/efi.h>
 
 /**
  * EFI entry point

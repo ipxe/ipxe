@@ -1,5 +1,5 @@
 /*
- * vxge-main.h: gPXE driver for Neterion Inc's X3100 Series 10GbE
+ * vxge-main.h: iPXE driver for Neterion Inc's X3100 Series 10GbE
  *              PCIe I/O Virtualized Server Adapter.
  *
  * Copyright(c) 2002-2010 Neterion Inc.

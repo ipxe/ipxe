@@ -538,7 +538,7 @@ int __debug_disable;
  * @defgroup licences Licence declarations
  *
  * For reasons that are partly historical, various different files
- * within the gPXE codebase have differing licences.
+ * within the iPXE codebase have differing licences.
  *
  * @{
  */

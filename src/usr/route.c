@@ -19,8 +19,8 @@
 FILE_LICENCE ( GPL2_OR_LATER );
 
 #include <stdio.h>
-#include <gpxe/netdevice.h>
-#include <gpxe/ip.h>
+#include <ipxe/netdevice.h>
+#include <ipxe/ip.h>
 #include <usr/route.h>
 
 /** @file

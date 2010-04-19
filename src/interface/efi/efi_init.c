@@ -19,8 +19,8 @@
 FILE_LICENCE ( GPL2_OR_LATER );
 
 #include <string.h>
-#include <gpxe/efi/efi.h>
-#include <gpxe/uuid.h>
+#include <ipxe/efi/efi.h>
+#include <ipxe/uuid.h>
 
 /** Image handle passed to entry point */
 EFI_HANDLE efi_image_handle;

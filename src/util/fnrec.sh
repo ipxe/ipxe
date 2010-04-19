@@ -24,7 +24,7 @@ Look up symbol names in <elf-binary> for function addresses from
 <addresses-file>.
 
 Example:
-$0 bin/gpxe.hd.tmp fnrec.dat
+$0 bin/ipxe.hd.tmp fnrec.dat
 EOF
 	exit 1
 fi

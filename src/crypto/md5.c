@@ -25,8 +25,8 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #include <stdint.h>
 #include <string.h>
 #include <byteswap.h>
-#include <gpxe/crypto.h>
-#include <gpxe/md5.h>
+#include <ipxe/crypto.h>
+#include <ipxe/md5.h>
 
 struct md5_step {
 	u32 ( * f ) ( u32 b, u32 c, u32 d );

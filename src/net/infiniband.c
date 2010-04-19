@@ -26,16 +26,16 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #include <byteswap.h>
 #include <errno.h>
 #include <assert.h>
-#include <gpxe/list.h>
-#include <gpxe/errortab.h>
-#include <gpxe/if_arp.h>
-#include <gpxe/netdevice.h>
-#include <gpxe/iobuf.h>
-#include <gpxe/ipoib.h>
-#include <gpxe/process.h>
-#include <gpxe/infiniband.h>
-#include <gpxe/ib_mi.h>
-#include <gpxe/ib_sma.h>
+#include <ipxe/list.h>
+#include <ipxe/errortab.h>
+#include <ipxe/if_arp.h>
+#include <ipxe/netdevice.h>
+#include <ipxe/iobuf.h>
+#include <ipxe/ipoib.h>
+#include <ipxe/process.h>
+#include <ipxe/infiniband.h>
+#include <ipxe/ib_mi.h>
+#include <ipxe/ib_sma.h>
 
 /** @file
  *

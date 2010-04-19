@@ -32,7 +32,7 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #define ARRAY_SIZE(x) (sizeof(x) / sizeof((x)[0]))
 
 /** FIXME: include/linux/pci_regs.h has these PCI regs, maybe
-	   we need such a file in gPXE?
+	   we need such a file in iPXE?
 **/
 #define  PCI_EXP_DEVCTL	        8	/* Device Control */
 #define  PCI_EXP_DEVCTL_READRQ	0x7000	/* Max_Read_Request_Size */

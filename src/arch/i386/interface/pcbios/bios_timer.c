@@ -24,7 +24,7 @@ FILE_LICENCE ( GPL2_OR_LATER );
  *
  */
 
-#include <gpxe/timer.h>
+#include <ipxe/timer.h>
 #include <realmode.h>
 #include <bios.h>
 

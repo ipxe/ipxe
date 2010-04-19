@@ -22,8 +22,8 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #include <console.h>
 #include <unistd.h>
 #include <config/general.h>
-#include <gpxe/keys.h>
-#include <gpxe/shell_banner.h>
+#include <ipxe/keys.h>
+#include <ipxe/shell_banner.h>
 
 /** @file
  *
@@ -45,7 +45,7 @@ int shell_banner ( void ) {
 		return enter_shell;
 	}
 
-	printf ( "\nPress Ctrl-B for the gPXE command line..." );
+	printf ( "\nPress Ctrl-B for the iPXE command line..." );
 
 	/* Wait for key */
 	for ( wait_count = 0 ; wait_count < BANNER_TIMEOUT ; wait_count++ ) {

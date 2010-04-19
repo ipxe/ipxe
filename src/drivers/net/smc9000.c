@@ -38,11 +38,11 @@ FILE_LICENCE ( GPL_ANY );
 #define PRINTK2(args...)
 #endif
 
-#include <gpxe/ethernet.h>
+#include <ipxe/ethernet.h>
 #include <errno.h>
 #include "etherboot.h"
 #include "nic.h"
-#include <gpxe/isa.h>
+#include <ipxe/isa.h>
 #include "smc9000.h"
 
 # define _outb outb

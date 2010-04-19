@@ -1,7 +1,7 @@
 #include "stddef.h"
 #include "console.h"
-#include <gpxe/process.h>
-#include <gpxe/nap.h>
+#include <ipxe/process.h>
+#include <ipxe/nap.h>
 
 /** @file */
 

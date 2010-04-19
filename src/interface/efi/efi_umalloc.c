@@ -19,12 +19,12 @@
 FILE_LICENCE ( GPL2_OR_LATER );
 
 #include <assert.h>
-#include <gpxe/umalloc.h>
-#include <gpxe/efi/efi.h>
+#include <ipxe/umalloc.h>
+#include <ipxe/efi/efi.h>
 
 /** @file
  *
- * gPXE user memory allocation API for EFI
+ * iPXE user memory allocation API for EFI
  *
  */
 

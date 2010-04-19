@@ -23,7 +23,7 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #include <realmode.h>
 #include <bios.h>
 #include <memsizes.h>
-#include <gpxe/memmap.h>
+#include <ipxe/memmap.h>
 
 /**
  * @file

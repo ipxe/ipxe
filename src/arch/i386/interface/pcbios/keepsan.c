@@ -1,9 +1,9 @@
 #include <stdint.h>
 #include <stdio.h>
-#include <gpxe/settings.h>
-#include <gpxe/dhcp.h>
-#include <gpxe/init.h>
-#include <gpxe/sanboot.h>
+#include <ipxe/settings.h>
+#include <ipxe/dhcp.h>
+#include <ipxe/init.h>
+#include <ipxe/sanboot.h>
 #include <usr/autoboot.h>
 
 struct setting keep_san_setting __setting = {

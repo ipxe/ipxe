@@ -19,16 +19,16 @@
 #include <stdio.h>
 #include <string.h>
 #include <byteswap.h>
-#include <gpxe/iobuf.h>
-#include <gpxe/in.h>
-#include <gpxe/if_arp.h>
-#include <gpxe/if_ether.h>
-#include <gpxe/ip.h>
-#include <gpxe/udp.h>
-#include <gpxe/netdevice.h>
-#include <gpxe/nap.h>
-#include <gpxe/gdbstub.h>
-#include <gpxe/gdbudp.h>
+#include <ipxe/iobuf.h>
+#include <ipxe/in.h>
+#include <ipxe/if_arp.h>
+#include <ipxe/if_ether.h>
+#include <ipxe/ip.h>
+#include <ipxe/udp.h>
+#include <ipxe/netdevice.h>
+#include <ipxe/nap.h>
+#include <ipxe/gdbstub.h>
+#include <ipxe/gdbudp.h>
 
 /** @file
  *

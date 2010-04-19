@@ -1,5 +1,5 @@
 /*
- * vxge-version.h: gPXE driver for Neterion Inc's X3100 Series 10GbE
+ * vxge-version.h: iPXE driver for Neterion Inc's X3100 Series 10GbE
  *              PCIe I/O Virtualized Server Adapter.
  *
  * Copyright(c) 2002-2010 Neterion Inc.
@@ -18,7 +18,7 @@ FILE_LICENCE(GPL2_ONLY);
 
 #define VXGE_VERSION_H
 
-/* gpxe vxge driver version fields.
+/* ipxe vxge driver version fields.
  * Note: Each field must be a nibble size
  */
 #define VXGE_VERSION_MAJOR	3

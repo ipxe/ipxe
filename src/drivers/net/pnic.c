@@ -16,13 +16,13 @@ FILE_LICENCE ( GPL2_OR_LATER );
 
 #include <stdint.h>
 #include <stdio.h>
-#include <gpxe/io.h>
+#include <ipxe/io.h>
 #include <errno.h>
-#include <gpxe/pci.h>
-#include <gpxe/if_ether.h>
-#include <gpxe/ethernet.h>
-#include <gpxe/iobuf.h>
-#include <gpxe/netdevice.h>
+#include <ipxe/pci.h>
+#include <ipxe/if_ether.h>
+#include <ipxe/ethernet.h>
+#include <ipxe/iobuf.h>
+#include <ipxe/netdevice.h>
 
 #include "pnic_api.h"
 

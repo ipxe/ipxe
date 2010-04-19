@@ -22,8 +22,8 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #include <string.h>
 #include <errno.h>
 #include <assert.h>
-#include <gpxe/uaccess.h>
-#include <gpxe/smbios.h>
+#include <ipxe/uaccess.h>
+#include <ipxe/smbios.h>
 
 /** @file
  *

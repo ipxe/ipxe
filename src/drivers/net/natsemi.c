@@ -1,5 +1,5 @@
 /* 
-   natsemi.c - gPXE driver for the NatSemi DP8381x series. 
+   natsemi.c - iPXE driver for the NatSemi DP8381x series.
  
    Based on:
 
@@ -51,7 +51,7 @@ FILE_LICENCE ( GPL_ANY );
 /* Revision History */
 
 /*
-  02 Jul 2007  Udayan Kumar	 1.2 ported the driver from etherboot to gPXE API.
+  02 Jul 2007  Udayan Kumar	 1.2 ported the driver from etherboot to iPXE API.
 				     Fully rewritten,adapting the old driver.
 		      	      	     Added a circular buffer for transmit and receive.
 		                     transmit routine will not wait for transmission to finish.
@@ -64,18 +64,18 @@ FILE_LICENCE ( GPL_ANY );
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
-#include <gpxe/io.h>
+#include <ipxe/io.h>
 #include <errno.h>
 #include <byteswap.h>
 #include <unistd.h>
-#include <gpxe/pci.h>
-#include <gpxe/if_ether.h>
-#include <gpxe/ethernet.h>
-#include <gpxe/iobuf.h>
-#include <gpxe/netdevice.h>
-#include <gpxe/spi_bit.h>
-#include <gpxe/threewire.h>
-#include <gpxe/nvo.h>
+#include <ipxe/pci.h>
+#include <ipxe/if_ether.h>
+#include <ipxe/ethernet.h>
+#include <ipxe/iobuf.h>
+#include <ipxe/netdevice.h>
+#include <ipxe/spi_bit.h>
+#include <ipxe/threewire.h>
+#include <ipxe/nvo.h>
 #include "natsemi.h"
 
 /*  Function Prototypes: */

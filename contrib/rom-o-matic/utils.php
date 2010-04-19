@@ -19,7 +19,7 @@
  * Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
  */
 
-// Include table of user-configurable gPXE options
+// Include table of user-configurable iPXE options
 require_once "flag-table.php";
 
 // Include user-shadowable globals
@@ -103,7 +103,7 @@ function curDirURL ()
 /**
  * Extract NIC families and associated ROM PCI IDs from the src/bin/NIC file.
  *
- * $src_dir must contain the path of the gPXE src directory for this build
+ * $src_dir must contain the path of the iPXE src directory for this build
  *
  * @return array[0] array $new_nics
  * @return array[1] array $roms
@@ -161,7 +161,7 @@ function parse_nic_file ()
 
     // add special cases to the top
 
-	$new_nics = array ( "all-drivers" => "gpxe",
+	$new_nics = array ( "all-drivers" => "ipxe",
 						"undionly" => "undionly",
 						"undi" => "undi",
     );
@@ -363,9 +363,9 @@ function get_flags ()
 }
 
 /**
- * Output given value in appropriate format for gPXE config file
+ * Output given value in appropriate format for iPXE config file
  *
- * gPXE config/*.h files use C pre-processor syntax.  Output the given
+ * iPXE config/*.h files use C pre-processor syntax.  Output the given
  * compile option in a format appropriate to its type
  *
  * @param string $key   index into $flag_table for given compile option
@@ -429,7 +429,7 @@ function echo_flags ( $flags )
 
         } else {
 
-            // Flag (gPXE compile option) should be displayed to user
+            // Flag (iPXE compile option) should be displayed to user
 
             if ( $type == "header" ) {
 
@@ -535,9 +535,9 @@ function mktempcopy ( $src, $dst, $prefix )
 }
 
 /**
- * Write gPXE config files based on value of given flags
+ * Write iPXE config files based on value of given flags
  *
- * gPXE compile options are stored in src/config/*.h .
+ * iPXE compile options are stored in src/config/*.h .
  * We write out a config file for each set of options.
  *
  * @param string $config_dir directory to write .h files to
@@ -545,7 +545,7 @@ function mktempcopy ( $src, $dst, $prefix )
  *
  * @return void
  */
-function write_gpxe_config_files ( $config_dir, $flags )
+function write_ipxe_config_files ( $config_dir, $flags )
 {
     global $flag_table;
 

@@ -140,7 +140,7 @@ FILE_LICENCE ( GPL2_ONLY );
 #define LPA_1000FULL            0x0800  /* Link partner 1000BASE-T full duplex */
 #define LPA_1000HALF            0x0400  /* Link partner 1000BASE-T half duplex */
 
-#include <gpxe/netdevice.h>
+#include <ipxe/netdevice.h>
 
 struct mii_if_info {
         int phy_id;

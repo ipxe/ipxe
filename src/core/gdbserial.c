@@ -17,9 +17,9 @@
  */
 
 #include <assert.h>
-#include <gpxe/serial.h>
-#include <gpxe/gdbstub.h>
-#include <gpxe/gdbserial.h>
+#include <ipxe/serial.h>
+#include <ipxe/gdbstub.h>
+#include <ipxe/gdbserial.h>
 
 struct gdb_transport serial_gdb_transport __gdb_transport;
 

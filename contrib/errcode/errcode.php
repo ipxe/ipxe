@@ -23,7 +23,7 @@ $ERRCODE_PATH = './errcode.py';
 
 <html>
     <head>
-        <title>gPXE Error Code Lookup</title>
+        <title>iPXE Error Code Lookup</title>
         <style>
             body, pre, div, form, p, h2, b, tt {
                 padding: 0;
@@ -73,10 +73,10 @@ if (!empty($_REQUEST['e']) && preg_match('/^(0x)?[0-9a-f]{8}$/', $_REQUEST['e'])
             <p>
             Firefox users can right-click on the <b>Error code</b>
             text box and select <b>Add a Keyword for this Search...</b>.
-            Set <b>name</b> to <tt>gPXE Error Code Lookup</tt> and
+            Set <b>name</b> to <tt>iPXE Error Code Lookup</tt> and
             <b>keyword</b> to <tt>gxpe</tt>  Then you can look up error
             codes by typing something like the following in your address
-            bar: <tt>gpxe 0x3c018003</tt>
+            bar: <tt>ipxe 0x3c018003</tt>
             <p>
         </div>
     </body>

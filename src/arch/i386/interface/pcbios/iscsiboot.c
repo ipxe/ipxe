@@ -3,10 +3,10 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <errno.h>
-#include <gpxe/iscsi.h>
-#include <gpxe/netdevice.h>
-#include <gpxe/ibft.h>
-#include <gpxe/sanboot.h>
+#include <ipxe/iscsi.h>
+#include <ipxe/netdevice.h>
+#include <ipxe/ibft.h>
+#include <ipxe/sanboot.h>
 #include <int13.h>
 
 FILE_LICENCE ( GPL2_OR_LATER );

@@ -26,7 +26,7 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #include <bios.h>
 #include <pnpbios.h>
 #include <basemem.h>
-#include <gpxe/pci.h>
+#include <ipxe/pci.h>
 #include <undi.h>
 #include <undirom.h>
 #include <undiload.h>

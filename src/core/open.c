@@ -21,10 +21,10 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #include <stdarg.h>
 #include <string.h>
 #include <errno.h>
-#include <gpxe/xfer.h>
-#include <gpxe/uri.h>
-#include <gpxe/socket.h>
-#include <gpxe/open.h>
+#include <ipxe/xfer.h>
+#include <ipxe/uri.h>
+#include <ipxe/socket.h>
+#include <ipxe/open.h>
 
 /** @file
  *
@@ -73,7 +73,7 @@ int xfer_open_uri ( struct xfer_interface *xfer, struct uri *uri ) {
  * Open URI string
  *
  * @v xfer		Data transfer interface
- * @v uri_string	URI string (e.g. "http://etherboot.org/kernel")
+ * @v uri_string	URI string (e.g. "http://ipxe.org/kernel")
  * @ret rc		Return status code
  *
  * The URI will be regarded as being relative to the current working

@@ -18,9 +18,9 @@
 
 FILE_LICENCE ( GPL2_OR_LATER );
 
-#include <gpxe/netdevice.h>
-#include <gpxe/net80211.h>
-#include <gpxe/command.h>
+#include <ipxe/netdevice.h>
+#include <ipxe/net80211.h>
+#include <ipxe/command.h>
 #include <usr/iwmgmt.h>
 #include <hci/ifmgmt_cmd.h>
 

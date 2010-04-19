@@ -21,7 +21,7 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #include <stddef.h>
 #include <errno.h>
 #include <unistd.h>
-#include <gpxe/spi.h>
+#include <ipxe/spi.h>
 
 /** @file
  *

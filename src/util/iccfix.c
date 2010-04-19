@@ -9,7 +9,7 @@
 #include <sys/stat.h>
 #include <sys/mman.h>
 #include <elf.h>
-#include <gpxe/tables.h>
+#include <ipxe/tables.h>
 
 #define DEBUG 0
 

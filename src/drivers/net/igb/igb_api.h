@@ -35,15 +35,15 @@ FILE_LICENCE ( GPL2_ONLY );
 #include <stdio.h>
 #include <string.h>
 #include <unistd.h>
-#include <gpxe/io.h>
+#include <ipxe/io.h>
 #include <errno.h>
 #include <byteswap.h>
-#include <gpxe/pci.h>
-#include <gpxe/malloc.h>
-#include <gpxe/if_ether.h>
-#include <gpxe/ethernet.h>
-#include <gpxe/iobuf.h>
-#include <gpxe/netdevice.h>
+#include <ipxe/pci.h>
+#include <ipxe/malloc.h>
+#include <ipxe/if_ether.h>
+#include <ipxe/ethernet.h>
+#include <ipxe/iobuf.h>
+#include <ipxe/netdevice.h>
 
 #include "igb_hw.h"
 

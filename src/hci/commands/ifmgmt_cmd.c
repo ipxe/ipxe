@@ -20,8 +20,8 @@ FILE_LICENCE ( GPL2_OR_LATER );
 
 #include <stdio.h>
 #include <getopt.h>
-#include <gpxe/netdevice.h>
-#include <gpxe/command.h>
+#include <ipxe/netdevice.h>
+#include <ipxe/command.h>
 #include <usr/ifmgmt.h>
 #include <hci/ifmgmt_cmd.h>
 

@@ -28,12 +28,12 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #include <stdio.h>
 #include <errno.h>
 #include <byteswap.h>
-#include <gpxe/uaccess.h>
-#include <gpxe/in.h>
-#include <gpxe/tftp.h>
-#include <gpxe/xfer.h>
-#include <gpxe/open.h>
-#include <gpxe/process.h>
+#include <ipxe/uaccess.h>
+#include <ipxe/in.h>
+#include <ipxe/tftp.h>
+#include <ipxe/xfer.h>
+#include <ipxe/open.h>
+#include <ipxe/process.h>
 #include <pxe.h>
 
 /** A PXE TFTP connection */

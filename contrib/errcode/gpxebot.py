@@ -20,11 +20,11 @@ import errcode
 
 HOST = 'irc.freenode.net'
 PORT = 6667
-NICK = 'gpxebot'
+NICK = 'ipxebot'
 CHAN = '#etherboot'
 NICKSERV_PASSWORD = None
-IDENT = 'gpxebot'
-REALNAME = 'gPXE bot'
+IDENT = 'ipxebot'
+REALNAME = 'iPXE bot'
 
 ERRCODE_RE = re.compile(r'(errcode|Error)\s+((0x)?[0-9a-fA-F]{8})')
 
@@ -59,7 +59,7 @@ def privmsg(_, target, msg):
         except ValueError:
             pass
     if msg.find('help') > -1:
-        pmsg(replyto, 'I look up gPXE error codes.  Message me like this:')
+        pmsg(replyto, 'I look up iPXE error codes.  Message me like this:')
         pmsg(replyto, 'errcode 0x12345678  OR  Error 0x12345678')
 
 def add_handler(command, handler, nargs):

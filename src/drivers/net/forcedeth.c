@@ -50,9 +50,9 @@ FILE_LICENCE ( GPL2_OR_LATER );
 /* to get the interface to the body of the program */
 #include "nic.h"
 /* to get the PCI support functions, if this is a PCI NIC */
-#include <gpxe/pci.h>
+#include <ipxe/pci.h>
 /* Include timer support functions */
-#include <gpxe/ethernet.h>
+#include <ipxe/ethernet.h>
 #include "mii.h"
 
 #define drv_version "v1.2"

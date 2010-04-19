@@ -24,7 +24,7 @@ extern int execv ( const char *command, char * const argv[] );
 	} )
 
 /* Pick up udelay() */
-#include <gpxe/timer.h>
+#include <ipxe/timer.h>
 
 /*
  * sleep() prototype is defined by POSIX.1.  usleep() prototype is

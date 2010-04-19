@@ -17,8 +17,8 @@ FILE_LICENCE ( GPL_ANY );
 #include "etherboot.h"
 #include "nic.h"
 #include <errno.h>
-#include <gpxe/pci.h>
-#include <gpxe/ethernet.h>
+#include <ipxe/pci.h>
+#include <ipxe/ethernet.h>
 #include "string.h"
 #include <mii.h>
 #include "bnx2.h"

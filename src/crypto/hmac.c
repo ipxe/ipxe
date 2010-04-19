@@ -26,8 +26,8 @@ FILE_LICENCE ( GPL2_OR_LATER );
 
 #include <string.h>
 #include <assert.h>
-#include <gpxe/crypto.h>
-#include <gpxe/hmac.h>
+#include <ipxe/crypto.h>
+#include <ipxe/hmac.h>
 
 /**
  * Reduce HMAC key length

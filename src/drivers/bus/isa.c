@@ -3,8 +3,8 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <errno.h>
-#include <gpxe/io.h>
-#include <gpxe/isa.h>
+#include <ipxe/io.h>
+#include <ipxe/isa.h>
 
 FILE_LICENCE ( GPL2_OR_LATER );
 

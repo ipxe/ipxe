@@ -9,7 +9,7 @@
 
 FILE_LICENCE ( GPL2_OR_LATER );
 
-#include <gpxe/pcibios.h>
-#include <gpxe/pcidirect.h>
+#include <ipxe/pcibios.h>
+#include <ipxe/pcidirect.h>
 
 #endif /* _BITS_PCI_IO_H */

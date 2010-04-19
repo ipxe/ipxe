@@ -27,11 +27,11 @@ FILE_LICENCE ( GPL2_OR_LATER );
 
 #include <pxe.h>
 #include <pxe_call.h>
-#include <gpxe/uaccess.h>
-#include <gpxe/image.h>
-#include <gpxe/segment.h>
-#include <gpxe/netdevice.h>
-#include <gpxe/features.h>
+#include <ipxe/uaccess.h>
+#include <ipxe/image.h>
+#include <ipxe/segment.h>
+#include <ipxe/netdevice.h>
+#include <ipxe/features.h>
 
 FEATURE ( FEATURE_IMAGE, "PXE", DHCP_EB_FEATURE_PXE, 1 );
 
@@ -87,7 +87,7 @@ int pxe_load ( struct image *image ) {
 		return -ENOEXEC;
 
 	/* Rejecting zero-length images is also useful, since these
-	 * end up looking to the user like bugs in gPXE.
+	 * end up looking to the user like bugs in iPXE.
 	 */
 	if ( ! filesz )
 		return -ENOEXEC;

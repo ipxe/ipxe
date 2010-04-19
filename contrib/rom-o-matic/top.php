@@ -26,7 +26,7 @@
 <html>
 <head>
   <link rev="made" href="mailto:<? echo "${webmaster_email}" ?>">
-  <meta name="keywords" content="rom, etherboot, gpxe, open source, rom-o-matic.net">
+  <meta name="keywords" content="rom, etherboot, ipxe, open source, rom-o-matic.net">
   <title><? echo $header_title ?></title>
   <meta name="description" content="<? echo $description ?>">
 </head>

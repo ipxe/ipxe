@@ -26,7 +26,7 @@ FILE_LICENCE ( GPL2_OR_LATER );
 
 #include <stdio.h>
 #include <string.h>
-#include <gpxe/cpio.h>
+#include <ipxe/cpio.h>
 
 /**
  * Set field within a CPIO header

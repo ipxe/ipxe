@@ -27,8 +27,8 @@
 #include <assert.h>
 #include <getopt.h>
 #include <bfd.h>
-#include <gpxe/efi/efi.h>
-#include <gpxe/efi/IndustryStandard/PeImage.h>
+#include <ipxe/efi/efi.h>
+#include <ipxe/efi/IndustryStandard/PeImage.h>
 #include <libgen.h>
 
 #define eprintf(...) fprintf ( stderr, __VA_ARGS__ )

@@ -24,12 +24,12 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #include <byteswap.h>
 #include <errno.h>
 #include <assert.h>
-#include <gpxe/if_arp.h>
-#include <gpxe/if_ether.h>
-#include <gpxe/in.h>
-#include <gpxe/netdevice.h>
-#include <gpxe/iobuf.h>
-#include <gpxe/ethernet.h>
+#include <ipxe/if_arp.h>
+#include <ipxe/if_ether.h>
+#include <ipxe/in.h>
+#include <ipxe/netdevice.h>
+#include <ipxe/iobuf.h>
+#include <ipxe/ethernet.h>
 
 /** @file
  *

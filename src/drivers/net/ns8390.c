@@ -41,11 +41,11 @@ FILE_LICENCE ( BSD2 );
 #include "etherboot.h"
 #include "nic.h"
 #include "ns8390.h"
-#include <gpxe/ethernet.h>
+#include <ipxe/ethernet.h>
 #ifdef	INCLUDE_NS8390
-#include <gpxe/pci.h>
+#include <ipxe/pci.h>
 #else
-#include <gpxe/isa.h>
+#include <ipxe/isa.h>
 #endif
 
 static unsigned char	eth_vendor, eth_flags;

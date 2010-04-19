@@ -21,9 +21,9 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #include <stdlib.h>
 #include <string.h>
 #include <errno.h>
-#include <gpxe/ieee80211.h>
-#include <gpxe/net80211.h>
-#include <gpxe/sec80211.h>
+#include <ipxe/ieee80211.h>
+#include <ipxe/net80211.h>
+#include <ipxe/sec80211.h>
 
 /** @file
  *
@@ -148,8 +148,8 @@ int sec80211_install ( struct net80211_crypto **which,
  * @v rsnp		Pointer to next descriptor count field in RSN IE
  * @v rsn_end		Pointer to end of RSN IE
  * @v map		Descriptor map to use
- * @v tbl_start		Start of linker table to examine for gPXE support
- * @v tbl_end		End of linker table to examine for gPXE support
+ * @v tbl_start		Start of linker table to examine for iPXE support
+ * @v tbl_end		End of linker table to examine for iPXE support
  * @ret rsnp		Updated to point to first byte after descriptors
  * @ret map_ent		Descriptor map entry of translation to use
  *
@@ -162,7 +162,7 @@ int sec80211_install ( struct net80211_crypto **which,
  * will return @c NULL if the input packet is malformed, and otherwise
  * set @a rsnp to the first byte it has not looked at. It will return
  * the first cipher in the list that is supported by the current build
- * of gPXE, or the first of all if none are supported.
+ * of iPXE, or the first of all if none are supported.
  *
  * We play rather fast and loose with type checking, because this
  * function is only called from two well-defined places in the

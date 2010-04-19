@@ -18,7 +18,7 @@ import sys
 import re
 
 pxenv_status_files = ('../../src/include/errno.h', )
-errfile_files = ('../../src/include/gpxe/errfile.h',
+errfile_files = ('../../src/include/ipxe/errfile.h',
             '../../src/arch/i386/include/bits/errfile.h')
 posix_errno_files = ('../../src/include/errno.h', )
 

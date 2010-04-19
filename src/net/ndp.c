@@ -2,12 +2,12 @@
 #include <string.h>
 #include <byteswap.h>
 #include <errno.h>
-#include <gpxe/if_ether.h>
-#include <gpxe/iobuf.h>
-#include <gpxe/ndp.h>
-#include <gpxe/icmp6.h>
-#include <gpxe/ip6.h>
-#include <gpxe/netdevice.h>
+#include <ipxe/if_ether.h>
+#include <ipxe/iobuf.h>
+#include <ipxe/ndp.h>
+#include <ipxe/icmp6.h>
+#include <ipxe/ip6.h>
+#include <ipxe/netdevice.h>
 
 /** @file
  *

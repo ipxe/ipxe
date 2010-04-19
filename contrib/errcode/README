@@ -1,6 +1,6 @@
-Error Code Lookup for gPXE
+Error Code Lookup for iPXE
 ==========================
-This program looks up gPXE error codes so you can locate the line of source
+This program looks up iPXE error codes so you can locate the line of source
 code which produced the error.
 
 Setup
@@ -8,11 +8,11 @@ Setup
 You must run:
 ./build_errcodedb.py >errcodedb.py
 
-This extracts error code definitions from the gPXE source code and produces a
+This extracts error code definitions from the iPXE source code and produces a
 "database" which is used by the main program.
 
 Once you have done this errcode.py and errcodedb.py are the only files you
-need.  They are now independent of the gPXE source code and can be moved
+need.  They are now independent of the iPXE source code and can be moved
 anywhere.
 
 [OPTIONAL]
@@ -21,7 +21,7 @@ $ERRCODE_PATH to the errcode.py script.  Then move errcode.php to a location
 visible from your web server.
 
 [OPTIONAL]
-A simple IRC bot is provided.  Edit gpxebot.py to fill in the IRC details.
+A simple IRC bot is provided.  Edit ipxebot.py to fill in the IRC details.
 
 Usage
 -----

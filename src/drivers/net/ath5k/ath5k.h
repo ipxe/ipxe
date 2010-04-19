@@ -2,7 +2,7 @@
  * Copyright (c) 2004-2007 Reyk Floeter <reyk@openbsd.org>
  * Copyright (c) 2006-2007 Nick Kossifidis <mickflemm@gmail.com>
  *
- * Modified for gPXE, July 2009, by Joshua Oreman <oremanj@rwcr.net>
+ * Modified for iPXE, July 2009, by Joshua Oreman <oremanj@rwcr.net>
  * Original from Linux kernel 2.6.30.
  *
  * Permission to use, copy, modify, and distribute this software for any
@@ -25,9 +25,9 @@ FILE_LICENCE ( MIT );
 
 #include <stddef.h>
 #include <byteswap.h>
-#include <gpxe/io.h>
-#include <gpxe/netdevice.h>
-#include <gpxe/net80211.h>
+#include <ipxe/io.h>
+#include <ipxe/netdevice.h>
+#include <ipxe/net80211.h>
 #include <errno.h>
 
 /* Keep all ath5k files under one errfile ID */

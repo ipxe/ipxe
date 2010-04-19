@@ -10,8 +10,8 @@
  */
 
 #include "console.h"
-#include <gpxe/init.h>
-#include <gpxe/pci.h>
+#include <ipxe/init.h>
+#include <ipxe/pci.h>
 
 #undef __BIG_ENDIAN
 #if 0

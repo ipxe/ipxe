@@ -14,10 +14,10 @@
 FILE_LICENCE ( GPL2_OR_LATER );
 
 #include "stddef.h"
-#include <gpxe/init.h>
-#include <gpxe/io.h>
+#include <ipxe/init.h>
+#include <ipxe/io.h>
 #include <unistd.h>
-#include <gpxe/serial.h>
+#include <ipxe/serial.h>
 #include "config/serial.h"
 
 /* Set default values if none specified */

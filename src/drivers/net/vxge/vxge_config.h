@@ -1,5 +1,5 @@
 /*
- * vxge-config.h: gPXE driver for Neterion Inc's X3100 Series 10GbE
+ * vxge-config.h: iPXE driver for Neterion Inc's X3100 Series 10GbE
  *              PCIe I/O Virtualized Server Adapter.
  *
  * Copyright(c) 2002-2010 Neterion Inc.
@@ -18,8 +18,8 @@ FILE_LICENCE(GPL2_ONLY);
 #define VXGE_CONFIG_H
 
 #include <stdint.h>
-#include <gpxe/list.h>
-#include <gpxe/pci.h>
+#include <ipxe/list.h>
+#include <ipxe/pci.h>
 
 #ifndef VXGE_CACHE_LINE_SIZE
 #define VXGE_CACHE_LINE_SIZE 4096
@@ -314,7 +314,7 @@ struct __vxge_hw_non_offload_db_wrapper {
  * @vp_id: Virtual path id
  * @tx_intr_num: Interrupt Number associated with the TX
  * @txdl: Start pointer of the txdl list of this fifo.
- *        gPxe does not support tx fragmentation, so we need
+ *        iPXE does not support tx fragmentation, so we need
  *        only one txd in a list
  * @depth: total number of lists in this fifo
  * @hw_offset: txd index from where adapter owns the txd list

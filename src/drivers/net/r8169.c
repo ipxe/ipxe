@@ -33,14 +33,14 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #include <assert.h>
 #include <byteswap.h>
 #include <errno.h>
-#include <gpxe/ethernet.h>
-#include <gpxe/if_ether.h>
-#include <gpxe/io.h>
-#include <gpxe/iobuf.h>
-#include <gpxe/malloc.h>
-#include <gpxe/netdevice.h>
-#include <gpxe/pci.h>
-#include <gpxe/timer.h>
+#include <ipxe/ethernet.h>
+#include <ipxe/if_ether.h>
+#include <ipxe/io.h>
+#include <ipxe/iobuf.h>
+#include <ipxe/malloc.h>
+#include <ipxe/netdevice.h>
+#include <ipxe/pci.h>
+#include <ipxe/timer.h>
 #include <mii.h>
 
 #include "r8169.h"
@@ -1577,7 +1577,7 @@ static void rtl_hw_start_8101(struct net_device *dev)
 	//        RTL_W16(IntrMask, tp->intr_event);
 }
 
-/*** gPXE API Support Routines ***/
+/*** iPXE API Support Routines ***/
 
 /**
  * setup_tx_resources - allocate tx resources (descriptors)
@@ -1818,7 +1818,7 @@ rtl8169_free_rx_resources ( struct rtl8169_private *tp )
 }
 
 /**
-    FIXME: Because gPXE's pci_device_id structure does not contain a
+    FIXME: Because iPXE's pci_device_id structure does not contain a
     field to contain arbitrary data, we need the following table to
     associate PCI IDs with nic variants, because a lot of driver
     routines depend on knowing which kind of variant they are dealing
@@ -1881,7 +1881,7 @@ static void rtl8169_irq_disable ( struct rtl8169_private *tp )
 	rtl8169_irq_mask_and_ack ( ioaddr );
 }
 
-/*** gPXE Core API Routines ***/
+/*** iPXE Core API Routines ***/
 
 /**
  * open - Called when a network interface is made active
@@ -2103,7 +2103,7 @@ rtl8169_probe ( struct pci_device *pdev, const struct pci_device_id *ent )
 	struct rtl8169_private *tp;
 	void *ioaddr;
 
-	/** FIXME: This lookup is necessary because gPXE does not have a "data"
+	/** FIXME: This lookup is necessary because iPXE does not have a "data"
 	    element in the structure pci_device_id which can pass an arbitrary
 	    piece of data to the driver.  It might be useful to add it. Then we
 	    could just use ent->data instead of having to look up cfg_index.

@@ -26,10 +26,10 @@ FILE_LICENCE ( BSD2 );
 
 /* #define EDEBUG */
 
-#include <gpxe/ethernet.h>
+#include <ipxe/ethernet.h>
 #include "etherboot.h"
 #include "nic.h"
-#include <gpxe/isa.h>
+#include <ipxe/isa.h>
 #include "3c509.h"
 
 static enum { none, bnc, utp } connector = none;	/* for 3C509 */

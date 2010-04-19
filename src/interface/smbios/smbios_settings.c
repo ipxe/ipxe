@@ -21,10 +21,10 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #include <stdint.h>
 #include <string.h>
 #include <errno.h>
-#include <gpxe/settings.h>
-#include <gpxe/init.h>
-#include <gpxe/uuid.h>
-#include <gpxe/smbios.h>
+#include <ipxe/settings.h>
+#include <ipxe/init.h>
+#include <ipxe/uuid.h>
+#include <ipxe/smbios.h>
 
 /** SMBIOS settings tag magic number */
 #define SMBIOS_TAG_MAGIC 0x5B /* "SmBios" */

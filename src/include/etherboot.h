@@ -15,9 +15,9 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #include <unistd.h>
 #include <strings.h>
 #include <console.h>
-#include <gpxe/timer.h>
-#include <gpxe/if_arp.h>
-#include <gpxe/if_ether.h>
+#include <ipxe/timer.h>
+#include <ipxe/if_arp.h>
+#include <ipxe/if_ether.h>
 
 typedef unsigned long Address;
 

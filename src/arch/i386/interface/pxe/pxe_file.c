@@ -8,9 +8,9 @@
 #include <stdio.h>
 #include <errno.h>
 #include <byteswap.h>
-#include <gpxe/uaccess.h>
-#include <gpxe/posix_io.h>
-#include <gpxe/features.h>
+#include <ipxe/uaccess.h>
+#include <ipxe/posix_io.h>
+#include <ipxe/features.h>
 #include <pxe.h>
 #include <realmode.h>
 
@@ -245,7 +245,7 @@ segoff_t __data16 ( pxe_exit_hook ) = { 0, 0 };
  * @ret #PXENV_EXIT_FAILURE		Command was not executed successfully
  * @ret s_PXENV_FILE_API_CHECK::Status	PXE status code
  * @ret s_PXENV_FILE_API_CHECK::Magic	Outbound magic number (0xe9c17b20)
- * @ret s_PXENV_FILE_API_CHECK::Provider "gPXE" (0x45585067)
+ * @ret s_PXENV_FILE_API_CHECK::Provider "iPXE" (0x45585067)
  * @ret s_PXENV_FILE_API_CHECK::APIMask API function bitmask
  * @ret s_PXENV_FILE_API_CHECK::Flags	Reserved
  *
@@ -264,7 +264,7 @@ PXENV_EXIT_t pxenv_file_api_check ( struct s_PXENV_FILE_API_CHECK *file_api_chec
 		file_api_check->Status   = PXENV_STATUS_SUCCESS;
 		file_api_check->Size     = sizeof(struct s_PXENV_FILE_API_CHECK);
 		file_api_check->Magic    = 0xe9c17b20;
-		file_api_check->Provider = 0x45585067; /* "gPXE" */
+		file_api_check->Provider = 0x45585067; /* "iPXE" */
 		file_api_check->APIMask  = 0x0000007f; /* Functions e0-e6 */
 		/* Check to see if we have a PXE exit hook */
 		if ( pxe_exit_hook.segment | pxe_exit_hook.offset )

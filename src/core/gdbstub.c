@@ -28,7 +28,7 @@
 #include <string.h>
 #include <ctype.h>
 #include <byteswap.h>
-#include <gpxe/gdbstub.h>
+#include <ipxe/gdbstub.h>
 #include "gdbmach.h"
 
 enum {

@@ -81,8 +81,8 @@ FILE_LICENCE ( GPL2_OR_LATER );
 
 #include "etherboot.h"
 #include "nic.h"
-#include <gpxe/pci.h>
-#include <gpxe/ethernet.h>
+#include <ipxe/pci.h>
+#include <ipxe/ethernet.h>
 
 static const char *w89c840_version = "driver Version 0.94 - December 12, 2003";
 

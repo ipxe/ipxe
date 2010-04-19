@@ -25,7 +25,7 @@ FILE_LICENCE ( GPL2_OR_LATER );
  */
 
 #include <string.h>
-#include <gpxe/crypto.h>
+#include <ipxe/crypto.h>
 
 static void digest_null_init ( void *ctx __unused ) {
 	/* Do nothing */

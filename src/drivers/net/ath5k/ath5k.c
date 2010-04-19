@@ -5,7 +5,7 @@
  * Copyright (c) 2007 Jiri Slaby <jirislaby@gmail.com>
  * Copyright (c) 2007 Luis R. Rodriguez <mcgrof@winlab.rutgers.edu>
  *
- * Modified for gPXE, July 2009, by Joshua Oreman <oremanj@rwcr.net>
+ * Modified for iPXE, July 2009, by Joshua Oreman <oremanj@rwcr.net>
  * Original from Linux kernel 2.6.30.
  *
  * All rights reserved.
@@ -46,11 +46,11 @@
 FILE_LICENCE ( BSD3 );
 
 #include <stdlib.h>
-#include <gpxe/malloc.h>
-#include <gpxe/timer.h>
-#include <gpxe/netdevice.h>
-#include <gpxe/pci.h>
-#include <gpxe/pci_io.h>
+#include <ipxe/malloc.h>
+#include <ipxe/timer.h>
+#include <ipxe/netdevice.h>
+#include <ipxe/pci.h>
+#include <ipxe/pci_io.h>
 
 #include "base.h"
 #include "reg.h"
@@ -1239,7 +1239,7 @@ accept:
 		iob_put(iob, rs.rs_datalen);
 
 		/* The MAC header is padded to have 32-bit boundary if the
-		 * packet payload is non-zero. However, gPXE only
+		 * packet payload is non-zero. However, iPXE only
 		 * supports standard 802.11 packets with 24-byte
 		 * header, so no padding correction should be needed.
 		 */
@@ -1508,7 +1508,7 @@ ath5k_tx(struct net80211_device *dev, struct io_buffer *iob)
 
 	/*
 	 * The hardware expects the header padded to 4 byte boundaries.
-	 * gPXE only ever sends 24-byte headers, so no action necessary.
+	 * iPXE only ever sends 24-byte headers, so no action necessary.
 	 */
 
 	if (list_empty(&sc->txbuf)) {

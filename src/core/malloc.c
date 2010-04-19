@@ -22,10 +22,10 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #include <stdint.h>
 #include <string.h>
 #include <strings.h>
-#include <gpxe/io.h>
-#include <gpxe/list.h>
-#include <gpxe/init.h>
-#include <gpxe/malloc.h>
+#include <ipxe/io.h>
+#include <ipxe/list.h>
+#include <ipxe/init.h>
+#include <ipxe/malloc.h>
 
 /** @file
  *

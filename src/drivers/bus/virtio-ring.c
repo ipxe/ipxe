@@ -15,9 +15,9 @@
  */
 
 #include "etherboot.h"
-#include "gpxe/io.h"
-#include "gpxe/virtio-ring.h"
-#include "gpxe/virtio-pci.h"
+#include "ipxe/io.h"
+#include "ipxe/virtio-ring.h"
+#include "ipxe/virtio-pci.h"
 
 #define BUG() do { \
    printf("BUG: failure at %s:%d/%s()!\n", \

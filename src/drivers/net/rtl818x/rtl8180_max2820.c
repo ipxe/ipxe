@@ -3,7 +3,7 @@
  *
  * Copyright 2007 Andrea Merello <andreamrl@tiscali.it>
  *
- * Modified slightly for gPXE, June 2009 by Joshua Oreman.
+ * Modified slightly for iPXE, June 2009 by Joshua Oreman.
  *
  * Code from the BSD driver and the rtl8181 project have been
  * very useful to understand certain things
@@ -21,8 +21,8 @@
  */
 
 #include <unistd.h>
-#include <gpxe/pci.h>
-#include <gpxe/net80211.h>
+#include <ipxe/pci.h>
+#include <ipxe/net80211.h>
 
 #include "rtl818x.h"
 

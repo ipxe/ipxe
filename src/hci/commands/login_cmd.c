@@ -1,7 +1,7 @@
 #include <string.h>
 #include <stdio.h>
-#include <gpxe/command.h>
-#include <gpxe/login_ui.h>
+#include <ipxe/command.h>
+#include <ipxe/login_ui.h>
 
 FILE_LICENCE ( GPL2_OR_LATER );
 

@@ -19,8 +19,8 @@
 #include <stddef.h>
 #include <stdio.h>
 #include <assert.h>
-#include <gpxe/uaccess.h>
-#include <gpxe/gdbstub.h>
+#include <ipxe/uaccess.h>
+#include <ipxe/gdbstub.h>
 #include <gdbmach.h>
 
 /** @file

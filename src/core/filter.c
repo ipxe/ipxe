@@ -18,8 +18,8 @@
 
 FILE_LICENCE ( GPL2_OR_LATER );
 
-#include <gpxe/xfer.h>
-#include <gpxe/filter.h>
+#include <ipxe/xfer.h>
+#include <ipxe/filter.h>
 
 /** @file
  *

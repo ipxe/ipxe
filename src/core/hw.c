@@ -2,10 +2,10 @@
 #include <stdlib.h>
 #include <string.h>
 #include <errno.h>
-#include <gpxe/refcnt.h>
-#include <gpxe/process.h>
-#include <gpxe/xfer.h>
-#include <gpxe/open.h>
+#include <ipxe/refcnt.h>
+#include <ipxe/process.h>
+#include <ipxe/xfer.h>
+#include <ipxe/open.h>
 
 /** @file
  *

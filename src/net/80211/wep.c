@@ -18,11 +18,11 @@
 
 FILE_LICENCE ( GPL2_OR_LATER );
 
-#include <gpxe/net80211.h>
-#include <gpxe/sec80211.h>
-#include <gpxe/crypto.h>
-#include <gpxe/arc4.h>
-#include <gpxe/crc32.h>
+#include <ipxe/net80211.h>
+#include <ipxe/sec80211.h>
+#include <ipxe/crypto.h>
+#include <ipxe/arc4.h>
+#include <ipxe/crc32.h>
 #include <stdlib.h>
 #include <string.h>
 #include <errno.h>

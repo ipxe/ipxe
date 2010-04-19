@@ -22,9 +22,9 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #include <stdlib.h>
 #include <string.h>
 #include <errno.h>
-#include <gpxe/dhcp.h>
-#include <gpxe/nvs.h>
-#include <gpxe/nvo.h>
+#include <ipxe/dhcp.h>
+#include <ipxe/nvs.h>
+#include <ipxe/nvo.h>
 
 /** @file
  *

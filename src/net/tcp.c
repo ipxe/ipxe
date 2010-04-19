@@ -4,16 +4,16 @@
 #include <assert.h>
 #include <errno.h>
 #include <byteswap.h>
-#include <gpxe/timer.h>
-#include <gpxe/iobuf.h>
-#include <gpxe/malloc.h>
-#include <gpxe/retry.h>
-#include <gpxe/refcnt.h>
-#include <gpxe/xfer.h>
-#include <gpxe/open.h>
-#include <gpxe/uri.h>
-#include <gpxe/tcpip.h>
-#include <gpxe/tcp.h>
+#include <ipxe/timer.h>
+#include <ipxe/iobuf.h>
+#include <ipxe/malloc.h>
+#include <ipxe/retry.h>
+#include <ipxe/refcnt.h>
+#include <ipxe/xfer.h>
+#include <ipxe/open.h>
+#include <ipxe/uri.h>
+#include <ipxe/tcpip.h>
+#include <ipxe/tcp.h>
 
 /** @file
  *

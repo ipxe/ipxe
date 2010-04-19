@@ -25,10 +25,10 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #include <errno.h>
 #include <assert.h>
 #include <libgen.h>
-#include <gpxe/list.h>
-#include <gpxe/umalloc.h>
-#include <gpxe/uri.h>
-#include <gpxe/image.h>
+#include <ipxe/list.h>
+#include <ipxe/umalloc.h>
+#include <ipxe/uri.h>
+#include <ipxe/image.h>
 
 /** @file
  *

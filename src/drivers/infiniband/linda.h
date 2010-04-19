@@ -29,7 +29,7 @@ FILE_LICENCE ( GPL2_OR_LATER );
  */
 
 #define BITOPS_LITTLE_ENDIAN
-#include <gpxe/bitops.h>
+#include <ipxe/bitops.h>
 #include "qib_7220_regs.h"
 
 struct ib_device;

@@ -18,12 +18,12 @@
 
 FILE_LICENCE ( GPL2_OR_LATER );
 
-#include <gpxe/nap.h>
-#include <gpxe/efi/efi.h>
+#include <ipxe/nap.h>
+#include <ipxe/efi/efi.h>
 
 /** @file
  *
- * gPXE CPU sleeping API for EFI
+ * iPXE CPU sleeping API for EFI
  *
  */
 

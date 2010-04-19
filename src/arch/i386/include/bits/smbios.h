@@ -9,6 +9,6 @@
 
 FILE_LICENCE ( GPL2_OR_LATER );
 
-#include <gpxe/bios_smbios.h>
+#include <ipxe/bios_smbios.h>
 
 #endif /* _BITS_SMBIOS_H */

@@ -14,18 +14,18 @@ FILE_LICENCE ( GPL2_OR_LATER );
 /*
  * Branding
  *
- * Vendors may use these strings to add their own branding to gPXE.
- * PRODUCT_NAME is displayed prior to any gPXE branding in startup
+ * Vendors may use these strings to add their own branding to iPXE.
+ * PRODUCT_NAME is displayed prior to any iPXE branding in startup
  * messages, and PRODUCT_SHORT_NAME is used where a brief product
  * label is required (e.g. in BIOS boot selection menus).
  *
  * To minimise end-user confusion, it's probably a good idea to either
  * make PRODUCT_SHORT_NAME a substring of PRODUCT_NAME or leave it as
- * "gPXE".
+ * "iPXE".
  *
  */
 #define PRODUCT_NAME ""
-#define PRODUCT_SHORT_NAME "gPXE"
+#define PRODUCT_SHORT_NAME "iPXE"
 
 /*
  * Timer configuration
@@ -45,7 +45,7 @@ FILE_LICENCE ( GPL2_OR_LATER );
  * PXE support
  *
  */
-//#undef	PXE_STACK		/* PXE stack in gPXE - you want this! */
+//#undef	PXE_STACK		/* PXE stack in iPXE - you want this! */
 //#undef	PXE_MENU		/* PXE menu booting */
 
 /*
@@ -98,7 +98,7 @@ FILE_LICENCE ( GPL2_OR_LATER );
 //#define	IMAGE_AOUT		/* a.out image support */
 //#define	IMAGE_WINCE		/* WinCE image support */
 //#define	IMAGE_PXE		/* PXE image support */
-//#define	IMAGE_SCRIPT		/* gPXE script image support */
+//#define	IMAGE_SCRIPT		/* iPXE script image support */
 //#define	IMAGE_BZIMAGE		/* Linux bzImage image support */
 //#define	IMAGE_COMBOOT		/* SYSLINUX COMBOOT image support */
 //#define	IMAGE_EFI		/* EFI image support */

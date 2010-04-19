@@ -1,6 +1,6 @@
 #!/bin/bash
 #
-# Generate a syslinux floppy that loads a gPXE image
+# Generate a syslinux floppy that loads a iPXE image
 #
 # gensdsk foo.sdsk foo.lkrn
 #

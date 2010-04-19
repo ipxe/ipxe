@@ -7,7 +7,7 @@ FILE_LICENCE ( GPL2_OR_LATER );
  *
  * Error codes
  *
- * Return status codes as used within gPXE are designed to allow for
+ * Return status codes as used within iPXE are designed to allow for
  * maximum visibility into the source of an error even in an end-user
  * build with no debugging.  They are constructed as follows:
  *
@@ -72,7 +72,7 @@ FILE_LICENCE ( GPL2_OR_LATER );
  */
 
 /* Get definitions for file identifiers */
-#include <gpxe/errfile.h>
+#include <ipxe/errfile.h>
 
 /* If we do not have a valid file identifier, generate a compiler
  * warning upon usage of any error codes.  (Don't just use a #warning,
@@ -85,7 +85,7 @@ extern char missing_errfile_declaration[] __attribute__ (( deprecated ));
 #define ERRFILE ( 0 * ( ( int ) missing_errfile_declaration ) )
 #endif
 
-/** Derive PXENV_STATUS code from gPXE error number */
+/** Derive PXENV_STATUS code from iPXE error number */
 #define PXENV_STATUS( rc ) ( (-(rc)) & 0x00ff )
 
 /**

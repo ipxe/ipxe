@@ -24,14 +24,14 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #include <string.h>
 #include <byteswap.h>
 #include <errno.h>
-#include <gpxe/errortab.h>
-#include <gpxe/if_arp.h>
-#include <gpxe/iobuf.h>
-#include <gpxe/netdevice.h>
-#include <gpxe/infiniband.h>
-#include <gpxe/ib_pathrec.h>
-#include <gpxe/ib_mcast.h>
-#include <gpxe/ipoib.h>
+#include <ipxe/errortab.h>
+#include <ipxe/if_arp.h>
+#include <ipxe/iobuf.h>
+#include <ipxe/netdevice.h>
+#include <ipxe/infiniband.h>
+#include <ipxe/ib_pathrec.h>
+#include <ipxe/ib_mcast.h>
+#include <ipxe/ipoib.h>
 
 /** @file
  *

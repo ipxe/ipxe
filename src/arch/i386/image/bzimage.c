@@ -32,12 +32,12 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #include <assert.h>
 #include <realmode.h>
 #include <bzimage.h>
-#include <gpxe/uaccess.h>
-#include <gpxe/image.h>
-#include <gpxe/segment.h>
-#include <gpxe/init.h>
-#include <gpxe/cpio.h>
-#include <gpxe/features.h>
+#include <ipxe/uaccess.h>
+#include <ipxe/image.h>
+#include <ipxe/segment.h>
+#include <ipxe/init.h>
+#include <ipxe/cpio.h>
+#include <ipxe/features.h>
 
 FEATURE ( FEATURE_IMAGE, "bzImage", DHCP_EB_FEATURE_BZIMAGE, 1 );
 
@@ -201,7 +201,7 @@ static void bzimage_update_header ( struct image *image,
 
 	/* Set loader type */
 	if ( bzimg->version >= 0x0200 )
-		bzimg->bzhdr.type_of_loader = BZI_LOADER_TYPE_GPXE;
+		bzimg->bzhdr.type_of_loader = BZI_LOADER_TYPE_IPXE;
 
 	/* Set heap end pointer */
 	if ( bzimg->version >= 0x0201 ) {

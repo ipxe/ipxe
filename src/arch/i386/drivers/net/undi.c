@@ -22,7 +22,7 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
-#include <gpxe/pci.h>
+#include <ipxe/pci.h>
 #include <undi.h>
 #include <undirom.h>
 #include <undiload.h>

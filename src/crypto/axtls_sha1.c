@@ -1,6 +1,6 @@
 #include "crypto/axtls/crypto.h"
-#include <gpxe/crypto.h>
-#include <gpxe/sha1.h>
+#include <ipxe/crypto.h>
+#include <ipxe/sha1.h>
 
 static void sha1_init ( void *ctx ) {
 	SHA1Init ( ctx );

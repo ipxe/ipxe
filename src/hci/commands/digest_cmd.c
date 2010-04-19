@@ -19,12 +19,12 @@
 #include <stdio.h>
 #include <string.h>
 #include <unistd.h>
-#include <gpxe/command.h>
-#include <gpxe/image.h>
-#include <gpxe/crypto.h>
+#include <ipxe/command.h>
+#include <ipxe/image.h>
+#include <ipxe/crypto.h>
 
-#include <gpxe/md5.h>
-#include <gpxe/sha1.h>
+#include <ipxe/md5.h>
+#include <ipxe/sha1.h>
 
 /**
  * "digest" command syntax message

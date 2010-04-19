@@ -11,7 +11,7 @@ FILE_LICENCE ( GPL2_OR_LATER );
 
 #include <stdint.h>
 #include <setjmp.h>
-#include <gpxe/in.h>
+#include <ipxe/in.h>
 
 /** Segment used for COMBOOT PSP and image */
 #define COMBOOT_PSP_SEG 0x07C0

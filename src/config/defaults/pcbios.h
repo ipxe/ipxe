@@ -21,11 +21,11 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #define	IMAGE_ELF		/* ELF image support */
 #define	IMAGE_MULTIBOOT		/* MultiBoot image support */
 #define	IMAGE_PXE		/* PXE image support */
-#define IMAGE_SCRIPT		/* gPXE script image support */
+#define IMAGE_SCRIPT		/* iPXE script image support */
 #define IMAGE_BZIMAGE		/* Linux bzImage image support */
 #define IMAGE_COMBOOT		/* SYSLINUX COMBOOT image support */
 
-#define PXE_STACK		/* PXE stack in gPXE - required for PXELINUX */
+#define PXE_STACK		/* PXE stack in iPXE - required for PXELINUX */
 #define PXE_MENU		/* PXE menu booting */
 #define	PXE_CMD			/* PXE commands */
 

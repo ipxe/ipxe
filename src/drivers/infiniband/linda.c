@@ -23,13 +23,13 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #include <errno.h>
 #include <unistd.h>
 #include <assert.h>
-#include <gpxe/io.h>
-#include <gpxe/pci.h>
-#include <gpxe/infiniband.h>
-#include <gpxe/i2c.h>
-#include <gpxe/bitbash.h>
-#include <gpxe/malloc.h>
-#include <gpxe/iobuf.h>
+#include <ipxe/io.h>
+#include <ipxe/pci.h>
+#include <ipxe/infiniband.h>
+#include <ipxe/i2c.h>
+#include <ipxe/bitbash.h>
+#include <ipxe/malloc.h>
+#include <ipxe/iobuf.h>
 #include "linda.h"
 
 /**

@@ -20,8 +20,8 @@ FILE_LICENCE ( GPL2_OR_LATER );
 
 #include <stdlib.h>
 #include <string.h>
-#include <gpxe/crypto.h>
-#include <gpxe/aes.h>
+#include <ipxe/crypto.h>
+#include <ipxe/aes.h>
 
 /**
  * Wrap a key or other data using AES Key Wrap (RFC 3394)

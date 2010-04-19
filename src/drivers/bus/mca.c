@@ -12,8 +12,8 @@ FILE_LICENCE ( BSD2 );
 #include <stdlib.h>
 #include <stdio.h>
 #include <errno.h>
-#include <gpxe/io.h>
-#include <gpxe/mca.h>
+#include <ipxe/io.h>
+#include <ipxe/mca.h>
 
 static void mcabus_remove ( struct root_device *rootdev );
 

@@ -21,7 +21,7 @@ FILE_LICENCE ( GPL2_OR_LATER );
 /**
  * @file
  *
- * gPXE scripts
+ * iPXE scripts
  *
  */
 
@@ -29,7 +29,7 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #include <stdlib.h>
 #include <ctype.h>
 #include <errno.h>
-#include <gpxe/image.h>
+#include <ipxe/image.h>
 
 struct image_type script_image_type __image_type ( PROBE_NORMAL );
 
@@ -91,7 +91,7 @@ static int script_exec ( struct image *image ) {
  * @ret rc		Return status code
  */
 static int script_load ( struct image *image ) {
-	static const char magic[] = "#!gpxe";
+	static const char magic[] = "#!ipxe";
 	char test[ sizeof ( magic ) - 1 /* NUL */ + 1 /* terminating space */];
 
 	/* Sanity check */

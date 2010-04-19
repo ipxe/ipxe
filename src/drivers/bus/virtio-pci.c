@@ -12,9 +12,9 @@
  */
 
 #include "etherboot.h"
-#include "gpxe/io.h"
-#include "gpxe/virtio-ring.h"
-#include "gpxe/virtio-pci.h"
+#include "ipxe/io.h"
+#include "ipxe/virtio-ring.h"
+#include "ipxe/virtio-pci.h"
 
 int vp_find_vq(unsigned int ioaddr, int queue_index,
                struct vring_virtqueue *vq)

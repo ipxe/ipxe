@@ -36,8 +36,8 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #include "etherboot.h"
 #include <errno.h>
 #include "nic.h"
-#include <gpxe/isa.h>
-#include <gpxe/ethernet.h>
+#include <ipxe/isa.h>
+#include <ipxe/ethernet.h>
 
 /* Different 82595 chips */
 #define LAN595		0

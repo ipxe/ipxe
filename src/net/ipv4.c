@@ -4,16 +4,16 @@
 #include <stdio.h>
 #include <errno.h>
 #include <byteswap.h>
-#include <gpxe/list.h>
-#include <gpxe/in.h>
-#include <gpxe/arp.h>
-#include <gpxe/if_ether.h>
-#include <gpxe/iobuf.h>
-#include <gpxe/netdevice.h>
-#include <gpxe/ip.h>
-#include <gpxe/tcpip.h>
-#include <gpxe/dhcp.h>
-#include <gpxe/settings.h>
+#include <ipxe/list.h>
+#include <ipxe/in.h>
+#include <ipxe/arp.h>
+#include <ipxe/if_ether.h>
+#include <ipxe/iobuf.h>
+#include <ipxe/netdevice.h>
+#include <ipxe/ip.h>
+#include <ipxe/tcpip.h>
+#include <ipxe/dhcp.h>
+#include <ipxe/settings.h>
 
 /** @file
  *

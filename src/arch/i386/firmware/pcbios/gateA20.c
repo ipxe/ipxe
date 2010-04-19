@@ -3,8 +3,8 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #include <stdio.h>
 #include <realmode.h>
 #include <bios.h>
-#include <gpxe/io.h>
-#include <gpxe/timer.h>
+#include <ipxe/io.h>
+#include <ipxe/timer.h>
 
 #define K_RDWR		0x60		/* keyboard data & cmds (read/write) */
 #define K_STATUS	0x64		/* keyboard status */

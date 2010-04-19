@@ -18,9 +18,9 @@
 
 FILE_LICENCE ( GPL2_OR_LATER );
 
-#include <gpxe/list.h>
-#include <gpxe/init.h>
-#include <gpxe/process.h>
+#include <ipxe/list.h>
+#include <ipxe/init.h>
+#include <ipxe/process.h>
 
 /** @file
  *

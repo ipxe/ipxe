@@ -1,5 +1,5 @@
-#include <gpxe/netdevice.h>
-#include <gpxe/command.h>
+#include <ipxe/netdevice.h>
+#include <ipxe/command.h>
 #include <hci/ifmgmt_cmd.h>
 #include <pxe_call.h>
 

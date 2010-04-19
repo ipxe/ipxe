@@ -30,17 +30,17 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #include <string.h>
 #include <errno.h>
 #include <byteswap.h>
-#include <gpxe/hmac.h>
-#include <gpxe/md5.h>
-#include <gpxe/sha1.h>
-#include <gpxe/aes.h>
-#include <gpxe/rsa.h>
-#include <gpxe/xfer.h>
-#include <gpxe/open.h>
-#include <gpxe/filter.h>
-#include <gpxe/asn1.h>
-#include <gpxe/x509.h>
-#include <gpxe/tls.h>
+#include <ipxe/hmac.h>
+#include <ipxe/md5.h>
+#include <ipxe/sha1.h>
+#include <ipxe/aes.h>
+#include <ipxe/rsa.h>
+#include <ipxe/xfer.h>
+#include <ipxe/open.h>
+#include <ipxe/filter.h>
+#include <ipxe/asn1.h>
+#include <ipxe/x509.h>
+#include <ipxe/tls.h>
 
 static int tls_send_plaintext ( struct tls_session *tls, unsigned int type,
 				const void *data, size_t len );

@@ -19,13 +19,13 @@
 FILE_LICENCE ( GPL2_OR_LATER );
 
 #include <errno.h>
-#include <gpxe/smbios.h>
-#include <gpxe/efi/efi.h>
-#include <gpxe/efi/Guid/SmBios.h>
+#include <ipxe/smbios.h>
+#include <ipxe/efi/efi.h>
+#include <ipxe/efi/Guid/SmBios.h>
 
 /** @file
  *
- * gPXE SMBIOS API for EFI
+ * iPXE SMBIOS API for EFI
  *
  */
 

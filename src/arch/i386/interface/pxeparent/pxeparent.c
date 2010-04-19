@@ -18,7 +18,7 @@
 
 FILE_LICENCE ( GPL2_OR_LATER );
 
-#include <gpxe/dhcp.h>
+#include <ipxe/dhcp.h>
 #include <pxeparent.h>
 #include <pxe_api.h>
 #include <pxe_types.h>

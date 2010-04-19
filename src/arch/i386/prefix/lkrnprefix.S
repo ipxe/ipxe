@@ -178,20 +178,20 @@ setup_code:
 	 * in the prefix, it doesn't matter: we just have to ensure that
 	 * %cs:0000 is where the start of the image *would* be.
 	 */
-	ljmp	$(SYSSEG-(PREFIXSIZE/16)), $run_gpxe
+	ljmp	$(SYSSEG-(PREFIXSIZE/16)), $run_ipxe
 
 
 	.org	PREFIXSIZE
 /*
 	We're now at the beginning of the kernel proper.
  */
-run_gpxe:
+run_ipxe:
 	/* Set up stack just below 0x7c00 */
 	xorw	%ax, %ax
 	movw	%ax, %ss
 	movw	$0x7c00, %sp
 
-	/* Install gPXE */
+	/* Install iPXE */
 	call	install
 
 	/* Set up real-mode stack */
@@ -209,7 +209,7 @@ run_gpxe:
 	call	prot_call
 	popl	%ecx /* discard */
 
-	/* Uninstall gPXE */
+	/* Uninstall iPXE */
 	call	uninstall
 
 	/* Boot next device */

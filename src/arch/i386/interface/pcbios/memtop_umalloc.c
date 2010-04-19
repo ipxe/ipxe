@@ -27,10 +27,10 @@ FILE_LICENCE ( GPL2_OR_LATER );
 
 #include <limits.h>
 #include <errno.h>
-#include <gpxe/uaccess.h>
-#include <gpxe/hidemem.h>
-#include <gpxe/memmap.h>
-#include <gpxe/umalloc.h>
+#include <ipxe/uaccess.h>
+#include <ipxe/hidemem.h>
+#include <ipxe/memmap.h>
+#include <ipxe/umalloc.h>
 
 /** Alignment of external allocated memory */
 #define EM_ALIGN ( 4 * 1024 )

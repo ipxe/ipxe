@@ -1,5 +1,5 @@
-#include <gpxe/init.h>
-#include <gpxe/serial.h>
+#include <ipxe/init.h>
+#include <ipxe/serial.h>
 #include "console.h"
 
 /** @file

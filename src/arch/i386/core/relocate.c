@@ -1,6 +1,6 @@
-#include <gpxe/io.h>
+#include <ipxe/io.h>
 #include <registers.h>
-#include <gpxe/memmap.h>
+#include <ipxe/memmap.h>
 
 /*
  * Originally by Eric Biederman

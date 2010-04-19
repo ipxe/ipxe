@@ -18,9 +18,9 @@
 
 FILE_LICENCE ( GPL2_OR_LATER );
 
-#include <gpxe/net80211.h>
-#include <gpxe/sha1.h>
-#include <gpxe/wpa.h>
+#include <ipxe/net80211.h>
+#include <ipxe/sha1.h>
+#include <ipxe/wpa.h>
 #include <errno.h>
 
 /** @file

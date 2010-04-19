@@ -18,8 +18,8 @@
 
 FILE_LICENCE ( GPL2_OR_LATER );
 
-#include <gpxe/io.h>
-#include <gpxe/pci.h>
+#include <ipxe/io.h>
+#include <ipxe/pci.h>
 
 /** @file
  *

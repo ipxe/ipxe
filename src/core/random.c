@@ -7,7 +7,7 @@
 FILE_LICENCE ( GPL2_OR_LATER );
 
 #include <stdlib.h>
-#include <gpxe/timer.h>
+#include <ipxe/timer.h>
 
 static int32_t rnd_seed = 0;
 

@@ -35,7 +35,7 @@ FILE_LICENCE ( GPL2_ONLY );
 
 #define SKGE_EEPROM_MAGIC	0x9933aabb
 
-/* Added for gPXE ------------------ */
+/* Added for iPXE ------------------ */
 
 /* from ethtool.h */
 #define AUTONEG_DISABLE	0x00

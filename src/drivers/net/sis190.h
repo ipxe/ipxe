@@ -13,14 +13,14 @@ FILE_LICENCE ( GPL_ANY );
 #include <byteswap.h>
 #include <errno.h>
 #include <mii.h>
-#include <gpxe/ethernet.h>
-#include <gpxe/if_ether.h>
-#include <gpxe/io.h>
-#include <gpxe/iobuf.h>
-#include <gpxe/malloc.h>
-#include <gpxe/netdevice.h>
-#include <gpxe/pci.h>
-#include <gpxe/timer.h>
+#include <ipxe/ethernet.h>
+#include <ipxe/if_ether.h>
+#include <ipxe/io.h>
+#include <ipxe/iobuf.h>
+#include <ipxe/malloc.h>
+#include <ipxe/netdevice.h>
+#include <ipxe/pci.h>
+#include <ipxe/timer.h>
 
 #define PCI_VENDOR_ID_SI	0x1039
 

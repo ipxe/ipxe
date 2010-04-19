@@ -32,10 +32,10 @@ FILE_LICENCE ( BSD2 );
 
 #include <stdlib.h>
 #include <errno.h>
-#include <gpxe/srp.h>
-#include <gpxe/infiniband.h>
-#include <gpxe/ib_cmrc.h>
-#include <gpxe/ib_srp.h>
+#include <ipxe/srp.h>
+#include <ipxe/infiniband.h>
+#include <ipxe/ib_cmrc.h>
+#include <ipxe/ib_srp.h>
 
 /**
  * @file

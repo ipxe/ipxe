@@ -23,9 +23,9 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #include <string.h>
 #include <errno.h>
 #include <byteswap.h>
-#include <gpxe/iobuf.h>
-#include <gpxe/infiniband.h>
-#include <gpxe/ib_packet.h>
+#include <ipxe/iobuf.h>
+#include <ipxe/infiniband.h>
+#include <ipxe/ib_packet.h>
 
 /**
  * @file

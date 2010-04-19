@@ -10,8 +10,8 @@
 FILE_LICENCE ( GPL2_OR_LATER );
 
 #include <stdint.h>
-#include <gpxe/uaccess.h>
-#include <gpxe/ib_packet.h>
+#include <ipxe/uaccess.h>
+#include <ipxe/ib_packet.h>
 #include "mlx_bitops.h"
 #include "MT25408_PRM.h"
 
@@ -273,7 +273,7 @@ union hermonprm_mad {
 } __attribute__ (( packed ));
 
 /*
- * gPXE-specific definitions
+ * iPXE-specific definitions
  *
  */
 

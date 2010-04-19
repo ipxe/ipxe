@@ -23,10 +23,10 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #include <stdio.h>
 #include <errno.h>
 #include <string.h>
-#include <gpxe/settings.h>
-#include <gpxe/netdevice.h>
-#include <gpxe/dhcppkt.h>
-#include <gpxe/fakedhcp.h>
+#include <ipxe/settings.h>
+#include <ipxe/netdevice.h>
+#include <ipxe/dhcppkt.h>
+#include <ipxe/fakedhcp.h>
 
 /** @file
  *

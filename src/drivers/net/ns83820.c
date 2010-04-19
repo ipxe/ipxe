@@ -42,7 +42,7 @@ FILE_LICENCE ( GPL2_OR_LATER );
 /* to get the interface to the body of the program */
 #include "nic.h"
 /* to get the PCI support functions, if this is a PCI NIC */
-#include <gpxe/pci.h>
+#include <ipxe/pci.h>
 
 #if ARCH == ia64		/* Support 64-bit addressing */
 #define USE_64BIT_ADDR

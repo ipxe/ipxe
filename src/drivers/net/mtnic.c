@@ -35,22 +35,22 @@ FILE_LICENCE ( GPL2_ONLY );
 
 #include <strings.h>
 #include <errno.h>
-#include <gpxe/malloc.h>
-#include <gpxe/umalloc.h>
+#include <ipxe/malloc.h>
+#include <ipxe/umalloc.h>
 #include <byteswap.h>
 #include <unistd.h>
-#include <gpxe/io.h>
-#include <gpxe/pci.h>
-#include <gpxe/ethernet.h>
-#include <gpxe/netdevice.h>
-#include <gpxe/iobuf.h>
+#include <ipxe/io.h>
+#include <ipxe/pci.h>
+#include <ipxe/ethernet.h>
+#include <ipxe/netdevice.h>
+#include <ipxe/iobuf.h>
 #include "mtnic.h"
 
 
 /*
 
 
-    mtnic.c - gPXE driver for Mellanox 10Gig ConnectX EN
+    mtnic.c - iPXE driver for Mellanox 10Gig ConnectX EN
 
 
 */

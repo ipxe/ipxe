@@ -3,7 +3,7 @@
 
 #include <stdint.h>
 #include <registers.h>
-#include <gpxe/uaccess.h>
+#include <ipxe/uaccess.h>
 
 /*
  * Data structures and type definitions

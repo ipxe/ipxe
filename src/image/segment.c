@@ -26,10 +26,10 @@ FILE_LICENCE ( GPL2_OR_LATER );
  */
 
 #include <errno.h>
-#include <gpxe/uaccess.h>
-#include <gpxe/memmap.h>
-#include <gpxe/errortab.h>
-#include <gpxe/segment.h>
+#include <ipxe/uaccess.h>
+#include <ipxe/memmap.h>
+#include <ipxe/errortab.h>
+#include <ipxe/segment.h>
 
 /**
  * Prepare segment for loading

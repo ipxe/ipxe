@@ -7,9 +7,9 @@
 
 #include "stddef.h"
 #include "string.h"
-#include <gpxe/io.h>
+#include <ipxe/io.h>
 #include "console.h"
-#include <gpxe/init.h>
+#include <ipxe/init.h>
 #include "vga.h"
 
 struct console_driver vga_console;

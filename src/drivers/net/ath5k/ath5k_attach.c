@@ -2,7 +2,7 @@
  * Copyright (c) 2004-2008 Reyk Floeter <reyk@openbsd.org>
  * Copyright (c) 2006-2008 Nick Kossifidis <mickflemm@gmail.com>
  *
- * Modified for gPXE, July 2009, by Joshua Oreman <oremanj@rwcr.net>
+ * Modified for iPXE, July 2009, by Joshua Oreman <oremanj@rwcr.net>
  * Original from Linux kernel 2.6.30.
  *
  * Permission to use, copy, modify, and distribute this software for any
@@ -25,7 +25,7 @@ FILE_LICENCE ( MIT );
 * Attach/Detach Functions and helpers *
 \*************************************/
 
-#include <gpxe/pci.h>
+#include <ipxe/pci.h>
 #include <unistd.h>
 #include <stdlib.h>
 #include "ath5k.h"

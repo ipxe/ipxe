@@ -6,8 +6,8 @@
 FILE_LICENCE ( BSD2 );
 
 #include "etherboot.h"
-#include <gpxe/mca.h>
-#include <gpxe/isa.h> /* for ISA_ROM */
+#include <ipxe/mca.h>
+#include <ipxe/isa.h> /* for ISA_ROM */
 #include "nic.h"
 #include "3c509.h"
 

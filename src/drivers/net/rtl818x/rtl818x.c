@@ -5,7 +5,7 @@
  * Copyright 2007 Michael Wu <flamingice@sourmilk.net>
  * Copyright 2007 Andrea Merello <andreamrl@tiscali.it>
  *
- * Modified for gPXE, June 2009, by Joshua Oreman <oremanj@rwcr.net>
+ * Modified for iPXE, June 2009, by Joshua Oreman <oremanj@rwcr.net>
  *
  * Based on the r8180 driver, which is:
  * Copyright 2004-2005 Andrea Merello <andreamrl@tiscali.it>, et al.
@@ -24,12 +24,12 @@ FILE_LICENCE(GPL2_ONLY);
 #include <stdio.h>
 #include <unistd.h>
 #include <byteswap.h>
-#include <gpxe/iobuf.h>
-#include <gpxe/malloc.h>
-#include <gpxe/pci.h>
-#include <gpxe/net80211.h>
-#include <gpxe/netdevice.h>
-#include <gpxe/threewire.h>
+#include <ipxe/iobuf.h>
+#include <ipxe/malloc.h>
+#include <ipxe/pci.h>
+#include <ipxe/net80211.h>
+#include <ipxe/netdevice.h>
+#include <ipxe/threewire.h>
 
 #include "rtl818x.h"
 

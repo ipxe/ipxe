@@ -20,10 +20,10 @@ FILE_LICENCE ( GPL2_OR_LATER );
 
 #include <stdint.h>
 #include <byteswap.h>
-#include <gpxe/netdevice.h>
-#include <gpxe/iobuf.h>
-#include <gpxe/if_ether.h>
-#include <gpxe/rarp.h>
+#include <ipxe/netdevice.h>
+#include <ipxe/iobuf.h>
+#include <ipxe/if_ether.h>
+#include <ipxe/rarp.h>
 
 /** @file
  *

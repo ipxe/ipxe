@@ -21,8 +21,8 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #include <stdlib.h>
 #include <string.h>
 #include <errno.h>
-#include <gpxe/asn1.h>
-#include <gpxe/x509.h>
+#include <ipxe/asn1.h>
+#include <ipxe/x509.h>
 
 /** @file
  *

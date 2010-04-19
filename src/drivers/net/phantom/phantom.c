@@ -26,15 +26,15 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #include <errno.h>
 #include <assert.h>
 #include <byteswap.h>
-#include <gpxe/pci.h>
-#include <gpxe/io.h>
-#include <gpxe/malloc.h>
-#include <gpxe/iobuf.h>
-#include <gpxe/netdevice.h>
-#include <gpxe/if_ether.h>
-#include <gpxe/ethernet.h>
-#include <gpxe/spi.h>
-#include <gpxe/settings.h>
+#include <ipxe/pci.h>
+#include <ipxe/io.h>
+#include <ipxe/malloc.h>
+#include <ipxe/iobuf.h>
+#include <ipxe/netdevice.h>
+#include <ipxe/if_ether.h>
+#include <ipxe/ethernet.h>
+#include <ipxe/spi.h>
+#include <ipxe/settings.h>
 #include "phantom.h"
 
 /**
@@ -1075,7 +1075,7 @@ static void phantom_poll_link_state ( struct net_device *netdev ) {
 	       phantom, xg_state_p3, phantom->link_state );
 	phantom->link_state = xg_state_p3;
 
-	/* Indicate link state to gPXE */
+	/* Indicate link state to iPXE */
 	link = UNM_NIC_REG_XG_STATE_P3_LINK ( phantom->port,
 					      phantom->link_state );
 	switch ( link ) {
@@ -1659,7 +1659,7 @@ static int phantom_clp_fetch ( struct phantom_nic *phantom, unsigned int port,
 
 /** A Phantom CLP setting */
 struct phantom_clp_setting {
-	/** gPXE setting */
+	/** iPXE setting */
 	struct setting *setting;
 	/** Setting number */
 	unsigned int clp_setting;
@@ -1673,7 +1673,7 @@ static struct phantom_clp_setting clp_settings[] = {
 /**
  * Find Phantom CLP setting
  *
- * @v setting		gPXE setting
+ * @v setting		iPXE setting
  * @v clp_setting	Setting number, or 0 if not found
  */
 static unsigned int
@@ -1716,7 +1716,7 @@ static int phantom_store_setting ( struct settings *settings,
 	unsigned int clp_setting;
 	int rc;
 
-	/* Find Phantom setting equivalent to gPXE setting */
+	/* Find Phantom setting equivalent to iPXE setting */
 	clp_setting = phantom_clp_setting ( phantom, setting );
 	if ( ! clp_setting )
 		return -ENOTSUP;
@@ -1750,7 +1750,7 @@ static int phantom_fetch_setting ( struct settings *settings,
 	int read_len;
 	int rc;
 
-	/* Find Phantom setting equivalent to gPXE setting */
+	/* Find Phantom setting equivalent to iPXE setting */
 	clp_setting = phantom_clp_setting ( phantom, setting );
 	if ( ! clp_setting )
 		return -ENOTSUP;
@@ -1985,7 +1985,7 @@ static void phantom_get_macaddr ( struct phantom_nic *phantom,
  * one per port.  To allow individual ports to be selectively
  * enabled/disabled for PXE boot (as required), we must therefore
  * leave the expansion ROM always enabled, and place the per-port
- * enable/disable logic within the gPXE driver.
+ * enable/disable logic within the iPXE driver.
  */
 static int phantom_check_boot_enable ( struct phantom_nic *phantom ) {
 	unsigned long boot_enable;

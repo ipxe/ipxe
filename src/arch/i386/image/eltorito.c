@@ -31,11 +31,11 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #include <realmode.h>
 #include <bootsector.h>
 #include <int13.h>
-#include <gpxe/uaccess.h>
-#include <gpxe/image.h>
-#include <gpxe/segment.h>
-#include <gpxe/ramdisk.h>
-#include <gpxe/init.h>
+#include <ipxe/uaccess.h>
+#include <ipxe/image.h>
+#include <ipxe/segment.h>
+#include <ipxe/ramdisk.h>
+#include <ipxe/init.h>
 
 #define ISO9660_BLKSIZE 2048
 #define ELTORITO_VOL_DESC_OFFSET ( 17 * ISO9660_BLKSIZE )

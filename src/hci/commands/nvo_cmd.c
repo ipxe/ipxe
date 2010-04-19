@@ -4,8 +4,8 @@
 #include <string.h>
 #include <errno.h>
 #include <getopt.h>
-#include <gpxe/settings.h>
-#include <gpxe/command.h>
+#include <ipxe/settings.h>
+#include <ipxe/command.h>
 
 FILE_LICENCE ( GPL2_OR_LATER );
 

@@ -1,7 +1,7 @@
 #include <stdint.h>
 #include <stdio.h>
 #include <byteswap.h>
-#include <gpxe/isa_ids.h>
+#include <ipxe/isa_ids.h>
 
 /* 
  * EISA and ISAPnP IDs are actually mildly human readable, though in a

@@ -26,7 +26,7 @@ FILE_LICENCE ( GPL2_OR_LATER );
  * uses random().
  */
 
-#include <gpxe/crypto.h>
+#include <ipxe/crypto.h>
 #include <stdlib.h>
 
 /**

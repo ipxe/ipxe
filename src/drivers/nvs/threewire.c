@@ -22,7 +22,7 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #include <string.h>
 #include <assert.h>
 #include <unistd.h>
-#include <gpxe/threewire.h>
+#include <ipxe/threewire.h>
 
 /** @file
  *

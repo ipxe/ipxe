@@ -441,7 +441,7 @@ print_free_basemem:
  *****************************************************************************
  */	
 finished:
-	jmp	run_gpxe
+	jmp	run_ipxe
 
 /*****************************************************************************
  * Subroutine: print segment:offset address
@@ -686,12 +686,12 @@ flags:
 	.equ undi_device_size, ( . - undi_device )
 
 /*****************************************************************************
- * Run gPXE main code
+ * Run iPXE main code
  *****************************************************************************
  */
 	.section ".prefix"
-run_gpxe:
-	/* Install gPXE */
+run_ipxe:
+	/* Install iPXE */
 	call	install
 
 	/* Set up real-mode stack */
@@ -731,7 +731,7 @@ run_gpxe:
 	call	prot_call
 	popl	%ecx /* discard */
 
-	/* Uninstall gPXE */
+	/* Uninstall iPXE */
 	call	uninstall
 
 	/* Restore PXE stack */

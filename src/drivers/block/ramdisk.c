@@ -18,8 +18,8 @@
 
 FILE_LICENCE ( GPL2_OR_LATER );
 
-#include <gpxe/blockdev.h>
-#include <gpxe/ramdisk.h>
+#include <ipxe/blockdev.h>
+#include <ipxe/ramdisk.h>
 
 /**
  * @file

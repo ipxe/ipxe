@@ -25,17 +25,17 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #include <errno.h>
 #include <assert.h>
 #include <byteswap.h>
-#include <gpxe/vsprintf.h>
-#include <gpxe/socket.h>
-#include <gpxe/xfer.h>
-#include <gpxe/open.h>
-#include <gpxe/scsi.h>
-#include <gpxe/process.h>
-#include <gpxe/uaccess.h>
-#include <gpxe/tcpip.h>
-#include <gpxe/settings.h>
-#include <gpxe/features.h>
-#include <gpxe/iscsi.h>
+#include <ipxe/vsprintf.h>
+#include <ipxe/socket.h>
+#include <ipxe/xfer.h>
+#include <ipxe/open.h>
+#include <ipxe/scsi.h>
+#include <ipxe/process.h>
+#include <ipxe/uaccess.h>
+#include <ipxe/tcpip.h>
+#include <ipxe/settings.h>
+#include <ipxe/features.h>
+#include <ipxe/iscsi.h>
 
 /** @file
  *

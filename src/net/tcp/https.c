@@ -26,10 +26,10 @@ FILE_LICENCE ( GPL2_OR_LATER );
  */
 
 #include <stddef.h>
-#include <gpxe/open.h>
-#include <gpxe/tls.h>
-#include <gpxe/http.h>
-#include <gpxe/features.h>
+#include <ipxe/open.h>
+#include <ipxe/tls.h>
+#include <ipxe/http.h>
+#include <ipxe/features.h>
 
 FEATURE ( FEATURE_PROTOCOL, "HTTPS", DHCP_EB_FEATURE_HTTPS, 1 );
 

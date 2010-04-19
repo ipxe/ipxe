@@ -1,7 +1,7 @@
 #include <stdint.h>
 #include <string.h>
 #include <stdio.h>
-#include <gpxe/linebuf.h>
+#include <ipxe/linebuf.h>
 
 static const char data1[] = 
 "Hello world\r\n"

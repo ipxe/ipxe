@@ -26,9 +26,9 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #include <stdio.h>
 #include <string.h>
 #include <errno.h>
-#include <gpxe/tables.h>
-#include <gpxe/device.h>
-#include <gpxe/pci.h>
+#include <ipxe/tables.h>
+#include <ipxe/device.h>
+#include <ipxe/pci.h>
 
 /** @file
  *

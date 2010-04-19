@@ -78,13 +78,13 @@ load_length:
 load_failed:
 	movw	$10f, %si
 	jmp	boot_error
-10:	.asciz	"Could not load gPXE\r\n"
+10:	.asciz	"Could not load iPXE\r\n"
 
 	.org 510
 	.byte 0x55, 0xaa
 
 start_image:
-	/* Install gPXE */
+	/* Install iPXE */
 	call	install
 
 	/* Set up real-mode stack */
@@ -102,7 +102,7 @@ start_image:
 	call	prot_call
 	popl	%ecx /* discard */
 
-	/* Uninstall gPXE */
+	/* Uninstall iPXE */
 	call	uninstall
 
 	/* Boot next device */

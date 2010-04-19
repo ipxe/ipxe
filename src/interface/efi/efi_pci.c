@@ -19,13 +19,13 @@
 FILE_LICENCE ( GPL2_OR_LATER );
 
 #include <errno.h>
-#include <gpxe/pci.h>
-#include <gpxe/efi/efi.h>
-#include <gpxe/efi/Protocol/PciRootBridgeIo.h>
+#include <ipxe/pci.h>
+#include <ipxe/efi/efi.h>
+#include <ipxe/efi/Protocol/PciRootBridgeIo.h>
 
 /** @file
  *
- * gPXE PCI I/O API for EFI
+ * iPXE PCI I/O API for EFI
  *
  */
 

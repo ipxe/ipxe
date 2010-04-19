@@ -1,8 +1,8 @@
 #include <string.h>
 #include <stdio.h>
-#include <gpxe/command.h>
-#include <gpxe/settings.h>
-#include <gpxe/settings_ui.h>
+#include <ipxe/command.h>
+#include <ipxe/settings.h>
+#include <ipxe/settings_ui.h>
 
 FILE_LICENCE ( GPL2_OR_LATER );
 

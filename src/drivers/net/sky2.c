@@ -1,5 +1,5 @@
 /*
- * gPXE driver for Marvell Yukon 2 chipset. Derived from Linux sky2 driver
+ * iPXE driver for Marvell Yukon 2 chipset. Derived from Linux sky2 driver
  * (v1.22), which was based on earlier sk98lin and skge drivers.
  *
  * This driver intentionally does not support all the features
@@ -8,7 +8,7 @@
  *
  * Copyright (C) 2005 Stephen Hemminger <shemminger@osdl.org>
  *
- * Modified for gPXE, April 2009 by Joshua Oreman
+ * Modified for iPXE, April 2009 by Joshua Oreman
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -30,11 +30,11 @@ FILE_LICENCE ( GPL2_ONLY );
 #include <errno.h>
 #include <stdio.h>
 #include <unistd.h>
-#include <gpxe/ethernet.h>
-#include <gpxe/if_ether.h>
-#include <gpxe/iobuf.h>
-#include <gpxe/malloc.h>
-#include <gpxe/pci.h>
+#include <ipxe/ethernet.h>
+#include <ipxe/if_ether.h>
+#include <ipxe/iobuf.h>
+#include <ipxe/malloc.h>
+#include <ipxe/pci.h>
 #include <byteswap.h>
 #include <mii.h>
 
@@ -1016,7 +1016,7 @@ static struct io_buffer *sky2_rx_alloc(struct sky2_port *sky2)
 	 * Cards with a RAM buffer hang in the rx FIFO if the
 	 * receive buffer isn't aligned to (Linux module comments say
 	 * 64 bytes, Linux module code says 8 bytes). Since io_buffers
-	 * are always 2kb-aligned under gPXE, just leave it be
+	 * are always 2kb-aligned under iPXE, just leave it be
 	 * without ETH_DATA_ALIGN in those cases.
 	 *
 	 * XXX This causes unaligned access to the IP header,

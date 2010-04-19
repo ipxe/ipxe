@@ -82,7 +82,7 @@ com32_wrapper:
 
 	.data
 
-/* Internal gPXE virtual address space %esp */
+/* Internal iPXE virtual address space %esp */
 .globl com32_internal_esp
 .lcomm com32_internal_esp, 4
 

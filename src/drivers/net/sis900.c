@@ -46,7 +46,7 @@ FILE_LICENCE ( GPL_ANY );
 /* Includes */
 
 #include "etherboot.h"
-#include <gpxe/pci.h>
+#include <ipxe/pci.h>
 #include "nic.h"
 
 #include "sis900.h"

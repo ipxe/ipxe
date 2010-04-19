@@ -111,8 +111,8 @@ FILE_LICENCE ( GPL_ANY );
 #include "etherboot.h"
 #include "nic.h"
 
-#include <gpxe/ethernet.h>
-#include <gpxe/pci.h>
+#include <ipxe/ethernet.h>
+#include <ipxe/pci.h>
 
 /* User settable parameters */
 

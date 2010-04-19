@@ -4,16 +4,16 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <byteswap.h>
-#include <gpxe/in.h>
-#include <gpxe/ip6.h>
-#include <gpxe/ndp.h>
-#include <gpxe/list.h>
-#include <gpxe/icmp6.h>
-#include <gpxe/tcpip.h>
-#include <gpxe/socket.h>
-#include <gpxe/iobuf.h>
-#include <gpxe/netdevice.h>
-#include <gpxe/if_ether.h>
+#include <ipxe/in.h>
+#include <ipxe/ip6.h>
+#include <ipxe/ndp.h>
+#include <ipxe/list.h>
+#include <ipxe/icmp6.h>
+#include <ipxe/tcpip.h>
+#include <ipxe/socket.h>
+#include <ipxe/iobuf.h>
+#include <ipxe/netdevice.h>
+#include <ipxe/if_ether.h>
 
 struct net_protocol ipv6_protocol;
 

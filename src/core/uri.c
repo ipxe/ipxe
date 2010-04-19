@@ -29,8 +29,8 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #include <string.h>
 #include <libgen.h>
 #include <ctype.h>
-#include <gpxe/vsprintf.h>
-#include <gpxe/uri.h>
+#include <ipxe/vsprintf.h>
+#include <ipxe/uri.h>
 
 /**
  * Dump URI for debugging
@@ -356,9 +356,9 @@ char * resolve_path ( const char *base_path,
  * @v relative_uri	Relative URI
  * @ret resolved_uri	Resolved URI
  *
- * Takes a base URI (e.g. "http://etherboot.org/kernels/vmlinuz" and a
+ * Takes a base URI (e.g. "http://ipxe.org/kernels/vmlinuz" and a
  * relative URI (e.g. "../initrds/initrd.gz") and produces a new URI
- * (e.g. "http://etherboot.org/initrds/initrd.gz").
+ * (e.g. "http://ipxe.org/initrds/initrd.gz").
  */
 struct uri * resolve_uri ( struct uri *base_uri,
 			   struct uri *relative_uri ) {

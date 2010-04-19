@@ -19,10 +19,10 @@
  * Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
  */
 
-// Directory containing gPXE source code tree
+// Directory containing iPXE source code tree
 $src_dir = "../../src";
 
-// Compute gPXE version based on source tree
+// Compute iPXE version based on source tree
 exec ( "make -C '$src_dir' version 2>&1", $make_output, $status );
 $version = ( $status == 0 && count ( $make_output  ) > 1 )
            ? trim ( $make_output[count ( $make_output ) - 2] )
@@ -36,10 +36,10 @@ $top_inc = "top.php";
 $bottom_inc = "bottom.php";
 
 // Descriptive strings
-$header_title = "ROM-o-matic for gPXE $version";
-$html_tagline = "ROM-o-matic dynamically generates gPXE images";
-$html_title   = "ROM-o-matic for gPXE $version";
-$description  = "a dynamic gPXE image generator";
+$header_title = "ROM-o-matic for iPXE $version";
+$html_tagline = "ROM-o-matic dynamically generates iPXE images";
+$html_title   = "ROM-o-matic for iPXE $version";
+$description  = "a dynamic iPXE image generator";
 
 // For emacs:
 // Local variables:

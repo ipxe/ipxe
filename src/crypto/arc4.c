@@ -20,8 +20,8 @@
 
 FILE_LICENCE ( GPL2_OR_LATER );
 
-#include <gpxe/crypto.h>
-#include <gpxe/arc4.h>
+#include <ipxe/crypto.h>
+#include <ipxe/arc4.h>
 
 #define SWAP( ary, i, j )	\
 	({ u8 temp = ary[i]; ary[i] = ary[j]; ary[j] = temp; })

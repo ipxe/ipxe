@@ -5,7 +5,7 @@ FILE_LICENCE ( GPL2_OR_LATER );
 
 #include "pxe_types.h"
 #include "pxe_api.h"
-#include <gpxe/device.h>
+#include <ipxe/device.h>
 
 /* Parameter block for pxenv_unknown() */
 struct s_PXENV_UNKNOWN {

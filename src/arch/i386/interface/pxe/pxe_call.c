@@ -18,8 +18,8 @@
 
 FILE_LICENCE ( GPL2_OR_LATER );
 
-#include <gpxe/uaccess.h>
-#include <gpxe/init.h>
+#include <ipxe/uaccess.h>
+#include <ipxe/init.h>
 #include <registers.h>
 #include <biosint.h>
 #include <pxe.h>

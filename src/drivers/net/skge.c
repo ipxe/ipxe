@@ -1,5 +1,5 @@
 /*
- * gPXE driver for Marvell Yukon chipset and SysKonnect Gigabit
+ * iPXE driver for Marvell Yukon chipset and SysKonnect Gigabit
  * Ethernet adapters. Derived from Linux skge driver (v1.13), which was
  * based on earlier sk98lin, e100 and FreeBSD if_sk drivers.
  *
@@ -9,7 +9,7 @@
  *
  * Copyright (C) 2004, 2005 Stephen Hemminger <shemminger@osdl.org>
  *
- * Modified for gPXE, July 2008 by Michael Decker <mrd999@gmail.com>
+ * Modified for iPXE, July 2008 by Michael Decker <mrd999@gmail.com>
  * Tested and Modified in December 2009 by
  *    Thomas Miletich <thomas.miletich@gmail.com>
  *
@@ -33,12 +33,12 @@ FILE_LICENCE ( GPL2_ONLY );
 #include <errno.h>
 #include <stdio.h>
 #include <unistd.h>
-#include <gpxe/netdevice.h>
-#include <gpxe/ethernet.h>
-#include <gpxe/if_ether.h>
-#include <gpxe/iobuf.h>
-#include <gpxe/malloc.h>
-#include <gpxe/pci.h>
+#include <ipxe/netdevice.h>
+#include <ipxe/ethernet.h>
+#include <ipxe/if_ether.h>
+#include <ipxe/iobuf.h>
+#include <ipxe/malloc.h>
+#include <ipxe/pci.h>
 
 #include "skge.h"
 
@@ -1724,7 +1724,7 @@ static int skge_up(struct net_device *dev)
 
 	assert(!(skge->dma & 7));
 
-	/* FIXME: find out whether 64 bit gPXE will be loaded > 4GB */
+	/* FIXME: find out whether 64 bit iPXE will be loaded > 4GB */
 	if ((u64)skge->dma >> 32 != ((u64) skge->dma + RING_SIZE) >> 32) {
 		DBG(PFX "pci_alloc_consistent region crosses 4G boundary\n");
 		err = -EINVAL;
@@ -2450,7 +2450,7 @@ static void skge_remove(struct pci_device *pdev)
  * @v netdev		Device to control.
  * @v enable		Zero to mask off IRQ, non-zero to enable IRQ.
  *
- * This is a gPXE Network Driver API function.
+ * This is a iPXE Network Driver API function.
  */
 static void skge_net_irq ( struct net_device *dev, int enable ) {
 	struct skge_port *skge = netdev_priv(dev);

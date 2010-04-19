@@ -19,8 +19,8 @@
 FILE_LICENCE ( GPL2_OR_LATER );
 
 #include <stdlib.h>
-#include <gpxe/init.h>
-#include <gpxe/efi/efi.h>
+#include <ipxe/init.h>
+#include <ipxe/efi/efi.h>
 
 /**
  * EFI entry point
@@ -37,7 +37,7 @@ EFI_STATUS EFIAPI _start ( EFI_HANDLE image_handle,
 	if ( ( efirc = efi_init ( image_handle, systab ) ) != 0 )
 		return efirc;
 
-	/* Initialise gPXE environment */
+	/* Initialise iPXE environment */
 	initialise();
 	startup();
 

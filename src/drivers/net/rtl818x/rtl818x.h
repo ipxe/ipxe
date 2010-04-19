@@ -4,7 +4,7 @@
  * Copyright 2007 Michael Wu <flamingice@sourmilk.net>
  * Copyright 2007 Andrea Merello <andreamrl@tiscali.it>
  *
- * Modified for gPXE, June 2009, by Joshua Oreman <oremanj@rwcr.net>
+ * Modified for iPXE, June 2009, by Joshua Oreman <oremanj@rwcr.net>
  *
  * Based on the r8187 driver, which is:
  * Copyright 2005 Andrea Merello <andreamrl@tiscali.it>, et al.
@@ -17,8 +17,8 @@
 #ifndef RTL818X_H
 #define RTL818X_H
 
-#include <gpxe/spi_bit.h>
-#include <gpxe/tables.h>
+#include <ipxe/spi_bit.h>
+#include <ipxe/tables.h>
 
 FILE_LICENCE(GPL2_ONLY);
 

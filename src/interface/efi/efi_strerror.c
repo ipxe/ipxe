@@ -19,11 +19,11 @@
 FILE_LICENCE ( GPL2_OR_LATER );
 
 #include <stdio.h>
-#include <gpxe/efi/efi.h>
+#include <ipxe/efi/efi.h>
 
 /** @file
  *
- * gPXE error message formatting for EFI
+ * iPXE error message formatting for EFI
  *
  */
 

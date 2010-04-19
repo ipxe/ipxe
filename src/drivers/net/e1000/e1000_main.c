@@ -541,7 +541,7 @@ void e1000_reset ( struct e1000_adapter *adapter )
 	e1000_init_manageability ( adapter );
 }
 
-/** Functions that implement the gPXE driver API **/
+/** Functions that implement the iPXE driver API **/
 
 /**
  * e1000_close - Disables a network interface

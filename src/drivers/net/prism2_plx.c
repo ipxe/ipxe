@@ -16,7 +16,7 @@ $Id$
 
 FILE_LICENCE ( GPL2_OR_LATER );
 
-#include <gpxe/pci.h>
+#include <ipxe/pci.h>
 #include <nic.h>
 
 #define WLAN_HOSTIF WLAN_PLX

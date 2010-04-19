@@ -18,12 +18,12 @@
 
 FILE_LICENCE ( GPL2_OR_LATER );
 
-#include <gpxe/io.h>
-#include <gpxe/x86_io.h>
+#include <ipxe/io.h>
+#include <ipxe/x86_io.h>
 
 /** @file
  *
- * gPXE I/O API for x86
+ * iPXE I/O API for x86
  *
  */
 

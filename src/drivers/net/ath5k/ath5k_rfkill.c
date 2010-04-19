@@ -2,7 +2,7 @@
  * RFKILL support for ath5k
  *
  * Copyright (c) 2009 Tobias Doerffel <tobias.doerffel@gmail.com>
- * Lightly modified for gPXE, Sep 2008 by Joshua Oreman <oremanj@rwcr.net>
+ * Lightly modified for iPXE, Sep 2008 by Joshua Oreman <oremanj@rwcr.net>
  *
  * All rights reserved.
  *

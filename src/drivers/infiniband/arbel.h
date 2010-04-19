@@ -10,7 +10,7 @@
 FILE_LICENCE ( GPL2_OR_LATER );
 
 #include <stdint.h>
-#include <gpxe/uaccess.h>
+#include <ipxe/uaccess.h>
 #include "mlx_bitops.h"
 #include "MT25218_PRM.h"
 
@@ -232,7 +232,7 @@ union arbelprm_mad {
 } __attribute__ (( packed ));
 
 /*
- * gPXE-specific definitions
+ * iPXE-specific definitions
  *
  */
 

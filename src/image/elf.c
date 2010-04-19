@@ -30,10 +30,10 @@ FILE_LICENCE ( GPL2_OR_LATER );
 
 #include <errno.h>
 #include <elf.h>
-#include <gpxe/uaccess.h>
-#include <gpxe/segment.h>
-#include <gpxe/image.h>
-#include <gpxe/elf.h>
+#include <ipxe/uaccess.h>
+#include <ipxe/segment.h>
+#include <ipxe/image.h>
+#include <ipxe/elf.h>
 
 typedef Elf32_Ehdr	Elf_Ehdr;
 typedef Elf32_Phdr	Elf_Phdr;

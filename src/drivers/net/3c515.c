@@ -49,9 +49,9 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #include "etherboot.h"
 /* to get the interface to the body of the program */
 #include "nic.h"
-#include <gpxe/isapnp.h>
-#include <gpxe/isa.h> /* for ISA_ROM */
-#include <gpxe/ethernet.h>
+#include <ipxe/isapnp.h>
+#include <ipxe/isa.h> /* for ISA_ROM */
+#include <ipxe/ethernet.h>
 
 static void t3c515_wait(unsigned int nticks)
 {

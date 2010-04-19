@@ -22,9 +22,9 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #include <biosint.h>
 #include <basemem.h>
 #include <fakee820.h>
-#include <gpxe/init.h>
-#include <gpxe/memmap.h>
-#include <gpxe/hidemem.h>
+#include <ipxe/init.h>
+#include <ipxe/memmap.h>
+#include <ipxe/hidemem.h>
 
 /** Set to true if you want to test a fake E820 map */
 #define FAKE_E820 0
@@ -33,7 +33,7 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #define ALIGN_HIDDEN 4096   /* 4kB page alignment should be enough */
 
 /**
- * A hidden region of gPXE
+ * A hidden region of iPXE
  *
  * This represents a region that will be edited out of the system's
  * memory map.
@@ -138,7 +138,7 @@ static void hide_etherboot ( void ) {
 	unsigned int fbms;
 
 	/* Dump memory map before mangling */
-	DBG ( "Hiding gPXE from system memory map\n" );
+	DBG ( "Hiding iPXE from system memory map\n" );
 	get_memmap ( &memmap );
 
 	/* Hook in fake E820 map, if we're testing one */
@@ -178,7 +178,7 @@ static void hide_etherboot ( void ) {
 			      &int15_vector );
 
 	/* Dump memory map after mangling */
-	DBG ( "Hidden gPXE from system memory map\n" );
+	DBG ( "Hidden iPXE from system memory map\n" );
 	get_memmap ( &memmap );
 }
 

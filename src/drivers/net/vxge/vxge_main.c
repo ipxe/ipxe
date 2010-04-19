@@ -1,5 +1,5 @@
 /*
- * vxge-main.c: gPXE driver for Neterion Inc's X3100 Series 10GbE
+ * vxge-main.c: iPXE driver for Neterion Inc's X3100 Series 10GbE
  *              PCIe I/O Virtualized Server Adapter.
  *
  * Copyright(c) 2002-2010 Neterion Inc.
@@ -17,16 +17,16 @@ FILE_LICENCE(GPL2_ONLY);
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
-#include <gpxe/io.h>
+#include <ipxe/io.h>
 #include <errno.h>
 #include <byteswap.h>
-#include <gpxe/pci.h>
-#include <gpxe/malloc.h>
-#include <gpxe/if_ether.h>
-#include <gpxe/ethernet.h>
-#include <gpxe/iobuf.h>
-#include <gpxe/netdevice.h>
-#include <gpxe/timer.h>
+#include <ipxe/pci.h>
+#include <ipxe/malloc.h>
+#include <ipxe/if_ether.h>
+#include <ipxe/ethernet.h>
+#include <ipxe/iobuf.h>
+#include <ipxe/netdevice.h>
+#include <ipxe/timer.h>
 #include <nic.h>
 
 #include "vxge_main.h"
@@ -165,7 +165,7 @@ int vxge_open_vpaths(struct vxgedev *vdev)
 	return VXGE_HW_OK;
 }
 
-/** Functions that implement the gPXE driver API **/
+/** Functions that implement the iPXE driver API **/
 
 /**
  * vxge_xmit

@@ -24,10 +24,10 @@ FILE_LICENCE ( GPL2_OR_LATER );
  *
  */
 
-#include <gpxe/netdevice.h>
-#include <gpxe/iobuf.h>
-#include <gpxe/if_ether.h>
-#include <gpxe/eapol.h>
+#include <ipxe/netdevice.h>
+#include <ipxe/iobuf.h>
+#include <ipxe/if_ether.h>
+#include <ipxe/eapol.h>
 #include <errno.h>
 #include <byteswap.h>
 

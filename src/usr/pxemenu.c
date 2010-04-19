@@ -27,10 +27,10 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #include <byteswap.h>
 #include <curses.h>
 #include <console.h>
-#include <gpxe/dhcp.h>
-#include <gpxe/keys.h>
-#include <gpxe/timer.h>
-#include <gpxe/process.h>
+#include <ipxe/dhcp.h>
+#include <ipxe/keys.h>
+#include <ipxe/timer.h>
+#include <ipxe/process.h>
 #include <usr/dhcpmgmt.h>
 #include <usr/autoboot.h>
 

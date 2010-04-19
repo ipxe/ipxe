@@ -1,9 +1,9 @@
 #include <errno.h>
 #include <comboot.h>
-#include <gpxe/in.h>
-#include <gpxe/list.h>
-#include <gpxe/process.h>
-#include <gpxe/resolv.h>
+#include <ipxe/in.h>
+#include <ipxe/list.h>
+#include <ipxe/process.h>
+#include <ipxe/resolv.h>
 
 FILE_LICENCE ( GPL2_OR_LATER );
 

@@ -33,14 +33,14 @@ FILE_LICENCE ( BSD2 );
 #include <errno.h>
 #include <byteswap.h>
 #include <realmode.h>
-#include <gpxe/pci.h>
-#include <gpxe/acpi.h>
-#include <gpxe/in.h>
-#include <gpxe/netdevice.h>
-#include <gpxe/ethernet.h>
-#include <gpxe/dhcp.h>
-#include <gpxe/iscsi.h>
-#include <gpxe/ibft.h>
+#include <ipxe/pci.h>
+#include <ipxe/acpi.h>
+#include <ipxe/in.h>
+#include <ipxe/netdevice.h>
+#include <ipxe/ethernet.h>
+#include <ipxe/dhcp.h>
+#include <ipxe/iscsi.h>
+#include <ipxe/ibft.h>
 
 /** @file
  *
@@ -54,8 +54,8 @@ FILE_LICENCE ( BSD2 );
  */
 
 #define ibftab __use_data16 ( ibftab )
-/** The iBFT used by gPXE */
-struct gpxe_ibft __data16 ( ibftab ) = {
+/** The iBFT used by iPXE */
+struct ipxe_ibft __data16 ( ibftab ) = {
 	/* Table header */
 	.table = {
 		/* ACPI header */
@@ -64,7 +64,7 @@ struct gpxe_ibft __data16 ( ibftab ) = {
 			.length = sizeof ( ibftab ),
 			.revision = 1,
 			.oem_id = "FENSYS",
-			.oem_table_id = "gPXE",
+			.oem_table_id = "iPXE",
 		},
 		/* Control block */
 		.control = {

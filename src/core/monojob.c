@@ -21,12 +21,12 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #include <string.h>
 #include <stdio.h>
 #include <errno.h>
-#include <gpxe/process.h>
+#include <ipxe/process.h>
 #include <console.h>
-#include <gpxe/keys.h>
-#include <gpxe/job.h>
-#include <gpxe/monojob.h>
-#include <gpxe/timer.h>
+#include <ipxe/keys.h>
+#include <ipxe/job.h>
+#include <ipxe/monojob.h>
+#include <ipxe/timer.h>
 
 /** @file
  *

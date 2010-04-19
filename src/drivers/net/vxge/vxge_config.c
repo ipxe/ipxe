@@ -1,5 +1,5 @@
 /*
- * vxge-config.c: gPXE driver for Neterion Inc's X3100 Series 10GbE PCIe I/O
+ * vxge-config.c: iPXE driver for Neterion Inc's X3100 Series 10GbE PCIe I/O
  *              Virtualized Server Adapter.
  *
  * Copyright(c) 2002-2010 Neterion Inc.
@@ -16,8 +16,8 @@ FILE_LICENCE(GPL2_ONLY);
 
 #include <stdlib.h>
 #include <stdio.h>
-#include <gpxe/malloc.h>
-#include <gpxe/iobuf.h>
+#include <ipxe/malloc.h>
+#include <ipxe/iobuf.h>
 #include <byteswap.h>
 
 #include "vxge_traffic.h"

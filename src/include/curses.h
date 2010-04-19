@@ -194,9 +194,9 @@ extern unsigned short _LINES;
 #define COLORS		COLOURS
 
 /*
- * KEY code constants are define in gpxe/keys.h
+ * KEY code constants are define in ipxe/keys.h
  */
-#include <gpxe/keys.h>
+#include <ipxe/keys.h>
 
 //extern int addch ( const chtype * );
 //extern int addchnstr ( const chtype *, int );

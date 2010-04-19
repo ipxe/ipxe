@@ -1,5 +1,5 @@
 /*
- * vxge-traffic.h: gPXE driver for Neterion Inc's X3100 Series 10GbE
+ * vxge-traffic.h: iPXE driver for Neterion Inc's X3100 Series 10GbE
  *              PCIe I/O Virtualized Server Adapter.
  *
  * Copyright(c) 2002-2010 Neterion Inc.
@@ -18,8 +18,8 @@ FILE_LICENCE(GPL2_ONLY);
 #define VXGE_TRAFFIC_H
 
 #include <stdint.h>
-#include <gpxe/if_ether.h>
-#include <gpxe/iobuf.h>
+#include <ipxe/if_ether.h>
+#include <ipxe/iobuf.h>
 
 #include "vxge_reg.h"
 #include "vxge_version.h"

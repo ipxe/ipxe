@@ -20,8 +20,8 @@ FILE_LICENCE ( GPL2_OR_LATER );
 
 #include <stdint.h>
 #include <errno.h>
-#include <gpxe/malloc.h>
-#include <gpxe/iobuf.h>
+#include <ipxe/malloc.h>
+#include <ipxe/iobuf.h>
 
 /** @file
  *

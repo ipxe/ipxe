@@ -3,7 +3,7 @@
 #include <stdio.h>
 #include <string.h>
 #include <errno.h>
-#include <gpxe/uri.h>
+#include <ipxe/uri.h>
 
 #define URI_MAX_LEN 1024
 
@@ -16,17 +16,17 @@ struct uri_test {
 static struct uri_test uri_tests[] = {
 	{ "http://www.fensystems.co.uk", "",
 	  "http://www.fensystems.co.uk/" },
-	{ "http://etherboot.org/wiki/page1", "page2",
-	  "http://etherboot.org/wiki/page2" },
-	{ "http://etherboot.org/wiki/page1", "../page3",
-	  "http://etherboot.org/page3" },
+	{ "http://ipxe.org/wiki/page1", "page2",
+	  "http://ipxe.org/wiki/page2" },
+	{ "http://ipxe.org/wiki/page1", "../page3",
+	  "http://ipxe.org/page3" },
 	{ "tftp://192.168.0.1/", "/tftpboot/vmlinuz",
 	  "tftp://192.168.0.1/tftpboot/vmlinuz" },
 	{ "ftp://the%41nswer%3d:%34ty%32wo@ether%62oot.org:8080/p%41th/foo",
 	  "to?%41=b#%43d",
-	  "ftp://theAnswer%3d:4ty2wo@etherboot.org:8080/path/to?a=b#cd" },
+	  "ftp://theAnswer%3d:4ty2wo@ipxe.org:8080/path/to?a=b#cd" },
 #if 0
-	"http://www.etherboot.org/wiki",
+	"http://www.ipxe.org/wiki",
 	"mailto:bob@nowhere.com",
 	"ftp://joe:secret@insecure.org:8081/hidden/path/to?what=is#this",
 #endif

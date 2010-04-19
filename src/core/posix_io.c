@@ -21,11 +21,11 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #include <stdlib.h>
 #include <string.h>
 #include <errno.h>
-#include <gpxe/list.h>
-#include <gpxe/xfer.h>
-#include <gpxe/open.h>
-#include <gpxe/process.h>
-#include <gpxe/posix_io.h>
+#include <ipxe/list.h>
+#include <ipxe/xfer.h>
+#include <ipxe/open.h>
+#include <ipxe/process.h>
+#include <ipxe/posix_io.h>
 
 /** @file
  *
@@ -33,7 +33,7 @@ FILE_LICENCE ( GPL2_OR_LATER );
  *
  * These functions provide traditional blocking I/O semantics.  They
  * are designed to be used by the PXE TFTP API.  Because they block,
- * they may not be used by most other portions of the gPXE codebase.
+ * they may not be used by most other portions of the iPXE codebase.
  */
 
 /** An open file */

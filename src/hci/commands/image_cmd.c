@@ -24,8 +24,8 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #include <errno.h>
 #include <libgen.h>
 #include <getopt.h>
-#include <gpxe/image.h>
-#include <gpxe/command.h>
+#include <ipxe/image.h>
+#include <ipxe/command.h>
 #include <usr/imgmgmt.h>
 
 /** @file

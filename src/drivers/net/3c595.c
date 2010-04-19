@@ -29,8 +29,8 @@ FILE_LICENCE ( BSD2 );
 
 #include "etherboot.h"
 #include "nic.h"
-#include <gpxe/pci.h>
-#include <gpxe/ethernet.h>
+#include <ipxe/pci.h>
+#include <ipxe/ethernet.h>
 #include "3c595.h"
 
 static struct nic_operations t595_operations;

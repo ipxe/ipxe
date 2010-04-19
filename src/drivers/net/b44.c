@@ -35,15 +35,15 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #include <stdio.h>
 #include <unistd.h>
 #include <byteswap.h>
-#include <gpxe/io.h>
+#include <ipxe/io.h>
 #include <mii.h>
-#include <gpxe/iobuf.h>
-#include <gpxe/malloc.h>
-#include <gpxe/pci.h>
-#include <gpxe/netdevice.h>
-#include <gpxe/ethernet.h>
-#include <gpxe/if_ether.h>
-#include <gpxe/memmap.h>
+#include <ipxe/iobuf.h>
+#include <ipxe/malloc.h>
+#include <ipxe/pci.h>
+#include <ipxe/netdevice.h>
+#include <ipxe/ethernet.h>
+#include <ipxe/if_ether.h>
+#include <ipxe/memmap.h>
 #include "b44.h"
 
 
@@ -628,7 +628,7 @@ static void b44_set_rx_mode(struct net_device *netdev)
 }
 
 
-/*** Implementation of gPXE driver callbacks ***/
+/*** Implementation of iPXE driver callbacks ***/
 
 /**
  * Probe device

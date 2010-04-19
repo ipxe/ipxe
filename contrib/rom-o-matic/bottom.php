@@ -26,25 +26,25 @@ Resources:
 </h4>
 <ul>
   <li>
-    Source code for gPXE images is available at
+    Source code for iPXE images is available at
     <a href="http://etherboot.org/wiki/download" target="_blank">
     http://etherboot.org/wiki/download</a>
     <br><br>
   </li>
   <li>
-    For general information about using gPXE, please visit the
+    For general information about using iPXE, please visit the
     <a href="http://www.etherboot.org/" target="_blank">
     Etherboot Project Home Page</a>
     <br><br>
   </li>
   <li>
-    For Email-based support for gPXE please join
+    For Email-based support for iPXE please join
     <a href="http://etherboot.org/wiki/mailinglists" target="_blank">
     Etherboot Project mailing lists.</a>
     <br><br>
   </li>
   <li>
-    For real-time online gPXE support via IRC please visit the
+    For real-time online iPXE support via IRC please visit the
     <a href="irc://irc.freenode.net/%23etherboot"> #etherboot channel
     of irc.freenode.net</a>.
     <br><br>

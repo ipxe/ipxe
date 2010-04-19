@@ -1,7 +1,7 @@
 #include <errno.h>
 #include <string.h>
 #include <stdio.h>
-#include <gpxe/errortab.h>
+#include <ipxe/errortab.h>
 
 /** @file
  *
@@ -52,7 +52,7 @@ static struct errortab * find_closest_error ( int errno ) {
 	if ( ( errortab = find_error ( errno ) ) != NULL )
 		return errortab;
 
-	/* Second, try masking off the gPXE-specific bit and seeing if
+	/* Second, try masking off the iPXE-specific bit and seeing if
 	 * we have an entry for the generic POSIX error message.
 	 */
 	if ( ( errortab = find_error ( errno & 0x7f0000ff ) ) != NULL )

@@ -33,18 +33,18 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #include <byteswap.h>
 #include <errno.h>
 #include <assert.h>
-#include <gpxe/uri.h>
-#include <gpxe/refcnt.h>
-#include <gpxe/iobuf.h>
-#include <gpxe/xfer.h>
-#include <gpxe/open.h>
-#include <gpxe/socket.h>
-#include <gpxe/tcpip.h>
-#include <gpxe/process.h>
-#include <gpxe/linebuf.h>
-#include <gpxe/features.h>
-#include <gpxe/base64.h>
-#include <gpxe/http.h>
+#include <ipxe/uri.h>
+#include <ipxe/refcnt.h>
+#include <ipxe/iobuf.h>
+#include <ipxe/xfer.h>
+#include <ipxe/open.h>
+#include <ipxe/socket.h>
+#include <ipxe/tcpip.h>
+#include <ipxe/process.h>
+#include <ipxe/linebuf.h>
+#include <ipxe/features.h>
+#include <ipxe/base64.h>
+#include <ipxe/http.h>
 
 FEATURE ( FEATURE_PROTOCOL, "HTTP", DHCP_EB_FEATURE_HTTP, 1 );
 
@@ -453,7 +453,7 @@ static void http_step ( struct process *process ) {
 		/* Send GET request */
 		if ( ( rc = xfer_printf ( &http->socket,
 					  "GET %s%s HTTP/1.0\r\n"
-					  "User-Agent: gPXE/" VERSION "\r\n"
+					  "User-Agent: iPXE/" VERSION "\r\n"
 					  "%s%s%s"
 					  "Host: %s\r\n"
 					  "\r\n",

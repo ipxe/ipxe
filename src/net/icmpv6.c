@@ -2,14 +2,14 @@
 #include <string.h>
 #include <byteswap.h>
 #include <errno.h>
-#include <gpxe/in.h>
-#include <gpxe/ip6.h>
-#include <gpxe/if_ether.h>
-#include <gpxe/iobuf.h>
-#include <gpxe/ndp.h>
-#include <gpxe/icmp6.h>
-#include <gpxe/tcpip.h>
-#include <gpxe/netdevice.h>
+#include <ipxe/in.h>
+#include <ipxe/ip6.h>
+#include <ipxe/if_ether.h>
+#include <ipxe/iobuf.h>
+#include <ipxe/ndp.h>
+#include <ipxe/icmp6.h>
+#include <ipxe/tcpip.h>
+#include <ipxe/netdevice.h>
 
 struct tcpip_protocol icmp6_protocol;
 

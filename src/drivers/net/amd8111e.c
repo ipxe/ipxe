@@ -33,8 +33,8 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #include "etherboot.h"
 #include "nic.h"
 #include "mii.h"
-#include <gpxe/pci.h>
-#include <gpxe/ethernet.h>
+#include <ipxe/pci.h>
+#include <ipxe/ethernet.h>
 #include "string.h"
 #include "stdint.h"
 #include "amd8111e.h"

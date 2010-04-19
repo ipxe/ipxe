@@ -23,9 +23,9 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #include <assert.h>
 #include <errno.h>
 #include <byteswap.h>
-#include <gpxe/blockdev.h>
-#include <gpxe/process.h>
-#include <gpxe/ata.h>
+#include <ipxe/blockdev.h>
+#include <ipxe/process.h>
+#include <ipxe/ata.h>
 
 /** @file
  *

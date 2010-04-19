@@ -1,10 +1,10 @@
 #include <stdint.h>
 #include <stdio.h>
 #include <errno.h>
-#include <gpxe/if_ether.h>
-#include <gpxe/netdevice.h>
-#include <gpxe/ethernet.h>
-#include <gpxe/iobuf.h>
+#include <ipxe/if_ether.h>
+#include <ipxe/netdevice.h>
+#include <ipxe/ethernet.h>
+#include <ipxe/iobuf.h>
 #include <nic.h>
 
 /*

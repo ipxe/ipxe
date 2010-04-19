@@ -18,8 +18,8 @@
 
 #include <stdio.h>
 #include <getopt.h>
-#include <gpxe/command.h>
-#include <gpxe/gdbstub.h>
+#include <ipxe/command.h>
+#include <ipxe/gdbstub.h>
 
 /** @file
  *

@@ -34,11 +34,11 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #include <realmode.h>
 #include <basemem.h>
 #include <comboot.h>
-#include <gpxe/uaccess.h>
-#include <gpxe/image.h>
-#include <gpxe/segment.h>
-#include <gpxe/init.h>
-#include <gpxe/features.h>
+#include <ipxe/uaccess.h>
+#include <ipxe/image.h>
+#include <ipxe/segment.h>
+#include <ipxe/init.h>
+#include <ipxe/features.h>
 
 FEATURE ( FEATURE_IMAGE, "COMBOOT", DHCP_EB_FEATURE_COMBOOT, 1 );
 

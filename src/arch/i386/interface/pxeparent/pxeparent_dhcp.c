@@ -19,8 +19,8 @@
 FILE_LICENCE ( GPL2_OR_LATER );
 
 #include <string.h>
-#include <gpxe/dhcp.h>
-#include <gpxe/netdevice.h>
+#include <ipxe/dhcp.h>
+#include <ipxe/netdevice.h>
 #include <undipreload.h>
 #include <pxeparent.h>
 #include <realmode.h>

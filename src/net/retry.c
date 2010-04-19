@@ -19,11 +19,11 @@
 FILE_LICENCE ( GPL2_OR_LATER );
 
 #include <stddef.h>
-#include <gpxe/timer.h>
-#include <gpxe/list.h>
-#include <gpxe/process.h>
-#include <gpxe/init.h>
-#include <gpxe/retry.h>
+#include <ipxe/timer.h>
+#include <ipxe/list.h>
+#include <ipxe/process.h>
+#include <ipxe/init.h>
+#include <ipxe/retry.h>
 
 /** @file
  *

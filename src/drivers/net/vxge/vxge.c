@@ -7,7 +7,7 @@
 
 FILE_LICENCE(GPL2_OR_LATER);
 
-#include <gpxe/pci.h>
+#include <ipxe/pci.h>
 
 REQUIRE_OBJECT(vxge_main);
 

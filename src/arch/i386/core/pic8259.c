@@ -18,7 +18,7 @@
 
 FILE_LICENCE ( GPL2_OR_LATER );
 
-#include <gpxe/io.h>
+#include <ipxe/io.h>
 #include <pic8259.h>
 
 /** @file

@@ -208,7 +208,7 @@ Output:		PXENV_EXIT_SUCCESS or PXENV_EXIT_FAILURE must be
 		structure must be set to one of the values represented
 		by the PXENV_STATUS_xxx constants.
 
-Description:	Execute a gPXE command.
+Description:	Execute a iPXE command.
 
 typedef struct s_PXENV_FILE_EXEC {
         PXENV_STATUS_t Status;
@@ -271,7 +271,7 @@ Returned from API service:
 
 Size:		Set to the number of bytes filled in (20).
 Magic:		Set to 0xe9c17b20.
-Provider:	Set to 0x45585067 ("gPXE").  Another implementation of this
+Provider:	Set to 0x45585067 ("iPXE").  Another implementation of this
 		API can use another value, e.g. to indicate a different
 		command set supported by FILE EXEC.
 APIMask:	Bitmask of supported API functions (one bit for each function

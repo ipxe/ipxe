@@ -26,12 +26,12 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #include <byteswap.h>
 #include <errno.h>
 #include <assert.h>
-#include <gpxe/in.h>
-#include <gpxe/vsprintf.h>
-#include <gpxe/dhcp.h>
-#include <gpxe/uuid.h>
-#include <gpxe/uri.h>
-#include <gpxe/settings.h>
+#include <ipxe/in.h>
+#include <ipxe/vsprintf.h>
+#include <ipxe/dhcp.h>
+#include <ipxe/uuid.h>
+#include <ipxe/uri.h>
+#include <ipxe/settings.h>
 
 /** @file
  *

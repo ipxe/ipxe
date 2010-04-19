@@ -2,9 +2,9 @@
 #include <string.h>
 #include <errno.h>
 #include <byteswap.h>
-#include <gpxe/iobuf.h>
-#include <gpxe/tables.h>
-#include <gpxe/tcpip.h>
+#include <ipxe/iobuf.h>
+#include <ipxe/tables.h>
+#include <ipxe/tcpip.h>
 
 /** @file
  *

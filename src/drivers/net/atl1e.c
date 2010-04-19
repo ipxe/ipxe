@@ -4,7 +4,7 @@
  * Derived from Intel e1000 driver
  * Copyright(c) 1999 - 2005 Intel Corporation. All rights reserved.
  *
- * Modified for gPXE, October 2009 by Joshua Oreman <oremanj@rwcr.net>.
+ * Modified for iPXE, October 2009 by Joshua Oreman <oremanj@rwcr.net>.
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by the Free

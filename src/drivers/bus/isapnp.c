@@ -62,9 +62,9 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #include <string.h>
 #include <stdio.h>
 #include <errno.h>
-#include <gpxe/io.h>
+#include <ipxe/io.h>
 #include <unistd.h>
-#include <gpxe/isapnp.h>
+#include <ipxe/isapnp.h>
 
 /**
  * ISAPnP Read Port address.

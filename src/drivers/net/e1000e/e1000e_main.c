@@ -860,7 +860,7 @@ static void e1000e_process_rx_packets ( struct net_device *netdev )
 	}
 }
 
-/** Functions that implement the gPXE driver API **/
+/** Functions that implement the iPXE driver API **/
 
 /**
  * e1000_close - Disables a network interface

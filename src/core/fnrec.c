@@ -21,8 +21,8 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
-#include <gpxe/init.h>
-#include <gpxe/uaccess.h>
+#include <ipxe/init.h>
+#include <ipxe/uaccess.h>
 
 /** @file
  *

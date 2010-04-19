@@ -1,11 +1,11 @@
 #!/usr/bin/perl -w
 # usage:
-# [somebody@somewhere ~/gpxe/src]$ ./util/diffsize.pl [<old rev> [<new rev>]]
+# [somebody@somewhere ~/ipxe/src]$ ./util/diffsize.pl [<old rev> [<new rev>]]
 # by default <old rev> is HEAD and <new rev> is the working tree
 
 use strict;
 
--d "bin" or die "Please run me in the gPXE src directory\n";
+-d "bin" or die "Please run me in the iPXE src directory\n";
 mkdir ".sizes";
 
 my($oldrev, $newrev);
@@ -47,8 +47,8 @@ sub calc_sizes($$) {
     system("git checkout $name >/dev/null"); $res ||= $?;
   }
 
-  system("make -j4 bin/gpxe.lkrn >/dev/null"); $res ||= $?;
-  system("make bin/gpxe.lkrn.sizes > .sizes/$rev.sizes"); $res ||= $?;
+  system("make -j4 bin/ipxe.lkrn >/dev/null"); $res ||= $?;
+  system("make bin/ipxe.lkrn.sizes > .sizes/$rev.sizes"); $res ||= $?;
 
   if (defined $name) {
     system("git checkout $lastrev >/dev/null"); $res ||= $?;

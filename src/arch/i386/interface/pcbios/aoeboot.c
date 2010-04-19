@@ -3,11 +3,11 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <errno.h>
-#include <gpxe/aoe.h>
-#include <gpxe/ata.h>
-#include <gpxe/netdevice.h>
-#include <gpxe/sanboot.h>
-#include <gpxe/abft.h>
+#include <ipxe/aoe.h>
+#include <ipxe/ata.h>
+#include <ipxe/netdevice.h>
+#include <ipxe/sanboot.h>
+#include <ipxe/abft.h>
 #include <int13.h>
 
 FILE_LICENCE ( GPL2_OR_LATER );

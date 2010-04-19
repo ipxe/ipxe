@@ -27,7 +27,7 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #include <realmode.h>
 #include <comboot.h>
 #include <assert.h>
-#include <gpxe/uaccess.h>
+#include <ipxe/uaccess.h>
 
 static com32sys_t __bss16 ( com32_regs );
 #define com32_regs __use_data16 ( com32_regs )

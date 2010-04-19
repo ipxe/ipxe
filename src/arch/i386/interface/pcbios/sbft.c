@@ -38,14 +38,14 @@ FILE_LICENCE ( BSD2 );
 
 #include <assert.h>
 #include <realmode.h>
-#include <gpxe/srp.h>
-#include <gpxe/ib_srp.h>
-#include <gpxe/acpi.h>
-#include <gpxe/sbft.h>
+#include <ipxe/srp.h>
+#include <ipxe/ib_srp.h>
+#include <ipxe/acpi.h>
+#include <ipxe/sbft.h>
 
 #define sbftab __use_data16 ( sbftab )
-/** The sBFT used by gPXE */
-struct gpxe_sbft __data16 ( sbftab ) = {
+/** The sBFT used by iPXE */
+struct ipxe_sbft __data16 ( sbftab ) = {
 	/* Table header */
 	.table = {
 		/* ACPI header */
@@ -54,7 +54,7 @@ struct gpxe_sbft __data16 ( sbftab ) = {
 			.length = sizeof ( sbftab ),
 			.revision = 1,
 			.oem_id = "FENSYS",
-			.oem_table_id = "gPXE",
+			.oem_table_id = "iPXE",
 		},
 		.scsi_offset = offsetof ( typeof ( sbftab ), scsi ),
 		.srp_offset = offsetof ( typeof ( sbftab ), srp ),

@@ -24,8 +24,8 @@ FILE_LICENCE ( BSD2 );
 #include "ns8390.h"
 #include "etherboot.h"
 #include "nic.h"
-#include <gpxe/ethernet.h>
-#include <gpxe/isa.h>
+#include <ipxe/ethernet.h>
+#include <ipxe/isa.h>
 #include <errno.h>
 
 #define ASIC_PIO NE_DATA

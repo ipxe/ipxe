@@ -19,14 +19,14 @@
 FILE_LICENCE ( GPL2_OR_LATER );
 
 #include <assert.h>
-#include <gpxe/io.h>
-#include <gpxe/efi/efi.h>
-#include <gpxe/efi/Protocol/CpuIo.h>
-#include <gpxe/efi/efi_io.h>
+#include <ipxe/io.h>
+#include <ipxe/efi/efi.h>
+#include <ipxe/efi/Protocol/CpuIo.h>
+#include <ipxe/efi/efi_io.h>
 
 /** @file
  *
- * gPXE I/O API for EFI
+ * iPXE I/O API for EFI
  *
  */
 

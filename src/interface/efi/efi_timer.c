@@ -21,13 +21,13 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #include <limits.h>
 #include <assert.h>
 #include <unistd.h>
-#include <gpxe/timer.h>
-#include <gpxe/efi/efi.h>
-#include <gpxe/efi/Protocol/Cpu.h>
+#include <ipxe/timer.h>
+#include <ipxe/efi/efi.h>
+#include <ipxe/efi/Protocol/Cpu.h>
 
 /** @file
  *
- * gPXE timer API for EFI
+ * iPXE timer API for EFI
  *
  */
 

@@ -3,7 +3,7 @@
  * Copyright (c) 2006-2008 Nick Kossifidis <mickflemm@gmail.com>
  * Copyright (c) 2007-2008 Pavel Roskin <proski@gnu.org>
  *
- * Lightly modified for gPXE, July 2009, by Joshua Oreman <oremanj@rwcr.net>.
+ * Lightly modified for iPXE, July 2009, by Joshua Oreman <oremanj@rwcr.net>.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above

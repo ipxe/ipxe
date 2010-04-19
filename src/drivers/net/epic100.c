@@ -7,8 +7,8 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #define LINUX_OUT_MACROS
 
 #include "etherboot.h"
-#include <gpxe/pci.h>
-#include <gpxe/ethernet.h>
+#include <ipxe/pci.h>
+#include <ipxe/ethernet.h>
 #include "nic.h"
 #include "console.h"
 #include "epic100.h"

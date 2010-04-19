@@ -6,7 +6,7 @@
 
 FILE_LICENCE ( GPL2_ONLY );
 
-/* Added for gPXE ------------------ */
+/* Added for iPXE ------------------ */
 
 /* These were defined in Linux ethtool.h. Their values are arbitrary;
    they aid only in bookkeeping for the driver. */

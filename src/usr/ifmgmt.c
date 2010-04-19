@@ -23,10 +23,10 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #include <unistd.h>
 #include <errno.h>
 #include <console.h>
-#include <gpxe/netdevice.h>
-#include <gpxe/device.h>
-#include <gpxe/process.h>
-#include <gpxe/keys.h>
+#include <ipxe/netdevice.h>
+#include <ipxe/device.h>
+#include <ipxe/process.h>
+#include <ipxe/keys.h>
 #include <usr/ifmgmt.h>
 
 /** @file

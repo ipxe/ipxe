@@ -23,9 +23,9 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #include <byteswap.h>
 #include <errno.h>
 #include <assert.h>
-#include <gpxe/list.h>
-#include <gpxe/blockdev.h>
-#include <gpxe/memmap.h>
+#include <ipxe/list.h>
+#include <ipxe/blockdev.h>
+#include <ipxe/memmap.h>
 #include <realmode.h>
 #include <bios.h>
 #include <biosint.h>

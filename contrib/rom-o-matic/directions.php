@@ -55,7 +55,7 @@
           above.<br><br>
         </li>
         <li>
-          gPXE does not support all possible PCI IDs for supported
+          iPXE does not support all possible PCI IDs for supported
           NICs.
           <br><br>
         </li>

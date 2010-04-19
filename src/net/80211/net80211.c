@@ -1,5 +1,5 @@
 /*
- * The gPXE 802.11 MAC layer.
+ * The iPXE 802.11 MAC layer.
  *
  * Copyright (c) 2009 Joshua Oreman <oremanj@rwcr.net>.
  *
@@ -23,15 +23,15 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #include <string.h>
 #include <byteswap.h>
 #include <stdlib.h>
-#include <gpxe/settings.h>
-#include <gpxe/if_arp.h>
-#include <gpxe/ethernet.h>
-#include <gpxe/ieee80211.h>
-#include <gpxe/netdevice.h>
-#include <gpxe/net80211.h>
-#include <gpxe/sec80211.h>
-#include <gpxe/timer.h>
-#include <gpxe/nap.h>
+#include <ipxe/settings.h>
+#include <ipxe/if_arp.h>
+#include <ipxe/ethernet.h>
+#include <ipxe/ieee80211.h>
+#include <ipxe/netdevice.h>
+#include <ipxe/net80211.h>
+#include <ipxe/sec80211.h>
+#include <ipxe/timer.h>
+#include <ipxe/nap.h>
 #include <unistd.h>
 #include <errno.h>
 
@@ -248,7 +248,7 @@ struct setting net80211_active_setting __setting = {
 /** The cryptographic key to use
  *
  * For hex WEP keys, as is common, this must be entered using the
- * normal gPXE method for entering hex settings; an ASCII string of
+ * normal iPXE method for entering hex settings; an ASCII string of
  * hex characters will not behave as expected.
  */
 struct setting net80211_key_setting __setting = {
@@ -459,7 +459,7 @@ static inline int net80211_rate_is_erp ( u16 rate )
  * being protected and its ACK; add the results of two calls, one with
  * bytes = 10 and one with bytes set to the next frame's size.
  *
- * No other frame types are currently supported by gPXE.
+ * No other frame types are currently supported by iPXE.
  */
 u16 net80211_duration ( struct net80211_device *dev, int bytes, u16 rate )
 {
@@ -1285,7 +1285,7 @@ net80211_marshal_request_info ( struct net80211_device *dev,
  * @ret ctx	Probe context
  *
  * Active scanning may only be used on channels 1-11 in the 2.4GHz
- * band, due to gPXE's lack of a complete regulatory database. If
+ * band, due to iPXE's lack of a complete regulatory database. If
  * active scanning is used, probe packets will be sent on each
  * channel; this can allow association with hidden-SSID networks if
  * the SSID is properly specified.

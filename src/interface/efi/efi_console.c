@@ -20,8 +20,8 @@ FILE_LICENCE ( GPL2_OR_LATER );
 
 #include <stddef.h>
 #include <assert.h>
-#include <gpxe/efi/efi.h>
-#include <gpxe/ansiesc.h>
+#include <ipxe/efi/efi.h>
+#include <ipxe/ansiesc.h>
 #include <console.h>
 
 #define ATTR_BOLD		0x08

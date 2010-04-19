@@ -5,14 +5,14 @@
 #include <assert.h>
 #include <errno.h>
 #include <byteswap.h>
-#include <gpxe/socket.h>
-#include <gpxe/tcpip.h>
-#include <gpxe/in.h>
-#include <gpxe/xfer.h>
-#include <gpxe/open.h>
-#include <gpxe/uri.h>
-#include <gpxe/features.h>
-#include <gpxe/ftp.h>
+#include <ipxe/socket.h>
+#include <ipxe/tcpip.h>
+#include <ipxe/in.h>
+#include <ipxe/xfer.h>
+#include <ipxe/open.h>
+#include <ipxe/uri.h>
+#include <ipxe/features.h>
+#include <ipxe/ftp.h>
 
 /** @file
  *
@@ -149,7 +149,7 @@ static const char * ftp_user ( struct ftp_request *ftp ) {
  * @ret password	FTP password
  */
 static const char * ftp_password ( struct ftp_request *ftp ) {
-	static char *ftp_default_password = "etherboot@etherboot.org";
+	static char *ftp_default_password = "ipxe@ipxe.org";
 	return ftp->uri->password ? ftp->uri->password : ftp_default_password;
 }
 

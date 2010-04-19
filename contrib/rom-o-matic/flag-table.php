@@ -59,7 +59,7 @@ $flag_table = array (
 	   "flag" => "PRODUCT_SHORT_NAME",
 	   "hide_from_user" => "yes",
 	   "type" => "string",
-	   "value" => "gPXE",
+	   "value" => "iPXE",
 	   "cfgsec" => "general"
 	   ),
 

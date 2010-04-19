@@ -22,10 +22,10 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #include <string.h>
 #include <byteswap.h>
 #include <errno.h>
-#include <gpxe/list.h>
-#include <gpxe/infiniband.h>
-#include <gpxe/ib_mi.h>
-#include <gpxe/ib_mcast.h>
+#include <ipxe/list.h>
+#include <ipxe/infiniband.h>
+#include <ipxe/ib_mi.h>
+#include <ipxe/ib_mcast.h>
 
 /** @file
  *

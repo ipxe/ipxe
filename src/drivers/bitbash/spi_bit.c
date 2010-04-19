@@ -25,8 +25,8 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #include <errno.h>
 #include <assert.h>
 #include <unistd.h>
-#include <gpxe/bitbash.h>
-#include <gpxe/spi_bit.h>
+#include <ipxe/bitbash.h>
+#include <ipxe/spi_bit.h>
 
 /** @file
  *

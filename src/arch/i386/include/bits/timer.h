@@ -9,7 +9,7 @@
 
 FILE_LICENCE ( GPL2_OR_LATER );
 
-#include <gpxe/bios_timer.h>
-#include <gpxe/rdtsc_timer.h>
+#include <ipxe/bios_timer.h>
+#include <ipxe/rdtsc_timer.h>
 
 #endif /* _BITS_TIMER_H */

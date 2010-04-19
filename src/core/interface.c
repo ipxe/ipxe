@@ -18,7 +18,7 @@
 
 FILE_LICENCE ( GPL2_OR_LATER );
 
-#include <gpxe/interface.h>
+#include <ipxe/interface.h>
 
 /** @file
  *

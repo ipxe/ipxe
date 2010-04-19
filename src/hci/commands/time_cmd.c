@@ -23,9 +23,9 @@
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
-#include <gpxe/command.h>
-#include <gpxe/nap.h>
-#include <gpxe/timer.h>
+#include <ipxe/command.h>
+#include <ipxe/nap.h>
+#include <ipxe/timer.h>
 
 static int time_exec ( int argc, char **argv ) {
 	unsigned long start;

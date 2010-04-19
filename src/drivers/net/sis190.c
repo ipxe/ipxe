@@ -5,7 +5,7 @@
    Copyright (c) 2003, 2004 Jeff Garzik <jgarzik@pobox.com>
    Copyright (c) 2003, 2004, 2005 Francois Romieu <romieu@fr.zoreil.com>
 
-   Modified for gPXE 2009 by Thomas Miletich <thomas.miletich@gmail.com>
+   Modified for iPXE 2009 by Thomas Miletich <thomas.miletich@gmail.com>
 
    Based on r8169.c, tg3.c, 8139cp.c, skge.c, epic100.c and SiS 190/191
    genuine driver.

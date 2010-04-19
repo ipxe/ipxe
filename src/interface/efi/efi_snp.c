@@ -23,27 +23,27 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #include <errno.h>
 #include <assert.h>
 #include <byteswap.h>
-#include <gpxe/netdevice.h>
-#include <gpxe/iobuf.h>
-#include <gpxe/in.h>
-#include <gpxe/pci.h>
-#include <gpxe/efi/efi.h>
-#include <gpxe/efi/Protocol/DriverBinding.h>
-#include <gpxe/efi/Protocol/PciIo.h>
-#include <gpxe/efi/Protocol/SimpleNetwork.h>
-#include <gpxe/efi/Protocol/ComponentName2.h>
-#include <gpxe/efi/Protocol/NetworkInterfaceIdentifier.h>
+#include <ipxe/netdevice.h>
+#include <ipxe/iobuf.h>
+#include <ipxe/in.h>
+#include <ipxe/pci.h>
+#include <ipxe/efi/efi.h>
+#include <ipxe/efi/Protocol/DriverBinding.h>
+#include <ipxe/efi/Protocol/PciIo.h>
+#include <ipxe/efi/Protocol/SimpleNetwork.h>
+#include <ipxe/efi/Protocol/ComponentName2.h>
+#include <ipxe/efi/Protocol/NetworkInterfaceIdentifier.h>
 #include <config/general.h>
 
 /** @file
  *
- * gPXE EFI SNP interface
+ * iPXE EFI SNP interface
  *
  */
 
 /** An SNP device */
 struct efi_snp_device {
-	/** The underlying gPXE network device */
+	/** The underlying iPXE network device */
 	struct net_device *netdev;
 	/** EFI device handle */
 	EFI_HANDLE handle;
@@ -112,7 +112,7 @@ static EFI_GUID efi_pci_io_protocol_guid
 	= EFI_PCI_IO_PROTOCOL_GUID;
 
 /**
- * Set EFI SNP mode based on gPXE net device parameters
+ * Set EFI SNP mode based on iPXE net device parameters
  *
  * @v snp		SNP interface
  */
@@ -794,7 +794,7 @@ efi_snp_netdev ( EFI_DRIVER_BINDING_PROTOCOL *driver, EFI_HANDLE device ) {
 	pci_busdevfn = PCI_BUSDEVFN ( pci_bus, PCI_DEVFN ( pci_dev, pci_fn ) );
 	if ( ( netdev = find_netdev_by_location ( BUS_TYPE_PCI,
 						  pci_busdevfn ) ) == NULL ) {
-		DBGCP ( driver, "SNPDRV %p device %p is not a gPXE network "
+		DBGCP ( driver, "SNPDRV %p device %p is not a iPXE network "
 			"device\n", driver, device );
 		goto out_no_netdev;
 	}
@@ -958,7 +958,7 @@ efi_snp_driver_start ( EFI_DRIVER_BINDING_PROTOCOL *driver,
 	/* Populate the NII structure */
 	snpdev->nii.Revision =
 		EFI_NETWORK_INTERFACE_IDENTIFIER_PROTOCOL_REVISION;
-	strncpy ( snpdev->nii.StringId, "gPXE",
+	strncpy ( snpdev->nii.StringId, "iPXE",
 		  sizeof ( snpdev->nii.StringId ) );
 
 	/* Populate the device name */

@@ -3,7 +3,7 @@
  * by Greg Beeley, Greg.Beeley@LightSys.org.  Modified by Steve Smith,
  * Steve.Smith@Juno.Com. Alignment bug fix Neil Newell (nn@icenoir.net).
  *
- * Port from etherboot to gPXE API, implementation of tx/rx ring support
+ * Port from etherboot to iPXE API, implementation of tx/rx ring support
  * by Thomas Miletich, thomas.miletich@gmail.com
  * Thanks to Marty Connor and Stefan Hajnoczi for their help and feedback.
  *

@@ -33,11 +33,11 @@ FILE_LICENCE ( BSD2 );
 #include <stdlib.h>
 #include <string.h>
 #include <errno.h>
-#include <gpxe/scsi.h>
-#include <gpxe/xfer.h>
-#include <gpxe/features.h>
-#include <gpxe/ib_srp.h>
-#include <gpxe/srp.h>
+#include <ipxe/scsi.h>
+#include <ipxe/xfer.h>
+#include <ipxe/features.h>
+#include <ipxe/ib_srp.h>
+#include <ipxe/srp.h>
 
 /**
  * @file

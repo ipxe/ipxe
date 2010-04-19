@@ -21,7 +21,7 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #include <stdint.h>
 #include <stdio.h>
 #include <byteswap.h>
-#include <gpxe/uuid.h>
+#include <ipxe/uuid.h>
 
 /** @file
  *

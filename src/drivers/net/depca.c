@@ -239,9 +239,9 @@ FILE_LICENCE ( GPL_ANY );
 
 #include "etherboot.h"
 #include "nic.h"
-#include <gpxe/isa.h>
+#include <ipxe/isa.h>
 #include "console.h"
-#include <gpxe/ethernet.h>
+#include <ipxe/ethernet.h>
 
 /*
 ** I/O addresses. Note that the 2k buffer option is not supported in

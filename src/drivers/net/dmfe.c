@@ -43,8 +43,8 @@ FILE_LICENCE ( GPL2_OR_LATER );
 /* to get the interface to the body of the program */
 #include "nic.h"
 /* to get the PCI support functions, if this is a PCI NIC */
-#include <gpxe/pci.h>
-#include <gpxe/ethernet.h>
+#include <ipxe/pci.h>
+#include <ipxe/ethernet.h>
 
 /* #define EDEBUG 1 */
 #ifdef EDEBUG

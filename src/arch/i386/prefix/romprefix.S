@@ -130,7 +130,7 @@ pnpheader:
 
 /* Manufacturer string */
 mfgstr:
-	.asciz	"http://etherboot.org"
+	.asciz	"http://ipxe.org"
 	.size mfgstr, . - mfgstr
 
 /* Product string
@@ -477,7 +477,7 @@ no_pmm:
 	call	print_message
 	popf
 	jnz	out
-	/* Ctrl-B was pressed: invoke gPXE.  The keypress will be
+	/* Ctrl-B was pressed: invoke iPXE.  The keypress will be
 	 * picked up by the initial shell prompt, and we will drop
 	 * into a shell.
 	 */
@@ -503,7 +503,7 @@ out:
  * strings PRODUCT_NAME and PRODUCT_SHORT_NAME in config/general.h.
  *
  * While nothing in the GPL prevents you from removing all references
- * to gPXE or http://etherboot.org, we prefer you not to do so.
+ * to iPXE or http://ipxe.org, we prefer you not to do so.
  *
  * If you have an OEM-mandated branding requirement that cannot be
  * satisfied simply by defining PRODUCT_NAME and PRODUCT_SHORT_NAME,
@@ -516,7 +516,7 @@ init_message:
 	.ascii	"\n"
 	.ascii	PRODUCT_NAME
 	.ascii	"\n"
-	.asciz	"gPXE (http://etherboot.org) - "
+	.asciz	"iPXE (http://ipxe.org) - "
 	.size	init_message, . - init_message
 init_message_pci:
 	.asciz	" PCI"
@@ -913,7 +913,7 @@ int19_entry:
 	call	print_message
 	popf
 	jz	1f
-	/* Leave keypress in buffer and start gPXE.  The keypress will
+	/* Leave keypress in buffer and start iPXE.  The keypress will
 	 * cause the usual initial Ctrl-B prompt to be skipped.
 	 */
 	pushw	%cs
@@ -972,7 +972,7 @@ exec:	/* Set %ds = %cs */
 	movw	%ax, %ss
 	movw	$0x7c00, %sp
 
-	/* Install gPXE */
+	/* Install iPXE */
 	movl	image_source, %esi
 	movl	decompress_to, %edi
 	call	alloc_basemem
@@ -993,7 +993,7 @@ exec:	/* Set %ds = %cs */
 	call	prot_call
 	popl	%ecx /* discard */
 
-	/* Uninstall gPXE */
+	/* Uninstall iPXE */
 	call	uninstall
 
 	/* Restore BIOS stack */

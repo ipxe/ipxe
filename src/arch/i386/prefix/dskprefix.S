@@ -355,7 +355,7 @@ msg1end:
 	.word 0xAA55
 
 start_runtime:
-	/* Install gPXE */
+	/* Install iPXE */
 	call	install
 
 	/* Set up real-mode stack */
@@ -373,7 +373,7 @@ start_runtime:
 	call	prot_call
 	popl	%ecx /* discard */
 
-	/* Uninstall gPXE */
+	/* Uninstall iPXE */
 	call	uninstall
 
 	/* Boot next device */

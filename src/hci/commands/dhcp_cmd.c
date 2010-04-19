@@ -27,9 +27,9 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #include <string.h>
 #include <assert.h>
 #include <getopt.h>
-#include <gpxe/netdevice.h>
-#include <gpxe/in.h>
-#include <gpxe/command.h>
+#include <ipxe/netdevice.h>
+#include <ipxe/in.h>
+#include <ipxe/command.h>
 #include <usr/dhcpmgmt.h>
 
 /** @file

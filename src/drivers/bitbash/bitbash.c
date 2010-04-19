@@ -18,7 +18,7 @@
 
 FILE_LICENCE ( GPL2_OR_LATER );
 
-#include <gpxe/bitbash.h>
+#include <ipxe/bitbash.h>
 
 /** @file
  *

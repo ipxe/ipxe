@@ -18,12 +18,12 @@
 
 FILE_LICENCE ( GPL2_OR_LATER );
 
-#include <gpxe/uaccess.h>
-#include <gpxe/efi/efi.h>
+#include <ipxe/uaccess.h>
+#include <ipxe/efi/efi.h>
 
 /** @file
  *
- * gPXE user access API for EFI
+ * iPXE user access API for EFI
  *
  */
 

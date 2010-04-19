@@ -36,7 +36,7 @@
  *              Jul 25 1997  V1.00  REW     Tested by AW to work in a PROM
  *                                          Cleanup for publication
  *              Dez 11 2004  V1.10  Kiszka  Add RX ring buffer support
- *              Jun    2008  v2.0   mdeck   Updated to gPXE. Changed much.
+ *              Jun    2008  v2.0   mdeck   Updated to iPXE. Changed much.
  *
  * Cleanups and fixes by Thomas Miletich<thomas.miletich@gmail.com>
  *
@@ -60,12 +60,12 @@ FILE_LICENCE ( GPL2_OR_LATER );
  *
  * Initialization
  *
- * ifec_pci_probe() is called by gPXE during initialization. Typical NIC
+ * ifec_pci_probe() is called by iPXE during initialization. Typical NIC
  * initialization is performed.  EEPROM data is read.
  *
  * Network Boot
  *
- * ifec_net_open() is called by gPXE before attempting to network boot from the
+ * ifec_net_open() is called by iPXE before attempting to network boot from the
  * card.  Here, the Command Unit & Receive Unit are initialized.  The tx & rx
  * rings are setup.  The MAC address is programmed and the card is configured.
  *
@@ -104,16 +104,16 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #include <errno.h>
 #include <stdio.h>
 #include <unistd.h>
-#include <gpxe/ethernet.h>
-#include <gpxe/if_ether.h>
-#include <gpxe/iobuf.h>
-#include <gpxe/malloc.h>
-#include <gpxe/pci.h>
-#include <gpxe/spi_bit.h>
-#include <gpxe/timer.h>
-#include <gpxe/nvs.h>
-#include <gpxe/threewire.h>
-#include <gpxe/netdevice.h>
+#include <ipxe/ethernet.h>
+#include <ipxe/if_ether.h>
+#include <ipxe/iobuf.h>
+#include <ipxe/malloc.h>
+#include <ipxe/pci.h>
+#include <ipxe/spi_bit.h>
+#include <ipxe/timer.h>
+#include <ipxe/nvs.h>
+#include <ipxe/threewire.h>
+#include <ipxe/netdevice.h>
 #include "eepro100.h"
 
 /****************************** Global data **********************************/
@@ -155,7 +155,7 @@ static struct net_device_operations ifec_operations = {
 	.irq      = ifec_net_irq
 };
 
-/******************* gPXE PCI Device Driver API functions ********************/
+/******************* iPXE PCI Device Driver API functions ********************/
 
 /*
  * Initialize the PCI device.
@@ -164,8 +164,8 @@ static struct net_device_operations ifec_operations = {
  * @v id  		The PCI device + vendor id.
  * @ret rc		Returns zero if successfully initialized.
  *
- * This function is called very early on, while gPXE is initializing.
- * This is a gPXE PCI Device Driver API function.
+ * This function is called very early on, while iPXE is initializing.
+ * This is a iPXE PCI Device Driver API function.
  */
 static int ifec_pci_probe ( struct pci_device *pci,
                             const struct pci_device_id *id __unused )
@@ -245,14 +245,14 @@ static void ifec_pci_remove ( struct pci_device *pci )
 	netdev_put        ( netdev );
 }
 
-/****************** gPXE Network Device Driver API functions *****************/
+/****************** iPXE Network Device Driver API functions *****************/
 
 /*
  * Close a network device.
  *
  * @v netdev		Device to close.
  *
- * This is a gPXE Network Device Driver API function.
+ * This is a iPXE Network Device Driver API function.
  */
 static void ifec_net_close ( struct net_device *netdev )
 {
@@ -285,7 +285,7 @@ static void ifec_net_close ( struct net_device *netdev )
  * @v netdev		Device to control.
  * @v enable		Zero to mask off IRQ, non-zero to enable IRQ.
  *
- * This is a gPXE Network Driver API function.
+ * This is a iPXE Network Driver API function.
  */
 static void ifec_net_irq ( struct net_device *netdev, int enable )
 {
@@ -304,7 +304,7 @@ static void ifec_net_irq ( struct net_device *netdev, int enable )
  * @ret rc  		Non-zero if failed to open.
  *
  * This enables tx and rx on the device.
- * This is a gPXE Network Device Driver API function.
+ * This is a iPXE Network Device Driver API function.
  */
 static int ifec_net_open ( struct net_device *netdev )
 {
@@ -393,9 +393,9 @@ error:
  *
  * @v netdev		Device being polled.
  *
- * This is called periodically by gPXE to let the driver check the status of
+ * This is called periodically by iPXE to let the driver check the status of
  * transmitted packets and to allow the driver to check for received packets.
- * This is a gPXE Network Device Driver API function.
+ * This is a iPXE Network Device Driver API function.
  */
 static void ifec_net_poll ( struct net_device *netdev )
 {
@@ -431,7 +431,7 @@ static void ifec_net_poll ( struct net_device *netdev )
  * @v iobuf 		Data to transmit.
  * @ret rc  		Non-zero if failed to transmit.
  *
- * This is a gPXE Network Driver API function.
+ * This is a iPXE Network Driver API function.
  */
 static int ifec_net_transmit ( struct net_device *netdev,
                                struct io_buffer *iobuf )
@@ -993,7 +993,7 @@ static void ifec_tx_process ( struct net_device *netdev )
 	/* Check status of transmitted packets */
 	while ( ( status = tcb->status ) && tcb->iob ) {
 		if ( status & TCB_U ) {
-			/* report error to gPXE */
+			/* report error to iPXE */
 			DBG ( "ifec_tx_process : tx error!\n " );
 			netdev_tx_complete_err ( netdev, tcb->iob, -EINVAL );
 		} else {

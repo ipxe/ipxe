@@ -93,22 +93,22 @@ INCDIRS		+= include .
 # Default build target: build the most common targets and print out a
 # helpfully suggestive message
 #
-all : bin/blib.a bin/gpxe.dsk bin/gpxe.iso bin/gpxe.usb bin/undionly.kpxe
+all : bin/blib.a bin/ipxe.dsk bin/ipxe.iso bin/ipxe.usb bin/undionly.kpxe
 	@$(ECHO) '==========================================================='
 	@$(ECHO)
 	@$(ECHO) 'To create a bootable floppy, type'
-	@$(ECHO) '    cat bin/gpxe.dsk > /dev/fd0'
+	@$(ECHO) '    cat bin/ipxe.dsk > /dev/fd0'
 	@$(ECHO) 'where /dev/fd0 is your floppy drive.  This will erase any'
 	@$(ECHO) 'data already on the disk.'
 	@$(ECHO)
 	@$(ECHO) 'To create a bootable USB key, type'
-	@$(ECHO) '    cat bin/gpxe.usb > /dev/sdX'
+	@$(ECHO) '    cat bin/ipxe.usb > /dev/sdX'
 	@$(ECHO) 'where /dev/sdX is your USB key, and is *not* a real hard'
 	@$(ECHO) 'disk on your system.  This will erase any data already on'
 	@$(ECHO) 'the USB key.'
 	@$(ECHO)
 	@$(ECHO) 'To create a bootable CD-ROM, burn the ISO image '
-	@$(ECHO) 'bin/gpxe.iso to a blank CD-ROM.'
+	@$(ECHO) 'bin/ipxe.iso to a blank CD-ROM.'
 	@$(ECHO)
 	@$(ECHO) 'These images contain drivers for all supported cards.  You'
 	@$(ECHO) 'can build more customised images, and ROM images, using'
@@ -140,7 +140,7 @@ CFLAGS		+= -DVERSION_MAJOR=$(VERSION_MAJOR) \
 		   -DVERSION_MINOR=$(VERSION_MINOR) \
 		   -DVERSION_PATCH=$(VERSION_PATCH) \
 		   -DVERSION=\"$(VERSION)\"
-IDENT		= '$(@F) $(VERSION) (GPL) etherboot.org'
+IDENT		= '$(@F) $(VERSION) (GPL) ipxe.org'
 version :
 	@$(ECHO) $(VERSION)
 

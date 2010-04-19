@@ -29,14 +29,14 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #include <string.h>
 #include <byteswap.h>
 #include <basemem_packet.h>
-#include <gpxe/netdevice.h>
-#include <gpxe/iobuf.h>
-#include <gpxe/device.h>
-#include <gpxe/pci.h>
-#include <gpxe/if_ether.h>
-#include <gpxe/ip.h>
-#include <gpxe/arp.h>
-#include <gpxe/rarp.h>
+#include <ipxe/netdevice.h>
+#include <ipxe/iobuf.h>
+#include <ipxe/device.h>
+#include <ipxe/pci.h>
+#include <ipxe/if_ether.h>
+#include <ipxe/ip.h>
+#include <ipxe/arp.h>
+#include <ipxe/rarp.h>
 #include "pxe.h"
 
 /**

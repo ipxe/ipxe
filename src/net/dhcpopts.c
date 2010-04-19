@@ -23,8 +23,8 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #include <stdio.h>
 #include <errno.h>
 #include <string.h>
-#include <gpxe/dhcp.h>
-#include <gpxe/dhcpopts.h>
+#include <ipxe/dhcp.h>
+#include <ipxe/dhcpopts.h>
 
 /** @file
  *

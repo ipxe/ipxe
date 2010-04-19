@@ -2,7 +2,7 @@
 
 FILE_LICENCE(GPL2_OR_LATER);
 
-#include <gpxe/pci.h>
+#include <ipxe/pci.h>
 
 REQUIRE_OBJECT(rtl818x);
 REQUIRE_OBJECT(rtl8180_grf5101);

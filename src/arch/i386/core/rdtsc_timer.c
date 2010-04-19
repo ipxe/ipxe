@@ -25,8 +25,8 @@ FILE_LICENCE ( GPL2_OR_LATER );
  */
 
 #include <assert.h>
-#include <gpxe/timer.h>
-#include <gpxe/timer2.h>
+#include <ipxe/timer.h>
+#include <ipxe/timer2.h>
 
 /**
  * Number of TSC ticks per microsecond

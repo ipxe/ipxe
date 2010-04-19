@@ -18,17 +18,17 @@
 
 FILE_LICENCE ( GPL2_OR_LATER );
 
-#include <gpxe/net80211.h>
-#include <gpxe/sec80211.h>
-#include <gpxe/wpa.h>
-#include <gpxe/eapol.h>
-#include <gpxe/crypto.h>
-#include <gpxe/arc4.h>
-#include <gpxe/crc32.h>
-#include <gpxe/sha1.h>
-#include <gpxe/hmac.h>
-#include <gpxe/list.h>
-#include <gpxe/ethernet.h>
+#include <ipxe/net80211.h>
+#include <ipxe/sec80211.h>
+#include <ipxe/wpa.h>
+#include <ipxe/eapol.h>
+#include <ipxe/crypto.h>
+#include <ipxe/arc4.h>
+#include <ipxe/crc32.h>
+#include <ipxe/sha1.h>
+#include <ipxe/hmac.h>
+#include <ipxe/list.h>
+#include <ipxe/ethernet.h>
 #include <stdlib.h>
 #include <string.h>
 #include <errno.h>
@@ -63,7 +63,7 @@ static int wpa_fail ( struct wpa_common_ctx *ctx, int rc )
  * @v crypt	Cryptosystem ID
  * @ret crypto	Cryptosystem handler structure
  *
- * If support for @a crypt is not compiled in to gPXE, or if @a crypt
+ * If support for @a crypt is not compiled in to iPXE, or if @a crypt
  * is NET80211_CRYPT_UNKNOWN, returns @c NULL.
  */
 static struct net80211_crypto *
@@ -110,7 +110,7 @@ struct wpa_kie * wpa_find_kie ( int version )
  * information element suitable for including in an association
  * request frame to the network identified by @c dev->associating.
  * If it is impossible to construct an information element consistent
- * with gPXE's capabilities that is compatible with that network, or
+ * with iPXE's capabilities that is compatible with that network, or
  * if none should be sent because that network's beacon included no
  * security information, returns an error indication and leaves
  * @a ie_ret unchanged.
@@ -777,7 +777,7 @@ static int wpa_handle_1_of_2 ( struct wpa_common_ctx *ctx,
 	 * So from an old WPA host, 3/4 does not contain an
 	 * encapsulated GTK. The first frame of the GK handshake
 	 * contains it, encrypted, but without a KDE wrapper, and with
-	 * the key ID field (which gPXE doesn't use) shoved away in
+	 * the key ID field (which iPXE doesn't use) shoved away in
 	 * the reserved bits in the info field, and the TxRx bit
 	 * stealing the Install bit's spot.
 	 */

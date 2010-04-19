@@ -28,10 +28,10 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #include <errno.h>
 #include <curses.h>
 #include <console.h>
-#include <gpxe/settings.h>
-#include <gpxe/editbox.h>
-#include <gpxe/keys.h>
-#include <gpxe/login_ui.h>
+#include <ipxe/settings.h>
+#include <ipxe/editbox.h>
+#include <ipxe/keys.h>
+#include <ipxe/login_ui.h>
 
 /* Colour pairs */
 #define CPAIR_NORMAL		1

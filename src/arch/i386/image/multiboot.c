@@ -30,13 +30,13 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #include <assert.h>
 #include <realmode.h>
 #include <multiboot.h>
-#include <gpxe/uaccess.h>
-#include <gpxe/image.h>
-#include <gpxe/segment.h>
-#include <gpxe/memmap.h>
-#include <gpxe/elf.h>
-#include <gpxe/init.h>
-#include <gpxe/features.h>
+#include <ipxe/uaccess.h>
+#include <ipxe/image.h>
+#include <ipxe/segment.h>
+#include <ipxe/memmap.h>
+#include <ipxe/elf.h>
+#include <ipxe/init.h>
+#include <ipxe/features.h>
 
 FEATURE ( FEATURE_IMAGE, "Multiboot", DHCP_EB_FEATURE_MULTIBOOT, 1 );
 
@@ -242,7 +242,7 @@ static struct multiboot_info __bss16 ( mbinfo );
 #define mbinfo __use_data16 ( mbinfo )
 
 /** The multiboot bootloader name */
-static char __data16_array ( mb_bootloader_name, [] ) = "gPXE " VERSION;
+static char __data16_array ( mb_bootloader_name, [] ) = "iPXE " VERSION;
 #define mb_bootloader_name __use_data16 ( mb_bootloader_name )
 
 /** The multiboot memory map */

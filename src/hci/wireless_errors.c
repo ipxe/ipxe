@@ -19,7 +19,7 @@
 FILE_LICENCE ( GPL2_OR_LATER );
 
 #include <errno.h>
-#include <gpxe/errortab.h>
+#include <ipxe/errortab.h>
 
 /* Record errors as though they come from the 802.11 stack */
 #undef ERRFILE
@@ -32,7 +32,7 @@ FILE_LICENCE ( GPL2_OR_LATER );
  * strerror.
  */
 struct errortab wireless_errors[] __errortab = {
-	/* gPXE 802.11 stack errors */
+	/* iPXE 802.11 stack errors */
 	{ EINVAL | EUNIQ_01, "Packet too short" },
 	{ EINVAL | EUNIQ_02, "Packet 802.11 version not supported" },
 	{ EINVAL | EUNIQ_03, "Packet not a data packet" },

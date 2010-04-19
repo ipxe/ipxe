@@ -22,11 +22,11 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #include <string.h>
 #include <byteswap.h>
 #include <errno.h>
-#include <gpxe/if_ether.h>
-#include <gpxe/if_arp.h>
-#include <gpxe/iobuf.h>
-#include <gpxe/netdevice.h>
-#include <gpxe/arp.h>
+#include <ipxe/if_ether.h>
+#include <ipxe/if_arp.h>
+#include <ipxe/iobuf.h>
+#include <ipxe/netdevice.h>
+#include <ipxe/arp.h>
 
 /** @file
  *

@@ -30,13 +30,13 @@ FILE_LICENCE ( GPL2_ONLY );
  *
  * Initialization
  *
- * myri10ge_pci_probe() is called by gPXE during initialization.
+ * myri10ge_pci_probe() is called by iPXE during initialization.
  * Minimal NIC initialization is performed to minimize resources
  * consumed when the driver is resident but unused.
  *
  * Network Boot
  *
- * myri10ge_net_open() is called by gPXE before attempting to network
+ * myri10ge_net_open() is called by iPXE before attempting to network
  * boot from the card.  Packet buffers are allocated and the NIC
  * interface is initialized.
  *
@@ -70,13 +70,13 @@ FILE_LICENCE ( GPL2_ONLY );
 
 #include <byteswap.h>
 #include <errno.h>
-#include <gpxe/ethernet.h>
-#include <gpxe/if_ether.h>
-#include <gpxe/iobuf.h>
-#include <gpxe/malloc.h>
-#include <gpxe/netdevice.h>
-#include <gpxe/pci.h>
-#include <gpxe/timer.h>
+#include <ipxe/ethernet.h>
+#include <ipxe/if_ether.h>
+#include <ipxe/iobuf.h>
+#include <ipxe/malloc.h>
+#include <ipxe/netdevice.h>
+#include <ipxe/pci.h>
+#include <ipxe/timer.h>
 
 #include "myri10ge_mcp.h"
 
@@ -484,7 +484,7 @@ static int mac_address_from_string_specs ( struct pci_device *pci,
 }
 
 /****************************************************************
- * gPXE PCI Device Driver API functions
+ * iPXE PCI Device Driver API functions
  ****************************************************************/
 
 /*
@@ -494,8 +494,8 @@ static int mac_address_from_string_specs ( struct pci_device *pci,
  * @v id  		The PCI device + vendor id.
  * @ret rc		Returns zero if successfully initialized.
  *
- * This function is called very early on, while gPXE is initializing.
- * This is a gPXE PCI Device Driver API function.
+ * This function is called very early on, while iPXE is initializing.
+ * This is a iPXE PCI Device Driver API function.
  */
 static int myri10ge_pci_probe ( struct pci_device *pci,
 				const struct pci_device_id *id __unused )
@@ -586,7 +586,7 @@ static void myri10ge_pci_remove ( struct pci_device *pci )
 }
 
 /****************************************************************
- * gPXE Network Device Driver Operations
+ * iPXE Network Device Driver Operations
  ****************************************************************/
 
 /*
@@ -594,7 +594,7 @@ static void myri10ge_pci_remove ( struct pci_device *pci )
  *
  * @v netdev		Device to close.
  *
- * This is a gPXE Network Device Driver API function.
+ * This is a iPXE Network Device Driver API function.
  */
 static void myri10ge_net_close ( struct net_device *netdev )
 {
@@ -638,7 +638,7 @@ static void myri10ge_net_close ( struct net_device *netdev )
  * @v netdev		Device to control.
  * @v enable		Zero to mask off IRQ, non-zero to enable IRQ.
  *
- * This is a gPXE Network Driver API function.
+ * This is a iPXE Network Driver API function.
  */
 static void myri10ge_net_irq ( struct net_device *netdev, int enable )
 {
@@ -666,7 +666,7 @@ static void myri10ge_net_irq ( struct net_device *netdev, int enable )
  * @ret rc  		Non-zero if failed to open.
  *
  * This enables tx and rx on the device.
- * This is a gPXE Network Device Driver API function.
+ * This is a iPXE Network Device Driver API function.
  */
 static int myri10ge_net_open ( struct net_device *netdev )
 {
@@ -759,7 +759,7 @@ static int myri10ge_net_open ( struct net_device *netdev )
 		     | netdev->ll_addr[5] );
 	TRY ( SET_ , MAC_ADDRESS , );
 
-	/* Enable multicast receives, because some gPXE clients don't work
+	/* Enable multicast receives, because some iPXE clients don't work
 	   without multicast. . */
 
 	TRY ( ENABLE_ , ALLMULTI , );
@@ -870,9 +870,9 @@ abort_with_nothing:
  *
  * @v netdev		Device being polled.
  *
- * This is called periodically by gPXE to let the driver check the status of
+ * This is called periodically by iPXE to let the driver check the status of
  * transmitted packets and to allow the driver to check for received packets.
- * This is a gPXE Network Device Driver API function.
+ * This is a iPXE Network Device Driver API function.
  */
 static void myri10ge_net_poll ( struct net_device *netdev )
 {
@@ -951,7 +951,7 @@ static void myri10ge_net_poll ( struct net_device *netdev )
  * @v iobuf 		Data to transmit.
  * @ret rc  		Non-zero if failed to transmit.
  *
- * This is a gPXE Network Driver API function.
+ * This is a iPXE Network Driver API function.
  */
 static int myri10ge_net_transmit ( struct net_device *netdev,
 				   struct io_buffer *iobuf )

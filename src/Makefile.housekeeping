@@ -569,7 +569,7 @@ CLEANUP		+= $(BIN)/NIC	# Doesn't match the $(BIN)/*.* pattern
 # TGT_ROM_NAME : the ROM name (e.g. "dfe538")
 # TGT_MEDIA    : the media type (e.g. "rom")
 #
-DRIVERS_gpxe	= $(DRIVERS)
+DRIVERS_ipxe	= $(DRIVERS)
 CARD_DRIVER	= $(firstword $(DRIVER_$(1)) $(1))
 TGT_ELEMENTS	= $(subst --, ,$(firstword $(subst ., ,$(notdir $@))))
 TGT_PREFIX	= $(word 2,$(subst ., ,$(notdir $@)))
@@ -851,9 +851,9 @@ allall: allroms allzroms allpxes allisos alldsks
 allroms allzroms : all%s : $(foreach ROM,$(ROMS),$(BIN)/$(ROM).%)
 allpxes allisos alldsks : all%s : $(foreach DRIVER,$(DRIVERS),$(BIN)/$(DRIVER).%)
 
-# Alias for gpxe.%
+# Alias for ipxe.%
 #
-$(BIN)/etherboot.% : $(BIN)/gpxe.%
+$(BIN)/etherboot.% : $(BIN)/ipxe.%
 	ln -sf $(notdir $<) $@
 
 endif # defined(BIN)

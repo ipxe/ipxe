@@ -3,9 +3,9 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <errno.h>
-#include <gpxe/io.h>
+#include <ipxe/io.h>
 #include <unistd.h>
-#include <gpxe/eisa.h>
+#include <ipxe/eisa.h>
 
 FILE_LICENCE ( GPL2_OR_LATER );
 

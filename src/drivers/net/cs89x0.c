@@ -88,10 +88,10 @@ FILE_LICENCE ( GPL2_ONLY );
   */
 
 #include <errno.h>
-#include <gpxe/ethernet.h>
+#include <ipxe/ethernet.h>
 #include "etherboot.h"
 #include "nic.h"
-#include <gpxe/isa.h>
+#include <ipxe/isa.h>
 #include "console.h"
 #include "cs89x0.h"
 

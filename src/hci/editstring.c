@@ -20,8 +20,8 @@ FILE_LICENCE ( GPL2_OR_LATER );
 
 #include <assert.h>
 #include <string.h>
-#include <gpxe/keys.h>
-#include <gpxe/editstring.h>
+#include <ipxe/keys.h>
+#include <ipxe/editstring.h>
 
 /** @file
  *

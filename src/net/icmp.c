@@ -20,10 +20,10 @@ FILE_LICENCE ( GPL2_OR_LATER );
 
 #include <string.h>
 #include <errno.h>
-#include <gpxe/iobuf.h>
-#include <gpxe/in.h>
-#include <gpxe/tcpip.h>
-#include <gpxe/icmp.h>
+#include <ipxe/iobuf.h>
+#include <ipxe/in.h>
+#include <ipxe/tcpip.h>
+#include <ipxe/icmp.h>
 
 /** @file
  *

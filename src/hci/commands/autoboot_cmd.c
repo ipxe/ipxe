@@ -1,5 +1,5 @@
 #include <stdio.h>
-#include <gpxe/command.h>
+#include <ipxe/command.h>
 #include <usr/autoboot.h>
 
 FILE_LICENCE ( GPL2_OR_LATER );

@@ -14,12 +14,12 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #include <string.h>
 #include <stdio.h>
 #include <byteswap.h>
-#include <gpxe/pci.h>
-#include <gpxe/isapnp.h>
-#include <gpxe/isa.h>
-#include <gpxe/eisa.h>
-#include <gpxe/mca.h>
-#include <gpxe/io.h>
+#include <ipxe/pci.h>
+#include <ipxe/isapnp.h>
+#include <ipxe/isa.h>
+#include <ipxe/eisa.h>
+#include <ipxe/mca.h>
+#include <ipxe/io.h>
 
 typedef enum {
 	DISABLE = 0,

@@ -19,9 +19,9 @@
 FILE_LICENCE ( GPL2_OR_LATER );
 
 #include <errno.h>
-#include <gpxe/efi/efi.h>
-#include <gpxe/image.h>
-#include <gpxe/features.h>
+#include <ipxe/efi/efi.h>
+#include <ipxe/image.h>
+#include <ipxe/features.h>
 
 FEATURE ( FEATURE_IMAGE, "EFI", DHCP_EB_FEATURE_EFI, 1 );
 

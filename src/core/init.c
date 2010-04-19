@@ -18,8 +18,8 @@
 
 FILE_LICENCE ( GPL2_OR_LATER );
 
-#include <gpxe/device.h>
-#include <gpxe/init.h>
+#include <ipxe/device.h>
+#include <ipxe/init.h>
 
 /** @file
  *
@@ -31,7 +31,7 @@ FILE_LICENCE ( GPL2_OR_LATER );
 static int started = 0;
 
 /**
- * Initialise gPXE
+ * Initialise iPXE
  *
  * This function performs the one-time-only and irreversible
  * initialisation steps, such as initialising the heap.  It must be
@@ -49,7 +49,7 @@ void initialise ( void ) {
 }
 
 /**
- * Start up gPXE
+ * Start up iPXE
  *
  * This function performs the repeatable initialisation steps, such as
  * probing devices.  You may call startup() and shutdown() multiple
@@ -71,11 +71,11 @@ void startup ( void ) {
 }
 
 /**
- * Shut down gPXE
+ * Shut down iPXE
  *
  * @v flags		Shutdown behaviour flags
  *
- * This function reverses the actions of startup(), and leaves gPXE in
+ * This function reverses the actions of startup(), and leaves iPXE in
  * a state ready to be removed from memory.  You may call startup()
  * again after calling shutdown().
  *

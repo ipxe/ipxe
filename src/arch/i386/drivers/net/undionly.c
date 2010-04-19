@@ -21,8 +21,8 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
-#include <gpxe/device.h>
-#include <gpxe/init.h>
+#include <ipxe/device.h>
+#include <ipxe/init.h>
 #include <undi.h>
 #include <undinet.h>
 #include <undipreload.h>

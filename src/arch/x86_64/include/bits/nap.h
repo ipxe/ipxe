@@ -7,6 +7,6 @@
  *
  */
 
-#include <gpxe/efi/efix86_nap.h>
+#include <ipxe/efi/efix86_nap.h>
 
 #endif /* _BITS_MAP_H */

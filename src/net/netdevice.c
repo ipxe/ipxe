@@ -24,14 +24,14 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #include <byteswap.h>
 #include <string.h>
 #include <errno.h>
-#include <gpxe/if_ether.h>
-#include <gpxe/iobuf.h>
-#include <gpxe/tables.h>
-#include <gpxe/process.h>
-#include <gpxe/init.h>
-#include <gpxe/device.h>
-#include <gpxe/errortab.h>
-#include <gpxe/netdevice.h>
+#include <ipxe/if_ether.h>
+#include <ipxe/iobuf.h>
+#include <ipxe/tables.h>
+#include <ipxe/process.h>
+#include <ipxe/init.h>
+#include <ipxe/device.h>
+#include <ipxe/errortab.h>
+#include <ipxe/netdevice.h>
 
 /** @file
  *

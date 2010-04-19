@@ -1,5 +1,5 @@
 /*
- * Simple 802.11 rate-control algorithm for gPXE.
+ * Simple 802.11 rate-control algorithm for iPXE.
  *
  * Copyright (c) 2009 Joshua Oreman <oremanj@rwcr.net>.
  *
@@ -21,7 +21,7 @@
 FILE_LICENCE ( GPL2_OR_LATER );
 
 #include <stdlib.h>
-#include <gpxe/net80211.h>
+#include <ipxe/net80211.h>
 
 /**
  * @file
@@ -69,11 +69,11 @@ FILE_LICENCE ( GPL2_OR_LATER );
  * below some threshold, and try increasing our rate when the goodness
  * is very high.
  *
- * This system is optimized for gPXE's style of usage. Because normal
+ * This system is optimized for iPXE's style of usage. Because normal
  * operation always involves receiving something, we'll make our way
  * to the best rate pretty quickly. We tend to follow the lead of the
  * sending AP in choosing rates, but we won't use rates for long that
- * don't work well for us in transmission. We assume gPXE won't be
+ * don't work well for us in transmission. We assume iPXE won't be
  * running for long enough that rate patterns will change much, so we
  * don't have to keep time counters or the like.  And if this doesn't
  * work well in practice there are many ways it could be tweaked.

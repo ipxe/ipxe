@@ -72,18 +72,18 @@ FILE_LICENCE ( GPL_ANY );
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
-#include <gpxe/io.h>
+#include <ipxe/io.h>
 #include <errno.h>
 #include <unistd.h>
 #include <byteswap.h>
-#include <gpxe/pci.h>
-#include <gpxe/if_ether.h>
-#include <gpxe/ethernet.h>
-#include <gpxe/iobuf.h>
-#include <gpxe/netdevice.h>
-#include <gpxe/spi_bit.h>
-#include <gpxe/threewire.h>
-#include <gpxe/nvo.h>
+#include <ipxe/pci.h>
+#include <ipxe/if_ether.h>
+#include <ipxe/ethernet.h>
+#include <ipxe/iobuf.h>
+#include <ipxe/netdevice.h>
+#include <ipxe/spi_bit.h>
+#include <ipxe/threewire.h>
+#include <ipxe/nvo.h>
 
 #define TX_RING_SIZE 4
 

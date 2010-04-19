@@ -20,7 +20,7 @@ FILE_LICENCE ( GPL2_OR_LATER );
 
 #include <string.h>
 #include <assert.h>
-#include <gpxe/ansiesc.h>
+#include <ipxe/ansiesc.h>
 
 /** @file
  *

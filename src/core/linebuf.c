@@ -29,7 +29,7 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #include <string.h>
 #include <stdlib.h>
 #include <errno.h>
-#include <gpxe/linebuf.h>
+#include <ipxe/linebuf.h>
 
 /**
  * Retrieve buffered-up line

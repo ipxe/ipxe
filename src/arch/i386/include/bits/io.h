@@ -9,6 +9,6 @@
 
 FILE_LICENCE ( GPL2_OR_LATER );
 
-#include <gpxe/x86_io.h>
+#include <ipxe/x86_io.h>
 
 #endif /* _BITS_IO_H */

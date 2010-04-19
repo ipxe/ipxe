@@ -22,11 +22,11 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #include <console.h>
 #include <string.h>
 #include <errno.h>
-#include <gpxe/net80211.h>
-#include <gpxe/ethernet.h>
+#include <ipxe/net80211.h>
+#include <ipxe/ethernet.h>
 #include <usr/ifmgmt.h>
 #include <usr/iwmgmt.h>
-#include <gpxe/errortab.h>
+#include <ipxe/errortab.h>
 
 /** @file
  *
