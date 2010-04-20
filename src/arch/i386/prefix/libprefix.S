@@ -512,13 +512,24 @@ install_prealloc:
 
 	/* Open up access to payload */
 #ifndef KEEP_IT_REAL
-	/* Flatten real mode */
+	/* Access high memory */
 	pushw	%cs
 	pushw	$1f
 	pushw	%ax
-	pushw	$flatten_real_mode
+	pushw	$access_highmem
 	lret
-1:
+1:	/* Die if we could not access high memory */
+	jnc	3f
+	movw	$a20_death_message, %si
+	xorw	%di, %di
+	call	print_message
+2:	jmp	2b
+	.section ".prefix.data", "aw", @progbits
+a20_death_message:
+	.asciz	"Gate A20 stuck - cannot continue\n"
+	.size	a20_death_message, . - a20_death_message
+	.previous
+3:
 #endif
 
 	/* Calculate physical address of payload (i.e. first source) */
@@ -570,13 +581,13 @@ install_prealloc:
 	popl	%edx /* discard */
 
 	/* Copy code to new location */
+	pushl	%edi
 	xorw	%ax, %ax
 	movw	%ax, %es
-	movl	%ebp, %edi
 	es rep addr32 movsb
+	popl	%edi
 
 	/* Initialise librm at new location */
-	movl	%ebp, %edi
 	lcall	*init_librm_vector
 #endif
 
