@@ -16,6 +16,7 @@ struct input_file {
 struct output_file {
 	void *buf;
 	size_t len;
+	size_t hdr_len;
 	size_t max_len;
 };
 
@@ -38,6 +39,13 @@ struct zinfo_pack {
 	uint32_t align;
 };
 
+struct zinfo_payload {
+	char type[4];
+	uint32_t pad1;
+	uint32_t pad2;
+	uint32_t align;
+};
+
 struct zinfo_add {
 	char type[4];
 	uint32_t offset;
@@ -49,6 +57,7 @@ union zinfo_record {
 	struct zinfo_common common;
 	struct zinfo_copy copy;
 	struct zinfo_pack pack;
+	struct zinfo_payload payload;
 	struct zinfo_add add;
 };
 
@@ -209,8 +218,22 @@ static int process_zinfo_pack ( struct input_file *input,
 	return 0;
 }
 
+static int process_zinfo_payl ( struct input_file *input,
+				struct output_file *output,
+				union zinfo_record *zinfo ) {
+	struct zinfo_payload *payload = &zinfo->payload;
+
+	output->len = align ( output->len, payload->align );
+	output->hdr_len = output->len;
+
+	if ( DEBUG ) {
+		fprintf ( stderr, "PAYL at %#zx\n", output->hdr_len );
+	}
+}
+
 static int process_zinfo_add ( struct input_file *input,
 			       struct output_file *output,
+			       size_t len,
 			       struct zinfo_add *add,
 			       size_t datasize ) {
 	size_t offset = add->offset;
@@ -227,7 +250,7 @@ static int process_zinfo_add ( struct input_file *input,
 	}
 
 	target = ( output->buf + offset );
-	size = ( align ( output->len, add->divisor ) / add->divisor );
+	size = ( align ( len, add->divisor ) / add->divisor );
 
 	switch ( datasize ) {
 	case 1:
@@ -283,7 +306,7 @@ static int process_zinfo_add ( struct input_file *input,
 		fprintf ( stderr, "ADDx [%#zx,%#zx) (%s%#x+(%#zx/%#x)) = "
 			  "%#lx\n", offset, ( offset + datasize ),
 			  ( ( addend < 0 ) ? "-" : "" ), abs ( addend ),
-			  output->len, add->divisor, val );
+			  len, add->divisor, val );
 	}
 
 	return 0;
@@ -292,19 +315,43 @@ static int process_zinfo_add ( struct input_file *input,
 static int process_zinfo_addb ( struct input_file *input,
 				struct output_file *output,
 				union zinfo_record *zinfo ) {
-	return process_zinfo_add ( input, output, &zinfo->add, 1 );
+	return process_zinfo_add ( input, output, output->len,
+				   &zinfo->add, 1 );
 }
 
 static int process_zinfo_addw ( struct input_file *input,
 				struct output_file *output,
 				union zinfo_record *zinfo ) {
-	return process_zinfo_add ( input, output, &zinfo->add, 2 );
+	return process_zinfo_add ( input, output, output->len,
+				   &zinfo->add, 2 );
 }
 
 static int process_zinfo_addl ( struct input_file *input,
 				struct output_file *output,
 				union zinfo_record *zinfo ) {
-	return process_zinfo_add ( input, output, &zinfo->add, 4 );
+	return process_zinfo_add ( input, output, output->len,
+				   &zinfo->add, 4 );
+}
+
+static int process_zinfo_adhb ( struct input_file *input,
+				struct output_file *output,
+				union zinfo_record *zinfo ) {
+	return process_zinfo_add ( input, output, output->hdr_len,
+				   &zinfo->add, 1 );
+}
+
+static int process_zinfo_adhw ( struct input_file *input,
+				struct output_file *output,
+				union zinfo_record *zinfo ) {
+	return process_zinfo_add ( input, output, output->hdr_len,
+				   &zinfo->add, 2 );
+}
+
+static int process_zinfo_adhl ( struct input_file *input,
+				struct output_file *output,
+				union zinfo_record *zinfo ) {
+	return process_zinfo_add ( input, output, output->hdr_len,
+				   &zinfo->add, 4 );
 }
 
 struct zinfo_processor {
@@ -317,9 +364,13 @@ struct zinfo_processor {
 static struct zinfo_processor zinfo_processors[] = {
 	{ "COPY", process_zinfo_copy },
 	{ "PACK", process_zinfo_pack },
+	{ "PAYL", process_zinfo_payl },
 	{ "ADDB", process_zinfo_addb },
 	{ "ADDW", process_zinfo_addw },
 	{ "ADDL", process_zinfo_addl },
+	{ "ADHB", process_zinfo_adhb },
+	{ "ADHW", process_zinfo_adhw },
+	{ "ADHL", process_zinfo_adhl },
 };
 
 static int process_zinfo ( struct input_file *input,

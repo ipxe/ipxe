@@ -45,17 +45,25 @@ SECTIONS {
      *
      */
 
-    .text16 0x0 : AT ( _text16_lma ) {
+    .text16.early 0x0 : AT ( _text16_early_lma ) {
 	_text16 = .;
 	*(.text16.null)
 	. += 1;				/* Prevent NULL being valid */
+	*(.text16.early)
+	*(.text16.early.*)
+	_etext16_early = .;
+    } .text16.late ALIGN ( _max_align ) : AT ( _text16_late_lma ) {
+	_text16_late = .;
 	*(.text16)
 	*(.text16.*)
 	_mtext16 = .;
     } .bss.text16 (NOLOAD) : AT ( _end_lma ) {
 	_etext16 = .;
     }
-    _text16_filesz	= ABSOLUTE ( _mtext16 - _text16 );
+    _text16_early_filesz = ABSOLUTE ( _etext16_early - _text16 );
+    _text16_early_memsz	= ABSOLUTE ( _etext16_early - _text16 );
+    _text16_late_filesz	= ABSOLUTE ( _mtext16 - _text16_late );
+    _text16_late_memsz	= ABSOLUTE ( _etext16 - _text16_late );
     _text16_memsz	= ABSOLUTE ( _etext16 - _text16 );
 
     /*
@@ -169,9 +177,13 @@ SECTIONS {
     .			+= _prefix_filesz;
 
     .			= ALIGN ( _max_align );
+    _text16_early_lma	= .;
+    .			+= _text16_early_filesz;
+
+    .			= ALIGN ( _max_align );
     _payload_lma	= .;
-    _text16_lma		= .;
-    .			+= _text16_filesz;
+    _text16_late_lma	= .;
+    .			+= _text16_late_filesz;
 
     .			= ALIGN ( _max_align );
     _data16_lma		= .;
@@ -194,8 +206,6 @@ SECTIONS {
      * Values calculated to save code from doing it
      *
      */
-    _prefix_memsz_pgh	= ( ( _prefix_memsz + 15 ) / 16 );
-    _prefix_memsz_sect	= ( ( _prefix_memsz + 511 ) / 512 );
     _text16_memsz_pgh	= ( ( _text16_memsz + 15 ) / 16 );
     _data16_memsz_pgh	= ( ( _data16_memsz + 15 ) / 16 );
 }

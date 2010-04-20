@@ -362,7 +362,8 @@ got_pmm: /* PMM allocation succeeded */
 	addr32 rep movsb	/* PMM presence implies flat real mode */
 	movl	%edi, decompress_to
 	/* Shrink ROM */
-	movb	$_prefix_memsz_sect, romheader_size
+	movb	shrunk_rom_size, %al
+	movb	%al, romheader_size
 pmm_fail:
 	/* Restore upper register halves */
 	popal
@@ -487,6 +488,19 @@ init_message_done:
 image_source:
 	.long	0
 	.size	image_source, . - image_source
+
+/* Shrunk ROM size (in 512-byte sectors)
+ *
+ */
+shrunk_rom_size:
+	.byte	0
+	.size	shrunk_rom_size, . - shrunk_rom_size
+	.section ".zinfo.fixup", "a", @progbits	/* Compressor fixups */
+	.ascii	"ADHB"
+	.long	shrunk_rom_size
+	.long	512
+	.long	0
+	.previous
 
 /* Temporary decompression area
  *

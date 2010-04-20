@@ -406,6 +406,7 @@ copy_bytes:
  *   %edx : total length of block (including any uninitialised data portion)
  * Returns:
  *   %esi : next source physical address (will be a multiple of 16)
+ *   %edi : next destination physical address (will be a multiple of 16)
  * Corrupts:
  *   none
  ****************************************************************************
@@ -417,7 +418,6 @@ install_block:
 	pushw	%ds
 	pushw	%es
 	pushl	%ecx
-	pushl	%edi
 	
 	/* Convert %esi and %edi to %ds:esi and %es:edi */
 	shrl	$4, %esi
@@ -445,18 +445,23 @@ install_block:
 	rep addr32 stosb
 	popw	%ax
 
-	/* Round up %esi to start of next source block */
+	/* Round up %esi and %edi to start of next blocks */
 	addl	$0xf, %esi
 	andl	$~0xf, %esi
+	addl	$0xf, %edi
+	andl	$~0xf, %edi
 
-	/* Convert %ds:esi back to a physical address */
+	/* Convert %ds:esi and %es:edi back to physical addresses */
 	xorl	%ecx, %ecx
 	movw	%ds, %cx
 	shll	$4, %ecx
 	addl	%ecx, %esi
+	xorl	%ecx, %ecx
+	movw	%es, %cx
+	shll	$4, %ecx
+	addl	%ecx, %edi
 
 	/* Restore registers and return */
-	popl	%edi
 	popl	%ecx
 	popw	%es
 	popw	%ds
@@ -626,6 +631,23 @@ install_prealloc:
 	/* Sanity: clear the direction flag asap */
 	cld
 
+	/* Copy decompression temporary area physical address to %ebp */
+	movl	%edi, %ebp
+
+	/* Install .text16.early */
+	pushl	%esi
+	xorl	%esi, %esi
+	movw	%cs, %si
+	shll	$4, %esi
+	addl	$_text16_early_lma, %esi
+	movzwl	%ax, %edi
+	shll	$4, %edi
+	movl	$_text16_early_filesz, %ecx
+	movl	$_text16_early_memsz, %edx
+	call	install_block		/* .text16.early */
+	popl	%esi
+
+	/* Open up access to payload */
 #ifndef KEEP_IT_REAL
 	/* Flatten real mode */
 	call	flatten_real_mode
@@ -636,21 +658,17 @@ install_prealloc:
 	jnz	1f
 	movw	%cs, %si
 	shll	$4, %esi
-1:	addl	$_payload_lma, %esi
+1:	addl	%cs:payload_lma, %esi
 
-	/* Install .text16 and .data16 */
-	pushl	%edi
-	movzwl	%ax, %edi
-	shll	$4, %edi
-	movl	$_text16_memsz, %ecx
-	movl	%ecx, %edx
-	call	install_block		/* .text16 */
+	/* Install .text16.late and .data16 */
+	movl	$_text16_late_filesz, %ecx
+	movl	$_text16_late_memsz, %edx
+	call	install_block		/* .text16.late */
 	movzwl	%bx, %edi
 	shll	$4, %edi
 	movl	$_data16_filesz, %ecx
 	movl	$_data16_memsz, %edx
 	call	install_block		/* .data16 */
-	popl	%edi
 
 	/* Set up %ds for access to .data16 */
 	movw	%bx, %ds
@@ -664,12 +682,14 @@ install_prealloc:
 	 * prior to reading the E820 memory map and relocating
 	 * properly.
 	 */
+	movl	%ebp, %edi
 	movl	$_textdata_filesz, %ecx
 	movl	$_textdata_memsz, %edx
 	call	install_block
 
 	/* Initialise librm at current location */
 	movw	%ax, (init_librm_vector+2)
+	movl	%ebp, %edi
 	lcall	*init_librm_vector
 
 	/* Call relocate() to determine target address for relocation.
@@ -682,13 +702,13 @@ install_prealloc:
 	popl	%edx /* discard */
 
 	/* Copy code to new location */
-	pushl	%edi
 	xorw	%ax, %ax
 	movw	%ax, %es
+	movl	%ebp, %edi
 	es rep addr32 movsb
-	popl	%edi
 
 	/* Initialise librm at new location */
+	movl	%ebp, %edi
 	lcall	*init_librm_vector
 #endif
 
@@ -719,6 +739,17 @@ prot_call_vector:
 	.size prot_call_vector, . - prot_call_vector
 #endif
 
+	/* Payload address */
+	.section ".prefix.lib", "awx", @progbits
+payload_lma:
+	.long 0
+	.section ".zinfo.fixup", "a", @progbits	/* Compressor fixups */
+	.ascii	"ADHL"
+	.long	payload_lma
+	.long	1
+	.long	0
+	.previous
+
 /****************************************************************************
  * uninstall
  *
@@ -745,27 +776,32 @@ uninstall:
 
 	/* File split information for the compressor */
 #if COMPRESS
+#define PACK_OR_COPY	"PACK"
+#else
+#define PACK_OR_COPY	"COPY"
+#endif
 	.section ".zinfo", "a", @progbits
 	.ascii	"COPY"
 	.long	_prefix_lma
 	.long	_prefix_filesz
 	.long	_max_align
-	.ascii	"PACK"
-	.long	_text16_lma
-	.long	_text16_filesz
+	.ascii	PACK_OR_COPY
+	.long	_text16_early_lma
+	.long	_text16_early_filesz
 	.long	_max_align
-	.ascii	"PACK"
+	.ascii	"PAYL"
+	.long	0
+	.long	0
+	.long	_max_align
+	.ascii	PACK_OR_COPY
+	.long	_text16_late_lma
+	.long	_text16_late_filesz
+	.long	_max_align
+	.ascii	PACK_OR_COPY
 	.long	_data16_lma
 	.long	_data16_filesz
 	.long	_max_align
-	.ascii	"PACK"
+	.ascii	PACK_OR_COPY
 	.long	_textdata_lma
 	.long	_textdata_filesz
 	.long	_max_align
-#else /* COMPRESS */
-	.section ".zinfo", "a", @progbits
-	.ascii	"COPY"
-	.long	_prefix_lma
-	.long	_filesz
-	.long	_max_align
-#endif /* COMPRESS */
