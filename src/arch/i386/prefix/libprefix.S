@@ -27,16 +27,9 @@ FILE_LICENCE ( GPL2_OR_LATER )
  * Temporary buffer into which to copy (or decompress) our runtime
  * image, prior to calling get_memmap() and relocate().  We don't
  * actually leave anything here once install() has returned.
- *
- * We use the start of an even megabyte so that we don't have to worry
- * about the current state of the A20 line.
- *
- * We use 4MB rather than 2MB because some PXE stack / PMM BIOS
- * combinations are known to place data required by other UNDI ROMs
- * loader around the 2MB mark.
  */
 	.globl	HIGHMEM_LOADPOINT
-	.equ	HIGHMEM_LOADPOINT, ( 4 << 20 )
+	.equ	HIGHMEM_LOADPOINT, ( 1 << 20 )
 
 /* Image compression enabled */
 #define COMPRESS 1
