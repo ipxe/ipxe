@@ -147,16 +147,6 @@ int pxeparent_call ( SEGOFF16_t entry, unsigned int function,
 			         "D" ( __from_data16 ( &pxeparent_params ) )
 			       : "ecx", "edx", "esi", "ebp" );
 
-	/* PXE API calls may rudely change the status of A20 and not
-	 * bother to restore it afterwards.  Intel is known to be
-	 * guilty of this.
-	 *
-	 * Note that we will return to this point even if A20 gets
-	 * screwed up by the parent PXE stack, because Etherboot always
-	 * resides in an even megabyte of RAM.
-	 */
-	gateA20_set();
-
 	/* Determine return status code based on PXENV_EXIT and
 	 * PXENV_STATUS
 	 */

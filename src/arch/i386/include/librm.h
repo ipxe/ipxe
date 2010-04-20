@@ -157,11 +157,6 @@ extern uint16_t __data16 ( rm_cs );
 extern uint16_t __text16 ( rm_ds );
 #define rm_ds __use_text16 ( rm_ds )
 
-/* Functions that librm expects to be able to link to.  Included here
- * so that the compiler will catch prototype mismatches.
- */
-extern void gateA20_set ( void );
-
 /**
  * Convert segment:offset address to user buffer
  *

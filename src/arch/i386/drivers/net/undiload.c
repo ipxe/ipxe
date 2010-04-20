@@ -104,16 +104,6 @@ int undi_load ( struct undi_device *undi, struct undi_rom *undirom ) {
 			       : "a" ( __from_data16 ( &undi_loader ) )
 			       : "ebx", "ecx", "edx", "esi", "edi", "ebp" );
 
-	/* UNDI API calls may rudely change the status of A20 and not
-	 * bother to restore it afterwards.  Intel is known to be
-	 * guilty of this.
-	 *
-	 * Note that we will return to this point even if A20 gets
-	 * screwed up by the UNDI driver, because Etherboot always
-	 * resides in an even megabyte of RAM.
-	 */	
-	gateA20_set();
-
 	if ( exit != PXENV_EXIT_SUCCESS ) {
 		/* Clear entry point */
 		memset ( &undi_loader_entry, 0, sizeof ( undi_loader_entry ) );

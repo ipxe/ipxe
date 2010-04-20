@@ -348,6 +348,7 @@ enable_a20_fast:
 #define ENABLE_A20_RETRIES 255
 	.section ".text16.early", "awx", @progbits
 	.code16
+	.globl	enable_a20
 enable_a20:
 	/* Preserve registers */
 	pushl	%ecx

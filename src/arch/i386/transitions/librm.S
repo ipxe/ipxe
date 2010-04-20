@@ -170,10 +170,18 @@ idt_init: /* Reuse the return opcode here */
 	.section ".text16", "ax", @progbits
 	.code16
 real_to_prot:
+	/* Enable A20 line */
+	call	enable_a20
+	/* A failure at this point is fatal, and there's nothing we
+	 * can do about it other than lock the machine to make the
+	 * problem immediately visible.
+	 */
+1:	jc	1b
+
 	/* Make sure we have our data segment available */
 	movw	%cs:rm_ds, %ax
 	movw	%ax, %ds
-	
+
 	/* Add _virt_offset, _text16 and _data16 to stack to be
 	 * copied, and also copy the return address.
 	 */
@@ -181,7 +189,7 @@ real_to_prot:
 	pushl	_text16
 	pushl	_data16
 	addw	$16, %cx /* %ecx must be less than 64kB anyway */
-	
+
 	/* Real-mode %ss:%sp => %ebp:%edx and virtual address => %esi */
 	xorl	%ebp, %ebp
 	movw	%ss, %bp
@@ -396,9 +404,6 @@ prot_call:
 	.section ".text", "ax", @progbits
 	.code32
 1:
-	/* Set up environment expected by C code */
-	call	gateA20_set
-
 	/* Call function */
 	leal	PC_OFFSET_IX86(%esp), %eax
 	pushl	%eax
@@ -442,13 +447,7 @@ prot_call:
  * function will be passed back to the protected-mode caller.  A
  * result of this is that this routine cannot be called directly from
  * C code, since it clobbers registers that the C ABI expects the
- * callee to preserve.  Gate A20 will *not* be automatically
- * re-enabled.  Since we always run from an even megabyte of memory,
- * we are guaranteed to return successfully to the protected-mode
- * code, which should then call gateA20_set() if it suspects that gate
- * A20 may have been disabled.  Note that enabling gate A20 is a
- * potentially slow operation that may also cause keyboard input to be
- * lost; this is why it is not done automatically.
+ * callee to preserve.
  *
  * librm.h defines a convenient macro REAL_CODE() for using real_call.
  * See librm.h and realmode.h for details and examples.

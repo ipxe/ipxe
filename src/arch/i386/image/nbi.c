@@ -1,7 +1,6 @@
 #include <errno.h>
 #include <assert.h>
 #include <realmode.h>
-#include <gateA20.h>
 #include <memsizes.h>
 #include <basemem_packet.h>
 #include <ipxe/uaccess.h>
@@ -306,8 +305,6 @@ static int nbi_boot16 ( struct image *image, struct imgheader *imgheader ) {
 	       imgheader->execaddr.segoff.segment,
 	       imgheader->execaddr.segoff.offset );
 
-	gateA20_unset();
-
 	__asm__ __volatile__ (
 		REAL_CODE ( "pushw %%ds\n\t"	/* far pointer to bootp data */
 			    "pushw %%bx\n\t"
@@ -327,8 +324,6 @@ static int nbi_boot16 ( struct image *image, struct imgheader *imgheader ) {
 		  "b" ( __from_data16 ( basemem_packet ) )
 		: "ecx", "edx", "ebp" );
 
-	gateA20_set();
-
 	return rc;
 }
 
@@ -344,8 +339,6 @@ static int nbi_boot32 ( struct image *image, struct imgheader *imgheader ) {
 
 	DBGC ( image, "NBI %p executing 32-bit image at %lx\n",
 	       image, imgheader->execaddr.linear );
-
-	/* no gateA20_unset for PM call */
 
 	/* Jump to OS with flat physical addressing */
 	__asm__ __volatile__ (
