@@ -32,12 +32,12 @@ extern char _etextdata[];
 #define MAX_ADDR (0xfff00000UL)
 
 /**
- * Relocate Etherboot
+ * Relocate iPXE
  *
  * @v ix86		x86 register dump from prefix
  * @ret ix86		x86 registers to return to prefix
  *
- * This finds a suitable location for Etherboot near the top of 32-bit
+ * This finds a suitable location for iPXE near the top of 32-bit
  * address space, and returns the physical address of the new location
  * to the prefix in %edi.
  */
@@ -59,11 +59,7 @@ __asmcall void relocate ( struct i386_all_regs *ix86 ) {
 	      start, end, padded_size, max_align );
 
 	/* Walk through the memory map and find the highest address
-	 * below 4GB that etherboot will fit into.  Ensure etherboot
-	 * lies entirely within a range with A20=0.  This means that
-	 * even if something screws up the state of the A20 line, the
-	 * etherboot code is still visible and we have a chance to
-	 * diagnose the problem.
+	 * below 4GB that iPXE will fit into.
 	 */
 	new_end = end;
 	for ( i = 0 ; i < memmap.count ; i++ ) {
@@ -87,42 +83,6 @@ __asmcall void relocate ( struct i386_all_regs *ix86 ) {
 		} else {
 			r_end = region->end;
 		}
-		
-		/* Shrink the range down to use only even megabytes
-		 * (i.e. A20=0).
-		 */
-		if ( ( r_end - 1 ) & 0x100000 ) {
-			/* If last byte that might be used (r_end-1)
-			 * is in an odd megabyte, round down r_end to
-			 * the top of the next even megabyte.
-			 *
-			 * Make sure that we don't accidentally wrap
-			 * r_end below 0.
-			 */
-			if ( r_end >= 1 ) {
-				r_end = ( r_end - 1 ) & ~0xfffff;
-				DBG ( "...end truncated to %lx "
-				      "(avoid ending in odd megabyte)\n",
-				      r_end );
-			}
-		} else if ( ( r_end - size ) & 0x100000 ) {
-			/* If the last byte that might be used
-			 * (r_end-1) is in an even megabyte, but the
-			 * first byte that might be used (r_end-size)
-			 * is an odd megabyte, round down to the top
-			 * of the next even megabyte.
-			 * 
-			 * Make sure that we don't accidentally wrap
-			 * r_end below 0.
-			 */
-			if ( r_end >= 0x100000 ) {
-				r_end = ( r_end - 0x100000 ) & ~0xfffff;
-				DBG ( "...end truncated to %lx "
-				      "(avoid starting in odd megabyte)\n",
-				      r_end );
-			}
-		}
-
 		DBG ( "...usable portion is [%lx,%lx)\n", r_start, r_end );
 
 		/* If we have rounded down r_end below r_ start, skip
@@ -133,19 +93,19 @@ __asmcall void relocate ( struct i386_all_regs *ix86 ) {
 			continue;
 		}
 
-		/* Check that there is enough space to fit in Etherboot */
+		/* Check that there is enough space to fit in iPXE */
 		if ( ( r_end - r_start ) < size ) {
 			DBG ( "...too small (need %lx bytes)\n", size );
 			continue;
 		}
 
-		/* If the start address of the Etherboot we would
+		/* If the start address of the iPXE we would
 		 * place in this block is higher than the end address
 		 * of the current highest block, use this block.
 		 *
 		 * Note that this avoids overlaps with the current
-		 * Etherboot, as well as choosing the highest of all
-		 * viable blocks.
+		 * iPXE, as well as choosing the highest of all viable
+		 * blocks.
 		 */
 		if ( ( r_end - size ) > new_end ) {
 			new_end = r_end;
@@ -153,7 +113,7 @@ __asmcall void relocate ( struct i386_all_regs *ix86 ) {
 		}
 	}
 
-	/* Calculate new location of Etherboot, and align it to the
+	/* Calculate new location of iPXE, and align it to the
 	 * required alignemnt.
 	 */
 	new_start = new_end - padded_size;
