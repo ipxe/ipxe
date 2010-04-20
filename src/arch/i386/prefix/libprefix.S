@@ -233,7 +233,7 @@ print_kill_line:
 	.size	print_kill_line, . - print_kill_line
 
 /****************************************************************************
- * flatten_real_mode
+ * flatten_real_mode (real-mode far call)
  *
  * Set up 4GB segment limits
  *
@@ -248,9 +248,8 @@ print_kill_line:
 #ifndef KEEP_IT_REAL
 
 	/* GDT for protected-mode calls */
-	.section ".prefix.lib", "awx", @progbits
+	.section ".text16.early.data", "aw", @progbits
 	.align 16
-flatten_vars:
 flatten_gdt:
 flatten_gdt_limit:	.word flatten_gdt_length - 1
 flatten_gdt_base:	.long 0
@@ -267,62 +266,50 @@ flatten_gdt_end:
 	.equ	flatten_gdt_length, . - flatten_gdt
 	.size	flatten_gdt, . - flatten_gdt
 
-	.section ".prefix.lib", "awx", @progbits
+	.section ".text16.early.data", "aw", @progbits
 	.align 16
 flatten_saved_gdt:
 	.long	0, 0
 	.size	flatten_saved_gdt, . - flatten_saved_gdt
 
-	.equ	flatten_vars_size, . - flatten_vars
-#define FLATTEN_VAR(x) ( -flatten_vars_size + ( (x) - flatten_vars ) )
-
-	.section ".prefix.lib", "awx", @progbits
+	.section ".text16.early", "awx", @progbits
 	.code16
 flatten_real_mode:
-	/* Preserve registers and flags, allocate local variable block */
-	pushw	%bp
-	movw	%sp, %bp
-	subw	$flatten_vars_size, %sp
-	andw	$0xfff0, %sp
+	/* Preserve registers and flags */
 	pushfl
 	pushl	%eax
-	pushl	%edi
 	pushw	%si
-	pushw	%cx
 	pushw	%gs
 	pushw	%fs
 	pushw	%es
 	pushw	%ds
 	pushw	%ss
 
-	/* Fill local variable block and preserve GDT */
-	pushw	%ss
-	popw	%es
-	movw	$flatten_vars, %si
-	leaw	FLATTEN_VAR(flatten_vars)(%bp), %di
-	movw	$flatten_vars_size, %cx
-	cs rep movsb
-	sgdt	FLATTEN_VAR(flatten_saved_gdt)(%bp)
+	/* Set %ds for access to .text16.early.data variables */
+	pushw	%cs
+	popw	%ds
+
+	/* Preserve original GDT */
+	sgdt flatten_saved_gdt
 
 	/* Set up GDT bases */
 	xorl	%eax, %eax
-	movw	%ss, %ax
-	shll	$4, %eax
-	movzwl	%bp, %edi
-	addr32 leal FLATTEN_VAR(flatten_gdt)(%eax, %edi), %eax
-	movl	%eax, FLATTEN_VAR(flatten_gdt_base)(%bp)
 	movw	%cs, %ax
-	movw	$FLATTEN_VAR(flatten_cs), %di
+	shll	$4, %eax
+	addl	$flatten_gdt, %eax
+	movl	%eax, flatten_gdt_base
+	movw	%cs, %ax
+	movw	$flatten_cs, %si
 	call	set_seg_base
 	movw	%ss, %ax
-	movw	$FLATTEN_VAR(flatten_ss), %di
+	movw	$flatten_ss, %si
 	call	set_seg_base
 
 	/* Switch temporarily to protected mode and set segment registers */
 	pushw	%cs
 	pushw	$2f
 	cli
-	data32 lgdt FLATTEN_VAR(flatten_gdt)(%bp)
+	data32 lgdt flatten_gdt
 	movl	%cr0, %eax
 	orb	$CR0_PE, %al
 	movl	%eax, %cr0
@@ -340,28 +327,26 @@ flatten_real_mode:
 2:	/* lret will ljmp to here */
 
 	/* Restore GDT, registers and flags */
-	data32 lgdt FLATTEN_VAR(flatten_saved_gdt)(%bp)
+	data32 lgdt flatten_saved_gdt
 	popw	%ss
 	popw	%ds
 	popw	%es
 	popw	%fs
 	popw	%gs
-	popw	%cx
 	popw	%si
-	popl	%edi
 	popl	%eax
 	popfl
-	movw	%bp, %sp
-	popw	%bp
-	ret
+	lret
 	.size flatten_real_mode, . - flatten_real_mode
 
+	.section ".text16.early", "awx", @progbits
+	.code16
 set_seg_base:
 	rolw	$4, %ax
-	movw	%ax, 2(%bp,%di)
-	andw	$0xfff0, 2(%bp,%di)
-	movb	%al, 4(%bp,%di)
-	andb	$0x0f, 4(%bp,%di)
+	movw	%ax, 2(%si)
+	andw	$0xfff0, 2(%si)
+	movb	%al, 4(%si)
+	andb	$0x0f, 4(%si)
 	ret
 	.size set_seg_base, . - set_seg_base
 
@@ -650,7 +635,12 @@ install_prealloc:
 	/* Open up access to payload */
 #ifndef KEEP_IT_REAL
 	/* Flatten real mode */
-	call	flatten_real_mode
+	pushw	%cs
+	pushw	$1f
+	pushw	%ax
+	pushw	$flatten_real_mode
+	lret
+1:
 #endif
 
 	/* Calculate physical address of payload (i.e. first source) */
