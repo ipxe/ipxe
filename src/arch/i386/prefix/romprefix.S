@@ -593,7 +593,7 @@ exec:	/* Set %ds = %cs */
 	movw	$prodstr, %si
 	xorw	%di, %di
 	call	print_message
-	movw	$exec_message, %si
+	movw	$exec_message_pre_install, %si
 	call	print_message
 
 	/* Store magic word on BIOS stack and remember BIOS %ss:sp */
@@ -611,6 +611,11 @@ exec:	/* Set %ds = %cs */
 	movl	decompress_to, %edi
 	call	alloc_basemem
 	call	install_prealloc
+
+	/* Print message indicating successful installation */
+	movw	$exec_message_post_install, %si
+	xorw	%di, %di
+	call	print_message
 
 	/* Set up real-mode stack */
 	movw	%bx, %ss
@@ -644,9 +649,12 @@ exec:	/* Set %ds = %cs */
 	int	$0x18
 	.previous
 
-exec_message:
-	.asciz	" starting execution\n"
-	.size exec_message, . - exec_message
+exec_message_pre_install:
+	.asciz	" starting execution..."
+	.size exec_message_pre_install, . - exec_message_pre_install
+exec_message_post_install:
+	.asciz	"ok\n"
+	.size exec_message_post_install, . - exec_message_post_install
 
 /* Wait for key press specified by %bl (masked by %bh)
  *
