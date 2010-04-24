@@ -483,9 +483,10 @@ init_message_done:
 	.asciz	"\n\n"
 	.size	init_message_done, . - init_message_done
 
-/* ROM image location
+/* Image source area
  *
- * May be either within option ROM space, or within PMM-allocated block.
+ * May be either zero (indicating to use option ROM space as source),
+ * or within a PMM-allocated block.
  */
 	.globl	image_source
 image_source:
@@ -507,11 +508,12 @@ shrunk_rom_size:
 
 /* Temporary decompression area
  *
- * May be either at HIGHMEM_LOADPOINT, or within PMM-allocated block.
+ * May be either zero (indicating to use default decompression area in
+ * high memory), or within a PMM-allocated block.
  */
 	.globl	decompress_to
 decompress_to:
-	.long	HIGHMEM_LOADPOINT
+	.long	0
 	.size	decompress_to, . - decompress_to
 
 /* BBS version

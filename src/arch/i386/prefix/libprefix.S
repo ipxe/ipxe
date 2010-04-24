@@ -21,16 +21,6 @@ FILE_LICENCE ( GPL2_OR_LATER )
 
 	.arch i386
 
-/**
- * High memory temporary load address
- *
- * Temporary buffer into which to copy (or decompress) our runtime
- * image, prior to calling get_memmap() and relocate().  We don't
- * actually leave anything here once install() has returned.
- */
-	.globl	HIGHMEM_LOADPOINT
-	.equ	HIGHMEM_LOADPOINT, ( 1 << 20 )
-
 /* Image compression enabled */
 #define COMPRESS 1
 
@@ -451,8 +441,8 @@ install:
 	call	alloc_basemem
 	/* Image source = %cs:0000 */
 	xorl	%esi, %esi
-	/* Image destination = HIGHMEM_LOADPOINT */
-	movl	$HIGHMEM_LOADPOINT, %edi
+	/* Image destination = default */
+	xorl	%edi, %edi
 	/* Install text and data segments */
 	call	install_prealloc
 	/* Restore registers and return */
@@ -470,7 +460,7 @@ install:
  *   %ax  : .text16 segment address
  *   %bx  : .data16 segment address
  *   %esi : Image source physical address (or zero for %cs:0000)
- *   %edi : Decompression temporary area physical address
+ *   %edi : Decompression temporary area physical address (or zero for default)
  * Corrupts:
  *   none
  ****************************************************************************
@@ -550,6 +540,22 @@ a20_death_message:
 	movw	%ax, (init_libkir_vector+2)
 	lcall	*init_libkir_vector
 #else
+	/* Find a suitable decompression temporary area, if none specified */
+	testl	%ebp, %ebp
+	jnz	1f
+	/* Use INT 15,88 to find the highest available address via INT
+	 * 15,88.  This limits us to around 64MB, which should avoid
+	 * all of the POST-time memory map failure modes.
+	 */
+	pushl	%eax
+	movb	$0x88, %ah
+	int	$0x15
+	movw	%ax, %bp
+	addl	$0x400, %ebp
+	subl	$_textdata_memsz_kb, %ebp
+	shll	$10, %ebp
+	popl	%eax
+1:
 	/* Install .text and .data to temporary area in high memory,
 	 * prior to reading the E820 memory map and relocating
 	 * properly.
