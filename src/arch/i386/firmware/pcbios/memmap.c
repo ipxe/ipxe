@@ -139,13 +139,13 @@ static unsigned int extmemsize_88 ( void ) {
  * use the E820 memory map obtained via get_memmap();
  */
 unsigned int extmemsize ( void ) {
-	unsigned int extmem;
+	unsigned int extmem_e801;
+	unsigned int extmem_88;
 
 	/* Try INT 15,e801 first, then fall back to INT 15,88 */
-	extmem = extmemsize_e801();
-	if ( ! extmem )
-		extmem = extmemsize_88();
-	return extmem;
+	extmem_88 = extmemsize_88();
+	extmem_e801 = extmemsize_e801();
+	return ( extmem_e801 ? extmem_e801 : extmem_88 );
 }
 
 /**
