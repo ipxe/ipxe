@@ -52,6 +52,9 @@ checksum:
 	.long	0
 	.previous
 
+build_id:
+	.long	_build_id		/* Randomly-generated build ID */
+
 pciheader:
 	.ascii	"PCIR"			/* Signature */
 	.word	pci_vendor_id		/* Vendor identification */ 
