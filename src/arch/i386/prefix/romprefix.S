@@ -16,7 +16,14 @@ FILE_LICENCE ( GPL2_OR_LATER )
 #define STACK_MAGIC ( 'L' + ( 'R' << 8 ) + ( 'E' << 16 ) + ( 'T' << 24 ) )
 #define PNP_GET_BBS_VERSION 0x60
 #define PMM_ALLOCATE 0x0000
-#define PMM_DEALLOCATE 0x0002
+#define PMM_FIND 0x0001
+#define PMM_HANDLE_BASE ( ( ( 'F' - 'A' + 1 ) << 26 ) + \
+			  ( ( 'E' - 'A' + 1 ) << 21 ) + \
+			  ( ( 'N' - 'A' + 1 ) << 16 ) )
+#define PMM_HANDLE_BASE_IMAGE_SOURCE \
+	( PMM_HANDLE_BASE | 0x00001000 )
+#define PMM_HANDLE_BASE_DECOMPRESS_TO \
+	( PMM_HANDLE_BASE | 0x00002000 )
 
 /* ROM banner timeout.  Based on the configurable BANNER_TIMEOUT in
  * config.h, but converted to a number of (18Hz) timer ticks, and
@@ -310,65 +317,44 @@ pmm_scan:
 	movw	$init_message_pmm, %si
 	xorw	%di, %di
 	call	print_message
-	/* We have PMM and so a 1kB stack: preserve upper register halves */
+	/* We have PMM and so a 1kB stack: preserve whole registers */
 	pushal
-	/* Calculate required allocation size in %esi */
-	movzbl	romheader_size, %eax
-	shll	$9, %eax
-	addl	$_textdata_memsz, %eax
-	orw	$0xffff, %ax	/* Ensure allocation size is at least 64kB */
-	bsrl	%eax, %ecx
-	subw	$15, %cx	/* Round up and convert to 64kB count */
-	movw	$1, %si
-	shlw	%cl, %si
-pmm_loop:
-	/* Try to allocate block via PMM */
-	pushw	$0x0006		/* Aligned, extended memory */
-	pushl	$0xffffffff	/* No handle */
-	movzwl	%si, %eax
-	shll	$12, %eax
-	pushl	%eax		/* Allocation size in paragraphs */
-	pushw	$PMM_ALLOCATE
-	lcall	*%es:7
-	addw	$12, %sp
-	/* Abort if allocation fails */
-	testw	%dx, %dx	/* %ax==0 even on success, since align>=64kB */
-	jz	pmm_fail
-	/* If block has A20==1, free block and try again with twice
-	 * the allocation size (and hence alignment).
-	 */
-	testw	$0x0010, %dx
-	jz	got_pmm
-	pushw	%dx
-	pushw	$0
-	pushw	$PMM_DEALLOCATE
-	lcall	*%es:7
-	addw	$6, %sp
-	addw	%si, %si
-	jmp	pmm_loop
-got_pmm: /* PMM allocation succeeded */
-	movw	%dx, ( image_source + 2 )
-	movw	%dx, %ax
-	xorw	%di, %di
-	call	print_hex_word
-	movb	$( '@' ), %al
-	call	print_character
-	movw	%si, %ax
-	call	print_hex_byte
-	/* Copy ROM to PMM block */
+	/* Allocate image source PMM block */
+	movzbl	romheader_size, %ecx
+	shll	$5, %ecx
+	movl	$PMM_HANDLE_BASE_IMAGE_SOURCE, %ebx
+	movw	$get_pmm_image_source, %bp
+	call	get_pmm
+	movl	%esi, image_source
+	jc	1f
+	/* Copy ROM to image source PMM block */
+	pushw	%es
 	xorw	%ax, %ax
 	movw	%ax, %es
-	movl	image_source, %edi
+	movl	%esi, %edi
 	xorl	%esi, %esi
 	movzbl	romheader_size, %ecx
 	shll	$9, %ecx
 	addr32 rep movsb	/* PMM presence implies flat real mode */
-	movl	%edi, decompress_to
+	popw	%es
 	/* Shrink ROM */
 	movb	shrunk_rom_size, %al
 	movb	%al, romheader_size
-pmm_fail:
-	/* Restore upper register halves */
+1:	/* Allocate decompression PMM block.  Round up the size to the
+	 * nearest 128kB and use the size within the PMM handle; this
+	 * allows the same decompression area to be shared between
+	 * multiple iPXE ROMs even with differing build IDs
+	 */
+	movl	$_textdata_memsz_pgh, %ecx
+	addl	$0x00001fff, %ecx
+	andl	$0xffffe000, %ecx
+	movl	%ecx, %ebx
+	shrw	$12, %bx
+	orl	$PMM_HANDLE_BASE_DECOMPRESS_TO, %ebx
+	movw	$get_pmm_decompress_to, %bp
+	call	get_pmm
+	movl	%esi, decompress_to
+	/* Restore registers */
 	popal
 no_pmm:
 
@@ -436,6 +422,88 @@ no_pmm:
 	lret
 	.size init, . - init
 
+/* Attempt to find or allocate PMM block
+ *
+ * Parameters:
+ *  %ecx : size of block to allocate, in paragraphs
+ *  %ebx : PMM handle base
+ *  %bp : routine to check acceptability of found blocks
+ *  %es:0000 : PMM structure
+ * Returns:
+ *  %ebx : PMM handle
+ *  %esi : allocated block address, or zero (with CF set) if allocation failed
+ */
+get_pmm:
+	/* Preserve registers */
+	pushl	%eax
+	pushw	%di
+	movw	$' ', %di
+get_pmm_find:
+	/* Try to find existing block */
+	pushl	%ebx		/* PMM handle */
+	pushw	$PMM_FIND
+	lcall	*%es:7
+	addw	$6, %sp
+	pushw	%dx
+	pushw	%ax
+	popl	%esi
+	testl	%esi, %esi
+	jz	get_pmm_allocate
+	/* Block found - check acceptability */
+	call	*%bp
+	jnc	get_pmm_done
+	/* Block not acceptable - increment handle and retry */
+	incl	%ebx
+	jmp	get_pmm_find
+get_pmm_allocate:
+	/* Block not found - try to allocate new block */
+	pushw	$0x0002		/* Extended memory */
+	pushl	%ebx		/* PMM handle */
+	pushl	%ecx		/* Length */
+	pushw	$PMM_ALLOCATE
+	lcall	*%es:7
+	addw	$12, %sp
+	pushw	%dx
+	pushw	%ax
+	popl	%esi
+	movw	$'+', %di	/* Indicate allocation attempt */
+	testl	%esi, %esi
+	jnz	get_pmm_done
+	stc
+get_pmm_done:
+	/* Print block address */
+	pushfw
+	movw	%di, %ax
+	xorw	%di, %di
+	call	print_character
+	movl	%esi, %eax
+	call	print_hex_dword
+	popfw
+	/* Restore registers and return */
+	popw	%di
+	popl	%eax
+	ret
+	.size	get_pmm, . - get_pmm
+
+	/* Check acceptability of image source block */
+get_pmm_image_source:
+	pushw	%es
+	xorw	%ax, %ax
+	movw	%ax, %es
+	movl	build_id, %eax
+	cmpl	%es:build_id(%esi), %eax
+	je	1f
+	stc
+1:	popw	%es
+	ret
+	.size	get_pmm_image_source, . - get_pmm_image_source
+
+	/* Check acceptability of decompression block */
+get_pmm_decompress_to:
+	clc
+	ret
+	.size	get_pmm_decompress_to, . - get_pmm_decompress_to
+
 /*
  * Note to hardware vendors:
  *
@@ -456,7 +524,7 @@ init_message:
 	.ascii	"\n"
 	.ascii	PRODUCT_NAME
 	.ascii	"\n"
-	.asciz	"iPXE (http://ipxe.org) - "
+	.asciz	"iPXE (http://ipxe.org) "
 	.size	init_message, . - init_message
 init_message_pci:
 	.asciz	" PCI"
