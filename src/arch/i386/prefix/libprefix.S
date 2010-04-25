@@ -443,6 +443,8 @@ install:
 	xorl	%esi, %esi
 	/* Image destination = default */
 	xorl	%edi, %edi
+	/* Allow relocation */
+	clc
 	/* Install text and data segments */
 	call	install_prealloc
 	/* Restore registers and return */
@@ -461,6 +463,7 @@ install:
  *   %bx  : .data16 segment address
  *   %esi : Image source physical address (or zero for %cs:0000)
  *   %edi : Decompression temporary area physical address (or zero for default)
+ *   CF set : Avoid relocating to top of memory
  * Corrupts:
  *   none
  ****************************************************************************
@@ -473,9 +476,8 @@ install_prealloc:
 	pushal
 	pushw	%ds
 	pushw	%es
-
-	/* Sanity: clear the direction flag asap */
-	cld
+	cld			/* Sanity: clear the direction flag asap */
+	pushfw
 
 	/* Copy decompression temporary area physical address to %ebp */
 	movl	%edi, %ebp
@@ -570,6 +572,11 @@ a20_death_message:
 	movl	%ebp, %edi
 	lcall	*init_librm_vector
 
+	/* Skip relocation if CF was set on entry */
+	popfw
+	pushfw
+	jc	skip_relocate
+
 	/* Call relocate() to determine target address for relocation.
 	 * relocate() will return with %esi, %edi and %ecx set up
 	 * ready for the copy to the new location.
@@ -588,9 +595,11 @@ a20_death_message:
 
 	/* Initialise librm at new location */
 	lcall	*init_librm_vector
+skip_relocate:
 #endif
 
 	/* Restore registers */
+	popfw
 	popw	%es
 	popw	%ds
 	popal

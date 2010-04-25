@@ -407,6 +407,7 @@ no_pmm:
 	 * picked up by the initial shell prompt, and we will drop
 	 * into a shell.
 	 */
+	stc			/* Inhibit relocation */
 	pushw	%cs
 	call	exec
 2:
@@ -597,6 +598,7 @@ bbs_version:
  * Called by the PnP BIOS when it wants to boot us.
  */
 bev_entry:
+	clc			/* Allow relocation */
 	pushw	%cs
 	call	exec
 	lret
@@ -631,6 +633,7 @@ int19_entry:
 	/* Leave keypress in buffer and start iPXE.  The keypress will
 	 * cause the usual initial Ctrl-B prompt to be skipped.
 	 */
+	clc			/* Allow relocation */
 	pushw	%cs
 	call	exec
 1:	/* Try to call original INT 19 vector */
@@ -662,6 +665,9 @@ exec:	/* Set %ds = %cs */
 	pushw	%cs
 	popw	%ds
 
+	/* Preserve state of CF */
+	lahf
+
 	/* Print message as soon as possible */
 	movw	$prodstr, %si
 	xorw	%di, %di
@@ -675,14 +681,17 @@ exec:	/* Set %ds = %cs */
 	movw	%sp, %bp
 
 	/* Obtain a reasonably-sized temporary stack */
-	xorw	%ax, %ax
-	movw	%ax, %ss
+	xorw	%bx, %bx
+	movw	%bx, %ss
 	movw	$0x7c00, %sp
 
 	/* Install iPXE */
+	sahf
+	pushfw
+	call	alloc_basemem
+	popfw
 	movl	image_source, %esi
 	movl	decompress_to, %edi
-	call	alloc_basemem
 	call	install_prealloc
 
 	/* Print message indicating successful installation */

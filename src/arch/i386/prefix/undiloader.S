@@ -28,6 +28,7 @@ undiloader:
 	movw	%es:14(%di), %ax
 	movl	image_source, %esi
 	movl	decompress_to, %edi
+	clc			/* Allow relocation */
 	call	install_prealloc
 	popw	%di
 	/* Call UNDI loader C code */
