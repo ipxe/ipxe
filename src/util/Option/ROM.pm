@@ -349,7 +349,8 @@ sub checksum {
   my $hash = shift;
   my $self = tied(%$hash);
 
-  return unpack ( "%8C*", ${$self->{data}} );
+  my $raw = substr ( ${$self->{data}}, 0, ( $hash->{length} * 512 ) );
+  return unpack ( "%8C*", $raw );
 }
 
 =pod

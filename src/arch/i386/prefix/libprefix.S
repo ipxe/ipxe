@@ -479,6 +479,10 @@ install_prealloc:
 	cld			/* Sanity: clear the direction flag asap */
 	pushfw
 
+	/* Set up %ds for (read-only) access to .prefix */
+	pushw	%cs
+	popw	%ds
+
 	/* Copy decompression temporary area physical address to %ebp */
 	movl	%edi, %ebp
 
@@ -495,7 +499,6 @@ install_prealloc:
 	call	install_block		/* .text16.early */
 	popl	%esi
 
-	/* Open up access to payload */
 #ifndef KEEP_IT_REAL
 	/* Access high memory */
 	pushw	%cs
@@ -511,18 +514,39 @@ install_prealloc:
 2:	jmp	2b
 	.section ".prefix.data", "aw", @progbits
 a20_death_message:
-	.asciz	"Gate A20 stuck - cannot continue\n"
+	.asciz	"\nHigh memory inaccessible - cannot continue\n"
 	.size	a20_death_message, . - a20_death_message
 	.previous
 3:
 #endif
+
+	/* Open payload (which may not yet be in memory) */
+	pushw	%cs
+	pushw	$1f
+	pushw	%ax
+	pushw	$open_payload
+	lret
+1:	/* Die if we could not access the payload */
+	jnc	3f
+	xorw	%di, %di
+	movl	%esi, %eax
+	call	print_hex_dword
+	movw	$payload_death_message, %si
+	call	print_message
+2:	jmp	2b
+	.section ".prefix.data", "aw", @progbits
+payload_death_message:
+	.asciz	"\nPayload inaccessible - cannot continue\n"
+	.size	payload_death_message, . - payload_death_message
+	.previous
+3:
 
 	/* Calculate physical address of payload (i.e. first source) */
 	testl	%esi, %esi
 	jnz	1f
 	movw	%cs, %si
 	shll	$4, %esi
-1:	addl	%cs:payload_lma, %esi
+1:	addl	payload_lma, %esi
 
 	/* Install .text16.late and .data16 */
 	movl	$_text16_late_filesz, %ecx
@@ -588,15 +612,21 @@ a20_death_message:
 
 	/* Copy code to new location */
 	pushl	%edi
+	pushw	%ax
 	xorw	%ax, %ax
 	movw	%ax, %es
 	es rep addr32 movsb
+	popw	%ax
 	popl	%edi
 
 	/* Initialise librm at new location */
 	lcall	*init_librm_vector
 skip_relocate:
 #endif
+
+	/* Close access to payload */
+	movw	%ax, (close_payload_vector+2)
+	lcall	*close_payload_vector
 
 	/* Restore registers */
 	popfw
@@ -625,6 +655,10 @@ prot_call_vector:
 	.word 0
 	.size prot_call_vector, . - prot_call_vector
 #endif
+close_payload_vector:
+	.word close_payload
+	.word 0
+	.size close_payload_vector, . - close_payload_vector
 
 	/* Payload address */
 	.section ".prefix.lib", "awx", @progbits
@@ -636,6 +670,17 @@ payload_lma:
 	.long	1
 	.long	0
 	.previous
+
+	/* Dummy routines to open and close payload */
+	.section ".text16.early.data", "aw", @progbits
+	.weak	open_payload
+	.weak	close_payload
+open_payload:
+close_payload:
+	clc
+	lret
+	.size	open_payload, . - open_payload
+	.size	close_payload, . - close_payload
 
 /****************************************************************************
  * uninstall

@@ -32,6 +32,16 @@ FILE_LICENCE ( GPL2_OR_LATER )
  */
 #define ROM_BANNER_TIMEOUT ( 2 * ( 18 * BANNER_TIMEOUT ) / 10 )
 
+/* Allow payload to be excluded from ROM size
+ */
+#if ROMPREFIX_EXCLUDE_PAYLOAD
+#define	ZINFO_TYPE_ADxB "ADHB"
+#define	ZINFO_TYPE_ADxW "ADHW"
+#else
+#define	ZINFO_TYPE_ADxB "ADDB"
+#define	ZINFO_TYPE_ADxW "ADDW"
+#endif
+
 	.text
 	.code16
 	.arch i386
@@ -53,7 +63,7 @@ checksum:
 	.size romheader, . - romheader
 
 	.section ".zinfo.fixup", "a", @progbits	/* Compressor fixups */
-	.ascii	"ADDB"
+	.ascii	ZINFO_TYPE_ADxB
 	.long	romheader_size
 	.long	512
 	.long	0
@@ -83,11 +93,11 @@ pciheader_runtime_length:
 	.size pciheader, . - pciheader
 
 	.section ".zinfo.fixup", "a", @progbits	/* Compressor fixups */
-	.ascii	"ADDW"
+	.ascii	ZINFO_TYPE_ADxW
 	.long	pciheader_image_length
 	.long	512
 	.long	0
-	.ascii	"ADDW"
+	.ascii	ZINFO_TYPE_ADxW
 	.long	pciheader_runtime_length
 	.long	512
 	.long	0
@@ -178,6 +188,9 @@ init:
 	 */
 	movw	%bx, %gs
 	movw	%di, %bx
+
+	/* Store PCI bus:dev.fn address */
+	movw	%ax, init_pci_busdevfn
 
 	/* Print message as early as possible */
 	movw	$init_message, %si
@@ -320,8 +333,7 @@ pmm_scan:
 	/* We have PMM and so a 1kB stack: preserve whole registers */
 	pushal
 	/* Allocate image source PMM block */
-	movzbl	romheader_size, %ecx
-	shll	$5, %ecx
+	movzwl	image_source_len_pgh, %ecx
 	movl	$PMM_HANDLE_BASE_IMAGE_SOURCE, %ebx
 	movw	$get_pmm_image_source, %bp
 	call	get_pmm
@@ -552,6 +564,13 @@ init_message_done:
 	.asciz	"\n\n"
 	.size	init_message_done, . - init_message_done
 
+/* PCI bus:dev.fn
+ *
+ */
+init_pci_busdevfn:
+	.word	0xffff
+	.size	init_pci_busdevfn, . - init_pci_busdevfn
+
 /* Image source area
  *
  * May be either zero (indicating to use option ROM space as source),
@@ -561,6 +580,19 @@ init_message_done:
 image_source:
 	.long	0
 	.size	image_source, . - image_source
+
+/* Image source area length (in paragraphs)
+ *
+ */
+image_source_len_pgh:
+	.word	0
+	.size	image_source_len_pgh, . - image_source_len_pgh
+	.section ".zinfo.fixup", "a", @progbits	/* Compressor fixups */
+	.ascii	"ADDW"
+	.long	image_source_len_pgh
+	.long	16
+	.long	0
+	.previous
 
 /* Shrunk ROM size (in 512-byte sectors)
  *
