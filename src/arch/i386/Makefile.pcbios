@@ -26,6 +26,10 @@ PAD_rom		= $(PADIMG) --blksize=512 --byte=0xff $@
 PAD_dsk		= $(PADIMG) --blksize=512 $@
 PAD_hd		= $(PADIMG) --blksize=32768 $@
 
+# Finalisation rules
+#
+FINALISE_rom	= $(FIXROM) $@
+
 # rule to make a non-emulation ISO boot image
 NON_AUTO_MEDIA	+= iso
 %iso:	%lkrn util/geniso

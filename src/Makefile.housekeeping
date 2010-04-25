@@ -614,15 +614,6 @@ TGT_LD_FLAGS	= $(foreach SYM,$(TGT_LD_PREFIX) $(TGT_LD_DRIVERS) obj_config,\
 		    -u $(SYM) --defsym check_$(SYM)=$(SYM) ) \
 		  $(patsubst %,--defsym %,$(TGT_LD_IDS))
 
-# Calculate makerom flags for the specific target
-# (e.g. "bin/dfe538--prism2_pci.zrom.tmp") and derive the variables:
-#
-# TGT_MAKEROM_FLAGS : target-specific flags for makerom (e.g.
-#		      "-p 0x1186,0x1300")
-#
-TGT_MAKEROM_FLAGS = $(strip $(MAKEROM_FLAGS_$(TGT_ROM_NAME)) \
-       $(if $(TGT_PCI_VENDOR),$(strip -p $(TGT_PCI_VENDOR),$(TGT_PCI_DEVICE))))
-
 # Calculate list of debugging versions of objects to be included in
 # the target.
 #
@@ -652,8 +643,6 @@ $(BIN)/%.info :
 	@$(ECHO) 'LD ID symbols        : $(TGT_LD_IDS)'
 	@$(ECHO)
 	@$(ECHO) 'LD target flags      : $(TGT_LD_FLAGS)'
-	@$(ECHO)
-	@$(ECHO) 'makerom target flags : $(TGT_MAKEROM_FLAGS)'
 	@$(ECHO)
 	@$(ECHO) 'Debugging objects    : $(DEBUG_OBJS)'
 	@$(ECHO) 'Replaced objects     : $(DEBUG_ORIG_OBJS)'
@@ -862,19 +851,6 @@ $(BIN)/etherboot.% : $(BIN)/ipxe.%
 	ln -sf $(notdir $<) $@
 
 endif # defined(BIN)
-
-###############################################################################
-#
-# Rules for finalising files.  TGT_MAKEROM_FLAGS is defined as part of
-# the automatic build system and varies by target; it includes the
-# "-p 0x1234,0x5678" string to set the PCI IDs.
-#
-FINALISE_rom	= $(MAKEROM) $(MAKEROM_FLAGS) $(TGT_MAKEROM_FLAGS) \
-		  -i$(IDENT) -s 0 $@
-
-# Some ROMs require specific flags to be passed to makerom.pl
-#
-MAKEROM_FLAGS_3c503 = -3
 
 ###############################################################################
 #
