@@ -37,10 +37,10 @@ __asmcall int main ( void ) {
 	struct image *image;
 
 	/* Some devices take an unreasonably long time to initialise */
-	printf ( PRODUCT_SHORT_NAME " initialising devices...\n" );
-
+	printf ( PRODUCT_SHORT_NAME " initialising devices..." );
 	initialise();
 	startup();
+	printf ( "ok\n" );
 
 	/*
 	 * Print welcome banner
