@@ -24,6 +24,8 @@ SECTIONS {
      *
      */
 
+    PROVIDE ( _max_align = 16 );
+
     /*
      * The prefix
      *
@@ -169,7 +171,6 @@ SECTIONS {
      *
      */
 
-    PROVIDE ( _max_align = 16 );
     .			= 0;
 
     .			= ALIGN ( _max_align );
