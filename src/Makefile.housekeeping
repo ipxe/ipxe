@@ -295,6 +295,7 @@ endif
 # Include architecture-specific include path
 ifdef ARCH
 INCDIRS		+= arch/$(ARCH)/include
+INCDIRS		+= arch/$(ARCH)/include/$(PLATFORM)
 endif
 
 ###############################################################################

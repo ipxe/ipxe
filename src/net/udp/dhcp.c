@@ -40,6 +40,7 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #include <ipxe/dhcp.h>
 #include <ipxe/dhcpopts.h>
 #include <ipxe/dhcppkt.h>
+#include <ipxe/dhcp_arch.h>
 #include <ipxe/features.h>
 
 /** @file
@@ -74,14 +75,10 @@ static uint8_t dhcp_request_options_data[] = {
 	DHCP_MESSAGE_TYPE, DHCP_BYTE ( 0 ),
 	DHCP_MAX_MESSAGE_SIZE,
 	DHCP_WORD ( ETH_MAX_MTU - 20 /* IP header */ - 8 /* UDP header */ ),
-	DHCP_CLIENT_ARCHITECTURE, DHCP_WORD ( 0 ),
-	DHCP_CLIENT_NDI, DHCP_OPTION ( 1 /* UNDI */ , 2, 1 /* v2.1 */ ),
-	DHCP_VENDOR_CLASS_ID,
-	DHCP_STRING (  'P', 'X', 'E', 'C', 'l', 'i', 'e', 'n', 't', ':',
-		       'A', 'r', 'c', 'h', ':', '0', '0', '0', '0', '0', ':',
-		       'U', 'N', 'D', 'I', ':', '0', '0', '2', '0', '0', '1' ),
-	DHCP_USER_CLASS_ID,
-	DHCP_STRING ( 'g', 'P', 'X', 'E' ),
+	DHCP_CLIENT_ARCHITECTURE, DHCP_ARCH_CLIENT_ARCHITECTURE,
+	DHCP_CLIENT_NDI, DHCP_ARCH_CLIENT_NDI,
+	DHCP_VENDOR_CLASS_ID, DHCP_ARCH_VENDOR_CLASS_ID,
+	DHCP_USER_CLASS_ID, DHCP_STRING ( 'i', 'P', 'X', 'E' ),
 	DHCP_PARAMETER_REQUEST_LIST,
 	DHCP_OPTION ( DHCP_SUBNET_MASK, DHCP_ROUTERS, DHCP_DNS_SERVERS,
 		      DHCP_LOG_SERVERS, DHCP_HOST_NAME, DHCP_DOMAIN_NAME,
