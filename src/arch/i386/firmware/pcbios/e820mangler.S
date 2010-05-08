@@ -493,18 +493,6 @@ get_mangled_e820:
 	.size get_mangled_e820, . - get_mangled_e820
 
 /****************************************************************************
- * Set/clear CF on the stack as appropriate, assumes stack is as it should
- * be immediately before IRET
- ****************************************************************************
- */
-patch_cf:
-	pushw	%bp
-	movw	%sp, %bp
-	setc	8(%bp)	/* Set/reset CF; clears PF, AF, ZF, SF */
-	popw	%bp
-	ret
-
-/****************************************************************************
  * INT 15,e820 handler
  ****************************************************************************
  */

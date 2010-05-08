@@ -669,6 +669,7 @@ void hook_comboot_interrupts ( ) {
 		              "pushw %%cs\n\t"
 		              "call prot_call\n\t"
 		              "addw $4, %%sp\n\t"
+			      "call patch_cf\n\t"
 		              "iret\n\t" )
 		          : : "i" ( int20 ) );
 
@@ -681,6 +682,7 @@ void hook_comboot_interrupts ( ) {
 		              "pushw %%cs\n\t"
 		              "call prot_call\n\t"
 		              "addw $4, %%sp\n\t"
+			      "call patch_cf\n\t"
 		              "iret\n\t" )
 		          : : "i" ( int21 ) );
 
@@ -693,6 +695,7 @@ void hook_comboot_interrupts ( ) {
 		              "pushw %%cs\n\t"
 		              "call prot_call\n\t"
 		              "addw $4, %%sp\n\t"
+			      "call patch_cf\n\t"
 		              "iret\n\t" )
 		          : : "i" ( int22) );
 
