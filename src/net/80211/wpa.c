@@ -269,44 +269,6 @@ void wpa_stop ( struct net80211_device *dev )
 
 
 /**
- * Check PMKID consistency
- *
- * @v ctx	WPA common context
- * @v pmkid	PMKID to check against (16 bytes long)
- * @ret rc	Zero if they match, or a negative error code if not
- */
-int wpa_check_pmkid ( struct wpa_common_ctx *ctx, const u8 *pmkid )
-{
-	u8 sha1_ctx[SHA1_CTX_SIZE];
-	u8 my_pmkid[SHA1_SIZE];
-	u8 pmk[ctx->pmk_len];
-	size_t pmk_len;
-	struct {
-		char name[8];
-		u8 aa[ETH_ALEN];
-		u8 spa[ETH_ALEN];
-	} __attribute__ (( packed )) pmkid_data;
-
-	memcpy ( pmk, ctx->pmk, ctx->pmk_len );
-	pmk_len = ctx->pmk_len;
-
-	memcpy ( pmkid_data.name, "PMK Name", 8 );
-	memcpy ( pmkid_data.aa, ctx->dev->bssid, ETH_ALEN );
-	memcpy ( pmkid_data.spa, ctx->dev->netdev->ll_addr, ETH_ALEN );
-
-	hmac_init ( &sha1_algorithm, sha1_ctx, pmk, &pmk_len );
-	hmac_update ( &sha1_algorithm, sha1_ctx, &pmkid_data,
-		      sizeof ( pmkid_data ) );
-	hmac_final ( &sha1_algorithm, sha1_ctx, pmk, &pmk_len, my_pmkid );
-
-	if ( memcmp ( my_pmkid, pmkid, WPA_PMKID_LEN ) != 0 )
-		return -EACCES;
-
-	return 0;
-}
-
-
-/**
  * Derive pairwise transient key
  *
  * @v ctx	WPA common context
@@ -546,8 +508,6 @@ static int wpa_handle_1_of_4 ( struct wpa_common_ctx *ctx,
 			       struct eapol_key_pkt *pkt, int is_rsn,
 			       struct wpa_kie *kie )
 {
-	int rc;
-
 	if ( ctx->state == WPA_WAITING )
 		return -EINVAL;
 
@@ -556,30 +516,6 @@ static int wpa_handle_1_of_4 ( struct wpa_common_ctx *ctx,
 	if ( ! ctx->have_Snonce ) {
 		get_random_bytes ( ctx->Snonce, sizeof ( ctx->Snonce ) );
 		ctx->have_Snonce = 1;
-	}
-
-	if ( is_rsn && pkt->datalen ) {
-		union ieee80211_ie *ie = ( union ieee80211_ie * ) pkt->data;
-		void *ie_end = pkt->data + pkt->datalen;
-
-		if ( ! ieee80211_ie_bound ( ie, ie_end ) ) {
-			DBGC ( ctx, "WPA %p: malformed PMKID KDE\n", ctx );
-			return wpa_fail ( ctx, -EINVAL );
-		}
-
-		while ( ie ) {
-			if ( ie->id == IEEE80211_IE_VENDOR &&
-			     ie->vendor.oui == WPA_KDE_PMKID ) {
-				rc = wpa_check_pmkid ( ctx, ie->vendor.data );
-				if ( rc < 0 ) {
-					DBGC ( ctx, "WPA %p ALERT: PMKID "
-					       "mismatch in 1/4\n", ctx );
-					return wpa_fail ( ctx, rc );
-				}
-			}
-
-			ie = ieee80211_next_ie ( ie, ie_end );
-		}
 	}
 
 	DBGC ( ctx, "WPA %p: received 1/4, looks OK\n", ctx );
