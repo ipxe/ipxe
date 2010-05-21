@@ -91,8 +91,12 @@ static int script_exec ( struct image *image ) {
  * @ret rc		Return status code
  */
 static int script_load ( struct image *image ) {
-	static const char magic[] = "#!ipxe";
-	char test[ sizeof ( magic ) - 1 /* NUL */ + 1 /* terminating space */];
+	static const char ipxe_magic[] = "#!ipxe";
+	static const char gpxe_magic[] = "#!gpxe";
+	linker_assert ( sizeof ( ipxe_magic ) == sizeof ( gpxe_magic ),
+			magic_size_mismatch );
+	char test[ sizeof ( ipxe_magic ) - 1 /* NUL */
+		   + 1 /* terminating space */];
 
 	/* Sanity check */
 	if ( image->len < sizeof ( test ) ) {
@@ -102,8 +106,9 @@ static int script_load ( struct image *image ) {
 
 	/* Check for magic signature */
 	copy_from_user ( test, image->data, 0, sizeof ( test ) );
-	if ( ( memcmp ( test, magic, ( sizeof ( test ) - 1 ) ) != 0 ) ||
-	     ! isspace ( test[ sizeof ( test ) - 1 ] ) ) {
+	if ( ! ( ( ( memcmp ( test, ipxe_magic, sizeof ( test ) - 1 ) == 0 ) ||
+		   ( memcmp ( test, gpxe_magic, sizeof ( test ) - 1 ) == 0 )) &&
+		 isspace ( test[ sizeof ( test ) - 1 ] ) ) ) {
 		DBG ( "Invalid magic signature\n" );
 		return -ENOEXEC;
 	}
