@@ -10,6 +10,7 @@ FILE_LICENCE ( GPL2_OR_LATER );
 
 #include <pxe_api.h>
 #include <realmode.h>
+#include <setjmp.h>
 
 struct net_device;
 
@@ -29,6 +30,9 @@ extern struct s_PXE __text16 ( ppxe );
 /** PXENV+ structure */
 extern struct s_PXENV __text16 ( pxenv );
 #define pxenv __use_text16 ( pxenv )
+
+/** PXENV_RESTART_TFTP jump buffer */
+extern rmjmp_buf pxe_restart_nbp;
 
 extern void pxe_activate ( struct net_device *netdev );
 extern int pxe_deactivate ( void );

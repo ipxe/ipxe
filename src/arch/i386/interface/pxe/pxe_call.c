@@ -20,6 +20,7 @@ FILE_LICENCE ( GPL2_OR_LATER );
 
 #include <ipxe/uaccess.h>
 #include <ipxe/init.h>
+#include <setjmp.h>
 #include <registers.h>
 #include <biosint.h>
 #include <pxe.h>
@@ -480,14 +481,23 @@ int pxe_deactivate ( void ) {
 	return 0;
 }
 
+/** Jump buffer for PXENV_RESTART_TFTP */
+rmjmp_buf pxe_restart_nbp;
+
 /**
  * Start PXE NBP at 0000:7c00
  *
  * @ret rc		Return status code
  */
 int pxe_start_nbp ( void ) {
+	int jmp;
 	int discard_b, discard_c, discard_d, discard_D;
 	uint16_t rc;
+
+	/* Allow restarting NBP via PXENV_RESTART_TFTP */
+	jmp = rmsetjmp ( pxe_restart_nbp );
+	if ( jmp )
+		DBG ( "Restarting NBP (%x)\n", jmp );
 
 	/* Far call to PXE NBP */
 	__asm__ __volatile__ ( REAL_CODE ( "movw %%cx, %%es\n\t"

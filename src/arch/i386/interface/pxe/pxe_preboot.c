@@ -28,6 +28,7 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #include <stdint.h>
 #include <string.h>
 #include <stdlib.h>
+#include <setjmp.h>
 #include <ipxe/uaccess.h>
 #include <ipxe/dhcp.h>
 #include <ipxe/fakedhcp.h>
@@ -227,13 +228,8 @@ PXENV_EXIT_t pxenv_restart_tftp ( struct s_PXENV_TFTP_READ_FILE
 	if ( tftp_exit != PXENV_EXIT_SUCCESS )
 		return tftp_exit;
 
-	/* Fire up the new NBP */
-	restart_tftp->Status = pxe_start_nbp();
-
-	/* Not sure what "SUCCESS" actually means, since we can only
-	 * return if the new NBP failed to boot...
-	 */
-	return PXENV_EXIT_SUCCESS;
+	/* Restart NBP */
+	rmlongjmp ( pxe_restart_nbp, PXENV_RESTART_TFTP );
 }
 
 /* PXENV_START_UNDI
