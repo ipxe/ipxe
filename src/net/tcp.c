@@ -702,12 +702,12 @@ static int tcp_rx_syn ( struct tcp_connection *tcp, uint32_t seq,
 	if ( ( tcp->rcv_ack - seq ) > 0 )
 		return 0;
 
+	/* Acknowledge SYN */
+	tcp_rx_seq ( tcp, 1 );
+
 	/* Mark SYN as received and start sending ACKs with each packet */
 	tcp->tcp_state |= ( TCP_STATE_SENT ( TCP_ACK ) |
 			    TCP_STATE_RCVD ( TCP_SYN ) );
-
-	/* Acknowledge SYN */
-	tcp_rx_seq ( tcp, 1 );
 
 	return 0;
 }
@@ -809,15 +809,15 @@ static int tcp_rx_data ( struct tcp_connection *tcp, uint32_t seq,
 	iob_pull ( iobuf, already_rcvd );
 	len -= already_rcvd;
 
+	/* Acknowledge new data */
+	tcp_rx_seq ( tcp, len );
+
 	/* Deliver data to application */
 	if ( ( rc = xfer_deliver_iob ( &tcp->xfer, iobuf ) ) != 0 ) {
 		DBGC ( tcp, "TCP %p could not deliver %08x..%08x: %s\n",
 		       tcp, seq, ( seq + len ), strerror ( rc ) );
 		return rc;
 	}
-
-	/* Acknowledge new data */
-	tcp_rx_seq ( tcp, len );
 
 	return 0;
 }
@@ -835,9 +835,11 @@ static int tcp_rx_fin ( struct tcp_connection *tcp, uint32_t seq ) {
 	if ( ( tcp->rcv_ack - seq ) > 0 )
 		return 0;
 
-	/* Mark FIN as received and acknowledge it */
-	tcp->tcp_state |= TCP_STATE_RCVD ( TCP_FIN );
+	/* Acknowledge FIN */
 	tcp_rx_seq ( tcp, 1 );
+
+	/* Mark FIN as received */
+	tcp->tcp_state |= TCP_STATE_RCVD ( TCP_FIN );
 
 	/* Close connection */
 	tcp_close ( tcp, 0 );
