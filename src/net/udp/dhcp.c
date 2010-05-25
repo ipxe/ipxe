@@ -401,6 +401,7 @@ static void dhcp_rx_offer ( struct dhcp_session *dhcp,
 	int has_pxeclient;
 	int pxeopts_len;
 	int has_pxeopts;
+	uint8_t discovery_control = 0;
 	struct dhcp_offer *offer;
 	int i;
 
@@ -439,9 +440,32 @@ static void dhcp_rx_offer ( struct dhcp_session *dhcp,
 	has_pxeclient = ( ( vci_len >= ( int ) sizeof ( vci ) ) &&
 			  ( strncmp ( "PXEClient", vci, sizeof (vci) ) == 0 ));
 
-	/* Identify presence of PXE-specific options */
+	/*
+	 * Identify presence of PXE-specific options
+	 *
+	 * The Intel firmware appears to check for:
+	 * - PXE_DISCOVERY_CONTROL exists and has bit 3 set, or
+	 * - both PXE_BOOT_MENU and PXE_BOOT_MENU_PROMPT exist
+	 *
+	 * If DISCOVERY_CONTROL bit 3 is set, the firmware treats this
+	 * packet like a "normal" non-PXE DHCP packet with respect to
+	 * boot filename, except that it can come from ProxyDHCP. This
+	 * is the scheme that dnsmasq uses in the simple case.
+	 *
+	 * Otherwise, if one of the boot menu / boot menu prompt
+	 * options exists but not both, the firmware signals an
+	 * error. If neither exists, the packet is not considered to
+	 * contain DHCP options.
+	 *
+	 * In an effort to preserve semantics but be more flexible, we
+	 * check only for bit 3 of DISCOVERY_CONTROL or the presence
+	 * of BOOT_MENU. We don't care (yet) about the menu prompt.
+	 */
 	pxeopts_len = dhcppkt_fetch ( dhcppkt, DHCP_PXE_BOOT_MENU, NULL, 0 );
-	has_pxeopts = ( pxeopts_len >= 0 );
+	dhcppkt_fetch ( dhcppkt, DHCP_PXE_DISCOVERY_CONTROL,
+			&discovery_control, sizeof ( discovery_control ) );
+	has_pxeopts = ( ( pxeopts_len >= 0 ) ||
+			( discovery_control & PXEBS_SKIP ) );
 	if ( has_pxeclient )
 		DBGC ( dhcp, "%s", ( has_pxeopts ? " pxe" : " proxy" ) );
 
