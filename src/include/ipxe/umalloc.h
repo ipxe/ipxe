@@ -26,6 +26,7 @@ FILE_LICENCE ( GPL2_OR_LATER );
 
 /* Include all architecture-independent I/O API headers */
 #include <ipxe/efi/efi_umalloc.h>
+#include <ipxe/linux/linux_umalloc.h>
 
 /* Include all architecture-dependent I/O API headers */
 #include <bits/umalloc.h>

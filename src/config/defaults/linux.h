@@ -10,6 +10,7 @@
 #define CONSOLE_LINUX
 #define TIMER_LINUX
 #define UACCESS_LINUX
+#define UMALLOC_LINUX
 
 #define IMAGE_SCRIPT
 
