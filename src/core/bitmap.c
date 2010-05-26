@@ -76,7 +76,7 @@ int bitmap_test ( struct bitmap *bitmap, unsigned int bit ) {
 
 	if ( bit >= bitmap->length )
 		return 0;
-	return ( bitmap->blocks[index] & mask );
+	return ( ( bitmap->blocks[index] & mask ) != 0 );
 }
 
 /**

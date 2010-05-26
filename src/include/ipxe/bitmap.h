@@ -33,7 +33,7 @@ typedef unsigned long bitmap_block_t;
  * @v bit		Bit index
  * @ret mask		Block mask
  */
-#define BITMAP_MASK( bit ) ( 1 << ( (bit) % BITMAP_BLKSIZE ) )
+#define BITMAP_MASK( bit ) ( 1UL << ( (bit) % BITMAP_BLKSIZE ) )
 
 /** A bitmap */
 struct bitmap {
