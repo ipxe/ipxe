@@ -12,6 +12,7 @@
 #define UACCESS_LINUX
 #define UMALLOC_LINUX
 #define NAP_LINUX
+#define SMBIOS_LINUX
 
 #define IMAGE_SCRIPT
 

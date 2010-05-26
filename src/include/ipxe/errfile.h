@@ -213,6 +213,7 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #define ERRFILE_login_ui	      ( ERRFILE_OTHER | 0x00170000 )
 #define ERRFILE_ib_srpboot	      ( ERRFILE_OTHER | 0x00180000 )
 #define ERRFILE_iwmgmt		      ( ERRFILE_OTHER | 0x00190000 )
+#define ERRFILE_linux_smbios	      ( ERRFILE_OTHER | 0x001a0000 )
 
 /** @} */
 
