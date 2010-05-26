@@ -417,13 +417,13 @@ static void dhcp_rx_offer ( struct dhcp_session *dhcp,
 
 	/* Enqueue an offer to be filled in */
 	for ( i = 0 ; i < DHCP_MAX_OFFERS ; i++ ) {
+		if ( ! dhcp->offers[i].valid )
+			break;
+
 		if ( dhcp->offers[i].server.s_addr == server_id.s_addr ) {
 			DBGC ( dhcp, " dup\n" );
 			return;
 		}
-
-		if ( ! dhcp->offers[i].valid )
-			break;
 	}
 	if ( i == DHCP_MAX_OFFERS ) {
 		DBGC ( dhcp, " dropped\n" );
