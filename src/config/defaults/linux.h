@@ -8,6 +8,7 @@
  */
 
 #define CONSOLE_LINUX
+#define TIMER_LINUX
 
 #define IMAGE_SCRIPT
 
