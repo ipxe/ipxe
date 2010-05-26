@@ -43,6 +43,7 @@ FILE_LICENCE ( GPL2_OR_LATER );
 
 /* Include all architecture-independent I/O API headers */
 #include <ipxe/null_nap.h>
+#include <ipxe/linux/linux_nap.h>
 
 /* Include all architecture-dependent I/O API headers */
 #include <bits/nap.h>

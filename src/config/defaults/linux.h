@@ -11,6 +11,7 @@
 #define TIMER_LINUX
 #define UACCESS_LINUX
 #define UMALLOC_LINUX
+#define NAP_LINUX
 
 #define IMAGE_SCRIPT
 
