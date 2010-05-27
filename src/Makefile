@@ -94,7 +94,8 @@ INCDIRS		+= include .
 # Default build target: build the most common targets and print out a
 # helpfully suggestive message
 #
-all : bin/blib.a bin/ipxe.dsk bin/ipxe.iso bin/ipxe.usb bin/undionly.kpxe
+all : bin/blib.a bin/ipxe.dsk bin/ipxe.iso bin/ipxe.usb bin/undionly.kpxe \
+      bin/rtl8139.rom
 	@$(ECHO) '==========================================================='
 	@$(ECHO)
 	@$(ECHO) 'To create a bootable floppy, type'
