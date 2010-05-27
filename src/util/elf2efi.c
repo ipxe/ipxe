@@ -247,8 +247,9 @@ static bfd * open_input_bfd ( const char *filename ) {
 	/* The call to bfd_check_format() must be present, otherwise
 	 * we get a segfault from later BFD calls.
 	 */
-	if ( bfd_check_format ( bfd, bfd_object ) < 0 ) {
-		eprintf ( "%s is not an object file\n", filename );
+	if ( ! bfd_check_format ( bfd, bfd_object ) ) {
+		eprintf ( "%s is not an object file: ", filename );
+		bfd_perror ( NULL );
 		exit ( 1 );
 	}
 
