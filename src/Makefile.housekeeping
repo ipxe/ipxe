@@ -873,7 +873,8 @@ CLEANUP += $(ZBIN)
 # The EFI image converter
 #
 ELF2EFI_CFLAGS	:= -I$(BINUTILS_DIR)/include -I$(BFD_DIR)/include \
-		   -idirafter include -L$(BINUTILS_DIR)/lib -L$(BFD_DIR)/lib \
+		   -I$(ZLIB_DIR)/include -idirafter include \
+		   -L$(BINUTILS_DIR)/lib -L$(BFD_DIR)/lib -L$(ZLIB_DIR)/lib \
 		   -lbfd -liberty -lz -Wl,--no-warn-search-mismatch
 
 $(ELF2EFI32) : util/elf2efi.c $(MAKEDEPS)
