@@ -19,7 +19,6 @@ extern int boot_next_server_and_filename ( struct in_addr next_server,
 					   const char *filename );
 extern int boot_root_path ( const char *root_path );
 
-extern int pxe_menu_boot ( struct net_device *netdev )
-	__attribute__ (( weak ));
+extern int pxe_menu_boot ( struct net_device *netdev );
 
 #endif /* _USR_AUTOBOOT_H */

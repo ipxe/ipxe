@@ -319,6 +319,20 @@ static __asmcall void int21 ( struct i386_all_regs *ix86 ) {
 
 
 /**
+ * Dispatch PXE API call weakly
+ *
+ * @v ix86		Registers for PXE call
+ * @ret present		Zero if the PXE stack is present, nonzero if not
+ *
+ * A successful return only indicates that the PXE stack was available
+ * for dispatching the call; it says nothing about the success of
+ * whatever the call asked for.
+ */
+__weak int pxe_api_call_weak ( struct i386_all_regs *ix86 __unused ) {
+	return -1;
+}
+
+/**
  * SYSLINUX API
  */
 static __asmcall void int22 ( struct i386_all_regs *ix86 ) {

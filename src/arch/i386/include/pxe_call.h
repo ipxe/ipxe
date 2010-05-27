@@ -38,24 +38,6 @@ extern void pxe_activate ( struct net_device *netdev );
 extern int pxe_deactivate ( void );
 extern int pxe_start_nbp ( void );
 extern __asmcall void pxe_api_call ( struct i386_all_regs *ix86 );
-extern int _pxe_api_call_weak ( struct i386_all_regs *ix86 )
-	__attribute__ (( weak ));
-
-/**
- * Dispatch PXE API call weakly
- *
- * @v ix86		Registers for PXE call
- * @ret present		Zero if the PXE stack is present, nonzero if not
- *
- * A successful return only indicates that the PXE stack was available
- * for dispatching the call; it says nothing about the success of
- * whatever the call asked for.
- */
-static inline int pxe_api_call_weak ( struct i386_all_regs *ix86 )
-{
-	if ( _pxe_api_call_weak != NULL )
-		return _pxe_api_call_weak ( ix86 );
-	return -1;
-}
+extern int pxe_api_call_weak ( struct i386_all_regs *ix86 );
 
 #endif /* _PXE_CALL_H */

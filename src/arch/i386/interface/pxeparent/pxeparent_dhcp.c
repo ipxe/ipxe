@@ -29,7 +29,7 @@ FILE_LICENCE ( GPL2_OR_LATER );
 /**
  * Present cached DHCP packet if it exists
  */
-void __weak_impl ( get_cached_dhcpack ) ( void ) {
+void get_cached_dhcpack ( void ) {
 	struct undi_device *undi;
 	struct s_PXENV_GET_CACHED_INFO get_cached_info;
 	int rc;

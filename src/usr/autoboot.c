@@ -43,6 +43,13 @@ FILE_LICENCE ( GPL2_OR_LATER );
 int shutdown_exit_flags = 0;
 
 /**
+ * Perform PXE menu boot when PXE stack is not available
+ */
+__weak int pxe_menu_boot ( struct net_device *netdev __unused ) {
+	return -ENOTSUP;
+}
+
+/**
  * Identify the boot network device
  *
  * @ret netdev		Boot network device
@@ -155,7 +162,7 @@ static int netboot ( struct net_device *netdev ) {
 			       buf, sizeof ( buf ) );
 	pxe_discovery_control =
 		fetch_uintz_setting ( NULL, &pxe_discovery_control_setting );
-	if ( ( strcmp ( buf, "PXEClient" ) == 0 ) && pxe_menu_boot != NULL &&
+	if ( ( strcmp ( buf, "PXEClient" ) == 0 ) &&
 	     setting_exists ( NULL, &pxe_boot_menu_setting ) &&
 	     ( ! ( ( pxe_discovery_control & PXEBS_SKIP ) &&
 		   setting_exists ( NULL, &filename_setting ) ) ) ) {

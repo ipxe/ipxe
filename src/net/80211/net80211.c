@@ -140,6 +140,17 @@ struct net80211_assoc_ctx {
 };
 
 /**
+ * Detect secure 802.11 network when security support is not available
+ *
+ * @return -ENOTSUP, always.
+ */
+__weak int sec80211_detect ( struct io_buffer *iob __unused,
+			     enum net80211_security_proto *secprot __unused,
+			     enum net80211_crypto_alg *crypt __unused ) {
+	return -ENOTSUP;
+}
+
+/**
  * @defgroup net80211_netdev Network device interface functions
  * @{
  */

@@ -27,42 +27,11 @@ FILE_LICENCE ( GPL2_OR_LATER );
 /** @file
  *
  * Definitions for general secured-network routines.
- *
- * Any function in this file which may be referenced by code which is
- * not exclusive to encryption-enabled builds (e.g. sec80211_detect(),
- * which is called by net80211_probe_step() to fill the net80211_wlan
- * structure's security fields) must be declared as a weak symbol,
- * using an inline interface similar to that used for
- * sec80211_detect() below. This prevents secure network support from
- * bloating general builds by any more than a few tiny hooks to call
- * crypto functions when crypto structures are non-NULL.
  */
 
-int _sec80211_detect ( struct io_buffer *iob,
-		       enum net80211_security_proto *secprot,
-		       enum net80211_crypto_alg *crypt )
-	__attribute__ (( weak ));
-
-
-/**
- * Inline safety wrapper for _sec80211_detect()
- *
- * @v iob	I/O buffer containing beacon frame
- * @ret secprot	Security handshaking protocol used by network
- * @ret crypt	Cryptosystem used by network
- * @ret rc	Return status code
- *
- * This function transparently calls _sec80211_detect() if the file
- * containing it was compiled in, or returns an error indication of
- * @c -ENOTSUP if not.
- */
-static inline int sec80211_detect ( struct io_buffer *iob,
-				    enum net80211_security_proto *secprot,
-				    enum net80211_crypto_alg *crypt ) {
-	if ( _sec80211_detect )
-		return _sec80211_detect ( iob, secprot, crypt );
-	return -ENOTSUP;
-}
+int sec80211_detect ( struct io_buffer *iob,
+		      enum net80211_security_proto *secprot,
+		      enum net80211_crypto_alg *crypt );
 
 int sec80211_detect_ie ( int is_rsn, u8 *start, u8 *end,
 			 enum net80211_security_proto *secprot,

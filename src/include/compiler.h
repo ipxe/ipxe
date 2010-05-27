@@ -179,41 +179,12 @@ REQUEST_EXPANDED ( CONFIG_SYMBOL );
 /** Select file identifier for errno.h (if used) */
 #define ERRFILE PREFIX_OBJECT ( ERRFILE_ )
 
-/**
- * @defgroup weakmacros Macros to manage weak symbol definitions
- *
- * Weak symbols allow one to reference a function in another file
- * without necessarily requiring that file to be linked in. In their
- * native form, the function will be @c NULL if its file is not linked
- * in; these macros provide an inline wrapper that returns an
- * appropriate error indication or default value.
- *
- * @{
- */
 #ifndef ASSEMBLY
 
-/** Mangle @a name into its weakly-referenced implementation */
-#define __weak_impl( name )   _w_ ## name
-
-/**
- * Declare a weak function with inline safety wrapper
- *
- * @v ret	Return type of weak function
- * @v name	Name of function to expose
- * @v proto	Parenthesized list of arguments with types
- * @v args	Parenthesized list of argument names
- * @v dfl	Value to return if weak function is not available
- */
-#define __weak_decl( ret, name, proto, args, dfl )		\
-        ret __weak_impl( name ) proto __attribute__ (( weak ));	\
-        static inline ret name proto {				\
-                if ( __weak_impl( name ) )			\
-                        return __weak_impl( name ) args;	\
-                return dfl;					\
-        }
+/** Declare a function as weak (use *before* the definition) */
+#define __weak		__attribute__ (( weak ))
 
 #endif
-/** @} */
 
 /** @defgroup dbg Debugging infrastructure
  * @{

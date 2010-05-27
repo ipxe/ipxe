@@ -630,7 +630,7 @@ extern int start_pxebs ( struct job_interface *job, struct net_device *netdev,
  * should look for such a packet and call store_cached_dhcpack() with
  * it if it exists.
  */
-__weak_decl ( void, get_cached_dhcpack, ( void ), (), );
+extern void get_cached_dhcpack ( void );
 
 extern void store_cached_dhcpack ( userptr_t data, size_t len );
 
