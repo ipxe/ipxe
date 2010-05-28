@@ -36,6 +36,7 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #include <ipxe/settings.h>
 #include <ipxe/features.h>
 #include <ipxe/base16.h>
+#include <ipxe/base64.h>
 #include <ipxe/iscsi.h>
 
 /** @file
@@ -56,7 +57,7 @@ FEATURE ( FEATURE_PROTOCOL, "iSCSI", DHCP_EB_FEATURE_ISCSI, 1 );
 #define EPERM_INITIATOR_AUTHORISATION ( EPERM | EUNIQ_02 )
 #define EPROTO_INVALID_CHAP_ALGORITHM ( EPROTO | EUNIQ_01 )
 #define EPROTO_INVALID_CHAP_IDENTIFIER ( EPROTO | EUNIQ_02 )
-#define EPROTO_INVALID_CHAP_CHALLENGE ( EPROTO | EUNIQ_03 )
+#define EPROTO_INVALID_LARGE_BINARY ( EPROTO | EUNIQ_03 )
 #define EPROTO_INVALID_CHAP_RESPONSE ( EPROTO | EUNIQ_04 )
 
 /** iSCSI initiator name (explicitly specified) */
@@ -614,6 +615,41 @@ static int iscsi_tx_login_request ( struct iscsi_session *iscsi ) {
 }
 
 /**
+ * Calculate maximum length of decoded large binary value
+ *
+ * @v encoded		Encoded large binary value
+ * @v max_raw_len	Maximum length of raw data
+ */
+static inline size_t
+iscsi_large_binary_decoded_max_len ( const char *encoded ) {
+	return ( strlen ( encoded ) ); /* Decoding never expands data */
+}
+
+/**
+ * Decode large binary value
+ *
+ * @v encoded		Encoded large binary value
+ * @v raw		Raw data
+ * @ret len		Length of raw data, or negative error
+ */
+static int iscsi_large_binary_decode ( const char *encoded, uint8_t *raw ) {
+
+	if ( encoded[0] != '0' )
+		return -EPROTO_INVALID_LARGE_BINARY;
+
+	switch ( encoded[1] ) {
+	case 'x' :
+	case 'X' :
+		return base16_decode ( ( encoded + 2 ), raw );
+	case 'b' :
+	case 'B' :
+		return base64_decode ( ( encoded + 2 ), raw );
+	default:
+		return -EPROTO_INVALID_LARGE_BINARY;
+	}
+}
+
+/**
  * Handle iSCSI TargetAddress text value
  *
  * @v iscsi		iSCSI session
@@ -737,24 +773,19 @@ static int iscsi_handle_chap_i_value ( struct iscsi_session *iscsi,
  */
 static int iscsi_handle_chap_c_value ( struct iscsi_session *iscsi,
 				       const char *value ) {
-	uint8_t buf[ strlen ( value ) ]; /* Decoding never expands data */
+	uint8_t buf[ iscsi_large_binary_decoded_max_len ( value ) ];
 	unsigned int i;
-	int len;
-
-	/* Check and strip leading "0x" */
-	if ( ( value[0] != '0' ) || ( value[1] != 'x' ) ) {
-		DBGC ( iscsi, "iSCSI %p saw invalid CHAP challenge \"%s\"\n",
-		       iscsi, value );
-		return -EPROTO_INVALID_CHAP_CHALLENGE;
-	}
+	size_t len;
+	int rc;
 
 	/* Process challenge */
-	len = base16_decode ( ( value + 2 ), buf );
-	if ( len < 0 ) {
+	rc = iscsi_large_binary_decode ( value, buf );
+	if ( rc < 0 ) {
 		DBGC ( iscsi, "iSCSI %p invalid CHAP challenge \"%s\": %s\n",
-		       iscsi, value, strerror ( len ) );
-		return len;
+		       iscsi, value, strerror ( rc ) );
+		return rc;
 	}
+	len = rc;
 	chap_update ( &iscsi->chap, buf, len );
 
 	/* Build CHAP response */
@@ -812,7 +843,7 @@ static int iscsi_handle_chap_n_value ( struct iscsi_session *iscsi,
  */
 static int iscsi_handle_chap_r_value ( struct iscsi_session *iscsi,
 				       const char *value ) {
-	uint8_t buf[ strlen ( value ) ]; /* Decoding never expands data */
+	uint8_t buf[ iscsi_large_binary_decoded_max_len ( value ) ];
 	size_t len;
 	int rc;
 
@@ -832,15 +863,8 @@ static int iscsi_handle_chap_r_value ( struct iscsi_session *iscsi,
 		      ( sizeof ( iscsi->chap_challenge ) - 1 ) );
 	chap_respond ( &iscsi->chap );
 
-	/* Check and strip leading "0x" */
-	if ( ( value[0] != '0' ) || ( value[1] != 'x' ) ) {
-		DBGC ( iscsi, "iSCSI %p saw invalid CHAP response \"%s\"\n",
-		       iscsi, value );
-		return -EPROTO_INVALID_CHAP_RESPONSE;
-	}
-
 	/* Process response */
-	rc = base16_decode ( ( value + 2 ), buf );
+	rc = iscsi_large_binary_decode ( value, buf );
 	if ( rc < 0 ) {
 		DBGC ( iscsi, "iSCSI %p invalid CHAP response \"%s\": %s\n",
 		       iscsi, value, strerror ( rc ) );
