@@ -5,14 +5,14 @@
   If a code construct is defined in the UEFI 2.1 specification it must be included
   by this include file.
 
-  Copyright (c) 2006 - 2008, Intel Corporation
-  All rights reserved. This program and the accompanying materials
-  are licensed and made available under the terms and conditions of the BSD License
-  which accompanies this distribution.  The full text of the license may be found at
-  http://opensource.org/licenses/bsd-license.php
+Copyright (c) 2006 - 2010, Intel Corporation. All rights reserved.<BR>
+This program and the accompanying materials are licensed and made available under
+the terms and conditions of the BSD License that accompanies this distribution.
+The full text of the license may be found at
+http://opensource.org/licenses/bsd-license.php.
 
-  THE PROGRAM IS DISTRIBUTED UNDER THE BSD LICENSE ON AN "AS IS" BASIS,
-  WITHOUT WARRANTIES OR REPRESENTATIONS OF ANY KIND, EITHER EXPRESS OR IMPLIED.
+THE PROGRAM IS DISTRIBUTED UNDER THE BSD LICENSE ON AN "AS IS" BASIS,
+WITHOUT WARRANTIES OR REPRESENTATIONS OF ANY KIND, EITHER EXPRESS OR IMPLIED.
 
 **/
 
@@ -26,12 +26,25 @@
 #include <ipxe/efi/Protocol/SimpleTextOut.h>
 
 ///
-/// Enumeration of memory allocation.
+/// Enumeration of EFI memory allocation types.
 ///
 typedef enum {
+  ///
+  /// Allocate any available range of pages that satisfies the request.
+  ///
   AllocateAnyPages,
+  ///
+  /// Allocate any available range of pages whose uppermost address is less than
+  /// or equal to a specified maximum address.
+  ///
   AllocateMaxAddress,
+  ///
+  /// Allocate pages at a specified address.
+  ///
   AllocateAddress,
+  ///
+  /// Maximum enumeration value that may be used for bounds checking.
+  ///
   MaxAllocateType
 } EFI_ALLOCATE_TYPE;
 
@@ -42,7 +55,7 @@ typedef enum {
 #define EFI_TIME_IN_DAYLIGHT      0x02
 
 ///
-/// Value definition for EFI_TIME.TimeZone
+/// Value definition for EFI_TIME.TimeZone.
 ///
 #define EFI_UNSPECIFIED_TIMEZONE  0x07FF
 
@@ -66,30 +79,39 @@ typedef enum {
 #define EFI_MEMORY_RUNTIME  0x8000000000000000ULL
 
 ///
-/// Memory descriptor version number
+/// Memory descriptor version number.
 ///
 #define EFI_MEMORY_DESCRIPTOR_VERSION 1
 
 ///
-/// Definition of memory descriptor
+/// Definition of an EFI memory descriptor.
 ///
 typedef struct {
+  ///
+  /// Type of the memory region.  See EFI_MEMORY_TYPE.
+  ///
   UINT32                Type;
+  ///
+  /// Physical address of the first byte of the memory region.  Must aligned
+  /// on a 4 KB boundary.
+  ///
   EFI_PHYSICAL_ADDRESS  PhysicalStart;
+  ///
+  /// Virtual address of the first byte of the memory region.  Must aligned
+  /// on a 4 KB boundary.
+  ///
   EFI_VIRTUAL_ADDRESS   VirtualStart;
+  ///
+  /// Number of 4KB pages in the memory region.
+  ///
   UINT64                NumberOfPages;
+  ///
+  /// Attributes of the memory region that describe the bit mask of capabilities
+  /// for that memory region, and not necessarily the current settings for that
+  /// memory region.
+  ///
   UINT64                Attribute;
 } EFI_MEMORY_DESCRIPTOR;
-
-///
-/// Build macros to find next EFI_MEMORY_DESCRIPTOR.
-///
-#define NEXT_MEMORY_DESCRIPTOR(_Ptr, _Size)   ((EFI_MEMORY_DESCRIPTOR *) (((UINT8 *) (_Ptr)) + (_Size)))
-
-///
-/// Declare forward referenced data structures
-///
-typedef struct _EFI_SYSTEM_TABLE   EFI_SYSTEM_TABLE;
 
 /**
   Allocates memory pages from the system.
@@ -97,7 +119,7 @@ typedef struct _EFI_SYSTEM_TABLE   EFI_SYSTEM_TABLE;
   @param  Type        The type of allocation to perform.
   @param  MemoryType  The type of memory to allocate.
   @param  Pages       The number of contiguous 4 KB pages to allocate.
-  @param  Memory      Pointer to a physical address. On input, the way in which the address is
+  @param  Memory      The pointer to a physical address. On input, the way in which the address is
                       used depends on the value of Type.
 
   @retval EFI_SUCCESS           The requested pages were allocated.
@@ -196,7 +218,7 @@ EFI_STATUS
 /**
   Returns pool memory to the system.
 
-  @param  Buffer                Pointer to the buffer to free.
+  @param  Buffer                The pointer to the buffer to free.
 
   @retval EFI_SUCCESS           The memory was returned to the system.
   @retval EFI_INVALID_PARAMETER Buffer was invalid.
@@ -306,7 +328,6 @@ EFI_STATUS
 // ConvertPointer DebugDisposition type.
 //
 #define EFI_OPTIONAL_PTR     0x00000001
-#define EFI_OPTIONAL_POINTER EFI_OPTIONAL_PTR
 
 /**
   Determines the new virtual address that is to be used on subsequent memory accesses.
@@ -356,7 +377,7 @@ EFI_STATUS
   Invoke a notification event
 
   @param  Event                 Event whose notification function is being invoked.
-  @param  Context               Pointer to the notification function's context,
+  @param  Context               The pointer to the notification function's context,
                                 which is implementation-dependent.
 
 **/
@@ -372,10 +393,10 @@ VOID
 
   @param  Type                  The type of event to create and its mode and attributes.
   @param  NotifyTpl             The task priority level of event notifications, if needed.
-  @param  NotifyFunction        Pointer to the event's notification function, if any.
-  @param  NotifyContext         Pointer to the notification function's context; corresponds to parameter
+  @param  NotifyFunction        The pointer to the event's notification function, if any.
+  @param  NotifyContext         The pointer to the notification function's context; corresponds to parameter
                                 Context in the notification function.
-  @param  Event                 Pointer to the newly created event if the call succeeds; undefined
+  @param  Event                 The pointer to the newly created event if the call succeeds; undefined
                                 otherwise.
 
   @retval EFI_SUCCESS           The event structure was created.
@@ -398,13 +419,13 @@ EFI_STATUS
 
   @param  Type                  The type of event to create and its mode and attributes.
   @param  NotifyTpl             The task priority level of event notifications,if needed.
-  @param  NotifyFunction        Pointer to the event's notification function, if any.
-  @param  NotifyContext         Pointer to the notification function's context; corresponds to parameter
+  @param  NotifyFunction        The pointer to the event's notification function, if any.
+  @param  NotifyContext         The pointer to the notification function's context; corresponds to parameter
                                 Context in the notification function.
-  @param  EventGroup            Pointer to the unique identifier of the group to which this event belongs.
+  @param  EventGroup            The pointer to the unique identifier of the group to which this event belongs.
                                 If this is NULL, then the function behaves as if the parameters were passed
                                 to CreateEvent.
-  @param  Event                 Pointer to the newly created event if the call succeeds; undefined
+  @param  Event                 The pointer to the newly created event if the call succeeds; undefined
                                 otherwise.
 
   @retval EFI_SUCCESS           The event structure was created.
@@ -427,8 +448,17 @@ EFI_STATUS
 /// Timer delay types
 ///
 typedef enum {
+  ///
+  /// An event's timer settings is to be cancelled and not trigger time is to be set/
+  ///
   TimerCancel,
+  ///
+  /// An event is to be signalled periodically at a specified interval from the current time.
+  ///
   TimerPeriodic,
+  ///
+  /// An event is to be signalled once at a specified interval from the current time.
+  ///
   TimerRelative
 } EFI_TIMER_DELAY;
 
@@ -475,7 +505,7 @@ EFI_STATUS
 
   @param  NumberOfEvents        The number of events in the Event array.
   @param  Event                 An array of EFI_EVENT.
-  @param  Index                 Pointer to the index of the event which satisfied the wait condition.
+  @param  Index                 The pointer to the index of the event which satisfied the wait condition.
 
   @retval EFI_SUCCESS           The event indicated by Index was signaled.
   @retval EFI_INVALID_PARAMETER 1) NumberOfEvents is 0.
@@ -561,8 +591,8 @@ VOID
 /**
   Returns the value of a variable.
 
-  @param  VariableName          A Null-terminated Unicode string that is the name of the
-                                vendor's variable.
+  @param  VariableName          A Null-terminated string that is the name of the vendor's
+                                variable.
   @param  VendorGuid            A unique identifier for the vendor.
   @param  Attributes            If not NULL, a pointer to the memory location to return the
                                 attributes bitmask for the variable.
@@ -597,7 +627,7 @@ EFI_STATUS
   @param  VariableNameSize      The size of the VariableName buffer.
   @param  VariableName          On input, supplies the last VariableName that was returned
                                 by GetNextVariableName(). On output, returns the Nullterminated
-                                Unicode string of the current variable.
+                                string of the current variable.
   @param  VendorGuid            On input, supplies the last VendorGuid that was returned by
                                 GetNextVariableName(). On output, returns the
                                 VendorGuid of the current variable.
@@ -622,23 +652,28 @@ EFI_STATUS
 /**
   Sets the value of a variable.
 
-  @param  VariableName          A Null-terminated Unicode string that is the name of the
-                                vendor's variable.
-  @param  VendorGuid            A unique identifier for the vendor.
-  @param  Attributes            Attributes bitmask to set for the variable.
-  @param  DataSize              The size in bytes of the Data buffer.
-  @param  Data                  The contents for the variable.
+  @param  VariableName           A Null-terminated string that is the name of the vendor's variable.
+                                 Each VariableName is unique for each VendorGuid. VariableName must
+                                 contain 1 or more characters. If VariableName is an empty string,
+                                 then EFI_INVALID_PARAMETER is returned.
+  @param  VendorGuid             A unique identifier for the vendor.
+  @param  Attributes             Attributes bitmask to set for the variable.
+  @param  DataSize               The size in bytes of the Data buffer. A size of zero causes the
+                                 variable to be deleted.
+  @param  Data                   The contents for the variable.
 
   @retval EFI_SUCCESS            The firmware has successfully stored the variable and its data as
                                  defined by the Attributes.
   @retval EFI_INVALID_PARAMETER  An invalid combination of attribute bits was supplied, or the
                                  DataSize exceeds the maximum allowed.
-  @retval EFI_INVALID_PARAMETER  VariableName is an empty Unicode string.
+  @retval EFI_INVALID_PARAMETER  VariableName is an empty string.
   @retval EFI_OUT_OF_RESOURCES   Not enough storage is available to hold the variable and its data.
   @retval EFI_DEVICE_ERROR       The variable could not be retrieved due to a hardware error.
   @retval EFI_WRITE_PROTECTED    The variable in question is read-only.
   @retval EFI_WRITE_PROTECTED    The variable in question cannot be deleted.
-  @retval EFI_SECURITY_VIOLATION The variable could not be retrieved due to an authentication failure.
+  @retval EFI_SECURITY_VIOLATION The variable could not be written due to EFI_VARIABLE_AUTHENTICATED_WRITE_ACCESS
+                                 set but the AuthInfo does NOT pass the validation check carried out
+                                 by the firmware.
   @retval EFI_NOT_FOUND          The variable trying to be updated or deleted was not found.
 
 **/
@@ -658,8 +693,27 @@ EFI_STATUS
 /// real time clock device as exposed through the EFI interfaces.
 ///
 typedef struct {
+  ///
+  /// Provides the reporting resolution of the real-time clock device in
+  /// counts per second. For a normal PC-AT CMOS RTC device, this
+  /// value would be 1 Hz, or 1, to indicate that the device only reports
+  /// the time to the resolution of 1 second.
+  ///
   UINT32    Resolution;
+  ///
+  /// Provides the timekeeping accuracy of the real-time clock in an
+  /// error rate of 1E-6 parts per million. For a clock with an accuracy
+  /// of 50 parts per million, the value in this field would be
+  /// 50,000,000.
+  ///
   UINT32    Accuracy;
+  ///
+  /// A TRUE indicates that a time set operation clears the device's
+  /// time below the Resolution reporting level. A FALSE
+  /// indicates that the state below the Resolution level of the
+  /// device is not cleared when the time is set. Normal PC-AT CMOS
+  /// RTC devices set this value to FALSE.
+  ///
   BOOLEAN   SetsToZero;
 } EFI_TIME_CAPABILITIES;
 
@@ -744,25 +798,6 @@ EFI_STATUS
   );
 
 /**
-  This is the declaration of an EFI image entry point. This entry point is
-  the same for UEFI Applications, UEFI OS Loaders, and UEFI Drivers including
-  both device drivers and bus drivers.
-
-  @param  ImageHandle           The firmware allocated handle for the UEFI image.
-  @param  SystemTable           A pointer to the EFI System Table.
-
-  @retval EFI_SUCCESS           The operation completed successfully.
-  @retval EFI_OUT_OF_RESOURCES  The request could not be completed due to a lack of resources.
-
-**/
-typedef
-EFI_STATUS
-(EFIAPI *EFI_IMAGE_ENTRY_POINT)(
-  IN  EFI_HANDLE                   ImageHandle,
-  IN  EFI_SYSTEM_TABLE             *SystemTable
-  );
-
-/**
   Loads an EFI image into memory.
 
   @param  BootPolicy            If TRUE, indicates that the request originates from the boot
@@ -775,7 +810,7 @@ EFI_STATUS
   @param  SourceBuffer          If not NULL, a pointer to the memory location containing a copy
                                 of the image to be loaded.
   @param  SourceSize            The size in bytes of SourceBuffer. Ignored if SourceBuffer is NULL.
-  @param  ImageHandle           Pointer to the returned image handle that is created when the
+  @param  ImageHandle           The pointer to the returned image handle that is created when the
                                 image is successfully loaded.
 
   @retval EFI_SUCCESS           Image was loaded into memory correctly.
@@ -803,12 +838,12 @@ EFI_STATUS
   Transfers control to a loaded image's entry point.
 
   @param  ImageHandle           Handle of image to be started.
-  @param  ExitDataSize          Pointer to the size, in bytes, of ExitData.
-  @param  ExitData              Pointer to a pointer to a data buffer that includes a Null-terminated
-                                Unicode string, optionally followed by additional binary data.
+  @param  ExitDataSize          The pointer to the size, in bytes, of ExitData.
+  @param  ExitData              The pointer to a pointer to a data buffer that includes a Null-terminated
+                                string, optionally followed by additional binary data.
 
   @retval EFI_INVALID_PARAMETER ImageHandle is either an invalid image handle or the image
-                                has already been initialized with StartImage
+                                has already been initialized with StartImage.
   @return Exit code from image
 
 **/
@@ -823,11 +858,16 @@ EFI_STATUS
 /**
   Terminates a loaded EFI image and returns control to boot services.
 
-  @param  ImageHandle           Handle that identifies the image.
+  @param  ImageHandle           Handle that identifies the image. This parameter is passed to the
+                                image on entry.
   @param  ExitStatus            The image's exit code.
-  @param  ExitDataSize          The size, in bytes, of ExitData.
-  @param  ExitData              Pointer to a data buffer that includes a Null-terminated Unicode string,
-                                optionally followed by additional binary data.
+  @param  ExitDataSize          The size, in bytes, of ExitData. Ignored if ExitStatus is EFI_SUCCESS.
+  @param  ExitData              The pointer to a data buffer that includes a Null-terminated string,
+                                optionally followed by additional binary data. The string is a
+                                description that the caller may use to further indicate the reason
+                                for the image's exit. ExitData is only valid if ExitStatus
+                                is something other than EFI_SUCCESS. The ExitData buffer
+                                must be allocated by calling AllocatePool().
 
   @retval EFI_SUCCESS           The image specified by ImageHandle was unloaded.
   @retval EFI_INVALID_PARAMETER The image specified by ImageHandle has been loaded and
@@ -851,8 +891,6 @@ EFI_STATUS
 
   @retval EFI_SUCCESS           The image has been unloaded.
   @retval EFI_INVALID_PARAMETER ImageHandle is not a valid image handle.
-  @retval EFI_UNSUPPORTED       The image has been started, and does not support unload.
-  @return Exit code from the image's unload handler
 
 **/
 typedef
@@ -899,13 +937,13 @@ EFI_STATUS
   @param  Timeout               The number of seconds to set the watchdog timer to.
   @param  WatchdogCode          The numeric code to log on a watchdog timer timeout event.
   @param  DataSize              The size, in bytes, of WatchdogData.
-  @param  WatchdogData          A data buffer that includes a Null-terminated Unicode string, optionally
+  @param  WatchdogData          A data buffer that includes a Null-terminated string, optionally
                                 followed by additional binary data.
 
   @retval EFI_SUCCESS           The timeout has been set.
   @retval EFI_INVALID_PARAMETER The supplied WatchdogCode is invalid.
   @retval EFI_UNSUPPORTED       The system does not have a watchdog timer.
-  @retval EFI_DEVICE_ERROR      The watch dog timer could not be programmed due to a hardware
+  @retval EFI_DEVICE_ERROR      The watchdog timer could not be programmed due to a hardware
                                 error.
 
 **/
@@ -922,10 +960,25 @@ EFI_STATUS
 /// Enumeration of reset types.
 ///
 typedef enum {
+  ///
+  /// Used to induce a system-wide reset. This sets all circuitry within the
+  /// system to its initial state.  This type of reset is asynchronous to system
+  /// operation and operates withgout regard to cycle boundaries.  EfiColdReset
+  /// is tantamount to a system power cycle.
+  ///
   EfiResetCold,
+  ///
+  /// Used to induce a system-wide initialization. The processors are set to their
+  /// initial state, and pending cycles are not corrupted.  If the system does
+  /// not support this reset type, then an EfiResetCold must be performed.
+  ///
   EfiResetWarm,
-  EfiResetShutdown,
-  EfiResetUpdate
+  ///
+  /// Used to induce an entry into a power state equivalent to the ACPI G2/S5 or G3
+  /// state.  If the system does not support this reset type, then when the system
+  /// is rebooted, it should exhibit the EfiResetCold attributes.
+  ///
+  EfiResetShutdown
 } EFI_RESET_TYPE;
 
 /**
@@ -936,7 +989,7 @@ typedef enum {
   @param  DataSize              The size, in bytes, of WatchdogData.
   @param  ResetData             For a ResetType of EfiResetCold, EfiResetWarm, or
                                 EfiResetShutdown the data buffer starts with a Null-terminated
-                                Unicode string, optionally followed by additional binary data.
+                                string, optionally followed by additional binary data.
 
 **/
 typedef
@@ -945,13 +998,13 @@ VOID
   IN EFI_RESET_TYPE           ResetType,
   IN EFI_STATUS               ResetStatus,
   IN UINTN                    DataSize,
-  IN CHAR16                   *ResetData OPTIONAL
+  IN VOID                     *ResetData OPTIONAL
   );
 
 /**
   Returns a monotonically increasing count for the platform.
 
-  @param  Count                 Pointer to returned value.
+  @param  Count                 The pointer to returned value.
 
   @retval EFI_SUCCESS           The next monotonic count was returned.
   @retval EFI_INVALID_PARAMETER Count is NULL.
@@ -967,7 +1020,7 @@ EFI_STATUS
 /**
   Returns the next high 32 bits of the platform's monotonic counter.
 
-  @param  HighCount             Pointer to returned value.
+  @param  HighCount             The pointer to returned value.
 
   @retval EFI_SUCCESS           The next high monotonic count was returned.
   @retval EFI_INVALID_PARAMETER HighCount is NULL.
@@ -1006,8 +1059,8 @@ EFI_STATUS
 /**
   Copies the contents of one buffer to another buffer.
 
-  @param  Destination           Pointer to the destination buffer of the memory copy.
-  @param  Source                Pointer to the source buffer of the memory copy.
+  @param  Destination           The pointer to the destination buffer of the memory copy.
+  @param  Source                The pointer to the source buffer of the memory copy.
   @param  Length                Number of bytes to copy from Source to Destination.
 
 **/
@@ -1022,7 +1075,7 @@ VOID
 /**
   The SetMem() function fills a buffer with a specified value.
 
-  @param  Buffer                Pointer to the buffer to fill.
+  @param  Buffer                The pointer to the buffer to fill.
   @param  Size                  Number of bytes in Buffer to fill.
   @param  Value                 Value to fill Buffer with.
 
@@ -1035,11 +1088,13 @@ VOID
   IN UINT8    Value
   );
 
-
-//
-// Protocol handler functions
-//
+///
+/// Enumeration of EFI Interface Types
+///
 typedef enum {
+  ///
+  /// Indicates that the supplied protocol interface is supplied in native form.
+  ///
   EFI_NATIVE_INTERFACE
 } EFI_INTERFACE_TYPE;
 
@@ -1262,7 +1317,9 @@ EFI_STATUS
   IN EFI_HANDLE               ControllerHandle
   );
 
-
+///
+/// EFI Oprn Protocol Information Entry
+///
 typedef struct {
   EFI_HANDLE  AgentHandle;
   EFI_HANDLE  ControllerHandle;
@@ -1346,10 +1403,22 @@ EFI_STATUS
   OUT VOID                     **Registration
   );
 
-
+///
+/// Enumeration of EFI Locate Search Types
+///
 typedef enum {
+  ///
+  /// Retrieve all the handles in the handle database.
+  ///
   AllHandles,
+  ///
+  /// Retrieve the next handle fron a RegisterProtocolNotify() event.
+  ///
   ByRegisterNotify,
+  ///
+  /// Retrieve the set of handles from the handle database that support a
+  /// specified protocol.
+  ///
   ByProtocol
 } EFI_LOCATE_SEARCH_TYPE;
 
@@ -1429,7 +1498,6 @@ EFI_STATUS
   IN VOID                     *Table
   );
 
-
 /**
   Returns an array of handles that support the requested protocol in a buffer allocated from pool.
 
@@ -1483,33 +1551,75 @@ EFI_STATUS
   OUT VOID      **Interface
   );
 
+///
+/// EFI Capsule Block Descriptor
+///
 typedef struct {
-  UINT64                            Length;
+  ///
+  /// Length in bytes of the data pointed to by DataBlock/ContinuationPointer.
+  ///
+  UINT64                  Length;
   union {
+    ///
+    /// Physical address of the data block. This member of the union is
+    /// used if Length is not equal to zero.
+    ///
     EFI_PHYSICAL_ADDRESS  DataBlock;
+    ///
+    /// Physical address of another block of
+    /// EFI_CAPSULE_BLOCK_DESCRIPTOR structures. This
+    /// member of the union is used if Length is equal to zero. If
+    /// ContinuationPointer is zero this entry represents the end of the list.
+    ///
     EFI_PHYSICAL_ADDRESS  ContinuationPointer;
   } Union;
 } EFI_CAPSULE_BLOCK_DESCRIPTOR;
 
+///
+/// EFI Capsule Header.
+///
 typedef struct {
+  ///
+  /// A GUID that defines the contents of a capsule.
+  ///
   EFI_GUID          CapsuleGuid;
+  ///
+  /// The size of the capsule header. This may be larger than the size of
+  /// the EFI_CAPSULE_HEADER since CapsuleGuid may imply
+  /// extended header entries
+  ///
   UINT32            HeaderSize;
+  ///
+  /// Bit-mapped list describing the capsule attributes. The Flag values
+  /// of 0x0000 - 0xFFFF are defined by CapsuleGuid. Flag values
+  /// of 0x10000 - 0xFFFFFFFF are defined by this specification
+  ///
   UINT32            Flags;
+  ///
+  /// Size in bytes of the capsule.
+  ///
   UINT32            CapsuleImageSize;
 } EFI_CAPSULE_HEADER;
 
-//
-// The EFI System Table entry must point to an array of capsules
-// that contain the same CapsuleGuid value. The array must be
-// prefixed by a UINT32 that represents the size of the array of capsules.
-//
+///
+/// The EFI System Table entry must point to an array of capsules
+/// that contain the same CapsuleGuid value. The array must be
+/// prefixed by a UINT32 that represents the size of the array of capsules.
+///
 typedef struct {
+  ///
+  /// the size of the array of capsules.
+  ///
   UINT32   CapsuleArrayNumber;
+  ///
+  /// Point to an array of capsules that contain the same CapsuleGuid value.
+  ///
   VOID*    CapsulePtr[1];
 } EFI_CAPSULE_TABLE;
 
 #define CAPSULE_FLAGS_PERSIST_ACROSS_RESET          0x00010000
 #define CAPSULE_FLAGS_POPULATE_SYSTEM_TABLE         0x00020000
+#define CAPSULE_FLAGS_INITIATE_RESET                0x00040000
 
 /**
   Passes capsules to the firmware with both virtual and physical mapping. Depending on the intended
@@ -1529,8 +1639,10 @@ typedef struct {
   @retval EFI_SUCCESS           Valid capsule was passed. If
                                 CAPSULE_FLAGS_PERSIT_ACROSS_RESET is not set, the
                                 capsule has been successfully processed by the firmware.
+  @retval EFI_INVALID_PARAMETER CapsuleSize is NULL, or an incompatible set of flags were
+                                set in the capsule header.
+  @retval EFI_INVALID_PARAMETER CapsuleCount is 0.
   @retval EFI_DEVICE_ERROR      The capsule update was started, but failed due to a device error.
-  @retval EFI_INVALID_PARAMETER CapsuleSize is NULL.
   @retval EFI_UNSUPPORTED       The capsule type is not supported on this platform.
   @retval EFI_OUT_OF_RESOURCES  There were insufficient resources to process the capsule.
 
@@ -1606,18 +1718,20 @@ EFI_STATUS
 //
 // EFI Runtime Services Table
 //
-#define EFI_SYSTEM_TABLE_SIGNATURE      0x5453595320494249ULL
-#define EFI_SYSTEM_TABLE_REVISION       ((2<<16) | (10))
-#define EFI_2_10_SYSTEM_TABLE_REVISION  ((2<<16) | (10))
-#define EFI_2_00_SYSTEM_TABLE_REVISION  ((2<<16) | (00))
-#define EFI_1_10_SYSTEM_TABLE_REVISION  ((1<<16) | (10))
-#define EFI_1_02_SYSTEM_TABLE_REVISION  ((1<<16) | (02))
+#define EFI_SYSTEM_TABLE_SIGNATURE      SIGNATURE_64 ('I','B','I',' ','S','Y','S','T')
+#define EFI_2_30_SYSTEM_TABLE_REVISION  ((2 << 16) | (30))
+#define EFI_2_20_SYSTEM_TABLE_REVISION  ((2 << 16) | (20))
+#define EFI_2_10_SYSTEM_TABLE_REVISION  ((2 << 16) | (10))
+#define EFI_2_00_SYSTEM_TABLE_REVISION  ((2 << 16) | (00))
+#define EFI_1_10_SYSTEM_TABLE_REVISION  ((1 << 16) | (10))
+#define EFI_1_02_SYSTEM_TABLE_REVISION  ((1 << 16) | (02))
+#define EFI_SYSTEM_TABLE_REVISION       EFI_2_30_SYSTEM_TABLE_REVISION
 
-#define EFI_RUNTIME_SERVICES_SIGNATURE  0x56524553544e5552ULL
-#define EFI_RUNTIME_SERVICES_REVISION   EFI_2_10_SYSTEM_TABLE_REVISION
+#define EFI_RUNTIME_SERVICES_SIGNATURE  SIGNATURE_64 ('R','U','N','T','S','E','R','V')
+#define EFI_RUNTIME_SERVICES_REVISION   EFI_2_30_SYSTEM_TABLE_REVISION
 
 ///
-/// EFI Runtime Services Table
+/// EFI Runtime Services Table.
 ///
 typedef struct {
   ///
@@ -1665,11 +1779,11 @@ typedef struct {
 } EFI_RUNTIME_SERVICES;
 
 
-#define EFI_BOOT_SERVICES_SIGNATURE   0x56524553544f4f42ULL
-#define EFI_BOOT_SERVICES_REVISION    EFI_2_10_SYSTEM_TABLE_REVISION
+#define EFI_BOOT_SERVICES_SIGNATURE   SIGNATURE_64 ('B','O','O','T','S','E','R','V')
+#define EFI_BOOT_SERVICES_REVISION    EFI_2_30_SYSTEM_TABLE_REVISION
 
 ///
-/// EFI Boot Services Table
+/// EFI Boot Services Table.
 ///
 typedef struct {
   ///
@@ -1770,7 +1884,7 @@ typedef struct {
 /// Contains a set of GUID/pointer pairs comprised of the ConfigurationTable field in the
 /// EFI System Table.
 ///
-typedef struct{
+typedef struct {
   ///
   /// The 128-bit GUID value that uniquely identifies the system configuration table.
   ///
@@ -1784,14 +1898,14 @@ typedef struct{
 ///
 /// EFI System Table
 ///
-struct _EFI_SYSTEM_TABLE {
+typedef struct {
   ///
   /// The table header for the EFI System Table.
   ///
   EFI_TABLE_HEADER                  Hdr;
   ///
-  /// A pointer to a null terminated Unicode string that identifies
-  /// the vendor that produces the system firmware for the platform.
+  /// A pointer to a null terminated string that identifies the vendor
+  /// that produces the system firmware for the platform.
   ///
   CHAR16                            *FirmwareVendor;
   ///
@@ -1800,11 +1914,12 @@ struct _EFI_SYSTEM_TABLE {
   ///
   UINT32                            FirmwareRevision;
   ///
-  /// The handle for the active console input device.
+  /// The handle for the active console input device. This handle must support
+  /// EFI_SIMPLE_TEXT_INPUT_PROTOCOL and EFI_SIMPLE_TEXT_INPUT_EX_PROTOCOL.
   ///
   EFI_HANDLE                        ConsoleInHandle;
   ///
-  /// A pointer to the SIMPLE_INPUT_PROTOCOL interface that is
+  /// A pointer to the EFI_SIMPLE_TEXT_INPUT_PROTOCOL interface that is
   /// associated with ConsoleInHandle.
   ///
   EFI_SIMPLE_TEXT_INPUT_PROTOCOL    *ConIn;
@@ -1813,16 +1928,17 @@ struct _EFI_SYSTEM_TABLE {
   ///
   EFI_HANDLE                        ConsoleOutHandle;
   ///
-  /// A pointer to the SIMPLE_TEXT_OUTPUT_PROTOCOL interface
+  /// A pointer to the EFI_SIMPLE_TEXT_OUTPUT_PROTOCOL interface
   /// that is associated with ConsoleOutHandle.
   ///
   EFI_SIMPLE_TEXT_OUTPUT_PROTOCOL   *ConOut;
   ///
   /// The handle for the active standard error console device.
+  /// This handle must support the EFI_SIMPLE_TEXT_OUTPUT_PROTOCOL.
   ///
   EFI_HANDLE                        StandardErrorHandle;
   ///
-  /// A pointer to the SIMPLE_TEXT_OUTPUT_PROTOCOL interface
+  /// A pointer to the EFI_SIMPLE_TEXT_OUTPUT_PROTOCOL interface
   /// that is associated with StandardErrorHandle.
   ///
   EFI_SIMPLE_TEXT_OUTPUT_PROTOCOL   *StdErr;
@@ -1843,7 +1959,25 @@ struct _EFI_SYSTEM_TABLE {
   /// The number of entries in the table is NumberOfTableEntries.
   ///
   EFI_CONFIGURATION_TABLE           *ConfigurationTable;
-};
+} EFI_SYSTEM_TABLE;
+
+/**
+  This is the declaration of an EFI image entry point. This entry point is
+  the same for UEFI Applications, UEFI OS Loaders, and UEFI Drivers including
+  both device drivers and bus drivers.
+
+  @param  ImageHandle           The firmware allocated handle for the UEFI image.
+  @param  SystemTable           A pointer to the EFI System Table.
+
+  @retval EFI_SUCCESS           The operation completed successfully.
+  @retval Others                An unexpected error occurred.
+**/
+typedef
+EFI_STATUS
+(EFIAPI *EFI_IMAGE_ENTRY_POINT)(
+  IN  EFI_HANDLE                   ImageHandle,
+  IN  EFI_SYSTEM_TABLE             *SystemTable
+  );
 
 //
 // EFI Load Options Attributes
@@ -1860,36 +1994,76 @@ struct _EFI_SYSTEM_TABLE {
 #define EFI_BOOT_OPTION_SUPPORT_APP   0x00000002
 #define EFI_BOOT_OPTION_SUPPORT_COUNT 0x00000300
 
+///
+/// EFI Boot Key Data
+///
 typedef union {
   struct {
+    ///
+    /// Indicates the revision of the EFI_KEY_OPTION structure. This revision level should be 0.
+    ///
     UINT32  Revision        : 8;
+    ///
+    /// Either the left or right Shift keys must be pressed (1) or must not be pressed (0).
+    ///
     UINT32  ShiftPressed    : 1;
+    ///
+    /// Either the left or right Control keys must be pressed (1) or must not be pressed (0).
+    ///
     UINT32  ControlPressed  : 1;
+    ///
+    /// Either the left or right Alt keys must be pressed (1) or must not be pressed (0).
+    ///
     UINT32  AltPressed      : 1;
+    ///
+    /// Either the left or right Logo keys must be pressed (1) or must not be pressed (0).
+    ///
     UINT32  LogoPressed     : 1;
+    ///
+    /// The Menu key must be pressed (1) or must not be pressed (0).
+    ///
     UINT32  MenuPressed     : 1;
-    UINT32  SysReqPessed    : 1;
+    ///
+    /// The SysReq key must be pressed (1) or must not be pressed (0).
+    ///
+    UINT32  SysReqPressed    : 1;
     UINT32  Reserved        : 16;
+    ///
+    /// Specifies the actual number of entries in EFI_KEY_OPTION.Keys, from 0-3. If
+    /// zero, then only the shift state is considered. If more than one, then the boot option will
+    /// only be launched if all of the specified keys are pressed with the same shift state.
+    ///
     UINT32  InputKeyCount   : 2;
   } Options;
   UINT32  PackedValue;
-} HOT_KEY_EFI_KEY_DATA;
+} EFI_BOOT_KEY_DATA;
 
+///
+/// EFI Key Option.
+///
 typedef struct {
-  HOT_KEY_EFI_KEY_DATA  KeyOptions;
-  UINT32                BootOptionCrc;
-  UINT16                BootOption;
-//EFI_INPUT_KEY         Keys[];
+  ///
+  /// Specifies options about how the key will be processed.
+  ///
+  EFI_BOOT_KEY_DATA  KeyData;
+  ///
+  /// The CRC-32 which should match the CRC-32 of the entire EFI_LOAD_OPTION to
+  /// which BootOption refers. If the CRC-32s do not match this value, then this key
+  /// option is ignored.
+  ///
+  UINT32             BootOptionCrc;
+  ///
+  /// The Boot#### option which will be invoked if this key is pressed and the boot option
+  /// is active (LOAD_OPTION_ACTIVE is set).
+  ///
+  UINT16             BootOption;
+  ///
+  /// The key codes to compare against those returned by the
+  /// EFI_SIMPLE_TEXT_INPUT and EFI_SIMPLE_TEXT_INPUT_EX protocols.
+  /// The number of key codes (0-3) is specified by the EFI_KEY_CODE_COUNT field in KeyOptions.
+  ///
+  //EFI_INPUT_KEY      Keys[];
 } EFI_KEY_OPTION;
-
-#define EFI_KEY_OPTION_SHIFT     0x00000001
-#define EFI_KEY_OPTION_CONTROL   0x00000002
-#define EFI_KEY_OPTION_ALT       0x00000004
-#define EFI_KEY_OPTION_LOGO      0x00000008
-#define EFI_KEY_OPTION_MENU      0x00000010
-#define EFI_KEY_OPTION_SYSREQ    0x00000020
-#define EFI_KEY_CODE_COUNT       0x00000300
-
 
 //
 // EFI File location to boot from on removable media devices
@@ -1897,6 +2071,7 @@ typedef struct {
 #define EFI_REMOVABLE_MEDIA_FILE_NAME_IA32    L"\\EFI\\BOOT\\BOOTIA32.EFI"
 #define EFI_REMOVABLE_MEDIA_FILE_NAME_IA64    L"\\EFI\\BOOT\\BOOTIA64.EFI"
 #define EFI_REMOVABLE_MEDIA_FILE_NAME_X64     L"\\EFI\\BOOT\\BOOTX64.EFI"
+#define EFI_REMOVABLE_MEDIA_FILE_NAME_ARM     L"\\EFI\\BOOT\\BOOTARM.EFI"
 
 #if   defined (MDE_CPU_IA32)
   #define EFI_REMOVABLE_MEDIA_FILE_NAME   EFI_REMOVABLE_MEDIA_FILE_NAME_IA32
@@ -1905,6 +2080,8 @@ typedef struct {
 #elif defined (MDE_CPU_X64)
   #define EFI_REMOVABLE_MEDIA_FILE_NAME   EFI_REMOVABLE_MEDIA_FILE_NAME_X64
 #elif defined (MDE_CPU_EBC)
+#elif defined (MDE_CPU_ARM)
+  #define EFI_REMOVABLE_MEDIA_FILE_NAME   EFI_REMOVABLE_MEDIA_FILE_NAME_ARM
 #else
   #error Unknown Processor Type
 #endif

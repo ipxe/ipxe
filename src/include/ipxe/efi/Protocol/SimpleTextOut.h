@@ -3,17 +3,17 @@
 
   Abstraction of a very simple text based output device like VGA text mode or
   a serial terminal. The Simple Text Out protocol instance can represent
-  a single hardware device or a virtual device that is an agregation
+  a single hardware device or a virtual device that is an aggregation
   of multiple physical devices.
 
-  Copyright (c) 2006 - 2008, Intel Corporation
-  All rights reserved. This program and the accompanying materials
-  are licensed and made available under the terms and conditions of the BSD License
-  which accompanies this distribution.  The full text of the license may be found at
-  http://opensource.org/licenses/bsd-license.php
+Copyright (c) 2006 - 2010, Intel Corporation. All rights reserved.<BR>
+This program and the accompanying materials are licensed and made available under
+the terms and conditions of the BSD License that accompanies this distribution.
+The full text of the license may be found at
+http://opensource.org/licenses/bsd-license.php.
 
-  THE PROGRAM IS DISTRIBUTED UNDER THE BSD LICENSE ON AN "AS IS" BASIS,
-  WITHOUT WARRANTIES OR REPRESENTATIONS OF ANY KIND, EITHER EXPRESS OR IMPLIED.
+THE PROGRAM IS DISTRIBUTED UNDER THE BSD LICENSE ON AN "AS IS" BASIS,
+WITHOUT WARRANTIES OR REPRESENTATIONS OF ANY KIND, EITHER EXPRESS OR IMPLIED.
 
 **/
 
@@ -137,18 +137,18 @@ typedef EFI_SIMPLE_TEXT_OUTPUT_PROTOCOL   SIMPLE_TEXT_OUTPUT_INTERFACE;
 
 //
 // We currently define attributes from 0 - 7F for color manipulations
-// To internally handle the local display characteristics for a particular character, we are defining
-// Bit 7 to signify the local glyph representation for a character.  If turned on, glyphs will be
+// To internally handle the local display characteristics for a particular character,
+// Bit 7 signifies the local glyph representation for a character.  If turned on, glyphs will be
 // pulled from the wide glyph database and will display locally as a wide character (16 X 19 versus 8 X 19)
 // If bit 7 is off, the narrow glyph database will be used.  This does NOT affect information that is sent to
-// non-local displays (e.g. serial or LAN consoles).
+// non-local displays, such as serial or LAN consoles.
 //
 #define EFI_WIDE_ATTRIBUTE  0x80
 
 /**
   Reset the text output device hardware and optionaly run diagnostics
 
-  @param  This                 Protocol instance pointer.
+  @param  This                 The protocol instance pointer.
   @param  ExtendedVerification Driver may perform more exhaustive verfication
                                operation of the device during reset.
 
@@ -165,12 +165,12 @@ EFI_STATUS
   );
 
 /**
-  Write a Unicode string to the output device.
+  Write a string to the output device.
 
-  @param  This   Protocol instance pointer.
-  @param  String The NULL-terminated Unicode string to be displayed on the output
+  @param  This   The protocol instance pointer.
+  @param  String The NULL-terminated string to be displayed on the output
                  device(s). All output devices must also support the Unicode
-                 drawing defined in this file.
+                 drawing character codes defined in this file.
 
   @retval EFI_SUCCESS             The string was output to the device.
   @retval EFI_DEVICE_ERROR        The device reported an error while attempting to output
@@ -178,7 +178,7 @@ EFI_STATUS
   @retval EFI_UNSUPPORTED         The output device's mode is not currently in a
                                   defined text mode.
   @retval EFI_WARN_UNKNOWN_GLYPH  This warning code indicates that some of the
-                                  characters in the Unicode string could not be
+                                  characters in the string could not be
                                   rendered and were skipped.
 
 **/
@@ -190,15 +190,15 @@ EFI_STATUS
   );
 
 /**
-  Verifies that all characters in a Unicode string can be output to the
+  Verifies that all characters in a string can be output to the
   target device.
 
-  @param  This   Protocol instance pointer.
-  @param  String The NULL-terminated Unicode string to be examined for the output
+  @param  This   The protocol instance pointer.
+  @param  String The NULL-terminated string to be examined for the output
                  device(s).
 
   @retval EFI_SUCCESS      The device(s) are capable of rendering the output string.
-  @retval EFI_UNSUPPORTED  Some of the characters in the Unicode string cannot be
+  @retval EFI_UNSUPPORTED  Some of the characters in the string cannot be
                            rendered by one or more of the output devices mapped
                            by the EFI handle.
 
@@ -214,7 +214,7 @@ EFI_STATUS
   Returns information for an available text mode that the output device(s)
   supports.
 
-  @param  This       Protocol instance pointer.
+  @param  This       The protocol instance pointer.
   @param  ModeNumber The mode number to return information on.
   @param  Columns    Returns the geometry of the text output device for the
                      requested ModeNumber.
@@ -238,7 +238,7 @@ EFI_STATUS
 /**
   Sets the output device(s) to a specified mode.
 
-  @param  This       Protocol instance pointer.
+  @param  This       The protocol instance pointer.
   @param  ModeNumber The mode number to set.
 
   @retval EFI_SUCCESS      The requested text mode was set.
@@ -257,14 +257,14 @@ EFI_STATUS
   Sets the background and foreground colors for the OutputString () and
   ClearScreen () functions.
 
-  @param  This      Protocol instance pointer.
+  @param  This      The protocol instance pointer.
   @param  Attribute The attribute to set. Bits 0..3 are the foreground color, and
                     bits 4..6 are the background color. All other bits are undefined
                     and must be zero. The valid Attributes are defined in this file.
 
-  @retval EFI_SUCCESS     The attribute was set.
-  @retval EFI_DEVICE_     ERROR The device had an error and could not complete the request.
-  @retval EFI_UNSUPPORTED The attribute requested is not defined.
+  @retval EFI_SUCCESS       The attribute was set.
+  @retval EFI_DEVICE_ERROR  The device had an error and could not complete the request.
+  @retval EFI_UNSUPPORTED   The attribute requested is not defined.
 
 **/
 typedef
@@ -278,7 +278,7 @@ EFI_STATUS
   Clears the output device(s) display to the currently selected background
   color.
 
-  @param  This              Protocol instance pointer.
+  @param  This              The protocol instance pointer.
 
   @retval  EFI_SUCCESS      The operation completed successfully.
   @retval  EFI_DEVICE_ERROR The device had an error and could not complete the request.
@@ -294,7 +294,7 @@ EFI_STATUS
 /**
   Sets the current coordinates of the cursor position
 
-  @param  This        Protocol instance pointer.
+  @param  This        The protocol instance pointer.
   @param  Column      The position to set the cursor to. Must be greater than or
                       equal to zero and less than the number of columns and rows
                       by QueryMode ().
@@ -319,7 +319,7 @@ EFI_STATUS
 /**
   Makes the cursor visible or invisible
 
-  @param  This    Protocol instance pointer.
+  @param  This    The protocol instance pointer.
   @param  Visible If TRUE, the cursor is set to be visible. If FALSE, the cursor is
                   set to be invisible.
 
@@ -340,36 +340,36 @@ EFI_STATUS
 /**
   @par Data Structure Description:
   Mode Structure pointed to by Simple Text Out protocol.
-
-  @param MaxMode
-  The number of modes supported by QueryMode () and SetMode ().
-
-  @param Mode
-  The text mode of the output device(s).
-
-  @param Attribute
-  The current character output attribute
-
-  @param CursorColumn
-  The cursor's column.
-
-  @param CursorRow
-  The cursor's row.
-
-  @param CursorVisible
-  The cursor is currently visbile or not.
-
 **/
 typedef struct {
+  ///
+  /// The number of modes supported by QueryMode () and SetMode ().
+  ///
   INT32   MaxMode;
 
   //
   // current settings
   //
+
+  ///
+  /// The text mode of the output device(s).
+  ///
   INT32   Mode;
+  ///
+  /// The current character output attribute.
+  ///
   INT32   Attribute;
+  ///
+  /// The cursor's column.
+  ///
   INT32   CursorColumn;
+  ///
+  /// The cursor's row.
+  ///
   INT32   CursorRow;
+  ///
+  /// The cursor is currently visbile or not.
+  ///
   BOOLEAN CursorVisible;
 } EFI_SIMPLE_TEXT_OUTPUT_MODE;
 

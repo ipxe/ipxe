@@ -1,11 +1,11 @@
 /** @file
-  Simple Text In protocol from the UEFI 2.0 specification.
+  Simple Text Input protocol from the UEFI 2.0 specification.
 
   Abstraction of a very simple input device like a keyboard or serial
   terminal.
 
-  Copyright (c) 2006 - 2008, Intel Corporation
-  All rights reserved. This program and the accompanying materials
+  Copyright (c) 2006 - 2009, Intel Corporation. All rights reserved.<BR>
+  This program and the accompanying materials
   are licensed and made available under the terms and conditions of the BSD License
   which accompanies this distribution.  The full text of the license may be found at
   http://opensource.org/licenses/bsd-license.php
@@ -18,27 +18,26 @@
 #ifndef __SIMPLE_TEXT_IN_PROTOCOL_H__
 #define __SIMPLE_TEXT_IN_PROTOCOL_H__
 
-#include <ipxe/efi/ProcessorBind.h>
-
 #define EFI_SIMPLE_TEXT_INPUT_PROTOCOL_GUID \
   { \
     0x387477c1, 0x69c7, 0x11d2, {0x8e, 0x39, 0x0, 0xa0, 0xc9, 0x69, 0x72, 0x3b } \
   }
 
-///
-/// Protocol GUID defined in EFI1.1.
-///
-#define SIMPLE_INPUT_PROTOCOL   EFI_SIMPLE_TEXT_INPUT_PROTOCOL_GUID
-
 typedef struct _EFI_SIMPLE_TEXT_INPUT_PROTOCOL  EFI_SIMPLE_TEXT_INPUT_PROTOCOL;
 
 ///
-/// Backward-compatible with EFI1.1.
+/// Protocol GUID name defined in EFI1.1.
+///
+#define SIMPLE_INPUT_PROTOCOL   EFI_SIMPLE_TEXT_INPUT_PROTOCOL_GUID
+
+///
+/// Protocol name in EFI1.1 for backward-compatible.
 ///
 typedef struct _EFI_SIMPLE_TEXT_INPUT_PROTOCOL  SIMPLE_INPUT_INTERFACE;
-//
-// Data structures
-//
+
+///
+/// The keystroke information for the key that was pressed.
+///
 typedef struct {
   UINT16  ScanCode;
   CHAR16  UnicodeChar;
@@ -82,7 +81,7 @@ typedef struct {
 #define SCAN_ESC        0x0017
 
 /**
-  Reset the input device and optionaly run diagnostics
+  Reset the input device and optionally run diagnostics
 
   @param  This                 Protocol instance pointer.
   @param  ExtendedVerification Driver may perform diagnostics on reset.
@@ -100,14 +99,14 @@ EFI_STATUS
 
 /**
   Reads the next keystroke from the input device. The WaitForKey Event can
-  be used to test for existance of a keystroke via WaitForEvent () call.
+  be used to test for existence of a keystroke via WaitForEvent () call.
 
   @param  This Protocol instance pointer.
   @param  Key  Driver may perform diagnostics on reset.
 
   @retval EFI_SUCCESS      The keystroke information was returned.
-  @retval EFI_NOT_READY    There was no keystroke data availiable.
-  @retval EFI_DEVICE_ERROR The keydtroke information was not returned due to
+  @retval EFI_NOT_READY    There was no keystroke data available.
+  @retval EFI_DEVICE_ERROR The keystroke information was not returned due to
                            hardware errors.
 
 **/

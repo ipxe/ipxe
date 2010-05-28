@@ -3,8 +3,8 @@
 
   This code abstracts the DXE core from processor implementation details.
 
-  Copyright (c) 2006 - 2008, Intel Corporation
-  All rights reserved. This program and the accompanying materials
+  Copyright (c) 2006 - 2008, Intel Corporation. All rights reserved.<BR>
+  This program and the accompanying materials
   are licensed and made available under the terms and conditions of the BSD License
   which accompanies this distribution.  The full text of the license may be found at
   http://opensource.org/licenses/bsd-license.php
@@ -24,6 +24,9 @@
 
 typedef struct _EFI_CPU_ARCH_PROTOCOL   EFI_CPU_ARCH_PROTOCOL;
 
+///
+/// The type of flush operation
+///
 typedef enum {
   EfiCpuFlushTypeWriteBackInvalidate,
   EfiCpuFlushTypeWriteBack,
@@ -31,6 +34,9 @@ typedef enum {
   EfiCpuMaxFlushType
 } EFI_CPU_FLUSH_TYPE;
 
+///
+/// The type of processor INIT.
+///
 typedef enum {
   EfiCpuInit,
   EfiCpuMaxInitType
@@ -206,7 +212,8 @@ EFI_STATUS
                            must be between 0 and NumberOfTimers-1.
   @param  TimerValue       Pointer to the returned timer value.
   @param  TimerPeriod      A pointer to the amount of time that passes in femtoseconds for each increment
-                           of TimerValue.
+                           of TimerValue. If TimerValue does not increment at a predictable rate, then 0 is
+                           returned. This parameter is optional and may be NULL.
 
   @retval EFI_SUCCESS           The processor timer value specified by TimerIndex was returned in TimerValue.
   @retval EFI_DEVICE_ERROR      An error occurred attempting to read one of the processor's timers.

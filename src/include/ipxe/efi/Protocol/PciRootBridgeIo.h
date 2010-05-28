@@ -3,10 +3,10 @@
 
   PCI Root Bridge I/O protocol is used by PCI Bus Driver to perform PCI Memory, PCI I/O,
   and PCI Configuration cycles on a PCI Root Bridge. It also provides services to perform
-  defferent types of bus mastering DMA
+  defferent types of bus mastering DMA.
 
-  Copyright (c) 2006 - 2008, Intel Corporation
-  All rights reserved. This program and the accompanying materials
+  Copyright (c) 2006 - 2008, Intel Corporation. All rights reserved.<BR>
+  This program and the accompanying materials
   are licensed and made available under the terms and conditions of the BSD License
   which accompanies this distribution.  The full text of the license may be found at
   http://opensource.org/licenses/bsd-license.php
@@ -26,6 +26,11 @@
 
 typedef struct _EFI_PCI_ROOT_BRIDGE_IO_PROTOCOL  EFI_PCI_ROOT_BRIDGE_IO_PROTOCOL;
 
+///
+/// *******************************************************
+/// EFI_PCI_ROOT_BRIDGE_IO_PROTOCOL_WIDTH
+/// *******************************************************
+///
 typedef enum {
   EfiPciWidthUint8,
   EfiPciWidthUint16,
@@ -42,12 +47,41 @@ typedef enum {
   EfiPciWidthMaximum
 } EFI_PCI_ROOT_BRIDGE_IO_PROTOCOL_WIDTH;
 
+///
+/// *******************************************************
+/// EFI_PCI_ROOT_BRIDGE_IO_PROTOCOL_OPERATION
+/// *******************************************************
+///
 typedef enum {
+  ///
+  /// A read operation from system memory by a bus master that is not capable of producing
+  /// PCI dual address cycles.
+  ///
   EfiPciOperationBusMasterRead,
+  ///
+  /// A write operation from system memory by a bus master that is not capable of producing
+  /// PCI dual address cycles.
+  ///
   EfiPciOperationBusMasterWrite,
+  ///
+  /// Provides both read and write access to system memory by both the processor and a bus
+  /// master that is not capable of producing PCI dual address cycles.
+  ///
   EfiPciOperationBusMasterCommonBuffer,
+  ///
+  /// A read operation from system memory by a bus master that is capable of producing PCI
+  /// dual address cycles.
+  ///
   EfiPciOperationBusMasterRead64,
+  ///
+  /// A write operation to system memory by a bus master that is capable of producing PCI
+  /// dual address cycles.
+  ///
   EfiPciOperationBusMasterWrite64,
+  ///
+  /// Provides both read and write access to system memory by both the processor and a bus
+  /// master that is capable of producing PCI dual address cycles.
+  ///
   EfiPciOperationBusMasterCommonBuffer64,
   EfiPciOperationMaximum
 } EFI_PCI_ROOT_BRIDGE_IO_PROTOCOL_OPERATION;
@@ -135,7 +169,13 @@ EFI_STATUS
   );
 
 typedef struct {
+  ///
+  /// Read PCI controller registers in the PCI root bridge memory space.
+  ///
   EFI_PCI_ROOT_BRIDGE_IO_PROTOCOL_IO_MEM  Read;
+  ///
+  /// Write PCI controller registers in the PCI root bridge memory space.
+  ///
   EFI_PCI_ROOT_BRIDGE_IO_PROTOCOL_IO_MEM  Write;
 } EFI_PCI_ROOT_BRIDGE_IO_PROTOCOL_ACCESS;
 
@@ -165,7 +205,7 @@ EFI_STATUS
   );
 
 /**
-  Provides the PCI controller-Cspecific addresses required to access system memory from a
+  Provides the PCI controller-specific addresses required to access system memory from a
   DMA bus master.
 
   @param  This                  A pointer to the EFI_PCI_ROOT_BRIDGE_IO_PROTOCOL.

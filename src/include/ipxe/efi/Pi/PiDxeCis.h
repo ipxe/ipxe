@@ -1,14 +1,14 @@
 /** @file
   Include file matches things in PI.
 
-  Copyright (c) 2006 - 2008, Intel Corporation
-  All rights reserved. This program and the accompanying materials
-  are licensed and made available under the terms and conditions of the BSD License
-  which accompanies this distribution.  The full text of the license may be found at
-  http://opensource.org/licenses/bsd-license.php
+Copyright (c) 2006 - 2010, Intel Corporation. All rights reserved.<BR>
+This program and the accompanying materials are licensed and made available under
+the terms and conditions of the BSD License that accompanies this distribution.
+The full text of the license may be found at
+http://opensource.org/licenses/bsd-license.php.
 
-  THE PROGRAM IS DISTRIBUTED UNDER THE BSD LICENSE ON AN "AS IS" BASIS,
-  WITHOUT WARRANTIES OR REPRESENTATIONS OF ANY KIND, EITHER EXPRESS OR IMPLIED.
+THE PROGRAM IS DISTRIBUTED UNDER THE BSD LICENSE ON AN "AS IS" BASIS,
+WITHOUT WARRANTIES OR REPRESENTATIONS OF ANY KIND, EITHER EXPRESS OR IMPLIED.
 
   @par Revision Reference:
   PI Version 1.0
@@ -18,25 +18,57 @@
 #ifndef __PI_DXECIS_H__
 #define __PI_DXECIS_H__
 
+#include <ipxe/efi/Uefi/UefiMultiPhase.h>
 #include <ipxe/efi/Pi/PiMultiPhase.h>
 
 ///
-/// Global Coherencey Domain types - Memory type
+/// Global Coherencey Domain types - Memory type.
 ///
 typedef enum {
+  ///
+  /// A memory region that is visible to the boot processor. However, there are no system
+  /// components that are currently decoding this memory region.
+  ///
   EfiGcdMemoryTypeNonExistent,
+  ///
+  /// A memory region that is visible to the boot processor. This memory region is being
+  /// decoded by a system component, but the memory region is not considered to be either
+  /// system memory or memory-mapped I/O.
+  ///
   EfiGcdMemoryTypeReserved,
+  ///
+  /// A memory region that is visible to the boot processor. A memory controller is
+  /// currently decoding this memory region and the memory controller is producing a
+  /// tested system memory region that is available to the memory services.
+  ///
   EfiGcdMemoryTypeSystemMemory,
+  ///
+  /// A memory region that is visible to the boot processor. This memory region is
+  /// currently being decoded by a component as memory-mapped I/O that can be used to
+  /// access I/O devices in the platform.
+  ///
   EfiGcdMemoryTypeMemoryMappedIo,
   EfiGcdMemoryTypeMaximum
 } EFI_GCD_MEMORY_TYPE;
 
 ///
-/// Global Coherencey Domain types - IO type
+/// Global Coherencey Domain types - IO type.
 ///
 typedef enum {
+  ///
+  /// An I/O region that is visible to the boot processor. However, there are no system
+  /// components that are currently decoding this I/O region.
+  ///
   EfiGcdIoTypeNonExistent,
+  ///
+  /// An I/O region that is visible to the boot processor. This I/O region is currently being
+  /// decoded by a system component, but the I/O region cannot be used to access I/O devices.
+  ///
   EfiGcdIoTypeReserved,
+  ///
+  /// An I/O region that is visible to the boot processor. This I/O region is currently being
+  /// decoded by a system component that is producing I/O ports that can be used to access I/O devices.
+  ///
   EfiGcdIoTypeIo,
   EfiGcdIoTypeMaximum
 } EFI_GCD_IO_TYPE;
@@ -45,22 +77,42 @@ typedef enum {
 /// The type of allocation to perform.
 ///
 typedef enum {
+  ///
+  /// The GCD memory space map is searched from the lowest address up to the highest address
+  /// looking for unallocated memory ranges.
+  ///
   EfiGcdAllocateAnySearchBottomUp,
+  ///
+  /// The GCD memory space map is searched from the lowest address up
+  /// to the specified MaxAddress looking for unallocated memory ranges.
+  ///
   EfiGcdAllocateMaxAddressSearchBottomUp,
+  ///
+  /// The GCD memory space map is checked to see if the memory range starting
+  /// at the specified Address is available.
+  ///
   EfiGcdAllocateAddress,
+  ///
+  /// The GCD memory space map is searched from the highest address down to the lowest address
+  /// looking for unallocated memory ranges.
+  ///
   EfiGcdAllocateAnySearchTopDown,
+  ///
+  /// The GCD memory space map is searched from the specified MaxAddress
+  /// down to the lowest address looking for unallocated memory ranges.
+  ///
   EfiGcdAllocateMaxAddressSearchTopDown,
   EfiGcdMaxAllocateType
 } EFI_GCD_ALLOCATE_TYPE;
 
 ///
-/// EFI_GCD_MEMORY_SPACE_DESCRIPTOR
+/// EFI_GCD_MEMORY_SPACE_DESCRIPTOR.
 ///
 typedef struct {
   ///
   /// The physical address of the first byte in the memory region. Type
   /// EFI_PHYSICAL_ADDRESS is defined in the AllocatePages() function
-  /// description in the UEFI 2.0 specification
+  /// description in the UEFI 2.0 specification.
   ///
   EFI_PHYSICAL_ADDRESS  BaseAddress;
 
@@ -82,7 +134,7 @@ typedef struct {
   UINT64                Attributes;
   ///
   /// Type of the memory region. Type EFI_GCD_MEMORY_TYPE is defined in the
-  /// AddMemorySpace() function description
+  /// AddMemorySpace() function description.
   ///
   EFI_GCD_MEMORY_TYPE   GcdMemoryType;
 
@@ -105,7 +157,7 @@ typedef struct {
 } EFI_GCD_MEMORY_SPACE_DESCRIPTOR;
 
 ///
-/// EFI_GCD_IO_SPACE_DESCRIPTOR
+/// EFI_GCD_IO_SPACE_DESCRIPTOR.
 ///
 typedef struct {
   ///
@@ -173,7 +225,7 @@ typedef struct {
                                  added to the global coherency domain of the processor.
   @retval EFI_ACCESS_DENIED      One or more bytes of the memory resource range
                                  specified by BaseAddress and Length was allocated
-                                 in a prior call to AllocateMemorySpace()..
+                                 in a prior call to AllocateMemorySpace().
 
 **/
 typedef
@@ -528,7 +580,7 @@ EFI_STATUS
   @retval EFI_SUCCESS         One or more DXE driver were dispatched.
   @retval EFI_NOT_FOUND       No DXE drivers were dispatched.
   @retval EFI_ALREADY_STARTED An attempt is being made to start the DXE Dispatcher recursively.
-                              Thus no action was taken.
+                              Thus, no action was taken.
 
 **/
 typedef
@@ -606,6 +658,10 @@ EFI_STATUS
 #define DXE_SERVICES_REVISION   ((1<<16) | (00))
 
 typedef struct {
+  ///
+  /// The table header for the DXE Services Table.
+  /// This header contains the DXE_SERVICES_SIGNATURE and DXE_SERVICES_REVISION values.
+  ///
   EFI_TABLE_HEADER                Hdr;
 
   //
@@ -638,5 +694,20 @@ typedef struct {
 } DXE_SERVICES;
 
 typedef DXE_SERVICES EFI_DXE_SERVICES;
+
+
+/**
+  The function prototype for invoking a function on an Application Processor.
+
+  This definition is used by the UEFI MP Serices Protocol, and the
+  PI SMM System Table.
+
+  @param[in,out] Buffer  The pointer to private data buffer.
+**/
+typedef
+VOID
+(EFIAPI *EFI_AP_PROCEDURE)(
+  IN OUT VOID  *Buffer
+  );
 
 #endif

@@ -1,14 +1,14 @@
 /** @file
   Defines data types and constants introduced in UEFI.
 
-  Copyright (c) 2006 - 2008, Intel Corporation
-  All rights reserved. This program and the accompanying materials
-  are licensed and made available under the terms and conditions of the BSD License
-  which accompanies this distribution.  The full text of the license may be found at
-  http://opensource.org/licenses/bsd-license.php
+Copyright (c) 2006 - 2010, Intel Corporation. All rights reserved.<BR>
+This program and the accompanying materials are licensed and made available under
+the terms and conditions of the BSD License that accompanies this distribution.
+The full text of the license may be found at
+http://opensource.org/licenses/bsd-license.php.
 
-  THE PROGRAM IS DISTRIBUTED UNDER THE BSD LICENSE ON AN "AS IS" BASIS,
-  WITHOUT WARRANTIES OR REPRESENTATIONS OF ANY KIND, EITHER EXPRESS OR IMPLIED.
+THE PROGRAM IS DISTRIBUTED UNDER THE BSD LICENSE ON AN "AS IS" BASIS,
+WITHOUT WARRANTIES OR REPRESENTATIONS OF ANY KIND, EITHER EXPRESS OR IMPLIED.
 
 **/
 
@@ -18,7 +18,7 @@
 #include <ipxe/efi/Base.h>
 
 //
-// Basical data type definitions introduced in UEFI.
+// Basic data type definitions introduced in UEFI.
 //
 
 ///
@@ -26,7 +26,7 @@
 ///
 typedef GUID                      EFI_GUID;
 ///
-/// Function return status for EFI API
+/// Function return status for EFI API.
 ///
 typedef RETURN_STATUS             EFI_STATUS;
 ///
@@ -45,12 +45,20 @@ typedef UINTN                     EFI_TPL;
 /// Logical block address.
 ///
 typedef UINT64                    EFI_LBA;
+
+///
+/// 64-bit physical memory address.
+///
 typedef UINT64                    EFI_PHYSICAL_ADDRESS;
+
+///
+/// 64-bit virtual memory address.
+///
 typedef UINT64                    EFI_VIRTUAL_ADDRESS;
 
 ///
 /// EFI Time Abstraction:
-///  Year:       1998 - 20XX
+///  Year:       1900 - 9999
 ///  Month:      1 - 12
 ///  Day:        1 - 31
 ///  Hour:       0 - 23
@@ -82,7 +90,7 @@ typedef struct {
 } EFI_IPv4_ADDRESS;
 
 ///
-/// 16-byte buffer. An IPv6 internet protocol address
+/// 16-byte buffer. An IPv6 internet protocol address.
 ///
 typedef struct {
   UINT8 Addr[16];
@@ -106,9 +114,9 @@ typedef union {
 } EFI_IP_ADDRESS;
 
 
-//
-// Enumeration of EFI_STATUS.
-//
+///
+/// Enumeration of EFI_STATUS.
+///@{
 #define EFI_SUCCESS               RETURN_SUCCESS
 #define EFI_LOAD_ERROR            RETURN_LOAD_ERROR
 #define EFI_INVALID_PARAMETER     RETURN_INVALID_PARAMETER
@@ -145,27 +153,31 @@ typedef union {
 #define EFI_WARN_DELETE_FAILURE   RETURN_WARN_DELETE_FAILURE
 #define EFI_WARN_WRITE_FAILURE    RETURN_WARN_WRITE_FAILURE
 #define EFI_WARN_BUFFER_TOO_SMALL RETURN_WARN_BUFFER_TOO_SMALL
+///@}
 
-
-//
-// Define macro to encode the status code.
-//
+///
+/// Define macro to encode the status code.
+///
 #define EFIERR(_a)                ENCODE_ERROR(_a)
 
 #define EFI_ERROR(A)              RETURN_ERROR(A)
 
-//
-// Define macros to build data structure signatures from characters.
-//
-#define EFI_SIGNATURE_16(A, B)                    SIGNATURE_16 (A, B)
-#define EFI_SIGNATURE_32(A, B, C, D)              SIGNATURE_32 (A, B, C, D)
-#define EFI_SIGNATURE_64(A, B, C, D, E, F, G, H)  SIGNATURE_64 (A, B, C, D, E, F, G, H)
-
+///
+/// ICMP error definitions
+///@{
+#define EFI_NETWORK_UNREACHABLE   EFIERR(100)
+#define EFI_HOST_UNREACHABLE      EFIERR(101)
+#define EFI_PROTOCOL_UNREACHABLE  EFIERR(102)
+#define EFI_PORT_UNREACHABLE      EFIERR(103)
+///@}
 
 ///
-///  Returns the byte offset to a field within a structure
-///
-#define EFI_FIELD_OFFSET(TYPE,Field) ((UINTN)(&(((TYPE *) 0)->Field)))
+/// Tcp connection status definitions
+///@{
+#define EFI_CONNECTION_FIN        EFIERR(104)
+#define EFI_CONNECTION_RESET      EFIERR(105)
+#define EFI_CONNECTION_REFUSED    EFIERR(106)
+///@}
 
 //
 // The EFI memory allocation functions work in units of EFI_PAGEs that are
@@ -180,21 +192,72 @@ typedef union {
 
 #define EFI_PAGES_TO_SIZE(a)   ( (a) << EFI_PAGE_SHIFT)
 
-
-#define EFI_MAX_BIT               MAX_BIT
-#define EFI_MAX_ADDRESS           MAX_ADDRESS
-
+///
+/// PE32+ Machine type for IA32 UEFI images.
+///
+#define EFI_IMAGE_MACHINE_IA32            0x014C
 
 ///
-/// Limited buffer size for a language code recommended by RFC3066
-/// (42 characters plus a NULL terminator)
+/// PE32+ Machine type for IA64 UEFI images.
 ///
-#define RFC_3066_ENTRY_SIZE             (42 + 1)
+#define EFI_IMAGE_MACHINE_IA64            0x0200
 
 ///
-/// The size of a 3 character ISO639 language code.
+/// PE32+ Machine type for EBC UEFI images.
 ///
-#define ISO_639_2_ENTRY_SIZE            3
+#define EFI_IMAGE_MACHINE_EBC             0x0EBC
 
+///
+/// PE32+ Machine type for X64 UEFI images.
+///
+#define EFI_IMAGE_MACHINE_X64             0x8664
+
+///
+/// PE32+ Machine type for ARM mixed ARM and Thumb/Thumb2 images.
+///
+#define EFI_IMAGE_MACHINE_ARMTHUMB_MIXED  0x01C2
+
+
+#if   defined (MDE_CPU_IA32)
+
+#define EFI_IMAGE_MACHINE_TYPE_SUPPORTED(Machine) \
+  (((Machine) == EFI_IMAGE_MACHINE_IA32) || ((Machine) == EFI_IMAGE_MACHINE_EBC))
+
+#define EFI_IMAGE_MACHINE_CROSS_TYPE_SUPPORTED(Machine) ((Machine) == EFI_IMAGE_MACHINE_X64)
+
+#elif defined (MDE_CPU_IPF)
+
+#define EFI_IMAGE_MACHINE_TYPE_SUPPORTED(Machine) \
+  (((Machine) == EFI_IMAGE_MACHINE_IA64) || ((Machine) == EFI_IMAGE_MACHINE_EBC))
+
+#define EFI_IMAGE_MACHINE_CROSS_TYPE_SUPPORTED(Machine) (FALSE)
+
+#elif defined (MDE_CPU_X64)
+
+#define EFI_IMAGE_MACHINE_TYPE_SUPPORTED(Machine) \
+  (((Machine) == EFI_IMAGE_MACHINE_X64) || ((Machine) == EFI_IMAGE_MACHINE_EBC))
+
+#define EFI_IMAGE_MACHINE_CROSS_TYPE_SUPPORTED(Machine) ((Machine) == EFI_IMAGE_MACHINE_IA32)
+
+#elif defined (MDE_CPU_ARM)
+
+#define EFI_IMAGE_MACHINE_TYPE_SUPPORTED(Machine) \
+  (((Machine) == EFI_IMAGE_MACHINE_ARMTHUMB_MIXED) || ((Machine) == EFI_IMAGE_MACHINE_EBC))
+
+#define EFI_IMAGE_MACHINE_CROSS_TYPE_SUPPORTED(Machine) ((Machine) == EFI_IMAGE_MACHINE_ARMTHUMB_MIXED)
+
+#elif defined (MDE_CPU_EBC)
+
+///
+/// This is just to make sure you can cross compile with the EBC compiler.
+/// It does not make sense to have a PE loader coded in EBC.
+///
+#define EFI_IMAGE_MACHINE_TYPE_SUPPORTED(Machine) ((Machine) == EFI_IMAGE_MACHINE_EBC)
+
+#define EFI_IMAGE_MACHINE_CROSS_TYPE_SUPPORTED(Machine) (FALSE)
+
+#else
+#error Unknown Processor Type
+#endif
 
 #endif

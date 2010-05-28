@@ -31,7 +31,7 @@ FILE_LICENCE ( GPL2_OR_LATER );
 
 /** SMBIOS configuration table */
 static struct smbios_entry *smbios_entry;
-EFI_USE_TABLE ( EFI_SMBIOS_TABLE, &smbios_entry, 0 );
+EFI_USE_TABLE ( SMBIOS_TABLE, &smbios_entry, 0 );
 
 /**
  * Find SMBIOS

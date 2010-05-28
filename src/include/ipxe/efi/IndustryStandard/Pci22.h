@@ -2,12 +2,12 @@
   Support for PCI 2.2 standard.
 
   This file includes the definitions in the following specifications,
-    PCI Local Bus Specification, 2.0
-    PCI-to-PCI Bridge Architecture Specification,
+    PCI Local Bus Specification, 2.2
+    PCI-to-PCI Bridge Architecture Specification, Revision 1.2
     PC Card Standard, 8.0
 
-  Copyright (c) 2006 - 2008, Intel Corporation
-  All rights reserved. This program and the accompanying materials
+  Copyright (c) 2006 - 2009, Intel Corporation. All rights reserved.<BR>
+  This program and the accompanying materials
   are licensed and made available under the terms and conditions of the BSD License
   which accompanies this distribution.  The full text of the license may be found at
   http://opensource.org/licenses/bsd-license.php
@@ -20,13 +20,16 @@
 #ifndef _PCI22_H_
 #define _PCI22_H_
 
-#define PCI_MAX_SEGMENT 0
 #define PCI_MAX_BUS     255
 #define PCI_MAX_DEVICE  31
 #define PCI_MAX_FUNC    7
 
-
 #pragma pack(1)
+
+///
+/// Common header region in PCI Configuration Space
+/// Section 6.1, PCI Local Bus Specification, 2.2
+///
 typedef struct {
   UINT16  VendorId;
   UINT16  DeviceId;
@@ -40,6 +43,10 @@ typedef struct {
   UINT8   BIST;
 } PCI_DEVICE_INDEPENDENT_REGION;
 
+///
+/// PCI Device header region in PCI Configuration Space
+/// Section 6.1, PCI Local Bus Specification, 2.2
+///
 typedef struct {
   UINT32  Bar[6];
   UINT32  CISPtr;
@@ -55,13 +62,18 @@ typedef struct {
   UINT8   MaxLat;
 } PCI_DEVICE_HEADER_TYPE_REGION;
 
+///
+/// PCI Device Configuration Space
+/// Section 6.1, PCI Local Bus Specification, 2.2
+///
 typedef struct {
   PCI_DEVICE_INDEPENDENT_REGION Hdr;
   PCI_DEVICE_HEADER_TYPE_REGION Device;
 } PCI_TYPE00;
 
 ///
-/// defined in PCI-to-PCI Bridge Architecture Specification
+/// PCI-PCI Bridge header region in PCI Configuration Space
+/// Section 3.2, PCI-PCI Bridge Architecture, Version 1.2
 ///
 typedef struct {
   UINT32  Bar[2];
@@ -88,6 +100,10 @@ typedef struct {
   UINT16  BridgeControl;
 } PCI_BRIDGE_CONTROL_REGISTER;
 
+///
+/// PCI-to-PCI Bridge Configuration Space
+/// Section 3.2, PCI-PCI Bridge Architecture, Version 1.2
+///
 typedef struct {
   PCI_DEVICE_INDEPENDENT_REGION Hdr;
   PCI_BRIDGE_CONTROL_REGISTER   Bridge;
@@ -99,7 +115,8 @@ typedef union {
 } PCI_TYPE_GENERIC;
 
 ///
-/// CardBus Conroller Configuration Space, defined in PC Card Standard. 8.0
+/// CardBus Conroller Configuration Space,
+/// Section 4.5.1, PC Card Standard. 8.0
 ///
 typedef struct {
   UINT32  CardBusSocketReg;     ///< Cardus Socket/ExCA Base
@@ -123,9 +140,9 @@ typedef struct {
   UINT16  BridgeControl;        ///< Bridge Control
 } PCI_CARDBUS_CONTROL_REGISTER;
 
-///
-/// Definitions of PCI class bytes and manipulation macros.
-///
+//
+// Definitions of PCI class bytes and manipulation macros.
+//
 #define PCI_CLASS_OLD                 0x00
 #define   PCI_CLASS_OLD_OTHER           0x00
 #define   PCI_CLASS_OLD_VGA             0x01
@@ -153,7 +170,6 @@ typedef struct {
 #define   PCI_CLASS_DISPLAY_XGA         0x01
 #define   PCI_CLASS_DISPLAY_3D          0x02
 #define   PCI_CLASS_DISPLAY_OTHER       0x80
-#define   PCI_CLASS_DISPLAY_GFX         0x80
 
 #define PCI_CLASS_MEDIA               0x04
 #define   PCI_CLASS_MEDIA_VIDEO         0x00
@@ -284,23 +300,172 @@ typedef struct {
 #define   PCI_SUBCLASS_DPIO             0x00
 #define   PCI_SUBCLASS_DPIO_OTHER       0x80
 
+/**
+  Macro that checks whether the Base Class code of device matched.
+
+  @param  _p      Specified device.
+  @param  c       Base Class code needs matching.
+
+  @retval TRUE    Base Class code matches the specified device.
+  @retval FALSE   Base Class code doesn't match the specified device.
+
+**/
 #define IS_CLASS1(_p, c)              ((_p)->Hdr.ClassCode[2] == (c))
+/**
+  Macro that checks whether the Base Class code and Sub-Class code of device matched.
+
+  @param  _p      Specified device.
+  @param  c       Base Class code needs matching.
+  @param  s       Sub-Class code needs matching.
+
+  @retval TRUE    Base Class code and Sub-Class code match the specified device.
+  @retval FALSE   Base Class code and Sub-Class code don't match the specified device.
+
+**/
 #define IS_CLASS2(_p, c, s)           (IS_CLASS1 (_p, c) && ((_p)->Hdr.ClassCode[1] == (s)))
+/**
+  Macro that checks whether the Base Class code, Sub-Class code and Interface code of device matched.
+
+  @param  _p      Specified device.
+  @param  c       Base Class code needs matching.
+  @param  s       Sub-Class code needs matching.
+  @param  p       Interface code needs matching.
+
+  @retval TRUE    Base Class code, Sub-Class code and Interface code match the specified device.
+  @retval FALSE   Base Class code, Sub-Class code and Interface code don't match the specified device.
+
+**/
 #define IS_CLASS3(_p, c, s, p)        (IS_CLASS2 (_p, c, s) && ((_p)->Hdr.ClassCode[0] == (p)))
 
+/**
+  Macro that checks whether device is a display controller.
+
+  @param  _p      Specified device.
+
+  @retval TRUE    Device is a display controller.
+  @retval FALSE   Device is not a display controller.
+
+**/
 #define IS_PCI_DISPLAY(_p)            IS_CLASS1 (_p, PCI_CLASS_DISPLAY)
-#define IS_PCI_VGA(_p)                IS_CLASS3 (_p, PCI_CLASS_DISPLAY, PCI_CLASS_DISPLAY_VGA, 0)
-#define IS_PCI_8514(_p)               IS_CLASS3 (_p, PCI_CLASS_DISPLAY, PCI_CLASS_DISPLAY_VGA, 1)
-#define IS_PCI_GFX(_p)                IS_CLASS3 (_p, PCI_CLASS_DISPLAY, PCI_CLASS_DISPLAY_GFX, 0)
+/**
+  Macro that checks whether device is a VGA-compatible controller.
+
+  @param  _p      Specified device.
+
+  @retval TRUE    Device is a VGA-compatible controller.
+  @retval FALSE   Device is not a VGA-compatible controller.
+
+**/
+#define IS_PCI_VGA(_p)                IS_CLASS3 (_p, PCI_CLASS_DISPLAY, PCI_CLASS_DISPLAY_VGA, PCI_IF_VGA_VGA)
+/**
+  Macro that checks whether device is an 8514-compatible controller.
+
+  @param  _p      Specified device.
+
+  @retval TRUE    Device is an 8514-compatible controller.
+  @retval FALSE   Device is not an 8514-compatible controller.
+
+**/
+#define IS_PCI_8514(_p)               IS_CLASS3 (_p, PCI_CLASS_DISPLAY, PCI_CLASS_DISPLAY_VGA, PCI_IF_VGA_8514)
+/**
+  Macro that checks whether device is built before the Class Code field was defined.
+
+  @param  _p      Specified device.
+
+  @retval TRUE    Device is an old device.
+  @retval FALSE   Device is not an old device.
+
+**/
 #define IS_PCI_OLD(_p)                IS_CLASS1 (_p, PCI_CLASS_OLD)
+/**
+  Macro that checks whether device is a VGA-compatible device built before the Class Code field was defined.
+
+  @param  _p      Specified device.
+
+  @retval TRUE    Device is an old VGA-compatible device.
+  @retval FALSE   Device is not an old VGA-compatible device.
+
+**/
 #define IS_PCI_OLD_VGA(_p)            IS_CLASS2 (_p, PCI_CLASS_OLD, PCI_CLASS_OLD_VGA)
+/**
+  Macro that checks whether device is an IDE controller.
+
+  @param  _p      Specified device.
+
+  @retval TRUE    Device is an IDE controller.
+  @retval FALSE   Device is not an IDE controller.
+
+**/
 #define IS_PCI_IDE(_p)                IS_CLASS2 (_p, PCI_CLASS_MASS_STORAGE, PCI_CLASS_MASS_STORAGE_IDE)
-#define IS_PCI_SCSI(_p)               IS_CLASS3 (_p, PCI_CLASS_MASS_STORAGE, PCI_CLASS_MASS_STORAGE_SCSI, 0)
-#define IS_PCI_RAID(_p)               IS_CLASS3 (_p, PCI_CLASS_MASS_STORAGE, PCI_CLASS_MASS_STORAGE_RAID, 0)
-#define IS_PCI_LPC(_p)                IS_CLASS3 (_p, PCI_CLASS_BRIDGE, PCI_CLASS_BRIDGE_ISA, 0)
-#define IS_PCI_P2P(_p)                IS_CLASS3 (_p, PCI_CLASS_BRIDGE, PCI_CLASS_BRIDGE_P2P, 0)
-#define IS_PCI_P2P_SUB(_p)            IS_CLASS3 (_p, PCI_CLASS_BRIDGE, PCI_CLASS_BRIDGE_P2P, 1)
+/**
+  Macro that checks whether device is a SCSI bus controller.
+
+  @param  _p      Specified device.
+
+  @retval TRUE    Device is a SCSI bus controller.
+  @retval FALSE   Device is not a SCSI bus controller.
+
+**/
+#define IS_PCI_SCSI(_p)               IS_CLASS2 (_p, PCI_CLASS_MASS_STORAGE, PCI_CLASS_MASS_STORAGE_SCSI)
+/**
+  Macro that checks whether device is a RAID controller.
+
+  @param  _p      Specified device.
+
+  @retval TRUE    Device is a RAID controller.
+  @retval FALSE   Device is not a RAID controller.
+
+**/
+#define IS_PCI_RAID(_p)               IS_CLASS2 (_p, PCI_CLASS_MASS_STORAGE, PCI_CLASS_MASS_STORAGE_RAID)
+/**
+  Macro that checks whether device is an ISA bridge.
+
+  @param  _p      Specified device.
+
+  @retval TRUE    Device is an ISA bridge.
+  @retval FALSE   Device is not an ISA bridge.
+
+**/
+#define IS_PCI_LPC(_p)                IS_CLASS2 (_p, PCI_CLASS_BRIDGE, PCI_CLASS_BRIDGE_ISA)
+/**
+  Macro that checks whether device is a PCI-to-PCI bridge.
+
+  @param  _p      Specified device.
+
+  @retval TRUE    Device is a PCI-to-PCI bridge.
+  @retval FALSE   Device is not a PCI-to-PCI bridge.
+
+**/
+#define IS_PCI_P2P(_p)                IS_CLASS3 (_p, PCI_CLASS_BRIDGE, PCI_CLASS_BRIDGE_P2P, PCI_IF_BRIDGE_P2P)
+/**
+  Macro that checks whether device is a Subtractive Decode PCI-to-PCI bridge.
+
+  @param  _p      Specified device.
+
+  @retval TRUE    Device is a Subtractive Decode PCI-to-PCI bridge.
+  @retval FALSE   Device is not a Subtractive Decode PCI-to-PCI bridge.
+
+**/
+#define IS_PCI_P2P_SUB(_p)            IS_CLASS3 (_p, PCI_CLASS_BRIDGE, PCI_CLASS_BRIDGE_P2P, PCI_IF_BRIDGE_P2P_SUBTRACTIVE)
+/**
+  Macro that checks whether device is a 16550-compatible serial controller.
+
+  @param  _p      Specified device.
+
+  @retval TRUE    Device is a 16550-compatible serial controller.
+  @retval FALSE   Device is not a 16550-compatible serial controller.
+
+**/
 #define IS_PCI_16550_SERIAL(_p)       IS_CLASS3 (_p, PCI_CLASS_SCC, PCI_SUBCLASS_SERIAL, PCI_IF_16550)
+/**
+  Macro that checks whether device is a Universal Serial Bus controller.
+
+  @param  _p      Specified device.
+
+  @retval TRUE    Device is a Universal Serial Bus controller.
+  @retval FALSE   Device is not a Universal Serial Bus controller.
+
+**/
 #define IS_PCI_USB(_p)                IS_CLASS2 (_p, PCI_CLASS_SERIAL, PCI_CLASS_SERIAL_USB)
 
 //
@@ -314,9 +479,35 @@ typedef struct {
 // Mask of Header type
 //
 #define HEADER_LAYOUT_CODE            0x7f
+/**
+  Macro that checks whether device is a PCI-PCI bridge.
 
+  @param  _p      Specified device.
+
+  @retval TRUE    Device is a PCI-PCI bridge.
+  @retval FALSE   Device is not a PCI-PCI bridge.
+
+**/
 #define IS_PCI_BRIDGE(_p)             (((_p)->Hdr.HeaderType & HEADER_LAYOUT_CODE) == (HEADER_TYPE_PCI_TO_PCI_BRIDGE))
+/**
+  Macro that checks whether device is a CardBus bridge.
+
+  @param  _p      Specified device.
+
+  @retval TRUE    Device is a CardBus bridge.
+  @retval FALSE   Device is not a CardBus bridge.
+
+**/
 #define IS_CARDBUS_BRIDGE(_p)         (((_p)->Hdr.HeaderType & HEADER_LAYOUT_CODE) == (HEADER_TYPE_CARDBUS_BRIDGE))
+/**
+  Macro that checks whether device is a multiple functions device.
+
+  @param  _p      Specified device.
+
+  @retval TRUE    Device is a multiple functions device.
+  @retval FALSE   Device is not a multiple functions device.
+
+**/
 #define IS_PCI_MULTI_FUNC(_p)         ((_p)->Hdr.HeaderType & HEADER_TYPE_MULTI_FUNCTION)
 
 ///
@@ -350,9 +541,9 @@ typedef struct {
 #define PCI_MAXGNT_OFFSET                           0x3E ///< Max Grant Register
 #define PCI_MAXLAT_OFFSET                           0x3F ///< Max Latency Register
 
-///
-/// defined in PCI-to-PCI Bridge Architecture Specification
-///
+//
+// defined in PCI-to-PCI Bridge Architecture Specification
+//
 #define PCI_BRIDGE_PRIMARY_BUS_REGISTER_OFFSET      0x18
 #define PCI_BRIDGE_SECONDARY_BUS_REGISTER_OFFSET    0x19
 #define PCI_BRIDGE_SUBORDINATE_BUS_REGISTER_OFFSET  0x1a
@@ -364,6 +555,9 @@ typedef struct {
 ///
 #define PCI_INT_LINE_UNKNOWN                        0xFF
 
+///
+/// PCI Access Data Format
+///
 typedef union {
   struct {
     UINT32  Reg : 8;
@@ -389,9 +583,9 @@ typedef union {
 #define EFI_PCI_COMMAND_SERR                            BIT8   ///< 0x0100
 #define EFI_PCI_COMMAND_FAST_BACK_TO_BACK               BIT9   ///< 0x0200
 
-///
-/// defined in PCI-to-PCI Bridge Architecture Specification
-///
+//
+// defined in PCI-to-PCI Bridge Architecture Specification
+//
 #define EFI_PCI_BRIDGE_CONTROL_PARITY_ERROR_RESPONSE    BIT0   ///< 0x0001
 #define EFI_PCI_BRIDGE_CONTROL_SERR                     BIT1   ///< 0x0002
 #define EFI_PCI_BRIDGE_CONTROL_ISA                      BIT2   ///< 0x0004
@@ -405,9 +599,9 @@ typedef union {
 #define EFI_PCI_BRIDGE_CONTROL_TIMER_STATUS             BIT10  ///< 0x0400
 #define EFI_PCI_BRIDGE_CONTROL_DISCARD_TIMER_SERR       BIT11  ///< 0x0800
 
-///
-/// Following are the PCI-CARDBUS bridge control bit, defined in PC Card Standard
-///
+//
+// Following are the PCI-CARDBUS bridge control bit, defined in PC Card Standard
+//
 #define EFI_PCI_BRIDGE_CONTROL_IREQINT_ENABLE           BIT7   ///< 0x0080
 #define EFI_PCI_BRIDGE_CONTROL_RANGE0_MEMORY_TYPE       BIT8   ///< 0x0100
 #define EFI_PCI_BRIDGE_CONTROL_RANGE1_MEMORY_TYPE       BIT9   ///< 0x0200
@@ -436,13 +630,19 @@ typedef union {
 #define EFI_PCI_CAPABILITY_ID_SLOTID  0x04
 #define EFI_PCI_CAPABILITY_ID_MSI     0x05
 #define EFI_PCI_CAPABILITY_ID_HOTPLUG 0x06
+
+///
+/// Capabilities List Header
+/// Section 6.7, PCI Local Bus Specification, 2.2
+///
 typedef struct {
   UINT8 CapabilityID;
   UINT8 NextItemPtr;
 } EFI_PCI_CAPABILITY_HDR;
 
 ///
-/// Capability EFI_PCI_CAPABILITY_ID_PMI, defined in PCI Power Management Interface Specifiction
+/// Power Management Register Block Definition
+/// Section 3.2, PCI Power Management Interface Specifiction, Revision 1.2
 ///
 typedef struct {
   EFI_PCI_CAPABILITY_HDR  Hdr;
@@ -453,7 +653,8 @@ typedef struct {
 } EFI_PCI_CAPABILITY_PMI;
 
 ///
-/// Capability EFI_PCI_CAPABILITY_ID_AGP, defined in Accelerated Graphics Port Interface Specification
+/// A.G.P Capability
+/// Section 6.1.4, Accelerated Graphics Port Interface Specification, Revision 1.0
 ///
 typedef struct {
   EFI_PCI_CAPABILITY_HDR  Hdr;
@@ -464,7 +665,8 @@ typedef struct {
 } EFI_PCI_CAPABILITY_AGP;
 
 ///
-/// Capability EFI_PCI_CAPABILITY_ID_VPD, in PCI2.2 Spec.
+/// VPD Capability Structure
+/// Appendix I, PCI Local Bus Specification, 2.2
 ///
 typedef struct {
   EFI_PCI_CAPABILITY_HDR  Hdr;
@@ -473,7 +675,8 @@ typedef struct {
 } EFI_PCI_CAPABILITY_VPD;
 
 ///
-/// Capability EFI_PCI_CAPABILITY_ID_SLOTID, defined in PCI-to-PCI Bridge Architeture Specification
+/// Slot Numbering Capabilities Register
+/// Section 3.2.6, PCI-to-PCI Bridge Architeture Specification, Revision 1.2
 ///
 typedef struct {
   EFI_PCI_CAPABILITY_HDR  Hdr;
@@ -482,7 +685,8 @@ typedef struct {
 } EFI_PCI_CAPABILITY_SLOTID;
 
 ///
-/// Capability EFI_PCI_CAPABILITY_ID_MSI, defined in PCI2.2
+/// Message Capability Structure for 32-bit Message Address
+/// Section 6.8.1, PCI Local Bus Specification, 2.2
 ///
 typedef struct {
   EFI_PCI_CAPABILITY_HDR  Hdr;
@@ -491,6 +695,10 @@ typedef struct {
   UINT16                  MsgDataReg;
 } EFI_PCI_CAPABILITY_MSI32;
 
+///
+/// Message Capability Structure for 64-bit Message Address
+/// Section 6.8.1, PCI Local Bus Specification, 2.2
+///
 typedef struct {
   EFI_PCI_CAPABILITY_HDR  Hdr;
   UINT16                  MsgCtrlReg;
@@ -500,7 +708,8 @@ typedef struct {
 } EFI_PCI_CAPABILITY_MSI64;
 
 ///
-/// Capability EFI_PCI_CAPABILITY_ID_HOTPLUG, defined in CompactPCI Hot Swap Specification PICMG 2.1, R1.0
+/// Capability EFI_PCI_CAPABILITY_ID_HOTPLUG,
+/// CompactPCI Hot Swap Specification PICMG 2.1, R1.0
 ///
 typedef struct {
   EFI_PCI_CAPABILITY_HDR  Hdr;
@@ -532,25 +741,25 @@ typedef struct {
 #define EFI_ROOT_BRIDGE_LIST                            'eprb'
 #define EFI_PCI_EXPANSION_ROM_HEADER_EFISIGNATURE       0x0EF1  ///< defined in UEFI Spec.
 
-typedef struct {
-  UINT8 Register;
-  UINT8 Function;
-  UINT8 Device;
-  UINT8 Bus;
-  UINT8 Reserved[4];
-} DEFIO_PCI_ADDR;
-
 #define PCI_EXPANSION_ROM_HEADER_SIGNATURE              0xaa55
 #define PCI_DATA_STRUCTURE_SIGNATURE                    SIGNATURE_32 ('P', 'C', 'I', 'R')
 #define PCI_CODE_TYPE_PCAT_IMAGE                        0x00
-#define EFI_PCI_EXPANSION_ROM_HEADER_COMPRESSED         0x0001  ///<defined in UEFI spec.
+#define EFI_PCI_EXPANSION_ROM_HEADER_COMPRESSED         0x0001  ///< defined in UEFI spec.
 
+///
+/// Standard PCI Expansion ROM Header
+/// Section 13.4.2, Unified Extensible Firmware Interface Specification, Version 2.1
+///
 typedef struct {
   UINT16  Signature;    ///< 0xaa55
   UINT8   Reserved[0x16];
   UINT16  PcirOffset;
 } PCI_EXPANSION_ROM_HEADER;
 
+///
+/// Legacy ROM Header Extensions
+/// Section 6.3.3.1, PCI Local Bus Specification, 2.2
+///
 typedef struct {
   UINT16  Signature;    ///< 0xaa55
   UINT8   Size512;
@@ -559,6 +768,10 @@ typedef struct {
   UINT16  PcirOffset;
 } EFI_LEGACY_EXPANSION_ROM_HEADER;
 
+///
+/// PCI Data Structure Format
+/// Section 6.3.1.2, PCI Local Bus Specification, 2.2
+///
 typedef struct {
   UINT32  Signature;    ///< "PCIR"
   UINT16  VendorId;
@@ -575,7 +788,8 @@ typedef struct {
 } PCI_DATA_STRUCTURE;
 
 ///
-/// defined in EFI/UEFI Spec
+/// EFI PCI Expansion ROM Header
+/// Section 13.4.2, Unified Extensible Firmware Interface Specification, Version 2.1
 ///
 typedef struct {
   UINT16  Signature;    ///< 0xaa55

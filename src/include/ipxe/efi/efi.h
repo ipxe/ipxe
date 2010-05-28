@@ -36,6 +36,16 @@
 #define __GNUC__ 1
 #endif
 
+/* EFI headers think your compiler uses the MS ABI by default on X64 */
+#if __x86_64__
+#define EFIAPI __attribute__((ms_abi))
+#endif
+
+/* EFI headers assume regparm(0) on i386, but that is not the case for iPXE */
+#if __i386__
+#define EFIAPI __attribute__((cdecl,regparm(0)))
+#endif
+
 /* Include the top-level EFI header files */
 #include <ipxe/efi/Uefi.h>
 #include <ipxe/efi/PiDxe.h>

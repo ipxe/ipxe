@@ -3,8 +3,8 @@
   This protocol is used to retrieve user readable names of drivers
   and controllers managed by UEFI Drivers.
 
-  Copyright (c) 2006 - 2008, Intel Corporation
-  All rights reserved. This program and the accompanying materials
+  Copyright (c) 2006 - 2008, Intel Corporation. All rights reserved.<BR>
+  This program and the accompanying materials
   are licensed and made available under the terms and conditions of the BSD License
   which accompanies this distribution.  The full text of the license may be found at
   http://opensource.org/licenses/bsd-license.php
@@ -27,7 +27,7 @@ typedef struct _EFI_COMPONENT_NAME2_PROTOCOL  EFI_COMPONENT_NAME2_PROTOCOL;
 
 
 /**
-  Retrieves a Unicode string that is the user readable name of
+  Retrieves a string that is the user readable name of
   the EFI Driver.
 
   @param  This       A pointer to the
@@ -40,15 +40,15 @@ typedef struct _EFI_COMPONENT_NAME2_PROTOCOL  EFI_COMPONENT_NAME2_PROTOCOL;
                      languages specified in SupportedLanguages.
                      The number of languages supported by a
                      driver is up to the driver writer. Language
-                     is specified in RFC 3066 language code
+                     is specified in RFC 4646 language code
                      format.
 
-  @param  DriverName A pointer to the Unicode string to return.
-                     This Unicode string is the name of the
+  @param  DriverName A pointer to the string to return.
+                     This string is the name of the
                      driver specified by This in the language
                      specified by Language.
 
-  @retval EFI_SUCCESS           The Unicode string for the
+  @retval EFI_SUCCESS           The string for the
                                 Driver specified by This and the
                                 language specified by Language
                                 was returned in DriverName.
@@ -72,7 +72,7 @@ EFI_STATUS
 
 
 /**
-  Retrieves a Unicode string that is the user readable name of
+  Retrieves a string that is the user readable name of
   the controller that is being managed by an EFI Driver.
 
   @param  This             A pointer to the
@@ -83,11 +83,11 @@ EFI_STATUS
                            This handle specifies the controller
                            whose name is to be returned.
 
-  @param ChildHandle      The handle of the child controller to
+  @param  ChildHandle      The handle of the child controller to
                            retrieve the name of.  This is an
                            optional parameter that may be NULL.
                            It will be NULL for device drivers.
-                           It will also be NULL for a bus
+                           It will also be NULL for bus
                            drivers that wish to retrieve the
                            name of the bus controller.  It will
                            not be NULL for a bus driver that
@@ -103,18 +103,17 @@ EFI_STATUS
                            SupportedLanguages. The number of
                            languages supported by a driver is up
                            to the driver writer. Language is
-                           specified in RFC 3066 language code
+                           specified in RFC 4646 language code
                            format.
 
-  @param  ControllerName   A pointer to the Unicode string to
-                           return.  This Unicode string is the
-                           name of the controller specified by
-                           ControllerHandle and ChildHandle in
-                           the language specified by Language
+  @param  ControllerName   A pointer to the string to return.
+                           This string is the name of the controller
+                           specified by ControllerHandle and ChildHandle
+                           in the language specified by Language
                            from the point of view of the driver
                            specified by This.
 
-  @retval EFI_SUCCESS           The Unicode string for the user
+  @retval EFI_SUCCESS           The string for the user
                                 readable name in the language
                                 specified by Language for the
                                 driver specified by This was
@@ -164,7 +163,7 @@ struct _EFI_COMPONENT_NAME2_PROTOCOL {
   /// supported language codes. This is the list of language codes that
   /// this protocol supports. The number of languages supported by a
   /// driver is up to the driver writer. SupportedLanguages is
-  /// specified in RFC 3066 format.
+  /// specified in RFC 4646 format.
   ///
   CHAR8                                    *SupportedLanguages;
 };

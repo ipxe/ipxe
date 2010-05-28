@@ -2,8 +2,8 @@
   EFI PCI I/O Protocol provides the basic Memory, I/O, PCI configuration,
   and DMA interfaces that a driver uses to access its PCI controller.
 
-  Copyright (c) 2006 - 2008, Intel Corporation
-  All rights reserved. This program and the accompanying materials
+  Copyright (c) 2006 - 2008, Intel Corporation. All rights reserved.<BR>
+  This program and the accompanying materials
   are licensed and made available under the terms and conditions of the BSD License
   which accompanies this distribution.  The full text of the license may be found at
   http://opensource.org/licenses/bsd-license.php
@@ -27,7 +27,9 @@
 typedef struct _EFI_PCI_IO_PROTOCOL  EFI_PCI_IO_PROTOCOL;
 
 ///
-/// Prototypes for the PCI I/O Protocol
+/// *******************************************************
+/// EFI_PCI_IO_PROTOCOL_WIDTH
+/// *******************************************************
 ///
 typedef enum {
   EfiPciIoWidthUint8      = 0,
@@ -57,7 +59,7 @@ typedef enum {
 #define EFI_PCI_IO_ATTRIBUTE_VGA_IO               0x0010  ///< I/O cycles 0x3B0-0x3BB and 0x3C0-0x3DF (10 bit decode)
 #define EFI_PCI_IO_ATTRIBUTE_IDE_PRIMARY_IO       0x0020  ///< I/O cycles 0x1F0-0x1F7, 0x3F6, 0x3F7 (10 bit decode)
 #define EFI_PCI_IO_ATTRIBUTE_IDE_SECONDARY_IO     0x0040  ///< I/O cycles 0x170-0x177, 0x376, 0x377 (10 bit decode)
-#define EFI_PCI_IO_ATTRIBUTE_MEMORY_WRITE_COMBINE 0x0080  ///< Map a memory range so write are combined
+#define EFI_PCI_IO_ATTRIBUTE_MEMORY_WRITE_COMBINE 0x0080  ///< Map a memory range so writes are combined
 #define EFI_PCI_IO_ATTRIBUTE_IO                   0x0100  ///< Enable the I/O decode bit in the PCI Config Header
 #define EFI_PCI_IO_ATTRIBUTE_MEMORY               0x0200  ///< Enable the Memory decode bit in the PCI Config Header
 #define EFI_PCI_IO_ATTRIBUTE_BUS_MASTER           0x0400  ///< Enable the DMA bit in the PCI Config Header
@@ -79,8 +81,18 @@ typedef enum {
 /// *******************************************************
 ///
 typedef enum {
+  ///
+  /// A read operation from system memory by a bus master.
+  ///
   EfiPciIoOperationBusMasterRead,
+  ///
+  /// A write operation from system memory by a bus master.
+  ///
   EfiPciIoOperationBusMasterWrite,
+  ///
+  /// Provides both read and write access to system memory by both the processor and a
+  /// bus master. The buffer is coherent from both the processor's and the bus master's point of view.
+  ///
   EfiPciIoOperationBusMasterCommonBuffer,
   EfiPciIoOperationMaximum
 } EFI_PCI_IO_PROTOCOL_OPERATION;
@@ -91,16 +103,31 @@ typedef enum {
 /// *******************************************************
 ///
 typedef enum {
+  ///
+  /// Retrieve the PCI controller's current attributes, and return them in Result.
+  ///
   EfiPciIoAttributeOperationGet,
+  ///
+  /// Set the PCI controller's current attributes to Attributes.
+  ///
   EfiPciIoAttributeOperationSet,
+  ///
+  /// Enable the attributes specified by the bits that are set in Attributes for this PCI controller.
+  ///
   EfiPciIoAttributeOperationEnable,
+  ///
+  /// Disable the attributes specified by the bits that are set in Attributes for this PCI controller.
+  ///
   EfiPciIoAttributeOperationDisable,
+  ///
+  /// Retrieve the PCI controller's supported attributes, and return them in Result.
+  ///
   EfiPciIoAttributeOperationSupported,
   EfiPciIoAttributeOperationMaximum
 } EFI_PCI_IO_PROTOCOL_ATTRIBUTE_OPERATION;
 
 /**
-  Reads from the memory space of a PCI controller. Returns when either the polling exit criteria is
+  Reads from the memory space of a PCI controller. Returns either when the polling exit criteria is
   satisfied or after a defined duration.
 
   @param  This                  A pointer to the EFI_PCI_IO_PROTOCOL instance.
@@ -166,7 +193,13 @@ EFI_STATUS
   );
 
 typedef struct {
+  ///
+  /// Read PCI controller registers in the PCI memory or I/O space.
+  ///
   EFI_PCI_IO_PROTOCOL_IO_MEM  Read;
+  ///
+  /// Write PCI controller registers in the PCI memory or I/O space.
+  ///
   EFI_PCI_IO_PROTOCOL_IO_MEM  Write;
 } EFI_PCI_IO_PROTOCOL_ACCESS;
 
@@ -199,7 +232,13 @@ EFI_STATUS
   );
 
 typedef struct {
+  ///
+  /// Read PCI controller registers in PCI configuration space.
+  ///
   EFI_PCI_IO_PROTOCOL_CONFIG  Read;
+  ///
+  /// Write PCI controller registers in PCI configuration space.
+  ///
   EFI_PCI_IO_PROTOCOL_CONFIG  Write;
 } EFI_PCI_IO_PROTOCOL_CONFIG_ACCESS;
 
@@ -244,7 +283,7 @@ EFI_STATUS
   );
 
 /**
-  Provides the PCI controller-Cspecific addresses needed to access system memory.
+  Provides the PCI controller-specific addresses needed to access system memory.
 
   @param  This                  A pointer to the EFI_PCI_IO_PROTOCOL instance.
   @param  Operation             Indicates if the bus master is going to read or write to system memory.
@@ -476,7 +515,7 @@ EFI_STATUS
 
 ///
 /// The EFI_PCI_IO_PROTOCOL provides the basic Memory, I/O, PCI configuration,
-/// and DMA interfaces that are used to abstract accesses to PCI controllers.
+/// and DMA interfaces used to abstract accesses to PCI controllers.
 /// There is one EFI_PCI_IO_PROTOCOL instance for each PCI controller on a PCI bus.
 /// A device driver that wishes to manage a PCI controller in a system will have to
 /// retrieve the EFI_PCI_IO_PROTOCOL instance that is associated with the PCI controller.

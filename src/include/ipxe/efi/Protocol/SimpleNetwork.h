@@ -1,5 +1,6 @@
 /** @file
-  Simple Network protocol as defined in the UEFI 2.0 specification.
+  The EFI_SIMPLE_NETWORK_PROTOCOL provides services to initialize a network interface,
+  transmit packets, receive packets, and close a network interface.
 
   Basic network device abstraction.
 
@@ -8,14 +9,17 @@
   MCast - MultiCast
   ...
 
-  Copyright (c) 2006 - 2008, Intel Corporation
-  All rights reserved. This program and the accompanying materials
-  are licensed and made available under the terms and conditions of the BSD License
-  which accompanies this distribution.  The full text of the license may be found at
-  http://opensource.org/licenses/bsd-license.php
+Copyright (c) 2006 - 2010, Intel Corporation. All rights reserved.<BR>
+This program and the accompanying materials are licensed and made available under
+the terms and conditions of the BSD License that accompanies this distribution.
+The full text of the license may be found at
+http://opensource.org/licenses/bsd-license.php.
 
-  THE PROGRAM IS DISTRIBUTED UNDER THE BSD LICENSE ON AN "AS IS" BASIS,
-  WITHOUT WARRANTIES OR REPRESENTATIONS OF ANY KIND, EITHER EXPRESS OR IMPLIED.
+THE PROGRAM IS DISTRIBUTED UNDER THE BSD LICENSE ON AN "AS IS" BASIS,
+WITHOUT WARRANTIES OR REPRESENTATIONS OF ANY KIND, EITHER EXPRESS OR IMPLIED.
+
+  @par Revision Reference:
+  This Protocol is introduced in EFI Specification 1.10.
 
 **/
 
@@ -36,7 +40,7 @@ typedef struct _EFI_SIMPLE_NETWORK_PROTOCOL  EFI_SIMPLE_NETWORK_PROTOCOL;
 typedef EFI_SIMPLE_NETWORK_PROTOCOL   EFI_SIMPLE_NETWORK;
 
 ///
-/// Simple Network Protocol data structures
+/// Simple Network Protocol data structures.
 ///
 typedef struct {
   ///
@@ -119,6 +123,11 @@ typedef struct {
 
 } EFI_NETWORK_STATISTICS;
 
+///
+/// The state of the network interface.
+/// When an EFI_SIMPLE_NETWORK_PROTOCOL driver initializes a
+/// network interface, the network interface is left in the EfiSimpleNetworkStopped state.
+///
 typedef enum {
   EfiSimpleNetworkStopped,
   EfiSimpleNetworkStarted,
@@ -139,24 +148,84 @@ typedef enum {
 
 #define MAX_MCAST_FILTER_CNT                              16
 typedef struct {
+  ///
+  /// Reports the current state of the network interface.
+  ///
   UINT32          State;
+  ///
+  /// The size, in bytes, of the network interface's HW address.
+  ///
   UINT32          HwAddressSize;
+  ///
+  /// The size, in bytes, of the network interface's media header.
+  ///
   UINT32          MediaHeaderSize;
+  ///
+  /// The maximum size, in bytes, of the packets supported by the network interface.
+  ///
   UINT32          MaxPacketSize;
+  ///
+  /// The size, in bytes, of the NVRAM device attached to the network interface.
+  ///
   UINT32          NvRamSize;
+  ///
+  /// The size that must be used for all NVRAM reads and writes. The
+  /// start address for NVRAM read and write operations and the total
+  /// length of those operations, must be a multiple of this value. The
+  /// legal values for this field are 0, 1, 2, 4, and 8.
+  ///
   UINT32          NvRamAccessSize;
+  ///
+  /// The multicast receive filter settings supported by the network interface.
+  ///
   UINT32          ReceiveFilterMask;
+  ///
+  /// The current multicast receive filter settings.
+  ///
   UINT32          ReceiveFilterSetting;
+  ///
+  /// The maximum number of multicast address receive filters supported by the driver.
+  ///
   UINT32          MaxMCastFilterCount;
+  ///
+  /// The current number of multicast address receive filters.
+  ///
   UINT32          MCastFilterCount;
+  ///
+  /// Array containing the addresses of the current multicast address receive filters.
+  ///
   EFI_MAC_ADDRESS MCastFilter[MAX_MCAST_FILTER_CNT];
+  ///
+  /// The current HW MAC address for the network interface.
+  ///
   EFI_MAC_ADDRESS CurrentAddress;
+  ///
+  /// The current HW MAC address for broadcast packets.
+  ///
   EFI_MAC_ADDRESS BroadcastAddress;
+  ///
+  /// The permanent HW MAC address for the network interface.
+  ///
   EFI_MAC_ADDRESS PermanentAddress;
+  ///
+  /// The interface type of the network interface.
+  ///
   UINT8           IfType;
+  ///
+  /// TRUE if the HW MAC address can be changed.
+  ///
   BOOLEAN         MacAddressChangeable;
+  ///
+  /// TRUE if the network interface can transmit more than one packet at a time.
+  ///
   BOOLEAN         MultipleTxSupported;
+  ///
+  /// TRUE if the presence of media can be determined; otherwise FALSE.
+  ///
   BOOLEAN         MediaPresentSupported;
+  ///
+  /// TRUE if media are connected to the network interface; otherwise FALSE.
+  ///
   BOOLEAN         MediaPresent;
 } EFI_SIMPLE_NETWORK_MODE;
 
@@ -204,7 +273,7 @@ EFI_STATUS
   required by the network interface; optionally, also requests allocation
   of additional transmit and receive buffers.
 
-  @param  This              Protocol instance pointer.
+  @param  This              The protocol instance pointer.
   @param  ExtraRxBufferSize The size, in bytes, of the extra receive buffer space
                             that the driver should allocate for the network interface.
                             Some network interfaces will not be able to use the extra
@@ -217,9 +286,9 @@ EFI_STATUS
                             being used.
 
   @retval EFI_SUCCESS           The network interface was initialized.
-  @retval EFI_NOT_STARTED       The network interface has not been started
+  @retval EFI_NOT_STARTED       The network interface has not been started.
   @retval EFI_OUT_OF_RESOURCES  There was not enough memory for the transmit and
-                                receive buffers.   .
+                                receive buffers.
   @retval EFI_INVALID_PARAMETER One or more of the parameters has an unsupported value.
   @retval EFI_DEVICE_ERROR      The command could not be sent to the network interface.
   @retval EFI_UNSUPPORTED       This function is not supported by the network interface.
@@ -237,13 +306,13 @@ EFI_STATUS
   Resets a network adapter and re-initializes it with the parameters that were
   provided in the previous call to Initialize().
 
-  @param  This                 Protocol instance pointer.
+  @param  This                 The protocol instance pointer.
   @param  ExtendedVerification Indicates that the driver may perform a more
                                exhaustive verification operation of the device
                                during reset.
 
   @retval EFI_SUCCESS           The network interface was reset.
-  @retval EFI_NOT_STARTED       The network interface has not been started
+  @retval EFI_NOT_STARTED       The network interface has not been started.
   @retval EFI_INVALID_PARAMETER One or more of the parameters has an unsupported value.
   @retval EFI_DEVICE_ERROR      The command could not be sent to the network interface.
   @retval EFI_UNSUPPORTED       This function is not supported by the network interface.
@@ -263,7 +332,7 @@ EFI_STATUS
   @param  This Protocol instance pointer.
 
   @retval EFI_SUCCESS           The network interface was shutdown.
-  @retval EFI_NOT_STARTED       The network interface has not been started
+  @retval EFI_NOT_STARTED       The network interface has not been started.
   @retval EFI_INVALID_PARAMETER One or more of the parameters has an unsupported value.
   @retval EFI_DEVICE_ERROR      The command could not be sent to the network interface.
   @retval EFI_UNSUPPORTED       This function is not supported by the network interface.
@@ -278,7 +347,7 @@ EFI_STATUS
 /**
   Manages the multicast receive filters of a network interface.
 
-  @param  This             Protocol instance pointer.
+  @param  This             The protocol instance pointer.
   @param  Enable           A bit mask of receive filters to enable on the network interface.
   @param  Disable          A bit mask of receive filters to disable on the network interface.
   @param  ResetMCastFilter Set to TRUE to reset the contents of the multicast receive
@@ -293,7 +362,7 @@ EFI_STATUS
                            ResetMCastFilter is TRUE.
 
   @retval EFI_SUCCESS           The multicast receive filter list was updated.
-  @retval EFI_NOT_STARTED       The network interface has not been started
+  @retval EFI_NOT_STARTED       The network interface has not been started.
   @retval EFI_INVALID_PARAMETER One or more of the parameters has an unsupported value.
   @retval EFI_DEVICE_ERROR      The command could not be sent to the network interface.
   @retval EFI_UNSUPPORTED       This function is not supported by the network interface.
@@ -313,13 +382,13 @@ EFI_STATUS
 /**
   Modifies or resets the current station address, if supported.
 
-  @param  This  Protocol instance pointer.
+  @param  This  The protocol instance pointer.
   @param  Reset Flag used to reset the station address to the network interfaces
                 permanent address.
-  @param  New   New station address to be used for the network interface.
+  @param  New   The new station address to be used for the network interface.
 
   @retval EFI_SUCCESS           The network interfaces station address was updated.
-  @retval EFI_NOT_STARTED       The network interface has not been started
+  @retval EFI_NOT_STARTED       The network interface has not been started.
   @retval EFI_INVALID_PARAMETER One or more of the parameters has an unsupported value.
   @retval EFI_DEVICE_ERROR      The command could not be sent to the network interface.
   @retval EFI_UNSUPPORTED       This function is not supported by the network interface.
@@ -366,7 +435,7 @@ EFI_STATUS
 /**
   Converts a multicast IP address to a multicast HW MAC address.
 
-  @param  This Protocol instance pointer.
+  @param  This The protocol instance pointer.
   @param  IPv6 Set to TRUE if the multicast IP address is IPv6 [RFC 2460]. Set
                to FALSE if the multicast IP address is IPv4 [RFC 791].
   @param  IP   The multicast IP address that is to be converted to a multicast
@@ -397,7 +466,7 @@ EFI_STATUS
   Performs read and write operations on the NVRAM device attached to a
   network interface.
 
-  @param  This       Protocol instance pointer.
+  @param  This       The protocol instance pointer.
   @param  ReadWrite  TRUE for read operations, FALSE for write operations.
   @param  Offset     Byte offset in the NVRAM device at which to start the read or
                      write operation. This must be a multiple of NvRamAccessSize and
@@ -427,7 +496,7 @@ EFI_STATUS
   Reads the current interrupt status and recycled transmit buffer status from
   a network interface.
 
-  @param  This            Protocol instance pointer.
+  @param  This            The protocol instance pointer.
   @param  InterruptStatus A pointer to the bit mask of the currently active interrupts
                           If this is NULL, the interrupt status will not be read from
                           the device. If this is not NULL, the interrupt status will
@@ -459,7 +528,7 @@ EFI_STATUS
 /**
   Places a packet in the transmit queue of a network interface.
 
-  @param  This       Protocol instance pointer.
+  @param  This       The protocol instance pointer.
   @param  HeaderSize The size, in bytes, of the media header to be filled in by
                      the Transmit() function. If HeaderSize is non-zero, then it
                      must be equal to This->Mode->MediaHeaderSize and the DestAddr
@@ -474,7 +543,7 @@ EFI_STATUS
   @param  SrcAddr    The source HW MAC address. If HeaderSize is zero, then this parameter
                      is ignored. If HeaderSize is non-zero and SrcAddr is NULL, then
                      This->Mode->CurrentAddress is used for the source HW MAC address.
-  @param  DsetAddr   The destination HW MAC address. If HeaderSize is zero, then this
+  @param  DestAddr   The destination HW MAC address. If HeaderSize is zero, then this
                      parameter is ignored.
   @param  Protocol   The type of header to build. If HeaderSize is zero, then this
                      parameter is ignored. See RFC 1700, section "Ether Types", for
@@ -504,7 +573,7 @@ EFI_STATUS
 /**
   Receives a packet from a network interface.
 
-  @param  This       Protocol instance pointer.
+  @param  This       The protocol instance pointer.
   @param  HeaderSize The size, in bytes, of the media header received on the network
                      interface. If this parameter is NULL, then the media header size
                      will not be returned.
@@ -515,7 +584,7 @@ EFI_STATUS
   @param  SrcAddr    The source HW MAC address. If this parameter is NULL, the
                      HW MAC source address will not be extracted from the media
                      header.
-  @param  DsetAddr   The destination HW MAC address. If this parameter is NULL,
+  @param  DestAddr   The destination HW MAC address. If this parameter is NULL,
                      the HW MAC destination address will not be extracted from the
                      media header.
   @param  Protocol   The media header type. If this parameter is NULL, then the
