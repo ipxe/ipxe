@@ -33,23 +33,24 @@ static const char base64[64] =
 	"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
 
 /**
- * Base64-encode a string
+ * Base64-encode data
  *
- * @v raw		Raw string
+ * @v raw		Raw data
+ * @v len		Length of raw data
  * @v encoded		Buffer for encoded string
  *
  * The buffer must be the correct length for the encoded string.  Use
  * something like
  *
- *     char buf[ base64_encoded_len ( strlen ( raw ) ) + 1 ];
+ *     char buf[ base64_encoded_len ( len ) + 1 ];
  *
  * (the +1 is for the terminating NUL) to provide a buffer of the
  * correct size.
  */
-void base64_encode ( const char *raw, char *encoded ) {
+void base64_encode ( const uint8_t *raw, size_t len, char *encoded ) {
 	const uint8_t *raw_bytes = ( ( const uint8_t * ) raw );
 	uint8_t *encoded_bytes = ( ( uint8_t * ) encoded );
-	size_t raw_bit_len = ( 8 * strlen ( raw ) );
+	size_t raw_bit_len = ( 8 * len );
 	unsigned int bit;
 	unsigned int tmp;
 
@@ -63,6 +64,7 @@ void base64_encode ( const char *raw, char *encoded ) {
 		*(encoded_bytes++) = '=';
 	*(encoded_bytes++) = '\0';
 
-	DBG ( "Base64-encoded \"%s\" as \"%s\"\n", raw, encoded );
-	assert ( strlen ( encoded ) == base64_encoded_len ( strlen ( raw ) ) );
+	DBG ( "Base64-encoded to \"%s\":\n", encoded );
+	DBG_HDA ( 0, raw, len );
+	assert ( strlen ( encoded ) == base64_encoded_len ( len ) );
 }

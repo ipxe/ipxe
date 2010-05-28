@@ -424,7 +424,7 @@ static void http_step ( struct process *process ) {
 	size_t user_pw_len = ( user ? ( strlen ( user ) + 1 /* ":" */ +
 					strlen ( password ) ) : 0 );
 	size_t user_pw_base64_len = base64_encoded_len ( user_pw_len );
-	char user_pw[ user_pw_len + 1 /* NUL */ ];
+	uint8_t user_pw[ user_pw_len + 1 /* NUL */ ];
 	char user_pw_base64[ user_pw_base64_len + 1 /* NUL */ ];
 	int rc;
 	int request_len = unparse_uri ( NULL, 0, http->uri,
@@ -443,11 +443,11 @@ static void http_step ( struct process *process ) {
 		/* Construct authorisation, if applicable */
 		if ( user ) {
 			/* Make "user:password" string from decoded fields */
-			snprintf ( user_pw, sizeof ( user_pw ), "%s:%s",
-				   user, password );
+			snprintf ( ( ( char * ) user_pw ), sizeof ( user_pw ),
+				   "%s:%s", user, password );
 
 			/* Base64-encode the "user:password" string */
-			base64_encode ( user_pw, user_pw_base64 );
+			base64_encode ( user_pw, user_pw_len, user_pw_base64 );
 		}
 
 		/* Send GET request */
