@@ -35,6 +35,7 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #include <ipxe/tcpip.h>
 #include <ipxe/settings.h>
 #include <ipxe/features.h>
+#include <ipxe/base16.h>
 #include <ipxe/iscsi.h>
 
 /** @file
@@ -481,7 +482,6 @@ static int iscsi_tx_data_out ( struct iscsi_session *iscsi ) {
 static int iscsi_build_login_request_strings ( struct iscsi_session *iscsi,
 					       void *data, size_t len ) {
 	unsigned int used = 0;
-	unsigned int i;
 	const char *auth_method;
 
 	if ( iscsi->status & ISCSI_STATUS_STRINGS_SECURITY ) {
@@ -508,26 +508,23 @@ static int iscsi_build_login_request_strings ( struct iscsi_session *iscsi,
 	}
 	
 	if ( ( iscsi->status & ISCSI_STATUS_STRINGS_CHAP_RESPONSE ) ) {
+		char buf[ base16_encoded_len ( iscsi->chap.response_len ) + 1 ];
 		assert ( iscsi->initiator_username != NULL );
+		base16_encode ( iscsi->chap.response, iscsi->chap.response_len,
+				buf );
 		used += ssnprintf ( data + used, len - used,
-				    "CHAP_N=%s%cCHAP_R=0x",
-				    iscsi->initiator_username, 0 );
-		for ( i = 0 ; i < iscsi->chap.response_len ; i++ ) {
-			used += ssnprintf ( data + used, len - used, "%02x",
-					    iscsi->chap.response[i] );
-		}
-		used += ssnprintf ( data + used, len - used, "%c", 0 );
+				    "CHAP_N=%s%cCHAP_R=0x%s%c",
+				    iscsi->initiator_username, 0, buf, 0 );
 	}
 
 	if ( ( iscsi->status & ISCSI_STATUS_STRINGS_CHAP_CHALLENGE ) ) {
+		size_t challenge_len = ( sizeof ( iscsi->chap_challenge ) - 1 );
+		char buf[ base16_encoded_len ( challenge_len ) + 1 ];
+		base16_encode ( ( iscsi->chap_challenge + 1 ), challenge_len,
+				buf );
 		used += ssnprintf ( data + used, len - used,
-				    "CHAP_I=%d%cCHAP_C=0x",
-				    iscsi->chap_challenge[0], 0 );
-		for ( i = 1 ; i < sizeof ( iscsi->chap_challenge ) ; i++ ) {
-			used += ssnprintf ( data + used, len - used, "%02x",
-					    iscsi->chap_challenge[i] );
-		}
-		used += ssnprintf ( data + used, len - used, "%c", 0 );
+				    "CHAP_I=%d%cCHAP_C=0x%s%c",
+				    iscsi->chap_challenge[0], 0, buf, 0 );
 	}
 
 	if ( iscsi->status & ISCSI_STATUS_STRINGS_OPERATIONAL ) {
@@ -740,10 +737,9 @@ static int iscsi_handle_chap_i_value ( struct iscsi_session *iscsi,
  */
 static int iscsi_handle_chap_c_value ( struct iscsi_session *iscsi,
 				       const char *value ) {
-	char buf[3];
-	char *endp;
-	uint8_t byte;
+	uint8_t buf[ strlen ( value ) ]; /* Decoding never expands data */
 	unsigned int i;
+	int len;
 
 	/* Check and strip leading "0x" */
 	if ( ( value[0] != '0' ) || ( value[1] != 'x' ) ) {
@@ -751,20 +747,15 @@ static int iscsi_handle_chap_c_value ( struct iscsi_session *iscsi,
 		       iscsi, value );
 		return -EPROTO_INVALID_CHAP_CHALLENGE;
 	}
-	value += 2;
 
-	/* Process challenge an octet at a time */
-	for ( ; ( value[0] && value[1] ) ; value += 2 ) {
-		memcpy ( buf, value, 2 );
-		buf[2] = 0;
-		byte = strtoul ( buf, &endp, 16 );
-		if ( *endp != '\0' ) {
-			DBGC ( iscsi, "iSCSI %p saw invalid CHAP challenge "
-			       "byte \"%s\"\n", iscsi, buf );
-			return -EPROTO_INVALID_CHAP_CHALLENGE;
-		}
-		chap_update ( &iscsi->chap, &byte, sizeof ( byte ) );
+	/* Process challenge */
+	len = base16_decode ( ( value + 2 ), buf );
+	if ( len < 0 ) {
+		DBGC ( iscsi, "iSCSI %p invalid CHAP challenge \"%s\": %s\n",
+		       iscsi, value, strerror ( len ) );
+		return len;
 	}
+	chap_update ( &iscsi->chap, buf, len );
 
 	/* Build CHAP response */
 	DBGC ( iscsi, "iSCSI %p sending CHAP response\n", iscsi );
