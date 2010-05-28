@@ -20,6 +20,8 @@ FILE_LICENCE ( GPL2_OR_LATER );
 
 #include <stdint.h>
 #include <string.h>
+#include <ctype.h>
+#include <errno.h>
 #include <assert.h>
 #include <ipxe/base64.h>
 
@@ -67,4 +69,87 @@ void base64_encode ( const uint8_t *raw, size_t len, char *encoded ) {
 	DBG ( "Base64-encoded to \"%s\":\n", encoded );
 	DBG_HDA ( 0, raw, len );
 	assert ( strlen ( encoded ) == base64_encoded_len ( len ) );
+}
+
+/**
+ * Base64-decode string
+ *
+ * @v encoded		Encoded string
+ * @v raw		Raw data
+ * @ret len		Length of raw data, or negative error
+ *
+ * The buffer must be large enough to contain the decoded data.  Use
+ * something like
+ *
+ *     char buf[ base64_decoded_max_len ( encoded ) ];
+ *
+ * to provide a buffer of the correct size.
+ */
+int base64_decode ( const char *encoded, uint8_t *raw ) {
+	const uint8_t *encoded_bytes = ( ( const uint8_t * ) encoded );
+	uint8_t *raw_bytes = ( ( uint8_t * ) raw );
+	uint8_t encoded_byte;
+	char *match;
+	int decoded;
+	unsigned int bit = 0;
+	unsigned int pad_count = 0;
+	size_t len;
+
+	/* Zero the raw data */
+	memset ( raw, 0, base64_decoded_max_len ( encoded ) );
+
+	/* Decode string */
+	while ( ( encoded_byte = *(encoded_bytes++) ) ) {
+
+		/* Ignore whitespace characters */
+		if ( isspace ( encoded_byte ) )
+			continue;
+
+		/* Process pad characters */
+		if ( encoded_byte == '=' ) {
+			if ( pad_count >= 2 ) {
+				DBG ( "Base64-encoded string \"%s\" has too "
+				      "many pad characters\n", encoded );
+				return -EINVAL;
+			}
+			pad_count++;
+			bit -= 2; /* unused_bits = ( 2 * pad_count ) */
+			continue;
+		}
+		if ( pad_count ) {
+			DBG ( "Base64-encoded string \"%s\" has invalid pad "
+			      "sequence\n", encoded );
+			return -EINVAL;
+		}
+
+		/* Process normal characters */
+		match = strchr ( base64, encoded_byte );
+		if ( ! match ) {
+			DBG ( "Base64-encoded string \"%s\" contains invalid "
+			      "character '%c'\n", encoded, encoded_byte );
+			return -EINVAL;
+		}
+		decoded = ( match - base64 );
+
+		/* Add to raw data */
+		decoded <<= 2;
+		raw_bytes[ bit / 8 ] |= ( decoded >> ( bit % 8 ) );
+		raw_bytes[ bit / 8 + 1 ] |= ( decoded << ( 8 - ( bit % 8 ) ) );
+		bit += 6;
+	}
+
+	/* Check that we decoded a whole number of bytes */
+	if ( ( bit % 8 ) != 0 ) {
+		DBG ( "Base64-encoded string \"%s\" has invalid bit length "
+		      "%d\n", encoded, bit );
+		return -EINVAL;
+	}
+	len = ( bit / 8 );
+
+	DBG ( "Base64-decoded \"%s\" to:\n", encoded );
+	DBG_HDA ( 0, raw, len );
+	assert ( len <= base64_decoded_max_len ( encoded ) );
+
+	/* Return length in bytes */
+	return ( len );
 }
