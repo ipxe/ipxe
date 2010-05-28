@@ -32,6 +32,7 @@ FILE_LICENCE ( BSD2 );
 
 #include <stdlib.h>
 #include <errno.h>
+#include <ipxe/base16.h>
 #include <ipxe/srp.h>
 #include <ipxe/infiniband.h>
 #include <ipxe/ib_cmrc.h>
@@ -78,8 +79,7 @@ static int ib_srp_parse_byte_string ( const char *rp_comp, uint8_t *bytes,
 				      unsigned int size_flags ) {
 	size_t size = ( size_flags & ~IB_SRP_PARSE_FLAG_MASK );
 	size_t rp_comp_len = strlen ( rp_comp );
-	char buf[3];
-	char *buf_end;
+	int decoded_size;
 
 	/* Allow optional components to be empty */
 	if ( ( rp_comp_len == 0 ) &&
@@ -91,13 +91,11 @@ static int ib_srp_parse_byte_string ( const char *rp_comp, uint8_t *bytes,
 		return -EINVAL_BYTE_STRING_LEN;
 
 	/* Parse byte string */
-	for ( ; size ; size--, rp_comp += 2, bytes++ ) {
-		memcpy ( buf, rp_comp, 2 );
-		buf[2] = '\0';
-		*bytes = strtoul ( buf, &buf_end, 16 );
-		if ( buf_end != &buf[2] )
-			return -EINVAL_BYTE_STRING;
-	}
+	decoded_size = base16_decode ( rp_comp, bytes );
+	if ( decoded_size < 0 )
+		return decoded_size;
+	assert ( decoded_size == size );
+
 	return 0;
 }
 
