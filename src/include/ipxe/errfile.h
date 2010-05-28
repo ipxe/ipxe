@@ -54,6 +54,7 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #define ERRFILE_xfer		       ( ERRFILE_CORE | 0x000e0000 )
 #define ERRFILE_bitmap		       ( ERRFILE_CORE | 0x000f0000 )
 #define ERRFILE_base64		       ( ERRFILE_CORE | 0x00100000 )
+#define ERRFILE_base16		       ( ERRFILE_CORE | 0x00110000 )
 
 #define ERRFILE_eisa		     ( ERRFILE_DRIVER | 0x00000000 )
 #define ERRFILE_isa		     ( ERRFILE_DRIVER | 0x00010000 )
