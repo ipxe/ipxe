@@ -812,10 +812,8 @@ static int iscsi_handle_chap_n_value ( struct iscsi_session *iscsi,
  */
 static int iscsi_handle_chap_r_value ( struct iscsi_session *iscsi,
 				       const char *value ) {
-	char buf[3];
-	char *endp;
-	uint8_t byte;
-	unsigned int i;
+	uint8_t buf[ strlen ( value ) ]; /* Decoding never expands data */
+	size_t len;
 	int rc;
 
 	/* Generate CHAP response for verification */
@@ -840,32 +838,27 @@ static int iscsi_handle_chap_r_value ( struct iscsi_session *iscsi,
 		       iscsi, value );
 		return -EPROTO_INVALID_CHAP_RESPONSE;
 	}
-	value += 2;
 
-	/* Check CHAP response length */
-	if ( strlen ( value ) != ( 2 * iscsi->chap.response_len ) ) {
+	/* Process response */
+	rc = base16_decode ( ( value + 2 ), buf );
+	if ( rc < 0 ) {
+		DBGC ( iscsi, "iSCSI %p invalid CHAP response \"%s\": %s\n",
+		       iscsi, value, strerror ( rc ) );
+		return rc;
+	}
+	len = rc;
+
+	/* Check CHAP response */
+	if ( len != iscsi->chap.response_len ) {
 		DBGC ( iscsi, "iSCSI %p invalid CHAP response length\n",
 		       iscsi );
 		return -EPROTO_INVALID_CHAP_RESPONSE;
 	}
-
-	/* Process response an octet at a time */
-	for ( i = 0 ; ( value[0] && value[1] ) ; value += 2, i++ ) {
-		memcpy ( buf, value, 2 );
-		buf[2] = 0;
-		byte = strtoul ( buf, &endp, 16 );
-		if ( *endp != '\0' ) {
-			DBGC ( iscsi, "iSCSI %p saw invalid CHAP response "
-			       "byte \"%s\"\n", iscsi, buf );
-			return -EPROTO_INVALID_CHAP_RESPONSE;
-		}
-		if ( byte != iscsi->chap.response[i] ) {
-			DBGC ( iscsi, "iSCSI %p saw incorrect CHAP "
-			       "response\n", iscsi );
-			return -EACCES_INCORRECT_TARGET_PASSWORD;
-		}
+	if ( memcmp ( buf, iscsi->chap.response, len ) != 0 ) {
+		DBGC ( iscsi, "iSCSI %p incorrect CHAP response \"%s\"\n",
+		       iscsi, value );
+		return -EACCES_INCORRECT_TARGET_PASSWORD;
 	}
-	assert ( i == iscsi->chap.response_len );
 
 	/* Mark session as authenticated */
 	iscsi->status |= ISCSI_STATUS_AUTH_REVERSE_OK;
