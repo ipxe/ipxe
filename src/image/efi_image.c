@@ -21,11 +21,26 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #include <errno.h>
 #include <ipxe/efi/efi.h>
 #include <ipxe/image.h>
+#include <ipxe/init.h>
 #include <ipxe/features.h>
 
 FEATURE ( FEATURE_IMAGE, "EFI", DHCP_EB_FEATURE_EFI, 1 );
 
 struct image_type efi_image_type __image_type ( PROBE_NORMAL );
+
+/** Event used to signal shutdown */
+static EFI_EVENT efi_shutdown_event;
+
+/**
+ * Shut down in preparation for booting an OS.
+ *
+ * This hook gets called at ExitBootServices time in order to make sure that
+ * the network cards are properly shut down before the OS takes over.
+ */
+static EFIAPI void efi_shutdown_hook ( EFI_EVENT event __unused,
+				       void *context __unused ) {
+	shutdown ( SHUTDOWN_BOOT );
+}
 
 /**
  * Execute EFI image
@@ -39,6 +54,7 @@ static int efi_image_exec ( struct image *image ) {
 	UINTN exit_data_size;
 	CHAR16 *exit_data;
 	EFI_STATUS efirc;
+	int rc;
 
 	/* Attempt loading image */
 	if ( ( efirc = bs->LoadImage ( FALSE, efi_image_handle, NULL,
@@ -50,21 +66,36 @@ static int efi_image_exec ( struct image *image ) {
 		return -ENOEXEC;
 	}
 
+	/* Be sure to shut down the NIC at ExitBootServices time, or else
+	 * DMA from the card can corrupt the OS.
+	 */
+	efirc = bs->CreateEvent ( EVT_SIGNAL_EXIT_BOOT_SERVICES,
+				  TPL_CALLBACK, efi_shutdown_hook,
+				  NULL, &efi_shutdown_event );
+	if ( efirc ) {
+		rc = EFIRC_TO_RC ( efirc );
+		goto done;
+	}
+
 	/* Start the image */
 	if ( ( efirc = bs->StartImage ( handle, &exit_data_size,
 					&exit_data ) ) != 0 ) {
 		DBGC ( image, "EFIIMAGE %p returned with status %s\n",
 		       image, efi_strerror ( efirc ) );
-		goto done;
 	}
 
- done:
+	rc = EFIRC_TO_RC ( efirc );
+
+	/* Remove the shutdown hook */
+	bs->CloseEvent ( efi_shutdown_event );
+
+done:
 	/* Unload the image.  We can't leave it loaded, because we
 	 * have no "unload" operation.
 	 */
 	bs->UnloadImage ( handle );
 
-	return EFIRC_TO_RC ( efirc );
+	return rc;
 }
 
 /**

@@ -20,13 +20,21 @@ FILE_LICENCE ( GPL2_OR_LATER );
 
 #include <string.h>
 #include <ipxe/efi/efi.h>
+#include <ipxe/efi/Protocol/LoadedImage.h>
 #include <ipxe/uuid.h>
 
 /** Image handle passed to entry point */
 EFI_HANDLE efi_image_handle;
 
+/** Loaded image protocol for this image */
+EFI_LOADED_IMAGE_PROTOCOL *efi_loaded_image;
+
 /** System table passed to entry point */
 EFI_SYSTEM_TABLE *efi_systab;
+
+/** EFI loaded image protocol GUID */
+static EFI_GUID efi_loaded_image_protocol_guid
+	= EFI_LOADED_IMAGE_PROTOCOL_GUID;
 
 /**
  * Look up EFI configuration table
@@ -59,6 +67,7 @@ EFI_STATUS efi_init ( EFI_HANDLE image_handle,
 	struct efi_protocol *prot;
 	struct efi_config_table *tab;
 	EFI_STATUS efirc;
+	void *loaded_image;
 
 	/* Store image handle and system table pointer for future use */
 	efi_image_handle = image_handle;
@@ -80,8 +89,20 @@ EFI_STATUS efi_init ( EFI_HANDLE image_handle,
 	}
 	DBGC ( systab, "EFI handle %p systab %p\n", image_handle, systab );
 
-	/* Look up used protocols */
 	bs = systab->BootServices;
+	efirc = bs->OpenProtocol ( image_handle,
+				   &efi_loaded_image_protocol_guid,
+				   &loaded_image, image_handle, NULL,
+				   EFI_OPEN_PROTOCOL_GET_PROTOCOL );
+	if ( efirc ) {
+	   DBGC ( systab, "Could not get loaded image protocol" );
+	   return efirc;
+	}
+
+	efi_loaded_image = loaded_image;
+	DBG ( "Image base address = %p\n", efi_loaded_image->ImageBase );
+
+	/* Look up used protocols */
 	for_each_table_entry ( prot, EFI_PROTOCOLS ) {
 		if ( ( efirc = bs->LocateProtocol ( &prot->u.guid, NULL,
 						    prot->protocol ) ) == 0 ) {

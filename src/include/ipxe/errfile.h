@@ -123,6 +123,8 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #define ERRFILE_vxge_config	     ( ERRFILE_DRIVER | 0x00560000 )
 #define ERRFILE_vxge_traffic	     ( ERRFILE_DRIVER | 0x00570000 )
 #define ERRFILE_igb_main	     ( ERRFILE_DRIVER | 0x00580000 )
+#define ERRFILE_snpnet		     ( ERRFILE_DRIVER | 0x00590000 )
+#define ERRFILE_snponly		     ( ERRFILE_DRIVER | 0x005a0000 )
 
 #define ERRFILE_scsi		     ( ERRFILE_DRIVER | 0x00700000 )
 #define ERRFILE_arbel		     ( ERRFILE_DRIVER | 0x00710000 )

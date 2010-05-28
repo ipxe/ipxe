@@ -42,6 +42,7 @@
 /* Include the top-level EFI header files */
 #include <ipxe/efi/Uefi.h>
 #include <ipxe/efi/PiDxe.h>
+#include <ipxe/efi/Protocol/LoadedImage.h>
 
 /* Reset any trailing #pragma pack directives */
 #pragma pack(1)
@@ -135,6 +136,7 @@ struct efi_config_table {
 #define EFIRC_TO_RC( efirc ) (efirc)
 
 extern EFI_HANDLE efi_image_handle;
+extern EFI_LOADED_IMAGE_PROTOCOL *efi_loaded_image;
 extern EFI_SYSTEM_TABLE *efi_systab;
 
 extern const char * efi_strerror ( EFI_STATUS efirc );
