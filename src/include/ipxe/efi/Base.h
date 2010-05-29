@@ -105,6 +105,16 @@ VERIFY_SIZE_OF (CHAR16, 2);
   #define ASM_FUNCTION_REMOVE_IF_UNREFERENCED
 #endif
 
+#ifdef __CC_ARM
+  //
+  // Older RVCT ARM compilers don't fully support #pragma pack and require __packed
+  // as a prefix for the structure.
+  //
+  #define PACKED  __packed
+#else
+  #define PACKED
+#endif
+
 ///
 /// 128 bit buffer containing a unique identifier value.
 /// Unless otherwise specified, aligned on a 64 bit boundary.

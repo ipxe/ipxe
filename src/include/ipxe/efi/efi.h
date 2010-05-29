@@ -19,13 +19,6 @@
  * header to reflect its new location within the iPXE tree.  It will
  * also tidy up the file by removing carriage return characters and
  * trailing whitespace.
- *
- *
- * At the time of writing, there are a few other modifications to
- * these headers that are present in my personal edk2 tree, that are
- * not yet committed back to the main edk2 repository.  These
- * modifications are fixes for compilation on case-dependent
- * filesystems, compilation under -mrtd and -mregparm=3, etc.
  */
 
 /* EFI headers rudely redefine NULL */
