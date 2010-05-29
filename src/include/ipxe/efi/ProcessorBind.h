@@ -1,3 +1,6 @@
+#ifndef _IPXE_EFI_PROCESSOR_BIND_H
+#define _IPXE_EFI_PROCESSOR_BIND_H
+
 /*
  * EFI header files rely on having the CPU architecture directory
  * present in the search path in order to pick up ProcessorBind.h.  We
@@ -12,3 +15,5 @@
 #if __x86_64__
 #include <ipxe/efi/X64/ProcessorBind.h>
 #endif
+
+#endif /* _IPXE_EFI_PROCESSOR_BIND_H */

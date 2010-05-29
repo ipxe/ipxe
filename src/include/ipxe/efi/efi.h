@@ -1,5 +1,5 @@
-#ifndef _EFI_H
-#define _EFI_H
+#ifndef _IPXE_EFI_H
+#define _IPXE_EFI_H
 
 /** @file
  *
@@ -142,4 +142,4 @@ extern EFI_STATUS efi_init ( EFI_HANDLE image_handle,
 			     EFI_SYSTEM_TABLE *systab );
 extern int efi_snp_install ( void );
 
-#endif /* _EFI_H */
+#endif /* _IPXE_EFI_H */
