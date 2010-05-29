@@ -28,9 +28,9 @@ typedef union {
 			uint8_t byte;
 		};
 		uint8_t h;
-	} PACKED;
+	} __attribute__ (( packed ));
 	uint16_t word;
-} PACKED reg16_t;
+} __attribute__ (( packed )) reg16_t;
 
 /**
  * A 32-bit general register.
@@ -46,10 +46,10 @@ typedef union {
 			uint8_t byte;
 		};
 		uint8_t h;
-	} PACKED;
+	} __attribute__ (( packed ));
 	uint16_t word;
 	uint32_t dword;
-} PACKED reg32_t;
+} __attribute__ (( packed )) reg32_t;
 
 /**
  * A 32-bit general register dump.
@@ -80,7 +80,7 @@ struct i386_regs {
 		struct {
 			uint8_t bl;
 			uint8_t bh;
-		} PACKED;
+		} __attribute__ (( packed ));
 		uint16_t bx;
 		uint32_t ebx;
 	};
@@ -88,7 +88,7 @@ struct i386_regs {
 		struct {
 			uint8_t dl;
 			uint8_t dh;
-		} PACKED;
+		} __attribute__ (( packed ));
 		uint16_t dx;
 		uint32_t edx;
 	};
@@ -96,7 +96,7 @@ struct i386_regs {
 		struct {
 			uint8_t cl;
 			uint8_t ch;
-		} PACKED;
+		} __attribute__ (( packed ));
 		uint16_t cx;
 		uint32_t ecx;
 	};
@@ -104,11 +104,11 @@ struct i386_regs {
 		struct {
 			uint8_t al;
 			uint8_t ah;
-		} PACKED;
+		} __attribute__ (( packed ));
 		uint16_t ax;
 		uint32_t eax;
 	};
-} PACKED;
+} __attribute__ (( packed ));
 
 /**
  * A segment register dump.
@@ -142,7 +142,7 @@ struct i386_seg_regs {
 	uint16_t es;
 	uint16_t fs;
 	uint16_t gs;
-} PACKED;
+} __attribute__ (( packed ));
 
 /**
  * A full register dump.
@@ -175,7 +175,7 @@ struct i386_all_regs {
 	struct i386_seg_regs segs;
 	struct i386_regs regs;
 	uint32_t flags;
-} PACKED;
+} __attribute__ (( packed ));
 
 /* Flags */
 #define CF ( 1 <<  0 )
@@ -191,7 +191,7 @@ struct i386_all_regs {
 struct segoff {
 	uint16_t offset;
 	uint16_t segment;
-} PACKED;
+} __attribute__ (( packed ));
 
 typedef struct segoff segoff_t;
 

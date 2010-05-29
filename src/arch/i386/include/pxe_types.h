@@ -111,14 +111,14 @@ typedef UINT16_t OFF16_t;
 typedef struct s_SEGOFF16 {
 	OFF16_t		offset;		/**< Offset within the segment */
 	SEGSEL_t	segment;	/**< Segment selector */
-} PACKED SEGOFF16_t;
+} __attribute__ (( packed )) SEGOFF16_t;
 
 /** A segment descriptor */
 typedef struct s_SEGDESC {
 	SEGSEL_t	segment_address;	/**< Segment selector */
 	ADDR32_t	Physical_address;	/**< Segment base address */
 	OFF16_t		Seg_size;		/**< Size of the segment */
-} PACKED SEGDESC_t;
+} __attribute__ (( packed )) SEGDESC_t;
 
 /** @} */ /* pxe_types */
 

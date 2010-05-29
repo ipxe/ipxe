@@ -10,7 +10,7 @@ FILE_LICENCE ( GPL2_OR_LATER );
 /* Parameter block for pxenv_unknown() */
 struct s_PXENV_UNKNOWN {
 	PXENV_STATUS_t Status;			/**< PXE status code */
-} PACKED;
+} __attribute__ (( packed ));
 
 typedef struct s_PXENV_UNKNOWN PXENV_UNKNOWN_t;
 
@@ -87,7 +87,7 @@ struct undi_rom_header {
 	UINT16_t PXEROMID;
 	/** Offset of the PCI ROM structure */
 	UINT16_t PCIRHeader;
-} PACKED;
+} __attribute__ (( packed ));
 
 /** Signature for an expansion ROM */
 #define ROM_SIGNATURE 0xaa55
@@ -121,7 +121,7 @@ struct undi_rom_id {
 	UINT16_t DataSize;
 	/** Minimum required code segment size */
 	UINT16_t CodeSize;
-} PACKED;
+} __attribute__ (( packed ));
 
 /** Signature for an UNDI ROM ID structure */
 #define UNDI_ROM_ID_SIGNATURE \
@@ -138,7 +138,7 @@ struct pcir_header {
 	uint16_t vendor_id;
 	/** PCI device ID */
 	uint16_t device_id;
-} PACKED;
+} __attribute__ (( packed ));
 
 /** Signature for an UNDI ROM ID structure */
 #define PCIR_SIGNATURE \

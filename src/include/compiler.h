@@ -429,9 +429,6 @@ int __debug_disable;
  */
 #ifndef ASSEMBLY
 
-/** Declare a data structure as packed. */
-#define PACKED __attribute__ (( packed ))
-
 /** Declare a variable or data structure as unused. */
 #define __unused __attribute__ (( unused ))
 

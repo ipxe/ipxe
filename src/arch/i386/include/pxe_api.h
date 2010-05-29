@@ -116,7 +116,7 @@ struct s_PXENV {
 	 * greater.  If present, it points to a struct s_PXE.
 	 */
 	SEGOFF16_t	PXEPtr;
-} PACKED;
+} __attribute__ (( packed ));
 
 typedef struct s_PXENV PXENV_t;
 
@@ -221,7 +221,7 @@ struct s_PXE {
 	SEGDESC_t	BC_Code;
 	/** Base-code writable code segment descriptor */
 	SEGDESC_t	BC_CodeWrite;
-} PACKED;
+} __attribute__ (( packed ));
 
 typedef struct s_PXE PXE_t;
 
@@ -248,7 +248,7 @@ typedef struct s_PXE PXE_t;
 struct s_PXENV_UNLOAD_STACK {
 	PXENV_STATUS_t Status;			/**< PXE status code */
 	UINT8_t reserved[10];			/**< Must be zero */
-} PACKED;
+} __attribute__ (( packed ));
 
 typedef struct s_PXENV_UNLOAD_STACK PXENV_UNLOAD_STACK_t;
 
@@ -292,7 +292,7 @@ struct s_PXENV_GET_CACHED_INFO {
 	UINT16_t BufferSize;			/**< Buffer size */
 	SEGOFF16_t Buffer;			/**< Buffer address */
 	UINT16_t BufferLimit;			/**< Maximum buffer size */
-} PACKED;
+} __attribute__ (( packed ));
 
 typedef struct s_PXENV_GET_CACHED_INFO PXENV_GET_CACHED_INFO_t;
 
@@ -399,7 +399,7 @@ struct bootph {
 			UINT8_t pad[56];
 		} v;
 	} vendor;
-} PACKED;
+} __attribute__ (( packed ));
 
 typedef struct bootph BOOTPLAYER_t;
 
@@ -492,7 +492,7 @@ struct s_PXENV_START_UNDI {
 	 * more sense.
 	 */
 	SEGSEL_t ES;
-} PACKED;
+} __attribute__ (( packed ));
 
 typedef struct s_PXENV_START_UNDI PXENV_START_UNDI_t;
 
@@ -513,7 +513,7 @@ extern PXENV_EXIT_t pxenv_start_undi ( struct s_PXENV_START_UNDI *start_undi );
 /** Parameter block for pxenv_stop_undi() */
 struct s_PXENV_STOP_UNDI {
 	PXENV_STATUS_t Status;			/**< PXE status code */
-} PACKED;
+} __attribute__ (( packed ));
 
 typedef struct s_PXENV_STOP_UNDI PXENV_STOP_UNDI_t;
 
@@ -534,7 +534,7 @@ extern PXENV_EXIT_t pxenv_stop_undi ( struct s_PXENV_STOP_UNDI *stop_undi );
 /** Parameter block for pxenv_start_base() */
 struct s_PXENV_START_BASE {
 	PXENV_STATUS_t Status;			/**< PXE status code */
-} PACKED;
+} __attribute__ (( packed ));
 
 typedef struct s_PXENV_START_BASE PXENV_START_BASE_t;
 
@@ -555,7 +555,7 @@ extern PXENV_EXIT_t pxenv_start_base ( struct s_PXENV_START_BASE *start_base );
 /** Parameter block for pxenv_stop_base() */
 struct s_PXENV_STOP_BASE {
 	PXENV_STATUS_t Status;			/**< PXE status code */
-} PACKED;
+} __attribute__ (( packed ));
 
 typedef struct s_PXENV_STOP_BASE PXENV_STOP_BASE_t;
 
@@ -596,7 +596,7 @@ struct s_PXENV_TFTP_OPEN {
 	 * negotiate blocksizes smaller than this.
 	 */
 	UINT16_t PacketSize;
-} PACKED;
+} __attribute__ (( packed ));
 
 typedef struct s_PXENV_TFTP_OPEN PXENV_TFTP_OPEN_t;
 
@@ -617,7 +617,7 @@ extern PXENV_EXIT_t pxenv_tftp_open ( struct s_PXENV_TFTP_OPEN *tftp_open );
 /** Parameter block for pxenv_tftp_close() */
 struct s_PXENV_TFTP_CLOSE {
 	PXENV_STATUS_t Status;			/**< PXE status code */
-} PACKED;
+} __attribute__ (( packed ));
 
 typedef struct s_PXENV_TFTP_CLOSE PXENV_TFTP_CLOSE_t;
 
@@ -641,7 +641,7 @@ struct s_PXENV_TFTP_READ {
 	UINT16_t PacketNumber;			/**< TFTP packet number */
 	UINT16_t BufferSize;			/**< Size of data buffer */
 	SEGOFF16_t Buffer;			/**< Address of data buffer */
-} PACKED;
+} __attribute__ (( packed ));
 
 typedef struct s_PXENV_TFTP_READ PXENV_TFTP_READ_t;
 
@@ -686,7 +686,7 @@ struct s_PXENV_TFTP_READ_FILE {
 	 * already been seen).
 	 */
 	UINT16_t TFTPReopenDelay;
-} PACKED;
+} __attribute__ (( packed ));
 
 typedef struct s_PXENV_TFTP_READ_FILE PXENV_TFTP_READ_FILE_t;
 
@@ -712,7 +712,7 @@ struct s_PXENV_TFTP_GET_FSIZE {
 	IP4_t GatewayIPAddress;			/**< Relay agent IP address */
 	UINT8_t FileName[128];			/**< File name */
 	UINT32_t FileSize;			/**< Size of the file */
-} PACKED;
+} __attribute__ (( packed ));
 
 typedef struct s_PXENV_TFTP_GET_FSIZE PXENV_TFTP_GET_FSIZE_t;
 
@@ -744,7 +744,7 @@ extern PXENV_EXIT_t pxenv_tftp_get_fsize ( struct s_PXENV_TFTP_GET_FSIZE
 struct s_PXENV_UDP_OPEN {
 	PXENV_STATUS_t	Status;		/**< PXE status code */
 	IP4_t		src_ip;		/**< IP address of this station */
-} PACKED;
+} __attribute__ (( packed ));
 
 typedef struct s_PXENV_UDP_OPEN PXENV_UDP_OPEN_t;
 
@@ -765,7 +765,7 @@ extern PXENV_EXIT_t pxenv_udp_open ( struct s_PXENV_UDP_OPEN *udp_open );
 /** Parameter block for pxenv_udp_close() */
 struct s_PXENV_UDP_CLOSE {
 	PXENV_STATUS_t	Status;		/**< PXE status code */
-} PACKED;
+} __attribute__ (( packed ));
 
 typedef struct s_PXENV_UDP_CLOSE PXENV_UDP_CLOSE_t;
 
@@ -792,7 +792,7 @@ struct s_PXENV_UDP_WRITE {
 	UDP_PORT_t	dst_port;	/**< Destination UDP port */
 	UINT16_t	buffer_size;	/**< UDP payload buffer size */
 	SEGOFF16_t	buffer;		/**< UDP payload buffer address */
-} PACKED;
+} __attribute__ (( packed ));
 
 typedef struct s_PXENV_UDP_WRITE PXENV_UDP_WRITE_t;
 
@@ -819,7 +819,7 @@ struct s_PXENV_UDP_READ {
 	UDP_PORT_t	d_port;		/**< Destination UDP port */
 	UINT16_t	buffer_size;	/**< UDP payload buffer size */
 	SEGOFF16_t	buffer;		/**< UDP payload buffer address */
-} PACKED;
+} __attribute__ (( packed ));
 
 typedef struct s_PXENV_UDP_READ PXENV_UDP_READ_t;
 
@@ -856,7 +856,7 @@ extern PXENV_EXIT_t pxenv_udp_read ( struct s_PXENV_UDP_READ *udp_read );
 /** Parameter block for pxenv_undi_startup() */
 struct s_PXENV_UNDI_STARTUP {
 	PXENV_STATUS_t	Status;		/**< PXE status code */
-} PACKED;
+} __attribute__ (( packed ));
 
 typedef struct s_PXENV_UNDI_STARTUP PXENV_UNDI_STARTUP_t;
 
@@ -878,7 +878,7 @@ extern PXENV_EXIT_t pxenv_undi_startup ( struct s_PXENV_UNDI_STARTUP
 /** Parameter block for pxenv_undi_cleanup() */
 struct s_PXENV_UNDI_CLEANUP {
 	PXENV_STATUS_t	Status;		/**< PXE status code */
-} PACKED;
+} __attribute__ (( packed ));
 
 typedef struct s_PXENV_UNDI_CLEANUP PXENV_UNDI_CLEANUP_t;
 
@@ -909,7 +909,7 @@ struct s_PXENV_UNDI_INITIALIZE {
 	 */
 	ADDR32_t ProtocolIni;
 	UINT8_t reserved[8];		/**< Must be zero */
-} PACKED;
+} __attribute__ (( packed ));
 
 typedef struct s_PXENV_UNDI_INITIALIZE PXENV_UNDI_INITIALIZE_t;
 
@@ -937,7 +937,7 @@ struct s_PXENV_UNDI_MCAST_ADDRESS {
 	UINT16_t MCastAddrCount;
 	/** List of up to #MAXNUM_MCADDR multicast MAC addresses */
 	MAC_ADDR_t McastAddr[MAXNUM_MCADDR];
-} PACKED;
+} __attribute__ (( packed ));
 
 typedef struct s_PXENV_UNDI_MCAST_ADDRESS PXENV_UNDI_MCAST_ADDRESS_t;
 
@@ -946,7 +946,7 @@ struct s_PXENV_UNDI_RESET {
 	PXENV_STATUS_t	Status;		/**< PXE status code */
 	/** Multicast MAC addresses */
 	struct s_PXENV_UNDI_MCAST_ADDRESS R_Mcast_Buf;
-} PACKED;
+} __attribute__ (( packed ));
 
 typedef struct s_PXENV_UNDI_RESET PXENV_UNDI_RESET_t;
 
@@ -968,7 +968,7 @@ extern PXENV_EXIT_t pxenv_undi_reset_adapter ( struct s_PXENV_UNDI_RESET
 /** Parameter block for pxenv_undi_shutdown() */
 struct s_PXENV_UNDI_SHUTDOWN {
 	PXENV_STATUS_t	Status;		/**< PXE status code */
-} PACKED;
+} __attribute__ (( packed ));
 
 typedef struct s_PXENV_UNDI_SHUTDOWN PXENV_UNDI_SHUTDOWN_t;
 
@@ -1020,7 +1020,7 @@ struct s_PXENV_UNDI_OPEN {
 	UINT16_t PktFilter;
 	/** Multicast MAC addresses */
 	struct s_PXENV_UNDI_MCAST_ADDRESS R_Mcast_Buf;
-} PACKED;
+} __attribute__ (( packed ));
 
 typedef struct s_PXENV_UNDI_OPEN PXENV_UNDI_OPEN_t;
 
@@ -1041,7 +1041,7 @@ extern PXENV_EXIT_t pxenv_undi_open ( struct s_PXENV_UNDI_OPEN *undi_open );
 /** Parameter block for pxenv_undi_close() */
 struct s_PXENV_UNDI_CLOSE {
 	PXENV_STATUS_t	Status;		/**< PXE status code */
-} PACKED;
+} __attribute__ (( packed ));
 
 typedef struct s_PXENV_UNDI_CLOSE PXENV_UNDI_CLOSE_t;
 
@@ -1092,7 +1092,7 @@ struct s_PXENV_UNDI_TBD {
 		UINT16_t TDDataLen;	/**< Length of this transmit buffer */
 		SEGOFF16_t TDDataPtr;	/**< Address of this transmit buffer */
 	} DataBlock[MAX_DATA_BLKS];
-} PACKED;
+} __attribute__ (( packed ));
 
 typedef struct s_PXENV_UNDI_TBD PXENV_UNDI_TBD_t;
 
@@ -1118,7 +1118,7 @@ struct s_PXENV_UNDI_TRANSMIT {
 	 */
 	SEGOFF16_t TBD;
 	UINT32_t Reserved[2];		/**< Must be zero */
-} PACKED;
+} __attribute__ (( packed ));
 
 typedef struct s_PXENV_UNDI_TRANSMIT PXENV_UNDI_TRANSMIT_t;
 
@@ -1142,7 +1142,7 @@ struct s_PXENV_UNDI_SET_MCAST_ADDRESS {
 	PXENV_STATUS_t	Status;		/**< PXE status code */
 	/** List of multicast addresses */
 	struct s_PXENV_UNDI_MCAST_ADDRESS R_Mcast_Buf;
-} PACKED;
+} __attribute__ (( packed ));
 
 typedef struct s_PXENV_UNDI_SET_MCAST_ADDRESS PXENV_UNDI_SET_MCAST_ADDRESS_t;
 
@@ -1165,7 +1165,7 @@ extern PXENV_EXIT_t pxenv_undi_set_mcast_address (
 struct s_PXENV_UNDI_SET_STATION_ADDRESS {
 	PXENV_STATUS_t	Status;		/**< PXE status code */
 	MAC_ADDR_t StationAddress;	/**< Station MAC address */
-} PACKED;
+} __attribute__ (( packed ));
 
 typedef struct s_PXENV_UNDI_SET_STATION_ADDRESS PXENV_UNDI_SET_STATION_ADDRESS_t;
 
@@ -1198,7 +1198,7 @@ struct s_PXENV_UNDI_SET_PACKET_FILTER {
 	 * without any kind of adult supervision" (quote from hpa).
 	 */
 	UINT8_t filter;
-} PACKED;
+} __attribute__ (( packed ));
 
 typedef struct s_PXENV_UNDI_SET_PACKET_FILTER PXENV_UNDI_SET_PACKET_FILTER_t;
 
@@ -1244,7 +1244,7 @@ struct s_PXENV_UNDI_GET_INFORMATION {
 	SEGSEL_t ROMAddress;		/**< Real-mode ROM segment address */
 	UINT16_t RxBufCt;		/**< Receive queue length */
 	UINT16_t TxBufCt;		/**< Transmit queue length */
-} PACKED;
+} __attribute__ (( packed ));
 
 typedef struct s_PXENV_UNDI_GET_INFORMATION PXENV_UNDI_GET_INFORMATION_t;
 
@@ -1270,7 +1270,7 @@ struct s_PXENV_UNDI_GET_STATISTICS {
 	UINT32_t RcvGoodFrames;		/**< Successful reception count */
 	UINT32_t RcvCRCErrors;		/**< Receive CRC error count */
 	UINT32_t RcvResourceErrors;	/**< Receive queue overflow count */
-} PACKED;
+} __attribute__ (( packed ));
 
 typedef struct s_PXENV_UNDI_GET_STATISTICS PXENV_UNDI_GET_STATISTICS_t;
 
@@ -1292,7 +1292,7 @@ extern PXENV_EXIT_t pxenv_undi_get_statistics (
 /** Parameter block for pxenv_undi_clear_statistics() */
 struct s_PXENV_UNDI_CLEAR_STATISTICS {
 	PXENV_STATUS_t	Status;		/**< PXE status code */
-} PACKED;
+} __attribute__ (( packed ));
 
 typedef struct s_PXENV_UNDI_CLEAR_STATISTICS PXENV_UNDI_CLEAR_STATISTICS_t;
 
@@ -1314,7 +1314,7 @@ extern PXENV_EXIT_t pxenv_undi_clear_statistics (
 /** Parameter block for pxenv_undi_initiate_diags() */
 struct s_PXENV_UNDI_INITIATE_DIAGS {
 	PXENV_STATUS_t	Status;		/**< PXE status code */
-} PACKED;
+} __attribute__ (( packed ));
 
 typedef struct s_PXENV_UNDI_INITIATE_DIAGS PXENV_UNDI_INITIATE_DIAGS_t;
 
@@ -1336,7 +1336,7 @@ extern PXENV_EXIT_t pxenv_undi_initiate_diags (
 /** Parameter block for pxenv_undi_force_interrupt() */
 struct s_PXENV_UNDI_FORCE_INTERRUPT {
 	PXENV_STATUS_t	Status;		/**< PXE status code */
-} PACKED;
+} __attribute__ (( packed ));
 
 typedef struct s_PXENV_UNDI_FORCE_INTERRUPT PXENV_UNDI_FORCE_INTERRUPT_t;
 
@@ -1360,7 +1360,7 @@ struct s_PXENV_UNDI_GET_MCAST_ADDRESS {
 	PXENV_STATUS_t	Status;		/**< PXE status code */
 	IP4_t InetAddr;			/**< Multicast IP address */
 	MAC_ADDR_t MediaAddr;		/**< Multicast MAC address */
-} PACKED;
+} __attribute__ (( packed ));
 
 typedef struct s_PXENV_UNDI_GET_MCAST_ADDRESS PXENV_UNDI_GET_MCAST_ADDRESS_t;
 
@@ -1394,7 +1394,7 @@ struct pci_nic_info {
 	UINT16_t BusDevFunc;		/**< PCI bus:dev:fn address */
 	UINT16_t SubVendor_ID;		/**< PCI subvendor ID */
 	UINT16_t SubDevice_ID;		/**< PCI subdevice ID */
-} PACKED;
+} __attribute__ (( packed ));
  
 /** Information for an ISAPnP or equivalent NIC */
 struct pnp_nic_info {
@@ -1404,7 +1404,7 @@ struct pnp_nic_info {
 	UINT8_t Prog_Intf;		/**< Programming interface */
 	/** Card Select Number assigned to card */
 	UINT16_t CardSelNum;
-} PACKED;
+} __attribute__ (( packed ));
 
 /** Parameter block for pxenv_undi_get_nic_type() */
 struct s_PXENV_UNDI_GET_NIC_TYPE {
@@ -1423,7 +1423,7 @@ struct s_PXENV_UNDI_GET_NIC_TYPE {
 		/** NIC information (if #NicType==#PnP_NIC) */
 		struct pnp_nic_info pnp;
 	} info;
-} PACKED;
+} __attribute__ (( packed ));
 
 typedef struct s_PXENV_UNDI_GET_NIC_TYPE PXENV_UNDI_GET_NIC_TYPE_t;
 
@@ -1484,7 +1484,7 @@ struct s_PXENV_UNDI_GET_IFACE_INFO {
 	 */
 	UINT32_t ServiceFlags;
 	UINT32_t Reserved[4];		/**< Must be zero */
-} PACKED;
+} __attribute__ (( packed ));
 
 typedef struct s_PXENV_UNDI_GET_IFACE_INFO PXENV_UNDI_GET_IFACE_INFO_t;
 
@@ -1520,7 +1520,7 @@ struct s_PXENV_UNDI_GET_STATE {
 	 * #PXE_UNDI_GET_STATE_OPENED.
 	 */
 	UINT8_t UNDIstate;
-} PACKED;
+} __attribute__ (( packed ));
 
 typedef struct s_PXENV_UNDI_GET_STATE PXENV_UNDI_GET_STATE_t;
 
@@ -1591,7 +1591,7 @@ struct s_PXENV_UNDI_ISR {
 	 * Valid values are #P_DIRECTED, #P_BROADCAST or #P_MULTICAST.
 	 */
 	UINT8_t PktType;
-} PACKED;
+} __attribute__ (( packed ));
 
 typedef struct s_PXENV_UNDI_ISR PXENV_UNDI_ISR_t;
 
@@ -1624,7 +1624,7 @@ struct s_PXENV_FILE_OPEN {
 	UINT16_t FileHandle;		/**< File handle */
 	SEGOFF16_t FileName;		/**< File URL */
 	UINT32_t Reserved;		/**< Reserved */
-} PACKED;
+} __attribute__ (( packed ));
 
 typedef struct s_PXENV_FILE_OPEN PXENV_FILE_OPEN_t;
 
@@ -1646,7 +1646,7 @@ extern PXENV_EXIT_t pxenv_file_open ( struct s_PXENV_FILE_OPEN *file_open );
 struct s_PXENV_FILE_CLOSE {
 	PXENV_STATUS_t Status;		/**< PXE status code */
 	UINT16_t FileHandle;		/**< File handle */
-} PACKED;
+} __attribute__ (( packed ));
 
 typedef struct s_PXENV_FILE_CLOSE PXENV_FILE_CLOSE_t;
 
@@ -1673,7 +1673,7 @@ struct s_PXENV_FILE_SELECT {
 	PXENV_STATUS_t Status;		/**< PXE status code */
 	UINT16_t FileHandle;		/**< File handle */
 	UINT16_t Ready;			/**< Indication of readiness */
-} PACKED;
+} __attribute__ (( packed ));
 
 typedef struct s_PXENV_FILE_SELECT PXENV_FILE_SELECT_t;
 
@@ -1698,7 +1698,7 @@ struct s_PXENV_FILE_READ {
 	UINT16_t FileHandle;		/**< File handle */
 	UINT16_t BufferSize;		/**< Data buffer size */
 	SEGOFF16_t Buffer;		/**< Data buffer */
-} PACKED;
+} __attribute__ (( packed ));
 
 typedef struct s_PXENV_FILE_READ PXENV_FILE_READ_t;
 
@@ -1721,7 +1721,7 @@ struct s_PXENV_GET_FILE_SIZE {
 	PXENV_STATUS_t Status;		/**< PXE status code */
 	UINT16_t FileHandle;		/**< File handle */
 	UINT32_t FileSize;		/**< File size */
-} PACKED;
+} __attribute__ (( packed ));
 
 typedef struct s_PXENV_GET_FILE_SIZE PXENV_GET_FILE_SIZE_t;
 
@@ -1744,7 +1744,7 @@ extern PXENV_EXIT_t pxenv_get_file_size ( struct s_PXENV_GET_FILE_SIZE
 struct s_PXENV_FILE_EXEC {
 	PXENV_STATUS_t Status;		/**< PXE status code */
 	SEGOFF16_t Command;		/**< Command to execute */
-} PACKED;
+} __attribute__ (( packed ));
 
 typedef struct s_PXENV_FILE_EXEC PXENV_FILE_EXEC_t;
 
@@ -1770,7 +1770,7 @@ struct s_PXENV_FILE_API_CHECK {
 	UINT32_t Provider;		/**< Implementation identifier */
 	UINT32_t APIMask;		/**< Supported API functions */
 	UINT32_t Flags;			/**< Reserved for the future */
-} PACKED;
+} __attribute__ (( packed ));
 
 typedef struct s_PXENV_FILE_API_CHECK PXENV_FILE_API_CHECK_t;
 
@@ -1792,7 +1792,7 @@ extern PXENV_EXIT_t pxenv_file_api_check ( struct s_PXENV_FILE_API_CHECK *file_a
 struct s_PXENV_FILE_EXIT_HOOK {
 	PXENV_STATUS_t Status;		/**< PXE status code */
 	SEGOFF16_t Hook;		/**< SEG16:OFF16 to jump to */
-} PACKED;
+} __attribute__ (( packed ));
 
 typedef struct s_PXENV_FILE_EXIT_HOOK PXENV_FILE_EXIT_HOOK_t;
 
@@ -1843,7 +1843,7 @@ struct s_UNDI_LOADER {
 	SEGOFF16_t PXEptr;
 	/** Address of the PXENV+ structure (a struct s_PXENV) */
 	SEGOFF16_t PXENVptr;
-} PACKED;
+} __attribute__ (( packed ));
 
 typedef struct s_UNDI_LOADER UNDI_LOADER_t;
 
