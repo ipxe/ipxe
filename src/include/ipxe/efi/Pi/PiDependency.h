@@ -17,6 +17,8 @@
 #ifndef __PI_DEPENDENCY_H__
 #define __PI_DEPENDENCY_H__
 
+FILE_LICENCE ( BSD3 );
+
 ///
 /// If present, this must be the first and only opcode,
 /// EFI_DEP_BEFORE is only used by DXE driver.

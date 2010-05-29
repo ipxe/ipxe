@@ -17,6 +17,8 @@
 #ifndef __EFI_WIN_CERTIFICATE_H__
 #define __EFI_WIN_CERTIFICATE_H__
 
+FILE_LICENCE ( BSD3 );
+
 //
 // _WIN_CERTIFICATE.wCertificateType
 //

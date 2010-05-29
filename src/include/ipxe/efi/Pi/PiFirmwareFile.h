@@ -19,6 +19,8 @@ WITHOUT WARRANTIES OR REPRESENTATIONS OF ANY KIND, EITHER EXPRESS OR IMPLIED.
 #ifndef __PI_FIRMWARE_FILE_H__
 #define __PI_FIRMWARE_FILE_H__
 
+FILE_LICENCE ( BSD3 );
+
 #pragma pack(1)
 ///
 /// Used to verify the integrity of the file.

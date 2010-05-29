@@ -16,6 +16,8 @@
 #ifndef __PCI_IO_H__
 #define __PCI_IO_H__
 
+FILE_LICENCE ( BSD3 );
+
 ///
 /// Global ID for the PCI I/O Protocol
 ///

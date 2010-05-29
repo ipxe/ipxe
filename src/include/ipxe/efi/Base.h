@@ -22,6 +22,8 @@ WITHOUT WARRANTIES OR REPRESENTATIONS OF ANY KIND, EITHER EXPRESS OR IMPLIED.
 #ifndef __BASE_H__
 #define __BASE_H__
 
+FILE_LICENCE ( BSD3 );
+
 //
 // Include processor specific binding
 //

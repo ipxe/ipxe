@@ -18,6 +18,8 @@
 #ifndef __PI_BOOT_MODE_H__
 #define __PI_BOOT_MODE_H__
 
+FILE_LICENCE ( BSD3 );
+
 ///
 /// EFI boot mode
 ///

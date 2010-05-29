@@ -15,6 +15,8 @@
 #ifndef __PROCESSOR_BIND_H__
 #define __PROCESSOR_BIND_H__
 
+FILE_LICENCE ( BSD3 );
+
 ///
 /// Define the processor type so other code can make processor based choices
 ///

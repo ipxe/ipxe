@@ -18,6 +18,8 @@ WITHOUT WARRANTIES OR REPRESENTATIONS OF ANY KIND, EITHER EXPRESS OR IMPLIED.
 #ifndef __EFI_DRIVER_BINDING_H__
 #define __EFI_DRIVER_BINDING_H__
 
+FILE_LICENCE ( BSD3 );
+
 ///
 /// The global ID for the ControllerHandle Driver Protocol.
 ///

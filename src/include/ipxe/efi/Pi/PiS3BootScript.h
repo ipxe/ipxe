@@ -16,6 +16,8 @@
 #ifndef _PI_S3_BOOT_SCRIPT_H_
 #define _PI_S3_BOOT_SCRIPT_H_
 
+FILE_LICENCE ( BSD3 );
+
 //*******************************************
 // EFI Boot Script Opcode definitions
 //*******************************************

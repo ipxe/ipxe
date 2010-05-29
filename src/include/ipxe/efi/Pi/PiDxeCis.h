@@ -18,6 +18,8 @@ WITHOUT WARRANTIES OR REPRESENTATIONS OF ANY KIND, EITHER EXPRESS OR IMPLIED.
 #ifndef __PI_DXECIS_H__
 #define __PI_DXECIS_H__
 
+FILE_LICENCE ( BSD3 );
+
 #include <ipxe/efi/Uefi/UefiMultiPhase.h>
 #include <ipxe/efi/Pi/PiMultiPhase.h>
 

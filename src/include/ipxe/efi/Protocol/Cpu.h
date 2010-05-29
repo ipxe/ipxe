@@ -17,6 +17,8 @@
 #ifndef __ARCH_PROTOCOL_CPU_H__
 #define __ARCH_PROTOCOL_CPU_H__
 
+FILE_LICENCE ( BSD3 );
+
 #include <ipxe/efi/Protocol/DebugSupport.h>
 
 #define EFI_CPU_ARCH_PROTOCOL_GUID \

@@ -17,6 +17,8 @@
 #ifndef __EFI_COMPONENT_NAME2_H__
 #define __EFI_COMPONENT_NAME2_H__
 
+FILE_LICENCE ( BSD3 );
+
 ///
 /// Global ID for the Component Name Protocol
 ///

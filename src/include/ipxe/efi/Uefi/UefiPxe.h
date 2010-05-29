@@ -21,6 +21,8 @@ WITHOUT WARRANTIES OR REPRESENTATIONS OF ANY KIND, EITHER EXPRESS OR IMPLIED.
 #ifndef __EFI_PXE_H__
 #define __EFI_PXE_H__
 
+FILE_LICENCE ( BSD3 );
+
 #pragma pack(1)
 
 #define PXE_BUSTYPE(a, b, c, d) \

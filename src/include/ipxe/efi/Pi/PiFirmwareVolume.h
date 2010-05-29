@@ -18,6 +18,8 @@
 #ifndef __PI_FIRMWAREVOLUME_H__
 #define __PI_FIRMWAREVOLUME_H__
 
+FILE_LICENCE ( BSD3 );
+
 ///
 /// EFI_FV_FILE_ATTRIBUTES
 ///

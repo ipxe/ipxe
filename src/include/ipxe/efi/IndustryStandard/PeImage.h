@@ -22,6 +22,8 @@ WITHOUT WARRANTIES OR REPRESENTATIONS OF ANY KIND, EITHER EXPRESS OR IMPLIED.
 #ifndef __PE_IMAGE_H__
 #define __PE_IMAGE_H__
 
+FILE_LICENCE ( BSD3 );
+
 //
 // PE32+ Subsystem type for EFI images
 //

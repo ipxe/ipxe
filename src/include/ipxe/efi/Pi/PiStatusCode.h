@@ -19,6 +19,8 @@ WITHOUT WARRANTIES OR REPRESENTATIONS OF ANY KIND, EITHER EXPRESS OR IMPLIED.
 #ifndef __PI_STATUS_CODE_H__
 #define __PI_STATUS_CODE_H__
 
+FILE_LICENCE ( BSD3 );
+
 //
 // Required for IA32 and IPF defines for CPU exception types
 //

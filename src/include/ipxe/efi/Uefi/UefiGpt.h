@@ -15,6 +15,8 @@ WITHOUT WARRANTIES OR REPRESENTATIONS OF ANY KIND, EITHER EXPRESS OR IMPLIED.
 #ifndef __UEFI_GPT_H__
 #define __UEFI_GPT_H__
 
+FILE_LICENCE ( BSD3 );
+
 ///
 /// The primary GUID Partition Table Header must be
 /// located in LBA 1 (i.e., the second logical block).

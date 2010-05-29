@@ -15,6 +15,8 @@ WITHOUT WARRANTIES OR REPRESENTATIONS OF ANY KIND, EITHER EXPRESS OR IMPLIED.
 #ifndef __UEFI_MULTIPHASE_H__
 #define __UEFI_MULTIPHASE_H__
 
+FILE_LICENCE ( BSD3 );
+
 #include <ipxe/efi/Guid/WinCertificate.h>
 ///
 /// Enumeration of memory types introduced in UEFI.

@@ -30,6 +30,8 @@
 #ifndef __CPU_IO2_H__
 #define __CPU_IO2_H__
 
+FILE_LICENCE ( BSD3 );
+
 #define EFI_CPU_IO2_PROTOCOL_GUID \
   { \
     0xad61f191, 0xae5f, 0x4c0e, {0xb9, 0xfa, 0xe8, 0x69, 0xd2, 0x88, 0xc6, 0x4f} \
