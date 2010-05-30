@@ -32,6 +32,19 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #include <ipxe/segment.h>
 
 /**
+ * Segment-specific error messages
+ *
+ * This error happens sufficiently often to merit a user-friendly
+ * description.
+ */
+#define ERANGE_SEGMENT __einfo_error ( EINFO_ERANGE_SEGMENT )
+#define EINFO_ERANGE_SEGMENT \
+	__einfo_uniqify ( EINFO_ERANGE, 0x01, "Requested memory not available" )
+struct errortab segment_errors[] __errortab = {
+	__einfo_errortab ( EINFO_ERANGE_SEGMENT ),
+};
+
+/**
  * Prepare segment for loading
  *
  * @v segment		Segment start
@@ -73,15 +86,5 @@ int prep_segment ( userptr_t segment, size_t filesz, size_t memsz ) {
 	/* No suitable memory region found */
 	DBG ( "Segment [%lx,%lx,%lx) does not fit into available memory\n",
 	      start, mid, end );
-	return -ERANGE;
+	return -ERANGE_SEGMENT;
 }
-
-/**
- * Segment-specific error messages
- *
- * This error happens sufficiently often to merit a user-friendly
- * description.
- */
-struct errortab segment_errors[] __errortab = {
-	{ ERANGE, "Requested memory not available" },
-};

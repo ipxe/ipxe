@@ -99,6 +99,8 @@ SECTIONS {
 	*(.eh_frame.*)
 	*(.rel)
 	*(.rel.*)
+	*(.einfo)
+	*(.einfo.*)
 	*(.discard)
     }
 }

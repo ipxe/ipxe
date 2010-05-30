@@ -50,13 +50,17 @@ struct list_head ib_devices = LIST_HEAD_INIT ( ib_devices );
 static struct list_head open_ib_devices = LIST_HEAD_INIT ( open_ib_devices );
 
 /* Disambiguate the various possible EINPROGRESSes */
-#define EINPROGRESS_INIT ( EINPROGRESS | EUNIQ_01 )
-#define EINPROGRESS_ARMED ( EINPROGRESS | EUNIQ_02 )
+#define EINPROGRESS_INIT __einfo_error ( EINFO_EINPROGRESS_INIT )
+#define EINFO_EINPROGRESS_INIT __einfo_uniqify \
+	( EINFO_EINPROGRESS, 0x01, "Initialising" )
+#define EINPROGRESS_ARMED __einfo_error ( EINFO_EINPROGRESS_ARMED )
+#define EINFO_EINPROGRESS_ARMED __einfo_uniqify \
+	( EINFO_EINPROGRESS, 0x02, "Armed" )
 
 /** Human-readable message for the link statuses */
 struct errortab infiniband_errors[] __errortab = {
-	{ EINPROGRESS_INIT, "Initialising" },
-	{ EINPROGRESS_ARMED, "Armed" },
+	__einfo_errortab ( EINFO_EINPROGRESS_INIT ),
+	__einfo_errortab ( EINFO_EINPROGRESS_ARMED ),
 };
 
 /***************************************************************************

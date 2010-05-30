@@ -550,6 +550,18 @@ $(BIN)/embedded.o : override CC := env CCACHE_DISABLE=1 $(CC)
 
 CFLAGS_embedded = -DEMBED_ALL="$(EMBED_ALL)"
 
+# Generate error usage information
+#
+$(BIN)/%.einfo : $(BIN)/%.o
+	$(QM)$(ECHO) "  [EINFO] $@"
+	$(Q)$(OBJCOPY) -O binary -j .einfo --set-section-flags .einfo=alloc \
+		$< $@
+
+EINFOS		:= $(patsubst $(BIN)/%.o,$(BIN)/%.einfo,$(BOBJS))
+$(BIN)/errors : $(EINFOS) $(EINFO)
+	$(QM)$(ECHO) "  [EINFO] $@"
+	$(Q)$(EINFO) $(EINFOS) | sort > $@
+
 # Generate the NIC file from the parsed source files.  The NIC file is
 # only for rom-o-matic.
 #
@@ -901,6 +913,15 @@ $(ICCFIX) : util/iccfix.c $(MAKEDEPS)
 	$(QM)$(ECHO) "  [HOSTCC] $@"
 	$(Q)$(HOST_CC) -idirafter include -O2 -o $@ $<
 CLEANUP += $(ICCFIX)
+
+###############################################################################
+#
+# The error usage information utility
+#
+$(EINFO) : util/einfo.c $(MAKEDEPS)
+	$(QM)$(ECHO) "  [HOSTCC] $@"
+	$(Q)$(HOST_CC) -idirafter include -O2 -o $@ $<
+CLEANUP += $(EINFO)
 
 ###############################################################################
 #

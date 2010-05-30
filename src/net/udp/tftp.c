@@ -48,13 +48,27 @@ FILE_LICENCE ( GPL2_OR_LATER );
 FEATURE ( FEATURE_PROTOCOL, "TFTP", DHCP_EB_FEATURE_TFTP, 1 );
 
 /* TFTP-specific error codes */
-#define ETFTP_INVALID_BLKSIZE	EUNIQ_01
-#define ETFTP_INVALID_TSIZE	EUNIQ_02
-#define ETFTP_MC_NO_PORT	EUNIQ_03
-#define ETFTP_MC_NO_MC		EUNIQ_04
-#define ETFTP_MC_INVALID_MC	EUNIQ_05
-#define ETFTP_MC_INVALID_IP	EUNIQ_06
-#define ETFTP_MC_INVALID_PORT	EUNIQ_07
+#define EINVAL_BLKSIZE 	__einfo_error ( EINFO_EINVAL_BLKSIZE )
+#define EINFO_EINVAL_BLKSIZE __einfo_uniqify \
+	( EINFO_EINVAL, 0x01, "Invalid blksize" )
+#define EINVAL_TSIZE __einfo_error ( EINFO_EINVAL_TSIZE )
+#define EINFO_EINVAL_TSIZE __einfo_uniqify \
+	( EINFO_EINVAL, 0x02, "Invalid tsize" )
+#define EINVAL_MC_NO_PORT __einfo_error ( EINFO_EINVAL_MC_NO_PORT )
+#define EINFO_EINVAL_MC_NO_PORT __einfo_uniqify \
+	( EINFO_EINVAL, 0x03, "Missing multicast port" )
+#define EINVAL_MC_NO_MC __einfo_error ( EINFO_EINVAL_MC_NO_MC )
+#define EINFO_EINVAL_MC_NO_MC __einfo_uniqify \
+	( EINFO_EINVAL, 0x04, "Missing multicast mc" )
+#define EINVAL_MC_INVALID_MC __einfo_error ( EINFO_EINVAL_MC_INVALID_MC )
+#define EINFO_EINVAL_MC_INVALID_MC __einfo_uniqify \
+	( EINFO_EINVAL, 0x05, "Missing multicast IP" )
+#define EINVAL_MC_INVALID_IP __einfo_error ( EINFO_EINVAL_MC_INVALID_IP )
+#define EINFO_EINVAL_MC_INVALID_IP __einfo_uniqify \
+	( EINFO_EINVAL, 0x06, "Invalid multicast IP" )
+#define EINVAL_MC_INVALID_PORT __einfo_error ( EINFO_EINVAL_MC_INVALID_PORT )
+#define EINFO_EINVAL_MC_INVALID_PORT __einfo_uniqify \
+	( EINFO_EINVAL, 0x07, "Invalid multicast port" )
 
 /**
  * A TFTP request
@@ -560,7 +574,7 @@ static int tftp_process_blksize ( struct tftp_request *tftp,
 	if ( *end ) {
 		DBGC ( tftp, "TFTP %p got invalid blksize \"%s\"\n",
 		       tftp, value );
-		return -( EINVAL | ETFTP_INVALID_BLKSIZE );
+		return -EINVAL_BLKSIZE;
 	}
 	DBGC ( tftp, "TFTP %p blksize=%d\n", tftp, tftp->blksize );
 
@@ -582,7 +596,7 @@ static int tftp_process_tsize ( struct tftp_request *tftp,
 	if ( *end ) {
 		DBGC ( tftp, "TFTP %p got invalid tsize \"%s\"\n",
 		       tftp, value );
-		return -( EINVAL | ETFTP_INVALID_TSIZE );
+		return -EINVAL_TSIZE;
 	}
 	DBGC ( tftp, "TFTP %p tsize=%ld\n", tftp, tftp->tsize );
 
@@ -616,13 +630,13 @@ static int tftp_process_multicast ( struct tftp_request *tftp,
 	port = strchr ( addr, ',' );
 	if ( ! port ) {
 		DBGC ( tftp, "TFTP %p multicast missing port,mc\n", tftp );
-		return -( EINVAL | ETFTP_MC_NO_PORT );
+		return -EINVAL_MC_NO_PORT;
 	}
 	*(port++) = '\0';
 	mc = strchr ( port, ',' );
 	if ( ! mc ) {
 		DBGC ( tftp, "TFTP %p multicast missing mc\n", tftp );
-		return -( EINVAL | ETFTP_MC_NO_MC );
+		return -EINVAL_MC_NO_MC;
 	}
 	*(mc++) = '\0';
 
@@ -631,7 +645,7 @@ static int tftp_process_multicast ( struct tftp_request *tftp,
 		tftp->flags &= ~TFTP_FL_SEND_ACK;
 	if ( *mc_end ) {
 		DBGC ( tftp, "TFTP %p multicast invalid mc %s\n", tftp, mc );
-		return -( EINVAL | ETFTP_MC_INVALID_MC );
+		return -EINVAL_MC_INVALID_MC;
 	}
 	DBGC ( tftp, "TFTP %p is%s the master client\n",
 	       tftp, ( ( tftp->flags & TFTP_FL_SEND_ACK ) ? "" : " not" ) );
@@ -640,7 +654,7 @@ static int tftp_process_multicast ( struct tftp_request *tftp,
 		if ( inet_aton ( addr, &socket.sin.sin_addr ) == 0 ) {
 			DBGC ( tftp, "TFTP %p multicast invalid IP address "
 			       "%s\n", tftp, addr );
-			return -( EINVAL | ETFTP_MC_INVALID_IP );
+			return -EINVAL_MC_INVALID_IP;
 		}
 		DBGC ( tftp, "TFTP %p multicast IP address %s\n",
 		       tftp, inet_ntoa ( socket.sin.sin_addr ) );
@@ -648,7 +662,7 @@ static int tftp_process_multicast ( struct tftp_request *tftp,
 		if ( *port_end ) {
 			DBGC ( tftp, "TFTP %p multicast invalid port %s\n",
 			       tftp, port );
-			return -( EINVAL | ETFTP_MC_INVALID_PORT );
+			return -EINVAL_MC_INVALID_PORT;
 		}
 		DBGC ( tftp, "TFTP %p multicast port %d\n",
 		       tftp, ntohs ( socket.sin.sin_port ) );
@@ -872,12 +886,20 @@ static int tftp_rx_data ( struct tftp_request *tftp,
 	return rc;
 }
 
-/** Translation between TFTP errors and internal error numbers */
-static const int tftp_errors[] = {
-	[TFTP_ERR_FILE_NOT_FOUND]	= ENOENT,
-	[TFTP_ERR_ACCESS_DENIED]	= EACCES,
-	[TFTP_ERR_ILLEGAL_OP]		= ENOTSUP,
-};
+/**
+ * Convert TFTP error code to return status code
+ *
+ * @v errcode		TFTP error code
+ * @ret rc		Return status code
+ */
+static int tftp_errcode_to_rc ( unsigned int errcode ) {
+	switch ( errcode ) {
+	case TFTP_ERR_FILE_NOT_FOUND:	return -ENOENT;
+	case TFTP_ERR_ACCESS_DENIED:	return -EACCES;
+	case TFTP_ERR_ILLEGAL_OP:	return -ENOTTY;
+	default:			return -ENOTSUP;
+	}
+}
 
 /**
  * Receive ERROR
@@ -889,8 +911,7 @@ static const int tftp_errors[] = {
  */
 static int tftp_rx_error ( struct tftp_request *tftp, void *buf, size_t len ) {
 	struct tftp_error *error = buf;
-	unsigned int err;
-	int rc = 0;
+	int rc;
 
 	/* Sanity check */
 	if ( len < sizeof ( *error ) ) {
@@ -903,11 +924,7 @@ static int tftp_rx_error ( struct tftp_request *tftp, void *buf, size_t len ) {
 	       "\"%s\"\n", tftp, ntohs ( error->errcode ), error->errmsg );
 	
 	/* Determine final operation result */
-	err = ntohs ( error->errcode );
-	if ( err < ( sizeof ( tftp_errors ) / sizeof ( tftp_errors[0] ) ) )
-		rc = -tftp_errors[err];
-	if ( ! rc )
-		rc = -ENOTSUP;
+	rc = tftp_errcode_to_rc ( ntohs ( error->errcode ) );
 
 	/* Close TFTP request */
 	tftp_done ( tftp, rc );

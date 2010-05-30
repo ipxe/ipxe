@@ -77,11 +77,13 @@ static struct ipoib_mac ipoib_broadcast = {
 };
 
 /** Link status for "broadcast join in progress" */
-#define EINPROGRESS_JOINING ( EINPROGRESS | EUNIQ_01 )
+#define EINPROGRESS_JOINING __einfo_error ( EINFO_EINPROGRESS_JOINING )
+#define EINFO_EINPROGRESS_JOINING __einfo_uniqify \
+	( EINFO_EINPROGRESS, 0x01, "Joining" )
 
 /** Human-readable message for the link status */
 struct errortab ipoib_errors[] __errortab = {
-	{ EINPROGRESS_JOINING, "Joining" },
+	__einfo_errortab ( EINFO_EINPROGRESS_JOINING ),
 };
 
 /****************************************************************************

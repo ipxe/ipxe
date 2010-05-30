@@ -48,17 +48,50 @@ FILE_LICENCE ( GPL2_OR_LATER );
 FEATURE ( FEATURE_PROTOCOL, "iSCSI", DHCP_EB_FEATURE_ISCSI, 1 );
 
 /* Disambiguate the various error causes */
-#define EACCES_INCORRECT_TARGET_USERNAME ( EACCES | EUNIQ_01 )
-#define EACCES_INCORRECT_TARGET_PASSWORD ( EACCES | EUNIQ_02 )
-#define ENOTSUP_INITIATOR_STATUS ( ENOTSUP | EUNIQ_01 )
-#define ENOTSUP_OPCODE ( ENOTSUP | EUNIQ_02 )
-#define ENOTSUP_DISCOVERY ( ENOTSUP | EUNIQ_03 )
-#define EPERM_INITIATOR_AUTHENTICATION ( EPERM | EUNIQ_01 )
-#define EPERM_INITIATOR_AUTHORISATION ( EPERM | EUNIQ_02 )
-#define EPROTO_INVALID_CHAP_ALGORITHM ( EPROTO | EUNIQ_01 )
-#define EPROTO_INVALID_CHAP_IDENTIFIER ( EPROTO | EUNIQ_02 )
-#define EPROTO_INVALID_LARGE_BINARY ( EPROTO | EUNIQ_03 )
-#define EPROTO_INVALID_CHAP_RESPONSE ( EPROTO | EUNIQ_04 )
+#define EACCES_INCORRECT_TARGET_USERNAME \
+	__einfo_error ( EINFO_EACCES_INCORRECT_TARGET_USERNAME )
+#define EINFO_EACCES_INCORRECT_TARGET_USERNAME \
+	__einfo_uniqify ( EINFO_EACCES, 0x01, "Incorrect target username" )
+#define EACCES_INCORRECT_TARGET_PASSWORD \
+	__einfo_error ( EINFO_EACCES_INCORRECT_TARGET_PASSWORD )
+#define EINFO_EACCES_INCORRECT_TARGET_PASSWORD \
+	__einfo_uniqify ( EINFO_EACCES, 0x02, "Incorrect target password" )
+#define ENOTSUP_INITIATOR_STATUS \
+	__einfo_error ( EINFO_ENOTSUP_INITIATOR_STATUS )
+#define EINFO_ENOTSUP_INITIATOR_STATUS \
+	__einfo_uniqify ( EINFO_ENOTSUP, 0x01, "Unsupported initiator status" )
+#define ENOTSUP_OPCODE \
+	__einfo_error ( EINFO_ENOTSUP_OPCODE )
+#define EINFO_ENOTSUP_OPCODE \
+	__einfo_uniqify ( EINFO_ENOTSUP, 0x02, "Unsupported opcode" )
+#define ENOTSUP_DISCOVERY \
+	__einfo_error ( EINFO_ENOTSUP_DISCOVERY )
+#define EINFO_ENOTSUP_DISCOVERY \
+	__einfo_uniqify ( EINFO_ENOTSUP, 0x03, "Discovery not supported" )
+#define EPERM_INITIATOR_AUTHENTICATION \
+	__einfo_error ( EINFO_EPERM_INITIATOR_AUTHENTICATION )
+#define EINFO_EPERM_INITIATOR_AUTHENTICATION \
+	__einfo_uniqify ( EINFO_EPERM, 0x01, "Initiator authentication failed" )
+#define EPERM_INITIATOR_AUTHORISATION \
+	__einfo_error ( EINFO_EPERM_INITIATOR_AUTHORISATION )
+#define EINFO_EPERM_INITIATOR_AUTHORISATION \
+	__einfo_uniqify ( EINFO_EPERM, 0x02, "Initiator not authorised" )
+#define EPROTO_INVALID_CHAP_ALGORITHM \
+	__einfo_error ( EINFO_EPROTO_INVALID_CHAP_ALGORITHM )
+#define EINFO_EPROTO_INVALID_CHAP_ALGORITHM \
+	__einfo_uniqify ( EINFO_EPROTO, 0x01, "Invalid CHAP algorithm" )
+#define EPROTO_INVALID_CHAP_IDENTIFIER \
+	__einfo_error ( EINFO_EPROTO_INVALID_CHAP_IDENTIFIER )
+#define EINFO_EPROTO_INVALID_CHAP_IDENTIFIER \
+	__einfo_uniqify ( EINFO_EPROTO, 0x02, "Invalid CHAP identifier" )
+#define EPROTO_INVALID_LARGE_BINARY \
+	__einfo_error ( EINFO_EPROTO_INVALID_LARGE_BINARY )
+#define EINFO_EPROTO_INVALID_LARGE_BINARY \
+	__einfo_uniqify ( EINFO_EPROTO, 0x03, "Invalid large binary" )
+#define EPROTO_INVALID_CHAP_RESPONSE \
+	__einfo_error ( EINFO_EPROTO_INVALID_CHAP_RESPONSE )
+#define EINFO_EPROTO_INVALID_CHAP_RESPONSE \
+	__einfo_uniqify ( EINFO_EPROTO, 0x04, "Invalid CHAP response" )
 
 /** iSCSI initiator name (explicitly specified) */
 static char *iscsi_explicit_initiator_iqn;

@@ -23,6 +23,8 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #include <string.h>
 #include <byteswap.h>
 #include <stdlib.h>
+#include <unistd.h>
+#include <errno.h>
 #include <ipxe/settings.h>
 #include <ipxe/if_arp.h>
 #include <ipxe/ethernet.h>
@@ -32,51 +34,13 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #include <ipxe/sec80211.h>
 #include <ipxe/timer.h>
 #include <ipxe/nap.h>
-#include <unistd.h>
-#include <errno.h>
+#include <ipxe/errortab.h>
+#include <ipxe/net80211_err.h>
 
 /** @file
  *
  * 802.11 device management
  */
-
-/* Disambiguate the EINVAL's a bit */
-#define EINVAL_PKT_TOO_SHORT	( EINVAL | EUNIQ_01 )
-#define EINVAL_PKT_VERSION	( EINVAL | EUNIQ_02 )
-#define EINVAL_PKT_NOT_DATA	( EINVAL | EUNIQ_03 )
-#define EINVAL_PKT_NOT_FROMDS	( EINVAL | EUNIQ_04 )
-#define EINVAL_PKT_LLC_HEADER	( EINVAL | EUNIQ_05 )
-#define EINVAL_CRYPTO_REQUEST	( EINVAL | EUNIQ_06 )
-#define EINVAL_ACTIVE_SCAN	( EINVAL | EUNIQ_07 )
-
-/*
- * 802.11 error codes: The AP can give us a status code explaining why
- * authentication failed, or a reason code explaining why we were
- * deauthenticated/disassociated. These codes range from 0-63 (the
- * field is 16 bits wide, but only up to 45 or so are defined yet; we
- * allow up to 63 for extensibility). This is encoded into an error
- * code as such:
- *
- *                                      status & 0x1f goes here --vv--
- *   Status code 0-31:  ECONNREFUSED | EUNIQ_(status & 0x1f) (0e1a6038)
- *   Status code 32-63: EHOSTUNREACH | EUNIQ_(status & 0x1f) (171a6011)
- *   Reason code 0-31:  ECONNRESET | EUNIQ_(reason & 0x1f)   (0f1a6039)
- *   Reason code 32-63: ENETRESET | EUNIQ_(reason & 0x1f)    (271a6001)
- *
- * The POSIX error codes more or less convey the appropriate message
- * (status codes occur when we can't associate at all, reason codes
- * when we lose association unexpectedly) and let us extract the
- * complete 802.11 error code from the rc value.
- */
-
-/** Make return status code from 802.11 status code */
-#define E80211_STATUS( stat )  ( ((stat & 0x20)? EHOSTUNREACH : ECONNREFUSED) \
-					| ((stat & 0x1f) << 8) )
-
-/** Make return status code from 802.11 reason code */
-#define E80211_REASON( reas )  ( ((reas & 0x20)? ENETRESET : ECONNRESET) \
-					| ((reas & 0x1f) << 8) )
-
 
 /** List of 802.11 devices */
 static struct list_head net80211_devices = LIST_HEAD_INIT ( net80211_devices );
@@ -2838,3 +2802,15 @@ void net80211_tx_complete ( struct net80211_device *dev,
 	/* Pass completion onward */
 	netdev_tx_complete_err ( dev->netdev, iob, rc );
 }
+
+/** Common 802.11 errors */
+struct errortab common_wireless_errors[] __errortab = {
+	__einfo_errortab ( EINFO_EINVAL_CRYPTO_REQUEST ),
+	__einfo_errortab ( EINFO_ECONNRESET_UNSPECIFIED ),
+	__einfo_errortab ( EINFO_ECONNRESET_INACTIVITY ),
+	__einfo_errortab ( EINFO_ECONNRESET_4WAY_TIMEOUT ),
+	__einfo_errortab ( EINFO_ECONNRESET_8021X_FAILURE ),
+	__einfo_errortab ( EINFO_ECONNREFUSED_FAILURE ),
+	__einfo_errortab ( EINFO_ECONNREFUSED_ASSOC_DENIED ),
+	__einfo_errortab ( EINFO_ECONNREFUSED_AUTH_ALGO_UNSUPP ),
+};

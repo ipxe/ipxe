@@ -34,6 +34,20 @@ FILE_LICENCE ( GPL2_OR_LATER );
  * static data in this file.
  */
 
+/* Unsupported cryptosystem error numbers */
+#define ENOTSUP_WEP __einfo_error ( EINFO_ENOTSUP_WEP )
+#define EINFO_ENOTSUP_WEP __einfo_uniqify ( EINFO_ENOTSUP, \
+	( 0x10 | NET80211_CRYPT_WEP ), "WEP not supported" )
+#define ENOTSUP_TKIP __einfo_error ( EINFO_ENOTSUP_TKIP )
+#define EINFO_ENOTSUP_TKIP __einfo_uniqify ( EINFO_ENOTSUP, \
+	( 0x10 | NET80211_CRYPT_TKIP ), "TKIP not supported" )
+#define ENOTSUP_CCMP __einfo_error ( EINFO_ENOTSUP_CCMP )
+#define EINFO_ENOTSUP_CCMP __einfo_uniqify ( EINFO_ENOTSUP, \
+	( 0x10 | NET80211_CRYPT_CCMP ), "CCMP not supported" )
+#define ENOTSUP_CRYPT( crypt )		     \
+	EUNIQ ( ENOTSUP, ( 0x10 | (crypt) ), \
+		ENOTSUP_WEP, ENOTSUP_TKIP, ENOTSUP_CCMP )
+
 /** Mapping from net80211 crypto/secprot types to RSN OUI descriptors */
 struct descriptor_map {
 	/** Value of net80211_crypto_alg or net80211_security_proto */
@@ -130,7 +144,7 @@ int sec80211_install ( struct net80211_crypto **which,
 
 	if ( ! crypto ) {
 		DBG ( "802.11-Sec no support for cryptosystem %d\n", crypt );
-		return -( ENOTSUP | EUNIQ_10 | ( crypt << 8 ) );
+		return -ENOTSUP_CRYPT ( crypt );
 	}
 
 	*which = crypto;

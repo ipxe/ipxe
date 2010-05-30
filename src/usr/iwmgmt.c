@@ -26,7 +26,6 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #include <ipxe/ethernet.h>
 #include <usr/ifmgmt.h>
 #include <usr/iwmgmt.h>
-#include <ipxe/errortab.h>
 
 /** @file
  *
@@ -225,20 +224,3 @@ int iwlist ( struct net80211_device *dev ) {
 		 dev->netdev->name, strerror ( rc ) );
 	return rc;
 }
-
-
-/* Record error codes as though they come from the 802.11 stack */
-#undef ERRFILE
-#define ERRFILE ERRFILE_net80211
-
-/** Common 802.11 errors */
-struct errortab common_wireless_errors[] __errortab = {
-	{ EINVAL | EUNIQ_06, "Packet decryption error" },
-	{ ECONNRESET | EUNIQ_01, "Unspecified reason" },
-	{ ECONNRESET | EUNIQ_04, "Disassociated due to inactivity" },
-	{ ECONNRESET | EUNIQ_0F, "4-Way Handshake timeout" },
-	{ ECONNRESET | EUNIQ_17, "IEEE 802.1X authentication failed" },
-	{ ECONNREFUSED | EUNIQ_01, "Unspecified failure" },
-	{ ECONNREFUSED | EUNIQ_0C, "Association denied" },
-	{ ECONNREFUSED | EUNIQ_0D, "Authentication method not supported" },
-};

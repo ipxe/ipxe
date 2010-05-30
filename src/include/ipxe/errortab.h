@@ -20,4 +20,9 @@ struct errortab {
 
 #define __errortab __table_entry ( ERRORTAB, 01 )
 
+#define __einfo_errortab( einfo ) {			\
+	.errno = __einfo_errno ( einfo ),		\
+	.text = __einfo_desc ( einfo ),			\
+	}
+
 #endif /* _IPXE_ERRORTAB_H */

@@ -43,6 +43,7 @@ ELF2EFI32	:= ./util/elf2efi32
 ELF2EFI64	:= ./util/elf2efi64
 EFIROM		:= ./util/efirom
 ICCFIX		:= ./util/iccfix
+EINFO		:= ./util/einfo
 DOXYGEN		:= doxygen
 BINUTILS_DIR	:= /usr
 BFD_DIR		:= $(BINUTILS_DIR)

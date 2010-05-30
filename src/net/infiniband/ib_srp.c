@@ -46,10 +46,15 @@ FILE_LICENCE ( BSD2 );
  */
 
 /* Disambiguate the various possible EINVALs */
-#define EINVAL_BYTE_STRING_LEN ( EINVAL | EUNIQ_01 )
-#define EINVAL_BYTE_STRING ( EINVAL | EUNIQ_02 )
-#define EINVAL_INTEGER ( EINVAL | EUNIQ_03 )
-#define EINVAL_RP_TOO_SHORT ( EINVAL | EUNIQ_04 )
+#define EINVAL_BYTE_STRING_LEN __einfo_error ( EINFO_EINVAL_BYTE_STRING_LEN )
+#define EINFO_EINVAL_BYTE_STRING_LEN __einfo_uniqify \
+	( EINFO_EINVAL, 0x01, "Invalid byte string length" )
+#define EINVAL_INTEGER __einfo_error ( EINFO_EINVAL_INTEGER )
+#define EINFO_EINVAL_INTEGER __einfo_uniqify \
+	( EINFO_EINVAL, 0x03, "Invalid integer" )
+#define EINVAL_RP_TOO_SHORT __einfo_error ( EINFO_EINVAL_RP_TOO_SHORT )
+#define EINFO_EINVAL_RP_TOO_SHORT __einfo_uniqify \
+	( EINFO_EINVAL, 0x04, "Root path too short" )
 
 /** IB SRP parse flags */
 enum ib_srp_parse_flags {

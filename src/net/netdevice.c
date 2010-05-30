@@ -46,11 +46,13 @@ struct list_head net_devices = LIST_HEAD_INIT ( net_devices );
 static struct list_head open_net_devices = LIST_HEAD_INIT ( open_net_devices );
 
 /** Default link status code */
-#define EUNKNOWN_LINK_STATUS EINPROGRESS
+#define EUNKNOWN_LINK_STATUS __einfo_error ( EINFO_EUNKNOWN_LINK_STATUS )
+#define EINFO_EUNKNOWN_LINK_STATUS \
+	__einfo_uniqify ( EINFO_EINPROGRESS, 0x01, "Unknown" )
 
 /** Human-readable message for the default link status */
 struct errortab netdev_errors[] __errortab = {
-	{ EUNKNOWN_LINK_STATUS, "Unknown" },
+	__einfo_errortab ( EINFO_EUNKNOWN_LINK_STATUS ),
 };
 
 /**
@@ -60,16 +62,12 @@ struct errortab netdev_errors[] __errortab = {
  */
 void netdev_link_down ( struct net_device *netdev ) {
 
-	switch ( netdev->link_rc ) {
-	case 0:
-	case -EUNKNOWN_LINK_STATUS:
+	/* Avoid clobbering a more detailed link status code, if one
+	 * is already set.
+	 */
+	if ( ( netdev->link_rc == 0 ) ||
+	     ( netdev->link_rc == -EUNKNOWN_LINK_STATUS ) ) {
 		netdev->link_rc = -ENOTCONN;
-		break;
-	default:
-		/* Avoid clobbering a more detailed link status code,
-		 * if one is already set.
-		 */
-		break;
 	}
 }
 

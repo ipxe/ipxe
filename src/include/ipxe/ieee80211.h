@@ -1,6 +1,7 @@
 #ifndef _IPXE_IEEE80211_H
 #define _IPXE_IEEE80211_H
 
+#include <stddef.h>
 #include <ipxe/if_ether.h>	/* for ETH_ALEN */
 #include <endian.h>
 
