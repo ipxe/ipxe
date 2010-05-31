@@ -16,6 +16,9 @@ _start:
 	pushl	%edi // argv -> C arg2
 	pushl	%esi // argc -> C arg1
 
+	call	save_args
+
+	/* Our main doesn't use any arguments */
 	call	main
 
 	movl	%eax, %ebx // rc -> syscall arg1

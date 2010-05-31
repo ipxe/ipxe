@@ -13,6 +13,9 @@ _start:
 
 	andq	$~15, %rsp // 16-byte align the stack
 
+	call	save_args
+
+	/* Our main doesn't use any arguments */
 	call	main
 
 	movq	%rax, %rdi // rc -> syscall arg1
