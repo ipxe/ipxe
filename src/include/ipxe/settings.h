@@ -210,6 +210,7 @@ extern void clear_settings ( struct settings *settings );
 extern int setting_cmp ( struct setting *a, struct setting *b );
 
 extern struct settings * find_settings ( const char *name );
+extern struct setting * find_setting ( const char *name );
 
 extern int storef_setting ( struct settings *settings,
 			    struct setting *setting,

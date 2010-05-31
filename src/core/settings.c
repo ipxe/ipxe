@@ -841,7 +841,7 @@ int storef_setting ( struct settings *settings, struct setting *setting,
  * @v name		Name
  * @ret setting		Named setting, or NULL
  */
-static struct setting * find_setting ( const char *name ) {
+struct setting * find_setting ( const char *name ) {
 	struct setting *setting;
 
 	for_each_table_entry ( setting, SETTINGS ) {
