@@ -61,6 +61,7 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #define ERRFILE_isapnp		     ( ERRFILE_DRIVER | 0x00020000 )
 #define ERRFILE_mca		     ( ERRFILE_DRIVER | 0x00030000 )
 #define ERRFILE_pci		     ( ERRFILE_DRIVER | 0x00040000 )
+#define ERRFILE_linux		     ( ERRFILE_DRIVER | 0x00050000 )
 
 #define ERRFILE_nvs		     ( ERRFILE_DRIVER | 0x00100000 )
 #define ERRFILE_spi		     ( ERRFILE_DRIVER | 0x00110000 )
