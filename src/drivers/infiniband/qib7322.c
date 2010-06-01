@@ -657,22 +657,28 @@ static int qib7322_init_send ( struct qib7322 *qib7322 ) {
 					  QIB7322_SMALL_SEND_BUF_SIZE,
 					  QIB7322_SMALL_SEND_BUF_START,
 					  QIB7322_SMALL_SEND_BUF_USED );
-	if ( ! qib7322->send_bufs_small )
+	if ( ! qib7322->send_bufs_small ) {
+		rc = -ENOMEM;
 		goto err_create_send_bufs_small;
+	}
 	qib7322->send_bufs_vl15_port0 =
 		qib7322_create_send_bufs ( qib7322, baseaddr_vl15_port0,
 					  QIB7322_VL15_PORT0_SEND_BUF_SIZE,
 					  QIB7322_VL15_PORT0_SEND_BUF_START,
 					  QIB7322_VL15_PORT0_SEND_BUF_COUNT );
-	if ( ! qib7322->send_bufs_vl15_port0 )
+	if ( ! qib7322->send_bufs_vl15_port0 ) {
+		rc = -ENOMEM;
 		goto err_create_send_bufs_vl15_port0;
+	}
 	qib7322->send_bufs_vl15_port1 =
 		qib7322_create_send_bufs ( qib7322, baseaddr_vl15_port1,
 					  QIB7322_VL15_PORT1_SEND_BUF_SIZE,
 					  QIB7322_VL15_PORT1_SEND_BUF_START,
 					  QIB7322_VL15_PORT1_SEND_BUF_COUNT );
-	if ( ! qib7322->send_bufs_vl15_port1 )
+	if ( ! qib7322->send_bufs_vl15_port1 ) {
+		rc = -ENOMEM;
 		goto err_create_send_bufs_vl15_port1;
+	}
 
 	/* Allocate space for the SendBufAvail array */
 	qib7322->sendbufavail = malloc_dma ( sizeof ( *qib7322->sendbufavail ),
@@ -1681,6 +1687,7 @@ static unsigned int qib7322_link_speed_supported ( struct qib7322 *qib7322,
 	default:
 		DBGC ( qib7322, "QIB7322 %p port %d is invalid\n",
 		       qib7322, port );
+		supported = 0;
 		break;
 	}
 
