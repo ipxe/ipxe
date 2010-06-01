@@ -146,7 +146,7 @@ struct qib7322 {
  * @v offset		Register offset
  */
 static void qib7322_readq ( struct qib7322 *qib7322, uint32_t *dwords,
-			   unsigned long offset ) {
+			    unsigned long offset ) {
 	void *addr = ( qib7322->regs + offset );
 
 	__asm__ __volatile__ ( "movq (%1), %%mm0\n\t"
@@ -173,7 +173,7 @@ static void qib7322_readq ( struct qib7322 *qib7322, uint32_t *dwords,
  * @v offset		Register offset
  */
 static void qib7322_writeq ( struct qib7322 *qib7322, const uint32_t *dwords,
-			    unsigned long offset ) {
+			     unsigned long offset ) {
 	void *addr = ( qib7322->regs + offset );
 
 	DBGIO ( "[%08lx] <= %08x%08x\n",
@@ -200,7 +200,7 @@ static void qib7322_writeq ( struct qib7322 *qib7322, const uint32_t *dwords,
  * @v offset		Register offset
  */
 static void qib7322_writel ( struct qib7322 *qib7322, uint32_t dword,
-			    unsigned long offset ) {
+			     unsigned long offset ) {
 	writel ( dword, ( qib7322->regs + offset ) );
 }
 
@@ -248,7 +248,7 @@ static void qib7322_link_state_changed ( struct ib_device *ibdev ) {
 
 	/* Read link state */
 	qib7322_readq_port ( qib7322, &ibcstatusa,
-			    QIB_7322_IBCStatusA_0_offset, port );
+			     QIB_7322_IBCStatusA_0_offset, port );
 	link_training_state = BIT_GET ( &ibcstatusa, LinkTrainingState );
 	link_state = BIT_GET ( &ibcstatusa, LinkState );
 	link_width = BIT_GET ( &ibcstatusa, LinkWidthActive );
@@ -290,7 +290,7 @@ static void qib7322_link_state_changed ( struct ib_device *ibdev ) {
  * @ret rc		Return status code
  */
 static int qib7322_link_state_check ( struct ib_device *ibdev,
-				     unsigned int new_link_state ) {
+				      unsigned int new_link_state ) {
 	struct qib7322 *qib7322 = ib_get_drvdata ( ibdev );
 	struct QIB_7322_IBCStatusA_0 ibcstatusa;
 	unsigned int port = ( ibdev->port - QIB7322_PORT_BASE );
@@ -299,7 +299,7 @@ static int qib7322_link_state_check ( struct ib_device *ibdev,
 
 	for ( i = 0 ; i < QIB7322_LINK_STATE_MAX_WAIT_US ; i++ ) {
 		qib7322_readq_port ( qib7322, &ibcstatusa,
-				    QIB_7322_IBCStatusA_0_offset, port );
+				     QIB_7322_IBCStatusA_0_offset, port );
 		link_state = BIT_GET ( &ibcstatusa, LinkState );
 		if ( link_state == new_link_state )
 			return 0;
@@ -318,7 +318,7 @@ static int qib7322_link_state_check ( struct ib_device *ibdev,
  * @v mad		Set port information MAD
  */
 static int qib7322_set_port_info ( struct ib_device *ibdev,
-				  union ib_mad *mad ) {
+				   union ib_mad *mad ) {
 	struct qib7322 *qib7322 = ib_get_drvdata ( ibdev );
 	struct ib_port_info *port_info = &mad->smp.smp_data.port_info;
 	struct QIB_7322_IBCCtrlA_0 ibcctrla;
@@ -334,10 +334,10 @@ static int qib7322_set_port_info ( struct ib_device *ibdev,
 		       qib7322, qib7322_link_state_text ( link_state ),
 		       link_state );
 		qib7322_readq_port ( qib7322, &ibcctrla,
-				    QIB_7322_IBCCtrlA_0_offset, port );
+				     QIB_7322_IBCCtrlA_0_offset, port );
 		BIT_SET ( &ibcctrla, LinkCmd, link_state );
 		qib7322_writeq_port ( qib7322, &ibcctrla,
-				     QIB_7322_IBCCtrlA_0_offset, port );
+				      QIB_7322_IBCCtrlA_0_offset, port );
 
 		/* Wait for link state change to take effect.  Ignore
 		 * errors; the current link state will be returned via
@@ -359,7 +359,7 @@ static int qib7322_set_port_info ( struct ib_device *ibdev,
  * @v mad		Set partition key table MAD
  */
 static int qib7322_set_pkey_table ( struct ib_device *ibdev __unused,
-				   union ib_mad *mad __unused ) {
+				    union ib_mad *mad __unused ) {
 	/* Nothing to do */
 	return 0;
 }
@@ -379,7 +379,7 @@ static int qib7322_set_pkey_table ( struct ib_device *ibdev __unused,
  * @ret rc		Return status code
  */
 static int qib7322_alloc_ctx ( struct ib_device *ibdev,
-			      struct ib_queue_pair *qp ) {
+			       struct ib_queue_pair *qp ) {
 	struct qib7322 *qib7322 = ib_get_drvdata ( ibdev );
 	unsigned int port = ( ibdev->port - QIB7322_PORT_BASE );
 	unsigned int ctx;
@@ -408,7 +408,7 @@ static int qib7322_alloc_ctx ( struct ib_device *ibdev,
  * @ret ctx		Context index
  */
 static unsigned int qib7322_ctx ( struct ib_device *ibdev,
-				 struct ib_queue_pair *qp ) {
+				  struct ib_queue_pair *qp ) {
 	return ( qp->qpn + ( ibdev->port - QIB7322_PORT_BASE ) );
 }
 
@@ -419,7 +419,7 @@ static unsigned int qib7322_ctx ( struct ib_device *ibdev,
  * @v ctx		Context index
  */
 static void qib7322_free_ctx ( struct ib_device *ibdev,
-			      struct ib_queue_pair *qp ) {
+			       struct ib_queue_pair *qp ) {
 	struct qib7322 *qib7322 = ib_get_drvdata ( ibdev );
 	unsigned int port = ( ibdev->port - QIB7322_PORT_BASE );
 	unsigned int ctx = qib7322_ctx ( ibdev, qp );
@@ -456,8 +456,8 @@ static void qib7322_free_ctx ( struct ib_device *ibdev,
  */
 static struct qib7322_send_buffers *
 qib7322_create_send_bufs ( struct qib7322 *qib7322, unsigned long base,
-			  unsigned int size, unsigned int start,
-			  unsigned int count ) {
+			   unsigned int size, unsigned int start,
+			   unsigned int count ) {
 	struct qib7322_send_buffers *send_bufs;
 	unsigned int i;
 
@@ -488,8 +488,9 @@ qib7322_create_send_bufs ( struct qib7322 *qib7322, unsigned long base,
  * @v qib7322		QIB7322 device
  * @v send_bufs		Send buffer set
  */
-static void qib7322_destroy_send_bufs ( struct qib7322 *qib7322 __unused,
-				       struct qib7322_send_buffers *send_bufs ){
+static void
+qib7322_destroy_send_bufs ( struct qib7322 *qib7322 __unused,
+			    struct qib7322_send_buffers *send_bufs ) {
 	free ( send_bufs );
 }
 
@@ -501,7 +502,7 @@ static void qib7322_destroy_send_bufs ( struct qib7322 *qib7322 __unused,
  * @ret send_buf	Send buffer, or negative error
  */
 static int qib7322_alloc_send_buf ( struct qib7322 *qib7322,
-				   struct qib7322_send_buffers *send_bufs ) {
+				    struct qib7322_send_buffers *send_bufs ) {
 	unsigned int used;
 	unsigned int mask;
 	unsigned int send_buf;
@@ -527,8 +528,8 @@ static int qib7322_alloc_send_buf ( struct qib7322 *qib7322,
  * @v send_buf		Send buffer
  */
 static void qib7322_free_send_buf ( struct qib7322 *qib7322 __unused,
-				   struct qib7322_send_buffers *send_bufs,
-				   unsigned int send_buf ) {
+				    struct qib7322_send_buffers *send_bufs,
+				    unsigned int send_buf ) {
 	unsigned int mask;
 
 	mask = ( send_bufs->count - 1 );
@@ -543,7 +544,7 @@ static void qib7322_free_send_buf ( struct qib7322 *qib7322 __unused,
  * @ret in_use		Send buffer is in use
  */
 static int qib7322_send_buf_in_use ( struct qib7322 *qib7322,
-				    unsigned int send_buf ) {
+				     unsigned int send_buf ) {
 	unsigned int send_idx;
 	unsigned int send_check;
 	unsigned int inusecheck;
@@ -567,8 +568,8 @@ static int qib7322_send_buf_in_use ( struct qib7322 *qib7322,
  */
 static unsigned long
 qib7322_send_buffer_offset ( struct qib7322 *qib7322 __unused,
-			    struct qib7322_send_buffers *send_bufs,
-			    unsigned int send_buf ) {
+			     struct qib7322_send_buffers *send_bufs,
+			     unsigned int send_buf ) {
 	unsigned int index;
 
 	index = ( ( send_buf & ~QIB7322_SEND_BUF_TOGGLE ) - send_bufs->start );
@@ -582,7 +583,7 @@ qib7322_send_buffer_offset ( struct qib7322 *qib7322 __unused,
  * @v qp		Queue pair
  */
 static int qib7322_create_send_wq ( struct ib_device *ibdev,
-				   struct ib_queue_pair *qp ) {
+				    struct ib_queue_pair *qp ) {
 	struct qib7322 *qib7322 = ib_get_drvdata ( ibdev );
 	struct ib_work_queue *wq = &qp->send;
 	struct qib7322_send_work_queue *qib7322_wq = ib_wq_get_drvdata ( wq );
@@ -601,7 +602,7 @@ static int qib7322_create_send_wq ( struct ib_device *ibdev,
 
 	/* Allocate space for send buffer usage list */
 	qib7322_wq->used = zalloc ( qp->send.num_wqes *
-				   sizeof ( qib7322_wq->used[0] ) );
+				    sizeof ( qib7322_wq->used[0] ) );
 	if ( ! qib7322_wq->used )
 		return -ENOMEM;
 
@@ -619,7 +620,7 @@ static int qib7322_create_send_wq ( struct ib_device *ibdev,
  * @v qp		Queue pair
  */
 static void qib7322_destroy_send_wq ( struct ib_device *ibdev __unused,
-				     struct ib_queue_pair *qp ) {
+				      struct ib_queue_pair *qp ) {
 	struct ib_work_queue *wq = &qp->send;
 	struct qib7322_send_work_queue *qib7322_wq = ib_wq_get_drvdata ( wq );
 
@@ -654,27 +655,27 @@ static int qib7322_init_send ( struct qib7322 *qib7322 ) {
 				QIB7322_VL15_PORT0_SEND_BUF_SIZE );
 	qib7322->send_bufs_small =
 		qib7322_create_send_bufs ( qib7322, baseaddr_smallpio,
-					  QIB7322_SMALL_SEND_BUF_SIZE,
-					  QIB7322_SMALL_SEND_BUF_START,
-					  QIB7322_SMALL_SEND_BUF_USED );
+					   QIB7322_SMALL_SEND_BUF_SIZE,
+					   QIB7322_SMALL_SEND_BUF_START,
+					   QIB7322_SMALL_SEND_BUF_USED );
 	if ( ! qib7322->send_bufs_small ) {
 		rc = -ENOMEM;
 		goto err_create_send_bufs_small;
 	}
 	qib7322->send_bufs_vl15_port0 =
 		qib7322_create_send_bufs ( qib7322, baseaddr_vl15_port0,
-					  QIB7322_VL15_PORT0_SEND_BUF_SIZE,
-					  QIB7322_VL15_PORT0_SEND_BUF_START,
-					  QIB7322_VL15_PORT0_SEND_BUF_COUNT );
+					   QIB7322_VL15_PORT0_SEND_BUF_SIZE,
+					   QIB7322_VL15_PORT0_SEND_BUF_START,
+					   QIB7322_VL15_PORT0_SEND_BUF_COUNT );
 	if ( ! qib7322->send_bufs_vl15_port0 ) {
 		rc = -ENOMEM;
 		goto err_create_send_bufs_vl15_port0;
 	}
 	qib7322->send_bufs_vl15_port1 =
 		qib7322_create_send_bufs ( qib7322, baseaddr_vl15_port1,
-					  QIB7322_VL15_PORT1_SEND_BUF_SIZE,
-					  QIB7322_VL15_PORT1_SEND_BUF_START,
-					  QIB7322_VL15_PORT1_SEND_BUF_COUNT );
+					   QIB7322_VL15_PORT1_SEND_BUF_SIZE,
+					   QIB7322_VL15_PORT1_SEND_BUF_START,
+					   QIB7322_VL15_PORT1_SEND_BUF_COUNT );
 	if ( ! qib7322->send_bufs_vl15_port1 ) {
 		rc = -ENOMEM;
 		goto err_create_send_bufs_vl15_port1;
@@ -682,7 +683,7 @@ static int qib7322_init_send ( struct qib7322 *qib7322 ) {
 
 	/* Allocate space for the SendBufAvail array */
 	qib7322->sendbufavail = malloc_dma ( sizeof ( *qib7322->sendbufavail ),
-					    QIB7322_SENDBUFAVAIL_ALIGN );
+					     QIB7322_SENDBUFAVAIL_ALIGN );
 	if ( ! qib7322->sendbufavail ) {
 		rc = -ENOMEM;
 		goto err_alloc_sendbufavail;
@@ -694,7 +695,7 @@ static int qib7322_init_send ( struct qib7322 *qib7322 ) {
 	BIT_FILL_1 ( &sendbufavailaddr, SendBufAvailAddr,
 		     ( virt_to_bus ( qib7322->sendbufavail ) >> 6 ) );
 	qib7322_writeq ( qib7322, &sendbufavailaddr,
-			QIB_7322_SendBufAvailAddr_offset );
+			 QIB_7322_SendBufAvailAddr_offset );
 
 	/* Enable sending */
 	memset ( &sendctrlp, 0, sizeof ( sendctrlp ) );
@@ -757,7 +758,7 @@ static void qib7322_fini_send ( struct qib7322 *qib7322 ) {
  * @ret rc		Return status code
  */
 static int qib7322_create_recv_wq ( struct ib_device *ibdev,
-				   struct ib_queue_pair *qp ) {
+				    struct ib_queue_pair *qp ) {
 	struct qib7322 *qib7322 = ib_get_drvdata ( ibdev );
 	struct ib_work_queue *wq = &qp->recv;
 	struct qib7322_recv_work_queue *qib7322_wq = ib_wq_get_drvdata ( wq );
@@ -780,7 +781,7 @@ static int qib7322_create_recv_wq ( struct ib_device *ibdev,
 
 	/* Allocate receive header buffer */
 	qib7322_wq->header = malloc_dma ( QIB7322_RECV_HEADERS_SIZE,
-					 QIB7322_RECV_HEADERS_ALIGN );
+					  QIB7322_RECV_HEADERS_ALIGN );
 	if ( ! qib7322_wq->header ) {
 		rc = -ENOMEM;
 		goto err_alloc_header;
@@ -791,25 +792,25 @@ static int qib7322_create_recv_wq ( struct ib_device *ibdev,
 	BIT_FILL_1 ( &rcvhdraddr, RcvHdrAddr,
 		     ( virt_to_bus ( qib7322_wq->header ) >> 2 ) );
 	qib7322_writeq_array8b ( qib7322, &rcvhdraddr,
-				QIB_7322_RcvHdrAddr0_offset, ctx );
+				 QIB_7322_RcvHdrAddr0_offset, ctx );
 	memset ( &rcvhdrtailaddr, 0, sizeof ( rcvhdrtailaddr ) );
 	BIT_FILL_1 ( &rcvhdrtailaddr, RcvHdrTailAddr,
 		     ( virt_to_bus ( &qib7322_wq->header_prod ) >> 2 ) );
 	qib7322_writeq_array8b ( qib7322, &rcvhdrtailaddr,
-				QIB_7322_RcvHdrTailAddr0_offset, ctx );
+				 QIB_7322_RcvHdrTailAddr0_offset, ctx );
 	memset ( &rcvhdrhead, 0, sizeof ( rcvhdrhead ) );
 	BIT_FILL_1 ( &rcvhdrhead, counter, 1 );
 	qib7322_writeq_array64k ( qib7322, &rcvhdrhead,
-				 QIB_7322_RcvHdrHead0_offset, ctx );
+				  QIB_7322_RcvHdrHead0_offset, ctx );
 	memset ( &rcvegrindexhead, 0, sizeof ( rcvegrindexhead ) );
 	BIT_FILL_1 ( &rcvegrindexhead, Value, 1 );
 	qib7322_writeq_array64k ( qib7322, &rcvegrindexhead,
-				 QIB_7322_RcvEgrIndexHead0_offset, ctx );
+				  QIB_7322_RcvEgrIndexHead0_offset, ctx );
 	qib7322_readq_port ( qib7322, &rcvctrlp,
-			    QIB_7322_RcvCtrl_0_offset, port );
+			     QIB_7322_RcvCtrl_0_offset, port );
 	BIT_SET ( &rcvctrlp, ContextEnable[ctx], 1 );
 	qib7322_writeq_port ( qib7322, &rcvctrlp,
-			     QIB_7322_RcvCtrl_0_offset, port );
+			      QIB_7322_RcvCtrl_0_offset, port );
 	qib7322_readq ( qib7322, &rcvctrl, QIB_7322_RcvCtrl_offset );
 	BIT_SET ( &rcvctrl, IntrAvail[ctx], 1 );
 	qib7322_writeq ( qib7322, &rcvctrl, QIB_7322_RcvCtrl_offset );
@@ -834,7 +835,7 @@ static int qib7322_create_recv_wq ( struct ib_device *ibdev,
  * @v qp		Queue pair
  */
 static void qib7322_destroy_recv_wq ( struct ib_device *ibdev,
-				     struct ib_queue_pair *qp ) {
+				      struct ib_queue_pair *qp ) {
 	struct qib7322 *qib7322 = ib_get_drvdata ( ibdev );
 	struct ib_work_queue *wq = &qp->recv;
 	struct qib7322_recv_work_queue *qib7322_wq = ib_wq_get_drvdata ( wq );
@@ -845,10 +846,10 @@ static void qib7322_destroy_recv_wq ( struct ib_device *ibdev,
 
 	/* Disable context in hardware */
 	qib7322_readq_port ( qib7322, &rcvctrlp,
-			    QIB_7322_RcvCtrl_0_offset, port );
+			     QIB_7322_RcvCtrl_0_offset, port );
 	BIT_SET ( &rcvctrlp, ContextEnable[ctx], 0 );
 	qib7322_writeq_port ( qib7322, &rcvctrlp,
-			     QIB_7322_RcvCtrl_0_offset, port );
+			      QIB_7322_RcvCtrl_0_offset, port );
 	qib7322_readq ( qib7322, &rcvctrl, QIB_7322_RcvCtrl_offset );
 	BIT_SET ( &rcvctrl, IntrAvail[ctx], 0 );
 	qib7322_writeq ( qib7322, &rcvctrl, QIB_7322_RcvCtrl_offset );
@@ -937,14 +938,14 @@ static int qib7322_init_recv ( struct qib7322 *qib7322 ) {
 		     RcvQPMapContext4, 8,
 		     RcvQPMapContext5, 10 );
 	qib7322_writeq ( qib7322, &rcvqpmaptablea0,
-			QIB_7322_RcvQPMapTableA_0_offset );
+			 QIB_7322_RcvQPMapTableA_0_offset );
 	memset ( &rcvqpmaptableb0, 0, sizeof ( rcvqpmaptableb0 ) );
 	BIT_FILL_3 ( &rcvqpmaptableb0,
 		     RcvQPMapContext6, 12,
 		     RcvQPMapContext7, 14,
 		     RcvQPMapContext8, 16 );
 	qib7322_writeq ( qib7322, &rcvqpmaptableb0,
-			QIB_7322_RcvQPMapTableB_0_offset );
+			 QIB_7322_RcvQPMapTableB_0_offset );
 	memset ( &rcvqpmaptablea1, 0, sizeof ( rcvqpmaptablea1 ) );
 	BIT_FILL_6 ( &rcvqpmaptablea1,
 		     RcvQPMapContext0, 1,
@@ -954,24 +955,24 @@ static int qib7322_init_recv ( struct qib7322 *qib7322 ) {
 		     RcvQPMapContext4, 9,
 		     RcvQPMapContext5, 11 );
 	qib7322_writeq ( qib7322, &rcvqpmaptablea1,
-			QIB_7322_RcvQPMapTableA_1_offset );
+			 QIB_7322_RcvQPMapTableA_1_offset );
 	memset ( &rcvqpmaptableb1, 0, sizeof ( rcvqpmaptableb1 ) );
 	BIT_FILL_3 ( &rcvqpmaptableb1,
 		     RcvQPMapContext6, 13,
 		     RcvQPMapContext7, 15,
 		     RcvQPMapContext8, 17 );
 	qib7322_writeq ( qib7322, &rcvqpmaptableb1,
-			QIB_7322_RcvQPMapTableB_1_offset );
+			 QIB_7322_RcvQPMapTableB_1_offset );
 
 	/* Map multicast QPNs to contexts */
 	memset ( &rcvqpmcastctx0, 0, sizeof ( rcvqpmcastctx0 ) );
 	BIT_FILL_1 ( &rcvqpmcastctx0, RcvQpMcContext, 0 );
 	qib7322_writeq ( qib7322, &rcvqpmcastctx0,
-			QIB_7322_RcvQPMulticastContext_0_offset );
+			 QIB_7322_RcvQPMulticastContext_0_offset );
 	memset ( &rcvqpmcastctx1, 0, sizeof ( rcvqpmcastctx1 ) );
 	BIT_FILL_1 ( &rcvqpmcastctx1, RcvQpMcContext, 1 );
 	qib7322_writeq ( qib7322, &rcvqpmcastctx1,
-			QIB_7322_RcvQPMulticastContext_1_offset );
+			 QIB_7322_RcvQPMulticastContext_1_offset );
 
 	/* Configure receive header buffer sizes */
 	memset ( &rcvhdrcnt, 0, sizeof ( rcvhdrcnt ) );
@@ -980,7 +981,7 @@ static int qib7322_init_recv ( struct qib7322 *qib7322 ) {
 	memset ( &rcvhdrentsize, 0, sizeof ( rcvhdrentsize ) );
 	BIT_FILL_1 ( &rcvhdrentsize, Value, ( QIB7322_RECV_HEADER_SIZE >> 2 ) );
 	qib7322_writeq ( qib7322, &rcvhdrentsize,
-			QIB_7322_RcvHdrEntSize_offset );
+			 QIB_7322_RcvHdrEntSize_offset );
 
 	/* Calculate eager array start addresses for each context */
 	qib7322_readq ( qib7322, &rcvegrbase, QIB_7322_RcvEgrBase_offset );
@@ -1014,14 +1015,14 @@ static int qib7322_init_recv ( struct qib7322 *qib7322 ) {
 	memset ( &rxcreditvl, 0, sizeof ( rxcreditvl ) );
 	BIT_FILL_1 ( &rxcreditvl, RxMaxCreditVL, QIB7322_MAX_CREDITS_VL0 );
 	qib7322_writeq_array8b ( qib7322, &rxcreditvl,
-				QIB_7322_RxCreditVL0_0_offset, 0 );
+				 QIB_7322_RxCreditVL0_0_offset, 0 );
 	qib7322_writeq_array8b ( qib7322, &rxcreditvl,
-				QIB_7322_RxCreditVL0_1_offset, 0 );
+				 QIB_7322_RxCreditVL0_1_offset, 0 );
 	BIT_FILL_1 ( &rxcreditvl, RxMaxCreditVL, QIB7322_MAX_CREDITS_VL15 );
 	qib7322_writeq_array8b ( qib7322, &rxcreditvl,
-				QIB_7322_RxCreditVL0_0_offset, 15 );
+				 QIB_7322_RxCreditVL0_0_offset, 15 );
 	qib7322_writeq_array8b ( qib7322, &rxcreditvl,
-				QIB_7322_RxCreditVL0_1_offset, 15 );
+				 QIB_7322_RxCreditVL0_1_offset, 15 );
 
 	return 0;
 }
@@ -1052,7 +1053,7 @@ static void qib7322_fini_recv ( struct qib7322 *qib7322 __unused ) {
  * @ret rc		Return status code
  */
 static int qib7322_create_cq ( struct ib_device *ibdev,
-			     struct ib_completion_queue *cq ) {
+			       struct ib_completion_queue *cq ) {
 	struct qib7322 *qib7322 = ib_get_drvdata ( ibdev );
 	static int cqn;
 
@@ -1076,7 +1077,7 @@ static int qib7322_create_cq ( struct ib_device *ibdev,
  * @v cq		Completion queue
  */
 static void qib7322_destroy_cq ( struct ib_device *ibdev,
-			       struct ib_completion_queue *cq ) {
+				 struct ib_completion_queue *cq ) {
 	struct qib7322 *qib7322 = ib_get_drvdata ( ibdev );
 
 	/* Nothing to do */
@@ -1098,7 +1099,7 @@ static void qib7322_destroy_cq ( struct ib_device *ibdev,
  * @ret rc		Return status code
  */
 static int qib7322_create_qp ( struct ib_device *ibdev,
-			      struct ib_queue_pair *qp ) {
+			       struct ib_queue_pair *qp ) {
 	struct qib7322 *qib7322 = ib_get_drvdata ( ibdev );
 	unsigned int ctx;
 	int rc;
@@ -1139,7 +1140,7 @@ static int qib7322_create_qp ( struct ib_device *ibdev,
  * @ret rc		Return status code
  */
 static int qib7322_modify_qp ( struct ib_device *ibdev,
-			      struct ib_queue_pair *qp ) {
+			       struct ib_queue_pair *qp ) {
 	struct qib7322 *qib7322 = ib_get_drvdata ( ibdev );
 
 	/* Nothing to do; the hardware doesn't have a notion of queue
@@ -1156,7 +1157,7 @@ static int qib7322_modify_qp ( struct ib_device *ibdev,
  * @v qp		Queue pair
  */
 static void qib7322_destroy_qp ( struct ib_device *ibdev,
-				struct ib_queue_pair *qp ) {
+				 struct ib_queue_pair *qp ) {
 
 	qib7322_destroy_send_wq ( ibdev, qp );
 	qib7322_destroy_recv_wq ( ibdev, qp );
@@ -1180,9 +1181,9 @@ static void qib7322_destroy_qp ( struct ib_device *ibdev,
  * @ret rc		Return status code
  */
 static int qib7322_post_send ( struct ib_device *ibdev,
-			      struct ib_queue_pair *qp,
-			      struct ib_address_vector *av,
-			      struct io_buffer *iobuf ) {
+			       struct ib_queue_pair *qp,
+			       struct ib_address_vector *av,
+			       struct io_buffer *iobuf ) {
 	struct qib7322 *qib7322 = ib_get_drvdata ( ibdev );
 	struct ib_work_queue *wq = &qp->send;
 	struct qib7322_send_work_queue *qib7322_wq = ib_wq_get_drvdata ( wq );
@@ -1203,7 +1204,7 @@ static int qib7322_post_send ( struct ib_device *ibdev,
 		return send_buf;
 	start_offset = offset =
 		qib7322_send_buffer_offset ( qib7322, qib7322_wq->send_bufs,
-					    send_buf );
+					     send_buf );
 
 	/* Store I/O buffer and send buffer index */
 	assert ( wq->iobufs[qib7322_wq->prod] == NULL );
@@ -1263,8 +1264,8 @@ static int qib7322_post_send ( struct ib_device *ibdev,
  * @v wqe_idx		Work queue entry index
  */
 static void qib7322_complete_send ( struct ib_device *ibdev,
-				   struct ib_queue_pair *qp,
-				   unsigned int wqe_idx ) {
+				    struct ib_queue_pair *qp,
+				    unsigned int wqe_idx ) {
 	struct qib7322 *qib7322 = ib_get_drvdata ( ibdev );
 	struct ib_work_queue *wq = &qp->send;
 	struct qib7322_send_work_queue *qib7322_wq = ib_wq_get_drvdata ( wq );
@@ -1293,7 +1294,7 @@ static void qib7322_complete_send ( struct ib_device *ibdev,
  * @v qp		Queue pair
  */
 static void qib7322_poll_send_wq ( struct ib_device *ibdev,
-				  struct ib_queue_pair *qp ) {
+				   struct ib_queue_pair *qp ) {
 	struct qib7322 *qib7322 = ib_get_drvdata ( ibdev );
 	struct ib_work_queue *wq = &qp->send;
 	struct qib7322_send_work_queue *qib7322_wq = ib_wq_get_drvdata ( wq );
@@ -1312,7 +1313,7 @@ static void qib7322_poll_send_wq ( struct ib_device *ibdev,
 
 		/* Increment consumer counter */
 		qib7322_wq->cons = ( ( qib7322_wq->cons + 1 ) &
-				    ( wq->num_wqes - 1 ) );
+				     ( wq->num_wqes - 1 ) );
 	}
 }
 
@@ -1325,8 +1326,8 @@ static void qib7322_poll_send_wq ( struct ib_device *ibdev,
  * @ret rc		Return status code
  */
 static int qib7322_post_recv ( struct ib_device *ibdev,
-			      struct ib_queue_pair *qp,
-			      struct io_buffer *iobuf ) {
+			       struct ib_queue_pair *qp,
+			       struct io_buffer *iobuf ) {
 	struct qib7322 *qib7322 = ib_get_drvdata ( ibdev );
 	struct ib_work_queue *wq = &qp->recv;
 	struct qib7322_recv_work_queue *qib7322_wq = ib_wq_get_drvdata ( wq );
@@ -1377,14 +1378,14 @@ static int qib7322_post_recv ( struct ib_device *ibdev,
 		     Addr, ( addr >> 11 ),
 		     BufSize, bufsize );
 	qib7322_writeq_array8b ( qib7322, &rcvegr, qib7322_wq->eager_array,
-				qib7322_wq->eager_prod );
+				 qib7322_wq->eager_prod );
 	DBGC2 ( qib7322, "QIB7322 %p QPN %ld RX egr %04x(%04x) posted "
 		"[%lx,%lx)\n", qib7322, qp->qpn, qib7322_wq->eager_prod,
 		wqe_idx, addr, ( addr + len ) );
 
 	/* Increment producer index */
 	qib7322_wq->eager_prod = ( ( qib7322_wq->eager_prod + 1 ) &
-				 ( qib7322_wq->eager_entries - 1 ) );
+				   ( qib7322_wq->eager_entries - 1 ) );
 
 	/* Update head index */
 	memset ( &rcvegrindexhead, 0, sizeof ( rcvegrindexhead ) );
@@ -1392,7 +1393,7 @@ static int qib7322_post_recv ( struct ib_device *ibdev,
 		     Value, ( ( qib7322_wq->eager_prod + 1 ) &
 			      ( qib7322_wq->eager_entries - 1 ) ) );
 	qib7322_writeq_array64k ( qib7322, &rcvegrindexhead,
-				QIB_7322_RcvEgrIndexHead0_offset, ctx );
+				  QIB_7322_RcvEgrIndexHead0_offset, ctx );
 
 	return 0;
 }
@@ -1405,8 +1406,8 @@ static int qib7322_post_recv ( struct ib_device *ibdev,
  * @v header_offs	Header offset
  */
 static void qib7322_complete_recv ( struct ib_device *ibdev,
-				   struct ib_queue_pair *qp,
-				   unsigned int header_offs ) {
+				    struct ib_queue_pair *qp,
+				    unsigned int header_offs ) {
 	struct qib7322 *qib7322 = ib_get_drvdata ( ibdev );
 	struct ib_work_queue *wq = &qp->recv;
 	struct qib7322_recv_work_queue *qib7322_wq = ib_wq_get_drvdata ( wq );
@@ -1542,12 +1543,12 @@ static void qib7322_complete_recv ( struct ib_device *ibdev,
 		/* Clear eager buffer */
 		memset ( &rcvegr, 0, sizeof ( rcvegr ) );
 		qib7322_writeq_array8b ( qib7322, &rcvegr,
-					qib7322_wq->eager_array,
-					qib7322_wq->eager_cons );
+					 qib7322_wq->eager_array,
+					 qib7322_wq->eager_cons );
 
 		/* Increment consumer index */
 		qib7322_wq->eager_cons = ( ( qib7322_wq->eager_cons + 1 ) &
-					  ( qib7322_wq->eager_entries - 1 ) );
+					   ( qib7322_wq->eager_entries - 1 ) );
 	}
 }
 
@@ -1558,7 +1559,7 @@ static void qib7322_complete_recv ( struct ib_device *ibdev,
  * @v qp		Queue pair
  */
 static void qib7322_poll_recv_wq ( struct ib_device *ibdev,
-				  struct ib_queue_pair *qp ) {
+				   struct ib_queue_pair *qp ) {
 	struct qib7322 *qib7322 = ib_get_drvdata ( ibdev );
 	struct ib_work_queue *wq = &qp->recv;
 	struct qib7322_recv_work_queue *qib7322_wq = ib_wq_get_drvdata ( wq );
@@ -1597,7 +1598,7 @@ static void qib7322_poll_recv_wq ( struct ib_device *ibdev,
 		     RcvHeadPointer, ( qib7322_wq->header_cons >> 2 ),
 		     counter, 1 );
 	qib7322_writeq_array64k ( qib7322, &rcvhdrhead,
-				QIB_7322_RcvHdrHead0_offset, ctx );
+				  QIB_7322_RcvHdrHead0_offset, ctx );
 }
 
 /**
@@ -1607,7 +1608,7 @@ static void qib7322_poll_recv_wq ( struct ib_device *ibdev,
  * @v cq		Completion queue
  */
 static void qib7322_poll_cq ( struct ib_device *ibdev,
-			     struct ib_completion_queue *cq ) {
+			      struct ib_completion_queue *cq ) {
 	struct ib_work_queue *wq;
 
 	/* Poll associated send and receive queues */
@@ -1640,12 +1641,12 @@ static void qib7322_poll_eq ( struct ib_device *ibdev ) {
 	/* Check for and clear status bits */
 	DBG_DISABLE ( DBGLVL_IO );
 	qib7322_readq_port ( qib7322, &errstatus,
-			    QIB_7322_ErrStatus_0_offset, port );
+			     QIB_7322_ErrStatus_0_offset, port );
 	if ( errstatus.u.qwords[0] ) {
 		DBGC ( qib7322, "QIB7322 %p port %d status %08x%08x\n", qib7322,
 		       port, errstatus.u.dwords[1],  errstatus.u.dwords[0] );
 		qib7322_writeq_port ( qib7322, &errstatus,
-				     QIB_7322_ErrClear_0_offset, port );
+				      QIB_7322_ErrClear_0_offset, port );
 	}
 	DBG_ENABLE ( DBGLVL_IO );
 
@@ -1668,7 +1669,7 @@ static void qib7322_poll_eq ( struct ib_device *ibdev ) {
  * @ret supported	Supported link speeds
  */
 static unsigned int qib7322_link_speed_supported ( struct qib7322 *qib7322,
-						  unsigned int port ) {
+						   unsigned int port ) {
 	struct QIB_7322_feature_mask features;
 	struct QIB_7322_Revision revision;
 	unsigned int supported;
@@ -1676,7 +1677,7 @@ static unsigned int qib7322_link_speed_supported ( struct qib7322 *qib7322,
 
 	/* Read the active feature mask */
 	qib7322_readq ( qib7322, &features,
-		       QIB_7322_active_feature_mask_offset );
+			QIB_7322_active_feature_mask_offset );
 	switch ( port ) {
 	case 0 :
 		supported = BIT_GET ( &features, Port0_Link_Speed_Supported );
@@ -1726,10 +1727,10 @@ static int qib7322_open ( struct ib_device *ibdev ) {
 
 	/* Enable link */
 	qib7322_readq_port ( qib7322, &ibcctrla,
-			    QIB_7322_IBCCtrlA_0_offset, port );
+			     QIB_7322_IBCCtrlA_0_offset, port );
 	BIT_SET ( &ibcctrla, IBLinkEn, 1 );
 	qib7322_writeq_port ( qib7322, &ibcctrla,
-			     QIB_7322_IBCCtrlA_0_offset, port );
+			      QIB_7322_IBCCtrlA_0_offset, port );
 
 	return 0;
 }
@@ -1746,10 +1747,10 @@ static void qib7322_close ( struct ib_device *ibdev ) {
 
 	/* Disable link */
 	qib7322_readq_port ( qib7322, &ibcctrla,
-			    QIB_7322_IBCCtrlA_0_offset, port );
+			     QIB_7322_IBCCtrlA_0_offset, port );
 	BIT_SET ( &ibcctrla, IBLinkEn, 0 );
 	qib7322_writeq_port ( qib7322, &ibcctrla,
-			     QIB_7322_IBCCtrlA_0_offset, port );
+			      QIB_7322_IBCCtrlA_0_offset, port );
 }
 
 /***************************************************************************
@@ -1768,8 +1769,8 @@ static void qib7322_close ( struct ib_device *ibdev ) {
  * @ret rc		Return status code
  */
 static int qib7322_mcast_attach ( struct ib_device *ibdev,
-				struct ib_queue_pair *qp,
-				struct ib_gid *gid ) {
+				  struct ib_queue_pair *qp,
+				  struct ib_gid *gid ) {
 	struct qib7322 *qib7322 = ib_get_drvdata ( ibdev );
 
 	( void ) qib7322;
@@ -1786,8 +1787,8 @@ static int qib7322_mcast_attach ( struct ib_device *ibdev,
  * @v gid		Multicast GID
  */
 static void qib7322_mcast_detach ( struct ib_device *ibdev,
-				 struct ib_queue_pair *qp,
-				 struct ib_gid *gid ) {
+				   struct ib_queue_pair *qp,
+				   struct ib_gid *gid ) {
 	struct qib7322 *qib7322 = ib_get_drvdata ( ibdev );
 
 	( void ) qib7322;
@@ -1836,7 +1837,7 @@ static unsigned int qib7322_i2c_bits[] = {
  * @ret non-zero	Input is a logic 1
  */
 static int qib7322_i2c_read_bit ( struct bit_basher *basher,
-				 unsigned int bit_id ) {
+				  unsigned int bit_id ) {
 	struct qib7322 *qib7322 =
 		container_of ( basher, struct qib7322, i2c.basher );
 	struct QIB_7322_EXTStatus extstatus;
@@ -1860,7 +1861,7 @@ static int qib7322_i2c_read_bit ( struct bit_basher *basher,
  * @v data		Value to write
  */
 static void qib7322_i2c_write_bit ( struct bit_basher *basher,
-				   unsigned int bit_id, unsigned long data ) {
+				    unsigned int bit_id, unsigned long data ) {
 	struct qib7322 *qib7322 =
 		container_of ( basher, struct qib7322, i2c.basher );
 	struct QIB_7322_EXTCtrl extctrl;
@@ -2000,7 +2001,7 @@ static int qib7322_ahb_wait ( struct qib7322 *qib7322 ) {
 	/* Wait for Ready bit to be asserted */
 	for ( i = 0 ; i < QIB7322_AHB_MAX_WAIT_US ; i++ ) {
 		qib7322_readq ( qib7322, &transaction,
-			       QIB_7322_ahb_transaction_reg_offset );
+				QIB_7322_ahb_transaction_reg_offset );
 		if ( BIT_GET ( &transaction, ahb_rdy ) )
 			return 0;
 		udelay ( 1 );
@@ -2019,7 +2020,7 @@ static int qib7322_ahb_wait ( struct qib7322 *qib7322 ) {
  * @ret rc		Return status code
  */
 static int qib7322_ahb_request ( struct qib7322 *qib7322,
-				unsigned int location ) {
+				 unsigned int location ) {
 	struct QIB_7322_ahb_access_ctrl access;
 	int rc;
 
@@ -2063,7 +2064,7 @@ static void qib7322_ahb_release ( struct qib7322 *qib7322 ) {
  * You must have already acquired ownership of the AHB.
  */
 static int qib7322_ahb_read ( struct qib7322 *qib7322, unsigned int location,
-			     uint32_t *data ) {
+			      uint32_t *data ) {
 	struct QIB_7322_ahb_transaction_reg xact;
 	int rc;
 
@@ -2095,7 +2096,7 @@ static int qib7322_ahb_read ( struct qib7322 *qib7322, unsigned int location,
  * You must have already acquired ownership of the AHB.
  */
 static int qib7322_ahb_write ( struct qib7322 *qib7322, unsigned int location,
-			      uint32_t data ) {
+			       uint32_t data ) {
 	struct QIB_7322_ahb_transaction_reg xact;
 	int rc;
 
@@ -2124,7 +2125,7 @@ static int qib7322_ahb_write ( struct qib7322 *qib7322, unsigned int location,
  * @ret rc		Return status code
  */
 static int qib7322_ahb_mod_reg ( struct qib7322 *qib7322, unsigned int location,
-				uint32_t value, uint32_t mask ) {
+				 uint32_t value, uint32_t mask ) {
 	uint32_t old_value;
 	uint32_t new_value;
 	int rc;
@@ -2167,7 +2168,7 @@ static int qib7322_ahb_mod_reg ( struct qib7322 *qib7322, unsigned int location,
  * @ret rc		Return status code
  */
 static int qib7322_ahb_mod_reg_all ( struct qib7322 *qib7322, unsigned int reg,
-				    uint32_t value, uint32_t mask ) {
+				     uint32_t value, uint32_t mask ) {
 	unsigned int port;
 	unsigned int channel;
 	unsigned int location;
@@ -2177,7 +2178,7 @@ static int qib7322_ahb_mod_reg_all ( struct qib7322 *qib7322, unsigned int reg,
 		for ( channel = 0 ; channel < QIB7322_MAX_WIDTH ; channel++ ) {
 			location = QIB7322_AHB_LOCATION ( port, channel, reg );
 			if ( ( rc = qib7322_ahb_mod_reg ( qib7322, location,
-							 value, mask ) ) != 0 )
+							  value, mask ) ) != 0 )
 				return rc;
 		}
 	}
@@ -2283,7 +2284,7 @@ static void qib7322_reset ( struct qib7322 *qib7322, struct pci_device *pci ) {
  * @ret rc		Return status code
  */
 static int qib7322_probe ( struct pci_device *pci,
-			  const struct pci_device_id *id __unused ) {
+			   const struct pci_device_id *id __unused ) {
 	struct qib7322 *qib7322;
 	struct QIB_7322_Revision revision;
 	struct ib_device *ibdev;
