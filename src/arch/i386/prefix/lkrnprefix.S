@@ -86,7 +86,7 @@ why_end:
 
 /*
 	The following header is documented in the Linux source code at
-	Documentation/i386/boot.txt
+	Documentation/x86/boot.txt
 */
 	.org	497
 setup_sects: 
