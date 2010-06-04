@@ -211,22 +211,6 @@ struct vxgedev {
 	char			fw_version[VXGE_HW_FW_STRLEN];
 };
 
-static inline int is_zero_ether_addr(const u8 *addr)
-{
-	return !(addr[0] | addr[1] | addr[2] | addr[3] | addr[4] | addr[5]);
-}
-
-static inline int is_multicast_ether_addr(const u8 *addr)
-{
-	return (0x01 & addr[0]);
-}
-
-/* checks the ethernet address @addr is a valid unicast */
-static inline int is_valid_ether_addr(const u8 *addr)
-{
-	return !is_multicast_ether_addr(addr) && !is_zero_ether_addr(addr);
-}
-
 void vxge_vpath_intr_enable(struct vxgedev *vdev, int vp_id);
 
 void vxge_vpath_intr_disable(struct vxgedev *vdev, int vp_id);

@@ -18,6 +18,7 @@ FILE_LICENCE(GPL2_ONLY);
 #include <stdio.h>
 #include <ipxe/malloc.h>
 #include <ipxe/iobuf.h>
+#include <ipxe/ethernet.h>
 #include <byteswap.h>
 
 #include "vxge_traffic.h"
