@@ -590,17 +590,22 @@ jme_disable_rx_engine(struct jme_adapter *jme)
 }
 
 static void
-jme_refill_rx_ring(struct jme_adapter *jme)
+jme_refill_rx_ring(struct jme_adapter *jme, int curhole)
 {
 	struct jme_ring *rxring = &jme->rxring;
 	int i = rxring->next_to_fill;
 	struct io_buffer **bufinf = rxring->bufinf;
 	int mask = jme->rx_ring_mask;
+	int limit = jme->rx_ring_size;
 
-	while (!bufinf[i]) {
-		if (jme_make_new_rx_buf(bufinf + i))
-			break;
-		jme_set_clean_rxdesc(jme, i);
+	while (limit--) {
+		if (!bufinf[i]) {
+			if (jme_make_new_rx_buf(bufinf + i))
+				break;
+			jme_set_clean_rxdesc(jme, i);
+		}
+		if (i == curhole)
+			limit = 0;
 		i = (i + 1) & mask;
 	}
 	rxring->next_to_fill = i;
@@ -622,7 +627,7 @@ jme_alloc_and_feed_iob(struct jme_adapter *jme, int idx)
 	netdev_rx(netdev, rxbi);
 
 	rxring->bufinf[idx] = NULL;
-	jme_refill_rx_ring(jme);
+	jme_refill_rx_ring(jme, idx);
 }
 
 static void
@@ -636,7 +641,8 @@ jme_process_receive(struct jme_adapter *jme)
 
 	i = rxring->next_to_clean;
 	rxdesc += i;
-	while (!(rxdesc->descwb.flags & cpu_to_le16(RXWBFLAG_OWN)) &&
+	while (rxring->bufinf[i] &&
+		!(rxdesc->descwb.flags & cpu_to_le16(RXWBFLAG_OWN)) &&
 		(rxdesc->descwb.desccnt & RXWBDCNT_WBCPL) &&
 		limit--) {
 
