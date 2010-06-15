@@ -51,6 +51,18 @@ struct retry_timer {
 	void ( * expired ) ( struct retry_timer *timer, int over );
 };
 
+/**
+ * Initialise a timer
+ *
+ * @v timer		Retry timer
+ * @v expired		Timer expired callback
+ */
+static inline __attribute__ (( always_inline )) void
+timer_init ( struct retry_timer *timer,
+	     void ( * expired ) ( struct retry_timer *timer, int over ) ) {
+	timer->expired = expired;
+}
+
 extern void start_timer ( struct retry_timer *timer );
 extern void start_timer_fixed ( struct retry_timer *timer,
 				unsigned long timeout );

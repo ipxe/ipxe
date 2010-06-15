@@ -753,8 +753,8 @@ static int slam_open ( struct xfer_interface *xfer, struct uri *uri ) {
 	xfer_init ( &slam->socket, &slam_socket_operations, &slam->refcnt );
 	xfer_init ( &slam->mc_socket, &slam_mc_socket_operations,
 		    &slam->refcnt );
-	slam->master_timer.expired = slam_master_timer_expired;
-	slam->slave_timer.expired = slam_slave_timer_expired;
+	timer_init ( &slam->master_timer, slam_master_timer_expired );
+	timer_init ( &slam->slave_timer, slam_slave_timer_expired );
 	/* Fake an invalid cached header of { 0x00, ... } */
 	slam->header_len = 1;
 	/* Fake parameters for initial NACK */

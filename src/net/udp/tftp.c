@@ -1136,13 +1136,13 @@ static int tftp_core_open ( struct xfer_interface *xfer, struct uri *uri,
 		return -ENOMEM;
 	ref_init ( &tftp->refcnt, tftp_free );
 	xfer_init ( &tftp->xfer, &tftp_xfer_operations, &tftp->refcnt );
-	tftp->uri = uri_get ( uri );
 	xfer_init ( &tftp->socket, &tftp_socket_operations, &tftp->refcnt );
 	xfer_init ( &tftp->mc_socket, &tftp_mc_socket_operations,
 		    &tftp->refcnt );
+	timer_init ( &tftp->timer, tftp_timer_expired );
+	tftp->uri = uri_get ( uri );
 	tftp->blksize = TFTP_DEFAULT_BLKSIZE;
 	tftp->flags = flags;
-	tftp->timer.expired = tftp_timer_expired;
 
 	/* Open socket */
 	tftp->port = uri_port ( tftp->uri, default_port );

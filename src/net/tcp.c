@@ -226,12 +226,12 @@ static int tcp_open ( struct xfer_interface *xfer, struct sockaddr *peer,
 	DBGC ( tcp, "TCP %p allocated\n", tcp );
 	ref_init ( &tcp->refcnt, NULL );
 	xfer_init ( &tcp->xfer, &tcp_xfer_operations, &tcp->refcnt );
+	timer_init ( &tcp->timer, tcp_expired );
 	tcp->prev_tcp_state = TCP_CLOSED;
 	tcp->tcp_state = TCP_STATE_SENT ( TCP_SYN );
 	tcp_dump_state ( tcp );
 	tcp->snd_seq = random();
 	INIT_LIST_HEAD ( &tcp->queue );
-	tcp->timer.expired = tcp_expired;
 	memcpy ( &tcp->peer, st_peer, sizeof ( tcp->peer ) );
 
 	/* Bind to local port */

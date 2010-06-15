@@ -281,8 +281,8 @@ ib_create_madx ( struct ib_device *ibdev, struct ib_mad_interface *mi,
 	madx = zalloc ( sizeof ( *madx ) );
 	if ( ! madx )
 		return NULL;
+	timer_init ( &madx->timer, ib_mi_timer_expired );
 	madx->mi = mi;
-	madx->timer.expired = ib_mi_timer_expired;
 	madx->op = op;
 
 	/* Determine address vector */

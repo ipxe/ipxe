@@ -1442,10 +1442,10 @@ int start_dhcp ( struct job_interface *job, struct net_device *netdev ) {
 	ref_init ( &dhcp->refcnt, dhcp_free );
 	job_init ( &dhcp->job, &dhcp_job_operations, &dhcp->refcnt );
 	xfer_init ( &dhcp->xfer, &dhcp_xfer_operations, &dhcp->refcnt );
+	timer_init ( &dhcp->timer, dhcp_timer_expired );
 	dhcp->netdev = netdev_get ( netdev );
 	dhcp->local.sin_family = AF_INET;
 	dhcp->local.sin_port = htons ( BOOTPC_PORT );
-	dhcp->timer.expired = dhcp_timer_expired;
 
 	/* Instantiate child objects and attach to our interfaces */
 	if ( ( rc = xfer_open_socket ( &dhcp->xfer, SOCK_DGRAM, &dhcp_peer,
@@ -1545,13 +1545,13 @@ int start_pxebs ( struct job_interface *job, struct net_device *netdev,
 	ref_init ( &dhcp->refcnt, dhcp_free );
 	job_init ( &dhcp->job, &dhcp_job_operations, &dhcp->refcnt );
 	xfer_init ( &dhcp->xfer, &dhcp_xfer_operations, &dhcp->refcnt );
+	timer_init ( &dhcp->timer, dhcp_timer_expired );
 	dhcp->netdev = netdev_get ( netdev );
 	dhcp->local.sin_family = AF_INET;
 	fetch_ipv4_setting ( netdev_settings ( netdev ), &ip_setting,
 			     &dhcp->local.sin_addr );
 	dhcp->local.sin_port = htons ( BOOTPC_PORT );
 	dhcp->pxe_type = cpu_to_le16 ( pxe_type );
-	dhcp->timer.expired = dhcp_timer_expired;
 
 	/* Construct PXE boot server IP address lists */
 	pxe_discovery_control =
