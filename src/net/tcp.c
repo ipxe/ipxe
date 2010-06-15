@@ -1016,8 +1016,7 @@ static int tcp_rx ( struct io_buffer *iobuf,
 	 * timer to expire and cause the connection to be freed.
 	 */
 	if ( TCP_CLOSED_GRACEFULLY ( tcp->tcp_state ) ) {
-		tcp->timer.timeout = ( 2 * TCP_MSL );
-		start_timer ( &tcp->timer );
+		start_timer_fixed ( &tcp->timer, ( 2 * TCP_MSL ) );
 	}
 
 	return 0;
