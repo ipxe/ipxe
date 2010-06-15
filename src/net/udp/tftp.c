@@ -1134,7 +1134,7 @@ static int tftp_core_open ( struct xfer_interface *xfer, struct uri *uri,
 	tftp = zalloc ( sizeof ( *tftp ) );
 	if ( ! tftp )
 		return -ENOMEM;
-	tftp->refcnt.free = tftp_free;
+	ref_init ( &tftp->refcnt, tftp_free );
 	xfer_init ( &tftp->xfer, &tftp_xfer_operations, &tftp->refcnt );
 	tftp->uri = uri_get ( uri );
 	xfer_init ( &tftp->socket, &tftp_socket_operations, &tftp->refcnt );

@@ -121,6 +121,7 @@ static int numeric_resolv ( struct resolv_interface *resolv,
 	numeric = zalloc ( sizeof ( *numeric ) );
 	if ( ! numeric )
 		return -ENOMEM;
+	ref_init ( &numeric->refcnt, NULL );
 	resolv_init ( &numeric->resolv, &null_resolv_ops, &numeric->refcnt );
 	process_init ( &numeric->process, numeric_step, &numeric->refcnt );
 	memcpy ( &numeric->sa, sa, sizeof ( numeric->sa ) );
@@ -256,6 +257,7 @@ int resolv ( struct resolv_interface *resolv, const char *name,
 	mux = zalloc ( sizeof ( *mux ) + name_len );
 	if ( ! mux )
 		return -ENOMEM;
+	ref_init ( &mux->refcnt, NULL );
 	resolv_init ( &mux->parent, &null_resolv_ops, &mux->refcnt );
 	resolv_init ( &mux->child, &resolv_mux_child_ops, &mux->refcnt );
 	mux->resolver = table_start ( RESOLVERS );
@@ -389,6 +391,7 @@ int xfer_open_named_socket ( struct xfer_interface *xfer, int semantics,
 	named = zalloc ( sizeof ( *named ) );
 	if ( ! named )
 		return -ENOMEM;
+	ref_init ( &named->refcnt, NULL );
 	xfer_init ( &named->xfer, &named_xfer_ops, &named->refcnt );
 	resolv_init ( &named->resolv, &named_resolv_ops, &named->refcnt );
 	named->semantics = semantics;

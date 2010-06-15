@@ -198,7 +198,7 @@ int open ( const char *uri_string ) {
 	file = zalloc ( sizeof ( *file ) );
 	if ( ! file )
 		return -ENOMEM;
-	file->refcnt.free = posix_file_free;
+	ref_init ( &file->refcnt, posix_file_free );
 	file->fd = fd;
 	file->rc = -EINPROGRESS;
 	xfer_init ( &file->xfer, &posix_file_xfer_operations,

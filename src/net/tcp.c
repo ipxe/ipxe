@@ -224,6 +224,7 @@ static int tcp_open ( struct xfer_interface *xfer, struct sockaddr *peer,
 	if ( ! tcp )
 		return -ENOMEM;
 	DBGC ( tcp, "TCP %p allocated\n", tcp );
+	ref_init ( &tcp->refcnt, NULL );
 	xfer_init ( &tcp->xfer, &tcp_xfer_operations, &tcp->refcnt );
 	tcp->prev_tcp_state = TCP_CLOSED;
 	tcp->tcp_state = TCP_STATE_SENT ( TCP_SYN );

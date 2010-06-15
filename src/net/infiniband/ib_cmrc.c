@@ -383,6 +383,7 @@ int ib_cmrc_open ( struct xfer_interface *xfer, struct ib_device *ibdev,
 		rc = -ENOMEM;
 		goto err_alloc;
 	}
+	ref_init ( &cmrc->refcnt, NULL );
 	xfer_init ( &cmrc->xfer, &ib_cmrc_xfer_operations, &cmrc->refcnt );
 	cmrc->ibdev = ibdev;
 	memcpy ( &cmrc->dgid, dgid, sizeof ( cmrc->dgid ) );

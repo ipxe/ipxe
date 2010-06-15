@@ -503,6 +503,7 @@ static int dns_resolv ( struct resolv_interface *resolv,
 		rc = -ENOMEM;
 		goto err_alloc_dns;
 	}
+	ref_init ( &dns->refcnt, NULL );
 	resolv_init ( &dns->resolv, &null_resolv_ops, &dns->refcnt );
 	xfer_init ( &dns->socket, &dns_socket_operations, &dns->refcnt );
 	dns->timer.expired = dns_timer_expired;

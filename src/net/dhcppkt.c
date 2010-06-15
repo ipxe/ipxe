@@ -271,6 +271,7 @@ static struct settings_operations dhcppkt_settings_operations = {
  */
 void dhcppkt_init ( struct dhcp_packet *dhcppkt, struct dhcphdr *data,
 		    size_t len ) {
+	ref_init ( &dhcppkt->refcnt, NULL );
 	dhcppkt->dhcphdr = data;
 	dhcppkt->max_len = len;
 	dhcpopt_init ( &dhcppkt->options, &dhcppkt->dhcphdr->options,

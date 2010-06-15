@@ -328,7 +328,7 @@ struct net_device * alloc_netdev ( size_t priv_size ) {
 	total_len = ( sizeof ( *netdev ) + priv_size );
 	netdev = zalloc ( total_len );
 	if ( netdev ) {
-		netdev->refcnt.free = free_netdev;
+		ref_init ( &netdev->refcnt, free_netdev );
 		netdev->link_rc = -EUNKNOWN_LINK_STATUS;
 		INIT_LIST_HEAD ( &netdev->tx_queue );
 		INIT_LIST_HEAD ( &netdev->rx_queue );

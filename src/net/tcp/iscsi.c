@@ -1792,7 +1792,7 @@ int iscsi_attach ( struct scsi_device *scsi, const char *root_path ) {
 	iscsi = zalloc ( sizeof ( *iscsi ) );
 	if ( ! iscsi )
 		return -ENOMEM;
-	iscsi->refcnt.free = iscsi_free;
+	ref_init ( &iscsi->refcnt, iscsi_free );
 	xfer_init ( &iscsi->socket, &iscsi_socket_operations, &iscsi->refcnt );
 	process_init ( &iscsi->process, iscsi_tx_step, &iscsi->refcnt );
 

@@ -438,7 +438,7 @@ int aoe_attach ( struct ata_device *ata, struct net_device *netdev,
 	aoe = zalloc ( sizeof ( *aoe ) );
 	if ( ! aoe )
 		return -ENOMEM;
-	aoe->refcnt.free = aoe_free;
+	ref_init ( &aoe->refcnt, aoe_free );
 	aoe->netdev = netdev_get ( netdev );
 	memcpy ( aoe->target, netdev->ll_broadcast, sizeof ( aoe->target ) );
 	aoe->tag = AOE_TAG_MAGIC;

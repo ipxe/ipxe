@@ -110,6 +110,7 @@ static int udp_open_common ( struct xfer_interface *xfer,
 	if ( ! udp )
 		return -ENOMEM;
 	DBGC ( udp, "UDP %p allocated\n", udp );
+	ref_init ( &udp->refcnt, NULL );
 	xfer_init ( &udp->xfer, &udp_xfer_operations, &udp->refcnt );
 	if ( st_peer )
 		memcpy ( &udp->peer, st_peer, sizeof ( udp->peer ) );

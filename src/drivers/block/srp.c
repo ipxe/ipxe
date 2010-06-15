@@ -482,6 +482,7 @@ int srp_attach ( struct scsi_device *scsi, const char *root_path ) {
 		rc = -ENOMEM;
 		goto err_alloc;
 	}
+	ref_init ( &srp->refcnt, NULL );
 	xfer_init ( &srp->socket, &srp_xfer_operations, &srp->refcnt );
 	srp->transport = transport;
 	DBGC ( srp, "SRP %p using %s\n", srp, root_path );

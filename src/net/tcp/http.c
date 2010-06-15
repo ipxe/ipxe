@@ -547,7 +547,7 @@ int http_open_filter ( struct xfer_interface *xfer, struct uri *uri,
 	http = zalloc ( sizeof ( *http ) );
 	if ( ! http )
 		return -ENOMEM;
-	http->refcnt.free = http_free;
+	ref_init ( &http->refcnt, http_free );
 	xfer_init ( &http->xfer, &http_xfer_operations, &http->refcnt );
        	http->uri = uri_get ( uri );
 	xfer_init ( &http->socket, &http_socket_operations, &http->refcnt );

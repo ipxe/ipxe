@@ -64,7 +64,7 @@ struct image * alloc_image ( void ) {
 
 	image = zalloc ( sizeof ( *image ) );
 	if ( image ) {
-		image->refcnt.free = free_image;
+		ref_init ( &image->refcnt, free_image );
 	}
 	return image;
 }

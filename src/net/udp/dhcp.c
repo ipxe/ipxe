@@ -1439,7 +1439,7 @@ int start_dhcp ( struct job_interface *job, struct net_device *netdev ) {
 	dhcp = zalloc ( sizeof ( *dhcp ) );
 	if ( ! dhcp )
 		return -ENOMEM;
-	dhcp->refcnt.free = dhcp_free;
+	ref_init ( &dhcp->refcnt, dhcp_free );
 	job_init ( &dhcp->job, &dhcp_job_operations, &dhcp->refcnt );
 	xfer_init ( &dhcp->xfer, &dhcp_xfer_operations, &dhcp->refcnt );
 	dhcp->netdev = netdev_get ( netdev );
@@ -1542,7 +1542,7 @@ int start_pxebs ( struct job_interface *job, struct net_device *netdev,
 			sizeof ( *ip ) /* terminator */ );
 	if ( ! dhcp )
 		return -ENOMEM;
-	dhcp->refcnt.free = dhcp_free;
+	ref_init ( &dhcp->refcnt, dhcp_free );
 	job_init ( &dhcp->job, &dhcp_job_operations, &dhcp->refcnt );
 	xfer_init ( &dhcp->xfer, &dhcp_xfer_operations, &dhcp->refcnt );
 	dhcp->netdev = netdev_get ( netdev );

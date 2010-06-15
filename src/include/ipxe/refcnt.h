@@ -40,6 +40,41 @@ struct refcnt {
 	void ( * free ) ( struct refcnt *refcnt );
 };
 
+/**
+ * Initialise a reference counter
+ *
+ * @v refcnt		Reference counter
+ * @v free		Freeing function
+ */
+static inline __attribute__ (( always_inline )) void
+ref_init ( struct refcnt *refcnt,
+	   void ( * free ) ( struct refcnt *refcnt ) ) {
+	refcnt->free = free;
+}
+
+/**
+ * Initialise a reference counter
+ *
+ * @v refcnt		Reference counter
+ * @v free		Free containing object
+ */
+#define ref_init( refcnt, free ) do {					\
+	if ( __builtin_constant_p ( (free) ) && ( (free) == NULL ) ) {	\
+		/* Skip common case of no initialisation required */	\
+	} else {							\
+		ref_init ( (refcnt), (free) );				\
+	}								\
+	} while ( 0 )
+
+/**
+ * Initialise a static reference counter
+ *
+ * @v free		Free containing object
+ */
+#define REF_INIT( free ) {						\
+		.free = free,						\
+	}
+
 extern struct refcnt * ref_get ( struct refcnt *refcnt );
 extern void ref_put ( struct refcnt *refcnt );
 

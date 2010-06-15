@@ -1731,7 +1731,7 @@ int add_tls ( struct xfer_interface *xfer, struct xfer_interface **next ) {
 	if ( ! tls )
 		return -ENOMEM;
 	memset ( tls, 0, sizeof ( *tls ) );
-	tls->refcnt.free = free_tls;
+	ref_init ( &tls->refcnt, free_tls );
 	filter_init ( &tls->plainstream, &tls_plainstream_operations,
 		      &tls->cipherstream, &tls_cipherstream_operations,
 		      &tls->refcnt );

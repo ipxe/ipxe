@@ -748,7 +748,7 @@ static int slam_open ( struct xfer_interface *xfer, struct uri *uri ) {
 	slam = zalloc ( sizeof ( *slam ) );
 	if ( ! slam )
 		return -ENOMEM;
-	slam->refcnt.free = slam_free;
+	ref_init ( &slam->refcnt, slam_free );
 	xfer_init ( &slam->xfer, &slam_xfer_operations, &slam->refcnt );
 	xfer_init ( &slam->socket, &slam_socket_operations, &slam->refcnt );
 	xfer_init ( &slam->mc_socket, &slam_mc_socket_operations,

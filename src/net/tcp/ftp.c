@@ -491,7 +491,7 @@ static int ftp_open ( struct xfer_interface *xfer, struct uri *uri ) {
 	ftp = zalloc ( sizeof ( *ftp ) );
 	if ( ! ftp )
 		return -ENOMEM;
-	ftp->refcnt.free = ftp_free;
+	ref_init ( &ftp->refcnt, ftp_free );
 	xfer_init ( &ftp->xfer, &ftp_xfer_operations, &ftp->refcnt );
 	ftp->uri = uri_get ( uri );
 	xfer_init ( &ftp->control, &ftp_control_operations, &ftp->refcnt );

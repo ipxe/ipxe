@@ -59,6 +59,7 @@ static int hw_open ( struct xfer_interface *xfer, struct uri *uri __unused ) {
 	hw = zalloc ( sizeof ( *hw ) );
 	if ( ! hw )
 		return -ENOMEM;
+	ref_init ( &hw->refcnt, NULL );
 	xfer_init ( &hw->xfer, &hw_xfer_operations, &hw->refcnt );
 	process_init ( &hw->process, hw_step, &hw->refcnt );
 
