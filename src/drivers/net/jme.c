@@ -993,7 +993,7 @@ jme_tx_clean(struct jme_adapter *jme)
 		txbi = txring->bufinf[i];
 
 		if (txbi && !(txdesc[i].descwb.flags & TXWBFLAG_OWN)) {
-			DBG2("TX clean address: %08lx(%08lx+%x)\n",
+			DBG2("TX clean address: %08lx(%08lx+%zx)\n",
 					(unsigned long)txbi->data,
 					virt_to_bus(txbi->data),
 					iob_len(txbi));
