@@ -17,5 +17,6 @@
 #define SMBIOS_EFI
 
 #define	IMAGE_EFI		/* EFI image support */
+#define	IMAGE_SCRIPT		/* iPXE script image support */
 
 #endif /* CONFIG_DEFAULTS_EFI_H */
