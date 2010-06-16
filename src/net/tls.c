@@ -35,9 +35,9 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #include <ipxe/sha1.h>
 #include <ipxe/aes.h>
 #include <ipxe/rsa.h>
+#include <ipxe/iobuf.h>
 #include <ipxe/xfer.h>
 #include <ipxe/open.h>
-#include <ipxe/filter.h>
 #include <ipxe/asn1.h>
 #include <ipxe/x509.h>
 #include <ipxe/tls.h>
@@ -107,10 +107,8 @@ static void tls_close ( struct tls_session *tls, int rc ) {
 	process_del ( &tls->process );
 	
 	/* Close ciphertext and plaintext streams */
-	xfer_nullify ( &tls->cipherstream.xfer );
-	xfer_close ( &tls->cipherstream.xfer, rc );
-	xfer_nullify ( &tls->plainstream.xfer );
-	xfer_close ( &tls->plainstream.xfer, rc );
+	intf_shutdown ( &tls->cipherstream, rc );
+	intf_shutdown ( &tls->plainstream, rc );
 }
 
 /******************************************************************************
@@ -1030,7 +1028,7 @@ static int tls_new_record ( struct tls_session *tls,
 	case TLS_TYPE_HANDSHAKE:
 		return tls_new_handshake ( tls, data, len );
 	case TLS_TYPE_DATA:
-		return xfer_deliver_raw ( &tls->plainstream.xfer, data, len );
+		return xfer_deliver_raw ( &tls->plainstream, data, len );
 	default:
 		/* RFC4346 says that we should just ignore unknown
 		 * record types.
@@ -1209,8 +1207,7 @@ static int tls_send_plaintext ( struct tls_session *tls, unsigned int type,
 
 	/* Allocate ciphertext */
 	ciphertext_len = ( sizeof ( *tlshdr ) + plaintext_len );
-	ciphertext = xfer_alloc_iob ( &tls->cipherstream.xfer,
-				      ciphertext_len );
+	ciphertext = xfer_alloc_iob ( &tls->cipherstream, ciphertext_len );
 	if ( ! ciphertext ) {
 		DBGC ( tls, "TLS %p could not allocate %zd bytes for "
 		       "ciphertext\n", tls, ciphertext_len );
@@ -1234,9 +1231,8 @@ static int tls_send_plaintext ( struct tls_session *tls, unsigned int type,
 	plaintext = NULL;
 
 	/* Send ciphertext */
-	rc = xfer_deliver_iob ( &tls->cipherstream.xfer, ciphertext );
-	ciphertext = NULL;
-	if ( rc != 0 ) {
+	if ( ( rc = xfer_deliver_iob ( &tls->cipherstream,
+				       iob_disown ( ciphertext ) ) ) != 0 ) {
 		DBGC ( tls, "TLS %p could not deliver ciphertext: %s\n",
 		       tls, strerror ( rc ) );
 		goto done;
@@ -1436,64 +1432,59 @@ static int tls_new_ciphertext ( struct tls_session *tls,
  */
 
 /**
- * Close interface
- *
- * @v xfer		Plainstream data transfer interface
- * @v rc		Reason for close
- */
-static void tls_plainstream_close ( struct xfer_interface *xfer, int rc ) {
-	struct tls_session *tls =
-		container_of ( xfer, struct tls_session, plainstream.xfer );
-
-	tls_close ( tls, rc );
-}
-
-/**
  * Check flow control window
  *
- * @v xfer		Plainstream data transfer interface
+ * @v tls		TLS session
  * @ret len		Length of window
  */
-static size_t tls_plainstream_window ( struct xfer_interface *xfer ) {
-	struct tls_session *tls =
-		container_of ( xfer, struct tls_session, plainstream.xfer );
+static size_t tls_plainstream_window ( struct tls_session *tls ) {
 
 	/* Block window unless we are ready to accept data */
 	if ( tls->tx_state != TLS_TX_DATA )
 		return 0;
 
-	return filter_window ( xfer );
+	return xfer_window ( &tls->cipherstream );
 }
 
 /**
  * Deliver datagram as raw data
  *
- * @v xfer		Plainstream data transfer interface
- * @v data		Data buffer
- * @v len		Length of data buffer
+ * @v tls		TLS session
+ * @v iobuf		I/O buffer
+ * @v meta		Data transfer metadata
  * @ret rc		Return status code
  */
-static int tls_plainstream_deliver_raw ( struct xfer_interface *xfer,
-					 const void *data, size_t len ) {
-	struct tls_session *tls =
-		container_of ( xfer, struct tls_session, plainstream.xfer );
+static int tls_plainstream_deliver ( struct tls_session *tls,
+				     struct io_buffer *iobuf,
+				     struct xfer_metadata *meta __unused ) {
+	int rc;
 	
 	/* Refuse unless we are ready to accept data */
-	if ( tls->tx_state != TLS_TX_DATA )
-		return -ENOTCONN;
+	if ( tls->tx_state != TLS_TX_DATA ) {
+		rc = -ENOTCONN;
+		goto done;
+	}
 
-	return tls_send_plaintext ( tls, TLS_TYPE_DATA, data, len );
+	if ( ( rc = tls_send_plaintext ( tls, TLS_TYPE_DATA, iobuf->data,
+					 iob_len ( iobuf ) ) ) != 0 )
+		goto done;
+
+ done:
+	free_iob ( iobuf );
+	return rc;
 }
 
-/** TLS plaintext stream operations */
-static struct xfer_interface_operations tls_plainstream_operations = {
-	.close		= tls_plainstream_close,
-	.vredirect	= ignore_xfer_vredirect,
-	.window		= tls_plainstream_window,
-	.alloc_iob	= default_xfer_alloc_iob,
-	.deliver_iob	= xfer_deliver_as_raw,
-	.deliver_raw	= tls_plainstream_deliver_raw,
+/** TLS plaintext stream interface operations */
+static struct interface_operation tls_plainstream_ops[] = {
+	INTF_OP ( xfer_deliver, struct tls_session *, tls_plainstream_deliver ),
+	INTF_OP ( xfer_window, struct tls_session *, tls_plainstream_window ),
+	INTF_OP ( intf_close, struct tls_session *, tls_close ),
 };
+
+/** TLS plaintext stream interface descriptor */
+static struct interface_descriptor tls_plainstream_desc =
+	INTF_DESC_PASSTHRU ( struct tls_session, plainstream,
+			     tls_plainstream_ops, cipherstream );
 
 /******************************************************************************
  *
@@ -1501,19 +1492,6 @@ static struct xfer_interface_operations tls_plainstream_operations = {
  *
  ******************************************************************************
  */
-
-/**
- * Close interface
- *
- * @v xfer		Plainstream data transfer interface
- * @v rc		Reason for close
- */
-static void tls_cipherstream_close ( struct xfer_interface *xfer, int rc ) {
-	struct tls_session *tls =
-		container_of ( xfer, struct tls_session, cipherstream.xfer );
-
-	tls_close ( tls, rc );
-}
 
 /**
  * Handle received TLS header
@@ -1569,22 +1547,21 @@ static int tls_newdata_process_data ( struct tls_session *tls ) {
 /**
  * Receive new ciphertext
  *
- * @v app		Stream application
- * @v data		Data received
- * @v len		Length of received data
+ * @v tls		TLS session
+ * @v iobuf		I/O buffer
+ * @v meta		Data transfer metadat
  * @ret rc		Return status code
  */
-static int tls_cipherstream_deliver_raw ( struct xfer_interface *xfer,
-					  const void *data, size_t len ) {
-	struct tls_session *tls = 
-		container_of ( xfer, struct tls_session, cipherstream.xfer );
+static int tls_cipherstream_deliver ( struct tls_session *tls,
+				      struct io_buffer *iobuf,
+				      struct xfer_metadata *xfer __unused ) {
 	size_t frag_len;
 	void *buf;
 	size_t buf_len;
 	int ( * process ) ( struct tls_session *tls );
 	int rc;
 
-	while ( len ) {
+	while ( iob_len ( iobuf ) ) {
 		/* Select buffer according to current state */
 		switch ( tls->rx_state ) {
 		case TLS_RX_HEADER:
@@ -1599,40 +1576,45 @@ static int tls_cipherstream_deliver_raw ( struct xfer_interface *xfer,
 			break;
 		default:
 			assert ( 0 );
-			return -EINVAL;
+			rc = -EINVAL;
+			goto done;
 		}
 
 		/* Copy data portion to buffer */
 		frag_len = ( buf_len - tls->rx_rcvd );
-		if ( frag_len > len )
-			frag_len = len;
-		memcpy ( ( buf + tls->rx_rcvd ), data, frag_len );
+		if ( frag_len > iob_len  ( iobuf ) )
+			frag_len = iob_len ( iobuf );
+		memcpy ( ( buf + tls->rx_rcvd ), iobuf->data, frag_len );
 		tls->rx_rcvd += frag_len;
-		data += frag_len;
-		len -= frag_len;
+		iob_pull ( iobuf, frag_len );
 
 		/* Process data if buffer is now full */
 		if ( tls->rx_rcvd == buf_len ) {
 			if ( ( rc = process ( tls ) ) != 0 ) {
 				tls_close ( tls, rc );
-				return rc;
+				goto done;
 			}
 			tls->rx_rcvd = 0;
 		}
 	}
+	rc = 0;
 
-	return 0;
+ done:
+	free_iob ( iobuf );
+	return rc;
 }
 
-/** TLS ciphertext stream operations */
-static struct xfer_interface_operations tls_cipherstream_operations = {
-	.close		= tls_cipherstream_close,
-	.vredirect	= xfer_vreopen,
-	.window		= filter_window,
-	.alloc_iob	= default_xfer_alloc_iob,
-	.deliver_iob	= xfer_deliver_as_raw,
-	.deliver_raw	= tls_cipherstream_deliver_raw,
+/** TLS ciphertext stream interface operations */
+static struct interface_operation tls_cipherstream_ops[] = {
+	INTF_OP ( xfer_deliver, struct tls_session *,
+		  tls_cipherstream_deliver ),
+	INTF_OP ( intf_close, struct tls_session *, tls_close ),
 };
+
+/** TLS ciphertext stream interface descriptor */
+static struct interface_descriptor tls_cipherstream_desc =
+	INTF_DESC_PASSTHRU ( struct tls_session, cipherstream,
+			     tls_cipherstream_ops, plainstream );
 
 /******************************************************************************
  *
@@ -1652,7 +1634,7 @@ static void tls_step ( struct process *process ) {
 	int rc;
 
 	/* Wait for cipherstream to become ready */
-	if ( ! xfer_window ( &tls->cipherstream.xfer ) )
+	if ( ! xfer_window ( &tls->cipherstream ) )
 		return;
 
 	switch ( tls->tx_state ) {
@@ -1723,7 +1705,7 @@ static void tls_step ( struct process *process ) {
  ******************************************************************************
  */
 
-int add_tls ( struct xfer_interface *xfer, struct xfer_interface **next ) {
+int add_tls ( struct interface *xfer, struct interface **next ) {
 	struct tls_session *tls;
 
 	/* Allocate and initialise TLS structure */
@@ -1732,9 +1714,8 @@ int add_tls ( struct xfer_interface *xfer, struct xfer_interface **next ) {
 		return -ENOMEM;
 	memset ( tls, 0, sizeof ( *tls ) );
 	ref_init ( &tls->refcnt, free_tls );
-	filter_init ( &tls->plainstream, &tls_plainstream_operations,
-		      &tls->cipherstream, &tls_cipherstream_operations,
-		      &tls->refcnt );
+	intf_init ( &tls->plainstream, &tls_plainstream_desc, &tls->refcnt );
+	intf_init ( &tls->cipherstream, &tls_cipherstream_desc, &tls->refcnt );
 	tls_clear_cipher ( tls, &tls->tx_cipherspec );
 	tls_clear_cipher ( tls, &tls->tx_cipherspec_pending );
 	tls_clear_cipher ( tls, &tls->rx_cipherspec );
@@ -1751,9 +1732,8 @@ int add_tls ( struct xfer_interface *xfer, struct xfer_interface **next ) {
 	process_init ( &tls->process, tls_step, &tls->refcnt );
 
 	/* Attach to parent interface, mortalise self, and return */
-	xfer_plug_plug ( &tls->plainstream.xfer, xfer );
-	*next = &tls->cipherstream.xfer;
+	intf_plug_plug ( &tls->plainstream, xfer );
+	*next = &tls->cipherstream;
 	ref_put ( &tls->refcnt );
 	return 0;
 }
-

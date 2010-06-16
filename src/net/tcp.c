@@ -31,7 +31,7 @@ struct tcp_connection {
 	struct list_head list;
 
 	/** Data transfer interface */
-	struct xfer_interface xfer;
+	struct interface xfer;
 	/** Data transfer interface closed flag */
 	int xfer_closed;
 
@@ -92,7 +92,7 @@ struct tcp_connection {
 static LIST_HEAD ( tcp_conns );
 
 /* Forward declarations */
-static struct xfer_interface_operations tcp_xfer_operations;
+static struct interface_descriptor tcp_xfer_desc;
 static void tcp_expired ( struct retry_timer *timer, int over );
 static int tcp_rx_ack ( struct tcp_connection *tcp, uint32_t ack,
 			uint32_t win );
@@ -211,7 +211,7 @@ static int tcp_bind ( struct tcp_connection *tcp, unsigned int port ) {
  * @v local		Local socket address, or NULL
  * @ret rc		Return status code
  */
-static int tcp_open ( struct xfer_interface *xfer, struct sockaddr *peer,
+static int tcp_open ( struct interface *xfer, struct sockaddr *peer,
 		      struct sockaddr *local ) {
 	struct sockaddr_tcpip *st_peer = ( struct sockaddr_tcpip * ) peer;
 	struct sockaddr_tcpip *st_local = ( struct sockaddr_tcpip * ) local;
@@ -225,7 +225,7 @@ static int tcp_open ( struct xfer_interface *xfer, struct sockaddr *peer,
 		return -ENOMEM;
 	DBGC ( tcp, "TCP %p allocated\n", tcp );
 	ref_init ( &tcp->refcnt, NULL );
-	xfer_init ( &tcp->xfer, &tcp_xfer_operations, &tcp->refcnt );
+	intf_init ( &tcp->xfer, &tcp_xfer_desc, &tcp->refcnt );
 	timer_init ( &tcp->timer, tcp_expired );
 	tcp->prev_tcp_state = TCP_CLOSED;
 	tcp->tcp_state = TCP_STATE_SENT ( TCP_SYN );
@@ -245,7 +245,7 @@ static int tcp_open ( struct xfer_interface *xfer, struct sockaddr *peer,
 	/* Attach parent interface, transfer reference to connection
 	 * list and return
 	 */
-	xfer_plug_plug ( &tcp->xfer, xfer );
+	intf_plug_plug ( &tcp->xfer, xfer );
 	list_add ( &tcp->list, &tcp_conns );
 	return 0;
 
@@ -268,8 +268,7 @@ static void tcp_close ( struct tcp_connection *tcp, int rc ) {
 	struct io_buffer *tmp;
 
 	/* Close data transfer interface */
-	xfer_nullify ( &tcp->xfer );
-	xfer_close ( &tcp->xfer, rc );
+	intf_shutdown ( &tcp->xfer, rc );
 	tcp->xfer_closed = 1;
 
 	/* If we are in CLOSED, or have otherwise not yet received a
@@ -1044,12 +1043,10 @@ struct tcpip_protocol tcp_protocol __tcpip_protocol = {
 /**
  * Close interface
  *
- * @v xfer		Data transfer interface
+ * @v tcp		TCP connection
  * @v rc		Reason for close
  */
-static void tcp_xfer_close ( struct xfer_interface *xfer, int rc ) {
-	struct tcp_connection *tcp =
-		container_of ( xfer, struct tcp_connection, xfer );
+static void tcp_xfer_close ( struct tcp_connection *tcp, int rc ) {
 
 	/* Close data transfer interface */
 	tcp_close ( tcp, rc );
@@ -1061,12 +1058,10 @@ static void tcp_xfer_close ( struct xfer_interface *xfer, int rc ) {
 /**
  * Check flow control window
  *
- * @v xfer		Data transfer interface
+ * @v tcp		TCP connection
  * @ret len		Length of window
  */
-static size_t tcp_xfer_window ( struct xfer_interface *xfer ) {
-	struct tcp_connection *tcp =
-		container_of ( xfer, struct tcp_connection, xfer );
+static size_t tcp_xfer_window ( struct tcp_connection *tcp ) {
 
 	/* Not ready if data queue is non-empty.  This imposes a limit
 	 * of only one unACKed packet in the TX queue at any time; we
@@ -1082,16 +1077,14 @@ static size_t tcp_xfer_window ( struct xfer_interface *xfer ) {
 /**
  * Deliver datagram as I/O buffer
  *
- * @v xfer		Data transfer interface
+ * @v tcp		TCP connection
  * @v iobuf		Datagram I/O buffer
  * @v meta		Data transfer metadata
  * @ret rc		Return status code
  */
-static int tcp_xfer_deliver_iob ( struct xfer_interface *xfer,
-				  struct io_buffer *iobuf,
-				  struct xfer_metadata *meta __unused ) {
-	struct tcp_connection *tcp =
-		container_of ( xfer, struct tcp_connection, xfer );
+static int tcp_xfer_deliver ( struct tcp_connection *tcp,
+			      struct io_buffer *iobuf,
+			      struct xfer_metadata *meta __unused ) {
 
 	/* Enqueue packet */
 	list_add_tail ( &iobuf->list, &tcp->queue );
@@ -1103,14 +1096,15 @@ static int tcp_xfer_deliver_iob ( struct xfer_interface *xfer,
 }
 
 /** TCP data transfer interface operations */
-static struct xfer_interface_operations tcp_xfer_operations = {
-	.close		= tcp_xfer_close,
-	.vredirect	= ignore_xfer_vredirect,
-	.window		= tcp_xfer_window,
-	.alloc_iob	= default_xfer_alloc_iob,
-	.deliver_iob	= tcp_xfer_deliver_iob,
-	.deliver_raw	= xfer_deliver_as_iob,
+static struct interface_operation tcp_xfer_operations[] = {
+	INTF_OP ( xfer_deliver, struct tcp_connection *, tcp_xfer_deliver ),
+	INTF_OP ( xfer_window, struct tcp_connection *, tcp_xfer_window ),
+	INTF_OP ( intf_close, struct tcp_connection *, tcp_xfer_close ),
 };
+
+/** TCP data transfer interface descriptor */
+static struct interface_descriptor tcp_xfer_desc =
+	INTF_DESC ( struct tcp_connection, xfer, tcp_xfer_operations );
 
 /***************************************************************************
  *
@@ -1136,7 +1130,7 @@ int tcp_sock_stream = TCP_SOCK_STREAM;
  * @v uri		URI
  * @ret rc		Return status code
  */
-static int tcp_open_uri ( struct xfer_interface *xfer, struct uri *uri ) {
+static int tcp_open_uri ( struct interface *xfer, struct uri *uri ) {
 	struct sockaddr_tcpip peer;
 
 	/* Sanity check */

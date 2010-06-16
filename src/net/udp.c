@@ -29,7 +29,7 @@ struct udp_connection {
 	struct list_head list;
 
 	/** Data transfer interface */
-	struct xfer_interface xfer;
+	struct interface xfer;
 
 	/** Local socket address */
 	struct sockaddr_tcpip local;
@@ -43,7 +43,7 @@ struct udp_connection {
 static LIST_HEAD ( udp_conns );
 
 /* Forward declatations */
-static struct xfer_interface_operations udp_xfer_operations;
+static struct interface_descriptor udp_xfer_desc;
 struct tcpip_protocol udp_protocol;
 
 /**
@@ -97,7 +97,7 @@ static int udp_bind ( struct udp_connection *udp ) {
  * @v promisc		Socket is promiscuous
  * @ret rc		Return status code
  */
-static int udp_open_common ( struct xfer_interface *xfer,
+static int udp_open_common ( struct interface *xfer,
 			     struct sockaddr *peer, struct sockaddr *local,
 			     int promisc ) {
 	struct sockaddr_tcpip *st_peer = ( struct sockaddr_tcpip * ) peer;
@@ -111,7 +111,7 @@ static int udp_open_common ( struct xfer_interface *xfer,
 		return -ENOMEM;
 	DBGC ( udp, "UDP %p allocated\n", udp );
 	ref_init ( &udp->refcnt, NULL );
-	xfer_init ( &udp->xfer, &udp_xfer_operations, &udp->refcnt );
+	intf_init ( &udp->xfer, &udp_xfer_desc, &udp->refcnt );
 	if ( st_peer )
 		memcpy ( &udp->peer, st_peer, sizeof ( udp->peer ) );
 	if ( st_local )
@@ -126,7 +126,7 @@ static int udp_open_common ( struct xfer_interface *xfer,
 	/* Attach parent interface, transfer reference to connection
 	 * list and return
 	 */
-	xfer_plug_plug ( &udp->xfer, xfer );
+	intf_plug_plug ( &udp->xfer, xfer );
 	list_add ( &udp->list, &udp_conns );
 	return 0;
 
@@ -143,7 +143,7 @@ static int udp_open_common ( struct xfer_interface *xfer,
  * @v local		Local socket address, or NULL
  * @ret rc		Return status code
  */
-int udp_open ( struct xfer_interface *xfer, struct sockaddr *peer,
+int udp_open ( struct interface *xfer, struct sockaddr *peer,
 	       struct sockaddr *local ) {
 	return udp_open_common ( xfer, peer, local, 0 );
 }
@@ -157,7 +157,7 @@ int udp_open ( struct xfer_interface *xfer, struct sockaddr *peer,
  * Promiscuous UDP connections are required in order to support the
  * PXE API.
  */
-int udp_open_promisc ( struct xfer_interface *xfer ) {
+int udp_open_promisc ( struct interface *xfer ) {
 	return udp_open_common ( xfer, NULL, NULL, 1 );
 }
 
@@ -170,8 +170,7 @@ int udp_open_promisc ( struct xfer_interface *xfer ) {
 static void udp_close ( struct udp_connection *udp, int rc ) {
 
 	/* Close data transfer interface */
-	xfer_nullify ( &udp->xfer );
-	xfer_close ( &udp->xfer, rc );
+	intf_shutdown ( &udp->xfer, rc );
 
 	/* Remove from list of connections and drop list's reference */
 	list_del ( &udp->list );
@@ -331,7 +330,7 @@ static int udp_rx ( struct io_buffer *iobuf, struct sockaddr_tcpip *st_src,
 	memset ( &meta, 0, sizeof ( meta ) );
 	meta.src = ( struct sockaddr * ) st_src;
 	meta.dest = ( struct sockaddr * ) st_dest;
-	rc = xfer_deliver_iob_meta ( &udp->xfer, iob_disown ( iobuf ), &meta );
+	rc = xfer_deliver ( &udp->xfer, iob_disown ( iobuf ), &meta );
 
  done:
 	free_iob ( iobuf );
@@ -352,30 +351,14 @@ struct tcpip_protocol udp_protocol __tcpip_protocol = {
  */
 
 /**
- * Close interface
- *
- * @v xfer		Data transfer interface
- * @v rc		Reason for close
- */
-static void udp_xfer_close ( struct xfer_interface *xfer, int rc ) {
-	struct udp_connection *udp =
-		container_of ( xfer, struct udp_connection, xfer );
-
-	/* Close connection */
-	udp_close ( udp, rc );
-}
-
-/**
  * Allocate I/O buffer for UDP
  *
- * @v xfer		Data transfer interface
+ * @v udp		UDP connection
  * @v len		Payload size
  * @ret iobuf		I/O buffer, or NULL
  */
-static struct io_buffer * udp_alloc_iob ( struct xfer_interface *xfer,
-					  size_t len ) {
-	struct udp_connection *udp =
-		container_of ( xfer, struct udp_connection, xfer );	
+static struct io_buffer * udp_xfer_alloc_iob ( struct udp_connection *udp,
+					       size_t len ) {
 	struct io_buffer *iobuf;
 
 	iobuf = alloc_iob ( UDP_MAX_HLEN + len );
@@ -391,16 +374,14 @@ static struct io_buffer * udp_alloc_iob ( struct xfer_interface *xfer,
 /**
  * Deliver datagram as I/O buffer
  *
- * @v xfer		Data transfer interface
+ * @v udp		UDP connection
  * @v iobuf		Datagram I/O buffer
  * @v meta		Data transfer metadata
  * @ret rc		Return status code
  */
-static int udp_xfer_deliver_iob ( struct xfer_interface *xfer,
-				  struct io_buffer *iobuf,
-				  struct xfer_metadata *meta ) {
-	struct udp_connection *udp =
-		container_of ( xfer, struct udp_connection, xfer );
+static int udp_xfer_deliver ( struct udp_connection *udp,
+			      struct io_buffer *iobuf,
+			      struct xfer_metadata *meta ) {
 
 	/* Transmit data, if possible */
 	udp_tx ( udp, iobuf, ( ( struct sockaddr_tcpip * ) meta->src ),
@@ -410,14 +391,15 @@ static int udp_xfer_deliver_iob ( struct xfer_interface *xfer,
 }
 
 /** UDP data transfer interface operations */
-static struct xfer_interface_operations udp_xfer_operations = {
-	.close		= udp_xfer_close,
-	.vredirect	= ignore_xfer_vredirect,
-	.window		= unlimited_xfer_window,
-	.alloc_iob	= udp_alloc_iob,
-	.deliver_iob	= udp_xfer_deliver_iob,
-	.deliver_raw	= xfer_deliver_as_iob,
+static struct interface_operation udp_xfer_operations[] = {
+	INTF_OP ( xfer_deliver, struct udp_connection *, udp_xfer_deliver ),
+	INTF_OP ( xfer_alloc_iob, struct udp_connection *, udp_xfer_alloc_iob ),
+	INTF_OP ( intf_close, struct udp_connection *, udp_close ),
 };
+
+/** UDP data transfer interface descriptor */
+static struct interface_descriptor udp_xfer_desc =
+	INTF_DESC ( struct udp_connection, xfer, udp_xfer_operations );
 
 /***************************************************************************
  *
@@ -443,7 +425,7 @@ int udp_sock_dgram = UDP_SOCK_DGRAM;
  * @v uri		URI
  * @ret rc		Return status code
  */
-static int udp_open_uri ( struct xfer_interface *xfer, struct uri *uri ) {
+static int udp_open_uri ( struct interface *xfer, struct uri *uri ) {
 	struct sockaddr_tcpip peer;
 
 	/* Sanity check */

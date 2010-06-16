@@ -70,7 +70,7 @@ struct ib_cmrc_connection {
 	/** Reference count */
 	struct refcnt refcnt;
 	/** Data transfer interface */
-	struct xfer_interface xfer;
+	struct interface xfer;
 	/** Infiniband device */
 	struct ib_device *ibdev;
 	/** Completion queue */
@@ -135,8 +135,7 @@ static void ib_cmrc_shutdown ( struct process *process ) {
 static void ib_cmrc_close ( struct ib_cmrc_connection *cmrc, int rc ) {
 
 	/* Close data transfer interface */
-	xfer_nullify ( &cmrc->xfer );
-	xfer_close ( &cmrc->xfer, rc );
+	intf_shutdown ( &cmrc->xfer, rc );
 
 	/* Schedule shutdown process */
 	process_add ( &cmrc->shutdown );
@@ -263,16 +262,14 @@ static struct ib_completion_queue_operations ib_cmrc_completion_ops = {
 /**
  * Send data via CMRC
  *
- * @v xfer		Data transfer interface
+ * @v cmrc		CMRC connection
  * @v iobuf		Datagram I/O buffer
  * @v meta		Data transfer metadata
  * @ret rc		Return status code
  */
-static int ib_cmrc_xfer_deliver_iob ( struct xfer_interface *xfer,
-				      struct io_buffer *iobuf,
-				      struct xfer_metadata *meta __unused ) {
-	struct ib_cmrc_connection *cmrc =
-		container_of ( xfer, struct ib_cmrc_connection, xfer );
+static int ib_cmrc_xfer_deliver ( struct ib_cmrc_connection *cmrc,
+				  struct io_buffer *iobuf,
+				  struct xfer_metadata *meta __unused ) {
 	int rc;
 
 	/* If no connection has yet been attempted, send this datagram
@@ -326,12 +323,10 @@ static int ib_cmrc_xfer_deliver_iob ( struct xfer_interface *xfer,
 /**
  * Check CMRC flow control window
  *
- * @v xfer		Data transfer interface
+ * @v cmrc		CMRC connection
  * @ret len		Length of window
  */
-static size_t ib_cmrc_xfer_window ( struct xfer_interface *xfer ) {
-	struct ib_cmrc_connection *cmrc =
-		container_of ( xfer, struct ib_cmrc_connection, xfer );
+static size_t ib_cmrc_xfer_window ( struct ib_cmrc_connection *cmrc ) {
 
 	/* We indicate a window only when we are successfully
 	 * connected.
@@ -339,29 +334,18 @@ static size_t ib_cmrc_xfer_window ( struct xfer_interface *xfer ) {
 	return ( cmrc->connected ? IB_MAX_PAYLOAD_SIZE : 0 );
 }
 
-/**
- * Close CMRC data-transfer interface
- *
- * @v xfer		Data transfer interface
- * @v rc		Reason for close
- */
-static void ib_cmrc_xfer_close ( struct xfer_interface *xfer, int rc ) {
-	struct ib_cmrc_connection *cmrc =
-		container_of ( xfer, struct ib_cmrc_connection, xfer );
-
-	DBGC ( cmrc, "CMRC %p closed: %s\n", cmrc, strerror ( rc ) );
-	ib_cmrc_close ( cmrc, rc );
-}
-
 /** CMRC data transfer interface operations */
-static struct xfer_interface_operations ib_cmrc_xfer_operations = {
-	.close		= ib_cmrc_xfer_close,
-	.vredirect	= ignore_xfer_vredirect,
-	.window		= ib_cmrc_xfer_window,
-	.alloc_iob	= default_xfer_alloc_iob,
-	.deliver_iob	= ib_cmrc_xfer_deliver_iob,
-	.deliver_raw	= xfer_deliver_as_iob,
+static struct interface_operation ib_cmrc_xfer_operations[] = {
+	INTF_OP ( xfer_deliver, struct ib_cmrc_connection *,
+		  ib_cmrc_xfer_deliver ),
+	INTF_OP ( xfer_window, struct ib_cmrc_connection *,
+		  ib_cmrc_xfer_window ),
+	INTF_OP ( intf_close, struct ib_cmrc_connection *, ib_cmrc_close ),
 };
+
+/** CMRC data transfer interface descriptor */
+static struct interface_descriptor ib_cmrc_xfer_desc =
+	INTF_DESC ( struct ib_cmrc_connection, xfer, ib_cmrc_xfer_operations );
 
 /**
  * Open CMRC connection
@@ -372,7 +356,7 @@ static struct xfer_interface_operations ib_cmrc_xfer_operations = {
  * @v service_id	Service ID
  * @ret rc		Returns status code
  */
-int ib_cmrc_open ( struct xfer_interface *xfer, struct ib_device *ibdev,
+int ib_cmrc_open ( struct interface *xfer, struct ib_device *ibdev,
 		   struct ib_gid *dgid, struct ib_gid_half *service_id ) {
 	struct ib_cmrc_connection *cmrc;
 	int rc;
@@ -384,7 +368,7 @@ int ib_cmrc_open ( struct xfer_interface *xfer, struct ib_device *ibdev,
 		goto err_alloc;
 	}
 	ref_init ( &cmrc->refcnt, NULL );
-	xfer_init ( &cmrc->xfer, &ib_cmrc_xfer_operations, &cmrc->refcnt );
+	intf_init ( &cmrc->xfer, &ib_cmrc_xfer_desc, &cmrc->refcnt );
 	cmrc->ibdev = ibdev;
 	memcpy ( &cmrc->dgid, dgid, sizeof ( cmrc->dgid ) );
 	memcpy ( &cmrc->service_id, service_id, sizeof ( cmrc->service_id ) );
@@ -422,7 +406,7 @@ int ib_cmrc_open ( struct xfer_interface *xfer, struct ib_device *ibdev,
 	/* Attach to parent interface, transfer reference (implicitly)
 	 * to our shutdown process, and return.
 	 */
-	xfer_plug_plug ( &cmrc->xfer, xfer );
+	intf_plug_plug ( &cmrc->xfer, xfer );
 	return 0;
 
 	ib_destroy_qp ( ibdev, cmrc->qp );

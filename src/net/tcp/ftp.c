@@ -8,6 +8,7 @@
 #include <ipxe/socket.h>
 #include <ipxe/tcpip.h>
 #include <ipxe/in.h>
+#include <ipxe/iobuf.h>
 #include <ipxe/xfer.h>
 #include <ipxe/open.h>
 #include <ipxe/uri.h>
@@ -48,14 +49,14 @@ struct ftp_request {
 	/** Reference counter */
 	struct refcnt refcnt;
 	/** Data transfer interface */
-	struct xfer_interface xfer;
+	struct interface xfer;
 
 	/** URI being fetched */
 	struct uri *uri;
 	/** FTP control channel interface */
-	struct xfer_interface control;
+	struct interface control;
 	/** FTP data channel interface */
-	struct xfer_interface data;
+	struct interface data;
 
 	/** Current state */
 	enum ftp_state state;
@@ -95,12 +96,9 @@ static void ftp_done ( struct ftp_request *ftp, int rc ) {
 	DBGC ( ftp, "FTP %p completed (%s)\n", ftp, strerror ( rc ) );
 
 	/* Close all data transfer interfaces */
-	xfer_nullify ( &ftp->xfer );
-	xfer_close ( &ftp->xfer, rc );
-	xfer_nullify ( &ftp->control );
-	xfer_close ( &ftp->control, rc );
-	xfer_nullify ( &ftp->data );
-	xfer_close ( &ftp->data, rc );
+	intf_shutdown ( &ftp->data, rc );
+	intf_shutdown ( &ftp->control, rc );
+	intf_shutdown ( &ftp->xfer, rc );
 }
 
 /*****************************************************************************
@@ -165,26 +163,6 @@ static struct ftp_control_string ftp_strings[] = {
 	[FTP_QUIT]	= { "QUIT", NULL },
 	[FTP_DONE]	= { NULL, NULL },
 };
-
-/**
- * Handle control channel being closed
- *
- * @v control		FTP control channel interface
- * @v rc		Reason for close
- *
- * When the control channel is closed, the data channel must also be
- * closed, if it is currently open.
- */
-static void ftp_control_close ( struct xfer_interface *control, int rc ) {
-	struct ftp_request *ftp =
-		container_of ( control, struct ftp_request, control );
-
-	DBGC ( ftp, "FTP %p control connection closed: %s\n",
-	       ftp, strerror ( rc ) );
-
-	/* Complete FTP operation */
-	ftp_done ( ftp, rc );
-}
 
 /**
  * Parse FTP byte sequence value
@@ -298,23 +276,25 @@ static void ftp_reply ( struct ftp_request *ftp ) {
 /**
  * Handle new data arriving on FTP control channel
  *
- * @v control		FTP control channel interface
- * @v data		New data
- * @v len		Length of new data
+ * @v ftp		FTP request
+ * @v iob		I/O buffer
+ * @v meta		Data transfer metadata
+ * @ret rc		Return status code
  *
  * Data is collected until a complete line is received, at which point
  * its information is passed to ftp_reply().
  */
-static int ftp_control_deliver_raw ( struct xfer_interface *control,
-				     const void *data, size_t len ) {
-	struct ftp_request *ftp =
-		container_of ( control, struct ftp_request, control );
+static int ftp_control_deliver ( struct ftp_request *ftp,
+				 struct io_buffer *iobuf,
+				 struct xfer_metadata *meta __unused ) {
+	char *data = iobuf->data;
+	size_t len = iob_len ( iobuf );
 	char *recvbuf = ftp->recvbuf;
 	size_t recvsize = ftp->recvsize;
 	char c;
 	
 	while ( len-- ) {
-		c = * ( ( char * ) data++ );
+		c = *(data++);
 		switch ( c ) {
 		case '\r' :
 		case '\n' :
@@ -351,18 +331,21 @@ static int ftp_control_deliver_raw ( struct xfer_interface *control,
 	ftp->recvbuf = recvbuf;
 	ftp->recvsize = recvsize;
 
+	/* Free I/O buffer */
+	free_iob ( iobuf );
+
 	return 0;
 }
 
-/** FTP control channel operations */
-static struct xfer_interface_operations ftp_control_operations = {
-	.close		= ftp_control_close,
-	.vredirect	= xfer_vreopen,
-	.window		= unlimited_xfer_window,
-	.alloc_iob	= default_xfer_alloc_iob,
-	.deliver_iob	= xfer_deliver_as_raw,
-	.deliver_raw	= ftp_control_deliver_raw,
+/** FTP control channel interface operations */
+static struct interface_operation ftp_control_operations[] = {
+	INTF_OP ( xfer_deliver, struct ftp_request *, ftp_control_deliver ),
+	INTF_OP ( intf_close, struct ftp_request *, ftp_done ),
 };
+
+/** FTP control channel interface descriptor */
+static struct interface_descriptor ftp_control_desc =
+	INTF_DESC ( struct ftp_request, control, ftp_control_operations );
 
 /*****************************************************************************
  *
@@ -373,7 +356,7 @@ static struct xfer_interface_operations ftp_control_operations = {
 /**
  * Handle FTP data channel being closed
  *
- * @v data		FTP data channel interface
+ * @v ftp		FTP request
  * @v rc		Reason for closure
  *
  * When the data channel is closed, the control channel should be left
@@ -382,9 +365,7 @@ static struct xfer_interface_operations ftp_control_operations = {
  *
  * If the data channel is closed due to an error, we abort the request.
  */
-static void ftp_data_closed ( struct xfer_interface *data, int rc ) {
-	struct ftp_request *ftp =
-		container_of ( data, struct ftp_request, data );
+static void ftp_data_closed ( struct ftp_request *ftp, int rc ) {
 
 	DBGC ( ftp, "FTP %p data connection closed: %s\n",
 	       ftp, strerror ( rc ) );
@@ -400,16 +381,14 @@ static void ftp_data_closed ( struct xfer_interface *data, int rc ) {
 /**
  * Handle data delivery via FTP data channel
  *
- * @v xfer		FTP data channel interface
+ * @v ftp		FTP request
  * @v iobuf		I/O buffer
  * @v meta		Data transfer metadata
  * @ret rc		Return status code
  */
-static int ftp_data_deliver_iob ( struct xfer_interface *data,
-				  struct io_buffer *iobuf,
-				  struct xfer_metadata *meta __unused ) {
-	struct ftp_request *ftp =
-		container_of ( data, struct ftp_request, data );
+static int ftp_data_deliver ( struct ftp_request *ftp,
+			      struct io_buffer *iobuf,
+			      struct xfer_metadata *meta __unused ) {
 	int rc;
 
 	if ( ( rc = xfer_deliver_iob ( &ftp->xfer, iobuf ) ) != 0 ) {
@@ -421,15 +400,15 @@ static int ftp_data_deliver_iob ( struct xfer_interface *data,
 	return 0;
 }
 
-/** FTP data channel operations */
-static struct xfer_interface_operations ftp_data_operations = {
-	.close		= ftp_data_closed,
-	.vredirect	= xfer_vreopen,
-	.window		= unlimited_xfer_window,
-	.alloc_iob	= default_xfer_alloc_iob,
-	.deliver_iob	= ftp_data_deliver_iob,
-	.deliver_raw	= xfer_deliver_as_iob,
+/** FTP data channel interface operations */
+static struct interface_operation ftp_data_operations[] = {
+	INTF_OP ( xfer_deliver, struct ftp_request *, ftp_data_deliver ),
+	INTF_OP ( intf_close, struct ftp_request *, ftp_data_closed ),
 };
+
+/** FTP data channel interface descriptor */
+static struct interface_descriptor ftp_data_desc =
+	INTF_DESC ( struct ftp_request, data, ftp_data_operations );
 
 /*****************************************************************************
  *
@@ -437,31 +416,14 @@ static struct xfer_interface_operations ftp_data_operations = {
  *
  */
 
-/**
- * Close FTP data transfer interface
- *
- * @v xfer		FTP data transfer interface
- * @v rc		Reason for close
- */
-static void ftp_xfer_closed ( struct xfer_interface *xfer, int rc ) {
-	struct ftp_request *ftp =
-		container_of ( xfer, struct ftp_request, xfer );
-
-	DBGC ( ftp, "FTP %p data transfer interface closed: %s\n",
-	       ftp, strerror ( rc ) );
-	
-	ftp_done ( ftp, rc );
-}
-
 /** FTP data transfer interface operations */
-static struct xfer_interface_operations ftp_xfer_operations = {
-	.close		= ftp_xfer_closed,
-	.vredirect	= ignore_xfer_vredirect,
-	.window		= unlimited_xfer_window,
-	.alloc_iob	= default_xfer_alloc_iob,
-	.deliver_iob	= xfer_deliver_as_raw,
-	.deliver_raw	= ignore_xfer_deliver_raw,
+static struct interface_operation ftp_xfer_operations[] = {
+	INTF_OP ( intf_close, struct ftp_request *, ftp_done ),
 };
+
+/** FTP data transfer interface descriptor */
+static struct interface_descriptor ftp_xfer_desc =
+	INTF_DESC ( struct ftp_request, xfer, ftp_xfer_operations );
 
 /*****************************************************************************
  *
@@ -476,7 +438,7 @@ static struct xfer_interface_operations ftp_xfer_operations = {
  * @v uri		Uniform Resource Identifier
  * @ret rc		Return status code
  */
-static int ftp_open ( struct xfer_interface *xfer, struct uri *uri ) {
+static int ftp_open ( struct interface *xfer, struct uri *uri ) {
 	struct ftp_request *ftp;
 	struct sockaddr_tcpip server;
 	int rc;
@@ -492,10 +454,10 @@ static int ftp_open ( struct xfer_interface *xfer, struct uri *uri ) {
 	if ( ! ftp )
 		return -ENOMEM;
 	ref_init ( &ftp->refcnt, ftp_free );
-	xfer_init ( &ftp->xfer, &ftp_xfer_operations, &ftp->refcnt );
+	intf_init ( &ftp->xfer, &ftp_xfer_desc, &ftp->refcnt );
+	intf_init ( &ftp->control, &ftp_control_desc, &ftp->refcnt );
+	intf_init ( &ftp->data, &ftp_data_desc, &ftp->refcnt );
 	ftp->uri = uri_get ( uri );
-	xfer_init ( &ftp->control, &ftp_control_operations, &ftp->refcnt );
-	xfer_init ( &ftp->data, &ftp_data_operations, &ftp->refcnt );
 	ftp->recvbuf = ftp->status_text;
 	ftp->recvsize = sizeof ( ftp->status_text ) - 1;
 
@@ -510,7 +472,7 @@ static int ftp_open ( struct xfer_interface *xfer, struct uri *uri ) {
 		goto err;
 
 	/* Attach to parent interface, mortalise self, and return */
-	xfer_plug_plug ( &ftp->xfer, xfer );
+	intf_plug_plug ( &ftp->xfer, xfer );
 	ref_put ( &ftp->refcnt );
 	return 0;
 

@@ -26,6 +26,7 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #include <assert.h>
 #include <byteswap.h>
 #include <ipxe/if_ether.h>
+#include <ipxe/iobuf.h>
 #include <ipxe/netdevice.h>
 #include <ipxe/device.h>
 #include <ipxe/xfer.h>
@@ -240,7 +241,7 @@ struct dhcp_session {
 	/** Job control interface */
 	struct interface job;
 	/** Data transfer interface */
-	struct xfer_interface xfer;
+	struct interface xfer;
 
 	/** Network device being configured */
 	struct net_device *netdev;
@@ -298,8 +299,7 @@ static void dhcp_finished ( struct dhcp_session *dhcp, int rc ) {
 	stop_timer ( &dhcp->timer );
 
 	/* Shut down interfaces */
-	xfer_nullify ( &dhcp->xfer );
-	xfer_close ( &dhcp->xfer, rc );
+	intf_shutdown ( &dhcp->xfer, rc );
 	intf_shutdown ( &dhcp->job, rc );
 }
 
@@ -1241,8 +1241,8 @@ static int dhcp_tx ( struct dhcp_session *dhcp ) {
 
 	/* Transmit the packet */
 	iob_put ( iobuf, dhcppkt.len );
-	if ( ( rc = xfer_deliver_iob_meta ( &dhcp->xfer, iob_disown ( iobuf ),
-					    &meta ) ) != 0 ) {
+	if ( ( rc = xfer_deliver ( &dhcp->xfer, iob_disown ( iobuf ),
+				   &meta ) ) != 0 ) {
 		DBGC ( dhcp, "DHCP %p could not transmit UDP packet: %s\n",
 		       dhcp, strerror ( rc ) );
 		goto done;
@@ -1256,16 +1256,14 @@ static int dhcp_tx ( struct dhcp_session *dhcp ) {
 /**
  * Receive new data
  *
- * @v xfer 		Data transfer interface
+ * @v dhcp		DHCP session
  * @v iobuf		I/O buffer
  * @v meta		Transfer metadata
  * @ret rc		Return status code
  */
-static int dhcp_deliver_iob ( struct xfer_interface *xfer,
-			      struct io_buffer *iobuf,
-			      struct xfer_metadata *meta ) {
-	struct dhcp_session *dhcp =
-		container_of ( xfer, struct dhcp_session, xfer );
+static int dhcp_deliver ( struct dhcp_session *dhcp,
+			  struct io_buffer *iobuf,
+			  struct xfer_metadata *meta ) {
 	struct sockaddr_in *peer;
 	size_t data_len;
 	struct dhcp_packet *dhcppkt;
@@ -1328,14 +1326,13 @@ static int dhcp_deliver_iob ( struct xfer_interface *xfer,
 }
 
 /** DHCP data transfer interface operations */
-static struct xfer_interface_operations dhcp_xfer_operations = {
-	.close		= ignore_xfer_close,
-	.vredirect	= xfer_vreopen,
-	.window		= unlimited_xfer_window,
-	.alloc_iob	= default_xfer_alloc_iob,
-	.deliver_iob	= dhcp_deliver_iob,
-	.deliver_raw	= xfer_deliver_as_iob,
+static struct interface_operation dhcp_xfer_operations[] = {
+	INTF_OP ( xfer_deliver, struct dhcp_session *, dhcp_deliver ),
 };
+
+/** DHCP data transfer interface descriptor */
+static struct interface_descriptor dhcp_xfer_desc =
+	INTF_DESC ( struct dhcp_session, xfer, dhcp_xfer_operations );
 
 /**
  * Handle DHCP retry timer expiry
@@ -1427,7 +1424,7 @@ int start_dhcp ( struct interface *job, struct net_device *netdev ) {
 		return -ENOMEM;
 	ref_init ( &dhcp->refcnt, dhcp_free );
 	intf_init ( &dhcp->job, &dhcp_job_desc, &dhcp->refcnt );
-	xfer_init ( &dhcp->xfer, &dhcp_xfer_operations, &dhcp->refcnt );
+	intf_init ( &dhcp->xfer, &dhcp_xfer_desc, &dhcp->refcnt );
 	timer_init ( &dhcp->timer, dhcp_timer_expired );
 	dhcp->netdev = netdev_get ( netdev );
 	dhcp->local.sin_family = AF_INET;
@@ -1530,7 +1527,7 @@ int start_pxebs ( struct interface *job, struct net_device *netdev,
 		return -ENOMEM;
 	ref_init ( &dhcp->refcnt, dhcp_free );
 	intf_init ( &dhcp->job, &dhcp_job_desc, &dhcp->refcnt );
-	xfer_init ( &dhcp->xfer, &dhcp_xfer_operations, &dhcp->refcnt );
+	intf_init ( &dhcp->xfer, &dhcp_xfer_desc, &dhcp->refcnt );
 	timer_init ( &dhcp->timer, dhcp_timer_expired );
 	dhcp->netdev = netdev_get ( netdev );
 	dhcp->local.sin_family = AF_INET;

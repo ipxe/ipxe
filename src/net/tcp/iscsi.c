@@ -27,6 +27,7 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #include <byteswap.h>
 #include <ipxe/vsprintf.h>
 #include <ipxe/socket.h>
+#include <ipxe/iobuf.h>
 #include <ipxe/xfer.h>
 #include <ipxe/open.h>
 #include <ipxe/scsi.h>
@@ -199,7 +200,7 @@ static int iscsi_open_connection ( struct iscsi_session *iscsi ) {
 static void iscsi_close_connection ( struct iscsi_session *iscsi, int rc ) {
 
 	/* Close all data transfer interfaces */
-	xfer_close ( &iscsi->socket, rc );
+	intf_restart ( &iscsi->socket, rc );
 
 	/* Clear connection status */
 	iscsi->status = 0;
@@ -1435,9 +1436,9 @@ static int iscsi_rx_data ( struct iscsi_session *iscsi, const void *data,
 /**
  * Receive new data
  *
- * @v socket		Transport layer interface
- * @v data		Received data
- * @v len		Length of received data
+ * @v iscsi		iSCSI session
+ * @v iobuf		I/O buffer
+ * @v meta		Data transfer metadata
  * @ret rc		Return status code
  *
  * This handles received PDUs.  The receive strategy is to fill in
@@ -1447,10 +1448,9 @@ static int iscsi_rx_data ( struct iscsi_session *iscsi, const void *data,
  * always has a full copy of the BHS available, even for portions of
  * the data in different packets to the BHS.
  */
-static int iscsi_socket_deliver_raw ( struct xfer_interface *socket,
-				      const void *data, size_t len ) {
-	struct iscsi_session *iscsi =
-		container_of ( socket, struct iscsi_session, socket );
+static int iscsi_socket_deliver ( struct iscsi_session *iscsi,
+				  struct io_buffer *iobuf,
+				  struct xfer_metadata *meta __unused ) {
 	struct iscsi_bhs_common *common = &iscsi->rx_bhs.common;
 	int ( * rx ) ( struct iscsi_session *iscsi, const void *data,
 		       size_t len, size_t remaining );
@@ -1483,48 +1483,52 @@ static int iscsi_socket_deliver_raw ( struct xfer_interface *socket,
 			break;
 		default:
 			assert ( 0 );
-			return -EINVAL;
+			rc = -EINVAL;
+			goto done;
 		}
 
 		frag_len = iscsi->rx_len - iscsi->rx_offset;
-		if ( frag_len > len )
-			frag_len = len;
+		if ( frag_len > iob_len ( iobuf ) )
+			frag_len = iob_len ( iobuf );
 		remaining = iscsi->rx_len - iscsi->rx_offset - frag_len;
-		if ( ( rc = rx ( iscsi, data, frag_len, remaining ) ) != 0 ) {
+		if ( ( rc = rx ( iscsi, iobuf->data, frag_len,
+				 remaining ) ) != 0 ) {
 			DBGC ( iscsi, "iSCSI %p could not process received "
 			       "data: %s\n", iscsi, strerror ( rc ) );
 			iscsi_close_connection ( iscsi, rc );
 			iscsi_scsi_done ( iscsi, rc );
-			return rc;
+			goto done;
 		}
 
 		iscsi->rx_offset += frag_len;
-		data += frag_len;
-		len -= frag_len;
+		iob_pull ( iobuf, frag_len );
 
 		/* If all the data for this state has not yet been
 		 * received, stay in this state for now.
 		 */
-		if ( iscsi->rx_offset != iscsi->rx_len )
-			return 0;
+		if ( iscsi->rx_offset != iscsi->rx_len ) {
+			rc = 0;
+			goto done;
+		}
 
 		iscsi->rx_state = next_state;
 		iscsi->rx_offset = 0;
 	}
 
-	return 0;
+ done:
+	/* Free I/O buffer */
+	free_iob ( iobuf );
+	return rc;
 }
 
 /**
  * Handle stream connection closure
  *
- * @v socket		Transport layer interface
+ * @v iscsi		iSCSI session
  * @v rc		Reason for close
  *
  */
-static void iscsi_socket_close ( struct xfer_interface *socket, int rc ) {
-	struct iscsi_session *iscsi =
-		container_of ( socket, struct iscsi_session, socket );
+static void iscsi_socket_close ( struct iscsi_session *iscsi, int rc ) {
 
 	/* Even a graceful close counts as an error for iSCSI */
 	if ( ! rc )
@@ -1552,15 +1556,13 @@ static void iscsi_socket_close ( struct xfer_interface *socket, int rc ) {
 /**
  * Handle redirection event
  *
- * @v socket		Transport layer interface
+ * @v iscsi		iSCSI session
  * @v type		Location type
  * @v args		Remaining arguments depend upon location type
  * @ret rc		Return status code
  */
-static int iscsi_vredirect ( struct xfer_interface *socket, int type,
+static int iscsi_vredirect ( struct iscsi_session *iscsi, int type,
 			     va_list args ) {
-	struct iscsi_session *iscsi =
-		container_of ( socket, struct iscsi_session, socket );
 	va_list tmp;
 	struct sockaddr *peer;
 
@@ -1578,20 +1580,20 @@ static int iscsi_vredirect ( struct xfer_interface *socket, int type,
 		va_end ( tmp );
 	}
 
-	return xfer_vreopen ( socket, type, args );
+	return xfer_vreopen ( &iscsi->socket, type, args );
 }
 			     
 
-/** iSCSI socket operations */
-static struct xfer_interface_operations iscsi_socket_operations = {
-	.close		= iscsi_socket_close,
-	.vredirect	= iscsi_vredirect,
-	.window		= unlimited_xfer_window,
-	.alloc_iob	= default_xfer_alloc_iob,
-	.deliver_iob	= xfer_deliver_as_raw,
-	.deliver_raw	= iscsi_socket_deliver_raw,
+/** iSCSI socket interface operations */
+static struct interface_operation iscsi_socket_operations[] = {
+	INTF_OP ( xfer_deliver, struct iscsi_session *, iscsi_socket_deliver ),
+	INTF_OP ( xfer_vredirect, struct iscsi_session *, iscsi_vredirect ),
+	INTF_OP ( intf_close, struct iscsi_session *, iscsi_socket_close ),
 };
 
+/** iSCSI socket interface descriptor */
+static struct interface_descriptor iscsi_socket_desc =
+	INTF_DESC ( struct iscsi_session, socket, iscsi_socket_operations );
 
 /****************************************************************************
  *
@@ -1641,7 +1643,6 @@ void iscsi_detach ( struct scsi_device *scsi ) {
 	struct iscsi_session *iscsi =
 		container_of ( scsi->backend, struct iscsi_session, refcnt );
 
-	xfer_nullify ( &iscsi->socket );
 	iscsi_close_connection ( iscsi, 0 );
 	process_del ( &iscsi->process );
 	scsi->command = scsi_detached_command;
@@ -1793,7 +1794,7 @@ int iscsi_attach ( struct scsi_device *scsi, const char *root_path ) {
 	if ( ! iscsi )
 		return -ENOMEM;
 	ref_init ( &iscsi->refcnt, iscsi_free );
-	xfer_init ( &iscsi->socket, &iscsi_socket_operations, &iscsi->refcnt );
+	intf_init ( &iscsi->socket, &iscsi_socket_desc, &iscsi->refcnt );
 	process_init ( &iscsi->process, iscsi_tx_step, &iscsi->refcnt );
 
 	/* Parse root path */

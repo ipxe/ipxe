@@ -299,7 +299,7 @@ struct named_socket {
 	/** Reference counter */
 	struct refcnt refcnt;
 	/** Data transfer interface */
-	struct xfer_interface xfer;
+	struct interface xfer;
 	/** Name resolution interface */
 	struct interface resolv;
 	/** Communication semantics (e.g. SOCK_STREAM) */
@@ -319,32 +319,29 @@ struct named_socket {
 static void named_close ( struct named_socket *named, int rc ) {
 	/* Shut down interfaces */
 	intf_shutdown ( &named->resolv, rc );
-	xfer_nullify ( &named->xfer );
-	xfer_close ( &named->xfer, rc );
+	intf_shutdown ( &named->xfer, rc );
 }
 
 /**
- * Handle close() event
+ * Check flow control window
  *
- * @v xfer		Data transfer interface
- * @v rc		Reason for close
+ * @v named		Named socket
+ * @ret len		Length of window
  */
-static void named_xfer_close ( struct xfer_interface *xfer, int rc ) {
-	struct named_socket *named =
-		container_of ( xfer, struct named_socket, xfer );
-
-	named_close ( named, rc );
+static size_t named_window ( struct named_socket *named __unused ) {
+	/* Not ready for data until we have redirected away */
+	return 0;
 }
 
 /** Named socket opener data transfer interface operations */
-static struct xfer_interface_operations named_xfer_ops = {
-	.close		= named_xfer_close,
-	.vredirect	= ignore_xfer_vredirect,
-	.window		= no_xfer_window,
-	.alloc_iob	= default_xfer_alloc_iob,
-	.deliver_iob	= xfer_deliver_as_raw,
-	.deliver_raw	= ignore_xfer_deliver_raw,
+static struct interface_operation named_xfer_ops[] = {
+	INTF_OP ( xfer_window, struct named_socket *, named_window ),
+	INTF_OP ( intf_close, struct named_socket *, named_close ),
 };
+
+/** Named socket opener data transfer interface descriptor */
+static struct interface_descriptor named_xfer_desc =
+	INTF_DESC ( struct named_socket, xfer, named_xfer_ops );
 
 /**
  * Name resolved
@@ -357,7 +354,7 @@ static void named_resolv_done ( struct named_socket *named,
 	int rc;
 
 	/* Nullify data transfer interface */
-	xfer_nullify ( &named->xfer );
+	intf_nullify ( &named->xfer );
 
 	/* Redirect data-xfer interface */
 	if ( ( rc = xfer_redirect ( &named->xfer, LOCATION_SOCKET,
@@ -370,7 +367,7 @@ static void named_resolv_done ( struct named_socket *named,
 	} else {
 		/* Redirection succeeded - unplug data-xfer interface */
 		DBGC ( named, "NAMED %p redirected successfully\n", named );
-		xfer_unplug ( &named->xfer );
+		intf_unplug ( &named->xfer );
 	}
 
 	/* Terminate named socket opener */
@@ -396,7 +393,7 @@ static struct interface_descriptor named_resolv_desc =
  * @v local		Local socket address, or NULL
  * @ret rc		Return status code
  */
-int xfer_open_named_socket ( struct xfer_interface *xfer, int semantics,
+int xfer_open_named_socket ( struct interface *xfer, int semantics,
 			     struct sockaddr *peer, const char *name,
 			     struct sockaddr *local ) {
 	struct named_socket *named;
@@ -407,7 +404,7 @@ int xfer_open_named_socket ( struct xfer_interface *xfer, int semantics,
 	if ( ! named )
 		return -ENOMEM;
 	ref_init ( &named->refcnt, NULL );
-	xfer_init ( &named->xfer, &named_xfer_ops, &named->refcnt );
+	intf_init ( &named->xfer, &named_xfer_desc, &named->refcnt );
 	intf_init ( &named->resolv, &named_resolv_desc, &named->refcnt );
 	named->semantics = semantics;
 	if ( local ) {
@@ -423,7 +420,7 @@ int xfer_open_named_socket ( struct xfer_interface *xfer, int semantics,
 		goto err;
 
 	/* Attach parent interface, mortalise self, and return */
-	xfer_plug_plug ( &named->xfer, xfer );
+	intf_plug_plug ( &named->xfer, xfer );
 	ref_put ( &named->refcnt );
 	return 0;
 

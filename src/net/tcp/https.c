@@ -40,7 +40,7 @@ FEATURE ( FEATURE_PROTOCOL, "HTTPS", DHCP_EB_FEATURE_HTTPS, 1 );
  * @v uri		Uniform Resource Identifier
  * @ret rc		Return status code
  */
-static int https_open ( struct xfer_interface *xfer, struct uri *uri ) {
+static int https_open ( struct interface *xfer, struct uri *uri ) {
 	return http_open_filter ( xfer, uri, HTTPS_PORT, add_tls );
 }
 

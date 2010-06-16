@@ -119,11 +119,11 @@ struct slam_request {
 	struct refcnt refcnt;
 
 	/** Data transfer interface */
-	struct xfer_interface xfer;
+	struct interface xfer;
 	/** Unicast socket */
-	struct xfer_interface socket;
+	struct interface socket;
 	/** Multicast socket */
-	struct xfer_interface mc_socket;
+	struct interface mc_socket;
 
 	/** Master client retry timer */
 	struct retry_timer master_timer;
@@ -184,12 +184,9 @@ static void slam_finished ( struct slam_request *slam, int rc ) {
 	stop_timer ( &slam->slave_timer );
 
 	/* Close all data transfer interfaces */
-	xfer_nullify ( &slam->socket );
-	xfer_close ( &slam->socket, rc );
-	xfer_nullify ( &slam->mc_socket );
-	xfer_close ( &slam->mc_socket, rc );
-	xfer_nullify ( &slam->xfer );
-	xfer_close ( &slam->xfer, rc );
+	intf_shutdown ( &slam->socket, rc );
+	intf_shutdown ( &slam->mc_socket, rc );
+	intf_shutdown ( &slam->xfer, rc );
 }
 
 /****************************************************************************
@@ -473,15 +470,13 @@ static int slam_pull_header ( struct slam_request *slam,
 /**
  * Receive SLAM data packet
  *
- * @v mc_socket		SLAM multicast socket
+ * @v slam		SLAM request
  * @v iobuf		I/O buffer
  * @ret rc		Return status code
  */
-static int slam_mc_socket_deliver ( struct xfer_interface *mc_socket,
+static int slam_mc_socket_deliver ( struct slam_request *slam,
 				    struct io_buffer *iobuf,
 				    struct xfer_metadata *rx_meta __unused ) {
-	struct slam_request *slam =
-		container_of ( mc_socket, struct slam_request, mc_socket );
 	struct xfer_metadata meta;
 	unsigned long packet;
 	size_t len;
@@ -533,8 +528,7 @@ static int slam_mc_socket_deliver ( struct xfer_interface *mc_socket,
 	memset ( &meta, 0, sizeof ( meta ) );
 	meta.whence = SEEK_SET;
 	meta.offset = ( packet * slam->block_size );
-	if ( ( rc = xfer_deliver_iob_meta ( &slam->xfer, iobuf,
-					    &meta ) ) != 0 )
+	if ( ( rc = xfer_deliver ( &slam->xfer, iobuf, &meta ) ) != 0 )
 		goto err;
 
 	/* Mark block as received */
@@ -556,15 +550,13 @@ static int slam_mc_socket_deliver ( struct xfer_interface *mc_socket,
 /**
  * Receive SLAM non-data packet
  *
- * @v socket		SLAM unicast socket
+ * @v slam		SLAM request
  * @v iobuf		I/O buffer
  * @ret rc		Return status code
  */
-static int slam_socket_deliver ( struct xfer_interface *socket,
+static int slam_socket_deliver ( struct slam_request *slam,
 				 struct io_buffer *iobuf,
 				 struct xfer_metadata *rx_meta __unused ) {
-	struct slam_request *slam =
-		container_of ( socket, struct slam_request, socket );
 	int rc;
 
 	/* Restart the master client timer */
@@ -597,57 +589,25 @@ static int slam_socket_deliver ( struct xfer_interface *socket,
 
 }
 
-/**
- * Close SLAM unicast socket
- *
- * @v socket		SLAM unicast socket
- * @v rc		Reason for close
- */
-static void slam_socket_close ( struct xfer_interface *socket, int rc ) {
-	struct slam_request *slam =
-		container_of ( socket, struct slam_request, socket );
-
-	DBGC ( slam, "SLAM %p unicast socket closed: %s\n",
-	       slam, strerror ( rc ) );
-
-	slam_finished ( slam, rc );
-}
-
-/** SLAM unicast socket data transfer operations */
-static struct xfer_interface_operations slam_socket_operations = {
-	.close		= slam_socket_close,
-	.vredirect	= xfer_vreopen,
-	.window		= unlimited_xfer_window,
-	.alloc_iob	= default_xfer_alloc_iob,
-	.deliver_iob	= slam_socket_deliver,
-	.deliver_raw	= xfer_deliver_as_iob,
+/** SLAM unicast socket interface operations */
+static struct interface_operation slam_socket_operations[] = {
+	INTF_OP ( xfer_deliver, struct slam_request *, slam_socket_deliver ),
+	INTF_OP ( intf_close, struct slam_request *, slam_finished ),
 };
 
-/**
- * Close SLAM multicast socket
- *
- * @v mc_socket		SLAM multicast socket
- * @v rc		Reason for close
- */
-static void slam_mc_socket_close ( struct xfer_interface *mc_socket, int rc ){
-	struct slam_request *slam =
-		container_of ( mc_socket, struct slam_request, mc_socket );
+/** SLAM unicast socket interface descriptor */
+static struct interface_descriptor slam_socket_desc =
+	INTF_DESC ( struct slam_request, socket, slam_socket_operations );
 
-	DBGC ( slam, "SLAM %p multicast socket closed: %s\n",
-	       slam, strerror ( rc ) );
-
-	slam_finished ( slam, rc );
-}
-
-/** SLAM multicast socket data transfer operations */
-static struct xfer_interface_operations slam_mc_socket_operations = {
-	.close		= slam_mc_socket_close,
-	.vredirect	= xfer_vreopen,
-	.window		= unlimited_xfer_window,
-	.alloc_iob	= default_xfer_alloc_iob,
-	.deliver_iob	= slam_mc_socket_deliver,
-	.deliver_raw	= xfer_deliver_as_iob,
+/** SLAM multicast socket interface operations */
+static struct interface_operation slam_mc_socket_operations[] = {
+	INTF_OP ( xfer_deliver, struct slam_request *, slam_mc_socket_deliver ),
+	INTF_OP ( intf_close, struct slam_request *, slam_finished ),
 };
+
+/** SLAM multicast socket interface descriptor */
+static struct interface_descriptor slam_mc_socket_desc =
+	INTF_DESC ( struct slam_request, mc_socket, slam_mc_socket_operations );
 
 /****************************************************************************
  *
@@ -655,31 +615,14 @@ static struct xfer_interface_operations slam_mc_socket_operations = {
  *
  */
 
-/**
- * Close SLAM data transfer interface
- *
- * @v xfer		SLAM data transfer interface
- * @v rc		Reason for close
- */
-static void slam_xfer_close ( struct xfer_interface *xfer, int rc ) {
-	struct slam_request *slam =
-		container_of ( xfer, struct slam_request, xfer );
-
-	DBGC ( slam, "SLAM %p data transfer interface closed: %s\n",
-	       slam, strerror ( rc ) );
-
-	slam_finished ( slam, rc );
-}
-
-/** SLAM data transfer operations */
-static struct xfer_interface_operations slam_xfer_operations = {
-	.close		= slam_xfer_close,
-	.vredirect	= ignore_xfer_vredirect,
-	.window		= unlimited_xfer_window,
-	.alloc_iob	= default_xfer_alloc_iob,
-	.deliver_iob	= xfer_deliver_as_raw,
-	.deliver_raw	= ignore_xfer_deliver_raw,
+/** SLAM data transfer interface operations */
+static struct interface_operation slam_xfer_operations[] = {
+	INTF_OP ( intf_close, struct slam_request *, slam_finished ),
 };
+
+/** SLAM data transfer interface descriptor */
+static struct interface_descriptor slam_xfer_desc =
+	INTF_DESC ( struct slam_request, xfer, slam_xfer_operations );
 
 /**
  * Parse SLAM URI multicast address
@@ -729,7 +672,7 @@ static int slam_parse_multicast_address ( struct slam_request *slam,
  * @v uri		Uniform Resource Identifier
  * @ret rc		Return status code
  */
-static int slam_open ( struct xfer_interface *xfer, struct uri *uri ) {
+static int slam_open ( struct interface *xfer, struct uri *uri ) {
 	static const struct sockaddr_in default_multicast = {
 		.sin_family = AF_INET,
 		.sin_port = htons ( SLAM_DEFAULT_MULTICAST_PORT ),
@@ -749,10 +692,9 @@ static int slam_open ( struct xfer_interface *xfer, struct uri *uri ) {
 	if ( ! slam )
 		return -ENOMEM;
 	ref_init ( &slam->refcnt, slam_free );
-	xfer_init ( &slam->xfer, &slam_xfer_operations, &slam->refcnt );
-	xfer_init ( &slam->socket, &slam_socket_operations, &slam->refcnt );
-	xfer_init ( &slam->mc_socket, &slam_mc_socket_operations,
-		    &slam->refcnt );
+	intf_init ( &slam->xfer, &slam_xfer_desc, &slam->refcnt );
+	intf_init ( &slam->socket, &slam_socket_desc, &slam->refcnt );
+	intf_init ( &slam->mc_socket, &slam_mc_socket_desc, &slam->refcnt );
 	timer_init ( &slam->master_timer, slam_master_timer_expired );
 	timer_init ( &slam->slave_timer, slam_slave_timer_expired );
 	/* Fake an invalid cached header of { 0x00, ... } */
@@ -795,7 +737,7 @@ static int slam_open ( struct xfer_interface *xfer, struct uri *uri ) {
 	start_timer_fixed ( &slam->slave_timer, SLAM_SLAVE_TIMEOUT );
 
 	/* Attach to parent interface, mortalise self, and return */
-	xfer_plug_plug ( &slam->xfer, xfer );
+	intf_plug_plug ( &slam->xfer, xfer );
 	ref_put ( &slam->refcnt );
 	return 0;
 

@@ -27,6 +27,7 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #include <errno.h>
 #include <assert.h>
 #include <ipxe/refcnt.h>
+#include <ipxe/iobuf.h>
 #include <ipxe/xfer.h>
 #include <ipxe/open.h>
 #include <ipxe/uri.h>
@@ -79,14 +80,14 @@ struct tftp_request {
 	/** Reference count */
 	struct refcnt refcnt;
 	/** Data transfer interface */
-	struct xfer_interface xfer;
+	struct interface xfer;
 
 	/** URI being fetched */
 	struct uri *uri;
 	/** Transport layer interface */
-	struct xfer_interface socket;
+	struct interface socket;
 	/** Multicast transport layer interface */
-	struct xfer_interface mc_socket;
+	struct interface mc_socket;
 
 	/** Data block size
 	 *
@@ -183,12 +184,9 @@ static void tftp_done ( struct tftp_request *tftp, int rc ) {
 	stop_timer ( &tftp->timer );
 
 	/* Close all data transfer interfaces */
-	xfer_nullify ( &tftp->socket );
-	xfer_close ( &tftp->socket, rc );
-	xfer_nullify ( &tftp->mc_socket );
-	xfer_close ( &tftp->mc_socket, rc );
-	xfer_nullify ( &tftp->xfer );
-	xfer_close ( &tftp->xfer, rc );
+	intf_shutdown ( &tftp->socket, rc );
+	intf_shutdown ( &tftp->mc_socket, rc );
+	intf_shutdown ( &tftp->xfer, rc );
 }
 
 /**
@@ -202,7 +200,7 @@ static int tftp_reopen ( struct tftp_request *tftp ) {
 	int rc;
 
 	/* Close socket */
-	xfer_close ( &tftp->socket, 0 );
+	intf_restart ( &tftp->socket, 0 );
 
 	/* Disable ACK sending. */
 	tftp->flags &= ~TFTP_FL_SEND_ACK;
@@ -236,7 +234,7 @@ static int tftp_reopen_mc ( struct tftp_request *tftp,
 	int rc;
 
 	/* Close multicast socket */
-	xfer_close ( &tftp->mc_socket, 0 );
+	intf_restart ( &tftp->mc_socket, 0 );
 
 	/* Open multicast socket.  We never send via this socket, so
 	 * use the local address as the peer address (since the peer
@@ -423,7 +421,7 @@ static int tftp_send_ack ( struct tftp_request *tftp ) {
 	ack->block = htons ( block );
 
 	/* ACK always goes to the peer recorded from the RRQ response */
-	return xfer_deliver_iob_meta ( &tftp->socket, iobuf, &meta );
+	return xfer_deliver ( &tftp->socket, iobuf, &meta );
 }
 
 /**
@@ -459,7 +457,7 @@ static int tftp_send_error ( struct tftp_request *tftp, int errcode,
 	strcpy ( err->errmsg, errmsg );
 
 	/* ERR always goes to the peer recorded from the RRQ response */
-	return xfer_deliver_iob_meta ( &tftp->socket, iobuf, &meta );
+	return xfer_deliver ( &tftp->socket, iobuf, &meta );
 }
 
 /**
@@ -525,7 +523,7 @@ static void tftp_timer_expired ( struct retry_timer *timer, int fail ) {
 				tftp->flags = TFTP_FL_RRQ_SIZES;
 
 				/* Close multicast socket */
-				xfer_close ( &tftp->mc_socket, 0 );
+				intf_restart ( &tftp->mc_socket, 0 );
 
 				/* Reset retry timer */
 				start_timer_nodelay ( &tftp->timer );
@@ -858,8 +856,8 @@ static int tftp_rx_data ( struct tftp_request *tftp,
 	memset ( &meta, 0, sizeof ( meta ) );
 	meta.whence = SEEK_SET;
 	meta.offset = offset;
-	if ( ( rc = xfer_deliver_iob_meta ( &tftp->xfer, iob_disown ( iobuf ),
-					    &meta ) ) != 0 ) {
+	if ( ( rc = xfer_deliver ( &tftp->xfer, iob_disown ( iobuf ),
+				   &meta ) ) != 0 ) {
 		DBGC ( tftp, "TFTP %p could not deliver data: %s\n",
 		       tftp, strerror ( rc ) );
 		goto done;
@@ -998,16 +996,14 @@ static int tftp_rx ( struct tftp_request *tftp,
 /**
  * Receive new data via socket
  *
- * @v socket		Transport layer interface
+ * @v tftp		TFTP connection
  * @v iobuf		I/O buffer
  * @v meta		Transfer metadata
  * @ret rc		Return status code
  */
-static int tftp_socket_deliver_iob ( struct xfer_interface *socket,
-				     struct io_buffer *iobuf,
-				     struct xfer_metadata *meta ) {
-	struct tftp_request *tftp =
-		container_of ( socket, struct tftp_request, socket );
+static int tftp_socket_deliver ( struct tftp_request *tftp,
+				 struct io_buffer *iobuf,
+				 struct xfer_metadata *meta ) {
 
 	/* Enable sending ACKs when we receive a unicast packet.  This
 	 * covers three cases:
@@ -1030,67 +1026,30 @@ static int tftp_socket_deliver_iob ( struct xfer_interface *socket,
 }
 
 /** TFTP socket operations */
-static struct xfer_interface_operations tftp_socket_operations = {
-	.close		= ignore_xfer_close,
-	.vredirect	= xfer_vreopen,
-	.window		= unlimited_xfer_window,
-	.alloc_iob	= default_xfer_alloc_iob,
-	.deliver_iob	= tftp_socket_deliver_iob,
-	.deliver_raw	= xfer_deliver_as_iob,
+static struct interface_operation tftp_socket_operations[] = {
+	INTF_OP ( xfer_deliver, struct tftp_request *, tftp_socket_deliver ),
 };
 
-/**
- * Receive new data via multicast socket
- *
- * @v mc_socket		Multicast transport layer interface
- * @v iobuf		I/O buffer
- * @v meta		Transfer metadata
- * @ret rc		Return status code
- */
-static int tftp_mc_socket_deliver_iob ( struct xfer_interface *mc_socket,
-					struct io_buffer *iobuf,
-					struct xfer_metadata *meta ) {
-	struct tftp_request *tftp =
-		container_of ( mc_socket, struct tftp_request, mc_socket );
-
-	return tftp_rx ( tftp, iobuf, meta );
-}
+/** TFTP socket interface descriptor */
+static struct interface_descriptor tftp_socket_desc =
+	INTF_DESC ( struct tftp_request, socket, tftp_socket_operations );
 
 /** TFTP multicast socket operations */
-static struct xfer_interface_operations tftp_mc_socket_operations = {
-	.close		= ignore_xfer_close,
-	.vredirect	= xfer_vreopen,
-	.window		= unlimited_xfer_window,
-	.alloc_iob	= default_xfer_alloc_iob,
-	.deliver_iob	= tftp_mc_socket_deliver_iob,
-	.deliver_raw	= xfer_deliver_as_iob,
+static struct interface_operation tftp_mc_socket_operations[] = {
+	INTF_OP ( xfer_deliver, struct tftp_request *, tftp_rx ),
 };
 
-/**
- * Close TFTP data transfer interface
- *
- * @v xfer		Data transfer interface
- * @v rc		Reason for close
- */
-static void tftp_xfer_close ( struct xfer_interface *xfer, int rc ) {
-	struct tftp_request *tftp =
-		container_of ( xfer, struct tftp_request, xfer );
-
-	DBGC ( tftp, "TFTP %p interface closed: %s\n",
-	       tftp, strerror ( rc ) );
-
-	tftp_done ( tftp, rc );
-}
+/** TFTP multicast socket interface descriptor */
+static struct interface_descriptor tftp_mc_socket_desc =
+	INTF_DESC ( struct tftp_request, mc_socket, tftp_mc_socket_operations );
 
 /**
  * Check flow control window
  *
- * @v xfer		Data transfer interface
+ * @v tftp		TFTP connection
  * @ret len		Length of window
  */
-static size_t tftp_xfer_window ( struct xfer_interface *xfer ) {
-	struct tftp_request *tftp =
-		container_of ( xfer, struct tftp_request, xfer );
+static size_t tftp_xfer_window ( struct tftp_request *tftp ) {
 
 	/* We abuse this data-xfer method to convey the blocksize to
 	 * the caller.  This really should be done using some kind of
@@ -1101,14 +1060,14 @@ static size_t tftp_xfer_window ( struct xfer_interface *xfer ) {
 }
 
 /** TFTP data transfer interface operations */
-static struct xfer_interface_operations tftp_xfer_operations = {
-	.close		= tftp_xfer_close,
-	.vredirect	= ignore_xfer_vredirect,
-	.window		= tftp_xfer_window,
-	.alloc_iob	= default_xfer_alloc_iob,
-	.deliver_iob	= xfer_deliver_as_raw,
-	.deliver_raw	= ignore_xfer_deliver_raw,
+static struct interface_operation tftp_xfer_operations[] = {
+	INTF_OP ( xfer_window, struct tftp_request *, tftp_xfer_window ),
+	INTF_OP ( intf_close, struct tftp_request *, tftp_done ),
 };
+
+/** TFTP data transfer interface descriptor */
+static struct interface_descriptor tftp_xfer_desc =
+	INTF_DESC ( struct tftp_request, xfer, tftp_xfer_operations );
 
 /**
  * Initiate TFTP/TFTM/MTFTP download
@@ -1117,7 +1076,7 @@ static struct xfer_interface_operations tftp_xfer_operations = {
  * @v uri		Uniform Resource Identifier
  * @ret rc		Return status code
  */
-static int tftp_core_open ( struct xfer_interface *xfer, struct uri *uri,
+static int tftp_core_open ( struct interface *xfer, struct uri *uri,
 			    unsigned int default_port,
 			    struct sockaddr *multicast,
 			    unsigned int flags ) {
@@ -1135,10 +1094,9 @@ static int tftp_core_open ( struct xfer_interface *xfer, struct uri *uri,
 	if ( ! tftp )
 		return -ENOMEM;
 	ref_init ( &tftp->refcnt, tftp_free );
-	xfer_init ( &tftp->xfer, &tftp_xfer_operations, &tftp->refcnt );
-	xfer_init ( &tftp->socket, &tftp_socket_operations, &tftp->refcnt );
-	xfer_init ( &tftp->mc_socket, &tftp_mc_socket_operations,
-		    &tftp->refcnt );
+	intf_init ( &tftp->xfer, &tftp_xfer_desc, &tftp->refcnt );
+	intf_init ( &tftp->socket, &tftp_socket_desc, &tftp->refcnt );
+	intf_init ( &tftp->mc_socket, &tftp_mc_socket_desc, &tftp->refcnt );
 	timer_init ( &tftp->timer, tftp_timer_expired );
 	tftp->uri = uri_get ( uri );
 	tftp->blksize = TFTP_DEFAULT_BLKSIZE;
@@ -1159,7 +1117,7 @@ static int tftp_core_open ( struct xfer_interface *xfer, struct uri *uri,
 	start_timer_nodelay ( &tftp->timer );
 
 	/* Attach to parent interface, mortalise self, and return */
-	xfer_plug_plug ( &tftp->xfer, xfer );
+	intf_plug_plug ( &tftp->xfer, xfer );
 	ref_put ( &tftp->refcnt );
 	return 0;
 
@@ -1178,7 +1136,7 @@ static int tftp_core_open ( struct xfer_interface *xfer, struct uri *uri,
  * @v uri		Uniform Resource Identifier
  * @ret rc		Return status code
  */
-static int tftp_open ( struct xfer_interface *xfer, struct uri *uri ) {
+static int tftp_open ( struct interface *xfer, struct uri *uri ) {
 	return tftp_core_open ( xfer, uri, TFTP_PORT, NULL,
 				TFTP_FL_RRQ_SIZES );
 
@@ -1197,7 +1155,7 @@ struct uri_opener tftp_uri_opener __uri_opener = {
  * @v uri		Uniform Resource Identifier
  * @ret rc		Return status code
  */
-static int tftpsize_open ( struct xfer_interface *xfer, struct uri *uri ) {
+static int tftpsize_open ( struct interface *xfer, struct uri *uri ) {
 	return tftp_core_open ( xfer, uri, TFTP_PORT, NULL,
 				( TFTP_FL_RRQ_SIZES |
 				  TFTP_FL_SIZEONLY ) );
@@ -1217,7 +1175,7 @@ struct uri_opener tftpsize_uri_opener __uri_opener = {
  * @v uri		Uniform Resource Identifier
  * @ret rc		Return status code
  */
-static int tftm_open ( struct xfer_interface *xfer, struct uri *uri ) {
+static int tftm_open ( struct interface *xfer, struct uri *uri ) {
 	return tftp_core_open ( xfer, uri, TFTP_PORT, NULL,
 				( TFTP_FL_RRQ_SIZES |
 				  TFTP_FL_RRQ_MULTICAST ) );
@@ -1237,7 +1195,7 @@ struct uri_opener tftm_uri_opener __uri_opener = {
  * @v uri		Uniform Resource Identifier
  * @ret rc		Return status code
  */
-static int mtftp_open ( struct xfer_interface *xfer, struct uri *uri ) {
+static int mtftp_open ( struct interface *xfer, struct uri *uri ) {
 	return tftp_core_open ( xfer, uri, MTFTP_PORT,
 				( struct sockaddr * ) &tftp_mtftp_socket,
 				TFTP_FL_MTFTP_RECOVERY );

@@ -832,7 +832,7 @@ struct srp_device {
 	struct scsi_command *command;
 
 	/** Underlying data transfer interface */
-	struct xfer_interface socket;
+	struct interface socket;
 
 	/** Transport type */
 	struct srp_transport_type *transport;

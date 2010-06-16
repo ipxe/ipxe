@@ -64,12 +64,12 @@ struct http_request {
 	/** Reference count */
 	struct refcnt refcnt;
 	/** Data transfer interface */
-	struct xfer_interface xfer;
+	struct interface xfer;
 
 	/** URI being fetched */
 	struct uri *uri;
 	/** Transport layer interface */
-	struct xfer_interface socket;
+	struct interface socket;
 
 	/** TX process */
 	struct process process;
@@ -125,10 +125,8 @@ static void http_done ( struct http_request *http, int rc ) {
 	process_del ( &http->process );
 
 	/* Close all data transfer interfaces */
-	xfer_nullify ( &http->socket );
-	xfer_close ( &http->socket, rc );
-	xfer_nullify ( &http->xfer );
-	xfer_close ( &http->xfer, rc );
+	intf_shutdown ( &http->socket, rc );
+	intf_shutdown ( &http->xfer, rc );
 }
 
 /**
@@ -349,16 +347,14 @@ static int http_rx_data ( struct http_request *http,
 /**
  * Handle new data arriving via HTTP connection
  *
- * @v socket		Transport layer interface
+ * @v http		HTTP request
  * @v iobuf		I/O buffer
  * @v meta		Data transfer metadata
  * @ret rc		Return status code
  */
-static int http_socket_deliver_iob ( struct xfer_interface *socket,
-				     struct io_buffer *iobuf,
-				     struct xfer_metadata *meta __unused ) {
-	struct http_request *http =
-		container_of ( socket, struct http_request, socket );
+static int http_socket_deliver ( struct http_request *http,
+				 struct io_buffer *iobuf,
+				 struct xfer_metadata *meta __unused ) {
 	struct http_line_handler *lh;
 	char *line;
 	ssize_t len;
@@ -469,57 +465,24 @@ static void http_step ( struct process *process ) {
 	}
 }
 
-/**
- * HTTP connection closed by network stack
- *
- * @v socket		Transport layer interface
- * @v rc		Reason for close
- */
-static void http_socket_close ( struct xfer_interface *socket, int rc ) {
-	struct http_request *http =
-		container_of ( socket, struct http_request, socket );
-
-	DBGC ( http, "HTTP %p socket closed: %s\n",
-	       http, strerror ( rc ) );
-	
-	http_done ( http, rc );
-}
-
-/** HTTP socket operations */
-static struct xfer_interface_operations http_socket_operations = {
-	.close		= http_socket_close,
-	.vredirect	= xfer_vreopen,
-	.window		= unlimited_xfer_window,
-	.alloc_iob	= default_xfer_alloc_iob,
-	.deliver_iob	= http_socket_deliver_iob,
-	.deliver_raw	= xfer_deliver_as_iob,
+/** HTTP socket interface operations */
+static struct interface_operation http_socket_operations[] = {
+	INTF_OP ( xfer_deliver, struct http_request *, http_socket_deliver ),
+	INTF_OP ( intf_close, struct http_request *, http_done ),
 };
 
-/**
- * Close HTTP data transfer interface
- *
- * @v xfer		Data transfer interface
- * @v rc		Reason for close
- */
-static void http_xfer_close ( struct xfer_interface *xfer, int rc ) {
-	struct http_request *http =
-		container_of ( xfer, struct http_request, xfer );
-
-	DBGC ( http, "HTTP %p interface closed: %s\n",
-	       http, strerror ( rc ) );
-
-	http_done ( http, rc );
-}
+/** HTTP socket interface descriptor */
+static struct interface_descriptor http_socket_desc =
+	INTF_DESC ( struct http_request, socket, http_socket_operations );
 
 /** HTTP data transfer interface operations */
-static struct xfer_interface_operations http_xfer_operations = {
-	.close		= http_xfer_close,
-	.vredirect	= ignore_xfer_vredirect,
-	.window		= unlimited_xfer_window,
-	.alloc_iob	= default_xfer_alloc_iob,
-	.deliver_iob	= xfer_deliver_as_raw,
-	.deliver_raw	= ignore_xfer_deliver_raw,
+static struct interface_operation http_xfer_operations[] = {
+	INTF_OP ( intf_close, struct http_request *, http_done ),
 };
+
+/** HTTP data transfer interface descriptor */
+static struct interface_descriptor http_xfer_desc =
+	INTF_DESC ( struct http_request, xfer, http_xfer_operations );
 
 /**
  * Initiate an HTTP connection, with optional filter
@@ -530,13 +493,13 @@ static struct xfer_interface_operations http_xfer_operations = {
  * @v filter		Filter to apply to socket, or NULL
  * @ret rc		Return status code
  */
-int http_open_filter ( struct xfer_interface *xfer, struct uri *uri,
+int http_open_filter ( struct interface *xfer, struct uri *uri,
 		       unsigned int default_port,
-		       int ( * filter ) ( struct xfer_interface *xfer,
-					  struct xfer_interface **next ) ) {
+		       int ( * filter ) ( struct interface *xfer,
+					  struct interface **next ) ) {
 	struct http_request *http;
 	struct sockaddr_tcpip server;
-	struct xfer_interface *socket;
+	struct interface *socket;
 	int rc;
 
 	/* Sanity checks */
@@ -548,9 +511,9 @@ int http_open_filter ( struct xfer_interface *xfer, struct uri *uri,
 	if ( ! http )
 		return -ENOMEM;
 	ref_init ( &http->refcnt, http_free );
-	xfer_init ( &http->xfer, &http_xfer_operations, &http->refcnt );
+	intf_init ( &http->xfer, &http_xfer_desc, &http->refcnt );
        	http->uri = uri_get ( uri );
-	xfer_init ( &http->socket, &http_socket_operations, &http->refcnt );
+	intf_init ( &http->socket, &http_socket_desc, &http->refcnt );
 	process_init ( &http->process, http_step, &http->refcnt );
 
 	/* Open socket */
@@ -567,7 +530,7 @@ int http_open_filter ( struct xfer_interface *xfer, struct uri *uri,
 		goto err;
 
 	/* Attach to parent interface, mortalise self, and return */
-	xfer_plug_plug ( &http->xfer, xfer );
+	intf_plug_plug ( &http->xfer, xfer );
 	ref_put ( &http->refcnt );
 	return 0;
 
@@ -586,7 +549,7 @@ int http_open_filter ( struct xfer_interface *xfer, struct uri *uri,
  * @v uri		Uniform Resource Identifier
  * @ret rc		Return status code
  */
-static int http_open ( struct xfer_interface *xfer, struct uri *uri ) {
+static int http_open ( struct interface *xfer, struct uri *uri ) {
 	return http_open_filter ( xfer, uri, HTTP_PORT, NULL );
 }
 

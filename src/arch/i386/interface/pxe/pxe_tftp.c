@@ -31,6 +31,7 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #include <ipxe/uaccess.h>
 #include <ipxe/in.h>
 #include <ipxe/tftp.h>
+#include <ipxe/iobuf.h>
 #include <ipxe/xfer.h>
 #include <ipxe/open.h>
 #include <ipxe/process.h>
@@ -39,7 +40,7 @@ FILE_LICENCE ( GPL2_OR_LATER );
 /** A PXE TFTP connection */
 struct pxe_tftp_connection {
 	/** Data transfer interface */
-	struct xfer_interface xfer;
+	struct interface xfer;
 	/** Data buffer */
 	userptr_t buffer;
 	/** Size of data buffer */
@@ -58,93 +59,84 @@ struct pxe_tftp_connection {
 	int rc;
 };
 
-/** The PXE TFTP connection */
-static struct pxe_tftp_connection pxe_tftp = {
-	.xfer = XFER_INIT ( &null_xfer_ops ),
-};
-
 /**
  * Close PXE TFTP connection
  *
+ * @v pxe_tftp		PXE TFTP connection
  * @v rc		Final status code
  */
-static void pxe_tftp_close ( int rc ) {
-	xfer_nullify ( &pxe_tftp.xfer );
-	xfer_close ( &pxe_tftp.xfer, rc );
-	pxe_tftp.rc = rc;
+static void pxe_tftp_close ( struct pxe_tftp_connection *pxe_tftp, int rc ) {
+	intf_shutdown ( &pxe_tftp->xfer, rc );
+	pxe_tftp->rc = rc;
 }
 
 /**
  * Receive new data
  *
- * @v xfer		Data transfer interface
+ * @v pxe_tftp		PXE TFTP connection
  * @v iobuf		I/O buffer
  * @v meta		Transfer metadata
  * @ret rc		Return status code
  */
-static int pxe_tftp_xfer_deliver_iob ( struct xfer_interface *xfer __unused,
-				       struct io_buffer *iobuf,
-				       struct xfer_metadata *meta ) {
+static int pxe_tftp_xfer_deliver ( struct pxe_tftp_connection *pxe_tftp,
+				   struct io_buffer *iobuf,
+				   struct xfer_metadata *meta ) {
 	size_t len = iob_len ( iobuf );
 	int rc = 0;
 
 	/* Calculate new buffer position */
 	if ( meta->whence != SEEK_CUR )
-		pxe_tftp.offset = 0;
-	pxe_tftp.offset += meta->offset;
+		pxe_tftp->offset = 0;
+	pxe_tftp->offset += meta->offset;
 
 	/* Copy data block to buffer */
 	if ( len == 0 ) {
 		/* No data (pure seek); treat as success */
-	} else if ( pxe_tftp.offset < pxe_tftp.start ) {
+	} else if ( pxe_tftp->offset < pxe_tftp->start ) {
 		DBG ( " buffer underrun at %zx (min %zx)",
-		      pxe_tftp.offset, pxe_tftp.start );
+		      pxe_tftp->offset, pxe_tftp->start );
 		rc = -ENOBUFS;
-	} else if ( ( pxe_tftp.offset + len ) >
-		    ( pxe_tftp.start + pxe_tftp.size ) ) {
+	} else if ( ( pxe_tftp->offset + len ) >
+		    ( pxe_tftp->start + pxe_tftp->size ) ) {
 		DBG ( " buffer overrun at %zx (max %zx)",
-		      ( pxe_tftp.offset + len ),
-		      ( pxe_tftp.start + pxe_tftp.size ) );
+		      ( pxe_tftp->offset + len ),
+		      ( pxe_tftp->start + pxe_tftp->size ) );
 		rc = -ENOBUFS;
 	} else {
-		copy_to_user ( pxe_tftp.buffer,
-			       ( pxe_tftp.offset - pxe_tftp.start ),
+		copy_to_user ( pxe_tftp->buffer,
+			       ( pxe_tftp->offset - pxe_tftp->start ),
 			       iobuf->data, len );
 	}
 
 	/* Calculate new buffer position */
-	pxe_tftp.offset += len;
+	pxe_tftp->offset += len;
 
 	/* Record maximum offset as the file size */
-	if ( pxe_tftp.max_offset < pxe_tftp.offset )
-		pxe_tftp.max_offset = pxe_tftp.offset;
+	if ( pxe_tftp->max_offset < pxe_tftp->offset )
+		pxe_tftp->max_offset = pxe_tftp->offset;
 
 	/* Terminate transfer on error */
 	if ( rc != 0 )
-		pxe_tftp_close ( rc );
+		pxe_tftp_close ( pxe_tftp, rc );
 
 	free_iob ( iobuf );
 	return rc;
 }
 
-/**
- * Handle close() event
- *
- * @v xfer		Data transfer interface
- * @v rc		Reason for close
- */
-static void pxe_tftp_xfer_close ( struct xfer_interface *xfer __unused,
-				  int rc ) {
-	pxe_tftp_close ( rc );
-}
+/** PXE TFTP connection interface operations */
+static struct interface_operation pxe_tftp_xfer_ops[] = {
+	INTF_OP ( xfer_deliver, struct pxe_tftp_connection *,
+		  pxe_tftp_xfer_deliver ),
+	INTF_OP ( intf_close, struct pxe_tftp_connection *, pxe_tftp_close ),
+};
 
-static struct xfer_interface_operations pxe_tftp_xfer_ops = {
-	.close		= pxe_tftp_xfer_close,
-	.vredirect	= xfer_vreopen,
-	.window		= unlimited_xfer_window,
-	.alloc_iob	= default_xfer_alloc_iob,
-	.deliver_iob	= pxe_tftp_xfer_deliver_iob,
-	.deliver_raw	= xfer_deliver_as_iob,
+/** PXE TFTP connection interface descriptor */
+static struct interface_descriptor pxe_tftp_xfer_desc =
+	INTF_DESC ( struct pxe_tftp_connection, xfer, pxe_tftp_xfer_ops );
+
+/** The PXE TFTP connection */
+static struct pxe_tftp_connection pxe_tftp = {
+	.xfer = INTF_INIT ( pxe_tftp_xfer_desc ),
 };
 
 /**
@@ -173,7 +165,7 @@ static int pxe_tftp_open ( uint32_t ipaddress, unsigned int port,
 
 	/* Reset PXE TFTP connection structure */
 	memset ( &pxe_tftp, 0, sizeof ( pxe_tftp ) );
-	xfer_init ( &pxe_tftp.xfer, &pxe_tftp_xfer_ops, NULL );
+	intf_init ( &pxe_tftp.xfer, &pxe_tftp_xfer_desc, NULL );
 	pxe_tftp.rc = -EINPROGRESS;
 
 	/* Construct URI string */
@@ -247,7 +239,7 @@ PXENV_EXIT_t pxenv_tftp_open ( struct s_PXENV_TFTP_OPEN *tftp_open ) {
 	DBG ( "PXENV_TFTP_OPEN" );
 
 	/* Guard against callers that fail to close before re-opening */
-	pxe_tftp_close ( 0 );
+	pxe_tftp_close ( &pxe_tftp, 0 );
 
 	/* Open connection */
 	if ( ( rc = pxe_tftp_open ( tftp_open->ServerIPAddress,
@@ -296,7 +288,7 @@ PXENV_EXIT_t pxenv_tftp_open ( struct s_PXENV_TFTP_OPEN *tftp_open ) {
 PXENV_EXIT_t pxenv_tftp_close ( struct s_PXENV_TFTP_CLOSE *tftp_close ) {
 	DBG ( "PXENV_TFTP_CLOSE" );
 
-	pxe_tftp_close ( 0 );
+	pxe_tftp_close ( &pxe_tftp, 0 );
 	tftp_close->Status = PXENV_STATUS_SUCCESS;
 	return PXENV_EXIT_SUCCESS;
 }
@@ -491,7 +483,7 @@ PXENV_EXIT_t pxenv_tftp_read_file ( struct s_PXENV_TFTP_READ_FILE
 	tftp_read_file->BufferSize = pxe_tftp.max_offset;
 
 	/* Close TFTP file */
-	pxe_tftp_close ( rc );
+	pxe_tftp_close ( &pxe_tftp, rc );
 
 	tftp_read_file->Status = PXENV_STATUS ( rc );
 	return ( rc ? PXENV_EXIT_FAILURE : PXENV_EXIT_SUCCESS );
@@ -565,7 +557,7 @@ PXENV_EXIT_t pxenv_tftp_get_fsize ( struct s_PXENV_TFTP_GET_FSIZE
 		rc = 0;
 
 	/* Close TFTP file */
-	pxe_tftp_close ( rc );
+	pxe_tftp_close ( &pxe_tftp, rc );
 
 	tftp_get_fsize->Status = PXENV_STATUS ( rc );
 	return ( rc ? PXENV_EXIT_FAILURE : PXENV_EXIT_SUCCESS );

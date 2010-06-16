@@ -75,7 +75,7 @@ static void srp_scsi_done ( struct srp_device *srp, int rc ) {
 static void srp_fail ( struct srp_device *srp, int rc ) {
 
 	/* Close underlying socket */
-	xfer_close ( &srp->socket, rc );
+	intf_restart ( &srp->socket, rc );
 
 	/* Clear session state */
 	srp->state = 0;
@@ -364,16 +364,14 @@ static int srp_unrecognised ( struct srp_device *srp,
 /**
  * Receive data from underlying socket
  *
- * @v xfer		Data transfer interface
+ * @v srp		SRP device
  * @v iobuf		Datagram I/O buffer
  * @v meta		Data transfer metadata
  * @ret rc		Return status code
  */
-static int srp_xfer_deliver_iob ( struct xfer_interface *xfer,
-				  struct io_buffer *iobuf,
-				  struct xfer_metadata *meta __unused ) {
-	struct srp_device *srp =
-		container_of ( xfer, struct srp_device, socket );
+static int srp_xfer_deliver ( struct srp_device *srp,
+			      struct io_buffer *iobuf,
+			      struct xfer_metadata *meta __unused ) {
 	struct srp_common *common = iobuf->data;
 	int ( * type ) ( struct srp_device *srp, struct io_buffer *iobuf );
 	int rc;
@@ -405,30 +403,15 @@ static int srp_xfer_deliver_iob ( struct xfer_interface *xfer,
 	return rc;
 }
 
-/**
- * Underlying socket closed
- *
- * @v xfer		Data transfer interface
- * @v rc		Reason for close
- */
-static void srp_xfer_close ( struct xfer_interface *xfer, int rc ) {
-	struct srp_device *srp =
-		container_of ( xfer, struct srp_device, socket );
-
-	DBGC ( srp, "SRP %p socket closed: %s\n", srp, strerror ( rc ) );
-
-	srp_fail ( srp, rc );
-}
-
 /** SRP data transfer interface operations */
-static struct xfer_interface_operations srp_xfer_operations = {
-	.close		= srp_xfer_close,
-	.vredirect	= ignore_xfer_vredirect,
-	.window		= unlimited_xfer_window,
-	.alloc_iob	= default_xfer_alloc_iob,
-	.deliver_iob	= srp_xfer_deliver_iob,
-	.deliver_raw	= xfer_deliver_as_iob,
+static struct interface_operation srp_xfer_operations[] = {
+	INTF_OP ( xfer_deliver, struct srp_device *, srp_xfer_deliver ),
+	INTF_OP ( intf_close, struct srp_device *, srp_fail ),
 };
+
+/** SRP data transfer interface descriptor */
+static struct interface_descriptor srp_xfer_desc =
+	INTF_DESC ( struct srp_device, socket, srp_xfer_operations );
 
 /**
  * Issue SCSI command via SRP
@@ -483,7 +466,7 @@ int srp_attach ( struct scsi_device *scsi, const char *root_path ) {
 		goto err_alloc;
 	}
 	ref_init ( &srp->refcnt, NULL );
-	xfer_init ( &srp->socket, &srp_xfer_operations, &srp->refcnt );
+	intf_init ( &srp->socket, &srp_xfer_desc, &srp->refcnt );
 	srp->transport = transport;
 	DBGC ( srp, "SRP %p using %s\n", srp, root_path );
 
@@ -516,8 +499,7 @@ void srp_detach ( struct scsi_device *scsi ) {
 		container_of ( scsi->backend, struct srp_device, refcnt );
 
 	/* Close socket */
-	xfer_nullify ( &srp->socket );
-	xfer_close ( &srp->socket, 0 );
+	intf_shutdown ( &srp->socket, 0 );
 	scsi->command = scsi_detached_command;
 	ref_put ( scsi->backend );
 	scsi->backend = NULL;

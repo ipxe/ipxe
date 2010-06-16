@@ -498,7 +498,7 @@ struct iscsi_session {
 	struct refcnt refcnt;
 
 	/** Transport-layer socket */
-	struct xfer_interface socket;
+	struct interface socket;
 
 	/** Target address */
 	char *target_address;

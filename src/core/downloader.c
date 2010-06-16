@@ -21,6 +21,7 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #include <stdlib.h>
 #include <stdarg.h>
 #include <errno.h>
+#include <ipxe/iobuf.h>
 #include <ipxe/xfer.h>
 #include <ipxe/open.h>
 #include <ipxe/job.h>
@@ -43,7 +44,7 @@ struct downloader {
 	/** Job control interface */
 	struct interface job;
 	/** Data transfer interface */
-	struct xfer_interface xfer;
+	struct interface xfer;
 
 	/** Image to contain downloaded file */
 	struct image *image;
@@ -79,8 +80,7 @@ static void downloader_finished ( struct downloader *downloader, int rc ) {
 		rc = downloader->register_image ( downloader->image );
 
 	/* Shut down interfaces */
-	xfer_nullify ( &downloader->xfer );
-	xfer_close ( &downloader->xfer, rc );
+	intf_shutdown ( &downloader->xfer, rc );
 	intf_shutdown ( &downloader->job, rc );
 }
 
@@ -145,18 +145,16 @@ static void downloader_progress ( struct downloader *downloader,
  */
 
 /**
- * Handle deliver_raw() event received via data transfer interface
+ * Handle received data
  *
- * @v xfer		Downloader data transfer interface
+ * @v downloader	Downloader
  * @v iobuf		Datagram I/O buffer
  * @v meta		Data transfer metadata
  * @ret rc		Return status code
  */
-static int downloader_xfer_deliver_iob ( struct xfer_interface *xfer,
-					 struct io_buffer *iobuf,
-					 struct xfer_metadata *meta ) {
-	struct downloader *downloader =
-		container_of ( xfer, struct downloader, xfer );
+static int downloader_xfer_deliver ( struct downloader *downloader,
+				     struct io_buffer *iobuf,
+				     struct xfer_metadata *meta ) {
 	size_t len;
 	size_t max;
 	int rc;
@@ -184,29 +182,15 @@ static int downloader_xfer_deliver_iob ( struct xfer_interface *xfer,
 	return rc;
 }
 
-/**
- * Handle close() event received via data transfer interface
- *
- * @v xfer		Downloader data transfer interface
- * @v rc		Reason for close
- */
-static void downloader_xfer_close ( struct xfer_interface *xfer, int rc ) {
-	struct downloader *downloader =
-		container_of ( xfer, struct downloader, xfer );
-
-	/* Terminate download */
-	downloader_finished ( downloader, rc );
-}
-
 /** Downloader data transfer interface operations */
-static struct xfer_interface_operations downloader_xfer_operations = {
-	.close		= downloader_xfer_close,
-	.vredirect	= xfer_vreopen,
-	.window		= unlimited_xfer_window,
-	.alloc_iob	= default_xfer_alloc_iob,
-	.deliver_iob	= downloader_xfer_deliver_iob,
-	.deliver_raw	= xfer_deliver_as_iob,
+static struct interface_operation downloader_xfer_operations[] = {
+	INTF_OP ( xfer_deliver, struct downloader *, downloader_xfer_deliver ),
+	INTF_OP ( intf_close, struct downloader *, downloader_finished ),
 };
+
+/** Downloader data transfer interface descriptor */
+static struct interface_descriptor downloader_xfer_desc =
+	INTF_DESC ( struct downloader, xfer, downloader_xfer_operations );
 
 /****************************************************************************
  *
@@ -258,7 +242,7 @@ int create_downloader ( struct interface *job, struct image *image,
 	ref_init ( &downloader->refcnt, downloader_free );
 	intf_init ( &downloader->job, &downloader_job_desc,
 		    &downloader->refcnt );
-	xfer_init ( &downloader->xfer, &downloader_xfer_operations,
+	intf_init ( &downloader->xfer, &downloader_xfer_desc,
 		    &downloader->refcnt );
 	downloader->image = image_get ( image );
 	downloader->register_image = register_image;

@@ -28,6 +28,7 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #include <errno.h>
 #include <byteswap.h>
 #include <ipxe/refcnt.h>
+#include <ipxe/iobuf.h>
 #include <ipxe/xfer.h>
 #include <ipxe/open.h>
 #include <ipxe/resolv.h>
@@ -60,7 +61,7 @@ struct dns_request {
 	/** Name resolution interface */
 	struct interface resolv;
 	/** Data transfer interface */
-	struct xfer_interface socket;
+	struct interface socket;
 	/** Retry timer */
 	struct retry_timer timer;
 
@@ -89,11 +90,8 @@ static void dns_done ( struct dns_request *dns, int rc ) {
 	/* Stop the retry timer */
 	stop_timer ( &dns->timer );
 
-	/* Close data transfer interface */
-	xfer_nullify ( &dns->socket );
-	xfer_close ( &dns->socket, rc );
-
 	/* Shut down interfaces */
+	intf_shutdown ( &dns->socket, rc );
 	intf_shutdown ( &dns->resolv, rc );
 }
 
@@ -322,25 +320,26 @@ static void dns_timer_expired ( struct retry_timer *timer, int fail ) {
 /**
  * Receive new data
  *
- * @v socket		UDP socket
- * @v data		DNS reply
- * @v len		Length of DNS reply
+ * @v dns		DNS request
+ * @v iobuf		I/O buffer
+ * @v meta		Data transfer metadata
  * @ret rc		Return status code
  */
-static int dns_xfer_deliver_raw ( struct xfer_interface *socket,
-				  const void *data, size_t len ) {
-	struct dns_request *dns =
-		container_of ( socket, struct dns_request, socket );
-	const struct dns_header *reply = data;
+static int dns_xfer_deliver ( struct dns_request *dns,
+			      struct io_buffer *iobuf,
+			      struct xfer_metadata *meta __unused ) {
+	const struct dns_header *reply = iobuf->data;
 	union dns_rr_info *rr_info;
 	struct sockaddr_in *sin;
 	unsigned int qtype = dns->qinfo->qtype;
+	int rc;
 
 	/* Sanity check */
-	if ( len < sizeof ( *reply ) ) {
+	if ( iob_len ( iobuf ) < sizeof ( *reply ) ) {
 		DBGC ( dns, "DNS %p received underlength packet length %zd\n",
-		       dns, len );
-		return -EINVAL;
+		       dns, iob_len ( iobuf ) );
+		rc = -EINVAL;
+		goto done;
 	}
 
 	/* Check reply ID matches query ID */
@@ -348,7 +347,8 @@ static int dns_xfer_deliver_raw ( struct xfer_interface *socket,
 		DBGC ( dns, "DNS %p received unexpected reply ID %d "
 		       "(wanted %d)\n", dns, ntohs ( reply->id ),
 		       ntohs ( dns->query.dns.id ) );
-		return -EINVAL;
+		rc = -EINVAL;
+		goto done;
 	}
 
 	DBGC ( dns, "DNS %p received reply ID %d\n", dns, ntohs ( reply->id ));
@@ -382,7 +382,8 @@ static int dns_xfer_deliver_raw ( struct xfer_interface *socket,
 
 			/* Mark operation as complete */
 			dns_done ( dns, 0 );
-			return 0;
+			rc = 0;
+			goto done;
 
 		case htons ( DNS_TYPE_CNAME ):
 
@@ -399,7 +400,8 @@ static int dns_xfer_deliver_raw ( struct xfer_interface *socket,
 				DBGC ( dns, "DNS %p recursion exceeded\n",
 				       dns );
 				dns_done ( dns, -ELOOP );
-				return 0;
+				rc = 0;
+				goto done;
 			}
 			break;
 
@@ -422,7 +424,8 @@ static int dns_xfer_deliver_raw ( struct xfer_interface *socket,
 		DBGC ( dns, "DNS %p found no A record; trying CNAME\n", dns );
 		dns->qinfo->qtype = htons ( DNS_TYPE_CNAME );
 		dns_send_packet ( dns );
-		return 0;
+		rc = 0;
+		goto done;
 
 	case htons ( DNS_TYPE_CNAME ):
 		/* We asked for a CNAME record.  If we got a response
@@ -431,29 +434,35 @@ static int dns_xfer_deliver_raw ( struct xfer_interface *socket,
 		 */
 		if ( dns->qinfo->qtype == htons ( DNS_TYPE_A ) ) {
 			dns_send_packet ( dns );
-			return 0;
+			rc = 0;
+			goto done;
 		} else {
 			DBGC ( dns, "DNS %p found no CNAME record\n", dns );
 			dns_done ( dns, -ENXIO );
-			return 0;
+			rc = 0;
+			goto done;
 		}
 
 	default:
 		assert ( 0 );
 		dns_done ( dns, -EINVAL );
-		return 0;
+		rc = -EINVAL;
+		goto done;
 	}
+
+ done:
+	/* Free I/O buffer */
+	free_iob ( iobuf );
+	return rc;
 }
 
 /**
  * Receive new data
  *
- * @v socket		UDP socket
+ * @v dns		DNS request
  * @v rc		Reason for close
  */
-static void dns_xfer_close ( struct xfer_interface *socket, int rc ) {
-	struct dns_request *dns =
-		container_of ( socket, struct dns_request, socket );
+static void dns_xfer_close ( struct dns_request *dns, int rc ) {
 
 	if ( ! rc )
 		rc = -ECONNABORTED;
@@ -461,15 +470,15 @@ static void dns_xfer_close ( struct xfer_interface *socket, int rc ) {
 	dns_done ( dns, rc );
 }
 
-/** DNS socket operations */
-static struct xfer_interface_operations dns_socket_operations = {
-	.close		= dns_xfer_close,
-	.vredirect	= xfer_vreopen,
-	.window		= unlimited_xfer_window,
-	.alloc_iob	= default_xfer_alloc_iob,
-	.deliver_iob	= xfer_deliver_as_raw,
-	.deliver_raw	= dns_xfer_deliver_raw,
+/** DNS socket interface operations */
+static struct interface_operation dns_socket_operations[] = {
+	INTF_OP ( xfer_deliver, struct dns_request *, dns_xfer_deliver ),
+	INTF_OP ( intf_close, struct dns_request *, dns_xfer_close ),
 };
+
+/** DNS socket interface descriptor */
+static struct interface_descriptor dns_socket_desc =
+	INTF_DESC ( struct dns_request, socket, dns_socket_operations );
 
 /** DNS resolver interface operations */
 static struct interface_operation dns_resolv_op[] = {
@@ -517,7 +526,7 @@ static int dns_resolv ( struct interface *resolv,
 	}
 	ref_init ( &dns->refcnt, NULL );
 	intf_init ( &dns->resolv, &dns_resolv_desc, &dns->refcnt );
-	xfer_init ( &dns->socket, &dns_socket_operations, &dns->refcnt );
+	intf_init ( &dns->socket, &dns_socket_desc, &dns->refcnt );
 	timer_init ( &dns->timer, dns_timer_expired );
 	memcpy ( &dns->sa, sa, sizeof ( dns->sa ) );
 

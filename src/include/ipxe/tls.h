@@ -11,7 +11,7 @@ FILE_LICENCE ( GPL2_OR_LATER );
 
 #include <stdint.h>
 #include <ipxe/refcnt.h>
-#include <ipxe/filter.h>
+#include <ipxe/interface.h>
 #include <ipxe/process.h>
 #include <ipxe/crypto.h>
 #include <ipxe/md5.h>
@@ -134,9 +134,9 @@ struct tls_session {
 	struct refcnt refcnt;
 
 	/** Plaintext stream */
-	struct xfer_filter_half plainstream;
+	struct interface plainstream;
 	/** Ciphertext stream */
-	struct xfer_filter_half cipherstream;
+	struct interface cipherstream;
 
 	/** Current TX cipher specification */
 	struct tls_cipherspec tx_cipherspec;
@@ -181,7 +181,7 @@ struct tls_session {
 	void *rx_data;
 };
 
-extern int add_tls ( struct xfer_interface *xfer,
-		     struct xfer_interface **next );
+extern int add_tls ( struct interface *xfer,
+		     struct interface **next );
 
 #endif /* _IPXE_TLS_H */

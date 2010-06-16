@@ -16,7 +16,8 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #include <ipxe/tcpip.h>
 #include <ipxe/if_ether.h>
 
-struct xfer_interface;
+struct interface;
+struct sockaddr;
 
 /**
  * UDP constants
@@ -40,8 +41,8 @@ struct udp_header {
 	uint16_t chksum;
 };
 
-extern int udp_open_promisc ( struct xfer_interface *xfer );
-extern int udp_open ( struct xfer_interface *xfer, struct sockaddr *peer,
+extern int udp_open_promisc ( struct interface *xfer );
+extern int udp_open ( struct interface *xfer, struct sockaddr *peer,
 		      struct sockaddr *local );
 
 #endif /* _IPXE_UDP_H */

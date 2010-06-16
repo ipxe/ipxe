@@ -22,6 +22,7 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #include <string.h>
 #include <errno.h>
 #include <ipxe/list.h>
+#include <ipxe/iobuf.h>
 #include <ipxe/xfer.h>
 #include <ipxe/open.h>
 #include <ipxe/process.h>
@@ -50,7 +51,7 @@ struct posix_file {
 	 */
 	int rc;
 	/** Data transfer interface */
-	struct xfer_interface xfer;
+	struct interface xfer;
 	/** Current seek position */
 	size_t pos;
 	/** File size */
@@ -87,38 +88,21 @@ static void posix_file_free ( struct refcnt *refcnt ) {
  * @v rc		Reason for termination
  */
 static void posix_file_finished ( struct posix_file *file, int rc ) {
-	xfer_nullify ( &file->xfer );
-	xfer_close ( &file->xfer, rc );
+	intf_shutdown ( &file->xfer, rc );
 	file->rc = rc;
-}
-
-/**
- * Handle close() event
- *
- * @v xfer		POSIX file data transfer interface
- * @v rc		Reason for close
- */
-static void posix_file_xfer_close ( struct xfer_interface *xfer, int rc ) {
-	struct posix_file *file =
-		container_of ( xfer, struct posix_file, xfer );
-
-	posix_file_finished ( file, rc );
 }
 
 /**
  * Handle deliver_iob() event
  *
- * @v xfer		POSIX file data transfer interface
+ * @v file		POSIX file
  * @v iobuf		I/O buffer
  * @v meta		Data transfer metadata
  * @ret rc		Return status code
  */
-static int
-posix_file_xfer_deliver_iob ( struct xfer_interface *xfer,
-			      struct io_buffer *iobuf,
-			      struct xfer_metadata *meta ) {
-	struct posix_file *file =
-		container_of ( xfer, struct posix_file, xfer );
+static int posix_file_xfer_deliver ( struct posix_file *file,
+				     struct io_buffer *iobuf,
+				     struct xfer_metadata *meta ) {
 
 	/* Keep track of file position solely for the filesize */
 	if ( meta->whence != SEEK_CUR )
@@ -137,14 +121,14 @@ posix_file_xfer_deliver_iob ( struct xfer_interface *xfer,
 }
 
 /** POSIX file data transfer interface operations */
-static struct xfer_interface_operations posix_file_xfer_operations = {
-	.close		= posix_file_xfer_close,
-	.vredirect	= xfer_vreopen,
-	.window		= unlimited_xfer_window,
-	.alloc_iob	= default_xfer_alloc_iob,
-	.deliver_iob	= posix_file_xfer_deliver_iob,
-	.deliver_raw	= xfer_deliver_as_iob,
+static struct interface_operation posix_file_xfer_operations[] = {
+	INTF_OP ( xfer_deliver, struct posix_file *, posix_file_xfer_deliver ),
+	INTF_OP ( intf_close, struct posix_file *, posix_file_finished ),
 };
+
+/** POSIX file data transfer interface descriptor */
+static struct interface_descriptor posix_file_xfer_desc =
+	INTF_DESC ( struct posix_file, xfer, posix_file_xfer_operations );
 
 /**
  * Identify file by file descriptor
@@ -201,8 +185,7 @@ int open ( const char *uri_string ) {
 	ref_init ( &file->refcnt, posix_file_free );
 	file->fd = fd;
 	file->rc = -EINPROGRESS;
-	xfer_init ( &file->xfer, &posix_file_xfer_operations,
-		    &file->refcnt );
+	intf_init ( &file->xfer, &posix_file_xfer_desc, &file->refcnt );
 	INIT_LIST_HEAD ( &file->data );
 
 	/* Open URI on data transfer interface */
