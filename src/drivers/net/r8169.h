@@ -440,7 +440,6 @@ struct rtl8169_private {
 
 	int chipset;
 	int mac_version;
-	int cfg_index;
 	u16 intr_event;
 
 	struct io_buffer *tx_iobuf[NUM_TX_DESC];

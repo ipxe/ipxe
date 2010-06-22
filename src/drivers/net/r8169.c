@@ -1817,52 +1817,6 @@ rtl8169_free_rx_resources ( struct rtl8169_private *tp )
 	}
 }
 
-/**
-    FIXME: Because iPXE's pci_device_id structure does not contain a
-    field to contain arbitrary data, we need the following table to
-    associate PCI IDs with nic variants, because a lot of driver
-    routines depend on knowing which kind of variant they are dealing
-    with. --mdc
- **/
-
-#define _R(VENDOR,DEVICE,INDEX) \
-	{ .vendor = VENDOR, .device = DEVICE, .index = INDEX }
-
-static const struct {
-	uint16_t vendor;
-	uint16_t device;
-	int index;
-} nic_variant_table[] = {
-	_R(0x10ec, 0x8129, RTL_CFG_0),
-	_R(0x10ec, 0x8136, RTL_CFG_2),
-	_R(0x10ec, 0x8167, RTL_CFG_0),
-	_R(0x10ec, 0x8168, RTL_CFG_1),
-	_R(0x10ec, 0x8169, RTL_CFG_0),
-	_R(0x1186, 0x4300, RTL_CFG_0),
-	_R(0x1259, 0xc107, RTL_CFG_0),
-	_R(0x16ec, 0x0116, RTL_CFG_0),
-	_R(0x1737, 0x1032, RTL_CFG_0),
-	_R(0x0001, 0x8168, RTL_CFG_2),
-};
-#undef _R
-
-static int
-rtl8169_get_nic_variant ( uint16_t vendor, uint16_t device )
-{
-	u32 i;
-
-	DBGP ( "rtl8169_get_nic_variant\n" );
-
-	for (i = 0; i < ARRAY_SIZE(nic_variant_table); i++) {
-		if ( ( nic_variant_table[i].vendor == vendor ) &&
-		     ( nic_variant_table[i].device == device ) ) {
-			return ( nic_variant_table[i].index );
-		}
-	}
-	DBG ( "No matching NIC variant found!\n" );
-	return ( RTL_CFG_0 );
-}
-
 static void rtl8169_irq_enable ( struct rtl8169_private *tp )
 {
 	void *ioaddr = tp->mmio_addr;
@@ -2103,19 +2057,12 @@ rtl8169_probe ( struct pci_device *pdev, const struct pci_device_id *ent )
 	struct rtl8169_private *tp;
 	void *ioaddr;
 
-	/** FIXME: This lookup is necessary because iPXE does not have a "data"
-	    element in the structure pci_device_id which can pass an arbitrary
-	    piece of data to the driver.  It might be useful to add it. Then we
-	    could just use ent->data instead of having to look up cfg_index.
-	**/
-	int cfg_index = rtl8169_get_nic_variant ( ent->vendor, ent->device );
-	const struct rtl_cfg_info *cfg = rtl_cfg_infos + cfg_index;
+	const struct rtl_cfg_info *cfg = rtl_cfg_infos + ent->driver_data;
 
 	DBGP ( "rtl8169_probe\n" );
 
 	DBG ( "ent->vendor = %#04x, ent->device = %#04x\n", ent->vendor, ent->device );
 
-	DBG ( "cfg_index = %d\n", cfg_index );
 	DBG ( "cfg->intr_event = %#04x\n", cfg->intr_event );
 
 	rc = -ENOMEM;
@@ -2144,7 +2091,6 @@ rtl8169_probe ( struct pci_device *pdev, const struct pci_device_id *ent )
 	tp->pci_dev    = pdev;
 	tp->irqno      = pdev->irq;
 	tp->netdev     = netdev;
-	tp->cfg_index  = cfg_index;
 	tp->intr_event = cfg->intr_event;
 	tp->cp_cmd     = PCIMulRW;
 
@@ -2257,16 +2203,16 @@ rtl8169_remove ( struct pci_device *pdev )
 }
 
 static struct pci_device_id rtl8169_nics[] = {
-	PCI_ROM(0x10ec, 0x8129, "rtl8169-0x8129", "rtl8169-0x8129", 0),
-	PCI_ROM(0x10ec, 0x8136, "rtl8169-0x8136", "rtl8169-0x8136", 0),
-	PCI_ROM(0x10ec, 0x8167, "rtl8169-0x8167", "rtl8169-0x8167", 0),
-	PCI_ROM(0x10ec, 0x8168, "rtl8169-0x8168", "rtl8169-0x8168", 0),
-	PCI_ROM(0x10ec, 0x8169, "rtl8169-0x8169", "rtl8169-0x8169", 0),
-	PCI_ROM(0x1186, 0x4300, "rtl8169-0x4300", "rtl8169-0x4300", 0),
-	PCI_ROM(0x1259, 0xc107, "rtl8169-0xc107", "rtl8169-0xc107", 0),
-	PCI_ROM(0x16ec, 0x0116, "rtl8169-0x0116", "rtl8169-0x0116", 0),
-	PCI_ROM(0x1737, 0x1032, "rtl8169-0x1032", "rtl8169-0x1032", 0),
-	PCI_ROM(0x0001, 0x8168, "rtl8169-0x8168", "rtl8169-0x8168", 0),
+	PCI_ROM(0x10ec, 0x8129, "rtl8169-0x8129", "rtl8169-0x8129", RTL_CFG_0),
+	PCI_ROM(0x10ec, 0x8136, "rtl8169-0x8136", "rtl8169-0x8136", RTL_CFG_2),
+	PCI_ROM(0x10ec, 0x8167, "rtl8169-0x8167", "rtl8169-0x8167", RTL_CFG_0),
+	PCI_ROM(0x10ec, 0x8168, "rtl8169-0x8168", "rtl8169-0x8168", RTL_CFG_1),
+	PCI_ROM(0x10ec, 0x8169, "rtl8169-0x8169", "rtl8169-0x8169", RTL_CFG_0),
+	PCI_ROM(0x1186, 0x4300, "rtl8169-0x4300", "rtl8169-0x4300", RTL_CFG_0),
+	PCI_ROM(0x1259, 0xc107, "rtl8169-0xc107", "rtl8169-0xc107", RTL_CFG_0),
+	PCI_ROM(0x16ec, 0x0116, "rtl8169-0x0116", "rtl8169-0x0116", RTL_CFG_0),
+	PCI_ROM(0x1737, 0x1032, "rtl8169-0x1032", "rtl8169-0x1032", RTL_CFG_0),
+	PCI_ROM(0x0001, 0x8168, "rtl8169-0x8168", "rtl8169-0x8168", RTL_CFG_2),
 };
 
 struct pci_driver rtl8169_driver __pci_driver = {
