@@ -473,7 +473,8 @@ static struct interface_operation http_socket_operations[] = {
 
 /** HTTP socket interface descriptor */
 static struct interface_descriptor http_socket_desc =
-	INTF_DESC ( struct http_request, socket, http_socket_operations );
+	INTF_DESC_PASSTHRU ( struct http_request, socket,
+			     http_socket_operations, xfer );
 
 /** HTTP data transfer interface operations */
 static struct interface_operation http_xfer_operations[] = {
@@ -482,7 +483,8 @@ static struct interface_operation http_xfer_operations[] = {
 
 /** HTTP data transfer interface descriptor */
 static struct interface_descriptor http_xfer_desc =
-	INTF_DESC ( struct http_request, xfer, http_xfer_operations );
+	INTF_DESC_PASSTHRU ( struct http_request, xfer,
+			     http_xfer_operations, socket );
 
 /**
  * Initiate an HTTP connection, with optional filter
