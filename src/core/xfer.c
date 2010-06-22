@@ -56,7 +56,7 @@ static struct xfer_metadata dummy_metadata;
 int xfer_vredirect ( struct interface *intf, int type, va_list args ) {
 	struct interface *dest;
 	xfer_vredirect_TYPE ( void * ) *op =
-		intf_get_dest_op ( intf, xfer_vredirect, &dest );
+		intf_get_dest_op_no_passthru ( intf, xfer_vredirect, &dest );
 	void *object = intf_object ( dest );
 	int rc;
 

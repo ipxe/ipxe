@@ -151,6 +151,31 @@ static struct interface * intf_get_passthru ( struct interface *intf ) {
 }
 
 /**
+ * Get object interface destination and operation method (without pass-through)
+ *
+ * @v intf		Object interface
+ * @v type		Operation type
+ * @ret dest		Destination interface
+ * @ret func		Implementing method, or NULL
+ */
+void * intf_get_dest_op_no_passthru_untyped ( struct interface *intf,
+					      void *type,
+					      struct interface **dest ) {
+	struct interface_descriptor *desc;
+	struct interface_operation *op;
+	unsigned int i;
+
+	*dest = intf_get ( intf->dest );
+	desc = (*dest)->desc;
+	for ( i = desc->num_op, op = desc->op ; i ; i--, op++ ) {
+		if ( op->type == type )
+			return op->func;
+	}
+
+	return NULL;
+}
+
+/**
  * Get object interface destination and operation method
  *
  * @v intf		Object interface
@@ -160,20 +185,16 @@ static struct interface * intf_get_passthru ( struct interface *intf ) {
  */
 void * intf_get_dest_op_untyped ( struct interface *intf, void *type,
 				  struct interface **dest ) {
-	struct interface_descriptor *desc;
-	struct interface_operation *op;
-	unsigned int i;
+	void *func;
 
 	while ( 1 ) {
+
 		/* Search for an implementing method provided by the
 		 * current destination interface.
 		 */
-		*dest = intf_get ( intf->dest );
-		desc = (*dest)->desc;
-		for ( i = desc->num_op, op = desc->op ; i ; i--, op++ ) {
-			if ( op->type == type )
-				return op->func;
-		}
+		func = intf_get_dest_op_no_passthru_untyped( intf, type, dest );
+		if ( func )
+			return func;
 
 		/* Pass through to the underlying interface, if applicable */
 		if ( ! ( intf = intf_get_passthru ( *dest ) ) )

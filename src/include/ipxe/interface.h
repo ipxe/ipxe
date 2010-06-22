@@ -132,6 +132,9 @@ extern void intf_nullify ( struct interface *intf );
 extern struct interface * intf_get ( struct interface *intf );
 extern void intf_put ( struct interface *intf );
 extern void * __attribute__ (( pure )) intf_object ( struct interface *intf );
+extern void * intf_get_dest_op_no_passthru_untyped ( struct interface *intf,
+						     void *type,
+						     struct interface **dest );
 extern void * intf_get_dest_op_untyped ( struct interface *intf, void *type,
 					 struct interface **dest );
 
@@ -170,6 +173,18 @@ static inline void intf_init ( struct interface *intf,
 		.refcnt = NULL,			\
 		.desc = &(descriptor),		\
 	}
+
+/**
+ * Get object interface destination and operation method (without pass-through)
+ *
+ * @v intf		Object interface
+ * @v type		Operation type
+ * @ret dest		Destination interface
+ * @ret func		Implementing method, or NULL
+ */
+#define intf_get_dest_op_no_passthru( intf, type, dest )		\
+	( ( type ## _TYPE ( void * ) * )				\
+	  intf_get_dest_op_no_passthru_untyped ( intf, type, dest ) )
 
 /**
  * Get object interface destination and operation method
