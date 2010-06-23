@@ -326,6 +326,7 @@ static void draw_instruction_row ( int editing ) {
 		      "Ctrl-C - discard changes" );
 	} else {
 		msg ( INSTRUCTION_ROW,
+		      "Ctrl-D - delete setting" INSTRUCTION_PAD
 		      "Ctrl-X - exit configuration utility" );
 	}
 }
@@ -429,6 +430,12 @@ static int main_loop ( struct settings *settings ) {
 			case KEY_UP:
 				if ( next > 0 )
 					reveal ( &widget, --next ) ;
+				break;
+			case CTRL_D:
+				delete_setting ( widget.settings,
+						 widget.setting );
+				select_setting ( &widget, next );
+				draw_setting ( &widget );
 				break;
 			case CTRL_X:
 				return 0;
