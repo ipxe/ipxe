@@ -962,50 +962,65 @@ static int tls_new_finished ( struct tls_session *tls,
  */
 static int tls_new_handshake ( struct tls_session *tls,
 			       void *data, size_t len ) {
-	struct {
-		uint8_t type;
-		uint8_t length[3];
-		uint8_t payload[0];
-	} __attribute__ (( packed )) *handshake = data;
-	void *payload = &handshake->payload;
-	size_t payload_len = tls_uint24 ( handshake->length );
-	void *end = ( payload + payload_len );
+	void *end = ( data + len );
 	int rc;
 
-	/* Sanity check */
-	if ( end != ( data + len ) ) {
-		DBGC ( tls, "TLS %p received overlength Handshake\n", tls );
-		DBGC_HD ( tls, data, len );
-		return -EINVAL;
+	while ( data != end ) {
+		struct {
+			uint8_t type;
+			uint8_t length[3];
+			uint8_t payload[0];
+		} __attribute__ (( packed )) *handshake = data;
+		void *payload = &handshake->payload;
+		size_t payload_len = tls_uint24 ( handshake->length );
+		void *next = ( payload + payload_len );
+
+		/* Sanity check */
+		if ( next > end ) {
+			DBGC ( tls, "TLS %p received overlength Handshake\n",
+			       tls );
+			DBGC_HD ( tls, data, len );
+			return -EINVAL;
+		}
+
+		switch ( handshake->type ) {
+		case TLS_SERVER_HELLO:
+			rc = tls_new_server_hello ( tls, payload, payload_len );
+			break;
+		case TLS_CERTIFICATE:
+			rc = tls_new_certificate ( tls, payload, payload_len );
+			break;
+		case TLS_SERVER_HELLO_DONE:
+			rc = tls_new_server_hello_done ( tls, payload,
+							 payload_len );
+			break;
+		case TLS_FINISHED:
+			rc = tls_new_finished ( tls, payload, payload_len );
+			break;
+		default:
+			DBGC ( tls, "TLS %p ignoring handshake type %d\n",
+			       tls, handshake->type );
+			rc = 0;
+			break;
+		}
+
+		/* Add to handshake digest (except for Hello Requests,
+		 * which are explicitly excluded).
+		 */
+		if ( handshake->type != TLS_HELLO_REQUEST )
+			tls_add_handshake ( tls, data,
+					    sizeof ( *handshake ) +
+					    payload_len );
+
+		/* Abort on failure */
+		if ( rc != 0 )
+			return rc;
+
+		/* Move to next handshake record */
+		data = next;
 	}
 
-	switch ( handshake->type ) {
-	case TLS_SERVER_HELLO:
-		rc = tls_new_server_hello ( tls, payload, payload_len );
-		break;
-	case TLS_CERTIFICATE:
-		rc = tls_new_certificate ( tls, payload, payload_len );
-		break;
-	case TLS_SERVER_HELLO_DONE:
-		rc = tls_new_server_hello_done ( tls, payload, payload_len );
-		break;
-	case TLS_FINISHED:
-		rc = tls_new_finished ( tls, payload, payload_len );
-		break;
-	default:
-		DBGC ( tls, "TLS %p ignoring handshake type %d\n",
-		       tls, handshake->type );
-		rc = 0;
-		break;
-	}
-
-	/* Add to handshake digest (except for Hello Requests, which
-	 * are explicitly excluded).
-	 */
-	if ( handshake->type != TLS_HELLO_REQUEST )
-		tls_add_handshake ( tls, data, len );
-
-	return rc;
+	return 0;
 }
 
 /**
