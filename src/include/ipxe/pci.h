@@ -159,6 +159,7 @@ FILE_LICENCE ( GPL2_ONLY );
 #define  PCI_CAP_ID_SLOTID	0x04	/* Slot Identification */
 #define  PCI_CAP_ID_MSI		0x05	/* Message Signalled Interrupts */
 #define  PCI_CAP_ID_CHSWP	0x06	/* CompactPCI HotSwap */
+#define  PCI_CAP_ID_VNDR	0x09	/* Vendor specific */
 #define  PCI_CAP_ID_EXP		0x10	/* PCI Express */
 #define PCI_CAP_LIST_NEXT	1	/* Next capability in the list */
 #define PCI_CAP_FLAGS		2	/* Capability defined flags (16 bits) */
