@@ -55,6 +55,12 @@ FILE_LICENCE ( GPL2_ONLY );
  * myri10ge_net_poll() polls for these receive notifications, posts
  * replacement receive buffers to the NIC, and passes received frames
  * to netdev_rx().
+ *
+ * NonVolatile Storage
+ *
+ * This driver supports NonVolatile Storage (nvs) in the NIC EEPROM.
+ * If the last EEPROM block is not otherwise filled, we tell
+ * iPXE it may store NonVolatile Options (nvo) there.
  */
 
 /*
@@ -75,6 +81,8 @@ FILE_LICENCE ( GPL2_ONLY );
 #include <ipxe/iobuf.h>
 #include <ipxe/malloc.h>
 #include <ipxe/netdevice.h>
+#include <ipxe/nvo.h>
+#include <ipxe/nvs.h>
 #include <ipxe/pci.h>
 #include <ipxe/timer.h>
 
@@ -169,6 +177,18 @@ struct myri10ge_private
 	   BEWARE: the value must be written 32 bits at a time. */
 
 	mcp_cmd_t	*command;
+
+	/*
+	 * Nonvolatile Storage for configuration options.
+	 */
+
+	struct nvs_device	nvs;
+	struct nvo_fragment	nvo_fragment[2];
+	struct nvo_block	nvo;
+
+	/* Cached PCI capability locations. */
+
+	uint8			pci_cap_vs;
 };
 
 /****************************************************************
@@ -196,6 +216,28 @@ static inline struct myri10ge_private *myri10ge_priv ( struct net_device *nd )
 	   since we use alloc_netdev() to allocate the storage. */
 
 	return ( struct myri10ge_private * ) ( nd + 1 );
+}
+
+/*
+ * Convert a Myri10ge driver private data pointer to a netdev pointer.
+ *
+ * @v p		Myri10ge device private data.
+ * @ret r	The corresponding network device.
+ */
+static inline struct net_device *myri10ge_netdev ( struct myri10ge_private *p )
+{
+	return ( ( struct net_device * ) p ) - 1;
+}
+
+/*
+ * Convert a network device pointer to a PCI device pointer.
+ *
+ * @v netdev	A Network Device.
+ * @ret r	The corresponding PCI device.
+ */
+static inline struct pci_device *myri10ge_pcidev ( struct net_device *netdev )
+{
+	return container_of (netdev->dev, struct pci_device, dev);
 }
 
 /*
@@ -381,12 +423,16 @@ static void myri10ge_interrupt_handler ( struct net_device *netdev )
 /* Constants for reading the STRING_SPECS via the Myricom
    Vendor Specific PCI configuration space capability. */
 
+#define VS_EEPROM_READ_ADDR ( vs + 0x04 )
+#define VS_EEPROM_READ_DATA ( vs + 0x08 )
+#define VS_EEPROM_WRITE     ( vs + 0x0C )
 #define VS_ADDR ( vs + 0x18 )
 #define VS_DATA ( vs + 0x14 )
 #define VS_MODE ( vs + 0x10 )
 #define 	VS_MODE_READ32 0x3
 #define 	VS_MODE_LOCATE 0x8
 #define 		VS_LOCATE_STRING_SPECS 0x3
+#define		VS_MODE_EEPROM_STREAM_WRITE 0xB
 
 /*
  * Read MAC address from its 'string specs' via the vendor-specific
@@ -394,27 +440,20 @@ static void myri10ge_interrupt_handler ( struct net_device *netdev )
  * before it is mapped.)
  *
  * @v pci		The device.
+ * @v vs		Offset of the PCI Vendor-Specific Capability.
  * @v mac		Buffer to store the MAC address.
  * @ret rc		Returns 0 on success, else an error code.
  */
 static int mac_address_from_string_specs ( struct pci_device *pci,
-						   uint8 mac[ETH_ALEN] )
+					   unsigned int vs,
+					   uint8 mac[ETH_ALEN] )
 {
 	char string_specs[256];
 	char *ptr, *limit;
 	char *to = string_specs;
 	uint32 addr;
 	uint32 len;
-	unsigned int vs;
 	int mac_set = 0;
-
-	/* Find the "vendor specific" capability. */
-
-	vs = pci_find_capability ( pci, 9 );
-	if ( vs == 0 ) {
-		DBG ( "no VS\n" );
-		return -ENOTSUP;
-	}
 
 	/* Locate the String specs in LANai SRAM. */
 
@@ -427,6 +466,7 @@ static int mac_address_from_string_specs ( struct pci_device *pci,
 	/* Copy in the string specs.  Use 32-bit reads for performance. */
 
 	if ( len > sizeof ( string_specs ) || ( len & 3 ) ) {
+		pci_write_config_byte ( pci, VS_MODE, 0 );
 		DBG ( "SS too big\n" );
 		return -ENOTSUP;
 	}
@@ -484,6 +524,247 @@ static int mac_address_from_string_specs ( struct pci_device *pci,
 }
 
 /****************************************************************
+ * NonVolatile Storage support
+ ****************************************************************/
+
+/*
+ * Fill a buffer with data read from nonvolatile storage.
+ *
+ * @v nvs	The NonVolatile Storage device to be read.
+ * @v addr      The first NonVolatile Storage address to be read.
+ * @v _buf	Pointer to the data buffer to be filled.
+ * @v len	The number of bytes to copy.
+ * @ret rc	0 on success, else nonzero.
+ */
+static int myri10ge_nvs_read ( struct nvs_device *nvs,
+			       unsigned int addr,
+			       void *_buf,
+			       size_t len )
+{
+	struct myri10ge_private *priv =
+		container_of (nvs, struct myri10ge_private, nvs);
+	struct pci_device *pci = myri10ge_pcidev ( myri10ge_netdev ( priv ) );
+	unsigned int vs = priv->pci_cap_vs;
+	unsigned char *buf = (unsigned char *) _buf;
+	unsigned int data;
+	unsigned int i, j;
+
+	DBGP ( "myri10ge_nvs_read\n" );
+
+	/* Issue the first read address. */
+
+	pci_write_config_byte ( pci, VS_EEPROM_READ_ADDR + 3, addr>>16 );
+	pci_write_config_byte ( pci, VS_EEPROM_READ_ADDR + 2, addr>>8 );
+	pci_write_config_byte ( pci, VS_EEPROM_READ_ADDR + 1, addr );
+	addr++;
+
+	/* Issue all the reads, and harvest the results every 4th issue. */
+
+	for ( i=0; i<len; ++i,addr++ ) {
+
+		/* Issue the next read address, updating only the
+		   bytes that need updating.  We always update the
+		   LSB, which triggers the read. */
+
+		if ( ( addr & 0xff ) == 0 ) {
+			if ( ( addr & 0xffff ) == 0 ) {
+				pci_write_config_byte ( pci,
+							VS_EEPROM_READ_ADDR + 3,
+							addr >> 16 );
+			}
+			pci_write_config_byte ( pci,
+					        VS_EEPROM_READ_ADDR + 2,
+						addr >> 8 );
+		}
+		pci_write_config_byte ( pci, VS_EEPROM_READ_ADDR + 1, addr );
+
+		/* If 4 data bytes are available, read them with a single read. */
+
+		if ( ( i & 3 ) == 3 ) {
+			pci_read_config_dword ( pci,
+						VS_EEPROM_READ_DATA,
+						&data );
+			for ( j=0; j<4; j++ ) {
+				buf[i-j] = data;
+				data >>= 8;
+			}
+		}
+	}
+
+	/* Harvest any remaining results. */
+
+	if ( ( i & 3 ) != 0 ) {
+		pci_read_config_dword ( pci, VS_EEPROM_READ_DATA, &data );
+		for ( j=1; j<=(i&3); j++ ) {
+			buf[i-j] = data;
+			data >>= 8;
+		}
+	}
+
+	DBGP_HDA ( addr - len, _buf, len );
+	return 0;
+}
+
+/*
+ * Write a buffer into nonvolatile storage.
+ *
+ * @v nvs	The NonVolatile Storage device to be written.
+ * @v address   The NonVolatile Storage address to be written.
+ * @v _buf	Pointer to the data to be written.
+ * @v len	Length of the buffer to be written.
+ * @ret rc	0 on success, else nonzero.
+ */
+static int myri10ge_nvs_write ( struct nvs_device *nvs,
+				unsigned int addr,
+				const void *_buf,
+				size_t len )
+{
+	struct myri10ge_private *priv =
+		container_of (nvs, struct myri10ge_private, nvs);
+	struct pci_device *pci = myri10ge_pcidev ( myri10ge_netdev ( priv ) );
+	unsigned int vs = priv->pci_cap_vs;
+	const unsigned char *buf = (const unsigned char *)_buf;
+	unsigned int i;
+	uint8 verify;
+
+	DBGP ( "nvs_write " );
+	DBGP_HDA ( addr, _buf, len );
+
+	/* Start erase of the NonVolatile Options block. */
+
+	DBGP ( "erasing " );
+	pci_write_config_dword ( pci, VS_EEPROM_WRITE, ( addr << 8 ) | 0xff );
+
+	/* Wait for erase to complete. */
+
+	DBGP ( "waiting " );
+	pci_read_config_byte ( pci, VS_EEPROM_READ_DATA, &verify );
+	while ( verify != 0xff ) {
+		pci_write_config_byte ( pci, VS_EEPROM_READ_ADDR + 1, addr );
+		pci_read_config_byte ( pci, VS_EEPROM_READ_DATA, &verify );
+	}
+
+	/* Write the data one byte at a time. */
+
+	DBGP ( "writing " );
+	pci_write_config_byte ( pci, VS_MODE, VS_MODE_EEPROM_STREAM_WRITE );
+	pci_write_config_dword ( pci, VS_ADDR, addr );
+	for (i=0; i<len; i++, addr++)
+		pci_write_config_byte ( pci, VS_DATA, buf[i] );
+	pci_write_config_dword ( pci, VS_ADDR, 0xffffffff );
+	pci_write_config_byte ( pci, VS_MODE, 0 );
+
+	DBGP ( "done\n" );
+	return 0;
+}
+
+/*
+ * Initialize NonVolatile storage support for a device.
+ *
+ * @v priv	Device private data for the device.
+ * @ret rc	0 on success, else an error code.
+ */
+
+static int myri10ge_nv_init ( struct myri10ge_private *priv )
+{
+	int rc;
+	struct myri10ge_eeprom_header
+	{
+		uint8 __jump[8];
+		uint32 eeprom_len;
+		uint32 eeprom_segment_len;
+		uint32 mcp1_offset;
+		uint32 mcp2_offset;
+		uint32 version;
+	} hdr;
+	uint32 mcp2_len;
+	unsigned int nvo_fragment_pos;
+
+	DBGP ( "myri10ge_nv_init\n" );
+
+	/* Read the EEPROM header, and byteswap the fields we will use.
+	   This is safe even though priv->nvs is not yet initialized. */
+
+	rc = myri10ge_nvs_read ( &priv->nvs, 0, &hdr, sizeof ( hdr ) );
+	if ( rc ) {
+		DBG ( "EEPROM header unreadable\n" );
+		return rc;
+	}
+	hdr.eeprom_len	       = ntohl ( hdr.eeprom_len );
+	hdr.eeprom_segment_len = ntohl ( hdr.eeprom_segment_len );
+	hdr.mcp2_offset	       = ntohl ( hdr.mcp2_offset );
+	hdr.version	       = ntohl ( hdr.version );
+	DBG2 ( "eelen:%xh seglen:%xh mcp2@%xh ver%d\n", hdr.eeprom_len,
+	       hdr.eeprom_segment_len, hdr.mcp2_offset, hdr.version );
+
+	/* If the firmware does not support EEPROM writes, simply return. */
+
+	if ( hdr.version < 1 ) {
+		DBG ( "No EEPROM write support\n" );
+		return 0;
+	}
+
+	/* Read the length of MCP2. */
+
+	rc = myri10ge_nvs_read ( &priv->nvs, hdr.mcp2_offset, &mcp2_len, 4 );
+	mcp2_len = ntohl ( mcp2_len );
+	DBG2 ( "mcp2len:%xh\n", mcp2_len );
+
+	/* Determine the position of the NonVolatile Options fragment and
+	   simply return if it overlaps other data. */
+
+	nvo_fragment_pos = hdr.eeprom_len -  hdr.eeprom_segment_len;
+	if ( hdr.mcp2_offset + mcp2_len > nvo_fragment_pos ) {
+		DBG ( "EEPROM full\n" );
+		return 0;
+	}
+
+	/* Initilize NonVolatile Storage state. */
+
+	priv->nvs.word_len_log2 = 0;
+	priv->nvs.size		= hdr.eeprom_len;
+	priv->nvs.block_size	= hdr.eeprom_segment_len;
+	priv->nvs.read		= myri10ge_nvs_read;
+	priv->nvs.write		= myri10ge_nvs_write;
+
+	/* Build the NonVolatile storage fragment list.  We would like
+	   to use the whole last EEPROM block for this, but we must
+	   reduce the block size lest malloc fail in
+	   src/core/nvo.o. */
+
+	priv->nvo_fragment[0].address = nvo_fragment_pos;
+	priv->nvo_fragment[0].len     = 0x200;
+
+	/* Register the NonVolatile Options storage. */
+
+	nvo_init ( &priv->nvo,
+		   &priv->nvs,
+		   priv->nvo_fragment,
+		   & myri10ge_netdev (priv) -> refcnt );
+	rc = register_nvo ( &priv->nvo,
+			    netdev_settings ( myri10ge_netdev ( priv ) ) );
+	if ( rc ) {
+		DBG ("register_nvo failed");
+		priv->nvo_fragment[0].len = 0;
+		return rc;
+	}
+
+	DBG2 ( "NVO supported\n" );
+	return 0;
+}
+
+void
+myri10ge_nv_fini ( struct myri10ge_private *priv )
+{
+	/* Simply return if nonvolatile access is not supported. */
+
+	if ( 0 == priv->nvo_fragment[0].len )
+		return;
+
+	unregister_nvo ( &priv->nvo );
+}
+
+/****************************************************************
  * iPXE PCI Device Driver API functions
  ****************************************************************/
 
@@ -532,9 +813,20 @@ static int myri10ge_pci_probe ( struct pci_device *pci,
 
 	myri10ge_net_irq ( netdev, 0 );
 
+	/* Find the PCI Vendor-Specific capability. */
+
+	priv->pci_cap_vs = pci_find_capability ( pci , PCI_CAP_ID_VNDR );
+	if ( 0 == priv->pci_cap_vs ) {
+		rc = -ENOTSUP;
+		dbg = "no_vs";
+		goto abort_with_netdev_init;
+	}
+
 	/* Read the NIC HW address. */
 
-	rc = mac_address_from_string_specs ( pci, netdev->hw_addr );
+	rc = mac_address_from_string_specs ( pci,
+					     priv->pci_cap_vs,
+					     netdev->hw_addr );
 	if ( rc ) {
 		dbg = "mac_from_ss";
 		goto abort_with_netdev_init;
@@ -554,10 +846,20 @@ static int myri10ge_pci_probe ( struct pci_device *pci,
 		goto abort_with_netdev_init;
 	}
 
+	/* Initialize NonVolatile Storage support. */
+
+	rc = myri10ge_nv_init ( priv );
+	if ( rc ) {
+		dbg = "myri10ge_nv_init";
+		goto abort_with_registered_netdev;
+	}
+
 	DBGP ( "done\n" );
 
 	return 0;
 
+abort_with_registered_netdev:
+	unregister_netdev ( netdev );
 abort_with_netdev_init:
 	netdev_nullify ( netdev );
 	netdev_put ( netdev );
@@ -580,6 +882,7 @@ static void myri10ge_pci_remove ( struct pci_device *pci )
 	DBGP ( "myri10ge_pci_remove\n" );
 	netdev = pci_get_drvdata ( pci );
 
+	myri10ge_nv_fini ( myri10ge_priv ( netdev ) );
 	unregister_netdev ( netdev );
 	netdev_nullify ( netdev );
 	netdev_put ( netdev );
