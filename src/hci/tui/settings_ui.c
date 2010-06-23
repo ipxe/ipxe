@@ -45,6 +45,7 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #define TITLE_ROW		1
 #define SETTINGS_LIST_ROW	3
 #define SETTINGS_LIST_COL	1
+#define SETTINGS_LIST_ROWS	16
 #define INFO_ROW		20
 #define ALERT_ROW		20
 #define INSTRUCTION_ROW		22
@@ -65,6 +66,8 @@ struct setting_row {
 struct setting_widget {
 	/** Settings block */
 	struct settings *settings;
+        /** Index of the first visible setting, for scrolling. */
+	unsigned int first_visible;
 	/** Configuration setting */
 	struct setting *setting;
 	/** Screen row */
@@ -84,15 +87,13 @@ struct setting_widget {
 
 static void load_setting ( struct setting_widget *widget ) __nonnull;
 static int save_setting ( struct setting_widget *widget ) __nonnull;
-static void init_setting ( struct setting_widget *widget,
-                           struct settings *settings,
-                           struct setting *setting,
-                           unsigned int row, unsigned int col ) __nonnull;
+static void init_widget ( struct setting_widget *widget,
+                           struct settings *settings ) __nonnull;
 static void draw_setting ( struct setting_widget *widget ) __nonnull;
 static int edit_setting ( struct setting_widget *widget, int key ) __nonnull;
-static void init_setting_index ( struct setting_widget *widget,
-                                 struct settings *settings,
-                                 unsigned int index ) __nonnull;
+static void select_setting ( struct setting_widget *widget,
+			     unsigned int index ) __nonnull;
+static void reveal ( struct setting_widget *widget, unsigned int n) __nonnull;
 static void vmsg ( unsigned int row, const char *fmt, va_list args ) __nonnull;
 static void msg ( unsigned int row, const char *fmt, ... ) __nonnull;
 static void valert ( const char *fmt, va_list args ) __nonnull;
@@ -135,28 +136,17 @@ static int save_setting ( struct setting_widget *widget ) {
 }
 
 /**
- * Initialise setting widget
+ * Initialise the scrolling setting widget, drawing initial display.
  *
  * @v widget		Setting widget
  * @v settings		Settings block
- * @v setting		Configuration setting
- * @v row		Screen row
- * @v col		Screen column
  */
-static void init_setting ( struct setting_widget *widget,
-			   struct settings *settings,
-			   struct setting *setting,
-			   unsigned int row, unsigned int col ) {
-
-	/* Initialise widget structure */
+static void init_widget ( struct setting_widget *widget,
+			  struct settings *settings ) {
 	memset ( widget, 0, sizeof ( *widget ) );
 	widget->settings = settings;
-	widget->setting = setting;
-	widget->row = row;
-	widget->col = col;
-
-	/* Read current setting value */
-	load_setting ( widget );
+	widget->first_visible = SETTINGS_LIST_ROWS;
+	reveal ( widget, 0 );
 }
 
 /**
@@ -212,19 +202,25 @@ static int edit_setting ( struct setting_widget *widget, int key ) {
 }
 
 /**
- * Initialise setting widget by index
+ * Select a setting for display updates, by index.
  *
  * @v widget		Setting widget
  * @v settings		Settings block
  * @v index		Index of setting with settings list
  */
-static void init_setting_index ( struct setting_widget *widget,
-				 struct settings *settings,
-				 unsigned int index ) {
+static void select_setting ( struct setting_widget *widget,
+			     unsigned int index ) {
 	struct setting *all_settings = table_start ( SETTINGS );
+	unsigned int skip = offsetof ( struct setting_widget, setting );
 
-	init_setting ( widget, settings, &all_settings[index],
-		       ( SETTINGS_LIST_ROW + index ), SETTINGS_LIST_COL );
+	/* Reset the widget, preserving static state. */
+	memset ( ( char * ) widget + skip, 0, sizeof ( *widget ) - skip );
+	widget->setting = &all_settings[index];
+	widget->row = SETTINGS_LIST_ROW + index - widget->first_visible;
+	widget->col = SETTINGS_LIST_COL;
+
+	/* Read current setting value */
+	load_setting ( widget );
 }
 
 /**
@@ -334,22 +330,65 @@ static void draw_instruction_row ( int editing ) {
 	}
 }
 
+/**
+ * Reveal a setting by index: Scroll the setting list to reveal the
+ * specified setting.
+ *
+ * @widget	The main loop's display widget.
+ * @n		The index of the setting to reveal.
+ */
+static void reveal ( struct setting_widget *widget, unsigned int n)
+{
+	unsigned int i;
+
+	/* Simply return if setting N is already on-screen. */
+	if ( n - widget->first_visible < SETTINGS_LIST_ROWS )
+		return;
+	
+	/* Jump scroll to make the specified setting visible. */
+	while ( widget->first_visible < n )
+		widget->first_visible += SETTINGS_LIST_ROWS;
+	while ( widget->first_visible > n )
+		widget->first_visible -= SETTINGS_LIST_ROWS;
+	
+	/* Draw elipses before and/or after the settings list to
+	   represent any invisible settings. */
+	mvaddstr ( SETTINGS_LIST_ROW - 1,
+		   SETTINGS_LIST_COL + 1,
+		   widget->first_visible > 0 ? "..." : "   " );
+	mvaddstr ( SETTINGS_LIST_ROW + SETTINGS_LIST_ROWS,
+		   SETTINGS_LIST_COL + 1,
+		   ( widget->first_visible + SETTINGS_LIST_ROWS < NUM_SETTINGS
+		     ? "..."
+		     : "   " ) );
+	
+	/* Draw visible settings. */
+	for ( i = 0; i < SETTINGS_LIST_ROWS; i++ ) {
+		if ( widget->first_visible + i < NUM_SETTINGS ) {
+			select_setting ( widget, widget->first_visible + i );
+			draw_setting ( widget );
+		} else {
+			clearmsg ( SETTINGS_LIST_ROW + i );
+		}
+	}
+
+	/* Set the widget to the current row, which will be redrawn
+	   appropriately by the main loop. */
+	select_setting ( widget, n );
+}
+
 static int main_loop ( struct settings *settings ) {
 	struct setting_widget widget;
 	unsigned int current = 0;
 	unsigned int next;
-	int i;
 	int key;
 	int rc;
 
 	/* Print initial screen content */
 	draw_title_row();
 	color_set ( CPAIR_NORMAL, NULL );
-	for ( i = ( NUM_SETTINGS - 1 ) ; i >= 0 ; i-- ) {
-		init_setting_index ( &widget, settings, i );
-		draw_setting ( &widget );
-	}
-
+	init_widget ( &widget, settings );
+	
 	while ( 1 ) {
 		/* Redraw information and instruction rows */
 		draw_info_row ( widget.setting );
@@ -385,11 +424,11 @@ static int main_loop ( struct settings *settings ) {
 			switch ( key ) {
 			case KEY_DOWN:
 				if ( next < ( NUM_SETTINGS - 1 ) )
-					next++;
+					reveal ( &widget, ++next );
 				break;
 			case KEY_UP:
 				if ( next > 0 )
-					next--;
+					reveal ( &widget, --next ) ;
 				break;
 			case CTRL_X:
 				return 0;
@@ -399,7 +438,7 @@ static int main_loop ( struct settings *settings ) {
 			}	
 			if ( next != current ) {
 				draw_setting ( &widget );
-				init_setting_index ( &widget, settings, next );
+				select_setting ( &widget, next );
 				current = next;
 			}
 		}
