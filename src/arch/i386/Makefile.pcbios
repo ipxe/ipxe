@@ -23,14 +23,14 @@ MEDIA		+= raw
 
 # Padding rules
 #
-PAD_rom		= $(PADIMG) --blksize=512 --byte=0xff $@
+PAD_rom		= $(PERL) $(PADIMG) --blksize=512 --byte=0xff $@
 PAD_mrom	= $(PAD_rom)
-PAD_dsk		= $(PADIMG) --blksize=512 $@
-PAD_hd		= $(PADIMG) --blksize=32768 $@
+PAD_dsk		= $(PERL) $(PADIMG) --blksize=512 $@
+PAD_hd		= $(PERL) $(PADIMG) --blksize=32768 $@
 
 # Finalisation rules
 #
-FINALISE_rom	= $(FIXROM) $@
+FINALISE_rom	= $(PERL) $(FIXROM) $@
 FINALISE_mrom	= $(FINALISE_rom)
 
 # rule to make a non-emulation ISO boot image
