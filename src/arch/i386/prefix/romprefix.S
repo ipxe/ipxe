@@ -14,7 +14,6 @@ FILE_LICENCE ( GPL2_OR_LATER )
 #define PMM_SIGNATURE ( '$' + ( 'P' << 8 ) + ( 'M' << 16 ) + ( 'M' << 24 ) )
 #define PCI_SIGNATURE ( 'P' + ( 'C' << 8 ) + ( 'I' << 16 ) + ( ' ' << 24 ) )
 #define STACK_MAGIC ( 'L' + ( 'R' << 8 ) + ( 'E' << 16 ) + ( 'T' << 24 ) )
-#define PNP_GET_BBS_VERSION 0x60
 #define PMM_ALLOCATE 0x0000
 #define PMM_FIND 0x0001
 #define PMM_HANDLE_BASE ( ( ( 'F' - 'A' + 1 ) << 26 ) + \
@@ -283,17 +282,8 @@ pnp_scan:
 	movw	$init_message_pnp, %si
 	xorw	%di, %di
 	call	print_message
-	/* Check for BBS */
-	pushw	%es:0x1b	/* Real-mode data segment */
-	pushw	%ds		/* &(bbs_version) */
-	pushw	$bbs_version
-	pushw	$PNP_GET_BBS_VERSION
-	lcall	*%es:0xd
-	addw	$8, %sp
-	testw	%ax, %ax
-	je	got_bbs
-no_pnp:	/* Not PnP-compliant - therefore cannot be BBS-compliant */
-no_bbs:	/* Not BBS-compliant - must hook INT 19 */
+	jmp	pnp_done
+no_pnp:	/* Not PnP-compliant - hook INT 19 */
 	movw	$init_message_int19, %si
 	xorw	%di, %di
 	call	print_message
@@ -304,12 +294,7 @@ no_bbs:	/* Not BBS-compliant - must hook INT 19 */
 	pushw	%gs /* %gs contains runtime %cs */
 	pushw	$int19_entry
 	popl	%es:( 0x19 * 4 )
-	jmp	bbs_done
-got_bbs: /* BBS compliant - no need to hook INT 19 */
-	movw	$init_message_bbs, %si
-	xorw	%di, %di
-	call	print_message
-bbs_done:
+pnp_done:
 
 	/* Check for PMM */
 	movw	$( 0xe000 - 1 ), %bx
@@ -545,9 +530,6 @@ init_message_pci:
 init_message_pnp:
 	.asciz	" PnP"
 	.size	init_message_pnp, . - init_message_pnp
-init_message_bbs:
-	.asciz	" BBS"
-	.size	init_message_bbs, . - init_message_bbs
 init_message_pmm:
 	.asciz	" PMM"
 	.size	init_message_pmm, . - init_message_pmm
@@ -616,14 +598,6 @@ shrunk_rom_size:
 decompress_to:
 	.long	0
 	.size	decompress_to, . - decompress_to
-
-/* BBS version
- *
- * Filled in by BBS BIOS.  We ignore the value.
- */
-bbs_version:
-	.word	0
-	.size	bbs_version, . - bbs_version
 
 /* Boot Execution Vector entry point
  *
