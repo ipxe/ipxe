@@ -513,7 +513,7 @@ static void
 pcnet32_setup_probe_phy ( struct pcnet32_private *priv )
 {
 	unsigned long ioaddr = priv->pci_dev->ioaddr;
-	char phycount;
+	unsigned int phycount = 0;
 	int phy_id;
 	int i;
 
