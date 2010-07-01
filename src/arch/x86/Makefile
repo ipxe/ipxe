@@ -10,3 +10,6 @@ SRCDIRS		+= arch/x86/prefix
 
 # breaks building some of the linux-related objects
 CFLAGS		+= -Ulinux
+
+# disable valgrind
+CFLAGS		+= -DNVALGRIND

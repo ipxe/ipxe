@@ -42,9 +42,12 @@ SECTIONS {
 	/*
 	 * The data section
 	 *
+	 * Adjust the address for the data segment.  We want to adjust up to
+	 * the same address within the page on the next page up.
 	 */
 
-	. = ALIGN ( _max_align );
+	. = ALIGN (CONSTANT (MAXPAGESIZE)) - ((CONSTANT (MAXPAGESIZE) - .) & (CONSTANT (MAXPAGESIZE) - 1));
+	. = DATA_SEGMENT_ALIGN (CONSTANT (MAXPAGESIZE), CONSTANT (COMMONPAGESIZE));
 	.data : {
 		_data = .;
 		*(.data)
@@ -91,8 +94,6 @@ SECTIONS {
 		*(.comment.*)
 		*(.note)
 		*(.note.*)
-		*(.eh_frame)
-		*(.eh_frame.*)
 		*(.rel)
 		*(.rel.*)
 		*(.discard)

@@ -1,5 +1,8 @@
 MEDIA = linux
 
+# enable valgrind
+CFLAGS += -UNVALGRIND
+
 INCDIRS += arch/x86/include/linux
 SRCDIRS += interface/linux
 SRCDIRS += drivers/linux
