@@ -14,7 +14,7 @@
 /* We've given up on this device. */
 #define VIRTIO_CONFIG_S_FAILED          0x80
 
-#define MAX_QUEUE_NUM      (512)
+#define MAX_QUEUE_NUM      (256)
 
 #define VRING_DESC_F_NEXT  1
 #define VRING_DESC_F_WRITE 2
@@ -71,7 +71,7 @@ struct vring_virtqueue {
    struct vring vring;
    u16 free_head;
    u16 last_used_idx;
-   u16 vdata[MAX_QUEUE_NUM];
+   void *vdata[MAX_QUEUE_NUM];
    /* PCI */
    int queue_index;
 };
@@ -133,10 +133,10 @@ static inline int vring_more_used(struct vring_virtqueue *vq)
 }
 
 void vring_detach(struct vring_virtqueue *vq, unsigned int head);
-int vring_get_buf(struct vring_virtqueue *vq, unsigned int *len);
+void *vring_get_buf(struct vring_virtqueue *vq, unsigned int *len);
 void vring_add_buf(struct vring_virtqueue *vq, struct vring_list list[],
                    unsigned int out, unsigned int in,
-                   int index, int num_added);
+                   void *index, int num_added);
 void vring_kick(unsigned int ioaddr, struct vring_virtqueue *vq, int num_added);
 
 #endif /* _VIRTIO_RING_H_ */

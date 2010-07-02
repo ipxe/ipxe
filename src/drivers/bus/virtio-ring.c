@@ -57,12 +57,12 @@ void vring_detach(struct vring_virtqueue *vq, unsigned int head)
  *
  */
 
-int vring_get_buf(struct vring_virtqueue *vq, unsigned int *len)
+void *vring_get_buf(struct vring_virtqueue *vq, unsigned int *len)
 {
    struct vring *vr = &vq->vring;
    struct vring_used_elem *elem;
    u32 id;
-   int ret;
+   void *opaque;
 
    BUG_ON(!vring_more_used(vq));
 
@@ -72,19 +72,19 @@ int vring_get_buf(struct vring_virtqueue *vq, unsigned int *len)
    if (len != NULL)
            *len = elem->len;
 
-   ret = vq->vdata[id];
+   opaque = vq->vdata[id];
 
    vring_detach(vq, id);
 
    vq->last_used_idx++;
 
-   return ret;
+   return opaque;
 }
 
 void vring_add_buf(struct vring_virtqueue *vq,
 		   struct vring_list list[],
 		   unsigned int out, unsigned int in,
-		   int index, int num_added)
+		   void *opaque, int num_added)
 {
    struct vring *vr = &vq->vring;
    int i, avail, head, prev;
@@ -113,7 +113,7 @@ void vring_add_buf(struct vring_virtqueue *vq,
 
    vq->free_head = i;
 
-   vq->vdata[head] = index;
+   vq->vdata[head] = opaque;
 
    avail = (vr->avail->idx + num_added) % vr->num;
    vr->avail->ring[avail] = head;

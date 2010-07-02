@@ -126,6 +126,7 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #define ERRFILE_snpnet		     ( ERRFILE_DRIVER | 0x00590000 )
 #define ERRFILE_snponly		     ( ERRFILE_DRIVER | 0x005a0000 )
 #define ERRFILE_jme		     ( ERRFILE_DRIVER | 0x005b0000 )
+#define ERRFILE_virtio_net	     ( ERRFILE_DRIVER | 0x005c0000 )
 
 #define ERRFILE_scsi		     ( ERRFILE_DRIVER | 0x00700000 )
 #define ERRFILE_arbel		     ( ERRFILE_DRIVER | 0x00710000 )
