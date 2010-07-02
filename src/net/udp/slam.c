@@ -462,7 +462,7 @@ static int slam_pull_header ( struct slam_request *slam,
 	}
 
 	/* Notify recipient of file size */
-	xfer_seek ( &slam->xfer, slam->total_bytes, SEEK_SET );
+	xfer_seek ( &slam->xfer, slam->total_bytes );
 
 	return 0;
 }
@@ -526,7 +526,7 @@ static int slam_mc_socket_deliver ( struct slam_request *slam,
 
 	/* Pass to recipient */
 	memset ( &meta, 0, sizeof ( meta ) );
-	meta.whence = SEEK_SET;
+	meta.flags = XFER_FL_ABS_OFFSET;
 	meta.offset = ( packet * slam->block_size );
 	if ( ( rc = xfer_deliver ( &slam->xfer, iobuf, &meta ) ) != 0 )
 		goto err;

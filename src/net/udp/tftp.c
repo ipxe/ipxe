@@ -269,8 +269,8 @@ static int tftp_presize ( struct tftp_request *tftp, size_t filesize ) {
 	tftp->filesize = filesize;
 
 	/* Notify recipient of file size */
-	xfer_seek ( &tftp->xfer, filesize, SEEK_SET );
-	xfer_seek ( &tftp->xfer, 0, SEEK_SET );
+	xfer_seek ( &tftp->xfer, filesize );
+	xfer_seek ( &tftp->xfer, 0 );
 
 	/* Calculate expected number of blocks.  Note that files whose
 	 * length is an exact multiple of the blocksize will have a
@@ -854,7 +854,7 @@ static int tftp_rx_data ( struct tftp_request *tftp,
 
 	/* Deliver data */
 	memset ( &meta, 0, sizeof ( meta ) );
-	meta.whence = SEEK_SET;
+	meta.flags = XFER_FL_ABS_OFFSET;
 	meta.offset = offset;
 	if ( ( rc = xfer_deliver ( &tftp->xfer, iob_disown ( iobuf ),
 				   &meta ) ) != 0 ) {

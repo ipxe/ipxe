@@ -105,7 +105,7 @@ static int posix_file_xfer_deliver ( struct posix_file *file,
 				     struct xfer_metadata *meta ) {
 
 	/* Keep track of file position solely for the filesize */
-	if ( meta->whence != SEEK_CUR )
+	if ( meta->flags & XFER_FL_ABS_OFFSET )
 		file->pos = 0;
 	file->pos += meta->offset;
 	if ( file->filesize < file->pos )

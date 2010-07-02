@@ -276,18 +276,17 @@ int xfer_printf ( struct interface *intf, const char *format, ... ) {
  *
  * @v intf		Data transfer interface
  * @v offset		Offset to new position
- * @v whence		Basis for new position
  * @ret rc		Return status code
  */
-int xfer_seek ( struct interface *intf, off_t offset, int whence ) {
+int xfer_seek ( struct interface *intf, off_t offset ) {
 	struct io_buffer *iobuf;
 	struct xfer_metadata meta = {
+		.flags = XFER_FL_ABS_OFFSET,
 		.offset = offset,
-		.whence = whence,
 	};
 
-	DBGC ( INTF_COL ( intf ), "INTF " INTF_FMT " seek %s+%ld\n",
-	       INTF_DBG ( intf ), whence_text ( whence ), offset );
+	DBGC ( INTF_COL ( intf ), "INTF " INTF_FMT " seek to %ld\n",
+	       INTF_DBG ( intf ), offset );
 
 	/* Allocate and send a zero-length data buffer */
 	iobuf = xfer_alloc_iob ( intf, 0 );

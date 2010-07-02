@@ -85,7 +85,7 @@ static int pxe_tftp_xfer_deliver ( struct pxe_tftp_connection *pxe_tftp,
 	int rc = 0;
 
 	/* Calculate new buffer position */
-	if ( meta->whence != SEEK_CUR )
+	if ( meta->flags & XFER_FL_ABS_OFFSET )
 		pxe_tftp->offset = 0;
 	pxe_tftp->offset += meta->offset;
 

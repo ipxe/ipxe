@@ -18,21 +18,23 @@ struct io_buffer;
 struct sockaddr;
 struct net_device;
 
-/** Basis positions for seek() events */
-enum seek_whence {
-	SEEK_CUR = 0,
-	SEEK_SET,
-};
-
 /** Data transfer metadata */
 struct xfer_metadata {
-	/** Position of data within stream */
-	off_t offset;
-	/** Basis for data position
+	/** Flags
 	 *
-	 * Must be one of @c SEEK_CUR or @c SEEK_SET.
+	 * This is the bitwise OR of zero or more @c XFER_FL_XXX
+	 * constants.
 	 */
-	int whence;
+	unsigned int flags;
+	/** Offset of data within stream
+	 *
+	 * This is an absolute offset if the @c XFER_FL_ABS_OFFSET
+	 * flag is set, otherwise a relative offset.  (A freshly
+	 * zeroed @c xfer_metadata structure therefore represents a
+	 * relative offset of zero, i.e. no offset from the current
+	 * position.)
+	 */
+	off_t offset;
 	/** Source socket address, or NULL */
 	struct sockaddr *src;
 	/** Destination socket address, or NULL */
@@ -41,19 +43,8 @@ struct xfer_metadata {
 	struct net_device *netdev;
 };
 
-/**
- * Describe seek basis
- *
- * @v whence		Basis for new position
- */
-static inline __attribute__ (( always_inline )) const char *
-whence_text ( int whence ) {
-	switch ( whence ) {
-	case SEEK_CUR:	return "CUR";
-	case SEEK_SET:	return "SET";
-	default:	return "INVALID";
-	}
-}
+/** Offset is absolute */
+#define XFER_FL_ABS_OFFSET 0x0001
 
 /* Data transfer interface operations */
 
@@ -89,6 +80,6 @@ extern int xfer_vprintf ( struct interface *intf,
 			  const char *format, va_list args );
 extern int __attribute__ (( format ( printf, 2, 3 ) ))
 xfer_printf ( struct interface *intf, const char *format, ... );
-extern int xfer_seek ( struct interface *intf, off_t offset, int whence );
+extern int xfer_seek ( struct interface *intf, off_t offset );
 
 #endif /* _IPXE_XFER_H */

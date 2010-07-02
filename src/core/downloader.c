@@ -160,7 +160,7 @@ static int downloader_xfer_deliver ( struct downloader *downloader,
 	int rc;
 
 	/* Calculate new buffer position */
-	if ( meta->whence != SEEK_CUR )
+	if ( meta->flags & XFER_FL_ABS_OFFSET )
 		downloader->pos = 0;
 	downloader->pos += meta->offset;
 

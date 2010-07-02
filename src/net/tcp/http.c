@@ -223,8 +223,8 @@ static int http_rx_content_length ( struct http_request *http,
 	}
 
 	/* Use seek() to notify recipient of filesize */
-	xfer_seek ( &http->xfer, http->content_length, SEEK_SET );
-	xfer_seek ( &http->xfer, 0, SEEK_SET );
+	xfer_seek ( &http->xfer, http->content_length );
+	xfer_seek ( &http->xfer, 0 );
 
 	return 0;
 }
