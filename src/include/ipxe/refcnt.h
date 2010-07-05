@@ -69,10 +69,10 @@ ref_init ( struct refcnt *refcnt,
 /**
  * Initialise a static reference counter
  *
- * @v free		Free containing object
+ * @v free_fn		Free containing object
  */
-#define REF_INIT( free ) {						\
-		.free = free,						\
+#define REF_INIT( free_fn ) {						\
+		.free = free_fn,					\
 	}
 
 extern struct refcnt * ref_get ( struct refcnt *refcnt );
