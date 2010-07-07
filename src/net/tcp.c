@@ -900,6 +900,7 @@ static int tcp_rx ( struct io_buffer *iobuf,
 	uint32_t seq;
 	uint32_t ack;
 	uint32_t win;
+	uint32_t ts_recent;
 	unsigned int flags;
 	size_t len;
 	int rc;
@@ -941,6 +942,8 @@ static int tcp_rx ( struct io_buffer *iobuf,
 	flags = tcphdr->flags;
 	tcp_rx_opts ( tcp, ( ( ( void * ) tcphdr ) + sizeof ( *tcphdr ) ),
 		      ( hlen - sizeof ( *tcphdr ) ), &options );
+	ts_recent = ( options.tsopt ?
+		      ntohl ( options.tsopt->tsval ) : tcp->ts_recent );
 	iob_pull ( iobuf, hlen );
 	len = iob_len ( iobuf );
 
@@ -981,7 +984,7 @@ static int tcp_rx ( struct io_buffer *iobuf,
 	}
 
 	/* Handle new data, if any */
-	tcp_rx_data ( tcp, seq, iobuf );
+	tcp_rx_data ( tcp, seq, iob_disown ( iobuf ) );
 	seq += len;
 
 	/* Handle FIN, if present */
@@ -990,9 +993,9 @@ static int tcp_rx ( struct io_buffer *iobuf,
 		seq++;
 	}
 
-	/* Update timestamp, if present and applicable */
-	if ( ( seq == tcp->rcv_ack ) && options.tsopt )
-		tcp->ts_recent = ntohl ( options.tsopt->tsval );
+	/* Update timestamp, if applicable */
+	if ( seq == tcp->rcv_ack )
+		tcp->ts_recent = ts_recent;
 
 	/* Dump out any state change as a result of the received packet */
 	tcp_dump_state ( tcp );
