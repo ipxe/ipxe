@@ -188,3 +188,20 @@ int __asmcall com32_cfarcall ( uint32_t proc, physaddr_t stack, size_t stacksz )
 
 	return eax;
 }
+
+/**
+ * IRQ handler
+ */
+void __asmcall com32_irq ( uint32_t vector ) {
+	uint32_t *ivt_entry = phys_to_virt( vector * 4 );
+
+	__asm__ __volatile__ (
+		REAL_CODE ( "pushfw\n\t"
+			    "pushw %%cs\n\t"
+			    "pushw $com32_irq_return\n\t"
+			    "pushl %0\n\t"
+			    "lret\n"
+			    "com32_irq_return:\n\t" )
+		: /* no outputs */
+		: "r" ( *ivt_entry ) );
+}
