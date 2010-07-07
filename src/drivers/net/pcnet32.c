@@ -74,7 +74,7 @@ static void pcnet32_wio_write_rap ( unsigned long addr , u16 val )
 
 static void pcnet32_wio_reset ( unsigned long addr )
 {
-	inw ( addr + PCNET32_DWIO_RESET );
+	inw ( addr + PCNET32_WIO_RESET );
 }
 
 static int pcnet32_wio_check ( unsigned long addr )
