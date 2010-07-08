@@ -47,6 +47,7 @@ struct list_head images = LIST_HEAD_INIT ( images );
 static void free_image ( struct refcnt *refcnt ) {
 	struct image *image = container_of ( refcnt, struct image, refcnt );
 
+	free ( image->cmdline );
 	uri_put ( image->uri );
 	ufree ( image->data );
 	image_put ( image->replacement );
