@@ -473,8 +473,8 @@ static int tcp_xmit ( struct tcp_connection *tcp, int force_send ) {
 		memset ( tsopt->nop, TCP_OPTION_NOP, sizeof ( tsopt->nop ) );
 		tsopt->tsopt.kind = TCP_OPTION_TS;
 		tsopt->tsopt.length = sizeof ( tsopt->tsopt );
-		tsopt->tsopt.tsval = ntohl ( currticks() );
-		tsopt->tsopt.tsecr = ntohl ( tcp->ts_recent );
+		tsopt->tsopt.tsval = htonl ( currticks() );
+		tsopt->tsopt.tsecr = htonl ( tcp->ts_recent );
 	}
 	if ( ! ( flags & TCP_SYN ) )
 		flags |= TCP_PSH;
