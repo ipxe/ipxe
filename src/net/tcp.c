@@ -37,7 +37,7 @@ struct tcp_connection {
 
 	/** Remote socket address */
 	struct sockaddr_tcpip peer;
-	/** Local port, in network byte order */
+	/** Local port */
 	unsigned int local_port;
 
 	/** Current TCP state */
@@ -166,7 +166,7 @@ tcp_dump_flags ( struct tcp_connection *tcp, unsigned int flags ) {
  * Bind TCP connection to local port
  *
  * @v tcp		TCP connection
- * @v port		Local port number, in network-endian order
+ * @v port		Local port number
  * @ret rc		Return status code
  *
  * If the port is 0, the connection is assigned an available port
@@ -182,7 +182,7 @@ static int tcp_bind ( struct tcp_connection *tcp, unsigned int port ) {
 			try_port++;
 			if ( try_port < 1024 )
 				continue;
-			if ( tcp_bind ( tcp, htons ( try_port ) ) == 0 )
+			if ( tcp_bind ( tcp, try_port ) == 0 )
 				return 0;
 		}
 		DBGC ( tcp, "TCP %p could not bind: no free ports\n", tcp );
@@ -193,13 +193,13 @@ static int tcp_bind ( struct tcp_connection *tcp, unsigned int port ) {
 	list_for_each_entry ( existing, &tcp_conns, list ) {
 		if ( existing->local_port == port ) {
 			DBGC ( tcp, "TCP %p could not bind: port %d in use\n",
-			       tcp, ntohs ( port ) );
+			       tcp, port );
 			return -EADDRINUSE;
 		}
 	}
 	tcp->local_port = port;
 
-	DBGC ( tcp, "TCP %p bound to port %d\n", tcp, ntohs ( port ) );
+	DBGC ( tcp, "TCP %p bound to port %d\n", tcp, port );
 	return 0;
 }
 
@@ -235,7 +235,7 @@ static int tcp_open ( struct interface *xfer, struct sockaddr *peer,
 	memcpy ( &tcp->peer, st_peer, sizeof ( tcp->peer ) );
 
 	/* Bind to local port */
-	bind_port = ( st_local ? st_local->st_port : 0 );
+	bind_port = ( st_local ? ntohs ( st_local->st_port ) : 0 );
 	if ( ( rc = tcp_bind ( tcp, bind_port ) ) != 0 )
 		goto err;
 
@@ -480,7 +480,7 @@ static int tcp_xmit ( struct tcp_connection *tcp, int force_send ) {
 		flags |= TCP_PSH;
 	tcphdr = iob_push ( iobuf, sizeof ( *tcphdr ) );
 	memset ( tcphdr, 0, sizeof ( *tcphdr ) );
-	tcphdr->src = tcp->local_port;
+	tcphdr->src = htons ( tcp->local_port );
 	tcphdr->dest = tcp->peer.st_port;
 	tcphdr->seq = htonl ( tcp->snd_seq );
 	tcphdr->ack = htonl ( tcp->rcv_ack );
@@ -612,7 +612,7 @@ static int tcp_xmit_reset ( struct tcp_connection *tcp,
 /**
  * Identify TCP connection by local port number
  *
- * @v local_port	Local port (in network-endian order)
+ * @v local_port	Local port
  * @ret tcp		TCP connection, or NULL
  */
 static struct tcp_connection * tcp_demux ( unsigned int local_port ) {
@@ -935,7 +935,7 @@ static int tcp_rx ( struct io_buffer *iobuf,
 	}
 	
 	/* Parse parameters from header and strip header */
-	tcp = tcp_demux ( tcphdr->dest );
+	tcp = tcp_demux ( ntohs ( tcphdr->dest ) );
 	start_seq = seq = ntohl ( tcphdr->seq );
 	ack = ntohl ( tcphdr->ack );
 	win = ntohs ( tcphdr->win );
