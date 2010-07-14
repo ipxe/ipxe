@@ -48,9 +48,6 @@ FILE_LICENCE ( GPL_ANY );
 #include <ipxe/pci.h>
 #include <ipxe/ethernet.h>
 
-#undef DAVICOM_DEBUG
-#undef DAVICOM_DEBUG_WHERE
-
 #define TX_TIME_OUT       2*TICKS_PER_SEC
 
 /* Register offsets for davicom device */
@@ -163,9 +160,6 @@ static void davicom_transmit(struct nic *nic, const char *d, unsigned int t,
 			   unsigned int s, const char *p);
 static int davicom_poll(struct nic *nic, int retrieve);
 static void davicom_disable(struct nic *nic);
-#ifdef	DAVICOM_DEBUG
-static void davicom_more(void);
-#endif /* DAVICOM_DEBUG */
 static void davicom_wait(unsigned int nticks);
 static int phy_read(int);
 static void phy_write(int, u16);
@@ -179,20 +173,9 @@ static void davicom_media_chk(struct nic *);
 /*********************************************************************/
 static inline void whereami(const char *str)
 {
-  printf("%s\n", str);
+  DBGP("%s\n", str);
   /* sleep(2); */
 }
-
-#ifdef	DAVICOM_DEBUG
-static void davicom_more()
-{
-  printf("\n\n-- more --");
-  while (!iskey())
-    /* wait */;
-  getchar();
-  printf("\n\n");
-}
-#endif /* DAVICOM_DEBUG */
 
 static void davicom_wait(unsigned int nticks)
 {
@@ -519,16 +502,14 @@ static void davicom_reset(struct nic *nic)
     /* wait */ ;
 
   if (currticks() >= to) {
-    printf ("TX Setup Timeout!\n");
+    DBG ("TX Setup Timeout!\n");
   }
   /* Point to next TX descriptor */
  TxPtr = (++TxPtr >= NTXD) ? 0:TxPtr;	/* Sten 10/9 */
 
-#ifdef DAVICOM_DEBUG
-  printf("txd.status = %X\n", txd.status);
-  printf("ticks = %d\n", currticks() - (to - TX_TIME_OUT));
-  davicom_more();
-#endif
+  DBG("txd.status = %lX\n", txd[TxPtr].status);
+  DBG("ticks = %ld\n", currticks() - (to - TX_TIME_OUT));
+  DBG_MORE();
 
   /* enable RX */
   outl(inl(ioaddr + CSR6) | 0x00000002, ioaddr + CSR6);
@@ -570,7 +551,7 @@ static void davicom_transmit(struct nic *nic, const char *d, unsigned int t,
     /* wait */ ;
 
   if (currticks() >= to) {
-    printf ("TX Timeout!\n");
+    DBG ("TX Timeout!\n");
   }
  
   /* Point to next TX descriptor */
