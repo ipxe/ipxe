@@ -382,11 +382,11 @@ endif
 #
 FNREC_STATE	:= $(BIN)/.fnrec.state
 ifeq ($(wildcard $(FNREC_STATE)),)
-FNREC_STATE_OLD := <invalid>
+FNREC_OLD	:= <invalid>
 else
-FNREC_STATE_OLD	:= $(shell cat $(FNREC_STATE))
+FNREC_OLD	:= $(shell cat $(FNREC_STATE))
 endif
-ifeq ($(FNREC_STATE_OLD),$(FNREC))
+ifeq ($(FNREC_OLD),$(FNREC))
 $(FNREC_STATE) :
 else
 $(FNREC_STATE) : clean
@@ -521,11 +521,11 @@ roms :
 #
 EMBEDDED_LIST	:= $(BIN)/.embedded.list
 ifeq ($(wildcard $(EMBEDDED_LIST)),)
-EMBEDDED_LIST_IMAGE := <invalid>
+EMBEDDED_IMAGE_OLD := <invalid>
 else
-EMBEDDED_LIST_IMAGE := $(shell cat $(EMBEDDED_LIST))
+EMBEDDED_IMAGE_OLD := $(shell cat $(EMBEDDED_LIST))
 endif
-ifneq ($(EMBEDDED_LIST_IMAGE),$(EMBEDDED_IMAGE))
+ifneq ($(EMBEDDED_IMAGE_OLD),$(EMBEDDED_IMAGE))
 $(shell $(ECHO) "$(EMBEDDED_IMAGE)" > $(EMBEDDED_LIST))
 endif
 
@@ -665,11 +665,11 @@ $(BIN)/%.info :
 #
 BLIB_LIST	:= $(BIN)/.blib.list
 ifeq ($(wildcard $(BLIB_LIST)),)
-BLIB_LIST_OBJS	:= <invalid>
+BLIB_OBJS_OLD	:= <invalid>
 else
-BLIB_LIST_OBJS	:= $(shell cat $(BLIB_LIST))
+BLIB_OBJS_OLD	:= $(shell cat $(BLIB_LIST))
 endif
-ifneq ($(BLIB_LIST_OBJS),$(BLIB_OBJS))
+ifneq ($(BLIB_OBJS_OLD),$(BLIB_OBJS))
 $(shell $(ECHO) "$(BLIB_OBJS)" > $(BLIB_LIST))
 endif
 
