@@ -459,15 +459,22 @@ int register_settings ( struct settings *settings, struct settings *parent ) {
  * @v settings		Settings block
  */
 void unregister_settings ( struct settings *settings ) {
+	struct settings *child;
+	struct settings *tmp;
+
+	/* Unregister child settings */
+	list_for_each_entry_safe ( child, tmp, &settings->children, siblings ) {
+		unregister_settings ( child );
+	}
 
 	DBGC ( settings, "Settings %p (\"%s\") unregistered\n",
 	       settings, settings_name ( settings ) );
 
 	/* Remove from list of settings */
-	ref_put ( settings->refcnt );
 	ref_put ( settings->parent->refcnt );
 	settings->parent = NULL;
 	list_del ( &settings->siblings );
+	ref_put ( settings->refcnt );
 
 	/* Apply potentially-updated settings */
 	apply_settings();
