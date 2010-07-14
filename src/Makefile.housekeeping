@@ -466,11 +466,9 @@ define src_template
 
 	@$(ECHO) "  [DEPS] $(1)"
 	@$(MKDIR) -p $(dir $(2))
-	@$(RM) $(2)
-	@$(TOUCH) $(2)
 	@$(CPP) $(CFLAGS) $(CFLAGS_$(3)) $(CFLAGS_$(4)) -DOBJECT=$(4) \
 		-Wno-error -M $(1) -MG -MP | \
-		sed 's/\.o\s*:/_DEPS =/' >> $(2)
+		sed 's/\.o\s*:/_DEPS =/' > $(2)
 	@$(ECHO_E) '\n$$(BIN)/$(4).o :' \
 		 '$(1) $$(MAKEDEPS) $$(POST_O_DEPS) $$($(4)_DEPS)' \
 		 '\n\t$$(QM)$(ECHO) "  [BUILD] $$@"' \
@@ -815,8 +813,6 @@ define media_template
 
 	@$(ECHO) "  [MEDIADEPS] $(1)"
 	@$(MKDIR) -p $(dir $(2))
-	@$(RM) $(2)
-	@$(TOUCH) $(2)
 	@$(ECHO_E) '$$(BIN)/%.$(1) : $$(BIN)/%.$(1).zbin' \
 		  '\n\t$$(QM)$(ECHO) "  [FINISH] $$@"' \
 		  '\n\t$$(Q)$$(CP) $$< $$@' \
