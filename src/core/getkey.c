@@ -38,7 +38,7 @@ FILE_LICENCE ( GPL2_OR_LATER );
  * @v timeout		Timeout period, in ticks
  * @ret character	Character read from console
  */
-static int getchar_timeout ( unsigned long timeout ) {
+int getchar_timeout ( unsigned long timeout ) {
 	unsigned long expiry = ( currticks() + timeout );
 
 	while ( currticks() < expiry ) {

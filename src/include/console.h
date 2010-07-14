@@ -102,6 +102,7 @@ struct console_driver {
 
 extern void putchar ( int character );
 extern int getchar ( void );
+extern int getchar_timeout ( unsigned long timeout );
 extern int iskey ( void );
 extern int getkey ( void );
 
