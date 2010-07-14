@@ -257,6 +257,8 @@ extern void dbg_autocolourise ( unsigned long id );
 extern void dbg_decolourise ( void );
 extern void dbg_hex_dump_da ( unsigned long dispaddr,
 			      const void *data, unsigned long len );
+extern void dbg_pause ( void );
+extern void dbg_more ( void );
 
 #if DEBUG_SYMBOL
 #define DBGLVL_MAX DEBUG_SYMBOL
@@ -333,6 +335,28 @@ int __debug_disable;
 	} while ( 0 )
 
 /**
+ * Prompt for key press if we are at a certain debug level
+ *
+ * @v level		Debug level
+ */
+#define DBG_PAUSE_IF( level ) do {				\
+		if ( DBG_ ## level ) {				\
+			dbg_pause();				\
+		}						\
+	} while ( 0 )
+
+/**
+ * Prompt for more output data if we are at a certain debug level
+ *
+ * @v level		Debug level
+ */
+#define DBG_MORE_IF( level ) do {				\
+		if ( DBG_ ## level ) {				\
+			dbg_more();				\
+		}						\
+	} while ( 0 )
+
+/**
  * Select colour for debug messages if we are at a certain debug level
  *
  * @v level		Debug level
@@ -380,41 +404,69 @@ int __debug_disable;
 		DBG_DC_IF ( level );				\
 	} while ( 0 )
 
+#define DBGC_PAUSE_IF( level, id ) do {				\
+		DBG_AC_IF ( level, id );			\
+		DBG_PAUSE_IF ( level );				\
+		DBG_DC_IF ( level );				\
+	} while ( 0 )
+
+#define DBGC_MORE_IF( level, id ) do {				\
+		DBG_AC_IF ( level, id );			\
+		DBG_MORE_IF ( level );				\
+		DBG_DC_IF ( level );				\
+	} while ( 0 )
+
 /* Versions of the DBGxxx_IF() macros that imply DBGxxx_IF( LOG, ... )*/
 
-#define DBG( ... )		DBG_IF		( LOG, __VA_ARGS__ )
-#define DBG_HDA( ... )		DBG_HDA_IF	( LOG, __VA_ARGS__ )
-#define DBG_HD( ... )		DBG_HD_IF	( LOG, __VA_ARGS__ )
-#define DBGC( ... )		DBGC_IF		( LOG, __VA_ARGS__ )
-#define DBGC_HDA( ... )		DBGC_HDA_IF	( LOG, __VA_ARGS__ )
-#define DBGC_HD( ... )		DBGC_HD_IF	( LOG, __VA_ARGS__ )
+#define DBG( ... )		DBG_IF		( LOG, ##__VA_ARGS__ )
+#define DBG_HDA( ... )		DBG_HDA_IF	( LOG, ##__VA_ARGS__ )
+#define DBG_HD( ... )		DBG_HD_IF	( LOG, ##__VA_ARGS__ )
+#define DBG_PAUSE( ... )	DBG_PAUSE_IF	( LOG, ##__VA_ARGS__ )
+#define DBG_MORE( ... )		DBG_MORE_IF	( LOG, ##__VA_ARGS__ )
+#define DBGC( ... )		DBGC_IF		( LOG, ##__VA_ARGS__ )
+#define DBGC_HDA( ... )		DBGC_HDA_IF	( LOG, ##__VA_ARGS__ )
+#define DBGC_HD( ... )		DBGC_HD_IF	( LOG, ##__VA_ARGS__ )
+#define DBGC_PAUSE( ... )	DBGC_PAUSE_IF	( LOG, ##__VA_ARGS__ )
+#define DBGC_MORE( ... )	DBGC_MORE_IF	( LOG, ##__VA_ARGS__ )
 
 /* Versions of the DBGxxx_IF() macros that imply DBGxxx_IF( EXTRA, ... )*/
 
-#define DBG2( ... )		DBG_IF		( EXTRA, __VA_ARGS__ )
-#define DBG2_HDA( ... )		DBG_HDA_IF	( EXTRA, __VA_ARGS__ )
-#define DBG2_HD( ... )		DBG_HD_IF	( EXTRA, __VA_ARGS__ )
-#define DBGC2( ... )		DBGC_IF		( EXTRA, __VA_ARGS__ )
-#define DBGC2_HDA( ... )	DBGC_HDA_IF	( EXTRA, __VA_ARGS__ )
-#define DBGC2_HD( ... )		DBGC_HD_IF	( EXTRA, __VA_ARGS__ )
+#define DBG2( ... )		DBG_IF		( EXTRA, ##__VA_ARGS__ )
+#define DBG2_HDA( ... )		DBG_HDA_IF	( EXTRA, ##__VA_ARGS__ )
+#define DBG2_HD( ... )		DBG_HD_IF	( EXTRA, ##__VA_ARGS__ )
+#define DBG2_PAUSE( ... )	DBG_PAUSE_IF	( EXTRA, ##__VA_ARGS__ )
+#define DBG2_MORE( ... )	DBG_MORE_IF	( EXTRA, ##__VA_ARGS__ )
+#define DBGC2( ... )		DBGC_IF		( EXTRA, ##__VA_ARGS__ )
+#define DBGC2_HDA( ... )	DBGC_HDA_IF	( EXTRA, ##__VA_ARGS__ )
+#define DBGC2_HD( ... )		DBGC_HD_IF	( EXTRA, ##__VA_ARGS__ )
+#define DBGC2_PAUSE( ... )	DBGC_PAUSE_IF	( EXTRA, ##__VA_ARGS__ )
+#define DBGC2_MORE( ... )	DBGC_MORE_IF	( EXTRA, ##__VA_ARGS__ )
 
 /* Versions of the DBGxxx_IF() macros that imply DBGxxx_IF( PROFILE, ... )*/
 
-#define DBGP( ... )		DBG_IF		( PROFILE, __VA_ARGS__ )
-#define DBGP_HDA( ... )		DBG_HDA_IF	( PROFILE, __VA_ARGS__ )
-#define DBGP_HD( ... )		DBG_HD_IF	( PROFILE, __VA_ARGS__ )
-#define DBGCP( ... )		DBGC_IF		( PROFILE, __VA_ARGS__ )
-#define DBGCP_HDA( ... )	DBGC_HDA_IF	( PROFILE, __VA_ARGS__ )
-#define DBGCP_HD( ... )		DBGC_HD_IF	( PROFILE, __VA_ARGS__ )
+#define DBGP( ... )		DBG_IF		( PROFILE, ##__VA_ARGS__ )
+#define DBGP_HDA( ... )		DBG_HDA_IF	( PROFILE, ##__VA_ARGS__ )
+#define DBGP_HD( ... )		DBG_HD_IF	( PROFILE, ##__VA_ARGS__ )
+#define DBGP_PAUSE( ... )	DBG_PAUSE_IF	( PROFILE, ##__VA_ARGS__ )
+#define DBGP_MORE( ... )	DBG_MORE_IF	( PROFILE, ##__VA_ARGS__ )
+#define DBGCP( ... )		DBGC_IF		( PROFILE, ##__VA_ARGS__ )
+#define DBGCP_HDA( ... )	DBGC_HDA_IF	( PROFILE, ##__VA_ARGS__ )
+#define DBGCP_HD( ... )		DBGC_HD_IF	( PROFILE, ##__VA_ARGS__ )
+#define DBGCP_PAUSE( ... )	DBGC_PAUSE_IF	( PROFILE, ##__VA_ARGS__ )
+#define DBGCP_MORE( ... )	DBGC_MORE_IF	( PROFILE, ##__VA_ARGS__ )
 
 /* Versions of the DBGxxx_IF() macros that imply DBGxxx_IF( IO, ... )*/
 
-#define DBGIO( ... )		DBG_IF		( IO, __VA_ARGS__ )
-#define DBGIO_HDA( ... )	DBG_HDA_IF	( IO, __VA_ARGS__ )
-#define DBGIO_HD( ... )		DBG_HD_IF	( IO, __VA_ARGS__ )
-#define DBGCIO( ... )		DBGC_IF		( IO, __VA_ARGS__ )
-#define DBGCIO_HDA( ... )	DBGC_HDA_IF	( IO, __VA_ARGS__ )
-#define DBGCIO_HD( ... )	DBGC_HD_IF	( IO, __VA_ARGS__ )
+#define DBGIO( ... )		DBG_IF		( IO, ##__VA_ARGS__ )
+#define DBGIO_HDA( ... )	DBG_HDA_IF	( IO, ##__VA_ARGS__ )
+#define DBGIO_HD( ... )		DBG_HD_IF	( IO, ##__VA_ARGS__ )
+#define DBGIO_PAUSE( ... )	DBG_PAUSE_IF	( IO, ##__VA_ARGS__ )
+#define DBGIO_MORE( ... )	DBG_MORE_IF	( IO, ##__VA_ARGS__ )
+#define DBGCIO( ... )		DBGC_IF		( IO, ##__VA_ARGS__ )
+#define DBGCIO_HDA( ... )	DBGC_HDA_IF	( IO, ##__VA_ARGS__ )
+#define DBGCIO_HD( ... )	DBGC_HD_IF	( IO, ##__VA_ARGS__ )
+#define DBGCIO_PAUSE( ... )	DBGC_PAUSE_IF	( IO, ##__VA_ARGS__ )
+#define DBGCIO_MORE( ... )	DBGC_MORE_IF	( IO, ##__VA_ARGS__ )
 
 
 #if DEBUG_SYMBOL == 0

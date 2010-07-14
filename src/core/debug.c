@@ -4,13 +4,21 @@
 #include <ipxe/io.h>
 #include <console.h>
 
-void pause ( void ) {
-	printf ( "\nPress a key" );
+/**
+ * Pause until a key is pressed
+ *
+ */
+void dbg_pause ( void ) {
+	printf ( "\nPress a key..." );
 	getchar();
-	printf ( "\r           \r" );
+	printf ( "\r              \r" );
 }
 
-void more ( void ) {
+/**
+ * Indicate more data to follow and pause until a key is pressed
+ *
+ */
+void dbg_more ( void ) {
 	printf ( "---more---" );
 	getchar();
 	printf ( "\r          \r" );
