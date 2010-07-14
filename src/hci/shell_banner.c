@@ -41,10 +41,11 @@ int shell_banner ( void ) {
 	int wait_count;
 	int key;
 
-	if ( BANNER_TIMEOUT <=  0 ) {
-		return enter_shell;
-	}
+	/* Skip prompt if timeout is zero */
+	if ( BANNER_TIMEOUT <= 0 )
+		return 0;
 
+	/* Display prompt */
 	printf ( "\nPress Ctrl-B for the iPXE command line..." );
 
 	/* Wait for key */
