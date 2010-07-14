@@ -181,8 +181,15 @@ REQUEST_EXPANDED ( CONFIG_SYMBOL );
 
 #ifndef ASSEMBLY
 
-/** Declare a function as weak (use *before* the definition) */
-#define __weak		__attribute__ (( weak ))
+/** Declare a function as weak (use *before* the definition)
+ *
+ * Due to a bug in at least GCC 4.4.4 and earlier, weak symbols may be
+ * inlined if they have hidden visibility (see above for why hidden
+ * visibility is used).  This results in the non-weak symbol never
+ * being used, so explicitly mark the function as noinline to prevent
+ * inlining.
+ */
+#define __weak		__attribute__ (( weak, noinline ))
 
 #endif
 
