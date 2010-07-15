@@ -84,6 +84,8 @@ struct tcp_connection {
 	struct list_head queue;
 	/** Retransmission timer */
 	struct retry_timer timer;
+	/** Shutdown (TIME_WAIT) timer */
+	struct retry_timer wait;
 };
 
 /**
@@ -94,6 +96,7 @@ static LIST_HEAD ( tcp_conns );
 /* Forward declarations */
 static struct interface_descriptor tcp_xfer_desc;
 static void tcp_expired ( struct retry_timer *timer, int over );
+static void tcp_wait_expired ( struct retry_timer *timer, int over );
 static int tcp_rx_ack ( struct tcp_connection *tcp, uint32_t ack,
 			uint32_t win );
 
@@ -229,6 +232,7 @@ static int tcp_open ( struct interface *xfer, struct sockaddr *peer,
 	ref_init ( &tcp->refcnt, NULL );
 	intf_init ( &tcp->xfer, &tcp_xfer_desc, &tcp->refcnt );
 	timer_init ( &tcp->timer, tcp_expired );
+	timer_init ( &tcp->wait, tcp_wait_expired );
 	tcp->prev_tcp_state = TCP_CLOSED;
 	tcp->tcp_state = TCP_STATE_SENT ( TCP_SYN );
 	tcp_dump_state ( tcp );
@@ -514,13 +518,12 @@ static int tcp_xmit ( struct tcp_connection *tcp, int force_send ) {
 /**
  * Retransmission timer expired
  *
- * @v timer	Retry timer
- * @v over	Failure indicator
+ * @v timer		Retransmission timer
+ * @v over		Failure indicator
  */
 static void tcp_expired ( struct retry_timer *timer, int over ) {
 	struct tcp_connection *tcp =
 		container_of ( timer, struct tcp_connection, timer );
-	int graceful_close = TCP_CLOSED_GRACEFULLY ( tcp->tcp_state );
 
 	DBGC ( tcp, "TCP %p timer %s in %s for %08x..%08x %08x\n", tcp,
 	       ( over ? "expired" : "fired" ), tcp_state ( tcp->tcp_state ),
@@ -530,14 +533,12 @@ static void tcp_expired ( struct retry_timer *timer, int over ) {
 		 ( tcp->tcp_state == TCP_SYN_RCVD ) ||
 		 ( tcp->tcp_state == TCP_ESTABLISHED ) ||
 		 ( tcp->tcp_state == TCP_FIN_WAIT_1 ) ||
-		 ( tcp->tcp_state == TCP_TIME_WAIT ) ||
 		 ( tcp->tcp_state == TCP_CLOSE_WAIT ) ||
 		 ( tcp->tcp_state == TCP_CLOSING_OR_LAST_ACK ) );
 
-	if ( over || graceful_close ) {
-		/* If we have finally timed out and given up, or if
-		 * this is the result of a graceful close, terminate
-		 * the connection
+	if ( over ) {
+		/* If we have finally timed out and given up,
+		 * terminate the connection
 		 */
 		tcp->tcp_state = TCP_CLOSED;
 		tcp_dump_state ( tcp );
@@ -546,6 +547,27 @@ static void tcp_expired ( struct retry_timer *timer, int over ) {
 		/* Otherwise, retransmit the packet */
 		tcp_xmit ( tcp, 0 );
 	}
+}
+
+/**
+ * Shutdown timer expired
+ *
+ * @v timer		Shutdown timer
+ * @v over		Failure indicator
+ */
+static void tcp_wait_expired ( struct retry_timer *timer, int over __unused ) {
+	struct tcp_connection *tcp =
+		container_of ( timer, struct tcp_connection, wait );
+
+	assert ( tcp->tcp_state == TCP_TIME_WAIT );
+
+	DBGC ( tcp, "TCP %p wait complete in %s for %08x..%08x %08x\n", tcp,
+	       tcp_state ( tcp->tcp_state ), tcp->snd_seq,
+	       ( tcp->snd_seq + tcp->snd_sent ), tcp->rcv_ack );
+
+	tcp->tcp_state = TCP_CLOSED;
+	tcp_dump_state ( tcp );
+	tcp_close ( tcp, 0 );
 }
 
 /**
@@ -1020,7 +1042,8 @@ static int tcp_rx ( struct io_buffer *iobuf,
 	 * timer to expire and cause the connection to be freed.
 	 */
 	if ( TCP_CLOSED_GRACEFULLY ( tcp->tcp_state ) ) {
-		start_timer_fixed ( &tcp->timer, ( 2 * TCP_MSL ) );
+		stop_timer ( &tcp->wait );
+		start_timer_fixed ( &tcp->wait, ( 2 * TCP_MSL ) );
 	}
 
 	return 0;
