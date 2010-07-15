@@ -93,6 +93,8 @@ enum tcp_flags {
 	TCP_XFER_CLOSED = 0x0001,
 	/** TCP timestamps are enabled */
 	TCP_TS_ENABLED = 0x0002,
+	/** TCP acknowledgement is pending */
+	TCP_ACK_PENDING = 0x0004,
 };
 
 /**
@@ -396,7 +398,6 @@ static size_t tcp_process_queue ( struct tcp_connection *tcp, size_t max_len,
  * Transmit any outstanding data
  *
  * @v tcp		TCP connection
- * @v force_send	Force sending of packet
  * 
  * Transmits any outstanding data on the connection.
  *
@@ -404,7 +405,7 @@ static size_t tcp_process_queue ( struct tcp_connection *tcp, size_t max_len,
  * will have been started if necessary, and so the stack will
  * eventually attempt to retransmit the failed packet.
  */
-static int tcp_xmit ( struct tcp_connection *tcp, int force_send ) {
+static int tcp_xmit ( struct tcp_connection *tcp ) {
 	struct io_buffer *iobuf;
 	struct tcp_header *tcphdr;
 	struct tcp_mss_option *mssopt;
@@ -438,7 +439,7 @@ static int tcp_xmit ( struct tcp_connection *tcp, int force_send ) {
 	tcp->snd_sent = seq_len;
 
 	/* If we have nothing to transmit, stop now */
-	if ( ( seq_len == 0 ) && ! force_send )
+	if ( ( seq_len == 0 ) && ! ( tcp->flags & TCP_ACK_PENDING ) )
 		return 0;
 
 	/* If we are transmitting anything that requires
@@ -519,6 +520,9 @@ static int tcp_xmit ( struct tcp_connection *tcp, int force_send ) {
 		return rc;
 	}
 
+	/* Clear ACK-pending flag */
+	tcp->flags &= ~TCP_ACK_PENDING;
+
 	return 0;
 }
 
@@ -552,7 +556,7 @@ static void tcp_expired ( struct retry_timer *timer, int over ) {
 		tcp_close ( tcp, -ETIMEDOUT );
 	} else {
 		/* Otherwise, retransmit the packet */
-		tcp_xmit ( tcp, 0 );
+		tcp_xmit ( tcp );
 	}
 }
 
@@ -709,6 +713,7 @@ static void tcp_rx_seq ( struct tcp_connection *tcp, uint32_t seq_len ) {
 	} else {
 		tcp->rcv_win = 0;
 	}
+	tcp->flags |= TCP_ACK_PENDING;
 }
 
 /**
@@ -927,7 +932,6 @@ static int tcp_rx ( struct io_buffer *iobuf,
 	struct tcp_options options;
 	size_t hlen;
 	uint16_t csum;
-	uint32_t start_seq;
 	uint32_t seq;
 	uint32_t ack;
 	uint32_t win;
@@ -967,7 +971,7 @@ static int tcp_rx ( struct io_buffer *iobuf,
 	
 	/* Parse parameters from header and strip header */
 	tcp = tcp_demux ( ntohs ( tcphdr->dest ) );
-	start_seq = seq = ntohl ( tcphdr->seq );
+	seq = ntohl ( tcphdr->seq );
 	ack = ntohl ( tcphdr->ack );
 	win = ntohs ( tcphdr->win );
 	flags = tcphdr->flags;
@@ -1002,6 +1006,12 @@ static int tcp_rx ( struct io_buffer *iobuf,
 		}
 	}
 
+	/* Force an ACK if this packet is out of order */
+	if ( ( tcp->tcp_state & TCP_STATE_RCVD ( TCP_SYN ) ) &&
+	     ( seq != tcp->rcv_ack ) ) {
+		tcp->flags |= TCP_ACK_PENDING;
+	}
+
 	/* Handle SYN, if present */
 	if ( flags & TCP_SYN ) {
 		tcp_rx_syn ( tcp, seq, &options );
@@ -1031,19 +1041,8 @@ static int tcp_rx ( struct io_buffer *iobuf,
 	/* Dump out any state change as a result of the received packet */
 	tcp_dump_state ( tcp );
 
-	/* Send out any pending data.  We force sending a reply if either
-	 *
-	 *  a) the peer is expecting an ACK (i.e. consumed sequence space), or
-	 *  b) either end of the packet was outside the receive window
-	 *
-	 * Case (b) enables us to support TCP keepalives using
-	 * zero-length packets, which we would otherwise ignore.  Note
-	 * that for case (b), we need *only* consider zero-length
-	 * packets, since non-zero-length packets will already be
-	 * caught by case (a).
-	 */
-	tcp_xmit ( tcp, ( ( start_seq != seq ) ||
-			  ( ( seq - tcp->rcv_ack ) > tcp->rcv_win ) ) );
+	/* Send out any pending data */
+	tcp_xmit ( tcp );
 
 	/* If this packet was the last we expect to receive, set up
 	 * timer to expire and cause the connection to be freed.
@@ -1087,7 +1086,7 @@ static void tcp_xfer_close ( struct tcp_connection *tcp, int rc ) {
 	tcp_close ( tcp, rc );
 
 	/* Transmit FIN, if possible */
-	tcp_xmit ( tcp, 0 );
+	tcp_xmit ( tcp );
 }
 
 /**
@@ -1125,7 +1124,7 @@ static int tcp_xfer_deliver ( struct tcp_connection *tcp,
 	list_add_tail ( &iobuf->list, &tcp->queue );
 
 	/* Transmit data, if possible */
-	tcp_xmit ( tcp, 0 );
+	tcp_xmit ( tcp );
 
 	return 0;
 }
