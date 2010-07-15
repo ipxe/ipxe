@@ -30,10 +30,11 @@ struct tcp_connection {
 	/** List of TCP connections */
 	struct list_head list;
 
+	/** Flags */
+	unsigned int flags;
+
 	/** Data transfer interface */
 	struct interface xfer;
-	/** Data transfer interface closed flag */
-	int xfer_closed;
 
 	/** Remote socket address */
 	struct sockaddr_tcpip peer;
@@ -77,8 +78,6 @@ struct tcp_connection {
 	 * Equivalent to TS.Recent in RFC 1323 terminology.
 	 */
 	uint32_t ts_recent;
-	/** Timestamps enabled */
-	int timestamps;
 
 	/** Transmit queue */
 	struct list_head queue;
@@ -86,6 +85,14 @@ struct tcp_connection {
 	struct retry_timer timer;
 	/** Shutdown (TIME_WAIT) timer */
 	struct retry_timer wait;
+};
+
+/** TCP flags */
+enum tcp_flags {
+	/** TCP data transfer interface has been closed */
+	TCP_XFER_CLOSED = 0x0001,
+	/** TCP timestamps are enabled */
+	TCP_TS_ENABLED = 0x0002,
 };
 
 /**
@@ -275,7 +282,7 @@ static void tcp_close ( struct tcp_connection *tcp, int rc ) {
 
 	/* Close data transfer interface */
 	intf_shutdown ( &tcp->xfer, rc );
-	tcp->xfer_closed = 1;
+	tcp->flags |= TCP_XFER_CLOSED;
 
 	/* If we are in CLOSED, or have otherwise not yet received a
 	 * SYN (i.e. we are in LISTEN or SYN_SENT), just delete the
@@ -474,7 +481,7 @@ static int tcp_xmit ( struct tcp_connection *tcp, int force_send ) {
 		mssopt->length = sizeof ( *mssopt );
 		mssopt->mss = htons ( TCP_MSS );
 	}
-	if ( ( flags & TCP_SYN ) || tcp->timestamps ) {
+	if ( ( flags & TCP_SYN ) || ( tcp->flags & TCP_TS_ENABLED ) ) {
 		tsopt = iob_push ( iobuf, sizeof ( *tsopt ) );
 		memset ( tsopt->nop, TCP_OPTION_NOP, sizeof ( tsopt->nop ) );
 		tsopt->tsopt.kind = TCP_OPTION_TS;
@@ -719,7 +726,7 @@ static int tcp_rx_syn ( struct tcp_connection *tcp, uint32_t seq,
 	if ( ! ( tcp->tcp_state & TCP_STATE_RCVD ( TCP_SYN ) ) ) {
 		tcp->rcv_ack = seq;
 		if ( options->tsopt )
-			tcp->timestamps = 1;
+			tcp->flags |= TCP_TS_ENABLED;
 	}
 
 	/* Ignore duplicate SYN */
@@ -801,7 +808,7 @@ static int tcp_rx_ack ( struct tcp_connection *tcp, uint32_t ack,
 		tcp->tcp_state |= TCP_STATE_ACKED ( acked_flags );
 
 	/* Start sending FIN if we've had all possible data ACKed */
-	if ( list_empty ( &tcp->queue ) && tcp->xfer_closed )
+	if ( list_empty ( &tcp->queue ) && ( tcp->flags & TCP_XFER_CLOSED ) )
 		tcp->tcp_state |= TCP_STATE_SENT ( TCP_FIN );
 
 	return 0;
