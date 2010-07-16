@@ -895,8 +895,6 @@ struct arbelprm_wqe_segment_ctrl_mlx_st {	/* Little Endian */
     pseudo_bit_t	vcrc[0x00010];         /* Packet's VCRC (if not 0 - otherwise computed by HW) */
     pseudo_bit_t	rlid[0x00010];         /* Destination LID (must match given headers) */
 /* -------------- */
-    pseudo_bit_t	reserved3[0x00040];
-/* -------------- */
 }; 
 
 /* Send WQE segment format */

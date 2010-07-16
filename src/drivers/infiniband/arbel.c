@@ -54,44 +54,42 @@ FILE_LICENCE ( GPL2_OR_LATER );
  */
 
 /**
- * Allocate queue number
+ * Allocate offset within usage bitmask
  *
- * @v q_inuse		Queue usage bitmask
- * @v max_inuse		Maximum number of in-use queues
- * @ret qn_offset	Free queue number offset, or negative error
+ * @v bits		Usage bitmask
+ * @v bits_len		Length of usage bitmask
+ * @ret bit		First free bit within bitmask, or negative error
  */
-static int arbel_alloc_qn_offset ( arbel_bitmask_t *q_inuse,
-				   unsigned int max_inuse ) {
-	unsigned int qn_offset = 0;
+static int arbel_bitmask_alloc ( arbel_bitmask_t *bits,
+				 unsigned int bits_len ) {
+	unsigned int bit = 0;
 	arbel_bitmask_t mask = 1;
 
-	while ( qn_offset < max_inuse ) {
-		if ( ( mask & *q_inuse ) == 0 ) {
-			*q_inuse |= mask;
-			return qn_offset;
+	while ( bit < bits_len ) {
+		if ( ( mask & *bits ) == 0 ) {
+			*bits |= mask;
+			return bit;
 		}
-		qn_offset++;
-		mask <<= 1;
-		if ( ! mask ) {
-			mask = 1;
-			q_inuse++;
-		}
+		bit++;
+		mask = ( mask << 1 ) | ( mask >> ( 8 * sizeof ( mask ) - 1 ) );
+		if ( mask == 1 )
+			bits++;
 	}
 	return -ENFILE;
 }
 
 /**
- * Free queue number
+ * Free offset within usage bitmask
  *
- * @v q_inuse		Queue usage bitmask
- * @v qn_offset		Queue number offset
+ * @v bits		Usage bitmask
+ * @v bit		Bit within bitmask
  */
-static void arbel_free_qn_offset ( arbel_bitmask_t *q_inuse, int qn_offset ) {
+static void arbel_bitmask_free ( arbel_bitmask_t *bits, int bit ) {
 	arbel_bitmask_t mask;
 
-	mask = ( 1 << ( qn_offset % ( 8 * sizeof ( mask ) ) ) );
-	q_inuse += ( qn_offset / ( 8 * sizeof ( mask ) ) );
-	*q_inuse &= ~mask;
+	mask = ( 1 << ( bit % ( 8 * sizeof ( mask ) ) ) );
+	bits += ( bit / ( 8 * sizeof ( mask ) ) );
+	*bits &= ~mask;
 }
 
 /***************************************************************************
@@ -368,6 +366,14 @@ arbel_cmd_2rst_qpee ( struct arbel *arbel, unsigned long qpn ) {
 }
 
 static inline int
+arbel_cmd_conf_special_qp ( struct arbel *arbel, unsigned int qp_type,
+			    unsigned long base_qpn ) {
+	return arbel_cmd ( arbel,
+			   ARBEL_HCR_VOID_CMD ( ARBEL_HCR_CONF_SPECIAL_QP ),
+			   qp_type, NULL, base_qpn, NULL );
+}
+
+static inline int
 arbel_cmd_mad_ifc ( struct arbel *arbel, unsigned int port,
 		    union arbelprm_mad *mad ) {
 	return arbel_cmd ( arbel,
@@ -556,7 +562,7 @@ static int arbel_create_cq ( struct ib_device *ibdev,
 	int rc;
 
 	/* Find a free completion queue number */
-	cqn_offset = arbel_alloc_qn_offset ( arbel->cq_inuse, ARBEL_MAX_CQS );
+	cqn_offset = arbel_bitmask_alloc ( arbel->cq_inuse, ARBEL_MAX_CQS );
 	if ( cqn_offset < 0 ) {
 		DBGC ( arbel, "Arbel %p out of completion queues\n", arbel );
 		rc = cqn_offset;
@@ -570,8 +576,8 @@ static int arbel_create_cq ( struct ib_device *ibdev,
 		rc = -ENOMEM;
 		goto err_arbel_cq;
 	}
-	arbel_cq->ci_doorbell_idx = arbel_cq_ci_doorbell_idx ( cqn_offset );
-	arbel_cq->arm_doorbell_idx = arbel_cq_arm_doorbell_idx ( cqn_offset );
+	arbel_cq->ci_doorbell_idx = arbel_cq_ci_doorbell_idx ( arbel, cq );
+	arbel_cq->arm_doorbell_idx = arbel_cq_arm_doorbell_idx ( arbel, cq );
 
 	/* Allocate completion queue itself */
 	arbel_cq->cqe_size = ( cq->num_cqes * sizeof ( arbel_cq->cqe[0] ) );
@@ -634,7 +640,7 @@ static int arbel_create_cq ( struct ib_device *ibdev,
  err_cqe:
 	free ( arbel_cq );
  err_arbel_cq:
-	arbel_free_qn_offset ( arbel->cq_inuse, cqn_offset );
+	arbel_bitmask_free ( arbel->cq_inuse, cqn_offset );
  err_cqn_offset:
 	return rc;
 }
@@ -675,7 +681,7 @@ static void arbel_destroy_cq ( struct ib_device *ibdev,
 
 	/* Mark queue number as free */
 	cqn_offset = ( cq->cqn - arbel->limits.reserved_cqs );
-	arbel_free_qn_offset ( arbel->cq_inuse, cqn_offset );
+	arbel_bitmask_free ( arbel->cq_inuse, cqn_offset );
 
 	ib_cq_set_drvdata ( cq, NULL );
 }
@@ -686,6 +692,63 @@ static void arbel_destroy_cq ( struct ib_device *ibdev,
  *
  ***************************************************************************
  */
+
+/**
+ * Assign queue pair number
+ *
+ * @v ibdev		Infiniband device
+ * @v qp		Queue pair
+ * @ret rc		Return status code
+ */
+static int arbel_alloc_qpn ( struct ib_device *ibdev,
+			     struct ib_queue_pair *qp ) {
+	struct arbel *arbel = ib_get_drvdata ( ibdev );
+	unsigned int port_offset;
+	int qpn_offset;
+
+	/* Calculate queue pair number */
+	port_offset = ( ibdev->port - ARBEL_PORT_BASE );
+
+	switch ( qp->type ) {
+	case IB_QPT_SMI:
+		qp->qpn = ( arbel->special_qpn_base + port_offset );
+		return 0;
+	case IB_QPT_GSI:
+		qp->qpn = ( arbel->special_qpn_base + 2 + port_offset );
+		return 0;
+	case IB_QPT_UD:
+		/* Find a free queue pair number */
+		qpn_offset = arbel_bitmask_alloc ( arbel->qp_inuse,
+						   ARBEL_MAX_QPS );
+		if ( qpn_offset < 0 ) {
+			DBGC ( arbel, "Arbel %p out of queue pairs\n",
+			       arbel );
+			return qpn_offset;
+		}
+		qp->qpn = ( arbel->qpn_base + qpn_offset );
+		return 0;
+	default:
+		DBGC ( arbel, "Arbel %p unsupported QP type %d\n",
+		       arbel, qp->type );
+		return -ENOTSUP;
+	}
+}
+
+/**
+ * Free queue pair number
+ *
+ * @v ibdev		Infiniband device
+ * @v qp		Queue pair
+ */
+static void arbel_free_qpn ( struct ib_device *ibdev,
+			     struct ib_queue_pair *qp ) {
+	struct arbel *arbel = ib_get_drvdata ( ibdev );
+	int qpn_offset;
+
+	qpn_offset = ( qp->qpn - arbel->qpn_base );
+	if ( qpn_offset >= 0 )
+		arbel_bitmask_free ( arbel->qp_inuse, qpn_offset );
+}
 
 /**
  * Create send work queue
@@ -717,6 +780,7 @@ static int arbel_create_send_wq ( struct arbel_send_work_queue *arbel_send_wq,
 		next_wqe = &arbel_send_wq->wqe[ ( i + 1 ) & wqe_idx_mask ].ud;
 		MLX_FILL_1 ( &wqe->next, 0, nda_31_6,
 			     ( virt_to_bus ( next_wqe ) >> 6 ) );
+		MLX_FILL_1 ( &wqe->next, 1, always1, 1 );
 	}
 	
 	return 0;
@@ -781,17 +845,11 @@ static int arbel_create_qp ( struct ib_device *ibdev,
 	struct arbelprm_qp_ee_state_transitions qpctx;
 	struct arbelprm_qp_db_record *send_db_rec;
 	struct arbelprm_qp_db_record *recv_db_rec;
-	int qpn_offset;
 	int rc;
 
-	/* Find a free queue pair number */
-	qpn_offset = arbel_alloc_qn_offset ( arbel->qp_inuse, ARBEL_MAX_QPS );
-	if ( qpn_offset < 0 ) {
-		DBGC ( arbel, "Arbel %p out of queue pairs\n", arbel );
-		rc = qpn_offset;
-		goto err_qpn_offset;
-	}
-	qp->qpn = ( ARBEL_QPN_BASE + arbel->limits.reserved_qps + qpn_offset );
+	/* Calculate queue pair number */
+	if ( ( rc = arbel_alloc_qpn ( ibdev, qp ) ) != 0 )
+		goto err_alloc_qpn;
 
 	/* Allocate control structures */
 	arbel_qp = zalloc ( sizeof ( *arbel_qp ) );
@@ -799,8 +857,8 @@ static int arbel_create_qp ( struct ib_device *ibdev,
 		rc = -ENOMEM;
 		goto err_arbel_qp;
 	}
-	arbel_qp->send.doorbell_idx = arbel_send_doorbell_idx ( qpn_offset );
-	arbel_qp->recv.doorbell_idx = arbel_recv_doorbell_idx ( qpn_offset );
+	arbel_qp->send.doorbell_idx = arbel_send_doorbell_idx ( arbel, qp );
+	arbel_qp->recv.doorbell_idx = arbel_recv_doorbell_idx ( arbel, qp );
 
 	/* Create send and receive work queues */
 	if ( ( rc = arbel_create_send_wq ( &arbel_qp->send,
@@ -827,7 +885,9 @@ static int arbel_create_qp ( struct ib_device *ibdev,
 	MLX_FILL_3 ( &qpctx, 2,
 		     qpc_eec_data.de, 1,
 		     qpc_eec_data.pm_state, 0x03 /* Always 0x03 for UD */,
-		     qpc_eec_data.st, ARBEL_ST_UD );
+		     qpc_eec_data.st,
+		     ( ( qp->type == IB_QPT_UD ) ?
+		       ARBEL_ST_UD : ARBEL_ST_MLX ) );
 	MLX_FILL_6 ( &qpctx, 4,
 		     qpc_eec_data.mtu, ARBEL_MTU_2048,
 		     qpc_eec_data.msg_max, 11 /* 2^11 = 2048 */,
@@ -897,8 +957,8 @@ static int arbel_create_qp ( struct ib_device *ibdev,
  err_create_send_wq:
 	free ( arbel_qp );
  err_arbel_qp:
-	arbel_free_qn_offset ( arbel->qp_inuse, qpn_offset );
- err_qpn_offset:
+	arbel_free_qpn ( ibdev, qp );
+ err_alloc_qpn:
 	return rc;
 }
 
@@ -940,7 +1000,6 @@ static void arbel_destroy_qp ( struct ib_device *ibdev,
 	struct arbel_queue_pair *arbel_qp = ib_qp_get_drvdata ( qp );
 	struct arbelprm_qp_db_record *send_db_rec;
 	struct arbelprm_qp_db_record *recv_db_rec;
-	int qpn_offset;
 	int rc;
 
 	/* Take ownership back from hardware */
@@ -963,8 +1022,7 @@ static void arbel_destroy_qp ( struct ib_device *ibdev,
 	free ( arbel_qp );
 
 	/* Mark queue number as free */
-	qpn_offset = ( qp->qpn - ARBEL_QPN_BASE - arbel->limits.reserved_qps );
-	arbel_free_qn_offset ( arbel->qp_inuse, qpn_offset );
+	arbel_free_qpn ( ibdev, qp );
 
 	ib_qp_set_drvdata ( qp, NULL );
 }
@@ -1003,6 +1061,109 @@ static const union ib_gid arbel_no_gid = {
 };
 
 /**
+ * Construct UD send work queue entry
+ *
+ * @v ibdev		Infiniband device
+ * @v qp		Queue pair
+ * @v av		Address vector
+ * @v iobuf		I/O buffer
+ * @v wqe		Send work queue entry
+ * @ret nds		Work queue entry size
+ */
+static size_t arbel_fill_ud_send_wqe ( struct ib_device *ibdev,
+				       struct ib_queue_pair *qp __unused,
+				       struct ib_address_vector *av,
+				       struct io_buffer *iobuf,
+				       union arbel_send_wqe *wqe ) {
+	struct arbel *arbel = ib_get_drvdata ( ibdev );
+	const union ib_gid *gid;
+
+	/* Construct this work queue entry */
+	MLX_FILL_1 ( &wqe->ud.ctrl, 0, always1, 1 );
+	MLX_FILL_2 ( &wqe->ud.ud, 0,
+		     ud_address_vector.pd, ARBEL_GLOBAL_PD,
+		     ud_address_vector.port_number, ibdev->port );
+	MLX_FILL_2 ( &wqe->ud.ud, 1,
+		     ud_address_vector.rlid, av->lid,
+		     ud_address_vector.g, av->gid_present );
+	MLX_FILL_2 ( &wqe->ud.ud, 2,
+		     ud_address_vector.max_stat_rate,
+			 ( ( av->rate >= 3 ) ? 0 : 1 ),
+		     ud_address_vector.msg, 3 );
+	MLX_FILL_1 ( &wqe->ud.ud, 3, ud_address_vector.sl, av->sl );
+	gid = ( av->gid_present ? &av->gid : &arbel_no_gid );
+	memcpy ( &wqe->ud.ud.u.dwords[4], gid, sizeof ( *gid ) );
+	MLX_FILL_1 ( &wqe->ud.ud, 8, destination_qp, av->qpn );
+	MLX_FILL_1 ( &wqe->ud.ud, 9, q_key, av->qkey );
+	MLX_FILL_1 ( &wqe->ud.data[0], 0, byte_count, iob_len ( iobuf ) );
+	MLX_FILL_1 ( &wqe->ud.data[0], 1, l_key, arbel->reserved_lkey );
+	MLX_FILL_1 ( &wqe->ud.data[0], 3,
+		     local_address_l, virt_to_bus ( iobuf->data ) );
+
+	return ( offsetof ( typeof ( wqe->ud ), data[1] ) >> 4 );
+}
+
+/**
+ * Construct MLX send work queue entry
+ *
+ * @v ibdev		Infiniband device
+ * @v qp		Queue pair
+ * @v av		Address vector
+ * @v iobuf		I/O buffer
+ * @v wqe		Send work queue entry
+ * @v next		Previous work queue entry's "next" field
+ * @ret nds		Work queue entry size
+ */
+static size_t arbel_fill_mlx_send_wqe ( struct ib_device *ibdev,
+					struct ib_queue_pair *qp,
+					struct ib_address_vector *av,
+					struct io_buffer *iobuf,
+					union arbel_send_wqe *wqe ) {
+	struct arbel *arbel = ib_get_drvdata ( ibdev );
+	struct io_buffer headers;
+
+	/* Construct IB headers */
+	iob_populate ( &headers, &wqe->mlx.headers, 0,
+		       sizeof ( wqe->mlx.headers ) );
+	iob_reserve ( &headers, sizeof ( wqe->mlx.headers ) );
+	ib_push ( ibdev, &headers, qp, iob_len ( iobuf ), av );
+
+	/* Construct this work queue entry */
+	MLX_FILL_5 ( &wqe->mlx.ctrl, 0,
+		     c, 1 /* generate completion */,
+		     icrc, 0 /* generate ICRC */,
+		     max_statrate, ( ( ( av->rate < 2 ) || ( av->rate > 10 ) )
+				     ? 8 : ( av->rate + 5 ) ),
+		     slr, 0,
+		     v15, ( ( qp->ext_qpn == IB_QPN_SMI ) ? 1 : 0 ) );
+	MLX_FILL_1 ( &wqe->mlx.ctrl, 1, rlid, av->lid );
+	MLX_FILL_1 ( &wqe->mlx.data[0], 0,
+		     byte_count, iob_len ( &headers ) );
+	MLX_FILL_1 ( &wqe->mlx.data[0], 1, l_key, arbel->reserved_lkey );
+	MLX_FILL_1 ( &wqe->mlx.data[0], 3,
+		     local_address_l, virt_to_bus ( headers.data ) );
+	MLX_FILL_1 ( &wqe->mlx.data[1], 0,
+		     byte_count, ( iob_len ( iobuf ) + 4 /* ICRC */ ) );
+	MLX_FILL_1 ( &wqe->mlx.data[1], 1, l_key, arbel->reserved_lkey );
+	MLX_FILL_1 ( &wqe->mlx.data[1], 3,
+		     local_address_l, virt_to_bus ( iobuf->data ) );
+
+	return ( offsetof ( typeof ( wqe->mlx ), data[2] ) >> 4 );
+}
+
+/** Work queue entry constructors */
+static size_t
+( * arbel_fill_send_wqe[] ) ( struct ib_device *ibdev,
+			      struct ib_queue_pair *qp,
+			      struct ib_address_vector *av,
+			      struct io_buffer *iobuf,
+			      union arbel_send_wqe *wqe ) = {
+	[IB_QPT_SMI] = arbel_fill_mlx_send_wqe,
+	[IB_QPT_GSI] = arbel_fill_mlx_send_wqe,
+	[IB_QPT_UD] = arbel_fill_ud_send_wqe,
+};
+
+/**
  * Post send work queue entry
  *
  * @v ibdev		Infiniband device
@@ -1019,11 +1180,10 @@ static int arbel_post_send ( struct ib_device *ibdev,
 	struct arbel_queue_pair *arbel_qp = ib_qp_get_drvdata ( qp );
 	struct ib_work_queue *wq = &qp->send;
 	struct arbel_send_work_queue *arbel_send_wq = &arbel_qp->send;
-	struct arbelprm_ud_send_wqe *prev_wqe;
-	struct arbelprm_ud_send_wqe *wqe;
+	union arbel_send_wqe *prev_wqe;
+	union arbel_send_wqe *wqe;
 	struct arbelprm_qp_db_record *qp_db_rec;
 	union arbelprm_doorbell_register db_reg;
-	const union ib_gid *gid;
 	unsigned int wqe_idx_mask;
 	size_t nds;
 
@@ -1034,41 +1194,22 @@ static int arbel_post_send ( struct ib_device *ibdev,
 		return -ENOBUFS;
 	}
 	wq->iobufs[wq->next_idx & wqe_idx_mask] = iobuf;
-	prev_wqe = &arbel_send_wq->wqe[(wq->next_idx - 1) & wqe_idx_mask].ud;
-	wqe = &arbel_send_wq->wqe[wq->next_idx & wqe_idx_mask].ud;
+	prev_wqe = &arbel_send_wq->wqe[(wq->next_idx - 1) & wqe_idx_mask];
+	wqe = &arbel_send_wq->wqe[wq->next_idx & wqe_idx_mask];
 
 	/* Construct work queue entry */
-	MLX_FILL_1 ( &wqe->next, 1, always1, 1 );
-	memset ( &wqe->ctrl, 0, sizeof ( wqe->ctrl ) );
-	MLX_FILL_1 ( &wqe->ctrl, 0, always1, 1 );
-	memset ( &wqe->ud, 0, sizeof ( wqe->ud ) );
-	MLX_FILL_2 ( &wqe->ud, 0,
-		     ud_address_vector.pd, ARBEL_GLOBAL_PD,
-		     ud_address_vector.port_number, ibdev->port );
-	MLX_FILL_2 ( &wqe->ud, 1,
-		     ud_address_vector.rlid, av->lid,
-		     ud_address_vector.g, av->gid_present );
-	MLX_FILL_2 ( &wqe->ud, 2,
-		     ud_address_vector.max_stat_rate,
-			 ( ( av->rate >= 3 ) ? 0 : 1 ),
-		     ud_address_vector.msg, 3 );
-	MLX_FILL_1 ( &wqe->ud, 3, ud_address_vector.sl, av->sl );
-	gid = ( av->gid_present ? &av->gid : &arbel_no_gid );
-	memcpy ( &wqe->ud.u.dwords[4], gid, sizeof ( *gid ) );
-	MLX_FILL_1 ( &wqe->ud, 8, destination_qp, av->qpn );
-	MLX_FILL_1 ( &wqe->ud, 9, q_key, av->qkey );
-	MLX_FILL_1 ( &wqe->data[0], 0, byte_count, iob_len ( iobuf ) );
-	MLX_FILL_1 ( &wqe->data[0], 1, l_key, arbel->reserved_lkey );
-	MLX_FILL_1 ( &wqe->data[0], 3,
-		     local_address_l, virt_to_bus ( iobuf->data ) );
+	memset ( ( ( ( void * ) wqe ) + sizeof ( wqe->next ) ), 0,
+		 ( sizeof ( *wqe ) - sizeof ( wqe->next ) ) );
+	assert ( qp->type < ( sizeof ( arbel_fill_send_wqe ) /
+			      sizeof ( arbel_fill_send_wqe[0] ) ) );
+	assert ( arbel_fill_send_wqe[qp->type] != NULL );
+	nds = arbel_fill_send_wqe[qp->type] ( ibdev, qp, av, iobuf, wqe );
 
 	/* Update previous work queue entry's "next" field */
-	nds = ( ( offsetof ( typeof ( *wqe ), data ) +
-		  sizeof ( wqe->data[0] ) ) >> 4 );
 	MLX_SET ( &prev_wqe->next, nopcode, ARBEL_OPCODE_SEND );
 	MLX_FILL_3 ( &prev_wqe->next, 1,
 		     nds, nds,
-		     f, 1,
+		     f, 0,
 		     always1, 1 );
 
 	/* Update doorbell record */
@@ -1211,7 +1352,7 @@ static int arbel_complete ( struct ib_device *ibdev,
 	iobuf = wq->iobufs[wqe_idx];
 	if ( ! iobuf ) {
 		DBGC ( arbel, "Arbel %p CQN %lx QPN %lx empty WQE %x\n",
-		       arbel, cq->cqn, qpn, wqe_idx );
+		       arbel, cq->cqn, qp->qpn, wqe_idx );
 		return -EIO;
 	}
 	wq->iobufs[wqe_idx] = NULL;
@@ -1553,6 +1694,27 @@ static void arbel_close ( struct ib_device *ibdev ) {
 	}
 }
 
+/**
+ * Set port information
+ *
+ * @v ibdev		Infiniband device
+ * @v mad		Set port information MAD
+ * @ret rc		Return status code
+ */
+static int arbel_set_port_info ( struct ib_device *ibdev,
+				 union ib_mad *mad ) {
+	int rc;
+
+	/* Send the MAD to the embedded SMA */
+	if ( ( rc = arbel_mad ( ibdev, mad ) ) != 0 )
+		return rc;
+
+	/* Update parameters held in software */
+	ib_smc_update ( ibdev, arbel_mad );
+
+	return 0;
+}
+
 /***************************************************************************
  *
  * Multicast group operations
@@ -1664,6 +1826,7 @@ static struct ib_device_operations arbel_ib_operations = {
 	.close		= arbel_close,
 	.mcast_attach	= arbel_mcast_attach,
 	.mcast_detach	= arbel_mcast_detach,
+	.set_port_info	= arbel_set_port_info,
 };
 
 /***************************************************************************
@@ -1862,7 +2025,8 @@ static int arbel_alloc_icm ( struct arbel *arbel,
 	icm_offset = ( ( arbel->limits.reserved_uars + 1 ) << 12 );
 
 	/* Queue pair contexts */
-	log_num_qps = fls ( arbel->limits.reserved_qps + ARBEL_MAX_QPS - 1 );
+	log_num_qps = fls ( arbel->limits.reserved_qps +
+			    ARBEL_RSVD_SPECIAL_QPS + ARBEL_MAX_QPS - 1 );
 	MLX_FILL_2 ( init_hca, 13,
 		     qpc_eec_cqc_eqc_rdb_parameters.qpc_base_addr_l,
 		     ( icm_offset >> 7 ),
@@ -2085,7 +2249,44 @@ static int arbel_setup_mpt ( struct arbel *arbel ) {
 
 	return 0;
 }
-	
+
+/**
+ * Configure special queue pairs
+ *
+ * @v arbel		Arbel device
+ * @ret rc		Return status code
+ */
+static int arbel_configure_special_qps ( struct arbel *arbel ) {
+	unsigned int smi_qpn_base;
+	unsigned int gsi_qpn_base;
+	int rc;
+
+	/* Special QP block must be aligned on an even number */
+	arbel->special_qpn_base = ( ( arbel->limits.reserved_qps + 1 ) & ~1 );
+	arbel->qpn_base = ( arbel->special_qpn_base +
+			    ARBEL_NUM_SPECIAL_QPS );
+	DBGC ( arbel, "Arbel %p special QPs at [%lx,%lx]\n", arbel,
+	       arbel->special_qpn_base, ( arbel->qpn_base - 1 ) );
+	smi_qpn_base = arbel->special_qpn_base;
+	gsi_qpn_base = ( smi_qpn_base + 2 );
+
+	/* Issue commands to configure special QPs */
+	if ( ( rc = arbel_cmd_conf_special_qp ( arbel, 0,
+						smi_qpn_base ) ) != 0 ) {
+		DBGC ( arbel, "Arbel %p could not configure SMI QPs: %s\n",
+		       arbel, strerror ( rc ) );
+		return rc;
+	}
+	if ( ( rc = arbel_cmd_conf_special_qp ( arbel, 1,
+						gsi_qpn_base ) ) != 0 ) {
+		DBGC ( arbel, "Arbel %p could not configure GSI QPs: %s\n",
+		       arbel, strerror ( rc ) );
+		return rc;
+	}
+
+	return 0;
+}
+
 /**
  * Probe PCI device
  *
@@ -2174,6 +2375,10 @@ static int arbel_probe ( struct pci_device *pci,
 	if ( ( rc = arbel_create_eq ( arbel ) ) != 0 )
 		goto err_create_eq;
 
+	/* Configure special QPs */
+	if ( ( rc = arbel_configure_special_qps ( arbel ) ) != 0 )
+		goto err_conf_special_qps;
+
 	/* Initialise parameters using SMC */
 	for ( i = 0 ; i < ARBEL_NUM_PORTS ; i++ )
 		ib_smc_init ( arbel->ibdev[i], arbel_mad );
@@ -2193,6 +2398,7 @@ static int arbel_probe ( struct pci_device *pci,
  err_register_ibdev:
 	for ( i-- ; i >= 0 ; i-- )
 		unregister_ibdev ( arbel->ibdev[i] );
+ err_conf_special_qps:
 	arbel_destroy_eq ( arbel );
  err_create_eq:
  err_setup_mpt:

@@ -11,6 +11,7 @@ FILE_LICENCE ( GPL2_OR_LATER );
 
 #include <stdint.h>
 #include <ipxe/uaccess.h>
+#include <ipxe/ib_packet.h>
 #include "mlx_bitops.h"
 #include "MT25218_PRM.h"
 
@@ -61,6 +62,7 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #define ARBEL_HCR_RTR2RTS_QPEE		0x001b
 #define ARBEL_HCR_RTS2RTS_QPEE		0x001c
 #define ARBEL_HCR_2RST_QPEE		0x0021
+#define ARBEL_HCR_CONF_SPECIAL_QP	0x0023
 #define ARBEL_HCR_MAD_IFC		0x0024
 #define ARBEL_HCR_READ_MGM		0x0025
 #define ARBEL_HCR_WRITE_MGM		0x0026
@@ -78,6 +80,7 @@ FILE_LICENCE ( GPL2_OR_LATER );
 
 /* Service types */
 #define ARBEL_ST_UD			0x03
+#define ARBEL_ST_MLX			0x07
 
 /* MTUs */
 #define ARBEL_MTU_2048			0x04
@@ -183,6 +186,7 @@ struct MLX_DECLARE_STRUCT ( arbelprm_scalar_parameter );
 struct MLX_DECLARE_STRUCT ( arbelprm_send_doorbell );
 struct MLX_DECLARE_STRUCT ( arbelprm_ud_address_vector );
 struct MLX_DECLARE_STRUCT ( arbelprm_virtual_physical_mapping );
+struct MLX_DECLARE_STRUCT ( arbelprm_wqe_segment_ctrl_mlx );
 struct MLX_DECLARE_STRUCT ( arbelprm_wqe_segment_ctrl_send );
 struct MLX_DECLARE_STRUCT ( arbelprm_wqe_segment_data_ptr );
 struct MLX_DECLARE_STRUCT ( arbelprm_wqe_segment_next );
@@ -193,13 +197,20 @@ struct MLX_DECLARE_STRUCT ( arbelprm_wqe_segment_ud );
  *
  */
 
-#define ARBEL_MAX_GATHER 1
+#define ARBEL_MAX_GATHER 2
 
 struct arbelprm_ud_send_wqe {
 	struct arbelprm_wqe_segment_next next;
 	struct arbelprm_wqe_segment_ctrl_send ctrl;
 	struct arbelprm_wqe_segment_ud ud;
 	struct arbelprm_wqe_segment_data_ptr data[ARBEL_MAX_GATHER];
+} __attribute__ (( packed ));
+
+struct arbelprm_mlx_send_wqe {
+	struct arbelprm_wqe_segment_next next;
+	struct arbelprm_wqe_segment_ctrl_mlx ctrl;
+	struct arbelprm_wqe_segment_data_ptr data[ARBEL_MAX_GATHER];
+	uint8_t headers[IB_MAX_HEADER_SIZE];
 } __attribute__ (( packed ));
 
 #define ARBEL_MAX_SCATTER 1
@@ -298,7 +309,9 @@ struct arbel_dev_limits {
 
 /** An Arbel send work queue entry */
 union arbel_send_wqe {
+	struct arbelprm_wqe_segment_next next;
 	struct arbelprm_ud_send_wqe ud;
+	struct arbelprm_mlx_send_wqe mlx;
 	uint8_t force_align[ARBEL_SEND_WQE_ALIGN];
 } __attribute__ (( packed ));
 
@@ -330,6 +343,16 @@ struct arbel_recv_work_queue {
 	/** Size of work queue */
 	size_t wqe_size;
 };
+
+/** Number of special queue pairs */
+#define ARBEL_NUM_SPECIAL_QPS 4
+
+/** Number of queue pairs reserved for the "special QP" block
+ *
+ * The special QPs must be in (2n,2n+1) pairs, hence we need to
+ * reserve one extra QP to allow for alignment.
+ */
+#define ARBEL_RSVD_SPECIAL_QPS	( ARBEL_NUM_SPECIAL_QPS + 1 )
 
 /** Maximum number of allocatable queue pairs
  *
@@ -441,6 +464,10 @@ struct arbel {
 	
 	/** Device limits */
 	struct arbel_dev_limits limits;
+	/** Special QPN base */
+	unsigned long special_qpn_base;
+	/** QPN base */
+	unsigned long qpn_base;
 
 	/** Infiniband devices */
 	struct ib_device *ibdev[ARBEL_NUM_PORTS];
@@ -512,50 +539,59 @@ struct arbel {
  */
 
 #define ARBEL_MAX_DOORBELL_RECORDS 512
-#define ARBEL_GROUP_SEPARATOR_DOORBELL ( ARBEL_MAX_CQS + ARBEL_MAX_QPS )
+#define ARBEL_GROUP_SEPARATOR_DOORBELL \
+	( ARBEL_MAX_CQS + ARBEL_RSVD_SPECIAL_QPS + ARBEL_MAX_QPS )
 
 /**
  * Get arm completion queue doorbell index
  *
- * @v cqn_offset	Completion queue number offset
+ * @v arbel		Arbel device
+ * @v cq		Completion queue
  * @ret doorbell_idx	Doorbell index
  */
 static inline unsigned int
-arbel_cq_arm_doorbell_idx ( unsigned int cqn_offset ) {
-	return cqn_offset;
+arbel_cq_arm_doorbell_idx ( struct arbel *arbel,
+			    struct ib_completion_queue *cq ) {
+	return ( cq->cqn - arbel->limits.reserved_cqs );
 }
 
 /**
  * Get send work request doorbell index
  *
- * @v qpn_offset	Queue pair number offset
+ * @v arbel		Arbel device
+ * @v qp		Queue pair
  * @ret doorbell_idx	Doorbell index
  */
 static inline unsigned int
-arbel_send_doorbell_idx ( unsigned int qpn_offset ) {
-	return ( ARBEL_MAX_CQS + qpn_offset );
+arbel_send_doorbell_idx ( struct arbel *arbel, struct ib_queue_pair *qp ) {
+	return ( ARBEL_MAX_CQS + ( qp->qpn - arbel->special_qpn_base ) );
 }
 
 /**
  * Get receive work request doorbell index
  *
- * @v qpn_offset	Queue pair number offset
+ * @v arbel		Arbel device
+ * @v qp		Queue pair
  * @ret doorbell_idx	Doorbell index
  */
 static inline unsigned int
-arbel_recv_doorbell_idx ( unsigned int qpn_offset ) {
-	return ( ARBEL_MAX_DOORBELL_RECORDS - ARBEL_MAX_CQS - qpn_offset - 1 );
+arbel_recv_doorbell_idx ( struct arbel *arbel, struct ib_queue_pair *qp ) {
+	return ( ARBEL_MAX_DOORBELL_RECORDS - ARBEL_MAX_CQS -
+		 ( qp->qpn - arbel->special_qpn_base ) - 1 );
 }
 
 /**
  * Get completion queue consumer counter doorbell index
  *
- * @v cqn_offset	Completion queue number offset
+ * @v arbel		Arbel device
+ * @v cq		Completion queue
  * @ret doorbell_idx	Doorbell index
  */
 static inline unsigned int
-arbel_cq_ci_doorbell_idx ( unsigned int cqn_offset ) {
-	return ( ARBEL_MAX_DOORBELL_RECORDS - cqn_offset - 1 );
+arbel_cq_ci_doorbell_idx ( struct arbel *arbel,
+			   struct ib_completion_queue *cq ) {
+	return ( ARBEL_MAX_DOORBELL_RECORDS -
+		 ( cq->cqn - arbel->limits.reserved_cqs ) - 1 );
 }
 
 #endif /* _ARBEL_H */
