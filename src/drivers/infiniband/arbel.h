@@ -360,8 +360,8 @@ struct arbel_recv_work_queue {
  */
 #define ARBEL_MAX_QPS		8
 
-/** Base queue pair number */
-#define ARBEL_QPN_BASE 0x550000
+/** Queue pair number randomisation mask */
+#define ARBEL_QPN_RANDOM_MASK 0xfff000
 
 /** An Arbel queue pair */
 struct arbel_queue_pair {
@@ -564,7 +564,9 @@ arbel_cq_arm_doorbell_idx ( struct arbel *arbel,
  */
 static inline unsigned int
 arbel_send_doorbell_idx ( struct arbel *arbel, struct ib_queue_pair *qp ) {
-	return ( ARBEL_MAX_CQS + ( qp->qpn - arbel->special_qpn_base ) );
+	return ( ARBEL_MAX_CQS +
+		 ( ( qp->qpn & ~ARBEL_QPN_RANDOM_MASK ) -
+		   arbel->special_qpn_base ) );
 }
 
 /**
@@ -577,7 +579,8 @@ arbel_send_doorbell_idx ( struct arbel *arbel, struct ib_queue_pair *qp ) {
 static inline unsigned int
 arbel_recv_doorbell_idx ( struct arbel *arbel, struct ib_queue_pair *qp ) {
 	return ( ARBEL_MAX_DOORBELL_RECORDS - ARBEL_MAX_CQS -
-		 ( qp->qpn - arbel->special_qpn_base ) - 1 );
+		 ( ( qp->qpn & ~ARBEL_QPN_RANDOM_MASK ) -
+		   arbel->special_qpn_base ) - 1 );
 }
 
 /**

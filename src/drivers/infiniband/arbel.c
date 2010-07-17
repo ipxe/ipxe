@@ -725,7 +725,8 @@ static int arbel_alloc_qpn ( struct ib_device *ibdev,
 			       arbel );
 			return qpn_offset;
 		}
-		qp->qpn = ( arbel->qpn_base + qpn_offset );
+		qp->qpn = ( ( random() & ARBEL_QPN_RANDOM_MASK ) |
+			    ( arbel->qpn_base + qpn_offset ) );
 		return 0;
 	default:
 		DBGC ( arbel, "Arbel %p unsupported QP type %d\n",
@@ -745,7 +746,7 @@ static void arbel_free_qpn ( struct ib_device *ibdev,
 	struct arbel *arbel = ib_get_drvdata ( ibdev );
 	int qpn_offset;
 
-	qpn_offset = ( qp->qpn - arbel->qpn_base );
+	qpn_offset = ( ( qp->qpn & ~ARBEL_QPN_RANDOM_MASK ) - arbel->qpn_base );
 	if ( qpn_offset >= 0 )
 		arbel_bitmask_free ( arbel->qp_inuse, qpn_offset );
 }
