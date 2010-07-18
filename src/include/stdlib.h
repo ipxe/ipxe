@@ -5,6 +5,7 @@ FILE_LICENCE ( GPL2_OR_LATER );
 
 #include <stdint.h>
 #include <assert.h>
+#include <ctype.h>
 
 /*****************************************************************************
  *
@@ -13,7 +14,46 @@ FILE_LICENCE ( GPL2_OR_LATER );
  ****************************************************************************
  */
 
+static inline int strtoul_base ( const char **pp, int base )
+{
+	const char *p = *pp;
+
+	while ( isspace ( *p ) )
+		p++;
+
+	if ( base == 0 ) {
+		base = 10;
+		if ( *p == '0' ) {
+			p++;
+			base = 8;
+			if ( ( *p | 0x20 ) == 'x' ) {
+				p++;
+				base = 16;
+			}
+		}
+	}
+
+	*pp = p;
+
+	return base;
+}
+
+static inline unsigned int strtoul_charval ( unsigned int charval )
+{
+	if ( charval >= 'a' ) {
+		charval = ( charval - 'a' + 10 );
+	} else if ( charval >= 'A' ) {
+		charval = ( charval - 'A' + 10 );
+	} else if ( charval <= '9' ) {
+		charval = ( charval - '0' );
+	}
+
+	return charval;
+}
+
 extern unsigned long strtoul ( const char *p, char **endp, int base );
+extern unsigned long long strtoull ( const char *p, char **endp, int base );
+
 
 /*****************************************************************************
  *

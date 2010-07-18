@@ -37,30 +37,10 @@ unsigned long strtoul ( const char *p, char **endp, int base ) {
 	unsigned long ret = 0;
 	unsigned int charval;
 
-	while ( isspace ( *p ) )
-		p++;
-
-	if ( base == 0 ) {
-		base = 10;
-		if ( *p == '0' ) {
-			p++;
-			base = 8;
-			if ( ( *p | 0x20 ) == 'x' ) {
-				p++;
-				base = 16;
-			}
-		}
-	}
+	base = strtoul_base ( &p, base );
 
 	while ( 1 ) {
-		charval = *p;
-		if ( charval >= 'a' ) {
-			charval = ( charval - 'a' + 10 );
-		} else if ( charval >= 'A' ) {
-			charval = ( charval - 'A' + 10 );
-		} else if ( charval <= '9' ) {
-			charval = ( charval - '0' );
-		}
+		charval = strtoul_charval ( *p );
 		if ( charval >= ( unsigned int ) base )
 			break;
 		ret = ( ( ret * base ) + charval );
