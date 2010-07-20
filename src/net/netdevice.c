@@ -24,6 +24,7 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #include <byteswap.h>
 #include <string.h>
 #include <errno.h>
+#include <config/general.h>
 #include <ipxe/if_ether.h>
 #include <ipxe/iobuf.h>
 #include <ipxe/tables.h>
@@ -126,13 +127,23 @@ int netdev_tx ( struct net_device *netdev, struct io_buffer *iobuf ) {
 	DBGC ( netdev, "NETDEV %p transmitting %p (%p+%zx)\n",
 	       netdev, iobuf, iobuf->data, iob_len ( iobuf ) );
 
+	/* Enqueue packet */
 	list_add_tail ( &iobuf->list, &netdev->tx_queue );
 
+	/* Avoid calling transmit() on unopened network devices */
 	if ( ! netdev_is_open ( netdev ) ) {
 		rc = -ENETUNREACH;
 		goto err;
 	}
-		
+
+	/* Discard packet (for test purposes) if applicable */
+	if ( ( NETDEV_DISCARD_RATE > 0 ) &&
+	     ( ( random() % NETDEV_DISCARD_RATE ) == 0 ) ) {
+		rc = -EAGAIN;
+		goto err;
+	}
+
+	/* Transmit packet */
 	if ( ( rc = netdev->op->transmit ( netdev, iobuf ) ) != 0 )
 		goto err;
 
@@ -217,6 +228,13 @@ void netdev_rx ( struct net_device *netdev, struct io_buffer *iobuf ) {
 
 	DBGC ( netdev, "NETDEV %p received %p (%p+%zx)\n",
 	       netdev, iobuf, iobuf->data, iob_len ( iobuf ) );
+
+	/* Discard packet (for test purposes) if applicable */
+	if ( ( NETDEV_DISCARD_RATE > 0 ) &&
+	     ( ( random() % NETDEV_DISCARD_RATE ) == 0 ) ) {
+		netdev_rx_err ( netdev, iobuf, -EAGAIN );
+		return;
+	}
 
 	/* Enqueue packet */
 	list_add_tail ( &iobuf->list, &netdev->rx_queue );

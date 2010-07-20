@@ -134,6 +134,7 @@ FILE_LICENCE ( GPL2_OR_LATER );
  *
  */
 
+#define	NETDEV_DISCARD_RATE 0	/* Drop every N packets (0=>no drop) */
 #undef	BUILD_SERIAL		/* Include an automatic build serial
 				 * number.  Add "bs" to the list of
 				 * make targets.  For example:
