@@ -287,7 +287,7 @@ struct tcp_options {
  * that payloads remain dword-aligned.
  */
 //#define TCP_MAX_WINDOW_SIZE	( 65536 - 4 )
-#define TCP_MAX_WINDOW_SIZE	4096
+#define TCP_MAX_WINDOW_SIZE	8192
 
 /**
  * Path MTU
@@ -312,6 +312,35 @@ struct tcp_options {
  * Currently set to 2 minutes, as per RFC 793.
  */
 #define TCP_MSL ( 2 * 60 * TICKS_PER_SEC )
+
+/**
+ * Compare TCP sequence numbers
+ *
+ * @v seq1		Sequence number 1
+ * @v seq2		Sequence number 2
+ * @ret diff		Sequence difference
+ *
+ * Analogous to memcmp(), returns an integer less than, equal to, or
+ * greater than zero if @c seq1 is found, respectively, to be before,
+ * equal to, or after @c seq2.
+ */
+static inline __attribute__ (( always_inline )) int32_t
+tcp_cmp ( uint32_t seq1, uint32_t seq2 ) {
+	return ( ( int32_t ) ( seq1 - seq2 ) );
+}
+
+/**
+ * Check if TCP sequence number lies within window
+ *
+ * @v seq		Sequence number
+ * @v start		Start of window
+ * @v len		Length of window
+ * @ret in_window	Sequence number is within window
+ */
+static inline int tcp_in_window ( uint32_t seq, uint32_t start,
+				  uint32_t len ) {
+	return ( ( seq - start ) < len );
+}
 
 extern struct tcpip_protocol tcp_protocol;
 
