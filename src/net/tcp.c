@@ -1004,14 +1004,21 @@ static void tcp_rx_enqueue ( struct tcp_connection *tcp, uint32_t seq,
  */
 static void tcp_process_rx_queue ( struct tcp_connection *tcp ) {
 	struct io_buffer *iobuf;
-	struct io_buffer *tmp;
 	struct tcp_rx_queued_header *tcpqhdr;
 	uint32_t seq;
 	unsigned int flags;
 	size_t len;
 
-	/* Process all applicable received buffers */
-	list_for_each_entry_safe ( iobuf, tmp, &tcp->rx_queue, list ) {
+	/* Process all applicable received buffers.  Note that we
+	 * cannot use list_for_each_entry() to iterate over the RX
+	 * queue, since tcp_discard() may remove packets from the RX
+	 * queue while we are processing.
+	 */
+	while ( ! list_empty ( &tcp->rx_queue ) ) {
+		list_for_each_entry ( iobuf, &tcp->rx_queue, list )
+			break;
+
+		/* Stop processing when we hit the first gap */
 		tcpqhdr = iobuf->data;
 		if ( tcp_cmp ( tcpqhdr->seq, tcp->rcv_ack ) > 0 )
 			break;
@@ -1181,6 +1188,34 @@ struct tcpip_protocol tcp_protocol __tcpip_protocol = {
 	.name = "TCP",
 	.rx = tcp_rx,
 	.tcpip_proto = IP_TCP,
+};
+
+/**
+ * Discard some cached TCP data
+ *
+ * @ret discarded	Number of cached items discarded
+ */
+static unsigned int tcp_discard ( void ) {
+	struct tcp_connection *tcp;
+	struct io_buffer *iobuf;
+	unsigned int discarded = 0;
+
+	/* Try to drop one queued RX packet from each connection */
+	list_for_each_entry ( tcp, &tcp_conns, list ) {
+		list_for_each_entry_reverse ( iobuf, &tcp->rx_queue, list ) {
+			list_del ( &iobuf->list );
+			free_iob ( iobuf );
+			discarded++;
+			break;
+		}
+	}
+
+	return discarded;
+}
+
+/** TCP cache discarder */
+struct cache_discarder tcp_cache_discarder __cache_discarder = {
+	.discard = tcp_discard,
 };
 
 /***************************************************************************
