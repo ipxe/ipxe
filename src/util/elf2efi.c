@@ -52,9 +52,9 @@ struct pe_relocs {
 struct pe_header {
 	EFI_IMAGE_DOS_HEADER dos;
 	uint8_t padding[128];
-#if defined(MDE_CPU_IA32)
+#if defined(EFI_TARGET_IA32)
 	EFI_IMAGE_NT_HEADERS32 nt;
-#elif defined(MDE_CPU_X64)
+#elif defined(EFI_TARGET_X64)
 	EFI_IMAGE_NT_HEADERS64 nt;
 #endif
 };
@@ -67,24 +67,24 @@ static struct pe_header efi_pe_header = {
 	.nt = {
 		.Signature = EFI_IMAGE_NT_SIGNATURE,
 		.FileHeader = {
-#if defined(MDE_CPU_IA32)
+#if defined(EFI_TARGET_IA32)
 			.Machine = EFI_IMAGE_MACHINE_IA32,
-#elif defined(MDE_CPU_X64)
+#elif defined(EFI_TARGET_X64)
 			.Machine = EFI_IMAGE_MACHINE_X64,
 #endif
 			.TimeDateStamp = 0x10d1a884,
 			.SizeOfOptionalHeader =
 				sizeof ( efi_pe_header.nt.OptionalHeader ),
 			.Characteristics = ( EFI_IMAGE_FILE_DLL |
-#if defined(MDE_CPU_IA32)
+#if defined(EFI_TARGET_IA32)
 					     EFI_IMAGE_FILE_32BIT_MACHINE |
 #endif
 					     EFI_IMAGE_FILE_EXECUTABLE_IMAGE ),
 		},
 		.OptionalHeader = {
-#if defined(MDE_CPU_IA32)
+#if defined(EFI_TARGET_IA32)
 			.Magic = EFI_IMAGE_NT_OPTIONAL_HDR32_MAGIC,
-#elif defined(MDE_CPU_X64)
+#elif defined(EFI_TARGET_X64)
 			.Magic = EFI_IMAGE_NT_OPTIONAL_HDR64_MAGIC,
 #endif
 			.SectionAlignment = EFI_FILE_ALIGN,
@@ -345,9 +345,9 @@ static struct pe_section * process_section ( bfd *bfd,
 	/* Extract current RVA limits from file header */
 	code_start = pe_header->nt.OptionalHeader.BaseOfCode;
 	code_end = ( code_start + pe_header->nt.OptionalHeader.SizeOfCode );
-#if defined(MDE_CPU_IA32)
+#if defined(EFI_TARGET_IA32)
 	data_start = pe_header->nt.OptionalHeader.BaseOfData;
-#elif defined(MDE_CPU_X64)
+#elif defined(EFI_TARGET_X64)
 	data_start = code_end;
 #endif
 	data_mid = ( data_start +
@@ -434,7 +434,7 @@ static struct pe_section * process_section ( bfd *bfd,
 	/* Write RVA limits back to file header */
 	pe_header->nt.OptionalHeader.BaseOfCode = code_start;
 	pe_header->nt.OptionalHeader.SizeOfCode = ( code_end - code_start );
-#if defined(MDE_CPU_IA32)
+#if defined(EFI_TARGET_IA32)
 	pe_header->nt.OptionalHeader.BaseOfData = data_start;
 #endif
 	pe_header->nt.OptionalHeader.SizeOfInitializedData =
