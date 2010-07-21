@@ -86,6 +86,21 @@ size_t freemem;
 static char heap[HEAP_SIZE] __attribute__ (( aligned ( __alignof__(void *) )));
 
 /**
+ * Discard some cached data
+ *
+ * @ret discarded	Number of cached items discarded
+ */
+static unsigned int discard_cache ( void ) {
+	struct cache_discarder *discarder;
+	unsigned int discarded = 0;
+
+	for_each_table_entry ( discarder, CACHE_DISCARDERS ) {
+		discarded += discarder->discard();
+	}
+	return discarded;
+}
+
+/**
  * Allocate a memory block
  *
  * @v size		Requested size
@@ -112,55 +127,62 @@ void * alloc_memblock ( size_t size, size_t align ) {
 	align_mask = ( align - 1 ) | ( MIN_MEMBLOCK_SIZE - 1 );
 
 	DBG ( "Allocating %#zx (aligned %#zx)\n", size, align );
-
-	/* Search through blocks for the first one with enough space */
-	list_for_each_entry ( block, &free_blocks, list ) {
-		pre_size = ( - virt_to_phys ( block ) ) & align_mask;
-		post_size = block->size - pre_size - size;
-		if ( post_size >= 0 ) {
-			/* Split block into pre-block, block, and
-			 * post-block.  After this split, the "pre"
-			 * block is the one currently linked into the
-			 * free list.
-			 */
-			pre   = block;
-			block = ( ( ( void * ) pre   ) + pre_size );
-			post  = ( ( ( void * ) block ) + size     );
-			DBG ( "[%p,%p) -> [%p,%p) + [%p,%p)\n", pre,
-			      ( ( ( void * ) pre ) + pre->size ), pre, block,
-			      post, ( ( ( void * ) pre ) + pre->size ) );
-			/* If there is a "post" block, add it in to
-			 * the free list.  Leak it if it is too small
-			 * (which can happen only at the very end of
-			 * the heap).
-			 */
-			if ( ( size_t ) post_size >= MIN_MEMBLOCK_SIZE ) {
-				post->size = post_size;
-				list_add ( &post->list, &pre->list );
+	while ( 1 ) {
+		/* Search through blocks for the first one with enough space */
+		list_for_each_entry ( block, &free_blocks, list ) {
+			pre_size = ( - virt_to_phys ( block ) ) & align_mask;
+			post_size = block->size - pre_size - size;
+			if ( post_size >= 0 ) {
+				/* Split block into pre-block, block, and
+				 * post-block.  After this split, the "pre"
+				 * block is the one currently linked into the
+				 * free list.
+				 */
+				pre   = block;
+				block = ( ( ( void * ) pre   ) + pre_size );
+				post  = ( ( ( void * ) block ) + size     );
+				DBG ( "[%p,%p) -> [%p,%p) + [%p,%p)\n", pre,
+				      ( ( ( void * ) pre ) + pre->size ),
+				      pre, block, post,
+				      ( ( ( void * ) pre ) + pre->size ) );
+				/* If there is a "post" block, add it in to
+				 * the free list.  Leak it if it is too small
+				 * (which can happen only at the very end of
+				 * the heap).
+				 */
+				if ( (size_t) post_size >= MIN_MEMBLOCK_SIZE ) {
+					post->size = post_size;
+					list_add ( &post->list, &pre->list );
+				}
+				/* Shrink "pre" block, leaving the main block
+				 * isolated and no longer part of the free
+				 * list.
+				 */
+				pre->size = pre_size;
+				/* If there is no "pre" block, remove it from
+				 * the list.  Also remove it (i.e. leak it) if
+				 * it is too small, which can happen only at
+				 * the very start of the heap.
+				 */
+				if ( pre_size < MIN_MEMBLOCK_SIZE )
+					list_del ( &pre->list );
+				/* Update total free memory */
+				freemem -= size;
+				/* Return allocated block */
+				DBG ( "Allocated [%p,%p)\n", block,
+				      ( ( ( void * ) block ) + size ) );
+				return block;
 			}
-			/* Shrink "pre" block, leaving the main block
-			 * isolated and no longer part of the free
-			 * list.
-			 */
-			pre->size = pre_size;
-			/* If there is no "pre" block, remove it from
-			 * the list.  Also remove it (i.e. leak it) if
-			 * it is too small, which can happen only at
-			 * the very start of the heap.
-			 */
-			if ( pre_size < MIN_MEMBLOCK_SIZE )
-				list_del ( &pre->list );
-			/* Update total free memory */
-			freemem -= size;
-			/* Return allocated block */
-			DBG ( "Allocated [%p,%p)\n", block,
-			      ( ( ( void * ) block ) + size ) );
-			return block;
+		}
+
+		/* Try discarding some cached data to free up memory */
+		if ( ! discard_cache() ) {
+			/* Nothing available to discard */
+			DBG ( "Failed to allocate %#zx (aligned %#zx)\n",
+			      size, align );
+			return NULL;
 		}
 	}
-
-	DBG ( "Failed to allocate %#zx (aligned %#zx)\n", size, align );
-	return NULL;
 }
 
 /**

@@ -18,6 +18,7 @@ FILE_LICENCE ( GPL2_OR_LATER );
  *
  */
 #include <stdlib.h>
+#include <ipxe/tables.h>
 
 extern size_t freemem;
 
@@ -55,5 +56,21 @@ static inline void * __malloc malloc_dma ( size_t size, size_t phys_align ) {
 static inline void free_dma ( void *ptr, size_t size ) {
 	free_memblock ( ptr, size );
 }
+
+/** A cache discarder */
+struct cache_discarder {
+	/**
+	 * Discard some cached data
+	 *
+	 * @ret discarded	Number of cached items discarded
+	 */
+	unsigned int ( * discard ) ( void );
+};
+
+/** Cache discarder table */
+#define CACHE_DISCARDERS __table ( struct cache_discarder, "cache_discarders" )
+
+/** Declare a cache discarder */
+#define __cache_discarder __table_entry ( CACHE_DISCARDERS, 01 )
 
 #endif /* _IPXE_MALLOC_H */
