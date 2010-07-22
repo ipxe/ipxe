@@ -1111,7 +1111,7 @@ static int tcp_rx ( struct io_buffer *iobuf,
 		    ( ( flags & TCP_FIN ) ? 1 : 0 ) );
 
 	/* Dump header */
-	DBGC2 ( tcp, "TCP %p RX %d<-%d           %08x %08x..%08zx %4zd",
+	DBGC2 ( tcp, "TCP %p RX %d<-%d           %08x %08x..%08x %4zd",
 		tcp, ntohs ( tcphdr->dest ), ntohs ( tcphdr->src ),
 		ntohl ( tcphdr->ack ), ntohl ( tcphdr->seq ),
 		( ntohl ( tcphdr->seq ) + seq_len ), len );
