@@ -34,8 +34,8 @@ FILE_LICENCE ( GPL2_OR_LATER );
 /**
  * Dummy transfer metadata
  *
- * This gets passed to xfer_interface::deliver_iob() and equivalents
- * when no metadata is available.
+ * This gets passed to xfer_interface::deliver() and equivalents when
+ * no metadata is available.
  */
 static struct xfer_metadata dummy_metadata;
 
@@ -216,10 +216,13 @@ int xfer_deliver_iob ( struct interface *intf, struct io_buffer *iobuf ) {
  * Deliver datagram as raw data
  *
  * @v intf		Data transfer interface
- * @v iobuf		Datagram I/O buffer
+ * @v data		Data
+ * @v len		Length of data
+ * @v meta		Data transfer metadata
  * @ret rc		Return status code
  */
-int xfer_deliver_raw ( struct interface *intf, const void *data, size_t len ) {
+int xfer_deliver_raw_meta ( struct interface *intf, const void *data,
+			    size_t len, struct xfer_metadata *meta ) {
 	struct io_buffer *iobuf;
 
 	iobuf = xfer_alloc_iob ( intf, len );
@@ -227,7 +230,19 @@ int xfer_deliver_raw ( struct interface *intf, const void *data, size_t len ) {
 		return -ENOMEM;
 
 	memcpy ( iob_put ( iobuf, len ), data, len );
-	return xfer_deliver_iob ( intf, iobuf );
+	return xfer_deliver ( intf, iobuf, meta );
+}
+
+/**
+ * Deliver datagram as raw data without metadata
+ *
+ * @v intf		Data transfer interface
+ * @v data		Data
+ * @v len		Length of data
+ * @ret rc		Return status code
+ */
+int xfer_deliver_raw ( struct interface *intf, const void *data, size_t len ) {
+	return xfer_deliver_raw_meta ( intf, data, len, &dummy_metadata );
 }
 
 /**

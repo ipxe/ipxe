@@ -74,6 +74,8 @@ extern int xfer_deliver ( struct interface *intf,
 extern int xfer_redirect ( struct interface *xfer, int type, ... );
 extern int xfer_deliver_iob ( struct interface *intf,
 			      struct io_buffer *iobuf );
+extern int xfer_deliver_raw_meta ( struct interface *intf, const void *data,
+				   size_t len, struct xfer_metadata *meta );
 extern int xfer_deliver_raw ( struct interface *intf,
 			      const void *data, size_t len );
 extern int xfer_vprintf ( struct interface *intf,
