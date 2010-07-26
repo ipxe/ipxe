@@ -309,6 +309,31 @@ FILE_LICENCE ( GPL2_OR_LATER );
 			     table_start ( table ) ) )
 
 /**
+ * Get index of entry within linker table
+ *
+ * @v table		Linker table
+ * @v entry		Table entry
+ *
+ * Example usage:
+ *
+ * @code
+ *
+ *   #define FROBNICATORS __table ( struct frobnicator, "frobnicators" )
+ *
+ *   #define __frobnicator __table_entry ( FROBNICATORS, 01 )
+ *
+ *   struct frobnicator my_frob __frobnicator = {
+ *      ...
+ *   };
+ *
+ *   unsigned int my_frob_idx = table_index ( FROBNICATORS, &my_frob );
+ *
+ * @endcode
+ */
+#define table_index( table, entry )					\
+	( ( unsigned int ) ( (entry) - table_start ( table ) ) )
+
+/**
  * Iterate through all entries within a linker table
  *
  * @v pointer		Entry pointer
