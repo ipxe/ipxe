@@ -25,7 +25,7 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #include <assert.h>
 #include <ipxe/list.h>
 #include <ipxe/blockdev.h>
-#include <ipxe/memmap.h>
+#include <ipxe/io.h>
 #include <realmode.h>
 #include <bios.h>
 #include <biosint.h>

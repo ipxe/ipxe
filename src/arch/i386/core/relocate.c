@@ -1,6 +1,5 @@
 #include <ipxe/io.h>
 #include <registers.h>
-#include <ipxe/memmap.h>
 
 /*
  * Originally by Eric Biederman

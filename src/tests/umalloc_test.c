@@ -1,7 +1,7 @@
 #include <stdio.h>
 #include <ipxe/uaccess.h>
 #include <ipxe/umalloc.h>
-#include <ipxe/memmap.h>
+#include <ipxe/io.h>
 
 void umalloc_test ( void ) {
 	struct memory_map memmap;

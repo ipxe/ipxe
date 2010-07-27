@@ -23,7 +23,7 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #include <basemem.h>
 #include <fakee820.h>
 #include <ipxe/init.h>
-#include <ipxe/memmap.h>
+#include <ipxe/io.h>
 #include <ipxe/hidemem.h>
 
 /** Set to true if you want to test a fake E820 map */

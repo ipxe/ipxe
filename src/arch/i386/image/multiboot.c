@@ -33,7 +33,7 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #include <ipxe/uaccess.h>
 #include <ipxe/image.h>
 #include <ipxe/segment.h>
-#include <ipxe/memmap.h>
+#include <ipxe/io.h>
 #include <ipxe/elf.h>
 #include <ipxe/init.h>
 #include <ipxe/features.h>

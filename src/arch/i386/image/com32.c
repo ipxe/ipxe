@@ -38,7 +38,7 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #include <ipxe/image.h>
 #include <ipxe/segment.h>
 #include <ipxe/init.h>
-#include <ipxe/memmap.h>
+#include <ipxe/io.h>
 
 struct image_type com32_image_type __image_type ( PROBE_NORMAL );
 

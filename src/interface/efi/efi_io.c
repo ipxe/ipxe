@@ -176,6 +176,17 @@ static void efi_iodelay ( void ) {
 	outb ( 0, 0x80 );
 }
 
+/**
+ * Get memory map
+ *
+ * Can't be done on EFI so return an empty map
+ *
+ * @v memmap		Memory map to fill in
+ */
+static void efi_get_memmap ( struct memory_map *memmap ) {
+	memmap->count = 0;
+}
+
 PROVIDE_IOAPI_INLINE ( efi, phys_to_bus );
 PROVIDE_IOAPI_INLINE ( efi, bus_to_phys );
 PROVIDE_IOAPI_INLINE ( efi, ioremap );
@@ -203,3 +214,4 @@ PROVIDE_IOAPI_INLINE ( efi, outsw );
 PROVIDE_IOAPI_INLINE ( efi, outsl );
 PROVIDE_IOAPI ( efi, iodelay, efi_iodelay );
 PROVIDE_IOAPI_INLINE ( efi, mb );
+PROVIDE_IOAPI ( efi, get_memmap, efi_get_memmap );

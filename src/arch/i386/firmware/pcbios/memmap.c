@@ -23,7 +23,7 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #include <realmode.h>
 #include <bios.h>
 #include <memsizes.h>
-#include <ipxe/memmap.h>
+#include <ipxe/io.h>
 
 /**
  * @file
@@ -282,7 +282,7 @@ static int meme820 ( struct memory_map *memmap ) {
  *
  * @v memmap		Memory map to fill in
  */
-void get_memmap ( struct memory_map *memmap ) {
+void x86_get_memmap ( struct memory_map *memmap ) {
 	unsigned int basemem, extmem;
 	int rc;
 
@@ -310,3 +310,5 @@ void get_memmap ( struct memory_map *memmap ) {
 	memmap->regions[1].end = 0x100000 + ( extmem * 1024 );
 	memmap->count = 2;
 }
+
+PROVIDE_IOAPI ( x86, get_memmap, x86_get_memmap );

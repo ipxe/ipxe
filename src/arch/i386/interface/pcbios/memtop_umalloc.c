@@ -29,7 +29,7 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #include <errno.h>
 #include <ipxe/uaccess.h>
 #include <ipxe/hidemem.h>
-#include <ipxe/memmap.h>
+#include <ipxe/io.h>
 #include <ipxe/umalloc.h>
 
 /** Alignment of external allocated memory */
