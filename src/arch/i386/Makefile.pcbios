@@ -8,6 +8,10 @@ LDSCRIPT	= arch/i386/scripts/i386.lds
 #
 LDFLAGS		+= -N --no-check-sections
 
+# pcbios specific drivers
+SRCDIRS		+= arch/i386/drivers
+SRCDIRS		+= arch/i386/drivers/net
+
 # Media types.
 #
 MEDIA		+= rom
