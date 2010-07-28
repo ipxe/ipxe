@@ -76,7 +76,7 @@ FILE_LICENCE ( GPL2_ONLY );
 static int
 mtnic_alloc_aligned(unsigned int size, void **va, unsigned long *pa, unsigned int alignment)
 {
-	*va = alloc_memblock(size, alignment);
+	*va = malloc_dma(size, alignment);
 	if (!*va) {
 		return -EADDRINUSE;
 	}
@@ -212,7 +212,7 @@ mtnic_alloc_ring(struct mtnic_port *priv, struct mtnic_ring *ring,
 					  (void *)&ring->db, &ring->db_dma, 32);
 		if (err) {
 			DBG("Failed allocating Rx ring doorbell record\n");
-			free_memblock(ring->buf, ring->buf_size);
+			free_dma(ring->buf, ring->buf_size);
 			return -EADDRINUSE;
 		}
 
@@ -230,7 +230,7 @@ mtnic_alloc_ring(struct mtnic_port *priv, struct mtnic_ring *ring,
 		err = mtnic_alloc_iobuf ( priv, ring, DEF_IOBUF_SIZE );
 		if (err) {
 			DBG("ERROR Allocating io buffer\n");
-			free_memblock(ring->buf, ring->buf_size);
+			free_dma(ring->buf, ring->buf_size);
 			return -EADDRINUSE;
 		}
 
@@ -251,7 +251,7 @@ mtnic_alloc_ring(struct mtnic_port *priv, struct mtnic_ring *ring,
 					priv->mtnic->fw.txcq_db_offset, PAGE_SIZE);
 		if (!ring->txcq_db) {
 			DBG("Couldn't map txcq doorbell, aborting...\n");
-			free_memblock(ring->buf, ring->buf_size);
+			free_dma(ring->buf, ring->buf_size);
 			return -EADDRINUSE;
 		}
 	}
@@ -296,7 +296,7 @@ mtnic_alloc_cq(struct net_device *dev, int num, struct mtnic_cq *cq,
 				  (void *)&cq->buf, &cq->dma, PAGE_SIZE);
 	if (err) {
 		DBG("Failed allocating CQ buffer\n");
-		free_memblock(cq->db, sizeof(struct mtnic_cq_db_record));
+		free_dma(cq->db, sizeof(struct mtnic_cq_db_record));
 		return -EADDRINUSE;
 	}
 	memset(cq->buf, 0, cq->buf_size);
@@ -370,16 +370,16 @@ mtnic_alloc_resources(struct net_device *dev)
 	return 0;
 
 cq1_error:
-	free_memblock(priv->cq[1].buf, priv->cq[1].buf_size);
-	free_memblock(priv->cq[1].db, sizeof(struct mtnic_cq_db_record));
+	free_dma(priv->cq[1].buf, priv->cq[1].buf_size);
+	free_dma(priv->cq[1].db, sizeof(struct mtnic_cq_db_record));
 
 rx_error:
-	free_memblock(priv->rx_ring.buf, priv->rx_ring.buf_size);
-	free_memblock(priv->rx_ring.db, sizeof(struct mtnic_cq_db_record));
+	free_dma(priv->rx_ring.buf, priv->rx_ring.buf_size);
+	free_dma(priv->rx_ring.db, sizeof(struct mtnic_cq_db_record));
 	mtnic_free_io_buffers(&priv->rx_ring);
 cq0_error:
-	free_memblock(priv->cq[0].buf, priv->cq[0].buf_size);
-	free_memblock(priv->cq[0].db, sizeof(struct mtnic_cq_db_record));
+	free_dma(priv->cq[0].buf, priv->cq[0].buf_size);
+	free_dma(priv->cq[0].db, sizeof(struct mtnic_cq_db_record));
 
 	return -EADDRINUSE;
 }
@@ -1159,7 +1159,7 @@ int mtnic_init_card(struct mtnic *mtnic)
 
 eq_error:
 	iounmap(mtnic->eq_db);
-	free_memblock(mtnic->eq.buf, mtnic->eq.buf_size);
+	free_dma(mtnic->eq.buf, mtnic->eq.buf_size);
 map_extra_error:
 	ufree((intptr_t)mtnic->fw.extra_pages.buf);
 map_fw_error:
@@ -1167,7 +1167,7 @@ map_fw_error:
 
 cmd_error:
 	iounmap(mtnic->hcr);
-	free_memblock(mtnic->cmd.buf, PAGE_SIZE);
+	free_dma(mtnic->cmd.buf, PAGE_SIZE);
 
 	return -EADDRINUSE;
 }
@@ -1465,14 +1465,14 @@ cq_error:
 
 allocation_error:
 
-	free_memblock(priv->tx_ring.buf, priv->tx_ring.buf_size);
+	free_dma(priv->tx_ring.buf, priv->tx_ring.buf_size);
 	iounmap(priv->tx_ring.txcq_db);
-	free_memblock(priv->cq[1].buf, priv->cq[1].buf_size);
-	free_memblock(priv->cq[1].db, sizeof(struct mtnic_cq_db_record));
-	free_memblock(priv->rx_ring.buf, priv->rx_ring.buf_size);
-	free_memblock(priv->rx_ring.db, sizeof(struct mtnic_cq_db_record));
-	free_memblock(priv->cq[0].buf, priv->cq[0].buf_size);
-	free_memblock(priv->cq[0].db, sizeof(struct mtnic_cq_db_record));
+	free_dma(priv->cq[1].buf, priv->cq[1].buf_size);
+	free_dma(priv->cq[1].db, sizeof(struct mtnic_cq_db_record));
+	free_dma(priv->rx_ring.buf, priv->rx_ring.buf_size);
+	free_dma(priv->rx_ring.db, sizeof(struct mtnic_cq_db_record));
+	free_dma(priv->cq[0].buf, priv->cq[0].buf_size);
+	free_dma(priv->cq[0].db, sizeof(struct mtnic_cq_db_record));
 
 	mtnic_free_io_buffers(&priv->rx_ring);
 
@@ -1625,14 +1625,14 @@ mtnic_close(struct net_device *dev)
 		mdelay ( 10 );
 
 		/* free memory */
-		free_memblock(priv->tx_ring.buf, priv->tx_ring.buf_size);
+		free_dma(priv->tx_ring.buf, priv->tx_ring.buf_size);
 		iounmap(priv->tx_ring.txcq_db);
-		free_memblock(priv->cq[1].buf, priv->cq[1].buf_size);
-		free_memblock(priv->cq[1].db, sizeof(struct mtnic_cq_db_record));
-		free_memblock(priv->rx_ring.buf, priv->rx_ring.buf_size);
-		free_memblock(priv->rx_ring.db, sizeof(struct mtnic_cq_db_record));
-		free_memblock(priv->cq[0].buf, priv->cq[0].buf_size);
-		free_memblock(priv->cq[0].db, sizeof(struct mtnic_cq_db_record));
+		free_dma(priv->cq[1].buf, priv->cq[1].buf_size);
+		free_dma(priv->cq[1].db, sizeof(struct mtnic_cq_db_record));
+		free_dma(priv->rx_ring.buf, priv->rx_ring.buf_size);
+		free_dma(priv->rx_ring.db, sizeof(struct mtnic_cq_db_record));
+		free_dma(priv->cq[0].buf, priv->cq[0].buf_size);
+		free_dma(priv->cq[0].db, sizeof(struct mtnic_cq_db_record));
 
 		/* Free RX buffers */
 		mtnic_free_io_buffers(&priv->rx_ring);
@@ -1682,11 +1682,11 @@ mtnic_disable(struct pci_device *pci)
 		DBG("Error Releasing resources %d\n", err);
 	}
 
-	free_memblock(mtnic->cmd.buf, PAGE_SIZE);
+	free_dma(mtnic->cmd.buf, PAGE_SIZE);
 	iounmap(mtnic->hcr);
 	ufree((intptr_t)mtnic->fw.fw_pages.buf);
 	ufree((intptr_t)mtnic->fw.extra_pages.buf);
-	free_memblock(mtnic->eq.buf, mtnic->eq.buf_size);
+	free_dma(mtnic->eq.buf, mtnic->eq.buf_size);
 	iounmap(mtnic->eq_db);
 
 
