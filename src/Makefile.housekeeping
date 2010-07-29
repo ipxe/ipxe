@@ -174,8 +174,9 @@ endif
 # make goals.
 #
 BIN_GOALS	:= $(filter bin/% bin-%,$(MAKECMDGOALS))
-BIN_GOAL_BINS	:= $(foreach BG,$(BIN_GOALS),$(firstword $(subst /, ,$(BG))))
-NUM_BINS	:= $(words $(sort $(BIN_GOAL_BINS)))
+BIN_GOALS_BINS	:= $(sort $(foreach BG,$(BIN_GOALS),\
+				    $(firstword $(subst /, ,$(BG)))))
+NUM_BINS	:= $(words $(BIN_GOALS_BINS))
 
 ifeq ($(NUM_BINS),0)
 
@@ -191,20 +192,29 @@ ifeq ($(NUM_BINS),1)
 # If exactly one BIN directory was specified, set BIN to match this
 # directory.
 #
-BIN		:= $(firstword $(BIN_GOAL_BINS))
+BIN		:= $(firstword $(BIN_GOALS_BINS))
 
 else # NUM_BINS == 1
 
 # More than one BIN directory was specified.  We cannot handle the
 # latter case within a single make invocation, so set up recursive
-# targets for each BIN directory.
+# targets for each BIN directory.  Use exactly one target for each BIN
+# directory since running multiple make invocations within the same
+# BIN directory is likely to cause problems.
 #
 # Leave $(BIN) undefined.  This has implications for any target that
 # depends on $(BIN); such targets should be made conditional upon the
 # existence of $(BIN).
 #
-$(BIN_GOALS) : % : BIN_RECURSE
-	$(Q)$(MAKE) --no-print-directory BIN=$(firstword $(subst /, ,$@)) $@
+BIN_GOALS_FIRST	:= $(foreach BGB,$(BIN_GOALS_BINS),\
+			     $(firstword $(filter $(BGB)/%,$(BIN_GOALS))))
+BIN_GOALS_OTHER	:= $(filter-out $(BIN_GOALS_FIRST),$(BIN_GOALS))
+
+$(BIN_GOALS_FIRST) : % : BIN_RECURSE
+	$(Q)$(MAKE) --no-print-directory BIN=$(firstword $(subst /, ,$@)) \
+	    $(filter $(firstword $(subst /, ,$@))/%, $(BIN_GOALS))
+$(BIN_GOALS_OTHER) : % : BIN_RECURSE
+	$(Q)$(TRUE)
 .PHONY : BIN_RECURSE
 
 endif # NUM_BINS == 1
