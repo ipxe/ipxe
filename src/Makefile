@@ -97,8 +97,9 @@ INCDIRS		+= include .
 # Default build target: build the most common targets and print out a
 # helpfully suggestive message
 #
-all : bin/blib.a bin/ipxe.dsk bin/ipxe.iso bin/ipxe.usb bin/undionly.kpxe \
-      bin/rtl8139.rom
+ALL		:= bin/blib.a bin/ipxe.dsk bin/ipxe.iso bin/ipxe.usb \
+		   bin/undionly.kpxe bin/rtl8139.rom
+all : $(ALL)
 	@$(ECHO) '==========================================================='
 	@$(ECHO)
 	@$(ECHO) 'To create a bootable floppy, type'
@@ -120,6 +121,19 @@ all : bin/blib.a bin/ipxe.dsk bin/ipxe.iso bin/ipxe.usb bin/undionly.kpxe \
 	@$(ECHO) '    make bin/<rom-name>.<output-format>'
 	@$(ECHO)
 	@$(ECHO) '==========================================================='
+
+###############################################################################
+#
+# Comprehensive build target: build a selection of cross-platform
+# targets to expose potential build errors that show up only on
+# certain platforms
+#
+everything :
+	$(Q)$(MAKE) --no-print-directory $(ALL) \
+		bin-i386-efi/ipxe.efi bin-i386-efi/ipxe.efidrv \
+		bin-i386-efi/ipxe.efirom \
+		bin-x86_64-efi/ipxe.efi bin-x86_64-efi/ipxe.efidrv \
+		bin-x86_64-efi/ipxe.efirom
 
 ###############################################################################
 #
