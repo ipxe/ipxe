@@ -402,9 +402,9 @@ int sec80211_detect_ie ( int is_rsn, u8 *start, u8 *end,
  * it. If it does not exist, any network with the PRIVACY bit set in
  * beacon->capab should be considered unknown.
  */
-int _sec80211_detect ( struct io_buffer *iob,
-		       enum net80211_security_proto *secprot,
-		       enum net80211_crypto_alg *crypt )
+int sec80211_detect ( struct io_buffer *iob,
+		      enum net80211_security_proto *secprot,
+		      enum net80211_crypto_alg *crypt )
 {
 	struct ieee80211_frame *hdr = iob->data;
 	struct ieee80211_beacon *beacon =
