@@ -2720,6 +2720,7 @@ void net80211_rx ( struct net80211_device *dev, struct io_buffer *iob,
 		}
 		free_iob ( iob );
 		iob = niob;
+		hdr = iob->data;
 	}
 
 	dev->last_signal = signal;
