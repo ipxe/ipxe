@@ -198,12 +198,12 @@ return s;
 #define __HAVE_ARCH_MEMSWAP
 static inline void * memswap(void *dest, void *src, size_t n)
 {
-int d0, d1, d2, d3;
+long d0, d1, d2, d3;
 __asm__ __volatile__(
 	"\n1:\t"
-	"movb (%%edi),%%al\n\t"
-	"xchgb (%%esi),%%al\n\t"
-	"incl %%esi\n\t"
+	"movb (%2),%%al\n\t"
+	"xchgb (%1),%%al\n\t"
+	"inc %1\n\t"
 	"stosb\n\t"
 	"loop 1b"
 	: "=&c" (d0), "=&S" (d1), "=&D" (d2), "=&a" (d3)
