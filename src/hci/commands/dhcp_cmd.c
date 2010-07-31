@@ -45,10 +45,50 @@ FILE_LICENCE ( GPL2_OR_LATER );
  */
 static void dhcp_syntax ( char **argv ) {
 	printf ( "Usage:\n"
-		 "  %s <interface>\n"
+		 "  %s [<interface>] [<interface>...]\n"
 		 "\n"
 		 "Configure a network interface using DHCP\n",
 		 argv[0] );
+}
+
+/**
+ * Execute "dhcp" command for a network device
+ *
+ * @v netdev		Network device
+ * @ret rc		Exit code
+ */
+static int dhcp_exec_netdev ( struct net_device *netdev ) {
+	int rc;
+
+	if ( ( rc = dhcp ( netdev ) ) != 0 ) {
+		printf ( "Could not configure %s: %s\n",
+			 netdev->name, strerror ( rc ) );
+
+		/* Close device on failure, to avoid memory exhaustion */
+		netdev_close ( netdev );
+
+		return 1;
+	}
+
+	return 0;
+}
+
+/**
+ * Execute "dhcp" command for a named network device
+ *
+ * @v netdev_name	Network device name
+ * @ret rc		Exit code
+ */
+static int dhcp_exec_name ( const char *netdev_name ) {
+	struct net_device *netdev;
+
+	netdev = find_netdev ( netdev_name );
+	if ( ! netdev ) {
+		printf ( "No such interface \"%s\"\n", netdev_name );
+		return 1;
+	}
+
+	return dhcp_exec_netdev ( netdev );
 }
 
 /**
@@ -63,7 +103,7 @@ static int dhcp_exec ( int argc, char **argv ) {
 		{ "help", 0, NULL, 'h' },
 		{ NULL, 0, NULL, 0 },
 	};
-	const char *netdev_txt;
+	const char *netdev_name;
 	struct net_device *netdev;
 	int c;
 	int rc;
@@ -80,28 +120,22 @@ static int dhcp_exec ( int argc, char **argv ) {
 		}
 	}
 
-	/* Need exactly one interface name remaining after the options */
-	if ( optind != ( argc - 1 ) ) {
-		dhcp_syntax ( argv );
-		return 1;
-	}
-	netdev_txt = argv[optind];
-
-	/* Parse arguments */
-	netdev = find_netdev ( netdev_txt );
-	if ( ! netdev ) {
-		printf ( "No such interface: %s\n", netdev_txt );
-		return 1;
-	}
-
-	/* Perform DHCP */
-	if ( ( rc = dhcp ( netdev ) ) != 0 ) {
-		printf ( "Could not configure %s: %s\n", netdev->name,
-			 strerror ( rc ) );
-		return 1;
+	if ( optind != argc ) {
+		/* Treat arguments as a list of interfaces to try */
+		while ( optind != argc ) {
+			netdev_name = argv[optind++];
+			if ( ( rc = dhcp_exec_name ( netdev_name ) ) == 0 )
+				return 0;
+		}
+	} else {
+		/* Try all interfaces */
+		for_each_netdev ( netdev ) {
+			if ( ( rc = dhcp_exec_netdev ( netdev ) ) == 0 )
+				return 0;
+		}
 	}
 
-	return 0;
+	return 1;
 }
 
 /**
