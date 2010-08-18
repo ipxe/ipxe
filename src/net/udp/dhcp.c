@@ -1389,7 +1389,7 @@ static struct sockaddr dhcp_peer = {
 /**
  * Get cached DHCPACK where none exists
  */
-__weak void get_cached_dhcpack ( void ) {}
+__weak void get_cached_dhcpack ( void ) { __keepme }
 
 /**
  * Start DHCP state machine on a network device
