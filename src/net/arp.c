@@ -63,7 +63,7 @@ static struct arp_entry arp_table[NUM_ARP_ENTRIES];
 
 static unsigned int next_new_arp_entry = 0;
 
-struct net_protocol arp_protocol;
+struct net_protocol arp_protocol __net_protocol;
 
 /**
  * Find entry in the ARP cache

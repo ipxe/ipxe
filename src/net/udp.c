@@ -44,7 +44,7 @@ static LIST_HEAD ( udp_conns );
 
 /* Forward declatations */
 static struct interface_descriptor udp_xfer_desc;
-struct tcpip_protocol udp_protocol;
+struct tcpip_protocol udp_protocol __tcpip_protocol;
 
 /**
  * Bind UDP connection to local port

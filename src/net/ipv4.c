@@ -26,8 +26,6 @@ FILE_LICENCE ( GPL2_OR_LATER );
 /* Unique IP datagram identification number */
 static uint16_t next_ident = 0;
 
-struct net_protocol ipv4_protocol;
-
 /** List of IPv4 miniroutes */
 struct list_head ipv4_miniroutes = LIST_HEAD_INIT ( ipv4_miniroutes );
 

@@ -15,8 +15,6 @@
 #include <ipxe/netdevice.h>
 #include <ipxe/if_ether.h>
 
-struct net_protocol ipv6_protocol;
-
 /* Unspecified IP6 address */
 static struct in6_addr ip6_none = {
         .in6_u.u6_addr32 = { 0,0,0,0 }

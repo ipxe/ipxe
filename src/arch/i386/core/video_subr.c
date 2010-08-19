@@ -12,7 +12,7 @@
 #include <ipxe/init.h>
 #include "vga.h"
 
-struct console_driver vga_console;
+struct console_driver vga_console __console_driver;
 
 static char *vidmem;		/* The video buffer */
 static int video_line, video_col;

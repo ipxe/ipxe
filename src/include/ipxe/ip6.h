@@ -11,6 +11,8 @@ FILE_LICENCE ( GPL2_OR_LATER );
 
 #include <stdint.h>
 #include <ipxe/in.h>
+#include <ipxe/netdevice.h>
+#include <ipxe/tcpip.h>
 
 /* IP6 constants */
 
@@ -64,11 +66,9 @@ struct ipv6_pseudo_header {
 #define IP6_NO_HEADER		0x59
 
 struct io_buffer;
-struct net_device;
-struct net_protocol;
 
-extern struct net_protocol ipv6_protocol;
-extern struct tcpip_net_protocol ipv6_tcpip_protocol;
+extern struct net_protocol ipv6_protocol __net_protocol;
+extern struct tcpip_net_protocol ipv6_tcpip_protocol __tcpip_net_protocol;
 extern char * inet6_ntoa ( struct in6_addr in6 );
 
 extern int add_ipv6_address ( struct net_device *netdev,

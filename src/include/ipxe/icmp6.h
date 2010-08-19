@@ -15,7 +15,7 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #define ICMP6_NSOLICIT 135
 #define ICMP6_NADVERT 136
 
-extern struct tcpip_protocol icmp6_protocol;
+extern struct tcpip_protocol icmp6_protocol __tcpip_protocol;
 
 struct icmp6_header {
 	uint8_t type;

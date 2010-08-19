@@ -40,7 +40,7 @@ FILE_LICENCE ( GPL2_OR_LATER );
  * partner sends us.
  */
 
-struct net_protocol eth_slow_protocol;
+struct net_protocol eth_slow_protocol __net_protocol;
 
 /** Slow protocols multicast address */
 static const uint8_t eth_slow_address[ETH_ALEN] =

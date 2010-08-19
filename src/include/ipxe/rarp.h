@@ -9,8 +9,8 @@
 
 FILE_LICENCE ( GPL2_OR_LATER );
 
-struct net_protocol;
+#include <ipxe/netdevice.h>
 
-extern struct net_protocol rarp_protocol;
+extern struct net_protocol rarp_protocol __net_protocol;
 
 #endif /* _IPXE_RARP_H */

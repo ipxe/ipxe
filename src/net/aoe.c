@@ -44,7 +44,7 @@ FILE_LICENCE ( GPL2_OR_LATER );
 
 FEATURE ( FEATURE_PROTOCOL, "AoE", DHCP_EB_FEATURE_AOE, 1 );
 
-struct net_protocol aoe_protocol;
+struct net_protocol aoe_protocol __net_protocol;
 
 /** List of all AoE sessions */
 static LIST_HEAD ( aoe_sessions );

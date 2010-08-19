@@ -11,8 +11,6 @@
 #include <ipxe/tcpip.h>
 #include <ipxe/netdevice.h>
 
-struct tcpip_protocol icmp6_protocol;
-
 /**
  * Send neighbour solicitation packet
  *

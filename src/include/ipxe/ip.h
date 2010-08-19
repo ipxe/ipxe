@@ -13,10 +13,9 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #include <ipxe/in.h>
 #include <ipxe/list.h>
 #include <ipxe/retry.h>
+#include <ipxe/netdevice.h>
 
 struct io_buffer;
-struct net_device;
-struct net_protocol;
 
 /* IP constants */
 
@@ -92,6 +91,6 @@ struct frag_buffer {
 
 extern struct list_head ipv4_miniroutes;
 
-extern struct net_protocol ipv4_protocol;
+extern struct net_protocol ipv4_protocol __net_protocol;
 
 #endif /* _IPXE_IP_H */
