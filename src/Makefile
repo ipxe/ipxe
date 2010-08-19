@@ -134,7 +134,8 @@ everything :
 		bin-i386-efi/ipxe.efi bin-i386-efi/ipxe.efidrv \
 		bin-i386-efi/ipxe.efirom \
 		bin-x86_64-efi/ipxe.efi bin-x86_64-efi/ipxe.efidrv \
-		bin-x86_64-efi/ipxe.efirom
+		bin-x86_64-efi/ipxe.efirom \
+		bin-i386-linux/tap.linux bin-x86_64-linux/tap.linux
 
 ###############################################################################
 #
