@@ -66,6 +66,17 @@ process_init ( struct process *process,
 	process_add ( process );
 }
 
+/**
+ * Check if process is running
+ *
+ * @v process		Process
+ * @ret running		Process is running
+ */
+static inline __attribute__ (( always_inline )) int
+process_running ( struct process *process ) {
+	return ( ! list_empty ( &process->list ) );
+}
+
 /** Permanent process table */
 #define PERMANENT_PROCESSES __table ( struct process, "processes" )
 

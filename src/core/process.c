@@ -42,7 +42,7 @@ static LIST_HEAD ( run_queue );
  * have no effect.
  */
 void process_add ( struct process *process ) {
-	if ( list_empty ( &process->list ) ) {
+	if ( ! process_running ( process ) ) {
 		DBGC ( process, "PROCESS %p starting\n", process );
 		ref_get ( process->refcnt );
 		list_add_tail ( &process->list, &run_queue );
@@ -60,7 +60,7 @@ void process_add ( struct process *process ) {
  * have no effect.
  */
 void process_del ( struct process *process ) {
-	if ( ! list_empty ( &process->list ) ) {
+	if ( process_running ( process ) ) {
 		DBGC ( process, "PROCESS %p stopping\n", process );
 		list_del ( &process->list );
 		INIT_LIST_HEAD ( &process->list );
