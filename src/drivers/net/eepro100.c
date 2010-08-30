@@ -1141,6 +1141,7 @@ PCI_ROM(0x8086, 0x1065, "82562-3",       "Intel 82562 based Fast Ethernet Connec
 PCI_ROM(0x8086, 0x5200, "eepro100-5200", "Intel EtherExpress PRO/100 Intelligent Server", 0),
 PCI_ROM(0x8086, 0x5201, "eepro100-5201", "Intel EtherExpress PRO/100 Intelligent Server", 0),
 PCI_ROM(0x8086, 0x1092, "82562-3",       "Intel Pro/100 VE Network", 0),
+PCI_ROM(0x8086, 0x27dc, "eepro100-27dc", "Intel 82801G (ICH7) Chipset Ethernet Controller", 0),
 };
 
 /* Cards with device ids 0x1030 to 0x103F, 0x2449, 0x2459 or 0x245D might need
