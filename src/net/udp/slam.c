@@ -695,8 +695,10 @@ static int slam_open ( struct interface *xfer, struct uri *uri ) {
 	intf_init ( &slam->xfer, &slam_xfer_desc, &slam->refcnt );
 	intf_init ( &slam->socket, &slam_socket_desc, &slam->refcnt );
 	intf_init ( &slam->mc_socket, &slam_mc_socket_desc, &slam->refcnt );
-	timer_init ( &slam->master_timer, slam_master_timer_expired );
-	timer_init ( &slam->slave_timer, slam_slave_timer_expired );
+	timer_init ( &slam->master_timer, slam_master_timer_expired,
+		     &slam->refcnt );
+	timer_init ( &slam->slave_timer, slam_slave_timer_expired,
+		     &slam->refcnt );
 	/* Fake an invalid cached header of { 0x00, ... } */
 	slam->header_len = 1;
 	/* Fake parameters for initial NACK */

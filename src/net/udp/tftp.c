@@ -1097,7 +1097,7 @@ static int tftp_core_open ( struct interface *xfer, struct uri *uri,
 	intf_init ( &tftp->xfer, &tftp_xfer_desc, &tftp->refcnt );
 	intf_init ( &tftp->socket, &tftp_socket_desc, &tftp->refcnt );
 	intf_init ( &tftp->mc_socket, &tftp_mc_socket_desc, &tftp->refcnt );
-	timer_init ( &tftp->timer, tftp_timer_expired );
+	timer_init ( &tftp->timer, tftp_timer_expired, &tftp->refcnt );
 	tftp->uri = uri_get ( uri );
 	tftp->blksize = TFTP_DEFAULT_BLKSIZE;
 	tftp->flags = flags;

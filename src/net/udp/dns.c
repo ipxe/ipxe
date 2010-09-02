@@ -527,7 +527,7 @@ static int dns_resolv ( struct interface *resolv,
 	ref_init ( &dns->refcnt, NULL );
 	intf_init ( &dns->resolv, &dns_resolv_desc, &dns->refcnt );
 	intf_init ( &dns->socket, &dns_socket_desc, &dns->refcnt );
-	timer_init ( &dns->timer, dns_timer_expired );
+	timer_init ( &dns->timer, dns_timer_expired, &dns->refcnt );
 	memcpy ( &dns->sa, sa, sizeof ( dns->sa ) );
 
 	/* Create query */

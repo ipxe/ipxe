@@ -281,7 +281,7 @@ ib_create_madx ( struct ib_device *ibdev, struct ib_mad_interface *mi,
 	madx = zalloc ( sizeof ( *madx ) );
 	if ( ! madx )
 		return NULL;
-	timer_init ( &madx->timer, ib_mi_timer_expired );
+	timer_init ( &madx->timer, ib_mi_timer_expired, NULL );
 	madx->mi = mi;
 	madx->op = op;
 

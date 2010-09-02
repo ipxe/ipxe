@@ -1425,7 +1425,7 @@ int start_dhcp ( struct interface *job, struct net_device *netdev ) {
 	ref_init ( &dhcp->refcnt, dhcp_free );
 	intf_init ( &dhcp->job, &dhcp_job_desc, &dhcp->refcnt );
 	intf_init ( &dhcp->xfer, &dhcp_xfer_desc, &dhcp->refcnt );
-	timer_init ( &dhcp->timer, dhcp_timer_expired );
+	timer_init ( &dhcp->timer, dhcp_timer_expired, &dhcp->refcnt );
 	dhcp->netdev = netdev_get ( netdev );
 	dhcp->local.sin_family = AF_INET;
 	dhcp->local.sin_port = htons ( BOOTPC_PORT );
@@ -1528,7 +1528,7 @@ int start_pxebs ( struct interface *job, struct net_device *netdev,
 	ref_init ( &dhcp->refcnt, dhcp_free );
 	intf_init ( &dhcp->job, &dhcp_job_desc, &dhcp->refcnt );
 	intf_init ( &dhcp->xfer, &dhcp_xfer_desc, &dhcp->refcnt );
-	timer_init ( &dhcp->timer, dhcp_timer_expired );
+	timer_init ( &dhcp->timer, dhcp_timer_expired, &dhcp->refcnt );
 	dhcp->netdev = netdev_get ( netdev );
 	dhcp->local.sin_family = AF_INET;
 	fetch_ipv4_setting ( netdev_settings ( netdev ), &ip_setting,

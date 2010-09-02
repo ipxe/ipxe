@@ -222,7 +222,7 @@ static struct io_buffer * ipv4_reassemble ( struct io_buffer * iobuf ) {
 		free_iob ( iobuf );
 
 		/* Set the reassembly timer */
-		timer_init ( &fragbuf->frag_timer, ipv4_frag_expired );
+		timer_init ( &fragbuf->frag_timer, ipv4_frag_expired, NULL );
 		start_timer_fixed ( &fragbuf->frag_timer, IP_FRAG_TIMEOUT );
 
 		/* Add the fragment buffer to the list of fragment buffers */

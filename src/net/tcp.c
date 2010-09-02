@@ -265,8 +265,8 @@ static int tcp_open ( struct interface *xfer, struct sockaddr *peer,
 	DBGC ( tcp, "TCP %p allocated\n", tcp );
 	ref_init ( &tcp->refcnt, NULL );
 	intf_init ( &tcp->xfer, &tcp_xfer_desc, &tcp->refcnt );
-	timer_init ( &tcp->timer, tcp_expired );
-	timer_init ( &tcp->wait, tcp_wait_expired );
+	timer_init ( &tcp->timer, tcp_expired, &tcp->refcnt );
+	timer_init ( &tcp->wait, tcp_wait_expired, &tcp->refcnt );
 	tcp->prev_tcp_state = TCP_CLOSED;
 	tcp->tcp_state = TCP_STATE_SENT ( TCP_SYN );
 	tcp_dump_state ( tcp );

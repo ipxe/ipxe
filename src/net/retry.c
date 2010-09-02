@@ -57,8 +57,10 @@ static LIST_HEAD ( timers );
  * be stopped and the timer's callback function will be called.
  */
 void start_timer ( struct retry_timer *timer ) {
-	if ( ! timer->running )
+	if ( ! timer->running ) {
 		list_add ( &timer->list, &timers );
+		ref_get ( timer->refcnt );
+	}
 	timer->start = currticks();
 	timer->running = 1;
 
@@ -136,6 +138,8 @@ void stop_timer ( struct retry_timer *timer ) {
 			      timer, timer->timeout );
 		}
 	}
+
+	ref_put ( timer->refcnt );
 }
 
 /**
@@ -164,7 +168,9 @@ static void timer_expired ( struct retry_timer *timer ) {
 	      timer, timer->timeout );
 
 	/* Call expiry callback */
-	timer->expired ( timer, fail );	
+	timer->expired ( timer, fail );
+
+	ref_put ( timer->refcnt );
 }
 
 /**
