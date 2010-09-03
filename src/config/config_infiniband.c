@@ -19,5 +19,5 @@ FILE_LICENCE ( GPL2_OR_LATER );
  * Drag in Infiniband-specific protocols
  */
 #ifdef SANBOOT_PROTO_IB_SRP
-REQUIRE_OBJECT ( ib_srpboot );
+REQUIRE_OBJECT ( ib_srp );
 #endif

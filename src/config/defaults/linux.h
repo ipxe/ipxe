@@ -13,6 +13,7 @@
 #define UMALLOC_LINUX
 #define NAP_LINUX
 #define SMBIOS_LINUX
+#define SANBOOT_NULL
 
 #define DRIVERS_LINUX
 

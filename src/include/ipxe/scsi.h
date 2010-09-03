@@ -2,9 +2,8 @@
 #define _IPXE_SCSI_H
 
 #include <stdint.h>
-#include <ipxe/blockdev.h>
 #include <ipxe/uaccess.h>
-#include <ipxe/refcnt.h>
+#include <ipxe/interface.h>
 
 /** @file
  *
@@ -13,6 +12,9 @@
  */
 
 FILE_LICENCE ( GPL2_OR_LATER );
+
+/** Maximum block for READ/WRITE (10) commands */
+#define SCSI_MAX_BLOCK_10 0xffffffffULL
 
 /**
  * @defgroup scsiops SCSI operation codes
@@ -214,8 +216,27 @@ union scsi_cdb {
 
 /** @} */
 
-/** A SCSI command */
-struct scsi_command {
+/** A SCSI LUN
+ *
+ * This is a four-level LUN as specified by SAM-2, in big-endian
+ * order.
+ */
+struct scsi_lun {
+	uint16_t u16[4];
+}  __attribute__ (( packed ));
+
+/** printf() format for dumping a scsi_lun */
+#define SCSI_LUN_FORMAT "%04x-%04x-%04x-%04x"
+
+/** printf() parameters for dumping a scsi_lun */
+#define SCSI_LUN_DATA(lun)						  \
+	ntohs ( (lun).u16[0] ), ntohs ( (lun).u16[1] ),			  \
+	ntohs ( (lun).u16[2] ), ntohs ( (lun).u16[3] )
+
+/** A SCSI command information unit */
+struct scsi_cmd {
+	/** LUN */
+	struct scsi_lun lun;
 	/** CDB for this command */
 	union scsi_cdb cdb;
 	/** Data-out buffer (may be NULL) */
@@ -232,50 +253,43 @@ struct scsi_command {
 	 * Must be zero if @c data_in is NULL
 	 */
 	size_t data_in_len;
+};
+
+/** SCSI sense data */
+struct scsi_sns {
+	/** Response code */
+	uint8_t code;
+	/** Reserved */
+	uint8_t reserved;
+	/** Sense key */
+	uint8_t key;
+	/** Information */
+	uint32_t info;
+};
+
+/** A SCSI response information unit */
+struct scsi_rsp {
 	/** SCSI status code */
 	uint8_t status;
-	/** SCSI sense response code */
-	uint8_t sense_response;
-	/** Command status code */
-	int rc;
+	/** Data overrun (or negative underrun) */
+	ssize_t overrun;
+	/** Autosense data (if any) */
+	struct scsi_sns sense;
 };
 
-/** A SCSI LUN
- *
- * This is a four-level LUN as specified by SAM-2, in big-endian
- * order.
- */
-struct scsi_lun {
-	uint16_t u16[4];
-}  __attribute__ (( packed ));
-
-/** A SCSI device */
-struct scsi_device {
-	/** Block device interface */
-	struct block_device blockdev;
-	/**
-	 * Issue SCSI command
-	 *
-	 * @v scsi		SCSI device
-	 * @v command		SCSI command
-	 * @ret rc		Return status code
-	 *
-	 * Note that a successful return status code indicates only
-	 * that the SCSI command was issued.  The caller must check
-	 * the status field in the command structure to see when the
-	 * command completes and whether, for example, the device
-	 * returned CHECK CONDITION or some other non-success status
-	 * code.
-	 */
-	int ( * command ) ( struct scsi_device *scsi,
-			    struct scsi_command *command );
-	/** Backing device */
-	struct refcnt *backend;
-};
-
-extern int scsi_detached_command ( struct scsi_device *scsi,
-				   struct scsi_command *command );
-extern int init_scsidev ( struct scsi_device *scsi );
 extern int scsi_parse_lun ( const char *lun_string, struct scsi_lun *lun );
+
+extern int scsi_command ( struct interface *control, struct interface *data,
+			  struct scsi_cmd *command );
+#define scsi_command_TYPE( object_type )				\
+	typeof ( int ( object_type, struct interface *data,		\
+		       struct scsi_cmd *command ) )
+
+extern void scsi_response ( struct interface *intf, struct scsi_rsp *response );
+#define scsi_response_TYPE( object_type ) \
+	typeof ( void ( object_type, struct scsi_rsp *response ) )
+
+extern int scsi_open ( struct interface *block, struct interface *scsi,
+		       struct scsi_lun *lun );
 
 #endif /* _IPXE_SCSI_H */

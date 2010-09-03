@@ -27,6 +27,7 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #include <ipxe/image.h>
 #include <ipxe/sanboot.h>
 #include <ipxe/uri.h>
+#include <ipxe/init.h>
 #include <usr/ifmgmt.h>
 #include <usr/route.h>
 #include <usr/dhcpmgmt.h>
@@ -109,6 +110,14 @@ int boot_next_server_and_filename ( struct in_addr next_server,
 	return rc;
 }
 
+/** The "keep-san" setting */
+struct setting keep_san_setting __setting = {
+	.name = "keep-san",
+	.description = "Preserve SAN connection",
+	.tag = DHCP_EB_KEEP_SAN,
+	.type = &setting_type_int8,
+};
+
 /**
  * Boot using root path
  *
@@ -116,17 +125,62 @@ int boot_next_server_and_filename ( struct in_addr next_server,
  * @ret rc		Return status code
  */
 int boot_root_path ( const char *root_path ) {
-	struct sanboot_protocol *sanboot;
+	struct uri *uri;
+	int drive;
+	int rc;
 
-	/* Quick hack */
-	for_each_table_entry ( sanboot, SANBOOT_PROTOCOLS ) {
-		if ( strncmp ( root_path, sanboot->prefix,
-			       strlen ( sanboot->prefix ) ) == 0 ) {
-			return sanboot->boot ( root_path );
-		}
+	/* Parse URI */
+	uri = parse_uri ( root_path );
+	if ( ! uri ) {
+		printf ( "Could not parse \"%s\"\n", root_path );
+		rc = -ENOMEM;
+		goto err_parse_uri;
 	}
 
-	return -ENOTSUP;
+	/* Hook SAN device */
+	if ( ( drive = san_hook ( uri, 0 ) ) < 0 ) {
+		rc = drive;
+		printf ( "Could not open SAN device: %s\n",
+			 strerror ( rc ) );
+		goto err_open;
+	}
+	printf ( "Registered as SAN device %#02x\n", drive );
+
+	/* Describe SAN device */
+	if ( ( rc = san_describe ( drive ) ) != 0 ) {
+		printf ( "Could not describe SAN device %#02x: %s\n",
+			 drive, strerror ( rc ) );
+		goto err_describe;
+	}
+
+	printf ( "Booting from SAN device %#02x\n", drive );
+	rc = san_boot ( drive );
+	printf ( "Boot from SAN device %#02x failed: %s\n",
+		 drive, strerror ( rc ) );
+
+	/* Leave drive registered, if instructed to do so */
+	if ( fetch_intz_setting ( NULL, &keep_san_setting ) != 0 ) {
+		printf ( "Preserving connection to SAN device %#02x\n",
+			 drive );
+		shutdown_exit_flags |= SHUTDOWN_KEEP_DEVICES;
+		goto err_keep_san;
+	}
+
+	/* Unhook SAN deivce */
+	printf ( "Unregistering SAN device %#02x\n", drive );
+	san_unhook ( drive );
+
+	/* Drop URI reference */
+	uri_put ( uri );
+
+	return 0;
+
+ err_keep_san:
+ err_describe:
+ err_open:
+	uri_put ( uri );
+ err_parse_uri:
+	return rc;
 }
 
 /**

@@ -14,6 +14,7 @@ FILE_LICENCE ( BSD2 );
 #include <ipxe/iobuf.h>
 #include <ipxe/xfer.h>
 #include <ipxe/scsi.h>
+#include <ipxe/acpi.h>
 
 /*****************************************************************************
  *
@@ -23,21 +24,18 @@ FILE_LICENCE ( BSD2 );
  */
 
 /** An SRP information unit tag */
-struct srp_tag {
+union srp_tag {
+	uint8_t bytes[8];
 	uint32_t dwords[2];
 } __attribute__ (( packed ));
 
-/** An SRP port ID */
-struct srp_port_id {
-	uint8_t bytes[16];
-} __attribute__ (( packed ));
+/** SRP tag magic marker */
+#define SRP_TAG_MAGIC 0x69505845
 
-/** An SRP port ID pair */
-struct srp_port_ids {
-	/** Initiator port ID */
-	struct srp_port_id initiator;
-	/** Target port ID */
-	struct srp_port_id target;
+/** An SRP port ID */
+union srp_port_id {
+	uint8_t bytes[16];
+	uint32_t dwords[4];
 } __attribute__ (( packed ));
 
 /** SRP information unit common fields */
@@ -47,7 +45,7 @@ struct srp_common {
 	/** Reserved */
 	uint8_t reserved0[7];
 	/** Tag */
-	struct srp_tag tag;
+	union srp_tag tag;
 } __attribute__ (( packed ));
 
 /*****************************************************************************
@@ -67,7 +65,7 @@ struct srp_login_req {
 	/** Reserved */
 	uint8_t reserved0[7];
 	/** Tag */
-	struct srp_tag tag;
+	union srp_tag tag;
 	/** Requested maximum initiator to target IU length */
 	uint32_t max_i_t_iu_len;
 	/** Reserved */
@@ -87,8 +85,10 @@ struct srp_login_req {
 	uint8_t flags;
 	/** Reserved */
 	uint8_t reserved2[5];
-	/** Initiator and target port identifiers */
-	struct srp_port_ids port_ids;
+	/** Initiator port identifier */
+	union srp_port_id initiator;
+	/** Target port identifier */
+	union srp_port_id target;
 } __attribute__ (( packed ));
 
 /** Type of an SRP login request */
@@ -137,7 +137,7 @@ struct srp_login_rsp {
 	/** Request limit delta */
 	uint32_t request_limit_delta;
 	/** Tag */
-	struct srp_tag tag;
+	union srp_tag tag;
 	/** Maximum initiator to target IU length */
 	uint32_t max_i_t_iu_len;
 	/** Maximum target to initiator IU length */
@@ -205,7 +205,7 @@ struct srp_login_rej {
 	 */
 	uint32_t reason;
 	/** Tag */
-	struct srp_tag tag;
+	union srp_tag tag;
 	/** Reserved */
 	uint8_t reserved1[8];
 	/** Supported buffer formats
@@ -265,7 +265,7 @@ struct srp_i_logout {
 	/** Reserved */
 	uint8_t reserved0[7];
 	/** Tag */
-	struct srp_tag tag;
+	union srp_tag tag;
 } __attribute__ (( packed ));
 
 /** Type of an SRP initiator logout request */
@@ -299,7 +299,7 @@ struct srp_t_logout {
 	 */
 	uint32_t reason;
 	/** Tag */
-	struct srp_tag tag;
+	union srp_tag tag;
 } __attribute__ (( packed ));
 
 /** Type of an SRP target logout request */
@@ -355,7 +355,7 @@ struct srp_tsk_mgmt {
 	/** Reserved */
 	uint8_t reserved0[6];
 	/** Tag */
-	struct srp_tag tag;
+	union srp_tag tag;
 	/** Reserved */
 	uint8_t reserved1[4];
 	/** Logical unit number */
@@ -370,7 +370,7 @@ struct srp_tsk_mgmt {
 	/** Reserved */
 	uint8_t reserved3[1];
 	/** Tag of task to be managed */
-	struct srp_tag managed_tag;
+	union srp_tag managed_tag;
 	/** Reserved */
 	uint8_t reserved4[8];
 } __attribute__ (( packed ));
@@ -432,7 +432,7 @@ struct srp_cmd {
 	/** Data-in buffer descriptor count */
 	uint8_t data_in_buffer_count;
 	/** Tag */
-	struct srp_tag tag;
+	union srp_tag tag;
 	/** Reserved */
 	uint8_t reserved1[4];
 	/** Logical unit number */
@@ -526,7 +526,7 @@ struct srp_rsp {
 	/** Request limit delta */
 	uint32_t request_limit_delta;
 	/** Tag */
-	struct srp_tag tag;
+	union srp_tag tag;
 	/** Reserved */
 	uint8_t reserved1[2];
 	/** Valid fields
@@ -580,9 +580,9 @@ struct srp_rsp {
  * @v rsp			SCSI response
  * @ret response_data		Response data, or NULL if not present
  */
-static inline void * srp_rsp_response_data ( struct srp_rsp *rsp ) {
+static inline const void * srp_rsp_response_data ( const struct srp_rsp *rsp ) {
 	return ( ( rsp->valid & SRP_RSP_VALID_RSPVALID ) ?
-		 ( ( ( void * ) rsp ) + sizeof ( *rsp ) ) : NULL );
+		 ( ( ( const void * ) rsp ) + sizeof ( *rsp ) ) : NULL );
 }
 
 /**
@@ -591,7 +591,7 @@ static inline void * srp_rsp_response_data ( struct srp_rsp *rsp ) {
  * @v rsp			SCSI response
  * @ret response_data_len	Response data length
  */
-static inline size_t srp_rsp_response_data_len ( struct srp_rsp *rsp ) {
+static inline size_t srp_rsp_response_data_len ( const struct srp_rsp *rsp ) {
 	return ( ( rsp->valid & SRP_RSP_VALID_RSPVALID ) ?
 		 ntohl ( rsp->response_data_len ) : 0 );
 }
@@ -602,9 +602,9 @@ static inline size_t srp_rsp_response_data_len ( struct srp_rsp *rsp ) {
  * @v rsp			SCSI response
  * @ret sense_data		Sense data, or NULL if not present
  */
-static inline void * srp_rsp_sense_data ( struct srp_rsp *rsp ) {
+static inline const void * srp_rsp_sense_data ( const struct srp_rsp *rsp ) {
 	return ( ( rsp->valid & SRP_RSP_VALID_SNSVALID ) ?
-		 ( ( ( void * ) rsp ) + sizeof ( *rsp ) +
+		 ( ( ( const void * ) rsp ) + sizeof ( *rsp ) +
 		   srp_rsp_response_data_len ( rsp ) ) : NULL );
 }
 
@@ -614,7 +614,7 @@ static inline void * srp_rsp_sense_data ( struct srp_rsp *rsp ) {
  * @v rsp			SCSI response
  * @ret sense_data_len		Sense data length
  */
-static inline size_t srp_rsp_sense_data_len ( struct srp_rsp *rsp ) {
+static inline size_t srp_rsp_sense_data_len ( const struct srp_rsp *rsp ) {
 	return ( ( rsp->valid & SRP_RSP_VALID_SNSVALID ) ?
 		 ntohl ( rsp->sense_data_len ) : 0 );
 }
@@ -644,7 +644,7 @@ struct srp_cred_req {
 	/** Request limit delta */
 	uint32_t request_limit_delta;
 	/** Tag */
-	struct srp_tag tag;
+	union srp_tag tag;
 } __attribute__ (( packed ));
 
 /** Type of an SRP credit request */
@@ -670,7 +670,7 @@ struct srp_cred_rsp {
 	/** Reserved */
 	uint8_t reserved0[7];
 	/** Tag */
-	struct srp_tag tag;
+	union srp_tag tag;
 } __attribute__ (( packed ));
 
 /** Type of an SRP credit response */
@@ -701,7 +701,7 @@ struct srp_aer_req {
 	/** Request limit delta */
 	uint32_t request_limit_delta;
 	/** Tag */
-	struct srp_tag tag;
+	union srp_tag tag;
 	/** Reserved */
 	uint8_t reserved1[4];
 	/** Logical unit number */
@@ -757,7 +757,7 @@ struct srp_aer_rsp {
 	/** Reserved */
 	uint8_t reserved0[7];
 	/** Tag */
-	struct srp_tag tag;
+	union srp_tag tag;
 } __attribute__ (( packed ));
 
 /** Type of an SRP asynchronous event response */
@@ -765,104 +765,65 @@ struct srp_aer_rsp {
 
 /*****************************************************************************
  *
- * Information units
+ * SRP boot firmware table
+ *
+ * The working draft specification for the SRP boot firmware table can
+ * be found at
+ *
+ *   http://ipxe.org/wiki/srp/sbft
  *
  *****************************************************************************
  */
 
-/** Maximum length of any initiator-to-target IU that we will send
- *
- * The longest IU is a SRP_CMD with no additional CDB and two direct
- * data buffer descriptors, which comes to 80 bytes.
+/** SRP Boot Firmware Table signature */
+#define SBFT_SIG ACPI_SIGNATURE ( 's', 'B', 'F', 'T' )
+
+/** An offset from the start of the sBFT */
+typedef uint16_t sbft_off_t;
+
+/**
+ * SRP Boot Firmware Table
  */
-#define SRP_MAX_I_T_IU_LEN 80
+struct sbft_table {
+	/** ACPI header */
+	struct acpi_description_header acpi;
+	/** Offset to SCSI subtable */
+	sbft_off_t scsi_offset;
+	/** Offset to SRP subtable */
+	sbft_off_t srp_offset;
+	/** Offset to IB subtable, if present */
+	sbft_off_t ib_offset;
+	/** Reserved */
+	uint8_t reserved[6];
+} __attribute__ (( packed ));
+
+/**
+ * sBFT SCSI subtable
+ */
+struct sbft_scsi_subtable {
+	/** LUN */
+	struct scsi_lun lun;
+} __attribute__ (( packed ));
+
+/**
+ * sBFT SRP subtable
+ */
+struct sbft_srp_subtable {
+	/** Initiator port identifier */
+	union srp_port_id initiator;
+	/** Target port identifier */
+	union srp_port_id target;
+} __attribute__ (( packed ));
 
 /*****************************************************************************
  *
- * SRP device
+ * SRP devices
  *
  *****************************************************************************
  */
 
-struct srp_device;
-
-/** An SRP transport type */
-struct srp_transport_type {
-	/** Length of transport private data */
-	size_t priv_len;
-	/** Parse root path
-	 *
-	 * @v srp		SRP device
-	 * @v root_path		Root path
-	 * @ret 		Return status code
-	 */
-	int ( * parse_root_path ) ( struct srp_device *srp,
-				    const char *root_path );
-	/** Connect SRP session
-	 *
-	 * @v srp		SRP device
-	 * @ret rc		Return status code
-	 *
-	 * This method should open the underlying socket.
-	 */
-	int ( * connect ) ( struct srp_device *srp );
-};
-
-/** An SRP device */
-struct srp_device {
-	/** Reference count */
-	struct refcnt refcnt;
-
-	/** Initiator and target port IDs */
-	struct srp_port_ids port_ids;
-	/** Logical unit number */
-	struct scsi_lun lun;
-	/** Memory handle */
-	uint32_t memory_handle;
-
-	/** Current state
-	 *
-	 * This is the bitwise-OR of zero or more @c SRP_STATE_XXX
-	 * flags.
-	 */
-	unsigned int state;
-	/** Retry counter */
-	unsigned int retry_count;
-	/** Current SCSI command */
-	struct scsi_command *command;
-
-	/** Underlying data transfer interface */
-	struct interface socket;
-
-	/** Transport type */
-	struct srp_transport_type *transport;
-	/** Transport private data */
-	char transport_priv[0];
-};
-
-/**
- * Get SRP transport private data
- *
- * @v srp		SRP device
- * @ret priv		SRP transport private data
- */
-static inline __always_inline void *
-srp_transport_priv ( struct srp_device *srp ) {
-	return ( ( void * ) srp->transport_priv );
-}
-
-/** SRP state flags */
-enum srp_state {
-	/** Underlying socket is open */
-	SRP_STATE_SOCKET_OPEN = 0x0001,
-	/** Session is logged in */
-	SRP_STATE_LOGGED_IN = 0x0002,
-};
-
-/** Maximum number of SRP retry attempts */
-#define SRP_MAX_RETRIES 3
-
-extern int srp_attach ( struct scsi_device *scsi, const char *root_path );
-extern void srp_detach ( struct scsi_device *scsi );
+extern int srp_open ( struct interface *block, struct interface *socket,
+		      union srp_port_id *initiator, union srp_port_id *target,
+		      uint32_t memory_handle, struct scsi_lun *lun );
 
 #endif /* _IPXE_SRP_H */

@@ -19,5 +19,5 @@ FILE_LICENCE ( GPL2_OR_LATER );
  * Drag in Ethernet-specific protocols
  */
 #ifdef SANBOOT_PROTO_AOE
-REQUIRE_OBJECT ( aoeboot );
+REQUIRE_OBJECT ( aoe );
 #endif

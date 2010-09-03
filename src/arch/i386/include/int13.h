@@ -13,8 +13,6 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #include <ipxe/list.h>
 #include <realmode.h>
 
-struct block_device;
-
 /**
  * @defgroup int13ops INT 13 operation codes
  * @{
@@ -56,6 +54,8 @@ struct block_device;
 #define INT13_STATUS_INVALID		0x01
 /** Read error */
 #define INT13_STATUS_READ_ERROR		0x04
+/** Reset failed */
+#define INT13_STATUS_RESET_FAILED	0x05
 /** Write error */
 #define INT13_STATUS_WRITE_ERROR	0xcc
 
@@ -63,57 +63,6 @@ struct block_device;
 
 /** Block size for non-extended INT 13 calls */
 #define INT13_BLKSIZE 512
-
-/** An INT 13 emulated drive */
-struct int13_drive {
-	/** List of all registered drives */
-	struct list_head list;
-
-	/** Underlying block device */
-	struct block_device *blockdev;
-
-	/** BIOS in-use drive number (0x80-0xff) */
-	unsigned int drive;
-	/** BIOS natural drive number (0x80-0xff)
-	 *
-	 * This is the drive number that would have been assigned by
-	 * 'naturally' appending the drive to the end of the BIOS
-	 * drive list.
-	 *
-	 * If the emulated drive replaces a preexisting drive, this is
-	 * the drive number that the preexisting drive gets remapped
-	 * to.
-	 */
-	unsigned int natural_drive;
-
-	/** Number of cylinders
-	 *
-	 * The cylinder number field in an INT 13 call is ten bits
-	 * wide, giving a maximum of 1024 cylinders.  Conventionally,
-	 * when the 7.8GB limit of a CHS address is exceeded, it is
-	 * the number of cylinders that is increased beyond the
-	 * addressable limit.
-	 */
-	unsigned int cylinders;
-	/** Number of heads
-	 *
-	 * The head number field in an INT 13 call is eight bits wide,
-	 * giving a maximum of 256 heads.  However, apparently all
-	 * versions of MS-DOS up to and including Win95 fail with 256
-	 * heads, so the maximum encountered in practice is 255.
-	 */
-	unsigned int heads;
-	/** Number of sectors per track
-	 *
-	 * The sector number field in an INT 13 call is six bits wide,
-	 * giving a maximum of 63 sectors, since sector numbering
-	 * (unlike head and cylinder numbering) starts at 1, not 0.
-	 */
-	unsigned int sectors_per_track;
-
-	/** Status of last operation */
-	int last_status;
-};
 
 /** An INT 13 disk address packet */
 struct int13_disk_address {
@@ -147,7 +96,6 @@ struct int13_disk_parameters {
 	uint64_t sectors;
 	/** Bytes per sector */
 	uint16_t sector_size;
-	
 } __attribute__ (( packed ));
 
 /**
@@ -285,8 +233,7 @@ struct master_boot_record {
 	uint16_t signature;
 } __attribute__ (( packed ));
 
-extern void register_int13_drive ( struct int13_drive *drive );
-extern void unregister_int13_drive ( struct int13_drive *drive );
-extern int int13_boot ( unsigned int drive );
+/** Use natural BIOS drive number */
+#define INT13_USE_NATURAL_DRIVE 0xff
 
 #endif /* INT13_H */

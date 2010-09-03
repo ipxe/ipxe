@@ -10,44 +10,46 @@
 
 FILE_LICENCE ( GPL2_OR_LATER );
 
+#include <stdint.h>
 #include <ipxe/uaccess.h>
+#include <ipxe/interface.h>
 
-struct block_device;
-
-/** Block device operations */
-struct block_device_operations {
-	/**
-	 * Read block
-	 *
-	 * @v blockdev	Block device
-	 * @v block	Block number
-	 * @v count	Block count
-	 * @v buffer	Data buffer
-	 * @ret rc	Return status code
-	 */
-	int ( * read ) ( struct block_device *blockdev, uint64_t block,
-			 unsigned long count, userptr_t buffer );
-	/**
-	 * Write block
-	 *
-	 * @v blockdev	Block device
-	 * @v block	Block number
-	 * @v count	Block count
-	 * @v buffer	Data buffer
-	 * @ret rc	Return status code
-	 */
-	int ( * write ) ( struct block_device *blockdev, uint64_t block,
-			  unsigned long count, userptr_t buffer );
-};
-
-/** A block device */
-struct block_device {
-	/** Block device operations */
-	struct block_device_operations *op;
-	/** Block size */
-	size_t blksize;
+/** Block device capacity */
+struct block_device_capacity {
 	/** Total number of blocks */
 	uint64_t blocks;
+	/** Block size */
+	size_t blksize;
+	/** Maximum number of blocks per single transfer */
+	unsigned int max_count;
 };
+
+extern int block_read ( struct interface *control, struct interface *data,
+			uint64_t lba, unsigned int count,
+			userptr_t buffer, size_t len );
+#define block_read_TYPE( object_type )					\
+	typeof ( int ( object_type, struct interface *data,		\
+		       uint64_t lba, unsigned int count,		\
+		       userptr_t buffer, size_t len ) )
+
+extern int block_write ( struct interface *control, struct interface *data,
+			 uint64_t lba, unsigned int count,
+			 userptr_t buffer, size_t len );
+#define block_write_TYPE( object_type )					\
+	typeof ( int ( object_type, struct interface *data,		\
+		       uint64_t lba, unsigned int count,		\
+		       userptr_t buffer, size_t len ) )
+
+extern int block_read_capacity ( struct interface *control,
+				 struct interface *data );
+#define block_read_capacity_TYPE( object_type )				\
+	typeof ( int ( object_type, struct interface *data ) )
+
+extern void block_capacity ( struct interface *intf,
+			     struct block_device_capacity *capacity );
+#define block_capacity_TYPE( object_type )				\
+	typeof ( void ( object_type,					\
+			struct block_device_capacity *capacity ) )
+
 
 #endif /* _IPXE_BLOCKDEV_H */

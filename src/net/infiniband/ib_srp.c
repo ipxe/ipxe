@@ -32,7 +32,11 @@ FILE_LICENCE ( BSD2 );
 
 #include <stdlib.h>
 #include <errno.h>
+#include <ipxe/interface.h>
+#include <ipxe/uri.h>
+#include <ipxe/open.h>
 #include <ipxe/base16.h>
+#include <ipxe/acpi.h>
 #include <ipxe/srp.h>
 #include <ipxe/infiniband.h>
 #include <ipxe/ib_cmrc.h>
@@ -56,6 +60,192 @@ FILE_LICENCE ( BSD2 );
 #define EINFO_EINVAL_RP_TOO_SHORT __einfo_uniqify \
 	( EINFO_EINVAL, 0x04, "Root path too short" )
 
+/******************************************************************************
+ *
+ * IB SRP devices
+ *
+ ******************************************************************************
+ */
+
+/** An Infiniband SRP device */
+struct ib_srp_device {
+	/** Reference count */
+	struct refcnt refcnt;
+
+	/** SRP transport interface */
+	struct interface srp;
+	/** CMRC interface */
+	struct interface cmrc;
+
+	/** Infiniband device */
+	struct ib_device *ibdev;
+
+	/** Destination GID (for boot firmware table) */
+	struct ib_gid dgid;
+	/** Service ID (for boot firmware table) */
+	struct ib_gid_half service_id;
+};
+
+/**
+ * Free IB SRP device
+ *
+ * @v refcnt		Reference count
+ */
+static void ib_srp_free ( struct refcnt *refcnt ) {
+	struct ib_srp_device *ib_srp =
+		container_of ( refcnt, struct ib_srp_device, refcnt );
+
+	ibdev_put ( ib_srp->ibdev );
+	free ( ib_srp );
+}
+
+/**
+ * Close IB SRP device
+ *
+ * @v ib_srp		IB SRP device
+ * @v rc		Reason for close
+ */
+static void ib_srp_close ( struct ib_srp_device *ib_srp, int rc ) {
+
+	/* Shut down interfaces */
+	intf_shutdown ( &ib_srp->cmrc, rc );
+	intf_shutdown ( &ib_srp->srp, rc );
+}
+
+/**
+ * Describe IB SRP device in an ACPI table
+ *
+ * @v srpdev		SRP device
+ * @v acpi		ACPI table
+ * @v len		Length of ACPI table
+ * @ret rc		Return status code
+ */
+static int ib_srp_describe ( struct ib_srp_device *ib_srp,
+			     struct acpi_description_header *acpi,
+			     size_t len ) {
+	struct ib_device *ibdev = ib_srp->ibdev;
+	struct sbft_table *sbft =
+		container_of ( acpi, struct sbft_table, acpi );
+	struct sbft_ib_subtable *ib_sbft;
+	size_t used;
+
+	/* Sanity check */
+	if ( acpi->signature != SBFT_SIG )
+		return -EINVAL;
+
+	/* Append IB subtable to existing table */
+	used = le32_to_cpu ( sbft->acpi.length );
+	sbft->ib_offset = cpu_to_le16 ( used );
+	ib_sbft = ( ( ( void * ) sbft ) + used );
+	used += sizeof ( *ib_sbft );
+	if ( used > len )
+		return -ENOBUFS;
+	sbft->acpi.length = cpu_to_le32 ( used );
+
+	/* Populate subtable */
+	memcpy ( &ib_sbft->sgid, &ibdev->gid, sizeof ( ib_sbft->sgid ) );
+	memcpy ( &ib_sbft->dgid, &ib_srp->dgid, sizeof ( ib_sbft->dgid ) );
+	memcpy ( &ib_sbft->service_id, &ib_srp->service_id,
+		 sizeof ( ib_sbft->service_id ) );
+	ib_sbft->pkey = cpu_to_le16 ( ibdev->pkey );
+
+	return 0;
+}
+
+/** IB SRP CMRC interface operations */
+static struct interface_operation ib_srp_cmrc_op[] = {
+	INTF_OP ( intf_close, struct ib_srp_device *, ib_srp_close ),
+};
+
+/** IB SRP CMRC interface descriptor */
+static struct interface_descriptor ib_srp_cmrc_desc =
+	INTF_DESC_PASSTHRU ( struct ib_srp_device, cmrc, ib_srp_cmrc_op, srp );
+
+/** IB SRP SRP interface operations */
+static struct interface_operation ib_srp_srp_op[] = {
+	INTF_OP ( acpi_describe, struct ib_srp_device *, ib_srp_describe ),
+	INTF_OP ( intf_close, struct ib_srp_device *, ib_srp_close ),
+};
+
+/** IB SRP SRP interface descriptor */
+static struct interface_descriptor ib_srp_srp_desc =
+	INTF_DESC_PASSTHRU ( struct ib_srp_device, srp, ib_srp_srp_op, cmrc );
+
+/**
+ * Open IB SRP device
+ *
+ * @v block		Block control interface
+ * @v ibdev		Infiniband device
+ * @v dgid		Destination GID
+ * @v service_id	Service ID
+ * @v initiator		Initiator port ID
+ * @v target		Target port ID
+ * @v lun		SCSI LUN
+ * @ret rc		Return status code
+ */
+static int ib_srp_open ( struct interface *block, struct ib_device *ibdev,
+			 struct ib_gid *dgid, struct ib_gid_half *service_id,
+			 union srp_port_id *initiator,
+			 union srp_port_id *target, struct scsi_lun *lun ) {
+	struct ib_srp_device *ib_srp;
+	int rc;
+
+	/* Allocate and initialise structure */
+	ib_srp = zalloc ( sizeof ( *ib_srp ) );
+	if ( ! ib_srp ) {
+		rc = -ENOMEM;
+		goto err_zalloc;
+	}
+	ref_init ( &ib_srp->refcnt, ib_srp_free );
+	intf_init ( &ib_srp->srp, &ib_srp_srp_desc, &ib_srp->refcnt );
+	intf_init ( &ib_srp->cmrc, &ib_srp_cmrc_desc, &ib_srp->refcnt );
+	ib_srp->ibdev = ibdev_get ( ibdev );
+	DBGC ( ib_srp, "IBSRP %p created for %08x%08x%08x%08x:%08x%08x\n",
+	       ib_srp, ntohl ( dgid->u.dwords[0] ),
+	       ntohl ( dgid->u.dwords[1] ), ntohl ( dgid->u.dwords[2] ),
+	       ntohl ( dgid->u.dwords[3] ), ntohl ( service_id->u.dwords[0] ),
+	       ntohl ( service_id->u.dwords[1] ) );
+
+	/* Preserve parameters required for boot firmware table */
+	memcpy ( &ib_srp->dgid, dgid, sizeof ( ib_srp->dgid ) );
+	memcpy ( &ib_srp->service_id, service_id,
+		 sizeof ( ib_srp->service_id ) );
+
+	/* Open CMRC socket */
+	if ( ( rc = ib_cmrc_open ( &ib_srp->cmrc, ibdev, dgid,
+				   service_id ) ) != 0 ) {
+		DBGC ( ib_srp, "IBSRP %p could not open CMRC socket: %s\n",
+		       ib_srp, strerror ( rc ) );
+		goto err_cmrc_open;
+	}
+
+	/* Attach SRP device to parent interface */
+	if ( ( rc = srp_open ( block, &ib_srp->srp, initiator, target,
+			       ibdev->rdma_key, lun ) ) != 0 ) {
+		DBGC ( ib_srp, "IBSRP %p could not create SRP device: %s\n",
+		       ib_srp, strerror ( rc ) );
+		goto err_srp_open;
+	}
+
+	/* Mortalise self and return */
+	ref_put ( &ib_srp->refcnt );
+	return 0;
+
+ err_srp_open:
+ err_cmrc_open:
+	ib_srp_close ( ib_srp, rc );
+	ref_put ( &ib_srp->refcnt );
+ err_zalloc:
+	return rc;
+}
+
+/******************************************************************************
+ *
+ * IB SRP URIs
+ *
+ ******************************************************************************
+ */
+
 /** IB SRP parse flags */
 enum ib_srp_parse_flags {
 	IB_SRP_PARSE_REQUIRED = 0x0000,
@@ -65,12 +255,20 @@ enum ib_srp_parse_flags {
 
 /** IB SRP root path parameters */
 struct ib_srp_root_path {
+	/** Source GID */
+	struct ib_gid sgid;
+	/** Initiator port ID */
+	union ib_srp_initiator_port_id initiator;
+	/** Destination GID */
+	struct ib_gid dgid;
+	/** Partition key */
+	uint16_t pkey;
+	/** Service ID */
+	struct ib_gid_half service_id;
 	/** SCSI LUN */
-	struct scsi_lun *lun;
-	/** SRP port IDs */
-	struct srp_port_ids *port_ids;
-	/** IB SRP parameters */
-	struct ib_srp_parameters *ib;
+	struct scsi_lun lun;
+	/** Target port ID */
+	union ib_srp_target_port_id target;
 };
 
 /**
@@ -99,7 +297,6 @@ static int ib_srp_parse_byte_string ( const char *rp_comp, uint8_t *bytes,
 	decoded_size = base16_decode ( rp_comp, bytes );
 	if ( decoded_size < 0 )
 		return decoded_size;
-	assert ( decoded_size == size );
 
 	return 0;
 }
@@ -126,19 +323,6 @@ static int ib_srp_parse_integer ( const char *rp_comp, int default_value ) {
 }
 
 /**
- * Parse IB SRP root path literal component
- *
- * @v rp_comp		Root path component string
- * @v rp		IB SRP root path
- * @ret rc		Return status code
- */
-static int ib_srp_parse_literal ( const char *rp_comp __unused,
-				  struct ib_srp_root_path *rp __unused ) {
-	/* Ignore */
-	return 0;
-}
-
-/**
  * Parse IB SRP root path source GID
  *
  * @v rp_comp		Root path component string
@@ -151,10 +335,10 @@ static int ib_srp_parse_sgid ( const char *rp_comp,
 
 	/* Default to the GID of the last opened Infiniband device */
 	if ( ( ibdev = last_opened_ibdev() ) != NULL )
-		memcpy ( &rp->ib->sgid, &ibdev->gid, sizeof ( rp->ib->sgid ) );
+		memcpy ( &rp->sgid, &ibdev->gid, sizeof ( rp->sgid ) );
 
-	return ib_srp_parse_byte_string ( rp_comp, rp->ib->sgid.u.bytes,
-					  ( sizeof ( rp->ib->sgid ) |
+	return ib_srp_parse_byte_string ( rp_comp, rp->sgid.u.bytes,
+					  ( sizeof ( rp->sgid ) |
 					    IB_SRP_PARSE_OPTIONAL ) );
 }
 
@@ -167,11 +351,10 @@ static int ib_srp_parse_sgid ( const char *rp_comp,
  */
 static int ib_srp_parse_initiator_id_ext ( const char *rp_comp,
 					   struct ib_srp_root_path *rp ) {
-	struct ib_srp_initiator_port_id *port_id =
-		ib_srp_initiator_port_id ( rp->port_ids );
+	union ib_srp_initiator_port_id *port_id = &rp->initiator;
 
-	return ib_srp_parse_byte_string ( rp_comp, port_id->id_ext.u.bytes,
-					  ( sizeof ( port_id->id_ext ) |
+	return ib_srp_parse_byte_string ( rp_comp, port_id->ib.id_ext.u.bytes,
+					  ( sizeof ( port_id->ib.id_ext ) |
 					    IB_SRP_PARSE_OPTIONAL ) );
 }
 
@@ -184,15 +367,14 @@ static int ib_srp_parse_initiator_id_ext ( const char *rp_comp,
  */
 static int ib_srp_parse_initiator_hca_guid ( const char *rp_comp,
 					     struct ib_srp_root_path *rp ) {
-	struct ib_srp_initiator_port_id *port_id =
-		ib_srp_initiator_port_id ( rp->port_ids );
+	union ib_srp_initiator_port_id *port_id = &rp->initiator;
 
 	/* Default to the GUID portion of the source GID */
-	memcpy ( &port_id->hca_guid, &rp->ib->sgid.u.half[1],
-		 sizeof ( port_id->hca_guid ) );
+	memcpy ( &port_id->ib.hca_guid, &rp->sgid.u.half[1],
+		 sizeof ( port_id->ib.hca_guid ) );
 
-	return ib_srp_parse_byte_string ( rp_comp, port_id->hca_guid.u.bytes,
-					  ( sizeof ( port_id->hca_guid ) |
+	return ib_srp_parse_byte_string ( rp_comp, port_id->ib.hca_guid.u.bytes,
+					  ( sizeof ( port_id->ib.hca_guid ) |
 					    IB_SRP_PARSE_OPTIONAL ) );
 }
 
@@ -205,8 +387,8 @@ static int ib_srp_parse_initiator_hca_guid ( const char *rp_comp,
  */
 static int ib_srp_parse_dgid ( const char *rp_comp,
 			       struct ib_srp_root_path *rp ) {
-	return ib_srp_parse_byte_string ( rp_comp, rp->ib->dgid.u.bytes,
-					  ( sizeof ( rp->ib->dgid ) |
+	return ib_srp_parse_byte_string ( rp_comp, rp->dgid.u.bytes,
+					  ( sizeof ( rp->dgid ) |
 					    IB_SRP_PARSE_REQUIRED ) );
 }
 
@@ -223,7 +405,7 @@ static int ib_srp_parse_pkey ( const char *rp_comp,
 
 	if ( ( pkey = ib_srp_parse_integer ( rp_comp, IB_PKEY_DEFAULT ) ) < 0 )
 		return pkey;
-	rp->ib->pkey = pkey;
+	rp->pkey = pkey;
 	return 0;
 }
 
@@ -236,8 +418,8 @@ static int ib_srp_parse_pkey ( const char *rp_comp,
  */
 static int ib_srp_parse_service_id ( const char *rp_comp,
 				     struct ib_srp_root_path *rp ) {
-	return ib_srp_parse_byte_string ( rp_comp, rp->ib->service_id.u.bytes,
-					  ( sizeof ( rp->ib->service_id ) |
+	return ib_srp_parse_byte_string ( rp_comp, rp->service_id.u.bytes,
+					  ( sizeof ( rp->service_id ) |
 					    IB_SRP_PARSE_REQUIRED ) );
 }
 
@@ -250,7 +432,7 @@ static int ib_srp_parse_service_id ( const char *rp_comp,
  */
 static int ib_srp_parse_lun ( const char *rp_comp,
 			      struct ib_srp_root_path *rp ) {
-	return scsi_parse_lun ( rp_comp, rp->lun );
+	return scsi_parse_lun ( rp_comp, &rp->lun );
 }
 
 /**
@@ -262,11 +444,10 @@ static int ib_srp_parse_lun ( const char *rp_comp,
  */
 static int ib_srp_parse_target_id_ext ( const char *rp_comp,
 					struct ib_srp_root_path *rp ) {
-	struct ib_srp_target_port_id *port_id =
-		ib_srp_target_port_id ( rp->port_ids );
+	union ib_srp_target_port_id *port_id = &rp->target;
 
-	return ib_srp_parse_byte_string ( rp_comp, port_id->id_ext.u.bytes,
-					  ( sizeof ( port_id->id_ext ) |
+	return ib_srp_parse_byte_string ( rp_comp, port_id->ib.id_ext.u.bytes,
+					  ( sizeof ( port_id->ib.id_ext ) |
 					    IB_SRP_PARSE_REQUIRED ) );
 }
 
@@ -279,11 +460,10 @@ static int ib_srp_parse_target_id_ext ( const char *rp_comp,
  */
 static int ib_srp_parse_target_ioc_guid ( const char *rp_comp,
 					  struct ib_srp_root_path *rp ) {
-	struct ib_srp_target_port_id *port_id =
-		ib_srp_target_port_id ( rp->port_ids );
+	union ib_srp_target_port_id *port_id = &rp->target;
 
-	return ib_srp_parse_byte_string ( rp_comp, port_id->ioc_guid.u.bytes,
-					  ( sizeof ( port_id->ioc_guid ) |
+	return ib_srp_parse_byte_string ( rp_comp, port_id->ib.ioc_guid.u.bytes,
+					  ( sizeof ( port_id->ib.ioc_guid ) |
 					    IB_SRP_PARSE_REQUIRED ) );
 }
 
@@ -301,7 +481,6 @@ struct ib_srp_root_path_parser {
 
 /** IB SRP root path components */
 static struct ib_srp_root_path_parser ib_srp_rp_parser[] = {
-	{ ib_srp_parse_literal },
 	{ ib_srp_parse_sgid },
 	{ ib_srp_parse_initiator_id_ext },
 	{ ib_srp_parse_initiator_hca_guid },
@@ -320,18 +499,13 @@ static struct ib_srp_root_path_parser ib_srp_rp_parser[] = {
 /**
  * Parse IB SRP root path
  *
- * @v srp		SRP device
- * @v rp_string		Root path
+ * @v rp_string		Root path string
+ * @v rp		IB SRP root path
  * @ret rc		Return status code
  */
-static int ib_srp_parse_root_path ( struct srp_device *srp,
-				    const char *rp_string ) {
-	struct ib_srp_parameters *ib_params = ib_srp_params ( srp );
-	struct ib_srp_root_path rp = {
-		.lun = &srp->lun,
-		.port_ids = &srp->port_ids,
-		.ib = ib_params,
-	};
+static int ib_srp_parse_root_path ( const char *rp_string,
+				    struct ib_srp_root_path *rp ) {
+	struct ib_srp_root_path_parser *parser;
 	char rp_string_copy[ strlen ( rp_string ) + 1 ];
 	char *rp_comp[IB_SRP_NUM_RP_COMPONENTS];
 	char *rp_string_tmp = rp_string_copy;
@@ -346,8 +520,8 @@ static int ib_srp_parse_root_path ( struct srp_device *srp,
 			break;
 		for ( ; *rp_string_tmp != ':' ; rp_string_tmp++ ) {
 			if ( ! *rp_string_tmp ) {
-				DBGC ( srp, "SRP %p root path \"%s\" too "
-				       "short\n", srp, rp_string );
+				DBG ( "IBSRP root path \"%s\" too short\n",
+				      rp_string );
 				return -EINVAL_RP_TOO_SHORT;
 			}
 		}
@@ -356,11 +530,11 @@ static int ib_srp_parse_root_path ( struct srp_device *srp,
 
 	/* Parse root path components */
 	for ( i = 0 ; i < IB_SRP_NUM_RP_COMPONENTS ; i++ ) {
-		if ( ( rc = ib_srp_rp_parser[i].parse ( rp_comp[i],
-							&rp ) ) != 0 ) {
-			DBGC ( srp, "SRP %p could not parse \"%s\" in root "
-			       "path \"%s\": %s\n", srp, rp_comp[i],
-			       rp_string, strerror ( rc ) );
+		parser = &ib_srp_rp_parser[i];
+		if ( ( rc = parser->parse ( rp_comp[i], rp ) ) != 0 ) {
+			DBG ( "IBSRP could not parse \"%s\" in root path "
+			      "\"%s\": %s\n", rp_comp[i], rp_string,
+			      strerror ( rc ) );
 			return rc;
 		}
 	}
@@ -369,41 +543,42 @@ static int ib_srp_parse_root_path ( struct srp_device *srp,
 }
 
 /**
- * Connect IB SRP session
+ * Open IB SRP URI
  *
- * @v srp		SRP device
+ * @v parent		Parent interface
+ * @v uri		URI
  * @ret rc		Return status code
  */
-static int ib_srp_connect ( struct srp_device *srp ) {
-	struct ib_srp_parameters *ib_params = ib_srp_params ( srp );
+static int ib_srp_open_uri ( struct interface *parent, struct uri *uri ) {
+	struct ib_srp_root_path rp;
 	struct ib_device *ibdev;
 	int rc;
 
+	/* Parse URI */
+	if ( ! uri->opaque )
+		return -EINVAL;
+	memset ( &rp, 0, sizeof ( rp ) );
+	if ( ( rc = ib_srp_parse_root_path ( uri->opaque, &rp ) ) != 0 )
+		return rc;
+
 	/* Identify Infiniband device */
-	ibdev = find_ibdev ( &ib_params->sgid );
+	ibdev = find_ibdev ( &rp.sgid );
 	if ( ! ibdev ) {
-		DBGC ( srp, "SRP %p could not identify Infiniband device\n",
-		       srp );
+		DBG ( "IBSRP could not identify Infiniband device\n" );
 		return -ENODEV;
 	}
 
-	/* Configure remaining SRP parameters */
-	srp->memory_handle = ibdev->rdma_key;
-
-	/* Open CMRC socket */
-	if ( ( rc = ib_cmrc_open ( &srp->socket, ibdev, &ib_params->dgid,
-				   &ib_params->service_id ) ) != 0 ) {
-		DBGC ( srp, "SRP %p could not open CMRC socket: %s\n",
-		       srp, strerror ( rc ) );
+	/* Open IB SRP device */
+	if ( ( rc = ib_srp_open ( parent, ibdev, &rp.dgid, &rp.service_id,
+				  &rp.initiator.srp, &rp.target.srp,
+				  &rp.lun ) ) != 0 )
 		return rc;
-	}
 
 	return 0;
 }
 
-/** IB SRP transport type */
-struct srp_transport_type ib_srp_transport = {
-	.priv_len = sizeof ( struct ib_srp_parameters ),
-	.parse_root_path = ib_srp_parse_root_path,
-	.connect = ib_srp_connect,
+/** IB SRP URI opener */
+struct uri_opener ib_srp_uri_opener __uri_opener = {
+	.scheme = "ib_srp",
+	.open = ib_srp_open_uri,
 };

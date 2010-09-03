@@ -2,9 +2,8 @@
 #define _IPXE_ATA_H
 
 #include <stdint.h>
-#include <ipxe/blockdev.h>
 #include <ipxe/uaccess.h>
-#include <ipxe/refcnt.h>
+#include <ipxe/interface.h>
 
 /** @file
  *
@@ -104,7 +103,7 @@ struct ata_cb {
 	uint8_t device;
 	/** Command/status register */
 	uint8_t cmd_stat;
-	/** LBA48 addressing flag */
+	/** Use LBA48 extended addressing */
 	int lba48;
 };
 
@@ -138,25 +137,8 @@ struct ata_cb {
 /** "Identify" command */
 #define ATA_CMD_IDENTIFY 0xec
 
-/** An ATA command */
-struct ata_command {
-	/** ATA command block */
-	struct ata_cb cb;
-	/** Data-out buffer (may be NULL)
-	 *
-	 * If non-NULL, this buffer must be ata_command::cb::count
-	 * sectors in size.
-	 */
-	userptr_t data_out;
-	/** Data-in buffer (may be NULL)
-	 *
-	 * If non-NULL, this buffer must be ata_command::cb::count
-	 * sectors in size.
-	 */
-	userptr_t data_in;
-	/** Command status code */
-	int rc;
-};
+/** Command completed in error */
+#define ATA_STAT_ERR 0x01
 
 /**
  * Structure returned by ATA IDENTIFY command
@@ -165,13 +147,15 @@ struct ata_command {
  * so we implement only a few fields.
  */
 struct ata_identity {
-	uint16_t ignore_a[60]; /* words 0-59 */
+	uint16_t ignore_a[27]; /* words 0-26 */
+	uint16_t model[20]; /* words 27-46 */
+	uint16_t ignore_b[13]; /* words 47-59 */
 	uint32_t lba_sectors; /* words 60-61 */
-	uint16_t ignore_b[21]; /* words 62-82 */
+	uint16_t ignore_c[21]; /* words 62-82 */
 	uint16_t supports_lba48; /* word 83 */
-	uint16_t ignore_c[16]; /* words 84-99 */
+	uint16_t ignore_d[16]; /* words 84-99 */
 	uint64_t lba48_sectors; /* words 100-103 */
-	uint16_t ignore_d[152]; /* words 104-255 */
+	uint16_t ignore_e[152]; /* words 104-255 */
 };
 
 /** Supports LBA48 flag */
@@ -180,30 +164,41 @@ struct ata_identity {
 /** ATA sector size */
 #define ATA_SECTOR_SIZE 512
 
-/** An ATA device */
-struct ata_device {
-	/** Block device interface */
-	struct block_device blockdev;
-	/** Device number
+/** An ATA command information unit */
+struct ata_cmd {
+	/** ATA command block */
+	struct ata_cb cb;
+	/** Data-out buffer (may be NULL)
 	 *
-	 * Must be ATA_DEV_MASTER or ATA_DEV_SLAVE.
+	 * If non-NULL, this buffer must be ata_command::cb::count
+	 * sectors in size.
 	 */
-	int device;
-	/** LBA48 extended addressing */
-	int lba48;
-	/**
-	 * Issue ATA command
+	userptr_t data_out;
+	/** Data-out buffer length
 	 *
-	 * @v ata		ATA device
-	 * @v command		ATA command
-	 * @ret rc		Return status code
+	 * Must be zero if @c data_out is NULL
 	 */
-	int ( * command ) ( struct ata_device *ata,
-			    struct ata_command *command );
-	/** Backing device */
-	struct refcnt *backend;
+	size_t data_out_len;
+	/** Data-in buffer (may be NULL)
+	 *
+	 * If non-NULL, this buffer must be ata_command::cb::count
+	 * sectors in size.
+	 */
+	userptr_t data_in;
+	/** Data-in buffer length
+	 *
+	 * Must be zero if @c data_in is NULL
+	 */
+	size_t data_in_len;
 };
 
-extern int init_atadev ( struct ata_device *ata );
+extern int ata_command ( struct interface *control, struct interface *data,
+			 struct ata_cmd *command );
+#define ata_command_TYPE( object_type )					\
+	typeof ( int ( object_type, struct interface *data,		\
+		       struct ata_cmd *command ) )
+
+extern int ata_open ( struct interface *block, struct interface *ata,
+		      unsigned int device, unsigned int max_count );
 
 #endif /* _IPXE_ATA_H */

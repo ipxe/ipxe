@@ -133,7 +133,7 @@ REQUIRE_OBJECT ( slam );
  *
  */
 #ifdef SANBOOT_PROTO_ISCSI
-REQUIRE_OBJECT ( iscsiboot );
+REQUIRE_OBJECT ( iscsi );
 #endif
 
 /*

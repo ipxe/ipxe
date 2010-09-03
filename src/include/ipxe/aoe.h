@@ -14,10 +14,11 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #include <ipxe/if_ether.h>
 #include <ipxe/retry.h>
 #include <ipxe/ata.h>
+#include <ipxe/acpi.h>
 
 /** An AoE config command */
 struct aoecfg {
-	/** AoE Queue depth */
+	/** AoE queue depth */
 	uint16_t bufcnt;
 	/** ATA target firmware version */
 	uint16_t fwver;
@@ -78,7 +79,7 @@ struct aoehdr {
 	/** Tag, in network byte order */
 	uint32_t tag;
 	/** Payload */
-	union aoecmd cmd[0];
+	union aoecmd payload[0];
 } __attribute__ (( packed ));
 
 #define AOE_VERSION	0x10	/**< Version 1 */
@@ -93,58 +94,38 @@ struct aoehdr {
 #define AOE_CMD_ATA	0x00	/**< Issue ATA command */
 #define AOE_CMD_CONFIG	0x01	/**< Query Config Information */
 
-#define AOE_TAG_MAGIC	0xebeb0000
-
 #define AOE_ERR_BAD_COMMAND	1 /**< Unrecognised command code */
 #define AOE_ERR_BAD_PARAMETER	2 /**< Bad argument parameter */
 #define AOE_ERR_UNAVAILABLE	3 /**< Device unavailable */
 #define AOE_ERR_CONFIG_EXISTS	4 /**< Config string present */
 #define AOE_ERR_BAD_VERSION	5 /**< Unsupported version */
 
-/** An AoE session */
-struct aoe_session {
-	/** Reference counter */
-	struct refcnt refcnt;
-
-	/** List of all AoE sessions */
-	struct list_head list;
-
-	/** Network device */
-	struct net_device *netdev;
-
-	/** Major number */
-	uint16_t major;
-	/** Minor number */
-	uint8_t minor;
-	/** Target MAC address */
-	uint8_t target[ETH_ALEN];
-
-	/** Tag for current AoE command */
-	uint32_t tag;
-
-	/** Current AOE command */
-	uint8_t aoe_cmd_type;
-	/** Current ATA command */
-	struct ata_command *command;
-	/** Overall status of current ATA command */
-	unsigned int status;
-	/** Byte offset within command's data buffer */
-	unsigned int command_offset;
-	/** Return status code for command */
-	int rc;
-
-	/** Retransmission timer */
-	struct retry_timer timer;
-};
-
 #define AOE_STATUS_ERR_MASK	0x0f /**< Error portion of status code */ 
 #define AOE_STATUS_PENDING	0x80 /**< Command pending */
+
+/** AoE tag magic marker */
+#define AOE_TAG_MAGIC 0x18ae0000
 
 /** Maximum number of sectors per packet */
 #define AOE_MAX_COUNT 2
 
-extern void aoe_detach ( struct ata_device *ata );
-extern int aoe_attach ( struct ata_device *ata, struct net_device *netdev,
-			const char *root_path );
+/** AoE boot firmware table signature */
+#define ABFT_SIG ACPI_SIGNATURE ( 'a', 'B', 'F', 'T' )
+
+/**
+ * AoE Boot Firmware Table (aBFT)
+ */
+struct abft_table {
+	/** ACPI header */
+	struct acpi_description_header acpi;
+	/** AoE shelf */
+	uint16_t shelf;
+	/** AoE slot */
+	uint8_t slot;
+	/** Reserved */
+	uint8_t reserved_a;
+	/** MAC address */
+	uint8_t mac[ETH_ALEN];
+} __attribute__ (( packed ));
 
 #endif /* _IPXE_AOE_H */

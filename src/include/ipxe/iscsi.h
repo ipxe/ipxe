@@ -90,6 +90,9 @@ struct iscsi_bhs_common {
 /** Final PDU of a sequence */
 #define ISCSI_FLAG_FINAL 0x80
 
+/** iSCSI tag magic marker */
+#define ISCSI_TAG_MAGIC 0x18ae0000
+
 /**
  * iSCSI basic header segment common request fields
  *
@@ -307,8 +310,10 @@ struct iscsi_bhs_scsi_response {
 	uint32_t maxcmdsn;
 	/** Expected data sequence number */
 	uint32_t expdatasn;
-	/** Reserved */
-	uint8_t reserved_b[8];
+	/** Bidirectional read residual count */
+	uint32_t bidi_residual_count;
+	/** Residual count */
+	uint32_t residual_count;
 };
 
 /** SCSI response opcode */
@@ -320,13 +325,11 @@ struct iscsi_bhs_scsi_response {
 /** SCSI target failure */
 #define ISCSI_RESPONSE_TARGET_FAILURE 0x01
 
-/** SCSI sense response code offset
- *
- * The SCSI response may contain unsolicited sense data in the data
- * segment.  If it does, this is the offset to the sense response code
- * byte, which is the only byte we care about.
- */
-#define ISCSI_SENSE_RESPONSE_CODE_OFFSET 2
+/** Data overflow occurred */
+#define ISCSI_RESPONSE_FLAG_OVERFLOW 0x20
+
+/** Data underflow occurred */
+#define ISCSI_RESPONSE_FLAG_UNDERFLOW 0x40
 
 /**
  * iSCSI data-in basic header segment
@@ -497,6 +500,10 @@ struct iscsi_session {
 	/** Reference counter */
 	struct refcnt refcnt;
 
+	/** SCSI command-issuing interface */
+	struct interface control;
+	/** SCSI command interface */
+	struct interface data;
 	/** Transport-layer socket */
 	struct interface socket;
 
@@ -506,10 +513,6 @@ struct iscsi_session {
 	unsigned int target_port;
 	/** Target IQN */
 	char *target_iqn;
-	/** Logical Unit Number (LUN) */
-	struct scsi_lun lun;
-	/** Target socket address (recorded only for iBFT) */
-	struct sockaddr target_sockaddr;
 
 	/** Session status
 	 *
@@ -517,12 +520,6 @@ struct iscsi_session {
 	 * constants.
 	 */
 	int status;
-	/** Retry count
-	 *
-	 * Number of times that the connection has been retried.
-	 * Reset upon a successful connection.
-	 */
-	int retry_count;
 
 	/** Initiator username (if any) */
 	char *initiator_username;
@@ -542,12 +539,6 @@ struct iscsi_session {
 	/** CHAP response (used for both initiator and target auth) */
 	struct chap_response chap;
 
-	/** Target session identifying handle
-	 *
-	 * This is assigned by the target when we first log in, and
-	 * must be reused on subsequent login attempts.
-	 */
-	uint16_t tsih;
 	/** Initiator task tag
 	 *
 	 * This is the tag of the current command.  It is incremented
@@ -560,15 +551,13 @@ struct iscsi_session {
 	 * response to an R2T.
 	 */
 	uint32_t ttt;
-	/**
-	 * Transfer offset
+	/** Transfer offset
 	 *
 	 * This is the offset for an in-progress sequence of data-out
 	 * PDUs in response to an R2T.
 	 */
 	uint32_t transfer_offset;
-	/**
-	 * Transfer length
+	/** Transfer length
 	 *
 	 * This is the length for an in-progress sequence of data-out
 	 * PDUs in response to an R2T.
@@ -609,18 +598,13 @@ struct iscsi_session {
 	/** Buffer for received data (not always used) */
 	void *rx_buffer;
 
-	/** Current SCSI command
-	 *
-	 * Set to NULL when command is complete.
-	 */
-	struct scsi_command *command;
-	/** Instant return code
-	 *
-	 * Set to a non-zero value if all requests should return
-	 * immediately.  This can be used to e.g. avoid retrying
-	 * logins that are doomed to fail authentication.
-	 */
-	int instant_rc;
+	/** Current SCSI command, if any */
+	struct scsi_cmd *command;
+
+	/** Target socket address (for boot firmware table) */
+	struct sockaddr target_sockaddr;
+	/** SCSI LUN (for boot firmware table) */
+	struct scsi_lun lun;
 };
 
 /** iSCSI session is currently in the security negotiation phase */
@@ -668,11 +652,6 @@ struct iscsi_session {
 /** Target authenticated itself correctly */
 #define ISCSI_STATUS_AUTH_REVERSE_OK 0x00040000
 
-/** Maximum number of retries at connecting */
-#define ISCSI_MAX_RETRIES 2
-
-extern int iscsi_attach ( struct scsi_device *scsi, const char *root_path );
-extern void iscsi_detach ( struct scsi_device *scsi );
 extern const char * iscsi_initiator_iqn ( void );
 
 #endif /* _IPXE_ISCSI_H */

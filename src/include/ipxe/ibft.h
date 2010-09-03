@@ -43,10 +43,11 @@ FILE_LICENCE ( BSD2 );
 
 #include <stdint.h>
 #include <ipxe/acpi.h>
+#include <ipxe/scsi.h>
 #include <ipxe/in.h>
 
 /** iSCSI Boot Firmware Table signature */
-#define IBFT_SIG "iBFT"
+#define IBFT_SIG ACPI_SIGNATURE ( 'i', 'B', 'F', 'T' )
 
 /** An offset from the start of the iBFT */
 typedef uint16_t ibft_off_t;
@@ -57,7 +58,7 @@ typedef uint16_t ibft_size_t;
 /** A string within the iBFT */
 struct ibft_string {
 	/** Length of string */
-	ibft_size_t length;
+	ibft_size_t len;
 	/** Offset to string */
 	ibft_off_t offset;
 } __attribute__ (( packed ));
@@ -208,7 +209,7 @@ struct ibft_target {
 	/** TCP port */
 	uint16_t socket;
 	/** Boot LUN */
-	uint64_t boot_lun;
+	struct scsi_lun boot_lun;
 	/** CHAP type
 	 *
 	 * This is an IBFT_CHAP_XXX constant.
@@ -260,43 +261,11 @@ struct ibft_table {
 	struct ibft_control control;
 } __attribute__ (( packed ));
 
-/**
- * iSCSI string block descriptor
- *
- * This is an internal structure that we use to keep track of the
- * allocation of string data.
- */
-struct ibft_string_block {
-	/** The iBFT containing these strings */
-	struct ibft_table *table;
-	/** Offset of first free byte within iBFT */
-	unsigned int offset;
-};
-
-/** Amount of space reserved for strings in a iPXE iBFT */
-#define IBFT_STRINGS_SIZE 384
-
-/**
- * An iBFT created by iPXE
- *
- */
-struct ipxe_ibft {
-	/** The fixed section */
-	struct ibft_table table;
-	/** The Initiator section */
-	struct ibft_initiator initiator __attribute__ (( aligned ( 16 ) ));
-	/** The NIC section */
-	struct ibft_nic nic __attribute__ (( aligned ( 16 ) ));
-	/** The Target section */
-	struct ibft_target target __attribute__ (( aligned ( 16 ) ));
-	/** Strings block */
-	char strings[IBFT_STRINGS_SIZE];
-} __attribute__ (( packed, aligned ( 16 ) ));
-
-struct net_device;
 struct iscsi_session;
+struct net_device;
 
-extern int ibft_fill_data ( struct net_device *netdev,
-			    struct iscsi_session *iscsi );
+extern int ibft_describe ( struct iscsi_session *iscsi,
+			   struct acpi_description_header *acpi,
+			   size_t len );
 
 #endif /* _IPXE_IBFT_H */

@@ -32,7 +32,6 @@ FILE_LICENCE ( BSD2 );
 #include <string.h>
 #include <errno.h>
 #include <byteswap.h>
-#include <realmode.h>
 #include <ipxe/pci.h>
 #include <ipxe/acpi.h>
 #include <ipxe/in.h>
@@ -53,62 +52,36 @@ FILE_LICENCE ( BSD2 );
  *
  */
 
-#define ibftab __use_data16 ( ibftab )
-/** The iBFT used by iPXE */
-struct ipxe_ibft __data16 ( ibftab ) = {
-	/* Table header */
-	.table = {
-		/* ACPI header */
-		.acpi = {
-			.signature = IBFT_SIG,
-			.length = sizeof ( ibftab ),
-			.revision = 1,
-			.oem_id = "FENSYS",
-			.oem_table_id = "iPXE",
-		},
-		/* Control block */
-		.control = {
-			.header = {
-				.structure_id = IBFT_STRUCTURE_ID_CONTROL,
-				.version = 1,
-				.length = sizeof ( ibftab.table.control ),
-				.flags = 0,
-			},
-			.initiator = offsetof ( typeof ( ibftab ), initiator ),
-			.nic_0 = offsetof ( typeof ( ibftab ), nic ),
-			.target_0 = offsetof ( typeof ( ibftab ), target ),
-		},
-	},
-	/* iSCSI initiator information */
-	.initiator = {
-		.header = {
-			.structure_id = IBFT_STRUCTURE_ID_INITIATOR,
-			.version = 1,
-			.length = sizeof ( ibftab.initiator ),
-			.flags = ( IBFT_FL_INITIATOR_BLOCK_VALID |
-				   IBFT_FL_INITIATOR_FIRMWARE_BOOT_SELECTED ),
-		},
-	},
-	/* NIC information */
-	.nic = {
-		.header = {
-			.structure_id = IBFT_STRUCTURE_ID_NIC,
-			.version = 1,
-			.length = sizeof ( ibftab.nic ),
-			.flags = ( IBFT_FL_NIC_BLOCK_VALID |
-				   IBFT_FL_NIC_FIRMWARE_BOOT_SELECTED ),
-		},
-	},
-	/* iSCSI target information */
-	.target = {
-		.header = {
-			.structure_id = IBFT_STRUCTURE_ID_TARGET,
-			.version = 1,
-			.length = sizeof ( ibftab.target ),
-			.flags = ( IBFT_FL_TARGET_BLOCK_VALID |
-				   IBFT_FL_TARGET_FIRMWARE_BOOT_SELECTED ),
-		},
-	},
+/**
+ * An iBFT created by iPXE
+ *
+ */
+struct ipxe_ibft {
+	/** The fixed section */
+	struct ibft_table table;
+	/** The Initiator section */
+	struct ibft_initiator initiator __attribute__ (( aligned ( 16 ) ));
+	/** The NIC section */
+	struct ibft_nic nic __attribute__ (( aligned ( 16 ) ));
+	/** The Target section */
+	struct ibft_target target __attribute__ (( aligned ( 16 ) ));
+	/** Strings block */
+	char strings[0];
+} __attribute__ (( packed, aligned ( 16 ) ));
+
+/**
+ * iSCSI string block descriptor
+ *
+ * This is an internal structure that we use to keep track of the
+ * allocation of string data.
+ */
+struct ibft_strings {
+	/** The iBFT containing these strings */
+	struct ibft_table *table;
+	/** Offset of first free byte within iBFT */
+	size_t offset;
+	/** Total length of the iBFT */
+	size_t len;
 };
 
 /**
@@ -132,9 +105,9 @@ static void ibft_set_ipaddr ( struct ibft_ipaddr *ipaddr, struct in_addr in ) {
  * @v setting		Configuration setting
  * @v tag		DHCP option tag
  */
-static void ibft_set_ipaddr_option ( struct ibft_ipaddr *ipaddr,
-				     struct setting *setting ) {
-	struct in_addr in = { 0 };
+static void ibft_set_ipaddr_setting ( struct ibft_ipaddr *ipaddr,
+				      struct setting *setting ) {
+	struct in_addr in;
 	fetch_ipv4_setting ( NULL, setting, &in );
 	ibft_set_ipaddr ( ipaddr, in );
 }
@@ -156,22 +129,19 @@ static const char * ibft_ipaddr ( struct ibft_ipaddr *ipaddr ) {
  * @v strings		iBFT string block descriptor
  * @v string		String field to fill in
  * @v len		Length of string to allocate (excluding NUL)
- * @ret rc		Return status code
+ * @ret dest		String destination, or NULL
  */
-static int ibft_alloc_string ( struct ibft_string_block *strings,
-			       struct ibft_string *string, size_t len ) {
-	char *dest;
-	unsigned int remaining;
+static char * ibft_alloc_string ( struct ibft_strings *strings,
+				  struct ibft_string *string, size_t len ) {
 
-	dest = ( ( ( char * ) strings->table ) + strings->offset );
-	remaining = ( strings->table->acpi.length - strings->offset );
-	if ( len >= remaining )
-		return -ENOMEM;
+	if ( ( strings->offset + len ) >= strings->len )
+		return NULL;
 
-	string->offset = strings->offset;
-	string->length = len;
+	string->offset = cpu_to_le16 ( strings->offset );
+	string->len = cpu_to_le16 ( len );
 	strings->offset += ( len + 1 );
-	return 0;
+
+	return ( ( ( char * ) strings->table ) + string->offset );
 }
 
 /**
@@ -182,18 +152,16 @@ static int ibft_alloc_string ( struct ibft_string_block *strings,
  * @v data		String to fill in, or NULL
  * @ret rc		Return status code
  */
-static int ibft_set_string ( struct ibft_string_block *strings,
+static int ibft_set_string ( struct ibft_strings *strings,
 			     struct ibft_string *string, const char *data ) {
 	char *dest;
-	int rc;
 
 	if ( ! data )
 		return 0;
 
-	if ( ( rc = ibft_alloc_string ( strings, string,
-					strlen ( data ) ) ) != 0 )
-		return rc;
-	dest = ( ( ( char * ) strings->table ) + string->offset );
+	dest = ibft_alloc_string ( strings, string, strlen ( data ) );
+	if ( ! dest )
+		return -ENOBUFS;
 	strcpy ( dest, data );
 
 	return 0;
@@ -207,24 +175,24 @@ static int ibft_set_string ( struct ibft_string_block *strings,
  * @v setting		Configuration setting
  * @ret rc		Return status code
  */
-static int ibft_set_string_option ( struct ibft_string_block *strings,
-				    struct ibft_string *string,
-				    struct setting *setting ) {
+static int ibft_set_string_setting ( struct ibft_strings *strings,
+				     struct ibft_string *string,
+				     struct setting *setting ) {
 	int len;
 	char *dest;
-	int rc;
 
 	len = fetch_setting_len ( NULL, setting );
 	if ( len < 0 ) {
 		string->offset = 0;
-		string->length = 0;
+		string->len = 0;
 		return 0;
 	}
 
-	if ( ( rc = ibft_alloc_string ( strings, string, len ) ) != 0 )
-		return rc;
-	dest = ( ( ( char * ) strings->table ) + string->offset );
+	dest = ibft_alloc_string ( strings, string, len );
+	if ( ! dest )
+		return -ENOBUFS;
 	fetch_string_setting ( NULL, setting, dest, ( len + 1 ) );
+
 	return 0;
 }
 
@@ -235,7 +203,7 @@ static int ibft_set_string_option ( struct ibft_string_block *strings,
  * @v string		String field
  * @ret data		String content (or "<empty>")
  */
-static const char * ibft_string ( struct ibft_string_block *strings,
+static const char * ibft_string ( struct ibft_strings *strings,
 				  struct ibft_string *string ) {
 	return ( string->offset ?
 		 ( ( ( char * ) strings->table ) + string->offset ) : NULL );
@@ -250,22 +218,29 @@ static const char * ibft_string ( struct ibft_string_block *strings,
  * @ret rc		Return status code
  */
 static int ibft_fill_nic ( struct ibft_nic *nic,
-			   struct ibft_string_block *strings,
+			   struct ibft_strings *strings,
 			   struct net_device *netdev ) {
 	struct ll_protocol *ll_protocol = netdev->ll_protocol;
 	struct in_addr netmask_addr = { 0 };
 	unsigned int netmask_count = 0;
 	int rc;
 
-	/* Extract values from DHCP configuration */
-	ibft_set_ipaddr_option ( &nic->ip_address, &ip_setting );
+	/* Fill in common header */
+	nic->header.structure_id = IBFT_STRUCTURE_ID_NIC;
+	nic->header.version = 1;
+	nic->header.length = cpu_to_le16 ( sizeof ( *nic ) );
+	nic->header.flags = ( IBFT_FL_NIC_BLOCK_VALID |
+			      IBFT_FL_NIC_FIRMWARE_BOOT_SELECTED );
+
+	/* Extract values from configuration settings */
+	ibft_set_ipaddr_setting ( &nic->ip_address, &ip_setting );
 	DBG ( "iBFT NIC IP = %s\n", ibft_ipaddr ( &nic->ip_address ) );
-	ibft_set_ipaddr_option ( &nic->gateway, &gateway_setting );
+	ibft_set_ipaddr_setting ( &nic->gateway, &gateway_setting );
 	DBG ( "iBFT NIC gateway = %s\n", ibft_ipaddr ( &nic->gateway ) );
-	ibft_set_ipaddr_option ( &nic->dns[0], &dns_setting );
+	ibft_set_ipaddr_setting ( &nic->dns[0], &dns_setting );
 	DBG ( "iBFT NIC DNS = %s\n", ibft_ipaddr ( &nic->dns[0] ) );
-	if ( ( rc = ibft_set_string_option ( strings, &nic->hostname,
-					     &hostname_setting ) ) != 0 )
+	if ( ( rc = ibft_set_string_setting ( strings, &nic->hostname,
+					      &hostname_setting ) ) != 0 )
 		return rc;
 	DBG ( "iBFT NIC hostname = %s\n",
 	      ibft_string ( strings, &nic->hostname ) );
@@ -287,8 +262,8 @@ static int ibft_fill_nic ( struct ibft_nic *nic,
 		return rc;
 	}
 	DBG ( "iBFT NIC MAC = %s\n", eth_ntoa ( nic->mac_address ) );
-	nic->pci_bus_dev_func = netdev->dev->desc.location;
-	DBG ( "iBFT NIC PCI = %04x\n", nic->pci_bus_dev_func );
+	nic->pci_bus_dev_func = cpu_to_le16 ( netdev->dev->desc.location );
+	DBG ( "iBFT NIC PCI = %04x\n", le16_to_cpu ( nic->pci_bus_dev_func ) );
 
 	return 0;
 }
@@ -301,10 +276,18 @@ static int ibft_fill_nic ( struct ibft_nic *nic,
  * @ret rc		Return status code
  */
 static int ibft_fill_initiator ( struct ibft_initiator *initiator,
-				 struct ibft_string_block *strings ) {
+				 struct ibft_strings *strings ) {
 	const char *initiator_iqn = iscsi_initiator_iqn();
 	int rc;
 
+	/* Fill in common header */
+	initiator->header.structure_id = IBFT_STRUCTURE_ID_INITIATOR;
+	initiator->header.version = 1;
+	initiator->header.length = cpu_to_le16 ( sizeof ( *initiator ) );
+	initiator->header.flags = ( IBFT_FL_INITIATOR_BLOCK_VALID |
+				    IBFT_FL_INITIATOR_FIRMWARE_BOOT_SELECTED );
+
+	/* Fill in hostname */
 	if ( ( rc = ibft_set_string ( strings, &initiator->initiator_name,
 				      initiator_iqn ) ) != 0 )
 		return rc;
@@ -323,7 +306,7 @@ static int ibft_fill_initiator ( struct ibft_initiator *initiator,
  * @ret rc		Return status code
  */
 static int ibft_fill_target_chap ( struct ibft_target *target,
-				   struct ibft_string_block *strings,
+				   struct ibft_strings *strings,
 				   struct iscsi_session *iscsi ) {
 	int rc;
 
@@ -356,7 +339,7 @@ static int ibft_fill_target_chap ( struct ibft_target *target,
  * @ret rc		Return status code
  */
 static int ibft_fill_target_reverse_chap ( struct ibft_target *target,
-					   struct ibft_string_block *strings,
+					   struct ibft_strings *strings,
 					   struct iscsi_session *iscsi ) {
 	int rc;
 
@@ -391,17 +374,27 @@ static int ibft_fill_target_reverse_chap ( struct ibft_target *target,
  * @ret rc		Return status code
  */
 static int ibft_fill_target ( struct ibft_target *target,
-			      struct ibft_string_block *strings,
+			      struct ibft_strings *strings,
 			      struct iscsi_session *iscsi ) {
 	struct sockaddr_in *sin_target =
 		( struct sockaddr_in * ) &iscsi->target_sockaddr;
 	int rc;
 
+	/* Fill in common header */
+	target->header.structure_id = IBFT_STRUCTURE_ID_TARGET;
+	target->header.version = 1;
+	target->header.length = cpu_to_le16 ( sizeof ( *target ) );
+	target->header.flags = ( IBFT_FL_TARGET_BLOCK_VALID |
+				 IBFT_FL_TARGET_FIRMWARE_BOOT_SELECTED );
+
 	/* Fill in Target values */
 	ibft_set_ipaddr ( &target->ip_address, sin_target->sin_addr );
 	DBG ( "iBFT target IP = %s\n", ibft_ipaddr ( &target->ip_address ) );
-	target->socket = ntohs ( sin_target->sin_port );
+	target->socket = cpu_to_le16 ( ntohs ( sin_target->sin_port ) );
 	DBG ( "iBFT target port = %d\n", target->socket );
+	memcpy ( &target->boot_lun, &iscsi->lun, sizeof ( target->boot_lun ) );
+	DBG ( "iBFT target boot LUN = " SCSI_LUN_FORMAT "\n",
+	      SCSI_LUN_DATA ( target->boot_lun ) );
 	if ( ( rc = ibft_set_string ( strings, &target->target_name,
 				      iscsi->target_iqn ) ) != 0 )
 		return rc;
@@ -417,35 +410,62 @@ static int ibft_fill_target ( struct ibft_target *target,
 }
 
 /**
- * Fill in all variable portions of iBFT
+ * Fill in iBFT
  *
- * @v netdev		Network device
- * @v initiator_iqn	Initiator IQN
- * @v st_target		Target socket address
- * @v target_iqn	Target IQN
+ * @v iscsi		iSCSI session
+ * @v acpi		ACPI table
+ * @v len		Length of ACPI table
  * @ret rc		Return status code
- *
  */
-int ibft_fill_data ( struct net_device *netdev,
-		     struct iscsi_session *iscsi ) {
-	struct ibft_string_block strings = {
-		.table = &ibftab.table,
-		.offset = offsetof ( typeof ( ibftab ), strings ),
+int ibft_describe ( struct iscsi_session *iscsi,
+		    struct acpi_description_header *acpi,
+		    size_t len ) {
+	struct ipxe_ibft *ibft =
+		container_of ( acpi, struct ipxe_ibft, table.acpi );
+	struct ibft_strings strings = {
+		.table = &ibft->table,
+		.offset = offsetof ( typeof ( *ibft ), strings ),
+		.len = len,
 	};
+	struct net_device *netdev;
 	int rc;
 
-	/* Fill in NIC, Initiator and Target portions */
-	if ( ( rc = ibft_fill_nic ( &ibftab.nic, &strings, netdev ) ) != 0 )
+	/* Ugly hack.  Now that we have a generic interface mechanism
+	 * that can support ioctls, we can potentially eliminate this.
+	 */
+	netdev = last_opened_netdev();
+	if ( ! netdev ) {
+		DBGC ( iscsi, "iSCSI %p cannot guess network device\n",
+		       iscsi );
+		return -ENODEV;
+	}
+
+	/* Fill in ACPI header */
+	ibft->table.acpi.signature = cpu_to_le32 ( IBFT_SIG );
+	ibft->table.acpi.length = cpu_to_le32 ( len );
+	ibft->table.acpi.revision = 1;
+
+	/* Fill in Control block */
+	ibft->table.control.header.structure_id = IBFT_STRUCTURE_ID_CONTROL;
+	ibft->table.control.header.version = 1;
+	ibft->table.control.header.length =
+		cpu_to_le16 ( sizeof ( ibft->table.control ) );
+	ibft->table.control.initiator =
+		cpu_to_le16 ( offsetof ( typeof ( *ibft ), initiator ) );
+	ibft->table.control.nic_0 =
+		cpu_to_le16 ( offsetof ( typeof ( *ibft ), nic ) );
+	ibft->table.control.target_0 =
+		cpu_to_le16 ( offsetof ( typeof ( *ibft ), target ) );
+
+	/* Fill in NIC, Initiator and Target blocks */
+	if ( ( rc = ibft_fill_nic ( &ibft->nic, &strings, netdev ) ) != 0 )
 		return rc;
-	if ( ( rc = ibft_fill_initiator ( &ibftab.initiator,
+	if ( ( rc = ibft_fill_initiator ( &ibft->initiator,
 					  &strings ) ) != 0 )
 		return rc;
-	if ( ( rc = ibft_fill_target ( &ibftab.target, &strings,
+	if ( ( rc = ibft_fill_target ( &ibft->target, &strings,
 				       iscsi ) ) != 0 )
 		return rc;
-
-	/* Update checksum */
-	acpi_fix_checksum ( &ibftab.table.acpi );
 
 	return 0;
 }
