@@ -458,6 +458,7 @@ static void rtl_poll ( struct net_device *netdev ) {
 				 rx_len - wrapped_len );
 			memcpy ( iob_put ( rx_iob, wrapped_len ),
 				 rtl->rx.ring, wrapped_len );
+			iob_unput ( rx_iob, 4 ); /* Strip CRC */
 
 			netdev_rx ( netdev, rx_iob );
 		} else {
