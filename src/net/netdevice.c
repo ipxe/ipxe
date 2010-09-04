@@ -57,6 +57,39 @@ struct errortab netdev_errors[] __errortab = {
 };
 
 /**
+ * Notify drivers of network device or link state change
+ *
+ * @v netdev		Network device
+ */
+static void netdev_notify ( struct net_device *netdev ) {
+	struct net_driver *driver;
+
+	for_each_table_entry ( driver, NET_DRIVERS )
+		driver->notify ( netdev );
+}
+
+/**
+ * Mark network device as having a specific link state
+ *
+ * @v netdev		Network device
+ * @v rc		Link status code
+ */
+void netdev_link_err ( struct net_device *netdev, int rc ) {
+
+	/* Record link state */
+	netdev->link_rc = rc;
+	if ( netdev->link_rc == 0 ) {
+		DBGC ( netdev, "NETDEV %p link is up\n", netdev );
+	} else {
+		DBGC ( netdev, "NETDEV %p link is down: %s\n",
+		       netdev, strerror ( netdev->link_rc ) );
+	}
+
+	/* Notify drivers of link state change */
+	netdev_notify ( netdev );
+}
+
+/**
  * Mark network device as having link down
  *
  * @v netdev		Network device
@@ -68,7 +101,7 @@ void netdev_link_down ( struct net_device *netdev ) {
 	 */
 	if ( ( netdev->link_rc == 0 ) ||
 	     ( netdev->link_rc == -EUNKNOWN_LINK_STATUS ) ) {
-		netdev->link_rc = -ENOTCONN;
+		netdev_link_err ( netdev, -ENOTCONN );
 	}
 }
 
@@ -367,6 +400,7 @@ struct net_device * alloc_netdev ( size_t priv_size ) {
  */
 int register_netdev ( struct net_device *netdev ) {
 	static unsigned int ifindex = 0;
+	struct net_driver *driver;
 	int rc;
 
 	/* Create device name */
@@ -376,14 +410,6 @@ int register_netdev ( struct net_device *netdev ) {
 	/* Set initial link-layer address */
 	netdev->ll_protocol->init_addr ( netdev->hw_addr, netdev->ll_addr );
 
-	/* Register per-netdev configuration settings */
-	if ( ( rc = register_settings ( netdev_settings ( netdev ),
-					NULL ) ) != 0 ) {
-		DBGC ( netdev, "NETDEV %p could not register settings: %s\n",
-		       netdev, strerror ( rc ) );
-		return rc;
-	}
-
 	/* Add to device list */
 	netdev_get ( netdev );
 	list_add_tail ( &netdev->list, &net_devices );
@@ -391,7 +417,31 @@ int register_netdev ( struct net_device *netdev ) {
 	       netdev, netdev->name, netdev->dev->name,
 	       netdev_addr ( netdev ) );
 
+	/* Register per-netdev configuration settings */
+	if ( ( rc = register_settings ( netdev_settings ( netdev ),
+					NULL ) ) != 0 ) {
+		DBGC ( netdev, "NETDEV %p could not register settings: %s\n",
+		       netdev, strerror ( rc ) );
+		goto err_register_settings;
+	}
+
+	/* Probe device */
+	for_each_table_entry ( driver, NET_DRIVERS ) {
+		if ( ( rc = driver->probe ( netdev ) ) != 0 ) {
+			DBGC ( netdev, "NETDEV %p could not add %s device: "
+			       "%s\n", netdev, driver->name, strerror ( rc ) );
+			goto err_probe;
+		}
+	}
+
 	return 0;
+
+ err_probe:
+	for_each_table_entry_continue_reverse ( driver, NET_DRIVERS )
+		driver->remove ( netdev );
+	unregister_settings ( netdev_settings ( netdev ) );
+ err_register_settings:
+	return rc;
 }
 
 /**
@@ -419,6 +469,9 @@ int netdev_open ( struct net_device *netdev ) {
 	/* Add to head of open devices list */
 	list_add ( &netdev->open_list, &open_net_devices );
 
+	/* Notify drivers of device state change */
+	netdev_notify ( netdev );
+
 	return 0;
 }
 
@@ -435,18 +488,21 @@ void netdev_close ( struct net_device *netdev ) {
 
 	DBGC ( netdev, "NETDEV %p closing\n", netdev );
 
+	/* Remove from open devices list */
+	list_del ( &netdev->open_list );
+
+	/* Mark as closed */
+	netdev->state &= ~NETDEV_OPEN;
+
+	/* Notify drivers of device state change */
+	netdev_notify ( netdev );
+
 	/* Close the device */
 	netdev->op->close ( netdev );
 
 	/* Flush TX and RX queues */
 	netdev_tx_flush ( netdev );
 	netdev_rx_flush ( netdev );
-
-	/* Mark as closed */
-	netdev->state &= ~NETDEV_OPEN;
-
-	/* Remove from open devices list */
-	list_del ( &netdev->open_list );
 }
 
 /**
@@ -457,9 +513,14 @@ void netdev_close ( struct net_device *netdev ) {
  * Removes the network device from the list of network devices.
  */
 void unregister_netdev ( struct net_device *netdev ) {
+	struct net_driver *driver;
 
 	/* Ensure device is closed */
 	netdev_close ( netdev );
+
+	/* Remove device */
+	for_each_table_entry_reverse ( driver, NET_DRIVERS )
+		driver->remove ( netdev );
 
 	/* Unregister per-netdev configuration settings */
 	unregister_settings ( netdev_settings ( netdev ) );

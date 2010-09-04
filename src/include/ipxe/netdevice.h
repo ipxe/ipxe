@@ -344,6 +344,34 @@ struct net_device {
 /** Declare a network-layer protocol */
 #define __net_protocol __table_entry ( NET_PROTOCOLS, 01 )
 
+/** A network upper-layer driver */
+struct net_driver {
+	/** Name */
+	const char *name;
+	/** Probe device
+	 *
+	 * @v netdev		Network device
+	 * @ret rc		Return status code
+	 */
+	int ( * probe ) ( struct net_device *netdev );
+	/** Notify of device or link state change
+	 *
+	 * @v netdev		Network device
+	 */
+	void ( * notify ) ( struct net_device *netdev );
+	/** Remove device
+	 *
+	 * @v netdev		Network device
+	 */
+	void ( * remove ) ( struct net_device *netdev );
+};
+
+/** Network driver table */
+#define NET_DRIVERS __table ( struct net_driver, "net_drivers" )
+
+/** Declare a network driver */
+#define __net_driver __table_entry ( NET_DRIVERS, 01 )
+
 extern struct list_head net_devices;
 extern struct net_device_operations null_netdev_operations;
 extern struct settings_operations netdev_settings_operations;
@@ -452,27 +480,6 @@ netdev_settings_init ( struct net_device *netdev ) {
 }
 
 /**
- * Mark network device as having link up
- *
- * @v netdev		Network device
- */
-static inline __attribute__ (( always_inline )) void
-netdev_link_up ( struct net_device *netdev ) {
-	netdev->link_rc = 0;
-}
-
-/**
- * Mark network device as having link down due to a specific error
- *
- * @v netdev		Network device
- * @v rc		Link status code
- */
-static inline __attribute__ (( always_inline )) void
-netdev_link_err ( struct net_device *netdev, int rc ) {
-	netdev->link_rc = rc;
-}
-
-/**
  * Check link state of network device
  *
  * @v netdev		Network device
@@ -505,6 +512,7 @@ netdev_irq_enabled ( struct net_device *netdev ) {
 	return ( netdev->state & NETDEV_IRQ_ENABLED );
 }
 
+extern void netdev_link_err ( struct net_device *netdev, int rc );
 extern void netdev_link_down ( struct net_device *netdev );
 extern int netdev_tx ( struct net_device *netdev, struct io_buffer *iobuf );
 extern void netdev_tx_complete_err ( struct net_device *netdev,
@@ -552,6 +560,16 @@ static inline void netdev_tx_complete ( struct net_device *netdev,
  */
 static inline void netdev_tx_complete_next ( struct net_device *netdev ) {
 	netdev_tx_complete_next_err ( netdev, 0 );
+}
+
+/**
+ * Mark network device as having link up
+ *
+ * @v netdev		Network device
+ */
+static inline __attribute__ (( always_inline )) void
+netdev_link_up ( struct net_device *netdev ) {
+	netdev_link_err ( netdev, 0 );
 }
 
 #endif /* _IPXE_NETDEVICE_H */
