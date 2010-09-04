@@ -360,6 +360,35 @@ FILE_LICENCE ( GPL2_OR_LATER );
 	      pointer++ )
 
 /**
+ * Iterate through all remaining entries within a linker table
+ *
+ * @v pointer		Entry pointer, preset to most recent entry
+ * @v table		Linker table
+ *
+ * Example usage:
+ *
+ * @code
+ *
+ *   #define FROBNICATORS __table ( struct frobnicator, "frobnicators" )
+ *   #define __frobnicator __table_entry ( FROBNICATORS, 01 )
+ *
+ *   struct frob my_frobnicator __frobnicator;
+ *   struct frobnicator *frob;
+ *
+ *   frob = &my_frobnicator;
+ *   for_each_table_entry_continue ( frob, FROBNICATORS ) {
+ *     ...
+ *   }
+ *
+ * @endcode
+ *
+ */
+#define for_each_table_entry_continue( pointer, table )			\
+	for ( pointer++ ;						\
+	      pointer < table_end ( table ) ;				\
+	      pointer++ )
+
+/**
  * Iterate through all entries within a linker table in reverse order
  *
  * @v pointer		Entry pointer
@@ -382,6 +411,35 @@ FILE_LICENCE ( GPL2_OR_LATER );
  */
 #define for_each_table_entry_reverse( pointer, table )			\
 	for ( pointer = ( table_end ( table ) - 1 ) ;			\
+	      pointer >= table_start ( table ) ;			\
+	      pointer-- )
+
+/**
+ * Iterate through all remaining entries within a linker table in reverse order
+ *
+ * @v pointer		Entry pointer, preset to most recent entry
+ * @v table		Linker table
+ *
+ * Example usage:
+ *
+ * @code
+ *
+ *   #define FROBNICATORS __table ( struct frobnicator, "frobnicators" )
+ *   #define __frobnicator __table_entry ( FROBNICATORS, 01 )
+ *
+ *   struct frob my_frobnicator __frobnicator;
+ *   struct frobnicator *frob;
+ *
+ *   frob = &my_frobnicator;
+ *   for_each_table_entry_continue_reverse ( frob, FROBNICATORS ) {
+ *     ...
+ *   }
+ *
+ * @endcode
+ *
+ */
+#define for_each_table_entry_continue_reverse( pointer, table )		\
+	for ( pointer-- ;						\
 	      pointer >= table_start ( table ) ;			\
 	      pointer-- )
 
