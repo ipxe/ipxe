@@ -12,6 +12,7 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #include <stdint.h>
 #include <ipxe/refcnt.h>
 #include <ipxe/device.h>
+#include <ipxe/tables.h>
 #include <ipxe/ib_packet.h>
 #include <ipxe/ib_mad.h>
 
@@ -432,6 +433,34 @@ struct ib_device {
 	void *owner_priv;
 };
 
+/** An Infiniband upper-layer driver */
+struct ib_driver {
+	/** Name */
+	const char *name;
+	/** Probe device
+	 *
+	 * @v ibdev		Infiniband device
+	 * @ret rc		Return status code
+	 */
+	int ( * probe ) ( struct ib_device *ibdev );
+	/** Notify of device or link state change
+	 *
+	 * @v ibdev		Infiniband device
+	 */
+	void ( * notify ) ( struct ib_device *ibdev );
+	/** Remove device
+	 *
+	 * @v ibdev		Infiniband device
+	 */
+	void ( * remove ) ( struct ib_device *ibdev );
+};
+
+/** Infiniband driver table */
+#define IB_DRIVERS __table ( struct ib_driver, "ib_drivers" )
+
+/** Declare an Infiniband driver */
+#define __ib_driver __table_entry ( IB_DRIVERS, 01 )
+
 extern struct ib_completion_queue *
 ib_create_cq ( struct ib_device *ibdev, unsigned int num_cqes,
 	       struct ib_completion_queue_operations *op );
@@ -492,7 +521,7 @@ extern struct list_head ib_devices;
 	list_for_each_entry ( (ibdev), &ib_devices, list )
 
 /**
- * Check link state
+ * Check link state of Infiniband device
  *
  * @v ibdev		Infiniband device
  * @ret link_up		Link is up
@@ -500,6 +529,17 @@ extern struct list_head ib_devices;
 static inline __always_inline int
 ib_link_ok ( struct ib_device *ibdev ) {
 	return ( ibdev->port_state == IB_PORT_STATE_ACTIVE );
+}
+
+/**
+ * Check whether or not Infiniband device is open
+ *
+ * @v ibdev		Infiniband device
+ * @v is_open		Infiniband device is open
+ */
+static inline __attribute__ (( always_inline )) int
+ib_is_open ( struct ib_device *ibdev ) {
+	return ( ibdev->open_count > 0 );
 }
 
 /**

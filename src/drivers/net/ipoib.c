@@ -598,6 +598,42 @@ static void ipoib_leave_broadcast_group ( struct ipoib_device *ipoib ) {
 }
 
 /**
+ * Handle link status change
+ *
+ * @v ibdev		Infiniband device
+ */
+static void ipoib_link_state_changed ( struct ib_device *ibdev ) {
+	struct net_device *netdev = ib_get_ownerdata ( ibdev );
+	struct ipoib_device *ipoib = netdev->priv;
+	struct ipoib_mac *mac = ( ( struct ipoib_mac * ) netdev->ll_addr );
+	int rc;
+
+	/* Leave existing broadcast group */
+	ipoib_leave_broadcast_group ( ipoib );
+
+	/* Update MAC address based on potentially-new GID prefix */
+	memcpy ( &mac->gid.u.half[0], &ibdev->gid.u.half[0],
+		 sizeof ( mac->gid.u.half[0] ) );
+
+	/* Update broadcast GID based on potentially-new partition key */
+	ipoib->broadcast.gid.u.words[2] =
+		htons ( ibdev->pkey | IB_PKEY_FULL );
+
+	/* Set net device link state to reflect Infiniband link state */
+	rc = ib_link_rc ( ibdev );
+	netdev_link_err ( netdev, ( rc ? rc : -EINPROGRESS_JOINING ) );
+
+	/* Join new broadcast group */
+	if ( ib_is_open ( ibdev ) && ib_link_ok ( ibdev ) &&
+	     ( ( rc = ipoib_join_broadcast_group ( ipoib ) ) != 0 ) ) {
+		DBGC ( ipoib, "IPoIB %p could not rejoin broadcast group: "
+		       "%s\n", ipoib, strerror ( rc ) );
+		netdev_link_err ( netdev, rc );
+		return;
+	}
+}
+
+/**
  * Open IPoIB network device
  *
  * @v netdev		Network device
@@ -691,48 +727,12 @@ static struct net_device_operations ipoib_operations = {
 };
 
 /**
- * Handle link status change
- *
- * @v ibdev		Infiniband device
- */
-void ipoib_link_state_changed ( struct ib_device *ibdev ) {
-	struct net_device *netdev = ib_get_ownerdata ( ibdev );
-	struct ipoib_device *ipoib = netdev->priv;
-	struct ipoib_mac *mac = ( ( struct ipoib_mac * ) netdev->ll_addr );
-	int rc;
-
-	/* Leave existing broadcast group */
-	ipoib_leave_broadcast_group ( ipoib );
-
-	/* Update MAC address based on potentially-new GID prefix */
-	memcpy ( &mac->gid.u.half[0], &ibdev->gid.u.half[0],
-		 sizeof ( mac->gid.u.half[0] ) );
-
-	/* Update broadcast GID based on potentially-new partition key */
-	ipoib->broadcast.gid.u.words[2] =
-		htons ( ibdev->pkey | IB_PKEY_FULL );
-
-	/* Set net device link state to reflect Infiniband link state */
-	rc = ib_link_rc ( ibdev );
-	netdev_link_err ( netdev, ( rc ? rc : -EINPROGRESS_JOINING ) );
-
-	/* Join new broadcast group */
-	if ( ib_link_ok ( ibdev ) &&
-	     ( ( rc = ipoib_join_broadcast_group ( ipoib ) ) != 0 ) ) {
-		DBGC ( ipoib, "IPoIB %p could not rejoin broadcast group: "
-		       "%s\n", ipoib, strerror ( rc ) );
-		netdev_link_err ( netdev, rc );
-		return;
-	}
-}
-
-/**
  * Probe IPoIB device
  *
  * @v ibdev		Infiniband device
  * @ret rc		Return status code
  */
-int ipoib_probe ( struct ib_device *ibdev ) {
+static int ipoib_probe ( struct ib_device *ibdev ) {
 	struct net_device *netdev;
 	struct ipoib_device *ipoib;
 	int rc;
@@ -775,10 +775,18 @@ int ipoib_probe ( struct ib_device *ibdev ) {
  *
  * @v ibdev		Infiniband device
  */
-void ipoib_remove ( struct ib_device *ibdev ) {
+static void ipoib_remove ( struct ib_device *ibdev ) {
 	struct net_device *netdev = ib_get_ownerdata ( ibdev );
 
 	unregister_netdev ( netdev );
 	netdev_nullify ( netdev );
 	netdev_put ( netdev );
 }
+
+/** IPoIB driver */
+struct ib_driver ipoib_driver __ib_driver = {
+	.name = "IPoIB",
+	.probe = ipoib_probe,
+	.notify = ipoib_link_state_changed,
+	.remove = ipoib_remove,
+};

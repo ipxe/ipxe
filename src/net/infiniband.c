@@ -31,7 +31,6 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #include <ipxe/if_arp.h>
 #include <ipxe/netdevice.h>
 #include <ipxe/iobuf.h>
-#include <ipxe/ipoib.h>
 #include <ipxe/process.h>
 #include <ipxe/infiniband.h>
 #include <ipxe/ib_mi.h>
@@ -539,6 +538,64 @@ void ib_refill_recv ( struct ib_device *ibdev, struct ib_queue_pair *qp ) {
  */
 
 /**
+ * Get link state
+ *
+ * @v ibdev		Infiniband device
+ * @ret rc		Link status code
+ */
+int ib_link_rc ( struct ib_device *ibdev ) {
+	switch ( ibdev->port_state ) {
+	case IB_PORT_STATE_DOWN:	return -ENOTCONN;
+	case IB_PORT_STATE_INIT:	return -EINPROGRESS_INIT;
+	case IB_PORT_STATE_ARMED:	return -EINPROGRESS_ARMED;
+	case IB_PORT_STATE_ACTIVE:	return 0;
+	default:			return -EINVAL;
+	}
+}
+
+/**
+ * Textual representation of Infiniband link state
+ *
+ * @v ibdev		Infiniband device
+ * @ret link_text	Link state text
+ */
+static const char * ib_link_state_text ( struct ib_device *ibdev ) {
+	switch ( ibdev->port_state ) {
+	case IB_PORT_STATE_DOWN:	return "DOWN";
+	case IB_PORT_STATE_INIT:	return "INIT";
+	case IB_PORT_STATE_ARMED:	return "ARMED";
+	case IB_PORT_STATE_ACTIVE:	return "ACTIVE";
+	default:			return "UNKNOWN";
+	}
+}
+
+/**
+ * Notify drivers of Infiniband device or link state change
+ *
+ * @v ibdev		Infiniband device
+ */
+static void ib_notify ( struct ib_device *ibdev ) {
+	struct ib_driver *driver;
+
+	for_each_table_entry ( driver, IB_DRIVERS )
+		driver->notify ( ibdev );
+}
+
+/**
+ * Notify of Infiniband link state change
+ *
+ * @v ibdev		Infiniband device
+ */
+void ib_link_state_changed ( struct ib_device *ibdev ) {
+
+	DBGC ( ibdev, "IBDEV %p link state is %s\n",
+	       ibdev, ib_link_state_text ( ibdev ) );
+
+	/* Notify drivers of link state change */
+	ib_notify ( ibdev );
+}
+
+/**
  * Open port
  *
  * @v ibdev		Infiniband device
@@ -586,6 +643,9 @@ int ib_open ( struct ib_device *ibdev ) {
 	/* Add to head of open devices list */
 	list_add ( &ibdev->open_list, &open_ib_devices );
 
+	/* Notify drivers of device state change */
+	ib_notify ( ibdev );
+
 	assert ( ibdev->open_count == 1 );
 	return 0;
 
@@ -614,27 +674,12 @@ void ib_close ( struct ib_device *ibdev ) {
 
 	/* Close device if this was the last remaining requested opening */
 	if ( ibdev->open_count == 0 ) {
+		ib_notify ( ibdev );
 		list_del ( &ibdev->open_list );
 		ib_destroy_mi ( ibdev, ibdev->gsi );
 		ib_destroy_sma ( ibdev, ibdev->smi );
 		ib_destroy_mi ( ibdev, ibdev->smi );
 		ibdev->op->close ( ibdev );
-	}
-}
-
-/**
- * Get link state
- *
- * @v ibdev		Infiniband device
- * @ret rc		Link status code
- */
-int ib_link_rc ( struct ib_device *ibdev ) {
-	switch ( ibdev->port_state ) {
-	case IB_PORT_STATE_DOWN:	return -ENOTCONN;
-	case IB_PORT_STATE_INIT:	return -EINPROGRESS_INIT;
-	case IB_PORT_STATE_ARMED:	return -EINPROGRESS_ARMED;
-	case IB_PORT_STATE_ACTIVE:	return 0;
-	default:			return -EINVAL;
 	}
 }
 
@@ -800,17 +845,6 @@ int ib_set_pkey_table ( struct ib_device *ibdev, union ib_mad *mad ) {
  */
 
 /**
- * Handle Infiniband link state change
- *
- * @v ibdev		Infiniband device
- */
-void ib_link_state_changed ( struct ib_device *ibdev ) {
-
-	/* Notify IPoIB of link state change */
-	ipoib_link_state_changed ( ibdev );
-}
-
-/**
  * Poll event queue
  *
  * @v ibdev		Infiniband device
@@ -883,24 +917,29 @@ struct ib_device * alloc_ibdev ( size_t priv_size ) {
  * @ret rc		Return status code
  */
 int register_ibdev ( struct ib_device *ibdev ) {
+	struct ib_driver *driver;
 	int rc;
 
 	/* Add to device list */
 	ibdev_get ( ibdev );
 	list_add_tail ( &ibdev->list, &ib_devices );
-
-	/* Add IPoIB device */
-	if ( ( rc = ipoib_probe ( ibdev ) ) != 0 ) {
-		DBGC ( ibdev, "IBDEV %p could not add IPoIB device: %s\n",
-		       ibdev, strerror ( rc ) );
-		goto err_ipoib_probe;
-	}
-
 	DBGC ( ibdev, "IBDEV %p registered (phys %s)\n", ibdev,
 	       ibdev->dev->name );
+
+	/* Probe device */
+	for_each_table_entry ( driver, IB_DRIVERS ) {
+		if ( ( rc = driver->probe ( ibdev ) ) != 0 ) {
+			DBGC ( ibdev, "IBDEV %p could not add %s device: %s\n",
+			       ibdev, driver->name, strerror ( rc ) );
+			goto err_probe;
+		}
+	}
+
 	return 0;
 
- err_ipoib_probe:
+ err_probe:
+	for_each_table_entry_continue_reverse ( driver, IB_DRIVERS )
+		driver->remove ( ibdev );
 	list_del ( &ibdev->list );
 	ibdev_put ( ibdev );
 	return rc;
@@ -912,9 +951,11 @@ int register_ibdev ( struct ib_device *ibdev ) {
  * @v ibdev		Infiniband device
  */
 void unregister_ibdev ( struct ib_device *ibdev ) {
+	struct ib_driver *driver;
 
-	/* Close device */
-	ipoib_remove ( ibdev );
+	/* Remove device */
+	for_each_table_entry_reverse ( driver, IB_DRIVERS )
+		driver->remove ( ibdev );
 
 	/* Remove from device list */
 	list_del ( &ibdev->list );
@@ -953,3 +994,6 @@ struct ib_device * last_opened_ibdev ( void ) {
 
 	return NULL;
 }
+
+/* Drag in IPoIB */
+REQUIRE_OBJECT ( ipoib );

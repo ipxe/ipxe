@@ -53,9 +53,6 @@ struct ipoib_hdr {
 } __attribute__ (( packed ));
 
 extern const char * ipoib_ntoa ( const void *ll_addr );
-extern void ipoib_link_state_changed ( struct ib_device *ibdev );
-extern int ipoib_probe ( struct ib_device *ibdev );
-extern void ipoib_remove ( struct ib_device *ibdev );
 extern struct net_device * alloc_ipoibdev ( size_t priv_size );
 
 #endif /* _IPXE_IPOIB_H */
