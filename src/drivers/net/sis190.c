@@ -1121,6 +1121,7 @@ static int sis190_probe(struct pci_device *pdev,
 	rc = sis190_init_board(pdev, &dev);
 	if (rc < 0)
 		goto out;
+	netdev_init(dev, &sis190_netdev_ops);
 
 	pci_set_drvdata(pdev, dev);
 
@@ -1142,7 +1143,6 @@ static int sis190_probe(struct pci_device *pdev,
 	sis190_set_speed_auto(dev);
 	sis190_phy_task(tp);
 
-	netdev_init(dev, &sis190_netdev_ops);
 	netdev_link_down(dev);
 out:
 	return rc;
