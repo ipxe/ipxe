@@ -105,6 +105,33 @@ size_t xfer_window ( struct interface *intf ) {
 }
 
 /**
+ * Report change of flow control window
+ *
+ * @v intf		Data transfer interface
+ *
+ * Note that this method is used to indicate only unsolicited changes
+ * in the flow control window.  In particular, this method must not be
+ * called as part of the response to xfer_deliver(), since that could
+ * easily lead to an infinite loop.  Callers of xfer_deliver() should
+ * assume that the flow control window will have changed without
+ * generating an xfer_window_changed() message.
+ */
+void xfer_window_changed ( struct interface *intf ) {
+	struct interface *dest;
+	xfer_window_changed_TYPE ( void * ) *op =
+		intf_get_dest_op ( intf, xfer_window_changed, &dest );
+	void *object = intf_object ( dest );
+
+	if ( op ) {
+		op ( object );
+	} else {
+		/* Default is to do nothing */
+	}
+
+	intf_put ( dest );
+}
+
+/**
  * Allocate I/O buffer
  *
  * @v intf		Data transfer interface

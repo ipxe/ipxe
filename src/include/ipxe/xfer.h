@@ -57,6 +57,10 @@ extern size_t xfer_window ( struct interface *intf );
 #define xfer_window_TYPE( object_type ) \
 	typeof ( size_t ( object_type ) )
 
+extern void xfer_window_changed ( struct interface *intf );
+#define xfer_window_changed_TYPE( object_type ) \
+	typeof ( void ( object_type ) )
+
 extern struct io_buffer * xfer_alloc_iob ( struct interface *intf,
 					   size_t len );
 #define xfer_alloc_iob_TYPE( object_type ) \
