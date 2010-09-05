@@ -86,6 +86,7 @@ FILE_LICENCE ( GPL_ANY );
 #include <ipxe/nvo.h>
 
 #define TX_RING_SIZE 4
+#define TX_MAX_LEN 8192
 
 struct rtl8139_tx {
 	unsigned int next;
@@ -381,6 +382,13 @@ static int rtl_transmit ( struct net_device *netdev,
 	if ( rtl->tx.iobuf[rtl->tx.next] != NULL ) {
 		DBGC ( rtl, "rtl8139 %p TX overflow\n", rtl );
 		return -ENOBUFS;
+	}
+
+	/* Check for oversized packets */
+	if ( iob_len ( iobuf ) >= TX_MAX_LEN ) {
+		DBGC ( rtl, "rtl8139 %p TX too large (%zd bytes)\n",
+		       rtl, iob_len ( iobuf ) );
+		return -ERANGE;
 	}
 
 	/* Pad and align packet */
