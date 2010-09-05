@@ -248,8 +248,6 @@ static int atl1e_sw_init(struct atl1e_adapter *adapter)
 	hw->dmar_block = atl1e_dma_req_1024;
 	hw->dmaw_block = atl1e_dma_req_1024;
 
-	netdev_link_down(adapter->netdev);
-
 	return 0;
 }
 
@@ -1211,8 +1209,6 @@ static int atl1e_probe(struct pci_device *pdev,
 		DBG("atl1e: cannot register network device\n");
 		goto err_free_netdev;
 	}
-
-	netdev_link_down(netdev);
 
 	cards_found++;
 	return 0;

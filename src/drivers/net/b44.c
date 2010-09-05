@@ -682,15 +682,15 @@ static int b44_probe(struct pci_device *pci, const struct pci_device_id *id)
 
 	b44_load_mac_and_phy_addr(bp);
 
-	/* Link management currently not implemented */
-	netdev_link_up(netdev);
-
 	rc = register_netdev(netdev);
 	if (rc != 0) {
 		iounmap(bp->regs);
 		netdev_put(netdev);
 		return rc;
 	}
+
+	/* Link management currently not implemented */
+	netdev_link_up(netdev);
 
 	b44_chip_reset(bp, B44_CHIP_RESET_FULL);
 

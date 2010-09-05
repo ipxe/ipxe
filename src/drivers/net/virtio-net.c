@@ -378,14 +378,20 @@ static int virtnet_probe ( struct pci_device *pci,
 		       eth_ntoa ( netdev->hw_addr ) );
 	}
 
+	/* Register network device */
+	if ( ( rc = register_netdev ( netdev ) ) != 0 )
+		goto err_register_netdev;
+
 	/* Mark link as up, control virtqueue is not used */
 	netdev_link_up ( netdev );
 
-	if ( ( rc = register_netdev ( netdev ) ) != 0 ) {
-		vp_reset ( ioaddr );
-		netdev_nullify ( netdev );
-		netdev_put ( netdev );
-	}
+	return 0;
+
+	unregister_netdev ( netdev );
+ err_register_netdev:
+	vp_reset ( ioaddr );
+	netdev_nullify ( netdev );
+	netdev_put ( netdev );
 	return rc;
 }
 

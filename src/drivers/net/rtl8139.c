@@ -528,12 +528,12 @@ static int rtl_probe ( struct pci_device *pci,
 	rtl_init_eeprom ( netdev );
 	nvs_read ( &rtl->eeprom.nvs, EE_MAC, netdev->hw_addr, ETH_ALEN );
 
-	/* Mark as link up; we don't yet handle link state */
-	netdev_link_up ( netdev );
-	
 	/* Register network device */
 	if ( ( rc = register_netdev ( netdev ) ) != 0 )
 		goto err_register_netdev;
+
+	/* Mark as link up; we don't yet handle link state */
+	netdev_link_up ( netdev );
 
 	/* Register non-volatile storage */
 	if ( rtl->nvo.nvs ) {

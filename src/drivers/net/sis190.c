@@ -1143,7 +1143,6 @@ static int sis190_probe(struct pci_device *pdev,
 	sis190_set_speed_auto(dev);
 	sis190_phy_task(tp);
 
-	netdev_link_down(dev);
 out:
 	return rc;
 

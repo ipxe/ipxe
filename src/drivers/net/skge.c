@@ -2324,9 +2324,6 @@ static struct net_device *skge_devinit(struct skge_hw *hw, int port,
 	/* read the mac address */
 	memcpy(dev->hw_addr, (void *) (hw->regs + B2_MAC_1 + port*8), ETH_ALEN);
 
-	/* device is off until link detection */
-	netdev_link_down(dev);
-
 	return dev;
 }
 

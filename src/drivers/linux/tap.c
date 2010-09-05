@@ -200,10 +200,10 @@ static int tap_probe(struct linux_device *device, struct linux_device_request *r
 	netdev->dev = &device->dev;
 	memset(nic, 0, sizeof(*nic));
 
-	netdev_link_up(netdev);
-
 	if ((rc = register_netdev(netdev)) != 0)
 		goto err_register;
+
+	netdev_link_up(netdev);
 
 	/* Look for the mandatory if setting */
 	if_setting = linux_find_setting("if", &request->settings);

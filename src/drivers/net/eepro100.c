@@ -209,10 +209,10 @@ static int ifec_pci_probe ( struct pci_device *pci,
 	nvs_read ( &priv->eeprom.nvs, EEPROM_ADDR_MDIO_REGISTER,
 		   &priv->mdio_register, 2 );
 
-	netdev_link_up ( netdev );
-
 	if ( ( rc = register_netdev ( netdev ) ) != 0 )
 		goto error;
+
+	netdev_link_up ( netdev );
 
 	DBGP ( "ints\n" );
 

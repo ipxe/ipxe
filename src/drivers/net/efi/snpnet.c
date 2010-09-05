@@ -300,12 +300,12 @@ int snpnet_probe ( struct snp_device *snpdev ) {
 	memcpy ( netdev->hw_addr, snp->Mode->PermanentAddress.Addr,
 		 snp->Mode->HwAddressSize );
 
-	/* Mark as link up; we don't handle link state */
-	netdev_link_up ( netdev );
-
 	/* Register network device */
 	if ( ( rc = register_netdev ( netdev ) ) != 0 )
 		goto err_register;
+
+	/* Mark as link up; we don't handle link state */
+	netdev_link_up ( netdev );
 
 	DBGC ( snp, "SNP %p added\n", snp );
 	return 0;

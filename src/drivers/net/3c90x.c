@@ -938,14 +938,14 @@ static int a3c90x_probe(struct pci_device *pci,
 	HWAddr[4] = inf_3c90x->eeprom[eepromHwAddrOffset + 2] >> 8;
 	HWAddr[5] = inf_3c90x->eeprom[eepromHwAddrOffset + 2] & 0xFF;
 
-	/* we don't handle linkstates yet, so we're always up */
-	netdev_link_up(netdev);
-
 	if ((rc = register_netdev(netdev)) != 0) {
 		DBG("3c90x: register_netdev() failed\n");
 		netdev_put(netdev);
 		return rc;
 	}
+
+	/* we don't handle linkstates yet, so we're always up */
+	netdev_link_up(netdev);
 
 	return 0;
 }

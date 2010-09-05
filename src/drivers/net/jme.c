@@ -1249,7 +1249,6 @@ jme_probe(struct pci_device *pci, const struct pci_device_id *id __unused)
 	 * Bring down phy before interface is opened.
 	 */
 	jme_phy_off(jme);
-	netdev_link_down(netdev);
 
 	/*
 	 * Reset MAC processor and reload EEPROM for MAC Address

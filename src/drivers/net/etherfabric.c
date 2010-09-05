@@ -4183,10 +4183,10 @@ efab_probe ( struct pci_device *pci,
 
 	memcpy ( netdev->hw_addr, efab->mac_addr, ETH_ALEN );
 
-	netdev_link_up ( netdev );
 	rc = register_netdev ( netdev );
 	if ( rc )
 		goto fail4;
+	netdev_link_up ( netdev );
 
 	/* Advertise non-volatile storage */
 	if ( efab->nvo.nvs ) {

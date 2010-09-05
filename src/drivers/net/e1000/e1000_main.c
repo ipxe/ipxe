@@ -803,11 +803,11 @@ int e1000_probe ( struct pci_device *pdev,
 	/* reset the hardware with the new settings */
 	e1000_reset ( adapter );
 
-	/* Mark as link up; we don't yet handle link state */
-	netdev_link_up ( netdev );
-
 	if ( ( err = register_netdev ( netdev ) ) != 0)
 		goto err_register;
+
+	/* Mark as link up; we don't yet handle link state */
+	netdev_link_up ( netdev );
 
 	for (i = 0; i < 6; i++)
 		DBG ("%02x%s", netdev->ll_addr[i], i == 5 ? "\n" : ":");

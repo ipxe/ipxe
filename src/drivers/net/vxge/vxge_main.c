@@ -443,11 +443,10 @@ int vxge_device_register(struct __vxge_hw_device *hldev,
 		goto _out2;
 	}
 
-	/* Make Link state as off at this point, when the Link change
+	/* Leave link state as off at this point, when the link change
 	 * interrupt comes the state will be automatically changed to
 	 * the right state.
 	 */
-	netdev_link_down(ndev);
 
 	vxge_debug(VXGE_INFO, "%s: Ethernet device registered\n",
 		VXGE_DRIVER_NAME);
