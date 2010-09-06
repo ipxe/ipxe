@@ -72,6 +72,15 @@ timer_init ( struct retry_timer *timer,
 	timer->refcnt = refcnt;
 }
 
+/**
+ * Initialise a static timer
+ *
+ * @v expired_fn	Timer expired callback
+ */
+#define TIMER_INIT( expired_fn ) {			\
+		.expired = (expired_fn),		\
+	}
+
 extern void start_timer ( struct retry_timer *timer );
 extern void start_timer_fixed ( struct retry_timer *timer,
 				unsigned long timeout );
