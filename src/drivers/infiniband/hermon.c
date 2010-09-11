@@ -369,9 +369,18 @@ hermon_cmd_sw2hw_cq ( struct hermon *hermon, unsigned long cqn,
 
 static inline int
 hermon_cmd_hw2sw_cq ( struct hermon *hermon, unsigned long cqn,
-		      struct hermonprm_completion_queue_context *cqctx) {
+		      struct hermonprm_completion_queue_context *cqctx ) {
 	return hermon_cmd ( hermon,
 			    HERMON_HCR_OUT_CMD ( HERMON_HCR_HW2SW_CQ,
+						 1, sizeof ( *cqctx ) ),
+			    0, NULL, cqn, cqctx );
+}
+
+static inline int
+hermon_cmd_query_cq ( struct hermon *hermon, unsigned long cqn,
+		      struct hermonprm_completion_queue_context *cqctx ) {
+	return hermon_cmd ( hermon,
+			    HERMON_HCR_OUT_CMD ( HERMON_HCR_QUERY_CQ,
 						 1, sizeof ( *cqctx ) ),
 			    0, NULL, cqn, cqctx );
 }
@@ -573,6 +582,7 @@ static int hermon_alloc_mtt ( struct hermon *hermon,
 			      struct hermon_mtt *mtt ) {
 	struct hermonprm_write_mtt write_mtt;
 	physaddr_t start;
+	physaddr_t addr;
 	unsigned int page_offset;
 	unsigned int num_pages;
 	int mtt_offset;
@@ -596,6 +606,7 @@ static int hermon_alloc_mtt ( struct hermon *hermon,
 	}
 	mtt_base_addr = ( ( hermon->cap.reserved_mtts + mtt_offset ) *
 			  hermon->cap.mtt_entry_size );
+	addr = start;
 
 	/* Fill in MTT structure */
 	mtt->mtt_offset = mtt_offset;
@@ -610,16 +621,21 @@ static int hermon_alloc_mtt ( struct hermon *hermon,
 			     value, mtt_base_addr );
 		MLX_FILL_2 ( &write_mtt.mtt, 1,
 			     p, 1,
-			     ptag_l, ( start >> 3 ) );
+			     ptag_l, ( addr >> 3 ) );
 		if ( ( rc = hermon_cmd_write_mtt ( hermon,
 						   &write_mtt ) ) != 0 ) {
 			DBGC ( hermon, "Hermon %p could not write MTT at %x\n",
 			       hermon, mtt_base_addr );
 			goto err_write_mtt;
 		}
-		start += HERMON_PAGE_SIZE;
+		addr += HERMON_PAGE_SIZE;
 		mtt_base_addr += hermon->cap.mtt_entry_size;
 	}
+
+	DBGC ( hermon, "Hermon %p MTT entries [%#x,%#x] for "
+	       "[%08lx,%08lx,%08lx,%08lx)\n", hermon, mtt->mtt_offset,
+	       ( mtt->mtt_offset + mtt->num_pages - 1 ), start,
+	       ( start + page_offset ), ( start + len ), addr );
 
 	return 0;
 
@@ -637,6 +653,10 @@ static int hermon_alloc_mtt ( struct hermon *hermon,
  */
 static void hermon_free_mtt ( struct hermon *hermon,
 			      struct hermon_mtt *mtt ) {
+
+	DBGC ( hermon, "Hermon %p MTT entries [%#x,%#x] freed\n",
+	       hermon, mtt->mtt_offset,
+	       ( mtt->mtt_offset + mtt->num_pages - 1 ) );
 	hermon_bitmask_free ( hermon->mtt_inuse, mtt->mtt_offset,
 			      mtt->num_pages );
 }
@@ -669,8 +689,8 @@ static int hermon_mad ( struct ib_device *ibdev, union ib_mad *mad ) {
 	/* Issue MAD */
 	if ( ( rc = hermon_cmd_mad_ifc ( hermon, ibdev->port,
 					 &mad_ifc ) ) != 0 ) {
-		DBGC ( hermon, "Hermon %p could not issue MAD IFC: %s\n",
-		       hermon, strerror ( rc ) );
+		DBGC ( hermon, "Hermon %p port %d could not issue MAD IFC: "
+		       "%s\n", hermon, ibdev->port, strerror ( rc ) );
 		return rc;
 	}
 
@@ -678,8 +698,8 @@ static int hermon_mad ( struct ib_device *ibdev, union ib_mad *mad ) {
 	memcpy ( mad, &mad_ifc.mad, sizeof ( *mad ) );
 
 	if ( mad->hdr.status != 0 ) {
-		DBGC ( hermon, "Hermon %p MAD IFC status %04x\n",
-		       hermon, ntohs ( mad->hdr.status ) );
+		DBGC ( hermon, "Hermon %p port %d MAD IFC status %04x\n",
+		       hermon, ibdev->port, ntohs ( mad->hdr.status ) );
 		return -EIO;
 	}
 	return 0;
@@ -691,6 +711,30 @@ static int hermon_mad ( struct ib_device *ibdev, union ib_mad *mad ) {
  *
  ***************************************************************************
  */
+
+/**
+ * Dump completion queue context (for debugging only)
+ *
+ * @v hermon		Hermon device
+ * @v cq		Completion queue
+ * @ret rc		Return status code
+ */
+static __attribute__ (( unused )) int
+hermon_dump_cqctx ( struct hermon *hermon, struct ib_completion_queue *cq ) {
+	struct hermonprm_completion_queue_context cqctx;
+	int rc;
+
+	memset ( &cqctx, 0, sizeof ( cqctx ) );
+	if ( ( rc = hermon_cmd_query_cq ( hermon, cq->cqn, &cqctx ) ) != 0 ) {
+		DBGC ( hermon, "Hermon %p CQN %#lx QUERY_CQ failed: %s\n",
+		       hermon, cq->cqn, strerror ( rc ) );
+		return rc;
+	}
+	DBGC ( hermon, "Hermon %p CQN %#lx context:\n", hermon, cq->cqn );
+	DBGC_HDA ( hermon, 0, &cqctx, sizeof ( cqctx ) );
+
+	return 0;
+}
 
 /**
  * Create completion queue
@@ -759,14 +803,15 @@ static int hermon_create_cq ( struct ib_device *ibdev,
 	MLX_FILL_1 ( &cqctx, 15, db_record_addr_l,
 		     ( virt_to_phys ( &hermon_cq->doorbell ) >> 3 ) );
 	if ( ( rc = hermon_cmd_sw2hw_cq ( hermon, cq->cqn, &cqctx ) ) != 0 ) {
-		DBGC ( hermon, "Hermon %p SW2HW_CQ failed: %s\n",
-		       hermon, strerror ( rc ) );
+		DBGC ( hermon, "Hermon %p CQN %#lx SW2HW_CQ failed: %s\n",
+		       hermon, cq->cqn, strerror ( rc ) );
 		goto err_sw2hw_cq;
 	}
 
-	DBGC ( hermon, "Hermon %p CQN %#lx ring at [%p,%p)\n",
-	       hermon, cq->cqn, hermon_cq->cqe,
-	       ( ( ( void * ) hermon_cq->cqe ) + hermon_cq->cqe_size ) );
+	DBGC ( hermon, "Hermon %p CQN %#lx ring [%08lx,%08lx), doorbell "
+	       "%08lx\n", hermon, cq->cqn, virt_to_phys ( hermon_cq->cqe ),
+	       ( virt_to_phys ( hermon_cq->cqe ) + hermon_cq->cqe_size ),
+	       virt_to_phys ( &hermon_cq->doorbell ) );
 	ib_cq_set_drvdata ( cq, hermon_cq );
 	return 0;
 
@@ -798,7 +843,7 @@ static void hermon_destroy_cq ( struct ib_device *ibdev,
 
 	/* Take ownership back from hardware */
 	if ( ( rc = hermon_cmd_hw2sw_cq ( hermon, cq->cqn, &cqctx ) ) != 0 ) {
-		DBGC ( hermon, "Hermon %p FATAL HW2SW_CQ failed on CQN %#lx: "
+		DBGC ( hermon, "Hermon %p CQN %#lx FATAL HW2SW_CQ failed: "
 		       "%s\n", hermon, cq->cqn, strerror ( rc ) );
 		/* Leak memory and return; at least we avoid corruption */
 		return;
@@ -925,20 +970,19 @@ static uint8_t hermon_qp_st[] = {
  * @v qp		Queue pair
  * @ret rc		Return status code
  */
-static inline int hermon_dump_qpctx ( struct hermon *hermon,
-				      struct ib_queue_pair *qp ) {
+static __attribute__ (( unused )) int
+hermon_dump_qpctx ( struct hermon *hermon, struct ib_queue_pair *qp ) {
 	struct hermonprm_qp_ee_state_transitions qpctx;
 	int rc;
 
 	memset ( &qpctx, 0, sizeof ( qpctx ) );
 	if ( ( rc = hermon_cmd_query_qp ( hermon, qp->qpn, &qpctx ) ) != 0 ) {
-		DBGC ( hermon, "Hermon %p QUERY_QP failed: %s\n",
-		       hermon, strerror ( rc ) );
+		DBGC ( hermon, "Hermon %p QPN %#lx QUERY_QP failed: %s\n",
+		       hermon, qp->qpn, strerror ( rc ) );
 		return rc;
 	}
-	DBGC ( hermon, "Hermon %p QPN %lx context:\n", hermon, qp->qpn );
-	DBGC_HDA ( hermon, 0, &qpctx.u.dwords[2],
-		   ( sizeof ( qpctx ) - 8 ) );
+	DBGC ( hermon, "Hermon %p QPN %#lx context:\n", hermon, qp->qpn );
+	DBGC_HDA ( hermon, 0, &qpctx.u.dwords[2], ( sizeof ( qpctx ) - 8 ) );
 
 	return 0;
 }
@@ -1032,18 +1076,26 @@ static int hermon_create_qp ( struct ib_device *ibdev,
 		     ( hermon_qp->mtt.mtt_base_addr >> 3 ) );
 	if ( ( rc = hermon_cmd_rst2init_qp ( hermon, qp->qpn,
 					     &qpctx ) ) != 0 ) {
-		DBGC ( hermon, "Hermon %p RST2INIT_QP failed: %s\n",
-		       hermon, strerror ( rc ) );
+		DBGC ( hermon, "Hermon %p QPN %#lx RST2INIT_QP failed: %s\n",
+		       hermon, qp->qpn, strerror ( rc ) );
 		goto err_rst2init_qp;
 	}
 	hermon_qp->state = HERMON_QP_ST_INIT;
 
-	DBGC ( hermon, "Hermon %p QPN %#lx send ring at [%p,%p)\n",
-	       hermon, qp->qpn, hermon_qp->send.wqe,
-	       ( ((void *)hermon_qp->send.wqe ) + hermon_qp->send.wqe_size ) );
-	DBGC ( hermon, "Hermon %p QPN %#lx receive ring at [%p,%p)\n",
-	       hermon, qp->qpn, hermon_qp->recv.wqe,
-	       ( ((void *)hermon_qp->recv.wqe ) + hermon_qp->recv.wqe_size ) );
+	DBGC ( hermon, "Hermon %p QPN %#lx send ring [%08lx,%08lx), doorbell "
+	       "%08lx\n", hermon, qp->qpn,
+	       virt_to_phys ( hermon_qp->send.wqe ),
+	       ( virt_to_phys ( hermon_qp->send.wqe ) +
+		 hermon_qp->send.wqe_size ),
+	       virt_to_phys ( hermon_qp->send.doorbell ) );
+	DBGC ( hermon, "Hermon %p QPN %#lx receive ring [%08lx,%08lx), "
+	       "doorbell %08lx\n", hermon, qp->qpn,
+	       virt_to_phys ( hermon_qp->recv.wqe ),
+	       ( virt_to_phys ( hermon_qp->recv.wqe ) +
+		 hermon_qp->recv.wqe_size ),
+	       virt_to_phys ( &hermon_qp->recv.doorbell ) );
+	DBGC ( hermon, "Hermon %p QPN %#lx send CQN %#lx receive CQN %#lx\n",
+	       hermon, qp->qpn, qp->send.cq->cqn, qp->recv.cq->cqn );
 	ib_qp_set_drvdata ( qp, hermon_qp );
 	return 0;
 
@@ -1097,8 +1149,8 @@ static int hermon_modify_qp ( struct ib_device *ibdev,
 			     qpc_eec_data.next_rcv_psn, qp->recv.psn );
 		if ( ( rc = hermon_cmd_init2rtr_qp ( hermon, qp->qpn,
 						     &qpctx ) ) != 0 ) {
-			DBGC ( hermon, "Hermon %p INIT2RTR_QP failed: %s\n",
-			       hermon, strerror ( rc ) );
+			DBGC ( hermon, "Hermon %p QPN %#lx INIT2RTR_QP failed:"
+			       " %s\n", hermon, qp->qpn, strerror ( rc ) );
 			return rc;
 		}
 		hermon_qp->state = HERMON_QP_ST_RTR;
@@ -1117,8 +1169,8 @@ static int hermon_modify_qp ( struct ib_device *ibdev,
 			     qpc_eec_data.next_send_psn, qp->send.psn );
 		if ( ( rc = hermon_cmd_rtr2rts_qp ( hermon, qp->qpn,
 						    &qpctx ) ) != 0 ) {
-			DBGC ( hermon, "Hermon %p RTR2RTS_QP failed: %s\n",
-			       hermon, strerror ( rc ) );
+			DBGC ( hermon, "Hermon %p QPN %#lx RTR2RTS_QP failed: "
+			       "%s\n", hermon, qp->qpn, strerror ( rc ) );
 			return rc;
 		}
 		hermon_qp->state = HERMON_QP_ST_RTS;
@@ -1129,8 +1181,8 @@ static int hermon_modify_qp ( struct ib_device *ibdev,
 	MLX_FILL_1 ( &qpctx, 0, opt_param_mask, HERMON_QP_OPT_PARAM_QKEY );
 	MLX_FILL_1 ( &qpctx, 44, qpc_eec_data.q_key, qp->qkey );
 	if ( ( rc = hermon_cmd_rts2rts_qp ( hermon, qp->qpn, &qpctx ) ) != 0 ){
-		DBGC ( hermon, "Hermon %p RTS2RTS_QP failed: %s\n",
-		       hermon, strerror ( rc ) );
+		DBGC ( hermon, "Hermon %p QPN %#lx RTS2RTS_QP failed: %s\n",
+		       hermon, qp->qpn, strerror ( rc ) );
 		return rc;
 	}
 
@@ -1151,8 +1203,8 @@ static void hermon_destroy_qp ( struct ib_device *ibdev,
 
 	/* Take ownership back from hardware */
 	if ( ( rc = hermon_cmd_2rst_qp ( hermon, qp->qpn ) ) != 0 ) {
-		DBGC ( hermon, "Hermon %p FATAL 2RST_QP failed on QPN %#lx: "
-		       "%s\n", hermon, qp->qpn, strerror ( rc ) );
+		DBGC ( hermon, "Hermon %p QPN %#lx FATAL 2RST_QP failed: %s\n",
+		       hermon, qp->qpn, strerror ( rc ) );
 		/* Leak memory and return; at least we avoid corruption */
 		return;
 	}
@@ -1176,6 +1228,28 @@ static void hermon_destroy_qp ( struct ib_device *ibdev,
  *
  ***************************************************************************
  */
+
+/**
+ * Construct UD send work queue entry
+ *
+ * @v ibdev		Infiniband device
+ * @v qp		Queue pair
+ * @v av		Address vector
+ * @v iobuf		I/O buffer
+ * @v wqe		Send work queue entry
+ * @ret opcode		Control opcode
+ */
+static __attribute__ (( unused )) unsigned int
+hermon_fill_nop_send_wqe ( struct ib_device *ibdev __unused,
+			   struct ib_queue_pair *qp __unused,
+			   struct ib_address_vector *av __unused,
+			   struct io_buffer *iobuf __unused,
+			   union hermon_send_wqe *wqe ) {
+
+	MLX_FILL_1 ( &wqe->ctrl, 1, ds, ( sizeof ( wqe->ctrl ) / 16 ) );
+	MLX_FILL_1 ( &wqe->ctrl, 2, c, 0x03 /* generate completion */ );
+	return HERMON_OPCODE_NOP;
+}
 
 /**
  * Construct UD send work queue entry
@@ -1325,18 +1399,22 @@ static int hermon_post_send ( struct ib_device *ibdev,
 	struct hermon_send_work_queue *hermon_send_wq = &hermon_qp->send;
 	union hermon_send_wqe *wqe;
 	union hermonprm_doorbell_register db_reg;
-	unsigned int wqe_idx_mask;
+	unsigned long wqe_idx_mask;
+	unsigned long wqe_idx;
+	unsigned int owner;
 	unsigned int opcode;
 
 	/* Allocate work queue entry */
+	wqe_idx = ( wq->next_idx & ( hermon_send_wq->num_wqes - 1 ) );
+	owner = ( ( wq->next_idx & hermon_send_wq->num_wqes ) ? 1 : 0 );
 	wqe_idx_mask = ( wq->num_wqes - 1 );
-	if ( wq->iobufs[wq->next_idx & wqe_idx_mask] ) {
-		DBGC ( hermon, "Hermon %p send queue full", hermon );
+	if ( wq->iobufs[ wqe_idx & wqe_idx_mask ] ) {
+		DBGC ( hermon, "Hermon %p QPN %#lx send queue full",
+		       hermon, qp->qpn );
 		return -ENOBUFS;
 	}
-	wq->iobufs[wq->next_idx & wqe_idx_mask] = iobuf;
-	wqe = &hermon_send_wq->wqe[ wq->next_idx &
-				    ( hermon_send_wq->num_wqes - 1 ) ];
+	wq->iobufs[ wqe_idx & wqe_idx_mask ] = iobuf;
+	wqe = &hermon_send_wq->wqe[wqe_idx];
 
 	/* Construct work queue entry */
 	memset ( ( ( ( void * ) wqe ) + 4 /* avoid ctrl.owner */ ), 0,
@@ -1348,17 +1426,15 @@ static int hermon_post_send ( struct ib_device *ibdev,
 	barrier();
 	MLX_FILL_2 ( &wqe->ctrl, 0,
 		     opcode, opcode,
-		     owner,
-		     ( ( wq->next_idx & hermon_send_wq->num_wqes ) ? 1 : 0 ) );
-	DBGCP ( hermon, "Hermon %p posting send WQE:\n", hermon );
-	DBGCP_HD ( hermon, wqe, sizeof ( *wqe ) );
-	barrier();
+		     owner, owner );
+	DBGCP ( hermon, "Hermon %p QPN %#lx posting send WQE %#lx:\n",
+		hermon, qp->qpn, wqe_idx );
+	DBGCP_HDA ( hermon, virt_to_phys ( wqe ), wqe, sizeof ( *wqe ) );
 
 	/* Ring doorbell register */
 	MLX_FILL_1 ( &db_reg.send, 0, qn, qp->qpn );
-	DBGCP ( hermon, "Ringing doorbell %08lx with %08x\n",
-		virt_to_phys ( hermon_send_wq->doorbell ), db_reg.dword[0] );
-	writel ( db_reg.dword[0], ( hermon_send_wq->doorbell ) );
+	barrier();
+	writel ( db_reg.dword[0], hermon_send_wq->doorbell );
 
 	/* Update work queue's index */
 	wq->next_idx++;
@@ -1387,7 +1463,8 @@ static int hermon_post_recv ( struct ib_device *ibdev,
 	/* Allocate work queue entry */
 	wqe_idx_mask = ( wq->num_wqes - 1 );
 	if ( wq->iobufs[wq->next_idx & wqe_idx_mask] ) {
-		DBGC ( hermon, "Hermon %p receive queue full", hermon );
+		DBGC ( hermon, "Hermon %p QPN %#lx receive queue full",
+		       hermon, qp->qpn );
 		return -ENOBUFS;
 	}
 	wq->iobufs[wq->next_idx & wqe_idx_mask] = iobuf;
@@ -1432,7 +1509,8 @@ static int hermon_complete ( struct ib_device *ibdev,
 	unsigned int opcode;
 	unsigned long qpn;
 	int is_send;
-	unsigned int wqe_idx;
+	unsigned long wqe_idx;
+	unsigned long wqe_idx_mask;
 	size_t len;
 	int rc = 0;
 
@@ -1443,7 +1521,7 @@ static int hermon_complete ( struct ib_device *ibdev,
 	if ( opcode >= HERMON_OPCODE_RECV_ERROR ) {
 		/* "s" field is not valid for error opcodes */
 		is_send = ( opcode == HERMON_OPCODE_SEND_ERROR );
-		DBGC ( hermon, "Hermon %p CQN %lx syndrome %x vendor %x\n",
+		DBGC ( hermon, "Hermon %p CQN %#lx syndrome %x vendor %x\n",
 		       hermon, cq->cqn, MLX_GET ( &cqe->error, syndrome ),
 		       MLX_GET ( &cqe->error, vendor_error_syndrome ) );
 		rc = -EIO;
@@ -1453,23 +1531,30 @@ static int hermon_complete ( struct ib_device *ibdev,
 	/* Identify work queue */
 	wq = ib_find_wq ( cq, qpn, is_send );
 	if ( ! wq ) {
-		DBGC ( hermon, "Hermon %p CQN %lx unknown %s QPN %lx\n",
+		DBGC ( hermon, "Hermon %p CQN %#lx unknown %s QPN %#lx\n",
 		       hermon, cq->cqn, ( is_send ? "send" : "recv" ), qpn );
 		return -EIO;
 	}
 	qp = wq->qp;
 	hermon_qp = ib_qp_get_drvdata ( qp );
 
+	/* Identify work queue entry */
+	wqe_idx = MLX_GET ( &cqe->normal, wqe_counter );
+	wqe_idx_mask = ( wq->num_wqes - 1 );
+	DBGCP ( hermon, "Hermon %p CQN %#lx QPN %#lx %s WQE %#lx completed:\n",
+		hermon, cq->cqn, qp->qpn, ( is_send ? "send" : "recv" ),
+		wqe_idx );
+	DBGCP_HDA ( hermon, virt_to_phys ( cqe ), cqe, sizeof ( *cqe ) );
+
 	/* Identify I/O buffer */
-	wqe_idx = ( MLX_GET ( &cqe->normal, wqe_counter ) &
-		    ( wq->num_wqes - 1 ) );
-	iobuf = wq->iobufs[wqe_idx];
+	iobuf = wq->iobufs[ wqe_idx & wqe_idx_mask ];
 	if ( ! iobuf ) {
-		DBGC ( hermon, "Hermon %p CQN %lx QPN %lx empty WQE %x\n",
-		       hermon, cq->cqn, qp->qpn, wqe_idx );
+		DBGC ( hermon, "Hermon %p CQN %#lx QPN %#lx empty %s WQE "
+		       "%#lx\n", hermon, cq->cqn, qp->qpn,
+		       ( is_send ? "send" : "recv" ), wqe_idx );
 		return -EIO;
 	}
-	wq->iobufs[wqe_idx] = NULL;
+	wq->iobufs[ wqe_idx & wqe_idx_mask ] = NULL;
 
 	if ( is_send ) {
 		/* Hand off to completion handler */
@@ -1532,14 +1617,13 @@ static void hermon_poll_cq ( struct ib_device *ibdev,
 			/* Entry still owned by hardware; end of poll */
 			break;
 		}
-		DBGCP ( hermon, "Hermon %p completion:\n", hermon );
-		DBGCP_HD ( hermon, cqe, sizeof ( *cqe ) );
 
 		/* Handle completion */
 		if ( ( rc = hermon_complete ( ibdev, cq, cqe ) ) != 0 ) {
-			DBGC ( hermon, "Hermon %p failed to complete: %s\n",
-			       hermon, strerror ( rc ) );
-			DBGC_HD ( hermon, cqe, sizeof ( *cqe ) );
+			DBGC ( hermon, "Hermon %p CQN %#lx failed to complete:"
+			       " %s\n", hermon, cq->cqn, strerror ( rc ) );
+			DBGC_HDA ( hermon, virt_to_phys ( cqe ),
+				   cqe, sizeof ( *cqe ) );
 		}
 
 		/* Update completion queue's index */
@@ -1611,8 +1695,8 @@ static int hermon_create_eq ( struct hermon *hermon ) {
 		     ( hermon_eq->mtt.mtt_base_addr >> 3 ) );
 	if ( ( rc = hermon_cmd_sw2hw_eq ( hermon, hermon_eq->eqn,
 					  &eqctx ) ) != 0 ) {
-		DBGC ( hermon, "Hermon %p SW2HW_EQ failed: %s\n",
-		       hermon, strerror ( rc ) );
+		DBGC ( hermon, "Hermon %p EQN %#lx SW2HW_EQ failed: %s\n",
+		       hermon, hermon_eq->eqn, strerror ( rc ) );
 		goto err_sw2hw_eq;
 	}
 
@@ -1622,14 +1706,16 @@ static int hermon_create_eq ( struct hermon *hermon ) {
 	if ( ( rc = hermon_cmd_map_eq ( hermon,
 					( HERMON_MAP_EQ | hermon_eq->eqn ),
 					&mask ) ) != 0 ) {
-		DBGC ( hermon, "Hermon %p MAP_EQ failed: %s\n",
-		       hermon, strerror ( rc )  );
+		DBGC ( hermon, "Hermon %p EQN %#lx MAP_EQ failed: %s\n",
+		       hermon, hermon_eq->eqn, strerror ( rc )  );
 		goto err_map_eq;
 	}
 
-	DBGC ( hermon, "Hermon %p EQN %#lx ring at [%p,%p])\n",
-	       hermon, hermon_eq->eqn, hermon_eq->eqe,
-	       ( ( ( void * ) hermon_eq->eqe ) + hermon_eq->eqe_size ) );
+	DBGC ( hermon, "Hermon %p EQN %#lx ring [%08lx,%08lx), doorbell "
+	       "%08lx\n", hermon, hermon_eq->eqn,
+	       virt_to_phys ( hermon_eq->eqe ),
+	       ( virt_to_phys ( hermon_eq->eqe ) + hermon_eq->eqe_size ),
+	       virt_to_phys ( hermon_eq->doorbell ) );
 	return 0;
 
  err_map_eq:
@@ -1660,16 +1746,16 @@ static void hermon_destroy_eq ( struct hermon *hermon ) {
 	if ( ( rc = hermon_cmd_map_eq ( hermon,
 					( HERMON_UNMAP_EQ | hermon_eq->eqn ),
 					&mask ) ) != 0 ) {
-		DBGC ( hermon, "Hermon %p FATAL MAP_EQ failed to unmap: %s\n",
-		       hermon, strerror ( rc ) );
+		DBGC ( hermon, "Hermon %p EQN %#lx FATAL MAP_EQ failed to "
+		       "unmap: %s\n", hermon, hermon_eq->eqn, strerror ( rc ) );
 		/* Continue; HCA may die but system should survive */
 	}
 
 	/* Take ownership back from hardware */
 	if ( ( rc = hermon_cmd_hw2sw_eq ( hermon, hermon_eq->eqn,
 					  &eqctx ) ) != 0 ) {
-		DBGC ( hermon, "Hermon %p FATAL HW2SW_EQ failed: %s\n",
-		       hermon, strerror ( rc ) );
+		DBGC ( hermon, "Hermon %p EQN %#lx FATAL HW2SW_EQ failed: %s\n",
+		       hermon, hermon_eq->eqn, strerror ( rc ) );
 		/* Leak memory and return; at least we avoid corruption */
 		return;
 	}
@@ -1735,8 +1821,10 @@ static void hermon_poll_eq ( struct ib_device *ibdev ) {
 			/* Entry still owned by hardware; end of poll */
 			break;
 		}
-		DBGCP ( hermon, "Hermon %p event:\n", hermon );
-		DBGCP_HD ( hermon, eqe, sizeof ( *eqe ) );
+		DBGCP ( hermon, "Hermon %p EQN %#lx event:\n",
+			hermon, hermon_eq->eqn );
+		DBGCP_HDA ( hermon, virt_to_phys ( eqe ),
+			    eqe, sizeof ( *eqe ) );
 
 		/* Handle event */
 		event_type = MLX_GET ( &eqe->generic, event_type );
@@ -1745,9 +1833,11 @@ static void hermon_poll_eq ( struct ib_device *ibdev ) {
 			hermon_event_port_state_change ( hermon, eqe );
 			break;
 		default:
-			DBGC ( hermon, "Hermon %p unrecognised event type "
-			       "%#x:\n", hermon, event_type );
-			DBGC_HD ( hermon, eqe, sizeof ( *eqe ) );
+			DBGC ( hermon, "Hermon %p EQN %#lx unrecognised event "
+			       "type %#x:\n",
+			       hermon, hermon_eq->eqn, event_type );
+			DBGC_HDA ( hermon, virt_to_phys ( eqe ),
+				   eqe, sizeof ( *eqe ) );
 			break;
 		}
 
@@ -1757,9 +1847,6 @@ static void hermon_poll_eq ( struct ib_device *ibdev ) {
 		/* Ring doorbell */
 		MLX_FILL_1 ( &db_reg.event, 0,
 			     ci, ( hermon_eq->next_idx & 0x00ffffffUL ) );
-		DBGCP ( hermon, "Ringing doorbell %08lx with %08x\n",
-			virt_to_phys ( hermon_eq->doorbell ),
-			db_reg.dword[0] );
 		writel ( db_reg.dword[0], hermon_eq->doorbell );
 	}
 }
@@ -1833,8 +1920,8 @@ static int hermon_open ( struct ib_device *ibdev ) {
 	MLX_FILL_1 ( &init_port, 2, max_pkey, 64 );
 	if ( ( rc = hermon_cmd_init_port ( hermon, ibdev->port,
 					   &init_port ) ) != 0 ) {
-		DBGC ( hermon, "Hermon %p could not intialise port: %s\n",
-		       hermon, strerror ( rc ) );
+		DBGC ( hermon, "Hermon %p port %d could not intialise port: "
+		       "%s\n", hermon, ibdev->port, strerror ( rc ) );
 		return rc;
 	}
 
@@ -1854,8 +1941,8 @@ static void hermon_close ( struct ib_device *ibdev ) {
 	int rc;
 
 	if ( ( rc = hermon_cmd_close_port ( hermon, ibdev->port ) ) != 0 ) {
-		DBGC ( hermon, "Hermon %p could not close port: %s\n",
-		       hermon, strerror ( rc ) );
+		DBGC ( hermon, "Hermon %p port %d could not close port: %s\n",
+		       hermon, ibdev->port, strerror ( rc ) );
 		/* Nothing we can do about this */
 	}
 }
@@ -2085,7 +2172,7 @@ static int hermon_start_firmware ( struct hermon *hermon ) {
 		goto err_alloc_fa;
 	}
 	fw_base = user_to_phys ( hermon->firmware_area, 0 );
-	DBGC ( hermon, "Hermon %p firmware area at physical [%lx,%lx)\n",
+	DBGC ( hermon, "Hermon %p firmware area at physical [%08lx,%08lx)\n",
 	       hermon, fw_base, ( fw_base + fw_size ) );
 	if ( ( rc = hermon_map_vpm ( hermon, hermon_cmd_map_fa,
 				     0, fw_base, fw_size ) ) != 0 ) {
@@ -2720,8 +2807,9 @@ static int hermon_probe ( struct pci_device *pci,
 	/* Register Infiniband devices */
 	for ( i = 0 ; i < hermon->cap.num_ports ; i++ ) {
 		if ( ( rc = register_ibdev ( hermon->ibdev[i] ) ) != 0 ) {
-			DBGC ( hermon, "Hermon %p could not register IB "
-			       "device: %s\n", hermon, strerror ( rc ) );
+			DBGC ( hermon, "Hermon %p port %d could not register "
+			       "IB device: %s\n", hermon,
+			       hermon->ibdev[i]->port, strerror ( rc ) );
 			goto err_register_ibdev;
 		}
 	}
