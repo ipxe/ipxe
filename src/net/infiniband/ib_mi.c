@@ -55,7 +55,7 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #define IB_MI_NUM_CQES 8
 
 /** TID magic signature */
-#define IB_MI_TID_MAGIC ( ( 'g' << 24 ) | ( 'P' << 16 ) | ( 'X' << 8 ) | 'E' )
+#define IB_MI_TID_MAGIC ( ( 'i' << 24 ) | ( 'P' << 16 ) | ( 'X' << 8 ) | 'E' )
 
 /** TID to use for next MAD */
 static unsigned int next_tid;
