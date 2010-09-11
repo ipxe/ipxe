@@ -286,10 +286,10 @@ extern void dbg_more ( void );
 int __debug_disable;
 #define DBGLVL ( DBGLVL_MAX & ~__debug_disable )
 #define DBG_DISABLE( level ) do {				\
-	__debug_disable |= ( (level) & DBGLVL_MAX );		\
+	__debug_disable |= (level);				\
 	} while ( 0 )
 #define DBG_ENABLE( level ) do {				\
-	__debug_disable &= ~( (level) & DBGLVL_MAX );		\
+	__debug_disable &= ~(level);				\
 	} while ( 0 )
 #else
 #define DBGLVL 0
