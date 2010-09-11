@@ -40,21 +40,37 @@ FILE_LICENCE ( GPL2_OR_LATER );
 static LIST_HEAD ( ib_cm_conns );
 
 /**
+ * Find connection by local communication ID
+ *
+ * @v local_id		Local communication ID
+ * @ret conn		Connection, or NULL
+ */
+static struct ib_connection * ib_cm_find ( uint32_t local_id ) {
+	struct ib_connection *conn;
+
+	list_for_each_entry ( conn, &ib_cm_conns, list ) {
+		if ( conn->local_id == local_id )
+			return conn;
+	}
+	return NULL;
+}
+
+/**
  * Send "ready to use" response
  *
  * @v ibdev		Infiniband device
  * @v mi		Management interface
- * @v conn		Connection
  * @v av		Address vector
+ * @v local_id		Local communication ID
+ * @v remote_id		Remote communication ID
  * @ret rc		Return status code
  */
 static int ib_cm_send_rtu ( struct ib_device *ibdev,
 			    struct ib_mad_interface *mi,
-			    struct ib_connection *conn,
-			    struct ib_address_vector *av ) {
+			    struct ib_address_vector *av,
+			    uint32_t local_id, uint32_t remote_id ) {
 	union ib_mad mad;
-	struct ib_cm_ready_to_use *ready =
-		&mad.cm.cm_data.ready_to_use;
+	struct ib_cm_ready_to_use *rtu = &mad.cm.cm_data.ready_to_use;
 	int rc;
 
 	/* Construct "ready to use" response */
@@ -63,11 +79,10 @@ static int ib_cm_send_rtu ( struct ib_device *ibdev,
 	mad.hdr.class_version = IB_CM_CLASS_VERSION;
 	mad.hdr.method = IB_MGMT_METHOD_SEND;
 	mad.hdr.attr_id = htons ( IB_CM_ATTR_READY_TO_USE );
-	ready->local_id = htonl ( conn->local_id );
-	ready->remote_id = htonl ( conn->remote_id );
+	rtu->local_id = htonl ( local_id );
+	rtu->remote_id = htonl ( remote_id );
 	if ( ( rc = ib_mi_send ( ibdev, mi, &mad, av ) ) != 0 ){
-		DBGC ( conn, "CM %p could not send RTU: %s\n",
-		       conn, strerror ( rc ) );
+		DBG ( "CM could not send RTU: %s\n", strerror ( rc ) );
 		return rc;
 	}
 
@@ -87,30 +102,99 @@ static int ib_cm_send_rtu ( struct ib_device *ibdev,
  * reply.  We have to respond to these with duplicate "ready to use"
  * MADs, otherwise the peer may time out and drop the connection.
  */
-static void ib_cm_connect_rep ( struct ib_device *ibdev,
-				struct ib_mad_interface *mi,
-				union ib_mad *mad,
-				struct ib_address_vector *av ) {
-	struct ib_cm_connect_reply *connect_rep =
-		&mad->cm.cm_data.connect_reply;
+static void ib_cm_recv_rep ( struct ib_device *ibdev,
+			     struct ib_mad_interface *mi,
+			     union ib_mad *mad,
+			     struct ib_address_vector *av ) {
+	struct ib_cm_connect_reply *rep = &mad->cm.cm_data.connect_reply;
 	struct ib_connection *conn;
+	uint32_t local_id = ntohl ( rep->remote_id );
 	int rc;
 
 	/* Identify connection */
-	list_for_each_entry ( conn, &ib_cm_conns, list ) {
-		if ( ntohl ( connect_rep->remote_id ) != conn->local_id )
-			continue;
+	conn = ib_cm_find ( local_id );
+	if ( conn ) {
 		/* Try to send "ready to use" reply */
-		if ( ( rc = ib_cm_send_rtu ( ibdev, mi, conn, av ) ) != 0 ) {
-			/* Ignore errors */
-			return;
+		if ( ( rc = ib_cm_send_rtu ( ibdev, mi, av, conn->local_id,
+					     conn->remote_id ) ) != 0 ) {
+			/* Ignore errors; the remote end will retry */
 		}
-		return;
+	} else {
+		DBG ( "CM unidentified connection %08x\n", local_id );
+	}
+}
+
+/**
+ * Send reply to disconnection request
+ *
+ * @v ibdev		Infiniband device
+ * @v mi		Management interface
+ * @v av		Address vector
+ * @v local_id		Local communication ID
+ * @v remote_id		Remote communication ID
+ * @ret rc		Return status code
+ */
+static int ib_cm_send_drep ( struct ib_device *ibdev,
+			     struct ib_mad_interface *mi,
+			     struct ib_address_vector *av,
+			     uint32_t local_id, uint32_t remote_id ) {
+	union ib_mad mad;
+	struct ib_cm_disconnect_reply *drep = &mad.cm.cm_data.disconnect_reply;
+	int rc;
+
+	/* Construct reply to disconnection request */
+	memset ( &mad, 0, sizeof ( mad ) );
+	mad.hdr.mgmt_class = IB_MGMT_CLASS_CM;
+	mad.hdr.class_version = IB_CM_CLASS_VERSION;
+	mad.hdr.method = IB_MGMT_METHOD_SEND;
+	mad.hdr.attr_id = htons ( IB_CM_ATTR_DISCONNECT_REPLY );
+	drep->local_id = htonl ( local_id );
+	drep->remote_id = htonl ( remote_id );
+	if ( ( rc = ib_mi_send ( ibdev, mi, &mad, av ) ) != 0 ){
+		DBG ( "CM could not send DREP: %s\n", strerror ( rc ) );
+		return rc;
 	}
 
-	DBG ( "CM unidentified connection %08x\n",
-	      ntohl ( connect_rep->remote_id ) );
+	return 0;
 }
+
+/**
+ * Handle disconnection requests
+ *
+ * @v ibdev		Infiniband device
+ * @v mi		Management interface
+ * @v mad		Received MAD
+ * @v av		Source address vector
+ * @ret rc		Return status code
+ */
+static void ib_cm_recv_dreq ( struct ib_device *ibdev,
+			      struct ib_mad_interface *mi,
+			      union ib_mad *mad,
+			      struct ib_address_vector *av ) {
+	struct ib_cm_disconnect_request *dreq =
+		&mad->cm.cm_data.disconnect_request;
+	struct ib_connection *conn;
+	uint32_t local_id = ntohl ( dreq->remote_id );
+	uint32_t remote_id = ntohl ( dreq->local_id );
+	int rc;
+
+	/* Identify connection */
+	conn = ib_cm_find ( local_id );
+	if ( conn ) {
+		/* Notify upper layer */
+		conn->op->changed ( ibdev, conn->qp, conn, -ENOTCONN,
+				    &dreq->private_data,
+				    sizeof ( dreq->private_data ) );
+	} else {
+		DBG ( "CM unidentified connection %08x\n", local_id );
+	}
+
+	/* Send reply */
+	if ( ( rc = ib_cm_send_drep ( ibdev, mi, av, local_id,
+				      remote_id ) ) != 0 ) {
+		/* Ignore errors; the remote end will retry */
+	}
+};
 
 /** Communication management agents */
 struct ib_mad_agent ib_cm_agent[] __ib_mad_agent = {
@@ -118,7 +202,13 @@ struct ib_mad_agent ib_cm_agent[] __ib_mad_agent = {
 		.mgmt_class = IB_MGMT_CLASS_CM,
 		.class_version = IB_CM_CLASS_VERSION,
 		.attr_id = htons ( IB_CM_ATTR_CONNECT_REPLY ),
-		.handle = ib_cm_connect_rep,
+		.handle = ib_cm_recv_rep,
+	},
+	{
+		.mgmt_class = IB_MGMT_CLASS_CM,
+		.class_version = IB_CM_CLASS_VERSION,
+		.attr_id = htons ( IB_CM_ATTR_DISCONNECT_REQUEST ),
+		.handle = ib_cm_recv_dreq,
 	},
 };
 
@@ -159,10 +249,8 @@ static void ib_cm_req_complete ( struct ib_device *ibdev,
 	struct ib_connection *conn = ib_madx_get_ownerdata ( madx );
 	struct ib_queue_pair *qp = conn->qp;
 	struct ib_cm_common *common = &mad->cm.cm_data.common;
-	struct ib_cm_connect_reply *connect_rep =
-		&mad->cm.cm_data.connect_reply;
-	struct ib_cm_connect_reject *connect_rej =
-		&mad->cm.cm_data.connect_reject;
+	struct ib_cm_connect_reply *rep = &mad->cm.cm_data.connect_reply;
+	struct ib_cm_connect_reject *rej = &mad->cm.cm_data.connect_reject;
 	void *private_data = NULL;
 	size_t private_data_len = 0;
 
@@ -183,10 +271,10 @@ static void ib_cm_req_complete ( struct ib_device *ibdev,
 
 	case htons ( IB_CM_ATTR_CONNECT_REPLY ) :
 		/* Extract fields */
-		qp->av.qpn = ( ntohl ( connect_rep->local_qpn ) >> 8 );
-		qp->send.psn = ( ntohl ( connect_rep->starting_psn ) >> 8 );
-		private_data = &connect_rep->private_data;
-		private_data_len = sizeof ( connect_rep->private_data );
+		qp->av.qpn = ( ntohl ( rep->local_qpn ) >> 8 );
+		qp->send.psn = ( ntohl ( rep->starting_psn ) >> 8 );
+		private_data = &rep->private_data;
+		private_data_len = sizeof ( rep->private_data );
 		DBGC ( conn, "CM %p connected to QPN %lx PSN %x\n",
 		       conn, qp->av.qpn, qp->send.psn );
 
@@ -198,7 +286,8 @@ static void ib_cm_req_complete ( struct ib_device *ibdev,
 		}
 
 		/* Send "ready to use" reply */
-		if ( ( rc = ib_cm_send_rtu ( ibdev, mi, conn, av ) ) != 0 ) {
+		if ( ( rc = ib_cm_send_rtu ( ibdev, mi, av, conn->local_id,
+					     conn->remote_id ) ) != 0 ) {
 			/* Treat as non-fatal */
 			rc = 0;
 		}
@@ -207,13 +296,13 @@ static void ib_cm_req_complete ( struct ib_device *ibdev,
 	case htons ( IB_CM_ATTR_CONNECT_REJECT ) :
 		/* Extract fields */
 		DBGC ( conn, "CM %p connection rejected (reason %d)\n",
-		       conn, ntohs ( connect_rej->reason ) );
+		       conn, ntohs ( rej->reason ) );
 		/* Private data is valid only for a Consumer Reject */
-		if ( connect_rej->reason == htons ( IB_CM_REJECT_CONSUMER ) ) {
-			private_data = &connect_rej->private_data;
-			private_data_len = sizeof (connect_rej->private_data);
+		if ( rej->reason == htons ( IB_CM_REJECT_CONSUMER ) ) {
+			private_data = &rej->private_data;
+			private_data_len = sizeof ( rej->private_data );
 		}
-		rc = ib_cm_rejection_reason_to_rc ( connect_rej->reason );
+		rc = ib_cm_rejection_reason_to_rc ( rej->reason );
 		break;
 
 	default:
@@ -252,8 +341,7 @@ static void ib_cm_path_complete ( struct ib_device *ibdev,
 	struct ib_connection *conn = ib_path_get_ownerdata ( path );
 	struct ib_queue_pair *qp = conn->qp;
 	union ib_mad mad;
-	struct ib_cm_connect_request *connect_req =
-		&mad.cm.cm_data.connect_request;
+	struct ib_cm_connect_request *req = &mad.cm.cm_data.connect_request;
 	size_t private_data_len;
 
 	/* Report failures */
@@ -273,41 +361,38 @@ static void ib_cm_path_complete ( struct ib_device *ibdev,
 	mad.hdr.class_version = IB_CM_CLASS_VERSION;
 	mad.hdr.method = IB_MGMT_METHOD_SEND;
 	mad.hdr.attr_id = htons ( IB_CM_ATTR_CONNECT_REQUEST );
-	connect_req->local_id = htonl ( conn->local_id );
-	memcpy ( &connect_req->service_id, &conn->service_id,
-		 sizeof ( connect_req->service_id ) );
-	ib_get_hca_info ( ibdev, &connect_req->local_ca );
-	connect_req->local_qpn__responder_resources =
-		htonl ( ( qp->qpn << 8 ) | 1 );
-	connect_req->local_eecn__initiator_depth = htonl ( ( 0 << 8 ) | 1 );
-	connect_req->remote_eecn__remote_timeout__service_type__ee_flow_ctrl =
+	req->local_id = htonl ( conn->local_id );
+	memcpy ( &req->service_id, &conn->service_id,
+		 sizeof ( req->service_id ) );
+	ib_get_hca_info ( ibdev, &req->local_ca );
+	req->local_qpn__responder_resources = htonl ( ( qp->qpn << 8 ) | 1 );
+	req->local_eecn__initiator_depth = htonl ( ( 0 << 8 ) | 1 );
+	req->remote_eecn__remote_timeout__service_type__ee_flow_ctrl =
 		htonl ( ( 0x14 << 3 ) | ( IB_CM_TRANSPORT_RC << 1 ) |
 			( 0 << 0 ) );
-	connect_req->starting_psn__local_timeout__retry_count =
+	req->starting_psn__local_timeout__retry_count =
 		htonl ( ( qp->recv.psn << 8 ) | ( 0x14 << 3 ) |
 			( 0x07 << 0 ) );
-	connect_req->pkey = htons ( ibdev->pkey );
-	connect_req->payload_mtu__rdc_exists__rnr_retry =
+	req->pkey = htons ( ibdev->pkey );
+	req->payload_mtu__rdc_exists__rnr_retry =
 		( ( IB_MTU_2048 << 4 ) | ( 1 << 3 ) | ( 0x07 << 0 ) );
-	connect_req->max_cm_retries__srq =
-		( ( 0x0f << 4 ) | ( 0 << 3 ) );
-	connect_req->primary.local_lid = htons ( ibdev->lid );
-	connect_req->primary.remote_lid = htons ( conn->qp->av.lid );
-	memcpy ( &connect_req->primary.local_gid, &ibdev->gid,
-		 sizeof ( connect_req->primary.local_gid ) );
-	memcpy ( &connect_req->primary.remote_gid, &conn->qp->av.gid,
-		 sizeof ( connect_req->primary.remote_gid ) );
-	connect_req->primary.flow_label__rate =
+	req->max_cm_retries__srq = ( ( 0x0f << 4 ) | ( 0 << 3 ) );
+	req->primary.local_lid = htons ( ibdev->lid );
+	req->primary.remote_lid = htons ( conn->qp->av.lid );
+	memcpy ( &req->primary.local_gid, &ibdev->gid,
+		 sizeof ( req->primary.local_gid ) );
+	memcpy ( &req->primary.remote_gid, &conn->qp->av.gid,
+		 sizeof ( req->primary.remote_gid ) );
+	req->primary.flow_label__rate =
 		htonl ( ( 0 << 12 ) | ( conn->qp->av.rate << 0 ) );
-	connect_req->primary.hop_limit = 0;
-	connect_req->primary.sl__subnet_local =
+	req->primary.hop_limit = 0;
+	req->primary.sl__subnet_local =
 		( ( conn->qp->av.sl << 4 ) | ( 1 << 3 ) );
-	connect_req->primary.local_ack_timeout = ( 0x13 << 3 );
+	req->primary.local_ack_timeout = ( 0x13 << 3 );
 	private_data_len = conn->private_data_len;
-	if ( private_data_len > sizeof ( connect_req->private_data ) )
-		private_data_len = sizeof ( connect_req->private_data );
-	memcpy ( &connect_req->private_data, &conn->private_data,
-		 private_data_len );
+	if ( private_data_len > sizeof ( req->private_data ) )
+		private_data_len = sizeof ( req->private_data );
+	memcpy ( &req->private_data, &conn->private_data, private_data_len );
 
 	/* Create connection request */
 	av->qpn = IB_QPN_GSI;

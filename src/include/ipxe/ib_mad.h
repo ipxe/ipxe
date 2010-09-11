@@ -451,6 +451,34 @@ struct ib_cm_ready_to_use {
 	uint8_t private_data[224];
 } __attribute__ (( packed ));
 
+/** A communication management disconnection request
+ *
+ * Defined in section 12.6.10 of the IBA.
+ */
+struct ib_cm_disconnect_request {
+	/** Local communication ID */
+	uint32_t local_id;
+	/** Remote communication ID */
+	uint32_t remote_id;
+	/** Remote QPN/EECN */
+	uint32_t remote_qpn_eecn;
+	/** Private data */
+	uint8_t private_data[220];
+} __attribute__ (( packed ));
+
+/** A communication management disconnection reply
+ *
+ * Defined in section 12.6.11 of the IBA.
+ */
+struct ib_cm_disconnect_reply {
+	/** Local communication ID */
+	uint32_t local_id;
+	/** Remote communication ID */
+	uint32_t remote_id;
+	/** Private data */
+	uint8_t private_data[224];
+} __attribute__ (( packed ));
+
 /** A communication management attribute */
 union ib_cm_data {
 	struct ib_cm_common common;
@@ -458,6 +486,8 @@ union ib_cm_data {
 	struct ib_cm_connect_reject connect_reject;
 	struct ib_cm_connect_reply connect_reply;
 	struct ib_cm_ready_to_use ready_to_use;
+	struct ib_cm_disconnect_request disconnect_request;
+	struct ib_cm_disconnect_reply disconnect_reply;
 	uint8_t bytes[232];
 } __attribute__ (( packed ));
 
