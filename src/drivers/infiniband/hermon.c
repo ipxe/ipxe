@@ -798,6 +798,7 @@ static int hermon_create_cq ( struct ib_device *ibdev,
 	MLX_FILL_2 ( &cqctx, 3,
 		     usr_page, HERMON_UAR_NON_EQ_PAGE,
 		     log_cq_size, fls ( cq->num_cqes - 1 ) );
+	MLX_FILL_1 ( &cqctx, 5, c_eqn, hermon->eq.eqn );
 	MLX_FILL_1 ( &cqctx, 7, mtt_base_addr_l,
 		     ( hermon_cq->mtt.mtt_base_addr >> 3 ) );
 	MLX_FILL_1 ( &cqctx, 15, db_record_addr_l,
