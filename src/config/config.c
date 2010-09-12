@@ -135,9 +135,6 @@ REQUIRE_OBJECT ( slam );
 #ifdef SANBOOT_PROTO_ISCSI
 REQUIRE_OBJECT ( iscsiboot );
 #endif
-#ifdef SANBOOT_PROTO_IB_SRP
-REQUIRE_OBJECT ( ib_srpboot );
-#endif
 
 /*
  * Drag in all requested resolvers
