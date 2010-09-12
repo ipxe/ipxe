@@ -38,7 +38,7 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #include <ipxe/init.h>
 #include <ipxe/features.h>
 
-FEATURE ( FEATURE_IMAGE, "Multiboot", DHCP_EB_FEATURE_MULTIBOOT, 1 );
+FEATURE ( FEATURE_IMAGE, "MBOOT", DHCP_EB_FEATURE_MULTIBOOT, 1 );
 
 struct image_type multiboot_image_type __image_type ( PROBE_MULTIBOOT );
 
