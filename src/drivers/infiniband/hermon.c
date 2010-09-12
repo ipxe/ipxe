@@ -770,6 +770,15 @@ static int hermon_create_cq ( struct ib_device *ibdev,
 		goto err_hermon_cq;
 	}
 
+	/* Allocate doorbell */
+	hermon_cq->doorbell = malloc_dma ( sizeof ( hermon_cq->doorbell[0] ),
+					   sizeof ( hermon_cq->doorbell[0] ) );
+	if ( ! hermon_cq->doorbell ) {
+		rc = -ENOMEM;
+		goto err_doorbell;
+	}
+	memset ( hermon_cq->doorbell, 0, sizeof ( hermon_cq->doorbell[0] ) );
+
 	/* Allocate completion queue itself */
 	hermon_cq->cqe_size = ( cq->num_cqes * sizeof ( hermon_cq->cqe[0] ) );
 	hermon_cq->cqe = malloc_dma ( hermon_cq->cqe_size,
@@ -802,7 +811,7 @@ static int hermon_create_cq ( struct ib_device *ibdev,
 	MLX_FILL_1 ( &cqctx, 7, mtt_base_addr_l,
 		     ( hermon_cq->mtt.mtt_base_addr >> 3 ) );
 	MLX_FILL_1 ( &cqctx, 15, db_record_addr_l,
-		     ( virt_to_phys ( &hermon_cq->doorbell ) >> 3 ) );
+		     ( virt_to_phys ( hermon_cq->doorbell ) >> 3 ) );
 	if ( ( rc = hermon_cmd_sw2hw_cq ( hermon, cq->cqn, &cqctx ) ) != 0 ) {
 		DBGC ( hermon, "Hermon %p CQN %#lx SW2HW_CQ failed: %s\n",
 		       hermon, cq->cqn, strerror ( rc ) );
@@ -812,7 +821,7 @@ static int hermon_create_cq ( struct ib_device *ibdev,
 	DBGC ( hermon, "Hermon %p CQN %#lx ring [%08lx,%08lx), doorbell "
 	       "%08lx\n", hermon, cq->cqn, virt_to_phys ( hermon_cq->cqe ),
 	       ( virt_to_phys ( hermon_cq->cqe ) + hermon_cq->cqe_size ),
-	       virt_to_phys ( &hermon_cq->doorbell ) );
+	       virt_to_phys ( hermon_cq->doorbell ) );
 	ib_cq_set_drvdata ( cq, hermon_cq );
 	return 0;
 
@@ -821,6 +830,8 @@ static int hermon_create_cq ( struct ib_device *ibdev,
  err_alloc_mtt:
 	free_dma ( hermon_cq->cqe, hermon_cq->cqe_size );
  err_cqe:
+	free_dma ( hermon_cq->doorbell, sizeof ( hermon_cq->doorbell[0] ) );
+ err_doorbell:
 	free ( hermon_cq );
  err_hermon_cq:
 	hermon_bitmask_free ( hermon->cq_inuse, cqn_offset, 1 );
@@ -855,6 +866,7 @@ static void hermon_destroy_cq ( struct ib_device *ibdev,
 
 	/* Free memory */
 	free_dma ( hermon_cq->cqe, hermon_cq->cqe_size );
+	free_dma ( hermon_cq->doorbell, sizeof ( hermon_cq->doorbell[0] ) );
 	free ( hermon_cq );
 
 	/* Mark queue number as free */
@@ -1013,7 +1025,16 @@ static int hermon_create_qp ( struct ib_device *ibdev,
 		goto err_hermon_qp;
 	}
 
-	/* Calculate doorbell address */
+	/* Allocate doorbells */
+	hermon_qp->recv.doorbell =
+		malloc_dma ( sizeof ( hermon_qp->recv.doorbell[0] ),
+			     sizeof ( hermon_qp->recv.doorbell[0] ) );
+	if ( ! hermon_qp->recv.doorbell ) {
+		rc = -ENOMEM;
+		goto err_recv_doorbell;
+	}
+	memset ( hermon_qp->recv.doorbell, 0,
+		 sizeof ( hermon_qp->recv.doorbell[0] ) );
 	hermon_qp->send.doorbell =
 		( hermon->uar + HERMON_UAR_NON_EQ_PAGE * HERMON_PAGE_SIZE +
 		  HERMON_DB_POST_SND_OFFSET );
@@ -1072,7 +1093,7 @@ static int hermon_create_qp ( struct ib_device *ibdev,
 		     ( hermon_qp->mtt.page_offset >> 6 ) );
 	MLX_FILL_1 ( &qpctx, 41, qpc_eec_data.cqn_rcv, qp->recv.cq->cqn );
 	MLX_FILL_1 ( &qpctx, 43, qpc_eec_data.db_record_addr_l,
-		     ( virt_to_phys ( &hermon_qp->recv.doorbell ) >> 2 ) );
+		     ( virt_to_phys ( hermon_qp->recv.doorbell ) >> 2 ) );
 	MLX_FILL_1 ( &qpctx, 53, qpc_eec_data.mtt_base_addr_l,
 		     ( hermon_qp->mtt.mtt_base_addr >> 3 ) );
 	if ( ( rc = hermon_cmd_rst2init_qp ( hermon, qp->qpn,
@@ -1094,7 +1115,7 @@ static int hermon_create_qp ( struct ib_device *ibdev,
 	       virt_to_phys ( hermon_qp->recv.wqe ),
 	       ( virt_to_phys ( hermon_qp->recv.wqe ) +
 		 hermon_qp->recv.wqe_size ),
-	       virt_to_phys ( &hermon_qp->recv.doorbell ) );
+	       virt_to_phys ( hermon_qp->recv.doorbell ) );
 	DBGC ( hermon, "Hermon %p QPN %#lx send CQN %#lx receive CQN %#lx\n",
 	       hermon, qp->qpn, qp->send.cq->cqn, qp->recv.cq->cqn );
 	ib_qp_set_drvdata ( qp, hermon_qp );
@@ -1106,6 +1127,9 @@ static int hermon_create_qp ( struct ib_device *ibdev,
  err_alloc_mtt:
 	free_dma ( hermon_qp->wqe, hermon_qp->wqe_size );
  err_alloc_wqe:
+	free_dma ( hermon_qp->recv.doorbell,
+		   sizeof ( hermon_qp->recv.doorbell[0] ) );
+ err_recv_doorbell:
 	free ( hermon_qp );
  err_hermon_qp:
 	hermon_free_qpn ( ibdev, qp );
@@ -1215,6 +1239,8 @@ static void hermon_destroy_qp ( struct ib_device *ibdev,
 
 	/* Free memory */
 	free_dma ( hermon_qp->wqe, hermon_qp->wqe_size );
+	free_dma ( hermon_qp->recv.doorbell,
+		   sizeof ( hermon_qp->recv.doorbell[0] ) );
 	free ( hermon_qp );
 
 	/* Mark queue number as free */
@@ -1482,7 +1508,7 @@ static int hermon_post_recv ( struct ib_device *ibdev,
 
 	/* Update doorbell record */
 	barrier();
-	MLX_FILL_1 ( &hermon_recv_wq->doorbell, 0, receive_wqe_counter,
+	MLX_FILL_1 ( hermon_recv_wq->doorbell, 0, receive_wqe_counter,
 		     ( wq->next_idx & 0xffff ) );
 
 	return 0;
@@ -1631,7 +1657,7 @@ static void hermon_poll_cq ( struct ib_device *ibdev,
 		cq->next_idx++;
 
 		/* Update doorbell record */
-		MLX_FILL_1 ( &hermon_cq->doorbell, 0, update_ci,
+		MLX_FILL_1 ( hermon_cq->doorbell, 0, update_ci,
 			     ( cq->next_idx & 0x00ffffffUL ) );
 	}
 }

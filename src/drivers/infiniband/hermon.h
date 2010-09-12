@@ -408,8 +408,8 @@ struct hermon_recv_work_queue {
 	union hermon_recv_wqe *wqe;
 	/** Size of work queue */
 	size_t wqe_size;
-	/** Doorbell */
-	struct hermonprm_qp_db_record doorbell __attribute__ (( aligned (4) ));
+	/** Doorbell record */
+	struct hermonprm_qp_db_record *doorbell;
 };
 
 /** Number of special queue pairs */
@@ -469,8 +469,8 @@ struct hermon_completion_queue {
 	size_t cqe_size;
 	/** MTT descriptor */
 	struct hermon_mtt mtt;
-	/** Doorbell */
-	struct hermonprm_cq_db_record doorbell __attribute__ (( aligned (8) ));
+	/** Doorbell record */
+	struct hermonprm_cq_db_record *doorbell;
 };
 
 /** Maximum number of allocatable event queues
