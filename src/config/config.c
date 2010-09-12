@@ -135,9 +135,6 @@ REQUIRE_OBJECT ( slam );
 #ifdef SANBOOT_PROTO_ISCSI
 REQUIRE_OBJECT ( iscsiboot );
 #endif
-#ifdef SANBOOT_PROTO_AOE
-REQUIRE_OBJECT ( aoeboot );
-#endif
 #ifdef SANBOOT_PROTO_IB_SRP
 REQUIRE_OBJECT ( ib_srpboot );
 #endif
