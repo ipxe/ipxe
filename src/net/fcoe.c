@@ -29,6 +29,7 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #include <ipxe/xfer.h>
 #include <ipxe/netdevice.h>
 #include <ipxe/features.h>
+#include <ipxe/errortab.h>
 #include <ipxe/crc32.h>
 #include <ipxe/fc.h>
 #include <ipxe/fcoe.h>
@@ -40,6 +41,20 @@ FILE_LICENCE ( GPL2_OR_LATER );
  */
 
 FEATURE ( FEATURE_PROTOCOL, "FCoE", DHCP_EB_FEATURE_FCOE, 1 );
+
+/* Disambiguate the various error causes */
+#define EINVAL_UNDERLENGTH __einfo_error ( EINFO_EINVAL_UNDERLENGTH )
+#define EINFO_EINVAL_UNDERLENGTH \
+	__einfo_uniqify ( EINFO_EINVAL, 0x01, "Underlength packet" )
+#define EINVAL_SOF __einfo_error ( EINFO_EINVAL_SOF )
+#define EINFO_EINVAL_SOF \
+	__einfo_uniqify ( EINFO_EINVAL, 0x02, "Invalid SoF delimiter" )
+#define EINVAL_CRC __einfo_error ( EINFO_EINVAL_CRC )
+#define EINFO_EINVAL_CRC \
+	__einfo_uniqify ( EINFO_EINVAL, 0x03, "Invalid CRC (not stripped?)" )
+#define EINVAL_EOF __einfo_error ( EINFO_EINVAL_EOF )
+#define EINFO_EINVAL_EOF \
+	__einfo_uniqify ( EINFO_EINVAL, 0x04, "Invalid EoF delimiter" )
 
 /** An FCoE port */
 struct fcoe_port {
@@ -171,7 +186,7 @@ static int fcoe_rx ( struct io_buffer *iobuf,
 	if ( iob_len ( iobuf ) < ( sizeof ( *fcoehdr ) + sizeof ( *fcoeftr ) )){
 		DBGC ( fcoe, "FCoE %s received under-length frame (%zd "
 		       "bytes)\n", fcoe->netdev->name, iob_len ( iobuf ) );
-		rc = -EINVAL;
+		rc = -EINVAL_UNDERLENGTH;
 		goto done;
 	}
 
@@ -192,21 +207,21 @@ static int fcoe_rx ( struct io_buffer *iobuf,
 		 ( fcoehdr->sof == FCOE_SOF_N3 ) ) ) {
 		DBGC ( fcoe, "FCoE %s received unsupported start-of-frame "
 		       "delimiter %02x\n", fcoe->netdev->name, fcoehdr->sof );
-		rc = -EINVAL;
+		rc = -EINVAL_SOF;
 		goto done;
 	}
 	if ( ( le32_to_cpu ( fcoeftr->crc ) ^ ~((uint32_t)0) ) !=
 	     crc32_le ( ~((uint32_t)0), iobuf->data, iob_len ( iobuf ) ) ) {
 		DBGC ( fcoe, "FCoE %s received invalid CRC\n",
 		       fcoe->netdev->name );
-		rc = -EINVAL;
+		rc = -EINVAL_CRC;
 		goto done;
 	}
 	if ( ! ( ( fcoeftr->eof == FCOE_EOF_N ) ||
 		 ( fcoeftr->eof == FCOE_EOF_T ) ) ) {
 		DBGC ( fcoe, "FCoE %s received unsupported end-of-frame "
 		       "delimiter %02x\n", fcoe->netdev->name, fcoeftr->eof );
-		rc = -EINVAL;
+		rc = -EINVAL_EOF;
 		goto done;
 	}
 
@@ -380,4 +395,14 @@ struct net_protocol fcoe_protocol __net_protocol = {
 	.name = "FCoE",
 	.net_proto = htons ( ETH_P_FCOE ),
 	.rx = fcoe_rx,
+};
+
+/** Human-readable message for CRC errors
+ *
+ * It seems as though several drivers neglect to strip the Ethernet
+ * CRC, which will cause the FCoE footer to be misplaced and result
+ * (coincidentally) in an "invalid CRC" error from FCoE.
+ */
+struct errortab fcoe_errors[] __errortab = {
+	__einfo_errortab ( EINFO_EINVAL_CRC ),
 };
