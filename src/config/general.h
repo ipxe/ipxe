@@ -112,6 +112,7 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #define	CONFIG_CMD		/* Option configuration console */
 #define	IFMGMT_CMD		/* Interface management commands */
 #define	IWMGMT_CMD		/* Wireless interface management commands */
+#define FCMGMT_CMD		/* Fibre Channel management commands */
 #define	ROUTE_CMD		/* Routing table management commands */
 #define IMAGE_CMD		/* Image management commands */
 #define DHCP_CMD		/* DHCP management commands */
