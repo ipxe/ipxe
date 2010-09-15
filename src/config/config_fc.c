@@ -22,3 +22,10 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #ifdef FCMGMT_CMD
 REQUIRE_OBJECT ( fcmgmt_cmd );
 #endif
+
+/*
+ * Drag in Fibre Channel-specific protocols
+ */
+#ifdef SANBOOT_PROTO_FCP
+REQUIRE_OBJECT ( fcp );
+#endif

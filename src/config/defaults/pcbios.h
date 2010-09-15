@@ -33,5 +33,6 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #define	SANBOOT_PROTO_ISCSI	/* iSCSI protocol */
 #define	SANBOOT_PROTO_AOE	/* AoE protocol */
 #define	SANBOOT_PROTO_IB_SRP	/* Infiniband SCSI RDMA protocol */
+#define	SANBOOT_PROTO_FCP	/* Fibre Channel protocol */
 
 #endif /* CONFIG_DEFAULTS_PCBIOS_H */

@@ -186,6 +186,7 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #define ERRFILE_eth_slow		( ERRFILE_NET | 0x002a0000 )
 #define ERRFILE_fc			( ERRFILE_NET | 0x002b0000 )
 #define ERRFILE_fcels			( ERRFILE_NET | 0x002c0000 )
+#define ERRFILE_fcp			( ERRFILE_NET | 0x002d0000 )
 
 #define ERRFILE_image		      ( ERRFILE_IMAGE | 0x00000000 )
 #define ERRFILE_elf		      ( ERRFILE_IMAGE | 0x00010000 )

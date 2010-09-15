@@ -68,6 +68,7 @@ FILE_LICENCE ( GPL2_OR_LATER );
 //#undef	SANBOOT_PROTO_ISCSI	/* iSCSI protocol */
 //#undef	SANBOOT_PROTO_AOE	/* AoE protocol */
 //#undef	SANBOOT_PROTO_IB_SRP	/* Infiniband SCSI RDMA protocol */
+//#undef	SANBOOT_PROTO_FCP	/* Fibre Channel protocol */
 
 /*
  * 802.11 cryptosystems and handshaking protocols
