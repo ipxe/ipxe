@@ -267,6 +267,9 @@ struct scsi_sns {
 	uint32_t info;
 };
 
+/** SCSI sense key mask */
+#define SCSI_SENSE_KEY_MASK 0x0f
+
 /** A SCSI response information unit */
 struct scsi_rsp {
 	/** SCSI status code */
