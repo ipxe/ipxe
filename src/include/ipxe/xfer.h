@@ -46,6 +46,22 @@ struct xfer_metadata {
 /** Offset is absolute */
 #define XFER_FL_ABS_OFFSET 0x0001
 
+/** Sender is relinquishing use of half-duplex channel */
+#define XFER_FL_OVER 0x0002
+
+/** This is the final data transfer */
+#define XFER_FL_OUT 0x0004
+
+/** Data content represents a command or status message
+ *
+ * The flag @c XFER_FL_RESPONSE is used to distinguish between a
+ * command message and a status message.
+ */
+#define XFER_FL_CMD_STAT 0x0008
+
+/** Data content is a response */
+#define XFER_FL_RESPONSE 0x0010
+
 /* Data transfer interface operations */
 
 extern int xfer_vredirect ( struct interface *intf, int type,
