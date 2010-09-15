@@ -21,3 +21,6 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #ifdef SANBOOT_PROTO_AOE
 REQUIRE_OBJECT ( aoe );
 #endif
+#ifdef NET_PROTO_FCOE
+REQUIRE_OBJECT ( fcoe );
+#endif
