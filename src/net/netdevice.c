@@ -658,7 +658,7 @@ int net_rx ( struct io_buffer *iobuf, struct net_device *netdev,
 	DBGC ( netdev, "NETDEV %p unknown network protocol %04x\n",
 	       netdev, ntohs ( net_proto ) );
 	free_iob ( iobuf );
-	return 0;
+	return -ENOTSUP;
 }
 
 /**
@@ -705,7 +705,12 @@ static void net_step ( struct process *process __unused ) {
 				continue;
 			}
 
-			net_rx ( iobuf, netdev, net_proto, ll_source );
+			/* Hand packet to network layer */
+			if ( ( rc = net_rx ( iob_disown ( iobuf ), netdev,
+					     net_proto, ll_source ) ) != 0 ) {
+				/* Record error for diagnosis */
+				netdev_rx_err ( netdev, NULL, rc );
+			}
 		}
 	}
 }
