@@ -88,7 +88,7 @@ struct ib_address_vector {
 	/** GID is present */
 	unsigned int gid_present;
 	/** GID, if present */
-	struct ib_gid gid;
+	union ib_gid gid;
 };
 
 /** An Infiniband Work Queue */
@@ -126,7 +126,7 @@ struct ib_multicast_gid {
 	/** List of multicast GIDs on this QP */
 	struct list_head list;
 	/** Multicast GID */
-	struct ib_gid gid;
+	union ib_gid gid;
 };
 
 /** An Infiniband queue pair type */
@@ -338,7 +338,7 @@ struct ib_device_operations {
 	 */
 	int ( * mcast_attach ) ( struct ib_device *ibdev,
 				 struct ib_queue_pair *qp,
-				 struct ib_gid *gid );
+				 union ib_gid *gid );
 	/** Detach from multicast group
 	 *
 	 * @v ibdev		Infiniband device
@@ -347,7 +347,7 @@ struct ib_device_operations {
 	 */
 	void ( * mcast_detach ) ( struct ib_device *ibdev,
 				  struct ib_queue_pair *qp,
-				  struct ib_gid *gid );
+				  union ib_gid *gid );
 	/** Set port information
 	 *
 	 * @v ibdev		Infiniband device
@@ -405,7 +405,7 @@ struct ib_device {
 	/** Link speed active */
 	uint8_t link_speed_active;
 	/** Port GID */
-	struct ib_gid gid;
+	union ib_gid gid;
 	/** Port LID */
 	uint16_t lid;
 	/** Subnet manager LID */
@@ -479,7 +479,7 @@ extern void ib_destroy_qp ( struct ib_device *ibdev,
 extern struct ib_queue_pair * ib_find_qp_qpn ( struct ib_device *ibdev,
 					       unsigned long qpn );
 extern struct ib_queue_pair * ib_find_qp_mgid ( struct ib_device *ibdev,
-						struct ib_gid *gid );
+						union ib_gid *gid );
 extern struct ib_work_queue * ib_find_wq ( struct ib_completion_queue *cq,
 					   unsigned long qpn, int is_send );
 extern int ib_post_send ( struct ib_device *ibdev, struct ib_queue_pair *qp,
@@ -500,17 +500,17 @@ extern int ib_open ( struct ib_device *ibdev );
 extern void ib_close ( struct ib_device *ibdev );
 extern int ib_link_rc ( struct ib_device *ibdev );
 extern int ib_mcast_attach ( struct ib_device *ibdev, struct ib_queue_pair *qp,
-			     struct ib_gid *gid );
+			     union ib_gid *gid );
 extern void ib_mcast_detach ( struct ib_device *ibdev,
-			      struct ib_queue_pair *qp, struct ib_gid *gid );
+			      struct ib_queue_pair *qp, union ib_gid *gid );
 extern int ib_get_hca_info ( struct ib_device *ibdev,
-			     struct ib_gid_half *hca_guid );
+			     union ib_guid *hca_guid );
 extern int ib_set_port_info ( struct ib_device *ibdev, union ib_mad *mad );
 extern int ib_set_pkey_table ( struct ib_device *ibdev, union ib_mad *mad );
 extern struct ib_device * alloc_ibdev ( size_t priv_size );
 extern int register_ibdev ( struct ib_device *ibdev );
 extern void unregister_ibdev ( struct ib_device *ibdev );
-extern struct ib_device * find_ibdev ( struct ib_gid *gid );
+extern struct ib_device * find_ibdev ( union ib_gid *gid );
 extern struct ib_device * last_opened_ibdev ( void );
 extern void ib_link_state_changed ( struct ib_device *ibdev );
 extern void ib_poll_eq ( struct ib_device *ibdev );

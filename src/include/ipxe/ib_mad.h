@@ -75,9 +75,9 @@ struct ib_node_info {
 	uint8_t class_version;
 	uint8_t node_type;
 	uint8_t num_ports;
-	struct ib_gid_half sys_guid;
-	struct ib_gid_half node_guid;
-	struct ib_gid_half port_guid;
+	union ib_guid sys_guid;
+	union ib_guid node_guid;
+	union ib_guid port_guid;
 	uint16_t partition_cap;
 	uint16_t device_id;
 	uint32_t revision;
@@ -221,8 +221,8 @@ struct ib_sa_hdr {
 
 struct ib_path_record {
 	uint32_t reserved0[2];
-	struct ib_gid dgid;
-	struct ib_gid sgid;
+	union ib_gid dgid;
+	union ib_gid sgid;
 	uint16_t dlid;
 	uint16_t slid;
 	uint32_t hop_limit__flow_label__raw_traffic;
@@ -239,8 +239,8 @@ struct ib_path_record {
 #define IB_SA_PATH_REC_SGID			(1<<3)
 
 struct ib_mc_member_record {
-	struct ib_gid mgid;
-	struct ib_gid port_gid;
+	union ib_gid mgid;
+	union ib_gid port_gid;
 	uint32_t qkey;
 	uint16_t mlid;
 	uint8_t mtu_selector__mtu;
@@ -320,9 +320,9 @@ struct ib_cm_path {
 	/** Remote port LID */
 	uint16_t remote_lid;
 	/** Local port GID */
-	struct ib_gid local_gid;
+	union ib_gid local_gid;
 	/** Remote port GID */
-	struct ib_gid remote_gid;
+	union ib_gid remote_gid;
 	/** Flow label and rate */
 	uint32_t flow_label__rate;
 	/** Traffic class */
@@ -345,9 +345,9 @@ struct ib_cm_connect_request {
 	/** Reserved */
 	uint32_t reserved0[1];
 	/** Service ID */
-	struct ib_gid_half service_id;
+	union ib_guid service_id;
 	/** Local CA GUID */
-	struct ib_gid_half local_ca;
+	union ib_guid local_ca;
 	/** Reserved */
 	uint32_t reserved1[1];
 	/** Local queue key */
@@ -433,7 +433,7 @@ struct ib_cm_connect_reply {
 	/** RNR retry count, SRQ */
 	uint8_t rnr_retry__srq;
 	/** Local CA GUID */
-	struct ib_gid_half local_ca;
+	union ib_guid local_ca;
 	/** Private data */
 	uint8_t private_data[196];
 } __attribute__ (( packed ));

@@ -118,7 +118,7 @@ struct qib7322 {
 	struct i2c_device eeprom;
 
 	/** Base GUID */
-	struct ib_gid_half guid;
+	union ib_guid guid;
 	/** Infiniband devices */
 	struct ib_device *ibdev[QIB7322_MAX_PORTS];
 };
@@ -1770,7 +1770,7 @@ static void qib7322_close ( struct ib_device *ibdev ) {
  */
 static int qib7322_mcast_attach ( struct ib_device *ibdev,
 				  struct ib_queue_pair *qp,
-				  struct ib_gid *gid ) {
+				  union ib_gid *gid ) {
 	struct qib7322 *qib7322 = ib_get_drvdata ( ibdev );
 
 	( void ) qib7322;
@@ -1788,7 +1788,7 @@ static int qib7322_mcast_attach ( struct ib_device *ibdev,
  */
 static void qib7322_mcast_detach ( struct ib_device *ibdev,
 				   struct ib_queue_pair *qp,
-				   struct ib_gid *gid ) {
+				   union ib_gid *gid ) {
 	struct qib7322 *qib7322 = ib_get_drvdata ( ibdev );
 
 	( void ) qib7322;
@@ -1946,21 +1946,19 @@ static int qib7322_init_i2c ( struct qib7322 *qib7322 ) {
  */
 static int qib7322_read_eeprom ( struct qib7322 *qib7322 ) {
 	struct i2c_interface *i2c = &qib7322->i2c.i2c;
-	struct ib_gid_half *guid = &qib7322->guid;
+	union ib_guid *guid = &qib7322->guid;
 	int rc;
 
 	/* Read GUID */
 	if ( ( rc = i2c->read ( i2c, &qib7322->eeprom,
-				QIB7322_EEPROM_GUID_OFFSET, guid->u.bytes,
+				QIB7322_EEPROM_GUID_OFFSET, guid->bytes,
 				sizeof ( *guid ) ) ) != 0 ) {
 		DBGC ( qib7322, "QIB7322 %p could not read GUID: %s\n",
 		       qib7322, strerror ( rc ) );
 		return rc;
 	}
-	DBGC2 ( qib7322, "QIB7322 %p has GUID %02x:%02x:%02x:%02x:%02x:%02x:"
-		"%02x:%02x\n", qib7322, guid->u.bytes[0], guid->u.bytes[1],
-		guid->u.bytes[2], guid->u.bytes[3], guid->u.bytes[4],
-		guid->u.bytes[5], guid->u.bytes[6], guid->u.bytes[7] );
+	DBGC2 ( qib7322, "QIB7322 %p has GUID " IB_GUID_FMT "\n",
+		qib7322, IB_GUID_ARGS ( guid ) );
 
 	/* Read serial number (debug only) */
 	if ( DBG_LOG ) {
@@ -2359,10 +2357,10 @@ static int qib7322_probe ( struct pci_device *pci,
 			IB_LINK_WIDTH_4X; /* 1x does not work */
 		ibdev->link_speed_enabled = ibdev->link_speed_supported =
 			IB_LINK_SPEED_SDR; /* to avoid need for link tuning */
-		memcpy ( &ibdev->gid.u.half[1], &qib7322->guid,
-			 sizeof ( ibdev->gid.u.half[1] ) );
-		assert ( ( ibdev->gid.u.half[1].u.bytes[7] & i ) == 0 );
-		ibdev->gid.u.half[1].u.bytes[7] |= i;
+		memcpy ( &ibdev->gid.s.guid, &qib7322->guid,
+			 sizeof ( ibdev->gid.s.guid ) );
+		assert ( ( ibdev->gid.s.guid.bytes[7] & i ) == 0 );
+		ibdev->gid.s.guid.bytes[7] |= i;
 		ib_set_drvdata ( ibdev, qib7322 );
 	}
 

@@ -49,18 +49,16 @@ static void ib_path_complete ( struct ib_device *ibdev,
 			       int rc, union ib_mad *mad,
 			       struct ib_address_vector *av __unused ) {
 	struct ib_path *path = ib_madx_get_ownerdata ( madx );
-	struct ib_gid *dgid = &path->av.gid;
+	union ib_gid *dgid = &path->av.gid;
 	struct ib_path_record *pathrec = &mad->sa.sa_data.path_record;
 
 	/* Report failures */
 	if ( ( rc == 0 ) && ( mad->hdr.status != htons ( IB_MGMT_STATUS_OK ) ))
 		rc = -ENETUNREACH;
 	if ( rc != 0 ) {
-		DBGC ( ibdev, "IBDEV %p path lookup for %08x:%08x:%08x:%08x "
-		       "failed: %s\n", ibdev, htonl ( dgid->u.dwords[0] ),
-		       htonl ( dgid->u.dwords[1] ),
-		       htonl ( dgid->u.dwords[2] ),
-		       htonl ( dgid->u.dwords[3] ), strerror ( rc ) );
+		DBGC ( ibdev, "IBDEV %p path lookup for " IB_GID_FMT
+		       " failed: %s\n",
+		       ibdev, IB_GID_ARGS ( dgid ), strerror ( rc ) );
 		goto out;
 	}
 
@@ -68,10 +66,8 @@ static void ib_path_complete ( struct ib_device *ibdev,
 	path->av.lid = ntohs ( pathrec->dlid );
 	path->av.sl = ( pathrec->reserved__sl & 0x0f );
 	path->av.rate = ( pathrec->rate_selector__rate & 0x3f );
-	DBGC ( ibdev, "IBDEV %p path to %08x:%08x:%08x:%08x is %04x sl %d "
-	       "rate %d\n", ibdev, htonl ( dgid->u.dwords[0] ),
-	       htonl ( dgid->u.dwords[1] ), htonl ( dgid->u.dwords[2] ),
-	       htonl ( dgid->u.dwords[3] ), path->av.lid, path->av.sl,
+	DBGC ( ibdev, "IBDEV %p path to " IB_GID_FMT " is %04x sl %d rate "
+	       "%d\n", ibdev, IB_GID_ARGS ( dgid ), path->av.lid, path->av.sl,
 	       path->av.rate );
 
  out:
@@ -179,7 +175,7 @@ static unsigned int ib_path_cache_idx;
  * @ret path		Path cache entry, or NULL
  */
 static struct ib_cached_path *
-ib_find_path_cache_entry ( struct ib_device *ibdev, struct ib_gid *dgid ) {
+ib_find_path_cache_entry ( struct ib_device *ibdev, union ib_gid *dgid ) {
 	struct ib_cached_path *cached;
 	unsigned int i;
 
@@ -240,14 +236,14 @@ static struct ib_path_operations ib_cached_path_op = {
  * cache similar to ARP.
  */
 int ib_resolve_path ( struct ib_device *ibdev, struct ib_address_vector *av ) {
-	struct ib_gid *gid = &av->gid;
+	union ib_gid *gid = &av->gid;
 	struct ib_cached_path *cached;
 	unsigned int cache_idx;
 
 	/* Sanity check */
 	if ( ! av->gid_present ) {
-		DBGC ( ibdev, "IBDEV %p attempt to look up path "
-		       "without GID\n", ibdev );
+		DBGC ( ibdev, "IBDEV %p attempt to look up path without GID\n",
+		       ibdev );
 		return -EINVAL;
 	}
 
@@ -258,16 +254,12 @@ int ib_resolve_path ( struct ib_device *ibdev, struct ib_address_vector *av ) {
 		av->lid = cached->path->av.lid;
 		av->rate = cached->path->av.rate;
 		av->sl = cached->path->av.sl;
-		DBGC2 ( ibdev, "IBDEV %p cache hit for %08x:%08x:%08x:%08x\n",
-			ibdev, htonl ( gid->u.dwords[0] ),
-			htonl ( gid->u.dwords[1] ), htonl ( gid->u.dwords[2] ),
-			htonl ( gid->u.dwords[3] ) );
+		DBGC2 ( ibdev, "IBDEV %p cache hit for " IB_GID_FMT "\n",
+			ibdev, IB_GID_ARGS ( gid ) );
 		return 0;
 	}
-	DBGC ( ibdev, "IBDEV %p cache miss for %08x:%08x:%08x:%08x%s\n",
-	       ibdev, htonl ( gid->u.dwords[0] ), htonl ( gid->u.dwords[1] ),
-	       htonl ( gid->u.dwords[2] ), htonl ( gid->u.dwords[3] ),
-	       ( cached ? " (in progress)" : "" ) );
+	DBGC ( ibdev, "IBDEV %p cache miss for " IB_GID_FMT "%s\n", ibdev,
+	       IB_GID_ARGS ( gid ), ( cached ? " (in progress)" : "" ) );
 
 	/* If lookup is already in progress, do nothing */
 	if ( cached )

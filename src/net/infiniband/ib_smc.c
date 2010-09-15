@@ -141,8 +141,8 @@ int ib_smc_update ( struct ib_device *ibdev, ib_local_mad_t local_mad ) {
 	 */
 	if ( ( rc = ib_smc_get_port_info ( ibdev, local_mad, &mad ) ) != 0 )
 		return rc;
-	memcpy ( &ibdev->gid.u.half[0], port_info->gid_prefix,
-		 sizeof ( ibdev->gid.u.half[0] ) );
+	memcpy ( &ibdev->gid.s.prefix, port_info->gid_prefix,
+		 sizeof ( ibdev->gid.s.prefix ) );
 	ibdev->lid = ntohs ( port_info->lid );
 	ibdev->sm_lid = ntohs ( port_info->mastersm_lid );
 	ibdev->link_width_enabled = port_info->link_width_enabled;
@@ -161,19 +161,16 @@ int ib_smc_update ( struct ib_device *ibdev, ib_local_mad_t local_mad ) {
 	/* GUID info gives us the second half of the port GID */
 	if ( ( rc = ib_smc_get_guid_info ( ibdev, local_mad, &mad ) ) != 0 )
 		return rc;
-	memcpy ( &ibdev->gid.u.half[1], guid_info->guid[0],
-		 sizeof ( ibdev->gid.u.half[1] ) );
+	memcpy ( &ibdev->gid.s.guid, guid_info->guid[0],
+		 sizeof ( ibdev->gid.s.guid ) );
 
 	/* Get partition key */
 	if ( ( rc = ib_smc_get_pkey_table ( ibdev, local_mad, &mad ) ) != 0 )
 		return rc;
 	ibdev->pkey = ntohs ( pkey_table->pkey[0] );
 
-	DBGC ( ibdev, "IBDEV %p port GID is %08x:%08x:%08x:%08x\n", ibdev,
-	       htonl ( ibdev->gid.u.dwords[0] ),
-	       htonl ( ibdev->gid.u.dwords[1] ),
-	       htonl ( ibdev->gid.u.dwords[2] ),
-	       htonl ( ibdev->gid.u.dwords[3] ) );
+	DBGC ( ibdev, "IBDEV %p port GID is " IB_GID_FMT "\n",
+	       ibdev, IB_GID_ARGS ( &ibdev->gid ) );
 
 	return 0;
 }

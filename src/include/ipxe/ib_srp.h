@@ -20,9 +20,9 @@ union ib_srp_initiator_port_id {
 	/** Infiniband version of port identifier */
 	struct {
 		/** Identifier extension */
-		struct ib_gid_half id_ext;
+		union ib_guid id_ext;
 		/** IB channel adapter GUID */
-		struct ib_gid_half hca_guid;
+		union ib_guid hca_guid;
 	} __attribute__ (( packed )) ib;
 };
 
@@ -33,9 +33,9 @@ union ib_srp_target_port_id {
 	/** Infiniband version of port identifier */
 	struct {
 		/** Identifier extension */
-		struct ib_gid_half id_ext;
+		union ib_guid id_ext;
 		/** I/O controller GUID */
-		struct ib_gid_half ioc_guid;
+		union ib_guid ioc_guid;
 	} __attribute__ (( packed )) ib;
 };
 
@@ -44,11 +44,11 @@ union ib_srp_target_port_id {
  */
 struct sbft_ib_subtable {
 	/** Source GID */
-	struct ib_gid sgid;
+	union ib_gid sgid;
 	/** Destination GID */
-	struct ib_gid dgid;
+	union ib_gid dgid;
 	/** Service ID */
-	struct ib_gid_half service_id;
+	union ib_guid service_id;
 	/** Partition key */
 	uint16_t pkey;
 	/** Reserved */

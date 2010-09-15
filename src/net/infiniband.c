@@ -341,7 +341,7 @@ struct ib_queue_pair * ib_find_qp_qpn ( struct ib_device *ibdev,
  * @ret qp		Queue pair, or NULL
  */
 struct ib_queue_pair * ib_find_qp_mgid ( struct ib_device *ibdev,
-					 struct ib_gid *gid ) {
+					 union ib_gid *gid ) {
 	struct ib_queue_pair *qp;
 	struct ib_multicast_gid *mgid;
 
@@ -703,7 +703,7 @@ void ib_close ( struct ib_device *ibdev ) {
  * the multicast group on the subnet.
  */
 int ib_mcast_attach ( struct ib_device *ibdev, struct ib_queue_pair *qp,
-		      struct ib_gid *gid ) {
+		      union ib_gid *gid ) {
 	struct ib_multicast_gid *mgid;
 	int rc;
 
@@ -737,7 +737,7 @@ int ib_mcast_attach ( struct ib_device *ibdev, struct ib_queue_pair *qp,
  * @v gid		Multicast GID
  */
 void ib_mcast_detach ( struct ib_device *ibdev, struct ib_queue_pair *qp,
-		       struct ib_gid *gid ) {
+		       union ib_gid *gid ) {
 	struct ib_multicast_gid *mgid;
 
 	/* Remove from hardware multicast GID list */
@@ -767,8 +767,7 @@ void ib_mcast_detach ( struct ib_device *ibdev, struct ib_queue_pair *qp,
  * @ret hca_guid	HCA GUID
  * @ret num_ports	Number of ports
  */
-int ib_get_hca_info ( struct ib_device *ibdev,
-		      struct ib_gid_half *hca_guid ) {
+int ib_get_hca_info ( struct ib_device *ibdev, union ib_guid *hca_guid ) {
 	struct ib_device *tmp;
 	int num_ports = 0;
 
@@ -779,7 +778,7 @@ int ib_get_hca_info ( struct ib_device *ibdev,
 		if ( tmp->dev != ibdev->dev )
 			continue;
 		if ( num_ports == 0 ) {
-			memcpy ( hca_guid, &tmp->gid.u.half[1],
+			memcpy ( hca_guid, &tmp->gid.s.guid,
 				 sizeof ( *hca_guid ) );
 		}
 		num_ports++;
@@ -969,7 +968,7 @@ void unregister_ibdev ( struct ib_device *ibdev ) {
  * @v gid		GID
  * @ret ibdev		Infiniband device, or NULL
  */
-struct ib_device * find_ibdev ( struct ib_gid *gid ) {
+struct ib_device * find_ibdev ( union ib_gid *gid ) {
 	struct ib_device *ibdev;
 
 	for_each_ibdev ( ibdev ) {

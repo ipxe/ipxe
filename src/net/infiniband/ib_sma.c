@@ -61,7 +61,7 @@ static void ib_sma_node_info ( struct ib_device *ibdev,
 	node_info->num_ports = ib_get_hca_info ( ibdev, &node_info->sys_guid );
 	memcpy ( &node_info->node_guid, &node_info->sys_guid,
 		 sizeof ( node_info->node_guid ) );
-	memcpy ( &node_info->port_guid, &ibdev->gid.u.half[1],
+	memcpy ( &node_info->port_guid, &ibdev->gid.s.guid,
 		 sizeof ( node_info->port_guid ) );
 	node_info->partition_cap = htons ( 1 );
 	node_info->local_port_num = ibdev->port;
@@ -88,7 +88,7 @@ static void ib_sma_node_desc ( struct ib_device *ibdev,
 			       union ib_mad *mad,
 			       struct ib_address_vector *av ) {
 	struct ib_node_desc *node_desc = &mad->smp.smp_data.node_desc;
-	struct ib_gid_half guid;
+	union ib_guid guid;
 	char hostname[ sizeof ( node_desc->node_string ) ];
 	int hostname_len;
 	int rc;
@@ -101,9 +101,9 @@ static void ib_sma_node_desc ( struct ib_device *ibdev,
 	snprintf ( node_desc->node_string, sizeof ( node_desc->node_string ),
 		   "iPXE %s%s%02x:%02x:%02x:%02x:%02x:%02x:%02x:%02x (%s)",
 		   hostname, ( ( hostname_len >= 0 ) ? " " : "" ),
-		   guid.u.bytes[0], guid.u.bytes[1], guid.u.bytes[2],
-		   guid.u.bytes[3], guid.u.bytes[4], guid.u.bytes[5],
-		   guid.u.bytes[6], guid.u.bytes[7], ibdev->dev->name );
+		   guid.bytes[0], guid.bytes[1], guid.bytes[2], guid.bytes[3],
+		   guid.bytes[4], guid.bytes[5], guid.bytes[6], guid.bytes[7],
+		   ibdev->dev->name );
 
 	/* Send GetResponse */
 	mad->hdr.method = IB_MGMT_METHOD_GET_RESP;
@@ -131,7 +131,7 @@ static void ib_sma_guid_info ( struct ib_device *ibdev,
 
 	/* Fill in information */
 	memset ( guid_info, 0, sizeof ( *guid_info ) );
-	memcpy ( guid_info->guid[0], &ibdev->gid.u.half[1],
+	memcpy ( guid_info->guid[0], &ibdev->gid.s.guid,
 		 sizeof ( guid_info->guid[0] ) );
 
 	/* Send GetResponse */
@@ -160,8 +160,8 @@ static int ib_sma_set_port_info ( struct ib_device *ibdev,
 	int rc;
 
 	/* Set parameters */
-	memcpy ( &ibdev->gid.u.half[0], port_info->gid_prefix,
-		 sizeof ( ibdev->gid.u.half[0] ) );
+	memcpy ( &ibdev->gid.s.prefix, port_info->gid_prefix,
+		 sizeof ( ibdev->gid.s.prefix ) );
 	ibdev->lid = ntohs ( port_info->lid );
 	ibdev->sm_lid = ntohs ( port_info->mastersm_lid );
 	if ( ( link_width_enabled = port_info->link_width_enabled ) )
@@ -210,7 +210,7 @@ static void ib_sma_port_info ( struct ib_device *ibdev,
 
 	/* Fill in information */
 	memset ( port_info, 0, sizeof ( *port_info ) );
-	memcpy ( port_info->gid_prefix, &ibdev->gid.u.half[0],
+	memcpy ( port_info->gid_prefix, &ibdev->gid.s.prefix,
 		 sizeof ( port_info->gid_prefix ) );
 	port_info->lid = ntohs ( ibdev->lid );
 	port_info->mastersm_lid = ntohs ( ibdev->sm_lid );

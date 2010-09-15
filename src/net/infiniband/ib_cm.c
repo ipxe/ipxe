@@ -432,7 +432,7 @@ static struct ib_path_operations ib_cm_path_op = {
  */
 struct ib_connection *
 ib_create_conn ( struct ib_device *ibdev, struct ib_queue_pair *qp,
-		 struct ib_gid *dgid, struct ib_gid_half *service_id,
+		 union ib_gid *dgid, union ib_guid *service_id,
 		 void *private_data, size_t private_data_len,
 		 struct ib_connection_operations *op ) {
 	struct ib_connection *conn;
@@ -463,11 +463,8 @@ ib_create_conn ( struct ib_device *ibdev, struct ib_queue_pair *qp,
 
 	DBGC ( conn, "CM %p created for IBDEV %p QPN %lx\n",
 	       conn, ibdev, qp->qpn );
-	DBGC ( conn, "CM %p connecting to %08x:%08x:%08x:%08x %08x:%08x\n",
-	       conn, ntohl ( dgid->u.dwords[0] ), ntohl ( dgid->u.dwords[1] ),
-	       ntohl ( dgid->u.dwords[2] ), ntohl ( dgid->u.dwords[3] ),
-	       ntohl ( service_id->u.dwords[0] ),
-	       ntohl ( service_id->u.dwords[1] ) );
+	DBGC ( conn, "CM %p connecting to " IB_GID_FMT " " IB_GUID_FMT "\n",
+	       conn, IB_GID_ARGS ( dgid ), IB_GUID_ARGS ( service_id ) );
 
 	return conn;
 

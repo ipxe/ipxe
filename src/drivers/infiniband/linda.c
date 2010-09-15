@@ -1456,7 +1456,7 @@ static void linda_close ( struct ib_device *ibdev ) {
  */
 static int linda_mcast_attach ( struct ib_device *ibdev,
 				struct ib_queue_pair *qp,
-				struct ib_gid *gid ) {
+				union ib_gid *gid ) {
 	struct linda *linda = ib_get_drvdata ( ibdev );
 
 	( void ) linda;
@@ -1474,7 +1474,7 @@ static int linda_mcast_attach ( struct ib_device *ibdev,
  */
 static void linda_mcast_detach ( struct ib_device *ibdev,
 				 struct ib_queue_pair *qp,
-				 struct ib_gid *gid ) {
+				 union ib_gid *gid ) {
 	struct linda *linda = ib_get_drvdata ( ibdev );
 
 	( void ) linda;
@@ -1631,22 +1631,19 @@ static int linda_init_i2c ( struct linda *linda ) {
  * @v guid		GUID to fill in
  * @ret rc		Return status code
  */
-static int linda_read_eeprom ( struct linda *linda,
-			       struct ib_gid_half *guid ) {
+static int linda_read_eeprom ( struct linda *linda, union ib_guid *guid ) {
 	struct i2c_interface *i2c = &linda->i2c.i2c;
 	int rc;
 
 	/* Read GUID */
 	if ( ( rc = i2c->read ( i2c, &linda->eeprom, LINDA_EEPROM_GUID_OFFSET,
-				guid->u.bytes, sizeof ( *guid ) ) ) != 0 ) {
+				guid->bytes, sizeof ( *guid ) ) ) != 0 ) {
 		DBGC ( linda, "Linda %p could not read GUID: %s\n",
 		       linda, strerror ( rc ) );
 		return rc;
 	}
-	DBGC2 ( linda, "Linda %p has GUID %02x:%02x:%02x:%02x:%02x:%02x:"
-		"%02x:%02x\n", linda, guid->u.bytes[0], guid->u.bytes[1],
-		guid->u.bytes[2], guid->u.bytes[3], guid->u.bytes[4],
-		guid->u.bytes[5], guid->u.bytes[6], guid->u.bytes[7] );
+	DBGC2 ( linda, "Linda %p has GUID " IB_GUID_FMT "\n",
+		linda, IB_GUID_ARGS ( guid ) );
 
 	/* Read serial number (debug only) */
 	if ( DBG_LOG ) {
@@ -2367,7 +2364,7 @@ static int linda_probe ( struct pci_device *pci,
 		goto err_init_i2c;
 
 	/* Read EEPROM parameters */
-	if ( ( rc = linda_read_eeprom ( linda, &ibdev->gid.u.half[1] ) ) != 0 )
+	if ( ( rc = linda_read_eeprom ( linda, &ibdev->gid.s.guid ) ) != 0 )
 		goto err_read_eeprom;
 
 	/* Initialise send datapath */

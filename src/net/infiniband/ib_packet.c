@@ -215,11 +215,8 @@ int ib_pull ( struct ib_device *ibdev, struct io_buffer *iobuf,
 		if ( IB_LID_MULTICAST ( lid ) && grh ) {
 			if ( ! ( *qp = ib_find_qp_mgid ( ibdev, &grh->dgid ))){
 				DBGC ( ibdev, "IBDEV %p RX for unknown MGID "
-				       "%08x:%08x:%08x:%08x\n", ibdev,
-				       ntohl ( grh->dgid.u.dwords[0] ),
-				       ntohl ( grh->dgid.u.dwords[1] ),
-				       ntohl ( grh->dgid.u.dwords[2] ),
-				       ntohl ( grh->dgid.u.dwords[3] ) );
+				       IB_GID_FMT "\n",
+				       ibdev, IB_GID_ARGS ( &grh->dgid ) );
 				return -ENODEV;
 			}
 		} else {

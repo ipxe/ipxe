@@ -72,8 +72,8 @@ struct ipoib_device {
 /** Broadcast IPoIB address */
 static struct ipoib_mac ipoib_broadcast = {
 	.flags__qpn = htonl ( IB_QPN_BROADCAST ),
-	.gid.u.bytes = 	{ 0xff, 0x12, 0x40, 0x1b, 0x00, 0x00, 0x00, 0x00,
-			  0x00, 0x00, 0x00, 0x00, 0xff, 0xff, 0xff, 0xff },
+	.gid.bytes = { 0xff, 0x12, 0x40, 0x1b, 0x00, 0x00, 0x00, 0x00,
+		       0x00, 0x00, 0x00, 0x00, 0xff, 0xff, 0xff, 0xff },
 };
 
 /** Link status for "broadcast join in progress" */
@@ -266,11 +266,11 @@ static int ipoib_pull ( struct net_device *netdev,
  * @v ll_addr		Link-layer address
  */
 static void ipoib_init_addr ( const void *hw_addr, void *ll_addr ) {
-	const struct ib_gid_half *guid = hw_addr;
+	const union ib_guid *guid = hw_addr;
 	struct ipoib_mac *mac = ll_addr;
 
 	memset ( mac, 0, sizeof ( *mac ) );
-	memcpy ( &mac->gid.u.half[1], guid, sizeof ( mac->gid.u.half[1] ) );
+	memcpy ( &mac->gid.s.guid, guid, sizeof ( mac->gid.s.guid ) );
 }
 
 /**
@@ -284,10 +284,10 @@ const char * ipoib_ntoa ( const void *ll_addr ) {
 	const struct ipoib_mac *mac = ll_addr;
 
 	snprintf ( buf, sizeof ( buf ), "%08x:%08x:%08x:%08x:%08x",
-		   htonl ( mac->flags__qpn ), htonl ( mac->gid.u.dwords[0] ),
-		   htonl ( mac->gid.u.dwords[1] ),
-		   htonl ( mac->gid.u.dwords[2] ),
-		   htonl ( mac->gid.u.dwords[3] ) );
+		   htonl ( mac->flags__qpn ), htonl ( mac->gid.dwords[0] ),
+		   htonl ( mac->gid.dwords[1] ),
+		   htonl ( mac->gid.dwords[2] ),
+		   htonl ( mac->gid.dwords[3] ) );
 	return buf;
 }
 
@@ -312,14 +312,14 @@ static int ipoib_mc_hash ( unsigned int af __unused,
  * @v ll_addr		Link-layer address
  * @v eth_addr		Ethernet-compatible address to fill in
  */
-static int ipoib_mlx_eth_addr ( const struct ib_gid_half *guid,
+static int ipoib_mlx_eth_addr ( const union ib_guid *guid,
 				uint8_t *eth_addr ) {
-	eth_addr[0] = ( ( guid->u.bytes[3] == 2 ) ? 0x00 : 0x02 );
-	eth_addr[1] = guid->u.bytes[1];
-	eth_addr[2] = guid->u.bytes[2];
-	eth_addr[3] = guid->u.bytes[5];
-	eth_addr[4] = guid->u.bytes[6];
-	eth_addr[5] = guid->u.bytes[7];
+	eth_addr[0] = ( ( guid->bytes[3] == 2 ) ? 0x00 : 0x02 );
+	eth_addr[1] = guid->bytes[1];
+	eth_addr[2] = guid->bytes[2];
+	eth_addr[3] = guid->bytes[5];
+	eth_addr[4] = guid->bytes[6];
+	eth_addr[5] = guid->bytes[7];
 	return 0;
 }
 
@@ -330,7 +330,7 @@ struct ipoib_eth_addr_handler {
 	/** GUID byte 2 */
 	uint8_t byte2;
 	/** Handler */
-	int ( * eth_addr ) ( const struct ib_gid_half *guid,
+	int ( * eth_addr ) ( const union ib_guid *guid,
 			     uint8_t *eth_addr );
 };
 
@@ -347,15 +347,15 @@ static struct ipoib_eth_addr_handler ipoib_eth_addr_handlers[] = {
  */
 static int ipoib_eth_addr ( const void *ll_addr, void *eth_addr ) {
 	const struct ipoib_mac *ipoib_addr = ll_addr;
-	const struct ib_gid_half *guid = &ipoib_addr->gid.u.half[1];
+	const union ib_guid *guid = &ipoib_addr->gid.s.guid;
 	struct ipoib_eth_addr_handler *handler;
 	unsigned int i;
 
 	for ( i = 0 ; i < ( sizeof ( ipoib_eth_addr_handlers ) /
 			    sizeof ( ipoib_eth_addr_handlers[0] ) ) ; i++ ) {
 		handler = &ipoib_eth_addr_handlers[i];
-		if ( ( handler->byte1 == guid->u.bytes[1] ) &&
-		     ( handler->byte2 == guid->u.bytes[2] ) ) {
+		if ( ( handler->byte1 == guid->bytes[1] ) &&
+		     ( handler->byte2 == guid->bytes[2] ) ) {
 			return handler->eth_addr ( guid, eth_addr );
 		}
 	}
@@ -366,7 +366,7 @@ static int ipoib_eth_addr ( const void *ll_addr, void *eth_addr ) {
 struct ll_protocol ipoib_protocol __ll_protocol = {
 	.name		= "IPoIB",
 	.ll_proto	= htons ( ARPHRD_INFINIBAND ),
-	.hw_addr_len	= sizeof ( struct ib_gid_half ),
+	.hw_addr_len	= sizeof ( union ib_guid ),
 	.ll_addr_len	= IPOIB_ALEN,
 	.ll_header_len	= IPOIB_HLEN,
 	.push		= ipoib_push,
@@ -612,11 +612,11 @@ static void ipoib_link_state_changed ( struct ib_device *ibdev ) {
 	ipoib_leave_broadcast_group ( ipoib );
 
 	/* Update MAC address based on potentially-new GID prefix */
-	memcpy ( &mac->gid.u.half[0], &ibdev->gid.u.half[0],
-		 sizeof ( mac->gid.u.half[0] ) );
+	memcpy ( &mac->gid.s.prefix, &ibdev->gid.s.prefix,
+		 sizeof ( mac->gid.s.prefix ) );
 
 	/* Update broadcast GID based on potentially-new partition key */
-	ipoib->broadcast.gid.u.words[2] =
+	ipoib->broadcast.gid.words[2] =
 		htons ( ibdev->pkey | IB_PKEY_FULL );
 
 	/* Set net device link state to reflect Infiniband link state */
@@ -750,8 +750,8 @@ static int ipoib_probe ( struct ib_device *ibdev ) {
 	ipoib->ibdev = ibdev;
 
 	/* Extract hardware address */
-	memcpy ( netdev->hw_addr, &ibdev->gid.u.half[1],
-		 sizeof ( ibdev->gid.u.half[1] ) );
+	memcpy ( netdev->hw_addr, &ibdev->gid.s.guid,
+		 sizeof ( ibdev->gid.s.guid ) );
 
 	/* Set default broadcast address */
 	memcpy ( &ipoib->broadcast, &ipoib_broadcast,

@@ -42,7 +42,7 @@ struct ib_connection {
 	/** Remote communication ID */
 	uint32_t remote_id;
 	/** Target service ID */
-	struct ib_gid_half service_id;
+	union ib_guid service_id;
 	/** Connection operations */
 	struct ib_connection_operations *op;
 
@@ -62,7 +62,7 @@ struct ib_connection {
 
 extern struct ib_connection *
 ib_create_conn ( struct ib_device *ibdev, struct ib_queue_pair *qp,
-		 struct ib_gid *dgid, struct ib_gid_half *service_id,
+		 union ib_gid *dgid, union ib_guid *service_id,
 		 void *req_private_data, size_t req_private_data_len,
 		 struct ib_connection_operations *op );
 extern void ib_destroy_conn ( struct ib_device *ibdev,

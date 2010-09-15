@@ -80,9 +80,9 @@ struct ib_cmrc_connection {
 	/** Connection */
 	struct ib_connection *conn;
 	/** Destination GID */
-	struct ib_gid dgid;
+	union ib_gid dgid;
 	/** Service ID */
-	struct ib_gid_half service_id;
+	union ib_guid service_id;
 	/** QP is connected */
 	int connected;
 	/** Shutdown process */
@@ -357,7 +357,7 @@ static struct interface_descriptor ib_cmrc_xfer_desc =
  * @ret rc		Returns status code
  */
 int ib_cmrc_open ( struct interface *xfer, struct ib_device *ibdev,
-		   struct ib_gid *dgid, struct ib_gid_half *service_id ) {
+		   union ib_gid *dgid, union ib_guid *service_id ) {
 	struct ib_cmrc_connection *cmrc;
 	int rc;
 

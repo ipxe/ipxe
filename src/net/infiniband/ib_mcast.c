@@ -41,7 +41,7 @@ FILE_LICENCE ( GPL2_OR_LATER );
  * @v join		Join (rather than leave) group
  * @v mad		MAD to fill in
  */
-static void ib_mcast_mad ( struct ib_device *ibdev, struct ib_gid *gid,
+static void ib_mcast_mad ( struct ib_device *ibdev, union ib_gid *gid,
 			   int join, union ib_mad *mad ) {
 	struct ib_mad_sa *sa = &mad->sa;
 
@@ -79,7 +79,7 @@ static void ib_mcast_complete ( struct ib_device *ibdev,
 				struct ib_address_vector *av __unused ) {
 	struct ib_mc_membership *membership = ib_madx_get_ownerdata ( madx );
 	struct ib_queue_pair *qp = membership->qp;
-	struct ib_gid *gid = &membership->gid;
+	union ib_gid *gid = &membership->gid;
 	struct ib_mc_member_record *mc_member_record =
 		&mad->sa.sa_data.mc_member_record;
 	int joined;
@@ -97,11 +97,9 @@ static void ib_mcast_complete ( struct ib_device *ibdev,
 	/* Extract values from MAD */
 	joined = ( mad->hdr.method == IB_MGMT_METHOD_GET_RESP );
 	qkey = ntohl ( mc_member_record->qkey );
-	DBGC ( ibdev, "IBDEV %p QPN %lx %s %08x:%08x:%08x:%08x qkey %lx\n",
+	DBGC ( ibdev, "IBDEV %p QPN %lx %s " IB_GID_FMT " qkey %lx\n",
 	       ibdev, qp->qpn, ( joined ? "joined" : "left" ),
-	       ntohl ( gid->u.dwords[0] ), ntohl ( gid->u.dwords[1] ),
-	       ntohl ( gid->u.dwords[2] ), ntohl ( gid->u.dwords[3] ),
-	       qkey );
+	       IB_GID_ARGS ( gid ), qkey );
 
 	/* Set queue key */
 	qp->qkey = qkey;
@@ -136,7 +134,7 @@ static struct ib_mad_transaction_operations ib_mcast_op = {
  * @ret rc		Return status code
  */
 int ib_mcast_join ( struct ib_device *ibdev, struct ib_queue_pair *qp,
-		    struct ib_mc_membership *membership, struct ib_gid *gid,
+		    struct ib_mc_membership *membership, union ib_gid *gid,
 		    void ( * complete ) ( struct ib_device *ibdev,
 					  struct ib_queue_pair *qp,
 					  struct ib_mc_membership *membership,
@@ -144,10 +142,8 @@ int ib_mcast_join ( struct ib_device *ibdev, struct ib_queue_pair *qp,
 	union ib_mad mad;
 	int rc;
 
-	DBGC ( ibdev, "IBDEV %p QPN %lx joining %08x:%08x:%08x:%08x\n",
-	       ibdev, qp->qpn, ntohl ( gid->u.dwords[0] ),
-	       ntohl ( gid->u.dwords[1] ), ntohl ( gid->u.dwords[2] ),
-	       ntohl ( gid->u.dwords[3] ) );
+	DBGC ( ibdev, "IBDEV %p QPN %lx joining " IB_GID_FMT "\n",
+	       ibdev, qp->qpn, IB_GID_ARGS ( gid ) );
 
 	/* Initialise structure */
 	membership->qp = qp;
@@ -191,14 +187,12 @@ int ib_mcast_join ( struct ib_device *ibdev, struct ib_queue_pair *qp,
  */
 void ib_mcast_leave ( struct ib_device *ibdev, struct ib_queue_pair *qp,
 		      struct ib_mc_membership *membership ) {
-	struct ib_gid *gid = &membership->gid;
+	union ib_gid *gid = &membership->gid;
 	union ib_mad mad;
 	int rc;
 
-	DBGC ( ibdev, "IBDEV %p QPN %lx leaving %08x:%08x:%08x:%08x\n",
-	       ibdev, qp->qpn, ntohl ( gid->u.dwords[0] ),
-	       ntohl ( gid->u.dwords[1] ), ntohl ( gid->u.dwords[2] ),
-	       ntohl ( gid->u.dwords[3] ) );
+	DBGC ( ibdev, "IBDEV %p QPN %lx leaving " IB_GID_FMT "\n",
+	       ibdev, qp->qpn, IB_GID_ARGS ( gid ) );
 
 	/* Detach from multicast GID */
 	ib_mcast_detach ( ibdev, qp, &membership->gid );

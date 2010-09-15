@@ -18,7 +18,7 @@ struct ib_mc_membership {
 	/** Queue pair */
 	struct ib_queue_pair *qp;
 	/** Multicast GID */
-	struct ib_gid gid;
+	union ib_gid gid;
 	/** Multicast group join transaction */
 	struct ib_mad_transaction *madx;
 	/** Handle join success/failure
@@ -36,7 +36,7 @@ struct ib_mc_membership {
 
 extern int ib_mcast_join ( struct ib_device *ibdev, struct ib_queue_pair *qp,
 			   struct ib_mc_membership *membership,
-			   struct ib_gid *gid,
+			   union ib_gid *gid,
 			   void ( * joined ) ( struct ib_device *ibdev,
 					       struct ib_queue_pair *qp,
 					       struct ib_mc_membership *memb,

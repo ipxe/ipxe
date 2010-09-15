@@ -14,24 +14,37 @@ struct ib_queue_pair;
 struct ib_address_vector;
 struct io_buffer;
 
-/** Half of an Infiniband Global Identifier */
-struct ib_gid_half {
-	union {
-		uint8_t bytes[8];
-		uint16_t words[4];
-		uint32_t dwords[2];
-	} u;
+/** An Infiniband Globally Unique Identifier */
+union ib_guid {
+	uint8_t bytes[8];
+	uint16_t words[4];
+	uint32_t dwords[2];
 };
 
+/** Infiniband Globally Unique Identifier debug message format */
+#define IB_GUID_FMT "%08x:%08x"
+
+/** Infiniband Globally Unique Identifier debug message arguments */
+#define IB_GUID_ARGS( guid ) \
+	ntohl ( (guid)->dwords[0] ), ntohl ( (guid)->dwords[1] )
+
 /** An Infiniband Global Identifier */
-struct ib_gid {
-	union {
-		uint8_t bytes[16];
-		uint16_t words[8];
-		uint32_t dwords[4];
-		struct ib_gid_half half[2];
-	} u;
+union ib_gid {
+	uint8_t bytes[16];
+	uint16_t words[8];
+	uint32_t dwords[4];
+	struct {
+		union ib_guid prefix;
+		union ib_guid guid;
+	} s;
 };
+
+/** Infiniband Global Identifier debug message format */
+#define IB_GID_FMT IB_GUID_FMT ":" IB_GUID_FMT
+
+/** Infiniband Global Identifier debug message arguments */
+#define IB_GID_ARGS( gid ) \
+	IB_GUID_ARGS ( &(gid)->s.prefix ), IB_GUID_ARGS ( &(gid)->s.guid )
 
 /** An Infiniband Local Route Header */
 struct ib_local_route_header {
@@ -83,9 +96,9 @@ struct ib_global_route_header {
 	/** Hop limit */
 	uint8_t hoplmt;
 	/** Source GID */
-	struct ib_gid sgid;
+	union ib_gid sgid;
 	/** Destiniation GID */
-	struct ib_gid dgid;
+	union ib_gid dgid;
 } __attribute__ (( packed ));
 
 #define IB_GRH_IPVER_IPv6 0x06

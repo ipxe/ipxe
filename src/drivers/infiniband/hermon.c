@@ -474,7 +474,7 @@ hermon_cmd_write_mcg ( struct hermon *hermon, unsigned int index,
 }
 
 static inline int
-hermon_cmd_mgid_hash ( struct hermon *hermon, const struct ib_gid *gid,
+hermon_cmd_mgid_hash ( struct hermon *hermon, const union ib_gid *gid,
 		       struct hermonprm_mgm_hash *hash ) {
 	return hermon_cmd ( hermon,
 			    HERMON_HCR_INOUT_CMD ( HERMON_HCR_MGID_HASH,
@@ -2012,7 +2012,7 @@ static int hermon_inform_sma ( struct ib_device *ibdev,
  */
 static int hermon_mcast_attach ( struct ib_device *ibdev,
 				 struct ib_queue_pair *qp,
-				 struct ib_gid *gid ) {
+				 union ib_gid *gid ) {
 	struct hermon *hermon = ib_get_drvdata ( ibdev );
 	struct hermonprm_mgm_hash hash;
 	struct hermonprm_mcg_entry mcg;
@@ -2066,7 +2066,7 @@ static int hermon_mcast_attach ( struct ib_device *ibdev,
  */
 static void hermon_mcast_detach ( struct ib_device *ibdev,
 				  struct ib_queue_pair *qp __unused,
-				  struct ib_gid *gid ) {
+				  union ib_gid *gid ) {
 	struct hermon *hermon = ib_get_drvdata ( ibdev );
 	struct hermonprm_mgm_hash hash;
 	struct hermonprm_mcg_entry mcg;

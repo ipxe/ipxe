@@ -81,9 +81,9 @@ struct ib_srp_device {
 	struct ib_device *ibdev;
 
 	/** Destination GID (for boot firmware table) */
-	struct ib_gid dgid;
+	union ib_gid dgid;
 	/** Service ID (for boot firmware table) */
-	struct ib_gid_half service_id;
+	union ib_guid service_id;
 };
 
 /**
@@ -184,7 +184,7 @@ static struct interface_descriptor ib_srp_srp_desc =
  * @ret rc		Return status code
  */
 static int ib_srp_open ( struct interface *block, struct ib_device *ibdev,
-			 struct ib_gid *dgid, struct ib_gid_half *service_id,
+			 union ib_gid *dgid, union ib_guid *service_id,
 			 union srp_port_id *initiator,
 			 union srp_port_id *target, struct scsi_lun *lun ) {
 	struct ib_srp_device *ib_srp;
@@ -200,11 +200,8 @@ static int ib_srp_open ( struct interface *block, struct ib_device *ibdev,
 	intf_init ( &ib_srp->srp, &ib_srp_srp_desc, &ib_srp->refcnt );
 	intf_init ( &ib_srp->cmrc, &ib_srp_cmrc_desc, &ib_srp->refcnt );
 	ib_srp->ibdev = ibdev_get ( ibdev );
-	DBGC ( ib_srp, "IBSRP %p created for %08x%08x%08x%08x:%08x%08x\n",
-	       ib_srp, ntohl ( dgid->u.dwords[0] ),
-	       ntohl ( dgid->u.dwords[1] ), ntohl ( dgid->u.dwords[2] ),
-	       ntohl ( dgid->u.dwords[3] ), ntohl ( service_id->u.dwords[0] ),
-	       ntohl ( service_id->u.dwords[1] ) );
+	DBGC ( ib_srp, "IBSRP %p for " IB_GID_FMT " " IB_GUID_FMT "\n",
+	       ib_srp, IB_GID_ARGS ( dgid ), IB_GUID_ARGS ( service_id ) );
 
 	/* Preserve parameters required for boot firmware table */
 	memcpy ( &ib_srp->dgid, dgid, sizeof ( ib_srp->dgid ) );
@@ -256,15 +253,15 @@ enum ib_srp_parse_flags {
 /** IB SRP root path parameters */
 struct ib_srp_root_path {
 	/** Source GID */
-	struct ib_gid sgid;
+	union ib_gid sgid;
 	/** Initiator port ID */
 	union ib_srp_initiator_port_id initiator;
 	/** Destination GID */
-	struct ib_gid dgid;
+	union ib_gid dgid;
 	/** Partition key */
 	uint16_t pkey;
 	/** Service ID */
-	struct ib_gid_half service_id;
+	union ib_guid service_id;
 	/** SCSI LUN */
 	struct scsi_lun lun;
 	/** Target port ID */
@@ -337,7 +334,7 @@ static int ib_srp_parse_sgid ( const char *rp_comp,
 	if ( ( ibdev = last_opened_ibdev() ) != NULL )
 		memcpy ( &rp->sgid, &ibdev->gid, sizeof ( rp->sgid ) );
 
-	return ib_srp_parse_byte_string ( rp_comp, rp->sgid.u.bytes,
+	return ib_srp_parse_byte_string ( rp_comp, rp->sgid.bytes,
 					  ( sizeof ( rp->sgid ) |
 					    IB_SRP_PARSE_OPTIONAL ) );
 }
@@ -353,7 +350,7 @@ static int ib_srp_parse_initiator_id_ext ( const char *rp_comp,
 					   struct ib_srp_root_path *rp ) {
 	union ib_srp_initiator_port_id *port_id = &rp->initiator;
 
-	return ib_srp_parse_byte_string ( rp_comp, port_id->ib.id_ext.u.bytes,
+	return ib_srp_parse_byte_string ( rp_comp, port_id->ib.id_ext.bytes,
 					  ( sizeof ( port_id->ib.id_ext ) |
 					    IB_SRP_PARSE_OPTIONAL ) );
 }
@@ -370,10 +367,10 @@ static int ib_srp_parse_initiator_hca_guid ( const char *rp_comp,
 	union ib_srp_initiator_port_id *port_id = &rp->initiator;
 
 	/* Default to the GUID portion of the source GID */
-	memcpy ( &port_id->ib.hca_guid, &rp->sgid.u.half[1],
+	memcpy ( &port_id->ib.hca_guid, &rp->sgid.s.guid,
 		 sizeof ( port_id->ib.hca_guid ) );
 
-	return ib_srp_parse_byte_string ( rp_comp, port_id->ib.hca_guid.u.bytes,
+	return ib_srp_parse_byte_string ( rp_comp, port_id->ib.hca_guid.bytes,
 					  ( sizeof ( port_id->ib.hca_guid ) |
 					    IB_SRP_PARSE_OPTIONAL ) );
 }
@@ -387,7 +384,7 @@ static int ib_srp_parse_initiator_hca_guid ( const char *rp_comp,
  */
 static int ib_srp_parse_dgid ( const char *rp_comp,
 			       struct ib_srp_root_path *rp ) {
-	return ib_srp_parse_byte_string ( rp_comp, rp->dgid.u.bytes,
+	return ib_srp_parse_byte_string ( rp_comp, rp->dgid.bytes,
 					  ( sizeof ( rp->dgid ) |
 					    IB_SRP_PARSE_REQUIRED ) );
 }
@@ -418,7 +415,7 @@ static int ib_srp_parse_pkey ( const char *rp_comp,
  */
 static int ib_srp_parse_service_id ( const char *rp_comp,
 				     struct ib_srp_root_path *rp ) {
-	return ib_srp_parse_byte_string ( rp_comp, rp->service_id.u.bytes,
+	return ib_srp_parse_byte_string ( rp_comp, rp->service_id.bytes,
 					  ( sizeof ( rp->service_id ) |
 					    IB_SRP_PARSE_REQUIRED ) );
 }
@@ -446,7 +443,7 @@ static int ib_srp_parse_target_id_ext ( const char *rp_comp,
 					struct ib_srp_root_path *rp ) {
 	union ib_srp_target_port_id *port_id = &rp->target;
 
-	return ib_srp_parse_byte_string ( rp_comp, port_id->ib.id_ext.u.bytes,
+	return ib_srp_parse_byte_string ( rp_comp, port_id->ib.id_ext.bytes,
 					  ( sizeof ( port_id->ib.id_ext ) |
 					    IB_SRP_PARSE_REQUIRED ) );
 }
@@ -462,7 +459,7 @@ static int ib_srp_parse_target_ioc_guid ( const char *rp_comp,
 					  struct ib_srp_root_path *rp ) {
 	union ib_srp_target_port_id *port_id = &rp->target;
 
-	return ib_srp_parse_byte_string ( rp_comp, port_id->ib.ioc_guid.u.bytes,
+	return ib_srp_parse_byte_string ( rp_comp, port_id->ib.ioc_guid.bytes,
 					  ( sizeof ( port_id->ib.ioc_guid ) |
 					    IB_SRP_PARSE_REQUIRED ) );
 }

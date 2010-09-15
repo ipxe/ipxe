@@ -396,7 +396,7 @@ arbel_cmd_write_mgm ( struct arbel *arbel, unsigned int index,
 }
 
 static inline int
-arbel_cmd_mgid_hash ( struct arbel *arbel, const struct ib_gid *gid,
+arbel_cmd_mgid_hash ( struct arbel *arbel, const union ib_gid *gid,
 		      struct arbelprm_mgm_hash *hash ) {
 	return arbel_cmd ( arbel,
 			   ARBEL_HCR_INOUT_CMD ( ARBEL_HCR_MGID_HASH,
@@ -998,8 +998,8 @@ static void arbel_ring_doorbell ( struct arbel *arbel,
 }
 
 /** GID used for GID-less send work queue entries */
-static const struct ib_gid arbel_no_gid = {
-	{ { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2, 0, 0, 0 } }
+static const union ib_gid arbel_no_gid = {
+	.bytes = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2, 0, 0, 0 },
 };
 
 /**
@@ -1023,7 +1023,7 @@ static int arbel_post_send ( struct ib_device *ibdev,
 	struct arbelprm_ud_send_wqe *wqe;
 	struct arbelprm_qp_db_record *qp_db_rec;
 	union arbelprm_doorbell_register db_reg;
-	const struct ib_gid *gid;
+	const union ib_gid *gid;
 	unsigned int wqe_idx_mask;
 	size_t nds;
 
@@ -1565,7 +1565,7 @@ static void arbel_close ( struct ib_device *ibdev ) {
  */
 static int arbel_mcast_attach ( struct ib_device *ibdev,
 				struct ib_queue_pair *qp,
-				struct ib_gid *gid ) {
+				union ib_gid *gid ) {
 	struct arbel *arbel = ib_get_drvdata ( ibdev );
 	struct arbelprm_mgm_hash hash;
 	struct arbelprm_mgm_entry mgm;
@@ -1620,7 +1620,7 @@ static int arbel_mcast_attach ( struct ib_device *ibdev,
  */
 static void arbel_mcast_detach ( struct ib_device *ibdev,
 				 struct ib_queue_pair *qp __unused,
-				 struct ib_gid *gid ) {
+				 union ib_gid *gid ) {
 	struct arbel *arbel = ib_get_drvdata ( ibdev );
 	struct arbelprm_mgm_hash hash;
 	struct arbelprm_mgm_entry mgm;

@@ -14,7 +14,7 @@ FILE_LICENCE ( BSD2 );
 
 extern int ib_cmrc_open ( struct interface *xfer,
 			  struct ib_device *ibdev,
-			  struct ib_gid *dgid,
-			  struct ib_gid_half *service_id );
+			  union ib_gid *dgid,
+			  union ib_guid *service_id );
 
 #endif /* _IPXE_IB_CMRC_H */

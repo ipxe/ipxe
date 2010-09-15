@@ -22,7 +22,7 @@ struct ipoib_mac {
 	 */
 	uint32_t flags__qpn;
 	/** Port GID */
-	struct ib_gid gid;
+	union ib_gid gid;
 } __attribute__ (( packed ));
 
 /** IPoIB link-layer header length */
