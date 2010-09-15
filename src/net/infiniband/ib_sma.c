@@ -58,8 +58,10 @@ static void ib_sma_node_info ( struct ib_device *ibdev,
 	node_info->base_version = IB_MGMT_BASE_VERSION;
 	node_info->class_version = IB_SMP_CLASS_VERSION;
 	node_info->node_type = IB_NODE_TYPE_HCA;
-	node_info->num_ports = ib_get_hca_info ( ibdev, &node_info->sys_guid );
-	memcpy ( &node_info->node_guid, &node_info->sys_guid,
+	node_info->num_ports = ib_count_ports ( ibdev );
+	memcpy ( &node_info->sys_guid, &ibdev->node_guid,
+		 sizeof ( node_info->sys_guid ) );
+	memcpy ( &node_info->node_guid, &ibdev->node_guid,
 		 sizeof ( node_info->node_guid ) );
 	memcpy ( &node_info->port_guid, &ibdev->gid.s.guid,
 		 sizeof ( node_info->port_guid ) );
@@ -88,22 +90,21 @@ static void ib_sma_node_desc ( struct ib_device *ibdev,
 			       union ib_mad *mad,
 			       struct ib_address_vector *av ) {
 	struct ib_node_desc *node_desc = &mad->smp.smp_data.node_desc;
-	union ib_guid guid;
+	union ib_guid *guid = &ibdev->node_guid;
 	char hostname[ sizeof ( node_desc->node_string ) ];
 	int hostname_len;
 	int rc;
 
 	/* Fill in information */
 	memset ( node_desc, 0, sizeof ( *node_desc ) );
-	ib_get_hca_info ( ibdev, &guid );
 	hostname_len = fetch_string_setting ( NULL, &hostname_setting,
 					      hostname, sizeof ( hostname ) );
 	snprintf ( node_desc->node_string, sizeof ( node_desc->node_string ),
 		   "iPXE %s%s%02x:%02x:%02x:%02x:%02x:%02x:%02x:%02x (%s)",
 		   hostname, ( ( hostname_len >= 0 ) ? " " : "" ),
-		   guid.bytes[0], guid.bytes[1], guid.bytes[2], guid.bytes[3],
-		   guid.bytes[4], guid.bytes[5], guid.bytes[6], guid.bytes[7],
-		   ibdev->dev->name );
+		   guid->bytes[0], guid->bytes[1], guid->bytes[2],
+		   guid->bytes[3], guid->bytes[4], guid->bytes[5],
+		   guid->bytes[6], guid->bytes[7], ibdev->dev->name );
 
 	/* Send GetResponse */
 	mad->hdr.method = IB_MGMT_METHOD_GET_RESP;

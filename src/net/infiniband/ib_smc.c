@@ -35,6 +35,60 @@ FILE_LICENCE ( GPL2_OR_LATER );
  */
 
 /**
+ * Issue local MAD
+ *
+ * @v ibdev		Infiniband device
+ * @v attr_id		Attribute ID, in network byte order
+ * @v attr_mod		Attribute modifier, in network byte order
+ * @v local_mad		Method for issuing local MADs
+ * @v mad		Management datagram to fill in
+ * @ret rc		Return status code
+ */
+static int ib_smc_mad ( struct ib_device *ibdev, uint16_t attr_id,
+			uint32_t attr_mod, ib_local_mad_t local_mad,
+			union ib_mad *mad ) {
+	int rc;
+
+	/* Construct MAD */
+	memset ( mad, 0, sizeof ( *mad ) );
+	mad->hdr.base_version = IB_MGMT_BASE_VERSION;
+	mad->hdr.mgmt_class = IB_MGMT_CLASS_SUBN_LID_ROUTED;
+	mad->hdr.class_version = 1;
+	mad->hdr.method = IB_MGMT_METHOD_GET;
+	mad->hdr.attr_id = attr_id;
+	mad->hdr.attr_mod = attr_mod;
+
+	/* Issue MAD */
+	if ( ( rc = local_mad ( ibdev, mad ) ) != 0 )
+		return rc;
+
+	return 0;
+}
+
+/**
+ * Get node information
+ *
+ * @v ibdev		Infiniband device
+ * @v local_mad		Method for issuing local MADs
+ * @v mad		Management datagram to fill in
+ * @ret rc		Return status code
+ */
+static int ib_smc_get_node_info ( struct ib_device *ibdev,
+				  ib_local_mad_t local_mad,
+				  union ib_mad *mad ) {
+	int rc;
+
+	/* Issue MAD */
+	if ( ( rc = ib_smc_mad ( ibdev, htons ( IB_SMP_ATTR_NODE_INFO ), 0,
+				 local_mad, mad ) ) != 0 ) {
+		DBGC ( ibdev, "IBDEV %p could not get node info: %s\n",
+		       ibdev, strerror ( rc ) );
+		return rc;
+	}
+	return 0;
+}
+
+/**
  * Get port information
  *
  * @v ibdev		Infiniband device
@@ -47,16 +101,9 @@ static int ib_smc_get_port_info ( struct ib_device *ibdev,
 				  union ib_mad *mad ) {
 	int rc;
 
-	/* Construct MAD */
-	memset ( mad, 0, sizeof ( *mad ) );
-	mad->hdr.base_version = IB_MGMT_BASE_VERSION;
-	mad->hdr.mgmt_class = IB_MGMT_CLASS_SUBN_LID_ROUTED;
-	mad->hdr.class_version = 1;
-	mad->hdr.method = IB_MGMT_METHOD_GET;
-	mad->hdr.attr_id = htons ( IB_SMP_ATTR_PORT_INFO );
-	mad->hdr.attr_mod = htonl ( ibdev->port );
-
-	if ( ( rc = local_mad ( ibdev, mad ) ) != 0 ) {
+	/* Issue MAD */
+	if ( ( rc = ib_smc_mad ( ibdev, htons ( IB_SMP_ATTR_PORT_INFO ),
+				 htonl ( ibdev->port ), local_mad, mad )) !=0){
 		DBGC ( ibdev, "IBDEV %p could not get port info: %s\n",
 		       ibdev, strerror ( rc ) );
 		return rc;
@@ -77,15 +124,9 @@ static int ib_smc_get_guid_info ( struct ib_device *ibdev,
 				  union ib_mad *mad ) {
 	int rc;
 
-	/* Construct MAD */
-	memset ( mad, 0, sizeof ( *mad ) );
-	mad->hdr.base_version = IB_MGMT_BASE_VERSION;
-	mad->hdr.mgmt_class = IB_MGMT_CLASS_SUBN_LID_ROUTED;
-	mad->hdr.class_version = 1;
-	mad->hdr.method = IB_MGMT_METHOD_GET;
-	mad->hdr.attr_id = htons ( IB_SMP_ATTR_GUID_INFO );
-
-	if ( ( rc = local_mad ( ibdev, mad ) ) != 0 ) {
+	/* Issue MAD */
+	if ( ( rc = ib_smc_mad ( ibdev, htons ( IB_SMP_ATTR_GUID_INFO ), 0,
+				 local_mad, mad ) ) != 0 ) {
 		DBGC ( ibdev, "IBDEV %p could not get GUID info: %s\n",
 		       ibdev, strerror ( rc ) );
 		return rc;
@@ -106,15 +147,9 @@ static int ib_smc_get_pkey_table ( struct ib_device *ibdev,
 				   union ib_mad *mad ) {
 	int rc;
 
-	/* Construct MAD */
-	memset ( mad, 0, sizeof ( *mad ) );
-	mad->hdr.base_version = IB_MGMT_BASE_VERSION;
-	mad->hdr.mgmt_class = IB_MGMT_CLASS_SUBN_LID_ROUTED;
-	mad->hdr.class_version = 1;
-	mad->hdr.method = IB_MGMT_METHOD_GET;
-	mad->hdr.attr_id = htons ( IB_SMP_ATTR_PKEY_TABLE );
-
-	if ( ( rc = local_mad ( ibdev, mad ) ) != 0 ) {
+	/* Issue MAD */
+	if ( ( rc = ib_smc_mad ( ibdev, htons ( IB_SMP_ATTR_PKEY_TABLE ), 0,
+				 local_mad, mad ) ) != 0 ) {
 		DBGC ( ibdev, "IBDEV %p could not get pkey table: %s\n",
 		       ibdev, strerror ( rc ) );
 		return rc;
@@ -131,10 +166,17 @@ static int ib_smc_get_pkey_table ( struct ib_device *ibdev,
  */
 static int ib_smc_get ( struct ib_device *ibdev, ib_local_mad_t local_mad ) {
 	union ib_mad mad;
+	struct ib_node_info *node_info = &mad.smp.smp_data.node_info;
 	struct ib_port_info *port_info = &mad.smp.smp_data.port_info;
 	struct ib_guid_info *guid_info = &mad.smp.smp_data.guid_info;
 	struct ib_pkey_table *pkey_table = &mad.smp.smp_data.pkey_table;
 	int rc;
+
+	/* Node info gives us the node GUID */
+	if ( ( rc = ib_smc_get_node_info ( ibdev, local_mad, &mad ) ) != 0 )
+		return rc;
+	memcpy ( &ibdev->node_guid, &node_info->node_guid,
+		 sizeof ( ibdev->node_guid ) );
 
 	/* Port info gives us the link state, the first half of the
 	 * port GID and the SM LID.

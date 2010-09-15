@@ -2357,6 +2357,8 @@ static int qib7322_probe ( struct pci_device *pci,
 			IB_LINK_WIDTH_4X; /* 1x does not work */
 		ibdev->link_speed_enabled = ibdev->link_speed_supported =
 			IB_LINK_SPEED_SDR; /* to avoid need for link tuning */
+		memcpy ( &ibdev->node_guid, &qib7322->guid,
+			 sizeof ( ibdev->node_guid ) );
 		memcpy ( &ibdev->gid.s.guid, &qib7322->guid,
 			 sizeof ( ibdev->gid.s.guid ) );
 		assert ( ( ibdev->gid.s.guid.bytes[7] & i ) == 0 );

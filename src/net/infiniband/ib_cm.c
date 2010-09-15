@@ -364,7 +364,7 @@ static void ib_cm_path_complete ( struct ib_device *ibdev,
 	req->local_id = htonl ( conn->local_id );
 	memcpy ( &req->service_id, &conn->service_id,
 		 sizeof ( req->service_id ) );
-	ib_get_hca_info ( ibdev, &req->local_ca );
+	memcpy ( &req->local_ca, &ibdev->node_guid, sizeof ( req->local_ca ) );
 	req->local_qpn__responder_resources = htonl ( ( qp->qpn << 8 ) | 1 );
 	req->local_eecn__initiator_depth = htonl ( ( 0 << 8 ) | 1 );
 	req->remote_eecn__remote_timeout__service_type__ee_flow_ctrl =

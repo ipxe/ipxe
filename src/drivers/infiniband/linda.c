@@ -2364,8 +2364,10 @@ static int linda_probe ( struct pci_device *pci,
 		goto err_init_i2c;
 
 	/* Read EEPROM parameters */
-	if ( ( rc = linda_read_eeprom ( linda, &ibdev->gid.s.guid ) ) != 0 )
+	if ( ( rc = linda_read_eeprom ( linda, &ibdev->node_guid ) ) != 0 )
 		goto err_read_eeprom;
+	memcpy ( &ibdev->gid.s.guid, &ibdev->node_guid,
+		 sizeof ( ibdev->gid.s.guid ) );
 
 	/* Initialise send datapath */
 	if ( ( rc = linda_init_send ( linda ) ) != 0 )
