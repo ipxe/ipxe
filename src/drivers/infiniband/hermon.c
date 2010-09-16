@@ -1836,6 +1836,15 @@ static void hermon_poll_eq ( struct ib_device *ibdev ) {
 	unsigned int eqe_idx_mask;
 	unsigned int event_type;
 
+	/* No event is generated upon reaching INIT, so we must poll
+	 * separately for link state changes while we remain DOWN.
+	 */
+	if ( ib_is_open ( ibdev ) &&
+	     ( ibdev->port_state == IB_PORT_STATE_DOWN ) ) {
+		ib_smc_update ( ibdev, hermon_mad );
+	}
+
+	/* Poll event queue */
 	while ( 1 ) {
 		/* Look for event entry */
 		eqe_idx_mask = ( HERMON_NUM_EQES - 1 );
