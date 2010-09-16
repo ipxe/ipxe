@@ -607,7 +607,7 @@ static int arbel_create_cq ( struct ib_device *ibdev,
 	MLX_FILL_2 ( &cqctx, 3,
 		     usr_page, arbel->limits.reserved_uars,
 		     log_cq_size, fls ( cq->num_cqes - 1 ) );
-	MLX_FILL_1 ( &cqctx, 5, c_eqn, ARBEL_NO_EQ );
+	MLX_FILL_1 ( &cqctx, 5, c_eqn, arbel->eq.eqn );
 	MLX_FILL_1 ( &cqctx, 6, pd, ARBEL_GLOBAL_PD );
 	MLX_FILL_1 ( &cqctx, 7, l_key, arbel->reserved_lkey );
 	MLX_FILL_1 ( &cqctx, 12, cqn, cq->cqn );
@@ -1350,8 +1350,7 @@ static int arbel_create_eq ( struct arbel *arbel ) {
 	}
 
 	/* Map events to this event queue */
-	memset ( &mask, 0, sizeof ( mask ) );
-	MLX_FILL_1 ( &mask, 1, port_state_change, 1 );
+	memset ( &mask, 0xff, sizeof ( mask ) );
 	if ( ( rc = arbel_cmd_map_eq ( arbel,
 				       ( ARBEL_MAP_EQ | arbel_eq->eqn ),
 				       &mask ) ) != 0 ) {
