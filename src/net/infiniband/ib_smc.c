@@ -123,13 +123,13 @@ static int ib_smc_get_pkey_table ( struct ib_device *ibdev,
 }
 
 /**
- * Get MAD parameters
+ * Get Infiniband parameters using SMC
  *
  * @v ibdev		Infiniband device
  * @v local_mad		Method for issuing local MADs
  * @ret rc		Return status code
  */
-int ib_smc_update ( struct ib_device *ibdev, ib_local_mad_t local_mad ) {
+static int ib_smc_get ( struct ib_device *ibdev, ib_local_mad_t local_mad ) {
 	union ib_mad mad;
 	struct ib_port_info *port_info = &mad.smp.smp_data.port_info;
 	struct ib_guid_info *guid_info = &mad.smp.smp_data.guid_info;
@@ -171,6 +171,43 @@ int ib_smc_update ( struct ib_device *ibdev, ib_local_mad_t local_mad ) {
 
 	DBGC ( ibdev, "IBDEV %p port GID is " IB_GID_FMT "\n",
 	       ibdev, IB_GID_ARGS ( &ibdev->gid ) );
+
+	return 0;
+}
+
+/**
+ * Initialise Infiniband parameters using SMC
+ *
+ * @v ibdev		Infiniband device
+ * @v local_mad		Method for issuing local MADs
+ * @ret rc		Return status code
+ */
+int ib_smc_init ( struct ib_device *ibdev, ib_local_mad_t local_mad ) {
+	int rc;
+
+	/* Get MAD parameters */
+	if ( ( rc = ib_smc_get ( ibdev, local_mad ) ) != 0 )
+		return rc;
+
+	return 0;
+}
+
+/**
+ * Update Infiniband parameters using SMC
+ *
+ * @v ibdev		Infiniband device
+ * @v local_mad		Method for issuing local MADs
+ * @ret rc		Return status code
+ */
+int ib_smc_update ( struct ib_device *ibdev, ib_local_mad_t local_mad ) {
+	int rc;
+
+	/* Get MAD parameters */
+	if ( ( rc = ib_smc_get ( ibdev, local_mad ) ) != 0 )
+		return rc;
+
+	/* Notify Infiniband core of potential link state change */
+	ib_link_state_changed ( ibdev );
 
 	return 0;
 }

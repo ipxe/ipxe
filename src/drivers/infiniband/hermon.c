@@ -1821,9 +1821,6 @@ static void hermon_event_port_state_change ( struct hermon *hermon,
 
 	/* Update MAD parameters */
 	ib_smc_update ( hermon->ibdev[port], hermon_mad );
-
-	/* Notify Infiniband core of link state change */
-	ib_link_state_changed ( hermon->ibdev[port] );
 }
 
 /**
@@ -2826,10 +2823,9 @@ static int hermon_probe ( struct pci_device *pci,
 	if ( ( rc = hermon_configure_special_qps ( hermon ) ) != 0 )
 		goto err_conf_special_qps;
 
-	/* Update IPoIB MAC address */
-	for ( i = 0 ; i < hermon->cap.num_ports ; i++ ) {
-		ib_smc_update ( hermon->ibdev[i], hermon_mad );
-	}
+	/* Initialise parameters using SMC */
+	for ( i = 0 ; i < hermon->cap.num_ports ; i++ )
+		ib_smc_init ( hermon->ibdev[i], hermon_mad );
 
 	/* Register Infiniband devices */
 	for ( i = 0 ; i < hermon->cap.num_ports ; i++ ) {

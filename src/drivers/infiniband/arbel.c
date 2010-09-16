@@ -1436,9 +1436,6 @@ static void arbel_event_port_state_change ( struct arbel *arbel,
 
 	/* Update MAD parameters */
 	ib_smc_update ( arbel->ibdev[port], arbel_mad );
-
-	/* Notify Infiniband core of link state change */
-	ib_link_state_changed ( arbel->ibdev[port] );
 }
 
 /**
@@ -2169,9 +2166,9 @@ static int arbel_probe ( struct pci_device *pci,
 	if ( ( rc = arbel_create_eq ( arbel ) ) != 0 )
 		goto err_create_eq;
 
-	/* Update MAD parameters */
+	/* Initialise parameters using SMC */
 	for ( i = 0 ; i < ARBEL_NUM_PORTS ; i++ )
-		ib_smc_update ( arbel->ibdev[i], arbel_mad );
+		ib_smc_init ( arbel->ibdev[i], arbel_mad );
 
 	/* Register Infiniband devices */
 	for ( i = 0 ; i < ARBEL_NUM_PORTS ; i++ ) {
