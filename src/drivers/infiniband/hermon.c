@@ -1727,9 +1727,8 @@ static int hermon_create_eq ( struct hermon *hermon ) {
 		goto err_sw2hw_eq;
 	}
 
-	/* Map events to this event queue */
-	memset ( &mask, 0, sizeof ( mask ) );
-	MLX_FILL_1 ( &mask, 1, port_state_change, 1 );
+	/* Map all events to this event queue */
+	memset ( &mask, 0xff, sizeof ( mask ) );
 	if ( ( rc = hermon_cmd_map_eq ( hermon,
 					( HERMON_MAP_EQ | hermon_eq->eqn ),
 					&mask ) ) != 0 ) {

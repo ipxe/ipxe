@@ -161,9 +161,26 @@ struct hermonprm_event_mask_st {
 	pseudo_bit_t reserved0[0x00020];
 /* -------------- */
 	pseudo_bit_t completion[0x00001];
-	pseudo_bit_t reserved1[0x0008];
+	pseudo_bit_t path_migration_succeeded[0x00001];
+	pseudo_bit_t communication_established[0x00001];
+	pseudo_bit_t send_queue_drained[0x00001];
+	pseudo_bit_t cq_error[0x00001];
+	pseudo_bit_t wq_catastrophe[0x00001];
+	pseudo_bit_t qpc_catastrophe[0x00001];
+	pseudo_bit_t path_migration_failed[0x00001];
+	pseudo_bit_t internal_error[0x00001];
 	pseudo_bit_t port_state_change[0x00001];
-	pseudo_bit_t reserved2[0x00016];
+	pseudo_bit_t command_done[0x00001];
+	pseudo_bit_t fexch_error[0x00001];
+	pseudo_bit_t reserved1[0x00004];
+	pseudo_bit_t wq_invalid_request[0x00001];
+	pseudo_bit_t wq_access_violation[0x00001];
+	pseudo_bit_t srq_catastrophe[0x00001];
+	pseudo_bit_t srq_last_wqe[0x00001];
+	pseudo_bit_t srq_rq_limit[0x00001];
+	pseudo_bit_t gpio[0x00001];
+	pseudo_bit_t clientreregister[0x00001];
+	pseudo_bit_t reserved2[0x00009];
 } __attribute__ (( packed ));
 
 struct hermonprm_port_state_change_event_st {
