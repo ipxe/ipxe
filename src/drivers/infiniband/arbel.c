@@ -1786,14 +1786,13 @@ static void arbel_close ( struct ib_device *ibdev ) {
 }
 
 /**
- * Set port information
+ * Inform embedded subnet management agent of a received MAD
  *
  * @v ibdev		Infiniband device
- * @v mad		Set port information MAD
+ * @v mad		MAD
  * @ret rc		Return status code
  */
-static int arbel_set_port_info ( struct ib_device *ibdev,
-				 union ib_mad *mad ) {
+static int arbel_inform_sma ( struct ib_device *ibdev, union ib_mad *mad ) {
 	int rc;
 
 	/* Send the MAD to the embedded SMA */
@@ -1917,7 +1916,8 @@ static struct ib_device_operations arbel_ib_operations = {
 	.close		= arbel_close,
 	.mcast_attach	= arbel_mcast_attach,
 	.mcast_detach	= arbel_mcast_detach,
-	.set_port_info	= arbel_set_port_info,
+	.set_port_info	= arbel_inform_sma,
+	.set_pkey_table	= arbel_inform_sma,
 };
 
 /***************************************************************************
