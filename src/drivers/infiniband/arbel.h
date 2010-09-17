@@ -365,12 +365,22 @@ struct arbel_recv_work_queue {
 /** Queue pair number randomisation mask */
 #define ARBEL_QPN_RANDOM_MASK 0xfff000
 
+/** Arbel queue pair state */
+enum arbel_queue_pair_state {
+	ARBEL_QP_ST_RST = 0,
+	ARBEL_QP_ST_INIT,
+	ARBEL_QP_ST_RTR,
+	ARBEL_QP_ST_RTS,
+};
+
 /** An Arbel queue pair */
 struct arbel_queue_pair {
 	/** Send work queue */
 	struct arbel_send_work_queue send;
 	/** Receive work queue */
 	struct arbel_recv_work_queue recv;
+	/** Queue state */
+	enum arbel_queue_pair_state state;
 };
 
 /** Maximum number of allocatable completion queues

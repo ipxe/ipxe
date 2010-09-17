@@ -953,7 +953,7 @@ static int arbel_create_qp ( struct ib_device *ibdev,
 		     res, ARBEL_UAR_RES_RQ,
 		     qp_number, qp->qpn );
 
-	/* Hand queue over to hardware */
+	/* Transition queue to INIT state */
 	memset ( &qpctx, 0, sizeof ( qpctx ) );
 	MLX_FILL_3 ( &qpctx, 2,
 		     qpc_eec_data.de, 1,
@@ -961,9 +961,7 @@ static int arbel_create_qp ( struct ib_device *ibdev,
 		     qpc_eec_data.st,
 		     ( ( qp->type == IB_QPT_UD ) ?
 		       ARBEL_ST_UD : ARBEL_ST_MLX ) );
-	MLX_FILL_6 ( &qpctx, 4,
-		     qpc_eec_data.mtu, ARBEL_MTU_2048,
-		     qpc_eec_data.msg_max, 11 /* 2^11 = 2048 */,
+	MLX_FILL_4 ( &qpctx, 4,
 		     qpc_eec_data.log_rq_size, fls ( qp->recv.num_wqes - 1 ),
 		     qpc_eec_data.log_rq_stride,
 		     ( fls ( sizeof ( arbel_qp->recv.wqe[0] ) - 1 ) - 4 ),
@@ -993,21 +991,7 @@ static int arbel_create_qp ( struct ib_device *ibdev,
 		       arbel, qp->qpn, strerror ( rc ) );
 		goto err_rst2init_qpee;
 	}
-	memset ( &qpctx, 0, sizeof ( qpctx ) );
-	MLX_FILL_2 ( &qpctx, 4,
-		     qpc_eec_data.mtu, ARBEL_MTU_2048,
-		     qpc_eec_data.msg_max, 11 /* 2^11 = 2048 */ );
-	if ( ( rc = arbel_cmd_init2rtr_qpee ( arbel, qp->qpn, &qpctx )) != 0 ){
-		DBGC ( arbel, "Arbel %p QPN %#lx INIT2RTR_QPEE failed: %s\n",
-		       arbel, qp->qpn, strerror ( rc ) );
-		goto err_init2rtr_qpee;
-	}
-	memset ( &qpctx, 0, sizeof ( qpctx ) );
-	if ( ( rc = arbel_cmd_rtr2rts_qpee ( arbel, qp->qpn, &qpctx ) ) != 0 ){
-		DBGC ( arbel, "Arbel %p QPN %#lx RTR2RTS_QPEE failed: %s\n",
-		       arbel, qp->qpn, strerror ( rc ) );
-		goto err_rtr2rts_qpee;
-	}
+	arbel_qp->state = ARBEL_QP_ST_INIT;
 
 	DBGC ( arbel, "Arbel %p QPN %#lx send ring [%08lx,%08lx), doorbell "
 	       "%08lx\n", arbel, qp->qpn, virt_to_phys ( arbel_qp->send.wqe ),
@@ -1024,8 +1008,6 @@ static int arbel_create_qp ( struct ib_device *ibdev,
 	ib_qp_set_drvdata ( qp, arbel_qp );
 	return 0;
 
- err_rtr2rts_qpee:
- err_init2rtr_qpee:
 	arbel_cmd_2rst_qpee ( arbel, qp->qpn );
  err_rst2init_qpee:
 	MLX_FILL_1 ( send_db_rec, 1, res, ARBEL_UAR_RES_NONE );
@@ -1051,10 +1033,40 @@ static int arbel_create_qp ( struct ib_device *ibdev,
 static int arbel_modify_qp ( struct ib_device *ibdev,
 			     struct ib_queue_pair *qp ) {
 	struct arbel *arbel = ib_get_drvdata ( ibdev );
+	struct arbel_queue_pair *arbel_qp = ib_qp_get_drvdata ( qp );
 	struct arbelprm_qp_ee_state_transitions qpctx;
 	int rc;
 
-	/* Issue RTS2RTS_QPEE */
+	/* Transition queue to RTR state, if applicable */
+	if ( arbel_qp->state < ARBEL_QP_ST_RTR ) {
+		memset ( &qpctx, 0, sizeof ( qpctx ) );
+		MLX_FILL_2 ( &qpctx, 4,
+			     qpc_eec_data.mtu, ARBEL_MTU_2048,
+			     qpc_eec_data.msg_max, 11 /* 2^11 = 2048 */ );
+		if ( ( rc = arbel_cmd_init2rtr_qpee ( arbel, qp->qpn,
+						      &qpctx ) ) != 0 ) {
+			DBGC ( arbel, "Arbel %p QPN %#lx INIT2RTR_QPEE failed:"
+			       " %s\n", arbel, qp->qpn, strerror ( rc ) );
+			return rc;
+		}
+		arbel_qp->state = ARBEL_QP_ST_RTR;
+	}
+
+	/* Transition queue to RTS state, if applicable */
+	if ( arbel_qp->state < ARBEL_QP_ST_RTS ) {
+		memset ( &qpctx, 0, sizeof ( qpctx ) );
+		MLX_FILL_1 ( &qpctx, 32,
+			     qpc_eec_data.next_send_psn, qp->send.psn );
+		if ( ( rc = arbel_cmd_rtr2rts_qpee ( arbel, qp->qpn,
+						     &qpctx ) ) != 0 ) {
+			DBGC ( arbel, "Arbel %p QPN %#lx RTR2RTS_QPEE failed: "
+			       "%s\n", arbel, qp->qpn, strerror ( rc ) );
+			return rc;
+		}
+		arbel_qp->state = ARBEL_QP_ST_RTS;
+	}
+
+	/* Update parameters in RTS state */
 	memset ( &qpctx, 0, sizeof ( qpctx ) );
 	MLX_FILL_1 ( &qpctx, 0, opt_param_mask, ARBEL_QPEE_OPT_PARAM_QKEY );
 	MLX_FILL_1 ( &qpctx, 44, qpc_eec_data.q_key, qp->qkey );
