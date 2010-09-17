@@ -91,9 +91,9 @@ FILE_LICENCE ( GPL2_OR_LATER );
 
 #define ARBEL_INVALID_LKEY		0x00000100UL
 
-#define ARBEL_PAGE_SIZE			4096
+#define ARBEL_PAGE_SIZE			( ( size_t ) 4096 )
 
-#define ARBEL_RDB_ENTRY_SIZE		32
+#define ARBEL_RDB_ENTRY_SIZE		( ( size_t ) 32 )
 
 #define ARBEL_DB_POST_SND_OFFSET	0x10
 #define ARBEL_DB_EQ_OFFSET(_eqn)	( 0x08 * (_eqn) )
@@ -308,6 +308,8 @@ struct arbel_dev_limits {
 	size_t eqc_entry_size;
 	/** Number of reserved UARs */
 	unsigned int reserved_uars;
+	/** UAR scratchpad entry size */
+	size_t uar_scratch_entry_size;
 };
 
 /** Alignment of Arbel send work queue entries */
